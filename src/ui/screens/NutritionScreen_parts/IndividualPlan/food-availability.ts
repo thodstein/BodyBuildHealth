@@ -127,6 +127,34 @@ export function isProteinPowderId(id: string): boolean {
   return POWDER_PROTEIN_IDS.has(id);
 }
 
+// ─── 4b. Волна 2: Низкокалорийные дни (1200-1500 ккал) ────────────────────
+/**
+ * Компактные овощи для низкокалорийных дней.
+ * При 1200-1500 ккал нет места для объёмных гарниров —
+ * используем овощи с максимальной клетчаткой на 100 ккал.
+ */
+export const LOW_KCAL_COMPACT_VEGGIES: ReadonlySet<string> = new Set([
+  'broccoli', 'cauliflower', 'spinach', 'cabbage', 'bell_pepper',
+  'cucumber', 'tomato', 'zucchini', 'eggplant', 'lettuce',
+  'arugula', 'kale', 'brussels_sprouts', 'green_beans', 'asparagus',
+]);
+
+/**
+ * Ягоды для низкокалорийных дней (высокая клетчатка, низкий сахар).
+ */
+export const LOW_KCAL_BERRIES: ReadonlySet<string> = new Set([
+  'raspberries', 'blackberries', 'strawberries', 'blueberries', 'cranberries',
+]);
+
+/**
+ * Проверяет, является ли продукт компактным источником клетчатки
+ * для низкокалорийных дней.
+ */
+export function isCompactFiberForLowKcal(foodId: string): boolean {
+  if (!foodId) return false;
+  return LOW_KCAL_COMPACT_VEGGIES.has(foodId) || LOW_KCAL_BERRIES.has(foodId);
+}
+
 // ─── 5. Семейства «стейплов» для дневной ротации ──────────────────────
 /** Продукт → семейство (гарнир/жир/фрукт), чтобы один и тот же вид не повторялся в каждом приёме. */
 export function stapleFamilyOf(id: string): string | null {

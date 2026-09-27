@@ -3282,6 +3282,38 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   if (input.weightKg <= 70 && input.mealsCount >= 7) {
     // keep as requested but note degeneracy will be flagged in matrix; no auto-clamp to preserve user intent
   }
+  // ─── Волна 2: Низкокалорийные дни (1200-1500 ккал) ───────────────────────
+  // При низкой калорийности приоритет белка над углеводами/жирами,
+  // компактные источники клетчатки, адаптивный peri-протокол.
+  {
+    const _targetKcal = input.goalKcal || 0;
+    if (_targetKcal >= 1200 && _targetKcal <= 1500) {
+      // Приоритет белка: минимум 35% калорий от белка
+      const _w = Math.max(40, input.weightKg || 80);
+      const _minProteinG = (_targetKcal * 0.35) / 4;
+      const _stdProteinG = _w * 0.45;
+      const _boostedProtein = Math.min(_w * 2.0, Math.max(input.goalProteinG || 0, _stdProteinG, _minProteinG));
+      if (_boostedProtein > (input.goalProteinG || 0)) {
+        input = { ...input, goalProteinG: Math.round(_boostedProtein) };
+      }
+      // Адаптивный peri-протокол: уменьшение peri-углеводов
+      const _standardPeri = 70; // стандартный целевой объём peri-углеводов
+      const _lowPeri = Math.round(_standardPeri * 0.5); // 1200-1500 ккал: вдвое меньше
+      (_pickCtx as any).lowKcalPeriCarbTarget = _lowPeri;
+      // Компактные источники клетчатки: приоритет овощам с высокой плотностью клетчатки
+      (_pickCtx as any).preferCompactFiber = true;
+    } else if (_targetKcal > 0 && _targetKcal < 1200) {
+      // Очень низкая калорийность: экстремальные меры
+      const _w = Math.max(40, input.weightKg || 80);
+      const _minProteinG = (_targetKcal * 0.40) / 4; // 40% калорий от белка
+      const _boostedProtein = Math.min(_w * 2.2, Math.max(input.goalProteinG || 0, _w * 0.45, _minProteinG));
+      if (_boostedProtein > (input.goalProteinG || 0)) {
+        input = { ...input, goalProteinG: Math.round(_boostedProtein) };
+      }
+      (_pickCtx as any).lowKcalPeriCarbTarget = 25; // минимальные peri-углеводы
+      (_pickCtx as any).preferCompactFiber = true;
+    }
+  }
   _pickCtx.qualityMode = input.quality === 'basic' ? 'basic' : 'full';
   _pickCtx.currentBudget = input.budget || 'medium';
   _pickCtx.currentWeightKg = Number.isFinite(input.weightKg) && input.weightKg > 0 ? input.weightKg : 80;

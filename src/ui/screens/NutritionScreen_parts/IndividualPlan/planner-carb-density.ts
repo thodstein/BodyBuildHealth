@@ -372,3 +372,150 @@ export function autoMealCountForHv(
   const needed = Math.max(byCarbs, byProtein, 8);
   return Math.min(needed, 12);
 }
+
+// ─── Волна 2: Низкие КБЖУ (1200-1500 ккал) ─────────────────────────────────────
+// Проблема: при низкой калорийности стандартная логика добивки углеводами/жирами
+// приводит к недобору белка и клетчатки. Нужно:
+// 1. Приоритет белка над углеводами/жирами
+// 2. Компактные источники клетчатки (овощи, ягоды) вместо объёмных
+// 3. Адаптивный peri-протокол: уменьшение peri-углеводов на низкокалорийных днях
+
+/** День с низкой калорийностью: 1200-1500 ккал. */
+export function isLowKcalDay(targetKcal: number): boolean {
+  return targetKcal >= 1200 && targetKcal <= 1500;
+}
+
+/** Очень низкая калорийность: <1200 ккал. */
+export function isVeryLowKcalDay(targetKcal: number): boolean {
+  return targetKcal > 0 && targetKcal < 1200;
+}
+
+/**
+ * Приоритет белка для низкокалорийных дней.
+ * При 1200-1500 ккал белок должен составлять минимум 35% калорийности.
+ * При <1200 ккал — минимум 40%.
+ * Стандартное соотношение (0.45 г/кг) может не покрыть этот минимум.
+ */
+export function lowKcalProteinBoost(
+  targetKcal: number,
+  weightKg: number,
+  baseProteinG: number,
+): number {
+  const w = Math.max(40, weightKg || 80);
+  // Для обычных дней — базовый белок без изменений
+  if (targetKcal > 1500) return baseProteinG;
+  // Минимум калорий от белка: 35% для 1200-1500, 40% для <1200
+  const proteinPct = targetKcal < 1200 ? 0.40 : 0.35;
+  const minProteinG = (targetKcal * proteinPct) / 4;
+  // Стандартный расчёт по весу
+  const standardG = w * 0.45;
+  // Берём максимум, но не более 2.0 г/кг (потолок для низкокалорийных дней)
+  const ceiling = w * 2.0;
+  return Math.min(ceiling, Math.max(baseProteinG, standardG, minProteinG));
+}
+
+/**
+ * Компактные источники клетчатки для низкокалорийных дней.
+ * При 1200-1500 ккал нет места для объёмных овощных гарниров —
+ * используем продукты с высоким содержанием клетчатки на 100 ккал.
+ */
+export interface CompactFiberSource {
+  id: string;
+  /** Клетчатка на 100 г (г). */
+  fiberPer100: number;
+  /** Калорийность на 100 г (ккал). */
+  kcalPer100: number;
+  /** Клетчатка на 100 ккал — ключевой показатель компактности. */
+  fiberDensity: number;
+}
+
+export const COMPACT_FIBER_SOURCES: CompactFiberSource[] = [
+  { id: 'broccoli', fiberPer100: 2.6, kcalPer100: 34, fiberDensity: 7.6 },
+  { id: 'cauliflower', fiberPer100: 2.0, kcalPer100: 25, fiberDensity: 8.0 },
+  { id: 'spinach', fiberPer100: 2.2, kcalPer100: 23, fiberDensity: 9.6 },
+  { id: 'cabbage', fiberPer100: 2.5, kcalPer100: 25, fiberDensity: 10.0 },
+  { id: 'bell_pepper', fiberPer100: 1.7, kcalPer100: 25, fiberDensity: 6.8 },
+  { id: 'cucumber', fiberPer100: 0.8, kcalPer100: 15, fiberDensity: 5.3 },
+  { id: 'tomato', fiberPer100: 1.2, kcalPer100: 18, fiberDensity: 6.7 },
+  { id: 'zucchini', fiberPer100: 1.0, kcalPer100: 17, fiberDensity: 5.9 },
+  { id: 'eggplant', fiberPer100: 3.0, kcalPer100: 25, fiberDensity: 12.0 },
+  { id: 'raspberries', fiberPer100: 6.5, kcalPer100: 52, fiberDensity: 12.5 },
+  { id: 'blackberries', fiberPer100: 5.3, kcalPer100: 43, fiberDensity: 12.3 },
+  { id: 'strawberries', fiberPer100: 2.0, kcalPer100: 32, fiberDensity: 6.3 },
+  { id: 'flaxseed', fiberPer100: 27.0, kcalPer100: 530, fiberDensity: 5.1 },
+  { id: 'chia_seeds', fiberPer100: 34.0, kcalPer100: 490, fiberDensity: 6.9 },
+  { id: 'psyllium_husk', fiberPer100: 71.0, kcalPer100: 20, fiberDensity: 355.0 },
+];
+
+/**
+ * Выбирает компактные источники клетчатки для низкокалорийного дня.
+ * Сортирует по плотности клетчатки на 100 ккал.
+ */
+export function selectCompactFiberSources(
+  targetKcal: number,
+  targetFiberG: number,
+  count = 3,
+): CompactFiberSource[] {
+  if (!isLowKcalDay(targetKcal) && !isVeryLowKcalDay(targetKcal)) return [];
+  return [...COMPACT_FIBER_SOURCES]
+    .sort((a, b) => b.fiberDensity - a.fiberDensity)
+    .slice(0, count);
+}
+
+/**
+ * Адаптивный peri-протокол для низкокалорийных дней.
+ * Стандартные peri-углеводы (60-75 г на окно) слишком велики для 1200-1500 ккал.
+ * Возвращает уменьшенный целевой объём peri-углеводов.
+ */
+export function lowKcalPeriCarbTarget(
+  targetKcal: number,
+  standardPeriTargetG: number,
+): number {
+  if (isVeryLowKcalDay(targetKcal)) {
+    // <1200 ккал: peri-углеводы минимальные (20-30 г на окно)
+    return Math.min(standardPeriTargetG, 25);
+  }
+  if (isLowKcalDay(targetKcal)) {
+    // 1200-1500 ккал: peri-углеводы уменьшаются вдвое
+    return Math.round(standardPeriTargetG * 0.5);
+  }
+  return standardPeriTargetG;
+}
+
+/**
+ * Масштаб добивки жиров для низкокалорийного дня.
+ * При 1200-1500 ккал жиры должны быть минимальны (0.6-0.8 г/кг),
+ * чтобы освободить место для белка.
+ */
+export function lowKcalFatCap(
+  targetKcal: number,
+  weightKg: number,
+  baseFatG: number,
+): number {
+  const w = Math.max(40, weightKg || 80);
+  // Для обычных дней — базовый уровень жиров без изменений
+  if (targetKcal > 1500) return Math.round(baseFatG);
+  // Минимум 0.6 г/кг для гормонального здоровья
+  const minFatG = w * 0.6;
+  // Не более 25% калорий от жиров (9 ккал/г)
+  const maxFatKcal = targetKcal * 0.25;
+  const maxFatG = maxFatKcal / 9;
+  return Math.round(Math.min(maxFatG, Math.max(minFatG, baseFatG)));
+}
+
+/**
+ * Адаптивный масштаб углеводной добивки для низкокалорийного дня.
+ * При 1200-1500 ккал углеводы составляют остаток после белка и жиров.
+ */
+export function lowKcalCarbTarget(
+  targetKcal: number,
+  targetProteinG: number,
+  targetFatG: number,
+): number {
+  const proteinKcal = targetProteinG * 4;
+  const fatKcal = targetFatG * 9;
+  const remaining = targetKcal - proteinKcal - fatKcal;
+  // Углеводы — остаток, но не менее 1 г/кг для функции щитовидной железы
+  const minCarbs = 100; // ~1.25 г/кг для 80 кг
+  return Math.max(minCarbs, Math.round(remaining / 4));
+}
