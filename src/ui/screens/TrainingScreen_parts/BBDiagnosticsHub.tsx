@@ -124,6 +124,9 @@ type BBState = {
   pmLoc: '' | PainLocation; pmDuring: string; pmMorning: string; pmRising: boolean; pmNight: boolean; pmSharp: boolean;
   /** R3: задняя цепь — NHE (повторы/угол) + аддукторы (сжатие/уровень Copenhagen). */
   nheL: string; nheR: string; nheAngle: string; addL: string; addR: string; cphLevel: '' | CphLevel;
+  /** Выбранное пользователем упражнение коррекции по зоне (⭐ = id записи библиотеки коррекций).
+   *  Единственный источник выбора: карточка/экспорт/вставка/мост читают тот же мемо. */
+  prefCorr: Record<string, string>;
 };
 
 const DEFAULT_STATE: BBState = {
@@ -164,6 +167,7 @@ const DEFAULT_STATE: BBState = {
   benchGripCm: '', benchTouch: '', benchScapula: '', benchAbduction: '', benchElbowsBelow: false, benchPain: false,
   pmLoc: '', pmDuring: '', pmMorning: '', pmRising: false, pmNight: false, pmSharp: false,
   nheL: '', nheR: '', nheAngle: '', addL: '', addR: '', cphLevel: '',
+  prefCorr: {},
 };
 
 const TAB_DEFS: Array<{ id: BBTab; label: string; icon: string; desc: string }> = [
@@ -1271,15 +1275,44 @@ export const BBDiagnosticsHub: React.FC = () => {
   }, [report.weakZonesGranular, report.symmetry.ratios, weakCauses, level, effSex, planAudit, inPlanExerciseIds, profileEquipment]);
 
   // PRO-CORR: библиотека коррекций — зона + причина + сигналы скринингов (единый corrSignalsFor: паритет с экспортом/вставкой).
+  // ⭐ Выбор пользователя поднимает запись наверх ОДИН ЗДЕСЬ — карточка, оба экспорта, блок волны,
+  // превью моста и инъекция в план читают этот же мемо (правка ранжира в 4 копиях = расхождение).
   const correctiveTopByZone = useMemo(() => {
     const out: Record<string, ReturnType<typeof rankCorrectives>> = {};
     for (const z of report.weakZonesGranular.slice(0, 2)) {
       try {
-        out[z] = rankCorrectives(corrSignalsFor(z, (weakCauses as any)?.[z]?.cause)).slice(0, 3);
+        const ranked = rankCorrectives(corrSignalsFor(z, (weakCauses as any)?.[z]?.cause));
+        const prefId = String((state.prefCorr || {})[z] || '').trim();
+        // Выбранная запись идёт первой, но только если реально доступна в окне (иначе — честный тихий фолбэк).
+        const pi = prefId ? ranked.findIndex((r) => r.corr.id === prefId) : -1;
+        if (pi > 0) {
+          const picked = ranked[pi];
+          out[z] = [picked, ...ranked.filter((r) => r.corr.id !== prefId)].slice(0, 3);
+        } else {
+          out[z] = ranked.slice(0, 3);
+        }
       } catch { out[z] = []; }
     }
     return out;
-  }, [report.weakZonesGranular, report.symmetry.ratios, weakCauses, level, profileEquipment, inPlanExerciseIds, moveDriver, benchV, nheV, adductorV, erIrV, painMon, hingeV, shoulderV, ybtV, asymText, teenGate, state.pmLoc, rotV, loadedHingeV]);
+  }, [report.weakZonesGranular, report.symmetry.ratios, weakCauses, level, profileEquipment, inPlanExerciseIds, moveDriver, benchV, nheV, adductorV, erIrV, painMon, hingeV, shoulderV, ybtV, asymText, teenGate, state.pmLoc, state.prefCorr, rotV, loadedHingeV]);
+
+  // Сколько вариантов скрыто, потому что упражнение УЖЕ ЕСТЬ в плане. Раньше это отсечение
+  // было невидимым: пользователь видел «почему нет приседания, которое я делаю?» без ответа.
+  const corrInPlanDropped = useMemo(() => {
+    const out: Record<string, number> = {};
+    for (const z of report.weakZonesGranular.slice(0, 2)) {
+      try {
+        const sig = corrSignalsFor(z, (weakCauses as any)?.[z]?.cause) as any;
+        // Тот же corrSignalsFor, только без плана — так «скрытые» считаются честно.
+        // Объект собирается отдельно: инлайн-литерал сигналов тут запрещён (паритет-гард).
+        const sigNoPlan = { ...sig, inPlanIds: [] } as any;
+        const withPlan = rankCorrectives(sig).length;
+        const noPlan = rankCorrectives(sigNoPlan).length;
+        out[z] = Math.max(0, noPlan - withPlan);
+      } catch { out[z] = 0; }
+    }
+    return out;
+  }, [report.weakZonesGranular, weakCauses, level, profileEquipment, inPlanExerciseIds, moveDriver, benchV, nheV, adductorV, erIrV, painMon, hingeV, shoulderV, ybtV, asymText, teenGate, state.pmLoc, rotV, loadedHingeV]);
 
   // ROUND-10: блок коррекции (волна) — единый источник для карточки и экспорта (HTML/CSV/печать)
   const corrBlockLines = useMemo(() => {
@@ -1682,6 +1715,7 @@ export const BBDiagnosticsHub: React.FC = () => {
     let working: any = plan;
     let injected = 0;
     let skippedBudget = 0;
+  let skippedDup = 0;
     let onlyTechSkip = false;
     const nWeeks = Array.isArray(working.weeks) ? working.weeks.length : 0;
     for (let wi = 0; wi < nWeeks; wi++) {
@@ -1718,12 +1752,18 @@ export const BBDiagnosticsHub: React.FC = () => {
         working = r.plan;
         injected += r.injected;
         skippedBudget += r.skippedBudget;
+        skippedDup += r.skippedDup;
       } catch { /* noop */ }
     }
+    // Честный счёт пропусков: «уже есть в днях» — это r.skippedDup, а не догадка.
+    const skipNote = [
+      skippedBudget > 0 ? `бюджет: ${skippedBudget}` : '',
+      skippedDup > 0 ? `уже в плане: ${skippedDup}` : '',
+    ].filter(Boolean).join(' · ');
     if (!injected) {
       setToast(onlyTechSkip
         ? '↩ Ступень 1 — вставка без силового объёма (только техника). Выбери ступень 2–3, когда боли нет'
-        : `⊘ Не вставлено (бюджет переполнен: ${skippedBudget} · или уже есть в днях)`);
+        : `⊘ Не вставлено (${skipNote || 'нечего вставлять'})`);
       setTimeout(() => setToast(''), 3000);
       return;
     }
@@ -1748,7 +1788,7 @@ export const BBDiagnosticsHub: React.FC = () => {
     setHasInjectPrev(true);
     setPlanNonce((n) => n + 1);
     try { window.dispatchEvent(new Event('he-bb-plan-saved')); } catch { /* noop */ }
-    setToast(`✓ Вставлено коррекций: ${injected} (нед: ${nWeeks}) · открыт ББ-авто`);
+    setToast(`✓ Вставлено коррекций: ${injected} (нед: ${nWeeks})${skipNote ? ` · пропущено (${skipNote})` : ''} · открыт ББ-авто`);
     setTimeout(() => setToast(''), 3000);
     try {
       window.dispatchEvent(new CustomEvent('planning-track-open', { detail: 'bb' } as any));
@@ -1891,6 +1931,58 @@ export const BBDiagnosticsHub: React.FC = () => {
                         <div style={{ marginTop: 6, padding: '8px 10px', borderRadius: 8, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.22)' }} data-bb="corrective-card" data-zone={z}>
                           <b style={{ color: '#00e68a', fontSize: 11 }}>🛠 Коррекция по скринингам (доза + техника)</b>
                           <span style={{ color: '#fff', fontSize: 10 }} data-bb="corrective-coverage"> · зона: {correctiveTopByZone[z].length} вариантов</span>
+                          {(corrInPlanDropped[z] || 0) > 0 && (
+                            <div style={{ marginTop: 2, fontSize: 10, color: '#fff' }} data-bb="corrective-inplan-note">
+                              ⓘ Скрыто {corrInPlanDropped[z]}: упражнение уже есть в плане — показаны альтернативы
+                            </div>
+                          )}
+                          {/* ⭐ Выбор упражнения: клик по строке — запись идёт первой в инъекцию/экспорт/блок/превью. */}
+                          <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 4 }} data-bb="corrective-picker">
+                            {correctiveTopByZone[z].map((r, i) => {
+                              const isChosen = (state.prefCorr || {})[z] === r.corr.id;
+                              return (
+                                <button
+                                  key={r.corr.id}
+                                  type="button"
+                                  data-bb="corrective-pick"
+                                  data-corr={r.corr.id}
+                                  data-active={isChosen ? '1' : '0'}
+                                  aria-pressed={isChosen}
+                                  aria-label={`Выбрать коррекцию: ${r.corr.title}`}
+                                  onClick={() => setState((s) => {
+                                    const cur = { ...(s.prefCorr || {}) };
+                                    if (cur[z] === r.corr.id) delete cur[z]; else cur[z] = r.corr.id;
+                                    return { ...s, prefCorr: cur };
+                                  })}
+                                  style={{ minHeight: 44, display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderRadius: 10, textAlign: 'left', cursor: 'pointer', background: isChosen ? 'rgba(0,230,138,0.14)' : 'rgba(255,255,255,0.04)', border: `1px solid ${isChosen ? 'rgba(0,230,138,0.45)' : 'rgba(255,255,255,0.10)'}`, color: '#fff', fontSize: 11, fontWeight: 700 }}
+                                >
+                                  <span aria-hidden data-bb="corrective-star" style={{ minWidth: 28, minHeight: 28, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 14, background: isChosen ? 'rgba(0,230,138,0.25)' : 'transparent', border: `1px solid ${isChosen ? 'rgba(0,230,138,0.5)' : 'rgba(255,255,255,0.14)'}` }}>{isChosen ? '★' : '☆'}</span>
+                                  <span style={{ flex: 1, minWidth: 0 }}>
+                                    {r.corr.title}
+                                    <span style={{ display: 'block', fontSize: 10, fontWeight: 500, color: '#fff' }}>
+                                      {i === 0 ? 'идёт первой в план' : 'нажми — поставить первой'} · {r.why.join(' + ') || 'по зоне'}
+                                    </span>
+                                  </span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                          <div style={{ marginTop: 4, fontSize: 10, color: '#fff' }} data-bb="corrective-pick-note">
+                            {/* «Выбрано» = выбрано И доступно в текущей выдаче. После вставки выбранного
+                                упражнения гейт K5 его прячет (оно уже в плане) — обещать «попадёт в
+                                инъекцию» было бы враньём, поэтому такое состояние честно гасится. */}
+                            {(() => {
+                              const live = (correctiveTopByZone[z] || []).map((r) => r.corr.id);
+                              const pref = (state.prefCorr || {})[z] || '';
+                              if (pref && live.includes(pref)) {
+                                return `Выбрано: ${weakRu(z)} · попадёт в инъекцию, экспорт и блок`;
+                              }
+                              if (pref && !live.includes(pref)) {
+                                return `Выбор снят: упражнение уже в плане (или отсечено фильтром) — снова топ-1 по ранжиру`;
+                              }
+                              return 'Своё упражнение не выбрано — в план идёт топ-1 по ранжиру (жми ☆, чтобы поменять)';
+                            })()}
+                          </div>
                           {correctiveTopByZone[z].slice(0, 2).map((r) => {
                             // П2: те же флаги, что вставка (readiness-red/жёлтая боль) — «показано = вставится».
                             const dose = (() => { try { return correctiveDose(r.corr, (weakCauses as any)?.[z]?.cause ?? null, corrDoseFlags()); } catch { return null; } })();

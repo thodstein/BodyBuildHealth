@@ -499,6 +499,24 @@ function levelOk(c: BBCorrective, level: string | null | undefined): boolean {
 }
 
 let catEquipCache: Map<string, string[]> | null = null;
+let catNameCache: Map<string, string> | null = null;
+/** Ключ идентичности упражнения: план и библиотека сравниваются в нижнем регистре без краёв. */
+function idKey(v: unknown): string { return String(v ?? '').toLowerCase().trim(); }
+/** Отображаемое имя упражнения по каталогу — именно его билдер кладёт в `BBExercise.exerciseName`. */
+function catalogNameOf(exerciseId: string): string {
+  try {
+    if (!catNameCache) {
+      catNameCache = new Map();
+      for (const c of EXERCISE_CATALOG as any[]) {
+        const id = idKey(c?.id);
+        if (!id || catNameCache.has(id)) continue;
+        catNameCache.set(id, idKey(c?.name));
+      }
+    }
+    return catNameCache.get(idKey(exerciseId)) ?? '';
+  } catch { return ''; }
+}
+
 /** Оборудование упражнения по каталогу (словарь профиля: barbell/dumbbell/machine/cable/bodyweight/band/kettlebell). */
 function catalogEquipmentOf(exerciseId: string): string[] | null {
   try {
@@ -523,13 +541,30 @@ function equipOk(c: BBCorrective, wanted: string[] | undefined): boolean {
   return equipmentAllows(catalogEquipmentOf(c.exerciseId), wanted, { machineAlways: false });
 }
 
-/** Ранг библиотеки: зона +5, драйвер/сигнал +4, причина +3, unilateral-при-асимметрии +2. Противопоказания: красная боль (pm-red), подросток (teen-loaded), боль плеча (shoulder-pain). K5: упражнение из плана — исключается (альтернатива важнее дубля). Возвращает запас 6: хаб спрашивает до 3, K4-кандидаты — больше. */
-export function rankCorrectives(s: BBScreenSignals): Array<{ corr: BBCorrective; score: number; why: string[] }> {
+/** Ранг библиотеки: зона +5, драйвер/сигнал +4, причина +3, unilateral-при-асимметрии +2. Противопоказания: красная боль (pm-red), подросток (teen-loaded), боль плеча (shoulder-pain). K5: упражнение из плана — исключается (альтернатива важнее дубля). Возвращает запас 6: хаб спрашивает до 3, K4-кандидаты — больше.
+ *
+ *  ЗОНА — ЖЁСТКИЙ ПЕРВЫЙ КЛЮЧ сортировки (zoneHit), score идёт вторым. Причина: глобальные
+ *  скрининги бьют по 4 балла ЗА КАЖДЫЙ тег, и запись СОСЕДНЕЙ мышцы набирала их больше, чем
+ *  зональная запись набирала зону (+5). Доказанный дефект: зона `glutes` + сигнал `ktw-asym`/
+ *  `driver:ankle` (икры/голеностоп) → первыми выходили `calf_raise_standing`/`calf_raise_seated`
+ *  («подъёмы на носки» в зоне ягодиц). Зона отвечает на вопрос «какую МЫШЦУ чиним», сигнал —
+ *  «по какому признаку», поэтому зона не может проигрывать чужому сигналу. Если в зоне нет ни
+ *  одной записи — сортировка по score (поведение легаси, сигнальные записи остаются в выдаче). */
+export function rankCorrectives(s: BBScreenSignals): Array<{ corr: BBCorrective; score: number; why: string[]; zoneHit: boolean }> {
   const tags = new Set(tagsForMovementScreens(s));
-  const inPlan = new Set((s.inPlanIds || []).map((x) => String(x || '').toLowerCase().trim()).filter(Boolean));
-  const out: Array<{ corr: BBCorrective; score: number; why: string[] }> = [];
+  const inPlan = new Set((s.inPlanIds || []).map(idKey).filter(Boolean));
+  const out: Array<{ corr: BBCorrective; score: number; why: string[]; zoneHit: boolean }> = [];
   for (const c of BB_CORRECTIVES) {
-    if (inPlan.has(String(c.exerciseId || '').toLowerCase())) continue;
+    // K5: упражнение уже в плане — исключаем (альтернатива важнее дубля).
+    // КОНТРАКТ (исправлено Sep 2026): `BBExercise` НЕ хранит `exerciseId` — билдер пишет в
+    // `exerciseName` ОТОБРАЖАЕМОЕ имя (`(exData as any).name || id`), поэтому хаб передаёт
+    // здесь ИМЕНА. Сверка только по id была мёртвой: гейт не срабатывал НИКОГДА, и карточка
+    // предлагала упражнение, которое уже есть в плане (партнёр — rankCorrectionsForWeak:101,
+    // где сверка id ИЛИ имени, и инъекция bb-diagnostics-injection:311-317).
+    if (inPlan.size) {
+      const cn = catalogNameOf(c.exerciseId);
+      if (inPlan.has(idKey(c.exerciseId)) || inPlan.has(idKey(c.title)) || (cn && inPlan.has(idKey(cn)))) continue;
+    }
     if (!levelOk(c, s.level)) continue;
     if (s.painLevel === 'red' && c.contraindicated.includes('pm-red')) continue;
     if (s.teenBlocked && c.contraindicated.includes('teen-loaded')) continue;
@@ -553,9 +588,9 @@ export function rankCorrectives(s: BBScreenSignals): Array<{ corr: BBCorrective;
     // Запасной (домашний аналог) не вытесняет основную запись при равном скоре, но появляется,
     // когда основную отсекли фильтры оборудования/уровня/противопоказаний.
     if (c.spare) score -= 3;
-    out.push({ corr: c, score, why });
+    out.push({ corr: c, score, why, zoneHit });
   }
-  out.sort((a, b) => b.score - a.score || a.corr.id.localeCompare(b.corr.id));
+  out.sort((a, b) => (b.zoneHit ? 1 : 0) - (a.zoneHit ? 1 : 0) || b.score - a.score || a.corr.id.localeCompare(b.corr.id));
   return out.slice(0, 6);
 }
 
