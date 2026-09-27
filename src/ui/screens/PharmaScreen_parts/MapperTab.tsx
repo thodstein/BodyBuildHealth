@@ -5,18 +5,25 @@ import { saveCalcSnapshot, buildCalcCsv, buildCalcHtml, downloadCsv, printHtml }
 import type { DrugEntry, MapperResult } from '../../../engines/drug-mapper.engine';
 import { useDataLink } from '../../../core/data-link';
 import { weeklyDose } from '../../../engines/pharma-frequency';
+import { PHARMA_DB } from '../../../core/pharma-database';
+
+const FEMALE_AAS_DRUGS = Object.values(PHARMA_DB).filter(s =>
+  s.class !== 'peptide' && s.class !== 'vitamin' && s.class !== 'mineral' &&
+  !s.id.includes('hcgh') && !s.id.includes('insulin') && !s.id.includes('igf') && !s.id.includes('mgf') && !s.id.includes('gh_')
+).slice(0, 20);
 
 export const MapperTab: React.FC = () => {
   const linked = useDataLink();
   const course = linked.course || [];
-  /** Ж3/Л11 (фаза 2 женского слоя): пол профиля — женские патологии стека и женские ec50 гемато. */
   const profileSex: 'male' | 'female' = linked.profile?.settings?.personal?.sex === 'female' ? 'female' : 'male';
   const [manualDrugs, setManualDrugs] = useState<DrugEntry[]>([]);
+  const [femaleAasEntries, setFemaleAasEntries] = useState<{ drugId: string; doseMgWeek: number; ester: string; weeksOn: number }[]>([]);
   const [newDrugName, setNewDrugName] = useState('');
   const [newDrugDose, setNewDrugDose] = useState(0);
   const [mapperResult, setMapperResult] = useState<MapperResult | null>(null);
   const [clinicalResult, setClinicalResult] = useState<any>(null);
   const [useCourse, setUseCourse] = useState(true);
+  const [aasFilter, setAasFilter] = useState<'all' | 'oral' | 'inject'>('all');
 
   const knownNames = useMemo(() => getKnownDrugNames(), []);
 
@@ -153,6 +160,73 @@ export const MapperTab: React.FC = () => {
           background:'linear-gradient(135deg, #8b5cf6, #7c3aed)', color:'#fff', fontWeight:800, fontSize:13, boxShadow:'0 6px 16px rgba(139,92,246,0.22)',
         }}>▶ Запустить маппинг</button>
       </div>
+
+      {profileSex === 'female' && (
+        <div style={{ ...card, marginTop:10 }}>
+          <div style={{ fontSize:12, fontWeight:800, color:'#f472b6', marginBottom:8 }}>♀ Женский AAS-калькулятор</div>
+          <div style={{ fontSize:10, color:'#fff', marginBottom:8 }}>Выбери препараты курса (мульти-ввод):</div>
+          <div style={{ display:'flex', gap:6, marginBottom:8 }}>
+            {(['all','oral','inject'] as const).map(f => (
+              <button key={f} onClick={() => setAasFilter(f)} style={{
+                padding:'5px 12px', borderRadius:16, fontSize:10, fontWeight:700, cursor:'pointer',
+                background: aasFilter===f ? '#f472b6' : 'rgba(255,255,255,0.06)',
+                color: aasFilter===f ? '#000' : '#fff',
+                border:'1px solid ' + (aasFilter===f ? '#f472b6' : 'rgba(255,255,255,0.08)'),
+              }}>{f==='all'?'Все':f==='oral'?'Оральные':'Инъекции'}</button>
+            ))}
+          </div>
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(120px, 1fr))', gap:6, marginBottom:10 }}>
+            {FEMALE_AAS_DRUGS.filter(d => aasFilter==='all' || (aasFilter==='oral' ? d.esters.length===0 : d.esters.length>0)).map(d => (
+              <div key={d.id} onClick={() => {
+                if (femaleAasEntries.some(e => e.drugId===d.id)) {
+                  setFemaleAasEntries(femaleAasEntries.filter(e => e.drugId!==d.id));
+                } else {
+                  setFemaleAasEntries([...femaleAasEntries, { drugId:d.id, doseMgWeek:100, ester:d.esters[0]||'', weeksOn:8 }]);
+                }
+              }} style={{
+                padding:'8px 10px', borderRadius:10, cursor:'pointer', textAlign:'center',
+                background: femaleAasEntries.some(e=>e.drugId===d.id) ? 'rgba(244,114,182,0.12)' : 'rgba(255,255,255,0.04)',
+                border:'1px solid ' + (femaleAasEntries.some(e=>e.drugId===d.id) ? 'rgba(244,114,182,0.22)' : 'rgba(255,255,255,0.06)'),
+              }}>
+                <div style={{ fontSize:10, fontWeight:700, color:'#fff' }}>{d.name.split('(')[0].trim()}</div>
+                <div style={{ fontSize:8, color:'#f472b6', marginTop:2 }}>{d.class}</div>
+              </div>
+            ))}
+          </div>
+          {femaleAasEntries.length > 0 && (
+            <div>
+              {femaleAasEntries.map((entry, i) => {
+                const drug = PHARMA_DB[entry.drugId];
+                return (
+                  <div key={i} style={{ background:'rgba(0,0,0,0.22)', borderRadius:10, padding:'8px 10px', marginBottom:6, border:'1px solid rgba(244,114,182,0.08)' }}>
+                    <div style={{ fontSize:11, fontWeight:800, color:'#fff', marginBottom:6 }}>{drug?.name || entry.drugId}</div>
+                    <div style={{ display:'flex', gap:6, alignItems:'center' }}>
+                      <input type="number" value={entry.doseMgWeek} onChange={e => {
+                        const next = [...femaleAasEntries];
+                        next[i] = { ...next[i], doseMgWeek: parseFloat(e.target.value)||0 };
+                        setFemaleAasEntries(next);
+                      }} style={{ flex:1, padding:'8px 10px', borderRadius:8, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.08)', color:'#fff', fontSize:11, fontWeight:700, outline:'none', minHeight:40 }} />
+                      <span style={{ fontSize:10, color:'#fff' }}>мг/нед</span>
+                      {drug && drug.esters.length > 0 && (
+                        <select value={entry.ester} onChange={e => {
+                          const next = [...femaleAasEntries];
+                          next[i] = { ...next[i], ester: e.target.value };
+                          setFemaleAasEntries(next);
+                        }} style={{ padding:'8px', borderRadius:8, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.08)', color:'#fff', fontSize:10, outline:'none', minHeight:40 }}>
+                          {drug.esters.map(est => <option key={est} value={est} style={{ background:'#1a1a1f' }}>{est}</option>)}
+                        </select>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+              <div style={{ fontSize:9, color:'#fbbf24', marginTop:6 }}>
+                ⚠️ Контрацепция обязательна. Тест на беременность перед курсом. При вирилизации — отмена.
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {mapperResult && (
         <>
