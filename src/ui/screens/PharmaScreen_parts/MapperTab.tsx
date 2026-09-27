@@ -222,6 +222,28 @@ export const MapperTab: React.FC = () => {
                   </div>
                 );
               })}
+            </div>
+          )}
+
+          <FemalePharmaCalculator />
+          {femaleAasEntries.length > 0 && (
+            <div>
+              {femaleAasEntries.map((entry, i) => {
+                const drug = PHARMA_DB[entry.drugId];
+                return (
+                  <div key={i} style={{ background:'rgba(0,0,0,0.22)', borderRadius:10, padding:'8px 10px', marginBottom:6, border:'1px solid rgba(244,114,182,0.08)' }}>
+                    <div style={{ fontSize:11, fontWeight:800, color:'#fff', marginBottom:6 }}>{drug?.name || entry.drugId}</div>
+                    <div style={{ display:'flex', gap:6, alignItems:'center' }}>
+                      <input type="number" value={entry.doseMgWeek} onChange={e => {
+                        const next = [...femaleAasEntries];
+                        next[i] = { ...next[i], doseMgWeek: parseFloat(e.target.value)||0 };
+                        setFemaleAasEntries(next);
+                      }} style={{ flex:1, padding:'8px 10px', borderRadius:8, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.08)', color:'#fff', fontSize:11, fontWeight:700, outline:'none', minHeight:40 }} />
+                      <span style={{ fontSize:10, color:'#fff' }}>мг/нед</span>
+                    </div>
+                  </div>
+                );
+              })}
               <div style={{ fontSize:9, color:'#fbbf24', marginTop:6 }}>
                 ⚠️ Контрацепция обязательна. Тест на беременность перед курсом. При вирилизации — отмена.
               </div>

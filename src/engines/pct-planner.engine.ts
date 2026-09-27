@@ -27,6 +27,18 @@ export interface PCTSchedule {
   warnings: string[];
 }
 
+export interface PCTOptions {
+  pctDurationWeeks?: number;
+  includeHCG?: boolean;
+  hcgDose?: number;
+  hcgFrequencyPerWeek?: number;
+  clomipheneStartDose?: number;
+  clomipheneTaperDose?: number;
+  tamoxifenDose?: number;
+  includeTamoxifen?: boolean;
+  supportStackDurationWeeks?: number;
+}
+
 function getHalfLifeHours(drugId: string): number {
   return PHARMA_DB[drugId]?.pk.halfLifeHours || 168;
 }
@@ -35,7 +47,23 @@ function daysToClear(halfLifeHours: number): number {
   return Math.ceil((halfLifeHours * 5) / 24);
 }
 
-export function generatePCTPlan(course: CourseEntry[], lastCourseWeek: number): PCTSchedule {
+export function generatePCTPlan(
+  course: CourseEntry[],
+  lastCourseWeek: number,
+  options: PCTOptions = {}
+): PCTSchedule {
+  const {
+    pctDurationWeeks = 4,
+    includeHCG = true,
+    hcgDose = 500,
+    hcgFrequencyPerWeek = 2,
+    clomipheneStartDose = 50,
+    clomipheneTaperDose = 25,
+    tamoxifenDose = 20,
+    includeTamoxifen = false,
+    supportStackDurationWeeks = 6,
+  } = options;
+
   const warnings: string[] = [];
   const activeDrugs = course.filter(c => c.endWeek >= lastCourseWeek);
   if (activeDrugs.length === 0) return { startDate: localIsoDate(), taperWeeks: [], pctStartWeek: course.length + 4, pctProtocol: [], supportStack: [], warnings: ['Нет активных препаратов для ПКТ'] };
@@ -53,17 +81,47 @@ export function generatePCTPlan(course: CourseEntry[], lastCourseWeek: number): 
     });
   }
 
-  const pctProtocol: PCTProtocolItem[] = [
-    { drug: 'clomi', substanceId: 'clomi', dose: '50 мг/день', doseValue: '50', doseUnit: 'мг/день', durationWeeks: 2, startDayOffset: 0, startWeek: pctStartWeek, endWeek: pctStartWeek + 2, class: 'pct_serm', timing: 'Ежедневно', frequency: '1 раз/день' },
-    { drug: 'clomi', substanceId: 'clomi', dose: '25 мг/день', doseValue: '25', doseUnit: 'мг/день', durationWeeks: 2, startDayOffset: 14, startWeek: pctStartWeek + 2, endWeek: pctStartWeek + 4, class: 'pct_serm', timing: 'Ежедневно', frequency: '1 раз/день' },
-    { drug: 'hcg', substanceId: 'hcg', dose: '500 МЕ 2×/нед', doseValue: '500', doseUnit: 'МЕ 2×/нед', durationWeeks: 4, startDayOffset: 0, startWeek: pctStartWeek, endWeek: pctStartWeek + 4, class: 'pct_gonadotropin', timing: '2 раза/нед', frequency: '2 раза/нед', scheme: '3/1 (3 нед приема, 1 нед отдых)' }
-  ];
+  const pctProtocol: PCTProtocolItem[] = [];
+  const halfDuration = Math.ceil(pctDurationWeeks / 2);
+
+  pctProtocol.push({
+    drug: 'clomi', substanceId: 'clomi',
+    dose: `${clomipheneStartDose} мг/день`, doseValue: String(clomipheneStartDose), doseUnit: 'мг/день',
+    durationWeeks: halfDuration, startDayOffset: 0, startWeek: pctStartWeek, endWeek: pctStartWeek + halfDuration,
+    class: 'pct_serm', timing: 'Ежедневно', frequency: '1 раз/день'
+  });
+
+  pctProtocol.push({
+    drug: 'clomi', substanceId: 'clomi',
+    dose: `${clomipheneTaperDose} мг/день`, doseValue: String(clomipheneTaperDose), doseUnit: 'мг/день',
+    durationWeeks: pctDurationWeeks - halfDuration, startDayOffset: halfDuration * 7, startWeek: pctStartWeek + halfDuration, endWeek: pctStartWeek + pctDurationWeeks,
+    class: 'pct_serm', timing: 'Ежедневно', frequency: '1 раз/день'
+  });
+
+  if (includeHCG) {
+    pctProtocol.push({
+      drug: 'hcg', substanceId: 'hcg',
+      dose: `${hcgDose} МЕ ${hcgFrequencyPerWeek}×/нед`, doseValue: String(hcgDose), doseUnit: `МЕ ${hcgFrequencyPerWeek}×/нед`,
+      durationWeeks: 4, startDayOffset: 0, startWeek: pctStartWeek, endWeek: pctStartWeek + 4,
+      class: 'pct_gonadotropin', timing: `${hcgFrequencyPerWeek} раза/нед`, frequency: `${hcgFrequencyPerWeek} раза/нед`,
+      scheme: '3/1 (3 нед приема, 1 нед отдых)'
+    });
+  }
+
+  if (includeTamoxifen) {
+    pctProtocol.push({
+      drug: 'tamoxifen', substanceId: 'tamoxifen',
+      dose: `${tamoxifenDose} мг/день`, doseValue: String(tamoxifenDose), doseUnit: 'мг/день',
+      durationWeeks: pctDurationWeeks, startDayOffset: 0, startWeek: pctStartWeek, endWeek: pctStartWeek + pctDurationWeeks,
+      class: 'pct_serm', timing: 'Ежедневно', frequency: '1 раз/день'
+    });
+  }
 
   const supportStack = [
-    { id: 'tudca', name: 'TUDCA', dose: '250-500 мг/день', durationWeeks: 6 },
-    { id: 'omega3', name: 'Омега-3', dose: '2-3 г/день', durationWeeks: 8 },
-    { id: 'magnesium', name: 'Магний бисглицинат', dose: '400 мг/вечер', durationWeeks: 6 },
-    { id: 'nac', name: 'NAC', dose: '1200 мг/день', durationWeeks: 4 }
+    { id: 'tudca', name: 'TUDCA', dose: '250-500 мг/день', durationWeeks: supportStackDurationWeeks },
+    { id: 'omega3', name: 'Омега-3', dose: '2-3 г/день', durationWeeks: supportStackDurationWeeks + 2 },
+    { id: 'magnesium', name: 'Магний бисглицинат', dose: '400 мг/вечер', durationWeeks: supportStackDurationWeeks },
+    { id: 'nac', name: 'NAC', dose: '1200 мг/день', durationWeeks: Math.max(4, supportStackDurationWeeks - 2) }
   ];
 
   const longOrals = course.filter(c => PHARMA_DB[c.substanceId]?.pd.hepatotoxicity >= 2 && (c.endWeek - c.startWeek) > 8);
@@ -72,7 +130,9 @@ export function generatePCTPlan(course: CourseEntry[], lastCourseWeek: number): 
   const highE2 = activeDrugs.some(d => PHARMA_DB[d.substanceId]?.pd.aromatization > 0.8);
   if (highE2) warnings.push('⚠️ Высокая ароматизация. Рассмотреть добавление ИА в ПКТ.');
 
-  warnings.push('⚠️ HCG: не использовать дольше 4 нед — риск десенситизации ЛГ-рецепторов и гинекомастии.');
+  if (includeHCG) {
+    warnings.push('⚠️ HCG: не использовать дольше 4 нед — риск десенситизации ЛГ-рецепторов и гинекомастии.');
+  }
   warnings.push('⚠️ Кломифен: при нарушении зрения/тромбоэмболии — отмена, консультация врача.');
   warnings.push('⚠️ Оральные ААС отменяются раньше инъекционных (за 1-2 нед до старта ПКТ).');
 
