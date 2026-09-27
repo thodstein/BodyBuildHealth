@@ -13,6 +13,7 @@ const read = (p: string) => readFileSync(resolve(ROOT, p), 'utf8');
 
 const CONSTRUCTOR = read('src/ui/screens/combat/CombatConstructor.tsx');
 const PLAN_VIEW = read('src/ui/screens/combat/CombatPlanView.tsx');
+const KIT = read('src/ui/screens/TrainingScreen_parts/training-ui.tsx');
 const CSS = read('src/styles-native.css');
 
 const combatSrc = CONSTRUCTOR + PLAN_VIEW + read('src/ui/screens/combat/CombatUI.tsx') + read('src/ui/screens/combat/combat-annual-card.tsx');
@@ -41,16 +42,20 @@ describe('E3.1 — APK: тап-таргеты ≥44px', () => {
 
 describe('E3.2 — APK: scroll-snap реально работает', () => {
   it('cb-steps висит на СКРОЛЛЕРЕ, а не на внешнем враппере', () => {
-    // было: <div className="cb-steps">{renderStepNav()}</div> — snap уезжал на
-    // не-скроллящий элемент и не работал
-    expect(CONSTRUCTOR).not.toMatch(/<div className="cb-steps">\{renderStepNav\(\)\}<\/div>/);
-    expect(CONSTRUCTOR).toMatch(/<div className="cb-steps"[^>]*overflowX: 'auto'/);
+    // Лента шагов с 2026-09-27 — общий компонент training-ui (как в ББ-авто,
+    // арм- и стронг-конструкторах). Класс .cb-steps приходит через navAttrs
+    // и ложится НА САМ скроллер, иначе snap снова уедет на враппер.
+    expect(CONSTRUCTOR).not.toMatch(/<div className="cb-steps"[^>]*>\s*\{renderStepNav\(\)\}/);
+    expect(CONSTRUCTOR).toMatch(/navAttrs=\{\{ className: 'cb-steps' \}\}/);
+    // Скролл/снап даёт общий токен кита, а не инлайн-стиль конструктора.
+    expect(KIT).toMatch(/PLANNER_STEP_NAV[\s\S]{0,600}?overflowX: 'auto'/);
   });
 });
 
 describe('E3.3 — a11y: aria-current на шагах', () => {
   it('активный шаг помечен, и только он', () => {
-    expect(CONSTRUCTOR).toMatch(/aria-current=\{active \? 'step' : undefined\}/);
+    // Разметка пилюли переехала в общий кит — контракт проверяем там.
+    expect(KIT).toMatch(/aria-current=\{isActive \? 'step' : undefined\}/);
   });
 
   it('нет фальшивых tab-ролей (кнопки честнее)', () => {
@@ -60,9 +65,11 @@ describe('E3.3 — a11y: aria-current на шагах', () => {
   });
 
   it('шаг несёт data-cb/data-step/data-active хуки', () => {
-    expect(CONSTRUCTOR).toContain('data-cb="step"');
-    expect(CONSTRUCTOR).toContain('data-step={s}');
-    expect(CONSTRUCTOR).toContain("data-active={active ? 'true' : 'false'}");
+    // data-cb="step" — APK-правило 44px, приходит через pillAttrs;
+    // data-step/data-active — из общего кита.
+    expect(CONSTRUCTOR).toContain("'data-cb': 'step'");
+    expect(KIT).toMatch(/data-step=\{s\.id\}/);
+    expect(KIT).toMatch(/data-active=\{isActive \? 'true' : 'false'\}/);
   });
 });
 

@@ -117,25 +117,35 @@ describe('WLDiagnosticsHub PRO', () => {
     await waitFor(() => expect(container.textContent).toContain('Dip 10см за 200мс'), { timeout: 2000 });
     expect(container.textContent).toContain('оптимален');
   });
-  it('E7 Kinovea CSV → метрики + bfPCA', async () => {
+  it('E7 импорт Kinovea CSV удалён, но ручной ввод метрик жив', async () => {
     const { container } = render(<WLDiagnosticsHub />);
     fireEvent.click(screen.getByRole('button', { name: /Видео/ }));
-    const ta = container.querySelector('textarea')!;
-    fireEvent.change(ta, { target: { value: 't,x,y\n0,0,0\n0.033,0.5,10\n0.066,1,25\n0.1,0.5,45\n0.133,0,60' } });
-    fireEvent.click(screen.getByText(/Разобрать Kinovea CSV/));
-    await waitFor(() => expect(container.textContent).toContain('Kinovea:'), { timeout: 2000 });
-    expect(container.textContent).toContain('bfPCA P1');
+    // Kinovea-поверхности больше нет: ни textarea Kinovea, ни кнопки разбора
+    expect(container.querySelector('textarea[placeholder*="Kinovea"]')).toBeNull();
+    expect(container.querySelector('[data-wl="kinovea"]')).toBeNull();
+    expect(screen.queryByText(/Разобрать Kinovea CSV/)).toBeNull();
+    // Ручной ввод xLoop/yMax/vMax продолжает работать и питает те же метрики
+    const nums = Array.from(container.querySelectorAll('input')) as HTMLInputElement[];
+    const byPlaceholder = (ph: string) => nums.find((n) => n.getAttribute('placeholder') === ph)!;
+    fireEvent.change(byPlaceholder('3.2'), { target: { value: '9' } });
+    fireEvent.change(byPlaceholder('85'), { target: { value: '60' } });
+    fireEvent.change(byPlaceholder('1.85'), { target: { value: '1.6' } });
+    await waitFor(() => expect(container.textContent).toContain('Enode correction:'), { timeout: 2000 });
+    expect(container.textContent).toMatch(/turnover (реально >4см|≤4см норма)/);
+    expect(container.textContent).toMatch(/catch (реально >6см|≤6см норма)/);
   });
-  it('V4-A повторный парс растит историю + EWMA-тренд', async () => {
+  it('V4-A история трекинга читается из хранилища, но новых записей не создаётся', async () => {
+    localStorage.setItem('he_ta_bar_tracking_v1', JSON.stringify([
+      { date: '2026-09-01', xLoop: 3, yMax: 50, vmax: 1.4, xBias: 0.5 },
+      { date: '2026-09-10', xLoop: 3.4, yMax: 52, vmax: 1.5, xBias: 0.5 },
+    ]));
     const { container } = render(<WLDiagnosticsHub />);
     fireEvent.click(screen.getByRole('button', { name: /Видео/ }));
-    const ta = container.querySelector('textarea')!;
-    const csv = 't,x,y\n0,0,0\n0.033,0.5,10\n0.066,1,25\n0.1,0.5,45\n0.133,0,60';
-    fireEvent.change(ta, { target: { value: csv } });
-    fireEvent.click(screen.getByText(/Разобрать Kinovea CSV/));
-    await waitFor(() => expect(container.textContent).toContain('Kinovea:'), { timeout: 2000 });
-    fireEvent.click(screen.getByText(/Разобрать Kinovea CSV/));
-    await waitFor(() => expect(container.textContent).toContain('История трекинга (2)'), { timeout: 2000 });
+    // PCI по старой истории считается
+    await waitFor(() => expect(container.textContent).toContain('История трекинга'), { timeout: 2000 });
+    expect(container.textContent).toMatch(/vmax 1\.4 → 1\.5 м\/с/);
+    // Кнопки импорта нет → история не может вырасти
+    expect(screen.queryByText(/Разобрать Kinovea CSV/)).toBeNull();
     expect(JSON.parse(localStorage.getItem('he_ta_bar_tracking_v1') || '[]').length).toBe(2);
   });
   it('V4-B инъекция + Sinclair уходят в экспорт без ошибок', async () => {
@@ -230,7 +240,8 @@ describe('WLDiagnosticsHub PRO', () => {
     fireEvent.click(screen.getAllByText(/Рывок/)[0]);
     fireEvent.click(screen.getAllByText(/Рывок: фиксация в седе/)[0]);
     fireEvent.click(screen.getAllByText(/Видео/)[0]);
-    const ta = container.querySelectorAll('textarea')[1];
+    // CSV поз суставов (единственная textarea во вкладке «Видео» после снятия Kinovea-импорта)
+    const ta = container.querySelector('textarea[placeholder^="t,hip,knee,ankle,shoulder"]')!;
     fireEvent.change(ta, { target: { value: 't,hip,knee,ankle,shoulder\n0,100,80,40,160\n0.1,95,70,38,155\n0.2,90,65,36,150' } });
     await waitFor(() => expect(container.textContent).toContain('Кадров: 3'), { timeout: 2000 });
     expect(container.textContent).toContain('OHS-прогноз по углам');
@@ -349,12 +360,18 @@ describe('WLDiagnosticsHub PRO', () => {
     expect(JSON.parse(localStorage.getItem('he_ta_progress_hist_v1') || '[]').length).toBe(1);
     expect(JSON.parse(localStorage.getItem('he_ta_progress_hist_v1') || '[]')[0].cycle).toBe('2025-2028');
   });
-  it('видео: live-MediaPipe/стабы убраны, остаётся CSV-трекинг углов', async () => {
+  it('видео: live-MediaPipe/стабы и Kinovea-импорт убраны, остаётся ручной ввод углов', async () => {
     const { container } = render(<WLDiagnosticsHub />);
     fireEvent.click(screen.getByRole('button', { name: /Видео/ }));
     expect(screen.queryByText(/Проверить MediaPipe/)).toBeNull();
     expect(container.textContent).not.toContain('Pose stub');
     expect(container.textContent).not.toContain('BlazePose stub');
+    expect(container.textContent).toContain('Углы с видео');
+    // Kinovea-импорт снят 2026-09-27, ручной ввод метрик и CSV поз углов остались
+    expect(container.querySelector('textarea[placeholder*="Kinovea"]')).toBeNull();
+    expect(container.querySelector('[data-wl="kinovea"]')).toBeNull();
+    expect(screen.queryByText(/Разобрать Kinovea CSV/)).toBeNull();
+    expect(container.textContent).toContain('xLoop см');
     expect(container.textContent).toContain('Углы с видео');
   });
   it('превью моста: что уедет (фаза → упражнение)', async () => {

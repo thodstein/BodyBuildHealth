@@ -1,14 +1,14 @@
 /** WLDiagnosticsHub.tsx — ТА-диагностика — хаб движения PRO (v2)
  *  Рывок 5 фаз + взятие 3 + толчок 3 × числовые углы (биомеханика) + bar path PRO (Vorobyev типы + метрики + SRD)
  *  + VBT peak zones (PLOS 2026) + FvR2 (Sandau) + OHS 6-сегментов + асимметрия + IMTP/ISPP + diary e1RM + RSS scoring
- *  + LIMITER-коррекции + видео Kinovea/Enode + apply в StrengthSportConstructor (weightlifting)
+ *  + LIMITER-коррекции + траектория/углы вручную (Enode) + apply в StrengthSportConstructor (weightlifting)
  */
 import React, { useMemo, useState, useEffect } from 'react';
 import { WL_WEAKPOINT_LABELS, WL_WEAKPOINT_CORRECTION, type WLWeakPoint } from '../../../engines/strength-sport/strength-sport-weakpoint';
 import { TA_BIOMECH, diagnoseTAWeakPoint, autoValidateAnglesFromPose, autoOHSFromPose, diagnoseJerkDip } from '../../../engines/strength-sport/strength-sport-biomechanics.engine';
 import { diagnoseBarPath, type BarPathDeviation, BAR_PATH_LABELS } from '../../../engines/strength-sport/strength-sport-diagnostics';
-import { classifyTrajectoryType, computeBarPathMetrics, diagnoseBarPathFromMetrics, isRealChange, correctEnodeHorizontal, extractBfPCAPatterns, type BarPathMetrics } from '../../../engines/strength-sport/strength-sport-barpath.engine';
-import { loadBarTracking, saveBarTracking, parseKinoveaCSV, analyzeBarTracking, videoQualityForCapture } from '../../../engines/strength-sport/strength-sport-video.engine';
+import { classifyTrajectoryType, computeBarPathMetrics, diagnoseBarPathFromMetrics, isRealChange, correctEnodeHorizontal, type BarPathMetrics } from '../../../engines/strength-sport/strength-sport-barpath.engine';
+import { loadBarTracking, videoQualityForCapture } from '../../../engines/strength-sport/strength-sport-video.engine';
 import { optimalFvSlopeForPmax, vbtEwma, TA_PEAK_VELOCITY_ZONES, taVthresNorms, computeFvR2, taZoneForVelocity, thresholdForTALift, velocityTypeForLift, diagnoseVelocityLossSS, vbtRecommendationSS } from '../../../engines/strength-sport/strength-sport-vbt.engine';
 import { applyToPlanner } from './planner-bridge';
 import { CARD, ACCENT } from './training-ui';
@@ -164,7 +164,7 @@ type WLState = {
   videoHeightM: string;
   videoDistM: string;
   videoSide: '' | 'left' | 'front' | 'right';
-  videoDevice: '' | 'kinovea' | 'enode' | 'phone';
+  videoDevice: '' | 'enode' | 'phone';
   progBw: string;
   progSnatch: string;
   progCj: string;
@@ -228,7 +228,7 @@ const DEFAULT_STATE: WLState = {
   videoHeightM: '',
   videoDistM: '',
   videoSide: '' as '' | 'left' | 'front' | 'right',
-  videoDevice: '' as '' | 'kinovea' | 'enode' | 'phone',
+  videoDevice: '' as '' | 'enode' | 'phone',
   progBw: '', progSnatch: '', progCj: '', progSex: '' as '' | 'male' | 'female',
   // V8: цикл Sinclair (пусто = текущий 2025-2028)
   progCycle: '' as '' | '2025-2028' | '2021-2024',
@@ -249,7 +249,7 @@ const TAB_DEFS: Array<{ id: WLTab; label: string; icon: string; desc: string }> 
   { id: 'jerk', label: 'Толчок', icon: '🦾', desc: '3 фазы + drive' },
   { id: 'aux', label: 'База', icon: '🦵', desc: 'присед/тяги/жим' },
   { id: 'vbt', label: 'VBT/FvR', icon: '⚡', desc: 'пик-зоны + FvR2' },
-  { id: 'video', label: 'Видео', icon: '📹', desc: 'Kinovea/Enode' },
+  { id: 'video', label: 'Видео', icon: '📹', desc: 'Траектория/углы вручную' },
   { id: 'mobility', label: 'Мобильность', icon: '🧘', desc: 'OHS 6 + асимметрия' },
   { id: 'correction', label: 'Коррекция', icon: '🛠️', desc: 'упражнения + дозы' },
 ];
@@ -284,9 +284,8 @@ export const WLDiagnosticsHub: React.FC = () => {
   });
   const [tab, setTab] = useState<WLTab>('snatch');
   const [toast, setToast] = useState<string>('');
-  const [csvText, setCsvText] = useState<string>('');
-  // V4-A: nonce парсов трекинга (одинаковый CSV даёт те же метрики — memo иначе не обновится)
-  const [trackNonce, setTrackNonce] = useState(0);
+  // Импорт Kinovea CSV удалён 2026-09-27 — новых треков в историю не пишется.
+  // Ранее сохранённые треки (loadBarTracking) всё ещё читаются для PCI/тренда.
   // Нонс перечитывания плана ТА из хранилища (инъекция/откат меняют его мимо мемов)
   const [planNonce, setPlanNonce] = useState(0);
   // E6: флаг снапшота до инъекции (откат)
@@ -556,8 +555,8 @@ export const WLDiagnosticsHub: React.FC = () => {
       const last = vels.slice(-5);
       return { from: last[0], to: last[last.length - 1], ewma: vbtEwma(vels), n: vels.length };
     } catch { return null; }
-    // V4-A: trackNonce — тренд свежий после каждого saveBarTracking
-  }, [trackNonce]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // E8: углы с видео → сводка + автовалидация фаз + OHS-прогноз
   const poseSummary = useMemo(() => {
@@ -789,10 +788,10 @@ export const WLDiagnosticsHub: React.FC = () => {
     mobilityFails: ohs.failed,
     imtpRatio: isppRatio,
     sex: profileSex,
-    hasVideo: !!barMetrics || !!csvText,
+    hasVideo: !!barMetrics,
     hasVbt: !!vbtLoss || !!state.vbtVel,
     hasMobility: ohs.failed !== 6,
-  }), [weakPoints.length, asymmetry, state.barPath, vbtLoss, state.vbtVel, ohs.failed, isppRatio, profileSex, barMetrics, csvText]);
+  }), [weakPoints.length, asymmetry, state.barPath, vbtLoss, state.vbtVel, ohs.failed, isppRatio, profileSex, barMetrics]);
 
   const score = scoring.score;
   const level = scoring.level;
@@ -886,7 +885,7 @@ export const WLDiagnosticsHub: React.FC = () => {
       const biases = okHist.map((h) => (typeof h.xBias === 'number' && Number.isFinite(h.xBias) ? h.xBias : null)).filter((v): v is number => v != null);
       return { pci: pciFromTrackings(all), persist: persistingAsymmetry(biases), roughN };
     } catch { return { pci: null, persist: { persisting: false, n: 0, text: null }, roughN: 0 }; }
-  }, [trackNonce, state.xLoopCm, state.videoHeightM, state.videoDistM, state.videoSide, state.videoDevice]);
+  }, [state.xLoopCm, state.videoHeightM, state.videoDistM, state.videoSide, state.videoDevice]);
 
   // V4: ACL-гард dip + выносливость силы + стратегия старта + нормы
   const aclGuard = useMemo(() => {
@@ -1318,33 +1317,6 @@ export const WLDiagnosticsHub: React.FC = () => {
     } catch {}
   };
 
-  const handleCsvParse = () => {
-    const pts = parseKinoveaCSV(csvText);
-    if (!pts) { setToast('CSV не распознан'); setTimeout(()=>setToast(''),2000); return; }
-    const res = analyzeBarTracking(pts);
-    if (!res) { setToast('Нет точек'); return; }
-    let bf = '';
-    try {
-      const pats = extractBfPCAPatterns(pts.map(p => p.x), pts.map(p => p.y));
-      const p1 = pats.find(p => p.pattern === 1), p3 = pats.find(p => p.pattern === 3);
-      if (p1 && p3) bf = `bfPCA P1 ${p1.score} · P3 ×${p3.score} ${p3.isOptimal ? 'OK' : 'много пересечений'} (коэфф. из Kipp 2024 — референс, не твоё измерение)`;
-    } catch { /* noop */ }
-    setState(s => ({ ...s, xLoopCm: String(res.xLoop), yMaxCm: String(res.yMax), peakVelMs: String(res.vmax), fvrHAcc: String(res.hAcc), bfPattern: bf,
-      // V5-П2: turnover из трекинга — только в пустое поле (ручной ввод приоритетнее)
-      ...(res.turnoverMs != null && !s.turnoverMs ? { turnoverMs: String(res.turnoverMs) } : {}) }));
-    // V4-A: замер в историю (питает EWMA-тренд); V5-V8: с тегом качества (rough вне PCI)
-    try {
-      const q = videoQualityForCapture({
-        heightM: state.videoHeightM ? parseFloat(state.videoHeightM) : null,
-        distM: state.videoDistM ? parseFloat(state.videoDistM) : null,
-        side: state.videoSide || null, device: state.videoDevice || null,
-      }).flag;
-      saveBarTracking({ ...res, quality: q });
-    } catch { /* noop */ }
-    setTrackNonce(n => n + 1);
-    setToast(`✓ Kinovea: xLoop ${res.xLoop}см yMax ${res.yMax}см vmax ${res.vmax} м/с${res.turnoverMs != null ? ` turnover ${res.turnoverMs}мс` : ''}`);
-    setTimeout(()=>setToast(''),3000);
-  };
 
   // E9: размах/плечи → профиль (рост остаётся вводом хаба)
   const applyAnthroToProfile = () => {
@@ -1563,7 +1535,7 @@ export const WLDiagnosticsHub: React.FC = () => {
           <div style={{ width: 36, height: 36, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg,#3b82f6,#a855f7)', color: '#fff', fontWeight: 900, fontSize: 16 }}>🏋️</div>
           <div style={{ flex: 1 }}>
             <div style={{ fontSize: 15, fontWeight: 900, color: '#fff', lineHeight: 1 }}>ТА-диагностика — хаб движения PRO</div>
-            <div style={{ fontSize: 10, color: '#fff', lineHeight: 1.3, opacity: 0.9 }}>Рывок 5 фаз + взятие 3 + толчок 3 + база 5 × числовые углы + bar path PRO (Vorobyev типы, SRD) + VBT пиковые зоны + FvR2 + OHS 6 + видео Kinovea/Enode.</div>
+            <div style={{ fontSize: 10, color: '#fff', lineHeight: 1.3, opacity: 0.9 }}>Рывок 5 фаз + взятие 3 + толчок 3 + база 5 × числовые углы + bar path PRO (Vorobyev типы, SRD) + VBT пиковые зоны + FvR2 + OHS 6 + траектория/углы вручную.</div>
           </div>
           <div style={{ textAlign: 'center' }}>
             <div style={{ width: 52, height: 52, borderRadius: 26, background: `conic-gradient(${sColor} ${score}%, rgba(255,255,255,0.06) 0)`, display: 'flex', alignItems: 'center', justifyContent: 'center', border: `2px solid ${sColor}`, fontWeight: 900, color: '#fff', fontSize: 14 }}>{score}</div>
@@ -1930,13 +1902,9 @@ export const WLDiagnosticsHub: React.FC = () => {
 
          {tab === 'video' && (
           <div>
-            <div style={{ fontSize: 11, fontWeight: 700, color: ACCENT, marginBottom: 6 }}>Видео / Bar tracking — Kinovea + Enode</div>
-            <div style={{ fontSize: 10, color: '#fff', marginBottom: 6 }}>Полевая методика Ang 2023 (loadsol + Kinovea free). Chavda 2024: Enode вертикаль r²=0.99, горизонталь bias → correction Intercept+Slope.</div>
-            <textarea value={csvText} onChange={e => setCsvText(e.target.value)} placeholder="Вставь Kinovea CSV (time,x,y) или t,x,y; x,y в см" style={{ width: '100%', height: 80, background: 'rgba(255,255,255,0.05)', color: '#fff', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '10px', fontSize: 13, fontFamily: 'monospace' }} />
-            <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
-              <button data-wl="kinovea" onClick={handleCsvParse} style={{ minHeight: 44, padding: '10px 12px', borderRadius: 10, background: 'rgba(59,130,246,0.14)', border: '1px solid #1f3a5f', color: '#60a5fa', fontSize: 11, cursor: 'pointer' }}>📊 Разобрать Kinovea CSV</button>
-              <span style={{ fontSize: 10, color: '#fff', alignSelf: 'center' }}>Или введи метрики вручную ниже</span>
-            </div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: ACCENT, marginBottom: 6 }}>Bar tracking — ручной ввод метрик</div>
+            <div style={{ fontSize: 10, color: '#fff', marginBottom: 6 }}>Метрики траектории вносятся числами ниже. Chavda 2024: Enode вертикаль r²=0.99, горизонталь bias → correction Intercept+Slope.</div>
+            <div style={{ fontSize: 10, color: '#fff', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.10)', borderRadius: 8, padding: '6px 8px', marginBottom: 6 }}>Импорт Kinovea CSV убран 2026-09-27. Ранее сохранённая история трекинга (если она есть в хранилище) всё ещё читается ниже, но новых замеров из CSV больше не будет.</div>
             {pciBlock.pci && <div data-wl="pci" style={{ fontSize: 10, color: pciBlock.pci.level === 'elite' || pciBlock.pci.level === 'intermediate' ? '#22c55e' : '#f59e0b', marginTop: 6 }}>🔁 {pciBlock.pci.text} (история трекинга, PoinT GO 2026){pciBlock.roughN > 0 ? ` · rough-съёмки вне расчёта: ${pciBlock.roughN} (Shah 2026)` : ''}</div>}
             {pciBlock.persist.persisting && <div data-wl="pci-persist" style={{ fontSize: 10, color: '#ef4444', marginTop: 4 }}>↔️ {pciBlock.persist.text}</div>}
             {/* W4: метаданные съёмки → флаг качества xLoop */}
@@ -1950,7 +1918,7 @@ export const WLDiagnosticsHub: React.FC = () => {
                 {([['left', 'Сбоку ←'], ['front', 'Спереди'], ['right', 'Сбоку →']] as const).map(([id, label]) => (
                   <button key={id} data-wl="video-side" onClick={() => setState(s => ({ ...s, videoSide: s.videoSide === id ? '' : id }))} aria-pressed={state.videoSide === id} style={{ minHeight: 44, padding: '10px 14px', borderRadius: 999, border: '1px solid', borderColor: state.videoSide === id ? '#3b82f6' : '#1f3a5f', background: state.videoSide === id ? 'rgba(59,130,246,0.14)' : '#0a1629', color: state.videoSide === id ? '#3b82f6' : '#fff', fontSize: 12, cursor: 'pointer' }}>{label}</button>
                 ))}
-                {([['kinovea', 'Kinovea'], ['enode', 'Enode'], ['phone', 'Телефон']] as const).map(([id, label]) => (
+                {([['enode', 'Enode'], ['phone', 'Телефон']] as const).map(([id, label]) => (
                   <button key={id} data-wl="video-device" onClick={() => setState(s => ({ ...s, videoDevice: s.videoDevice === id ? '' : id }))} aria-pressed={state.videoDevice === id} style={{ minHeight: 44, padding: '10px 14px', borderRadius: 999, border: '1px solid', borderColor: state.videoDevice === id ? '#a855f7' : '#1f3a5f', background: state.videoDevice === id ? 'rgba(168,85,247,0.14)' : '#0a1629', color: state.videoDevice === id ? '#a855f7' : '#fff', fontSize: 12, cursor: 'pointer' }}>{label}</button>
                 ))}
               </div>
@@ -1958,7 +1926,9 @@ export const WLDiagnosticsHub: React.FC = () => {
                 {videoQuality.flag === 'ok' ? '✓ ' : videoQuality.flag === 'rough' ? '≈ ' : '· '}{videoQuality.reason}
               </div>
             </div>
-            {state.bfPattern && <div style={{ fontSize: 10, color: '#a78bfa', marginTop: 6 }}>📐 {state.bfPattern} (Kipp 2024: P1 +0.42 лучше, P3 −0.38 хуже)</div>}
+            {/* bfPattern больше не вычисляется (Kinovea-разбор удалён 2026-09-27) —
+                остаётся только чтение значения, сохранённого до этой даты. */}
+            {state.bfPattern && <div style={{ fontSize: 10, color: '#a78bfa', marginTop: 6 }}>📐 {state.bfPattern} (Kipp 2024: P1 +0.42 лучше, P3 −0.38 хуже) · из прежнего разбора CSV</div>}
             {barTrend && <div style={{ fontSize: 10, color: '#fff', marginTop: 4 }}>📈 История трекинга ({barTrend.n}): vmax {barTrend.from} → {barTrend.to} м/с · EWMA {barTrend.ewma}</div>}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: 6, marginTop: 8 }}>
               <label style={{ fontSize: 11, color: '#fff' }}>xLoop см<br /><input value={state.xLoopCm} onChange={e => setState(s => ({ ...s, xLoopCm: e.target.value }))} placeholder="3.2" style={{ width: '100%', marginTop: 4, background: 'rgba(255,255,255,0.05)', color: '#fff', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '10px 12px', fontSize: 16, minHeight: 44, boxSizing: 'border-box' as const }} /></label>

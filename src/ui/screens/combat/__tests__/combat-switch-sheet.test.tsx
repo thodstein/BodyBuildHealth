@@ -53,7 +53,7 @@ describe('Combat switch', () => {
 
   it('нативных чекбоксов и селектов в конструкторе не осталось', () => {
     const { container } = render(<CombatConstructor />);
-    for (const s of ['2 Атлет', '3 Вне зала', '4 Сплит', '7 Экспорт']) go(s);
+    for (const s of ['2 Атлет', '3 Вне зала', '4 Сплит', '📤 Экспорт']) go(s);
     expect(container.querySelectorAll("input[type='checkbox']").length).toBe(0);
     expect(container.querySelectorAll('select').length).toBe(0);
   });
@@ -64,7 +64,7 @@ describe('Combat sheet select', () => {
     const ann = buildAnnualATR('mma' as any, 12, null, { cycles: 1 } as any);
     saveAnnualCB(ann);
     render(<CombatConstructor />);
-    go('7 Экспорт');
+    go('📤 Экспорт');
     const trig = screen.getByRole('button', { name: 'Длина года' });
     expect(trig.textContent).toContain('52 нед');
     fireEvent.click(trig);
@@ -78,7 +78,7 @@ describe('Combat sheet select', () => {
     const ann = buildAnnualATR('mma' as any, 12, null, { cycles: 1 } as any);
     saveAnnualCB(ann);
     render(<CombatConstructor />);
-    go('7 Экспорт');
+    go('📤 Экспорт');
     fireEvent.click(screen.getByRole('button', { name: 'Длина года' }));
     expect(screen.getByRole('dialog', { name: 'Длина года' })).toBeTruthy();
     fireEvent.click(document.querySelector('.cb-pop-backdrop')!);
@@ -173,7 +173,7 @@ describe('Combat plan controls', () => {
 describe('Combat RU guard', () => {
   it('ни одного английского id в интерфейсе всех шагов', () => {
     render(<CombatConstructor />);
-    for (const s of ['1 Параметры', '2 Атлет', '3 Вне зала', '4 Сплит', '7 Экспорт']) go(s);
+    for (const s of ['1 Параметры', '2 Атлет', '3 Вне зала', '4 Сплит', '📤 Экспорт']) go(s);
     const txt = document.body.textContent || '';
     const banned = ['bench_bar', 'row_bar', 'compound_first', 'pre_exhaust', 'post_exhaust', 'power_endurance', 'heavy_light', 'rest_pause', 'myo_reps', 'upper_power', 'lower_power', 'full_power', 'OutsideLoad', 'P0-6', 'fight week', 'low fiber', 'Hard spar', 'Tech spar', 'day_before_24h', 'same_day_2h', 'load_cut', 'deplete_reload', 'moderate_cut', 'mma · power', 'striker +', 'grappler +'];
     for (const b of banned) expect(txt, b).not.toContain(b);

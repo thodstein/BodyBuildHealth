@@ -7,9 +7,9 @@ import { loadStrengthSportPlan } from '../../../../engines/strength-sport/streng
 beforeEach(() => { localStorage.clear(); });
 
 function goToSplit(container: HTMLElement) {
-  fireEvent.click(screen.getByText(/Далее → 2 👤 Атлет/));
-  fireEvent.click(screen.getByText(/Далее → 3 🏃 Вне зала/));
-  fireEvent.click(screen.getByText(/Далее → 4 🧩 Сплит/));
+  fireEvent.click(screen.getByText(/Далее → 2 Атлет/));
+  fireEvent.click(screen.getByText(/Далее → 3 Вне зала/));
+  fireEvent.click(screen.getByText(/Далее → 4 Сплит/));
   expect(container.textContent).toContain('Интернет-цикл');
 }
 

@@ -39,9 +39,9 @@ describe('SM corrective wave opt-in', () => {
     });
     const { container } = render(<StrengthSportConstructor />);
     expect(container.textContent).toContain('СМ-хаб');
-    fireEvent.click(screen.getByText(/Далее → 2 👤 Атлет/));
-    fireEvent.click(screen.getByText(/Далее → 3 🏃 Вне зала/));
-    fireEvent.click(screen.getByText(/Далее → 4 🧩 Сплит/));
+    fireEvent.click(screen.getByText(/Далее → 2 Атлет/));
+    fireEvent.click(screen.getByText(/Далее → 3 Вне зала/));
+    fireEvent.click(screen.getByText(/Далее → 4 Сплит/));
     fireEvent.click(screen.getByText(/Собрать план/));
     await waitFor(() => expect(container.textContent).toContain('План 8нед'), { timeout: 12000 });
     expect(container.textContent).toContain('коррекция 1');
@@ -62,9 +62,9 @@ describe('SM corrective wave opt-in', () => {
       } as any,
     });
     const { container } = render(<StrengthSportConstructor />);
-    fireEvent.click(screen.getByText(/Далее → 2 👤 Атлет/));
-    fireEvent.click(screen.getByText(/Далее → 3 🏃 Вне зала/));
-    fireEvent.click(screen.getByText(/Далее → 4 🧩 Сплит/));
+    fireEvent.click(screen.getByText(/Далее → 2 Атлет/));
+    fireEvent.click(screen.getByText(/Далее → 3 Вне зала/));
+    fireEvent.click(screen.getByText(/Далее → 4 Сплит/));
     fireEvent.click(screen.getByText(/Собрать план/));
     await waitFor(() => expect(container.textContent).toContain('План 8нед'), { timeout: 12000 });
     fireEvent.click(await screen.findByText(/Волна коррекции \(1 фазы\)/, {}, { timeout: 5000 }));

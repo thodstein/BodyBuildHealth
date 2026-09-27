@@ -235,7 +235,7 @@ describe('мост хаб→план: VBT хаба реально работае
 });
 
 describe('мост хаб→конструктор: приём через localStorage', () => {
-  it('VBT хаба виден в конструкторе строкой «Из хаба»', () => {
+  it('VBT хаба больше не показывается в конструкторе (поля плана убраны 2026-09-27)', () => {
     localStorage.setItem(
       'he_planner_apply',
       JSON.stringify({
@@ -251,7 +251,8 @@ describe('мост хаб→конструктор: приём через localS
       }),
     );
     const { container } = render(<StrengthSportConstructor />);
-    expect(container.textContent).toContain('Из хаба: yoke_walk 2т');
+    // Sway/контест из того же пакета по-прежнему доезжают — мост не сломан.
+    expect(container.textContent).not.toContain('Из хаба: yoke_walk');
   });
 });
 
@@ -355,9 +356,9 @@ describe('Э0.6: verification из хаба доходит до плана', () 
       }),
     );
     const { container } = render(<StrengthSportConstructor />);
-    fireEvent.click(screen.getByText(/Далее → 2 👤 Атлет/));
-    fireEvent.click(screen.getByText(/Далее → 3 🏃 Вне зала/));
-    fireEvent.click(screen.getByText(/Далее → 4 🧩 Сплит/));
+    fireEvent.click(screen.getByText(/Далее → 2 Атлет/));
+    fireEvent.click(screen.getByText(/Далее → 3 Вне зала/));
+    fireEvent.click(screen.getByText(/Далее → 4 Сплит/));
     fireEvent.click(screen.getByLabelText('Цикл'));
     fireEvent.click(within(await screen.findByRole('dialog', { name: 'Цикл' })).getByText(/общая база/));
     fireEvent.click(screen.getByText(/Собрать план/));

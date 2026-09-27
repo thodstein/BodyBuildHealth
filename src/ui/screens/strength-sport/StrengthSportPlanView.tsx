@@ -9,7 +9,6 @@ import type { OutsideLoad } from '../../../engines/outside-load.engine';
 import { buildStrengthSportReport } from '../../../engines/strength-sport/strength-sport-finalize.engine';
 import { buildStrengthCsv, downloadStrengthCsv, downloadStrengthXlsx, buildStrengthPrintHtml, shareStrengthDigest, downloadStrengthIcs } from '../../../engines/strength-sport/strength-sport-export';
 import { buildWLMeetPlan, wlAttemptRationale } from '../../../engines/strength-sport/strength-sport-attempts.engine';
-import { estimate1RMFromVelocitySS } from '../../../engines/strength-sport/strength-sport-vbt.engine';
 import { buildSMEventPlan, smEventRationale } from '../../../engines/strength-sport/strength-sport-strongman-attempts.engine';
 import { EVENT_META } from '../../../engines/strength-sport/strength-sport-event-types';
 import { TAPER_CESSATION_DAYS } from '../../../engines/strength-sport/strength-sport-taper.engine';
@@ -30,8 +29,6 @@ type Props = {
   sex: 'male' | 'female';
   outside: OutsideLoad | null;
   outsideMetrics: { volumeMultiplier: number } | null;
-  vbtMap: Record<string, number>;
-  onVbtMap: (k: string, v: number) => void;
   expandedWeek: number | null;
   onToggleWeek: (w: number | null) => void;
   onUpdateEx: (wkIdx: number, day: number, exId: string, patch: Partial<{ weight: number; reps: string; rir: number }>) => void;
@@ -52,7 +49,7 @@ type Props = {
 
 export const StrengthSportPlanView: React.FC<Props> = ({
   plan, mode, modeColor, days, bodyweight, sex, outside, outsideMetrics,
-  vbtMap, onVbtMap, expandedWeek, onToggleWeek, onUpdateEx, onUpdateSet, onMoveEx, onMedleyChange,
+  expandedWeek, onToggleWeek, onUpdateEx, onUpdateSet, onMoveEx, onMedleyChange,
   annual, onAnnualChange, annualCycleSel, onAnnualCycleSel, rankedCycles,
   msg, setMsg, onExportProgram, onBuildSeason, onBuildAnnualFromCycles,
 }) => {
@@ -259,12 +256,10 @@ export const StrengthSportPlanView: React.FC<Props> = ({
                             <input type="number" value={s.weight} onChange={e=> onUpdateSet(wk.week-1,sess.day,ex.id,si,{weight:Number(e.target.value)||0})} style={{ width:62, minHeight:44, padding:'8px 6px', fontSize:14, fontWeight:700, background:'rgba(255,255,255,0.07)', color:'#fff', border:'0.5px solid rgba(255,255,255,0.12)', borderRadius:10, textAlign:'center', fontVariantNumeric:'tabular-nums' }} />кг
                             <input type="number" value={s.reps} onChange={e=> onUpdateSet(wk.week-1,sess.day,ex.id,si,{reps:Number(e.target.value)||0})} style={{ width:48, minHeight:44, padding:'8px 6px', fontSize:14, fontWeight:700, background:'rgba(255,255,255,0.07)', color:'#fff', border:'0.5px solid rgba(255,255,255,0.12)', borderRadius:10, textAlign:'center', fontVariantNumeric:'tabular-nums' }} />×
                             <input type="number" value={s.rir} onChange={e=> onUpdateSet(wk.week-1,sess.day,ex.id,si,{rir:Number(e.target.value)||0})} style={{ width:46, minHeight:44, padding:'8px 6px', fontSize:14, fontWeight:700, background:'rgba(255,255,255,0.07)', color:'#fff', border:'0.5px solid rgba(255,255,255,0.12)', borderRadius:10, textAlign:'center', fontVariantNumeric:'tabular-nums' }} />RIR
-                            <input type="number" step="0.05" placeholder="м/с" value={vbtMap[`${wk.week}-${sess.day}-${ex.id}-${si}`] ?? ''} onChange={e=> { const v=parseFloat(e.target.value); const k=`${wk.week}-${sess.day}-${ex.id}-${si}`; onVbtMap(k, Number.isFinite(v)?v:0); }} style={{ width:58, minHeight:44, padding:'8px 6px', fontSize:13, background:'rgba(255,255,255,0.07)', color:'#fff', border:'0.5px solid rgba(255,255,255,0.12)', borderRadius:10, textAlign:'center', fontVariantNumeric:'tabular-nums' }} />
                             {(ex.id.includes('yoke')||ex.id.includes('farmers')||ex.id.includes('carry')||ex.id.includes('husafell')||ex.id.includes('frame')||ex.id.includes('sled')||ex.id.includes('tire')||ex.id.includes('stone')||ex.id.includes('sandbag')) && <>
                               <input type="number" placeholder="м" title="дистанция м" value={(s as any).distanceM ?? ''} onChange={e=> onUpdateSet(wk.week-1,sess.day,ex.id,si,{distanceM: Number(e.target.value)||0} as any)} style={{ width:54, minHeight:44, padding:'8px 6px', fontSize:13, fontWeight:700, background:'rgba(255,159,10,0.10)', color:'#fff', border:'0.5px solid rgba(255,159,10,0.20)', borderRadius:10, textAlign:'center' }} />
                               <input type="number" placeholder="с" title="cap с" value={(s as any).timeCapS ?? ''} onChange={e=> onUpdateSet(wk.week-1,sess.day,ex.id,si,{timeCapS: Number(e.target.value)||0} as any)} style={{ width:54, minHeight:44, padding:'8px 6px', fontSize:13, fontWeight:700, background:'rgba(59,130,246,0.10)', color:'#fff', border:'0.5px solid rgba(59,130,246,0.20)', borderRadius:10, textAlign:'center' }} />
                             </>}
-                            {(() => { const v=vbtMap[`${wk.week}-${sess.day}-${ex.id}-${si}`]; if(!v||v<=0) return null; const e1=estimate1RMFromVelocitySS(s.weight, v, ex.id); return e1? <span style={{ fontSize:9, color:TEXT_3, fontVariantNumeric:'tabular-nums' }}>e1RM {Math.round(e1)}кг</span>:null; })()}
                           </span>
                         ))}
                       </div>

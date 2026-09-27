@@ -16,7 +16,6 @@ import { simulateContest } from '../../../engines/strength-sport/strength-sport-
 import { getSSCycleById } from '../../../data/ss-cycles/ss-cycle-index';
 import { subscribePlannerApply, getPlannerApply } from '../TrainingScreen_parts/planner-bridge';
 import { parseSmBridgePayload } from './sm-bridge-intake';
-import { shouldClearVbt } from '../../../engines/strength-sport/strength-sport-planner-pro.engine';
 import type { StrongmanContest } from '../../../engines/strength-sport/strength-sport-contest.types';
 import { ensureStrongmanApkStyles } from './strongman-apk-loader';
 
@@ -77,8 +76,8 @@ export function useStrengthSportWizard() {
   }, [annualCycleSel]);
   const [acwr, setAcwr] = useState<{ ratio:number; zone:string } | null>(null);
   const [hrv, setHrv] = useState<any>(null);
-  const [velocityLoss, setVelocityLoss] = useState<number>(0);
-  const [vbtPerLift, setVbtPerLift] = useState<Record<string, {best:number,last:number}>>({ snatch:{best:0,last:0}, clean:{best:0,last:0}, squat:{best:0,last:0} });
+  // VBT из визарда убран (решение 2026-09-27): velocityLoss/vbtPerLift/vbtMap
+  // больше не пишутся в план. LVP-калибровка (скорость→нагрузка) остаётся.
   const [lvpLift, setLvpLift] = useState<string>('snatch');
   const [lvpPoints, setLvpPoints] = useState<Array<{pct:number,velocity:number}>>([{pct:0.5, velocity:2.70},{pct:0.65, velocity:2.15},{pct:0.80, velocity:1.80},{pct:0.90, velocity:1.55}]);
   const [lvpResult, setLvpResult] = useState<any>(null);
@@ -105,9 +104,7 @@ export function useStrengthSportWizard() {
   ]);
   const [weakPoints, setWeakPoints] = useState<string[]>([]);
   const [diagnosticLevel, setDiagnosticLevel] = useState<string>('');
-  // VBT-история и sway из хаба (bridge): hubVelocity идёт в velocityHistory билда напрямую,
-  // минуя vbtMap (у него другой формат ключей week-day-ex-set).
-  const [hubVelocity, setHubVelocity] = useState<Record<string, number[]>>({});
+  // Sway из хаба (bridge) — уходит в rationale плана.
   const [swayCmBridge, setSwayCmBridge] = useState<number | null>(null);
   // Э0.6: честная полнота доказательной базы диагноза (строка уходит в rationale плана,
   // а печать SS-плана печатает rationale — т.е. видна и в плане, и на бумаге).
@@ -153,14 +150,8 @@ export function useStrengthSportWizard() {
       }
       // Стратегия попыток из хаба (раньше молча терялась — всегда был 'balanced')
       if (p.strategy) setContestStrategy(p.strategy);
-      // VBT/sway/уровень живут вне гейта слабых: иначе VBT-only пакеты молча умирали.
+      // Уровень диагноза живёт вне гейта слабых: иначе пакеты без слабых молча умирали.
       if (p.diagnosticLevel) setDiagnosticLevel(p.diagnosticLevel);
-      // VBT history from SM hub — в отдельный стейт (формат {liftId:[точки]},
-      // в vbtMap нельзя: там ключи week-day-ex-set, build() такое отбрасывает)
-      if (Object.keys(p.hubVelocity).length > 0) {
-        try { setHubVelocity(prev => ({ ...prev, ...p.hubVelocity })); } catch {}
-      }
-      if (p.velocityLossPct != null) setVelocityLoss(p.velocityLossPct);
       // Sway carry из хаба — в rationale плана (у билдера нет sway-входа)
       if (p.swayCm != null) setSwayCmBridge(p.swayCm);
       // Э0.6: verification хаба (доля 0-1 + каналы) → честная строка в rationale.
@@ -232,19 +223,6 @@ export function useStrengthSportWizard() {
   useEffect(() => {
     ensureStrongmanApkStyles();
   }, []);
-  const [vbtMap, setVbtMap] = useState<Record<string, number>>(() => {
-    try { const raw = localStorage.getItem('he_vbt_ss_v1'); return raw ? JSON.parse(raw) as Record<string,number> : {}; } catch { return {}; }
-  });
-  // Planner PRO P6: stale-VBT — смена цикла/режима чистит замеры week-day-ex-set (история не переживает rebuild).
-  const prevCycleRef = React.useRef<{ cycleId: string; mode: string } | null>(null);
-  useEffect(() => {
-    try {
-      const prev = prevCycleRef.current;
-      if (prev && shouldClearVbt(prev.cycleId, cycleId, prev.mode, mode)) setVbtMap({});
-      prevCycleRef.current = { cycleId, mode };
-    } catch {}
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cycleId, mode]);
   const [plan, setPlan] = useState<StrengthSportPlan | null>(null);
   const [annual, setAnnual] = useState(() => loadAnnualSS());
   const [diaryLoad, setDiaryLoad] = useState<number | null>(null);
@@ -260,7 +238,6 @@ export function useStrengthSportWizard() {
     if (!contest || mode !== 'strongman') return null;
     try { return simulateContest(contest as any, workMax as any, contestStrategy as any); } catch { return null; }
   }, [contest, workMax, contestStrategy, mode]);
-  useEffect(() => { try { localStorage.setItem('he_vbt_ss_v1', JSON.stringify(vbtMap)); } catch {} }, [vbtMap]);
   useEffect(() => { try { localStorage.setItem('he_ss_cycle_v1', cycleId); } catch {} }, [cycleId]);
   useEffect(() => { try { localStorage.setItem('he_ss_cycle_mode_v1', cycleMode); } catch {} }, [cycleMode]);
   // Ранжирование интернет-циклов под текущие параметры (селектор ss-cycles)
@@ -316,16 +293,16 @@ export function useStrengthSportWizard() {
     competitionDate, setCompetitionDate, patternId, setPatternId,
     cycleId, setCycleId, cycleMode, setCycleMode, cycleConsent, setCycleConsent,
     annualCycleSel, setAnnualCycleSel,
-    acwr, setAcwr, hrv, setHrv, velocityLoss, setVelocityLoss,
-    vbtPerLift, setVbtPerLift, lvpLift, setLvpLift, lvpPoints, setLvpPoints, lvpResult, setLvpResult,
+    acwr, setAcwr, hrv, setHrv,
+    lvpLift, setLvpLift, lvpPoints, setLvpPoints, lvpResult, setLvpResult,
     taperWeeks, setTaperWeeks, contest, setContest, contestStrategy, setContestStrategy,
     weightClass, setWeightClass, rpeCap, setRpeCap, deadliftGrip, setDeadliftGrip,
     blockModel, setBlockModel, autoDeload, setAutoDeload, conditioningDay, setConditioningDay,
     medleyPreview, setMedleyPreview, weakPoints, setWeakPoints, diagnosticLevel, setDiagnosticLevel,
-    hubVelocity, setHubVelocity, swayCmBridge, setSwayCmBridge, verificationNoteBridge,
+    swayCmBridge, setSwayCmBridge, verificationNoteBridge,
     orthoNote, setOrthoNote,
     taBridge, setTaBridge,
-    vbtMap, setVbtMap, plan, setPlan, annual, setAnnual,
+    plan, setPlan, annual, setAnnual,
     diaryLoad, setDiaryLoad, expandedWeek, setExpandedWeek, msg, setMsg,
     building, setBuilding, buildStage, setBuildStage, tick,
     outsideMetrics, contestSim, rankedCycles,

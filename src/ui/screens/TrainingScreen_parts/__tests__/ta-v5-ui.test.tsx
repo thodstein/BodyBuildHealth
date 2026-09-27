@@ -55,17 +55,21 @@ describe('ta v5 UI', () => {
     expect(container.querySelector('[data-wl="age-scale"]')?.textContent).toMatch(/Q-masters/);
     expect((container.querySelector('[data-wl="prog-age"]') as HTMLInputElement)?.value).toBe('52');
   });
-  it('П2: Kinovea-разбор сам ставит turnoverMs (ручной приоритетнее)', () => {
+  it('П2: импорт Kinovea убран — turnoverMs только из ручного ввода', () => {
     const { container } = render(<WLDiagnosticsHub />);
     fireEvent.click(screen.getByRole('button', { name: '📹 Видео' }));
-    const lines = ['time,x,y'];
-    for (let i = 0; i < 10; i++) lines.push(`${(i / 30).toFixed(3)},0,${i * 10}`);
-    for (let i = 1; i <= 8; i++) lines.push(`${((9 + i) / 30).toFixed(3)},0,${90 - i * 7}`);
-    fireEvent.change(container.querySelector('textarea')!, { target: { value: lines.join('\n') } });
-    fireEvent.click(screen.getByRole('button', { name: '📊 Разобрать Kinovea CSV' }));
-    expect(container.textContent).toMatch(/turnover \d+мс/);
+    // Кнопки разбора CSV больше нет
+    expect(screen.queryByRole('button', { name: '📊 Разобрать Kinovea CSV' })).toBeNull();
+    expect(container.querySelector('textarea[placeholder*="Kinovea"]')).toBeNull();
+    // Ручной turnover (вкладка «Рывок») продолжает доезжать до расчёта
     fireEvent.click(screen.getByRole('button', { name: '🏋️ Рывок' }));
-    expect(container.querySelector('[data-wl="turnover-note"]')?.textContent).toMatch(/уход \d+мс/);
+    const t = container.querySelector('[data-wl="turnover"]') as HTMLInputElement;
+    expect(t).toBeTruthy();
+    fireEvent.change(t, { target: { value: '320' } });
+    const note = container.querySelector('[data-wl="turnover-note"]');
+    expect(note).toBeTruthy();
+    expect(note!.textContent).toMatch(/320мс/);
+    expect(note!.textContent).toMatch(/уход/);
   });
   it('П3: снимки мощности дают тренд Вт', () => {
     localStorage.setItem('he_ta_pullpower_hist_v1', JSON.stringify([

@@ -33,18 +33,19 @@ import { buildAnnualFromSSCycles } from '../../../engines/strength-sport/strengt
 import type { StrengthSportInput, StrengthSportPlan } from '../../../engines/strength-sport/strength-sport.types';
 import { getWL, getStrong } from '../../../engines/strength-sport/strength-sport-volume';
 import { isNativeApp } from '../../../core/app-platform';
-import { collectSsVelocityHistory } from './sm-bridge-intake';
 import { weightClassFor, weightClassLine, weightClassForInput, smWeightClassesFor, RPE_CAP_OPTIONS, SS_BLOCK_MODELS, DELOAD_VS_TAPER_NOTE, scoreCheckin, pushCheckin, loadCheckins, saveCheckins, progHashOf, autoDeloadEffective, type SsCheckin } from '../../../engines/strength-sport/strength-sport-planner-pro.engine';
 import { CARD_STRONG, CARD_HERO, ROW, BTN, BTN_PRIMARY, BTN_SMALL, BTN_STRONG, INPUT, SELECT, TEXT_2, ACCENT, ACCENT_STRONG, ACCENT_GRAD, STRONG_GRAD, SectionCard, Badge, InfoBanner, GroupHeading, ProgressBar, ChipToggle, Field, Divider, Highlight, StrengthPopupSelect, StrengthPopupNumber, EventCard, LEVEL_RU, ZONE_RU, EQUIP_RU, MOBILITY_RU, MODE_RU, GOAL_RU, ruLabel } from './StrengthUI';
-import { BTN as T_BTN, BTN_GHOST as T_BTN_GHOST, STEP_PILL } from '../TrainingScreen_parts/training-ui';
+import { BTN as T_BTN, BTN_GHOST as T_BTN_GHOST, PlannerStepNav, usePlannerStepScroll, PLANNER_HEAD_BAR, PLANNER_HEAD_TITLE, PLANNER_STEP_NAV_WRAP } from '../TrainingScreen_parts/training-ui';
 
 type Step = StrengthSportStep;
-const STEP_LABEL_RU: Record<Step,string> = { params:'1 ⚙️ Параметры', athlete:'2 👤 Атлет', outside:'3 🏃 Вне зала', split:'4 🧩 Сплит', plan:'5 📋 План', quality:'6 ✅ Качество', export:'7 📤 Экспорт' };
-const STEP_GROUPS: Record<string, Step[]> = {
-  'ПАРАМЕТРЫ': ['params', 'athlete', 'outside', 'split'],
-  'ПЛАН': ['plan', 'quality'],
-  'ВЫДАЧА': ['export'],
-};
+/** Подписи шагов — в формате ББ-авто: номер + текст, эмодзи у шага выдачи. */
+const STEP_LABEL_RU: Record<Step,string> = { params:'1 Параметры', athlete:'2 Атлет', outside:'3 Вне зала', split:'4 Сплит', plan:'5 План', quality:'6 Качество', export:'📤 Экспорт' };
+/** Группы задают ТОЛЬКО разделители, как в ББ-авто (названия не рисуются). */
+const STEP_GROUPS: Step[][] = [
+  ['params', 'athlete', 'outside', 'split'],
+  ['plan', 'quality'],
+  ['export'],
+];
 
 /* Лёгкий haptic на навигации (guard — тишина вне устройства) */
 function buzzStep(): void {
@@ -63,20 +64,21 @@ export const StrengthSportConstructor: React.FC = () => {
     competitionDate, setCompetitionDate, patternId, setPatternId,
     cycleId, setCycleId, cycleMode, setCycleMode, cycleConsent, setCycleConsent,
     annualCycleSel, setAnnualCycleSel,
-    acwr, setAcwr, hrv, setHrv, velocityLoss, setVelocityLoss,
-    vbtPerLift, setVbtPerLift, lvpLift, setLvpLift, lvpPoints, setLvpPoints, lvpResult, setLvpResult,
+    acwr, setAcwr, hrv, setHrv,
+    lvpLift, setLvpLift, lvpPoints, setLvpPoints, lvpResult, setLvpResult,
     taperWeeks, setTaperWeeks, contest, setContest, contestStrategy, setContestStrategy,
     weightClass, setWeightClass, rpeCap, setRpeCap, deadliftGrip, setDeadliftGrip,
     blockModel, setBlockModel, autoDeload, setAutoDeload, conditioningDay, setConditioningDay,
     medleyPreview, setMedleyPreview, weakPoints, setWeakPoints, diagnosticLevel, setDiagnosticLevel,
-    hubVelocity, setHubVelocity, swayCmBridge, setSwayCmBridge, verificationNoteBridge,
+    swayCmBridge, setSwayCmBridge, verificationNoteBridge,
     orthoNote,
     taBridge, setTaBridge,
-    vbtMap, setVbtMap, plan, setPlan, annual, setAnnual,
+    plan, setPlan, annual, setAnnual,
     diaryLoad, setDiaryLoad, expandedWeek, setExpandedWeek, msg, setMsg,
     building, setBuilding, buildStage, setBuildStage, tick,
     outsideMetrics, contestSim, rankedCycles,
   } = useStrengthSportWizard();
+  usePlannerStepScroll('ss', [step]);
   // Откат спец-блока: снапшот тот же, что в хабе (TA_PLAN_KEY) — кнопки в обоих местах взаимозаменяемы.
   const [hasSpecPrev, setHasSpecPrev] = React.useState<boolean>(() => {
     try { return hasTAPlanPrev(); } catch { return false; }
@@ -195,10 +197,6 @@ export const StrengthSportConstructor: React.FC = () => {
         if(diaryTrend.length===0) diaryTrend=null;
       }
     }catch{}
-    // VBT-история одним проходом (vbtMap → per-lift → хаб), см. collectSsVelocityHistory.
-    // vbtMap НЕ очищаем: ключи week-day-ex-set стабильны между пересборками,
-    // замеры — это история последних сессий, она должна переживать rebuild.
-    const velocityHistory = collectSsVelocityHistory(vbtMap, vbtPerLift as any, hubVelocity);
     // Planner PRO P4-live: скор сохранённого чекина ≤2 включает делоды на сборке (механика штатная).
     let checkinDeload = false;
     let checkinScore: number | null = null;
@@ -220,8 +218,9 @@ export const StrengthSportConstructor: React.FC = () => {
       competitionDate: competitionDate || undefined,
       startDate: localIsoDate(),
       acwr: acwr as any,
-      velocityLossPct: velocityLoss > 0 ? velocityLoss : undefined,
-      velocityHistory: velocityHistory || undefined,
+      // VBT из UI и из снимка плана убран (решение 2026-09-27): новые планы
+      // больше не несут velocityLossPct/velocityHistory. Движки и старые
+      // планы их по-прежнему читают — обратная совместимость не сломана.
       patternId: patternId || undefined,
       diaryTrend: diaryTrend || undefined,
       taperWeeks: goal==='peaking' ? taperWeeks : undefined,
@@ -704,24 +703,31 @@ export const StrengthSportConstructor: React.FC = () => {
   const stepIndex = stepList.indexOf(step) + 1;
   const modeColor = mode === 'weightlifting' ? '#00e68a' : mode === 'strongman' ? '#f59e0b' : '#0ea5e9';
   const modeGrad = mode === 'weightlifting' ? ACCENT_GRAD : mode === 'strongman' ? STRONG_GRAD : 'linear-gradient(135deg, #0ea5e9, #6366f1)';
-  const groupEndKeys = new Set(Object.values(STEP_GROUPS).map(arr => arr[arr.length - 1]).filter(Boolean));
   // План без плана показывает CTA-пустышку со сборкой — лочим только качество.
   const needsPlan = (s: Step) => s === 'quality' && !plan;
   const exportLocked = !plan && !annual;
 
   const go = (s: Step) => { buzzStep(); setStep(s); };
+  /** Причина блокировки шага — показывается в шапке пилюли и во флеше,
+   *  чтобы «не нажимается» не выглядело поломкой. */
+  const stepLockReason = (s: string): string | null => {
+    const st = s as Step;
+    if (st === 'export' && exportLocked) return 'Сначала собери план или год';
+    if (needsPlan(st)) return 'Сначала собери план';
+    return null;
+  };
+  const stepDefs = stepList.map(id => ({ id, label: STEP_LABEL_RU[id] }));
   const renderStepNav = () => (
-    <div style={{ background: 'rgba(24,24,27,0.55)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 10, padding: '5px 6px', marginBottom: 2, display: 'flex', gap: 4, overflowX: 'auto' as const, alignItems: 'center' }}>
-      {stepList.map(s => {
-        const active = step === s;
-        const disabled = s === 'export' ? exportLocked : needsPlan(s);
-        return (
-          <span key={s} style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 as const }}>
-            <button disabled={disabled} onClick={() => { if (disabled) return; go(s); }} style={{ ...STEP_PILL(active), flexShrink: 0 as const, opacity: disabled ? 0.45 : 1 }}>{STEP_LABEL_RU[s]}</button>
-            {groupEndKeys.has(s) && s !== stepList[stepList.length - 1] && <span style={{ width: 1, height: 18, background: 'linear-gradient(to bottom, transparent, rgba(255,255,255,0.08), transparent)', flexShrink: 0 as const, margin: '0 2px', alignSelf: 'center' }} />}
-          </span>
-        );
-      })}
+    <div style={PLANNER_STEP_NAV_WRAP}>
+      <PlannerStepNav
+        dataNav="ss"
+        steps={stepDefs}
+        groups={STEP_GROUPS}
+        active={step}
+        onSelect={id => go(id as Step)}
+        lockReason={stepLockReason}
+        flash={setMsg}
+      />
     </div>
   );
   const renderNavRow = (prev: Step | null, next: Step | null, nextLabel?: string) => (
@@ -736,28 +742,28 @@ export const StrengthSportConstructor: React.FC = () => {
   const qualitySummary = weakPoints.length ? `Слабые: ${weakPoints.length}` : injuries.length ? `Травмы: ${injuries.length}` : equipment.length ? `Инвентарь: ${equipment.length}` : 'проверки по плану';
 
   return (
-    <div className={isNativeApp() ? 'train-strong ss-apk' : 'train-strong'} data-ss="root" style={{ padding: '0 10px 90px', display: 'flex', flexDirection: 'column', gap: 8, maxWidth: 880, margin: '0 auto' }}>
+    /* Корень — 1-в-1 с ББ-авто: без своих отступов и maxWidth, их даёт
+       хост окна конструктора (.tp-cbody). Иначе лента на телефоне уже ББ. */
+    <div className={isNativeApp() ? 'train-strong ss-apk' : 'train-strong'} data-ss="root" style={{ display: 'flex', flexDirection: 'column', gap: 8, width: '100%', minWidth: 0, maxWidth: '100%' }}>
       <style>{`input[type="range"]{ -webkit-appearance:none; appearance:none; height:8px; border-radius:999px; background:rgba(255,255,255,0.10); border:0.5px solid rgba(255,255,255,0.06); }
         input[type="range"]::-webkit-slider-thumb{ -webkit-appearance:none; width:26px; height:26px; border-radius:50%; background:${mode === 'strongman' ? '#f59e0b' : mode === 'hybrid' ? '#0ea5e9' : '#00e68a'}; border:3px solid #fff; box-shadow:0 2px 12px rgba(0,0,0,0.30), 0 0 0 5px ${mode === 'strongman' ? 'rgba(245,158,11,0.15)' : mode === 'hybrid' ? 'rgba(14,165,233,0.15)' : 'rgba(0,230,138,0.15)'}; cursor:pointer; }
         input[type="range"]::-moz-range-thumb{ width:22px; height:22px; border-radius:50%; background:${mode === 'strongman' ? '#f59e0b' : mode === 'hybrid' ? '#0ea5e9' : '#00e68a'}; border:3px solid #fff; box-shadow:0 2px 12px rgba(0,0,0,0.30); cursor:pointer; }
         input[type="date"]{ color-scheme: dark; }`}</style>
 
-      {/* HERO — компакт в стиле комбата: без glow-пятен и пустот */}
+      {/* Шапка и лента шагов — те же токены, что в ББ-авто. */}
+      <div style={PLANNER_HEAD_BAR}>
+        <span style={PLANNER_HEAD_TITLE}>{mode === 'weightlifting' ? '🏋️ Тяжёлая атлетика — PRO' : mode === 'strongman' ? '🪨 Силовой экстрим — PRO' : '🔀 Гибрид — PRO'}</span>
+        <Badge color={modeColor} bg={`${modeColor}14`} border={`${modeColor}30`}>{stepIndex}/7 · {STEP_LABEL_RU[step]}</Badge>
+      </div>
+      <div data-ss="steps">{renderStepNav()}</div>
+
+      {/* HERO — статусная строка режима (прогресс + бейджи), карточка кита. */}
       <div data-ss="hero" style={mode === 'strongman' ? CARD_STRONG : CARD_HERO}>
-        <div style={ROW}>
-          <span style={{ width: 44, height: 44, borderRadius: 13, background: modeGrad, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, color: mode === 'weightlifting' ? '#06281c' : '#fff', boxShadow: `0 6px 18px ${modeColor}44, inset 0 1px 0 rgba(255,255,255,0.28)`, flexShrink: 0 }}>{mode === 'weightlifting' ? '🏋️' : mode === 'strongman' ? '🪨' : '🔀'}</span>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 15, fontWeight: 900, color: '#fff', lineHeight: 1.05, letterSpacing: -0.3 }}>{mode === 'weightlifting' ? 'Тяжёлая атлетика — PRO' : mode === 'strongman' ? 'Силовой экстрим — PRO' : 'Гибрид — PRO'}</div>
-            <div style={{ fontSize: 11.5, color: '#fff', lineHeight: 1.35, marginTop: 2 }}>Torokhtiy 3/3/3/1 · Prilepin · SINCLAIR 2025 · 92/97/102%</div>
-          </div>
-          <Badge color={modeColor} bg={`${modeColor}14`} border={`${modeColor}30`}>{stepIndex}/7 · {STEP_LABEL_RU[step]}</Badge>
-        </div>
+        <div style={{ fontSize: 11, color: '#fff', lineHeight: 1.35 }}>Torokhtiy 3/3/3/1 · Prilepin · SINCLAIR 2025 · 92/97/102%</div>
         <ProgressBar value={stepIndex} max={7} color={modeColor} height={8} />
-        <div data-ss="steps">{renderStepNav()}</div>
         <div style={{ ...ROW, justifyContent:'space-between', gap: 8 }}>
           <div style={{ ...ROW, gap: 6 }}>
             {plan && <Badge color={modeColor} bg={`${modeColor}12`} border={`${modeColor}22`} icon="📋">План {plan.weeks}нед · {plan.patternId}</Badge>}
-            {Object.keys(hubVelocity).length > 0 && <Badge color="#f5b04c" bg="rgba(245,158,11,0.10)" border="rgba(245,158,11,0.18)">📥 Из хаба: {Object.entries(hubVelocity).map(([k, v]) => `${k} ${v.length}т`).join(' · ')}</Badge>}
             {(taBridge.attempts || taBridge.sinclair || taBridge.specWeeks != null || taBridge.causes || taBridge.fvr || (taBridge.correctiveDetail?.length ?? 0) > 0) && <Badge color="#7dd3fc" bg="rgba(56,189,248,0.10)" border="rgba(56,189,248,0.18)">📥 ТА-хаб{(taBridge.attempts?.snatch?.length || taBridge.attempts?.cj?.length) ? ' · заявки' : ''}{taBridge.sinclair ? ` · Sinclair ${taBridge.sinclair.value}` : ''}{taBridge.sinclair?.qm != null ? ` · QM ${taBridge.sinclair.qm}` : ''}{taBridge.specWeeks != null ? ` · спец ${taBridge.specWeeks}нед` : ''}{taBridge.causes ? ` · причины ${Object.keys(taBridge.causes).length}` : ''}{taBridge.fvr ? ` · FvR ${taBridge.fvr.snatchTh}` : ''}{taBridge.correctiveDetail?.length ? ` · коррекция ${taBridge.correctiveDetail.length}` : ''}</Badge>}
             {((taBridge as any).smPrefCorr || (taBridge as any).smCorrectiveDetail?.length) && <Badge color="#f5b04c" bg="rgba(245,158,11,0.10)" border="rgba(245,158,11,0.18)">📥 СМ-хаб{(taBridge as any).smPrefCorr ? ` · ⭐ ${Object.keys((taBridge as any).smPrefCorr).length}` : ''}{(taBridge as any).smCorrectiveDetail?.length ? ` · коррекция ${(taBridge as any).smCorrectiveDetail.length}` : ''}</Badge>}
             {plan && weakPoints.length > 0 && (taBridge.specTargets?.length ?? 0) > 0 && <button data-ss="apply-spec" onClick={handleApplySpecBlock} style={{ minHeight: 44, padding: '10px 14px', borderRadius: 999, border: '1px solid rgba(56,189,248,0.35)', background: 'rgba(56,189,248,0.14)', color: '#7dd3fc', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>📥 Спец-блок ({taBridge.specTargets!.length} нед)</button>}
@@ -889,33 +895,6 @@ export const StrengthSportConstructor: React.FC = () => {
             )}
           </SectionCard>
 
-          <SectionCard icon="⚡" title="VBT per-lift" subtitle="snatch/clean/squat — пороги 10% TA / 15% тяга (PLOS 2026)" accent collapsible defaultOpen={false} summary={`потеря ${velocityLoss}% · ${(['snatch','clean','squat'] as const).filter(l => ((vbtPerLift as any)[l]?.best || 0) > 0).length}/3 лифта`} status={(velocityLoss > 0 || (['snatch','clean','squat'] as const).some(l => ((vbtPerLift as any)[l]?.best || 0) > 0)) ? 'ok' : undefined}>
-            <Field label="VBT потеря" hint="потеря скорости vs бюджет · >20% → объём ×0.90, RIR+1"><div style={{ display:'flex', alignItems:'center', gap:8 }}><input type="range" min={0} max={40} value={velocityLoss} onChange={e=> setVelocityLoss(Number(e.target.value))} style={{ flex:1 }} /><Highlight color={velocityLoss>25?'#ff3b30': velocityLoss>20?'#ff9f0a':'#30d158'}>{velocityLoss}%</Highlight></div></Field>
-            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(180px, 1fr))', gap:8 }}>
-              {(['snatch','clean','squat'] as const).map(lift => {
-                const vals = (vbtPerLift as any)[lift] || {best:0,last:0};
-                const loss = vals.best>0 && vals.last>0 ? Math.round((vals.best - vals.last)/vals.best*100) : 0;
-                const col = loss>20 ? '#ef4444' : loss>10 ? '#f59e0b' : '#22c55e';
-                return (
-                  <div key={lift} style={{ background:'rgba(0,0,0,0.16)', padding:'10px', borderRadius:12, border:'0.5px solid rgba(255,255,255,0.07)', display:'flex', flexDirection:'column', gap:6 }}>
-                    <div style={{ fontSize:10, fontWeight:800, color:'#86efac', textTransform:'uppercase', letterSpacing:0.5 }}>{lift==='snatch'?'🏋️ Рывок':lift==='clean'?'🏋️ Толчок':'🦵 Присед'} · {lift}</div>
-                    <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
-                      <Field label="Best м/с"><input type="number" step={0.05} value={vals.best||''} onChange={e=> { const v=Number(e.target.value)||0; setVbtPerLift(s=> ({...s, [lift]:{...((s as any)[lift]||{best:0,last:0}), best:v}})); }} style={INPUT} placeholder="1.60" /></Field>
-                      <Field label="Last м/с"><input type="number" step={0.05} value={vals.last||''} onChange={e=> { const v=Number(e.target.value)||0; setVbtPerLift(s=> ({...s, [lift]:{...((s as any)[lift]||{best:0,last:0}), last:v}})); }} style={INPUT} placeholder="1.40" /></Field>
-                    </div>
-                    {loss>0 && <div style={{ fontSize:10, fontWeight:700, color:col }}>{loss}% · {loss>20?'⚠️ стоп':loss>10?'контроль':'✅'} · порог {lift==='snatch'||lift==='clean'?10:15}%</div>}
-                  </div>
-                );
-              })}
-            </div>
-            {Object.keys(hubVelocity).length > 0 && (
-              <div style={{ fontSize:11, color:'#f5b04c', background:'rgba(245,158,11,0.08)', border:'1px solid rgba(245,158,11,0.20)', padding:'8px 10px', borderRadius:10, display:'flex', gap:8, alignItems:'center', flexWrap:'wrap' }}>
-                <span>📥 Из хаба: {Object.entries(hubVelocity).map(([k, v]) => `${k} ${v.length}т`).join(' · ')}</span>
-                <button onClick={() => setHubVelocity({})} style={{ padding:'6px 12px', borderRadius:10, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.10)', color:'#fff', fontSize:11, fontWeight:700, cursor:'pointer' }}>✕ Сбросить</button>
-              </div>
-            )}
-          </SectionCard>
-
           <SectionCard icon="📈" title="LVP калибровка" subtitle="Скорость — нагрузка (Wood 2026 peak) 50/65/75/90%" accent collapsible defaultOpen={false} summary={lvpResult ? `${lvpLift} · r² ${lvpResult.r2}` : 'не калиброван'} status={lvpResult ? 'ok' : undefined}>
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
               <StrengthPopupSelect label="Лифт" value={lvpLift} onChange={v=> setLvpLift(v)} options={[{id:'snatch',label:'🏋️ Рывок'},{id:'clean',label:'🏋️ Толчок'},{id:'squat',label:'🦵 Присед'},{id:'deadlift',label:'🏋️ Тяга'},{id:'yoke_walk',label:'🚜 Йок'},{id:'farmers_walk',label:'🚜 Фермер'}]} />
@@ -1006,12 +985,12 @@ export const StrengthSportConstructor: React.FC = () => {
               <>
                 <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
                   <ChipToggle active={cycleMode==='faithful'} onClick={()=> setCycleMode('faithful')}>📜 Дословно (дефолт)</ChipToggle>
-                  <ChipToggle active={cycleMode==='adapt'} onClick={()=> setCycleMode('adapt')}>🛡️ Адаптировать (ACWR/VBT)</ChipToggle>
+                  <ChipToggle active={cycleMode==='adapt'} onClick={()=> setCycleMode('adapt')}>🛡️ Адаптировать (ACWR)</ChipToggle>
                 </div>
                 <div style={{ fontSize:10, color:'#fff', background:'rgba(255,255,255,0.03)', padding:'6px 8px', borderRadius:8, border:'0.5px solid rgba(255,255,255,0.06)' }}>
                   {cycleMode==='faithful'
                     ? 'Дословно: сеты/повторы/% 1-в-1 из источника, без авто-срезок объёма. Травмы и фолбэк снарядов действуют всегда.'
-                    : 'Адаптировать: поверх дословного — срезки ACWR/outside/VBT и дрейф ПМ по лифту.'}
+                    : 'Адаптировать: поверх дословного — срезки ACWR/outside и дрейф ПМ по лифту.'}
                 </div>
                 {(() => {
                   const tpl = getSSCycleById(cycleId);
@@ -1253,8 +1232,6 @@ export const StrengthSportConstructor: React.FC = () => {
           sex={sex}
           outside={outside}
           outsideMetrics={outsideMetrics}
-          vbtMap={vbtMap}
-          onVbtMap={(k, v) => setVbtMap(m => ({ ...m, [k]: v }))}
           expandedWeek={expandedWeek}
           onToggleWeek={(w) => setExpandedWeek(w)}
           onUpdateEx={updateEx}

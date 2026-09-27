@@ -167,12 +167,14 @@ for (const [file, hooks] of [
   }
 }
 // Шаги конструктора: хук data-cb="step" + APK-правило 44px по нему.
-mustContain(COMBAT_SRC + 'CombatConstructor.tsx', `data-cb="step"`, 'combat step hook');
+// Лента шагов с 2026-09-27 — общий компонент кита (как в ББ-авто), поэтому
+// хук приходит через pillAttrs, а aria-current/data-step — из training-ui.
+mustContain(COMBAT_SRC + 'CombatConstructor.tsx', `'data-cb': 'step'`, 'combat step hook');
 mustContain('src/styles-native.css', `[data-cb='step']`, 'combat step css hook');
 // 44px на тап-таргеты (guard на регресс к 40px — было .cb-chip).
 mustContain('src/styles-native.css', '.cb-chip {\n  min-height: 44px !important', 'combat cb-chip 44px');
-// a11y: aria-current на шагах + live-region на тосте.
-mustContain(COMBAT_SRC + 'CombatConstructor.tsx', `aria-current={active ? 'step' : undefined}`, 'combat step aria-current');
+// a11y: aria-current на шагах (в общем ките) + live-region на тосте.
+mustContain('src/ui/screens/TrainingScreen_parts/training-ui.tsx', `aria-current={isActive ? 'step' : undefined}`, 'planner step aria-current');
 mustContain(COMBAT_SRC + 'CombatConstructor.tsx', 'role="status" aria-live="polite"', 'combat toast live region');
 // …и ни одного нативного <select>/checkbox в боевом UI.
 for (const f of ['CombatConstructor.tsx', 'CombatPlanView.tsx', 'CombatUI.tsx', 'combat-annual-card.tsx', 'cb-camp-intel.tsx', 'cb-camp-strip.tsx', 'cb-camp-charts.tsx', 'cb-variants.tsx', 'cb-camp-measurements.tsx']) {

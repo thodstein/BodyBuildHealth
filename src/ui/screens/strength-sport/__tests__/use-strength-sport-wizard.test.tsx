@@ -55,7 +55,7 @@ describe('useStrengthSportWizard', () => {
     expect(result.current.msg).toMatch(/не найден/);
   });
 
-  it('мост weakpoints: контест/стратегия/VBT/sway из хаба доходят до стейта', () => {
+  it('мост weakpoints: контест/стратегия/sway из хаба доходят до стейта', () => {
     const { result } = renderHook(() => useStrengthSportWizard());
     act(() => {
       applyToPlanner({
@@ -78,13 +78,11 @@ describe('useStrengthSportWizard', () => {
     expect(result.current.mode).toBe('strongman');
     expect(result.current.contest).not.toBeNull();
     expect(result.current.contestStrategy).toBe('aggressive');
-    expect(result.current.velocityLoss).toBe(18);
     expect(result.current.swayCmBridge).toBe(4.2);
-    expect(result.current.hubVelocity).toEqual({ yoke_walk: [1.5, 1.2] });
     expect(result.current.weakPoints.length).toBeGreaterThan(0);
   });
 
-  it('мост VBT-only без слабых: скорость и sway доходят до стейта', () => {
+  it('мост VBT-only: скорость больше не попадает в стейт (поля плана убраны), sway — да', () => {
     const { result } = renderHook(() => useStrengthSportWizard());
     act(() => {
       applyToPlanner({
@@ -98,8 +96,10 @@ describe('useStrengthSportWizard', () => {
         } as any,
       });
     });
-    expect(result.current.velocityLoss).toBe(22);
-    expect(result.current.hubVelocity).toEqual({ snatch: [1.6, 1.2] });
+    // VBT из хаба парсится движком, но визард его больше не хранит
+    // (решение 2026-09-27) — новый план не получает velocity-полей.
+    expect('velocityLoss' in result.current).toBe(false);
+    expect('hubVelocity' in result.current).toBe(false);
     expect(result.current.swayCmBridge).toBe(3.5);
     expect(result.current.diagnosticLevel).toBe('warn');
     expect(result.current.weakPoints).toEqual([]);

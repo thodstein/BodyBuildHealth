@@ -247,6 +247,182 @@ export const BbFoldCard: React.FC<{
   );
 };
 
+/* ── Шаговая навигация планировщиков (единый образец ББ-авто) ──
+   Один компонент на ББ-авто, арм, ТА/стронг и единоборства: раньше у каждого
+   был свой бэкграунд строки шагов (0.92 / 0.55 / rgb(20,20,23)) и свой набор
+   разделителей, поэтому «визуально одинаковые» планировщики расходились. */
+
+export type PlannerStepDef = { id: string; label: string };
+
+/** Контейнер ленты шагов — плотный фон вместо стекла: blur(12px) давал лаги
+ *  при переключении шагов на телефоне. */
+export const PLANNER_STEP_NAV: React.CSSProperties = {
+  background: 'rgba(24,24,27,0.92)', border: '1px solid rgba(255,255,255,0.07)',
+  borderRadius: 10, padding: '5px 6px', marginBottom: 8, display: 'flex', gap: 4,
+  overflowX: 'auto', scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch',
+  alignItems: 'center',
+};
+
+/** Внешняя обёртка ленты (как в ББ-авто). */
+export const PLANNER_STEP_NAV_WRAP: React.CSSProperties = {
+  display: 'flex', gap: 4, marginBottom: 10, flexWrap: 'wrap', alignItems: 'center',
+};
+
+/** Вертикальный разделитель между группами шагов. */
+export const PLANNER_NAV_DIVIDER: React.CSSProperties = {
+  width: 1, height: 18, flexShrink: 0, margin: '0 2px', alignSelf: 'center',
+  background: 'linear-gradient(to bottom, transparent, rgba(255,255,255,0.08), transparent)',
+};
+
+/** Шапка конструктора (имя + действия) — единый вид. */
+export const PLANNER_HEAD_BAR: React.CSSProperties = {
+  marginBottom: 10, padding: '8px 12px', borderRadius: 12,
+  background: 'var(--accent-dim)', border: '1px solid var(--accent-glow)',
+  display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
+};
+
+export const PLANNER_HEAD_TITLE: React.CSSProperties = { fontSize: 13, fontWeight: 800, color: 'var(--accent)' };
+
+/** Глобальный флеш — виден на всех шагах, не только в параметрах. */
+export const PLANNER_FLASH: React.CSSProperties = {
+  marginBottom: 10, padding: '8px 12px', borderRadius: 10,
+  background: 'rgba(0,230,138,0.08)', border: '1px solid rgba(0,230,138,0.2)',
+  color: '#00e68a', fontSize: 11, fontWeight: 700,
+};
+
+/** Лента шагов конструктора. `groups` задаёт РАЗДЕЛИТЕЛИ, как в ББ-авто:
+ *  названия групп там намеренно не рисуются — визуально это полоса пилюль. */
+export const PlannerStepNav: React.FC<{
+  steps: PlannerStepDef[];
+  groups: string[][];
+  active: string;
+  /** Ключ трека — попадает в data-planner-step-nav, нужен хуку прокрутки. */
+  dataNav: string;
+  onSelect: (id: string) => void;
+  /** Причина блокировки шага — вместо молчаливого «не нажимается». */
+  lockReason?: (id: string) => string | null;
+  flash?: (msg: string) => void;
+  /** Совместимость с существующими хуками/тестами. */
+  navAttrs?: Record<string, string>;
+  pillClassName?: string;
+  pillAttrs?: (id: string) => Record<string, string>;
+}> = ({ steps, groups, active, dataNav, onSelect, lockReason, flash, navAttrs, pillClassName, pillAttrs }) => {
+  const groupEndKeys = new Set(groups.map(g => g[g.length - 1]).filter(Boolean));
+  const lastId = steps.length ? steps[steps.length - 1].id : null;
+  return (
+    <div {...navAttrs} data-planner-step-nav={dataNav} aria-label="Шаги" style={PLANNER_STEP_NAV}>
+      {steps.map(s => {
+        const isActive = active === s.id;
+        const reason = lockReason ? lockReason(s.id) : null;
+        const disabled = reason != null;
+        return (
+          <span key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+            <button
+              type="button"
+              className={pillClassName}
+              data-step={s.id}
+              data-active={isActive ? 'true' : 'false'}
+              disabled={disabled}
+              aria-current={isActive ? 'step' : undefined}
+              aria-label={s.label}
+              title={disabled ? reason! : undefined}
+              onClick={() => {
+                if (disabled) { if (flash) flash(`🔒 ${reason}`); return; }
+                onSelect(s.id);
+              }}
+              style={{ ...STEP_PILL(isActive), flexShrink: 0, opacity: disabled ? 0.45 : 1 }}
+              {...(pillAttrs ? pillAttrs(s.id) : null)}
+            >{s.label}</button>
+            {groupEndKeys.has(s.id) && s.id !== lastId && <span aria-hidden style={PLANNER_NAV_DIVIDER} />}
+          </span>
+        );
+      })}
+    </div>
+  );
+};
+
+/** Смена шага — скролл экрана наверх + активная пилюля в видимую зону. */
+export function usePlannerStepScroll(navKey: string, deps: React.DependencyList): void {
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  React.useEffect(() => {
+    try {
+      const scroller = document.querySelector('.screen.training-screen') as HTMLElement | null;
+      if (scroller && typeof scroller.scrollTo === 'function') scroller.scrollTo({ top: 0, behavior: 'smooth' });
+      const nav = document.querySelector(`[data-planner-step-nav="${navKey}"]`) as HTMLElement | null;
+      const activeBtn = nav?.querySelector('button[aria-current="step"]') as HTMLElement | null;
+      if (activeBtn && typeof activeBtn.scrollIntoView === 'function') {
+        activeBtn.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' });
+      }
+    } catch { /* нет DOM (SSR/jsdom) — не критично */ }
+  }, deps);
+}
+
+/** Переключатель-строка: заголовок + описание + трек/тамб (высота 44px). */
+export const BbRowSwitch: React.FC<{
+  checked: boolean;
+  onChange: (v: boolean) => void;
+  title: React.ReactNode;
+  desc?: React.ReactNode;
+  icon?: string;
+  accent?: string;
+  ariaLabel?: string;
+  disabled?: boolean;
+}> = ({ checked, onChange, title, desc, icon, accent = ACCENT, ariaLabel, disabled }) => (
+  <button
+    type="button"
+    role="switch"
+    aria-checked={checked}
+    aria-label={ariaLabel}
+    aria-disabled={disabled}
+    onClick={() => { if (!disabled) onChange(!checked); }}
+    style={{
+      width: '100%', display: 'flex', alignItems: 'center', gap: 10, margin: '0 0 6px',
+      padding: '10px 12px', minHeight: 44, borderRadius: 12, cursor: disabled ? 'not-allowed' : 'pointer', textAlign: 'left',
+      boxSizing: 'border-box', fontFamily: 'inherit', opacity: disabled ? 0.5 : 1,
+      background: checked ? `linear-gradient(135deg, ${accent}1e, rgba(24,24,27,0.35))` : 'rgba(255,255,255,0.03)',
+      border: checked ? `1px solid ${accent}66` : '1px solid rgba(255,255,255,0.08)',
+      transition: 'all .15s',
+    }}
+  >
+    {icon && <span style={{ fontSize: 16, flexShrink: 0 }}>{icon}</span>}
+    <span style={{ flex: 1, minWidth: 0 }}>
+      <span style={{ display: 'block', fontSize: 12, fontWeight: 700, color: checked ? accent : '#fff', lineHeight: 1.25 }}>{title}</span>
+      {desc && <span style={{ display: 'block', fontSize: 10, color: '#fff', lineHeight: 1.35, marginTop: 2 }}>{desc}</span>}
+    </span>
+    <span style={{ marginLeft: 'auto', width: 36, height: 20, borderRadius: 10, flexShrink: 0, position: 'relative', background: checked ? accent : 'rgba(255,255,255,0.15)', transition: 'background .2s' }}>
+      <span style={{ position: 'absolute', top: 2, left: checked ? 18 : 2, width: 16, height: 16, borderRadius: '50%', background: '#fff', transition: 'left .2s' }} />
+    </span>
+  </button>
+);
+
+/** Компактный чип-переключатель (чек-листы, инлайн-ряды): ≥44px, aria-pressed. */
+export const BbToggleChip: React.FC<{
+  checked: boolean;
+  onChange: (v: boolean) => void;
+  label: React.ReactNode;
+  accent?: string;
+  ariaLabel?: string;
+}> = ({ checked, onChange, label, accent = '#22c55e', ariaLabel }) => (
+  <button
+    type="button"
+    role="switch"
+    aria-checked={checked}
+    aria-label={ariaLabel}
+    onClick={() => onChange(!checked)}
+    style={{
+      display: 'inline-flex', alignItems: 'center', gap: 6, minHeight: 44, padding: '6px 12px',
+      borderRadius: 12, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
+      fontSize: 11, fontWeight: checked ? 800 : 600,
+      background: checked ? `${accent}22` : 'rgba(255,255,255,0.04)',
+      border: checked ? `1px solid ${accent}66` : '1px solid rgba(255,255,255,0.1)',
+      color: checked ? accent : '#fff',
+    }}
+  >
+    <span aria-hidden style={{ fontSize: 12 }}>{checked ? '✓' : '○'}</span>
+    <span style={{ minWidth: 0 }}>{label}</span>
+  </button>
+);
+
 /** Section title with accent bar. */
 export function SectionTitle({ label, icon }: { label: string; icon?: string }): React.ReactElement {
   return (

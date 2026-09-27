@@ -38,9 +38,9 @@ describe('TA spec opt-in', () => {
     // Мост виден сразу (бейдж ТА-хаба)
     expect(container.textContent).toContain('ТА-хаб');
     // До сплита и сборка параметрического плана (без цикла)
-    fireEvent.click(screen.getByText(/Далее → 2 👤 Атлет/));
-    fireEvent.click(screen.getByText(/Далее → 3 🏃 Вне зала/));
-    fireEvent.click(screen.getByText(/Далее → 4 🧩 Сплит/));
+    fireEvent.click(screen.getByText(/Далее → 2 Атлет/));
+    fireEvent.click(screen.getByText(/Далее → 3 Вне зала/));
+    fireEvent.click(screen.getByText(/Далее → 4 Сплит/));
     fireEvent.click(screen.getByText(/Собрать план/));
     await waitFor(() => expect(container.textContent).toContain('План 8нед'), { timeout: 12000 });
     // C9: детальная строка коррекции доехала до конструктора (бейдж моста;
@@ -66,9 +66,9 @@ describe('TA spec opt-in', () => {
       } as any,
     });
     const { container } = render(<StrengthSportConstructor />);
-    fireEvent.click(screen.getByText(/Далее → 2 👤 Атлет/));
-    fireEvent.click(screen.getByText(/Далее → 3 🏃 Вне зала/));
-    fireEvent.click(screen.getByText(/Далее → 4 🧩 Сплит/));
+    fireEvent.click(screen.getByText(/Далее → 2 Атлет/));
+    fireEvent.click(screen.getByText(/Далее → 3 Вне зала/));
+    fireEvent.click(screen.getByText(/Далее → 4 Сплит/));
     fireEvent.click(screen.getByText(/Собрать план/));
     await waitFor(() => expect(container.textContent).toContain('План 8нед'), { timeout: 12000 });
     fireEvent.click(await screen.findByText(/Спец-блок \(2 нед\)/, {}, { timeout: 5000 }));

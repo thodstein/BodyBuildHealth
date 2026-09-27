@@ -60,25 +60,19 @@ describe('E4.2 — сгон веса: баннер движка на экран�
   });
 });
 
-describe('E4.3 — VBT-рекомендация из движка', () => {
-  it('потеря скорости >30% даёт стоп-тон и точный текст движка', () => {
-    const plan = mkPlan();
-    render(<CbCampIntelCard plan={plan} velocityLoss={35} />);
-    const rec = vbtRecommendationCombat(35);
-    expect(rec.action).toBeTruthy();
-    expect(screen.getByText(new RegExp(`35% · ${rec.action.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`))).toBeTruthy();
-    expect(screen.getByText(/стоп/)).toBeTruthy();
-  });
-
-  it('потеря <=20% не стращает', () => {
-    render(<CbCampIntelCard plan={mkPlan()} velocityLoss={10} />);
-    expect(screen.getByText(/норма/)).toBeTruthy();
-    expect(screen.queryByText(/стоп/)).toBeNull();
-  });
-
-  it('без данных о VBT строки нет', () => {
+describe('E4.3 — потеря скорости убрана из разведки (2026-09-27)', () => {
+  // Строка «Потеря скорости» удалена вместе с VBT-полями плана. Движок
+  // vbtRecommendationCombat остаётся (его читают другие потребители), но
+  // карточка разведки больше не показывает потерю темпа — и не должна.
+  it('строки потери скорости нет ни при каких данных плана', () => {
     render(<CbCampIntelCard plan={mkPlan()} />);
     expect(screen.queryByText(/Потеря скорости/)).toBeNull();
+  });
+
+  it('движок рекомендации жив — тест самого движка остаётся в combat-области', () => {
+    const rec = vbtRecommendationCombat(35);
+    expect(rec.action).toBeTruthy();
+    expect(rec.rirAdd).toBeGreaterThanOrEqual(0);
   });
 });
 

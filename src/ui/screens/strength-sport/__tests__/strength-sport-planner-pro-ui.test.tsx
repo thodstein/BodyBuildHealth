@@ -11,13 +11,13 @@ beforeEach(() => {
 });
 
 function goToAthlete() {
-  fireEvent.click(screen.getByText(/Далее → 2 👤 Атлет/));
+  fireEvent.click(screen.getByText(/Далее → 2 Атлет/));
 }
 
 function goToSplit() {
   goToAthlete();
-  fireEvent.click(screen.getByText(/Далее → 3 🏃 Вне зала/));
-  fireEvent.click(screen.getByText(/Далее → 4 🧩 Сплит/));
+  fireEvent.click(screen.getByText(/Далее → 3 Вне зала/));
+  fireEvent.click(screen.getByText(/Далее → 4 Сплит/));
 }
 
 describe('Planner PRO UI', () => {

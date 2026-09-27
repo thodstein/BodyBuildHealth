@@ -29,7 +29,6 @@ import { combatToNutritionPayload, combatToCardioPayload } from '../../../engine
 import type { CombatNutritionPayload, CombatCardioPayload } from '../../../engines/combat/combat-integration.engine';
 import { getPlannerApply, subscribePlannerApply } from '../TrainingScreen_parts/planner-bridge';
 import { CB_STRICT_GROUPS, cbStrictGroupFor } from '../../../engines/combat/combat-selection';
-import { diagnoseVelocityLossCombat } from '../../../engines/combat/combat-vbt.engine';
 import { getDiaryTrendCB, getDiaryTrendCBAsync } from '../../../engines/combat/combat-diary.engine';
 import { loadHrvHistory, hrvEwma, hrvGrade, hrvFromHistory } from '../../../engines/combat/combat-monitoring.engine';
 import { useCombatWizard, type WizardStep } from './useCombatWizard';
@@ -39,10 +38,11 @@ import {
   SectionCard, StatTile, Badge, InfoBanner, GroupHeading, SectionNav, ProgressBar, Stepper, ChipToggle, Field, Divider, CardHeader, Highlight, AccentText, CombatPopupSelect, CombatPopupNumber,
   EQUIP_RU, MOBILITY_RU, LEVEL_RU, PHASE_RU, ZONE_RU, PERIODIZATION_RU, SESSION_TAG_RU, ruLabel, CbSwitch,
 } from './CombatUI';
-import { CARD as T_CARD, BTN as T_BTN, BTN_GHOST as T_BTN_GHOST, H as T_H, SMALL as T_SMALL, STEP_PILL, IN as T_IN } from '../TrainingScreen_parts/training-ui';
+import { CARD as T_CARD, BTN as T_BTN, BTN_GHOST as T_BTN_GHOST, H as T_H, SMALL as T_SMALL, IN as T_IN, PlannerStepNav, usePlannerStepScroll, PLANNER_HEAD_BAR, PLANNER_HEAD_TITLE, PLANNER_STEP_NAV_WRAP } from '../TrainingScreen_parts/training-ui';
 import { CombatPlanView, CbQualityMap, CbMesoCard, CbDiaryCard } from './CombatPlanView';
 
 type Step = WizardStep;
+/** Подписи шагов — в формате ББ-авто: номер + текст, эмодзи у шага выдачи. */
 const STEP_LABEL_RU: Record<Step, string> = {
   params: '1 Параметры',
   athlete: '2 Атлет',
@@ -50,13 +50,14 @@ const STEP_LABEL_RU: Record<Step, string> = {
   split: '4 Сплит',
   plan: '5 План',
   quality: '6 Качество',
-  export: '7 Экспорт',
+  export: '📤 Экспорт',
 };
-const STEP_GROUPS: Record<string, Step[]> = {
-  'ПАРАМЕТРЫ': ['params', 'athlete', 'outside', 'split'],
-  'ПЛАН': ['plan', 'quality'],
-  'ВЫДАЧА': ['export'],
-};
+/** Группы задают ТОЛЬКО разделители, как в ББ-авто (названия не рисуются). */
+const STEP_GROUPS: Step[][] = [
+  ['params', 'athlete', 'outside', 'split'],
+  ['plan', 'quality'],
+  ['export'],
+];
 const WM_LABEL_RU: Record<string, string> = { bench: 'Жим лёжа', squat: 'Присед', deadlift: 'Тяга', chest: 'Грудь', back: 'Спина', quads: 'Квадрицепс', hamstrings: 'Бицепс бедра', shoulders: 'Плечи' };
 /* RU-подписи для саммари/кнопок — те же строки, что в шитах выбора */
 const DISC_RU: Record<string, string> = { boxing: 'Бокс', mma: 'ММА', wrestling: 'Борьба', kickboxing: 'Кикбоксинг', general: 'Общая' };
@@ -126,7 +127,7 @@ export const CombatConstructor: React.FC = () => {
     equipment, setEquipment, mobility, setMobility, injuries, setInjuries, injInput, setInjInput, injExclude, setInjExclude,
     bodyweight, setBodyweight, sex, setSex, age, setAge,
     fightDate, setFightDate, taperWeeks, setTaperWeeks, startDate, setStartDate,
-    acwr, setAcwr, velocityLoss, setVelocityLoss, vbtBest, setVbtBest, vbtLast, setVbtLast, vbtHistory, setVbtHistory, vbtPerLift, setVbtPerLift, hrvLine, setHrvLine,
+    acwr, setAcwr, hrvLine, setHrvLine,
     patternId, setPatternId,
     workMax, setWorkMax, workMaxByExercise, setWorkMaxByExercise, showExactWM, setShowExactWM,
     plan, setPlan, history, setHistory, annual, setAnnual, diaryLoad, setDiaryLoad, msg, setMsg,
@@ -136,6 +137,7 @@ export const CombatConstructor: React.FC = () => {
     weightClass, setWeightClass, weightClassLimitKg, setWeightClassLimitKg, weightClassRuleset, setWeightClassRuleset, travelMode, setTravelMode, lutealPhase, setLutealPhase,
     outsideMetrics,
   } = useCombatWizard();
+  usePlannerStepScroll('combat', [step]);
   const [cycFilter, setCycFilter] = React.useState<string>('all');
 
   const go = (s: Step) => { buzzStep(); setStep(s); };
@@ -324,59 +326,9 @@ export const CombatConstructor: React.FC = () => {
     } catch {}
     const wcProtocol = weightCut > 0 ? buildWeightCutProtocol(weightCut, { startWeightKg: bodyweight, waterMode, sodiumMode, carbMode, heatSessions, weighInType: weighInType as any, confirmedManipulation, orsSodiumMmolPerDl: orsSodium, discipline, fiberGPerDay: weightCutFiber, dailyStepsTarget: weightCutSteps } as any) : null;
     const sparringLoad = sparringEnabled ? { hardSparSessions: sparringHard, techSparSessions: sparringTech, wrestlingSessions: sparringWrest } as any : null;
-    let effectiveLoss: number | null = velocityLoss > 0 ? velocityLoss : null;
-    if (vbtBest > 0 && vbtLast > 0) {
-      try { const d = diagnoseVelocityLossCombat(vbtBest, vbtLast, 20); effectiveLoss = d.lossPct; } catch {}
-    }
-    // per-lift VBT map приоритетнее скаляра (P1-2 per-lift UI)
-    let velocityLossPerLift: Record<string, number> | null = null;
-    try {
-      const perLift = vbtPerLift as Record<string, {best:number,last:number}>;
-      const map: Record<string, number> = {};
-      for (const [lift, vals] of Object.entries(perLift || {})) {
-        if (vals && vals.best>0 && vals.last>0) {
-          const d = diagnoseVelocityLossCombat(vals.best, vals.last, 20);
-          if (d.lossPct>5) map[lift] = Math.round(d.lossPct);
-        }
-      }
-      if (Object.keys(map).length) velocityLossPerLift = map;
-    } catch {}
-    // per-exercise EWMA history приоритетнее скаляра (P1-2)
-    let vbtHistToPass: any = null;
-    try {
-      if (Array.isArray(vbtHistory) && vbtHistory.length >= 2) vbtHistToPass = vbtHistory;
-      else {
-        const { loadVbtHistoryCB } = await import('../../../engines/combat/combat-vbt.engine');
-        const hist = loadVbtHistoryCB();
-        if (hist.length >= 2) vbtHistToPass = hist;
-      }
-    } catch {}
-    // сохраняем в историю per-lift + скаляр fallback (для EWMA 7/14д)
-    if ((vbtBest > 0 && vbtLast > 0) || velocityLossPerLift) {
-      try {
-        const { loadVbtHistoryCB, saveVbtHistoryCB } = await import('../../../engines/combat/combat-vbt.engine');
-        const hist = loadVbtHistoryCB();
-        const today = new Date().toISOString().slice(0,10);
-        if (velocityLossPerLift) {
-          for (const [lift, vals] of Object.entries(vbtPerLift as Record<string, { best: number; last: number }>)) {
-            if (vals.best>0 && vals.last>0) {
-              const w = (workMax as any)?.[lift] || (workMax as any)?.bench || bodyweight;
-              hist.push({ liftId: lift, velocity: vals.best, date: today, weight: w });
-              hist.push({ liftId: lift, velocity: vals.last, date: today, weight: w });
-            }
-          }
-        } else if (vbtBest>0 && vbtLast>0) {
-          const lifts = ['bench_bar','squat','row_bar'];
-          for (const lift of lifts) {
-            const w = (workMax as any)?.[lift] || (workMax as any)?.bench || bodyweight;
-            hist.push({ liftId: lift, velocity: vbtBest, date: today, weight: w });
-            hist.push({ liftId: lift, velocity: vbtLast, date: today, weight: w });
-          }
-        }
-        saveVbtHistoryCB(hist);
-        setVbtHistory(hist.slice(-48));
-      } catch {}
-    }
+    // VBT из UI и из снимка плана убран (решение 2026-09-27): новые планы больше
+    // не несут velocityLossPct/vbtHistory/velocityLossPerLift. Движки и старые
+    // планы их по-прежнему читают — обратная совместимость не сломана.
     let input: CombatInput = {
       discipline, goal, level, weeks, daysPerWeek: days,
       weightCutKg: weightCut, weightCutProtocol: wcProtocol as any, methodology, dupMode, intensityTech,
@@ -385,7 +337,7 @@ export const CombatConstructor: React.FC = () => {
       bodyweight, sex, age,
       workMax: workMax as any,
       workMaxByExercise: Object.keys(workMaxByExercise).length ? workMaxByExercise as any : undefined,
-      acwr: acwr as any, velocityLossPct: effectiveLoss, vbtHistory: vbtHistToPass as any, velocityLossPerLift: velocityLossPerLift as any,
+      acwr: acwr as any,
       outsideLoad: outsideEnabled && !sparringEnabled ? outside : null,
       sparringLoad,
       fightStyle: fightStyle as any,
@@ -601,28 +553,32 @@ export const CombatConstructor: React.FC = () => {
   const stepIndex = stepList.indexOf(step) + 1;
   const needsPlan = (s: Step) => (s === 'plan' || s === 'quality') && !plan;
   const exportLocked = !plan && !annual;
-  const groupEndKeys = new Set(Object.values(STEP_GROUPS).map(arr => arr[arr.length - 1]).filter(Boolean));
+  /** Причина блокировки шага — в шапке пилюли и во флеше, чтобы
+   *  «не нажимается» не выглядело поломкой. */
+  const stepLockReason = (s: string): string | null => {
+    const st = s as Step;
+    if (st === 'export' && exportLocked) return 'Сначала собери план или год';
+    if (needsPlan(st)) return 'Сначала собери план';
+    return null;
+  };
+  const stepDefs = stepList.map(id => ({ id, label: STEP_LABEL_RU[id] }));
 
+  /* Лента шагов — общий компонент training-ui (тот же, что в ББ-авто и в
+     арм/стронг-конструкторах). Класс .cb-steps и хук data-cb="step" перенесены
+     в него через navAttrs/pillAttrs: APK-слой и a11y-контракт сохранены. */
   const renderStepNav = () => (
-    <div className="cb-steps" aria-label="Шаги конструктора" style={{ background: 'rgba(24,24,27,0.55)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 10, padding: '5px 6px', marginBottom: 2, display: 'flex', gap: 4, overflowX: 'auto' as const, scrollbarWidth: 'none' as const, WebkitOverflowScrolling: 'touch' as const, alignItems: 'center' }}>
-      {stepList.map(s => {
-        const active = step === s;
-        const disabled = s === 'export' ? exportLocked : needsPlan(s);
-        return (
-          <span key={s} style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 as const }}>
-            <button
-              disabled={disabled}
-              onClick={() => { if (disabled) return; go(s); }}
-              data-cb="step"
-              data-step={s}
-              data-active={active ? 'true' : 'false'}
-              aria-current={active ? 'step' : undefined}
-              style={{ ...STEP_PILL(active), flexShrink: 0 as const, opacity: disabled ? 0.45 : 1 }}
-            >{STEP_LABEL_RU[s]}</button>
-            {groupEndKeys.has(s) && s !== stepList[stepList.length - 1] && <span style={{ width: 1, height: 18, background: 'linear-gradient(to bottom, transparent, rgba(255,255,255,0.08), transparent)', flexShrink: 0 as const, margin: '0 2px', alignSelf: 'center' }} />}
-          </span>
-        );
-      })}
+    <div style={PLANNER_STEP_NAV_WRAP}>
+      <PlannerStepNav
+        dataNav="combat"
+        steps={stepDefs}
+        groups={STEP_GROUPS}
+        active={step}
+        onSelect={id => go(id as Step)}
+        lockReason={stepLockReason}
+        flash={setMsg}
+        navAttrs={{ className: 'cb-steps' }}
+        pillAttrs={() => ({ 'data-cb': 'step' })}
+      />
     </div>
   );
 
@@ -647,32 +603,27 @@ export const CombatConstructor: React.FC = () => {
   const paramsSummary = `${ruLabel(PERIODIZATION_RU, periodizationModel ?? 'atr_10')} · ${weeks}нед · ${days}×`;
 
   return (
-    <div className="combat-constructor" data-step={step} style={{ padding: '0 10px 90px', display: 'flex', flexDirection: 'column', gap: 8, maxWidth: 860, margin: '0 auto' }}>
+    /* Корень — 1-в-1 с ББ-авто: без своих отступов и maxWidth, их даёт
+       хост окна конструктора (.tp-cbody). */
+    <div className="combat-constructor" data-step={step} style={{ display: 'flex', flexDirection: 'column', gap: 8, width: '100%', minWidth: 0, maxWidth: '100%' }}>
       <style>{`input[type="range"]{ -webkit-appearance:none; appearance:none; height:6px; border-radius:999px; background:rgba(255,255,255,0.08); }
         input[type="range"]::-webkit-slider-thumb{ -webkit-appearance:none; width:18px; height:18px; border-radius:50%; background:linear-gradient(135deg,#a855f7,#ec4899); border:2px solid #fff; box-shadow:0 2px 10px rgba(168,85,247,0.42); cursor:pointer; }
         input[type="range"]::-moz-range-thumb{ width:18px; height:18px; border-radius:50%; background:linear-gradient(135deg,#a855f7,#ec4899); border:2px solid #fff; box-shadow:0 2px 10px rgba(168,85,247,0.42); cursor:pointer; }
         input[type="date"]{ color-scheme: dark; }
       `}</style>
 
-      {/* HERO */}
+      {/* Шапка и лента шагов — те же токены, что в ББ-авто. */}
+      <div style={PLANNER_HEAD_BAR}>
+        <span style={PLANNER_HEAD_TITLE}>🥊 Единоборства — PRO силовая</span>
+        <span className="cb-hero-step"><Badge color="#fff" bg="linear-gradient(135deg, rgba(168,85,247,0.28), rgba(236,72,153,0.22))" border="rgba(255,255,255,0.14)">{stepIndex}/7 · {STEP_LABEL_RU[step]}</Badge></span>
+      </div>
+      {renderStepNav()}
+
+      {/* HERO — статусная строка (прогресс + бейджи), карточка кита. */}
       <div className="cb-hero" style={CARD_HERO}>
-        <div style={{ position: 'absolute', top: -40, right: -40, width: 180, height: 180, borderRadius: '50%', background: 'radial-gradient(circle, rgba(168,85,247,0.18), transparent 70%)', filter: 'blur(2px)', pointerEvents: 'none' }} />
-        <div style={{ position: 'absolute', bottom: -30, left: 50, width: 220, height: 120, borderRadius: '50%', background: 'radial-gradient(circle, rgba(236,72,153,0.10), transparent 70%)', filter: 'blur(2px)', pointerEvents: 'none' }} />
-        <div style={ROW}>
-          <span className="cb-hero-icon" style={{
-            width: 44, height: 44, borderRadius: 13, background: ACCENT_GRAD, display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 20, boxShadow: '0 6px 18px rgba(168,85,247,0.32), inset 0 1px 0 rgba(255,255,255,0.22)', flexShrink: 0,
-          }}>🥊</span>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div className="cb-hero-title" style={{ fontSize: 15, fontWeight: 900, color: '#fff', lineHeight: 1.05, letterSpacing: -0.3 }}>Единоборства — PRO силовая</div>
-            <div className="cb-hero-sub" style={{ fontSize: 11.5, color: '#fff', lineHeight: 1.35, marginTop: 2 }}>ATR 5/3/2 · кондиция 3 системы · тапер к дате · весогонка ISSN · спарринг · годовой</div>
-          </div>
-          <span className="cb-hero-step"><Badge color="#fff" bg="linear-gradient(135deg, rgba(168,85,247,0.28), rgba(236,72,153,0.22))" border="rgba(255,255,255,0.14)">{stepIndex}/7 · {STEP_LABEL_RU[step]}</Badge></span>
-        </div>
+        <div className="cb-hero-sub" style={{ fontSize: 11, color: '#fff', lineHeight: 1.35 }}>ATR 5/3/2 · кондиция 3 системы · тапер к дате · весогонка ISSN · спарринг · годовой</div>
 
         <div className="cb-progress"><ProgressBar value={stepIndex} max={7} color={ACCENT} height={8} /></div>
-
-        {renderStepNav()}
 
         <div className="cb-status" style={{ ...ROW, justifyContent: 'space-between', gap: 8 }}>
           <div style={ROW}>
@@ -858,49 +809,6 @@ export const CombatConstructor: React.FC = () => {
                 </InfoBanner>
               )}
               {hrvLine && <InfoBanner tone={hrvLine.includes('dangerous') ? 'warn' : hrvLine.includes('caution') ? 'warn' : 'ok'}>{hrvLine}</InfoBanner>}
-            </SectionCard>
-          </CbSec>
-
-          <CbSec title="⚡ VBT — потеря скорости" summary={velocityLoss > 0 ? `${velocityLoss}%` : 'не задан'}>
-            <SectionCard icon="⚡" title="VBT — потеря скорости" subtitle="Vitruve: >20% → RIR+1, >25% → вес −5%" accent>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                <Field label="Потеря скорости" hint={`${velocityLoss}% — бюджет`}>
-                  <div style={{ display:'flex', alignItems:'center', gap:8 }}><input type="range" min={0} max={40} value={velocityLoss} onChange={e => setVelocityLoss(Number(e.target.value))} style={{ flex:1 }} /><Highlight color={velocityLoss>25?'#ff3b30': velocityLoss>20?'#ff9f0a':'#a855f7'}>{velocityLoss}%</Highlight></div>
-                </Field>
-                <div style={{ fontSize: 11, color: '#fff', alignSelf: 'center', background: velocityLoss>20?'rgba(245,158,11,0.08)':'rgba(168,85,247,0.08)', padding: '8px 10px', borderRadius: 10, border: `0.5px solid ${velocityLoss>20?'rgba(245,158,11,0.18)':'rgba(168,85,247,0.14)'}`, display:'flex', gap:6, alignItems:'center' }}>
-                  Бюджет <Highlight color={velocityLoss>20?'#ff9f0a':'#a855f7'}>×{velocityLoss > 20 ? '0.90' : '1.00'}</Highlight> {velocityLoss > 20 ? '— снижение объёма' : '— норма'}
-                </div>
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                <Field label="Best скорость, м/с">
-                  <input type="number" step={0.05} value={vbtBest || ''} onChange={e => { const v = Number(e.target.value) || 0; setVbtBest(v); if (v > 0 && vbtLast > 0) { const d = diagnoseVelocityLossCombat(v, vbtLast, 20); setVelocityLoss(d.lossPct); } }} style={INPUT} placeholder="0.80" />
-                </Field>
-                <Field label="Last скорость, м/с">
-                  <input type="number" step={0.05} value={vbtLast || ''} onChange={e => { const v = Number(e.target.value) || 0; setVbtLast(v); if (vbtBest > 0 && v > 0) { const d = diagnoseVelocityLossCombat(vbtBest, v, 20); setVelocityLoss(d.lossPct); } }} style={INPUT} placeholder="0.60" />
-                </Field>
-              </div>
-              {vbtBest > 0 && vbtLast > 0 && (() => { const d = diagnoseVelocityLossCombat(vbtBest, vbtLast, 20); return (
-                <div style={{ fontSize: 11, fontWeight: 800, color: d.lossPct > 25 ? '#f87171' : d.lossPct > 20 ? '#fbbf24' : '#4ade80', background: d.lossPct > 25 ? 'rgba(239,68,68,0.08)' : d.lossPct > 20 ? 'rgba(245,158,11,0.08)' : 'rgba(34,197,94,0.08)', border: `1px solid ${d.lossPct > 25 ? 'rgba(239,68,68,0.18)' : d.lossPct > 20 ? 'rgba(245,158,11,0.18)' : 'rgba(34,197,94,0.18)'}`, padding: '8px 10px', borderRadius: 10 }}>
-                  {d.lossPct}% · {d.zone} · {d.recommendation} {d.exceeded ? '⚠️' : '✅'}
-                </div>
-              ); })()}
-              <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(180px, 1fr))', gap:8, marginTop:4 }}>
-                {(['squat','bench_bar','row_bar'] as const).map(lift => {
-                  const vals = (vbtPerLift as any)[lift] || {best:0,last:0};
-                  const d = vals.best>0 && vals.last>0 ? diagnoseVelocityLossCombat(vals.best, vals.last, 20) : null;
-                  return (
-                    <div key={lift} style={{ background:'rgba(0,0,0,0.14)', padding:'8px 10px', borderRadius:10, border:'0.5px solid rgba(255,255,255,0.06)', display:'flex', flexDirection:'column', gap:6 }}>
-                      <div style={{ fontSize:10, fontWeight:800, color:'#c4b5fd', textTransform:'uppercase', letterSpacing:0.5 }}>{lift === 'squat' ? '🦵 Присед' : lift === 'bench_bar' ? '🏋️ Жим' : '💪 Тяга'}</div>
-                      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
-                        <Field label="Best м/с"><input type="number" step={0.05} value={vals.best || ''} onChange={e => { const v=Number(e.target.value)||0; setVbtPerLift(s=> ({...s, [lift]:{...((s as any)[lift]||{best:0,last:0}), best:v}})); }} style={INPUT} placeholder="0.80" /></Field>
-                        <Field label="Last м/с"><input type="number" step={0.05} value={vals.last || ''} onChange={e => { const v=Number(e.target.value)||0; setVbtPerLift(s=> ({...s, [lift]:{...((s as any)[lift]||{best:0,last:0}), last:v}})); }} style={INPUT} placeholder="0.60" /></Field>
-                      </div>
-                      {d && <div style={{ fontSize:10, fontWeight:700, color: d.lossPct>25?'#f87171': d.lossPct>15?'#fbbf24':'#4ade80' }}>{d.lossPct}% · {d.zone} {d.exceeded?'⚠️':'✅'}</div>}
-                    </div>
-                  );
-                })}
-              </div>
-              <div style={{ fontSize:11, color:'#fff', background:'rgba(255,255,255,0.03)', padding:'6px 8px', borderRadius:8, border:'0.5px solid rgba(255,255,255,0.06)' }}>По лифтам приоритетнее скаляра: присед/жим/тяга режутся индивидуально (иначе скаляр Best/Last).</div>
             </SectionCard>
           </CbSec>
 
@@ -1368,7 +1276,6 @@ export const CombatConstructor: React.FC = () => {
           <CbCampIntelCard
             plan={plan}
             acwr={acwr as any}
-            velocityLoss={velocityLoss > 0 ? velocityLoss : null}
             outsideSessions={((plan.inputSnapshot as any)?.sessionsPerWeek as number) ?? 0}
           />
           <CbDiaryCard trends={diaryTrends} />

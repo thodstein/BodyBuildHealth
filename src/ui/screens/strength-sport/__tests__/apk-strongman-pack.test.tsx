@@ -153,7 +153,7 @@ describe('APK strongman pack', () => {
 
   it('пустая выдача: шаг План без плана показывает CTA, а не пустоту', async () => {
     render(<StrengthSportConstructor />);
-    fireEvent.click(screen.getByText(/📋 План/));
+    fireEvent.click(screen.getByText(/5 План/));
     expect(await screen.findByText('Плана пока нет')).toBeTruthy();
     fireEvent.click(screen.getByText(/← К сплиту/));
     expect(await screen.findByText('Интернет-цикл')).toBeTruthy();

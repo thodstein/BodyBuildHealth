@@ -15,7 +15,6 @@ import { weightCutSafetyBanner } from '../../../engines/combat/combat-weight-cut
 import { coreVolumeCheck } from '../../../engines/combat/combat-core.engine';
 import { conditioningBudgetCost, conditioningNeedsAerobicMaintenance } from '../../../engines/combat/combat-conditioning.engine';
 import { combatLoadStatus, combatHrvReportEwma, vbtVelocityForPct } from '../../../engines/combat/combat-monitoring.engine';
-import { vbtRecommendationCombat } from '../../../engines/combat/combat-vbt.engine';
 import { getNeckMeta, ufcNeckMatrixCategory } from '../../../engines/combat/combat-neck.engine';
 import {
   cutRisk,
@@ -35,11 +34,10 @@ const CORE_LABELS: Record<string, string> = {
 export const CbCampIntelCard: React.FC<{
   plan: CombatPlan;
   acwr?: { ratio: number; zone: string } | null;
-  velocityLoss?: number | null;
   outsideSessions?: number;
   /** Длительность поединка, мин. Нет в модели — берётся из снимка, если есть. */
   fightMinutes?: number | null;
-}> = ({ plan, acwr, velocityLoss, outsideSessions, fightMinutes }) => {
+}> = ({ plan, acwr, outsideSessions, fightMinutes }) => {
   const rows = useMemo(() => {
     const out: { key: string; icon: string; title: string; tone: 'ok' | 'warn' | 'danger'; body: string; badge?: string }[] = [];
 
@@ -118,8 +116,8 @@ export const CbCampIntelCard: React.FC<{
       });
     }
 
-    // 5. Нагрузка — ACWR/HRV/VBT одной строкой от движка
-    const loadNotes = combatLoadStatus(acwr as any, null, typeof velocityLoss === 'number' ? velocityLoss : null);
+    // 5. Нагрузка — ACWR/HRV одной строкой от движка
+    const loadNotes = combatLoadStatus(acwr as any, null, null);
     const hrv = combatHrvReportEwma();
     if (hrv) loadNotes.push(`HRV (EWMA ${hrv.ewma}): ${hrv.note}`);
     // RPE: через 10 минут достаточно — позже измерять не нужно (PMID 24570606)
@@ -131,19 +129,6 @@ export const CbCampIntelCard: React.FC<{
         title: 'Нагрузка и восстановление',
         tone: /danger|critical/i.test(loadNotes.join(' ')) ? 'danger' : /caution/i.test(loadNotes.join(' ')) ? 'warn' : 'ok',
         body: loadNotes.join(' · '),
-      });
-    }
-
-    // 5. Скорость — рекомендация движка по потере темпа
-    if (typeof velocityLoss === 'number' && velocityLoss > 0) {
-      const rec = vbtRecommendationCombat(velocityLoss);
-      out.push({
-        key: 'vbt',
-        icon: '⚡',
-        title: 'Потеря скорости',
-        tone: velocityLoss > 30 ? 'danger' : velocityLoss > 20 ? 'warn' : 'ok',
-        body: `${velocityLoss}% · ${rec.action} (RIR+${rec.rirAdd} · объём ×${rec.volumeMult})`,
-        badge: velocityLoss > 30 ? 'стоп' : velocityLoss > 20 ? 'коррекция' : 'норма',
       });
     }
 
@@ -179,7 +164,7 @@ export const CbCampIntelCard: React.FC<{
     }
 
     return out;
-  }, [plan, acwr, velocityLoss, outsideSessions]);
+  }, [plan, acwr, outsideSessions]);
 
   if (!rows.length) return null;
 
