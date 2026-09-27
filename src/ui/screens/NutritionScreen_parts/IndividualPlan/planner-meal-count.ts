@@ -71,6 +71,37 @@ export function recommendMealCount(
   return recommendMealCountDetailed(awakeH, proteinG, carbsG, opts).count;
 }
 
+// ─── Волна 1: HV-расширение ──────────────────────────────────────────────────
+// При 1500г У / 500г Б стандартный кап 45-75г белка на приём не подходит:
+// нужно 8-12 приёмов с прогрессивным капом.
+
+/** Прогрессивный кап белка на приём для HV-дней. */
+export function hvProteinCapPerMeal(
+  totalProteinG: number,
+  mealsCount: number,
+  weightKg: number,
+): number {
+  const perMeal = totalProteinG / mealsCount;
+  const base = perMeal <= 40 ? perMeal : perMeal <= 60 ? perMeal * 1.1 : Math.min(perMeal * 1.2, 350);
+  const weightBonus = Math.max(1, Math.min(1.3, weightKg / 80));
+  return Math.round(base * weightBonus);
+}
+
+/** Авто-расширение приёмов для HV-дней (1500г У / 500г Б). */
+export function autoMealCountForHv(
+  targetCarbsG: number,
+  targetProteinG: number,
+  weightKg: number,
+  baseMealsCount: number,
+): number {
+  const isHv = targetCarbsG >= 1200 || targetProteinG >= 400;
+  if (!isHv) return baseMealsCount;
+  const byCarbs = Math.ceil(targetCarbsG / 180);
+  const byProtein = Math.ceil(targetProteinG / 50);
+  const needed = Math.max(byCarbs, byProtein, 8);
+  return Math.min(needed, 12);
+}
+
 // ─── E1: структура дня — приёмы, окна инсулина, peri ────────────────────────
 export interface MealStructureInput {
   awakeH: number;
@@ -117,7 +148,9 @@ export function planMealStructure(input: MealStructureInput): MealStructure {
   // Каждому болюсному окну нужен «свой» регулярный приём-хозяин (движок инжектирует
   // окно отдельным приёмом — но раскладка остальных углеводов требует минимум +1 слот).
   if (insulinWindows > 0) regular = Math.max(regular, Math.min(9, insulinWindows + 3));
-  regular = Math.max(3, Math.min(10, regular));
+  // Волна 1: HV-расширение для экстремальных КБЖУ (1500г У / 500г Б)
+  regular = autoMealCountForHv(input.carbsG, input.proteinG, input.weightKg || 80, regular);
+  regular = Math.max(3, Math.min(12, regular));
   const periMeals = input.isTrainingDay ? (input.allowIntraWorkout ? 3 : 2) : 0;
   const binding: MealCountBinding =
     regular === rec.awakeFloor ? 'awake'

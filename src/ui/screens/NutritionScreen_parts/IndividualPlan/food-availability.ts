@@ -409,6 +409,10 @@ export interface DailyQuotaState {
    *  иначе фиксированные лимиты 80-кг натурала блокируют реализацию цели
    *  (рис ≤3 приёмов/день не закрывает 1161У; порошок ≤2 приёма — 500Б). 1.0 = legacy. */
   targetScale: number;
+  /** Волна 1: цели дня для экстремального масштабирования квот. */
+  targetKcal?: number;
+  targetCarbsG?: number;
+  targetProteinG?: number;
 }
 
 /** B8: масштаб квот от веса. Без веса/некорректный вес → 1.0 (обратно-совместимо). */
@@ -450,8 +454,19 @@ export function hvStyleWidensTopups(hvStyle: string | undefined): boolean {
   return hvStyle === 'practical' || hvStyle === 'mixed';
 }
 
-export function createDailyQuota(weightKg?: number, targetScale?: number): DailyQuotaState {
-  return { powderMeals: 0, familyUses: new Map(), familyGrams: new Map(), fruitMeals: 0, eggWhGrams: 0, weightScale: quotaWeightScale(weightKg), targetScale: Math.max(1, Math.min(1.6, Number(targetScale) || 1)) };
+export function createDailyQuota(
+  weightKg?: number,
+  targetScale?: number,
+  opts?: { targetKcal?: number; targetCarbsG?: number; targetProteinG?: number },
+): DailyQuotaState {
+  return {
+    powderMeals: 0, familyUses: new Map(), familyGrams: new Map(), fruitMeals: 0, eggWhGrams: 0,
+    weightScale: quotaWeightScale(weightKg),
+    targetScale: Math.max(1, Math.min(1.6, Number(targetScale) || 1)),
+    targetKcal: opts?.targetKcal,
+    targetCarbsG: opts?.targetCarbsG,
+    targetProteinG: opts?.targetProteinG,
+  };
 }
 
 // ── Лимиты (доказательная база: см. план «Профессиональный планировщик») ──
@@ -480,21 +495,26 @@ export const QUOTA_LIMITS = {
 export function blockedIdsForNextMeal(q: DailyQuotaState, nextMealType: string): Set<string> {
   const blocked = new Set<string>();
   // B8: грамм-лимиты масштабируются от веса атлета (приём-лимиты — нет).
-  // Масштаб цели: грамм-лимиты × (вес × цель, кламп 2.0) — 1500У-дню орехи 60 г
-  // не закрывают жировую комнату, а 500Б-дню порошок 2×60 г не даёт белка.
   const sc = (q as DailyQuotaState).weightScale || 1;
   const ts = (q as DailyQuotaState).targetScale || 1;
   const gramScale = Math.min(2, sc * ts);
-  const nutCapG = Math.round(QUOTA_LIMITS.maxNutsGramsPerDay * gramScale);
-  const oilCapG = Math.round(QUOTA_LIMITS.maxOilGramsPerDay * gramScale);
-  const eggCapG = Math.round(QUOTA_LIMITS.maxEggWholeGramsPerDay * gramScale);
-  // Один слот порошка резервируется под post-workout (трен-день) — перекусы не съедают оба.
-  const _powderCap = quotaMealCap(QUOTA_LIMITS.maxPowderMeals, ts, 3);
+  // Волна 1: экстремальные квоты для HV-дней (1500г У / 500г Б)
+  const ext = scaleQuotasForExtreme(
+    (q as DailyQuotaState).targetKcal || 0,
+    (q as DailyQuotaState).targetCarbsG || 0,
+    (q as DailyQuotaState).targetProteinG || 0,
+    ts,
+  );
+  const nutCapG = Math.round((ext ? ext.nuts : QUOTA_LIMITS.maxNutsGramsPerDay) * gramScale);
+  const oilCapG = Math.round((ext ? ext.oil : QUOTA_LIMITS.maxOilGramsPerDay) * gramScale);
+  const eggCapG = Math.round((ext ? ext.egg : QUOTA_LIMITS.maxEggWholeGramsPerDay) * gramScale);
+  // Один слот порошка резервируется под post-workout (трен-день).
+  const _powderCap = ext ? ext.powder : quotaMealCap(QUOTA_LIMITS.maxPowderMeals, ts, 3);
   const _powderEff = nextMealType === 'postworkout' ? _powderCap : _powderCap - 1;
   if (q.powderMeals >= _powderEff) {
     for (const id of POWDER_PROTEIN_IDS) blocked.add(id);
   }
-  const _famCap = quotaMealCap(QUOTA_LIMITS.maxFamilyMeals, ts, 5);
+  const _famCap = ext ? ext.family : quotaMealCap(QUOTA_LIMITS.maxFamilyMeals, ts, 5);
   const familyMealCap = (fam: string) => (fam === 'oats' ? quotaMealCap(QUOTA_LIMITS.maxOatsFamilyMeals, ts, 3) : _famCap);
   for (const [fam, uses] of q.familyUses) {
     const cap = fam === 'nuts' || fam === 'seeds' ? quotaMealCap(QUOTA_LIMITS.maxNutMeals, ts, 3)
@@ -505,7 +525,8 @@ export function blockedIdsForNextMeal(q: DailyQuotaState, nextMealType: string):
   const nutGrams = (q.familyGrams.get('nuts') || 0) + (q.familyGrams.get('seeds') || 0);
   if (nutGrams >= nutCapG) { markFamilyBlocked(blocked, 'nuts'); markFamilyBlocked(blocked, 'seeds'); }
   if ((q.familyGrams.get('oils') || 0) >= oilCapG) markFamilyBlocked(blocked, 'oils');
-  if (q.fruitMeals >= quotaMealCap(QUOTA_LIMITS.maxFruitMeals, ts, 5)) blocked.add('__ALL_FRUIT__');
+  const fruitCap = ext ? ext.fruit : quotaMealCap(QUOTA_LIMITS.maxFruitMeals, ts, 5);
+  if (q.fruitMeals >= fruitCap) blocked.add('__ALL_FRUIT__');
   if (q.eggWhGrams >= eggCapG) blocked.add('egg_whole');
   void nextMealType;
   return blocked;
@@ -513,6 +534,38 @@ export function blockedIdsForNextMeal(q: DailyQuotaState, nextMealType: string):
 
 function markFamilyBlocked(blocked: Set<string>, fam: string) {
   blocked.add(`__FAM__${fam}`);
+}
+
+// ─── Волна 1: Масштабирование квот для экстремальных дней ─────────────────────
+// При 1500г У / 500г Б стандартные квоты (масло 15г, орехи 60г, соусы 30г)
+// слишком узкие — атлет физически не может набрать калории без перебора.
+
+export interface ExtremeQuotaScale {
+  oil: number;
+  nuts: number;
+  egg: number;
+  fruit: number;
+  powder: number;
+  family: number;
+}
+
+export function scaleQuotasForExtreme(
+  targetKcal: number,
+  targetCarbsG: number,
+  targetProteinG: number,
+  targetScale: number,
+): ExtremeQuotaScale | null {
+  const isExtreme = targetCarbsG >= 1200 || targetProteinG >= 400 || targetKcal >= 7000;
+  if (!isExtreme) return null;
+  const scale = Math.min(1.5, Math.max(1, targetKcal / 5000));
+  return {
+    oil: Math.round(25 * scale),
+    nuts: Math.round(60 * Math.min(1.5, scale)),
+    egg: Math.round(230 * Math.min(1.3, scale)),
+    fruit: Math.min(6, Math.round(4 * scale)),
+    powder: Math.min(3, Math.max(2, Math.round(2 * scale))),
+    family: Math.min(5, Math.max(3, Math.round(3 * scale))),
+  };
 }
 
 /** Проверка конкретного продукта против блок-листа следующего приёма. */

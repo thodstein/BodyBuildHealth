@@ -162,3 +162,213 @@ export function liveLadderSteps(): DenseCarbStep[] {
     return DENSE_CARB_LADDER;
   }
 }
+
+// ─── Волна 1: Экстремальные КБЖУ (1500г У / 500г Б) ───────────────────────────
+// Проблема: статическая лестница DENSE_CARB_LADDER покрывает только «добивку»
+// 600-1000г углеводов. При 1500г У нужно 8-10 носителей, чередующихся между
+// приёмами с учётом квот семейств и капов съедобности.
+
+export interface HvCarbCarrier {
+  id: string;
+  /** Плотность углеводов (г/100г) — для ранжирования. */
+  carbPer100: number;
+  /** Кап одной порции (г/мл) — реальный съедобный потолок. */
+  portionCap: number;
+  /** Гликемический индекс (для чередования быстрых/медленных). */
+  gi: number;
+  /** Жидкий носитель — для intra/post окон. */
+  liquid?: boolean;
+}
+
+/**
+ * Расширенная лестница HV-носителей для экстремальных углеводных дней.
+ * Все id проверены по FOOD_DB. Порядок = от жидких к плотным.
+ */
+export const HV_CARB_CARRIERS: HvCarbCarrier[] = [
+  // Жидкие (intra/post/peri)
+  { id: 'orange_juice', carbPer100: 10, portionCap: 400, gi: 50, liquid: true },
+  { id: 'dextrose', carbPer100: 95, portionCap: 60, gi: 100, liquid: true },
+  { id: 'isoton', carbPer100: 6, portionCap: 500, gi: 40, liquid: true },
+  { id: 'drink_isotonic', carbPer100: 6, portionCap: 500, gi: 40, liquid: true },
+  // Сахаристые (быстрые)
+  { id: 'honey', carbPer100: 80, portionCap: 60, gi: 50 },
+  { id: 'jam', carbPer100: 65, portionCap: 55, gi: 60 },
+  { id: 'marmalade', carbPer100: 60, portionCap: 50, gi: 60 },
+  { id: 'zefir', carbPer100: 40, portionCap: 50, gi: 40 },
+  { id: 'pastila', carbPer100: 50, portionCap: 50, gi: 50 },
+  // Выпечка
+  { id: 'pryaniki', carbPer100: 75, portionCap: 80, gi: 70 },
+  { id: 'sushki', carbPer100: 75, portionCap: 80, gi: 70 },
+  { id: 'bread_white', carbPer100: 50, portionCap: 165, gi: 70 },
+  { id: 'sugar_cookies', carbPer100: 70, portionCap: 60, gi: 65 },
+  { id: 'bread_rye', carbPer100: 45, portionCap: 165, gi: 65 },
+  // Концентраты (сухофрукты)
+  { id: 'dates', carbPer100: 65, portionCap: 60, gi: 55 },
+  { id: 'raisins', carbPer100: 70, portionCap: 60, gi: 60 },
+  { id: 'dried_apricots', carbPer100: 60, portionCap: 60, gi: 50 },
+  { id: 'dried_banana_chips', carbPer100: 60, portionCap: 40, gi: 50 },
+  // Крупы сухие (плотные носители)
+  { id: 'corn_flakes', carbPer100: 80, portionCap: 150, gi: 80 },
+  { id: 'rice_white', carbPer100: 75, portionCap: 450, gi: 70 },
+  { id: 'cream_of_rice', carbPer100: 80, portionCap: 400, gi: 75 },
+  { id: 'buckwheat', carbPer100: 65, portionCap: 450, gi: 55 },
+  { id: 'oats_dry', carbPer100: 60, portionCap: 100, gi: 55 },
+  { id: 'quinoa', carbPer100: 60, portionCap: 400, gi: 55 },
+  { id: 'bulgur', carbPer100: 70, portionCap: 300, gi: 55 },
+  { id: 'millet', carbPer100: 65, portionCap: 400, gi: 65 },
+  { id: 'barley', carbPer100: 65, portionCap: 450, gi: 50 },
+  // Картофель/батат (варёные)
+  { id: 'potato_boiled', carbPer100: 17, portionCap: 300, gi: 70 },
+  { id: 'sweet_potato', carbPer100: 20, portionCap: 300, gi: 60 },
+  { id: 'potato_baked', carbPer100: 20, portionCap: 300, gi: 70 },
+];
+
+export interface HvCarrierSelection {
+  carriers: HvCarbCarrier[];
+  liquidCarriers: HvCarbCarrier[];
+  solidCarriers: HvCarbCarrier[];
+  totalCapacity: number;
+}
+
+/**
+ * Выбирает набор носителей для HV-дня с учётом:
+ * - Квоты семейства (не более 3-4 приёмов на семейство крупы)
+ * - Капов съедобности
+ * - Разнообразия (не повторять носитель в соседних приёмах)
+ * - Баланса GI (чередовать быстрые/медленные)
+ */
+export function selectHvCarbCarriers(
+  targetCarbsG: number,
+  weightKg: number,
+  opts: { mealsCount?: number; recentCarrierIds?: Set<string> } = {},
+): HvCarrierSelection {
+  const mealsCount = Math.max(6, opts.mealsCount || 8);
+  const recent = opts.recentCarrierIds || new Set<string>();
+  const available = HV_CARB_CARRIERS.filter(c => {
+    try {
+      return FOOD_DB.some(f => f.id === c.id);
+    } catch { return true; }
+  });
+  const liquid = available.filter(c => c.liquid);
+  const solid = available.filter(c => !c.liquid);
+  const perMealTarget = targetCarbsG / mealsCount;
+  const carriers: HvCarbCarrier[] = [];
+  const usedFamilies = new Map<string, number>();
+  const familyOf = (id: string): string => {
+    if (/rice|cream_of_rice/.test(id)) return 'rice';
+    if (/oats/.test(id)) return 'oats';
+    if (/buckwheat/.test(id)) return 'buckwheat';
+    if (/quinoa/.test(id)) return 'quinoa';
+    if (/bulgur/.test(id)) return 'bulgur';
+    if (/millet/.test(id)) return 'millet';
+    if (/barley/.test(id)) return 'barley';
+    if (/potato|sweet_potato/.test(id)) return 'potato';
+    if (/bread/.test(id)) return 'bread';
+    if (/dates|raisins|dried_apricots|dried_banana/.test(id)) return 'dried_fruit';
+    if (/honey|jam|marmalade|zefir|pastila/.test(id)) return 'sweets';
+    if (/juice|dextrose|isoton/.test(id)) return 'liquid';
+    if (/flakes|cookies|pryaniki|sushki/.test(id)) return 'bake';
+    return 'other';
+  };
+  const maxFamilyUses = Math.max(2, Math.floor(mealsCount / 3));
+  const pickForMeal = (mealIdx: number, isLiquid: boolean): HvCarbCarrier | null => {
+    const pool = isLiquid ? liquid : solid;
+    const candidates = pool.filter(c => {
+      const fam = familyOf(c.id);
+      const uses = usedFamilies.get(fam) || 0;
+      if (uses >= maxFamilyUses) return false;
+      if (recent.has(c.id) && mealIdx < 2) return false;
+      return true;
+    });
+    if (candidates.length === 0) return null;
+    const targetDensity = perMealTarget > 100 ? 60 : perMealTarget > 60 ? 40 : 20;
+    candidates.sort((a, b) => {
+      const aDist = Math.abs(a.carbPer100 - targetDensity);
+      const bDist = Math.abs(b.carbPer100 - targetDensity);
+      const aRecent = recent.has(a.id) ? 10 : 0;
+      const bRecent = recent.has(b.id) ? 10 : 0;
+      return (aDist + aRecent) - (bDist + bRecent);
+    });
+    const picked = candidates[0];
+    const fam = familyOf(picked.id);
+    usedFamilies.set(fam, (usedFamilies.get(fam) || 0) + 1);
+    return picked;
+  };
+  for (let i = 0; i < mealsCount; i++) {
+    const isLiquid = i === 0 || i === mealsCount - 1;
+    const carrier = pickForMeal(i, isLiquid);
+    if (carrier) carriers.push(carrier);
+  }
+  const totalCapacity = carriers.reduce((s, c) => s + c.portionCap, 0);
+  return {
+    carriers,
+    liquidCarriers: carriers.filter(c => c.liquid),
+    solidCarriers: carriers.filter(c => !c.liquid),
+    totalCapacity,
+  };
+}
+
+export interface ExtremeQuotaScale {
+  oil: number;
+  nuts: number;
+  egg: number;
+  fruit: number;
+  powder: number;
+  family: number;
+}
+
+/**
+ * Масштабирует порционные квоты для экстремальных дней.
+ * При 1500г У / 500г Б стандартные квоты (масло 15г, соусы 30г) слишком узкие.
+ * Возвращает null для обычных дней (байт-в-байт поведение).
+ */
+export function scalePortionCapsForExtreme(
+  targetKcal: number,
+  targetCarbsG: number,
+  targetProteinG: number,
+): ExtremeQuotaScale | null {
+  const isExtreme = targetCarbsG >= 1200 || targetProteinG >= 400 || targetKcal >= 7000;
+  if (!isExtreme) return null;
+  const scale = Math.min(1.5, Math.max(1, targetKcal / 5000));
+  return {
+    oil: Math.round(15 * scale),
+    nuts: Math.round(60 * Math.min(1.5, scale)),
+    egg: Math.round(230 * Math.min(1.3, scale)),
+    fruit: Math.min(6, Math.round(4 * scale)),
+    powder: Math.min(3, Math.max(2, Math.round(2 * scale))),
+    family: Math.min(5, Math.max(3, Math.round(3 * scale))),
+  };
+}
+
+/**
+ * Прогрессивный кап белка на приём для экстремальных дней.
+ * При 500г белка и 10 приёмах = 50г/приём — стандартный кап 45-75г не подходит.
+ */
+export function hvProteinCapPerMeal(
+  totalProteinG: number,
+  mealsCount: number,
+  weightKg: number,
+): number {
+  const perMeal = totalProteinG / mealsCount;
+  const base = perMeal <= 40 ? perMeal : perMeal <= 60 ? perMeal * 1.1 : Math.min(perMeal * 1.2, 350);
+  const weightBonus = Math.max(1, Math.min(1.3, weightKg / 80));
+  return Math.round(base * weightBonus);
+}
+
+/**
+ * Авто-расширение числа приёмов для HV-дней.
+ * При 1500г углеводов нужно минимум 8 приёмов (по 150-180г углеводов на приём).
+ */
+export function autoMealCountForHv(
+  targetCarbsG: number,
+  targetProteinG: number,
+  weightKg: number,
+  baseMealsCount: number,
+): number {
+  const isHv = targetCarbsG >= 1200 || targetProteinG >= 400;
+  if (!isHv) return baseMealsCount;
+  const byCarbs = Math.ceil(targetCarbsG / 180);
+  const byProtein = Math.ceil(targetProteinG / 50);
+  const needed = Math.max(byCarbs, byProtein, 8);
+  return Math.min(needed, 12);
+}

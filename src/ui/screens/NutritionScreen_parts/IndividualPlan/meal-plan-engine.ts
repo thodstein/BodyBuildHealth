@@ -46,7 +46,7 @@ import {
 } from "./food-availability";
 import { correctDayToTargets as _correctDayToTargets, mealTargetsStale as _mealTargetsStale } from "./day-target-corrector";
 import { getFoodAllergenTags } from "./planner-restrictions";
-import { edibilityCapFor, liveLadderSteps, isHighCarbDay as _isHighCarbDay, EDIBILITY_CAPS, extremeCapacityProfile, DEFAULT_EXTREME_CAPACITY, type ExtremeCapacityProfile } from "./planner-carb-density";
+import { edibilityCapFor, liveLadderSteps, isHighCarbDay as _isHighCarbDay, EDIBILITY_CAPS, extremeCapacityProfile, DEFAULT_EXTREME_CAPACITY, type ExtremeCapacityProfile, selectHvCarbCarriers, scalePortionCapsForExtreme, hvProteinCapPerMeal, autoMealCountForHv, type HvCarbCarrier, type HvCarrierSelection } from "./planner-carb-density";
 import { computeEA } from "./planner-ea.engine";
 import { planTypeFloorMods } from "./planner-day-targets";
 import { perMealProteinCapG } from "./planner-meal-count";
@@ -3270,7 +3270,10 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     else if (_carb >= 1100 && _need < 8) _need = 8;
     _need = Math.max(3, Math.min(10, _need));
     if (_need > input.mealsCount) {
-      const _pCap = perMealProteinCapG(input.weightKg);
+      const _isHv = (input.goalCarbsG || 0) >= 1200 || (input.goalProteinG || 0) >= 400;
+      const _pCap = _isHv
+        ? hvProteinCapPerMeal(input.goalProteinG || 0, _need, input.weightKg)
+        : perMealProteinCapG(input.weightKg);
       _autoMealsNote = `🍽 День требует ${_need} приёмов (было ${input.mealsCount}): нормальная тарелка — ≤${_pCap} г белка / ≤120 г углей / ≤900 ккал на приём.`;
       input = { ...input, mealsCount: _need };
     }
@@ -3988,7 +3991,11 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   // ≤1 приёма (овсянка ≤2), орехи/семена ≤2 приёмов ≤45 г, масла ≤2 приёмов, фрукты ≤3,
   // яйца ≤230 г. Блок-лист вычисляется перед КАЖДЫМ приёмом, после сборки — регистрация.
   // MealTargets: квоты скейлятся целью дня (900У/1500У/500Б растягивают капы).
-  const quota = createDailyQuota(input.weightKg, _pickCtx.dayTargetScale);
+  const quota = createDailyQuota(input.weightKg, _pickCtx.dayTargetScale, {
+    targetKcal: input.goalKcal,
+    targetCarbsG: input.goalCarbsG,
+    targetProteinG: input.goalProteinG,
+  });
   // Гейт семейств для пост-сборочных добавок (посадка/omega-fallback): они идут
   // мимо пуловых фильтров — квоты семейств проверяем напрямую. B8: грамм-лимиты ×масштаб веса.
   const _quotaFamilyOk = (id: string): boolean => {
