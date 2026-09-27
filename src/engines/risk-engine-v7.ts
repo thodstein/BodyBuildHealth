@@ -456,8 +456,10 @@ export function runV7Simulation(input: V7RiskInput): V7RiskResult {
 
   // 11. Build legacy RiskResult (use organSummary meanS as proxy for totalDamage)
   const systemBreakdown: Record<string, { raw: number; net: number }> = {};
-  for (const sys of RISK_SYSTEMS_V7) {
-    const matrixSys = matrix.systems[sys];
+  // Источник истины — сама матрица: система попадает сюда только если модель её
+  // описала. Перебор по статическому RISK_SYSTEMS_V7 после удаления неописанных
+  // систем из матрицы давал бы undefined на неописанных ключах.
+  for (const [sys, matrixSys] of Object.entries(matrix.systems)) {
     systemBreakdown[sys] = { raw: matrixSys.raw, net: matrixSys.net };
   }
   const osHeart = organSummary.heart?.meanS ?? 0;
@@ -481,8 +483,7 @@ export function runV7Simulation(input: V7RiskInput): V7RiskResult {
 
   const mechanismBreakdown: Record<string, number> = {};
   const mechanismDetail: Record<string, MechanismCell> = {};
-  for (const sys of RISK_SYSTEMS_V7) {
-    const matrixSys = matrix.systems[sys];
+  for (const [sys, matrixSys] of Object.entries(matrix.systems)) {
     for (const [mechIdx, mechData] of Object.entries(matrixSys.mechanisms)) {
       const key = sys + '_m' + mechIdx;
       mechanismBreakdown[key] = mechData.P_raw * 100;

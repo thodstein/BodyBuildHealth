@@ -827,7 +827,7 @@ export interface MatrixResult {
 }
 
 // Base risk per (system, mechanism)
-const BASE_RISK: Record<string, Record<number, number>> = {
+export const BASE_RISK: Record<string, Record<number, number>> = {
   cardio: { 1: 0.08, 2: 0.10, 3: 0.06, 4: 0.07, 5: 0.05, 6: 0.04, 7: 0.05, 8: 0.04 },
   hepatic: { 1: 0.07, 2: 0.08, 3: 0.06, 4: 0.05, 5: 0.04, 6: 0.06, 7: 0.08, 8: 0.06 },
   renal: { 1: 0.06, 2: 0.04, 3: 0.05, 4: 0.04, 5: 0.03, 6: 0.02, 7: 0.04 },
@@ -844,7 +844,7 @@ const BASE_RISK: Record<string, Record<number, number>> = {
   vessels: { 1: 0.06, 2: 0.05, 3: 0.08, 4: 0.04, 5: 0.04, 6: 0.03, 7: 0.03 },
 };
 
-const MECH_WEIGHTS: Record<string, Record<number, number>> = {
+export const MECH_WEIGHTS: Record<string, Record<number, number>> = {
   cardio: { 1: 0.14, 2: 0.16, 3: 0.12, 4: 0.13, 5: 0.11, 6: 0.10, 7: 0.12, 8: 0.12 },
   hepatic: { 1: 0.15, 2: 0.15, 3: 0.12, 4: 0.11, 5: 0.10, 6: 0.11, 7: 0.13, 8: 0.13 },
   renal: { 1: 0.20, 2: 0.17, 3: 0.16, 4: 0.14, 5: 0.13, 6: 0.08, 7: 0.12 },
@@ -1091,11 +1091,26 @@ export function computeV7Matrix(input: MatrixInput, supportIds: string[] = []): 
 
   for (const sys of RISK_SYSTEMS_V7) {
     const systemRisk: SystemRisk = { raw: 0, net: 0, mechanisms: {} };
-    const baseRisks = BASE_RISK[sys] ?? {};
+    const baseRisks = BASE_RISK[sys];
     const weights = MECH_WEIGHTS[sys] ?? {};
 
-    for (let mechIdx = 1; mechIdx <= 9; mechIdx++) {
-      const base = baseRisks[mechIdx] ?? 0.02;
+    // Модель V7 описана не для всех систем из RISK_SYSTEMS_V7: считаем только те,
+    // у которых есть собственные механизмы (BASE_RISK). Система без модели не даёт
+    // ни балла, ни вклада в индекс. Раньше здесь стоял перебор 1..9 с подстановками
+    // ?? 0.02 / ?? 1/7: неописанные системы давали ~2.57% из воздуха и опускали
+    // индекс, а описанные — получали фантомные слоты. Совпадение ключей BASE_RISK
+    // и MECH_WEIGHTS по каждой системе держит тест v7-no-phantom-mechanisms.
+    if (!baseRisks) continue;
+    const mechIdxs = Object.keys(baseRisks)
+      .map(Number)
+      .filter(i => Number.isFinite(i))
+      .sort((a, b) => a - b);
+    if (mechIdxs.length === 0) continue;
+
+    for (const mechIdx of mechIdxs) {
+      const base = baseRisks[mechIdx];
+      // Механизм без базового риска в модели не считаем — и не выдумываем значение.
+      if (typeof base !== 'number' || !Number.isFinite(base)) continue;
 
       const geneticMult = getGeneticMultiplier(input.genetics, sys, mechIdx);
       const labF = computeLabFactorForMech(input.labs, sys, mechIdx, input.sex);
@@ -1125,7 +1140,11 @@ export function computeV7Matrix(input: MatrixInput, supportIds: string[] = []): 
 
     let raw = 0, net = 0;
     for (const [mechStr, mechData] of Object.entries(systemRisk.mechanisms)) {
-      const w = weights[Number(mechStr)] ?? 1/7;
+      const w = weights[Number(mechStr)];
+      // Механизм без веса нельзя усреднять — пропускаем, а не подставляем 1/7.
+      // Сумма весов описанной системы равна 1 (держит тот же тест), поэтому
+      // нормировки здесь нет и числа описанных систем не меняются.
+      if (typeof w !== 'number' || !Number.isFinite(w)) continue;
       raw += w * mechData.P_raw;
       net += w * mechData.P_net;
     }

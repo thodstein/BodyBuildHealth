@@ -49,6 +49,17 @@ function hasValidMech(sysKey: string, mechIdx: number): boolean {
   return getMechName(sysKey, mechIdx) !== '';
 }
 
+// Форма модели берётся из самой матрицы, а не из зашитой строки: после удаления
+// неописанных систем и фантомных слотов зашитое «18 систем × 7-9 механизмов»
+// перестало соответствовать тому, что реально считает движок.
+function v7ModelShape(matrix: { systems?: Record<string, { mechanisms?: Record<string, unknown> }> }): string {
+  const counts = Object.values(matrix.systems ?? {}).map(s => Object.keys(s.mechanisms ?? {}).length);
+  if (counts.length === 0) return 'нет описанных систем в модели';
+  const min = Math.min(...counts);
+  const max = Math.max(...counts);
+  return counts.length + ' систем · ' + (min === max ? String(min) : min + '–' + max) + ' механизмов в системе';
+}
+
 const SENSITIVITY_LABELS: Record<string, string> = {
   proteinPerKg: 'Белок (г/кг)', fiberG: 'Клетчатка', omega3G: 'Омега-3',
   sodiumG: 'Натрий', potassiumG: 'Калий', sleepHours: 'Сон',
@@ -329,7 +340,7 @@ export const V7RiskDisplay: React.FC<{
   const renderMatrix = () => (
     <div className="card" style={{ marginBottom: 12, padding:16, borderRadius:18, background:'rgba(20,22,30,0.55)', border:'1px solid rgba(255,255,255,0.09)' }}>
       <h3 style={{ margin: '0 0 6px 0', fontSize:15, fontWeight:800, color:'#fff' }}>🔲 Матрица рисков V7</h3>
-      <p style={{ fontSize: 12, color: '#fff', margin: '0 0 12px 0' }}>18 систем × 7-9 механизмов</p>
+      <p style={{ fontSize: 12, color: '#fff', margin: '0 0 12px 0' }}>{v7ModelShape(matrix)}</p>
       {Object.entries(matrix.systems).map(([sysKey, sysData]: [string, any]) => {
         const label = SYSTEM_NAMES_RU[sysKey] || sysKey;
         return (
