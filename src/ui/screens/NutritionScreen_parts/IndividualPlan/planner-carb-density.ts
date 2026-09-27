@@ -294,10 +294,14 @@ export function selectHvCarbCarriers(
     usedFamilies.set(fam, (usedFamilies.get(fam) || 0) + 1);
     return picked;
   };
+  const isExtreme = perMealTarget > 100;
+  const carriersPerMeal = isExtreme ? 3 : 1;
   for (let i = 0; i < mealsCount; i++) {
     const isLiquid = i === 0 || i === mealsCount - 1;
-    const carrier = pickForMeal(i, isLiquid);
-    if (carrier) carriers.push(carrier);
+    for (let j = 0; j < carriersPerMeal; j++) {
+      const carrier = pickForMeal(i, isLiquid);
+      if (carrier) carriers.push(carrier);
+    }
   }
   const totalCapacity = carriers.reduce((s, c) => s + c.portionCap, 0);
   return {
