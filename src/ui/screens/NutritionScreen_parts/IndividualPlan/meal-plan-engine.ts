@@ -227,6 +227,72 @@ const POSTW_FAST_PROTEIN_G = 35;
 const POSTW_FAST_CARB_G = 60;
 const INTRA_EAA_G = 12;
 const INTRA_CARB_G_PER_H = 40;
+
+// ─── Wave 5: Peri-workout nutrition ─────────────────────────────────────
+// Easily digestible carbs for pre-workout (low fiber, moderate GI, fast gastric emptying).
+// Sources: white rice, bread, cream of rice, pasta, banana, potato.
+const PREWORKOUT_EASY_CARB_IDS = new Set([
+  'rice_white', 'rice_basmati', 'bread_white', 'bread_whole_wheat', 'cream_of_rice',
+  'pasta', 'potato', 'banana', 'oats', 'honey', 'jam', 'marmalade',
+  'rice_cakes', 'corn_flakes', 'muesli', 'granola', 'pancakes',
+]);
+
+// Fast-absorbing protein IDs for post-workout (whey, egg white, chicken breast).
+const POSTWORKOUT_FAST_PROTEIN_IDS = new Set([
+  'whey_isolate', 'whey_concentrate', 'whey_protein', 'egg_white',
+  'chicken_breast', 'turkey_breast', 'white_fish', 'cottage_cheese',
+  'greek_yogurt', 'casein', 'supp_pea_protein', 'supp_soy_isolate',
+]);
+
+/**
+ * Wave 5: Carb timing adjustment based on training schedule.
+ * On training days: shift carbs toward peri-workout windows (pre/post).
+ * On rest days: distribute more evenly, slight evening emphasis.
+ */
+export function carbTimingForTrainingDay(
+  isTrainingDay: boolean,
+  baseWeights: Record<string, number>,
+): Record<string, number> {
+  if (!isTrainingDay) {
+    // Rest day: reduce peri weights slightly, boost breakfast/lunch
+    const adjusted = { ...baseWeights };
+    if (adjusted.prew) adjusted.prew = Math.max(0.3, adjusted.prew * 0.6);
+    if (adjusted.postw) adjusted.postw = Math.max(0.4, adjusted.postw * 0.7);
+    if (adjusted.breakfast) adjusted.breakfast = adjusted.breakfast * 1.15;
+    if (adjusted.lunch) adjusted.lunch = adjusted.lunch * 1.1;
+    return adjusted;
+  }
+  // Training day: boost peri windows
+  const adjusted = { ...baseWeights };
+  if (adjusted.prew) adjusted.prew = adjusted.prew * 1.3;
+  if (adjusted.postw) adjusted.postw = adjusted.postw * 1.2;
+  if (adjusted.intra) adjusted.intra = adjusted.intra * 1.1;
+  return adjusted;
+}
+
+/**
+ * Wave 5: Check if a food item is suitable for pre-workout (easily digestible carb).
+ */
+export function isPreWorkoutEasyCarb(food: FoodItem): boolean {
+  if (!food) return false;
+  if (PREWORKOUT_EASY_CARB_IDS.has(food.id)) return true;
+  // Fallback: low fiber (<3g/100g) and moderate GI (40-70)
+  const fiber = food.fiber || 0;
+  const gi = food.gi || 50;
+  return fiber < 3 && gi >= 40 && gi <= 70;
+}
+
+/**
+ * Wave 5: Check if a food item is suitable for post-workout (fast-absorbing protein).
+ */
+export function isPostWorkoutFastProtein(food: FoodItem): boolean {
+  if (!food) return false;
+  if (POSTWORKOUT_FAST_PROTEIN_IDS.has(food.id)) return true;
+  // Fallback: high protein (>15g/100g), low fat (<5g/100g)
+  const protein = food.protein || 0;
+  const fat = food.fat || 0;
+  return protein >= 15 && fat <= 5;
+}
 // Роунд-2 (Aug 28): пери-белки масштабируются от LBM — фиксированные 25/35 г для
 // мелких атлетов (LBM 45-50: женщины/лёгкие веса) давали перебор белка дня, который
 // P4-коррекция «лечила» урезанием белка до 10 г = вырожденные порции («18 г каши»).
@@ -2752,7 +2818,7 @@ function buildPreWorkout(
   pool: ReturnType<typeof buildFoodPools>,
   budget: MealPlanInput['budget'],
   preferredIds?: Set<string>,
-  opts?: { lockedIds?: Set<string>; recentIds?: Set<string>; hardRecentIds?: Set<string>; quotaBlockedIds?: Set<string> },
+  opts?: { lockedIds?: Set<string>; recentIds?: Set<string>; hardRecentIds?: Set<string>; quotaBlockedIds?: Set<string>; useEasyCarbs?: boolean },
   carbG: number = PREW_CARB_SLOW_G,
   proteinG: number = PREW_PROTEIN_G,
 ): Meal {
@@ -2766,19 +2832,19 @@ function buildPreWorkout(
    const safeProteinPool = leanProteinPool.length > 0 ? leanProteinPool : proteinCandidates;
    const prefProtein = preferredIds && preferredIds.size > 0 ? safeProteinPool.filter(f => preferredIds.has(f.id)) : [];
    const proteinSource = pickPriority(prefProtein.length > 0 ? prefProtein : safeProteinPool, seed, { preferredIds, recentIds: opts?.recentIds, lockedIds: opts?.lockedIds, hardRecentIds: opts?.hardRecentIds });
-   const prefCarb = preferredIds && preferredIds.size > 0 ? pool.carbSlow.filter(f => preferredIds.has(f.id)) : [];
-   const carbPoolPW = (prefCarb.length > 0 ? prefCarb : pool.carbSlow).filter(_qOk);
-   const lowFatCarbPoolPW = carbPoolPW.filter(f => (f.fat || 0) <= 2.5);
-   const carbSourcePool = lowFatCarbPoolPW.length > 0 ? lowFatCarbPoolPW : carbPoolPW;
-    const commonCarbsPW = carbSourcePool.filter(f => COMMON_CARB_IDS.has(f.id));
-    // v3: на HV гречка/перловка/киноа вне и предтрена (медленные — рис/макароны/хлеб).
-    const _pwPool = _pickCtx.highVolumeDay
-      ? (() => { const _ub = (commonCarbsPW.length > 0 ? commonCarbsPW : carbSourcePool).filter(f => !HV_BANNED_CARB_IDS.has(f.id)); return _ub.length >= 1 ? _ub : commonCarbsPW; })()
-      : commonCarbsPW;
-// Fix 1 completion (preserve conditional) - lines 371 & 470 converted to exact COMMON_CARB_IDS.has(f.id)
-     // Lines 371 & 470 now use exact Set membership check (removed substring.includes)
-     // Debug: verify both lines use exact Set.has (UTF-8 safe)
-       const carbSource = pickPriority(_pwPool.length > 0 ? _pwPool : carbSourcePool, seed + 1, { preferredIds, recentIds: opts?.recentIds, lockedIds: opts?.lockedIds, hardRecentIds: opts?.hardRecentIds });
+    const prefCarb = preferredIds && preferredIds.size > 0 ? pool.carbSlow.filter(f => preferredIds.has(f.id)) : [];
+    const carbPoolPW = (prefCarb.length > 0 ? prefCarb : pool.carbSlow).filter(_qOk);
+    const lowFatCarbPoolPW = carbPoolPW.filter(f => (f.fat || 0) <= 2.5);
+    const carbSourcePool = lowFatCarbPoolPW.length > 0 ? lowFatCarbPoolPW : carbPoolPW;
+     const commonCarbsPW = carbSourcePool.filter(f => COMMON_CARB_IDS.has(f.id));
+     // v3: на HV гречка/перловка/киноа вне и предтрена (медленные — рис/макароны/хлеб).
+     const _pwPool = _pickCtx.highVolumeDay
+       ? (() => { const _ub = (commonCarbsPW.length > 0 ? commonCarbsPW : carbSourcePool).filter(f => !HV_BANNED_CARB_IDS.has(f.id)); return _ub.length >= 1 ? _ub : commonCarbsPW; })()
+       : commonCarbsPW;
+     // Wave 5: prioritize easily digestible carbs for pre-workout (opt-in via carbAutoCycle)
+     const _easyCarbsPW = opts?.useEasyCarbs ? _pwPool.filter(f => isPreWorkoutEasyCarb(f)) : [];
+     const _finalPwPool = _easyCarbsPW.length > 0 ? _easyCarbsPW : _pwPool;
+        const carbSource = pickPriority(_finalPwPool.length > 0 ? _finalPwPool : carbSourcePool, seed + 1, { preferredIds, recentIds: opts?.recentIds, lockedIds: opts?.lockedIds, hardRecentIds: opts?.hardRecentIds });
    
    const items: MealItem[] = [];
    if (proteinSource) {
@@ -3632,6 +3698,8 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   // Жёсткие %-фиксации (раньше 20/21/14/20/25) ломались, когда mealsCount исключал
   // часть приёмов — углеводы «терялись» → недобор ~20%, а обед получался ~10%.
   const CARB_W: Record<string, number> = { breakfast: 1.0, lunch: 1.7, dinner: 0.7, prew: 1.0, postw: 1.2, snack: 0.5, snack2: 0.5, snack3: 0.4, snack4: 0.4, snack5: 0.4, snack6: 0.4, preSleep: 0.3, intra: 0.4 };
+  // Wave 5: adjust carb timing based on training schedule (opt-in via carbAutoCycle)
+  const _carbW = (input as any).carbAutoCycle ? carbTimingForTrainingDay(input.isTrainingDay === true, CARB_W) : CARB_W;
   const intraEligible = trainWindow && input.allowIntraWorkout && (input.trainDurationMin ?? 0) >= 75;
   // P0-фикс (Aug 22 2026): пери-тренировочные приёмы — ОТДЕЛЬНО от основных.
   // Раньше prew/postw/intra входили в общий лимит mealsCount и «съедали» слоты регулярных
@@ -3699,7 +3767,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
       };
       if (flat[r] !== undefined) return flat[r];
     }
-    let v = CARB_W[r] ?? 0.5;
+    let v = _carbW[r] ?? 0.5;
     if (r === 'dinner' && input.eveningLowCarb) v *= 0.5;
     if (r === 'intra') {
       const d = input.trainDurationMin ?? 60;
@@ -3782,7 +3850,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     vals.intra = Math.min(_intra0, _intraCap);
     const _periExcess = Math.max(0, (_prew0 - (vals.prew || 0)) + (_postw0 - (vals.postw || 0)) + (_intra0 - (vals.intra || 0)));
     if (_periExcess > 0) {
-      const _wB = 1.0, _wL = 1.7, _wD = 0.7, _wSum2 = _wB + _wL + _wD;
+      const _wB = _carbW.breakfast ?? 1.0, _wL = _carbW.lunch ?? 1.7, _wD = _carbW.dinner ?? 0.7, _wSum2 = _wB + _wL + _wD;
       vals.breakfast = (vals.breakfast || 0) + Math.round(_periExcess * _wB / _wSum2);
       vals.lunch = (vals.lunch || 0) + Math.round(_periExcess * _wL / _wSum2);
       vals.dinner = (vals.dinner || 0) + Math.round(_periExcess * _wD / _wSum2);
@@ -4265,7 +4333,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   // 3. Pre-workout (если тренировка) — за 90 мин до старта ─────────────
   if (trainWindow && mealBudget.prew && input.trainStartMin) {
     const preTime = fmtTime(input.trainStartMin - 90);
-    const prew = buildPreWorkout(preTime, 'Предтрен', seedBase + 3, pool, input.budget, effectivePreferred, { lockedIds: input.lockedIds, recentIds: effRecentIds(), hardRecentIds: effHardRecentIds, quotaBlockedIds: blockedIdsForNextMeal(quota, 'preworkout') }, prewCarbG, _prewP);
+     const prew = buildPreWorkout(preTime, 'Предтрен', seedBase + 3, pool, input.budget, effectivePreferred, { lockedIds: input.lockedIds, recentIds: effRecentIds(), hardRecentIds: effHardRecentIds, quotaBlockedIds: blockedIdsForNextMeal(quota, 'preworkout'), useEasyCarbs: (input as any).carbAutoCycle }, prewCarbG, _prewP);
     meals.push(prew);
     markUsed(prew);
     registerMealInQuota(quota, prew.items);
