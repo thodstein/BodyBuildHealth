@@ -6,7 +6,7 @@ import { db } from '../../core/db';
 import { getProfile } from '../../core/profile-manager';
 import { generatePCTPlan, buildPCTPlanWithTiming } from '../../engines/pct-planner.engine';
 import { STRUCTURED_PCT_PROTOCOLS } from '../../engines/pct-timing.engine';
-import { AAS_MEDICAL_DISCLAIMER } from '../../data/aas-support-protocols';
+import { AAS_MEDICAL_DISCLAIMER, matchProtocolsForStack } from '../../data/aas-support-protocols';
 import { PHARMA_DB } from '../../core/pharma-database';
 import { UnifiedLabPanel } from '../components/UnifiedLabPanel';
 
@@ -121,6 +121,12 @@ export const FertilityPCTScreen: React.FC<{ initialTab?: FertTab; restrictToMode
     const lastWeek = pctCourse.reduce((m, c) => Math.max(m, c.endWeek || 0), 0);
     try { return buildPCTPlanWithTiming(pctCourse, lastWeek); } catch { return null; }
   }, [pctCourse]);
+
+  // Протоколы ААС/ГР/инсулина, подобранные под фактический стек курса.
+  const matchedStackProtocols = useMemo(
+    () => matchProtocolsForStack(pctCourse.map((c) => c.substanceId)),
+    [pctCourse],
+  );
 
   const [allLabs, setAllLabs] = useState<Record<string, string>>({});
   const [labEntries, setLabEntries] = useState<LabPoint[]>([]);
@@ -749,6 +755,29 @@ export const FertilityPCTScreen: React.FC<{ initialTab?: FertTab; restrictToMode
                   📋 {AAS_MEDICAL_DISCLAIMER}
                 </div>
               </div>
+
+              {matchedStackProtocols.length > 0 && (
+                <div style={s.card} data-pct-stack-match="1">
+                  <h4 style={{ margin:'0 0 6px', fontSize:12, color:'#8b5cf6' }}>🎯 Поддержка под ваш стек ({matchedStackProtocols.length})</h4>
+                  <div style={{ display:'flex', flexDirection:'column', gap:5 }}>
+                    {matchedStackProtocols.map((p) => (
+                      <div key={p.id} style={{ padding:'8px 10px', borderRadius:6, background:'rgba(139,92,246,0.06)', border:'1px solid rgba(139,92,246,0.12)' }}>
+                        <div style={{ display:'flex', justifyContent:'space-between', gap:6, flexWrap:'wrap' }}>
+                          <span style={{ fontSize:10, fontWeight:600, color:'#fff' }}>{p.title}</span>
+                          <span style={{ fontSize:9, fontWeight:800, color:'#fff', background:'rgba(255,255,255,0.08)', padding:'1px 6px', borderRadius:8 }}>[{p.evidenceLevel}]</span>
+                        </div>
+                        <div style={{ fontSize:9, color:'var(--text-dim)', marginTop:3, lineHeight:1.3 }}>{p.evidenceNote}</div>
+                        {p.monitoring.length > 0 && (
+                          <div style={{ fontSize:9, color:'rgba(255,255,255,0.75)', marginTop:3 }}>🔬 {p.monitoring.join(' · ')}</div>
+                        )}
+                        {p.warnings.length > 0 && (
+                          <div style={{ fontSize:9, color:'#fbbf24', marginTop:2 }}>⚠️ {p.warnings.join(' · ')}</div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               <div style={s.card}>
                 <h4 style={{ margin:'0 0 6px', fontSize:12, color:'#f59e0b' }}>🧠 Нейроанатомия репродуктивной оси</h4>

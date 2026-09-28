@@ -118,6 +118,23 @@ const AAS_SYSTEM_PROFILE: Record<string, Record<string, number>> = {
   gh_peptide: { cardio: 0.10, hepatic: 0.05, renal: 0.10, neuro: 0.10, endocrine: 0.35, hematologic: 0.10, reproductive: 0.20 }
 };
 
+/**
+ * ПРОВЕНАНС МОДЕЛИ ПОКРЫТИЯ (честная граница, Этап 3 аудита).
+ *
+ * SUPPORT_EC50 (полуэффективная доза) и SUPPORT_DEFAULT_DOSE — параметры МОДЕЛИ
+ * покрытия (сигмоида Emax), калиброванные так, чтобы покрытие выходило на плато
+ * около клинической дозы. Это не «подтверждённые дозозависимые EC50 из РКИ»: единый
+ * EC50 на вещество в РКИ обычно не определён, а клиническая доза зависит от
+ * показания/популяции. Поэтому per-value цитаты здесь сознательно НЕ проставлены —
+ * их не существует в таком виде, а придумывать было бы ложью.
+ *
+ * Базис (порядок величин и спектр действия) — SUPPORT_RESEARCH ниже (30 источников:
+ * Fliser 2011, Vanhoutte 2013, Beuers 2010, Holick 2007, Grober 2015 и др.),
+ * плюс реестры доз support-limits.ts (UL/SafeLevel) и support-dosing.ts (evidenceLevel A/B/C).
+ */
+export const SUPPORT_MODEL_PROVENANCE =
+  'EC50/дозы — параметры модели покрытия (Emax-сигмоида), калиброванные по клиническому порядку величин из SUPPORT_RESEARCH, support-limits и support-dosing; не подушевые EC50 из РКИ.';
+
 const SUPPORT_EC50: Record<string, number> = {
   telmisartan: 20,
   nebivolol: 5,
