@@ -558,6 +558,9 @@ export const BbAutoConstructor: React.FC = () => {
   const [prepTrainingProtocol, setPrepTrainingProtocol] = useState<PeakingProtocol>('bb');
   const [prepPreferLowFiber, setPrepPreferLowFiber] = useState(false);
   const [prepCreatineStop, setPrepCreatineStop] = useState(false);
+  // 🧬 Адаптивный тапер (P0-1/P0-3): опыт и гликоген
+  const [prepExperience, setPrepExperience] = useState<number | undefined>(undefined);
+  const [prepGlycogenLevel, setPrepGlycogenLevel] = useState<number>(5);
   const [prepCompetitions, setPrepCompetitions] = useState<ContestEventEntry[] | undefined>(undefined);
   const [prepMainCompetitionId, setPrepMainCompetitionId] = useState<string | undefined>(undefined);
   // 🏁 Режим подготовки (тренировочная логика недель подготовки): 1.0 = сохранение
@@ -3738,12 +3741,12 @@ export const BbAutoConstructor: React.FC = () => {
       phaseNow, postLogCycle, postLogHunger, postLogSleep, postLogStrength, postLogTick,
       postLogWeek, postLogWeight, prepApplied, prepBasePlan, prepBusy, prepCarbMode,
       prepCheckin, prepCheckinDone, prepCompetitions, prepConfirmedManip, prepContra, prepContraExtra,
-      prepCreatineStop, prepMainCompetitionId, prepPlan, prepPreferLowFiber, prepShowDate, prepSodiumMode,
+      prepCreatineStop, prepExperience, prepGlycogenLevel, prepMainCompetitionId, prepPlan, prepPreferLowFiber, prepShowDate, prepSodiumMode,
       prepTaperWeeks, prepTrainingProtocol, prepVolumeMode, prepWaterMode, prepWeeks,
       readiness, recarb, savePrepToProfile, setContestWizard, setLiveFull, setLiveVisual,
       setLiveWater, setPeakSpec, setPeakWeekCategory, setPostLogCycle, setPostLogHunger, setPostLogSleep,
       setPostLogStrength, setPostLogTick, setPostLogWeek, setPostLogWeight, setPrepCarbMode, setPrepCompetitions,
-      setPrepConfirmedManip, setPrepContraExtra, setPrepCreatineStop, setPrepMainCompetitionId, setPrepPlan, setPrepPreferLowFiber,
+      setPrepConfirmedManip, setPrepContraExtra, setPrepCreatineStop, setPrepExperience, setPrepGlycogenLevel, setPrepMainCompetitionId, setPrepPlan, setPrepPreferLowFiber,
       setPrepSodiumMode, setPrepTaperWeeks, setPrepTrainingProtocol, setPrepVolumeMode, setPrepWaterMode, setRecarb,
       setShowCheck, setStep, setTestRatings, setTestWeightDelta, setWkNote, setWkPsyche,
       setWkSessions, setWkSleep, setWkWaist, setWkWeek, setWkWeight, showCheck,
@@ -3840,6 +3843,8 @@ export const BbAutoConstructor: React.FC = () => {
     bodyFatPct: prepBodyFat,
     experienceLevel: (bbLevel === 'enhanced' || bbLevel === 'advanced' ? 'advanced' : bbLevel === 'beginner' ? 'beginner' : 'intermediate') as 'beginner' | 'intermediate' | 'advanced',
     prepCount: 0,
+    experience: prepExperience != null ? { yearsTraining: prepExperience } : undefined,
+    glycogenLevel: prepGlycogenLevel,
   });
 
   const handleBuildPrep = () => {

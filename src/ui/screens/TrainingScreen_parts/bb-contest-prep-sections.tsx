@@ -21,6 +21,7 @@ import { PopupSelect } from '../SRCBBScreen_parts/TrainingPopups';
 import { CollapsibleCard, BbRowSwitch, BbToggleChip, type Step } from './bb-auto-constructor-shared';
 import { CARD, SMALL, BTN, BTN_GHOST, H, IN } from './training-ui';
 import { PeakWeekMonitorCard, ShowDayEmergencyCard, PrepLabsCard, ShowSeriesCard, ShowCoachCard } from '../../components/contest-prep/PeakWeekProCard';
+import { buildTaperModifiers } from '../../../engines/bb/bb-taper-adaptive.engine';
 import { postShowRecoveryProgress } from '../../../engines/bb/bb-peak-pro.engine';
 import { getWeightLog } from '../../../engines/profile-store';
 
@@ -28,7 +29,7 @@ export interface BbContestPrepCtx { [key: string]: any }
 
 /** A — шапка шага + пилюли визарда + подсказка + карточка «📅 Параметры подготовки» (шаги 1–3). */
 export const BbContestPrepParams: React.FC<{ ctx: BbContestPrepCtx }> = ({ ctx }) => {
-  const { adaptiveTaper, assembleContestPrep, buildContestPrepConfig, builtPlan, setBuiltPlan, flash, contestWizard, expYearsForPrep, handleApplyAdaptiveTaper, handleExtendPrep, handleShiftPrepShowDate, lastTest, peakSpec, peakWeekCategory, peds, prepApplied, prepBusy, prepCarbMode, prepCompetitions, prepConfirmedManip, prepContra, prepContraExtra, prepCreatineStop, prepMainCompetitionId, prepPlan, prepPreferLowFiber, prepShowDate, prepSodiumMode, prepTaperWeeks, prepTrainingProtocol, prepVolumeMode, prepWaterMode, prepWeeks, readiness, setContestWizard, setPeakSpec, setPeakWeekCategory, setPrepCarbMode, setPrepCompetitions, setPrepConfirmedManip, setPrepContraExtra, setPrepCreatineStop, setPrepMainCompetitionId, setPrepPreferLowFiber, setPrepSodiumMode, setPrepTaperWeeks, setPrepTrainingProtocol, setPrepVolumeMode, setPrepWaterMode, setStep, spillRisk } = ctx;
+  const { adaptiveTaper, assembleContestPrep, buildContestPrepConfig, builtPlan, setBuiltPlan, flash, contestWizard, expYearsForPrep, handleApplyAdaptiveTaper, handleExtendPrep, handleShiftPrepShowDate, lastTest, peakSpec, peakWeekCategory, peds, prepApplied, prepBusy, prepCarbMode, prepCompetitions, prepConfirmedManip, prepContra, prepContraExtra, prepCreatineStop, prepExperience, prepGlycogenLevel, prepMainCompetitionId, prepPlan, prepPreferLowFiber, prepShowDate, prepSodiumMode, prepTaperWeeks, prepTrainingProtocol, prepVolumeMode, prepWaterMode, prepWeeks, readiness, setContestWizard, setPeakSpec, setPeakWeekCategory, setPrepCarbMode, setPrepCompetitions, setPrepConfirmedManip, setPrepContraExtra, setPrepCreatineStop, setPrepExperience, setPrepGlycogenLevel, setPrepMainCompetitionId, setPrepPreferLowFiber, setPrepSodiumMode, setPrepTaperWeeks, setPrepTrainingProtocol, setPrepVolumeMode, setPrepWaterMode, setStep, spillRisk } = ctx;
   return (
     <>
       {/* <<Params>> */}
@@ -95,6 +96,37 @@ export const BbContestPrepParams: React.FC<{ ctx: BbContestPrepCtx }> = ({ ctx }
             <div style={{ fontSize:11, marginTop:4, color: spillRisk.level==='high' ? '#ef4444' : spillRisk.level==='medium' ? '#f59e0b' : '#4ade80' }}>Spill риск {spillRisk.level}: {spillRisk.note}</div>
             {spillRisk.level==='high' && <div style={{ fontSize:9, color:'#ef4444', marginTop:4 }}>⛔ High: смените carb на moderate/linear, stable вода</div>}
             {isShortCycle(prepWeeks + prepTaperWeeks + 1) && <div style={{ fontSize:9, color:'#fbbf24', marginTop:4 }}>⚠ ShortCycle 4-6 нед: linear/moderate без final каскада</div>}
+          </div>
+          {/* P0-1/P0-3: адаптивный тапер — опыт (длина/объём/интенсивность) + гликоген */}
+          <div style={{ marginTop:8, padding:8, borderRadius:8, background:'rgba(34,197,94,0.06)', border:'1px solid rgba(34,197,94,0.2)' }}>
+            <div style={{ ...SMALL, color:'#4ade80', fontWeight:700, marginBottom:4 }}>🧬 Адаптивный тапер</div>
+            <div style={{ display:'flex', gap:12, flexWrap:'wrap', alignItems:'center' }}>
+              <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                <span style={{ fontSize:10, color:'#fff' }}>Опыт (лет):</span>
+                <button style={BTN_GHOST} onClick={() => setPrepExperience(Math.max(0, (prepExperience ?? 0) - 1))}>−</button>
+                <b style={{ fontSize:13, color:'#fff', minWidth:18, textAlign:'center' }}>{prepExperience ?? 0}</b>
+                <button style={BTN_GHOST} onClick={() => setPrepExperience(Math.min(10, (prepExperience ?? 0) + 1))}>+</button>
+              </div>
+              <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                <span style={{ fontSize:10, color:'#fff' }}>Гликоген (1-10):</span>
+                <button style={BTN_GHOST} onClick={() => setPrepGlycogenLevel(Math.max(1, (prepGlycogenLevel ?? 5) - 1))}>−</button>
+                <b style={{ fontSize:13, color:'#fff', minWidth:18, textAlign:'center' }}>{prepGlycogenLevel ?? 5}</b>
+                <button style={BTN_GHOST} onClick={() => setPrepGlycogenLevel(Math.min(10, (prepGlycogenLevel ?? 5) + 1))}>+</button>
+              </div>
+            </div>
+            {(() => {
+              const mods = buildTaperModifiers({ cfg: buildContestPrepConfig(), experience: prepExperience != null ? { yearsTraining: prepExperience } : undefined });
+              const parts: string[] = [];
+              if (mods.taperLength != null) parts.push(`длина ${mods.taperLength} нед`);
+              if (mods.volumeMult != null) parts.push(`объём ×${Math.round(mods.volumeMult * 100) / 100}`);
+              if (mods.intensityMult != null) parts.push(`интенсивность ×${Math.round(mods.intensityMult * 1000) / 1000}`);
+              return (
+                <div style={{ fontSize:9, color:'#fff', marginTop:4 }}>
+                  {parts.length ? `Тапер: ${parts.join(' · ')}` : 'Тапер: базовая кривая'}
+                  {prepGlycogenLevel !== 5 ? ` · гликоген ${prepGlycogenLevel} → ${prepGlycogenLevel <= 3 ? '+15%' : prepGlycogenLevel >= 8 ? '−10%' : 'без изменений'} карб-бюджета` : ''}
+                </div>
+              );
+            })()}
           </div>
           {/* Соревнования — единый словарь A/B/C — wizard 3 */}
           <div style={{ display: contestWizard===3 ? 'block' : 'none', marginBottom:8, padding:8, borderRadius:8, background:'rgba(239,68,68,0.06)', border:'1px solid rgba(239,68,68,0.15)' }}>
