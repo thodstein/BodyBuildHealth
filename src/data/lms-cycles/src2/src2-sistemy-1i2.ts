@@ -70,11 +70,6 @@ const weeks: SRDaySpec[][] = [
 export const SRC2_SISTEMY_1I2: SRCycleTemplate = {
  meta: {
   id: 'src2-sistemy-1i2',
-    evidenceLevel: 'C',
-    bestFor: ['II-KMS'],
-    timeCommitment: 'medium',
-    equipmentNeeded: ['barbell', 'rack'],
-    periodization: 'linear',
   title: 'Системы 1 и 2 (Суровецкий, жим)',
   direction: 'bench',
   level: 'II-KMS',

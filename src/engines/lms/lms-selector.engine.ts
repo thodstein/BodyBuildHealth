@@ -30,14 +30,6 @@ export interface LMSSelectorInput {
   daysPerWeek?: number;      // доступных тренировочных дней
   direction?: 'powerlifting' | 'bench' | 'deadlift_bench' | 'armwrestling' | 'bodybuilding';
   mode?: 'natural' | 'on_course' | 'pct';
-  /** Фильтр по уровню доказательности. */
-  evidenceLevel?: 'A' | 'B' | 'C';
-  /** Фильтр по необходимому оборудованию. */
-  equipmentNeeded?: string[];
-  /** Фильтр по типу периодизации. */
-  periodization?: 'linear' | 'dup' | 'block' | 'conjugate';
-  /** Фильтр по временным затратам. */
-  timeCommitment?: 'low' | 'medium' | 'high';
 }
 
 export interface LMSRankedCycle {
@@ -137,45 +129,6 @@ export function rankCycles(input: LMSSelectorInput): LMSRankedCycle[] {
     if (input.daysPerWeek != null && m.sessionsPerWeek > 0) {
       if (m.sessionsPerWeek <= input.daysPerWeek) { score += 15; rationale.push(`нужно ${m.sessionsPerWeek} дн/нед, доступно ${input.daysPerWeek}`); }
       else { score -= 20; warnings.push(`нужно ${m.sessionsPerWeek} дн/нед, доступно только ${input.daysPerWeek}`); }
-    }
-
-    // Фильтры по метаданным
-    if (input.evidenceLevel && m.evidenceLevel) {
-      if (m.evidenceLevel === input.evidenceLevel) {
-        score += 10;
-        rationale.push(`уровень доказательности ${m.evidenceLevel}`);
-      } else {
-        score -= 10;
-        warnings.push(`уровень доказательности ${m.evidenceLevel} не соответствует запрошенному ${input.evidenceLevel}`);
-      }
-    }
-    if (input.equipmentNeeded && m.equipmentNeeded) {
-      const hasAll = input.equipmentNeeded.every(eq => m.equipmentNeeded!.includes(eq));
-      if (hasAll) {
-        score += 5;
-        rationale.push(`оборудование: ${m.equipmentNeeded.join(', ')}`);
-      } else {
-        score -= 5;
-        warnings.push(`требуется оборудование: ${m.equipmentNeeded.join(', ')}`);
-      }
-    }
-    if (input.periodization && m.periodization) {
-      if (m.periodization === input.periodization) {
-        score += 8;
-        rationale.push(`периодизация: ${m.periodization}`);
-      } else {
-        score -= 8;
-        warnings.push(`периодизация ${m.periodization} не соответствует запрошенной ${input.periodization}`);
-      }
-    }
-    if (input.timeCommitment && m.timeCommitment) {
-      if (m.timeCommitment === input.timeCommitment) {
-        score += 5;
-        rationale.push(`временные затраты: ${m.timeCommitment}`);
-      } else {
-        score -= 5;
-        warnings.push(`временные затраты ${m.timeCommitment} не соответствуют запрошенным ${input.timeCommitment}`);
-      }
     }
 
     // режим: ПКТ — предпочитаем менее объёмные/интенсивные

@@ -7,11 +7,6 @@ import type { SRCycleTemplate } from './lms-types';
 export const BLOCK_BENCH_EXP: SRCycleTemplate = {
   meta: {
     id: 'block-bench-exp',
-    evidenceLevel: 'C',
-    bestFor: ['MS-MSMK'],
-    timeCommitment: 'high',
-    equipmentNeeded: ['barbell', 'rack'],
-    periodization: 'block',
     title: 'Блочный: жим, продвинутый',
     direction: 'bench',
     level: 'MS-MSMK',

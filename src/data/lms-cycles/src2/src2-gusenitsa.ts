@@ -65,11 +65,6 @@ const weeks: SRDaySpec[][] = [
 export const SRC2_GUSENITSA: SRCycleTemplate = {
  meta: {
   id: 'src2-gusenitsa',
-    evidenceLevel: 'C',
-    bestFor: ['II-KMS'],
-    timeCommitment: 'medium',
-    equipmentNeeded: ['barbell', 'rack'],
-    periodization: 'block',
   title: 'Гусеница (Суровецкий)',
   direction: 'powerlifting',
   level: 'II-KMS',

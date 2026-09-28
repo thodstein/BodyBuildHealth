@@ -14,11 +14,6 @@ const day = (...exercises: ReturnType<typeof ex>[]) => ({ exercises });
 export const CYCLE_BB_F_GLUTE_PUMP_4: SRCycleTemplate = {
   meta: {
     id: 'cycle-bb-f-glute-pump-4',
-    evidenceLevel: 'C',
-    bestFor: ['II-KMS'],
-    timeCommitment: 'high',
-    equipmentNeeded: ['barbell', 'dumbbell', 'machine', 'cable'],
-    periodization: 'linear',
     title: 'Женский глут-памп 4н (4×/нед)',
     direction: 'bodybuilding',
     level: 'II-KMS',

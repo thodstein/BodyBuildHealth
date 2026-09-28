@@ -56,11 +56,6 @@ for (let w=0; w<14; w++) {
 export const SRC2_WASHINGTON_5X5: SRCycleTemplate = {
   meta: {
     id: 'src2-washington-5x5',
-    evidenceLevel: 'C',
-    bestFor: ['novice', 'II-KMS'],
-    timeCommitment: 'high',
-    equipmentNeeded: ['barbell', 'rack'],
-    periodization: 'linear',
     title: 'Washington 5x5 (14 недель волна)',
     direction: 'powerlifting',
     level: 'novice',

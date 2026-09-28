@@ -23,11 +23,6 @@ const weeks: SRDaySpec[][] = Array.from({ length: 9 }, (_, wi) => {
 export const GZCL_UHF: SRCycleTemplate = {
   meta: {
     id: 'gzcl-uhf',
-    evidenceLevel: 'B',
-    bestFor: ['KMS-MS'],
-    timeCommitment: 'high',
-    equipmentNeeded: ['barbell', 'rack'],
-    periodization: 'block',
     title: 'GZCL UHF 9н — 5д/нед',
     direction: 'powerlifting',
     level: 'KMS-MS',

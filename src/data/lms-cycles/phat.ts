@@ -23,11 +23,6 @@ const weeks: SRDaySpec[][] = Array.from({ length: 12 }, (_, wi) => {
 export const PHAT: SRCycleTemplate = {
   meta: {
     id: 'phat',
-    evidenceLevel: 'C',
-    bestFor: ['II-KMS', 'KMS-MS'],
-    timeCommitment: 'high',
-    equipmentNeeded: ['barbell', 'rack'],
-    periodization: 'dup',
     title: 'PHAT 12н (Layne Norton)',
     direction: 'powerlifting',
     level: 'intermediate',

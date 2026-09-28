@@ -114,11 +114,6 @@ const weeks: SRDaySpec[][] = [
 export const SRC2_MURAVYOV_16: SRCycleTemplate = {
  meta: {
   id: 'src2-muravyov-16',
-    evidenceLevel: 'C',
-    bestFor: ['II-KMS'],
-    timeCommitment: 'high',
-    equipmentNeeded: ['barbell', 'rack'],
-    periodization: 'linear',
   title: 'Муравьёв 16 недель (СБ+присед на груди)',
   direction: 'powerlifting',
   level: 'II-KMS',

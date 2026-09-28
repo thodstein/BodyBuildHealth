@@ -20,11 +20,6 @@ const weeks: SRDaySpec[][] = Array.from({ length: 10 }, (_, wi) => {
 export const COAN_DEADLIFT: SRCycleTemplate = {
   meta: {
     id: 'coan-deadlift',
-    evidenceLevel: 'C',
-    bestFor: ['KMS-MS'],
-    timeCommitment: 'low',
-    equipmentNeeded: ['barbell', 'rack'],
-    periodization: 'block',
     title: 'Coan Deadlift 10н (Ed Coan)',
     direction: 'powerlifting',
     level: 'KMS-MS',

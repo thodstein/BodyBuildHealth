@@ -3,11 +3,6 @@ import type { SRCycleTemplate } from './lms-types';
 export const CYCLE_BB_06: SRCycleTemplate = {
  meta: {
   id: 'cycle-bb-06',
-    evidenceLevel: 'C',
-    bestFor: ['II-KMS'],
-    timeCommitment: 'high',
-    equipmentNeeded: ['barbell', 'dumbbell', 'machine', 'cable'],
-    periodization: 'linear',
   title: 'PHUL 4x/нед (Power Hypertrophy Upper Lower)',
   direction: 'bodybuilding',
   level: 'II-KMS',

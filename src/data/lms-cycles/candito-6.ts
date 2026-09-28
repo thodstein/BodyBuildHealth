@@ -59,11 +59,6 @@ const weeks: SRDaySpec[][] = [
 export const CANDITO_6: SRCycleTemplate = {
   meta: {
     id: 'candito-6',
-    evidenceLevel: 'B',
-    bestFor: ['II-KMS'],
-    timeCommitment: 'high',
-    equipmentNeeded: ['barbell', 'rack'],
-    periodization: 'block',
     title: 'Candito 6 недель — пик',
     direction: 'powerlifting',
     level: 'II-KMS',

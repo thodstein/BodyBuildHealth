@@ -36,11 +36,6 @@ const weeks: SRDaySpec[][] = [
 export const WENDLER_531: SRCycleTemplate = {
   meta: {
     id: 'wendler-531',
-    evidenceLevel: 'B',
-    bestFor: ['II-KMS', 'KMS-MS'],
-    timeCommitment: 'high',
-    equipmentNeeded: ['barbell', 'rack'],
-    periodization: 'linear',
     title: 'Wendler 5/3/1 — 4 недели',
     direction: 'powerlifting',
     level: 'intermediate',

@@ -23,11 +23,6 @@ const weeks: SRDaySpec[][] = Array.from({ length: 12 }, (_, wi) => {
 export const TEN_TWENTY_LIFE: SRCycleTemplate = {
   meta: {
     id: 'ten-twenty-life',
-    evidenceLevel: 'C',
-    bestFor: ['KMS-MS'],
-    timeCommitment: 'high',
-    equipmentNeeded: ['barbell', 'rack'],
-    periodization: 'linear',
     title: '10/20/Life 12н (Brian Carroll)',
     direction: 'powerlifting',
     level: 'KMS-MS',

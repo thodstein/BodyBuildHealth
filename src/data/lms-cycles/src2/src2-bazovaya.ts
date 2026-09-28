@@ -59,11 +59,6 @@ const weeks: SRDaySpec[][] = [
 export const SRC2_BAZOVAYA: SRCycleTemplate = {
  meta: {
   id: 'src2-bazovaya',
-    evidenceLevel: 'C',
-    bestFor: ['II-KMS', 'KMS-MS'],
-    timeCommitment: 'high',
-    equipmentNeeded: ['barbell', 'rack'],
-    periodization: 'linear',
   title: 'Базовая программа по пауэрлифтингу (Суровецкий)',
   direction: 'powerlifting',
   level: 'intermediate',

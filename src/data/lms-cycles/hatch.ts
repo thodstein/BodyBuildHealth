@@ -22,11 +22,6 @@ const weeks: SRDaySpec[][] = Array.from({ length: 12 }, (_, wi) => {
 export const HATCH: SRCycleTemplate = {
   meta: {
     id: 'hatch',
-    evidenceLevel: 'B',
-    bestFor: ['II-KMS', 'KMS-MS'],
-    timeCommitment: 'low',
-    equipmentNeeded: ['barbell', 'rack'],
-    periodization: 'block',
     title: 'Hatch Squat — 12н',
     direction: 'powerlifting',
     level: 'intermediate',

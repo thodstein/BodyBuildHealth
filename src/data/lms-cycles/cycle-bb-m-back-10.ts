@@ -14,11 +14,6 @@ const day = (...exercises: ReturnType<typeof ex>[]) => ({ exercises });
 export const CYCLE_BB_M_BACK_10: SRCycleTemplate = {
   meta: {
     id: 'cycle-bb-m-back-10',
-    evidenceLevel: 'C',
-    bestFor: ['KMS-MS'],
-    timeCommitment: 'high',
-    equipmentNeeded: ['barbell', 'dumbbell', 'machine', 'cable'],
-    periodization: 'linear',
     title: 'Специализация спины 10н (5×/нед)',
     direction: 'bodybuilding',
     level: 'KMS-MS',

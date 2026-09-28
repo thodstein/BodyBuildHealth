@@ -41,11 +41,6 @@ const weeks: SRDaySpec[][] = [
 export const NSUNS: SRCycleTemplate = {
   meta: {
     id: 'nsuns',
-    evidenceLevel: 'C',
-    bestFor: ['II-KMS', 'KMS-MS'],
-    timeCommitment: 'high',
-    equipmentNeeded: ['barbell', 'rack'],
-    periodization: 'linear',
     title: 'nSuns 5/3/1 LP — 4 недели',
     direction: 'powerlifting',
     level: 'intermediate',

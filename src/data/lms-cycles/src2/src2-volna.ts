@@ -46,11 +46,6 @@ const weeks: SRDaySpec[][] = [
 export const SRC2_VOLNA: SRCycleTemplate = {
  meta: {
   id: 'src2-volna',
-    evidenceLevel: 'C',
-    bestFor: ['II-KMS'],
-    timeCommitment: 'medium',
-    equipmentNeeded: ['barbell', 'rack'],
-    periodization: 'linear',
   title: 'Волна (Суровецкий)',
   direction: 'powerlifting',
   level: 'II-KMS',

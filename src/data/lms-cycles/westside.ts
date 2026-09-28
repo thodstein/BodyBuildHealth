@@ -42,11 +42,6 @@ const weeks: SRDaySpec[][] = [
 export const WESTSIDE: SRCycleTemplate = {
   meta: {
     id: 'westside',
-    evidenceLevel: 'B',
-    bestFor: ['KMS-MS'],
-    timeCommitment: 'high',
-    equipmentNeeded: ['barbell', 'rack'],
-    periodization: 'conjugate',
     title: 'Westside Conjugate — 4 недели (Louie Simmons)',
     direction: 'powerlifting',
     level: 'KMS-MS',

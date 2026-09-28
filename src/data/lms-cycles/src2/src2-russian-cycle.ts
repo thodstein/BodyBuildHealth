@@ -60,11 +60,6 @@ const weeks: SRDaySpec[][] = [
 export const SRC2_RUSSIAN_CYCLE: SRCycleTemplate = {
   meta: {
     id: 'src2-russian-cycle',
-    evidenceLevel: 'C',
-    bestFor: ['KMS-MS'],
-    timeCommitment: 'low',
-    equipmentNeeded: ['barbell', 'rack'],
-    periodization: 'linear',
     title: 'Русский цикл 12 недель (присед+жим+тяга)',
     direction: 'powerlifting',
     level: 'KMS-MS',

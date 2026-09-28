@@ -53,11 +53,6 @@ const weeks: SRDaySpec[][] = [
 export const GOLOVINSKY_8: SRCycleTemplate = {
   meta: {
     id: 'golovinsky-8',
-    evidenceLevel: 'C',
-    bestFor: ['KMS-MS'],
-    timeCommitment: 'medium',
-    equipmentNeeded: ['barbell', 'rack'],
-    periodization: 'linear',
     title: 'Головинский 8н троеборье (МС-МСМК)',
     direction: 'powerlifting',
     level: 'KMS-MS',

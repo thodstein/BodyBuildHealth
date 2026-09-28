@@ -27,11 +27,6 @@ const weeks: SRDaySpec[][] = Array.from({ length: 16 }, (_, wi) => {
 export const CALGARY_16: SRCycleTemplate = {
   meta: {
     id: 'calgary-16',
-    evidenceLevel: 'C',
-    bestFor: ['KMS-MS'],
-    timeCommitment: 'high',
-    equipmentNeeded: ['barbell', 'rack'],
-    periodization: 'block',
     title: 'Calgary Barbell 16н (Bryce Krawczyk)',
     direction: 'powerlifting',
     level: 'KMS-MS',

@@ -9,11 +9,6 @@ import type { SRCycleTemplate } from './lms-types';
 export const CYCLE_BB_F_BEGINNER_6: SRCycleTemplate = {
  meta: {
   id: 'cycle-bb-f-beginner-6',
-    evidenceLevel: 'C',
-    bestFor: ['novice', 'II-KMS'],
-    timeCommitment: 'medium',
-    equipmentNeeded: ['barbell', 'dumbbell', 'machine', 'cable'],
-    periodization: 'linear',
   title: 'Женский стартовый цикл 6н (3×/нед)',
   direction: 'bodybuilding',
   level: 'novice',

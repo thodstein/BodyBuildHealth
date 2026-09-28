@@ -42,11 +42,6 @@ const weeks: SRDaySpec[][] = [
 export const SRC2_VERKHOSHANSKY_PEAK: SRCycleTemplate = {
   meta: {
     id: 'src2-verkhoshansky-peak',
-    evidenceLevel: 'C',
-    bestFor: ['KMS-MS'],
-    timeCommitment: 'low',
-    equipmentNeeded: ['barbell', 'rack'],
-    periodization: 'linear',
     title: 'Верхошанский пик 6 недель (жим+присед)',
     direction: 'powerlifting',
     level: 'KMS-MS',

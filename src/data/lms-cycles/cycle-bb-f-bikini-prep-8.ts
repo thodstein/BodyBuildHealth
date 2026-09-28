@@ -9,11 +9,6 @@ import type { SRCycleTemplate } from './lms-types';
 export const CYCLE_BB_F_BIKINI_PREP_8: SRCycleTemplate = {
  meta: {
   id: 'cycle-bb-f-bikini-prep-8',
-    evidenceLevel: 'C',
-    bestFor: ['II-KMS'],
-    timeCommitment: 'high',
-    equipmentNeeded: ['barbell', 'dumbbell', 'machine', 'cable'],
-    periodization: 'linear',
   title: 'Женская подготовка bikini 8н (5×/нед)',
   direction: 'bodybuilding',
   level: 'II-KMS',

@@ -22,11 +22,6 @@ const weeks: SRDaySpec[][] = Array.from({ length: 4 }, (_, wi) => {
 export const BULGARIAN: SRCycleTemplate = {
   meta: {
     id: 'bulgarian',
-    evidenceLevel: 'C',
-    bestFor: ['MS-MSMK'],
-    timeCommitment: 'high',
-    equipmentNeeded: ['barbell', 'rack'],
-    periodization: 'block',
     title: 'Bulgarian Method — 4н (ежедневный макс)',
     direction: 'powerlifting',
     level: 'MS-MSMK',

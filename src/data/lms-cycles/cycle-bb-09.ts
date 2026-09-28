@@ -3,11 +3,6 @@ import type { SRCycleTemplate } from './lms-types';
 export const CYCLE_BB_09: SRCycleTemplate = {
  meta: {
   id: 'cycle-bb-09',
-    evidenceLevel: 'C',
-    bestFor: ['II-KMS'],
-    timeCommitment: 'high',
-    equipmentNeeded: ['barbell', 'dumbbell', 'machine', 'cable'],
-    periodization: 'linear',
   title: 'Торс/Конечности 4x/нед (Специализация)',
   direction: 'bodybuilding',
   level: 'II-KMS',

@@ -7,11 +7,6 @@ import type { SRCycleTemplate } from './lms-types';
 export const BLOCK_LIFT_INT: SRCycleTemplate = {
   meta: {
     id: 'block-lift-int',
-    evidenceLevel: 'C',
-    bestFor: ['II-MS'],
-    timeCommitment: 'high',
-    equipmentNeeded: ['barbell', 'rack'],
-    periodization: 'block',
     title: 'Блочный: троеборье, средний',
     direction: 'powerlifting',
     level: 'II-MS',

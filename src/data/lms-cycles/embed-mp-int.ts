@@ -7,11 +7,6 @@ import type { SRCycleTemplate } from './lms-types';
 export const EMBED_MP_INT: SRCycleTemplate = {
   meta: {
     id: 'embed-mp-int',
-    evidenceLevel: 'C',
-    bestFor: ['II-MS'],
-    timeCommitment: 'medium',
-    equipmentNeeded: ['barbell', 'rack'],
-    periodization: 'block',
     title: 'Встраиваемый: жим стоя, средний',
     direction: 'bench',
     level: 'II-MS',

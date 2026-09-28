@@ -30,7 +30,6 @@ import { cloneCycleTemplate } from '../../data/lms-cycles/lms-cycle-clone';
 import { meetAttemptsFor, MEET_STRATEGY_PCT_LABEL, MEET_WARMUP_STEPS, warmupToOpener, resolveCompetitionLifts, type MeetAttemptsInfo, type MeetStrategy } from './competition-attempts';
 import { buildPLTaperCurve, summarizeTaperCurve, type PeakWeekLayout, type TaperCurvePoint, type TaperMode, type TaperWeightGoal } from './lms-taper.engine';
 import { buildPLPeakBlockLayout, dateWeeksBackward, type PLPeakBlockLayout } from './lms-peak-block.engine';
-import { estimate1RMFromVelocity, pctForVelocity, velocityForPct, type VBTLift } from '../pro/vbt.engine';
 
 export interface LMSBuildInput {
   template: SRCycleTemplate;
@@ -80,8 +79,6 @@ export interface LMSBuildInput {
   acwr?: { ratio: number; zone: 'undertrained' | 'optimal' | 'caution' | 'dangerous' };
   /** Авторегуляция: topSetPctMultiplier/volumeMultiplier/rirShift (если передана — применяется к весам). */
   autoReg?: { topSetPctMultiplier: number; volumeMultiplier: number; rirShift: number; deload: boolean };
-  /** VBT: подгрузка веса по скорости разминочного подхода. */
-  vbt?: { lift: VBTLift; warmupVelocity: number; warmupWeight: number };
   /** Режим периодизации: linear (по умолчанию) или dup (Daily Undulating). */
   periodization?: 'linear' | 'dup';
   /** Авторегуляция ПРОГРЕССИИ ПМ (только ПМ, без объёма). off — фикс. % цикла; auto — % по авторасчётам
@@ -1419,19 +1416,7 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
 
            // Расчётный вес с авторегуляцией (topSetPctMultiplier)
            const baseWeight = workWeight(pm, s.pct);
-           let adjWeight = Math.round(baseWeight * arTopMult * dupWtMult * 10) / 10;
-
-           // VBT: подгрузка веса по скорости разминочного подхода
-           if (input.vbt && input.vbt.lift === (spec.load?.toLowerCase() as VBTLift)) {
-             const vbtResult = estimate1RMFromVelocity(input.vbt.lift, input.vbt.warmupVelocity, input.vbt.warmupWeight);
-             if (vbtResult.e1RM > 0) {
-               const vbtPct = pctForVelocity(input.vbt.lift, input.vbt.warmupVelocity);
-               if (vbtPct > 0) {
-                 const vbtWeight = Math.round((vbtResult.e1RM * vbtPct) * 10) / 10;
-                 adjWeight = Math.round(adjWeight * 0.7 + vbtWeight * 0.3) / 10; // 70% план + 30% VBT
-               }
-             }
-           }
+           const adjWeight = Math.round(baseWeight * arTopMult * dupWtMult * 10) / 10;
 
             // RIR с ACWR + авторегуляцией + DUP
             const baseRir = faithful ? (s.rir ?? rirBase) : rirBase;
@@ -1712,7 +1697,6 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
       : '',
     ...deloadNotes,
     input.autoReg ? `🧠 Авторегуляция: топ-сет×${arTopMult}, объём×${arVolMult}, RIR+${arRirShift}${input.autoReg.deload ? ', deload' : ''}.` : '',
-    input.vbt ? `⚡ VBT: ${input.vbt.lift} — разминочная скорость ${input.vbt.warmupVelocity.toFixed(2)} м/с, подгрузка веса по скорости.` : '',
     input.periodization === 'dup' ? '🔄 DUP: ежедневное варьирование зон (гипертрофия/сила/пик) вместо линейной прогрессии.' : '',
     pmAutoNote,
     ...weakNotes,

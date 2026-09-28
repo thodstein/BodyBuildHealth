@@ -7,11 +7,6 @@ import type { SRCycleTemplate } from './lms-types';
 export const EMBED_BIC_EXP: SRCycleTemplate = {
   meta: {
     id: 'embed-bic-exp',
-    evidenceLevel: 'C',
-    bestFor: ['MS-MSMK'],
-    timeCommitment: 'high',
-    equipmentNeeded: ['barbell', 'dumbbell', 'machine', 'cable'],
-    periodization: 'block',
     title: 'Встраиваемый: бицепс, продвинутый',
     direction: 'bodybuilding',
     level: 'MS-MSMK',

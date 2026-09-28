@@ -41,11 +41,6 @@ const weeks: SRDaySpec[][] = [
 export const SRC2_SHEIKO_PREP: SRCycleTemplate = {
   meta: {
     id: 'src2-sheiko-prep',
-    evidenceLevel: 'B',
-    bestFor: ['KMS-MS'],
-    timeCommitment: 'high',
-    equipmentNeeded: ['barbell', 'rack'],
-    periodization: 'block',
     title: 'Шейко подготовительный (КМС/МС, 4 нед)',
     direction: 'powerlifting',
     level: 'KMS-MS',

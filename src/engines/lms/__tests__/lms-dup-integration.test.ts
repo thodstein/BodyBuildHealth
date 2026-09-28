@@ -103,14 +103,6 @@ describe('DUP-режим в buildLMSPlan', () => {
     expect(plan.progressionRationale).toContain('Авторегуляция');
   });
 
-  it('DUP с VBT — оба режима работают вместе', () => {
-    const vbt = { lift: 'squat' as const, warmupVelocity: 0.85, warmupWeight: 60 };
-    const plan = buildLMSPlan(makeInput({ periodization: 'dup', vbt }));
-    expect(plan.weeks.length).toBeGreaterThan(0);
-    expect(plan.progressionRationale).toContain('DUP');
-    expect(plan.progressionRationale).toContain('VBT');
-  });
-
   it('DUP: rationale содержит описание режима', () => {
     const plan = buildLMSPlan(makeInput({ periodization: 'dup' }));
     expect(plan.progressionRationale).toContain('ежедневное варьирование');

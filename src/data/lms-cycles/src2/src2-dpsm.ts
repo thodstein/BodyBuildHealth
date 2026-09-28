@@ -72,11 +72,6 @@ const weeks: SRDaySpec[][] = [
 export const SRC2_DPSM: SRCycleTemplate = {
  meta: {
   id: 'src2-dpsm',
-    evidenceLevel: 'C',
-    bestFor: ['KMS-MS'],
-    timeCommitment: 'high',
-    equipmentNeeded: ['barbell', 'rack'],
-    periodization: 'linear',
   title: 'ДПСМ (Суровецкий)',
   direction: 'powerlifting',
   level: 'KMS-MS',

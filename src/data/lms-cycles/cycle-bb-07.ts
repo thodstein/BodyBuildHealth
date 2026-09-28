@@ -3,11 +3,6 @@ import type { SRCycleTemplate } from './lms-types';
 export const CYCLE_BB_07: SRCycleTemplate = {
  meta: {
   id: 'cycle-bb-07',
-    evidenceLevel: 'C',
-    bestFor: ['KMS-MS'],
-    timeCommitment: 'high',
-    equipmentNeeded: ['barbell', 'dumbbell', 'machine', 'cable'],
-    periodization: 'linear',
   title: 'PHAT 5x/нед (Power Hypertrophy Adaptive Training)',
   direction: 'bodybuilding',
   level: 'KMS-MS',

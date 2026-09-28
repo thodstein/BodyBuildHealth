@@ -3,11 +3,6 @@ import type { SRCycleTemplate } from './lms-types';
 export const CYCLE_BB_10: SRCycleTemplate = {
  meta: {
   id: 'cycle-bb-10',
-    evidenceLevel: 'C',
-    bestFor: ['KMS-MS'],
-    timeCommitment: 'high',
-    equipmentNeeded: ['barbell', 'dumbbell', 'machine', 'cable'],
-    periodization: 'linear',
   title: 'Специализация: Руки + Плечи 5x/нед (ПРОФ)',
   direction: 'bodybuilding',
   level: 'KMS-MS',

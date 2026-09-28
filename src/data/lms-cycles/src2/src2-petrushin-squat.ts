@@ -24,11 +24,6 @@ const weeks: SRDaySpec[][] = [
 export const SRC2_PETRUSHIN_SQUAT: SRCycleTemplate = {
   meta: {
     id: 'src2-petrushin-squat',
-    evidenceLevel: 'C',
-    bestFor: ['II-KMS'],
-    timeCommitment: 'low',
-    equipmentNeeded: ['barbell', 'rack'],
-    periodization: 'linear',
     title: 'Петрушин присед 12 недель (+15кг)',
     direction: 'powerlifting',
     level: 'II-KMS',

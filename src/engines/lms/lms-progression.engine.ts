@@ -134,21 +134,3 @@ export function progressionRationale(input: PMProgressionInput): string {
   return `${modeLabel[input.mode]}: PM ${verb} на ${sign}${pct}%/нед (${dir}). ` +
     `PM0=${input.pm0} кг → за ${input.weeks} нед: ${end.toFixed(1)} кг${capped ? ` (кап роста ×${(end / input.pm0).toFixed(2)} — без капа было бы ${rawEnd.toFixed(1)} кг)` : ''}.`;
 }
-
-/**
- * Детренированность: снижение PM после паузы без тренировок.
- * Yilmaz 2026 (JSCR): 14 дней без тренировки -> снижение нервной функции
- * (CMJ RSI, IMTP RFD, спринт), мышечная масса значимо не меняется.
- * Модель: <7 дней — без потерь; 7-13 — −3%; 14-20 — −8%; 21-34 — −13%; 35+ — −18% (потолок).
- */
-export function computeDetrainingPM(pm: number, daysOff: number): number {
-  if (!Number.isFinite(pm) || pm <= 0) return pm;
-  if (!Number.isFinite(daysOff) || daysOff < 0) return pm;
-  let lossPct: number;
-  if (daysOff < 7) lossPct = 0;
-  else if (daysOff < 14) lossPct = 0.03;
-  else if (daysOff < 21) lossPct = 0.08;
-  else if (daysOff < 35) lossPct = 0.13;
-  else lossPct = 0.18;
-  return Math.round(pm * (1 - lossPct) * 10) / 10;
-}

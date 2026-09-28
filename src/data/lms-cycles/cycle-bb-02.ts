@@ -3,11 +3,6 @@ import type { SRCycleTemplate } from './lms-types';
 export const CYCLE_BB_02: SRCycleTemplate = {
  meta: {
   id: 'cycle-bb-02',
-    evidenceLevel: 'C',
-    bestFor: ['II-MS'],
-    timeCommitment: 'high',
-    equipmentNeeded: ['barbell', 'dumbbell', 'machine', 'cable'],
-    periodization: 'linear',
   title: 'Массонабор Push/Pull/Legs + Upper Pump 4x/нед (ПРОФ)',
   direction: 'bodybuilding',
   level: 'II-MS',

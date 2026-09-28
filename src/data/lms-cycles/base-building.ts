@@ -20,11 +20,6 @@ const weeks: SRDaySpec[][] = Array.from({ length: 8 }, (_, wi) => {
 export const BASE_BUILDING: SRCycleTemplate = {
   meta: {
     id: 'base-building',
-    evidenceLevel: 'C',
-    bestFor: ['II-KMS', 'KMS-MS'],
-    timeCommitment: 'high',
-    equipmentNeeded: ['barbell', 'rack'],
-    periodization: 'linear',
     title: 'Base Building 8н (Paul Carter)',
     direction: 'powerlifting',
     level: 'intermediate',
