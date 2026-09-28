@@ -35,7 +35,7 @@ import type { LabCompositeResult } from "../../../../engines/lab-analysis.engine
 import {
   foodAvailableForPlan, isHerbSpiceId, isPureSupplementId, isProteinPowderId,
   createDailyQuota, blockedIdsForNextMeal, registerMealInQuota, foodAvailableWithQuota,
-  QUOTA_LIMITS, stapleFamilyOf, nutCatchupCap, oilCatchupCap,
+  QUOTA_LIMITS, stapleFamilyOf, nutCatchupCap, oilCatchupCap, quotaWeightScale,
   isPortableFood, isWorkWindowMeal, isHvStapleBanned, isBreakfastBannedCarb, countCarbItems,
   isBreakfastBannedProtein, isBreakfastBannedFat, isHeavyAnimalFat, isSweetBaseId,
   familyMealCap, familyMealUses, isCreamId, creamMealCap, citrusFruitCapG, sweetFleshClash, isSweetCarbId, isFleshProteinId, isFishId,
@@ -8638,18 +8638,10 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     }
 
     // ─── P4 (план «ведро»): честный флаг сходимости products-пути ───
-    // Паритет с recipe-путём (withinTolerance/deviationPct), но порог 8%,
-    // а не 3%: вместо молчаливого мусора при большом недоборе — флаг + нота.
-    const _dayDevP4 = Math.max(
-      (input.goalKcal || 0) > 0 ? Math.abs(totals.kcal - (input.goalKcal || 0)) / (input.goalKcal || 1) : 0,
-      (input.goalProteinG || 0) > 0 ? Math.abs(totals.p - (input.goalProteinG || 0)) / (input.goalProteinG || 1) : 0,
-      (input.goalFatG || 0) > 0 ? Math.abs(totals.f - (input.goalFatG || 0)) / (input.goalFatG || 1) : 0,
-      (input.goalCarbsG || 0) > 0 ? Math.abs(totals.c - (input.goalCarbsG || 0)) / (input.goalCarbsG || 1) : 0,
-    );
-    const _dayDevPctP4 = Math.round(_dayDevP4 * 1000) / 10;
-    if (_dayDevPctP4 > 8) {
-      notes.push(`⚠ «Не сошлось»: отклонение дня от целей ${_dayDevPctP4}% (>8%) — пулы/капы не закрыли цели, итог честный best-effort, а не подгонка мусором`);
-    }
+    // ВАЖНО (stale-flag fix, Sep 28 2026): вычисляется В КОНЦЕ функции — после всех
+    // recalcDayTotals/P5b/капов/микро (см. перед return). Ранняя версия читала
+    // ПРОМЕЖУТОЧНЫЙ totals и показывала завышенное отклонение (до ~26% там, где
+    // финальный факт был ≤8%).
 
     // ─── P5b-realism: финальная дотяжка углеводов до СЪЕДОБНЫХ капов ───
     // Середины капов (280-315 г варёного крахмала) — бюджетные, а не «съедобные»:
@@ -9081,6 +9073,77 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
       const _w = Math.max(40, input.weightKg || 80);
       const _waterL = Math.round(((35 * _w + Math.max(0, (input.goalKcal || 0) - 3000) / 1000 * 400) / 1000) * 10) / 10;
       notes.push(`💧 Вода: ~${_waterL} л/день (35 мл/кг + 400 мл/1000 ккал свыше 3000${input.isTrainingDay ? ' + пот тренировки' : ''}); Na 4–6 г, K:Na ≥3:1${_bolusUnits > 0 ? ' — под инсулином держите быстрые У (декстрозу) на гипо' : ''}.`);
+    }
+
+    // ─── FINAL FAT CLOSE-GAP (Sep 28 2026) ───
+    // Жир — остаточный макрос: после приоритета Б/У его часто недобирают, а поздние
+    // углеводные доборы килокалории не возвращают. Если Ж < 92% цели И есть ккал-комната,
+    // добиваем СУЩЕСТВУЮЩИЕ жировые пункты гибких приёмов — это чинит и Ж, и ккал
+    // (двойной выигрыш именно по «сильно большому отклонению»). Только рост, только
+    // гибкие приёмы (не peri/pre-sleep), кап по цели Ж И по ккал-комнате ≤101% цели.
+    // ВАЖНО: кап по РЕАЛЬНОЙ ккал-комнате пункта (а не только граммам жира) + семейные
+    // катчелл-капы (орехи/семена/масла) — иначе смешанные носители улетали за квоты.
+    {
+      const _gF = fatTotal || input.goalFatG || 0;
+      const _kcalCeil = (input.goalKcal || 0) * 1.01;
+      if (_gF > 0 && totals.f < _gF * 0.92 && totals.kcal < _kcalCeil) {
+        const _ws = quotaWeightScale(input.weightKg);
+        const _nutCap = nutCatchupCap(_ws), _oilCap = oilCatchupCap(_ws);
+        const _famTotals: Record<string, number> = {};
+        for (const m of meals) for (const it of m.items) { const f = stapleFamilyOf(it.id); if (f) _famTotals[f] = (_famTotals[f] || 0) + it.amount; }
+        const _famRoom = (fam?: string | null): number => {
+          if (fam === 'oils') return _oilCap - (_famTotals['oils'] || 0);
+          if (fam === 'nuts' || fam === 'seeds') return _nutCap - ((_famTotals['nuts'] || 0) + (_famTotals['seeds'] || 0));
+          return Infinity;
+        };
+        let _fatItems = meals.filter(_flexMeal).flatMap(m => m.items.filter(it => it.role === 'fat').map(it => ({ meal: m, item: it })));
+        if (morningTrainLoad) _fatItems = _fatItems.filter(({ meal }) => meal.type !== 'dinner');
+        let _kcalRoom = _kcalCeil - totals.kcal;
+        let _fatNeed = _gF - totals.f;
+        for (const { meal, item } of _fatItems) {
+          if (_kcalRoom < 30 || _fatNeed <= 2) break;
+          const food = FOOD_DB.find(f => f.id === item.id);
+          if (!food || !food.fat || !food.kcal) continue;
+          const fam = stapleFamilyOf(item.id);
+          const famRoomNow = _famRoom(fam);
+          const byKcal = Math.floor(_kcalRoom / (food.kcal || 1) * 100);
+          const byFat = Math.floor(_fatNeed / (food.fat || 1) * 100);
+          const byFam = Math.max(0, Math.floor(famRoomNow));
+          const target = Math.min(item.amount + Math.min(byKcal, byFat, byFam), maxGramPerItem(_pickCtx.currentBudget, mealCapScaleOf(meal)));
+          const snapped = snapPortionG(food, target);
+          if (snapped <= item.amount) continue;
+          // снап может округлить вверх за катчелл-кап семейства — тогда пропускаем пункт
+          if (famRoomNow !== Infinity && (snapped - item.amount) > famRoomNow + 0.5) continue;
+          const _oldAmount = item.amount;
+          const factor = snapped / (item.amount || 1);
+          const dKcal = item.kcal * (factor - 1), dFat = item.f * (factor - 1);
+          if (dKcal > _kcalRoom) continue; // снап не влезает в комнату — пропускаем пункт
+          item.amount = snapped; item.kcal = Math.round(item.kcal * factor); item.p = Math.round(item.p * factor); item.f = Math.round(item.f * factor); item.c = Math.round(item.c * factor); item.fiber = Math.round(item.fiber * factor); item.leucine_mg = Math.round((item.leucine_mg || 0) * factor);
+          if (fam) _famTotals[fam] = (_famTotals[fam] || 0) + (snapped - _oldAmount);
+          _kcalRoom -= dKcal; _fatNeed -= dFat;
+        }
+        recalcMealTotals(meals);
+        recalcDayTotals(meals, totals);
+      }
+    }
+
+    // ─── P4 (план «ведро»): честный флаг сходимости products-пути (ФИНАЛЬНЫЙ totals) ───
+    // Считается здесь, ПОСЛЕ всех писателей (recalcDayTotals/P5b/капы/микро), иначе
+    // флаг отражал промежуточный снимок и завышал отклонение (stale-flag fix).
+    // Порог 8% (осознанно мягче recipe-порога 3%): при большом недоборе — честный
+    // флаг best-effort + нота, а не молчаливая подгонка мусором.
+    let _dayDevPctP4 = 0;
+    {
+      const _dayDevP4 = Math.max(
+        (input.goalKcal || 0) > 0 ? Math.abs(totals.kcal - (input.goalKcal || 0)) / (input.goalKcal || 1) : 0,
+        (input.goalProteinG || 0) > 0 ? Math.abs(totals.p - (input.goalProteinG || 0)) / (input.goalProteinG || 1) : 0,
+        (input.goalFatG || 0) > 0 ? Math.abs(totals.f - (input.goalFatG || 0)) / (input.goalFatG || 1) : 0,
+        (input.goalCarbsG || 0) > 0 ? Math.abs(totals.c - (input.goalCarbsG || 0)) / (input.goalCarbsG || 1) : 0,
+      );
+      _dayDevPctP4 = Math.round(_dayDevP4 * 1000) / 10;
+      if (_dayDevPctP4 > 8) {
+        notes.push(`⚠ «Не сошлось»: отклонение дня от целей ${_dayDevPctP4}% (>8%) — пулы/капы не закрыли цели, итог честный best-effort, а не подгонка мусором`);
+      }
     }
 
     return {
