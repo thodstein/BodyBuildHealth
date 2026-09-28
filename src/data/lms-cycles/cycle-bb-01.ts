@@ -3,6 +3,11 @@ import type { SRCycleTemplate } from './lms-types';
 export const CYCLE_BB_01: SRCycleTemplate = {
  meta: {
   id: 'cycle-bb-01',
+    evidenceLevel: 'C',
+    bestFor: ['II-MS'],
+    timeCommitment: 'high',
+    equipmentNeeded: ['barbell', 'dumbbell', 'machine', 'cable'],
+    periodization: 'linear',
   title: 'Гипертрофия Upper/Lower 4x/нед (ПРОФ)',
   direction: 'bodybuilding',
   level: 'II-MS',

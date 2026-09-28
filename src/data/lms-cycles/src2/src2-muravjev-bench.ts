@@ -73,6 +73,11 @@ const weeks: SRDaySpec[][] = [
 export const SRC2_MURAVJEV_BENCH: SRCycleTemplate = {
   meta: {
     id: 'src2-muravjev-bench',
+    evidenceLevel: 'C',
+    bestFor: ['II-KMS'],
+    timeCommitment: 'medium',
+    equipmentNeeded: ['barbell', 'rack'],
+    periodization: 'linear',
     title: 'Муравьёв жим (12 недель, DK Bruder)',
     direction: 'bench',
     level: 'II-KMS',

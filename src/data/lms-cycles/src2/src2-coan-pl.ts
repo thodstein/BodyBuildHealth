@@ -72,6 +72,11 @@ const weeks: SRDaySpec[][] = [
 export const SRC2_COAN_PL: SRCycleTemplate = {
   meta: {
     id: 'src2-coan-pl',
+    evidenceLevel: 'C',
+    bestFor: ['KMS-MS'],
+    timeCommitment: 'medium',
+    equipmentNeeded: ['barbell', 'rack'],
+    periodization: 'block',
     title: 'Эд Коэн троеборье (12 недель)',
     direction: 'powerlifting',
     level: 'KMS-MS',

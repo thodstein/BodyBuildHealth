@@ -102,6 +102,11 @@ const weeks: SRDaySpec[][] = [
 export const SMOLOV: SRCycleTemplate = {
   meta: {
     id: 'smolov',
+    evidenceLevel: 'B',
+    bestFor: ['KMS-MS'],
+    timeCommitment: 'high',
+    equipmentNeeded: ['barbell', 'rack'],
+    periodization: 'block',
     title: 'Смолов — 13 недель приседа (специализация)',
     direction: 'powerlifting',
     level: 'KMS-MS',

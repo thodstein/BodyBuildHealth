@@ -9,6 +9,11 @@ import type { SRCycleTemplate } from './lms-types';
 export const CYCLE_BB_F_CUT_8: SRCycleTemplate = {
  meta: {
   id: 'cycle-bb-f-cut-8',
+    evidenceLevel: 'C',
+    bestFor: ['II-KMS'],
+    timeCommitment: 'high',
+    equipmentNeeded: ['barbell', 'dumbbell', 'machine', 'cable'],
+    periodization: 'linear',
   title: 'Женская сушка 8н (4×/нед)',
   direction: 'bodybuilding',
   level: 'II-KMS',

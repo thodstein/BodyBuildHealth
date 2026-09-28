@@ -79,6 +79,11 @@ const weeks: SRDaySpec[][] = [
 export const SRC2_COAN_BENCH: SRCycleTemplate = {
   meta: {
     id: 'src2-coan-bench',
+    evidenceLevel: 'C',
+    bestFor: ['KMS-MS'],
+    timeCommitment: 'low',
+    equipmentNeeded: ['barbell', 'rack'],
+    periodization: 'block',
     title: 'Эд Коэн жим (12 недель heavy/light)',
     direction: 'bench',
     level: 'KMS-MS',

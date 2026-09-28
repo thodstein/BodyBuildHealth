@@ -15,6 +15,11 @@ const day = (...exercises: ReturnType<typeof ex>[]) => ({ exercises });
 export const CYCLE_BB_F_BIKINI_BASE_12: SRCycleTemplate = {
   meta: {
     id: 'cycle-bb-f-bikini-base-12',
+    evidenceLevel: 'C',
+    bestFor: ['II-KMS'],
+    timeCommitment: 'high',
+    equipmentNeeded: ['barbell', 'dumbbell', 'machine', 'cable'],
+    periodization: 'linear',
     title: 'Женская база бикини 12н (4×/нед)',
     direction: 'bodybuilding',
     level: 'II-KMS',

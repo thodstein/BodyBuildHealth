@@ -10,6 +10,11 @@ import type { SRCycleTemplate } from './lms-types';
 export const CYCLE_BB_F_GLUTE_12: SRCycleTemplate = {
  meta: {
   id: 'cycle-bb-f-glute-12',
+    evidenceLevel: 'C',
+    bestFor: ['II-KMS'],
+    timeCommitment: 'high',
+    equipmentNeeded: ['barbell', 'dumbbell', 'machine', 'cable'],
+    periodization: 'linear',
   title: 'Женская специализация ягодиц 12н (5×/нед)',
   direction: 'bodybuilding',
   level: 'II-KMS',

@@ -23,6 +23,11 @@ const weeks: SRDaySpec[][] = Array.from({ length: 20 }, (_, wi) => {
 export const SHEIKO_AML_20: SRCycleTemplate = {
   meta: {
     id: 'sheiko-aml-20',
+    evidenceLevel: 'B',
+    bestFor: ['MS-MSMK'],
+    timeCommitment: 'high',
+    equipmentNeeded: ['barbell', 'rack'],
+    periodization: 'block',
     title: 'Шейко AML 20н — Advanced Large Load',
     direction: 'powerlifting',
     level: 'MS-MSMK',

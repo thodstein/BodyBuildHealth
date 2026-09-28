@@ -39,6 +39,11 @@ const weeks: SRDaySpec[][] = [
 export const SHEIKO_32: SRCycleTemplate = {
   meta: {
     id: 'sheiko-32',
+    evidenceLevel: 'B',
+    bestFor: ['KMS-MS'],
+    timeCommitment: 'medium',
+    equipmentNeeded: ['barbell', 'rack'],
+    periodization: 'block',
     title: 'Шейко #32 — пик',
     direction: 'powerlifting',
     level: 'KMS-MS',

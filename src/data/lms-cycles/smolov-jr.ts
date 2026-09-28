@@ -38,6 +38,11 @@ const weeks: SRDaySpec[][] = [
 export const SMOLOV_JR: SRCycleTemplate = {
   meta: {
     id: 'smolov-jr',
+    evidenceLevel: 'B',
+    bestFor: ['II-KMS'],
+    timeCommitment: 'high',
+    equipmentNeeded: ['barbell', 'rack'],
+    periodization: 'block',
     title: 'Смолов Jr — 3 недели (присед/жим)',
     direction: 'powerlifting',
     level: 'II-KMS',

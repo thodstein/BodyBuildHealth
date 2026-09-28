@@ -3,6 +3,11 @@ import type { SRCycleTemplate } from './lms-types';
 export const CYCLE_BB_08: SRCycleTemplate = {
  meta: {
   id: 'cycle-bb-08',
+    evidenceLevel: 'C',
+    bestFor: ['KMS-MS'],
+    timeCommitment: 'high',
+    equipmentNeeded: ['barbell', 'dumbbell', 'machine', 'cable'],
+    periodization: 'linear',
   title: 'Arnold Split 6x/нед (ПРОФ)',
   direction: 'bodybuilding',
   level: 'KMS-MS',

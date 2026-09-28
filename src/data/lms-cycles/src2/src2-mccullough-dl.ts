@@ -25,6 +25,11 @@ const weeks: SRDaySpec[][] = [
 export const SRC2_MCCULLOUGH_DL: SRCycleTemplate = {
   meta: {
     id: 'src2-mccullough-dl',
+    evidenceLevel: 'C',
+    bestFor: ['II-KMS'],
+    timeCommitment: 'high',
+    equipmentNeeded: ['barbell', 'rack'],
+    periodization: 'linear',
     title: 'Том МакКаллоу тяга/жим (14 недель)',
     direction: 'deadlift_bench',
     level: 'II-KMS',

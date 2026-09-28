@@ -27,6 +27,11 @@ const weeks: SRDaySpec[][] = [
 export const SRC2_BUTENKO_BASE: SRCycleTemplate = {
   meta: {
     id: 'src2-butenko-base',
+    evidenceLevel: 'C',
+    bestFor: ['II-MS'],
+    timeCommitment: 'high',
+    equipmentNeeded: ['barbell', 'rack'],
+    periodization: 'linear',
     title: 'Бутенко база 16 недель (жим)',
     direction: 'bench',
     level: 'II-MS',

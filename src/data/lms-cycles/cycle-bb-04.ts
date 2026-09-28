@@ -3,6 +3,11 @@ import type { SRCycleTemplate } from './lms-types';
 export const CYCLE_BB_04: SRCycleTemplate = {
  meta: {
   id: 'cycle-bb-04',
+    evidenceLevel: 'C',
+    bestFor: ['KMS-MSMK'],
+    timeCommitment: 'high',
+    equipmentNeeded: ['barbell', 'dumbbell', 'machine', 'cable'],
+    periodization: 'linear',
   title: 'PPL Heavy+Pump 6x/нед (ПРОФ, продвинутый)',
   direction: 'bodybuilding',
   level: 'KMS-MSMK',

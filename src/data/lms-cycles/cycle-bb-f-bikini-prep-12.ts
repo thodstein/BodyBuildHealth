@@ -16,6 +16,11 @@ const day = (...exercises: ReturnType<typeof ex>[]) => ({ exercises });
 export const CYCLE_BB_F_BIKINI_PREP_12: SRCycleTemplate = {
   meta: {
     id: 'cycle-bb-f-bikini-prep-12',
+    evidenceLevel: 'C',
+    bestFor: ['II-KMS'],
+    timeCommitment: 'high',
+    equipmentNeeded: ['barbell', 'dumbbell', 'machine', 'cable'],
+    periodization: 'linear',
     title: 'Женская подводка бикини 12н (5×/нед)',
     direction: 'bodybuilding',
     level: 'II-KMS',

@@ -22,6 +22,11 @@ const weeks: SRDaySpec[][] = Array.from({ length: 8 }, (_, wi) => {
 export const BRIDGE: SRCycleTemplate = {
   meta: {
     id: 'bridge',
+    evidenceLevel: 'C',
+    bestFor: ['II-KMS', 'KMS-MS'],
+    timeCommitment: 'high',
+    equipmentNeeded: ['barbell', 'rack'],
+    periodization: 'linear',
     title: 'The Bridge 8н (Barbell Medicine)',
     direction: 'powerlifting',
     level: 'intermediate',

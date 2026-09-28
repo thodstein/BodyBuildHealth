@@ -24,6 +24,11 @@ const weeks: SRDaySpec[][] = Array.from({ length: 9 }, (_, wi) => {
 export const TSA_9: SRCycleTemplate = {
   meta: {
     id: 'tsa-9',
+    evidenceLevel: 'C',
+    bestFor: ['KMS-MS'],
+    timeCommitment: 'high',
+    equipmentNeeded: ['barbell', 'rack'],
+    periodization: 'block',
     title: 'TSA 9н Intermediate (RPE)',
     direction: 'powerlifting',
     level: 'KMS-MS',

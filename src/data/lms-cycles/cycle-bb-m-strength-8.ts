@@ -14,6 +14,11 @@ const day = (...exercises: ReturnType<typeof ex>[]) => ({ exercises });
 export const CYCLE_BB_M_STRENGTH_8: SRCycleTemplate = {
   meta: {
     id: 'cycle-bb-m-strength-8',
+    evidenceLevel: 'C',
+    bestFor: ['II-KMS'],
+    timeCommitment: 'high',
+    equipmentNeeded: ['barbell', 'dumbbell', 'machine', 'cable'],
+    periodization: 'linear',
     title: 'Сила + масса 8н (4×/нед)',
     direction: 'bodybuilding',
     level: 'II-KMS',

@@ -55,6 +55,11 @@ const weeks: SRDaySpec[][] = [
 export const SRC2_PERSPEKTIVA: SRCycleTemplate = {
  meta: {
   id: 'src2-perspektiva',
+    evidenceLevel: 'C',
+    bestFor: ['novice', 'II-KMS'],
+    timeCommitment: 'low',
+    equipmentNeeded: ['barbell', 'rack'],
+    periodization: 'linear',
   title: 'Перспектива (Суровецкий)',
   direction: 'powerlifting',
   level: 'novice',

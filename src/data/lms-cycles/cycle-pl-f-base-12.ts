@@ -14,6 +14,11 @@ const day = (...exercises: ReturnType<typeof ex>[]) => ({ exercises });
 export const CYCLE_PL_F_BASE_12: SRCycleTemplate = {
   meta: {
     id: 'cycle-pl-f-base-12',
+    evidenceLevel: 'C',
+    bestFor: ['II-KMS'],
+    timeCommitment: 'high',
+    equipmentNeeded: ['barbell', 'rack'],
+    periodization: 'linear',
     title: 'Женская ПЛ-база 12н (4×/нед)',
     direction: 'powerlifting',
     level: 'II-KMS',

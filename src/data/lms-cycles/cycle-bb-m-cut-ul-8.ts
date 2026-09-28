@@ -14,6 +14,11 @@ const day = (...exercises: ReturnType<typeof ex>[]) => ({ exercises });
 export const CYCLE_BB_M_CUT_UL_8: SRCycleTemplate = {
   meta: {
     id: 'cycle-bb-m-cut-ul-8',
+    evidenceLevel: 'C',
+    bestFor: ['II-KMS'],
+    timeCommitment: 'high',
+    equipmentNeeded: ['barbell', 'dumbbell', 'machine', 'cable'],
+    periodization: 'linear',
     title: 'Мужская сушка верх/низ 8н (4×/нед)',
     direction: 'bodybuilding',
     level: 'II-KMS',

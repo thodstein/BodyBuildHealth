@@ -22,6 +22,11 @@ const weeks: SRDaySpec[][] = Array.from({ length: 12 }, (_, wi) => {
 export const PHUL: SRCycleTemplate = {
   meta: {
     id: 'phul',
+    evidenceLevel: 'C',
+    bestFor: ['II-KMS', 'KMS-MS'],
+    timeCommitment: 'high',
+    equipmentNeeded: ['barbell', 'rack'],
+    periodization: 'dup',
     title: 'PHUL 12н (Power/Hypertrophy)',
     direction: 'powerlifting',
     level: 'intermediate',

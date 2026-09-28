@@ -14,6 +14,11 @@ const day = (...exercises: ReturnType<typeof ex>[]) => ({ exercises });
 export const CYCLE_BB_M_HOTEL_4: SRCycleTemplate = {
   meta: {
     id: 'cycle-bb-m-hotel-4',
+    evidenceLevel: 'C',
+    bestFor: ['II-KMS'],
+    timeCommitment: 'medium',
+    equipmentNeeded: ['dumbbell', 'bodyweight'],
+    periodization: 'linear',
     title: 'Поездка/отель 4н (3×/нед)',
     direction: 'bodybuilding',
     level: 'II-KMS',

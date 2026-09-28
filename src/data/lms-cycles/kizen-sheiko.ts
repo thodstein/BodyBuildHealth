@@ -23,6 +23,11 @@ const weeks: SRDaySpec[][] = Array.from({ length: 12 }, (_, wi) => {
 export const KIZEN_SHEIKO: SRCycleTemplate = {
   meta: {
     id: 'kizen-sheiko',
+    evidenceLevel: 'B',
+    bestFor: ['KMS-MS'],
+    timeCommitment: 'high',
+    equipmentNeeded: ['barbell', 'rack'],
+    periodization: 'block',
     title: 'Kizen Sheiko Intermediate 12н',
     direction: 'powerlifting',
     level: 'KMS-MS',

@@ -21,6 +21,11 @@ const weeks: SRDaySpec[][] = Array.from({ length: 8 }, (_, wi) => {
 export const CALGARY_8: SRCycleTemplate = {
   meta: {
     id: 'calgary-8',
+    evidenceLevel: 'C',
+    bestFor: ['KMS-MS'],
+    timeCommitment: 'high',
+    equipmentNeeded: ['barbell', 'rack'],
+    periodization: 'block',
     title: 'Calgary 8н (укороченный)',
     direction: 'powerlifting',
     level: 'KMS-MS',

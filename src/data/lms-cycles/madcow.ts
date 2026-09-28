@@ -54,6 +54,11 @@ const weeks: SRDaySpec[][] = [
 export const MADCOW: SRCycleTemplate = {
   meta: {
     id: 'madcow',
+    evidenceLevel: 'C',
+    bestFor: ['II-KMS', 'KMS-MS'],
+    timeCommitment: 'medium',
+    equipmentNeeded: ['barbell', 'rack'],
+    periodization: 'block',
     title: 'Madcow 5×5 — 8 недель',
     direction: 'powerlifting',
     level: 'intermediate',

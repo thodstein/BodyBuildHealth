@@ -77,6 +77,11 @@ const weeks: SRDaySpec[][] = [
 export const SRC2_REKORD: SRCycleTemplate = {
  meta: {
   id: 'src2-rekord',
+    evidenceLevel: 'C',
+    bestFor: ['KMS-MS'],
+    timeCommitment: 'medium',
+    equipmentNeeded: ['barbell', 'rack'],
+    periodization: 'linear',
   title: 'Рекорд (Суровецкий)',
   direction: 'powerlifting',
   level: 'KMS-MS',

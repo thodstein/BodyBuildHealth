@@ -3,6 +3,11 @@ import type { SRCycleTemplate } from './lms-types';
 export const CYCLE_BB_05: SRCycleTemplate = {
  meta: {
   id: 'cycle-bb-05',
+    evidenceLevel: 'C',
+    bestFor: ['novice', 'II-KMS'],
+    timeCommitment: 'medium',
+    equipmentNeeded: ['barbell', 'dumbbell', 'machine', 'cable'],
+    periodization: 'linear',
   title: 'Начальный Full Body 3x/нед (новички)',
   direction: 'bodybuilding',
   level: 'novice',

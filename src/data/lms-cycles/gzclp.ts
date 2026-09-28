@@ -33,6 +33,11 @@ const weeks: SRDaySpec[][] = [
 export const GZCLP: SRCycleTemplate = {
   meta: {
     id: 'gzclp',
+    evidenceLevel: 'B',
+    bestFor: ['novice', 'II-KMS'],
+    timeCommitment: 'medium',
+    equipmentNeeded: ['barbell', 'rack'],
+    periodization: 'block',
     title: 'GZCLP — 4 недели (Cody LeFever)',
     direction: 'powerlifting',
     level: 'novice',

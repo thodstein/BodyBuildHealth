@@ -3,6 +3,11 @@ import type { SRCycleTemplate } from '../lms-types';
 export const SRC2_PTBAZ_8: SRCycleTemplate = {
  meta: {
   id: 'src2-ptbaz-8',
+    evidenceLevel: 'C',
+    bestFor: ['II-KMS'],
+    timeCommitment: 'medium',
+    equipmentNeeded: ['barbell', 'rack'],
+    periodization: 'linear',
   title: 'ПТ-БАЗ 8 нед (с разгрузкой)',
   direction: 'powerlifting',
   level: 'II-KMS',

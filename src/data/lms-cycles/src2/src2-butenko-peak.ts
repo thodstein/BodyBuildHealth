@@ -32,6 +32,11 @@ const weeks: SRDaySpec[][] = [
 export const SRC2_BUTENKO_PEAK: SRCycleTemplate = {
   meta: {
     id: 'src2-butenko-peak',
+    evidenceLevel: 'C',
+    bestFor: ['KMS-MS'],
+    timeCommitment: 'medium',
+    equipmentNeeded: ['barbell', 'rack'],
+    periodization: 'linear',
     title: 'Бутенко пиковый 4 недели (жим)',
     direction: 'bench',
     level: 'KMS-MS',

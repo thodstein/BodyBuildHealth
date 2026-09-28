@@ -14,6 +14,11 @@ const day = (...exercises: ReturnType<typeof ex>[]) => ({ exercises });
 export const CYCLE_BB_M_ARMS_8: SRCycleTemplate = {
   meta: {
     id: 'cycle-bb-m-arms-8',
+    evidenceLevel: 'C',
+    bestFor: ['KMS-MS'],
+    timeCommitment: 'high',
+    equipmentNeeded: ['barbell', 'dumbbell', 'machine', 'cable'],
+    periodization: 'linear',
     title: 'Специализация рук 8н (5×/нед)',
     direction: 'bodybuilding',
     level: 'KMS-MS',

@@ -22,6 +22,11 @@ const weeks: SRDaySpec[][] = Array.from({ length: 8 }, (_, wi) => {
 export const LILLIEBRIDGE: SRCycleTemplate = {
   meta: {
     id: 'lilliebridge',
+    evidenceLevel: 'C',
+    bestFor: ['KMS-MS'],
+    timeCommitment: 'high',
+    equipmentNeeded: ['barbell', 'rack'],
+    periodization: 'block',
     title: 'Lilliebridge Method — 8н',
     direction: 'powerlifting',
     level: 'KMS-MS',

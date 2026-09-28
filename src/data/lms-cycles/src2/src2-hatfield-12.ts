@@ -85,6 +85,11 @@ const weeks: SRDaySpec[][] = [
 export const SRC2_HATFIELD_12: SRCycleTemplate = {
   meta: {
     id: 'src2-hatfield-12',
+    evidenceLevel: 'C',
+    bestFor: ['II-KMS'],
+    timeCommitment: 'medium',
+    equipmentNeeded: ['barbell', 'rack'],
+    periodization: 'linear',
     title: 'Хетфилд 12 недель (троеборье)',
     direction: 'powerlifting',
     level: 'II-KMS',

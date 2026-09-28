@@ -16,6 +16,11 @@ const day = (...exercises: ReturnType<typeof ex>[]) => ({ exercises });
 export const CYCLE_BB_F_WELLNESS_12: SRCycleTemplate = {
   meta: {
     id: 'cycle-bb-f-wellness-12',
+    evidenceLevel: 'C',
+    bestFor: ['II-KMS'],
+    timeCommitment: 'high',
+    equipmentNeeded: ['barbell', 'dumbbell', 'machine', 'cable'],
+    periodization: 'linear',
     title: 'Женский wellness 12н (5×/нед)',
     direction: 'bodybuilding',
     level: 'II-KMS',

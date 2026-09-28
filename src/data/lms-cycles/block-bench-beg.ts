@@ -7,6 +7,11 @@ import type { SRCycleTemplate } from './lms-types';
 export const BLOCK_BENCH_BEG: SRCycleTemplate = {
   meta: {
     id: 'block-bench-beg',
+    evidenceLevel: 'C',
+    bestFor: ['novice', 'II-KMS'],
+    timeCommitment: 'medium',
+    equipmentNeeded: ['barbell', 'rack'],
+    periodization: 'block',
     title: 'Блочный: жим, новичок',
     direction: 'bench',
     level: 'novice',

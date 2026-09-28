@@ -47,6 +47,11 @@ const weeks: SRDaySpec[][] = [
 export const SRC2_PT12TA: SRCycleTemplate = {
  meta: {
   id: 'src2-pt12ta',
+    evidenceLevel: 'C',
+    bestFor: ['II-KMS'],
+    timeCommitment: 'medium',
+    equipmentNeeded: ['barbell', 'rack'],
+    periodization: 'linear',
   title: 'ПТ12-ТА Присед/Тяга (Суровецкий)',
   direction: 'powerlifting',
   level: 'II-KMS',

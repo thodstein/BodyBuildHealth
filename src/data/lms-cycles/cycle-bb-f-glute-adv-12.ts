@@ -14,6 +14,11 @@ const day = (...exercises: ReturnType<typeof ex>[]) => ({ exercises });
 export const CYCLE_BB_F_GLUTE_ADV_12: SRCycleTemplate = {
   meta: {
     id: 'cycle-bb-f-glute-adv-12',
+    evidenceLevel: 'C',
+    bestFor: ['KMS-MS'],
+    timeCommitment: 'high',
+    equipmentNeeded: ['barbell', 'dumbbell', 'machine', 'cable'],
+    periodization: 'linear',
     title: 'Женские ягодицы PRO 12н (6×/нед)',
     direction: 'bodybuilding',
     level: 'KMS-MS',

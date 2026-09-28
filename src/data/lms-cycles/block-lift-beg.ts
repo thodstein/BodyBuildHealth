@@ -7,6 +7,11 @@ import type { SRCycleTemplate } from './lms-types';
 export const BLOCK_LIFT_BEG: SRCycleTemplate = {
   meta: {
     id: 'block-lift-beg',
+    evidenceLevel: 'C',
+    bestFor: ['novice', 'II-KMS'],
+    timeCommitment: 'medium',
+    equipmentNeeded: ['barbell', 'rack'],
+    periodization: 'block',
     title: 'Блочный: троеборье, новичок',
     direction: 'powerlifting',
     level: 'novice',

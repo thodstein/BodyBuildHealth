@@ -33,6 +33,11 @@ const weeks: SRDaySpec[][] = [
 export const TEXAS_METHOD: SRCycleTemplate = {
   meta: {
     id: 'texas-method',
+    evidenceLevel: 'C',
+    bestFor: ['II-KMS', 'KMS-MS'],
+    timeCommitment: 'medium',
+    equipmentNeeded: ['barbell', 'rack'],
+    periodization: 'block',
     title: 'Texas Method — 4 недели',
     direction: 'powerlifting',
     level: 'intermediate',

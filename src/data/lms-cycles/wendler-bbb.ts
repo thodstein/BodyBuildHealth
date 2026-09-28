@@ -35,6 +35,11 @@ const weeks: SRDaySpec[][] = [
 export const WENDLER_BBB: SRCycleTemplate = {
   meta: {
     id: 'wendler-bbb',
+    evidenceLevel: 'B',
+    bestFor: ['II-KMS', 'KMS-MS'],
+    timeCommitment: 'high',
+    equipmentNeeded: ['barbell', 'rack'],
+    periodization: 'linear',
     title: 'Wendler 5/3/1 BBB — 4н',
     direction: 'powerlifting',
     level: 'intermediate',
