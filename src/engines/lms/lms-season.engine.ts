@@ -399,6 +399,7 @@ export interface AssembleSeasonOptions {
   acwr?: LMSBuildInput['acwr'];
   autoReg?: LMSBuildInput['autoReg'];
   pmAutoReg?: LMSBuildInput['pmAutoReg'];
+  periodization?: LMSBuildInput['periodization'];
   volumeGoal?: LMSBuildInput['volumeGoal'];
   focusLift?: LMSBuildInput['focusLift'];
   currentReadiness?: number;
@@ -502,6 +503,7 @@ export function assembleSeasonPlan(plan: PLSeasonPlan, opts: AssembleSeasonOptio
       acwr: opts.acwr,
       autoReg: opts.autoReg,
       pmAutoReg: opts.pmAutoReg,
+      periodization: opts.periodization,
       ...(opts.recovery ?? {}),
     });
     outputs.push(out);

@@ -76,6 +76,7 @@ export interface CompGapBuildOptions extends CompGapOptions {
   acwr?: LMSBuildInput['acwr'];
   autoReg?: LMSBuildInput['autoReg'];
   pmAutoReg?: LMSBuildInput['pmAutoReg'];
+  periodization?: LMSBuildInput['periodization'];
   volumeGoal?: LMSBuildInput['volumeGoal'];
   focusLift?: LMSBuildInput['focusLift'];
   currentReadiness?: number;
@@ -273,6 +274,7 @@ export function planBetweenCompetitions(
       acwr: opts.acwr,
       autoReg: opts.autoReg,
       pmAutoReg: opts.pmAutoReg,
+      periodization: opts.periodization,
       ...(opts.recovery ?? {}),
     });
     segOutputs.set(j, out.weeks.length > 0 ? out.weeks : [placeholder(1)]);

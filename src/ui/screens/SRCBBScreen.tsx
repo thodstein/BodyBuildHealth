@@ -74,6 +74,14 @@ const getTempo = (exerciseName: string, goal: string, isMainLift: boolean): RepT
   });
 };
 
+/**
+ * Сжать AutoRegOutput до полей, которые читает buildLMSPlan.
+ * Билдер применяет topSetPctMultiplier/volumeMultiplier/rirShift/deload —
+ * остальные диагностические поля (decisions/factors/…) ему не нужны.
+ */
+const autoregPayload = (ar: AutoRegOutput | null): { topSetPctMultiplier: number; volumeMultiplier: number; rirShift: number; deload: boolean } | undefined =>
+  ar ? { topSetPctMultiplier: ar.topSetPctMultiplier, volumeMultiplier: ar.volumeMultiplier, rirShift: ar.rirShift, deload: ar.deload } : undefined;
+
 type Mode = 'pl' | 'bb' | 'manual';
 
 // Фаза 3: карточки/кнопки — из единого кита training-ui (без локальных копий токенов).
@@ -608,6 +616,9 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
       progressionEnabled: true,
       faithful: true,
       periodization: periodizationMode,
+      // Авторегуляция: 'auto' применяет рассчитанные множители к самому плану,
+      // 'diary' — только к runtime-показу SessionPlayer (в buildSrc не трогаем).
+      autoReg: autoRegMode === 'auto' ? autoregPayload(autoRegResult) : undefined,
       ...rec,
     });
     // 🔋 Делод по кнопке пользователя: применяется к САМОМУ плану (таблица/печать/
@@ -639,6 +650,8 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
            courseIntensity,
            weeksOverride: block.weeks,
            progressionEnabled: true,
+           periodization: periodizationMode,
+           autoReg: autoRegMode === 'auto' ? autoregPayload(autoRegResult) : undefined,
           volumeGoal: (linked.profile?.settings as Record<string, any> | undefined)?.volumeGoal || 'mav',
           focusLift: (linked.profile?.settings as Record<string, any> | undefined)?.focusLift,
           currentReadiness: linked.readiness?.recovery,
@@ -1517,8 +1530,10 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
     limiterExerciseMap,
     limiterProtocolMap,
     limiterDayMap,
+    autoReg: autoRegMode === 'auto' ? autoregPayload(autoRegResult) : undefined,
+    periodization: periodizationMode,
     recovery: getRecoveryMetrics(linked),
-  }), [exercisePMs, pmSquat, pmBench, pmDead, pedAuto, peds, courseIntensity, pedDoses, plCalorieSurplus, plProteinPerKg, acwrData, autoRegMode, autoRegResult, pmAutoRegMode, pmDiary, linked, weakPoints, plWeakPoints, weakGroupDayMap, plWeakPointDayMap, weakGroupExerciseMap, plWeakPointExerciseMap, orthopedicBlockedPatterns, diagnosticExerciseMap, diagnosticDayMap, diagnosticWeakSide, limiterExerciseMap, limiterProtocolMap, limiterDayMap]);
+  }), [exercisePMs, pmSquat, pmBench, pmDead, pedAuto, peds, courseIntensity, pedDoses, plCalorieSurplus, plProteinPerKg, acwrData, autoRegMode, autoRegResult, periodizationMode, pmAutoRegMode, pmDiary, linked, weakPoints, plWeakPoints, weakGroupDayMap, plWeakPointDayMap, weakGroupExerciseMap, plWeakPointExerciseMap, orthopedicBlockedPatterns, diagnosticExerciseMap, diagnosticDayMap, diagnosticWeakSide, limiterExerciseMap, limiterProtocolMap, limiterDayMap]);
 
   // 📊 Frequency Planner: недельные объёмы по группам — из volume-landmarks
   // собранного плана (раньше передавался вымышленный хардкод 12/10/14/8/6/4).
