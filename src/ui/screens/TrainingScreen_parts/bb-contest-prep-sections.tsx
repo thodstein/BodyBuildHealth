@@ -9,7 +9,7 @@
  * форма состояния god-component не типизируется снаружи (осознанный trade-off мех. переноса).
  */
 import React from 'react';
-import { isoToday, CATEGORY_PROFILES, CONTEST_CATEGORY_LABELS, CONTEST_SPECIALIZATION_LABELS, nutritionTargetsForPrepDate, prepPhaseForDate, PREP_PHASE_LABELS, PREP_PHASE_COLORS, buildShowTimeline, configFromPlan, isShortCycle, resolvePeakStrategy, recommendCarbStrategyFromTrial, liveAdjustForPeakDay, buildShowChecklist, toggleShowChecklistItem, buildPostShowPlan, prepTrainingCompliance, manipulationLockNote, trialCarbDoseGPerKg, TAPER_VS_DELOAD_NOTE, lastHardDayForMuscle, prepDietBreaks, prepRefeedDates, addPeakPriming, activePostShowCurve, buildPeakWeek, recarbLoadFromVisual, coordinateLastHeavyDay, type BBContestCategory, type ContestSpecialization, type PrepPhaseKey, type WaterStrategy, type SodiumStrategy, type CarbLoadStrategy } from '../../../engines/bb/bb-contest-prep.engine';
+import { buildTrainingTaper, isoToday, CATEGORY_PROFILES, CONTEST_CATEGORY_LABELS, CONTEST_SPECIALIZATION_LABELS, nutritionTargetsForPrepDate, prepPhaseForDate, PREP_PHASE_LABELS, PREP_PHASE_COLORS, buildShowTimeline, configFromPlan, isShortCycle, resolvePeakStrategy, recommendCarbStrategyFromTrial, liveAdjustForPeakDay, buildShowChecklist, toggleShowChecklistItem, buildPostShowPlan, prepTrainingCompliance, manipulationLockNote, trialCarbDoseGPerKg, TAPER_VS_DELOAD_NOTE, lastHardDayForMuscle, prepDietBreaks, prepRefeedDates, addPeakPriming, activePostShowCurve, buildPeakWeek, recarbLoadFromVisual, coordinateLastHeavyDay, type BBContestCategory, type ContestSpecialization, type PrepPhaseKey, type WaterStrategy, type SodiumStrategy, type CarbLoadStrategy } from '../../../engines/bb/bb-contest-prep.engine';
 import { getPostShowLog, savePostShowEntry, removePostShowEntry, postShowRecoveryMarkers, postShowComedownNotes } from '../../../engines/bb/bb-prep-post-show-log.engine';
 import { prepStepsTrend } from '../../../engines/bb/bb-prep-weekly-log';
 import { PREP_LAB_PANEL, PREP_PROCEDURES, PREP_HYDRATION_GUIDELINES } from '../../../engines/bb/bb-prep-process.engine';
@@ -21,7 +21,7 @@ import { PopupSelect } from '../SRCBBScreen_parts/TrainingPopups';
 import { CollapsibleCard, BbRowSwitch, BbToggleChip, type Step } from './bb-auto-constructor-shared';
 import { CARD, SMALL, BTN, BTN_GHOST, H, IN } from './training-ui';
 import { PeakWeekMonitorCard, ShowDayEmergencyCard, PrepLabsCard, ShowSeriesCard, ShowCoachCard } from '../../components/contest-prep/PeakWeekProCard';
-import { buildTaperModifiers } from '../../../engines/bb/bb-taper-adaptive.engine';
+import { buildTaperModifiers, taperCurveSVG, compareTaperStrategies } from '../../../engines/bb/bb-taper-adaptive.engine';
 import { postShowRecoveryProgress } from '../../../engines/bb/bb-peak-pro.engine';
 import { getWeightLog } from '../../../engines/profile-store';
 
@@ -227,6 +227,16 @@ export const BbContestPrepParams: React.FC<{ ctx: BbContestPrepCtx }> = ({ ctx }
                   Homer 2024: деплеция не обязательна — загрузка с D-6 без деплеции-дней; для опытных с trial (новичкам — moderate).
                 </div>
               )}
+              {/* Сравнение стратегий загрузки (compareTaperStrategies) */}
+              <div style={{ marginTop:6 }}>
+                {compareTaperStrategies(buildContestPrepConfig().category).map(r => (
+                  <div key={r.strategy} style={{ display:'flex', gap:6, alignItems:'center', fontSize:9, color:'#fff', padding:'2px 0' }}>
+                    <span style={{ fontWeight: prepCarbMode === r.strategy ? 800 : 500, color: prepCarbMode === r.strategy ? '#4ade80' : '#fff', minWidth:118 }}>{r.label}</span>
+                    <span style={{ color: r.spillRisk === 'low' ? '#4ade80' : r.spillRisk === 'medium' ? '#f59e0b' : '#ef4444' }}>spill {r.spillRisk}</span>
+                    <span style={{ opacity:0.85 }}>· {r.bestFor}</span>
+                  </div>
+                ))}
+              </div>
             </div>
             <div>
               <div style={{ ...SMALL, marginBottom:4 }}>🏋️ Протокол (Библиотека)</div>
@@ -331,6 +341,17 @@ export const BbContestPrepPreview: React.FC<{ ctx: BbContestPrepCtx }> = ({ ctx 
               {(() => { const e = buildContestPrepConfig().experienceLevel; return e === 'advanced' ? 'продвинутый' : e === 'beginner' ? 'новичок' : 'средний'; })()}
               ) · режим подготовки: объём {Math.round((prepPlan.preparation.volumeMult ?? 1) * 100)}%
             </div>
+            {/* Кривая тапера (taperCurveSVG): объём/интенсивность/RIR по неделям */}
+            {(() => {
+              const taper = buildTrainingTaper(buildContestPrepConfig());
+              if (!taper.length) return null;
+              return (
+                <div style={{ marginBottom:8 }}>
+                  <div style={{ fontSize:10, color:'#fff', fontWeight:700, marginBottom:2 }}>📉 Кривая тапера ({taper.length} нед)</div>
+                  <div style={{ overflowX:'auto' }} dangerouslySetInnerHTML={{ __html: taperCurveSVG(taper) }} />
+                </div>
+              );
+            })()}
             {phaseNow && (
               <div style={{ fontSize:11, fontWeight:700, color:PREP_PHASE_COLORS[phaseNow.key as PrepPhaseKey], marginBottom:4 }}>
                 📍 Сейчас: {PREP_PHASE_LABELS[phaseNow.key as PrepPhaseKey]} ({phaseNow.dateStart} — {phaseNow.dateEnd})

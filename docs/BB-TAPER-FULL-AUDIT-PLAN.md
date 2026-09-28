@@ -181,25 +181,17 @@
 4. ✅ Per-category модификаторы тапера (`CATEGORY_TAPER_VOLUME_MOD`: bikini/wellness ×0.90)
 5. ✅ Модификатор тапера по ПЭД-статусу (`enhanced` → volume ×0.95, intensity ×1.025)
 
-### Фаза 2: Важные доработки (P1) — ВЫПОЛНЕНО (`6b6df5f4` + `29215e8f`)
-1. ✅ Динамическая коррекция пик-недели по чек-инам (`adaptPeakWeekByCheckin` в `bb-peak-pro.engine.ts`)
-2. ✅ Интеграция с дневником питания (`analyzeNutritionDiary`: средние нутриенты, тренд углеводов, рекомендация стратегии)
-3. ✅ Протокол "stable_full" (`buildStableFullProtocol`: вода 3.5л, натрий 2800мг, без манипуляций)
-4. ✅ Модификатор тапера по фазе цикла (`cyclePhaseTaperMod`: лютеиновая → intensity ×0.95, RIR +1)
-5. ✅ Протокол для РПП/РЕД-С (`buildRedSafeProtocol`: без дефицита, без манипуляций, повышенный белок)
-6. ✅ Интеграция с лабораторными анализами (`labTaperWarnings`: ферритин/кортизол/тестостерон/эстрадиол/ТТГ/глюкоза/HbA1c)
-7. ✅ Детальный протокол мульти-шоу (`buildMultiShowProtocol`: overreach + peak между шоу)
-8. ✅ Учёт соматотипа (`somatotypeTaperMod`: эктоморф +1 г/кг, эндоморф −1 г/кг)
+### Фаза 2: Важные доработки (P1) — РЕВИЗИЯ (лишнее удалено)
+Аудит потребителей показал: функции не использовались в UI и частично дублировали существующее.
+- ❌ Удалено как дубли/нишевое: `adaptPeakWeekByCheckin` (роль покрывает `peakWeekTrendAdvice`), `buildMultiShowProtocol` (дубль `planTwoShowSequence`), `exportPeakWeek` (дубль `buildPrepIcs`/`buildContestPrepPrintHtml`), `veteranTaperMod` (дубль age≥40), `cyclePhaseTaperMod` (дубль `isLutealPhase`), `buildStableFullProtocol`, `buildRedSafeProtocol`, `somatotypeTaperMod`, `labTaperWarnings`, `analyzeNutritionDiary`, `travelTaperMod`, `buildPeakReminders`, `buildPeakCancellationPlan`, `buildTaperCalendar`.
 
-### Фаза 3: Качество и UX (P2) — ВЫПОЛНЕНО (`35161a75`)
-1. ✅ Визуализация кривой тапера (`taperCurveSVG`: SVG-график объём/интенсивность/RIR)
-2. ✅ Сравнение стратегий пик-недели (`compareTaperStrategies`: 6 стратегий с бюджетом и spill risk)
-3. ✅ Экспорт пик-недели в PDF/ICS/CSV (`exportPeakWeek`: HTML + ICS + CSV)
-4. ✅ Напоминания (`buildPeakReminders`: 7 напоминаний с датами)
-5. ✅ Протокол отмены пик-недели (`buildPeakCancellationPlan`: 3 дня возврата)
-6. ✅ Модификатор для путешествий (`travelTaperMod`: +0.3-0.5л воды при перелёте)
-7. ✅ Модификатор для ветеранов 40+ (`veteranTaperMod`: объём ×1.05, интенсивность ×0.97)
-8. ✅ Связь с тренировочным календарём (`buildTaperCalendar`: недели × фазы × множители)
+### Фаза 3: Качество и UX (P2) — ВЫПОЛНЕНО ЧАСТИЧНО
+1. ✅ Визуализация кривой тапера (`taperCurveSVG`) — **подключено** в шаг 5 Preview
+2. ✅ Сравнение стратегий загрузки (`compareTaperStrategies`) — **подключено** в шаг 3
+3. ❌ Экспорт/напоминания/отмена/путешествия/ветераны/календарь — удалены (дубли или без потребителя)
+
+### Итог ревизии
+В продукте оставлено и подключено к UI: адаптивный тапер по опыту (`buildTaperModifiers`/`buildAdaptiveTaper`), гликоген-коррекция (`glycogenAdjustedDose`), визуализация (`taperCurveSVG`), сравнение стратегий (`compareTaperStrategies`).
 
 ---
 
