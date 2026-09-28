@@ -72,10 +72,6 @@ import type { BBPlanReport } from './bb-report.engine';
 
 import type { BBPlanValidationResult } from './bb-validator.engine';
 import { isMobilityRestricted } from './bb-mobility.engine';
-import { rpeToPct } from './bb-rpe-calibration';
-import { isHighActivationExercise } from './bb-emg-scoring';
-import { getMdupProfile } from './bb-mdup';
-import { pctForRir } from '../rir-table';
 import { resolveSpecialization, specializationEmphasisFactor, specializationMrvFactor, isSpecializationWeak, isSpecializationFocus, canonicalMuscle, buildSpecializationSchedule, specResForWeekSchedule, tradeoffForWeek, specializationScheduleText, type SpecializationResolution, type SpecializationBlock } from './bb-specialization.engine';
 import { applyTradeoffToPlan } from './bb-tradeoff.engine';
 
@@ -2032,19 +2028,12 @@ function buildSession(
       ? 1 + Math.min(0.06, 0.02 * Math.max(0, phaseWeek - 1))
       : 1;
     let weight = weightForRepMax(reps, wm, rir, phaseCfg.intensityMultiplier) * loadProgressMult;
-    // RPE calibration: если есть индивидуальная калибровка — используем её для уточнения веса
-    const exerciseName = (input as any)?.patternId || '';
-    const calPct = rpeToPct(exerciseName, rir);
-    if (calPct > 0 && calPct !== pctForRir(rir)) {
-      weight = Math.round(wm * calPct * phaseCfg.intensityMultiplier * loadProgressMult * 10) / 10;
-    }
-    // mDUP: вариация интенсивности по дню недели (если мышца тренируется 2+ раза)
-    const mdupProfile = getMdupProfile(muscle);
-    if (mdupProfile && musclePlans.length > 1) {
-      const dayOfWeek = (sessionTag?.length || 0) % 3;
-      const mdupDay = dayOfWeek === 0 ? mdupProfile.heavy : dayOfWeek === 1 ? mdupProfile.medium : mdupProfile.light;
-      weight = Math.round(weight * mdupDay.pct * 10) / 10;
-    }
+    // Аудит 2026-09: блоки «RPE calibration»/«mDUP» удалены. Они ссылались на
+    // несуществующие в области buildSession `input`/`sessionTag` (не компилировалось),
+    // а фичи были мёртвыми: rpeToPct без наблюдений = no-op (confidence 0), mDUP давал
+    // множитель от `sessionTag.length` и применялся ко всем мышцам 2+/нед без флага —
+    // это ломало калиброванные веса. Модули (bb-rpe-calibration/bb-mdup/bb-emg-scoring/
+    // bb-vl-thresholds/bb-individual-landmarks) удалены как спекулятивный WIP без потребителей.
     // P4: Eccentric overload (Schoenfeld 2021) - advanced/enhanced can handle 110-120% eccentric
     if (eccentricMult && eccentricMult > 1.0 && role === 'primary') {
       weight = Math.round(weight * eccentricMult * 10) / 10;
