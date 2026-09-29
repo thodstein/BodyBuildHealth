@@ -46,7 +46,7 @@ import {
 } from "./food-availability";
 import { correctDayToTargets as _correctDayToTargets, mealTargetsStale as _mealTargetsStale, PLANNER_CONVERGENCE_PCT, checkTargetsConsistency } from "./day-target-corrector";
 import { reconcileDay } from "./planner-day-reconciler";
-import { getFoodAllergenTags } from "./planner-restrictions";
+import { getFoodAllergenTags, matchesSelectedAllergen } from "./planner-restrictions";
 import { edibilityCapFor, liveLadderSteps, isHighCarbDay as _isHighCarbDay, EDIBILITY_CAPS, extremeCapacityProfile, DEFAULT_EXTREME_CAPACITY, type ExtremeCapacityProfile, selectHvCarbCarriers, scalePortionCapsForExtreme, hvProteinCapPerMeal, autoMealCountForHv, type HvCarbCarrier, type HvCarrierSelection } from "./planner-carb-density";
 import { computeEA } from "./planner-ea.engine";
 import { planTypeFloorMods } from "./planner-day-targets";
@@ -9425,7 +9425,12 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     // переносятся только carb_slow/carb_fast). Принимаем перенос ТОЛЬКО если день не
     // теряет сходимость (≤ канона на сошедшемся / не хуже старта на честно-несошедшемся),
     // иначе откат — «не навреди». Остаток честно флагается скор-композицией (E7).
+    // Гейт: экстремальные/инсулин-дни (как у E0-reconciliation) НЕ трогаем — у них
+    // свои проходы и калиброванные контракты (болюс-окна = доза, HV/R-HV-матрицы).
     {
+      const _lateSkip = _pickCtx.highVolumeDay || !!(input as any).refeedDay
+        || _pickCtx.capacity.active || (input.goalKcal || 0) >= 4500
+        || input.carbCapGPerKg === 0 || meals.some((m: any) => m._insulinWindow);
       const _MAIN_MEAL_TYPES = new Set(['breakfast', 'lunch', 'dinner']);
       const _FRAG_KCAL = 180;
       const _devOfDay = () => Math.max(
@@ -9438,8 +9443,8 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
       const _canonCons = PLANNER_CONVERGENCE_PCT / 100;
       const _fragCount = (arr: any[]) => arr.filter((m: any) => (m.totals?.kcal || 0) > 0 && (m.totals?.kcal || 0) < _FRAG_KCAL).length;
       let _consolidatedAny = false;
-      for (let _ci = 0; _ci < 6; _ci++) {
-        const _mains = meals.filter((m: any) => _MAIN_MEAL_TYPES.has(String(m.type || '')) && (m.totals?.kcal || 0) > 0);
+      for (let _ci = 0; !_lateSkip && _ci < 6; _ci++) {
+        const _mains = meals.filter((m: any) => _MAIN_MEAL_TYPES.has(String(m.type || '')) && (m.totals?.kcal || 0) > 0 && !m._insulinWindow);
         const _tiny = _mains
           .filter((m: any) => (m.totals?.kcal || 0) < _FRAG_KCAL)
           .sort((a: any, b: any) => (a.totals?.kcal || 0) - (b.totals?.kcal || 0))[0];
@@ -9508,6 +9513,140 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
         if (!_moved) break; // ни один донор не дал переноса без потери сходимости
       }
       if (_consolidatedAny) _refreshMpsFromMeals();
+    }
+
+    // ─── E12 (=E5): жёсткий анти-повтор углеводного носителя в основных приёмах ───
+    // Один и тот же carb-id в 2+ основных приёмах (рис и в обед, и в ужин) — дефект
+    // «одно и то же весь день». Своп: заменяем ПОВТОРНУЮ позицию другим носителем,
+    // граммы подбираются под углеводы жертвы (калорийность приёма сохраняется),
+    // предпочтение — ДРУГОЕ семейство с дневной комнатой (familyMealCap), иначе —
+    // другой id того же семейства. Пункты не добавляем; белок-носители не трогаем.
+    // Guard: max-dev дня ≤ max(было, канон) и клетчатка ≤85 г (реализм-кап), иначе
+    // откат. Пул — только цельные крахмалы (не сладости/концентраты/добавки).
+    {
+      const _lateSkip12 = _pickCtx.highVolumeDay || !!(input as any).refeedDay
+        || _pickCtx.capacity.active || (input.goalKcal || 0) >= 4500
+        || input.carbCapGPerKg === 0 || meals.some((m: any) => m._insulinWindow);
+      const _MAIN_MEAL_TYPES = new Set(['breakfast', 'lunch', 'dinner']);
+      const _devOfDay12 = () => Math.max(
+        (input.goalKcal || 0) > 0 ? Math.abs(totals.kcal - (input.goalKcal || 0)) / (input.goalKcal || 1) : 0,
+        (input.goalProteinG || 0) > 0 ? Math.abs(totals.p - (input.goalProteinG || 0)) / (input.goalProteinG || 1) : 0,
+        (input.goalFatG || 0) > 0 ? Math.abs(totals.f - (input.goalFatG || 0)) / (input.goalFatG || 1) : 0,
+        (input.goalCarbsG || 0) > 0 ? Math.abs(totals.c - (input.goalCarbsG || 0)) / (input.goalCarbsG || 1) : 0,
+      );
+      const _canon12 = PLANNER_CONVERGENCE_PCT / 100;
+      let _swappedAny = false;
+      for (let _si = 0; !_lateSkip12 && _si < 4; _si++) {
+        const _mains = meals.filter((m: any) => _MAIN_MEAL_TYPES.has(String(m.type || '')) && !m._insulinWindow);
+        // id → список {meal, item} в основных приёмах (в порядке приёмов).
+        const _uses = new Map<string, Array<{ meal: any; item: any }>>();
+        for (const _m of _mains) for (const _it of (_m.items || [])) {
+          if ((_it.role !== 'carb_slow' && _it.role !== 'carb_fast') || (_it as any)._fixedGrams || !((_it.amount || 0) > 0)) continue;
+          const _arr = _uses.get(_it.id) || []; _arr.push({ meal: _m, item: _it }); _uses.set(_it.id, _arr);
+        }
+        const _dup = [..._uses.entries()].find(([, arr]) => arr.length >= 2);
+        if (!_dup) break;
+        const [oldId, occurrences] = _dup;
+        // Жертва — позиция в САМОМ ПОЗДНЕМ основном приёме (ужин чаще «свалка»).
+        const victim = occurrences[occurrences.length - 1];
+        const _vMeal = victim.meal; const _vIt = victim.item;
+        // «1 крахмал на тарелку»: своп только если в приёме ровно один носитель.
+        const _mealCarbs = (_vMeal.items || []).filter((x: any) => x.role === 'carb_slow' || x.role === 'carb_fast');
+        if (_mealCarbs.length !== 1) break;
+        const _vFam = stapleFamilyOf(oldId) || '';
+        const _vDens = (_vIt.c / Math.max(1, _vIt.amount)) * 100;
+        const _slot12 = String(_vMeal.type || 'dinner') as AffinitySlot;
+        const _dayMainIds = new Set<string>();
+        for (const _m of _mains) for (const _it of (_m.items || [])) {
+          if (_it.role === 'carb_slow' || _it.role === 'carb_fast') _dayMainIds.add(_it.id);
+        }
+        // Пул свопа — только «классические гарниры ББ» (не нишевые крупы/крахмалы-загустители),
+        // с полным уважением ограничений пользователя (исключения/аллергены/непереносимости/
+        // категории/вегетарианство) — своп не имеет права внести запрещённый продукт.
+        const _E12_STAPLES = [
+          'rice_white', 'rice_brown', 'rice_basmati', 'rice_jasmine', 'rice_red',
+          'buckwheat', 'bulgur', 'quinoa', 'millet', 'barley', 'couscous',
+          'pasta_durum', 'spaghetti', 'pasta_wholewheat', 'soba',
+          'potato_boiled', 'potato_baked', 'sweet_potato', 'cornmeal',
+        ];
+        const _cands12 = _E12_STAPLES
+          .map(id => FOOD_DB.find((f: any) => f.id === id))
+          .filter((f: any) => !!f)
+          .filter((f: any) => !combinedExcluded.has(f.id)
+            && !(input.allergenTags && input.allergenTags.size > 0
+              && [...input.allergenTags].some(a => matchesSelectedAllergen(f, a, FOOD_DB as any)))
+            && (!input.intolerances || filterByIntolerance(f, input.intolerances))
+            && (!input.categoryPref || matchesCategoryPref(f, input.categoryPref))
+            && foodAvailableForPlan(f)
+            && afAllows(f.id, _slot12)
+            && !_dayMainIds.has(f.id))
+          .map((f: any) => {
+            const fam = stapleFamilyOf(f.id) || '';
+            const diffFam = fam !== null && fam !== _vFam;
+            const cap = familyMealCap(fam, { hv: _pickCtx.highVolumeDay, ts: _pickCtx.dayTargetScale });
+            const uses = familyMealUses(meals as any, f.id);
+            return { f, fam, diffFam, room: !diffFam || uses < cap, uses, dens: f.carbs || 0 };
+          })
+          .filter((c: any) => c.room)
+          .sort((a: any, b: any) =>
+            (a.diffFam === b.diffFam ? 0 : a.diffFam ? -1 : 1)
+            || a.uses - b.uses
+            || Math.abs(a.dens - _vDens) - Math.abs(b.dens - _vDens)
+            || (a.f.id < b.f.id ? -1 : a.f.id > b.f.id ? 1 : 0));
+        let _swapped = false;
+        for (const _c of _cands12) {
+          const _f = _c.f;
+          const _rawG = (_vIt.c || 0) / Math.max(1e-6, (_f.carbs || 0) / 100);
+          const _capG = carbPortionCap(_f as any, mealCapScaleOf(_vMeal as any));
+          // Граммы на 5-г сетке с МИНИМАЛЬНОЙ макро-дистанцией к жертве (без снап-«пола
+          // 50 г»: он раздувал малый гарнир и уводил день — доказано контролем 3000).
+          const _baseG = Math.round(_rawG / 5) * 5;
+          const _capSnapG = Math.floor(_capG / 5) * 5;
+          let _newG = 0; let _bestD = Infinity;
+          for (const _g of [_baseG - 10, _baseG - 5, _baseG, _baseG + 5, _baseG + 10, _capSnapG]) {
+            if (_g < 25 || _g > _capG) continue;
+            const _rr = _g / 100;
+            const _d = Math.abs((_f.protein || 0) * _rr - (_vIt.p || 0))
+              + Math.abs((_f.fat || 0) * _rr - (_vIt.f || 0))
+              + Math.abs((_f.carbs || 0) * _rr - (_vIt.c || 0))
+              + Math.abs((4 * (_f.protein || 0) + 9 * (_f.fat || 0) + 4 * (_f.carbs || 0)) * _rr - (_vIt.kcal || 0)) / 10;
+            if (_d < _bestD - 1e-9) { _bestD = _d; _newG = _g; }
+          }
+          if (!(_newG >= 25)) continue;
+          const _devBefore12 = _devOfDay12();
+          const _fiberBefore12 = totals.fiber;
+          const _backup = { ..._vIt };
+          const _r = _newG / 100;
+          _vIt.id = _f.id; _vIt.name = _f.name;
+          _vIt.amount = _newG;
+          _vIt.p = Math.round((_f.protein || 0) * _r * 10) / 10;
+          _vIt.f = Math.round((_f.fat || 0) * _r * 10) / 10;
+          _vIt.c = Math.round((_f.carbs || 0) * _r * 10) / 10;
+          _vIt.fiber = Math.round((_f.fiber || 0) * _r * 10) / 10;
+          const _newK = Math.round(4 * _vIt.p + 9 * _vIt.f + 4 * _vIt.c);
+          const _kRatio = _newK / Math.max(1, _backup.kcal || 0);
+          if (typeof _vIt.leucine_mg === 'number') _vIt.leucine_mg = Math.round((_backup.leucine_mg || 0) * _kRatio);
+          _vIt.kcal = _newK;
+          _vMeal.totals = mealTotalsOf(_vMeal.items);
+          recalcDayTotals(meals, totals);
+          if (_devOfDay12() <= Math.max(_devBefore12, _canon12) + 1e-9 && totals.fiber <= 85.5) {
+            const _ai = allFoodsUsed.indexOf(oldId);
+            if (_ai >= 0) allFoodsUsed[_ai] = _f.id; else allFoodsUsed.push(_f.id);
+            // old id больше не встречается в дне → он уходит из «уникальных продуктов».
+            if (!meals.some((m: any) => (m.items || []).some((x: any) => x.id === oldId))) usedTodayIds.delete(oldId);
+            usedTodayIds.add(_f.id);
+            notes.push(`🔁 «${_vMeal.label || _vMeal.type}»: ${_backup.name || oldId} → ${_f.name || _f.id} ${_newG} г (анти-повтор носителя в основных приёмах)`);
+            _swapped = true; _swappedAny = true;
+            break;
+          }
+          Object.assign(_vIt, _backup);
+          _vMeal.totals = mealTotalsOf(_vMeal.items);
+          recalcDayTotals(meals, totals);
+          totals.fiber = _fiberBefore12;
+        }
+        if (!_swapped) break; // для этого повтора свопа нет — остальные не трогаем (детерминизм)
+      }
+      if (_swappedAny) _refreshMpsFromMeals();
     }
 
     // ─── P4/E0: честный флаг сходимости products-пути (ФИНАЛЬНЫЙ totals) ───

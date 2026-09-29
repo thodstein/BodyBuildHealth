@@ -73,6 +73,8 @@ describe('§3A-2 no-insulin экстрим: матрица train/rest × инс�
   it('обычный день (3000 ккал, контроль 2692/174/74/332) — не тронут', () => {
     // §3A-2: все новые ветки за экстрим-профилем; обычный день — байт-в-байт
     // (контроль §0 плана: 90 кг, 3000 ккал, 180/80/340, 5 приёмов, medium, тренировка).
+    // E11/E12 (консолидация/анти-повтор) тоже гейтятся как E0: HV/инсулин/≥4500/
+    // carbCapGPerKg=0 (этот день) — не трогаются (проверено Sep 29 2026).
     const p = buildDayPlan(base({
       weightKg: 90, lbmKg: 75, bodyFatPct: 14, goalKcal: 3000, goalProteinG: 180, goalFatG: 80, goalCarbsG: 340,
       mealsCount: 5, isTrainingDay: true, trainStartMin: 17 * 60, trainDurationMin: 90, allowIntraWorkout: true,
