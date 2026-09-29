@@ -501,7 +501,7 @@ export const IndividualPlanSettings: React.FC = () => {
               boxShadow: generationMode === 'products' ? '0 4px 16px rgba(0,230,138,0.15)' : 'none',
               minHeight: 64,
             }}>
-            <div style={{ fontSize: 13, fontWeight: 800, color: generationMode === 'products' ? '#00e68a' : 'rgba(255,255,255,0.85)' }}>🥩 По продуктам</div>
+            <div style={{ fontSize: 13, fontWeight: 800, color: generationMode === 'products' ? '#00e68a' : 'rgba(255,255,255,0.85)' }}>🥩 По продуктам · быстрый</div>
             <div style={{ fontSize: 9, color: generationMode === 'products' ? 'rgba(0,230,138,0.85)' : 'rgba(255,255,255,0.55)', marginTop: 3, lineHeight: 1.45 }}>
               Классический план из продуктов с точными КБЖУ и круглыми порциями (молоко 250/500/750 г)
             </div>
@@ -517,9 +517,9 @@ export const IndividualPlanSettings: React.FC = () => {
               boxShadow: generationMode === 'recipes' ? '0 4px 16px rgba(249,115,22,0.18)' : 'none',
               minHeight: 64,
             }}>
-            <div style={{ fontSize: 13, fontWeight: 800, color: generationMode === 'recipes' ? '#f97316' : 'rgba(255,255,255,0.85)' }}>🍳 По рецептам</div>
+            <div style={{ fontSize: 13, fontWeight: 800, color: generationMode === 'recipes' ? '#f97316' : 'rgba(255,255,255,0.85)' }}>👨‍🍳 По рецептам · ПРО ⭐</div>
             <div style={{ fontSize: 9, color: generationMode === 'recipes' ? 'rgba(253,186,116,0.95)' : 'rgba(255,255,255,0.55)', marginTop: 3, lineHeight: 1.45 }}>
-              Завтрак/обед/ужин — готовые рецепты: на каждый приём 2–3 варианта на выбор, день сходится в КБЖУ ±3%. Перекусы — продуктами
+              Про-режим: завтрак/обед/ужин — готовые блюда (2–3 варианта на приём), день сходится в КБЖУ ±3%. Перекусы — продуктами. Рекомендуется
             </div>
           </button>
         </div>
