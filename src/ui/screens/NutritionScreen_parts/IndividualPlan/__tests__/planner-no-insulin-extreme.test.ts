@@ -70,19 +70,20 @@ describe('§3A-2 no-insulin экстрим: матрица train/rest × инс�
     });
   }
 
-  it('обычный день (3000 ккал, контроль 2692/174/74/332) — не тронут', () => {
+  it('обычный день (3000 ккал, контроль 2806/185/75/348) — не тронут', () => {
     // §3A-2: все новые ветки за экстрим-профилем; обычный день — байт-в-байт
     // (контроль §0 плана: 90 кг, 3000 ккал, 180/80/340, 5 приёмов, medium, тренировка).
-    // E11/E12 (консолидация/анти-повтор) тоже гейтятся как E0: HV/инсулин/≥4500/
-    // carbCapGPerKg=0 (этот день) — не трогаются (проверено Sep 29 2026).
+    // было→стало (E15, Sep 29 2026): 2692/173.5/74.4/332.1 → 2806/184.7/74.8/348.2 —
+    // ночной белок стал вес-зависимым (90 кг → 36 г вместо 28): ночь плотнее,
+    // max-dev дня 10.3% → 6.5%. E11/E12-гейт (carbCapGPerKg=0) не тронут.
     const p = buildDayPlan(base({
       weightKg: 90, lbmKg: 75, bodyFatPct: 14, goalKcal: 3000, goalProteinG: 180, goalFatG: 80, goalCarbsG: 340,
       mealsCount: 5, isTrainingDay: true, trainStartMin: 17 * 60, trainDurationMin: 90, allowIntraWorkout: true,
       budget: 'medium' as const, dayOffset: 0,
     }));
-    expect(p.totals.kcal).toBe(2692);
-    expect(p.totals.p).toBe(173.5);
-    expect(p.totals.f).toBe(74.4);
-    expect(p.totals.c).toBe(332.1);
+    expect(p.totals.kcal).toBe(2806);
+    expect(p.totals.p).toBe(184.7);
+    expect(p.totals.f).toBe(74.8);
+    expect(p.totals.c).toBe(348.2);
   });
 });

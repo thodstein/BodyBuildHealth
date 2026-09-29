@@ -51,6 +51,10 @@ export interface ReconOptions {
   mealProteinCap?: number;
   /** LBM атлета — для масштабирования абсолютных полов белка у малых атлетов. */
   lbmKg?: number;
+  /** E15: пол белка ночного приёма (г) — вес-зависимый бюджет (0.4 г/кг, 20–45 г).
+   *  Если задан — pre-sleep не режется ниже него (иначе «зависит от веса» не доедет
+   *  до факта: reconciler ужимал ночь к LBM-полу 25 г на всех). */
+  preSleepFloorP?: number;
   /** Верхняя граница роста для пункта (граммы). По умолчанию — роль-зависимый
    *  множитель. Движок передаёт функцию, уважающую дневные капы (орехи/масла) и
    *  (E14) бюджет тарелки приёма — третий аргумент meal даёт текущий приём. */
@@ -70,7 +74,7 @@ const KNOB_ROLES = new Set(['protein', 'fast_protein', 'slow_protein', 'carb_slo
  *  иначе белок трен-дня всегда «в плюс» (peri 20/28/28 = 76 г) и день не сходится.
  *  Small-athlete: у малого LBM абсолютные полы (15/20/25) — уже 0.4-0.6 г/кг и
  *  физически раздувают цель 100 г; масштабируем их вниз (крупные атлеты не тронуты). */
-function proteinFloorByType(mealType: string, mainFloor: number, amount: number, lbmKg = 0): number {
+function proteinFloorByType(mealType: string, mainFloor: number, amount: number, lbmKg = 0, preSleepFloorP = 0): number {
   const scale = lbmKg > 0 ? Math.min(1, lbmKg / 55) : 1;
   switch (mealType) {
     case 'breakfast':
@@ -80,7 +84,7 @@ function proteinFloorByType(mealType: string, mainFloor: number, amount: number,
     case 'snack2': return Math.min(mainFloor, 50);
     case 'preworkout': return Math.max(8, Math.round(15 * scale));
     case 'postworkout': return Math.max(12, Math.round(20 * scale));
-    case 'presleep': return Math.max(15, Math.round(25 * scale));
+    case 'presleep': return preSleepFloorP > 0 ? preSleepFloorP : Math.max(15, Math.round(25 * scale));
     default: return Math.min(amount, 40);
   }
 }
@@ -165,7 +169,7 @@ export function reconcileDay(mealsIn: ReconMeal[], targets: ReconTargets, opts?:
         // на малых КБЖУ это единственная позиция белка выше пола, без неё день не сходится.
         const _mt = String(m.type || '');
         const _isPeri = _mt === 'preworkout' || _mt === 'postworkout' || _mt === 'presleep';
-        const _floor = proteinFloorByType(_mt, mainProteinFloor, it.amount, opts?.lbmKg ?? 0);
+        const _floor = proteinFloorByType(_mt, mainProteinFloor, it.amount, opts?.lbmKg ?? 0, opts?.preSleepFloorP ?? 0);
         if (_isPeri) {
           lo = (it.p || 0) > 0 ? Math.min(it.amount, Math.max(0, ((it.amount || 0) * _floor) / it.p)) : it.amount;
         } else {

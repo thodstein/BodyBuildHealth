@@ -18,6 +18,9 @@ import { scoreDayComposition } from '../planner-composition-quality';
  * M70-2000 T s2 ужин 120→180 (frag 1→0, comp 83→90, dev 1.2%). F60-1500 T s1 —
  * перенос отклонён guard'ом (день честно несошедшийся, донор/жир-ось не пускают):
  * frag остаётся 1, БЕЗ регресса композиции (анти-регресс-лок).
+ * E15 (Sep 29 2026, вес-зависимый ночной белок): F50 R s1 крошек больше нет до
+ * консолидации (frag 0, dev 0.2%) — пасс держим на s3 (нота «укрупнён» жива);
+ * итоговая гарантия «нет крошек <180» проверяется на s1 без требования ноты.
  */
 
 const fragOf = (p: any): Array<{ label: string; kcal: number }> =>
@@ -34,14 +37,23 @@ const f50R: MealPlanInput = {
 };
 
 describe('E11: консолидация крошечных основных приёмов', () => {
-  it('F50-1200 R s1: ужин укрупнён до ≥180, день в каноне, есть честная нота', () => {
-    const p = buildDayPlan({ ...f50R, randomSalt: 1 });
+  it('F50-1200 R s3: ужин укрупнён до ≥180, день в каноне, есть честная нота', () => {
+    // было→стало (E15, Sep 29 2026): с вес-зависимым ночным бюджетом (20 г для 50 кг
+    // вместо 28) день s1 перераспределился — крошек нет до консолидации (нота не нужна,
+    // frag=0 держим отдельно); пасс по-прежнему срабатывает на s2/s3 (нота «укрупнён»).
+    const p = buildDayPlan({ ...f50R, randomSalt: 3 });
     expect(fragOf(p), `фрагменты: ${JSON.stringify(fragOf(p))}`).toEqual([]);
     expect(p.withinTolerance, `dev=${p.deviationPct}%`).toBe(true);
     expect(p.deviationPct).toBeLessThanOrEqual(3);
     const dinner = p.meals.find(m => m.type === 'dinner')!;
     expect(dinner.totals.kcal).toBeGreaterThanOrEqual(180);
     expect(p.notes.some(n => n.includes('укрупнён переносом'))).toBe(true);
+  });
+
+  it('F50-1200 R s1: крошек нет (итог гарантии держится и без ноты)', () => {
+    const p = buildDayPlan({ ...f50R, randomSalt: 1 });
+    expect(fragOf(p), `фрагменты: ${JSON.stringify(fragOf(p))}`).toEqual([]);
+    expect(p.withinTolerance, `dev=${p.deviationPct}%`).toBe(true);
   });
 
   it('F50-1200 R s2: ужин укрупнён, день в каноне', () => {

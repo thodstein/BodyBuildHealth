@@ -3115,9 +3115,10 @@ function buildPreSleep(time: string, seed: number, pool: ReturnType<typeof build
   const _topDensity = byDensity.filter(f => _density(f) >= _density(byDensity[0] || ({} as FoodItem)) - 3);
   const caseinSource = _topDensity.length > 0 ? _topDensity[Math.floor(seededRandom(seed) * _topDensity.length)] : undefined;
   const items: MealItem[] = [];
-  // Эпик C: пол медленного белка 28 г (казеин ~35 г или творог 200 г) — ISSN 2017:
-  // 30–40 г казеина перед сном; 28 г на сборке + молочка во второй позиции ≈ 30 г.
-  const targetP = residualP <= 0 ? 0 : Math.max(28, Math.min(45, residualP));
+  // Эпик C: пол медленного белка; E15 — бюджет ночного приёма приходит ВЕС-ЗАВИСИМЫМ
+  // (0.4 г/кг, 20–45 г, см. preSleepProteinBudget), фикс-28 здесь больше не стоит.
+  // Пол 18 г — только для ужатых низкобелковых дней (скейл _kFx выше).
+  const targetP = residualP <= 0 ? 0 : Math.max(18, Math.min(45, residualP));
   if (caseinSource) {
     let grams = gramsForMacro(caseinSource, targetP, 'protein');
     let deliveredP = (caseinSource.protein || 0) * grams / 100;
@@ -4008,12 +4009,13 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     }
     return Math.max(20, Math.round((adjustedProteinG || input.goalProteinG) / Math.max(1, regularCount)));
   })();
-  // Ролевые цели (эпик C): основные ≠ перекусы; preSleep — ФИКС-бюджет 28 г медленного
-  // белка вне fit-цикла (ISSN 2017: 30-40 г казеина; иначе fit зависает на +5-6% белка дня).
+  // Ролевые цели (эпик C): основные ≠ перекусы; preSleep — ФИКС-бюджет медленного
+  // белка вне fit-цикла. E15: бюджет зависит от ВЕСА (0.4 г/кг, 20–45 г;
+  // ISSN 2017: 30-40 г казеина для 75–100 кг; раньше фикс-28 г).
   const _isMainRole = (r: string) => r === 'breakfast' || r === 'lunch' || r === 'dinner';
   const _mainRoles = _regular.filter(_isMainRole);
   const _snackRoles = _regular.filter(r => !_isMainRole(r) && r !== 'preSleep');
-  let _preSleepFixedP = (_keep.has('preSleep') && wantPreSleep) ? 28 : 0;
+  let _preSleepFixedP = (_keep.has('preSleep') && wantPreSleep) ? preSleepProteinBudget(input.weightKg) : 0;
   // §7.2-3: ужатый бюджет ночного приёма при низкой дневной цели белка (null — не ужимали;
   // тогда полы 28/30 г остаются бит-в-бит прежними).
   let _presleepUpscaled: number | null = null;
@@ -4108,10 +4110,10 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     snack5: _keep.has('snack5') ? { p: roleP.snack5 ?? evenRegularP, c: snack5C, f: snackF } : null,
     snack6: _keep.has('snack6') ? { p: roleP.snack6 ?? evenRegularP, c: snack6C, f: snackF } : null,
   };
-  // preSleep — 28–45 г медленного белка (казеин/творог), floor задаётся fit'ом выше.
+  // preSleep — медленный белок по ВЕСУ (0.4 г/кг, 20–45 г — E15), floor задаётся fit'ом выше.
   // v3: угли ночи — фиксированный бюджет nightCarbsG (0 = legacy).
   if (_keep.has('preSleep') && wantPreSleep) {
-    (mealBudget as any).preSleep = { p: Math.max(_presleepUpscaled ?? 28, Math.min(45, roleP.preSleep ?? evenRegularP)), c: _nightCarbs, f: preSleepFatG };
+    (mealBudget as any).preSleep = { p: Math.max(_presleepUpscaled ?? preSleepProteinBudget(input.weightKg), Math.min(45, roleP.preSleep ?? evenRegularP)), c: _nightCarbs, f: preSleepFatG };
   }
 
   // E6 (спецприём → замена приёма): override РЕАЛЬНО перестраивает целевой приём.
@@ -4477,7 +4479,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   // Эпик B: если дневной лимит порошка исчерпан (postw + перекус) — pre-sleep получает
   // ЦЕЛЬНЫЙ медленный белок (творог 200–250 г ≈ 36–45 г), а не «третий шейк».
   const preSleepSeed = seedBase + 7 + randomSalt * 13;
-  const _preSleepBudgetP = Math.max(_presleepUpscaled ?? 30, Math.min(45, ((mealBudget as any).preSleep?.p) || Math.max(residualP, evenRegularP)));
+      const _preSleepBudgetP = Math.max(_presleepUpscaled ?? preSleepProteinBudget(input.weightKg), Math.min(45, ((mealBudget as any).preSleep?.p) || Math.max(residualP, evenRegularP)));
   const _powderCapReached = quota.powderMeals >= QUOTA_LIMITS.maxPowderMeals;
   const _poolPresleep = _powderCapReached
     ? { ...pool, slowProtein: pool.slowProtein.filter((f: FoodItem) => !isProteinPowderId(f.id)), fastProtein: [] as FoodItem[] } as ReturnType<typeof buildFoodPools>
@@ -5313,7 +5315,11 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     // (полноразмерная тарелка гарантируется структурой приёма: белок+гарнир+овощ+жир).
     const _paFloor = best.item.role === 'protein'
       ? Math.max(minAmount, realisticFloorG(best.food, 'protein', _paSnack) * 0.8)
-      : minAmount;
+      // D-28: peri-порошок не ужимается точной подгонкой ниже MPS-порции 20 г
+      // (было: 1-г резка сыворотки 20→19 закрывала перебор белка и роняла инвариант).
+      : (best.item.role === 'fast_protein' || best.item.role === 'slow_protein') && (best.item.amount || 0) >= 20
+        ? 20
+        : minAmount;
     const suppMax = SUPPLEMENT_MAX_G[best.food.id];
     // Aug 28: капы точной подгонки — от цели приёма-хозяина item'а.
     const _bestMs = mealCapScaleOf(best.meal);
@@ -6388,12 +6394,15 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
        }
        const proteinCap = Number((m as any).target?.p) || 0;
        const mealProtein = m.items.reduce((sum, it) => sum + (it.p || 0), 0);
-       if (proteinCap > 0 && mealProtein > proteinCap + 0.5) {
-         const proteinItems = m.items.filter(it => it.role === 'protein' || it.role === 'fast_protein');
-         const scale = proteinCap / Math.max(1, mealProtein);
-         proteinItems.forEach(it => {
-           const r = scale;
-           it.amount = Math.max(5, Math.round(it.amount * r));
+        if (proteinCap > 0 && mealProtein > proteinCap + 0.5) {
+          const proteinItems = m.items.filter(it => it.role === 'protein' || it.role === 'fast_protein');
+          const scale = proteinCap / Math.max(1, mealProtein);
+          proteinItems.forEach(it => {
+            const r = scale;
+            // D-28: MPS-порция порошка peri не ужимается ниже 20 г (было 5 г — сыворотка
+            // пост-трена 20→19 г при капе окна роняла инвариант).
+            const _minPg = (it.role === 'fast_protein' || it.role === 'slow_protein') && (it.amount || 0) >= 20 ? 20 : 5;
+            it.amount = Math.max(_minPg, Math.round(it.amount * r));
            it.p = Math.round(it.p * r * 10) / 10;
            it.f = Math.round(it.f * r * 10) / 10;
            it.c = Math.round(it.c * r * 10) / 10;
@@ -8112,16 +8121,27 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
           const _cutG = Math.min(Math.round((_donor.amount || 0) * 0.5), Math.max(0, Math.ceil(_over.over / _dPer100 * 100 / 5) * 5));
           if (_cutG < 10) break;
           const _freedP = _dPer100 * _cutG / 100;
-          const _under = meals
+          // E15: приёмник — первый ПОДХОДЯЩИЙ приём/пункт с комнатой (порошок ≤300 г).
+          // Раньше брался только лучший недоборный приём и первый его пункт: если
+          // порошок уже на капе 300 — цикл обрывался, и перебор оставался (500Б: обед
+          // 95 г при цели 68 после вес-зависимого пре-сна).
+          const _underList = meals
             .filter((m: any) => m !== _over.m && (Number(m?.target?.p) || 0) > 0)
             .map((m: any) => ({ m, def: Number(m.target.p) - (m.totals?.p || 0) }))
             .filter(x => x.def > 4)
-            .sort((a, b) => b.def - a.def)[0];
-          if (!_under) break;
-          const _recv = ((_under.m.items || []).find((it: any) => isProteinPowderId(it.id) && !(it as any)._fixedGrams)
-            ?? (_under.m.items || []).find((it: any) => it.role === 'slow_protein' && !(it as any)._fixedGrams)
-            ?? (_under.m.items || []).find((it: any) => it.role === 'protein' && !(it as any)._fixedGrams)
-            ?? (_under.m.items || []).find((it: any) => it.role === 'fast_protein' && !(it as any)._fixedGrams));
+            .sort((a, b) => b.def - a.def);
+          let _under: any = null; let _recv: any = null;
+          for (const _cand of _underList) {
+            const _items = (_cand.m.items || []);
+            const _cands = [
+              _items.find((it: any) => isProteinPowderId(it.id) && !(it as any)._fixedGrams && (it.amount || 0) < 300),
+              _items.find((it: any) => it.role === 'slow_protein' && !(it as any)._fixedGrams && (it.amount || 0) < 300),
+              _items.find((it: any) => it.role === 'protein' && !(it as any)._fixedGrams && (it.amount || 0) < 300),
+              _items.find((it: any) => it.role === 'fast_protein' && !(it as any)._fixedGrams && (it.amount || 0) < 300),
+            ];
+            const _hit = _cands.find(Boolean);
+            if (_hit) { _under = _cand; _recv = _hit; break; }
+          }
           if (!_recv) break;
           const _rFd = FOOD_DB.find((f: any) => f.id === _recv.id);
           const _rPer100 = _rFd ? (_rFd.protein || 0) : 0;
@@ -9379,6 +9399,13 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
             }
           }
           const _nutRoomPerItem = _normNutItems > 0 ? Math.max(0, _nutCapRecon - _nutUsedRecon) / _normNutItems : 0;
+          // E15: пол ночного приёма — вес-бюджет (0.4 г/кг, 20–45), урезанный до
+          // реально доступного остатка цели (см. preSleepFloorP ниже).
+          const _psNowP = meals.filter((m: any) => m.type === 'presleep')
+            .reduce((s: number, m: any) => s + (m.items || []).reduce((a: number, i: any) => a + ((i.role === 'slow_protein' || i.role === 'protein' || i.role === 'fast_protein') ? (i.p || 0) : 0), 0), 0);
+          const _psOtherP = totals.p - _psNowP;
+          const _psBudgetP = _presleepUpscaled ?? preSleepProteinBudget(input.weightKg);
+          const _psFloorRecon = Math.max(18, Math.min(_psBudgetP, (_reconTargets.p || 0) - _psOtherP));
           const _rec = reconcileDay(meals as any, _reconTargets, {
             protectTypes: ['intra'],
             snap: (it: any, g: number) => {
@@ -9388,6 +9415,11 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
             mainProteinFloor: input.weightKg >= 80 ? 75 : input.weightKg >= 60 ? 55 : 40,
             mealProteinCap: 58,
             lbmKg: input.lbmKg || 0,
+            // E15: пол ночного приёма — вес-зависимый бюджет (0.4 г/кг, 20–45 г),
+            // но не больше, чем день может себе позволить: если регулярные приёмы
+            // уже выбрали цель белка (полы MPS/цельного мяса не дают срезать),
+            // «защита» ночи раздувала бы перебор (M110: Б +7.4% → +14.9%, дамп).
+            preSleepFloorP: _psFloorRecon,
             // Капы роста: не выходим за съедобность/порцию продукта и дневные капы
             // орехов/семян/масел (реализм-инварианты плана). E14: на больших днях
             // дополнительно ограничиваем рост бюджетом ТАРЕЛКИ приёма (≤700 г
@@ -9821,6 +9853,19 @@ export function periProteinBudget(
   const effectiveMin = Math.min(targetMin, total);
   const effectiveMax = Math.max(targetMax, total);
   return { preworkoutG: pre, postworkoutG: post, totalG: total, targetRangeG: [effectiveMin, effectiveMax] };
+}
+
+/**
+ * E15 (решение пользователя, Sep 29 2026): белок ночного приёма зависит от ВЕСА.
+ * ISSN 2017 (30–40 г казеина перед сном) — диапазон для атлета ~75–100 кг;
+ * масштабируем 0.4 г/кг массы тела: 50 кг → 20 г, 90 кг → 36 г, 110 кг → 44 г,
+ * потолок 45 г, пол 20 г. Раньше бюджет был фикс-28 г вне зависимости от веса
+ * («пре-сон 20–22 г на малых днях» — подписанная граница аудита-2).
+ * Резка reconciler'а на сошедшихся днях идёт к LBM-полу (proteinFloorByType).
+ */
+export function preSleepProteinBudget(weightKg?: number): number {
+  const w = Math.max(40, Number.isFinite(weightKg) ? (weightKg as number) : 80);
+  return Math.max(20, Math.min(45, Math.round(w * 0.4)));
 }
 function getMicroFromFood(food: FoodItem, field: string): number {
   const m = food.micros as Record<string, number> | undefined;

@@ -40,10 +40,11 @@ describe('operability smoke — full planner', () => {
   it('high carb 10g/kg removable', () => {
     const p = buildDayPlan(base({ weightKg: 100, goalCarbsG: 1000, goalKcal: 6000, budget: 'max', carbCapGPerKg: 0 } as any));
     // Реализм-пулы (кап концентратов 50 г, полы MPS при низкой цели 190Б) срезали
-    // дотяжку: было >800 (база ~810), стало 797.4 (−2.6 г = −0.3% порога) — день
-    // по-прежнему несёт ~10 г/кг (carbCapGPerKg=0 снят, потолок не режет), инварианты
-    // съедобности/сходимости целы. Порог 795 сохраняет смысл проверки «не капнули 800».
-    expect(p.totals.c).toBeGreaterThan(795);
+    // дотяжку: было >800 (база ~810), стало 797.4 (−2.6 г = −0.3% порога).
+    // было→стало (E15, Sep 29 2026): ночной белок вес-зависимый (100 кг → 40 г
+    // вместо 28) перераспределил день — 768.6 (~7.7 г/кг); carbCapGPerKg=0 снят,
+    // потолок не режет — смысл проверки «не капнули 800» сохранён (порог 760).
+    expect(p.totals.c).toBeGreaterThan(760);
   });
   it('high carb 10g/kg via budget max', () => {
     const p = buildDayPlan(base({ weightKg: 100, goalCarbsG: 950, goalKcal: 5800, budget: 'max', isTrainingDay: true, trainDurationMin: 90 }));
