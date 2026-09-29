@@ -9311,11 +9311,28 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
       } catch { /* тарелка-гард — best-effort */ }
     }
 
-    // ─── E3 (анти-фрагментация): ОТЛОЖЕНО ───
-    // Полная консолидация крошечных основных приёмов (перенос калорий между приёмами)
-    // затрагивает калиброванные инварианты (per-meal GL, белковые капы болюс-дней) —
-    // см. docs/NUTRITION-PLANNER-PRO-PLAN §3 E3. Текущий движок держит крошки ≥100 ккал
-    // (аудит-фрагмент 124 закрыт общим пайплайном); lock — planner-fragment-guard.
+    // ─── E11 (=E3 полный): консолидация крошечных основных приёмов — см. НИЖЕ,
+    // после E0-reconciliation (порядок обязателен: корректор может менять состав
+    // приёмов, «укрупнять» до финального паса нельзя). Витрина MPS пересчитывается
+    // из фактических items и после reconciliation, и после консолидации.
+    const _refreshMpsFromMeals = () => {
+      const _mbR = meals.map(m => {
+        const _p = m.items.reduce((s, i) => s + i.p, 0);
+        const _leu = (m.items.reduce((s, i) => s + (i.leucine_mg || 0), 0)) / 1000;
+        return { label: m.label || m.type, proteinG: Math.round(_p), leucineG: Math.round(_leu * 10) / 10, triggersMps: m.mpsCheck?.triggers_mTOR || (_p >= 25 && _leu >= 2.5) };
+      });
+      (mpsSummary as any).meals = _mbR;
+      (mpsSummary as any).avg_protein_per_meal_g = Math.round(totals.p / Math.max(1, meals.length));
+      const _feedR = _mbR.filter(x => (x.proteinG || 0) >= 25).length;
+      (mpsSummary as any).avg_leucine_g = Math.round(totals.leucine_mg / Math.max(1, _feedR)) / 1000;
+      (mpsSummary as any).fiberG = Math.round(totals.fiber);
+      const _pvR = meals.filter(m => !['intra', 'presleep'].includes(m.type)).map(m => m.totals.p || 0).filter(v => v > 0);
+      if (_pvR.length >= 3) {
+        const _meanR = _pvR.reduce((a, b) => a + b, 0) / _pvR.length;
+        const _sdR = Math.sqrt(_pvR.reduce((a, b) => a + Math.pow(b - _meanR, 2), 0) / _pvR.length);
+        (mpsSummary as any).proteinCV = _meanR > 0 ? Math.round((_sdR / _meanR) * 100) / 100 : 0;
+      }
+    };
 
     // ─── E0: финальный reconciliation-pass продуктового дня (сходимость ≤3%) ───
     // После ВСЕХ писателей (recalcDayTotals/P5b/капы/микро) двигаем граммы
@@ -9395,25 +9412,102 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
           }
         } catch { /* reconciliation — best-effort; не ломаем генерацию */ }
       }
-      // Витрина MPS/микро обязана совпадать с ФИНАЛЬНЫМ планом (после reconciliation).
-      if (_reconApplied) {
-        const _mbR = meals.map(m => {
-          const _p = m.items.reduce((s, i) => s + i.p, 0);
-          const _leu = (m.items.reduce((s, i) => s + (i.leucine_mg || 0), 0)) / 1000;
-          return { label: m.label || m.type, proteinG: Math.round(_p), leucineG: Math.round(_leu * 10) / 10, triggersMps: m.mpsCheck?.triggers_mTOR || (_p >= 25 && _leu >= 2.5) };
-        });
-        (mpsSummary as any).meals = _mbR;
-        (mpsSummary as any).avg_protein_per_meal_g = Math.round(totals.p / Math.max(1, meals.length));
-        const _feedR = _mbR.filter(x => (x.proteinG || 0) >= 25).length;
-        (mpsSummary as any).avg_leucine_g = Math.round(totals.leucine_mg / Math.max(1, _feedR)) / 1000;
-        (mpsSummary as any).fiberG = Math.round(totals.fiber);
-        const _pvR = meals.filter(m => !['intra', 'presleep'].includes(m.type)).map(m => m.totals.p || 0).filter(v => v > 0);
-        if (_pvR.length >= 3) {
-          const _meanR = _pvR.reduce((a, b) => a + b, 0) / _pvR.length;
-          const _sdR = Math.sqrt(_pvR.reduce((a, b) => a + Math.pow(b - _meanR, 2), 0) / _pvR.length);
-          (mpsSummary as any).proteinCV = _meanR > 0 ? Math.round((_sdR / _meanR) * 100) / 100 : 0;
+      // Витрина MPS обязана совпадать с ФИНАЛЬНЫМ планом (после reconciliation и
+      // консолидации крошечных приёмов E11 — обе меняют факт, счёт берём из items).
+      if (_reconApplied) _refreshMpsFromMeals();
+    }
+
+    // ─── E11 (=E3 полный): консолидация крошечных основных приёмов (<180 ккал) ───
+    // Дефект сушки: «показной» основной приём ~110–170 ккал рядом с крупным.
+    // Переносим КАЛОРИИ граммами: режем углеводный носитель крупнейшего основного
+    // приёма-донора и растим углеводный носитель крошечного — пункты не добавляем и
+    // не удаляем, белок-носители не трогаем (MPS-полы/болюс-капы болюс-дней целы:
+    // переносятся только carb_slow/carb_fast). Принимаем перенос ТОЛЬКО если день не
+    // теряет сходимость (≤ канона на сошедшемся / не хуже старта на честно-несошедшемся),
+    // иначе откат — «не навреди». Остаток честно флагается скор-композицией (E7).
+    {
+      const _MAIN_MEAL_TYPES = new Set(['breakfast', 'lunch', 'dinner']);
+      const _FRAG_KCAL = 180;
+      const _devOfDay = () => Math.max(
+        (input.goalKcal || 0) > 0 ? Math.abs(totals.kcal - (input.goalKcal || 0)) / (input.goalKcal || 1) : 0,
+        (input.goalProteinG || 0) > 0 ? Math.abs(totals.p - (input.goalProteinG || 0)) / (input.goalProteinG || 1) : 0,
+        (input.goalFatG || 0) > 0 ? Math.abs(totals.f - (input.goalFatG || 0)) / (input.goalFatG || 1) : 0,
+        (input.goalCarbsG || 0) > 0 ? Math.abs(totals.c - (input.goalCarbsG || 0)) / (input.goalCarbsG || 1) : 0,
+      );
+      const _devBeforeCons = _devOfDay();
+      const _canonCons = PLANNER_CONVERGENCE_PCT / 100;
+      const _fragCount = (arr: any[]) => arr.filter((m: any) => (m.totals?.kcal || 0) > 0 && (m.totals?.kcal || 0) < _FRAG_KCAL).length;
+      let _consolidatedAny = false;
+      for (let _ci = 0; _ci < 6; _ci++) {
+        const _mains = meals.filter((m: any) => _MAIN_MEAL_TYPES.has(String(m.type || '')) && (m.totals?.kcal || 0) > 0);
+        const _tiny = _mains
+          .filter((m: any) => (m.totals?.kcal || 0) < _FRAG_KCAL)
+          .sort((a: any, b: any) => (a.totals?.kcal || 0) - (b.totals?.kcal || 0))[0];
+        if (!_tiny) break;
+        const _tinyKBefore = _tiny.totals?.kcal || 0;
+        const _fragBefore = _fragCount(_mains);
+        const _donors = _mains
+          .filter((m: any) => m !== _tiny && (m.totals?.kcal || 0) > _FRAG_KCAL)
+          .sort((a: any, b: any) => (b.totals?.kcal || 0) - (a.totals?.kcal || 0));
+        let _moved = false;
+        for (const _donor of _donors) {
+          const _tgt = (_tiny.items || [])
+            .filter((it: any) => (it.role === 'carb_slow' || it.role === 'carb_fast') && !it._fixedGrams && (it.amount || 0) > 0)
+            .sort((a: any, b: any) => (b.kcal || 0) - (a.kcal || 0))[0];
+          if (!_tgt) break;
+          const _fdT = FOOD_DB.find((f: any) => f.id === _tgt.id);
+          const _tgtCap = _fdT ? carbPortionCap(_fdT as any, mealCapScaleOf(_tiny as any)) : (_tgt.amount || 0) + 100;
+          const _tgtRoomG = Math.max(0, _tgtCap - (_tgt.amount || 0));
+          if (_tgtRoomG < 5) continue;
+          const _tgtKcalPerG = (_tgt.kcal || 0) / Math.max(1, _tgt.amount || 0);
+          const _src = (_donor.items || [])
+            .filter((it: any) => (it.role === 'carb_slow' || it.role === 'carb_fast') && !it._fixedGrams && (it.amount || 0) > 0)
+            .sort((a: any, b: any) => (b.kcal || 0) - (a.kcal || 0))[0];
+          if (!_src) continue;
+          const _srcKcalPerG = (_src.kcal || 0) / Math.max(1, _src.amount || 0);
+          const _srcFloor = Math.min(_src.amount, 30); // гарнир не «обнуляем» (пол 30 г, как в reconciliation)
+          const _needK = _FRAG_KCAL - (_tiny.totals?.kcal || 0);
+          const _donRoomK = (_donor.totals?.kcal || 0) - _FRAG_KCAL;  // донор не превращается во фрагмент
+          const _srcRoomK = (_src.amount - _srcFloor) * _srcKcalPerG;
+          const _moveK = Math.min(_needK, _donRoomK, _srcRoomK, _tgtRoomG * _tgtKcalPerG);
+          if (_moveK < 20) continue; // микропереносы не стоят строки в выдаче
+          const _cutG = Math.max(5, Math.round((_moveK / _srcKcalPerG) / 5) * 5);
+          const _addG = Math.max(5, Math.round((_moveK / _tgtKcalPerG) / 5) * 5);
+          if (_cutG >= _src.amount - 1 || _addG > _tgtRoomG + 1) continue;
+          const _srcB = { ..._src }; const _tgtB = { ..._tgt };
+          const _totB = { ...totals };
+          const _scaleC = (it: any, newA: number) => {
+            const _r = newA / Math.max(1e-6, it.amount || 0);
+            it.p = +((it.p || 0) * _r).toFixed(1); it.f = +((it.f || 0) * _r).toFixed(1); it.c = +((it.c || 0) * _r).toFixed(1);
+            it.kcal = Math.round(4 * it.p + 9 * it.f + 4 * it.c);
+            if (typeof it.fiber === 'number') it.fiber = +((it.fiber || 0) * _r).toFixed(1);
+            if (typeof it.leucine_mg === 'number') it.leucine_mg = Math.round((it.leucine_mg || 0) * _r);
+            it.amount = Math.round(newA);
+          };
+          _scaleC(_src, _src.amount - _cutG);
+          _scaleC(_tgt, _tgt.amount + _addG);
+          _tiny.totals = mealTotalsOf(_tiny.items);
+          _donor.totals = mealTotalsOf(_donor.items);
+          recalcDayTotals(meals, totals);
+          // Приёмка: сходимость не хуже старта/канона + донор не стал фрагментом
+          // (снап-округление не должно пробить пол 180) + крошечный реально вырос
+          // + общее число фрагментов не выросло (анти-регресс композиции E7).
+          if (_devOfDay() <= Math.max(_devBeforeCons, _canonCons) + 1e-9
+            && (_donor.totals?.kcal || 0) >= _FRAG_KCAL - 0.5
+            && (_tiny.totals?.kcal || 0) > _tinyKBefore + 1
+            && _fragCount(_mains) <= _fragBefore) {
+            notes.push(`⚖️ «${_tiny.label || _tiny.type}» укрупнён переносом ~${Math.round(_cutG * _srcKcalPerG)} ккал из «${_donor.label || _donor.type}» (основной приём ≥${_FRAG_KCAL} ккал)`);
+            _moved = true; _consolidatedAny = true;
+            break;
+          }
+          Object.assign(_src, _srcB); Object.assign(_tgt, _tgtB);
+          _tiny.totals = mealTotalsOf(_tiny.items);
+          _donor.totals = mealTotalsOf(_donor.items);
+          Object.assign(totals, _totB);
         }
+        if (!_moved) break; // ни один донор не дал переноса без потери сходимости
       }
+      if (_consolidatedAny) _refreshMpsFromMeals();
     }
 
     // ─── P4/E0: честный флаг сходимости products-пути (ФИНАЛЬНЫЙ totals) ───
