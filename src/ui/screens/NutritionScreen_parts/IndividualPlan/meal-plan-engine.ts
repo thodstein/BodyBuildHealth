@@ -50,6 +50,7 @@ import { edibilityCapFor, liveLadderSteps, isHighCarbDay as _isHighCarbDay, EDIB
 import { computeEA } from "./planner-ea.engine";
 import { planTypeFloorMods } from "./planner-day-targets";
 import { perMealProteinCapG } from "./planner-meal-count";
+import { afAllows, afFilterPool, type AffinitySlot } from "./planner-meal-affinity";
 
 // ─── Публичные типы ────────────────────────────────────────────────────
 export interface MealItem {
@@ -1887,7 +1888,9 @@ function buildWholeMeal(
   // На завтраке избранные белки фильтруются до «завтрашних» (яйца/творог/сыворотка), и даже
   // если избранных «завтрашних» нет — завтрак получит яйца/творог/сыворотку, а НЕ любимый
   // говяжий фарш. Любимое мясо остаётся для обеда/ужина (ветка preferredRot ниже).
-  const _preferredForThis = (breakfast ? preferredRot.filter(f => isBreakfastProtein(f)) : preferredRot);
+  // E1: affinity — избранное тоже подчиняется матрице «продукт × слот» (печень в снек не лезет).
+  const _affSlot = _mealKind as AffinitySlot;
+  const _preferredForThis = (breakfast ? preferredRot.filter(f => isBreakfastProtein(f)) : preferredRot).filter(f => afAllows(f.id, _affSlot));
   const proteinPool = _preferredForThis.length > 0
     ? _preferredForThis
     : snack && pool.fastProtein.length > 0 ? [...pool.fastProtein, ..._snackRotPool]
@@ -2018,9 +2021,10 @@ function buildWholeMeal(
     // v3: на HV снековый keyword-пул быстро пустеет (квоты+бан) — требуем ≥3, иначе общий пул.
     // Иначе 3-й+ снеки собираются из огрызков (яйцо 50 + отруби 31).
     const _snackPoolOk = snack && _snackPools && (_pickCtx.highVolumeDay ? _snackPools.carbs.length >= 3 : _snackPools.carbs.length > 0);
-    const carbPoolRaw = _snackPoolOk
+    // E1: affinity — овсянка/хлопья не идут в обед/ужин, бобовые — не в перекус.
+    const carbPoolRaw = afFilterPool(_snackPoolOk
       ? (_snackPools as NonNullable<typeof _snackPools>).carbs
-      : (breakfast && _breakfastPools && _breakfastPools.carbs.length > 0) ? _breakfastPools.carbs : _carbPool;
+      : (breakfast && _breakfastPools && _breakfastPools.carbs.length > 0) ? _breakfastPools.carbs : _carbPool, _affSlot);
     // Сухофрукты/концентраты — только добивка, не основа (иначе 14г каши + 100г сухофруктов — пустой рацион).
     // v3: сухие стейплы (крем риса/кукурузные хлопья, STAPLE_DRY_IDS) — ОСНОВА, не добивка.
 // v3: ранжир плотности на HV — сухие стейплы первыми, дальше по удобству (угли/клетчатка).
