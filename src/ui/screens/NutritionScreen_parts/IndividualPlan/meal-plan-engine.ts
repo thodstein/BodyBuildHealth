@@ -9294,7 +9294,10 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
             }
           }
           m.items.push(_item); m.totals = mealTotalsOf(m.items); recalcDayTotals(meals, totals);
-          if (_devVeg(totals) > _devBeforeV + 1e-9) {
+          // Порог приёмки: день НЕ выходит за канон (сошедшийся может дойти до 3%,
+          // несведённый — не ухудшиться) — овощ не «ломает» сходимость.
+          const _limitV = Math.max(_devBeforeV, PLANNER_CONVERGENCE_PCT / 100);
+          if (_devVeg(totals) > _limitV + 1e-9) {
             // откат: убрать овощ и восстановить крахмал
             m.items.pop();
             if (_mCarb && _carbOrig) Object.assign(_mCarb, _carbOrig);
