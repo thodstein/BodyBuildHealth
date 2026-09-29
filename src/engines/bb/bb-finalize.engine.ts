@@ -3153,7 +3153,7 @@ function enforceExerciseLevels(plan: BBPlan, options: BBFinalizeOptions): void {
 export function finalizeBBPlan(plan: BBPlan, options: BBFinalizeOptions = {}): BBPlan {
   if (!plan) {
     console.warn('[bb-finalize] finalizeBBPlan: plan is null/undefined — returning empty plan');
-    return { pattern: { id: 'unknown', name: 'Unknown', sessionsPerRotation: 1, rotationDays: [0] }, weeks: [], rotationMuscleVolume: {}, rationale: [] };
+    return { pattern: { id: 'unknown', name: 'Unknown', rotationDays: 7, sessionsPerRotation: 1, schedule: [], level: [], description: '' }, weeks: [], rotationMuscleVolume: {}, rationale: [] };
   }
   if (!plan.weeks || plan.weeks.length === 0) {
     console.warn('[bb-finalize] finalizeBBPlan: plan.weeks is empty — returning plan as-is');

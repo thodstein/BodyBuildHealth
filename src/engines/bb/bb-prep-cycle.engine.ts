@@ -26,6 +26,7 @@ import { applyDUPOverlay, type DUPMode } from './bb-dup.engine';
 import { buildBBContestPrepPlan, applyContestPrepToBBPlan, CATEGORY_PROFILES, isoToday, isoDiffDays, isoAddDays, prepPhaseForWeek, buildPeakWeek, configFromPlan, isMonotonicTaper, prepDietBreaks, isPrepRefeedDay, syncPrepDietBreaksWithPlan, type BBContestCategory, type BBContestPrepConfig, type BBContestPrepPlan, type BBPlanWithPrep, type CarbLoadStrategy, type ContestEventEntry, type ContestSpecialization, type ExperienceLevel, type SodiumStrategy, type WaterStrategy } from './bb-contest-prep.engine';
 import { prepSplitProfile, PREP_MINIMAL_MODE_LABELS, type PrepMinimalMode } from './bb-prep-splits';
 import { hrvRecoveryMult, hrvSignalFromStore } from '../pro/hrv-baseline.engine';
+import type { TrainingExperienceData } from './bb-taper-adaptive.engine';
 
 /** Конфигурация Prep-цикла (всё пользовательское, валидируется). */
 export interface PrepCycleConfig {
@@ -103,6 +104,10 @@ export interface PrepCycleConfig {
   bodyFatPct?: number;
   experienceLevel: ExperienceLevel;
   prepCount?: number;
+  /** Адаптивный тапер (P0-1): данные о тренированности — длина/объём/интенсивность тапера. */
+  experience?: TrainingExperienceData;
+  /** Уровень гликогена 1-10 (1 = истощён) — коррекция карб-дозы пик-недели (Burke 2011). */
+  glycogenLevel?: number;
   prepVolumeMult?: number;
   /** Стратегия объёма подготовки (крутизна каскада): gentle/balanced/aggressive. */
   prepVolumeStrategy?: PrepVolumeStrategy;
@@ -362,6 +367,8 @@ export function buildPrepCycle(raw: PrepCycleConfig, opts: PrepCycleBuildOpts = 
     experienceLevel: cfg.experienceLevel,
     enhanced: cfg.enhanced,
     prepCount: cfg.prepCount ?? 0,
+    experience: cfg.experience,
+    glycogenLevel: cfg.glycogenLevel,
     pedContext: cfg.pedContext,
     showDate: cfg.showDate,
     weeksOut: taperWeeks,

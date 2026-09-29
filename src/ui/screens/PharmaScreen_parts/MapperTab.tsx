@@ -178,12 +178,12 @@ export const MapperTab: React.FC = () => {
             ))}
           </div>
           <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(120px, 1fr))', gap:6, marginBottom:10 }}>
-            {FEMALE_AAS_DRUGS.filter(d => aasFilter==='all' || (aasFilter==='oral' ? d.esters.length===0 : d.esters.length>0)).map(d => (
+            {FEMALE_AAS_DRUGS.filter(d => aasFilter==='all' || (aasFilter==='oral' ? (d.esters?.length ?? 0)===0 : (d.esters?.length ?? 0)>0)).map(d => (
               <div key={d.id} onClick={() => {
                 if (femaleAasEntries.some(e => e.drugId===d.id)) {
                   setFemaleAasEntries(femaleAasEntries.filter(e => e.drugId!==d.id));
                 } else {
-                  setFemaleAasEntries([...femaleAasEntries, { drugId:d.id, doseMgWeek:100, ester:d.esters[0]||'', weeksOn:8 }]);
+                  setFemaleAasEntries([...femaleAasEntries, { drugId:d.id, doseMgWeek:100, ester:d.esters?.[0]||'', weeksOn:8 }]);
                 }
               }} style={{
                 padding:'8px 10px', borderRadius:10, cursor:'pointer', textAlign:'center',
@@ -209,13 +209,13 @@ export const MapperTab: React.FC = () => {
                         setFemaleAasEntries(next);
                       }} style={{ flex:1, padding:'8px 10px', borderRadius:8, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.08)', color:'#fff', fontSize:11, fontWeight:700, outline:'none', minHeight:40 }} />
                       <span style={{ fontSize:10, color:'#fff' }}>мг/нед</span>
-                      {drug && drug.esters.length > 0 && (
+                      {drug && (drug.esters?.length ?? 0) > 0 && (
                         <select value={entry.ester} onChange={e => {
                           const next = [...femaleAasEntries];
                           next[i] = { ...next[i], ester: e.target.value };
                           setFemaleAasEntries(next);
                         }} style={{ padding:'8px', borderRadius:8, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.08)', color:'#fff', fontSize:10, outline:'none', minHeight:40 }}>
-                          {drug.esters.map(est => <option key={est} value={est} style={{ background:'#1a1a1f' }}>{est}</option>)}
+                          {drug.esters?.map(est => <option key={est} value={est} style={{ background:'#1a1a1f' }}>{est}</option>)}
                         </select>
                       )}
                     </div>
