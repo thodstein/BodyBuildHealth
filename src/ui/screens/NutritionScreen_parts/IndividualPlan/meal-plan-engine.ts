@@ -9350,9 +9350,16 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
       );
       // Экстремальные/спец-дни НЕ трогаем (иначе нарушаем капы съедобности/тарелки
       // и окон инсулина — эти дни управляются собственными проходами best-effort).
-      const _reconSkip = _pickCtx.highVolumeDay || !!(input as any).refeedDay
-        || _pickCtx.capacity.active || (input.goalKcal || 0) >= 4500
-        || input.carbCapGPerKg === 0 || meals.some((m: any) => m._insulinWindow);
+      // E14: большие НЕ-экстремальные HV-дни (M110 5000 и т.п.) тоже сводим —
+      // per-meal бюджет с капом тарелки 700 г (иначе недобор закрывался ростом
+      // одной тарелки). Сверх-большие (≥6000 ккал) и capacity-экстримы (1500У,
+      // инсулин-окна, ≥8 г/кг) остаются своим проходам (§3D/E15) — как и раньше.
+      const _bigDayRecon = _pickCtx.highVolumeDay && !_pickCtx.capacity.active
+        && (input.goalKcal || 0) < 6000;
+      const _reconSkip = !!(input as any).refeedDay
+        || _pickCtx.capacity.active || (input.goalKcal || 0) >= 6000
+        || input.carbCapGPerKg === 0 || meals.some((m: any) => m._insulinWindow)
+        || ((_pickCtx.highVolumeDay || (input.goalKcal || 0) >= 4500) && !_bigDayRecon);
       let _reconApplied = false;
       if (_preRecon > PLANNER_CONVERGENCE_PCT / 100 + 1e-9 && !_reconSkip) {
         try {
@@ -9382,20 +9389,32 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
             mealProteinCap: 58,
             lbmKg: input.lbmKg || 0,
             // Капы роста: не выходим за съедобность/порцию продукта и дневные капы
-            // орехов/семян/масел (реализм-инварианты плана).
-            growCap: (it: any, role: string) => {
+            // орехов/семян/масел (реализм-инварианты плана). E14: на больших днях
+            // дополнительно ограничиваем рост бюджетом ТАРЕЛКИ приёма (≤700 г
+            // твёрдого; комната делится между растущими позициями приёма).
+            growCap: (it: any, role: string, meal?: any) => {
+              const _plateShare = () => {
+                if (!_bigDayRecon || !meal) return Infinity;
+                const _solid = (meal.items || []).filter((x: any) => x.role !== 'liquid')
+                  .reduce((s: number, x: any) => s + (x.amount || 0), 0);
+                const _room = Math.max(0, 700 - _solid);
+                const _growables = (meal.items || []).filter((x: any) =>
+                  (x.role === 'carb_slow' || x.role === 'carb_fast' || x.role === 'fat')
+                  && !((x as any)._fixedGrams) && (x.amount || 0) > 0).length;
+                return _growables > 0 ? _room / _growables : 0;
+              };
               const fam = stapleFamilyOf(it.id || '');
               if (role === 'fat') {
                 // Орехи/семена — рост ТОЛЬКО в комнату дня (кап − уже съеденное),
                 // масла — до капа приёма 25 г.
-                if (fam === 'nuts' || fam === 'seeds') return it.amount + _nutRoomPerItem;
-                if (fam === 'oils') return Math.min(30, it.amount * 1.6);
+                if (fam === 'nuts' || fam === 'seeds') return Math.min(it.amount + _nutRoomPerItem, it.amount + _plateShare());
+                if (fam === 'oils') return Math.min(30, it.amount * 1.6, it.amount + _plateShare());
               }
               // Яйца — дневной катчелл-кап (275 г «растить» нельзя).
-              if (it.id === 'egg_whole') return eggCatchupCap(quotaWeightScale(input.weightKg));
+              if (it.id === 'egg_whole') return Math.min(eggCatchupCap(quotaWeightScale(input.weightKg)), it.amount + _plateShare());
               const capItem = maxGramPerItem(_pickCtx.currentBudget);
               const capEdible = edibilityCapFor(it.id, Infinity);
-              return Math.min(capItem, capEdible);
+              return Math.min(capItem, capEdible, it.amount + _plateShare());
             },
             // Сетка среза теперь 5-г (мелкая) — спуску нужно больше проходов.
             maxIter: 10,

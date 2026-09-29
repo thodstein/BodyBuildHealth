@@ -61,4 +61,23 @@ describe('E0: reconnectDay (чистая функция)', () => {
     expect(r.adjusted).toBe(false);
     expect(r.devPct).toBe(0);
   });
+
+  it('E14: growCap получает приём и уважает бюджет тарелки (третий аргумент)', () => {
+    // Чисто-углеводный носитель (без белка/жира) — единственная ось роста: углеводы.
+    const meals: ReconMeal[] = [{ type: 'lunch', items: [mk('rice', 'carb_slow', 100, 0, 0, 78)] }];
+    const targets = { kcal: 600, p: 0, f: 0, c: 220 };
+    const r = reconcileDay(meals, targets, {
+      snap: (_it, g) => Math.max(0, Math.round(g / 5) * 5),
+      growCap: (_it, _role, meal) => {
+        // бюджет тарелки: рост только в комнату приёма (мелкий тест-аналог 700 г).
+        // Без третьего аргумента (meal) комната считалась бы от пустого приёма и
+        // лимит не сработал бы — лок ловит именно это.
+        const solid = (meal?.items || []).reduce((s, x) => s + (x.amount || 0), 0);
+        return 100 + Math.max(0, 150 - solid);
+      },
+    });
+    const rice = r.meals[0].items[0];
+    expect(rice.amount).toBeGreaterThan(100);   // рост состоялся
+    expect(rice.amount).toBeLessThanOrEqual(150); // упёрся в бюджет тарелки приёма
+  });
 });

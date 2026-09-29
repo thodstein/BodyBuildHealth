@@ -52,8 +52,9 @@ export interface ReconOptions {
   /** LBM атлета — для масштабирования абсолютных полов белка у малых атлетов. */
   lbmKg?: number;
   /** Верхняя граница роста для пункта (граммы). По умолчанию — роль-зависимый
-   *  множитель. Движок передаёт функцию, уважающую дневные капы (орехи/масла). */
-  growCap?: (item: ReconItem, role: string) => number;
+   *  множитель. Движок передаёт функцию, уважающую дневные капы (орехи/масла) и
+   *  (E14) бюджет тарелки приёма — третий аргумент meal даёт текущий приём. */
+  growCap?: (item: ReconItem, role: string, meal?: ReconMeal) => number;
   maxIter?: number;
 }
 export interface ReconResult {
@@ -154,7 +155,7 @@ export function reconcileDay(mealsIn: ReconMeal[], targets: ReconTargets, opts?:
       if (!KNOB_ROLES.has(role)) return;
       if (!(it.amount > 0)) return;
       let lo: number; let hi: number;
-      const _growCap = opts?.growCap ? opts.growCap(it, role) : Infinity;
+      const _growCap = opts?.growCap ? opts.growCap(it, role, m) : Infinity;
       if (role === 'protein' || role === 'fast_protein' || role === 'slow_protein') {
         // Пол белка: у ОСНОВНЫХ приёмов — в граммах ЕДЫ (страж реализма тарелки),
         // у peri/pre-sleep/перекуса — в граммах БЕЛКА (переводим в еду по плотности;
