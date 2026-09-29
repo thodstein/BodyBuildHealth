@@ -111,7 +111,8 @@ describe('C — обогащение реально выдаваемых тон�
   });
 
   it('C3: p5p имеет реальную дозу (не фабричный 500)', () => {
-    expect(defaultDosage('p5p')?.mg).toBe(50);
+    // 25 мг (консервативно как B6; было 50 — ужато при аудите протоколов, EFSA UL добавки 12 мг)
+    expect(defaultDosage('p5p')?.mg).toBe(25);
   });
 
   it('C4: канонические ключи dosing резолвятся (red_yeast, vitamin_b_complex)', () => {

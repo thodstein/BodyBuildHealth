@@ -3126,7 +3126,8 @@ export const DEFAULT_DOSAGES: Record<string, SubstanceDosage> = {
   phosphatidylcholine: { mg: 1200, timing: 'с едой' },
   telmisartan: { mg: 40, timing: 'утро (КАД и ЧСС контроль!)' },
   tudca: { mg: 1000, timing: 'перед едой, 2x/д' },
-  vitamin_b6: { mg: 50, timing: 'с едой' },
+  // Канон реестра 10-25 мг (SUPPORT_DOSING); EFSA UL добавки 12 мг — движок капит UL-гейтом
+  vitamin_b6: { mg: 25, timing: 'с едой' },
   vitamin_d3: { mg: 5000, timing: 'с едой (МЕ)' },
   zinc: { mg: 30, timing: 'на ночь (пиколинат)' },
   piperine: { mg: 10, timing: 'с куркумином' }, chondroitin: { mg: 1200, timing: 'с едой' },
@@ -3135,8 +3136,9 @@ export const DEFAULT_DOSAGES: Record<string, SubstanceDosage> = {
   // ── Женский слой (FEMALE_AAS_PROTOCOLS §5.1; female-support-layer) ──
   vitex: { mg: 30, timing: 'утром (D2-агонист, контроль PRL)' },
   inositol: { mg: 3000, timing: '2 г 2×/д с едой (мио-инозитол)' },
-  // Активная форма B6 (пиридоксаль-5-фосфат); >100 мг/сут — риск нейропатии (как B6)
-  p5p: { mg: 50, timing: 'утром, с едой' },
+  // Активная форма B6 (пиридоксаль-5-фосфат); консервативно — как B6 (EFSA UL 12 мг);
+  // 25-50 мг — терапевтический коридор, длительно >100 мг/сут — риск нейропатии
+  p5p: { mg: 25, timing: 'утром, с едой' },
   // ── Tier-system препараты (v4) ──
   niacin: { mg: 500, timing: 'на ночь (с едой, ↑ постепенно)' },
   phosphatidylserine: { mg: 300, timing: 'с едой' },

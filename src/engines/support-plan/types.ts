@@ -138,6 +138,8 @@ export interface NutritionData {
   calories: number; proteinG: number; fatG: number; carbsG: number;
   waterL: number; saltIntake: string; omega3: boolean; fiberG: number;
   proteinGPerKg: number; sodiumMg: number; potassiumMg: number;
+  /** Опция «учёт принятых добавок»: что пользователь уже принимает (из профиля nutrition.currentSupplements) */
+  takenSupplements?: Array<{ id: string; doseMg: number }>;
 }
 
 // ─── Block 12: Medical Contraindications ───
@@ -183,6 +185,8 @@ export interface GeneticData {
   srd5a2: 'hypersensitive' | 'normal' | 'unknown';
   arSensitivity: 'high' | 'normal' | 'low' | 'unknown';
   mthfr: 'c677t' | 'normal' | 'unknown';
+  /** HFE (гемохроматоз) — из профиля health.genetics; влияние: железо противопоказано */
+  hfe?: 'c282y' | 'h63d' | 'normal' | 'unknown';
 }
 
 // ─── GI Tract / Microbiome ───
@@ -231,6 +235,13 @@ export interface CalculatorState {
   jointMode?: boolean;
   reproMode?: boolean;
   neuroMode?: boolean;
+  /**
+   * Опции подбора (opt-in, UI — карточка «⚙️ Опции подбора» в AutoCalculator):
+   *  - diaryLabs: авто-подстановка свежих анализов из дневника лаборатории;
+   *  - dietAware: учёт уже принимаемых добавок (перекрытие доз);
+   *  - geneticsOn: корректировка плана по генетическим маркерам (MTHFR/HFE).
+   */
+  options?: { diaryLabs?: boolean; dietAware?: boolean; geneticsOn?: boolean };
   symptoms?: string[];
   healthConditions?: string[];
 }
@@ -394,6 +405,8 @@ export interface PlanResult {
   protocolWarnings?: string[];
   /** D1 (audit): ошибка расчёта — честный сигнал для UI (тост/баннер), не только console.error. */
   error?: string;
+  /** Опции подбора: заметки генетики/учёта рациона (пусто — опции выключены). */
+  optionNotes?: string[];
 }
 
 export interface LabFindingSub {

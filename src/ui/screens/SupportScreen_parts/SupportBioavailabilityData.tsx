@@ -187,7 +187,7 @@ export const THERAPEUTIC_WINDOWS: Record<string, { minMg: number; optMg: number;
   b12: { minMg: 2.4, optMg: 100, maxMg: 1000, ul: 9999, unit: 'мкг', note: 'Нет UL. Депо в печени 2-5 мг.' },
   vitc: { minMg: 90, optMg: 500, maxMg: 2000, ul: 2000, note: 'UL 2000 мг. >1000 мг → осмотическая диарея.' },
   ala: { minMg: 300, optMg: 600, maxMg: 1200, ul: 1800, note: 'R-форма эффективнее. >1200 мг → тошнота.' },
-  nac: { minMg: 600, optMg: 1200, maxMg: 2400, ul: 3000, note: '>2400 мг/сут → головная боль. 2-3 приёма.' },
+  nac: { minMg: 600, optMg: 1200, maxMg: 2400, ul: 4000, note: 'Канон кросс-модульного капа 4000 мг/сут (движок капит авто-план на 2400). 2-3 приёма.' },
   coq10: { minMg: 100, optMg: 200, maxMg: 400, ul: 1200, note: 'Убихинол в 3× эффективнее убихинона.' },
   omega3: { minMg: 500, optMg: 1000, maxMg: 3000, ul: 5000, note: 'EPA+DHA. >3000 мг → риск кровотечения.' },
   cr: { minMg: 25, optMg: 200, maxMg: 1000, ul: 1000, unit: 'мкг', note: 'Cr пиколинат 200-1000 мкг. UL 1000 мкг.' },

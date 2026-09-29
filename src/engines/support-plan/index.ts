@@ -39,6 +39,7 @@ import {
   buildDepletionWarnings, buildCumulativeLoad, buildPillBurden,
 } from './display';
 import { recommendStacksLight } from './stacks';
+import { applyGeneticsToPlanSubs, applyDietAwareToPlanSubs } from '../support-genetics-diet.engine';
 
 /**
  * ЕДИНЫЙ расчёт поддержки: вещества + риски + display-данные.
@@ -72,11 +73,26 @@ function runSupportUnifiedInner(state: CalculatorState): PlanResult {
 
   // ── 1. Substances (deduped, PlanSubstance[]) ──
   const weight = state.profile?.weight || 80;
-  const substances = buildSubstances(tzRes.selectedSubstances, tzRes, {
+  const rawSubs = buildSubstances(tzRes.selectedSubstances, tzRes, {
     boostAdded: tzRes.boostAdded,
     jointSubs: tzRes.jointSubs,
     neuroSubs: tzRes.neuroSubs,
   }, weight);
+
+  // ── 1a. Опции подбора (opt-in, карточка «⚙️ Опции подбора»): генетика + учёт принятых ──
+  // Опции выключены → байт-в-байт прежний план.
+  const optionNotes: string[] = [];
+  let substances = rawSubs;
+  if (state.options?.geneticsOn) {
+    const g = applyGeneticsToPlanSubs(substances, { mthfr: state.genetics?.mthfr, hfe: state.genetics?.hfe });
+    substances = g.subs;
+    optionNotes.push(...g.notes);
+  }
+  if (state.options?.dietAware) {
+    const d = applyDietAwareToPlanSubs(substances, state.nutrition?.takenSupplements);
+    substances = d.subs;
+    optionNotes.push(...d.notes);
+  }
 
   // ── 2. Dosages ──
   const dosages: Record<string, { mg: number; timing: string }> = {};
@@ -162,7 +178,10 @@ function runSupportUnifiedInner(state: CalculatorState): PlanResult {
     cumulativeLoad: cumulativeLoad.length > 0 ? cumulativeLoad : undefined,
     pillBurden,
     phaseAssignedDrugs: tzRes.phaseAssignedDrugs,
-    protocolWarnings: tzRes.protocolWarnings,
+    protocolWarnings: optionNotes.length > 0
+      ? [...(tzRes.protocolWarnings || []), ...optionNotes]
+      : tzRes.protocolWarnings,
+    optionNotes: optionNotes.length > 0 ? optionNotes : undefined,
   };
 }
 

@@ -18,6 +18,7 @@ import { PHASE_PROTOCOL } from '../../../engines/tz-bridge-phase';
 import { STACK_BOOSTER_TRIGGERS, buildGapFillSuggestions, megaEnhance, type MegaEnhanceSuggestion, getNeuroBoosterSubstanceIds, getJointsBoosterSubstanceIds, getHematoBoosterSubstanceIds } from '../../../engines/tz-bridge-boosters';
 import { computeResidualRisk, type PedRiskAssessment } from '../../../engines/ped-risk-matrix';
 import { buildMapperCtx, labSliceToValues } from '../../../engines/support-plan/mapper-ctx';
+import { applyGeneticsToRecSubs, applyDietAwareToRecSubs } from '../../../engines/support-genetics-diet.engine';
 import { SUPPORT_CATALOG_DATA } from '../../../data/support-catalog-data';
 import '../../../data/support-catalog-init';
 import { SafetyGuardrails, SafetyConflicts, SafetyProcedures, SafetyAssayWarnings, SafetyGaps, SafetyLabFindings, SafetyCumulativeLoad, SafetyPillBurden, SafetyPedEscalation, SafetyInjections } from './CalcSafetyLayer';
@@ -789,20 +790,39 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
   // по конфликтам и противопоказаниям с учётом UI-условий (hasCVD и т.п.).
   const finalRec = useMemo(() => {
     if (!rec) return null;
-    if (removedSubs.length === 0 && addedSubs.length === 0) return rec;
-    const interactionIds = rec.subs.map(s => s.substanceId);
+    // ── Опции подбора (opt-in, карточка «⚙️ Опции подбора»): генетика + учёт принятых ──
+    // Применяются всегда (не только при ручных правках); выключены → байт-в-байт прежний rec.
+    let optBase: SupportRecommendation = rec;
+    const optNotes: string[] = [];
+    if (state.options?.geneticsOn) {
+      const g = applyGeneticsToRecSubs(rec.subs, { mthfr: state.genetics?.mthfr, hfe: state.genetics?.hfe });
+      optBase = { ...optBase, subs: g.subs };
+      optNotes.push(...g.notes);
+    }
+    if (state.options?.dietAware) {
+      const d = applyDietAwareToRecSubs(optBase.subs, (state.nutrition as any)?.takenSupplements || [], (id: string) => subDosage(id));
+      optBase = { ...optBase, subs: d.subs };
+      optNotes.push(...d.notes);
+    }
+    const rec0 = optBase;
+    if (removedSubs.length === 0 && addedSubs.length === 0) {
+      if (optNotes.length === 0) return rec0;
+      return { ...rec0, protocolWarnings: [...(rec0.protocolWarnings || []), ...optNotes] };
+    }
+    const interactionIds = rec0.subs.map(s => s.substanceId);
     const mappedConditions: string[] = [...(state.healthConditions || [])];
     if (state.contraindications.hasCVD || state.cardio.previousCVD) mappedConditions.push('ihd');
     if (state.contraindications.hasThrombophilia) mappedConditions.push('thrombophilia');
     if (state.contraindications.hasGI) mappedConditions.push('peptic_ulcer');
     if (state.contraindications.hasKidneyDisease) mappedConditions.push('ckd_stage3', 'ckd_stage4_5');
     return {
-      ...rec,
+      ...rec0,
       conflicts: checkInteractions(interactionIds).map(i => ({
         a: i.a, b: i.b, reason: `${i.reason} — ${i.action}`, level: i.severity === 'block' ? 'block' as const : 'warn' as const,
       })),
       contraindications: checkContraindications(interactionIds, mappedConditions),
-      summary: `${rec.summary} После ручной корректировки: ${rec.subs.length} элементов.`,
+      summary: `${rec0.summary} После ручной корректировки: ${rec0.subs.length} элементов.`,
+      protocolWarnings: optNotes.length > 0 ? [...(rec0.protocolWarnings || []), ...optNotes] : rec0.protocolWarnings,
     };
   }, [rec, removedSubs, addedSubs, state]);
 

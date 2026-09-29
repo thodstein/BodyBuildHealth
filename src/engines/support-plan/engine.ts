@@ -951,7 +951,19 @@ export function hydrateState(): Partial<CalculatorState> {
           srd5a2: s.genetics.SRD5A2 || s.genetics.srd5a2 || 'unknown',
           arSensitivity: s.genetics.AR || s.genetics.ar || 'unknown',
           mthfr: s.genetics.MTHFR || s.genetics.mthfr || 'unknown',
+          // HFE (гемохроматоз) — из профиля health.genetics (свободная карта маркеров)
+          hfe: s.genetics.HFE || s.genetics.hfe || 'unknown',
         };
+      }
+      // ── Принятые добавки (опция «учёт рациона») ──
+      const profileSupps = Array.isArray(s.nutrition?.currentSupplements) ? s.nutrition.currentSupplements : [];
+      if (profileSupps.length > 0) {
+        const taken = profileSupps
+          .map((x: any) => ({ id: String(x?.id || x?.substanceId || ''), doseMg: Number(x?.doseMg) || 0 }))
+          .filter((x: any) => x.id);
+        if (taken.length > 0) {
+          result.nutrition = { ...(result.nutrition as any || {}), takenSupplements: taken } as any;
+        }
       }
       // ── Contraindications ──
       if (!result.contraindications) {

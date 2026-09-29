@@ -118,6 +118,32 @@ export const AutoCalculator: React.FC<AutoCalculatorProps> = ({ onApply, embedde
   }, [state.labs.fullPanel]);
 
   const update = <K extends keyof CalculatorState>(key: K, val: CalculatorState[K]) => setState(s => ({ ...s, [key]: val }));
+
+  // ── Опция «📥 Анализы из дневника»: авто-подстановка свежих анализов (opt-in) ──
+  // Если в дневнике лаборатории запись ДАТИРОВАНА ПОЗЖЕ текущего fullPanel —
+  // подставляем её автоматически (тот же конвертер labPointsToSlice, что у ручной кнопки).
+  const diaryPullRef = React.useRef<string>('');
+  React.useEffect(() => {
+    if (!state.options?.diaryLabs) { diaryPullRef.current = ''; return; }
+    try {
+      const hist = JSON.parse(localStorage.getItem('he_lab_diary') || '[]');
+      if (!Array.isArray(hist) || hist.length === 0) return;
+      const last = hist[hist.length - 1];
+      const lastDate = String(last?.date || '');
+      if (!lastDate || !last?.markers || !Array.isArray(last.markers)) return;
+      if (lastDate === diaryPullRef.current) return; // эту запись уже подтягивали
+      const cur = state.labs.fullPanel;
+      if (cur?.date && String(cur.date) >= lastDate) { diaryPullRef.current = lastDate; return; }
+      const slice = labPointsToSlice(last.markers);
+      if (!slice) return;
+      diaryPullRef.current = lastDate;
+      update('labs', { ...state.labs, fullPanel: { ...slice, date: lastDate } });
+      setFillStatus(`📥 Анализы от ${lastDate.split('-').reverse().join('.')} подставлены из дневника`);
+      setTimeout(() => setFillStatus(''), 2500);
+    } catch { /* нет дневника — тихо */ }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.options?.diaryLabs, state.labs.fullPanel?.date]);
+
   const uProf = (v: Partial<CalculatorState['profile']>) => setState(s => ({ ...s, profile: { ...s.profile, ...v } }));
   const uPharm = (v: Partial<CalculatorState['pharma']>) => setState(s => ({ ...s, pharma: { ...s.pharma, ...v } }));
   const uGoals = (v: Partial<CalculatorState['goals']>) => setState(s => ({ ...s, goals: { ...s.goals, ...v } }));
@@ -400,6 +426,67 @@ export const AutoCalculator: React.FC<AutoCalculatorProps> = ({ onApply, embedde
                 Источник: PHASE_PROTOCOL движка — подробности в блоке «📋 Фаза» карточки подбора ниже.
               </div>
             </div>
+          </div>
+        );
+      })()}
+
+      {/* ===== КАРТОЧКА ОПЦИЙ ПОДБОРА (opt-in, выбор пользователя) ===== */}
+      {(() => {
+        const opts = state.options || {};
+        const rows: { key: 'diaryLabs' | 'dietAware' | 'geneticsOn'; icon: string; label: string; desc: string; color: string }[] = [
+          { key: 'diaryLabs', icon: '📥', label: 'Анализы из дневника', desc: 'свежие анализы из Лаборатории подставляются автоматически', color: '#60a5fa' },
+          { key: 'dietAware', icon: '🍽', label: 'Учёт принятых добавок', desc: 'уже принимаемые перекрывают позиции плана (по дозе)', color: '#00e68a' },
+          { key: 'geneticsOn', icon: '🧬', label: 'Генетика (MTHFR/HFE)', desc: 'корректировка плана по маркерам профиля', color: '#a78bfa' },
+        ];
+        const geneInfo = (() => {
+          const g = state.genetics || {};
+          const parts: string[] = [];
+          if (g.mthfr === 'c677t') parts.push('MTHFR C677T ✓');
+          if (g.hfe && g.hfe !== 'unknown' && g.hfe !== 'normal') parts.push('HFE ' + g.hfe + ' ✓');
+          return parts.length > 0 ? parts.join(' · ') : 'маркеры не указаны в профиле';
+        })();
+        return (
+          <div data-calc="options" style={{
+            marginBottom: 10,
+            borderRadius: 14,
+            background: 'linear-gradient(135deg, rgba(0,230,138,0.05), rgba(59,130,246,0.03))',
+            border: '1.5px solid rgba(0,230,138,0.14)',
+            padding: '10px 12px',
+          }}>
+            <div style={{ fontSize: 11, fontWeight: 800, color: '#00e68a', marginBottom: 8, letterSpacing: '-0.2px', display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span>⚙️</span>
+              <span>Опции подбора</span>
+              <span style={{ fontSize: 8, fontWeight: 600, color: 'rgba(255,255,255,0.3)', letterSpacing: 0 }}>(по умолчанию выкл.)</span>
+            </div>
+            <div style={{ display: 'grid', gap: 4 }}>
+              {rows.map(r => {
+                const active = !!(opts as any)[r.key];
+                return (
+                  <div key={r.key} role="button" tabIndex={0} aria-pressed={active}
+                    data-calc-option={r.key}
+                    onClick={() => update('options', { ...opts, [r.key]: !active })}
+                    onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); update('options', { ...opts, [r.key]: !active }); } }}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', minHeight: 44,
+                      padding: '6px 10px', borderRadius: 10,
+                      background: active ? 'rgba(0,230,138,0.07)' : 'rgba(255,255,255,0.02)',
+                      border: active ? '1.5px solid rgba(0,230,138,0.3)' : '1px solid rgba(255,255,255,0.05)',
+                    }}>
+                    <span style={{ fontSize: 15 }}>{r.icon}</span>
+                    <span style={{ flex: 1, textAlign: 'left' }}>
+                      <span style={{ display: 'block', fontSize: 9.5, fontWeight: 700, color: active ? r.color : 'var(--text)' }}>{r.label}</span>
+                      <span style={{ display: 'block', fontSize: 7.5, color: 'rgba(255,255,255,0.4)' }}>{r.desc}</span>
+                    </span>
+                    <span style={{ fontSize: 12, color: active ? r.color : 'rgba(255,255,255,0.2)', fontWeight: 800 }}>{active ? '✓' : '○'}</span>
+                  </div>
+                );
+              })}
+            </div>
+            {opts.geneticsOn && (
+              <div data-calc-genetics-info style={{ marginTop: 6, padding: '5px 8px', borderRadius: 8, fontSize: 7.5, background: 'rgba(0,0,0,0.15)', border: '1px solid rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.6)' }}>
+                🧬 Маркеры: {geneInfo}. MTHFR → метилфолат/B2/гомоцистеин; HFE → железо исключено. Спросите анализ при сомнениях — не диагноз.
+              </div>
+            )}
           </div>
         );
       })()}
