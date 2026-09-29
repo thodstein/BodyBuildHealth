@@ -22,8 +22,9 @@ const BREAKFAST_STAPLE_RE = /(^|_)(oat|oats|oatmeal|oat_bran|porridge|corn_flake
 // Субпродукты — еда основных приёмов (обед/ужин), не перекуса.
 const ORGAN_MEAT_RE = /(^|_)(liver|kidney|pate|tongue|heart_tripe|brain|sweetbread)(_|$)/i;
 
-// Бобовые — полноценный приём (обед/ужин), не перекус.
-const LEGUME_RE = /(^|_)(legume|lentil|lentils|chickpea|chickpeas|bean|beans|pea|peas)(_|$)/i;
+// Бобовые (сухие/зерновые) — полноценный приём (обед/ужин), не перекус.
+// Зелёный горошек (peas_green/green_peas) — овощ, НЕ баним (он идёт в овощной пул).
+const LEGUME_RE = /(^|_)(legume|lentil|lentils|chickpea|chickpeas|bean|beans)(_|$)/i;
 
 /**
  * Допустим ли продукт в слоте. Default true (совместимость). Правила —

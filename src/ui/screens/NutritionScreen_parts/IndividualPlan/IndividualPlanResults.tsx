@@ -23,6 +23,7 @@ import { readDiaryV2 } from "../diary-storage-v2";
 import { buildDayReportPrintHtml, buildMealTimelinePrintHtml, buildRecipePlanPrintHtml, buildCoachExportHtml, shareOrCopyText, printPlanHtml, downloadCoachFile } from "./planner-day-print";
 import { buildDayBriefing } from "./planner-briefing";
 import { explainDayPlan } from "./planner-day-explain";
+import { scoreDayComposition } from "./planner-composition-quality";
 import {
   loadAbSnapshots, saveAbSnapshot, removeAbSnapshot, snapshotFromDayPlan, diffAbSnapshots,
   AB_SLOTS, type AbSlot, type AbPlanSnapshot, type AbDiffResult,
@@ -528,6 +529,7 @@ const doImportPlan = (raw: string): boolean => {
           // причины (⚠ «Не сошлось»/«Корректор…»/<60%…), компенсации (добор/дотяжка/ужатие) и
           // точечные проверки (MPS-интервалы, натрий, клетчатка).
           const ex = explainDayPlan(dayPlan as any, planTargets as any);
+          const comp = scoreDayComposition(dayPlan as any);
           // Заголовок честный: причины из notes движка («Не сошлось»/«Корректор…»/<60%)
           // важнее расчётной девиации — день мог не сойтись и без отдельной ноты.
           const bad = ex.causes.length > 0 || (ex.devPct != null && ex.devPct > ex.tolerance);
@@ -543,6 +545,16 @@ const doImportPlan = (raw: string): boolean => {
                 </div>
               )}
               {ex.headline && <div style={{ fontSize: 9, color: '#fff', marginBottom: 4 }}>{ex.headline}</div>}
+              <div data-composition={comp.grade} style={{ fontSize: 9, color: '#fff', marginBottom: 4, lineHeight: 1.4 }}>
+                🥗 Композиция: <b>{comp.score}/100</b> ({comp.grade})
+                {comp.issues.length === 0 ? ' · замечаний нет' : ` · ${comp.issues.length} замеч.`}
+                {comp.issues.length > 0 && (
+                  <div style={{ marginTop: 2 }}>
+                    {comp.issues.slice(0, 4).map((i, k) => <div key={'ci' + k} style={{ fontSize: 9, color: '#fff' }}>• {i.label} — {i.hint}</div>)}
+                  </div>
+                )}
+                {comp.positives.length > 0 && <div style={{ marginTop: 2, fontSize: 9, color: '#fff' }}>✓ {comp.positives.join(' · ')}</div>}
+              </div>
               {ex.causes.map((r, i) => (
                 <div key={'bc' + i} data-bitexplain-cause={r.id} style={{ fontSize: 9, color: '#fff', lineHeight: 1.4, marginBottom: 3 }}>
                   <span style={{ color: accent, fontWeight: 700 }}>⚠ {r.title}.</span> {r.hint}

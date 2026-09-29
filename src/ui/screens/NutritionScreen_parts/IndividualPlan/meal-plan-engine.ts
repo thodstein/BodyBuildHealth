@@ -2023,9 +2023,16 @@ function buildWholeMeal(
     // Иначе 3-й+ снеки собираются из огрызков (яйцо 50 + отруби 31).
     const _snackPoolOk = snack && _snackPools && (_pickCtx.highVolumeDay ? _snackPools.carbs.length >= 3 : _snackPools.carbs.length > 0);
     // E1: affinity — овсянка/хлопья не идут в обед/ужин, бобовые — не в перекус.
-    const carbPoolRaw = afFilterPool(_snackPoolOk
+    // Если слот-фильтр выбил весь текущий пул — расширяем его ВСЕМИ карбами дня
+    // (не возвращаем off-slot исходник: иначе овсянка просачивалась в ужин).
+    const _carbBaseRaw = _snackPoolOk
       ? (_snackPools as NonNullable<typeof _snackPools>).carbs
-      : (breakfast && _breakfastPools && _breakfastPools.carbs.length > 0) ? _breakfastPools.carbs : _carbPool, _affSlot);
+      : (breakfast && _breakfastPools && _breakfastPools.carbs.length > 0) ? _breakfastPools.carbs : _carbPool;
+    let carbPoolRaw = afFilterPool(_carbBaseRaw, _affSlot);
+    if (carbPoolRaw === _carbBaseRaw && carbPoolRaw.length > 0 && carbPoolRaw.some(f => !afAllows(f.id, _affSlot))) {
+      const _wider = afFilterPool([...pool.carbSlow, ...pool.carbFast], _affSlot);
+      if (_wider.length > 0) carbPoolRaw = _wider;
+    }
     // Сухофрукты/концентраты — только добивка, не основа (иначе 14г каши + 100г сухофруктов — пустой рацион).
     // v3: сухие стейплы (крем риса/кукурузные хлопья, STAPLE_DRY_IDS) — ОСНОВА, не добивка.
 // v3: ранжир плотности на HV — сухие стейплы первыми, дальше по удобству (угли/клетчатка).
@@ -9141,6 +9148,58 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
         recalcMealTotals(meals);
         recalcDayTotals(meals, totals);
       }
+    }
+
+    // ─── E1-финал: уборка остаточных off-slot пунктов ───
+    // Корректор/коктейль могут добавить off-slot носитель (напр. овсянку в ужин)
+    // напрямую из FOOD_DB, минуя affinity-фильтр пулов. Свопим на разрешённый
+    // продукт той же роли с близкой углеводной плотностью; только если сходимость
+    // не ухудшается (>0.5 п.п.). Граммы сохраняем.
+    {
+      try {
+        const _nrmE1 = normalizeMacroTargets(input.goalKcal, input.goalProteinG, input.goalFatG, input.goalCarbsG);
+        const _tE1 = { kcal: _nrmE1.kcal, p: _nrmE1.p, f: _nrmE1.f, c: _nrmE1.c };
+        const _devE1 = (tt: any) => Math.max(
+          (_tE1.kcal || 0) > 0 ? Math.abs(tt.kcal - _tE1.kcal) / _tE1.kcal : 0,
+          (_tE1.p || 0) > 0 ? Math.abs(tt.p - _tE1.p) / _tE1.p : 0,
+          (_tE1.f || 0) > 0 ? Math.abs(tt.f - _tE1.f) / _tE1.f : 0,
+          (_tE1.c || 0) > 0 ? Math.abs(tt.c - _tE1.c) / _tE1.c : 0,
+        );
+        const _slotE1 = (t: string): AffinitySlot => (t === 'breakfast' ? 'breakfast' : t === 'lunch' ? 'lunch' : t === 'dinner' ? 'dinner' : t === 'preworkout' ? 'preworkout' : t === 'postworkout' ? 'postworkout' : t === 'intra' ? 'intra' : t === 'presleep' ? 'presleep' : 'snack');
+        const _candsE1 = (role: string, slot: AffinitySlot, refCarbs: number): FoodItem[] => {
+          let arr: FoodItem[] = [];
+          if (role === 'carb_slow' || role === 'carb_fast') arr = [...pool.carbSlow, ...pool.carbFast];
+          else if (role === 'protein' || role === 'fast_protein') arr = [...pool.proteinLean, ...pool.proteinSolid, ...((pool as any).vegProteinExtra || [])];
+          else if (role === 'fat') arr = [...pool.fats];
+          else return [];
+          return arr.filter(f => afAllows(f.id, slot)
+            && !(combinedExcluded && combinedExcluded.has(f.id)) && foodPassesCtxAllergens(f)
+            && Math.abs((f.carbs || 0) - refCarbs) <= 15);
+        };
+        for (const m of meals) {
+          const slot = _slotE1(String(m.type || ''));
+          for (let ii = 0; ii < (m.items || []).length; ii++) {
+            const it = m.items[ii];
+            if ((it as any)._fixedGrams || afAllows(it.id, slot)) continue;
+            const ref = FOOD_DB.find(x => x.id === it.id);
+            if (!ref) continue;
+            const cands = _candsE1(String(it.role || ''), slot, ref.carbs || 0);
+            if (cands.length === 0) continue;
+            const alt = pickPriority(cands, (input.randomSalt || 0) + ii * 7 + 1, { recentIds: effRecentIds(), lockedIds: input.lockedIds });
+            if (!alt) continue;
+            const _devBefore = _devE1(totals);
+            const orig = m.items[ii];
+            m.items[ii] = makeItem(alt as any, it.amount || 0, it.role as any);
+            m.totals = mealTotalsOf(m.items);
+            recalcDayTotals(meals, totals);
+            if (_devE1(totals) > _devBefore + 0.005) {
+              m.items[ii] = orig; m.totals = mealTotalsOf(m.items); recalcDayTotals(meals, totals);
+            } else {
+              notes.push(`🔀 «${m.label || m.type}»: ${it.id} → ${alt.id} (слот-пригодность)`);
+            }
+          }
+        }
+      } catch { /* уборка off-slot — best-effort */ }
     }
 
     // ─── E3 (анти-фрагментация): ОТЛОЖЕНО ───
