@@ -9339,6 +9339,22 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
       let _reconApplied = false;
       if (_preRecon > PLANNER_CONVERGENCE_PCT / 100 + 1e-9 && !_reconSkip) {
         try {
+          // E10: комнаты роста по дневным катчелл-капам. Раньше орехи/семена были
+          // «НЕ растим» (blanket-запрет) — на малых КБЖУ жировая ось дня не закрывалась
+          // (в дне нет масла, а орехи 10–15 г при капе ~70 г). Теперь комната дня
+          // делится на число позиций семейства: сумма роста ≤ кап − использовано
+          // (гарантия реализма «орехи ≤ катчелл-потолка» цела).
+          const _wsRecon = quotaWeightScale(input.weightKg);
+          const _nutCapRecon = nutCatchupCap(_wsRecon);
+          let _nutUsedRecon = 0; let _normNutItems = 0;
+          for (const _m of meals) for (const _it of _m.items) {
+            const _fam = stapleFamilyOf(_it.id || '');
+            if (_fam === 'nuts' || _fam === 'seeds') {
+              _nutUsedRecon += _it.amount || 0;
+              if (_it.role === 'fat' && !((_it as any)._fixedGrams) && (_it.amount || 0) > 0) _normNutItems++;
+            }
+          }
+          const _nutRoomPerItem = _normNutItems > 0 ? Math.max(0, _nutCapRecon - _nutUsedRecon) / _normNutItems : 0;
           const _rec = reconcileDay(meals as any, _reconTargets, {
             protectTypes: ['intra'],
             snap: (it: any, g: number) => {
@@ -9353,9 +9369,9 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
             growCap: (it: any, role: string) => {
               const fam = stapleFamilyOf(it.id || '');
               if (role === 'fat') {
-                // Орехи/семена — дневной катчелл-кап, НЕ растим; масла можно подрастить
-                // (до капа приёма 25 г) — иначе на днях без сыра/авокадо жир-ось не закрыть.
-                if (fam === 'nuts' || fam === 'seeds') return it.amount;
+                // Орехи/семена — рост ТОЛЬКО в комнату дня (кап − уже съеденное),
+                // масла — до капа приёма 25 г.
+                if (fam === 'nuts' || fam === 'seeds') return it.amount + _nutRoomPerItem;
                 if (fam === 'oils') return Math.min(30, it.amount * 1.6);
               }
               // Яйца — дневной катчелл-кап (275 г «растить» нельзя).

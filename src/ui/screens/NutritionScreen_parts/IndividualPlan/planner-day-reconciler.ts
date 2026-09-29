@@ -9,6 +9,12 @@
  * peri-окна уколов, добавки/жидкости/овощи/фрукты; цельный белок основных
  * приёмов не уходит ниже стража реалистичности (75 г по умолчанию).
  *
+ * E10 (аудит-2, малые атлеты): (а) pre-sleep slow_protein тоже «крутилка» —
+ * иначе белок выше пола нечем срезать; (б) ПАРНЫЙ ход «срез переполненной оси →
+ * рост недобранной» — одиночный жадный застревает на сцепленных осях (рост
+ * углеводов тянет белок, срез белка роняет жир); (в) окно роста углеводов ×2.5
+ * (верх всё равно ограничен growCap движка). Функция остаётся детерминированной.
+ *
  * Чистая функция: не знает FOOD_DB; снап-функция порций передаётся снаружи
  * (по умолчанию — грубая сетка 5 г). Ничего не мутирует (работает по копиям).
  */
@@ -57,7 +63,7 @@ export interface ReconResult {
   debugInfo?: string;
 }
 
-const KNOB_ROLES = new Set(['protein', 'fast_protein', 'carb_slow', 'carb_fast', 'fat']);
+const KNOB_ROLES = new Set(['protein', 'fast_protein', 'slow_protein', 'carb_slow', 'carb_fast', 'fat']);
 
 /** Нижний пол белка по типу приёма (граммы). Peri/pre-sleep можно подрезать —
  *  иначе белок трен-дня всегда «в плюс» (peri 20/28/28 = 76 г) и день не сходится.
@@ -149,11 +155,13 @@ export function reconcileDay(mealsIn: ReconMeal[], targets: ReconTargets, opts?:
       if (!(it.amount > 0)) return;
       let lo: number; let hi: number;
       const _growCap = opts?.growCap ? opts.growCap(it, role) : Infinity;
-      if (role === 'protein' || role === 'fast_protein') {
+      if (role === 'protein' || role === 'fast_protein' || role === 'slow_protein') {
         // Пол белка: у ОСНОВНЫХ приёмов — в граммах ЕДЫ (страж реализма тарелки),
         // у peri/pre-sleep/перекуса — в граммах БЕЛКА (переводим в еду по плотности;
         // раньше единицы путались и пол был бессмысленным). Рост разрешён при
         // недоборе белка дня, но белок приёма не превысит mealProteinCap (≤60 г).
+        // E10: slow_protein (казеин/творог pre-sleep) — тоже регулируемый белок:
+        // на малых КБЖУ это единственная позиция белка выше пола, без неё день не сходится.
         const _mt = String(m.type || '');
         const _isPeri = _mt === 'preworkout' || _mt === 'postworkout' || _mt === 'presleep';
         const _floor = proteinFloorByType(_mt, mainProteinFloor, it.amount, opts?.lbmKg ?? 0);
@@ -167,8 +175,12 @@ export function reconcileDay(mealsIn: ReconMeal[], targets: ReconTargets, opts?:
         const hiByMeal = pPerG > 0 ? it.amount + roomP / pPerG : it.amount;
         hi = Math.min(Math.max(it.amount, hiByMeal), it.amount * 1.5, _growCap);
       } else if (role === 'carb_slow' || role === 'carb_fast') {
+        // E10: на малых КБЖУ углеводный носитель приёма нередко стартует с 30–50 г —
+        // прежнее окно ×1.6 (50→80 г) физически не закрывало углеводную ось дня.
+        // Верхний предел человеческой порции всё равно задаёт growCap (съедобность
+        // продукта/кап пункта), поэтому окно расширено до ×2.5.
         lo = Math.min(it.amount, 30);
-        hi = Math.min(it.amount * 1.6, _growCap);
+        hi = Math.min(it.amount * 2.5, _growCap);
       } else { // fat — срез до 5 г (не в ноль: «chia 0 г» — мусор) и рост в пределах капа
         lo = Math.min(it.amount, 5);
         hi = Math.min(it.amount * 1.6, _growCap);
@@ -236,6 +248,52 @@ export function reconcileDay(mealsIn: ReconMeal[], targets: ReconTargets, opts?:
           evalAmount(k, localBestV);
           bestDev = localBestDev; bestAbs = localBestAbs; improved = true;
         }
+      }
+    }
+
+    // ─── E10: ПАРНЫЙ ОБМЕН (срез переполненной оси → рост недобранной) ────────
+    // Жадный одиночный шаг застревает, когда оси «сцеплены»: рост углеводов любой
+    // крупой тянет белок (у малых атлетов он уже в переборе из-за полов peri/pre-sleep),
+    // а срез белка роняет жир. Совместный шаг «белок/жир вниз + углевод/жир вверх»
+    // решает это в одном принятии. Только если одиночные шаги не дали улучшения.
+    if (!improved) {
+      const shrinkables = knobs.filter(k => {
+        const r = String(meals[k.mi].items[k.ii].role || '');
+        return (r === 'protein' || r === 'fast_protein' || r === 'slow_protein' || r === 'fat') && k.lo < meals[k.mi].items[k.ii].amount - 2;
+      });
+      const growables = knobs.filter(k => k.hi > meals[k.mi].items[k.ii].amount + 2);
+      let pairBestDev = bestDev; let pairBestAbs = bestAbs;
+      let pairBest: { k1: Knob; v1: number; k2: Knob; v2: number } | null = null;
+      for (const k1 of shrinkables) {
+        const it1 = meals[k1.mi].items[k1.ii];
+        const cur1 = it1.amount;
+        const o1 = { p: it1.p, f: it1.f, c: it1.c, kcal: it1.kcal, fiber: it1.fiber, leucine_mg: it1.leucine_mg, amount: it1.amount };
+        const v1s = [snapV(k1, k1.lo), snapV(k1, (cur1 + k1.lo) / 2)];
+        for (const k2 of growables) {
+          if (k2.mi === k1.mi && k2.ii === k1.ii) continue;
+          const it2 = meals[k2.mi].items[k2.ii];
+          const cur2 = it2.amount;
+          const o2 = { p: it2.p, f: it2.f, c: it2.c, kcal: it2.kcal, fiber: it2.fiber, leucine_mg: it2.leucine_mg, amount: it2.amount };
+          const v2s = [snapV(k2, k2.hi), snapV(k2, (cur2 + k2.hi) / 2)];
+          for (const v1 of v1s) {
+            if (!(v1 < cur1 - 1)) continue;
+            for (const v2 of v2s) {
+              if (!(v2 > cur2 + 1)) continue;
+              evalAmount(k1, v1); evalAmount(k2, v2);
+              const tot = sumDay(meals);
+              const d = reconMaxDev(tot, targets);
+              const a = absDev(tot, targets);
+              const better = d < pairBestDev - 1e-9 || (Math.abs(d - pairBestDev) <= 1e-9 && a < pairBestAbs - 1e-9);
+              if (better) { pairBestDev = d; pairBestAbs = a; pairBest = { k1, v1, k2, v2 }; }
+              Object.assign(it1, o1); Object.assign(it2, o2);
+            }
+          }
+        }
+      }
+      if (pairBest) {
+        evalAmount(pairBest.k1, pairBest.v1);
+        evalAmount(pairBest.k2, pairBest.v2);
+        bestDev = pairBestDev; bestAbs = pairBestAbs; improved = true;
       }
     }
     if (!improved) break;
