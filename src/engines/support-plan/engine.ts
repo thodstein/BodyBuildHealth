@@ -823,6 +823,8 @@ export function hydrateState(): Partial<CalculatorState> {
       if (s.injection) result.injection = s.injection;
       if (s.journal) result.journal = s.journal;
       if (s.labs) result.labs = s.labs;
+      // Опции подбора (opt-in): без восстановления опции умирали при каждом перемонте
+      if (s.options) result.options = s.options;
     }
   } catch {}
   try {
