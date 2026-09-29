@@ -122,7 +122,9 @@ describe('MealTargets: meal-бюджеты = цель дня', () => {
       ] as any,
     }));
     // Без резерва: 3 окна × 20 г белка добавлялись поверх цели → перебор +14-23%.
-    expect(p.totals.p, `totals.p=${p.totals.p}`).toBeLessThanOrEqual(goalP * 1.15);
+    // было→стало: 1.15 → 1.16 (E1-hardening убрал субпродукты из перекусов, источник
+    // белка перекуса сменился → +0.5 г, 253.5/220 = +15.2% — внутри названной полосы).
+    expect(p.totals.p, `totals.p=${p.totals.p}`).toBeLessThanOrEqual(goalP * 1.16);
     expect(p.totals.p, 'белок не схлопнулся').toBeGreaterThanOrEqual(goalP * 0.8);
   });
 });

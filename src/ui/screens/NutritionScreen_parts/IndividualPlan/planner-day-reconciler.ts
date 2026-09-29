@@ -98,7 +98,10 @@ function absDev(total: ReconTargets, target: ReconTargets): number {
     + Math.abs(total.c - target.c) / Math.max(1, target.c);
 }
 
-function rescaleItem(it: ReconItem, newAmount: number): void {
+function rescaleItem(it: ReconItem, newAmountRaw: number): void {
+  // Порции — ВСЕГДА целые граммы (инвариант P2-2; снап-функция может дать дробь,
+  // напр. масло 17.6 г). Крахмалы/белки движок и так держит целыми.
+  const newAmount = Math.max(0, Math.round(newAmountRaw));
   const r = newAmount / Math.max(1e-6, it.amount || 0);
   it.p = +(it.p * r).toFixed(1);
   it.f = +(it.f * r).toFixed(1);

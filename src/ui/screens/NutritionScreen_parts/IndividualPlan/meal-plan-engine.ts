@@ -1894,7 +1894,7 @@ function buildWholeMeal(
   const _preferredForThis = (breakfast ? preferredRot.filter(f => isBreakfastProtein(f)) : preferredRot).filter(f => afAllows(f.id, _affSlot));
   const proteinPool = _preferredForThis.length > 0
     ? _preferredForThis
-    : snack && pool.fastProtein.length > 0 ? [...pool.fastProtein, ..._snackRotPool]
+    : snack && pool.fastProtein.length > 0 ? afFilterPool([...pool.fastProtein, ..._snackRotPool], 'snack')
     : breakfast && _breakfastProtein && _breakfastProtein.length > 0 ? _breakfastProtein
     : breakfast && _breakfastFallbackProtein.length > 0 ? _breakfastFallbackProtein
     : breakfast && preferredRot.length > 0 ? preferredRot
@@ -9142,6 +9142,12 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
         recalcDayTotals(meals, totals);
       }
     }
+
+    // ─── E3 (анти-фрагментация): ОТЛОЖЕНО ───
+    // Полная консолидация крошечных основных приёмов (перенос калорий между приёмами)
+    // затрагивает калиброванные инварианты (per-meal GL, белковые капы болюс-дней) —
+    // см. docs/NUTRITION-PLANNER-PRO-PLAN §3 E3. Текущий движок держит крошки ≥100 ккал
+    // (аудит-фрагмент 124 закрыт общим пайплайном); lock — planner-fragment-guard.
 
     // ─── E0: финальный reconciliation-pass продуктового дня (сходимость ≤3%) ───
     // После ВСЕХ писателей (recalcDayTotals/P5b/капы/микро) двигаем граммы
