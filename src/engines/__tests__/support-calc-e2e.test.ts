@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { calculateSupportTZ } from '../support-plan/engine';
 import { runSupportUnified } from '../support-plan/index';
+import type { CalculatorState } from '../support-plan/types';
 import { buildMapperCtx } from '../support-plan/mapper-ctx';
 import { resolvePlan, isDoctorControlled } from '../tz-mapper-engine';
 import { buildTzInput, buildTzInputCore } from '../support-plan/engine-helpers';
@@ -12,12 +13,12 @@ import { getSubstanceMonitoring } from '../../data/substance-monitoring-db';
 import { findSeparationRules } from '../../data/separation-timing-db';
 import { DEFAULT_STATE } from '../../ui/screens/Calculator/Calc.types';
 
-function stateWith(ids: string[], overrides: any = {}) {
+function stateWith(ids: string[], overrides: Partial<CalculatorState> = {}) {
   return {
     ...DEFAULT_STATE,
     pharma: { ...DEFAULT_STATE.pharma, phase: 'course', aas: ids.map(id => ({ id, doseMgWeek: 500, weeks: 12 })) },
     ...overrides,
-  };
+  } as CalculatorState;
 }
 
 describe('support calc E2E — критический сценарий: test 500 + tren 400 + nand 300', () => {

@@ -19,8 +19,7 @@ import { STACK_BOOSTER_TRIGGERS, buildGapFillSuggestions, megaEnhance, type Mega
 import { computeResidualRisk, type PedRiskAssessment } from '../../../engines/ped-risk-matrix';
 import { buildMapperCtx, labSliceToValues } from '../../../engines/support-plan/mapper-ctx';
 import { SUPPORT_CATALOG_DATA } from '../../../data/support-catalog-data';
-import { registerCatalogExtras } from '../../../data/support-catalog-extras';
-registerCatalogExtras(SUPPORT_CATALOG_DATA);
+import '../../../data/support-catalog-init';
 import { SafetyGuardrails, SafetyConflicts, SafetyProcedures, SafetyAssayWarnings, SafetyGaps, SafetyLabFindings, SafetyCumulativeLoad, SafetyPillBurden, SafetyPedEscalation, SafetyInjections } from './CalcSafetyLayer';
 import { CalcSystemPanel, SYSTEM_PANELS, SYSTEM_TO_PANEL } from './CalcSystemPanel';
 import { DEFAULT_DOSAGES } from '../../../data/support-meta';
@@ -1418,7 +1417,8 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
               const lifestyle = s.lifestyle || {};
               const health = s.health || {};
               const pharma = s.pharma || {};
-              const phaseMap: Record<string, string> = { baseline: 'base', course: 'course', bridge: 'bridge', pct: 'pct', post_pct: 'pct', fertility: 'base' };
+              // fertility → 'fertility' (было: 'base' — см. hydrateState engine.ts)
+              const phaseMap: Record<string, string> = { baseline: 'base', course: 'course', bridge: 'bridge', pct: 'pct', post_pct: 'pct', fertility: 'fertility' };
               const aas = Array.isArray(pharma.currentSubstances) ? pharma.currentSubstances.map((sub: any) => ({
                 id: sub.id || sub.substanceId || '',
                 mgPerWeek: sub.doseMgWeek || sub.weeklyDose || sub.doseMg || 0,

@@ -3135,6 +3135,8 @@ export const DEFAULT_DOSAGES: Record<string, SubstanceDosage> = {
   // ── Женский слой (FEMALE_AAS_PROTOCOLS §5.1; female-support-layer) ──
   vitex: { mg: 30, timing: 'утром (D2-агонист, контроль PRL)' },
   inositol: { mg: 3000, timing: '2 г 2×/д с едой (мио-инозитол)' },
+  // Активная форма B6 (пиридоксаль-5-фосфат); >100 мг/сут — риск нейропатии (как B6)
+  p5p: { mg: 50, timing: 'утром, с едой' },
   // ── Tier-system препараты (v4) ──
   niacin: { mg: 500, timing: 'на ночь (с едой, ↑ постепенно)' },
   phosphatidylserine: { mg: 300, timing: 'с едой' },

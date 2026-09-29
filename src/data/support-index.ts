@@ -1,3 +1,6 @@
+// Единая инициализация: полный каталог (base → supplement → автогенерация)
+// ДО построения обратных индексов — иначе индексы видят частичный каталог.
+import './support-catalog-init';
 import { SUPPORT_CATALOG_DATA as SUPPORT_CATALOG } from './support-catalog-data';
 import { LAB_MARKER_MAP } from './lab-marker-map';
 import { normalizeMechanisms } from '../engines/biostack-mechanism-normalizer';

@@ -6,6 +6,9 @@
 //    const dose = getProtocolDose('telmisartan', 'Cardio_Phase2');
 //  ════════════════════════════════════════════════════════════════════════════
 
+// Канонизация id алиасов (telmi→telmisartan, udca→tudca…) — модуль чистый, без циклов.
+import { canonId } from '../engines/support-plan/shared-constants';
+
 export interface DosingRecord {
   id: string;
   name: string;
@@ -109,6 +112,20 @@ export const SUPPORT_DOSING: Record<string, DosingRecord> = {
     warnings: ['statin_myopathy_risk', 'avoid_with_statin', 'hepatotoxicity', 'not_a_ladder_step_no_cv_benefit', 'citrinin_free_only', 'coq10_mandatory', 'ck_alt_monitoring'],
     evidenceLevel: 'C',
     lastUpdated: '2024-07-19',
+    protocolRefs: ['Cardio_Phase2'],
+    riskThresholdKey: 'red_yeast_rice',
+  },
+  // C4 (audit): канонический id (canonId('red_yeast_rice') → 'red_yeast' — так вещество
+  // лежит в SUPPLEMENTS_DB). Легаси-ключ выше сохранён для совместимости.
+  red_yeast: {
+    id: 'red_yeast', name: 'Red Yeast Rice', nameRu: 'Красный дрожжевой рис',
+    category: 'supplement',
+    doseRange: { min: 1200, max: 2400, unit: 'mg', frequency: 'daily' },
+    indications: ['dyslipidemia', 'ldl_reduction', 'statin_alternative'],
+    mechanisms: ['HMG_COA_INHIBITION', 'STATIN_LIKE'],
+    warnings: ['statin_myopathy_risk', 'avoid_with_statin', 'hepatotoxicity', 'not_a_ladder_step_no_cv_benefit', 'citrinin_free_only', 'coq10_mandatory', 'ck_alt_monitoring'],
+    evidenceLevel: 'C',
+    lastUpdated: '2026-09-28',
     protocolRefs: ['Cardio_Phase2'],
     riskThresholdKey: 'red_yeast_rice',
   },
@@ -811,6 +828,18 @@ export const SUPPORT_DOSING: Record<string, DosingRecord> = {
     lastUpdated: '2024-07-19',
     protocolRefs: ['Metabolic_Phase1'],
   },
+  // C4 (audit): канонический id из SUPPLEMENTS_DB (легаси-ключ b_complex выше сохранён)
+  vitamin_b_complex: {
+    id: 'vitamin_b_complex', name: 'B-Complex', nameRu: 'Витамины группы B (комплекс)',
+    category: 'vitamin',
+    doseRange: { min: 1, max: 1, unit: 'capsule', frequency: 'daily_morning' },
+    indications: ['methylation', 'energy_metabolism', 'homocysteine_lowering'],
+    mechanisms: ['METHYLATION', 'ONE_CARBON_METABOLISM', 'HOMOCYSTEINE_REDUCTION'],
+    warnings: ['urine_discoloration_normal'],
+    evidenceLevel: 'A',
+    lastUpdated: '2026-09-28',
+    protocolRefs: ['Metabolic_Phase1'],
+  },
   // ════════════════════════════════════════════════════════════════════════════
   //  ЭТАП 3: Вещества из ТЗ «Нейротоксичность ААС» + «Суставы.txt»
   // ════════════════════════════════════════════════════════════════════════════
@@ -1045,7 +1074,11 @@ export const SUPPORT_DOSING: Record<string, DosingRecord> = {
 // ════════════════════════════════════════════════════════════════════════════
 
 export function getDosingRecord(id: string): DosingRecord | undefined {
-  return SUPPORT_DOSING[id.toLowerCase()];
+  const k = String(id || '').toLowerCase();
+  // Канонизация id: алиасы (telmi→telmisartan, udca→tudca…) хранят дозу
+  // под каноническим id — без канонизации запись не находилась.
+  const cid = canonId(k);
+  return SUPPORT_DOSING[cid] || SUPPORT_DOSING[k];
 }
 
 export function getProtocolDose(id: string, protocolPhase: string): string {

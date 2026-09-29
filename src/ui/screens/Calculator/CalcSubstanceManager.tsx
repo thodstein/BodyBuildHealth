@@ -5,8 +5,8 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import type { SupportRecommendation } from '../../../engines/tz-mapper-engine';
 import { SUPPORT_CATALOG_DATA } from '../../../data/support-catalog-data';
-import { registerCatalogExtras, isCatalogJunk } from '../../../data/support-catalog-extras';
-registerCatalogExtras(SUPPORT_CATALOG_DATA);
+import { isCatalogJunk } from '../../../data/support-catalog-extras';
+import '../../../data/support-catalog-init';
 import { ALL_STACKS } from '../../../data/support-stacks';
 import { DEFAULT_DOSAGES } from '../../../data/support-meta';
 import { NON_PILL_SUPPORT_IDS } from '../../../engines/support-plan/substances';

@@ -61,6 +61,7 @@ export function runSupportUnified(state: CalculatorState): PlanResult {
       labFindings: [], uncoveredMechanisms: [], coverageGaps: [], weekScale: 1,
       stackRecommendations: [], conflicts: [], riskBreakdown: {},
       pillBurden: { totalSubstances: 0, estimatedPillsPerDay: 0, morningPills: 0, afternoonPills: 0, eveningPills: 0, feasibility: 'unknown', message: 'Ошибка расчёта' },
+      error: 'Ошибка расчёта поддержки: ' + (err?.message || 'неизвестная'),
     };
   }
 }

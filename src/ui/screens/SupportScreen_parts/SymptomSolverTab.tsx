@@ -23,6 +23,7 @@ import {
   type SelectedSymptom,
 } from '../../../engines/symptom-priority-engine';
 import { SUPPORT_CATALOG_DATA } from '../../../data/support-catalog-data';
+import '../../../data/support-catalog-init';
 import { getSymptomHistory, getSymptomChartData } from '../../../engines/symptom-diary.engine';
 import { linkSymptomsToLabs } from '../../../engines/symptom-lab-link';
 import {

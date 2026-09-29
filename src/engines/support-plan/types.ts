@@ -8,6 +8,7 @@ import { SUPPORT_CATALOG_DATA, DEFAULT_DOSAGES } from '../../data/support-databa
 import type { SupportCatalogEntry } from '../../data/support-catalog-data';
 import type { SupportStack } from '../../data/support-stacks-types';
 import type { TzSpecResult } from '../risk-engine-tz-spec';
+import { canonId } from './shared-constants';
 // 26 сен 2026 (E0.1/E0.2): лимиты нутриентов — единственный источник `support-limits`.
 import { NUTRIENT_LIMITS_V2, resolveNutrient } from '../support-limits';
 
@@ -16,7 +17,9 @@ import { NUTRIENT_LIMITS_V2, resolveNutrient } from '../support-limits';
 // ═══════════════════════════════════════════════════════════════
 
 export type Sex = 'male' | 'female';
-export type CoursePhase = 'course' | 'bridge' | 'pct' | 'base';
+// 'trt'/'fertility' — значения, которые пишет UI-селектор фаз (AutoCalculator);
+// 'base' — легаси-псевдоним TRT из hydrateState (профиль 'baseline' → 'base').
+export type CoursePhase = 'course' | 'bridge' | 'pct' | 'base' | 'trt' | 'fertility';
 export type PowerLevel = 'basic' | 'mid' | 'max' | 'boost';
 
 // ─── Block 1: User Profile ───
@@ -389,6 +392,8 @@ export interface PlanResult {
   /** Mandatory-назначения (hCG, AI, caber, TUDCA, NAC и т.д.) */
   phaseAssignedDrugs?: Array<{ id: string; reason: string; trigger: string; category: string }>;
   protocolWarnings?: string[];
+  /** D1 (audit): ошибка расчёта — честный сигнал для UI (тост/баннер), не только console.error. */
+  error?: string;
 }
 
 export interface LabFindingSub {
@@ -473,7 +478,10 @@ export function catalogEntry(id: string): SupportCatalogEntry | null {
 }
 
 export function defaultDosage(id: string): { mg: number; timing: string } | undefined {
-  return DEFAULT_DOSAGES[id];
+  // Канонизация id: алиасы (telmi→telmisartan, udca→tudca, l_theanine→theanine…)
+  // хранят дозу под каноническим id — без канонизации доза терялась.
+  const cid = canonId(id);
+  return DEFAULT_DOSAGES[cid] || DEFAULT_DOSAGES[id];
 }
 
 // ═══════════════════════════════════════════════════════════════

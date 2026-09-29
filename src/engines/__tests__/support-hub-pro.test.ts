@@ -41,8 +41,8 @@ describe('P1 честная био-таблица', () => {
 });
 
 describe('P2 единое окно дозы', () => {
-  const therapeutic: any = { mg: { minMg: 200, optMg: 400, maxMg: 600, ul: 350, note: 'Mg' } };
-  const ranges: any = { creatine: { therMin: 3000, therMax: 5000, label: 'Креатин' } };
+  const therapeutic = { mg: { minMg: 200, optMg: 400, maxMg: 600, ul: 350, note: 'Mg' } } as Record<string, { minMg: number; optMg: number; maxMg: number; ul: number; note: string }>;
+  const ranges = { creatine: { therMin: 3000, therMax: 5000, label: 'Креатин' } } as Record<string, { therMin: number; therMax: number; label: string }>;
   it('прямое окно приоритетнее ranges', () => {
     const w = doseWindowFor('magnesium_glycinate', therapeutic, ranges);
     expect(w.hasData).toBe(true);

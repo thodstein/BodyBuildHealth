@@ -56,16 +56,20 @@ export function buildMapperCtx(
   manualChoices?: { addSubs?: string[]; removeSubs?: string[]; explicitCategories?: any[] },
   stackTriggers?: string[],
 ): MapperCtx {
+  // Фазы UI (AutoCalculator): course/bridge/pct/fertility/trt; 'base' — легаси-псевдоним TRT.
+  // Было: fertility и trt проваливались в 'course' — пользователи получали курсовый
+  // протокол (T-бустеры подавлены, hCG 500 МЕ) вместо фазовых протоколов движка.
   const phaseKey = (state.pharma.phase === 'bridge' ? 'bridge'
     : state.pharma.phase === 'pct' ? 'pct'
-    : state.pharma.phase === 'base' ? 'trt'
+    : state.pharma.phase === 'fertility' ? 'fertility'
+    : (state.pharma.phase === 'base' || state.pharma.phase === 'trt') ? 'trt'
     : 'course') as PhaseKey;
   const phaseCtx: PhaseContext = {
     usingAAS: state.pharma.aas.length > 0,
     usingBridgeAAS: state.pharma.aas.length > 0 && state.pharma.phase === 'bridge',
     explicitPhase: phaseKey,
     onPCTDrug: state.pharma.phase === 'pct',
-    inFertilityProgram: false,
+    inFertilityProgram: state.pharma.phase === 'fertility',
   };
   const labs = labSliceToValues(state.labs.fullPanel);
   const pedDoses = (Array.isArray(state.pharma?.aas) ? state.pharma.aas : [])

@@ -588,7 +588,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab; initialSubTab?: 
       planRes = runSupportUnified(normalizeCalculatorState(state));
     } catch (e) {
       console.error('runSupportUnified in useMemo threw:', e);
-      planRes = { substances: [], dosages: {}, schedule: [], systems: {}, mechanisms: [], coveragePercent: 0, synergyComment: '', monitoring: [], specialInstructions: [], riskDynamics: [], overallRiskBefore: 50, overallRiskAfter: 50, labFindings: [], uncoveredMechanisms: [], coverageGaps: [], weekScale: 1, stackRecommendations: [], conflicts: [], riskBreakdown: {}, pillBurden: { totalSubstances: 0, estimatedPillsPerDay: 0, morningPills: 0, afternoonPills: 0, eveningPills: 0, feasibility: 'unknown', message: 'Ошибка расчёта' } } as PlanResult;
+      planRes = { substances: [], dosages: {}, schedule: [], systems: {}, mechanisms: [], coveragePercent: 0, synergyComment: '', monitoring: [], specialInstructions: [], riskDynamics: [], overallRiskBefore: 50, overallRiskAfter: 50, labFindings: [], uncoveredMechanisms: [], coverageGaps: [], weekScale: 1, stackRecommendations: [], conflicts: [], riskBreakdown: {}, pillBurden: { totalSubstances: 0, estimatedPillsPerDay: 0, morningPills: 0, afternoonPills: 0, eveningPills: 0, feasibility: 'unknown', message: 'Ошибка расчёта' }, error: 'Ошибка расчёта поддержки: ' + ((e as Error)?.message || 'неизвестная') } as PlanResult;
     }
     // subs + dosages из единого результата (с dedup)
     const subs: string[] = [...new Set(planRes.substances.map(p => p.id))];
@@ -622,6 +622,10 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab; initialSubTab?: 
   useEffect(() => {
     if (!effectiveLevel?.planRes) return;
     setPlanResult(effectiveLevel.planRes);
+    try {
+      // D1 (audit): ошибка расчёта — видима пользователю (тост), а не только console.error.
+      if ((effectiveLevel.planRes as any).error) showToast(`⚠ ${(effectiveLevel.planRes as any).error}`, 'error');
+    } catch {}
     try {
       const boostSubs = effectiveLevel.planRes.substances.filter((p: any) => p.fromBoost);
       const jointSubs = effectiveLevel.planRes.substances.filter((p: any) => p.fromJoint);

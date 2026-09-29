@@ -1246,6 +1246,72 @@ const SUPPLEMENT: Record<string, any> = {
     analog:['casein','plant_protein','collagen','eggs_protein'],
   },
 
+  // ── C2 (audit): реально выдаваемые вещества с тонкой автозаписью — полные данные ──
+  // Список из сканера выдач (20 профилей, docs/SUPPORT-CALCULATOR-PRO-AUDIT.md §5 C1):
+  // p5p, tadalafil, niacin. (vitex уже имел богатую запись выше — в пробе-1 без шарда
+  // он был ложноположительным «тонким».) Остальной тонкий хвост планом не выдаётся.
+  p5p: {
+    id:'p5p', name:'P5P (Pyridoxal-5-Phosphate)', nameRu:'P5P (пиридоксаль-5-фосфат)',
+    tier:'standard', category:['vitamin','neuroprotector'],
+    forms:[{ id:'p5p', name:'P5P 50 мг', nameRu:'P5P 50 мг', dose:'50 мг утром, с едой', best:true }],
+    organs:['BRAIN','NERVES','BLOOD'],
+    systems:['cns','hematologic'],
+    mechanisms:['GABA_SYNTHESIS','SEROTONIN_SYNTHESIS','NEUROTRANSMITTER_SYNTHESIS','HEME_SYNTHESIS'],
+    description:'Активная (коферментная) форма витамина B6 — не требует печёночной конверсии из пиридоксина. Кофактор синтеза дофамина, серотонина, ГАМК и гема. На курсе ААС поддерживает нейротрансмиссию при стресс-нагрузке; при повышенном пролактине — софты-позиция вместе с витексом.',
+    synergies:[
+      { with:'magnesium', effect:'ГАМК-ергика и сон', mechanism:'P5P — кофактор глутаматдекарбоксилазы (GABA), Mg закрывает NMDA', severity:'MEDIUM' },
+      { with:'zinc', effect:'Синтез нейротрансмиттеров', mechanism:'Zn-кофактор витамин-B6-зависимых энзимов', severity:'LOW' },
+    ],
+    conflicts:[
+      { with:'l_dopa', effect:'↓ эффективности леводопы (без карбидопы)', mechanism:'Периферийная декарбоксилаза активируется B6 — леводопа конвертируется до ЦНС', severity:'MEDIUM' },
+    ],
+    monitoring:[{ what:'Симптомы периферической нейропатии', when:'при >100 мг/сут длительно', targetRange:'≤100 мг/сут эквивалент B6' }],
+    contraindications:['Индивидуальная гиперчувствительность'],
+    sideEffects:['При >100 мг/сут длительно — сенсорная нейропатия','Тошнота (натощак)'],
+    dosage:{ mg:50, timing:'утром, с едой' }, bestForCourse:false,
+  },
+  tadalafil: {
+    id:'tadalafil', name:'Tadalafil', nameRu:'Тадалафил',
+    tier:'specialty', category:['pharma','cardioprotector'],
+    forms:[{ id:'tadalafil', name:'Tadalafil 5 мг', nameRu:'Тадалафил 5 мг/сут', dose:'5 мг утром', best:true }],
+    organs:['HEART','PENIS','PROSTATE','ENDOTHELIUM'],
+    systems:['cardio','reproductive'],
+    mechanisms:['PDE5_INHIBITION','NO_SIGNALING','ENDOTHELIAL_FUNCTION','BPH_RELAXATION'],
+    description:'Ингибитор ФДЭ-5 длительного действия: ↑ цГМФ в гладкомышечных клетках — вазодилатация, улучшение эндотелиальной функции, ↓АД лёгочного русла. Кардио-контур курса (cv-профиль): эндотелиальная поддержка + урологический бонус (простата). Кровоток к мышцам — вторичный эффект, не основное показание.',
+    synergies:[
+      { with:'telmisartan', effect:'Эндотелий + АД', mechanism:'АРБ (AT1) + NO/цГМФ — комплементарные пути вазодилатации', severity:'MEDIUM' },
+      { with:'citrulline', effect:'Субстрат NO', mechanism:'Цитруллин → аргинин → NO + PDE5i удерживает цГМФ', severity:'LOW' },
+    ],
+    conflicts:[
+      { with:'nitrates', effect:'⛔ Абсолютное: гипотензия-коллапс', mechanism:'Нитраты тоже ↑ цГМФ через NO — синергизм опасен', severity:'HIGH' },
+      { with:'alpha_blockers', effect:'Ортостатическая гипотензия', mechanism:'Суммация вазодилатации; разнесение приёма', severity:'MEDIUM' },
+    ],
+    monitoring:[{ what:'АД, ортостатика', when:'Каждые 4 нед', targetRange:'≥90/60' }],
+    contraindications:['Нитраты (абсолютно)','Тяжёлая гипотензия','Недавний ИМ/инсульт','Нестабильная стенокардия'],
+    sideEffects:['Головная боль','Миалгия/боль в спине','Гипотензия','Редко — НАИОН (передний ишемический нейропатий зрительного нерва)'],
+    dosage:{ mg:5, timing:'утро (PDE5i, простата)' }, bestForCourse:true,
+  },
+  niacin: {
+    id:'niacin', name:'Niacin (Vitamin B3)', nameRu:'Ниацин (витамин B3)',
+    tier:'standard', category:['vitamin','lipid'],
+    forms:[{ id:'niacin', name:'Niacin ER 500 мг', nameRu:'Ниацин пролонг. 500 мг', dose:'500 мг на ночь, с едой', best:true }],
+    organs:['LIVER','BLOOD_VESSELS','SKIN'],
+    systems:['cardio','hepatic'],
+    mechanisms:['HDL_AUGMENTATION','TRIGLYCERIDE_REDUCTION','VLIPOPROTEIN_SUPPRESSION'],
+    description:'Витамин B3 в фармакологических дозах: ↑ ЛПВП, ↓ триглицериды. Честная оговорка: в современных РКИ (AIM-HIGH, HPS2-THRIVE) добавление ниацина к статинам НЕ улучшило кардио-исходы и ↑ побочные — роль ограниченная, у терапии липидов первичны статины/эзетимиб (уровень доказательности C).',
+    synergies:[
+      { with:'red_yeast', effect:'Липидный контур', mechanism:'Монаколин (статин-подобный) + ниацин — разные механизмы, контроля печени', severity:'MEDIUM' },
+    ],
+    conflicts:[
+      { with:'statins_high_dose', effect:'↑ миопатии', mechanism:'Аддитивный риск миопатии с статинами', severity:'MEDIUM' },
+      { with:'metformin_gf_hepatic', effect:'Печень: аддитивная нагрузка', mechanism:'Гепатотоксичность при высоких дозах ниацина', severity:'LOW' },
+    ],
+    monitoring:[{ what:'АЛТ/АСТ, глюкоза, мочевая кислота', when:'Каждые 8 нед', targetRange:'АЛТ/АСТ < 2×ВГН, глюкоза < 6.0' }],
+    contraindications:['Активная язва Ж/ДПК','Тяжёлая печёночная недостаточность','Острый приступ подагры'],
+    sideEffects:['Приливы (простагландины)','Гипергликемия','↑ мочевой кислоты','Гепатотоксичность при высоких дозах/ER-формах'],
+    dosage:{ mg:500, timing:'на ночь (с едой, ↑ постепенно)' }, bestForCourse:false,
+  },
+
 };
 
 // Append to catalog

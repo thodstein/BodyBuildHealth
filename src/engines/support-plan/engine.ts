@@ -879,7 +879,9 @@ export function hydrateState(): Partial<CalculatorState> {
       }
       // ── Pharma: из pharma.* с маппингом ──
       if (!result.pharma) {
-        const phaseMap: Record<string, string> = { baseline: 'base', course: 'course', bridge: 'bridge', pct: 'pct', post_pct: 'pct', fertility: 'base' };
+        // fertility → 'fertility' (было: 'base' — фертильность получала TRT-протокол
+        // вместо фазового протокола фертильности движка)
+        const phaseMap: Record<string, string> = { baseline: 'base', course: 'course', bridge: 'bridge', pct: 'pct', post_pct: 'pct', fertility: 'fertility' };
         // Маппинг currentSubstances → aas с поддержкой разных имён полей (doseMgWeek/weeklyDose/doseMg)
         const csAas = Array.isArray(pharma.currentSubstances) ? pharma.currentSubstances.map((s: any) => ({
           id: s.id || s.substanceId || '',

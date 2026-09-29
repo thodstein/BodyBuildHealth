@@ -1,4 +1,5 @@
 // ── Barrel: re-exports all support modules ──
+import "./support-catalog-init";
 export * from "./support-interactions-db";
 export * from "./support-category-data";
 export * from "./support-meta";

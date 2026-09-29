@@ -37,6 +37,7 @@ export function isCatalogJunk(id: string): boolean {
 import { TZ_MECH_LABELS, TZ_SYSTEM_LABELS } from './support-db';
 import { ADMINISTRATION_RULES_DB } from './administration-rules-db';
 import { DEFAULT_DOSAGES } from './support-meta';
+import { canonId } from '../engines/support-plan/shared-constants';
 
 const ADMIN_RULES_BY_ID: Record<string, { timing: string; reason: string }> = {};
 for (const r of ADMINISTRATION_RULES_DB) ADMIN_RULES_BY_ID[r.substanceId] = r;
@@ -380,8 +381,14 @@ function organOf(organId: string): string {
   return (TZ_SYSTEM_LABELS as any)[organId] || organId;
 }
 
+/** Идемпотентность: инициализация каталога выполняется ОДИН раз (см. support-catalog-init.ts).
+ *  Повторные вызовы (легаси-сайты UI, тесты) — no-op. */
+let _extrasRegistered = false;
+
 /** Полное дополнение каталога: 28 ручных + автогенерация для ВСЕХ мех-веществ. */
 export function registerCatalogExtras(cat: Record<string, any>): void {
+  if (_extrasRegistered) return;
+  _extrasRegistered = true;
   // 1) ручные богатые записи
   for (const e of CATALOG_EXTRAS) {
     if (!cat[e.id]) {
@@ -415,7 +422,9 @@ export function registerCatalogExtras(cat: Record<string, any>): void {
     const systems = Array.from(new Set(entries.map(e => e.organId)));
     const cat_ = categoryOf(id);
     const nameRu = RU_NAMES[key] || humanName(id);
-    const defaultDose = DEFAULT_DOSAGES[key] || DEFAULT_DOSAGES[id];
+    // Канонизация id: алиасы (udca→tudca, telmi→telmisartan…) хранят дозу
+    // под каноническим id — иначе автозапись остаётся без дозы.
+    const defaultDose = DEFAULT_DOSAGES[canonId(key)] || DEFAULT_DOSAGES[key] || DEFAULT_DOSAGES[id];
     const catDesc: Record<string, string> = {
       pharma: 'Рецептурный препарат — принимать только по назначению и под контролем врача.',
       vitamin: 'Витамин: применяется для профилактики/коррекции дефицитов, влияет на энергетику и метаболизм.',

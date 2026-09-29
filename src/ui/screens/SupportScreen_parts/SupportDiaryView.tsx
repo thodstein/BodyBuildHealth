@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { SUPPORT_CATALOG_DATA } from '../../../data/support-catalog-data';
+import '../../../data/support-catalog-init';
 import { getSubstanceName } from '../../../engines/stack-optimizer.engine';
 import { ComplaintsTab } from './ComplaintsTab';
 import { SupplementComplianceCard } from './SupplementComplianceCard';

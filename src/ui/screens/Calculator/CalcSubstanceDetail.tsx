@@ -4,8 +4,7 @@
 import React, { useState } from 'react';
 import type { SupportRecommendation } from '../../../engines/tz-mapper-engine';
 import { SUPPORT_CATALOG_DATA } from '../../../data/support-catalog-data';
-import { registerCatalogExtras } from '../../../data/support-catalog-extras';
-registerCatalogExtras(SUPPORT_CATALOG_DATA);
+import '../../../data/support-catalog-init';
 import { DEFAULT_DOSAGES } from '../../../data/support-meta';
 import { getSubstanceForm } from '../../../data/substance-forms';
 import { getTitrationProtocol } from '../../../data/titration-protocols';

@@ -29,8 +29,11 @@ import { PHASE_PROTOCOL, type PhaseKey } from '../tz-bridge-phase';
 
 /** Нормализация дозы по весу тела (мг → мг с учётом кг).
  *  weightNormalized = baseDose × (bodyWeight / referenceWeight)^0.75
- *  Показатель 0.75 — аллометрическое масштабирование Клейбера. */
+ *  Показатель 0.75 — аллометрическое масштабирование Клейбера.
+ *  Граничный гард: NaN/отрицательный/нулевой вес → референсная доза без масштабирования
+ *  (иначе NaN^0.75 = NaN протекал в дозу и дальше в UI). */
 export function normalizeDoseByWeight(baseDoseMg: number, bodyWeightKg: number, refWeightKg = 80): number {
+  if (!Number.isFinite(bodyWeightKg) || bodyWeightKg <= 0) return Math.round(baseDoseMg);
   const bmiFactor = Math.pow(bodyWeightKg / refWeightKg, 0.75);
   return Math.round(baseDoseMg * bmiFactor);
 }

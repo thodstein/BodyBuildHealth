@@ -4,6 +4,7 @@ import { findSymptomById } from '../../../engines/symptom-solver.engine';
 import type { SymptomEntry } from '../../../engines/symptom-solver.types';
 import { getSymptomDiaryStats, getSymptomChartData, getSymptomDiarySummary, updateSymptomToday, getSymptomDiary } from '../../../engines/symptom-diary.engine';
 import { SUPPORT_CATALOG_DATA } from '../../../data/support-catalog-data';
+import '../../../data/support-catalog-init';
 
 const SUPPORT_DIARY_KEY = 'he_support_diary';
 

@@ -113,7 +113,8 @@ export function buildSubstances(
     seen.add(id);
     seenCanon.add(cid);
     const e = catalogEntry(id);
-    const def = DEFAULT_DOSAGES[id];
+    // Канонизация: алиасы (udca→tudca, telmi→telmisartan…) хранят дозу под каноническим id.
+    const def = DEFAULT_DOSAGES[cid] || DEFAULT_DOSAGES[id];
     // Weight-based dosing
     let doseMg = def?.mg ?? e?.dosage?.mg ?? (FOUNDATION_ITEMS[cid] ? 0 : 500);
     const wbd = WEIGHT_BASED_DOSING[cid];
@@ -194,7 +195,8 @@ export function buildSchedule(
     seen.add(id);
     seenCanon.add(cid);
     const e = catalogEntry(id);
-    const def = DEFAULT_DOSAGES[id];
+    // Канонизация дозы (см. buildSubstances): алиас → канонический id.
+    const def = DEFAULT_DOSAGES[cid] || DEFAULT_DOSAGES[id];
     const foundation = FOUNDATION_ITEMS[cid];
     if (foundation) {
       blocks.morning.push({ id, name: foundation.name, dose: foundation.dose, instructions: foundation.timing });
