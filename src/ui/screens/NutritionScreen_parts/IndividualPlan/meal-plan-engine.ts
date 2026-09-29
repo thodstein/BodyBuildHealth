@@ -235,7 +235,31 @@ const PREWORKOUT_EASY_CARB_IDS = new Set([
   'rice_white', 'rice_basmati', 'bread_white', 'bread_whole_wheat', 'cream_of_rice',
   'pasta', 'potato', 'banana', 'oats', 'honey', 'jam', 'marmalade',
   'rice_cakes', 'corn_flakes', 'muesli', 'granola', 'pancakes',
+  // E2 (PRO-план §3): белый список «лёгких» углеводов для предтрена расширен
+  // (быстрый крахмал без тяжёлой клетчатки; бобовые/овощи/масла НЕ входят).
+  'rice_instant', 'white_rice', 'rice_glutinous', 'potato_boiled', 'sweet_potato',
+  'tapioca', 'semolina', 'couscous', 'bagel', 'bread_baguette', 'croissant_plain',
+  'banana_ripe', 'mango', 'grapes', 'watermelon', 'fresh_dates', 'figs',
+  'isotonic', 'dextrose', 'maltodextrin', 'amylopectin',
 ]);
+
+/** E2: предтрене-запрещённые углеводные носители (клетчатка/бобовые/овощи/масла/соусы):
+ *  замедляют gastric emptying и вызывают ЖКТ-дискомфорт в окне «−90 мин». */
+const PREWORKOUT_BANNED_TOKENS = new Set([
+  'legume', 'lentil', 'lentils', 'chickpea', 'chickpeas', 'bean', 'beans', 'pea', 'peas', 'soy', 'tofu',
+  'broccoli', 'cabbage', 'cauliflower', 'spinach', 'kale', 'zucchini', 'cucumber',
+  'tomato', 'pepper', 'veg', 'vegetable', 'greens', 'asparagus', 'celery',
+  'oil', 'sauce', 'mayo', 'mayonnaise', 'seed', 'seeds', 'nut', 'nuts',
+  'almond', 'walnut', 'flax', 'chia', 'avocado', 'olive',
+]);
+export function isPreWorkoutBannedCarb(food: FoodItem | null | undefined): boolean {
+  if (!food) return false;
+  const tokens = String(food.id || '').toLowerCase().split(/[_\s-]+/).filter(Boolean);
+  if (tokens.some(t => PREWORKOUT_BANNED_TOKENS.has(t) || PREWORKOUT_BANNED_TOKENS.has(t.replace(/s$/, '')))) return true;
+  // Масла/жиры: основная калорийность из жира, не углеводный носитель окна.
+  if ((food.fat || 0) >= 20 && (food.carbs || 0) < 20) return true;
+  return false;
+}
 
 // Fast-absorbing protein IDs for post-workout (whey, egg white, chicken breast).
 const POSTWORKOUT_FAST_PROTEIN_IDS = new Set([
@@ -273,8 +297,13 @@ export function carbTimingForTrainingDay(
 /**
  * Wave 5: Check if a food item is suitable for pre-workout (easily digestible carb).
  */
+// E2: жёсткий потолок клетчатки носителя предтрена (г/100 г). Даже «белый список»
+// (овсянка/цельнозерновой хлеб/muesli) с высокой клетчаткой в окно «−90 мин» не идёт:
+// цель — fiber приёма ≤6 г. Это делает E2-инвариант достижимым без догадок.
+const PREW_EASY_FIBER_MAX = 5;
 export function isPreWorkoutEasyCarb(food: FoodItem): boolean {
   if (!food) return false;
+  if ((food.fiber || 0) > PREW_EASY_FIBER_MAX) return false;
   if (PREWORKOUT_EASY_CARB_IDS.has(food.id)) return true;
   // Fallback: low fiber (<3g/100g) and moderate GI (40-70)
   const fiber = food.fiber || 0;
@@ -2832,10 +2861,11 @@ function buildPreWorkout(
    const safeProteinPool = leanProteinPool.length > 0 ? leanProteinPool : proteinCandidates;
    const prefProtein = preferredIds && preferredIds.size > 0 ? safeProteinPool.filter(f => preferredIds.has(f.id)) : [];
    const proteinSource = pickPriority(prefProtein.length > 0 ? prefProtein : safeProteinPool, seed, { preferredIds, recentIds: opts?.recentIds, lockedIds: opts?.lockedIds, hardRecentIds: opts?.hardRecentIds });
-    const prefCarb = preferredIds && preferredIds.size > 0 ? pool.carbSlow.filter(f => preferredIds.has(f.id)) : [];
-    const carbPoolPW = (prefCarb.length > 0 ? prefCarb : pool.carbSlow).filter(_qOk);
-    const lowFatCarbPoolPW = carbPoolPW.filter(f => (f.fat || 0) <= 2.5);
-    const carbSourcePool = lowFatCarbPoolPW.length > 0 ? lowFatCarbPoolPW : carbPoolPW;
+     const prefCarb = preferredIds && preferredIds.size > 0 ? pool.carbSlow.filter(f => preferredIds.has(f.id)) : [];
+     // E2: в предтрене жёстко исключаем бобовые/овощи/масла/соусы (off-slot + клетчатка).
+     const carbPoolPW = (prefCarb.length > 0 ? prefCarb : pool.carbSlow).filter(f => _qOk(f) && !isPreWorkoutBannedCarb(f));
+     const lowFatCarbPoolPW = carbPoolPW.filter(f => (f.fat || 0) <= 2.5);
+     const carbSourcePool = lowFatCarbPoolPW.length > 0 ? lowFatCarbPoolPW : carbPoolPW;
      const commonCarbsPW = carbSourcePool.filter(f => COMMON_CARB_IDS.has(f.id));
      // v3: на HV гречка/перловка/киноа вне и предтрена (медленные — рис/макароны/хлеб).
      const _pwPool = _pickCtx.highVolumeDay
@@ -4333,7 +4363,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   // 3. Pre-workout (если тренировка) — за 90 мин до старта ─────────────
   if (trainWindow && mealBudget.prew && input.trainStartMin) {
     const preTime = fmtTime(input.trainStartMin - 90);
-     const prew = buildPreWorkout(preTime, 'Предтрен', seedBase + 3, pool, input.budget, effectivePreferred, { lockedIds: input.lockedIds, recentIds: effRecentIds(), hardRecentIds: effHardRecentIds, quotaBlockedIds: blockedIdsForNextMeal(quota, 'preworkout'), useEasyCarbs: (input as any).carbAutoCycle }, prewCarbG, _prewP);
+     const prew = buildPreWorkout(preTime, 'Предтрен', seedBase + 3, pool, input.budget, effectivePreferred, { lockedIds: input.lockedIds, recentIds: effRecentIds(), hardRecentIds: effHardRecentIds, quotaBlockedIds: blockedIdsForNextMeal(quota, 'preworkout'), useEasyCarbs: true }, prewCarbG, _prewP);
     meals.push(prew);
     markUsed(prew);
     registerMealInQuota(quota, prew.items);
