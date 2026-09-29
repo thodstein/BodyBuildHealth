@@ -77,6 +77,22 @@ describe('E14: бюджет больших дней (M110 5000)', () => {
     expect(p.withinTolerance).toBe(false);
   });
 
+  it('500Б (большой белковый день, highVolumeDay по белку≥400): тоже в бюджете', () => {
+    // 500 г белка: dayKcal 4500 — раньше скипался и как ≥4500, и как HV; теперь
+    // проходит бюджет-reconciliation (T 9.9→4.3%, R s1 3.8→0.2%).
+    const mk500 = (over: Partial<MealPlanInput>): MealPlanInput => ({
+      weightKg: 110, lbmKg: 90, bodyFatPct: 16, sex: 'male',
+      goalKcal: 4500, goalProteinG: 500, goalFatG: 100, goalCarbsG: 400,
+      mealsCount: 5, isTrainingDay: true, trainStartMin: 1050, trainDurationMin: 90, allowIntraWorkout: true,
+      budget: 'max', dayOffset: 0, cyclePhase: 'course', variety: 'medium', eveningLowCarb: false,
+      ...over,
+    });
+    const t1 = buildDayPlan(mk500({ randomSalt: 1 }));
+    expect(devOf(t1, mk500({ randomSalt: 1 })) * 100, `T dev=${t1.deviationPct}%`).toBeLessThanOrEqual(5);
+    const r1 = buildDayPlan(mk500({ isTrainingDay: false, trainStartMin: undefined, allowIntraWorkout: false, randomSalt: 1 }));
+    expect(r1.withinTolerance, `R dev=${r1.deviationPct}%`).toBe(true);
+  });
+
   it('детерминизм большого дня', () => {
     const inp = M110({ randomSalt: 2 });
     const a = buildDayPlan(inp);
