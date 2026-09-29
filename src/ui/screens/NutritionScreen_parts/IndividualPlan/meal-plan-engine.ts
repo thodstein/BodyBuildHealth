@@ -2645,9 +2645,14 @@ function hvCarbConvSort(a: { id: string; carbs?: number; fiber?: number }, b: { 
   if (remF > 5) {
     // PRO: завтраку — сразу без наливаемых масел/сала (иначе pick заменит, но топ-ап вернёт).
     const _fatPoolBase = (snack && _snackNuts && _snackNuts.length > 0) ? _snackNuts : pool.fats;
-    const _fatPoolTyped = breakfast
+    const _fatPoolTypedRaw = breakfast
       ? _fatPoolBase.filter(f => !isBreakfastBannedFat(f.id) && !isHeavyAnimalFat(f.id))
       : _fatPoolBase.filter(f => !isHeavyAnimalFat(f.id));
+    // E4: соус/специя — только вкус, НЕ носитель калорий. Если есть настоящий жир
+    // (масло/авокадо/орехи) — соусы из пула жира убираем полностью (иначе майонез
+    // становился «жиром обеда» на 25-34 г — свалка).
+    const _fatNonCond = _fatPoolTypedRaw.filter(f => !isSauceCondimentFood(f) && !isHerbSpiceId(f.id));
+    const _fatPoolTyped = _fatNonCond.length > 0 ? _fatNonCond : _fatPoolTypedRaw;
     // §7.2-1 (пик-день, лимит клетчатки <35): жиры без клетчаточных носителей — орехи/
     // семена/авокадо несут 3-14 г клетчатки на 100 г (чиа 34!), масла/какао-масло — 0.
     const fatSourcePool = (() => {
@@ -2687,7 +2692,7 @@ function hvCarbConvSort(a: { id: string; carbs?: number; fiber?: number }, b: { 
         items.push(item); remP -= item.p; remF -= item.f; remC -= item.c;
         // Если орех закрыл лишь часть и остался жир — добиваем маслом (не орехом)
         if (isNut && remF > 5) {
-          const oilPool = pool.fats.filter(f => !isNutId(f.id) && !isHerbSpiceId(f.id) && !isHeavyAnimalFat(f.id) && !(breakfast && isBreakfastBannedFat(f.id)));
+          const oilPool = pool.fats.filter(f => !isNutId(f.id) && !isHerbSpiceId(f.id) && !isSauceCondimentFood(f) && !isHeavyAnimalFat(f.id) && !(breakfast && isBreakfastBannedFat(f.id)));
           const oil = oilPool.length > 0 ? pickPriority(oilPool, seed + 61, { lockedIds, recentIds, hardRecentIds }) : null;
           if (oil) {
             const oilGrams = gramsForMacro(oil, remF, 'fat');
@@ -9200,6 +9205,69 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
           }
         }
       } catch { /* уборка off-slot — best-effort */ }
+    }
+
+    // ─── Тарелка: овощ в обед/ужине ───
+    // Корректор может вырезать овощ основного приёма ради клетчатки/углеводов
+    // (тогда обед/ужин = «мясо + крахмал»). Возвращаем минимальный овощ, если есть
+    // запас клетчатки; добавляем ТОЛЬКО при неухудшении сходимости (>0.5 п.п.).
+    {
+      try {
+        // Цели — СЫРЫЕ (как честный флаг), иначе гард мерил не ту ось и пропускал
+        // переход через канон (dev на нормализованных целях ≠ dev на пользовательских).
+        const _tVeg = { kcal: input.goalKcal || 0, p: input.goalProteinG || 0, f: input.goalFatG || 0, c: input.goalCarbsG || 0 };
+        const _devVeg = (tt: any) => Math.max(
+          (_tVeg.kcal || 0) > 0 ? Math.abs(tt.kcal - _tVeg.kcal) / _tVeg.kcal : 0,
+          (_tVeg.p || 0) > 0 ? Math.abs(tt.p - _tVeg.p) / _tVeg.p : 0,
+          (_tVeg.f || 0) > 0 ? Math.abs(tt.f - _tVeg.f) / _tVeg.f : 0,
+          (_tVeg.c || 0) > 0 ? Math.abs(tt.c - _tVeg.c) / _tVeg.c : 0,
+        );
+        const _vegPool = [...pool.vegGreen, ...pool.vegColor]
+          .filter(f => !(combinedExcluded && combinedExcluded.has(f.id)) && foodPassesCtxAllergens(f) && foodAvailableForPlan(f));
+        const _fiberCapV = _pickCtx.highVolumeDay ? 115 : (input.fiberCapG ?? 85);
+        for (const m of meals) {
+          if (m.type !== 'lunch' && m.type !== 'dinner') continue;
+          if ((m.items || []).some((it: any) => it.role === 'veg')) continue;
+          if (_vegPool.length === 0) continue;
+          const _fiberNow = meals.reduce((s: number, mm: any) => s + (mm.totals?.fiber || 0), 0);
+          if (_fiberNow >= _fiberCapV - 4) continue;
+          const _veg = pickPriority(_vegPool, (input.randomSalt || 0) + 7, { recentIds: effRecentIds(), lockedIds: input.lockedIds });
+          if (!_veg) continue;
+          const _grams = Math.min(90, edibilityCapFor(_veg.id, 250));
+          if (_grams < 40) continue;
+          const _devBeforeV = _devVeg(totals);
+          const _item = makeItem(_veg as any, _grams, 'veg');
+          // Ккал-нейтрально: срезаем эквивалент калорий с крупнейшего крахмала приёма
+          // (иначе овощ заметно уводит сходимость и откатывается — белок/угли «в плюс»).
+          const _mCarb = (m.items || [])
+            .filter((it: any) => (it.role === 'carb_slow' || it.role === 'carb_fast') && !it._fixedGrams && (it.kcal || 0) > 60)
+            .sort((a: any, b: any) => (b.kcal || 0) - (a.kcal || 0))[0];
+          let _carbOrig: any = null;
+          if (_mCarb) {
+            _carbOrig = { ..._mCarb };
+            const _cut = Math.min(_item.kcal, (_mCarb.kcal || 0) - 60);
+            if (_cut > 0) {
+              const _kg = (_mCarb.kcal || 1) / Math.max(1, _mCarb.amount || 1);
+              const _newA = Math.max(10, Math.round((_mCarb.amount || 0) - _cut / Math.max(0.3, _kg)));
+              const _r = _newA / Math.max(1, _mCarb.amount || 0);
+              _mCarb.p = +(_mCarb.p * _r).toFixed(1); _mCarb.f = +(_mCarb.f * _r).toFixed(1); _mCarb.c = +(_mCarb.c * _r).toFixed(1);
+              _mCarb.kcal = Math.round(4 * _mCarb.p + 9 * _mCarb.f + 4 * _mCarb.c);
+              _mCarb.amount = _newA;
+            }
+          }
+          m.items.push(_item); m.totals = mealTotalsOf(m.items); recalcDayTotals(meals, totals);
+          if (_devVeg(totals) > _devBeforeV + 1e-9) {
+            // откат: убрать овощ и восстановить крахмал
+            m.items.pop();
+            if (_mCarb && _carbOrig) Object.assign(_mCarb, _carbOrig);
+            m.totals = mealTotalsOf(m.items); recalcDayTotals(meals, totals);
+          } else {
+            // помечаем использованным — следующий приём выберет ДРУГОЙ овощ (не дубль)
+            usedTodayIds.add(_veg.id); allFoodsUsed.push(_veg.id);
+            notes.push(`🥦 «${m.label || m.type}»: овощ ${_veg.id} возвращён к тарелке`);
+          }
+        }
+      } catch { /* тарелка-гард — best-effort */ }
     }
 
     // ─── E3 (анти-фрагментация): ОТЛОЖЕНО ───

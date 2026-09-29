@@ -17,6 +17,9 @@ const profiles: MealPlanInput[] = [
   base({}),
   base({ isTrainingDay: false, trainStartMin: undefined, dayOffset: 1, weightKg: 60, lbmKg: 48, goalKcal: 1610, goalProteinG: 130, goalFatG: 50, goalCarbsG: 160, variety: 'medium' }),
   base({ dayOffset: 3, weightKg: 95, lbmKg: 78, goalKcal: 4000, goalProteinG: 220, goalFatG: 100, goalCarbsG: 300, budget: 'max' }),
+  // Регресс-кейс аудита: здесь майонез был «жиром обеда» на 25-34 г (F65 трен).
+  base({ weightKg: 65, lbmKg: 50, sex: 'female', goalKcal: 1980, goalProteinG: 140, goalFatG: 60, goalCarbsG: 220, dayOffset: 1 }),
+  base({ dayOffset: 2, weightKg: 80, lbmKg: 66, goalKcal: 2600, goalProteinG: 165, goalFatG: 75, goalCarbsG: 290 }),
 ];
 
 describe('E4: соусы/специи — не носитель калорий', () => {
