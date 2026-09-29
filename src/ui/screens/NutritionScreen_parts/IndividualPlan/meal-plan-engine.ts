@@ -44,7 +44,8 @@ import {
   isSauceCondimentFood,
   dayTargetScale, quotaMealCap, isLowFiberComposition,
 } from "./food-availability";
-import { correctDayToTargets as _correctDayToTargets, mealTargetsStale as _mealTargetsStale } from "./day-target-corrector";
+import { correctDayToTargets as _correctDayToTargets, mealTargetsStale as _mealTargetsStale, PLANNER_CONVERGENCE_PCT, checkTargetsConsistency } from "./day-target-corrector";
+import { reconcileDay } from "./planner-day-reconciler";
 import { getFoodAllergenTags } from "./planner-restrictions";
 import { edibilityCapFor, liveLadderSteps, isHighCarbDay as _isHighCarbDay, EDIBILITY_CAPS, extremeCapacityProfile, DEFAULT_EXTREME_CAPACITY, type ExtremeCapacityProfile, selectHvCarbCarriers, scalePortionCapsForExtreme, hvProteinCapPerMeal, autoMealCountForHv, type HvCarbCarrier, type HvCarrierSelection } from "./planner-carb-density";
 import { computeEA } from "./planner-ea.engine";
@@ -79,9 +80,9 @@ export interface DayPlanV2 {
   diversity: { uniqueFoods: number; categories: Record<string, number> };
   microSummary?: { coverage: MicroCoverageEntry[]; topDeficitNutrient: string | null };
   notes: string[];
-  /** P4 (план «ведро»): честный флаг сходимости products-пути. max-dev ≤8% —
-    осознанно мягче recipe-порога 3% (products собирает из отдельных продуктов,
-    а не авторских рецептов). deviationPct — то же отклонение в %. */
+  /** E0/P4: честный флаг сходимости products-пути. Канон допуска —
+    PLANNER_CONVERGENCE_PCT (3%): при >3% флаг false + явная причина в notes
+    (несогласованные цели / упор в капы-полы реализма). deviationPct — отклонение %. */
   withinTolerance?: boolean;
   deviationPct?: number;
 }
@@ -9052,27 +9053,8 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
       }
     }
 
-    // ─── §3F-честность: «Точность рациона» ПОСЛЕ всех проходов ───
-    // Считаем к ЦЕЛИ ПОЛЬЗОВАТЕЛЯ (введённой), а не к скрытой клинической adjusted-цели
-    // (проба: «Б 31%» при факте −3% от 180 — adjusted ~133 + середина пайплайна).
-    {
-      const _gP = input.goalProteinG || adjustedProteinG;
-      const _dP = Math.abs(totals.p - _gP) / Math.max(1, _gP);
-      const _dC = Math.abs(totals.c - carbsTotal) / Math.max(1, carbsTotal);
-      const _dF = Math.abs(totals.f - fatTotal) / Math.max(1, fatTotal);
-      const _maxDev = Math.max(_dP, _dC, _dF);
-      if (_maxDev <= 0.02) {
-        notes.push(`🎯 Точность рациона: Б ${totals.p}/${_gP}г, Ж ${totals.f}/${fatTotal}г, У ${totals.c}/${carbsTotal}г (отклонение ≤2%)`);
-      } else if (_maxDev <= 0.05) {
-        notes.push(`✓ Точность рациона: отклонение ≤5% (Б ${Math.round(_dP * 100)}%, Ж ${Math.round(_dF * 100)}%, У ${Math.round(_dC * 100)}%)`);
-      } else {
-        notes.push(`⚠ Точность рациона: отклонение >5% (Б ${Math.round(_dP * 100)}%, Ж ${Math.round(_dF * 100)}%, У ${Math.round(_dC * 100)}%) — проверьте пулы продуктов`);
-      }
-      if (adjustedProteinG > 0 && Math.abs(adjustedProteinG - _gP) / _gP > 0.05) {
-        const _dAdj = Math.abs(totals.p - adjustedProteinG) / Math.max(1, adjustedProteinG);
-        notes.push(`ℹ️ Белок: ваша цель ${_gP} г — ${Math.round(_dP * 100)}%; клиническая цель уровня/фазы ${adjustedProteinG} г — ${Math.round(_dAdj * 100)}% (полы приёмов)`);
-      }
-    }
+    // «Точность рациона» ПЕРЕНЕСЕНА ниже: считается ПОСЛЕ reconciliation-pass, иначе
+    // ноту опережал финальный пасс подгонки порций (note-vs-факт расходились).
 
     // ─── §realism: витрина MPS пересобирается ПОСЛЕ всех проходов ───
     // mpsSummary собирался в середине функции (до «посадки», MPS-коридора, 500Б-смягчений
@@ -9161,11 +9143,84 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
       }
     }
 
-    // ─── P4 (план «ведро»): честный флаг сходимости products-пути (ФИНАЛЬНЫЙ totals) ───
-    // Считается здесь, ПОСЛЕ всех писателей (recalcDayTotals/P5b/капы/микро), иначе
-    // флаг отражал промежуточный снимок и завышал отклонение (stale-flag fix).
-    // Порог 8% (осознанно мягче recipe-порога 3%): при большом недоборе — честный
-    // флаг best-effort + нота, а не молчаливая подгонка мусором.
+    // ─── E0: финальный reconciliation-pass продуктового дня (сходимость ≤3%) ───
+    // После ВСЕХ писателей (recalcDayTotals/P5b/капы/микро) двигаем граммы
+    // flex-пунктов на дискретной сетке, минимизируя max-отклонение по 4 макросам.
+    // Только при текущем dev > канона — сошедшиеся дни байт-в-байт. Защищены
+    // peri/intra/окна уколов; цельный белок основных приёмов — не ниже 75 г.
+    {
+      const _nrmRecon = normalizeMacroTargets(input.goalKcal, input.goalProteinG, input.goalFatG, input.goalCarbsG);
+      const _reconTargets = { kcal: _nrmRecon.kcal, p: _nrmRecon.p, f: _nrmRecon.f, c: _nrmRecon.c };
+      const _preRecon = Math.max(
+        (_reconTargets.kcal || 0) > 0 ? Math.abs(totals.kcal - _reconTargets.kcal) / _reconTargets.kcal : 0,
+        (_reconTargets.p || 0) > 0 ? Math.abs(totals.p - _reconTargets.p) / _reconTargets.p : 0,
+        (_reconTargets.f || 0) > 0 ? Math.abs(totals.f - _reconTargets.f) / _reconTargets.f : 0,
+        (_reconTargets.c || 0) > 0 ? Math.abs(totals.c - _reconTargets.c) / _reconTargets.c : 0,
+      );
+      // Экстремальные/спец-дни НЕ трогаем (иначе нарушаем капы съедобности/тарелки
+      // и окон инсулина — эти дни управляются собственными проходами best-effort).
+      const _reconSkip = _pickCtx.highVolumeDay || !!(input as any).refeedDay
+        || _pickCtx.capacity.active || (input.goalKcal || 0) >= 4500
+        || input.carbCapGPerKg === 0 || meals.some((m: any) => m._insulinWindow);
+      let _reconApplied = false;
+      if (_preRecon > PLANNER_CONVERGENCE_PCT / 100 + 1e-9 && !_reconSkip) {
+        try {
+          const _rec = reconcileDay(meals as any, _reconTargets, {
+            protectTypes: ['intra'],
+            snap: (it: any, g: number) => {
+              const fd = FOOD_DB.find((f: any) => f.id === it.id);
+              return fd ? snapPortionG(fd as any, g) : Math.max(0, Math.round(g / 5) * 5);
+            },
+            mainProteinFloor: input.weightKg >= 80 ? 75 : 55,
+            mealProteinCap: 60,
+            // Капы роста: не выходим за съедобность/порцию продукта и дневные капы
+            // орехов/семян/масел (реализм-инварианты плана).
+            growCap: (it: any, role: string) => {
+              const fam = stapleFamilyOf(it.id || '');
+              if (role === 'fat' && (fam === 'nuts' || fam === 'seeds' || fam === 'oils')) return it.amount;
+              const capItem = maxGramPerItem(_pickCtx.currentBudget);
+              const capEdible = edibilityCapFor(it.id, Infinity);
+              return Math.min(capItem, capEdible);
+            },
+            maxIter: 6,
+          });
+          if (_rec.adjusted && _rec.devPct + 1e-9 < _preRecon) {
+            meals.splice(0, meals.length, ...(_rec.meals as any));
+            recalcMealTotals(meals);
+            recalcDayTotals(meals, totals);
+            _reconApplied = true;
+            const _postPct = Math.round(_rec.devPct * 1000) / 10;
+            if (_postPct <= PLANNER_CONVERGENCE_PCT) {
+              notes.push(`⚖️ Сходимость дня сведена к ≤${PLANNER_CONVERGENCE_PCT}% (${Math.round(_preRecon * 100)}% → ${_postPct}%) — финальная подгонка порций по целям`);
+            }
+          }
+        } catch { /* reconciliation — best-effort; не ломаем генерацию */ }
+      }
+      // Витрина MPS/микро обязана совпадать с ФИНАЛЬНЫМ планом (после reconciliation).
+      if (_reconApplied) {
+        const _mbR = meals.map(m => {
+          const _p = m.items.reduce((s, i) => s + i.p, 0);
+          const _leu = (m.items.reduce((s, i) => s + (i.leucine_mg || 0), 0)) / 1000;
+          return { label: m.label || m.type, proteinG: Math.round(_p), leucineG: Math.round(_leu * 10) / 10, triggersMps: m.mpsCheck?.triggers_mTOR || (_p >= 25 && _leu >= 2.5) };
+        });
+        (mpsSummary as any).meals = _mbR;
+        (mpsSummary as any).avg_protein_per_meal_g = Math.round(totals.p / Math.max(1, meals.length));
+        const _feedR = _mbR.filter(x => (x.proteinG || 0) >= 25).length;
+        (mpsSummary as any).avg_leucine_g = Math.round(totals.leucine_mg / Math.max(1, _feedR)) / 1000;
+        (mpsSummary as any).fiberG = Math.round(totals.fiber);
+        const _pvR = meals.filter(m => !['intra', 'presleep'].includes(m.type)).map(m => m.totals.p || 0).filter(v => v > 0);
+        if (_pvR.length >= 3) {
+          const _meanR = _pvR.reduce((a, b) => a + b, 0) / _pvR.length;
+          const _sdR = Math.sqrt(_pvR.reduce((a, b) => a + Math.pow(b - _meanR, 2), 0) / _pvR.length);
+          (mpsSummary as any).proteinCV = _meanR > 0 ? Math.round((_sdR / _meanR) * 100) / 100 : 0;
+        }
+      }
+    }
+
+    // ─── P4/E0: честный флаг сходимости products-пути (ФИНАЛЬНЫЙ totals) ───
+    // Считается здесь, ПОСЛЕ всех писателей и reconciliation. Канон допуска —
+    // PLANNER_CONVERGENCE_PCT (3%). >3% — только честный best-effort с ЯВНОЙ
+    // причиной (несогласованные цели / упор в капы-полы), а не подгонка мусором.
     let _dayDevPctP4 = 0;
     {
       const _dayDevP4 = Math.max(
@@ -9175,8 +9230,35 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
         (input.goalCarbsG || 0) > 0 ? Math.abs(totals.c - (input.goalCarbsG || 0)) / (input.goalCarbsG || 1) : 0,
       );
       _dayDevPctP4 = Math.round(_dayDevP4 * 1000) / 10;
-      if (_dayDevPctP4 > 8) {
-        notes.push(`⚠ «Не сошлось»: отклонение дня от целей ${_dayDevPctP4}% (>8%) — пулы/капы не закрыли цели, итог честный best-effort, а не подгонка мусором`);
+      if (_dayDevPctP4 > PLANNER_CONVERGENCE_PCT) {
+        const _cons = checkTargetsConsistency(input.goalKcal, input.goalProteinG, input.goalFatG, input.goalCarbsG);
+        if (!_cons.consistent) {
+          notes.push(`⚠ «Не сошлось»: цели несогласованы (ккал ${input.goalKcal} ≠ 4Б+4У+9Ж = ${_cons.atwaterKcal}, расхождение ${_cons.devPct}%) — день сведён к макросам, ккал-ось честный best-effort`);
+        } else {
+          notes.push(`⚠ «Не сошлось»: отклонение дня от целей ${_dayDevPctP4}% (канон ${PLANNER_CONVERGENCE_PCT}%) — пулы/капы/полы реализма не дали закрыть цель, итог честный best-effort`);
+        }
+      }
+    }
+
+    // ─── §3F-честность: «Точность рациона» ПОСЛЕ reconciliation ───
+    // Считаем к ЦЕЛИ ПОЛЬЗОВАТЕЛЯ (введённой), а не к скрытой клинической adjusted-цели;
+    // ПОСЛЕ финального пасса подгонки порций (иначе note-vs-факт расходятся).
+    {
+      const _gP = input.goalProteinG || adjustedProteinG;
+      const _dP = Math.abs(totals.p - _gP) / Math.max(1, _gP);
+      const _dC = Math.abs(totals.c - carbsTotal) / Math.max(1, carbsTotal);
+      const _dF = Math.abs(totals.f - fatTotal) / Math.max(1, fatTotal);
+      const _maxDev = Math.max(_dP, _dC, _dF);
+      if (_maxDev <= 0.02) {
+        notes.push(`🎯 Точность рациона: Б ${totals.p}/${_gP}г, Ж ${totals.f}/${fatTotal}г, У ${totals.c}/${carbsTotal}г (отклонение ≤2%)`);
+      } else if (_maxDev <= 0.05) {
+        notes.push(`✓ Точность рациона: отклонение ≤5% (Б ${Math.round(_dP * 100)}%, Ж ${Math.round(_dF * 100)}%, У ${Math.round(_dC * 100)}%)`);
+      } else {
+        notes.push(`⚠ Точность рациона: отклонение >5% (Б ${Math.round(_dP * 100)}%, Ж ${Math.round(_dF * 100)}%, У ${Math.round(_dC * 100)}%) — проверьте пулы продуктов`);
+      }
+      if (adjustedProteinG > 0 && Math.abs(adjustedProteinG - _gP) / _gP > 0.05) {
+        const _dAdj = Math.abs(totals.p - adjustedProteinG) / Math.max(1, adjustedProteinG);
+        notes.push(`ℹ️ Белок: ваша цель ${_gP} г — ${Math.round(_dP * 100)}%; клиническая цель уровня/фазы ${adjustedProteinG} г — ${Math.round(_dAdj * 100)}% (полы приёмов)`);
       }
     }
 
@@ -9189,7 +9271,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
      diversity: { uniqueFoods, categories },
       microSummary: { coverage: _microRes.coverage, topDeficitNutrient: _microRes.topDeficitNutrient },
       notes,
-      withinTolerance: _dayDevPctP4 <= 8,
+      withinTolerance: _dayDevPctP4 <= PLANNER_CONVERGENCE_PCT,
       deviationPct: _dayDevPctP4,
     };
   } finally {

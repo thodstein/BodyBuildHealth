@@ -531,12 +531,17 @@ const doImportPlan = (raw: string): boolean => {
           // Заголовок честный: причины из notes движка («Не сошлось»/«Корректор…»/<60%)
           // важнее расчётной девиации — день мог не сойтись и без отдельной ноты.
           const bad = ex.causes.length > 0 || (ex.devPct != null && ex.devPct > ex.tolerance);
-          const hasContent = ex.causes.length > 0 || ex.fixes.length > 0 || ex.checks.length > 0 || bad;
+          const hasContent = ex.causes.length > 0 || ex.fixes.length > 0 || ex.checks.length > 0 || bad || ex.devPct != null;
           if (!hasContent) return null;
           const accent = bad ? '#f59e0b' : '#22c55e';
           return (
             <div data-bitexplain="1" role="status" style={{ marginBottom: 8, padding: '8px 10px', borderRadius: 10, background: bad ? 'rgba(245,158,11,0.08)' : 'rgba(34,197,94,0.06)', border: `1px solid ${bad ? 'rgba(245,158,11,0.3)' : 'rgba(34,197,94,0.25)'}` }}>
               <div data-bitexplain-head style={{ fontSize: 10, fontWeight: 800, color: '#fff', marginBottom: 3 }}>{bad ? '🧭 Почему день не сошёлся' : '🧭 Разбор дня (сошёлся)'}</div>
+              {ex.devPct != null && (
+                <div data-precision-badge={ex.within === false ? 'false' : 'true'} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 7px', borderRadius: 999, marginBottom: 4, fontSize: 9, fontWeight: 800, color: '#fff', background: bad ? 'rgba(245,158,11,0.14)' : 'rgba(34,197,94,0.14)', border: `1px solid ${bad ? 'rgba(245,158,11,0.35)' : 'rgba(34,197,94,0.3)'}` }}>
+                  🎯 Точность {ex.within === false ? '>' : '≤'}{ex.tolerance}% · факт {ex.devPct}%
+                </div>
+              )}
               {ex.headline && <div style={{ fontSize: 9, color: '#fff', marginBottom: 4 }}>{ex.headline}</div>}
               {ex.causes.map((r, i) => (
                 <div key={'bc' + i} data-bitexplain-cause={r.id} style={{ fontSize: 9, color: '#fff', lineHeight: 1.4, marginBottom: 3 }}>

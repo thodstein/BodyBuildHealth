@@ -20,6 +20,28 @@ const POWDER_PORTION_CAP_G = 60;
 // маркер, а не isPeriLikeMeal(): старые гейты по типам разные в каждой ветке
 // (swap скипает prew, cut — нет) и их расширение ломает peri-поведение.
 
+/** E0 (PRO-план §3): ЕДИНЫЙ канон допуска сходимости дня — ≤3% по каждому
+ *  макросу (ккал/Б/Ж/У). Читают ОБА пути (products/recipes) и UI. Числа 5/8 —
+ *  только визуальные градации (зелёный/янтарь/красный), НЕ «допуск». */
+export const PLANNER_CONVERGENCE_PCT = 3;
+
+/**
+ * E0.3 (feasibility-гейт): внутренняя согласованность целей.
+ * Ккал обязан ≈ 4Б + 4У + 9Ж (Atwater). Если расхождение > допуска — день
+ * НЕ сможет сойтись одновременно по ккал И макросам (математически),
+ * движок сведёт макросы, а «ккал-ось» останется в честном best-effort.
+ * UI предупреждает ДО генерации. Ничего не мутирует.
+ */
+export function checkTargetsConsistency(
+  kcal: number, p: number, f: number, c: number,
+  tolPct: number = PLANNER_CONVERGENCE_PCT,
+): { atwaterKcal: number; devPct: number; consistent: boolean } {
+  const atwaterKcal = Math.round(4 * (p || 0) + 9 * (f || 0) + 4 * (c || 0));
+  const base = (kcal || 0) > 0 ? kcal : atwaterKcal;
+  const devPct = base > 0 ? Math.abs(atwaterKcal - (kcal || 0)) / base * 100 : 0;
+  return { atwaterKcal, devPct: Math.round(devPct * 10) / 10, consistent: devPct <= tolPct + 1e-9 };
+}
+
 export interface DayTargets { kcal: number; p: number; f: number; c: number; }
 export interface CorrectorItem { id: string; name: string; amount: number; kcal: number; p: number; f: number; c: number; fiber?: number; leucine_mg?: number; role?: string; _fixedGrams?: number; _cocktail?: { kind: string; name: string; group: string } }
 export interface CorrectorMeal { label?: string; type?: string; time?: string; items: CorrectorItem[]; totals?: { kcal: number; p: number; f: number; c: number; fiber?: number }; recipeApplied?: string; recipeAppliedData?: { ingredientIds?: string[] }; recipeApplied2?: string; recipeAppliedData2?: { ingredientIds?: string[] }; }

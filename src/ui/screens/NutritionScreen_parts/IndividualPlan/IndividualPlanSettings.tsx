@@ -59,6 +59,7 @@ const INJ_LABEL_TO_PHARMA: Record<string, string> = {
 import { applyCarbPeriodizationMods, carbPeriodizationLabel } from './planner-carb-periodization';
 import { autoCyclePhase, getCycleLog, saveCyclePeriod, clearCycleLog, CYCLE_PHASE_RU } from './planner-cycle-calendar';
 import { computeEnergyAvailability } from './planner-female-cycle';
+import { checkTargetsConsistency, PLANNER_CONVERGENCE_PCT } from './day-target-corrector';
 import { getRecipes, type Recipe } from '../../../../engines/nutrition-periodization.engine';
 
 
@@ -399,6 +400,17 @@ export const IndividualPlanSettings: React.FC = () => {
               <PopupNumber label="Углеводы" value={manualC ?? effectiveC} min={0} max={1200} step={5} suffix="г" onChange={v => setManualC(v)} />
             </div>
           )}
+          {kbjuMode === 'manual' && (() => {
+            // E0.3 (feasibility-гейт): ккал обязан ≈ 4Б+4У+9Ж. Иначе день сведётся к
+            // макросам, а «ккал-ось» останется честным best-effort — предупреждаем ДО генерации.
+            const c = checkTargetsConsistency(manualKcal ?? effectiveKcal, manualP ?? effectiveP, manualF ?? effectiveF, manualC ?? effectiveC);
+            if (c.consistent) return null;
+            return (
+              <div data-kbju-feasibility="1" role="alert" style={{ fontSize:9, color:'#fff', padding:'5px 8px', marginBottom:7, background:'rgba(245,158,11,0.10)', border:'1px solid rgba(245,158,11,0.35)', borderRadius:6, lineHeight:1.4 }}>
+                ⚖️ Цели несогласованы: ккал {manualKcal ?? effectiveKcal} ≠ 4Б+4У+9Ж = {c.atwaterKcal} г. Расхождение {c.devPct}% (канон ≤{PLANNER_CONVERGENCE_PCT}%). День сойдётся по макросам, ккал-ось — лучший достижимый вариант. Выровняйте ккал или макросы.
+              </div>
+            );
+          })()}
           {errorMsg && <div style={{ fontSize:9, color:'#ef4444', padding:'5px 8px', marginBottom:6, background:'rgba(239,68,68,0.06)', borderRadius:6 }}>⚠️ {errorMsg}</div>}
           <button onClick={() => { try { const err = _validatePlannerInput(); if (err) { setErrorMsg(err); return; } setErrorMsg(null); generatePlan(1); setPlanTab('plan'); } catch (e: any) { setErrorMsg('Ошибка: ' + (e?.message || String(e))); } }} style={{ ...greenBtn, width:'100%' }}>⚡ Рассчитать и создать рацион</button>
         </GlassCard>

@@ -11,6 +11,8 @@
  * Движок и его notes НЕ меняются; UI показывает то, что уже посчитано.
  */
 
+import { PLANNER_CONVERGENCE_PCT } from './day-target-corrector';
+
 export type DayExplainLevel = 'problem' | 'fix' | 'check';
 
 export interface DayExplainReason {
@@ -156,7 +158,8 @@ export function explainDayPlan(
   targets?: ExplainTargets | null,
   opts?: { tolerance?: number; maxPerGroup?: number },
 ): DayExplainResult {
-  const tolerance = Math.max(1, Number(opts?.tolerance) || 8);
+  // E0: канон допуска — PLANNER_CONVERGENCE_PCT (3%); 5/8 остаются визуальными градациями.
+  const tolerance = Math.max(1, Number(opts?.tolerance) || PLANNER_CONVERGENCE_PCT);
   if (!plan) {
     return { devPct: null, tolerance, within: null, headline: null, causes: [], fixes: [], checks: [] };
   }
