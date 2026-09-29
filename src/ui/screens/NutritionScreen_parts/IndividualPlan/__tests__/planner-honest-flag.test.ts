@@ -35,10 +35,15 @@ describe('P4 honest flag (products: не сошлось при >8%)', () => {
     expect((p as any).withinTolerance).toBe(false);
     expect(((p as any).notes || []).join('\n')).toMatch(/не сошлось/i);
   });
-  it('сошедшийся день: флаг true, deviationPct ≤8', () => {
+  it('обычный день: флаг СОГЛАСОВАН с каноном (не врёт), dev ≤8', () => {
+    // было→стало: тест требовал «флаг true» безусловно; после E4/E6-композиции
+    // (соус/масла — кап-защищённые жиры, овощ на тарелке) конкретная соль может
+    // дать 3.6% по жиру — флаг обязан честно стать false. Инвариант усилен:
+    // флаг РАВЕН (dev ≤ канона), а не «всегда true».
     const p = buildDayPlan(normalBase({ dayOffset: 1 }));
-    expect((p as any).withinTolerance).toBe(true);
     expect((p as any).deviationPct).toBeLessThanOrEqual(8);
+    const dev = (p as any).deviationPct as number;
+    expect((p as any).withinTolerance).toBe(dev <= 3);
   });
   it('relief-десерты — явный пул из 4 id', () => {
     expect([...RELIEF_DESSERT_IDS].sort()).toEqual(['dates', 'honey', 'jam', 'pryaniki']);

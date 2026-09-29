@@ -43,6 +43,8 @@ export interface ReconOptions {
   mainProteinFloor?: number;
   /** Верхний предел белка одного приёма (г) при росте белка (напр. ≤60 г). */
   mealProteinCap?: number;
+  /** LBM атлета — для масштабирования абсолютных полов белка у малых атлетов. */
+  lbmKg?: number;
   /** Верхняя граница роста для пункта (граммы). По умолчанию — роль-зависимый
    *  множитель. Движок передаёт функцию, уважающую дневные капы (орехи/масла). */
   growCap?: (item: ReconItem, role: string) => number;
@@ -52,22 +54,26 @@ export interface ReconResult {
   meals: ReconMeal[];
   devPct: number;
   adjusted: boolean;
+  debugInfo?: string;
 }
 
 const KNOB_ROLES = new Set(['protein', 'fast_protein', 'carb_slow', 'carb_fast', 'fat']);
 
 /** Нижний пол белка по типу приёма (граммы). Peri/pre-sleep можно подрезать —
- *  иначе белок трен-дня всегда «в плюс» (peri 20/28/28 = 76 г) и день не сходится. */
-function proteinFloorByType(mealType: string, mainFloor: number, amount: number): number {
+ *  иначе белок трен-дня всегда «в плюс» (peri 20/28/28 = 76 г) и день не сходится.
+ *  Small-athlete: у малого LBM абсолютные полы (15/20/25) — уже 0.4-0.6 г/кг и
+ *  физически раздувают цель 100 г; масштабируем их вниз (крупные атлеты не тронуты). */
+function proteinFloorByType(mealType: string, mainFloor: number, amount: number, lbmKg = 0): number {
+  const scale = lbmKg > 0 ? Math.min(1, lbmKg / 55) : 1;
   switch (mealType) {
     case 'breakfast':
     case 'lunch':
     case 'dinner': return mainFloor;
     case 'snack':
     case 'snack2': return Math.min(mainFloor, 50);
-    case 'preworkout': return 15;
-    case 'postworkout': return 20;
-    case 'presleep': return 25;
+    case 'preworkout': return Math.max(8, Math.round(15 * scale));
+    case 'postworkout': return Math.max(12, Math.round(20 * scale));
+    case 'presleep': return Math.max(15, Math.round(25 * scale));
     default: return Math.min(amount, 40);
   }
 }
@@ -144,22 +150,31 @@ export function reconcileDay(mealsIn: ReconMeal[], targets: ReconTargets, opts?:
       let lo: number; let hi: number;
       const _growCap = opts?.growCap ? opts.growCap(it, role) : Infinity;
       if (role === 'protein' || role === 'fast_protein') {
-        // Пол — по типу приёма (цельный белок основного приёма ≥ стража реализма;
-        // peri/pre-sleep/мелкие можно подрезать). Рост разрешён при недоборе белка
-        // дня, но так, чтобы белок приёма не превысил mealProteinCap (≤60 г).
+        // Пол белка: у ОСНОВНЫХ приёмов — в граммах ЕДЫ (страж реализма тарелки),
+        // у peri/pre-sleep/перекуса — в граммах БЕЛКА (переводим в еду по плотности;
+        // раньше единицы путались и пол был бессмысленным). Рост разрешён при
+        // недоборе белка дня, но белок приёма не превысит mealProteinCap (≤60 г).
+        const _mt = String(m.type || '');
+        const _isPeri = _mt === 'preworkout' || _mt === 'postworkout' || _mt === 'presleep';
+        const _floor = proteinFloorByType(_mt, mainProteinFloor, it.amount, opts?.lbmKg ?? 0);
+        if (_isPeri) {
+          lo = (it.p || 0) > 0 ? Math.min(it.amount, Math.max(0, ((it.amount || 0) * _floor) / it.p)) : it.amount;
+        } else {
+          lo = Math.min(it.amount, _floor);
+        }
         const pPerG = (it.p || 0) / Math.max(1e-6, it.amount || 0);
         const roomP = Math.max(0, mealProteinCap - mealPNow);
         const hiByMeal = pPerG > 0 ? it.amount + roomP / pPerG : it.amount;
-        lo = Math.min(it.amount, proteinFloorByType(String(m.type || ''), mainProteinFloor, it.amount));
         hi = Math.min(Math.max(it.amount, hiByMeal), it.amount * 1.5, _growCap);
       } else if (role === 'carb_slow' || role === 'carb_fast') {
         lo = Math.min(it.amount, 30);
         hi = Math.min(it.amount * 1.6, _growCap);
-      } else { // fat — срез до 0 и рост в пределах дневного капа (орехи/масла)
-        lo = 0;
+      } else { // fat — срез до 5 г (не в ноль: «chia 0 г» — мусор) и рост в пределах капа
+        lo = Math.min(it.amount, 5);
         hi = Math.min(it.amount * 1.6, _growCap);
       }
-      if (hi - lo < 5) return;
+      // Диапазон: белок/угли ≥5 г, жир ≥2 г (масло 5→8 г закрывает жир-ось).
+      if (hi - lo < (role === 'fat' ? 2 : 5)) return;
       knobs.push({ mi, ii, lo, hi });
     });
   });
@@ -172,8 +187,15 @@ export function reconcileDay(mealsIn: ReconMeal[], targets: ReconTargets, opts?:
     rescaleItem(meals[k.mi].items[k.ii], amount);
   };
   const snapV = (k: Knob, v: number): number => {
-    const s = snap(meals[k.mi].items[k.ii], v);
-    return Math.max(k.lo, Math.min(k.hi, s));
+    const item = meals[k.mi].items[k.ii];
+    const raw = Math.max(k.lo, Math.min(k.hi, v));
+    const s = snap(item, raw);
+    const sc = Math.max(k.lo, Math.min(k.hi, s));
+    // Сетка порций у мяса/молочки начинается с 100 г, поэтому снап «раздувал»
+    // кандидата на СРЕЗ вверх (trim недостижим). При запросе ниже текущего берём
+    // ровный 5-г шаг — срез реально исполняется (малое КБЖУ сходится).
+    if (raw < (item.amount || 0) && sc > raw) return Math.max(k.lo, Math.round(raw / 5) * 5);
+    return sc;
   };
 
   for (let pass = 0; pass < maxIter; pass++) {

@@ -35,7 +35,7 @@ import type { LabCompositeResult } from "../../../../engines/lab-analysis.engine
 import {
   foodAvailableForPlan, isHerbSpiceId, isPureSupplementId, isProteinPowderId,
   createDailyQuota, blockedIdsForNextMeal, registerMealInQuota, foodAvailableWithQuota,
-  QUOTA_LIMITS, stapleFamilyOf, nutCatchupCap, oilCatchupCap, quotaWeightScale,
+  QUOTA_LIMITS, stapleFamilyOf, nutCatchupCap, oilCatchupCap, eggCatchupCap, quotaWeightScale,
   isPortableFood, isWorkWindowMeal, isHvStapleBanned, isBreakfastBannedCarb, countCarbItems,
   isBreakfastBannedProtein, isBreakfastBannedFat, isHeavyAnimalFat, isSweetBaseId,
   familyMealCap, familyMealUses, isCreamId, creamMealCap, citrusFruitCapG, sweetFleshClash, isSweetCarbId, isFleshProteinId, isFishId,
@@ -2727,7 +2727,32 @@ function hvCarbConvSort(a: { id: string; carbs?: number; fiber?: number }, b: { 
           const wheyLeuPer100 = whey ? getLeucine(whey) : 0;
           const wheyGrams = whey ? Math.min(40, Math.max(15, Math.round(_needP / Math.max(1, whey.protein || 20) * 100))) : 0;
           const wItem = whey && wheyGrams > 0 ? makeItem(whey, wheyGrams, 'fast_protein') : null;
-          if (wItem) {
+          // Гигиена композиции: если в приёме УЖЕ есть белок — растим ЕГО, а не
+          // добавляем второй порошок (было: «whey_protein 20 г + whey_isolate 20 г»
+          // в одном перекусе = 34 г белка и двойной источник).
+          const _exP = items.find(i => i.role === 'protein' || i.role === 'fast_protein' || i.role === 'slow_protein');
+          if (_exP) {
+            const _fd = FOOD_DB.find(f => f.id === _exP.id);
+            if (_fd) {
+              const _needP2 = Math.max(0, _fillTarget - curP);
+              const _isPowd = isProteinPowderId(_exP.id);
+              const _capG = _isPowd ? 40 : 300;
+              const _addG = Math.min(Math.max(0, _capG - (_exP.amount || 0)), gramsForMacro(_fd, _needP2, 'protein'));
+              if (_addG >= 5) {
+                const _perG = Math.max(1, _exP.amount || 1);
+                const _dP = (_exP.p || 0) / _perG * _addG;
+                const _dF = (_exP.f || 0) / _perG * _addG;
+                const _dC = (_exP.c || 0) / _perG * _addG;
+                const _r2 = ((_exP.amount || 0) + _addG) / _perG;
+                _exP.p = +((_exP.p || 0) * _r2).toFixed(1); _exP.f = +((_exP.f || 0) * _r2).toFixed(1); _exP.c = +((_exP.c || 0) * _r2).toFixed(1);
+                _exP.kcal = Math.round(4 * _exP.p + 9 * _exP.f + 4 * _exP.c);
+                if (typeof _exP.fiber === 'number') _exP.fiber = +((_exP.fiber || 0) * _r2).toFixed(1);
+                if (typeof _exP.leucine_mg === 'number') _exP.leucine_mg = Math.round(_exP.leucine_mg * _r2);
+                _exP.amount = Math.round((_exP.amount || 0) + _addG);
+                remP -= _dP; remF -= _dF; remC -= _dC;
+              }
+            }
+          } else if (wItem) {
             items.push(wItem); remP -= wItem.p; remF -= wItem.f; remC -= wItem.c;
           } else {
             // Fallback: медленный цельный белок (творог 100 г ≈ 18 г белка) вместо порошка.
@@ -9155,6 +9180,19 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
       }
     }
 
+    // ─── Гигиена: пункты-нулёвки (chia 0 г, almonds 0 г) — мусор, а не еда ───
+    // Масштабирование/капы могли округлить порцию до 0 г; такие строки удаляем
+    // (макросы у них нулевые — состав не меняется, уходит «свалка» из выдачи).
+    {
+      let _zeroRemoved = false;
+      for (const m of meals) {
+        const _before = (m.items || []).length;
+        m.items = (m.items || []).filter((it: any) => (it.amount || 0) >= 2 || it.role === 'supplement');
+        if (m.items.length !== _before) { m.totals = mealTotalsOf(m.items); _zeroRemoved = true; }
+      }
+      if (_zeroRemoved) recalcDayTotals(meals, totals);
+    }
+
     // ─── E1-финал: уборка остаточных off-slot пунктов ───
     // Корректор/коктейль могут добавить off-slot носитель (напр. овсянку в ужин)
     // напрямую из FOOD_DB, минуя affinity-фильтр пулов. Свопим на разрешённый
@@ -9304,18 +9342,27 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
               const fd = FOOD_DB.find((f: any) => f.id === it.id);
               return fd ? snapPortionG(fd as any, g) : Math.max(0, Math.round(g / 5) * 5);
             },
-            mainProteinFloor: input.weightKg >= 80 ? 75 : 55,
-            mealProteinCap: 60,
+            mainProteinFloor: input.weightKg >= 80 ? 75 : input.weightKg >= 60 ? 55 : 40,
+            mealProteinCap: 58,
+            lbmKg: input.lbmKg || 0,
             // Капы роста: не выходим за съедобность/порцию продукта и дневные капы
             // орехов/семян/масел (реализм-инварианты плана).
             growCap: (it: any, role: string) => {
               const fam = stapleFamilyOf(it.id || '');
-              if (role === 'fat' && (fam === 'nuts' || fam === 'seeds' || fam === 'oils')) return it.amount;
+              if (role === 'fat') {
+                // Орехи/семена — дневной катчелл-кап, НЕ растим; масла можно подрастить
+                // (до капа приёма 25 г) — иначе на днях без сыра/авокадо жир-ось не закрыть.
+                if (fam === 'nuts' || fam === 'seeds') return it.amount;
+                if (fam === 'oils') return Math.min(30, it.amount * 1.6);
+              }
+              // Яйца — дневной катчелл-кап (275 г «растить» нельзя).
+              if (it.id === 'egg_whole') return eggCatchupCap(quotaWeightScale(input.weightKg));
               const capItem = maxGramPerItem(_pickCtx.currentBudget);
               const capEdible = edibilityCapFor(it.id, Infinity);
               return Math.min(capItem, capEdible);
             },
-            maxIter: 6,
+            // Сетка среза теперь 5-г (мелкая) — спуску нужно больше проходов.
+            maxIter: 10,
           });
           if (_rec.adjusted && _rec.devPct + 1e-9 < _preRecon) {
             meals.splice(0, meals.length, ...(_rec.meals as any));
