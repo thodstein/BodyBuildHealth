@@ -19,13 +19,20 @@ const train = (o: any = {}) => ({
 });
 
 describe('F2: диетология бодибилдинга', () => {
-  it('явный контроллер пери-окна держит белок в бюджете 0.4-0.5 г/кг LBM', () => {
+  it('явный контроллер пери-окна держит белок в бюджете 0.4-0.5 г/кг LBM (полы LBM-масштаб)', () => {
     for (const lbm of [45, 64, 73.8, 90, 110]) {
       const budget = periProteinBudget(lbm, true, { preworkout: true, postworkout: true });
       expect(budget.totalG).toBeGreaterThanOrEqual(budget.targetRangeG[0]);
       expect(budget.totalG).toBeLessThanOrEqual(budget.targetRangeG[1]);
-      expect(budget.preworkoutG).toBeGreaterThanOrEqual(20);
-      expect(budget.postworkoutG).toBeGreaterThanOrEqual(25);
+      // было→стало (E16, Sep 30 2026, решение пользователя): фикс-полы 20/25 г
+      // душили малые LBM (F50/F60: peri-белок доминировал цель 100–110 г, день
+      // расходился на +8…21% Б). Полы выровнены с полом reconciler'а —
+      // prew = 0.25 г/кг LBM (мин 8), postw = 0.40 г/кг LBM (мин 12):
+      // LBM 45 → 11/18 (было 20/25), 73.8 → 18/30 (было 20/30), 110 → 28/44.
+      expect(budget.preworkoutG).toBeGreaterThanOrEqual(Math.max(8, Math.round(lbm * 0.25)));
+      expect(budget.postworkoutG).toBeGreaterThanOrEqual(Math.max(12, Math.round(lbm * 0.40)));
+      // окно-канон 0.4–0.55 г/кг LBM на весь peri-бюджет (Schoenfeld & Aragon 2018)
+      expect(budget.totalG / lbm).toBeGreaterThanOrEqual(0.42);
     }
     expect(periProteinBudget(73.8, false, { preworkout: true, postworkout: true }).totalG).toBe(0);
   });

@@ -9368,18 +9368,23 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
         (_reconTargets.f || 0) > 0 ? Math.abs(totals.f - _reconTargets.f) / _reconTargets.f : 0,
         (_reconTargets.c || 0) > 0 ? Math.abs(totals.c - _reconTargets.c) / _reconTargets.c : 0,
       );
-      // Экстремальные/спец-дни НЕ трогаем (иначе нарушаем капы съедобности/тарелки
-      // и окон инсулина — эти дни управляются собственными проходами best-effort).
-      // E14: большие НЕ-экстремальные HV-дни (M110 5000 и т.п.) тоже сводим —
-      // per-meal бюджет с капом тарелки 700 г (иначе недобор закрывался ростом
-      // одной тарелки). Сверх-большие (≥6000 ккал) и capacity-экстримы (1500У,
-      // инсулин-окна, ≥8 г/кг) остаются своим проходам (§3D/E15) — как и раньше.
+      // Экстремальные/спец-дни с ИНСУЛИН-ОКНАМИ НЕ трогаем (окна = доза препарата —
+      // калиброванный контракт). E14: большие НЕ-экстремальные HV-дни (M110 5000)
+      // сводим с капом тарелки 700 г. E16 (решение пользователя «НЕ БОЛЕЕ 3%»):
+      // capacity-экстримы БЕЗ инсулин-окон (HV1500/500Б best-effort) тоже проходят
+      // reconciliation — с капом тарелки 900 г и капами продукта: жир/белок-оси
+      // сводятся срезом носителей, а не «тихой подгонкой» (замер: HV1500 R s1
+      // F+41.7% → цель ≤3%, см. planner-hv-recon-lock). Refeed-дни и инсулиновые
+      // окна — прежний skip (§3D/E15).
+      const _hasInsulinWindows = meals.some((m: any) => m._insulinWindow);
+      const _extremeRecon = _pickCtx.capacity.active && !_hasInsulinWindows && !(input as any).refeedDay;
       const _bigDayRecon = _pickCtx.highVolumeDay && !_pickCtx.capacity.active
         && (input.goalKcal || 0) < 6000;
+      // (Инсулин-окна у capacity-дней делают _extremeRecon=false → skip первой ветвью.)
       const _reconSkip = !!(input as any).refeedDay
-        || _pickCtx.capacity.active || (input.goalKcal || 0) >= 6000
-        || input.carbCapGPerKg === 0 || meals.some((m: any) => m._insulinWindow)
-        || ((_pickCtx.highVolumeDay || (input.goalKcal || 0) >= 4500) && !_bigDayRecon);
+        || ((_pickCtx.capacity.active || (input.goalKcal || 0) >= 6000) && !_extremeRecon)
+        || (input.carbCapGPerKg === 0 && !_extremeRecon)
+        || ((_pickCtx.highVolumeDay || (input.goalKcal || 0) >= 4500) && !_bigDayRecon && !_extremeRecon);
       let _reconApplied = false;
       if (_preRecon > PLANNER_CONVERGENCE_PCT / 100 + 1e-9 && !_reconSkip) {
         try {
@@ -9407,12 +9412,18 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
           const _psBudgetP = _presleepUpscaled ?? preSleepProteinBudget(input.weightKg);
           const _psFloorRecon = Math.max(18, Math.min(_psBudgetP, (_reconTargets.p || 0) - _psOtherP));
           const _rec = reconcileDay(meals as any, _reconTargets, {
-            protectTypes: ['intra'],
+            // eveningLowCarb — жёсткая настройка пользователя («ужин ≤12% У»): ужин
+            // защищён от роста в reconciliation (иначе финальная подгонка добивала
+            // ужин углеводами и доля росла: planner.test 12.0 → 12.8%).
+            protectTypes: input.eveningLowCarb ? ['intra', 'dinner'] : ['intra'],
             snap: (it: any, g: number) => {
               const fd = FOOD_DB.find((f: any) => f.id === it.id);
               return fd ? snapPortionG(fd as any, g) : Math.max(0, Math.round(g / 5) * 5);
             },
-            mainProteinFloor: input.weightKg >= 80 ? 75 : input.weightKg >= 60 ? 55 : 40,
+            // E16: пол основных приёмов 60–64 кг — 50 г ЕДЫ (было 55: на F60 пол 55×3
+            // при цели ~120 г Б не оставлял места углеводам; 50 г chicken ≈ 11.5 г Б —
+            // выше порога MPS-стимула Moore 2015). <60 кг — прежние 40 г (F50 не душим).
+            mainProteinFloor: input.weightKg >= 80 ? 75 : input.weightKg >= 65 ? 55 : input.weightKg >= 60 ? 50 : 40,
             mealProteinCap: 58,
             lbmKg: input.lbmKg || 0,
             // E15: пол ночного приёма — вес-зависимый бюджет (0.4 г/кг, 20–45 г),
@@ -9426,10 +9437,11 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
             // твёрдого; комната делится между растущими позициями приёма).
             growCap: (it: any, role: string, meal?: any) => {
               const _plateShare = () => {
-                if (!_bigDayRecon || !meal) return Infinity;
+                if ((!_bigDayRecon && !_extremeRecon) || !meal) return Infinity;
+                const _plateLimit = _extremeRecon ? 900 : 700;
                 const _solid = (meal.items || []).filter((x: any) => x.role !== 'liquid')
                   .reduce((s: number, x: any) => s + (x.amount || 0), 0);
-                const _room = Math.max(0, 700 - _solid);
+                const _room = Math.max(0, _plateLimit - _solid);
                 const _growables = (meal.items || []).filter((x: any) =>
                   (x.role === 'carb_slow' || x.role === 'carb_fast' || x.role === 'fat')
                   && !((x as any)._fixedGrams) && (x.amount || 0) > 0).length;
@@ -9446,7 +9458,87 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
               if (it.id === 'egg_whole') return Math.min(eggCatchupCap(quotaWeightScale(input.weightKg)), it.amount + _plateShare());
               const capItem = maxGramPerItem(_pickCtx.currentBudget);
               const capEdible = edibilityCapFor(it.id, Infinity);
-              return Math.min(capItem, capEdible, it.amount + _plateShare());
+              let _base = Math.min(capItem, capEdible, it.amount + _plateShare());
+              // E16: паритет клетчатки — рост носителя не пробивает реализм-кап дня 85 г
+              // (иначе финальная подгонка выводила клетчатку за 85: масса 100/6пр/max
+              // 85.3 → «≤85» падал). Только рост; срез не ограничиваем.
+              if ((role === 'carb_slow' || role === 'carb_fast')
+                && !_pickCtx.capacity.active && !_isHighCarbDay(input.goalCarbsG || 0, input.weightKg || 80)
+                && (input.goalKcal || 0) < 4500 && input.carbCapGPerKg !== 0) {
+                const _fibNow = meals.reduce((s: number, mm: any) => s + (mm.items || []).reduce((a: number, x: any) => a + (x.fiber || 0), 0), 0);
+                const _perGFib = (it.fiber || 0) / Math.max(1e-6, it.amount || 1);
+                if (_perGFib > 0) _base = Math.min(_base, it.amount + Math.max(0, 85 - _fibNow) / _perGFib);
+              }
+              // E16: peri-окна — рост углеводов ограничен капами окон (prew 60 / postw 75,
+              // как у билдера): иначе reconcile на 1200–1500У раздувал postw до 120 г У
+              // (падал инвариант «peri-капы при любом бюджете», planner-high-volume).
+              const _mtm = String(meal?.type || '');
+              if ((role === 'carb_slow' || role === 'carb_fast') && (_mtm === 'preworkout' || _mtm === 'postworkout')) {
+                // Потолок окна: суммарные У приёма ≤60 (prew) / ≤75 (postw) — как капы билдера.
+                // Целевые У позиции = кап − У остальных позиций; выше текущей не поднимаем
+                // (growCap — только верхняя граница, срез делает knob-lo).
+                const _capC = _mtm === 'preworkout' ? 60 : 75;
+                const _mealC = (meal.items || []).reduce((s: number, x: any) => s + (x.c || 0), 0);
+                const _otherC = Math.max(0, _mealC - (it.c || 0));
+                const _perG = (it.c || 0) / Math.max(1e-6, it.amount || 1);
+                const _byCarb = _perG > 0 ? Math.max(0, _capC - _otherC) / _perG : it.amount;
+                return Math.min(_base, Math.max(it.amount, _byCarb));
+              }
+              return _base;
+            },
+            // E16: «долив» новым lean-носителем, когда роста существующих позиций нет
+            // (все выше капов роста). Продукт выбирает движок: FOOD_DB, исключения,
+            // аллергены, семейные капы, съедобность; граммы — под дефицит углеводов.
+            // Только обычные не-HV дни (HV/экстримы идут своими калиброванными проходами).
+            tryAddCarrier: (meal: any, deficitC: number) => {
+              try {
+                if (_pickCtx.highVolumeDay || _pickCtx.capacity.active) return null;
+                const _mt = String(meal?.type || '');
+                // Завтрак — вне списка: рис/картофель в завтраке запрещены типологией
+                // (planner-anchor-wave-verify: «нет гарниров-нарушителей в завтраке»).
+                if (!['lunch', 'dinner'].includes(_mt) && !/^snack/.test(_mt)) return null;
+                // P2-паритет: второй углеводный источник в приёме разрешён только
+                // «большому» приёму (target.c ≥ 100 г) или крошечному (<180 ккал —
+                // укрупнение вместо фрагмента). Умеренный обед ~95 г У — ровно один носитель
+                // (planner-dietology-fixes «гречка+рис»).
+                const _hasCarbItem = (meal.items || []).some((x: any) => x.role === 'carb_slow' || x.role === 'carb_fast');
+                const _mkcalItems = (meal.items || []).reduce((s: number, x: any) => s + (x.kcal || 0), 0);
+                const _isFragMeal = _mkcalItems > 0 && _mkcalItems < 180;
+                const _tgC = (meal.target?.c as number) || 0;
+                if (_hasCarbItem && !_isFragMeal && _tgC > 0 && _tgC < 100) return null;
+                // Клетчатка дня: не добиваем носителем день, уже стоящий у реализм-капа 85 г.
+                const _fiberNow = meals.reduce((s: number, mm: any) => s + ((mm.totals?.fiber as number) || 0), 0);
+                const _famUsesOf = (fam: string): number => {
+                  let n = 0;
+                  for (const mm of meals) {
+                    if ((mm.items || []).some((x: any) => (x.role === 'carb_slow' || x.role === 'carb_fast') && stapleFamilyOf(x.id) === fam)) n++;
+                  }
+                  return n;
+                };
+                for (const cid of ['rice_white', 'potato_boiled', 'rice_basmati', 'corn_flakes', 'buckwheat', 'quinoa']) {
+                  if (_pickCtx.currentExcludedIds && _pickCtx.currentExcludedIds.has(cid)) continue;
+                  const fd = FOOD_DB.find((f: any) => f.id === cid);
+                  if (!fd || (fd.protein || 0) >= 5 || (fd.carbs || 0) < 15) continue;
+                  if (!foodPassesCtxAllergens(fd)) continue;
+                  const fam = stapleFamilyOf(cid) || cid;
+                  if (_famUsesOf(fam) >= familyMealCap(fam, { hv: false, ts: _pickCtx.dayTargetScale })) continue;
+                  const _defG = Math.ceil(deficitC / Math.max(1, fd.carbs || 1) * 100 / 5) * 5;
+                  const _capE = edibilityCapFor(cid, 300);
+                  const grams = Math.max(30, Math.min(200, _capE, _defG));
+                  const r = grams / 100;
+                  // реализм-кап клетчатки дня (85 г) — добавка не пробивает потолок
+                  if (_fiberNow + (fd.fiber || 0) * r > 85) continue;
+                  return {
+                    id: cid, role: 'carb_slow', amount: grams,
+                    p: +((fd.protein || 0) * r).toFixed(1),
+                    f: +((fd.fat || 0) * r).toFixed(1),
+                    c: +((fd.carbs || 0) * r).toFixed(1),
+                    kcal: Math.round(((fd.kcal || 0) || ((fd.protein || 0) * 4 + (fd.fat || 0) * 9 + (fd.carbs || 0) * 4)) * r),
+                    fiber: +((fd.fiber || 0) * r).toFixed(1),
+                  };
+                }
+              } catch { /* best-effort — не ломаем генерацию */ }
+              return null;
             },
             // Сетка среза теперь 5-г (мелкая) — спуску нужно больше проходов.
             maxIter: 10,
@@ -9700,6 +9792,58 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
       if (_swappedAny) _refreshMpsFromMeals();
     }
 
+    // ─── E16: финальный кап клетчатки дня (реализм ≤85 г) ───
+    // Клетчатка растёт с углеводными носителями. На НЕсогласованных целях
+    // (530У при 4200 ккал: Atwater-расчёт даёт 595 У) день честно идёт к
+    // kcal-derived цели и добивает кап 85 г (масса 100/6пр/max: 85.3). Один
+    // детерминированный срез самого клетчаткового flex-пункта — принят ТОЛЬКО
+    // если отклонение дня не ухудшается (иначе откат: «не навреди»).
+    {
+      // Гейт: экстремумы (capacity/HV по ЦЕЛИ/≥4500/инсулин-окна/carbCap=0) — у них свои
+      // калиброванные контуры, их клетчатка — часть матрицы. НЕ по _pickCtx.highVolumeDay:
+      // он включает kcal ≥4200 (масса 100/6пр/max 4200 — обычный день и должен ужиматься).
+      const _fiberSkip = _pickCtx.capacity.active || _isHighCarbDay(input.goalCarbsG || 0, input.weightKg || 80)
+        || (input.goalKcal || 0) >= 4500 || input.carbCapGPerKg === 0
+        || !!(input as any).refeedDay || meals.some((m: any) => m._insulinWindow);
+      const _FIBER_CAP = 85;
+      const _devF = () => Math.max(
+        (input.goalKcal || 0) > 0 ? Math.abs(totals.kcal - (input.goalKcal || 0)) / (input.goalKcal || 1) : 0,
+        (input.goalProteinG || 0) > 0 ? Math.abs(totals.p - (input.goalProteinG || 0)) / (input.goalProteinG || 1) : 0,
+        (input.goalFatG || 0) > 0 ? Math.abs(totals.f - (input.goalFatG || 0)) / (input.goalFatG || 1) : 0,
+        (input.goalCarbsG || 0) > 0 ? Math.abs(totals.c - (input.goalCarbsG || 0)) / (input.goalCarbsG || 1) : 0,
+      );
+      let _fguard = 0;
+      while (!_fiberSkip && totals.fiber > _FIBER_CAP + 0.05 && _fguard++ < 8) {
+        const _cands = meals.flatMap((m: any) => (m.items || []).map((it: any) => ({ m, it })))
+          .filter(({ m, it }: any) => (it.fiber || 0) > 0 && !it._fixedGrams
+            && !['intra', 'preworkout', 'postworkout', 'presleep'].includes(String(m.type || ''))
+            && !m._insulinWindow
+            && (it.amount || 0) > 10
+            && !((it as any)._microProtectedG > 0 && (it.amount || 0) <= (it as any)._microProtectedG))
+          .sort((a: any, b: any) => (b.it.fiber || 0) - (a.it.fiber || 0));
+        let _doneF = false;
+        const _devBeforeF = _devF();
+        for (const { m, it } of _cands) {
+          const _b = { amount: it.amount, p: it.p, f: it.f, c: it.c, kcal: it.kcal, fiber: it.fiber, leucine_mg: it.leucine_mg };
+          const _cut = Math.max(5, Math.round(it.amount * 0.1 / 5) * 5);
+          const _na = it.amount - _cut;
+          if (_na < 5) continue;
+          const _r = _na / Math.max(1e-6, it.amount);
+          it.amount = _na; it.p = +(it.p * _r).toFixed(1); it.f = +(it.f * _r).toFixed(1); it.c = +(it.c * _r).toFixed(1);
+          it.kcal = Math.round(4 * it.p + 9 * it.f + 4 * it.c);
+          if (typeof it.fiber === 'number') it.fiber = +(it.fiber * _r).toFixed(1);
+          if (typeof it.leucine_mg === 'number') it.leucine_mg = Math.round(it.leucine_mg * _r);
+          m.totals = mealTotalsOf(m.items); recalcDayTotals(meals, totals);
+          if (totals.fiber <= _FIBER_CAP + 0.05 && _devF() <= _devBeforeF + 1e-9) {
+            notes.push(`🌾 Клетчатка дня ужата до ≤${_FIBER_CAP} г: «${m.label || m.type}» ${it.id} −${_cut} г (реализм-кап; сходимость не хуже)`);
+            _doneF = true; break;
+          }
+          Object.assign(it, _b); m.totals = mealTotalsOf(m.items); recalcDayTotals(meals, totals);
+        }
+        if (!_doneF) break;
+      }
+    }
+
     // ─── P4/E0: честный флаг сходимости products-пути (ФИНАЛЬНЫЙ totals) ───
     // Считается здесь, ПОСЛЕ всех писателей и reconciliation. Канон допуска —
     // PLANNER_CONVERGENCE_PCT (3%). >3% — только честный best-effort с ЯВНОЙ
@@ -9845,8 +9989,14 @@ export function periProteinBudget(
   const lbm = Number.isFinite(lbmKg) && lbmKg > 0 ? lbmKg : 0;
   const targetMin = Math.round(lbm * 0.45);
   const targetMax = Math.round(lbm * 0.95);
-  const pre = slots.preworkout ? Math.max(20, Math.min(35, Math.round(lbm * 0.25))) : 0;
-  const post = slots.postworkout ? Math.max(25, Math.min(50, Math.round(lbm * 0.40))) : 0;
+  // Аудит-2/E16 (решение пользователя): полы слотов масштабируются LBM — паритет с
+  // полом reconciler'а (proteinFloorByType: 15/20 × lbm/55, мин 8/12). Было: фикс-полы
+  // 20/25 г — на малых атлетах (LBM 41–49: F50/F60) peri-белок доминировал цель
+  // 100–110 г, дни честно расходились (F60 T s1 Б +21%). Стало: 0.25/0.40 г/кг LBM,
+  // пол 8/12: LBM 41 → 10/16, 49 → 12/20, 73.8 → 18/30, 90 → 23/36. Крупные атлеты:
+  // prew 20→18 (LBM 73.8), postw без изменений (30); запас смягчает reconciler.
+  const pre = slots.preworkout ? Math.max(8, Math.min(35, Math.round(lbm * 0.25))) : 0;
+  const post = slots.postworkout ? Math.max(12, Math.min(50, Math.round(lbm * 0.40))) : 0;
   const total = pre + post;
   // The lower/upper range is reported from the actual active-slot policy;
   // for small LBM the slot minimum is physiologically more important.
@@ -10069,6 +10219,10 @@ export function closeExtremeMicroGaps(
       _it.amount = _beforeAmt + _gActual;
       _it.p = _after.p; _it.f = _after.f; _it.c = _after.c; _it.kcal = _after.kcal;
       _it.fiber = _after.fiber; if (_it.leucine_mg != null) _it.leucine_mg = _after.leucine_mg;
+      // E16: микро-доля защищена от финального reconciliation (иначе срез жиров
+      // возвращал VitE к 45% — срез белка/жира «съедал» именно микро-добавку).
+      // Пол только НА эту граммовку: резать выше неё reconcile по-прежнему может.
+      _it._microProtectedG = _beforeAmt + _gActual;
       _existing.m.totals = mealTotalsOf(_existing.m.items);
     } else {
       const item = {

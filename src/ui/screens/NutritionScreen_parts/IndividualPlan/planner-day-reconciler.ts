@@ -5,7 +5,9 @@
  *
  * Задача: после всех писателей движка минимизировать максимальное относительное
  * отклонение дня по 4 макросам (ккал/Б/Ж/У), двигая порции на дискретной сетке.
- * Не добавляет/не удаляет пункты, не меняет их вид — только граммы. Защищены
+ * Сама по себе не удаляет пункты и не меняет их вид — только граммы; НОВЫЙ пункт
+ * может появиться единственным путём: `tryAddCarrier` (E16) — движок отдаёт
+ * lean-носитель, если роста существующих не хватает (см. ниже). Защищены
  * peri-окна уколов, добавки/жидкости/овощи/фрукты; цельный белок основных
  * приёмов не уходит ниже стража реалистичности (75 г по умолчанию).
  *
@@ -59,6 +61,12 @@ export interface ReconOptions {
    *  множитель. Движок передаёт функцию, уважающую дневные капы (орехи/масла) и
    *  (E14) бюджет тарелки приёма — третий аргумент meal даёт текущий приём. */
   growCap?: (item: ReconItem, role: string, meal?: ReconMeal) => number;
+  /** E16: финальный «долив» lean-носителем, когда одиночные и парные ходы исчерпаны,
+   *  а день недобирает углеводы (M85 R s2: все носители уже выше капов роста → без
+   *  НОВОГО пункта углеводная ось висела на −12.7%). Продукт и граммы выбирает движок
+   *  (FOOD_DB, исключения/аллергены/семейные капы/съедобность); reconciler принимает
+   *  ход только если он улучшает max-отклонение — сам или в паре «+носитель / −белок». */
+  tryAddCarrier?: (meal: ReconMeal, deficitC: number) => ReconItem | null;
   maxIter?: number;
 }
 export interface ReconResult {
@@ -70,10 +78,18 @@ export interface ReconResult {
 
 const KNOB_ROLES = new Set(['protein', 'fast_protein', 'slow_protein', 'carb_slow', 'carb_fast', 'fat']);
 
-/** Нижний пол белка по типу приёма (граммы). Peri/pre-sleep можно подрезать —
- *  иначе белок трен-дня всегда «в плюс» (peri 20/28/28 = 76 г) и день не сходится.
- *  Small-athlete: у малого LBM абсолютные полы (15/20/25) — уже 0.4-0.6 г/кг и
- *  физически раздувают цель 100 г; масштабируем их вниз (крупные атлеты не тронуты). */
+/** Нижний пол белка по типу приёма (граммы). Peri/pre-sleep/перекусы — в граммах
+ *  БЕЛКА (в knob-коде конвертируются по плотности продукта), основные — в граммах ЕДЫ.
+ *  Аудит-2/E16 (решение пользователя): полы peri-окна масштабируются LBM —
+ *  крупные атлеты держат прежние полы (prew 15 / postw 20 для LBM ≥75), малые
+ *  ужимаются: prew = clamp(0.20 г/кг LBM, 6–15), postw = clamp(0.27 г/кг LBM, 9–20).
+ *  Было: 15/20 × lbm/55 — для LBM 49 это 13+18=31 г = 0.63 г/кг LBM на окно
+ *  (выше рекомендации Schoenfeld & Aragon 2018: 0.4–0.55 г/кг), из-за чего F60
+ *  не сходился (P +19.5%). Стало: LBM 49 → 10/13 (0.47 г/кг), LBM 41 → 8/11.
+ *  Перекусы: было «50 г ЕДЫ» (шот whey 20 г = 17 г Б неприкосновенен), стало
+ *  10 г БЕЛКА — срезаем powder на переборе белка (реализм еды держат полы основных).
+ *  fast_protein (порошок peri) дополнительно защищён полом 20 г ЕДЫ (D-28/E15:
+ *  MPS-порция сыворотки не ужимается — только в knob-коде, см. ниже). */
 function proteinFloorByType(mealType: string, mainFloor: number, amount: number, lbmKg = 0, preSleepFloorP = 0): number {
   const scale = lbmKg > 0 ? Math.min(1, lbmKg / 55) : 1;
   switch (mealType) {
@@ -81,9 +97,14 @@ function proteinFloorByType(mealType: string, mainFloor: number, amount: number,
     case 'lunch':
     case 'dinner': return mainFloor;
     case 'snack':
-    case 'snack2': return Math.min(mainFloor, 50);
-    case 'preworkout': return Math.max(8, Math.round(15 * scale));
-    case 'postworkout': return Math.max(12, Math.round(20 * scale));
+    case 'snack2':
+    case 'snack3':
+    case 'snack4':
+    case 'snack5':
+    case 'snack6': return Math.max(10, Math.round(10 * scale));
+    // peri: прежние крупные полы (15/20) с LBM-масштабом вниз для малых.
+    case 'preworkout': return lbmKg > 0 ? Math.max(6, Math.min(15, Math.round(0.20 * lbmKg))) : 15;
+    case 'postworkout': return lbmKg > 0 ? Math.max(9, Math.min(20, Math.round(0.27 * lbmKg))) : 20;
     case 'presleep': return preSleepFloorP > 0 ? preSleepFloorP : Math.max(15, Math.round(25 * scale));
     default: return Math.min(amount, 40);
   }
@@ -168,12 +189,20 @@ export function reconcileDay(mealsIn: ReconMeal[], targets: ReconTargets, opts?:
         // E10: slow_protein (казеин/творог pre-sleep) — тоже регулируемый белок:
         // на малых КБЖУ это единственная позиция белка выше пола, без неё день не сходится.
         const _mt = String(m.type || '');
-        const _isPeri = _mt === 'preworkout' || _mt === 'postworkout' || _mt === 'presleep';
+        const _isPeri = _mt === 'preworkout' || _mt === 'postworkout' || _mt === 'presleep' || /^snack/.test(_mt);
         const _floor = proteinFloorByType(_mt, mainProteinFloor, it.amount, opts?.lbmKg ?? 0, opts?.preSleepFloorP ?? 0);
         if (_isPeri) {
+          // пол в граммах БЕЛКА: переводим в граммы еды по плотности продукта
+          // (перекусы с E16 тоже здесь: powder-шот срезается на переборе белка).
           lo = (it.p || 0) > 0 ? Math.min(it.amount, Math.max(0, ((it.amount || 0) * _floor) / it.p)) : it.amount;
         } else {
           lo = Math.min(it.amount, _floor);
+        }
+        // D-28/E15: MPS-порция peri-порошка не ужимается ниже 20 г ЕДЫ — но только в
+        // peri-ОКНАХ pre/post (D-28 «peri-workout сыворотка не ужимается»): в перекусе
+        // сыворотка — обычный белок, её граммовка остаётся крутилкой сведения дня.
+        if (role === 'fast_protein' && (String(m.type || '') === 'preworkout' || String(m.type || '') === 'postworkout')) {
+          lo = Math.max(lo, Math.min(it.amount, 20));
         }
         const pPerG = (it.p || 0) / Math.max(1e-6, it.amount || 0);
         const roomP = Math.max(0, mealProteinCap - mealPNow);
@@ -190,6 +219,10 @@ export function reconcileDay(mealsIn: ReconMeal[], targets: ReconTargets, opts?:
         lo = Math.min(it.amount, 5);
         hi = Math.min(it.amount * 1.6, _growCap);
       }
+      // §3I/E16: микро-добавка (семечки/морковь на 8000+) защищена до своей граммовки —
+      // иначе срез жира обнулял VitE (45% против канона ≥70%). Для ВСЕХ ролей (семечки —
+      // жир, не только белок). Выше защищённой граммовки резать по-прежнему можно.
+      if ((it as any)._microProtectedG > 0) lo = Math.max(lo, Math.min(it.amount, (it as any)._microProtectedG));
       // Диапазон: белок/угли ≥5 г, жир ≥2 г (масло 5→8 г закрывает жир-ось).
       if (hi - lo < (role === 'fat' ? 2 : 5)) return;
       knobs.push({ mi, ii, lo, hi });
@@ -299,6 +332,74 @@ export function reconcileDay(mealsIn: ReconMeal[], targets: ReconTargets, opts?:
         evalAmount(pairBest.k1, pairBest.v1);
         evalAmount(pairBest.k2, pairBest.v2);
         bestDev = pairBestDev; bestAbs = pairBestAbs; improved = true;
+      }
+      // ─── E16: «долив» новым lean-носителем (когда роста существующих нет) ───
+      // Движок даёт кандидата (FOOD_DB + исключения/аллергены/семейные капы).
+      // Принимаем ход сам по себе ИЛИ в паре со срезом переполненного белка
+      // (иначе M85 R s2: −12.7% У при Б +10.8% — обе оси сцеплены, роста нет).
+      if (!improved && opts?.tryAddCarrier) {
+        const _cDef = (targets.c || 0) - sumDay(meals).c;
+        if (_cDef > Math.max(5, (targets.c || 0) * 0.02)) {
+          const _shrinkP = knobs.filter(k => {
+            const r = String(meals[k.mi].items[k.ii].role || '');
+            return (r === 'protein' || r === 'fast_protein' || r === 'slow_protein')
+              && k.lo < meals[k.mi].items[k.ii].amount - 2;
+          });
+          // Порядок: сначала «крошечные» основные приёмы (<180 ккал) — долив делает их
+          // полноценными (E11-гарантия), затем остальные (детерминированно по индексу).
+          const _kcalOf = (m: ReconMeal): number => (m.items || []).reduce((s, x) => s + (x.kcal || 0), 0);
+          const _isMainT = (t: string): boolean => t === 'breakfast' || t === 'lunch' || t === 'dinner';
+          const _order = meals.map((_m, i) => i).sort((a, b) => {
+            const fa = _isMainT(String(meals[a].type || '')) && _kcalOf(meals[a]) > 0 && _kcalOf(meals[a]) < 180 ? 0 : 1;
+            const fb = _isMainT(String(meals[b].type || '')) && _kcalOf(meals[b]) > 0 && _kcalOf(meals[b]) < 180 ? 0 : 1;
+            return fa - fb || a - b;
+          });
+          for (const mi of _order) {
+            const m = meals[mi];
+            if (protect.has(String(m.type || '')) || m._insulinWindow) continue;
+            if ((m.items || []).length >= 8) continue;
+            const cand = opts.tryAddCarrier(m, _cDef);
+            if (!cand || !(cand.amount > 0)) continue;
+            const added: ReconItem = { ...cand };
+            m.items.push(added);
+            let accepted = false;
+            {
+              const tot = sumDay(meals);
+              const d = reconMaxDev(tot, targets);
+              const a = absDev(tot, targets);
+              if (d < bestDev - 1e-9 || (Math.abs(d - bestDev) <= 1e-9 && a < bestAbs - 1e-9)) {
+                bestDev = d; bestAbs = a; accepted = true; improved = true;
+              }
+            }
+            if (!accepted && _shrinkP.length > 0) {
+              let pairDev = bestDev; let pairAbs = bestAbs; let pairK: Knob | null = null; let pairV = 0;
+              for (const k1 of _shrinkP) {
+                const it1 = meals[k1.mi].items[k1.ii];
+                const cur1 = it1.amount;
+                const o1 = { p: it1.p, f: it1.f, c: it1.c, kcal: it1.kcal, fiber: it1.fiber, leucine_mg: it1.leucine_mg, amount: it1.amount };
+                // Мелкие позиции (шот сыворотки 15 г): снап-сетка округляет 12.5–14 → 15 (=cur)
+                // и срез «не существует» — добавляем целые fallback-кандидаты.
+                for (const v1 of [snapV(k1, k1.lo), snapV(k1, (cur1 + k1.lo) / 2), Math.max(k1.lo, cur1 - 5), Math.max(k1.lo, Math.round((cur1 + k1.lo) / 2))]) {
+                  if (!(v1 < cur1 - 1)) continue;
+                  evalAmount(k1, v1);
+                  const tot = sumDay(meals);
+                  const d = reconMaxDev(tot, targets);
+                  const a = absDev(tot, targets);
+                  if (d < pairDev - 1e-9 || (Math.abs(d - pairDev) <= 1e-9 && a < pairAbs - 1e-9)) {
+                    pairDev = d; pairAbs = a; pairK = k1; pairV = v1;
+                  }
+                  Object.assign(it1, o1);
+                }
+              }
+              if (pairK) {
+                evalAmount(pairK, pairV);
+                bestDev = pairDev; bestAbs = pairAbs; accepted = true; improved = true;
+              }
+            }
+            if (accepted) break;
+            m.items.pop();
+          }
+        }
       }
     }
     if (!improved) break;

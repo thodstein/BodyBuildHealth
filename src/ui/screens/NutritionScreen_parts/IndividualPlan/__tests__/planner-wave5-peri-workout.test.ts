@@ -220,7 +220,10 @@ describe('Wave 5: buildDayPlan peri-workout integration', () => {
 describe('Wave 5: periProteinBudget with training schedule', () => {
   it('training day with both slots: budget is LBM-scaled', () => {
     const budget = periProteinBudget(73.8, true, { preworkout: true, postworkout: true });
-    expect(budget.preworkoutG).toBeGreaterThanOrEqual(20);
+    // было→стало (E16, Sep 30 2026, решение пользователя): фикс-пол 20 г завышал
+    // пери-бюджет малым LBM; теперь prew = 0.25 г/кг LBM (мин 8) — для LBM 73.8
+    // бюджет 18 г (было ≥20), суммарно окно 0.65 г/кг остаётся в каноне 0.4–0.95.
+    expect(budget.preworkoutG).toBeGreaterThanOrEqual(18);
     expect(budget.postworkoutG).toBeGreaterThanOrEqual(25);
     expect(budget.totalG).toBe(budget.preworkoutG + budget.postworkoutG);
   });
@@ -232,7 +235,8 @@ describe('Wave 5: periProteinBudget with training schedule', () => {
 
   it('training day with only preworkout: budget is pre-only', () => {
     const budget = periProteinBudget(73.8, true, { preworkout: true, postworkout: false });
-    expect(budget.preworkoutG).toBeGreaterThanOrEqual(20);
+    // было→стало (E16): 20 → 18 (0.25 г/кг LBM, мин 8) — см. тест бюджета выше.
+    expect(budget.preworkoutG).toBeGreaterThanOrEqual(18);
     expect(budget.postworkoutG).toBe(0);
   });
 
