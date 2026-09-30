@@ -1,4 +1,4 @@
-﻿/**
+/**
  * BbAutoConstructor.tsx — PRO-ББ АВТО-КОНСТРУКТОР (профессиональный тренерский подход).
  *
  * Ключевые улучшения против базового:
@@ -64,6 +64,7 @@ import { useOriginalPrograms } from './useOriginalPrograms';
 
 import { PlanExportCard } from './PlanExportCard';
 import { loadSavedBBPlans, saveBBPlanVariant, deleteBBPlanVariant, type SavedBBPlan } from './bb-plans-store';
+import { bbPlanSaveBlockReason } from './bb-plan-save-guard';
 import { deserializeBBPrepConfig, legacyConfigFromProfile, isoAddDays, isoToday, CATEGORY_PROFILES, buildBBContestPrepPlan, applyContestPrepToBBPlan, extendBBPlanPreparation, addPrepWeeks, shiftBBContestPrepShowDate, prepPhaseForDate, configFromPlan, computeReadiness, spillRiskScore, isShortCycle, saveTestPeakWeekResult, latestTestPeakWeek, planFromStored, prepWeightAdvice, syncPrepDietBreaksWithPlan, recommendBBTaperConfig, sRPEAdjustment, loadShowChecklist, type BBTaperRecommendation, buildContestPrepPrintHtml, recordPrepAdjustment, buildPrepIcs, buildPrepCoachJson, prepTrainingCompliance, buildPrepWeeklyReportHtml, buildPrepCheckinsCsv, trialCarbDoseGPerKg, type BBContestPrepConfig, type BBContestCategory, type ContestSpecialization, type BBContestPrepPlan, type BBPlanWithPrep, type ContestEventEntry, type WaterStrategy, type SodiumStrategy, type CarbLoadStrategy } from '../../../engines/bb/bb-contest-prep.engine';
 import { CONTEST_PREP_UPDATED_EVENT, migrateLegacyContestPrepIfNeeded, storeContestPrepPlan } from '../../../engines/bb/bb-contest-prep-sync';
 import { loadPeakWeekLog, peakWeekAdherence, peakWeekTrendAdvice, emergencyLines } from '../../../engines/bb/bb-peak-pro.engine';
@@ -2633,8 +2634,12 @@ export const BbAutoConstructor: React.FC = () => {
         injuries,
         mobilityRestrictions,
       });
-      if (saveSafety.riskLevel === 'dangerous') { flash(`⚠ SafetyScore ${saveSafety.score}/100 — план сохранён с предупреждением, проверьте риски.`); }
-      if (!planToSave.validation?.valid) { flash('⚠ План сохранён с ошибками валидации — проверьте предупреждения.'); }
+      // Волна 0, п.0.2 (исполнение валидатора): план с error-ами валидации или
+      // SafetyScore < 60 НЕ сохраняется — раньше показывалось предупреждение,
+      // но запись всё равно уходила в he_bb_plan_saved (небезопасный план мог
+      // быть исполнен). Блокировка честная: причина + что править.
+      const blockReason = bbPlanSaveBlockReason(planToSave, saveSafety);
+      if (blockReason) { flash(blockReason); return; }
       setBuiltPlan(planToSave); localStorage.setItem('he_bb_plan_saved', JSON.stringify({ plan: planToSave, date: new Date().toISOString() })); flash('План сохранён');
       try { localStorage.removeItem('he_bb_plan_saved_prev'); localStorage.removeItem('he_bb_plan_history'); } catch { /* ignore */ }
     } catch { flash('Ошибка сохранения'); }
@@ -2645,8 +2650,9 @@ export const BbAutoConstructor: React.FC = () => {
     if (!builtPlan) return;
     const exportPlan = applyEditsToPlan(builtPlan);
     const saveSafety = calculatePlanSafetyScore(exportPlan, { acwrRatio: calculateACWR(), injuries, mobilityRestrictions });
-    if (saveSafety.riskLevel === 'dangerous') { flash(`⚠ SafetyScore ${saveSafety.score}/100 — сохраняем с предупреждением.`); }
-    if (!exportPlan.validation?.valid) { flash('⚠ Есть ошибки валидации — сохраняем с предупреждением.'); }
+    // Волна 0, п.0.2: небезопасный план не сохраняется (см. handleSavePlan).
+    const blockReason = bbPlanSaveBlockReason(exportPlan, saveSafety);
+    if (blockReason) { flash(blockReason); return; }
     const fallbackName = `${exportPlan.pattern.name} ${bbWeeks}нед`;
     setNamePrompt({
       title: '💾 Название плана (Мои тренировки)',
@@ -2674,7 +2680,9 @@ export const BbAutoConstructor: React.FC = () => {
   const handleSaveVariant = () => {
     if (!builtPlan || !metrics) return;
     const exportPlan = applyEditsToPlan(builtPlan);
-    if (!exportPlan.validation?.valid) { flash('⚠ Есть ошибки валидации — сохраняем вариант с предупреждением.'); }
+    // Волна 0, п.0.2: вариант с ошибками валидации не сохраняется.
+    const blockReason = bbPlanSaveBlockReason(exportPlan, null);
+    if (blockReason) { flash(blockReason); return; }
     const exportMetrics = calcBBPlanMetrics(exportPlan, pedAdapt.combinedMrvMultiplier);
     // Скор варианта — среднее понедельных «Объём» (факт выдачи × параметры плана).
     const exportQualityScore = (() => { try { return averageWeeklyScores(exportPlan as any).avgVolume; } catch { return 0; } })();

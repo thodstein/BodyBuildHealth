@@ -219,6 +219,10 @@ export const SPLIT_PATTERNS: SplitPattern[] = [
     id: 'push_pull_2',
     name: 'Push/Pull 4×/нед (каждая мышца 2×)',
     rotationDays: 7, sessionsPerRotation: 4,
+    // Аудит-2 (Волна 0): у сплита НЕТ дня ног — финализатор добивает нижнюю
+    // часть тела покрывающим проходом (ensureLegsCoverageForUpperOnlySplits):
+    // ноги не могут быть нулевыми в бодибилдинг-плане. Раскладка Push/Pull
+    // сохранена (селектор «high-объём → короткие дни ≤4 групп»).
     schedule: [
       { kind: 'тренировка', character: 'тяж', sessionTag: 'Push' },
       { kind: 'тренировка', character: 'памп', sessionTag: 'Pull' },
@@ -229,7 +233,7 @@ export const SPLIT_PATTERNS: SplitPattern[] = [
       { kind: 'отдых', character: null },
     ],
     level: ['intermediate', 'advanced', 'enhanced'],
-    description: 'Push/Pull 2×/нед: один тяж, один памп. Каждая мышца 2×/нед. Сбалансированный объём без перетрена.',
+    description: 'Push/Pull 2×/нед: один тяж, один памп; ноги покрываются добором (сплит их не содержит). Сбалансированный объём без перетрена.',
     direction: 'both',
   },
   {

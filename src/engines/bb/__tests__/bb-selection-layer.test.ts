@@ -203,8 +203,12 @@ describe('computeMuscleSets — вынесенный слой объёма (3.1)
     expect(computeMuscleSets('back', 3, { level: 'intermediate', phase: 'accumulation', role: 'primary', muscleVolumeRotation: rot, isHeavy: true })).toBe(3);
   });
 
-  it('natural advanced: спина поднимается к минимуму 10 (кап сессии 10)', () => {
-    expect(computeMuscleSets('back', 3, { level: 'advanced', phase: 'accumulation', role: 'primary', muscleVolumeRotation: rot, isHeavy: true })).toBe(10);
+  it('natural advanced: спина поднимается к канону сессии из недельного рецепта (14)', () => {
+    // Re-baseline (аудит-2, Волна 0): кап сессии = недельный канон ÷ 2 стимула.
+    // Было 10 (консервативная таблица натурала) → стало 14 (back advanced:
+    // лендмарк-неделя 28 × формула ×1.0 ÷ 2 стимула). Формула владельца:
+    // без ПЕД спина ~26–32/нед; табличная десятка срезала натуралу объём.
+    expect(computeMuscleSets('back', 3, { level: 'advanced', phase: 'accumulation', role: 'primary', muscleVolumeRotation: rot, isHeavy: true })).toBe(14);
   });
 
   it('deload не поднимает минимумы (кап сессии 16 для enhanced 5 лет)', () => {

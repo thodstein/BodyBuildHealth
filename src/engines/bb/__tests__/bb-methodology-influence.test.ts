@@ -137,9 +137,18 @@ describe('M1: каждая настройка реально влияет на �
     expect(sig(p)).not.toBe(sig(build({ goal: 'strength_mass' })));
   });
 
-  it('packingV2 меняет раскладку (сеты/число движений)', () => {
+  it('packingV2 включается (штамп плана + заливка сессий)', () => {
+    // Re-baseline (аудит-2): раскладка (сеты/движения) больше НЕ меняется —
+    // фазовый сброс хвостов отключён осознанно (P0-2.7): рецепт по роли
+    // (якорь 5, дальше 4) уже даёт ровно недельную сумму, а planPackingDrops
+    // удалял упражнения и ломал «6–8 упражнений на мышцу». Проверяем, что
+    // настройка реально доезжает до плана (штамп packingV2 + packingApplied
+    // в сессиях) и план валиден; «показано = применяется», но без
+    // переписывания раскладки.
     const p = build({ packingV2: true });
-    expect(sig(p)).not.toBe(sig(BASE));
+    expect((p as any).packingV2).toBe(true);
+    expect(p.weeks.some(w => w.sessions.some(s => (s as any).packingApplied === true))).toBe(true);
+    expect(sig(p)).toBe(sig(BASE));
   });
 
   it('pedPhaseOverride при MGF+IGF1 работает (фаза), иначе — честный игнор', () => {

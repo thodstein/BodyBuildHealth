@@ -253,11 +253,13 @@ export function sessionLimitsFor(
   }
   if (input.trainingVolumeMode === 'high') {
     const isMaxExp = input.level === 'enhanced' && (input.trainingYears ?? 0) >= 6;
-    maxWorkingSets = Math.round(maxWorkingSets * (isMaxExp ? 1.3 : 1.2));
-    // Абсолютный кап реализма: даже объёмный режим не выходит за 18 упражнений
-    // и 50 сетов (практический потолок тренажёрного дня ~2 часа).
+    const baseSets = maxWorkingSets;
+    // Объёмный режим НИКОГДА не опускает кап ниже базового (было: 52/60 на
+    // курсе ×1.2 → min(50) = 50 < 52 — «объёмный» режим УРЕЗАЛ сессию).
+    // Абсолютный потолок 60 сетов — канон владельца «про на ПЕД» (спина
+    // 60/нед ÷ 2 стимула = 30/сессию), 18 упражнений — практика дня ~2 ч.
+    maxWorkingSets = Math.min(60, Math.max(baseSets, Math.round(baseSets * (isMaxExp ? 1.3 : 1.2))));
     maxExercises = Math.min(18, maxExercises + (isMaxExp ? 3 : 2));
-    maxWorkingSets = Math.min(50, maxWorkingSets);
   }
   return { weeklyWorkingSets, maxWorkingSets, maxExercises };
 }
@@ -326,48 +328,27 @@ export function perSessionMuscleCap(input: {
   // курсе_6), из-за чего спина с рецептом 60 была недостижима и молча
   // прижималась к 2 сетам на упражнение.
   const weekly = weeklyCapFor({ muscle: (input.muscle || '').toLowerCase(), level: input.level, trainingYears: input.trainingYears, onCourse: input.onCourse });
-  if (weekly > 0) return Math.max(3, Math.round(weekly / 2));
-  const level = (input.level || 'intermediate').toLowerCase();
-  const years = Number.isFinite(input.trainingYears) ? (input.trainingYears as number) : 0;
-  const course = !!input.onCourse; // ПЕД-признак (уровень 'enhanced' без ПЕД = опытный натурал)
-  const m = (input.muscle || '').toLowerCase();
-  const isBackLegs = ['back', 'quads', 'hamstrings', 'glutes', 'legs'].includes(m);
-  const isChest = ['chest', 'shoulders'].includes(m);
-  const isArm = ['biceps', 'triceps', 'delt_front', 'delt_mid', 'delt_rear', 'forearms'].includes(m);
-  if (course && years >= 6) {
-    if (isBackLegs) return 22;
-    if (isChest) return 18;
-    if (isArm) return 12;
-    return 16;
-  }
-  if (course && years >= 3) {
-    if (isBackLegs) return 16;
-    if (isChest) return 14;
-    if (isArm) return 10;
-    return 12;
-  }
-  if (course && years >= 1) {
-    if (isBackLegs) return 12;
-    if (isChest) return 10;
-    if (isArm) return 8;
-    return 10;
-  }
-  // Натуральные капы — умеренные (BIG только курсу/стажу выше).
-  // intermediate держим около старого поведения (кап 5 → 6-8 точечно),
-  // иначе натуральные недельные объёмы улетают за MRV (chest 22 при MRV 20).
-  if (level === 'advanced' || level === 'enhanced') {
-    if (isBackLegs) return 10;
-    if (isChest) return 8;
-    if (isArm) return 6;
-    return 8;
-  }
-  if (level === 'intermediate') {
-    if (isBackLegs) return 8;
-    if (isChest) return 7;
-    if (isArm) return 5;
-    return 6;
-  }
-  return 6;
+  const level0 = (input.level || 'intermediate').toLowerCase();
+  const years0 = Number.isFinite(input.trainingYears) ? (input.trainingYears as number) : 0;
+  const course0 = !!input.onCourse;
+  const m0 = (input.muscle || '').toLowerCase();
+  const isBack0 = m0 === 'back';
+  const isBackLegs0 = ['back', 'quads', 'hamstrings', 'glutes', 'legs'].includes(m0);
+  const isChest0 = ['chest', 'shoulders'].includes(m0);
+  const isArm0 = ['biceps', 'triceps', 'delt_front', 'delt_mid', 'delt_rear', 'forearms'].includes(m0);
+  // ОТКАЛИБРОВАННЫЙ ПОЛ (прежняя таблица): канон спины (60/2=30) и формула
+  // могут его только ПОДНЯТЬ. Иначе ноги/грудь/пресс падали вдвое
+  // (квадры 22→11, грудь 24→18, пресс 13→8) — регрессия против калибровки.
+  let legacy = 6;
+  if (course0 && years0 >= 6) legacy = isBackLegs0 ? 22 : isChest0 ? 18 : isArm0 ? 12 : 16;
+  else if (course0 && years0 >= 3) legacy = isBackLegs0 ? 16 : isChest0 ? 14 : isArm0 ? 10 : 12;
+  else if (course0 && years0 >= 1) legacy = isBackLegs0 ? 12 : isChest0 ? 10 : isArm0 ? 8 : 10;
+  else if (level0 === 'advanced' || level0 === 'enhanced') legacy = isBackLegs0 ? 10 : isChest0 ? 8 : isArm0 ? 6 : 8;
+  else if (level0 === 'intermediate') legacy = isBackLegs0 ? 8 : isChest0 ? 7 : isArm0 ? 5 : 6;
+  // Спина на курсе: канон владельца (60/2 = 30) главнее пола.
+  if (isBack0 && course0) return Math.max(legacy, weekly > 0 ? Math.round(weekly / 2) : legacy);
+  if (weekly > 0) return Math.max(legacy, Math.round(weekly / 2));
+  return legacy;
 }
 
 /** Shared nutrition soft-cap used by every BB source (Helms 2022). */
@@ -710,8 +691,12 @@ export const SESSION_MUSCLE_REALISM: Record<'beginner' | 'intermediate' | 'advan
   // «спина 6 упражнений × 2 сета»). Ориентир для опытных — Schoenfeld 2017
   // (опрос 340 силовиков): ~20 прямых сетов на мышцу за сессию; для про-на-курсе
   // с рецептом 60/нед за 2 стимула это 30/сессию.
-  beginner:     { big: 11, mid: 7,  small: 7 },
-  intermediate: { big: 15, mid: 9,  small: 8 },
+  // beginner/intermediate — ОТКАЛИБРОВАННЫЕ значения (исследовательская база
+  // для этих уровней). Поднятие их вместе с про-тирами давало реальный
+  // MRV-overflow (beginner × ppl_6: ovf 1 в матрице проф-методик).
+  beginner:     { big: 8,  mid: 7,  small: 7 },
+  intermediate: { big: 12, mid: 9,  small: 8 },
+  // advanced и курсовые тиры — выше пропорционально (база «про на курсе»).
   advanced:     { big: 20, mid: 12, small: 10 },
   course_1:     { big: 22, mid: 12, small: 10 },
   course_3:     { big: 26, mid: 13, small: 11 },
@@ -890,14 +875,15 @@ export function sessionMuscleRealismCap(input: {
 
 /** Потолок числа упражнений на мышцу в сессии: ≥2 сета на упражнение (Schoenfeld). */
 export function sessionMuscleExerciseCap(setsForMuscle: number): number {
-  // Сколько упражнений нужно мышце, чтобы набрать setsForMuscle прямых сетов.
-  // Принцип владельца: 6-8 упражнений на мышцу, якорное получает больше
-  // подходов (тяга верхнего блока 5 сетов и дальше), остальные 3-5.
-  // 30 сетов → 7 упражнений (5+5+4+4+4+4+4), 20 → 5, 12 → 4, 8 → 3.
-  // Раньше стояло деление на 2 (30 → 15 упражнений, нереально) или /3.5 (→ 9,
-  // больше потолка сессии в 16 упражнений при 5+ группах).
+  // Правило владельца: на КРУПНУЮ мышцу 6-8 упражнений (спина про: 30 сетов
+  // → 8 по верхней границе диапазона; сумма держится distributeSetsByRole),
+  // а не 15 по «2 сета на упражнение».
+  // Средние/малые НЕ ужимаются ниже прежнего поведения (ceil(s/2)) —
+  // иначе руки/дельты/икры теряли половину объёма при том же числе сетов
+  // (бицепс 16→8, задняя дельта 16→7 в снапшотах).
   const s = Number(setsForMuscle) || 0;
-  return Math.max(3, Math.min(8, Math.ceil(s / 4.5)));
+  const byFloor = Math.max(1, Math.ceil(s / 2));
+  return Math.min(byFloor, Math.max(3, Math.min(8, Math.ceil(s / 4.5) + 1)));
 }
 
 /**

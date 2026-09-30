@@ -83,6 +83,11 @@ export interface BBWeek {
   phase?: BBPhase;
   deload?: boolean;
   taper?: boolean;
+  /** Волна 0, п. 0.5: неделя уже прошла авто-taper финализатора
+   *  (applyTaperToFinalWeeks). Повторная финализация (revalidate после правок)
+   *  пропускает такие недели — раньше taper ×0.75/×0.50 накладывался поверх
+   *  себя (объём −8.13% за 3 прогона). */
+  taperApplied?: boolean;
   /** Волна 5.3: структурный флаг недели-разгрузки (фаза/флаг deload, второй
    *  overreaching-делод). Потребители читают флаг, комментарий — для UI. */
   isDeloadLike?: boolean;
@@ -104,6 +109,22 @@ export interface BBPlan {
   report?: BBPlanReport;
   balanceReport?: import('./bb-balance.engine').BBBalanceReport;
   validation?: BBPlanValidationResult;
+  /** Волна 0 follow-up (аудит-2): контекст финализации — повторная финализация
+   *  (revalidate) читает его, чтобы не пересчитывать капы как у натурала. */
+  buildContext?: {
+    level?: string;
+    trainingYears?: number;
+    onCourse?: boolean;
+    doseAwareMrv?: number;
+    courseIntensity?: string;
+    maxWorkingSets?: number;
+    maxExercises?: number;
+    priorityMuscles?: string[];
+    specializationSchedule?: any;
+    mrvMultiplier?: number;
+    gradedMuscles?: string[];
+    mobilityRestrictions?: string[];
+  };
   safetyConstraints?: {
     equipment?: string[];
     excludedExercises?: string[];

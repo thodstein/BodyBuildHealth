@@ -1107,6 +1107,11 @@ export function applyTaperToFinalWeeks(plan: BBPlan, _totalWeeks: number): BBPla
 
   const newWeeks = weeks.map((w, idx) => {
     if (idx < taperStart || idx >= taperEnd) return w; // не taper-неделя
+    // Волна 0, п. 0.5 (идемпотентность): неделя уже прошла авто-taper —
+    // повторная финализация (revalidate после правок в «Коррекции») НЕ
+    // накладывает кривую второй раз (было ×0.75×0.75 и ×0.50×0.50,
+    // суммарно −8.13% объёма за 3 прогона).
+    if ((w as any).taperApplied === true) return w;
     // P0-fix: пропускать недели, уже являющиеся deload (объём < 60% предыдущей).
     // Иначе taper×deload = двойное снижение (0.50×0.45 = 22.5% объёма = перетрен).
     const curSets = w.sessions.flatMap(s => s.exercises).reduce((sum, e) => sum + e.sets, 0);
@@ -1140,7 +1145,7 @@ export function applyTaperToFinalWeeks(plan: BBPlan, _totalWeeks: number): BBPla
         };
       }),
     }));
-    return { ...w, sessions: newSessions, taper: true };
+    return { ...w, sessions: newSessions, taper: true, taperApplied: true };
   });
 
   return { ...plan, weeks: newWeeks };

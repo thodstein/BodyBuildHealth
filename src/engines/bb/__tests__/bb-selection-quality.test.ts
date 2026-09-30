@@ -17,6 +17,17 @@ function sessionForbidden(sessionTag: string): Set<string> | null {
   return null;
 }
 
+/** Аудит-2: сплит без дня ног (push_pull_2) получает ножное покрытие в
+ *  Push/Pull-сессии (финализатор добивает низ, иначе ноги = 0). Для таких
+ *  сплитов ножные мышцы в верхних днях — не «загрязнение», а покрытие. */
+function isUpperOnlySplit(splitId: string): boolean {
+  const p = SPLIT_PATTERNS.find(s => s.id === splitId) as any;
+  const schedule: any[] = Array.isArray(p?.schedule) ? p.schedule : [];
+  return schedule.length > 0 && !schedule.some((d: any) => d?.kind === 'тренировка'
+    && /Legs|Lower|FullBody|Glutes|Torso/i.test(String(d?.sessionTag || '')));
+}
+const LEG_MUSCLES = new Set(['quads', 'hamstrings', 'glutes', 'calves']);
+
 function muscleOf(ex: any): string | null {
   return ex.muscle || null;
 }
@@ -28,11 +39,14 @@ describe('BB-auto quality of exercise selection & comments', () => {
     for (const split of SPLIT_PATTERNS) {
       for (const level of levels) {
         const plan = buildBBPlan({ patternId: split.id, level, goal: 'mass', weeks: 1, workMax: WM });
+        const allowLegs = isUpperOnlySplit(split.id);
         for (const sess of plan.weeks[0].sessions) {
           const forbidden = sessionForbidden(sess.sessionTag || '');
           if (!forbidden) continue;
           for (const ex of sess.exercises) {
             const m = muscleOf(ex);
+            // Сплиты без дня ног: ножное покрытие в Push/Pull допустимо (см. isUpperOnlySplit).
+            if (allowLegs && m && LEG_MUSCLES.has(m)) continue;
             if (m && forbidden.has(m)) {
               // eslint-disable-next-line no-console
               console.log(`CROSS-TAG ${split.id} ${level} ${sess.sessionTag} → ${ex.name} (muscle=${m})`);

@@ -88,8 +88,12 @@ describe('0.3 — валидатор считает по тем же капам,
     expect(codes(withoutCaps.issues)).toContain('session_working_set_cap');
   });
 
-  it('контекст курса доезжает до капа: intermediate+6 лет на курсе = 44/16, а не 24/10', () => {
-    expect(sessionLimitsFor({ level: 'intermediate', trainingYears: 6, onCourse: true })).toEqual({ maxWorkingSets: 44, maxExercises: 16 });
+  it('контекст курса доезжает до капа: intermediate+6 лет на курсе = 60/16, а не 24/10', () => {
+    // Re-baseline (аудит-2, потолок ПРО НА ПЕД): 44/16 → 60/16. 60 сетов —
+    // канон владельца для про на ПЕД (спина 60/нед ÷ 2 стимула = 30/сессию
+    // + руки/трапы/задняя дельта); 44 физически не вмещали недельный рецепт.
+    // 16 упражнений — потолок «ни одной сессии >16–17».
+    expect(sessionLimitsFor({ level: 'intermediate', trainingYears: 6, onCourse: true })).toEqual({ maxWorkingSets: 60, maxExercises: 16 });
     // Без onCourse тот же уровень = натуральный кап.
     expect(sessionLimitsFor({ level: 'intermediate', trainingYears: 6 })).toEqual({ maxWorkingSets: 24, maxExercises: 10 });
   });

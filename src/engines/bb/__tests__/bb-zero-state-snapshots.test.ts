@@ -58,11 +58,17 @@ describe('BB zero-state snapshots (baseline Этапа 10)', () => {
     // Факт по самому плану (нед 1, upper_lower_4, enhanced 6+): back 24→32,
     // chest 23→24, quads 18→22, abs 10→13, delt_mid исчез (ушёл в нули).
     // Снимок сверен с фактом: weeklyVolume === aggregateBBVolume по сессиям.
-    // ⚠️ Незакрыто (требует решения владельца, не правится молча): недельный
-    //   бюджет спины 32 < 60, заявленный владельцем для про-уровня; сейчас
-    //   спина получает 2 стимула в этом сплите, до 60 нужно 3-4 (см. отчёт).
+    // Re-baseline 8 (аудит-2, формула ПЕД + сессионные капы из канона):
+    // AAS-500 без GH/INS даёт более скромный dose-aware множитель, чем прежний
+    // плоский ×1.3-1.9 (chest 24→22, quads 22→18, glutes 12→10, abs 13→10),
+    // но финализатор догружает малые группы, которые раньше срезались капом
+    // сессии (traps 4→7, forearms 4→6, появились delt_front/mid по 2).
+    // back 32→33. Валидатор зелёный, инварианты целы.
+    // ⚠️ Граница (осознанная): на upper_lower_4 спина получает 2 стимула —
+    //   недельный бюджет 33 < 60 (канон про-на-ПЕД достигается на PPL с 2
+    //   Pull-днями; см. docs/BB-AUTO-PROFESSIONAL-AUDIT-2.md).
     expect(directVolume(plan)).toEqual({
-      abs: 13, back: 32, biceps: 4, calves: 10, chest: 24, delt_rear: 2, forearms: 4, glutes: 12, hamstrings: 26, quads: 22, shoulders: 0, traps: 4, triceps: 4,
+      abs: 10, back: 33, biceps: 4, calves: 10, chest: 22, delt_front: 2, delt_mid: 2, delt_rear: 2, forearms: 6, glutes: 10, hamstrings: 26, quads: 18, shoulders: 0, traps: 7, triceps: 4,
     });
   });
 
@@ -89,8 +95,16 @@ describe('BB zero-state snapshots (baseline Этапа 10)', () => {
     // Факт (нед 1, ppl_6, intermediate): back 20→18, бицепс 18→16 — это то,
     // что реально в плане; прежние значения были правдоподобной, но неверной
     // калибровкой. План не менялся.
+    // Re-baseline 6 (аудит-2): (1) сессионный кап считается ПЕР-НЕДЕЛЬНО
+    // (было: стимулы по всем неделям плана — на длинных планах кап делился
+    // дважды) — выполнение не режется ниже контракта (chest 16→18, glutes
+    // 9→11, hamstrings 10→12, quads 20→19 после перераспределения);
+    // (2) задняя дельта в Pull — канон пара «тяга к лицу + махи в наклоне»
+    // (по 3 сета за Pull) → delt_rear 16→12 при видимой паре 6/сессию
+    // (инвариант bb-ppl-invariant 5-8 выполняется); (3) грудь Push —
+    // наклон + горизонт (make-room вместо раннего выхода) → 18.
     expect(directVolume(plan)).toEqual({
-      abs: 8, back: 18, biceps: 16, calves: 18, chest: 16, delt_front: 5, delt_mid: 3, delt_rear: 16, forearms: 7, glutes: 9, hamstrings: 10, quads: 20, shoulders: 3, traps: 10, triceps: 16,
+      abs: 8, back: 18, biceps: 16, calves: 18, chest: 18, delt_front: 7, delt_mid: 3, delt_rear: 12, forearms: 7, glutes: 11, hamstrings: 12, quads: 19, shoulders: 3, traps: 10, triceps: 16,
     });
   });
 

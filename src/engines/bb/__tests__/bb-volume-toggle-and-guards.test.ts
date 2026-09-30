@@ -12,18 +12,19 @@ describe('F0: sessionLimitsFor капы от уровня (реализм сес
     const l = sessionLimitsFor({ level: 'intermediate', trainingYears: 1 });
     expect(l.maxWorkingSets).toBe(24);
   });
-  it('enhanced 0 лет + без onCourse -> 34/13 (было 40/14)', () => {
+  it('enhanced без ПЕД = опытный натурал -> 40/15 (было 34/13)', () => {
     const l = sessionLimitsFor({ level: 'enhanced', trainingYears: 0 });
-    // Re-baseline (аудит 2026-09, реализм сессии): 40/14 → 34/13.
-    // Причина: 40-сетовые сессии на плотных сплитах давали 16-18 упражнений;
-    // практический потолок тренажёрного дня — ~34 сета / 13 движений
-    // (Henselmans 9-13 сетов на группу, Remmert 2025 PUOS ≈ 11).
-    expect(l.maxWorkingSets).toBe(34);
-    expect(l.maxExercises).toBe(13);
+    // Re-baseline 2 (аудит-2, признак «на курсе» = фактический ПЕД):
+    // уровень enhanced БЕЗ доз идёт тиром advanced (натурал) и держит
+    // 40/15 — это откалиброванная полоса «опытный натурал»; 34/13 осталось
+    // бы регрессией, срезавшей натуральный про-объём до курсовых лимитов
+    // (см. bbVolumeTier: course-тиры только по onCourse).
+    expect(l.maxWorkingSets).toBe(40);
+    expect(l.maxExercises).toBe(15);
   });
-  it('enhanced 1 год -> 34/13', () => {
+  it('enhanced 1 год без ПЕД -> 40/15', () => {
     const l = sessionLimitsFor({ level: 'enhanced', trainingYears: 1 });
-    expect(l.maxWorkingSets).toBe(34);
+    expect(l.maxWorkingSets).toBe(40);
   });
   it('enhanced 3 года -> 40/15 (было 60/18)', () => {
     const l = sessionLimitsFor({ level: 'enhanced', trainingYears: 3 });
@@ -32,9 +33,12 @@ describe('F0: sessionLimitsFor капы от уровня (реализм сес
     expect(l.maxWorkingSets).toBe(40);
     expect(l.maxExercises).toBe(15);
   });
-  it('natural 3 года + onCourse -> 40/15', () => {
+  it('курс 3 года (AAS, onCourse) -> 52/15 (было 40)', () => {
     const l = sessionLimitsFor({ level: 'intermediate', trainingYears: 3, onCourse: true, peds: ['AAS'] });
-    expect(l.maxWorkingSets).toBe(40);
+    // Re-baseline 2 (аудит-2, потолки ПРО НА ПЕД): курс 3+ лет — тир course_3,
+    // сессия держит курс-рецепт (спина 60/нед ÷ 2 стимула = 30/сессию + руки/
+    // трапы/задняя дельта ~52). 40/15 резало курс-план до натурального объёма.
+    expect(l.maxWorkingSets).toBe(52);
   });
 });
 

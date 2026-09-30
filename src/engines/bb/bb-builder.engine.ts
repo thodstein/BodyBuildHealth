@@ -384,6 +384,9 @@ export interface BBSession {
 }
 
 export interface BBWeek {
+  /** Волна 0, п. 0.5: неделя уже прошла авто-taper финализатора — повторная
+   *  финализация её пропускает (идемпотентность revalidate). */
+  taperApplied?: boolean;
   week: number;
   phase?: BBPhase;
   deload?: boolean;
@@ -505,6 +508,23 @@ export interface BBPlan {
   maxExercises?: number;
   gradedMuscles?: string[];
   mobilityRestrictions?: string[];
+  /** Волна 0 follow-up (аудит-2): контекст финализации (ПЕД/стаж/сессионные
+   *  капы) — повторная финализация (revalidate) читает его и не считает капы
+   *  как у натурала. См. finalizeBBPlan. */
+  buildContext?: {
+    level?: string;
+    trainingYears?: number;
+    onCourse?: boolean;
+    doseAwareMrv?: number;
+    courseIntensity?: string;
+    maxWorkingSets?: number;
+    maxExercises?: number;
+    priorityMuscles?: string[];
+    specializationSchedule?: any;
+    mrvMultiplier?: number;
+    gradedMuscles?: string[];
+    mobilityRestrictions?: string[];
+  };
   /** Расширенная недельная сводка сетов (по мышцам: сессии/рабочие/разминочные/паттерны). */
   expandedSummary?: import('./bb-summary.engine').BBExpandedSummary;
   // Полный слепок выбранных кнопок — чтобы отчёт соответствовал реальным настройкам (а не «от новичка»)
@@ -3095,7 +3115,17 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
       if (v == null) return 0;
       return parseFloat(String(v).replace(',', '.').replace(/[^0-9.\-eE]/g, '')) || 0;
     };
-    const active = (['AAS', 'insulin', 'MGF', 'IGF1', 'GH'] as const).filter(k => doseVal((doses as any)[k]) > 0);
+    // Алиасы классов с UI: «INS» → insulin, «HGH» → GH, «IGF» → IGF1.
+    // Без этого доза инсулина с UI не попадала в активные ПЕД (актив = [] по
+    // этому ключу), и формула ПЕД недосчитывала объём препаратов.
+    const PED_KEY_ALIAS: Record<string, 'AAS' | 'insulin' | 'MGF' | 'IGF1' | 'GH'> = {
+      AAS: 'AAS', insulin: 'insulin', INS: 'insulin', MGF: 'MGF',
+      IGF1: 'IGF1', IGF: 'IGF1', IGF1_LR3: 'IGF1', GH: 'GH', HGH: 'GH', gh: 'GH',
+    };
+    const active = (Object.keys(PED_KEY_ALIAS) as string[])
+      .filter(k => (doses as any)[k] !== undefined && doseVal((doses as any)[k]) > 0)
+      .map(k => PED_KEY_ALIAS[k])
+      .filter((v, i, a) => a.indexOf(v) === i);
     if (active.length > 0) {
       try {
         const baseMrv: Record<string, number> = {};
@@ -3318,6 +3348,23 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
       // MRV cap (mrvByMuscle[m]) вычисляется отдельно ниже с учётом recovery.
       recoveryMultiplier: 1,
     });
+    // Якоря владельца (спина 60, ноги 32+30+18): целевой объём мышцы не ниже
+    // канона. Без этого аллокация ног получала цель 26 и недодавала (квадры
+    // 11 прямых/нед при рецепте 32), а валидатор/ремонт считали это нормой.
+    // СКОУП: не при активной специализации — там у не-целей ПОДДЕРЖИВАЮЩИЙ
+    // объём MEV (floor поднял бы support до капа и сломал «топ-2 на MAV+10%,
+    // остальные на MEV»); цели блока получают MAV×1.1–1.3 своим путём.
+    if (!specRes.active) {
+      const anchor = weeklyCapFor({
+        muscle: m, level, trainingYears: input.trainingYears, onCourse,
+        courseIntensity: input.courseIntensity, doseAwareMrv: pedAdapt?.combinedMrvMultiplier,
+      });
+      const t = volumeTargets[m];
+      if (anchor > 0 && t && (t.targetSets || 0) < anchor) {
+        t.targetSets = anchor;
+        t.rationale = [...(t.rationale || []), `Якорь владельца: цель ≥ ${anchor} сетов/нед`];
+      }
+    }
     // fix D: истинный MRV — потолок для капа.
     // fix C: для отстающих/фокус-групп поднимаем потолок в такт объёмному
     // бусту (weak ×1.2, focus ×1.3), иначе normalizeWeekMrv стирает акцент.
@@ -4749,6 +4796,11 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
     trainingYears: input.trainingYears,
     // onCourse для BIG per-exercise капов финализатора (иначе курс душится до 5)
     onCourse,
+    // Формула ПЕД в финализаторе: без doseAwareMrv канон спины считался
+    // 42/нед (21/сессию) вместо 60/нед (30/сессию) — тяжесть курса и объём
+    // препаратов не доезжали до аллокации объёма.
+    doseAwareMrv: pedAdapt?.combinedMrvMultiplier,
+    courseIntensity: (input as any).courseIntensity,
     bodyweightCapability: input.bodyweightCapability,
     supersetMode: input.supersetMode,
     volumeScheme: effVolumeScheme,

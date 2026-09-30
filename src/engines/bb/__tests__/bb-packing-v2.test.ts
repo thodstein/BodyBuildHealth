@@ -161,12 +161,18 @@ describe('Packing-v2 в плане (пилот back)', () => {
     }
   });
 
-  it('BIG-объёмы: движений меньше, объём цел, план валиден', () => {
+  it('BIG-объёмы: объём цел, слотов не больше, план валиден', () => {
     const big: any = { ...base, level: 'enhanced', trainingYears: 6, pedDoses: { AAS: 500 }, courseIntensity: 'moderate' };
     const off = buildBBPlan({ ...big });
     const on = buildBBPlan({ ...big, packingV2: true });
+    // Re-baseline (аудит-2): строгое «слотов меньше» ослаблено до «не больше» —
+    // фазовый сброс хвостов (planPackingDrops) отключён осознанно (P0-2.7,
+    // bb-builder: PACKING_DROPS_ENABLED=false): после перехода на рецепт по
+    // роли (якорь 5, дальше 4) переливать нечего, а сам проход удалял
+    // упражнения и ломал правило «6–8 упражнений на мышцу». Паритет с
+    // натуральным кейсом строкой выше (там уже toBeLessThanOrEqual).
     expect(Math.abs(backSets(on) - backSets(off))).toBeLessThanOrEqual(2);
-    expect(backExCount(on)).toBeLessThan(backExCount(off));
+    expect(backExCount(on)).toBeLessThanOrEqual(backExCount(off));
     expect(isPackingActive(on)).toBe(true);
     const v = validateBBPlan(on, { level: 'enhanced', trainingYears: 6 } as any);
     expect(v.issues.filter(i => i.level === 'error')).toHaveLength(0);
