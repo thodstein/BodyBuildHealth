@@ -1,4 +1,4 @@
-﻿/**
+/**
  * bb-builder.engine.ts — генератор бодибилдинг-плана из раскладки ротации (Этап BB6, полный рефактор 3.1).
  * Связывает: bb-split-patterns (расписание) + bb-day-types (тяж/памп/первичная-добивка) +
  * volume-landmarks (MEV/MAV/MRV) + rir-matrix (RIR-прогрессия по неделям) + selection/volume/loading слои.
@@ -59,7 +59,7 @@ import { acuteChronicRatio, toDailyLoads } from '../../engines/pro/training-load
 import type { Macrocycle, MacroPhase, BBMacrocycle } from '../lms/macrocycle.engine';
 import { syncBBPlanSetShape, validateBBPlan } from './bb-validator.engine';
 import { finalizeBBPlan } from './bb-finalize.engine';
-import { buildBBVolumeTarget, type BBVolumeTarget, computeMrvMult, regimeMrvMultFor, computeBBRecoveryScore, computeBBWeeklyBudget, sessionLimitsFor, computeBBRecoveryMultiplier, computeBBNutritionMultiplier, perExerciseCap, perSessionMuscleCap, sessionMrvRotCap, sessionMuscleRealismCap, sessionMuscleExerciseCap, sessionDensityExerciseCap, resolveMrvCap, BB_MRV_TOLERANCE } from './bb-volume.engine';
+import { buildBBVolumeTarget, type BBVolumeTarget, computeMrvMult, regimeMrvMultFor, computeBBRecoveryScore, computeBBWeeklyBudget, sessionLimitsFor, computeBBRecoveryMultiplier, computeBBNutritionMultiplier, perExerciseCap, perSessionMuscleCap, sessionMrvRotCap, sessionMuscleRealismCap, sessionMuscleExerciseCap, sessionDensityExerciseCap, resolveMrvCap, weeklyCapFor, distributeSetsByRole, BB_MRV_TOLERANCE } from './bb-volume.engine';
 import { buildBBExpandedSummary } from './bb-summary.engine';
 import { jointGuardScorePenalty, jointGuardActive } from './bb-joint-guard.engine';
 import { insulinWindowActive, applyInsulinWindowToPlan } from './bb-insulin-window.engine';
@@ -1382,16 +1382,28 @@ function getTagPrimaryMuscles(legDayIndex: number, highVolumeLegs = false): Reco
 /** 3.1 — вынесенные слои: volume/selection/loading — единый источник для buildSession и тестов. */
 export function computeMuscleSets(muscle: string, baseSets: number, opts: { level: string; trainingYears?: number; phase: string; role: string; muscleVolumeRotation: Record<string, number>; isHeavy?: boolean; onCourse?: boolean }): number {
   let sets = baseSets;
+  // Аудит 2026-09 (Волна 0): недельный кап мышцы приходит из канона
+  // (weeklyCapFor), а потолок сессии = недельный/2 (perSessionMuscleCap).
+  // Раньше здесь стоял зашитый минимум (спина 22 на курсе_6), из-за чего
+  // недельный рецепт 60/2=30 был недостижим: билдер просил 22, а всё
+  // остальное срезалось «до 2 сетов». Теперь цель = канон, а не константа.
+  const sessCap = perSessionMuscleCap({ level: opts.level, trainingYears: opts.trainingYears, onCourse: opts.onCourse, muscle });
   // High-volume enhanced минимумы — прямой бюджет, не остаток после других групп
   if (opts.level === 'enhanced' && (opts.trainingYears ?? 0) >= 3 && opts.phase !== 'deload') {
-    if (muscle === 'back') sets = Math.max(sets, (opts.trainingYears ?? 0) >= 6 ? 22 : 18);
-    if (muscle === 'chest' && opts.isHeavy) sets = Math.max(sets, (opts.trainingYears ?? 0) >= 6 ? 18 : 14);
-    if (['quads', 'hamstrings', 'glutes'].includes(muscle)) sets = Math.max(sets, (opts.trainingYears ?? 0) >= 6 ? 20 : 14);
-    if (muscle === 'glutes' && opts.isHeavy) sets = Math.max(sets, (opts.trainingYears ?? 0) >= 6 ? 8 : 6);
-    if (['biceps', 'triceps'].includes(muscle) && opts.isHeavy) sets = Math.max(sets, (opts.trainingYears ?? 0) >= 6 ? 8 : 6);
+    const canon = sessCap;
+    // Старые калиброванные полы СОХРАНЯЮТСЯ как минимум: канон может только
+    // ПОДНЯТЬ объём (у него якоря про-на-ПЕД), но не опустить ниже
+    // откалиброванных значений — иначе малые мышцы срезались вдвое
+    // (бицепс 16→8, дельты 16→7, трицепс 16→9, квадры 22→11).
+    const yr = opts.trainingYears ?? 0;
+    if (muscle === 'back') sets = Math.max(sets, yr >= 6 ? 22 : 18, canon);
+    if (muscle === 'chest' && opts.isHeavy) sets = Math.max(sets, yr >= 6 ? 18 : 14, Math.round(canon * 0.8));
+    if (['quads', 'hamstrings', 'glutes'].includes(muscle)) sets = Math.max(sets, yr >= 6 ? 20 : 14, Math.round(canon * 0.85));
+    if (muscle === 'glutes' && opts.isHeavy) sets = Math.max(sets, yr >= 6 ? 8 : 6, Math.round(canon * 0.3));
+    if (['biceps', 'triceps'].includes(muscle) && opts.isHeavy) sets = Math.max(sets, yr >= 6 ? 8 : 6, Math.round(canon * 0.35));
   }
-  // Natural advanced — спина минимум 10 в Upper
-  if (opts.level === 'advanced' && muscle === 'back' && opts.phase !== 'deload') sets = Math.max(sets, 10);
+  // Natural advanced — спина в Upper-днях не должна быть остатком после груди.
+  if (opts.level === 'advanced' && muscle === 'back' && opts.phase !== 'deload') sets = Math.max(sets, sessCap);
   // Indirect overlap — прямые руки снижаются если тяг/жимов много (косвенный уже закрывает)
   if (muscle === 'biceps') {
     const pullSets = opts.muscleVolumeRotation['back'] || 0;
@@ -1406,9 +1418,8 @@ export function computeMuscleSets(muscle: string, baseSets: number, opts: { leve
     else if (pushSets >= 14) sets = Math.min(sets, Math.round(pushSets * 0.2));
   }
   // Фазовая модуляция уже применена в sessionShareFor, здесь только cap.
-  // BIG-кап с учётом level/стаж/PED — единый источник perSessionMuscleCap
-  // (раньше хардкод 5 убивал enhanced-минимумы 18-22).
-  const sessCap = perSessionMuscleCap({ level: opts.level, trainingYears: opts.trainingYears, onCourse: opts.onCourse, muscle });
+  // BIG-кап с учётом level/стажа/PED — единый источник perSessionMuscleCap
+  // (теперь выведен из недельного канона, а не из отдельной строки).
   return Math.max(1, Math.min(sessCap, sets));
 }
 
@@ -2697,7 +2708,13 @@ function buildSession(
       // Только спина/грудь: у ног любое изменение формы флиппует MEV-фидеры
       // через косвенный микс (quads +3, hams +1 слот, glutes +4 — всё докидки
       // гарантий, доказано дампами), поэтому ноги вне PACKING_MUSCLES.
-      if (packedSets) {
+      // P0-2.7: этот проход existed, чтобы «перелить» сеты из хвостовых
+      // упражнений в якорные. После перехода на рецепт по роли (5/4) сваливать
+      // нечего, а сам проход УДАЛЯЛ упражнения — то есть ломал правило
+      // «6-8 упражнений на мышцу». Отключён осознанно; пирамида весов
+      // (backoffWeights) и per-exercise капы продолжают работать.
+      const PACKING_DROPS_ENABLED = false;
+      if (PACKING_DROPS_ENABLED && packedSets) {
         const dropItems = pl.exDatas.map(d => ({
           pattern: packingPatternOf(d as any),
           strictKeys: strictKeysFor(d as any, pl.muscle),
@@ -2724,27 +2741,35 @@ function buildSession(
         }
       }
     }
-    // Для primary больших мышц (chest/back/quads) — ограничить per-exercise sets
-    // чтобы не забирать весь бюджет (7 sets на жим = 35 fatigue = весь день).
-    // Волна-2.12: единый per-exercise кап из bb-volume (perExerciseCap) вместо
-    // локального 5/8 — одна модель для builder/normalize/финализатора.
+    // Распределение сетов мышцы по упражнениям (аудит 2026-09): по принципу
+    // владельца — якорное (compound-first) получает больше подходов, дальше
+    // 3-4, и СУММА РОВНО равна рецепту. Раньше было ровное деление
+    // pl.sets/exDatas.length с округлением: 30 сетов по 7 упражнениям давало
+    // 4×7=28, а по 6 — 5×6=30, но с полом 3 и setCap сумма уезжала ещё
+    // сильнее ( спина сдавала 24 из рецепта 60). Точный итог даёт
+    // distributeSetsByRole: 30 по 7 → 5,5,4,4,4,4,4.
+    const roleCaps = pl.exDatas.map(() => perExerciseCap(level, pl.muscle, trainingYears, onCourse));
+    const exMin = level === 'enhanced' && (trainingYears ?? 0) >= 3 ? 3 : 2;
+    // Packing-v2: залитое число сетов (сумма = pl.sets ровно, пирамида
+    // весов — ниже через backoffWeights). null (не feasible) → legacy.
+    const roleDist = distributeSetsByRole(pl.sets, pl.exDatas.length, roleCaps).map(v => Math.max(exMin, v));
     for (let ei = 0; ei < pl.exDatas.length; ei++) {
       const exData = pl.exDatas[ei];
       const wPct = (exData as any).substitutionWeightPct ?? 1.0;
       const vPct = (exData as any).substitutionVolumePct ?? 1.0;
       const isSubstituted = (exData as any).substituted === true;
       const repsCap = (exData as any).repsCap ?? 20;
-      // P1-4: минимум 2 сета на упражнение (1 сет = разминка, не рабочий объём для гипертрофии).
-      // back target уже масштабирован на недельном prescription-уровне выше;
-      // не умножаем каждый exercise повторно, иначе стаж давал бы двойной boost.
       const setCap = perExerciseCap(level, pl.muscle, trainingYears, onCourse);
-        const exSetsRaw = Math.round(Math.round(pl.sets / pl.exDatas.length) * vPct);
-        // Минимум 3 сета на упражнение для enhanced 3+ — 2 сета недостаточно
-        // для гипертрофии опытного атлета.
-        const exMin = level === 'enhanced' && (trainingYears ?? 0) >= 3 ? 3 : 2;
-        // Packing-v2: залитое число сетов (сумма = pl.sets ровно, пирамида
-        // весов — ниже через backoffWeights). null (не feasible) → legacy.
-        const exSets = packedSets ? packedSets[ei] : Math.max(exMin, Math.min(setCap, exSetsRaw));
+      // vPct (замена с потерей объёма) применяем к ПОЛУЧЕННОМУ числу, потом
+      // добираем остаток до рецепта — сумма по мышце не должна «теряться».
+      const exSetsRaw = Math.max(exMin, Math.round(roleDist[ei] * vPct));
+      // Packing-v2 теперь влияет только на ПИРАМИДУ ВЕСОВ (backoffWeights), но
+      // НЕ на число сетов. Число сетов — это рецепт пользователя: якорное
+      // упражнение получает больше подходов (тяга верхнего блока 5 и дальше),
+      // сумма по мышце равна pl.sets РОВНО. Раньше packing «валил» остаток в
+      // якорное упражнение (3+3+3+3+3+3+8 вместо 5+5+4+4+4+4+4), и недельный
+      // рецепт спины 60 был недостижим в принципе.
+      const exSets = Math.min(setCap, Math.max(exMin, exSetsRaw));
       const exWeight = (exData as any)._effWeight ?? pl.weight;
       const finalRir = isSubstituted ? Math.min(pl.rir + 1, 4) : ((exData as any)._deltRir ?? pl.rir);
       const cost = ((exData as any)?.fatigueCost || 5) * exSets;
@@ -3299,8 +3324,13 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
     // Волна-2.4: единый resolver (явные слагаемые) — порядок округлений 1-в-1
     // с прежними ветками (ниже PRO-ключи используют armBoost: 'pro').
     const legFreqMult = ['quads', 'hamstrings', 'glutes'].includes(m) ? Math.max(1, (muscleSessionCount[m] || 1) / 2) : 1;
+    // ПЕД учитывается ФОРМУЛОЙ: база — лендмарк уровня, множитель ПЕД
+    // (dose-aware, TRT 1.1 … полный стек 2.15) применяет resolveMrvCap.
+    // Якоря владельца (спина 60, ноги 80) — ПОТОЛОК сверху, а не база:
+    // 60 — это значение ДЛЯ ПРО НА ПЕД; без ПЕД формула даёт меньше.
+    const baseMrv = lm.mrv;
     const capMrv = resolveMrvCap({
-      baseMrv: lm.mrv,
+      baseMrv,
       regimeMult: regimeMrvMultFor(m, regimeMult),
       labMrvMultiplier: input.labMrvMultiplier,
       recoveryMult,
@@ -3315,7 +3345,18 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
       specFactor: specializationMrvFactor(m, specRes),
       blast: !!input.blastCruiseEnabled,
     });
-    mrvByMuscle[m] = capMrv;
+    // Потолок владельца — ТОЛЬКО НА ПЕД (спина 60, ноги 32+30+18, грудь 48…).
+    // Без ПЕД потолка нет: там работают обычные множители resolveMrvCap
+    // (recovery/nutrition/частота), иначе «лендмарк × формула» как потолок
+    // срезал бы натуралов ниже их же откалиброванного объёма
+    // (бицепс 16→8, дельты 16→7, квадры 22→11 — регрессия).
+    const userCeiling = onCourse
+      ? weeklyCapFor({
+          muscle: m, level, trainingYears: input.trainingYears, onCourse,
+          courseIntensity: input.courseIntensity, doseAwareMrv: pedAdapt?.combinedMrvMultiplier,
+        })
+      : 0;
+    mrvByMuscle[m] = userCeiling > 0 ? Math.min(capMrv, userCeiling) : capMrv;
   }
   }
   // B6: расширяем mrvByMuscle для PRO-ключей (delt_front/mid/rear, forearms, traps,

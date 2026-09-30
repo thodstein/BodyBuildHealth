@@ -1,7 +1,7 @@
 import type { BBPlan } from './bb-builder.engine';
 import { syncBBPlanSetShape, validateBBPlan, resolveExerciseCatalogEntry, BB_MRV_TOLERANCE } from './bb-validator.engine';
 import { tidySessionExercises, orderSessionExercises, isCompoundEx, type SessionMethodology } from './bb-session-order.engine';
-import { aggregateBBVolume, buildBBVolumeTarget, exerciseVolumeContributions, indirectMuscleContributions, normalizeBBMuscle, sessionLimitsFor as centralizedSessionLimits, perExerciseCap, sessionMuscleRealismCap, sessionMuscleClass } from './bb-volume.engine';
+import { aggregateBBVolume, buildBBVolumeTarget, exerciseVolumeContributions, indirectMuscleContributions, normalizeBBMuscle, sessionLimitsFor as centralizedSessionLimits, perExerciseCap, sessionMuscleRealismCap, sessionMuscleClass, prescribedSessionCap, weeklyCapFor, perSessionMuscleCap, sessionMuscleExerciseCap, distributeSetsByRole } from './bb-volume.engine';
 
 /**
  * Indirect-вклад упражнения в мышцу с паритетом aggregateBBVolume
@@ -240,8 +240,13 @@ function allocateExperiencedBackSession(session: any, week: any, options: BBFina
   // FullBody — не back-день: здесь спина не должна вытеснять ноги/руки/плечи.
   // В FullBody-сессии back-блок ограничен до 3 упражнений / 12 сетов.
   const isFullBody = /FullBody/i.test(session.sessionTag || '');
-  const targetExercises = isFullBody ? 3 : (years >= 6 ? 6 : 5);
-  const targetSets = isFullBody ? 12 : (years >= 6 ? 22 : 18);
+  // Аудит 2026-09 (Волна 0): цель сессии — из КАНОНА (недельный рецепт ÷ число
+  // стимулов), а не зашитые 22/18 сетов и 6 упражнений. Для про-на-курсе канон
+  // спины = 60/нед ÷ 2 Pull = 30 сетов/сессию и 7 упражнений (правило «6-8
+  // упражнений на мышцу»). Зашитые числа делали недельный рецепт недостижимым.
+  const canonSessSets = perSessionMuscleCap({ muscle: 'back', level: options.level, trainingYears: options.trainingYears, onCourse: options.onCourse });
+  const targetExercises = isFullBody ? 3 : Math.max(years >= 6 ? 6 : 5, sessionMuscleExerciseCap(canonSessSets));
+  const targetSets = isFullBody ? 12 : Math.max(years >= 6 ? 22 : 18, canonSessSets);
   // Чередование тяж/памп для про: нечётный день — тяж (horizontal rows 4-5×6-10
   // RIR 1-2, механическое напряжение); чётный — памп (vertical + lat-изоляции
   // 3-4×12-18 RIR 3, метаболический стресс). Паттерны в памп-день не тяжёлые.
@@ -356,6 +361,22 @@ function allocateExperiencedBackSession(session: any, week: any, options: BBFina
       usedPatterns.add(candidatePattern);
       total += added.sets;
     }
+  }
+  // Аудит 2026-09 (Волна 0): финальная форма сетов по ПРИНЦИПУ владельца —
+  // якорное (первое) упражнение получает 5 подходов, дальше 4. Сумма РОВНО
+  // равна цели: 30 по 7 → 5+5+4+4+4+4+4. Раньше добор шёл «до 5 в каждое по
+  // кругу» и остаток валился в одно движение (3+3+3+3+3+3+8), из-за чего
+  // недельный рецепт спины 60 не набирался.
+  const roleDist = distributeSetsByRole(targetSets, current.length, current.map(() => 5));
+  for (let i = 0; i < current.length; i++) {
+    const ex = current[i];
+    const want = roleDist[i];
+    if ((ex.sets || 0) === want) continue;
+    ex.sets = want;
+    if (!Array.isArray(ex.workSets)) ex.workSets = [];
+    const sampleWs = ex.workSets[ex.workSets.length - 1] || { reps: 10, rir: 2, weight: 0 };
+    while (ex.workSets.length < want) ex.workSets.push({ ...sampleWs });
+    if (ex.workSets.length > want) ex.workSets = ex.workSets.slice(0, want);
   }
   }
 
@@ -2509,17 +2530,40 @@ export function enforceSessionRealism(plan: BBPlan, options: BBFinalizeOptions =
       }
       for (const [muscle, list] of byMuscle) {
         if (isSpecTarget(muscle)) continue;
+        // Аудит 2026-09 (Волна 0): кап сессии считается ОТ РЕЦЕПТА мышцы
+        // (недельный кап ÷ число её стимулов в неделю), а не из плоской строки
+        // «big=16 для всех». Спина с рецептом 60/нед за 2 стимула = 30/сессию;
+        // старая строка давала 12-16 и молча схлопывала объём до 2 сетов на
+        // упражнение. Рецепт и стимулы берём из weeklyVolume (первую неделю) —
+        // это уже пересчитанные по финальному плану числа.
+        const weekVol = ((plan as any).weeklyVolume?.[weekNum] || {}) as Record<string, { directSets?: number }>;
+        const weeklyTarget = Number(weekVol[muscle]?.directSets) || weeklyCapFor({ muscle, level: options.level, trainingYears: options.trainingYears, onCourse: options.onCourse });
+        let stimuli = 0;
+        for (const w of plan.weeks) for (const s of w.sessions) {
+          if (aggregateBBVolume([s])[muscle]?.directSets) stimuli++;
+        }
         let cap = 0;
         try {
-          cap = sessionMuscleRealismCap({ muscle, level: options.level, trainingYears: options.trainingYears, onCourse: options.onCourse, groupsInSession: uniqueMuscles.size });
+          cap = prescribedSessionCap({
+            muscle,
+            weeklyTarget,
+            stimuliPerWeek: stimuli,
+            level: options.level,
+            trainingYears: options.trainingYears,
+            onCourse: options.onCourse,
+            groupsInSession: uniqueMuscles.size,
+          });
         } catch { cap = 0; }
         if (cap <= 0) continue;
         let total = list.reduce((a: number, e: any) => a + (e.sets || 0), 0);
-        // 1a: срезаем сеты самых маленьких упражнений до пола 2.
+        // 1a: срезаем сеты до ПОЛА УПРАЖНЕНИЯ (2 у изоляции / 3 у базового),
+        // а не «до 2 у всего подряд» — иначе про-мышца (спина, рецепт 60/нед)
+        // молча схлопывалась в 2×6 сетов вместо отведённого ей объёма.
+        const floorOf = (e: any) => (e.role === 'primary' || isCompoundEx(e) ? 3 : 2);
         const sorted = [...list].sort((a: any, b: any) => (a.sets || 0) - (b.sets || 0));
         for (const ex of sorted) {
           if (total <= cap) break;
-          const cut = Math.min((ex.sets || 0) - 2, total - cap);
+          const cut = Math.min((ex.sets || 0) - floorOf(ex), total - cap);
           if (cut > 0) {
             ex.sets = (ex.sets || 0) - cut;
             if (Array.isArray(ex.workSets) && ex.workSets.length > ex.sets) ex.workSets = ex.workSets.slice(0, ex.sets);
@@ -3533,13 +3577,21 @@ for (const week of next.weeks) {
             if (wres.active && !tradeoffForWeek(options.specializationSchedule, wNo) && !isSpecializationWeak(e.muscle, wres) && !isSpecializationFocus(e.muscle, wres)) goal = lm.mev;
           }
           let perSessionGoal = Math.max(2, Math.ceil(goal / f));
-          // Back для enhanced 3+: allocation-стандарт на сессию (18/22),
-          // а не недельный target ÷ сессии (32/2=16) — иначе день недобирает.
+          // Спина для опытных: цель сессии — из КАНОНА (недельный рецепт ÷
+          // число стимулов), а не зашитые 18/22. Зашитое число делало недельный
+          // рецепт 60 недостижимым: ремонт добивал день до 22 и останавливался,
+          // хотя канон для про-на-курсе — 30/сессию.
           if (e.muscle === 'back' && options.level === 'enhanced' && (options.trainingYears ?? 0) >= 3 && !/FullBody/i.test(s.sessionTag || '')) {
-            perSessionGoal = (options.trainingYears ?? 0) >= 6 ? 22 : 18;
+            const canonSess = perSessionMuscleCap({ muscle: 'back', level: options.level, trainingYears: options.trainingYears, onCourse: options.onCourse });
+            perSessionGoal = Math.max(perSessionGoal, canonSess);
           }
           if ((sessDirect[e.muscle] || 0) >= perSessionGoal) continue;
-          let guard = Math.max(2, Math.min(5, perSessionGoal));
+          // Сколько упражнений этой мышцы в сессии — чтобы поднимать ПО ПРИНЦИПУ
+          // (по 1 сету на упражнение по кругу), а не сваливать +5 в якорное
+          // (3+3+3+3+3+3+8). Итог — ровная форма 5/5/4/4/4/4/4.
+          const muscleExs = working.filter((x: any) => x.muscle === e.muscle);
+          const share = Math.max(2, Math.ceil(perSessionGoal / Math.max(1, muscleExs.length)));
+          let guard = Math.max(2, Math.min(share, perSessionGoal));
           // Кап-запас: подъём не должен выталкивать недельный effective
           // (direct + indirect от compound) выше MRV×1.15.
           if (mrvCap) {
@@ -3554,10 +3606,13 @@ for (const week of next.weeks) {
           }
           if (e.sets < guard && sesSets < maxSessionSets) {
             const sample = e.workSets?.[e.workSets.length - 1] || { reps: 10, rir: 2, weight: 0 };
-            while (e.sets < guard && sesSets < maxSessionSets) {
+            while (e.sets < guard && sesSets < maxSessionSets && (sessDirect[e.muscle] || 0) < perSessionGoal) {
               e.workSets.push({ ...sample });
               e.sets += 1;
               sesSets += 1;
+              // Счётчик сессии ОБНОВЛЯЕМ — иначе каждое упражнение мышцы
+              // поднималось до guard и сумма улетала за рецепт.
+              sessDirect[e.muscle] = (sessDirect[e.muscle] || 0) + 1;
               raisedByMuscle.set(e.muscle, (raisedByMuscle.get(e.muscle) || 0) + 1);
             }
           }
@@ -4821,7 +4876,11 @@ for (const week of next.weeks) {
     week.week,
     aggregateBBVolume(week.sessions),
   ]));
-  const validation = validateBBPlan(next, {
+  // Канон опций валидации: одни и те же числа, что финализатор применил.
+  // Аудит 2026-09 (0.3) — раньше сюда не доходили maxWorkingSets/maxExercises/
+  // onCourse, поэтому валидатор считал по дефолтным 24/10 и получал ложные
+  // session_*_cap на планах, которым сам же финализатор назначил 36/40/44.
+  const validationOptions = {
     level: options.level,
     trainingYears: options.trainingYears,
     equipment: options.equipment,
@@ -4831,7 +4890,12 @@ for (const week of next.weeks) {
     checkOrder: options.checkOrder,
     methodology: options.methodology,
     specializationTargets: (options as any).priorityMuscles,
-  });
+    onCourse: options.onCourse,
+    trainingVolumeMode: (options as any).trainingVolumeMode,
+    maxWorkingSets: options.maxWorkingSets,
+    maxExercises: options.maxExercises,
+  } as any;
+  const validation = validateBBPlan(next, validationOptions);
   next.validation = validation;
   next.fatigueReport = next.weeks.map(week => ({
     week: week.week,
@@ -5058,6 +5122,18 @@ for (const week of next.weeks) {
     }
   }
   syncBBPlanSetShape(next);
+  // Аудит 2026-09 (0.4): ФИНАЛЬНЫЙ снимок валидации и weeklyVolume.
+  // Раньше они снимались на ~4824, а после них шли ещё шесть мутирующих
+  // проходов (arm-heads, enforceExerciseLevels, warmup, dedup,
+  // enforceSessionRealism, reorder) — то есть plan.validation и
+  // plan.weeklyVolume описывали версию плана, которой уже не существует.
+  // Ранний снимок (выше) намеренно сохранён: из него собираются
+  // rationale-строки о том, что финализатор починил.
+  next.weeklyVolume = Object.fromEntries(next.weeks.map(week => [
+    week.week,
+    aggregateBBVolume(week.sessions),
+  ]));
+  next.validation = validateBBPlan(next, validationOptions);
   next.balanceReport = analyzeBBBalance(next, { specTargets: (options as any).priorityMuscles });
   next.report = buildBBPlanReport(next);
   return next;

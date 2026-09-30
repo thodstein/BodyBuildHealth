@@ -47,6 +47,29 @@ export interface BBPlanValidationOptions {
    * и не считать overflow цели дефектом.
    */
   specializationTargets?: string[];
+  /**
+   * Аудит 2026-09 (0.3): контекст, влияющий на капы сессии. До правки
+   * валидатор вызывал `sessionLimitsFor` только с `{level, trainingYears,
+   * patternId}`, из-за чего план на курсе / в высокообъёмном режиме
+   * проверялся по дефолтным 24 сетам / 10 упражнениям и получал ложные
+   * `session_working_set_cap` / `session_exercise_cap` там, где билдер
+   * применял кап 36/40/44. Теперь вход тот же, что у
+   * `bb-volume.sessionLimitsFor`.
+   */
+  onCourse?: boolean;
+  peds?: string[];
+  courseIntensity?: string;
+  trainingVolumeMode?: 'standard' | 'high';
+  /** Плотность дня (число групп) — второй аргумент `sessionLimitsFor`. */
+  sessionGroups?: number;
+  /**
+   * ЯВНЫЕ капы, применённые сборщиком. Приоритетнее любых вычисленных:
+   * валидатор обязан проверять план по тем же числам, по которым его
+   * реально резал финализатор, иначе он гарантирует то, чего не проверял.
+   * Прокидываются из BBFinalizeOptions.maxWorkingSets/maxExercises.
+   */
+  maxWorkingSets?: number;
+  maxExercises?: number;
 }
 
 /** Лимиты сессии зависят от уровня: natural 24/10, enhanced 60/18 (3+ лет)
@@ -92,8 +115,28 @@ export function resolveExerciseCatalogEntry(name: string, exerciseName?: string)
 }
 
 export function sessionLimitsFor(options: BBPlanValidationOptions): { maxExercises: number; maxWorkingSets: number } {
-  const l = centralizedSessionLimits({ level: options.level, trainingYears: options.trainingYears, patternId: (options as any).patternId || (options as any).splitId } as any, { id: (options as any).patternId || (options as any).splitId } as any);
-  return { maxExercises: l.maxExercises, maxWorkingSets: l.maxWorkingSets };
+  // Аудит 2026-09 (0.3): явные капы сборщика — приоритетнее вычисленных.
+  // Иначе валидатор проверял бы план по другим числам, чем те, по которым
+  // его резал финализатор (см. BBPlanValidationOptions.maxWorkingSets).
+  if (Number.isFinite(options.maxExercises) && Number.isFinite(options.maxWorkingSets)) {
+    return { maxExercises: options.maxExercises as number, maxWorkingSets: options.maxWorkingSets as number };
+  }
+  const splitId = (options as any).patternId || (options as any).splitId || '';
+  const l = centralizedSessionLimits({
+    level: options.level,
+    trainingYears: options.trainingYears,
+    onCourse: options.onCourse,
+    peds: options.peds,
+    courseIntensity: options.courseIntensity,
+    trainingVolumeMode: options.trainingVolumeMode,
+    // patternId/splitId едем и во вход (канон читает оба варианта) и в split.
+    patternId: splitId,
+    splitId,
+  } as any, { id: splitId, sessionGroups: options.sessionGroups } as any);
+  return {
+    maxExercises: options.maxExercises ?? l.maxExercises,
+    maxWorkingSets: options.maxWorkingSets ?? l.maxWorkingSets,
+  };
 }
 
 /** Синхронизирует агрегированное число sets с фактическими рабочими сетами. */
@@ -273,20 +316,44 @@ export function validateBBPlan(plan: BBPlan, options: BBPlanValidationOptions = 
       issues.push({ level: 'warning', code: 'deload_rir_too_low', message: `Неделя ${week.week}: deload содержит RIR ниже 3.` });
     }
   }
-  for (let index = 1; index < plan.weeks.length; index++) {
-    const week = plan.weeks[index] as any;
-    const previous = plan.weeks[index - 1];
+  // Тейпер: объём должен не расти ВНУТРИ серии тейпера. Аудит 2026-09 (0.6):
+  // старая проверка сравнивала каждую неделю тейпера только с НЕПОСРЕДСТВЕННО
+  // предыдущей, а перед первой неделей тейпера почти всегда стоит делод — он
+  // заведомо самая лёгкая неделя мезоцикла, поэтому «тейпер вырос»
+  // срабатывало в 192/192 планах, хотя сам тейпер был строго монотонно
+  // убывающим (проверено пробой: 186→172→166 при делоде 92 перед ним).
+  // Теперь база — последняя рабочая неделя ДО начала серии тейпера (делоды
+  // пропускаются: тейпер по построению стартует выше делода), а внутри серии
+  // каждая неделя сравнивается с предыдущей (монотонность серии).
+  const taperFlags = plan.weeks.map((week: any) => {
     const phase = String(week.phase || '').toLowerCase();
-    const taper = Boolean(week.taper) || /taper|тапер/i.test(String(week.rationale || ''));
-    if (!taper && phase !== 'peaking') continue;
+    return Boolean(week.taper) || /taper|тапер/i.test(String(week.rationale || '')) || phase === 'peaking';
+  });
+  const deloadFlags = plan.weeks.map((week: any) => {
+    const phase = String(week.phase || '').toLowerCase();
+    return phase === 'deload' || phase === 'transition' || Boolean((week as any).deload);
+  });
+  if (plan.weeks.length > 4) {
     // Ф1.1: короткие embed-блоки (2-4 недели, спец-вливания) — их «peak» это
     // бласт-неделя, объём в ней растёт по построению; правило тапера
     // (снижение к старту) относится к полным мезоциклам.
-    if (plan.weeks.length <= 4) continue;
-    const currentSets = week.sessions.reduce((sum: number, session: BBSession) => sum + session.exercises.reduce((s, exercise) => s + exercise.sets, 0), 0);
-    const previousSets = previous.sessions.reduce((sum, session) => sum + session.exercises.reduce((s, exercise) => s + exercise.sets, 0), 0);
-    if (currentSets > previousSets) {
-      issues.push({ level: 'warning', code: 'taper_volume_increased', message: `Неделя ${week.week}: taper/peak объём ${currentSets} выше предыдущей недели ${previousSets}.` });
+    const setsOfWeek = plan.weeks.map(week => week.sessions.reduce((sum: number, session: BBSession) => sum + session.exercises.reduce((s, exercise) => s + exercise.sets, 0), 0));
+    for (let index = 1; index < plan.weeks.length; index++) {
+      if (!taperFlags[index]) continue;
+      const previousInRun = taperFlags[index - 1];
+      let baselineIndex = index - 1;
+      if (!previousInRun) {
+        // Начало серии: идём назад до последней РАБОЧЕЙ недели (минуя делоды).
+        baselineIndex = index - 1;
+        while (baselineIndex >= 0 && (taperFlags[baselineIndex] || deloadFlags[baselineIndex])) baselineIndex--;
+        if (baselineIndex < 0) continue; // весь план — тейпер/делод, сравнивать не с чем
+      }
+      const currentSets = setsOfWeek[index];
+      const baselineSets = setsOfWeek[baselineIndex];
+      if (currentSets > baselineSets) {
+        const what = previousInRun ? `предыдущей неделей тейпера ${plan.weeks[baselineIndex].week}` : `базой тейпера (неделя ${plan.weeks[baselineIndex].week})`;
+        issues.push({ level: 'warning', code: 'taper_volume_increased', message: `Неделя ${plan.weeks[index].week}: taper/peak объём ${currentSets} выше ${what} ${baselineSets}.` });
+      }
     }
   }
   if (options.level && plan.weeks.length > 0) {

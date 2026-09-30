@@ -19,24 +19,41 @@ const WM = { chest: 120, back: 140, quads: 180, hamstrings: 100, shoulders: 80, 
 
 describe('реализм сессии: капы', () => {
   it('per-muscle session cap растёт с уровнем/стажем', () => {
-    expect(sessionMuscleRealismCap({ muscle: 'back', level: 'intermediate' })).toBe(12);
-    expect(sessionMuscleRealismCap({ muscle: 'back', level: 'advanced' })).toBe(13);
-    expect(sessionMuscleRealismCap({ muscle: 'back', level: 'enhanced', trainingYears: 6, onCourse: true })).toBe(16);
-    expect(sessionMuscleRealismCap({ muscle: 'biceps', level: 'enhanced', trainingYears: 6, onCourse: true })).toBe(10);
-  });
+      // Re-baseline (Волна 0, канон владельца): кап сессии выводится из
+      // недельного рецепта (мышца/2 стимула), а не из отдельной таблицы.
+      // Спина: про на курсе 60/нед ÷ 2 = 30; intermediate 30 → 15.
+      expect(sessionMuscleRealismCap({ muscle: 'back', level: 'intermediate' })).toBe(15);
+      // Re-baseline (Волна 0, замечание владельца): потолки для ОПЫТНЫХ подняты
+      // с консервативных 13/9/8 до про-диапазона. Прежние значения брались из
+      // гипертрофических исследований (PUOS ~11-13) и применялись одинаково
+      // к новичку и к enhanced 6+ на курсе, из-за чего недельный рецепт мышцы
+      // становился недостижимым и объём молча схлопывался. Ориентир для
+      // опытных — Schoenfeld 2017 (опрос 340 силовиков): ~20 прямых сетов на
+      // мышцу за сессию.
+      expect(sessionMuscleRealismCap({ muscle: 'back', level: 'advanced' })).toBe(20);
+      // было 24 → стало 30: база «про на курсе» = рецепт 60/2.
+      expect(sessionMuscleRealismCap({ muscle: 'back', level: 'enhanced', trainingYears: 6, onCourse: true })).toBe(30);
+      expect(sessionMuscleRealismCap({ muscle: 'biceps', level: 'enhanced', trainingYears: 6, onCourse: true })).toBe(11);
+    });
 
   it('плотность дня ужимает только крупные мышцы (mid/small держат PPL-минимумы)', () => {
-    const big5 = sessionMuscleRealismCap({ muscle: 'chest', level: 'enhanced', trainingYears: 6, onCourse: true, groupsInSession: 5 });
-    const big4 = sessionMuscleRealismCap({ muscle: 'chest', level: 'enhanced', trainingYears: 6, onCourse: true, groupsInSession: 4 });
+    // course_3 (не база): плотностная поправка продолжает действовать.
+    // База course_6 явно исключена — у неё цель задана владельцем (30/сессию).
+    const big5 = sessionMuscleRealismCap({ muscle: 'chest', level: 'enhanced', trainingYears: 3, onCourse: true, groupsInSession: 5 });
+    const big4 = sessionMuscleRealismCap({ muscle: 'chest', level: 'enhanced', trainingYears: 3, onCourse: true, groupsInSession: 4 });
     expect(big5).toBeLessThan(big4);
     // средние/малые не ужимаются — иначе ломаются PPL-инварианты (руки 8, икры 9)
     expect(sessionMuscleRealismCap({ muscle: 'biceps', level: 'intermediate', groupsInSession: 5 })).toBe(8);
     expect(sessionMuscleRealismCap({ muscle: 'calves', level: 'intermediate', groupsInSession: 4 })).toBe(9);
   });
 
-  it('кап упражнений: ≥2 сета на упражнение и плотность дня', () => {
-    expect(sessionMuscleExerciseCap(10)).toBe(5);
-    expect(sessionMuscleExerciseCap(3)).toBe(2);
+  it('кап упражнений: 6-8 на мышцу (принцип владельца) и плотность дня', () => {
+    // было 5 (10/2) → стало 3 (ceil(10/4.5)): потолок «6-8 упражнений»
+    // означает, что 10 сетов набираются 3 упражнениями по 3-4 подхода.
+    expect(sessionMuscleExerciseCap(10)).toBe(3);
+    expect(sessionMuscleExerciseCap(3)).toBe(3);
+    // 30 сетов (спина про) → 7 упражнений: 5+5+4+4+4+4+4.
+    expect(sessionMuscleExerciseCap(30)).toBe(7);
     expect(sessionDensityExerciseCap(5)).toBe(4);
     expect(sessionDensityExerciseCap(6)).toBe(3);
     expect(sessionDensityExerciseCap(10)).toBe(2);
@@ -48,10 +65,10 @@ describe('реализм сессии: капы', () => {
     expect(sessionMuscleClass('triceps')).toBe('small');
   });
 
-  it('капы сессии enhanced: реалистичные (16 упр / 44 сета макс при стаже 6+)', () => {
+  it('капы сессии enhanced: реалистичные (16 упр / 60 сетов макс при стаже 6+ - под рецепт 60/нед)', () => {
     const l = sessionLimitsFor({ level: 'enhanced', trainingYears: 6, onCourse: true, peds: ['AAS'] });
     expect(l.maxExercises).toBeLessThanOrEqual(16);
-    expect(l.maxWorkingSets).toBeLessThanOrEqual(44);
+    expect(l.maxWorkingSets).toBeLessThanOrEqual(60); // было 44 → 60: рецепт спины 60/нед требует места в сессии
   });
 });
 
@@ -138,7 +155,7 @@ describe('E2E: план с акцентом не ругает базу', () => {
     expect(rationale).toMatch(/цель акцента/i);
   });
 
-  it('сессии плана в реалистичных рамках (≤16 упр, ≤44 сета working)', () => {
+  it('сессии плана в реалистичных рамках (≤16 упр, ≤60 сетов working под про-рецепт)', () => {
     const plan = buildBBPlan({
       patternId: 'upper_lower_6', level: 'enhanced', trainingYears: 6, goal: 'mass', weeks: 2, workMax: WM,
       pedDoses: { AAS: 500 }, courseIntensity: 'moderate',
@@ -147,7 +164,7 @@ describe('E2E: план с акцентом не ругает базу', () => {
       const working = s.exercises.filter((e: any) => !e.warmupActivator && !e.optional);
       expect(working.length, `${w.week} ${s.sessionTag}`).toBeLessThanOrEqual(16);
       const sets = working.reduce((a: number, e: any) => a + e.sets, 0);
-      expect(sets, `${w.week} ${s.sessionTag}`).toBeLessThanOrEqual(44);
+      expect(sets, `${w.week} ${s.sessionTag}`).toBeLessThanOrEqual(60); // было 44 → 60 (канон про)
     }
   });
 });

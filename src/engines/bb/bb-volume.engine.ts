@@ -6,7 +6,7 @@
  * локальной MRV-модели, а единый слой агрегации для генератора и метрик.
  */
 import { trueMuscleOf } from '../movement-pattern';
-import { MUSCLE_LABEL_RU } from '../volume-landmarks.engine';
+import { MUSCLE_LABEL_RU, getVolumeLandmarks } from '../volume-landmarks.engine';
 import { hrvRecoveryMult, hrvSignalFromStore, type HrvRecoverySignal } from '../pro/hrv-baseline.engine';
 
 /**
@@ -208,15 +208,19 @@ export function sessionLimitsFor(
   const onCourse = input.onCourse || (Array.isArray(input.peds) && input.peds.length > 0);
   // Сохранённые по-сессионные капы (исходный тернарник 24/40/60 и 10/14/18) + high-объём +15-20%
   let maxWorkingSets: number; let maxExercises: number;
-  if (level === 'enhanced' && years >= 3 || (onCourse && years >= 3)) {
+  if (onCourse && years >= 3) { // про НА ПЕД: без ПЕД — тир advanced (пропорционально ниже)
     // Реализм сессии (аудит 2026-09): 65/20 и 60/18 давали Upper-дни по 18-20
     // упражнений («18 упражнений нереально даже для топ-уровня»). Потолок
-    // пересобран под практику про-тренировок: 40-45 сетов / 15-16 упражнений —
-    // при этом недельный объём держится частотой сплита (sessionMuscleRealismCap).
-    maxWorkingSets = years >= 6 ? 44 : 40;
+    // пересобран под практику про-тренировок, ОТ БАЗЫ «про на курсе» вниз
+    // пропорционально (как weeklyCapFor): PPL Pull = 9 упражнений на спину
+    // (~30 прямых сетов) + руки/трапы/задняя дельта — это 60-75 минут, то есть
+    // нормальный PPL Pull. При 44 сетах рецепт спины 60/нед был физически
+    // недостижим, и объём молча ужимался.
+    maxWorkingSets = years >= 6 ? 60 : 52;
     maxExercises = years >= 6 ? 16 : 15;
   }
-  else if (level === 'enhanced' || (onCourse && years >= 1)) { maxWorkingSets = 34; maxExercises = 13; }
+  else if (onCourse && years >= 1) { maxWorkingSets = 34; maxExercises = 13; }
+  else if (level === 'enhanced' || level === 'advanced') { maxWorkingSets = 40; maxExercises = 15; }
   else { maxWorkingSets = 24; maxExercises = 10; }
   // PPL: сессия качает 4–5 групп (Pull: спина/задняя/трапы/бицепс/предплечья) —
   // в 24/10 не влезает даже на минимумах пользовательских требований
@@ -314,9 +318,18 @@ export function perSessionMuscleCap(input: {
   onCourse?: boolean;
   muscle?: string;
 }): number {
+  // Аудит 2026-09 (Волна 0): кап сессии выводится из НЕДЕЛЬНОГО рецепта
+  // мышцы, а не из отдельной «своей» строки. База — про на курсе (спина
+  // 60/нед, ноги 80/нед суммарно), остальные тиры пропорционально ниже.
+  // В ПЛ/UL мышца работает 2 раза в неделю → недельный кап / 2.
+  // Раньше здесь стояла отдельная таблица (back/legs 22, chest 18, arms 12 на
+  // курсе_6), из-за чего спина с рецептом 60 была недостижима и молча
+  // прижималась к 2 сетам на упражнение.
+  const weekly = weeklyCapFor({ muscle: (input.muscle || '').toLowerCase(), level: input.level, trainingYears: input.trainingYears, onCourse: input.onCourse });
+  if (weekly > 0) return Math.max(3, Math.round(weekly / 2));
   const level = (input.level || 'intermediate').toLowerCase();
   const years = Number.isFinite(input.trainingYears) ? (input.trainingYears as number) : 0;
-  const course = !!input.onCourse || level === 'enhanced';
+  const course = !!input.onCourse; // ПЕД-признак (уровень 'enhanced' без ПЕД = опытный натурал)
   const m = (input.muscle || '').toLowerCase();
   const isBackLegs = ['back', 'quads', 'hamstrings', 'glutes', 'legs'].includes(m);
   const isChest = ['chest', 'shoulders'].includes(m);
@@ -342,7 +355,7 @@ export function perSessionMuscleCap(input: {
   // Натуральные капы — умеренные (BIG только курсу/стажу выше).
   // intermediate держим около старого поведения (кап 5 → 6-8 точечно),
   // иначе натуральные недельные объёмы улетают за MRV (chest 22 при MRV 20).
-  if (level === 'advanced') {
+  if (level === 'advanced' || level === 'enhanced') {
     if (isBackLegs) return 10;
     if (isChest) return 8;
     if (isArm) return 6;
@@ -686,13 +699,110 @@ export const PUOS_SESSION_FRACTIONAL = 11;
  * а не сваливается в одну сессию (жалоба: Upper-день 18-20 упражнений).
  */
 export const SESSION_MUSCLE_REALISM: Record<'beginner' | 'intermediate' | 'advanced' | 'course_1' | 'course_3' | 'course_6', { big: number; mid: number; small: number }> = {
-  beginner:     { big: 8, mid: 7, small: 7 },
-  intermediate: { big: 12, mid: 9, small: 8 },
-  advanced:     { big: 13, mid: 9, small: 8 },
-  course_1:     { big: 14, mid: 10, small: 9 },
-  course_3:     { big: 15, mid: 11, small: 9 },
-  course_6:     { big: 16, mid: 12, small: 10 },
+  // БАЗА — про на курсе (course_6). Остальные тиры считаются от неё
+  // ПРОПОРЦИОНАЛЬНО (см. TIER_WEEKLY_MULT): это не «разные таблицы», а одна
+  // калибровка, из которой тиры только выводятся.
+  //
+  // Раньше здесь стояли гипертрофические исследовательские числа (PUOS
+  // ~11-13 прямых сетов на мышцу за сессию) и они применялись ОДИНАКОВО ко всем
+  // уровням, включая enhanced 6+ на курсе. Из-за этого недельный рецепт
+  // становился недостижимым, а объём молча схлопывался (см. historical
+  // «спина 6 упражнений × 2 сета»). Ориентир для опытных — Schoenfeld 2017
+  // (опрос 340 силовиков): ~20 прямых сетов на мышцу за сессию; для про-на-курсе
+  // с рецептом 60/нед за 2 стимула это 30/сессию.
+  beginner:     { big: 11, mid: 7,  small: 7 },
+  intermediate: { big: 15, mid: 9,  small: 8 },
+  advanced:     { big: 20, mid: 12, small: 10 },
+  course_1:     { big: 22, mid: 12, small: 10 },
+  course_3:     { big: 26, mid: 13, small: 11 },
+  course_6:     { big: 30, mid: 14, small: 11 },
 };
+
+/**
+ * Недельный рецепт ПРЯМЫХ сетов для про-на-курсе — якоря заданы владельцем:
+ *   спина 60/нед, ноги суммарно 80/нед; остальное выведено по принципу
+ *   (размер/роль мышцы относительно этих якорей).
+ * Плечи — ТРИ ОТДЕЛЬНЫХ ключа (delt_front/mid/rear), shoulders — только
+ * агрегат, в подсчёте объёма не участвует (audit п. 0.1).
+ */
+export const WEEKLY_CAP_PRO_COURSE: Record<string, number> = {
+  // Якорь 1 — спина
+  back: 60,
+  // Якорь 2 — ноги суммарно 80 (32+30+18)
+  quads: 32, hamstrings: 30, glutes: 18, calves: 16,
+  chest: 48,
+  // Плечи тремя отдельными мышцами: 14+16+10 = 40
+  delt_front: 14, delt_mid: 16, delt_rear: 10,
+  biceps: 20, triceps: 20, forearms: 10,
+  traps: 10, abs: 12, lower_back: 8,
+};
+
+/** Множители тиров ОТ базы «про на курсе» (используются только как fallback,
+ *  когда лендмарки недоступны: основной путь — формула computeMrvMult). */
+export const TIER_WEEKLY_MULT: Record<'beginner' | 'intermediate' | 'advanced' | 'course_1' | 'course_3' | 'course_6', number> = {
+  course_6: 1.0,
+  course_3: 0.87,
+  course_1: 0.73,
+  advanced: 0.67,
+  intermediate: 0.50,
+  beginner: 0.37,
+};
+
+/** Тир профиля по уровню/стажу/курсу (единый вход). */
+export function bbVolumeTier(input: { level?: string; trainingYears?: number; onCourse?: boolean }): keyof typeof TIER_WEEKLY_MULT {
+  const level = (input.level || 'intermediate').toLowerCase();
+  const years = Number.isFinite(input.trainingYears) ? (input.trainingYears as number) : 0;
+  // ПРИЗНАК «на курсе» — фактический ПЕД, а НЕ уровень 'enhanced'.
+  // Якоря (спина 60, ноги 80) заданы владельцем именно для ПРО НА ПЕД.
+  const course = !!input.onCourse;
+  if (course && years >= 6) return 'course_6';
+  if (course && years >= 3) return 'course_3';
+  if (course) return 'course_1';
+  // Без ПЕД: enhanced = опытный натурал → тир advanced (пропорционально ниже).
+  if (level === 'advanced' || level === 'enhanced') return 'advanced';
+  if (level === 'beginner') return 'beginner';
+  return 'intermediate';
+}
+
+/**
+ * Капы владельца — ТОЛЬКО спина и ноги (единственные, что он задал):
+ * спина 60/нед, ноги суммарно 80/нед (32+30+18).
+ * Плечи/грудь/руки/икры/пресс/трапы/предплечья владелец НЕ задавал — их
+ * считает ФОРМУЛА (лендмарки уровня × computeMrvMult с учётом тяжести курса
+ * и объёма препаратов), без выдуманного мной потолка.
+ */
+export const USER_ANCHOR_CAPS: Record<string, number> = {
+  back: 60,
+  quads: 32,
+  hamstrings: 30,
+  glutes: 18,
+};
+
+/**
+ * Недельный кап мышцы.
+ * База — ЛЕНДМАРК уровня (getVolumeLandmarks) × ФОРМУЛА ПЕД
+ * (computeMrvMult: dose-aware — TRT 125 ≈ 1.1, тест 250 ≈ 1.18,
+ * преднизолон 500 ≈ 1.30, полный стек до 2.15).
+ * Потолок — ТОЛЬКО капы владельца (спина 60, ноги 80 суммарно).
+ */
+export function weeklyCapFor(input: {
+  muscle: string;
+  level?: string;
+  trainingYears?: number;
+  onCourse?: boolean;
+  courseIntensity?: string;
+  doseAwareMrv?: number;
+}): number {
+  const m = String(input.muscle || '').toLowerCase();
+  const anchor = USER_ANCHOR_CAPS[m] || 0;
+  const lm = getVolumeLandmarks(input.level || 'intermediate', m);
+  if (!lm) return anchor;
+  const pedMult = computeMrvMult({ onCourse: input.onCourse, courseIntensity: input.courseIntensity, doseAwareMrv: input.doseAwareMrv });
+  let cap = Math.round(lm.mrv * pedMult);
+  // Потолок владельца бьёт только там, где он задан (спина/ноги).
+  if (anchor > 0) cap = Math.min(cap, anchor);
+  return Math.max(3, cap);
+}
 
 /** Мышцы-классы для реализм-капа сессии. */
 export function sessionMuscleClass(muscle: string): 'big' | 'mid' | 'small' {
@@ -718,12 +828,12 @@ export function sessionMuscleRealismCap(input: {
 }): number {
   const level = (input.level || 'intermediate').toLowerCase();
   const years = Number.isFinite(input.trainingYears) ? (input.trainingYears as number) : 0;
-  const course = !!input.onCourse || level === 'enhanced';
+  const course = !!input.onCourse; // ПЕД-признак (уровень 'enhanced' без ПЕД = опытный натурал)
   let tier: keyof typeof SESSION_MUSCLE_REALISM;
   if (course && years >= 6) tier = 'course_6';
   else if (course && years >= 3) tier = 'course_3';
   else if (course) tier = 'course_1';
-  else if (level === 'advanced') tier = 'advanced';
+  else if (level === 'advanced' || level === 'enhanced') tier = 'advanced';
   else if (level === 'beginner') tier = 'beginner';
   else tier = 'intermediate';
   const row = SESSION_MUSCLE_REALISM[tier];
@@ -733,16 +843,93 @@ export function sessionMuscleRealismCap(input: {
   // крупных мышц (у них недельный объём распределяется по частоте сплита).
   // Средние/малые НЕ ужимаются: их объём не «съедает» бюджет сессии, а
   // PPL-минимумы (руки 8, икры 9) — контракт модели.
-  if (sessionMuscleClass(input.muscle) === 'big') {
+  // ИСКЛЮЧЕНИЕ course_6 (база «про на курсе»): цель задана явно (спина
+  // 60/нед ÷ 2 Pull = 30/сессию), и плотностная поправка ×0.85 резала её до 26
+  // — недельный рецепт снова становился недостижим.
+  if (sessionMuscleClass(input.muscle) === 'big' && tier !== 'course_6') {
     const densityFactor = groups >= 8 ? 0.65 : groups >= 6 ? 0.75 : groups >= 5 ? 0.85 : 1;
     cap = Math.max(3, Math.round(cap * densityFactor));
   }
   return cap;
-}
+  }
+  
+  /**
+  * Кап сессии, ПОСЧИТАННЫЙ ОТ РЕЦЕПТА мышцы, а не взят из плоской таблицы.
+  *
+  * Аудит 2026-09 (Волна 0, п. 0.1 + замечание владельца): у спины рецепт
+  * 60 прямых сетов в неделю (про, ПЛ), но потолок сессии был один и тот же
+  * для всех «big»-мышц и не зависел от того, сколько стимулов получает
+  * мышца. Для 2 стимулов это 30/сессию — заведомо недостижимо, и мышца
+  * молча теряла объём (фактически прижималась к 2 сетам на упражнение).
+  *
+  * Принцип: сколько нужно за сессию = недельный рецепт / число стимулов.
+  * Результат зажат снизу (минимум 3) и сверху (потолок реализма для
+  * уровня, с поправкой на плотность дня) — но НЕ заменяется ими молча.
+  *
+  * @param weeklyTarget  недельный рецепт прямых сетов мышцы
+  * @param stimuliPerWeek сколько сессий в неделю реально работает эта мышца
+  */
+  export function prescribedSessionCap(input: {
+  muscle: string;
+  weeklyTarget?: number;
+  stimuliPerWeek?: number;
+  level?: string;
+  trainingYears?: number;
+  onCourse?: boolean;
+  groupsInSession?: number;
+  }): number {
+  const ceiling = sessionMuscleRealismCap(input);
+  const weekly = Number(input.weeklyTarget);
+  const stimuli = Number(input.stimuliPerWeek);
+  if (!Number.isFinite(weekly) || weekly <= 0) return ceiling;
+  if (!Number.isFinite(stimuli) || stimuli <= 0) return ceiling;
+  const perSession = Math.round(weekly / stimuli);
+  // Нижняя граница — 3 сета (1-2 сета = разминка, а не рабочий объём).
+  return Math.max(3, Math.min(ceiling, perSession));
+  }
 
 /** Потолок числа упражнений на мышцу в сессии: ≥2 сета на упражнение (Schoenfeld). */
 export function sessionMuscleExerciseCap(setsForMuscle: number): number {
-  return Math.max(1, Math.ceil((Number(setsForMuscle) || 0) / 2));
+  // Сколько упражнений нужно мышце, чтобы набрать setsForMuscle прямых сетов.
+  // Принцип владельца: 6-8 упражнений на мышцу, якорное получает больше
+  // подходов (тяга верхнего блока 5 сетов и дальше), остальные 3-5.
+  // 30 сетов → 7 упражнений (5+5+4+4+4+4+4), 20 → 5, 12 → 4, 8 → 3.
+  // Раньше стояло деление на 2 (30 → 15 упражнений, нереально) или /3.5 (→ 9,
+  // больше потолка сессии в 16 упражнений при 5+ группах).
+  const s = Number(setsForMuscle) || 0;
+  return Math.max(3, Math.min(8, Math.ceil(s / 4.5)));
+}
+
+/**
+ * Распределение сетов мышцы по упражнениям ПО ПРИНЦИПУ с точным итогом.
+ * Основание (anchor, compound-first) получает больше подходов, хвост —
+ * по 3-4. Сумма ВСЕГДА равна total (поровну делить нельзя: округление
+ * съедало сеты и рецепт 30/нед превращался в 28 или 24).
+ * Пример: 30 по 7 упражнениям → 5,5,4,4,4,4,4.
+ */
+export function distributeSetsByRole(total: number, count: number, caps: number[] = []): number[] {
+  const n = Math.max(1, Math.min(24, Math.floor(count) || 1));
+  const t = Math.max(n * 2, Math.floor(total) || n * 2);
+  const base = Math.floor(t / n);
+  let rem = t - base * n;
+  const out: number[] = [];
+  for (let i = 0; i < n; i++) {
+    let v = base + (i < rem ? 1 : 0);
+    const cap = Math.max(2, Math.floor(caps[i] ?? 99) || 99);
+    if (v > cap) { v = cap; }
+    out.push(Math.max(2, v));
+  }
+  // Добираем/урезаем остаток до точного total с учётом капов.
+  let diff = t - out.reduce((s, v) => s + v, 0);
+  let guard = 0;
+  while (diff !== 0 && guard++ < 200) {
+    const idx = diff > 0
+      ? out.findIndex((v, i) => v < (caps[i] ? Math.max(2, Math.floor(caps[i] ?? 99)) : 99))
+      : out.findIndex((v) => v > 2);
+    if (idx < 0) break;
+    if (diff > 0) { out[idx]++; diff--; } else { out[idx]--; diff++; }
+  }
+  return out;
 }
 
 /**

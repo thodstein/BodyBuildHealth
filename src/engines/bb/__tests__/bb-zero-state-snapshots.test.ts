@@ -48,8 +48,21 @@ describe('BB zero-state snapshots (baseline Этапа 10)', () => {
 
     // Направление: сессии 10-15 упражнений / 30-40 сетов вместо 18-20/60+;
     // недельный объём держится частотой сплита. Значения — осознанный re-baseline.
+    // Re-baseline 6 (Волна 0, п. 0.4 «валидация/weeklyVolume после мутаций»):
+    // этот снапшот калибровался по СТАРОМУ weeklyVolume, который снимался ДО
+    // enforceSessionRealism — то есть показывал объём, которого в плане нет.
+    // Re-baseline 7 (Волна 0, потолки сессии для опытных): cap big для
+    // advanced/course поднят 13→20 и 16→24 (Schoenfeld 2017: ~20 прямых сетов
+    // на мышцу/сессию у опытных), а нарезка внутри мышцы идёт до ПОЛА
+    // УПРАЖНЕНИЯ (3 у базового / 2 у изоляции) вместо «до 2 у всего».
+    // Факт по самому плану (нед 1, upper_lower_4, enhanced 6+): back 24→32,
+    // chest 23→24, quads 18→22, abs 10→13, delt_mid исчез (ушёл в нули).
+    // Снимок сверен с фактом: weeklyVolume === aggregateBBVolume по сессиям.
+    // ⚠️ Незакрыто (требует решения владельца, не правится молча): недельный
+    //   бюджет спины 32 < 60, заявленный владельцем для про-уровня; сейчас
+    //   спина получает 2 стимула в этом сплите, до 60 нужно 3-4 (см. отчёт).
     expect(directVolume(plan)).toEqual({
-      abs: 10, back: 40, biceps: 4, calves: 10, chest: 28, delt_mid: 2, delt_rear: 2, forearms: 4, glutes: 12, hamstrings: 26, quads: 19, shoulders: 0, traps: 4, triceps: 4,
+      abs: 13, back: 32, biceps: 4, calves: 10, chest: 24, delt_rear: 2, forearms: 4, glutes: 12, hamstrings: 26, quads: 22, shoulders: 0, traps: 4, triceps: 4,
     });
   });
 
@@ -71,8 +84,13 @@ describe('BB zero-state snapshots (baseline Этапа 10)', () => {
     // BB_MRV_TOLERANCE 1.15 (был локальный 1.05) — план больше не режется
     // строже валидатора: бицепс 16→18 (PPL-флор доехал без преждевременной
     // резки). Валидатор зелёный (overflow ≤ допуска).
+    // Re-baseline 5 (Волна 0, п. 0.4): снапшот пересчитан по ФАКТУ финального
+    // плана, а не по устаревшему weeklyVolume (снимался до enforceSessionRealism).
+    // Факт (нед 1, ppl_6, intermediate): back 20→18, бицепс 18→16 — это то,
+    // что реально в плане; прежние значения были правдоподобной, но неверной
+    // калибровкой. План не менялся.
     expect(directVolume(plan)).toEqual({
-      abs: 8, back: 20, biceps: 18, calves: 18, chest: 16, delt_front: 5, delt_mid: 3, delt_rear: 16, forearms: 7, glutes: 9, hamstrings: 10, quads: 20, shoulders: 3, traps: 10, triceps: 16,
+      abs: 8, back: 18, biceps: 16, calves: 18, chest: 16, delt_front: 5, delt_mid: 3, delt_rear: 16, forearms: 7, glutes: 9, hamstrings: 10, quads: 20, shoulders: 3, traps: 10, triceps: 16,
     });
   });
 
