@@ -36,12 +36,12 @@ beforeEach(() => {
 });
 
 describe('Ручная библиотека: арм + ТА/стронг', () => {
-  it('4 таба с живыми счётчиками (27 арм + 30 SS)', () => {
+  it('4 таба с живыми счётчиками (27 арм + 32 SS)', () => {
     renderGallery();
     expect(screen.getByRole('tab', { name: new RegExp(`Арм \\(${ARM_CYCLE_LIBRARY.length}\\)`) })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: new RegExp(`ТА·Стронг \\(${SS_CYCLES.length}\\)`) })).toBeInTheDocument();
     expect(ARM_CYCLE_LIBRARY.length).toBe(27); // было 19 → 27 (PRO-PLAN R2)
-    expect(SS_CYCLES.length).toBe(30); // было 15 → 30 (PRO-волна циклов ТА/стронга)
+    expect(SS_CYCLES.length).toBe(32); // было 15 → 32 (PRO-волна циклов ТА/стронга/гибрида)
   });
 
   it('таб Арм: карточка + мост arm_cycle (payload + трек + событие + баннер)', () => {

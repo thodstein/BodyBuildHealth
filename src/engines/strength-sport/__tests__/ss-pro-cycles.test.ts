@@ -20,6 +20,7 @@ const PRO_IDS = [
   'ss-ta-russian-12', 'ss-ta-comp-12', 'ss-ta-taper-2', 'ss-ta-gpp-8',
   'ss-sm-beginner-8', 'ss-sm-gpp-10', 'ss-sm-static-12', 'ss-sm-moving-8',
   'ss-sm-loading-6', 'ss-sm-peak-8', 'ss-sm-taper-2',
+  'ss-hb-base-10', 'ss-hb-peak-6',
 ];
 
 const inputFor = (mode: string, over: any = {}) => ({
@@ -28,25 +29,25 @@ const inputFor = (mode: string, over: any = {}) => ({
 }) as any;
 
 describe('PRO-циклы: реестр', () => {
-  it('30 циклов всего (было 15), id уникальны', () => {
-    expect(SS_CYCLES.length).toBe(30);
+  it('32 цикла всего (было 15), id уникальны', () => {
+    expect(SS_CYCLES.length).toBe(32);
     const ids = SS_CYCLES.map(c => c.meta.id);
     expect(new Set(ids).size).toBe(ids.length);
   });
-  it('все 15 PRO-циклов в реестре и достаются по id', () => {
+  it('все 17 PRO-циклов в реестре и достаются по id', () => {
     for (const id of PRO_IDS) {
       const c = getSSCycleById(id);
       expect(c, id).toBeTruthy();
       expect(c!.meta.id).toBe(id);
     }
   });
-  it('режимы: 14 ТА + 14 стронг + 2 гибрид', () => {
+  it('режимы: 14 ТА + 14 стронг + 4 гибрид', () => {
     const ta = SS_CYCLES.filter(c => c.meta.mode === 'weightlifting').length;
     const sm = SS_CYCLES.filter(c => c.meta.mode === 'strongman').length;
     const hb = SS_CYCLES.filter(c => c.meta.mode === 'hybrid').length;
     expect(ta).toBe(14);
     expect(sm).toBe(14);
-    expect(hb).toBe(2);
+    expect(hb).toBe(4);
   });
 });
 
@@ -218,5 +219,23 @@ describe('PRO-циклы: сборка', () => {
       // Объём падает (свежесть): сетов в нед.2 ≤ нед.1
       expect(plan.weeksData[1].totalSets || 0, id).toBeLessThanOrEqual(plan.weeksData[0].totalSets || 0);
     }
+  });
+
+  it('гибрид: база несёт штангу+ивенты с делодами, пик — mock нед.5 и тейпер нед.6', () => {
+    const base = buildSSCyclePlan('ss-hb-base-10', inputFor('hybrid', { weeks: 10, daysPerWeek: 4 }), { cycleMode: 'faithful' });
+    const ids = base.weeksData.flatMap(w => w.sessions.flatMap(s => s.exercises.map(e => e.id)));
+    expect(ids).toContain('back_squat');
+    expect(ids).toContain('log_press');
+    expect(ids).toContain('farmers_walk_heavy');
+    expect(ids).toContain('atlas_stone_load');
+    expect(base.weeksData[3].deload).toBe(true);
+    expect(base.weeksData[7].deload).toBe(true);
+
+    const peak = buildSSCyclePlan('ss-hb-peak-6', inputFor('hybrid', { weeks: 6, daysPerWeek: 4 }), { cycleMode: 'faithful' });
+    expect(peak.weeksData[4].taper).toBe(false); // mock-неделя
+    expect(peak.weeksData[5].taper).toBe(true);
+    const olyDay = peak.weeksData[4].sessions.find(s => s.sessionTag === 'oly_day')!;
+    expect(olyDay.exercises.find(e => e.id === 'snatch')!.workSets.map(x => x.pct)).toEqual([90, 96, 101]);
+    expect(peak.rationale.join(' ')).toMatch(/Mock-недели 5/);
   });
 });

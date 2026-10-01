@@ -36,6 +36,8 @@ import { SS_SM_LOADING_6 } from './ss-sm-loading-6';
 import { SS_TA_TAPER_2 } from './ss-ta-taper-2';
 import { SS_SM_TAPER_2 } from './ss-sm-taper-2';
 import { SS_TA_GPP_8 } from './ss-ta-gpp-8';
+import { SS_HB_BASE_10 } from './ss-hb-base-10';
+import { SS_HB_PEAK_6 } from './ss-hb-peak-6';
 
 export const SS_CYCLES: SSCycleTemplate[] = [
   // ——— ТА (14) · [0] оставлен general-8: на него завязаны UI-контракты каталога ———
@@ -68,7 +70,9 @@ export const SS_CYCLES: SSCycleTemplate[] = [
   SS_SM_PRESS_6,
   SS_SM_PEAK_4,
   SS_SM_TAPER_2,
-  // ——— Гибрид (2) ———
+  // ——— Гибрид (4) ———
+  SS_HB_BASE_10,
+  SS_HB_PEAK_6,
   SS_HB_MIX_8,
   SS_HB_TRANSIT_2,
 ];

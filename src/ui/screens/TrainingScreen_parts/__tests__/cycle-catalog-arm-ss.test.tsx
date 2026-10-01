@@ -30,7 +30,7 @@ describe('CycleCatalog — арм + ТА/стронг', () => {
 
   it('библиотеки содержат ожидаемое число циклов', () => {
     expect(ARM_CYCLE_LIBRARY.length).toBe(27); // было 19 → 27 (PRO-PLAN R2)
-    expect(SS_CYCLES.length).toBe(30); // было 15 → 30 (PRO-волна циклов ТА/стронга)
+    expect(SS_CYCLES.length).toBe(32); // было 15 → 32 (PRO-волна циклов ТА/стронга/гибрида)
     expect(LMS_CYCLES.length).toBeGreaterThan(0);
   });
 

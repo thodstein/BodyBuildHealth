@@ -17,11 +17,11 @@ const baseInput = (over: any = {}) => ({
 }) as any;
 
 describe('ss-cycles index integrity', () => {
-  it('30 циклов (15 + 15 PRO-волны), id уникальны', () => {
-    // Было 15 → стало 30 (PRO-волна: соревновательные/техника/сила/русская/
+  it('32 цикла (15 + 17 PRO-волны), id уникальны', () => {
+    // Было 15 → стало 32 (PRO-волна: соревновательные/техника/сила/русская/
     // спец-присед/masters/GPP/тейпер для ТА + статика/переноски/новичок/GPP/пик/
-    // загрузки/тейпер для стронга; покрыты ss-pro-cycles.test.ts).
-    expect(SS_CYCLES.length).toBe(30);
+    // загрузки/тейпер для стронга + гибридные база/пик; покрыты ss-pro-cycles.test.ts).
+    expect(SS_CYCLES.length).toBe(32);
     const ids = SS_CYCLES.map(c => c.meta.id);
     expect(new Set(ids).size).toBe(ids.length);
   });
