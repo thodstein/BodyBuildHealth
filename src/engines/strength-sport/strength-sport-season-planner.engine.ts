@@ -22,7 +22,7 @@ import type { SSCycleMode, SSCycleTemplate } from '../../data/ss-cycles/ss-types
 import { buildAnnualFromSSCycles } from './strength-sport-ss-annual.engine';
 import type { AnnualSS } from './strength-sport-annual';
 import type { StrengthSportInput } from './strength-sport.types';
-import { shiftIsoDate } from '../../core/local-date';
+import { shiftIsoDate, localIsoDate } from '../../core/local-date';
 
 // ——— Фазы сезона ———
 export type SSSeasonPhase = 'gpp' | 'base' | 'build' | 'peak' | 'taper' | 'transition';
@@ -647,20 +647,91 @@ export function seasonSummaryLines(plan: SSSeasonPlan): string[] {
   return lines;
 }
 
+/** ISO-день → UTC-полночь (для арифметики дней без сдвига часового пояса). */
+function isoDayToUtc(iso: string): number | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso ?? ''));
+  if (!m) return null;
+  const t = Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  return Number.isFinite(t) ? t : null;
+}
+
+/** Целые дни между двумя календарными датами (UTC-безопасно). */
+export function dayDiffIso(fromIso: string, toIso: string): number | null {
+  const a = isoDayToUtc(fromIso);
+  const b = isoDayToUtc(toIso);
+  if (a == null || b == null) return null;
+  return Math.round((b - a) / 86400000);
+}
+
 /** Сколько недель до даты старта (локально, без UTC-сдвига дня). */
 export function weeksUntilDate(competitionDate: string, fromDate?: string): number | null {
+  const diff = dayDiffIso(fromDate || localIsoDate(), competitionDate);
+  return diff == null ? null : Math.round(diff / 7);
+}
+
+// ——— «Где я в сезоне» ———
+export interface SSActiveSeasonBlock {
+  blockIndex: number; // 0-based
+  week: number; // сквозная неделя сезона (1-based)
+  weekInBlock: number;
+  totalWeeks: number;
+  phase: SSSeasonPhase;
+  phaseLabel: string;
+  color: string;
+  title: string;
+  cycleId: string;
+  isDeloadWeek: boolean;
+  isTaperWeek: boolean;
+  isMockWeek: boolean;
+}
+
+/**
+ * Активный блок сезона на дату (или «сегодня»). Дата старта — из аргумента,
+ * из первого блока (inputSnapshot.startDate) или сегодня. Вне сезона — null.
+ */
+export function activeSeasonBlockForDate(
+  annual: AnnualSS,
+  dateISO?: string,
+  opts?: { startDate?: string },
+): SSActiveSeasonBlock | null {
   try {
-    const parse = (iso: string): number => {
-      const [y, m, d] = String(iso).slice(0, 10).split('-').map(Number);
-      if (!Number.isFinite(y) || !Number.isFinite(m) || !Number.isFinite(d)) throw new Error('bad date');
-      return Date.UTC(y, m - 1, d);
-    };
-    const from = fromDate ? parse(fromDate) : (() => {
-      const now = new Date();
-      return Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
-    })();
-    const diff = Math.round((parse(competitionDate) - from) / (7 * 86400000));
-    return diff;
+    if (!annual || !Array.isArray(annual.blocks) || !annual.blocks.length) return null;
+    const snap = (annual.blocks[0] as any)?.plan?.inputSnapshot?.startDate as string | undefined;
+    const start = String(opts?.startDate || snap || '').slice(0, 10);
+    if (!isoDayToUtc(start)) return null;
+    const target = String(dateISO || localIsoDate()).slice(0, 10);
+    const days = dayDiffIso(start, target);
+    if (days == null || days < 0) return null;
+    const week = Math.floor(days / 7) + 1;
+    if (week > annual.totalWeeks) return null;
+    let w = 1;
+    for (let i = 0; i < annual.blocks.length; i++) {
+      const b = annual.blocks[i];
+      if (week < w + b.weeks) {
+        const weekInBlock = week - w + 1;
+        const cid = b.plan?.inputSnapshot?.cycleId as string | undefined;
+        const t = cid ? SS_CYCLES.find((c) => c.meta.id === cid) : undefined;
+        const phase: SSSeasonPhase = t ? cycleSeasonPhase(t) : (b.weeks <= 2 ? 'transition' : 'build');
+        const meta = SEASON_PHASE_META[phase];
+        const wd: any = b.plan?.weeksData?.[weekInBlock - 1];
+        return {
+          blockIndex: i,
+          week,
+          weekInBlock,
+          totalWeeks: annual.totalWeeks,
+          phase,
+          phaseLabel: meta.label,
+          color: meta.color,
+          title: t?.meta.title || `Блок ${i + 1}`,
+          cycleId: cid || b.mode,
+          isDeloadWeek: !!wd?.deload,
+          isTaperWeek: !!wd?.taper,
+          isMockWeek: !!(t?.meta.mockWeeks || []).includes(weekInBlock),
+        };
+      }
+      w += b.weeks;
+    }
+    return null;
   } catch { return null; }
 }
 

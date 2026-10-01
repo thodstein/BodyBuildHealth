@@ -8,6 +8,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import React from 'react';
 import { StrengthSportConstructor } from '../StrengthSportConstructor';
 import { loadAnnualSS } from '../../../../engines/strength-sport/strength-sport-annual';
+import { loadStrengthSportPlan } from '../../../../engines/strength-sport/strength-sport-storage';
 import { loadSeasonPlan } from '../../../../engines/strength-sport/strength-sport-season-planner.engine';
 
 beforeEach(() => { localStorage.clear(); });
@@ -151,5 +152,25 @@ describe('PRO-планировщик сезона: UI', () => {
     fireEvent.click(container.querySelector('[data-ss="season-ics"]') as HTMLElement);
     await waitFor(() => expect(container.textContent).toMatch(/Календарь сезона выгружен/));
     expect(createUrl).toHaveBeenCalledTimes(1);
+  });
+
+  it('открыть блок сезона → активный план = этот блок', async () => {
+    const { container } = render(<StrengthSportConstructor />);
+    await buildPlanAndGoExport(container);
+    await openSeasonCard(container);
+    fireEvent.click(screen.getByText('✦ Собрать сезон'));
+    await waitFor(() => expect(container.textContent).toMatch(/Сезон собран/), { timeout: 8000 });
+
+    const opens = container.querySelectorAll('[data-ss="season-open"]');
+    expect(opens.length).toBeGreaterThanOrEqual(3);
+    const season = loadSeasonPlan()!;
+
+    fireEvent.click(opens[0] as HTMLElement);
+    await waitFor(() => expect(container.textContent).toMatch(/Открыт блок 1/));
+    expect(loadStrengthSportPlan()?.patternId).toBe(`cycle:${season.blocks[0].cycleId}`);
+    expect(loadStrengthSportPlan()?.weeksData?.length).toBe(season.blocks[0].weeks);
+    // На шаге плана виден индикатор «где я в сезоне» (сезон стартует сегодня → нед 1)
+    await waitFor(() => expect(container.querySelector('[data-ss="season-now"]')).toBeTruthy());
+    expect(container.textContent).toMatch(/Сезон: нед 1 из/);
   });
 });

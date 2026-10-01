@@ -14,6 +14,7 @@ import { EVENT_META } from '../../../engines/strength-sport/strength-sport-event
 import { TAPER_CESSATION_DAYS } from '../../../engines/strength-sport/strength-sport-taper.engine';
 import { buildConditioningRationale } from '../../../engines/strength-sport/strength-sport-conditioning';
 import { moveAnnualBlock } from '../../../engines/strength-sport/strength-sport-annual';
+import { activeSeasonBlockForDate } from '../../../engines/strength-sport/strength-sport-season-planner.engine';
 import { CARD, BTN, BTN_PRIMARY, BTN_SMALL, INPUT, TEXT_2, TEXT_3, ACCENT, ACCENT_STRONG, ACCENT_SOFT, STRONG_SOFT, ACCENT_BORDER, STRONG_BORDER, ACCENT_GRAD, SectionCard, StatTile, Badge, InfoBanner, GroupHeading, CardHeader, Highlight, HighlightStrong, ChipToggle, Divider } from './StrengthUI';
 import { StrengthGantt, StrengthHeatmap, EventCard } from './StrengthUI';
 import { MODE_RU, LEVEL_RU, PHASE_RU, ruLabel } from './StrengthUI';
@@ -54,8 +55,20 @@ export const StrengthSportPlanView: React.FC<Props> = ({
   msg, setMsg, onExportProgram, onBuildSeason, onBuildAnnualFromCycles,
 }) => {
   const doMsg = (m: string, ms = 1800) => { setMsg?.(m); setTimeout(() => setMsg?.(''), ms); };
+  /** «Где я в сезоне»: активный блок по дате старта годового плана. */
+  const seasonNow = React.useMemo(() => { try { return activeSeasonBlockForDate(annual); } catch { return null; } }, [annual]);
   return (
     <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+      {seasonNow && (
+        <div data-ss="season-now" style={{ display:'flex', gap:8, flexWrap:'wrap', alignItems:'center', fontSize:12.5, fontWeight:700, color:'#fff', background:`${seasonNow.color}14`, border:`1px solid ${seasonNow.color}44`, borderRadius:14, padding:'10px 12px', lineHeight:1.45 }}>
+          <span style={{ color: seasonNow.color, fontVariantNumeric:'tabular-nums' }}>📅 Сезон: нед {seasonNow.week} из {seasonNow.totalWeeks}</span>
+          <span>· блок {seasonNow.blockIndex + 1}/{annual.blocks.length}: {seasonNow.phaseLabel}</span>
+          <span style={{ fontWeight:600 }}>· {seasonNow.title}</span>
+          {seasonNow.isDeloadWeek && <span>💤 делод</span>}
+          {seasonNow.isTaperWeek && <span>📉 тейпер</span>}
+          {seasonNow.isMockWeek && <span>🏁 mock</span>}
+        </div>
+      )}
       {/* Сводка — Apple glass + Highlights + StatTiles */}
       <SectionCard icon="📋" title="Сводка плана" subtitle={`${ruLabel(MODE_RU, plan.mode)} · ${ruLabel(PHASE_RU, plan.weeksData[0]?.phase || 'accumulation')} · ${plan.weeks} нед`} accent>
         <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(130px,1fr))', gap:10 }}>

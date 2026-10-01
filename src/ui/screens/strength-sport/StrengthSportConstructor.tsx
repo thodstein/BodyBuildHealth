@@ -806,6 +806,31 @@ export const StrengthSportConstructor: React.FC = () => {
     setTimeout(()=>setMsg(''), 2400);
   };
 
+  /** Год, собранный ИМЕННО из текущего плана сезона (сверка по циклам блоков) —
+   *  только тогда кнопки «открыть блок» указывают на правильные планы. */
+  const seasonAnnual = React.useMemo(() => {
+    if (!annual || !seasonPlan) return null;
+    if (!Array.isArray(annual.blocks) || annual.blocks.length !== seasonPlan.blocks.length) return null;
+    for (let i = 0; i < annual.blocks.length; i++) {
+      const cid = annual.blocks[i]?.plan?.inputSnapshot?.cycleId;
+      if (cid && cid !== seasonPlan.blocks[i].cycleId) return null;
+    }
+    return annual;
+  }, [annual, seasonPlan]);
+
+  /** Открыть собранный блок сезона как активный план (замкнуть контур «сезон → план»). */
+  const handleOpenSeasonBlock = (idx: number) => {
+    try {
+      const blk = seasonAnnual?.blocks?.[idx];
+      if (!blk?.plan) { setMsg('⚠ Блок не собран — нажмите «Собрать сезон»'); setTimeout(()=>setMsg(''), 2400); return; }
+      setPlan(blk.plan);
+      try { saveStrengthSportPlan(blk.plan); } catch { /* квота/ssr — план останется в памяти */ }
+      setMsg(`📥 Открыт блок ${idx + 1}: ${blk.plan.weeks} нед · ${blk.plan.patternId}`);
+      setStep('plan');
+    } catch { setMsg('⚠ Не удалось открыть блок'); }
+    setTimeout(()=>setMsg(''), 2800);
+  };
+
   const stepList: Step[] = ['params', 'athlete', 'outside', 'split', 'plan', 'quality', 'export'];
   const stepIndex = stepList.indexOf(step) + 1;
   const modeColor = mode === 'weightlifting' ? '#00e68a' : mode === 'strongman' ? '#f59e0b' : '#0ea5e9';
@@ -1351,9 +1376,11 @@ export const StrengthSportConstructor: React.FC = () => {
                           const b = seasonPlan.blocks[i];
                           const ph = b ? SEASON_PHASE_META[b.phase] : null;
                           return (
-                            <div key={i} style={{ fontSize:11, color:'#fff', lineHeight:1.45, borderLeft:`3px solid ${ph?.color || 'rgba(255,255,255,0.2)'}`, paddingLeft:8 }}>
-                              {line}
-                              {b?.note && <span style={{ opacity:0.85 }}> · {b.note}</span>}
+                            <div key={i} style={{ fontSize:11, color:'#fff', lineHeight:1.45, borderLeft:`3px solid ${ph?.color || 'rgba(255,255,255,0.2)'}`, paddingLeft:8, display:'flex', gap:6, alignItems:'center', flexWrap:'wrap' }}>
+                              <span style={{ flex:1, minWidth:160 }}>{line}{b?.note && <span style={{ opacity:0.85 }}> · {b.note}</span>}</span>
+                              {seasonAnnual?.blocks?.[i]?.plan && (
+                                <button data-ss="season-open" onClick={() => handleOpenSeasonBlock(i)} style={{ ...BTN_SMALL, minHeight:34, padding:'6px 10px', fontSize:11, flex:'none' }}>📥 Открыть</button>
+                              )}
                             </div>
                           );
                         })}

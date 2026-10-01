@@ -12,7 +12,10 @@ import {
   seasonTimeline, seasonSummaryLines, weeksUntilDate, SEASON_PHASE_META,
   seasonPlanWeekCells, buildSeasonSummaryText, buildSeasonPrintHtml, buildSeasonIcs,
   saveSeasonPlan, loadSeasonPlan, clearSeasonPlan, SS_SEASON_PLAN_KEY,
+  activeSeasonBlockForDate, dayDiffIso,
 } from '../strength-sport-season-planner.engine';
+import { buildAnnualFromSSCycles } from '../strength-sport-ss-annual.engine';
+import { shiftIsoDate } from '../../../core/local-date';
 import { SS_CYCLES, getSSCycleById } from '../../../data/ss-cycles/ss-cycle-index';
 
 const WM = {
@@ -469,5 +472,50 @@ describe('season-planner: календарь .ics', () => {
     expect(starts.length).toBe(p.blocks.length);
     expect(ends.length).toBe(p.blocks.length);
     for (let i = 1; i < starts.length; i++) expect(starts[i], `блок ${i}`).toBe(ends[i - 1]);
+  });
+});
+
+describe('season-planner: «где я в сезоне»', () => {
+  const start = '2026-09-07';
+  const annualOf = (ids: string[], mode: 'weightlifting' | 'strongman') => buildAnnualFromSSCycles(
+    ids,
+    { mode, goal: 'peaking', level: 'intermediate', weeks: 8, daysPerWeek: 4, workMax: WM, startDate: start } as any,
+    { cycleMode: 'faithful' },
+  );
+
+  it('день → неделя/блок/флаги делода, тейпера, mock; вне сезона — null', () => {
+    const annual = annualOf(['ss-sm-peak-8'], 'strongman');
+    expect(annual.totalWeeks).toBe(8);
+    const w1 = activeSeasonBlockForDate(annual, start)!;
+    expect(w1.week).toBe(1);
+    expect(w1.blockIndex).toBe(0);
+    expect(w1.weekInBlock).toBe(1);
+    expect(w1.color).toMatch(/^#/);
+    expect(activeSeasonBlockForDate(annual, shiftIsoDate(start, 28))!.week).toBe(5);
+    const w7 = activeSeasonBlockForDate(annual, shiftIsoDate(start, 42))!;
+    expect(w7.week).toBe(7);
+    expect(w7.isMockWeek).toBe(true);
+    const w8 = activeSeasonBlockForDate(annual, shiftIsoDate(start, 49))!;
+    expect(w8.week).toBe(8);
+    expect(w8.isTaperWeek).toBe(true);
+    expect(activeSeasonBlockForDate(annual, shiftIsoDate(start, 56))).toBeNull();
+    expect(activeSeasonBlockForDate(annual, '2026-09-01')).toBeNull();
+  });
+
+  it('многоблочный сезон: второй блок стартует после первого (сквозная неделя)', () => {
+    const annual = annualOf(['ss-ta-taper-2', 'ss-ta-comp-12'], 'weightlifting');
+    const first = annualOf(['ss-ta-taper-2'], 'weightlifting').totalWeeks; // 2
+    const inSecond = activeSeasonBlockForDate(annual, shiftIsoDate(start, first * 7))!;
+    expect(inSecond.blockIndex).toBe(1);
+    expect(inSecond.week).toBe(first + 1);
+    expect(inSecond.weekInBlock).toBe(1);
+    expect(inSecond.title).toMatch(/соревновательн/i);
+  });
+
+  it('dayDiffIso: целые дни без UTC-сдвига', () => {
+    expect(dayDiffIso('2026-01-01', '2026-01-08')).toBe(7);
+    expect(dayDiffIso('2026-01-08', '2026-01-01')).toBe(-7);
+    expect(dayDiffIso('мусор', '2026-01-01')).toBeNull();
+    expect(dayDiffIso('2026-01-01', '')).toBeNull();
   });
 });
