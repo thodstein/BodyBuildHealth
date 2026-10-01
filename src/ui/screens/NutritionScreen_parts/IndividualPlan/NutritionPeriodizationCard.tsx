@@ -35,6 +35,8 @@ interface Props {
   todayIso: string;
   specialMeals?: { date: string; type: 'refeed' | 'cheat_meal' | 'fast' }[];
   weightLog?: { date: string; weightKg: number }[];
+  /** Deep-link: клик по дню периода → открыть этот день в плане (если он сгенерирован). */
+  onOpenDay?: (date: string) => void;
 }
 
 const PREP_ACCENT = '#f59e0b';
@@ -81,7 +83,7 @@ const DayMarkers: React.FC<{ d: PeriodizationDay }> = ({ d }) => (
 
 export const NutritionPeriodizationCard: React.FC<Props> = ({
   prepPlan, base, goal, carbPeriodization, isTrainingDayForOffset,
-  heavyTrainDay, dayLabels, postShowTrack, todayIso, specialMeals, weightLog,
+  heavyTrainDay, dayLabels, postShowTrack, todayIso, specialMeals, weightLog, onOpenDay,
 }) => {
   const mode: 'prep' | 'general' = prepPlan ? 'prep' : 'general';
   const accent = mode === 'prep' ? PREP_ACCENT : GENERAL_ACCENT;
@@ -251,8 +253,9 @@ export const NutritionPeriodizationCard: React.FC<Props> = ({
                       <td style={td}><WeekMarkers w={w} /></td>
                     </tr>
                     {open && periodization.days.slice((w.weekIndex - 1) * 7, w.weekIndex * 7).map(d => (
-                      <tr key={d.date} data-day={d.date} style={{ background: 'rgba(255,255,255,0.02)' }}>
-                        <td style={{ ...td, textAlign: 'left', fontWeight: 700, paddingLeft: 14 }}>{d.weekday} {d.date.slice(8)}</td>
+                      <tr key={d.date} data-day={d.date} onClick={onOpenDay ? () => onOpenDay(d.date) : undefined}
+                        style={{ background: 'rgba(255,255,255,0.02)', cursor: onOpenDay ? 'pointer' : 'default' }}>
+                        <td style={{ ...td, textAlign: 'left', fontWeight: 700, paddingLeft: 14 }}>{onOpenDay ? '▸ ' : ''}{d.weekday} {d.date.slice(8)}</td>
                         <td style={{ ...td, textAlign: 'left' }}>{d.isTraining ? '🏋️' : '🛌'}{d.isHeavy ? ' тяж' : ''}</td>
                         <td style={td}>{d.kcal}</td>
                         <td style={td}>{d.proteinG}/{d.fatG}/{d.carbsG}</td>

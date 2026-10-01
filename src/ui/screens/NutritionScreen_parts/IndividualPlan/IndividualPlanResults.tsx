@@ -618,6 +618,18 @@ const doImportPlan = (raw: string): boolean => {
               todayIso={localIsoDate(new Date())}
               specialMeals={readScheduledSpecialMeals()}
               weightLog={(() => { try { return getWeightLog().map(e => ({ date: e.date, weightKg: e.weight })); } catch { return []; } })()}
+              onOpenDay={(date) => {
+                try {
+                  const today = localIsoDate(new Date());
+                  const off = Math.round((new Date(date + 'T00:00:00').getTime() - new Date(today + 'T00:00:00').getTime()) / 86400000);
+                  if (off >= 0 && off < planDays) {
+                    setSelectedDayIndex(off);
+                    try { resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch {}
+                  } else {
+                    (window as any).showToast?.('Этот день не сгенерирован — соберите план на нужную дату (1/3/7 дней)', 'info');
+                  }
+                } catch { /* deep-link best-effort */ }
+              }}
             />
           </div>
         )}

@@ -67,6 +67,15 @@ describe('Карточка периодизации питания', () => {
     expect(container.querySelector('[data-day="2026-03-09"]')).toBeTruthy();
   });
 
+  it('deep-link: клик по дню недели вызывает onOpenDay с датой', () => {
+    const calls: string[] = [];
+    const { container } = render(<NutritionPeriodizationCard {...baseProps} onOpenDay={(d) => calls.push(d)} />);
+    const day = container.querySelector('[data-day="2026-03-02"]') as HTMLElement;
+    expect(day).toBeTruthy();
+    fireEvent.click(day);
+    expect(calls).toContain('2026-03-02');
+  });
+
   it('specialMeals: запланированный читмил виден меткой в дне', () => {
     const { container } = render(
       <NutritionPeriodizationCard {...baseProps} specialMeals={[{ date: '2026-03-04', type: 'cheat_meal' }]} />,
