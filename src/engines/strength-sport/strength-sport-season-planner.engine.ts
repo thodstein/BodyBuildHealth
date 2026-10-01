@@ -250,6 +250,10 @@ export function rankCyclesForSeasonPhase(
     const m = t.meta;
     const reasons: string[] = [];
     let score = 50;
+    // Свой режим приоритетнее: ТА-сезон берёт ТА-циклы, стронг — стронговые,
+    // а гибридный сезон — гибридные (штанга + ивенты в одном блоке).
+    if (t.meta.mode === mode) { score += 10; reasons.push('свой режим +10'); }
+    else if (mode === 'hybrid' && t.meta.mode === 'hybrid') { score += 8; reasons.push('гибридный цикл +8'); }
     // Фаза
     const cp = cycleSeasonPhase(t);
     if (cp === phase) { score += 30; reasons.push(`фаза ${phase} совпала +30`); }
@@ -509,6 +513,9 @@ export function recommendSeasonPlan(input: SSSeasonInput): SSSeasonPlan {
   if (totalWeeks > 52) warnings.push(`Сезон ${totalWeeks} нед > 52 — урежьте горизонт или разбейте на два сезона`);
   if (blocks.length && horizon - totalWeeks >= 4) {
     warnings.push(`Горизонт ${horizon} нед, сезон ${totalWeeks} нед: не хватило валидных циклов — добавьте блок вручную или выберите пресет «Два пика»`);
+  }
+  if (blocks.length && totalWeeks - horizon >= 4) {
+    warnings.push(`Сезон ${totalWeeks} нед длиннее окна ${horizon} нед на ${totalWeeks - horizon}: старт не помещается — уберите блок или возьмите короткие циклы (тейпер-2/пик-4)`);
   }
   if (totalWeeks !== horizon && blocks.length) rationale.push(`Итог ${totalWeeks} нед (сумма длин циклов; расхождение с горизонтом — честное)`);
 

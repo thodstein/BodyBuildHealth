@@ -118,6 +118,12 @@ describe('season-planner: подбор цикла под фазу', () => {
     expect(sm!.meta.id).toBe('ss-sm-taper-2');
     expect(ta!.meta.weeks).toBe(2);
   });
+  it('свой режим приоритетнее: гибридный сезон берёт гибридные циклы', () => {
+    const basePick = pickCycleForSeasonPhase('hybrid', 'base', { level: 'intermediate', targetWeeks: 10, daysPerWeek: 4, equipment: ['barbell', 'other'] });
+    expect(basePick!.meta.id).toBe('ss-hb-base-10');
+    const peakPick = pickCycleForSeasonPhase('hybrid', 'peak', { level: 'intermediate', targetWeeks: 6, daysPerWeek: 4, equipment: ['barbell', 'other'] });
+    expect(peakPick!.meta.id).toBe('ss-hb-peak-6');
+  });
   it('без спец-снарядов цикл с ивентами допустим, но со штрафом-пометкой', () => {
     const ranked = rankCyclesForSeasonPhase('strongman', 'build', { level: 'intermediate', targetWeeks: 12, equipment: ['barbell'] });
     const staticC = ranked.find(r => r.cycle.meta.id === 'ss-sm-static-12');
@@ -428,6 +434,16 @@ describe('season-planner: планирование от даты старта', 
       goal: 'peaking', competitionDate: '2026-10-15', startDate: '2026-10-01',
     });
     expect(p.warnings.join(' ')).toMatch(/очень короткое окно/i);
+  });
+
+  it('окно уже собранного сезона: предупреждение о непомещающемся старте', () => {
+    const p = recommendSeasonPlan({
+      mode: 'weightlifting', level: 'intermediate', daysPerWeek: 5, weeks: 10,
+      goal: 'peaking', competitionDate: '2026-11-01', startDate: '2026-10-01',
+    });
+    expect(p.requestedWeeks).toBeLessThanOrEqual(5);
+    expect(p.totalWeeks).toBeGreaterThan(p.requestedWeeks);
+    expect(p.warnings.join(' ')).toMatch(/длиннее окна/);
   });
 
   it('без даты старта горизонт мастера уважается (дата — только якорь)', () => {
