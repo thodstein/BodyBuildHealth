@@ -8,6 +8,9 @@ import { resolveAllergenFoodIds, resolveAllExcludedFoodIds, selectedAllergenTags
 import { effectiveSpecialMealTarget } from "./planner-special-meal-state";
 import { sumMealTotals, sumDayTotals } from "./planner-recipe-mode";
 import { localIsoDate } from "./planner-date-utils";
+import { buildTrainSchedule, isTrainingDayFor } from "./planner-training-schedule";
+import { NutritionPeriodizationCard } from "./NutritionPeriodizationCard";
+import { getWeightLog } from "../../../../engines/profile-store";
 import { PopupSelect } from "../../../components/PopupXxx";
 import type { DrugInjection } from "./types";
 import { GlassCard, greenBtn, reportPillStyle } from "./ui";
@@ -38,6 +41,19 @@ const getDiaryEntriesForDate = (date: string): any[] => {
   } catch {
     return [];
   }
+};
+
+// Периодизация: запланированные спец-дни (he_special_meals) — рефид/читмил/фастинг.
+// Читаем сырой календарь (та же форма, что в Context.buildOneDay) → движок применит
+// те же моды и покажет метки в горизонте вперёд.
+const readScheduledSpecialMeals = (): { date: string; type: 'refeed' | 'cheat_meal' | 'fast' }[] => {
+  try {
+    const raw = JSON.parse(localStorage.getItem('he_special_meals') || '[]');
+    if (!Array.isArray(raw)) return [];
+    return raw
+      .filter((m: any) => m && typeof m.date === 'string' && ['refeed', 'cheat_meal', 'fast'].includes(m.type))
+      .map((m: any) => ({ date: m.date, type: m.type as 'refeed' | 'cheat_meal' | 'fast' }));
+  } catch { return []; }
 };
 
 const getDiaryLoggedDayCount = (): number => {
@@ -135,6 +151,7 @@ export const IndividualPlanResults: React.FC = () => {
     setDayPlan, setThreeDayPlan, planTargets, planType, variety,
     linkToTraining, trainStart,
     weightMode,
+    goal, bbPrepPlan, trainEnd, trainScheduleType, trainPattern,
     workScheduleEnabled, workStartTime, workEndTime, workDays, workScheduleType,
     v2Phase, v2Pharma, v2Labs, histamineSensitive,
     combatNutrition, applyCombatNutrition,
@@ -579,6 +596,29 @@ const doImportPlan = (raw: string): boolean => {
             </div>
           );
         })()}
+        {generated && effectiveKcal > 0 && (
+          <div style={{ marginBottom: 8 }}>
+            <NutritionPeriodizationCard
+              prepPlan={bbPrepPlan}
+              base={{
+                kcal: effectiveKcal,
+                proteinG: effectiveP,
+                fatG: effectiveF,
+                carbsG: effectiveC,
+                waterMl: waterCalc?.total ? Math.round(waterCalc.total * 1000) : 3000,
+                sodiumMg: waterCalc?.electrolytes?.sodiumMg || 3500,
+              }}
+              goal={goal}
+              carbPeriodization={carbPeriodization}
+              isTrainingDayForOffset={(offset) => isTrainingDayFor(buildTrainSchedule(linkToTraining, trainStart, trainEnd, trainingDays, trainScheduleType, trainPattern), offset)}
+              heavyTrainDay={heavyTrainDay}
+              dayLabels={DAY_LABELS}
+              todayIso={localIsoDate(new Date())}
+              specialMeals={readScheduledSpecialMeals()}
+              weightLog={(() => { try { return getWeightLog().map(e => ({ date: e.date, weightKg: e.weight })); } catch { return []; } })()}
+            />
+          </div>
+        )}
         <GlassCard title="Выбор дней" icon="📅" color="#00e68a">
           <div style={{ display:'inline-flex', alignItems:'center', gap:6, padding:'4px 8px', borderRadius:999, background:'rgba(0,230,138,0.08)', border:'1px solid rgba(0,230,138,0.14)', color:'rgba(255,255,255,0.68)', fontSize:10, margin:'0 auto 8px', fontWeight:600, textAlign:'center' }}>👆 Нажмите на день — откроется план на 1 день</div>
           <div style={{ display:'grid', gridTemplateColumns:'repeat(7,1fr)', gap:5, marginBottom:10 }}>

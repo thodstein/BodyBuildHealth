@@ -12,7 +12,7 @@
  */
 
 export type AffinitySlot =
-  | 'breakfast' | 'lunch' | 'dinner' | 'snack'
+  | 'breakfast' | 'lunch' | 'dinner' | 'snack' | 'lateSnack'
   | 'preworkout' | 'postworkout' | 'intra' | 'presleep';
 
 // Завтрак-стейплы (каши/хлопья/злаковые завтраки) — не место в обеде/ужине.
@@ -37,6 +37,11 @@ export function afAllows(foodId: string | null | undefined, slot: AffinitySlot):
     case 'lunch':
     case 'dinner':
       // Завтрак-стейпл (овсянка/хлопья) в обед/ужин — off-slot.
+      if (BREAKFAST_STAPLE_RE.test(id)) return false;
+      return true;
+    case 'lateSnack':
+      // E17: поздний перекус (после 20:00) — как ужин: завтрак-стейпл (овсянка/
+      // хлопья) на ночь не ставим (было: «Овсяные хлопья 218 г» в 21:15).
       if (BREAKFAST_STAPLE_RE.test(id)) return false;
       return true;
     case 'snack':

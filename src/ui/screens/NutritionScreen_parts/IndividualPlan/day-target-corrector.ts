@@ -13,6 +13,7 @@
 import { FOOD_DB, FOOD_ALLERGEN_DIET } from '../../../../core/nutrition-database';
 import type { FoodItem } from '../../../../core/nutrition-database';
 import { foodAvailableForPlan, stapleFamilyOf, familyMealCap, isCreamId, creamMealCap, citrusFruitCapG, countCarbItems, sweetFleshClash, isSweetCarbId, isFleshProteinId, isFishId, isProteinPowderId, isPortableFood, isWorkWindowMeal, isHvStapleBanned, isBreakfastBannedCarb, isBreakfastBannedProtein, isBreakfastBannedFat, isHeavyAnimalFat, isSweetBaseId, isFlakeId, mealHasMeatProtein, dayTargetScale, hvStyleWidensTopups, HV_PRACTICAL_CARB_IDS, isConcentrateFoodId, CONCENTRATE_PORTION_CAP_G, isLowFiberComposition } from './food-availability';
+import { afAllows } from './planner-meal-affinity';
 // Порошок — не больше скупа (60 г) в одном пункте, иначе «изолят 186 г в перекусе».
 // Универсально (не HV-гейт): таких порций не бывает и на обычных днях.
 const POWDER_PORTION_CAP_G = 60;
@@ -666,6 +667,14 @@ export function correctDayToTargets(
               if (!_fam) return 2;
               return familyMealCap(_fam, { hv, ts: _tsCap });
             };
+            // E17: поздний перекус (после 20:00) — density-swap не ставит завтрак-стейпл
+            // (овсянка/хлопья) или десерт на ночь; меняем на ужинный плотный носитель.
+            const _mNight = (() => {
+              const _t = String((_m as any).type || '');
+              if (!_t.startsWith('snack')) return false;
+              const _mm = /^(\d{1,2}):(\d{2})$/.exec(String((_m as any).time || ''));
+              return _mm ? (Number(_mm[1]) * 60 + Number(_mm[2])) >= 20 * 60 : false;
+            })();
             const _altsF = _alts.filter(f => {
               const _bf = stapleFamilyOf(f.id);
               // HV-исключение: плотность важнее (churn-бан только обычных дней).
@@ -674,6 +683,7 @@ export function correctDayToTargets(
               if (isCreamId(f.id) && _creamUsesD() >= creamMealCap(hv, _tsCap)) return false;
               // P1b: вето «тунец + крем» (жертва-рыба — можно, clash уходит с ней).
               if (isCreamId(f.id) && (meals[_vMi].items || []).some((x: any) => x.id !== _vic.id && isFishId(x.id))) return false;
+              if (_mNight && (!afAllows(f.id, 'lateSnack') || isSweetCarbId(f.id))) return false;
               return true;
             });
             let _best: FoodItem | undefined = [..._altsF.filter(f => !_sugarFull || !_sIds.has(f.id))]

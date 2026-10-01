@@ -8,7 +8,7 @@ import { calcNutritionV2 } from '../../engines/nutrition-v2.engine';
 import { NutritionDiary } from './NutritionScreen_parts/NutritionDiary';
 import { searchByName as searchOFF, productToFoodItem } from '../../engines/openfoodfacts.engine';
 import { RETAIL_CHAINS, retailToFoodItem, searchRetailProducts, type RetailProduct } from '../../engines/retail-search.engine';
-import { IndividualPlan, NutritionPlanScope, PlanReportTab } from './NutritionScreen_parts/IndividualPlan';
+import { IndividualPlan, NutritionPlanScope, PlanReportTab, NutritionPeriodizationTab } from './NutritionScreen_parts/IndividualPlan';
 import { OrganLoadCalculator } from './NutritionScreen_parts/IndividualPlan/OrganLoadCalculator';
 import { PeakWeekTab } from './NutritionScreen_parts/IndividualPlan/PeakWeekTab';
 import { readPlanTargets, PLAN_TARGETS_EVENT, type PlanKbjuTargets } from './NutritionScreen_parts/IndividualPlan/plan-targets-bridge';
@@ -43,7 +43,7 @@ import { InfoErrorBoundary } from './SupportScreen_parts/SupportScreenData';
 interface DiaryEntry { name: string; kcal: number; p: number; f: number; c: number; date?: string; }
 type NutritionPage = 'hero' | 'tabs';
 type NutritionSection = 'diary' | 'planning' | 'ration' | 'kitchen' | 'analysis' | 'overview' | 'analytics' | 'all';
-type ActiveTab = 'diary' | 'charts' | 'mealplan' | 'cart' | 'favorites' | 'catalog' | 'reference' | 'recipes' | 'reports' | 'restaurant' | 'info' | 'customfood' | 'overview' | 'usefulness' | 'progress' | 'nutria' | 'visualize' | 'achievements' | 'quests' | 'peri' | 'metabolic' | 'planreport' | 'organload' | 'peak';
+type ActiveTab = 'diary' | 'charts' | 'mealplan' | 'cart' | 'favorites' | 'catalog' | 'reference' | 'recipes' | 'reports' | 'restaurant' | 'info' | 'customfood' | 'overview' | 'usefulness' | 'progress' | 'nutria' | 'visualize' | 'achievements' | 'quests' | 'peri' | 'metabolic' | 'planreport' | 'organload' | 'peak' | 'periodization';
 
 const SECTION_TABS: Record<NutritionSection, string[]> = {
   overview: ['diary', 'charts', 'mealplan', 'cart', 'favorites', 'catalog', 'reference', 'recipes', 'restaurant', 'reports', 'customfood', 'overview', 'usefulness', 'progress', 'nutria', 'visualize', 'achievements', 'quests', 'metabolic'],
@@ -54,7 +54,7 @@ const SECTION_TABS: Record<NutritionSection, string[]> = {
   // planning оставлен legacy-алиасом (диплинки/тесты), в UI-переключателе не показывается.
   ration: ['mealplan', 'favorites', 'cart', 'peak'],
   kitchen: ['catalog', 'recipes', 'restaurant', 'customfood'],
-  analysis: ['reference', 'info', 'usefulness', 'metabolic', 'planreport', 'organload'],
+  analysis: ['reference', 'info', 'usefulness', 'metabolic', 'planreport', 'organload', 'periodization'],
   all: ['diary', 'charts', 'mealplan', 'cart', 'favorites', 'catalog', 'reference', 'recipes', 'restaurant', 'reports', 'customfood', 'overview', 'usefulness', 'progress', 'nutria', 'visualize', 'achievements', 'quests', 'peri', 'metabolic'],
 };
 
@@ -76,6 +76,7 @@ const TAB_LABELS: Record<string, string> = {
   planreport: '📊 Отчёт',
   organload: '🧬 Нагрузка',
   peak: '🏁 Тапер',
+  periodization: '🍽 Периодизация',
 };
 
 const cardBg = { background: '#18181b', borderRadius: 18, border: '1px solid rgba(255,255,255,0.06)', boxShadow: '0 2px 16px rgba(0,0,0,0.2)' };
@@ -1399,7 +1400,7 @@ export const NutritionScreen: React.FC<{ initialSubTab?: string }> = ({ initialS
         setTab(tab);
         setPage('tabs');
         if (tab === 'peak') setNutritionSection('ration');
-        else if (tab === 'planreport' || tab === 'organload') setNutritionSection('analysis');
+        else if (tab === 'planreport' || tab === 'organload' || tab === 'periodization') setNutritionSection('analysis');
       } catch {}
     };
     window.addEventListener('nutrition-open-tab', handler as EventListener);
@@ -1538,6 +1539,7 @@ export const NutritionScreen: React.FC<{ initialSubTab?: string }> = ({ initialS
       case 'metabolic': return <InfoErrorBoundary label="Метаболика"><MetabolicHub /></InfoErrorBoundary>;
       case 'planreport': return <InfoErrorBoundary label="Отчёт плана"><PlanReportTab /></InfoErrorBoundary>;
       case 'organload': return <InfoErrorBoundary label="Нагрузка БЖУ"><OrganLoadCalculator /></InfoErrorBoundary>;
+      case 'periodization': return <InfoErrorBoundary label="Периодизация питания"><NutritionPeriodizationTab /></InfoErrorBoundary>;
       case 'peak': return <InfoErrorBoundary label="Тапер ББ"><PeakWeekTab /></InfoErrorBoundary>;
       default: return null;
     }

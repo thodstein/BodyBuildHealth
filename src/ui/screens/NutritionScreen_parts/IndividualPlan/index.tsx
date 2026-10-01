@@ -9,6 +9,10 @@ import { OrganLoadCalculator } from "./OrganLoadCalculator";
 import { PeakWeekTab } from "./PeakWeekTab";
 import { usePlanCtx } from "./IndividualPlanContext";
 import type { PlannerMode } from "./types";
+import { NutritionPeriodizationCard } from "./NutritionPeriodizationCard";
+import { buildTrainSchedule, isTrainingDayFor } from "./planner-training-schedule";
+import { localIsoDate } from "./planner-date-utils";
+import { getWeightLog } from "../../../../engines/profile-store";
 
 type PlanTab = 'settings' | 'plan' | 'composer' | 'report' | 'organload' | 'peak';
 
@@ -619,3 +623,47 @@ const ReportTab: React.FC = () => {
 
 /** Отчёт рациона как топ-таб (экспорт для NutritionScreen; внутри — тот же ReportTab). */
 export const PlanReportTab: React.FC = ReportTab;
+
+/** Периодизация питания как топ-таб (экспорт для NutritionScreen) — тот же движок, что в табе «План». */
+export const NutritionPeriodizationTab: React.FC = () => {
+  const {
+    bbPrepPlan, effectiveKcal, effectiveP, effectiveF, effectiveC, waterCalc,
+    goal, carbPeriodization, linkToTraining, trainStart, trainEnd, trainingDays,
+    trainScheduleType, trainPattern, heavyTrainDay, DAY_LABELS,
+  } = usePlanCtx();
+  const specialMeals = (() => {
+    try {
+      const raw = JSON.parse(localStorage.getItem('he_special_meals') || '[]');
+      if (!Array.isArray(raw)) return [];
+      return raw.filter((m: any) => m && typeof m.date === 'string' && ['refeed', 'cheat_meal', 'fast'].includes(m.type))
+        .map((m: any) => ({ date: m.date, type: m.type as 'refeed' | 'cheat_meal' | 'fast' }));
+    } catch { return []; }
+  })();
+  const weightLog = (() => { try { return getWeightLog().map(e => ({ date: e.date, weightKg: e.weight })); } catch { return []; } })();
+  return (
+    <div style={{ paddingBottom: 24 }}>
+      {(!effectiveKcal || effectiveKcal <= 0) && (
+        <div style={{ fontSize: 11, color: '#fff', marginBottom: 8 }}>⚠️ Сначала создайте план — тогда появится периодизация вперёд.</div>
+      )}
+      <NutritionPeriodizationCard
+        prepPlan={bbPrepPlan}
+        base={{
+          kcal: effectiveKcal || 0,
+          proteinG: effectiveP || 0,
+          fatG: effectiveF || 0,
+          carbsG: effectiveC || 0,
+          waterMl: waterCalc?.total ? Math.round(waterCalc.total * 1000) : 3000,
+          sodiumMg: waterCalc?.electrolytes?.sodiumMg || 3500,
+        }}
+        goal={goal}
+        carbPeriodization={carbPeriodization}
+        isTrainingDayForOffset={(offset) => isTrainingDayFor(buildTrainSchedule(linkToTraining, trainStart, trainEnd, trainingDays, trainScheduleType, trainPattern), offset)}
+        heavyTrainDay={heavyTrainDay}
+        dayLabels={DAY_LABELS}
+        todayIso={localIsoDate(new Date())}
+        specialMeals={specialMeals}
+        weightLog={weightLog}
+      />
+    </div>
+  );
+};

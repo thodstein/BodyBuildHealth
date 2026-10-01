@@ -1161,15 +1161,17 @@ function gapFillTimes(fixedMin: number[], count: number): number[] {
     // §3B: предпочтительный разрыв 2.5 ч; если день плотный (много приёмов/окон) —
     // допускаем вынужденный разрыв 90 мин, а при полном отсутствии — ставим приём в
     // точку, максимально удалённую от всех существующих (никаких дублей времени).
+    // E17 (чистота выдачи): время приёма округляем до 5 мин (08:23 → 08:25),
+    // иначе меню выглядит машинной свалкой. Шаг 5 сохраняет разрывы ≥90/150.
     if (bestGap >= 150) {
-      const mid = Math.round((pts[bestIdx - 1] + pts[bestIdx]) / 2);
+      const mid = Math.round((pts[bestIdx - 1] + pts[bestIdx]) / 2 / 5) * 5;
       result.push(mid);
       pts.push(mid);
       pts.sort((a, b) => a - b);
       continue;
     }
     if (bestGap >= 90) {
-      const mid = Math.round((pts[bestIdx - 1] + pts[bestIdx]) / 2);
+      const mid = Math.round((pts[bestIdx - 1] + pts[bestIdx]) / 2 / 5) * 5;
       result.push(mid);
       pts.push(mid);
       pts.sort((a, b) => a - b);
@@ -1890,7 +1892,14 @@ function buildWholeMeal(
   // если избранных «завтрашних» нет — завтрак получит яйца/творог/сыворотку, а НЕ любимый
   // говяжий фарш. Любимое мясо остаётся для обеда/ужина (ветка preferredRot ниже).
   // E1: affinity — избранное тоже подчиняется матрице «продукт × слот» (печень в снек не лезет).
-  const _affSlot = _mealKind as AffinitySlot;
+  // E17: поздний перекус (после 20:00) — слот 'lateSnack' (как ужин): завтрак-стейпл
+  // (овсянка/хлопья) на ночь не ставим.
+  const _isLateSnack = _mealKind === 'snack' && (() => {
+    const m = /^(\d{1,2}):(\d{2})$/.exec(String(time || ''));
+    if (!m) return false;
+    return (Number(m[1]) * 60 + Number(m[2])) >= 20 * 60;
+  })();
+  const _affSlot: AffinitySlot = _isLateSnack ? 'lateSnack' : (_mealKind as AffinitySlot);
   const _preferredForThis = (breakfast ? preferredRot.filter(f => isBreakfastProtein(f)) : preferredRot).filter(f => afAllows(f.id, _affSlot));
   const proteinPool = _preferredForThis.length > 0
     ? _preferredForThis
@@ -2033,6 +2042,7 @@ function buildWholeMeal(
       const _wider = afFilterPool([...pool.carbSlow, ...pool.carbFast], _affSlot);
       if (_wider.length > 0) carbPoolRaw = _wider;
     }
+
     // Сухофрукты/концентраты — только добивка, не основа (иначе 14г каши + 100г сухофруктов — пустой рацион).
     // v3: сухие стейплы (крем риса/кукурузные хлопья, STAPLE_DRY_IDS) — ОСНОВА, не добивка.
 // v3: ранжир плотности на HV — сухие стейплы первыми, дальше по удобству (угли/клетчатка).
@@ -3061,7 +3071,9 @@ function buildPostWorkout(
 // ─── МЕТОД: intra-workout (тяжёлый training) ─────────────────────────
 function buildIntraWorkout(time: string, seed: number, pool: ReturnType<typeof buildFoodPools>, carbG?: number): Meal {
   const items: MealItem[] = [];
-  if (pool.eaa) items.push(makeItem(pool.eaa, INTRA_EAA_G, 'fast_protein'));
+  // E17: EAA — ФИКС-доза (не масштабируется корректором/реконсайлером под макросы:
+  // раньше EAA 12 г раздувался до 165 г в попытке добрать белок — «свалка» в intra).
+  if (pool.eaa) { const _eaa = makeItem(pool.eaa, INTRA_EAA_G, 'fast_protein'); (_eaa as any)._fixedGrams = INTRA_EAA_G; items.push(_eaa); }
   // Dextrin (amylopectin): если нет — синтетический пункт
   // FIX 2.2 (БАГ-10): intra отдаёт свою распределённую углеводную долю (_carbFor('intra')),
   // а не фикс. 40 г/ч — иначе карб-веса резервировались, но не доставлялись.
@@ -3075,7 +3087,9 @@ function buildIntraWorkout(time: string, seed: number, pool: ReturnType<typeof b
   // Доза: раствор ~6-8% — 25 г порошка на порцию (содержит Na 400/ K 200 / Mg 60 мг).
   if (pool.isotonic) {
     const _isoG = Math.min(25, SUPPLEMENT_MAX_G[pool.isotonic.id] ?? 25);
-    items.push(makeItem(pool.isotonic, _isoG, 'liquid'));
+    const _iso = makeItem(pool.isotonic, _isoG, 'liquid');
+    (_iso as any)._fixedGrams = _isoG; // E17: фикс-доза изотоника (не раздувается под У)
+    items.push(_iso);
   }
 
   const totals = items.reduce((acc, it) => ({
@@ -6109,6 +6123,12 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
             // (на обычных днях 3-й гарнир иногда нужен: 3 приёма × 157У не закрыть двумя).
             if (effWorst === 'c' && _pickCtx.highVolumeDay && (HV_BANNED_CARB_IDS.has(cand.id) || isHvStapleBanned(cand.id))) continue;
             if (effWorst === 'c' && (_tm.type === 'breakfast' || /Завтрак/i.test(_tm.label || '')) && isBreakfastBannedCarb(cand.id)) continue;
+            // E17: поздний перекус (после 20:00) — тот же запрет завтрак-стейпла, что у ужина
+            // (иначе добор У кладёт «овсяные хлопья 218 г» в 21:15).
+            if (effWorst === 'c' && _isSnackSlot(_tm.type) && (() => {
+              const mm = /^(\d{1,2}):(\d{2})$/.exec(String((_tm as any).time || ''));
+              return mm ? (Number(mm[1]) * 60 + Number(mm[2])) >= 20 * 60 : false;
+            })() && !afAllows(cand.id, 'lateSnack')) continue;
             // P2 (типология, жалоба «нахъера везде по 2-3 вида каши»): ОДИН углевод в
             // приёме, в нормальной порции (рост существующего до капа — без лимита).
             // Второй пункт — ТОЛЬКО десерт в обед (рис + пряник/джем ≤60, правило №3).
@@ -6774,7 +6794,13 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
             // P1b: вето «тунец + крем» — крем-хвост к рыбе не кладём.
             const _haveFishT = (m.items || []).some((x: any) => isFishId(x.id));
             // P0 (HV-рацион): хлопья — не ужинная еда (завтрак/снек/peri). Ужин — крупа/паста.
-            const _noFlakesDinner = String((m as any).type || '') === 'dinner';
+            // E17: поздний перекус (после 20:00) — как ужин: без завтрак-стейпла (хлопья)
+            // и без десертов (пряники/джем/мёд на ночь).
+            const _mLateSnack = String((m as any).type || '').startsWith('snack') && (() => {
+              const mm = /^(\d{1,2}):(\d{2})$/.exec(String((m as any).time || ''));
+              return mm ? (Number(mm[1]) * 60 + Number(mm[2])) >= 20 * 60 : false;
+            })();
+            const _noFlakesDinner = String((m as any).type || '') === 'dinner' || _mLateSnack;
             const _df = _orderedDense
               .map((did: string) => FOOD_DB.find((f: any) => f.id === did))
               .filter((f: any) => f && !_have.has(f.id)
@@ -6782,6 +6808,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
                 && !_haveFams.has(stapleFamilyOf(f.id) as string)
                 && (!isCreamId(f.id) || !_haveFishT || (_isLunchDsrt && _sweetIdsDsrt.has(f.id)))
                 && (_isLunchDsrt || !_sweetIdsDsrt.has(f.id) || (_sNowDsrt + 50 <= (input.goalCarbsG || 0) * _sCapDsrt))
+                && !(_mLateSnack && _sweetIdsDsrt.has(f.id))
                 && !(_noFlakesDinner && /flake/i.test(f.id))
                 && _denseUses(f.id) < 2
                 && _denseFamUses(f.id) < familyMealCap(stapleFamilyOf(f.id), { hv: true, ts: _pickCtx.dayTargetScale })
@@ -9843,6 +9870,179 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
         if (!_doneF) break;
       }
     }
+
+    // ─── E17: финальное сглаживание ultraP (500Б) — главные приёмы ≤ цель×1.35 ───
+    // EAA/фикс-дозы сняли часть белка из intra; поздние проходы могли перегрузить один
+    // приём. Переносим белок из перегруженного в недогруженный (не фикс-пункты) — держим
+    // контракт §500Б-сглаживания (≤1.35× цели приёма) даже после фикс-доз.
+    {
+      const _ultraPFin = (input.goalProteinG || 0) >= 350 || (input.goalProteinG || 0) / Math.max(40, input.weightKg || 80) >= 3.5;
+      if (_ultraPFin) {
+        const _scaleFin = (it: any, newAmount: number) => {
+          const r = newAmount / Math.max(1, it.amount || 1);
+          it.amount = newAmount;
+          it.p = Math.round((it.p || 0) * r * 10) / 10;
+          it.f = Math.round((it.f || 0) * r * 10) / 10;
+          it.c = Math.round((it.c || 0) * r * 10) / 10;
+          it.kcal = Math.round(4 * it.p + 9 * it.f + 4 * it.c);
+          if (it.fiber != null) it.fiber = Math.round(it.fiber * r * 10) / 10;
+          if (it.leucine_mg != null) it.leucine_mg = Math.round(it.leucine_mg * r);
+        };
+        for (let _k = 0; _k < 12; _k++) {
+          const _ov = meals
+            .filter((m: any) => !m._insulinWindow && (Number(m?.target?.p) || 0) > 0)
+            .map((m: any) => ({ m, over: (m.totals?.p || 0) - Number(m.target.p) * 1.35 }))
+            .filter(x => x.over > 1).sort((a, b) => b.over - a.over)[0];
+          if (!_ov) break;
+          const _don = (_ov.m.items || []).filter((it: any) => ['protein', 'fast_protein', 'slow_protein'].includes(it.role) && !(it as any)._fixedGrams)
+            .sort((a: any, b: any) => (b.p || 0) - (a.p || 0))[0];
+          if (!_don) break;
+          const _dFd = FOOD_DB.find((f: any) => f.id === _don.id);
+          if (!_dFd || (_dFd.protein || 0) <= 0) break;
+          const _cutG = Math.min(Math.round((_don.amount || 0) * 0.5), Math.max(0, Math.ceil(_ov.over / ((_dFd.protein || 0) / 100) / 5) * 5));
+          if (_cutG < 5) break;
+          const _freedP = (_dFd.protein || 0) * _cutG / 100;
+          const _und = meals
+            .filter((m: any) => m !== _ov.m && (Number(m?.target?.p) || 0) > 0)
+            .map((m: any) => ({ m, def: Number(m.target.p) - (m.totals?.p || 0) }))
+            .filter(x => x.def > 2).sort((a, b) => b.def - a.def)[0];
+          if (!_und) break;
+          const _recv = (_und.m.items || []).filter((it: any) => ['protein', 'fast_protein', 'slow_protein'].includes(it.role) && !(it as any)._fixedGrams)
+            .sort((a: any, b: any) => (b.p || 0) - (a.p || 0))[0];
+          if (!_recv) break;
+          const _rFd = FOOD_DB.find((f: any) => f.id === _recv.id);
+          if (!_rFd || (_rFd.protein || 0) <= 0) break;
+          const _addG = Math.max(5, Math.round(_freedP / ((_rFd.protein || 0) / 100) / 5) * 5);
+          // «Не навреди»: применяем перенос только если отклонение дня не ухудшилось.
+          const _devS = () => Math.max(
+            (input.goalKcal || 0) > 0 ? Math.abs(totals.kcal - (input.goalKcal || 0)) / (input.goalKcal || 1) : 0,
+            (input.goalProteinG || 0) > 0 ? Math.abs(totals.p - (input.goalProteinG || 0)) / (input.goalProteinG || 1) : 0,
+            (input.goalFatG || 0) > 0 ? Math.abs(totals.f - (input.goalFatG || 0)) / (input.goalFatG || 1) : 0,
+            (input.goalCarbsG || 0) > 0 ? Math.abs(totals.c - (input.goalCarbsG || 0)) / (input.goalCarbsG || 1) : 0,
+          );
+          const _dBefore = _devS();
+          const _donA = _don.amount; const _recvA = _recv.amount;
+          _scaleFin(_don, (_don.amount || 0) - _cutG);
+          _scaleFin(_recv, (_recv.amount || 0) + _addG);
+          _ov.m.totals = mealTotalsOf(_ov.m.items);
+          _und.m.totals = mealTotalsOf(_und.m.items);
+          recalcDayTotals(meals, totals);
+          if (_devS() > _dBefore + 1e-9) {
+            _scaleFin(_don, _donA); _scaleFin(_recv, _recvA);
+            _ov.m.totals = mealTotalsOf(_ov.m.items);
+            _und.m.totals = mealTotalsOf(_und.m.items);
+            recalcDayTotals(meals, totals);
+            break;
+          }
+        }
+      }
+    }
+
+    // ─── E17: гигиена поздних перекусов (off-slot на ночь) ───
+    // Поздний перекус (после 20:00) не должен нести завтрак-стейпл (овсянка/хлопья)
+    // или десерт (пряники/джем/мёд) — «свалка на ночь». Заменяем носитель на ужинный
+    // плотный (крем риса/рис/картофель/хлеб/гречка/паста) с сохранением углеводов,
+    // недостающий белок добираем в существующий белковый пункт приёма. «Не навреди»:
+    // откат, если отклонение дня ухудшилось или белок не скомпенсирован.
+    try {
+      const _NIGHT_SWEET = new Set(['pryaniki', 'jam', 'honey', 'dates', 'marmalade', 'zefir', 'pastila', 'sushki', 'sugar_cookies', 'dates_dried', 'raisins', 'dried_apricots']);
+      const _NIGHT_CARBS = ['cream_of_rice', 'rice_semolina', 'rice_white', 'potato_boiled', 'bread_rye', 'bread_white', 'grain_red_rice', 'grain_black_rice', 'buckwheat', 'pasta_durum', 'rice_basmati'];
+      const _devNight = () => Math.max(
+        (input.goalKcal || 0) > 0 ? Math.abs(totals.kcal - (input.goalKcal || 0)) / (input.goalKcal || 1) : 0,
+        (input.goalProteinG || 0) > 0 ? Math.abs(totals.p - (input.goalProteinG || 0)) / (input.goalProteinG || 1) : 0,
+        (input.goalFatG || 0) > 0 ? Math.abs(totals.f - (input.goalFatG || 0)) / (input.goalFatG || 1) : 0,
+        (input.goalCarbsG || 0) > 0 ? Math.abs(totals.c - (input.goalCarbsG || 0)) / (input.goalCarbsG || 1) : 0,
+      );
+      for (const m of meals as any[]) {
+        const _t = String(m.type || '');
+        if (!_t.startsWith('snack')) continue;
+        const _mm = /^(\d{1,2}):(\d{2})$/.exec(String(m.time || ''));
+        if (!_mm || (Number(_mm[1]) * 60 + Number(_mm[2])) < 20 * 60) continue;
+        const _have = new Set((m.items || []).map((x: any) => x.id));
+        for (const it of (m.items || []) as any[]) {
+          if (it.role !== 'carb_slow' && it.role !== 'carb_fast') continue;
+          if ((it as any)._fixedGrams) continue;
+          if (afAllows(it.id, 'lateSnack') && !_NIGHT_SWEET.has(it.id)) continue;
+          const _replId = _NIGHT_CARBS.find(id => !_have.has(id)
+            && !(_pickCtx.currentExcludedIds && _pickCtx.currentExcludedIds.has(id))
+            && !(input.excludedIds && input.excludedIds.has(id))
+            && (() => { const f = FOOD_DB.find((x: any) => x.id === id); return !!f && foodPassesCtxAllergens(f) && foodAvailableForPlan(f); })());
+          if (!_replId) continue;
+          const fd = FOOD_DB.find((f: any) => f.id === _replId);
+          if (!fd || (fd.carbs || 0) < 10) continue;
+          const _snap = (m.items || []).map((x: any) => ({ ...x }));
+          const _dev0 = _devNight();
+          const _oldP = it.p || 0;
+          const _oldF = it.f || 0;
+          const _g = Math.max(30, Math.min(300, Math.round((it.c || 0) / Math.max(1, fd.carbs || 1) * 100 / 5) * 5));
+          const _r = _g / 100;
+          it.id = fd.id; it.name = fd.name; it.amount = _g;
+          it.p = +((fd.protein || 0) * _r).toFixed(1); it.f = +((fd.fat || 0) * _r).toFixed(1); it.c = +((fd.carbs || 0) * _r).toFixed(1);
+          it.kcal = Math.round(4 * it.p + 9 * it.f + 4 * it.c); it.fiber = +((fd.fiber || 0) * _r).toFixed(1);
+          // Компенсация белка — растим существующий белковый пункт приёма.
+          const _dP = _oldP - it.p;
+          let _compOk = true;
+          if (_dP > 1.5) {
+            const _pIt = (m.items || []).find((x: any) => ['protein', 'fast_protein', 'slow_protein'].includes(x.role) && x.id !== it.id && !(x as any)._fixedGrams);
+            const _pFd = _pIt ? FOOD_DB.find((f: any) => f.id === _pIt.id) : null;
+            if (_pIt && _pFd && (_pFd.protein || 0) > 0) {
+              const _maxAdd = isProteinPowderId(_pIt.id) ? Math.max(0, (SUPPLEMENT_MAX_G[_pIt.id] ?? 60) - (_pIt.amount || 0)) : 120;
+              const _addG = Math.min(_maxAdd, Math.round(_dP / ((_pFd.protein || 0) / 100)));
+              if (_addG >= 5) {
+                const pr = _addG / 100;
+                _pIt.amount += _addG;
+                _pIt.p = +(_pIt.p + (_pFd.protein || 0) * pr).toFixed(1);
+                _pIt.f = +(_pIt.f + (_pFd.fat || 0) * pr).toFixed(1);
+                _pIt.c = +(_pIt.c + (_pFd.carbs || 0) * pr).toFixed(1);
+                _pIt.kcal = Math.round(4 * _pIt.p + 9 * _pIt.f + 4 * _pIt.c);
+                _pIt.fiber = +(((_pIt.fiber || 0) + (_pFd.fiber || 0) * pr)).toFixed(1);
+              } else if (_dP - _addG * ((_pFd.protein || 0) / 100) > 2) _compOk = false;
+            } else _compOk = false;
+          }
+          // Компенсация жира (овсянка жирнее риса/крема): растим существующий жир-пункт
+          // приёма или добавляем небольшой ночной жир (орехи/масло) под дельту.
+          const _dF = _oldF - it.f;
+          if (_compOk && _dF > 2) {
+            const _fIt = (m.items || []).find((x: any) => x.role === 'fat' && x.id !== it.id && !(x as any)._fixedGrams);
+            const _fFd = _fIt ? FOOD_DB.find((f: any) => f.id === _fIt.id) : null;
+            if (_fIt && _fFd && (_fFd.fat || 0) > 0) {
+              const _addF = Math.min(40, Math.round(_dF / ((_fFd.fat || 0) / 100)));
+              if (_addF >= 3) {
+                const fr = _addF / 100;
+                _fIt.amount += _addF;
+                _fIt.p = +(_fIt.p + (_fFd.protein || 0) * fr).toFixed(1);
+                _fIt.f = +(_fIt.f + (_fFd.fat || 0) * fr).toFixed(1);
+                _fIt.c = +(_fIt.c + (_fFd.carbs || 0) * fr).toFixed(1);
+                _fIt.kcal = Math.round(4 * _fIt.p + 9 * _fIt.f + 4 * _fIt.c);
+              } else if (_dF - _addF * ((_fFd.fat || 0) / 100) > 2.5) _compOk = false;
+            } else {
+              const _fatId = ['almonds', 'walnuts', 'sunflower_seeds', 'olive_oil'].find(id => !_have.has(id)
+                && !(_pickCtx.currentExcludedIds && _pickCtx.currentExcludedIds.has(id))
+                && !(input.excludedIds && input.excludedIds.has(id))
+                && (() => { const f = FOOD_DB.find((x: any) => x.id === id); return !!f && foodPassesCtxAllergens(f) && foodAvailableForPlan(f); })());
+              const _fFd2 = _fatId ? FOOD_DB.find((f: any) => f.id === _fatId) : null;
+              if (_fatId && _fFd2 && (_fFd2.fat || 0) > 0) {
+                const _fg = Math.max(5, Math.min(25, Math.round(_dF / ((_fFd2.fat || 0) / 100))));
+                const fr = _fg / 100;
+                (m.items || []).push({
+                  id: _fatId, name: _fFd2.name, amount: _fg, role: 'fat',
+                  p: +((_fFd2.protein || 0) * fr).toFixed(1), f: +((_fFd2.fat || 0) * fr).toFixed(1), c: +((_fFd2.carbs || 0) * fr).toFixed(1),
+                  kcal: Math.round(4 * ((_fFd2.protein || 0) * fr) + 9 * ((_fFd2.fat || 0) * fr) + 4 * ((_fFd2.carbs || 0) * fr)),
+                  fiber: +((_fFd2.fiber || 0) * fr).toFixed(1), leucine_mg: 0,
+                });
+                _have.add(_fatId);
+              } else _compOk = false;
+            }
+          }
+          m.totals = mealTotalsOf(m.items); recalcDayTotals(meals, totals);
+          if (!_compOk || _devNight() > _dev0 + 0.005) {
+            m.items = _snap; m.totals = mealTotalsOf(m.items); recalcDayTotals(meals, totals);
+          } else {
+            _have.add(fd.id);
+          }
+        }
+      }
+    } catch { /* best-effort гигиена — не ломаем генерацию */ }
 
     // ─── P4/E0: честный флаг сходимости products-пути (ФИНАЛЬНЫЙ totals) ───
     // Считается здесь, ПОСЛЕ всех писателей и reconciliation. Канон допуска —
