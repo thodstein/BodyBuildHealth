@@ -244,6 +244,30 @@ export function planArmPeaks(
   return runtime;
 }
 
+/* ── Разминочная рампа ───────────────────────────────────────────────────── */
+
+/**
+ * Разминочные подходы тяжёлого упражнения (BB-паттерн в арм-масштабе):
+ * 40–50% ×10–12 → 70% ×5 → 85% ×3. Только для weighted-работы; загрузки строго
+ * возрастают и не перешагивают рабочий вес. Малые веса получают 2 ступени.
+ */
+export function buildArmWarmupSets(topWeight: number, _opts?: { heavy?: boolean }): Array<{ load: number; reps: number }> {
+  const w = Number(topWeight) || 0;
+  if (w <= 0) return [];
+  const out: Array<{ load: number; reps: number }> = [];
+  const push = (pct: number, reps: number) => {
+    const load = Math.max(2, Math.round(w * pct * 2) / 2);
+    if (load >= w) return;
+    if (out.length && load <= out[out.length - 1].load) return;
+    out.push({ load, reps });
+  };
+  if (w >= 60) push(0.4, 12);
+  push(0.5, 10);
+  push(0.72, 5);
+  if (w >= 50) push(0.85, 3);
+  return out;
+}
+
 /* ── База-якорь (LegsCore) ───────────────────────────────────────────────── */
 
 interface AnchorExerciseLike { id: string; name: string; sets: number; reps: string; }

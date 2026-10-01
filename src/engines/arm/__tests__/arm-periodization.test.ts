@@ -6,6 +6,7 @@ import {
   progressionForWeek,
   planArmPeaks,
   buildArmAnchorSession,
+  buildArmWarmupSets,
   DOUBLE_BLOCK_STEP,
 } from '../arm-periodization.engine';
 
@@ -134,6 +135,20 @@ describe('arm-periodization: мульти-старты', () => {
     const r = planArmPeaks([{ week: 8, priority: 'A' }], 8, map8);
     expect(r.recoveryWeeks).toEqual([]);
     expect(r.windows[0].recoveryWeek).toBeNull();
+  });
+});
+
+describe('arm-periodization: разминочная рампа', () => {
+  it('крупный вес: ступени строго возрастают и не перешагивают рабочий', () => {
+    const s = buildArmWarmupSets(80);
+    expect(s.length).toBeGreaterThanOrEqual(3);
+    for (let i = 1; i < s.length; i++) expect(s[i].load).toBeGreaterThan(s[i - 1].load);
+    expect(Math.max(...s.map((x) => x.load))).toBeLessThan(80);
+  });
+  it('малый вес: 2 ступени; ноль/мусор — пусто', () => {
+    expect(buildArmWarmupSets(10).length).toBe(2);
+    expect(buildArmWarmupSets(0)).toEqual([]);
+    expect(buildArmWarmupSets(Number.NaN)).toEqual([]);
   });
 });
 

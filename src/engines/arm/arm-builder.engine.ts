@@ -36,8 +36,9 @@ import { checkCocGates } from './arm-pro5-coc-gate.engine';
 import { larrattSinglesFor, strengthLogRir, isSinglesCandidate } from './arm-pro5-singles.engine';
 import { suggestSplitForCycle } from './arm-pro5-ux.engine';
 import { armInjuryRepsCap, armInjuryVolumeFactor, armInjuryWeightFactor, mobilityBlockReason } from './arm-injury-guard.engine';
-import { cycleBlocksFor, deriveArmBlocks, planArmPeaks, progressionForWeek, buildArmAnchorSession, blockForWeek } from './arm-periodization.engine';
-import { legsAnchorBlock } from './arm-competition-prep.engine';
+import { cycleBlocksFor, deriveArmBlocks, planArmPeaks, progressionForWeek, buildArmAnchorSession, buildArmWarmupSets, blockForWeek } from './arm-periodization.engine';
+import { legsAnchorBlock, weeksUntilStart } from './arm-competition-prep.engine';
+import { armFactFeedback, factRateFor } from './arm-plan-feedback.engine';
 
 const PHASES: Array<'accumulation' | 'intensification' | 'deload' | 'peaking'> = ['accumulation','intensification','deload','peaking'];
 
@@ -465,7 +466,19 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
   const progressionStyle = ((input as any).progressionStyle || 'auto') as 'auto' | 'linear' | 'double' | 'wave';
   // labWarnings уже учтены в labMult, но tendonWarnings отдельно
 
-  // Cross-mesocycle continuity: если есть previousPlan — используем его финальные веса как базу для прогрессии (+2.5%/мезоцикл, как BB)
+  // PRO-PLAN P0-1: обратная связь «план ↔ факт» — факт дневника важнее плановой
+  // ставки: beat → ставка, on_track → 1.0, stalled → −2%, нет данных → ставка.
+  // Без diarySessions/previousPlan — пусто и поведение байт-в-байт.
+  let factFeedback: ReturnType<typeof armFactFeedback> = { muscles: [], summary: '', stalled: [], beats: [] };
+  const feedbackWarnings: string[] = [];
+  try {
+    const fs = (input as any).diarySessions;
+    if (Array.isArray(fs) && fs.length > 0 && input.previousPlan) {
+      factFeedback = armFactFeedback(input.previousPlan as any, fs, { windowDays: 28 });
+    }
+  } catch { markDegraded('обратная связь по дневнику недоступна — кросс-мезо по плановой ставке'); }
+
+  // Cross-mesocycle continuity: если есть previousPlan — используем его финальные веса как базу для прогрессии (факт-ставка или +2.5%/мезоцикл)
   let crossMesoWorkMax: Record<string, number> | null = null;
   if (input.previousPlan && (input.previousPlan as any).weeks && Array.isArray((input.previousPlan as any).weeks)) {
     try {
@@ -478,9 +491,8 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
             const mus = (ex.muscle||'').toString().toLowerCase();
             const w = ex.workSets && ex.workSets[0] ? Number(ex.workSets[0].weight) : 0;
             if (mus && Number.isFinite(w) && w>0) {
-              // Кросс-мезо прогрессия: дефолт +2.5%; при заданной ставке
-              // (mesoRatePct, legacy correctionPct) — ставка цикла/мезоцикла.
-              const rate = progRates.mesoRate;
+              // Per-muscle ставка: факт дневника > общая кросс-мезо ставка.
+              const rate = factRateFor(mus, factFeedback.muscles, progRates.mesoRate);
               const progressed = Math.round(w * rate * 2)/2;
               if (!crossMesoWorkMax[mus] || progressed > crossMesoWorkMax[mus]) crossMesoWorkMax[mus] = progressed;
             }
@@ -592,10 +604,30 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
       }
     }
   } catch { markDegraded('цикл недоступен — фазы generic'); }
+  // PRO-PLAN P0-4: авто-пик из даты старта (когда старты не заданы вручную):
+  // дата внутри окна плана → пик на соответствующей неделе с приоритетом календаря.
+  let peaksInput = (input as any).peaks;
+  let autoPeakNote: string | null = null;
+  try {
+    const arr = Array.isArray(peaksInput) ? peaksInput : [];
+    const iso = String((input as any).competitionDateIso || (input as any).calStartIso || '');
+    if (arr.length === 0 && iso && weeks >= 4) {
+      const wOut = weeksUntilStart(undefined, iso);
+      if (Number.isFinite(wOut) && wOut >= 1 && wOut <= weeks - 1) {
+        const peakWeek = Math.max(1, Math.min(weeks, weeks - Math.round(wOut)));
+        const raw = String((input as any).calPriority || 'A').toUpperCase();
+        const prio = (raw === 'A' || raw === 'B' || raw === 'C' ? raw : 'A') as 'A' | 'B' | 'C';
+        peaksInput = [{ week: peakWeek, priority: prio, name: 'Старт из даты' }];
+        autoPeakNote = `🏁 Старт из даты ${iso}: авто-пик Н${peakWeek} (${prio}) — тейпер-окно и восстановление построены.`;
+      } else if (Number.isFinite(wOut)) {
+        autoPeakNote = `🏁 Дата старта ${iso} вне окна плана (${wOut} нед) — авто-пик не строился, только гейты готовности.`;
+      }
+    }
+  } catch { autoPeakNote = null; }
   // PRO-PLAN: мульти-старты внутри плана — тейпер-окна + восстановительные недели.
   let peaksRuntime: ReturnType<typeof planArmPeaks> = { windows: [], phaseOverrides: {}, volumeOverrides: {}, rirOverrides: {}, taperWeeks: [], recoveryWeeks: [], markers: {}, notes: [] };
   try {
-    peaksRuntime = planArmPeaks((input as any).peaks, weeks, phaseMap as Record<number, string>);
+    peaksRuntime = planArmPeaks(peaksInput, weeks, phaseMap as Record<number, string>);
     for (const [wStr, ph] of Object.entries(peaksRuntime.phaseOverrides)) {
       const w = Number(wStr);
       if (w >= 1 && w <= weeks) (phaseMap as Record<number, string>)[w] = ph;
@@ -829,6 +861,13 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
           });
         }
 
+        // PRO-PLAN P0-2: разминочная рампа тяжёлого упражнения (BB-паттерн в арм-масштабе).
+        let warmupSets: Array<{ load: number; reps: number }> | undefined;
+        try {
+          const topSetW = workSets.length ? Math.max(...workSets.map((x) => Number(x.weight) || 0)) : 0;
+          if (effCh === 'тяж' && !wantSingles && topSetW > 0) warmupSets = buildArmWarmupSets(topSetW);
+        } catch { warmupSets = undefined; }
+
         // TOP wave-9: showcase-протокол хвата — один в неделю (peak → overcrush, intensification → negatives)
         let gripShow: '' | 'over' | 'neg' = '';
         if (!gripExecDone && mus.startsWith('grip_')) {
@@ -869,6 +908,7 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
           provenance: 'catalog',
           provenanceSource: `exercise-catalog-arm:${exTpl.id}`,
           holdSeconds: gripShow === 'over' ? 12 : (mus === 'grip_support' || mus === 'grip_pinch' || mus === 'grip_crush' ? (effCh === 'техника' ? 15 : 10) : undefined),
+          ...(warmupSets && warmupSets.length ? { warmupSets } : {}),
           comment: ((rfdSpeed
             ? `RFD speed 5×3 @RPE8: ускорение через весь диапазон, отдых 90с · ${exTpl.technique || ''}`
             : (exTpl.technique || ''))
@@ -1053,6 +1093,18 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
   if (progressionStyle === 'double') rationale.push('Прогрессия double: повторы +1/нед в блоке (до +3), вес +2.5% между блоками; RIR держит цель.');
   else if (progressionStyle === 'wave') rationale.push('Прогрессия wave: тяжёлая/средняя/лёгкая недели внутри блока (+1.5% базы за блок).');
   for (const line of peaksRuntime.notes) rationale.push(line);
+  if (autoPeakNote) rationale.push(autoPeakNote);
+  // P0-1: сводка «план ↔ факт» + честные последствия по плато/опережению.
+  if (factFeedback.muscles.length && crossMesoWorkMax) {
+    rationale.push(factFeedback.summary);
+    const beats = factFeedback.muscles.filter((f) => f.status === 'beat');
+    const stalled = factFeedback.muscles.filter((f) => f.status === 'stalled');
+    if (beats.length) rationale.push(`Факт превысил план: ${beats.slice(0, 4).map((f) => f.muscle).join(', ')} — ставка ${progRates.mesoRate.toFixed(3)} на эти мышцы.`);
+    if (stalled.length) {
+      rationale.push(`⛔ Плато по факту: ${stalled.slice(0, 4).map((f) => f.muscle).join(', ')} — вес −2%, проверьте сон/питание.`);
+      feedbackWarnings.push(`Плато факта (дневник): ${stalled.map((f) => f.muscle).join(', ')} — ставка мезо снижена.`);
+    }
+  }
   if (diaryDeload) rationale.push(`🔄 Дневник: ACWR danger — первая неделя построена как разгрузка (60%, RIR+2) до восстановления.`);
   if (anchorProto) rationale.push('🏋️ База-якорь: LegsCore-сессия 1×/нед (присед/тяга/фермер) — side-цепь и общий тонус.');
   if (Number((input as any).daysPerWeek || 0) > 0) {
@@ -1134,7 +1186,7 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
       for (const line of (inj.plan.rationale || [])) rationale.push(line);
     }
   } catch { markDegraded('peak-протокол хвата недоступен — базовая методика'); }
-  const proWarnings = [...pro.warnings, ...selectionWarnings];
+  const proWarnings = [...pro.warnings, ...selectionWarnings, ...feedbackWarnings];
   for (const line of pro5safety.warnings) proWarnings.push(line);
   for (const line of pro5safety.blocked) proWarnings.push(`⛔ ${line}`);
   // PRO-5: пост-проход честных гейтов (только warnings/строки, объёмы не трогаем).

@@ -31,6 +31,27 @@ export interface ArmPeakInput {
   name?: string;
 }
 
+/** Запись дневника для контура «план ↔ факт» (структурный паритет HubDiarySession). */
+export interface ArmDiarySetFact {
+  weightKg?: number;
+  weight?: number;
+  reps?: number;
+  rpe?: number;
+  isWarmup?: boolean;
+}
+export interface ArmDiaryExerciseFact {
+  exerciseId?: string;
+  exerciseName?: string;
+  name?: string;
+  muscle?: string;
+  muscleGroup?: string;
+  sets?: ArmDiarySetFact[];
+}
+export interface ArmDiarySessionFact {
+  date: string;
+  exercises: ArmDiaryExerciseFact[];
+}
+
 export type ArmGoal = 'strength' | 'peaking' | 'hypertrophy' | 'endurance' | 'maintenance';
 export type ArmGoalBB = ArmGoal; // alias для совместимости
 export type ArmPhase = 'accumulation' | 'intensification' | 'deload' | 'peaking';
@@ -186,6 +207,9 @@ export interface ArmBuilderInput {
   progressionStyle?: ArmProgressionStyle; // дефолт auto: цикл-ставка → линейная, иначе ровно
   peaks?: ArmPeakInput[]; // мульти-старты внутри плана (тейпер-окна + восстановление)
   legsAnchor?: boolean; // база-якорь 1×/нед: присед/тяга/фермер (LegsCore-сессия)
+  /** Контур «план ↔ факт»: сессии живого дневника (только с previousPlan — кросс-мезо
+   *  ставка становится per-muscle: beat → ставка, on_track → 1.0, stalled → −2%). */
+  diarySessions?: ArmDiarySessionFact[];
 }
 
 export interface ArmInjury {

@@ -3,7 +3,7 @@
  * стиль прогрессии, мульти-старты (маркеры недель), база-якорь (LegsCore), CSV.
  */
 import { describe, it, expect, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, within } from '@testing-library/react';
 import React from 'react';
 import { ArmAutoConstructor } from '../ArmAutoConstructor';
 
@@ -17,6 +17,12 @@ function openPlanSec() {
   expect(head, 'секция периодизации').toBeTruthy();
   if (head && head.getAttribute('aria-expanded') === 'false') fireEvent.click(head);
 }
+function openSec(re: RegExp) {
+  const head = screen.getAllByRole('button', { name: re }).find((b) => b.getAttribute('aria-expanded') != null);
+  expect(head, `секция ${re}`).toBeTruthy();
+  if (head && head.getAttribute('aria-expanded') === 'false') fireEvent.click(head);
+}
+const isoInWeeks = (n: number) => new Date(Date.now() + n * 7 * 86400000).toISOString().slice(0, 10);
 
 describe('Arm PRO-PLAN UI', () => {
   it('секция «Периодизация и старты»: стили прогрессии выбираются', () => {
@@ -50,6 +56,52 @@ describe('Arm PRO-PLAN UI', () => {
     fireEvent.change(screen.getByLabelText('Неделя старта'), { target: { value: '99' } });
     fireEvent.click(screen.getByRole('button', { name: '＋ Добавить старт' }));
     expect(document.querySelector('[data-arm="peak-list"]')).toBeNull();
+  });
+
+  it('P0-3: блоки специализации — добавить блок, выбрать цель, превью расписания', () => {
+    const { container } = render(<ArmAutoConstructor />);
+    fireEvent.click(screen.getByRole('button', { name: '2 Атлет' }));
+    openSec(/Слабые зоны/);
+    fireEvent.click(screen.getByRole('switch', { name: /Специализация/ }));
+    fireEvent.click(screen.getByRole('button', { name: '＋ Добавить блок специализации' }));
+    const block = container.querySelector('[data-arm="spec-block"]');
+    expect(block, 'блок специализации').not.toBeNull();
+    const targetsRow = block!.querySelectorAll('.ad-chips')[0] as HTMLElement;
+    const chip = within(targetsRow).getByText('Пронаторы');
+    fireEvent.click(chip);
+    expect(chip.getAttribute('data-active')).toBe('true');
+    const prev = container.querySelector('[data-arm="spec-preview"]');
+    expect(prev?.textContent).toContain('нед 1-');
+    expect(prev?.textContent).toContain('pronators');
+  });
+
+  it('P0-4: авто-пик из даты старта (кнопка → старт в списке)', () => {
+    render(<ArmAutoConstructor />);
+    fireEvent.click(screen.getByRole('button', { name: '2 Атлет' }));
+    openSec(/PRO: старт WAF/);
+    fireEvent.change(screen.getByLabelText(/Дата старта/), { target: { value: isoInWeeks(5) } });
+    fireEvent.click(screen.getByRole('button', { name: '4 Сплит и цикл' }));
+    openPlanSec();
+    const btn = document.querySelector('[data-arm="auto-peak"]') as HTMLElement;
+    expect(btn, 'кнопка авто-пика').not.toBeNull();
+    expect(btn.textContent).toContain('Н3'); // недели 8 − 5
+    fireEvent.click(btn);
+    const list = document.querySelector('[data-arm="peak-list"]');
+    expect(list?.textContent).toContain('Н3');
+  });
+
+  it('P0-1/P0-2: после сборки — разминка в плане и карточка «План vs факт»', () => {
+    const { container } = render(<ArmAutoConstructor />);
+    // вес базы → тяжёлые упражнения получают вес и разминку
+    fireEvent.click(screen.getByRole('button', { name: '2 Атлет' }));
+    openSec(/Рабочие максимумы/);
+    fireEvent.change(screen.getByLabelText(/База \(кг\)/), { target: { value: '50' } });
+    fireEvent.click(screen.getByRole('button', { name: '4 Сплит и цикл' }));
+    fireEvent.click(screen.getByText('⚡ Собрать план'));
+    expect(container.querySelector('[data-arm="ex-warmup"]'), 'строка разминки').not.toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: '6 Веса и качество' }));
+    expect(container.querySelector('[data-arm="plan-fact-card"]'), 'карточка план↔факт').not.toBeNull();
+    expect(container.querySelector('[data-arm="export-csv"]')).toBeNull(); // CSV — на шаге экспорта
   });
 
   it('план с стартом и якорем: маркер недели, LegsCore, CSV-кнопка', () => {

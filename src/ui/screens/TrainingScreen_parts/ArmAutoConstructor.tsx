@@ -15,7 +15,7 @@ import { buildArmSchedule } from '../../../engines/arm/arm-specialization.engine
 import { armPlanSnapshotId, refreshArmPlanSnapshot } from '../../../engines/arm/arm-plan-snapshot.engine';
 import { buildArmPrintHtml, buildArmIcs, buildArmPlanCsv } from '../../../engines/arm/arm-export.engine';
 import { ARM_SPLIT_PATTERNS } from '../../../engines/arm/arm-split-patterns';
-import { ARM_MUSCLE_RU } from '../../../engines/arm/arm-types';
+import { ARM_MUSCLE_RU, ARM_MUSCLES, type ArmSpecializationBlock } from '../../../engines/arm/arm-types';
 import { injectArmCorrections } from '../../../engines/arm/arm-diagnostics-injection.engine';
 import { bridgeDoseFromPayload } from '../../../engines/arm/arm-correction-dose.engine';
 import { injectArmliftCorrections, applyArmliftSpecWave, type ArmliftInjectionItem } from '../../../engines/arm/armlift-injection.engine';
@@ -31,6 +31,9 @@ import { buildGripRpe } from '../../../engines/arm/arm-grip-rpe.engine';
 import { ARM_CYCLE_LIBRARY, fitCycleToWeeks, getArmCycle } from '../../../engines/arm/arm-cycle-library.engine';
 import { rankArmCycles } from '../../../engines/arm/arm-cycle-selector.engine';
 import { planArmPeaks } from '../../../engines/arm/arm-periodization.engine';
+import { armFactFeedback, armPlanCompliance } from '../../../engines/arm/arm-plan-feedback.engine';
+import { loadHubDiarySessions } from '../../../engines/hub-diary.engine';
+import { localIsoDate } from '../../../core/local-date';
 import { GRIP_IMPLEMENTS, type ArmImplement } from '../../../engines/arm/arm-grip.engine';
 import { ARM_MEDLEYS, getMedley } from '../../../engines/arm/arm-medley.engine';
 import { buildArmProSummary } from '../../../engines/arm/arm-pro-integration.engine';
@@ -442,6 +445,24 @@ export function applyArmEdits(plan: any, edits: Record<string, ArmExerciseEdit>,
   };
 }
 
+/* P0-3: блоки специализации из UI → канонический ArmSpecializationBlock (доноры → tradeoff). */
+export type UiSpecBlock = {
+  weekStart: number;
+  weekEnd: number;
+  targets: string[];
+  donors: string[];
+  mode: 'none' | 'reduce_direct_to_floor' | 'remove_direct_when_indirect_covers_floor';
+};
+export function specBlocksToSchedule(blocks: UiSpecBlock[]): ArmSpecializationBlock[] {
+  return (blocks || []).map((b, i) => ({
+    id: `ui-spec-${i + 1}`,
+    weekStart: Math.round(Number(b.weekStart) || 1),
+    weekEnd: Math.round(Number(b.weekEnd) || 1),
+    targets: (b.targets || []).slice(0, 2),
+    ...(b.donors?.length && b.mode !== 'none' ? { tradeoff: { mode: b.mode, donorMuscles: b.donors.slice(0, 2) } } : {}),
+  }));
+}
+
 type GateKey = 'humerus' | 'ucl' | 'shoulder' | 'tendon' | 'table' | 'volume' | 'cycle' | 'antagonist' | 'other';
 
 const GATE_META: Record<GateKey, { title: string }> = {
@@ -717,6 +738,8 @@ const [rfdEstimated, setRfdEstimated] = useState<boolean>(false);
   const [peaks, setPeaks] = useState<Array<{ week: number; priority: 'A' | 'B' | 'C'; name?: string }>>([]);
   const [peakWeekInput, setPeakWeekInput] = useState<string>('');
   const [peakPrioInput, setPeakPrioInput] = useState<'A' | 'B' | 'C'>('B');
+  // P0-3: блоки специализации (explicit schedule: цели/доноры по неделям).
+  const [specBlocks, setSpecBlocks] = useState<UiSpecBlock[]>([]);
   // R8: ось humerus-2026 + попытки медли (опционально, пусто = как раньше)
   const [cycAxisOn, setCycAxisOn] = useState<boolean>(false);
   const [axTrunk, setAxTrunk] = useState<boolean>(false);
@@ -1109,6 +1132,37 @@ const [rfdEstimated, setRfdEstimated] = useState<boolean>(false);
     try { return planArmPeaks(peaks, weeks, {}); } catch { return null; }
   }, [peaks, weeks]);
 
+  // P0-1: живой дневник (v2) для контура «план ↔ факт» и дневникового ACWR в сборке.
+  const diarySessions = useMemo(() => {
+    try { return loadHubDiarySessions(); } catch { return []; }
+  }, [step, builtPlan]);
+  const factFeedback = useMemo(() => {
+    try { return builtPlan ? armFactFeedback(builtPlan, diarySessions as any, { windowDays: 28 }) : null; } catch { return null; }
+  }, [builtPlan, diarySessions]);
+  const compliance = useMemo(() => {
+    try {
+      const raw = typeof localStorage !== 'undefined' ? localStorage.getItem('he_arm_plan_built_at') : null;
+      const week1 = raw && /^\d{4}-\d{2}-\d{2}$/.test(raw) ? raw : localIsoDate();
+      return builtPlan ? armPlanCompliance(builtPlan, diarySessions as any, week1) : null;
+    } catch { return null; }
+  }, [builtPlan, diarySessions]);
+  // P0-3: блоки специализации — добавить/править/удалить + превью расписания.
+  const addSpecBlock = () => {
+    setSpecBlocks((prev) => {
+      const start = prev.length ? Math.min(weeks, prev[prev.length - 1].weekEnd + 1) : 1;
+      const end = Math.min(weeks, start + 4);
+      return [...prev, { weekStart: start, weekEnd: Math.max(start, end), targets: weakPoints.slice(0, 2), donors: [], mode: 'none' as const }];
+    });
+  };
+  const updateSpecBlock = (i: number, patch: Partial<UiSpecBlock>) => setSpecBlocks((prev) => prev.map((b, j) => (j === i ? { ...b, ...patch } : b)));
+  const removeSpecBlock = (i: number) => setSpecBlocks((prev) => prev.filter((_, j) => j !== i));
+  const specSchedulePreview = useMemo(() => {
+    try {
+      if (!specialization || specBlocks.length === 0) return null;
+      return buildArmSchedule({ focusGroup: focusGroup || undefined, weakPoints, specialization, totalWeeks: weeks, explicitBlocks: specBlocksToSchedule(specBlocks) });
+    } catch { return null; }
+  }, [specialization, specBlocks, focusGroup, weakPoints, weeks]);
+
   const handleBuild = () => {
     const pid = patternId || best?.id || ARM_SPLIT_PATTERNS[0].id;
     try {
@@ -1139,6 +1193,8 @@ const [rfdEstimated, setRfdEstimated] = useState<boolean>(false);
         weakPoints,
         focusGroup: focusGroup || undefined,
         specialization,
+        // P0-3: явные блоки специализации (цели/доноры по неделям) — только когда заданы.
+        specializationSchedule: specialization && specBlocks.length ? specBlocksToSchedule(specBlocks) : undefined,
         workMax,
         pedDoses: Object.keys(pedDoses).length ? pedDoses : undefined,
         courseIntensity,
@@ -1160,9 +1216,19 @@ const [rfdEstimated, setRfdEstimated] = useState<boolean>(false);
         // Wave-1 Э1.5: Para реально доезжает до плана (иначе был write-only вход).
         paraClass: proPara !== 'none' ? proPara : undefined,
         sparring: proSpar === 'off' ? undefined : { intensityPct: Number(proSpar) as any, partnerDeltaKg: parseFloat(proSparDelta) || 0 },
-        diary: (parseFloat(proSrpe) > 0 || parseFloat(proElbow) > 0)
-          ? [{ dateIso: new Date().toISOString().slice(0, 10), srpe: parseFloat(proSrpe) || undefined, elbowPain: parseFloat(proElbow) || undefined }]
-          : undefined,
+        // P0-1: живой sRPE-дневник + ручные сигналы (ACWR/CNS/боль работают в сборке).
+        diary: (() => {
+          try {
+            const arr = loadSRPESessions().slice(-28).map((s) => ({ dateIso: s.date, srpe: s.sRPE, durationMin: s.durationMin }));
+            const manual = parseFloat(proSrpe) > 0 || parseFloat(proElbow) > 0
+              ? [{ dateIso: localIsoDate(), srpe: parseFloat(proSrpe) || undefined, elbowPain: parseFloat(proElbow) || undefined }]
+              : [];
+            const all = [...arr, ...manual];
+            return all.length ? (all as any) : undefined;
+          } catch { return undefined; }
+        })(),
+        // P0-1: факт дневника для per-muscle кросс-мезо ставки (используется с previousPlan).
+        diarySessions: diarySessions.length ? (diarySessions as any) : undefined,
         bench: (parseFloat(proBenchRt) > 0 || parseFloat(proBenchWristLb) > 0 || parseFloat(proBenchPron) > 0 || parseFloat(proBenchSide) > 0)
           ? { rtKg: parseFloat(proBenchRt) || undefined, wristCurlLb: parseFloat(proBenchWristLb) || undefined, pronHoldSec: parseFloat(proBenchPron) || undefined, sideKg: parseFloat(proBenchSide) || undefined }
           : undefined,
@@ -1281,6 +1347,8 @@ const [rfdEstimated, setRfdEstimated] = useState<boolean>(false);
       plan = refreshArmPlanSnapshot(plan, level);
       setBuiltPlan(plan);
       persistArmPlan(plan);
+      // P0-1: дата старта плана — база недельных окон для «План vs факт».
+      try { localStorage.setItem('he_arm_plan_built_at', localIsoDate()); } catch { /* noop */ }
       setWeekSel(1);
       setArmEdits({});
       setEditOpen(null);
@@ -1494,8 +1562,45 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
                 <AdChip key={m} active={weakPoints.includes(m)} onClick={()=>toggleWeak(m)}>{ARM_MUSCLE_RU[m] || m}</AdChip>
               ))}
             </div>
-            <AdSwitch checked={specialization} onChange={setSpecialization} label="Специализация (блок 6 нед + баланс)" />
+            <AdSwitch checked={specialization} onChange={setSpecialization} label="Специализация (цель ×1.3, блоки ниже)" />
             {specialization && <span className="ad-tip">{specPreview.rationale}</span>}
+            {specialization && (
+              <div data-arm="spec-blocks">
+                <div className="ad-muted">Блоки специализации: недели → цели → доноры (пусто = legacy-блок 6 нед + баланс).</div>
+                {specBlocks.map((b, i) => (
+                  <div key={i} className="ad-sec ad-bio" data-arm="spec-block" data-valid="na">
+                    <div className="ad-row" style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+                      <AdField label="С нед">
+                        <input type="number" min={1} max={weeks} value={b.weekStart} aria-label={`Начало блока ${i + 1}`} onChange={(e) => updateSpecBlock(i, { weekStart: Math.max(1, Math.min(weeks, parseInt(e.target.value) || 1)) })} style={{ width: 70 }} />
+                      </AdField>
+                      <AdField label="По нед">
+                        <input type="number" min={1} max={weeks} value={b.weekEnd} aria-label={`Конец блока ${i + 1}`} onChange={(e) => updateSpecBlock(i, { weekEnd: Math.max(1, Math.min(weeks, parseInt(e.target.value) || 1)) })} style={{ width: 70 }} />
+                      </AdField>
+                      <AdSheetSelect label="Доноры" hook="spec-donor-mode" value={b.mode} onChange={(v) => updateSpecBlock(i, { mode: v as UiSpecBlock['mode'] })} options={[
+                        { id: 'none', label: '— без снятия (цель сама)', desc: 'доноры не трогаются' },
+                        { id: 'reduce_direct_to_floor', label: 'Снять до MEV', desc: 'изоляции доноров вниз до минимального объёма' },
+                        { id: 'remove_direct_when_indirect_covers_floor', label: 'Снять до MEV (агрессивно)', desc: 'дополнительно −1 сет изоляций' },
+                      ]} />
+                      <AdBtn variant="ghost" onClick={() => removeSpecBlock(i)} aria-label={`Убрать блок ${i + 1}`}>✕ Блок</AdBtn>
+                    </div>
+                    <div className="ad-muted">Цели блока (1–2):</div>
+                    <div className="ad-chips">
+                      {ARM_MUSCLES.map((m) => (
+                        <AdChip key={m} active={b.targets.includes(m)} onClick={() => updateSpecBlock(i, { targets: b.targets.includes(m) ? b.targets.filter((x) => x !== m) : [...b.targets, m].slice(0, 2) })}>{ARM_MUSCLE_RU[m] || m}</AdChip>
+                      ))}
+                    </div>
+                    <div className="ad-muted">Доноры (0–2, только при «Снять до MEV»):</div>
+                    <div className="ad-chips">
+                      {ARM_MUSCLES.map((m) => (
+                        <AdChip key={m} active={b.donors.includes(m)} onClick={() => updateSpecBlock(i, { donors: b.donors.includes(m) ? b.donors.filter((x) => x !== m) : [...b.donors, m].slice(0, 2) })}>{ARM_MUSCLE_RU[m] || m}</AdChip>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+                <AdBtn variant="dark" block onClick={addSpecBlock}>＋ Добавить блок специализации</AdBtn>
+                {specSchedulePreview && <span className="ad-tip" data-arm="spec-preview">{specSchedulePreview.rationale}</span>}
+              </div>
+            )}
           </AdSec>
           {diagWeakPoints.length>0 && (
             <AdBanner tone="warn">
@@ -1993,6 +2098,16 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
             {progStyle === 'double' && <div className="ad-tip">Double: повторы +1/нед в блоке (до +3), вес +2.5% между блоками — профессиональная двойная прогрессия.</div>}
             {progStyle === 'wave' && <div className="ad-tip">Wave: тяжёлая/средняя/лёгкая недели внутри блока — плотность без отказа.</div>}
             <AdSwitch checked={legsAnchor} onChange={setLegsAnchor} label="База-якорь: присед/тяга/фермер 1×/нед (LegsCore)" />
+            {proDate && peaks.length === 0 && (() => {
+              try {
+                const wOut = weeksUntilStart(undefined, proDate);
+                if (Number.isFinite(wOut) && wOut >= 1 && wOut <= weeks - 1) {
+                  const pw = Math.max(1, weeks - Math.round(wOut));
+                  return <AdBtn variant="dark" block data-arm="auto-peak" onClick={() => setPeaks([{ week: pw, priority: (['A', 'B', 'C'].includes(topCalPrio) ? topCalPrio : 'B') as 'A' | 'B' | 'C', name: 'Старт из даты' }])}>🏁 Авто-пик из даты старта: Н{pw} ({wOut} нед до старта)</AdBtn>;
+                }
+                return <div className="ad-tip">Дата старта {proDate} вне окна плана ({wOut} нед) — авто-пик не строится, только гейты готовности.</div>;
+              } catch { return null; }
+            })()}
             <div className="ad-row" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'flex-end' }}>
               <AdField label={`Неделя старта (1–${weeks})`}>
                 <input value={peakWeekInput} onChange={(e) => setPeakWeekInput(e.target.value)} placeholder="напр. 12" inputMode="numeric" aria-label="Неделя старта" style={{ width: 110 }} />
@@ -2076,6 +2191,9 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
                             <span className="ad-ex-nm">{ex.name} <span>· {ARM_MUSCLE_RU[ex.muscle] || ex.muscle}</span> {ex.isTable ? '🖐️' : ''} {ex.workingAngle ? `· РУ ${ex.workingAngle.elbowDeg}° ${ex.workingAngle.direction}` : ''}</span>
                             <span className="ad-ex-vl"><b style={{ fontVariantNumeric: 'tabular-nums' }}>{ex.sets}×{ex.repsRange[0]}-{ex.repsRange[1]}</b> <span className="ad-tag" style={rirTint(ex.rir)}>RIR{ex.rir}</span>{ex.holdSeconds ? <span className="ad-tag">hold {ex.holdSeconds}с</span> : ''}{ex.workSets?.[0]?.weight > 0 ? <span className="ad-wtag">≈{ex.workSets[0].weight} кг</span> : ''}{armEdits[armEditKey(curWeek.week, si, ei)] ? <span className="ad-tag" data-arm="ex-edited">✏️</span> : ''} <button type="button" className="ad-chip" data-arm="ex-edit-toggle" aria-expanded={editOpen===armEditKey(curWeek.week, si, ei)} aria-label={`Править ${ex.name}`} onClick={()=>setEditOpen(prev=>prev===armEditKey(curWeek.week, si, ei)?null:armEditKey(curWeek.week, si, ei))} style={{ minHeight: 44, padding: '8px 12px' }}>✏️</button></span>
                           </div>
+                          {Array.isArray(ex.warmupSets) && ex.warmupSets.length > 0 && (
+                            <div className="ad-muted" data-arm="ex-warmup" style={{ fontVariantNumeric: 'tabular-nums' }}>🔥 Разминка: {ex.warmupSets.map((w: any) => `${w.load}×${w.reps}`).join(' → ')}</div>
+                          )}
                           {ex.comment && /RFD speed|Contest-sim|унилатерально|Table-IQ|overcrush|negatives|🔄 Замена/.test(ex.comment) && (
                             <div className="ad-tip">💡 {ex.comment}</div>
                           )}
@@ -2232,8 +2350,38 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
                   {!pro7Acwr && <div className="ad-muted">sRPE-сессий в дневнике нет — ACWR не считается (метод из дневника тренировок, не из замеров помоста).</div>}
                 </div>
                 <AdBanner tone="info">
-                  Сигналы показывают состояние и рекомендацию — <b>не меняются автоматически</b>: объём/веса меняйте на шаге «План» или через правки.
+                  ACWR danger из дневника <b>автоматически</b> делает первую неделю разгрузочной при сборке; остальные сигналы — рекомендация: объём/веса меняйте на шаге «План».
                 </AdBanner>
+              </AdSec>
+              </div>
+              {/* P0-1: контур «план ↔ факт» — e1RM по дневнику + выполнение по неделям. */}
+              <div data-arm="plan-fact-card">
+              <AdSec title="📈 План vs факт (дневник)" hook="plan-fact" collapsible defaultOpen={false}
+                summary={factFeedback?.muscles?.length ? `мышц с фактом: ${factFeedback.muscles.filter((f) => f.status !== 'no_data').length}/${factFeedback.muscles.length}` : 'нет записей'}
+                status={factFeedback?.stalled?.length ? 'warn' : undefined}>
+                {factFeedback && factFeedback.muscles.length > 0 ? (
+                  <>
+                    <div className="ad-tip" data-arm="fact-summary">{factFeedback.summary}</div>
+                    <div className="ad-list" data-arm="fact-rows">
+                      {factFeedback.muscles.slice(0, 8).map((f) => (
+                        <div key={f.muscle} className="ad-finding" data-level={f.status === 'stalled' ? 'bad' : f.status === 'beat' ? 'ok' : 'warn'} style={{ fontVariantNumeric: 'tabular-nums' }}>
+                          {ARM_MUSCLE_RU[f.muscle] || f.muscle}: план {f.plannedE1rmKg} → факт {f.factE1rmKg} e1RM (Δ {f.deltaPct >= 0 ? '+' : ''}{f.deltaPct}%) · {f.action === 'increase' ? 'ставка мезо' : f.action === 'hold' ? 'держим' : f.action === 'back_off' ? '−2% и проверка' : 'нет данных'}
+                        </div>
+                      ))}
+                    </div>
+                    {compliance && (
+                      <div className="ad-strip" data-arm="compliance" aria-label="Выполнение по неделям">
+                        {compliance.weeks.map((w) => (
+                          <span key={w.week} className="ad-ph" data-phase={w.status === 'done' ? 'accumulation' : w.status === 'partial' ? 'intensification' : w.status === 'missed' ? 'peaking' : 'deload'} title={`Н${w.week}: ${w.factSets}/${w.plannedSets} сетов (${w.pct}%)`}>{w.week}</span>
+                        ))}
+                      </div>
+                    )}
+                    {compliance && <div className="ad-muted" data-arm="compliance-note">{compliance.note}</div>}
+                    <AdBtn variant="dark" block data-arm="fact-apply" onClick={() => { setTopContinuity(true); flash('✅ Факт будет учтён в следующем плане (кросс-мезо: beat → ставка, on_track → держим, stalled → −2%).'); }}>🔄 Учесть факт в следующем плане (per-muscle ставка)</AdBtn>
+                  </>
+                ) : (
+                  <div className="ad-muted">Дневник пуст или нет рабочих весов — факт появится после первых записей.</div>
+                )}
               </AdSec>
               </div>
               {editsCount > 0 && <div className="ad-muted">✏️ Правки: {editsCount} упр. — гейты и отчёт по базовому плану.</div>}

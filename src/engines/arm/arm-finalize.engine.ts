@@ -9,6 +9,7 @@ import { getArmCycle } from './arm-cycle-library.engine';
 import { buildArmTaperCurve, applyArmTaperToWeeks, type ArmTaperMode } from './arm-taper.engine';
 import { armInjuryRepsCap, armInjuryVolumeFactor, armInjuryWeightFactor, mobilityBlockReason } from './arm-injury-guard.engine';
 import { canonicalizeArmMuscle, isArmTendonMuscle } from './arm-tendon-sets.engine';
+import { applyArmTradeoffToPlan } from './arm-tradeoff.engine';
 
 function ensurePronSupBalance(plan: ArmPlan): void {
   for (const wk of plan.weeks) {
@@ -404,6 +405,17 @@ export function finalizeArmPlan(plan: ArmPlan, opts?: { level?: string; tableRat
   ensureCocCoverage(plan);
   applyCycleTaperPreset(plan);
   ensureTableTime(plan, tableRatio);
+  // PRO-PLAN P0-3: донорское перераспределение явных блоков специализации
+  // (legacy-блоки без tradeoff — no-op; повторная финализация защищена флагом).
+  try {
+    const sched = plan.specializationSchedule;
+    const hasTradeoff = !!(sched?.active && sched.blocks?.some((b: any) => b.tradeoff));
+    if (hasTradeoff && !(plan as any)._tradeoffApplied) {
+      applyArmTradeoffToPlan(plan, sched as any, level);
+      (plan as any)._tradeoffApplied = true;
+      plan.rationale.push(`Донорское перераспределение: снятие прямых изоляций доноров до MEV в блоке(ах) специализации.`);
+    }
+  } catch { plan.rationale.push('⚠ Донорское перераспределение недоступно — специализация без снятия доноров.'); }
   capEnforcement(plan, level);
   enforceSessionLimits(plan, level);
   orderSessionExercises(plan);

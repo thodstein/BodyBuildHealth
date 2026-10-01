@@ -75,7 +75,10 @@ export function buildArmPrintHtml(plan: ArmPlan, diagnostics?: { findings?: Arra
         const hold = ex.holdSeconds ? ` hold ${ex.holdSeconds}с` : '';
         const table = ex.isTable ? ' 🖐️' : '';
         const comment = ex.comment ? `<div class="ex-c">💡 ${esc(ex.comment)}</div>` : '';
-        return `<tr><td><b>${esc(ex.name)}</b>${table}${comment}</td><td>${esc(ex.muscle)}</td><td class="num">${ex.sets}×${ex.repsRange[0]}-${ex.repsRange[1]} RIR${ex.rir}${hold}${esc(exWeight(ex))}</td><td>${esc(angle)}</td><td class="num">${esc(ex.tempoSpec || '')}</td></tr>`;
+        const warm = Array.isArray((ex as any).warmupSets) && (ex as any).warmupSets.length
+          ? ` · 🔥 ${(ex as any).warmupSets.map((w: any) => `${w.load}×${w.reps}`).join('/')}`
+          : '';
+        return `<tr><td><b>${esc(ex.name)}</b>${table}${comment}</td><td>${esc(ex.muscle)}</td><td class="num">${ex.sets}×${ex.repsRange[0]}-${ex.repsRange[1]} RIR${ex.rir}${hold}${esc(exWeight(ex))}${esc(warm)}</td><td>${esc(angle)}</td><td class="num">${esc(ex.tempoSpec || '')}</td></tr>`;
       }).join('');
       const sessNote = (sess as any).note ? `<div class="note">📝 ${esc((sess as any).note)}</div>` : '';
       return `<section class="sess"><h4>День ${sess.day} — ${esc(sess.sessionTag)} <span class="chip">${esc(sess.character)}</span> ${sess.tableTime ? '<span class="chip table">🖐️ стол</span>' : ''} <span class="wtot">${sessSets(sess)} сетов</span></h4>${sessNote}<table class="t"><thead><tr><th>Упражнение</th><th>Мышца</th><th>Сеты×Повт</th><th>РУ</th><th>Темп</th></tr></thead><tbody>${exRows}</tbody></table></section>`;
@@ -148,7 +151,7 @@ function csvCell(v: unknown): string {
  */
 export function buildArmPlanCsv(plan: ArmPlan): string {
   assertArmPlanExportable(plan);
-  const head = ['Неделя', 'Блок', 'Фаза', 'Старт', 'Делод', 'День', 'Сессия', 'Характер', 'Стол', 'Упражнение', 'Мышца', 'Сеты', 'ПовтMin', 'ПовтMax', 'RIR', 'ВесМин', 'ВесМакс', 'ОтдыхС', 'Темп', 'ХолдС', 'Комментарий'];
+  const head = ['Неделя', 'Блок', 'Фаза', 'Старт', 'Делод', 'День', 'Сессия', 'Характер', 'Стол', 'Упражнение', 'Мышца', 'Сеты', 'ПовтMin', 'ПовтMax', 'RIR', 'ВесМин', 'ВесМакс', 'ОтдыхС', 'Темп', 'ХолдС', 'Разминка', 'Комментарий'];
   const lines: string[] = [head.map(csvCell).join(';')];
   for (const wk of plan.weeks) {
     for (const sess of wk.sessions) {
@@ -178,6 +181,7 @@ export function buildArmPlanCsv(plan: ArmPlan): string {
           ex.restSeconds ?? '',
           ex.tempoSpec || '',
           holds.length ? Math.max(...holds) : '',
+          Array.isArray((ex as any).warmupSets) && (ex as any).warmupSets.length ? (ex as any).warmupSets.map((w: any) => `${w.load}x${w.reps}`).join('/') : '',
           ex.comment || '',
         ].map(csvCell).join(';'));
       }
