@@ -34,7 +34,7 @@ export const CYCLE_BB_F_FB_3: SRCycleTemplate = {
       'Верх-баланс: спина ≥ 0.8× груди',
       'RIR 3→1; делоды W4/W8',
     ],
-    tags: ['lms', 'bodybuilding', 'female', 'fullbody', 'glutes'],
+    tags: ['lms', 'bodybuilding', 'female', 'fullbody', 'glutes', 'classic'],
   },
   week1: [
     day(

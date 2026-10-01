@@ -89,6 +89,17 @@ export function matchCardioPeriod(c: CardioCycleTemplate, period: string): boole
   return true;
 }
 
+/**
+ * Профессиональная библиотека (docs/BB-AUTO-PROFESSIONAL-CYCLES-PLAN.md):
+ * именная система — meta несёт схему/методику, либо тег системы (classic/nubret/…).
+ */
+export function isNamedSystemCycle(c: { meta?: any }): boolean {
+  const m = c?.meta || {};
+  if (m.volumeScheme || m.methodology) return true;
+  const tags: string[] = m.tags || [];
+  return tags.some(t => ['classic', 'nubret', 'rp', 'dc', 'hit', 'periodization', 'bro', 'gvt', 'gironda', 'fst7', 'meadows', 'yates'].includes(t));
+}
+
 // ── Нормализация цели/уровня профиля под union движка rankCycles ──
 function normalizeGoal(g: string): UserGoal {
   const s = (g || '').toLowerCase();
@@ -303,6 +314,7 @@ export const CycleCatalog: React.FC<Props> = (p) => {
   const [author, setAuthor] = React.useState('all');
   // ♀ Женские (тег female, Ф5 CYCLE-SYSTEM-FULL-AUDIT) — чип рядом с периодом
   const [femaleOnly, setFemaleOnly] = React.useState(false);
+  const [namedOnly, setNamedOnly] = React.useState(false);
   const [showRec, setShowRec] = React.useState(false);
   // ── Фильтры сворачиваются: за длинной панелью должны быть видны сами циклы ──
   const [showFilters, setShowFilters] = React.useState(false);
@@ -379,6 +391,7 @@ export const CycleCatalog: React.FC<Props> = (p) => {
       const m = c.meta;
       if (favOnly && !favs.includes(m.id)) return false;
       if (femaleOnly && !(m.tags || []).includes('female')) return false;
+      if (namedOnly && !isNamedSystemCycle(c)) return false;
       if (focus !== 'all' && focusKeyOf(c, cat) !== focus) return false;
       if (levelF !== 'all' && m.level !== levelF) return false;
       if (period !== 'all' && m.period !== period) return false;
@@ -388,7 +401,7 @@ export const CycleCatalog: React.FC<Props> = (p) => {
       if (q && !(`${m.title || ''} ${m.description || ''} ${m.howItWorks || ''}`.toLowerCase().includes(q))) return false;
       return true;
     });
-  }, [base, focus, levelF, period, weeks, freq, author, search, favOnly, favs, femaleOnly]);
+  }, [base, focus, levelF, period, weeks, freq, author, search, favOnly, favs, femaleOnly, namedOnly]);
 
   // ── Арм-библиотека (19 именных циклов): фильтры поиска/фокуса/уровня/недель/частоты ──
   const armFiltered = React.useMemo(() => {
@@ -710,6 +723,8 @@ export const CycleCatalog: React.FC<Props> = (p) => {
               ))}
               {/* ♀ Женские (Ф5): тег female */}
               <Chip label="♀ Женские" active={femaleOnly} onClick={() => setFemaleOnly(!femaleOnly)} />
+              {/* 🏛 Именные системы (профессиональная библиотека) */}
+              <Chip label="🏛 Именные" active={namedOnly} onClick={() => setNamedOnly(!namedOnly)} />
             </div>
           </div>
           )}
@@ -1175,7 +1190,11 @@ export const CycleCatalog: React.FC<Props> = (p) => {
             const m = c.meta;
             // Ф5: ♀-бейдж на женских циклах (первым чипом, с розовым акцентом)
             const isFemale = (m.tags || []).includes('female');
+            // Профессиональная библиотека: 🏛-бейдж на именных системах.
+            const isNamed = isNamedSystemCycle(c);
+            const femaleIdx = isNamed ? 1 : 0;
             const chips = [
+              ...(isNamed ? ['🏛 Система'] : []),
               ...(isFemale ? ['♀ Женский'] : []),
               m.level, `${m.weeks} нед`, `${m.sessionsPerWeek} дн/нед`, PERIOD_LABELS[m.period] || m.period, FOCUS_LABELS[focusKeyOf(c, cat)] || focusKeyOf(c, cat),
             ];
@@ -1184,13 +1203,13 @@ export const CycleCatalog: React.FC<Props> = (p) => {
                 key={m.id}
                 title={m.title}
                 icon=""
-                accent={isFemale ? '#f472b6' : '#00e68a'}
+                accent={isFemale ? '#f472b6' : isNamed ? '#a78bfa' : '#00e68a'}
                 short={
                   <div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 6 }}>
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
                         {chips.map((ch, i) => (
-                          <span key={i} style={{ fontSize: 11, fontWeight: 600, color: '#fff', background: (isFemale && i === 0) ? 'rgba(244,114,182,0.18)' : 'rgba(255,255,255,0.06)', border: (isFemale && i === 0) ? '1px solid rgba(244,114,182,0.35)' : '1px solid transparent', borderRadius: 8, padding: '2px 7px' }}>{ch}</span>
+                          <span key={i} style={{ fontSize: 11, fontWeight: 600, color: '#fff', background: (isFemale && i === femaleIdx) ? 'rgba(244,114,182,0.18)' : (isNamed && i === 0) ? 'rgba(167,139,250,0.18)' : 'rgba(255,255,255,0.06)', border: (isFemale && i === femaleIdx) ? '1px solid rgba(244,114,182,0.35)' : (isNamed && i === 0) ? '1px solid rgba(167,139,250,0.4)' : '1px solid transparent', borderRadius: 8, padding: '2px 7px' }}>{ch}</span>
                         ))}
                       </div>
                       <button aria-label={favs.includes(m.id) ? `Убрать из избранного ${m.title}` : `В избранное ${m.title}`}
