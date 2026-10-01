@@ -43,3 +43,30 @@ export function resolveEffectiveMethodology(
   if (userMethodology !== 'compound_first') return userMethodology;
   return cycleMeta?.methodology ?? userMethodology;
 }
+
+const SCHEME_RU: Record<string, string> = {
+  gvt: 'GVT (10×10)',
+  gironda: 'Gironda 8×8',
+  fst7: 'FST-7 (7-сетовые финишеры)',
+};
+
+/**
+ * Заметка в rationale плана: какая схема/методика именной системы реально применена
+ * (только если она взята из meta цикла, а не выбрана пользователем). null — если нечего.
+ */
+export function namedSystemNote(
+  cycleMeta: NamedCycleDefaults | null | undefined,
+  effectiveScheme: BBVolumeScheme,
+  effectiveMethodology: SessionMethodology,
+  userScheme: BBVolumeScheme,
+  userMethodology: SessionMethodology,
+): string | null {
+  const parts: string[] = [];
+  if (cycleMeta?.volumeScheme && cycleMeta.volumeScheme === effectiveScheme && userScheme === 'standard') {
+    parts.push(`схема «${SCHEME_RU[effectiveScheme] ?? effectiveScheme}»`);
+  }
+  if (cycleMeta?.methodology && cycleMeta.methodology === effectiveMethodology && userMethodology === 'compound_first') {
+    parts.push(`методика «${String(effectiveMethodology).replace(/_/g, ' ')}»`);
+  }
+  return parts.length ? `🎛 Именная система: применены ${parts.join(' + ')} (дефолт цикла).` : null;
+}

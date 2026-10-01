@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { resolveEffectiveVolumeScheme, resolveEffectiveMethodology } from '../bb-scheme-resolve';
+import { resolveEffectiveVolumeScheme, resolveEffectiveMethodology, namedSystemNote } from '../bb-scheme-resolve';
 import { buildBBPlan } from '../../../../engines/bb/bb-builder.engine';
 
 /**
@@ -30,6 +30,15 @@ describe('Резолвер схемы/методики: ПРОФ-цикл vs gen
     expect(resolveEffectiveVolumeScheme('gironda', 'standard', { volumeScheme: 'gvt' })).toBe('gironda');
     expect(resolveEffectiveMethodology('pre_exhaust', { methodology: 'mountain_dog' })).toBe('pre_exhaust');
     expect(resolveEffectiveVolumeScheme('standard', 'high', { volumeScheme: 'gironda' })).toBe('gvt');
+  });
+
+  it('заметка «именная система применена» — только когда взята из meta', () => {
+    expect(namedSystemNote({ volumeScheme: 'gvt' }, 'gvt', 'compound_first', 'standard', 'compound_first')).toContain('GVT');
+    expect(namedSystemNote({ methodology: 'mountain_dog' }, 'standard', 'mountain_dog', 'standard', 'compound_first')).toContain('mountain dog');
+    // пользователь переопределил — заметки нет
+    expect(namedSystemNote({ volumeScheme: 'gvt' }, 'gironda', 'compound_first', 'gironda', 'compound_first')).toBeNull();
+    // meta нет — заметки нет
+    expect(namedSystemNote(undefined, 'standard', 'compound_first', 'standard', 'compound_first')).toBeNull();
   });
 });
 

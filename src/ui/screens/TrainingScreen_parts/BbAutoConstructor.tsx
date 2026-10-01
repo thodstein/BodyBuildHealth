@@ -56,7 +56,7 @@ import { PCT_FOR_RIR } from '../../../engines/rir-table';
 import { labTrainingAdjust } from './lab-training-adjust';
 import { getCycleById, normalizeCycleDirection, getCyclesByDirection } from '../../../data/lms-cycles/lms-cycle-index';
 import { programToBBPlan, cycleTemplateToFullProgram } from '../../../engines/bb/cycle-to-plan';
-import { resolveEffectiveVolumeScheme, resolveEffectiveMethodology } from './bb-scheme-resolve';
+import { resolveEffectiveVolumeScheme, resolveEffectiveMethodology, namedSystemNote } from './bb-scheme-resolve';
 import type { SRCycleTemplate } from '../../../data/lms-cycles/lms-types';
 import { FULL_PROGRAM_LIBRARY } from '../../../engines/complete-program-library.engine';
 import type { FullProgram } from '../../../engines/complete-program-library.engine';
@@ -2457,6 +2457,12 @@ export const BbAutoConstructor: React.FC = () => {
       } catch { /* битый стор — молча */ }
       plan.rationale = [...(plan.rationale || []), `🧬 Лаб ББ: ${profParts.join(' · ')}`];
     }
+    // Профессиональная библиотека: прозрачная заметка «схема/методика именной
+    // системы применена» (только когда взята из meta цикла, а не выбрана вручную).
+    try {
+      const namedNote = namedSystemNote(libCycleMeta as any, effectiveVolumeScheme, effectiveMethodology, volumeScheme, bbMethodology);
+      if (namedNote) plan.rationale = [...(plan.rationale || []), namedNote];
+    } catch { /* инфо-заметка — не роняем сборку */ }
     // Объёмный режим в generic-ветке уже прокинут через buildBBPlan(effectiveVolGoal/effectiveVolumeScheme); капы те же от уровня
 
     const modeLabel = bbAnnualMacrocycle
