@@ -30,7 +30,7 @@ import { recommendSSCycle } from '../../../engines/strength-sport/strength-sport
 import { buildSSCyclePlan } from '../../../engines/strength-sport/strength-sport-ss-cycle-to-plan.engine';
 import { localIsoDate } from '../../../engines/workout-logger.engine';
 import { buildAnnualFromSSCycles } from '../../../engines/strength-sport/strength-sport-ss-annual.engine';
-import { seasonPresetsFor, recommendSeasonPlan, buildSeasonPlan, validateSeasonPeriodization, seasonSummaryLines, seasonPlanWeekCells, buildSeasonSummaryText, buildSeasonPrintHtml, buildSeasonIcs, saveSeasonPlan, loadSeasonPlan, clearSeasonPlan, SEASON_PHASE_META, type SSSeasonPlan } from '../../../engines/strength-sport/strength-sport-season-planner.engine';
+import { seasonPresetsFor, recommendSeasonPlan, seasonInputSignature, buildSeasonPlan, validateSeasonPeriodization, seasonSummaryLines, seasonPlanWeekCells, buildSeasonSummaryText, buildSeasonPrintHtml, buildSeasonIcs, saveSeasonPlan, loadSeasonPlan, clearSeasonPlan, SEASON_PHASE_META, type SSSeasonPlan } from '../../../engines/strength-sport/strength-sport-season-planner.engine';
 import type { StrengthSportInput, StrengthSportPlan } from '../../../engines/strength-sport/strength-sport.types';
 import { getWL, getStrong } from '../../../engines/strength-sport/strength-sport-volume';
 import { isNativeApp } from '../../../core/app-platform';
@@ -707,6 +707,22 @@ export const StrengthSportConstructor: React.FC = () => {
   };
 
   const seasonModeLabel = mode === 'weightlifting' ? 'Тяжёлая атлетика' : mode === 'strongman' ? 'Силовой экстрим' : 'Гибрид';
+  /** Единый вход сезона: планировщик, скорость «рассчитать/собрать» и stale-детект. */
+  const seasonInputNow = React.useMemo(() => ({
+    mode: mode as any,
+    level,
+    daysPerWeek: days,
+    weeks,
+    goal,
+    competitionDate: competitionDate || undefined,
+    startDate: competitionDate ? localIsoDate() : undefined,
+    equipment,
+    age,
+    presetId: seasonPresetId || undefined,
+    cycleConsent,
+    weakPoints: weakPoints.length ? weakPoints as any : undefined,
+  }), [mode, level, days, weeks, goal, competitionDate, equipment, age, seasonPresetId, cycleConsent, weakPoints]);
+  const seasonSigNow = React.useMemo(() => { try { return seasonInputSignature(seasonInputNow); } catch { return ''; } }, [seasonInputNow]);
 
   /** PRO-волна: единый вход сборки сезона (тот же набор полей, что «Год из циклов»). */
   const ssSeasonBase = (): any => ({ mode, goal, level, workMax, equipment, injuries, mobilityRestrictions: mobility, sex, bodyweight, age, cycleConsent, methodology, dupMode, intensityTech, outsideLoad: outsideEnabled ? outside : null, acwr: acwr as any, weakPoints: weakPoints.length ? weakPoints : undefined, contest: mode==='strongman' ? contest : undefined, contestStrategy: mode==='strongman' ? contestStrategy : undefined, startDate: localIsoDate() });
@@ -714,20 +730,7 @@ export const StrengthSportConstructor: React.FC = () => {
   /** Рассчитать сезон (фазы → циклы) без записи — превью для пользователя. */
   const handleRecommendSeason = () => {
     try {
-      const season = recommendSeasonPlan({
-        mode: mode as any,
-        level,
-        daysPerWeek: days,
-        weeks,
-        goal,
-        competitionDate: competitionDate || undefined,
-        startDate: competitionDate ? localIsoDate() : undefined,
-        equipment,
-        age,
-        presetId: seasonPresetId || undefined,
-        cycleConsent,
-        weakPoints: weakPoints.length ? weakPoints as any : undefined,
-      });
+      const season = recommendSeasonPlan(seasonInputNow);
       setSeasonPlan(season);
       try { saveSeasonPlan(season); } catch { /* квота/ssr — тихо */ }
       setMsg(`🧭 Сезон рассчитан: ${season.blocks.length} блоков · ${season.totalWeeks} нед`);
@@ -741,14 +744,7 @@ export const StrengthSportConstructor: React.FC = () => {
   /** Собрать сезон: AnnualSS с кросс-мезо прогрессией ПМ + методическая валидация. */
   const handleBuildSeasonPro = () => {
     try {
-      const season = seasonPlan || recommendSeasonPlan({
-        mode: mode as any, level, daysPerWeek: days, weeks, goal,
-        competitionDate: competitionDate || undefined,
-        startDate: competitionDate ? localIsoDate() : undefined,
-        equipment, age,
-        presetId: seasonPresetId || undefined, cycleConsent,
-        weakPoints: weakPoints.length ? weakPoints as any : undefined,
-      });
+      const season = seasonPlan || recommendSeasonPlan(seasonInputNow);
       const v = validateSeasonPeriodization(season);
       const ann = buildSeasonPlan(season, { ...ssSeasonBase(), weeks: season.totalWeeks } as StrengthSportInput, {
         cycleMode, competitionDate: competitionDate || undefined, taperWeeks,
@@ -1359,6 +1355,11 @@ export const StrengthSportConstructor: React.FC = () => {
                     <button data-ss="season-recommend" onClick={handleRecommendSeason} style={{ ...BTN, flex:1, minWidth:150 }}>🧭 Рассчитать сезон</button>
                     <button data-ss="season-build" onClick={handleBuildSeasonPro} style={{ ...(mode==='strongman'?BTN_STRONG:BTN_PRIMARY), flex:1.2, minWidth:150 }}>✦ Собрать сезон</button>
                   </div>
+                  {seasonPlan?.inputSig && seasonSigNow && seasonPlan.inputSig !== seasonSigNow && (
+                    <div data-ss="season-stale" role="status" style={{ marginTop:8, fontSize:11.5, fontWeight:700, color:'#fff', background:'rgba(245,158,11,0.10)', border:'1px solid rgba(245,158,11,0.28)', borderRadius:10, padding:'8px 10px', lineHeight:1.45 }}>
+                      🔁 Параметры изменились после расчёта — нажмите «Рассчитать сезон», чтобы обновить.
+                    </div>
+                  )}
                   {seasonPlan && (
                     <div style={{ display:'flex', flexDirection:'column', gap:6, marginTop:10 }}>
                       <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>

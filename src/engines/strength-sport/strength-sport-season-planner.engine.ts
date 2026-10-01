@@ -226,6 +226,25 @@ export interface SSSeasonPlan {
   blocks: SSSeasonBlockPlan[];
   rationale: string[];
   warnings: string[];
+  /** Сигнатура входов, из которых собран сезон — UI ловит «настройки изменились». */
+  inputSig?: string;
+}
+
+/** Детерминированная сигнатура входов планировщика (для stale-детекта в UI). */
+export function seasonInputSignature(input: SSSeasonInput): string {
+  return JSON.stringify({
+    mode: input.mode,
+    level: input.level,
+    weeks: input.weeks ?? null,
+    days: input.daysPerWeek,
+    goal: input.goal || '',
+    comp: input.competitionDate || '',
+    start: input.startDate || '',
+    eq: [...(input.equipment || [])].map((s) => String(s).toLowerCase()).sort(),
+    age: input.age ?? null,
+    preset: input.presetId || '',
+    wp: [...(input.weakPoints || [])].map(String).sort(),
+  });
 }
 
 const LEVEL_RANK: Record<string, number> = { beginner: 0, intermediate: 1, advanced: 2, enhanced: 3 };
@@ -523,7 +542,7 @@ export function recommendSeasonPlan(input: SSSeasonInput): SSSeasonPlan {
   if ((input.age ?? 0) >= 40) rationale.push('Masters 40+: 6-дневные циклы штрафуются при подборе, daily-max исключён');
   if ((LEVEL_RANK[input.level] ?? 1) === 0) rationale.push('Новичок: daily-max-циклы исключены подбором');
 
-  return { presetId, presetLabel: preset.label, mode: input.mode, totalWeeks, requestedWeeks: horizon, blocks, rationale, warnings };
+  return { presetId, presetLabel: preset.label, mode: input.mode, totalWeeks, requestedWeeks: horizon, blocks, rationale, warnings, inputSig: seasonInputSignature(input) };
 }
 
 // ——— Сборка сезона ———

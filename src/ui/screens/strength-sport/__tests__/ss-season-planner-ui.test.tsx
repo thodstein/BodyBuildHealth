@@ -9,7 +9,7 @@ import React from 'react';
 import { StrengthSportConstructor } from '../StrengthSportConstructor';
 import { loadAnnualSS } from '../../../../engines/strength-sport/strength-sport-annual';
 import { loadStrengthSportPlan } from '../../../../engines/strength-sport/strength-sport-storage';
-import { loadSeasonPlan } from '../../../../engines/strength-sport/strength-sport-season-planner.engine';
+import { loadSeasonPlan, recommendSeasonPlan, saveSeasonPlan } from '../../../../engines/strength-sport/strength-sport-season-planner.engine';
 
 beforeEach(() => { localStorage.clear(); });
 
@@ -172,5 +172,18 @@ describe('PRO-планировщик сезона: UI', () => {
     // На шаге плана виден индикатор «где я в сезоне» (сезон стартует сегодня → нед 1)
     await waitFor(() => expect(container.querySelector('[data-ss="season-now"]')).toBeTruthy());
     expect(container.textContent).toMatch(/Сезон: нед 1 из/);
+  });
+
+  it('stale-детект: сезон из стора с чужой сигнатурой → плашка, пересчёт убирает', async () => {
+    const seed = recommendSeasonPlan({ mode: 'weightlifting', level: 'intermediate', daysPerWeek: 5, weeks: 12, goal: 'strength' } as any);
+    saveSeasonPlan({ ...seed, inputSig: 'stale-signature' });
+
+    const { container } = render(<StrengthSportConstructor />);
+    await buildPlanAndGoExport(container);
+    await openSeasonCard(container);
+    await waitFor(() => expect(container.querySelector('[data-ss="season-stale"]')).toBeTruthy());
+
+    fireEvent.click(screen.getByText('🧭 Рассчитать сезон'));
+    await waitFor(() => expect(container.querySelector('[data-ss="season-stale"]')).toBeNull());
   });
 });

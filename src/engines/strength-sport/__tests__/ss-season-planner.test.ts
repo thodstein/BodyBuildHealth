@@ -12,7 +12,7 @@ import {
   seasonTimeline, seasonSummaryLines, weeksUntilDate, SEASON_PHASE_META,
   seasonPlanWeekCells, buildSeasonSummaryText, buildSeasonPrintHtml, buildSeasonIcs,
   saveSeasonPlan, loadSeasonPlan, clearSeasonPlan, SS_SEASON_PLAN_KEY,
-  activeSeasonBlockForDate, dayDiffIso,
+  activeSeasonBlockForDate, dayDiffIso, seasonInputSignature,
 } from '../strength-sport-season-planner.engine';
 import { buildAnnualFromSSCycles } from '../strength-sport-ss-annual.engine';
 import { shiftIsoDate } from '../../../core/local-date';
@@ -533,5 +533,16 @@ describe('season-planner: «где я в сезоне»', () => {
     expect(dayDiffIso('2026-01-08', '2026-01-01')).toBe(-7);
     expect(dayDiffIso('мусор', '2026-01-01')).toBeNull();
     expect(dayDiffIso('2026-01-01', '')).toBeNull();
+  });
+
+  it('seasonInputSignature: стабильна, порядок оборудования не важен, чувствительна к входам', () => {
+    const a: any = { mode: 'weightlifting', level: 'intermediate', daysPerWeek: 5, weeks: 16, goal: 'strength', equipment: ['barbell', 'other'] };
+    const b: any = { ...a, equipment: ['other', 'barbell'] };
+    expect(seasonInputSignature(a)).toBe(seasonInputSignature(b));
+    expect(seasonInputSignature(a)).not.toBe(seasonInputSignature({ ...a, weeks: 20 }));
+    expect(seasonInputSignature(a)).not.toBe(seasonInputSignature({ ...a, level: 'advanced' }));
+    expect(seasonInputSignature(a)).not.toBe(seasonInputSignature({ ...a, competitionDate: '2026-12-01' }));
+    const p = recommendSeasonPlan(a);
+    expect(p.inputSig).toBe(seasonInputSignature(a));
   });
 });
