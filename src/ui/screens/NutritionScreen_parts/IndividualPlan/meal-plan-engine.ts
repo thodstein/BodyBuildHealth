@@ -9947,10 +9947,12 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     // → рис/картофель; лимон/лайм (приправа, не фрукт) → обычный фрукт. Guard: +2%.
     try {
       const JUNK_FAT = /^sauce_|^oil_(soybean|corn|palm|rice_bran|camelina|cedar|black_cumin|chili|truffle|mustard)|^seed_(poppy|fennel|anise|celery|nigella|cumin|coriander|cardamom|mustard_yellow)|^nut_(kukui|pili|baru)|basil_seeds|hazelnut_paste|pesto|fat_cocoa_butter/;
+      const JUNK_CARB = /^root_(taro|cassava|yam)|plantain|breadfruit/;
       const FLAVOR_FRUIT = /^(lemon|lime)(_|$)/;
       // Чистые масла первыми — замена «мусорного» масла макро-нейтральна (100 г жира → 100 г).
       const FAT_REPL = ['olive_oil', 'oil_coconut', 'oil_mct', 'oil_ghee', 'fat_ghee', 'butter', 'avocado', 'almonds', 'walnuts', 'nuts_mix'];
-      const CARB_REPL = ['potato_boiled', 'buckwheat'];
+      // Обычные углеводные носители для замены экзотического корнеплода.
+      const CARB_REPL = ['potato_boiled', 'buckwheat', 'bulgur', 'pasta_durum', 'rice_white', 'rice_basmati', 'grain_red_rice', 'sweet_potato'];
       const FRUIT_REPL = ['apple', 'banana', 'berries', 'blueberries', 'orange', 'pear', 'kiwi'];
       const _devJ = () => Math.max(
         (input.goalKcal || 0) > 0 ? Math.abs(totals.kcal - (input.goalKcal || 0)) / (input.goalKcal || 1) : 0,
@@ -9958,8 +9960,16 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
         (input.goalFatG || 0) > 0 ? Math.abs(totals.f - (input.goalFatG || 0)) / (input.goalFatG || 1) : 0,
         (input.goalCarbsG || 0) > 0 ? Math.abs(totals.c - (input.goalCarbsG || 0)) / (input.goalCarbsG || 1) : 0,
       );
-      // Ротация замен привязана к дню (dayOffset) — иначе каждый день начинает с rice_white
-      // и 7-дневка «рисуется рисом» (нарушение разнообразия стейплов).
+      const _junkAllowed = (rid: string): boolean => !(_pickCtx.currentExcludedIds && _pickCtx.currentExcludedIds.has(rid))
+        && !(input.excludedIds && input.excludedIds.has(rid))
+        && (() => { const f = FOOD_DB.find((x: any) => x.id === rid); return !!f && foodPassesCtxAllergens(f) && foodAvailableForPlan(f); })();
+      // Семейства стейплов, уже использованные в дне — карб-замену берём из ДРУГОГО семейства
+      // (иначе таро→рис добавляет рис в день, где рис уже есть → доминант в 7-дневке).
+      const _dayFams = new Set<string>();
+      for (const mm of meals as any[]) for (const x of (mm.items || []) as any[]) {
+        if (x.role === 'carb_slow' || x.role === 'carb_fast') { const fam = stapleFamilyOf(x.id); if (fam) _dayFams.add(fam); }
+      }
+      // Ротация замен привязана к дню (dayOffset) — иначе каждый день начинает с одного носителя.
       let _junkRot = (input.dayOffset || 0);
       for (const m of meals as any[]) {
         const _have = new Set((m.items || []).map((x: any) => x.id));
@@ -9968,21 +9978,23 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
           const id = String(it.id || '');
           // Роль не важна: id достаточно (таро мог лечь как fruit/veg, соус — как fat/other).
           const isFatJunk = JUNK_FAT.test(id);
-          // Карб-«мусор» (таро/кассава/ям) НЕ трогаем пост-обработкой: замена создавала
-          // доминирующее семейство в 7-дневке (нарушение разнообразия) — остаётся границей.
-          const isCarbJunk = false;
-          const isFruitJunk = !isFatJunk && FLAVOR_FRUIT.test(id);
+          const isCarbJunk = !isFatJunk && JUNK_CARB.test(id);
+          const isFruitJunk = !isFatJunk && !isCarbJunk && FLAVOR_FRUIT.test(id);
           if (!isFatJunk && !isCarbJunk && !isFruitJunk) continue;
-          const _base0 = isFatJunk ? FAT_REPL : isCarbJunk ? CARB_REPL : FRUIT_REPL;
-          // Ротация замен (иначе таро→рис во всех днях ломает разнообразие 7-дневки).
-          const _rot = _base0.slice(_junkRot % _base0.length).concat(_base0.slice(0, _junkRot % _base0.length));
-          _junkRot++;
-          const replList = _rot;
           const macro: 'f' | 'c' = isFatJunk ? 'f' : 'c';
-          const replId = replList.find(rid => !_have.has(rid)
-            && !(_pickCtx.currentExcludedIds && _pickCtx.currentExcludedIds.has(rid))
-            && !(input.excludedIds && input.excludedIds.has(rid))
-            && (() => { const f = FOOD_DB.find((x: any) => x.id === rid); return !!f && foodPassesCtxAllergens(f) && foodAvailableForPlan(f); })());
+          let replId: string | undefined;
+          if (isCarbJunk) {
+            // Приоритет — семейство, которого НЕТ в дне; иначе любое допустимое.
+            const _pref = CARB_REPL.filter(rid => !_have.has(rid) && !_dayFams.has(stapleFamilyOf(rid) as string) && _junkAllowed(rid));
+            const _any = CARB_REPL.filter(rid => !_have.has(rid) && _junkAllowed(rid));
+            const _list = _pref.length > 0 ? _pref : _any;
+            replId = _list.length > 0 ? _list[_junkRot++ % _list.length] : undefined;
+          } else {
+            const _base0 = isFatJunk ? FAT_REPL : FRUIT_REPL;
+            const _rot = _base0.slice(_junkRot % _base0.length).concat(_base0.slice(0, _junkRot % _base0.length));
+            _junkRot++;
+            replId = _rot.find(rid => !_have.has(rid) && _junkAllowed(rid));
+          }
           if (!replId) continue;
           const fd = FOOD_DB.find((f: any) => f.id === replId);
           if (!fd) continue;

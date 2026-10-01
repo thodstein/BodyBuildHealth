@@ -10,6 +10,8 @@ import { sumMealTotals, sumDayTotals } from "./planner-recipe-mode";
 import { localIsoDate } from "./planner-date-utils";
 import { buildTrainSchedule, isTrainingDayFor } from "./planner-training-schedule";
 import { NutritionPeriodizationCard } from "./NutritionPeriodizationCard";
+import { SupplementTimingCard } from "./SupplementTimingCard";
+import { ALL_SUBSTANCES } from "../../../../data/support-substances";
 import { getWeightLog } from "../../../../engines/profile-store";
 import { PopupSelect } from "../../../components/PopupXxx";
 import type { DrugInjection } from "./types";
@@ -151,7 +153,7 @@ export const IndividualPlanResults: React.FC = () => {
     setDayPlan, setThreeDayPlan, planTargets, planType, variety,
     linkToTraining, trainStart,
     weightMode,
-    goal, bbPrepPlan, trainEnd, trainScheduleType, trainPattern,
+    goal, bbPrepPlan, trainEnd, trainScheduleType, trainPattern, takenSupplements,
     workScheduleEnabled, workStartTime, workEndTime, workDays, workScheduleType,
     v2Phase, v2Pharma, v2Labs, histamineSensitive,
     combatNutrition, applyCombatNutrition,
@@ -1826,6 +1828,31 @@ const doImportPlan = (raw: string): boolean => {
             {waterCalc.total} л/день
           </div>
         </GlassCard>
+      )}
+
+      {generated && dayPlan && takenSupplements.length > 0 && (
+        <SupplementTimingCard
+          supplements={takenSupplements.map(id => {
+            const s = ALL_SUBSTANCES.find(a => a.id === id);
+            return s ? { id: s.id, name: s.name, nameRu: s.nameRu, dosage: s.dosage, timing: s.timing } : { id };
+          })}
+          meals={(dayPlan.meals || []).map((m: any) => ({
+            type: String(m.type || ''), label: String(m.label || ''), time: String(m.time || ''),
+            items: (m.items || []).map((it: any) => ({ id: it.id, name: it.name, f: it.f })),
+          }))}
+          trainStartMin={(() => { const mm = /^(\d{1,2}):(\d{2})$/.exec(String(trainStart || '')); return mm ? Number(mm[1]) * 60 + Number(mm[2]) : undefined; })()}
+          trainDurationMin={(() => {
+            const a = /^(\d{1,2}):(\d{2})$/.exec(String(trainStart || ''));
+            const b = /^(\d{1,2}):(\d{2})$/.exec(String(trainEnd || ''));
+            if (!a || !b) return undefined;
+            const d = (Number(b[1]) * 60 + Number(b[2])) - (Number(a[1]) * 60 + Number(a[2]));
+            return d > 0 ? d : undefined;
+          })()}
+          isTrainingDay={isTrainingDayFor(buildTrainSchedule(linkToTraining, trainStart, trainEnd, trainingDays, trainScheduleType, trainPattern), selectedDayIndex)}
+          weightKg={weight || 80}
+          sex={sex}
+          goal={goal}
+        />
       )}
 
       {generated && healthIssues.length > 0 && (

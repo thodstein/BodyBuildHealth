@@ -56,6 +56,16 @@ describe('E17: чистая выдача рациона', () => {
     }
   });
 
+  it('E18: экзотические корнеплоды (таро/кассава/ям) и лимон/лайм не в рационе', () => {
+    const JUNK = /^root_(taro|cassava|yam)|plantain|breadfruit|^(lemon|lime)(_|$)/;
+    for (const salt of [1, 2, 3, 4, 5, 6, 7]) {
+      const p = buildDayPlan(mk({ goalKcal: 2720, goalProteinG: 170, goalFatG: 80, goalCarbsG: 330, mealsCount: 5, randomSalt: salt, dayOffset: salt } as any));
+      for (const m of p.meals) for (const it of (m.items || [])) {
+        expect(JUNK.test(String(it.id)), `${it.id} @${m.type} (соль ${salt})`).toBe(false);
+      }
+    }
+  });
+
   it('HV1500: поздний перекус (после 20:00) без овсянки/хлопьев и десертов', () => {
     const p = buildDayPlan(mk({
       weightKg: 120, lbmKg: 100, bodyFatPct: 16, goalKcal: 8900, goalProteinG: 500, goalFatG: 100, goalCarbsG: 1500,
