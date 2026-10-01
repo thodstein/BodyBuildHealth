@@ -78,15 +78,19 @@ describe('§3A-2 no-insulin экстрим: матрица train/rest × инс�
     // max-dev дня 10.3% → 6.5%.
     // было→стало (E16, Sep 30 2026, решение пользователя — полы LBM-масштаб):
     // prew-бюджет для LBM 75 стал 19 г (было фикс-пол 20) → 2806/184.7/74.8/348.2
-    // → 2807/183.9/74.6/350. E11/E12-гейт (carbCapGPerKg=0) не тронут.
+    // → 2807/183.9/74.6/350.
+    // было→стало (E18, Oct 1 2026, гигиена «мусора»): дешёвое соевое масло заменено обычным
+    // (оливковое/авокадо/орехи) — 2807/183.9/74.6/350 → 2816/183.9/75.6/350 (+9 ккал). Это
+    // улучшение реализма (не «мусор»), не регресс. Карб-«мусор» (таро) пост-обработкой не
+    // трогается — граница (замена ломала разнообразие 7-дневки).
     const p = buildDayPlan(base({
       weightKg: 90, lbmKg: 75, bodyFatPct: 14, goalKcal: 3000, goalProteinG: 180, goalFatG: 80, goalCarbsG: 340,
       mealsCount: 5, isTrainingDay: true, trainStartMin: 17 * 60, trainDurationMin: 90, allowIntraWorkout: true,
       budget: 'medium' as const, dayOffset: 0,
     }));
-    expect(p.totals.kcal).toBe(2807);
+    expect(p.totals.kcal).toBe(2816);
     expect(p.totals.p).toBe(183.9);
-    expect(p.totals.f).toBe(74.6);
+    expect(p.totals.f).toBe(75.6);
     expect(p.totals.c).toBe(350);
   });
 });

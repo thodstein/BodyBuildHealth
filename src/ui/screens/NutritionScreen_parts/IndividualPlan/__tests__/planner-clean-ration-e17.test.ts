@@ -46,6 +46,16 @@ describe('E17: чистая выдача рациона', () => {
     }
   });
 
+  it('E18: дешёвые/экзотические масла-«мусор» не стоят «жиром приёма»', () => {
+    const JUNK = /^sauce_|^oil_(soybean|corn|palm|rice_bran|camelina|cedar|black_cumin|chili|truffle|mustard)|^seed_(poppy|fennel|anise|celery|nigella|cumin|coriander|cardamom|mustard_yellow)|^nut_(kukui|pili|baru)|basil_seeds|hazelnut_paste|pesto|fat_cocoa_butter/;
+    for (const salt of [1, 2, 3, 4, 5]) {
+      const p = buildDayPlan(mk({ goalKcal: 2720, goalProteinG: 170, goalFatG: 80, goalCarbsG: 330, mealsCount: 5, randomSalt: salt } as any));
+      for (const m of p.meals) for (const it of (m.items || [])) {
+        if (it.role === 'fat') expect(JUNK.test(String(it.id)), `${it.id} @${m.type} (соль ${salt})`).toBe(false);
+      }
+    }
+  });
+
   it('HV1500: поздний перекус (после 20:00) без овсянки/хлопьев и десертов', () => {
     const p = buildDayPlan(mk({
       weightKg: 120, lbmKg: 100, bodyFatPct: 16, goalKcal: 8900, goalProteinG: 500, goalFatG: 100, goalCarbsG: 1500,
@@ -57,8 +67,9 @@ describe('E17: чистая выдача рациона', () => {
       for (const it of (m.items || [])) {
         const id = String(it.id || '');
         if (it.role !== 'carb_slow' && it.role !== 'carb_fast') continue;
-        expect(!afAllows(id, 'lateSnack'), `${m.label}: ${id} — off-slot на ночь`).toBe(true);
-        expect(SWEET.has(id), `${m.label}: ${id} — десерт на ночь`).toBe(false);
+        // На ночь запрещены только завтрак-стейпл (овсянка/хлопья) и десерты;
+        // ужинный плотный носитель (рис/крем/картофель) — разрешён.
+        expect(afAllows(id, 'lateSnack') && !SWEET.has(id), `${m.label}: ${id} — off-slot на ночь`).toBe(true);
       }
     }
   });

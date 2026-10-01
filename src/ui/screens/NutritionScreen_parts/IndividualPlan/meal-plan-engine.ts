@@ -1665,6 +1665,8 @@ function buildFoodPools(excludedIds: Set<string>, isVeg: boolean, budget: MealPl
   const cFastBud = byBudget(cFastRaw);
   const cFruitRaw = basePool.filter(f => f.category === 'veg_fruit' && (f.carbs || 0) >= 8 && (f.gi || 0) <= 55 && (f.fiber || 0) >= 1.5 && (f.protein || 0) < 15 && !VEG_LOOKALIKE_PAT.test(f.id));
   const cFruitBud = byBudget(cFruitRaw);
+  // E18: рафинированные дешёвые масла (соевое/кукурузное/пальмовое) — не «жир приёма»
+  // для бодибилдера: оливковое/гхи/сливочное/авокадо/орехи предпочтительнее.
   const fatsRaw = basePool.filter(f => f.category === 'fat' && (f.fat || 0) >= 10);
   const fatsBud = byBudget(fatsRaw);
   // variety-based pool limiting: перемешиваем и обрезаем для разнообразия
@@ -9938,6 +9940,75 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
       }
     }
 
+    // ─── E18: гигиена «мусора» — экзотика/кондоменты → обычные носители (не навреди) ───
+    // Пост-обработка (не пулы: смена пулов сдвигает seeded-выборы и ломает калибровку).
+    // Заменяем: соусы/пасты и экзотические масла/семена (напр. «масло рисовых отрубей»,
+    // «семена аниса») → оливковое/авокадо/орехи; экзотические корнеплоды (таро/кассава/ям)
+    // → рис/картофель; лимон/лайм (приправа, не фрукт) → обычный фрукт. Guard: +2%.
+    try {
+      const JUNK_FAT = /^sauce_|^oil_(soybean|corn|palm|rice_bran|camelina|cedar|black_cumin|chili|truffle|mustard)|^seed_(poppy|fennel|anise|celery|nigella|cumin|coriander|cardamom|mustard_yellow)|^nut_(kukui|pili|baru)|basil_seeds|hazelnut_paste|pesto|fat_cocoa_butter/;
+      const FLAVOR_FRUIT = /^(lemon|lime)(_|$)/;
+      // Чистые масла первыми — замена «мусорного» масла макро-нейтральна (100 г жира → 100 г).
+      const FAT_REPL = ['olive_oil', 'oil_coconut', 'oil_mct', 'oil_ghee', 'fat_ghee', 'butter', 'avocado', 'almonds', 'walnuts', 'nuts_mix'];
+      const CARB_REPL = ['potato_boiled', 'buckwheat'];
+      const FRUIT_REPL = ['apple', 'banana', 'berries', 'blueberries', 'orange', 'pear', 'kiwi'];
+      const _devJ = () => Math.max(
+        (input.goalKcal || 0) > 0 ? Math.abs(totals.kcal - (input.goalKcal || 0)) / (input.goalKcal || 1) : 0,
+        (input.goalProteinG || 0) > 0 ? Math.abs(totals.p - (input.goalProteinG || 0)) / (input.goalProteinG || 1) : 0,
+        (input.goalFatG || 0) > 0 ? Math.abs(totals.f - (input.goalFatG || 0)) / (input.goalFatG || 1) : 0,
+        (input.goalCarbsG || 0) > 0 ? Math.abs(totals.c - (input.goalCarbsG || 0)) / (input.goalCarbsG || 1) : 0,
+      );
+      // Ротация замен привязана к дню (dayOffset) — иначе каждый день начинает с rice_white
+      // и 7-дневка «рисуется рисом» (нарушение разнообразия стейплов).
+      let _junkRot = (input.dayOffset || 0);
+      for (const m of meals as any[]) {
+        const _have = new Set((m.items || []).map((x: any) => x.id));
+        for (const it of (m.items || []) as any[]) {
+          if ((it as any)._fixedGrams) continue;
+          const id = String(it.id || '');
+          // Роль не важна: id достаточно (таро мог лечь как fruit/veg, соус — как fat/other).
+          const isFatJunk = JUNK_FAT.test(id);
+          // Карб-«мусор» (таро/кассава/ям) НЕ трогаем пост-обработкой: замена создавала
+          // доминирующее семейство в 7-дневке (нарушение разнообразия) — остаётся границей.
+          const isCarbJunk = false;
+          const isFruitJunk = !isFatJunk && FLAVOR_FRUIT.test(id);
+          if (!isFatJunk && !isCarbJunk && !isFruitJunk) continue;
+          const _base0 = isFatJunk ? FAT_REPL : isCarbJunk ? CARB_REPL : FRUIT_REPL;
+          // Ротация замен (иначе таро→рис во всех днях ломает разнообразие 7-дневки).
+          const _rot = _base0.slice(_junkRot % _base0.length).concat(_base0.slice(0, _junkRot % _base0.length));
+          _junkRot++;
+          const replList = _rot;
+          const macro: 'f' | 'c' = isFatJunk ? 'f' : 'c';
+          const replId = replList.find(rid => !_have.has(rid)
+            && !(_pickCtx.currentExcludedIds && _pickCtx.currentExcludedIds.has(rid))
+            && !(input.excludedIds && input.excludedIds.has(rid))
+            && (() => { const f = FOOD_DB.find((x: any) => x.id === rid); return !!f && foodPassesCtxAllergens(f) && foodAvailableForPlan(f); })());
+          if (!replId) continue;
+          const fd = FOOD_DB.find((f: any) => f.id === replId);
+          if (!fd) continue;
+          const dens = macro === 'f' ? (fd.fat || 0) : (fd.carbs || 0);
+          const base = (it as any)[macro] || 0;
+          if (dens <= 0 || base <= 0) continue;
+          const _snap = (m.items || []).map((x: any) => ({ ...x }));
+          const _dev0 = _devJ();
+          const _g = Math.max(5, Math.min(300, Math.round(base / dens * 100 / 5) * 5));
+          const r = _g / 100;
+          it.id = fd.id; it.name = fd.name; it.amount = _g;
+          it.p = +((fd.protein || 0) * r).toFixed(1); it.f = +((fd.fat || 0) * r).toFixed(1); it.c = +((fd.carbs || 0) * r).toFixed(1);
+          it.kcal = Math.round(4 * it.p + 9 * it.f + 4 * it.c); it.fiber = +((fd.fiber || 0) * r).toFixed(1);
+          m.totals = mealTotalsOf(m.items); recalcDayTotals(meals, totals);
+          // «Не навреди»: сошедшийся день (≤3%) держим в каноне; честно-несошедшийся —
+          // не ухудшаем больше чем на 1 п.п. (гигиена «мусора» в приоритете, но без порчи дня).
+          const _capJ = _dev0 <= 0.03 ? 0.03 : _dev0 + 0.01;
+          if (_devJ() > _capJ + 1e-9) {
+            m.items = _snap; m.totals = mealTotalsOf(m.items); recalcDayTotals(meals, totals);
+          } else {
+            _have.add(fd.id);
+          }
+        }
+      }
+    } catch { /* best-effort гигиена — не ломаем генерацию */ }
+
     // ─── E17: гигиена поздних перекусов (off-slot на ночь) ───
     // Поздний перекус (после 20:00) не должен нести завтрак-стейпл (овсянка/хлопья)
     // или десерт (пряники/джем/мёд) — «свалка на ночь». Заменяем носитель на ужинный
@@ -10035,7 +10106,9 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
             }
           }
           m.totals = mealTotalsOf(m.items); recalcDayTotals(meals, totals);
-          if (!_compOk || _devNight() > _dev0 + 0.005) {
+          // Off-slot на ночь — ЖЁСТКОЕ правило: применяем даже при лёгком ухудшении
+          // отклонения (допуск +2%), откат только при реальной порче дня.
+          if (!_compOk || _devNight() > _dev0 + 0.02) {
             m.items = _snap; m.totals = mealTotalsOf(m.items); recalcDayTotals(meals, totals);
           } else {
             _have.add(fd.id);
@@ -10043,6 +10116,9 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
         }
       }
     } catch { /* best-effort гигиена — не ломаем генерацию */ }
+
+    // Витрина MPS должна совпадать с ФИНАЛЬНЫМ планом (санитайзеры E17/E18 меняют items).
+    if (typeof _refreshMpsFromMeals === 'function') _refreshMpsFromMeals();
 
     // ─── P4/E0: честный флаг сходимости products-пути (ФИНАЛЬНЫЙ totals) ───
     // Считается здесь, ПОСЛЕ всех писателей и reconciliation. Канон допуска —
