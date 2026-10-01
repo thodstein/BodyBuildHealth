@@ -56,6 +56,7 @@ import { PCT_FOR_RIR } from '../../../engines/rir-table';
 import { labTrainingAdjust } from './lab-training-adjust';
 import { getCycleById, normalizeCycleDirection, getCyclesByDirection } from '../../../data/lms-cycles/lms-cycle-index';
 import { programToBBPlan, cycleTemplateToFullProgram } from '../../../engines/bb/cycle-to-plan';
+import { resolveEffectiveVolumeScheme, resolveEffectiveMethodology } from './bb-scheme-resolve';
 import type { SRCycleTemplate } from '../../../data/lms-cycles/lms-types';
 import { FULL_PROGRAM_LIBRARY } from '../../../engines/complete-program-library.engine';
 import type { FullProgram } from '../../../engines/complete-program-library.engine';
@@ -2116,14 +2117,10 @@ export const BbAutoConstructor: React.FC = () => {
     const effectiveVolGoal = (trainingVolumeMode === 'high' ? 'mrv' : bbVolGoal) as any;
     // Профессиональная библиотека (именные системы): если пользователь не выбрал
     // схему/методику, берём дефолт из meta цикла (GVT/Gironda/FST-7/Mountain Dog) —
-    // «показано = применяется» для именных систем.
+    // «показано = применяется». В generic-режиме meta не передаётся → прежнее поведение.
     const libCycleMeta = (bbSource === 'cycle' && selectedCycleId) ? getCycleById(selectedCycleId)?.meta : undefined;
-    const effectiveVolumeScheme = (trainingVolumeMode === 'high' && volumeScheme === 'standard'
-      ? 'gvt' as const
-      : (volumeScheme !== 'standard' ? volumeScheme : ((libCycleMeta as any)?.volumeScheme ?? 'standard'))) as any;
-    const effectiveMethodology = (bbMethodology !== 'compound_first'
-      ? bbMethodology
-      : ((libCycleMeta as any)?.methodology ?? bbMethodology)) as typeof bbMethodology;
+    const effectiveVolumeScheme = resolveEffectiveVolumeScheme(volumeScheme, trainingVolumeMode, libCycleMeta as any);
+    const effectiveMethodology = resolveEffectiveMethodology(bbMethodology, libCycleMeta as any);
 
     try {
 
