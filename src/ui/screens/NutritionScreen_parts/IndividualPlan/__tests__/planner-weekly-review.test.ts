@@ -65,6 +65,32 @@ describe('Недельный разбор', () => {
     expect(r.recommendation).toMatch(/Приверженность/);
   });
 
+  it('плато: вес стоит неделю И 28 дней → verdict plateau + совет рефид/диет-брейк', () => {
+    const wl = [
+      { date: '2026-02-10', weightKg: 80 },
+      { date: '2026-03-02', weightKg: 80 },
+      { date: '2026-03-08', weightKg: 80 },
+    ];
+    const r = buildWeeklyReview(inp({ weightLog: wl }));
+    expect(r.plateau).toBe(true);
+    expect(r.verdict).toBe('plateau');
+    expect(r.kcalAdjust).toBe(0);
+    expect(r.longWeightRatePctPerWeek).toBe(0);
+    expect(r.recommendation).toMatch(/РЕФИД|ДИЕТ-БРЕЙК/);
+  });
+
+  it('28-дневный тренд считается отдельно от недельного', () => {
+    const wl = [
+      { date: '2026-02-10', weightKg: 82 },
+      { date: '2026-03-02', weightKg: 80 },
+      { date: '2026-03-08', weightKg: 79.66 },
+    ];
+    const r = buildWeeklyReview(inp({ weightLog: wl }));
+    expect(r.longWeightRatePctPerWeek).not.toBeNull();
+    expect(r.longWeightRatePctPerWeek!).toBeLessThan(r.weightRatePctPerWeek!);
+    expect(r.plateau).toBe(false);
+  });
+
   it('<4 дней логов → no_data', () => {
     const r = buildWeeklyReview(inp({ days: daysOn(3000, 180, 3) }));
     expect(r.verdict).toBe('no_data');

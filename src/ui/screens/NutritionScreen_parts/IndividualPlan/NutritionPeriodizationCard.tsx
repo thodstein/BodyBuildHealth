@@ -33,8 +33,9 @@ interface Props {
   dayLabels?: string[];
   postShowTrack?: 'recovery' | 'reverse';
   todayIso: string;
-  specialMeals?: { date: string; type: 'refeed' | 'cheat_meal' | 'fast' }[];
+  specialMeals?: { date: string; type: 'refeed' | 'cheat_meal' | 'fast' | 'diet_break' }[];
   weightLog?: { date: string; weightKg: number }[];
+  maintenanceKcal?: number;
   /** Deep-link: клик по дню периода → открыть этот день в плане (если он сгенерирован). */
   onOpenDay?: (date: string) => void;
 }
@@ -83,7 +84,7 @@ const DayMarkers: React.FC<{ d: PeriodizationDay }> = ({ d }) => (
 
 export const NutritionPeriodizationCard: React.FC<Props> = ({
   prepPlan, base, goal, carbPeriodization, isTrainingDayForOffset,
-  heavyTrainDay, dayLabels, postShowTrack, todayIso, specialMeals, weightLog, onOpenDay,
+  heavyTrainDay, dayLabels, postShowTrack, todayIso, specialMeals, weightLog, maintenanceKcal, onOpenDay,
 }) => {
   const mode: 'prep' | 'general' = prepPlan ? 'prep' : 'general';
   const accent = mode === 'prep' ? PREP_ACCENT : GENERAL_ACCENT;
@@ -111,7 +112,7 @@ export const NutritionPeriodizationCard: React.FC<Props> = ({
     () => (weightLog || []).map(w => `${w.date}:${w.weightKg}`).sort().join(','),
     [weightLog],
   );
-  const sig = `${mode}|${startDate}|${horizonEff}|${baseKey}|${goal}|${carbPeriodization}|${trainSig}|${heavyTrainDay || ''}|${postShowTrack || ''}|${prepPlan?.id || ''}|${prepPlan?.updatedAt || ''}|${specialKey}|${weightSig}`;
+  const sig = `${mode}|${startDate}|${horizonEff}|${baseKey}|${goal}|${carbPeriodization}|${trainSig}|${heavyTrainDay || ''}|${postShowTrack || ''}|${prepPlan?.id || ''}|${prepPlan?.updatedAt || ''}|${specialKey}|${weightSig}|${maintenanceKcal || 0}`;
 
   const periodization = useMemo(() => buildNutritionPeriodization({
     startDate,
@@ -126,6 +127,7 @@ export const NutritionPeriodizationCard: React.FC<Props> = ({
     postShowTrack,
     specialMeals,
     weightLog,
+    maintenanceKcal,
   }), [sig]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const horizonOptions = useMemo(() => {

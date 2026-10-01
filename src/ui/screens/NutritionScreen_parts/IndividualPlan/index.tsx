@@ -10,6 +10,7 @@ import { PeakWeekTab } from "./PeakWeekTab";
 import { usePlanCtx } from "./IndividualPlanContext";
 import type { PlannerMode } from "./types";
 import { NutritionPeriodizationCard } from "./NutritionPeriodizationCard";
+import { NutritionProCards } from "./NutritionProCards";
 import { buildTrainSchedule, isTrainingDayFor } from "./planner-training-schedule";
 import { localIsoDate } from "./planner-date-utils";
 import { getWeightLog } from "../../../../engines/profile-store";
@@ -617,6 +618,7 @@ const ReportTab: React.FC = () => {
           })()}
         </div>}
       </>}
+      <NutritionProCards />
     </div>
   );
 };

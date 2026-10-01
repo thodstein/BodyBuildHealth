@@ -15,8 +15,8 @@ interface Props {
   onApplyKcalAdjust?: (delta: number) => void;
 }
 
-const VERDICT_COLOR: Record<string, string> = { on_track: '#22c55e', too_slow: '#f59e0b', too_fast: '#f97316', no_data: '#60a5fa' };
-const VERDICT_LABEL: Record<string, string> = { on_track: '✅ В цели', too_slow: '🐢 Медленно', too_fast: '🐇 Быстро', no_data: '📭 Мало данных' };
+const VERDICT_COLOR: Record<string, string> = { on_track: '#22c55e', too_slow: '#f59e0b', too_fast: '#f97316', plateau: '#8b5cf6', no_data: '#60a5fa' };
+const VERDICT_LABEL: Record<string, string> = { on_track: '✅ В цели', too_slow: '🐢 Медленно', too_fast: '🐇 Быстро', plateau: '⛰️ Плато', no_data: '📭 Мало данных' };
 
 export const WeeklyReviewCard: React.FC<Props> = ({ days, targetKcal, targetProteinG, weightLog, goal, onApplyKcalAdjust }) => {
   const r = useMemo(() => buildWeeklyReview({ days, targetKcal, targetProteinG, weightLog, goal }), [days, targetKcal, targetProteinG, weightLog, goal]);
@@ -44,6 +44,7 @@ export const WeeklyReviewCard: React.FC<Props> = ({ days, targetKcal, targetProt
               {r.weightDeltaKg != null && <span style={{ color: r.weightDeltaKg < 0 ? '#22c55e' : '#f59e0b', fontWeight: 800 }}>{` (${r.weightDeltaKg > 0 ? '+' : ''}${r.weightDeltaKg})`}</span>}
             </div>
             <div style={{ fontSize: 9.5, color: '#fff' }}>{rate != null ? `${rate}%/нед (цель ${r.targetRatePctPerWeek}%)` : 'нет данных веса'}</div>
+            {r.longWeightRatePctPerWeek != null && <div style={{ fontSize: 9.5, color: '#fff' }}>28 дн: {r.longWeightRatePctPerWeek}%/нед</div>}
           </div>
         </div>
         <div data-wr-reco style={{ fontSize: 10.5, lineHeight: 1.5, color: '#fff' }}>

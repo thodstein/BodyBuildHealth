@@ -6,6 +6,7 @@
 import React, { useMemo, useState } from 'react';
 import { GlassCard } from './ui';
 import { buildRefeedCalendar } from './planner-refeed-calendar.engine';
+import { shiftIsoDate } from '../../../../core/local-date';
 
 interface Props {
   goal: string;
@@ -32,9 +33,12 @@ export const RefeedCalendarCard: React.FC<Props> = ({ goal, startDate, bodyFatPc
           if (!have.has(`${d}:refeed`)) { list.push({ date: d, type: 'refeed' }); have.add(`${d}:refeed`); added++; }
         }
         if (w.isDietBreak) {
-          const key = `${w.dateStart}:diet_break`;
-          // диет-брейк кодируем рефид-днём на старте недели (мод «Рефид» на день) + пометка
-          if (!have.has(key) && !have.has(`${w.dateStart}:refeed`)) { list.push({ date: w.dateStart, type: 'refeed' }); have.add(`${w.dateStart}:refeed`); added++; }
+          // E23: полноценная неделя на поддержании — 7 дней типа 'diet_break'
+          // (Context поднимает калории к поддержанию + углеводы выше).
+          for (let k = 0; k < 7; k++) {
+            const d = shiftIsoDate(w.dateStart, k);
+            if (!have.has(`${d}:diet_break`)) { list.push({ date: d, type: 'diet_break' }); have.add(`${d}:diet_break`); added++; }
+          }
         }
       }
       localStorage.setItem('he_special_meals', JSON.stringify(list.slice(-400)));

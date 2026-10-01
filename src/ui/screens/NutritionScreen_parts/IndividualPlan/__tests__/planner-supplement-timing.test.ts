@@ -2,7 +2,7 @@
  * planner-supplement-timing.test.ts — PRO-схема приёма добавок относительно рациона.
  */
 import { describe, it, expect } from 'vitest';
-import { buildSupplementTiming, suppSlotFor, type SuppTimingInput } from '../planner-supplement-timing.engine';
+import { buildSupplementTiming, suppSlotFor, suppSlotForMealType, type SuppTimingInput } from '../planner-supplement-timing.engine';
 
 const meals = [
   { type: 'breakfast', label: 'Завтрак', time: '07:30', items: [] },
@@ -35,6 +35,17 @@ describe('Схема приёма добавок', () => {
     expect(suppSlotFor('iron_bisglycinate')).toBe('breakfast');
     expect(suppSlotFor('electrolyte')).toBe('intra');
     expect(suppSlotFor('some_unknown_thing')).toBe('anytime');
+  });
+
+  it('тип приёма плана → слот добавки (для строки «💊 К приёму»)', () => {
+    expect(suppSlotForMealType('breakfast')).toBe('breakfast');
+    expect(suppSlotForMealType('lunch')).toBe('lunch');
+    expect(suppSlotForMealType('dinner')).toBe('dinner');
+    expect(suppSlotForMealType('presleep')).toBe('presleep');
+    expect(suppSlotForMealType('preworkout')).toBe('preWO');
+    expect(suppSlotForMealType('intra')).toBe('intra');
+    expect(suppSlotForMealType('postworkout')).toBe('postWO');
+    expect(suppSlotForMealType('snack2')).toBe('anytime');
   });
 
   it('креатин — пост-трен, кофеин — за 45 мин до старта, омега — обед, магний — ночь', () => {

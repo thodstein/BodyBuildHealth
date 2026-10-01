@@ -71,9 +71,11 @@ export interface PeriodizationInput {
    * refeed ×1.12/×2.2, cheat kcal ≥×1.12, fast ≤×0.75/×0.7. В prep-режиме — только метки
    * (цели фазы задаёт prep-движок, как и в живом рационе).
    */
-  specialMeals?: { date: string; type: 'refeed' | 'cheat_meal' | 'fast' }[];
+  specialMeals?: { date: string; type: 'refeed' | 'cheat_meal' | 'fast' | 'diet_break' }[];
   /** Дневник веса (факт) — средний вес недели рядом с целевым (prep). */
   weightLog?: { date: string; weightKg: number }[];
+  /** Поддержание (TDEE) — для точного показа диет-брейк-дня (калории к поддержанию). */
+  maintenanceKcal?: number;
 }
 
 export interface PeriodizationDay {
@@ -277,9 +279,16 @@ function buildDay(
   const special = (input.specialMeals || []).find(s => s && s.date === date) || null;
   const isCheat = special?.type === 'cheat_meal';
   const isFast = special?.type === 'fast';
+  const isDietBreakSpecial = special?.type === 'diet_break';
   if (special?.type === 'refeed') { dayKcalMod = 1.12; dayCarbMod = 2.2; isRefeedPeriodization = true; }
   if (isCheat && !isRefeedPeriodization) { dayKcalMod = Math.max(dayKcalMod, 1.12); }
   if (isFast) { dayKcalMod = Math.min(dayKcalMod, 0.75); dayCarbMod = Math.min(dayCarbMod, 0.7); }
+  if (isDietBreakSpecial) {
+    // E23: полноценный день на поддержании — калории к TDEE, углеводы выше (дефицит пауза).
+    const _maintMod = (input.maintenanceKcal && input.maintenanceKcal > 0) ? (input.maintenanceKcal / Math.max(1, base.kcal || 1)) : 1.12;
+    dayKcalMod = Math.max(dayKcalMod, _maintMod);
+    dayCarbMod = Math.max(dayCarbMod, 1.15);
+  }
 
   // База дня после периодизации (та же арифметика, что в Context.buildOneDay).
   const baseKcal = Math.max(1200, base.kcal || 0);
@@ -352,7 +361,7 @@ function buildDay(
     sodiumMg: base.sodiumMg || PREP_SODIUM_BASE_MG,
     potassiumMg: 3500,
     isRefeed: isRefeedPeriodization,
-    isDietBreak: false,
+    isDietBreak: isDietBreakSpecial,
     isPeakWeek: false,
     isPostShow: false,
     isCheat,

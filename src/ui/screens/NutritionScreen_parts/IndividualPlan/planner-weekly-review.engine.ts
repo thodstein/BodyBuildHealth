@@ -21,7 +21,7 @@ export interface WeeklyReviewInput {
   windowDays?: number;
 }
 
-export type WeeklyVerdict = 'on_track' | 'too_slow' | 'too_fast' | 'no_data';
+export type WeeklyVerdict = 'on_track' | 'too_slow' | 'too_fast' | 'plateau' | 'no_data';
 
 export interface WeeklyReview {
   windowDays: number;
@@ -33,12 +33,18 @@ export interface WeeklyReview {
   weightEndKg: number | null;
   weightDeltaKg: number | null;
   weightRatePctPerWeek: number | null;
+  /** Долгосрочный тренд (28 дней) — против случайного шума недели. */
+  longWeightRatePctPerWeek: number | null;
+  /** Плато: недельный И 28-дневный тренд ~0 в дефиците → пора рефид/диет-брейк. */
+  plateau: boolean;
   targetRatePctPerWeek: number;
   verdict: WeeklyVerdict;
   /** Рекомендуемая правка калорий (±150, 0 — держать). */
   kcalAdjust: number;
   recommendation: string;
 }
+
+import { shiftIsoDate } from '../../../../core/local-date';
 
 const clamp = (v: number, lo: number, hi: number): number => Math.max(lo, Math.min(hi, v));
 const round1 = (v: number): number => Math.round(v * 10) / 10;
@@ -96,6 +102,24 @@ export function buildWeeklyReview(input: WeeklyReviewInput): WeeklyReview {
     // Темп считаем от СЫРОЙ дельты (округление до 0.1 кг искажало −0.34 → −0.3 → темп −0.4%).
     weightRatePctPerWeek = round1(((_rawEnd - _rawStart) / _rawStart) * (7 / span) * 100);
   }
+  // 28-дневный тренд — против случайного шума одной недели (плато/адаптация).
+  let longWeightRatePctPerWeek: number | null = null;
+  let _longSpan = 0;
+  const _today = dates.length > 0 ? dates[dates.length - 1] : '';
+  if (_today) {
+    const _longFrom = shiftIsoDate(_today, -27);
+    const _llog = (Array.isArray(input.weightLog) ? input.weightLog : [])
+      .filter(w => w && typeof w.date === 'string' && Number.isFinite(w.weightKg) && w.weightKg > 0 && w.date >= _longFrom && w.date <= _today)
+      .sort((a, b) => a.date.localeCompare(b.date));
+    if (_llog.length >= 2) {
+      _longSpan = Math.max(1, _daysBetween(_llog[0].date, _llog[_llog.length - 1].date));
+      longWeightRatePctPerWeek = round1(((_llog[_llog.length - 1].weightKg - _llog[0].weightKg) / _llog[0].weightKg) * (7 / _longSpan) * 100);
+    }
+  }
+  // Плато — только при НАСТОЯЩЕМ 28-дневном окне (≥14 дней данных): иначе 1 неделя
+  // плоского веса = «слишком медленно» (коррекция ккал), а не «адаптация» (рефид/брейк).
+  const plateau = targetRate < 0 && weightRatePctPerWeek != null && longWeightRatePctPerWeek != null
+    && _longSpan >= 14 && Math.abs(weightRatePctPerWeek) < 0.1 && Math.abs(longWeightRatePctPerWeek) < 0.15;
 
   let verdict: WeeklyVerdict = 'no_data';
   let kcalAdjust = 0;
@@ -108,7 +132,8 @@ export function buildWeeklyReview(input: WeeklyReviewInput): WeeklyReview {
       const diff = weightRatePctPerWeek - targetRate;
       if (targetRate < 0) {
         // Сушка.
-        if (diff > 0.25) { verdict = 'too_slow'; kcalAdjust = -150; recommendation = `Темп ${weightRatePctPerWeek}%/нед — медленнее цели ${targetRate}%/нед. Уберите ~150 ккал (жиры/углеводы) ИЛИ добавьте кардио — одна переменная.`; }
+        if (plateau) { verdict = 'plateau'; kcalAdjust = 0; recommendation = `Плато: недельный ${weightRatePctPerWeek}%/нед и 28-дневный ${longWeightRatePctPerWeek}%/нед — метаболическая адаптация (не «мало еды»). Запланируйте РЕФИД (1 день, углеводы ×2) или ДИЕТ-БРЕЙК (1 неделя на поддержании), затем продолжите дефицит — «сломайте» плато восстановлением, а не ещё большим дефицитом.`; }
+        else if (diff > 0.25) { verdict = 'too_slow'; kcalAdjust = -150; recommendation = `Темп ${weightRatePctPerWeek}%/нед — медленнее цели ${targetRate}%/нед. Уберите ~150 ккал (жиры/углеводы) ИЛИ добавьте кардио — одна переменная.`; }
         else if (diff < -0.25) { verdict = 'too_fast'; kcalAdjust = 150; recommendation = `Темп ${weightRatePctPerWeek}%/нед — быстрее цели (риск мышц/гормонов). Добавьте ~150 ккал, белок не режьте.`; }
         else { verdict = 'on_track'; recommendation = `✅ На курсе: темп ${weightRatePctPerWeek}%/нед в цели. Ничего не меняем.`; }
       } else if (targetRate > 0) {
@@ -126,5 +151,5 @@ export function buildWeeklyReview(input: WeeklyReviewInput): WeeklyReview {
   if (loggedDays >= 4 && adherencePct < 70 && verdict !== 'no_data') {
     recommendation += ` ⚠ Приверженность ${adherencePct}% — сначала выровняйте выполнение, потом меняйте ккал.`;
   }
-  return { windowDays, loggedDays, avgKcal, avgProteinG, adherencePct, weightStartKg, weightEndKg, weightDeltaKg, weightRatePctPerWeek, targetRatePctPerWeek: targetRate, verdict, kcalAdjust, recommendation };
+  return { windowDays, loggedDays, avgKcal, avgProteinG, adherencePct, weightStartKg, weightEndKg, weightDeltaKg, weightRatePctPerWeek, longWeightRatePctPerWeek, plateau, targetRatePctPerWeek: targetRate, verdict, kcalAdjust, recommendation };
 }

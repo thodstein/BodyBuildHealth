@@ -49,6 +49,14 @@ export interface SupplementTiming {
   notes: string[];
 }
 
+/** Тип приёма плана → слот добавки (для строки «💊 К приёму» в списке приёмов). */
+export function suppSlotForMealType(mealType: string): SuppSlotKey {
+  const t = String(mealType || '');
+  return t === 'preworkout' ? 'preWO' : t === 'intra' ? 'intra' : t === 'postworkout' ? 'postWO'
+    : t === 'presleep' ? 'presleep' : t === 'breakfast' ? 'breakfast' : t === 'lunch' ? 'lunch'
+      : t === 'dinner' ? 'dinner' : t.startsWith('snack') ? 'anytime' : 'breakfast';
+}
+
 const SLOT_LABEL: Record<SuppSlotKey, string> = {
   preWO: '🏋 Перед тренировкой',
   intra: '🥤 Во время тренировки',

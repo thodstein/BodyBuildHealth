@@ -16,6 +16,16 @@ describe('RefeedCalendarCard', () => {
     expect(stored.some((m: any) => m.type === 'refeed')).toBe(true);
   });
 
+  it('диет-брейк-неделя пишется как 7 дней type=diet_break', () => {
+    const { container } = render(<RefeedCalendarCard goal="cutting" startDate="2026-03-02" bodyFatPct={8} />);
+    // горизонт по умолчанию 8; BF 8 → брейк каждые 8 недель → 8-я неделя брейк.
+    fireEvent.click(container.querySelector('[data-refeed-horizon="8"]') as HTMLElement);
+    fireEvent.click(container.querySelector('[data-refeed-apply]') as HTMLElement);
+    const stored = JSON.parse(localStorage.getItem('he_special_meals') || '[]');
+    const breaks = stored.filter((m: any) => m.type === 'diet_break');
+    expect(breaks.length).toBe(7);
+  });
+
   it('горизонт переключается', () => {
     const { container } = render(<RefeedCalendarCard goal="cutting" startDate="2026-03-02" bodyFatPct={12} />);
     expect(container.querySelectorAll('[data-refeed-week]').length).toBe(8);

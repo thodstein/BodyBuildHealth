@@ -50,13 +50,13 @@ const getDiaryEntriesForDate = (date: string): any[] => {
 // Периодизация: запланированные спец-дни (he_special_meals) — рефид/читмил/фастинг.
 // Читаем сырой календарь (та же форма, что в Context.buildOneDay) → движок применит
 // те же моды и покажет метки в горизонте вперёд.
-const readScheduledSpecialMeals = (): { date: string; type: 'refeed' | 'cheat_meal' | 'fast' }[] => {
+const readScheduledSpecialMeals = (): { date: string; type: 'refeed' | 'cheat_meal' | 'fast' | 'diet_break' }[] => {
   try {
     const raw = JSON.parse(localStorage.getItem('he_special_meals') || '[]');
     if (!Array.isArray(raw)) return [];
     return raw
-      .filter((m: any) => m && typeof m.date === 'string' && ['refeed', 'cheat_meal', 'fast'].includes(m.type))
-      .map((m: any) => ({ date: m.date, type: m.type as 'refeed' | 'cheat_meal' | 'fast' }));
+      .filter((m: any) => m && typeof m.date === 'string' && ['refeed', 'cheat_meal', 'fast', 'diet_break'].includes(m.type))
+      .map((m: any) => ({ date: m.date, type: m.type as 'refeed' | 'cheat_meal' | 'fast' | 'diet_break' }));
   } catch { return []; }
 };
 
@@ -618,6 +618,7 @@ const doImportPlan = (raw: string): boolean => {
               heavyTrainDay={heavyTrainDay}
               dayLabels={DAY_LABELS}
               todayIso={localIsoDate(new Date())}
+              maintenanceKcal={(planTargets as any)?.tdee || undefined}
               specialMeals={readScheduledSpecialMeals()}
               weightLog={(() => { try { return getWeightLog().map(e => ({ date: e.date, weightKg: e.weight })); } catch { return []; } })()}
               onOpenDay={(date) => {

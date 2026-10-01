@@ -122,6 +122,14 @@ describe('Периодизация питания — general-режим', () =>
     expect(d.carbsG).toBe(Math.round(350 * 2.2));
   });
 
+  it('диет-брейк-день: калории к поддержанию (TDEE) + метка isDietBreak', () => {
+    const p = buildNutritionPeriodization(baseInput({ horizonWeeks: 1, maintenanceKcal: 3400, specialMeals: [{ date: '2026-03-04', type: 'diet_break' }] }));
+    const d = p.days.find(x => x.date === '2026-03-04')!;
+    expect(d.isDietBreak).toBe(true);
+    expect(d.kcal).toBe(3400);
+    expect(d.carbsG).toBe(Math.round(350 * 1.15));
+  });
+
   it('невалидная дата → пустая структура без исключения', () => {
     const p = buildNutritionPeriodization(baseInput({ startDate: 'bad' }));
     expect(p.days).toHaveLength(0);
