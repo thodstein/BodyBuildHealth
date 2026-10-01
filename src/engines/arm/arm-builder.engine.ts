@@ -117,13 +117,25 @@ function loadModeForExercise(e: { equipment?: string; movementPattern?: string; 
   return 'tool';
 }
 
+/** P2: снаряд платформы → приоритетные упражнения (gripImplement теперь влияет на план). */
+const IMPLEMENT_BIAS_IDS: Record<string, string[]> = {
+  rolling_thunder: ['rolling_thunder', 'wrist_wrench_60', 'napalm_handle_60', 'excalibur_handle'],
+  apollon_axle: ['apollon_axle', 'fat_bar_deadlift'],
+  saxon_bar: ['saxon_bar', 'country_crush_2', 'euro_pinch_2h'],
+  hub: ['hub_pinch', 'anvil_hub', 'little_big_horn'],
+  pinch_block: ['pinch_block_80', 'blockbuster_pinch', 'plate_pinch_hold'],
+  coc_bullet: ['coc_gripper', 'coc_no1', 'coc_no1_5', 'coc_no2', 'silver_bullet_hold'],
+  farmer_handles: ['farmer_walk_fat', 'kettlebell_hold', 'bodyweight_dead_hang'],
+  fat_gripz: ['fat_gripz_curl', 'farmer_walk_fat'],
+};
+
 const ARM_DIFF_RANK: Record<string, number> = { beginner: 0, intermediate: 1, advanced: 2 };
 function armLevelRank(level: string): number {
   const l = String(level || 'intermediate').toLowerCase();
   return l === 'beginner' ? 0 : l === 'intermediate' ? 1 : l === 'advanced' ? 2 : 3;
 }
 
-function pickExerciseForMuscle(muscle: string, role: 'primary'|'accessory', equipment: string[], favorite: string[], excluded: string[], usedIds: Set<string>, technique?: string, mobilityRestrictions: string[] = [], injuries?: Array<{ muscle: string; volumePct?: number; exclude?: boolean }>, level: string = 'intermediate', week: number = 1, rotationOn: boolean = false): typeof ARM_EXERCISES[number] | null {
+function pickExerciseForMuscle(muscle: string, role: 'primary'|'accessory', equipment: string[], favorite: string[], excluded: string[], usedIds: Set<string>, technique?: string, mobilityRestrictions: string[] = [], injuries?: Array<{ muscle: string; volumePct?: number; exclude?: boolean }>, level: string = 'intermediate', week: number = 1, rotationOn: boolean = false, implementBias?: Set<string>): typeof ARM_EXERCISES[number] | null {
   const mLow = muscle.toLowerCase();
   if (armInjuryVolumeFactor(injuries, mLow) <= 0) return null;
   // Техника-специфичные приоритеты
@@ -204,6 +216,10 @@ function pickExerciseForMuscle(muscle: string, role: 'primary'|'accessory', equi
     const boostA = techniqueBoost(a);
     const boostB = techniqueBoost(b);
     if (boostB !== boostA) return boostB - boostA;
+    // P2: приоритет выбранного снаряда платформы (gripImplement).
+    const biasA = implementBias?.has(a.id) ? 1 : 0;
+    const biasB = implementBias?.has(b.id) ? 1 : 0;
+    if (biasB !== biasA) return biasB - biasA;
     return (role === 'primary' ? b.fatigueCost - a.fatigueCost : a.fatigueCost - b.fatigueCost);
   });
   // P1-5: ротация по неделям внутри группы замены (3 варианта, детерминированно).
@@ -329,6 +345,13 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
   };
   const weakPoints = (input.weakPoints || []).map(s => s.toLowerCase());
   const focusGroup = input.focusGroup ? input.focusGroup.toLowerCase() : undefined;
+  // P2: выбранный снаряд платформы (gripImplement) — приоритет в пулах хвата (иначе undefined).
+  const implementBias = (() => {
+    try {
+      const gi = String((input as any).gripImplement || '');
+      return gi && IMPLEMENT_BIAS_IDS[gi] ? new Set(IMPLEMENT_BIAS_IDS[gi]) : undefined;
+    } catch { return undefined; }
+  })();
 
   // PRO A–J: оркестратор (аддитивно, try/catch внутри — ядро не падает)
   // PRO-5 G1: честная деградация — каждая опциональная ветка пишет причину, а не молчит.
@@ -618,13 +641,17 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
     const arr = Array.isArray(peaksInput) ? peaksInput : [];
     const iso = String((input as any).competitionDateIso || (input as any).calStartIso || '');
     if (arr.length === 0 && iso && weeks >= 4) {
-      const wOut = weeksUntilStart(undefined, iso);
-      if (Number.isFinite(wOut) && wOut >= 1 && wOut <= weeks - 1) {
-        const peakWeek = Math.max(1, Math.min(weeks, weeks - Math.round(wOut)));
+      // Якорь: дата начала плана (planStartWeek), иначе — сегодня. Пик = неделя старта
+      // события внутри плана (wOut от начала), а не «конец минус wOut» (баг смещения).
+      const isoStart = String((input as any).planStartWeek || '');
+      const startOk = /^\d{4}-\d{2}-\d{2}$/.test(isoStart);
+      const wOut = startOk ? weeksUntilStart(isoStart, iso) : weeksUntilStart(undefined, iso);
+      if (Number.isFinite(wOut) && wOut >= 1 && wOut <= weeks) {
+        const peakWeek = Math.max(1, Math.min(weeks, Math.round(wOut)));
         const raw = String((input as any).calPriority || 'A').toUpperCase();
         const prio = (raw === 'A' || raw === 'B' || raw === 'C' ? raw : 'A') as 'A' | 'B' | 'C';
         peaksInput = [{ week: peakWeek, priority: prio, name: 'Старт из даты' }];
-        autoPeakNote = `🏁 Старт из даты ${iso}: авто-пик Н${peakWeek} (${prio}) — тейпер-окно и восстановление построены.`;
+        autoPeakNote = `🏁 Старт из даты ${iso}: авто-пик Н${peakWeek} (${prio}, ${wOut} нед от ${startOk ? 'начала плана' : 'сегодня'}) — тейпер-окно и восстановление построены.`;
       } else if (Number.isFinite(wOut)) {
         autoPeakNote = `🏁 Дата старта ${iso} вне окна плана (${wOut} нед) — авто-пик не строился, только гейты готовности.`;
       }
@@ -854,7 +881,7 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
           ? strengthLogRir(Math.min(8, Math.max(1, w)), effCh)
           : rirFor(effCh, phase, w, technique);
         const rir = wantSingles && larratt ? larratt.rir : Math.max(0, Math.min(5, rirBase + (pro.rirShift || 0) + iqRir + hookShift + peakRir));
-        const exTpl = pickExerciseForMuscle(mus, role, equipment, favorite, excluded, usedInSession, technique, mobilityRestrictions, injuries, level, w, (input as any).rotationMode === true);
+        const exTpl = pickExerciseForMuscle(mus, role, equipment, favorite, excluded, usedInSession, technique, mobilityRestrictions, injuries, level, w, (input as any).rotationMode === true, implementBias);
         if (!exTpl) {
           addSelectionWarning(`missing:${mus}:${mobilityRestrictions.join('|')}`, `Н${w} ${mus}: нет безопасного упражнения для equipment/ограничений; произвольная замена не используется.`);
           continue;
@@ -1152,6 +1179,7 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
   else if (progressionStyle === 'wave') rationale.push('Прогрессия wave: тяжёлая/средняя/лёгкая недели внутри блока (+1.5% базы за блок).');
   for (const line of peaksRuntime.notes) rationale.push(line);
   if (autoPeakNote) rationale.push(autoPeakNote);
+  if (implementBias) rationale.push(`🖐️ Снаряд платформы: приоритет «${String((input as any).gripImplement)}» в пулах хвата (шкала помоста — PLATFORM_WR).`);
   // P0-1: сводка «план ↔ факт» + честные последствия по плато/опережению.
   if (factFeedback.muscles.length && crossMesoWorkMax) {
     rationale.push(factFeedback.summary);

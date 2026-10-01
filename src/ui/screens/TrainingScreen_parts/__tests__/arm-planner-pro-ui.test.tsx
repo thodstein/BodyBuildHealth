@@ -84,10 +84,10 @@ describe('Arm PRO-PLAN UI', () => {
     openPlanSec();
     const btn = document.querySelector('[data-arm="auto-peak"]') as HTMLElement;
     expect(btn, 'кнопка авто-пика').not.toBeNull();
-    expect(btn.textContent).toContain('Н3'); // недели 8 − 5
+    expect(btn.textContent).toContain('Н5'); // старт через 5 нед → неделя 5 плана
     fireEvent.click(btn);
     const list = document.querySelector('[data-arm="peak-list"]');
-    expect(list?.textContent).toContain('Н3');
+    expect(list?.textContent).toContain('Н5');
   });
 
   it('P0-1/P0-2: после сборки — разминка в плане и карточка «План vs факт»', () => {
@@ -149,6 +149,22 @@ describe('Arm PRO-PLAN UI', () => {
     fireEvent.click(screen.getByRole('button', { name: '4 Сплит и цикл' }));
     openPlanSec();
     expect(screen.getByRole('switch', { name: /Ротация упражнений/ }).getAttribute('aria-checked')).toBe('true');
+  });
+
+  it('паритет: карточка аудита 12 точек + добивка худшей точки', () => {
+    const { container } = render(<ArmAutoConstructor />);
+    fireEvent.click(screen.getByRole('button', { name: '4 Сплит и цикл' }));
+    fireEvent.click(screen.getByText('⚡ Собрать план'));
+    fireEvent.click(screen.getByRole('button', { name: '6 Веса и качество' }));
+    expect(container.querySelector('[data-arm="plan-audit-card"]')).not.toBeNull();
+    expect(container.querySelector('[data-arm="plan-audit-cover"]')?.textContent).toMatch(/Покрытие:/);
+    const points = container.querySelectorAll('[data-arm="plan-audit-points"] [data-covered]');
+    expect(points.length).toBe(12);
+    const btn = container.querySelector('[data-arm="plan-audit-worst"]') as HTMLElement | null;
+    if (btn) {
+      fireEvent.click(btn);
+      expect(document.body.textContent).toContain('Добито');
+    }
   });
 
   it('план с стартом и якорем: маркер недели, LegsCore, CSV-кнопка', () => {

@@ -187,6 +187,15 @@ describe('arm-planner PRO: P0 — факт дневника, разминка, �
     expect(plan.peakWindows![0].priority).toBe('A');
     expect(plan.rationale.some((l: string) => /Старт из даты/.test(l))).toBe(true);
   });
+  it('авто-пик: неделя старта = неделя события (регресс на смещение weeks−wOut)', () => {
+    const plan = buildArmPlan({ ...BASE, weeks: 8, competitionDateIso: isoInWeeks(5) } as any);
+    expect(plan.peakWindows?.[0]?.week).toBe(5);
+  });
+  it('авто-пик: якорь planStartWeek — неделя считается от начала плана', () => {
+    const plan = buildArmPlan({ ...BASE, weeks: 8, planStartWeek: isoInWeeks(2), competitionDateIso: isoInWeeks(7) } as any);
+    expect(plan.peakWindows?.[0]?.week).toBe(5); // 7 − 2 = 5 недель от старта плана
+    expect(plan.rationale.some((l: string) => /от начала плана/.test(l))).toBe(true);
+  });
   it('дата старта вне окна плана — без пика, честная строка', () => {
     const plan = buildArmPlan({ ...BASE, weeks: 8, competitionDateIso: isoInWeeks(20) } as any);
     expect(plan.peakWindows?.length ?? 0).toBe(0);
@@ -265,6 +274,18 @@ describe('arm-planner PRO: P0 — факт дневника, разминка, �
     const plan = buildArmPlan({ ...BASE, targetWeightKg: 74, checkins: [ci(1, '2026-09-01', 80), ci(2, '2026-09-08', 78.5)] } as any);
     expect(plan.rationale.some((l: string) => /быстрее/.test(l))).toBe(true);
     expect(plan.weeks[0].phase).not.toBe('deload'); // боль нет — разгрузки нет
+  });
+  it('P2: снаряд платформы приоритетен в пулах хвата (gripImplement)', () => {
+    const common = { ...BASE, discipline: 'armlifting', patternId: 'grip_3_support', level: 'intermediate', technique: 'balanced', gripFocus: 'pinch' } as any;
+    const withBias = buildArmPlan({ ...common, gripImplement: 'hub' } as any);
+    const noBias = buildArmPlan({ ...common } as any);
+    const pinchId = (p: any) => {
+      for (const w of p.weeks) for (const s of w.sessions) for (const e of s.exercises) if (e.muscle === 'grip_pinch') return e.exerciseId;
+      return null;
+    };
+    expect(['hub_pinch', 'anvil_hub', 'little_big_horn']).toContain(pinchId(withBias));
+    expect(['hub_pinch', 'anvil_hub', 'little_big_horn']).not.toContain(pinchId(noBias));
+    expect(withBias.rationale.some((l: string) => /Снаряд платформы/.test(l))).toBe(true);
   });
   it('P2-14: сгонка к дате старта в rationale (вес факта не трогает план)', () => {
     const plan = buildArmPlan({ ...BASE, competitionDateIso: isoInWeeks(6), bodyWeightKg: 80, targetWeightKg: 74 } as any);

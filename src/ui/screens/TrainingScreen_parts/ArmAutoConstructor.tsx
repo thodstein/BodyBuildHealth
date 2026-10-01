@@ -57,7 +57,8 @@ import { resolveArmReturnToLoad } from '../../../engines/arm/arm-return-to-load.
 import { loadSRPESessions } from '../../../engines/pro/srpe-store';
 import { acuteChronicRatio, toDailyLoads } from '../../../engines/pro/training-load.engine';
 import { loadForceTrials, buildWeeklyStats, fatigueTrend, forceTrend } from '../../../engines/arm/arm-force-history.store';
-import type { ArmWeakPoint } from '../../../engines/arm/arm-biomechanics.engine';
+import { ARM_WEAK_POINTS, type ArmWeakPoint } from '../../../engines/arm/arm-biomechanics.engine';
+import { auditArmPlan, worstArmPoint } from '../../../engines/arm/arm-plan-audit.engine';
 import { ArmTechniqueCard } from './ArmTechniqueCard';
 import { ArmGripCard } from './ArmGripCard';
 import { ArmHeatmap } from './ArmHeatmap';
@@ -739,6 +740,8 @@ const [rfdEstimated, setRfdEstimated] = useState<boolean>(false);
   const [peaks, setPeaks] = useState<Array<{ week: number; priority: 'A' | 'B' | 'C'; name?: string }>>([]);
   const [peakWeekInput, setPeakWeekInput] = useState<string>('');
   const [peakPrioInput, setPeakPrioInput] = useState<'A' | 'B' | 'C'>('B');
+  const [peakNameInput, setPeakNameInput] = useState<string>('');
+  const [planStartDate, setPlanStartDate] = useState<string>('');
   // P0-3: блоки специализации (explicit schedule: цели/доноры по неделям).
   const [specBlocks, setSpecBlocks] = useState<UiSpecBlock[]>([]);
   // P1-5/P1-9/P2-11: ротация, интенсификация, строгая частота сплита.
@@ -1141,8 +1144,9 @@ const [rfdEstimated, setRfdEstimated] = useState<boolean>(false);
     const w = Math.round(Number(peakWeekInput));
     if (!Number.isFinite(w) || w < 1 || w > weeks) { flash(`⚠ Неделя старта: 1–${weeks}`); return; }
     if (peaks.some((p) => p.week === w)) { flash('⚠ Этот старт уже добавлен'); return; }
-    setPeaks((prev) => [...prev, { week: w, priority: peakPrioInput }].sort((a, b) => a.week - b.week));
+    setPeaks((prev) => [...prev, { week: w, priority: peakPrioInput, ...(peakNameInput.trim() ? { name: peakNameInput.trim().slice(0, 40) } : {}) }].sort((a, b) => a.week - b.week));
     setPeakWeekInput('');
+    setPeakNameInput('');
   };
   const removePeak = (w: number) => setPeaks((prev) => prev.filter((p) => p.week !== w));
   const peaksPreview = useMemo(() => {
@@ -1163,6 +1167,10 @@ const [rfdEstimated, setRfdEstimated] = useState<boolean>(false);
       return builtPlan ? armPlanCompliance(builtPlan, diarySessions as any, week1) : null;
     } catch { return null; }
   }, [builtPlan, diarySessions]);
+  // Паритет ББ/ТА: аудит покрытия 12 мёртвых точек прямо в конструкторе.
+  const planAudit = useMemo(() => {
+    try { return builtPlan ? auditArmPlan(builtPlan) : null; } catch { return null; }
+  }, [builtPlan]);
   // P0-3: блоки специализации — добавить/править/удалить + превью расписания.
   const addSpecBlock = () => {
     setSpecBlocks((prev) => {
@@ -1261,9 +1269,12 @@ const [rfdEstimated, setRfdEstimated] = useState<boolean>(false);
         weeks,
         daysPerWeek,
         gripFocus: gripFocus as any,
+        // P2: снаряд платформы реально влияет на пул хвата (только армлифтинг).
+        gripImplement: (discipline as string) === 'armlifting' ? (proPlatImpl as any) : undefined,
         // PRO-PLAN: стиль прогрессии / старты в плане / база-якорь (пусто = как раньше).
         progressionStyle: progStyle !== 'auto' ? (progStyle as any) : undefined,
         peaks: peaks.length ? peaks : undefined,
+        planStartWeek: planStartDate || undefined,
         legsAnchor: legsAnchor || undefined,
         rotationMode: rotMode || undefined,
         intensityTechniques: intensityT || undefined,
@@ -2183,17 +2194,23 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
             <AdSwitch checked={intensityT} onChange={setIntensityT} label="💧 Drop-set на памп-изоляции (гипертрофия)" />
             {proDate && peaks.length === 0 && (() => {
               try {
-                const wOut = weeksUntilStart(undefined, proDate);
-                if (Number.isFinite(wOut) && wOut >= 1 && wOut <= weeks - 1) {
-                  const pw = Math.max(1, weeks - Math.round(wOut));
-                  return <AdBtn variant="dark" block data-arm="auto-peak" onClick={() => setPeaks([{ week: pw, priority: (['A', 'B', 'C'].includes(topCalPrio) ? topCalPrio : 'B') as 'A' | 'B' | 'C', name: 'Старт из даты' }])}>🏁 Авто-пик из даты старта: Н{pw} ({wOut} нед до старта)</AdBtn>;
+                const wOut = weeksUntilStart(planStartDate || undefined, proDate);
+                if (Number.isFinite(wOut) && wOut >= 1 && wOut <= weeks) {
+                  const pw = Math.max(1, Math.min(weeks, Math.round(wOut)));
+                  return <AdBtn variant="dark" block data-arm="auto-peak" onClick={() => setPeaks([{ week: pw, priority: (['A', 'B', 'C'].includes(topCalPrio) ? topCalPrio : 'B') as 'A' | 'B' | 'C', name: 'Старт из даты' }])}>🏁 Авто-пик из даты старта: Н{pw} ({wOut} нед)</AdBtn>;
                 }
                 return <div className="ad-tip">Дата старта {proDate} вне окна плана ({wOut} нед) — авто-пик не строится, только гейты готовности.</div>;
               } catch { return null; }
             })()}
             <div className="ad-row" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+              <AdField label="Дата начала плана (опц.)">
+                <input type="date" value={planStartDate} onChange={(e) => setPlanStartDate(e.target.value)} aria-label="Дата начала плана" />
+              </AdField>
               <AdField label={`Неделя старта (1–${weeks})`}>
                 <input value={peakWeekInput} onChange={(e) => setPeakWeekInput(e.target.value)} placeholder="напр. 12" inputMode="numeric" aria-label="Неделя старта" style={{ width: 110 }} />
+              </AdField>
+              <AdField label="Название (опц.)">
+                <input value={peakNameInput} onChange={(e) => setPeakNameInput(e.target.value)} placeholder="Чемпионат" aria-label="Название старта" style={{ width: 140 }} />
               </AdField>
               <div>
                 <div className="ad-fl">Приоритет</div>
@@ -2508,6 +2525,41 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
                 ) : (
                   <div className="ad-muted">Дневник пуст или нет рабочих весов — факт появится после первых записей.</div>
                 )}
+              </AdSec>
+              </div>
+              {/* Паритет ББ/ТА: аудит покрытия 12 мёртвых точек (+ добивка в 1 клик). */}
+              <div data-arm="plan-audit-card">
+              <AdSec title="🎯 Покрытие 12 точек (аудит плана)" hook="plan-audit" collapsible defaultOpen={false}
+                summary={planAudit ? `${planAudit.coveragePct}% · стол ${Math.round(planAudit.tableRatio * 100)}%` : 'нет плана'}
+                status={planAudit && planAudit.missing.length ? 'warn' : undefined}>
+                {planAudit ? (
+                  <>
+                    <div className="ad-tip" data-arm="plan-audit-cover" style={{ fontVariantNumeric: 'tabular-nums' }}>
+                      Покрытие: {planAudit.covered.length}/12 точек ({planAudit.coveragePct}%) · стол {Math.round(planAudit.tableRatio * 100)}% / зал {100 - Math.round(planAudit.tableRatio * 100)}% · static {planAudit.staticSets} / dynamic {planAudit.dynamicSets} сетов.
+                    </div>
+                    <div className="ad-chips" data-arm="plan-audit-points">
+                      {ARM_WEAK_POINTS.map((wp) => (
+                        <span key={wp} className="ad-tag" data-covered={planAudit.covered.includes(wp) ? 'true' : 'false'} style={{ fontVariantNumeric: 'tabular-nums' }}>
+                          {wp} {planAudit.byPoint[wp]?.sets || 0}
+                        </span>
+                      ))}
+                    </div>
+                    {planAudit.missing.length > 0 && (
+                      <AdBtn variant="dark" block data-arm="plan-audit-worst" onClick={() => {
+                        try {
+                          const worst = worstArmPoint(viewPlan, planAudit.missing);
+                          if (!worst) { flash('⚠ Дыра не определена'); return; }
+                          const inj = injectArmCorrections(viewPlan, [worst], { level, workMax, weekIdxs: (viewPlan.weeks || []).map((_: any, i: number) => i) });
+                          const next = refreshArmPlanSnapshot(inj.plan, level);
+                          setBuiltPlan(next);
+                          persistArmPlan(next);
+                          flash(`💉 Добито: ${worst} (${inj.injected} упражн., все недели)`);
+                        } catch (e: any) { flash(`⚠ ${e?.message || e}`); }
+                      }}>💉 Добить худшую точку ({planAudit.missing[0]}) во все недели</AdBtn>
+                    )}
+                    {planAudit.duplicates.length > 0 && <div className="ad-muted">Дубли (3+ сессии): {planAudit.duplicates.join(', ')}</div>}
+                  </>
+                ) : <div className="ad-muted">План не собран — аудит появится после сборки.</div>}
               </AdSec>
               </div>
               {editsCount > 0 && <div className="ad-muted">✏️ Правки: {editsCount} упр. — гейты и отчёт по базовому плану.</div>}
