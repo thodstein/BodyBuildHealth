@@ -115,8 +115,10 @@ describe('BB zero-state snapshots (baseline Этапа 10)', () => {
     // Re-baseline 2 (Ф1.1 CYCLE-SYSTEM-FULL-AUDIT): leg press → squat/quads
     // (movement-pattern) — квадры 15→13 (косвенный вклад leg press в хамс/
     // ягодицы убран из quad-бакета; валидатор зелёный).
+    // Re-baseline 3 (про-объём циклового пути): предписанные цели по мышцам
+    // (частота×per-session-кап) — квадры 13→15.
     expect(directVolume(plan)).toEqual({
-      abs: 7, back: 10, biceps: 11, calves: 8, chest: 8, delt_front: 2, delt_mid: 2, delt_rear: 10, forearms: 7, glutes: 8, hamstrings: 11, quads: 13, shoulders: 0, traps: 6, triceps: 9,
+      abs: 7, back: 10, biceps: 11, calves: 8, chest: 8, delt_front: 2, delt_mid: 2, delt_rear: 10, forearms: 7, glutes: 8, hamstrings: 11, quads: 15, shoulders: 0, traps: 6, triceps: 9,
     });
   });
 
@@ -125,8 +127,10 @@ describe('BB zero-state snapshots (baseline Этапа 10)', () => {
     expect(src).toBeDefined();
     const plan = programToBBPlan(src!, { workMax: WM, level: 'enhanced', trainingYears: 6, ...PED, mode: 'adapt' } as any);
     // Re-baseline (осознанно): см. выше.
+    // Re-baseline 3 (про-объём): предписанные цели по мышцам/частоте —
+    // quads 9→19, chest 10→11, back 10→9, hamstrings 14→10, traps 9→6.
     expect(directVolume(plan)).toEqual({
-      abs: 7, back: 10, biceps: 12, calves: 8, chest: 10, delt_front: 3, delt_mid: 2, delt_rear: 10, forearms: 7, glutes: 8, hamstrings: 14, quads: 9, shoulders: 0, traps: 9, triceps: 12,
+      abs: 7, back: 9, biceps: 12, calves: 8, chest: 11, delt_front: 3, delt_mid: 2, delt_rear: 10, forearms: 7, glutes: 8, hamstrings: 10, quads: 19, shoulders: 0, traps: 6, triceps: 12,
     });
   });
 

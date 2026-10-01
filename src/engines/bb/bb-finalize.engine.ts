@@ -2452,6 +2452,10 @@ export interface BBFinalizeOptions {
    *  Добавляемые финализатором упражнения тоже фильтруются. */
   mobilityRestrictions?: string[];
   ensureMinimumVolume?: boolean;
+  /** Цикловой/программный путь: поднимать до предписанной цели ВСЕ мышцы
+   *  (включая руки и жимовые/присед-упражнения), а не только изоляции/тяги.
+   *  Без флага — прежнее поведение (generic не меняется). */
+  expandAllMuscles?: boolean;
   /** Кап упражнений сессии для MEV-фидеров (dense-циклы: авторские сессии
    *  11-13 упражнений при реальном лимите 14-20 — hardcoded-10 блокировал
    *  добивку до MEV). Без поля — legacy 10. */
@@ -3874,8 +3878,11 @@ for (const week of next.weeks) {
           // приседы) создают косвенный объём на triceps/shoulders, выталкивая
           // их effective за кап. Руки (biceps/triceps/forearms) тоже исключены
           // — их прямой объём регулируется редукцией по indirect.
-          if (['biceps', 'triceps', 'forearms'].includes(e.muscle)) continue;
-          if (/жим|press|присед|squat|выпад|lunge|мост|hip.?thrust|разгибан.*ног|leg.?extension/i.test(e.name || '')) continue;
+          // Цикловой путь (expandAllMuscles): поднимаем ВСЕ мышцы до цели.
+          if (!(options as any).expandAllMuscles) {
+            if (['biceps', 'triceps', 'forearms'].includes(e.muscle)) continue;
+            if (/жим|press|присед|squat|выпад|lunge|мост|hip.?thrust|разгибан.*ног|leg.?extension/i.test(e.name || '')) continue;
+          }
           const lm = getVolumeLandmarks(options.level, e.muscle);
           if (!lm) continue;
           const weekDirect = weekVolume[e.muscle]?.directSets || 0;

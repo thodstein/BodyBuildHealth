@@ -1,4 +1,4 @@
-﻿/**
+/**
  * cycle-to-plan.ts — конвертер SRCycleTemplate (BB-цикл) → BBPlan.
  *
  * Позволяет BbAutoConstructor и TrainingConstructor использовать
@@ -10,7 +10,8 @@ import type { BBPhase } from './bb-types';
 import { femalePosteriorBoost } from './bb-demographics';
 import { getBBVolumeLandmarks, isWeak, abDominantPattern, normalizeWeekMrv } from './bb-builder.engine';
 import { syncBBPlanSetShape } from './bb-validator.engine';
-import { aggregateBBVolume, perExerciseCap } from './bb-volume.engine';
+import { aggregateBBVolume, perExerciseCap, exerciseVolumeContributions } from './bb-volume.engine';
+import { buildBBVolumeTarget, computeMrvMult, regimeMrvMultFor, weeklyCapFor, perSessionMuscleCap, type BBVolumeTarget } from './bb-volume.engine';
 import { isRearDeltExercise, isMobilityRestricted } from './bb-builder.engine';
 import { buildExerciseInstructions, formatExerciseInstructions } from './bb-exercise-instructions.engine';
 import { PCT_FOR_RIR } from '../rir-table';
@@ -174,6 +175,165 @@ export function programToCycleTemplate(program: FullProgram): SRCycleTemplate {
 // Конвертер: SRCycleTemplate → FullProgram
 // Использует week1 + meta для генерации всех недель с прогрессией RIR/нагрузки.
 // ──────────────────────────────────────────────────────────────────────
+
+/**
+ * Предписанные цели объёма для циклового пути (паритет с generic buildBBPlan).
+ *
+ * Цель = MAV(или MEV/MRV) × цель × режим(PED ×2) × лаб × объёмный режим — как в
+ * билдере. MRV-кап цели масштабируется режимом (PED): иначе спина упиралась в
+ * «сырой» MRV 32 вместо 32×режим≈60 и недобирала (про+фарма: 14/нед против 43).
+ */
+function buildCycleVolumeTargets(
+  allLandmarks: Record<string, { mev: number; mav: number; mrv: number } | undefined>,
+  opts: {
+    level?: string; trainingYears?: number; onCourse?: boolean; peds?: string[];
+    courseIntensity?: string; goal?: string;
+    volumeGoal?: 'mev' | 'mav' | 'mrv'; labMrvMultiplier?: number; trainingVolumeMode?: string;
+    muscleFrequency?: Record<string, number>;
+  },
+): Record<string, BBVolumeTarget> {
+  const regimeMult = computeMrvMult({ onCourse: opts.onCourse, peds: opts.peds, courseIntensity: opts.courseIntensity });
+  const goal = opts.volumeGoal || 'mav';
+  const g = (opts.goal || 'mass').toLowerCase();
+  const goalMult = g === 'cut' ? 0.72 : g === 'recomp' ? 0.92 : g === 'maintenance' ? 0.80 : g === 'mass' ? 1.05 : g === 'strength_mass' ? 1.03 : 1;
+  const lvl = String(opts.level ?? 'intermediate');
+  const highBoost = opts.trainingVolumeMode === 'high'
+    ? (lvl === 'enhanced' && (opts.trainingYears ?? 0) >= 6 ? 1.35 : lvl === 'enhanced' ? 1.30 : 1.25)
+    : 1;
+  const out: Record<string, BBVolumeTarget> = {};
+  for (const [m, lm] of Object.entries(allLandmarks)) {
+    if (!lm?.mrv) continue;
+    const freq = Math.max(1, Math.round(opts.muscleFrequency?.[m] || 1));
+    // Цель ПО МЫШЦЕ и ЧАСТОТЕ: недельный рецепт = min(якорь владельца,
+    // per-session-кап × число сессий/нед). Спина про+фарма: per-session 30 × 2 = 60
+    // (32/сессию заявка) — а не MAV×2=42, что душило её. Для 1×/нед мышцы цель
+    // ниже (per-session × 1) — учитываем разницу сессий.
+    const weeklyAnchor = weeklyCapFor({
+      muscle: m, level: lvl, trainingYears: opts.trainingYears,
+      onCourse: opts.onCourse, courseIntensity: opts.courseIntensity,
+    });
+    const perSess = perSessionMuscleCap({
+      level: lvl, trainingYears: opts.trainingYears, onCourse: opts.onCourse, muscle: m,
+    });
+    let v = Math.min(weeklyAnchor, perSess * freq);
+    // Естественный пол: не ниже MAV (иначе мышца не растёт), и не ниже заданной цели.
+    const base = goal === 'mev' ? lm.mev : goal === 'mrv' ? lm.mrv : lm.mav;
+    const naturalBase = Math.round(base * goalMult);
+    if (v < naturalBase) v = naturalBase;
+    v = Math.round(v * (opts.labMrvMultiplier ?? 1));
+    v = Math.round(v * highBoost);
+    // Кап цели — MRV, масштабированный режимом (PED): иначе сырой MRV душит про+фарму.
+    const scaledLm = { mev: lm.mev, mav: lm.mav, mrv: Math.max(lm.mrv, Math.round(lm.mrv * regimeMult)) };
+    out[m] = buildBBVolumeTarget({
+      muscle: m,
+      frequency: freq,
+      landmarks: scaledLm,
+      rotationSets: v,
+      volumeGoal: goal,
+    });
+  }
+  return out;
+}
+
+/**
+ * Прямое расширение объёма до предписанных целей (цикловой путь).
+ * Финализаторный MEV-repair имеет гейты, из-за которых спина/руки не добирают
+ * до цели. Этот проход ПОСЛЕ финализатора поднимает прямой объём каждой мышцы
+ * до targetSets, распределяя сеты по её упражнениям (наименьшие первыми), в
+ * пределах perExerciseCap и лимита сессии. Guard «не навреди»: если сет перелил
+ * ЛЮБУЮ мышцу за её (PED-масштабированный) кап — откат. Не трогает deload/taper/prep.
+ */
+function expandPlanToTargets(
+  plan: BBPlan,
+  targets: Record<string, BBVolumeTarget>,
+  opts: { level?: string; trainingYears?: number; onCourse?: boolean; maxWorkingSets?: number; caps?: Record<string, number> },
+): void {
+  const yrs = opts.trainingYears ?? 0;
+  const onCourse = !!opts.onCourse;
+  const caps = opts.caps || {};
+  for (const week of plan.weeks) {
+    const w = week as any;
+    if (w.phase === 'deload' || w.deload === true || w.taperApplied === true || w.taper === true || w.prepProtocol || w.contestPhase || w.peakWeek) continue;
+    let weekEff: Record<string, number> = {};
+    const recompute = () => {
+      const v = aggregateBBVolume(week.sessions) as any;
+      weekEff = {};
+      for (const [m, x] of Object.entries(v)) weekEff[m] = (x as any).effectiveSets || 0;
+    };
+    recompute();
+    for (const [muscle, target] of Object.entries(targets)) {
+      const t = Number(target?.targetSets) || 0;
+      if (t <= 0) continue;
+      if ((weekEff[muscle] || 0) >= t) continue;
+      const exs = week.sessions.flatMap(s => s.exercises.filter(e => !(e as any).warmupActivator && e.muscle === muscle && !/FST-7/.test(String((e as any).comment || ''))));
+      if (!exs.length) continue;
+      const cap = perExerciseCap(opts.level, muscle, yrs, onCourse);
+      let guard = 0;
+      while ((weekEff[muscle] || 0) < t && guard++ < 300) {
+        const cand = exs.filter(e => (e.sets || 0) < cap).sort((a, b) => (a.sets || 0) - (b.sets || 0))[0];
+        if (!cand) break;
+        const s = week.sessions.find(ss => ss.exercises.includes(cand));
+        if (!s) break;
+        const sesSets = s.exercises.filter((x: any) => !(x as any).warmupActivator).reduce((a, x) => a + (x.sets || 0), 0);
+        if (opts.maxWorkingSets && sesSets >= opts.maxWorkingSets) break;
+        const sample = cand.workSets?.[cand.workSets.length - 1] || { reps: 10, rir: 2, weight: 0 };
+        cand.workSets.push({ ...sample });
+        cand.sets = (cand.sets || 0) + 1;
+        recompute();
+        const over = Object.entries(weekEff).find(([m, e]) => { const c = caps[m]; return !!c && e > c; });
+        if (over) {
+          cand.sets -= 1;
+          cand.workSets.pop();
+          recompute();
+          break;
+        }
+      }
+    }
+    // Финальный кап-трим: мышца всё ещё выше капа (перелив от проходов
+    // финализатора) — срезаем её сеты (accessory → любой).
+    for (let g = 0; g < 60; g++) {
+      recompute();
+      const worst = Object.entries(weekEff).find(([m, e]) => { const c = caps[m]; return !!c && e > c; });
+      if (!worst) break;
+      const [m] = worst;
+      const pool = week.sessions
+        .flatMap(s => s.exercises.filter(e => !(e as any).warmupActivator && e.muscle === m && !/FST-7/.test(String((e as any).comment || ''))))
+        .filter(e => (e.sets || 0) > 2)
+        .sort((a, b) => (a.role === 'primary' ? 1 : 0) - (b.role === 'primary' ? 1 : 0) || (b.sets || 0) - (a.sets || 0));
+      if (!pool.length) break;
+      pool[0].sets -= 1;
+      if (Array.isArray(pool[0].workSets) && pool[0].workSets.length > pool[0].sets) pool[0].workSets = pool[0].workSets.slice(0, pool[0].sets);
+    }
+    // Перелив КОСВЕННЫЙ (напр. трицепс от жимов) — режем упражнение с наибольшим
+    // косвенным вкладом.
+    for (let g = 0; g < 40; g++) {
+      recompute();
+      const worst = Object.entries(weekEff).find(([mm, e]) => { const c = caps[mm]; return !!c && e > c; });
+      if (!worst) break;
+      const mm = worst[0];
+      let best: any = null; let bestVal = 0;
+      for (const s of week.sessions) for (const e of s.exercises) {
+        if ((e as any).warmupActivator || (e.sets || 0) <= 2) continue;
+        if (/FST-7/.test(String((e as any).comment || ''))) continue;
+        let val = 0;
+        try {
+          const contribs = exerciseVolumeContributions(e as any) as any[];
+          const c = contribs.find((x: any) => x.muscle === mm);
+          val = c ? (c.effectiveSets || 0) / Math.max(1, e.sets || 1) : 0;
+        } catch { val = 0; }
+        if (val > bestVal) { bestVal = val; best = e; }
+      }
+      if (!best) break;
+      best.sets -= 1;
+      if (Array.isArray(best.workSets) && best.workSets.length > best.sets) best.workSets = best.workSets.slice(0, best.sets);
+    }
+  }
+  // Не требуем объём у мышц, которых в плане нет (ложный target_volume_deficit).
+  const trained = new Set<string>();
+  for (const w of plan.weeks) for (const s of w.sessions) for (const e of s.exercises) if (!(e as any).warmupActivator) trained.add(e.muscle);
+  const vt: any = (plan as any).volumeTargets;
+  if (vt) for (const m of Object.keys(vt)) if (!trained.has(m)) delete vt[m];
+}
 
 export function cycleTemplateToFullProgram(cycle: SRCycleTemplate): FullProgram {
   const { meta, week1, weeks: explicitWeeks } = cycle;
@@ -1449,8 +1609,18 @@ export function convertCycleToBBPlan(input: CycleToPlanInput): BBPlan {
   const cycleFst7Seven = cycleVolumeScheme === 'fst7' && mode === 'adapt';
   if (input.volumeScheme === 'fst7' && cycleVolumeScheme === 'standard') rationale.push('⛔ FST-7 7-in-1: cycle path оставлен в standard (faithful/уровень/joint-guard/соло-инсулин).');
 
+  // Предписанные цели объёма по ВСЕМ мышцам (паритет с generic) — только adapt.
+  const cycleVolumeTargets = mode === 'adapt'
+    ? buildCycleVolumeTargets(allLandmarks as any, {
+        level, trainingYears: input.trainingYears, onCourse, peds, courseIntensity,
+        goal: input.goal, volumeGoal: input.volumeGoal, labMrvMultiplier: input.labMrvMultiplier,
+        trainingVolumeMode: (input as any).trainingVolumeMode, muscleFrequency,
+      })
+    : undefined;
+
   const finalized = finalizeBBPlan({
     ...finalPlan,
+    ...(cycleVolumeTargets ? { volumeTargets: cycleVolumeTargets } : {}),
     volumeLandmarks,
     muscleFrequency,
     // Ф1.1: цикл управляет своей периодизацией (meta.deloadWeeks или выведенные
@@ -1467,6 +1637,7 @@ export function convertCycleToBBPlan(input: CycleToPlanInput): BBPlan {
     volumeScheme: cycleVolumeScheme,
   }, {
     reorder: mode !== 'faithful',
+    expandAllMuscles: mode === 'adapt',
     priorityMuscles: [...new Set([...weakPoints, ...specSchedule.blocks.flatMap(b => b.targets), ...(focusGroup ? [focusGroup] : [])])],
     specializationSchedule: specSchedule,
     methodology: input.methodology,
@@ -1494,6 +1665,19 @@ export function convertCycleToBBPlan(input: CycleToPlanInput): BBPlan {
     volumeScheme: cycleVolumeScheme,
     fst7Seven: cycleFst7Seven,
   });
+  // Прямое расширение до предписанных целей (все мышцы) — до MRV-трима ниже.
+  if (mode === 'adapt' && cycleVolumeTargets) {
+    const expandCaps: Record<string, number> = {};
+    for (const [m, lm] of Object.entries(allLandmarks as any)) { const l = lm as any; if (l?.mrv) expandCaps[m] = Math.max(l.mrv, Math.round(l.mrv * mrvMult)); }
+    if (input.sex === 'female') {
+      if (expandCaps.glutes) expandCaps.glutes = Math.round(expandCaps.glutes * 1.2);
+      if (expandCaps.hamstrings) expandCaps.hamstrings = Math.round(expandCaps.hamstrings * 1.2);
+    }
+    expandPlanToTargets(finalized, cycleVolumeTargets, {
+      level, trainingYears: input.trainingYears, onCourse, caps: expandCaps,
+      maxWorkingSets: centralizedSessionLimits({ level, trainingYears: input.trainingYears, peds, courseIntensity }).maxWorkingSets,
+    });
+  }
   (finalized as any).trainingVolumeMode = (input as any).trainingVolumeMode || 'standard';
   (finalized as any).level = level;
   (finalized as any).volumeScheme = cycleVolumeScheme;
@@ -1947,7 +2131,10 @@ export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts)
   const avAxial = opts.avoidAxialLoad || false;
 
   // PED adaptation для MRV-кап (добивка слабых групп не превышает MRV)
-  const levelForLandmarks = (['beginner', 'intermediate', 'advanced'].includes(level) ? level : 'intermediate') as 'beginner' | 'intermediate' | 'advanced';
+  // 'enhanced' использует СВОИ лендмарки (+15% к advanced) — паритет с convert-путём
+  // и generic; раньше маппился в 'intermediate' → цикловой UI-путь недооценивал
+  // объём про-на-курсе.
+  const levelForLandmarks = (['beginner', 'intermediate', 'advanced', 'enhanced'].includes(level) ? level : 'intermediate') as 'beginner' | 'intermediate' | 'advanced' | 'enhanced';
   const allLandmarks = withMEVCalibration(levelForLandmarks, getAllVolumeLandmarks(levelForLandmarks));
   const landmarks = Object.fromEntries(Object.entries(allLandmarks).map(([m, v]) => [m, (v as { mrv: number }).mrv]));
   const pedAdapt = adaptForPEDs(opts.peds || [], landmarks, opts.pedDoses, opts.courseIntensity);
@@ -2584,8 +2771,30 @@ export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts)
   })();
   const programFst7Seven = programVolumeScheme === 'fst7' && mode === 'adapt';
   const programOnCourse = (opts.peds?.length || 0) > 0;
+  // Частота МЫШЦЫ = число СЕССИЙ/нед (не «число недель»): спина в PPL = 2, не 1.
+  // Берём максимум по неделям (делод-недели не урезают частоту).
+  const sessionFreq: Record<string, number> = {};
+  for (const wk of weeks) {
+    const perWeek: Record<string, number> = {};
+    for (const sess of wk.sessions) {
+      const seen = new Set<string>();
+      for (const ex of sess.exercises) seen.add(ex.muscle);
+      for (const m of seen) perWeek[m] = (perWeek[m] || 0) + 1;
+    }
+    for (const [m, c] of Object.entries(perWeek)) sessionFreq[m] = Math.max(sessionFreq[m] || 0, c);
+  }
+  // Предписанные цели объёма по ВСЕМ мышцам (паритет с generic) — только adapt.
+  const programVolumeTargets = mode === 'adapt'
+    ? buildCycleVolumeTargets(allLandmarks as any, {
+        level: levelForLandmarks, trainingYears: opts.trainingYears, onCourse: programOnCourse,
+        peds: opts.peds, courseIntensity: opts.courseIntensity,
+        goal: opts.goal, volumeGoal: opts.volumeGoal, labMrvMultiplier: (opts as any).labMrvMultiplier,
+        trainingVolumeMode: opts.trainingVolumeMode, muscleFrequency: sessionFreq,
+      })
+    : undefined;
   const finalized = finalizeBBPlan({
     ...finalPlan,
+    ...(programVolumeTargets ? { volumeTargets: programVolumeTargets } : {}),
     volumeLandmarks,
     muscleFrequency,
     // Контекст специализации/лимитов сохраняется для повторной финализации.
@@ -2600,6 +2809,7 @@ export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts)
     mobilityRestrictions: opts.mobilityRestrictions,
   }, {
     reorder: mode !== 'faithful',
+    expandAllMuscles: mode === 'adapt',
     priorityMuscles: [...new Set([...weakPoints, ...specSchedule.blocks.flatMap(b => b.targets), ...(focusGroup ? [focusGroup] : [])])],
     specializationSchedule: specSchedule,
     methodology: opts.methodology,
@@ -2785,6 +2995,19 @@ export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts)
       }
       if (bfrApplied > 0) finalized.rationale.push(`🩸 BFR-режим: ${bfrApplied} изоляций переведены в 30-15-15-15 @25% (объём и восстановление).`);
     }
+  }
+  // Прямое расширение до предписанных целей (все мышцы).
+  if (mode === 'adapt' && programVolumeTargets) {
+    const expandCapsProgram: Record<string, number> = {};
+    for (const [m, lm] of Object.entries(allLandmarks as any)) { const l = lm as any; if (l?.mrv) expandCapsProgram[m] = Math.max(l.mrv, Math.round(l.mrv * mrvMult)); }
+    if (opts.sex === 'female') {
+      if (expandCapsProgram.glutes) expandCapsProgram.glutes = Math.round(expandCapsProgram.glutes * 1.2);
+      if (expandCapsProgram.hamstrings) expandCapsProgram.hamstrings = Math.round(expandCapsProgram.hamstrings * 1.2);
+    }
+    expandPlanToTargets(finalized, programVolumeTargets, {
+      level: levelForLandmarks, trainingYears: opts.trainingYears, onCourse: programOnCourse,
+      caps: expandCapsProgram, maxWorkingSets: programSessionLimits.maxWorkingSets,
+    });
   }
   (finalized as any).trainingVolumeMode = (opts as any).trainingVolumeMode || 'standard';
   (finalized as any).level = opts.level;
