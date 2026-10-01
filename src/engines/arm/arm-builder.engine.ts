@@ -39,6 +39,7 @@ import { armInjuryRepsCap, armInjuryVolumeFactor, armInjuryWeightFactor, mobilit
 import { cycleBlocksFor, deriveArmBlocks, planArmPeaks, progressionForWeek, buildArmAnchorSession, buildArmWarmupSets, blockForWeek } from './arm-periodization.engine';
 import { legsAnchorBlock, weeksUntilStart, planWeightCut } from './arm-competition-prep.engine';
 import { armFactFeedback, factRateFor, armPerMuscleLoadAlerts } from './arm-plan-feedback.engine';
+import { armCheckinTrend } from './arm-weekly-checkin.engine';
 
 const PHASES: Array<'accumulation' | 'intensification' | 'deload' | 'peaking'> = ['accumulation','intensification','deload','peaking'];
 
@@ -652,6 +653,19 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
     readinessDeload = true;
     if (String(phaseMap[1] || '') !== 'deload') (phaseMap as Record<number, string>)[1] = 'deload';
   }
+  // P1-10: недельный чек-ин — боль ≥4 две недели подряд → разгрузка первой недели;
+  // тренд веса/энергии — честные строки (план не переписывается задним числом).
+  let checkinTrend: ReturnType<typeof armCheckinTrend> | null = null;
+  try {
+    const ci = (input as any).checkins;
+    if (Array.isArray(ci) && ci.length) {
+      checkinTrend = armCheckinTrend(ci, { targetWeightKg: Number((input as any).targetWeightKg) || undefined });
+    }
+  } catch { markDegraded('чек-ин недели недоступен'); }
+  if (checkinTrend?.painWarn && weeks >= 3) {
+    readinessDeload = true;
+    if (String(phaseMap[1] || '') !== 'deload') (phaseMap as Record<number, string>)[1] = 'deload';
+  }
   // P1-7: локальная перегрузка мышцы по дневнику (сеты 7д vs среднее 28д ≥1.5) —
   // первые две недели целевой объём мышцы ×0.8 + честная строка.
   let muscleLoadAlerts: ReturnType<typeof armPerMuscleLoadAlerts> = [];
@@ -1151,6 +1165,10 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
   }
   // P1-8 / P1-7 / P1-9 / P2-14: честные строки профессионального контура.
   if (readinessDeload) rationale.push('🩺 Готовность красная: первая неделя — разгрузка (60%, RIR+2) до восстановления.');
+  if (checkinTrend && checkinTrend.weeks > 0) {
+    rationale.push(`🗓 Чек-ин недели: ${checkinTrend.notes.join(' ')}`);
+    if (checkinTrend.painWarn) feedbackWarnings.push(`Чек-ин: боль локтя ${checkinTrend.painAvgLast2}/10 две недели — первая неделя разгрузочная.`);
+  }
   if (muscleLoadAlerts.length) {
     const txt = muscleLoadAlerts.slice(0, 4).map((a) => `${a.muscle} (7д ${a.sets7} vs ср.${a.weeklyAvg}, ×${a.ratio})`).join('; ');
     rationale.push(`⚖️ Локальная перегрузка дневника: ${txt} — первые 2 недели объём ×0.8, контроль восстановления.`);

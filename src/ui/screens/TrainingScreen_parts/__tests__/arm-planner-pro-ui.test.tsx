@@ -115,6 +115,42 @@ describe('Arm PRO-PLAN UI', () => {
     expect(screen.getByRole('switch', { name: /Drop-set/ })).toBeTruthy();
   });
 
+  it('P1-10: чек-ин недели сохраняется и показывается', () => {
+    const { container } = render(<ArmAutoConstructor />);
+    fireEvent.click(screen.getByRole('button', { name: '4 Сплит и цикл' }));
+    fireEvent.click(screen.getByText('⚡ Собрать план'));
+    fireEvent.click(screen.getByRole('button', { name: '6 Веса и качество' }));
+    openSec(/Чек-ин недели/);
+    fireEvent.change(screen.getByLabelText('Чек-ин боль'), { target: { value: '5' } });
+    fireEvent.change(screen.getByLabelText('Чек-ин вес'), { target: { value: '80' } });
+    fireEvent.click(screen.getByRole('button', { name: /Сохранить чек-ин недели/ }));
+    const rows = container.querySelector('[data-arm="checkin-rows"]');
+    expect(rows?.textContent).toContain('боль 5');
+    expect(String(localStorage.getItem('he_arm_checkins_v1'))).toContain('elbowPain010');
+  });
+
+  it('PRO-PLAN: настройки контура (ротация) восстанавливаются из варианта', () => {
+    render(<ArmAutoConstructor />);
+    fireEvent.click(screen.getByRole('button', { name: '4 Сплит и цикл' }));
+    openPlanSec();
+    fireEvent.click(screen.getByRole('switch', { name: /Ротация упражнений/ }));
+    fireEvent.click(screen.getByText('⚡ Собрать план'));
+    fireEvent.click(screen.getByRole('button', { name: '📤 Экспорт' }));
+    openSec(/Варианты плана/);
+    fireEvent.change(screen.getByLabelText('Название варианта'), { target: { value: 'ПРО-вариант' } });
+    fireEvent.click(screen.getByRole('button', { name: /Сохранить вариант/ }));
+    // выключаем ротацию и загружаем вариант — настройка должна вернуться
+    fireEvent.click(screen.getByRole('button', { name: '4 Сплит и цикл' }));
+    const rot = screen.getByRole('switch', { name: /Ротация упражнений/ });
+    fireEvent.click(rot);
+    expect(rot.getAttribute('aria-checked')).toBe('false');
+    fireEvent.click(screen.getByRole('button', { name: '📤 Экспорт' }));
+    fireEvent.click(screen.getByRole('button', { name: /Загрузить ПРО-вариант/ }));
+    fireEvent.click(screen.getByRole('button', { name: '4 Сплит и цикл' }));
+    openPlanSec();
+    expect(screen.getByRole('switch', { name: /Ротация упражнений/ }).getAttribute('aria-checked')).toBe('true');
+  });
+
   it('план с стартом и якорем: маркер недели, LegsCore, CSV-кнопка', () => {
     const { container } = render(<ArmAutoConstructor />);
     // недели 10 → окно старта Н6 целиком внутри плана

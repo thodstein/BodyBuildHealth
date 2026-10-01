@@ -42,7 +42,17 @@ export const LADDER_GRIP: Record<LadderRung, 'support' | 'pinch' | 'crush' | 'hu
   coc_bullet: 'crush',
 };
 
-/** Мировые ориентиры (муж/жен, кг; Silver Bullet — секунды). */
+/**
+ * Опорные ориентиры лестницы (муж/жен, кг; Silver Bullet — секунды).
+ *
+ * ВНИМАНИЕ (честность шкал, P2-13): это НЕ единая WR-таблица помоста.
+ *  - `rolling_thunder` — действующий WR IronMind (Tyukalov 2013 / Gaiduchenko 2012);
+ *  - остальные — пороговые/исторические ориентиры промоушена (например, Axle 210 —
+ *    истор. рекорд, действующий WR площадки 237.5/137.9; Hub/Pinch — другие снаряды
+ *    и ширина, чем в PLATFORM_WR). Для процентов помоста сверяйтесь с PLATFORM_WR.
+ */
+export const LADDER_SCALE_NOTE = 'Лестница: RT — действующий WR; остальные ступени — пороговые ориентиры промоушена (шкала может отличаться от помоста).';
+
 export const LADDER_WR: Record<LadderRung, { male: number; female: number; unit: 'kg' | 'sec' }> = {
   fat_gripz: { male: 0, female: 0, unit: 'kg' }, // стартер без WR
   rolling_thunder: { male: 130.5, female: 77.2, unit: 'kg' },
@@ -69,7 +79,14 @@ function normRung(v: unknown): LadderRung | null {
   return (IMPLEMENT_LADDER as string[]).includes(s) ? (s as LadderRung) : null;
 }
 
-/** % от WR (0–100+, null для стартера без WR). */
+/** Метка опорной шкалы ступени: RT — WR, остальные — ориентир промоушена. */
+export function ladderRefLabel(rung: string): string {
+  const r = normRung(rung);
+  if (!r || r === 'fat_gripz') return '';
+  return r === 'rolling_thunder' ? 'WR' : 'ориентира';
+}
+
+/** % от опорного значения ступени (0–100+, null для стартера без ориентира). */
 export function ladderWrPct(rung: string, value: number, sex: string): number | null {
   const r = normRung(rung);
   const v = Number(value);
@@ -92,9 +109,10 @@ export function nextImplement(current: string, value: number, sex: string): { ne
   const need = PROMOTE_PCT[r] * 100;
   const next = idx + 1 < IMPLEMENT_LADDER.length ? IMPLEMENT_LADDER[idx + 1] : null;
   if (pct == null || !next) return { next, ready: false, note: `${LADDER_RU[r]}: держите базу, тест раз в мезоцикл.` };
+  const refLabel = ladderRefLabel(r) || 'ориентира';
   if (pct >= need)
-    return { next, ready: true, note: `${LADDER_RU[r]} ${pct}% WR (порог ${need}%) → готов к ${LADDER_RU[next]}.` };
-  return { next, ready: false, note: `${LADDER_RU[r]} ${pct}% WR — до порога ${need}% оставайтесь, добор объёмом RPE7.` };
+    return { next, ready: true, note: `${LADDER_RU[r]} ${pct}% ${refLabel} (порог ${need}%) → готов к ${LADDER_RU[next]}.` };
+  return { next, ready: false, note: `${LADDER_RU[r]} ${pct}% ${refLabel} — до порога ${need}% оставайтесь, добор объёмом RPE7.` };
 }
 
 /** Коэффициент переноса между имплементами (оценка для планирования попыток). */

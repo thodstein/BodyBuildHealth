@@ -253,6 +253,19 @@ describe('arm-planner PRO: P0 — факт дневника, разминка, �
     expect(ics).toContain('🏁 старт A');
     expect(ics).toMatch(/· База/);
   });
+  it('P1-10: боль в чек-инах ≥4 две недели → первая неделя разгрузочная', () => {
+    const ci = (week: number, dateIso: string, pain: number) => ({ id: `c${week}`, week, dateIso, elbowPain010: pain, weightKg: 80 });
+    const plan = buildArmPlan({ ...BASE, checkins: [ci(1, '2026-09-01', 5), ci(2, '2026-09-08', 4)] } as any);
+    expect(plan.weeks[0].phase).toBe('deload');
+    expect(plan.rationale.some((l: string) => /Чек-ин недели/.test(l))).toBe(true);
+    expect((plan.safetyWarnings || []).join(' ')).toContain('боль локтя');
+  });
+  it('P1-10: тренд веса быстрее цели → честная строка (план не переписывается)', () => {
+    const ci = (week: number, dateIso: string, weightKg: number) => ({ id: `c${week}`, week, dateIso, weightKg });
+    const plan = buildArmPlan({ ...BASE, targetWeightKg: 74, checkins: [ci(1, '2026-09-01', 80), ci(2, '2026-09-08', 78.5)] } as any);
+    expect(plan.rationale.some((l: string) => /быстрее/.test(l))).toBe(true);
+    expect(plan.weeks[0].phase).not.toBe('deload'); // боль нет — разгрузки нет
+  });
   it('P2-14: сгонка к дате старта в rationale (вес факта не трогает план)', () => {
     const plan = buildArmPlan({ ...BASE, competitionDateIso: isoInWeeks(6), bodyWeightKg: 80, targetWeightKg: 74 } as any);
     expect(plan.rationale.some((l: string) => /Сгонка к старту/.test(l))).toBe(true);

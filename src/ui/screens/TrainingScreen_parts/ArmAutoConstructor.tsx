@@ -15,7 +15,8 @@ import { buildArmSchedule } from '../../../engines/arm/arm-specialization.engine
 import { armPlanSnapshotId, refreshArmPlanSnapshot } from '../../../engines/arm/arm-plan-snapshot.engine';
 import { buildArmPrintHtml, buildArmIcs, buildArmPlanCsv } from '../../../engines/arm/arm-export.engine';
 import { ARM_SPLIT_PATTERNS } from '../../../engines/arm/arm-split-patterns';
-import { ARM_MUSCLE_RU, ARM_MUSCLES, type ArmSpecializationBlock } from '../../../engines/arm/arm-types';
+import { ARM_MUSCLE_RU, ARM_MUSCLES, type ArmSpecializationBlock, type ArmWeeklyCheckin } from '../../../engines/arm/arm-types';
+import { loadArmCheckins, saveArmCheckin, removeArmCheckin, armCheckinTrend } from '../../../engines/arm/arm-weekly-checkin.engine';
 import { injectArmCorrections } from '../../../engines/arm/arm-diagnostics-injection.engine';
 import { bridgeDoseFromPayload } from '../../../engines/arm/arm-correction-dose.engine';
 import { injectArmliftCorrections, applyArmliftSpecWave, type ArmliftInjectionItem } from '../../../engines/arm/armlift-injection.engine';
@@ -744,6 +745,12 @@ const [rfdEstimated, setRfdEstimated] = useState<boolean>(false);
   const [rotMode, setRotMode] = useState<boolean>(false);
   const [intensityT, setIntensityT] = useState<boolean>(false);
   const [strictDays, setStrictDays] = useState<boolean>(false);
+  // P1-10: недельный чек-ин (вес/сон/энергия/боль) — storage + тренд.
+  const [checkins, setCheckins] = useState<ArmWeeklyCheckin[]>(() => loadArmCheckins());
+  const [ciWeight, setCiWeight] = useState<string>('');
+  const [ciSleep, setCiSleep] = useState<string>('');
+  const [ciEnergy, setCiEnergy] = useState<string>('');
+  const [ciPain, setCiPain] = useState<string>('');
   // R8: ось humerus-2026 + попытки медли (опционально, пусто = как раньше)
   const [cycAxisOn, setCycAxisOn] = useState<boolean>(false);
   const [axTrunk, setAxTrunk] = useState<boolean>(false);
@@ -1172,6 +1179,65 @@ const [rfdEstimated, setRfdEstimated] = useState<boolean>(false);
       return buildArmSchedule({ focusGroup: focusGroup || undefined, weakPoints, specialization, totalWeeks: weeks, explicitBlocks: specBlocksToSchedule(specBlocks) });
     } catch { return null; }
   }, [specialization, specBlocks, focusGroup, weakPoints, weeks]);
+  // P1-10: тренд чек-инов + номер текущей недели плана (от даты сборки).
+  const checkinTrend = useMemo(() => {
+    try { return checkins.length ? armCheckinTrend(checkins, { targetWeightKg: parseFloat(proTargetW) || undefined }) : null; } catch { return null; }
+  }, [checkins, proTargetW]);
+  const checkinWeek = useMemo(() => {
+    try {
+      const raw = typeof localStorage !== 'undefined' ? localStorage.getItem('he_arm_plan_built_at') : null;
+      if (raw && /^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+        const days = Math.floor((Date.parse(`${localIsoDate()}T00:00:00Z`) - Date.parse(`${raw}T00:00:00Z`)) / 86400000);
+        return Math.max(1, Math.min(weeks, Math.floor(days / 7) + 1));
+      }
+    } catch { /* noop */ }
+    return 1;
+  }, [weeks, builtPlan]);
+  useEffect(() => {
+    if (ciWeight !== '') return;
+    const last = checkins.find((c) => Number(c.weightKg) > 0);
+    if (last?.weightKg) setCiWeight(String(last.weightKg));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [checkins]);
+  // PRO-PLAN: возврат настроек контура из снапшота варианта (не теряются при загрузке).
+  const restoreUiFromSnapshot = React.useCallback((snap: any) => {
+    if (!snap || typeof snap !== 'object') return;
+    try {
+      if (snap.discipline) setDiscipline(String(snap.discipline));
+      if (snap.technique) setTechnique(String(snap.technique));
+      if (snap.goal) setGoal(String(snap.goal));
+      if (snap.level && (LEVELS as readonly string[]).includes(String(snap.level))) setLevel(String(snap.level));
+      if (Number(snap.weeks) > 0) setWeeks(Math.max(2, Math.min(52, Math.round(Number(snap.weeks)))));
+      if (Number(snap.daysPerWeek) > 0) setDaysPerWeek(Math.max(2, Math.min(6, Math.round(Number(snap.daysPerWeek)))));
+      if (snap.progressionStyle) setProgStyle(String(snap.progressionStyle));
+      setLegsAnchor(!!snap.legsAnchor);
+      setRotMode(!!snap.rotationMode);
+      setIntensityT(!!snap.intensityTechniques);
+      if (Array.isArray(snap.peaks)) {
+        const maxW = Math.max(1, Number(snap.weeks) || 52);
+        setPeaks(snap.peaks
+          .filter((p: any) => p && Number(p.week) >= 1 && Number(p.week) <= maxW)
+          .map((p: any) => ({
+            week: Math.round(Number(p.week)),
+            priority: (['A', 'B', 'C'].includes(String(p.priority)) ? String(p.priority) : 'B') as 'A' | 'B' | 'C',
+            ...(p.name ? { name: String(p.name) } : {}),
+          })));
+      }
+      if (Array.isArray(snap.specializationSchedule)) {
+        setSpecBlocks(snap.specializationSchedule
+          .filter((b: any) => b && Array.isArray(b.targets))
+          .slice(0, 4)
+          .map((b: any) => ({
+            weekStart: Math.max(1, Math.round(Number(b.weekStart) || 1)),
+            weekEnd: Math.max(1, Math.round(Number(b.weekEnd) || 1)),
+            targets: (b.targets || []).slice(0, 2).map((t: unknown) => String(t)),
+            donors: Array.isArray(b.tradeoff?.donorMuscles) ? b.tradeoff.donorMuscles.slice(0, 2).map((t: unknown) => String(t)) : [],
+            mode: (b.tradeoff?.mode === 'reduce_direct_to_floor' || b.tradeoff?.mode === 'remove_direct_when_indirect_covers_floor') ? b.tradeoff.mode : 'none',
+          })));
+      }
+      if (snap.cycleId) setCycId(String(snap.cycleId));
+    } catch { /* тихо */ }
+  }, []);
 
   const handleBuild = () => {
     const pid = patternId || best?.id || ARM_SPLIT_PATTERNS[0].id;
@@ -1201,6 +1267,7 @@ const [rfdEstimated, setRfdEstimated] = useState<boolean>(false);
         legsAnchor: legsAnchor || undefined,
         rotationMode: rotMode || undefined,
         intensityTechniques: intensityT || undefined,
+        checkins: checkins.length ? checkins : undefined,
         readinessStatus: (pro7Readiness?.status === 'red' || pro7Readiness?.status === 'yellow' || pro7Readiness?.status === 'green') ? pro7Readiness.status : undefined,
         ...profilePatch,
         weakPoints,
@@ -2370,6 +2437,49 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
                 </AdBanner>
               </AdSec>
               </div>
+              {/* P1-10: недельный чек-ин (вес/сон/энергия/боль) — тренд + разгрузка при боли. */}
+              <div data-arm="checkin-card">
+              <AdSec title="🗓 Чек-ин недели" hook="checkin" collapsible defaultOpen={false}
+                summary={checkins.length ? `записей: ${checkins.length} · боль ${checkinTrend?.painAvgLast2 ?? '—'}/10` : 'нет записей'}
+                status={checkinTrend?.painWarn ? 'warn' : undefined}>
+                <AdGrid cols="2">
+                  <AdField label="Вес, кг"><input inputMode="decimal" value={ciWeight} onChange={(e) => setCiWeight(e.target.value)} aria-label="Чек-ин вес" placeholder="—" /></AdField>
+                  <AdField label="Сон, ч"><input inputMode="decimal" value={ciSleep} onChange={(e) => setCiSleep(e.target.value)} aria-label="Чек-ин сон" placeholder="—" /></AdField>
+                  <AdField label="Энергия 0–10"><input inputMode="numeric" value={ciEnergy} onChange={(e) => setCiEnergy(e.target.value)} aria-label="Чек-ин энергия" placeholder="—" /></AdField>
+                  <AdField label="Боль локтя 0–10"><input inputMode="numeric" value={ciPain} onChange={(e) => setCiPain(e.target.value)} aria-label="Чек-ин боль" placeholder="—" /></AdField>
+                </AdGrid>
+                <AdBtn variant="primary" block data-arm="checkin-save" onClick={() => {
+                  const w = Math.max(1, Math.min(weeks, checkinWeek));
+                  const entry: ArmWeeklyCheckin = {
+                    id: `armci-${Date.now()}`,
+                    week: w,
+                    dateIso: localIsoDate(),
+                    ...(parseFloat(ciWeight) > 0 ? { weightKg: parseFloat(ciWeight) } : {}),
+                    ...(parseFloat(ciSleep) > 0 ? { sleepHours: parseFloat(ciSleep) } : {}),
+                    ...(ciEnergy !== '' && parseFloat(ciEnergy) >= 0 ? { energy010: parseFloat(ciEnergy) } : {}),
+                    ...(ciPain !== '' && parseFloat(ciPain) >= 0 ? { elbowPain010: parseFloat(ciPain) } : {}),
+                  };
+                  const next = saveArmCheckin(entry);
+                  setCheckins(next);
+                  setCiSleep(''); setCiEnergy(''); setCiPain('');
+                  flash(`🗓 Чек-ин недели ${w} сохранён`);
+                }}>💾 Сохранить чек-ин недели {checkinWeek}</AdBtn>
+                {checkinTrend && checkins.length > 0 && (
+                  <>
+                    <div className="ad-tip" data-arm="checkin-trend">{checkinTrend.notes.join(' ')}</div>
+                    <div className="ad-list" data-arm="checkin-rows">
+                      {checkins.slice(0, 4).map((c) => (
+                        <div key={c.id} className="ad-finding" data-level={Number(c.elbowPain010) >= 4 ? 'warn' : 'ok'} style={{ fontVariantNumeric: 'tabular-nums' }}>
+                          Н{c.week} · {c.dateIso} · {c.weightKg ? `${c.weightKg} кг` : '—'} · сон {c.sleepHours ?? '—'} · энергия {c.energy010 ?? '—'} · боль {c.elbowPain010 ?? '—'}
+                          <button type="button" className="ad-chip" data-arm="checkin-remove" aria-label={`Убрать чек-ин недели ${c.week}`} onClick={() => setCheckins(removeArmCheckin(c.id))}>✕</button>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )}
+                {checkins.length === 0 && <div className="ad-muted">Самооценка недели: вес, сон, энергия, боль локтя. Боль ≥4 две недели → первая неделя следующего плана разгрузочная.</div>}
+              </AdSec>
+              </div>
               {/* P0-1: контур «план ↔ факт» — e1RM по дневнику + выполнение по неделям. */}
               <div data-arm="plan-fact-card">
               <AdSec title="📈 План vs факт (дневник)" hook="plan-fact" collapsible defaultOpen={false}
@@ -2633,6 +2743,7 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
 
                             setBuiltPlan(v.plan);
                             persistArmPlan(v.plan);
+                            try { restoreUiFromSnapshot((v.plan as any)?.inputSnapshot); } catch { /* тихо */ }
                             setArmEdits({});
                             setEditOpen(null);
                             setWeekSel(1);

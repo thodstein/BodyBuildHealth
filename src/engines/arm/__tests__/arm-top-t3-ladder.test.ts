@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { IMPLEMENT_LADDER, ladderWrPct, nextImplement, transferFactor } from '../arm-implement-ladder.engine';
+import { IMPLEMENT_LADDER, ladderWrPct, nextImplement, transferFactor, ladderRefLabel, LADDER_SCALE_NOTE } from '../arm-implement-ladder.engine';
 
 describe('arm TOP T3 лестница инвентаря', () => {
   it('лестница идёт support → pinch → crush', () => {
@@ -26,5 +26,14 @@ describe('arm TOP T3 лестница инвентаря', () => {
     expect(transferFactor('rolling_thunder', 'apollon_axle')).toBeGreaterThan(1);
     expect(transferFactor('apollon_axle', 'rolling_thunder')).toBeLessThan(1);
     expect(transferFactor('rolling_thunder', 'rolling_thunder')).toBe(1);
+  });
+  // P2-13: честность шкал — «WR» только где это действующий WR (RT), иначе «ориентир».
+  it('шкала: RT — WR, остальные — ориентир (без ложного «WR»)', () => {
+    expect(ladderRefLabel('rolling_thunder')).toBe('WR');
+    expect(ladderRefLabel('apollon_axle')).toBe('ориентира');
+    expect(ladderRefLabel('hub')).toBe('ориентира');
+    expect(nextImplement('rolling_thunder', 80, 'male').note).toContain('% WR');
+    expect(nextImplement('apollon_axle', 160, 'male').note).toContain('% ориентира');
+    expect(LADDER_SCALE_NOTE).toContain('пороговые ориентиры');
   });
 });

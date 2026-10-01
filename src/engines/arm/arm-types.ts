@@ -52,6 +52,18 @@ export interface ArmDiarySessionFact {
   exercises: ArmDiaryExerciseFact[];
 }
 
+/** Недельный чек-ин атлета (P1-10): вес/сон/энергия/боль + заметка. */
+export interface ArmWeeklyCheckin {
+  id: string;
+  week: number;
+  dateIso: string;
+  weightKg?: number;
+  sleepHours?: number;
+  energy010?: number;
+  elbowPain010?: number;
+  note?: string;
+}
+
 export type ArmGoal = 'strength' | 'peaking' | 'hypertrophy' | 'endurance' | 'maintenance';
 export type ArmGoalBB = ArmGoal; // alias для совместимости
 export type ArmPhase = 'accumulation' | 'intensification' | 'deload' | 'peaking';
@@ -216,6 +228,8 @@ export interface ArmBuilderInput {
   readinessStatus?: 'green' | 'yellow' | 'red' | 'unknown';
   /** P1-9: интенсификационные техники гипертрофии (drop-set на памп-изоляции). */
   intensityTechniques?: boolean;
+  /** P1-10: недельные чек-ины — боль ≥4 две недели → разгрузка, вес-тренд в rationale. */
+  checkins?: ArmWeeklyCheckin[];
 }
 
 export interface ArmInjury {
