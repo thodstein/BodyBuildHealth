@@ -32,6 +32,16 @@ export interface SRCycleMeta {
   targetFocus?: 'push' | 'pull' | 'legs' | 'upper' | 'lower' | 'fullbody' | 'arms' | 'shoulders' | 'back' | 'chest' | 'mixed' | 'specialization' | 'contest';
   deloadWeeks?: number[]; // номера недель с разгрузкой
   rirProgression?: { start: number; end: number }; // RIR первой/последней недели
+  /**
+   * Профессиональная библиотека (именные системы): схема объёма по умолчанию.
+   * UI-планировщик применяет её к плану цикла, если пользователь не выбрал свою.
+   */
+  volumeScheme?: 'gvt' | 'fst7' | 'gironda';
+  /**
+   * Профессиональная библиотека: методика порядка/техник по умолчанию
+   * (Mountain Dog / FST-7 / гиперемия). Применяется планировщиком как дефолт.
+   */
+  methodology?: 'compound_first' | 'pre_exhaust' | 'post_exhaust' | 'mountain_dog' | 'fst7' | 'hyperemia';
   phases?: SRPhaseBlock[]; // фазы макропериодизации (сила→гипертрофия и т.д.)
   /** Авторская разметка недель исходного PL-цикла, если она есть в источнике. */
   sourcePhases?: SRPhaseBlock[];

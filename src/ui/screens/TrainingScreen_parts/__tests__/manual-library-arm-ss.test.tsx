@@ -117,9 +117,9 @@ describe('Ручная библиотека: маппинг фильтров (в
     // + сцена (bodyfitness-12, KMS-MS)
     // Re-baseline (Фаза 4, решение пользователя): 66 → 65 — удалён дефектный advanced-цикл
     // («1 сессия/нед» при spw 3–4, корректная пересборка невозможна).
-    // Профессиональная библиотека (docs/BB-AUTO-PROFESSIONAL-CYCLES-PLAN.md): +10 advanced-циклов
-    // (bro-5/ppl-6/gvt/gironda/fst7/meadows/yates/dc/hit + жен. ppl-5). Было 65 → стало 75.
-    expect(adv.length).toBe(75);
+    // Профессиональная библиотека (docs/BB-AUTO-PROFESSIONAL-CYCLES-PLAN.md): +12 advanced-циклов
+    // (bro-5/ppl-6/gvt/gironda/fst7/meadows/yates/dc/hit/nubret/rp-ul + жен. ppl-5). Было 65 → стало 77.
+    expect(adv.length).toBe(77);
     expect(beg.length + adv.length + LMS_CYCLES.filter(c => plCycleMatchesLevel(c.meta.level, 'intermediate') && !beg.includes(c) && !adv.includes(c)).length).toBeGreaterThanOrEqual(LMS_CYCLES.length - 3);
   });
 

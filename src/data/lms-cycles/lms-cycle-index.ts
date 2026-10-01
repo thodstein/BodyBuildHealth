@@ -91,6 +91,8 @@ import { CYCLE_BB_M_MEADOWS_8 } from './cycle-bb-m-meadows-8';
 import { CYCLE_BB_M_YATES_8 } from './cycle-bb-m-yates-8';
 import { CYCLE_BB_M_DC_6 } from './cycle-bb-m-dc-6';
 import { CYCLE_BB_M_HIT_6 } from './cycle-bb-m-hit-6';
+import { CYCLE_BB_M_NUBRET_6 } from './cycle-bb-m-nubret-6';
+import { CYCLE_BB_M_RP_UL_6 } from './cycle-bb-m-rp-ul-6';
 import { CYCLE_BB_F_FB_3 } from './cycle-bb-f-fb-3';
 import { CYCLE_BB_F_PPL_5 } from './cycle-bb-f-ppl-5';
 
@@ -228,7 +230,7 @@ export const LMS_CYCLES: SRCycleTemplate[] = [
   CYCLE_BB_F_BODYFITNESS_12,
    CYCLE_BB_F_DELT_8,
    CYCLE_BB_F_WELLNESS_12,
-   // Профессиональная библиотека: именные классические системы (12 циклов)
+   // Профессиональная библиотека: именные классические системы (14 циклов)
    CYCLE_BB_M_BRO_5,
    CYCLE_BB_M_PPL_6,
    CYCLE_BB_M_FB_3,
@@ -239,6 +241,8 @@ export const LMS_CYCLES: SRCycleTemplate[] = [
    CYCLE_BB_M_YATES_8,
    CYCLE_BB_M_DC_6,
    CYCLE_BB_M_HIT_6,
+   CYCLE_BB_M_NUBRET_6,
+   CYCLE_BB_M_RP_UL_6,
    CYCLE_BB_F_FB_3,
    CYCLE_BB_F_PPL_5,
     // СРЦ2

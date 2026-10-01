@@ -33,10 +33,10 @@ describe('Ф4: вторая волна циклов (5 женских + 6 муж
     // Re-baseline (Фаза 4, решение пользователя): удалены 5 дефектных циклов
     // (juggernaut-2/korte-3x3/cube/russian-squat/src2-solovyov-bench-28 — «1 сессия/нед»
     // при spw 3–4, корректно пересобрать нельзя). Было 132 → стало 127.
-    // Профессиональная библиотека (docs/BB-AUTO-PROFESSIONAL-CYCLES-PLAN.md): +12 именных
-    // классических систем (Bro/PPL-6/FB-3/GVT/Gironda/FST-7/Meadows/Yates/DC/HIT + жен. FB-3/PPL-5).
-    // Было 127 → стало 139.
-    expect(LMS_CYCLES.length).toBe(139);
+    // Профессиональная библиотека (docs/BB-AUTO-PROFESSIONAL-CYCLES-PLAN.md): +14 именных
+    // классических систем (Bro/PPL-6/FB-3/GVT/Gironda/FST-7/Meadows/Yates/DC/HIT/Nubret/RP-UL + жен. FB-3/PPL-5).
+    // Было 127 → стало 141.
+    expect(LMS_CYCLES.length).toBe(141);
   });
 
   it('все 22 собираются через конвертер: 0 ошибок валидатора, делоды присутствуют', () => {

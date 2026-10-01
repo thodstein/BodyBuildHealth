@@ -1,6 +1,6 @@
 # BB-AUTO: профессиональный планировщик и профессиональные циклы
 
-Дата: Oct 01 2026 (HEAD базы: `995dcd58b`). Область: `src/data/lms-cycles`, `src/engines/bb`.
+Дата: Oct 01 2026. Область: `src/data/lms-cycles`, `src/engines/bb`, `BbAutoConstructor`.
 Правила: только Edit/Write; чужие WIP не трогать; математика планов (капы/MRV/фазы) не
 пересматривается — контент-волна; после каждой волны прогоны vitest + `tsc --noEmit`.
 
@@ -10,79 +10,93 @@
 |---|---|
 | Реестр `LMS_CYCLES` | **127** циклов (84 PL/арм/ТА + 38 BB + прочее) |
 | BB-циклы (`direction: 'bodybuilding'`) | **38** |
-| Мужские ББ | 23: base 01–12 + beginner-ul/cut-ul/pec/back/maint/dumbbell + arms/shoulders/legs/strength/hotel |
-| Женские ББ | 15: glute×4, posterior, bikini×3, bodyfitness, wellness, delt, upper, maint, cut, beginner |
-| Движки | 96 файлов; `bb-builder` (388КБ), `bb-finalize` (378КБ), `cycle-to-plan` (181КБ) — зрелые |
-| Схемы/методики движка | `volumeScheme`: gvt/gironda/fst7; `methodology`: DC/mountain_dog/hyperemia/pre_exhaust… |
+| Движки | 96 файлов; `bb-builder` (388КБ), `bb-finalize` (378КБ), `cycle-to-plan` (181КБ) |
+| Схемы/методики движка | `volumeScheme`: gvt/gironda/fst7; `methodology`: DC/Mountain Dog/FST-7/hyperemia |
 
-**Вывод.** Движок и объёмная модель — профессиональные. Слабое звено — **именные
-классические системы бодибилдинга отсутствуют как циклы**: Bro-split, классический PPL 6×,
-Full Body 3× для среднего уровня, GVT, Gironda 8×8, FST-7, Mountain Dog, Yates Blood & Guts.
-Каталог знает «сплиты» (25 паттернов) и методики, но **готовых мезоциклов этих систем нет** —
-пользователь не может выбрать «GVT» или «Yates» из библиотеки.
+**Вывод.** Движок и объёмная модель — профессиональные. Пробел — **именные классические
+системы бодибилдинга отсутствуют как циклы** (Bro-split, PPL 6×, Full Body 3×, GVT,
+Gironda 8×8, FST-7, Mountain Dog, Yates, DC, HIT, Nubret, RP-мезоцикл).
 
 ## §2. Цель волны
 
-Дать планировщику **библиотеку именных профессиональных систем** — 10 новых циклов
-(8 мужских + 2 женских), каждый: корректная форма `SRCycleTemplate`, канонические имена
-каталога, период RIR-лестница, делоды, фазовые заметки, честные `howItWorks/conditions`.
+Дать планировщику **библиотеку именных профессиональных систем** — 14 новых циклов
+(12 мужских + 2 женских), каждый с корректной формой, каноническими именами каталога,
+RIR-лестницей, делодами, фазовыми заметками. Плюс **профессиональная проводка**:
+именная система несёт свою схему объёма/методику в `meta`, и планировщик применяет её
+к плану («показано = применяется»).
 
-Инварианты (жёсткие, проверяются тестами):
-- `direction: 'bodybuilding'`, `tags: ['lms','bodybuilding', …]`;
-- все имена резолвятся `findCatalogExerciseByLabel` (иначе ломается `pl-p2-data-hygiene` allowlist);
-- `pct ≤ 1.1` (гард проходок), ≥2 сетов/упражнение, ≤10 упражнений/сессия;
-- `deloadWeeks` присутствуют, RIR-лестница `start > end`;
-- каждая major-мышца (chest/back/quads/hamstrings/glutes/shoulders/biceps/triceps) получает
-  частоту ≥1 (иначе `low_training_frequency`/`target_volume_deficit` — error);
-- пол меняет план (female glute/ham ×1.2) и цель меняет план (`goalMult`) — инвариант
-  `bb-cycle-audit-library`.
+## §3. Новые циклы
 
-## §3. Новые циклы (план)
-
-| id | Система | Нед | ×/нед | Уровень | Особенность |
+| id | Система | Нед | ×/нед | Уровень | Особенность / схема |
 |---|---|---|---|---|---|
 | `cycle-bb-m-bro-5` | Bro-split (1 группа/день) | 8 | 5 | KMS-MS | классика: Грудь/Спина/Ноги/Плечи/Руки |
 | `cycle-bb-m-ppl-6` | PPL классический | 8 | 6 | KMS-MS | Push/Pull/Legs ×2, разные углы |
 | `cycle-bb-m-fb-3` | Full Body 3×/нед | 8 | 3 | II-KMS | тяж/средн/лёгк (heavy/light/medium) |
-| `cycle-bb-m-gvt-8` | Немецкий объёмный (GVT) | 8 | 4 | KMS-MS | 2 упражнения/мышцу × 5 сетов = 10 сетов |
-| `cycle-bb-m-gironda-8` | Gironda 8×8 | 8 | 4 | KMS-MS | высокая плотность, 8 повторений |
-| `cycle-bb-m-fst7-8` | FST-7 | 8 | 5 | KMS-MS | 7-сетовые финишеры на изоляции |
-| `cycle-bb-m-meadows-8` | Mountain Dog | 8 | 4 | KMS-MSMK | стретч-позиции, разнообразие углов |
+| `cycle-bb-m-gvt-8` | Немецкий объёмный (GVT) | 8 | 4 | KMS-MS | 2 упр./мышцу × 5 сетов = 10 сетов; **scheme=gvt** |
+| `cycle-bb-m-gironda-8` | Gironda 8×8 | 8 | 4 | KMS-MS | высокая плотность; **scheme=gironda** |
+| `cycle-bb-m-fst7-8` | FST-7 | 8 | 5 | KMS-MS | 7-сетовые финишеры; **scheme=fst7, method=fst7** |
+| `cycle-bb-m-meadows-8` | Mountain Dog | 8 | 4 | KMS-MSMK | стретч-позиции; **method=mountain_dog** |
 | `cycle-bb-m-yates-8` | Yates Blood & Guts | 8 | 4 | KMS-MS | отказные подходы, 4 дня |
 | `cycle-bb-m-dc-6` | DC Training (Trudel) | 6 | 3 | KMS-MS | A/B/C-ротация, rest-pause, стретч |
-| `cycle-bb-m-hit-6` | Heavy Duty HIT (Mentzer) | 6 | 3 | KMS-MS | минимальный объём, отказные подходы |
+| `cycle-bb-m-hit-6` | Heavy Duty HIT (Mentzer) | 6 | 3 | KMS-MS | минимальный объём, отказ |
+| `cycle-bb-m-nubret-6` | Сплит Nubret | 6 | 5 | KMS-MS | очень высокий объём (16–19 сетов/группу) |
+| `cycle-bb-m-rp-ul-6` | Мезоцикл объёма RP | 6 | 4 | KMS-MS | MEV→MRV, фазы накопление/интенсификация |
 | `cycle-bb-f-fb-3` | Женский Full Body | 8 | 3 | II-KMS | низ/верх/полное, ягодичный акцент |
 | `cycle-bb-f-ppl-5` | Женский PPL 5× | 8 | 5 | KMS-MS | ягодичный акцент + верх-баланс |
 
-Итого: **+12 циклов** (10 мужских + 2 женских), реестр 127 → **139**, BB-циклов 38 → 50.
+Итого: реестр 127 → **141**, BB-циклов 38 → **52**.
 
-## §4. Re-baseline
+## §4. Профессиональная проводка (планер)
 
-- `cycle-wave2-matrix.test.ts`: `LMS_CYCLES.length` 127 → **139** (комментарий «было→стало»).
-- `manual-library-arm-ss.test.tsx`: advanced-уровень 65 → **75** (комментарий «было→стало»).
-- Больше ничего: BB-циклов 38 → 50; сэмплы `i%5`/`i%9` аудита сдвигаются — новые циклы
-  держат инвариант «пол/цель меняют план» (проверено прогоном).
-- `pl-p2-data-hygiene`: имена новых циклов резолвятся, `pct ≤ 1.1` (проверено — 18/18).
+- `SRCycleMeta += volumeScheme?('gvt'|'fst7'|'gironda')` и `methodology?(SessionMethodology)`.
+- Заполнено у GVT/Gironda/FST-7/Mountain Dog.
+- `BbAutoConstructor`: если пользователь не выбрал схему/методику — берётся дефолт из
+  `meta` выбранного цикла (порядок приоритета: явный выбор пользователя → meta → standard).
+- Lock-тест `bb-named-systems-scheme` (4): meta-поля + реальное применение (GVT → 10 повторов,
+  Gironda → 8) + parity без схемы.
 
-## §5. Верификация (факт)
+## §5. Re-baseline
+
+- `cycle-wave2-matrix.test.ts`: `LMS_CYCLES.length` 127 → **141**.
+- `manual-library-arm-ss.test.tsx`: advanced-уровень 65 → **77**.
+- Оба с комментарием «было→стало».
+
+## §6. Верификация (факт)
 
 | Проверка | Результат |
 |---|---|
-| `src/engines/bb` (263 файла) | **2926 passed / 20 skipped / 0 failed** |
-| Тяжёлый аудит `BB_CYCLE_AUDIT_FULL=1` (4 уровня × 50 циклов × 2 пола × 2 цели) | **20/20** (по файлам) |
-| `bb-cycle-matrix` (convert-путь, 50 циклов × 2 пола × 2 цели) | 5/5 |
-| `bb-cycle-audit-library` (структура/MRV/валидатор/делод/faithful) | 4/4 |
-| `cycle-wave2-matrix`, `lms-cycle-matrix`, `pl-p2-data-hygiene`, `bb-female-cycles` | зелёные |
-| UI `TrainingScreen_parts/__tests__/bb-*` + каталог/библиотека | **321 passed** (1 предсуществующий unhandled-таймер `bb-diagnostics-pro5`) |
-| `tsc --noEmit` (12GB heap) | **EXIT=0** |
+| `src/engines/bb` (264 файла) | **2930 passed / 20 skipped / 0 failed** |
+| Тяжёлый аудит `BB_CYCLE_AUDIT_FULL=1` (4 уровня × 52 цикла × 2 пола × 2 цели) | **20/20** |
+| Глубокий пробник: 14 новых циклов × 4 уровня × 2 пола × 2 цели × {natural, AAS500/GH4/INS10} × {convert, program(+named scheme)} | **ALL CLEAN** (0 ошибок, 0 MRV-overflow) |
+| `bb-cycle-matrix` / `bb-cycle-audit-library` / `cycle-wave2-matrix` / `lms-cycle-matrix` / `pl-p2-data-hygiene` / `bb-female-cycles` | зелёные |
+| UI `TrainingScreen_parts/__tests__/bb-*` + каталог/библиотека/мост | **302 passed** |
+| `tsc --noEmit` | 0 по моим файлам (1 чужая ошибка `src/engines/arm/index.ts` — WIP параллельного агента) |
 
-## §6. Журнал
+### Объём/уровни/фарма (замер `programToBBPlan`, эффективные сеты/нед, рабочие недели)
+
+Ключевые наблюдения (natural → AAS500/GH4/INS10):
+- Масштабирование уровня работает: напр. Bro-5 грудь 7.8 (beg) → 13.7 (enh) → 18.5 (enh+PED).
+- PED-множитель поднимает объём (MRV ×1.3–2.0) — все циклы остаются в капе.
+- Low-volume системы (DC/HIT) дают малый объём малых мышц (дельты 2.5–4, руки 3–7) — это
+  дизайн системы; валидатор ошибок не даёт. Голени/пресс добиваются MEV-гарантией движка.
+
+### Порядок и состав упражнений
+
+- Основной компаунд — первым во всех сессиях, кроме **leg-дня**: движок намеренно ставит
+  активацию (разгибания/сгибания ног) перед тяжёлым компаундом (pre-activation) — это
+  свойство движка (присутствует и в базовых `cycle-bb-01`/`bb-04`), не контента.
+- Состав: 3–8 упражнений/день; всего уникальных упражнений на цикл 28–80 (растёт с уровнем).
+
+## §7. Журнал
 
 | Волна | Статус |
 |---|---|
 | Аудит контента (§1) | ✅ |
-| 12 именных циклов | ✅ |
+| 14 именных циклов | ✅ |
+| Профессиональная проводка (§4) | ✅ |
 | Реестр + re-baseline | ✅ |
-| Прогоны + tsc | ✅ |
-| Найденные и исправленные дефекты контента | PPL-6: triceps-индирект overflow на beginner (4 жимовых упражнения + head-coverage) → трицепс приведён к канону, 2 жима убрано; glutes/hams overflow на PPL-6 → ноги перестроены (квадры+сгибания, без 2-го жима). Все 12 циклов чисты на 4 уровнях × 2 полах × 2 целях в обоих путях. |
+| Глубокий пробник объём/уровни/фарма/порядок | ✅ |
+| Прогоны + тяжёлый аудит + tsc | ✅ |
 
+**Осознанные границы:** порядок leg-дня (активация вперёд) — движковое решение, не менялось
+(смена затронула бы все планы); low-volume DC/HIT остаются низкообъёмными по дизайну.

@@ -2114,7 +2114,16 @@ export const BbAutoConstructor: React.FC = () => {
     } : undefined;
     // Объёмный режим: high → цель MRV, капы те же от уровня (дефолт 24 с фармой — норма)
     const effectiveVolGoal = (trainingVolumeMode === 'high' ? 'mrv' : bbVolGoal) as any;
-    const effectiveVolumeScheme = (trainingVolumeMode === 'high' && volumeScheme === 'standard' ? 'gvt' as const : volumeScheme) as any;
+    // Профессиональная библиотека (именные системы): если пользователь не выбрал
+    // схему/методику, берём дефолт из meta цикла (GVT/Gironda/FST-7/Mountain Dog) —
+    // «показано = применяется» для именных систем.
+    const libCycleMeta = (bbSource === 'cycle' && selectedCycleId) ? getCycleById(selectedCycleId)?.meta : undefined;
+    const effectiveVolumeScheme = (trainingVolumeMode === 'high' && volumeScheme === 'standard'
+      ? 'gvt' as const
+      : (volumeScheme !== 'standard' ? volumeScheme : ((libCycleMeta as any)?.volumeScheme ?? 'standard'))) as any;
+    const effectiveMethodology = (bbMethodology !== 'compound_first'
+      ? bbMethodology
+      : ((libCycleMeta as any)?.methodology ?? bbMethodology)) as typeof bbMethodology;
 
     try {
 
@@ -2165,9 +2174,9 @@ export const BbAutoConstructor: React.FC = () => {
            // M3 (§8.3): цель пользователя доезжает в program-путь (был тихий игнор:
            // сушка/масса не влияли на объём циклового UI-пути — паритет с generic).
            goal: bbGoal,
-          specialization: specializationMode,
-           mode: bbAdaptMode,
-           methodology: bbMethodology,
+           specialization: specializationMode,
+            mode: bbAdaptMode,
+            methodology: effectiveMethodology,
             trainingFocus: bbTrainingFocus,
              trainingVolumeMode: trainingVolumeMode as any,
              sex: linked.profile?.settings?.personal?.sex,
