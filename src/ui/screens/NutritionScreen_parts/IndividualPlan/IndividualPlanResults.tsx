@@ -12,6 +12,7 @@ import { buildTrainSchedule, isTrainingDayFor } from "./planner-training-schedul
 import { NutritionPeriodizationCard } from "./NutritionPeriodizationCard";
 import { SupplementTimingCard } from "./SupplementTimingCard";
 import { WeeklyReviewCard } from "./WeeklyReviewCard";
+import { RefeedCalendarCard } from "./RefeedCalendarCard";
 import { ALL_SUBSTANCES } from "../../../../data/support-substances";
 import { getWeightLog } from "../../../../engines/profile-store";
 import { PopupSelect } from "../../../components/PopupXxx";
@@ -1104,6 +1105,8 @@ const doImportPlan = (raw: string): boolean => {
             );
           } catch { return null; }
         })()}
+
+        <RefeedCalendarCard goal={goal} startDate={localIsoDate(new Date())} bodyFatPct={bodyFatPct} />
       </>)}
 
       {generated && planDays === 3 && threeDayPlan && (
