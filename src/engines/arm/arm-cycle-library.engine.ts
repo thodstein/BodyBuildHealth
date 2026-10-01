@@ -37,9 +37,26 @@ export type ArmCycleId =
   | 'gog_rt_6'
   | 'horne_basic_12'
   | 'levan_pyramid_4'
-  | 'donatif_adv_8';
+  | 'donatif_adv_8'
+  // PRO-PLAN R2: профессиональные циклы (межсезонье/защита/hook-press/сезон/лифтинг/женский/возврат)
+  | 'offseason_base_10'
+  | 'kingsmove_8'
+  | 'hook_press_8'
+  | 'waf_season_16'
+  | 'rt_ladder_8'
+  | 'axle_pinch_10'
+  | 'women_base_8'
+  | 'post_injury_return_6';
 
 export type ArmCycleFit = 'exact' | 'proposed_extend' | 'proposed_shrink' | 'strict_skip';
+
+/** Мезо-блок цикла: имя/цель/границы недель (профессиональная структура). */
+export interface ArmCycleBlock {
+  name: string;
+  objective: string;
+  weekStart: number;
+  weekEnd: number;
+}
 
 export interface ArmCycleTemplate {
   id: ArmCycleId;
@@ -55,6 +72,9 @@ export interface ArmCycleTemplate {
   taperPreset: 'classic' | 'tableready_deload' | 'coc_deload' | 'toproll_taper' | 'none';
   correctionPctDefault: number; // %/нед прогрессии весов (СРЦ — 0.5)
   note: string;
+  /** Мезо-блоки цикла (профессиональный контур). Для старых циклов не заданы —
+   *  блоки выводятся из фазовой карты (deriveArmBlocks). */
+  blocks?: ArmCycleBlock[];
 }
 
 function phasesLinear(
@@ -218,6 +238,110 @@ export const ARM_CYCLE_LIBRARY: ArmCycleTemplate[] = [
     tablePerWeek: 1, rpe: 'День макс-силы + день динамики + день спецвыносливости (RPE/%1RM)', deloadRule: 'Делоад каждая 4–6н: объём вниз, связки/эксцентрика лёгкая + мобильность',
     taperPreset: 'classic', correctionPctDefault: 0.5,
     note: 'Сессии с точной целью (пронация / back pressure / hook-статика), углы как на старте. Медиальный локоть — лимитер частоты.',
+  },
+  // ══ PRO-PLAN R2: профессиональные циклы (мезо-блоки + специализация) ══
+  {
+    id: 'offseason_base_10', name: 'Межсезонье 10 (GPP → база → сила)', discipline: 'armwrestling',
+    weeks: 10, daysPerWeek: 4, level: ['beginner', 'intermediate'],
+    phases: phasesLinear(10, (w) => (w <= 3 ? 'accumulation' : w === 4 ? 'deload' : w <= 7 ? 'accumulation' : w === 8 ? 'deload' : 'intensification')),
+    tablePerWeek: 1, rpe: 'GPP RPE 6–7 → база 7–8 → сила 8', deloadRule: 'Н4/Н8 разгрузка 60%; стол 1×/нед втягивающий, без максимумов',
+    taperPreset: 'classic', correctionPctDefault: 0.5,
+    note: 'Каркас межсезонья: 3 нед GPP (связки/техника/восстановление) → 4 нед базы (объём, база-якорь LegsCore) → втягивание в силу. Без синглов и отказных подходов.',
+    blocks: [
+      { name: 'GPP', objective: 'связки, техника, аэробная база, бытовая готовность', weekStart: 1, weekEnd: 3 },
+      { name: 'База', objective: 'объём предплечья/хвата, база-якорь, стол-техника', weekStart: 4, weekEnd: 7 },
+      { name: 'Силовой старт', objective: 'интенсивность 8 RPE, подготовка к силовому блоку', weekStart: 8, weekEnd: 10 },
+    ],
+  },
+  {
+    id: 'kingsmove_8', name: 'Kingsmove 8 (защита: кисть-назад + containment)', discipline: 'armwrestling',
+    weeks: 8, daysPerWeek: 4, level: ['advanced', 'enhanced'],
+    phases: phasesLinear(8, (w) => (w <= 3 ? 'accumulation' : w === 4 ? 'deload' : w <= 7 ? 'intensification' : 'peaking')),
+    tablePerWeek: 2, rpe: 'Н1–3 объём защиты 7–8; Н5–7 изо-удержания 8–9; Н8 пик', deloadRule: 'Н4 −40% (кисть-назад только лёгкие изо); Н8 свежесть: 60% объёма, техника стола',
+    taperPreset: 'classic', correctionPctDefault: 0.5,
+    note: 'Специализация обороны: разгибатели кисти (kingsmove), containment пальцев, back pressure. 2 стола/нед — один защитный (сопротивление), один спарринг. Локоть — лимитер: при боли ≥4 только изометрия.',
+    blocks: [
+      { name: 'База выносливости', objective: 'разгибатели кисти, containment, изо 15–20с', weekStart: 1, weekEnd: 4 },
+      { name: 'Сила защиты', objective: 'кисть-назад под нагрузкой, back pressure 5–8', weekStart: 5, weekEnd: 7 },
+      { name: 'Пик', objective: 'свежесть, табличный стейт, без отказа', weekStart: 8, weekEnd: 8 },
+    ],
+  },
+  {
+    id: 'hook_press_8', name: 'Hook + Press 8 (внутренний + боковой)', discipline: 'armwrestling',
+    weeks: 8, daysPerWeek: 4, level: ['advanced', 'enhanced'],
+    phases: phasesLinear(8, (w) => (w <= 3 ? 'accumulation' : w === 4 ? 'deload' : w <= 7 ? 'intensification' : 'peaking')),
+    tablePerWeek: 1, rpe: 'Н1–3 cup/супинация 7–8; Н5–7 hook-тяга и press 8–9; Н8 пик', deloadRule: 'Н4 −40%; side — только изометрия/ремень; Н8 без максимумов бокового',
+    taperPreset: 'classic', correctionPctDefault: 0.5,
+    note: 'Гибридная атака: hook (cup+супинация+брахиалис) и press-цепь (боковое, трицепс, плечо). Humerus-guard активен: side ≤ капа, RIR≥2. Стол 1×/нед с фокусом на старт из крюка.',
+    blocks: [
+      { name: 'Объём hook/press', objective: 'cup/супинация объём + press-цепь база', weekStart: 1, weekEnd: 4 },
+      { name: 'Сила цепи', objective: 'hook-тяга 5–8, press 8–10, старты', weekStart: 5, weekEnd: 7 },
+      { name: 'Пик', objective: 'стартовая специфика, свежесть', weekStart: 8, weekEnd: 8 },
+    ],
+  },
+  {
+    id: 'waf_season_16', name: 'Сезон WAF 16 (база → специфика → тейпер → пик)', discipline: 'armwrestling',
+    weeks: 16, daysPerWeek: 5, level: ['advanced', 'enhanced'],
+    phases: phasesLinear(16, (w) => (w <= 3 ? 'accumulation' : w === 4 ? 'deload' : w <= 6 ? 'accumulation' : w <= 10 ? 'intensification' : w === 11 ? 'deload' : w <= 14 ? 'intensification' : w === 15 ? 'deload' : 'peaking')),
+    tablePerWeek: 2, rpe: 'Н1–6 база 6–7/7–8; Н7–14 специфика 8–9; Н15–16 тейпер/пик 5–7', deloadRule: 'Н4/Н11/Н15 разгрузки; Н16 пик 45% объёма, только старты и техника',
+    taperPreset: 'classic', correctionPctDefault: 0.5,
+    note: 'Полный сезон к Worlds: база 6 нед (GPP+объём) → специфика 8 нед (углы старта, матчапы) → тейпер 1 нед + пик. 2 стола/нед в специфике, 1 в базе. После старта — восстановительная неделя вместо Н1 нового цикла.',
+    blocks: [
+      { name: 'База', objective: 'GPP, объём, база-якорь, техника старта', weekStart: 1, weekEnd: 4 },
+      { name: 'Специфика', objective: 'углы и матчапы, интенсивность 8–9, стол 2×', weekStart: 5, weekEnd: 11 },
+      { name: 'Сила', objective: 'пиковые веса 5–6, скорость/strain', weekStart: 12, weekEnd: 14 },
+      { name: 'Тейпер/Пик', objective: 'разгрузка + стейт к дате старта', weekStart: 15, weekEnd: 16 },
+    ],
+  },
+  {
+    id: 'rt_ladder_8', name: 'RT-лестница 8 (% от max, Rolling Thunder)', discipline: 'armlifting',
+    weeks: 8, daysPerWeek: 3, level: ['intermediate', 'advanced'],
+    phases: phasesLinear(8, (w) => (w <= 3 ? 'accumulation' : w === 4 ? 'deload' : w <= 7 ? 'intensification' : 'peaking')),
+    tablePerWeek: 0, rpe: 'Vol Н1–3: 70–80%×6–8; Int Н5–7: 85–95%×3–5 + синглы; Н8 тест', deloadRule: 'Н4 −40% (техника хвата); Н8 тест-макс после 48–72ч отдыха',
+    taperPreset: 'classic', correctionPctDefault: 0.5,
+    note: 'Классическая %-лестница Rolling Thunder от текущего максимума: объём → интенсивность → синглы → тест. Каждая тяга DOH без лямок, магнезия; хват-экстензоры и pinch — обязательная подсобка, не аксессуар.',
+    blocks: [
+      { name: 'Объём RT', objective: '70–80% базовый объём, кожура/техника хвата', weekStart: 1, weekEnd: 4 },
+      { name: '% лестница', objective: '85–95% тройки → синглы, пик силы хвата', weekStart: 5, weekEnd: 7 },
+      { name: 'Тест-пик', objective: 'макс RT, стейт, разгрузка перед тестом', weekStart: 8, weekEnd: 8 },
+    ],
+  },
+  {
+    id: 'axle_pinch_10', name: 'Axle + Pinch 10 (двухснарядный)', discipline: 'armlifting',
+    weeks: 10, daysPerWeek: 3, level: ['intermediate', 'advanced'],
+    phases: phasesLinear(10, (w) => (w <= 3 ? 'accumulation' : w === 4 ? 'deload' : w <= 8 ? 'intensification' : w === 9 ? 'deload' : 'peaking')),
+    tablePerWeek: 0, rpe: 'Н1–3 Axle 70–80%, Saxon/Hub 5–8; Н5–8 85–95% тройки; Н10 тест', deloadRule: 'Н4/Н9 −40%; Axle и Pinch в разные дни, кожа рук — лимитер частоты',
+    taperPreset: 'classic', correctionPctDefault: 0.5,
+    note: 'Двухснарядная подготовка Axle + Saxon/Pinch: две несовместимые адаптации (support DOH и щипок) развиваются параллельно на разных днях. Hub/Euro — подсобка. Тест обоих снарядов в Н10 с 72ч отдыха.',
+    blocks: [
+      { name: 'Axle база', objective: 'DOH тяга 70–80%, хват-поддержка объём', weekStart: 1, weekEnd: 5 },
+      { name: 'Saxon/Pinch', objective: 'щипок 5–8, Hub/Euro подсобка, % рост', weekStart: 6, weekEnd: 8 },
+      { name: 'Пик/тест', objective: 'разгрузка + тест Axle и Pinch', weekStart: 9, weekEnd: 10 },
+    ],
+  },
+  {
+    id: 'women_base_8', name: 'Женская база 8 (предплечье + хват)', discipline: 'armwrestling',
+    weeks: 8, daysPerWeek: 3, level: ['beginner', 'intermediate'],
+    phases: phasesLinear(8, (w) => (w <= 3 ? 'accumulation' : w === 4 ? 'deload' : w <= 7 ? 'accumulation' : 'intensification')),
+    tablePerWeek: 1, rpe: 'RPE 6–7 база, без отказа; стол 1×/нед техника', deloadRule: 'Н4 −40%; цикл — объём мягче на 15–20% (сухожилия/связки), железо-контроль при дефиците',
+    taperPreset: 'classic', correctionPctDefault: 0.5,
+    note: 'Стартовая женская база: техника стола, cup/supination/хват без отказных подходов, база-якорь для side-цепи. Если на дефиците (подготовка к сцене) — объём по нижней границе, белок ≥2 г/кг, контроль железа/ферритина.',
+    blocks: [
+      { name: 'Втягивание', objective: 'техника хвата и стола, связки, RPE 6–7', weekStart: 1, weekEnd: 4 },
+      { name: 'База', objective: 'объём предплечья/хвата, база-якорь, лёгкая сила', weekStart: 5, weekEnd: 8 },
+    ],
+  },
+  {
+    id: 'post_injury_return_6', name: 'Возврат после травмы 6 (tendon-first)', discipline: 'armwrestling',
+    weeks: 6, daysPerWeek: 3, level: ['beginner', 'intermediate'],
+    phases: phasesLinear(6, (w) => (w <= 3 ? 'accumulation' : w === 4 ? 'deload' : 'accumulation')),
+    tablePerWeek: 0, rpe: 'RPE 5–6, без отказа и синглов; боль ≤3 по ходу и <3 утром', deloadRule: 'Н4 разгрузка; при боли >3 — шаг назад на 1 неделю (PMM-принцип)',
+    taperPreset: 'none', correctionPctDefault: 0,
+    note: 'Возврат после травмы локтя/кисти: изометрии и лёгкая изотоническая работа, эксцентрика 3с, никаких максимумов и стола. Прогресс = безболезненное повторение; при рецидиве — к врачу, не «дотерпеть».',
+    blocks: [
+      { name: 'Реадаптация', objective: 'изометрия 20–30с, лёгкая эксцентрика, контроль боли', weekStart: 1, weekEnd: 3 },
+      { name: 'Втягивание', objective: 'лёгкая сила 5–8, связки, техника без стола', weekStart: 4, weekEnd: 6 },
+    ],
   },
 ];
 

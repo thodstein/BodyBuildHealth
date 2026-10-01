@@ -62,6 +62,7 @@ function ensureFlexExtBalance(plan: ArmPlan): void {
           muscle: 'wrist_extensors' as any, name: 'Разгибание кисти со штангой', role: 'accessory', character: 'памп' as any,
           sets: 2, repsRange: [12,20], rir: 2,
           workSets: [{ reps: 15, rir: 2, weight: 0, restSeconds: 60 }, { reps: 15, rir: 2, weight: 0, restSeconds: 60 }],
+          movementPattern: 'wrist_extension' as any, substitutionGroup: 'wrist_ext',
           loadMode: 'bodyweight', provenance: 'finalizer', provenanceSource: 'arm-finalize:flex-ext-balance',
         });
       }
@@ -296,6 +297,7 @@ function ensureGripCoverage(plan: ArmPlan): void {
       if (last) last.exercises.push({
         muscle: 'grip_support' as any, name: 'Rolling Thunder (вращающаяся ручка)', role: 'accessory', character: 'памп' as any,
          sets: 2, repsRange: [5,8], rir: 2, workSets: [{ reps: 5, rir: 2, weight: 0 }, { reps: 5, rir: 2, weight: 0 }],
+         movementPattern: 'grip_support' as any, substitutionGroup: 'grip_support',
          loadMode: 'tool', provenance: 'finalizer', provenanceSource: 'arm-finalize:grip-coverage',
        });
     }
@@ -304,6 +306,7 @@ function ensureGripCoverage(plan: ArmPlan): void {
       if (last && last.exercises.length < 6) last.exercises.push({
         muscle: 'grip_pinch' as any, name: 'Щипок блинов (удержание)', role: 'accessory', character: 'памп' as any,
          sets: 2, repsRange: [1,1], rir: 2, workSets: [{ reps: 1, rir: 2, weight: 0, holdSeconds: 10 }, { reps: 1, rir: 2, weight: 0, holdSeconds: 10 }],
+         movementPattern: 'grip_pinch' as any, substitutionGroup: 'grip_pinch',
          loadMode: 'tool', provenance: 'finalizer', provenanceSource: 'arm-finalize:grip-coverage',
        });
     }

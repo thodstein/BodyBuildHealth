@@ -76,12 +76,12 @@ describe('Arm cycle picker', () => {
     expect(screen.getByRole('button', { name: 'Цикл: — обычный план —' }), 'reset').toBeTruthy();
   });
 
-  it('шит и пикер покрывают всю библиотеку (19)', () => {
+  it('шит и пикер покрывают всю библиотеку (27)', () => {
     const { container } = render(<ArmAutoConstructor />);
     fireEvent.click(screen.getByRole('button', { name: '4 Сплит и цикл' }));
     const dlg = openCycleSheet();
     const opts = within(dlg).getAllByRole('button').filter((b) => b.textContent !== 'Готово');
-    expect(opts.length).toBe(20);
+    expect(opts.length).toBe(ARM_CYCLE_LIBRARY.length + 1); // + «— обычный план —»
     expect(container.querySelectorAll("[data-arm='cycle-picker'] .ad-split").length).toBe(ARM_CYCLE_LIBRARY.length);
   });
 

@@ -1,13 +1,27 @@
 import { describe, it, expect } from 'vitest';
 import { ARM_CYCLE_LIBRARY, getArmCycle, cyclePhaseMap, fitCycleToWeeks } from '../arm-cycle-library.engine';
-import { rankArmCycles, selectBestArmCycle, explainArmCycle } from '../arm-cycle-selector.engine';
+import { rankArmCycles, selectBestArmCycle, explainArmCycle, suggestCycleForMacroPhase } from '../arm-cycle-selector.engine';
 import { buildArmPlan } from '../arm-builder.engine';
 import { buildArmTaperCurve } from '../arm-taper.engine';
 
 describe('arm-cycle-library', () => {
-  it('19 шаблонов, уникальные id', () => {
-    expect(ARM_CYCLE_LIBRARY.length).toBe(19);
-    expect(new Set(ARM_CYCLE_LIBRARY.map((c) => c.id)).size).toBe(19);
+  it('27 шаблонов (19 + 8 PRO-PLAN), уникальные id', () => {
+    // было 19 → стало 27 (PRO-PLAN R2: межсезонье/kingsmove/hook-press/сезон WAF/RT/axle-pinch/женский/возврат)
+    expect(ARM_CYCLE_LIBRARY.length).toBe(27);
+    expect(new Set(ARM_CYCLE_LIBRARY.map((c) => c.id)).size).toBe(27);
+  });
+  it('PRO-PLAN циклы несут мезо-блоки (структура профессионального планирования)', () => {
+    for (const id of ['offseason_base_10', 'kingsmove_8', 'hook_press_8', 'waf_season_16', 'rt_ladder_8', 'axle_pinch_10', 'women_base_8', 'post_injury_return_6']) {
+      const c = getArmCycle(id);
+      expect(c, id).toBeDefined();
+      expect(c!.blocks && c!.blocks.length, `${id}: blocks`).toBeGreaterThan(0);
+      for (const b of c!.blocks!) {
+        expect(b.weekEnd).toBeGreaterThanOrEqual(b.weekStart);
+        expect(b.weekStart).toBeGreaterThanOrEqual(1);
+        expect(b.weekEnd).toBeLessThanOrEqual(c!.weeks);
+        expect(String(b.objective || '').length).toBeGreaterThan(0);
+      }
+    }
   });
   it('все шаблоны валидны: недели/фазы/тейпер', () => {
     for (const c of ARM_CYCLE_LIBRARY) {
@@ -16,6 +30,17 @@ describe('arm-cycle-library', () => {
       expect(c.daysPerWeek).toBeGreaterThan(0);
       expect(c.correctionPctDefault).toBeGreaterThanOrEqual(0);
     }
+  });
+  it('PRO-PLAN циклы участвуют в годовых подсказках (канон-первый цел)', () => {
+    expect(suggestCycleForMacroPhase('hypertrophy')).toContain('offseason_base_10');
+    expect(suggestCycleForMacroPhase('strength')).toContain('hook_press_8');
+    expect(suggestCycleForMacroPhase('peaking')).toContain('waf_season_16');
+    expect(suggestCycleForMacroPhase('strength', 'armlifting')).toContain('rt_ladder_8');
+    expect(suggestCycleForMacroPhase('peaking', 'armlifting')).toContain('rt_ladder_8');
+    // канон-первый не сдвинут (локи соседних тестов)
+    expect(suggestCycleForMacroPhase('strength')[0]).toBe('src_toproll_12');
+    expect(suggestCycleForMacroPhase('peaking')[0]).toBe('toproll_6');
+    expect(suggestCycleForMacroPhase('transition')).toEqual(['brzenk_1_1']);
   });
   it('getArmCycle: известные id', () => {
     expect(getArmCycle('strengthlog_8')?.weeks).toBe(8);

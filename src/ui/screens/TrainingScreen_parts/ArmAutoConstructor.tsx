@@ -13,7 +13,7 @@ import { finalizeArmPlan } from '../../../engines/arm/arm-finalize.engine';
 import { rankArmSplits } from '../../../engines/arm/arm-selector.engine';
 import { buildArmSchedule } from '../../../engines/arm/arm-specialization.engine';
 import { armPlanSnapshotId, refreshArmPlanSnapshot } from '../../../engines/arm/arm-plan-snapshot.engine';
-import { buildArmPrintHtml, buildArmIcs } from '../../../engines/arm/arm-export.engine';
+import { buildArmPrintHtml, buildArmIcs, buildArmPlanCsv } from '../../../engines/arm/arm-export.engine';
 import { ARM_SPLIT_PATTERNS } from '../../../engines/arm/arm-split-patterns';
 import { ARM_MUSCLE_RU } from '../../../engines/arm/arm-types';
 import { injectArmCorrections } from '../../../engines/arm/arm-diagnostics-injection.engine';
@@ -30,6 +30,7 @@ import { suggestSplitForCycle, consentPreview } from '../../../engines/arm/arm-p
 import { buildGripRpe } from '../../../engines/arm/arm-grip-rpe.engine';
 import { ARM_CYCLE_LIBRARY, fitCycleToWeeks, getArmCycle } from '../../../engines/arm/arm-cycle-library.engine';
 import { rankArmCycles } from '../../../engines/arm/arm-cycle-selector.engine';
+import { planArmPeaks } from '../../../engines/arm/arm-periodization.engine';
 import { GRIP_IMPLEMENTS, type ArmImplement } from '../../../engines/arm/arm-grip.engine';
 import { ARM_MEDLEYS, getMedley } from '../../../engines/arm/arm-medley.engine';
 import { buildArmProSummary } from '../../../engines/arm/arm-pro-integration.engine';
@@ -710,6 +711,12 @@ const [rfdEstimated, setRfdEstimated] = useState<boolean>(false);
   const [cycMedley, setCycMedley] = useState<string>('');
   const [cycFor, setCycFor] = useState<boolean>(false);
   const [cycForSpec, setCycForSpec] = useState<string>('support');
+  // PRO-PLAN: профессиональный контур периодизации — стиль прогрессии, старты, база-якорь.
+  const [progStyle, setProgStyle] = useState<string>('auto');
+  const [legsAnchor, setLegsAnchor] = useState<boolean>(false);
+  const [peaks, setPeaks] = useState<Array<{ week: number; priority: 'A' | 'B' | 'C'; name?: string }>>([]);
+  const [peakWeekInput, setPeakWeekInput] = useState<string>('');
+  const [peakPrioInput, setPeakPrioInput] = useState<'A' | 'B' | 'C'>('B');
   // R8: ось humerus-2026 + попытки медли (опционально, пусто = как раньше)
   const [cycAxisOn, setCycAxisOn] = useState<boolean>(false);
   const [axTrunk, setAxTrunk] = useState<boolean>(false);
@@ -1089,6 +1096,19 @@ const [rfdEstimated, setRfdEstimated] = useState<boolean>(false);
 
   const flash = (t: string) => { setMsg(t); setTimeout(()=>setMsg(''), 2600); };
 
+  // PRO-PLAN: старты внутри плана (мульти-пиковость) — валидация + превью окон.
+  const addPeak = () => {
+    const w = Math.round(Number(peakWeekInput));
+    if (!Number.isFinite(w) || w < 1 || w > weeks) { flash(`⚠ Неделя старта: 1–${weeks}`); return; }
+    if (peaks.some((p) => p.week === w)) { flash('⚠ Этот старт уже добавлен'); return; }
+    setPeaks((prev) => [...prev, { week: w, priority: peakPrioInput }].sort((a, b) => a.week - b.week));
+    setPeakWeekInput('');
+  };
+  const removePeak = (w: number) => setPeaks((prev) => prev.filter((p) => p.week !== w));
+  const peaksPreview = useMemo(() => {
+    try { return planArmPeaks(peaks, weeks, {}); } catch { return null; }
+  }, [peaks, weeks]);
+
   const handleBuild = () => {
     const pid = patternId || best?.id || ARM_SPLIT_PATTERNS[0].id;
     try {
@@ -1109,7 +1129,12 @@ const [rfdEstimated, setRfdEstimated] = useState<boolean>(false);
         goal: goal as any,
         technique: technique as any,
         weeks,
+        daysPerWeek,
         gripFocus: gripFocus as any,
+        // PRO-PLAN: стиль прогрессии / старты в плане / база-якорь (пусто = как раньше).
+        progressionStyle: progStyle !== 'auto' ? (progStyle as any) : undefined,
+        peaks: peaks.length ? peaks : undefined,
+        legsAnchor: legsAnchor || undefined,
         ...profilePatch,
         weakPoints,
         focusGroup: focusGroup || undefined,
@@ -1227,7 +1252,10 @@ const [rfdEstimated, setRfdEstimated] = useState<boolean>(false);
               if (Number.isFinite(w) && w >= 1 && w <= 3) doseOpts.waveWeek = w;
             } catch {}
           } catch {}
-          const inj = injectArmCorrections(plan, toInject as ArmWeakPoint[], { level, workMax, ...doseOpts });
+          // PRO-PLAN: инъекция во ВСЕ недели плана (не только первую) — коррекция
+          // сопровождает весь мезоцикл, а не исчезает с 1-й недели. Делод-скип и
+          // per-day dedup остаются в движке.
+          const inj = injectArmCorrections(plan, toInject as ArmWeakPoint[], { level, workMax, weekIdxs: (plan.weeks || []).map((_: any, i: number) => i), ...doseOpts });
           plan = inj.plan;
           if (inj.injected>0) plan.rationale = [...(plan.rationale||[]), `Инъекция мёртвых точек: ${inj.notes.join(' · ')}`];
         }
@@ -1235,9 +1263,10 @@ const [rfdEstimated, setRfdEstimated] = useState<boolean>(false);
       // PRO-5 real: волна хват-коррекций армлифтинга — ТОЛЬКО дисциплина armlifting
       try {
         if ((discipline as string) === 'armlifting' && armliftCorrections.items.length) {
+          const allWeekIdxs = (plan.weeks || []).map((_: any, i: number) => i);
           const inj = armliftCorrections.spec.length
-            ? applyArmliftSpecWave(plan, armliftCorrections.spec, armliftCorrections.items, { level, workMax, weakArmNote: (armliftCorrections as any).weakArmNote, orderNote: (armliftCorrections as any).orderNote })
-            : injectArmliftCorrections(plan, armliftCorrections.items, { level, workMax, weakArmNote: (armliftCorrections as any).weakArmNote, orderNote: (armliftCorrections as any).orderNote });
+            ? applyArmliftSpecWave(plan, armliftCorrections.spec, armliftCorrections.items, { level, workMax, weekIdxs: allWeekIdxs, weakArmNote: (armliftCorrections as any).weakArmNote, orderNote: (armliftCorrections as any).orderNote })
+            : injectArmliftCorrections(plan, armliftCorrections.items, { level, workMax, weekIdxs: allWeekIdxs, weakArmNote: (armliftCorrections as any).weakArmNote, orderNote: (armliftCorrections as any).orderNote });
           plan = inj.plan;
           if (inj.injected > 0 || inj.notes.length) {
             plan.rationale = [...(plan.rationale || []), `Армлифтинг-коррекции: ${inj.notes.join(' · ')}`];
@@ -1944,6 +1973,52 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
               } catch { return null; }
             })()}
           </AdSec>
+          {/* PRO-PLAN: стиль прогрессии, старты внутри плана, база-якорь. */}
+          <AdSec title="🎯 Периодизация и старты" hint="Стиль прогрессии, старты внутри ОДНОГО плана (тейпер-окна + восстановление) и база-якорь." collapsible defaultOpen={false} summary={`${progStyle === 'auto' ? 'Авто' : progStyle === 'linear' ? 'Линейная' : progStyle === 'double' ? 'Двойная' : 'Волновая'} · стартов: ${peaks.length}`} status={peaks.length ? 'ok' : undefined}>
+            <div className="ad-chips" data-arm="prog-style">
+              {[
+                { id: 'auto', label: 'Авто (цикл/линейная)' },
+                { id: 'linear', label: 'Линейная %/нед' },
+                { id: 'double', label: 'Двойная прогрессия' },
+                { id: 'wave', label: 'Волновая в блоке' },
+              ].map((o) => <AdChip key={o.id} active={progStyle === o.id} onClick={() => setProgStyle(o.id)}>{o.label}</AdChip>)}
+            </div>
+            {progStyle === 'auto' && cycId && (() => {
+              try {
+                const c = getArmCycle(cycId);
+                if (c && c.correctionPctDefault > 0) return <div className="ad-tip" data-arm="prog-cycle-note">Дефолт цикла: +{c.correctionPctDefault}%/нед (переопределяется полем «цикл %/нед»).</div>;
+              } catch { /* тихий */ }
+              return null;
+            })()}
+            {progStyle === 'double' && <div className="ad-tip">Double: повторы +1/нед в блоке (до +3), вес +2.5% между блоками — профессиональная двойная прогрессия.</div>}
+            {progStyle === 'wave' && <div className="ad-tip">Wave: тяжёлая/средняя/лёгкая недели внутри блока — плотность без отказа.</div>}
+            <AdSwitch checked={legsAnchor} onChange={setLegsAnchor} label="База-якорь: присед/тяга/фермер 1×/нед (LegsCore)" />
+            <div className="ad-row" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+              <AdField label={`Неделя старта (1–${weeks})`}>
+                <input value={peakWeekInput} onChange={(e) => setPeakWeekInput(e.target.value)} placeholder="напр. 12" inputMode="numeric" aria-label="Неделя старта" style={{ width: 110 }} />
+              </AdField>
+              <div>
+                <div className="ad-fl">Приоритет</div>
+                <div className="ad-chips">
+                  {[{ id: 'A', label: 'A · главный' }, { id: 'B', label: 'B · контроль' }, { id: 'C', label: 'C · тренировочный' }].map((o) => (
+                    <AdChip key={o.id} active={peakPrioInput === o.id} onClick={() => setPeakPrioInput(o.id as 'A' | 'B' | 'C')}>{o.label}</AdChip>
+                  ))}
+                </div>
+              </div>
+              <AdBtn variant="dark" onClick={addPeak}>＋ Добавить старт</AdBtn>
+            </div>
+            {peaks.length > 0 && (
+              <div className="ad-list" data-arm="peak-list">
+                {peaks.map((p) => (
+                  <div key={p.week} className="ad-tip" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span>🏁 Н{p.week} · {p.priority === 'A' ? 'главный (тейпер 3 нед + восстановление)' : p.priority === 'B' ? 'контрольный (2 нед + восстановление)' : 'тренировочный (шарпенинг 85%, без восстановления)'}</span>
+                    <button type="button" className="ad-chip" data-arm="peak-remove" onClick={() => removePeak(p.week)} aria-label={`Убрать старт недели ${p.week}`}>✕</button>
+                  </div>
+                ))}
+              </div>
+            )}
+            {peaksPreview?.notes.map((n, i) => <div key={i} className="ad-tip" data-arm="peak-note">{n}</div>)}
+          </AdSec>
           <AdCta>
             <AdBtn variant="ghost" block onClick={()=>setStep('grip')}>← Назад</AdBtn>
           </AdCta>
@@ -1976,9 +2051,9 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
                   const v = planDash && planDash.vol[w.week - 1] != null ? planDash.vol[w.week - 1] : 0;
                   const h = planDash ? Math.max(8, Math.round((v / planDash.volMax) * 100)) : 8;
                   return (
-                  <button key={w.week} className="ad-wpill" data-active={weekSel===w.week} data-phase={w.phase} onClick={()=>setWeekSel(w.week)} aria-label={`Неделя ${w.week}, сетов ${v}`}>
+                  <button key={w.week} className="ad-wpill" data-active={weekSel===w.week} data-phase={w.phase} onClick={()=>setWeekSel(w.week)} aria-label={`Неделя ${w.week}, сетов ${v}${w.peak ? `, старт ${w.peak.priority}` : ''}${w.block ? `, блок ${w.block}` : ''}`} title={`${w.block ? `🧱 ${w.block}` : ''}${w.peak ? ` · 🏁 старт ${w.peak.priority}` : ''}`}>
                     <span className="ad-wpill-bar" aria-hidden><span className="ad-wpill-fill" style={{ height: `${h}%` }} /></span>
-                    <span className="ad-wpill-t" style={{ fontVariantNumeric: 'tabular-nums' }}>Н{w.week} · {v} {w.phase==='deload' ? '· deload' : w.phase==='peaking' ? '· пик' : ''}</span>
+                    <span className="ad-wpill-t" style={{ fontVariantNumeric: 'tabular-nums' }}>{w.peak ? '🏁 ' : ''}Н{w.week} · {v} {w.phase==='deload' ? '· deload' : w.phase==='peaking' ? '· пик' : ''}</span>
                   </button>
                   );
                 })}
@@ -1986,6 +2061,8 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
               {curWeek && (
                 <div>
                   <h4 className="ad-sec-t"><span aria-hidden style={{ display: 'inline-block', width: 9, height: 9, borderRadius: 99, background: PHASE_DOT[curWeek.phase] || '#94a3b8', marginRight: 6, verticalAlign: '1px' }} />Неделя {curWeek.week} — {curWeek.phase} {curWeek.deload ? '(deload)' : ''}</h4>
+                  {curWeek.block && <div className="ad-tip" data-arm="week-block">🧱 Блок: {curWeek.block}</div>}
+                  {curWeek.peak && <div className="ad-tip" data-arm="week-peak">🏁 Старт ({curWeek.peak.priority}): {curWeek.peak.name} — тейпер-окно, объём срезан, RIR поднят.</div>}
                   {editsCount > 0 && <div className="ad-row" style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 6 }}><span className="ad-tag">✏️ Правки: {editsCount} упр.</span><AdBtn variant="ghost" data-arm="edits-reset" onClick={()=>{ setArmEdits({}); setEditOpen(null); }}>Сбросить правки</AdBtn></div>}
                   {curWeek.note && <div className="ad-tip">📝 {curWeek.note}</div>}
                   <div className="ad-sess-list">
@@ -2298,7 +2375,16 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
                   const blob = new Blob([ics], { type: 'text/calendar' });
                   const url = URL.createObjectURL(blob);
                   const a = document.createElement('a'); a.href = url; a.download = 'arm-plan.ics'; a.click(); URL.revokeObjectURL(url);
-                }}>📅 .ics</AdBtn>
+                 }}>📅 .ics</AdBtn>
+                 <AdBtn variant="ghost" disabled={exportBlocked} data-arm="export-csv" onClick={() => {
+                   try {
+                     const csv = buildArmPlanCsv(viewPlan);
+                     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+                     const url = URL.createObjectURL(blob);
+                     const a = document.createElement('a'); a.href = url; a.download = 'arm-plan.csv'; a.click(); URL.revokeObjectURL(url);
+                     flash('✅ CSV плана выгружен');
+                   } catch (e: any) { flash(`⚠ CSV: ${e?.message || e}`); }
+                 }}>📊 .csv</AdBtn>
                  <AdBtn variant="ghost" disabled={exportBlocked} onClick={() => {
                    const tot = (viewPlan.weeks || []).reduce((a: number, w: any) => a + (w.sessions || []).reduce((x: number, s: any) => x + (s.exercises || []).reduce((y: number, e: any) => y + (e.sets || 0), 0), 0), 0);
 
@@ -2307,6 +2393,8 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
                      `${discipline} · ${technique} · ${level} · ${goal}`,
                      weakPoints.length ? `Слабые: ${weakPoints.join(', ')}` : 'Без специализации',
                      cycId ? `Цикл: ${cycId}` : 'Обычный план',
+                     ...(Array.isArray(viewPlan.blocks) && viewPlan.blocks.length ? [`Блоки: ${viewPlan.blocks.map((b: any) => `${b.name} (${b.weekStart}–${b.weekEnd})`).join(' → ')}`] : []),
+                     ...(Array.isArray(viewPlan.peakWindows) && viewPlan.peakWindows.length ? [`Старты: ${viewPlan.peakWindows.map((p: any) => `Н${p.week} (${p.priority})`).join(', ')}`] : []),
                       `Всего: ${tot} сетов · стол-сессии ${planDash ? planDash.tablePct : '—'}% · объём ${planDash ? planDash.tableVolumePct : '—'}% · минуты ${planDash?.tableMinutesPct == null ? 'нет данных' : `${planDash.tableMinutesPct}%`}`,
                      (viewPlan.weeks || []).map((w: any) => `Н${w.week} (${w.phase}): ${(w.sessions || []).reduce((x: number, s: any) => x + (s.exercises || []).reduce((y: number, e: any) => y + (e.sets || 0), 0), 0)}`).join(' · '),
                    ];

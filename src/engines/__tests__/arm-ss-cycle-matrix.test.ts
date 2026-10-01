@@ -46,9 +46,9 @@ function assertArmPlanShape(plan: ReturnType<typeof buildArmPlan>, tag: string) 
   expect(validation.errors.length, `${tag}: errors ${JSON.stringify(validation.errors)}`).toBe(0);
 }
 
-describe('Ф1.3: ARM-матрица (19 именных циклов через buildArmPlan)', () => {
-  it('все 19 циклов собираются: форма, делоды, тапер, 0 ошибок валидатора', () => {
-    expect(ARM_CYCLE_LIBRARY.length).toBe(19);
+describe('Ф1.3: ARM-матрица (27 именных циклов через buildArmPlan)', () => {
+  it('все 27 циклов собираются: форма, делоды, тапер, 0 ошибок валидатора', () => {
+    expect(ARM_CYCLE_LIBRARY.length).toBe(27); // было 19 → 27 (PRO-PLAN R2)
     for (const cyc of ARM_CYCLE_LIBRARY) {
       const plan = buildArmPlan({
         discipline: cyc.discipline === 'any' ? 'armwrestling' : cyc.discipline,

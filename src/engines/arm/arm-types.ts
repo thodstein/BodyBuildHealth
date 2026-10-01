@@ -19,6 +19,18 @@ export type ArmImplement =
   | 'fat_gripz'
   | 'none';
 
+/** Стиль прогрессии плана: auto (цикл/линейная по ставке), linear (%/нед),
+ *  double (повторы в блоке + вес между блоками), wave (тяж/сред/лёгк внутри блока). */
+export type ArmProgressionStyle = 'auto' | 'linear' | 'double' | 'wave';
+
+/** Старт внутри одного плана (мульти-пиковость). A — главный (3-нед тейпер),
+ *  B — контрольный (2-нед), C — тренировочный (шарпенинг 1 нед). */
+export interface ArmPeakInput {
+  week: number;
+  priority: 'A' | 'B' | 'C';
+  name?: string;
+}
+
 export type ArmGoal = 'strength' | 'peaking' | 'hypertrophy' | 'endurance' | 'maintenance';
 export type ArmGoalBB = ArmGoal; // alias для совместимости
 export type ArmPhase = 'accumulation' | 'intensification' | 'deload' | 'peaking';
@@ -170,6 +182,10 @@ export interface ArmBuilderInput {
   elbowPain?: number; // PRO-5: боль медиального локтя 0–10 (hook-cap)
   rpeParity?: boolean; // PRO-5: RIR по карте StrengthLog (дефолт выкл)
   larrattStepKg?: number; // PRO-5: микрошаг синглов (дефолт 0.57)
+  // ── PRO-PLAN (профессиональный контур периодизации, всё опционально) ──
+  progressionStyle?: ArmProgressionStyle; // дефолт auto: цикл-ставка → линейная, иначе ровно
+  peaks?: ArmPeakInput[]; // мульти-старты внутри плана (тейпер-окна + восстановление)
+  legsAnchor?: boolean; // база-якорь 1×/нед: присед/тяга/фермер (LegsCore-сессия)
 }
 
 export interface ArmInjury {
@@ -262,6 +278,10 @@ export interface ArmWeek {
   tableRatio?: number;
   sessions: ArmSession[];
   note?: string;
+  /** Мезо-блок недели (профессиональный контур периодизации). */
+  block?: string;
+  /** Старт в этой неделе (мульти-пиковость). */
+  peak?: { priority: 'A' | 'B' | 'C'; name: string };
 }
 
 export interface ArmPlan {
@@ -285,6 +305,11 @@ export interface ArmPlan {
   mrvByMuscle?: Record<string, number>;
   safetyWarnings?: string[];
   planSnapshotId?: string;
+  /** Мезо-блоки плана (профессиональный контур периодизации). */
+  blocks?: Array<{ id: string; name: string; objective: string; weekStart: number; weekEnd: number }>;
+  progressionStyle?: ArmProgressionStyle;
+  /** Тейпер-окна стартов внутри плана (для UI/печати). */
+  peakWindows?: Array<{ week: number; priority: 'A' | 'B' | 'C'; name: string; leadWeeks: number[]; recoveryWeek: number | null; skippedReason?: string }>;
 }
 
 export interface ArmValidationResult {

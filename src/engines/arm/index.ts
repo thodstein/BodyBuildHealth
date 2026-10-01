@@ -94,6 +94,7 @@ export * from './arm-table-inject.engine';
 export * from './arm-grip-protocol.engine';
 export * from './arm-cycle-library.engine';
 export * from './arm-cycle-selector.engine';
+export * from './arm-periodization.engine';
 export * from './arm-coc-ladder.engine';
 export * from './arm-flat-pyramid.engine';
 export * from './arm-regimen.engine';

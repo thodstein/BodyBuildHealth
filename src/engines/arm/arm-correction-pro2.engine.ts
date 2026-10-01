@@ -101,6 +101,25 @@ export const CORRECTION_ROLE: Record<string, CorrectionRole> = {
   // профилистика (по 12 точек)
   wrist_ext_bb: 'pump',
   external_rotation_band: 'iso',
+  // PRO-PLAN: роли новых упражнений (kingsmove/rising/hook/side/back/тренажёры)
+  wrist_ext_db: 'pump',
+  wrist_ext_band: 'pump',
+  kingsmove_wrist_back: 'heavy',
+  kingsmove_hold_iso: 'static',
+  riser_lift_db: 'heavy',
+  rising_hold_iso: 'static',
+  finger_containment_hold: 'iso',
+  scott_hook_curl: 'heavy',
+  hook_hold_iso: 'static',
+  side_press_db_bench: 'heavy',
+  side_hold_iso_pulley: 'static',
+  press_chain_pushdown: 'iso',
+  back_pressure_low_row: 'heavy',
+  back_hold_table_iso: 'static',
+  machine_wrist_curl: 'iso',
+  machine_reverse_curl: 'pump',
+  kettlebell_hold: 'static',
+  bodyweight_dead_hang: 'static',
 };
 
 export function roleOf(exId: string): CorrectionRole | null {
@@ -119,18 +138,18 @@ export function roleLabel(exId: string): string {
 export const POOL_TOPUP: Partial<Record<ArmWeakPoint, string[]>> = {
   // ROUND-10: после расширения базы (≥6) часть топапов стала дублями — добавлен по одному
   // уникальному id на точку (дедуп в poolWithTopup), чтобы топ-ап реально давал выбор.
-  cup_start: ['wrist_curl_db', 'fat_gripz_curl'],
-  cup_hold: ['wrist_curl_db', 'wrist_wrench_60'],
-  rising_top: ['pinch_block_80', 'euro_pinch_2h'],
-  pron_open: ['pronation_pulses', 'lever_top', 'hammer_rope_cable'],
-  pron_lock: ['pronation_pulses', 'pronation_sledge', 'zottman_curl'],
-  sup_cup: ['reverse_ez_curl', 'indian_clubs', 'reverse_curl_cable'],
-  sup_drag: ['reverse_ez_curl', 'incline_hammer'],
-  side_mid: ['anti_rotation_hold', 'ulnar_dev'],
-  side_pin: ['anti_rotation_hold', 'wrist_ext_bb'],
-  back_start: ['towel_pullup', 'hammer_rope_cable', 'coc_trainer'],
-  back_drag: ['towel_pullup', 'silver_bullet_hold'],
-  contain_fingers: ['pinch_block_80', 'coc_no1_5'],
+  cup_start: ['wrist_curl_db', 'fat_gripz_curl', 'machine_wrist_curl'],
+  cup_hold: ['wrist_curl_db', 'wrist_wrench_60', 'machine_wrist_curl'],
+  rising_top: ['pinch_block_80', 'euro_pinch_2h', 'riser_lift_db', 'rising_hold_iso'],
+  pron_open: ['pronation_pulses', 'lever_top', 'hammer_rope_cable', 'machine_reverse_curl'],
+  pron_lock: ['pronation_pulses', 'pronation_sledge', 'zottman_curl', 'machine_reverse_curl'],
+  sup_cup: ['reverse_ez_curl', 'indian_clubs', 'reverse_curl_cable', 'scott_hook_curl'],
+  sup_drag: ['reverse_ez_curl', 'incline_hammer', 'scott_hook_curl', 'hook_hold_iso'],
+  side_mid: ['anti_rotation_hold', 'ulnar_dev', 'side_press_db_bench', 'press_chain_pushdown'],
+  side_pin: ['anti_rotation_hold', 'wrist_ext_bb', 'side_hold_iso_pulley', 'press_chain_pushdown'],
+  back_start: ['towel_pullup', 'hammer_rope_cable', 'coc_trainer', 'back_pressure_low_row'],
+  back_drag: ['towel_pullup', 'silver_bullet_hold', 'back_pressure_low_row', 'back_hold_table_iso'],
+  contain_fingers: ['pinch_block_80', 'coc_no1_5', 'finger_containment_hold', 'kingsmove_hold_iso', 'kingsmove_wrist_back'],
 };
 
 export function poolWithTopup(wp: ArmWeakPoint): string[] {

@@ -94,9 +94,16 @@ export function explainArmCycle(id: string): string {
 export function suggestCycleForMacroPhase(phase: string, discipline = 'armwrestling'): string[] {
   const p = String(phase || '').toLowerCase();
   const isLift = discipline === 'armlifting';
-  if (p === 'hypertrophy') return isLift ? ['grinder_hybrid_12', 'coc_8'] : ['strengthlog_8', 'tableready_12', 'kuznica_6_8'];
-  if (p === 'strength') return isLift ? ['grinder_hybrid_12', 'coc_12'] : ['src_toproll_12', 'kuznica_6_8', 'dobrorezov_44'];
-  if (p === 'peaking') return isLift ? ['coc_12', 'for_7'] : ['toproll_6', 'larratt_table_bloodflow'];
+  // Первый id — канон (зафиксирован тестами); PRO-PLAN циклы — добавлены хвостом.
+  if (p === 'hypertrophy') return isLift
+    ? ['grinder_hybrid_12', 'coc_8', 'horne_basic_12']
+    : ['strengthlog_8', 'tableready_12', 'kuznica_6_8', 'offseason_base_10', 'women_base_8'];
+  if (p === 'strength') return isLift
+    ? ['grinder_hybrid_12', 'coc_12', 'rt_ladder_8', 'axle_pinch_10']
+    : ['src_toproll_12', 'kuznica_6_8', 'dobrorezov_44', 'hook_press_8', 'waf_season_16'];
+  if (p === 'peaking') return isLift
+    ? ['coc_12', 'for_7', 'rt_ladder_8']
+    : ['toproll_6', 'larratt_table_bloodflow', 'waf_season_16'];
   if (p === 'transition') return ['brzenk_1_1'];
   return ['strengthlog_8'];
 }
