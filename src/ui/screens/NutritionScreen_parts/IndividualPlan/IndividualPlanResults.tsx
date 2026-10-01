@@ -154,7 +154,7 @@ export const IndividualPlanResults: React.FC = () => {
     setDayPlan, setThreeDayPlan, planTargets, planType, variety,
     linkToTraining, trainStart,
     weightMode,
-    goal, bbPrepPlan, trainEnd, trainScheduleType, trainPattern, takenSupplements,
+    goal, bbPrepPlan, trainEnd, trainScheduleType, trainPattern, takenSupplements, applyKcalAdjust,
     workScheduleEnabled, workStartTime, workEndTime, workDays, workScheduleType,
     v2Phase, v2Pharma, v2Labs, histamineSensitive,
     combatNutrition, applyCombatNutrition,
@@ -1099,6 +1099,7 @@ const doImportPlan = (raw: string): boolean => {
                 targetProteinG={dayPlan?.totals?.p || effectiveP || 0}
                 weightLog={(() => { try { return getWeightLog().map(e => ({ date: e.date, weightKg: e.weight })); } catch { return []; } })()}
                 goal={goal}
+                onApplyKcalAdjust={applyKcalAdjust}
               />
             );
           } catch { return null; }

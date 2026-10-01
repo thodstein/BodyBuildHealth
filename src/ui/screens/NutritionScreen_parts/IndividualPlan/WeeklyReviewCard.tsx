@@ -12,12 +12,13 @@ interface Props {
   targetProteinG: number;
   weightLog: { date: string; weightKg: number }[];
   goal: string;
+  onApplyKcalAdjust?: (delta: number) => void;
 }
 
 const VERDICT_COLOR: Record<string, string> = { on_track: '#22c55e', too_slow: '#f59e0b', too_fast: '#f97316', no_data: '#60a5fa' };
 const VERDICT_LABEL: Record<string, string> = { on_track: '✅ В цели', too_slow: '🐢 Медленно', too_fast: '🐇 Быстро', no_data: '📭 Мало данных' };
 
-export const WeeklyReviewCard: React.FC<Props> = ({ days, targetKcal, targetProteinG, weightLog, goal }) => {
+export const WeeklyReviewCard: React.FC<Props> = ({ days, targetKcal, targetProteinG, weightLog, goal, onApplyKcalAdjust }) => {
   const r = useMemo(() => buildWeeklyReview({ days, targetKcal, targetProteinG, weightLog, goal }), [days, targetKcal, targetProteinG, weightLog, goal]);
   if (r.loggedDays === 0) return null;
   const color = VERDICT_COLOR[r.verdict] || '#60a5fa';
@@ -49,6 +50,19 @@ export const WeeklyReviewCard: React.FC<Props> = ({ days, targetKcal, targetProt
           {r.kcalAdjust !== 0 && <span style={{ fontWeight: 800, color: '#f59e0b' }}>{r.kcalAdjust > 0 ? `+${r.kcalAdjust}` : r.kcalAdjust} ккал/день · </span>}
           {r.recommendation}
         </div>
+        {r.kcalAdjust !== 0 && onApplyKcalAdjust && (
+          <button
+            data-wr-apply
+            onClick={() => onApplyKcalAdjust(r.kcalAdjust)}
+            style={{
+              marginTop: 8, minHeight: 44, width: '100%', padding: '8px 12px', borderRadius: 12, cursor: 'pointer',
+              fontSize: 12, fontWeight: 800, color: '#0A0A0A', border: 'none',
+              background: 'linear-gradient(135deg,#00e68a,#00c8a0)',
+            }}
+          >
+            Применить {r.kcalAdjust > 0 ? `+${r.kcalAdjust}` : r.kcalAdjust} ккал/день
+          </button>
+        )}
       </div>
     </GlassCard>
   );
