@@ -40,7 +40,7 @@ describe('Ручная библиотека: арм + ТА/стронг', () => 
     renderGallery();
     expect(screen.getByRole('tab', { name: new RegExp(`Арм \\(${ARM_CYCLE_LIBRARY.length}\\)`) })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: new RegExp(`ТА·Стронг \\(${SS_CYCLES.length}\\)`) })).toBeInTheDocument();
-    expect(ARM_CYCLE_LIBRARY.length).toBe(19);
+    expect(ARM_CYCLE_LIBRARY.length).toBe(27); // было 19 → 27 (PRO-PLAN R2)
     expect(SS_CYCLES.length).toBe(15);
   });
 
@@ -117,7 +117,9 @@ describe('Ручная библиотека: маппинг фильтров (в
     // + сцена (bodyfitness-12, KMS-MS)
     // Re-baseline (Фаза 4, решение пользователя): 66 → 65 — удалён дефектный advanced-цикл
     // («1 сессия/нед» при spw 3–4, корректная пересборка невозможна).
-    expect(adv.length).toBe(65);
+    // Профессиональная библиотека (docs/BB-AUTO-PROFESSIONAL-CYCLES-PLAN.md): +10 advanced-циклов
+    // (bro-5/ppl-6/gvt/gironda/fst7/meadows/yates/dc/hit + жен. ppl-5). Было 65 → стало 75.
+    expect(adv.length).toBe(75);
     expect(beg.length + adv.length + LMS_CYCLES.filter(c => plCycleMatchesLevel(c.meta.level, 'intermediate') && !beg.includes(c) && !adv.includes(c)).length).toBeGreaterThanOrEqual(LMS_CYCLES.length - 3);
   });
 

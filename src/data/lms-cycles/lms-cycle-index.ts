@@ -79,6 +79,20 @@ import { CYCLE_BB_F_BIKINI_PREP_12 } from './cycle-bb-f-bikini-prep-12';
 import { CYCLE_BB_F_BODYFITNESS_12 } from './cycle-bb-f-bodyfitness-12';
 import { CYCLE_BB_F_DELT_8 } from './cycle-bb-f-delt-8';
 import { CYCLE_BB_F_WELLNESS_12 } from './cycle-bb-f-wellness-12';
+// Профессиональная библиотека: именные классические системы
+// (docs/BB-AUTO-PROFESSIONAL-CYCLES-PLAN.md)
+import { CYCLE_BB_M_BRO_5 } from './cycle-bb-m-bro-5';
+import { CYCLE_BB_M_PPL_6 } from './cycle-bb-m-ppl-6';
+import { CYCLE_BB_M_FB_3 } from './cycle-bb-m-fb-3';
+import { CYCLE_BB_M_GVT_8 } from './cycle-bb-m-gvt-8';
+import { CYCLE_BB_M_GIRONDA_8 } from './cycle-bb-m-gironda-8';
+import { CYCLE_BB_M_FST7_8 } from './cycle-bb-m-fst7-8';
+import { CYCLE_BB_M_MEADOWS_8 } from './cycle-bb-m-meadows-8';
+import { CYCLE_BB_M_YATES_8 } from './cycle-bb-m-yates-8';
+import { CYCLE_BB_M_DC_6 } from './cycle-bb-m-dc-6';
+import { CYCLE_BB_M_HIT_6 } from './cycle-bb-m-hit-6';
+import { CYCLE_BB_F_FB_3 } from './cycle-bb-f-fb-3';
+import { CYCLE_BB_F_PPL_5 } from './cycle-bb-f-ppl-5';
 
 // СРЦ2 (авторские программы) — начато Jul 12
 import { SRC2_MURAVYOV_16 } from './src2/src2-muravyov-16';
@@ -212,9 +226,22 @@ export const LMS_CYCLES: SRCycleTemplate[] = [
   CYCLE_BB_F_BIKINI_BASE_12,
   CYCLE_BB_F_BIKINI_PREP_12,
   CYCLE_BB_F_BODYFITNESS_12,
-  CYCLE_BB_F_DELT_8,
-  CYCLE_BB_F_WELLNESS_12,
-   // СРЦ2
+   CYCLE_BB_F_DELT_8,
+   CYCLE_BB_F_WELLNESS_12,
+   // Профессиональная библиотека: именные классические системы (12 циклов)
+   CYCLE_BB_M_BRO_5,
+   CYCLE_BB_M_PPL_6,
+   CYCLE_BB_M_FB_3,
+   CYCLE_BB_M_GVT_8,
+   CYCLE_BB_M_GIRONDA_8,
+   CYCLE_BB_M_FST7_8,
+   CYCLE_BB_M_MEADOWS_8,
+   CYCLE_BB_M_YATES_8,
+   CYCLE_BB_M_DC_6,
+   CYCLE_BB_M_HIT_6,
+   CYCLE_BB_F_FB_3,
+   CYCLE_BB_F_PPL_5,
+    // СРЦ2
    SRC2_MURAVYOV_16,
    SRC2_PTBAZ_8,
    SRC2_PT12TA,
