@@ -3,7 +3,7 @@ import { buildArmPlan } from '../arm-builder.engine';
 import { finalizeArmPlan } from '../arm-finalize.engine';
 import { validateArmPlan } from '../arm-validator.engine';
 import { ARM_EXERCISES, validateArmCatalog } from '../../../core/exercise-catalog-arm';
-import { buildArmPlanCsv, buildArmIcs } from '../arm-export.engine';
+import { buildArmPlanCsv, buildArmIcs, buildArmPrintHtml } from '../arm-export.engine';
 import { armIndirectOverflowWarnings } from '../arm-finalize.engine';
 
 /** Вес первого сета упражнения мышцы в неделе (0 если нет). */
@@ -287,9 +287,17 @@ describe('arm-planner PRO: P0 — факт дневника, разминка, �
     expect(['hub_pinch', 'anvil_hub', 'little_big_horn']).not.toContain(pinchId(noBias));
     expect(withBias.rationale.some((l: string) => /Снаряд платформы/.test(l))).toBe(true);
   });
-  it('P2-14: сгонка к дате старта в rationale (вес факта не трогает план)', () => {
+  it('P2-14: сгонка — строка + недельные весовые цели (объём не меняется)', () => {
     const plan = buildArmPlan({ ...BASE, competitionDateIso: isoInWeeks(6), bodyWeightKg: 80, targetWeightKg: 74 } as any);
     expect(plan.rationale.some((l: string) => /Сгонка к старту/.test(l))).toBe(true);
+    expect(String(plan.weeks[0].note || '')).toContain('вес ≤');
+    expect(String(plan.weeks[5].note || '')).toContain('вес ≤ 74');
+    expect(String(plan.weeks[6].note || '')).not.toContain('вес ≤'); // после старта целей нет
+  });
+  it('печать: шапка несёт покрытие 12 точек', () => {
+    const plan = finalizeArmPlan(buildArmPlan({ ...BASE }), { level: 'intermediate' });
+    const html = buildArmPrintHtml(plan);
+    expect(html).toContain('12 точек');
   });
   it('блоки специализации: два блока по неделям + донорское перераспределение', () => {
     const plan = finalizeArmPlan(buildArmPlan({

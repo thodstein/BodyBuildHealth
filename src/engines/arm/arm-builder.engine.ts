@@ -725,6 +725,18 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
   }
   // PRO-PLAN: база-якорь (LegsCore: присед/тяга/фермер) — реальная сессия, не строка.
   const anchorProto = (input as any).legsAnchor === true ? (() => { try { return legsAnchorBlock(level); } catch { return null; } })() : null;
+  // P2-14b: сгонка — недельные весовые цели в заметках недель (контроль; объём не меняется).
+  const cutPlan = (() => {
+    try {
+      const isoC = String((input as any).competitionDateIso || '');
+      const bw = Number((input as any).bodyWeightKg);
+      const tw = Number((input as any).targetWeightKg);
+      if (isoC && Number.isFinite(bw) && Number.isFinite(tw) && bw > 0 && tw > 0 && bw > tw) {
+        return planWeightCut({ startKg: bw, targetKg: tw, weeksOut: weeksUntilStart(undefined, isoC), sex: (input as any).sex });
+      }
+    } catch { /* тихо */ }
+    return null;
+  })();
   // Хвостовое окно тейпера: непрерывный run делоад/пик-недель с конца плана
   // (PRO-5 G4: явный стейт taperStateFor; поведение 1-в-1 со старым циклом).
   // Только оно идёт под кривую финализатора; срединные делоады (каждая 4-я)
@@ -1053,6 +1065,10 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
         if (impl) weekNote = `🎯 Медли-фокус: ${impl}`;
       }
     } catch { weekNote = undefined; markDegraded('медли-фокус недоступен — ротация не добавлена'); }
+    if (cutPlan && cutPlan.lossKg > 0 && w <= cutPlan.weeksOut) {
+      const targetKg = Math.max(cutPlan.targetKg, Math.round((cutPlan.startKg - cutPlan.weeklyLossKg * w) * 10) / 10);
+      weekNote = `${weekNote ? `${weekNote} ` : ''}⚖️ вес ≤ ${targetKg} кг`;
+    }
     // PRO-PLAN: база-якорь (присед/тяга/фермер) — отдельная LegsCore-сессия 1×/нед.
     if (anchorProto && !isDeload && !isPeaking && !peaksRuntime.taperWeeks.includes(w)) {
       try {
@@ -1203,15 +1219,7 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
     feedbackWarnings.push(`Локальная перегрузка дневника: ${txt}.`);
   }
   if (dropSetsApplied > 0) rationale.push(`💧 Drop-set: +${dropSetsApplied} мини-сетов на памп-изоляции (гипертрофия, без отдыха).`);
-  try {
-    const isoC = String((input as any).competitionDateIso || '');
-    const bw = Number((input as any).bodyWeightKg);
-    const tw = Number((input as any).targetWeightKg);
-    if (isoC && Number.isFinite(bw) && Number.isFinite(tw) && bw > 0 && tw > 0 && bw > tw) {
-      const cut = planWeightCut({ startKg: bw, targetKg: tw, weeksOut: weeksUntilStart(undefined, isoC), sex: (input as any).sex });
-      rationale.push(`⚖️ Сгонка к старту: ${cut.note}`);
-    }
-  } catch { /* опционально */ }
+  if (cutPlan) rationale.push(`⚖️ Сгонка к старту: ${cutPlan.note}`);
   if (diaryDeload) rationale.push(`🔄 Дневник: ACWR danger — первая неделя построена как разгрузка (60%, RIR+2) до восстановления.`);
   if (anchorProto) rationale.push('🏋️ База-якорь: LegsCore-сессия 1×/нед (присед/тяга/фермер) — side-цепь и общий тонус.');
   if (Number((input as any).daysPerWeek || 0) > 0) {

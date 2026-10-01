@@ -1163,10 +1163,13 @@ const [rfdEstimated, setRfdEstimated] = useState<boolean>(false);
   const compliance = useMemo(() => {
     try {
       const raw = typeof localStorage !== 'undefined' ? localStorage.getItem('he_arm_plan_built_at') : null;
-      const week1 = raw && /^\d{4}-\d{2}-\d{2}$/.test(raw) ? raw : localIsoDate();
+      // Приоритет: явная дата начала плана → дата сборки → сегодня.
+      const week1 = /^\d{4}-\d{2}-\d{2}$/.test(planStartDate)
+        ? planStartDate
+        : raw && /^\d{4}-\d{2}-\d{2}$/.test(raw) ? raw : localIsoDate();
       return builtPlan ? armPlanCompliance(builtPlan, diarySessions as any, week1) : null;
     } catch { return null; }
-  }, [builtPlan, diarySessions]);
+  }, [builtPlan, diarySessions, planStartDate]);
   // Паритет ББ/ТА: аудит покрытия 12 мёртвых точек прямо в конструкторе.
   const planAudit = useMemo(() => {
     try { return builtPlan ? auditArmPlan(builtPlan) : null; } catch { return null; }
