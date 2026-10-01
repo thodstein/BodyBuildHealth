@@ -6,7 +6,7 @@
 import type { StrengthSportPlan } from './strength-sport.types';
 
 export interface AnnualSSBlock { id: string; startWeek: number; weeks: number; mode: string; plan?: StrengthSportPlan; status: 'built'|'planned'|'error'; competitionDate?: string; taperWeeks?: number; }
-export interface AnnualSS { id: string; totalWeeks: number; blocks: AnnualSSBlock[]; createdAt: string; updatedAt?: string; }
+export interface AnnualSS { id: string; totalWeeks: number; blocks: AnnualSSBlock[]; createdAt: string; updatedAt?: string; /** PRO-планировщик сезона: методические заметки сборки (опционально). */ rationale?: string[]; }
 
 const KEY='he_strength_annual_v1';
 export function saveAnnualSS(a: AnnualSS){

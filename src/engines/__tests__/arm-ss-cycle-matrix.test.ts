@@ -85,9 +85,11 @@ const ssInput: StrengthSportInput = {
   equipment: ['barbell', 'dumbbell', 'machine', 'cable', 'specialty'],
 } as StrengthSportInput;
 
-describe('Ф1.4: SS-матрица (15 циклов ТА·Стронг через buildSSCyclePlan)', () => {
-  it('все 15 циклов собираются: форма/математика без NaN', () => {
-    expect(SS_CYCLES.length).toBe(15);
+describe('Ф1.4: SS-матрица (30 циклов ТА·Стронг через buildSSCyclePlan)', () => {
+  it('все 30 циклов собираются: форма/математика без NaN', () => {
+    // Было 15 → стало 30: PRO-волна (15 профессиональных циклов ТА/стронга,
+    // ss-pro-cycles.test.ts — форма/фазы/якоря).
+    expect(SS_CYCLES.length).toBe(30);
     for (const t of SS_CYCLES) {
       // Безопасностный контракт: болгарский daily-max требует advanced+ и явного
       // согласия — buildSSCyclePlan теперь fail-closed. Эта матрица проверяет

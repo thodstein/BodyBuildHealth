@@ -1,8 +1,8 @@
 /**
  * ManualLibraryGallery.tsx — галерея библиотеки для ручного конструктора.
  * Объединяет FullProgram (complete-library + women + custom + originals), LMS-циклы,
- * именные арм-циклы (ARM_CYCLE_LIBRARY, 19), ТА/стронг-циклы (SS_CYCLES, 15)
- * и кардио-циклы (CARDIO_CYCLES, 35) и циклы единоборств (COMBAT_CYCLE_LIBRARY, 13).
+ * именные арм-циклы (ARM_CYCLE_LIBRARY, 27), ТА/стронг-циклы (SS_CYCLES, 30)
+ * и кардио-циклы (CARDIO_CYCLES, 46) и циклы единоборств (COMBAT_CYCLE_LIBRARY, 13).
  * Фильтры: поиск / уровень / цель / дни/нед / избранное.
  * Превью недели-1, сравнение 2 программ, 1-клик «Взять за основу».
  * Арм/SS-циклы уходят в свои конструкторы через planner-bridge

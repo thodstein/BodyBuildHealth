@@ -298,6 +298,10 @@ export function buildSSCyclePlan(
     if (t.meta.taperWeeks?.length) anchors.push(`тейпер нед ${t.meta.taperWeeks.join(',')}`);
     if (anchors.length) rationale.push(`⚓ Якорь к старту ${input.competitionDate}: ${anchors.join(' · ')} (порядок недель не меняем)`);
   }
+  // PRO: mock-недели всегда подписаны (симуляция старта — не просто «тяжёлая неделя»)
+  if (t.meta.mockWeeks?.length) {
+    rationale.push(`🏁 Mock-недели ${t.meta.mockWeeks.join(', ')}: заявки opener 90% / 2-й 96% / 3-й 101% — симуляция старта (объём урезан, свежесть под пик)`);
+  }
 
   const fallbackUsed = new Set<string>();
   const weeksData: StrengthSportWeek[] = [];

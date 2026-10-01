@@ -30,6 +30,7 @@ import { recommendSSCycle } from '../../../engines/strength-sport/strength-sport
 import { buildSSCyclePlan } from '../../../engines/strength-sport/strength-sport-ss-cycle-to-plan.engine';
 import { localIsoDate } from '../../../engines/workout-logger.engine';
 import { buildAnnualFromSSCycles } from '../../../engines/strength-sport/strength-sport-ss-annual.engine';
+import { seasonPresetsFor, recommendSeasonPlan, buildSeasonPlan, validateSeasonPeriodization, seasonSummaryLines, seasonPlanWeekCells, buildSeasonSummaryText, buildSeasonPrintHtml, buildSeasonIcs, saveSeasonPlan, loadSeasonPlan, clearSeasonPlan, SEASON_PHASE_META, type SSSeasonPlan } from '../../../engines/strength-sport/strength-sport-season-planner.engine';
 import type { StrengthSportInput, StrengthSportPlan } from '../../../engines/strength-sport/strength-sport.types';
 import { getWL, getStrong } from '../../../engines/strength-sport/strength-sport-volume';
 import { isNativeApp } from '../../../core/app-platform';
@@ -111,6 +112,11 @@ export const StrengthSportConstructor: React.FC = () => {
     return { eventFatigue: 3, grip: 3, back: 3, sleep: 3, appetite: 3 };
   });
   // Весь стейт/эффекты/мемоизация — в useStrengthSportWizard; здесь только хендлеры и рендер шагов.
+  // PRO-планировщик сезона: пресет + рассчитанный сезон (блоки/фазы/циклы).
+  // Персист: последний сезон и пресет переживают перемонтирование.
+  const initialSeason = React.useMemo(() => { try { return loadSeasonPlan(); } catch { return null; } }, []);
+  const [seasonPresetId, setSeasonPresetId] = React.useState<string>(initialSeason?.presetId || '');
+  const [seasonPlan, setSeasonPlan] = React.useState<SSSeasonPlan | null>(initialSeason);
   const pullFromProfile = () => {
     try {
       const raw = localStorage.getItem('he_profile_v2');
@@ -700,6 +706,106 @@ export const StrengthSportConstructor: React.FC = () => {
     }catch(e){ const m = e instanceof Error ? e.message : String(e); try { console.warn('[SS annual-from-cycles]', m); } catch {} setMsg(`⛔ ${m}`); setTimeout(()=>setMsg(''),4600); }
   };
 
+  const seasonModeLabel = mode === 'weightlifting' ? 'Тяжёлая атлетика' : mode === 'strongman' ? 'Силовой экстрим' : 'Гибрид';
+
+  /** PRO-волна: единый вход сборки сезона (тот же набор полей, что «Год из циклов»). */
+  const ssSeasonBase = (): any => ({ mode, goal, level, workMax, equipment, injuries, mobilityRestrictions: mobility, sex, bodyweight, age, cycleConsent, methodology, dupMode, intensityTech, outsideLoad: outsideEnabled ? outside : null, acwr: acwr as any, weakPoints: weakPoints.length ? weakPoints : undefined, contest: mode==='strongman' ? contest : undefined, contestStrategy: mode==='strongman' ? contestStrategy : undefined, startDate: localIsoDate() });
+
+  /** Рассчитать сезон (фазы → циклы) без записи — превью для пользователя. */
+  const handleRecommendSeason = () => {
+    try {
+      const season = recommendSeasonPlan({
+        mode: mode as any,
+        level,
+        daysPerWeek: days,
+        weeks,
+        goal,
+        competitionDate: competitionDate || undefined,
+        startDate: competitionDate ? localIsoDate() : undefined,
+        equipment,
+        age,
+        presetId: seasonPresetId || undefined,
+        cycleConsent,
+        weakPoints: weakPoints.length ? weakPoints as any : undefined,
+      });
+      setSeasonPlan(season);
+      try { saveSeasonPlan(season); } catch { /* квота/ssr — тихо */ }
+      setMsg(`🧭 Сезон рассчитан: ${season.blocks.length} блоков · ${season.totalWeeks} нед`);
+      setTimeout(()=>setMsg(''),2400);
+    } catch (e) {
+      const m = e instanceof Error ? e.message : String(e);
+      setMsg(`⛔ ${m}`); setTimeout(()=>setMsg(''),4600);
+    }
+  };
+
+  /** Собрать сезон: AnnualSS с кросс-мезо прогрессией ПМ + методическая валидация. */
+  const handleBuildSeasonPro = () => {
+    try {
+      const season = seasonPlan || recommendSeasonPlan({
+        mode: mode as any, level, daysPerWeek: days, weeks, goal,
+        competitionDate: competitionDate || undefined,
+        startDate: competitionDate ? localIsoDate() : undefined,
+        equipment, age,
+        presetId: seasonPresetId || undefined, cycleConsent,
+        weakPoints: weakPoints.length ? weakPoints as any : undefined,
+      });
+      const v = validateSeasonPeriodization(season);
+      const ann = buildSeasonPlan(season, { ...ssSeasonBase(), weeks: season.totalWeeks } as StrengthSportInput, {
+        cycleMode, competitionDate: competitionDate || undefined, taperWeeks,
+      });
+      saveAnnualSS(ann); setAnnual(ann);
+      try { syncStrengthAnnualToGeneral(ann); } catch {}
+      setSeasonPlan(season);
+      try { saveSeasonPlan(season); } catch { /* квота/ssr — тихо */ }
+      setMsg(`✦ Сезон собран: ${ann.blocks.length} блоков · ${ann.totalWeeks} нед${v.warnings.length ? ` · ⚠ ${v.warnings.length}` : ''}`);
+      setTimeout(()=>setMsg(''),3200);
+    } catch (e) {
+      const m = e instanceof Error ? e.message : String(e);
+      try { console.warn('[SS season-pro]', m); } catch {}
+      setMsg(`⛔ ${m}`); setTimeout(()=>setMsg(''),4600);
+    }
+  };
+
+  /** Копировать сводку сезона (для тренера/дневника). */
+  const handleCopySeason = () => {
+    if (!seasonPlan) return;
+    try {
+      const txt = buildSeasonSummaryText(seasonPlan, { modeLabel: seasonModeLabel, competitionDate: competitionDate || undefined });
+      navigator.clipboard?.writeText(txt);
+      setMsg('📋 Сводка сезона скопирована');
+    } catch { setMsg('⚠ Не удалось скопировать'); }
+    setTimeout(()=>setMsg(''), 2000);
+  };
+
+  /** Печать сводки сезона (HTML, XSS-esc внутри движка). */
+  const handlePrintSeason = () => {
+    if (!seasonPlan) return;
+    try {
+      const html = buildSeasonPrintHtml(seasonPlan, { modeLabel: seasonModeLabel, competitionDate: competitionDate || undefined, startDate: localIsoDate() });
+      const w = window.open('', '_blank');
+      if (w) { w.document.write(html); w.document.close(); w.print(); }
+      else setMsg('⚠ Разрешите всплывающие окна для печати');
+    } catch { setMsg('⚠ Не удалось открыть печать'); }
+    setTimeout(()=>setMsg(''), 2400);
+  };
+
+  /** Календарь сезона .ics (блоки + соревнование). */
+  const handleSeasonIcs = () => {
+    if (!seasonPlan) return;
+    try {
+      const ics = buildSeasonIcs(seasonPlan, { startDate: localIsoDate(), competitionDate: competitionDate || undefined, modeLabel: seasonModeLabel });
+      if (!ics) { setMsg('⚠ Нет даты старта для календаря'); setTimeout(()=>setMsg(''), 2400); return; }
+      const blob = new Blob([ics], { type: 'text/calendar;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = `ss-season-${localIsoDate()}.ics`;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => { try { URL.revokeObjectURL(url); } catch { /* noop */ } }, 1500);
+      setMsg('📅 Календарь сезона выгружен');
+    } catch { setMsg('⚠ Не удалось выгрузить календарь'); }
+    setTimeout(()=>setMsg(''), 2400);
+  };
+
   const stepList: Step[] = ['params', 'athlete', 'outside', 'split', 'plan', 'quality', 'export'];
   const stepIndex = stepList.indexOf(step) + 1;
   const modeColor = mode === 'weightlifting' ? '#00e68a' : mode === 'strongman' ? '#f59e0b' : '#0ea5e9';
@@ -1218,6 +1324,70 @@ export const StrengthSportConstructor: React.FC = () => {
               </div>
               {annual && <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}><span style={{ fontSize:12, fontWeight:700, color:'#fff' }}>Год: {annual.totalWeeks}нед · {annual.blocks.length} блоков</span></div>}
               {renderNavRow('quality', 'plan', 'К плану →')}
+              <SectionCard id="ss-season-pro" icon="🧭" title="Профессиональный сезон ТА/стронг" subtitle="Фазы → циклы: GPP → база → наращивание → пик → тейпер → переход" accent={!!seasonPlan} collapsible defaultOpen={false} status={seasonPlan ? (validateSeasonPeriodization(seasonPlan).warnings.length ? 'warn' : 'ok') : undefined} summary={seasonPlan ? `${seasonPlan.blocks.length} блоков · ${seasonPlan.totalWeeks} нед · ${seasonPlan.presetLabel}` : 'подбор блоков под цель, уровень и дату старта'}>
+                <div data-ss="season-pro">
+                  <StrengthPopupSelect label="Пресет сезона" value={seasonPresetId} onChange={v => { setSeasonPresetId(v); setSeasonPlan(null); try { clearSeasonPlan(); } catch { /* noop */ } }} strong={mode==='strongman'} options={[
+                    { id: '', label: 'Авто (по цели и старту)', desc: 'планировщик выберет сам' },
+                    ...seasonPresetsFor(mode).map(p => ({ id: p.id, label: p.label, desc: p.desc })),
+                  ]} />
+                  <div style={{ display:'flex', gap:8, flexWrap:'wrap', marginTop:8 }}>
+                    <button data-ss="season-recommend" onClick={handleRecommendSeason} style={{ ...BTN, flex:1, minWidth:150 }}>🧭 Рассчитать сезон</button>
+                    <button data-ss="season-build" onClick={handleBuildSeasonPro} style={{ ...(mode==='strongman'?BTN_STRONG:BTN_PRIMARY), flex:1.2, minWidth:150 }}>✦ Собрать сезон</button>
+                  </div>
+                  {seasonPlan && (
+                    <div style={{ display:'flex', flexDirection:'column', gap:6, marginTop:10 }}>
+                      <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
+                        {seasonPlan.blocks.map((b, i) => {
+                          const ph = SEASON_PHASE_META[b.phase];
+                          return (
+                            <span key={`${b.cycleId}_${i}`} data-ss="season-block" title={`${b.title} · ${b.note}`} style={{ fontSize:10, fontWeight:700, padding:'4px 8px', borderRadius:9, background:`${ph.color}1f`, border:`1px solid ${ph.color}55`, color:'#fff', fontVariantNumeric:'tabular-nums' }}>
+                              {ph.short}·{b.weeks}н
+                            </span>
+                          );
+                        })}
+                      </div>
+                      <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
+                        {seasonSummaryLines(seasonPlan).map((line, i) => {
+                          const b = seasonPlan.blocks[i];
+                          const ph = b ? SEASON_PHASE_META[b.phase] : null;
+                          return (
+                            <div key={i} style={{ fontSize:11, color:'#fff', lineHeight:1.45, borderLeft:`3px solid ${ph?.color || 'rgba(255,255,255,0.2)'}`, paddingLeft:8 }}>
+                              {line}
+                              {b?.note && <span style={{ opacity:0.85 }}> · {b.note}</span>}
+                            </div>
+                          );
+                        })}
+                      </div>
+                      {/* Таймлайн: неделя = ячейка, цвет = фаза (Gantt) */}
+                      <div data-ss="season-timeline" style={{ display:'flex', flexWrap:'wrap', gap:3 }}>
+                        {seasonPlanWeekCells(seasonPlan).map(c => (
+                          <span key={c.week} data-ss="season-week" data-phase={c.phase} title={`Нед ${c.week} · ${c.phaseLabel} — ${c.title}`}
+                            style={{ fontSize:9, width:24, height:24, display:'inline-flex', alignItems:'center', justifyContent:'center', borderRadius:7, background:`${c.color}26`, border:`1px solid ${c.color}66`, color:'#fff', fontWeight: c.blockStart ? 800 : 600, fontVariantNumeric:'tabular-nums' }}>
+                            {c.week}
+                          </span>
+                        ))}
+                      </div>
+                      <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
+                        <button data-ss="season-copy" onClick={handleCopySeason} style={{ ...BTN_SMALL, flex:1, minWidth:120 }}>⎙ Копировать</button>
+                        <button data-ss="season-print" onClick={handlePrintSeason} style={{ ...BTN_SMALL, flex:1, minWidth:120 }}>🖨 Печать</button>
+                        <button data-ss="season-ics" onClick={handleSeasonIcs} style={{ ...BTN_SMALL, flex:1, minWidth:120 }}>📅 .ics</button>
+                        <button data-ss="season-clear" onClick={() => { setSeasonPlan(null); setSeasonPresetId(''); try { clearSeasonPlan(); } catch { /* noop */ } setMsg('Сезон сброшен'); setTimeout(()=>setMsg(''), 1600); }} style={{ ...BTN_SMALL, flex:0.7, minWidth:90 }}>✕ Сброс</button>
+                      </div>
+                      {seasonPlan.rationale.length > 0 && (
+                        <div style={{ fontSize:10.5, color:'#fff', background:'rgba(255,255,255,0.03)', padding:'7px 9px', borderRadius:9, border:'0.5px solid rgba(255,255,255,0.06)', lineHeight:1.5 }}>
+                          {seasonPlan.rationale.join(' · ')}
+                        </div>
+                      )}
+                      {seasonPlan.warnings.length > 0 && (
+                        <InfoBanner tone="warn">{seasonPlan.warnings.join(' · ')}</InfoBanner>
+                      )}
+                      {validateSeasonPeriodization(seasonPlan).warnings.length > 0 && (
+                        <InfoBanner tone="info">🧪 Методика: {validateSeasonPeriodization(seasonPlan).warnings.join(' · ')}</InfoBanner>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </SectionCard>
             </SectionCard>
           )}
         </div>
