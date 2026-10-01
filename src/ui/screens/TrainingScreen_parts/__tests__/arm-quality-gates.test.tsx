@@ -83,7 +83,9 @@ describe('Arm PRO-7 readiness / return-to-load', () => {
     expect(container.querySelector("[data-arm='pro7-card']"), 'pro7-card').not.toBeNull();
     expect(container.querySelector("[data-arm='pro7-signals']"), 'pro7-signals').not.toBeNull();
     expect(container.textContent).toMatch(/Готовность|Возврат к нагрузке/);
-    expect(container.textContent).toContain('не меняются автоматически');
+    // было: «не меняются автоматически» — после P0 ACWR danger реально делает
+    // первую неделю разгрузочной при сборке, поэтому подпись честно изменена.
+    expect(container.textContent).toContain('автоматически');
   });
 
   it('высокая боль даёт стоп по готовности и фазе удержания', () => {

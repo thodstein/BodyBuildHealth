@@ -205,6 +205,52 @@ export function applyFactProgression(prevBase: Record<string, number>, facts: Ar
   return { workMax, factors, notes };
 }
 
+/* ── P1-7: per-muscle недельная нагрузка дневника ────────────────────────── */
+
+export interface ArmMuscleLoadAlert {
+  muscle: string;
+  sets7: number;
+  weeklyAvg: number;
+  ratio: number;
+}
+
+/**
+ * Перегрузка мышцы по дневнику: сеты за 7 дней против недельного среднего за 28 дней.
+ * ratio ≥ порога (1.5) — мышца «разогнана» быстрее своей базы (локальный делод).
+ */
+export function armPerMuscleLoadAlerts(sessions: ArmDiarySessionFact[] | undefined, threshold = 1.5): ArmMuscleLoadAlert[] {
+  const valid = (sessions || []).filter((s) => s && typeof s.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s.date));
+  if (valid.length === 0) return [];
+  const latest = valid.reduce((a, b) => (a.date >= b.date ? a : b)).date;
+  const latestMs = Date.parse(`${latest}T00:00:00Z`);
+  const map: Record<string, { sets7: number; sets28: number }> = {};
+  for (const s of valid) {
+    const t = Date.parse(`${s.date}T00:00:00Z`);
+    if (!Number.isFinite(t)) continue;
+    const in28 = t > latestMs - 28 * 86400000;
+    if (!in28) continue;
+    const in7 = t > latestMs - 7 * 86400000;
+    for (const ex of s.exercises || []) {
+      const muscle = String(ex.muscle || ex.muscleGroup || '').toLowerCase();
+      if (!muscle) continue;
+      const sets = (ex.sets || []).filter((x) => (x as any).isWarmup !== true).length;
+      if (sets <= 0) continue;
+      if (!map[muscle]) map[muscle] = { sets7: 0, sets28: 0 };
+      map[muscle].sets28 += sets;
+      if (in7) map[muscle].sets7 += sets;
+    }
+  }
+  const out: ArmMuscleLoadAlert[] = [];
+  for (const [muscle, v] of Object.entries(map)) {
+    const weeklyAvg = v.sets28 / 4;
+    if (weeklyAvg < 3) continue;
+    const ratio = Math.round((v.sets7 / weeklyAvg) * 100) / 100;
+    if (ratio >= threshold) out.push({ muscle, sets7: v.sets7, weeklyAvg: Math.round(weeklyAvg * 10) / 10, ratio });
+  }
+  out.sort((a, b) => b.ratio - a.ratio);
+  return out;
+}
+
 /* ── Выполнение плана по дневнику ────────────────────────────────────────── */
 
 function addDaysIso(iso: string, days: number): string {

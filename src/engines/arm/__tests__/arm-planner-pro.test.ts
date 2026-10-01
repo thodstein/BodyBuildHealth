@@ -3,7 +3,8 @@ import { buildArmPlan } from '../arm-builder.engine';
 import { finalizeArmPlan } from '../arm-finalize.engine';
 import { validateArmPlan } from '../arm-validator.engine';
 import { ARM_EXERCISES, validateArmCatalog } from '../../../core/exercise-catalog-arm';
-import { buildArmPlanCsv } from '../arm-export.engine';
+import { buildArmPlanCsv, buildArmIcs } from '../arm-export.engine';
+import { armIndirectOverflowWarnings } from '../arm-finalize.engine';
 
 /** Вес первого сета упражнения мышцы в неделе (0 если нет). */
 function weightOf(plan: any, week: number, muscle: string): number {
@@ -190,6 +191,71 @@ describe('arm-planner PRO: P0 — факт дневника, разминка, �
     const plan = buildArmPlan({ ...BASE, weeks: 8, competitionDateIso: isoInWeeks(20) } as any);
     expect(plan.peakWindows?.length ?? 0).toBe(0);
     expect(plan.rationale.some((l: string) => /вне окна плана/.test(l))).toBe(true);
+  });
+  it('P1-5: ротация упражнений по неделям меняет exerciseId в группе', () => {
+    const rot = buildArmPlan({ ...BASE, rotationMode: true } as any);
+    const idAt = (plan: any, week: number, muscle: string) => {
+      const wk = plan.weeks.find((w: any) => w.week === week);
+      for (const s of wk.sessions) for (const e of s.exercises) if (e.muscle === muscle) return e.exerciseId;
+      return null;
+    };
+    const w1 = idAt(rot, 1, 'pronators');
+    const w2 = idAt(rot, 2, 'pronators');
+    expect(w1).toBeTruthy();
+    expect(w2).toBeTruthy();
+    expect(w2).not.toBe(w1);
+    const noRot = buildArmPlan({ ...BASE } as any);
+    expect(idAt(noRot, 2, 'pronators')).toBe(idAt(noRot, 1, 'pronators'));
+  });
+  it('P1-8: красная готовность → первая неделя разгрузочная + строка', () => {
+    const plan = buildArmPlan({ ...BASE, readinessStatus: 'red' } as any);
+    expect(plan.weeks[0].phase).toBe('deload');
+    expect(plan.rationale.some((l: string) => /Готовность красная/.test(l))).toBe(true);
+  });
+  it('P1-7: локальная перегрузка дневника режет объём мышцы первые 2 недели', () => {
+    const day = (offset: number, sets: number) => ({
+      date: new Date(Date.now() - offset * 86400000).toISOString().slice(0, 10),
+      exercises: [{ exerciseName: 'Пронация на блоке (90)', muscle: 'pronators', sets: Array.from({ length: sets }, () => ({ weightKg: 30, reps: 8 })) }],
+    });
+    const diary = [day(0, 12), day(8, 3), day(15, 3), day(22, 3)];
+    const base = buildArmPlan({ ...BASE } as any);
+    const hot = buildArmPlan({ ...BASE, diarySessions: diary } as any);
+    const w1Sets = (plan: any) => {
+      const wk = plan.weeks.find((w: any) => w.week === 1);
+      return wk.sessions.flatMap((s: any) => s.exercises).filter((e: any) => e.muscle === 'pronators').reduce((a: number, e: any) => a + e.sets, 0);
+    };
+    expect(w1Sets(hot)).toBeLessThan(w1Sets(base));
+    expect(hot.rationale.some((l: string) => /Локальная перегрузка дневника/.test(l))).toBe(true);
+  });
+  it('P1-9: drop-set только при opt-in (гипертрофия, памп-изоляция)', () => {
+    const off = buildArmPlan({ ...BASE, goal: 'hypertrophy', weeks: 4 } as any);
+    const on = buildArmPlan({ ...BASE, goal: 'hypertrophy', weeks: 4, intensityTechniques: true } as any);
+    const dropCount = (plan: any) => plan.weeks.flatMap((w: any) => w.sessions).flatMap((s: any) => s.exercises)
+      .filter((e: any) => String(e.comment || '').includes('drop-set')).length;
+    expect(dropCount(off)).toBe(0);
+    expect(dropCount(on)).toBeGreaterThan(0);
+    for (const w of on.weeks) for (const s of w.sessions) for (const e of s.exercises) expect(e.sets).toBe(e.workSets.length);
+  });
+  it('P1-6: косвенный/эффективный объём в MRV-контроле (warning, не срез)', () => {
+    const plan: any = {
+      weeks: [{ week: 1, phase: 'accumulation', sessions: [{ exercises: [{ muscle: 'wrist_flexors', name: 'X', sets: 13, movementPattern: 'cupping' }] }] }],
+      mrvByMuscle: { wrist_flexors: 10 },
+    };
+    const warn = armIndirectOverflowWarnings(plan, 'intermediate');
+    expect(warn.length).toBe(1);
+    expect(warn[0]).toContain('эффективный объём');
+    plan.weeks[0].sessions[0].exercises[0].sets = 11;
+    expect(armIndirectOverflowWarnings(plan, 'intermediate')).toEqual([]);
+  });
+  it('P2-12: ICS несёт блок и маркер старта', () => {
+    const plan = finalizeArmPlan(buildArmPlan({ ...BASE, weeks: 8, peaks: [{ week: 6, priority: 'A' }] } as any), { level: 'intermediate' });
+    const ics = buildArmIcs(plan, '2026-10-01');
+    expect(ics).toContain('🏁 старт A');
+    expect(ics).toMatch(/· База/);
+  });
+  it('P2-14: сгонка к дате старта в rationale (вес факта не трогает план)', () => {
+    const plan = buildArmPlan({ ...BASE, competitionDateIso: isoInWeeks(6), bodyWeightKg: 80, targetWeightKg: 74 } as any);
+    expect(plan.rationale.some((l: string) => /Сгонка к старту/.test(l))).toBe(true);
   });
   it('блоки специализации: два блока по неделям + донорское перераспределение', () => {
     const plan = finalizeArmPlan(buildArmPlan({

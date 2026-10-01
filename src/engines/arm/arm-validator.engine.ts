@@ -43,7 +43,7 @@ export function validateArmPlan(plan: ArmPlan, level?: string): ArmValidationRes
     for (const line of foreignPoolWarnings(plan.weeks as any)) warnings.push(line);
   } catch { /* опционально */ }
   for (const line of (plan.safetyWarnings || [])) {
-    if (/нет безопасного упражнения|исключено травмой|ограничен/.test(line) && !warnings.includes(line)) warnings.push(line);
+    if (/нет безопасного упражнения|исключено травмой|ограничен|эффективный объём/.test(line) && !warnings.includes(line)) warnings.push(line);
   }
   for (const line of armWorkSetsMismatches(plan)) errors.push(`workSets mismatch: ${line}`);
 

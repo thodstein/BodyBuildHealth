@@ -740,6 +740,10 @@ const [rfdEstimated, setRfdEstimated] = useState<boolean>(false);
   const [peakPrioInput, setPeakPrioInput] = useState<'A' | 'B' | 'C'>('B');
   // P0-3: блоки специализации (explicit schedule: цели/доноры по неделям).
   const [specBlocks, setSpecBlocks] = useState<UiSpecBlock[]>([]);
+  // P1-5/P1-9/P2-11: ротация, интенсификация, строгая частота сплита.
+  const [rotMode, setRotMode] = useState<boolean>(false);
+  const [intensityT, setIntensityT] = useState<boolean>(false);
+  const [strictDays, setStrictDays] = useState<boolean>(false);
   // R8: ось humerus-2026 + попытки медли (опционально, пусто = как раньше)
   const [cycAxisOn, setCycAxisOn] = useState<boolean>(false);
   const [axTrunk, setAxTrunk] = useState<boolean>(false);
@@ -1112,6 +1116,12 @@ const [rfdEstimated, setRfdEstimated] = useState<boolean>(false);
   }, [level, goal, technique, discipline, daysPerWeek, gripFocus, weakPoints, specialization, cycId, profileSnapshot]);
 
   const best = useMemo(() => ranked[0]?.pattern, [ranked]);
+  // P2-11: строгий фильтр сплитов по заявленной частоте (дней/нед).
+  const rankedShown = useMemo(() => {
+    if (!strictDays) return ranked;
+    const exact = ranked.filter((r: any) => Math.abs((r.pattern.sessionsPerRotation * 7) / Math.max(1, r.pattern.rotationDays) - daysPerWeek) < 0.01);
+    return exact.length ? exact : ranked;
+  }, [ranked, strictDays, daysPerWeek]);
 
   const specPreview = useMemo(() => {
     return buildArmSchedule({ focusGroup: focusGroup || undefined, weakPoints, specialization, totalWeeks: weeks });
@@ -1189,6 +1199,9 @@ const [rfdEstimated, setRfdEstimated] = useState<boolean>(false);
         progressionStyle: progStyle !== 'auto' ? (progStyle as any) : undefined,
         peaks: peaks.length ? peaks : undefined,
         legsAnchor: legsAnchor || undefined,
+        rotationMode: rotMode || undefined,
+        intensityTechniques: intensityT || undefined,
+        readinessStatus: (pro7Readiness?.status === 'red' || pro7Readiness?.status === 'yellow' || pro7Readiness?.status === 'green') ? pro7Readiness.status : undefined,
         ...profilePatch,
         weakPoints,
         focusGroup: focusGroup || undefined,
@@ -1947,7 +1960,8 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
       {step === 'split' && (
         <AdCard className="ad-stepview">
           <AdSec title="🗓 Выбор сплита" hint={`Ранжирование по уровню/цели/технике/хватe/дням (${daysPerWeek}/нед). Зелёный — лучший.`}>
-            <SplitList ranked={ranked} patternId={patternId} onPick={pickSplit} />
+            <AdSwitch checked={strictDays} onChange={setStrictDays} label={`Только точная частота ${daysPerWeek}×/нед`} />
+            <SplitList ranked={rankedShown} patternId={patternId} onPick={pickSplit} />
           </AdSec>
           <AdCta>
             <AdBtn variant="primary" block hero onClick={handleBuild}>⚡ Собрать план</AdBtn>
@@ -2098,6 +2112,8 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
             {progStyle === 'double' && <div className="ad-tip">Double: повторы +1/нед в блоке (до +3), вес +2.5% между блоками — профессиональная двойная прогрессия.</div>}
             {progStyle === 'wave' && <div className="ad-tip">Wave: тяжёлая/средняя/лёгкая недели внутри блока — плотность без отказа.</div>}
             <AdSwitch checked={legsAnchor} onChange={setLegsAnchor} label="База-якорь: присед/тяга/фермер 1×/нед (LegsCore)" />
+            <AdSwitch checked={rotMode} onChange={setRotMode} label="🔁 Ротация упражнений по неделям (3 варианта группы)" />
+            <AdSwitch checked={intensityT} onChange={setIntensityT} label="💧 Drop-set на памп-изоляции (гипертрофия)" />
             {proDate && peaks.length === 0 && (() => {
               try {
                 const wOut = weeksUntilStart(undefined, proDate);

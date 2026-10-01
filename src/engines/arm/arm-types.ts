@@ -210,6 +210,12 @@ export interface ArmBuilderInput {
   /** Контур «план ↔ факт»: сессии живого дневника (только с previousPlan — кросс-мезо
    *  ставка становится per-muscle: beat → ставка, on_track → 1.0, stalled → −2%). */
   diarySessions?: ArmDiarySessionFact[];
+  /** P1-5: ротация упражнений по неделям внутри группы замены (3 варианта, детерминированно). */
+  rotationMode?: boolean;
+  /** P1-8: готовность (из UI PRO-7) — red делает первую неделю разгрузочной. */
+  readinessStatus?: 'green' | 'yellow' | 'red' | 'unknown';
+  /** P1-9: интенсификационные техники гипертрофии (drop-set на памп-изоляции). */
+  intensityTechniques?: boolean;
 }
 
 export interface ArmInjury {

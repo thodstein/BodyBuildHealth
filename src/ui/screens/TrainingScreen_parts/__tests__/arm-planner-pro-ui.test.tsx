@@ -104,6 +104,17 @@ describe('Arm PRO-PLAN UI', () => {
     expect(container.querySelector('[data-arm="export-csv"]')).toBeNull(); // CSV — на шаге экспорта
   });
 
+  it('P1/P2: тумблеры ротации, drop-set и строгой частоты', () => {
+    render(<ArmAutoConstructor />);
+    fireEvent.click(screen.getByRole('button', { name: '4 Сплит и цикл' }));
+    expect(screen.getByRole('switch', { name: /Только точная частота/ })).toBeTruthy();
+    openPlanSec();
+    const rot = screen.getByRole('switch', { name: /Ротация упражнений/ });
+    fireEvent.click(rot);
+    expect(rot.getAttribute('aria-checked')).toBe('true');
+    expect(screen.getByRole('switch', { name: /Drop-set/ })).toBeTruthy();
+  });
+
   it('план с стартом и якорем: маркер недели, LegsCore, CSV-кнопка', () => {
     const { container } = render(<ArmAutoConstructor />);
     // недели 10 → окно старта Н6 целиком внутри плана

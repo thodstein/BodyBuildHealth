@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { armFactFeedback, applyFactProgression, factRateFor, armPlanCompliance, armFactE1RM } from '../arm-plan-feedback.engine';
+import { armFactFeedback, applyFactProgression, factRateFor, armPlanCompliance, armFactE1RM, armPerMuscleLoadAlerts } from '../arm-plan-feedback.engine';
 import type { ArmPlan, ArmDiarySessionFact } from '../arm-types';
 
 function planOneMuscle(weight = 50, reps = 8): ArmPlan {
@@ -89,6 +89,23 @@ describe('arm-plan-feedback: per-muscle ставка следующей мезы
     expect(out.workMax.supinators).toBe(30.5); // 30.75 (float) → 30.5
     expect(out.notes.join(' ')).toContain('Плато по факту');
     expect(out.notes.join(' ')).toContain('Факт превысил план');
+  });
+});
+
+describe('arm-plan-feedback: per-muscle нагрузка (P1-7)', () => {
+  const day = (offset: number, sets: number) => ({
+    date: new Date(Date.now() - offset * 86400000).toISOString().slice(0, 10),
+    exercises: [{ exerciseName: 'Пронация', muscle: 'pronators', sets: Array.from({ length: sets }, () => ({ weightKg: 30, reps: 8 })) }],
+  });
+  it('ratio ≥1.5 → мышца в алертах; спокойная база — нет', () => {
+    const hot = armPerMuscleLoadAlerts([day(0, 12), day(8, 3), day(15, 3), day(22, 3)]);
+    expect(hot.map((a) => a.muscle)).toContain('pronators');
+    expect(hot[0].ratio).toBeGreaterThanOrEqual(1.5);
+    const calm = armPerMuscleLoadAlerts([day(0, 3), day(8, 3), day(15, 3), day(22, 3)]);
+    expect(calm).toEqual([]);
+  });
+  it('мало данных (<3 сетов/нед в среднем) — без алертов', () => {
+    expect(armPerMuscleLoadAlerts([day(0, 2), day(15, 1)])).toEqual([]);
   });
 });
 

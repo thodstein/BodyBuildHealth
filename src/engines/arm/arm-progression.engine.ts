@@ -8,6 +8,11 @@ export function epley1RM(weight: number, reps: number): number {
   return weight * (1 + reps / 30);
 }
 
+/**
+ * @deprecated API сохранён (внешние потребители/тесты). В билдере используется
+ * inline-путь прогрессии (auto/linear/double/wave в arm-periodization.engine +
+ * контур «план ↔ факт» в arm-plan-feedback.engine) — эта функция не вызывается.
+ */
 export function prescribeArmLoad(input: {
   currentWeight: number;
   currentReps: number;

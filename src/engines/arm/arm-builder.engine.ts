@@ -37,8 +37,8 @@ import { larrattSinglesFor, strengthLogRir, isSinglesCandidate } from './arm-pro
 import { suggestSplitForCycle } from './arm-pro5-ux.engine';
 import { armInjuryRepsCap, armInjuryVolumeFactor, armInjuryWeightFactor, mobilityBlockReason } from './arm-injury-guard.engine';
 import { cycleBlocksFor, deriveArmBlocks, planArmPeaks, progressionForWeek, buildArmAnchorSession, buildArmWarmupSets, blockForWeek } from './arm-periodization.engine';
-import { legsAnchorBlock, weeksUntilStart } from './arm-competition-prep.engine';
-import { armFactFeedback, factRateFor } from './arm-plan-feedback.engine';
+import { legsAnchorBlock, weeksUntilStart, planWeightCut } from './arm-competition-prep.engine';
+import { armFactFeedback, factRateFor, armPerMuscleLoadAlerts } from './arm-plan-feedback.engine';
 
 const PHASES: Array<'accumulation' | 'intensification' | 'deload' | 'peaking'> = ['accumulation','intensification','deload','peaking'];
 
@@ -122,7 +122,7 @@ function armLevelRank(level: string): number {
   return l === 'beginner' ? 0 : l === 'intermediate' ? 1 : l === 'advanced' ? 2 : 3;
 }
 
-function pickExerciseForMuscle(muscle: string, role: 'primary'|'accessory', equipment: string[], favorite: string[], excluded: string[], usedIds: Set<string>, technique?: string, mobilityRestrictions: string[] = [], injuries?: Array<{ muscle: string; volumePct?: number; exclude?: boolean }>, level: string = 'intermediate'): typeof ARM_EXERCISES[number] | null {
+function pickExerciseForMuscle(muscle: string, role: 'primary'|'accessory', equipment: string[], favorite: string[], excluded: string[], usedIds: Set<string>, technique?: string, mobilityRestrictions: string[] = [], injuries?: Array<{ muscle: string; volumePct?: number; exclude?: boolean }>, level: string = 'intermediate', week: number = 1, rotationOn: boolean = false): typeof ARM_EXERCISES[number] | null {
   const mLow = muscle.toLowerCase();
   if (armInjuryVolumeFactor(injuries, mLow) <= 0) return null;
   // Техника-специфичные приоритеты
@@ -205,6 +205,11 @@ function pickExerciseForMuscle(muscle: string, role: 'primary'|'accessory', equi
     if (boostB !== boostA) return boostB - boostA;
     return (role === 'primary' ? b.fatigueCost - a.fatigueCost : a.fatigueCost - b.fatigueCost);
   });
+  // P1-5: ротация по неделям внутри группы замены (3 варианта, детерминированно).
+  if (rotationOn && usable.length > 1) {
+    const span = Math.min(3, usable.length);
+    return usable[(Math.max(1, Math.round(week)) - 1) % span];
+  }
   return usable[0];
 }
 
@@ -640,6 +645,21 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
     diaryDeload = true;
     if (String(phaseMap[1] || '') !== 'deload') (phaseMap as Record<number, string>)[1] = 'deload';
   }
+  // P1-8: красная готовность (сон/HRV/боль/ACWR из UI PRO-7) → первая неделя разгрузочная.
+  let readinessDeload = false;
+  const readinessStatus = String((input as any).readinessStatus || '').toLowerCase();
+  if (readinessStatus === 'red' && weeks >= 3) {
+    readinessDeload = true;
+    if (String(phaseMap[1] || '') !== 'deload') (phaseMap as Record<number, string>)[1] = 'deload';
+  }
+  // P1-7: локальная перегрузка мышцы по дневнику (сеты 7д vs среднее 28д ≥1.5) —
+  // первые две недели целевой объём мышцы ×0.8 + честная строка.
+  let muscleLoadAlerts: ReturnType<typeof armPerMuscleLoadAlerts> = [];
+  try {
+    const fs3 = (input as any).diarySessions;
+    if (Array.isArray(fs3) && fs3.length) muscleLoadAlerts = armPerMuscleLoadAlerts(fs3);
+  } catch { markDegraded('per-muscle нагрузка недоступна'); }
+  const overloadedMuscles = new Set(muscleLoadAlerts.map((a) => a.muscle));
   // PRO-PLAN: мезо-блоки (явные цикловые или выведенные из фаз).
   let planBlocks: ReturnType<typeof deriveArmBlocks> = [];
   try {
@@ -676,6 +696,7 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
   const usedIdsGlobal = new Set<string>();
   const angleHistory: Record<string, ArmWorkingAngle[]> = {};
   let larrattWeeks = 0; // PRO-5 P4: недель с применёнными синглами
+  let dropSetsApplied = 0; // P1-9: применённые drop-set мини-сеты
 
   for (let w = 1; w <= weeks; w++) {
     const phase = (phaseMap[w] || 'accumulation') as any;
@@ -788,7 +809,10 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
         const targetRaw = volumeTargets[mus] ? Math.round(volumeTargets[mus].targetSets * weekMult * (pro.volumeMult || 1) * matchupMult * gripMult * iqSide * iqRise * injuryFactor) : 6;
         const target = volumeTargets[mus] ? Math.min(volumeTargets[mus].mrv, targetRaw) : 6;
         const freq = muscleFreq[mus] || 1;
-        const setsBase = setsFor(mus, effCh, w, target, freq);
+        // P1-7: локальная перегрузка мышцы (дневник) — первые 2 недели сеты ×0.8
+        // (после кап-функции: иначе per-exercise cap маскировал локальный делод).
+        let setsBase = setsFor(mus, effCh, w, target, freq);
+        if (w <= 2 && overloadedMuscles.has(mus)) setsBase = Math.max(1, Math.round(setsBase * 0.8));
         const repsBase = repsFor(mus, effCh, phase);
         const injuryRepsCap = armInjuryRepsCap(injuries, mus);
         // TOP wave-5: RFD — настоящий speed-протокол 5×3 RPE8 вместо метки (первое speed-упражнение тяжёлой intensification)
@@ -816,7 +840,7 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
           ? strengthLogRir(Math.min(8, Math.max(1, w)), effCh)
           : rirFor(effCh, phase, w, technique);
         const rir = wantSingles && larratt ? larratt.rir : Math.max(0, Math.min(5, rirBase + (pro.rirShift || 0) + iqRir + hookShift + peakRir));
-        const exTpl = pickExerciseForMuscle(mus, role, equipment, favorite, excluded, usedInSession, technique, mobilityRestrictions, injuries, level);
+        const exTpl = pickExerciseForMuscle(mus, role, equipment, favorite, excluded, usedInSession, technique, mobilityRestrictions, injuries, level, w, (input as any).rotationMode === true);
         if (!exTpl) {
           addSelectionWarning(`missing:${mus}:${mobilityRestrictions.join('|')}`, `Н${w} ${mus}: нет безопасного упражнения для equipment/ограничений; произвольная замена не используется.`);
           continue;
@@ -881,6 +905,25 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
           }
         }
 
+        // P1-9: drop-set (opt-in: гипертрофия + памп-изоляция) — +1 сет, кап не превышаем.
+        let dropSet = false;
+        let finalSets = sets;
+        try {
+          if (
+            (input as any).intensityTechniques === true && goal === 'hypertrophy' && effCh === 'памп' &&
+            String(exTpl.type) === 'isolation' && !isDeload && sets >= 2 && sets < perExerciseCap(mus, level)
+          ) {
+            const last = workSets[workSets.length - 1];
+            const w0 = Number(last?.weight) || 0;
+            if (w0 > 0) {
+              workSets.push({ ...last, weight: Math.max(0.5, Math.round(w0 * 0.7 * 2) / 2), reps: Math.min(30, (Number(last.reps) || 10) + 2), rir: 0, restSeconds: 0 });
+              finalSets = workSets.length;
+              dropSet = true;
+              dropSetsApplied++;
+            }
+          }
+        } catch { dropSet = false; finalSets = sets; }
+
         // PRO-5 G7: честная пометка веса-ориентира (workMax пуст — прогрессия не ведётся).
         let wEstimated = false;
         try {
@@ -891,7 +934,7 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
           name: exTpl.name,
           role: 'primary',
           character: effCh,
-          sets,
+          sets: finalSets,
           repsRange: repsFinal,
           rir,
           workSets,
@@ -913,6 +956,7 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
             ? `RFD speed 5×3 @RPE8: ускорение через весь диапазон, отдых 90с · ${exTpl.technique || ''}`
             : (exTpl.technique || ''))
             + (gripShow === 'over' ? ' · overcrush hold 8–12с (дожим)' : gripShow === 'neg' ? ' · negatives 5с' : '')
+            + (dropSet ? ' · 💧 drop-set: −30% вес, без отдыха' : '')
             + (wantSingles && larratt ? ` · ${larratt.comment}` : '')
             + (wEstimated ? ' · вес ориентир — задайте workMax' : '') || undefined),
         });
@@ -1105,6 +1149,23 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
       feedbackWarnings.push(`Плато факта (дневник): ${stalled.map((f) => f.muscle).join(', ')} — ставка мезо снижена.`);
     }
   }
+  // P1-8 / P1-7 / P1-9 / P2-14: честные строки профессионального контура.
+  if (readinessDeload) rationale.push('🩺 Готовность красная: первая неделя — разгрузка (60%, RIR+2) до восстановления.');
+  if (muscleLoadAlerts.length) {
+    const txt = muscleLoadAlerts.slice(0, 4).map((a) => `${a.muscle} (7д ${a.sets7} vs ср.${a.weeklyAvg}, ×${a.ratio})`).join('; ');
+    rationale.push(`⚖️ Локальная перегрузка дневника: ${txt} — первые 2 недели объём ×0.8, контроль восстановления.`);
+    feedbackWarnings.push(`Локальная перегрузка дневника: ${txt}.`);
+  }
+  if (dropSetsApplied > 0) rationale.push(`💧 Drop-set: +${dropSetsApplied} мини-сетов на памп-изоляции (гипертрофия, без отдыха).`);
+  try {
+    const isoC = String((input as any).competitionDateIso || '');
+    const bw = Number((input as any).bodyWeightKg);
+    const tw = Number((input as any).targetWeightKg);
+    if (isoC && Number.isFinite(bw) && Number.isFinite(tw) && bw > 0 && tw > 0 && bw > tw) {
+      const cut = planWeightCut({ startKg: bw, targetKg: tw, weeksOut: weeksUntilStart(undefined, isoC), sex: (input as any).sex });
+      rationale.push(`⚖️ Сгонка к старту: ${cut.note}`);
+    }
+  } catch { /* опционально */ }
   if (diaryDeload) rationale.push(`🔄 Дневник: ACWR danger — первая неделя построена как разгрузка (60%, RIR+2) до восстановления.`);
   if (anchorProto) rationale.push('🏋️ База-якорь: LegsCore-сессия 1×/нед (присед/тяга/фермер) — side-цепь и общий тонус.');
   if (Number((input as any).daysPerWeek || 0) > 0) {

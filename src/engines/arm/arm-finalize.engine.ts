@@ -4,7 +4,7 @@
  */
 import type { ArmPlan } from './arm-types';
 import { getArmLandmarks } from './arm-volume-landmarks.engine';
-import { perExerciseCap } from './arm-volume.engine';
+import { perExerciseCap, aggregateArmVolume } from './arm-volume.engine';
 import { getArmCycle } from './arm-cycle-library.engine';
 import { buildArmTaperCurve, applyArmTaperToWeeks, type ArmTaperMode } from './arm-taper.engine';
 import { armInjuryRepsCap, armInjuryVolumeFactor, armInjuryWeightFactor, mobilityBlockReason } from './arm-injury-guard.engine';
@@ -394,6 +394,25 @@ function applyCycleTaperPreset(plan: ArmPlan): void {
   plan.rationale.push(`Тейпер-пресет ${preset}: кривая ${curve.map((p) => `${p.volumePct}`).join('/')} на ${curve.length} нед хвоста.`);
 }
 
+/**
+ * P1-6: косвенный объём в MRV-контроле — эффективные (прямые+косвенные) сеты
+ * больше MRV×1.15 → честный warning (не срез; поведение плана не меняется).
+ */
+export function armIndirectOverflowWarnings(plan: ArmPlan, level: string): string[] {
+  const out: string[] = [];
+  for (const wk of plan.weeks) {
+    const agg = aggregateArmVolume([wk as any]);
+    for (const [muscle, v] of Object.entries(agg)) {
+      const mrv = plan.mrvByMuscle?.[muscle] ?? getArmLandmarks(level, muscle).mrv;
+      if (!Number.isFinite(mrv) || mrv <= 0) continue;
+      if (v.effectiveSets > mrv * 1.15 + 0.001) {
+        out.push(`Н${wk.week}: ${muscle} эффективный объём ${Math.round(v.effectiveSets * 10) / 10} > MRV ${mrv}×1.15 (косвенная нагрузка учтена) — проверьте баланс.`);
+      }
+    }
+  }
+  return out;
+}
+
 export function finalizeArmPlan(plan: ArmPlan, opts?: { level?: string; tableRatio?: number }): ArmPlan {
   const level = opts?.level || plan.level || 'intermediate';
   const tableRatio = opts?.tableRatio ?? 0.55;
@@ -423,6 +442,18 @@ export function finalizeArmPlan(plan: ArmPlan, opts?: { level?: string; tableRat
   dedupeAngles(plan);
   injectTendonConditioning(plan, level);
   enforceInputSafety(plan);
+  // P1-6: эффективный объём (прямой+косвенный) в MRV-контроле — warning (идемпотентно).
+  try {
+    if (!(plan as any)._indirectChecked) {
+      const lines = armIndirectOverflowWarnings(plan, level);
+      if (lines.length) {
+        if (!plan.safetyWarnings) plan.safetyWarnings = [];
+        const seen = new Set(plan.safetyWarnings);
+        for (const l of lines) if (!seen.has(l)) { plan.safetyWarnings.push(l); seen.add(l); }
+      }
+      (plan as any)._indirectChecked = true;
+    }
+  } catch { /* опционально */ }
 
   // Итоговый пересчёт weeklyVolume
   const weeklyVolume: Record<number, any> = {};
