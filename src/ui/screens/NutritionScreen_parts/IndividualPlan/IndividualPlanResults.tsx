@@ -11,6 +11,7 @@ import { localIsoDate } from "./planner-date-utils";
 import { buildTrainSchedule, isTrainingDayFor } from "./planner-training-schedule";
 import { NutritionPeriodizationCard } from "./NutritionPeriodizationCard";
 import { SupplementTimingCard } from "./SupplementTimingCard";
+import { WeeklyReviewCard } from "./WeeklyReviewCard";
 import { ALL_SUBSTANCES } from "../../../../data/support-substances";
 import { getWeightLog } from "../../../../engines/profile-store";
 import { PopupSelect } from "../../../components/PopupXxx";
@@ -1075,6 +1076,30 @@ const doImportPlan = (raw: string): boolean => {
                   </div>
                 </div>
               </GlassCard>
+            );
+          } catch { return null; }
+        })()}
+
+        {(() => {
+          try {
+            const days: { date: string; kcal: number; proteinG: number }[] = [];
+            for (let i = 6; i >= 0; i--) {
+              const d = new Date(); d.setDate(d.getDate() - i);
+              const date = localIsoDate(d);
+              const entries = getDiaryEntriesForDate(date);
+              const kcal = Math.round(entries.reduce((s: number, x: any) => s + (x.kcal || 0), 0));
+              const p = Math.round(entries.reduce((s: number, x: any) => s + (x.p || x.protein || 0), 0));
+              if (kcal > 0) days.push({ date, kcal, proteinG: p });
+            }
+            if (days.length === 0) return null;
+            return (
+              <WeeklyReviewCard
+                days={days}
+                targetKcal={dayPlan?.totals?.kcal || effectiveKcal || 0}
+                targetProteinG={dayPlan?.totals?.p || effectiveP || 0}
+                weightLog={(() => { try { return getWeightLog().map(e => ({ date: e.date, weightKg: e.weight })); } catch { return []; } })()}
+                goal={goal}
+              />
             );
           } catch { return null; }
         })()}
