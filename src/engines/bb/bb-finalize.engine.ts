@@ -2439,6 +2439,9 @@ export interface BBFinalizeOptions {
   /** Избранное пользователя — iso-вычитка не трогает (адаптив-подбор). */
   favoriteExercises?: string[];
   avoidAxialLoad?: boolean;
+  /** Силовые лифты (становая/жим стоя) разрешены в добавляемых упражнениях
+   *  циклового пути (allowStrengthLifts конвертера). false/undefined — фильтр. */
+  allowStrengthLifts?: boolean;
   excludedMuscles?: string[];
   /** Мышцы с ГРАДИРОВАННОЙ травмой (щадящий режим, exclude=false):
    *  остаются в плане со сниженным весом/объёмом/повторами. Добивочные
@@ -2653,7 +2656,17 @@ function enforceSessionExerciseLimit(plan: BBPlan, options: BBFinalizeOptions): 
       return weekSpec.weak.includes(muscle) || weekSpec.weak.includes(am) || weekSpec.targets.includes(muscle) || weekSpec.targets.includes(am);
     };
     for (const session of week.sessions) {
-      const working = () => session.exercises.filter((e: any) => !(e as any).warmupActivator && !(e as any).optional);
+      // Валидатор считает ВСЕ рабочие упражнения, включая optional («при наличии
+      // сил») — кап сессии должен сходиться и с ним (аудит 2026-10: generic
+      // glute_focus_4/fullbody_3 давали 17 при лимите 16: 16 обязательных +
+      // optional). Снимаем optional первыми, затем прежняя логика.
+      const working = () => session.exercises.filter((e: any) => !(e as any).warmupActivator);
+      if (working().length <= maxEx) continue;
+      const optionalExs = session.exercises.filter((e: any) => (e as any).optional && !(e as any).warmupActivator);
+      for (const ex of optionalExs) {
+        if (working().length <= maxEx) break;
+        session.exercises = session.exercises.filter((x: any) => x !== ex);
+      }
       if (working().length <= maxEx) continue;
       // Изоляции по имени (в спец-планах они primary — но дубли паттернов
       // всё равно лишние), затем accessory-не-изоляции; compound не трогаем.
@@ -3468,6 +3481,92 @@ function enforceExerciseLevels(plan: BBPlan, options: BBFinalizeOptions): void {
 }
 
 /**
+ * Ёмкость сессии циклового пути (expandAllMuscles): если мышца ниже
+ * пер-сессионной цели, а ВСЕ её упражнения уже на perExerciseCap — добавляем
+ * упражнение той же мышцы (каталог, tier ≤2, с фильтрами excluded/equipment/
+ * mobility/axial), а не раздуваем одно движение до 24–30 сетов (аудит 2026-10:
+ * calves/подтягивания/жимы получали 20–28 сетов на одно упражнение).
+ * Не трогает делоды/prep/taper; соблюдает maxExercises/maxWorkingSets сессии;
+ * для graded (щадящих) мышц не добавляет. Без expandAllMuscles — no-op.
+ */
+function ensureMuscleSessionCapacity(week: any, plan: BBPlan, options: BBFinalizeOptions): void {
+  if (!(options as any).expandAllMuscles) return;
+  const yrs = options.trainingYears ?? 0;
+  const onCourse = !!options.onCourse;
+  const maxSessionSets = options.maxWorkingSets ?? 60;
+  const maxEx = options.maxExercises ?? 16;
+  const excludedMuscles = new Set(options.excludedMuscles || []);
+  const graded = new Set([...(options.gradedMuscles || []), ...((options.gradedInjuries || []).map(g => g.muscle))]);
+  const equipmentOk = (c: any): boolean => {
+    if (!options.equipment?.length) return true;
+    const eq = Array.isArray(c.equipment) ? c.equipment : [String(c.equipment || '')];
+    if (!eq.length) return true;
+    if (eq.includes('bodyweight')) return true;
+    return eq.some((x: string) => options.equipment!.includes(x));
+  };
+  const freq = new Map<string, number>();
+  for (const s of week.sessions) {
+    const seen = new Set<string>();
+    for (const e of s.exercises) if (!(e as any).warmupActivator) seen.add(e.muscle);
+    for (const m of seen) freq.set(m, (freq.get(m) || 0) + 1);
+  }
+  for (const s of week.sessions) {
+    const working = () => s.exercises.filter((e: any) => !(e as any).warmupActivator);
+    const sessSets = () => working().reduce((a: number, e: any) => a + (e.sets || 0), 0);
+    const muscles: string[] = [...new Set((working() as any[]).map((e: any) => e.muscle as string))];
+    for (const m of muscles) {
+      if (excludedMuscles.has(m) || graded.has(m)) continue;
+      const t = plan.volumeTargets?.[m]?.targetSets || 0;
+      if (t <= 0) continue;
+      const f = freq.get(m) || 1;
+      const lm = getVolumeLandmarks(options.level || 'intermediate', m);
+      let perSessionGoal = Math.max(2, Math.ceil(Math.max(t, lm?.mev ?? 0) / f));
+      if (m === 'back' && options.level === 'enhanced' && yrs >= 3 && !/FullBody/i.test(s.sessionTag || '')) {
+        perSessionGoal = Math.max(perSessionGoal, perSessionMuscleCap({ muscle: 'back', level: options.level, trainingYears: yrs, onCourse }));
+      }
+      const exCap = perExerciseCap(options.level, m, yrs, onCourse);
+      // До 2 добавлений на мышцу/сессию (иначе сессия из одного движения
+      // не наберёт пер-сессионную цель при капе 10).
+      for (let add = 0; add < 2; add++) {
+        const exs = working().filter((e: any) => e.muscle === m);
+        if (!exs.length) break;
+        const sessDirect = exs.reduce((a: number, e: any) => a + (e.sets || 0), 0);
+        if (sessDirect >= perSessionGoal) break;
+        // Есть куда растить существующие — не добавляем (это работа repair/expansion).
+        if (!exs.every((e: any) => (e.sets || 0) >= exCap)) break;
+        if (working().length >= maxEx || sessSets() >= maxSessionSets) break;
+        const used = new Set(working().map((e: any) => e.name));
+        const strengthLiftName = /становая|сумо|мёртв|мертв|жим стоя|армейск|швунг|толчок|рывок|overhead.?squat/i;
+        const cand = EXERCISE_CATALOG.find((x: any) =>
+          bbExerciseTier(x) <= 2
+          && trueMuscleOf(x) === m
+          && !used.has(x.name)
+          && !options.excludedExercises?.includes(x.id)
+          && !options.excludedExercises?.includes(x.name)
+          && !excludedMuscles.has((x as any).group)
+          && (options.allowStrengthLifts === true || !strengthLiftName.test(x.name))
+          && (!options.avoidAxialLoad || !isAxialLoadExercise(x))
+          && !isMobilityRestricted(x, options.mobilityRestrictions)
+          && equipmentOk(x));
+        if (!cand) break;
+        const room = maxSessionSets - sessSets();
+        const sets = Math.max(3, Math.min(exCap, perSessionGoal - sessDirect, room, 4));
+        if (sets < 3 || room < 3) break;
+        const wm = (options.workMax && (options.workMax[m] || options.workMax.chest)) || 60;
+        const w = Math.round(wm * 0.5 * 10) / 10;
+        s.exercises.push({
+          muscle: m, name: cand.name, exerciseName: cand.name, role: 'accessory', character: 'памп',
+          sets, repsRange: [10, 15], rir: 3, restSeconds: 90, warmupSets: [],
+          workSets: Array.from({ length: sets }, () => ({ reps: 12, rir: 3, weight: w, restSeconds: 90 })),
+          comment: `➕ Ёмкость сессии: ${cand.name} (${m}) — упражнения мышцы на капе ${exCap}, цель сессии ${perSessionGoal} сетов.`,
+          rationale: 'Cycle capacity: движение вместо раздувания одного упражнения',
+        } as any);
+      }
+    }
+  }
+}
+
+/**
  * Общий последний проход для generic, проф-циклов и библиотечных программ.
  * Не меняет объём и не добавляет упражнения: только приводит форму результата
  * к единому BBPlan-контракту и восстанавливает тренерский порядок там, где
@@ -3919,7 +4018,13 @@ for (const week of next.weeks) {
           // (3+3+3+3+3+3+8). Итог — ровная форма 5/5/4/4/4/4/4.
           const muscleExs = working.filter((x: any) => x.muscle === e.muscle);
           const share = Math.max(2, Math.ceil(perSessionGoal / Math.max(1, muscleExs.length)));
-          let guard = Math.max(2, Math.min(share, perSessionGoal));
+          // Адекватность (аудит 2026-10): потолок одного упражнения — perExerciseCap
+          // (10 big / 8 прочие на курсе 6+). Раньше сессия с 1–2 упражнениями мышцы
+          // поднимала каждое до perSessionGoal (24–30 сетов на calves/подтягивания) —
+          // неадекватная программа. Если всё на капе — добор идёт УПРАЖНЕНИЕМ
+          // (ensureMuscleSessionCapacity ниже), а не раздуванием одного.
+          const exCapRepair = perExerciseCap(options.level, e.muscle, options.trainingYears, options.onCourse);
+          let guard = Math.max(2, Math.min(share, perSessionGoal, exCapRepair));
           // Кап-запас: подъём не должен выталкивать недельный effective
           // (direct + indirect от compound) выше MRV×1.15.
           if (mrvCap) {
@@ -4081,6 +4186,15 @@ for (const week of next.weeks) {
     }
 
     syncBBPlanSetShape(next);
+    // Цикловой adapt: после капа на упражнение добавляем ЁМКОСТЬ упражнением,
+    // если мышца не добирает пер-сессионную цель (а не 24–30 сетов на одно).
+    if ((options as any).expandAllMuscles) {
+      for (const w of next.weeks) {
+        if (isPrepControlled(w) || isDeloadLikeWeek(w)) continue;
+        ensureMuscleSessionCapacity(w, plan, options);
+      }
+      syncBBPlanSetShape(next);
+    }
   }
   // Taper is a source-independent final phase pass. It is deliberately here
   // rather than in the generic builder so cycle/program outputs get it too.

@@ -267,18 +267,40 @@ function expandPlanToTargets(
       if ((weekEff[muscle] || 0) >= t) continue;
       const exs = week.sessions.flatMap(s => s.exercises.filter(e => !(e as any).warmupActivator && e.muscle === muscle && !/FST-7/.test(String((e as any).comment || ''))));
       if (!exs.length) continue;
-      // Кап расширения: не ниже per-session-цели мышцы (чтобы дотянуть до неё),
-      // и не ниже обычного per-exercise капа. Иначе 10 сетов/упр душили спину.
-      const perSessGoal = Math.max(2, Math.ceil(t / Math.max(1, Number(target?.frequency) || 1)));
-      const cap = Math.max(perExerciseCap(opts.level, muscle, yrs, onCourse), perSessGoal);
+      // Адекватность (аудит 2026-10): потолок ОДНОГО упражнения — perExerciseCap
+      // (10 big / 8 прочие на курсе 6+; 5–8 legacy), а не per-session-цель.
+      // Раньше cap = max(perExerciseCap, perSessGoal) позволял 20–28 сетов на
+      // одно упражнение (calves/подтягивания/жимы) — цикл выглядел неадекватно.
+      // Недельная цель распределяется ПО СЕССИЯМ: каждое упражнение растёт до
+      // perExerciseCap, а сессия — до ceil(цель / число сессий мышцы), не выше
+      // канона perSessionMuscleCap. Если всё на капе — добор остаётся дефицитом
+      // (финализатор при expandAllMuscles добавляет упражнение ёмкости).
+      const exCap = perExerciseCap(opts.level, muscle, yrs, onCourse);
+      const sessList = week.sessions.filter(s => s.exercises.some(e => !(e as any).warmupActivator && e.muscle === muscle));
+      const perSessGoal = Math.max(2, Math.min(
+        perSessionMuscleCap({ muscle, level: opts.level, trainingYears: yrs, onCourse }),
+        Math.ceil(t / Math.max(1, sessList.length)),
+      ));
+      const sessSetsOf = (s: any) => s.exercises.filter((x: any) => !(x as any).warmupActivator).reduce((a: number, x: any) => a + (x.sets || 0), 0);
+      const sessMuscleSetsOf = (s: any) => s.exercises.filter((x: any) => !(x as any).warmupActivator && x.muscle === muscle).reduce((a: number, x: any) => a + (x.sets || 0), 0);
       let guard = 0;
       while ((weekEff[muscle] || 0) < t && guard++ < 300) {
-        const cand = exs.filter(e => (e.sets || 0) < cap).sort((a, b) => (a.sets || 0) - (b.sets || 0))[0];
+        // Кандидат — самое мелкое упражнение мышцы, у которого есть ЗАПАС:
+        // сессия ниже лимита сетов и ниже пер-сессионной цели мышцы. Полная
+        // сессия больше НЕ обрывает добор для остальных сессий недели (было
+        // 49+9: одна сессия надувалась, вторая стояла).
+        const cand = exs
+          .filter(e => (e.sets || 0) < exCap)
+          .filter(e => {
+            const s = week.sessions.find(ss => ss.exercises.includes(e));
+            if (!s) return false;
+            if (opts.maxWorkingSets && sessSetsOf(s) >= opts.maxWorkingSets) return false;
+            return sessMuscleSetsOf(s) < perSessGoal;
+          })
+          .sort((a, b) => (a.sets || 0) - (b.sets || 0) || String(a.name).localeCompare(String(b.name)))[0];
         if (!cand) break;
         const s = week.sessions.find(ss => ss.exercises.includes(cand));
         if (!s) break;
-        const sesSets = s.exercises.filter((x: any) => !(x as any).warmupActivator).reduce((a, x) => a + (x.sets || 0), 0);
-        if (opts.maxWorkingSets && sesSets >= opts.maxWorkingSets) break;
         const sample = cand.workSets?.[cand.workSets.length - 1] || { reps: 10, rir: 2, weight: 0 };
         // Мышцы, которых касается ДОБАВЛЯЕМОЕ упражнение (direct + indirect):
         // guard проверяет ТОЛЬКО их — пред-перелив несвязанной мышцы (напр.
@@ -1740,6 +1762,7 @@ export function convertCycleToBBPlan(input: CycleToPlanInput): BBPlan {
     equipment,
     excludedExercises,
     avoidAxialLoad,
+    allowStrengthLifts: input.allowStrengthLifts,
     excludedMuscles: [...excludedMuscles],
     gradedMuscles: [...new Set(gradedInjuries.map(inj => inj.muscle))],
     gradedInjuries: gradedInjuries.map(inj => ({ muscle: inj.muscle, exclude: inj.exclude, weightPct: inj.weightPct, volumePct: inj.volumePct, repsCap: inj.repsCap })),
@@ -2912,6 +2935,7 @@ export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts)
     equipment: eqList,
     excludedExercises: opts.excludedExercises,
     avoidAxialLoad: avAxial,
+    allowStrengthLifts: opts.allowStrengthLifts,
     excludedMuscles: [...excludedMuscles],
     gradedMuscles: [...new Set(gradedInjuries.map(inj => inj.muscle))],
     gradedInjuries: gradedInjuries.map(inj => ({ muscle: inj.muscle, exclude: inj.exclude, weightPct: inj.weightPct, volumePct: inj.volumePct, repsCap: inj.repsCap })),

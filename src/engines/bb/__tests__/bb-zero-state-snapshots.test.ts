@@ -103,8 +103,12 @@ describe('BB zero-state snapshots (baseline Этапа 10)', () => {
     // (по 3 сета за Pull) → delt_rear 16→12 при видимой паре 6/сессию
     // (инвариант bb-ppl-invariant 5-8 выполняется); (3) грудь Push —
     // наклон + горизонт (make-room вместо раннего выхода) → 18.
+    // Re-baseline 7 (аудит 2026-10, потолок упражнения): MEV-repair больше не
+    // поднимает ОДНО упражнение выше perExerciseCap — распределение ровнее:
+    // спина 18→19 тем же недельным объёмом (та же цель, кап 5/упр; валидатор
+    // зелёный, сессии в лимитах).
     expect(directVolume(plan)).toEqual({
-      abs: 8, back: 18, biceps: 16, calves: 18, chest: 18, delt_front: 7, delt_mid: 3, delt_rear: 12, forearms: 7, glutes: 11, hamstrings: 12, quads: 19, shoulders: 3, traps: 10, triceps: 16,
+      abs: 8, back: 19, biceps: 16, calves: 18, chest: 18, delt_front: 7, delt_mid: 3, delt_rear: 12, forearms: 7, glutes: 11, hamstrings: 12, quads: 19, shoulders: 3, traps: 10, triceps: 16,
     });
   });
 
@@ -129,8 +133,13 @@ describe('BB zero-state snapshots (baseline Этапа 10)', () => {
     // Re-baseline (осознанно): см. выше.
     // Re-baseline 3 (про-объём): предписанные цели по мышцам/частоте —
     // quads 9→19, chest 10→11, back 10→9, hamstrings 14→10, traps 9→6.
+    // Re-baseline 4 (аудит 2026-10, потолок упражнения/ёмкость): ремонт больше
+    // не раздувает одно упражнение (кап perExerciseCap) и добирает ёмкость
+    // УПРАЖНЕНИЕМ — перераспределение без переполнений: трицепс 12→8 (на капе,
+    // косвенный объём от жимов сохранён), грудь 11→13, квадры 19→20; max сетов
+    // на упражнение ≤ кап, сессии ≤ лимитов (валидатор зелёный).
     expect(directVolume(plan)).toEqual({
-      abs: 7, back: 9, biceps: 12, calves: 8, chest: 11, delt_front: 3, delt_mid: 2, delt_rear: 10, forearms: 7, glutes: 8, hamstrings: 10, quads: 19, shoulders: 0, traps: 6, triceps: 12,
+      abs: 7, back: 9, biceps: 12, calves: 8, chest: 13, delt_front: 3, delt_mid: 2, delt_rear: 10, forearms: 7, glutes: 8, hamstrings: 10, quads: 20, shoulders: 0, traps: 6, triceps: 8,
     });
   });
 

@@ -14,7 +14,7 @@ import { programToBBPlan, cycleTemplateToFullProgram } from '../../cycle-to-plan
 import { getCyclesByDirection } from '../../../../data/lms-cycles/lms-cycle-index';
 import { describe, expect, it } from 'vitest';
 import { validateBBPlan } from '../../bb-validator.engine';
-import { aggregateBBVolume } from '../../bb-volume.engine';
+import { aggregateBBVolume, perExerciseCap } from '../../bb-volume.engine';
 
 export const CYCLE_AUDIT_WORKMAX = {
   chest: 102.7, back: 121.3, shoulders: 61.7, quads: 141.3, hamstrings: 101.7,
@@ -128,15 +128,20 @@ export const cycleAuditComments = (p: any) => cycleAuditAllEx(p).map((e: any) =>
 
 export interface CycleAuditBuckets {
   weeks: string[]; phases: string[]; nan: string[]; setsShape: string[]; reps: string[];
-  rir: string[]; weight: string[]; dupes: string[]; empty: string[];
+  rir: string[]; weight: string[]; dupes: string[]; empty: string[]; exerciseCap: string[];
 }
 
 export const emptyCycleAuditBuckets = (): CycleAuditBuckets => ({
-  weeks: [], phases: [], nan: [], setsShape: [], reps: [], rir: [], weight: [], dupes: [], empty: [],
+  weeks: [], phases: [], nan: [], setsShape: [], reps: [], rir: [], weight: [], dupes: [], empty: [], exerciseCap: [],
 });
 
 /** Структурный аудит одного плана — нарушения копятся в бакеты (один прогон = все классы). */
-export function auditCycleStructure(key: string, plan: any, b: CycleAuditBuckets): number {
+export function auditCycleStructure(key: string, plan: any, b: CycleAuditBuckets, level?: string): number {
+  const capLevel = level || 'intermediate';
+  const capYears = CYCLE_AUDIT_YEARS[capLevel] ?? 0;
+  // Faithful = дословный источник (свой набор сетов автора, капы к нему не
+  // применяются по контракту) — адекватность упражнения проверяем в adapt.
+  const faithful = (plan as any).methodologyApplied === false;
   let cells = 0;
   if (!Array.isArray(plan.weeks) || plan.weeks.length === 0) { cycleAuditPush(b.weeks, `${key}: нет недель`); return 0; }
   for (const w of plan.weeks) {
@@ -155,6 +160,13 @@ export function auditCycleStructure(key: string, plan: any, b: CycleAuditBuckets
         cells++;
         if (!Number.isFinite(e.sets)) cycleAuditPush(b.nan, `${tag} ${nm}: sets=${e.sets}`);
         if (!Number.isFinite(e.rir) || e.rir < 0 || e.rir > 6) cycleAuditPush(b.rir, `${tag} ${nm}: rir=${e.rir}`);
+        // Адекватность объёма упражнения (аудит 2026-10): ни одно упражнение не
+        // выше perExerciseCap своего уровня/мышцы — 20–28 сетов на упражнение
+        // были регрессом циклового пути. Faithful не трогаем (дословный источник).
+        if (!faithful) {
+          const exCap = perExerciseCap(capLevel, e.muscle, capYears, false);
+          if (Number.isFinite(e.sets) && e.sets > exCap + 0.01) cycleAuditPush(b.exerciseCap, `${tag} ${nm} (${e.muscle}): sets=${e.sets} > cap=${exCap}`);
+        }
         const wsLen = Array.isArray(e.workSets) ? e.workSets.length : -1;
         if (!Number.isFinite(e.sets) || Math.abs(e.sets - wsLen) > 0.01) cycleAuditPush(b.setsShape, `${tag} ${nm}: sets=${e.sets} ws=${wsLen}`);
         for (const x of e.workSets || []) {
@@ -191,7 +203,7 @@ export function registerCycleAuditSuite(level: CycleAuditLevel): void {
     it('adapt: структура (все циклы × 2 пола × 2 цели)', () => {
       const b = emptyCycleAuditBuckets();
       let cells = 0;
-      for (const { key, plan } of bbAuditAdaptCells(level)) cells += auditCycleStructure(key, plan, b);
+      for (const { key, plan } of bbAuditAdaptCells(level)) cells += auditCycleStructure(key, plan, b, level);
       expect(cells).toBeGreaterThan(2000);
       expect(cycleAuditBucketReport(b)).toEqual([]);
     }, 900000);
@@ -265,7 +277,7 @@ export function registerCycleAuditSuite(level: CycleAuditLevel): void {
       const errors: string[] = [];
       let cells = 0;
       for (const { key, plan } of bbAuditFaithfulCells(level)) {
-        cells += auditCycleStructure(key, plan, b);
+        cells += auditCycleStructure(key, plan, b, level);
         const r = validateBBPlan(plan as any, { level, trainingYears: CYCLE_AUDIT_YEARS[level] });
         for (const i of r.issues) if (i.level === 'error') cycleAuditPush(errors, `${key}: [${i.code}] ${i.message}`);
       }
