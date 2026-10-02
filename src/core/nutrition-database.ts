@@ -2367,31 +2367,57 @@ export { RATION_TIERS };
     const isPlantMilk = /^(milk_|oat_milk|almond_milk|soy_milk|coconut_milk|drink_oat)/.test(f.id)
       && !f.id.startsWith('milk_powder');
     const hasDairy = (isDairy || f.id.includes('milk') || f.id.includes('cheese') || f.id.includes('cream') || f.id.includes('yogurt') || f.id.includes('kefir') || f.id.includes('whey') || f.id.includes('casein')) && !isPlantMilk;
-    const hasFish = f.id.includes('fish') || f.id.includes('salmon') || f.id.includes('tuna') || f.id.includes('cod') || f.id.includes('herring') || f.id.includes('mackerel') || f.id.includes('sardine') || f.id.includes('trout');
+    // P0-фикс: расширенный список рыбных id (tilapia/halibut/sea_bass/pollock/hake/…)
+    // Раньше «Тилапия», «Палтус», «Сибас», «Минтай (pollock)» не получали тег fish,
+    // т.к. их id не содержал 'fish'/'salmon'/'cod' — рыбный аллергик их не исключал.
+    const hasFish = f.id.includes('fish') || f.id.includes('salmon') || f.id.includes('tuna') || f.id.includes('cod') || f.id.includes('herring') || f.id.includes('mackerel') || f.id.includes('sardine') || f.id.includes('trout')
+      || f.id.includes('tilapia') || f.id.includes('bass') || f.id.includes('halibut') || f.id.includes('pollock') || f.id.includes('hake') || f.id.includes('perch') || f.id.includes('pike') || f.id.includes('sole') || f.id.includes('flounder') || f.id.includes('catfish') || f.id.includes('pangasius') || f.id.includes('seabream');
     const hasShellfish = f.id.includes('shrimp') || f.id.includes('crab') || f.id.includes('lobster') || f.id.includes('mussel') || f.id.includes('clam') || f.id.includes('oyster') || f.id.includes('scallop') || f.id.includes('octopus') || f.id.includes('squid');
     const hasEggs = f.id.includes('egg');
     const hasNuts = f.id.includes('almond') || f.id.includes('walnut') || f.id.includes('cashew') || f.id.includes('pistachio') || f.id.includes('hazelnut') || f.id.includes('pecan') || f.id.includes('macadamia') || f.id.includes('nut') || f.id.includes('peanut');
     const hasSoy = f.id.includes('soy') || f.id.includes('tofu') || f.id.includes('tempeh') || f.id.includes('edamame');
-    const allergens: string[] = [];
-    if (hasFish) allergens.push('fish');
-    if (hasShellfish) allergens.push('shellfish');
-    if (hasDairy) allergens.push('dairy');
-    if (hasEggs) allergens.push('eggs');
-    if (hasNuts) allergens.push('tree_nuts');
-    if (hasSoy) allergens.push('soy');
-    if (hasGluten) allergens.push('gluten');
-    const isVegetarian = !isMeatOrFish && !f.id.includes('beef') && !f.id.includes('pork') && !f.id.includes('lamb') && !f.id.includes('chicken') && !f.id.includes('turkey') && !f.id.includes('duck') && !f.id.includes('goose') && !f.id.includes('rabbit') && !f.id.includes('venison') && !f.id.includes('bison') && !f.id.includes('elk') && !f.id.includes('boar') && !f.id.includes('game');
-    const isVegan = isVegetarian && !hasDairy && !hasEggs && !f.id.includes('honey');
+    // P0-фикс: объединяем эвристику с явными метаданными литерала.
+    //  • literal allergens — ДОБАВЛЯЮТСЯ (pollock/red_caviar → fish);
+    //  • isDairyFree:false ⇒ dairy, isGlutenFree:false ⇒ gluten (инвариант БД);
+    //  • isDairyFree:true / isGlutenFree:true — УБИРАЮТ ложный эвристический тег
+    //    (cream_of_rice id содержит 'cream', corn_flakes/millet — 'grain/carb').
+    const allergens = new Set<string>();
+    if (hasFish) allergens.add('fish');
+    if (hasShellfish) allergens.add('shellfish');
+    if (hasDairy) allergens.add('dairy');
+    if (hasEggs) allergens.add('eggs');
+    if (hasNuts) allergens.add('tree_nuts');
+    if (hasSoy) allergens.add('soy');
+    if (hasGluten) allergens.add('gluten');
+    if (Array.isArray(f.allergens)) for (const t of f.allergens) allergens.add(t);
+    if (f.isDairyFree === false) allergens.add('dairy');
+    if (f.isDairyFree === true) allergens.delete('dairy');
+    if (f.isGlutenFree === false) allergens.add('gluten');
+    if (f.isGlutenFree === true) allergens.delete('gluten');
+    const heurVegetarian = !isMeatOrFish && !f.id.includes('beef') && !f.id.includes('pork') && !f.id.includes('lamb') && !f.id.includes('chicken') && !f.id.includes('turkey') && !f.id.includes('duck') && !f.id.includes('goose') && !f.id.includes('rabbit') && !f.id.includes('venison') && !f.id.includes('bison') && !f.id.includes('elk') && !f.id.includes('boar') && !f.id.includes('game');
+    // P0-фикс: явный флаг литерала приоритетнее эвристики. Иначе red_caviar (category:'fat',
+    // isVegetarian:false) классифицировался как вегетарианский и попадал в вегетарианский рацион,
+    // а глютен-свободные grain/carb (millet/corn_flakes/cream_of_rice, isGlutenFree:true) ложно
+    // помечались глютеновыми. Флаг рыбы/моллюсков отменяет вегетарианство безусловно.
+    const hasAnimalAllergen = allergens.has('fish') || allergens.has('shellfish');
+    const isVegetarian = typeof f.isVegetarian === 'boolean'
+      ? (f.isVegetarian && !hasAnimalAllergen)
+      : heurVegetarian;
+    const isVegan = typeof f.isVegan === 'boolean'
+      ? f.isVegan
+      : (isVegetarian && !hasDairy && !hasEggs && !f.id.includes('honey'));
+    const isGlutenFree = typeof f.isGlutenFree === 'boolean' ? f.isGlutenFree : !hasGluten;
+    const isDairyFree = typeof f.isDairyFree === 'boolean' ? f.isDairyFree : !hasDairy;
     const dietTags: string[] = [];
     if (['protein', 'fat', 'veg_fruit'].includes(cat) || f.carbs < 10) dietTags.push('keto');
     if (!hasGluten && !['grain', 'carb'].includes(cat)) dietTags.push('paleo');
     if (!isMeatOrFish || hasFish) dietTags.push('mediterranean');
     FOOD_ALLERGEN_DIET[f.id] = {
-      allergens,
+      allergens: [...allergens],
       isVegetarian,
       isVegan,
-      isGlutenFree: !hasGluten,
-      isDairyFree: !hasDairy,
+      isGlutenFree,
+      isDairyFree,
       dietTags,
     };
   }

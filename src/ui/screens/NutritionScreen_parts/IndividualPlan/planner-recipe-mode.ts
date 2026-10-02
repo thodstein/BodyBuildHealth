@@ -20,7 +20,7 @@ import type { Recipe } from '../../../../engines/nutrition-periodization.engine'
 import { decomposeRecipe, pickRecipesForMeal, scaleComponentAmount, recipeViolatesHardRestrictions } from './recipe-engine';
 import { optimizeRecipePortionScales, maxRelativeDeviation } from './planner-recipe-optimizer';
 import { isHighCarbDay, extremeCapacityProfile } from './planner-carb-density';
-import { createDailyQuota, registerMealInQuota, blockedIdsForNextMeal, foodAvailableWithQuota, isProteinPowderId, stapleFamilyOf, isPortableFood, isWorkWindowMeal, isBreakfastBannedCarb, isBreakfastBannedProtein, hvStyleWidensTopups, HV_PRACTICAL_CARB_IDS } from './food-availability';
+import { createDailyQuota, registerMealInQuota, blockedIdsForNextMeal, foodAvailableWithQuota, isProteinPowderId, stapleFamilyOf, isPortableFood, isWorkWindowMeal, isBreakfastBannedCarb, isBreakfastBannedProtein, hvStyleWidensTopups, HV_PRACTICAL_CARB_IDS, scaleQuotasForExtreme } from './food-availability';
 import { applyRealisticFloors, closeExtremeMicroGaps } from './meal-plan-engine';
 import { correctDayToTargets } from './day-target-corrector';
 import { toRawPurchaseAmount } from './planner-weight-mode';
@@ -1466,7 +1466,11 @@ export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDa
   // C1 (Эпик C): дневные квоты реалистичной тарелки ДЕЙСТВУЮТ на рецептурный путь.
   // Раньше assembleRecipeDay ограничивал только порошок — семейство гарниров (рис ×3+),
   // орехи ≤60 г, масла ≤25 г, яйца ≤230 г игнорировались.
-  const quota = createDailyQuota(args.athleteWeightKg);
+  // P1-фикс: передаём дневные цели — иначе scaleQuotasForExtreme получал (0,0,0) и экстрим-
+  // масштабирование квот (1500г У / 500г Б) в рецептурном пути было мертво.
+  const quota = createDailyQuota(args.athleteWeightKg, undefined, {
+    targetKcal: targets?.kcal, targetCarbsG: targets?.c, targetProteinG: targets?.p,
+  });
   meals.forEach(m => {
     if (m.recipeApplied || !m.items?.length) return;
     try { registerMealInQuota(quota, m.items as any); } catch (e) { try { console.warn('[Planner] квоты приёма не зарегистрированы:', e); } catch {} }
@@ -1475,6 +1479,11 @@ export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDa
   const trimQuotaOverflow = (ms: PlanMealLike[]): string[] => {
     const out: string[] = [];
     const _sc = quota.weightScale || 1;
+    // P1-фикс: экстрим-масштабирование квот и в рецептурном пути (было захардкожено 60/25/230
+    // ×weightScale, из-за чего экстрим-день рецептов не расширял орехи/масла/яйца).
+    const _ts = quota.targetScale || 1;
+    const _ext = scaleQuotasForExtreme(targets?.kcal || 0, targets?.c || 0, targets?.p || 0, _ts);
+    const _gramScale = Math.min(2, _sc * _ts);
     const trimByFam = (fams: string[], cap: number, minG: number, label: string) => {
       let total = ms.flatMap(m => m.items).filter(it => fams.includes(stapleFamilyOf(it.id) || '')).reduce((s, it) => s + (it.amount || 0), 0);
       if (total <= cap) return;
@@ -1492,10 +1501,10 @@ export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDa
       }
       out.push(`⚖️ ${label}: приведено к квоте ${cap} г/день`);
     };
-    trimByFam(['nuts', 'seeds'], Math.round(60 * _sc), 8, 'Орехи/семена');
-    trimByFam(['oils'], Math.round(25 * _sc), 5, 'Масла');
+    trimByFam(['nuts', 'seeds'], Math.round((_ext ? _ext.nuts : 60) * _gramScale), 8, 'Орехи/семена');
+    trimByFam(['oils'], Math.round((_ext ? _ext.oil : 25) * _gramScale), 5, 'Масла');
     const eggs = ms.flatMap(m => m.items).filter(it => it.id === 'egg_whole').reduce((s, it) => s + (it.amount || 0), 0);
-    const eggCap = Math.round(230 * _sc);
+    const eggCap = Math.round((_ext ? _ext.egg : 230) * _gramScale);
     if (eggs > eggCap) {
       const cutShare = Math.min(0.5, (eggs - eggCap) / eggs);
       for (const m of ms) {
@@ -1796,7 +1805,6 @@ export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDa
     const tryBuild = (cand: Recipe): { flat: FlatRecipeOption; items: PlanItemLike[]; totals: PlanTotalsLike; sideNote: string | null; rawCarbs: number } | null => {
       const flat = flattenRecipeOption(cand);
       const built = buildRecipeMealItems(rebuildRecipeFromFlat(flat));
-      try { if ((globalThis as any).__DBG_VARIETY) console.log(`[DBG] tryBuild ${cand.name}: built=${built?.length ?? 'null'}`); } catch {}
       if (!built || built.length === 0) return null;
       const decompTot = sumMealTotals(built);
       // Чистка-2026: МАСШТАБ В ПОРЦИЯХ. ГЕЙТ приёмки оценивается на непрерывном масштабе
@@ -1951,8 +1959,9 @@ export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDa
     // Peri-капы приёмки HV (стража физиологических окон в рецептурном пути):
     // предтрен ≤63 / пост-трен ≤79. Только high-carb дни: обычные дни идут legacy
     // (иначе гейт меняет выбор рецептов в 50 property-сценариях).
-    // Pre-sleep НЕ клампим: пул presleep-рецептов по дизайну несёт мёд+лактозу
-    // (~19У), кламп резал бы авторское ядро («йогурт с черникой» 118→31).
+    // Pre-sleep в гейте приёмки НЕ ограничиваем (иначе авторский presleep-рецепт с мёдом+
+    // лактозой ~19У отвергался бы). Кап 20У применяется ПОЗЖЕ отдельным trimPeriCarbs
+    // (он аккуратно ужимает сайды/остаток до 20У, ядро — в последнюю очередь, до пола).
     const _periCarbCap = !_dayHighCarb ? null : periType === 'preworkout' ? 63 : periType === 'postworkout' ? 79 : null;
     const _passesGate = (built: { totals: PlanTotalsLike }): boolean => {
       const tk = built.totals.kcal || 1;

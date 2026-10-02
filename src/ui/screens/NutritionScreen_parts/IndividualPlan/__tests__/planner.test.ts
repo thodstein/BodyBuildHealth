@@ -45,8 +45,10 @@ describe('computePlannerTargets', () => {
     expect(r.fats).toBeLessThanOrEqual(Math.round(90 * 0.4));
   });
 
-  it('ручные г/кг перезаписывают белок', () => {
-    const r = computePlannerTargets(baseTargetInput({ manualGPerKg: { protein: 2.2, fat: 0, carbs: 0 } }));
+  it('ручные г/кг перезаписывают белок (в ручном режиме)', () => {
+    // P0-fix: manualGPerKg применяется ТОЛЬКО при kbjuMode='manual' — иначе загрязнял
+    // auto-калории у пользователей, когда-либо вводивших г/кг.
+    const r = computePlannerTargets(baseTargetInput({ kbjuMode: 'manual', manualGPerKg: { protein: 2.2, fat: 0, carbs: 0 } }));
     expect(r.protein).toBe(Math.round(90 * 2.2));
     expect(r.kcal).toBe(r.protein * 4 + r.fats * 9 + r.carbs * 4);
   });

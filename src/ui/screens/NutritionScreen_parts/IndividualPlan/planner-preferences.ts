@@ -88,10 +88,12 @@ const HIGH_HISTAMINE = new Set([
   'strawberry','citrus','chocolate','walnuts','peanuts',
 ]);
 
-// High-oxalate foods
+// High-oxalate foods (P2-фикс: прежние токены nuts_almonds/nuts_cashews/nuts_hazelnuts/tea_black/
+// tea_green/wheat_bran/soy_textured не матчили реальные id — almond/cashew/hazelnut/green_tea/
+// grain_wheat_bran/soy. Матч по подстроке id, поэтому используем корни.)
 const HIGH_OXALATE = new Set([
-  'spinach','rhubarb','beetroot','chard','cocoa','chocolate','nuts_almonds','nuts_cashews','nuts_hazelnuts',
-  'tea_black','tea_green','wheat_bran','buckwheat','soy_textured','tofu','black_pepper',
+  'spinach','rhubarb','beetroot','chard','cocoa','chocolate','almond','cashew','hazelnut','walnut','pecan',
+  'green_tea','black_tea','wheat_bran','rice_bran','buckwheat','soy','tofu','black_pepper','sesame',
 ]);
 
 export function filterByIntolerance(food: FoodItem, into: Intolerances): boolean {

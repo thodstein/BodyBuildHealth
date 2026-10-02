@@ -134,16 +134,18 @@ export function isProteinPowderId(id: string): boolean {
  * используем овощи с максимальной клетчаткой на 100 ккал.
  */
 export const LOW_KCAL_COMPACT_VEGGIES: ReadonlySet<string> = new Set([
-  'broccoli', 'cauliflower', 'spinach', 'cabbage', 'bell_pepper',
-  'cucumber', 'tomato', 'zucchini', 'eggplant', 'lettuce',
-  'arugula', 'kale', 'brussels_sprouts', 'green_beans', 'asparagus',
+  'broccoli', 'cauliflower', 'spinach', 'cabbage', 'bell_pepper', 'pepper',
+  'cucumber', 'tomato', 'zucchini', 'eggplant', 'lettuce', 'salad',
+  'arugula', 'kale', 'brussels_sprouts', 'green_beans', 'green_bean', 'peas_green', 'asparagus', 'mushrooms',
 ]);
 
 /**
  * Ягоды для низкокалорийных дней (высокая клетчатка, низкий сахар).
+ * P2-фикс: добавлены реальные FOOD_DB id (berries/blueberries) — прежние raspberries/
+ * blackberries/cranberries в БД отсутствуют и матчили только в тесте.
  */
 export const LOW_KCAL_BERRIES: ReadonlySet<string> = new Set([
-  'raspberries', 'blackberries', 'strawberries', 'blueberries', 'cranberries',
+  'raspberries', 'blackberries', 'strawberries', 'blueberries', 'cranberries', 'berries',
 ]);
 
 /**

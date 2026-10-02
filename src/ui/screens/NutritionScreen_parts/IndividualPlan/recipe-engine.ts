@@ -521,6 +521,16 @@ export function recipeMacroDistance(recipe: Recipe, opts: Pick<RecipeMatchOption
 }
 
 /**
+ * Ранг кандидата: score минус дистанция до цели, но штраф дистанции ограничен 40% score.
+ * Раньше штраф мог «съесть» весь score (Math.min(score, dist*100/4)) → у далёких по КБЖУ
+ * рецептов ранг схлопывался в 0 и стабильная сортировка брала порядок БД (шум). Теперь
+ * score всегда доминирует, дистанция лишь смещает близкие по score кандидаты.
+ */
+function recipeRank(x: { score: number; dist: number }): number {
+  return x.score - Math.min(x.score * 0.4, x.dist * 25);
+}
+
+/**
  * Подбирает лучший рецепт для приёма пищи.
  * Возвращает рецепт или null (если нет подходящих).
  */
@@ -531,8 +541,7 @@ export function pickRecipeForMeal(
   const scored = recipes
     .map(r => ({ recipe: r, score: scoreRecipeForMeal(r, opts), dist: recipeMacroDistance(r, opts) }))
     .filter(x => x.score >= 40) // минимальный порог
-    // Ранг: бонусно-«накрученные» рецепты могут быть сбиты дистанцией до цели полностью
-    .sort((a, b) => (b.score - Math.min(b.score, b.dist * 100 / 4)) - (a.score - Math.min(a.score, a.dist * 100 / 4)));
+    .sort((a, b) => recipeRank(b) - recipeRank(a) || a.dist - b.dist);
   return scored.length > 0 ? scored[0].recipe : null;
 }
 
@@ -547,7 +556,7 @@ export function pickRecipesForMeal(
   return recipes
     .map(r => ({ recipe: r, score: scoreRecipeForMeal(r, opts), dist: recipeMacroDistance(r, opts) }))
     .filter(x => x.score >= 35)
-    .sort((a, b) => (b.score - Math.min(b.score, b.dist * 100 / 4)) - (a.score - Math.min(a.score, a.dist * 100 / 4)))
+    .sort((a, b) => recipeRank(b) - recipeRank(a) || a.dist - b.dist)
     .slice(0, count)
     .map(x => x.recipe);
 }

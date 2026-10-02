@@ -860,6 +860,23 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
   const DAY_LABELS = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
   const injectDrugTypes = ['инсулин', 'ГР', 'ИФР-1', 'MGF', 'IGF-1 DES', 'IGF-1 LR3', 'HMG', 'HCG', 'GHRP', 'CJC', 'BPC-157', 'TB-500', 'меланотан', 'семаглутид', 'тирзепатид', 'другое'];
 
+  // FIX: manual KBJU + kbjuMode теперь инициализируются из localStorage и персистятся.
+  // P1-fix: manualKcal/P/F/C из Profile (UnifiedSettings.nutrition.manualTargets) + legacy.
+  // P0-фикс (Этап 1): kbjuMode объявлен ДО calcTargets — computePlannerTargets применяет
+  // manualGPerKg только в ручном режиме, поэтому режим должен быть виден в useMemo.
+  const [kbjuMode, setKbjuMode] = useState<'auto' | 'manual' | 'profile'>(() => {
+    // P1-fix: читаем из Profile (UnifiedSettings.nutrition.kbjuMode)
+    try {
+      const v = (s as any)?.nutrition?.kbjuMode;
+      if (v === 'manual' || v === 'profile' || v === 'auto') return v;
+    } catch {}
+    try {
+      const v = localStorage.getItem('he_kbju_mode');
+      if (v === 'manual' || v === 'profile' || v === 'auto') return v;
+    } catch {}
+    return 'auto';
+  });
+
   const calcTargets = useMemo(() => {
     try {
       const _localWorkoutsPerWeek = (() => {
@@ -878,11 +895,12 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
         workoutsPerWeek: _localWorkoutsPerWeek, avgWorkoutMinutes: _localAvgMinutes,
         dailySteps, householdActivity, trainType, trainIntensity, surplusPct,
         injections: injections.map(i => ({ type: i.type, dose: i.dose, esterType: i.esterType })),
-        weightAdaptMode, weightLogWeek, expectedLossKgWeek,
+        weightAdaptMode, weightLogWeek, weightLogPeriod, expectedLossKgWeek,
         metabolicAdaptEnabled, metabolicAdaptPct, manualGPerKg: { protein: manualGPerKg.protein || 0, fat: manualGPerKg.fat || 0, carbs: manualGPerKg.carbs || 0 },
+        kbjuMode,
       });
     } catch { return { bmr: 0, tdee: 0, kcal: 2500, protein: 160, fats: 70, carbs: 300, adjustment: 0 }; }
-  }, [weight, height, age, sex, goal, trainingDays, linkToTraining, trainStart, trainEnd, trainScheduleType, trainPattern, s?.training?.daysPerWeek, s?.training?.minutesPerSession, injections, phase, bodyFatPct, weightAdaptMode, weightLogWeek, expectedLossKgWeek, metabolicAdaptEnabled, metabolicAdaptPct, manualGPerKg, dailySteps, householdActivity, trainType, trainIntensity, surplusPct]);
+  }, [weight, height, age, sex, goal, trainingDays, linkToTraining, trainStart, trainEnd, trainScheduleType, trainPattern, s?.training?.daysPerWeek, s?.training?.minutesPerSession, injections, phase, bodyFatPct, weightAdaptMode, weightLogWeek, weightLogPeriod, expectedLossKgWeek, metabolicAdaptEnabled, metabolicAdaptPct, manualGPerKg, kbjuMode, dailySteps, householdActivity, trainType, trainIntensity, surplusPct]);
 
   // FIX: manual KBJU + kbjuMode теперь инициализируются из localStorage и персистятся.
   // Раньше при перезагрузке страницы все ручные цели КБЖУ сбрасывались на null, а режим — на 'auto'.
@@ -915,19 +933,6 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     } catch {}
     try { const v = localStorage.getItem('he_manual_c'); return v !== null ? Number(v) : null; } catch { return null; }
   });
-  const [kbjuMode, setKbjuMode] = useState<'auto' | 'manual' | 'profile'>(() => {
-    // P1-fix: читаем из Profile (UnifiedSettings.nutrition.kbjuMode)
-    try {
-      const v = (s as any)?.nutrition?.kbjuMode;
-      if (v === 'manual' || v === 'profile' || v === 'auto') return v;
-    } catch {}
-    try {
-      const v = localStorage.getItem('he_kbju_mode');
-      if (v === 'manual' || v === 'profile' || v === 'auto') return v;
-    } catch {}
-    return 'auto';
-  });
-
   const profileTargets = useMemo(() => {
     // P1-fix: replaced legacy calcNutrition (which ignored phase/course/weight-adapt)
     // with computePlannerTargets using neutral settings (maintenance phase, no
@@ -982,6 +987,10 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
   const [planType, setPlanType] = useState<PlanType>((['classic', 'keto', 'highcarb', 'mediterranean', 'vegetarian'] as const).includes(_pf.planType as any) ? _pf.planType : 'classic');
   const [variety, setVariety] = useState<'minimal' | 'medium' | 'max'>((['minimal', 'medium', 'max'] as const).includes(_pf.variety as any) ? _pf.variety : 'max');
   const _insulinUnits = (injections || []).filter((i: any) => String(i?.type || '').toLowerCase().includes('инсулин')).reduce((s: number, i: any) => s + (Number(i?.dose) || 0), 0);
+  // P1-фикс: фарма-надбавка белка (ААС +0.3 г/кг, GLP-1 +0.2 г/кг) — раньше считалась в
+  // computePlannerTargets, но auto-день её игнорировал. Прокидываем в buildDayTargets явно.
+  const _pharmaProteinBoostG = weight * (((injections || []).some((i: any) => i?.type === 'ААС') ? 0.3 : 0)
+    + ((injections || []).some((i: any) => i?.type === 'семаглутид' || i?.type === 'тирзепатид') ? 0.2 : 0));
   // P1-тренировки: объём недели берём из ФАКТИЧЕСКОГО расписания (weeklyTrainingCount
   // учитывает eod/pattern/дни недели), а не из `trainingDays.filter(Boolean).length`
   // (это массив 7 флагов, игнорирующий тип расписания). При выключенной привязке
@@ -1009,7 +1018,8 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     // P1-9 «Снять потолок»: кнопка в UI меняла только подпись — цель дня считалась
     // с потолком г/кг. 0 = без потолка (контракт computeDieteticCarbTarget).
     carbCapGPerKg: carbCapOverride ? 0 : undefined,
-  }), [weight, _proteinGPerKg, kbjuMode, manualKcal, manualP, manualF, manualC, manualGPerKg, calcTargets, profileTargets, goal, _trainVolMin, budget, _insulinUnits, planType, carbCapOverride]);
+    pharmaProteinBoostG: _pharmaProteinBoostG,
+  }), [weight, _proteinGPerKg, kbjuMode, manualKcal, manualP, manualF, manualC, manualGPerKg, calcTargets, profileTargets, goal, _trainVolMin, budget, _insulinUnits, _pharmaProteinBoostG, planType, carbCapOverride]);
   const dayTargetsBreakdown: string[] = [...dayTargets.breakdown];
   // Ф4.25: читаем заметку ББ-плана (he_bb_nutrition_note) — калораж + трен-дни для
   // циклирования углеводов. Применяется только если есть данные (no-op иначе).
@@ -1166,6 +1176,11 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
       try { updateSection('nutrition', { eveningLowCarb: true }); } catch {}
     }
   }, [healthIssues]);
+  // P1-fix: surplusPct/eveningLowCarb дублируем в профиль. Settings пишет только legacy-ключ
+  // (he_surplus_pct / he_evening_low_carb), а чтение отдаёт приоритет профилю → после одного
+  // «Сохранить в профиль» правка UI молча откатывалась (профиль затенял legacy).
+  React.useEffect(() => { try { updateSection('nutrition', { surplusPct }); } catch {} }, [surplusPct]);
+  React.useEffect(() => { try { updateSection('nutrition', { eveningLowCarb }); } catch {} }, [eveningLowCarb]);
   // v3: угли на ночь 0/20/40 (настройка «Ночь — угли»). 0 = legacy (только казеин).
   const [nightCarbs, setNightCarbs] = useState<number>(() => {
     try {
@@ -1988,6 +2003,10 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     if (!dayData?.meals?.[mealIdx]?.items?.[itemIdx]) return;
     saveUndo();
     const old = dayData.meals[mealIdx].items[itemIdx];
+    // P1-фикс: оживляем адаптивную историю замен. recordReplacement раньше не вызывался
+    // ниоткуда → getDeprioritizedIds() всегда пуст → механизм «часто заменяемые продукты
+    // деприоритизируются» был мёртв. Считаем замену, только если продукт реально сменился.
+    try { if (old?.id && newFood.id && old.id !== newFood.id) recordReplacement(old.id); } catch {}
     // per100 invariant: сохраняем граммы старого приёма (не servingSize нового), пересчитываем КБЖУ честно per100
     let grams = old.amount || 100;
     if (newFood.category === 'other' && grams > 10) grams = 10;
@@ -3861,7 +3880,12 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
         const _weekAcc: any[] = [];
         // FIX «свалка»: новая неделя месяца — чистое окно weekFamilies (бан не тащится
         // из прошлой недели/прошлых регенераций).
+        // P1-фикс variety: вместе с окном сбрасываем и guard повторного пуша. Раньше дни 0-2
+        // уже были собраны выше (для threeDayPlan) и помечены в _pushedFamOffsets, поэтому
+        // после этого ресета недельный цикл НЕ добавлял их семейства → гейт «одна крупа ≤2
+        // дней/нед» видел только дни 3-6 и не срабатывал с начала недели.
         varietyLedgerRef.current.weekFamilies = [];
+        _pushedFamOffsets.clear();
         for (let _i = 0; _i < 7; _i++) {
           await maybeYield();
           _weekAcc.push(buildOneDay(_weekBase + _i));

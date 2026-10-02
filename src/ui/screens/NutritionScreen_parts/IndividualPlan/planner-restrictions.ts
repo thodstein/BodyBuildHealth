@@ -112,12 +112,22 @@ export function allergenTextMatches(allergenId: string, foodName: string): boole
   return false;
 }
 
-/** Теги аллергенов продукта: сначала FOOD_ALLERGEN_DIET (канонический источник), затем поле FoodItem.allergens. */
+/**
+ * Теги аллергенов продукта: ОБЪЕДИНЕНИЕ FOOD_ALLERGEN_DIET и поля FoodItem.allergens.
+ *
+ * P0-фикс безопасности: раньше при наличии записи в FOOD_ALLERGEN_DIET поле FoodItem.allergens
+ * ИГНОРИРОВАЛОСЬ (return diet.allergens). Авто-генератор заполняет FOOD_ALLERGEN_DIET для всех
+ * товаров, поэтому явные теги из литералов БД были мертвы: pollock/red_caviar (allergens:['fish'])
+ * не исключались у рыбного аллергика, т.к. эвристика по id их не распознала. Теперь источники
+ * складываются — тег считается активным, если он есть хотя бы в одном.
+ */
 export function getFoodAllergenTags(foodId: string, foods: FoodItem[]): string[] {
+  const out = new Set<string>();
   const diet = FOOD_ALLERGEN_DIET[foodId];
-  if (diet && Array.isArray(diet.allergens)) return diet.allergens;
+  if (diet && Array.isArray(diet.allergens)) for (const t of diet.allergens) out.add(t);
   const food = foods.find(f => f.id === foodId);
-  return Array.isArray(food?.allergens) ? (food.allergens as string[]) : [];
+  if (Array.isArray(food?.allergens)) for (const t of food!.allergens as string[]) out.add(t);
+  return [...out];
 }
 
 /** Совпадает ли продукт с конкретным аллергеном пользователя (для предупреждений после генерации). */
@@ -174,7 +184,13 @@ export function resolveDietRestrictionIds(foods: FoodItem[], dietPrefs: string[]
     foods.filter(f => (f.carbs || 0) > 15 && (f.gi || 0) > 60).forEach(f => result.add(f.id));
   }
   if (set.has('min_processed')) {
-    MIN_PROCESSED_IDS.forEach(id => result.add(id));
+    // P1-фикс: раньше добавлялись «голые» строки (sausage/bacon/chips/soda/…), 16 из которых
+    // НЕ существуют в FOOD_DB → ограничение почти ничего не исключало. Теперь: явный список
+    // фильтруется по существующим id + вся категория fast_food (KFC/McD/BK/ВкусВилл — реальный
+    // «мусор») + несколько обработанных продуктов.
+    const existing = new Set(foods.map(f => f.id));
+    for (const id of MIN_PROCESSED_IDS) if (existing.has(id)) result.add(id);
+    for (const f of foods) if (f.category === 'fast_food') result.add(f.id);
   }
   return result;
 }

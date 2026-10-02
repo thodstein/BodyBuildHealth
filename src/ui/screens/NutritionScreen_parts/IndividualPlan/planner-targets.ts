@@ -43,10 +43,14 @@ export interface PlannerTargetInput {
   injections: { type: string; dose: number; esterType?: string }[];
   weightAdaptMode: boolean;
   weightLogWeek: number[];
+  /** P1-фикс: период лога веса (daily/every2/every3/weekly) — иначе rate завышается ×7. */
+  weightLogPeriod?: string;
   expectedLossKgWeek: number;
   metabolicAdaptEnabled: boolean;
   metabolicAdaptPct: number;
   manualGPerKg: { protein: number; fat: number; carbs: number };
+  /** P0-фикс: режим КБЖУ. manualGPerKg применяется ТОЛЬКО при 'manual' (иначе загрязнял auto-калории). */
+  kbjuMode?: string;
 }
 
 export interface PlannerTargets {
@@ -196,8 +200,9 @@ export function computePlannerTargets(input: PlannerTargetInput): PlannerTargets
     weightKg: _weight, heightCm: height, age, sex, goal, phase, bodyFatPct,
     workoutsPerWeek: _wpw, avgWorkoutMinutes: _awm, dailySteps, householdActivity,
     trainType, trainIntensity, surplusPct, injections: _injections,
-    weightAdaptMode, weightLogWeek, expectedLossKgWeek,
+    weightAdaptMode, weightLogWeek, weightLogPeriod, expectedLossKgWeek,
     metabolicAdaptEnabled, metabolicAdaptPct: _metabolicAdaptPct, manualGPerKg: _manualGPerKg,
+    kbjuMode,
   } = input;
   const weight = Math.max(40, Math.min(300, Number(_weight) || 80));
   const wpw = Math.max(0, Number(_wpw) || 0);
@@ -233,10 +238,14 @@ export function computePlannerTargets(input: PlannerTargetInput): PlannerTargets
     const validW = weightLogWeek.filter(w => Number.isFinite(w) && w > 0);
     if (validW.length >= 2) {
       const actualLoss = validW[0] - validW[validW.length - 1];
-      const intervals = Math.max(1, validW.length - 1);
-      // kg per week = (total loss / intervals) * 7 (assume 1 interval = 1 day).
-      // If intervals span a different period, the caller's weightLogWeek is responsible
-      // for reflecting that; we only correct the double-division bug here.
+      // P1-фикс: период лога. Раньше интервал всегда = 1 день → недельный лог (2 точки)
+      // давал rate ×7 и уводил weightAdj в кламп ±20%. Теперь daysPerPoint из weightLogPeriod.
+      const daysPerPoint = weightLogPeriod === 'weekly' ? 7
+        : weightLogPeriod === 'every3' ? 3
+        : weightLogPeriod === 'every2' ? 2
+        : 1;
+      const intervals = Math.max(1, (validW.length - 1) * daysPerPoint);
+      // kg per week = (total loss / intervals) * 7
       const weeklyAvgLoss = actualLoss > 0 ? (actualLoss / intervals) * 7 : 0;
       if (expectedLossKgWeek > 0 && weeklyAvgLoss < expectedLossKgWeek * 0.7) {
         weightAdj = 1 - (expectedLossKgWeek - Math.max(0, weeklyAvgLoss)) * 2 / Math.max(1, weight);
@@ -291,15 +300,25 @@ export function computePlannerTargets(input: PlannerTargetInput): PlannerTargets
     warnings.push(`⚠ Фаза «${phase}» + цель «${goal}»: калории считаются по цели (профицит), фарма-фаза их не снижает. На ПКТ/мосте обычно держат поддержание/дефицит — проверьте цель.`);
   }
   // ─── 2. Bulk surplus ─────────────────────────────────────────────────────────
-  if (engineGoal === 'bulk' && surplusPct !== 10) {
-    targets.kcal = Math.round((targets.tdee || targets.kcal) * (1 + surplusPct / 100));
+  // P0-фикс: профицит считается от ПОДДЕРЖИВАЮЩЕГО TDEE (maintenance), а не от базового
+  // BMR×PAL — иначе терялась вес-трендовая коррекция и метаболическая адаптация V2.
+  // Убран магический сентинел «10» (он делал «+10%» фактически +8%, а «11%» — скачком +11%):
+  // 0 = профицит не задан (используется дефолт V2 для mass); >0 = явный процент, кламп 0–30.
+  if (engineGoal === 'bulk' && surplusPct > 0) {
+    const pct = Math.max(0, Math.min(30, surplusPct));
+    const maintenanceTdee = (targetsV2 && targetsV2.tdee > 0) ? targetsV2.tdee : (targets.tdee || targets.kcal);
+    targets.kcal = Math.round(maintenanceTdee * (1 + pct / 100));
     targets.carbs = Math.round((targets.kcal - targets.protein * 4 - targets.fats * 9) / 4);
   }
 
   // 4-7. Pharma adjustments
+  // P1-фикс: единый детектор инсулина (был `=== 'инсулин'` — не ловил «Инсулин»/«insulin»,
+  // расходясь с Context, который считает lowercased includes). esterType 'none' (дефолт формы)
+  // больше НЕ считается коротким инсулином — иначе ложно включался инсулин-флор углеводов.
+  const isInsulin = (t: string) => String(t || '').toLowerCase().includes('инсулин') || String(t || '').toLowerCase() === 'insulin';
   const hasAAS = injections.some(i => i.type === 'ААС');
-  const hasShortInsulin = injections.some(i => i.type === 'инсулин' && i.esterType != null && i.esterType !== 'long');
-  const hasInsulin = injections.some(i => i.type === 'инсулин');
+  const hasShortInsulin = injections.some(i => isInsulin(i.type) && !!i.esterType && i.esterType !== 'long' && i.esterType !== 'none');
+  const hasInsulin = injections.some(i => isInsulin(i.type));
   const hasGLP = injections.some(i => i.type === 'семаглутид' || i.type === 'тирзепатид');
 
   if (hasAAS) {
@@ -307,7 +326,7 @@ export function computePlannerTargets(input: PlannerTargetInput): PlannerTargets
     targets.kcal = targets.protein * 4 + targets.fats * 9 + targets.carbs * 4;
   }
   if (hasShortInsulin) {
-    const totalInsulinDose = injections.filter(i => i.type === 'инсулин' && i.esterType != null && i.esterType !== 'long').reduce((s, i) => s + (Number(i.dose) || 0), 0);
+    const totalInsulinDose = injections.filter(i => isInsulin(i.type) && !!i.esterType && i.esterType !== 'long' && i.esterType !== 'none').reduce((s, i) => s + (Number(i.dose) || 0), 0);
     const minInsulinCarbs = totalInsulinDose * 10;
     if (targets.carbs < minInsulinCarbs) targets.carbs = Math.round(minInsulinCarbs * 1.2);
     const maxFat = Math.round(weight * 0.5);
@@ -358,12 +377,17 @@ export function computePlannerTargets(input: PlannerTargetInput): PlannerTargets
     }
   }
 
-  // 10. Manual г/кг (overrides macros, recompute kcal)
-  if (manualGPerKg.protein > 0) targets.protein = Math.round(weight * manualGPerKg.protein);
-  if (manualGPerKg.fat > 0) targets.fats = Math.round(weight * manualGPerKg.fat);
-  if (manualGPerKg.carbs > 0) targets.carbs = Math.round(weight * manualGPerKg.carbs);
-  if (manualGPerKg.protein > 0 || manualGPerKg.fat > 0 || manualGPerKg.carbs > 0) {
-    targets.kcal = targets.protein * 4 + targets.fats * 9 + targets.carbs * 4;
+  // 10. Manual г/кг (перезаписывают Б/Ж/У и пересчитывают kcal).
+  // P0-фикс: применяется ТОЛЬКО в ручном режиме. Раньше выполнялось безусловно, и
+  // пользователь, когда-либо вводивший г/кг, получал в AUTO-режиме калории, посчитанные
+  // от устаревших ручных макросов (наука-калораж молча подменялась).
+  if (kbjuMode === 'manual') {
+    if (manualGPerKg.protein > 0) targets.protein = Math.round(weight * manualGPerKg.protein);
+    if (manualGPerKg.fat > 0) targets.fats = Math.round(weight * manualGPerKg.fat);
+    if (manualGPerKg.carbs > 0) targets.carbs = Math.round(weight * manualGPerKg.carbs);
+    if (manualGPerKg.protein > 0 || manualGPerKg.fat > 0 || manualGPerKg.carbs > 0) {
+      targets.kcal = targets.protein * 4 + targets.fats * 9 + targets.carbs * 4;
+    }
   }
 
   if (warnings.length > 0) targets.warnings = warnings;

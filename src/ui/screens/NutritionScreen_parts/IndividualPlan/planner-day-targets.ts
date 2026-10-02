@@ -70,6 +70,13 @@ export interface DayTargetsInput {
    * undefined = контекстный потолок по цели/объёму (прежнее поведение).
    */
   carbCapGPerKg?: number;
+  /**
+   * P1-фикс: фарма-надбавка белка (ААС +0.3 г/кг, GLP +0.2 г/кг), которую раньше считал
+   * computePlannerTargets, но auto-день её игнорировал (брал только пресет). Теперь
+   * прибавляется к пресету (кап 2.6 г/кг), чтобы чип «+ААС +N г» совпадал с днём.
+   * 0/undefined → поведение прежнее (байт-в-байт).
+   */
+  pharmaProteinBoostG?: number;
 }
 
 export interface DayTargetsResult {
@@ -151,7 +158,10 @@ export function buildDayTargets(input: DayTargetsInput): DayTargetsResult {
   }
 
   // ─── auto: наука = источник калорий, пресет = белок, угли = остаток ─────────
-  const protein = Math.round(weight * preset);
+  // P1-фикс: фарма-надбавка белка (ААС/GLP) добавляется к пресету, чтобы цель дня
+  // совпадала с чипом «+ААС +N г». Кап 2.6 г/кг (выше авто-диапазона 2.2, но ниже опасного).
+  const pharmaBoost = Math.max(0, Number(input.pharmaProteinBoostG) || 0);
+  const protein = Math.round(Math.min(weight * 2.6, weight * preset + pharmaBoost));
   // Инсулин: научный кап жира 0.5 г/кг СИЛЬНЕЕ пола (planner-targets правило 6).
   const fatFloorAbs = Math.round(weight * fatFloor);
   const fats = insulinUnits > 0
@@ -203,6 +213,7 @@ export function buildDayTargets(input: DayTargetsInput): DayTargetsResult {
   // Эпик 2: предупреждения согласованности (цель vs фарма-фаза) — в карточке целей.
   if (Array.isArray((base as any).warnings)) (base as any).warnings.forEach((w: string) => breakdown.push(w));
   breakdown.push(`Белок: пресет ${preset} г/кг → ${protein} г`);
+  if (pharmaBoost > 0) breakdown.push(`💉 Фарма-надбавка белка: +${Math.round(pharmaBoost)} г (ААС/GLP, кап 2.6 г/кг)`);
   if (base.protein > protein * 1.12) breakdown.push(`Научный белок ${Math.round(base.protein)} г выше пресета — пресет приоритетен (поднимите «🥩 Пресет белка» при необходимости)`);
   breakdown.push(insulinUnits > 0
     ? `Жиры: ${fatsFinal} г (инсулин: кап 0.5 г/кг сильнее пола)`

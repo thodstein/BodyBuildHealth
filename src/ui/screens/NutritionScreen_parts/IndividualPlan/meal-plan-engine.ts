@@ -220,7 +220,6 @@ const MPS_LBM_LOW = 0.3; // legacy LBM coeff (kept)
 const MPS_LBM_HIGH = 0.4; // legacy
 const MPS_WEIGHT_OPT = 0.40; // Schoenfeld 0.40-0.55 g/kg total weight per meal (optimal)
 const MPS_WEIGHT_HIGH = 0.45; // enhanced/course
-const FAT_FLOOR_PER_KG = 0.8;
 const CARB_FLOOR_G = 130;
 const PREW_PROTEIN_G = 25;
 const PREW_CARB_SLOW_G = 40;
@@ -1302,7 +1301,12 @@ function foodPassesCtxAllergens(f: { id: string }): boolean {
   try {
     const ft = getFoodAllergenTags(f.id, FOOD_DB);
     for (const t of tags) if (ft.includes(t)) return false;
-  } catch { /* fail-open для бит-идентичности обычных дней */ }
+  } catch {
+    // P0-фикс безопасности: fail-CLOSED — при сбое чтения тегов продукт исключается,
+    // если у пользователя вообще есть выбранные аллергены (обычные дни сюда не доходят —
+    // ранний return true выше). Раньше был fail-open → аллерген мог просочиться.
+    return false;
+  }
   return true;
 }
 
@@ -3453,12 +3457,6 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
       if (_boostedProtein > (input.goalProteinG || 0)) {
         input = { ...input, goalProteinG: Math.round(_boostedProtein) };
       }
-      // Адаптивный peri-протокол: уменьшение peri-углеводов
-      const _standardPeri = 70; // стандартный целевой объём peri-углеводов
-      const _lowPeri = Math.round(_standardPeri * 0.5); // 1200-1500 ккал: вдвое меньше
-      (_pickCtx as any).lowKcalPeriCarbTarget = _lowPeri;
-      // Компактные источники клетчатки: приоритет овощам с высокой плотностью клетчатки
-      (_pickCtx as any).preferCompactFiber = true;
     } else if (_targetKcal > 0 && _targetKcal < 1200) {
       // Очень низкая калорийность: экстремальные меры
       const _w = Math.max(40, input.weightKg || 80);
@@ -3467,8 +3465,6 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
       if (_boostedProtein > (input.goalProteinG || 0)) {
         input = { ...input, goalProteinG: Math.round(_boostedProtein) };
       }
-      (_pickCtx as any).lowKcalPeriCarbTarget = 25; // минимальные peri-углеводы
-      (_pickCtx as any).preferCompactFiber = true;
     }
   }
   _pickCtx.qualityMode = input.quality === 'basic' ? 'basic' : 'full';
@@ -3628,6 +3624,11 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
         // B2 (Эпик B): carbGiPref (менструальный low-GI) влияет на carbSlow — должен быть
         // в сигнатуре кэша, иначе строгий low-GI пул протекал бы в другие дни/пресеты.
         input.carbGiPref || null,
+        // P1-фикс: вкус и адаптивная история замен влияют на buildFoodPools, но не входили
+        // в ключ — два дня, отличающиеся только ими, получали ОДИН кэш (вкус/деприоритизация
+        // молча игнорировались).
+        input.tasteProfile || null,
+        input.deprioritizedIds ? [...input.deprioritizedIds].sort() : null,
       ]);
       const cached = _poolCache.get(key);
       if (cached) return cached;
@@ -6527,9 +6528,6 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     // Окна уколов locked (маркер): их граммы — доза, коррекции их не трогают
     // (гейты внутри корректора); день сходится С окнами в totals.
     {
-      if (process.env.ZZ_TRACE) {
-        for (const _bm of meals) console.error(`ZZ-PRECORR ${_bm.label}: ${(_bm.items || []).map((x: any) => `${x.id}(${x.amount})`).join(' + ')}`);
-      }
       const _norm = normalizeMacroTargets(input.goalKcal, input.goalProteinG, input.goalFatG, input.goalCarbsG);
       const _targets = { kcal: _norm.kcal, p: _norm.p, f: _norm.f, c: _norm.c };
       // P1b: HV-дням больше итераций (жиры/угли морит protein/carbs-ось; 40 не хватало).
@@ -6574,9 +6572,6 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
           if (_corr.deviationPct > 3) notes.push(`⚠ Корректор дневных целей: осталось отклонение ${_corr.deviationPct}% (>3%) — проверьте пулы/капы`);
           else if (_beforeDev > 0.03) notes.push(`✓ Корректор дневных целей: сведено к ≤3% (было ${Math.round(_beforeDev * 100)}% → ${_corr.deviationPct}%)`);
         }
-      }
-      if (process.env.ZZ_TRACE) {
-        for (const _bm of meals) console.error(`ZZ-POSTCORR ${_bm.label}: ${(_bm.items || []).map((x: any) => `${x.id}(${x.amount})`).join(' + ')}`);
       }
       // P2-финал: клетчаточный кап 85 г — корректор клампит свои добавки, но build-овые
       // семечки/овощи могли остаться за капом (85.3 г). Слегка срезаем крупнейший

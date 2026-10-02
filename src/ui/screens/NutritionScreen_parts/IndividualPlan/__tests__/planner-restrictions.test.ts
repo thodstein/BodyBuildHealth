@@ -194,8 +194,11 @@ describe('resolveDietRestrictionIds + resolveAllExcludedFoodIds', () => {
 
   it('min_processed исключает фастфуд', () => {
     const ids = resolveDietRestrictionIds(FOOD_DB, ['min_processed']);
-    expect(ids.has('sausage')).toBe(true);
+    // P1-fix: 'sausage' в FOOD_DB не существует (был фантомным id). Проверяем реальные
+    // fast_food-продукты, которые ограничение теперь исключает по категории.
+    expect(ids.has('kfc_wings')).toBe(true);
     expect(ids.has('mcd_big_mac')).toBe(true);
+    expect(ids.has('pizza_margherita')).toBe(true);
     expect(ids.has('salmon')).toBe(false);
   });
 
