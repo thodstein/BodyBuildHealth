@@ -671,7 +671,7 @@ function ensureLegHeavyBlock(session: any, options: BBFinalizeOptions, muscle: s
 /** Памп-блок пассивной мышцы ног (hamstrings в quads-день и наоборот): 4×12-15.
  *  Существующие compound-упражнения памп-мышцы перерабатываются в лёгкий памп
  *  (≤3 сета, 12-20 reps, RIR 3) — в памп-день не должно быть тяжёлой работы. */
-function ensureLegPumpBlock(session: any, options: BBFinalizeOptions, muscle: string, target: number): void {
+function ensureLegPumpBlock(session: any, options: BBFinalizeOptions, muscle: string, target: number, totalCap = false): void {
   const used = (c: any) => options.excludedExercises?.includes(c.id) || options.excludedExercises?.includes(c.name);
   const equipmentOk = (c: any) => {
     if (!options.equipment?.length) return true;
@@ -688,6 +688,35 @@ function ensureLegPumpBlock(session: any, options: BBFinalizeOptions, muscle: st
     e.repsRange = [12, 20];
     if (e.sets > 4) { e.sets = 4; e.workSets = e.workSets.slice(0, 4); }
     if (e.workSets?.length && e.workSets.length > 4) e.workSets = e.workSets.slice(0, 4);
+  }
+  // Памп-мышца — ДОБИВКА тяжёлого дня (требование владельца: PPL ноги — один
+  // день упор на квадры, второй на бицепс бедра, у пассивной мышцы — финишер).
+  // Держим СУММУ прямых сетов памп-мышцы в пределах target (~4-6), а не «≤4 на
+  // упражнение» (иначе 3-4 хам-упражнения давали 12-16 сетов и оба Legs-дня
+  // выглядели одинаково). Трим: сначала лишние сеты, затем лишние упражнения
+  // (минимум 1 упражнение / 2 сета). Перебор тяжёлой мышцы не трогаем.
+  {
+    const isScheme = (e: any) => /GVT|FST-?7|8\s*[x×]\s*8|Gironda/i.test(String(e.comment || ''));
+    const nonScheme = () => existing.filter((e: any) => !isScheme(e));
+    let total = existing.reduce((a: number, e: any) => a + (e.sets || 0), 0);
+    const trim = (e: any) => { e.sets -= 1; if (Array.isArray(e.workSets) && e.workSets.length > e.sets) e.workSets = e.workSets.slice(0, e.sets); };
+    // Суммарный финишер-кап применяем ТОЛЬКО при ≥2 Legs-днях (PPL/Upper-Lower
+    // альтернация: один день упор на квадры, другой на бицепс бедра). При одном
+    // Legs-дне (специализация) не ужимаем — иначе теряется женский задний
+    // акцент и leg-специализация.
+    if (totalCap) {
+      const bySets = [...nonScheme()].sort((a: any, b: any) => (b.sets || 0) - (a.sets || 0));
+      for (const e of bySets) {
+        while (total > target && (e.sets || 0) > 2) { trim(e); total -= 1; }
+      }
+      let guard = 0;
+      while (total > target && nonScheme().length > 1 && guard++ < 8) {
+        const victim = [...nonScheme()].sort((a: any, b: any) => (a.sets || 0) - (b.sets || 0))[0];
+        total -= victim.sets || 0;
+        session.exercises = session.exercises.filter((x: any) => x !== victim);
+        existing.splice(existing.indexOf(victim), 1);
+      }
+    }
   }
   if (existing.some((e: any) => classifyLegExercise(e.name).pattern === 'leg_curl' || /сгибан.*ног/i.test(e.name))) return;
   const key = muscle === 'quads' ? /разгибан.*ног|leg.?extension/i : /сгибан.*ног|leg.?curl/i;
@@ -1030,12 +1059,13 @@ function allocateExperiencedLegSession(session: any, week: any, options: BBFinal
   const heavyQuads = legIndex >= 0 ? legIndex % 2 === 0 : (session.day ?? 1) % 2 === 1;
   const heavyMuscle = heavyQuads ? 'quads' : 'hamstrings';
   const pumpMuscle = heavyQuads ? 'hamstrings' : 'quads';
+  const alternateLegs = weekLegs.length >= 2;
   const heavyTarget = level === 'enhanced' ? (years >= 6 ? 16 : 12) : level === 'advanced' ? 12 : level === 'intermediate' ? 10 : 8;
   if (!muscleBlocked(heavyMuscle)) ensureLegHeavyBlock(session, options, heavyMuscle, heavyTarget, heavyQuads);
-  if (!muscleBlocked(pumpMuscle)) ensureLegPumpBlock(session, options, pumpMuscle, 4);
+  if (!muscleBlocked(pumpMuscle)) ensureLegPumpBlock(session, options, pumpMuscle, 4, alternateLegs);
   if (!muscleBlocked('glutes')) ensureGlutesBlock(session, options, level === 'enhanced' ? (years >= 6 ? 12 : 10) : 8, heavyQuads);
   // Повторная переработка памп-мышцы: поздние добавления (добивки) тоже становятся лёгкими
-  if (!muscleBlocked(pumpMuscle)) ensureLegPumpBlock(session, options, pumpMuscle, 4);
+  if (!muscleBlocked(pumpMuscle)) ensureLegPumpBlock(session, options, pumpMuscle, 4, alternateLegs);
   // Икры — каждый Legs-день обеспечивает ensureSmallMuscleQuality (pump 3-4 сета)
   // BUG-FIX (audit 2026-08): repsCap градированной травмы соблюдается в leg-работе.
   for (const ex of session.exercises as any[]) {
@@ -2752,6 +2782,15 @@ export function enforceSessionRealism(plan: BBPlan, options: BBFinalizeOptions =
       const totalWorkingSets = () => working().reduce((a: number, e: any) => a + (e.sets || 0), 0);
       const packingSession = !!(session as any).packingApplied;
       let setGuard = 0;
+      // FST-7 7-in-1 — назначенный про-протокол: общий бюджет сессии снимается
+      // обычными упражнениями, а не схемой (иначе FST-7 терял 7 сетов и методика
+      // становилась NO-OP). GVT/Gironda/8×8 держат ≤5 сетов сами — их НЕ исключаем
+      // из бюджета (иначе сессия уходит за кап → overflow).
+      const isSchemeEx = (e: any) => /FST-?7|GVT/.test(String(e.comment || ''));
+      // Схемные упражнения (GVT/Gironda/8×8/FST-7) в ЖЁСТКОМ проходе (down to 2)
+      // не режем — их форма назначена (GVT держит ≥4, тест pro-methods); в
+      // мягком (down to 4) GVT/Gironda могут ужаться до 4.
+      const isSchemeHard = (e: any) => /FST-?7|GVT|Gironda|8\s*[x×]\s*8/i.test(String(e.comment || ''));
       while (!packingSession && totalWorkingSets() > maxSets && setGuard++ < 120) {
         // Приоритет резки (жалоба «Upper 18 упражнений / 59 сетов»): сначала
         // средние/малые мышцы (плечи/икры/пресс/руки) до 4 сетов — у них есть
@@ -2759,12 +2798,12 @@ export function enforceSessionRealism(plan: BBPlan, options: BBFinalizeOptions =
         // Цели специализации неприкосновенны, PPL-минимумы рук сохраняются
         // (в Pull/Push бюджет не переполнен и проход не срабатывает).
         const soft = working()
-          .filter((e: any) => sessionMuscleClass((e as any).muscle) !== 'big' && !isSpecTarget((e as any).muscle) && (e.sets || 0) > 4)
+          .filter((e: any) => !isSchemeEx(e) && sessionMuscleClass((e as any).muscle) !== 'big' && !isSpecTarget((e as any).muscle) && (e.sets || 0) > 4)
           .sort((a: any, b: any) => (b.sets || 0) - (a.sets || 0));
         let victim: any = soft.find((e: any) => e.role === 'accessory' || isIso(e.name || '')) || soft[0] || null;
         if (!victim) {
           const hard = working()
-            .filter((e: any) => !isSpecTarget((e as any).muscle) && (e.sets || 0) > 2)
+            .filter((e: any) => !isSchemeHard(e) && !isSpecTarget((e as any).muscle) && (e.sets || 0) > 2)
             .sort((a: any, b: any) => (b.sets || 0) - (a.sets || 0));
           victim = hard.find((e: any) => e.role === 'accessory' || isIso(e.name || '')) || hard[0] || null;
         }
@@ -4345,7 +4384,14 @@ for (const week of next.weeks) {
       for (const muscle of seen) frequency[muscle] = (frequency[muscle] || 0) + 1 / Math.max(1, next.weeks.length);
     }
     const targets: NonNullable<BBPlan['volumeTargets']> = {};
+    // Композитные ключи (shoulders/arms/legs) — фантомные цели: peak-факт их
+    // учитывает (косвенный shoulders, агрегат arms/legs), но объём мышцы
+    // измеряется по каноническим ключам (delt_*/biceps/triceps/quads/...).
+    // Цель по агрегату недостижима и давала ложный дефицит 100% + давила
+    // упражнения к капу. Пер-мышечные цели строятся отдельно.
+    const COMPOSITE_TARGETS = new Set(['shoulders', 'arms', 'legs', 'core', 'delts']);
     for (const [muscle, volume] of Object.entries(peakVolume)) {
+      if (COMPOSITE_TARGETS.has(String(muscle).toLowerCase())) continue;
       const landmarks = getVolumeLandmarks(options.level, muscle);
       if (!landmarks) continue;
       targets[muscle] = buildBBVolumeTarget({
@@ -4590,7 +4636,14 @@ for (const week of next.weeks) {
           (isSchemeMarked(a) ? 1 : 0) - (isSchemeMarked(b) ? 1 : 0));
         for (const e of cutOrder) {
           if (need <= 0) break;
+          // FST-7 7-in-1 — назначенный про-протокол (гейт в билдере, MRV-гейт в
+          // applyVolumeScheme): не режем недельным бюджетом, иначе финишер
+          // терял 7 сетов и схема становилась NO-OP. Бюджет закрывается обычными
+          // изоляциями; при исчерпании — снимаем остаток с не-схемных.
+          if (/FST-7/.test(String((e as any).comment || ''))) continue;
           while (need > 0 && e.sets > 2) {
+            // GVT/Gironda/8×8 держат форму ≥4 сетов (bb-pro-methods).
+            if (isSchemeMarked(e) && e.sets <= 4) break;
             e.sets -= 1;
             if (Array.isArray(e.workSets) && e.workSets.length > e.sets) e.workSets = e.workSets.slice(0, e.sets);
             need -= 1;
@@ -5145,8 +5198,10 @@ for (const week of next.weeks) {
           if (f == null) return false;
           return (sessTotals[x.muscle] || 0) <= f;
         };
-        for (const e of workingEx.filter((x: any) => x.role === 'accessory' && x.sets > 2 && !prot(x))) {
+        for (const e of workingEx.filter((x: any) => x.role === 'accessory' && x.sets > 2 && !prot(x) && !/FST-7/.test(String((x as any).comment || '')))) {
+          const isSchemeLate = /GVT|Gironda|8\s*[x×]\s*8/.test(String((e as any).comment || ''));
           while (total > lateCap && e.sets > 2 && !prot(e)) {
+            if (isSchemeLate && e.sets <= 4) break; // GVT/Gironda держат форму ≥4
             e.sets -= 1;
             if (Array.isArray(e.workSets) && e.workSets.length > e.sets) e.workSets = e.workSets.slice(0, e.sets);
             total -= 1;

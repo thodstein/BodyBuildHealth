@@ -292,8 +292,13 @@ export function computeBBRecoveryMultiplier(input: {
 
 /** Единый cap сетов на упражнение — про-правило, единственный источник (Фаза 2.5).
  *  Без флага onCourse — legacy (5; enhanced 3+ на главных — 8).
- *  BIG-ветка при явном onCourse===true: стаж 6+ — 10/8, 3+ — 8/6, 1+ — 6/5
- *  (главные/остальные). Сигнатура обратно совместима. */
+ *  BIG-ветка при явном onCourse===true: 6 (главные) / 5 (остальные) на всех
+ *  курсовых тирах. Про-практика цикла — 4–6 сетов на движение (10 — только
+ *  мини-сетовые техники: DC/Myo/FST-7, они не считаются real-сетами). Раньше
+ *  ветка давала 10/8, и expansion добивал ОДНО упражнение до 10 сетов в погоне
+ *  за недельной целью — «10 сетов на жим». Недостающая ёмкость добирается
+ *  ДВИЖЕНИЯМИ (ensureMuscleSessionCapacity), а не раздуванием одного.
+ *  Сигнатура обратно совместима. */
 export function perExerciseCap(level?: string, muscle?: string, trainingYears?: number, onCourse?: boolean): number {
   const m = (muscle || '').toLowerCase();
   const years = Number.isFinite(trainingYears) ? (trainingYears as number) : 0;
@@ -301,9 +306,6 @@ export function perExerciseCap(level?: string, muscle?: string, trainingYears?: 
   // чтобы не ломать существующие тесты (enhanced biceps 6 → 5).
   if (onCourse === true) {
     const isMain = ['back', 'chest', 'quads', 'hamstrings', 'legs', 'glutes', 'shoulders'].includes(m);
-    if (years >= 6) return isMain ? 10 : 8;
-    if (years >= 3) return isMain ? 8 : 6;
-    if (years >= 1) return isMain ? 6 : 5;
     return isMain ? 6 : 5;
   }
   if (level === 'enhanced' && years >= 3 && ['back', 'chest', 'quads', 'hamstrings', 'legs'].includes(m)) return 8;
@@ -786,6 +788,11 @@ export function weeklyCapFor(input: {
   let cap = Math.round(lm.mrv * pedMult);
   // Потолок владельца бьёт только там, где он задан (спина/ноги).
   if (anchor > 0) cap = Math.min(cap, anchor);
+  // Спина: канон владельца 60/нед на курсе — это ЦЕЛЬ (не потолок формулы).
+  // Дозо-зависимая формула для полного стека даёт 49–57 и молча ужимала спину
+  // ниже канона (43/нед вместо 60). Якоря НОГ остаются потолками (32/30/18),
+  // спина — ФЛОР. perSessionMuscleCap('back') = 60/2 = 30/сессию (требование).
+  if (m === 'back' && input.onCourse && anchor > 0) cap = Math.max(cap, anchor);
   return Math.max(3, cap);
 }
 

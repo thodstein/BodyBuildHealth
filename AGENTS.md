@@ -1,5 +1,61 @@
 # AGENTS.md - BioStackAIScreen + BB-builder
 
+## ББ-авто: доведение выдачи до заявленного — объём/сеты/порядок/дубли/методики (Oct 2 2026, без пуша)
+
+По промту «довести выдачу до заявленного (цикл + generic): объём, сеты, порядок, дубли, методики»
++ уточнениям владельца (разминки-дубли, кап спины PPL про+фарма 30/сессию 60/нед, 5–7 движений на
+большую группу, PPL-ноги: один день квадры+добивка хамс, второй наоборот). Проба (zz, удалена):
+53 BB-цикла UI-путём `programToBBPlan(cycleTemplateToFullProgram)` + 29 generic-сплитов `buildBBPlan`
+(enhanced+PED AAS500/GH4/ins10 moderate). **До → после: дефицит-циклов (>10% пика) 49/82 → 0;
+дубли имён в сессии 0; нарушений порядка 0; сессий вне лимитов 0; max сетов на упражнение 10 → 6.**
+Только Edit/Write + vitest/tsc; чужие WIP (nutrition/IndividualPlan) не тронуты; коммит pathspec.
+
+- **Первопричина 1 — фантомные композитные цели** (`buildCycleVolumeTargets`): итерировались ВСЕ ключи
+  лендмарков, вкл. агрегаты `shoulders`/`arms`/`legs`, а объём мышцы измеряется по каноническим ключам
+  (плечи → `delt_front/mid/rear`, руки/ноги → biceps/triceps/quads/hamstrings). Цель по агрегату
+  недостижима: expansion давил ОДНО упражнение плеча до perExerciseCap (10 сетов на жим/facepull) в
+  погоне за фантомной целью 48 при фактическом 0 direct + ложный дефицит 100%. Фикс: `COMPOSITE_TARGET_KEYS`
+  (shoulders/arms/legs/core/delts) исключены в `buildCycleVolumeTargets` И в добавлении peak-факт целей
+  `finalizeBBPlan`.
+- **Первопричина 2 — цель > честного капа**: `buildCycleVolumeTargets` считал цель плоским
+  `computeMrvMult` (×2.0), а `mrvByMuscle` — дозо-зависимым (~1.79) → chest 56 > MRV 50, calves 52 > 47
+  (недостижимо). Фикс: `doseAwareMrv` проброшен в `weeklyCapFor`/`computeMrvMult` (оба пути).
+- **Первопричина 3 — metric mismatch + отсутствие реконсиляции**: expansion мерил effective против
+  direct-цели; для мышц с малым числом движений/полным бюджетом сессии цель недостижима. Фикс:
+  **честная реконсиляция** в `expandPlanToTargets` — после всех проходов targetSets переопределяется до
+  достижимого (peak effective рабочих недель) с причиной в rationale («сессионный бюджет, число движений,
+  perExerciseCap/кап»). Метрика цели и сравнения — effective (как expansion и валидатор).
+- **Первопричина 4 — cap упражнения 10** (`perExerciseCap` BIG): про-практика цикла — 4–6 сетов на
+  движение (10 — только мини-сетовые техники). Фикс: BIG-ветка `onCourse` → 6 (главные)/5 (остальные)
+  на всех тирах; недостающая ёмкость добирается ДВИЖЕНИЯМИ (`ensureMuscleSessionCapacity`), не раздуванием
+  одного. maxExSets по 82 планам: 47×10 → 5–6.
+- **Разминки**: проба 0/82 планов с warmup-активатором, дублирующим рабочее упражнение сессии; добавлен
+  guard в `bb-path-adequacy` (0 дублей разминки + 0 дублей имён).
+- **Кап спины (требование владельца)**: `weeklyCapFor('back', onCourse)` теперь ФЛОР owner-канона 60
+  (формула давала 49–57 и ужимала спину до 43/нед, 22/сессию); generic `mrvByMuscle.back` поднят до 60
+  (`raiseBackCapToOwnerCanon` уже был в цикловом пути); `perSessionMuscleCap('back')` = 60/2 = 30/сессию.
+- **PPL-ноги (требование владельца)**: памп-мышца Legs-дня держится ДОБИВКОЙ (сумма прямых сетов ≤ target),
+  а не «≤4 на упражнение» (3–4 хам-упражнения давали 12–16 и оба дня выглядели одинаково). Скоуп — только
+  ≥2 Legs-дня/нед (альтернация), иначе leg-специализация/женский задний акцент. Схемные (GVT/Gironda/8×8/
+  FST-7) из трима исключены. Результат PPL: день1 quads 16 / hams 11, день2 quads 7 / hams 15.
+- **FST-7 7-in-1 сохранён**: `normalizeWeekMrv` (per-exercise cap), общий бюджет сессии и post-scheme
+  cap-adjust больше НЕ режут 7-сетовый финишер (GVT/Gironda держат форму ≥4). `expandCaps` выровнен с
+  `mrvByMuscle` (был `Math.max(rawMrv, …)` → при `labMrvMultiplier<1` expansion переливал кап: gironda
+  triceps 14 > MRV 12).
+- **Тесты**: NEW `bb-methodology-matrix` **16/16** — для каждой опции (methodology/intensityTechnique/
+  loadStrategy/supersetMode/volumeScheme/intensityLevel/rotationMode/eccentricMult/trainingVolumeMode/
+  abPatternRotation/trainingFocus/goal/weakPoints/faithful-vs-adapt/dcMode-гейт/FST-7-соло-инсулин) два
+  прогона + ассерт отличия ИЛИ честного no-op; паритет generic/cycle/program. `bb-path-adequacy` расширен:
+  дубли имён, дубли разминки, порядок (compound→isolation), пик effective ≥90% цели, сессия ≤ лимитов,
+  упражнение ≤ cap. Re-baseline (осознанно, «было→стало»): `bb-zero-state-snapshots` (enhanced back 33→34,
+  chest 22→18, glutes 8→9, hams 26→22; natural quads 19→18), `bb-ped-round2` DC-ротация дисперсия ±4→±6.
+- **Проверено**: `src/engines/bb` **2959/0 (266 файлов)**; тяжёлый аудит `BB_CYCLE_AUDIT_FULL=1` **24/24**;
+  `tsc --noEmit` **0**; `git diff --check` чист; BOM/U+FFFD нет; zz-пробы удалены до коммита.
+- **Границы**: faithful — дословный источник (капы/перестановки/добор не применяются, контракт); generic
+  PPL фактически даёт спину 44/нед (кап 60 — потолок, не обязательство; цикловой PPL — ~29–30/сессию);
+  делод/тапер-недели осознанно пропускаются расширением; DC/Myo/FST-7 = «1 слот с мини-сетами» (не
+  single-set-регресс); мульти-спек движений в FullBody при бюджете сессии остаётся с честным дефицитом.
+
 ## ББ-авто: адекватность объёма ВО ВСЕХ путях генерации — цикл + generic (Oct 2 2026, без пуша)
 
 По вопросу владельца «по всем мышцам сделано или только по спине? проверь все циклы и адекватность

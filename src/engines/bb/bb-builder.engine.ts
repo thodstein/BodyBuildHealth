@@ -1135,7 +1135,11 @@ export function normalizeWeekMrv(weekSessions: BBSession[], mrvByMuscle: Record<
     const floor = isDeload ? 1 : 2; // C6: deload floor=1, рабочая неделя floor=2
     for (const ex of info.exs) {
       const cap = perExCapFor(ex.muscle);
-      if (ex.sets > cap) ex.sets = cap;
+      // FST-7 7-in-1 — назначенный про-протокол (гейт в билдере, MRV-гейт в
+      // applyVolumeScheme): не ужимаем 7 сетов до perExerciseCap, иначе схема
+      // становится NO-OP. Остальные упражнения — под обычным капом.
+      const isFst7Seven = (ex.sets || 0) > cap && (ex.sets || 0) <= 7 && /FST-?7/.test(String((ex as any).comment || ''));
+      if (!isFst7Seven && ex.sets > cap) ex.sets = cap;
       if (ex.sets < floor) ex.sets = floor;
       syncWorkSets(ex);
     }
@@ -3431,6 +3435,16 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
         blast: !!input.blastCruiseEnabled,
       });
     }
+  }
+  // Спина: канон владельца 60/нед на курсе — ЦЕЛЬ, не потолок формулы.
+  // Дозо-зависимая формула даёт 49–57 и молча ужимала спину (43/нед вместо 60,
+  // 22/сессию вместо 30). Поднимаем ТОЛЬКО спину на курсе (якоря ног — потолки).
+  if (onCourse && !excludedMuscles.has('back')) {
+    const backCanon = weeklyCapFor({
+      muscle: 'back', level, trainingYears: input.trainingYears, onCourse,
+      courseIntensity: input.courseIntensity, doseAwareMrv: pedAdapt?.combinedMrvMultiplier,
+    });
+    mrvByMuscle.back = Math.max(mrvByMuscle.back || 0, backCanon);
   }
 
   // Целевые объёмы для остальных блоков расписания (другие цели / баланс):

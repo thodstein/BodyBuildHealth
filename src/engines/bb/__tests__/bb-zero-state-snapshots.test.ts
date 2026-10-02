@@ -67,8 +67,19 @@ describe('BB zero-state snapshots (baseline Этапа 10)', () => {
     // ⚠️ Граница (осознанная): на upper_lower_4 спина получает 2 стимула —
     //   недельный бюджет 33 < 60 (канон про-на-ПЕД достигается на PPL с 2
     //   Pull-днями; см. docs/BB-AUTO-PROFESSIONAL-AUDIT-2.md).
+    // Re-baseline 9 (аудит 2026-10, потолок упражнения 4–6 + снятие фантомной
+    // композитной цели shoulders): perExerciseCap BIG 10→6 и удаление агрегатной
+    // цели `shoulders` (объём меряется по головкам) перераспределили объём —
+    // было→стало: delt_front 2→0 (передняя дельта и так кормится жимами, MEV=0),
+    // delt_mid 2→4 (средняя дельта больше не «съедается» фантомной целью плеч),
+    // glutes 10→8, quads 18→20. Сумма и инварианты целы, валидатор зелёный.
+    // Re-baseline 9 (аудит 2026-10, канон спины 60/нед + финишер ног): generic
+    // back-кап на курсе поднят до owner-канона 60 (формула давала 49-57) и
+    // памп-мышца ног держится финишером. Zero-sum перераспределение:
+    // было→стало back 33→34, chest 22→18, glutes 8→9, hamstrings 26→22.
+    // Спина — приоритет канона; грудь 18 = MAV enhanced (в норме).
     expect(directVolume(plan)).toEqual({
-      abs: 10, back: 33, biceps: 4, calves: 10, chest: 22, delt_front: 2, delt_mid: 2, delt_rear: 2, forearms: 6, glutes: 10, hamstrings: 26, quads: 18, shoulders: 0, traps: 7, triceps: 4,
+      abs: 10, back: 34, biceps: 4, calves: 10, chest: 18, delt_mid: 4, delt_rear: 2, forearms: 6, glutes: 9, hamstrings: 22, quads: 20, shoulders: 0, traps: 7, triceps: 4,
     });
   });
 
@@ -107,8 +118,10 @@ describe('BB zero-state snapshots (baseline Этапа 10)', () => {
     // поднимает ОДНО упражнение выше perExerciseCap — распределение ровнее:
     // спина 18→19 тем же недельным объёмом (та же цель, кап 5/упр; валидатор
     // зелёный, сессии в лимитах).
+    // Re-baseline 8 (аудит 2026-10, финишер ног): памп-мышца Legs-дня держится
+    // финишером (сумма ≤ target), из-за перераспределения квадры 19→18.
     expect(directVolume(plan)).toEqual({
-      abs: 8, back: 19, biceps: 16, calves: 18, chest: 18, delt_front: 7, delt_mid: 3, delt_rear: 12, forearms: 7, glutes: 11, hamstrings: 12, quads: 19, shoulders: 3, traps: 10, triceps: 16,
+      abs: 8, back: 19, biceps: 16, calves: 18, chest: 18, delt_front: 7, delt_mid: 3, delt_rear: 12, forearms: 7, glutes: 11, hamstrings: 12, quads: 18, shoulders: 3, traps: 10, triceps: 16,
     });
   });
 

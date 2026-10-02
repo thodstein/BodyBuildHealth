@@ -183,6 +183,29 @@ export function programToCycleTemplate(program: FullProgram): SRCycleTemplate {
  * билдере. MRV-кап цели масштабируется режимом (PED): иначе спина упиралась в
  * «сырой» MRV 32 вместо 32×режим≈60 и недобирала (про+фарма: 14/нед против 43).
  */
+/**
+ * Композитные ключи, объём которых НЕ измеряется под этим же именем:
+ *  • `shoulders` — aggregateBBVolume раскладывает плечи по головкам
+ *    (delt_front/mid/rear), сам ключ shoulders получает только косвенный вклад;
+ *  • `arms` / `legs` — агрегаты (biceps+triceps / quads+hamstrings).
+ * Цель по такому ключу недостижима «по определению»: expansion давил одно
+ * упражнение плеча до perExerciseCap (10 сетов на жим/facepull) в погоне за
+ * фантомной целью 48 при фактическом 0 direct — и в отчёте всплывал ложный
+ * дефицит 100%. Пер-головковые/пер-мышечные цели уже строятся отдельно.
+ */
+const COMPOSITE_TARGET_KEYS: ReadonlySet<string> = new Set(['shoulders', 'arms', 'legs', 'core', 'delts']);
+
+/** Метки назначенных объёмных схем (FST-7/GVT/8×8/Gironda): «1 слот с
+ *  мини-сетами» / назначенный протокол — не объект произвольного среза в
+ *  MRV-триме (иначе финишер FST-7 7-сетов ужимался до perExerciseCap). */
+const SCHEME_MARK_RE = /FST-7|GVT|8×8|Gironda/i;
+
+/** Прямой вклад упражнения в мышцу (с учётом разбиения плеч по головкам). */
+function isDirectContributor(e: any, muscle: string): boolean {
+  try { return exerciseVolumeContributions(e).some((c: any) => c.source === 'direct' && c.muscle === muscle); }
+  catch { return e.muscle === muscle; }
+}
+
 function buildCycleVolumeTargets(
   allLandmarks: Record<string, { mev: number; mav: number; mrv: number } | undefined>,
   opts: {
@@ -190,9 +213,13 @@ function buildCycleVolumeTargets(
     courseIntensity?: string; goal?: string;
     volumeGoal?: 'mev' | 'mav' | 'mrv'; labMrvMultiplier?: number; trainingVolumeMode?: string;
     muscleFrequency?: Record<string, number>;
+    /** Дозо-зависимый MRV-множитель (adaptForPEDs.combinedMrvMultiplier). Без него
+     *  цель считалась плоским ×2.0 и превышала честный кап (chest 56 > MRV 50,
+     *  calves 52 > 47) — цель становилась недостижимой. */
+    doseAwareMrv?: number;
   },
 ): Record<string, BBVolumeTarget> {
-  const regimeMult = computeMrvMult({ onCourse: opts.onCourse, peds: opts.peds, courseIntensity: opts.courseIntensity });
+  const regimeMult = computeMrvMult({ onCourse: opts.onCourse, peds: opts.peds, courseIntensity: opts.courseIntensity, doseAwareMrv: opts.doseAwareMrv });
   const goal = opts.volumeGoal || 'mav';
   const g = (opts.goal || 'mass').toLowerCase();
   const goalMult = g === 'cut' ? 0.72 : g === 'recomp' ? 0.92 : g === 'maintenance' ? 0.80 : g === 'mass' ? 1.05 : g === 'strength_mass' ? 1.03 : 1;
@@ -203,6 +230,9 @@ function buildCycleVolumeTargets(
   const out: Record<string, BBVolumeTarget> = {};
   for (const [m, lm] of Object.entries(allLandmarks)) {
     if (!lm?.mrv) continue;
+    // Композитные ключи — фантомные цели (см. COMPOSITE_TARGET_KEYS): объём
+    // мышцы измеряется по каноническим ключам, а не по агрегату.
+    if (COMPOSITE_TARGET_KEYS.has(String(m).toLowerCase())) continue;
     const freq = Math.max(1, Math.round(opts.muscleFrequency?.[m] || 1));
     // Цель ПО МЫШЦЕ и ЧАСТОТЕ: недельный рецепт = min(якорь владельца,
     // per-session-кап × число сессий/нед). Спина про+фарма: per-session 30 × 2 = 60
@@ -211,6 +241,7 @@ function buildCycleVolumeTargets(
     const weeklyAnchor = weeklyCapFor({
       muscle: m, level: lvl, trainingYears: opts.trainingYears,
       onCourse: opts.onCourse, courseIntensity: opts.courseIntensity,
+      doseAwareMrv: opts.doseAwareMrv,
     });
     const perSess = perSessionMuscleCap({
       level: lvl, trainingYears: opts.trainingYears, onCourse: opts.onCourse, muscle: m,
@@ -429,6 +460,32 @@ function expandPlanToTargets(
   for (const w of plan.weeks) for (const s of w.sessions) for (const e of s.exercises) if (!(e as any).warmupActivator) trained.add(e.muscle);
   const vt: any = (plan as any).volumeTargets;
   if (vt) for (const m of Object.keys(vt)) if (!trained.has(m)) delete vt[m];
+  // Честная реконсиляция цели (требование владельца 2026-10): targetSets и
+  // сравнение — в ОДНОЙ метрике (effective, как expansion и валидатор). Если
+  // план физически не набирает цель (сессионный бюджет 60, число движений
+  // источника, perExerciseCap, кап) — цель переопределяется до достижимой с
+  // причиной в rationale. Раньше UI/отчёт показывал недостижимую цель (chest 56
+  // при MRV 50, calves 52 при 47, traps/forearms/triceps при 1-2 движениях
+  // источника) и «дефицит», которого план закрыть не мог.
+  if (vt) {
+    const achieved: Record<string, number> = {};
+    for (const week of plan.weeks) {
+      const w = week as any;
+      if (w.phase === 'deload' || w.deload === true || w.taperApplied === true || w.taper === true || w.prepProtocol || w.contestPhase || w.peakWeek) continue;
+      const v = aggregateBBVolume(week.sessions) as any;
+      for (const [m, x] of Object.entries(v)) achieved[m] = Math.max(achieved[m] || 0, (x as any).effectiveSets || 0);
+    }
+    for (const [m, target] of Object.entries(vt as Record<string, any>)) {
+      const t = Number(target?.targetSets) || 0;
+      if (t <= 0) continue;
+      const got = achieved[m] || 0;
+      if (got < t * 0.9) {
+        const prev = t;
+        target.targetSets = Math.round(got);
+        plan.rationale.push(`📉 Цель «${m}» переопределена до достижимой: ${prev} → ${target.targetSets} сетов/нед (сессионный бюджет ${opts.maxWorkingSets ?? '—'}, число движений источника, perExerciseCap/кап).`);
+      }
+    }
+  }
 }
 
 /** Канон владельца для спины: недельный кап не ниже weeklyCapFor (60/нед на
@@ -1727,6 +1784,7 @@ export function convertCycleToBBPlan(input: CycleToPlanInput): BBPlan {
         level, trainingYears: input.trainingYears, onCourse, peds, courseIntensity,
         goal: input.goal, volumeGoal: input.volumeGoal, labMrvMultiplier: input.labMrvMultiplier,
         trainingVolumeMode: (input as any).trainingVolumeMode, muscleFrequency,
+        doseAwareMrv: pedAdapt.combinedMrvMultiplier,
       })
     : undefined;
 
@@ -1781,7 +1839,7 @@ export function convertCycleToBBPlan(input: CycleToPlanInput): BBPlan {
   // Прямое расширение до предписанных целей (все мышцы) — до MRV-трима ниже.
   if (mode === 'adapt' && cycleVolumeTargets) {
     const expandCaps: Record<string, number> = {};
-    for (const [m, lm] of Object.entries(allLandmarks as any)) { const l = lm as any; if (l?.mrv) expandCaps[m] = Math.max(l.mrv, Math.round(l.mrv * mrvMult)); }
+    for (const [m, lm] of Object.entries(allLandmarks as any)) { const l = lm as any; if (l?.mrv) expandCaps[m] = Math.round(l.mrv * mrvMult); }
     if (input.sex === 'female') {
       if (expandCaps.glutes) expandCaps.glutes = Math.round(expandCaps.glutes * 1.2);
       if (expandCaps.hamstrings) expandCaps.hamstrings = Math.round(expandCaps.hamstrings * 1.2);
@@ -1898,8 +1956,9 @@ export function convertCycleToBBPlan(input: CycleToPlanInput): BBPlan {
           try { return trueMuscleOf(e as any) || e.muscle; } catch { return e.muscle; }
         };
         // Кандидаты на срез: изоляции/accessory этой мышцы, не primary, с сетами > floor.
+        // Схемные финишеры (FST-7/GVT/8×8) — назначенный протокол, не режем.
         const all = w.sessions
-          .flatMap(s => s.exercises.filter((e: any) => !(e as any).warmupActivator && canon(e) === worst!.muscle));
+          .flatMap(s => s.exercises.filter((e: any) => !(e as any).warmupActivator && !SCHEME_MARK_RE.test(String((e as any).comment || '')) && (canon(e) === worst!.muscle || isDirectContributor(e, worst!.muscle))));
         const cands = all
           .filter((e: any) => e.role !== 'primary' && e.sets > floorSetsFor(worst!.muscle, e))
           .sort((a: any, b: any) => a.sets - b.sets);
@@ -2905,6 +2964,7 @@ export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts)
         peds: opts.peds, courseIntensity: opts.courseIntensity,
         goal: opts.goal, volumeGoal: opts.volumeGoal, labMrvMultiplier: (opts as any).labMrvMultiplier,
         trainingVolumeMode: opts.trainingVolumeMode, muscleFrequency: sessionFreq,
+        doseAwareMrv: pedAdapt.combinedMrvMultiplier,
       })
     : undefined;
   const finalized = finalizeBBPlan({
@@ -3012,8 +3072,9 @@ export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts)
         }
         if (!worst) break;
         const canon = (e: any): string => { try { return trueMuscleOf(e as any) || e.muscle; } catch { return e.muscle; } };
+        // Схемные финишеры (FST-7/GVT/8×8) — назначенный протокол, не режем.
         const all = w.sessions
-          .flatMap(s => s.exercises.filter((e: any) => !(e as any).warmupActivator && canon(e) === worst!.muscle));
+          .flatMap(s => s.exercises.filter((e: any) => !(e as any).warmupActivator && !SCHEME_MARK_RE.test(String((e as any).comment || '')) && (canon(e) === worst!.muscle || isDirectContributor(e, worst!.muscle))));
         const cands = all
           .filter((e: any) => e.role !== 'primary' && e.sets > floorSetsFor(worst!.muscle, e))
           .sort((a: any, b: any) => a.sets - b.sets);
@@ -3116,7 +3177,7 @@ export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts)
   // Прямое расширение до предписанных целей (все мышцы).
   if (mode === 'adapt' && programVolumeTargets) {
     const expandCapsProgram: Record<string, number> = {};
-    for (const [m, lm] of Object.entries(allLandmarks as any)) { const l = lm as any; if (l?.mrv) expandCapsProgram[m] = Math.max(l.mrv, Math.round(l.mrv * mrvMult)); }
+    for (const [m, lm] of Object.entries(allLandmarks as any)) { const l = lm as any; if (l?.mrv) expandCapsProgram[m] = Math.round(l.mrv * pedMrvMult); }
     if (opts.sex === 'female') {
       if (expandCapsProgram.glutes) expandCapsProgram.glutes = Math.round(expandCapsProgram.glutes * 1.2);
       if (expandCapsProgram.hamstrings) expandCapsProgram.hamstrings = Math.round(expandCapsProgram.hamstrings * 1.2);

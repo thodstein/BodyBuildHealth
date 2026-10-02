@@ -3,7 +3,7 @@ import { LMS_CYCLES } from '../../../data/lms-cycles/lms-cycle-index';
 import { cycleTemplateToFullProgram, programToBBPlan } from '../cycle-to-plan';
 import { buildBBPlan } from '../bb-builder.engine';
 import { SPLIT_PATTERNS } from '../bb-split-patterns';
-import { perExerciseCap, sessionLimitsFor } from '../bb-volume.engine';
+import { perExerciseCap, sessionLimitsFor, aggregateBBVolume } from '../bb-volume.engine';
 
 /**
  * Адекватность объёма во ВСЕХ путях генерации (аудит 2026-10, требование
@@ -47,6 +47,25 @@ function assertAdequate(plan: any, label: string): void {
       expect(working.length, `${label} W${w.week} ${s.sessionTag}: упражнений`).toBeLessThanOrEqual(LIMITS.maxExercises);
       const sets = working.reduce((a: number, e: any) => a + (e.sets || 0), 0);
       expect(sets, `${label} W${w.week} ${s.sessionTag}: сетов сессии`).toBeLessThanOrEqual(LIMITS.maxWorkingSets);
+      // Дубли имён в сессии (аудит 2026-10): 0 повторов одного имени.
+      const names = working.map((e: any) => String(e.exerciseName || e.name || '').toLowerCase());
+      expect(new Set(names).size, `${label} W${w.week} ${s.sessionTag}: дубли имён`).toBe(names.length);
+      // Разминка-активатор не дублирует рабочее упражнение той же сессии.
+      const warmNames = s.exercises.filter((e: any) => e.warmupActivator).map((e: any) => String(e.exerciseName || e.name || '').toLowerCase());
+      for (const wn of warmNames) {
+        expect(working.some((e: any) => String(e.exerciseName || e.name || '').toLowerCase() === wn), `${label} W${w.week} ${s.sessionTag}: разминка дублирует рабочее «${wn}»`).toBe(false);
+      }
+      // Порядок: изоляция мышцы не идёт ДО её compound-primary.
+      const seenPrimary = new Set<string>();
+      for (let i = 0; i < working.length; i++) {
+        const e: any = working[i];
+        const isIso = e.role === 'accessory' && /разгибан|сгибан|curl|raise|fly|мах|развод|шраг|pushdown|подъем|подъём|отведен|сведен/i.test(String(e.name || ''));
+        if (isIso && !seenPrimary.has(e.muscle)) {
+          const laterCompound = working.slice(i + 1).some((x: any) => x.muscle === e.muscle && x.role === 'primary');
+          expect(laterCompound, `${label} W${w.week} ${s.sessionTag}: изоляция ${e.name} (${e.muscle}) до compound`).toBe(false);
+        }
+        if (e.role === 'primary') seenPrimary.add(e.muscle);
+      }
       for (const e of working) {
         const cap = perExerciseCap(LEVEL, e.muscle, YEARS, true);
         expect(e.sets, `${label} W${w.week} ${s.sessionTag}: ${e.name} (${e.muscle})`).toBeLessThanOrEqual(cap);
@@ -59,6 +78,27 @@ function assertAdequate(plan: any, label: string): void {
         expect((e.workSets || []).length, `${label}: ${e.name} sets vs workSets`).toBe(e.sets);
       }
     }
+    // Объём мышцы проверяем на ПИКЕ рабочих недель (в отдельном assertPeakTargets):
+    // accumulation-недели ниже пика, а taper/deload — назначенно снижены.
+  }
+}
+
+/** Пиковый effective за рабочие недели ≥ 90% цели (или цель уже реконсилирована). */
+function assertPeakTargets(plan: any, label: string): void {
+  const peak: Record<string, number> = {};
+  for (const w of plan.weeks) {
+    const isDeload = w.phase === 'deload' || w.deload === true || w.taper === true || w.taperApplied === true;
+    if (isDeload) continue;
+    const vol = aggregateBBVolume(w.sessions) as any;
+    for (const [m, x] of Object.entries(vol)) peak[m] = Math.max(peak[m] || 0, (x as any).effectiveSets || 0);
+  }
+  // Все недели taper/deload — цель намеренно снижена, проверять нечего.
+  if (Object.keys(peak).length === 0) return;
+  for (const [m, t] of Object.entries((plan.volumeTargets || {}) as Record<string, { targetSets: number }>)) {
+    const target = Number(t?.targetSets) || 0;
+    if (target <= 0) continue;
+    const got = peak[m] || 0;
+    expect(got, `${label} ${m}: peak effective ${got} < 90% target ${target}`).toBeGreaterThanOrEqual(target * 0.9 - 0.01);
   }
 }
 
@@ -71,6 +111,7 @@ describe('ББ-авто: адекватность объёма — все пут
         workMax: WORKMAX, level: LEVEL, trainingYears: YEARS, mode: 'adapt', sex: 'male', goal: 'mass', ...PED,
       } as never);
       assertAdequate(plan, `cycle ${id}`);
+      assertPeakTargets(plan, `cycle ${id}`);
     }
   });
 
@@ -79,6 +120,7 @@ describe('ББ-авто: адекватность объёма — все пут
     for (const sp of SPLIT_PATTERNS) {
       const plan = buildBBPlan({ patternId: sp.id, weeks: 4, level: LEVEL, trainingYears: YEARS, goal: 'mass', sex: 'male', workMax: WORKMAX, ...PED } as never);
       assertAdequate(plan, `split ${sp.id}`);
+      assertPeakTargets(plan, `split ${sp.id}`);
     }
   });
 
