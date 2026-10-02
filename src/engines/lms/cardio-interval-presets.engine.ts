@@ -17,7 +17,8 @@
 import type { CardioEquipment, CardioStructuredBlock, CardioType } from './cardio.engine';
 
 export interface CardioIntervalPreset {
-  id: 'norwegian-4x4' | 'billat-30-30' | 'tabata' | 'rst-10x10' | 'sit-8x20' | 'hiit-opt-140';
+  id: 'norwegian-4x4' | 'billat-30-30' | 'tabata' | 'rst-10x10' | 'sit-8x20' | 'hiit-opt-140'
+    | 'hills-8x60' | 'sweet-spot-3x12' | 'row-4x1500';
   title: string;
   protocol: string;
   frequency: string;
@@ -125,6 +126,48 @@ export const CARDIO_INTERVAL_PRESETS: CardioIntervalPreset[] = [
     },
     warmup: 'Разминка 10 мин легко + 3-4 ускорения.',
     equipment: ['running'],
+  },
+  {
+    id: 'hills-8x60',
+    title: 'Горки 8×60 с (сила-выносливость)',
+    protocol: '8× (60 с в горку 4-8% сильно / трусца вниз до восстановления) — 1×/нед 4-6 нед',
+    frequency: '1×/нед в блоке горок, не в день тяжёлых ног',
+    calibration: 'В горку — сильно, но подконтрольно (шаг короткий и частый); вниз — трусца, пульс успевает упасть',
+    sessionType: 'miss',
+    build: () => ({
+      workSec: 60, restSec: 120, reps: 8, target: 'rpe',
+      note: 'Горки: 60 с в подъём 4-8% / трусца вниз ×8',
+    }),
+    warmup: 'Разминка 15 мин легко + 2-3 ускорения по плоскому.',
+    equipment: ['running'],
+  },
+  {
+    id: 'sweet-spot-3x12',
+    title: 'Sweet Spot 3×12 мин (вело)',
+    protocol: '3× (12 мин @88-94% FTP / 4 мин легко) — 2×/нед, база/билд',
+    frequency: '2×/нед в блоке FTP, не в день тяжёлых ног',
+    calibration: 'Мощность: 88-94% FTP (нужен измеритель мощности или велостанок с ваттами); каденс 85-95',
+    sessionType: 'miss',
+    build: () => ({
+      workSec: 720, restSec: 240, reps: 3, target: 'power',
+      note: 'Sweet Spot: 12 мин @88-94% FTP / 4 мин легко ×3',
+    }),
+    warmup: 'Разминка 15 мин + заминка 5 мин.',
+    equipment: ['cycling'],
+  },
+  {
+    id: 'row-4x1500',
+    title: 'Гребля 4×1500 м (сплит цели)',
+    protocol: '4× (1500 м / 3 мин лёгкой гребли) — сплит 5К +2-3 с/500 м',
+    frequency: '1×/нед в блоке 5К, не в день тяжёлых ног',
+    calibration: 'Сплит: цель 5К +2-3 с на 500 м; rate 24-26, техника ровная',
+    sessionType: 'hiit',
+    build: () => ({
+      workSec: 360, restSec: 180, reps: 4, target: 'pace',
+      note: 'Гребля: 1500 м на сплите цели / 3 мин легко ×4',
+    }),
+    warmup: 'Разминка 8-10 мин лёгкой гребли + 2×20 мощных гребков.',
+    equipment: ['rowing'],
   },
 ];
 

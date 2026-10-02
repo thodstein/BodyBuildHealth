@@ -24,8 +24,8 @@ describe('CycleCatalog — кардио', () => {
     cleanup();
   });
 
-  it('библиотека содержит 35 циклов', () => {
-    expect(CARDIO_CYCLES.length).toBe(35);
+  it('библиотека содержит 46 циклов (было 35, +11 волны PRO-2)', () => {
+    expect(CARDIO_CYCLES.length).toBe(46);
   });
 
   it('«Все» показывает заголовок кардио со счётчиком', () => {

@@ -485,12 +485,13 @@ export const CardioConstructor: React.FC = () => {
     const block = preset.build(opts ?? {});
     const equip = (equipment.find(e => preset.equipment.includes(e)) ?? preset.equipment[0] ?? 'running') as CardioEquipment;
     const totalMin = Math.max(12, Math.round((block.workSec * block.reps + block.restSec * block.reps) / 60) + 12);
+    const sessType = preset.sessionType;
     const session: CardioSession = {
-      type: 'hiit',
+      type: sessType,
       durationMin: totalMin,
       weeklyFrequency: 1,
-      intensity: 'high',
-      kcalPerSession: kcalForCardio('hiit', totalMin, bodyWeight, equip, sex),
+      intensity: sessType === 'hiit' ? 'high' : 'moderate',
+      kcalPerSession: kcalForCardio(sessType, totalMin, bodyWeight, equip, sex),
       purpose: `${preset.title}: ${preset.protocol}. Разминка 10-12 мин.`,
       equipment: equip,
       structured: [block],

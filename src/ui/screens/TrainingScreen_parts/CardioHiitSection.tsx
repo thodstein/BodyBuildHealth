@@ -31,7 +31,7 @@ export const CardioHiitSection: React.FC<{
   return (
     <div style={CARD} data-cardio="hiit-section" data-blocked={blocked ? 'true' : 'false'}>
       <div style={LABEL}>⚡ HIIT-протоколы</div>
-      <div style={HINT_SM}>4×4 — VO2max-выбор (Hov +6.5%); 140/165 — opt-2025 (WRR 0.85); 30-30 — по 6-мин тесту; RST/SIT — спринты; Tabata — только вело/гребля. Не в день ног, не same-session с силой.</div>
+      <div style={HINT_SM}>4×4 — VO2max-выбор (Hov +6.5%); 140/165 — opt-2025 (WRR 0.85); 30-30 — по 6-мин тесту; RST/SIT — спринты; Tabata — только вело/гребля; горки — сила-выносливость; Sweet Spot — вело по FTP; 4×1500 м — гребля. Не в день ног, не same-session с силой.</div>
       {blocked ? (
         <div
           role="status"

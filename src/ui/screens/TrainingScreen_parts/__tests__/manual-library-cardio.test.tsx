@@ -34,10 +34,10 @@ beforeEach(() => {
 });
 
 describe('Ручная библиотека: кардио', () => {
-  it('таб Кардио с живым счётчиком (35)', () => {
+  it('таб Кардио с живым счётчиком (46, волна PRO-2: было 35)', () => {
     renderGallery();
     expect(screen.getByRole('tab', { name: new RegExp(`Кардио \\(${CARDIO_CYCLES.length}\\)`) })).toBeInTheDocument();
-    expect(CARDIO_CYCLES.length).toBe(35);
+    expect(CARDIO_CYCLES.length).toBe(46);
   });
 
   it('таб Кардио: карточка + мост (pending + трек + событие + баннер)', () => {

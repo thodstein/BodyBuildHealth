@@ -156,8 +156,8 @@ describe('P4 red-flags', () => {
 
 // ─── P3: интервалы ───
 describe('P3 intervals 3→6', () => {
-  it('6 пресетов с дозами', () => {
-    expect(CARDIO_INTERVAL_PRESETS.length).toBe(6);
+  it('9 пресетов с дозами (было 6 → +горки/SS/гребля волны PRO-2)', () => {
+    expect(CARDIO_INTERVAL_PRESETS.length).toBe(9);
     expect(CARDIO_INTERVAL_PRESETS.map(p => p.id)).toEqual(
       expect.arrayContaining(['rst-10x10', 'sit-8x20', 'hiit-opt-140']),
     );
