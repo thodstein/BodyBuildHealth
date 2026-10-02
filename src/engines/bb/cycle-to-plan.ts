@@ -285,15 +285,81 @@ function expandPlanToTargets(
         // трицепс от жимов) не должен блокировать добор спины.
         let contribMuscles: string[] = [muscle];
         try { const cs = exerciseVolumeContributions(cand as any) as any[]; if (cs.length) contribMuscles = cs.map((c: any) => c.muscle); } catch { /* fallback */ }
+        // Стартовый effective затрагиваемых мышц — guard ловит только НОВОЕ
+        // пересечение капа. Если мышца уже была выше капа (перелив финализатора
+        // при expandAllMuscles, напр. трицепс 34.1 при капе 34), это НЕ причина
+        // блокировать добор спины: финальный кап-трим недели всё равно приведёт
+        // её к капу. Раньше пред-перелив навсегда останавливал расширение (W3+
+        // спины: STOP=over-cap triceps → спина 0 сетов).
+        const beforeEff: Record<string, number> = {};
+        for (const mm of contribMuscles) beforeEff[mm] = weekEff[mm] || 0;
         cand.workSets.push({ ...sample });
         cand.sets = (cand.sets || 0) + 1;
         recompute();
-        const overM = contribMuscles.find(mm => { const c = caps[mm]; return !!c && (weekEff[mm] || 0) > c; });
+        const overM = contribMuscles.find(mm => {
+          const c = caps[mm];
+          if (!c) return false;
+          return (weekEff[mm] || 0) > c && beforeEff[mm] <= c;
+        });
         if (overM) {
           cand.sets -= 1;
           cand.workSets.pop();
           recompute();
           break;
+        }
+      }
+    }
+    // PRO+ФАРМА (требование владельца): тяговая сессия добивает СПИНУ до
+    // per-session канона (60/нед ÷ 2 стимула = 30) за счёт прочих мышц дня.
+    // Бюджет сессии НЕ поднимаем (maxWorkingSets — канон владельца): если
+    // свободного бюджета нет — сеты переносятся от не-спинных доноров дня
+    // (сеты > 2), суммарный объём сессии неизменен; недельные MRV-капы —
+    // только потолки, перенос их не нарушает. Гейт: enhanced на курсе.
+    if (onCourse && String(opts.level || '') === 'enhanced' && targets?.back) {
+      const backWeekly = Number(targets.back.targetSets) || 0;
+      const backSessions = week.sessions.filter(s => s.exercises.some(e => !(e as any).warmupActivator && e.muscle === 'back'));
+      if (backWeekly > 0 && backSessions.length > 0) {
+        const perSessCanon = perSessionMuscleCap({ muscle: 'back', level: opts.level, trainingYears: yrs, onCourse });
+        const perSessGoal = Math.max(2, Math.min(perSessCanon, Math.ceil(backWeekly / backSessions.length)));
+        const exCap = perExerciseCap(opts.level, 'back', yrs, onCourse);
+        const backExsOf = (s: any) => s.exercises.filter((e: any) => !(e as any).warmupActivator && e.muscle === 'back' && !/FST-7/.test(String((e as any).comment || '')));
+        const setsOf = (arr: any[]) => arr.reduce((a: number, e: any) => a + (e.sets || 0), 0);
+        const pickSmallestBack = (s: any) => backExsOf(s)
+          .filter((e: any) => (e.sets || 0) < exCap)
+          .sort((a: any, b: any) => (a.sets || 0) - (b.sets || 0) || String(a.name).localeCompare(String(b.name)))[0];
+        const addSet = (e: any) => {
+          const sample = e.workSets?.[e.workSets.length - 1] || { reps: 10, rir: 2, weight: 0 };
+          e.workSets.push({ ...sample });
+          e.sets = (e.sets || 0) + 1;
+        };
+        for (const s of backSessions) {
+          let backSets = setsOf(backExsOf(s));
+          if (backSets >= perSessGoal) continue;
+          // (1) свободный бюджет сессии — как раньше, но цель per-session.
+          let sesSets = setsOf(s.exercises.filter((e: any) => !(e as any).warmupActivator));
+          while (backSets < perSessGoal) {
+            const cand = pickSmallestBack(s);
+            if (!cand) break;
+            if (opts.maxWorkingSets && sesSets >= opts.maxWorkingSets) break;
+            addSet(cand);
+            backSets++; sesSets++;
+          }
+          // (2) сессия на бюджете — перенос 1:1 от не-спинных доноров дня.
+          if (backSets < perSessGoal) {
+            const pickDonor = () => s.exercises
+              .filter((e: any) => !(e as any).warmupActivator && e.muscle !== 'back' && !/FST-7/.test(String((e as any).comment || '')) && (e.sets || 0) > 2)
+              .sort((a: any, b: any) => (b.sets || 0) - (a.sets || 0) || String(a.name).localeCompare(String(b.name)))[0];
+            let guard = 0;
+            while (backSets < perSessGoal && guard++ < 120) {
+              const cand = pickSmallestBack(s);
+              const donor = pickDonor();
+              if (!cand || !donor) break;
+              donor.sets -= 1;
+              if (Array.isArray(donor.workSets) && donor.workSets.length > donor.sets) donor.workSets = donor.workSets.slice(0, donor.sets);
+              addSet(cand);
+              backSets++;
+            }
+          }
         }
       }
     }
@@ -341,6 +407,22 @@ function expandPlanToTargets(
   for (const w of plan.weeks) for (const s of w.sessions) for (const e of s.exercises) if (!(e as any).warmupActivator) trained.add(e.muscle);
   const vt: any = (plan as any).volumeTargets;
   if (vt) for (const m of Object.keys(vt)) if (!trained.has(m)) delete vt[m];
+}
+
+/** Канон владельца для спины: недельный кап не ниже weeklyCapFor (60/нед на
+ *  курсе; 30/сессию при 2 стимулах) — тот же источник, что у цель-билдера
+ *  (buildCycleVolumeTargets) и perSessionMuscleCap. Дозо-зависимая формула
+ *  mrvByMuscle для полного стека даёт 49–57 — НИЖЕ канона, и target(60) > cap
+ *  ломал добор: финальный трим резал спину обратно. Поднимаем ТОЛЬКО спину
+ *  (её якорь 60 не достигается формулой; якоря ног формула уже перекрывает).
+ *  Естественный путь (без курса) не тронут. */
+function raiseBackCapToOwnerCanon(
+  caps: Record<string, number>,
+  opts: { level?: string; trainingYears?: number; onCourse?: boolean; courseIntensity?: string },
+): void {
+  if (!opts.onCourse) return;
+  const canon = weeklyCapFor({ muscle: 'back', level: opts.level, trainingYears: opts.trainingYears, onCourse: true, courseIntensity: opts.courseIntensity });
+  if (canon > (caps.back || 0)) caps.back = canon;
 }
 
 export function cycleTemplateToFullProgram(cycle: SRCycleTemplate): FullProgram {
@@ -650,7 +732,7 @@ function muscleGroupFromExName(exName: string, catalog: typeof EXERCISE_CATALOG)
   // Для профессионального порядка (quads compound первым, затем hamstrings, затем calves)
   // нужно различать: присед/жим ногами/выпад = quads, RDL/мёртвая = hamstrings, мост = glutes.
   if (/присед|squat|жим.*ног|leg.?press|выпад|lunge|болгар|разгибан.*ног|leg.?ext/i.test(_l) && !/румын|rdl|мёртв|stiff/i.test(_l)) return 'quads';
-  if (/румын|rdl|мёртв|merтв|stiff|сгибан.*ног|leg.?curl|на прямых ногах|тяга.*прям/i.test(_l)) return 'hamstrings';
+  if (/румын|rdl|мёртв|merтв|stiff|сгибан.*ног|leg.?curl|на прямых ногах|прям(?:ыми|ых|ые|ой) ног/i.test(_l)) return 'hamstrings';
   if (/ягодичн|hip.?thrust|glute|мост/i.test(_l)) return 'glutes';
   if (/икры|подъём.*носк|подъем.*носк|calf/i.test(_l)) return 'calves';
   const found = catalog.find(e => e.name === exName)
@@ -1681,6 +1763,7 @@ export function convertCycleToBBPlan(input: CycleToPlanInput): BBPlan {
       if (expandCaps.glutes) expandCaps.glutes = Math.round(expandCaps.glutes * 1.2);
       if (expandCaps.hamstrings) expandCaps.hamstrings = Math.round(expandCaps.hamstrings * 1.2);
     }
+    raiseBackCapToOwnerCanon(expandCaps, { level, trainingYears: input.trainingYears, onCourse, courseIntensity: input.courseIntensity });
     expandPlanToTargets(finalized, cycleVolumeTargets, {
       level, trainingYears: input.trainingYears, onCourse, caps: expandCaps,
       maxWorkingSets: centralizedSessionLimits({ level, trainingYears: input.trainingYears, peds, courseIntensity }).maxWorkingSets,
@@ -1755,6 +1838,7 @@ export function convertCycleToBBPlan(input: CycleToPlanInput): BBPlan {
       if (input.sex === 'female' && (m === 'glutes' || m === 'hamstrings')) capMrv = Math.round(capMrv * 1.2);
       mrvByMuscle[m] = capMrv;
     }
+    raiseBackCapToOwnerCanon(mrvByMuscle, { level, trainingYears: input.trainingYears, onCourse, courseIntensity: input.courseIntensity });
     const specTargets = new Set([...weakPoints, ...(specSchedule.blocks.flatMap(b => b.targets))]);
     for (const t of specTargets) {
       const lm = (allLandmarks as any)[t];
@@ -2873,6 +2957,7 @@ export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts)
       if (opts.sex === 'female' && (m === 'glutes' || m === 'hamstrings')) capMrv = Math.round(capMrv * 1.2);
       mrvByMuscle[m] = capMrv;
     }
+    raiseBackCapToOwnerCanon(mrvByMuscle, { level: String(opts.level ?? levelForLandmarks), trainingYears: opts.trainingYears, onCourse: onCourseProgram, courseIntensity: opts.courseIntensity });
     const specTargetsProgram = new Set([...weakPoints, ...specSchedule.blocks.flatMap(b => b.targets)]);
     for (const t of specTargetsProgram) {
       const lmSpec = (allLandmarks as any)[t];
@@ -3012,6 +3097,7 @@ export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts)
       if (expandCapsProgram.glutes) expandCapsProgram.glutes = Math.round(expandCapsProgram.glutes * 1.2);
       if (expandCapsProgram.hamstrings) expandCapsProgram.hamstrings = Math.round(expandCapsProgram.hamstrings * 1.2);
     }
+    raiseBackCapToOwnerCanon(expandCapsProgram, { level: String(opts.level ?? levelForLandmarks), trainingYears: opts.trainingYears, onCourse: programOnCourse, courseIntensity: opts.courseIntensity });
     expandPlanToTargets(finalized, programVolumeTargets, {
       level: levelForLandmarks, trainingYears: opts.trainingYears, onCourse: programOnCourse,
       caps: expandCapsProgram, maxWorkingSets: programSessionLimits.maxWorkingSets,
