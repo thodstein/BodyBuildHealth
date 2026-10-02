@@ -267,7 +267,10 @@ function expandPlanToTargets(
       if ((weekEff[muscle] || 0) >= t) continue;
       const exs = week.sessions.flatMap(s => s.exercises.filter(e => !(e as any).warmupActivator && e.muscle === muscle && !/FST-7/.test(String((e as any).comment || ''))));
       if (!exs.length) continue;
-      const cap = perExerciseCap(opts.level, muscle, yrs, onCourse);
+      // Кап расширения: не ниже per-session-цели мышцы (чтобы дотянуть до неё),
+      // и не ниже обычного per-exercise капа. Иначе 10 сетов/упр душили спину.
+      const perSessGoal = Math.max(2, Math.ceil(t / Math.max(1, Number(target?.frequency) || 1)));
+      const cap = Math.max(perExerciseCap(opts.level, muscle, yrs, onCourse), perSessGoal);
       let guard = 0;
       while ((weekEff[muscle] || 0) < t && guard++ < 300) {
         const cand = exs.filter(e => (e.sets || 0) < cap).sort((a, b) => (a.sets || 0) - (b.sets || 0))[0];
