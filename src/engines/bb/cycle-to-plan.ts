@@ -277,11 +277,16 @@ function expandPlanToTargets(
         const sesSets = s.exercises.filter((x: any) => !(x as any).warmupActivator).reduce((a, x) => a + (x.sets || 0), 0);
         if (opts.maxWorkingSets && sesSets >= opts.maxWorkingSets) break;
         const sample = cand.workSets?.[cand.workSets.length - 1] || { reps: 10, rir: 2, weight: 0 };
+        // Мышцы, которых касается ДОБАВЛЯЕМОЕ упражнение (direct + indirect):
+        // guard проверяет ТОЛЬКО их — пред-перелив несвязанной мышцы (напр.
+        // трицепс от жимов) не должен блокировать добор спины.
+        let contribMuscles: string[] = [muscle];
+        try { const cs = exerciseVolumeContributions(cand as any) as any[]; if (cs.length) contribMuscles = cs.map((c: any) => c.muscle); } catch { /* fallback */ }
         cand.workSets.push({ ...sample });
         cand.sets = (cand.sets || 0) + 1;
         recompute();
-        const over = Object.entries(weekEff).find(([m, e]) => { const c = caps[m]; return !!c && e > c; });
-        if (over) {
+        const overM = contribMuscles.find(mm => { const c = caps[mm]; return !!c && (weekEff[mm] || 0) > c; });
+        if (overM) {
           cand.sets -= 1;
           cand.workSets.pop();
           recompute();
