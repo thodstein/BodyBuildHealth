@@ -37,7 +37,10 @@ describe('АПК-оффлайн распознавание анализов (ф�
     expect(codes).toEqual(expect.arrayContaining(['ALT', 'GLU', 'CREATININE']));
     // APK WebView must load the bundled same-origin worker directly, not via
     // Tesseract's default Blob worker (blocked on some Capacitor Android builds).
-    expect((createWorker as any).mock.calls[0][2]).toMatchObject({ workerBlobURL: false });
+    expect((createWorker as any).mock.calls[0][2]).toMatchObject({
+      workerBlobURL: false,
+      corePath: expect.stringMatching(/\/tesseract\/core\/tesseract-core-lstm\.wasm\.js$/),
+    });
   });
 
   it('предупреждения честно говорят про оффлайн-режим, а не молчат', async () => {

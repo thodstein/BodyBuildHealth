@@ -528,15 +528,24 @@ export async function recognizeImageTextOffline(
   const progressWindow = { base: 0, span: 1 };
   let worker: any;
   try {
+    const nativeApp = isNativeApp();
+    // Older Android System WebViews can advertise SIMD support but fail while
+    // compiling Tesseract's SIMD/relaxed-SIMD core. The generic corePath makes
+    // Tesseract choose that variant at runtime. APK assets include the plain
+    // LSTM core too; selecting it explicitly avoids that false-positive probe
+    // and keeps offline recognition independent from CDN fallback.
+    const corePath = nativeApp
+      ? `${opts.corePath.replace(/\/$/, '')}/tesseract-core-lstm.wasm.js`
+      : opts.corePath;
     worker = await Tesseract.createWorker('rus+eng', 1, {
       workerPath: opts.workerPath,
-      corePath: opts.corePath,
+      corePath,
       langPath: opts.langPath,
       // Capacitor Android WebView can reject Tesseract's default Blob-backed
       // worker even when the bundled worker asset is available. In APK use
       // the same-origin worker directly; web/TG still need the Blob wrapper
       // because their worker script may be served from a different origin.
-      workerBlobURL: !isNativeApp(),
+      workerBlobURL: !nativeApp,
       logger: (m: any) => {
         if (m?.status === 'recognizing text' && typeof m?.progress === 'number') {
           report(progressWindow.base + progressWindow.span * m.progress);
