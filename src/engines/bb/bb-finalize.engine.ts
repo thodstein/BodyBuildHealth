@@ -3606,6 +3606,71 @@ function ensureMuscleSessionCapacity(week: any, plan: BBPlan, options: BBFinaliz
 }
 
 /**
+ * PRO+ФАРМА: тяговая сессия добивает СПИНУ до per-session канона (60/нед ÷
+ * 2 стимула = 30) — паритет generic↔cycle. Бюджет сессии НЕ поднимаем: если
+ * свободного бюджета нет, сеты переносятся 1:1 от не-спинных доноров дня
+ * (сеты > 2), суммарный объём сессии неизменен. Гейт: enhanced на курсе.
+ * Раньше это жило только в цикловом `expandPlanToTargets` — generic PPL давал
+ * спину 22/сессию при капе 30 (владелец: «30/сессию, 60/нед»).
+ */
+export function prioritizeBackSessions(plan: BBPlan, opts: {
+  level?: string; trainingYears?: number; onCourse?: boolean; maxWorkingSets?: number;
+}): void {
+  if (!opts.onCourse || String(opts.level || '') !== 'enhanced') return;
+  const yrs = Number.isFinite(opts.trainingYears) ? (opts.trainingYears as number) : 0;
+  const backWeekly = Number((plan as any).volumeTargets?.back?.targetSets) || Number((plan as any).mrvByMuscle?.back) || 0;
+  if (backWeekly <= 0) return;
+  for (const week of plan.weeks) {
+    const w: any = week;
+    if (w.phase === 'deload' || w.deload === true || w.taperApplied === true || w.taper === true || w.prepProtocol || w.contestPhase || w.peakWeek) continue;
+    // Только ВЫДЕЛЕННЫЕ тяговые дни (PPL Pull / bro Back): в Upper/Lower спина
+    // co-main с грудью — форс 30/сессию вытеснял грудь (bb-split-balance
+    // «грудь не голодает»). Владелец: «спины ППЛ 30/сессию».
+    const backSessions = week.sessions.filter(s => /Pull|Back/i.test(String((s as any).sessionTag || '')) && s.exercises.some(e => !(e as any).warmupActivator && e.muscle === 'back'));
+    if (!backSessions.length) continue;
+    const perSessCanon = perSessionMuscleCap({ muscle: 'back', level: opts.level, trainingYears: yrs, onCourse: opts.onCourse });
+    const perSessGoal = Math.max(2, Math.min(perSessCanon, Math.ceil(backWeekly / backSessions.length)));
+    const exCap = perExerciseCap(opts.level, 'back', yrs, opts.onCourse);
+    const backExsOf = (s: any) => s.exercises.filter((e: any) => !(e as any).warmupActivator && e.muscle === 'back' && !/FST-7/.test(String((e as any).comment || '')));
+    const setsOf = (arr: any[]) => arr.reduce((a: number, e: any) => a + (e.sets || 0), 0);
+    const pickSmallestBack = (s: any) => backExsOf(s)
+      .filter((e: any) => (e.sets || 0) < exCap)
+      .sort((a: any, b: any) => (a.sets || 0) - (b.sets || 0) || String(a.name).localeCompare(String(b.name)))[0];
+    const addSet = (e: any) => {
+      const sample = e.workSets?.[e.workSets.length - 1] || { reps: 10, rir: 2, weight: 0 };
+      if (Array.isArray(e.workSets)) e.workSets.push({ ...sample });
+      e.sets = (e.sets || 0) + 1;
+    };
+    for (const s of backSessions) {
+      let backSets = setsOf(backExsOf(s));
+      if (backSets >= perSessGoal) continue;
+      let sesSets = setsOf(s.exercises.filter((e: any) => !(e as any).warmupActivator));
+      while (backSets < perSessGoal) {
+        const cand = pickSmallestBack(s);
+        if (!cand) break;
+        if (opts.maxWorkingSets && sesSets >= opts.maxWorkingSets) break;
+        addSet(cand); backSets++; sesSets++;
+      }
+      if (backSets < perSessGoal) {
+        const pickDonor = () => s.exercises
+          .filter((e: any) => !(e as any).warmupActivator && e.muscle !== 'back' && !/FST-7/.test(String((e as any).comment || '')) && (e.sets || 0) > 2)
+          .sort((a: any, b: any) => (b.sets || 0) - (a.sets || 0) || String(a.name).localeCompare(String(b.name)))[0];
+        let guard = 0;
+        while (backSets < perSessGoal && guard++ < 120) {
+          const cand = pickSmallestBack(s);
+          const donor = pickDonor();
+          if (!cand || !donor) break;
+          donor.sets -= 1;
+          if (Array.isArray(donor.workSets) && donor.workSets.length > donor.sets) donor.workSets = donor.workSets.slice(0, donor.sets);
+          addSet(cand);
+          backSets++;
+        }
+      }
+    }
+  }
+}
+
+/**
  * Общий последний проход для generic, проф-циклов и библиотечных программ.
  * Не меняет объём и не добавляет упражнения: только приводит форму результата
  * к единому BBPlan-контракту и восстанавливает тренерский порядок там, где
