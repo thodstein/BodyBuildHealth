@@ -77,6 +77,23 @@ describe('BB-auto: DC Rest-Pause — фаз-гейт (аудит 2026-10)', () =
       expect(isDc(e), `натурал W${w.week}: ${e.name}`).toBe(false);
     }
   });
+
+  it('выборка сплитов: DC только в intensification (нет утечки в accumulation/делод/тапер)', () => {
+    const sample = ['ppl_6', 'fullbody_3', 'bro_5', 'upper_lower_4', 'arnold_6', 'phul_4'];
+    for (const patternId of sample) {
+      const plan: any = buildBBPlan({
+        patternId, weeks: 8, level: 'enhanced', trainingYears: 9, goal: 'mass',
+        workMax: WM, sex: 'male',
+        peds: ['AAS', 'GH', 'insulin'], pedDoses: { AAS: 500, GH: 4, insulin: 10 }, courseIntensity: 'moderate',
+      } as never);
+      for (const w of plan.weeks) {
+        const hasDc = w.sessions.some((s: any) => s.exercises.some((e: any) => isDc(e)));
+        if (hasDc) {
+          expect(w.phase, `${patternId} W${w.week}: DC вне intensification (phase=${w.phase})`).toBe('intensification');
+        }
+      }
+    }
+  });
 });
 
 describe('BB-auto: taper коротких планов (аудит 2026-10)', () => {

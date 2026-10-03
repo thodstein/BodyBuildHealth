@@ -1,5 +1,47 @@
 # AGENTS.md - BioStackAIScreen + BB-builder
 
+## Планировщик единоборств PRO-3: аудит + выполнение В1–В4 и части В5/В6 (Oct 3 2026, без коммита)
+
+По команде «проведи полный анализ планировщика единоборств → выдай баги и возможности уровня про → выполняй полностью».
+Свежий аудит (41 движок + 21 UI-файл, baseline 697+151 зелёных, все критичные находки перепроверены чтением кода),
+план — NEW `docs/COMBAT-PLANNER-PRO-3-PLAN.md` (14 P0 / 33 P1 / ~30 P2 + 6 эпиков PRO). Затем выполнение:
+`src/engines/combat` + `src/ui/screens/combat` — **900/900** (база 848 + 52 новых лока в 5 файлах
+`combat-pro3-wave1..5`), `tsc --noEmit` **0 по всему проекту**, `verify:apk-design` OK, круг user-program/manual 78/78.
+Только Edit/Write + vitest/tsc; чужие файлы не тронуты; коммита нет.
+
+- **В1 P0-безопасность/данные**: NEW `admitCombatExercise` (единый гейт: teen-бан/травма/исключение/мобильность/
+  оборудование) для ВСЕХ путей — `filterPool`-финал, fallback, авто-core, авто-шея, prehab; `holdSeconds` +
+  `parseHoldSeconds` (детект «30с» по цифре, а не по букве «с» — «8-10/сторону» больше не reps=1); изометрии шеи
+  вес 0 (было 50 кг); camp+taper кондиция не пустеет; `normalizeAnnualBlockWeeks` (52×2=52, 12×4 → кламп циклов);
+  валидация дат года + `isAnnualCBShape` + ICS skip; XLSX: sheetjs отдаёт ArrayBuffer — **экспорт ВСЕГДА писал
+  битый pad-муляж, тест проходил на нём** (закрыто, тест теперь на реальный zip).
+- **В2 P0-интеграции**: экспорт «В программу» реально сохраняется (`ProgramDirection 'combat'` + `CombatProgramBody`
+  + shape/validate + ArmEditor/иконки); храповик мезоцикла убит (`combatMesocycleHash`/`shouldApplyCombatMesocycle`
+  + фильтр дисциплины — повторная сборка не бампает веса); PED-маппинг `PharmaSubstanceEntry[] → {id: doseMg}`
+  (было: объекты в string[] → всегда natural); живой ключ дневника `he_workout_log_v2` + `flattenDiaryLogsCB`
+  (weightKg→weight, holdSec).
+- **В3 P1 (≈30 пунктов)**: спарринг-гейт по неделям (делод снимает sparring, а не блокирует весь план — тест
+  пере-базлайнен «было→стало»); weight_cut 2 нед; «Na 1г/л»; prehab через admit; группы без двойного счёта
+  (шея≠ротация, battle_rope≠хват); кап упражнения из `sessionLimitsForCombat` (было до 6 при капе 5/4);
+  set-флор warning; тапер-флаг только в окне боя; rationale ×0.85 только при weight_cut; NaN-гарды бюджета;
+  id плана + `workMaxByExercise`/`weightClassRuleset`; уникальные legacy-id; открытая категория Infinity;
+  спарринг-журнал: фактические длительности (rounds×roundMinutes) + поле «мин/раунд» + кнопка «⟡ Из журнала»
+  (avgDurationMin масштабирует нагрузку); жиры (female 40/male 30) и ORS (50-90) едины; RTP-гейт (error на hard spar,
+  RIR≥3, `rtpIncomplete`); `cutWeightAdvice` (одна переменная, тапер/файт-вик без коррекций); UTC→`localIsoDate`;
+  метрики вне зала в спарринг-режиме; мастер-тумблер управляет спаррингом; ACWR на AU (sRPE×мин, было RPE-баллы);
+  courseIntensity-селект + favorites/excluded из профиля; шея 4 плоскости на сборке; teen-сауна; VBT `@deprecated`.
+- **В4 PRO-ядро**: недельная double progression (+2%/2 нед, кап +6%, делод/тапер/весогонка нейтральны, малые
+  снаряды шаг 0.5); делод собственные повторы; **conjugate реально работает** (`conjugateMethodForSession` был мёртв:
+  ME/DE/RE по сессиям + темп + rationale); дневниковая авторегуляция (просадка группы e1RM >5% → вес −5%, RIR+1).
+- **В5 частично**: библиотека циклов **13→25** (весогонка бокс/борьба/кик/ММА, кэмпы борьбы/общей, enhanced×2,
+  отель, женская база, teen, поддержание ×2) + лок покрытия; `fightMinutes` → энергопрофиль боя в rationale/интелидже.
+- **В6 частично**: менеджер сохранённых планов (загрузка/удаление); своп пересчитывает вес/темп/отдых; агрегаты
+  недели после правок; вариант restored выходит из просмотра при правке; `cb-camp-intel` deps.
+- **Осталось (границы, §5 плана)**: год собирается планами по блокам; недельная волна кондиции/размещение по дням;
+  RMR/мощность-журналы, HEAT_EVIDENCE, женская модуляция цикла, LEA из sRPE; топ-сет/бэкоффы; удаление ~25 мёртвых
+  экспортов; чистый финализатор (localStorage-HRV); `CB_RU_MODEL` camp_8/linear; P2-гигиена. `validateCombatPlan`
+  сохраняет входные ошибки (семантика задокументирована); `trainingYears` не пробрасывается (нет поля в профиле).
+
 ## ББ-авто: фаз-гейт DC Rest-Pause + taper коротких планов (Oct 3 2026, без пуша)
 
 По промту «ББ-авто — фаз-гейт DC и taper коротких планов». Проба (zz, удалена):
@@ -23,9 +65,10 @@ Edit/Write + vitest/tsc; чужие WIP (combat/meal-plan/ProgramEditor) не т
   (≥1 рабочая неделя до taper), профиль берётся С КОНЦА (`profileShift = 3 − taperLen`) — глубокая
   ×0.50 всегда последняя неделя перед делодом. 8-нед планы — без изменений (окно 3 нед).
 - **Re-baseline (осознанно, «было→стало»)**: `bb-rep-schemes` — `dc_rp` sets 4→1 (workSets 4→1).
-- **NEW тест** `bb-dc-phase-taper` 5/5: accumulation 0 DC-1-сетов; intensification все primary
-  DC+1 сет; натурал без DC; `fullbody_3/4` — taper < рабочих недель, W1 не taper; 8-нед taper = 3 нед
-  с углублением к концу.
+- **NEW тест** `bb-dc-phase-taper` 6/6: accumulation 0 DC-1-сетов; intensification все primary
+  DC+1 сет; натурал без DC; выборка сплитов (ppl/fullbody/bro/upper_lower/arnold/phul) — DC только
+  в intensification; `fullbody_3/4` — taper < рабочих недель, W1 не taper; 8-нед taper = 3 нед
+  с углублением к концу. Матрица всех 25 сплитов проверена пробой (0 утечек) — zz удалена.
 - **Проверено**: `src/engines/bb` **2956/0** (268 файлов, включая zz; без zz — 2956 база + 5 новых),
   тяжёлый аудит `BB_CYCLE_AUDIT_FULL=1` **24/24**, `tsc --noEmit` **0**, `git diff --check` чист.
   zz-проба удалена до коммита.
