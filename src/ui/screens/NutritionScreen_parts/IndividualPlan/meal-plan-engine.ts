@@ -3659,7 +3659,14 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   }
   const seedBase = ((input.dayOffset ?? 0) + randomSalt) * 10007 + (input.isTrainingDay ? 3000 : 7000);
   // P0-4: lock + set pickCtx (sync JS ensures non-reentrancy; cleanup in finally at the end of buildDayPlan).
-  if (_pickCtx._locked) { try { console.warn('[meal-plan-engine] buildDayPlan reentrant call — prefs may leak between plans.'); } catch {} }
+  // Шаг 6 рефактора: реальный abort вместо тихого warn. Раньше повторный вход ПЕРЕЗАПИСЫВАЛ
+  // общий _pickCtx (context outer-вызова затирался, prefs протекали между планами). Теперь
+  // реентрантный вызов падает громко — вызывающий обязан убрать рекурсию, а не молча получить
+  // испорченный план. В нормальном потоке (единственный прод-вызов — IndividualPlanContext)
+  // реентрантности нет, guard не срабатывает.
+  if (_pickCtx._locked) {
+    throw new Error('[meal-plan-engine] buildDayPlan reentrant call — _pickCtx уже захвачен; уберите рекурсию/параллельный вызов (контекст не переиспользуем).');
+  }
   _pickCtx._locked = true;
   _pickCtx.tasteProfile = input.tasteProfile;
   _pickCtx.deprioritizedIds = input.deprioritizedIds;
