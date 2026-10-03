@@ -100,3 +100,21 @@ describe('P1: esterType none не короткий инсулин', () => {
     expect(rapid.carbs).toBeGreaterThan(noIns.carbs);
   });
 });
+
+describe('P2: goal-гейты weight/metabolic adapt', () => {
+  it('weight-adapt не режет калораж набора', () => {
+    const on = computePlannerTargets(base({ goal: 'mass', surplusPct: 0, weightAdaptMode: true, weightLogWeek: [90, 90, 90], expectedLossKgWeek: 0.5 }));
+    const off = computePlannerTargets(base({ goal: 'mass', surplusPct: 0, weightAdaptMode: false, weightLogWeek: [90, 90, 90], expectedLossKgWeek: 0.5 }));
+    expect(on.kcal).toBe(off.kcal);
+  });
+  it('metabolic adapt не применяется на массу', () => {
+    const on = computePlannerTargets(base({ goal: 'mass', surplusPct: 0, metabolicAdaptEnabled: true, metabolicAdaptPct: 10 }));
+    const off = computePlannerTargets(base({ goal: 'mass', surplusPct: 0, metabolicAdaptEnabled: false, metabolicAdaptPct: 0 }));
+    expect(on.kcal).toBe(off.kcal);
+  });
+  it('metabolic adapt применяется на сушке', () => {
+    const on = computePlannerTargets(base({ goal: 'cutting', metabolicAdaptEnabled: true, metabolicAdaptPct: 10 }));
+    const off = computePlannerTargets(base({ goal: 'cutting', metabolicAdaptEnabled: false, metabolicAdaptPct: 0 }));
+    expect(on.kcal).toBeLessThan(off.kcal);
+  });
+});

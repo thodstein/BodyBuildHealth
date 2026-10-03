@@ -720,7 +720,10 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
       if (merged.length > 0) return merged;
     } catch {}
     const e: { date: string; weight: number }[] = [];
-    for (let i = 0; i < 3; i++) { const d = new Date(); d.setDate(d.getDate() - (2 - i)); e.push({ date: localIsoDate(d), weight: 80 }); }
+    // P2-фикс: сид из текущего веса пользователя (раньше всегда 80 кг — 95-кг атлет
+    // видел чужой baseline в «Адаптации веса»).
+    const _seedW = Number.isFinite(weight) && weight > 0 ? weight : 80;
+    for (let i = 0; i < 3; i++) { const d = new Date(); d.setDate(d.getDate() - (2 - i)); e.push({ date: localIsoDate(d), weight: _seedW }); }
     return e;
   });
   const [weightLogPeriod, setWeightLogPeriod] = useState<string>(typeof _pf.weightLogPeriod === 'string' ? _pf.weightLogPeriod : 'every3');
@@ -882,7 +885,8 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
       const _localWorkoutsPerWeek = (() => {
         if (linkToTraining) return weeklyTrainingCount(buildTrainSchedule(linkToTraining, trainStart, trainEnd, trainingDays, trainScheduleType, trainPattern));
         const profileDays = Number((s as any)?.training?.daysPerWeek);
-        return Number.isFinite(profileDays) && profileDays > 0 ? Math.round(profileDays) : 3;
+        // P2-фикс: 0 тренировок больше не превращается в 3 (завышал PAL/TDEE). NaN → 3.
+        return Number.isFinite(profileDays) && profileDays >= 0 ? Math.round(profileDays) : 3;
       })();
       const _localAvgMinutes = (() => {
         try {
@@ -944,7 +948,8 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
         weightKg: s?.personal?.weight || weight, heightCm: s?.personal?.height || height,
         age: s?.personal?.age || age, sex: s?.personal?.sex || sex,
         goal: 'maintenance', phase: 'maintenance', bodyFatPct,
-        workoutsPerWeek: s?.training?.daysPerWeek || 3, avgWorkoutMinutes: s?.training?.minutesPerSession || 60,
+        workoutsPerWeek: (() => { const d = Number(s?.training?.daysPerWeek); return Number.isFinite(d) && d >= 0 ? d : 3; })(),
+        avgWorkoutMinutes: s?.training?.minutesPerSession || 60,
         dailySteps, householdActivity, trainType, trainIntensity, surplusPct: 10,
         injections: [],
         weightAdaptMode: false, weightLogWeek: [], expectedLossKgWeek: 0,
@@ -3293,7 +3298,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
         const lbmKg = weight * (1 - bfPct / 100);
          const trainStartMin = linkToTraining && trainStart?.includes(':') ? toMin(trainStart) : undefined;
         const excludedIds = new Set<string>(excludedFoods || []);
-        (healthIssues || []).forEach(hid => { const issue = HEALTH_ISSUES.find(h => h.id === hid); if (issue?.foodIds) issue.foodIds.forEach(fid => excludedIds.add(fid)); });
+        (healthIssues || []).forEach(hid => { const issue = HEALTH_ISSUES.find(h => h.id === hid); if (issue?.foodIds) issue.foodIds.forEach(fid => { if (FOOD_DB.some(f => f.id === fid)) excludedIds.add(fid); }); });
         getAutoExcludedFoodIds(FOOD_DB, healthIssues || []).forEach(fid => excludedIds.add(fid));
         // FIX allergens-restrictions: аллергены и dietPrefs-ограничения теперь исключаются
         // единым резолвером в ОБОИХ путях генерации (раньше pro-движок их игнорировал).
@@ -3552,7 +3557,13 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
            mealsCount: _effMealsCount, isTrainingDay: linkToTraining && plannerModeRef.current === 'pro' ? isTrainDay(offset) : false,
           trainStartMin: linkToTraining && isTrainDay(offset) && plannerModeRef.current === 'pro' ? toMin(trainStart) : undefined,
           allowIntraWorkout: linkToTraining && intraWorkoutEnabled && trainIntensity !== 'low' && plannerModeRef.current === 'pro',
-          trainDurationMin: linkToTraining ? (s?.training?.minutesPerSession || 60) : undefined,
+          trainDurationMin: linkToTraining ? (() => {
+            // P1-фикс: длительность сессии из окна «Начало/Конец» тренировки (раньше окно
+            // не влияло на генерацию — брался только minutesPerSession из профиля).
+            const _dur = toMin(trainEnd) - toMin(trainStart);
+            if (Number.isFinite(_dur) && _dur >= 20 && _dur <= 300) return Math.round(_dur);
+            return (s?.training?.minutesPerSession || 60);
+          })() : undefined,
           trainIntensity: (trainIntensity as any) || 'medium',
           carbAutoCycle: (carbPeriodization === 'carb_cycle' || carbPeriodization === 'butch' || (carbPeriodization as any) === 'auto'),
           excludedIds: (() => { const s: Set<string> = new Set<string>(excludedIds); if (_mp) _mp.avoidIds.forEach((id: string) => s.add(id)); return s; })(),
@@ -3837,7 +3848,10 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
           })(),
           nutritionLogic: [],
           dietDiversity: { uniqueFoods: v2.diversity.uniqueFoods, totalPortions: 0, categories: v2.diversity.categories, score: Math.min(10, v2.diversity.uniqueFoods), note: `${v2.diversity.uniqueFoods} уникальных продуктов` },
-          timingScores: [], intraWorkout: null, mpsSummary: v2.mpsSummary, proNotes: v2.notes,
+          timingScores: [], intraWorkout: null, mpsSummary: v2.mpsSummary,
+          // P1-фикс: заметки пользователя («Заметки по питанию») больше не write-only —
+          // доезжают до плана и печати/экспорта.
+          proNotes: [...(v2.notes || []), ...((customNotes || '').trim() ? [`📝 Заметка: ${customNotes.trim()}`] : [])],
           microSummary: v2.microSummary,
           diaryCompensation: _diaryActive ? diaryComp : undefined,
           isRefeedDay,

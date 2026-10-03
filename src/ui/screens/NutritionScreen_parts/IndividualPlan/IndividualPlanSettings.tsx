@@ -1530,7 +1530,7 @@ export const IndividualPlanSettings: React.FC = () => {
         <div style={{ fontSize: 9, color: '#fff', marginBottom: 8, lineHeight: 1.5, padding: '5px 7px', borderRadius: 6, background: 'rgba(255,255,255,0.03)', borderLeft: '2px solid #f59e0b' }}>
           {PROTEIN_G_PER_KG_RANGE_NOTE}
         </div>
-        <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.8)', marginBottom: 4 }}>Сейчас: {effectiveP} г белка · {(weight>0?(effectiveP/weight).toFixed(2):'–')} г/кг · {PROTEIN_PRESETS.find(p=>p.id===proteinPreset)?.gPerKg || 2} г/кг пресет</div>
+        <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.8)', marginBottom: 4 }}>Сейчас: {effectiveP} г белка · {(weight>0?(effectiveP/weight).toFixed(2):'–')} г/кг · {PROTEIN_PRESETS.find(p=>p.id===proteinPreset)?.gPerKg || 1.6} г/кг пресет</div>
         <div style={{ display: 'grid', gridTemplateColumns: `repeat(${PROTEIN_PRESETS.length}, 1fr)`, gap: 5 }}>
           {PROTEIN_PRESETS.map(p => (
             <button key={p.id} onClick={() => setProteinPreset(p.id)} style={{

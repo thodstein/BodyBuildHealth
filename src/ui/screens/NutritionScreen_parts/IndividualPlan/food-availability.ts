@@ -369,7 +369,6 @@ export const CANNED_SUBSTITUTE: Record<string, string> = {
   canned_olives_green: 'avocado',
   milk_coconut_canned: 'coconut_urbec',
   veg_bamboo_shoots_canned: 'celery',
-  seafood_tuna_canned_water: 'tuna_steak',
 };
 
 /**
@@ -675,8 +674,8 @@ export function isPeriLikeMeal(m: { type?: string } | null | undefined): boolean
 // остальное (перловка/гречка/киноа/батат/крахмалы/мука) — объём/клетчатка/ЖКТ.
 /** HV-степлы вне сборки: объёмные/клетчаточные/ингредиенты (перловка/гречка/киноа/батат/крахмал/мука). */
 export const HV_STAPLE_BAN: ReadonlySet<string> = new Set([
-  'buckwheat', 'barley', 'grain_barley_pearl', 'quinoa', 'quinoa_flakes', 'grain_quinoa_flakes',
-  'oat_bran', 'grain_oat_bran', 'rice_bran', 'grain_rice_bran', 'wheat_bran', 'sweet_potato',
+  'buckwheat', 'barley', 'grain_barley_pearl', 'quinoa', 'grain_quinoa_flakes',
+  'grain_oat_bran', 'grain_rice_bran', 'sweet_potato',
   'grain_tapioca_starch', 'grain_arrowroot_starch', 'grain_coconut_flour',
 ]);
 /** true если гарнир запрещён в HV-сборке (объём/клетчатка/ингредиент). */

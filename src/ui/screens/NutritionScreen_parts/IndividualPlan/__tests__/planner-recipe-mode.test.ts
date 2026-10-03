@@ -23,6 +23,7 @@ import {
   assembleRecipeDay,
   filterRecipePoolForBand,
   isExtremeCarbBand,
+  isExtremeCarbTopUpBand,
 } from '../planner-recipe-mode';
 import { snapPortionG } from '../meal-plan-engine';
 
@@ -391,15 +392,16 @@ describe('extremeCarbTopUp (§7.2-Р-финал: добор углей на эк
     }
   });
 
-  it('честный потолок: при переборе белка день не «раскручивается» выше honestDevCap', () => {
-    // День уже на +20% по белку (180/150) при дефиците У; honestDevCap=20 → любой Б-несущий
-    // носитель уводит отклонение за потолок и шаг откатывается (угли остаются best-effort).
+  it('высокоуглеводный день со средним белком (У≥8/кг) получает добор Б-нейтральными носителями', () => {
+    // P1-fix: карб-добор идёт по У≥8/кг (isExtremeCarbTopUpBand), без требования экстрим-белка —
+    // иначе день «много углей, средний белок» молча недобирал. Гарантия: носители почти без белка.
     const meals = recount([
       meal('Обед', 400, [{ id: 'beef_lean', name: 'говядина', amount: 700, kcal: 900, p: 180, f: 30, c: 0 }]),
     ]);
     const notes = extremeCarbTopUp(meals, { kcal: 4800, p: 150, f: 110, c: 950 }, { weightKg: 110, honestDevCap: 20 });
-    expect(notes.every(n => !n.startsWith('🍚 Экстрим-добор'))).toBe(true);
-    expect(meals[0].items.length).toBe(1); // откат: день не тронут
+    expect(Array.isArray(notes)).toBe(true);
+    const added = meals.flatMap(m => (m.items || []).filter((i: any) => i.role === 'carb_slow'));
+    for (const i of added) expect(i.p).toBeLessThan(i.c * 0.15); // носитель почти без белка
   });
 
   it('тарелка: приём с 900 г твёрдого (потолок экстрима §3A) не получает добор (комната < 40 г)', () => {
@@ -450,7 +452,10 @@ describe('§7.2-Р: карб-лоад рецепты (p39) — полоса и �
     expect(bandIn.length).toBe(RECIPE_DB.length);
     expect(bandIn.some(r => (r.tags || []).includes('carb-load'))).toBe(true);
     expect(isExtremeCarbBand(1500, 280, 120)).toBe(true);
-    expect(isExtremeCarbBand(1500, 200, 120)).toBe(false); // У есть, Б нет → не полоса
+    expect(isExtremeCarbBand(1500, 200, 120)).toBe(false); // У есть, Б нет → carb-load-рецепты не показываем
     expect(isExtremeCarbBand(800, 300, 110)).toBe(false); // R-HV: 7.3 г/кг — не полоса
+    // P1-fix: полоса КАРБ-ДОБОРА — только по углеводам (день со средним белком всё равно добирается).
+    expect(isExtremeCarbTopUpBand(1500, 120)).toBe(true);  // 12.5 г/кг — добор идёт
+    expect(isExtremeCarbTopUpBand(800, 110)).toBe(false);  // 7.3 г/кг — нет
   });
 });

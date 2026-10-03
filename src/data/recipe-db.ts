@@ -93,10 +93,12 @@ function normalizeRecipeKcal(r: Recipe): Recipe {
  * Пороги — кулинарные нормы (ст.л. масла = 8-10 г, лимон = 30-60 г).
  */
 const PORTION_CAPS: Array<{ test: RegExp; cap: number }> = [
-  { test: /(^|_)(olive_oil|coconut_oil|flaxseed_oil)$|^(oil_|butter_)/, cap: 15 },
+  { test: /(^|_)(olive_oil|coconut_oil|flaxseed_oil|sunflower_oil)$|^(oil_|butter_)|^butter$/, cap: 15 },
   { test: /^(citrus|lemon|lime)$/, cap: 60 },
   { test: /^(sauce_|mayonnaise|mayo_|ketchup|sour_cream)/, cap: 30 },
   { test: /^(spice_|herb_|seed_cumin|seed_coriander)/, cap: 10 },
+  // P2-фикс: орехи/семена капаются на ингредиент (было без капа → sunflower_seeds 100 г = ~580 ккал).
+  { test: /(_seeds?$|^seeds?$|^almonds$|^walnuts$|^cashew$|^hazelnut$|^peanut|^pecan$|^pistachio|^macadamia$|^flaxseed$|^chia_seeds$|^sesame$)/, cap: 40 },
 ];
 
 function sanitizeRecipePortions(r: Recipe): Recipe {

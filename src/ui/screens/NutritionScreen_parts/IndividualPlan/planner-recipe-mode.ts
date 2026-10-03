@@ -1052,6 +1052,17 @@ export function isExtremeCarbBand(carbsG: number, proteinG: number, weightKg: nu
 }
 
 /**
+ * P1-фикс: полоса КАРБ-ДОБОРА — только по углеводам (У≥8 г/кг), без требования экстрим-белка.
+ * Раньше carb-топап использовал isExtremeCarbBand (У И Б≥2.3/кг) → день «много углей, средний
+ * белок» (напр. 1500 г У / 200 г Б на 120 кг) не получал никакой догрузки и молча недобирал.
+ * Показ carb-load рецептов остаётся под isExtremeCarbBand (консервативно).
+ */
+export function isExtremeCarbTopUpBand(carbsG: number, weightKg: number): boolean {
+  const w = weightKg > 0 ? weightKg : 80;
+  return (carbsG || 0) >= 8 * w;
+}
+
+/**
  * Вне экстрим-полосы 'carb-load' рецепты вырезаются из пула (обычные дни байт-в-байт
  * прежние). Единая точка и для сборки дня, и для чипов-подсказок UI.
  */
@@ -1085,8 +1096,9 @@ export function extremeCarbTopUp(
   if (!w || tC <= 0 || !Array.isArray(meals)) return notes;
   // §3A EXTREME-SCALE: тарелка рецептурного приёма шире на экстреме (730 → 850/900).
   const _capProf = extremeCapacityProfile({ carbsG: tC, weightKg: w, goalKcal: tK, highVolumeDay: true });
-  // Та же полоса, что в продукт-пути §7.2-7c: экстрим-угли при экстрим-белке.
-  if (!isExtremeCarbBand(tC, tP, w)) return notes;
+  // Полоса карб-добора: только по углеводам (см. isExtremeCarbTopUpBand) — догружаем даже
+  // при среднем белке, иначе высокоуглеводный день молча недобирал.
+  if (!isExtremeCarbTopUpBand(tC, w)) return notes;
   const before = sumDayTotals(meals);
   const devBefore = maxDeviationPct(before, targets);
   const dC0 = tC - before.c;
@@ -1499,7 +1511,11 @@ export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDa
           total -= (it.amount || 0) * (1 - r);
         }
       }
-      out.push(`⚖️ ${label}: приведено к квоте ${cap} г/день`);
+      // P2-фикс: нота честная — если 60%-шага не хватило до квоты, сообщаем фактический объём.
+      const _after = ms.flatMap(m => m.items).filter(it => fams.includes(stapleFamilyOf(it.id) || '')).reduce((s, it) => s + (it.amount || 0), 0);
+      out.push(_after <= cap + 1
+        ? `⚖️ ${label}: приведено к квоте ${cap} г/день`
+        : `⚖️ ${label}: урезано до ${Math.round(_after)} г (квота ${cap} г за один шаг недостижима)`);
     };
     trimByFam(['nuts', 'seeds'], Math.round((_ext ? _ext.nuts : 60) * _gramScale), 8, 'Орехи/семена');
     trimByFam(['oils'], Math.round((_ext ? _ext.oil : 25) * _gramScale), 5, 'Масла');

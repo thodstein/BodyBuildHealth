@@ -232,7 +232,10 @@ export function computePlannerTargets(input: PlannerTargetInput): PlannerTargets
   // the caller should pass 7-8 points. If intervals are >1 day, the rate is still
   // approximately correct because we scale by the ratio 7/(n-1).
   let weightAdj = 1.0;
-  if (weightAdaptMode && weightLogWeek.length >= 2) {
+  // P2-фикс: loss-коррекция веса применяется только к дефицит-целям (cut/recomp) — на масс/
+  // поддержании «недобор потери» ложно резал калораж набора.
+  const _lossGoal = engineGoal === 'cut' || engineGoal === 'recomp';
+  if (weightAdaptMode && _lossGoal && weightLogWeek.length >= 2) {
     // FIX input-audit: фильтруем 0/отрицательные записи — они давали ложный «сброс веса»
     // (80 → 0 = «потеря 80кг») и молча поднимали калораж до +20%
     const validW = weightLogWeek.filter(w => Number.isFinite(w) && w > 0);
@@ -352,7 +355,9 @@ export function computePlannerTargets(input: PlannerTargetInput): PlannerTargets
   }
 
   // 9. Metabolic adaptation
-  if (metabolicAdaptEnabled && metabolicAdaptPct > 0) {
+  // P2-фикс: адаптация метаболизма применяется к дефицит-целям/поддержанию, но не к набору
+  // (на массе снижение калорий противоречит цели).
+  if (metabolicAdaptEnabled && metabolicAdaptPct > 0 && engineGoal !== 'bulk') {
     const adaptFactor = 1 - metabolicAdaptPct / 100;
     targets.kcal = Math.round(targets.kcal * adaptFactor);
     targets.protein = Math.round(targets.protein * adaptFactor);

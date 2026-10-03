@@ -220,25 +220,27 @@ function findFoodByName(name: string): FoodItem | undefined {
   // По id (если name похож на id)
   food = FOOD_DB.find(f => f.id.toLowerCase().includes(lower.replace(/\s+/g, '_')));
   if (food) return food;
-  // Ключевые слова
+  // Ключевые слова. P2-фикс: специфичные ключи ИДУТ РАНЬШЕ общих (объект обходится в порядке
+  // вставки): 'басмати' до 'рис' (иначе «Рис басмати» → rice_white), 'сладкий картофель' до
+  // 'картофель', 'сливочное масло' до 'масло', 'болгарский перец' до 'перец'.
   const kwMap: Record<string, string> = {
-    'куриная грудка': 'chicken_breast', 'курица': 'chicken_breast', 'грудка': 'chicken_breast',
+    'куриная грудка': 'chicken_breast', 'грудка': 'chicken_breast', 'курица': 'chicken_breast',
     'индейка': 'turkey_breast', 'говядина': 'beef_lean', 'стейк': 'beef_steak',
-    'рис': 'rice_white', 'баскати': 'rice_basmati', 'басмати': 'rice_basmati',
-    'гречка': 'buckwheat', 'овсянка': 'oats', 'овсяные хлопья': 'oats', 'хлопья': 'corn_flakes',
+    'баскати': 'rice_basmati', 'басмати': 'rice_basmati', 'рис': 'rice_white',
+    'гречка': 'buckwheat', 'овсяные хлопья': 'oats', 'овсянка': 'oats', 'хлопья': 'corn_flakes',
     'брокколи': 'broccoli', 'шпинат': 'spinach', 'томаты': 'tomato', 'помидор': 'tomato',
     'яйца': 'egg_whole', 'яйцо': 'egg_whole', 'белок': 'egg_white',
     'творог': 'cottage_cheese_5', 'молоко': 'milk', 'кефир': 'kefir', 'йогурт': 'yogurt_greek',
     'лосось': 'salmon', 'форель': 'trout', 'тунец': 'tuna_fresh',
-    'миндаль': 'almonds', 'грецкие орехи': 'walnuts', 'орехи': 'walnuts',
+    'грецкие орехи': 'walnuts', 'миндаль': 'almonds', 'орехи': 'walnuts',
     'авокадо': 'avocado', 'банан': 'banana', 'яблоко': 'apple',
-    'оливковое масло': 'olive_oil', 'масло': 'butter', 'сливочное масло': 'butter',
+    'сливочное масло': 'butter', 'оливковое масло': 'olive_oil', 'масло': 'butter',
     'протеин': 'whey_isolate', 'сыворотка': 'whey_isolate', 'казеин': 'casein',
     'семена чиа': 'chia_seeds', 'чиа': 'chia_seeds', 'льняное семя': 'flaxseed',
     'финики': 'dates', 'курага': 'dried_apricots', 'изюм': 'raisins',
     'чечевица': 'lentils', 'нут': 'chickpeas', 'тофу': 'tofu',
-    'картофель': 'potato_boiled', 'сладкий картофель': 'sweet_potato',
-    'перец': 'red_pepper', 'болгарский перец': 'red_pepper',
+    'сладкий картофель': 'sweet_potato', 'картофель': 'potato_boiled',
+    'болгарский перец': 'red_pepper', 'перец': 'red_pepper',
     'лук': 'onion', 'чеснок': 'garlic', 'имбирь': 'ginger',
     'соевый соус': 'soy_sauce', 'мед': 'honey', 'корица': 'cinnamon',
   };

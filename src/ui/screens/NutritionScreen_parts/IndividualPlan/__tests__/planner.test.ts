@@ -53,9 +53,10 @@ describe('computePlannerTargets', () => {
     expect(r.kcal).toBe(r.protein * 4 + r.fats * 9 + r.carbs * 4);
   });
 
-  it('metabolic adaptation снижает kcal', () => {
-    const base = computePlannerTargets(baseTargetInput());
-    const adj = computePlannerTargets(baseTargetInput({ metabolicAdaptEnabled: true, metabolicAdaptPct: 10 }));
+  it('metabolic adaptation снижает kcal (дефицит-цель)', () => {
+    // P2-fix: адаптация метаболизма гейтится по цели — на массе не режет калораж.
+    const base = computePlannerTargets(baseTargetInput({ goal: 'cutting', phase: 'cutting' }));
+    const adj = computePlannerTargets(baseTargetInput({ goal: 'cutting', phase: 'cutting', metabolicAdaptEnabled: true, metabolicAdaptPct: 10 }));
     expect(adj.kcal).toBeLessThan(base.kcal);
   });
 
