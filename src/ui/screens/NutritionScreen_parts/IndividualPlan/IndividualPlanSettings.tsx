@@ -748,14 +748,11 @@ export const IndividualPlanSettings: React.FC = () => {
               <PopupNumber label="Тестостерон" value={parseFloat(v2Labs.testosterone)||0} min={0} max={60} step={0.5} suffix="нмоль/л" onChange={v=>setV2Labs((p:any)=>({...p,testosterone:String(v)}))} />
             </div>
           </div>
-          <div style={{ marginBottom: 6 }}>
-            <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginBottom: 2 }}>Чувствительность к гистамину</div>
-            <button onClick={() => setHistamineSensitive(!histamineSensitive)} style={{
-              padding: '4px 10px', borderRadius: 10, fontSize: 9, fontWeight: 700, cursor: 'pointer',
-              background: histamineSensitive ? 'rgba(239,68,68,0.15)' : '#202023',
-              border: histamineSensitive ? '1px solid rgba(239,68,68,0.3)' : '1px solid rgba(255,255,255,0.06)',
-              color: histamineSensitive ? '#ef4444' : 'rgba(255,255,255,0.5)',
-            }}>{histamineSensitive ? '⚠️ Чувствителен к гистамину' : '✅ Не чувствителен'}</button>
+          {/* Чистка дублей (план единого источника, остаток): единый контрол гистамина —
+              чип «Гистамин» в карточке «Исключения» (🚫 Непереносимость, ниже). Здесь —
+              только строка-ссылка на тот же сеттер histamineSensitive. */}
+          <div style={{ marginBottom: 6, fontSize: 9, color: 'rgba(255,255,255,0.85)' }}>
+            Чувствительность к гистамину: {histamineSensitive ? '⚠️ да' : 'нет'} — переключается чипом «Гистамин» в карточке «Исключения».
           </div>
         </GlassCard>
       )}
@@ -2169,39 +2166,17 @@ export const IndividualPlanSettings: React.FC = () => {
         {carbPeriodization !== 'none' && carbCapClipped && (
           <div style={{ marginTop: 6, padding: '6px 8px', borderRadius: 8, background: 'rgba(245,158,11,0.07)', border: '1px solid rgba(245,158,11,0.22)', fontSize: 9, color: '#fbbf24', lineHeight: 1.5 }}>
             ⚠ Диетологический потолок углеводов {carbCapGPerKg} г/кг ограничивает режим «{CARB_PERIODIZATION_OPTIONS.find(o=>o.id===carbPeriodization)?.label}» — цели тренировочных дней могут не дотягиваться до волны. Потолок задаётся стилем питания (кето/высоко-углеводный); снять — в ручном КБЖУ.
-            {/* P1-9: явный чекпоинт «Снять потолок» (дубль кнопки из карточки КБЖУ — тот же оверрайд) */}
-            <button onClick={() => { setCarbCapOverride(true); try { (window as any).showToast?.('🔓 Потолок углей снят — периодизация больше не режется', 'success'); } catch {} }} style={{ display:'block', marginTop:4, padding:'3px 8px', borderRadius:6, cursor:'pointer', fontSize:9, fontWeight:800, background:'rgba(245,158,11,0.14)', border:'1px solid rgba(245,158,11,0.4)', color:'#fbbf24' }}>🔓 Снять потолок</button>
+            {/* Чистка дублей (план единого источника, остаток): кнопка «Снять потолок» —
+                единый источник в карточке «КБЖУ» выше (тот же оверрайд carbCapOverride).
+                Здесь — только строка-ссылка. */}
+            <div style={{ marginTop: 4, fontSize: 9, color: 'rgba(255,255,255,0.75)' }}>Снять потолок — в карточке «КБЖУ» выше (единый переключатель).</div>
           </div>
         )}
         {(carbPeriodization === 'carb_cycle' || carbPeriodization === 'butch') && (
-          <div style={{ marginTop: 8, padding: '8px 10px', borderRadius: 10, background: 'rgba(59,130,246,0.06)', border: '1px solid rgba(59,130,246,0.12)' }}>
-            <div style={{ fontSize: 9, fontWeight: 600, color: '#60a5fa', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 4 }}>
-              📅 Выберите тренировочные дни:
-            </div>
-            <div style={{ display: 'flex', gap: 4, justifyContent: 'center' }}>
-              {DAY_LABELS.map((label, idx) => {
-                const isTrain = trainingDays[idx];
-                return (
-                  <button key={idx} onClick={() => {
-                    setTrainingDays(trainingDays.map((d, i) => i === idx ? !d : d));
-                  }} style={{
-                    width: 36, height: 36, borderRadius: '50%', cursor: 'pointer',
-                    border: isTrain ? '2px solid #22c55e' : '2px solid #3f3f46',
-                    background: isTrain ? 'rgba(34,197,94,0.2)' : '#202023',
-                    color: isTrain ? '#22c55e' : 'rgba(255,255,255,0.85)',
-                    fontSize: 10, fontWeight: isTrain ? 800 : 500,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    transition: 'all 0.15s',
-                  }}>
-                    {label}
-                  </button>
-                );
-              })}
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4, fontSize: 9, color: 'rgba(255,255,255,0.85)' }}>
-              <span>🏋️ {trainingDays.filter(Boolean).length} тренировочных</span>
-              <span>😴 {trainingDays.filter(d => !d).length} выходных</span>
-            </div>
+          <div style={{ marginTop: 8, padding: '6px 8px', borderRadius: 8, background: 'rgba(59,130,246,0.05)', border: '1px solid rgba(59,130,246,0.12)', fontSize: 9, color: 'rgba(255,255,255,0.85)' }}>
+            {/* Чистка дублей (план единого источника, остаток): тренировочные дни —
+                единый источник в карточке «Тренировки» выше (тот же сеттер trainingDays). */}
+            📅 Тренировочные дни ({trainingDays.filter(Boolean).length} тр / {trainingDays.filter(d => !d).length} отдых) задаются в карточке «Тренировки» выше — единый источник для периодизации.
           </div>
         )}
         <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px dashed rgba(255,255,255,0.08)', fontSize: 9, fontWeight: 700, color: '#a78bfa', marginBottom: 6 }}>⚖️ Адаптация и гибкие дни</div>
