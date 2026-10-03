@@ -1201,3 +1201,86 @@ export function heatProtocol(input: { sessionsDone?: number | null; inWeightCut?
     source: HEAT_SOURCE,
   };
 }
+
+// ─── Э5.5: журналы RMR и максимальной мощности (сигналы «весовых качелей») ───
+// Кейс PMID 40443978: за 5-недельный лагерь RMR −253 ккал/день, мощность −27%
+// при потере FFM всего 0.6 кг — просадка RMR/мощности сама по себе тревожна.
+// Журналы позволяют применить weightCycleVerdict к собственным данным.
+
+export const COMBAT_RMR_KEY = 'he_combat_rmr_v1';
+export const COMBAT_RMR_CAP = 120;
+export const COMBAT_POWER_KEY = 'he_combat_power_v1';
+export const COMBAT_POWER_CAP = 120;
+
+export interface RmrEntry { date: string; kcalPerDay: number; note?: string }
+export interface PowerEntry { date: string; watts: number; note?: string }
+
+function validRmr(r: any): RmrEntry | null {
+  if (!r || !isIso(r.date)) return null;
+  const v = num(r.kcalPerDay);
+  if (v === null || v < 600 || v > 5000) return null; // человеческий RMR, мусор отсекаем
+  return { date: r.date, kcalPerDay: Math.round(v), note: typeof r.note === 'string' ? r.note.slice(0, 200) : undefined };
+}
+function validPower(r: any): PowerEntry | null {
+  if (!r || !isIso(r.date)) return null;
+  const v = num(r.watts);
+  if (v === null || v < 30 || v > 2000) return null;
+  return { date: r.date, watts: Math.round(v), note: typeof r.note === 'string' ? r.note.slice(0, 200) : undefined };
+}
+
+export function normalizeRmr(rows: any[]): RmrEntry[] {
+  const seen = new Set<string>();
+  const out: RmrEntry[] = [];
+  for (const r of rows || []) {
+    const v = validRmr(r);
+    if (!v || seen.has(v.date)) continue;
+    seen.add(v.date);
+    out.push(v);
+  }
+  return out.sort((a, b) => a.date.localeCompare(b.date)).slice(-COMBAT_RMR_CAP);
+}
+export function normalizePower(rows: any[]): PowerEntry[] {
+  const seen = new Set<string>();
+  const out: PowerEntry[] = [];
+  for (const r of rows || []) {
+    const v = validPower(r);
+    if (!v || seen.has(v.date)) continue;
+    seen.add(v.date);
+    out.push(v);
+  }
+  return out.sort((a, b) => a.date.localeCompare(b.date)).slice(-COMBAT_POWER_CAP);
+}
+
+export function loadRmr(): RmrEntry[] { return normalizeRmr(readStore<any>(COMBAT_RMR_KEY)); }
+export function loadPower(): PowerEntry[] { return normalizePower(readStore<any>(COMBAT_POWER_KEY)); }
+
+export function addRmr(date: string, kcalPerDay: number, note?: string): boolean {
+  const v = validRmr({ date, kcalPerDay, note });
+  if (!v) return false;
+  return writeStore(COMBAT_RMR_KEY, normalizeRmr([...readStore<any>(COMBAT_RMR_KEY), v]));
+}
+export function addPower(date: string, watts: number, note?: string): boolean {
+  const v = validPower({ date, watts, note });
+  if (!v) return false;
+  return writeStore(COMBAT_POWER_KEY, normalizePower([...readStore<any>(COMBAT_POWER_KEY), v]));
+}
+export function removeRmr(date: string): boolean {
+  if (!isIso(date)) return false;
+  return writeStore(COMBAT_RMR_KEY, readStore<any>(COMBAT_RMR_KEY).filter((r: any) => r?.date !== date));
+}
+export function removePower(date: string): boolean {
+  if (!isIso(date)) return false;
+  return writeStore(COMBAT_POWER_KEY, readStore<any>(COMBAT_POWER_KEY).filter((r: any) => r?.date !== date));
+}
+
+/** Дельта RMR (последний − первый, ккал/день) и дельта мощности (%); null при <2 записях. */
+export function rmrDeltaFromJournal(rows: RmrEntry[]): number | null {
+  if (!Array.isArray(rows) || rows.length < 2) return null;
+  return Math.round(rows[rows.length - 1].kcalPerDay - rows[0].kcalPerDay);
+}
+export function powerDeltaPctFromJournal(rows: PowerEntry[]): number | null {
+  if (!Array.isArray(rows) || rows.length < 2) return null;
+  const first = rows[0].watts;
+  if (!(first > 0)) return null;
+  return Math.round(((rows[rows.length - 1].watts - first) / first * 100) * 10) / 10;
+}

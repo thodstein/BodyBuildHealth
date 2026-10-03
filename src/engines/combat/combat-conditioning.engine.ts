@@ -86,6 +86,18 @@ export function conditioningSessionsForWeek(
           description: 'Алактат POWER: взрыв 10с + 50с полный отдых — ATP-PCr power. Для тейкдаунов/нокаут-комбинаций',
           exercises: ['sled_push', 'battle_rope', 'box_jump', 'med_ball_slam'],
         });
+      } else if (isAccum && week % 2 === 1) {
+        // Э5.3: недельная волна внутри накопления — нечётные недели power, чётные capacity
+        out.push({
+          id: `cond_alactic_w${week}_power_wave`,
+          modality: 'alactic',
+          durationMin: 25,
+          intervals: '8×10с, 50с отдых (1:5), 95% — power (нед-волна)',
+          hrZone: 'peak 85-95% max',
+          rpe: 9,
+          description: 'Алактат POWER (нед-волна): полный отдых, взрыв — нечётные недели накопления (Jamieson)',
+          exercises: ['sled_push', 'battle_rope', 'box_jump', 'med_ball_slam'],
+        });
       } else if (isAccum) {
         out.push({
           id: `cond_alactic_w${week}_capacity`,
@@ -119,6 +131,18 @@ export function conditioningSessionsForWeek(
           hrZone: 'Zone4-5 165-180',
           rpe: 9,
           description: 'Лактат POWER: короткие макс-отрезки 20-40с, длинный отдых 8-15мин — ↑гликол. ферменты (Jamieson)',
+          exercises: ['battle_rope', 'sledge_hammer', 'sled_pull'],
+        });
+      } else if (isAccum && week % 2 === 1) {
+        // Э5.3: недельная волна — нечётные недели lactic power (короткие макс-отрезки)
+        out.push({
+          id: `cond_lactic_w${week}_power_wave`,
+          modality: 'lactic',
+          durationMin: 26,
+          intervals: '20-40с max / 8-15мин между сериями, 2-4×3 — lactic POWER (нед-волна)',
+          hrZone: 'Zone4-5 165-180',
+          rpe: 9,
+          description: 'Лактат POWER (нед-волна): короткие макс-отрезки, длинный отдых — нечётные недели накопления (Jamieson)',
           exercises: ['battle_rope', 'sledge_hammer', 'sled_pull'],
         });
       } else if (isAccum) {
@@ -209,6 +233,7 @@ export function buildConditioningRationale(goal: string, outsideSessions: number
   if (weeks >= 8) lines.push('Периодизация кондиции: Off аэробаза → Pre alactic+lac → Camp поддержание + тапер (Jamieson)');
   if (outsideSessions >= 5) lines.push('При 5× татами: alactic/lactic покрыты спаррингом — сохраняем 1× Zone2 для восстановления между раундами');
   lines.push('Размещение: Пн/Чт или Вт/Пт — разнос ≥36ч от hard spar и тяжёлого зала (Boxing Science)');
+  lines.push('Волна накопления: нечётные недели — power-акценты (полный отдых), чётные — capacity (Jamieson)');
   return lines;
 }
 

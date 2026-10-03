@@ -8,6 +8,7 @@
 import React from 'react';
 import { SectionCard, CardHeader, Badge, BTN_SMALL, INPUT, CombatPopupSelect, Highlight, PHASE_RU, ruLabel, TEXT_3 } from './CombatUI';
 import { annualCBPhaseForWeek, annualResidualNote } from '../../../engines/combat/combat-annual';
+import { localIsoDate } from '../../../core/local-date';
 
 export interface AnnualCardProps {
   annual: any;
@@ -42,11 +43,18 @@ export function daysToFirstFight(annual: any, todayIso?: string): number | null 
   const list = Array.isArray(annual?.competitions) ? annual.competitions : [];
   const dates = list.map((c: any) => c?.date).filter((d: any) => typeof d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d)).sort();
   if (!dates.length) return null;
-  const today = todayIso || new Date().toISOString().slice(0, 10);
+  const today = todayIso || localIsoDate();
   const t = Date.parse(`${today}T00:00:00Z`);
-  const d = Date.parse(`${dates[0]}T00:00:00Z`);
-  if (!Number.isFinite(t) || !Number.isFinite(d)) return null;
-  return Math.round((d - t) / 86400000);
+  if (!Number.isFinite(t)) return null;
+  const parsed = dates
+    .map((d: string) => ({ ts: Date.parse(`${d}T00:00:00Z`) }))
+    .filter((x: { ts: number }) => Number.isFinite(x.ts));
+  if (!parsed.length) return null;
+  // P2: ближайший БУДУЩИЙ бой (раньше брался самый ранний — прошлый бой перекрывал отсчёт);
+  // если все прошли — самый свежий прошедший (отрицательный отсчёт в UI)
+  const future = parsed.filter((x: { ts: number }) => x.ts >= t).sort((a: { ts: number }, b: { ts: number }) => a.ts - b.ts)[0];
+  const pick = future || parsed[parsed.length - 1];
+  return Math.round((pick.ts - t) / 86400000);
 }
 
 export const AnnualCard: React.FC<AnnualCardProps> = (p) => {

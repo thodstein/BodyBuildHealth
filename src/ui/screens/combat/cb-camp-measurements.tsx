@@ -15,10 +15,12 @@ import {
   loadGrip, addGrip, gripSummary, gripP50Ref,
   loadRtp, addRtp, rtpSummary, RTP_STAGES, RTP_STAGE_BY_ID, RTP_EARLY_AEROBIC_NOTE, RTP_SOURCE_IDS, HEAT_EVIDENCE,
   loadTests, addTest, testBattery, COMBAT_TEST_BATTERY, COMBAT_TEST_BY_ID,
+  loadRmr, addRmr, loadPower, addPower, rmrDeltaFromJournal, powerDeltaPctFromJournal,
   readScreenManual, writeScreenManual, resolveScreenInputs, COMBAT_TESTS_KEY,
   type RtpStageId, type CombatTestId, type ScreenField, type ScreenSource,
   type SparType, type GripHand,
 } from '../../../engines/combat/combat-measurements.engine';
+import { weightCycleVerdict } from '../../../engines/combat/combat-science';
 
 const IN = 16;
 const BTN: React.CSSProperties = { minHeight: 44, fontSize: IN, padding: '8px 12px' };
@@ -167,8 +169,7 @@ export const CbCampMeasurementsCard: React.FC<{
   // ВСЕ пять пропсов идут в auto: родитель может передать любой из них, и это
   // валидный источник. Сейчас CombatPlanView передаёт только kcal и ffmKg —
   // расход и симптомы приходят исключительно из ручного ввода.
-  const [manual, setManual] = useState(() => readScreenManual());
-  const resolved = useMemo(
+  const [manual, setManual] = useState(() => readScreenManual());  const resolved = useMemo(
     () => resolveScreenInputs({ kcal, trainingKcal, ffmKg, cat2Flags, heatSessions }, manual),
     [kcal, trainingKcal, ffmKg, cat2Flags, heatSessions, manual]);
   const onSetManual = useCallback((f: ScreenField, raw: string) => {
@@ -193,6 +194,18 @@ export const CbCampMeasurementsCard: React.FC<{
     inWeightCut: !!(snap?.weightCutKg || snap?.weightCutProtocol),
     fightWeek,
   }), [resolved.heatSessions, snap, fightWeek]);
+  // Э5.5: журналы RMR/мощности → сигналы «весовых качелей» (weightCycleVerdict)
+  const [rmrRows, setRmrRows] = useState(() => loadRmr());
+  const [pwrRows, setPwrRows] = useState(() => loadPower());
+  const [rmrDate, setRmrDate] = useState('');
+  const [rmrVal, setRmrVal] = useState('');
+  const [pwrVal, setPwrVal] = useState('');
+  const [wpMsg, setWpMsg] = useState<string | null>(null);
+  const cycleVerdict = useMemo(() => weightCycleVerdict({
+    rmrDelta: rmrDeltaFromJournal(rmrRows),
+    powerDeltaPct: powerDeltaPctFromJournal(pwrRows),
+    ffmDeltaKg: null,
+  }), [rmrRows, pwrRows]);
 
   return (
     <SectionCard title="Замеры, журналы и скрининги" accent>
@@ -441,6 +454,33 @@ export const CbCampMeasurementsCard: React.FC<{
         <span style={{ fontSize: 12, color: '#fff' }}>{heat.hydration}</span>
         {/* Э5.6: доказательная база теплового протокола (раньше HEAT_EVIDENCE был мёртвым экспортом) */}
         <span data-cb="heat-evidence" style={{ fontSize: 11, color: '#fff' }}>{HEAT_EVIDENCE}</span>
+      </div>
+
+      {/* Э5.5 — журналы RMR и мощности: сигналы «весовых качелей» (weightCycleVerdict) */}
+      <div data-cb="measure-cycle-signals" style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 8 }}>
+        <Highlight>📉 Весовые качели: RMR и мощность</Highlight>
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          <input aria-label="Дата RMR" data-cb="rmr-date" style={{ ...inp(rmrDate, 'ГГГГ-ММ-ДД'), flex: '1 1 130px' }} value={rmrDate} onChange={e => setRmrDate(e.target.value)} />
+          <input aria-label="RMR ккал/сут" data-cb="rmr-kcal" inputMode="numeric" style={{ ...inp(rmrVal, 'ккал/сут'), flex: '1 1 90px' }} value={rmrVal} onChange={e => setRmrVal(e.target.value)} />
+          <button data-cb="rmr-add" style={{ ...BTN, background: '#22c55e', color: '#111', border: 0, borderRadius: 12 }} onClick={() => {
+            const ok = addRmr(rmrDate, Number(rmrVal.replace(',', '.')));
+            if (!ok) { setWpMsg('⚠ Нужны дата и RMR 600–5000 ккал/сут'); return; }
+            setRmrDate(''); setRmrVal(''); setWpMsg('✅ RMR записан'); setRmrRows(loadRmr());
+          }}>＋ RMR</button>
+        </div>
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          <input aria-label="Мощность, Вт" data-cb="pwr-watts" inputMode="numeric" style={{ ...inp(pwrVal, 'Вт (макс.)'), flex: '1 1 90px' }} value={pwrVal} onChange={e => setPwrVal(e.target.value)} />
+          <button data-cb="pwr-add" style={{ ...BTN, background: '#3b82f6', color: '#fff', border: 0, borderRadius: 12 }} onClick={() => {
+            const ok = addPower(rmrDate || localIsoDate(), Number(pwrVal.replace(',', '.')));
+            if (!ok) { setWpMsg('⚠ Нужна мощность 30–2000 Вт'); return; }
+            setPwrVal(''); setWpMsg('✅ Мощность записана'); setPwrRows(loadPower());
+          }}>＋ Мощность</button>
+        </div>
+        {wpMsg ? <div data-cb="wp-msg" style={{ fontSize: 12, color: '#fff' }}>{wpMsg}</div> : null}
+        <div data-cb="cycle-verdict" style={{ fontSize: 12, color: '#fff' }}>
+          {cycleVerdict.level === 'danger' ? '⛔' : cycleVerdict.level === 'watch' ? '⚠' : '✅'} {cycleVerdict.signals.join(' · ')}
+        </div>
+        <span style={{ fontSize: 11, color: '#fff' }}>{cycleVerdict.source}</span>
       </div>
     </SectionCard>
   );
