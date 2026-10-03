@@ -28,6 +28,7 @@ import { sparringToOutsideLoad, sparringWeeklyLoad, sparringSummary } from './co
 import { teenCombatGates, hasWeightManipulation, neckExtensionCutoffKg, concussionProtocol, sparringSafetyErrors, teenNeckIsoFallback } from './combat-safety.engine';
 import { weightToClassBoundary, weightClassLine } from './combat-weight-class.engine';
 import { femaleCutTempoDefault, femaleCombatNotes, travelPoolFilter, travelVolumeMult, travelTaperNote } from './combat-female-travel.engine';
+import { cycleModulationFor } from './combat-female-cycle';
 import { isExcludeInjuryCB } from './combat-selection';
 import { combatDiaryGroupFor } from './combat-diary.engine';
 import { computeRecoveryMultiplier, computeNutritionMultiplier } from '../recovery-budget.engine';
@@ -368,6 +369,34 @@ function buildWorkSets(reps: [number, number], sets: number, rir: number, weight
   return out;
 }
 
+/**
+ * Э5.7: недельный срез объёма по фазе цикла (лютеиновая/менструальная).
+ * Работает на уровне НЕДЕЛИ: −7%/−10% от суммарных сетов держатся как
+ * проценты (округление на отдельном упражнении при 2-3 сетах их «съедало»).
+ * Пол упражнения — 2 сета, порядок детерминированный (самый объёмный первым).
+ */
+function applyFemaleCycleVolumeCut(sessions: CombatSession[], mult: number): void {
+  if (!(mult < 1)) return;
+  const totalOf = () => sessions.reduce((a, s) => a + s.exercises.reduce((x, e) => x + e.sets, 0), 0);
+  const start = totalOf();
+  if (start <= 0) return;
+  const target = Math.max(1, Math.round(start * mult));
+  let guard = 0;
+  while (totalOf() > target && guard++ < 500) {
+    let pick: CombatExercise | null = null;
+    for (const s of sessions) {
+      for (const e of s.exercises) {
+        if (e.sets <= 2) continue;
+        if (!pick || e.sets > pick.sets) pick = e;
+      }
+    }
+    if (!pick) break;
+    pick.sets -= 1;
+    pick.workSets = pick.workSets.slice(0, pick.sets);
+    while (pick.workSets.length < pick.sets) pick.workSets.push({ reps: 5, rir: Math.max(3, pick.rir), weight: pick.weight });
+  }
+}
+
 export function buildCombatPlan(input: CombatInput): CombatPlan {
   const weeks = clampWeeks(input.weeks);
   const daysPerWeek = clampDays(input.daysPerWeek);
@@ -439,6 +468,9 @@ export function buildCombatPlan(input: CombatInput): CombatPlan {
   rationale.push(`Recovery ×${recoveryMult.toFixed(2)} · Nutrition ×${nutritionMult.toFixed(2)}${acwrMult !== 1 ? ` · ACWR ×${acwrMult.toFixed(2)}` : ''}${(input as any).travelMode === 'hotel' ? ' · Travel ×0.9' : ''} · Budget ${weeklyBudget}`);
   // P5: женские ноты + travel-нота в rationale (без новой математики)
   for (const n of femaleCombatNotes({ sex: input.sex, lutealPhase: !!(input as any).lutealPhase, weightCutKg: input.weightCutKg, bodyweightKg: input.bodyweight })) rationale.push(n);
+  // Э5.7: модуляция по фазе цикла — только female + фаза из лога (иначе байт-в-байт)
+  const femaleCycleMod = input.sex === 'female' ? cycleModulationFor(input.cyclePhase) : null;
+  if (femaleCycleMod) rationale.push(femaleCycleMod.note);
   const travelNote = travelTaperNote((input as any).travelMode, !!input.fightDate);
   if (travelNote) rationale.push(travelNote);
   // №4: слабая сторона из диагностики — след в rationale (унилатеральная добивка)
@@ -613,6 +645,12 @@ export function buildCombatPlan(input: CombatInput): CombatPlan {
         if (acwrMult < 1 && sets > 2) sets = Math.max(2, Math.round(sets * acwrMult));
         else if (acwrMult > 1 && sets < perExCap) sets = Math.min(perExCap, sets + 1);
         if (deload) sets = Math.max(2, Math.round(sets * 0.6));
+        // Э5.7: женская модуляция по фазе цикла — RIR здесь, объём недельным
+        // срезом ниже (округление на упражнении «съедало» −5–10% на малых сетах)
+        if (femaleCycleMod) {
+          if (femaleCycleMod.rirAdd) rir = Math.min(4, rir + femaleCycleMod.rirAdd);
+          if (femaleCycleMod.rirMin !== null) rir = Math.max(rir, femaleCycleMod.rirMin);
+        }
         const gentle = gentleFactorCB(id, input.injuries as any);
         let weight = weightForCombatExercise(id, input, goal);
         if (gentle < 1) { weight = Math.round(weight * gentle / 2.5) * 2.5; rir = Math.min(4, rir + 1); reps = [reps[0]+1, reps[1]+1] as any; }
@@ -850,6 +888,10 @@ export function buildCombatPlan(input: CombatInput): CombatPlan {
         }
       }
     }
+    // Э5.7: срез объёма недели по фазе цикла — проценты держатся на неделе
+    // (на упражнении −7%/−10% округлялись до нуля при 2-3 сетах);
+    // делод/тапер уже лёгкие — повторно не режем
+    if (femaleCycleMod && !deload && !taper) applyFemaleCycleVolumeCut(sessions, femaleCycleMod.volumeMult);
     const totalSets = sessions.reduce((s, sess) => s + sess.exercises.reduce((a, e) => a + e.sets, 0), 0);
     const totalTonnage = sessions.reduce((s, sess) => s + sess.exercises.reduce((a, e) => a + e.workSets.reduce((x, ws) => x + ws.weight * ws.reps, 0), 0), 0);
     weeksData.push({ week: w, phase, deload, taper, sessions, totalSets, totalTonnage, outsideLoad: outsideMetrics?.weeklyLoad });

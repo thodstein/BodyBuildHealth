@@ -2,10 +2,13 @@
  * combat-annual.ts — изолированный годовой план для единоборств (ATR 5/3/2 + competitions).
  * Не трогает annual-training.
  */
-import type { CombatPlan } from './combat.types';
-import { cbAnnualPhaseName, cbAnnualStatusName, cbDisciplineName } from './combat-builder.engine';
+import type { CombatPlan, CombatGoal, CombatLevel, CombatInput, CombatWeek } from './combat.types';
+import { cbAnnualPhaseName, cbAnnualStatusName, cbDisciplineName, buildCombatPlan } from './combat-builder.engine';
+import { finalizeCombatPlan } from './combat-finalize.engine';
+import { TAPER_SC_PRE, TAPER_SC_FIGHT, TAPER_SC_FIGHT_SHORT } from './combat-taper.engine';
+import type { CombatCyclePhase } from './combat-female-cycle';
 export type AnnualCBPhase = 'accumulation' | 'transmutation' | 'realization' | 'transition' | 'gpp' | 'power' | 'taper';
-export interface AnnualCBBlock { id: string; startWeek:number; weeks:number; discipline:string; phase: AnnualCBPhase; status:'built'|'planned'|'error'; plan?: CombatPlan; fightDate?: string | null; }
+export interface AnnualCBBlock { id: string; startWeek:number; weeks:number; discipline:string; phase: AnnualCBPhase; status:'built'|'planned'|'error'; plan?: CombatPlan; fightDate?: string | null; /** Э5.2: дата старта блока (неделя 1) — якорь от startDate года. */ startDate?: string | null; /** Э5.2: честная причина, если блок не собрался (status='error'). */ error?: string | null; }
 export interface AnnualCBCompetition { id:string; name:string; date:string; weightClass?:string; /** P7: main → полный тапер 2нед, secondary → мини-тапер 1нед (−25…−35%) */ priority?: 'main' | 'secondary'; }
 export interface AnnualCB { id:string; totalWeeks:number; discipline:string; blocks: AnnualCBBlock[]; competitions: AnnualCBCompetition[]; createdAt:string; updatedAt?:string; }
 const KEY='he_combat_annual_v1';
@@ -55,6 +58,158 @@ export function normalizeAnnualBlockWeeks(blocks: AnnualCBBlock[], totalWeeks: n
   }
   diff = totalWeeks - sum();
   if (diff > 0) blocks[0].weeks += diff;
+}
+
+// ─── Э5.2: год собирается ПЛАНАМИ по блокам ───────────────────────────────
+
+/**
+ * Цель плана из фазы блока (согласовано с ATR-схемой):
+ *   accumulation/gpp → power, transmutation → power,
+ *   realization/taper → camp, transition → maintenance.
+ */
+export function annualBlockGoal(phase: AnnualCBPhase): CombatGoal {
+  if (phase === 'transition') return 'maintenance';
+  if (phase === 'realization' || phase === 'taper') return 'camp';
+  return 'power';
+}
+
+/**
+ * Дата старта блока = startDate года + (startWeek − 1) недель.
+ * Невалидный/отсутствующий startDate → null (честно, без Date.now-догадок).
+ */
+export function blockStartDate(annual: AnnualCB | null, block: AnnualCBBlock, startDate?: string | null): string | null {
+  if (!block || !Number.isFinite(block.startWeek) || block.startWeek < 1) return null;
+  if (!startDate || !isValidIsoDateAnnual(startDate)) return null;
+  const d = new Date(startDate + 'T00:00:00Z');
+  if (!Number.isFinite(d.getTime())) return null;
+  d.setUTCDate(d.getUTCDate() + (Math.round(block.startWeek) - 1) * 7);
+  return d.toISOString().slice(0, 10);
+}
+
+/**
+ * Приводит план к длине блока:
+ * - короче лимита мезоцикла (>12 нед) — блок дособирается повторным циклом
+ *   базового мезо (недели перенумерованы; фазы внутри блока повторяются —
+ *   Issurin multi-cycle), маркер в rationale;
+ * - короче 2 нед (билдер клампит минимум) — лишние недели отрезаются с конца.
+ */
+function fitPlanToBlockWeeks(plan: CombatPlan, target: number): void {
+  const t = Math.max(1, Math.round(target));
+  const cur = plan.weeksData.length;
+  if (t < cur) {
+    plan.weeksData = plan.weeksData.slice(0, t);
+  } else if (t > cur && cur > 0) {
+    const base: CombatWeek[] = JSON.parse(JSON.stringify(plan.weeksData));
+    for (let w = cur + 1; w <= t; w++) {
+      const copy: CombatWeek = JSON.parse(JSON.stringify(base[(w - 1) % base.length]));
+      copy.week = w;
+      plan.weeksData.push(copy);
+    }
+    plan.rationale.push(`🔁 Блок ${t} нед > лимита мезоцикла 12: собран повторным циклом базового мезо (недели перенумерованы, фазы внутри блока повторяются)`);
+  }
+  plan.weeks = plan.weeksData.length;
+  if (plan.inputSnapshot) plan.inputSnapshot.weeks = plan.weeks;
+}
+
+/**
+ * Mini-taper для taper-блока БЕЗ даты боя: явный срез по единому источнику
+ * combat-taper (TAPER_SC_PRE/FIGHT/FIGHT_SHORT). Блок с датой боя сюда не
+ * попадает — там кривую применяет сам билдер (канонический scMult), и второй
+ * срез был бы двойным.
+ */
+function applyExplicitMiniTaper(plan: CombatPlan): void {
+  const n = plan.weeksData.length;
+  plan.weeksData.forEach((wk, i) => {
+    const mult = n <= 1 ? TAPER_SC_FIGHT_SHORT : i === n - 1 ? TAPER_SC_FIGHT : i === n - 2 ? TAPER_SC_PRE : 1;
+    if (mult >= 1) return;
+    wk.taper = true;
+    for (const sess of wk.sessions) {
+      for (const ex of sess.exercises) {
+        ex.sets = Math.max(2, Math.round(ex.sets * mult));
+        ex.workSets = ex.workSets.slice(0, ex.sets);
+        while (ex.workSets.length < ex.sets) ex.workSets.push({ reps: 5, rir: 2, weight: ex.weight });
+      }
+    }
+  });
+}
+
+export interface AnnualPlanBuildOptions {
+  level?: CombatLevel;
+  daysPerWeek?: number;
+  patternId?: string | null;
+  weightCutKg?: number;
+  bodyweight?: number;
+  sex?: 'male' | 'female';
+  /** Э5.7: фаза цикла из лога — паритет с планировщиком питания. */
+  cyclePhase?: CombatCyclePhase | null;
+  equipment?: string[];
+  mobilityRestrictions?: string[];
+  injuries?: any[];
+  /** Якорь даты года (неделя 1 = startDate). Тот же, что при добавлении боёв. */
+  startDate?: string | null;
+}
+
+/**
+ * Э5.2: собирает CombatPlan на КАЖДЫЙ блок года (`buildCombatPlan` +
+ * `finalizeCombatPlan`). Ошибка одного блока изолирована (status='error' +
+ * текст), остальные собираются. Чистая по возврату: исходный annual не
+ * мутируется, возвращается новый объект.
+ */
+export function buildAnnualPlans(annual: AnnualCB, opts?: AnnualPlanBuildOptions): AnnualCB {
+  const next: AnnualCB = {
+    ...annual,
+    blocks: annual.blocks.map(b => ({ ...b, plan: b.plan, status: b.status })),
+    updatedAt: new Date().toISOString(),
+  } as AnnualCB;
+  for (const b of next.blocks) {
+    try {
+      const target = Math.round(Number(b.weeks));
+      if (!Number.isFinite(target) || target < 1 || target > 52) {
+        b.status = 'error'; b.plan = undefined;
+        b.error = `некорректная длительность блока (${String(b.weeks)})`;
+        continue;
+      }
+      const startIso = blockStartDate(next, b, opts?.startDate ?? null);
+      const isTaperBlock = b.phase === 'taper';
+      const input: CombatInput = {
+        discipline: b.discipline as CombatInput['discipline'],
+        goal: annualBlockGoal(b.phase),
+        level: opts?.level ?? 'intermediate',
+        weeks: Math.max(2, Math.min(12, target)),
+        daysPerWeek: Math.min(4, Math.max(2, Math.round(opts?.daysPerWeek ?? 3))),
+        patternId: opts?.patternId || undefined,
+        weightCutKg: opts?.weightCutKg && opts.weightCutKg > 0 ? opts.weightCutKg : undefined,
+        bodyweight: opts?.bodyweight,
+        sex: opts?.sex,
+        cyclePhase: opts?.cyclePhase ?? undefined,
+        equipment: opts?.equipment,
+        mobilityRestrictions: opts?.mobilityRestrictions,
+        injuries: opts?.injuries,
+        startDate: startIso,
+        fightDate: b.fightDate ?? null,
+      } as any;
+      // без даты боя taper-блок строим linear'но (иначе camp_8 сам срежет
+      // хвост и явный mini-taper дал бы двойной срез)
+      if (isTaperBlock && !b.fightDate) input.periodizationModel = 'linear';
+      let plan = buildCombatPlan(input);
+      fitPlanToBlockWeeks(plan, target);
+      if (isTaperBlock && !b.fightDate) applyExplicitMiniTaper(plan);
+      plan = finalizeCombatPlan(plan);
+      if (isTaperBlock) {
+        const cut = target <= 1 ? `×${TAPER_SC_FIGHT}` : `×${TAPER_SC_PRE}→×${TAPER_SC_FIGHT}`;
+        plan.rationale.push(`🔻 Mini-taper блока: объём ${cut} (единый источник combat-taper; Bosquet 2007)`);
+      }
+      b.plan = plan;
+      b.status = 'built';
+      b.error = null;
+      b.startDate = startIso;
+    } catch (e: any) {
+      b.status = 'error';
+      b.plan = undefined;
+      b.error = e?.message ? String(e.message) : 'ошибка сборки блока';
+    }
+  }
+  return next;
 }
 
 // ATR 10нед: 5 Accum /3 Trans /2 Real (+ transition 2-4нед после главного)
@@ -262,7 +417,13 @@ export function buildAnnualPrintHtml(annual: AnnualCB): string {
   const phaseColor: Record<string,string> = { accumulation:'#3b82f6', transmutation:'#a855f7', realization:'#ef4444', transition:'#f59e0b', gpp:'#10b981', power:'#f97316', taper:'#06b6d4', deload:'#eab308', conjugate:'#6366f1' };
   const rows = annual.blocks.map(b=>{
     const col = phaseColor[b.phase] || '#6b7280';
-    return `<tr style="background:${col}14; border-left:4px solid ${col}"><td>${b.startWeek}-${b.startWeek+b.weeks-1}</td><td><span style="background:${col};color:#fff;padding:2px 6px;border-radius:4px;font-size:10px">${esc(cbAnnualPhaseName(b.phase))}</span></td><td>${esc(cbDisciplineName(b.discipline))}</td><td>${b.weeks}нед</td><td>${esc(cbAnnualStatusName(b.status))}</td><td>${b.fightDate? esc(b.fightDate):''}</td></tr>`;
+    // Э5.2: per-block строка плана — сколько недель/сетов/нед даёт собранный план
+    const pw = b.plan && Array.isArray(b.plan.weeksData) && b.plan.weeksData.length ? b.plan.weeksData : null;
+    const planInfo = pw
+      ? `<br><span style="font-size:9px;color:#6b7280">план блока: ${b.plan!.weeks} нед · ${Math.round(pw.reduce((s,w)=>s+(w.totalSets||0),0)/Math.max(1,b.plan!.weeks))} сетов/нед · ${esc(cbAnnualPhaseName((pw[0]?.phase as any) || b.phase))}</span>`
+      : '';
+    const errInfo = b.status === 'error' && b.error ? `<br><span style="font-size:9px;color:#b91c1c">${esc(b.error)}</span>` : '';
+    return `<tr style="background:${col}14; border-left:4px solid ${col}"><td>${b.startWeek}-${b.startWeek+b.weeks-1}</td><td><span style="background:${col};color:#fff;padding:2px 6px;border-radius:4px;font-size:10px">${esc(cbAnnualPhaseName(b.phase))}</span></td><td>${esc(cbDisciplineName(b.discipline))}</td><td>${b.weeks}нед</td><td>${esc(cbAnnualStatusName(b.status))}${planInfo}${errInfo}</td><td>${b.fightDate? esc(b.fightDate):''}</td></tr>`;
   }).join('');
   const comps = annual.competitions.map(c=> `<li>${esc(c.name)} — ${esc(c.date)} ${c.weightClass? '('+esc(c.weightClass)+')':''}</li>`).join('');
   // Gantt — горизонтальная полоса ATR (как annual-training-print)

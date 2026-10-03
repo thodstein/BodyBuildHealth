@@ -75,6 +75,12 @@ export interface CombatInput {
   weightClassRuleset?: string | null;
   travelMode?: 'off' | 'hotel';
   lutealPhase?: boolean;
+  /**
+   * Э5.7: фаза менструального цикла из лога `he_cycle_log` (паритет с
+   * планировщиком питания). Модуляция объёма/RIR только при sex==='female';
+   * без фазы — байт-в-байт прежнее поведение.
+   */
+  cyclePhase?: 'follicular' | 'ovulation' | 'luteal' | 'menstrual' | null;
   // №4: уровень шеи из диагностики (1–4, переопределяет автовыбор) + слабая сторона
   neckLevelOverride?: number | null;
   weakSide?: 'left' | 'right' | null;

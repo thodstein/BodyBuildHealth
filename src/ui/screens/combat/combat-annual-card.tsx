@@ -33,6 +33,12 @@ export interface AnnualCardProps {
   annualCyclesHint?: number;
   onPrintAnnual?: () => void;
   onDownloadIcs?: () => void;
+  /** Э5.2: собрать CombatPlan на каждый блок года. */
+  onBuildPlans?: () => void;
+  /** Э5.2: печать плана конкретного блока. */
+  onPrintBlock?: (block: any) => void;
+  /** Э5.2: загрузить план блока в конструктор. */
+  onLoadBlock?: (block: any) => void;
 }
 
 const PHASE_COLOR = (p: string) =>
@@ -100,6 +106,11 @@ export const AnnualCard: React.FC<AnnualCardProps> = (p) => {
               ↻ Построить {p.annualWeeks} нед ×{p.annualCycles ?? 1} ц
             </button>
           )}
+          {p.onBuildPlans && (
+            <button data-cb="annual-build-plans" onClick={p.onBuildPlans} style={{ ...BTN_SMALL, background: 'rgba(16,185,129,0.14)', color: '#6ee7b7', border: '0.5px solid rgba(16,185,129,0.24)' }}>
+              📦 Собрать планы блоков
+            </button>
+          )}
           {p.setAnnualWeeks && (
             <div style={{ flex: '1 1 140px', minWidth: 0 }}>
               <CombatPopupSelect label="Длина года" value={String(p.annualWeeks)} onChange={v => p.setAnnualWeeks!(Number(v))} options={[
@@ -129,7 +140,7 @@ export const AnnualCard: React.FC<AnnualCardProps> = (p) => {
             const col = PHASE_COLOR(b.phase);
             return (
               <span key={b.id} style={{ padding: '5px 8px', borderRadius: 10, fontSize: 10.5, fontWeight: 700, background: `${col}12`, border: `0.5px solid ${col}22`, color: col, fontVariantNumeric: 'tabular-nums' }}>
-                <Highlight color={col}>Нед {b.startWeek}-{b.startWeek + b.weeks - 1}</Highlight> · {ruLabel(PHASE_RU, b.phase)} · <Highlight color={col}>{b.weeks}нед</Highlight>{b.fightDate ? ' 🏁' : ''}
+                <Highlight color={col}>Нед {b.startWeek}-{b.startWeek + b.weeks - 1}</Highlight> · {ruLabel(PHASE_RU, b.phase)} · <Highlight color={col}>{b.weeks}нед</Highlight>{b.fightDate ? ' 🏁' : ''}{b.plan ? ' ✅' : b.status === 'error' ? ' ❌' : ''}
               </span>
             );
           })}
@@ -150,6 +161,31 @@ export const AnnualCard: React.FC<AnnualCardProps> = (p) => {
           <span>Нед 1 · {p.startDate || '—'}</span>
           <span>Нед {annual.totalWeeks}</span>
         </div>
+
+        {/* Э5.2: собранные планы блоков — печать и загрузка в конструктор */}
+        {blocks.some((b: any) => b.plan) && (
+          <div data-cb="annual-block-plans" style={{ display: 'flex', flexDirection: 'column', gap: 6, background: 'rgba(16,185,129,0.05)', border: '0.5px solid rgba(16,185,129,0.16)', borderRadius: 12, padding: 10 }}>
+            <div style={{ fontSize: 11, fontWeight: 800, color: '#6ee7b7' }}>
+              📦 Планы блоков · {blocks.filter((b: any) => b.plan).length}/{blocks.length}
+            </div>
+            {blocks.filter((b: any) => b.plan).map((b: any) => {
+              const setsWeek = (b.plan.weeksData || []).reduce((a: number, w: any) => a + (w.totalSets || 0), 0);
+              return (
+                <div key={b.id} data-cb="annual-block-plan" style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', background: 'rgba(255,255,255,0.03)', padding: '7px 9px', borderRadius: 10, border: '0.5px solid rgba(255,255,255,0.06)' }}>
+                  <span style={{ fontSize: 11, color: '#fff', flex: 1, minWidth: 140, fontVariantNumeric: 'tabular-nums' }}>
+                    Нед {b.startWeek}-{b.startWeek + b.weeks - 1} · {ruLabel(PHASE_RU, b.phase)} · план: <Highlight color="#6ee7b7">{b.plan.weeks} нед</Highlight> · {Math.round(setsWeek / Math.max(1, b.plan.weeks))} сетов/нед
+                  </span>
+                  {p.onPrintBlock && (
+                    <button data-cb="annual-block-print" aria-label={`Печать блока ${b.startWeek}-${b.startWeek + b.weeks - 1}`} onClick={() => p.onPrintBlock!(b)} style={{ ...BTN_SMALL, minHeight: 40, padding: '6px 10px', background: 'rgba(255,255,255,0.06)', color: '#fff', border: '0.5px solid rgba(255,255,255,0.1)' }}>🖨</button>
+                  )}
+                  {p.onLoadBlock && (
+                    <button data-cb="annual-block-load" aria-label={`Открыть блок ${b.startWeek}-${b.startWeek + b.weeks - 1} в конструкторе`} onClick={() => p.onLoadBlock!(b)} style={{ ...BTN_SMALL, minHeight: 40, padding: '6px 10px', background: 'rgba(168,85,247,0.14)', color: '#d8b4fe', border: '0.5px solid rgba(168,85,247,0.24)' }}>📂</button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
 
         {comps.length > 0 && (
           <div style={{ background: 'rgba(239,68,68,0.06)', border: '0.5px solid rgba(239,68,68,0.14)', borderRadius: 12, padding: 10 }}>

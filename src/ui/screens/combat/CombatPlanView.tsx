@@ -59,6 +59,10 @@ type Props = {
   onPrintAnnual?: () => void;
   onDownloadIcs?: () => void;
   onExportProgram?: () => void;
+  /** Э5.2: сборка/печать/загрузка планов блоков года. */
+  onBuildPlans?: () => void;
+  onPrintBlock?: (block: any) => void;
+  onLoadBlock?: (block: any) => void;
 };
 
 /* Карта качества шея/хват/core по неделям — переиспользуется в шаге «Качество» */
@@ -137,6 +141,7 @@ export const CombatPlanView: React.FC<Props> = ({
   annual, annualWeeks, setAnnualWeeks, annualCycles, setAnnualCycles, competitionName, setCompetitionName, competitionDate, setCompetitionDate, competitionWeight, setCompetitionWeight, competitionPriority, setCompetitionPriority,
   startDate, outside, outsideMetrics, diaryLoad, acwr, msg, setMsg,
   onBuildATR, onAddCompetition, onRemoveCompetition, onRemoveAnnual, annualCyclesHint, onPrintAnnual, onDownloadIcs, onExportProgram,
+  onBuildPlans, onPrintBlock, onLoadBlock,
 }) => {
   const [expandedWeek, setExpandedWeek] = React.useState<number | null>(0);
   const [openSess, setOpenSess] = React.useState<Record<string, boolean>>({});
@@ -433,6 +438,9 @@ export const CombatPlanView: React.FC<Props> = ({
           annualCyclesHint={annualCyclesHint}
           onPrintAnnual={onPrintAnnual}
           onDownloadIcs={onDownloadIcs}
+          onBuildPlans={onBuildPlans}
+          onPrintBlock={onPrintBlock}
+          onLoadBlock={onLoadBlock}
         />
       )}
 

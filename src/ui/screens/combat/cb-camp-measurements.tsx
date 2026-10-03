@@ -16,7 +16,7 @@ import {
   loadRtp, addRtp, rtpSummary, RTP_STAGES, RTP_STAGE_BY_ID, RTP_EARLY_AEROBIC_NOTE, RTP_SOURCE_IDS, HEAT_EVIDENCE,
   loadTests, addTest, testBattery, COMBAT_TEST_BATTERY, COMBAT_TEST_BY_ID,
   loadRmr, addRmr, loadPower, addPower, rmrDeltaFromJournal, powerDeltaPctFromJournal,
-  readScreenManual, writeScreenManual, resolveScreenInputs, COMBAT_TESTS_KEY,
+  readScreenManual, writeScreenManual, resolveScreenInputs, COMBAT_TESTS_KEY, estimateTrainingKcalFromDiary,
   type RtpStageId, type CombatTestId, type ScreenField, type ScreenSource,
   type SparType, type GripHand,
 } from '../../../engines/combat/combat-measurements.engine';
@@ -169,9 +169,21 @@ export const CbCampMeasurementsCard: React.FC<{
   // ВСЕ пять пропсов идут в auto: родитель может передать любой из них, и это
   // валидный источник. Сейчас CombatPlanView передаёт только kcal и ffmKg —
   // расход и симптомы приходят исключительно из ручного ввода.
+  // Э5.7: авто-тренировочный расход из дневника (кардио — MET-оценки; силовая
+  // часть честно не выводится). Ручной ввод в `manual` перекрывает авто.
+  const autoTraining = useMemo(() => {
+    let srpe: unknown[] = [];
+    try { const raw = JSON.parse(localStorage.getItem('he_srpe_sessions') || '[]'); if (Array.isArray(raw)) srpe = raw; } catch { /* no-op */ }
+    return estimateTrainingKcalFromDiary(srpe, { weightKg: (snap as any)?.bodyweight ?? (snap as any)?.bodyweightKg ?? null });
+  }, [snap?.bodyweight, (snap as any)?.bodyweightKg]);
   const [manual, setManual] = useState(() => readScreenManual());  const resolved = useMemo(
-    () => resolveScreenInputs({ kcal, trainingKcal, ffmKg, cat2Flags, heatSessions }, manual),
-    [kcal, trainingKcal, ffmKg, cat2Flags, heatSessions, manual]);
+    () => resolveScreenInputs({ kcal, trainingKcal: trainingKcal ?? autoTraining.kcal, ffmKg, cat2Flags, heatSessions }, manual),
+    [kcal, trainingKcal, autoTraining.kcal, ffmKg, cat2Flags, heatSessions, manual]);
+  // Подпись источника: авто-расход из дневника не должен называться «из плана».
+  const srcName = useCallback((f: ScreenField): string =>
+    resolved.source[f] === 'auto' && f === 'trainingKcal' && trainingKcal == null && autoTraining.partial
+      ? 'из дневника'
+      : SCREEN_SRC_LABEL[resolved.source[f]], [resolved, trainingKcal, autoTraining.partial]);
   const onSetManual = useCallback((f: ScreenField, raw: string) => {
     const next = writeScreenManual({ ...readScreenManual(), [f]: raw === '' ? null : Number(raw.replace(',', '.')) } as any);
     setManual(next);
@@ -414,7 +426,7 @@ export const CbCampMeasurementsCard: React.FC<{
           {SCREEN_INPUT_ROWS.map((r) => (
             <label key={r.field} style={{ fontSize: 11, color: '#fff', display: 'flex', flexDirection: 'column', gap: 2, flex: '0 1 132px' }}>
               <span data-cb={`lea-src-${r.field}`} data-src={resolved.source[r.field]}>
-                {r.label} · {SCREEN_SRC_LABEL[resolved.source[r.field]]}
+                {r.label} · {srcName(r.field)}
                 {resolved[r.field] !== null ? ` = ${resolved[r.field]}` : ''}
               </span>
               <input
@@ -431,8 +443,13 @@ export const CbCampMeasurementsCard: React.FC<{
             </label>
           ))}
         </div>
+        {autoTraining.partial && trainingKcal == null && (
+          <span data-cb="lea-diary-note" style={{ fontSize: 11, color: '#fff' }}>
+            🩺 Дневник: ≈{autoTraining.kcal} ккал/сут (кардио-часть за {autoTraining.windowDays} дн). {autoTraining.note}
+          </span>
+        )}
         <div data-cb="lea-src-note" style={{ fontSize: 11, color: '#fff' }}>
-          «Из плана» и «из профиля» подставляются автоматически, «вручную» — то, что вы ввели сами. Тренировочный расход и признаки CAT2 вводятся только вручную: вывести их из данных без выдуманного коэффициента нельзя.
+          «Из плана», «из профиля» и «из дневника» подставляются автоматически, «вручную» — то, что вы ввели сами. Трен. расход авто берётся только из кардио-дневника (MET-оценки); силовая часть и признаки CAT2 вводятся только вручную: перевести sRPE в ккал без выдуманного коэффициента нельзя.
         </div>
         <Badge>{lea.source}</Badge>
       </div>

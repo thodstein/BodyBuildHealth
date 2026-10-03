@@ -13,7 +13,8 @@ import { COMBAT_CYCLE_LIBRARY, getCombatCycle } from '../../../engines/combat/co
 import type { OutsideLoad } from '../../../engines/outside-load.engine';
 import { saveCombatPlan, loadCombatPlans, removeCombatPlan, migrateAllCombatStorage } from '../../../engines/combat/combat-storage';
 import { applyCombatMesocycle, combatMesocycleHash, shouldApplyCombatMesocycle } from '../../../engines/combat/combat-mesocycle';
-import { buildAnnualATR, saveAnnualCB, loadAnnualCB, removeAnnualCB, buildAnnualPrintHtml, buildAnnualIcs, addCompetitionToAnnual, removeCompetitionFromAnnual, autoAnnualWithFightTaper } from '../../../engines/combat/combat-annual';
+import { buildAnnualATR, saveAnnualCB, loadAnnualCB, removeAnnualCB, buildAnnualPrintHtml, buildAnnualIcs, addCompetitionToAnnual, removeCompetitionFromAnnual, autoAnnualWithFightTaper, buildAnnualPlans } from '../../../engines/combat/combat-annual';
+import { autoCombatCyclePhase } from '../../../engines/combat/combat-female-cycle';
 import { AnnualCard } from './combat-annual-card';
 import { CbCampIntelCard } from './cb-camp-intel';
 import { buildCombatPrintHtml, downloadCombatCsv, buildCombatPlanIcs } from '../../../engines/combat/combat-print.engine';
@@ -353,6 +354,11 @@ export const CombatConstructor: React.FC = () => {
     } catch {}
     // P1-27: RTP-гейт — если протокол возврата начат и не завершён, сборка ограничивает интенсивность
     try { const rtpFlag = rtpIncomplete(loadRtp()); if (rtpFlag) extra.rtpIncomplete = true; } catch {}
+    // Э5.7: фаза цикла из he_cycle_log — только для female; нет лога → без модуляции
+    let cyclePhase: CombatInput['cyclePhase'] = null;
+    if (sex === 'female') {
+      try { const auto = autoCombatCyclePhase(); if (auto.phase !== 'none') cyclePhase = auto.phase; } catch { /* no-op */ }
+    }
     const wcProtocol = weightCut > 0 ? buildWeightCutProtocol(weightCut, { startWeightKg: bodyweight, waterMode, sodiumMode, carbMode, heatSessions, weighInType: weighInType as any, confirmedManipulation, orsSodiumMmolPerDl: orsSodium, discipline, fiberGPerDay: weightCutFiber, dailyStepsTarget: weightCutSteps } as any) : null;
     // P1-12: спарринг учитывается только при включённом мастере «нагрузка вне зала»
     // Э1.1: avgDurationMin из журнала (кнопка «Из журнала») масштабирует нагрузку
@@ -391,6 +397,7 @@ export const CombatConstructor: React.FC = () => {
       weightClassRuleset: weightClassRuleset || undefined,
       travelMode: travelMode !== 'off' ? travelMode : undefined,
       lutealPhase: lutealPhase || undefined,
+      cyclePhase: cyclePhase || undefined,
       courseIntensity: courseIntensity !== 'auto' ? courseIntensity : undefined,
       ...extra,
     } as any;
@@ -624,6 +631,44 @@ export const CombatConstructor: React.FC = () => {
       const a = document.createElement('a'); a.href = url; a.download = `combat-annual-${annual.totalWeeks}w.ics`; a.click();
       setTimeout(() => URL.revokeObjectURL(url), 1000);
     } catch (e) { setMsg('⚠ Не удалось выгрузить календарь — проверьте даты боя'); setTimeout(() => setMsg(''), 2600); }
+  };
+  /** Э5.2: собрать CombatPlan на каждый блок года (ошибки блоков изолированы). */
+  const handleBuildAnnualPlans = () => {
+    if (!annual) { doMsg('⚠ Сначала постройте год'); return; }
+    let phase: CombatInput['cyclePhase'] = null;
+    if (sex === 'female') { try { const a = autoCombatCyclePhase(); if (a.phase !== 'none') phase = a.phase; } catch { /* no-op */ } }
+    try {
+      const next = buildAnnualPlans(annual, {
+        level: level as any,
+        daysPerWeek: days,
+        patternId: patternId || null,
+        weightCutKg: weightCut > 0 ? weightCut : undefined,
+        bodyweight, sex,
+        cyclePhase: phase,
+        equipment, mobilityRestrictions: mobility, injuries,
+        startDate: startDate || null,
+      });
+      saveAnnualCB(next); setAnnual(next);
+      const built = next.blocks.filter(b => b.status === 'built').length;
+      const errs = next.blocks.filter(b => b.status === 'error').length;
+      doMsg(`📦 Планы блоков: собрано ${built}${errs ? ` · ошибок ${errs}` : ''}`);
+    } catch { doMsg('⚠ Не удалось собрать планы блоков'); }
+  };
+  const handlePrintAnnualBlock = (b: any) => {
+    if (!b?.plan) { doMsg('⚠ У блока нет собранного плана'); return; }
+    try {
+      const html = buildCombatPrintHtml(b.plan);
+      const w = window.open('', '_blank');
+      if (w) { w.document.write(html); w.document.close(); w.print(); } else { navigator.clipboard?.writeText(html); doMsg('HTML скопирован'); }
+    } catch { doMsg('⚠ Не удалось напечатать блок'); }
+  };
+  const handleLoadAnnualBlock = (b: any) => {
+    if (!b?.plan) { doMsg('⚠ У блока нет собранного плана'); return; }
+    try {
+      setPlan(JSON.parse(JSON.stringify(b.plan)));
+      go('plan');
+      doMsg(`📂 План блока (нед ${b.startWeek}-${b.startWeek + b.weeks - 1}) загружен в конструктор`);
+    } catch { doMsg('⚠ Не удалось загрузить план блока'); }
   };
   const doMsg = (m: string) => { setMsg(m); setTimeout(() => setMsg(''), 2200); };
   const mesoPrev = React.useMemo(() => {
@@ -1319,6 +1364,9 @@ export const CombatConstructor: React.FC = () => {
           onPrintAnnual={handlePrintAnnual}
           onDownloadIcs={handleDownloadIcs}
           onExportProgram={exportToUserProgram}
+          onBuildPlans={handleBuildAnnualPlans}
+          onPrintBlock={handlePrintAnnualBlock}
+          onLoadBlock={handleLoadAnnualBlock}
           annual={annual}
           annualWeeks={annualWeeks}
           setAnnualWeeks={setAnnualWeeks}
@@ -1463,6 +1511,9 @@ export const CombatConstructor: React.FC = () => {
               annualCyclesHint={annualCycles}
               onPrintAnnual={handlePrintAnnual}
               onDownloadIcs={handleDownloadIcs}
+              onBuildPlans={handleBuildAnnualPlans}
+              onPrintBlock={handlePrintAnnualBlock}
+              onLoadBlock={handleLoadAnnualBlock}
             />
           ) : (
             <div className="cb-empty" style={{ ...CARD, alignItems: 'center', padding: 28, textAlign: 'center' }}>

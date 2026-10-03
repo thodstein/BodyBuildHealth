@@ -1,5 +1,39 @@
 # AGENTS.md - BioStackAIScreen + BB-builder
 
+## Планировщик единоборств PRO-3: wave8 — остаток §5 закрыт (Oct 3 2026, коммит pathspec, без пуша)
+
+По промту «Выполни остаток плана docs/COMBAT-PLANNER-PRO-3-PLAN.md §5–§6 (Э5.2 год планами, LEA из sRPE, женская
+модуляция)». Только Edit/Write + vitest/tsc; чужие WIP (`recipe-db`/`recipe-engine`, `.tmp-dbg3.txt`, `zz-probe-p30`)
+не тронуты; коммит строго pathspec; **без пуша**.
+
+- **Э5.2 — год собирается планами по блокам** (`combat-annual.ts` + `combat-annual-card.tsx`):
+  `buildAnnualPlans(annual, opts)` — `buildCombatPlan`+`finalizeCombatPlan` на КАЖДЫЙ блок; цель из фазы
+  (`annualBlockGoal`: accumulation/gpp/transmutation→power, realization/taper→camp, transition→maintenance);
+  `blockStartDate`-якорь (неделя 1 = startDate года, мусор → null); taper-блок — единый источник `combat-taper`
+  (с датой боя — каноническая кривая билдера, без даты — явные `TAPER_SC_PRE/FIGHT/FIGHT_SHORT` на linear-сборке,
+  без двойного среза) + маркер `🔻 Mini-taper` в rationale; блок >12 нед собирается повторным циклом недель
+  (перенумерация + маркер `🔁`); ошибки блоков изолированы (`status:'error'`+`error`, остальные собираются);
+  `startDate` блока пишется в блок. Печать года — строка «план блока: N нед · X сетов/нед · фаза» (+ error-текст
+  экранируется); `AnnualCard` — «📦 Собрать планы блоков» + «🖨»/«📂» на каждом собранном блоке
+  (обработчики в `CombatConstructor`, проброс через `CombatPlanView`).
+- **Э5.7 — LEA из sRPE** (`combat-measurements.engine`): `estimateTrainingKcalFromDiary(srpeSessions, opts)` —
+  кардио-часть реальными MET-оценками (`estimateCardioEntryKcal` за окно `he_cardio_sessions`); силовой вклад из
+  sRPE **честно `null`** (подписанной формулы sRPE→ккал в проекте нет — множитель не выдуман), `partial:true` +
+  «введите вручную»; авто в `resolveScreenInputs` (ручное приоритетнее), на карточке — подпись «из дневника» и
+  честная нота. Тест: сид кардио-дневника → kcal>0; пусто → null и «вручную».
+- **Э5.7 — женская модуляция по фазе цикла**: NEW `combat-female-cycle` — фаза из `he_cycle_log` (паритет с
+  `planner-cycle-calendar`, lock на 40 днях: границы фаз и медиана длины 1-в-1), `cycleModulationFor`: лютеиновая
+  −7% объёма недели + RIR+1; менструальная −10% + RIR ≥3 (без отказа); фолликулярная/овуляция — норма. Гейт
+  `sex==='female' && cyclePhase`; без лога — байт-в-байт (weeksData/rationale/id равны). Срез недельный (на
+  упражнении −7%/−10% округлялись до нуля при 2–3 сетах), делод/тапер повторно не режутся; конструктор читает
+  фазу из лога при сборке (`autoCombatCyclePhase`).
+- **Проверено**: `src/engines/combat`+`src/ui/screens/combat` — **942/942** (57 файлов; 783 движков + 159 UI;
+  94 лока в 9 файлах `combat-pro3-wave1..8`), `tsc --noEmit` **0 по всему проекту**, `verify:apk-design` OK,
+  user-program/manual-круг 56/56. NEW `combat-pro3-wave8` 18/18 (движок) + `combat-pro3-wave8-ui` 8/8.
+- **Границы (честно)**: силовая часть расхода — `null` до появления подписанной формулы sRPE→ккал; женская
+  модуляция — только при непустом `he_cycle_log`; блок >12 нед — повтор мезо (фазы внутри блока повторяются);
+  `opts.startDate` должен совпадать с якорем года при добавлении боёв (иначе taper-блок без якоря).
+
 ## Планировщик единоборств PRO-3: продолжение после коммита fb9b9e20e — Э5.3-волна, Э5.5-журналы, Э6-P2 (Oct 3 2026, коммит pathspec, без пуша)
 
 По команде «продолжай, если нужна новая сессия предупреждай заранее и напиши промт» после коммита `fb9b9e20e`

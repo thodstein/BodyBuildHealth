@@ -9,6 +9,7 @@
  */
 
 import type { SparringLoad } from './combat-sparring.engine';
+import { loadCardioLog, estimateCardioEntryKcal, type CardioLogEntry } from '../lms/cardio-diary.engine';
 
 // ─── 8.1 Журнал веса ───────────────────────────────────────────────────────
 
@@ -990,6 +991,103 @@ export function resolveScreenInputs(
   return {
     kcal: k.v, trainingKcal: t.v, ffmKg: f.v, cat2Flags: c.v, heatSessions: h.v,
     source: { kcal: k.s, trainingKcal: t.s, ffmKg: f.s, cat2Flags: c.s, heatSessions: h.s },
+  };
+}
+
+// ─── Э5.7: авто-источник тренировочного расхода для LEA ────────────────────
+//
+// Честность важнее полноты. Единственный подписанный источник в проекте —
+// MET-модель кардио-движка (`estimateCardioEntryKcal` — реальные оценки
+// записей кардио-дневника). Перевести силовые sRPE-сессии в ккал нечем:
+// подписанной формулы sRPE→ккал/мин в коде НЕТ, а «придумать множитель» —
+// тот самый класс ошибок, который запрещён правилом проекта. Поэтому силовая
+// часть здесь всегда честный null со строкой «введите вручную», а итог
+// (`partial:true`) — только кардио-часть: пользователь видит, что это не весь
+// расход, и может вписать силовую часть сам (ручной ввод приоритетнее авто).
+
+export interface DiaryTrainingKcal {
+  /** Авто-оценка тренировочного расхода, ккал/сут. null — данных нет. */
+  kcal: number | null;
+  /** Кардио-часть: сумма MET-оценок за окно / дни. */
+  cardioKcalPerDay: number | null;
+  /** Силовая часть: null — нет подписанной формулы перевода sRPE→ккал. */
+  strengthKcalPerDay: number | null;
+  /** Сколько кардио-записей попало в окно. */
+  cardioEntries: number;
+  /** Сколько sRPE-сессий попало в окно (в ккал не переводим). */
+  srpeSessions: number;
+  /** Итог покрывает только кардио-часть — силовой вклад пользователь вводит сам. */
+  partial: boolean;
+  /** Окно агрегации, дней. */
+  windowDays: number;
+  /** Честная строка для UI. */
+  note: string;
+}
+
+/** Локальная ISO-дата (без UTC-сдвига). */
+function todayIsoLocal(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+/** Сдвиг ISO-даты в UTC-арифметике (date-only строки — безопасно). */
+function isoShiftDays(iso: string, days: number): string {
+  const d = new Date(iso + 'T00:00:00Z');
+  if (!Number.isFinite(d.getTime())) return iso;
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
+/**
+ * Авто-тренировочный расход из дневника для скрининга LEA.
+ * - кардио-дневник: `estimateCardioEntryKcal` по фактическим записям в окне;
+ * - sRPE-сессии: только считаются (в ккал не переводятся — формулы нет).
+ *
+ * @param srpeSessions sRPE-сессии (`he_srpe_sessions`); нужны лишь для честной строки.
+ * @param opts.cardioEntries явный журнал (тесты/повторное использование); иначе `loadCardioLog()`.
+ */
+export function estimateTrainingKcalFromDiary(
+  srpeSessions?: unknown[] | null,
+  opts?: { cardioEntries?: CardioLogEntry[] | null; days?: number; todayIso?: string; weightKg?: number | null },
+): DiaryTrainingKcal {
+  const days = Math.max(1, Math.min(28, Math.round(opts?.days ?? 7)));
+  const today = typeof opts?.todayIso === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(opts.todayIso) ? opts.todayIso : todayIsoLocal();
+  const from = isoShiftDays(today, -(days - 1));
+  const inWindow = (d: unknown): boolean =>
+    typeof d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d) && d >= from && d <= today;
+
+  let entries: CardioLogEntry[];
+  if (Array.isArray(opts?.cardioEntries)) entries = opts!.cardioEntries!;
+  else { try { entries = loadCardioLog(); } catch { entries = []; } }
+
+  let cardioEntries = 0;
+  let cardioSum = 0;
+  for (const e of entries) {
+    if (!e || (e as any).completed === false) continue;
+    if (!inWindow((e as any).date)) continue;
+    const dur = Number((e as any).durationMin);
+    if (!Number.isFinite(dur) || dur <= 0) continue;
+    cardioEntries++;
+    cardioSum += estimateCardioEntryKcal((e as any).type, dur, opts?.weightKg ?? undefined);
+  }
+  const cardioKcalPerDay = cardioEntries > 0 ? Math.round(cardioSum / days) : null;
+  const srpeCount = Array.isArray(srpeSessions)
+    ? srpeSessions.filter((s: any) => inWindow(s?.date)).length
+    : 0;
+  const note = cardioKcalPerDay === null
+    ? 'Кардио-дневник за окно пуст — тренировочный расход введите вручную.'
+    : srpeCount > 0
+      ? 'Взята только кардио-часть (MET-оценки дневника): подписанной формулы sRPE→ккал нет — силовой вклад введите вручную.'
+      : 'Кардио-часть из дневника (MET-оценки); силовой вклад не входит — при необходимости введите вручную.';
+  return {
+    kcal: cardioKcalPerDay,
+    cardioKcalPerDay,
+    strengthKcalPerDay: null,
+    cardioEntries,
+    srpeSessions: srpeCount,
+    partial: cardioKcalPerDay !== null,
+    windowDays: days,
+    note,
   };
 }
 

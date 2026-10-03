@@ -204,9 +204,9 @@ UI: 7 шагов визарда (`CombatConstructor.tsx`), состояние в
 
 ---
 
-## 5. СТАТУС ВЫПОЛНЕНИЯ (3 окт 2026, без коммита — worktree)
+## 5. СТАТУС ВЫПОЛНЕНИЯ (3 окт 2026, продолжение wave8 — остаток §5 закрыт)
 
-**Сделано и проверено** (`src/engines/combat` + `src/ui/screens/combat` — **900/900**, `tsc --noEmit` **0**, `verify:apk-design` OK, user-program/manual-круг 78/78):
+**Сделано и проверено** (`src/engines/combat` + `src/ui/screens/combat` — **942/942**, `tsc --noEmit` **0**, `verify:apk-design` OK, user-program/manual-круг 56/56):
 
 - **В1 (P0-1…4, 9–14)**: единый `admitCombatExercise` (пул/fallback/авто-core/авто-шея/prehab) — teen-бан, травмы, исключения, мобильность, оборудование; `holdSeconds` + детект по цифре; изометрии шеи вес 0; camp+taper кондиция; нормализация недель года (52×2=52, 12×4 кламп циклов); валидация дат года + shape стора + ICS guard; XLSX реальный ArrayBuffer (**найден и закрыт скрытый дефект: экспорт ВСЕГДА писал pad-муляж, тест проходил на нём**). NEW `combat-pro3-wave1` 16/16.
 - **В2 (P0-5…8)**: `combatPlanToUserProgram` + `ProgramDirection 'combat'` + `CombatProgramBody` + shape/validate + редактор/иконки; хэш-гард мезоцикла (`combatMesocycleHash`/`shouldApplyCombatMesocycle`, фильтр дисциплины); PED-маппинг `{id: doseMg}`; живой ключ `he_workout_log_v2` + `flattenDiaryLogsCB` (weightKg→weight). NEW `combat-pro3-wave2` 12/12.
@@ -216,18 +216,22 @@ UI: 7 шагов визарда (`CombatConstructor.tsx`), состояние в
 - **В6 (частично, Э4.1)**: менеджер сохранённых планов (загрузка/удаление); ре-валидация после правок (finalize-семантика в хэндлерах); своп пересчитывает вес/темп/отдых; агрегаты недели после правок; вариант restored выходит из просмотра при правке.
 - **В7 (продолжение, вторым заходом)**: **Э2.2** разминочная лестница 40/60/75/85% (было 1 сет 50%) + топ-сет и бэкоффы 90% на тяж-базе ≥3 сетов (делод ровный); **Э5.3** `conditioningSuggestedDays` (0=Пн, разнос ≥36ч) в сессиях + строка размещения в rationale; **Э5.6** `HEAT_EVIDENCE` выведен в тепловой блок (был мёртвым экспортом); **Э6** `CB_RU_MODEL` camp_8/linear (rationale и печать), **чистый финализатор** (HRV только из снимка плана, localStorage больше не читается), селект теста E8 показывает текущий тест, удалены 8 проверенно мёртвых экспортов (`ensureMandatory`, `phaseForCombatWeekNew`, `weekGroupExercises`, `checkStatus`, `variantChangedRows`, `combatDiaryStatsFromSessions`, `combatNutritionEventPayload`, `buildCombatShareHash`). NEW `combat-pro3-wave6` 7/7.
 - **Продолжение (третьим заходом)**: **Э5.5** журналы RMR/мощности (`loadRmr`/`addRmr`/`loadPower`/`addPower`/`rmrDeltaFromJournal`/`powerDeltaPctFromJournal`, капы/валидация) + UI-блок «Весовые качели» в замерах с `weightCycleVerdict` (RMR −253/мощность −27% → danger, источник PMID 40443978); **Э5.3-недельная волна**: нечётные недели накопления — power-акценты (полный отдых), чётные — capacity (Jamieson) + строка rationale; **Э6-P2**: внешний QR `api.qrserver.com` убран из печати плана/года (офлайн-АПК, хэш не утекает), `daysToFirstFight` = ближайший БУДУЩИЙ бой (прошлый больше не перекрывает отсчёт). NEW `combat-pro3-wave7` 9/9.
+- **Продолжение (четвёртым заходом, wave8 — остаток §5 закрыт)**:
+  - **Э5.2 — год собирается планами по блокам**: `buildAnnualPlans(annual, opts)` — `buildCombatPlan` + `finalizeCombatPlan` на каждый блок (цель из фазы `annualBlockGoal`: accumulation/gpp/transmutation→power, realization/taper→camp, transition→maintenance; `patternId`/`level`/`weightCutKg`/`daysPerWeek`/sex/cyclePhase из opts); `blockStartDate(annual, block, startDate)` — якорь «неделя 1 = startDate года» (невалидный якорь → null, без Date.now-догадок); taper-блок режет объём единым источником `combat-taper` (блок с датой боя — канонической кривой билдера, без даты — явными `TAPER_SC_PRE/FIGHT/FIGHT_SHORT` linear-сборкой без двойного среза); маркер `🔻 Mini-taper` в rationale; блок длиннее лимита мезоцикла (12 нед) собирается повторным циклом недель (перенумерация, маркер в rationale); ошибки блоков изолированы (`status:'error'` + `error`, остальные собираются); персист переживает shape-валидацию. Per-block строка «план блока: N нед · X сетов/нед · фаза» в `buildAnnualPrintHtml`; на `AnnualCard` — «📦 Собрать планы блоков» + на каждом собранном блоке «🖨 Печать блока» и «📂 В конструктор» (обработчики в `CombatConstructor`, проброс через `CombatPlanView`).
+  - **Э5.7 — LEA из sRPE**: `estimateTrainingKcalFromDiary(srpeSessions, opts)` в `combat-measurements` — кардио-часть = реальные MET-оценки `estimateCardioEntryKcal` за окно (`he_cardio_sessions`, живьём через `loadCardioLog`); силовой вклад из sRPE **честно `null`** (подписанной формулы sRPE→ккал в проекте нет — множитель не выдуман), `partial:true` + строка «введите вручную»; авто идёт в `resolveScreenInputs` (ручной ввод приоритетнее), подпись источника «из дневника» и честная нота на карточке.
+  - **Э5.7 — женская модуляция по фазе цикла**: NEW `combat-female-cycle` — фаза из `he_cycle_log` (паритет с `planner-cycle-calendar`, lock-тест на 40 днях: границы фаз/медиана длины идентичны), `cycleModulationFor`: лютеиновая — объём недели −7% и RIR+1, менструальная — −10% и RIR ≥3 (без отказа), фолликулярная/овуляция — норма; гейт `sex==='female' && cyclePhase` (без лога — байт-в-байт по weeksData/rationale/id); срез объёма недельный (на упражнении −7%/−10% округлялись до нуля при 2–3 сетах), делод/тапер не режутся повторно; конструктор читает фазу из лога при сборке.
+  - NEW `combat-pro3-wave8` **18/18** + UI `combat-pro3-wave8-ui` **8/8**.
 
-**Итог прогонов**: `src/engines/combat` + `src/ui/screens/combat` — **916/916** (55 файлов; 765 движков + 151 UI; база 848 + 68 локов в 7 файлах `combat-pro3-wave1..7`), `tsc --noEmit` **0**, `verify:apk-design` OK, user-program/manual-круг 75/75.
+**Итог прогонов**: `src/engines/combat` + `src/ui/screens/combat` — **942/942** (57 файлов; 783 движков + 159 UI; база 848 + 94 лока в 9 файлах `combat-pro3-wave1..8`), `tsc --noEmit` **0**, `verify:apk-design` OK, user-program/manual-круг 56/56.
 
 **Осталось (честные границы)**:
-- Э5.2 год собирается планами по блокам (сейчас — календарь; mini-taper/startDate-якорь/per-block экспорт не сделаны).
-- Э5.7: женская модуляция по фазе цикла (`he_cycle_log`), LEA из sRPE (нужен подписанный источник формулы силового вклада — иначе честный null).
+- Э5.7 закрыт: LEA — кардио-часть реальная, силовая честно `null` до появления подписанной формулы sRPE→ккал; женская модуляция — только при наличии лога `he_cycle_log`.
 - Э6: VBT-трио (`loadVbtHistoryCB`/`saveVbtHistoryCB`/`diagnoseVelocityLossEwma`) оставлено `@deprecated` по политике «API сохранён»; тест-локнутые экспорты (`validateCombatCycles`, `TAPER_SC_*`, `CB_ANGLE_CLASSES` и др.) не удалялись осознанно.
 - P1-8: семантика `validateCombatPlan` задокументирована (сохранённые ошибки — из входных гейтов; свежесть через ре-сборку), «чистый fresh-режим» не вводился осознанно.
 - P1-29: `trainingYears` не пробрасывается — поля нет в профиле (граница).
 - P0-10/P0-11 покрыты тестами; `combatPlanId` изменился (добавлены `workMaxByExercise`/`weightClassRuleset` в стабильный хэш) — старые сохранённые планы не удаляются (лежат в списке), новые id уникальнее.
 
-## 6. Промт новой сессии (остаток: Э5.2 год планами, LEA из sRPE, женская модуляция)
+## 6. Промт новой сессии (остаток: Э5.2 год планами, LEA из sRPE, женская модуляция) — ✅ ВЫПОЛНЕНО wave8 (см. §5)
 
 > «Выполни остаток плана `docs/COMBAT-PLANNER-PRO-3-PLAN.md` §5 — крупные эпики, вынесенные в новую сессию.
 > Только Edit/Write + vitest/tsc; чужие файлы не трогать; коммит строго pathspec; без пуша.
