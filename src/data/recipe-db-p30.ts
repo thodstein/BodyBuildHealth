@@ -53,9 +53,9 @@ export const RECIPE_DB_P30: Recipe[] = [
   {
     name: 'BB-Масса: рис с яичницей и сыром', meal: 'breakfast', prepTimeMin: 15,
     kcal: 860, protein: 41, fat: 40, carbs: 84,
-    ingredientIds: ['rice_white', 'egg_whole', 'cheese_hard', 'olive_oil', 'tomato'], portions: { rice_white: 100, egg_whole: 200, cheese_hard: 30, olive_oil: 8, tomato: 100 },
+    ingredientIds: ['rice_white', 'egg_whole', 'cheese_hard', 'olive_oil', 'tomato'], portions: { rice_white: 260, egg_whole: 200, cheese_hard: 30, olive_oil: 8, tomato: 100 },
     difficulty: 'easy', cookSkill: 'basic', batchFriendly: true,
-    ingredients: ['Рис 100 г (сухой)', 'Яйца 200 г', 'Твёрдый сыр 30 г', 'Оливковое масло 8 г', 'Помидор 100 г'],
+    ingredients: ['Рис 260 г (вареный)', 'Яйца 200 г', 'Твёрдый сыр 30 г', 'Оливковое масло 8 г', 'Помидор 100 г'],
     instructions: ['Отварить рис', 'Пожарить яйца, смешать с рисом', 'Посыпать сыром, добавить помидор'],
     tags: ['завтрак', 'масса', 'углеводы'], usefulness: 8.4,
     description: 'Рис на завтрак — азиатская классика массонабора',
@@ -103,9 +103,9 @@ export const RECIPE_DB_P30: Recipe[] = [
   {
     name: 'BB-Масса: рисовая каша на молоке с изюмом', meal: 'breakfast', prepTimeMin: 20,
     kcal: 825, protein: 44, fat: 20, carbs: 119,
-    ingredientIds: ['rice_white', 'milk', 'whey_isolate', 'raisins', 'butter'], portions: { rice_white: 90, milk: 400, whey_isolate: 30, raisins: 40, butter: 10 },
+    ingredientIds: ['rice_white', 'milk', 'whey_isolate', 'raisins', 'butter'], portions: { rice_white: 230, milk: 400, whey_isolate: 30, raisins: 40, butter: 10 },
     difficulty: 'easy', cookSkill: 'basic', batchFriendly: false,
-    ingredients: ['Рис 90 г (сухой)', 'Молоко 400 мл', 'Протеин 30 г', 'Изюм 40 г', 'Масло сливочное 10 г'],
+    ingredients: ['Рис 230 г (вареный)', 'Молоко 400 мл', 'Протеин 30 г', 'Изюм 40 г', 'Масло сливочное 10 г'],
     instructions: ['Варить рис на молоке до готовности', 'Вмешать протеин, изюм и масло'],
     tags: ['завтрак', 'масса', 'углеводы'], usefulness: 8.5,
     description: 'Молочная рисовая каша — 119 г углеводов для массы',

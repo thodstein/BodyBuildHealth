@@ -105,36 +105,14 @@ type RecipeRestrictionOptions = Pick<RecipeMatchOptions, 'excludedIds' | 'allerg
  * Иначе парсит ingredients (строки вида "Куриная грудка 200г") и матчит с FOOD_DB по имени.
  */
 export function decomposeRecipe(recipe: Recipe): MealItem[] {
-  const items: MealItem[] = [];
-  const used = new Set<string>();
-
   // Путь 1: явные ingredientIds + portions (новые рецепты)
   if (recipe.ingredientIds && recipe.ingredientIds.length > 0) {
-    for (const fid of recipe.ingredientIds) {
-      // P2-фикс: дедуп по СУБСТИТУИРОВАННОМУ id. Раньше проверялся сырой fid, а в used
-      // клался _fid → рецепт с двумя консервами, сходящимися в один свежий аналог, дублировал ингредиент.
-      const _fid = isCannedFoodId(fid) ? (CANNED_SUBSTITUTE[fid] ?? fid) : fid;
-      if (used.has(_fid)) continue;
-      const food = FOOD_DB.find(f => f.id === _fid);
-      if (!food) continue;
-      const grams = recipe.portions?.[fid] ?? 100;
-      const item = makeMealItem(food, grams, roleForFood(food));
-      items.push(item);
-      used.add(_fid);
-    }
-    // Если порций мало и есть молоко (milk: true в завтраках) — добавим ТОЛЬКО если
-    // пользователь явно указал молоко в ингредиентах (раньше 200 мл навязывались каждому
-    // завтраку → искажение декомпозиции и КБЖУ).
-    if (items.length > 0 && recipe.meal === 'breakfast' && !used.has('milk')
-      && ((recipe.portions && Object.prototype.hasOwnProperty.call(recipe.portions, 'milk'))
-        || (recipe.ingredients || []).some(i => /молок/i.test(i)))) {
-      const milk = FOOD_DB.find(f => f.id === 'milk');
-      if (milk) items.push(makeMealItem(milk, 200, 'liquid'));
-    }
-    return scaleToRecipeKcal(items, recipe);
+    return scaleToRecipeKcal(decomposeRecipeRaw(recipe), recipe);
   }
 
   // Путь 2: парсинг ingredients (строки) — fallback для старых рецептов
+  const items: MealItem[] = [];
+  const used = new Set<string>();
   for (const ing of recipe.ingredients) {
     const parsed = parseIngredient(ing);
     if (!parsed) continue;
@@ -145,6 +123,39 @@ export function decomposeRecipe(recipe: Recipe): MealItem[] {
     used.add(food.id);
   }
   return scaleToRecipeKcal(items, recipe);
+}
+
+/**
+ * «Сырая» декомпозиция ingredientIds × portions → FOOD_DB БЕЗ масштабирования под kcal шапки.
+ * Это фактически съедаемые Б/Ж/У автора раскладки (до scaleToRecipeKcal). Единственный
+ * источник — decomposeRecipe и syncRecipeHeaderFromDecomposition (нет дублирования логики).
+ */
+export function decomposeRecipeRaw(recipe: Recipe): MealItem[] {
+  const items: MealItem[] = [];
+  const used = new Set<string>();
+  if (!recipe.ingredientIds || recipe.ingredientIds.length === 0) return items;
+  for (const fid of recipe.ingredientIds) {
+    // P2-фикс: дедуп по СУБСТИТУИРОВАННОМУ id. Раньше проверялся сырой fid, а в used
+    // клался _fid → рецепт с двумя консервами, сходящимися в один свежий аналог, дублировал ингредиент.
+    const _fid = isCannedFoodId(fid) ? (CANNED_SUBSTITUTE[fid] ?? fid) : fid;
+    if (used.has(_fid)) continue;
+    const food = FOOD_DB.find(f => f.id === _fid);
+    if (!food) continue;
+    const grams = recipe.portions?.[fid] ?? 100;
+    const item = makeMealItem(food, grams, roleForFood(food));
+    items.push(item);
+    used.add(_fid);
+  }
+  // Если порций мало и есть молоко (milk: true в завтраках) — добавим ТОЛЬКО если
+  // пользователь явно указал молоко в ингредиентах (раньше 200 мл навязывались каждому
+  // завтраку → искажение декомпозиции и КБЖУ).
+  if (items.length > 0 && recipe.meal === 'breakfast' && !used.has('milk')
+    && ((recipe.portions && Object.prototype.hasOwnProperty.call(recipe.portions, 'milk'))
+      || (recipe.ingredients || []).some(i => /молок/i.test(i)))) {
+    const milk = FOOD_DB.find(f => f.id === 'milk');
+    if (milk) items.push(makeMealItem(milk, 200, 'liquid'));
+  }
+  return items;
 }
 
 /**
@@ -167,6 +178,25 @@ export function recipeDecompositionDeviationPct(recipe: Recipe): number {
   const d = recipeDecompositionFacts(recipe);
   const dev = (a: number, b: number): number => (b > 0 ? Math.abs(a - b) / b * 100 : 0);
   return Math.round(Math.max(dev(d.p, recipe.protein), dev(d.f, recipe.fat), dev(d.c, recipe.carbs)) * 10) / 10;
+}
+
+/**
+ * Синхронизация шапки рецепта с декомпозицией (план единого источника, остаток):
+ * protein/fat/carbs пересчитываются из ФАКТИЧЕСКОЙ раскладки (ingredientIds × portions →
+ * FOOD_DB, тот же путь, что decomposeRecipe), kcal = 4Б+4У+9Ж. Раньше шапка была авторской
+ * заявкой и расходилась с раскладкой у 953/994 рецептов (жир ×2.9–3.9) — теперь «показано =
+ * съедается»: приём в плане несёт те же макросы, что шапка рецепта. Легаси-рецепты без
+ * ingredientIds не трогаются (декомпозиции нет).
+ */
+export function syncRecipeHeaderFromDecomposition(recipe: Recipe): Recipe {
+  if (!recipe.ingredientIds || recipe.ingredientIds.length === 0) return recipe;
+  const items = decomposeRecipeRaw(recipe);
+  if (items.length === 0) return recipe;
+  const p = Math.round(items.reduce((s, i) => s + i.p, 0));
+  const f = Math.round(items.reduce((s, i) => s + i.f, 0));
+  const c = Math.round(items.reduce((s, i) => s + i.c, 0));
+  const kcal = Math.max(50, Math.round((4 * p + 9 * f + 4 * c) / 5) * 5);
+  return { ...recipe, protein: p, fat: f, carbs: c, kcal };
 }
 
 function scaleToRecipeKcal(items: MealItem[], recipe: Recipe): MealItem[] {

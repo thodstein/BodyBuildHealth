@@ -27,6 +27,11 @@ import { RECIPE_DB_P37 } from './recipe-db-p37';
 import { RECIPE_DB_P38 } from './recipe-db-p38';
 import { RECIPE_DB_P39 } from './recipe-db-p39';
 import { enrichRecipes } from './recipe-enrichment';
+// План единого источника, остаток: шапка рецепта синхронизируется с декомпозицией
+// (ingredientIds × portions → FOOD_DB). Раньше шапка расходилась с раскладкой у 953/994
+// рецептов (жир ×2.9–3.9). Импорт из recipe-engine — единственный источник decomposeRecipe
+// (нет дублирования логики; на сборке вызывается один раз, не в рантайме плана).
+import { syncRecipeHeaderFromDecomposition } from '../ui/screens/NutritionScreen_parts/IndividualPlan/recipe-engine';
 
 /**
  * C-требование «КБЖУ-консистентность ≤3%»: kcal рецепта не должен расходиться с формулой
@@ -41,6 +46,12 @@ import { enrichRecipes } from './recipe-enrichment';
  * мечту», порции — реальные) → scaleToRecipeKcal резал порции ×0.2 («курица 58 г» на
  * обед). Теперь при расхождении декомпозиции с шапкой >35% ПОРЦИИ авторитетны:
  * kcal (и макросы шапки) пересчитываются из разборa.
+ *
+ * Oct 2026 (план единого источника, остаток «шапка ↔ декомпозиция»): шапка рецепта
+ * СИНХРОНИЗИРУЕТСЯ с декомпозицией на сборке (`syncRecipeHeaderFromDecomposition`):
+ * protein/fat/carbs = фактические ingredientIds × portions → FOOD_DB, kcal = 4Б+4У+9Ж.
+ * До этого 953/994 рецептов расходились >3% (жир ×2.9–3.9 — шапка врала). Теперь приём
+ * в плане несёт те же макросы, что шапка рецепта («показано = съедается»).
  */
 function decompKcal(r: Recipe): number {
   if (!r.ingredientIds || r.ingredientIds.length === 0) return 0;
@@ -160,4 +171,4 @@ export const RECIPE_DB: Recipe[] = enrichRecipes([
   ...RECIPE_DB_P38,
   // p39: 4 «карб-лоад» блюда (Б/У 5.4–11.5) — видны только в экстрим-полосе (tag 'carb-load').
   ...RECIPE_DB_P39,
-]).map(sanitizeRecipePortions).map(normalizeRecipeKcal);
+]).map(sanitizeRecipePortions).map(normalizeRecipeKcal).map(syncRecipeHeaderFromDecomposition);
