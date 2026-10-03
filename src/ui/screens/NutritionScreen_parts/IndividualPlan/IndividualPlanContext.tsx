@@ -3440,9 +3440,11 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
         const _dietBreakNote: string | undefined = ((goal === 'cutting' || goal === 'fat_loss') && metabolicAdaptEnabled && metabolicAdaptPct > 0)
           ? '📉 Diet break рекомендован: метаболическая адаптация обнаружена. Перейдите на 2 недели maintenance (калорий поддержания) для восстановления лептина/гормонов и щитовидной. Белок 2.2 г/кг, углеводы восстановления, тренировки сохранить.'
           : undefined;
-        const _sleepNote: string | undefined = (sleepHours < 7 || sleepQuality < 6)
-          ? '😴 Сон слабый: добавьте tryptophan-источники (индейка, яйцо, творог, овсянка) + Mg glycinate на ночь. Тарт-вишня (мелатонин) перед сном. Избегать кофеин/алкоголя после 15:00.'
-          : undefined;
+        const _sleepParts: string[] = [];
+        if (sleepHours < 7 || sleepQuality < 6) _sleepParts.push('😴 Сон слабый: добавьте tryptophan-источники (индейка, яйцо, творог, овсянка) + Mg glycinate на ночь. Тарт-вишня (мелатонин) перед сном. Избегать кофеин/алкоголя после 15:00.');
+        // P1-фикс: стресс больше не тихий no-op — даёт видимую заметку (на калораж/макросы не влияет).
+        if (stressLevel >= 7) _sleepParts.push('😰 Высокий стресс: кортизол↑ → приоритет Mg glycinate/теанину/ашваганде, стабильные приёмы, не урезайте калории агрессивно.');
+        const _sleepNote: string | undefined = _sleepParts.length > 0 ? _sleepParts.join(' ') : undefined;
         // Эпик 5: скользящая компенсация — база даты КАЖДОГО дня серии (день N
         // компенсирует факт дня N−1). Раньше применялась только к offset 0.
         const _prepDate = isoAddDays(isoToday(), offset);

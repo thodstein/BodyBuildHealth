@@ -111,11 +111,10 @@ export function decomposeRecipe(recipe: Recipe): MealItem[] {
   // Путь 1: явные ingredientIds + portions (новые рецепты)
   if (recipe.ingredientIds && recipe.ingredientIds.length > 0) {
     for (const fid of recipe.ingredientIds) {
-      if (used.has(fid)) continue;
-      // P0-3 (консервы): рецепт-путь обязан соблюдать тот же гейт, что и пулы —
-      // «консервы — не автогенерация» (жалоба «опять консервированный тунец»).
-      // Замена свежим аналогом 1-в-1 сохраняет позицию и нормализуется по ккал ниже.
+      // P2-фикс: дедуп по СУБСТИТУИРОВАННОМУ id. Раньше проверялся сырой fid, а в used
+      // клался _fid → рецепт с двумя консервами, сходящимися в один свежий аналог, дублировал ингредиент.
       const _fid = isCannedFoodId(fid) ? (CANNED_SUBSTITUTE[fid] ?? fid) : fid;
+      if (used.has(_fid)) continue;
       const food = FOOD_DB.find(f => f.id === _fid);
       if (!food) continue;
       const grams = recipe.portions?.[fid] ?? 100;

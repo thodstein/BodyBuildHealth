@@ -10172,14 +10172,24 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
       }
     }
 
+    // P2-фикс: microSummary.coverage и diversity пересчитываем на ФИНАЛЬНЫХ meals —
+    // поздние проходы (E18/E17/E12, гигиена) добавляли/удаляли позиции, и витрина
+    // расходилась с реальной тарелкой.
+    const _finalFoodIds = new Set<string>();
+    for (const m of meals) for (const it of (m.items || [])) _finalFoodIds.add(it.id);
+    const _finalCategories: Record<string, number> = {};
+    _finalFoodIds.forEach(id => { const f = FOOD_DB.find(x => x.id === id); const cat = f?.category || 'other'; _finalCategories[cat] = (_finalCategories[cat] || 0) + 1; });
+    const _finalMicro = _pickCtx.qualityMode === 'full'
+      ? analyzeMicroCoverage(sumMicros(meals.flatMap(m => m.items.map(it => ({ id: it.id, amount: it.amount }))), FOOD_DB as any), input.sex || 'male', input.weightKg, input.cyclePhase as any, !!input.isTrainingDay, input.calciumTargetOverride, input.sodiumTargetOverride)
+      : { coverage: [], topDeficitNutrient: null as string | null };
     return {
      dayIndex: (input.dayOffset ?? 0),
     isTrainingDay: input.isTrainingDay,
     meals,
     totals,
      mpsSummary,
-     diversity: { uniqueFoods, categories },
-      microSummary: { coverage: _microRes.coverage, topDeficitNutrient: _microRes.topDeficitNutrient },
+     diversity: { uniqueFoods: _finalFoodIds.size, categories: _finalCategories },
+      microSummary: { coverage: _finalMicro.coverage, topDeficitNutrient: _finalMicro.topDeficitNutrient },
       notes,
       withinTolerance: _dayDevPctP4 <= PLANNER_CONVERGENCE_PCT,
       deviationPct: _dayDevPctP4,

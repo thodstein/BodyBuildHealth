@@ -599,6 +599,9 @@ export const IndividualPlanSettings: React.FC = () => {
           <PopupNumber label="🌟 Качество сна" value={sleepQuality} min={1} max={10} suffix="/10" onChange={setSleepQuality} />
           <PopupNumber label="😰 Стресс" value={stressLevel} min={1} max={10} suffix="/10" onChange={setStressLevel} />
         </div>
+        <div style={{ fontSize: 9, color: '#fff', marginBottom: 6, opacity: 0.9 }}>
+          Сон и стресс дают заметки по восстановлению/микронутриентам (триптофан, Mg, тарт-вишня) — калораж и макросы они не меняют (те идут из TDEE/цели/фармы).
+        </div>
         {sex === 'female' && (
           <div style={{ marginBottom: 6 }}>
             <PopupSelect label="🌸 Фаза цикла" value={cyclePhase} options={[{id:'none',label:'Не указана (авто по календарю)'},{id:'follicular',label:'Фолликулярная'},{id:'ovulation',label:'Овуляция'},{id:'luteal',label:'Лютеиновая'},{id:'menstrual',label:'Менструация'}]} onChange={v => setCyclePhase(v as any)} />
