@@ -5006,6 +5006,17 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   // Итерация C: инсулин-окна (тип 'snack' + маркер) — не гибкие. Только маркер:
   // peri-типы здесь не трогаем (у flex-списка своя семантика типов).
   const _flexMeal = (m: { type?: string }) => ['breakfast', 'lunch', 'dinner', 'snack', 'snack2', 'snack3', 'snack4', 'snack5', 'snack6'].includes(m.type || '') && !(m as any)._insulinWindow;
+  // Шаг 2 рефактора (единый источник макросов): два жировых прохода (kcal-догон жиром
+  // ниже + fat-deficit-догон после P4-CARB) срабатывали на ОДНОМ дне и перекрывались
+  // (add→add осцилляция). Флаг: если kcal-догон реально добавил жир — fat-deficit-проход
+  // НЕ запускается. На ЭКСТРЕМАЛЬНЫХ днях (capacity/HV/≥4500 ккал/инсулин-окна/carbCap=0)
+  // оба прохода взаимно дополняют друг друга (E0-прецедент: у экстримов свои калиброванные
+  // контуры) — там merge не применяется. Поведение меняется только на обычных днях, где
+  // оба прохода срабатывали.
+  let _fatKcalTopUpApplied = false;
+  const _fatMergeExtreme = _pickCtx.capacity.active || _pickCtx.highVolumeDay
+    || (input.goalKcal || 0) >= 4500 || input.carbCapGPerKg === 0
+    || meals.some((m: any) => m._insulinWindow);
   {
     const devK = (input.goalKcal - totals.kcal) / Math.max(1, input.goalKcal);
     if (!impossibleGoal && devK > 0.10 && totals.f < fatTotal * FAT_CAP_MULT) {
@@ -5047,6 +5058,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
         recalcMealTotals(meals);
         // P2-fix: добавлены fiber и leucine_mg в day totals (были stale после fat scaling)
         recalcDayTotals(meals, totals); // B4
+        _fatKcalTopUpApplied = true; // шаг 2: kcal-догон жиром сработал — fat-deficit ниже пропускаем
       }
     }
   }
@@ -5136,10 +5148,12 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
 
   // Fat deficit correction — if fat >10% under goal, increase fat items (capped at +100% per item).
   // Д-7: Skip when impossibleGoal (fat floor already reduced; don't force fat back up).
+  // Шаг 2 рефактора: пропускаем, если kcal-догон жиром уже сработал выше (_fatKcalTopUpApplied)
+  // — два прохода на одном дне давали add→add перелив жира.
   {
     const goalF = fatTotal;
     const devF = (goalF - totals.f) / Math.max(1, goalF);
-      if (!impossibleGoal && devF > 0.10) {
+      if (!impossibleGoal && (!_fatKcalTopUpApplied || _fatMergeExtreme) && devF > 0.10) {
         // Чистка-2026: догон не выводит жиры дня за цель ×1.08 (масштаб снапа сетки
         // «масло 10→15→30» исторически давал перебор ×1.25 при малом числе fat-items).
         // РАСХОЖДЕНИЕ: ×1.08 vs FAT_CAP_MULT (×1.10) — сводится в шаге 2 рефактора.
