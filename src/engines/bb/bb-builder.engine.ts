@@ -4937,7 +4937,7 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
       if (heavyScheme || pumpScheme) {
         const hs = heavyScheme ? REP_SCHEMES[heavyScheme] : null;
         const ps = pumpScheme ? REP_SCHEMES[pumpScheme] : null;
-        if (hs) withMeth.rationale.push(`📋 Схема тяж: ${hs.nameRu} ${hs.repRange[0]}-${hs.repRange[1]} RIR${hs.rir} (${hs.evidence})`);
+        if (hs) withMeth.rationale.push(`📋 Схема тяж: ${hs.nameRu} ${hs.repRange[0]}-${hs.repRange[1]} RIR${hs.rir} (${hs.evidence})${hs.phaseGate ? ` — только фаза ${hs.phaseGate.join('/')}` : ''}`);
         if (ps) withMeth.rationale.push(`📋 Схема памп: ${ps.nameRu} ${ps.repRange[0]}-${ps.repRange[1]} RIR${ps.rir} (${ps.evidence})`);
         // Фаза 1.1: rep-схемы применяются к РЕАЛЬНОЙ загрузке (не только rationale).
         // Тяж-primary → схема тяж; памп-accessory → схема памп. Инварианты: cap 5 сетов,

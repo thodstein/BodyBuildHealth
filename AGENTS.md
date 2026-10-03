@@ -55,7 +55,7 @@ Edit/Write + vitest/tsc; чужие WIP (combat/meal-plan/ProgramEditor) не т
   ИНТЕНСИФИКАЦИИ) попадал в accumulation. Fix: `RepScheme.phaseGate` (dc_rp → `['intensification']`,
   cluster → `['peaking']`) + опция `phases` в `applySchemeToPlan` (недели вне гейта пропускаются);
   билдер передаёт `phases: hs?.phaseGate`/`ps?.phaseGate`. Unit-вызовы без `phases` — прежнее
-  поведение (байт-в-байт).
+  поведение (байт-в-байт). Rationale честный: «📋 Схема тяж: … — только фаза intensification».
 - **DC = «1 рабочий слот»**: `dc_rp` теперь реально сокращает подходы до 1 (RP 7+4+3), а не
   сохраняет 2–5 сетов. Плюс DC-структура покрывает ВСЕ `primary` дня (тяж И памп) — «4-й
   pamp-primary» больше не остаётся урезанным без метки. Прочие тяж-схемы (hypertrophy/strength/
