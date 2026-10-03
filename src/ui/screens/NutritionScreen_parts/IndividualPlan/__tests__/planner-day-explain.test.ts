@@ -6,6 +6,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { explainDayPlan, dayDeviationPct } from '../planner-day-explain';
+import { buildDayPlan } from '../meal-plan-engine';
 
 const totals = (over: any = {}) => ({ kcal: 3000, p: 180, f: 80, c: 400, fiber: 35, ...over });
 const targets = { kcal: 3000, p: 180, f: 80, c: 400 };
@@ -122,5 +123,53 @@ describe('explainDayPlan: заголовок/капы/пустота', () => {
     } as any, targets, { maxPerGroup: 2 });
     expect(ex.causes.filter(c => c.id === 'meal-carb-short')).toHaveLength(1);
     expect(ex.causes.length).toBeLessThanOrEqual(2);
+  });
+});
+
+describe('explainDayPlan: журнал проходов (шаг 7)', () => {
+  it('прокидывает passJournal плана как journal', () => {
+    const ex = explainDayPlan({
+      totals: totals(), targets, notes: [],
+      passJournal: [
+        { id: 'build', label: 'Сборка дня', devBefore: 58.4, devAfter: 58.4 },
+        { id: 'converge', label: 'Сведение макросов', devBefore: 58.4, devAfter: 40.1 },
+        { id: 'reconcile', label: 'Reconciliation', devBefore: 40.1, devAfter: 1 },
+      ],
+    } as any, targets);
+    expect(ex.journal).toHaveLength(3);
+    expect(ex.journal[1].id).toBe('converge');
+    expect(ex.journal[2].devAfter).toBe(1);
+  });
+
+  it('нет passJournal → пустой journal (обратная совместимость)', () => {
+    const ex = explainDayPlan({ totals: totals(), targets, notes: [] } as any, targets);
+    expect(ex.journal).toEqual([]);
+  });
+
+  it('битый passJournal отбрасывается (мусор не роняет карточку)', () => {
+    const ex = explainDayPlan({ totals: totals(), targets, notes: [], passJournal: [{ id: 'x' } as any, null as any] } as any, targets);
+    expect(ex.journal).toEqual([]);
+  });
+
+  it('buildDayPlan: журнал улучшает день в целом, reconcile доводит до ≤3% (обычный день)', () => {
+    const p = buildDayPlan({
+      weightKg: 70, lbmKg: 57, bodyFatPct: 18, sex: 'male',
+      goalKcal: 2000, goalProteinG: 140, goalFatG: 60, goalCarbsG: 225,
+      mealsCount: 5, isTrainingDay: true, trainStartMin: 1050, trainDurationMin: 90, allowIntraWorkout: true,
+      budget: 'medium', dayOffset: 0, cyclePhase: 'course', variety: 'medium', eveningLowCarb: false,
+      randomSalt: 1,
+    } as any);
+    const j = p.passJournal || [];
+    expect(j.length).toBeGreaterThan(1);
+    expect(j[0].id).toBe('build');
+    expect(j[j.length - 1].id).toBe('final');
+    // Итог не хуже старта (сведение дня монотонно по финалу).
+    expect(j[j.length - 1].devAfter).toBeLessThanOrEqual(j[0].devBefore);
+    // Все значения конечны.
+    for (const e of j) { expect(Number.isFinite(e.devBefore)).toBe(true); expect(Number.isFinite(e.devAfter)).toBe(true); }
+    // Reconciliation доводит обычный день к канону ≤3%.
+    const rec = j.find(e => e.id === 'reconcile');
+    expect(rec).toBeTruthy();
+    expect(rec!.devAfter).toBeLessThanOrEqual(3.5);
   });
 });

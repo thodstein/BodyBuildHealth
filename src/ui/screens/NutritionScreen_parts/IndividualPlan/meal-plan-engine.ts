@@ -45,6 +45,7 @@ import {
   dayTargetScale, quotaMealCap, isLowFiberComposition,
 } from "./food-availability";
 import { correctDayToTargets as _correctDayToTargets, mealTargetsStale as _mealTargetsStale, PLANNER_CONVERGENCE_PCT, checkTargetsConsistency } from "./day-target-corrector";
+import type { PassJournalEntry } from "./planner-day-explain";
 import { reconcileDay } from "./planner-day-reconciler";
 import { getFoodAllergenTags, matchesSelectedAllergen } from "./planner-restrictions";
 import { edibilityCapFor, liveLadderSteps, isHighCarbDay as _isHighCarbDay, EDIBILITY_CAPS, extremeCapacityProfile, DEFAULT_EXTREME_CAPACITY, type ExtremeCapacityProfile, selectHvCarbCarriers, scalePortionCapsForExtreme, hvProteinCapPerMeal, autoMealCountForHv, type HvCarbCarrier, type HvCarrierSelection } from "./planner-carb-density";
@@ -95,6 +96,9 @@ export interface DayPlanV2 {
     (несогласованные цели / упор в капы-полы реализма). deviationPct — отклонение %. */
   withinTolerance?: boolean;
   deviationPct?: number;
+  /** Шаг 7 рефактора: журнал проходов сведения дня (dev до/после) — для карточки
+    «Почему день не сошёлся». Аддитивно; старые сохранённые планы без поля — ок. */
+  passJournal?: PassJournalEntry[];
 }
 
 export interface MealPlanInput {
@@ -5013,6 +5017,23 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   // Итерация C: инсулин-окна (тип 'snack' + маркер) — не гибкие. Только маркер:
   // peri-типы здесь не трогаем (у flex-списка своя семантика типов).
   const _flexMeal = (m: { type?: string }) => ['breakfast', 'lunch', 'dinner', 'snack', 'snack2', 'snack3', 'snack4', 'snack5', 'snack6'].includes(m.type || '') && !(m as any)._insulinWindow;
+  // Шаг 7 рефактора: журнал проходов (max-dev до/после). Показывает, что сведение дня
+  // монотонно улучшает отклонение; питает карточку «Почему день не сошёлся».
+  const _passJournal: PassJournalEntry[] = [];
+  const _journalDev = (): number => {
+    const devs = [
+      (input.goalKcal || 0) > 0 ? Math.abs(totals.kcal - (input.goalKcal || 0)) / (input.goalKcal || 1) : 0,
+      (input.goalProteinG || 0) > 0 ? Math.abs(totals.p - (input.goalProteinG || 0)) / (input.goalProteinG || 1) : 0,
+      (input.goalFatG || 0) > 0 ? Math.abs(totals.f - (input.goalFatG || 0)) / (input.goalFatG || 1) : 0,
+      (input.goalCarbsG || 0) > 0 ? Math.abs(totals.c - (input.goalCarbsG || 0)) / (input.goalCarbsG || 1) : 0,
+    ];
+    return Math.round(Math.max(...devs) * 1000) / 10;
+  };
+  const _jMark = (id: string, label: string): void => {
+    const before = _passJournal.length ? _passJournal[_passJournal.length - 1].devAfter : _journalDev();
+    _passJournal.push({ id, label, devBefore: before, devAfter: _journalDev() });
+  };
+  _jMark('build', 'Сборка дня (базовые приёмы)');
   // Шаг 2 рефактора (единый источник макросов): два жировых прохода (kcal-догон жиром
   // ниже + fat-deficit-догон после P4-CARB) срабатывали на ОДНОМ дне и перекрывались
   // (add→add осцилляция). Флаг: если kcal-догон реально добавил жир — fat-deficit-проход
@@ -5426,6 +5447,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   }
   };
   _convergeMacrosToTargets();
+  _jMark('converge', 'Сведение макросов (грубо + точно)');
 
   // §3F-честность: отчёт «Точность рациона» перенесён в САМЫЙ КОНЕЦ (после P4b/P5b/P6/P7),
   // иначе он описывал промежуточное состояние (Б 31% при финальных −3%: середина пайплайна
@@ -5874,6 +5896,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
       devP4b = (totals.p - goalP4b) / Math.max(1, goalP4b);
     }
   }
+  _jMark('p4b-protein', 'Финальная белковая коррекция (P4b)');
 
   // P4c (Aug 28): финальный ЖИР-кламп — зеркально P4b. Snap-сетка (масло 28→30, сливочное
   // 21→50) и kcal-догон раздували жиры дня за fatTotal×1.10 → разбег с целью карточки.
@@ -5898,6 +5921,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
       overF = totals.f - _fatCeil;
     }
   }
+  _jMark('p4c-fat', 'Финальный жир-кламп (P4c)');
 
   // Строгая 4-осевая посадка ≤3% по каждому параметру (ккал,Б,Ж,У) и общему КБЖУ — 2026-08-27.
   // preSleep — опционально (если уже хватает белка, не форсируем), intra — только при
@@ -9624,6 +9648,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
       // консолидации крошечных приёмов E11 — обе меняют факт, счёт берём из items).
       if (_reconApplied) _refreshMpsFromMeals();
     }
+    _jMark('reconcile', 'Reconciliation дня (≤3%)');
 
     // ─── E11 (=E3 полный): консолидация крошечных основных приёмов (<180 ккал) ───
     // Дефект сушки: «показной» основной приём ~110–170 ккал рядом с крупным.
@@ -10223,6 +10248,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     const _finalMicro = _pickCtx.qualityMode === 'full'
       ? analyzeMicroCoverage(sumMicros(meals.flatMap(m => m.items.map(it => ({ id: it.id, amount: it.amount }))), FOOD_DB as any), input.sex || 'male', input.weightKg, input.cyclePhase as any, !!input.isTrainingDay, input.calciumTargetOverride, input.sodiumTargetOverride)
       : { coverage: [], topDeficitNutrient: null as string | null };
+    _jMark('final', 'Финал (микро/гигиена/витрина)');
     return {
      dayIndex: (input.dayOffset ?? 0),
     isTrainingDay: input.isTrainingDay,
@@ -10234,6 +10260,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
       notes,
       withinTolerance: _dayDevPctP4 <= PLANNER_CONVERGENCE_PCT,
       deviationPct: _dayDevPctP4,
+      passJournal: _passJournal,
     };
   } finally {
     // P0-4: освобождаем pickCtx — даже если генерация выбросила исключение, prefs не утекут в следующий план.

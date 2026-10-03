@@ -15,6 +15,16 @@ import { PLANNER_CONVERGENCE_PCT } from './day-target-corrector';
 
 export type DayExplainLevel = 'problem' | 'fix' | 'check';
 
+/** Шаг 7 рефактора: запись журнала проходов движка (монотонное улучшение dev). */
+export interface PassJournalEntry {
+  id: string;
+  label: string;
+  /** max-отклонение дня до прохода, % (0 = точно в цель). */
+  devBefore: number;
+  /** max-отклонение дня после прохода, %. */
+  devAfter: number;
+}
+
 export interface DayExplainReason {
   id: string;
   level: DayExplainLevel;
@@ -31,6 +41,8 @@ export interface DayExplainResult {
   causes: DayExplainReason[];
   fixes: DayExplainReason[];
   checks: DayExplainReason[];
+  /** Шаг 7: журнал проходов (сборка → сведение → P4b → P4c → reconciliation → финал). */
+  journal: PassJournalEntry[];
 }
 
 interface ExplainPlanLike {
@@ -39,6 +51,7 @@ interface ExplainPlanLike {
   notes?: string[] | null;
   deviationPct?: number | null;
   withinTolerance?: boolean | null;
+  passJournal?: PassJournalEntry[] | null;
 }
 
 interface ExplainTargets {
@@ -160,8 +173,11 @@ export function explainDayPlan(
 ): DayExplainResult {
   // E0: канон допуска — PLANNER_CONVERGENCE_PCT (3%); 5/8 остаются визуальными градациями.
   const tolerance = Math.max(1, Number(opts?.tolerance) || PLANNER_CONVERGENCE_PCT);
+  const journal: PassJournalEntry[] = Array.isArray(plan?.passJournal)
+    ? plan!.passJournal!.filter(e => e && typeof e.devAfter === 'number').slice(0, 12)
+    : [];
   if (!plan) {
-    return { devPct: null, tolerance, within: null, headline: null, causes: [], fixes: [], checks: [] };
+    return { devPct: null, tolerance, within: null, headline: null, causes: [], fixes: [], checks: [], journal: [] };
   }
   const computed = dayDeviationPct(plan.totals, targets);
   const devPct = typeof plan.deviationPct === 'number' && Number.isFinite(plan.deviationPct)
@@ -207,5 +223,6 @@ export function explainDayPlan(
     causes: causes.slice(0, cap),
     fixes: fixes.slice(0, cap),
     checks: checks.slice(0, cap),
+    journal,
   };
 }

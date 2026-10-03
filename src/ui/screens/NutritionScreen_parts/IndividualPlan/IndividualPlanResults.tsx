@@ -597,6 +597,16 @@ const doImportPlan = (raw: string): boolean => {
                   ))}
                 </details>
               )}
+              {Array.isArray(ex.journal) && ex.journal.length > 1 && (
+                <details data-bitexplain-journal="1" style={{ marginTop: 2 }}>
+                  <summary style={{ fontSize: 9, color: '#fff', cursor: 'pointer', minHeight: 28, display: 'flex', alignItems: 'center' }}>📉 Журнал сведения дня ({ex.journal.length})</summary>
+                  {ex.journal.map((j, i) => (
+                    <div key={'bj' + i} data-bitexplain-pass={j.id} style={{ fontSize: 9, color: '#fff', lineHeight: 1.4, marginTop: 2 }}>
+                      • {j.label}: {j.devBefore}% → {j.devAfter}% {j.devAfter <= j.devBefore ? '↓' : '↑'}
+                    </div>
+                  ))}
+                </details>
+              )}
             </div>
           );
         })()}
