@@ -39,12 +39,62 @@
 - **P4b временно повышает max-dev** (журнал это показывает) — кандидат на слияние с reconciliation
   в отдельной сессии (нужны замеры, сейчас P4b держит белковый инвариант перед reconcile).
 
-## Остаток помельче (НЕ выполнен, отдельная сессия)
-- Ядра рецептов: сузить `correctDayToTargets` coreScale до заявленных ±15% (сейчас −25%/+30%).
-- Шапка рецепта vs декомпозиция: синхронизировать P/F/C или показывать расхождение.
-- Дубли настроек: `trainingDays` ×2, `carbCapOverride` ×2, histamine ×2 — свести к одному.
-- `specificity` — орфан движка, удалить из `MealPlanInput`.
-- 447 raw-рецептов >3% от Atwater — усилить `recipe-kbju-consistency` (проверка декомпозиции).
+## Остаток помельче (частично; отдельная сессия)
+- ✅ `specificity` — орфан удалён из `MealPlanInput` (`ed4a5697f`).
+- ✅ `recipe-kbju-consistency` усилен: NEW `recipeDecompositionDeviationPct`/`recipeDecompositionFacts`
+  + baseline-ceiling лок (`8d1bcbb9`). **Замер: 953 из 994 рецептов с ingredientIds расходятся
+  >3%** (топ-оффендеры: жир ×2.9–3.9 от шапки). Лок держит потолок 953.
+- ⏳ Шапка рецепта vs декомпозиция — **синхронизировать** (пересчитать `protein/fat/carbs` из
+  декомпозиции на сборке, как уже делает `normalizeRecipeKcal` с kcal) ИЛИ показывать расхождение
+  в карточке рецепта. Полная синхронизация меняет числа планов (953 рецепта) → ре-калибровка.
+- ⏳ Ядра рецептов: сузить `correctDayToTargets` coreScale до заявленных ±15% (сейчас `maxCoreScale`
+  1.30/1.20; комментарий «не более ±25%»). Behavioral — замерить падения.
+- ⏳ Дубли настроек: `trainingDays` ×2 (тренировки-карточка + карб-периодизация), `carbCapOverride` ×2
+  (КБЖУ-карточка + периодизация), histamine ×2 (кнопка + чип lowHistamine). UI-дубли (один сеттер),
+  тест-связаны (`planner-settings-audit` C5, `planner-settings-clicks`).
+- ⏳ `FAT_DEFICIT_CAP_MULT` (1.08) vs `FAT_CAP_MULT` (1.10) — свести (после шага 2 почти всегда
+  пропускается на обычных днях).
+- ⏳ Промежуточные клетчаточные тримы — снять при ре-калибровке.
+- ⏳ P4b временно повышает max-dev (журнал шага 7) — кандидат на слияние с reconciliation.
+
+## Промт новой сессии (скопировать целиком)
+
+```
+Продолжи рефактор планировщика питания (docs/NUTRITION-MACRO-SINGLE-SOURCE-PLAN.md, шаги 1–7
+выполнены и закоммичены). Остались мелкие пункты — делай по одному = коммит pathspec.
+
+Правила: только Edit/Write (PowerShell-перезапись ЗАПРЕЩЕНА — портит кодировку); чужие WIP не
+трогать; после каждого шага:
+  npx vitest run src/ui/screens/NutritionScreen_parts/IndividualPlan/__tests__   (сейчас 1378/1378)
+  NODE_OPTIONS=--max-old-space-size=12288 npx tsc --noEmit                         (0)
+  npm run verify:apk-design                                                       (OK)
+Re-baseline только с комментарием «было→стало». Контроль: 4 профиля × 3/7 дней + рецепты + 1500У/500Б.
+
+Задачи по приоритету:
+1. ШАПКА РЕЦЕПТА ↔ ДЕКОМПОЗИЦИЯ (честность, 953/994 расходятся >3%): в `recipe-db.ts`
+   на этапе сборки пересчитать `protein/fat/carbs` рецепта из `decomposeRecipe` (ingredientIds×
+   portions) — как уже делает `normalizeRecipeKcal` с kcal; kcal = 4Б+4У+9Ж. Затем пересчитать
+   baseline в `recipe-kbju-consistency.test.ts` (BASELINE_BAD → новое число, комментарий «было→стало»)
+   и проверить, сколько калиброванных тестов планов упало (двигает числа меню) — ре-базировать с
+   обоснованием. Если чисел планов слишком много — альтернатива: badge «факт: Б/Ж/У» в карточке
+   рецепта (`MealListRender.tsx`, `recipeAppliedData`) при `recipeDecompositionDeviationPct > 3`.
+2. CORE-SCALE РЕЦЕПТА: `day-target-corrector.ts` `maxCoreScale` 1.30/1.20 → сузить до заявленных
+   ±15% (`allowCoreScale ? 1.15 : 1.15`), обновить комментарий; замерить падения и ре-базировать
+   «было→стало».
+3. ДУБЛИ НАСТРОЕК (UI, один сеттер): `IndividualPlanSettings.tsx` — trainingDays ×2 (строки ~1116
+   и ~2176), carbCapOverride ×2 (~366 и ~2173), histamine ×2 (~753 кнопка и ~1806 чип lowHistamine).
+   Убрать один из каждой пары, оставив канонический (тренировки-карточка / КБЖУ-карточка / чип),
+   в дублирующем месте — строку-ссылку. Обновить `planner-settings-audit`/`planner-settings-clicks`
+   если они ассертят удалённый контрол.
+4. МНОЖИТЕЛЬ ЖИРА: свести `FAT_DEFICIT_CAP_MULT` (1.08) к `FAT_CAP_MULT` (1.10) в
+   `planner-day-limits.ts` + заменить использование; замерить падения.
+5. P4b vs reconciliation: журнал шага 7 показывает P4b временно повышает max-dev (40→48→1).
+   Проверить, можно ли убрать P4b (перенести белковую резку в reconcileDay), сохранив
+   MPS-инвариант; замерить.
+
+Критерий: suite зелёный (или осознанный re-baseline «было→стало»), tsc 0, apk-verify OK,
+журнал сведения дня монотонно улучшается.
+```
 
 ## Зачем
 `meal-plan-engine.ts` (10 535 строк) собирает день ~27 проходами. Один и тот же макрос
