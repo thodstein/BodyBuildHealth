@@ -299,7 +299,9 @@ export function correctDayToTargets(
   // Без окон посттрен — обычный гибкий приём (как раньше).
   const _hasWins = meals.some((m: any) => (m as any)._insulinWindow);
   const _postLocked = (m: CorrectorMeal): boolean => _hasWins && m.type === 'postworkout';
-  // кумулятивная шкала ядра рецепта (не более ±25% для тяжей, иначе 7-12% разбег)
+  // кумулятивная шкала ядра рецепта — не более ±15% (про-норма порционной коррекции;
+  // было ±30/25% при allowCoreScale и ±20/15% иначе — расходилось с заявленным коридором).
+  // allowCoreScale по-прежнему решает, трогать ли ядро вообще.
   const coreScale = new Map<string, number>(); // key = mealIdx:itemId
 
   const safeTargets: DayTargets = {
@@ -341,7 +343,7 @@ export function correctDayToTargets(
     (m.type === 'breakfast' || m.type === 'lunch' || m.type === 'dinner') &&
     (m.totals?.p || 0) >= MPS_CEIL_LBM_G_PER_KG * _lbmCorr;
 
-  const maxCoreScale = opts?.allowCoreScale ? 1.30 : 1.20;
+  const maxCoreScale = 1.15;
   // P2: кандидаты, у которых не нашлось места для размещения (все приёмы закрыты
   // типологией), запоминаем — следующая итерация пробует следующего, а не умирает
   // (раньше `break` на первом же неразмещаемом кандидате глотал до 80 итераций
@@ -811,7 +813,7 @@ export function correctDayToTargets(
         } else if (cand.it.role === 'fruit') {
           floor = Math.round(30 * weightScaleCorr);
         }
-        const minFactor = opts?.allowCoreScale ? 0.75 : 0.85;
+        const minFactor = 0.85;
         const minAmount = isCore ? Math.max(floor, Math.round(cand.it.amount * minFactor / curScale)) : Math.max(floor, 15);
         // шаг — до 15% за итерацию
         const targetCutG = Math.min(cand.it.amount - minAmount, Math.ceil(Math.abs(need) / cand.per100 * 100 * 0.7));
