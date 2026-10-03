@@ -34,7 +34,7 @@ import { acuteChronicRatio, toDailyLoads } from '../pro/training-load.engine';
 import type { FullProgram, ProgramWeek, ProgramDay } from '../../engines/complete-program-library.engine';
 import type { BBTrainingFocus } from './bb-goal-types';
 import { FOCUS_RIR_TABLE } from './bb-goal-types';
-import { finalizeBBPlan } from './bb-finalize.engine';
+import { finalizeBBPlan, reconcileVolumeTargets } from './bb-finalize.engine';
 import { buildBBPlanReport } from './bb-report.engine';
 import { computeBBRecoveryMultiplier, computeBBNutritionMultiplier } from './bb-volume.engine';
 import { applyFeedbackToBuild, autoReplaceOnPlateau, applyDiaryVolumeCorrection } from './bb-progression-feedback.engine';
@@ -464,28 +464,8 @@ function expandPlanToTargets(
   // сравнение — в ОДНОЙ метрике (effective, как expansion и валидатор). Если
   // план физически не набирает цель (сессионный бюджет 60, число движений
   // источника, perExerciseCap, кап) — цель переопределяется до достижимой с
-  // причиной в rationale. Раньше UI/отчёт показывал недостижимую цель (chest 56
-  // при MRV 50, calves 52 при 47, traps/forearms/triceps при 1-2 движениях
-  // источника) и «дефицит», которого план закрыть не мог.
-  if (vt) {
-    const achieved: Record<string, number> = {};
-    for (const week of plan.weeks) {
-      const w = week as any;
-      if (w.phase === 'deload' || w.deload === true || w.taperApplied === true || w.taper === true || w.prepProtocol || w.contestPhase || w.peakWeek) continue;
-      const v = aggregateBBVolume(week.sessions) as any;
-      for (const [m, x] of Object.entries(v)) achieved[m] = Math.max(achieved[m] || 0, (x as any).effectiveSets || 0);
-    }
-    for (const [m, target] of Object.entries(vt as Record<string, any>)) {
-      const t = Number(target?.targetSets) || 0;
-      if (t <= 0) continue;
-      const got = achieved[m] || 0;
-      if (got < t * 0.9) {
-        const prev = t;
-        target.targetSets = Math.round(got);
-        plan.rationale.push(`📉 Цель «${m}» переопределена до достижимой: ${prev} → ${target.targetSets} сетов/нед (сессионный бюджет ${opts.maxWorkingSets ?? '—'}, число движений источника, perExerciseCap/кап).`);
-      }
-    }
-  }
+  // причиной в rationale. Единый источник — reconcileVolumeTargets (паритет generic).
+  if (vt) reconcileVolumeTargets(plan, { maxWorkingSets: opts.maxWorkingSets });
 }
 
 /** Канон владельца для спины: недельный кап не ниже weeklyCapFor (60/нед на

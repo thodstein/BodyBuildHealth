@@ -58,7 +58,7 @@ import { loadSRPESessions } from '../../engines/pro/srpe-store';
 import { acuteChronicRatio, toDailyLoads } from '../../engines/pro/training-load.engine';
 import type { Macrocycle, MacroPhase, BBMacrocycle } from '../lms/macrocycle.engine';
 import { syncBBPlanSetShape, validateBBPlan } from './bb-validator.engine';
-import { finalizeBBPlan, prioritizeBackSessions } from './bb-finalize.engine';
+import { finalizeBBPlan, prioritizeBackSessions, reconcileVolumeTargets } from './bb-finalize.engine';
 import { buildBBVolumeTarget, type BBVolumeTarget, computeMrvMult, regimeMrvMultFor, computeBBRecoveryScore, computeBBWeeklyBudget, sessionLimitsFor, computeBBRecoveryMultiplier, computeBBNutritionMultiplier, perExerciseCap, perSessionMuscleCap, sessionMrvRotCap, sessionMuscleRealismCap, sessionMuscleExerciseCap, sessionDensityExerciseCap, resolveMrvCap, weeklyCapFor, distributeSetsByRole, BB_MRV_TOLERANCE } from './bb-volume.engine';
 import { buildBBExpandedSummary } from './bb-summary.engine';
 import { jointGuardScorePenalty, jointGuardActive } from './bb-joint-guard.engine';
@@ -4828,6 +4828,9 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
   prioritizeBackSessions(finalized, {
     level, trainingYears: input.trainingYears, onCourse, maxWorkingSets: sessLimits.maxWorkingSets,
   });
+  // Честная реконсиляция целей (паритет с цикловым путём): цель не выше
+  // достижимого peak effective; иначе UI показывал недостижимую цель/дефицит.
+  reconcileVolumeTargets(finalized, { maxWorkingSets: sessLimits.maxWorkingSets });
   // R1: rehab-возврат ПОСЛЕ finalize (паритет с program-путём) — иначе MEV-фидер
   // финализатора возвращал объём целевой мышцы и рампа не соблюдалась.
   if (input.rehabMuscles?.length) {

@@ -3671,6 +3671,40 @@ export function prioritizeBackSessions(plan: BBPlan, opts: {
 }
 
 /**
+ * Честная реконсиляция целей объёма: targetSets и сравнение — в ОДНОЙ метрике
+ * (effective, как валидатор). Если план физически не набирает цель (сессионный
+ * бюджет, число движений источника, perExerciseCap/кап) — цель переопределяется
+ * до достижимой (peak effective рабочих недель) с причиной в rationale.
+ * Паритет циклового (`expandPlanToTargets`) и generic путей: раньше generic
+ * fullbody_3 держал цель chest 50 при фактическом 24 (недостижимо).
+ */
+export function reconcileVolumeTargets(plan: BBPlan, opts: { maxWorkingSets?: number } = {}): void {
+  const vt: any = (plan as any).volumeTargets;
+  if (!vt) return;
+  const achieved: Record<string, number> = {};
+  for (const week of plan.weeks) {
+    const w: any = week;
+    if (w.phase === 'deload' || w.deload === true || w.taperApplied === true || w.taper === true || w.prepProtocol || w.contestPhase || w.peakWeek) continue;
+    const v = aggregateBBVolume(week.sessions) as any;
+    for (const [m, x] of Object.entries(v)) achieved[m] = Math.max(achieved[m] || 0, (x as any).effectiveSets || 0);
+  }
+  for (const [m, target] of Object.entries(vt as Record<string, any>)) {
+    const t = Number(target?.targetSets) || 0;
+    if (t <= 0) continue;
+    const got = achieved[m] || 0;
+    if (got < t * 0.9) {
+      const prev = t;
+      // Округление не должно ПРЕВЫШАТЬ достижимое (иначе цель 1 при факте 0.75
+      // снова недостижима): округляем вниз, если round завышает.
+      let next = Math.round(got);
+      if (next > got) next = Math.floor(got);
+      target.targetSets = next;
+      plan.rationale.push(`📉 Цель «${m}» переопределена до достижимой: ${prev} → ${target.targetSets} сетов/нед (сессионный бюджет ${opts.maxWorkingSets ?? '—'}, число движений источника, perExerciseCap/кап).`);
+    }
+  }
+}
+
+/**
  * Общий последний проход для generic, проф-циклов и библиотечных программ.
  * Не меняет объём и не добавляет упражнения: только приводит форму результата
  * к единому BBPlan-контракту и восстанавливает тренерский порядок там, где
