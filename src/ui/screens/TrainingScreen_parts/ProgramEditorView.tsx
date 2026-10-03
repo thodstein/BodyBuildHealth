@@ -79,8 +79,8 @@ const LEVEL_OPTS = [
   { id: 'beginner', label: 'Новичок' }, { id: 'intermediate', label: 'Средний' },
   { id: 'advanced', label: 'Опытный' }, { id: 'enhanced', label: 'Enhanced' },
 ];
-const DIR_COLOR: Record<string, string> = { bb: '#00e68a', pl: '#a78bfa', hybrid: '#3b82f6' };
-const DIR_LABEL: Record<string, string> = { bb: 'ББ', pl: 'ПЛ', hybrid: 'Hybrid' };
+const DIR_COLOR: Record<string, string> = { bb: '#00e68a', pl: '#a78bfa', hybrid: '#3b82f6', combat: '#f97316' };
+const DIR_LABEL: Record<string, string> = { bb: 'ББ', pl: 'ПЛ', hybrid: 'Hybrid', combat: '🥊 Единоборства' };
 const SOURCE_LABEL: Record<string, string> = {
   custom: 'своя', cloned_library: 'из библиотеки', cloned_cycle: 'клон цикла', from_build: 'из сборки',
 };
@@ -505,7 +505,7 @@ export const ProgramEditor: React.FC<ProgramEditorProps> = ({ program, onChange,
     const sendToExecution = useCallback(() => {
      let days: { label: string; exercises: { name: string; muscleGroup: string; targetSets: { weight: number; reps: number; rir: number }[] }[] }[] = [];
 
-    const executionWeeks = dir === 'bb' ? program.bb?.weeks : dir === 'arm' ? program.arm?.weeks : undefined;
+    const executionWeeks = dir === 'bb' ? program.bb?.weeks : dir === 'arm' ? program.arm?.weeks : dir === 'combat' ? program.combat?.weeks : undefined;
     if (executionWeeks) {
       const wi = Math.max(0, Math.min(execWeek - 1, executionWeeks.length - 1));
       const week = executionWeeks[wi];
@@ -1036,17 +1036,18 @@ return (
       {(() => {
         const bbEmpty = !!program.bb && (program.bb.weeks ?? []).every(w => w.sessions.every(s => s.blocks.length === 0));
         const armEmpty = !!program.arm && (program.arm.weeks ?? []).every(w => w.sessions.every(s => s.blocks.length === 0));
+        const combatEmpty = !!program.combat && (program.combat.weeks ?? []).every(w => w.sessions.every(s => s.blocks.length === 0));
         const plEmpty = !!program.pl && !program.pl.schedule.length && !(program.pl.customWeeks ?? []).length;
-        if (!bbEmpty && !plEmpty && !armEmpty) return null;
+        if (!bbEmpty && !plEmpty && !armEmpty && !combatEmpty) return null;
         return (
           <div className="constructor-surface" style={{ ...CARD, padding: 12, borderLeft: '3px solid #f59e0b' }}>
             <div style={{ fontSize: 12, fontWeight: 800, color: '#f59e0b', marginBottom: 4 }}>🗓 Недели пока пустые</div>
             <div style={{ fontSize: 11, color: DIM_STRONG, lineHeight: 1.45, marginBottom: 8 }}>
-              {dir === 'arm'
-                ? 'Заполните упражнения в карточках недель ниже — для Арм-программы автосборка не применяется.'
+              {dir === 'arm' || dir === 'combat'
+                ? 'Заполните упражнения в карточках недель ниже — для этой программы автосборка не применяется.'
                 : 'Соберите программу автоматически или загрузите из библиотеки — здесь появятся расписание недели и упражнения.'}
             </div>
-            {dir !== 'arm' && (
+            {dir !== 'arm' && dir !== 'combat' && (
               <button style={{ ...BTN, padding: '8px 16px', fontSize: 12, minHeight: 44 }} onClick={() => autoFillDraft()}>
                 {isAutoFilling ? '⏳ Создание...' : '⚡ Создать автоматически'}
               </button>
@@ -1859,22 +1860,22 @@ return (
       )}
 
       {/* P2.11: редактирование constraints (оборудование, травмы, avoidAxialLoad, любимые/исключённые) + progression — pro-only, шаг «👤 Профиль» */}
-      {isPro && estep === 'profile' && (dir === 'bb' || dir === 'arm') && (program.bb || program.arm) && (
-        <>
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginTop: 2 }}>
-          <span style={{ fontSize: 12, fontWeight: 800, color: '#fff' }}>⚙️ Ограничения и прогрессия</span>
-          <span style={{ fontSize: 10, color: DIM }}>Оборудование, травмы и стратегия нагрузки</span>
-        </div>
-        <BBConstraintsPanel
-           constraints={(dir === 'arm' ? program.arm!.constraints : program.bb!.constraints) ?? { equipment: [] }}
-           progression={(dir === 'arm' ? program.arm!.progression : program.bb!.progression) ?? { loadStrategy: 'double_progression', deloadProtocol: 'pump', intensityTechniques: ['none'] }}
-           onChangeConstraints={(constraints) => dir === 'arm' ? update({ arm: { ...program.arm!, constraints } }) : update({ bb: { ...program.bb!, constraints } })}
-           onChangeProgression={(progression) => dir === 'arm' ? update({ arm: { ...program.arm!, progression } }) : update({ bb: { ...program.bb!, progression } })}
-        />
-        </>
-      )}
+      {isPro && estep === 'profile' && (dir === 'bb' || dir === 'arm' || dir === 'combat') && (program.bb || program.arm || program.combat) && (
+          <>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginTop: 2 }}>
+            <span style={{ fontSize: 12, fontWeight: 800, color: '#fff' }}>📋 Профиль и ограничения</span>
+            <span style={{ fontSize: 10, color: DIM }}>оборудование, травмы и настройки прогрессии</span>
+          </div>
+          <BBConstraintsPanel
+            constraints={(dir === 'arm' ? program.arm!.constraints : dir === 'combat' ? (program.combat as any)!.constraints : program.bb!.constraints) ?? { equipment: [] }}
+            progression={(dir === 'arm' ? program.arm!.progression : dir === 'combat' ? (program.combat as any)!.progression : program.bb!.progression) ?? { loadStrategy: 'double_progression', deloadProtocol: 'pump', intensityTechniques: ['none'] }}
+            onChangeConstraints={(constraints) => dir === 'arm' ? update({ arm: { ...program.arm!, constraints } }) : dir === 'combat' ? update({ combat: { ...(program.combat as any)!, constraints } }) : update({ bb: { ...program.bb!, constraints } })}
+            onChangeProgression={(progression) => dir === 'arm' ? update({ arm: { ...program.arm!, progression } }) : dir === 'combat' ? update({ combat: { ...(program.combat as any)!, progression } }) : update({ bb: { ...program.bb!, progression } })}
+          />
+          </>
+        )}
 
-      {estep === 'weeks' && !showTableView && (dir === 'bb' || dir === 'pl' || dir === 'hybrid' || dir === 'arm') && (
+      {estep === 'weeks' && !showTableView && (dir === 'bb' || dir === 'pl' || dir === 'hybrid' || dir === 'arm' || dir === 'combat') && (
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginTop: 2 }}>
           <span style={{ fontSize: 12, fontWeight: 800, color: '#fff' }}>✏️ Редактор недель и дней</span>
           <span style={{ fontSize: 10, color: DIM }}>Добавляйте дни, упражнения и настраивайте подходы</span>
@@ -1882,6 +1883,7 @@ return (
       )}
       {estep === 'weeks' && !showTableView && dir === 'bb' && program.bb && <BBEditor body={program.bb} level={program.meta.level} onChange={(bb) => update({ bb })} />}
       {estep === 'weeks' && !showTableView && dir === 'arm' && program.arm && <ArmEditor body={program.arm} level={program.meta.level} onChange={(arm) => update({ arm })} />}
+      {estep === 'weeks' && !showTableView && dir === 'combat' && program.combat && <ArmEditor body={program.combat as any} level={program.meta.level} onChange={(combat) => update({ combat: { ...combat, direction: 'combat' } as any })} />}
       {estep === 'weeks' && !showTableView && dir === 'pl' && program.pl && <PLEditor body={program.pl} onChange={(pl) => update({ pl })} />}
       {estep === 'weeks' && !showTableView && dir === 'hybrid' && program.hybrid && (
         <>

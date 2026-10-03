@@ -50,10 +50,19 @@ export function saveCombatPlan(plan: CombatPlan): void {
   } catch { /* честно молчим только при полном провале — план живёт в памяти конструктора */ }
 }
 
+/** P1-24: legacy-план без id получает УНИКАЛЬНЫЙ (по содержимому) id —
+ *  раньше все legacy-планы получали один 'cb_legacy_migrated' и сливались в один. */
+function legacyPlanHash(raw: any): string {
+  const src = `${raw?.discipline || ''}|${raw?.weeks || raw?.weeksData?.length || 0}|${raw?.patternId || ''}|${raw?.createdAt || ''}|${JSON.stringify(raw?.weeksData?.map((w: any) => [w?.week, w?.phase, w?.totalSets])) || ''}`;
+  let h = 0x811c9dc5;
+  for (let i = 0; i < src.length; i++) { h ^= src.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; }
+  return 'cb_legacy_' + h.toString(36);
+}
+
 function migrateCombatPlan(raw: any): CombatPlan {
   if (!raw || typeof raw !== 'object') return raw;
   // P7: legacy без id — детерминированный id (иначе список/удаление не работает)
-  if (typeof raw.id !== 'string' || !raw.id) raw.id = 'cb_legacy_migrated';
+  if (typeof raw.id !== 'string' || !raw.id) raw.id = legacyPlanHash(raw);
   // v1→v2: normDiscipline
   const discMap: Record<string,string> = { boxing:'boxing', 'бокс':'boxing', mma:'mma', 'мма':'mma', wrestling:'wrestling', 'борьба':'wrestling', kickboxing:'kickboxing', 'кик':'kickboxing', general:'general' };
   if (typeof raw.discipline === 'string') {

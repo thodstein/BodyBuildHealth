@@ -13,7 +13,12 @@ export interface SparringLoad {
   wrestlingSessions: number; // 0-4, RPE 7-8, борьба/клинч
   conditioningSessions?: number; // опционально, RPE 6, бег
   hardDays?: number[]; // 0=Пн ... 6=Вс, если не заданы — авто [1,3,5] для hard
+  /** P1-18: фактическая средняя длительность сессии (из журнала: rounds×roundMinutes);
+   *  если не задана — дефолты 90/60/75/40 по типам. */
+  avgDurationMin?: number;
 }
+
+const DEFAULT_DURATION: Record<'hard' | 'tech' | 'wrest' | 'cond', number> = { hard: 90, tech: 60, wrest: 75, cond: 40 };
 
 export function sparringWeeklyLoad(s: SparringLoad): number {
   // scale: hard 90×8.5=765 vs outside generic 90×7=630 — намеренно выше: hard spar RPE 8-9 (ЦНС-удар, 6мин раунд) vs тех 5.5; дельта 0.10 в volumeMultiplier обоснована Boxing Science
@@ -21,7 +26,23 @@ export function sparringWeeklyLoad(s: SparringLoad): number {
   const tech = Math.max(0, Math.min(4, Math.round(s.techSparSessions || 0))) * 60 * 5.5;
   const wrest = Math.max(0, Math.min(4, Math.round(s.wrestlingSessions || 0))) * 75 * 7.5;
   const cond = Math.max(0, Math.min(4, Math.round(s.conditioningSessions || 0))) * 40 * 6;
-  return Math.round(hard + tech + wrest + cond);
+  const base = hard + tech + wrest + cond;
+  // P1-18: журнальная средняя длительность масштабирует нагрузку (факт вместо фабрики)
+  if (typeof s.avgDurationMin === 'number' && Number.isFinite(s.avgDurationMin) && s.avgDurationMin > 0) {
+    const counts = {
+      hard: Math.max(0, Math.min(4, Math.round(s.hardSparSessions || 0))),
+      tech: Math.max(0, Math.min(4, Math.round(s.techSparSessions || 0))),
+      wrest: Math.max(0, Math.min(4, Math.round(s.wrestlingSessions || 0))),
+      cond: Math.max(0, Math.min(4, Math.round(s.conditioningSessions || 0))),
+    };
+    const totalSessions = counts.hard + counts.tech + counts.wrest + counts.cond;
+    if (totalSessions > 0) {
+      const defaultAvg = (counts.hard * DEFAULT_DURATION.hard + counts.tech * DEFAULT_DURATION.tech + counts.wrest * DEFAULT_DURATION.wrest + counts.cond * DEFAULT_DURATION.cond) / totalSessions;
+      const scale = defaultAvg > 0 ? s.avgDurationMin / defaultAvg : 1;
+      return Math.round(base * scale);
+    }
+  }
+  return Math.round(base);
 }
 
 export function sparringToOutsideLoad(s: SparringLoad | null | undefined, discipline?: string): OutsideLoad | null {
@@ -29,7 +50,10 @@ export function sparringToOutsideLoad(s: SparringLoad | null | undefined, discip
   const totalSessions = (s.hardSparSessions || 0) + (s.techSparSessions || 0) + (s.wrestlingSessions || 0) + (s.conditioningSessions || 0);
   if (totalSessions === 0) return null;
   const wl = sparringWeeklyLoad(s);
-  const avgDuration = totalSessions > 0 ? Math.round(( (s.hardSparSessions||0)*90 + (s.techSparSessions||0)*60 + (s.wrestlingSessions||0)*75 + (s.conditioningSessions||0)*40) / totalSessions) : 70;
+  // P1-18: длительность из журнала, иначе — взвешенные дефолты
+  const avgDuration = (typeof s.avgDurationMin === 'number' && Number.isFinite(s.avgDurationMin) && s.avgDurationMin > 0)
+    ? Math.round(s.avgDurationMin)
+    : Math.round(( (s.hardSparSessions||0)*90 + (s.techSparSessions||0)*60 + (s.wrestlingSessions||0)*75 + (s.conditioningSessions||0)*40) / totalSessions);
   const avgRPE = totalSessions > 0 ? ((s.hardSparSessions||0)*8.5 + (s.techSparSessions||0)*5.5 + (s.wrestlingSessions||0)*7.5 + (s.conditioningSessions||0)*6) / totalSessions : 6;
   // high дни — hard spar дни + wrestling (если >=2)
   let highDays: number[] = [];
@@ -82,5 +106,6 @@ export function normalizeSparringLoad(input: SparringLoad | null | undefined): S
   const ws = Math.max(0, Math.min(4, Math.round(Number(input.wrestlingSessions) || 0)));
   const cs = Math.max(0, Math.min(4, Math.round(Number(input.conditioningSessions) || 0)));
   if (hs+ts+ws+cs === 0) return null;
-  return { hardSparSessions: hs, techSparSessions: ts, wrestlingSessions: ws, conditioningSessions: cs, hardDays: Array.isArray(input.hardDays) ? input.hardDays : undefined };
+  const avg = Number(input.avgDurationMin);
+  return { hardSparSessions: hs, techSparSessions: ts, wrestlingSessions: ws, conditioningSessions: cs, hardDays: Array.isArray(input.hardDays) ? input.hardDays : undefined, ...(Number.isFinite(avg) && avg > 0 ? { avgDurationMin: avg } : {}) };
 }

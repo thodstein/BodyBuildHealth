@@ -73,3 +73,16 @@ export function coreVolumeCheck(weekExercises: string[]): { antiExt: number; ant
   const ok = antiExt >= 1 && antiRot >= 1 && antiLat >= 1 && rotPower >= 1;
   return { antiExt, antiRot, antiLat, rotPower, ok };
 }
+
+/**
+ * P0-13: длительность удержания из строки reps ('30с', '20-30с/сторону',
+ * '30с + 30м'). Детект ТОЛЬКО по цифре перед «с» — «8-10/сторону»/«12/стор»
+ * холдами НЕ являются (раньше `reps.includes('с')` давал reps=1 динамике).
+ */
+export function parseHoldSeconds(reps: string | undefined | null): number | null {
+  if (!reps) return null;
+  const m = String(reps).match(/(\d+)\s*с(?![а-яa-z])/i);
+  if (!m) return null;
+  const v = parseInt(m[1], 10);
+  return Number.isFinite(v) && v > 0 ? v : null;
+}

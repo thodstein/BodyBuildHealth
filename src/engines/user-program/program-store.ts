@@ -293,6 +293,31 @@ export function validateProgram(program: UserProgram): ValidationIssue[] {
   }
 
   // 2b. Проверка АРМ — как ББ (день ≤10, RIR 0-5, делод)
+  if (dir === 'combat' && (program as any).combat) {
+    const body: any = (program as any).combat;
+    if (!Array.isArray(body.weeks) || body.weeks.length === 0) {
+      issues.push({ level: 'warning', code: 'NO_WEEKS', message: 'Программа единоборств без недель — добавьте хотя бы одну' });
+    } else {
+      if (body.weeks.length !== meta.weeks) {
+        issues.push({ level: 'warning', code: 'COMBAT_META_MISMATCH', message: `meta.weeks=${meta.weeks}, в теле ${body.weeks.length} недель — расхождение` });
+      }
+      for (const w of body.weeks) {
+        for (const s of (w.sessions || [])) {
+          if ((s.blocks || []).length > 10) {
+            issues.push({ level: 'error', code: 'DAY_CAP_EXCEEDED', message: `Неделя ${w.week} ${s.name}: ${s.blocks.length} упражнений (лимит 10)` });
+          }
+          for (const b of (s.blocks || [])) {
+            for (const st of (b.sets ?? [])) {
+              if (typeof st.rir === 'number' && (st.rir < 0 || st.rir > 5)) {
+                issues.push({ level: 'warning', code: 'RIR_RANGE', message: `${b.exerciseName}: RIR ${st.rir} вне 0-5` });
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
   if (dir === 'arm' && (program as any).arm) {
     const armBody: any = (program as any).arm;
     if (armBody.weeks.length === 0) {
@@ -369,9 +394,24 @@ export function isUserProgramShape(value: unknown): value is UserProgram {
   const meta = candidate.meta;
   if (!meta || typeof meta !== 'object') return false;
   if (typeof meta.id !== 'string' || typeof meta.title !== 'string') return false;
-  if (!['bb', 'pl', 'hybrid', 'arm'].includes(meta.direction)) return false;
+  if (!['bb', 'pl', 'hybrid', 'arm', 'combat'].includes(meta.direction)) return false;
   if (!Number.isInteger(meta.daysPerWeek) || meta.daysPerWeek < 1 || meta.daysPerWeek > 7) return false;
   if (!Number.isInteger(meta.weeks) || meta.weeks < 1 || meta.weeks > 52) return false;
+  if (meta.direction === 'combat') {
+    return !!candidate.combat
+      && Array.isArray(candidate.combat.weeks)
+      && candidate.combat.weeks.every(week => !!week
+        && Array.isArray(week.sessions)
+        && new Set(week.sessions.map(session => session?.id)).size === week.sessions.length
+        && week.sessions.every(session => !!session
+          && typeof session.id === 'string'
+          && Array.isArray(session.blocks)
+          && new Set(session.blocks.map(block => block?.id)).size === session.blocks.length
+          && session.blocks.every(block => !!block
+            && typeof block.id === 'string'
+            && typeof block.exerciseName === 'string'
+            && Array.isArray(block.sets))));
+  }
   if (meta.direction === 'arm') {
     return !!candidate.arm
       && Array.isArray(candidate.arm.weeks)

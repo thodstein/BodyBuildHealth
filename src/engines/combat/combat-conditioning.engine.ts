@@ -18,6 +18,17 @@ export interface ConditioningSession {
   rpe?: number; // 6-9
   description: string;
   exercises: string[]; // ids
+  /** Э5.3: рекомендуемые дни недели (0=Пн) — разнос ≥36ч от hard spar/тяжёлого зала. */
+  suggestedDays?: number[];
+}
+
+/** Э5.3: размещение кондиции по дням недели (0=Пн), разнос ≥36 ч. */
+export function conditioningSuggestedDays(count: number): number[] {
+  if (!Number.isFinite(count) || count <= 0) return [];
+  if (count === 1) return [2];
+  if (count === 2) return [1, 4];
+  if (count === 3) return [0, 2, 4];
+  return [0, 2, 4, 5];
 }
 
 export interface ConditioningPlan {
@@ -171,9 +182,20 @@ export function conditioningSessionsForWeek(
     }
   }
   // deload — сокращаем (фактор из единого источника combat-taper.engine)
-  if (phase === 'deload') return out.map(s => ({ ...s, durationMin: Math.round(s.durationMin * TAPER_DELOAD), intervals: s.intervals + ' (делод ×0.6)' }));
-  if (phase === 'realization' || phase === 'taper') return out.filter(s => s.modality === 'aerobic').map(s => ({ ...s, durationMin: Math.round(s.durationMin * TAPER_COND) }));
-  return out;
+  if (phase === 'deload') {
+    const days = conditioningSuggestedDays(out.length);
+    return out.map((s, i) => ({ ...s, suggestedDays: [days[i] ?? 2], durationMin: Math.round(s.durationMin * TAPER_DELOAD), intervals: s.intervals + ' (делод ×0.6)' }));
+  }
+  if (phase === 'realization' || phase === 'taper') {
+    // P0-9: у camp в базе нет aerobic — тапер-фильтр обнулял всю кондицию.
+    // Если aerobic нет, сохраняем базовые моды в урезанном объёме (поддержание).
+    const aerobic = out.filter(s => s.modality === 'aerobic');
+    const keep = aerobic.length ? aerobic : out;
+    const days = conditioningSuggestedDays(keep.length);
+    return keep.map((s, i) => ({ ...s, suggestedDays: [days[i] ?? 2], durationMin: Math.round(s.durationMin * TAPER_COND) }));
+  }
+  const days = conditioningSuggestedDays(out.length);
+  return out.map((s, i) => ({ ...s, suggestedDays: [days[i] ?? 2] }));
 }
 
 export function buildConditioningRationale(goal: string, outsideSessions: number, weeks: number): string[] {
@@ -186,6 +208,7 @@ export function buildConditioningRationale(goal: string, outsideSessions: number
   lines.push('Системы: alactic 10с/50с (ATP-PCr) + lactic 3мин/90с (глюколиз) + aerobic Zone2 40′ (130-150 уд, cardiac output)');
   if (weeks >= 8) lines.push('Периодизация кондиции: Off аэробаза → Pre alactic+lac → Camp поддержание + тапер (Jamieson)');
   if (outsideSessions >= 5) lines.push('При 5× татами: alactic/lactic покрыты спаррингом — сохраняем 1× Zone2 для восстановления между раундами');
+  lines.push('Размещение: Пн/Чт или Вт/Пт — разнос ≥36ч от hard spar и тяжёлого зала (Boxing Science)');
   return lines;
 }
 

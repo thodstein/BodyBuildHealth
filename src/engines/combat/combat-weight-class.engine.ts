@@ -146,6 +146,11 @@ export function weightClassLine(
   classLimitKg: number | null | undefined,
   classLabel?: string | null
 ): string | null {
+  // P1-25: открытая категория (Infinity) — валидный выбор, раньше строка пропадала
+  if (classLimitKg === Infinity) {
+    const target = Math.round((bodyweightKg - (cutKg || 0)) * 10) / 10;
+    return `Категория ${classLabel || 'открытая'}: цель ${target} кг — без лимита (open)`;
+  }
   const d = weightToClassBoundary(bodyweightKg, cutKg, classLimitKg);
   if (d == null || classLimitKg == null) return null;
   const target = Math.round((bodyweightKg - (cutKg || 0)) * 10) / 10;

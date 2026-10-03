@@ -108,6 +108,80 @@ export const COMBAT_CYCLE_LIBRARY: CombatCycleTemplate[] = [
     periodizationModel: 'linear_12', patternId: 'combat_3',
     blurb: 'Линейная волна 5→4→3 на базе, двойная прогрессия в подсобке.',
   },
+  // ── PRO-волна: весогонка по дисциплинам, кэмпы, enhanced, отель, женская/teen-база,
+  //    поддержание в сезоне (ISSN 2025 · Boxing Science · борцовские школы) ──
+  {
+    id: 'cb-box-cut-6', name: 'Бокс · весогонка 6 нед', author: 'ISSN · весогонка',
+    discipline: 'boxing', goal: 'weight_cut', level: 'intermediate', weeks: 6, daysPerWeek: 3,
+    periodizationModel: 'linear_12', patternId: 'combat_3',
+    blurb: 'Дефицит + объём ×0.75, RIR 3-4 без отказа; сохранение силы удара (Boxing Science).',
+  },
+  {
+    id: 'cb-wrestle-cut-6', name: 'Борьба · весогонка 6 нед', author: 'ISSN · весогонка',
+    discipline: 'wrestling', goal: 'weight_cut', level: 'intermediate', weeks: 6, daysPerWeek: 3,
+    periodizationModel: 'linear_12', patternId: 'combat_3b',
+    blurb: 'Сгон к взвешиванию: тяги/шея сохраняются, объём ↓, без отказа.',
+  },
+  {
+    id: 'cb-kick-cut-6', name: 'Кикбоксинг · весогонка 6 нед', author: 'ISSN · весогонка',
+    discipline: 'kickboxing', goal: 'weight_cut', level: 'intermediate', weeks: 6, daysPerWeek: 3,
+    periodizationModel: 'linear_12', patternId: 'combat_3',
+    blurb: 'Дефицит с приоритетом ног/ротации; техника под усталостью.',
+  },
+  {
+    id: 'cb-wrestle-camp-8', name: 'Борьба · кэмп 8 нед', author: 'Борцовская школа · кэмп',
+    discipline: 'wrestling', goal: 'camp', level: 'advanced', weeks: 8, daysPerWeek: 4,
+    periodizationModel: 'atr_10', patternId: 'combat_4',
+    blurb: 'Межсезонье→пик: сила→мощность→кэмп + тапер 8-14 дней.',
+  },
+  {
+    id: 'cb-general-camp-8', name: 'Общая · кэмп 8 нед', author: 'ОФП · кэмп',
+    discipline: 'general', goal: 'camp', level: 'intermediate', weeks: 8, daysPerWeek: 3,
+    periodizationModel: 'camp_8', patternId: 'combat_3',
+    blurb: 'Поддержание силы в кэмпе: 3×/нед, RIR 2-3, тапер к дате боя.',
+  },
+  {
+    id: 'cb-mma-enhanced-8', name: 'ММА · PRO 8 нед (курс)', author: 'MMA block · enhanced',
+    discipline: 'mma', goal: 'power', level: 'enhanced', weeks: 8, daysPerWeek: 4,
+    periodizationModel: 'atr_10', patternId: 'combat_4',
+    blurb: 'Расширенный объём (PED-надбавка) + блочная сила/мощность; 4×/нед.',
+  },
+  {
+    id: 'cb-box-enhanced-8', name: 'Бокс · PRO кэмп 8 нед (курс)', author: 'Boxing Science · enhanced',
+    discipline: 'boxing', goal: 'camp', level: 'enhanced', weeks: 8, daysPerWeek: 4,
+    periodizationModel: 'atr_10', patternId: 'combat_4',
+    blurb: 'Кэмп с расширенным объёмом: сила→скорость→тапер; восстановление на курсе.',
+  },
+  {
+    id: 'cb-mma-hotel-4', name: 'ММА · отель 4 нед (свой вес)', author: 'ОФП · поездка',
+    discipline: 'mma', goal: 'maintenance', level: 'intermediate', weeks: 4, daysPerWeek: 2,
+    periodizationModel: 'linear_12', patternId: 'combat_2a',
+    blurb: 'Поездка/отель: только свой вес, объём ×0.9 — поддержание силы.',
+  },
+  {
+    id: 'cb-general-f-base-6', name: 'Общая · женская база 6 нед', author: 'ОФП · женская база',
+    discipline: 'general', goal: 'maintenance', level: 'beginner', weeks: 6, daysPerWeek: 2,
+    periodizationModel: 'linear_12', patternId: 'combat_2a',
+    blurb: 'Женская база: 2×/нед, унилатеральная работа, шея/хват мягче, RIR 3-4.',
+  },
+  {
+    id: 'cb-teen-4', name: 'Общая · подросток 4 нед', author: 'ОФП · teen-гейт',
+    discipline: 'general', goal: 'maintenance', level: 'beginner', weeks: 4, daysPerWeek: 2,
+    periodizationModel: 'linear_12', patternId: 'combat_2a',
+    blurb: '14–15 лет: техника и изометрия шеи (teen-гейт), без hard spar и манипуляций.',
+  },
+  {
+    id: 'cb-box-maint-4', name: 'Бокс · поддержание в сезоне 4 нед', author: 'Boxing Science · in-season',
+    discipline: 'boxing', goal: 'maintenance', level: 'intermediate', weeks: 4, daysPerWeek: 2,
+    periodizationModel: 'linear_12', patternId: 'combat_2a',
+    blurb: 'Между боями: 2×/нед, RIR 3-4, шея/кор — сохранение без усталости.',
+  },
+  {
+    id: 'cb-wrestle-maint-4', name: 'Борьба · поддержание 4 нед', author: 'Борцовская школа · in-season',
+    discipline: 'wrestling', goal: 'maintenance', level: 'intermediate', weeks: 4, daysPerWeek: 2,
+    periodizationModel: 'linear_12', patternId: 'combat_2a',
+    blurb: 'Турнирный сезон: тяги/шея/хват в поддержании, RIR 3-4.',
+  },
 ];
 
 export function getCombatCycle(id: string): CombatCycleTemplate | null {

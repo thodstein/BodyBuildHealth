@@ -2,6 +2,46 @@
  * combat-selection.ts — зальный отбор для единоборств (изолировано).
  * ANGLE_CLASSES для шеи/хвата/ротации/ног, STRICT группы.
  */
+import { TEEN_BANNED_EXERCISES } from './combat-safety.engine';
+import { isMobilityRestrictedCB, isAxialLoadExerciseCB } from './combat-mobility';
+
+/** Единый safety-гейт (P0): любое добавление упражнения (пул, fallback,
+ *  авто-core/шея, prehab) обязано проходить эту проверку. */
+export interface CombatAdmitCtx {
+  excludedExercises?: string[];
+  age?: number | null;
+  injuries?: any[];
+  mobilityRestrictions?: string[];
+  avoidAxialLoad?: boolean;
+  equipment?: string[];
+}
+
+/** Оборудование-зависимые id: без кабеля/резинок и без саней они недопустимы
+ *  (паритет с filterPool: equipment пуст = всё доступно). */
+const CABLE_REQUIRED_IDS = ['pallof_rotation_press', 'band_external_rotation', 'band_pull_apart', 'rope_climb'];
+const SLED_IDS = ['sled_push', 'sled_pull'];
+
+export function admitCombatExercise(id: string, ctx: CombatAdmitCtx): boolean {
+  if (!id) return false;
+  if (ctx.excludedExercises?.length) {
+    const excl = new Set(ctx.excludedExercises.map(s => String(s).toLowerCase()));
+    if (excl.has(id.toLowerCase())) return false;
+  }
+  if (typeof ctx.age === 'number' && Number.isFinite(ctx.age) && ctx.age <= 15) {
+    if (TEEN_BANNED_EXERCISES.includes(id)) return false;
+  }
+  if (ctx.injuries?.length && filterByInjuryCB([id], ctx.injuries).length === 0) return false;
+  if (ctx.mobilityRestrictions?.length && isMobilityRestrictedCB(id, ctx.mobilityRestrictions)) return false;
+  if (ctx.avoidAxialLoad && isAxialLoadExerciseCB(id)) return false;
+  if (ctx.equipment?.length) {
+    const eq = ctx.equipment.map(s => String(s).toLowerCase());
+    const hasCable = eq.includes('cable') || eq.includes('other');
+    const hasSled = eq.includes('other') || eq.includes('sled');
+    if (!hasCable && CABLE_REQUIRED_IDS.includes(id)) return false;
+    if (!hasSled && SLED_IDS.includes(id)) return false;
+  }
+  return true;
+}
 
 export const CB_ANGLE_CLASSES: Record<string, Record<string, string[]>> = {
   upper_power: {

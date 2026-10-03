@@ -81,6 +81,11 @@ export function vbtRecommendationCombat(lossPct: number): { action: string; rirA
 // --- Per-exercise history + EWMA (как в cardio-diary hrvEwma) ---
 export interface VbtHistoryEntry { liftId: string; velocity: number; date: string; weight?: number }
 
+/**
+ * @deprecated P1-30: VBT-ввод убран из UI (решение 2026-09-27) — у функции нет
+ * прод-потребителей. API сохранён для старых планов/внешних вызовов; новая
+ * авторегуляция по скорости должна читать живой дневник (velocityMs).
+ */
 export function loadVbtHistoryCB(): VbtHistoryEntry[] {
   try {
     for (const key of ['he_combat_vbt_log','he_vbt_log','he_vbt_history','he_training_vbt']) {
@@ -97,13 +102,23 @@ export function loadVbtHistoryCB(): VbtHistoryEntry[] {
         if (out.length) return out;
       }
     }
-    // fallback: workout_log may contain velocity
+    // fallback: живой дневник силы he_workout_log_v2 (P0-8) → легаси he_workout_log
     try {
-      const wl = typeof localStorage !== 'undefined' ? localStorage.getItem('he_workout_log') : null;
-      if (wl) {
+      for (const wlKey of ['he_workout_log_v2', 'he_workout_log']) {
+        const wl = typeof localStorage !== 'undefined' ? localStorage.getItem(wlKey) : null;
+        if (!wl) continue;
         const arr = JSON.parse(wl);
         const out: VbtHistoryEntry[] = [];
-        for (const sess of arr || []) for (const ex of (sess.exercises || [])) for (const s of (ex.sets || [])) if (s.velocity) out.push({ liftId: ex.id || ex.name, velocity: Number(s.velocity), date: sess.date, weight: s.weight });
+        for (const sess of arr || []) for (const ex of (sess.exercises || [])) for (const s of (ex.sets || [])) {
+          const v = Number(s.velocityMs ?? s.velocity);
+          if (!Number.isFinite(v) || v <= 0.05 || v >= 4) continue;
+          out.push({
+            liftId: String(ex.exerciseId || ex.id || ex.exerciseName || ex.name || ''),
+            velocity: v,
+            date: sess.date,
+            weight: s.weightKg != null ? Number(s.weightKg) : s.weight != null ? Number(s.weight) : undefined,
+          });
+        }
         if (out.length) return out.slice(-48);
       }
     } catch {}
@@ -111,6 +126,7 @@ export function loadVbtHistoryCB(): VbtHistoryEntry[] {
   return [];
 }
 
+/** @deprecated P1-30: см. loadVbtHistoryCB — нет прод-потребителей (VBT убран из UI). */
 export function saveVbtHistoryCB(entries: VbtHistoryEntry[]): void {
   try { localStorage.setItem('he_combat_vbt_log', JSON.stringify(entries.slice(-48))); } catch {}
 }
@@ -150,6 +166,7 @@ export function atrTransitionHintForTrend(liftId: string, changePct: number | nu
   return null;
 }
 
+/** @deprecated P1-30: нет прод-потребителей (в SS-модуле своя живая версия). */
 export function diagnoseVelocityLossEwma(bestVel: number, history: number[]|VbtHistoryEntry[], liftId?: string, threshold: 20|10|25|40 = 20, weight?: number): { lossPct: number; zone: string; exceeded: boolean; e1RMByVelocity: number | null; ewma: number | null; recommendation: string } {
   const vels = Array.isArray(history) && history.length && typeof (history as any)[0]==='object' && 'velocity' in (history as any)[0] ? (history as VbtHistoryEntry[]).filter(e=> !liftId || e.liftId===liftId).map(e=> e.velocity) : history as number[];
   const ewma = vbtEwma(vels);

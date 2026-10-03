@@ -25,7 +25,3 @@ export function styleNarrative(style: FightStyle | undefined, discipline: Discip
   if (style==='grappler') return 'Grappler: шея/хват+унилатеральные ноги+тяги — клинч, партер, борьба';
   return 'Hybrid: баланс удар/борьба — упор на дисциплину';
 }
-
-export function ensureMandatory(plan: any): void {
-  // заглушка: проверка что neck/grip покрыты — используется в finalize
-}

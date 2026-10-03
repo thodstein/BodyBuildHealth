@@ -5,8 +5,8 @@
 По команде «проведи полный анализ планировщика единоборств → выдай баги и возможности уровня про → выполняй полностью».
 Свежий аудит (41 движок + 21 UI-файл, baseline 697+151 зелёных, все критичные находки перепроверены чтением кода),
 план — NEW `docs/COMBAT-PLANNER-PRO-3-PLAN.md` (14 P0 / 33 P1 / ~30 P2 + 6 эпиков PRO). Затем выполнение:
-`src/engines/combat` + `src/ui/screens/combat` — **900/900** (база 848 + 52 новых лока в 5 файлах
-`combat-pro3-wave1..5`), `tsc --noEmit` **0 по всему проекту**, `verify:apk-design` OK, круг user-program/manual 78/78.
+`src/engines/combat` + `src/ui/screens/combat` — **907/907** (база 848 + 59 локов в 6 файлах
+`combat-pro3-wave1..6`), `tsc --noEmit` **0 по всему проекту**, `verify:apk-design` OK, круг user-program/manual 75/75.
 Только Edit/Write + vitest/tsc; чужие файлы не тронуты; коммита нет.
 
 - **В1 P0-безопасность/данные**: NEW `admitCombatExercise` (единый гейт: teen-бан/травма/исключение/мобильность/
@@ -37,9 +37,16 @@
   отель, женская база, teen, поддержание ×2) + лок покрытия; `fightMinutes` → энергопрофиль боя в rationale/интелидже.
 - **В6 частично**: менеджер сохранённых планов (загрузка/удаление); своп пересчитывает вес/темп/отдых; агрегаты
   недели после правок; вариант restored выходит из просмотра при правке; `cb-camp-intel` deps.
-- **Осталось (границы, §5 плана)**: год собирается планами по блокам; недельная волна кондиции/размещение по дням;
-  RMR/мощность-журналы, HEAT_EVIDENCE, женская модуляция цикла, LEA из sRPE; топ-сет/бэкоффы; удаление ~25 мёртвых
-  экспортов; чистый финализатор (localStorage-HRV); `CB_RU_MODEL` camp_8/linear; P2-гигиена. `validateCombatPlan`
+- **В7 (продолжение «продолжай», вторым заходом)**: Э2.2 разминочная лестница 40/60/75/85% + топ-сет/бэкоффы 90%
+  на тяж-базе (делод ровный); Э5.3 `conditioningSuggestedDays` (разнос ≥36ч) + строка размещения; Э5.6
+  `HEAT_EVIDENCE` в тепловом блоке; Э6 `CB_RU_MODEL` camp_8/linear, **чистый финализатор** (HRV только из снимка
+  плана — localStorage не читается), селект теста E8, удалены 8 проверенно мёртвых экспортов
+  (`ensureMandatory`/`phaseForCombatWeekNew`/`weekGroupExercises`/`checkStatus`/`variantChangedRows`/
+  `combatDiaryStatsFromSessions`/`combatNutritionEventPayload`/`buildCombatShareHash`). NEW `combat-pro3-wave6` 7/7.
+  **Итог: `src/engines/combat` + `src/ui/screens/combat` — 907/907 (54 файла), `tsc` 0, apk-verify OK.**
+- **Осталось (границы, §5 плана)**: год собирается планами по блокам; недельная волна кондиции (размещение по
+  дням сделано); RMR/мощность-журналы, женская модуляция цикла, LEA из sRPE; VBT-трио `@deprecated` (политика
+  «API сохранён»); тест-локнутые экспорты не удалялись; P2-остатки (внешний QR, `daysToFirstFight`). `validateCombatPlan`
   сохраняет входные ошибки (семантика задокументирована); `trainingYears` не пробрасывается (нет поля в профиле).
 
 ## ББ-авто: фаз-гейт DC Rest-Pause + taper коротких планов (Oct 3 2026, без пуша)

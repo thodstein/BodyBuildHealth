@@ -11,8 +11,8 @@ import { finalizeCombatPlan, buildCombatReport, isCombatPlanBlocked } from '../.
 import { COMBAT_PATTERNS, recommendCombatPattern } from '../../../engines/combat/combat-split-patterns';
 import { COMBAT_CYCLE_LIBRARY, getCombatCycle } from '../../../engines/combat/combat-cycle-library';
 import type { OutsideLoad } from '../../../engines/outside-load.engine';
-import { saveCombatPlan, loadCombatPlans, migrateAllCombatStorage } from '../../../engines/combat/combat-storage';
-import { applyCombatMesocycle } from '../../../engines/combat/combat-mesocycle';
+import { saveCombatPlan, loadCombatPlans, removeCombatPlan, migrateAllCombatStorage } from '../../../engines/combat/combat-storage';
+import { applyCombatMesocycle, combatMesocycleHash, shouldApplyCombatMesocycle } from '../../../engines/combat/combat-mesocycle';
 import { buildAnnualATR, saveAnnualCB, loadAnnualCB, removeAnnualCB, buildAnnualPrintHtml, buildAnnualIcs, addCompetitionToAnnual, removeCompetitionFromAnnual, autoAnnualWithFightTaper } from '../../../engines/combat/combat-annual';
 import { AnnualCard } from './combat-annual-card';
 import { CbCampIntelCard } from './cb-camp-intel';
@@ -23,14 +23,18 @@ import type { CombatInput, CombatPlan } from '../../../engines/combat/combat.typ
 import { getCombat } from '../../../engines/combat/combat-volume';
 import { buildWeightCutProtocol } from '../../../engines/combat/combat-weight-cut.engine';
 import { weightClassesFor, weightClassLine, weightClassLimitValid, weightClassRulesetNote } from '../../../engines/combat/combat-weight-class.engine';
+import { weightForCombatExerciseResolved } from '../../../engines/combat/combat-workmax';
+import { tempoForCB, restForCB } from '../../../engines/combat/combat-loading';
 import { validateSparringLoad, sparringWeeklyLoad, normalizeSparringLoad } from '../../../engines/combat/combat-sparring.engine';
 import { screenCombatRedFlags } from '../../../engines/combat/combat-safety.engine';
-import { combatToNutritionPayload, combatToCardioPayload } from '../../../engines/combat/combat-integration.engine';
+import { combatToNutritionPayload, combatToCardioPayload, combatPlanToUserProgram } from '../../../engines/combat/combat-integration.engine';
 import type { CombatNutritionPayload, CombatCardioPayload } from '../../../engines/combat/combat-integration.engine';
 import { getPlannerApply, subscribePlannerApply } from '../TrainingScreen_parts/planner-bridge';
 import { CB_STRICT_GROUPS, cbStrictGroupFor } from '../../../engines/combat/combat-selection';
 import { getDiaryTrendCB, getDiaryTrendCBAsync } from '../../../engines/combat/combat-diary.engine';
 import { loadHrvHistory, hrvEwma, hrvGrade, hrvFromHistory } from '../../../engines/combat/combat-monitoring.engine';
+import { loadRtp, rtpIncomplete, loadSparring, sparringJournalToLoad } from '../../../engines/combat/combat-measurements.engine';
+import { localIsoDate } from '../../../core/local-date';
 import { useCombatWizard, type WizardStep } from './useCombatWizard';
 import {
   CARD, CARD_ACCENT, CARD_HERO, ROW, COL, LABEL, HINT, HINT_SM, BTN, BTN_PRIMARY, BTN_SMALL, BTN_GHOST,
@@ -123,10 +127,12 @@ export const CombatConstructor: React.FC = () => {
     methodology, setMethodology, dupMode, setDupMode, intensityTech, setIntensityTech,
     periodizationModel, setPeriodizationModel, conditioningMode, setConditioningMode,
     outside, setOutside, outsideEnabled, setOutsideEnabled, sparringHard, setSparringHard, sparringTech, setSparringTech, sparringWrest, setSparringWrest, sparringEnabled, setSparringEnabled,
+    sparringAvgDur, setSparringAvgDur,
     fightStyle, setFightStyle, avoidAxialLoad, setAvoidAxialLoad,
     equipment, setEquipment, mobility, setMobility, injuries, setInjuries, injInput, setInjInput, injExclude, setInjExclude,
     bodyweight, setBodyweight, sex, setSex, age, setAge,
     fightDate, setFightDate, taperWeeks, setTaperWeeks, startDate, setStartDate,
+    fightMinutes, setFightMinutes,
     acwr, setAcwr, hrvLine, setHrvLine,
     patternId, setPatternId,
     workMax, setWorkMax, workMaxByExercise, setWorkMaxByExercise, showExactWM, setShowExactWM,
@@ -135,10 +141,14 @@ export const CombatConstructor: React.FC = () => {
     concussionHistory, setConcussionHistory, neckExtensionKg, setNeckExtensionKg, neckFlexExtRatio, setNeckFlexExtRatio,
     neckLevelOverride, setNeckLevelOverride, weakSide, setWeakSide,
     weightClass, setWeightClass, weightClassLimitKg, setWeightClassLimitKg, weightClassRuleset, setWeightClassRuleset, travelMode, setTravelMode, lutealPhase, setLutealPhase,
+    courseIntensity, setCourseIntensity,
     outsideMetrics,
   } = useCombatWizard();
   usePlannerStepScroll('combat', [step]);
   const [cycFilter, setCycFilter] = React.useState<string>('all');
+  /** Э4.1: менеджер сохранённых планов (тик — перечитать список после удаления). */
+  const [plansTick, setPlansTick] = React.useState(0);
+  const savedPlansList = React.useMemo(() => { try { return loadCombatPlans(); } catch { return []; } }, [plansTick, plan]);
 
   const go = (s: Step) => { buzzStep(); setStep(s); };
 
@@ -318,14 +328,37 @@ export const CombatConstructor: React.FC = () => {
         extra.stressLevel = typeof lifestyle.stressLevel === 'number' ? lifestyle.stressLevel : undefined;
         extra.calorieSurplus = typeof p.nutrition?.calorieSurplus === 'number' ? p.nutrition.calorieSurplus : undefined;
         extra.proteinPerKg = typeof p.nutrition?.proteinPerKg === 'number' ? p.nutrition.proteinPerKg : undefined;
-        if (Array.isArray(ph.currentSubstances) && ph.currentSubstances.length) extra.peds = ph.currentSubstances;
-        if (ph.currentSubstancesDoses && typeof ph.currentSubstancesDoses === 'object') extra.pedDoses = ph.currentSubstancesDoses;
-        else if (p.pharma?.doses && typeof p.pharma.doses === 'object') extra.pedDoses = p.pharma.doses;
+        // P0-7: currentSubstances — объекты PharmaSubstanceEntry[] (доза в doseMg),
+        // а движок ждёт id[] + {id: доза}; раньше летели объекты → PED-адаптация
+        // молча отключалась (всегда natural ×1.0)
+        if (Array.isArray(ph.currentSubstances) && ph.currentSubstances.length) {
+          const peds: string[] = [];
+          const doses: Record<string, number> = {};
+          for (const s of ph.currentSubstances) {
+            const id = String(s?.id || s?.name || '').trim();
+            if (!id) continue;
+            peds.push(id);
+            const d = Number(s?.doseMg);
+            if (Number.isFinite(d) && d > 0) doses[id] = d;
+          }
+          if (peds.length) extra.peds = peds;
+          if (Object.keys(doses).length) extra.pedDoses = doses;
+        }
+        if (!extra.pedDoses && p.pharma?.doses && typeof p.pharma.doses === 'object') extra.pedDoses = p.pharma.doses;
+        // P1-29: предпочтения/исключения из профиля доезжают до отбора упражнений
+        if (Array.isArray(p.training?.favoriteExercises) && p.training.favoriteExercises.length) extra.favoriteExercises = p.training.favoriteExercises;
+        if (Array.isArray(p.training?.excludedExercises) && p.training.excludedExercises.length) extra.excludedExercises = p.training.excludedExercises;
         extra.labMrvMultiplier = typeof p.labs?.mrvMultiplier === 'number' ? p.labs.mrvMultiplier : undefined;
       }
     } catch {}
+    // P1-27: RTP-гейт — если протокол возврата начат и не завершён, сборка ограничивает интенсивность
+    try { const rtpFlag = rtpIncomplete(loadRtp()); if (rtpFlag) extra.rtpIncomplete = true; } catch {}
     const wcProtocol = weightCut > 0 ? buildWeightCutProtocol(weightCut, { startWeightKg: bodyweight, waterMode, sodiumMode, carbMode, heatSessions, weighInType: weighInType as any, confirmedManipulation, orsSodiumMmolPerDl: orsSodium, discipline, fiberGPerDay: weightCutFiber, dailyStepsTarget: weightCutSteps } as any) : null;
-    const sparringLoad = sparringEnabled ? { hardSparSessions: sparringHard, techSparSessions: sparringTech, wrestlingSessions: sparringWrest } as any : null;
+    // P1-12: спарринг учитывается только при включённом мастере «нагрузка вне зала»
+    // Э1.1: avgDurationMin из журнала (кнопка «Из журнала») масштабирует нагрузку
+    const sparringLoad = (sparringEnabled && outsideEnabled)
+      ? { hardSparSessions: sparringHard, techSparSessions: sparringTech, wrestlingSessions: sparringWrest, ...(sparringAvgDur ? { avgDurationMin: sparringAvgDur } : {}) } as any
+      : null;
     // VBT из UI и из снимка плана убран (решение 2026-09-27): новые планы больше
     // не несут velocityLossPct/vbtHistory/velocityLossPerLift. Движки и старые
     // планы их по-прежнему читают — обратная совместимость не сломана.
@@ -334,6 +367,7 @@ export const CombatConstructor: React.FC = () => {
       weightCutKg: weightCut, weightCutProtocol: wcProtocol as any, methodology, dupMode, intensityTech,
       periodizationModel: periodizationModel as any, conditioningMode: conditioningMode as any,
       fightDate: fightDate || null, taperWeeks: fightDate ? taperWeeks : undefined, startDate,
+      fightMinutes: fightMinutes > 0 ? fightMinutes : undefined,
       bodyweight, sex, age,
       workMax: workMax as any,
       workMaxByExercise: Object.keys(workMaxByExercise).length ? workMaxByExercise as any : undefined,
@@ -354,8 +388,10 @@ export const CombatConstructor: React.FC = () => {
       // P4/P5 весовая категория + travel + лютеиновая (опционально)
       weightClass: weightClass || undefined,
       weightClassLimitKg: weightClassLimitKg || undefined,
+      weightClassRuleset: weightClassRuleset || undefined,
       travelMode: travelMode !== 'off' ? travelMode : undefined,
       lutealPhase: lutealPhase || undefined,
+      courseIntensity: courseIntensity !== 'auto' ? courseIntensity : undefined,
       ...extra,
     } as any;
     try {
@@ -371,7 +407,20 @@ export const CombatConstructor: React.FC = () => {
       const idx = combatLastResultIndex(logs || []);
       if (idx && Object.keys(idx).length) (input as any).diaryLastResultIndex = idx;
     } catch {}
-    try { const prev = loadCombatPlans()[0]; if (prev) input = applyCombatMesocycle(prev, input) as any; } catch {}
+    // P0-6: кросс-мезо только для «нового» мезоцикла — повторная сборка с теми же
+    // входами не бампает веса заново (было: 10 пересборов = +25 кг) и не смешивает дисциплины
+    let mesoHash: string | null = null;
+    try {
+      const prev = loadCombatPlans()[0];
+      if (prev) {
+        mesoHash = combatMesocycleHash(input);
+        let lastHash: string | null = null;
+        try { lastHash = localStorage.getItem('he_combat_meso_hash_v1'); } catch {}
+        if (shouldApplyCombatMesocycle(prev, input, lastHash)) {
+          input = applyCombatMesocycle(prev, input) as any;
+        }
+      }
+    } catch {}
     let p = buildCombatPlan(input);
     p = finalizeCombatPlan(p);
     setPlan(p);
@@ -384,6 +433,8 @@ export const CombatConstructor: React.FC = () => {
       return;
     }
     saveCombatPlan(p);
+    // P0-6: фиксируем хэш успешной сборки — повторный клик с теми же входами идемпотентен
+    try { if (mesoHash) localStorage.setItem('he_combat_meso_hash_v1', mesoHash); } catch {}
     try {
       const nut: CombatNutritionPayload = { planId: p.id, ...combatToNutritionPayload(p), bodyweight, discipline, goal };
       localStorage.setItem('he_combat_nutrition_payload', JSON.stringify(nut));
@@ -401,6 +452,12 @@ export const CombatConstructor: React.FC = () => {
   };
 
   const pushHistory = (p: CombatPlan) => setHistory(h => [...h.slice(-9), JSON.parse(JSON.stringify(p))]);
+  /** P1-11: агрегаты недели после правок — сводка/печать не врут (паритет с финализатором). */
+  const recomputeWeekAgg = (w: any) => {
+    if (!w) return;
+    w.totalSets = (w.sessions || []).reduce((s: number, ss: any) => s + ss.exercises.reduce((a: number, e: any) => a + e.sets, 0), 0);
+    w.totalTonnage = (w.sessions || []).reduce((s: number, ss: any) => s + ss.exercises.reduce((a: number, e: any) => a + (e.workSets || []).reduce((x: number, ws: any) => x + ws.weight * ws.reps, 0), 0), 0);
+  };
   const undo = () => {
     setHistory(h => {
       if (h.length === 0) { setMsg('История пуста'); setTimeout(() => setMsg(''), 1800); return h; }
@@ -436,6 +493,7 @@ export const CombatConstructor: React.FC = () => {
         }
       }
       if (patch.rir != null) { if (patch.rir < 0 || patch.rir > 5) { setMsg('RIR 0–5'); setTimeout(() => setMsg(''), 1800); return prev; } ex.rir = patch.rir; ex.workSets = ex.workSets.map(s => ({ ...s, rir: patch.rir! })); }
+      recomputeWeekAgg(wk);
       saveCombatPlan(copy);
       return copy;
     });
@@ -454,6 +512,7 @@ export const CombatConstructor: React.FC = () => {
       const tmp = sess.exercises[idx];
       sess.exercises[idx] = sess.exercises[nIdx];
       sess.exercises[nIdx] = tmp;
+      recomputeWeekAgg(copy.weeksData[wkIdx]);
       saveCombatPlan(copy);
       return copy;
     });
@@ -478,6 +537,23 @@ export const CombatConstructor: React.FC = () => {
       ex.name = meta.name;
       ex.group = meta.group;
       ex.pattern = meta.pattern;
+      // P1-10: пересчёт веса/темпа/отдыха/комментария под НОВОЕ упражнение
+      // (раньше оставался вес и комментарий прежнего — «показано ≠ факт»)
+      try {
+        const snapAny: any = copy.inputSnapshot || {};
+        const w = weightForCombatExerciseResolved(newId, {
+          workMaxByExercise: snapAny.workMaxByExercise ?? null,
+          workMax: snapAny.workMax ?? null,
+          bodyweight: snapAny.bodyweightKg ?? snapAny.bodyweight ?? null,
+          goalMult: copy.goal === 'weight_cut' ? 0.92 : copy.goal === 'maintenance' ? 0.95 : 1,
+        });
+        ex.weight = w;
+        ex.workSets = ex.workSets.map(st => ({ ...st, weight: w }));
+        ex.tempo = tempoForCB(newId, ex.role === 'primary', ex.character as any);
+        ex.restSeconds = restForCB(ex.role === 'primary', ex.character as any, newId);
+        ex.comment = `↻ Замена: ${meta.name} — проверьте вес`;
+      } catch {}
+      recomputeWeekAgg(copy.weeksData[wkIdx]);
       saveCombatPlan(copy);
       setMsg(`↻ Заменено: ${newId}`); setTimeout(() => setMsg(''), 1800);
       return copy;
@@ -488,28 +564,35 @@ export const CombatConstructor: React.FC = () => {
     if (!plan) return;
     // Гейт внутри функции (оборона в глубину: кнопки disabled, но прямой вызов тоже блочится)
     if (isCombatPlanBlocked(plan)) { setMsg('⛔ Экспорт заблокирован — сначала исправьте ошибки'); setTimeout(() => setMsg(''), 2600); return; }
-    const prog: any = {
-      id: plan.id,
-      meta: { id: plan.id, title: `Единоборства ${plan.discipline} ${plan.weeks}нед`, direction: 'combat', createdAt: new Date().toISOString(), source: 'combat', discipline: plan.discipline, level: plan.level, methodology: plan.inputSnapshot?.methodology, dupMode: (plan.inputSnapshot as any)?.dupMode, intensityTech: (plan.inputSnapshot as any)?.intensityTech, periodizationModel: (plan.inputSnapshot as any)?.periodizationModel, fightDate: (plan.inputSnapshot as any)?.fightDate },
-      weeks: plan.weeksData.map(w => ({ week: w.week, phase: w.phase, deload: w.deload, taper: (w as any).taper, sessions: w.sessions.map(s => ({ day: s.day, tag: s.sessionTag, character: s.character, exercises: s.exercises.map(e => ({ id: e.id, name: e.name, sets: e.sets, reps: e.reps, weight: e.weight, rir: e.rir, tempo: e.tempo, restSeconds: e.restSeconds, technique: (e as any).technique, warmupSets: e.warmupSets, workSets: e.workSets })) })) })),
-      outside: plan.outsideMetrics,
-      conditioning: (plan as any).conditioning,
-      validation: plan.validation,
-    };
-    try { saveUserProgram(prog); setMsg('✦ Экспортировано в библиотеку'); setTimeout(() => setMsg(''), 2200); } catch {}
+    // P0-5: полноценный UserProgram (direction:'combat' + недельная форма) —
+    // раньше объект отбраковывался saveUserProgram, а тост врал
+    const prog = combatPlanToUserProgram(plan);
+    let savedOk = false;
+    try {
+      const all = saveUserProgram(prog);
+      savedOk = Array.isArray(all) && all.some((p: any) => p?.meta?.id === plan.id);
+    } catch { savedOk = false; }
+    if (savedOk) setMsg('✦ Экспортировано в библиотеку (Мои программы)');
+    else setMsg('⚠ Не удалось сохранить в библиотеку — проверьте хранилище');
+    setTimeout(() => setMsg(''), 2400);
     try { localStorage.setItem('he_last_combat_program', JSON.stringify(prog)); } catch {}
     try { navigator.clipboard?.writeText(JSON.stringify(prog, null, 2)); } catch {}
   };
 
   const handleBuildATR = () => {
+    const effCycles = Math.max(1, Math.min(4, Math.floor(annualWeeks / 8)));
     const ann = buildAnnualATR(discipline as any, annualWeeks, startDate || null, { cycles: annualCycles } as any);
-    saveAnnualCB(ann); setAnnual(ann); setMsg(`✦ Годовой ATR ${annualWeeks} нед ×${annualCycles} цикла построен`); setTimeout(() => setMsg(''), 2200);
+    saveAnnualCB(ann); setAnnual(ann);
+    setMsg(`✦ Годовой ATR ${annualWeeks} нед ×${Math.min(annualCycles, effCycles)} цикла построен${annualCycles > effCycles ? ` (лимит ${effCycles}: цикл ≥8 нед)` : ''}`);
+    setTimeout(() => setMsg(''), 2600);
   };
   const handleAddCompetition = () => {
-    if (!annual || !competitionName || !competitionDate) { setMsg('Укажите название и дату боя'); setTimeout(() => setMsg(''), 1800); return; }
+    if (!competitionName || !competitionDate) { setMsg('Укажите название и дату боя'); setTimeout(() => setMsg(''), 1800); return; }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(competitionDate) || !Number.isFinite(new Date(competitionDate).getTime())) { setMsg('⚠ Некорректная дата боя — формат ГГГГ-ММ-ДД'); setTimeout(() => setMsg(''), 2200); return; }
     const ann = loadAnnualCB();
-    if (!ann) return;
+    if (!ann) { setMsg('⚠ Годовой план не построен — сначала соберите год'); setTimeout(() => setMsg(''), 2200); return; }
     const next = addCompetitionToAnnual(ann, { id: `comp_${Date.now()}`, name: competitionName, date: competitionDate, weightClass: competitionWeight || undefined, priority: competitionPriority } as any, startDate || null);
+    if (next === ann) { setMsg('⚠ Бой не добавлен — проверьте дату'); setTimeout(() => setMsg(''), 2200); return; }
     saveAnnualCB(next); setAnnual(next); setMsg(`✦ Бой добавлен (${competitionPriority === 'secondary' ? 'мини-тапер 1нед' : 'тапер 2нед'})`); setTimeout(() => setMsg(''), 1800);
     setCompetitionName(''); setCompetitionDate(''); setCompetitionWeight('');
   };
@@ -526,16 +609,21 @@ export const CombatConstructor: React.FC = () => {
   };
   const handlePrintAnnual = () => {
     if (!annual) return;
-    const html = buildAnnualPrintHtml(annual);
-    const w = window.open('', '_blank');
-    if (w) { w.document.write(html); w.document.close(); w.print(); } else { navigator.clipboard?.writeText(html); setMsg('HTML скопирован'); }
+    try {
+      const html = buildAnnualPrintHtml(annual);
+      const w = window.open('', '_blank');
+      if (w) { w.document.write(html); w.document.close(); w.print(); } else { navigator.clipboard?.writeText(html); setMsg('HTML скопирован'); }
+    } catch (e) { setMsg('⚠ Не удалось напечатать год — данные повреждены, пересоберите год'); setTimeout(() => setMsg(''), 2600); }
   };
   const handleDownloadIcs = () => {
     if (!annual) return;
-    const ics = buildAnnualIcs(annual, startDate || null);
-    const blob = new Blob([ics], { type: 'text/calendar' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a'); a.href = url; a.download = `combat-annual-${annual.totalWeeks}w.ics`; a.click(); URL.revokeObjectURL(url);
+    try {
+      const ics = buildAnnualIcs(annual, startDate || null);
+      const blob = new Blob([ics], { type: 'text/calendar' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href = url; a.download = `combat-annual-${annual.totalWeeks}w.ics`; a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (e) { setMsg('⚠ Не удалось выгрузить календарь — проверьте даты боя'); setTimeout(() => setMsg(''), 2600); }
   };
   const doMsg = (m: string) => { setMsg(m); setTimeout(() => setMsg(''), 2200); };
   const mesoPrev = React.useMemo(() => {
@@ -599,7 +687,7 @@ export const CombatConstructor: React.FC = () => {
   void SelectWrap;
 
   const athleteSummary = `${sex === 'male' ? 'М' : 'Ж'} · ${bodyweight}кг · ${age} лет`;
-  const outsideSummary = sparringEnabled ? `спарринг ${sparringHard + sparringTech + sparringWrest}×` : outsideEnabled ? `вне зала ${outside?.sessionsPerWeek ?? 0}×` : 'выкл';
+  const outsideSummary = (sparringEnabled && outsideEnabled) ? `спарринг ${sparringHard + sparringTech + sparringWrest}×` : outsideEnabled ? `вне зала ${outside?.sessionsPerWeek ?? 0}×` : 'выкл';
   const paramsSummary = `${ruLabel(PERIODIZATION_RU, periodizationModel ?? 'atr_10')} · ${weeks}нед · ${days}×`;
 
   return (
@@ -780,6 +868,13 @@ export const CombatConstructor: React.FC = () => {
                   );
                 } catch { return null; }
               })()}
+              <Field label="Интенсивность курса (PED)" hint="учитывается в PED-надбавке объёма; авто — без надбавки интенсивности">
+                <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap' }}>
+                  {([['auto', 'Авто'], ['mild', 'Лёгкая'], ['moderate', 'Средняя'], ['heavy', 'Тяжёлая']] as const).map(([id, label]) => (
+                    <ChipToggle key={id} active={courseIntensity === id} onClick={() => setCourseIntensity(id as any)}>{label}</ChipToggle>
+                  ))}
+                </div>
+              </Field>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
                 <CombatPopupNumber label="Экстензия шеи" value={neckExtensionKg} min={0} max={120} suffix="кг" onChange={v=> setNeckExtensionKg(v)} />
                 <CombatPopupNumber label="Шея flex/ext" value={neckFlexExtRatio} min={0} max={2} step={0.01} onChange={v=> setNeckFlexExtRatio(v)} />
@@ -906,15 +1001,24 @@ export const CombatConstructor: React.FC = () => {
                 <Field label="Дата боя">
                   <input type="date" value={fightDate} onChange={e => setFightDate(e.target.value)} style={INPUT} />
                 </Field>
-                <CombatPopupSelect label="Тапер" value={String(taperWeeks)} onChange={v=> setTaperWeeks(Number(v))} options={[
-                  { id:'1', label:'1 нед', desc:'объём −45%' },
-                  { id:'2', label:'2 нед', desc:'−35% → −55%' },
-                ]} />
+                {fightDate ? (
+                  <CombatPopupSelect label="Тапер" value={String(taperWeeks)} onChange={v=> setTaperWeeks(Number(v))} options={[
+                    { id:'1', label:'1 нед', desc:'объём −45%' },
+                    { id:'2', label:'2 нед', desc:'−35% → −55%' },
+                  ]} />
+                ) : (
+                  <Field label="Тапер" hint="сначала дата боя">
+                    <div style={{ ...INPUT, opacity: 0.55, display: 'flex', alignItems: 'center', fontSize: 12 }}>недоступно без даты</div>
+                  </Field>
+                )}
                 <Field label="Старт плана">
                   <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} style={INPUT} />
                 </Field>
-              </div>
-              <InfoBanner tone="info">Тапер по Bosquet: объём 0.65 → 0.45, интенсивность 90-95%, спарринг ↓, сауна 15-20′×3/нед</InfoBanner>
+                </div>
+                <Field label="Длительность поединка" hint="энергопрофиль боя в отчёте (1-12 мин)">
+                  <CombatPopupNumber label="Длительность поединка" value={fightMinutes} min={0} max={15} suffix="мин" onChange={v => setFightMinutes(v)} />
+                </Field>
+                <InfoBanner tone="info">Тапер по Bosquet: объём 0.65 → 0.45, интенсивность 90-95%, спарринг ↓{age > 15 ? ', сауна 15-20′×3/нед' : ' (сауна исключена: teen-гейт)'}</InfoBanner>
             </SectionCard>
           </CbSec>
 
@@ -1034,6 +1138,19 @@ export const CombatConstructor: React.FC = () => {
 
                   {sparringEnabled && (
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px,1fr))', gap: 10, background: 'rgba(0,0,0,0.14)', padding: 12, borderRadius: 12, border: '0.5px solid rgba(255,255,255,0.06)' }}>
+                      {/* Э1.1: факт из журнала спарринга (7 дней) → счётчики и длительность */}
+                      <div style={{ gridColumn: '1 / -1' }}>
+                        <button data-cb="spar-journal" style={{ ...BTN, background: 'rgba(236,72,153,0.16)', color: '#fff', border: '1px solid rgba(236,72,153,0.3)' }}
+                          onClick={() => {
+                            try {
+                              const jl = sparringJournalToLoad(loadSparring(), localIsoDate());
+                              if (!jl) { doMsg('В журнале нет сессий за 7 дней'); return; }
+                              setSparringHard(jl.hardSparSessions); setSparringTech(jl.techSparSessions); setSparringWrest(jl.wrestlingSessions);
+                              setSparringAvgDur(jl.avgDurationMin ?? null);
+                              doMsg(`Журнал: hard ${jl.hardSparSessions} · tech ${jl.techSparSessions} · борьба ${jl.wrestlingSessions}${jl.avgDurationMin ? ` · ${jl.avgDurationMin} мин` : ''}`);
+                            } catch { doMsg('Журнал недоступен'); }
+                          }}>⟡ Из журнала (7 дней)</button>
+                      </div>
                       <Field label="Жёсткий спарринг" hint={`RPE 8.5 · 90мин`}>
                         <div style={{ display:'flex', alignItems:'center', gap:8 }}><input type="range" min={0} max={4} value={sparringHard} onChange={e => setSparringHard(Number(e.target.value))} style={{ flex:1 }} /><Highlight color="#ff3b30">{sparringHard}×</Highlight></div>
                       </Field>
@@ -1276,7 +1393,12 @@ export const CombatConstructor: React.FC = () => {
           <CbCampIntelCard
             plan={plan}
             acwr={acwr as any}
-            outsideSessions={((plan.inputSnapshot as any)?.sessionsPerWeek as number) ?? 0}
+            outsideSessions={(() => {
+              const snap: any = plan.inputSnapshot || {};
+              if (snap.sparringLoad) return (snap.sparringLoad.hardSparSessions || 0) + (snap.sparringLoad.techSparSessions || 0) + (snap.sparringLoad.wrestlingSessions || 0);
+              return snap.outsideLoad?.sessionsPerWeek ?? 0;
+            })()}
+            fightMinutes={fightMinutes > 0 ? fightMinutes : ((plan.inputSnapshot as any)?.fightMinutes ?? null)}
           />
           <CbDiaryCard trends={diaryTrends} />
           <CbQualityMap plan={plan} />
@@ -1298,8 +1420,27 @@ export const CombatConstructor: React.FC = () => {
       )}
 
       {step === 'export' && (
-        <div className="cb-pane" data-pane="export" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {annual ? (
+          <div className="cb-pane" data-pane="export" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {/* Э4.1: сохранённые планы — загрузка/удаление (раньше список жил только в истории мезоцикла) */}
+            <SectionCard icon="📂" title="Сохранённые планы" subtitle={`${savedPlansList.length} из 20 · загрузка и удаление`}>
+              {savedPlansList.length === 0 ? (
+                <InfoBanner tone="info">Пока нет сохранённых планов — соберите первый на шаге «План».</InfoBanner>
+              ) : savedPlansList.slice(0, 8).map((sp: any) => (
+                <div key={sp.id} style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', padding: '6px 0', borderBottom: '0.5px solid rgba(255,255,255,0.06)' }}>
+                  <span style={{ fontSize: 12, color: '#fff', flex: 1, minWidth: 140 }}>{sp.discipline} · {sp.weeks} нед · {sp.patternId} · {sp.validation?.ok ? '✅' : '⚠'}</span>
+                  <button data-cb="plan-load" style={BTN} onClick={() => { setPlan(sp); go('plan'); doMsg('📂 План загружен — правьте и сохраняйте'); }}>📂 Загрузить</button>
+                  <button data-cb="plan-del" style={BTN_GHOST} aria-label="Удалить план" onClick={() => {
+                    try {
+                      removeCombatPlan(sp.id);
+                      setPlansTick(t => t + 1);
+                      setPlan((prev: CombatPlan | null) => (prev?.id === sp.id ? null : prev));
+                      doMsg('🗑 План удалён');
+                    } catch { doMsg('Не удалось удалить план'); }
+                  }}>🗑</button>
+                </div>
+              ))}
+            </SectionCard>
+            {annual ? (
             <AnnualCard
               annual={annual}
               onBuildATR={handleBuildATR}

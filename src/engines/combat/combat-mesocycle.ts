@@ -58,6 +58,40 @@ export function applyCombatMesocycle(prev: CombatPlan | null, nextInput: CombatI
   return next;
 }
 
+/**
+ * P0-6: хэш значимых входов сборки — защита от «храповика»: повторная сборка
+ * с теми же параметрами не бампает веса второй раз (прецедент he_ss_prog_hash_v1).
+ */
+export function combatMesocycleHash(input: CombatInput): string {
+  const src: any = input as any;
+  const stable = {
+    discipline: src.discipline, goal: src.goal, level: src.level,
+    weeks: src.weeks, daysPerWeek: src.daysPerWeek, patternId: src.patternId || null,
+    workMax: src.workMax || null, workMaxByExercise: src.workMaxByExercise || null,
+    weightCutKg: src.weightCutKg ?? 0, fightDate: src.fightDate || null,
+    methodology: src.methodology || null, dupMode: src.dupMode || null,
+    intensityTech: src.intensityTech || null, periodizationModel: src.periodizationModel || null,
+    outside: src.outsideLoad ? { s: src.outsideLoad.sessionsPerWeek ?? 0 } : null,
+    sparring: src.sparringLoad ? { h: src.sparringLoad.hardSparSessions ?? 0, t: src.sparringLoad.techSparSessions ?? 0, w: src.sparringLoad.wrestlingSessions ?? 0 } : null,
+  };
+  const s = JSON.stringify(stable);
+  let h = 2166136261;
+  for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
+  return (h >>> 0).toString(16);
+}
+
+/**
+ * P0-6: применять ли кросс-мезо прогрессию. НЕ применяем, если:
+ *  - нет предыдущего плана;
+ *  - предыдущий план другой дисциплины (веса не переезжают бокс→борьба);
+ *  - хэш входов совпадает с последней успешной сборкой (идемпотентный пересбор).
+ */
+export function shouldApplyCombatMesocycle(prev: CombatPlan | null, input: CombatInput, lastHash: string | null): boolean {
+  if (!prev) return false;
+  if (prev.discipline !== (input.discipline as any)) return false;
+  return lastHash !== combatMesocycleHash(input);
+}
+
 export function combatMesocycleSummary(prev: CombatPlan | null, next: CombatInput): string[] {
   if (!prev) return ['Первый мезоцикл — база без прогрессии'];
   const lines: string[] = [`Пред. план ${prev.discipline} ${prev.weeks}нед ${prev.patternId} → прогрессия`];

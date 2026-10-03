@@ -18,13 +18,19 @@ function epley(weight: number, reps: number): number {
 function groupForExercise(nameOrId: string): string | null {
   const n = nameOrId.toLowerCase();
   if (n.includes('neck')) return 'neck';
+  // P1-5: ротация раньше хвата — battle_rope (маркер 'battle') больше не уходит в grip
+  if (n.includes('landmine') || n.includes('pallof') || n.includes('med_ball') || n.includes('sledge') || n.includes('battle')) return 'rotational';
   if (n.includes('grip') || n.includes('pinch') || n.includes('wrist') || n.includes('farmer') || n.includes('towel') || n.includes('rope')) return 'grip';
   if (n.includes('squat') || n.includes('lunge') || n.includes('rdl') || n.includes('trap_bar') || n.includes('nordic') || n.includes('step_up')) return 'legs';
   if (n.includes('bench') || n.includes('ohp') || n.includes('push_press') || n.includes('landmine_press')) return 'push';
   if (n.includes('row') || n.includes('pullup') || n.includes('pull') || n.includes('face_pull')) return 'pull';
-  if (n.includes('landmine') || n.includes('pallof') || n.includes('med_ball') || n.includes('sledge') || n.includes('battle')) return 'rotational';
   if (n.includes('deadbug') || n.includes('hollow') || n.includes('plank') || n.includes('ab_wheel')) return 'core';
   return null;
+}
+
+/** Э1.4: группа упражнения для дневниковой авторегуляции (публичный канон). */
+export function combatDiaryGroupFor(nameOrId: string): string | null {
+  return groupForExercise(nameOrId);
 }
 
 export function buildDiaryTrendCB(logs: any[]): DiaryTrendCB[] | null {
@@ -45,9 +51,9 @@ export function buildDiaryTrendCB(logs: any[]): DiaryTrendCB[] | null {
       const t = new Date(d).getTime();
       if (!Number.isFinite(t)) continue;
       const maxE1 = Math.max(...(e.sets as any[]).map((s: any) => {
-        const w = Number(s.weight) || 0;
+        const w = Number(s.weight ?? s.weightKg) || 0;
         const r = Number(s.reps) || 0;
-        const hold = Number(s.holdSec ?? s.timeSec ?? s.durationSec ?? s.seconds ?? 0);
+        const hold = Number(s.holdSec ?? s.holdSeconds ?? s.timeSec ?? s.durationSec ?? s.seconds ?? 0);
         const effHold = hold > 0 ? hold : (typeof s.reps === 'string' && String(s.reps).includes('с') ? (Number(String(s.reps).replace(/\D/g,'')) || r) : r);
         // без веса: изометрия/удержание скорит по времени для ВСЕХ групп
         // (раньше только grip/neck — планки/лодочки давали 0 и core-тренда не было);
@@ -88,22 +94,60 @@ export function gripIsometricVolume(ex: any): number {
   return r * 10;
 }
 
+/**
+ * P0-8: живой дневник силы пишет `he_workout_log_v2` (WorkoutSession[]:
+ * {date, exercises:[{exerciseId, exerciseName, sets:[{weightKg, reps, velocityMs}]}]}),
+ * а легаси-ключи читались первыми. Плюс аддитивная нормализация: `weightKg`→`weight`,
+ * `holdSeconds/holdSec/timeSec`→`holdSec` — потребители читают единый контракт.
+ */
+export function flattenDiaryLogsCB(raw: unknown): any[] {
+  if (!Array.isArray(raw) || raw.length === 0) return [];
+  const out: any[] = [];
+  for (const item of raw) {
+    if (!item || typeof item !== 'object') continue;
+    if (Array.isArray((item as any).exercises)) {
+      const sess: any = item;
+      for (const ex of sess.exercises) {
+        const sets = Array.isArray(ex?.sets) ? ex.sets : Array.isArray(ex?.workSets) ? ex.workSets : [];
+        if (!sets.length) continue;
+        out.push({
+          date: sess.date,
+          exerciseId: ex.exerciseId || ex.id,
+          exerciseName: ex.exerciseName || ex.name,
+          sets: sets.map(normalizeDiarySet),
+        });
+      }
+    } else if (Array.isArray((item as any).sets)) {
+      out.push({ ...(item as any), sets: (item as any).sets.map(normalizeDiarySet) });
+    }
+  }
+  return out;
+}
+
+function normalizeDiarySet(s: any): any {
+  if (!s || typeof s !== 'object') return s;
+  const weight = s.weight != null ? s.weight : s.weightKg;
+  const holdSec = s.holdSec ?? s.holdSeconds ?? s.timeSec ?? s.durationSec ?? s.seconds;
+  return { ...s, weight, ...(holdSec != null ? { holdSec } : {}) };
+}
+
 export function loadDiaryLogsCB(): any[] {
   try {
-    const keys = ['he_workout_log','he_training_log','he_workout_history','he_srpe_sessions','he_combined_log','he_strength_log','he_combat_log','he_training_log_v2'];
+    // P0-8: живой ключ первым (прецедент hub-diary.engine)
+    const keys = ['he_workout_log_v2','he_workout_log','he_training_log','he_workout_history','he_srpe_sessions','he_combined_log','he_strength_log','he_combat_log','he_training_log_v2'];
     for (const key of keys) {
       const raw = typeof localStorage !== 'undefined' ? localStorage.getItem(key) : null;
       if (!raw) continue;
       const arr = JSON.parse(raw);
-      if (Array.isArray(arr) && arr.length) {
-        if (arr.length > 0 && typeof arr[0] === 'object') return arr;
-      }
+      const flat = flattenDiaryLogsCB(arr);
+      if (flat.length) return flat;
     }
     try {
       const idbMirror = typeof localStorage !== 'undefined' ? localStorage.getItem('he_idb_training_log') : null;
       if (idbMirror) {
         const arr = JSON.parse(idbMirror);
-        if (Array.isArray(arr) && arr.length) return arr;
+        const flat = flattenDiaryLogsCB(arr);
+        if (flat.length) return flat;
       }
     } catch {}
   } catch {}
@@ -126,13 +170,13 @@ export async function loadDiaryLogsCBAsync(): Promise<any[]> {
               for (const ex of r.exercises) {
                 const sets = ex.sets || ex.workSets || [];
                 if (!Array.isArray(sets) || sets.length===0) continue;
-                out.push({ date: r.date, exerciseId: ex.id || ex.exerciseId, exerciseName: ex.name || ex.exerciseName, sets });
+                out.push({ date: r.date, exerciseId: ex.id || ex.exerciseId, exerciseName: ex.name || ex.exerciseName, sets: sets.map(normalizeDiarySet) });
               }
             } else if (r?.exerciseId || r?.exerciseName) {
               // flat entry
-              if (Array.isArray(r.sets) && r.sets.length) out.push(r);
+              if (Array.isArray(r.sets) && r.sets.length) out.push({ ...r, sets: r.sets.map(normalizeDiarySet) });
             } else if (r?.date && r?.sets) {
-              out.push(r);
+              out.push({ ...r, sets: Array.isArray(r.sets) ? r.sets.map(normalizeDiarySet) : r.sets });
             }
           }
         }
@@ -175,7 +219,7 @@ export function combatLastResultIndex(logs: any[]): Record<string, CombatLastRes
     if (!Number.isFinite(t) || now - t < 0 || now - t > 28 * dayMs) continue;
     let best = 0;
     for (const s of e.sets as any[]) {
-      const w = Number(s.weight) || 0;
+      const w = Number(s.weight ?? s.weightKg) || 0;
       const r = Number(s.reps) || 0;
       if (w > 0 && r > 0) best = Math.max(best, epleyForEntry(w, r));
     }

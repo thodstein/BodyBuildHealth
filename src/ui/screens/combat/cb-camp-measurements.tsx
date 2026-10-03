@@ -9,11 +9,11 @@ import { SectionCard, Highlight, Badge, CombatPopupSelect } from './CombatUI';
 import { localIsoDate } from '../../../core/local-date';
 import type { CombatPlan } from '../../../engines/combat/combat.types';
 import {
-  loadWeighIns, addWeighIn, removeWeighIn, weighTrajectory, cutDeviation,
+  loadWeighIns, addWeighIn, removeWeighIn, weighTrajectory, cutDeviation, cutWeightAdvice,
   loadSparring, addSparring, removeSparring, sparringSummary, sparringJournalToLoad,
   leaScreen, sleepVerdict, heatProtocol,
   loadGrip, addGrip, gripSummary, gripP50Ref,
-  loadRtp, addRtp, rtpSummary, RTP_STAGES, RTP_STAGE_BY_ID, RTP_EARLY_AEROBIC_NOTE, RTP_SOURCE_IDS,
+  loadRtp, addRtp, rtpSummary, RTP_STAGES, RTP_STAGE_BY_ID, RTP_EARLY_AEROBIC_NOTE, RTP_SOURCE_IDS, HEAT_EVIDENCE,
   loadTests, addTest, testBattery, COMBAT_TEST_BATTERY, COMBAT_TEST_BY_ID,
   readScreenManual, writeScreenManual, resolveScreenInputs, COMBAT_TESTS_KEY,
   type RtpStageId, type CombatTestId, type ScreenField, type ScreenSource,
@@ -77,7 +77,12 @@ export const CbCampMeasurementsCard: React.FC<{
     startKg: snap?.bodyweightKg ?? snap?.bodyweight ?? null,
     targetKg: snap?.weightClassLimitKg ?? null,
     weeks: snap?.weeks ?? null,
-    today: new Date().toISOString().slice(0, 10),
+    today: localIsoDate(),
+  }), [weighins, snap]);
+  // P1-28: совет по темпу сгона (одна переменная за раз), тапер/файт-вик — без коррекций
+  const cutAdvice = useMemo(() => cutWeightAdvice(weighins, {
+    today: localIsoDate(),
+    sex: snap?.sex,
   }), [weighins, snap]);
 
   const onAddWeigh = useCallback(() => {
@@ -91,21 +96,22 @@ export const CbCampMeasurementsCard: React.FC<{
   const [spar, setSpar] = useState<ReturnType<typeof loadSparring>>(() => loadSparring());
   const [sType, setSType] = useState<SparType>('hard');
   const [sRounds, setSRounds] = useState('5');
+  const [sRoundMin, setSRoundMin] = useState('5');
   const [sRpe, setSRpe] = useState('');
   const [sMsg, setSMsg] = useState<string | null>(null);
   const sparSummary = useMemo(() => sparringSummary(spar), [spar]);
   const sparLoad = useMemo(
-    () => sparringJournalToLoad(spar, new Date().toISOString().slice(0, 10)),
+    () => sparringJournalToLoad(spar, localIsoDate()),
     [spar],
   );
 
   const onAddSpar = useCallback(() => {
-    const today = new Date().toISOString().slice(0, 10);
-    const ok = addSparring(today, sType, Number(sRounds), 5, sRpe ? Number(sRpe) : undefined);
-    if (!ok) { setSMsg('⚠️ Проверьте раунды (1-15) и тип.'); return; }
+    const today = localIsoDate();
+    const ok = addSparring(today, sType, Number(sRounds), Number(sRoundMin), sRpe ? Number(sRpe) : undefined);
+    if (!ok) { setSMsg('⚠️ Проверьте раунды (1-15), минуты раунда (1-15) и тип.'); return; }
     setSRpe(''); setSMsg('✅ Сессия записана');
     setSpar(loadSparring());
-  }, [sType, sRounds, sRpe]);
+  }, [sType, sRounds, sRoundMin, sRpe]);
 
   // ── 8.3 сила хвата ──
   const [grip, setGrip] = useState<ReturnType<typeof loadGrip>>(() => loadGrip());
@@ -175,11 +181,18 @@ export const CbCampMeasurementsCard: React.FC<{
     cat2Flags: resolved.cat2Flags, sex: snap?.sex,
   }), [resolved, snap?.sex]);
   const sleep = useMemo(() => sleepVerdict(sleepHours), [sleepHours]);
+  // P1-26: fight week из даты боя плана (было захардкожено false — ветка не работала)
+  const fightWeek = useMemo(() => {
+    const fd = snap?.fightDate;
+    if (!fd) return false;
+    const diff = Math.ceil((Date.parse(fd) - Date.now()) / 86400000);
+    return diff >= 0 && diff <= 7;
+  }, [snap?.fightDate]);
   const heat = useMemo(() => heatProtocol({
     sessionsDone: resolved.heatSessions,
     inWeightCut: !!(snap?.weightCutKg || snap?.weightCutProtocol),
-    fightWeek: false,
-  }), [resolved.heatSessions, snap]);
+    fightWeek,
+  }), [resolved.heatSessions, snap, fightWeek]);
 
   return (
     <SectionCard title="Замеры, журналы и скрининги" accent>
@@ -211,6 +224,11 @@ export const CbCampMeasurementsCard: React.FC<{
             План на сегодня {dev.plannedKg!.toFixed(1)} кг · факт {dev.actualKg!.toFixed(1)} кг · {dev.note}
           </div>
         ) : dev.actualKg !== null ? <Line tone="warn">{dev.note}</Line> : null}
+        {cutAdvice.status !== 'no_data' ? (
+          <div data-cb="weigh-advice" style={{ fontSize: 12, color: '#fff' }}>
+            {cutAdvice.status === 'too_fast' ? '🔺' : cutAdvice.status === 'too_slow' ? '🔻' : '✅'} {cutAdvice.advice}
+          </div>
+        ) : weighins.length > 0 ? <Line tone="warn">{cutAdvice.advice}</Line> : null}
       </div>
 
       {/* 8.2 — журнал спарринга */}
@@ -230,6 +248,8 @@ export const CbCampMeasurementsCard: React.FC<{
           />
           <input aria-label="Раундов" data-cb="spar-rounds" inputMode="numeric" style={{ ...inp(sRounds, 'раундов'), flex: '1 1 80px' }}
             value={sRounds} onChange={e => setSRounds(e.target.value)} />
+          <input aria-label="Минут в раунде" data-cb="spar-roundmin" inputMode="numeric" style={{ ...inp(sRoundMin, 'мин/раунд'), flex: '1 1 80px' }}
+            value={sRoundMin} onChange={e => setSRoundMin(e.target.value)} />
           <input aria-label="RPE" data-cb="spar-rpe" inputMode="numeric" style={{ ...inp(sRpe, 'RPE 1-10'), flex: '1 1 80px' }}
             value={sRpe} onChange={e => setSRpe(e.target.value)} />
           <button data-cb="spar-add" style={{ ...BTN, background: '#ec4899', color: '#fff', border: 0, borderRadius: 12 }}
@@ -333,12 +353,12 @@ export const CbCampMeasurementsCard: React.FC<{
         </div>
         <Line tone="ok">{battery.note}</Line>
         <div data-cb="test-form" style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-          <CombatPopupSelect
-            label="Тест"
-            value={COMBAT_TEST_BY_ID[tId].label}
-            onChange={v => setTId(v as CombatTestId)}
-            options={COMBAT_TEST_BATTERY.map((t) => ({ id: t.id as string, label: t.label }))}
-          />
+            <CombatPopupSelect
+              label="Тест"
+              value={tId}
+              onChange={v => setTId(v as CombatTestId)}
+              options={COMBAT_TEST_BATTERY.map((t) => ({ id: t.id as string, label: t.label }))}
+            />
           <input
             aria-label="Дата теста"
             data-cb="test-date"
@@ -419,6 +439,8 @@ export const CbCampMeasurementsCard: React.FC<{
         </Line>
         {heat.gate.reasons.map((r, i) => <Line key={i} tone="warn">{r}</Line>)}
         <span style={{ fontSize: 12, color: '#fff' }}>{heat.hydration}</span>
+        {/* Э5.6: доказательная база теплового протокола (раньше HEAT_EVIDENCE был мёртвым экспортом) */}
+        <span data-cb="heat-evidence" style={{ fontSize: 11, color: '#fff' }}>{HEAT_EVIDENCE}</span>
       </div>
     </SectionCard>
   );

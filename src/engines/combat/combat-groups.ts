@@ -29,11 +29,13 @@ export const CB_GROUP_IDS: Record<string, string[]> = {
 };
 
 /** Подстрочные маркеры — для id, которых ещё нет в каноническом списке.
- *  Узкие, чтобы не срабатывать на чужие движения. */
+ *  Узкие, чтобы не срабатывать на чужие движения.
+ *  P1-5: без общего 'rotation' (он ловил neck_rotation/neck_harness_rotation и
+ *  резал шею при MRV-триме ротации) и без 'rope' (battle_rope — ротация, не хват). */
 const CB_GROUP_MARKERS: Record<string, string[]> = {
   neck: ['neck'],
-  grip: ['grip', 'pinch', 'wrist', 'farmer', 'towel', 'rope'],
-  rotational: ['landmine', 'pallof', 'med_ball', 'sledge', 'battle', 'rotation'],
+  grip: ['grip', 'pinch', 'wrist', 'farmer', 'towel'],
+  rotational: ['landmine', 'pallof', 'med_ball', 'sledge', 'battle'],
   plyo: ['box_jump', 'depth_jump', 'broad_jump'],
   unilateral: ['bulgarian', 'single_leg_rdl', 'cossack', 'step_up', 'single_arm_row'],
 };
@@ -62,14 +64,4 @@ export function weekGroupSets(
   let total = 0;
   for (const sess of sessions) for (const ex of sess.exercises) if (inCombatGroup(ex.id, group)) total += ex.sets;
   return total;
-}
-
-/** Упражнения группы недели в порядке «самые объёмные первыми» (для MRV-трима). */
-export function weekGroupExercises(
-  sessions: { exercises: any[] }[],
-  group: string,
-): any[] {
-  const out: any[] = [];
-  for (const sess of sessions) for (const ex of sess.exercises) if (inCombatGroup(ex.id, group)) out.push(ex);
-  return out.sort((a, b) => (b.sets || 0) - (a.sets || 0));
 }

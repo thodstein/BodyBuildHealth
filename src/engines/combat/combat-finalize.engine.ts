@@ -7,8 +7,8 @@ import { isDayConflictWithOutside } from '../outside-load.engine';
 import { getCombat } from './combat-volume';
 import { inCombatGroup, weekGroupSets } from './combat-groups';
 import { sessionLimitsForCombat, validateSyncCombat } from './combat-limits';
-import { combatHrvReport } from './combat-monitoring.engine';
 import { cbRuInterference } from './combat-builder.engine';
+import { admitCombatExercise } from './combat-selection';
 
 /** Порог «не трогать»: единственный стимул мышцы. */
 const PROTECTED_SCORE = 100;
@@ -119,7 +119,9 @@ export function finalizeCombatPlan(plan: CombatPlan): CombatPlan {
       // предупреждаются. Порядок удаления — необязательные и мелкие первыми,
       // базу (lead/compound) и последний стимул мышцы не трогаем.
       let removed = enforceSessionBudget(sess, lim, totalSets, (msg) => warnings.push(`Нед ${wk.week} ${sess.sessionTag}: ${msg}`));
-      if (removed) totalSets = sess.exercises.reduce((s, e) => s + e.sets, 0);
+      // P1-7: пересчитываем ВСЕГДА — set-флор тоже меняет сеты (removed=0), иначе
+      // warning «N сетов > лимита» врал после фактического среза
+      totalSets = sess.exercises.reduce((s, e) => s + e.sets, 0);
       if (totalSets > lim.maxSets) warnings.push(`Нед ${wk.week} ${sess.sessionTag}: ${totalSets} сетов > лимита ${lim.maxSets}`);
       if (sess.exercises.length > lim.maxExercises) warnings.push(`Нед ${wk.week} ${sess.sessionTag}: ${sess.exercises.length} упр > лимита ${lim.maxExercises}`);
     }
@@ -214,11 +216,28 @@ export function finalizeCombatPlan(plan: CombatPlan): CombatPlan {
         if (target && target.exercises.some(e => e.id === 'face_pull')) {
           warnings.push(`Нед ${wk.week}: prehab <3 сетов (${prehab}), face_pull уже в плане — добейте его до 3×15 вручную (дубль не вставляем).`);
         } else {
-          warnings.push(`Нед ${wk.week}: prehab <3 сетов (${prehab}) — авто-добавлен face_pull 3×15 для плеча.`);
-          if (target && target.exercises.length < lim.maxExercises && target.exercises.reduce((a,e)=>a+e.sets,0) + 3 <= lim.maxSets) {
-            const prePerEx = Math.min(3, lim.perExerciseCap);
-            target.exercises.push({ id:'face_pull', name:'Тяга к лицу', group:'shoulders', pattern:'isolation', role:'accessory', character:'памп', sets: prePerEx, reps:'12-15', rir:3, weight: 15, workSets: Array.from({length:prePerEx},()=>({reps:13, rir:3, weight:15, tempo:'2-0-1-0', restSeconds:60})), tempo:'2-0-1-0', restSeconds:60, comment:'Prehab: скапула/ротаторы — авто' } as any);
-            target.durationMin = (target.durationMin||0)+6;
+          // P1-4: prehab проходит единый admit-гейт (оборудование/травма/исключение/
+          // мобильность) — раньше face_pull вставлялся в зал без кабеля и при травме плеча
+          const snap: any = plan.inputSnapshot || {};
+          const prehabAllowed = admitCombatExercise('face_pull', {
+            excludedExercises: snap.excludedExercises,
+            age: snap.age,
+            injuries: snap.injuries,
+            mobilityRestrictions: snap.mobilityRestrictions,
+            avoidAxialLoad: snap.avoidAxialLoad,
+            equipment: snap.equipment,
+          });
+          if (!prehabAllowed) {
+            warnings.push(`Нед ${wk.week}: prehab <3 сетов (${prehab}) — face_pull недоступен (оборудование/травма/исключение), добейте вручную`);
+          } else {
+            if (target && target.exercises.length < lim.maxExercises && target.exercises.reduce((a,e)=>a+e.sets,0) + 3 <= lim.maxSets) {
+              warnings.push(`Нед ${wk.week}: prehab <3 сетов (${prehab}) — авто-добавлен face_pull 3×15 для плеча.`);
+              const prePerEx = Math.min(3, lim.perExerciseCap);
+              target.exercises.push({ id:'face_pull', name:'Тяга к лицу', group:'shoulders', pattern:'isolation', role:'accessory', character:'памп', sets: prePerEx, reps:'12-15', rir:3, weight: 15, workSets: Array.from({length:prePerEx},()=>({reps:13, rir:3, weight:15, tempo:'2-0-1-0', restSeconds:60})), tempo:'2-0-1-0', restSeconds:60, comment:'Prehab: скапула/ротаторы — авто' } as any);
+              target.durationMin = (target.durationMin||0)+6;
+            } else {
+              warnings.push(`Нед ${wk.week}: prehab <3 сетов (${prehab}) — в сессии нет места под face_pull, добейте вручную`);
+            }
           }
         }
       }
@@ -272,11 +291,12 @@ export function finalizeCombatPlan(plan: CombatPlan): CombatPlan {
     }
   }
 
-  // HRV — если есть история, добавляем градацию
-  try {
-    const hrv = combatHrvReport();
-    if (hrv && hrv.grade !== 'optimal') warnings.push(`HRV ${hrv.last}мс (ср ${hrv.mean}±${hrv.sd}): ${hrv.note}`);
-  } catch {}
+  // HRV — из СНИМКА плана (UI кладёт hrvGrade при истории ≥7). Финализатор чистый:
+  // localStorage больше не читается (числа HRV живут на экране мониторинга).
+  const hrvGrade = (plan.inputSnapshot as any)?.hrvGrade;
+  if (hrvGrade && hrvGrade !== 'optimal') {
+    warnings.push(`HRV: ${hrvGrade === 'dangerous' ? 'недовосстановление' : 'внимание'} (${hrvGrade}) — RIR+1, объём −10-15%`);
+  }
 
   // Весогонка: проверка дефицита
   if (plan.inputSnapshot?.weightCutKg && plan.inputSnapshot.weightCutKg > 0 && plan.goal !== 'weight_cut') {
@@ -308,8 +328,9 @@ export function buildCombatReport(plan: CombatPlan): string {
   if (plan.inputSnapshot?.methodology || plan.inputSnapshot?.dupMode || plan.inputSnapshot?.intensityTech) lines.push(`Методика: ${plan.inputSnapshot.methodology || 'compound_first'} · DUP: ${plan.inputSnapshot.dupMode || 'off'} · Техника: ${plan.inputSnapshot.intensityTech || 'none'}`);
   lines.push(`Сеты/нед: ${plan.weeksData.map(w => `Н${w.week}:${w.totalSets}${w.deload?' (делод)':''}`).join(' | ')}`);
   for (const wk of plan.weeksData) {
-    const neck = wk.sessions.reduce((a,s)=> a + s.exercises.filter(e=> e.id.includes('neck')).reduce((x,e)=> x+e.sets,0),0);
-    const grip = wk.sessions.reduce((a,s)=> a + s.exercises.filter(e=> e.id.includes('grip')||e.id.includes('pinch')||e.id.includes('wrist')).reduce((x,e)=> x+e.sets,0),0);
+    // P1-5: единый канон групп (в отчёте видел farmer_carry, не двоил шею)
+    const neck = weekGroupSets(wk.sessions, 'neck');
+    const grip = weekGroupSets(wk.sessions, 'grip');
     lines.push(`Нед ${wk.week} ${wk.phase}: шея ${neck} сетов, хват ${grip}, ${wk.sessions.length} сессий`);
   }
   if (plan.outsideMetrics) lines.push(`Вне зала: ${plan.outsideMetrics.weeklyLoad} load → ×${plan.outsideMetrics.volumeMultiplier} (${cbRuInterference(plan.outsideMetrics.interference)}) ${plan.outsideMetrics.rationale.join(' | ')}`);

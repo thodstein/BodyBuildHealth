@@ -143,6 +143,14 @@ export const CombatPlanView: React.FC<Props> = ({
   const [restored, setRestored] = React.useState<CombatPlan | null>(null);
   const shown = restored || plan;
   const doMsg = (m: string) => { setMsg?.(m); setTimeout(() => setMsg?.(''), 2200); };
+  // P1-9: правка в режиме просмотра варианта выходит из просмотра — иначе рендер
+  // показывал restored, а мутировался live-план («показано ≠ правится»)
+  const exitRestoredForEdit = () => {
+    if (restored) { setRestored(null); doMsg('↩ Просмотр варианта закрыт — правка идёт в текущий план'); }
+  };
+  const updEx = (w: number, d: number, id: string, p: Partial<{ weight: number; reps: string; rir: number }>) => { exitRestoredForEdit(); onUpdateEx(w, d, id, p); };
+  const movEx = (w: number, d: number, id: string, dir: -1 | 1) => { exitRestoredForEdit(); onMoveEx(w, d, id, dir); };
+  const swpEx = (w: number, d: number, id: string, nid: string) => { exitRestoredForEdit(); onSwapEx(w, d, id, nid); };
   const sessOpen = (wk: number, day: number, idx: number) => openSess[`${wk}-${day}`] ?? idx === 0;
   // №1: заблокированный план (errors) нельзя выгружать ни в каком виде — канон isCombatPlanBlocked из finalize
   const blocked = isCombatPlanBlocked(plan);
@@ -370,18 +378,18 @@ export const CombatPlanView: React.FC<Props> = ({
                           </div>
 
                           <div className="cb-plan-exgrid" style={{ display: 'grid', gridTemplateColumns: '64px 64px 64px 1fr auto', gap: 6, alignItems: 'center' }}>
-                            <input aria-label="вес" type="number" value={ex.weight} onChange={e => onUpdateEx(wk.week - 1, sess.day, ex.id, { weight: Number(e.target.value) || 0 })} placeholder="вес" style={{ ...INPUT, padding: '10px 8px', fontSize: 13, textAlign: 'center' }} />
-                            <input aria-label="повторы" type="text" value={ex.reps} onChange={e => onUpdateEx(wk.week - 1, sess.day, ex.id, { reps: e.target.value })} placeholder="повт" style={{ ...INPUT, padding: '10px 8px', fontSize: 13, textAlign: 'center' }} />
-                            <input aria-label="RIR" type="number" min={0} max={5} value={ex.rir} onChange={e => onUpdateEx(wk.week - 1, sess.day, ex.id, { rir: Number(e.target.value) || 0 })} style={{ ...INPUT, padding: '10px 8px', fontSize: 13, textAlign: 'center' }} />
+                            <input aria-label="вес" type="number" value={ex.weight} onChange={e => updEx(wk.week - 1, sess.day, ex.id, { weight: Number(e.target.value) || 0 })} placeholder="вес" style={{ ...INPUT, padding: '10px 8px', fontSize: 13, textAlign: 'center' }} />
+                            <input aria-label="повторы" type="text" value={ex.reps} onChange={e => updEx(wk.week - 1, sess.day, ex.id, { reps: e.target.value })} placeholder="повт" style={{ ...INPUT, padding: '10px 8px', fontSize: 13, textAlign: 'center' }} />
+                            <input aria-label="RIR" type="number" min={0} max={5} value={ex.rir} onChange={e => updEx(wk.week - 1, sess.day, ex.id, { rir: Number(e.target.value) || 0 })} style={{ ...INPUT, padding: '10px 8px', fontSize: 13, textAlign: 'center' }} />
                             <div style={{ flex: '1 1 120px', minWidth: 0 }}>
-                              <CombatPopupSelect label="Замена" value={ex.id} onChange={v => { if (v !== ex.id) onSwapEx(wk.week - 1, sess.day, ex.id, v); }} options={[
+                              <CombatPopupSelect label="Замена" value={ex.id} onChange={v => { if (v !== ex.id) swpEx(wk.week - 1, sess.day, ex.id, v); }} options={[
                                 { id: ex.id, label: `${cbExerciseName(ex.id)} · текущий` },
                                 ...(cbStrictGroupFor(ex.id) ? CB_STRICT_GROUPS[cbStrictGroupFor(ex.id)!] : []).filter(id => id !== ex.id).map(id => ({ id, label: cbExerciseName(id) })),
                               ]} />
                             </div>
                             <div style={{ display: 'flex', gap: 4 }}>
-                              <button aria-label="вверх" onClick={() => onMoveEx(wk.week - 1, sess.day, ex.id, -1)} className="cb-plan-move" style={{ width: 44, height: 44, borderRadius: 12, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', cursor: 'pointer', fontSize: 14 }}>↑</button>
-                              <button aria-label="вниз" onClick={() => onMoveEx(wk.week - 1, sess.day, ex.id, 1)} className="cb-plan-move" style={{ width: 44, height: 44, borderRadius: 12, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', cursor: 'pointer', fontSize: 14 }}>↓</button>
+                              <button aria-label="вверх" onClick={() => movEx(wk.week - 1, sess.day, ex.id, -1)} className="cb-plan-move" style={{ width: 44, height: 44, borderRadius: 12, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', cursor: 'pointer', fontSize: 14 }}>↑</button>
+                              <button aria-label="вниз" onClick={() => movEx(wk.week - 1, sess.day, ex.id, 1)} className="cb-plan-move" style={{ width: 44, height: 44, borderRadius: 12, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', cursor: 'pointer', fontSize: 14 }}>↓</button>
                             </div>
                           </div>
 

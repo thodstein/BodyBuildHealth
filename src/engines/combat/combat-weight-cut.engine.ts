@@ -180,7 +180,7 @@ export function weightCutNutritionForWeek(
     if (bodyweightKg > 110 && water > 3500) water = 3500;
     sodium = protocol.sodiumMode === 'moderate_cut' ? 1500 : 2500;
     if (bodyweightKg > 110) sodium = Math.min(sodium, 3500);
-    notes.push(`Fight week: вода ${water}мл + Na ${sodium}мг + угли ${carbs}г (клетчатка ${fiber}г) → взвешивание → рефид 8г/кг + вода 150% + Na 1г/кг за 12-24ч`);
+    notes.push(`Fight week: вода ${water}мл + Na ${sodium}мг + угли ${carbs}г (клетчатка ${fiber}г) → взвешивание → рефид 8г/кг + вода 150% + Na 1г/л за 12-24ч`);
     if (!isSameDay) notes.push(`ORS ${protocol.orsSodiumMmolPerDl ?? 65} mmol/дл 1-1.5л/ч сразу после, угли ≤60г/ч, волокно <10г`);
     if (protocol.heatSessions) notes.push('Сауна 15-20′×3 + sweat suit — компенсация ↓ объёма зала (≤4% BM/24ч по ISSN)');
     if (bodyweightKg > 110) notes.push('Heavy >110кг: вода/Na скорректированы под массу');
@@ -211,7 +211,7 @@ export function weightCutNutritionForWeek(
   if (ph === 'fight_week' && protocol.weighInType === 'same_day_2h') {
     notes.push('Same-day: острая потеря воды ≤2% BM — основа: жир + регуляция lean mass');
   }
-  return { kcal, proteinG: protein, carbsG: carbs, waterMl: water, sodiumMg: sodium, fiberG: fiber, orsMmol: protocol.orsSodiumMmolPerDl ?? 65, notes };
+  return { kcal, proteinG: protein, carbsG: carbs, waterMl: water, sodiumMg: sodium, fiberG: fiber, orsMmol: Math.max(50, Math.min(90, Math.round(protocol.orsSodiumMmolPerDl ?? 65))), notes };
 }
 
 export function weightCutRehydrationNotes(lossKg: number): string[] {
@@ -237,8 +237,8 @@ export function validateWeightCutProtocol(p: WeightCutProtocol, opts?: { bodywei
   if (p.weighInType === 'same_day_2h' && p.waterMode === 'load_cut') errs.push('Same-day: water load_cut не рекомендуется — window 1-2ч недостаточен');
   // fiber
   if ((p.fiberGPerDay ?? 28) > 15 && p.targetLossKg >= 4) errs.push('Fight week клетчатка >15г — ISSN <10г/день ×4д для 1-2% BM');
-  // ORS
-  if (p.orsSodiumMmolPerDl != null && (p.orsSodiumMmolPerDl < 30 || p.orsSodiumMmolPerDl > 100)) errs.push(`ORS Na ${p.orsSodiumMmolPerDl} вне 50-90 (ISSN) — скорректируйте`);
+  // ORS: единый коридор 50-90 (ISSN), как в weightCutOrsProtocol и тексте ошибки
+  if (p.orsSodiumMmolPerDl != null && (p.orsSodiumMmolPerDl < 50 || p.orsSodiumMmolPerDl > 90)) errs.push(`ORS Na ${p.orsSodiumMmolPerDl} вне 50-90 (ISSN) — скорректируйте`);
   // heat
   if (p.heatSessions && p.targetLossKg > 6) errs.push('Heat sessions + сгонка >6кг — только под наблюдением врача, не соло-сауна');
   if (!p.confirmedManipulation && (p.waterMode === 'load_cut' || p.carbMode === 'deplete_reload') && p.targetLossKg > 5) errs.push('Экстремальный протокол (load_cut/deplete) требует подтверждения — чекбокс "Подтверждаю манипуляции"');
@@ -263,7 +263,15 @@ export function combatWeightCutToMealInput(
 ): { kcal: number; protein: number; fat: number; carbs: number; waterMl: number; sodiumMg: number; fiberMaxG: number; weighInType?: WeighInType; orsMmol?: number } | null {
   const nut = weightCutNutritionForWeek(week, totalWeeks, protocol, bodyweightKg, sex);
   if (nut.kcal == null || nut.proteinG == null) return null;
-  const fat = Math.round(bodyweightKg * (sex === 'female' ? 0.8 : 0.6));
+  // P1-16: те же полы жиров, что в weightCutNutritionForWeek (female ≥40, male ≥30) —
+  // раньше мост ставил 30 обоим и у лёгкой женщины жир не сходился с nut.kcal
+  const fatPerKg = sex === 'female' ? 0.8 : 0.6;
+  let fat = Math.round(bodyweightKg * fatPerKg);
+  if (sex === 'female' && fat < 40) fat = 40;
+  if (sex !== 'female' && fat < 30) fat = 30;
   const fiberMaxG = weightCutFiberForWeek(week, totalWeeks, protocol);
-  return { kcal: nut.kcal!, protein: nut.proteinG!, fat: fat < 30 ? 30 : fat, carbs: nut.carbsG!, waterMl: nut.waterMl!, sodiumMg: nut.sodiumMg!, fiberMaxG, weighInType: protocol?.weighInType, orsMmol: nut.orsMmol ?? 65 };
+  // P1-17: ORS клампится в единый коридор 50-90
+  const orsRaw = nut.orsMmol ?? 65;
+  const orsMmol = Math.max(50, Math.min(90, Math.round(orsRaw)));
+  return { kcal: nut.kcal!, protein: nut.proteinG!, fat, carbs: nut.carbsG!, waterMl: nut.waterMl!, sodiumMg: nut.sodiumMg!, fiberMaxG, weighInType: protocol?.weighInType, orsMmol };
 }

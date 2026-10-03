@@ -71,11 +71,17 @@ export interface CombatInput {
   // P4 весовая категория (лимит кг) + P5: travel-режим + лютеиновая пометка
   weightClass?: string | null;
   weightClassLimitKg?: number | null;
+  /** P1-23: свод правил категорий (uww/judo/sambo/bjj) — входит в id плана. */
+  weightClassRuleset?: string | null;
   travelMode?: 'off' | 'hotel';
   lutealPhase?: boolean;
   // №4: уровень шеи из диагностики (1–4, переопределяет автовыбор) + слабая сторона
   neckLevelOverride?: number | null;
   weakSide?: 'left' | 'right' | null;
+  /** P1-27: RTP начат и не завершён — hard spar запрещён, интенсивность RIR≥3. */
+  rtpIncomplete?: boolean;
+  /** Э5.4: длительность поединка (мин) — профиль энергосистем в rationale/интелидже. */
+  fightMinutes?: number | null;
 }
 
 export interface CombatSet {
@@ -84,6 +90,8 @@ export interface CombatSet {
   weight: number;
   tempo?: string;
   restSeconds?: number;
+  /** Длительность удержания (с) для изометрий/планок — reps при этом = 1 (P0-13). */
+  holdSeconds?: number;
 }
 
 export interface CombatExercise {
@@ -102,6 +110,8 @@ export interface CombatExercise {
   tempo?: string;
   restSeconds?: number;
   comment?: string;
+  /** Длительность удержания (с), если упражнение изометрическое (P0-13). */
+  holdSeconds?: number;
 }
 
 export interface CombatSession {

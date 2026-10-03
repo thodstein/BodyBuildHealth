@@ -10,16 +10,18 @@ import { finalizeCombatPlan } from '../combat-finalize.engine';
 describe('combat cycle library', () => {
   it('все циклы валидны (паттерн/дни/недели)', () => {
     expect(validateCombatCycles()).toEqual([]);
-    expect(COMBAT_CYCLE_LIBRARY.length).toBeGreaterThanOrEqual(12);
+    expect(COMBAT_CYCLE_LIBRARY.length).toBeGreaterThanOrEqual(25);
   });
 
-  it('каждый вид спорта покрыт: бокс 3, борьба 2, ММА 4, кик 2, общая 2', () => {
+  it('каждый вид спорта покрыт: бокс 6, борьба 5, ММА 6, кик 3, общая 5', () => {
+    // было→стало (Э5.1 PRO-волна): 13→25 циклов — добавлены весогонка по дисциплинам,
+    // кэмпы борьбы/общей, enhanced×2, отель, женская база, teen, поддержание в сезоне
     const by = (d: string) => COMBAT_CYCLE_LIBRARY.filter(c => c.discipline === d).length;
-    expect(by('boxing')).toBe(3);
-    expect(by('wrestling')).toBe(2);
-    expect(by('mma')).toBe(4);
-    expect(by('kickboxing')).toBe(2);
-    expect(by('general')).toBe(2);
+    expect(by('boxing')).toBe(6);
+    expect(by('wrestling')).toBe(5);
+    expect(by('mma')).toBe(6);
+    expect(by('kickboxing')).toBe(3);
+    expect(by('general')).toBe(5);
   });
 
   it('id уникальны, getCombatCycle находит/не находит', () => {

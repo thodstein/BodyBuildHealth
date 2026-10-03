@@ -23,7 +23,7 @@ import type { BBPlan } from '../bb/bb-builder.engine';
 
 /* ───────────────────────── Общие типы ───────────────────────── */
 
-export type ProgramDirection = 'bb' | 'pl' | 'hybrid' | 'arm';
+export type ProgramDirection = 'bb' | 'pl' | 'hybrid' | 'arm' | 'combat';
 export type ProgramSource = 'custom' | 'cloned_library' | 'cloned_cycle' | 'from_build';
 
 /** Фаза периодизации (зеркалирует BBPhase из phase-periodization, без UI-зависимости). */
@@ -325,12 +325,21 @@ export interface ArmProgramBody extends Omit<BBProgramBody, 'direction'> {
   direction: 'arm';
 }
 
+/** P0-5: экспорт плана единоборств в ручную библиотеку (та же недельная форма,
+ *  что BB/arm — движок единоборств строит UserWeek 1-в-1). */
+export interface CombatProgramBody extends Omit<BBProgramBody, 'direction'> {
+  direction: 'combat';
+  /** Дисциплина/цель/стиль/спарринг — метаданные для карточки библиотеки. */
+  combatMeta?: { discipline?: string; goal?: string; fightStyle?: string; patternId?: string; weeks?: number };
+}
+
 export interface UserProgram {
   meta: ProgramMeta;
   bb?: BBProgramBody;
   pl?: PLProgramBody;
   hybrid?: HybridProgramBody;
   arm?: ArmProgramBody;
+  combat?: CombatProgramBody;
 }
 
 /* ───────────────────────── Утилиты id ───────────────────────── */

@@ -157,7 +157,3 @@ export function diffCombatVariants(a: CombatVariant, b: CombatVariant): VariantD
   push('weightCut', 'Сгон', a.hasWeightCut ? 'да' : 'нет', b.hasWeightCut ? 'да' : 'нет');
   return rows;
 }
-
-export function variantChangedRows(a: CombatVariant, b: CombatVariant): VariantDiffRow[] {
-  return diffCombatVariants(a, b).filter(r => r.changed);
-}

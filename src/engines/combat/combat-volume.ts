@@ -60,9 +60,3 @@ export function normLevel(l: string): Level {
 export function getCombat(level: string, key: string): Landmarks | null {
   return COMBAT_LANDMARKS[normLevel(level)]?.[key] || null;
 }
-export function checkStatus(cur: number, lm: Landmarks): 'below'|'optimal'|'high'|'over' {
-  if (cur < lm.mev) return 'below';
-  if (cur <= lm.mav) return 'optimal';
-  if (cur <= lm.mrv) return 'high';
-  return 'over';
-}

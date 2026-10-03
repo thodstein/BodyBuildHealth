@@ -56,7 +56,7 @@ export const CbCampIntelCard: React.FC<{
         tone: banner ? (banner.startsWith('⛔') || banner.includes('Same-day') ? 'danger' : 'warn')
           : risk.level === 'danger' ? 'danger' : risk.level === 'caution' ? 'warn' : 'ok',
         body: banner || (wc
-          ? `Протокол собран: цель ${(wc?.targetLossKg ?? 0).toFixed(1)} кг · вода ${(wc?.waterCutL ?? 0).toFixed(1)} л · натрий ${wc?.sodiumCutG ?? 0} г`
+          ? `Протокол собран: цель ${(wc?.targetLossKg ?? 0).toFixed(1)} кг · вода ${wc?.waterMode === 'load_cut' ? 'загрузка-срез' : 'стабильно'} · натрий ${wc?.sodiumMode === 'moderate_cut' ? 'плавный срез' : 'стабильно'}`
           : risk.note),
         badge: risk.unsafe ? `${(risk.pct * 100).toFixed(1)}% · ${risk.source}` : undefined,
       });
@@ -164,7 +164,7 @@ export const CbCampIntelCard: React.FC<{
     }
 
     return out;
-  }, [plan, acwr, outsideSessions]);
+  }, [plan, acwr, outsideSessions, fightMinutes]);
 
   if (!rows.length) return null;
 

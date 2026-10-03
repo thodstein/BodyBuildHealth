@@ -10,7 +10,16 @@ export interface AnnualCBCompetition { id:string; name:string; date:string; weig
 export interface AnnualCB { id:string; totalWeeks:number; discipline:string; blocks: AnnualCBBlock[]; competitions: AnnualCBCompetition[]; createdAt:string; updatedAt?:string; }
 const KEY='he_combat_annual_v1';
 export function saveAnnualCB(a: AnnualCB){ try{ localStorage.setItem(KEY, JSON.stringify(a)); }catch{} }
-export function loadAnnualCB(): AnnualCB | null { try{ const r=localStorage.getItem(KEY); return r? JSON.parse(r): null;}catch{return null;} }
+/** P0-11: валидация формы — битый стор больше не роняет print/ICS/Gantt. */
+export function isAnnualCBShape(v: unknown): v is AnnualCB {
+  if (!v || typeof v !== 'object') return false;
+  const a = v as Partial<AnnualCB>;
+  if (typeof a.totalWeeks !== 'number' || !Number.isFinite(a.totalWeeks) || a.totalWeeks < 1) return false;
+  if (!Array.isArray(a.blocks) || !Array.isArray(a.competitions)) return false;
+  return a.blocks.every(b => !!b && typeof b.weeks === 'number' && Number.isFinite(b.weeks) && b.weeks >= 1
+    && typeof b.startWeek === 'number' && Number.isFinite(b.startWeek));
+}
+export function loadAnnualCB(): AnnualCB | null { try{ const r=localStorage.getItem(KEY); if(!r) return null; const parsed=JSON.parse(r); return isAnnualCBShape(parsed) ? parsed : null;}catch{return null;} }
 export function removeAnnualCB(): void { try{ localStorage.removeItem(KEY); }catch{} }
 
 // legacy: склейка из планов (совместимость) — фазы auto ATR
@@ -26,11 +35,35 @@ export function buildAnnualFromCB(plans: CombatPlan[]): AnnualCB {
   return { id:`ann_cb_${disc}_${tot}_${plans.length}`, totalWeeks:tot, discipline: disc, blocks, competitions:[], createdAt:new Date().toISOString() };
 }
 
+/**
+ * P0-10: приводит сумму недель блоков ровно к totalWeeks.
+ * Лишние недели режутся каскадом с конца (не ниже 1), недостающие добавляются
+ * последнему блоку. Раньше коррекция правила только последний transition и
+ * 52 нед × 2 цикла давали 53 недели.
+ */
+export function normalizeAnnualBlockWeeks(blocks: AnnualCBBlock[], totalWeeks: number): void {
+  if (!blocks.length) return;
+  const sum = () => blocks.reduce((a, b) => a + b.weeks, 0);
+  let diff = totalWeeks - sum();
+  for (let i = blocks.length - 1; i >= 0 && diff !== 0; i--) {
+    const b = blocks[i];
+    if (diff > 0) { b.weeks += diff; diff = 0; }
+    else {
+      const take = Math.min(b.weeks - 1, -diff);
+      b.weeks -= take; diff += take;
+    }
+  }
+  diff = totalWeeks - sum();
+  if (diff > 0) blocks[0].weeks += diff;
+}
+
 // ATR 10нед: 5 Accum /3 Trans /2 Real (+ transition 2-4нед после главного)
 // Issurin residual: strength 30-40д, aerobic 25-35д, anaerobic 18-24д, speed 2-7д — для multi-cycle кумуляция
 export function buildAnnualATR(discipline: string, totalWeeks = 52, startDate?: string | null, opts?: { cycles?: number; disciplinePerCycle?: string[] }): AnnualCB {
   const tw = Math.max(8, Math.min(52, Math.round(totalWeeks)));
-  const cycles = Math.max(1, Math.min(4, Math.round(opts?.cycles ?? 1)));
+  // P0-10: цикл требует ≥8 нед — больше 4 и больше floor(tw/8) циклов не бывает
+  const maxCycles = Math.max(1, Math.min(4, Math.floor(tw / 8)));
+  const cycles = Math.max(1, Math.min(maxCycles, Math.round(opts?.cycles ?? 1)));
   if (cycles === 1) {
     // пропорции ATR 50/30/20 — используем largest remainder как в periodization
     const accum = Math.round(tw * 0.5);
@@ -80,16 +113,9 @@ export function buildAnnualATR(discipline: string, totalWeeks = 52, startDate?: 
       curWeek += 2;
     }
   }
-  // нормализация startWeek после возможного переполнения из-за округлений
+  // P0-10: нормализация суммы недель до tw (каскад с конца)
+  normalizeAnnualBlockWeeks(blocks, tw);
   let w = 1; for (const b of blocks) { b.startWeek = w; w += b.weeks; }
-  const total = w - 1;
-  // если total != tw — коррекция последнего transition
-  if (total !== tw) {
-    const diff = tw - total;
-    const last = blocks[blocks.length - 1];
-    if (last.phase === 'transition') last.weeks = Math.max(1, last.weeks + diff);
-  }
-  w = 1; for (const b of blocks) { b.startWeek = w; w += b.weeks; }
   return { id:`ann_atr_${discipline}_${tw}_${cycles}c`, totalWeeks: tw, discipline, blocks, competitions:[], createdAt:new Date().toISOString() };
 }
 
@@ -115,9 +141,10 @@ function isValidIsoDateAnnual(s: string): boolean {
   return Number.isFinite(d.getTime()) && d.toISOString().slice(0,10)===s;
 }
 export function addCompetitionToAnnual(annual: AnnualCB, comp: AnnualCBCompetition, startDate?: string | null): AnnualCB {
+  // P0-11: невалидная дата НЕ попадает в стор (раньше comp добавлялся и ронял ICS)
+  if (!comp || !isValidIsoDateAnnual(comp.date)) return annual;
   const next: AnnualCB = { ...annual, competitions: [...annual.competitions, comp], updatedAt: new Date().toISOString(), blocks: annual.blocks.map(b=> ({...b})) } as AnnualCB;
   try {
-    if (!isValidIsoDateAnnual(comp.date)) return next;
     const d = new Date(comp.date).getTime();
     // детерм: если передан startDate — считаем от него, иначе от сегодня (fallback)
     const startRef = (startDate && isValidIsoDateAnnual(startDate)) ? new Date(startDate).getTime() : Date.now();
@@ -252,8 +279,9 @@ export function buildAnnualPrintHtml(annual: AnnualCB): string {
 }
 
 export function buildAnnualIcs(annual: AnnualCB, startDate?: string | null): string {
-  const start = startDate ? new Date(startDate) : new Date();
-  const fmt = (d: Date)=> d.toISOString().replace(/[-:]/g,'').slice(0,15)+'Z';
+  const startRaw = startDate ? new Date(startDate) : new Date();
+  const start = Number.isFinite(startRaw.getTime()) ? startRaw : new Date();
+  const fmt = (d: Date)=> (Number.isFinite(d.getTime()) ? d : new Date()).toISOString().replace(/[-:]/g,'').slice(0,15)+'Z';
   const escIcs = (s:string)=> s.replace(/,/g,'\\,').replace(/;/g,'\\;').replace(/\n/g,'\\n');
   const lines: string[] = ['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//BodyBuildHealth//Combat Annual//RU','CALSCALE:GREGORIAN'];
   for (const b of annual.blocks) {
@@ -262,6 +290,8 @@ export function buildAnnualIcs(annual: AnnualCB, startDate?: string | null): str
     lines.push('BEGIN:VEVENT', `UID:cb-${b.id}@bodybuild`, `DTSTAMP:${fmt(new Date())}`, `DTSTART:${fmt(s)}`, `DTEND:${fmt(e)}`, `SUMMARY:${escIcs(`${cbAnnualPhaseName(b.phase)} ${cbDisciplineName(b.discipline)} ${b.weeks}нед`)}`, `DESCRIPTION:${escIcs(`Фаза ${cbAnnualPhaseName(b.phase)}, статус ${cbAnnualStatusName(b.status)}${b.fightDate?' бой '+b.fightDate:''}`)}`, 'END:VEVENT');
   }
   for (const c of annual.competitions) {
+    // P0-11: невалидная дата соревнования пропускается, а не роняет экспорт
+    if (!isValidIsoDateAnnual(c.date)) continue;
     const d = new Date(c.date);
     const e = new Date(d.getTime()+86400000);
     lines.push('BEGIN:VEVENT', `UID:comp-${c.id}@bodybuild`, `DTSTAMP:${fmt(new Date())}`, `DTSTART:${fmt(d)}`, `DTEND:${fmt(e)}`, `SUMMARY:${escIcs(`Бой: ${c.name}`)}`, `DESCRIPTION:${escIcs(c.weightClass||'')}`, 'END:VEVENT');

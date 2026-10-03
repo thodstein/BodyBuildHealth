@@ -169,6 +169,59 @@ export function cutDeviation(rows: WeighIn[], opts: { startKg?: number | null; t
   };
 }
 
+export interface CutWeightAdvice {
+  status: 'no_data' | 'on_track' | 'too_fast' | 'too_slow';
+  avg7d: number | null;
+  prev7d: number | null;
+  /** % массы за неделю (положительное = идёт сгон). */
+  weeklyChangePct: number | null;
+  targetRatePctPerWeek: number;
+  advice: string;
+  /** Одна переменная за раз (прецедент BB prepWeightAdvice). */
+  action: { kind: 'calories' | 'cardio' | 'none'; delta?: number };
+}
+
+/**
+ * P1-28: совет по темпу сгона из журнала веса — средние за 7 дней против
+ * предыдущих 7 (шум воды сглажен), одна переменная за раз. В тапере/файт-вике
+ * коррекции запрещены (вес уже управляется протоколом).
+ */
+export function cutWeightAdvice(
+  rows: WeighIn[],
+  opts?: { today?: string; sex?: 'male' | 'female'; goalRatePctPerWeek?: number; phase?: 'prep' | 'taper' | 'fight_week' | null }
+): CutWeightAdvice {
+  const target = typeof opts?.goalRatePctPerWeek === 'number' && Number.isFinite(opts.goalRatePctPerWeek)
+    ? opts.goalRatePctPerWeek
+    : (opts?.sex === 'female' ? 0.4 : 0.5);
+  const base: CutWeightAdvice = { status: 'no_data', avg7d: null, prev7d: null, weeklyChangePct: null, targetRatePctPerWeek: target, advice: '', action: { kind: 'none' } };
+  if (!Array.isArray(rows) || rows.length < 4) {
+    return { ...base, advice: 'Для авто-совета по темпу нужно ≥4 записей веса (ведите журнал).' };
+  }
+  if (opts?.phase === 'taper' || opts?.phase === 'fight_week') {
+    return { ...base, status: 'on_track', advice: 'Тапер/файт-вик: вес управляется протоколом — калории и кардио не корректируем.' };
+  }
+  const t = opts?.today && isIso(opts.today) ? Date.parse(opts.today) : Date.now();
+  const day = 86400000;
+  const mean = (arr: WeighIn[]) => arr.reduce((a, r) => a + r.weightKg, 0) / Math.max(1, arr.length);
+  const recent = rows.filter(r => { const d = Date.parse(r.date); return isFinite(d) && d <= t && d >= t - 7 * day; });
+  const prev = rows.filter(r => { const d = Date.parse(r.date); return isFinite(d) && d < t - 7 * day && d >= t - 14 * day; });
+  if (recent.length < 2 || prev.length < 2) {
+    return { ...base, advice: 'Недостаточно данных за 14 дней (нужно ≥2 записи в каждой неделе) — продолжайте журнал.' };
+  }
+  const avg7d = Math.round(mean(recent) * 10) / 10;
+  const prev7d = Math.round(mean(prev) * 10) / 10;
+  const weeklyChangePct = prev7d > 0 ? Math.round(((prev7d - avg7d) / prev7d * 100) * 10) / 10 : null;
+  if (weeklyChangePct == null) return { ...base, advice: 'Недостаточно данных для расчёта темпа.' };
+  const diff = weeklyChangePct - target;
+  if (diff > 0.25) {
+    return { status: 'too_fast', avg7d, prev7d, weeklyChangePct, targetRatePctPerWeek: target, advice: `Темп ${weeklyChangePct}%/нед выше цели ${target}% — риск потери мышц: +150 ккал ИЛИ −20 мин кардио (одна переменная).`, action: { kind: 'calories', delta: 150 } };
+  }
+  if (diff < -0.25) {
+    return { status: 'too_slow', avg7d, prev7d, weeklyChangePct, targetRatePctPerWeek: target, advice: `Темп ${weeklyChangePct}%/нед ниже цели ${target}% — −150 ккал ИЛИ +20 мин кардио (одна переменная).`, action: { kind: 'calories', delta: -150 } };
+  }
+  return { status: 'on_track', avg7d, prev7d, weeklyChangePct, targetRatePctPerWeek: target, advice: `Темп ${weeklyChangePct}%/нед — по цели ${target}%, ничего не меняем.`, action: { kind: 'none' } };
+}
+
 function clampDays(rows: WeighIn[], today: string | undefined, totalWeeks: number): number {
   const start = rows.length ? Date.parse(rows[0].date) : NaN;
   if (!isFinite(start)) return 0;
@@ -298,12 +351,18 @@ export function sparringJournalToLoad(rows: SparringEntry[], today: string | nul
   if (!inWeek.length) return null;
   const hard = inWeek.filter(r => r.type === 'hard');
   const hardDays = hard.map(r => weekdayMon0(r.date));
+  // P1-18: средняя фактическая длительность (rounds×roundMinutes) вместо фабричных 90/60/75/40
+  const durs = inWeek
+    .map(r => (Number(r.rounds) > 0 && Number(r.roundMinutes) > 0) ? Number(r.rounds) * Number(r.roundMinutes) : null)
+    .filter((x): x is number => x != null && x > 0);
+  const avgDurationMin = durs.length ? Math.round(durs.reduce((a, b) => a + b, 0) / durs.length) : undefined;
   return {
     hardSparSessions: hard.length,
     techSparSessions: inWeek.filter(r => r.type === 'tech').length,
     wrestlingSessions: inWeek.filter(r => r.type === 'wrestling').length,
     conditioningSessions: inWeek.filter(r => r.type === 'conditioning').length,
     hardDays: hardDays.length ? [...new Set(hardDays)] : undefined,
+    ...(avgDurationMin ? { avgDurationMin } : {}),
   } as SparringLoad;
 }
 
@@ -640,6 +699,19 @@ export function rtpSummary(rows: RtpLog[], today: string | null | undefined): Rt
     return { ...base, status: 'stage', blocked: `Слишком рано: ступень держится минимум ${need} сут.` };
   }
   return { ...base, status: 'stage', canPass: true, blocked: null };
+}
+
+/**
+ * P1-27: RTP не завершён (начат, но не все ступени пройдены) — гейт для сборки:
+ * hard spar запрещён, интенсивность ограничена. Без лога RTP — false (нет контекста).
+ */
+export function rtpIncomplete(rows: RtpLog[], today?: string | null): boolean {
+  if (!Array.isArray(rows) || rows.length === 0) return false;
+  const t = today || (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; })();
+  try {
+    const s = rtpSummary(rows, t);
+    return s.currentStage != null; // все ступени пройдены → currentStage null
+  } catch { return false; }
 }
 
 export const RTP_EARLY_AEROBIC_NOTE =

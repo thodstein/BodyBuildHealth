@@ -5,21 +5,6 @@
 import type { CombatPlan } from './combat.types';
 import { weightCutNutritionForWeek, weightCutFiberForWeek, weightCutOrsProtocol, combatWeightCutToMealInput } from './combat-weight-cut.engine';
 
-export interface CombatDiaryStats {
-  totalSetsLastWeek: number;
-  avgRPE: number;
-  acwrRatio: number | null;
-  acwrZone: string | null;
-}
-
-export function combatDiaryStatsFromSessions(sessions: Array<{ date: string; load?: number; rpe?: number }>): CombatDiaryStats | null {
-  if (!Array.isArray(sessions) || sessions.length === 0) return null;
-  const lastWeek = sessions.slice(-7);
-  const totalSetsLastWeek = lastWeek.reduce((a, s: any) => a + (s.sets || s.load || 0), 0);
-  const avgRPE = lastWeek.reduce((a, s: any) => a + (s.rpe || s.sRPE || 5), 0) / Math.max(1, lastWeek.length);
-  return { totalSetsLastWeek, avgRPE: Math.round(avgRPE * 10) / 10, acwrRatio: null, acwrZone: null };
-}
-
 export function combatToNutritionPayload(plan: CombatPlan): { kcal: number | null; proteinG: number | null; carbsG: number | null; fatG: number | null; fiberG: number | null; waterMl: number | null; sodiumMg: number | null; note: string; weighInType?: string; orsMmol?: number; mealInput?: any } {
   const bw = (plan.inputSnapshot as any)?.bodyweight || 80;
   const sex = (plan.inputSnapshot as any)?.sex || 'male';
@@ -34,7 +19,7 @@ export function combatToNutritionPayload(plan: CombatPlan): { kcal: number | nul
       kcal: nut.kcal ?? null,
       proteinG: nut.proteinG ?? null,
       carbsG: nut.carbsG ?? null,
-      fatG: Math.round(bw * (sex === 'female' ? 0.8 : 0.6)),
+      fatG: (meal as any)?.fat ?? Math.round(bw * (sex === 'female' ? 0.8 : 0.6)),
       fiberG: fiber,
       waterMl: nut.waterMl ?? null,
       sodiumMg: nut.sodiumMg ?? null,
@@ -78,12 +63,6 @@ export function combatToCardioPayload(plan: CombatPlan): { zone2MinPerWeek: numb
   return { zone2MinPerWeek: Math.round(zone2 / weeks), hiitSessions: Math.round(hiit / weeks), totalConditioningMin: Math.round(total / weeks), outsideLoad, needsAerobicMaintenance: outsideSessions >= 5 };
 }
 
-export function combatNutritionEventPayload(plan: CombatPlan): Record<string, any> {
-  const nut = combatToNutritionPayload(plan);
-  const cardio = combatToCardioPayload(plan);
-  return { planId: plan.id, discipline: plan.discipline, goal: plan.goal, weeks: plan.weeks, ...nut, cardio, weighInType: (nut as any).weighInType };
-}
-
 // ── P2: типизированные исходящие (тот же канал localStorage + he-combat-updated,
 // потребители: IndividualPlanContext слушает he-combat-updated, CardioConstructor читает payload) ──
 /** Питание → IndividualPlanContext (слушатель `he-combat-updated`, ключ `he_combat_nutrition_payload`). */
@@ -94,3 +73,89 @@ export type CombatNutritionPayload = ReturnType<typeof combatToNutritionPayload>
 export type CombatCardioPayload = NonNullable<ReturnType<typeof combatToCardioPayload>> & {
   planId: string;
 };
+
+/* ── P0-5: экспорт плана единоборств в ручную библиотеку ─────────────────────
+ * Раньше UI собирал объект с direction:'combat' без daysPerWeek/weeks и без
+ * тела — saveUserProgram молча отбрасывал его (ложный тост «Экспортировано»).
+ * Теперь — полноценный UserProgram с CombatProgramBody (та же недельная форма,
+ * что BB/arm: session.blocks[].sets). Чистая функция — тестируемая. */
+
+type UserPhase = 'accumulation' | 'intensification' | 'deload' | 'peaking';
+
+function combatPhaseToUserPhase(p: string): UserPhase {
+  if (p === 'deload') return 'deload';
+  if (p === 'realization' || p === 'taper') return 'peaking';
+  if (p === 'transmutation' || p === 'power' || p === 'conjugate') return 'intensification';
+  return 'accumulation';
+}
+
+export function combatPlanToUserProgram(plan: CombatPlan): any {
+  const snap: any = plan.inputSnapshot || {};
+  const weeks = (plan.weeksData || []).map(w => ({
+    week: w.week,
+    phase: combatPhaseToUserPhase(w.phase),
+    deload: !!w.deload,
+    sessions: (w.sessions || []).map(s => ({
+      id: `cbs_${plan.id}_${w.week}_${s.day}`,
+      name: s.sessionTag || `День ${s.day}`,
+      focus: s.sessionTag,
+      character: s.character || null,
+      estimatedMin: s.durationMin,
+      blocks: (s.exercises || []).map((e, ei) => ({
+        id: `cbb_${plan.id}_${w.week}_${s.day}_${ei}`,
+        type: e.role === 'primary' ? 'compound' : 'accessory',
+        exerciseName: e.name,
+        muscle: e.group,
+        role: e.role,
+        character: e.character,
+        note: e.comment,
+        sets: (e.workSets || []).map(st => ({
+          reps: st.reps,
+          rir: st.rir,
+          weight: st.weight,
+          ...(st.tempo ? { tempo: st.tempo } : {}),
+          ...(st.restSeconds != null ? { restSec: st.restSeconds } : {}),
+          ...(st.holdSeconds != null ? { holdSeconds: st.holdSeconds } : {}),
+        })),
+      })),
+    })),
+  }));
+  const firstWeek = plan.weeksData?.[0];
+  const daysPerWeek = Math.max(1, Math.min(7, firstWeek?.sessions?.length || snap.daysPerWeek || 3));
+  const microcycleTemplate = {
+    daySlots: (firstWeek?.sessions || []).map((s, i) => ({ day: i + 1, label: s.sessionTag || `День ${i + 1}`, muscles: [] })),
+  };
+  const now = new Date().toISOString();
+  return {
+    meta: {
+      id: plan.id,
+      title: `Единоборства ${plan.discipline} ${plan.weeks}нед`,
+      author: 'BioStack',
+      goal: plan.goal,
+      level: plan.level,
+      daysPerWeek,
+      weeks: plan.weeksData.length,
+      direction: 'combat',
+      createdAt: now,
+      updatedAt: now,
+      source: 'from_build',
+      tags: ['combat', plan.discipline],
+      notes: (plan.rationale || []).slice(0, 3).join(' · '),
+    },
+    combat: {
+      direction: 'combat',
+      microcycleTemplate,
+      weeks,
+      volumeBudget: {},
+      progression: { loadStrategy: 'double_progression', deloadProtocol: 'pump', intensityTechniques: ['none'] },
+      constraints: { equipment: snap.equipment || [] },
+      combatMeta: {
+        discipline: plan.discipline,
+        goal: plan.goal,
+        fightStyle: snap.fightStyle,
+        patternId: plan.patternId,
+        weeks: plan.weeks,
+      },
+    },
+  };
+}

@@ -5,6 +5,7 @@
  */
 import type { CombatPlan } from './combat.types';
 import { getCombat } from './combat-volume';
+import { weekGroupSets } from './combat-groups';
 import { cbSessionTagName, cbDisciplineName, cbAnnualPhaseName } from './combat-builder.engine';
 
 const CB_RU_GOAL_X: Record<string, string> = { power: 'Взрывная сила', endurance: 'Выносливость', maintenance: 'Поддержание', camp: 'Кэмп к бою', weight_cut: 'Весогонка' };
@@ -27,8 +28,10 @@ export function buildCombatXlsxHtml(plan: CombatPlan): string {
   // heatmap шея/хват/core
   const heatKind = (kind:'neck'|'grip'|'core', w:any) => {
     let sets = 0;
-    if (kind==='neck') sets = w.sessions.reduce((s:number,sess:any)=> s + sess.exercises.filter((e:any)=> e.id.includes('neck')).reduce((a:number,e:any)=> a+e.sets,0),0);
-    if (kind==='grip') sets = w.sessions.reduce((s:number,sess:any)=> s + sess.exercises.filter((e:any)=> e.id.includes('grip')||e.id.includes('pinch')||e.id.includes('wrist')).reduce((a:number,e:any)=>a+e.sets,0),0);
+    // P1-5: единый канон групп (weekGroupSets) — раньше инлайн-цепочки не видели
+    // farmer_carry в хвате и считали neck_rotation дважды
+    if (kind==='neck') sets = weekGroupSets(w.sessions, 'neck');
+    if (kind==='grip') sets = weekGroupSets(w.sessions, 'grip');
     if (kind==='core') sets = w.sessions.reduce((s:number,sess:any)=> s + sess.exercises.filter((e:any)=> ['deadbug','hollow_hold','side_plank','ab_wheel','copenhagen_plank','pallof_rotation_press'].includes(e.id)).reduce((a:number,e:any)=>a+e.sets,0),0);
     const lm = kind!=='core' ? getCombat((plan.level as any), kind) : null;
     let bg='#a855f714', col='#a855f7';
@@ -81,8 +84,8 @@ export function buildCombatXlsxBuffer(plan: CombatPlan): Uint8Array {
     const row:any[] = [kind==='neck'?'Шея':kind==='grip'?'Хват':'Core'];
     for (const w of plan.weeksData) {
       let sets=0;
-      if (kind==='neck') sets = w.sessions.reduce((s:number,sess:any)=> s + sess.exercises.filter((e:any)=> e.id.includes('neck')).reduce((a:number,e:any)=> a+e.sets,0),0);
-      if (kind==='grip') sets = w.sessions.reduce((s:number,sess:any)=> s + sess.exercises.filter((e:any)=> e.id.includes('grip')||e.id.includes('pinch')||e.id.includes('wrist')).reduce((a:number,e:any)=>a+e.sets,0),0);
+      if (kind==='neck') sets = weekGroupSets(w.sessions, 'neck');
+      if (kind==='grip') sets = weekGroupSets(w.sessions, 'grip');
       if (kind==='core') sets = w.sessions.reduce((s:number,sess:any)=> s + sess.exercises.filter((e:any)=> ['deadbug','hollow_hold','side_plank','ab_wheel','copenhagen_plank','pallof_rotation_press'].includes(e.id)).reduce((a:number,e:any)=>a+e.sets,0),0);
       row.push(sets);
     }
@@ -102,15 +105,18 @@ export function buildCombatXlsxBuffer(plan: CombatPlan): Uint8Array {
   ws3['!cols'] = [{wch:16},{wch:48}];
   XLSX.utils.book_append_sheet(wb, ws3, 'Мета');
     const out: any = XLSX.write(wb, { type:'array', bookType:'xlsx' });
+    // P0-12: sheetjs отдаёт ArrayBuffer — раньше ни одна ветка не совпадала и
+    // экспорт ВСЕГДА писал битый pad-файл (тест проходил на муляже)
+    if (out instanceof ArrayBuffer) return new Uint8Array(out);
     if (out instanceof Uint8Array) return out;
     if (Array.isArray(out)) return new Uint8Array(out as number[]);
+    if (out && typeof out.byteLength === 'number') return new Uint8Array(out as ArrayBuffer);
     if (out && typeof out.length === 'number') return new Uint8Array(out);
     throw new Error('xlsx write returned unexpected');
-  } catch {
-    const pad = new Uint8Array(5000);
-    pad[0]=0x50; pad[1]=0x4B;
-    for (let i=2;i<pad.length;i++) pad[i]= (i%26)+65;
-    return pad;
+  } catch (e) {
+    // P0-12: не подсовываем битый «PK-файл» — пусть downloadCombatXlsx уйдёт
+    // в HTML-фолбэк (.xls), который Excel открывает
+    throw e instanceof Error ? e : new Error('xlsx write failed');
   }
 }
 

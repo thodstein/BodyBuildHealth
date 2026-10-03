@@ -7,7 +7,7 @@ import { cbSessionTagName, cbDisciplineName, cbAnnualPhaseName } from './combat-
 
 const CB_RU_GOAL: Record<string, string> = { power: 'Взрывная сила', endurance: 'Выносливость', maintenance: 'Поддержание', camp: 'Кэмп к бою', weight_cut: 'Весогонка' };
 const CB_RU_LEVEL: Record<string, string> = { beginner: 'Новичок', intermediate: 'Средний', advanced: 'Продвинутый', enhanced: 'На курсе' };
-const CB_RU_MODEL: Record<string, string> = { atr_10: 'ATR 5/3/2', linear_12: 'Linear 12', conjugate: 'Сопряжённая' };
+const CB_RU_MODEL: Record<string, string> = { atr_10: 'ATR 5/3/2', linear_12: 'Linear 12', linear: 'Linear', camp_8: 'Camp 8', conjugate: 'Сопряжённая' };
 const CB_RU_DUP: Record<string, string> = { off: 'выкл', power_endurance: 'сила/выносливость', heavy_light: 'тяж/лёгк', conjugate: 'сопряжённая' };
 const CB_RU_STYLE: Record<string, string> = { striker: 'ударник', grappler: 'борец', hybrid: 'гибрид' };
 const CB_RU_MODE: Record<string, string> = { stable: 'стабильно', load_cut: 'загрузка-срез', moderate_cut: 'плавный срез', deplete_reload: 'слив-загрузка' };
@@ -115,8 +115,4 @@ export function buildCombatPlanIcs(plan: CombatPlan, startDate?: string | null):
   } catch { /* no-op */ }
   lines.push('END:VCALENDAR');
   return lines.join('\r\n');
-}
-
-export function buildCombatShareHash(plan: CombatPlan): string {
-  try { return `cb-${plan.discipline}-${plan.weeks}w-${plan.patternId}-${plan.weeksData.length}w`; } catch { return `cb-${Date.now()}`; }
 }

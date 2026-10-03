@@ -6,7 +6,7 @@
 import { computeOutsideMetrics, outsideVolumeMultiplier, outsideFrequencyPenalty, isDayConflictWithOutside, type OutsideLoad } from '../outside-load.engine';
 import { getCombatPattern, recommendCombatPattern, type CombatPattern } from './combat-split-patterns';
 import { phaseForCombatWeek, rirForCombat, repsForCombat } from './combat-progression';
-import { phaseForCombatWeekATR, rirForCombatPhase, repsForCombatPhase, isDeloadWeekATR, isTaperWeek } from './combat-periodization.engine';
+import { phaseForCombatWeekATR, rirForCombatPhase, repsForCombatPhase, isDeloadWeekATR, isTaperWeek, conjugateMethodForSession } from './combat-periodization.engine';
 import { isTaperByFightDate, taperVolumeMultiplier, buildTaperRationale, taperSplitForWeek, validateTaperConfig, fightWeekIndex, recommendTaperWeeks } from './combat-taper.engine';
 import { weightCutVolumeMultiplier, weightCutNutritionForWeek, weightCutRehydrationNotes, buildWeightCutProtocol, weightCutPhaseForWeek, validateWeightCutProtocol } from './combat-weight-cut.engine';
 import {
@@ -14,12 +14,13 @@ import {
   MIN_SETS_PER_EXERCISE, MAX_TRIM_PASSES_PER_EX, MAX_TRIM_ITERATIONS,
 } from './combat-budget-constants';
 import { buildConditioningRationale, conditioningSessionsForWeek } from './combat-conditioning.engine';
-import { filterByTierCB, filterByInjuryCB, selectDiverseCB, tierForCB, gentleFactorForCB, repsCapForCB } from './combat-selection';
+import { filterByTierCB, filterByInjuryCB, selectDiverseCB, tierForCB, gentleFactorForCB, repsCapForCB, admitCombatExercise, type CombatAdmitCtx } from './combat-selection';
 import { accentForDiscipline, accentForFightStyle, styleNarrative } from './combat-specialization';
+import { fightEnergyProfile } from './combat-science';
 import { tempoForCB, restForCB } from './combat-loading';
 import { adaptForPEDsCombat } from './combat-ped-adaptation';
 import { filterByMobilityCB, isAxialLoadExerciseCB, isMobilityRestrictedCB } from './combat-mobility';
-import { validateSyncCombat } from './combat-limits';
+import { validateSyncCombat, sessionLimitsForCombat } from './combat-limits';
 import { applyCombatDUP } from './combat-dup';
 import { applyCombatIntensity } from './combat-intensity';
 import { weightForCombatExerciseResolved } from './combat-workmax';
@@ -28,11 +29,12 @@ import { teenCombatGates, hasWeightManipulation, neckExtensionCutoffKg, concussi
 import { weightToClassBoundary, weightClassLine } from './combat-weight-class.engine';
 import { femaleCutTempoDefault, femaleCombatNotes, travelPoolFilter, travelVolumeMult, travelTaperNote } from './combat-female-travel.engine';
 import { isExcludeInjuryCB } from './combat-selection';
+import { combatDiaryGroupFor } from './combat-diary.engine';
 import { computeRecoveryMultiplier, computeNutritionMultiplier } from '../recovery-budget.engine';
 import { COMBAT_LANDMARKS } from './combat-volume';
 import { vbtRecommendationCombat, vbtHistoryForLift, vbtEwma, diagnoseVelocityLossCombat, vbtTrendForLift, atrTransitionHintForTrend, combatLossThresholdForGoal } from './combat-vbt.engine';
 import type { VbtHistoryEntry } from './combat-vbt.engine';
-import { coreWeeklyPlan } from './combat-core.engine';
+import { coreWeeklyPlan, parseHoldSeconds } from './combat-core.engine';
 import { neckWeeklyPlan, neckProgressionFor, NECK_IDS } from './combat-neck.engine';
 import type { CombatInput, CombatPlan, CombatWeek, CombatSession, CombatExercise, CombatSet, CombatPhase } from './combat.types';
 
@@ -129,7 +131,7 @@ export function resolveCombatSwapMeta(newId: string, fallback: { name: string; g
 const CB_RU_DISC: Record<string, string> = { boxing: 'Бокс', mma: 'ММА', wrestling: 'Борьба', kickboxing: 'Кикбоксинг', general: 'Общая' };
 const CB_RU_GOAL: Record<string, string> = { power: 'взрывная сила', endurance: 'выносливость', maintenance: 'поддержание', camp: 'кэмп к бою', weight_cut: 'весогонка' };
 const CB_RU_STYLE: Record<string, string> = { striker: 'ударник', grappler: 'борец', hybrid: 'гибрид' };
-const CB_RU_MODEL: Record<string, string> = { atr_10: 'ATR 5/3/2', linear_12: 'Linear 12', conjugate: 'Conjugate' };
+const CB_RU_MODEL: Record<string, string> = { atr_10: 'ATR 5/3/2', linear_12: 'Linear 12', linear: 'Linear', camp_8: 'Camp 8', conjugate: 'Conjugate' };
 const CB_RU_INTERF: Record<string, string> = { high: 'высокая', medium: 'средняя', low: 'низкая' };
 const CB_RU_MODE: Record<string, string> = { stable: 'стабильно', load_cut: 'загрузка-срез', moderate_cut: 'плавный срез', deplete_reload: 'слив-загрузка' };
 export function cbRuInterference(v: string): string { return CB_RU_INTERF[v] || v; }
@@ -216,6 +218,18 @@ function getExerciseMeta(id: string): { name: string; group: string; pattern: st
 }
 
 const COMBAT_FALLBACK: Record<string,string> = { pallof_rotation_press:'landmine_rotation', neck_bridge_wrestler:'neck_harness_ext', wrist_roller:'plate_pinch', gi_grip_pullup:'pullup', towel_pullup:'pullup', rope_climb:'pullup', fat_bar_row:'row_bar', landmine_press:'ohp', med_ball_rot_throw:'med_ball_throw', sledge_hammer:'landmine_rotation', battle_rope:'kb_swing', sled_push:'squat', sled_pull:'row_bar', nordic_curl:'rdl', glute_ham_raise:'rdl', trap_bar_dead:'squat' };
+
+/** Единый контекст допуска из входа (P0-1…4). */
+function admitCtxFor(input: CombatInput): CombatAdmitCtx {
+  return {
+    excludedExercises: input.excludedExercises,
+    age: input.age,
+    injuries: input.injuries as any,
+    mobilityRestrictions: input.mobilityRestrictions,
+    avoidAxialLoad: input.avoidAxialLoad,
+    equipment: input.equipment,
+  };
+}
 function filterPool(ids: string[], input: CombatInput): string[] {
   let out = [...ids];
   if (input.excludedExercises?.length) {
@@ -263,16 +277,30 @@ function filterPool(ids: string[], input: CombatInput): string[] {
   }
   // P5 travel: отель — только свой вес (верх ограничен честно)
   out = travelPoolFilter(out, (input as any).travelMode);
+  // P0: финальный safety-гейт — ни один fallback/globalSafe не возвращает
+  // исключённое, teen-запрещённое, травмированное или недоступное по оборудованию
+  const ctx = admitCtxFor(input);
+  out = out.filter(id => admitCombatExercise(id, ctx));
+  if (out.length === 0) {
+    const lastResort = ['deadbug', 'side_plank', 'landmine_rotation', 'pallof_rotation_press', 'plate_pinch', 'squat', 'row_bar'];
+    out = lastResort.filter(id => admitCombatExercise(id, ctx)).slice(0, 2);
+  }
   return out;
 }
 function gentleFactorCB(id: string, injuries: any[]|undefined): number {
   return gentleFactorForCB(id, injuries);
 }
 
+/** Шаг округления веса: 2.5 кг, для лёгких снарядов (шея/хват <20 кг) — 0.5 кг. */
+function roundWeightCB(v: number, small = false): number {
+  const step = small ? 0.5 : 2.5;
+  return Math.round(v / step) * step;
+}
+
 function weightForCombatExercise(id: string, input: CombatInput, goal: string): number {
   const goalMult = goal === 'weight_cut' ? 0.92 : goal === 'maintenance' ? 0.95 : 1;
   const outsideMult = outsideVolumeMultiplier(input.outsideLoad as OutsideLoad) || 1;
-  const bodyweightIds = new Set(['pullup','gi_grip_pullup','towel_pullup','rope_climb','box_jump','depth_jump','broad_jump','deadbug','hollow_hold','side_plank','ab_wheel','copenhagen_plank','neck_bridge_wrestler','plate_pinch','wrist_roller','wrist_flexion','wrist_extension','band_external_rotation','band_pull_apart','ytw_raise']);
+  const bodyweightIds = new Set(['pullup','gi_grip_pullup','towel_pullup','rope_climb','box_jump','depth_jump','broad_jump','deadbug','hollow_hold','side_plank','ab_wheel','copenhagen_plank','neck_bridge_wrestler','plate_pinch','wrist_roller','wrist_flexion','wrist_extension','band_external_rotation','band_pull_apart','ytw_raise','neck_isometric_front','neck_isometric_back','neck_isometric_side','neck_band_rotation_isometric','neck_eccentric_flexion','neck_harness_rotation']);
   if (bodyweightIds.has(id) || id.includes('pinch')) return 0;
   let w = weightForCombatExerciseResolved(id, {
     workMaxByExercise: input.workMaxByExercise ?? null,
@@ -318,10 +346,25 @@ function weightForCombatExercise(id: string, input: CombatInput, goal: string): 
   return w;
 }
 
-function buildWorkSets(reps: [number, number], sets: number, rir: number, weight: number, isHeavy: boolean): CombatSet[] {
+/** Э2.2: разминочная лестница 40/60/75/85% (было 1 сет 50%). */
+function buildWarmupLadder(weight: number, tempo: string): CombatSet[] {
+  if (!(weight > 20)) return [];
+  const pct = (p: number) => roundWeightCB(weight * p, weight < 40);
+  const out: CombatSet[] = [{ reps: 8, rir: 5, weight: pct(0.4), tempo, restSeconds: 60 }];
+  if (weight > 30) out.push({ reps: 5, rir: 5, weight: pct(0.6), tempo, restSeconds: 60 });
+  if (weight > 40) out.push({ reps: 3, rir: 5, weight: pct(0.75), tempo, restSeconds: 60 });
+  if (weight > 100) out.push({ reps: 2, rir: 5, weight: pct(0.85), tempo, restSeconds: 60 });
+  return out;
+}
+
+function buildWorkSets(reps: [number, number], sets: number, rir: number, weight: number, isHeavy: boolean, backOff = false): CombatSet[] {
   const rep = Math.round((reps[0] + reps[1]) / 2);
   const out: CombatSet[] = [];
-  for (let i = 0; i < sets; i++) out.push({ reps: rep, rir, weight, tempo: isHeavy ? '2-0-X-0' : '2-0-1-0', restSeconds: isHeavy ? 150 : 75 });
+  for (let i = 0; i < sets; i++) {
+    // Э2.2: топ-сет + бэкоффы 90% (только тяж-база, ≥3 сетов)
+    const w = backOff && i > 0 ? roundWeightCB(weight * 0.9, weight < 20) : weight;
+    out.push({ reps: rep, rir, weight: w, tempo: isHeavy ? '2-0-X-0' : '2-0-1-0', restSeconds: isHeavy ? 150 : 75 });
+  }
   return out;
 }
 
@@ -364,11 +407,13 @@ export function buildCombatPlan(input: CombatInput): CombatPlan {
     const baseMav = lm ? Object.values(lm).reduce((s, v) => s + (v.mav || 0), 0) : 64;
     // + небольшой запас для core/ротации (max 5)
     const base = Math.round((baseMav + 4) * ped.mrvMult);
-    const lab = input.labMrvMultiplier ?? 1;
+    // P1-33: NaN-гард — NaN от профиля отключал enforcement бюджета молча
+    const labRaw = Number(input.labMrvMultiplier);
+    const lab = Number.isFinite(labRaw) && labRaw > 0 ? Math.max(0.5, Math.min(1.5, labRaw)) : 1;
     // кламп произведения чтобы не эксплодить при stacking 0.6*0.6*0.6 → 0.21
-    const effRecovery = Math.max(0.6, Math.min(1.15, recoveryMult));
-    const effNutrition = Math.max(0.7, Math.min(1.1, nutritionMult));
-    const effOutside = Math.max(0.55, Math.min(1, outsideMult));
+    const effRecovery = Number.isFinite(recoveryMult) ? Math.max(0.6, Math.min(1.15, recoveryMult)) : 1;
+    const effNutrition = Number.isFinite(nutritionMult) ? Math.max(0.7, Math.min(1.1, nutritionMult)) : 1;
+    const effOutside = Number.isFinite(outsideMult) ? Math.max(0.55, Math.min(1, outsideMult)) : 1;
     const effAcwr = Math.max(0.6, Math.min(1.1, acwrMult));
     const effTravel = travelVolumeMult((input as any).travelMode);
     return Math.round(base * lab * effOutside * effRecovery * effNutrition * effAcwr * effTravel);
@@ -382,6 +427,13 @@ export function buildCombatPlan(input: CombatInput): CombatPlan {
   if (patternLevelMismatch) rationale.push(`Сплит ${input.patternId} не для уровня «${level}» — взят ${pattern.name}`);
   rationale.push(`Дисциплина: ${CB_RU_DISC[discipline] || discipline} · стиль ${CB_RU_STYLE[input.fightStyle as string] || input.fightStyle || 'гибрид'} · цель ${CB_RU_GOAL[goal] || goal} · ${weeks} нед · ${pattern.name} · модель ${CB_RU_MODEL[periodModelEarly] || periodModelEarly}`);
   rationale.push(styleNarrative(input.fightStyle as any, discipline as any));
+  // Э5.4: профиль энергосистем по длительности поединка (честные источники движка)
+  if (typeof input.fightMinutes === 'number' && Number.isFinite(input.fightMinutes) && input.fightMinutes > 0) {
+    try {
+      const prof = fightEnergyProfile(input.fightMinutes);
+      rationale.push(`Поединок ~${prof.minutes} мин: аэроб ${Math.round(prof.aerobic * 100)}% / АТФ-ФК ${Math.round(prof.alactic * 100)}% / гликолиз ${Math.round(prof.glycolytic * 100)}% (ЧСС ~${prof.hrPct}%, лактат ~${prof.lactate} ммоль/л) — ${prof.source}`);
+    } catch { /* no-op */ }
+  }
   if (input.sparringLoad) rationale.push(sparringSummary(input.sparringLoad));
   if (outsideMetrics) rationale.push(`Вне зала: ${outsideMetrics.weeklyLoad} load (${cbRuInterference(outsideMetrics.interference)}) → объём зала ×${outsideMetrics.volumeMultiplier}`);
   rationale.push(`Recovery ×${recoveryMult.toFixed(2)} · Nutrition ×${nutritionMult.toFixed(2)}${acwrMult !== 1 ? ` · ACWR ×${acwrMult.toFixed(2)}` : ''}${(input as any).travelMode === 'hotel' ? ' · Travel ×0.9' : ''} · Budget ${weeklyBudget}`);
@@ -394,7 +446,8 @@ export function buildCombatPlan(input: CombatInput): CombatPlan {
     const sideRu = (input as any).weakSide === 'left' ? 'левая' : 'правая';
     rationale.push(`Асимметрия: слабее ${sideRu} сторона (из диагностики) → унилатеральная добивка слабой стороне (болгарский/румынка одной/тяга одной)`);
   }
-  if (input.weightCutKg && input.weightCutKg > 0 && !wcProtocol) rationale.push(`Весогонка: −${input.weightCutKg} кг → объём ×0.85, без отказа`);
+  // P1-20: снижение ×0.85 применяется только при goal=weight_cut — rationale больше не врёт
+  if (input.weightCutKg && input.weightCutKg > 0 && !wcProtocol && goal === 'weight_cut') rationale.push(`Весогонка: −${input.weightCutKg} кг → объём ×0.85, без отказа`);
   if (wcProtocol) {
     rationale.push(`Протокол весогонки: ${wcProtocol.targetLossKg}кг за ${wcProtocol.weeksOut}нед · вода ${CB_RU_MODE[wcProtocol.waterMode] || wcProtocol.waterMode} · Na ${CB_RU_MODE[wcProtocol.sodiumMode] || wcProtocol.sodiumMode} · угли ${CB_RU_MODE[wcProtocol.carbMode] || wcProtocol.carbMode}${wcProtocol.heatSessions?' · сауна':''}`);
     const nut = weightCutNutritionForWeek(1, weeks, wcProtocol, input.bodyweight || 80, input.sex as any);
@@ -402,7 +455,15 @@ export function buildCombatPlan(input: CombatInput): CombatPlan {
     rationale.push(weightCutRehydrationNotes(wcProtocol.targetLossKg)[0]);
   }
   if (taperCfg) {
-    rationale.push(...buildTaperRationale(taperCfg, weeks));
+    // P1-32: подросткам сауна не советуется (teen-гейт запрещает манипуляции)
+    const teenForRationale = teenCombatGates(input.age).isTeen;
+    const taperLines = buildTaperRationale(taperCfg, weeks);
+    if (teenForRationale) {
+      rationale.push(...taperLines.filter(l => !/саун/i.test(l)));
+      rationale.push('Подросток 14–15: сауна/водные манипуляции в тапере исключены (teen-гейт)');
+    } else {
+      rationale.push(...taperLines);
+    }
     // P1: раздельные кривые + рекомендуемая длительность — одной строкой, калибровки не трогаем
     const recTw = recommendTaperWeeks(daysPerWeek, outsideSessions);
     const splitFw = fightWeekIndex(taperCfg.fightDate, taperCfg.startDate, weeks);
@@ -424,6 +485,14 @@ export function buildCombatPlan(input: CombatInput): CombatPlan {
   const weeksData: CombatWeek[] = [];
   // periodization model: atr_10 для >=9 нед, иначе linear; camp → camp_8; conjugate явный
   const periodModel = input.periodizationModel || (goal === 'camp' ? 'camp_8' : weeks >= 9 ? 'atr_10' : 'linear');
+  // Э1.4: карта дневникового тренда e1RM по группам (28д) — авторегуляция веса/RIR
+  const diaryTrendMap = new Map<string, number>();
+  if (Array.isArray((input as any).diaryTrendCB)) {
+    for (const t of (input as any).diaryTrendCB) {
+      if (t?.group && typeof t.changePct === 'number' && Number.isFinite(t.changePct)) diaryTrendMap.set(String(t.group), t.changePct);
+    }
+  }
+  if (diaryTrendMap.size) rationale.push('Дневник: тренд e1RM 28д по группам учтён (просадка >5% → вес −5%, RIR+1)');
   for (let w = 1; w <= weeks; w++) {
     // ATR/linear/conjugate — единый источник
     let phase: CombatPhase = phaseForCombatWeekATR(w, weeks, goal, periodModel as any) as CombatPhase;
@@ -435,6 +504,9 @@ export function buildCombatPlan(input: CombatInput): CombatPlan {
       deload = false;
       phase = 'taper';
     }
+    // P1-21: при дате боя флаг taper действителен ТОЛЬКО в окне тапера — иначе
+    // ATR-realization вне окна обещал «объём ↓ 35-55%», а среза не было
+    if (taperCfg && taper && !isTaperByFightDate(w, weeks, taperCfg)) taper = false;
     // нормализуем phase для отображения: realization → taper (совместимость), accumulation→gpp etc при linear? оставляем как есть для ATR, для linear маппим
     if (periodModel === 'linear' || periodModel === 'camp_8') {
       // linear использует gpp/power/taper/deload — уже верные
@@ -442,6 +514,7 @@ export function buildCombatPlan(input: CombatInput): CombatPlan {
     // conjugate оставляет 'conjugate'
     const condSessionsWeek = (input as any).conditioningMode !== 'off' ? conditioningSessionsForWeek(w, phase as any, goal, outsideSessions) : [];
     const sessions: CombatSession[] = [];
+    let conjLogged = false;
     for (let d = 0; d < 7; d++) {
       const slot = pattern.schedule[d];
       if (!slot || slot.kind !== 'тренировка') continue;
@@ -455,6 +528,8 @@ export function buildCombatPlan(input: CombatInput): CombatPlan {
       let pool = filterPool(poolIds, input);
       const primaryCount = effectiveCharacter === 'тяж' ? 3 : 2;
       const total = 5;
+      // P1-6: кап упражнения — единый источник (было 6 при лимите 4/5)
+      const perExCap = sessionLimitsForCombat(level, Array.isArray(input.peds) && input.peds.length > 0).perExerciseCap;
       const favSet = new Set((input.favoriteExercises || []).map(s=>s.toLowerCase()));
       let chosen = selectDiverseCB(pool, tag, total, favSet);
       // methodology ordering: compound_first/post_exhaust → tier1 first, pre_exhaust → tier2+ first (изоляция перед базой)
@@ -465,7 +540,14 @@ export function buildCombatPlan(input: CombatInput): CombatPlan {
         chosen = [...chosen].sort((a,b)=> tierForCB(a) - tierForCB(b));
       }
       if (tag === 'full_conditioning' && !chosen.some(id => id.includes('neck'))) {
-        if (!chosen.includes('neck_harness_ext')) { chosen.unshift('neck_harness_ext'); chosen.splice(total); }
+        // P0-1: вставка идёт через единый admit-гейт (teen-бан/травма/исключение/
+        // мобильность/оборудование) — раньше unshift обходил filterPool
+        const ctx = admitCtxFor(input);
+        let neckPick: string | null = 'neck_harness_ext';
+        if (typeof input.age === 'number' && Number.isFinite(input.age) && input.age <= 15) neckPick = teenNeckIsoFallback('neck_harness_ext');
+        if (neckPick && admitCombatExercise(neckPick, ctx) && !chosen.includes(neckPick)) {
+          chosen.unshift(neckPick); chosen.splice(total);
+        }
       }
       if (chosen.length < primaryCount + 1) {
         for (const id of pool) { if (chosen.length >= total) break; if (!chosen.includes(id)) chosen.push(id); }
@@ -481,27 +563,34 @@ export function buildCombatPlan(input: CombatInput): CombatPlan {
         if (!reps || (reps[0] as any)==null) reps = repsForCombat(goal, effectiveCharacter);
         let rir = rirForCombatPhase(phase as any, effectiveCharacter as any, goal);
         if (rir == null) rir = rirForCombat(goal, phase, effectiveCharacter);
+        // Э2.4: conjugate — ME/DE/RE по сессиям (единый канон combat-periodization;
+        // раньше conjugateMethodForSession был мёртв, модель меняла только фазу)
+        const conjMethod = (periodModel === 'conjugate' && !deload && !taper) ? conjugateMethodForSession(tag, w) : null;
+        if (conjMethod === 'max_effort') { reps = [1, 3]; rir = Math.min(rir, 2); }
+        else if (conjMethod === 'dynamic_effort') { reps = [3, 5]; }
+        else if (conjMethod === 'repetition_method') { reps = [8, 12]; rir = Math.min(4, rir + 1); }
+        if (conjMethod && !conjLogged) { conjLogged = true; rationale.push(`Сопряжённая ротация W${w}: сессии ME/DE/RE (макс/динамик/повторы)`); }
         let sets = effectiveCharacter === 'тяж' ? (isPrimary ? 4 : 3) : (deload || taper ? 2 : 3);
         const accentMap = accentForDiscipline(discipline as any);
         const accentKey = id.includes('neck') ? 'neck' : (id.includes('grip')||id.includes('pinch')||id.includes('wrist')) ? 'grip' : (id.includes('landmine')||id.includes('pallof')||id.includes('med_ball')||id.includes('rotation')) ? 'rotational' : tag.includes('lower')||tag.includes('full') ? 'legs' : 'push';
         const accMult = (accentMap as any)[accentKey] || 1;
-        if (accMult !== 1) sets = Math.max(2, Math.min(6, Math.round(sets * accMult)));
+        if (accMult !== 1) sets = Math.max(2, Math.min(perExCap, Math.round(sets * accMult)));
         // fightStyle: striker→rotational+plyo+contrast, grappler→neck/grip+unilateral — детально (P1-4)
         const fs = (input.fightStyle as string | undefined) || 'hybrid';
         const styleMap = accentForFightStyle(fs as any, discipline as any);
         // striker: rotational, plyo
         if (fs === 'striker') {
-          if (id.includes('landmine') || id.includes('med_ball') || id.includes('sledge') || id.includes('rotation')) sets = Math.min(6, sets + 1);
+          if (id.includes('landmine') || id.includes('med_ball') || id.includes('sledge') || id.includes('rotation')) sets = Math.min(perExCap, sets + 1);
           if (id.includes('box_jump') || id.includes('depth_jump') || id.includes('broad_jump') || id.includes('med_ball_throw') || id.includes('sledge_hammer') || id.includes('battle_rope')) {
             const m = (styleMap as any).plyo || 1;
-            if (m !== 1) sets = Math.max(2, Math.min(6, Math.round(sets * m)));
-            else sets = Math.min(6, sets + 1);
+            if (m !== 1) sets = Math.max(2, Math.min(perExCap, Math.round(sets * m)));
+            else sets = Math.min(perExCap, sets + 1);
           }
         } else if (fs === 'grappler') {
-          if (id.includes('neck') || id.includes('grip') || id.includes('wrist') || id.includes('towel') || id.includes('rope') || id.includes('pullup') || id.includes('farmer') || id.includes('fat_bar')) sets = Math.min(6, sets + 1);
+          if (id.includes('neck') || id.includes('grip') || id.includes('wrist') || id.includes('towel') || id.includes('rope') || id.includes('pullup') || id.includes('farmer') || id.includes('fat_bar')) sets = Math.min(perExCap, sets + 1);
           if (id.includes('bulgarian') || id.includes('single_leg_rdl') || id.includes('cossack') || id.includes('step_up') || id.includes('farmer')) {
             const m = (styleMap as any).unilateral || 1.15;
-            sets = Math.max(2, Math.min(6, Math.round(sets * m)));
+            sets = Math.max(2, Math.min(perExCap, Math.round(sets * m)));
           }
         }
         // весогонка + тапер: ISSN — дефицит и тапер умножаются (Helms), не min. Для делода — только wcm.
@@ -522,7 +611,7 @@ export function buildCombatPlan(input: CombatInput): CombatPlan {
         // кондиция: компенсация доп нагрузки — 1 сет если есть конди-сессии, минимум 2 (фикc P0-2)
         if (condSessionsWeek.length > 0 && sets > 2) sets = Math.max(2, sets - 1);
         if (acwrMult < 1 && sets > 2) sets = Math.max(2, Math.round(sets * acwrMult));
-        else if (acwrMult > 1 && sets < 6) sets = Math.min(6, sets + 1);
+        else if (acwrMult > 1 && sets < perExCap) sets = Math.min(perExCap, sets + 1);
         if (deload) sets = Math.max(2, Math.round(sets * 0.6));
         const gentle = gentleFactorCB(id, input.injuries as any);
         let weight = weightForCombatExercise(id, input, goal);
@@ -532,6 +621,21 @@ export function buildCombatPlan(input: CombatInput): CombatPlan {
         if (cap != null && reps[1] > cap) {
           const low = Math.min(reps[0], Math.max(5, cap - 4));
           reps = [low, cap] as any;
+        }
+        // Э2.1: недельная double progression — +2% каждые 2 недели (делод/тапер/
+        // весогонка нейтральны, кап +6% за цикл; малые снаряды шагом 0.5 кг)
+        if (weight > 0 && !deload && !taper && goal !== 'weight_cut') {
+          const progMult = Math.min(1.06, 1 + 0.02 * Math.floor((w - 1) / 2));
+          if (progMult > 1) weight = roundWeightCB(weight * progMult, weight < 20);
+        }
+        // Э1.4: дневниковая авторегуляция — просадка группы e1RM >5% снижает вес и повышает RIR
+        if (weight > 0 && !deload && !taper) {
+          const dg = combatDiaryGroupFor(id);
+          const ch = dg ? diaryTrendMap.get(dg) : undefined;
+          if (typeof ch === 'number' && ch < -5) {
+            weight = roundWeightCB(weight * 0.95, weight < 20);
+            rir = Math.min(4, rir + 1);
+          }
         }
         // ACWR / velocity корректировка (VBT per-exercise EWMA приоритетнее скаляра)
         const perLiftLoss = (input.velocityLossPerLift as Record<string,number> | undefined)?.[id];
@@ -552,6 +656,8 @@ export function buildCombatPlan(input: CombatInput): CombatPlan {
           } catch {}
         }
         const vLoss = vLossEffective ?? (input.velocityLossPct as number | undefined);
+        // P1-27: незавершённый RTP — интенсивность ограничена (RIR≥3)
+        if (input.rtpIncomplete) rir = Math.max(3, rir);
         if (input.acwr?.zone === 'dangerous') rir = Math.min(4, rir + 2);
         else if (input.acwr?.zone === 'caution') rir = Math.min(4, rir + 1);
         else if (typeof vLoss === 'number' && vLoss > 0) {
@@ -562,7 +668,8 @@ export function buildCombatPlan(input: CombatInput): CombatPlan {
             weight = Math.round(weight * wMult / 2.5) * 2.5;
           }
         }
-        const workSets = buildWorkSets(reps, sets, rir, weight, isPrimary && effectiveCharacter === 'тяж');
+        const isTopSetBase = isPrimary && effectiveCharacter === 'тяж';
+        const workSets = buildWorkSets(reps, sets, rir, weight, isTopSetBase, isTopSetBase && sets >= 3 && !deload && !taper);
         let tempo = tempoForCB(id, isPrimary, effectiveCharacter as any);
         let rest = restForCB(isPrimary, effectiveCharacter as any, id);
         // fightStyle волна: striker — ротация взрыв X-0-X-0 / grappler — хват с паузой
@@ -571,6 +678,9 @@ export function buildCombatPlan(input: CombatInput): CombatPlan {
         const isGripId = id.includes('grip') || id.includes('pinch') || id.includes('wrist') || id.includes('towel') || id.includes('rope');
         if (fsWave === 'striker' && isRot) { tempo = 'X-0-X-0'; rest = Math.max(60, rest - 15); }
         else if (fsWave === 'grappler' && isGripId) { tempo = '2-1-1-0'; rest = rest + 15; }
+        // Э2.4: conjugate-темп (DE — взрыв, ME — контроль)
+        if (conjMethod === 'dynamic_effort') tempo = 'X-0-X-0';
+        else if (conjMethod === 'max_effort') tempo = '2-0-X-0';
         const wcPhaseLocal = wcProtocol ? weightCutPhaseForWeek(w, weeks, wcProtocol) : null;
         const wcComment = wcPhaseLocal==='fight_week' ? 'Fight week: вода 2л/Na1.5г/угли 1г/кг → взвешивание → рефид 8г/кг + 150% воды (контроль ЖКТ)' : wcPhaseLocal==='taper' ? 'Весогонка тапер: угли 1г/кг, вода 8л (load) → слив' : null;
         const ex: CombatExercise = {
@@ -585,13 +695,14 @@ export function buildCombatPlan(input: CombatInput): CombatPlan {
           rir,
           weight,
           workSets: workSets.map(s=> ({...s, tempo, restSeconds: rest})),
-          warmupSets: isPrimary && weight > 20 ? [{ reps: 8, rir: 5, weight: Math.round(weight * 0.5 / 2.5) * 2.5, tempo, restSeconds: 60 }] : [],
+          warmupSets: isPrimary ? buildWarmupLadder(weight, tempo) : [],
           tempo,
           restSeconds: rest,
           comment: (conflict && isLegOrPlyo) ? 'Снижена интенсивность: завтра высокая внезальная' : wcComment ? wcComment : deload ? 'Делод' : taper ? 'Тапер к бою: объём ↓ 35-55%, интенсивность 90-95%, спарринг ↓' : gentle < 1 ? 'Щадящий: снижен вес, +RIR' : (meta as any).technique || undefined,
         };
         exercises.push(ex);
       }
+      if (exercises.length === 0) continue; // P0: полностью отфильтрованная сессия не попадает в план
       sessions.push({ day: d + 1, week: w, sessionTag: tag, character: deload ? 'лёг' : (effectiveCharacter as any), exercises, durationMin: exercises.length * 10 + 10 });
     }
     sessions.sort((a, b) => a.day - b.day);
@@ -613,29 +724,43 @@ export function buildCombatPlan(input: CombatInput): CombatPlan {
         else if (needLat) prog = corePlans.find((p:any)=> p.function==='anti_lateral') || corePlans[2];
         else prog = corePlans[0];
         // кабель-фильтр: если нет кабеля, заменяем pallof на deadbug
+        const coreAdmitCtx = admitCtxFor(input);
         let coreId: string = prog.exercises[0];
         if (!hasCable && coreId==='pallof_rotation_press') { coreId = 'deadbug'; prog = corePlans.find((p:any)=> p.function==='anti_extension') || prog; }
-        const coreMeta = getExerciseMeta(coreId) || { name: coreId, group: 'core', pattern: prog.function || 'anti_extension' };
-        const isHold = prog.reps.includes('с') || prog.reps.includes('с/'); // планка
-        const repsNum = isHold ? 1 : parseInt(prog.reps) || 8;
-        const coreEx: any = {
-          id: coreId,
-          name: coreMeta.name,
-          group: 'core',
-          pattern: coreMeta.pattern,
-          role: 'accessory',
-          character: 'памп',
-          sets: prog.sets,
-          reps: prog.reps,
-          rir: 3,
-          weight: 0,
-          workSets: Array.from({length: prog.sets}, ()=> ({ reps: repsNum, rir:3, weight: 0, tempo: '2-1-1-0', restSeconds: prog.rest })),
-          tempo: '2-1-1-0',
-          restSeconds: prog.rest,
-          comment: `Core Boxing Science: ${prog.function} L${prog.level} (${prog.cue}) — авто`,
-        };
-        target.exercises.push(coreEx);
-        target.durationMin = (target.durationMin||0)+6;
+        // P0-3: авто-core проходит единый admit-гейт (травма спины/исключение/
+        // мобильность) — при блокировке ищем допустимую альтернативу, иначе не добавляем
+        if (!admitCombatExercise(coreId, coreAdmitCtx)) {
+          const alt = corePlans.find((p:any)=> (p.exercises||[]).some((x:string)=> admitCombatExercise(x, coreAdmitCtx)));
+          if (alt) {
+            prog = alt;
+            coreId = (alt.exercises as string[]).find((x:string)=> admitCombatExercise(x, coreAdmitCtx)) || coreId;
+          }
+        }
+        if (admitCombatExercise(coreId, coreAdmitCtx)) {
+          const coreMeta = getExerciseMeta(coreId) || { name: coreId, group: 'core', pattern: prog.function || 'anti_extension' };
+          const coreHoldSec = parseHoldSeconds(prog.reps);
+          const isHold = coreHoldSec != null;
+          const repsNum = isHold ? 1 : parseInt(prog.reps) || 8;
+          const coreEx: any = {
+            id: coreId,
+            name: coreMeta.name,
+            group: 'core',
+            pattern: coreMeta.pattern,
+            role: 'accessory',
+            character: 'памп',
+            sets: prog.sets,
+            reps: prog.reps,
+            rir: 3,
+            weight: 0,
+            holdSeconds: coreHoldSec ?? undefined,
+            workSets: Array.from({length: prog.sets}, ()=> ({ reps: repsNum, rir:3, weight: 0, tempo: '2-1-1-0', restSeconds: prog.rest, ...(coreHoldSec != null ? { holdSeconds: coreHoldSec } : {}) })),
+            tempo: '2-1-1-0',
+            restSeconds: prog.rest,
+            comment: `Core Boxing Science: ${prog.function} L${prog.level} (${prog.cue}) — авто`,
+          };
+          target.exercises.push(coreEx);
+          target.durationMin = (target.durationMin||0)+6;
+        }
       }
     }
     // P0-3 Neck 2.0 auto — Collins + BJSM Delphi 4 плоскости, как core (если не делод/тапер и <4 сетов шеи или missing plane)
@@ -647,7 +772,11 @@ export function buildCombatPlan(input: CombatInput): CombatPlan {
     const hasRot = neckIds.some(id=> ['neck_rotation','neck_harness_rotation','neck_band_rotation_isometric'].includes(id));
     const neckNeed = neckSets < 4 || !hasFlex || !hasExt || !hasLat || !hasRot;
     if (neckNeed && !deload && !taper) {
-      const targetNeck = sessions.find(s=> s.sessionTag.includes('neck_grip') || s.sessionTag.includes('full_conditioning') || s.sessionTag.includes('upper_power')) || sessions[0];
+      // P1-31: предпочитаем выделенную шея-сессию, затем кондицию, затем верх
+      const targetNeck = sessions.find(s=> s.sessionTag.includes('neck_grip'))
+        || sessions.find(s=> s.sessionTag.includes('full_conditioning'))
+        || sessions.find(s=> s.sessionTag.includes('upper_power'))
+        || sessions[0];
       if (targetNeck && targetNeck.exercises.length < 8 && targetNeck.exercises.reduce((a,e)=>a+e.sets,0) < 22) {
         // №4: override уровня шеи из диагностики (1–4) важнее автовыбора; teen — только изометрия
         const ovr = (input as any).neckLevelOverride;
@@ -656,24 +785,49 @@ export function buildCombatPlan(input: CombatInput): CombatPlan {
           ? (() => { try { return neckProgressionFor(ovrLvl).exercises; } catch { return neckWeeklyPlan(level, w, phase); } })()
           : neckWeeklyPlan(level, w, phase);
         if (ovrLvl != null) rationale.push(`Шея: уровень L${ovrLvl} из диагностики (override автовыбора)`);
-        // выбираем первую missing плоскость
-        let pick: string | null = null;
-        if (!hasFlex) pick = neckPlan.find(e=> ['neck_flexion','neck_isometric_front','neck_eccentric_flexion'].includes(e.id))?.id || 'neck_isometric_front';
-        else if (!hasExt) pick = neckPlan.find(e=> ['neck_harness_ext','neck_isometric_back'].includes(e.id))?.id || 'neck_harness_ext';
-        else if (!hasLat) pick = 'neck_isometric_side';
-        else if (!hasRot) pick = 'neck_band_rotation_isometric';
-        else pick = neckPlan[0]?.id || 'neck_isometric_front';
-        // №4: teen-фолбэк — авто-добавка шла мимо filterPool и могла дать banned-динамику
-        if (pick && teenCombatGates(input.age).isTeen) {
-          const fb = teenNeckIsoFallback(pick);
-          if (fb !== pick) { rationale.push(`Шея teen: динамика ${pick} → изометрия ${fb}`); pick = fb; }
+        // P1-31: добиваем ВСЕ missing плоскости, а не одну за неделю (финализатор
+        // потом вечно предупреждал о неполной мультипланарности), в пределах лимитов сессии
+        const neckAdmitCtx = admitCtxFor(input);
+        const isTeenNeck = teenCombatGates(input.age).isTeen;
+        const pickForPlane = (has: boolean, ids: string[], fallback: string): string | null => {
+          if (has) return null;
+          return neckPlan.find(e => ids.includes(e.id))?.id || fallback;
+        };
+        const planeCandidates: (string | null)[] = [
+          pickForPlane(hasFlex, ['neck_flexion', 'neck_isometric_front', 'neck_eccentric_flexion'], 'neck_isometric_front'),
+          pickForPlane(hasExt, ['neck_harness_ext', 'neck_isometric_back'], 'neck_harness_ext'),
+          hasLat ? null : 'neck_isometric_side',
+          hasRot ? null : 'neck_band_rotation_isometric',
+        ];
+        const planePicks: string[] = [];
+        for (let cand of planeCandidates) {
+          if (!cand) continue;
+          if (isTeenNeck) {
+            const fb = teenNeckIsoFallback(cand);
+            if (fb !== cand) { rationale.push(`Шея teen: динамика ${cand} → изометрия ${fb}`); cand = fb; }
+          }
+          if (!admitCombatExercise(cand, neckAdmitCtx)) {
+            const isoAlts = ['neck_isometric_front', 'neck_isometric_back', 'neck_isometric_side', 'neck_band_rotation_isometric'];
+            cand = isoAlts.find(x => admitCombatExercise(x, neckAdmitCtx) && !targetNeck.exercises.some(e => e.id === x)) || null;
+          }
+          if (!cand || targetNeck.exercises.some(e => e.id === cand)) continue;
+          planePicks.push(cand);
         }
-        if (pick && !targetNeck.exercises.some(e=> e.id===pick)) {
-          const nm = getExerciseMeta(pick) || { name: pick, group: 'neck', pattern: 'isolation' };
+        // все плоскости уже есть, но объём шеи < MEV — добираем упражнение из плана
+        if (!planePicks.length && neckSets < 4) {
+          const topUp = neckPlan[0]?.id;
+          if (topUp && admitCombatExercise(topUp, neckAdmitCtx) && !targetNeck.exercises.some(e => e.id === topUp)) planePicks.push(topUp);
+        }
+        for (const pick of planePicks) {
           const neckProg = neckPlan.find(p=> p.id===pick);
           const setsN = neckProg ? neckProg.sets : 2;
+          const roomSets = targetNeck.exercises.reduce((a, e) => a + e.sets, 0);
+          // P1-31: не превышаем лимиты сессии (было: сеты добавляемого не учитывались → 23 > 22)
+          if (targetNeck.exercises.length >= 8 || roomSets + setsN > 22) break;
+          const nm = getExerciseMeta(pick) || { name: pick, group: 'neck', pattern: 'isolation' };
           const repsN = neckProg ? neckProg.reps : '15с/стор';
-          const isHoldN = repsN.includes('с');
+          const neckHoldSec = parseHoldSeconds(repsN);
+          const isHoldN = neckHoldSec != null;
           const repsNumN = isHoldN ? 1 : parseInt(repsN) || 12;
           targetNeck.exercises.push({
             id: pick,
@@ -686,7 +840,8 @@ export function buildCombatPlan(input: CombatInput): CombatPlan {
             reps: repsN,
             rir: 3,
             weight: 0,
-            workSets: Array.from({length: setsN}, ()=> ({ reps: repsNumN, rir:3, weight: 0, tempo: '2-1-1-0', restSeconds: 60 })),
+            holdSeconds: neckHoldSec ?? undefined,
+            workSets: Array.from({length: setsN}, ()=> ({ reps: repsNumN, rir:3, weight: 0, tempo: '2-1-1-0', restSeconds: 60, ...(neckHoldSec != null ? { holdSeconds: neckHoldSec } : {}) })),
             tempo: '2-1-1-0',
             restSeconds: 60,
             comment: `Шея Collins 2.0: ${pick} — авто 4 плоскости (Iron Neck ${hasFlex?'':'flex '} ${hasExt?'':'ext '} ${hasLat?'':'lat '} ${hasRot?'':'rot '})`,
@@ -855,6 +1010,11 @@ export function buildCombatPlan(input: CombatInput): CombatPlan {
       if (input.weightCutKg && input.weightCutKg > 0 && !manip) warnings.push('Подросток: любая сгонка — только gradual под врачом, без RWL (Frontiers 2025: RWL запрещён <18)');
     }
     const conc = concussionProtocol(input.concussionHistory);
+    // P1-27: RTP-гейт — начатый и не завершённый протокол возврата блокирует hard spar
+    if (input.rtpIncomplete) {
+      if (hardSpar > 0) errors.push('RTP не завершён — hard spar запрещён до прохождения всех ступеней возврата');
+      warnings.push('RTP не завершён: интенсивность ограничена RIR≥3, hard spar снят (покой→аэробка→тех→контакт→полный)');
+    }
     if (conc.stage === 'blocked') {
       errors.push(`Сотрясения ×${Math.round(input.concussionHistory || 0)} за 12 мес — сборка заблокирована до врача (return-протокол: покой → аэробка → тех-работа → спарринг)`);
     } else if (conc.stage === 'limited' && hardSpar > conc.maxHardSpar) {
@@ -883,9 +1043,12 @@ export function buildCombatPlan(input: CombatInput): CombatPlan {
     });
     const hasExclude = Array.isArray(input.injuries) && input.injuries.some(isExcludeInjuryCB);
     const hasDeloadWeek = weeksData.some(w => w.deload);
+    // P1-1: делод-недели СНИМАЮТ hard spar по дизайну (taper-split), а не блокируют
+    // весь план — раньше любой план ≥5 нед с делодом был «ошибкой» на hard spar
+    if (hardSpar > 0 && hasDeloadWeek) warnings.push('Hard spar не ставится в делод-недели — там только technical/дриллинг (авто)');
     for (const e of sparringSafetyErrors(hardSpar, {
-      isFightWeek: false, // см. P1 taper-split гейт выше
-      isDeloadWeek: hasDeloadWeek,
+      isFightWeek: false, // fight-week покрыт отдельным taper-гейтом ниже (taper-split)
+      isDeloadWeek: false, // см. P1-1: делод снимает sparring, а не блокирует
       isTaperWeek: false,
       acwrZone: input.acwr?.zone ?? null,
       hrvGrade: (input as any).hrvGrade ?? null,
@@ -1003,8 +1166,10 @@ export function combatPlanId(input: any): string {
     sex: input?.sex,
     age: input?.age,
     fightStyle: input?.fightStyle || null,
-    cycleId: input?.cycleId || null,
+    // P1-23: workMaxByExercise входил в план, но не в id — разные точные веса
+    // получали один id и затирали друг друга в истории
     workMax: input?.workMax || null,
+    workMaxByExercise: input?.workMaxByExercise || null,
     equipment: input?.equipment || null,
   };
   return `cb_${fnv1a(JSON.stringify(stable))}`;
@@ -1033,6 +1198,10 @@ export function validateCombatPlan(plan: CombatPlan): { ok: boolean; warnings: s
     }
   }
   for (const e of validateSyncCombat(plan)) warnings.push(e);
+  // Сохранённые warnings/errors переносим: они рождаются входными гейтами сборки
+  // (мед-блок, границы категории, делод-спарринг и т.п.) и структурно не
+  // пересчитываются. Свежесть обеспечивается ре-сборкой (build) — правки
+  // упражнений входные гейты не отменяют. Наборы дедуплицируются (Set ниже).
   const saved = plan.validation?.warnings || [];
   for (const w of saved) if (!warnings.includes(w)) warnings.push(w);
   const savedErr = plan.validation?.errors || [];

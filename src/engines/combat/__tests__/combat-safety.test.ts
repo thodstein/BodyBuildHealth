@@ -148,8 +148,11 @@ describe('combat P3 builder wiring', () => {
   it('hard spar в делод/ACWR-dangerous/HRV-dangerous/exclude — error', () => {
     const spar = { hardSparSessions: 1, techSparSessions: 1, wrestlingSessions: 0 } as any;
     const deload = buildCombatPlan({ discipline: 'mma', goal: 'power', level: 'intermediate', weeks: 8, daysPerWeek: 3, sparringLoad: spar } as any);
-    // 8нед linear: нед 4 делод → gate ловит
-    expect(validateCombatPlan(deload).errors.some(e => e.includes('делод'))).toBe(true);
+    // было→стало (P1-1): делод-недели СНИМАЮТ hard spar по дизайну (taper-split) —
+    // это warning, а не блок всего плана (раньше любой план ≥5 нед с делодом был «error»)
+    const deloadVal = validateCombatPlan(deload);
+    expect(deloadVal.errors.some(e => e.includes('делод'))).toBe(false);
+    expect(deloadVal.warnings.some(w => w.includes('делод'))).toBe(true);
     const acwr = buildCombatPlan({ discipline: 'mma', goal: 'power', level: 'intermediate', weeks: 4, daysPerWeek: 3, sparringLoad: spar, acwr: { ratio: 1.7, zone: 'dangerous' } } as any);
     expect(validateCombatPlan(acwr).errors.some(e => e.includes('ACWR dangerous'))).toBe(true);
     const excl = buildCombatPlan({ discipline: 'mma', goal: 'power', level: 'intermediate', weeks: 4, daysPerWeek: 3, sparringLoad: spar, injuries: [{ location: 'shoulder', exclude: true }] } as any);

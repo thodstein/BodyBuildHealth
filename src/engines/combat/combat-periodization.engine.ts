@@ -90,7 +90,8 @@ export function phaseForCombatWeekATR(
   // weight_cut — особый: taper всегда последние 2 нед
   if (goal === 'weight_cut') {
     if (w === totalWeeks) return 'deload';
-    if (w >= totalWeeks - 1) return 'taper';
+    // P1-2: тапер только при ≥3 неделях — на 2-недельном плане не было рабочих фаз
+    if (totalWeeks >= 3 && w >= totalWeeks - 1) return 'taper';
     if (w <= Math.round(totalWeeks * 0.4)) return 'gpp';
     return 'power';
   }
@@ -159,12 +160,11 @@ export function repsForCombatPhase(phase: CombatPhase, character: 'тяж' | 'п
     if (character === 'тяж') return [1, 3]; // max effort
     return [8, 12];
   }
+  // Э2.3: у делода собственный профиль (было: фолбэк [5,8] для всех характеров)
+  if (phase === 'deload') return character === 'тяж' ? [5, 8] : [10, 15];
   if (goal === 'weight_cut') return character === 'тяж' ? [5, 8] : [10, 15];
   if (phase === 'accumulation' || phase === 'gpp') return character === 'тяж' ? [6, 10] : [12, 20];
   if (phase === 'transmutation' || phase === 'power') return character === 'тяж' ? [3, 6] : [8, 12];
   if (phase === 'realization' || phase === 'taper') return character === 'тяж' ? [3, 5] : [8, 12];
   return [5, 8];
 }
-
-// Для старых вызовов — совместимый алиас
-export const phaseForCombatWeekNew = phaseForCombatWeekATR;

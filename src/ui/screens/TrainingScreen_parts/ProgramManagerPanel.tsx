@@ -123,8 +123,8 @@ function timeAgo(iso?: string): string {
   return `${Math.floor(mo / 12)} г назад`;
 }
 
-const DIR_COLOR: Record<string, string> = { bb: '#00e68a', pl: '#a78bfa', hybrid: '#3b82f6', arm: '#f59e0b' };
-const DIR_LABEL: Record<string, string> = { bb: 'ББ', pl: 'ПЛ', hybrid: 'Hybrid', arm: 'АРМ' };
+const DIR_COLOR: Record<string, string> = { bb: '#00e68a', pl: '#a78bfa', hybrid: '#3b82f6', arm: '#f59e0b', combat: '#f97316' };
+const DIR_LABEL: Record<string, string> = { bb: 'ББ', pl: 'ПЛ', hybrid: 'Hybrid', arm: 'АРМ', combat: 'ЕДИНОБОРСТВА' };
 const SOURCE_LABEL: Record<string, string> = {
   custom: 'своя', cloned_library: 'из библиотеки', cloned_cycle: 'клон цикла', from_build: 'из сборки',
 };
@@ -1259,7 +1259,7 @@ export const ProgramManagerPanel: React.FC = () => {
           return (
             <div key={p.meta.id} className="manual-prog-row" data-dir={p.meta.direction} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', marginBottom: 8, borderRadius: 14, background: `linear-gradient(135deg, ${dc}14, rgba(24,24,27,0.6))`, border: `1px solid ${dc}30`, boxShadow: '0 2px 10px rgba(0,0,0,0.15)' }}>
               <div className="manual-prog-ico" style={{ width: 42, height: 42, borderRadius: 12, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 19, background: dc + '1a', border: '1px solid ' + dc + '45', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.08)' }}>
-                 {p.meta.direction === 'bb' ? '💪' : p.meta.direction === 'pl' ? '🏆' : p.meta.direction === 'arm' ? '🦾' : '⚡'}
+                 {p.meta.direction === 'bb' ? '💪' : p.meta.direction === 'pl' ? '🏆' : p.meta.direction === 'arm' ? '🦾' : p.meta.direction === 'combat' ? '🥊' : '⚡'}
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}><div style={{ fontSize: 13, fontWeight: 800, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flex: 1 }}>{p.meta.title}</div>{(() => { try { const q=computePlanQualityFor(p, p.meta.level); const col=q.score>=75?'#22c55e':q.score>=50?'#f59e0b':'#ef4444'; return <span style={{ fontSize: 10, fontWeight: 800, color: col, background: col+'14', border:`1px solid ${col}30`, borderRadius: 20, padding:'2px 6px', whiteSpace:'nowrap' }}>{q.score} {q.grade}</span>; } catch { return null; }})()}</div>

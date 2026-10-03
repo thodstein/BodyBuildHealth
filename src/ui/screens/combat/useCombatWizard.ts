@@ -7,7 +7,9 @@ import { useState, useMemo, useEffect } from 'react';
 import type { CombatInput, CombatPlan } from '../../../engines/combat/combat.types';
 import type { OutsideLoad } from '../../../engines/outside-load.engine';
 import { defaultOutsideLoadFor, computeOutsideMetrics } from '../../../engines/outside-load.engine';
+import { localIsoDate } from '../../../core/local-date';
 import { combatACWR, combatACWRHonest, combatHrvReport, combatHrvReportWithSource } from '../../../engines/combat/combat-monitoring.engine';
+import { sparringToOutsideLoad, normalizeSparringLoad } from '../../../engines/combat/combat-sparring.engine';
 import { loadAnnualCB } from '../../../engines/combat/combat-annual';
 import type { AnnualCB } from '../../../engines/combat/combat-annual';
 
@@ -41,6 +43,8 @@ export function useCombatWizard() {
   const [sparringTech, setSparringTech] = useState(2);
   const [sparringWrest, setSparringWrest] = useState(1);
   const [sparringEnabled, setSparringEnabled] = useState(false);
+  /** Э1.1: средняя длительность из журнала спарринга (кнопка «Из журнала»). */
+  const [sparringAvgDur, setSparringAvgDur] = useState<number | null>(null);
   const [fightStyle, setFightStyle] = useState<'striker'|'grappler'|'hybrid'>('hybrid');
   const [avoidAxialLoad, setAvoidAxialLoad] = useState(false);
   const [equipment, setEquipment] = useState<string[]>([]);
@@ -52,8 +56,10 @@ export function useCombatWizard() {
   const [sex, setSex] = useState<'male'|'female'>('male');
   const [age, setAge] = useState(28);
   const [fightDate, setFightDate] = useState('');
+  /** Э5.4: длительность поединка (мин) — энергопрофиль в rationale/интелидже. */
+  const [fightMinutes, setFightMinutes] = useState(0);
   const [taperWeeks, setTaperWeeks] = useState(2);
-  const [startDate, setStartDate] = useState(() => new Date().toISOString().slice(0,10));
+  const [startDate, setStartDate] = useState(() => localIsoDate());
   const [acwr, setAcwr] = useState<{ ratio:number; zone:string; method?: 'ewma_uncoupled' | 'ra_coupled'; shortHistory?: boolean }|null>(null);
   // VBT из визарда убран (решение 2026-09-27): velocityLoss/vbtBest/vbtLast/
   // vbtPerLift/vbtHistory больше не пишутся в план. Движки и старые планы
@@ -89,20 +95,40 @@ export function useCombatWizard() {
   const [weightClassRuleset, setWeightClassRuleset] = useState('');
   const [travelMode, setTravelMode] = useState<'off' | 'hotel'>('off');
   const [lutealPhase, setLutealPhase] = useState(false);
+  /** P1-29: интенсивность курса для PED-адаптации (auto = без надбавки интенсивности). */
+  const [courseIntensity, setCourseIntensity] = useState<'auto' | 'mild' | 'moderate' | 'heavy'>('auto');
 
-  const outsideMetrics = useMemo(() => computeOutsideMetrics(outsideEnabled ? outside : null), [outside, outsideEnabled]);
+  // P1-13: в режиме спарринга метрики считаются от спарринга (раньше показывали
+  // outside, а план строился от sparringLoad — «показано ≠ план»)
+  const outsideMetrics = useMemo(() => {
+    if (!outsideEnabled) return computeOutsideMetrics(null);
+    if (sparringEnabled) {
+      const sl = normalizeSparringLoad({ hardSparSessions: sparringHard, techSparSessions: sparringTech, wrestlingSessions: sparringWrest });
+      return computeOutsideMetrics(sparringToOutsideLoad(sl, discipline));
+    }
+    return computeOutsideMetrics(outside);
+  }, [outside, outsideEnabled, sparringEnabled, sparringHard, sparringTech, sparringWrest, discipline]);
 
   useEffect(() => {
     try {
       const raw = localStorage.getItem('he_srpe_sessions') || localStorage.getItem('he_training_log') || '[]';
       const arr = JSON.parse(raw);
       if (Array.isArray(arr) && arr.length) {
-        const week = arr.slice(-7).reduce((a:any, s:any)=> a + (s.load || s.sRPE || s.rpe || 0), 0);
+        // P1-14: канон AU = sRPE × минуты (s.load уже AU); раньше суммировались
+        // голые RPE-баллы — ACWR и «нагрузка 7д» были на неверной шкале
+        const sessionAU = (s: any) => {
+          const load = Number(s?.load);
+          if (Number.isFinite(load) && load > 0) return load;
+          const rpe = Number(s?.sRPE ?? s?.rpe);
+          const dur = Number(s?.durationMin);
+          return Number.isFinite(rpe) && Number.isFinite(dur) && rpe > 0 && dur > 0 ? rpe * dur : 0;
+        };
+        const week = arr.slice(-7).reduce((a:any, s:any)=> a + sessionAU(s), 0);
         setDiaryLoad(week);
         try{
           // P6: честный ACWR — EWMA-uncoupled при ≥14д, иначе RA-coupled с пометкой (одна шкала sRPE×мин)
           const daily: Record<string, number> = {};
-          for(const s of arr){ const d=(s.date||'').slice(0,10); if(d) daily[d]=(daily[d]||0)+(s.load||s.sRPE||s.rpe||0); }
+          for(const s of arr){ const d=(s.date||'').slice(0,10); if(d) daily[d]=(daily[d]||0)+sessionAU(s); }
           const vals = Object.values(daily).slice(-28);
           if(vals.length>=7){
             const h = combatACWRHonest(vals);
@@ -134,10 +160,12 @@ export function useCombatWizard() {
     methodology, setMethodology, dupMode, setDupMode, intensityTech, setIntensityTech,
     periodizationModel, setPeriodizationModel, conditioningMode, setConditioningMode,
     outside, setOutside, outsideEnabled, setOutsideEnabled, sparringHard, setSparringHard, sparringTech, setSparringTech, sparringWrest, setSparringWrest, sparringEnabled, setSparringEnabled,
+    sparringAvgDur, setSparringAvgDur,
     fightStyle, setFightStyle, avoidAxialLoad, setAvoidAxialLoad,
     equipment, setEquipment, mobility, setMobility, injuries, setInjuries, injInput, setInjInput, injExclude, setInjExclude,
     bodyweight, setBodyweight, sex, setSex, age, setAge,
     fightDate, setFightDate, taperWeeks, setTaperWeeks, startDate, setStartDate,
+    fightMinutes, setFightMinutes,
     acwr, setAcwr, hrvLine, setHrvLine,
     patternId, setPatternId,
     workMax, setWorkMax, workMaxByExercise, setWorkMaxByExercise, showExactWM, setShowExactWM,
@@ -146,6 +174,7 @@ export function useCombatWizard() {
     concussionHistory, setConcussionHistory, neckExtensionKg, setNeckExtensionKg, neckFlexExtRatio, setNeckFlexExtRatio,
     neckLevelOverride, setNeckLevelOverride, weakSide, setWeakSide,
     weightClass, setWeightClass, weightClassLimitKg, setWeightClassLimitKg, weightClassRuleset, setWeightClassRuleset, travelMode, setTravelMode, lutealPhase, setLutealPhase,
+    courseIntensity, setCourseIntensity,
     outsideMetrics,
   };
 }
