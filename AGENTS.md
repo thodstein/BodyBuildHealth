@@ -72,10 +72,11 @@ Edit/Write + vitest/tsc; чужие WIP (combat/meal-plan/ProgramEditor) не т
   (≥1 рабочая неделя до taper), профиль берётся С КОНЦА (`profileShift = 3 − taperLen`) — глубокая
   ×0.50 всегда последняя неделя перед делодом. 8-нед планы — без изменений (окно 3 нед).
 - **Re-baseline (осознанно, «было→стало»)**: `bb-rep-schemes` — `dc_rp` sets 4→1 (workSets 4→1).
-- **NEW тест** `bb-dc-phase-taper` 6/6: accumulation 0 DC-1-сетов; intensification все primary
+- **NEW тест** `bb-dc-phase-taper` 7/7: accumulation 0 DC-1-сетов; intensification все primary
   DC+1 сет; натурал без DC; выборка сплитов (ppl/fullbody/bro/upper_lower/arnold/phul) — DC только
-  в intensification; `fullbody_3/4` — taper < рабочих недель, W1 не taper; 8-нед taper = 3 нед
-  с углублением к концу. Матрица всех 25 сплитов проверена пробой (0 утечек) — zz удалена.
+  в intensification; все 5 целей — DC только intensification, cluster только peaking;
+  `fullbody_3/4` — taper < рабочих недель, W1 не taper; 8-нед taper = 3 нед с углублением к концу.
+  Матрица всех 25 сплитов × все цели × 3 уровня проверена пробой (0 утечек) — zz удалены.
 - **Проверено**: `src/engines/bb` **2956/0** (268 файлов, включая zz; без zz — 2956 база + 5 новых),
   тяжёлый аудит `BB_CYCLE_AUDIT_FULL=1` **24/24**, `tsc --noEmit` **0**, `git diff --check` чист.
   zz-проба удалена до коммита.

@@ -94,6 +94,20 @@ describe('BB-auto: DC Rest-Pause — фаз-гейт (аудит 2026-10)', () =
       }
     }
   });
+
+  it('все цели: DC только intensification, cluster только peaking', () => {
+    for (const goal of ['mass', 'cut', 'recomp', 'maintenance', 'strength_mass']) {
+      const plan: any = buildBBPlan({
+        patternId: 'upper_lower_6', weeks: 12, level: 'enhanced', trainingYears: 9, goal,
+        workMax: WM, sex: 'male',
+        peds: ['AAS', 'GH', 'insulin'], pedDoses: { AAS: 500, GH: 4, insulin: 10 }, courseIntensity: 'moderate',
+      } as never);
+      for (const w of plan.weeks) for (const s of w.sessions) for (const e of s.exercises) {
+        if (isDc(e)) expect(w.phase, `${goal}: DC W${w.week} phase=${w.phase}`).toBe('intensification');
+        if (/Кластер/i.test(String(e.comment || ''))) expect(w.phase, `${goal}: cluster W${w.week} phase=${w.phase}`).toBe('peaking');
+      }
+    }
+  });
 });
 
 describe('BB-auto: taper коротких планов (аудит 2026-10)', () => {
