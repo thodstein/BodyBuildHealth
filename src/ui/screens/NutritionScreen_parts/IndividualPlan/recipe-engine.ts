@@ -147,6 +147,28 @@ export function decomposeRecipe(recipe: Recipe): MealItem[] {
   return scaleToRecipeKcal(items, recipe);
 }
 
+/**
+ * Честность «шапка рецепта ↔ декомпозиция» (план единого источника, остаток):
+ * декомпозиция (ingredientIds × portions → FOOD_DB) — это то, что реально съедается;
+ * шапка (recipe.protein/fat/carbs) — авторская заявка. Возвращает фактические Б/Ж/У
+ * раскладки и максимальное отклонение от шапки (%). Если расхождение >3% — шапка врёт.
+ */
+export function recipeDecompositionFacts(recipe: Recipe): { p: number; f: number; c: number; kcal: number } {
+  const items = decomposeRecipe(recipe);
+  const p = Math.round(items.reduce((s, i) => s + i.p, 0) * 10) / 10;
+  const f = Math.round(items.reduce((s, i) => s + i.f, 0) * 10) / 10;
+  const c = Math.round(items.reduce((s, i) => s + i.c, 0) * 10) / 10;
+  return { p, f, c, kcal: Math.round(4 * p + 9 * f + 4 * c) };
+}
+
+/** Максимальное относительное расхождение шапки рецепта и декомпозиции (%). */
+export function recipeDecompositionDeviationPct(recipe: Recipe): number {
+  if (!recipe.ingredientIds || recipe.ingredientIds.length === 0) return 0;
+  const d = recipeDecompositionFacts(recipe);
+  const dev = (a: number, b: number): number => (b > 0 ? Math.abs(a - b) / b * 100 : 0);
+  return Math.round(Math.max(dev(d.p, recipe.protein), dev(d.f, recipe.fat), dev(d.c, recipe.carbs)) * 10) / 10;
+}
+
 function scaleToRecipeKcal(items: MealItem[], recipe: Recipe): MealItem[] {
   if (items.length === 0) return items;
   const currentKcal = items.reduce((s, i) => s + i.kcal, 0);

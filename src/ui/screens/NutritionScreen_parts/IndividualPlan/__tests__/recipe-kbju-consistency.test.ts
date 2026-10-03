@@ -6,6 +6,7 @@ import { RECIPE_DB_P28 } from '../../../../../data/recipe-db-p28';
 import { RECIPE_DB_P29 } from '../../../../../data/recipe-db-p29';
 import { FOOD_DB } from '../../../../../core/nutrition-database';
 import { kbjuFormulaDeviationPct } from '../planner-recipe-mode';
+import { recipeDecompositionDeviationPct, recipeDecompositionFacts } from '../recipe-engine';
 
 /**
  * C-требование «Разночтение КБЖУ ≤3%»: kcal рецепта = 4Б + 4У + 9Ж (±3%).
@@ -65,5 +66,34 @@ describe('КБЖУ-консистентность RECIPE_DB (≤3%)', () => {
     expect(all.length).toBeGreaterThanOrEqual(148);
     const names = new Set(all.map(r => r.name));
     expect(names.size).toBe(all.length);
+  });
+});
+
+/**
+ * Честность «шапка рецепта ↔ декомпозиция» (остаток плана единого источника).
+ * Декомпозиция (ingredientIds × portions) — это фактически съедаемые Б/Ж/У; шапка —
+ * авторская заявка. Замер: 953 из 994 рецептов с ingredientIds расходятся >3%
+ * (топ-оффендеры: жир ×2.9–3.9 от шапки). Это унаследованный дефект данных:
+ * шапки не пересчитываются из раскладки (нормализуется только kcal из шапки).
+ * Лок — ПОТОЛОК: расхождение не должно РАСТИ (новые рецепты — писать порции под шапку).
+ * Полная синхронизация шапки из декомпозиции = отдельная сессия (меняет числа планов).
+ */
+describe('Рецепт: шапка vs декомпозиция (baseline-ceiling)', () => {
+  const BASELINE_BAD = 953;
+
+  it('helper: рецепт без ingredientIds → 0; facts совпадают с декомпозицией', () => {
+    const noIds = { ...RECIPE_DB[0], ingredientIds: undefined } as any;
+    expect(recipeDecompositionDeviationPct(noIds)).toBe(0);
+    const withIds = RECIPE_DB.find(r => r.ingredientIds && r.ingredientIds.length > 0)!;
+    const facts = recipeDecompositionFacts(withIds);
+    expect(Number.isFinite(facts.p) && Number.isFinite(facts.f) && Number.isFinite(facts.c)).toBe(true);
+    expect(facts.kcal).toBe(Math.round(4 * facts.p + 9 * facts.f + 4 * facts.c));
+  });
+
+  it('число рецептов с расхождением >3% не превышает baseline (не растёт)', () => {
+    const withIds = RECIPE_DB.filter(r => r.ingredientIds && r.ingredientIds.length > 0);
+    const bad = withIds.filter(r => recipeDecompositionDeviationPct(r) > 3);
+    expect(withIds.length).toBeGreaterThan(0);
+    expect(bad.length, `было ${BASELINE_BAD}, стало ${bad.length} — новые рецепты должны писать порции под шапку`).toBeLessThanOrEqual(BASELINE_BAD);
   });
 });
