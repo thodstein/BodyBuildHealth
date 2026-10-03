@@ -1,4 +1,4 @@
-﻿/**
+/**
  * meal-plan-engine.ts — профессиональный движок генерации рациона бодибилдера.
  *
  * Принципы (на основе клинической спортивной диетологии):
@@ -24,7 +24,7 @@
  */
 
 import { FOOD_DB, FOOD_ALLERGEN_DIET } from "../../../../core/nutrition-database";
-import { filterBySpecificity, filterByIntolerance, matchesCategoryPref, isPreferredCategory, tasteMatchScore, type Specificity, type CategoryPref, type Intolerances, type TasteProfile } from "./planner-preferences";
+import { filterByIntolerance, matchesCategoryPref, isPreferredCategory, tasteMatchScore, type CategoryPref, type Intolerances, type TasteProfile } from "./planner-preferences";
 import { analyzeMicroCoverage, sumMicros, type MicroCoverageEntry } from "./planner-micro-coverage";
 import { detectMealInteractions, cookMethodGuidance } from "./planner-food-interactions";
 import type { FoodItem } from "../../../../core/nutrition-database";
@@ -126,7 +126,7 @@ export interface MealPlanInput {
   // D-28: meal-bound preferred — food bound to a specific meal (e.g. rice_cream only on breakfast).
   preferredByMeal?: Record<string, Set<string>>;
   // D-28+: advanced user-preference filters
-  specificity?: Specificity;              // 'everyday' | 'varied' | 'gourmet'
+  // (specificity удалён — орфан: ни UI, ни генерация его не передавали, движок использовал default)
   categoryPref?: CategoryPref;           // preferred/excluded categories
   intolerances?: Intolerances;            // lowFODMAP, lowHistamine, lowOxalate
   tasteProfile?: TasteProfile;            // spicy/sweet/salty/sour (0-3)
@@ -1569,7 +1569,7 @@ function makeItem(food: FoodItem, grams: number, role: MealItem['role']): MealIt
 }
 
 // ─── Пулы продуктов по ролям (с фильтром аллергенов и диеты) ───────────
-function buildFoodPools(excludedIds: Set<string>, isVeg: boolean, budget: MealPlanInput['budget'], varietyPoolSize?: number, preferredIds?: Set<string>, opts?: { specificity?: Specificity; categoryPref?: CategoryPref; intolerances?: Intolerances; tasteProfile?: TasteProfile; deprioritizedIds?: Set<string>; allergenTags?: Set<string>; portableMode?: boolean; saltSeed?: number }) {
+function buildFoodPools(excludedIds: Set<string>, isVeg: boolean, budget: MealPlanInput['budget'], varietyPoolSize?: number, preferredIds?: Set<string>, opts?: { categoryPref?: CategoryPref; intolerances?: Intolerances; tasteProfile?: TasteProfile; deprioritizedIds?: Set<string>; allergenTags?: Set<string>; portableMode?: boolean; saltSeed?: number }) {
   // P0-5 ОТЗВАН: соляной сид variety-трима ломал калиброванные гарантии (яйцо-квота
   // 325>298 при соли 2, HV-сходимость). Параметр saltSeed оставлен в сигнатуре для
   // P1-роунда (ledger-разнообразие) — по умолчанию 0 = поведение байт-в-байт.
@@ -1656,8 +1656,7 @@ function buildFoodPools(excludedIds: Set<string>, isVeg: boolean, budget: MealPl
   let _baseFiltered = (budget === 'max' || budget === 'enhanced')
     ? basePoolRaw
     : basePoolRaw.filter(f => !isPremiumOrExotic(f.id));
-  // D-28+: apply specificity, intolerance, category-exclusion filters
-  if (opts?.specificity && opts.specificity !== 'varied') _baseFiltered = filterBySpecificity(_baseFiltered, opts.specificity);
+  // D-28+: apply intolerance, category-exclusion filters (specificity удалён — орфан)
   const _into = opts?.intolerances; if (_into) _baseFiltered = _baseFiltered.filter(f => filterByIntolerance(f, _into));
   const _cpref = opts?.categoryPref; if (_cpref) _baseFiltered = _baseFiltered.filter(f => matchesCategoryPref(f, _cpref));
   const basePool = _baseFiltered;
@@ -3629,7 +3628,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
       const key = JSON.stringify([
         [...combinedExcluded].sort(), !!input.isVegetarian, input.budget, varietyPoolSize,
         [...(input.preferredIds || [])].sort(), [...(input.allergenTags || [])].sort(),
-        input.specificity || null, input.categoryPref || null, input.intolerances || null,
+        input.categoryPref || null, input.intolerances || null,
         // FIX 2.3 (БАГ-14): пулы зависят от _pickCtx.qualityMode (basic фильтрует premium/exotic),
         // но quality не входил в сигнатуру кэша — смена full↔basic возвращала старые пулы.
         input.quality || 'full',
@@ -3646,12 +3645,12 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
       ]);
       const cached = _poolCache.get(key);
       if (cached) return cached;
-      const built = buildFoodPools(combinedExcluded, !!input.isVegetarian, input.budget, varietyPoolSize, input.preferredIds, { specificity: input.specificity, categoryPref: input.categoryPref, intolerances: input.intolerances, tasteProfile: input.tasteProfile, deprioritizedIds: input.deprioritizedIds, allergenTags: input.allergenTags, portableMode: input.portableMode });
+      const built = buildFoodPools(combinedExcluded, !!input.isVegetarian, input.budget, varietyPoolSize, input.preferredIds, { categoryPref: input.categoryPref, intolerances: input.intolerances, tasteProfile: input.tasteProfile, deprioritizedIds: input.deprioritizedIds, allergenTags: input.allergenTags, portableMode: input.portableMode });
       if (_poolCache.size >= 12) { const first = _poolCache.keys().next(); if (!first.done) _poolCache.delete(first.value); }
       _poolCache.set(key, built);
       return built;
     } catch {
-      return buildFoodPools(combinedExcluded, !!input.isVegetarian, input.budget, varietyPoolSize, input.preferredIds, { specificity: input.specificity, categoryPref: input.categoryPref, intolerances: input.intolerances, tasteProfile: input.tasteProfile, deprioritizedIds: input.deprioritizedIds, allergenTags: input.allergenTags, portableMode: input.portableMode });
+      return buildFoodPools(combinedExcluded, !!input.isVegetarian, input.budget, varietyPoolSize, input.preferredIds, { categoryPref: input.categoryPref, intolerances: input.intolerances, tasteProfile: input.tasteProfile, deprioritizedIds: input.deprioritizedIds, allergenTags: input.allergenTags, portableMode: input.portableMode });
     }
   })();
 
