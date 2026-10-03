@@ -52,6 +52,16 @@ import { computeEA } from "./planner-ea.engine";
 import { planTypeFloorMods } from "./planner-day-targets";
 import { perMealProteinCapG } from "./planner-meal-count";
 import { afAllows, afFilterPool, type AffinitySlot } from "./planner-meal-affinity";
+import {
+  PROTEIN_FLOOR_MAIN_G, PROTEIN_FLOOR_SNACK_G, PROTEIN_FLOOR_POWDER_G, PROTEIN_FLOOR_FAST_SLOW_G,
+  PROTEIN_FLOOR_MAIN_SOFT_G, PROTEIN_FLOOR_SNACK_SOFT_G, PROTEIN_FLOOR_MAIN_LOW_G, PROTEIN_FLOOR_SNACK_LOW_G,
+  PROTEIN_FLOOR_MAIN_HV_G, PROTEIN_FLOOR_SNACK_HV_G, PROTEIN_FLOOR_MAIN_EXTREME_G, PROTEIN_FLOOR_SNACK_EXTREME_G,
+  PROTEIN_FLOOR_PRESLEEP_DAIRY_G, reconMainProteinFloorG, RECON_MEAL_PROTEIN_CAP_G,
+  MPS_CEIL_LBM_G_PER_KG, MPS_FLOOR_LBM_G_PER_KG, p6HardProteinFloorG, isUltraPProtein,
+  PRESLEEP_PROTEIN_G_PER_KG, PRESLEEP_PROTEIN_MIN_G, PRESLEEP_PROTEIN_MAX_G, PRESLEEP_PROTEIN_UPSCALED_MIN_G,
+  FAT_CAP_MULT, FAT_DEFICIT_CAP_MULT, FAT_CAP_WEIGHT_G_PER_KG, FAT_CAP_WEIGHT_MULT,
+  FIBER_CAP_G, FIBER_HARD_CAP_G, FIBER_HV_CAP_MAX_G, fiberHvStepCapG, fiberHvTierFloorG, fiberP4CapG,
+} from "./planner-day-limits";
 
 // ─── Публичные типы ────────────────────────────────────────────────────
 export interface MealItem {
@@ -3138,7 +3148,7 @@ function buildPreSleep(time: string, seed: number, pool: ReturnType<typeof build
   // Эпик C: пол медленного белка; E15 — бюджет ночного приёма приходит ВЕС-ЗАВИСИМЫМ
   // (0.4 г/кг, 20–45 г, см. preSleepProteinBudget), фикс-28 здесь больше не стоит.
   // Пол 18 г — только для ужатых низкобелковых дней (скейл _kFx выше).
-  const targetP = residualP <= 0 ? 0 : Math.max(18, Math.min(45, residualP));
+  const targetP = residualP <= 0 ? 0 : Math.max(PRESLEEP_PROTEIN_UPSCALED_MIN_G, Math.min(PRESLEEP_PROTEIN_MAX_G, residualP));
   if (caseinSource) {
     let grams = gramsForMacro(caseinSource, targetP, 'protein');
     let deliveredP = (caseinSource.protein || 0) * grams / 100;
@@ -4039,8 +4049,8 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   // §7.2-3: полы цельного белка P4b (мейн 80 / перекус 50 г) на низкобелковых днях ужимаются
   // до реалистичного минимума 60/40 — иначе P4b не может дотянуть день до цели (тест
   // «по всем комбо 120/90кг»: 9 приёмов × пол 80 г мяса ≈ +31% к цели 144 г).
-  let _p4bFloorWholeMain = 80;
-  let _p4bFloorWholeSnack = 50;
+  let _p4bFloorWholeMain = PROTEIN_FLOOR_MAIN_SOFT_G;
+  let _p4bFloorWholeSnack = PROTEIN_FLOOR_SNACK_SOFT_G;
   // MealTargets: белок болюс-окон заранее вычтен из дневной цели — окна строятся
   // ПОСЛЕ бюджетов с фиксированными ~20 г белка каждый, и регулярные приёмы их
   // не знали: 3 окна = +60 г поверх цели, мейны добирали их же (перебор +14-23%).
@@ -4051,7 +4061,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   // UltraP (500Б при 110 кг = выше потолка Morton): best-effort — мейн-бюджет растёт
   // до 68 г (0.62 г/кг LBM), иначе targets дня −7% и мердж доливает белок в обед,
   // вытесняя углеводы (У-реализация −23% при живом остатке).
-  const _ultraPBudget = (adjustedProteinG || input.goalProteinG) >= 350 || (adjustedProteinG || input.goalProteinG) / Math.max(40, input.weightKg || 80) >= 3.5;
+  const _ultraPBudget = isUltraPProtein(adjustedProteinG || input.goalProteinG, input.weightKg || 80);
   const _mainPCap = _ultraPBudget ? 68 : 55;
   let _mainP = Math.max(25, Math.min(50, Math.round(input.lbmKg * 0.45)));
   let _snkP = Math.max(20, Math.min(35, Math.round(input.lbmKg * 0.30)));
@@ -4081,10 +4091,10 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
       _prewP = Math.round(_prewP * _kFx);
       _postwP = Math.round(_postwP * _kFx);
       periProteinFixed = _prewP + _postwP;
-      _preSleepFixedP = Math.max(18, Math.round(_preSleepFixedP * _kFx));
+      _preSleepFixedP = Math.max(PRESLEEP_PROTEIN_UPSCALED_MIN_G, Math.round(_preSleepFixedP * _kFx));
       _presleepUpscaled = _preSleepFixedP > 0 ? _preSleepFixedP : null;
-      _p4bFloorWholeMain = 60;
-      _p4bFloorWholeSnack = 40;
+      _p4bFloorWholeMain = PROTEIN_FLOOR_MAIN_LOW_G;
+      _p4bFloorWholeSnack = PROTEIN_FLOOR_SNACK_LOW_G;
       notes.push(`⚖️ Цель белка ${_dayPT} г ниже полов приёмов (${_regularFloorTotal} г) + окна: peri ужат до ${periProteinFixed} г, pre-sleep до ${_preSleepFixedP} г — иначе день уходил бы за цель на +20-30%.`);
     }
   }
@@ -4130,7 +4140,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   // preSleep — медленный белок по ВЕСУ (0.4 г/кг, 20–45 г — E15), floor задаётся fit'ом выше.
   // v3: угли ночи — фиксированный бюджет nightCarbsG (0 = legacy).
   if (_keep.has('preSleep') && wantPreSleep) {
-    (mealBudget as any).preSleep = { p: Math.max(_presleepUpscaled ?? preSleepProteinBudget(input.weightKg), Math.min(45, roleP.preSleep ?? evenRegularP)), c: _nightCarbs, f: preSleepFatG };
+    (mealBudget as any).preSleep = { p: Math.max(_presleepUpscaled ?? preSleepProteinBudget(input.weightKg), Math.min(PRESLEEP_PROTEIN_MAX_G, roleP.preSleep ?? evenRegularP)), c: _nightCarbs, f: preSleepFatG };
   }
 
   // E6 (спецприём → замена приёма): override РЕАЛЬНО перестраивает целевой приём.
@@ -4496,7 +4506,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   // Эпик B: если дневной лимит порошка исчерпан (postw + перекус) — pre-sleep получает
   // ЦЕЛЬНЫЙ медленный белок (творог 200–250 г ≈ 36–45 г), а не «третий шейк».
   const preSleepSeed = seedBase + 7 + randomSalt * 13;
-      const _preSleepBudgetP = Math.max(_presleepUpscaled ?? preSleepProteinBudget(input.weightKg), Math.min(45, ((mealBudget as any).preSleep?.p) || Math.max(residualP, evenRegularP)));
+      const _preSleepBudgetP = Math.max(_presleepUpscaled ?? preSleepProteinBudget(input.weightKg), Math.min(PRESLEEP_PROTEIN_MAX_G, ((mealBudget as any).preSleep?.p) || Math.max(residualP, evenRegularP)));
   const _powderCapReached = quota.powderMeals >= QUOTA_LIMITS.maxPowderMeals;
   const _poolPresleep = _powderCapReached
     ? { ...pool, slowProtein: pool.slowProtein.filter((f: FoodItem) => !isProteinPowderId(f.id)), fastProtein: [] as FoodItem[] } as ReturnType<typeof buildFoodPools>
@@ -4998,9 +5008,9 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   const _flexMeal = (m: { type?: string }) => ['breakfast', 'lunch', 'dinner', 'snack', 'snack2', 'snack3', 'snack4', 'snack5', 'snack6'].includes(m.type || '') && !(m as any)._insulinWindow;
   {
     const devK = (input.goalKcal - totals.kcal) / Math.max(1, input.goalKcal);
-    if (!impossibleGoal && devK > 0.10 && totals.f < fatTotal * 1.10) {
+    if (!impossibleGoal && devK > 0.10 && totals.f < fatTotal * FAT_CAP_MULT) {
       const kcalNeed = input.goalKcal - totals.kcal;
-      const fatCap = fatTotal * 1.10 - totals.f;
+      const fatCap = fatTotal * FAT_CAP_MULT - totals.f;
       let fatItems = meals.flatMap(m => m.items.filter(it => it.role === 'fat').map(it => ({ meal: m, item: it })));
       // Д-28 (загрузка под утреннюю тренировку): ужин — минимум жиров по дизайну,
       // kcal-догон жиром его НЕ раздувает (тест ≤12 г жира в ужине).
@@ -5132,7 +5142,8 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
       if (!impossibleGoal && devF > 0.10) {
         // Чистка-2026: догон не выводит жиры дня за цель ×1.08 (масштаб снапа сетки
         // «масло 10→15→30» исторически давал перебор ×1.25 при малом числе fat-items).
-        const _fatCeilD = fatTotal * 1.08;
+        // РАСХОЖДЕНИЕ: ×1.08 vs FAT_CAP_MULT (×1.10) — сводится в шаге 2 рефактора.
+        const _fatCeilD = fatTotal * FAT_DEFICIT_CAP_MULT;
         const fatDeficit = Math.min(goalF - totals.f, Math.max(0, _fatCeilD - totals.f));
         let fatItems = meals.flatMap(m => m.items.filter(it => it.role === 'fat').map(it => ({ meal: m, item: it })));
         // Д-28 (загрузка под утреннюю тренировку): ужин без жиров по дизайну — не раздуваем.
@@ -5223,8 +5234,8 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
         // Эпик B: цельный белок ОСНОВНОГО приёма не режется ниже 90 г (реальная порция),
         // перекуса — ниже 60 г. Иначе коррекции превращают курицу в «дегустационные» 40-54 г.
         const _isMainMeal = !/Перекус|Полдник|Второй завтрак|Перед сном/i.test(meal.label || '') && meal.type !== 'presleep';
-        const _proteinMin = isProtein ? ((item.role === 'protein' && !isPowder) ? (_isMainMeal ? 90 : 60)
-          : ((item.role === 'fast_protein' || item.role === 'slow_protein') ? (isPowder ? 20 : 60) : 20)) : 0;
+        const _proteinMin = isProtein ? ((item.role === 'protein' && !isPowder) ? (_isMainMeal ? PROTEIN_FLOOR_MAIN_G : PROTEIN_FLOOR_SNACK_G)
+          : ((item.role === 'fast_protein' || item.role === 'slow_protein') ? (isPowder ? PROTEIN_FLOOR_POWDER_G : PROTEIN_FLOOR_FAST_SLOW_G) : PROTEIN_FLOOR_POWDER_G)) : 0;
         const _downFloor = Math.max(suppMin, _proteinMin, (item.role === 'fruit' ? 30 : 0));
         const newAmount = isPowder && fd2 ? snapPortionG(fd2, Math.max(_downFloor, Math.min(upCap, rawNew))) : Math.max(_downFloor, Math.min(upCap, rawNew));
         const factor = newAmount / (item.amount || 1);
@@ -5717,7 +5728,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   // углеводные гарниры (носители калорий) режутся в последнюю очередь и не ниже 60% порции.
   // Peak: honour input.fiberCapG (e.g. 20g Helms loading day) — never exceed it.
   {
-    const _baseFiberCap = Math.max(25, Math.min(50, Math.round(input.goalKcal / 1000 * 14)));
+    const _baseFiberCap = FIBER_CAP_G(input.goalKcal);
     const _fiberCap = typeof input.fiberCapG === 'number' ? Math.min(_baseFiberCap, Math.max(15, Math.round(input.fiberCapG))) : _baseFiberCap;
     const _dayFiber = meals.reduce((s, m) => s + (m.totals.fiber || 0), 0);
     if (_dayFiber > _fiberCap) {
@@ -5776,8 +5787,8 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     const _p4bDense = goalP4b / Math.max(40, input.weightKg || 80) >= 2.3;
     const _p4bExtreme = _p4bDense && (input.goalCarbsG || 0) / Math.max(40, input.weightKg || 80) >= 8;
     const _p4bOverHv = _pickCtx.highVolumeDay && _p4bDense && (totals.p - goalP4b) / Math.max(1, goalP4b) > 0.05;
-    const _flMain4b = _p4bOverHv ? (_p4bExtreme ? 60 : Math.max(75, _p4bFloorWholeMain)) : _p4bFloorWholeMain;
-    const _flSnack4b = _p4bOverHv ? (_p4bExtreme ? 48 : 50) : _p4bFloorWholeSnack;
+    const _flMain4b = _p4bOverHv ? (_p4bExtreme ? PROTEIN_FLOOR_MAIN_EXTREME_G : Math.max(PROTEIN_FLOOR_MAIN_HV_G, _p4bFloorWholeMain)) : _p4bFloorWholeMain;
+    const _flSnack4b = _p4bOverHv ? (_p4bExtreme ? PROTEIN_FLOOR_SNACK_EXTREME_G : PROTEIN_FLOOR_SNACK_HV_G) : _p4bFloorWholeSnack;
     let guard4b = 6;
     let devP4b = (totals.p - goalP4b) / Math.max(1, goalP4b);
     while (devP4b > 0.05 && guard4b-- > 0) {
@@ -5816,9 +5827,9 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
           (item.role === 'fast_protein' || item.role === 'slow_protein')
             // Эпик C: цельная молочка (творог/йогурт) — реальная порция 60 г (pre-sleep 100 г),
             // порошок 20 г; иначе посадка резала ночной творог до 70 г / 19 г белка.
-            ? (food.category === 'supplement' ? 20 : (meal.type === 'presleep' ? 100 : 60))
+            ? (food.category === 'supplement' ? PROTEIN_FLOOR_POWDER_G : (meal.type === 'presleep' ? PROTEIN_FLOOR_PRESLEEP_DAIRY_G : PROTEIN_FLOOR_FAST_SLOW_G))
             : (item.role === 'veg' ? 30 : 10),
-          item.role === 'protein' ? (_mMain4b ? (food.category === 'supplement' ? 20 : _flMain4b) : _flSnack4b) : 0,
+          item.role === 'protein' ? (_mMain4b ? (food.category === 'supplement' ? PROTEIN_FLOOR_POWDER_G : _flMain4b) : _flSnack4b) : 0,
         );
         const newAmount = Math.max(floor4b, Math.round(item.amount - reduceGrams));
         if (newAmount >= item.amount) return;
@@ -5837,7 +5848,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   // P4c (Aug 28): финальный ЖИР-кламп — зеркально P4b. Snap-сетка (масло 28→30, сливочное
   // 21→50) и kcal-догон раздували жиры дня за fatTotal×1.10 → разбег с целью карточки.
   {
-    const _fatCeil = Math.max(fatTotal * 1.10, input.goalFatG * 1.10, input.weightKg * 0.8 * 1.05);
+    const _fatCeil = Math.max(fatTotal * FAT_CAP_MULT, input.goalFatG * FAT_CAP_MULT, input.weightKg * FAT_CAP_WEIGHT_G_PER_KG * FAT_CAP_WEIGHT_MULT);
     let guard4c = 5;
     let overF = totals.f - _fatCeil;
     while (overF > 1 && guard4c-- > 0) {
@@ -6578,7 +6589,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
       // гибкий fiber-носитель (семена/орехи/овощи; белок/стейплы не трогаем).
       {
         const _fibNow = meals.reduce((s: number, m: any) => s + (m.totals.fiber || m.items.reduce((a: number, it: any) => a + (it.fiber || 0) * (it.amount || 0) / 100, 0)), 0);
-        if (_fibNow > 85) {
+        if (_fibNow > FIBER_HARD_CAP_G) {
           let _best: { m: any; it: any; den: number } | null = null;
           for (const _m of meals) {
             for (const _it of (_m.items || [])) {
@@ -6593,7 +6604,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
             }
           }
           if (_best && (_best.it.fiber || 0) > 0) {
-            const _need = _fibNow - 85;
+            const _need = _fibNow - FIBER_HARD_CAP_G;
             const _cut = Math.ceil(_need / (_best.it.fiber || 1) * 100);
             _best.it.amount = Math.max(5, (_best.it.amount || 0) - _cut);
             recalcMealTotals(meals);
@@ -6867,7 +6878,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
       const _fiberCapDay = (() => {
         // v3: ступени по углям дня — только HV (обычные дни: legacy-формула бит-идентична).
         if (!_pickCtx.highVolumeDay) {
-          const _legacy = Math.max(25, Math.min(50, Math.round(input.goalKcal / 1000 * 14)));
+          const _legacy = FIBER_CAP_G(input.goalKcal);
           if (typeof input.fiberCapG === 'number' && input.fiberCapG < _legacy) return Math.max(15, Math.round(input.fiberCapG));
           return _legacy;
         }
@@ -6879,9 +6890,9 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
         // и сносил −32 г жиров дня. Пол по углям: 700У+ несут ~85-100 г неизбежной
         // клетчатки — кап ниже 105 всегда стреляет по жирам. Тест-кап 116 цел.
         const _c = input.goalCarbsG || 0;
-        const _stepCap = _c >= 700 ? 115 : _c >= 500 ? 65 : 50;
+        const _stepCap = fiberHvStepCapG(_c);
         const _kcalBased = Math.round(input.goalKcal / 1000 * 14);
-        const _tierFloor = _c >= 700 ? 105 : _c >= 500 ? 60 : 0;
+        const _tierFloor = fiberHvTierFloorG(_c);
         const _base = Math.max(25, Math.min(_stepCap, Math.max(_kcalBased, _tierFloor)));
         if (typeof input.fiberCapG === 'number' && input.fiberCapG < _base) return Math.max(15, Math.round(input.fiberCapG));
         return _base;
@@ -8247,7 +8258,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     // вывести за кап; срезаем крупнейший гибкий fiber-носитель (семена/орехи/овощи).
     {
       const _fibNow = meals.reduce((s: number, m: any) => s + (m.totals.fiber || m.items.reduce((a: number, it: any) => a + (it.fiber || 0) * (it.amount || 0) / 100, 0)), 0);
-      if (_fibNow > 85) {
+      if (_fibNow > FIBER_HARD_CAP_G) {
         let _best: { it: any; den: number } | null = null;
         for (const _m of meals) {
           for (const _it of (_m.items || [])) {
@@ -8261,7 +8272,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
           }
         }
         if (_best && (_best.it.fiber || 0) > 0) {
-          const _need = _fibNow - 85;
+          const _need = _fibNow - FIBER_HARD_CAP_G;
           const _cut = Math.ceil(_need / (_best.it.fiber || 1) * 100);
           const _newAmt = Math.max(5, (_best.it.amount || 0) - _cut);
           const _r = _newAmt / Math.max(1, _best.it.amount || 1);
@@ -8890,7 +8901,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     // Гейт сходимости: срезаем клетчатку только когда день уже сошёлся по ккал
     // (≥97% цели) — на недобирающем дне резка усугубит недобор (operability 1000У: 797).
     if ((input.goalCarbsG || 0) >= 1000 && totals.kcal >= (input.goalKcal || 0) * 0.97 && totals.c >= (input.goalCarbsG || 0) * 0.97) {
-      const _p4Cap = Math.max(50, Math.round(((input.goalKcal || 0) / 1000) * 14));
+      const _p4Cap = fiberP4CapG(input.goalKcal || 0);
       let _p4Guard = 10;
       while (totals.fiber > _p4Cap && _p4Guard-- > 0) {
         let _p4Best: { m: any; it: any } | null = null;
@@ -8930,10 +8941,10 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     // (dguarantees обед 0.6206 при 0.62). Режем ТОЛЬКО когда день уже на/выше цели белка
     // (0.99) и это не ultra-P-бюджет 500Б (там мейн ~0.62+ г/кг LBM осознан; Morton-потолок).
     if (!input.manualTargetsLocked && (input.goalProteinG || 0) > 0 && (input.lbmKg || 0) > 0) {
-      const _ultraP6 = (input.goalProteinG || 0) >= 350 || (input.goalProteinG || 0) / Math.max(40, input.weightKg || 80) >= 3.5;
+      const _ultraP6 = isUltraPProtein(input.goalProteinG || 0, input.weightKg || 80);
       if (!_ultraP6 && totals.p >= (input.goalProteinG || 0) * 0.99) {
-        const _pCeil6 = (input.lbmKg as number) * 0.62;
-        const _floorP6 = (input.lbmKg as number) * 0.22; // нижний MPS-пол приёма — неприкосновенен
+        const _pCeil6 = (input.lbmKg as number) * MPS_CEIL_LBM_G_PER_KG;
+        const _floorP6 = (input.lbmKg as number) * MPS_FLOOR_LBM_G_PER_KG; // нижний MPS-пол приёма — неприкосновенен
         for (const m of meals) {
           const _t6 = String((m as any).type || '');
           if (!['breakfast', 'lunch', 'dinner'].includes(_t6) || (m as any)._insulinWindow) continue;
@@ -8950,8 +8961,8 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
             // норма (dguarantees обед 0.6206), а его turkey 100 г «пол» не достигает и блокировал
             // правку. Ниже 0.5*веса порция мяса не опускается, порошки — 20 г (MPS-порция).
             const _hard6 = (it.role === 'fast_protein' || it.role === 'slow_protein')
-              ? 20
-              : Math.max(40, Math.round((input.weightKg || 80) * 0.5));
+              ? PROTEIN_FLOOR_POWDER_G
+              : p6HardProteinFloorG(input.weightKg || 80);
             const _fl6 = Math.max(10, Math.min(realisticFloorG(food, it.role, false, input.weightKg || 80), _hard6));
             if (it.amount <= _fl6) continue;
             const _needG6 = Math.ceil(((_mp6 - _pCeil6) / food.protein) * 100);
@@ -9306,7 +9317,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
         );
         const _vegPool = [...pool.vegGreen, ...pool.vegColor]
           .filter(f => !(combinedExcluded && combinedExcluded.has(f.id)) && foodPassesCtxAllergens(f) && foodAvailableForPlan(f));
-        const _fiberCapV = _pickCtx.highVolumeDay ? 115 : (input.fiberCapG ?? 85);
+        const _fiberCapV = _pickCtx.highVolumeDay ? FIBER_HV_CAP_MAX_G : (input.fiberCapG ?? FIBER_HARD_CAP_G);
         for (const m of meals) {
           if (m.type !== 'lunch' && m.type !== 'dinner') continue;
           if ((m.items || []).some((it: any) => it.role === 'veg')) continue;
@@ -9434,7 +9445,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
             .reduce((s: number, m: any) => s + (m.items || []).reduce((a: number, i: any) => a + ((i.role === 'slow_protein' || i.role === 'protein' || i.role === 'fast_protein') ? (i.p || 0) : 0), 0), 0);
           const _psOtherP = totals.p - _psNowP;
           const _psBudgetP = _presleepUpscaled ?? preSleepProteinBudget(input.weightKg);
-          const _psFloorRecon = Math.max(18, Math.min(_psBudgetP, (_reconTargets.p || 0) - _psOtherP));
+          const _psFloorRecon = Math.max(PRESLEEP_PROTEIN_UPSCALED_MIN_G, Math.min(_psBudgetP, (_reconTargets.p || 0) - _psOtherP));
           const _rec = reconcileDay(meals as any, _reconTargets, {
             // eveningLowCarb — жёсткая настройка пользователя («ужин ≤12% У»): ужин
             // защищён от роста в reconciliation (иначе финальная подгонка добивала
@@ -9447,8 +9458,8 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
             // E16: пол основных приёмов 60–64 кг — 50 г ЕДЫ (было 55: на F60 пол 55×3
             // при цели ~120 г Б не оставлял места углеводам; 50 г chicken ≈ 11.5 г Б —
             // выше порога MPS-стимула Moore 2015). <60 кг — прежние 40 г (F50 не душим).
-            mainProteinFloor: input.weightKg >= 80 ? 75 : input.weightKg >= 65 ? 55 : input.weightKg >= 60 ? 50 : 40,
-            mealProteinCap: 58,
+            mainProteinFloor: reconMainProteinFloorG(input.weightKg),
+            mealProteinCap: RECON_MEAL_PROTEIN_CAP_G,
             lbmKg: input.lbmKg || 0,
             // E15: пол ночного приёма — вес-зависимый бюджет (0.4 г/кг, 20–45 г),
             // но не больше, чем день может себе позволить: если регулярные приёмы
@@ -9491,7 +9502,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
                 && (input.goalKcal || 0) < 4500 && input.carbCapGPerKg !== 0) {
                 const _fibNow = meals.reduce((s: number, mm: any) => s + (mm.items || []).reduce((a: number, x: any) => a + (x.fiber || 0), 0), 0);
                 const _perGFib = (it.fiber || 0) / Math.max(1e-6, it.amount || 1);
-                if (_perGFib > 0) _base = Math.min(_base, it.amount + Math.max(0, 85 - _fibNow) / _perGFib);
+                if (_perGFib > 0) _base = Math.min(_base, it.amount + Math.max(0, FIBER_HARD_CAP_G - _fibNow) / _perGFib);
               }
               // E16: peri-окна — рост углеводов ограничен капами окон (prew 60 / postw 75,
               // как у билдера): иначе reconcile на 1200–1500У раздувал postw до 120 г У
@@ -9551,7 +9562,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
                   const grams = Math.max(30, Math.min(200, _capE, _defG));
                   const r = grams / 100;
                   // реализм-кап клетчатки дня (85 г) — добавка не пробивает потолок
-                  if (_fiberNow + (fd.fiber || 0) * r > 85) continue;
+                  if (_fiberNow + (fd.fiber || 0) * r > FIBER_HARD_CAP_G) continue;
                   return {
                     id: cid, role: 'carb_slow', amount: grams,
                     p: +((fd.protein || 0) * r).toFixed(1),
@@ -9796,7 +9807,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
           _vIt.kcal = _newK;
           _vMeal.totals = mealTotalsOf(_vMeal.items);
           recalcDayTotals(meals, totals);
-          if (_devOfDay12() <= Math.max(_devBefore12, _canon12) + 1e-9 && totals.fiber <= 85.5) {
+          if (_devOfDay12() <= Math.max(_devBefore12, _canon12) + 1e-9 && totals.fiber <= FIBER_HARD_CAP_G + 0.5) {
             const _ai = allFoodsUsed.indexOf(oldId);
             if (_ai >= 0) allFoodsUsed[_ai] = _f.id; else allFoodsUsed.push(_f.id);
             // old id больше не встречается в дне → он уходит из «уникальных продуктов».
@@ -9829,7 +9840,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
       const _fiberSkip = _pickCtx.capacity.active || _isHighCarbDay(input.goalCarbsG || 0, input.weightKg || 80)
         || (input.goalKcal || 0) >= 4500 || input.carbCapGPerKg === 0
         || !!(input as any).refeedDay || meals.some((m: any) => m._insulinWindow);
-      const _FIBER_CAP = 85;
+      const _FIBER_CAP = FIBER_HARD_CAP_G;
       const _devF = () => Math.max(
         (input.goalKcal || 0) > 0 ? Math.abs(totals.kcal - (input.goalKcal || 0)) / (input.goalKcal || 1) : 0,
         (input.goalProteinG || 0) > 0 ? Math.abs(totals.p - (input.goalProteinG || 0)) / (input.goalProteinG || 1) : 0,
@@ -9873,7 +9884,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     // приём. Переносим белок из перегруженного в недогруженный (не фикс-пункты) — держим
     // контракт §500Б-сглаживания (≤1.35× цели приёма) даже после фикс-доз.
     {
-      const _ultraPFin = (input.goalProteinG || 0) >= 350 || (input.goalProteinG || 0) / Math.max(40, input.weightKg || 80) >= 3.5;
+      const _ultraPFin = isUltraPProtein(input.goalProteinG || 0, input.weightKg || 80);
       if (_ultraPFin) {
         const _scaleFin = (it: any, newAmount: number) => {
           const r = newAmount / Math.max(1, it.amount || 1);
@@ -10308,7 +10319,7 @@ export function periProteinBudget(
  */
 export function preSleepProteinBudget(weightKg?: number): number {
   const w = Math.max(40, Number.isFinite(weightKg) ? (weightKg as number) : 80);
-  return Math.max(20, Math.min(45, Math.round(w * 0.4)));
+  return Math.max(PRESLEEP_PROTEIN_MIN_G, Math.min(PRESLEEP_PROTEIN_MAX_G, Math.round(w * PRESLEEP_PROTEIN_G_PER_KG)));
 }
 function getMicroFromFood(food: FoodItem, field: string): number {
   const m = food.micros as Record<string, number> | undefined;

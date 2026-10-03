@@ -14,6 +14,7 @@ import { FOOD_DB, FOOD_ALLERGEN_DIET } from '../../../../core/nutrition-database
 import type { FoodItem } from '../../../../core/nutrition-database';
 import { foodAvailableForPlan, stapleFamilyOf, familyMealCap, isCreamId, creamMealCap, citrusFruitCapG, countCarbItems, sweetFleshClash, isSweetCarbId, isFleshProteinId, isFishId, isProteinPowderId, isPortableFood, isWorkWindowMeal, isHvStapleBanned, isBreakfastBannedCarb, isBreakfastBannedProtein, isBreakfastBannedFat, isHeavyAnimalFat, isSweetBaseId, isFlakeId, mealHasMeatProtein, dayTargetScale, hvStyleWidensTopups, HV_PRACTICAL_CARB_IDS, isConcentrateFoodId, CONCENTRATE_PORTION_CAP_G, isLowFiberComposition } from './food-availability';
 import { afAllows } from './planner-meal-affinity';
+import { MPS_CEIL_LBM_G_PER_KG, FIBER_HARD_CAP_G, fiberHvStepCapG, isUltraPProtein } from './planner-day-limits';
 // Порошок — не больше скупа (60 г) в одном пункте, иначе «изолят 186 г в перекусе».
 // Универсально (не HV-гейт): таких порций не бывает и на обычных днях.
 const POWDER_PORTION_CAP_G = 60;
@@ -319,8 +320,8 @@ export function correctDayToTargets(
   // (движок на обычных днях тримит по 85 — формула 25-50 заводила корректор в лишние
   // тримы, меняя траекторию: белок уплывал +5% на simple 3000).
   const _corrFiberBase = hv
-    ? ((safeTargets.c || 0) >= 700 ? 115 : (safeTargets.c || 0) >= 500 ? 65 : 50)
-    : 85;
+    ? fiberHvStepCapG(safeTargets.c || 0)
+    : FIBER_HARD_CAP_G;
   // Этап 7-фикс (fiber peak cap, §7.2-1): явный лимит клетчатки дня (пик-неделя ББ —
   // _peakTargets.fiberMaxG) главнее построек — трим корректора уважает его (было 85).
   const _corrFiberCap = (typeof opts?.fiberCapG === 'number' && opts.fiberCapG < _corrFiberBase)
@@ -335,10 +336,10 @@ export function correctDayToTargets(
   // корректора выбивает приём за 0.62 г/кг). LBM опционально (engine передаёт lbmKg);
   // на ultraP-днях коридор невыполним — гард неактивен.
   const _lbmCorr = opts?.lbmKg && opts.lbmKg > 0 ? opts.lbmKg : 0;
-  const _ultraPCorr = (safeTargets.p || 0) >= 350 || (safeTargets.p || 0) / Math.max(40, weightKg) >= 3.5;
+  const _ultraPCorr = isUltraPProtein(safeTargets.p || 0, weightKg);
   const _corrFull = (m: CorrectorMeal): boolean => _lbmCorr > 0 && !_ultraPCorr &&
     (m.type === 'breakfast' || m.type === 'lunch' || m.type === 'dinner') &&
-    (m.totals?.p || 0) >= 0.62 * _lbmCorr;
+    (m.totals?.p || 0) >= MPS_CEIL_LBM_G_PER_KG * _lbmCorr;
 
   const maxCoreScale = opts?.allowCoreScale ? 1.30 : 1.20;
   // P2: кандидаты, у которых не нашлось места для размещения (все приёмы закрыты
@@ -572,7 +573,7 @@ export function correctDayToTargets(
               const afterDev = maxDevPct(afterTotals as DayTargets, safeTargets);
               // MealTargets/MPS: своп не выводит основной приём за его цель +15 и за
               // MPS-коридор 0.62 г/кг LBM (иначе финальные проходы движка срезают).
-              const _mpsCapS = (_lbmCorr > 0 && !_ultraPCorr) ? 0.62 * _lbmCorr : 0;
+              const _mpsCapS = (_lbmCorr > 0 && !_ultraPCorr) ? MPS_CEIL_LBM_G_PER_KG * _lbmCorr : 0;
               const _swapOverM = under === 'p' && _mpsCapS > 0 &&
                 ['breakfast', 'lunch', 'dinner'].includes(String(meals[victimMi].type || '')) &&
                 ((meals[victimMi].totals?.p || 0) > _mpsCapS + 0.5);
@@ -1006,7 +1007,7 @@ export function correctDayToTargets(
           (((meals[cand.mi] as any).totals || {} as any)[eff] || 0) > _mtG[eff] + 15);
         // MPS-коридор движка (0.62 г/кг LBM) — рост белка не выводит основной приём
         // за коридор (иначе финальный MPS-проход срезает рост, день падает на −10-15%).
-        const _mpsCapC = (_lbmCorr > 0 && !_ultraPCorr) ? 0.62 * _lbmCorr : 0;
+        const _mpsCapC = (_lbmCorr > 0 && !_ultraPCorr) ? MPS_CEIL_LBM_G_PER_KG * _lbmCorr : 0;
         const _mpsOver = !!(eff === 'p' && _mpsCapC > 0 &&
           ['breakfast', 'lunch', 'dinner'].includes(String(meals[cand.mi].type || '')) &&
           (((meals[cand.mi] as any).totals || {} as any).p || 0) > _mpsCapC + 0.5);
