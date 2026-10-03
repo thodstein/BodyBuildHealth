@@ -60,7 +60,7 @@ import {
   PROTEIN_FLOOR_PRESLEEP_DAIRY_G, reconMainProteinFloorG, RECON_MEAL_PROTEIN_CAP_G,
   MPS_CEIL_LBM_G_PER_KG, MPS_FLOOR_LBM_G_PER_KG, MPS_MAIN_MIN_LBM_G_PER_KG, p6HardProteinFloorG, isUltraPProtein,
   PRESLEEP_PROTEIN_G_PER_KG, PRESLEEP_PROTEIN_MIN_G, PRESLEEP_PROTEIN_MAX_G, PRESLEEP_PROTEIN_UPSCALED_MIN_G,
-  FAT_CAP_MULT, FAT_DEFICIT_CAP_MULT, FAT_ROOM_CAP_MULT, FAT_CAP_WEIGHT_G_PER_KG, FAT_CAP_WEIGHT_MULT,
+  FAT_CAP_MULT, FAT_ROOM_CAP_MULT, FAT_CAP_WEIGHT_G_PER_KG, FAT_CAP_WEIGHT_MULT,
   FIBER_CAP_G, FIBER_HARD_CAP_G, FIBER_HV_CAP_MAX_G, fiberHvStepCapG, fiberHvTierFloorG, fiberP4CapG,
 } from "./planner-day-limits";
 
@@ -5181,10 +5181,11 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     const goalF = fatTotal;
     const devF = (goalF - totals.f) / Math.max(1, goalF);
       if (!impossibleGoal && (!_fatKcalTopUpApplied || _fatMergeExtreme) && devF > 0.10) {
-        // Чистка-2026: догон не выводит жиры дня за цель ×1.08 (масштаб снапа сетки
+        // Чистка-2026: догон не выводит жиры дня за цель ×FAT_CAP_MULT (масштаб снапа сетки
         // «масло 10→15→30» исторически давал перебор ×1.25 при малом числе fat-items).
-        // РАСХОЖДЕНИЕ: ×1.08 vs FAT_CAP_MULT (×1.10) — сводится в шаге 2 рефактора.
-        const _fatCeilD = fatTotal * FAT_DEFICIT_CAP_MULT;
+        // Единый множитель (план единого источника, остаток): fat-deficit-догон больше НЕ
+        // использует отдельный ×1.08 — тот же FAT_CAP_MULT, что kcal-догон и P4c.
+        const _fatCeilD = fatTotal * FAT_CAP_MULT;
         const fatDeficit = Math.min(goalF - totals.f, Math.max(0, _fatCeilD - totals.f));
         let fatItems = meals.flatMap(m => m.items.filter(it => it.role === 'fat').map(it => ({ meal: m, item: it })));
         // Д-28 (загрузка под утреннюю тренировку): ужин без жиров по дизайну — не раздуваем.

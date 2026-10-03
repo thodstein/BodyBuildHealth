@@ -101,11 +101,6 @@ export const PRESLEEP_PROTEIN_UPSCALED_MIN_G = 18;
 
 /** kcal-догон жиром и P4c-кламп: не выводить жиры дня за цель × FAT_CAP_MULT. */
 export const FAT_CAP_MULT = 1.1;
-/**
- * РАСХОЖДЕНИЕ: fat-deficit-догон использует ×1.08 (было ×1.10 у kcal-догона).
- * Свести в шаге 2 (слияние двух жировых проходов).
- */
-export const FAT_DEFICIT_CAP_MULT = 1.08;
 /** Комната роста жира в поздних доборах (не выводить день за цель ×1.08). */
 export const FAT_ROOM_CAP_MULT = 1.08;
 /** Дополнительный кламп жира по весу (P4c): weightKg × 0.8 × ×1.05. */
