@@ -58,9 +58,9 @@ import {
   PROTEIN_FLOOR_MAIN_SOFT_G, PROTEIN_FLOOR_SNACK_SOFT_G, PROTEIN_FLOOR_MAIN_LOW_G, PROTEIN_FLOOR_SNACK_LOW_G,
   PROTEIN_FLOOR_MAIN_HV_G, PROTEIN_FLOOR_SNACK_HV_G, PROTEIN_FLOOR_MAIN_EXTREME_G, PROTEIN_FLOOR_SNACK_EXTREME_G,
   PROTEIN_FLOOR_PRESLEEP_DAIRY_G, reconMainProteinFloorG, RECON_MEAL_PROTEIN_CAP_G,
-  MPS_CEIL_LBM_G_PER_KG, MPS_FLOOR_LBM_G_PER_KG, p6HardProteinFloorG, isUltraPProtein,
+  MPS_CEIL_LBM_G_PER_KG, MPS_FLOOR_LBM_G_PER_KG, MPS_MAIN_MIN_LBM_G_PER_KG, p6HardProteinFloorG, isUltraPProtein,
   PRESLEEP_PROTEIN_G_PER_KG, PRESLEEP_PROTEIN_MIN_G, PRESLEEP_PROTEIN_MAX_G, PRESLEEP_PROTEIN_UPSCALED_MIN_G,
-  FAT_CAP_MULT, FAT_DEFICIT_CAP_MULT, FAT_CAP_WEIGHT_G_PER_KG, FAT_CAP_WEIGHT_MULT,
+  FAT_CAP_MULT, FAT_DEFICIT_CAP_MULT, FAT_ROOM_CAP_MULT, FAT_CAP_WEIGHT_G_PER_KG, FAT_CAP_WEIGHT_MULT,
   FIBER_CAP_G, FIBER_HARD_CAP_G, FIBER_HV_CAP_MAX_G, fiberHvStepCapG, fiberHvTierFloorG, fiberP4CapG,
 } from "./planner-day-limits";
 
@@ -4885,8 +4885,8 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     return { label: m.label || m.type, proteinG: Math.round(_p), leucineG: Math.round(_leu * 10) / 10, triggersMps: m.mpsCheck?.triggers_mTOR || (_p >= 25 && _leu >= 2.5) };
   });
   for (const mb of mealsBreakdown) {
-    if (mb.proteinG > 0 && mb.proteinG < Math.max(22, Math.round(_lbmSafe * 0.22)) && !['intra', 'presleep'].includes(meals.find(mm => (mm.label || mm.type) === mb.label)?.type || '')) {
-      notes.push(`⚠ ${mb.label}: ${mb.proteinG} г белка (лейцин ${mb.leucineG} г) — ниже MPS-порога ~${Math.max(22, Math.round(_lbmSafe * 0.22))} г. Дополните приём творогом/яйцами/сывороткой (+15-20 г белка).`);
+    if (mb.proteinG > 0 && mb.proteinG < Math.max(22, Math.round(_lbmSafe * MPS_FLOOR_LBM_G_PER_KG)) && !['intra', 'presleep'].includes(meals.find(mm => (mm.label || mm.type) === mb.label)?.type || '')) {
+      notes.push(`⚠ ${mb.label}: ${mb.proteinG} г белка (лейцин ${mb.leucineG} г) — ниже MPS-порога ~${Math.max(22, Math.round(_lbmSafe * MPS_FLOOR_LBM_G_PER_KG))} г. Дополните приём творогом/яйцами/сывороткой (+15-20 г белка).`);
     }
   }
   const mpsSummary: DayPlanV2['mpsSummary'] & { meals: unknown[]; fiberG: number; fiberTargetG: number; proteinCV?: number; ea?: number; eaStatus?: string; eaEee?: number } = {
@@ -6765,7 +6765,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
             // Потолок — от ЦЕЛИ (goalFatG ×1.08), а не от adjusted fatTotal: иначе adjusted
             // выше цели разрешал добивку жирными носителями (отруби 20.9Ж) сверх теста ×1.12.
             if (addG > 0 && (fd.fat || 0) > 0) {
-              const _fatRoom = Math.max(0, Math.min(fatTotal * 1.08, (input.goalFatG || 0) * 1.08) - totals.f);
+              const _fatRoom = Math.max(0, Math.min(fatTotal * FAT_ROOM_CAP_MULT, (input.goalFatG || 0) * FAT_ROOM_CAP_MULT) - totals.f);
               const _maxByFat = Math.floor(_fatRoom / fd.fat * 100);
               if (_maxByFat < 10) continue;
               addG = Math.min(addG, _maxByFat);
@@ -6884,7 +6884,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
             const _dcap = _denseCap[_df.id] ?? 100;
             let _dg = Math.min(_dcap, Math.floor(Math.max(0, _cDevNow) / Math.max(1, _df.carbs || 1) * 100 / 5) * 5);
             if ((_df.fat || 0) > 0) {
-              const _fatRoom2 = Math.max(0, Math.min(fatTotal * 1.08, (input.goalFatG || 0) * 1.08) - totals.f);
+              const _fatRoom2 = Math.max(0, Math.min(fatTotal * FAT_ROOM_CAP_MULT, (input.goalFatG || 0) * FAT_ROOM_CAP_MULT) - totals.f);
               const _maxByFat2 = Math.floor(_fatRoom2 / (_df.fat || 1) * 100);
               if (_maxByFat2 < 10) continue;
               _dg = Math.min(_dg, _maxByFat2);
@@ -7136,7 +7136,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
               // (гарнир/овощи несут 8-14 г).
               if (!_ultraPMeal && (input.lbmKg || 0) > 0 && ['breakfast', 'lunch', 'dinner'].includes(String((_c2.m as any).type || ''))) {
                 const _mp = (_c2.m as any).totals?.p || 0;
-                if (_mp >= 0.62 * (input.lbmKg || 0)) continue;
+                if (_mp >= MPS_CEIL_LBM_G_PER_KG * (input.lbmKg || 0)) continue;
               }
               // Коктейльный режим: порошок мерджем НЕ растим (скуп 60 г — потолок,
               // иначе «изолят 60 + 126 = 186»); добираем едой/жидким белком, а при
@@ -7543,7 +7543,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
           // P1a: коридор считаем по ВСЕМУ белку приёма (m.totals.p), а не только мясным ролям:
           // гарнир/овощи несут 8-14 г (картофель 291 + шпинат 212), тест считает итог приёма.
           const _mealProt = (m as any).totals?.p || 0;
-          const _corrMode = !_ultraPCorr && _lbmCorr > 0 && _isMainCorr && _mealProt > 0.62 * _lbmCorr;
+          const _corrMode = !_ultraPCorr && _lbmCorr > 0 && _isMainCorr && _mealProt > MPS_CEIL_LBM_G_PER_KG * _lbmCorr;
           if (_meats.length >= 2 && (_pickCtx.highVolumeDay || (_pickCtx as any).denseDay || _corrMode)) {
             _meats.sort((a: any, b: any) => (b.p || 0) - (a.p || 0));
             const _keep = _meats[0];
@@ -7791,7 +7791,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
             if (_p0aSkip(m)) continue;
             if (!_ultraP0a && _lbmP0a > 0 && ['breakfast', 'lunch', 'dinner'].includes(String((m as any).type || ''))) {
               const _mealP = (m as any).totals?.p || 0;
-              if (_mealP >= 0.62 * _lbmP0a) continue;
+              if (_mealP >= MPS_CEIL_LBM_G_PER_KG * _lbmP0a) continue;
             }
             // P1a: не растим приём выше его белковой цели +8 (иначе добор переливает
             // сытые приёмы поверх сведённого дня; зеркало углеводного гарда выше).
@@ -7951,7 +7951,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
             }
           }
           if ((fd.fat || 0) > 0) {
-            const fatRoom = Math.max(0, Math.min(fatTotal * 1.08, (input.goalFatG || 0) * 1.08) - totals.f);
+            const fatRoom = Math.max(0, Math.min(fatTotal * FAT_ROOM_CAP_MULT, (input.goalFatG || 0) * FAT_ROOM_CAP_MULT) - totals.f);
             addG = Math.min(addG, Math.floor(fatRoom / (fd.fat || 1) * 100));
           }
           // Не раздуваем белок дня за кап (+15% цели): carb-носители несут внедрённый белок
@@ -8080,7 +8080,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
       const _lbmF = input.lbmKg || 0;
       const _ultraPF = (input.goalProteinG || 0) >= 350 || (input.goalProteinG || 0) / Math.max(40, input.weightKg || 80) >= 3.5;
       if (_lbmF > 0 && !_ultraPF) {
-        const _capP = 0.62 * _lbmF;
+        const _capP = MPS_CEIL_LBM_G_PER_KG * _lbmF;
         for (const m of meals) {
           const t = String((m as any).type || '');
           if (!['breakfast', 'lunch', 'dinner'].includes(t) || (m as any)._insulinWindow) continue;
@@ -8147,7 +8147,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
           if (!['breakfast', 'lunch', 'dinner'].includes(_tL) || (m as any)._insulinWindow) continue;
           // Целимся в 0.225 г/кг LBM (не 0.22): +0.005 — запас на округления последующих
           // проходов (пасс видел 16.2 = 0.2195 LBM, финал уезжал на 15.9 = 0.2154).
-          const _needLo = 0.225 * _lbmL - ((m as any).totals?.p || 0);
+          const _needLo = MPS_MAIN_MIN_LBM_G_PER_KG * _lbmL - ((m as any).totals?.p || 0);
           if (_needLo <= 0.2) continue; // 0.2 г — шум округления, ниже не трогаем
           const _protsL = (m.items || []).filter((it: any) => (it.role === 'protein' || it.role === 'fast_protein' || it.role === 'slow_protein') && !(it as any)._fixedGrams);
           if (_protsL.length === 0) continue;

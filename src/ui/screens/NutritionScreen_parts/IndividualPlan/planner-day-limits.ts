@@ -64,6 +64,8 @@ export const RECON_MEAL_PROTEIN_CAP_G = 58;
 export const MPS_CEIL_LBM_G_PER_KG = 0.62;
 /** Нижний MPS-пол приёма — неприкосновенен. */
 export const MPS_FLOOR_LBM_G_PER_KG = 0.22;
+/** Минимум белка ОСНОВНОГО приёма (0.225 г/кг LBM) — MPS-минимум мейна. */
+export const MPS_MAIN_MIN_LBM_G_PER_KG = 0.225;
 /** P6: жёсткий пол порции мяса при ужатии к MPS-потолку (порошок — PROTEIN_FLOOR_POWDER_G). */
 export function p6HardProteinFloorG(weightKg: number): number {
   return Math.max(40, Math.round((weightKg || 80) * 0.5));
@@ -104,6 +106,8 @@ export const FAT_CAP_MULT = 1.1;
  * Свести в шаге 2 (слияние двух жировых проходов).
  */
 export const FAT_DEFICIT_CAP_MULT = 1.08;
+/** Комната роста жира в поздних доборах (не выводить день за цель ×1.08). */
+export const FAT_ROOM_CAP_MULT = 1.08;
 /** Дополнительный кламп жира по весу (P4c): weightKg × 0.8 × ×1.05. */
 export const FAT_CAP_WEIGHT_G_PER_KG = 0.8;
 export const FAT_CAP_WEIGHT_MULT = 1.05;
