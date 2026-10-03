@@ -5183,7 +5183,14 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   }
 
 
-  // ─── Этап 1: Грубая итеративная коррекция макросов (до ±5%) ───
+  // ─── ЕДИНЫЙ проход сведения макросов (шаг 3 рефактора «единый источник») ───
+  // Один оркестратор, два подшага: A) грубая итеративная коррекция (до ±5%),
+  // B) точная подгонка одного гибкого item (≤2%). Все пороги — из planner-day-limits.
+  // Финальные проходы P4 (overshoot)/P4b (последняя белковая)/P6 (MPS-потолок)/reconciler
+  // остаются отдельными: у них другие контексты (роль/приём/LBM-коридор/дискретная сетка),
+  // а не дубли этого прохода.
+  const _convergeMacrosToTargets = () => {
+  // ── Подшаг A: грубая итеративная коррекция (до ±5%) ──
   for (let iter = 0; iter < 8; iter++) {
     const gP = adjustedProteinG || input.goalProteinG, gC = carbsTotal, gF = fatTotal;
     const dP = (gP - totals.p) / Math.max(1, gP);
@@ -5264,7 +5271,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     recalcDayTotals(meals, totals); // B4
   }
 
-  // ─── Этап 2: Точная подгонка ≤2% — точечная коррекция одного гибкого item ───
+  // ── Подшаг B: точная подгонка ≤2% — точечная коррекция одного гибкого item ──
   // Для каждого макроса вычисляем точную граммовку самого подходящего item,
   // чтобы довести макрос до цели с точностью ≤2%.
   const preciseAdjust = (
@@ -5410,6 +5417,8 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     const doneF = preciseAdjust(['fat'], gPreciseF, totals.f, 'fat');
     if (doneP && doneC && doneF) break;
   }
+  };
+  _convergeMacrosToTargets();
 
   // §3F-честность: отчёт «Точность рациона» перенесён в САМЫЙ КОНЕЦ (после P4b/P5b/P6/P7),
   // иначе он описывал промежуточное состояние (Б 31% при финальных −3%: середина пайплайна
