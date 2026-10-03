@@ -108,6 +108,39 @@ describe('BB-auto: DC Rest-Pause — фаз-гейт (аудит 2026-10)', () =
       }
     }
   });
+
+  it('аудит 2026-10-2: strength_mass 12 нед — intensification DC, peaking cluster, accumulation без DC (per-phase)', () => {
+    const plan: any = buildBBPlan({
+      patternId: 'upper_lower_6', weeks: 12, level: 'enhanced', trainingYears: 9, goal: 'strength_mass',
+      workMax: WM, sex: 'male',
+      peds: ['AAS', 'GH', 'insulin'], pedDoses: { AAS: 500, GH: 4, insulin: 10 }, courseIntensity: 'moderate',
+    } as never);
+    // intensification: КАЖДЫЙ primary получает DC-схему и 1 рабочий слот.
+    const int = plan.weeks.filter((w: any) => w.phase === 'intensification');
+    expect(int.length).toBeGreaterThan(0);
+    let intPrim = 0, intDc = 0;
+    for (const w of int) for (const s of w.sessions) for (const e of s.exercises) {
+      if (e.warmupActivator || e.role !== 'primary') continue;
+      intPrim++;
+      if (isDc(e)) { intDc++; expect(e.sets, `W${w.week}: ${e.name} — DC 1 слот`).toBe(1); }
+    }
+    expect(intPrim).toBeGreaterThan(0);
+    expect(intDc, 'intensification должен получить dc_rp (per-phase, а не только representative)').toBe(intPrim);
+    // peaking: cluster.
+    const peak = plan.weeks.filter((w: any) => w.phase === 'peaking');
+    expect(peak.length).toBeGreaterThan(0);
+    expect(peak.some((w: any) => w.sessions.some((s: any) => s.exercises.some((e: any) => /Кластер/i.test(String(e.comment || '')))))).toBe(true);
+    // accumulation: без DC (дефолтная схема не переписывает загрузку accumulation).
+    const acc = plan.weeks.filter((w: any) => w.phase === 'accumulation');
+    expect(acc.length).toBeGreaterThan(0);
+    for (const w of acc) for (const s of w.sessions) for (const e of s.exercises) {
+      if (e.warmupActivator) continue;
+      expect(isDc(e), `accumulation W${w.week}: ${e.name} не должен быть DC`).toBe(false);
+    }
+    // «Показано = применено»: rationale по каждой фазе, а не одна строка.
+    expect(plan.rationale.some((r: string) => /Схема тяж · Интенсификация/.test(r))).toBe(true);
+    expect(plan.rationale.some((r: string) => /Схема тяж · Пик/.test(r))).toBe(true);
+  });
 });
 
 describe('BB-auto: taper коротких планов (аудит 2026-10)', () => {

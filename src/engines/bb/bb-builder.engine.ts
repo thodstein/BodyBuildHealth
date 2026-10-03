@@ -47,7 +47,7 @@ import { FEMALE_POSTERIOR_BOOST } from './bb-demographics';
 // Фазовая периодизация (distributePhases) — ЕДИНЫЙ источник RIR/фаз/deload для ББ-плана.
 // Импорт distributePhases/getPhaseVolumeMult из UI-модуля намеренный: это каноническая
 // реализация, которую использует и ручной конструктор (phase-periodization).
-import { distributePhases, PHASE_CONFIGS, getPhaseConfig, getPhaseVolumeMult, type BBPhase } from '../periodization';
+import { distributePhases, PHASE_CONFIGS, PHASE_LABELS, getPhaseConfig, getPhaseVolumeMult, type BBPhase } from '../periodization';
 import { orderSessionExercises, type SessionMethodology } from './bb-session-order.engine';
 import { type BBTrainingFocus, FOCUS_RIR_TABLE } from './bb-goal-types';
 import { clampRir } from './bb-utils';
@@ -4932,38 +4932,59 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
       // (целевые мышцы переданы в targetMuscles из specRes — Фаза 2.9).
       // Rep-схемы: подсказка, не форсирование (сохраняем текущие reps, добавляем label)
       // Выбираем схему для отображения в rationale (не переписываем repsRange)
-      const heavyScheme = meth.recommendedScheme.heavy;
       const pumpScheme = meth.recommendedScheme.pump;
-      if (heavyScheme || pumpScheme) {
-        const hs = heavyScheme ? REP_SCHEMES[heavyScheme] : null;
-        const ps = pumpScheme ? REP_SCHEMES[pumpScheme] : null;
-        if (hs) withMeth.rationale.push(`📋 Схема тяж: ${hs.nameRu} ${hs.repRange[0]}-${hs.repRange[1]} RIR${hs.rir} (${hs.evidence})${hs.phaseGate ? ` — только фаза ${hs.phaseGate.join('/')}` : ''}`);
-        if (ps) withMeth.rationale.push(`📋 Схема памп: ${ps.nameRu} ${ps.repRange[0]}-${ps.repRange[1]} RIR${ps.rir} (${ps.evidence})`);
-        // Фаза 1.1: rep-схемы применяются к РЕАЛЬНОЙ загрузке (не только rationale).
-        // Тяж-primary → схема тяж; памп-accessory → схема памп. Инварианты: cap 5 сетов,
-        // deload и warmup не трогаются, вес пересчитывается по Brzycki от workMax.
-        const schemeOpts = {
-          weightForRepMax,
-          workMax,
-          defaultWorkMax,
-          proWorkmaxRatio: (m: string) => PRO_WORKMAX_RATIO[m] as any,
-          intensityMult: 1,
-          // Волна-3.3: гейт minLevel схемы (dc_rp/cluster — advanced+).
-          level,
-        };
-        // Применяем rep-схему к РЕАЛЬНОЙ загрузке. Важно: дефолтная схема памп
-        // (hypertrophy_8_12, которую schemeFor возвращает без специализированного PED-профиля)
-        // НЕ должна переписывать памп-дни — памп держит 12-20 повторов. Применяем памп-схему
-        // только если это реальная памп-схема (min повторов ≥ 12: pump/fst7/gvt/myo/bfr/lengthened).
-        const isRealPumpScheme = !!ps && ps.repRange[0] >= 12;
-        // Фаз-гейт (аудит 2026-10): dc_rp/cluster несут phaseGate — не накладываем
-        // их на accumulation/прочие недели (dc_rp применялся на ВЕСЬ план, т.к.
-        // schemeFor выбирался по «репрезентативной» фазе плана).
-        const heavyApplied = applySchemeToPlan(withMeth, hs, 'heavy_primary', { ...schemeOpts, phases: hs?.phaseGate });
-        const pumpApplied = isRealPumpScheme ? applySchemeToPlan(withMeth, ps, 'pump_accessory', { ...schemeOpts, phases: ps?.phaseGate }) : 0;
-        if (heavyApplied > 0 || pumpApplied > 0) {
-          withMeth.rationale.push(`⚙️ Схемы применены к загрузке: ${heavyApplied} тяж-primary + ${pumpApplied} памп-accessory (reps/rest/tempo/вес пересчитаны).`);
+      // Аудит 2026-10-2: per-phase rep-схемы (устранить «репрезентативную фазу»).
+      // Раньше схема выбиралась ОДИН раз по самой продвинутой фазе плана, поэтому
+      // план с accumulation+intensification+peaking (strength_mass) брал cluster
+      // (peaking) и накладывал его только на peaking — intensification терял dc_rp.
+      // Теперь у КАЖДОЙ фазы своя схема (dc_rp → intensification, cluster → peaking).
+      // Инвариант: НЕ-фазово-специфичная схема (без phaseGate, напр. дефолтная
+      // hypertrophy_8_12) применяется ТОЛЬКО к «репрезентативной» фазе — иначе
+      // загрузка accumulation переписывалась бы дефолтной схемой (вес выше
+      // интенсив-фазы). Памп-схема не фазово-специфична — остаётся одной.
+      const schemeOpts = {
+        weightForRepMax,
+        workMax,
+        defaultWorkMax,
+        proWorkmaxRatio: (m: string) => PRO_WORKMAX_RATIO[m] as any,
+        intensityMult: 1,
+        // Волна-3.3: гейт minLevel схемы (dc_rp/cluster — advanced+).
+        level,
+      };
+      const pedProfile = meth.schemeProfile;
+      const phasesInPlan = Array.from(new Set(
+        (withMeth.weeks || [])
+          .map((w: any) => String(w?.phase || ''))
+          .filter((p: string) => !!p && p !== 'deload'),
+      ));
+      let heavyApplied = 0;
+      for (const phase of phasesInPlan) {
+        const hid = schemeFor({ goal: input.goal, focus: input.trainingFocus, phase: phase as BBPhase, character: 'тяж', level, pedProfile });
+        const hs = REP_SCHEMES[hid];
+        if (!hs) continue;
+        // Дефолтную (не фаз-специфичную) схему применяем только к репрезентативной
+        // фазе — сохраняет прежнее поведение чистых accumulation-планов и не трогает
+        // загрузку accumulation в многофазных планах.
+        const isRepresentative = phase === schemePhase;
+        if (!hs.phaseGate && !isRepresentative) continue;
+        const gate = hs.phaseGate ?? (isRepresentative ? undefined : [phase]);
+        const n = applySchemeToPlan(withMeth, hs, 'heavy_primary', { ...schemeOpts, phases: gate });
+        if (n > 0) {
+          heavyApplied += n;
+          // «Показано = применено»: строка на КАЖДУЮ фазу, а не одна.
+          withMeth.rationale.push(`📋 Схема тяж · ${(PHASE_LABELS as any)[phase] || phase}: ${hs.nameRu} ${hs.repRange[0]}-${hs.repRange[1]} RIR${hs.rir} (${hs.evidence}) — применено к ${n} упр.`);
         }
+      }
+      const ps = pumpScheme ? REP_SCHEMES[pumpScheme] : null;
+      if (ps) withMeth.rationale.push(`📋 Схема памп: ${ps.nameRu} ${ps.repRange[0]}-${ps.repRange[1]} RIR${ps.rir} (${ps.evidence})`);
+      // Применяем rep-схему к РЕАЛЬНОЙ загрузке. Важно: дефолтная схема памп
+      // (hypertrophy_8_12, которую schemeFor возвращает без специализированного PED-профиля)
+      // НЕ должна переписывать памп-дни — памп держит 12-20 повторов. Применяем памп-схему
+      // только если это реальная памп-схема (min повторов ≥ 12: pump/fst7/gvt/myo/bfr/lengthened).
+      const isRealPumpScheme = !!ps && ps.repRange[0] >= 12;
+      const pumpApplied = isRealPumpScheme ? applySchemeToPlan(withMeth, ps, 'pump_accessory', { ...schemeOpts, phases: ps?.phaseGate }) : 0;
+      if (heavyApplied > 0 || pumpApplied > 0) {
+        withMeth.rationale.push(`⚙️ Схемы применены к загрузке: ${heavyApplied} тяж-primary + ${pumpApplied} памп-accessory (reps/rest/tempo/вес пересчитаны).`);
       }
       // Все сплиты адаптируются: показать адаптированный объём для выбранного сплита
       const adaptNote = `🔄 Сплит «${pattern.name}» адаптирован: целевые объёмы пересчитаны под фарму (режим ×${regimeMult.toFixed(2)}, оценка бюджета ${weeklyBudgetEstimate} сетов/нед) — все сплиты масштабируются, выбор сохранён`;

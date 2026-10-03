@@ -26,6 +26,12 @@ export interface PEDMethodology {
   failureAllowed: boolean;
   /** Рекомендованная схема для тяж/памп (не форсирует, а подсказывает). */
   recommendedScheme: { heavy: RepSchemeId; pump: RepSchemeId };
+  /**
+   * Аудит 2026-10-2: пед-профиль для per-phase выбора схемы билдером.
+   * Билдер вызывает `schemeFor({ phase, character, pedProfile: meth.schemeProfile })`
+   * по КАЖДОЙ фазе плана, а не один раз по «репрезентативной» фазе.
+   */
+  schemeProfile: NonNullable<SchemeForInput['pedProfile']>;
   /** Пери-WO углеводы. */
   periWorkout: { carbs: 'high' | 'moderate' | 'low'; intraNote?: string; warning?: string };
   /** Целевая мышца для MGF/IGF1 (локально). */
@@ -188,7 +194,7 @@ export function recommendPEDMethodology(input: PEDMethodologyInput): PEDMethodol
     periWorkout = { carbs: 'moderate' };
   }
 
-  return { insulinPumpWindow, jointGuard, bfrAllowed, failureAllowed, recommendedScheme: { heavy, pump }, periWorkout, mgfTargetMuscles, pedPhase, pedPhaseByWeek, insulinSafety: safety.active ? safety : null, rationale };
+  return { insulinPumpWindow, jointGuard, bfrAllowed, failureAllowed, recommendedScheme: { heavy, pump }, schemeProfile: pedProfile, periWorkout, mgfTargetMuscles, pedPhase, pedPhaseByWeek, insulinSafety: safety.active ? safety : null, rationale };
 }
 
 /**
