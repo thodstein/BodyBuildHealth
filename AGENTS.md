@@ -1,5 +1,35 @@
 # AGENTS.md - BioStackAIScreen + BB-builder
 
+## ББ-авто: фаз-гейт DC Rest-Pause + taper коротких планов (Oct 3 2026, без пуша)
+
+По промту «ББ-авто — фаз-гейт DC и taper коротких планов». Проба (zz, удалена):
+`buildBBPlan({patternId:'upper_lower_6', weeks:8, enhanced, AAS500/GH4/ins10})` — accumulation W1–W3
+primary получали DC-структуру; `fullbody_3/4 нед` — taperApplied на всех рабочих неделях. Только
+Edit/Write + vitest/tsc; чужие WIP (combat/meal-plan/ProgramEditor) не тронуты; коммит pathspec.
+
+- **Первопричина DC**: `recommendPEDMethodology` выбирал `recommendedScheme.heavy` по
+  «репрезентативной» фазе плана (`schemePhase` = самая продвинутая: intensification, если она есть
+  в хвосте), а `applySchemeToPlan` накладывал схему на ВСЕ недели плана → `dc_rp` (методика
+  ИНТЕНСИФИКАЦИИ) попадал в accumulation. Fix: `RepScheme.phaseGate` (dc_rp → `['intensification']`,
+  cluster → `['peaking']`) + опция `phases` в `applySchemeToPlan` (недели вне гейта пропускаются);
+  билдер передаёт `phases: hs?.phaseGate`/`ps?.phaseGate`. Unit-вызовы без `phases` — прежнее
+  поведение (байт-в-байт).
+- **DC = «1 рабочий слот»**: `dc_rp` теперь реально сокращает подходы до 1 (RP 7+4+3), а не
+  сохраняет 2–5 сетов. Плюс DC-структура покрывает ВСЕ `primary` дня (тяж И памп) — «4-й
+  pamp-primary» больше не остаётся урезанным без метки. Прочие тяж-схемы (hypertrophy/strength/
+  cluster) фильтр памп-primary сохраняют.
+- **Taper коротких планов**: `applyTaperToFinalWeeks` для 4-нед плана (taperEnd=3) брал окно
+  [0..3) — taper все 3 рабочие недели. Fix: длина окна `taperLen = min(3, max(1, taperEnd−1))`
+  (≥1 рабочая неделя до taper), профиль берётся С КОНЦА (`profileShift = 3 − taperLen`) — глубокая
+  ×0.50 всегда последняя неделя перед делодом. 8-нед планы — без изменений (окно 3 нед).
+- **Re-baseline (осознанно, «было→стало»)**: `bb-rep-schemes` — `dc_rp` sets 4→1 (workSets 4→1).
+- **NEW тест** `bb-dc-phase-taper` 5/5: accumulation 0 DC-1-сетов; intensification все primary
+  DC+1 сет; натурал без DC; `fullbody_3/4` — taper < рабочих недель, W1 не taper; 8-нед taper = 3 нед
+  с углублением к концу.
+- **Проверено**: `src/engines/bb` **2956/0** (268 файлов, включая zz; без zz — 2956 база + 5 новых),
+  тяжёлый аудит `BB_CYCLE_AUDIT_FULL=1` **24/24**, `tsc --noEmit` **0**, `git diff --check` чист.
+  zz-проба удалена до коммита.
+
 ## ББ-авто: доведение выдачи до заявленного — объём/сеты/порядок/дубли/методики (Oct 2 2026, без пуша)
 
 По промту «довести выдачу до заявленного (цикл + generic): объём, сеты, порядок, дубли, методики»

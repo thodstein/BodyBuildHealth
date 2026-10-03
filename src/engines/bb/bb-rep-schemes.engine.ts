@@ -51,6 +51,14 @@ export interface RepScheme {
   pedHint?: Array<'AAS' | 'GH' | 'insulin' | 'MGF' | 'IGF1'>;
   /** Уровень доступа. */
   minLevel?: 'beginner' | 'intermediate' | 'advanced' | 'enhanced';
+  /**
+   * Фаз-гейт (аудит 2026-10): схема применяется ТОЛЬКО к неделям этих фаз.
+   * dc_rp — методика интенсификации (DoggCrapp blast), cluster — пика;
+   * применение к accumulation-неделям было багом: план с intensification в
+   * хвосте выбирал dc_rp по «репрезентативной» фазе плана и накладывал его
+   * на ВСЕ недели (accumulation W1–W3 получали DC-разметку).
+   */
+  phaseGate?: BBPhase[];
 }
 
 export const REP_SCHEMES: Record<RepSchemeId, RepScheme> = {
@@ -117,6 +125,7 @@ export const REP_SCHEMES: Record<RepSchemeId, RepScheme> = {
     evidence: 'DoggCrapp DC Training',
     minLevel: 'advanced',
     pedHint: ['AAS'],
+    phaseGate: ['intensification'],
   },
   fst7: {
     id: 'fst7',
@@ -193,6 +202,7 @@ export const REP_SCHEMES: Record<RepSchemeId, RepScheme> = {
     evidence: 'Haff cluster training',
     minLevel: 'advanced',
     pedHint: ['AAS'],
+    phaseGate: ['peaking'],
   },
   fortitude_mr: {
     id: 'fortitude_mr',
@@ -353,18 +363,27 @@ export function applySchemeToPlan(
     intensityMult?: number;
     /** Волна-3.3: уровень атлета — гейт scheme.minLevel (dc_rp/cluster недоступны новичку). */
     level?: string;
+    /**
+     * Фаз-гейт (аудит 2026-10): если задан — схема применяется ТОЛЬКО к неделям
+     * этих фаз. Билдер передаёт `scheme.phaseGate` (dc_rp → intensification,
+     * cluster → peaking), иначе dc_rp накладывался на accumulation-недели.
+     * Не задан (unit-вызовы) — фильтра нет, поведение прежнее.
+     */
+    phases?: string[];
   },
 ): number {
   if (!scheme) return 0;
   // Волна-3.3: minLevel схемы уважается (dc_rp — advanced, cluster — advanced…).
   if (!levelMeetsMin(opts.level, scheme.minLevel)) return 0;
-  const { weightForRepMax, workMax, defaultWorkMax, proWorkmaxRatio, intensityMult = 1 } = opts;
+  const { weightForRepMax, workMax, defaultWorkMax, proWorkmaxRatio, intensityMult = 1, phases } = opts;
   const loading = schemeToLoading(scheme);
   const isHeavyTarget = target === 'heavy_primary';
   let applied = 0;
 
   for (const week of plan.weeks || []) {
     if (week?.phase === 'deload' || week?.deload) continue;
+    // Фаз-гейт: dc_rp — только intensification, cluster — только peaking.
+    if (phases && !phases.includes(String((week as any).phase || ''))) continue;
     for (const sess of week.sessions || []) {
       for (const ex of sess.exercises || []) {
         if (!ex || ex.warmupActivator) continue;
@@ -374,13 +393,21 @@ export function applySchemeToPlan(
         if (isWidowmakerExercise(ex)) continue;
         // Целевой фильтр по character самого УПРАЖНЕНИЯ (не сессии) + роли.
         // Памп-primary внутри тяж-сессии (например hams в Legs D1) НЕ должен
-        // получать тяж-схему — он остаётся памп-режимом.
+        // получать тяж-схему — он остаётся памп-режимом. ИСКЛЮЧЕНИЕ — DC
+        // (DoggCrapp): сессия целиком RP, поэтому DC-структура покрывает ВСЕ
+        // primary дня (тяж и памп), иначе «4-й pamp-primary» оставался бы
+        // урезанным без метки (аудит 2026-10).
         const exChar = ex.character || sess.character || 'тяж';
-        const heavyMatch = isHeavyTarget && exChar === 'тяж' && ex.role === 'primary';
+        const heavyMatch = isHeavyTarget && ex.role === 'primary'
+          && (exChar === 'тяж' || scheme.id === 'dc_rp');
         const pumpMatch = !isHeavyTarget && (exChar === 'памп' || exChar === 'лёг') && ex.role === 'accessory';
         if (!heavyMatch && !pumpMatch) continue;
         // Сохраняем число сетов (кап 5), меняем только loading.
-        const setCount = Math.max(1, Math.min(5, ex.workSets?.length || ex.sets || 3));
+        // DC (DoggCrapp) — протокол «1 рабочий слот» (RP 7+4+3): схема
+        // действительно сокращает число подходов до одного.
+        const setCount = scheme.id === 'dc_rp'
+          ? 1
+          : Math.max(1, Math.min(5, ex.workSets?.length || ex.sets || 3));
         // Вес: Brzycki от workMax мышцы (как в buildSession), с intensityMult.
         const wm = workMax[ex.muscle] || proWorkmaxRatio?.(ex.muscle)?.(workMax) || defaultWorkMax?.(ex.muscle) || 50;
         // Волна-3.5: BFR — единый протокол 30-15-15-15 на 25% workMax (не uniform 23).

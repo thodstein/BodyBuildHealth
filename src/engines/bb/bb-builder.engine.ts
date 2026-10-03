@@ -4956,8 +4956,11 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
         // НЕ должна переписывать памп-дни — памп держит 12-20 повторов. Применяем памп-схему
         // только если это реальная памп-схема (min повторов ≥ 12: pump/fst7/gvt/myo/bfr/lengthened).
         const isRealPumpScheme = !!ps && ps.repRange[0] >= 12;
-        const heavyApplied = applySchemeToPlan(withMeth, hs, 'heavy_primary', schemeOpts);
-        const pumpApplied = isRealPumpScheme ? applySchemeToPlan(withMeth, ps, 'pump_accessory', schemeOpts) : 0;
+        // Фаз-гейт (аудит 2026-10): dc_rp/cluster несут phaseGate — не накладываем
+        // их на accumulation/прочие недели (dc_rp применялся на ВЕСЬ план, т.к.
+        // schemeFor выбирался по «репрезентативной» фазе плана).
+        const heavyApplied = applySchemeToPlan(withMeth, hs, 'heavy_primary', { ...schemeOpts, phases: hs?.phaseGate });
+        const pumpApplied = isRealPumpScheme ? applySchemeToPlan(withMeth, ps, 'pump_accessory', { ...schemeOpts, phases: ps?.phaseGate }) : 0;
         if (heavyApplied > 0 || pumpApplied > 0) {
           withMeth.rationale.push(`⚙️ Схемы применены к загрузке: ${heavyApplied} тяж-primary + ${pumpApplied} памп-accessory (reps/rest/tempo/вес пересчитаны).`);
         }

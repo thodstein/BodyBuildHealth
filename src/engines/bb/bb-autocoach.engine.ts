@@ -1096,8 +1096,16 @@ export function applyTaperToFinalWeeks(plan: BBPlan, _totalWeeks: number): BBPla
   // (вызовы/тесты передают длину плана) и будущего использования (Bosquet 2005, Helms 2022).
   // RIR shift и tempo swap добавлены для проф-уровня (fix A6).
   const taperEnd = lastDeloadIdx >= 0 ? lastDeloadIdx : weeks.length;
-  const taperStart = Math.max(0, taperEnd - 3);
+  // Аудит 2026-10: taper НЕ должен покрывать ВЕСЬ план. Для 4-недельного плана
+  // (taperEnd=3, т.е. 3 рабочие недели перед делодом) окно [0..3) делало taper
+  // все 3 рабочие недели — accumulation/intensification недель не оставалось.
+  // Оставляем ≥1 рабочую неделю до taper: длина окна ≤ taperEnd−1, профиль
+  // берётся с КОНЦА (глубокий ×0.50 — всегда последняя неделя перед делодом).
+  const taperLen = Math.min(3, Math.max(1, taperEnd - 1));
+  const taperStart = Math.max(0, taperEnd - taperLen);
   if (taperEnd - taperStart < 2) return plan; // недостаточно нед для taper
+  // Смещение профиля: короткое окно (2 нед) → [0.75, 0.50] (с конца), полное → [1.0, 0.75, 0.50].
+  const profileShift = Math.max(0, 3 - taperLen);
 
   // Taper-профиль: volume ↓, RIR ↑ (восстановление), tempo → deload-style (4-2-2-0).
   // Bosquet 2005: объём −30-50%, интенсивность сохранена. Helms 2022: RIR +2-3.
@@ -1117,7 +1125,7 @@ export function applyTaperToFinalWeeks(plan: BBPlan, _totalWeeks: number): BBPla
     const curSets = w.sessions.flatMap(s => s.exercises).reduce((sum, e) => sum + e.sets, 0);
     const prevSets = idx > 0 ? weeks[idx - 1].sessions.flatMap(s => s.exercises).reduce((sum, e) => sum + e.sets, 0) : curSets;
     if (w.deload === true || w.phase === 'deload' || curSets < prevSets * 0.6) return w; // уже deload-неделя — не taper
-    const taperWeek = idx - taperStart; // 0, 1, 2
+    const taperWeek = idx - taperStart + profileShift; // профиль с конца окна
     const volumeMult = TAPER_VOLUME[taperWeek] ?? 0.50;
     const rirShift = TAPER_RIR_SHIFT[taperWeek] ?? 2;
     const taperTempo = TAPER_TEMPO[Math.min(taperWeek, TAPER_TEMPO.length - 1)] ?? '4-2-2-0';

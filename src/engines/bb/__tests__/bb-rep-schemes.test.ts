@@ -71,8 +71,11 @@ describe('bb-rep-schemes.engine', () => {
     expect(bench.rir).toBe(REP_SCHEMES.dc_rp.rir);
     expect(bench.restSeconds).toBe(REP_SCHEMES.dc_rp.restSec);
     expect(bench.tempoSpec).toBe(REP_SCHEMES.dc_rp.tempo);
-    expect(bench.sets).toBe(4); // кап 5 сохранён
-    expect(bench.workSets).toHaveLength(4);
+    // Было→стало (аудит 2026-10): DC (DoggCrapp) — протокол «1 рабочий слот»
+    // (RP 7+4+3), поэтому схема сокращает число подходов до 1 (было — кап 5
+    // сохранялся, и «DC-структура» не была 1-сетовой).
+    expect(bench.sets).toBe(1);
+    expect(bench.workSets).toHaveLength(1);
     // разводка (памп-accessory) не тронута
     const fly = p.weeks[0].sessions[1].exercises[0];
     expect(fly.repsRange).toEqual([12, 15]);
