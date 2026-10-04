@@ -88,7 +88,10 @@ export const AAS_SUBSTANCE_TEQ: Record<string, number> = {
   // trenbolone — самый андрогенный
   tren: 2.5, tren_ace: 2.5, tren_e: 2.5, tren_hex: 2.5,
   // прочие
-  equipoise: 0.9, eq: 0.9, boldenone: 0.9,
+  // 26.09.2026 (аудит): `bold_undec` — КАНОНИЧЕСКИЙ id болденона (ped-alias-map:
+  // boldenone → bold_undec). Без него resolveTequivKey('bold_undec') возвращал ''
+  // и доза болденона молча выпадала из T-эквивалента (риск-порог занижался).
+  equipoise: 0.9, eq: 0.9, boldenone: 0.9, bold_undec: 0.9, boldenone_undecylenate: 0.9,
   primobolan: 0.5, prim: 0.5, prim_enan: 0.5,
   masteron: 0.9, drostanolone: 0.9, drost: 0.9,
   winstrol: 2.0, stan: 2.0, stanozolol: 2.0,
@@ -227,7 +230,7 @@ export function getPedCap(ped: PED): number {
  *  P0-2: используется и для perPED.dose, и для aasDose (risk-threshold) —
  *  ранее aasDose использовал Number() который возвращал NaN для "500mg".
  *  Fix: г→мг ×1000, мкг остаётся мкг (порядок проверки: мкг → мг → г). */
-function parseDose(raw: unknown): number {
+export function parseDose(raw: unknown): number {
   if (typeof raw === 'number') return raw;
   if (raw != null) {
     const s = String(raw).toLowerCase();

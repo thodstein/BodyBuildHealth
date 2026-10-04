@@ -1950,6 +1950,9 @@ export const BbAutoConstructor: React.FC = () => {
           if (Array.isArray(state.specBlocks)) setSpecBlocks(state.specBlocks as any);
           if (typeof state.pedPhaseOverride === 'string') setPedPhaseOverride(state.pedPhaseOverride as any);
           if (typeof state.dcMode === 'boolean') setDcMode(state.dcMode);
+          // 26.09.2026 (аудит): volumeScheme записывался в he_bb_auto_state_v1, но не
+          // восстанавливался → GVT/FST-7/Gironda сбрасывался в 'standard' после перезагрузки.
+          if (typeof state.volumeScheme === 'string') setVolumeScheme(state.volumeScheme as any);
         }
       }
     } catch {}
@@ -2097,7 +2100,10 @@ export const BbAutoConstructor: React.FC = () => {
     const weight = Math.round(wm * pct);
     const w2 = structuredClone(builtPlan.weeks);
     const targetSession = w2[bbWeekSel - 1].sessions[si];
-    targetSession.exercises[ei] = { ...oldEx, name: rep.name, muscle: (rep as any).group || oldEx.muscle || 'chest', workSets: [{ ...oldEx.workSets[0], weight }] };
+    // 26.09.2026 (аудит): exerciseName — это id каталога (ключ весов/экспорта/SessionPlayer).
+    // Раньше поле сохраняло id СТАРОГО упражнения после свопа → вес/техника/экспорт
+    // ссылались на прежнее упражнение.
+    targetSession.exercises[ei] = { ...oldEx, name: rep.name, exerciseName: (rep as any).id || rep.name, muscle: (rep as any).group || oldEx.muscle || 'chest', workSets: [{ ...oldEx.workSets[0], weight }] };
     setBuiltPlan(revalidateEditedPlan({ ...builtPlan, weeks: w2 }));
     setSubTarget(null);
   }, [subTarget, builtPlan, bbWeekSel, bbWorkMax]);
@@ -2476,6 +2482,17 @@ export const BbAutoConstructor: React.FC = () => {
         ? `⚠ ACWR ${acwr.ratio.toFixed(2)} — зона осторожности (1.3-1.5). Рассмотрите разгрузку.`
         : 'Делод: нет (ACWR в норме)');
 
+    // 26.09.2026 (аудит): авто-калибровку реальных весов применяем ДО единственного
+    // setBuiltPlan. Раньше был ВТОРОЙ setBuiltPlan(prev => ({...prev, ...plan})), чей
+    // `...plan` перекрывал rationale первого — план терял «📌 Источник/📈 Стратегия/📦 Объём».
+    try {
+      const stored = getProfile().settings?.training?.workMaxByExercise;
+      const calib = autoCalibrateFromStored(plan, stored, (n) => /подтягив|отжимани|скручив|планка|пловец|альпинист|tgu|мостик|отведение.*стоя|икры.*одной|выпад.*назад|болгарск/i.test(n));
+      if (calib.applied > 0) {
+        plan = { ...calib.plan, rationale: [...calib.plan.rationale, `⚖️ Применены сохранённые реальные веса (${calib.applied} вхождений упражнений).`] };
+      }
+    } catch { /* ignore */ }
+
     setBuiltPlan({
       ...plan,
       // Слепок всех кнопок — чтобы отчёт соответствовал реальным настройкам, а не «от новичка»
@@ -2538,21 +2555,6 @@ export const BbAutoConstructor: React.FC = () => {
     });
     // Новая сборка с нуля — снапшот отката инъекции протух (план другой)
     try { localStorage.removeItem('he_bb_plan_saved_prev'); localStorage.removeItem('he_bb_plan_history'); } catch { /* ignore */ }
-    // ⚖️ Авто-калибровка реальных весов из training.workMaxByExercise (сохранённых на шаге «Реальные веса»)
-    try {
-      const stored = getProfile().settings?.training?.workMaxByExercise;
-      const calib = autoCalibrateFromStored(plan, stored, (n) => /подтягив|отжимани|скручив|планка|пловец|альпинист|tgu|мостик|отведение.*стоя|икры.*одной|выпад.*назад|болгарск/i.test(n));
-      if (calib.applied > 0) {
-        plan = { ...calib.plan, rationale: [...calib.plan.rationale, `⚖️ Применены сохранённые реальные веса (${calib.applied} вхождений упражнений).`] };
-      }
-    } catch { /* ignore */ }
-    setBuiltPlan((prev) => ({
-      ...(prev || {}),
-      ...plan,
-      trainingVolumeMode,
-    }));
-    // Новая сборка с нуля — снапшот отката инъекции протух (план другой)
-    try { localStorage.removeItem('he_bb_plan_saved_prev'); localStorage.removeItem('he_bb_plan_history'); } catch { /* ignore */ }
     // PRO: per-muscle frequency optimization
     try {
       const sessions = loadSessions();
@@ -2595,7 +2597,9 @@ export const BbAutoConstructor: React.FC = () => {
       sessions: w.sessions.map((s, si) => ({
         ...s,
         exercises: s.exercises.map((e, ei) => {
-          const editKey = `${si}-${ei}`;
+          // 26.09.2026 (аудит): ключ включает неделю (w.week) — правка одной недели
+          // применялась ко ВСЕМ неделям (мезоцикл выравнивался по одному вводу).
+          const editKey = `${w.week}-${si}-${ei}`;
           const edit = exerciseEdits[editKey];
           if (!edit) return e;
           const edited = {
@@ -2721,6 +2725,11 @@ export const BbAutoConstructor: React.FC = () => {
             cycleId: planMode === 'programs' ? selectedCycleId : undefined,
             abPatternRotation: abRotation === true ? true : undefined,
             packingV2: packingV2 === true ? true : undefined,
+            // 26.09.2026 (аудит): dcMode/pedPhaseOverride объявлены в SavedBBPlan и
+            // восстанавливаются в конструкторе, но НЕ сохранялись — настройка DC-lite и
+            // фазы MGF/IGF1 терялась при сохранении варианта.
+            pedPhaseOverride: pedPhaseOverride !== 'auto' ? pedPhaseOverride : undefined,
+            dcMode: dcMode === true ? true : undefined,
             // Аудит «дубли шаг 1-2»: сохраняем остальные настройки шага 1-2 (дефолты — undefined,
             // паттерн как у abPatternRotation/packingV2).
             proPreset: proPreset !== 'none' ? proPreset : undefined,
@@ -2894,7 +2903,9 @@ export const BbAutoConstructor: React.FC = () => {
     const ratio: Record<string, number> = { barbell: 1, smith: 0.9, machine: 0.85, dumbbell: 0.8, cable: 0.8, bodyweight: 0.7 };
     const loadRatio = (ratio[newEquipment] || 1) / (ratio[oldEquipment] || 1);
     target.name = found.name;
-    target.exerciseName = found.name;
+    // 26.09.2026 (аудит): exerciseName = id каталога (а не display-имя) — иначе ключ
+    // весов/экспорта/SessionPlayer указывал на неверное упражнение.
+    target.exerciseName = (found as any).id || found.name;
     target.muscle = found.group || target.muscle;
     target.workSets = target.workSets.map(ws => ({ ...ws, weight: Math.round(ws.weight * loadRatio * 10) / 10 }));
     target.comment = `${target.comment || ''} | Ручная замена: ${oldEquipment || 'unknown'} → ${newEquipment || 'unknown'}, вес ×${loadRatio.toFixed(2)}`;

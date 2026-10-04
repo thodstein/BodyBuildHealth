@@ -12,6 +12,7 @@
  */
 
 import type { BBPlan, BBWeek, BBExercise } from './bb-builder.engine';
+import { isBBJunk } from './bb-builder.engine';
 import { aggregateBBVolume } from './bb-volume.engine';
 import { canonicalMuscle, expandDonorMuscles, type VolumeTradeoffPolicy } from './bb-specialization.engine';
 import { matchesAnyZonePattern } from './bb-specialization-registry';
@@ -19,6 +20,8 @@ import { getVolumeLandmarks } from '../volume-landmarks.engine';
 import { EXERCISE_CATALOG } from '../../core/exercise-catalog';
 import { trueMuscleOf } from '../movement-pattern';
 import { TAG_MUSCLES } from './bb-day-types';
+import { isPoolAllowed } from './bb-exercise-levels.engine';
+import { isMobilityRestricted } from './bb-mobility.engine';
 
 export interface TradeoffApplyOptions {
   level: string;
@@ -27,6 +30,9 @@ export interface TradeoffApplyOptions {
   equipment: string[];
   maxExercisesPerSession: number;
   maxWorkingSetsPerSession: number;
+  /** 26.09.2026 (аудит): фильтры паритета с пулами/финализатором (опциональны, обратно совместимо). */
+  excludedExercises?: string[];
+  mobilityRestrictions?: string[];
 }
 
 export interface TradeoffWeekReport {
@@ -168,9 +174,15 @@ function addToRecipient(
           if (trueMuscleOf(c) !== m) return false;
           if (usedNames.has(c.name)) return false;
           if (!matchesAnyZonePattern(c.name || '', targets)) return false;
+          // 26.09.2026 (аудит): паритет с пулами/финализатором — не переносим
+          // исключённые/mobility-restricted/мусорные/неразрешённые уровнем упражнения.
+          if (isBBJunk(c)) return false;
+          if (!isPoolAllowed(opts.level, c)) return false;
+          if (opts.excludedExercises?.includes(c.id) || opts.excludedExercises?.includes(c.name)) return false;
+          if (isMobilityRestricted(c, opts.mobilityRestrictions)) return false;
           if (opts.equipment.length > 0) {
             const eq = Array.isArray(c.equipment) ? c.equipment : [String(c.equipment || '')];
-            if (eq.length > 0 && !eq.some((x: string) => opts.equipment.includes(x))) return false;
+            if (eq.length > 0 && !eq.includes('bodyweight') && !eq.some((x: string) => opts.equipment.includes(x))) return false;
           }
           return true;
         });
@@ -246,7 +258,10 @@ export function applyTradeoffToPlan(
       // Резка доноров идёт (флор-защищена), но перенос цели не делаем:
       // делод — не неделя для перераспределения объёма.
       if (targets.length === 0) continue;
-      const removedSets = trimDonorIsolations(week, new Set(policy.donorMuscles.map(canonicalMuscle)), policy, opts);
+      // 26.09.2026 (аудит): composite-доноры (legs/arms/core) не разворачивались в
+      // реальные мышцы → на делод-неделях доноры не резались вовсе. Паритет с
+      // не-делод-веткой (expandDonorMuscles).
+      const removedSets = trimDonorIsolations(week, new Set(expandDonorMuscles(policy.donorMuscles).map(canonicalMuscle)), policy, opts);
       reports.push({
         week: week.week, removedSets, transferredSets: 0,
         unusedSets: removedSets, donors: policy.donorMuscles, mode: policy.mode,

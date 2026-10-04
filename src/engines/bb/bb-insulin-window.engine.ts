@@ -19,6 +19,8 @@ export function insulinWindowActive(input: InsulinWindowInput): boolean {
 
 export function applyInsulinWindowToPlan(plan: BBPlan, input: InsulinWindowInput): BBPlan {
   if (!insulinWindowActive(input)) return plan;
+  // 26.09.2026 (аудит): идемпотентность — повторное применение дублировало rationale-строку.
+  if ((plan.rationale || []).some(r => String(r).includes('💉 Insulin window:'))) return plan;
   const copy: BBPlan = {
     ...plan,
     weeks: plan.weeks.map(w => ({ ...w, sessions: w.sessions.map(s => ({ ...s, exercises: s.exercises.map(e => ({ ...e, workSets: [...e.workSets] })) })) })),

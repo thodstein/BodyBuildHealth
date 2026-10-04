@@ -65,7 +65,7 @@ export interface BbPlanStepProps {
 
 export const BbPlanStep: React.FC<BbPlanStepProps> = ({
   builtPlan, metrics, bbWeekSel, setBbWeekSel, bbWeeks, autoDeload, weakPoints, dupMode,
-  autoRegOn, autoRegResult, exerciseEdits, setExerciseEdits, editMode, setEditMode,
+  exerciseEdits, setExerciseEdits, editMode, setEditMode,
   collapsedDays, setCollapsedDays, collapsedExercises, setCollapsedExercises,
   bbTrainingFocus, bbLevel, bbTrainingYears, onCourse, trainingVolumeMode, setSubTarget, handleSendToExecution,
   setWeightEntries, setWeightsApplied, setStep, actionRow,
@@ -468,10 +468,15 @@ export const BbPlanStep: React.FC<BbPlanStepProps> = ({
               {/* Упражнения */}
               <div style={{ padding:'4px 0' }}>
                 {s.exercises.map((e, ei) => {
-                  const rawW = e.workSets[0]?.weight || 80;
-                  const adjW = autoRegOn && autoRegResult ? Math.round(rawW * autoRegResult.topSetPctMultiplier * 10) / 10 : rawW;
-                  const adjSets0 = autoRegOn && autoRegResult ? Math.max(1, Math.round(e.sets * autoRegResult.volumeMultiplier)) : e.sets;
-                  const editKey = `${si}-${ei}`;
+                  // 26.09.2026 (аудит): НЕ применяем autoReg повторно в отображении —
+                  // движок уже применил его к плану (applyPostPhaseProcessing). Прежний
+                  // код умножал вес/сеты ВТОРОЙ раз (показывал меньше, чем в плане) и в
+                  // faithful-режиме показывал несуществующую коррекцию.
+                  const adjW = e.workSets[0]?.weight || 80;
+                  const adjSets0 = e.sets;
+                  // 26.09.2026 (аудит): ключ правки привязан к НЕДЕЛЕ (wk.week) — иначе
+                  // правка одной недели применялась ко ВСЕМ неделям (см. applyEditsToPlan).
+                  const editKey = `${wk.week}-${si}-${ei}`;
                   const edit = exerciseEdits[editKey] || { sets: adjSets0, reps: e.workSets[0]?.reps || 10, weight: adjW };
                   const isEditing = editMode?.dayIdx === si && editMode?.exIdx === ei;
                   const comment = e.comment || exerciseComment(e, weakPoints, '', currentPhase);

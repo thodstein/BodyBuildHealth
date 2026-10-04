@@ -2810,8 +2810,10 @@ function buildSession(
       // как RIR drift. Ранее week=9 → restProgression=120с → baseRest-120=0 → clamped to 60
       // на всей фазе intensification. Теперь phaseWeek=1-4 → max 45s сокращения.
       const restProgression = phase === 'deload' ? -30 : Math.max(0, (phaseWeek - 1) * 15);
+      // 26.09.2026 (аудит): deload — ровно +30с для всех (комментарий «Делод → +30с»).
+      // Прежняя формула для primary давала +60с (baseRest +30 − restProgression(−30)).
       const exRestBase = phase === 'deload'
-        ? Math.min(180, (pl.role === 'accessory' ? baseRest : baseRest + 30) - restProgression)
+        ? Math.min(180, baseRest + 30)
         : Math.max(60, (pl.role === 'accessory' ? Math.max(45, baseRest - 30) : baseRest) - restProgression);
       // Интенсивность тренинга: light → больше отдыха, high → меньше (плотность).
       const exRest = Math.round(exRestBase * intensityRestMult);
@@ -3203,10 +3205,13 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
     courseIntensity: pedAdapt?.courseIntensity || input.courseIntensity,
     doseAwareMrv: pedAdapt?.combinedMrvMultiplier,
   });
-  const recoveryScore = computeBBRecoveryScore({
-    bodyFat: input.bodyFat, leanMass: input.leanMass, hrvMs: input.hrvMs,
-    sleepHours: input.sleepHours, stressLevel: input.stressLevel,
-  });
+    const recoveryScore = computeBBRecoveryScore({
+      bodyFat: input.bodyFat, leanMass: input.leanMass, hrvMs: input.hrvMs,
+      // 26.09.2026 (аудит): явная HRV-база доезжает до оценки (была объявлена, но не
+      // передавалась — HRV-сигнал брался только из store, игнорируя hrvBaseline).
+      hrvBaseline: input.hrvBaseline,
+      sleepHours: input.sleepHours, stressLevel: input.stressLevel,
+    });
   // Фаза 4.28: ручной оверрайд множителя восстановления из визарда.
   const recoveryMultOverride = Number.isFinite(input.recoveryMultOverride) ? Math.max(0.6, Math.min(1.5, input.recoveryMultOverride as number)) : 1;
   // P0-7 (аудит 2026-09): это ОЦЕНКА для rationale/отображения, а не кап —
@@ -3264,13 +3269,17 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
   const volumeTargets: Record<string, BBVolumeTarget> = {};
   // Recovery/nutrition — единый источник из bb-volume.engine (fix F1: убираем дубли)
   const wearableMerged = mergeWearableIntoRecovery({ hrvMs: input.hrvMs, sleepHours: input.sleepHours, stressLevel: input.stressLevel }, input.wearable ?? null);
-  const recoveryMult = computeBBRecoveryMultiplier({
-    bodyFat: input.bodyFat,
-    leanMass: input.leanMass,
-    hrvMs: wearableMerged.hrvMs,
-    sleepHours: wearableMerged.sleepHours,
-    stressLevel: wearableMerged.stressLevel,
-  }) * cycleVolumeFactor(input.cycleDay, input.cycleLength, input.sex) * wearableRecoveryFactor(input.wearable ?? null);
+    const recoveryMult = computeBBRecoveryMultiplier({
+      bodyFat: input.bodyFat,
+      leanMass: input.leanMass,
+      hrvMs: wearableMerged.hrvMs,
+      // 26.09.2026 (аудит): личная HRV-база/Z доезжает до MRV-множителя (была объявлена,
+      // но не передавалась — HRV-сигнал всегда брался из store he_hrv_log).
+      hrvBaseline: input.hrvBaseline,
+      hrvBaselineZ: input.hrvBaselineZ,
+      sleepHours: wearableMerged.sleepHours,
+      stressLevel: wearableMerged.stressLevel,
+    }) * cycleVolumeFactor(input.cycleDay, input.cycleLength, input.sex) * wearableRecoveryFactor(input.wearable ?? null);
   const nutritionMult = computeBBNutritionMultiplier({
     calorieSurplus: input.calorieSurplus,
     proteinPerKg: input.proteinPerKg,
@@ -5189,6 +5198,11 @@ function compensateCrossDayWeakPoints(
 
     // Идём по каждой неделе отдельно
     for (let wi = 0; wi < weeks.length; wi++) {
+      // 26.09.2026 (аудит): делод/тапер-недели НЕ добиваем feeder'ами — низкий объём
+      // там намеренный (паритет с addAdaptiveMEVFeeders в bb-finalize, который их скипает).
+      // Без этого guard'а делод-неделя (объём ×0.6 < MEV) всегда получала +2 сета слабой мышцы.
+      const wkFlags = weeks[wi] as any;
+      if (wkFlags.deload || wkFlags.phase === 'deload' || wkFlags.taper || wkFlags.taperApplied || wkFlags.isDeloadLike) continue;
       // Считаем недельный объём по слабой мышце
       let weekSets = 0;
       for (const s of weeks[wi].sessions) {

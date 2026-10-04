@@ -905,6 +905,9 @@ export function applyPrepVolumeCascade(
   const weeks: any[] = (plan.weeks as any[]).map((wk, idx) => {
     const phaseKey = wk.contestPhase;
     if (phaseKey !== 'preparation' && phaseKey !== 'final_preparation') return wk;
+    // 26.09.2026 (аудит): builder-делод внутри подготовки не трогаем — иначе каскад
+    // ×~0.98 накладывался поверх делода, а затем applyPrepDeloads давал двойной делод.
+    if ((wk as any).deload || String((wk as any).phase || '').toLowerCase() === 'deload') return wk;
     const pv = prepVolumePhaseForWeek(vp, idx + 1, prepWeeks);
     if (!pv) return wk;
     const mult = pv.volumeMult;
@@ -938,7 +941,8 @@ export function applyPrepVolumeCascade(
   // убираем его в prep-неделях: пустой день → отдых (не тратим время/день впустую).
   const workingSetsOf = (s: any) => (s.exercises || []).filter((e: any) => !(e as any).warmupActivator).reduce((a: number, e: any) => a + (e.sets || 0), 0);
   for (const wk of weeks) {
-    if (wk.contestPhase === 'preparation' || wk.contestPhase === 'final_preparation') {
+    if ((wk.contestPhase === 'preparation' || wk.contestPhase === 'final_preparation')
+      && !((wk as any).deload || String((wk as any).phase || '').toLowerCase() === 'deload')) {
       wk.sessions = (wk.sessions || []).filter((s: any) => workingSetsOf(s) >= 6);
     }
   }
@@ -946,7 +950,9 @@ export function applyPrepVolumeCascade(
   // Нормализация prep-кривой: buildBBPlan рамп-апит объём к финалу (×0.85→×1.10),
   // а prep должен ДЕРЖАТЬ и нисходить к таперу. Якорим prep к ПЕРВОЙ prep-неделе
   // и масштабируем последующие вниз по фазовому множителю (монотонная кривая).
-  const prepIdx = weeks.map((w, i) => [w, i] as const).filter(([w]) => w.contestPhase === 'preparation' || w.contestPhase === 'final_preparation');
+  const prepIdx = weeks.map((w, i) => [w, i] as const).filter(([w]) =>
+    (w.contestPhase === 'preparation' || w.contestPhase === 'final_preparation')
+    && !((w as any).deload || String((w as any).phase || '').toLowerCase() === 'deload'));
   if (prepIdx.length >= 2) {
     const firstIdx = prepIdx[0][1];
     const firstTotal = weeks[firstIdx].sessions.reduce((a: number, s: any) => a + (s.exercises || []).filter((e: any) => !(e as any).warmupActivator).reduce((b: number, e: any) => b + (e.sets || 0), 0), 0);

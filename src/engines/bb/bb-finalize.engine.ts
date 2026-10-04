@@ -1489,7 +1489,13 @@ function ensureSmallMuscleQuality(session: any, week: any, options: BBFinalizeOp
         const sessionSets = session.exercises.reduce((sum: number, x: any) => sum + (x.sets || 0), 0);
         const maxSessionSets = options.level === 'enhanced' && (options.trainingYears ?? 0) >= 3 ? 60 : options.level === 'enhanced' && (options.trainingYears ?? 0) >= 1 ? 40 : 24;
         const room = maxSessionSets - sessionSets;
-        const targetSets = Math.min(sets, Math.max(2, room));
+        const slotSets = slot.sets || 0;
+        // 26.09.2026 (аудит): прежний Math.max(2, room) при room≤0 и слоте <2 сетов
+        // добавлял сеты сверх капа сессии. Оставляем прежнее значение, но если замена
+        // слота S на T выводит итог за кап (T−S > room) — ужимаем T до maxNew.
+        let targetSets = Math.min(sets, Math.max(2, room));
+        const maxNew = room + slotSets;
+        if (targetSets > maxNew) targetSets = Math.max(1, maxNew);
         slot.muscle = muscle;
         slot.name = candidate.name;
         slot.exerciseName = candidate.name;
@@ -2537,6 +2543,21 @@ const SPEC_FREQ_TAGS: Record<string, string[]> = {
   biceps: ['Pull', 'Arms', 'FullBody'], triceps: ['Push', 'Arms', 'FullBody'],
   calves: ['Legs', 'Lower', 'FullBody'], abs: ['FullBody', 'Torso'], traps: ['Pull', 'Upper'],
 };
+/**
+ * 26.09.2026 (аудит): неделя под управлением taper/prep/пика (объём уже срезан
+ * applyTaperToFinalWeeks / contest-prep). Посты, которые ДОБАВЛЯЮТ объём/RIR
+ * (специализация, схемы объёма GVT/FST-7, PPL-гарантия, frequency-guard), должны
+ * их пропускать — иначе taper ×0.75/×0.50 откатывается обратно. Паритет с
+ * локальными isPrepControlled/isGenericTaperWeek в finalizeBBPlan.
+ */
+function isTaperPrepOrPeakWeek(w: any): boolean {
+  if (!w) return false;
+  if (w.taper === true || w.taperApplied === true) return true;
+  if (w.contestPhase === 'taper' || w.contestPhase === 'peak_week') return true;
+  if (w.peakWeek === true) return true;
+  if (typeof w.prepProtocol === 'string' && !String(w.prepProtocol).startsWith('Пропущена')) return true;
+  return false;
+}
 export function applySpecializationPass(plan: BBPlan, options: BBFinalizeOptions): void {
   const priority = options.priorityMuscles || [];
   const schedule = options.specializationSchedule;
@@ -2551,7 +2572,7 @@ export function applySpecializationPass(plan: BBPlan, options: BBFinalizeOptions
   };
 
   for (const week of plan.weeks) {
-    if (week.phase === 'deload') continue;
+    if (week.phase === 'deload' || isTaperPrepOrPeakWeek(week)) continue;
     // Цели НЕДЕЛИ: по активному расписанию блоков специализации или весь
     // priorityMuscles (legacy/неактивное расписание).
     const weekTargets = (schedule && schedule.active)
@@ -3117,7 +3138,7 @@ export function applyVolumeScheme(plan: BBPlan, scheme: string, opts?: { fst7Sev
   if (!cfg) return;
   const caps = (plan as any).mrvByMuscle || {};
   for (const week of plan.weeks) {
-    if (week.phase === 'deload') continue;
+    if (week.phase === 'deload' || isTaperPrepOrPeakWeek(week)) continue;
     // Недельный прямой объём по мышцам (до схемы) — схема не должна
     // выталкивать мышцу за её адаптированный MRV-кап.
     const weekDirect: Record<string, number> = {};
@@ -3842,7 +3863,20 @@ export function finalizeBBPlan(plan: BBPlan, options: BBFinalizeOptions = {}): B
         }
         if (total < target) {
           const used = new Set(items.map((e: any) => e.name));
-          const candidate = EXERCISE_CATALOG.find((x: any) => trueMuscleOf(x) === muscle && !used.has(x.name));
+          // 26.09.2026 (аудит): прежний find проверял только мышцу и имя — mobility-/
+          // equipment-/excluded-ограничения игнорировались (паритет с findCatalog:567).
+          const candidate = EXERCISE_CATALOG.find((x: any) => {
+            if (trueMuscleOf(x) !== muscle || used.has(x.name)) return false;
+            if (options.excludedExercises?.includes(x.id) || options.excludedExercises?.includes(x.name)) return false;
+            if (isBBJunk(x)) return false;
+            if (options.avoidAxialLoad && isAxialLoadExercise(x as any)) return false;
+            if (isMobilityRestricted(x, options.mobilityRestrictions)) return false;
+            if (options.equipment?.length) {
+              const eq = Array.isArray(x.equipment) ? x.equipment : [String(x.equipment || '')];
+              if (eq.length && !eq.includes('bodyweight') && !eq.some((q: string) => options.equipment!.includes(q))) return false;
+            }
+            return true;
+          });
           if (candidate) {
             const base: any = items[0];
             const added: any = structuredClone(base);
@@ -4870,7 +4904,7 @@ for (const week of next.weeks) {
       ).maxWorkingSets;
     } catch { sessCap = 30; }
     for (const week of next.weeks) {
-      if ((week as any).phase === 'deload' || (week as any).deload) continue;
+      if ((week as any).phase === 'deload' || (week as any).deload || isTaperPrepOrPeakWeek(week)) continue;
       for (const s of week.sessions) {
         const tag = s.sessionTag || '';
         const need = /Pull|Back/i.test(tag)
@@ -5062,7 +5096,7 @@ for (const week of next.weeks) {
   if (!options.preserveSource && (next as any).pattern?.id && /fullbody/i.test(String((next as any).pattern.id || ''))) {
     const MAJORS = ['chest', 'back', 'quads', 'hamstrings', 'shoulders', 'glutes', 'biceps', 'triceps'];
     for (const week of next.weeks) {
-      if ((week as any).phase === 'deload' || (week as any).deload) continue;
+      if ((week as any).phase === 'deload' || (week as any).deload || isTaperPrepOrPeakWeek(week)) continue;
       for (const m of MAJORS) {
         const withMuscle = week.sessions.filter((s: any) =>
           s.exercises.some((e: any) => !(e as any).warmupActivator && e.muscle === m));

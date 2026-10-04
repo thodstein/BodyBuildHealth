@@ -92,14 +92,17 @@ describe('Проф-методики × уровни (матрица)', () => {
         const plan = buildBBPlan({ ...base, volumeScheme: 'gvt' });
         const inv = invariants(plan);
         expect(inv).toEqual({ over5: 0, single: 0, ovf: 0 });
-        const applied = plan.weeks.filter((w: any) => w.phase !== 'deload').flatMap((w: any) => w.sessions)
+        // 26.09.2026 (аудит): taper-недели исключены — GVT (высокообъёмная схема) не
+        // должен возвращать объём в уже срезанные недели (иначе taper ×0.75/×0.50
+        // откатывается). Проверяем не-taper рабочие недели.
+        const applied = plan.weeks.filter((w: any) => w.phase !== 'deload' && !(w as any).taper && !(w as any).taperApplied)
+          .flatMap((w: any) => w.sessions)
           .flatMap((s: any) => s.exercises).filter((e: any) => (e.comment || '').includes('GVT'));
         if (isBeginner) {
           // Новичку GVT не применяется.
           expect(applied.length).toBe(0);
-        } else if (applied.length > 0) {
-          // Полное применение: минимум одно упражнение с 5×10@75с
-          expect(applied.some((e: any) => e.sets === 5)).toBe(true);
+        } else {
+          // Схема корректна там, где есть запас по MRV; кап-аджуст может срезать до 2.
           for (const e of applied) {
             expect(e.sets).toBeLessThanOrEqual(5);
             expect(e.sets).toBeGreaterThanOrEqual(2);
@@ -124,6 +127,16 @@ describe('Проф-методики × уровни (матрица)', () => {
       });
     }
   }
+
+  it('схема gvt на 12-нед плане реально даёт 5×10 (не только кап-срез)', () => {
+    // 26.09.2026 (аудит): на коротком 4-нед плане почти все рабочие недели — taper
+    // (GVT их не трогает), поэтому «полное применение 5×10» проверяем на длинном плане.
+    const plan = buildBBPlan({ patternId: 'upper_lower_4', level: 'intermediate', trainingYears: 3, goal: 'mass', weeks: 12, workMax: WM, volumeScheme: 'gvt' } as any);
+    const applied = plan.weeks.filter((w: any) => w.phase !== 'deload' && !(w as any).taper && !(w as any).taperApplied)
+      .flatMap((w: any) => w.sessions).flatMap((s: any) => s.exercises)
+      .filter((e: any) => (e.comment || '').includes('GVT'));
+    expect(applied.some((e: any) => e.sets === 5)).toBe(true);
+  });
 
   it('комбо (DUP + суперсеты + GVT) — все инварианты чисты на ключевых уровнях', () => {
     for (const [name, level, years] of LEVELS) {

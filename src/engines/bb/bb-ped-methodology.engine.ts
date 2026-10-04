@@ -10,7 +10,7 @@ import { schemeFor, type SchemeForInput } from './bb-rep-schemes.engine';
 import type { BBPhase } from '../periodization';
 import { resolvePedPhase, describePedPhase, insulinSafetyCheck, type PedPhase, type InsulinSafety } from './bb-ped-phasing.engine';
 import { canonicalMuscle } from './bb-specialization.engine';
-import { computeAASEquivDose } from './bb-ped-adaptation.engine';
+import { computeAASEquivDose, parseDose } from './bb-ped-adaptation.engine';
 import type { SessionMethodology } from './bb-session-order.engine';
 
 export type PED = 'AAS' | 'insulin' | 'MGF' | 'IGF1' | 'GH';
@@ -76,10 +76,8 @@ export interface PEDMethodologyInput {
 
 function has(peds: PED[], k: PED): boolean { return peds.includes(k); }
 function dose(doses: Record<string, number>, k: string): number {
-  const raw = doses[k];
-  if (typeof raw === 'number') return raw;
-  if (raw != null) return parseFloat(String(raw).replace(',', '.').replace(/[^0-9.]/g, '')) || 0;
-  return 0;
+  // 26.09.2026 (аудит): единый парсер (г→×1000/мкг/мг) — локальная копия теряла единицы.
+  return parseDose(doses[k]);
 }
 
 export function recommendPEDMethodology(input: PEDMethodologyInput): PEDMethodology {
@@ -235,6 +233,9 @@ export function applyPEDMethodologyToPlan(
     skipGuardNote?: boolean;
   },
 ): import('./bb-builder.engine').BBPlan {
+  // 26.09.2026 (аудит): идемпотентность — повторное применение (revalidate/повторный
+  // program-оверлей) дублировало rationale-строки. Маркеры уже применённого оверлея.
+  if ((plan.rationale || []).some(r => /💊 |🍚 Peri-WO:|🧬 MGF\/IGF1|🧬 GH\+insulin pump window/.test(String(r)))) return plan;
   if (!meth.insulinPumpWindow && !meth.jointGuard && !meth.mgfTargetMuscles.length) {
     // Даже без окна — добавить periWorkout rationale
     if (meth.periWorkout.intraNote || meth.periWorkout.warning) {

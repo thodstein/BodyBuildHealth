@@ -112,8 +112,10 @@ export function computeLoading(input: LoadingInput): LoadingOutput {
   // FIX: используем phaseWeek (не absolute week) — parity с bb-builder.
   const baseRest = phaseCfg.restBase;
   const restProgression = input.phase === 'deload' ? -30 : Math.max(0, (input.phaseWeek - 1) * 15);
+  // 26.09.2026 (аудит): deload — ровно +30с к базе для ВСЕХ (комментарий «deload +30s»).
+  // Прежняя формула для primary давала baseRest +30 − (−30) = +60с (двойной +30).
   const restSeconds = input.phase === 'deload'
-    ? Math.min(180, (isAccessory ? baseRest : baseRest + 30) - restProgression)
+    ? Math.min(180, baseRest + 30)
     : Math.max(60, (isAccessory ? Math.max(45, baseRest - 30) : baseRest) - restProgression);
 
   // Work sets: all same weight/reps/rir (DUP wave applied later in prescribeLoad)

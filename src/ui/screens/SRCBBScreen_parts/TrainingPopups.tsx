@@ -65,7 +65,15 @@ export const PopupNumber: React.FC<{
             style={{ width: '100%', padding: '12px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.3)', color: '#fff', fontSize: 16, boxSizing: 'border-box', textAlign: 'center', marginBottom: 12 }} />
           <div style={{ display: 'flex', gap: 8 }}>
             <button onClick={() => setOpen(false)} style={{ flex: 1, padding: '10px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'transparent', color: '#fff', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>Отмена</button>
-            <button onClick={() => { const v = parseFloat(edit); if (!isNaN(v)) onChange(v); setOpen(false); }} style={{ flex: 1, padding: '10px', borderRadius: 8, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#000', fontWeight: 700, fontSize: 12 }}>OK</button>
+            <button onClick={() => {
+              // 26.09.2026 (аудит): min/max были только HTML-подсказкой — OK принимал
+              // любое число (weeks=999, workMax=99999). Клампим к границам.
+              let v = parseFloat(edit);
+              if (isNaN(v)) { setOpen(false); return; }
+              if (min !== undefined) v = Math.max(min, v);
+              if (max !== undefined) v = Math.min(max, v);
+              onChange(v); setOpen(false);
+            }} style={{ flex: 1, padding: '10px', borderRadius: 8, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#000', fontWeight: 700, fontSize: 12 }}>OK</button>
           </div>
         </div>
       </div>

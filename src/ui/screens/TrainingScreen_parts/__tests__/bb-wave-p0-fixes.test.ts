@@ -79,7 +79,13 @@ describe('§2.4/2.5/2.6: UI-разрывы', () => {
   });
 
   it('калибровка сохраняет полный metadata-слепок методик', () => {
-    expect(SRC).toContain('setBuiltPlan((prev) => ({\n      ...(prev || {}),\n      ...plan,\n      trainingVolumeMode,');
+    // 26.09.2026 (аудит): второй setBuiltPlan(prev => ({...prev, ...plan, trainingVolumeMode}))
+    // перекрывал rationale/метаданные первого — удалён. Калибровка теперь применяется ДО
+    // единственного обогащённого setBuiltPlan (source/strategy/volume-строки сохраняются).
+    expect(SRC).not.toContain('setBuiltPlan((prev) => ({\n      ...(prev || {}),\n      ...plan,\n      trainingVolumeMode,');
+    expect(SRC).toContain('Применены сохранённые реальные веса');
+    expect(SRC).toContain('📌 Источник:');
+    expect(SRC).toContain('rationale: [...plan.rationale,');
   });
 
   it('карточка оптимизации частоты рендерится (была write-only)', () => {

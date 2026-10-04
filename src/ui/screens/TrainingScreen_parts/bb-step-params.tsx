@@ -161,7 +161,6 @@ export interface BbParamsStepProps {
 }
 
 const GRID2: React.CSSProperties = { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 };
-const GRID3: React.CSSProperties = { display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6 };
 const NOTE: React.CSSProperties = { fontSize: 10, color: '#fff', lineHeight: 1.45 };
 
 export const BbParamsStep: React.FC<BbParamsStepProps> = ({

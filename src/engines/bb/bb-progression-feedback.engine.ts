@@ -240,6 +240,9 @@ export function applyFeedbackToBuild(
   strategy: LoadStrategy = 'double_progression',
 ): BBPlan {
   if (!sessions || sessions.length === 0 || plan.weeks.length === 0) return plan;
+  // 26.09.2026 (аудит): идемпотентность — повторный вызов дублировал комментарий
+  // «↻ из факта:» на каждом прогоне (вес тот же, а строка росла).
+  if (plan.weeks.some(w => (w.sessions || []).some(s => (s.exercises || []).some(e => String(e.comment || '').includes('↻ из факта:'))))) return plan;
   const lastIndex = buildLastResultIndex(sessions);
   if (lastIndex.size === 0) return plan;
   const tw = plan.weeks.length;
@@ -297,6 +300,10 @@ export function applyDiaryVolumeCorrection(
   opts?: { maxAdherenceFloor?: number },
 ): { plan: BBPlan; changes: string[] } {
   if (!sessions || sessions.length === 0 || !plan || !plan.weeks?.length) return { plan, changes: [] };
+  // 26.09.2026 (аудит): идемпотентность. Повторный вызов на уже скорректированном плане
+  // умножал сеты ещё раз (adherence 0.75 дважды → 0.5625). Маркер в комментарии.
+  const alreadyCorrected = plan.weeks.some(w => (w.sessions || []).some(s => (s.exercises || []).some(e => String(e.comment || '').includes('📉 объём скорректирован по дневнику'))));
+  if (alreadyCorrected) return { plan, changes: [] };
   let perMuscleACWR: Record<string, { ratio: number; zone: string }> = {};
   try { perMuscleACWR = computePerMuscleACWR(sessions); } catch { return { plan, changes: [] }; }
 
@@ -596,12 +603,18 @@ export function computePerMuscleACWR(
 ): Record<string, { ratio: number; zone: 'undertrained' | 'optimal' | 'caution' | 'dangerous' }> {
   if (!sessions || sessions.length < 4) return {};
 
-  // Группируем сессии по неделям (ISO week start Monday)
+  // Группируем сессии по неделям (ISO week start Monday).
+  // 26.09.2026 (аудит): раньше new Date('YYYY-MM-DD') = полночь UTC, а getDay/setDate —
+  // локальные, toISOString — снова UTC: в UTC- зонах ключ понедельника уезжал на день.
+  // Теперь всё в локальном времени (полдень — DST-безопасно).
   const weekKey = (dateStr: string): string => {
-    const d = new Date(dateStr);
+    const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(dateStr));
+    if (!m) return String(dateStr).slice(0, 10);
+    const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]), 12, 0, 0);
     const day = d.getDay() || 7; // 0=Sunday → 7
     d.setDate(d.getDate() - (day - 1)); // понедельник
-    return d.toISOString().slice(0, 10);
+    const yy = d.getFullYear(); const mm = String(d.getMonth() + 1).padStart(2, '0'); const dd = String(d.getDate()).padStart(2, '0');
+    return `${yy}-${mm}-${dd}`;
   };
 
   // muscle → week → total sets

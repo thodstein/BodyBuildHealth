@@ -355,7 +355,7 @@ export const BbAdjustStep: React.FC<BbAdjustStepProps> = ({
               <button onClick={() => {
                 const next: any = { ...editsRef.current };
                 for (const s of wk.sessions) for (let ei = 0; ei < s.exercises.length; ei++) {
-                  const key = `${wk.sessions.indexOf(s)}-${ei}`;
+                  const key = `${wk.week}-${wk.sessions.indexOf(s)}-${ei}`;
                   const cur = next[key] || { sets: s.exercises[ei].sets, reps: s.exercises[ei].workSets?.[0]?.reps || 10, weight: s.exercises[ei].workSets?.[0]?.weight || 80 };
                   if (bulkMode === 'mult') next[key] = { ...cur, [bulkField]: Math.round((cur[bulkField] || 0) * bulkValue) };
                   else next[key] = { ...cur, [bulkField]: bulkValue };
@@ -370,7 +370,9 @@ export const BbAdjustStep: React.FC<BbAdjustStepProps> = ({
           <ExpandableCard key={si} title={'День ' + (si+1) + ' · ' + s.character + ' (' + s.exercises.length + ' упр.)'} icon="🏋️" short={s.exercises.map(e => e.name).join(', ')} full={
             <div>
               {s.exercises.map((e, ei) => {
-                const editKey = `${si}-${ei}`;
+                // 26.09.2026 (аудит): ключ правки включает неделю (wk.week) — правка
+                // одной недели больше не применяется ко всему мезоциклу.
+                const editKey = `${wk.week}-${si}-${ei}`;
                 const edit = exerciseEdits[editKey] || { sets: e.sets, reps: e.workSets[0]?.reps || 10, weight: e.workSets[0]?.weight || 80 };
                 const isComp = isCompoundEx(e);
                 const altExercises = getExercisesByGroup(e.muscle).filter(x => x.name !== e.name).slice(0, 5);

@@ -870,6 +870,12 @@ function peakWeekCacheKey(eff: BBContestPrepConfig): string {
     eff.allergens?.join(',') ?? '',
     eff.showDate,
     eff.schedule?.stage ?? '', eff.schedule?.wake ?? '',
+    // 26.09.2026 (аудит): contraindications и glycogenLevel влияют на buildPeakWeek
+    // (safety-gate форсит stable-моды; glycogen корректирует бюджет). Без них два
+    // конфига с разными противопоказаниями получали ОДИН кэш-результат (напр. tapered
+    // для пациента с почками). Ключ дополнен — кэш не смешивает разные конфиги.
+    eff.contraindications?.slice().sort().join(',') ?? '',
+    eff.glycogenLevel ?? '',
   ];
   return parts.map(p => String(p ?? '')).join('|');
 }
@@ -1062,7 +1068,10 @@ export function buildPeakWeek(cfg: BBContestPrepConfig, opts?: { carbDoseGPerKg?
     : null;
   const totalBudget = dosePerKg != null
     ? Math.round(w * dosePerKg)
-    : clamp(Math.round(rawBudget), Math.round(w * budgetMin), Math.round(w * budgetMax * tolMult));
+    // 26.09.2026 (аудит): используем adjRawBudget (glycogenAdjustedDose), а не rawBudget —
+    // прежний код считал adjRawBudget и НЕ применял (glycogenLevel не влиял на бюджет).
+    // При нормальном гликогене glycAdj=1 → байт-в-байт с прежним поведением.
+    : clamp(adjRawBudget, Math.round(w * budgetMin), Math.round(w * budgetMax * tolMult));
   const distribution = CARB_DISTRIBUTION[strat] ?? CARB_DISTRIBUTION.moderate;
   // load-дни: распределить бюджет по долям; деплеция — мягкая 1.2-1.8 г/кг (Homer 2024 без брутальной деплеции)
   // Для новичков/без trial — повышенная деплеция (не ниже 1.5 для light), для опытных с trial — можно 0.9
@@ -1877,7 +1886,7 @@ export function applyTrainingTaperToBBPlan(
 export function applyPeakWeekOverlayToBBPlan(
   plan: BBPlan,
   rawCfg: BBContestPrepConfig,
-  opts?: { weekNumber?: number; carbDoseGPerKg?: number },
+  opts?: { weekNumber?: number; carbDoseGPerKg?: number; force?: boolean },
 ): BBPlanWithPrep {
   if (!plan || !Array.isArray(plan.weeks) || plan.weeks.length === 0) return plan as BBPlanWithPrep;
   const v = validateBBContestPrepConfig(rawCfg);
@@ -1892,7 +1901,13 @@ export function applyPeakWeekOverlayToBBPlan(
   const targetIdx = clamp((opts?.weekNumber ?? weeks.length) - 1, 0, weeks.length - 1);
   const target = weeks[targetIdx];
   let applied = false;
-  if (target.peakWeek !== true) {
+  // 26.09.2026 (аудит): добавлен `force` — повторное наложение с изменённым конфигом
+  // (доза/стратегия/вода) больше не игнорируется (прежний guard «первое наложение
+  // навсегда»). Исходные сессии сохраняются в `__peakOverlayBase`, чтобы force-пересборка
+  // НЕ компаундила сокращение объёма (паритет с taper-путём `peakWeekBase`).
+  if (target.peakWeek !== true || opts?.force === true) {
+    const baseSessions = ((target as any).__peakOverlayBase || target.sessions) as any[];
+    (target as any).__peakOverlayBase = baseSessions;
     // PRO-2 P2-доводка: оверлей Macrocycle-пути тоже берёт дозу trial (без неё — коридор).
     const peakWeek = buildPeakWeek(cfg, opts?.carbDoseGPerKg != null ? { carbDoseGPerKg: opts.carbDoseGPerKg } : undefined);
     target.phase = 'peaking';
@@ -1900,7 +1915,7 @@ export function applyPeakWeekOverlayToBBPlan(
     target.taper = true;
     target.peakWeek = true;
     target.contestPhase = 'peak_week';
-    target.sessions = target.sessions.map((s: any, si: number) => toPeakWeekSession(s, si, cfg, peakWeek));
+    target.sessions = baseSessions.map((s: any, si: number) => toPeakWeekSession(s, si, cfg, peakWeek));
     target.prepProtocol = `Пик-неделя: ${PHASES_BY_STRATEGY[cfg.carbLoadStrategy].map(p => PHASE_LABELS_RU[p]).join(' → ')}${opts?.carbDoseGPerKg != null ? ` · доза trial ${opts.carbDoseGPerKg} г/кг` : ''}`;
     applied = true;
   } else if (target.contestPhase !== 'peak_week') {
@@ -1984,8 +1999,16 @@ export function applyContestPrepToBBPlan(
   const weeks = tapered.weeks as any[];
   const total = weeks.length;
   const endIdx = clamp((opts.weekNumber ?? total) - 1, 0, total - 1);
-  // 0-index: taper занимает недели [endIdx - taperWeeks, endIdx - 1], пик = endIdx.
-  const taperStart0 = Math.max(0, endIdx - taperWeeks);
+  // 0-index: taper занимает недели [taperStart0, endIdx - 1], пик = endIdx.
+  // 26.09.2026 (аудит): фактическая длина тапера (adaptive) может отличаться от запрошенной
+  // (новичок/40+ → 4 нед вместо 2). Берём НАЧАЛО тапера из разметки taper-движка
+  // (contestPhase='taper'), а не из taperWeeks — иначе фазы разъезжались: неделя получала
+  // и taper-срез, и final-prep ×0.9 (двойной срез), либо taper-метку без среза.
+  let taperStart0 = Math.max(0, endIdx - taperWeeks);
+  for (let i = 0; i < endIdx; i++) {
+    const w = weeks[i] as any;
+    if (w && w.contestPhase === 'taper') { taperStart0 = i; break; }
+  }
   const prepEnd0 = taperStart0 - 1;
   const finalStart0 = Math.max(0, prepEnd0 - 1);
 
@@ -2661,7 +2684,9 @@ export function buildBBContestPrepPlan(rawCfg: BBContestPrepConfig, opts: BuildP
     },
     taper: {
       enabled: taperWeeks > 0,
-      weeks: taperWeeks,
+      // 26.09.2026 (аудит): длина тапера = фактическая (adaptive), а не запрошенная —
+      // иначе печать «нед N» считала `weeks - i` и давала 2,1,0,-1 при расхождении.
+      weeks: taperCurve.length || taperWeeks,
       volumeProfile: taperCurve.map(t => t.volumePct),
       intensityProfile: taperCurve.map(t => t.intensityPct),
       rirProfile: taperCurve.map(t => [t.rirMin, t.rirMax]),
@@ -2718,7 +2743,8 @@ export function replanBBContestPrep(plan: BBContestPrepPlan, showDate: string, p
     preparation: { ...plan.preparation, weeks: pw, finalWeeks: pw >= 4 ? 2 : 0, startDate },
     taper: {
       ...plan.taper,
-      weeks: tw,
+      // 26.09.2026 (аудит): фактическая длина (adaptive) — паритет с volumeProfile.
+      weeks: taper.length || tw,
       volumeProfile: taper.map(t => t.volumePct),
       intensityProfile: taper.map(t => t.intensityPct),
       rirProfile: taper.map(t => [t.rirMin, t.rirMax]),

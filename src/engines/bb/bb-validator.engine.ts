@@ -467,30 +467,35 @@ export function generateActionableRecommendations(
   for (const issue of issues) {
     switch (issue.code) {
       case 'target_volume_deficit': {
-        // "muscle: effective volume X ниже MEV Y" → "Добавьте N сетов на muscle"
-        const match = issue.message.match(/([\w_]+):.*volume\s+([\d.]+).*MEV\s+(\d+)/);
-        if (match) {
-          const muscle = match[1];
-          const ru = MUSCLE_LABEL_RU[muscle] || muscle;
-          const current = parseFloat(match[2]);
-          const mev = parseInt(match[3]);
-          const deficit = Math.ceil(mev - current);
-          recs.push({
-            priority: 'high',
-            action: `Добавьте ${deficit} подход(ов) на «${ru}»: текущие эффективные ${current} < минимума MEV ${mev}. Включите фидер-сет (2-3 сета изоляции) или добавьте упражнение в ближайшую тренировку этой мышцы.`,
-            code: issue.code,
-          });
-        }
+        // 26.09.2026 (аудит): мышца берётся из issue.exercise (канон), а не из regex по
+        // сообщению — прежний regex `([\w_]+):.*volume` ждал ASCII-ключ и англ. «volume»,
+        // а прод-сообщение на русском («эффективных сетов 5.5 ниже минимума MEV 8»),
+        // поэтому match всегда падал → рекомендаций не было → ниже срабатывал ложный
+        // «✅ План сбалансирован». Числа извлекаются языко-независимо.
+        const muscle = issue.exercise || (issue.message.match(/^([A-Za-z_]+):/)?.[1] ?? '');
+        const ru = MUSCLE_LABEL_RU[muscle] || muscle || 'мышца';
+        const mevM = issue.message.match(/MEV\s+([\d.]+)/);
+        const nums = issue.message.match(/\d+(?:[.,]\d+)?/g) || [];
+        const current = nums.length ? parseFloat((nums[0] || '0').replace(',', '.')) : 0;
+        const mev = mevM ? parseFloat(mevM[1]) : 0;
+        const deficit = Math.max(1, Math.ceil((mev > 0 ? mev : current + 1) - current));
+        recs.push({
+          priority: 'high',
+          action: `Добавьте ${deficit} подход(ов) на «${ru}»: текущие эффективные ${current} < минимума MEV ${mev}. Включите фидер-сет (2-3 сета изоляции) или добавьте упражнение в ближайшую тренировку этой мышцы.`,
+          code: issue.code,
+        });
         break;
       }
       case 'effective_mrv_overflow': {
-        const match = issue.message.match(/([\w_]+):.*effective\s+([\d.]+).*MRV\s+(\d+)/);
-        if (match) {
-          const muscle = match[1];
-          const ru = MUSCLE_LABEL_RU[muscle] || muscle;
-          const current = parseFloat(match[2]);
-          const mrv = parseInt(match[3]);
-          const excess = Math.ceil(current - mrv);
+        const muscle = issue.exercise || (issue.message.match(/^([A-Za-z_]+):/)?.[1] ?? '');
+        const ru = MUSCLE_LABEL_RU[muscle] || muscle || 'мышца';
+        // Прод-сообщение: «Неделя 3: Спина: эффективных: 25 > MRV 20 …» — берём X и cap
+        // из связки «X > MRV cap» (языко-независимо).
+        const m = issue.message.match(/([\d.]+)\s*>\s*MRV\s+([\d.]+)/);
+        const current = m ? parseFloat(m[1]) : 0;
+        const mrv = m ? parseFloat(m[2]) : 0;
+        const excess = Math.max(1, Math.ceil(current - mrv));
+        if (m) {
           recs.push({
             priority: 'high',
             // 26.09.2026 было→стало: раньше здесь стояло «выше верхней границы MRV» + «риск
@@ -562,6 +567,17 @@ export function generateActionableRecommendations(
         recs.push({
           priority: 'medium',
           action: issue.message.includes('сушка') ? 'Сушка + сила: смените фокус на hypertrophy/endurance для сохранения мышц в дефиците.' : 'strength_mass требует фокус «сила» (низкие повторы) — смените trainingFocus.',
+          code: issue.code,
+        });
+        break;
+      }
+      default: {
+        // 26.09.2026 (аудит): любой не разобранный warning/error даёт хотя бы общую
+        // рекомендацию — иначе план с предупреждениями (sets_mismatch, equipment_*,
+        // single_work_set и др.) получал ложный «✅ План сбалансирован».
+        recs.push({
+          priority: issue.level === 'error' ? 'high' : 'medium',
+          action: issue.message || 'Проверьте план по этому замечанию.',
           code: issue.code,
         });
         break;

@@ -164,12 +164,39 @@ function migrateSavedPlan(value: any): SavedBBPlan {
       platePreset: typeof rawParams.platePreset === 'string' && rawParams.platePreset !== 'standard' ? rawParams.platePreset : undefined,
       targetBodyFat: Number.isFinite(rawParams.targetBodyFat) ? Number(rawParams.targetBodyFat) : undefined,
       cycleDay: Number.isFinite(rawParams.cycleDay) ? Number(rawParams.cycleDay) : undefined,
+      // 26.09.2026 (аудит): эти поля объявлены и восстанавливаются в конструкторе, но
+      // migrateSavedPlan их ВЫБРАСЫВАЛ → при перезагрузке multi-block специализация
+      // схлопывалась в один 5-нед блок, а DC-lite/фаза MGF-IGF1 терялись.
+      pedPhaseOverride: ['auto', 'proliferation', 'differentiation'].includes(rawParams.pedPhaseOverride) ? rawParams.pedPhaseOverride : undefined,
+      dcMode: rawParams.dcMode === true ? true : undefined,
+      specBlocks: Array.isArray(rawParams.specBlocks)
+        ? rawParams.specBlocks
+            .filter((b: any) => b && Number.isFinite(b.weekStart) && Number.isFinite(b.weekEnd))
+            .map((b: any) => ({
+              id: typeof b.id === 'string' ? b.id : undefined,
+              weekStart: Number(b.weekStart),
+              weekEnd: Number(b.weekEnd),
+              targets: Array.isArray(b.targets) ? b.targets.filter((t: any) => typeof t === 'string') : [],
+              tradeoff: b.tradeoff && typeof b.tradeoff === 'object' ? {
+                mode: ['none', 'reduce_direct_to_floor', 'remove_direct_when_indirect_covers_floor'].includes(b.tradeoff.mode) ? b.tradeoff.mode : 'none',
+                donorMuscles: Array.isArray(b.tradeoff.donorMuscles) ? b.tradeoff.donorMuscles.filter((d: any) => typeof d === 'string') : [],
+                preserveIndirect: true as const,
+              } : undefined,
+            }))
+        : undefined,
     },
     metrics: {
       totalSets: Number(value.metrics?.totalSets) || 0, avgRir: Number(value.metrics?.avgRir) || 0,
       sessionsPerWeek: Number(value.metrics?.sessionsPerWeek) || value.plan.pattern?.sessionsPerRotation || 0,
       phases: Array.isArray(value.metrics?.phases) ? value.metrics.phases.filter((item: any) => typeof item === 'string') : [], qualityScore: Number(value.metrics?.qualityScore) || 0,
       muscleCount: Number(value.metrics?.muscleCount) || 0, mrvMult: Number(value.metrics?.mrvMult) || 1,
+      // 26.09.2026 (аудит): пик/время/осевые метрики терялись при миграции — таблица
+      // сравнения вариантов после перезагрузки показывала «—».
+      peakWeek: Number.isFinite(value.metrics?.peakWeek) ? Number(value.metrics.peakWeek) : undefined,
+      peakDirectSets: Number.isFinite(value.metrics?.peakDirectSets) ? Number(value.metrics.peakDirectSets) : undefined,
+      peakEffectiveSets: Number.isFinite(value.metrics?.peakEffectiveSets) ? Number(value.metrics.peakEffectiveSets) : undefined,
+      maxSessionMinutes: Number.isFinite(value.metrics?.maxSessionMinutes) ? Number(value.metrics.maxSessionMinutes) : undefined,
+      maxAxialCost: Number.isFinite(value.metrics?.maxAxialCost) ? Number(value.metrics.maxAxialCost) : undefined,
     },
   };
 }

@@ -34,8 +34,15 @@ export const BbWeightsStep: React.FC<BbWeightsStepProps> = ({
   const filled = entries.filter(e => e.actualWeight != null && e.actualWeight > 0).length;
   // Фаза 0: группировка по группам мышц (порядок — по появлению в плане).
   const groups = groupWeightEntries(entries);
-  const setEntry = (i: number, v: number | null) =>
-    setWeightEntries(prev => { const c = prev.length ? prev.slice() : collectPlanExercises(builtPlan); c[i] = { ...c[i], actualWeight: v }; return c; });
+  // 26.09.2026 (аудит): прежний setEntry(i) использовал индекс ВНУТРИ группы против
+  // ГЛОБАЛЬНОГО массива entries — ввод веса во 2-й+ группе писал в упражнение первой
+  // группы (вес «уезжал» на чужое упражнение, поле оставалось пустым). Матчим по id/имени.
+  const setEntry = (entry: PlanWeightEntry, v: number | null) =>
+    setWeightEntries(prev => {
+      const base = prev.length ? prev : collectPlanExercises(builtPlan);
+      const key = entry.id || entry.name;
+      return base.map(x => ((x.id || x.name) === key ? { ...x, actualWeight: v } : x));
+    });
   const apply = () => {
     if (!builtPlan) return;
     const res = recalibratePlanWeights(builtPlan, entries);
@@ -96,7 +103,7 @@ export const BbWeightsStep: React.FC<BbWeightsStepProps> = ({
                   </button>
                   {!collapsed && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: 8 }}>
-                      {g.items.map((e, i) => (
+                      {g.items.map((e) => (
                         <div key={e.id || e.name} style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, padding: '8px 10px', display: 'flex', alignItems: 'center', gap: 8, boxSizing: 'border-box' }}>
                           <div style={{ flex: 1, minWidth: 0 }}>
                             <div style={{ fontSize: 12, fontWeight: 700, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.name}</div>
@@ -111,7 +118,7 @@ export const BbWeightsStep: React.FC<BbWeightsStepProps> = ({
                               type="number" inputMode="decimal" min={0} step={0.5}
                               value={e.actualWeight ?? ''}
                               placeholder={String(e.referenceWeight)}
-                              onChange={ev => setEntry(i, ev.target.value === '' ? null : Number(ev.target.value))}
+                              onChange={ev => setEntry(e, ev.target.value === '' ? null : Number(ev.target.value))}
                               style={{ width: 84, textAlign: 'center', flexShrink: 0, background: e.actualWeight != null && e.actualWeight > 0 ? 'rgba(0,230,138,0.12)' : '#18181b', color: '#fff', border: e.actualWeight != null && e.actualWeight > 0 ? '1px solid rgba(0,230,138,0.4)' : '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: '6px 8px', fontSize: 12 }}
                             />
                           </label>

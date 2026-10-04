@@ -18,7 +18,7 @@
  * дней и MRV-капы не трогает. Интеграция: recommendPEDMethodology (фаза в
  * pedProfile для schemeFor) + applyPEDMethodologyToPlan (пометки по неделям).
  */
-import { computeAASEquivDose } from './bb-ped-adaptation.engine';
+import { computeAASEquivDose, parseDose } from './bb-ped-adaptation.engine';
 
 export type PED = 'AAS' | 'insulin' | 'MGF' | 'IGF1' | 'GH';
 
@@ -35,10 +35,9 @@ export interface PedPhasingInput {
 }
 
 function doseOf(doses: Record<string, number> | undefined, k: string): number {
-  const raw = doses?.[k];
-  if (typeof raw === 'number') return raw;
-  if (raw != null) return parseFloat(String(raw).replace(',', '.').replace(/[^0-9.]/g, '')) || 0;
-  return 0;
+  // 26.09.2026 (аудит): единый парсер дозы (г→×1000, мкг/мг) — прежняя локальная копия
+  // теряла единицы ("1,5г" → 1.5 вместо 1500) и расходилась с bb-ped-adaptation.
+  return parseDose(doses?.[k]);
 }
 
 function has(peds: PED[], doses: Record<string, number> | undefined, k: PED): boolean {

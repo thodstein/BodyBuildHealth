@@ -203,6 +203,9 @@ export function trueMuscleOf(ex: any): string | null {
   if (_g === 'shoulders' && /жим|press|армей|overhead|ohp|жимовой швунг/i.test(nm) && !/мах|raise|fly|развод|отведен/i.test(nm)) return 'shoulders';
   // Close-grip bench is a triceps compound, not chest.
   if (/жим.*узк|close.?grip/i.test(nm) || (/узким хватом/.test(nm) && /жим|press|bench/i.test(nm))) return 'triceps';
+  // 26.09.2026 (аудит): жимовые compound рук (JM-жим и т.п.) — группа 'arms', но
+  // derivePattern по «жим» давал horizontal_push → chest. Это трицепс-движение.
+  if (_g === 'arms' && /жим|press|bench/i.test(nm)) return 'triceps';
   const base = MP_TO_MUSCLE[mp];
   if (base) return base;
   // isolation_back: шраги → traps, остальное → back

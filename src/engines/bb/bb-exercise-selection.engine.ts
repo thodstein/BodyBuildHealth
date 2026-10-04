@@ -89,7 +89,10 @@ export const ANGLE_CLASSES: Record<string, AngleClass[]> = {
     { name: 'dumbbell_curl', match: (e) => /сгибан.*гантел|dumbbell.*curl|бицепс.*гантел/i.test(e.name) && !/молот|наклон|проповед|концентр/i.test(e.name) },
   ],
   triceps: [
-    { name: 'press_closegrip', match: (e) => /жим.*узк|close.?grip|француз.*жим/i.test(e.name) },
+    // 26.09.2026 (аудит): «Французский жим» — это extension (длинная головка), а не
+    // close-grip press. Убран `француз.*жим` из press_closegrip (он матчился первым
+    // и крал весь french-класс у extension_overhead).
+    { name: 'press_closegrip', match: (e) => /жим.*узк|close.?grip/i.test(e.name) },
     { name: 'extension_overhead', match: (e) => /разгибан.*из.?за|overhead.*triceps|француз|french/i.test(e.name) },
     { name: 'pushdown', match: (e) => /разгибан.*блок|pushdown|трицепс.*блок|канат.*рукоят/i.test(e.name) },
     { name: 'dips_triceps', match: (e) => /отжим.*брус|dip|брусь/i.test(e.name) },
@@ -103,7 +106,9 @@ export const ANGLE_CLASSES: Record<string, AngleClass[]> = {
   // Дельты — топ слабых зон, без угловых классов стимул-карта слепая.
   shoulders: [
     { name: 'overhead_press', match: (e) => (/жим.*(стоя|сидя)|overhead.*press|военн.*жим|\b-ohp\b|^ohp|push.?press|арнольд|arnold/i.test(e.name) || /^(ohp|db_press|ohp_seated|push_press)$/i.test(e.id || '')) && !/наклон.*скам|incline.*bench/i.test(e.name) },
-    { name: 'lateral_raise', match: (e) => /махи.*сторон|разведен.*сторон|lateral.*raise|махи.*гантел/i.test(e.name) || /^(lateral_raise|cable_lateral)$/i.test(e.id || '') },
+    // 26.09.2026 (аудит): добавлен lateral_raise_single («Махи одной рукой в наклоне») —
+    // раньше не попадал ни в один класс плеч (махи.*сторон/гантел его не ловили).
+    { name: 'lateral_raise', match: (e) => /махи.*сторон|разведен.*сторон|lateral.*raise|махи.*гантел|махи.*рукой/i.test(e.name) || /^(lateral_raise|cable_lateral|lateral_raise_single)$/i.test(e.id || '') || e.substitutionGroup === 'lat_delt_iso' },
     { name: 'rear_delt', match: (e) => /задн.*дельт|rear.?delt|лиц.*тяга|face.?pull|обратн.*(бабоч|дельт)/i.test(e.name) || /^(rear_delt_fly|rear_delt_machine|face_pull|face_pull_sh)$/i.test(e.id || '') },
     { name: 'upright_row', match: (e) => /тяга.*подбород|upright/i.test(e.name) },
   ],
