@@ -33,6 +33,53 @@ function newLocalId(): string {
   return 'local_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 10);
 }
 
+/**
+ * Чтение пользователей никогда не роняет вход: на части устройств
+ * (старый Android/WebView, Huawei без Google-сервисов) IndexedDB бывает
+ * недоступен или заблокирован. Раньше исключение уходило наверх и
+ * пользователь видел красный экран вместо приложения.
+ */
+async function loadUsersSafe(): Promise<LocalUserProfile[]> {
+  try {
+    const users = await db.getAll<LocalUserProfile>('users');
+    return Array.isArray(users) ? users : [];
+  } catch {
+    return [];
+  }
+}
+
+async function saveUserSafe(user: LocalUserProfile): Promise<boolean> {
+  try {
+    await db.put('users', user);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function writeSessionSafe(user: LocalUserProfile): void {
+  try {
+    localStorage.setItem('he_session_v2', JSON.stringify({ id: user.id, email: user.email, ts: Date.now() }));
+  } catch {
+    /* приватный режим/quota — вход всё равно продолжается */
+  }
+}
+
+/** Профиль для аварийного входа: БД недоступна, но приложение должно открыться. */
+export function emergencyProfile(name = 'Пользователь'): UserProfile {
+  return toAppProfile({
+    id: newLocalId(),
+    email: 'user@local',
+    name,
+    passwordHash: '',
+    salt: '',
+    role: 'user',
+    createdAt: new Date().toISOString(),
+    lastLogin: new Date().toISOString(),
+    settings: { age: 25, weight: 80, height: 180, sex: 'male', goal: 'bulk' },
+  });
+}
+
 export async function renderAuthModule(container: HTMLElement, onLogin: (profile: UserProfile) => void) {
   // Try Telegram WebApp auth first
   const tg = (window as any).Telegram?.WebApp;
@@ -45,7 +92,7 @@ export async function renderAuthModule(container: HTMLElement, onLogin: (profile
       const userNameLower = tgUser.username || userName;
 
       // Create or find user in local DB
-      const users: LocalUserProfile[] = await db.getAll('users') || [];
+      const users = await loadUsersSafe();
       let user = users.find(u => u.id === userId);
 
       if (!user) {
@@ -60,14 +107,14 @@ export async function renderAuthModule(container: HTMLElement, onLogin: (profile
           lastLogin: new Date().toISOString(),
           settings: { age: 25, weight: 80, height: 180, sex: 'male', goal: 'bulk' },
         };
-        await db.put('users', user);
+        await saveUserSafe(user);
       } else {
         user.lastLogin = new Date().toISOString();
         user.name = userName;
-        await db.put('users', user);
+        await saveUserSafe(user);
       }
 
-      localStorage.setItem('he_session_v2', JSON.stringify({ id: user.id, email: user.email, ts: Date.now() }));
+      writeSessionSafe(user);
       try { await initKvSync(user.id); } catch (e) { console.warn('KvSync init failed:', e); }
       onLogin(toAppProfile(user));
       return;
@@ -75,7 +122,7 @@ export async function renderAuthModule(container: HTMLElement, onLogin: (profile
   }
 
   // Fallback: auto-login with local profile (no registration form)
-  const users: LocalUserProfile[] = await db.getAll('users') || [];
+  const users = await loadUsersSafe();
   let user = users.find(u => u.role === 'admin') || users[0];
 
   if (!user) {
@@ -92,13 +139,13 @@ export async function renderAuthModule(container: HTMLElement, onLogin: (profile
       lastLogin: new Date().toISOString(),
       settings: { age: 25, weight: 80, height: 180, sex: 'male', goal: 'bulk' },
     };
-    await db.put('users', defaultUser);
+    await saveUserSafe(defaultUser);
     user = defaultUser;
   }
 
   user.lastLogin = new Date().toISOString();
-  await db.put('users', user);
-  localStorage.setItem('he_session_v2', JSON.stringify({ id: user.id, email: user.email, ts: Date.now() }));
+  await saveUserSafe(user);
+  writeSessionSafe(user);
   // АПК после привязки кодом: привязанный tg-токен даёт pull облака (переустановка — тоже).
   try {
     const linked = getLinkedTgToken();

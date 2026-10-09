@@ -232,9 +232,18 @@ export const BarcodeScanner: React.FC<Props> = ({ onProductFound, onClose }) => 
         setError('Нет доступа к камере. Разрешите камеру для приложения — иначе сканер не запустится.');
         return;
       }
-      if (outcome.status === 'unavailable' && (outcome as { hint?: string }).hint === 'installing-module') {
-        setScanNotice('Загружается модуль Google-сканера. После установки нажмите кнопку сканирования ещё раз.');
-        return;
+      if (outcome.status === 'unavailable') {
+        const hint = (outcome as { hint?: string }).hint;
+        if (hint === 'installing-module') {
+          setScanNotice('Загружается модуль Google-сканера. После установки нажмите кнопку сканирования ещё раз.');
+          return;
+        }
+        if (hint === 'no-gms') {
+          // Huawei/Honor без Google-сервисов: модуль сканера не поставится
+          // никогда. Раньше UI предлагал «подождать» — вечный тупик.
+          setScanNotice('На этом устройстве нет Google-сервисов, поэтому камера-сканер не запустится. Сфотографируйте штрихкод кнопкой ниже или введите цифры — это работает везде.');
+          return;
+        }
       }
       // cancelled — молча, без ошибки (пользователь сам закрыл сканер).
     } catch {

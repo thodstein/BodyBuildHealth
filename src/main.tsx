@@ -3,8 +3,8 @@ if ('serviceWorker' in navigator && import.meta.env.DEV) {
   navigator.serviceWorker.getRegistrations().then(regs => regs.forEach(r => { console.log('Unregistering stale SW:', r.scope); r.unregister(); }));
 }
 
-import { renderAuthModule } from './ui/auth-module';
-import { db } from './core/db';
+import { renderAuthModule, emergencyProfile } from './ui/auth-module';
+import { db, dbInitDiagnostics } from './core/db';
 import { registry } from './core/data/registry';
 import { initPWA } from './core/pwa-manager';
 import { onViewportChanged, hapticImpact, onKeyboardClose } from './core/telegram';
@@ -97,6 +97,25 @@ function bootStamp(msg: string) {
   }
 }
 
+/**
+ * Текст ошибки для экрана. Раньше сюда попадало только `e.message`, а у
+ * IndexedDB-ошибок он часто пустой — пользователь видел «какой-то текст».
+ * Теперь видно имя типа и, если есть, код.
+ */
+function describeErr(e: unknown): string {
+  if (e instanceof Error) {
+    const code = (e as Error & { code?: unknown }).code;
+    return (e.name || 'Error') + (e.message ? ': ' + e.message : '') + (code != null ? ' (код ' + String(code) + ')' : '');
+  }
+  if (e && typeof e === 'object') {
+    const anyE = e as { name?: unknown; message?: unknown; code?: unknown };
+    const name = typeof anyE.name === 'string' ? anyE.name : 'Error';
+    const msg = typeof anyE.message === 'string' ? anyE.message : '';
+    return name + (msg ? ': ' + msg : '') + (anyE.code != null ? ' (код ' + String(anyE.code) + ')' : '');
+  }
+  return String(e ?? 'неизвестная ошибка');
+}
+
 /** Гонка промиса с таймаутом: зависший шаг bootstrap превращается в видимую ошибку, а не вечный спиннер. */
 async function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -114,14 +133,116 @@ async function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise
   }
 }
 
+/** Версия Chromium из UA — главный признак «старый WebView» (иначе ошибку не видно). */
+function chromiumVersion(): string {
+  const m = /Chrome\/(\d+)/.exec(navigator.userAgent || '');
+  return m ? m[1] : '?';
+}
+
+/** Сводка окружения для диагностики на телефоне (копируется пользователем). */
+function diagnosticsText(): string {
+  const w = window as unknown as { __bootLog?: string[]; __bootErrors?: string[] };
+  const log = (w.__bootLog || []).join(' | ') || '-';
+  const errs = (w.__bootErrors || []).slice(-6).join(' ;; ') || 'none';
+  return (
+    'UA: ' + (navigator.userAgent || '?') + '\n' +
+    'Chromium: ' + chromiumVersion() + '\n' +
+    'online: ' + (navigator.onLine ? 'yes' : 'no') + '\n' +
+    'bootLog: ' + log + '\n' +
+    'errors: ' + errs
+  );
+}
+
+function copyText(text: string) {
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).catch(() => legacyCopy(text));
+    } else {
+      legacyCopy(text);
+    }
+  } catch {
+    legacyCopy(text);
+  }
+}
+
+function legacyCopy(text: string) {
+  try {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.cssText = 'position:fixed;left:0;top:0;opacity:0;';
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+  } catch {
+    /* ignore */
+  }
+}
+
+/**
+ * Неблокирующая плашка поверх приложения: сообщение + копирование диагностики.
+ * Раньше любая ошибка на старте давала красный экран без приложения —
+ * на устройствах без Google-сервисов это читалось как «не работает».
+ */
+function showStartupBanner(title: string, detail: string) {
+  try {
+    const box = document.createElement('div');
+    box.setAttribute('role', 'status');
+    box.style.cssText = 'position:fixed;left:8px;right:8px;top:8px;z-index:10001;background:#2a1b12;' +
+      'color:#fff;border:1px solid #f59e0b;border-radius:12px;padding:12px;' +
+      'font-family:system-ui,sans-serif;font-size:13px;line-height:1.4;';
+    const head = document.createElement('div');
+    head.style.cssText = 'font-weight:700;font-size:14px;margin-bottom:4px;';
+    head.textContent = title;
+    const msg = document.createElement('div');
+    msg.style.cssText = 'opacity:0.95;';
+    msg.textContent = detail;
+    const btn = document.createElement('button');
+    btn.textContent = '📋 Скопировать диагностику';
+    btn.style.cssText = 'margin-top:8px;min-height:44px;padding:10px 14px;border-radius:10px;' +
+      'border:1px solid #f59e0b;background:#3a2a18;color:#fff;font-size:13px;';
+    btn.onclick = () => {
+      try {
+        btn.textContent = '✓ Скопировано';
+      } catch {
+        /* ignore */
+      }
+      copyText(title + '\n' + detail + '\n' + diagnosticsText());
+    };
+    box.appendChild(head);
+    box.appendChild(msg);
+    box.appendChild(btn);
+    document.body.appendChild(box);
+  } catch {
+    /* баннер не критичен */
+  }
+}
+
 function showBootstrapError(msg: string) {
   const app = document.getElementById('app');
   if (app) {
     app.innerHTML = `<div style="padding:24px;color:#ff453a;font-family:system-ui,sans-serif;">
       <h2 style="margin:0 0 8px;font-size:18px;">Ошибка загрузки</h2>
-      <p style="margin:0 0 16px;color:#aaa;font-size:14px;">${msg}</p>
-      <button onclick="location.reload()" style="padding:10px 20px;background:#007aff;color:#fff;border:none;border-radius:8px;cursor:pointer;">⟳ Перезагрузить</button>
+      <p style="margin:0 0 12px;color:#fff;font-size:14px;white-space:pre-wrap;word-break:break-word;">${msg}</p>
+      <pre id="he-boot-diag" style="display:block;max-width:100%;overflow:auto;text-align:left;font-size:11px;color:#fff;background:#0a0a0f;border:1px solid #2a2a2a;border-radius:8px;padding:12px;white-space:pre-wrap;word-break:break-all;-webkit-user-select:text;user-select:text;">${diagnosticsText()}</pre>
+      <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:12px;">
+        <button id="he-boot-reload" style="padding:12px 20px;min-height:44px;background:#007aff;color:#fff;border:none;border-radius:8px;font-size:15px;">⟳ Перезагрузить</button>
+        <button id="he-boot-wipe" style="padding:12px 20px;min-height:44px;background:#3a3a3c;color:#fff;border:none;border-radius:8px;font-size:15px;">🗑 Сбросить данные</button>
+        <button id="he-boot-copy" style="padding:12px 20px;min-height:44px;background:#3a3a3c;color:#fff;border:none;border-radius:8px;font-size:15px;">📋 Диагностика</button>
+      </div>
     </div>`;
+    const reload = document.getElementById('he-boot-reload');
+    if (reload) reload.onclick = () => location.reload();
+    const wipe = document.getElementById('he-boot-wipe');
+    if (wipe) {
+      wipe.onclick = () => {
+        try { localStorage.clear(); } catch { /* ignore */ }
+        try { indexedDB.deleteDatabase('HealthEngineDB_v3'); } catch { /* ignore */ }
+        location.reload();
+      };
+    }
+    const copy = document.getElementById('he-boot-copy');
+    if (copy) copy.onclick = () => copyText(msg + '\n' + diagnosticsText());
   }
 }
 
@@ -181,13 +302,26 @@ async function bootstrap() {
   }
 
   bootStamp('bootstrap-start');
+  let dbOk = true;
   try {
-    await withTimeout(db.init(), 10000, 'db.init');
+    // db.init() сам ретраит (3 попытки, blocked/таймаут не убивают запуск),
+    // поэтому внешний бюджет — суммарный, а не на одну попытку.
+    await withTimeout(db.init(), 30000, 'db.init');
     bootStamp('db-ok');
   } catch (e) {
+    // Раньше здесь был тупик: красный экран и никакого приложения. На
+    // устройствах со старым/заблокированным WebView (Huawei без Google,
+    // Android 9–10) это и было «приложение не работает». Теперь открываем
+    // приложение без локального хранилища и честно говорим об этом.
+    dbOk = false;
     bootStamp('db-fail');
-    showBootstrapError('Ошибка инициализации базы данных. Перезагрузите.');
-    return;
+    const diag = dbInitDiagnostics();
+    console.warn('[bootstrap] db.init failed:', e, diag);
+    showStartupBanner(
+      '⚠️ Локальное хранилище недоступно',
+      'Приложение открыто, но данные не сохраняются: ' + (diag.error || 'IndexedDB init failed') +
+        '. Попыток: ' + diag.attempts + '. Обычно лечится перезапуском телефона или обновлением Android System WebView.',
+    );
   }
 
   try {
@@ -229,7 +363,7 @@ async function bootstrap() {
   try { initCloudSync(); } catch (e) { console.warn('initCloudSync failed:', e); }
   try { processQueue(); } catch (e) { console.warn('processQueue failed:', e); }
 
-  const onLogin = (profile: any) => {
+  const renderApp = (profile: any) => {
     try {
       try { initRealtime(profile.id || 'user_default'); } catch (e) { console.warn('initRealtime failed:', e); }
       const root = createRoot(app);
@@ -264,7 +398,16 @@ async function bootstrap() {
       }
     } catch (e) {
       console.error('[bootstrap] React render failed:', e);
-      showBootstrapError('Ошибка рендеринга приложения: ' + ((e as Error)?.message || e));
+      showBootstrapError('Ошибка рендеринга приложения: ' + describeErr(e));
+    }
+  };
+
+  const onLogin = (profile: any) => {
+    try {
+      renderApp(profile);
+    } catch (e) {
+      console.error('[bootstrap] onLogin failed:', e);
+      showBootstrapError('Ошибка рендеринга приложения: ' + describeErr(e));
     }
   };
 
@@ -273,8 +416,15 @@ async function bootstrap() {
     await withTimeout(renderAuthModule(app, onLogin), 20000, 'auth');
     bootStamp('auth-done');
   } catch (e) {
+    // Вход не должен закрывать приложение: раньше здесь был красный экран
+    // «Ошибка авторизации» — на Huawei это и выглядело как «вход не работает».
     console.error('[bootstrap] renderAuthModule failed:', e);
-    showBootstrapError('Ошибка авторизации: ' + ((e as Error)?.message || e));
+    bootStamp('auth-fail');
+    showStartupBanner(
+      '⚠️ Ошибка входа',
+      'Вход не завершился: ' + describeErr(e) + '. Приложение открыто без входа — данные в этом запуске не подгружены.',
+    );
+    renderApp(emergencyProfile());
   }
 }
 

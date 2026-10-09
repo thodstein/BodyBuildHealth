@@ -12,6 +12,43 @@ export const STORES = ['users',
 
 type StoreNames = typeof STORES[number] | string;
 
+/**
+ * Открытие БД на живых телефонах. Прежний код режал старт одним окном в 5с
+ * и мгновенно отказывал на `blocked`. Обе ситуации реальны на старых
+ * Android/WebView (Android 9–10, Huawei без Google-сервисов):
+ * - апгрейд схемы (23 хранилища + индексы) на холодном старте спокойно
+ *   занимает больше 5 секунд → было «Ошибка инициализации базы данных»;
+ * - WebView держит зомби-соединение от прошлого процесса → `blocked`
+ *   намертво, хотя соединение вот-вот освободится само.
+ * Теперь это ретраи с растущим бюджетом, а `blocked` просто ждёт.
+ */
+const DB_INIT_MAX_ATTEMPTS = 3;
+const DB_INIT_ATTEMPT_TIMEOUT_MS = 8000;
+
+/** Последняя ошибка инициализации — для честной диагностики на экране. */
+let lastInitError: string | null = null;
+let lastInitAttempts = 0;
+let dbReady = false;
+
+export function dbInitDiagnostics(): { ok: boolean; attempts: number; error: string | null } {
+  return { ok: dbReady, attempts: lastInitAttempts, error: lastInitError };
+}
+
+function describeError(e: unknown): string {
+  if (e instanceof Error) return e.name + ': ' + (e.message || '(без текста)');
+  if (e && typeof e === 'object') {
+    const anyE = e as { name?: unknown; message?: unknown };
+    const name = typeof anyE.name === 'string' ? anyE.name : 'Error';
+    const msg = typeof anyE.message === 'string' ? anyE.message : '';
+    return name + (msg ? ': ' + msg : '');
+  }
+  return String(e ?? 'unknown');
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise((res) => setTimeout(res, ms));
+}
+
 const INDEXES: Record<string, { name: string; keyPath: string }[]> = {
   labs_log: [
     { name: 'date', keyPath: 'date' },
@@ -43,10 +80,57 @@ class HealthDB {
   private db: IDBDatabase | null = null;
 
   async init() {
+    lastInitAttempts = 0;
+    let lastErr: unknown = null;
+    for (let attempt = 1; attempt <= DB_INIT_MAX_ATTEMPTS; attempt++) {
+      lastInitAttempts = attempt;
+      try {
+        await this.openOnce(attempt);
+        dbReady = true;
+        lastInitError = null;
+        return;
+      } catch (e) {
+        lastErr = e;
+        lastInitError = describeError(e);
+        try {
+          this.db?.close();
+        } catch {
+          /* ignore */
+        }
+        this.db = null;
+        if (attempt < DB_INIT_MAX_ATTEMPTS) await delay(400 * attempt);
+      }
+    }
+    dbReady = false;
+    throw lastErr instanceof Error ? lastErr : new Error(lastInitError || 'IndexedDB init failed');
+  }
+
+  /** Одна попытка открытия. Бюджет одинаковый: повтор нужен из-за blocked/ошибки, а не из-за медленного старта. */
+  private openOnce(attempt: number): Promise<void> {
+    const budget = DB_INIT_ATTEMPT_TIMEOUT_MS;
     return new Promise<void>((res, rej) => {
-      const r = indexedDB.open(DB_NAME, DB_VERSION);
+      let r: IDBOpenDBRequest;
+      try {
+        r = indexedDB.open(DB_NAME, DB_VERSION);
+      } catch (e) {
+        rej(e);
+        return;
+      }
       let settled = false;
-      const done = (fn: () => void) => { if (!settled) { settled = true; fn(); } };
+      const done = (fn: () => void) => {
+        if (!settled) {
+          settled = true;
+          fn();
+        }
+      };
+      const timer = setTimeout(
+        () => done(() => rej(new Error(`IndexedDB init timeout (попытка ${attempt}/${DB_INIT_MAX_ATTEMPTS})`))),
+        budget,
+      );
+      const finish = (fn: () => void) => {
+        clearTimeout(timer);
+        done(fn);
+      };
       r.onupgradeneeded = e => {
         const d = (e.target as IDBOpenDBRequest).result;
         STORES.forEach(s => {
@@ -66,11 +150,17 @@ class HealthDB {
           }
         });
       };
-      r.onsuccess = () => { this.db = r.result; done(() => res()); };
-      r.onerror = () => done(() => rej(r.error));
-      r.onblocked = () => done(() => rej(new Error('IndexedDB blocked — close other tabs and reload')));
-      // Safety timeout: if neither success/error/blocked fires within 5s, reject
-      setTimeout(() => done(() => rej(new Error('IndexedDB init timeout'))), 5000);
+      r.onsuccess = () => {
+        this.db = r.result;
+        finish(() => res());
+      };
+      r.onerror = () => finish(() => rej(r.error || new Error('IndexedDB open error')));
+      // blocked НЕ отклоняем: чужое соединение освободится само (частая
+      // история на Huawei — WebView держит соединение после перезапуска
+      // процесса). Если не освободится — отработает бюджет попытки.
+      r.onblocked = () => {
+        /* ждём освобождения соединения */
+      };
     });
   }
 

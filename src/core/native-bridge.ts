@@ -418,12 +418,17 @@ export async function scanNativeBarcode(): Promise<NativeBarcodeOutcome> {
       if (typeof scanner.isGoogleBarcodeScannerModuleAvailable === 'function') {
         const avail = await scanner.isGoogleBarcodeScannerModuleAvailable();
         if (avail && avail.available === false) {
+          let started = false;
           try {
             // Plugin docs: this only starts an asynchronous install. Tell the UI
             // to expose retry instead of assuming a second probe means ready.
             await scanner.installGoogleBarcodeScannerModule();
-          } catch { /* if install already runs, the user can retry */ }
-          return { status: 'unavailable', hint: 'installing-module' };
+            started = true;
+          } catch { /* нет Google-сервисов — модуль не поставится никогда */ }
+          // Устройства без Play Market/Google-сервисов (Huawei, Honor) модуль
+          // не ставят НИКОГДА. Раньше UI велел «подождать и нажать ещё раз» —
+          // это вечный тупик на устройствах без GMS. Отдаём отдельный код.
+          return started ? { status: 'unavailable', hint: 'installing-module' } : { status: 'unavailable', hint: 'no-gms' };
         }
       }
     } catch {
