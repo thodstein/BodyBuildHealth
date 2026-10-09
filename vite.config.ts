@@ -100,6 +100,10 @@ export default defineConfig(({ command }) => ({
               id.includes('support-interactions-db') ||
               id.includes('support-category-data') ||
               id.includes('risk-engine-tz-db')) return 'support-db';
+          // recipe-decompose — чистый слой (только core/nutrition-database): держим в
+          // recipe-db чанке, а не в nutrition-plan, иначе цикл чанков
+          // nutrition-plan → recipe-db → nutrition-plan даёт TDZ на старте APK.
+          if (id.includes('recipe-decompose')) return 'recipe-db';
           if (id.includes('recipe-db')) return 'recipe-db';
           if (id.includes('symptom-solver.data')) return 'symptom-solver';
           if (id.includes('programs-data') || id.includes('training-methodology') || id.includes('lms-cycles')) return 'training-data';

@@ -31,7 +31,11 @@ import { enrichRecipes } from './recipe-enrichment';
 // (ingredientIds × portions → FOOD_DB). Раньше шапка расходилась с раскладкой у 953/994
 // рецептов (жир ×2.9–3.9). Импорт из recipe-engine — единственный источник decomposeRecipe
 // (нет дублирования логики; на сборке вызывается один раз, не в рантайме плана).
-import { syncRecipeHeaderFromDecomposition } from '../ui/screens/NutritionScreen_parts/IndividualPlan/recipe-engine';
+// Чистый слой декомпозиции — нейтральный data-модуль (НЕ IndividualPlan): держать этот
+// импорт вне чанка планировщика обязательно, иначе на старте APK возникает
+// цикл чанков nutrition-plan → recipe-db → nutrition-plan и TDZ 'CANNED_SUBSTITUTE'
+// (приложение не грузится). См. src/data/recipe-decompose.ts.
+import { syncRecipeHeaderFromDecomposition } from './recipe-decompose';
 
 /**
  * C-требование «КБЖУ-консистентность ≤3%»: kcal рецепта не должен расходиться с формулой

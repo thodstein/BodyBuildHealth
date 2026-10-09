@@ -1,4 +1,9 @@
 import type { FoodItem } from '../../../../core/nutrition-database';
+// Единый источник консервов/соусов — нейтральный data-модуль (разрывает цикл чанков
+// nutrition-plan → recipe-db → nutrition-plan; см. recipe-decompose.ts). Реэкспорт
+// сохраняет прежний публичный API `food-availability`.
+import { isCannedFoodId, isSauceCondimentFood, CANNED_SUBSTITUTE } from '../../../../data/recipe-decompose';
+export { isCannedFoodId, isSauceCondimentFood, CANNED_SUBSTITUTE };
 
 /**
  * РЕЕСТР РЕАЛИЗМА ПРОДУКТОВ (эпик A, «профессиональный планировщик»)
@@ -330,46 +335,8 @@ export function foodAvailableForPlan(f: { id: string }, preferredIds?: Set<strin
   return true;
 }
 
-/** Консервы (tuna_canned, canned_*, *_canned_*) — вне автогенерации полностью. */
-export function isCannedFoodId(id: string): boolean {
-  return /canned/i.test(id || '');
-}
-
-/**
- * Соусы/приправы (sauce_*, mayo*, ketchup*) — приправа, а не белковая/углеводная база.
- * Причина: категория 'other' у соусов раньше валилась в роль 'protein'
- * (recipe-engine.roleForFood) → applyRealisticFloors поднимал соевый соус 15 г до
- * 80 г «белкового пола». Имя-матч ограничен категорией 'other' и исключает готовые
- * блюда (префиксы ru-, int-, snack-, drink-), у которых «майонез» упомянут в описании.
- */
-export function isSauceCondimentFood(f: { id?: string; name?: string; category?: string }): boolean {
-  const id = (f.id || '').toLowerCase();
-  if (/^(sauce_|mayo_|mayonnaise|ketchup)/.test(id)) return true;
-  if (/^(ru_|int_|snack_|drink_)/.test(id)) return false;
-  if (f.category !== 'other') return false;
-  const name = (f.name || '').toLowerCase();
-  return /соус|сальса|майонез|кетчуп|горчиц|терияк|срирач|кочхуджан|васаби|уксус|sauce|salsa|mayo|ketchup|mustard|vinegar|sriracha|wasabi/.test(name);
-}
-
-/**
- * Замена консервов свежими 1-в-1 С СОХРАНЕНИЕМ ПОЗИЦИИ в пуле (не удаление!).
- * Простое выкидывание id сдвигает индексы seeded-пиков и ломает сходимость
- * несвязанных сценариев (доказано: D-24 −33% от бана). Дубль свежего id в пуле —
- * осознанно (вес ×2 на свежак вместо консервы, длина пула цела).
- */
-export const CANNED_SUBSTITUTE: Record<string, string> = {
-  tuna_canned: 'tuna_steak',
-  cod_roe_canned: 'sardines',
-  crab_meat_canned: 'seafood_shrimp_tiger',
-  protein_squid_canned: 'pollock',
-  protein_mussels_canned: 'seafood_shrimp_tiger',
-  canned_green_peas: 'peas_green',
-  canned_corn_sweet: 'corn',
-  canned_tomatoes: 'tomato',
-  canned_olives_green: 'avocado',
-  milk_coconut_canned: 'coconut_urbec',
-  veg_bamboo_shoots_canned: 'celery',
-};
+// `isCannedFoodId`, `isSauceCondimentFood`, `CANNED_SUBSTITUTE` вынесены в
+// `src/data/recipe-decompose.ts` (единый источник) и реэкспортированы вверху файла.
 
 /**
  * P1-realism: позиционная замена дрейфующих specialty/экзотических id НОРМАЛЬНЫМИ

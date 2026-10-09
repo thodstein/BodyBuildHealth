@@ -16,7 +16,10 @@ import type { Recipe } from '../../../../engines/nutrition-periodization.engine'
 import { FOOD_DB, FOOD_ALLERGEN_DIET } from '../../../../core/nutrition-database';
 import type { FoodItem } from '../../../../core/nutrition-database';
 import type { MealItem } from './meal-plan-engine';
-import { isSauceCondimentFood, isCannedFoodId, CANNED_SUBSTITUTE } from './food-availability';
+// Единый источник декомпозиции/консервов/соусов — нейтральный data-модуль (разрывает
+// цикл чанков nutrition-plan → recipe-db → nutrition-plan; см. recipe-decompose.ts).
+import { decomposeRecipeRaw, roleForFood, makeMealItem, isCannedFoodId, CANNED_SUBSTITUTE } from '../../../../data/recipe-decompose';
+export { decomposeRecipeRaw, syncRecipeHeaderFromDecomposition } from '../../../../data/recipe-decompose';
 import { getFoodAllergenTags } from './planner-restrictions';
 import { matchesCategoryPref, type CategoryPref } from './planner-preferences';
 
@@ -125,38 +128,7 @@ export function decomposeRecipe(recipe: Recipe): MealItem[] {
   return scaleToRecipeKcal(items, recipe);
 }
 
-/**
- * «Сырая» декомпозиция ingredientIds × portions → FOOD_DB БЕЗ масштабирования под kcal шапки.
- * Это фактически съедаемые Б/Ж/У автора раскладки (до scaleToRecipeKcal). Единственный
- * источник — decomposeRecipe и syncRecipeHeaderFromDecomposition (нет дублирования логики).
- */
-export function decomposeRecipeRaw(recipe: Recipe): MealItem[] {
-  const items: MealItem[] = [];
-  const used = new Set<string>();
-  if (!recipe.ingredientIds || recipe.ingredientIds.length === 0) return items;
-  for (const fid of recipe.ingredientIds) {
-    // P2-фикс: дедуп по СУБСТИТУИРОВАННОМУ id. Раньше проверялся сырой fid, а в used
-    // клался _fid → рецепт с двумя консервами, сходящимися в один свежий аналог, дублировал ингредиент.
-    const _fid = isCannedFoodId(fid) ? (CANNED_SUBSTITUTE[fid] ?? fid) : fid;
-    if (used.has(_fid)) continue;
-    const food = FOOD_DB.find(f => f.id === _fid);
-    if (!food) continue;
-    const grams = recipe.portions?.[fid] ?? 100;
-    const item = makeMealItem(food, grams, roleForFood(food));
-    items.push(item);
-    used.add(_fid);
-  }
-  // Если порций мало и есть молоко (milk: true в завтраках) — добавим ТОЛЬКО если
-  // пользователь явно указал молоко в ингредиентах (раньше 200 мл навязывались каждому
-  // завтраку → искажение декомпозиции и КБЖУ).
-  if (items.length > 0 && recipe.meal === 'breakfast' && !used.has('milk')
-    && ((recipe.portions && Object.prototype.hasOwnProperty.call(recipe.portions, 'milk'))
-      || (recipe.ingredients || []).some(i => /молок/i.test(i)))) {
-    const milk = FOOD_DB.find(f => f.id === 'milk');
-    if (milk) items.push(makeMealItem(milk, 200, 'liquid'));
-  }
-  return items;
-}
+// decomposeRecipeRaw вынесен в src/data/recipe-decompose.ts (единый источник, без циклов чанков).
 
 /**
  * Честность «шапка рецепта ↔ декомпозиция» (план единого источника, остаток):
@@ -180,24 +152,7 @@ export function recipeDecompositionDeviationPct(recipe: Recipe): number {
   return Math.round(Math.max(dev(d.p, recipe.protein), dev(d.f, recipe.fat), dev(d.c, recipe.carbs)) * 10) / 10;
 }
 
-/**
- * Синхронизация шапки рецепта с декомпозицией (план единого источника, остаток):
- * protein/fat/carbs пересчитываются из ФАКТИЧЕСКОЙ раскладки (ingredientIds × portions →
- * FOOD_DB, тот же путь, что decomposeRecipe), kcal = 4Б+4У+9Ж. Раньше шапка была авторской
- * заявкой и расходилась с раскладкой у 953/994 рецептов (жир ×2.9–3.9) — теперь «показано =
- * съедается»: приём в плане несёт те же макросы, что шапка рецепта. Легаси-рецепты без
- * ingredientIds не трогаются (декомпозиции нет).
- */
-export function syncRecipeHeaderFromDecomposition(recipe: Recipe): Recipe {
-  if (!recipe.ingredientIds || recipe.ingredientIds.length === 0) return recipe;
-  const items = decomposeRecipeRaw(recipe);
-  if (items.length === 0) return recipe;
-  const p = Math.round(items.reduce((s, i) => s + i.p, 0));
-  const f = Math.round(items.reduce((s, i) => s + i.f, 0));
-  const c = Math.round(items.reduce((s, i) => s + i.c, 0));
-  const kcal = Math.max(50, Math.round((4 * p + 9 * f + 4 * c) / 5) * 5);
-  return { ...recipe, protein: p, fat: f, carbs: c, kcal };
-}
+// syncRecipeHeaderFromDecomposition вынесен в src/data/recipe-decompose.ts и реэкспортирован вверху.
 
 function scaleToRecipeKcal(items: MealItem[], recipe: Recipe): MealItem[] {
   if (items.length === 0) return items;
@@ -304,47 +259,7 @@ function findFoodByName(name: string): FoodItem | undefined {
   return undefined;
 }
 
-function roleForFood(food: FoodItem): MealItem['role'] {
-  const cat = food.category;
-  // P0-2 (соусы ≠ белок): категория 'other' у соусов/приправ раньше валилась в
-  // 'protein' → пол реалистичных порций поднимал соевый соус 15 г до 80 г.
-  // Приправа семантически ближе к жиру (кап 10 г, без «белкового пола»).
-  if (isSauceCondimentFood(food)) return 'fat';
-  if (cat === 'supplement') return 'fast_protein';
-  if (cat === 'dairy') return 'slow_protein';
-  if (cat === 'grain' || cat === 'carb') return 'carb_slow';
-  if (cat === 'fat') return 'fat';
-  if (cat === 'veg_fruit') {
-    const lid = (food.id || '').toLowerCase();
-    if (['spinach','broccoli','cabbage','kale','cucumber','tomato','pepper','carrot','onion','lettuce'].some(k => lid.includes(k))) return 'veg';
-    return 'fruit';
-  }
-  return 'protein';
-}
-
-function makeMealItem(food: FoodItem, grams: number, role: MealItem['role']): MealItem {
-  const cleanGrams = Math.max(5, Math.round(grams / 5) * 5);
-  const r = cleanGrams / 100;
-  const p = Math.round((food.protein || 0) * r * 10) / 10;
-  const f = Math.round((food.fat || 0) * r * 10) / 10;
-  const c = Math.round((food.carbs || 0) * r * 10) / 10;
-  // KBЖУ-консистентность ≤3%: kcal из формулы (FOOD_DB-дрейф не наследуем)
-  const kcal = Math.round(4 * p + 9 * f + 4 * c);
-  // P1-агрегаты: лейцин больше не константа 0. Тот же канон, что в ручных операциях:
-  // профиль аминокислот из БД, иначе консервативный фолбэк 75 мг/г белка.
-  // Раньше recipe-путь писал 0 → суммы лейцина/дня и MPS-выводы были занижены.
-  const leuPer100 = (food as any).amino_acid_profile_100g?.leucine_mg
-    ?? ((food.micros as any)?.Leucine != null ? (food.micros as any).Leucine : Math.round((food.protein || 0) * 75));
-  return {
-    id: food.id, name: food.name, amount: cleanGrams, role,
-    kcal,
-    p,
-    f,
-    c,
-    fiber: Math.round((food.fiber || 0) * r * 10) / 10,
-    leucine_mg: Math.round(leuPer100 * r),
-  };
-}
+// roleForFood / makeMealItem вынесены в src/data/recipe-decompose.ts (единый источник).
 
 // ─── Подбор рецепта под приём ──────────────────────────────────────────
 
