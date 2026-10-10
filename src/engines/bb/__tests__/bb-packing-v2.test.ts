@@ -210,8 +210,13 @@ describe('Packing-v2 матрица по сплитам', () => {
       const off = buildBBPlan({ ...input });
       const on = buildBBPlan({ ...input, packingV2: true });
       // Все пакуемые мышцы: объём ±2, слотов не больше.
+      // Допуск ±3 (было ±2, шаг 7 плана ББ-авто): ramп «Вход в мезоцикл» режет
+      // неделю нелинейно (floor 2 на упражнение), а packing-вариант достигает
+      // более высокой цели (on 18 при off 17), поэтому его cap выше и остаток
+      // после резки иного размера. Замер UL/intermediate/chest: было 17/18
+      // (дрейф 1) → стало 15/18 (дрейф 3). Направление и слоты не меняются.
       for (const m of ['back', 'chest', 'quads', 'hamstrings', 'glutes']) {
-        expect(Math.abs(muscleSets(on, m) - muscleSets(off, m)), `${patternId}/${p.level}/${m}: дрейф`).toBeLessThanOrEqual(2);
+        expect(Math.abs(muscleSets(on, m) - muscleSets(off, m)), `${patternId}/${p.level}/${m}: дрейф`).toBeLessThanOrEqual(3);
         expect(muscleSlots(on, m), `${patternId}/${p.level}/${m}: слоты`).toBeLessThanOrEqual(muscleSlots(off, m));
       }
       // Валидность: packing не добавляет ошибок (предсуществующие капы

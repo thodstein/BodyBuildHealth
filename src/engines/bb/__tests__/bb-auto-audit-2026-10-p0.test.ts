@@ -916,11 +916,18 @@ describe('G1-усиление: недельный потолок ramпа реа�
     .filter((e: any) => e.muscle === m && !(e as any).warmupActivator)
     .reduce((a: number, e: any) => a + (e.sets || 0), 0);
 
-  it('БЕЗ усиления ramп был пожеланием: calves = цели (0.85 проигнорирован)', () => {
-    // Baseline-замер (тот, что сделал усиление необходимым):
-    // targetSets.calves = 18 (якорь владельца), 0.85×18 = 15, но фактически 18.
+  it('ramп режет якорные мышцы, но НЕ трогает PPL-контракт сплита', () => {
+    // Шаг 7 плана (замер «было→стало» на ppl_6, intermediate, 12 нед):
+    // было — W1 = анкерная цель по всем мышцам (rampStart 0.85 игнорирован);
+    // стало — W1 = ~0.89×якорь у анкерных мышц (back 20→19, chest 20→18,
+    // quads 20→18), а PPL-контракт (икры 9×2 сессии = 18) удерживается:
+    // cap 16 < floor 18 → потолок поднят флором (pplWeeklyFloorFor).
     const p: any = buildBBPlan(base({ weeks: 12 }));
-    expect(weekly(p, 'calves')).toBeGreaterThanOrEqual(18);
+    const anchor = (m: string) => Number((p as any).volumeTargets?.[m]?.targetSets) || 0;
+    for (const m of ['chest', 'quads']) {
+      expect(weekly(p, m), `${m}: ramп не сработал`).toBeLessThan(anchor(m));
+    }
+    expect(weekly(p, 'calves')).toBe(18);
   });
 
   it('preloaded теперь ЖЁСТКО кает неделю к цели (не раздувается доборами)', () => {
@@ -939,21 +946,46 @@ describe('G1-усиление: недельный потолок ramпа реа�
     expect(JSON.stringify(pre.weeks[0])).not.toBe(JSON.stringify(std.weeks[0]));
   });
 
-  it('source-guard: усиливающий проход подключён и скоупит на явные режимы', () => {
+  it('source-guard: усиливающий проход подключён для ВСЕХ режимов (gate снят)', () => {
     const src = readFileSync(join(__dirname, '..', 'bb-builder.engine.ts'), 'utf8');
     expect(src).toContain('G1-усиление: ramп должен быть ЖЁСТКИМ');
-    expect(src).toContain("input.volumeRamp === 'preloaded' || input.volumeRamp === 'flat'");
+    // Шаг 7 плана: gate явных режимов снят — рампа настоящий и для дефолта
+    // (standard). Раньше было `input.volumeRamp === 'preloaded' || ... === 'flat'`.
+    expect(src).not.toContain("input.volumeRamp === 'preloaded' || input.volumeRamp === 'flat'");
     // Порог берётся от АНКЕРНОЙ цели (volumeTargets[m].targetSets), а не от
     // пред-якорной scaledVolumeRotation — иначе ramп вытесняет якорь владельца.
-    expect(src).toContain('const rampCap = Math.round(anchorTarget * Math.min(1.1, weekVolumeMult) * (1 + slack));');
+    expect(src).toContain('let rampCap = Math.round(anchorTarget * Math.min(1.1, weekVolumeMult) * (1 + slack));');
+    // Вынесено в чистую функцию + ФИНАЛЬНОЕ применение после финалайзера
+    // (fill/MEV-repair/prioritizeBackSessions иначе возвращают неделю к якорю).
+    expect(src).toContain('export function enforceRampWeeklyCap(');
+    expect(src).toContain('enforceRampWeeklyCap(week.sessions, caps);');
+    // Капы доезжают до конца сборки через неделю (week.rampCap).
+    expect(src).toContain('rampCap: rampCapWeek');
+    // PPL-контракт сплита: ramп не режет ниже недельного минимума дизайна.
+    expect(src).toContain('pplWeeklyFloorFor(m, pplCounts, level)');
   });
 
-  it('дефолт (standard) усилением НЕ трогается (байт-в-байт)', () => {
+  it('дефолт (standard) ramп тоже РЕАЛЬНЫЙ: W1 ниже анкерной цели', () => {
+    // Было (до шага 7): W1 = анкерная цель (calves 18 при 0.85×18 = 15),
+    // rampStart игнорировался. Стало: W1 = ~0.89×якорь (cap × slack 5%).
     const a = buildBBPlan(base({ weeks: 12 }));
     const b = buildBBPlan(base({ weeks: 12, volumeRamp: 'standard' } as Partial<BBBuilderInput>));
     expect(JSON.stringify(b.weeks[0])).toBe(JSON.stringify(a.weeks[0]));
-    // calves по-прежнему на цели — усиление не применялось.
-    expect(weekly(a, 'calves')).toBeGreaterThanOrEqual(18);
+    // Анкерные мышцы режутся, но не более чем на ~15% (rampStart 0.85 + slack).
+    for (const m of ['back', 'chest', 'quads']) {
+      const anchor = Number((a as any).volumeTargets?.[m]?.targetSets) || 0;
+      if (!anchor) continue;
+      const w1 = a.weeks[0].sessions.flatMap((s: any) => s.exercises)
+        .filter((e: any) => e.muscle === m && !(e as any).warmupActivator)
+        .reduce((x: number, e: any) => x + (e.sets || 0), 0);
+      expect(w1, `${m}: W1 ${w1} против якоря ${anchor}`).toBeLessThan(anchor);
+      expect(w1, `${m}: падение >15%`).toBeGreaterThanOrEqual(Math.floor(anchor * 0.85) - 1);
+    }
+    // Хвост плана выходит на якорь (ramп — именно РАЗГОН, не плоское снижение).
+    const peakBack = Math.max(...a.weeks.map((w: any) => w.sessions.flatMap((s: any) => s.exercises)
+      .filter((e: any) => e.muscle === 'back' && !(e as any).warmupActivator)
+      .reduce((x: number, e: any) => x + (e.sets || 0), 0)));
+    expect(peakBack).toBeGreaterThan(weekly(a, 'back'));
   });
 });
 
@@ -976,9 +1008,24 @@ describe('Частотная семантика якорей (подтвержд
     const bro = probe('bro_5');
     expect(freq(ppl, 'back')).toBe(2);
     expect(freq(bro, 'back')).toBe(1);
-    expect(weekly(ppl, 'back')).toBe(60);
+    // Шаг 7 плана: якорь 60 остаётся целью (volumeTargets), а неделя входа
+    // (standard-ramp, rampStart 0.85 + slack 5%) намеренно ниже —
+    // было→стало W1: 60 → 54 (0.90×якоря). Раньше W1 тоже был 60, то есть
+    // ramп «Вход в мезоцикл» был пожеланием. Пиковая РАБОЧАЯ неделя выходит
+    // на ~93% якоря (56): ramp растёт (54→55→56), а хвост плана и так снижен
+    // фазами/тейпером — это в рамках инварианта «peak ≥ 90% цели».
+    const pplBack = ppl.weeks.map((w: any) => w.sessions.flatMap((s: any) => s.exercises)
+      .filter((e: any) => e.muscle === 'back' && !(e as any).warmupActivator)
+      .reduce((a: number, e: any) => a + (e.sets || 0), 0));
+    const peakBack = Math.max(...pplBack);
+    expect(peakBack, 'пик ниже 90% якоря').toBeGreaterThanOrEqual(54);
+    expect(peakBack).toBeLessThanOrEqual(60);
+    // Ramп — реальный разгон: вход строго ниже пика.
+    expect(weekly(ppl, 'back')).toBeLessThan(peakBack);
+    expect(weekly(ppl, 'back')).toBeGreaterThanOrEqual(50);
+    expect(weekly(ppl, 'back')).toBeLessThanOrEqual(56);
     // Одна сессия в неделю — примерно вдвое меньше недельной цели.
-    expect(weekly(bro, 'back')).toBeLessThanOrEqual(weekly(ppl, 'back') * 0.55);
+    expect(weekly(bro, 'back')).toBeLessThanOrEqual(weekly(ppl, 'back') * 0.6);
     expect(weekly(bro, 'back')).toBeGreaterThanOrEqual(weekly(ppl, 'back') * 0.4);
   });
 

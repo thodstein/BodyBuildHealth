@@ -73,7 +73,7 @@ import { loadSRPESessions } from '../../engines/pro/srpe-store';
 import { acuteChronicRatio, toDailyLoads } from '../../engines/pro/training-load.engine';
 import type { Macrocycle, MacroPhase, BBMacrocycle } from '../lms/macrocycle.engine';
 import { syncBBPlanSetShape, validateBBPlan } from './bb-validator.engine';
-import { finalizeBBPlan, prioritizeBackSessions, reconcileVolumeTargets } from './bb-finalize.engine';
+import { finalizeBBPlan, prioritizeBackSessions, reconcileVolumeTargets, pplWeeklyFloorFor } from './bb-finalize.engine';
 import { buildBBVolumeTarget, type BBVolumeTarget, computeMrvMult, regimeMrvMultFor, computeBBRecoveryScore, computeBBWeeklyBudget, sessionLimitsFor, computeBBRecoveryMultiplier, computeBBNutritionMultiplier, perExerciseCap, perSessionMuscleCap, sessionMrvRotCap, sessionMuscleRealismCap, sessionMuscleExerciseCap, sessionDensityExerciseCap, resolveMrvCap, weeklyCapFor, distributeSetsByRole, BB_MRV_TOLERANCE } from './bb-volume.engine';
 import { buildBBExpandedSummary } from './bb-summary.engine';
 import { jointGuardScorePenalty, jointGuardActive } from './bb-joint-guard.engine';
@@ -451,6 +451,14 @@ export interface BBWeek {
    *  второй overreaching-делод). Потребители (finalize) читают флаг, а не парсят
    *  комментарии; комментарий остаётся для UI/печати. */
   isDeloadLike?: boolean;
+  /** G1: недельные потолки рампа «Вход в мезоцикл» (мышца → cap сетов).
+   *  Считаются в недельном цикле и переживают клонирование финализатора
+   *  (`...week`), поэтому финальное применение в конце buildBBPlan не
+   *  пересчитывает множители заново. Делод-недели поля не несут (ramп их не режет). */
+  rampCap?: Record<string, number>;
+  /** G1: недельный множитель объёма (ramp × blast/cruise × волна) — база
+   *  пересчёта капов в финальном применении от СОГЛАСОВАННЫХ целей. */
+  rampMult?: number;
   sessions: BBSession[];
 }
 
@@ -1301,6 +1309,83 @@ export function normalizeWeekMrv(weekSessions: BBSession[], mrvByMuscle: Record<
         if (!progressed) break;
       }
       for (const ex of info.exs) syncWorkSets(ex);
+    }
+  }
+}
+
+/** Капы рампа «Вход в мезоцикл» для одной недели: мышца → потолок сетов.
+ *  База — АНКЕРНАЯ цель недели (volumeTargets[m].targetSets: MAV, поднятый
+ *  якорем владельца: спина 60, ноги 32+30+18). Для PPL потолок не опускается
+ *  ниже недельного контракта сплита (pplWeeklyFloorFor) — иначе рампа ломает
+ *  баланс сплита на неделе входа (замер: бицепс Pull 8 → 5 сетов). */
+export function rampCapsForWeek(
+  muscles: string[],
+  targetOf: (m: string) => number,
+  weekVolumeMult: number,
+  slack: number,
+  pplCounts: { pullCnt: number; pushCnt: number; legsCnt: number } | null,
+  level?: string,
+): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const m of muscles) {
+    const anchorTarget = targetOf(m);
+    let rampCap = Math.round(anchorTarget * Math.min(1.1, weekVolumeMult) * (1 + slack));
+    if (pplCounts) {
+      const floor = pplWeeklyFloorFor(m, pplCounts, level);
+      if (floor != null && floor > rampCap) rampCap = floor;
+    }
+    if (rampCap > 0) out[m] = rampCap;
+  }
+  return out;
+}
+
+/** G1-усиление: ramп как ЖЁСТКИМ недельным потолком.
+ *
+ *  База потолка — АНКЕРНАЯ цель недели (volumeTargets[m].targetSets: MAV,
+ *  поднятый якорем владельца: спина 60, ноги 32+30+18), а НЕ
+ *  scaledVolumeRotation (пред-якорная MAV-цель). Иначе ramп «preloaded» давал
+ *  МЕНЬШЕ standard: замер до фикса — preloaded calves 12 против standard 18,
+ *  потому что потолок резал к 0.85 от пред-якорной цифры и выбрасывал решение
+ *  владельца.
+ *
+ *  Вынесено в чистую функцию, потому что проход применяется ДВАЖДЫ:
+ *  1) в недельном цикле (base-план), чтобы финализатор стартовал с честного
+ *     объёма;
+ *  2) в конце buildBBPlan — финализатор и пост-пассы (fill/MEV-repair/late
+ *     top-up/weak-optional/prioritizeBackSessions) возвращают неделю к
+ *     анкерной цели, и без второго применения ramп остаётся пожеланием
+ *     (замер: back W1 = 60 при cap 54, rampStart 0.85 полностью игнорирован).
+ *
+ *  Инварианты: рез accessory/изоляция → primary, пол 2 сета (0 single-set),
+ *  workSets режутся вместе с sets. Опциональные упражнения (⚡ слабая группа,
+ *  MGF-слот) и назначенные про-протоколы (GVT/FST-7/8×8, DC-widowmaker) не
+ *  режутся — они по контракту идут «без учёта капа»/выше анкерной цели
+ *  (паритет с исключениями normalizeWeekMrv). */
+export function enforceRampWeeklyCap(weekSessions: BBSession[], caps: Record<string, number>): void {
+  for (const [m, rampCap] of Object.entries(caps)) {
+    if (!(rampCap > 0)) continue;
+    const exs = weekSessions.flatMap((s: any) => s.exercises)
+      .filter((e: any) => !(e as any).warmupActivator && !(e as any).optional
+        && (e as any).techniqueTag !== 'widowmaker'
+        && !/GVT|FST-?7|8\s*[x×]\s*8/i.test(String((e as any).comment || ''))
+        && collapseKey(e.muscle) === m);
+    if (!exs.length) continue;
+    let total = exs.reduce((a: number, e: any) => a + (e.sets || 0), 0);
+    if (total <= rampCap) continue;
+    // Режем с конца: accessory/изоляция первыми, primary — последним (после пола 2).
+    const order = [...exs].sort((a: any, b: any) => {
+      const ra = a.role === 'primary' ? 1 : 0, rb = b.role === 'primary' ? 1 : 0;
+      if (ra !== rb) return ra - rb;
+      return (b.sets || 0) - (a.sets || 0);
+    });
+    for (const ex of order) {
+      if (total <= rampCap) break;
+      const min = 2;
+      const cut = Math.min(total - rampCap, (ex.sets || 0) - min);
+      if (cut <= 0) continue;
+      ex.sets -= cut;
+      if (Array.isArray((ex as any).workSets) && (ex as any).workSets.length > ex.sets) (ex as any).workSets.length = ex.sets;
+      total -= cut;
     }
   }
 }
@@ -4020,42 +4105,36 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
     // volume-добавляющие пассы финалайзера (fill/MEV-repair/ensureSmallMuscleQuality/
     // аллокации) раздувают неделю обратно к targetSets, и ramп не работает вообще:
     // замер без прохода — calves W1 = 18 при цели 18 (0.85×18=15 проигнорирован).
-    // Скоуп: ТОЛЬКО при явном volumeRamp (preloaded/flat) — дефолт `standard`
-    // остаётся байт-в-байт, потому что там поведение зафиксировано калибровкой.
-    if (!isDeloadWeek && (input.volumeRamp === 'preloaded' || input.volumeRamp === 'flat')) {
+    // Скоуп: ВСЕ режимы, включая дефолт `standard`. Дефолт тоже имел rampStart
+    // 0.85, но рампа у него никогда не был настоящим (W1 = анкерная цель) —
+    // согласовано с владельцем: потолок применяется всегда, падение W1 по
+    // анкерным мышцам замерено (≤ ~11% при rampStart 0.85 и slack 5%), т.е.
+    // в рамках допустимых ~15%.
+    // Капы пишутся на неделю (week.rampCap): финалайзер клонирует недели
+    // поверхностным спредом, поэтому финальное применение в конце buildBBPlan
+    // берёт те же числа, не пересчитывая множители. Рядом едет недельный
+    // множитель (week.rampMult) — финальное применение пересчитывает кап от
+    // СОГЛАСОВАННЫХ целей (после reconcileVolumeTargets): до согласования цель
+    // могла быть выше достижимой (chest 36 при факте 32), и рампа от неё
+    // молча выключался.
+    let rampCapWeek: Record<string, number> | undefined;
+    if (!isDeloadWeek) {
       const slack = input.volumeRamp === 'flat' ? 0.02 : 0.05;
-      for (const m of Object.keys(scaledVolumeRotation)) {
-        // База потолка — АНКЕРНАЯ цель недели (volumeTargets[m].targetSets: MAV,
-        // поднятый якорем владельца: спина 60, ноги 32+30+18), а НЕ
-        // scaledVolumeRotation (пред-якорная MAV-цель). Иначе ramп «preloaded»
-        // давал МЕНЬШЕ standard: замер до фикса — preloaded calves 12 против
-        // standard 18, потому что потолок резал к 0.85 от пред-якорной цифры и
-        // выбрасывал решение владельца.
-        const anchorTarget = Number((volumeTargets as any)[m]?.targetSets) || scaledVolumeRotation[m];
-        const rampCap = Math.round(anchorTarget * Math.min(1.1, weekVolumeMult) * (1 + slack));
-        const exs = weekSessions.flatMap((s: any) => s.exercises)
-          .filter((e: any) => !(e as any).warmupActivator && collapseKey(e.muscle) === m);
-        if (!exs.length) continue;
-        let total = exs.reduce((a: number, e: any) => a + (e.sets || 0), 0);
-        // Режем с конца: accessory/изоляция первыми, primary — последним (после пола 2).
-        const order = [...exs].sort((a: any, b: any) => {
-          const ra = a.role === 'primary' ? 1 : 0, rb = b.role === 'primary' ? 1 : 0;
-          if (ra !== rb) return ra - rb;
-          return (b.sets || 0) - (a.sets || 0);
-        });
-        for (const ex of order) {
-          if (total <= rampCap) break;
-          const min = 2;
-          const cut = Math.min(total - rampCap, (ex.sets || 0) - min);
-          if (cut <= 0) continue;
-          ex.sets -= cut;
-          if (Array.isArray((ex as any).workSets) && (ex as any).workSets.length > ex.sets) (ex as any).workSets.length = ex.sets;
-          total -= cut;
-        }
-      }
+      // PPL-КОНТРАКТ сплита: ramп не режет ниже недельного минимума дизайна
+      // (бицепс 8/Pull, трицепс 8/Push, икры 9/Legs...) — иначе W1 перестаёт
+      // быть PPL и ломается баланс сплита (bb-ppl-invariant). Мышцы якорного
+      // типа (спина 60, ноги) контракта не имеют — их ramп режет по цели.
+      const isPplSplit = String((pattern as any)?.id || '').toLowerCase().includes('ppl');
+      const pplCounts = isPplSplit ? {
+        pullCnt: weekSessions.filter((s: any) => /Pull|Back/i.test(s.sessionTag || '')).length || 1,
+        pushCnt: weekSessions.filter((s: any) => /Push|Chest/i.test(s.sessionTag || '')).length || 1,
+        legsCnt: weekSessions.filter((s: any) => /Legs|Lower/i.test(s.sessionTag || '')).length || 1,
+      } : null;
+      rampCapWeek = rampCapsForWeek(Object.keys(scaledVolumeRotation), (m: string) => Number((volumeTargets as any)[m]?.targetSets) || scaledVolumeRotation[m], weekVolumeMult, slack, pplCounts, level);
+      enforceRampWeeklyCap(weekSessions, rampCapWeek);
     }
     // Волна 5.3: структурный флаг разгрузки — там же, где фаза/комментарий.
-    weeks.push({ week: w, phase, deload: phase === 'deload', isDeloadLike: phase === 'deload', sessions: weekSessions });
+    weeks.push({ week: w, phase, deload: phase === 'deload', isDeloadLike: phase === 'deload', rampCap: rampCapWeek, rampMult: isDeloadWeek ? undefined : weekVolumeMult, sessions: weekSessions });
     // Запоминаем упражнения этой недели для мягкого freshness блокировки следующей.
     // В режиме «запрет» (forbid) freshness отключён — строго те же упражнения.
     prevWeekUsedByMuscle.clear();
@@ -5329,6 +5408,46 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
       finalized = applyInsulinWindowToPlan(finalized, win);
     }
   } catch (e) { console.warn('[BB] insulin window пропущено:', e); }
+  // G1-усиление (часть 2): ФИНАЛЬНОЕ применение рампа-потолка.
+  // Первый проход живёт в недельном цикле (base-план), но финализатор и
+  // пост-пассы (fill/MEV-repair/late top-up/weak-optional/
+  // prioritizeBackSessions — последний сознательно добивает спину до 30/сессию)
+  // возвращают неделю к анкерной цели, и рампа оставался пожеланием:
+  // замер до части 2 — back W1 = 60 при cap 54 (rampStart 0.85 игнорирован).
+  // Капы ПЕРЕСЧИТЫВАЮТСЯ от согласованных целей (reconcileVolumeTargets уже
+  // опустил недостижимые: chest 36 → 32), иначе рампа от предсогласованной
+  // цифры молча выключался (замер: chest W1 = 32 при cap 33).
+  // Делод-недели rampMult не несут и не режутся.
+  {
+    const slack = input.volumeRamp === 'flat' ? 0.02 : 0.05;
+    const finalTargets = (finalized as any).volumeTargets || {};
+    const isPplSplit = String((pattern as any)?.id || '').toLowerCase().includes('ppl');
+    for (const week of finalized.weeks) {
+      const mult = (week as any).rampMult as number | undefined;
+      if (mult == null) continue;
+      // Недели с НАЗНАЧЕННОЙ кривой объёма рампа не трогаем: авто-taper
+      // (taperApplied/taper) и prep-контур (peakWeek/contestPhase/prepProtocol)
+      // уже задали свой профиль — повторная резка ломала его монотонность
+      // (замер fullbody_3 8 нед: W6 74→67, W7 71 — последняя taper-неделя
+      // оказалась «глубже» предыдущей). Делод-недели rampMult не несут.
+      const wAny = week as any;
+      if (wAny.taperApplied === true || wAny.taper === true || wAny.peakWeek === true
+        || wAny.contestPhase || (typeof wAny.prepProtocol === 'string' && wAny.prepProtocol)) continue;
+      const pplCounts = isPplSplit ? {
+        pullCnt: week.sessions.filter((s: any) => /Pull|Back/i.test(s.sessionTag || '')).length || 1,
+        pushCnt: week.sessions.filter((s: any) => /Push|Chest/i.test(s.sessionTag || '')).length || 1,
+        legsCnt: week.sessions.filter((s: any) => /Legs|Lower/i.test(s.sessionTag || '')).length || 1,
+      } : null;
+      const caps = rampCapsForWeek(Object.keys(finalTargets), (m: string) => Number((finalTargets as any)[m]?.targetSets) || 0, mult, slack, pplCounts, level);
+      enforceRampWeeklyCap(week.sessions, caps);
+    }
+    // Согласование целей ПОСЛЕ рампа: reconcileVolumeTargets выше считал пик по
+    // финализированному плану, поэтому рампа опускал факт ниже согласованной цели
+    // (замер: fullbody_3 chest peak 21 при цели 24 — инвариант «peak ≥ 90% цели»).
+    // Повторный прогон опускает цель к реальному пику ramp-плана.
+    reconcileVolumeTargets(finalized, { maxWorkingSets: sessLimits.maxWorkingSets });
+  }
+  syncBBPlanSetShape(finalized);
   return finalized;
 }
 

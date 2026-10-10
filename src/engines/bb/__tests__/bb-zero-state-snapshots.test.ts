@@ -78,8 +78,18 @@ describe('BB zero-state snapshots (baseline Этапа 10)', () => {
     // памп-мышца ног держится финишером. Zero-sum перераспределение:
     // было→стало back 33→34, chest 22→18, glutes 8→9, hamstrings 26→22.
     // Спина — приоритет канона; грудь 18 = MAV enhanced (в норме).
+    // Re-baseline 10 (шаг 7 плана ББ-авто, ramп «Вход в мезоцикл» настоящий для
+    // дефолта standard): усиливающий проход рампа-потолка снят с гейта явных
+    // режимов и добит ФИНАЛЬНЫМ применением после финализатора (раньше
+    // fill/MEV-repair/prioritizeBackSessions возвращали неделю к анкерной цели
+    // и rampStart 0.85 был пожеланием). W1 теперь = ~0.89×якорь:
+    // было→стало chest 18→17 (Anchor 20, cap = round(20×0.85×1.05) = 18,
+    // фактическая резка на 1 сет распределением). Падение по якорным мышцам
+    // задокументировано замером (back 60→54 на ppl_6, ≤10%) — в рамках
+    // допустимых ~15%. Потолок не режет ниже PPL-контракта сплита (бицепс/
+    // трицепс/икры) — см. pplWeeklyFloorFor.
     expect(directVolume(plan)).toEqual({
-      abs: 10, back: 34, biceps: 4, calves: 10, chest: 18, delt_mid: 4, delt_rear: 2, forearms: 6, glutes: 9, hamstrings: 22, quads: 20, shoulders: 0, traps: 7, triceps: 4,
+      abs: 10, back: 34, biceps: 4, calves: 10, chest: 17, delt_mid: 4, delt_rear: 2, forearms: 6, glutes: 9, hamstrings: 22, quads: 20, shoulders: 0, traps: 7, triceps: 4,
     });
   });
 

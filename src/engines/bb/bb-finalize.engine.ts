@@ -1595,6 +1595,33 @@ function isPPLPattern(options: any, plan: any): boolean {
   return raw.includes('ppl');
 }
 
+/**
+ * PPL-КОНТРАКТ: недельные минимумы мышц, которые дизайн сплита держит жёстко
+ * (bb-ppl-invariant: бицепс 8/Pull, трицепс 8/Push, икры 9/Legs, шраги 5/Pull,
+ * плечи 6/Pull, задняя дельта 5/Pull, средняя 3/Push; новичкам — половинный
+ * MEV-масштаб). null — контракта нет (мышцы якорного типа, например спина).
+ *
+ * Единый источник для двух потребителей:
+ *  - MRV-кап-аджуст финализатора (нижняя граница резки);
+ *  - рампа-проход билдера (bb-builder.enforceRampWeeklyCap): rampStart НЕ режет
+ *    ниже контракта сплита, иначе W1 перестаёт быть PPL (замер: бицепс Pull
+ *    8 → 5 сетов при cap 12) и ломается баланс сплита.
+ */
+export function pplWeeklyFloorFor(
+  muscle: string,
+  counts: { pullCnt: number; pushCnt: number; legsCnt: number },
+  level?: string,
+): number | null {
+  const perSession = level === 'beginner'
+    ? { traps: 3, biceps: 4, triceps: 4, calves: 5, shoulders: 3, delt_rear: 3, delt_mid: 2 }[muscle]
+    : { traps: 5, biceps: 8, triceps: 8, calves: 9, shoulders: 6, delt_rear: 5, delt_mid: 3 }[muscle];
+  if (perSession == null) return null;
+  const per = muscle === 'triceps' || muscle === 'delt_mid' ? counts.pushCnt
+    : muscle === 'calves' ? counts.legsCnt
+    : counts.pullCnt;
+  return perSession * Math.max(1, per);
+}
+
 function findCatalogCandidate(muscle: string, pattern: RegExp, options: BBFinalizeOptions, exclude: any): any {
   return EXERCISE_CATALOG.find((c: any) => {
     if (trueMuscleOf(c) !== muscle) return false;
@@ -4714,14 +4741,11 @@ for (const week of next.weeks) {
         // (bb-ppl-invariant: biceps 8/Pull, triceps 8/Push, shrug 5, calves 9).
         let pplFloor: number | null = null;
         if (isPPLPattern(options, next)) {
-          const pullCnt = (week as any).sessions.filter((s: any) => /Pull|Back/i.test(s.sessionTag || '')).length || 1;
-          const pushCnt = (week as any).sessions.filter((s: any) => /Push|Chest/i.test(s.sessionTag || '')).length || 1;
-          const legsCnt = (week as any).sessions.filter((s: any) => /Legs|Lower/i.test(s.sessionTag || '')).length || 1;
-          const isBeg = options.level === 'beginner';
-          const pplMin: Record<string, number> = isBeg
-            ? { traps: 3 * pullCnt, biceps: 4 * pullCnt, triceps: 4 * pushCnt, calves: 5 * legsCnt, shoulders: 3 * pullCnt, delt_rear: 3 * pullCnt, delt_mid: 2 * pushCnt } as any
-            : { traps: 5 * pullCnt, biceps: 8 * pullCnt, triceps: 8 * pushCnt, calves: 9 * legsCnt, shoulders: 6 * pullCnt, delt_rear: 5 * pullCnt, delt_mid: 3 * pushCnt } as any;
-          const minWeekly2 = (pplMin as any)[muscle];
+          const minWeekly2 = pplWeeklyFloorFor(muscle, {
+            pullCnt: (week as any).sessions.filter((s: any) => /Pull|Back/i.test(s.sessionTag || '')).length || 1,
+            pushCnt: (week as any).sessions.filter((s: any) => /Push|Chest/i.test(s.sessionTag || '')).length || 1,
+            legsCnt: (week as any).sessions.filter((s: any) => /Legs|Lower/i.test(s.sessionTag || '')).length || 1,
+          }, options.level);
           // Флор ограничен сверху капом: собственный избыток выше MRV режется
           // (иначе флор цементирует overflow), жертва чужого indirect — защищена.
           if (minWeekly2 != null && directTotal <= Math.min(minWeekly2, cap)) continue;
