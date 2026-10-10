@@ -955,9 +955,12 @@ export function rebalanceDayAfterRecipes(
   const finalTotals = sumDayTotals(work);
   let devFinal = maxDeviationPct(finalTotals, validTargets);
 
-  // Финальная точная посадка: если после всех ходов всё ещё >3%, равномерно масштабируем
-  // items применённых рецептов в КУМУЛЯТИВНОМ коридоре ±10% (пропорции/вкус не меняются —
-  // это компенсация небольшого дрейфа декомпозиции, а не правка авторских порций).
+  // Финальная точная посадка: если после всех ходов всё ещё >3%, масштабируем
+  // ядра применённых рецептов в КУМУЛЯТИВНОМ коридоре ±5% (пропорции/вкус не
+  // меняются — компенсация дрейфа декомпозиции, а не правка авторских порций).
+  // §4.4: коридор был ±10% — порции рецептов уезжали от авторских на ~12%
+  // (продуктовый путь сходится в ≤3% без дрейфа порций). Компенсация остатка —
+  // поздними доборами (extremeCarbTopUp/снаки), а не распуханием порции.
   if (devFinal > 3) {
     // G3: ключ — номер приёма (один рецепт) или `${mi}:1`/`${mi}:2` (два рецепта раздельно).
     const cumScale = new Map<number | string, number>();
@@ -966,7 +969,7 @@ export function rebalanceDayAfterRecipes(
       for (let mi = 0; mi < work.length; mi++) {
         const m = work[mi];
         if (!m.recipeApplied || !m.items?.length) continue;
-        // G3: два рецепта в приёме — раздельные коридоры ±10% на КАЖДЫЙ рецепт
+        // G3: два рецепта в приёме — раздельные коридоры ±5% на КАЖДЫЙ рецепт
         // (раньше весь приём масштабировался целиком под одним счётчиком — пропорции
         // второго рецепта плыли вместе с первым).
         const _idsOf = (d: any): Set<string> | null =>
@@ -1009,11 +1012,11 @@ export function rebalanceDayAfterRecipes(
             const it = (m.items || [])[ii];
             return { kcal: acc.kcal + (it?.kcal || 0), p: acc.p + (it?.p || 0), f: acc.f + (it?.f || 0), c: acc.c + (it?.c || 0) };
           }, { kcal: 0, p: 0, f: 0, c: 0 });
-          for (let sPct = -10; sPct <= 10; sPct += 1) {
+          for (let sPct = -5; sPct <= 5; sPct += 1) {
             const s = 1 + sPct / 100;
             if (s === 1) continue;
             const nextCum = used * s;
-            if (nextCum < 0.9 || nextCum > 1.1) continue; // коридор посадки на рецепт
+            if (nextCum < 0.95 || nextCum > 1.05) continue; // коридор посадки на рецепт (§4.4)
             const ntDay = {
               kcal: finalTotals.kcal - gTotals.kcal + gTotals.kcal * s,
               p: finalTotals.p - gTotals.p + gTotals.p * s,

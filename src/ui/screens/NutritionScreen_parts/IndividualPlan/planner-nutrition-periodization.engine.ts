@@ -76,6 +76,15 @@ export interface PeriodizationInput {
   weightLog?: { date: string; weightKg: number }[];
   /** Поддержание (TDEE) — для точного показа диет-брейк-дня (калории к поддержанию). */
   maintenanceKcal?: number;
+  /**
+   * §4.2: дневные моды генерации, которых нет в периодизации углеводов —
+   * женская фаза цикла, дефицит категории бодибилдинга и дневниковая компенсация
+   * (Context.buildOneDay: _mp.kcalMod/carbMod × _defMod + diaryComp.delta).
+   * Применяются ДО спец-дней (refeed в генераторе «затирает» мод) — тот же порядок.
+   * Без него мод = 1 и дельта = 0 (прежнее поведение). В prep-режиме НЕ
+   * применяется — цели фазы абсолютны (как и в генераторе).
+   */
+  dayModsByOffset?: (offset: number, isTraining: boolean) => { kcalMod?: number; carbMod?: number; kcalDelta?: number } | null;
 }
 
 export interface PeriodizationDay {
@@ -274,6 +283,18 @@ function buildDay(
   let dayCarbMod = perio.dayCarbMod;
   let isRefeedPeriodization = perio.isRefeedDay;
   if (isHeavy) { dayKcalMod *= 1.05; dayCarbMod *= 1.25; }
+  // §4.2: моды генерации (менструальная фаза × дефицит категории) — применяются ДО
+  // спец-дней, ровно в порядке Context.buildOneDay (refeed ниже «затирает» мод,
+  // cheat/fast берят max/min — как в генераторе). Без callback — прежнее поведение.
+  let _dayKcalDelta = 0;
+  try {
+    const _dm = input.dayModsByOffset ? input.dayModsByOffset(offset, isTraining) : null;
+    if (_dm) {
+      if (_dm.kcalMod && _dm.kcalMod > 0) dayKcalMod *= _dm.kcalMod;
+      if (_dm.carbMod && _dm.carbMod > 0) dayCarbMod *= _dm.carbMod;
+      if (_dm.kcalDelta) _dayKcalDelta = Math.round(_dm.kcalDelta);
+    }
+  } catch { /* callback от потребителя — best-effort */ }
 
   // Запланированные спец-дни (he_special_meals) — те же моды, что в Context.buildOneDay.
   const special = (input.specialMeals || []).find(s => s && s.date === date) || null;
@@ -344,7 +365,9 @@ function buildDay(
   }
 
   // General-режим: цель + карб-периодизация (без контест-препа).
-  const kcal = genBase.kcal;
+  // Дневниковая компенсация (§4.2) добавляется к цели дня — как в генераторе
+  // (`goalKcal = max(1200, base × mod) + diaryComp.delta.kcal × dampK`).
+  const kcal = genBase.kcal + _dayKcalDelta;
   const proteinG = genBase.proteinG;
   const fatG = genBase.fatG;
   const carbsG = genBase.carbsG;

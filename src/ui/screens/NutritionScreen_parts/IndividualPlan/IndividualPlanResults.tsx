@@ -164,6 +164,7 @@ export const IndividualPlanResults: React.FC = () => {
     setErrorMsg,
     setPlanTab,
     addPlanToDiary,
+    dayModsByOffset,
   } = usePlanCtx();
 
   const [showCalcPopup, setShowCalcPopup] = useState(false);
@@ -633,6 +634,7 @@ const doImportPlan = (raw: string): boolean => {
               goal={goal}
               carbPeriodization={carbPeriodization}
               isTrainingDayForOffset={(offset) => isTrainingDayFor(buildTrainSchedule(linkToTraining, trainStart, trainEnd, trainingDays, trainScheduleType, trainPattern), offset)}
+              dayModsByOffset={dayModsByOffset}
               heavyTrainDay={heavyTrainDay}
               dayLabels={DAY_LABELS}
               todayIso={localIsoDate(new Date())}
@@ -1201,7 +1203,7 @@ const doImportPlan = (raw: string): boolean => {
             const weekIdx = monthPlanMode ? (selectedWeek || 0) : 0;
             const isTrainArr = (Array.isArray(weekPlan?.days) ? weekPlan.days : []).map((d: any) => !!d?.isTrainingDay);
             const planK = monthPlanMode
-              ? expectedWeekKcal(effectiveKcal, carbPeriodization, weekIdx, isTrainArr, heavyTrainDay, DAY_LABELS)
+              ? expectedWeekKcal(effectiveKcal, carbPeriodization, weekIdx, isTrainArr, heavyTrainDay, DAY_LABELS, dayModsByOffset)
               : Math.round((effectiveKcal || 0) * 7);
             const factK = Math.round(weekPlan.totals?.kcal || 0);
             const devK = planK > 0 ? Math.round((factK - planK) / planK * 100) : 0;

@@ -38,6 +38,12 @@ interface Props {
   maintenanceKcal?: number;
   /** Deep-link: клик по дню периода → открыть этот день в плане (если он сгенерирован). */
   onOpenDay?: (date: string) => void;
+  /**
+   * §4.2: дневные моды генерации (менструальная фаза × дефицит категории +
+   * дневниковая компенсация) — тот же расчёт, что в Context.buildOneDay.
+   * Без них карточка показывала «старую» цель (±8% расхождения с выдачей).
+   */
+  dayModsByOffset?: (offset: number, isTraining: boolean) => { kcalMod?: number; carbMod?: number; kcalDelta?: number } | null;
 }
 
 const PREP_ACCENT = '#f59e0b';
@@ -84,7 +90,7 @@ const DayMarkers: React.FC<{ d: PeriodizationDay }> = ({ d }) => (
 
 export const NutritionPeriodizationCard: React.FC<Props> = ({
   prepPlan, base, goal, carbPeriodization, isTrainingDayForOffset,
-  heavyTrainDay, dayLabels, postShowTrack, todayIso, specialMeals, weightLog, maintenanceKcal, onOpenDay,
+  heavyTrainDay, dayLabels, postShowTrack, todayIso, specialMeals, weightLog, maintenanceKcal, onOpenDay, dayModsByOffset,
 }) => {
   const mode: 'prep' | 'general' = prepPlan ? 'prep' : 'general';
   const accent = mode === 'prep' ? PREP_ACCENT : GENERAL_ACCENT;
@@ -112,7 +118,19 @@ export const NutritionPeriodizationCard: React.FC<Props> = ({
     () => (weightLog || []).map(w => `${w.date}:${w.weightKg}`).sort().join(','),
     [weightLog],
   );
-  const sig = `${mode}|${startDate}|${horizonEff}|${baseKey}|${goal}|${carbPeriodization}|${trainSig}|${heavyTrainDay || ''}|${postShowTrack || ''}|${prepPlan?.id || ''}|${prepPlan?.updatedAt || ''}|${specialKey}|${weightSig}|${maintenanceKcal || 0}`;
+  // Подпись модов (§4.2): фиксируем выход dayModsByOffset на 14 дней в sig —
+  // иначе мемо «не заметит» смену фазы цикла/компенсации (колбэк пересоздаётся).
+  const modsSig = useMemo(() => {
+    if (!dayModsByOffset) return '0';
+    try {
+      return Array.from({ length: 14 }, (_, i) => {
+        const dm = dayModsByOffset(i, false) || {};
+        return `${(dm.kcalMod ?? 1).toFixed(3)}/${(dm.carbMod ?? 1).toFixed(3)}/${dm.kcalDelta ?? 0}`;
+      }).join(',');
+    } catch { return 'e'; }
+  }, [dayModsByOffset]);
+
+  const sig = `${mode}|${startDate}|${horizonEff}|${baseKey}|${goal}|${carbPeriodization}|${trainSig}|${heavyTrainDay || ''}|${postShowTrack || ''}|${prepPlan?.id || ''}|${prepPlan?.updatedAt || ''}|${specialKey}|${weightSig}|${maintenanceKcal || 0}|${modsSig}`;
 
   const periodization = useMemo(() => buildNutritionPeriodization({
     startDate,
@@ -128,6 +146,7 @@ export const NutritionPeriodizationCard: React.FC<Props> = ({
     specialMeals,
     weightLog,
     maintenanceKcal,
+    dayModsByOffset,
   }), [sig]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const horizonOptions = useMemo(() => {

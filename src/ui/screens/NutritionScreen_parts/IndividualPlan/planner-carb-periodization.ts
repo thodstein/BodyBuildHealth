@@ -127,11 +127,15 @@ export function isHeavyDayForOffset(
  * (refeed/carb_cycle/butch/two_one/five_two). Для недель месяца сравнение ложно
  * показывало «вне ±5%» при корректном плане.
  *
+ * §4.2: дополнительный `dayMods` (из Context, тот же расчёт, что в генераторе) —
+ * менструальная фаза × дефицит категории + дневниковая компенсация. Без него —
+ * прежнее поведение (только периодизация + тяжёлый день).
+ *
  * Считает сумму ожидаемых целей дней недели: для каждого offset из диапазона
  * [weekIndex*7, weekIndex*7+6] применяет dayKcalMod из applyCarbPeriodizationMods
- * (волна/рефид/цикл) + тяжелый день (+5%). Тренировочность дня берётся из фактически
- * сгенерированного дня (weekPlan.days[i].isTrainingDay), тяжёлый день — по выбранному
- * дню недели. Возвращает округлённое ожидаемое значение недели.
+ * (волна/рефид/цикл) + тяжёлый день (+5%) + моды callback'а и абсолютную дельту
+ * (компенсация). Тренировочность дня берётся из фактически сгенерированного дня
+ * (weekPlan.days[i].isTrainingDay), тяжёлый день — по выбранному дню недели.
  */
 export function expectedWeekKcal(
   effectiveKcal: number,
@@ -140,6 +144,7 @@ export function expectedWeekKcal(
   isTrainDays: boolean[],
   heavyTrainDay?: string | undefined | null,
   dayLabels?: string[],
+  dayMods?: (offset: number, isTrain: boolean) => { kcalMod?: number; kcalDelta?: number } | null,
 ): number {
   const kcal = Math.max(1200, effectiveKcal || 0);
   let total = 0;
@@ -149,7 +154,15 @@ export function expectedWeekKcal(
     const isTrain = !!(isTrainDays && isTrainDays[i]);
     let mod = applyCarbPeriodizationMods(mode, offset, isTrain).dayKcalMod;
     if (Array.isArray(dayLabels) && dayLabels.length === 7 && isHeavyDayForOffset(heavyTrainDay, offset, dayLabels)) mod *= 1.05;
-    total += Math.round(kcal * mod);
+    let delta = 0;
+    try {
+      const dm = dayMods ? dayMods(offset, isTrain) : null;
+      if (dm) {
+        if (dm.kcalMod && dm.kcalMod > 0) mod *= dm.kcalMod;
+        if (dm.kcalDelta) delta = Math.round(dm.kcalDelta);
+      }
+    } catch { /* callback от потребителя — best-effort */ }
+    total += Math.round(kcal * mod) + delta;
   }
   return total;
 }

@@ -80,7 +80,7 @@ export const CARB_PERIODIZATION_OPTIONS: { id: CarbPeriodization; label: string;
   { id: 'carb_cycle', label: 'Угл. цикл', icon: '🔄', desc: 'Трен: +15% ккал/+30% угл, отдых: −15%/−30%' },
   { id: 'butch', label: 'БУЧ', icon: '⤴️⤵️', desc: '3 дня ВУ (трен) + 1 день НУ (отдых)' },
   { id: 'flex_80_20', label: '80/20', icon: '📊', desc: '80% цельные, 20% свободные (+5% ккал)' },
-  { id: 'two_one', label: '2+1', icon: '⏳', desc: '2 нед дефицит → 1 нед поддержание' },
+  { id: 'two_one', label: '2+1', icon: '⏳', desc: '3-дневный цикл: 2 дня ×1.12 ккал/угл → 1 день ×0.85' },
   { id: 'five_two', label: '5:2', icon: '📅', desc: '5 дней план → 2 дня лайт (80% ккал)' },
   { id: 'wave', label: 'Волна 2+1', icon: '🌊', desc: 'Недельная волна: 2 нед работа + 1 нед поддержание' },
 ];

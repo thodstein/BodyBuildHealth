@@ -130,6 +130,12 @@ export interface PlanCtx {
   effectiveP: number;
   effectiveF: number;
   effectiveC: number;
+  /**
+   * §4.2: дневные моды генерации (менструальная фаза × дефицит категории +
+   * дневниковая компенсация) — для карточки периодизации и «Недели vs план»
+   * (ожидание недели = фактическая сумма целей сгенерированных дней).
+   */
+  dayModsByOffset: (offset: number, isTraining: boolean) => { kcalMod: number; carbMod: number; kcalDelta: number };
   /** Эпик A: человекочитаемый разбор целей (TDEE → модификаторы → макросы). */
   dayTargetsBreakdown: string[];
   carbCapClipped: boolean;
@@ -4265,8 +4271,65 @@ const [errorMsg, setErrorMsg] = useState<string | null>(null);
     return supportStack.filter(x => suppSlotFor(x.id, x.name) === slot).map(x => ({ name: x.name, dose: x.dose }));
   };
 
+  // ─── §4.2: дневные моды генерации для «показано = сгенерируется» ───
+  // Карточка периодизации и «Неделя vs план» раньше знали только периодизацию
+  // углеводов и тяжёлый день — женская фаза цикла, дефицит категории бодибилдинга
+  // и дневниковая компенсация в ожидание недели не входили (расхождение ±8%:
+  // женщина, лютеиновая фаза). Callback считает ровно ту же арифметику, что
+  // buildOneDay (ниже): _mp.kcalMod × _defMod и компенсация diaryComp с тем же
+  // анти-осцилляционным демпфированием. Возвращает ДОБАВОЧНЫЕ моды (периодизацию и
+  // спец-дни применяет вызывающая сторона — тем же порядком, что в генераторе).
+  const dayModsByOffset = useCallback((offset: number, isTraining: boolean): { kcalMod: number; carbMod: number; kcalDelta: number } => {
+    let kcalMod = 1, carbMod = 1, kcalDelta = 0;
+    try {
+      // Полный мод дня (периодизация + тяжёлый + добaвочные) — нужен только для
+      // демпфирования компенсации; спец-дни он тоже учитывает (refeed «затирает»).
+      const _baseK = Math.max(1200, effectiveKcal || weight * 30 || 2500);
+      let _fullMod = applyCarbPeriodizationMods(carbPeriodization, offset, !!isTraining).dayKcalMod;
+      if (isHeavyDayForOffset(heavyTrainDay, offset, DAY_LABELS)) _fullMod *= 1.05;
+      if (sex === 'female') {
+        const _ph: MenstrualPhase = ((cyclePhase as MenstrualPhase) && (cyclePhase as MenstrualPhase) !== 'none')
+          ? (cyclePhase as MenstrualPhase) : autoCyclePhase().phase;
+        const _mp = _ph ? getMenstrualPhaseNutrition(_ph) : null;
+        if (_mp) { kcalMod *= _mp.kcalMod; carbMod *= _mp.carbMod; _fullMod *= _mp.kcalMod; }
+      }
+      const _bbCat = getBBCategory(bbCategory, sex);
+      if (_bbCat) {
+        const _defMod = getCombinedDeficitMod(bodyFatPct, _bbCat.targetBodyFatPct, goal === 'cutting' || goal === 'fat_loss');
+        kcalMod *= _defMod;
+        _fullMod *= _defMod;
+      }
+      // Спец-дни по расписанию — те же моды, что в buildOneDay (refeed затирает).
+      try {
+        const _sm = JSON.parse(localStorage.getItem('he_special_meals') || '[]');
+        if (Array.isArray(_sm)) {
+          const _today = _sm.filter((m: any) => m && m.date === isoAddDays(isoToday(), offset));
+          const _isRefeed = _today.some((m: any) => m.type === 'refeed');
+          const _isCheat = _today.some((m: any) => m.type === 'cheat_meal');
+          const _isFast = _today.some((m: any) => m.type === 'fast');
+          if (_isRefeed) _fullMod = 1.12;
+          else if (_isCheat) _fullMod = Math.max(_fullMod, 1.12);
+          else if (_isFast) _fullMod = Math.min(_fullMod, 0.75);
+        }
+      } catch { /* storage — best-effort */ }
+      if (diaryAdaptation) {
+        const _comp = computeRollingCompensation(
+          { kcal: _baseK, p: Math.max(80, effectiveP || weight * 2 || 160), f: Math.max(30, effectiveF || weight * 0.8 || 70), c: Math.max(50, effectiveC || weight * 3.5 || 300) },
+          7, isoAddDays(isoToday(), offset),
+        );
+        if (_comp && _comp.applied && _comp.delta.kcal) {
+          const _dir = _fullMod - 1;
+          const _damp = (Math.sign(_dir) === Math.sign(_comp.delta.kcal) && _dir !== 0) ? Math.max(0, 1 - Math.abs(_dir)) : 1;
+          kcalDelta = Math.round(_comp.delta.kcal * _damp);
+        }
+      }
+    } catch { /* best-effort: без модов показываем базовую цель */ }
+    return { kcalMod, carbMod, kcalDelta };
+  }, [sex, cyclePhase, bbCategory, bodyFatPct, goal, diaryAdaptation, effectiveKcal, effectiveP, effectiveF, effectiveC, weight, carbPeriodization, heavyTrainDay]);
+
   const ctx = useMemo<Omit<PlanCtx, 'renderMealList'>>(() => ({
     profile, s, courseEntries, annualPhase, combatNutrition,
+    dayModsByOffset,
     weight, setWeight, height, setHeight, age, setAge, sex, setSex,
     dailySteps, setDailySteps, cookTimeMin, setCookTimeMin,
     cookingSkill, setCookingSkill, cookingFrequency, setCookingFrequency, batchCooking, setBatchCooking,
@@ -4369,7 +4432,7 @@ const [errorMsg, setErrorMsg] = useState<string | null>(null);
     errorMsg, setErrorMsg,
     planTab, setPlanTab,
     labs,
-  }), [addPlanToDiary, weight, height, age, sex, dailySteps, cookTimeMin, combatNutrition, _rawCForCap, applyCombatNutrition, cookingSkill, cookingFrequency, batchCooking, cravingMode, cravingDays, lazyDayMode, lazyDayDays, surplusPct, trainType, trainIntensity, householdActivity, bodyFatPct, sleepHours, sleepQuality, stressLevel, cyclePhase, weightAdaptMode, weightLogWeek, expectedLossKgWeek, showWeightAdaptModal, weightLogEntries, weightLogPeriod, metabolicAdaptEnabled, metabolicAdaptPct, manualGPerKg, monthPlanMode, monthPlan, selectedWeek, goal, phase, goalUserSet, injections, injName, injTime, injDose, injUnit, injType, injEster, trainStart, trainEnd, linkToTraining, trainScheduleType, trainPattern, manualKcal, manualP, manualF, manualC, kbjuMode, budget, proteinPreset, variety, varietyLevel, wakeTime, bedTime, lunchTime, dinnerTime, workFood, morningTrainLoad, mealsCount, allergens, healthIssues, eveningLowCarb, nightCarbs, addMilkToBreakfast, breakfastStyle, breakfastTemplate, planType, preferredFoods, quickAddMealIdx, quickAddSearch, customNotes, excludedFoods, dietPrefs, allergenExcludedCount, planTargets, carbPeriodization, heavyTrainDay, workScheduleEnabled, workStartTime, workEndTime, workDays, workScheduleType, trainingDays, generated, planDays, selectedDayIndex, planView, dayPlan, threeDayPlan, weekPlan, shoppingList, waterCalc, savedPlans, lockedFoodIds, expandedSavedId, editItem, editAmount, replacingItem, recipePickerMeal, dayPlanNotes, draggedItem, dropTarget, undoStack, userRecipes, showRecipeCreator, showAddDrug, showDrugTypePicker, takenSupplements, showSuppPicker, suppSearch, newRecipe, v2Phase, v2Labs, v2Pharma, histamineSensitive, errorMsg, planTab, specialMealMode, specialMealGoal, specialMealProteinG, specialMealFatG, specialMealCarbsG, specialMealTiming, specialMealReplaceMode, specialMealReplaceTarget, cheatMealPlan, carbloadPlan, butchPlan, cravingPlan, lazyDayPlan, recommendations, mealPrepPlan, mealPrepDays, activeReports, allergenReport, nutrientReport, qualityReport, riskReport, drugCompatReport, nutritionReport, profile, s, courseEntries, labAnalysis, labs, bbPrepConfig, bbPrepPlan, applyKcalAdjust, supportStack, autoGoal, injectDrugTypes, calcTargets, profileTargets, effectiveKcal, effectiveP, effectiveF, effectiveC, allergenExcludedCount]);
+  }), [addPlanToDiary, weight, height, age, sex, dailySteps, cookTimeMin, combatNutrition, _rawCForCap, applyCombatNutrition, cookingSkill, cookingFrequency, batchCooking, cravingMode, cravingDays, lazyDayMode, lazyDayDays, surplusPct, trainType, trainIntensity, householdActivity, bodyFatPct, sleepHours, sleepQuality, stressLevel, cyclePhase, weightAdaptMode, weightLogWeek, expectedLossKgWeek, showWeightAdaptModal, weightLogEntries, weightLogPeriod, metabolicAdaptEnabled, metabolicAdaptPct, manualGPerKg, monthPlanMode, monthPlan, selectedWeek, goal, phase, goalUserSet, injections, injName, injTime, injDose, injUnit, injType, injEster, trainStart, trainEnd, linkToTraining, trainScheduleType, trainPattern, manualKcal, manualP, manualF, manualC, kbjuMode, budget, proteinPreset, variety, varietyLevel, wakeTime, bedTime, lunchTime, dinnerTime, workFood, morningTrainLoad, mealsCount, allergens, healthIssues, eveningLowCarb, nightCarbs, addMilkToBreakfast, breakfastStyle, breakfastTemplate, planType, preferredFoods, quickAddMealIdx, quickAddSearch, customNotes, excludedFoods, dietPrefs, allergenExcludedCount, planTargets, carbPeriodization, heavyTrainDay, workScheduleEnabled, workStartTime, workEndTime, workDays, workScheduleType, trainingDays, generated, planDays, selectedDayIndex, planView, dayPlan, threeDayPlan, weekPlan, shoppingList, waterCalc, savedPlans, lockedFoodIds, expandedSavedId, editItem, editAmount, replacingItem, recipePickerMeal, dayPlanNotes, draggedItem, dropTarget, undoStack, userRecipes, showRecipeCreator, showAddDrug, showDrugTypePicker, takenSupplements, showSuppPicker, suppSearch, newRecipe, v2Phase, v2Labs, v2Pharma, histamineSensitive, errorMsg, planTab, specialMealMode, specialMealGoal, specialMealProteinG, specialMealFatG, specialMealCarbsG, specialMealTiming, specialMealReplaceMode, specialMealReplaceTarget, cheatMealPlan, carbloadPlan, butchPlan, cravingPlan, lazyDayPlan, recommendations, mealPrepPlan, mealPrepDays, activeReports, allergenReport, nutrientReport, qualityReport, riskReport, drugCompatReport, nutritionReport, profile, s, courseEntries, labAnalysis, labs, bbPrepConfig, bbPrepPlan, applyKcalAdjust, supportStack, autoGoal, injectDrugTypes, calcTargets, profileTargets, effectiveKcal, effectiveP, effectiveF, effectiveC, allergenExcludedCount, diaryAdaptation, bbCategory, dayModsByOffset]);
 
   const renderMealList = useRenderMealList({ ...ctx, plannerMode });
   const finalCtx = useMemo<PlanCtx>(() => ({ ...ctx, plannerMode, setPlannerMode, generationMode, setGenerationMode, weightMode, setWeightMode, favoriteRecipes, toggleFavoriteRecipe, isFavoriteRecipe, pickRecipeOption, moreRecipeOptions, refreshRecipeSuggestions, removeMealRebalanced, updateMealTime, duplicateMeal, renderMealList, annualPhase, bbPrepPlan }), [ctx, plannerMode, generationMode, weightMode, favoriteRecipes, pickRecipeOption, moreRecipeOptions, refreshRecipeSuggestions, removeMealRebalanced, updateMealTime, duplicateMeal, renderMealList, annualPhase, bbPrepPlan]);

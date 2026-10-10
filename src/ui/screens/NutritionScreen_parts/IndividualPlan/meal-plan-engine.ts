@@ -25,7 +25,7 @@
 
 import { FOOD_DB, FOOD_ALLERGEN_DIET } from "../../../../core/nutrition-database";
 import { filterByIntolerance, matchesCategoryPref, isPreferredCategory, tasteMatchScore, type CategoryPref, type Intolerances, type TasteProfile } from "./planner-preferences";
-import { analyzeMicroCoverage, sumMicros, type MicroCoverageEntry } from "./planner-micro-coverage";
+import { analyzeMicroCoverage, sumMicros, RDA_BASE, type MicroCoverageEntry } from "./planner-micro-coverage";
 import { getMicroFromFood } from "./planner-micro-reader";
 import { detectMealInteractions, cookMethodGuidance } from "./planner-food-interactions";
 import type { FoodItem } from "../../../../core/nutrition-database";
@@ -5467,10 +5467,14 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   // микронутриентно-адекватным, а не только диагностированным). Добавляем целевой
   // продукт для самого критичного дефицита (<60% RDA) в самый лёгкий приём, затем
   // пересчитываем макро-totals — kcal пересчитается блоком Atwater ниже.
+  // §4.1: ккал-гейт считаем по ФОРМУЛЬНЫМ ккал дня (P*4+C*4+F*9) — именно они
+  // становятся totals.kcal блока Atwater ниже, т.е. «показано = сгенерируется».
   const microBoost = _pickCtx.qualityMode === 'full'
-    ? activelyCloseTopDeficiency(meals, !!input.isVegetarian, input.sex || 'male', input.excludedIds || new Set(), { allergenTags: input.allergenTags, intolerances: input.intolerances, categoryPref: input.categoryPref })
+    ? activelyCloseTopDeficiency(meals, !!input.isVegetarian, input.sex || 'male', input.excludedIds || new Set(), { allergenTags: input.allergenTags, intolerances: input.intolerances, categoryPref: input.categoryPref }, { kcalNow: totals.p * 4 + totals.c * 4 + totals.f * 9, kcalTarget: input.goalKcal || 0 })
     : { note: null };
+  let microBoostNoteIdx = -1;
   if (microBoost.note) {
+    microBoostNoteIdx = notes.length;
     notes.push('🧬 ' + microBoost.note);
     recalcDayTotals(meals, totals); // B4
   }
@@ -10280,6 +10284,27 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
       ? analyzeMicroCoverage(sumMicros(meals.flatMap(m => m.items.map(it => ({ id: it.id, amount: it.amount }))), FOOD_DB as any), input.sex || 'male', input.weightKg, input.cyclePhase as any, !!input.isTrainingDay, input.calciumTargetOverride, input.sodiumTargetOverride)
       : { coverage: [], topDeficitNutrient: null as string | null };
     _jMark('final', 'Финал (микро/гигиена/витрина)');
+    // ─── §4.1 «призрак микро-добавки»: нота описывает ФАКТИЧЕСКУЮ тарелку ───
+    // Поздние проходы (типология «овощи — 1 пункт», клетчаточный кап, P4b) могли
+    // ужать/убрать добавленный продукт — нота «добавлен лосось 100 г» врала.
+    // Пересчитываем по item'у: сохранился — честные граммы и закрытие; ужать/
+    // заменили — корректная дельта; удалён полностью — совет, а не ложь.
+    if (microBoostNoteIdx >= 0 && microBoost.micro) {
+      const _mb = microBoost.micro;
+      // Ищем пункт по payload-маркеру (spread-клоны корректора его сохраняют),
+      // а НЕ по ссылке на исходный объект — reconciliation клонирует meals.
+      const _mbFound = meals.flatMap(m => (m.items || [])).find((x: any) => (x as any)._microClosure === _mb) as any;
+      const _mbFood = _mbFound ? FOOD_DB.find(f => f.id === _mbFound.id) : undefined;
+      if (_mbFound && _mbFood && _mbFood.id === _mb.foodId) {
+        const _actualG = Math.round(_mbFound.amount || 0);
+        const _addedNow = Math.round(getMicroFromFood(_mbFood, _mb.key) * _actualG / 100);
+        notes[microBoostNoteIdx] = _actualG >= _mb.grams
+          ? `🧬 ${_mb.foodName} ${_actualG}г → закрытие дефицита ${_mb.key}: +${_addedNow} ${_mb.unit} (${_mb.before}→${_mb.before + _addedNow}/${_mb.rda} ${_mb.unit})`
+          : `🧬 ${_mb.foodName} ${_actualG}г (из ${_mb.grams} г — ужат поздними проходами) → дефицит ${_mb.key}: +${_addedNow} ${_mb.unit} (${_mb.before}→${_mb.before + _addedNow}/${_mb.rda} ${_mb.unit})`;
+      } else {
+        notes[microBoostNoteIdx] = `⚠ Дефицит ${_mb.key}: ${_mb.foodName} ${_mb.grams} г не влез в калорийность дня (поздние проходы его сократили) — добавьте вручную или поднимите ккал`;
+      }
+    }
     return {
      dayIndex: (input.dayOffset ?? 0),
     isTrainingDay: input.isTrainingDay,
@@ -10319,20 +10344,27 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
 
 // ─── Покрытие микронутриентов: выявление дефицитов + рекомендации ─────
 // Д-6: each nutrient carries a vegFoodId so deficiency recommendations respect vegetarian mode.
-// Честная граница: RDA-пороги движка (18/15/100/400…) — КАЛИБРОВАННЫЕ под ~1378 тестов
-// планировщика; отчёт покрытия (planner-micro-coverage.RDA_BASE) держит медицинский канон
-// (Fe 8/18, Zn 11/8, VitC 90/75, Mg 420/320 по полу). Расхождение ЗАДОКУМЕНТИРОВАНО —
-// сведение порогов в одном раунде сломало бы 13 калиброванных локов (проверено).
+// §4.5 (RDA-сведение): числовой канон норм ЕДИНЫЙ — `RDA_BASE` из отчёта покрытия
+// (sex-aware: Fe 8/18, Zn 11/8, VitC 90/75, Mg 420/320, Omega3 1600/1100 по полу).
+// Исторический долг: движок держал произвольные значения (18/15/100/400) — ноты и
+// микродобавка спорили с витриной покрытия об одном дне («дефицит Fe» при 7/8 = 88%).
+// Статическое поле `rda` = мужской канон (fallback/совместимость), реальную норму
+// считает `rdaFor(key, sex)`; потребители используют его.
 // Единый сумматор микро (sumMicros ≡ getMicroFromFood) — planner-micro-reader.ts.
+const rdaFor = (key: string, sex: 'male' | 'female' | 'other'): number => {
+  const b = (RDA_BASE as Record<string, { male: number; female: number }>)[key];
+  if (!b) return 0;
+  return sex === 'female' ? b.female : b.male;
+};
 const RDA_TARGETS: Record<string, { rda: number; unit: string; foodId: string; vegFoodId: string; alternatives: string[]; foodG: number }> = {
-  Fe: { rda: 18, unit: 'мг', foodId: 'beef_liver', vegFoodId: 'lentils', alternatives: ['beef_lean', 'spinach'], foodG: 50 },
-  Mg: { rda: 400, unit: 'мг', foodId: 'pumpkin_seeds', vegFoodId: 'pumpkin_seeds', alternatives: ['almonds', 'spinach'], foodG: 30 },
-  Zn: { rda: 15, unit: 'мг', foodId: 'oysters', vegFoodId: 'pumpkin_seeds', alternatives: ['beef_lean', 'egg_whole'], foodG: 50 },
+  Fe: { rda: 8, unit: 'мг', foodId: 'beef_liver', vegFoodId: 'lentils', alternatives: ['beef_lean', 'spinach'], foodG: 50 },
+  Mg: { rda: 420, unit: 'мг', foodId: 'pumpkin_seeds', vegFoodId: 'pumpkin_seeds', alternatives: ['almonds', 'spinach'], foodG: 30 },
+  Zn: { rda: 11, unit: 'мг', foodId: 'oysters', vegFoodId: 'pumpkin_seeds', alternatives: ['beef_lean', 'egg_whole'], foodG: 50 },
   K: { rda: 3500, unit: 'мг', foodId: 'avocado', vegFoodId: 'avocado', alternatives: ['spinach', 'potato_boiled'], foodG: 100 },
   Ca: { rda: 1000, unit: 'мг', foodId: 'sardines', vegFoodId: 'tofu', alternatives: ['cottage_cheese_5', 'yogurt_greek'], foodG: 50 },
   Omega3: { rda: 1600, unit: 'мг', foodId: 'salmon', vegFoodId: 'flaxseed', alternatives: ['sardines', 'chia_seeds'], foodG: 80 },
   Se: { rda: 55, unit: 'мкг', foodId: 'beef_lean', vegFoodId: 'brazil_nuts', alternatives: ['egg_whole', 'tuna_canned'], foodG: 150 },
-  VitC: { rda: 100, unit: 'мг', foodId: 'veg_bell_pepper_red', vegFoodId: 'veg_bell_pepper_red', alternatives: ['kiwi', 'broccoli'], foodG: 100 },
+  VitC: { rda: 90, unit: 'мг', foodId: 'veg_bell_pepper_red', vegFoodId: 'veg_bell_pepper_red', alternatives: ['kiwi', 'broccoli'], foodG: 100 },
   VitD: { rda: 15, unit: 'мкг', foodId: 'salmon', vegFoodId: 'egg_yolk_cooked', alternatives: ['sardines', 'egg_yolk_cooked'], foodG: 100 },
   VitB12: { rda: 2.4, unit: 'мкг', foodId: 'beef_lean', vegFoodId: 'egg_yolk_cooked', alternatives: ['tuna_canned', 'egg_whole'], foodG: 150 },
   VitB9: { rda: 400, unit: 'мкг', foodId: 'spinach', vegFoodId: 'spinach', alternatives: ['lentils', 'broccoli'], foodG: 150 },
@@ -10417,6 +10449,8 @@ export function preSleepProteinBudget(weightKg?: number): number {
 // Единый читатель микро вынесен в planner-micro-reader.ts (импорт ниже) — одна
 // реализация на движок и отчёт покрытия (раньше два сумматора расходились).
 export { getMicroFromFood as _getMicroFromFoodForTest };
+// §4.5: единый RDA-канон на экспорт для тестов паритета с отчётом покрытия.
+export { rdaFor as _rdaForForTest };
 // Д-6: veg-aware. In vegetarian mode, deficiency recommendations use plant/dairy sources,
 // never suggesting meat/fish (salmon/oysters/beef_liver) which the user does not eat.
 function closeFoodDeficiencies(meals: Meal[], isVegetarian = false, sex: 'male'|'female'|'other' = 'male'): string[] {
@@ -10432,7 +10466,7 @@ function closeFoodDeficiencies(meals: Meal[], isVegetarian = false, sex: 'male'|
   const notes: string[] = [];
   const usedIds = new Set(allItems.filter(x => x.food).map(x => x.food!.id));
   Object.entries(RDA_TARGETS).forEach(([key, cfg]) => {
-    const effRda = key === 'Fe' ? (sex === 'male' ? 8 : 18) : cfg.rda;
+    const effRda = rdaFor(key, sex) || cfg.rda; // §4.5: единый sex-aware канон
     const val = totals[key] || 0;
     if (val < effRda * 0.6) {
       const sourceId = isVegetarian ? (cfg.vegFoodId || cfg.foodId) : cfg.foodId;
@@ -10452,7 +10486,10 @@ function closeFoodDeficiencies(meals: Meal[], isVegetarian = false, sex: 'male'|
 // D-23: активное закрытие дефицита — добавляет целевой продукт для самого критичного
 // микронутриента (<60% RDA) в самый лёгкий приём. Возвращает note (или null).
 // Aug 28: продукт уважает аллергены/непереносимости/категории (opts) — раньше только excludedIds.
-function activelyCloseTopDeficiency(meals: Meal[], isVegetarian: boolean, sex: 'male'|'female'|'other', excludedIds: Set<string>, opts?: { allergenTags?: Set<string>; intolerances?: Intolerances; categoryPref?: CategoryPref }): { note: string | null } {
+// §4.1 (призрак микро-добавки): kcalGate — ккал дня против цели на момент добавки;
+// защита _fixedGrams включается только при комнате <90% цели (см. ниже). Возвращается
+// ссылка на item — конец buildDayPlan пересчитывает ноту по ФАКТИЧЕСКИМ граммам.
+function activelyCloseTopDeficiency(meals: Meal[], isVegetarian: boolean, sex: 'male'|'female'|'other', excludedIds: Set<string>, opts?: { allergenTags?: Set<string>; intolerances?: Intolerances; categoryPref?: CategoryPref }, kcalGate: { kcalNow: number; kcalTarget: number } = { kcalNow: 0, kcalTarget: 0 }): { note: string | null; micro?: { item: any; foodId: string; foodName: string; grams: number; key: string; unit: string; rda: number; before: number } } {
   const _foodAllowed = (f: any): boolean => {
     if (excludedIds.has(f.id)) return false;
     if (!opts) return true;
@@ -10471,7 +10508,7 @@ function activelyCloseTopDeficiency(meals: Meal[], isVegetarian: boolean, sex: '
   });
   let worstKey: string | null = null; let worstPct = 60;
   for (const [key, cfg] of Object.entries(RDA_TARGETS)) {
-    const effRda = key === 'Fe' ? (sex === 'male' ? 8 : 18) : cfg.rda;
+    const effRda = rdaFor(key, sex) || cfg.rda; // §4.5: единый sex-aware канон
     const pct = (microTotals[key] || 0) / effRda * 100;
     if (pct < worstPct) { worstPct = pct; worstKey = key; }
   }
@@ -10490,19 +10527,40 @@ function activelyCloseTopDeficiency(meals: Meal[], isVegetarian: boolean, sex: '
   // и так добавляются отдельным Omega-3-проходом в обед; завтрак остаётся «завтрашним».
   // Aug 28: НЕ добавляем и в пери-тренировочные приёмы (prew/intra/postw — это напитки:
   // «EAA + лосось» — бессмыслица и раздуватель белка).
+  // §4.1 (призрак микро-добавки): выбор приёма НЕ менялся намеренно — смена цели
+  // (приём без овоща) сдвигала состав калиброванных дней. Вместо этого честность
+  // ноты обеспечивает deferred-пересчёт в конце buildDayPlan: если пункт не выжил
+  // (типология «овощи — 1 пункт», клетчаточный кап, P4b) — нота говорит совет,
+  // а не утверждает добавку.
   let target = meals.find(m => !['presleep','breakfast','preworkout','intra','postworkout'].includes(m.type) && !m.type.startsWith('snack')) || meals.find(m => !['presleep','breakfast','preworkout','intra','postworkout'].includes(m.type)) || meals.find(m => m.type !== 'presleep') || meals[0];
   for (const m of meals) if (!['presleep','breakfast','preworkout','intra','postworkout'].includes(m.type) && !m.type.startsWith('snack') && (m.totals.kcal || 0) < (target.totals.kcal || 0)) target = m;
   const grams = cfg.foodG;
-  // P1-фикс (призрак микро-добавки) — ОТКЛЮЧЁН по каскаду тестов: защита _fixedGrams
-  // удерживала 100 г рыбы в тарелке даже при низкокалорийных днях и сдвигала состав.
-  // TODO: включать защиту только при dayOffset-гейте (ккал-комната), тогда ноты перестанут врать.
+  // P1-фикс (призрак микро-добавки): защита _fixedGrams включается ТОЛЬКО когда в дне
+  // есть реальная ккал-комната — день на момент добавки ниже 90% цели (план аудита).
+  // Замер матрицы 36 ячеек: пулы сходются к макросам ДО микро-прохода, поэтому на
+  // сходящихся днях комната ≈0 и защита молчит — пункт тогда масштабируем, и поздние
+  // проходы могут его ужать/убрать (проверено: любая защита на сходящемся дне сдвигала
+  // калиброванные локи, напр. контроль 2830 → 2717). Комната появляется на недособранных
+  // днях и в ручном режиме, где ккал-цель выше формулы макросов — там закрытие
+  // дефицита реально доезжает до тарелки. Честность ноты в ЛЮБОМ случае обеспечивает
+  // deferred-пересчёт в конце buildDayPlan: граммы читаются с фактического item'а
+  // (payload-маркер _microClosure переживает spread-клоны корректора).
+  const _hasKcalRoom = kcalGate.kcalTarget > 0 && kcalGate.kcalNow < kcalGate.kcalTarget * 0.9;
+  const effRda = rdaFor(worstKey, sex) || cfg.rda; // §4.5: единый sex-aware канон
+  const before = Math.round(microTotals[worstKey] || 0);
   const item = makeItem(food, grams, 'veg');
+  if (_hasKcalRoom) (item as any)._fixedGrams = grams;
+  // Payload-маркер (БЕЗ ссылки на item — иначе JSON.stringify плана уходит в круг:
+  // localStorage/cloud-kv падали на «Converting circular structure to JSON»).
+  // Spread-клоны корректора копируют ссылку на тот же payload — поиск по identity.
+  const _microClosure = { foodId: food.id, foodName: food.name, grams, key: worstKey, unit: cfg.unit, rda: effRda, before };
+  (item as any)._microClosure = _microClosure;
   target.items.push(item);
   target.totals = target.items.reduce((acc, it) => ({ kcal: acc.kcal + it.kcal, p: acc.p + it.p, f: acc.f + it.f, c: acc.c + it.c, fiber: acc.fiber + (it.fiber||0), leucine_mg: acc.leucine_mg + (it.leucine_mg||0) }), { kcal: 0, p: 0, f: 0, c: 0, fiber: 0, leucine_mg: 0 });
-  const effRda = worstKey === 'Fe' ? (sex === 'male' ? 8 : 18) : cfg.rda;
-  const added = Math.round(getMicroFromFood(food, worstKey) * grams / 100);
-  const before = Math.round(microTotals[worstKey] || 0);
-  return { note: `${food.name} ${grams}г → закрытие дефицита ${worstKey}: +${added} ${cfg.unit} (${before}→${before + added}/${effRda} ${cfg.unit})` };
+  return {
+    note: `${food.name} ${grams}г → закрытие дефицита ${worstKey}: +${Math.round(getMicroFromFood(food, worstKey) * grams / 100)} ${cfg.unit} (${before}→${before + Math.round(getMicroFromFood(food, worstKey) * grams / 100)}/${effRda} ${cfg.unit})`,
+    micro: _microClosure,
+  };
 }
 
 // §3I (остаток I, план NUTRITION-EXTREME-SCALE-PRO): на 8000+ ккал RDA не масштабируется,
