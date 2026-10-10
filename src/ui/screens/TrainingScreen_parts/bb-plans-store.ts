@@ -15,6 +15,8 @@ export interface SavedBBPlan {
     goal: string;
     weeks: number;
     volumeGoal: string;
+    /** G1: сценарий входа в мезоцикл (standard/preloaded/flat). */
+    volumeRamp?: 'standard' | 'preloaded' | 'flat';
     peds: string[];
     pedDoses?: Record<string, number>;
     courseIntensity?: string;
@@ -129,6 +131,8 @@ function migrateSavedPlan(value: any): SavedBBPlan {
       patternName: rawParams.patternName || value.plan.pattern?.name || '',
       level: rawParams.level || value.plan.level || 'intermediate', goal: rawParams.goal || 'mass',
       weeks, volumeGoal: rawParams.volumeGoal || 'mav',
+      // G1: сценарий входа в мезоцикл (legacy-варианты без поля = standard).
+      volumeRamp: rawParams.volumeRamp === 'preloaded' || rawParams.volumeRamp === 'flat' ? rawParams.volumeRamp : 'standard',
       peds: Array.isArray(rawParams.peds) ? rawParams.peds.filter((item: any) => typeof item === 'string') : [],
       pedDoses: rawParams.pedDoses && typeof rawParams.pedDoses === 'object' ? rawParams.pedDoses : undefined,
       courseIntensity: rawParams.courseIntensity,

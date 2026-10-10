@@ -109,6 +109,9 @@ export interface BbParamsStepProps {
   setIntensityLevel: React.Dispatch<React.SetStateAction<'light' | 'moderate' | 'high'>>;
   bbVolGoal: string;
   setBbVolGoal: React.Dispatch<React.SetStateAction<string>>;
+  /** G1: сценарий входа в мезоцикл (standard/preloaded/flat). */
+  bbVolumeRamp: 'standard' | 'preloaded' | 'flat';
+  setBbVolumeRamp: React.Dispatch<React.SetStateAction<'standard' | 'preloaded' | 'flat'>>;
   onUserVolGoal: (v: string) => void;
   trainingVolumeMode: 'standard' | 'high';
   setTrainingVolumeMode: React.Dispatch<React.SetStateAction<'standard' | 'high'>>;
@@ -174,7 +177,7 @@ export const BbParamsStep: React.FC<BbParamsStepProps> = ({
   supersetMode, setSupersetMode, volumeScheme, setVolumeScheme, pedDoses, peds,
   loadStrategy, setLoadStrategy, onUserLoadStrategy, deloadType, setDeloadType, onUserDeloadType, onUserIntensityTech,
   eccentricMult, setEccentricMult, calorieSurplus, setCalorieSurplus,
-  rotationMode, setRotationMode, intensityLevel, setIntensityLevel, bbVolGoal, setBbVolGoal, onUserVolGoal,
+  rotationMode, setRotationMode, intensityLevel, setIntensityLevel, bbVolGoal, setBbVolGoal, onUserVolGoal, bbVolumeRamp, setBbVolumeRamp,
   trainingVolumeMode, setTrainingVolumeMode,
   avoidAxialLoadUi, setAvoidAxialLoadUi, fewerCompound, setFewerCompound,
   allowStrengthLifts, setAllowStrengthLifts, abRotation, setAbRotation, packingV2, setPackingV2, autoRegOn, setAutoRegOn,
@@ -412,6 +415,27 @@ export const BbParamsStep: React.FC<BbParamsStepProps> = ({
           {isGeneric
             ? <PopupSelectSmart label="🎯 Цель объёма" value={bbVolGoal} onChange={onUserVolGoal} suggestedIds={bbSuggest.volumeGoal} suggestionReason="По цели и уровню" options={[['mev', 'Минимум (MEV)'], ['mav', 'Оптимум (MAV)'], ['mrv', 'Максимум (MRV)']].map(([id, label]) => ({ id, label }))} />
             : <PopupSelect label="🎯 Цель объёма" value={bbVolGoal} onChange={v => setBbVolGoal(v)} options={[['mev', 'Минимум (MEV)'], ['mav', 'Оптимум (MAV)'], ['mrv', 'Максимум (MRV)']].map(([id, label]) => ({ id, label }))} />}
+          {isGeneric
+            ? <PopupSelect
+                label="🚀 Вход в мезоцикл"
+                value={bbVolumeRamp}
+                onChange={v => setBbVolumeRamp(v as any)}
+                options={[
+                  ['standard', 'Разгон — начать легко'],
+                  ['preloaded', 'Сразу разогнанный'],
+                  ['flat', 'Без разгона (ровно)'],
+                ] as any}
+              />
+            : <div style={{ ...NOTE, color: '#f59e0b' }}>
+                🚀 Вход в мезоцикл: в режиме источника разгон задаёт сама программа — её понедельная
+                раскладка % и есть кривая входа. Универсальный разгон применяется только к
+                генерик-сплиту.
+              </div>}
+          <div style={{ ...NOTE, color: '#fff' }}>
+            {isGeneric
+              ? 'Разгон: первые недели легче цели — есть запас под рост веса и повторов. Сразу разогнанный — старт на цели (возврат после перерыва, короткий блок, повторный мезо). Мышцы на минимумах (руки в PPL, мелкие группы) выбор не двигает — они и так держат минимум.'
+              : ''}
+          </div>
           <PopupSelect
             label='📦 Схема объёма памп-дней'
             value={volumeScheme}

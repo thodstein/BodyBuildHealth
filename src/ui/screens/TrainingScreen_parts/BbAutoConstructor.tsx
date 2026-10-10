@@ -207,6 +207,9 @@ export const BbAutoConstructor: React.FC = () => {
   }, []);
   const [bbAnnualMacrocycle, setBbAnnualMacrocycle] = useState<BBMacrocycle | null>(null);
   const [bbVolGoal, setBbVolGoal] = useState<string>('mav');
+// G1: сценарий входа в мезоцикл (где стартует объём относительно цели).
+// 'standard' = прежнее поведение (0.85→1.10, прогрессивная перегрузка).
+const [bbVolumeRamp, setBbVolumeRamp] = useState<'standard' | 'preloaded' | 'flat'>('standard');
   const [trainingVolumeMode, setTrainingVolumeMode] = useState<'standard' | 'high'>('standard');
   // Фаза 4.28: ручные оверрайды восстановления/лаб-множителя в визарде (null = авто).
   const [labMultOverride, setLabMultOverride] = useState<number | null>(null);
@@ -2185,6 +2188,8 @@ export const BbAutoConstructor: React.FC = () => {
             trainingYears: bbTrainingYears,
             bodyweightCapability: prof.bodyweightCapability,
            volumeGoal: effectiveVolGoal,
+           // G1: сценарий входа в мезоцикл (standard/preloaded/flat).
+           volumeRamp: bbVolumeRamp,
            // M3 (§8.3): цель пользователя доезжает в program-путь (был тихий игнор:
            // сушка/масса не влияли на объём циклового UI-пути — паритет с generic).
            goal: bbGoal,
@@ -2241,6 +2246,7 @@ export const BbAutoConstructor: React.FC = () => {
           patternId: selectedSplitId, level: bbLevel, trainingYears: bbTrainingYears, goal: bbGoal as any, weeks: bbWeeks,
           bodyweightCapability: prof.bodyweightCapability,
           workMax: bbWorkMax, weakPoints, focusGroup: '', volumeGoal: effectiveVolGoal,
+          volumeRamp: bbVolumeRamp,
           specialization: specializationMode,
           specializationSchedule: buildSpecBlocks,
          injuries,
@@ -2509,6 +2515,9 @@ export const BbAutoConstructor: React.FC = () => {
       // Слепок всех кнопок — чтобы отчёт соответствовал реальным настройкам, а не «от новичка»
       trainingVolumeMode,
       volumeGoal: (plan as any).volumeGoal || effectiveVolGoal,
+      // G1: воспроизводимость варианта — режим входа из плана, иначе из UI.
+      // (top-level, как volumeGoal — читается снапшотом варианта.)
+      ...({ volumeRamp: (plan as any).volumeRamp || bbVolumeRamp } as any),
       goal: bbGoal,
       trainingFocus: bbTrainingFocus,
       methodology: bbMethodology,
@@ -2885,6 +2894,8 @@ export const BbAutoConstructor: React.FC = () => {
     if (vp.proPreset) setProPreset(vp.proPreset);
     if (vp.trainingVolumeMode) setTrainingVolumeMode(vp.trainingVolumeMode);
     if (vp.volumeScheme) setVolumeScheme(vp.volumeScheme);
+    // G1: сценарий входа в мезоцикл из варианта (legacy = standard).
+    if (vp.volumeRamp) setBbVolumeRamp(vp.volumeRamp);
     if (vp.supersetMode) setSupersetMode(vp.supersetMode);
     if (vp.intensityLevel) setIntensityLevel(vp.intensityLevel);
     if (vp.rotationMode) setRotationMode(vp.rotationMode);
@@ -3452,6 +3463,8 @@ export const BbAutoConstructor: React.FC = () => {
       bbVolGoal={bbVolGoal}
       setBbVolGoal={setBbVolGoal}
       onUserVolGoal={onUserVolGoal}
+ bbVolumeRamp={bbVolumeRamp}
+ setBbVolumeRamp={setBbVolumeRamp}
       trainingVolumeMode={trainingVolumeMode}
       setTrainingVolumeMode={setTrainingVolumeMode}
       avoidAxialLoadUi={avoidAxialLoadUi}

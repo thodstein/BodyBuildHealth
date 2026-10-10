@@ -2020,6 +2020,11 @@ export interface ProgramToBBPlanOpts {
     assistedPullUpLoad?: number;
   };
   volumeGoal?: BBVolumeGoal;
+  /**
+   * G1: сценарий входа в мезоцикл для program-пути (паритет с generic).
+   * 'standard' (дефолт) = прежнее поведение (рампа 0.85→1.10).
+   */
+  volumeRamp?: 'standard' | 'preloaded' | 'flat';
   /** Цель пользователя (mass/cut/recomp/maintenance/strength_mass): объём-множитель
    *  adapt-пути (паритет с generic/convert). Без поля — 'mass' (легаси-вызовы). */
   goal?: string;

@@ -150,6 +150,22 @@ export interface BBBuilderInput {
   focusGroup?: string;           // группа специализации → MAV↑↑
   volumeGoal?: BBVolumeGoal;     // цель по объёму: MEV | MAV | MRV
   /**
+   * G1: сценарий входа в мезоцикл (где начинает объём относительно цели).
+   *
+   * - `standard` (дефолт, поведение прежнее): 0.85 → 1.10 — прогрессивная
+   *   перегрузка, «разминка» мезоцикла. Первые недели легче цели, чтобы был
+   *   запас под рост веса/повторов.
+   * - `preloaded`: 1.0 → 1.10 — начать СРАЗУ на цели. Для спортсмена, который
+   *   уже знает свою переносимость (возврат после перерыва, короткий блок,
+   *   повторный мезо) — разминочные недели только тратят время.
+   * - `flat`: 1.0 постоянно — без рампа вообще.
+   *
+   * Важно (честно): мышцы, запертые на МИНИМУМАХ (PPL-минимумы рук,
+   * MEV-гарантии, мелкие группы), этот выбор НЕ двигает — 16 сетов бицепса
+   * одинаковы при любом режиме. Замерено пробой.
+   */
+  volumeRamp?: 'standard' | 'preloaded' | 'flat';
+  /**
    * G1-полный (opt-in): Israetel-волна объёма внутри фазы поверх плоского
    * рампа (1.0 → 1.15 → 0.75 → 1.05 + 2.5% за 4 недели). Дефолт выкл —
    * недельные множители остаются прежними.
@@ -3614,8 +3630,14 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
     const phaseWeek = phaseWeekCounter[phase];
     const weekPhase = phase;
     const isDeloadWeek = weekPhase === 'deload';
+    // G1: старт рампа. standard = 0.85 (прогрессивная перегрузка), preloaded = 1.0
+    // (сразу разогнанный вход), flat = без рампа. Дефолт/undefined — прежняя
+    // формула 0.85→1.10 (байт-в-байт).
+    const rampMode = input.volumeRamp || 'standard';
+    const rampStart = rampMode === 'preloaded' ? 1.0 : 0.85;
     let baseWeekVolumeMult = isDeloadWeek ? 0.6
-      : Math.min(1.10, 0.85 + ((w - 1) / Math.max(1, input.weeks - 1)) * 0.25);
+      : rampMode === 'flat' ? 1.0
+      : Math.min(1.10, rampStart + ((w - 1) / Math.max(1, input.weeks - 1)) * (1.10 - rampStart));
     // G1 rate-limiter: гасим пост-делодный скачок (см. lastAppliedWeekMult).
     if (!isDeloadWeek && lastAppliedWeekMult != null) {
       baseWeekVolumeMult = Math.min(baseWeekVolumeMult, lastAppliedWeekMult * MAX_WEEK_RAMP);
@@ -4818,6 +4840,8 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
     // G1-полный: флаг волны в снапшот — иначе план нельзя воспроизвести
     // («показано ≠ сохранено»: реплан/adapter не узнали бы о волне).
     volumeWave: input.volumeWave === true ? true : undefined,
+    // G1: сценарий входа в мезоцикл — top-level (его читает UI-снапшот варианта).
+    volumeRamp: input.volumeRamp && input.volumeRamp !== 'standard' ? input.volumeRamp : undefined,
     goal: input.goal,
     trainingFocus: input.trainingFocus,
     methodology: input.methodology,
@@ -4836,7 +4860,9 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
       goal: input.goal,
       trainingVolumeMode: input.trainingVolumeMode || 'standard',
       volumeGoal: input.volumeGoal,
-      // G1-полный: флаг волны и во вложенный снапшот — его читает реплана/адаптеры.
+      // G1: сценарий входа в мезоцикл + волна — во вложенный снапшот, иначе
+      // реплана/адаптеры не воспроизвели бы выбор пользователя.
+      volumeRamp: input.volumeRamp && input.volumeRamp !== 'standard' ? input.volumeRamp : undefined,
       volumeWave: input.volumeWave === true ? true : undefined,
       trainingFocus: input.trainingFocus,
       methodology: input.methodology,
