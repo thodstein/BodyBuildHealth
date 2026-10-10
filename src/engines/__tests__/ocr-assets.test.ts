@@ -36,8 +36,12 @@ describe('ocr-assets: local path configuration', () => {
     expect(p.workerPath).toContain('tesseract.js@v');
     expect(p.corePath).toContain('cdn.jsdelivr.net');
     expect(p.corePath).toContain('tesseract.js-core@v');
-    expect(p.langPath).toContain('cdn.jsdelivr.net');
-    expect(p.langPath).toContain('@tesseract.js-data');
+    // Было: langPath = корень пакета 'https://cdn.jsdelivr.net/npm/@tesseract.js-data',
+    // и воркер запрашивал '.../@tesseract.js-data/rus.traineddata.gz' — такого файла
+    // нет (пакет разложен по <lang>/<version>/), фолбэк был 404-ным по построению.
+    // Теперь langPath не задан: tesseract.js строит корректный URL на КАЖДЫЙ язык
+    // сам ('.../@tesseract.js-data/<lang>/4.0.0_best_int/<lang>.traineddata.gz').
+    expect(p.langPath).toBeUndefined();
     expect(p.pdfjsWorkerSrc).toContain('cdnjs.cloudflare.com');
     expect(p.pdfjsWorkerSrc).toContain('pdf.worker.min.mjs');
   });

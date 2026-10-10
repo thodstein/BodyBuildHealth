@@ -26,6 +26,7 @@ import { LabsOverview } from './LabsScreen_parts/LabsOverview';
 import LabsCatalogTab from './LabsScreen_parts/LabsCatalogTab';
 import LabsProblemPanelsTab from './LabsScreen_parts/LabsProblemPanelsTab';
 import { processUploadedFile, saveParsedLabs, type ParsedLabValue, type OCRResult } from '../../core/ocr-engine';
+import { applyLabsSummaryToProfile } from '../../core/labs-profile-sync';
 import { getProfile, updateProfile } from '../../core/profile-manager';
 import { PopupNumber, PopupBool, PopupSelect } from '../components/PopupXxx';
 import { normalizedRatio } from '../../core/labs-mapping';
@@ -295,7 +296,24 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
 
   const labs: LabPoint[] = linked.labs || [];
   // P0 fix: legacy без phase — только baseline, иначе completion врёт во всех фазах
-  const currentLabs = useMemo(() => labs.filter(l => !l.archived && (!l.phase ? selectedPhase === 'baseline' : l.phase === selectedPhase)), [labs, selectedPhase]);
+    // Dedup + детерминированный порядок. `labs` приходит из `db.getAll('labs_log')`
+  // БЕЗ сортировки, а id записи — случайный UUID: порядок ключей стора ничего не
+  // гарантирует. Раньше «текущее» значение и «предыдущее» выбирались произвольно —
+  // после импорта/ручного ввода на экране мог показаться СТАРЫЙ результат, а
+  // сравнение и тренды считались не от той записи.
+  // Правило: на код — одно значение, побеждает самая свежая дата.
+  const currentLabs = useMemo(() => {
+    const filtered = labs.filter(l => !l.archived && (!l.phase ? selectedPhase === 'baseline' : l.phase === selectedPhase));
+    const dateOf = (l: LabPoint) => (typeof l.date === 'string' && l.date ? l.date : '');
+    const byCode = new Map<string, LabPoint>();
+    for (const l of filtered) {
+      if (!l || typeof l.code !== 'string') continue;
+      const key = l.code.toUpperCase();
+      const prev = byCode.get(key);
+      if (!prev || dateOf(l) > dateOf(prev)) byCode.set(key, l);
+    }
+    return Array.from(byCode.values()).sort((a, b) => dateOf(b).localeCompare(dateOf(a)));
+  }, [labs, selectedPhase]);
   // P0 fix: архив — только archived, а не «все чужие фазы» (иначе архив всегда полон, а переключение фазы теряет данные)
   const archiveLabs = useMemo(() => labs.filter(l => !!l.archived), [labs]);
   const hasLabs = currentLabs && currentLabs.length > 0;
@@ -614,12 +632,31 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
     if (!ocrResult) return;
     const labsToSave = ocrResult.labs.filter(l => selectedLabs.has(l.code));
     if (labsToSave.length === 0) return;
-    const saved = await saveParsedLabs(labsToSave, selectedPhase);
-    if (saved > 0) { notifyDataChange(); setTick(t => t + 1); }
+    // Дата бланка из распознанного текста + пол пациента: без них импорт
+    // подставлял сегодняшнюю дату и мужские границы норм (для женщины это
+    // давало «отклонение» рядом с женской нормой на экране).
+    const saved = await saveParsedLabs(labsToSave, selectedPhase, {
+      date: (ocrResult as any).date,
+      sex: profileSex,
+    });
+    if (saved > 0) {
+      notifyDataChange();
+      setTick(t => t + 1);
+      // Импортированные значения — это ТЕКУЩИЕ значения пациента. Профиль
+      // (labs.summary) — единственный источник для калькулятора рисков/поддержки;
+      // раньше OCR писал только в labs_log, и поддержка оставалась без анализов.
+      applyLabsSummaryToProfile(
+        labsToSave,
+        (ocrResult as any).date,
+        localIsoDate(),
+        () => getProfile(),
+        (patch) => updateProfile(patch as any),
+      );
+    }
     setShowImport(false);
     setOcrResult(null);
     setSelectedLabs(new Set());
-  }, [ocrResult, selectedLabs, selectedPhase]);
+  }, [ocrResult, selectedLabs, selectedPhase, profileSex]);
 
   const toggleLabSelection = useCallback((code: string) => {
     setSelectedLabs(prev => { const next = new Set(prev); if (next.has(code)) next.delete(code); else next.add(code); return next; });

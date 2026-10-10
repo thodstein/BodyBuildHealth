@@ -6,6 +6,7 @@ import { isCapacitorNative } from '../../../../../core/app-platform';
 import { FOOD_DB } from '../../../../../core/nutrition-database';
 import { type DiaryItem, type FoodItemLike } from '../../types';
 import { readJSONArr } from '../../diary-storage-v2';
+import { readProgramRestrictions, summarizeImportChecks } from '../diary-import-guards';
 
 export function useDiaryQueue({ diaryData, selectedDate, mealType, usdaFoods, saveDiary, showToast, bumpRefresh, setShowBarcode, setFoodSearch }: {
   diaryData: Record<string, any>;
@@ -48,7 +49,10 @@ export function useDiaryQueue({ diaryData, selectedDate, mealType, usdaFoods, sa
     if (!data[selectedDate].meals[mt]) data[selectedDate].meals[mt] = [];
     (data[selectedDate].meals[mt] as any).push({ name: food.name, qty: '100 г', kcal: food.kcal, p: food.protein, f: food.fat, c: food.carbs, category: food.category, foodId: (food as any).id });
     saveDiary(data);
-    showToast(`⚡ ${food.name} → ${mt} 100г`);
+    // Сверка с действующими ограничениями программы: дневник — факт, поэтому
+    // предупреждаем, а не отказываем (тихий отказ съел бы реальную еду).
+    const summary = summarizeImportChecks([{ name: food.name, foodId: (food as any).id, category: food.category }], readProgramRestrictions());
+    showToast(summary.text || `⚡ ${food.name} → ${mt} 100г`);
   }, [diaryData, selectedDate, mealType, saveDiary, showToast]);
 
   const handleBarcodeProduct = useCallback((product: OFFProduct) => {
@@ -61,16 +65,27 @@ export function useDiaryQueue({ diaryData, selectedDate, mealType, usdaFoods, sa
         try { void m.saveSharedBarcode(product); } catch { /* ignore */ }
       }).catch(() => {});
     } catch { /* ignore */ }
-    setParsedItems(prev => [...prev, { name: item.name, kcal: item.kcal, p: item.protein, f: item.fat, c: item.carbs, qty: 100, category: (item as any).category || 'other', foodId: (item as any).id, confidence: 1 }]);
-    showToast(`📷 ${item.name} → очередь (на 100 г)`);
+    // Штрихкод — единственный стабильный идентификатор товара из сети: в FOOD_DB
+    // его нет, а имя меняется («Творог 5%» / «Творог 5%, 200г»). Без него запись
+    // нельзя было ни найти, ни дедуплицировать при повторном сканировании.
+    setParsedItems(prev => [...prev, { name: item.name, kcal: item.kcal, p: item.protein, f: item.fat, c: item.carbs, qty: 100, category: (item as any).category || 'other', foodId: (item as any).id, barcode: product.barcode, confidence: 1 }]);
+    // Товар из сети почти всегда без id в FOOD_DB → сверка идёт по названию.
+    const summary = summarizeImportChecks([{ name: item.name, foodId: (item as any).id, category: (item as any).category }], readProgramRestrictions());
+    showToast(summary.text || `📷 ${item.name} → очередь (на 100 г)`);
   }, [setShowBarcode, showToast]);
 
   const convertOCRItems = useCallback((meals: { mealType: string; items: Array<{ name: string; qty: string; qtyGrams?: number; kcal: number; p: number; f: number; c: number; category?: string; foodId?: string; micros?: Record<string, number>; confidence?: number }> }[], usdaFallback?: FoodItemLike[]) => {
     return meals.flatMap(m => m.items.map(item => {
-      const qtyMatch = item.qty?.match(/[\d]+(?:[.,]\d+)?/);
-      const parsedQty = qtyMatch ? Number.parseFloat(qtyMatch[0].replace(',', '.')) : 100;
-      const qty = Math.max(10, Math.round(item.qtyGrams ?? parsedQty));
-       let result: DiaryItem = { name: item.name || m.mealType || 'Блюдо', kcal: Math.round(item.kcal) || 0, p: Math.round((item.p || 0) * 10) / 10, f: Math.round((item.f || 0) * 10) / 10, c: Math.round((item.c || 0) * 10) / 10, qty, category: item.category, foodId: item.foodId, micros: item.micros, confidence: item.confidence };
+      // Русская упаковка/меню пишут порцию словом: «1 стакан», «2 шт», «1 ст. л.».
+      // Наивный парсинг первого числа давал 1 шт → флор 10 г вместо ~240 г:
+      // позиция молча уезжала в КБЖУ на порядок. Канон порций — тот же,
+      // что у nutrition-ocr-parser при разборе текста.
+      const catalogFood = findFood(item.name) as any;
+      const grams = item.qtyGrams ?? (item.qty ? quantityToGrams(item.qty, catalogFood) : 100);
+      const qty = Math.max(10, Math.round(grams || 100));
+      let result: DiaryItem = { name: item.name || m.mealType || 'Блюдо', kcal: Math.round(item.kcal) || 0, p: Math.round((item.p || 0) * 10) / 10, f: Math.round((item.f || 0) * 10) / 10, c: Math.round((item.c || 0) * 10) / 10, qty, category: item.category, foodId: item.foodId, micros: item.micros, confidence: item.confidence };
+      if (result.foodId == null && catalogFood?.id) result.foodId = catalogFood.id;
+      if (!result.category && catalogFood?.category) result.category = catalogFood.category;
       // USDA is only an identity/category fallback. Keep the actual values
       // captured in the screenshot instead of replacing them with another item.
       if (!result.foodId && usdaFallback?.length) {
@@ -176,14 +191,26 @@ export function useDiaryQueue({ diaryData, selectedDate, mealType, usdaFoods, sa
       data[selectedDate].meals[mt].push({
         name: item.name, qty: `${q} г`, kcal: Math.round(item.kcal * q / 100),
         p: Math.round((item.p * q / 100) * 10) / 10, f: Math.round((item.f * q / 100) * 10) / 10, c: Math.round((item.c * q / 100) * 10) / 10,
-        category: item.category, foodId: item.foodId, micros: item.micros,
+        category: item.category, foodId: item.foodId, barcode: item.barcode, micros: item.micros,
         qualityScore,
       });
     });
     saveDiary(data);
     setParsedItems([]);
     setOcrText('');
-    showToast(`✅ ${items.length} позиций → ${mt}`);
+    // Сверка очереди с действующими ограничениями программы. Пишем как факт
+    // (еда реально съедена), но явно говорим, что позиция противоречит
+    // настройкам рациона — иначе пользователь узнаёт об этом из отчёта.
+    const summary = summarizeImportChecks(
+      items.map(it => ({ name: it.name, foodId: it.foodId, category: it.category })),
+      readProgramRestrictions(),
+    );
+    if (summary.text) {
+      setOcrHint(summary.text);
+      showToast(summary.text);
+    } else {
+      showToast(`✅ ${items.length} позиций → ${mt}`);
+    }
   }, [diaryData, selectedDate, mealType, saveDiary, showToast]);
 
   const addCustomFood = useCallback(() => {

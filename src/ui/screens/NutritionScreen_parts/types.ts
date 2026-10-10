@@ -7,6 +7,11 @@ export interface DiaryItem {
   qty?: number | string;
   category?: string;
   foodId?: string;
+  /**
+   * Штрихкод сканированного товара. В FOOD_DB продукта из сети нет, а имя
+   * меняется между упаковками — код остаётся единственным стабильным ключом.
+   */
+  barcode?: string;
   micros?: Record<string, number>;
   confidence?: number;
   qtyGrams?: number;

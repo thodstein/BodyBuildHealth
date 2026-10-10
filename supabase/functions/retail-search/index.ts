@@ -262,12 +262,26 @@ async function vkusvillSearch(query: string, limit: number, diag?: string[]): Pr
   return [];
 }
 
+/** Допустимые длины штрихкода: EAN-8, UPC-A (12), EAN-13. */
+const BARCODE_LENGTHS = [8, 12, 13];
+
 async function vkusvillProductByBarcode(barcode: string, diag?: string[]): Promise<RetailItem[]> {
   const bc = (barcode || '').replace(/\D/g, '');
-  if (!/^\d{13}$/.test(bc)) {
-    diag?.push('barcode must be 13 digits');
+  if (!BARCODE_LENGTHS.includes(bc.length)) {
+    diag?.push(`barcode must be ${BARCODE_LENGTHS.join(', '} digits`);
     return [];
   }
+  // EAN-8 часто хранится в каталоге как EAN-13 с ведущими нулями, поэтому
+  // пробуем и «как есть», и дополненный вариант — тихо, без выдуманных совпадений.
+  const candidates = bc.length === 8 ? [bc, `00000${bc}`] : [bc];
+  for (const candidate of candidates) {
+    const found = await vkusvillBarcodeLookup(candidate, diag);
+    if (found.length) return found;
+  }
+  return [];
+}
+
+async function vkusvillBarcodeLookup(bc: string, diag?: string[]): Promise<RetailItem[]> {
   for (const endpoint of VKUSVILL_ENDPOINTS) {
     try {
       const init = await mcpPost(endpoint, '', 'initialize', {

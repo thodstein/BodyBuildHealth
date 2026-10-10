@@ -250,6 +250,8 @@ export const RECIPE_DB_P2: Recipe[] = [
   {
     name: 'Острая курица по-корейски', meal: 'dinner', prepTimeMin: 25,
     kcal: 380, protein: 44, fat: 12, carbs: 26,
+    ingredientIds: ['poultry_chicken_thigh_skinless', 'rice_white', 'sauce_soy', 'sesame_seeds', 'garlic', 'ginger_root', 'chili_pepper', 'sauce_apple_cider'],
+    portions: { 'poultry_chicken_thigh_skinless': 250, 'rice_white': 70, 'sauce_soy': 30, 'sesame_seeds': 5, 'garlic': 10, 'ginger_root': 10, 'chili_pepper': 5, 'sauce_apple_cider': 15 },
     ingredients: [
         'Куриные бёдра без кожи 250г',
         'Перец чили 1/2',
@@ -668,6 +670,8 @@ export const RECIPE_DB_P2: Recipe[] = [
   {
     name: 'Куриный пирог с овощами', meal: 'dinner', prepTimeMin: 40,
     kcal: 380, protein: 40, fat: 16, carbs: 20,
+    ingredientIds: ['chicken_breast', 'egg_whole', 'zucchini', 'pepper', 'onion', 'milk', 'cheese_hard'],
+    portions: { 'chicken_breast': 150, 'egg_whole': 165, 'zucchini': 100, 'pepper': 60, 'onion': 60, 'milk': 80, 'cheese_hard': 30 },
     ingredients: [
         'Куриная грудка 150г',
         'Яйца 3 шт',
@@ -1288,6 +1292,8 @@ export const RECIPE_DB_P2: Recipe[] = [
   {
     name: 'Ленивые вареники с творогом и сметаной', meal: 'dinner', prepTimeMin: 20,
     kcal: 360, protein: 32, fat: 8, carbs: 44,
+    ingredientIds: ['cottage_cheese_5', 'grain_rice_flour', 'egg_whole', 'sour_cream_10'],
+    portions: { 'cottage_cheese_5': 300, 'grain_rice_flour': 60, 'egg_whole': 55, 'sour_cream_10': 30 },
     ingredients: [
         'Творог 5% 300г',
         'Мука рисовая 60г',

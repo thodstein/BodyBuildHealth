@@ -509,14 +509,10 @@ function detectWatermarkText(text: string): string[] {
 
 async function recognizeOcrCanvas(Tesseract: any, canvas: HTMLCanvasElement): Promise<string> {
   const enhanced = enhanceOcrCanvas(canvas);
-  const { resolveTesseractOptions } = await import('./ocr-assets');
+  const { resolveTesseractOptions, tesseractWorkerOptions } = await import('./ocr-assets');
   const opts = await resolveTesseractOptions();
   try {
-    const worker = await Tesseract.createWorker('rus+eng', 1, {
-      workerPath: opts.workerPath,
-      corePath: opts.corePath,
-      langPath: opts.langPath,
-    });
+    const worker = await Tesseract.createWorker('rus+eng', 1, tesseractWorkerOptions(opts));
     try {
       const { data } = await worker.recognize(enhanced);
       return data.text || '';
@@ -526,11 +522,7 @@ async function recognizeOcrCanvas(Tesseract: any, canvas: HTMLCanvasElement): Pr
   } catch (firstError: any) {
     console.warn('Russian OCR failed (local assets), retrying in English:', firstError);
     try {
-      const worker = await Tesseract.createWorker('eng', 1, {
-        workerPath: opts.workerPath,
-        corePath: opts.corePath,
-        langPath: opts.langPath,
-      });
+      const worker = await Tesseract.createWorker('eng', 1, tesseractWorkerOptions(opts));
       try {
         const { data } = await worker.recognize(enhanced);
         return data.text || '';
@@ -545,13 +537,9 @@ async function recognizeOcrCanvas(Tesseract: any, canvas: HTMLCanvasElement): Pr
 }
 
 async function createRussianOcrWorker(Tesseract: any) {
-  const { resolveTesseractOptions } = await import('./ocr-assets');
+  const { resolveTesseractOptions, tesseractWorkerOptions } = await import('./ocr-assets');
   const opts = await resolveTesseractOptions();
-  return Tesseract.createWorker('rus+eng', 1, {
-    workerPath: opts.workerPath,
-    corePath: opts.corePath,
-    langPath: opts.langPath,
-  });
+  return Tesseract.createWorker('rus+eng', 1, tesseractWorkerOptions(opts));
 }
 
 function isMobileWebView(): boolean {
@@ -881,13 +869,31 @@ export function parseLabText(rawText: string): ParsedLabResult {
     }
   }
 
-  const dateMatch = normalizedText.match(/(\d{1,2})[./](\d{1,2})[./](\d{2,4})/);
+  // Дата бланка. П��иоритет — помеченная «Дата/Дата анализа»: на русском бланке
+  // она всегда подписана, а первая попавшаяся точка в тексте может быть любым
+  // числом («12.05» в графе референса, номер образца и т.п.). Раньше бралась
+  // ПЕРВАЯ точка в тексте — при импорте старого бланка в историю попадала
+  // произвольная дата, и тренды/нормы по дате считали не то.
+  const DATE_RE = /(\d{1,2})[./](\d{1,2})[./](\d{2,4})/;
+  const labelledDate = normalizedText.match(
+    /(?:дата|дата\s+анализа|д\.?а\.|исследование|обследование)[^0-9\n]{0,20}(\d{1,2})[./](\d{1,2})[./](\d{2,4})/i,
+  );
+  const bareDate = normalizedText.match(DATE_RE);
   let date: string | undefined;
-  if (dateMatch) {
-    const d = dateMatch[1].padStart(2, '0');
-    const m = dateMatch[2].padStart(2, '0');
-    const y = dateMatch[3].length === 2 ? '20' + dateMatch[3] : dateMatch[3];
-    date = `${y}-${m}-${d}`;
+  for (const m of [labelledDate, bareDate]) {
+    if (!m) continue;
+    const d = Number(m[1]);
+    const mo = Number(m[2]);
+    const y = m[3].length === 2 ? 2000 + Number(m[3]) : Number(m[3]);
+    // Календарная валидность + «не из будущего» + разумный диапазон:
+    // мусорная дата хуже отсутствия даты (тихо портила бы историю).
+    const dt = new Date(Date.UTC(y, mo - 1, d));
+    const validCalendar =
+      dt.getUTCFullYear() === y && dt.getUTCMonth() === mo - 1 && dt.getUTCDate() === d &&
+      y >= 1990 && y <= new Date().getUTCFullYear();
+    if (!validCalendar) continue;
+    date = `${y}-${String(mo).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    break;
   }
 
   const warnings: string[] = [];
@@ -1074,17 +1080,13 @@ export async function parseLabFile(file: File, arrayBuffer?: ArrayBuffer): Promi
  */
 export async function ocrImageText(file: File): Promise<string> {
   let Tesseract: any;
-  let workerOptions: { workerPath: string; corePath: string; langPath: string };
+  let workerOptions: { workerPath: string; corePath: string; langPath?: string };
   const errors: string[] = [];
   try {
     Tesseract = await import('tesseract.js') as any;
-    const { resolveTesseractOptions } = await import('./ocr-assets');
+    const { resolveTesseractOptions, tesseractWorkerOptions } = await import('./ocr-assets');
     const opts = await resolveTesseractOptions();
-    workerOptions = {
-      workerPath: opts.workerPath,
-      corePath: opts.corePath,
-      langPath: opts.langPath,
-    };
+    workerOptions = tesseractWorkerOptions(opts);
   } catch (initError: any) {
     throw new Error(`OCR engine not available: ${initError?.message || String(initError)}. Check internet connection or reinstall the app.`);
   }

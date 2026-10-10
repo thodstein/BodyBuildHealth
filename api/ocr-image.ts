@@ -80,8 +80,19 @@ async function recognizePass(buffer: Buffer, language: keyof typeof TESSERACT_LA
 }
 
 async function recognizeImage(buffer: Buffer): Promise<string> {
-  const text = (await recognizePass(buffer, 'rus')).trim();
-  if (text) return text;
+  const rus = (await recognizePass(buffer, 'rus')).trim();
+  // Вторая модель — латинские аббревиатуры. На русском бланке анализов метки
+  // (HbA1c, TSH, ALT, HDL) печатаются латиницей, и проход 'rus' читает их как
+  // мусор — маркер терялся, пользователю «не найдено показателей». Проход
+  // 'eng' возвращает ровно эти метки. Сбои модели не роняют ответ: русский
+  // текст уже получен.
+  let eng = '';
+  try { eng = (await recognizePass(buffer, 'eng')).trim(); } catch { /* опциональный проход */ }
+  if (eng && nutritionOcrScore(eng, 'eng') > 0) {
+    if (!rus) return eng;
+    return `${rus}\n${eng}`;
+  }
+  if (rus) return rus;
   throw new Error('OCR returned empty text');
 }
 

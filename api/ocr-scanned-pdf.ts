@@ -13,20 +13,49 @@ function localRussianLangPath(): string {
   return require('@tesseract.js-data/rus').langPath;
 }
 
+function localEnglishLangPath(): string {
+  return require('@tesseract.js-data/eng').langPath;
+}
+
+/**
+ * Модели OCR, которые прогоняются по одному изображению.
+ * Русский бланк анализов содержит ЛАТИНСКИЕ аббревиатуры (HbA1c, TSH, ALT,
+ * HDL, LDL, GFR) — они латиницей даже в полностью русском документе. Проход
+ * одной русской модели читает их как мусор, и показатель терялся («не найдено
+ * показателей»). Проход 'eng' возвращает ровно эти метки, поэтому оба текста
+ * склеиваются: парсеры ниже дедуплицируют маркер по коду, дублей строк нет.
+ */
+const OCR_PASSES: Array<{ lang: string; langPath: string }> = [
+  { lang: 'rus', langPath: localRussianLangPath() },
+  { lang: 'eng', langPath: localEnglishLangPath() },
+];
+
+/** Выполнить fn на воркере каждой модели; воркеры гасятся всегда. */
+async function forEachOcrPass<T>(fn: (worker: any) => Promise<T>): Promise<T[]> {
+  const { createWorker } = await import('tesseract.js');
+  const results: T[] = [];
+  for (const pass of OCR_PASSES) {
+    const worker = await createWorker(pass.lang, 1, { langPath: pass.langPath, gzip: true } as any);
+    try {
+      results.push(await fn(worker));
+    } finally {
+      await worker.terminate();
+    }
+  }
+  return results;
+}
+
 export const config = {
   api: { bodyParser: { sizeLimit: '16mb' } },
 };
 
 async function recognizeImage(buffer: Buffer): Promise<string> {
-  const { createWorker } = await import('tesseract.js');
-  const worker = await createWorker('rus', 1, { langPath: localRussianLangPath(), gzip: true } as any);
-  try {
+  const texts = await forEachOcrPass(async (worker) => {
     await worker.setParameters({ tessedit_pageseg_mode: '3' as any, preserve_interword_spaces: '1', user_defined_dpi: '300' });
     const result = await worker.recognize(buffer);
     return result.data.text || '';
-  } finally {
-    await worker.terminate();
-  }
+  });
+  return texts.filter(t => t.trim()).join('\n');
 }
 
 async function recognizePdf(buffer: Buffer): Promise<string> {
@@ -61,32 +90,37 @@ async function recognizePdf(buffer: Buffer): Promise<string> {
   } as any).promise;
   if (pdf.numPages > MAX_PAGES) throw new Error(`PDF содержит ${pdf.numPages} страниц, максимум ${MAX_PAGES}`);
 
-  const worker = await createWorker('rus', 1, { langPath: localRussianLangPath(), gzip: true } as any);
+  const pages: string[] = [];
   try {
-    await worker.setParameters({
-      tessedit_pageseg_mode: '3' as any,
-      preserve_interword_spaces: '1',
-      user_defined_dpi: '300',
-    });
-    const pages: string[] = [];
-    for (let number = 1; number <= pdf.numPages; number++) {
-      const page = await pdf.getPage(number);
-      const base = page.getViewport({ scale: 1 });
-      const scale = Math.min(2.5, Math.sqrt(MAX_PAGE_PIXELS / Math.max(1, base.width * base.height)));
-      const viewport = page.getViewport({ scale });
-      const canvas = createCanvas(Math.ceil(viewport.width), Math.ceil(viewport.height));
-      const context = canvas.getContext('2d');
-      await page.render({ canvas: canvas as any, canvasContext: context as any, viewport }).promise;
-      const result = await worker.recognize(canvas as any);
-      if (result.data.text?.trim()) pages.push(result.data.text);
-      page.cleanup?.();
+    for (const pageTexts of await forEachOcrPass(async (worker) => {
+      await worker.setParameters({
+        tessedit_pageseg_mode: '3' as any,
+        preserve_interword_spaces: '1',
+        user_defined_dpi: '300',
+      });
+      const texts: string[] = [];
+      for (let number = 1; number <= pdf.numPages; number++) {
+        const page = await pdf.getPage(number);
+        const base = page.getViewport({ scale: 1 });
+        const scale = Math.min(2.5, Math.sqrt(MAX_PAGE_PIXELS / Math.max(1, base.width * base.height)));
+        const viewport = page.getViewport({ scale });
+        const canvas = createCanvas(Math.ceil(viewport.width), Math.ceil(viewport.height));
+        const context = canvas.getContext('2d');
+        await page.render({ canvas: canvas as any, canvasContext: context as any, viewport }).promise;
+        const result = await worker.recognize(canvas as any);
+        if (result.data.text?.trim()) texts.push(result.data.text);
+        page.cleanup?.();
+      }
+      return texts;
+    })) {
+      for (const t of pageTexts) pages.push(t);
     }
-    return pages.join('\n');
   } finally {
-    await worker.terminate();
+    // pdfjs держит таймеры/память: без этого serverless-инстанс не остывает.
     await pdf.cleanup?.();
     await (pdf as any).destroy?.();
   }
+  return pages.join('\n');
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {

@@ -28,6 +28,19 @@ const SUPABASE_ANON = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 const CACHE_KEY = 'he_retail_search_cache_v2';
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 const CACHE_MAX_QUERIES = 40;
+const FETCH_TIMEOUT_MS = 12000;
+
+/**
+ * Таймаут fetch, совместимый со старыми WebView.
+ * `AbortSignal.timeout` появился не везде (Android WebView до ~Chrome 103 +
+ * Node < 17.3): прямое обращение бросало TypeError, и поиск по сетям падал
+ * полностью, хотя сеть была жива. Поэтому свой AbortController + setTimeout.
+ */
+function fetchTimeoutSignal(): { signal: AbortSignal; done: () => void } {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+  return { signal: controller.signal, done: () => clearTimeout(timer) };
+}
 
 interface CacheEntry {
   ts: number;
@@ -117,6 +130,7 @@ export async function searchRetailProducts(query: string, limit = 9): Promise<Re
     return { items: hit.items.slice(0, limit), available: true };
   }
 
+  const timeout = fetchTimeoutSignal();
   try {
     const res = await fetch(`${SUPABASE_URL}/functions/v1/retail-search`, {
       method: 'POST',
@@ -126,7 +140,7 @@ export async function searchRetailProducts(query: string, limit = 9): Promise<Re
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({ query: q, limit }),
-      signal: AbortSignal.timeout(12000),
+      signal: timeout.signal,
     } as RequestInit);
     if (!res.ok) return { items: [], available: false };
     const data = await res.json();
@@ -136,6 +150,8 @@ export async function searchRetailProducts(query: string, limit = 9): Promise<Re
     return { items: items.slice(0, limit), available: true };
   } catch {
     return { items: [], available: false };
+  } finally {
+    timeout.done();
   }
 }
 
@@ -148,6 +164,7 @@ export async function searchRetailProductByBarcode(barcode: string): Promise<Ret
   const hit = cache[cacheKey];
   if (hit && Date.now() - hit.ts < CACHE_TTL_MS) return hit.items[0] || null;
 
+  const timeout = fetchTimeoutSignal();
   try {
     const res = await fetch(`${SUPABASE_URL}/functions/v1/retail-search`, {
       method: 'POST',
@@ -157,7 +174,7 @@ export async function searchRetailProductByBarcode(barcode: string): Promise<Ret
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({ barcode: bc }),
-      signal: AbortSignal.timeout(12000),
+      signal: timeout.signal,
     } as RequestInit);
     if (!res.ok) return null;
     const data = await res.json();
@@ -167,6 +184,8 @@ export async function searchRetailProductByBarcode(barcode: string): Promise<Ret
     return items[0] || null;
   } catch {
     return null;
+  } finally {
+    timeout.done();
   }
 }
 

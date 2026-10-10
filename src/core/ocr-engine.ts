@@ -4,6 +4,7 @@ import { parseLabText as parseLabTextProviderAware, detectProvider } from './lab
 import { parseLabResults as parseWithBiomarkerRegex, type ExtractedMarker } from '../engines/biomarker-regex-engine';
 import { UCUM_MAP } from './constants';
 import { mapToUcumCode, normalizeLabMeasurement } from './labs-mapping';
+import { getLabNorm } from '../engines/lab-norms.engine';
 import { db } from './db';
 import { notifyDataChange } from './data-link';
 import { formatDate } from './utils/date-utils';
@@ -146,6 +147,13 @@ export interface OCRResult {
   source: 'pdf' | 'image' | 'text';
   confidence: number;
   warnings: string[];
+  /**
+   * Дата бланка в формате YYYY-MM-DD, если она распозналась (русский бланк
+   * печатает «Дата …»). Раньше она терялась на пути от парсеров к сохранению,
+   * и импорт СРАЗУ ПОДМЕНЯЛСЯ сегодняшней датой: старый анализ попадал в
+   * сегодняшний день дневника, а с ним ломались тренды и нормы «по дате».
+   */
+  date?: string;
 }
 
 export interface ParsedLabValue {
@@ -229,7 +237,7 @@ function mergeParsedResults(
   return { labs, warnings };
 }
 
-function parseLabTextAllWays(rawText: string, extractionMethod: string): { labs: ParsedLabValue[]; provider: string; warnings: string[] } {
+function parseLabTextAllWays(rawText: string, extractionMethod: string): { labs: ParsedLabValue[]; provider: string; warnings: string[]; date?: string } {
   const parsed = parseLabTextFromPdf(rawText);
   const pdfLabs = parsed.values.map(v => ({ ...v }));
   const providerResults = parseLabTextProviderAware(rawText);
@@ -237,6 +245,9 @@ function parseLabTextAllWays(rawText: string, extractionMethod: string): { labs:
   const merged = mergeParsedResults(pdfLabs, providerResults, provider);
   const labs = merged.labs;
   const regexResults = parseWithBiomarkerRegex(rawText, extractionMethod);
+  // Дата бланка извлекается из ТОГО ЖЕ текста: она нужна импорту, иначе
+  // анализ за март сохраняется как «сегодня» и портит историю/тренды.
+  const formDate = parsed.date;
 
   // Build a lookup of existing labs by canonical code so the regex parser can
   // augment rather than be blocked by earlier (possibly lower-quality) results.
@@ -281,7 +292,7 @@ function parseLabTextAllWays(rawText: string, extractionMethod: string): { labs:
       labsByCode.set(code, newLab);
     }
   }
-  return { labs, provider: provider || 'unknown', warnings: [...merged.warnings, ...regexResults.warnings] };
+  return { labs, provider: provider || 'unknown', warnings: [...merged.warnings, ...regexResults.warnings], date: formDate };
 }
 
 /**
@@ -502,7 +513,7 @@ export async function recognizeImageTextOffline(
       onProgress?.(Math.max(0, Math.min(1, Number.isFinite(fraction) ? fraction : 0)));
     } catch { /* ignore */ }
   };
-  let opts: { workerPath: string; corePath: string; langPath: string };
+  let opts: { workerPath: string; corePath: string; langPath?: string };
   try {
     const { resolveTesseractOptions } = await import('../engines/ocr-assets');
     opts = await resolveTesseractOptions();
@@ -540,7 +551,9 @@ export async function recognizeImageTextOffline(
     worker = await Tesseract.createWorker('rus+eng', 1, {
       workerPath: opts.workerPath,
       corePath,
-      langPath: opts.langPath,
+      // Только когда задан (локальные ассеты). В CDN-режиме langPath пустой,
+      // и тогда не должен попадать в опции: tesseract.js достроит URL на язык.
+      ...(opts.langPath ? { langPath: opts.langPath } : {}),
       // Capacitor Android WebView can reject Tesseract's default Blob-backed
       // worker even when the bundled worker asset is available. In APK use
       // the same-origin worker directly; web/TG still need the Blob wrapper
@@ -635,6 +648,9 @@ export async function processUploadedFile(
   let rawText = '';
   let source: 'pdf' | 'image' | 'text' = 'text';
   let confidence = 0.5;
+  // Дата бланка (YYYY-MM-DD). Собирается из распознанного текста и уходит
+  // в результат, чтобы импорт не подставлял сегодняшнюю дату.
+  let formDate: string | undefined;
 
   const fileType = typeof file?.type === 'string' ? file.type : '';
   const fileName = typeof file?.name === 'string' ? file.name : '';
@@ -663,10 +679,11 @@ export async function processUploadedFile(
         rawText = ocrText;
         const parsedAll = parseLabTextAllWays(rawText, 'server-tesseract');
         labs = finalizeLabCandidates(parsedAll.labs);
+        formDate = parsedAll.date;
         warnings.push('PDF обработан на сервере для Telegram Mobile.');
         warnings.push(...parsedAll.warnings);
         confidence = labs.length > 0 ? 0.85 : 0.3;
-        return { text: rawText, labs, meals, source, confidence, warnings };
+        return { text: rawText, labs, meals, source, confidence, warnings, date: formDate };
       }
       let result;
       try {
@@ -680,6 +697,7 @@ export async function processUploadedFile(
       }
       rawText = result.rawText;
       let parsedAll = parseLabTextAllWays(rawText, 'pdf-parse');
+      formDate = parsedAll.date;
       // Scanned PDFs have no text layer. Render their pages and run the same
       // Russian/English OCR pipeline used for uploaded photos.
       if (shouldRetryPdfWithOcr(rawText, parsedAll.labs)) {
@@ -693,6 +711,8 @@ export async function processUploadedFile(
               labs: finalizeLabCandidates([...parsedAll.labs, ...ocrParsed.labs]),
               provider: parsedAll.provider !== 'unknown' ? parsedAll.provider : ocrParsed.provider,
               warnings: [...parsedAll.warnings, ...ocrParsed.warnings],
+              // OCR страниц тоже может увидеть «Дата …» — берём ту, что есть
+              date: parsedAll.date || ocrParsed.date,
             };
             rawText = `${rawText}\n${ocrText}`.trim();
             warnings.push('PDF обработан через OCR страниц.');
@@ -750,6 +770,12 @@ export async function processUploadedFile(
         // АПК/оффлайн: серверные ./api/* в WebView недоступны — пробуем
         // локальный tesseract, дальше общий парсинг rawText как обычно.
         try {
+          // 'nutrition' — режим общего пути изображений: он обслуживает и бланки
+          // анализов, и скриншоты приложений (FatSecret/MyFitnessPal). В режиме
+          // 'labs' разреженный проход не склеивался с блочным, и колонки
+          // макросов FatSecret (отдельными строками) терялись. Для бланка
+          // это не хуже: маркеры дедуплицируются по коду, первое вхождение
+          // побеждает, а блочный проход идёт первым.
           const offlineText = await recognizeImageTextOffline(file, 90_000, opts?.onProgress, 'nutrition');
           if (offlineText.trim().length <= 2) {
             return { text: '', labs: [], meals: [], source, confidence: 0, warnings };
@@ -770,6 +796,7 @@ export async function processUploadedFile(
         let parsedAll: ReturnType<typeof parseLabTextAllWays> = { labs: [], provider: 'unknown', warnings: [] };
         try {
           parsedAll = parseLabTextAllWays(rawText, 'tesseract.js');
+          formDate = parsedAll.date;
         } catch (labParseError: any) {
           warnings.push(`Лабораторный парсер пропущен: ${labParseError?.message || String(labParseError)}`);
         }
@@ -813,6 +840,7 @@ export async function processUploadedFile(
       rawText = await readFileAsText(file);
        const parsedAll = parseLabTextAllWays(rawText, 'text');
        labs = finalizeLabCandidates(parsedAll.labs);
+       formDate = parsedAll.date;
        const providerName = parsedAll.provider;
        warnings.push(...parsedAll.warnings);
 
@@ -826,17 +854,40 @@ export async function processUploadedFile(
     }
   }
 
-  return { text: rawText, labs, meals, source, confidence, warnings };
+  return { text: rawText, labs, meals, source, confidence, warnings, date: formDate };
 }
 
 /**
  * Save parsed lab results to IndexedDB
+ *
+ * opts.date — дата БЛАНКА (YYYY-MM-DD) из распознанного текста. Без неё импорт
+ * подставлял сегодняшнюю дату, и старый анализ оказывался «сделан сегодня»:
+ * ломались тренды динамики и нормы, привязанные к дате.
+ * opts.sex — пол пациента: без него отклонение считалось по мужским границам
+ * (UCUM_MAP), а рядом UI показывал женскую норму — внутреннее противоречие.
  */
-export async function saveParsedLabs(labs: ParsedLabValue[], phase: string): Promise<number> {
+export async function saveParsedLabs(
+  labs: ParsedLabValue[],
+  phase: string,
+  opts?: { date?: string; sex?: string },
+): Promise<number> {
   let saved = 0;
   try {
     await db.init();
+    const validFormDate = typeof opts?.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(opts.date) ? opts.date : undefined;
+    const saveDate = validFormDate || formatDate(new Date());
     for (const lab of labs) {
+      // Гендерные нормы там, где их знает проект (HCT/Hb/RBC/ферритин/АЛТ/АСТ…).
+      // Приоритет у нормы профиля: пол в коде UCUM_MAP — мужской дефолт.
+      let isAbnormal = lab.isAbnormal;
+      if (opts?.sex) {
+        try {
+          const norm = getLabNorm(lab.code, opts.sex as 'male' | 'female');
+          if (norm && (norm.uln != null || norm.lln != null)) {
+            isAbnormal = norm.uln != null ? lab.value > norm.uln : lab.value < norm.lln;
+          }
+        } catch { /* нет нормы для кода — оставляем как распознали */ }
+      }
       const point: LabPoint = {
         id: typeof globalThis.crypto?.randomUUID === 'function'
           ? globalThis.crypto.randomUUID()
@@ -845,11 +896,11 @@ export async function saveParsedLabs(labs: ParsedLabValue[], phase: string): Pro
         name: lab.name,
         value: lab.value,
         unit: lab.unit,
-        date: formatDate(new Date()),
+        date: saveDate,
         phase,
         refLow: lab.refLow,
         refHigh: lab.refHigh,
-        isAbnormal: lab.isAbnormal,
+        isAbnormal,
       };
       await db.put('labs_log', point);
       saved++;

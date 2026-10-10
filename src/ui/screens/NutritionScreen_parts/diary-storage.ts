@@ -8,6 +8,15 @@ export interface DiaryMealItem {
   category?: string;
   foodId?: string;
   micros?: Record<string, number>;
+  /**
+   * Штрихкод, по которому продукт попал в дневник (сканер/фото/сеть).
+   * Без него повторный скан того же товара не узнаётся, а отчёт по продуктам
+   * нельзя сверить с составом на упаковке. Поле аддитивное: старые записи без
+   * него валидны (валидатор проверяет только name/kcal/p/f/c).
+   */
+  barcode?: string;
+  /** Источник значения КБЖУ: снимок с упаковки/каталога/вручную. */
+  source?: string;
 }
 
 export function aggregateDiaryMicros(day: DiaryDay | undefined): Record<string, number> {

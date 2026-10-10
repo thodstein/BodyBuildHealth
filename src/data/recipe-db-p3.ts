@@ -56,6 +56,8 @@ export const RECIPE_DB_P3: Recipe[] = [
   {
     name: 'Салат Цезарь с курицей', meal: 'lunch', prepTimeMin: 15,
     kcal: 420, protein: 48, fat: 18, carbs: 16,
+    ingredientIds: ['chicken_breast', 'lettuce_romaine', 'cheese_parmesan', 'bread_rye', 'yogurt_greek', 'sauce_mustard', 'lemon'],
+    portions: { 'chicken_breast': 180, 'lettuce_romaine': 100, 'cheese_parmesan': 20, 'bread_rye': 20, 'yogurt_greek': 60, 'sauce_mustard': 5, 'lemon': 15 },
     ingredients: [
         'Куриная грудка 180г',
         'Салат романо 100г',
@@ -703,6 +705,8 @@ export const RECIPE_DB_P3: Recipe[] = [
   {
     name: 'Плов с курицей', meal: 'lunch', prepTimeMin: 35,
     kcal: 500, protein: 42, fat: 8, carbs: 62,
+    ingredientIds: ['poultry_chicken_thigh_skinless', 'rice_white', 'carrot', 'onion', 'garlic', 'seed_cumin', 'turmeric', 'fruit_barberry'],
+    portions: { 'poultry_chicken_thigh_skinless': 200, 'rice_white': 100, 'carrot': 80, 'onion': 100, 'garlic': 10, 'seed_cumin': 3, 'turmeric': 2, 'fruit_barberry': 10 },
     ingredients: [
         'Куриное бедро без кожи 200г',
         'Рис длиннозёрный 100г',
@@ -842,6 +846,8 @@ export const RECIPE_DB_P3: Recipe[] = [
   {
     name: 'Паста с курицей и грибами', meal: 'lunch', prepTimeMin: 20,
     kcal: 520, protein: 42, fat: 14, carbs: 58,
+    ingredientIds: ['pasta_durum', 'chicken_breast', 'mushrooms', 'cream_10', 'cheese_parmesan', 'garlic', 'herb_thyme_fresh'],
+    portions: { 'pasta_durum': 80, 'chicken_breast': 150, 'mushrooms': 100, 'cream_10': 80, 'cheese_parmesan': 15, 'garlic': 10, 'herb_thyme_fresh': 5 },
     ingredients: [
         'Паста феттучини 80г',
         'Куриная грудка 150г',
@@ -1194,6 +1200,8 @@ export const RECIPE_DB_P3: Recipe[] = [
   {
     name: 'Салат с тунцом, киноа и авокадо', meal: 'lunch', prepTimeMin: 20,
     kcal: 470, protein: 38, fat: 18, carbs: 38,
+    ingredientIds: ['tuna_canned', 'quinoa_seeds', 'avocado', 'cucumber', 'tomato', 'veg_onion_red', 'lemon', 'olive_oil', 'herb_parsley_fresh'],
+    portions: { 'tuna_canned': 200, 'quinoa_seeds': 50, 'avocado': 100, 'cucumber': 100, 'tomato': 100, 'veg_onion_red': 50, 'lemon': 40, 'olive_oil': 14, 'herb_parsley_fresh': 15 },
     ingredients: [
         'Тунец консервированный 200 г',
         'Киноа 80 г (сухая)',
@@ -1381,6 +1389,8 @@ export const RECIPE_DB_P3: Recipe[] = [
   {
     name: 'Салат нисуаз фит', meal: 'lunch', prepTimeMin: 15,
     kcal: 380, protein: 36, fat: 16, carbs: 22,
+    ingredientIds: ['tuna_canned', 'veg_string_beans', 'egg_whole', 'tomato', 'olives_black', 'olive_oil', 'sauce_mustard'],
+    portions: { 'tuna_canned': 150, 'veg_string_beans': 100, 'egg_whole': 110, 'tomato': 80, 'olives_black': 30, 'olive_oil': 10, 'sauce_mustard': 5 },
     ingredients: [
         'Тунец консерв. 150г',
         'Фасоль стручковая 100г',
@@ -1437,6 +1447,8 @@ export const RECIPE_DB_P3: Recipe[] = [
   {
     name: 'Лаваш с тунцом и овощами', meal: 'lunch', prepTimeMin: 10,
     kcal: 380, protein: 34, fat: 14, carbs: 32,
+    ingredientIds: ['bread_lavash', 'tuna_canned', 'cucumber', 'tomato', 'veg_cabbage_napa', 'sour_cream_10', 'garlic'],
+    portions: { 'bread_lavash': 70, 'tuna_canned': 150, 'cucumber': 80, 'tomato': 120, 'veg_cabbage_napa': 50, 'sour_cream_10': 30, 'garlic': 10 },
     ingredients: [
         'Лаваш тонкий 1 шт',
         'Тунец консерв. 150г',
@@ -1466,6 +1478,8 @@ export const RECIPE_DB_P3: Recipe[] = [
   {
     name: 'Греческий салат с протеином', meal: 'lunch', prepTimeMin: 10,
     kcal: 340, protein: 34, fat: 18, carbs: 12,
+    ingredientIds: ['tuna_canned', 'cucumber', 'tomato', 'feta_cheese', 'olives_black', 'olive_oil'],
+    portions: { 'tuna_canned': 150, 'cucumber': 100, 'tomato': 100, 'feta_cheese': 40, 'olives_black': 30, 'olive_oil': 14 },
     ingredients: [
         'Тунец консерв. 150г или курица отварная 150г',
         'Огурец 100г',

@@ -409,6 +409,45 @@ function editDistance(a: string, b: string): number {
   return row[b.length];
 }
 
+/**
+ * Совпадение слова запроса со словом каталога.
+ * maxDist=0 — точное совпадение.
+ *
+ * Допуск на опечатки сделан ЗАВИСИМЫМ от длины слова: русские формы одного
+ * продукта расходятся больше чем на 1 символ («куриная» ↔ «курица» = 2 ошибки,
+ * «творожный» ↔ «творог» = 3), и при жёстком допуске 1 OCR-название не находило
+ * продукт вообще. Короткие слова по-прежнему требуют точного совпадения —
+ * иначе «рис»/«масло» начинают матчить лишнее.
+ */
+function wordMatches(queryWord: string, candidate: string, maxDist: number): boolean {
+  if (candidate.includes(queryWord)) return true;
+  if (queryWord.length >= 3 && queryWord.includes(candidate)) return true;
+  if (queryWord.length >= 5 && candidate.length >= 5) {
+    if (maxDist <= 0) return false;
+    // Для длинных слов допускаем 2 ошибки: русские падежи меняют больше одного
+    // символа (куриная→курица), и допуск 1 терял продукт целиком.
+    const allowed = queryWord.length >= 7 && candidate.length >= 7 ? 2 : maxDist;
+    return editDistance(queryWord, candidate) <= allowed;
+  }
+  return false;
+}
+
+/** Поиск по каталогу: сколько слов запроса нашли пару. */
+function scanFoods(foods: FoodItem[], words: string[], maxDist: number): FoodItem | undefined {
+  return foods
+    .map(food => {
+      const foodWords = normalizeFoodText(food.name).split(/\s+/);
+      const score = words.reduce(
+        (total, word) => total + (foodWords.some(candidate => wordMatches(word, candidate, maxDist)) ? 1 : 0),
+        0,
+      );
+      const exactWord = words.some(word => foodWords.includes(word));
+      return { food, score, exactWord };
+    })
+    .filter(result => result.score > 0 && (words.length <= 1 || result.exactWord || result.score >= 2))
+    .sort((a, b) => b.score - a.score || a.food.name.length - b.food.name.length)[0]?.food;
+}
+
 /** Matches OCR names to the local food database, including partial word matches.
  * Pass `extraCatalog` for USDA/external foods as a secondary fallback. */
 export function findFood(name: string, extraCatalog?: FoodItem[]): FoodItem | undefined {
@@ -420,23 +459,23 @@ export function findFood(name: string, extraCatalog?: FoodItem[]): FoodItem | un
     if (byId) return byId;
   }
   const words = query.split(/\s+/).filter(word => word.length > 2);
-  const dbResult = FOOD_DB
-    .map(food => {
-      const foodWords = normalizeFoodText(food.name).split(/\s+/);
-      const score = words.reduce((total, word) => total + (foodWords.some(candidate => candidate.includes(word) || (candidate.length >= 3 && word.includes(candidate)) || (word.length >= 5 && candidate.length >= 5 && editDistance(word, candidate) <= 1)) ? 1 : 0), 0);
-      const exactWord = words.some(word => foodWords.includes(word));
-      return { food, score, exactWord };
-    })
-    .filter(result => result.score > 0 && (words.length <= 1 || result.exactWord || result.score >= 2))
-    .sort((a, b) => b.score - a.score || a.food.name.length - b.food.name.length)[0]?.food;
+  const dbResult = scanFoods(FOOD_DB, words, 1);
   if (dbResult) return dbResult;
+  // Второй проход — только если точный/1-ошибочный ничего не нашёл. Поэтому
+  // всё, что находилось раньше, находится РОВНО так же: этот проход аддитивный.
+  if (!dbResult) {
+    const relaxed = scanFoods(FOOD_DB, words, 2);
+    if (relaxed) return relaxed;
+  }
   // Fallback: search extra catalog (USDA_FOODS, etc.)
   if (extraCatalog && extraCatalog.length > 0) {
     return extraCatalog
       .map(food => {
         if (!food || typeof food.name !== 'string' || !food.name.trim()) return { food, score: 0 };
         const foodWords = normalizeFoodText(food.name).split(/\s+/);
-        const score = words.reduce((total, word) => total + (foodWords.some(candidate => candidate.includes(word) || (candidate.length >= 3 && word.includes(candidate)) || (word.length >= 5 && candidate.length >= 5 && editDistance(word, candidate) <= 1)) ? 1 : 0), 0);
+        // Внешний каталог (USDA) — прежний допуск 1: меняем только то, что
+        // не находилось, поведение существующих совпадений сохраняем.
+        const score = words.reduce((total, word) => total + (foodWords.some(candidate => wordMatches(word, candidate, 1)) ? 1 : 0), 0);
         return { food, score };
       })
       .filter(result => result.score > 0)
@@ -504,6 +543,11 @@ function normalizeItem(name: string, qty: string, kcal: number, p: number, f: nu
   const macrosPlausible = macroKcal === 0 || safeKcal === 0 || macroKcal <= safeKcal * 1.35;
   const hasMacros = safeKcal > 0 || safeP > 0 || safeF > 0 || safeC > 0;
   const hasAnyMacros = safeP > 0 || safeF > 0 || safeC > 0;
+  // OCR-колонки есть, но противоречат ккал: брать вместо них значения из БД
+  // нельзя — это значения, которых на снимке НЕ БЫЛО (дневник — факт, а не
+  // додумывание). В этом случае макросы обнуляются, ккал сохраняются.
+  // Если колонок не было вовсе — подстановка из БД остаётся прежней.
+  const rejectOcrMacros = !macrosPlausible && hasAnyMacros;
   const confidence = food
     ? (directId ? (hasMacros ? 0.95 : 0.85) : hasAnyMacros ? 0.6 : 0.4)
     : (hasAnyMacros ? 0.5 : 0.3);
@@ -524,9 +568,9 @@ function normalizeItem(name: string, qty: string, kcal: number, p: number, f: nu
     qty,
     qtyGrams: Math.round(weight),
     kcal: (providedKcal > 0 || hasAnyMacros) ? Math.round(safeKcal / multiplier) : food?.kcal || 0,
-    p: hasMacros && macrosPlausible ? Math.round((safeP || (food?.protein || 0) * multiplier) / multiplier * 10) / 10 : (food?.protein || 0),
-    f: hasMacros && macrosPlausible ? Math.round((safeF || (food?.fat || 0) * multiplier) / multiplier * 10) / 10 : (food?.fat || 0),
-    c: hasMacros && macrosPlausible ? Math.round((safeC || (food?.carbs || 0) * multiplier) / multiplier * 10) / 10 : (food?.carbs || 0),
+    p: hasMacros && macrosPlausible ? Math.round((safeP || (food?.protein || 0) * multiplier) / multiplier * 10) / 10 : (rejectOcrMacros ? 0 : (food?.protein || 0)),
+    f: hasMacros && macrosPlausible ? Math.round((safeF || (food?.fat || 0) * multiplier) / multiplier * 10) / 10 : (rejectOcrMacros ? 0 : (food?.fat || 0)),
+    c: hasMacros && macrosPlausible ? Math.round((safeC || (food?.carbs || 0) * multiplier) / multiplier * 10) / 10 : (rejectOcrMacros ? 0 : (food?.carbs || 0)),
     micros,
     foodId: food?.id,
     category: food?.category,

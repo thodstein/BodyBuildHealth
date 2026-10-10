@@ -196,6 +196,8 @@ export const RECIPE_DB_P4: Recipe[] = [
   {
     name: 'Паста болоньезе из сои/нут', meal: 'lunch', prepTimeMin: 25,
     kcal: 420, protein: 28, fat: 10, carbs: 60,
+    ingredientIds: ['pasta_durum', 'supp_soy_isolate', 'canned_tomatoes', 'onion', 'carrot', 'garlic', 'spice_oregano'],
+    portions: { 'pasta_durum': 80, 'supp_soy_isolate': 30, 'canned_tomatoes': 200, 'onion': 100, 'carrot': 100, 'garlic': 10, 'spice_oregano': 2 },
     ingredients: [
         'Паста из твёрдых сортов 80г',
         'Фарш соевый 50г',
@@ -251,6 +253,8 @@ export const RECIPE_DB_P4: Recipe[] = [
   {
     name: 'Белковый смузи', meal: 'snack', prepTimeMin: 5,
     kcal: 980, protein: 65, fat: 35, carbs: 95,
+    ingredientIds: ['milk', 'whey_isolate', 'banana', 'oats_dry', 'peanut_butter', 'honey'],
+    portions: { 'milk': 400, 'whey_isolate': 40, 'banana': 110, 'oats_dry': 50, 'peanut_butter': 30, 'honey': 15 },
     ingredients: [
         'Молоко 400мл',
         'Протеин 40г',
@@ -315,6 +319,8 @@ export const RECIPE_DB_P4: Recipe[] = [
   {
     name: 'Протеиновый чизкейк без выпечки', meal: 'snack', prepTimeMin: 15,
     kcal: 380, protein: 38, fat: 14, carbs: 24,
+    ingredientIds: ['cottage_cheese_5', 'whey_isolate', 'supp_gelatin', 'almonds', 'spice_cinnamon'],
+    portions: { 'cottage_cheese_5': 200, 'whey_isolate': 30, 'supp_gelatin': 10, 'almonds': 15, 'spice_cinnamon': 2 },
     ingredients: [
         'Творог 5% 200 г',
         'Протеин ванильный 30 г',
@@ -597,6 +603,8 @@ export const RECIPE_DB_P4: Recipe[] = [
   {
     name: 'Протеиновые шарики', meal: 'snack', prepTimeMin: 10,
     kcal: 320, protein: 28, fat: 12, carbs: 32,
+    ingredientIds: ['whey_isolate', 'oats_dry', 'peanut_butter', 'honey', 'coconut_flakes', 'spice_cinnamon'],
+    portions: { 'whey_isolate': 30, 'oats_dry': 50, 'peanut_butter': 25, 'honey': 10, 'coconut_flakes': 10, 'spice_cinnamon': 2 },
     ingredients: [
         'Протеин 30г',
         'Овсянка 50г',
@@ -649,6 +657,8 @@ export const RECIPE_DB_P4: Recipe[] = [
   {
     name: 'Сырные палочки', meal: 'snack', prepTimeMin: 15,
     kcal: 260, protein: 28, fat: 14, carbs: 6,
+    ingredientIds: ['cheese_hard', 'whey_isolate', 'egg_whole', 'spice_paprika'],
+    portions: { 'cheese_hard': 100, 'whey_isolate': 15, 'egg_whole': 55, 'spice_paprika': 2 },
     ingredients: [
         'Сыр твёрдый 100г',
         'Протеин без вкуса 15г',
@@ -673,6 +683,8 @@ export const RECIPE_DB_P4: Recipe[] = [
   {
     name: 'Протеиновый кофе', meal: 'snack', prepTimeMin: 3,
     kcal: 160, protein: 28, fat: 2, carbs: 6,
+    ingredientIds: ['coffee_espresso', 'whey_isolate', 'milk', 'spice_cinnamon'],
+    portions: { 'coffee_espresso': 60, 'whey_isolate': 25, 'milk': 100, 'spice_cinnamon': 2 },
     ingredients: [
         'Кофе эспрессо 60мл',
         'Протеин/коллаген 25г',
@@ -796,6 +808,8 @@ export const RECIPE_DB_P4: Recipe[] = [
   {
     name: 'Бананово-белковый пудинг', meal: 'snack', prepTimeMin: 5,
     kcal: 220, protein: 26, fat: 8, carbs: 20,
+    ingredientIds: ['chia_seeds', 'whey_isolate', 'milk', 'banana', 'spice_cinnamon'],
+    portions: { 'chia_seeds': 20, 'whey_isolate': 20, 'milk': 200, 'banana': 60, 'spice_cinnamon': 2 },
     ingredients: [
         'Семена чиа 20г',
         'Протеин 20г',
@@ -1286,6 +1300,8 @@ export const RECIPE_DB_P4: Recipe[] = [
   {
     name: 'Снеки из нута', meal: 'snack', prepTimeMin: 25,
     kcal: 200, protein: 12, fat: 8, carbs: 24,
+    ingredientIds: ['chickpeas', 'olive_oil', 'spice_paprika', 'turmeric', 'spice_garlic_powder'],
+    portions: { 'chickpeas': 200, 'olive_oil': 14, 'spice_paprika': 2, 'turmeric': 2, 'spice_garlic_powder': 2 },
     ingredients: [
         'Нут консерв. 200г',
         'Оливковое масло 1 ст.л.',

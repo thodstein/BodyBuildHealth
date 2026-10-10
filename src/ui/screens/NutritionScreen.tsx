@@ -7,6 +7,8 @@ import { calcNutrition } from '../../engines/nutrition.engine';
 import { calcNutritionV2 } from '../../engines/nutrition-v2.engine';
 import { NutritionDiary } from './NutritionScreen_parts/NutritionDiary';
 import { searchByName as searchOFF, productToFoodItem } from '../../engines/openfoodfacts.engine';
+import { localIsoDate } from '../../core/local-date';
+import { readProgramRestrictions, summarizeImportChecks } from './NutritionScreen_parts/diary/diary-import-guards';
 import { RETAIL_CHAINS, retailToFoodItem, searchRetailProducts, type RetailProduct } from '../../engines/retail-search.engine';
 import { IndividualPlan, NutritionPlanScope, PlanReportTab, NutritionPeriodizationTab } from './NutritionScreen_parts/IndividualPlan';
 import { OrganLoadCalculator } from './NutritionScreen_parts/IndividualPlan/OrganLoadCalculator';
@@ -1297,10 +1299,16 @@ export const NutritionScreen: React.FC<{ initialSubTab?: string }> = ({ initialS
   const [page, setPage] = useState<NutritionPage>('hero');
   const [scanOpen, setScanOpen] = useState(false);
 
-  const onScanProduct = (p: { name?: string; kcal?: number; protein?: number; fat?: number; carbs?: number }) => {
+  const onScanProduct = (p: { name?: string; kcal?: number; protein?: number; fat?: number; carbs?: number; barcode?: string; category?: string; foodId?: string; micros?: Record<string, number> }) => {
     try {
       const item = productToFoodItem(p as any);
-      const today = new Date().toISOString().split('T')[0];
+      // Канон дат: календарный день — только из core/local-date. Здесь был
+      // toISOString(), т.е. UTC: в вечерние часы на телефоне UTC+ скан уезжал
+      // во ВЧЕРАШНИЙ день дневника, и итоги дня (а с ними и сравнение с
+      // целями программы) считали не тот день.
+      const today = localIsoDate();
+      const foodId = (item as any).id || p.foodId;
+      const category = (item as any).category || p.category;
       addMealEntryV2(today, 'snack', {
         name: String(item.name || 'Сканированный продукт').slice(0, 120),
         kcal: Math.max(0, Math.round(item.kcal || 0)),
@@ -1308,11 +1316,28 @@ export const NutritionScreen: React.FC<{ initialSubTab?: string }> = ({ initialS
         f: Math.max(0, Math.round(item.fat || 0)),
         c: Math.max(0, Math.round(item.carbs || 0)),
         qty: 100,
+        // Раньше терялись: без foodId/категории позиция не участвовала в
+        // отчётах по качеству, аллергенах и повторном скане.
+        foodId: foodId || undefined,
+        category: category || undefined,
+        micros: (item as any).micros || p.micros,
+        barcode: p.barcode,
+        source: p.barcode ? 'barcode' : 'offline',
       });
+      // Сверка с действующими ограничениями программы (предупреждение, не запрет).
+      const summary = summarizeImportChecks(
+        [{ name: item.name, foodId: foodId, category }],
+        readProgramRestrictions(),
+      );
       setScanOpen(false);
       setTab('diary');
       setPage('tabs');
       setNutritionSection('diary');
+      if (summary.text) {
+        // Канон тостов проекта — window.showToast (ставится контуром питания).
+        // Вызываем через guard: этот экран рендерится и без него.
+        try { (window as any).showToast?.(summary.text, 'warning'); } catch { /* ignore */ }
+      }
     } catch {
       setScanOpen(false);
     }

@@ -22,7 +22,17 @@ function appAssetPath(path: string): string {
 export interface OcrAssetPaths {
   workerPath: string;
   corePath: string;
-  langPath: string;
+  /**
+   * Каталог traineddata. `undefined` = НЕ ПЕРЕДАВАТЬ langPath в createWorker:
+   * tesseract.js тогда строит URL на каждый язык сам
+   * (`.../@tesseract.js-data/<lang>/4.0.0_best_int/<lang>.traineddata.gz`).
+   *
+   * Раньше для CDN сюда подставлялся корень пакета
+   * `.../npm/@tesseract.js-data`, и воркер запрашивал
+   * `.../@tesseract.js-data/rus.traineddata.gz` — такого файла НЕТ (пакет
+   * разложен по `<lang>/<version>/`), фолбэк был 404-ным по построению.
+   */
+  langPath?: string;
   pdfjsWorkerSrc: string;
 }
 
@@ -36,7 +46,8 @@ export function getOcrAssetPaths(prefer: 'local' | 'cdn' = 'local'): OcrAssetPat
     return {
       workerPath: `https://cdn.jsdelivr.net/npm/tesseract.js@v${TESSERACT_VERSION}/dist/worker.min.js`,
       corePath: `https://cdn.jsdelivr.net/npm/tesseract.js-core@v${TESSERACT_CORE_VERSION}`,
-      langPath: `https://cdn.jsdelivr.net/npm/@tesseract.js-data`,
+      // БЕЗ langPath: единого каталога под все языки на jsdelivr нет, а
+      // свой URL tesseract.js соберёт корректно для каждого языка.
       pdfjsWorkerSrc: `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${getPdfjsVersionForCdn()}/pdf.worker.min.mjs`,
     };
   }
@@ -93,6 +104,24 @@ export async function localAssetAvailable(url: string): Promise<boolean> {
 }
 
 /**
+ * Опции createWorker из резолвера. langPath передаётся ТОЛЬКО когда он
+ * задан: для CDN его нет специально (см. OcrAssetPaths.langPath), и
+ * tesseract.js достроит корректный URL на каждый язык сам.
+ */
+export function tesseractWorkerOptions(src: {
+  workerPath: string;
+  corePath: string;
+  langPath?: string;
+}): { workerPath: string; corePath: string; langPath?: string } {
+  const opts: { workerPath: string; corePath: string; langPath?: string } = {
+    workerPath: src.workerPath,
+    corePath: src.corePath,
+  };
+  if (src.langPath) opts.langPath = src.langPath;
+  return opts;
+}
+
+/**
  * Resolve Tesseract worker options with automatic CDN fallback.
  * If the local worker.min.js is unreachable (e.g. assets not synced),
  * we transparently fall back to the CDN so OCR still works.
@@ -106,21 +135,23 @@ export async function localAssetAvailable(url: string): Promise<boolean> {
 export async function resolveTesseractOptions(): Promise<{
   workerPath: string;
   corePath: string;
-  langPath: string;
+  langPath: string | undefined;
   source: 'local' | 'cdn';
 }> {
   const local = getOcrAssetPaths('local');
   // Capacitor bundles these files into the APK. Some Android WebViews reject
   // HEAD/Range probes even though the bundled assets are readable by Tesseract;
   // probing here would incorrectly switch to an unavailable CDN.
-  if (isCapacitorNative()) return { ...local, source: 'local' };
+  if (isCapacitorNative()) return { ...local, source: 'local', langPath: local.langPath };
   const workerOk = await localAssetAvailable(local.workerPath);
   if (workerOk) {
     // Ядро, которое getCore запросит первым на большинстве современных
     // телефонов (relaxed-SIMD + LSTM). Плюс русская модель — без неё
     // русскоязычные бланки не разбираются даже при живом воркере.
     const coreProbe = `${local.corePath.replace(/\/$/, '')}/tesseract-core-lstm.wasm.js`;
-    const langProbe = `${local.langPath.replace(/\/$/, '')}/rus.traineddata.gz`;
+    // Локальный langPath задан всегда — пробуем именно русскую модель.
+    const langBase = local.langPath as string;
+    const langProbe = `${langBase.replace(/\/$/, '')}/rus.traineddata.gz`;
     const [coreOk, langOk] = await Promise.all([
       localAssetAvailable(coreProbe),
       localAssetAvailable(langProbe),

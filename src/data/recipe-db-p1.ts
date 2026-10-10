@@ -243,6 +243,8 @@ export const RECIPE_DB_P1: Recipe[] = [
   {
     name: 'Овсяноблин с курицей и сыром', meal: 'breakfast', prepTimeMin: 12,
     kcal: 440, protein: 40, fat: 16, carbs: 34,
+    ingredientIds: ['oats_dry', 'egg_whole', 'milk', 'chicken_breast', 'cheese_hard', 'herb_dill_fresh'],
+    portions: { 'oats_dry': 50, 'egg_whole': 55, 'milk': 50, 'chicken_breast': 80, 'cheese_hard': 25, 'herb_dill_fresh': 10 },
     ingredients: [
         'Овсяные хлопья 50г',
         'Яйцо 1 шт',
@@ -386,6 +388,8 @@ export const RECIPE_DB_P1: Recipe[] = [
   {
     name: 'Яйца бенедикт с лососем', meal: 'breakfast', prepTimeMin: 15,
     kcal: 400, protein: 36, fat: 24, carbs: 12,
+    ingredientIds: ['egg_whole', 'salmon', 'whole_grain_bread', 'yogurt_greek', 'sauce_mustard', 'lemon', 'sauce_apple_cider'],
+    portions: { 'egg_whole': 110, 'salmon': 60, 'whole_grain_bread': 30, 'yogurt_greek': 60, 'sauce_mustard': 5, 'lemon': 15, 'sauce_apple_cider': 10 },
     ingredients: [
         'Яйца 2 шт',
         'Сёмга слабосолёная 60г',
@@ -772,6 +776,8 @@ export const RECIPE_DB_P1: Recipe[] = [
   {
     name: 'Бурито для завтрака', meal: 'breakfast', prepTimeMin: 15,
     kcal: 480, protein: 30, fat: 22, carbs: 44,
+    ingredientIds: ['tortilla_wheat', 'egg_whole', 'legume_black_bean', 'avocado', 'cheese_cheddar', 'sauce_salsa'],
+    portions: { 'tortilla_wheat': 45, 'egg_whole': 110, 'legume_black_bean': 80, 'avocado': 40, 'cheese_cheddar': 20, 'sauce_salsa': 30 },
     ingredients: [
         'Тортилья цельнозерновая 1 шт',
         'Яйца 2 шт',
@@ -824,6 +830,8 @@ export const RECIPE_DB_P1: Recipe[] = [
   {
     name: 'Овсянка солёная с яйцом и авокадо', meal: 'breakfast', prepTimeMin: 8,
     kcal: 420, protein: 28, fat: 20, carbs: 38,
+    ingredientIds: ['oats_dry', 'egg_whole', 'avocado', 'sauce_soy', 'sesame_seeds', 'veg_scallion'],
+    portions: { 'oats_dry': 50, 'egg_whole': 55, 'avocado': 40, 'sauce_soy': 5, 'sesame_seeds': 5, 'veg_scallion': 15 },
     ingredients: [
         'Овсяные хлопья 50г',
         'Вода 150мл',
@@ -1086,6 +1094,8 @@ export const RECIPE_DB_P1: Recipe[] = [
   {
     name: 'Куриное филе «Пармезан»', meal: 'dinner', prepTimeMin: 25,
     kcal: 440, protein: 52, fat: 16, carbs: 22,
+    ingredientIds: ['chicken_breast', 'cheese_parmesan', 'egg_whole', 'bread_white', 'canned_tomatoes', 'cheese_mozzarella'],
+    portions: { 'chicken_breast': 180, 'cheese_parmesan': 20, 'egg_whole': 50, 'bread_white': 15, 'canned_tomatoes': 80, 'cheese_mozzarella': 25 },
     ingredients: [
         'Куриная грудка 200г',
         'Пармезан 25г',
