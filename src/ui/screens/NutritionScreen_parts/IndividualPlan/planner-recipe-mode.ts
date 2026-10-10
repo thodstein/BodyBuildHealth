@@ -480,7 +480,7 @@ function maxDeviationPct(totals: PlanTotalsLike, t: DayMacroTargets): number {
 export function rebalanceDayAfterRecipes(
   meals: PlanMealLike[],
   targets: DayMacroTargets,
-  opts?: { excludedIds?: Set<string>; maxIter?: number; seed?: number; highCarb?: boolean; portableMode?: boolean; isWorkDay?: boolean; workStartMin?: number; workEndMin?: number; hvStyle?: string; weekIndex?: number },
+  opts?: { excludedIds?: Set<string>; maxIter?: number; seed?: number; highCarb?: boolean; portableMode?: boolean; isWorkDay?: boolean; workStartMin?: number; workEndMin?: number; hvStyle?: string; weekIndex?: number; plantCorridorPct?: number },
 ): RebalanceResult {
   const notes: string[] = [];
   // Экстрим углей (≥1300): больше итераций ребаланса (24 не хватает: 15 приёмов,
@@ -488,8 +488,10 @@ export function rebalanceDayAfterRecipes(
   const maxIter = opts?.maxIter ?? ((targets?.c || 0) >= 1300 ? 40 : 24);
   const _sub = (ids: string[]) => subrot(weekRotateTopups(ids, opts?.weekIndex), opts?.seed);
   // HV-gate: удобные носители/дедуп/защита снеков/ккал-гейт — только high-carb дни
-  // (800У+); обычные дни идут бит-идентично прежнему (сторожит property-тест).
+  // (800У+); обычные дни идут бит-идентично прежнего (сторожит property-тест).
   const _hv = opts?.highCarb === true;
+  // §4.4: коридор «посадки» ядер рецептов (по умолчанию ±3%).
+  const _plantCorridorPct = Math.max(0, Math.min(15, opts?.plantCorridorPct ?? 3));
   // v3 portable: приём в рабочем окне получает только портативные топ-апы.
   const _pw = (m: any): boolean => !!opts?.portableMode && !!opts?.isWorkDay && isWorkWindowMeal(m?.time, opts?.workStartMin, opts?.workEndMin);
   const work: PlanMealLike[] = meals.map(m => ({ ...m, items: [...(m.items || [])], totals: { ...(m.totals || { kcal: 0, p: 0, f: 0, c: 0 }) } }));
@@ -1012,11 +1014,11 @@ export function rebalanceDayAfterRecipes(
             const it = (m.items || [])[ii];
             return { kcal: acc.kcal + (it?.kcal || 0), p: acc.p + (it?.p || 0), f: acc.f + (it?.f || 0), c: acc.c + (it?.c || 0) };
           }, { kcal: 0, p: 0, f: 0, c: 0 });
-          for (let sPct = -5; sPct <= 5; sPct += 1) {
+          for (let sPct = -_plantCorridorPct; sPct <= _plantCorridorPct; sPct += 1) {
             const s = 1 + sPct / 100;
             if (s === 1) continue;
             const nextCum = used * s;
-            if (nextCum < 0.95 || nextCum > 1.05) continue; // коридор посадки на рецепт (§4.4)
+            if (nextCum < 1 - _plantCorridorPct / 100 || nextCum > 1 + _plantCorridorPct / 100) continue; // коридор посадки на рецепт (§4.4)
             const ntDay = {
               kcal: finalTotals.kcal - gTotals.kcal + gTotals.kcal * s,
               p: finalTotals.p - gTotals.p + gTotals.p * s,
@@ -1388,6 +1390,13 @@ export interface AssembleRecipeDayArgs {
   weekIndex?: number;
   /** §3I: пол для RDA микро-плотных (VitA 900/700 мкг); без поля — male. */
   sex?: 'male' | 'female' | 'other';
+  /**
+   * §4.4: коридор финальной «посадки» ядер рецептов (проценты от 1.0). По умолчанию 3
+   * (±3%) — порции не уезжают от авторских сильнее, чем продуктовый путь отклоняется
+   * от цели. Большие значения — только если вызывающая сторона явно знает, что иначе
+   * сходимость не добивается (напр. экстрим-полоса).
+   */
+  plantCorridorPct?: number;
 }
 
 export interface AssembleRecipeDayResult {
@@ -1456,6 +1465,12 @@ export function carbRoomScore(
 
 export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDayResult {
   const { meals, pool: _poolRaw, targets, excludedIds, cookProfile, usedNamesAcrossDays } = args;
+  // §4.4: коридор «посадки» ядер рецептов. По умолчанию ±3% — требование владельца
+  // («порции не больше 3%»): порции близки к авторским, продуктовый путь сходится в ≤3%.
+  // Остаток сходимости добирают НЕ порции, а своп не-ядровых жировых сайдов на углеводные
+  // носители (§4.6 ниже). Вызывающая сторона может явно расширить коридор (extreme-полоса),
+  // когда день иначе честно уходит в dev — см. Context.
+  const _plantCorridorPct = Math.max(0, Math.min(15, args.plantCorridorPct ?? 3));
   // §7.2-Р-финал: экстрим-полоса (У≥8 г/кг и Б≥2.3 г/кг) — это другой режим дня.
   // (а) карб-лоад блюда ('carb-load') видны ТОЛЬКО здесь: вне полосы обычные дни
   // байт-в-байт прежние (теги фильтруются до выбора кандидатов);
@@ -2183,7 +2198,7 @@ export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDa
 
   // Ребаланс дня: недобор закрываем топ-апом в перекус, перебор режем по гибким слотам
   // (выбранные рецепты не трогаются). Цель — дневные КБЖУ в ±3%. C5: субротация пулов.
-  const rb = rebalanceDayAfterRecipes(meals, targets, { excludedIds, seed: args.seed, highCarb: _dayHighCarb, hvStyle: args.hvStyle, weekIndex: args.weekIndex, portableMode: args.portableMode, isWorkDay: args.isWorkDay, workStartMin: args.workStartMin, workEndMin: args.workEndMin });
+  const rb = rebalanceDayAfterRecipes(meals, targets, { excludedIds, seed: args.seed, highCarb: _dayHighCarb, hvStyle: args.hvStyle, weekIndex: args.weekIndex, portableMode: args.portableMode, isWorkDay: args.isWorkDay, workStartMin: args.workStartMin, workEndMin: args.workEndMin, plantCorridorPct: _plantCorridorPct });
   let notes = [...rb.notes];
   // Peri-капы сразу после ребаланса (до корректора): топ-апы/сайды могли залить окна.
   notes.push(...trimPeriCarbs(rb.meals));
@@ -2231,13 +2246,21 @@ export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDa
   // Резка перебора/посадка ужимали единственный белковый пункт ниже 5 г (арахисовая паста
   // 27→19 г = 4.75 г Б) — перекус оставался «пустым по белку» при живых калориях.
   // Добавляем лёгкий белковый пункт (творожный тип, не порошок) — MPS-интервал дня цел.
+  // §4.6: но НЕ тогда, когда день уже перебирает белок (рецептные ядра structural +Б):
+  // добор усиливал отклонение (замер: plain 2600 три изолята по 30 г при Б +4.1%).
+  // Инвариант MPS тогда остаётся честным советом, а не молчаливой порчей сходимости.
   {
+    const _dayTotals0 = sumMealTotals(outMeals as any);
+    const _goalP0 = targets?.p || 0;
+    const _pOver = _goalP0 > 0 && _dayTotals0.p > _goalP0 * 1.02;
+    const _skippedSnacks: string[] = [];
     for (const m of outMeals as any[]) {
       const t = String((m as any).type || '');
       if (!t.startsWith('snack') || (m as any)._insulinWindow) continue;
       const items = (m.items || []) as any[];
       if (items.length === 0 || (m.totals?.kcal || 0) < 100) continue;
       if (items.some((i: any) => (i.p || 0) >= 5)) continue;
+      if (_pOver) { _skippedSnacks.push(m.label); continue; }
       const prot = topupFoods(TOPUP_PROTEIN_IDS, excludedIds)
         .filter(f => !excludedIds?.has(f.id) && (f.protein || 0) > 0 && (f.protein || 0) < 20)
         .sort((a, b) => (a.kcal || 0) - (b.kcal || 0))[0];
@@ -2246,6 +2269,9 @@ export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDa
       m.items = [...items, scaleItem({ name: prot.name, id: prot.id, amount: 100, kcal: Math.round(prot.kcal || 0), p: prot.protein || 0, f: prot.fat || 0, c: prot.carbs || 0, fiber: prot.fiber || 0 } as any, gP)];
       m.totals = sumMealTotals(m.items as any);
       notes.push(`🍽 «${m.label}»: белковый пункт восстановлен (${prot.name} ${gP} г) — перекус оставался без белка`);
+    }
+    if (_skippedSnacks.length > 0) {
+      notes.push(`ℹ️ ${_skippedSnacks.join(', ')}: белок перекуса не добит — день уже выше цели белка (сходимость приоритетнее MPS-интервала)`);
     }
   }
 
@@ -2283,6 +2309,118 @@ export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDa
         }
       }
       if (_fatNow < sumDayTotals(outMeals as any).f) notes = [...notes, `⚖️ Жир дня приведён к цели ×1.05 (сайды-масла на экстрим-полосе)`];
+    }
+  }
+
+  // §4.6: жир/углеводный перекос обычного дня (не экстрим-полоса). Замер: plain 2600
+  // финишировал с Ж +4.1% при У −4% — рецептные ядра несут жир, а ребаланс молчит
+  // (порог добора 120 ккал). Меняем НЕ-ядровой жировой сайд на низкобелковый
+  // углеродный носитель с паритетом ккал: порции рецептов не трогаются, оси сходятся.
+  // Guard «не навреди»: откат, если дневная девиация не улучшилась.
+  if (!isExtremeCarbBand(targets?.c || 0, targets?.p || 0, args.athleteWeightKg ?? 80)
+    && (targets?.f || 0) > 0 && (targets?.c || 0) > 0) {
+    const _t0 = sumDayTotals(outMeals as any);
+    const _fOver = (_t0.f - targets.f) / targets.f > 0.02;
+    const _cUnder = (targets.c - _t0.c) / targets.c > 0.02;
+    const _swapKcalEquiv = (targets.f - _t0.f) * 9 + (targets.c - _t0.c) * 4;
+    // Порог 10 ккал: защиту даёт guard «не навреди» ниже (откат приёма при
+    // неудлучении), а не высокий порог — иначе хвосты ±3–4% молча лижут отклонение.
+    if (_fOver && _cUnder && _swapKcalEquiv >= 10) {
+      const _devBefore = maxDeviationPct(_t0 as any, { kcal: targets.kcal, p: targets.p, f: targets.f, c: targets.c } as any);
+      const _coreOf = (m: any): Set<string> => new Set<string>([
+        ...(((m as any).recipeAppliedData as any)?.ingredientIds || []),
+        ...(((m as any).recipeAppliedData2 as any)?.ingredientIds || []),
+      ]);
+      for (const m of outMeals as any[]) {
+        const _mt = String((m as any).type || '');
+        if ((m as any)._insulinWindow || ['presleep', 'preworkout', 'intra', 'postworkout'].includes(_mt)) continue;
+        const _core = _coreOf(m);
+        const _victims = ((m.items || []) as any[]).filter(it => it.role === 'fat' && !(it as any)._fixedGrams && !_core.has(it.id) && (it.amount || 0) >= 10);
+        if (_victims.length === 0) continue;
+        // Низкобелковый носитель с максимальной углеводной плотностью (мясные блюда не лезут).
+        const carb = topupFoods(weekRotateTopups(TOPUP_CARB_IDS, args.weekIndex), excludedIds)
+          .filter(f => !excludedIds?.has(f.id) && (f.protein || 0) < 5 && (f.carbs || 0) >= 15 && f.category !== 'veg_fruit')
+          .sort((a, b) => ((b.carbs || 0) / Math.max(1, b.kcal || 1)) - ((a.carbs || 0) / Math.max(1, a.kcal || 1)))[0];
+        if (!carb) continue;
+        const _snap = m.items.map((i: any) => ({ ...i }));
+        const _mt0 = m.totals;
+        for (const v of _victims) {
+          const _perKcal = (v.kcal || 0) / Math.max(1, v.amount || 1);
+          const _g = Math.max(5, Math.round(((v.amount || 0) * _perKcal) / Math.max(1, carb.kcal || 1) * 100 / 5) * 5);
+          if (_g < 5) continue;
+          const idx = (m.items || []).indexOf(v);
+          (m.items as any[])[idx] = scaleItem({ name: carb.name, id: carb.id, amount: 100, kcal: Math.round(carb.kcal || 0), p: carb.protein || 0, f: carb.fat || 0, c: carb.carbs || 0, fiber: carb.fiber || 0 } as any, _g);
+        }
+        m.totals = sumMealTotals(m.items as any);
+        const _t1 = sumDayTotals(outMeals as any);
+        const _devAfter = maxDeviationPct(_t1 as any, { kcal: targets.kcal, p: targets.p, f: targets.f, c: targets.c } as any);
+        if (_devAfter > _devBefore) {
+          // откат приёма — «не навреди»
+          (m.items as any[]).length = 0;
+          _snap.forEach((i: any) => (m.items as any[]).push(i));
+          m.totals = _mt0 || sumMealTotals(m.items as any);
+          continue;
+        }
+        notes.push(`⚖️ «${m.label}»: жировой сайд заменён на ${carb.name} (ккал-паритет) — день перебирал жир и недобирал угли`);
+        break; // одного приёма достаточно — пересчёт и выход
+      }
+    }
+  }
+
+  // §4.6 (зеркало свопа жира): перебор белка обычного дня. Замер: plain 2600 s0
+  // финишировал с Б +4.2% (182/175) — ядра рецептов structural несут белок. Режем
+  // НЕ-ядровые белковые пункты (порошок/творог в перекусах) до цели дня, но не ниже
+  // MPS-порога snack (≥5 г): инвариант «перекус несёт белок» цел.
+  // Guard «не навреди»: откат приёма, если дневная девиация не улучшилась.
+  if (!isExtremeCarbBand(targets?.c || 0, targets?.p || 0, args.athleteWeightKg ?? 80) && (targets?.p || 0) > 0) {
+    const _t0p = sumDayTotals(outMeals as any);
+    const _pOver = (_t0p.p - targets.p) / targets.p;
+    if (_pOver > 0.02) {
+      const _excessP = _t0p.p - targets.p;
+      const _devBeforeP = maxDeviationPct(_t0p as any, { kcal: targets.kcal, p: targets.p, f: targets.f, c: targets.c } as any);
+      const _coreOfP = (m: any): Set<string> => new Set<string>([
+        ...(((m as any).recipeAppliedData as any)?.ingredientIds || []),
+        ...(((m as any).recipeAppliedData2 as any)?.ingredientIds || []),
+      ]);
+      for (const m of outMeals as any[]) {
+        const _mt = String((m as any).type || '');
+        if ((m as any)._insulinWindow || ['presleep', 'preworkout', 'intra', 'postworkout'].includes(_mt)) continue;
+        const _core = _coreOfP(m);
+        const _prot = ((m.items || []) as any[])
+          .filter(it => ['protein', 'fast_protein', 'slow_protein'].includes(it.role)
+            && !(it as any)._fixedGrams && !_core.has(it.id) && (it.p || 0) > 5)
+          .sort((a, b) => (b.p || 0) - (a.p || 0))[0];
+        if (!_prot) continue;
+        const _fd = FOOD_DB.find(f => f.id === _prot.id);
+        if (!_fd || !(_fd.protein || 0)) continue;
+        const _snap = m.items.map((i: any) => ({ ...i }));
+        const _mt0 = m.totals;
+        // Срезаем излишек дня (с округлением вниз до 5 г), но оставляем ≥5 г в приёме (MPS).
+        const _cutG = Math.min(
+          Math.max(0, (_prot.amount || 0) - 5),
+          Math.floor(_excessP / (_fd.protein / 100) / 5) * 5,
+        );
+        if (_cutG < 5) continue;
+        const _ng = (_prot.amount || 0) - _cutG;
+        const _r = _ng / Math.max(1, _prot.amount || 1);
+        _prot.amount = _ng;
+        _prot.p = Math.round((_prot.p || 0) * _r * 10) / 10;
+        _prot.f = Math.round((_prot.f || 0) * _r * 10) / 10;
+        _prot.c = Math.round((_prot.c || 0) * _r * 10) / 10;
+        _prot.kcal = Math.round(4 * _prot.p + 9 * _prot.f + 4 * _prot.c);
+        _prot.fiber = Math.round((_prot.fiber || 0) * _r * 10) / 10;
+        m.totals = sumMealTotals(m.items as any);
+        const _t1p = sumDayTotals(outMeals as any);
+        const _devAfterP = maxDeviationPct(_t1p as any, { kcal: targets.kcal, p: targets.p, f: targets.f, c: targets.c } as any);
+        if (_devAfterP > _devBeforeP) {
+          (m.items as any[]).length = 0;
+          _snap.forEach((i: any) => (m.items as any[]).push(i));
+          m.totals = _mt0 || sumMealTotals(m.items as any);
+          continue;
+        }
+        notes.push(`⚖️ «${m.label}»: ${_prot.name} ужат на ${_cutG} г — день перебирал белок (ядра рецептов)`);
+        break;
+      }
     }
   }
 

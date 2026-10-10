@@ -56,26 +56,40 @@ const CELLS: Array<[string, MealPlanInput]> = [
   ['plain 2600 s0', base({ weightKg: 85, lbmKg: 72, goalKcal: 2600, goalProteinG: 175, goalFatG: 80, goalCarbsG: 320, randomSalt: 0 })],
 ];
 
-describe('§4.4 коридор посадки порций рецептов ≤5%', () => {
+describe('§4.4/§4.6 коридор порций ≤3% и сходимость рецептурного пути', () => {
   for (const [label, inp] of CELLS) {
-    it(`${label}: ни одна порция не уезжает от авторской больше чем на 5%`, () => {
+    it(`${label}: ни одна порция не уезжает от авторской больше чем на 3%`, () => {
       const res = assemble(inp);
       const drift = maxPortionDrift(res.notes);
-      expect(drift, `ноты: ${res.notes.filter(n => /×\d+%/.test(n)).join(' | ')}`).toBeLessThanOrEqual(5);
+      expect(drift, `ноты: ${res.notes.filter(n => /×\d+%/.test(n)).join(' | ')}`).toBeLessThanOrEqual(3);
     });
   }
 
-  it('сходимость дня остаётся в честных границах (не хуже прежней)', () => {
+  it('сходимость дня: обычные клетки ≤4%, экстрим — в честном капе', () => {
     for (const [label, inp] of CELLS) {
       const res = assemble(inp);
       const t = sumDayTotals(res.meals as any);
       const target = (inp as any).goalKcal;
       // Экстрим-R-HV — документированный honest-cap (effective-цель vs цель пользователя);
-      // обычные дни — в пределах канона 3% (допуск на кумулятивное округление).
+      // обычные дни — 4% порог из ЗАМЕРА (база с коридором ±10% давала 5.4% на s0 и 5.1%
+      // на 3500; порог усилен относительно базы, не ослаблен).
       const isExtreme = label.startsWith('R-1500');
       const dev = Math.abs(t.kcal - target) / target * 100;
-      expect(dev, `${label}: kcal ${Math.round(t.kcal)}/${target} (${dev.toFixed(1)}%)`).toBeLessThanOrEqual(isExtreme ? 30 : 8);
+      expect(dev, `${label}: kcal ${Math.round(t.kcal)}/${target} (${dev.toFixed(1)}%)`).toBeLessThanOrEqual(isExtreme ? 30 : 4);
     }
+  });
+
+  it('§4.6: жир/углеводный перекос обычного дня сведён свопом не-ядрового сайда', () => {
+    // Было (замер): plain 2600 финишировал с Ж +4.1% при У −4.0% — ребаланс молчал
+    // (порог 120 ккал). Стало: не-ядровой жировой сайд меняется на углеводный носитель
+    // с ккал-паритетом, оси сходятся.
+    const res = assemble(CELLS.find(c => c[0] === 'plain 2600')![1]);
+    const t = sumDayTotals(res.meals as any);
+    const goal = { f: 80, c: 320 };
+    const devF = Math.abs(t.f - goal.f) / goal.f * 100;
+    const devC = Math.abs(t.c - goal.c) / goal.c * 100;
+    expect(devF, `Ж ${Math.round(t.f)}/${goal.f} (${devF.toFixed(1)}%)`).toBeLessThanOrEqual(3);
+    expect(devC, `У ${Math.round(t.c)}/${goal.c} (${devC.toFixed(1)}%)`).toBeLessThanOrEqual(3);
   });
 
   it('детерминизм: тот же вход → тот же дрейф и та же сходимость', () => {
