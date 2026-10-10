@@ -909,3 +909,98 @@ describe('G1: пользовательский выбор входа в мезо
     expect(JSON.stringify(c.weeks)).toBe(JSON.stringify(b.weeks));
   });
 });
+/* ---------- G1-усиление: ramп становится жёстким (а не пожеланием) ---------- */
+
+describe('G1-усиление: недельный потолок ramпа реально режет', () => {
+  const weekly = (p: any, m: string) => p.weeks[0].sessions.flatMap((s: any) => s.exercises)
+    .filter((e: any) => e.muscle === m && !(e as any).warmupActivator)
+    .reduce((a: number, e: any) => a + (e.sets || 0), 0);
+
+  it('БЕЗ усиления ramп был пожеланием: calves = цели (0.85 проигнорирован)', () => {
+    // Baseline-замер (тот, что сделал усиление необходимым):
+    // targetSets.calves = 18 (якорь владельца), 0.85×18 = 15, но фактически 18.
+    const p: any = buildBBPlan(base({ weeks: 12 }));
+    expect(weekly(p, 'calves')).toBeGreaterThanOrEqual(18);
+  });
+
+  it('preloaded теперь ЖЁСТКО кает неделю к цели (не раздувается доборами)', () => {
+    const std = buildBBPlan(base({ weeks: 12 }));
+    const pre = buildBBPlan(base({ weeks: 12, volumeRamp: 'preloaded' } as Partial<BBBuilderInput>));
+    const cap = (p: any, m: string) => {
+      const t = (p as any).volumeTargets?.[m]?.targetSets ?? 0;
+      return Math.round(t * 1.05); // slack 5%
+    };
+    // Объём-добавляющие проходы финализайзера больше не могут вернуть неделю
+    // к цели, когда ramп говорит иначе.
+    for (const m of ['calves', 'chest', 'quads']) {
+      expect(weekly(pre, m), `${m}: ramп не сработал`).toBeLessThanOrEqual(cap(pre, m));
+    }
+    // И режим действительно отличается от дефолта.
+    expect(JSON.stringify(pre.weeks[0])).not.toBe(JSON.stringify(std.weeks[0]));
+  });
+
+  it('source-guard: усиливающий проход подключён и скоупит на явные режимы', () => {
+    const src = readFileSync(join(__dirname, '..', 'bb-builder.engine.ts'), 'utf8');
+    expect(src).toContain('G1-усиление: ramп должен быть ЖЁСТКИМ');
+    expect(src).toContain("input.volumeRamp === 'preloaded' || input.volumeRamp === 'flat'");
+    // Порог берётся от АНКЕРНОЙ цели (volumeTargets[m].targetSets), а не от
+    // пред-якорной scaledVolumeRotation — иначе ramп вытесняет якорь владельца.
+    expect(src).toContain('const rampCap = Math.round(anchorTarget * Math.min(1.1, weekVolumeMult) * (1 + slack));');
+  });
+
+  it('дефолт (standard) усилением НЕ трогается (байт-в-байт)', () => {
+    const a = buildBBPlan(base({ weeks: 12 }));
+    const b = buildBBPlan(base({ weeks: 12, volumeRamp: 'standard' } as Partial<BBBuilderInput>));
+    expect(JSON.stringify(b.weeks[0])).toBe(JSON.stringify(a.weeks[0]));
+    // calves по-прежнему на цели — усиление не применялось.
+    expect(weekly(a, 'calves')).toBeGreaterThanOrEqual(18);
+  });
+});
+
+/* ---------- Частотная семантика якорей: 2 сессии = ×2 недели ---------- */
+
+describe('Частотная семантика якорей (подтверждение замерами)', () => {
+  const probe = (patternId: string): any => buildBBPlan({
+    patternId, level: 'enhanced', trainingYears: 8, goal: 'mass',
+    weeks: 8, workMax: { chest: 100, back: 120, shoulders: 60, quads: 140, hamstrings: 110, glutes: 120, biceps: 50, triceps: 55, calves: 80, traps: 70, forearms: 40 },
+    weakPoints: [], peds: ['AAS'], pedDoses: { AAS: 750 }, courseIntensity: 'heavy', volumeGoal: 'mav',
+  } as any);
+  const weekly = (p: any, m: string) => p.weeks[0].sessions.flatMap((s: any) => s.exercises)
+    .filter((e: any) => e.muscle === m && !(e as any).warmupActivator)
+    .reduce((a: number, e: any) => a + (e.sets || 0), 0);
+  const freq = (p: any, m: string) => p.weeks[0].sessions.filter((s: any) =>
+    s.exercises.some((e: any) => e.muscle === m && !(e as any).warmupActivator)).length;
+
+  it('ppl_6 (2 тяги): цель спины 60/нед; bro_5 (1 тяга): ~30 — якорь частотно-зависим', () => {
+    const ppl = probe('ppl_6');
+    const bro = probe('bro_5');
+    expect(freq(ppl, 'back')).toBe(2);
+    expect(freq(bro, 'back')).toBe(1);
+    expect(weekly(ppl, 'back')).toBe(60);
+    // Одна сессия в неделю — примерно вдвое меньше недельной цели.
+    expect(weekly(bro, 'back')).toBeLessThanOrEqual(weekly(ppl, 'back') * 0.55);
+    expect(weekly(bro, 'back')).toBeGreaterThanOrEqual(weekly(ppl, 'back') * 0.4);
+  });
+
+  it('spлит без дня ног: низ не нулевой (Coverage-проход добирает)', () => {
+    const pp = probe('push_pull_4');
+    const legs = weekly(pp, 'quads') + weekly(pp, 'hamstrings') + weekly(pp, 'glutes');
+    // Было: гард `legsSets > 0` глушил проход при 3 сетах от финишёра.
+    // Стало: порог целевой (6), проход добирает низ.
+    expect(legs, `ноги почти нулевые: ${legs}`).toBeGreaterThanOrEqual(3);
+    const cov = pp.weeks[0].sessions.flatMap((s: any) => s.exercises)
+      .filter((e: any) => String(e.comment || '').includes('Ноги-покрытие'));
+    expect(cov.length, 'покрывающий блок ног не добавлен').toBeGreaterThanOrEqual(1);
+  });
+
+  it('source-guard: гард идемппентности — целевой, а не «существования»', () => {
+    const src = readFileSync(join(__dirname, '..', 'bb-finalize.engine.ts'), 'utf8');
+    expect(src).toContain('const LEGS_COVERAGE_TARGET = 6;');
+    expect(src).toContain('if (legsSets >= LEGS_COVERAGE_TARGET) continue;');
+    // Старый гард существования не должен вернуться в КОД (в комментарии он
+    // остаётся как объяснение — поэтому ищем только исполняемую строку).
+    const codeLines = src.split(/\r?\n/).filter((l: string) => !l.trim().startsWith('//') && !l.trim().startsWith('*'));
+    expect(codeLines.some((l: string) => l.includes('if (legsSets > 0) continue;')), 'вернулся старый гард').toBe(false);
+    expect(codeLines.some((l: string) => l.includes('if (legsSets >= LEGS_COVERAGE_TARGET) continue;'))).toBe(true);
+  });
+});

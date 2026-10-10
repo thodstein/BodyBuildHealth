@@ -931,7 +931,15 @@ function ensureLegsCoverageForUpperOnlySplits(plan: any, options: BBFinalizeOpti
     for (const s of week.sessions) for (const e of s.exercises) {
       if (!(e as any).warmupActivator && ['quads', 'hamstrings', 'glutes'].includes(e.muscle)) legsSets += e.sets || 0;
     }
-    if (legsSets > 0) continue; // уже есть ноги (или проход уже сработал — идемпотентность)
+    // Гард идемпотентности — ЦЕЛЕВОЙ, а не «существования».
+    // Было `if (legsSets > 0) continue;`: любой финишёр, дающий 3 сета квадров,
+    // глушил весь проход — сплит без дня ног (push_pull_2) уезжал с 3 сетами
+    // ног в НЕДЕЛЮ при капе сессии 30 и цели квадров 20+. Замер: push_pull_2
+    // quads freq=1 weekly=3. Проход добавляет 3 квадров + 3 хамса = 6, поэтому
+    // порог равен этой цели: повторный прогон видит 6 и пропускает (идемпотентен),
+    // а недобор 1..5 — добирается.
+    const LEGS_COVERAGE_TARGET = 6;
+    if (legsSets >= LEGS_COVERAGE_TARGET) continue;
     const sessions = (week.sessions || []).filter((s: any) => !(s as any).deload);
     if (sessions.length === 0) continue;
     const sessSets = (s: any) => s.exercises.filter((e: any) => !(e as any).warmupActivator).reduce((a: number, e: any) => a + (e.sets || 0), 0);

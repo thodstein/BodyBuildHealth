@@ -4016,6 +4016,44 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
     // fix D: капаем недельный объём каждой мышцы по её истинному MRV — единый perExerciseCap.
     // onCourse пробрасываем чтобы per-exercise кап на курсе был BIG (8-10), а не 5.
     normalizeWeekMrv(weekSessions, mrvByMuscle, phase === 'deload', { level: input.level, trainingYears: input.trainingYears, onCourse });
+    // G1-усиление: ramп должен быть ЖЁСТКИМ, а не пожеланием. Без этого прохода
+    // volume-добавляющие пассы финалайзера (fill/MEV-repair/ensureSmallMuscleQuality/
+    // аллокации) раздувают неделю обратно к targetSets, и ramп не работает вообще:
+    // замер без прохода — calves W1 = 18 при цели 18 (0.85×18=15 проигнорирован).
+    // Скоуп: ТОЛЬКО при явном volumeRamp (preloaded/flat) — дефолт `standard`
+    // остаётся байт-в-байт, потому что там поведение зафиксировано калибровкой.
+    if (!isDeloadWeek && (input.volumeRamp === 'preloaded' || input.volumeRamp === 'flat')) {
+      const slack = input.volumeRamp === 'flat' ? 0.02 : 0.05;
+      for (const m of Object.keys(scaledVolumeRotation)) {
+        // База потолка — АНКЕРНАЯ цель недели (volumeTargets[m].targetSets: MAV,
+        // поднятый якорем владельца: спина 60, ноги 32+30+18), а НЕ
+        // scaledVolumeRotation (пред-якорная MAV-цель). Иначе ramп «preloaded»
+        // давал МЕНЬШЕ standard: замер до фикса — preloaded calves 12 против
+        // standard 18, потому что потолок резал к 0.85 от пред-якорной цифры и
+        // выбрасывал решение владельца.
+        const anchorTarget = Number((volumeTargets as any)[m]?.targetSets) || scaledVolumeRotation[m];
+        const rampCap = Math.round(anchorTarget * Math.min(1.1, weekVolumeMult) * (1 + slack));
+        const exs = weekSessions.flatMap((s: any) => s.exercises)
+          .filter((e: any) => !(e as any).warmupActivator && collapseKey(e.muscle) === m);
+        if (!exs.length) continue;
+        let total = exs.reduce((a: number, e: any) => a + (e.sets || 0), 0);
+        // Режем с конца: accessory/изоляция первыми, primary — последним (после пола 2).
+        const order = [...exs].sort((a: any, b: any) => {
+          const ra = a.role === 'primary' ? 1 : 0, rb = b.role === 'primary' ? 1 : 0;
+          if (ra !== rb) return ra - rb;
+          return (b.sets || 0) - (a.sets || 0);
+        });
+        for (const ex of order) {
+          if (total <= rampCap) break;
+          const min = 2;
+          const cut = Math.min(total - rampCap, (ex.sets || 0) - min);
+          if (cut <= 0) continue;
+          ex.sets -= cut;
+          if (Array.isArray((ex as any).workSets) && (ex as any).workSets.length > ex.sets) (ex as any).workSets.length = ex.sets;
+          total -= cut;
+        }
+      }
+    }
     // Волна 5.3: структурный флаг разгрузки — там же, где фаза/комментарий.
     weeks.push({ week: w, phase, deload: phase === 'deload', isDeloadLike: phase === 'deload', sessions: weekSessions });
     // Запоминаем упражнения этой недели для мягкого freshness блокировки следующей.
