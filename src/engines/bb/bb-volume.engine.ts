@@ -712,20 +712,11 @@ export const SESSION_MUSCLE_REALISM: Record<'beginner' | 'intermediate' | 'advan
  * Плечи — ТРИ ОТДЕЛЬНЫХ ключа (delt_front/mid/rear), shoulders — только
  * агрегат, в подсчёте объёма не участвует (audit п. 0.1).
  */
-export const WEEKLY_CAP_PRO_COURSE: Record<string, number> = {
-  // Якорь 1 — спина
-  back: 60,
-  // Якорь 2 — ноги суммарно 80 (32+30+18)
-  quads: 32, hamstrings: 30, glutes: 18, calves: 16,
-  chest: 48,
-  // Плечи тремя отдельными мышцами: 14+16+10 = 40
-  delt_front: 14, delt_mid: 16, delt_rear: 10,
-  biceps: 20, triceps: 20, forearms: 10,
-  traps: 10, abs: 12, lower_back: 8,
-};
-
-/** Множители тиров ОТ базы «про на курсе» (используются только как fallback,
- *  когда лендмарки недоступны: основной путь — формула computeMrvMult). */
+/** Множители тиров ОТ базы «про на курсе». Аудит 2026-10: дубль якорей
+ *  `WEEKLY_CAP_PRO_COURSE` удалён — те же числа живут в `USER_ANCHOR_CAPS`
+ *  (единственный потребитель: `perSessionMuscleCap`), третья копия была
+ *  мертва. Эти множители оставлены как задокументированный fallback на случай
+ *  недоступных лендмарков (основной путь — `computeMrvMult`). */
 export const TIER_WEEKLY_MULT: Record<'beginner' | 'intermediate' | 'advanced' | 'course_1' | 'course_3' | 'course_6', number> = {
   course_6: 1.0,
   course_3: 0.87,

@@ -40,6 +40,14 @@ export interface AutoDraftOptions {
   onCourse?: boolean;
   courseIntensity?: string;
   injuries?: { muscle: string; from?: string; to?: string; exclude?: boolean; volumePct?: number; weightPct?: number; repsCap?: number }[];
+  /**
+   * Цель объёма (mev/mav/mrv). Аудит 2026-10: было захардкожено 'mav' внутри
+   * `autodraftBBPlan` — вызывающий не мог передать выбор пользователя. Теперь
+   * опционально; без поля поведение БАЙТ-В-БАЙТ ('mav'), чтобы не менять планы
+   * ручного конструктора и годовых сборок. UI ручного пути выбора объёма пока
+   * не имеет — это опция на будущее, а не восстановление потерянного выбора.
+   */
+  volumeGoal?: 'mev' | 'mav' | 'mrv';
   /** Техника интенсивности для primary (dropset/rest_pause/myo_rep/etc). */
   intensityTechnique?: import('../bb/bb-autocoach.engine').IntensityTechnique;
   /** Авто-делод по ACWR (true = движок сам режет объём при ACWR>1.3). */
@@ -185,7 +193,7 @@ export function autodraftBBPlan(opts: AutoDraftOptions): BBPlan {
     focusGroup: opts.focusGroup,
     specialization: opts.specialization,
     equipment: opts.equipment ?? [],
-    volumeGoal: 'mav',
+    volumeGoal: opts.volumeGoal ?? 'mav',
     avoidAxialLoad: opts.avoidAxialLoad ?? false,
     favoriteExercises: opts.favoriteExercises ?? [],
     excludedExercises: opts.excludedExercises ?? [],

@@ -11,7 +11,7 @@ import { extractMesocycleProgression } from '../bb-mesocycle-progression.engine'
 import { getVolumeLandmarks } from '../../volume-landmarks.engine';
 import { replanBBMesoFromFact, replanSummary, type ReplanBBResult, type ReplanBBOptions } from '../bb-replan.engine';
 import { applyRecoveryRelief, needsRecoveryRelief, musclesForPainLocation } from '../bb-recovery-relief.engine';
-import { readFileSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 
 /**
@@ -388,14 +388,21 @@ describe('PRO-GAP6: возраст в билдере (opt-in, без age — б�
 /* ─────────────────── source-guards на отсутствие регресса ─────────────────── */
 
 describe('source-guards: находки аудита не вернулись', () => {
-  it('mastersAdjust/bb-constants: мёртвые экспорты не ожили', () => {
-    const demoSrc = readFileSync(join(__dirname, '..', 'bb-demographics.ts'), 'utf8');
-    expect(demoSrc).toContain('export function mastersAdjust');
-    // masters-логика в билдере идёт через mastersMrvMult, НЕ через прямой
-    // вызов adjustVolumeForDemographic (тот меняет MEV/MAV/MRV и ломает минимумы).
-    const builderSrc = readFileSync(join(__dirname, '..', 'bb-builder.engine.ts'), 'utf8');
-    expect(builderSrc).not.toContain('adjustVolumeForDemographic(');
-    expect(builderSrc).toContain('function mastersMrvMult');
+  it('мёртвые таблицы не ожили: bb-constants/phaseExerciseMix/WEEKLY_CAP_PRO_COURSE удалены', () => {
+    // Аудит 2026-10: все три были дублями живых значений с 0 потребителей.
+    // Файл bb-constants.ts удалён целиком (18 экспортов, 0 читателей).
+    const bbDir = join(__dirname, '..');
+    expect(existsSync(join(bbDir, 'bb-constants.ts')), 'bb-constants.ts вернулся').toBe(false);
+    const autoSrc = readFileSync(join(bbDir, 'bb-autocoach.engine.ts'), 'utf8');
+    expect(autoSrc, 'phaseExerciseMix вернулся').not.toContain('export function phaseExerciseMix');
+    const volSrc = readFileSync(join(bbDir, 'bb-volume.engine.ts'), 'utf8');
+    expect(volSrc, 'WEEKLY_CAP_PRO_COURSE вернулся').not.toContain('export const WEEKLY_CAP_PRO_COURSE');
+    // Живой якорь на месте — удалили именно дубль.
+    expect(volSrc).toContain('export const USER_ANCHOR_CAPS');
+    // manual-draft: volumeGoal проброшен, дефолт прежний ('mav').
+    const draftSrc = readFileSync(join(__dirname, '..', '..', 'manual-constructor', 'manual-draft.engine.ts'), 'utf8');
+    expect(draftSrc).toContain('volumeGoal?: ');
+    expect(draftSrc).toContain("volumeGoal: opts.volumeGoal ?? 'mav'");
   });
 });
 
@@ -763,5 +770,59 @@ describe('G8-tail: cycle/program пустили mevCalibration в финализ
   it('source-guard: оба finalizeBBPlan-сайта пробрасывают калибровку', () => {
     const src = readFileSync(join(__dirname, '..', 'cycle-to-plan.ts'), 'utf8');
     expect((src.match(/mevCalibration: loadMEVCalibration\(\),/g) || []).length).toBe(2);
+  });
+});
+/* ─────────────────── G1-полный: Israetel-волна (opt-in) + замер траектории ─────────────────── */
+
+describe('G1-полный: недельная траектория объёма', () => {
+  const setsFor = (p: any, m: string): number[] => p.weeks.map((w: any) => w.sessions
+    .flatMap((s: any) => s.exercises)
+    .filter((e: any) => e.muscle === m && !(e as any).warmupActivator)
+    .reduce((a: number, e: any) => a + (e.sets || 0), 0));
+
+  it('по умолчанию поведение байт-в-байт (флаг выключен)', () => {
+    const off = buildBBPlan(base({ weeks: 12 }));
+    const on = buildBBPlan(base({ weeks: 12, volumeWave: false } as Partial<BBBuilderInput>));
+    expect(JSON.stringify(on.weeks[0])).toBe(JSON.stringify(off.weeks[0]));
+    expect(JSON.stringify(on.weeks[5])).toBe(JSON.stringify(off.weeks[5]));
+  });
+
+  it('флаг доезжает до плана и меняет недельные множители (реально не no-op)', () => {
+    const off = buildBBPlan(base({ weeks: 12 }));
+    const on = buildBBPlan(base({ weeks: 12, volumeWave: true } as Partial<BBBuilderInput>));
+    const sig = (p: any) => JSON.stringify(p.weeks.map((w: any) => setsFor(p, 'chest')));
+    expect(sig(on), 'флаг volumeWave не менял ничего').not.toBe(sig(off));
+    expect((on as any).inputSnapshot?.volumeWave).toBe(true);
+  });
+
+  it('волна даёт разное число сетов по неделям (не плоский plateau)', () => {
+    const on = buildBBPlan(base({ weeks: 12, volumeWave: true } as Partial<BBBuilderInput>));
+    const weekly = on.weeks.map((w: any) => w.sessions
+      .flatMap((s: any) => s.exercises)
+      .filter((e: any) => !(e as any).warmupActivator)
+      .reduce((a: number, e: any) => a + (e.sets || 0), 0));
+    const working = weekly.filter((_, i) => on.weeks[i].phase !== 'deload');
+    // Разброс обязателен: волна 1.0/1.15/0.75/1.05 физически разносит недели.
+    expect(Math.max(...working) - Math.min(...working), 'недели совпали — волны нет').toBeGreaterThan(0);
+  });
+
+  it('source-guard: getVolumeWaveFactor реально вызывается в билдере (был мёртв)', () => {
+    const src = readFileSync(join(__dirname, '..', 'bb-builder.engine.ts'), 'utf8');
+    expect(src).toContain('const wave = getVolumeWaveFactor(phaseWeek, phase);');
+    // Импорт добавлен — иначе был бы мёртвый экспорт.
+    expect(src).toMatch(/getVolumeWaveFactor, type BBPhase \} from '\.\.\/periodization'/);
+  });
+
+  it('ЗАМЕР (baseline для следующей кампании): финалайзер раздувает до MRV уже на W1', () => {
+    // Зафиксировано числами, чтобы ре-базлайн следующей сессии был осознанным.
+    // chest: старт 18 при MRV 20 (90%) — запаса под прогрессию нет;
+    // calves: 18 при MRV 18 (100%).
+    const p: any = buildBBPlan(base({ weeks: 12 }));
+    const mrv = (p as any).mrvByMuscle || {};
+    const chestW1 = setsFor(p, 'chest')[0];
+    const calvesW1 = setsFor(p, 'calves')[0];
+    expect(mrv.chest).toBeGreaterThan(0);
+    expect(chestW1).toBeGreaterThan(mrv.chest * 0.7);
+    if (mrv.calves > 0) expect(calvesW1).toBeGreaterThan(mrv.calves * 0.7);
   });
 });

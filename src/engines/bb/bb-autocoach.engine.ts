@@ -625,25 +625,10 @@ export function suggestFeeders(weakPoints: string[], equipment: string[]): Feede
 
 /* ──────────── Exercise type allocation per phase ──────────── */
 
-/**
- * Распределение упражнений по категориям в зависимости от фазы.
- * Напр. accumulation: больше изоляции/кабелей (метаболический стресс),
- * intensification: больше compounds/машин (механическое натяжение).
- */
-export function phaseExerciseMix(phase: string): { compoundPct: number; isolationPct: number; machinePct: number; cablePct: number; feederPct: number } {
-  switch (phase) {
-    case 'accumulation':
-      return { compoundPct: 0.35, isolationPct: 0.30, machinePct: 0.15, cablePct: 0.15, feederPct: 0.05 };
-    case 'intensification':
-      return { compoundPct: 0.50, isolationPct: 0.15, machinePct: 0.20, cablePct: 0.10, feederPct: 0.05 };
-    case 'deload':
-      return { compoundPct: 0.15, isolationPct: 0.30, machinePct: 0.20, cablePct: 0.25, feederPct: 0.10 };
-    case 'peaking':
-      return { compoundPct: 0.55, isolationPct: 0.10, machinePct: 0.20, cablePct: 0.10, feederPct: 0.05 };
-    default:
-      return { compoundPct: 0.40, isolationPct: 0.25, machinePct: 0.20, cablePct: 0.10, feederPct: 0.05 };
-  }
-}
+/* Аудит 2026-10: `phaseExerciseMix` удалён — дубль `PHASE_CONFIGS[phase].exerciseMix`
+ * (phase-periodization.ts) значением-в-значение, 0 потребителей. Единственный
+ * источник активации оборудования по фазе — `PHASE_EQUIPMENT_PREF` (bb-builder),
+ * который читает те же `PHASE_CONFIGS`. */
 
 /* ──────────── Garbage volume detection ──────────── */
 export interface GarbageVolume {

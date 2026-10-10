@@ -62,7 +62,7 @@ function mastersMrvMult(age?: number): number {
 // Фазовая периодизация (distributePhases) — ЕДИНЫЙ источник RIR/фаз/deload для ББ-плана.
 // Импорт distributePhases/getPhaseVolumeMult из UI-модуля намеренный: это каноническая
 // реализация, которую использует и ручной конструктор (phase-periodization).
-import { distributePhases, PHASE_CONFIGS, PHASE_LABELS, getPhaseConfig, getPhaseVolumeMult, type BBPhase } from '../periodization';
+import { distributePhases, PHASE_CONFIGS, PHASE_LABELS, getPhaseConfig, getPhaseVolumeMult, getVolumeWaveFactor, type BBPhase } from '../periodization';
 import { orderSessionExercises, type SessionMethodology } from './bb-session-order.engine';
 import { type BBTrainingFocus, FOCUS_RIR_TABLE } from './bb-goal-types';
 import { clampRir } from './bb-utils';
@@ -149,6 +149,12 @@ export interface BBBuilderInput {
   weakPoints?: string[];         // отстающие группы → MAV↑
   focusGroup?: string;           // группа специализации → MAV↑↑
   volumeGoal?: BBVolumeGoal;     // цель по объёму: MEV | MAV | MRV
+  /**
+   * G1-полный (opt-in): Israetel-волна объёма внутри фазы поверх плоского
+   * рампа (1.0 → 1.15 → 0.75 → 1.05 + 2.5% за 4 недели). Дефолт выкл —
+   * недельные множители остаются прежними.
+   */
+  volumeWave?: boolean;
   specialization?: boolean;      // true = слабые на MAV+10%, остальные на MEV
   /** Явное расписание блоков специализации (недели + цели 1-2 мышцы; [] = баланс).
    *  Без него: один блок 6-10 нед, затем возврат к балансу. */
@@ -2557,8 +2563,9 @@ function buildSession(
     const dupSign = phase === 'deload' ? +1 : -1;
     const dupRepsOffset = phaseCfg && phaseWeek > 1 ? dupSign * Math.floor((phaseWeek - 1) * 1.5) : 0;
 
-    // P7: phaseExerciseMix — приоритет equipment по фазе (accumulation→cable, peaking→barbell).
-    // Это формирует пропорцию compound/isolation/cable/machine, заявленную в PHASE_CONFIGS.
+    // P7: PHASE_EQUIPMENT_PREF — приоритет equipment по фазе (accumulation→cable,
+    // peaking→barbell). Формирует пропорцию, заявленную в PHASE_CONFIGS.
+    // (Аудит 2026-10: раньше комментарий ссылался на мёртвый `phaseExerciseMix`.)
     const phaseEquip = PHASE_EQUIPMENT_PREF[phase] || ['barbell', 'dumbbell', 'machine', 'cable'];
 
     // Жёсткие группы замены (требование пользователя): каждая группа мышцы,
@@ -3602,7 +3609,10 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
   for (let w = 1; w <= input.weeks; w++) {
     // P5: Volume progression MEV→MAV→MRV (Helms 2022)
     // Week 1 = 0.85× (MEV), mid = 1.0× (MAV), last = 1.10× (MRV), deload = 0.6×
-    const weekPhase = phaseByWeek.get(w) || 'accumulation';
+    const phase = phaseByWeek.get(w) || 'accumulation';
+    phaseWeekCounter[phase] = (phaseWeekCounter[phase] || 0) + 1;
+    const phaseWeek = phaseWeekCounter[phase];
+    const weekPhase = phase;
     const isDeloadWeek = weekPhase === 'deload';
     let baseWeekVolumeMult = isDeloadWeek ? 0.6
       : Math.min(1.10, 0.85 + ((w - 1) / Math.max(1, input.weeks - 1)) * 0.25);
@@ -3611,6 +3621,15 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
       baseWeekVolumeMult = Math.min(baseWeekVolumeMult, lastAppliedWeekMult * MAX_WEEK_RAMP);
     }
     lastAppliedWeekMult = baseWeekVolumeMult;
+    // G1-полный (opt-in `volumeWave`): Israetel-волна внутри фазы поверх плоского
+    // рампа — средняя (1.0) → высокая (1.15) → низкая (0.75) → консолидация (1.05),
+    // с прогрессивной базой +2.5% за каждые 4 недели. Функция жила в UI-слое
+    // (phase-periodization) и использовалась только ручным конструктором; BB-путь
+    // её не звал никогда. Дефолт выкл → недельные множители байт-в-байт.
+    if (!isDeloadWeek && input.volumeWave === true) {
+      const wave = getVolumeWaveFactor(phaseWeek, phase);
+      if (Number.isFinite(wave) && wave > 0) baseWeekVolumeMult = baseWeekVolumeMult * wave;
+    }
     // Blast/Cruise: 8н blast ×1.15 / 4н cruise ×0.85 (повторяется), только при вкл.
     let blastMult = 1;
     if (input.blastCruiseEnabled) {
@@ -3644,9 +3663,7 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
     // каждую неделю (как weekLocalUsed).
     const abWeekPatterns = new Map<string, string[]>();
     const weekSessions: BBSession[] = [];
-    const phase = phaseByWeek.get(w) || 'accumulation';
-    phaseWeekCounter[phase] = (phaseWeekCounter[phase] || 0) + 1;
-    const phaseWeek = phaseWeekCounter[phase];
+    // `phase`/`phaseWeek` считаются выше (до рампа объёма — от них зависит волна).
     // Soft freshness: упражнения предыдущей недели — в штрафном списке (не хард-блок).
     const prevWeekNames = (() => {
       const out: string[] = [];
@@ -4798,6 +4815,9 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
     mobilityRestrictions: input.mobilityRestrictions,
     trainingVolumeMode: input.trainingVolumeMode || 'standard',
     volumeGoal: input.volumeGoal,
+    // G1-полный: флаг волны в снапшот — иначе план нельзя воспроизвести
+    // («показано ≠ сохранено»: реплан/adapter не узнали бы о волне).
+    volumeWave: input.volumeWave === true ? true : undefined,
     goal: input.goal,
     trainingFocus: input.trainingFocus,
     methodology: input.methodology,
@@ -4816,6 +4836,8 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
       goal: input.goal,
       trainingVolumeMode: input.trainingVolumeMode || 'standard',
       volumeGoal: input.volumeGoal,
+      // G1-полный: флаг волны и во вложенный снапшот — его читает реплана/адаптеры.
+      volumeWave: input.volumeWave === true ? true : undefined,
       trainingFocus: input.trainingFocus,
       methodology: input.methodology,
       supersetMode: input.supersetMode,
