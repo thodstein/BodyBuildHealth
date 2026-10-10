@@ -185,13 +185,15 @@ export function getLifeStageNote(stage: LifeStage): string | null {
 export interface EnergyAvailabilityResult {
   ea: number;                    // ккал/кг FFM/день
   exerciseKcal: number;
-  status: 'optimal' | 'reduced' | 'risk';
+  status: 'optimal' | 'reduced' | 'risk' | 'severe';
   note: string | null;
 }
 
 // E4 (Эпик E): ЕДИНАЯ EA-функция — делегирует в planner-ea.engine (раньше две функции
 // с расходящимися порогами: reduced <40 здесь vs <45 в движке). Женская специфика —
 // только текст заметки; пороги и расчёт — один источник (planner-ea: severe<20/risk<30/reduced<45).
+// P1-фикс: 'severe' больше не склоняется в 'risk' — терялось действие «+500-700 ккал»
+// (критический дефицит требует вмешательства сильнее, чем обычный риск).
 import { computeEA } from './planner-ea.engine';
 
 export function computeEnergyAvailability(
@@ -204,13 +206,14 @@ export function computeEnergyAvailability(
   sex: 'male' | 'female',
 ): EnergyAvailabilityResult {
   const r = computeEA({ intakeKcal, weightKg, lbmKg, isTrainingDay, trainDurationMin, trainIntensity });
-  const status: EnergyAvailabilityResult['status'] = r.status === 'severe' ? 'risk' : r.status;
   let note: string | null = r.note || null;
-  if (r.status === 'risk' || r.status === 'severe') {
+  if (r.status === 'severe') {
+    note = `⛔ RED-S SEVERE: EA ${r.ea} ккал/кг FFM/день (<20) — критический дефицит. Немедленно ↑ккал +500-700 или ↓EEE. Риск: кости/гормоны/иммунитет/MPS.`;
+  } else if (r.status === 'risk') {
     const lowEf = sex === 'female' ? 'аменорея/потеря костей/метаболическое замедление (RED-S)' : 'снижение тестостерона/восстановления/иммунитета';
-    note = '⚠️ RED-S риск: Energy Availability = ' + r.ea + ' ккал/кг FFM/день (<30). Дефицит слишком глубокий относительно тренировочной нагрузки — ' + lowEf + '. Увеличьте ккал или снизьте объём тренировок. Целевой EA: 40-45 (женщины), ≥40 (мужчины).';
+    note = '⚠️ RED-S риск: Energy Availability = ' + r.ea + ' ккал/кг FFM/день (<30). Дефицит слишком глубокий относительно тренировочной нагрузки — ' + lowEf + '. Увеличьте ккал на +300-500 или снизьте объём тренировок. Целевой EA: 40-45 (женщины), ≥40 (мужчины).';
   } else if (r.status === 'reduced') {
     note = '🟡 EA = ' + r.ea + ' ккал/кг FFM/день (30-45, сниженная зона). Контролируйте восстановление/цикл/либидо; не задерживайтесь долго.';
   }
-  return { ea: r.ea, exerciseKcal: r.eee, status, note };
+  return { ea: r.ea, exerciseKcal: r.eee, status: r.status, note };
 }

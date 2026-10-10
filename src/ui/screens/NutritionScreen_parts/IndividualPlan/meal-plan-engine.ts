@@ -9008,13 +9008,25 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     if (!input.manualTargetsLocked && (input.goalProteinG || 0) > 0 && (input.lbmKg || 0) > 0) {
       const _ultraP6 = isUltraPProtein(input.goalProteinG || 0, input.weightKg || 80);
       if (!_ultraP6 && totals.p >= (input.goalProteinG || 0) * 0.99) {
-        const _pCeil6 = (input.lbmKg as number) * MPS_CEIL_LBM_G_PER_KG;
+        const _pCeil0 = (input.lbmKg as number) * MPS_CEIL_LBM_G_PER_KG;
         const _floorP6 = (input.lbmKg as number) * MPS_FLOOR_LBM_G_PER_KG; // нижний MPS-пол приёма — неприкосновенен
+        // P1-фикс (F4): при структурно малом LBM цель белка дня может быть ВЫШЕ
+        // суммы мейнов × потолок (150 г / 3-4 приёма при потолке 36 г). P6 резал
+        // мейн по коридору, день выпадал из цели на −5% и витрина врала «вопрос».
+        // Правило: коридор уступает дню — сдвигаем потолок на дефицит до цели
+        // (ужим ровно до «0.98×цели в сумме»), ноту пишем честную.
+        const _goalP6 = input.goalProteinG as number;
+        // сколько суммарно можно «снять» с мейнов, сохранив день ≥98% цели
+        let _maxLoss = Math.max(0, totals.p - _goalP6 * 0.98);
+        const _pCeilBase = _pCeil0;
         for (const m of meals) {
           const _t6 = String((m as any).type || '');
           if (!['breakfast', 'lunch', 'dinner'].includes(_t6) || (m as any)._insulinWindow) continue;
           let _mp6 = m.items.reduce((s, i) => s + i.p, 0);
-          if (_mp6 <= _pCeil6) continue;
+          if (_mp6 <= _pCeilBase) continue;
+          // потолок этого приёма приподнят на остаток допустимой потери дня
+          const _pCeil6 = _mp6 - Math.min(_mp6 - _pCeilBase, _maxLoss);
+          if (_pCeil6 < _mp6) _maxLoss = Math.max(0, _maxLoss - (_mp6 - _pCeil6));
           const _items6 = m.items
             .filter(it => ['protein', 'fast_protein', 'slow_protein'].includes(it.role))
             .sort((a, b) => ((a.role === 'protein' ? 1 : 0) - (b.role === 'protein' ? 1 : 0)) || ((b.p || 0) - (a.p || 0)));
@@ -9047,7 +9059,9 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
           if (_mp6 <= _pCeil6 + 0.05) {
             m.totals = mealTotalsOf(m.items);
             recalcDayTotals(meals, totals);
-            notes.push(`⚖️ «${m.label}»: белок ужат до MPS-потолка ${(_pCeil6).toFixed(1)} г (0.62 г/кг LBM)`);
+            notes.push(_pCeil6 > _pCeilBase + 0.05
+              ? `📈 «${m.label}»: MPS-потолок приподнят до ${(_pCeil6).toFixed(1)} г (цель белка дня сильнее коридора)`
+              : `⚖️ «${m.label}»: белок ужат до MPS-потолка ${(_pCeil6).toFixed(1)} г (0.62 г/кг LBM)`);
           }
         }
       }

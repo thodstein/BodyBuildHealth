@@ -44,10 +44,20 @@ export function computeEA(input: EAInput): EAResult {
   const mets = input.trainIntensity === 'high' ? 7 : input.trainIntensity === 'medium' ? 6 : 5;
   const hours = input.isTrainingDay ? (Math.max(0, Number(input.trainDurationMin) || 0) / 60) : 0;
   const eee = Math.round(mets * w * hours);
-  const ea = Math.round((input.intakeKcal - eee) / ffm);
+  // P1-фикс: NaN/Infinity из intake молча давал status 'optimal' (все сравнения false) —
+  // на человеческом плане это ложное «зелёное». Нет данных → честный null-режим.
+  const _eaRaw = (input.intakeKcal - eee) / ffm;
+  const eaFinite = Number.isFinite(_eaRaw);
+  const ea = eaFinite ? Math.round(_eaRaw) : 0;
   let status: EAStatus = 'optimal';
   let note: string | null = null;
   let zoneLabel = '✅ EA optimal ≥45';
+  if (!eaFinite) {
+    status = 'optimal';
+    zoneLabel = '⚪ EA нет данных';
+    note = null;
+    return { ea: 0, ffm: Math.round(ffm), eee, status, note, zoneLabel };
+  }
   if (ea < 20) {
     status = 'severe';
     zoneLabel = '⛔ EA severe <20';

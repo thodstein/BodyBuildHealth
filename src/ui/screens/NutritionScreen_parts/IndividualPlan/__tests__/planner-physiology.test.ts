@@ -6,21 +6,38 @@ import { getMicro } from '../../../../../core/nutrition-micros';
 import { FOOD_DB } from '../../../../../core/nutrition-database';
 
 describe('computeEnergyAvailability (#1 RED-S)', () => {
-  it('EA risk when deep deficit + heavy training (female)', () => {
+  it('EA severe when deep deficit + heavy training (female) — было→стало: risk', () => {
+    // было→стало: severe больше не склоняется в risk — критический дефицит <20 ккал/кг
+    // FFM требует действия «+500-700 ккал», которое терялось в общей risk-ветке.
     const r = computeEnergyAvailability(1500, 58, 49, true, 90, 'high', 'female');
-    expect(r.status).toBe('risk');
-    expect(r.ea).toBeLessThan(30);
+    expect(r.status).toBe('severe');
+    expect(r.ea).toBeLessThan(20);
     expect(r.note).toContain('RED-S');
+    expect(r.note).toContain('500-700');
+  });
+  it('EA risk (20..30 зона, не severe) — отдельная ветка действия +300-500', () => {
+    const r = computeEnergyAvailability(1700, 58, 49, true, 60, 'medium', 'female');
+    expect(r.status).toBe('risk');
+    expect(r.ea).toBeGreaterThanOrEqual(20);
+    expect(r.ea).toBeLessThan(30);
+    expect(r.note).toContain('300-500');
   });
   it('EA optimal at maintenance', () => {
     const r = computeEnergyAvailability(2900, 80, 68, true, 75, 'medium', 'male');
     expect(r.ea).toBeGreaterThanOrEqual(30);
     expect(r.status).not.toBe('risk');
+    expect(r.status).not.toBe('severe');
   });
   it('rest day -> exerciseKcal 0', () => {
     const r = computeEnergyAvailability(2000, 70, 58, false, 60, 'high', 'female');
     expect(r.exerciseKcal).toBe(0);
     expect(r.ea).toBe(Math.round(2000 / 58));
+  });
+  it('NaN intake не даёт ложное optimal', () => {
+    const r = computeEnergyAvailability(NaN, 70, 58, false, 0, 'low', 'female');
+    expect(r.status).toBe('optimal');
+    expect(r.ea).toBe(0);
+    expect(r.note).toBeNull();
   });
 });
 

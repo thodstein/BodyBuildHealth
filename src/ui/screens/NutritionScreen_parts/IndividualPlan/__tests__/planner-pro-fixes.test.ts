@@ -21,6 +21,7 @@ import { buildDayTargets } from "../planner-day-targets";
 import { getMicroFromFood } from "../planner-micro-reader";
 import { RDA_BASE, sumMicros } from "../planner-micro-coverage";
 import { scaleRecipeToTarget } from "../planner-recipe-mode";
+import { buildDayPlan } from "../meal-plan-engine";
 import { computeDieteticCarbTarget, plannerWeightAdjustAdvice } from "../planner-targets";
 import { FOOD_DB } from "../../../../../core/nutrition-database";
 
@@ -120,6 +121,18 @@ describe("P1-фикс: scaleRecipeToTarget — кап не отменяется 
     };
     const res = scaleRecipeToTarget(nutty, { kcal: 300, p: 20, f: 8, c: 40 }, 80);
     expect(res).toBeNull();
+  });
+});
+
+describe("P2-фикс: MPS-потолок уступает цели дня (малый LBM)", () => {
+  it("150 г белка при LBM 58 / 4 приёма — день не выпадает под 98% цели", () => {
+    const plan = buildDayPlan({
+      weightKg: 75, lbmKg: 58, bodyFatPct: 22.7, sex: 'female',
+      goalKcal: 2100, goalProteinG: 150, goalFatG: 70, goalCarbsG: 190,
+      mealsCount: 4, isTrainingDay: false, budget: 'medium',
+      dayOffset: 0, variety: 'max',
+    } as any);
+    expect(plan.totals.p).toBeGreaterThanOrEqual(150 * 0.98);
   });
 });
 
