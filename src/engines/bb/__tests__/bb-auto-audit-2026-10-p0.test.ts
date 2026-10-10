@@ -11,6 +11,7 @@ import { extractMesocycleProgression } from '../bb-mesocycle-progression.engine'
 import { getVolumeLandmarks } from '../../volume-landmarks.engine';
 import { replanBBMesoFromFact, replanSummary, type ReplanBBResult, type ReplanBBOptions } from '../bb-replan.engine';
 import { applyRecoveryRelief, needsRecoveryRelief, musclesForPainLocation } from '../bb-recovery-relief.engine';
+import { finalizeBBPlan } from '../bb-finalize.engine';
 import { readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 
@@ -1049,5 +1050,82 @@ describe('Частотная семантика якорей (подтвержд
     const codeLines = src.split(/\r?\n/).filter((l: string) => !l.trim().startsWith('//') && !l.trim().startsWith('*'));
     expect(codeLines.some((l: string) => l.includes('if (legsSets > 0) continue;')), 'вернулся старый гард').toBe(false);
     expect(codeLines.some((l: string) => l.includes('if (legsSets >= LEGS_COVERAGE_TARGET) continue;'))).toBe(true);
+  });
+});
+
+/* ---------- Шаг 7 / revalidate: рампа переживает повторную финализацию ---------- */
+
+describe('Рампа «Вход в мезоцикл» выживает revalidate («Коррекция»)', () => {
+  const mrvOf = (p: any) => p.pedAdaptation?.combinedMrvMultiplier;
+  const optsFor = (p: any) => ({
+    reorder: false, phaseSafety: true, level: 'enhanced', trainingYears: 8,
+    volumeGoal: 'mav', specializationSchedule: p.specializationSchedule,
+    priorityMuscles: p.priorityMuscles, mrvMultiplier: p.mrvMultiplier,
+    ensureMinimumVolume: true, controlledRotation: false,
+    maxWorkingSets: p.maxWorkingSets, maxExercises: p.maxExercises,
+    gradedMuscles: p.gradedMuscles, onCourse: true, doseAwareMrv: mrvOf(p),
+  } as any);
+  const w1 = (p: any, m: string) => p.weeks[0].sessions.flatMap((s: any) => s.exercises)
+    .filter((e: any) => e.muscle === m && !(e as any).warmupActivator)
+    .reduce((a: number, e: any) => a + (e.sets || 0), 0);
+  const built = () => buildBBPlan({
+    patternId: 'ppl_6', level: 'enhanced', trainingYears: 8, goal: 'mass', weeks: 12,
+    workMax: { chest: 100, back: 120, shoulders: 60, quads: 140, hamstrings: 110, glutes: 120, biceps: 50, triceps: 55, calves: 80, traps: 70, forearms: 40 },
+    weakPoints: [], peds: ['AAS'] as any, pedDoses: { AAS: 750 } as any,
+    courseIntensity: 'heavy', volumeGoal: 'mav',
+  } as any) as any;
+
+  it('повторная финализация НЕ раздувает ранние недели к анкерной цели', () => {
+    // Было (до шага 7): revalidate возвращал неделю к anchor — замер
+    // chest W1 29→34 при rampStart 0.85 (рампа забывалась после правок).
+    const p = built();
+    const before = w1(p, 'chest');
+    const re = finalizeBBPlan(structuredClone(p), optsFor(p));
+    expect(before, 'baseline W1 chest').toBeLessThan(30);
+    expect(w1(re, 'chest'), 'revalidate раздул W1 — рампа потерялась').toBeLessThanOrEqual(before);
+    // quads — тот же контракт.
+    expect(w1(re, 'quads')).toBeLessThanOrEqual(w1(p, 'quads'));
+  });
+
+  it('revalidate идемпотентен: второй прогон не раздувает ранние недели', () => {
+    const p = built();
+    const re1 = finalizeBBPlan(structuredClone(p), optsFor(p));
+    const re2 = finalizeBBPlan(structuredClone(re1), optsFor(re1));
+    for (const m of ['chest', 'quads', 'back']) {
+      // Контракт: ранние недели не РАСТУТ (рампа — потолок, не пол).
+      // Точность — по chest/back (их держит кап), quads с допуском ±1:
+      // сам финализатор имеет предсуществующую неидемпотентность
+      // (замер quads 21→20 на reorder:false) — это отдельный долг,
+      // не про рампа, и он в сторону УМЕНЬШЕНИЯ.
+      const tol = m === 'quads' ? 1 : 0;
+      expect(w1(re2, m), `${m}: повторный revalidate раздул`).toBeLessThanOrEqual(w1(re1, m));
+      expect(w1(re2, m), `${m}: повторный revalidate дрейфует`).toBeGreaterThanOrEqual(w1(re1, m) - tol);
+    }
+  });
+
+  it('source-guard: кап пишется на неделю и переустанавливается в finalize', () => {
+    const src = readFileSync(join(__dirname, '..', 'bb-builder.engine.ts'), 'utf8');
+    expect(src).toContain('(week as any).rampCap = caps;');
+    const fin = readFileSync(join(__dirname, '..', 'bb-finalize.engine.ts'), 'utf8');
+    // Переустановка в finalizeBBPlan — иначе revalidate теряет кап.
+    expect(fin).toContain('import { normalizeWeekMrv, enforceRampWeeklyCap } from ');
+    expect(fin).toContain('const caps = (week as any).rampCap as Record<string, number> | undefined;');
+    expect(fin).toContain('enforceRampWeeklyCap(week.sessions, caps);');
+  });
+
+  it('UI-путь «Коррекция» паритетен сборке: prioritizeBack + переустановка рампа', () => {
+    const ui = readFileSync(join(__dirname, '..', '..', '..', 'ui', 'screens', 'TrainingScreen_parts', 'BbAutoConstructor.tsx'), 'utf8');
+    expect(ui).toContain('prioritizeBackSessions(out, {');
+    expect(ui).toContain('enforceRampWeeklyCap(week.sessions, caps);');
+  });
+
+  it('планы без капов (cycle/program/hand-made) проход не трогает', () => {
+    const handmade: any = {
+      pattern: { id: 'x', name: 'X', rotationDays: 7, sessionsPerRotation: 1, schedule: [], level: [], description: '' },
+      rationale: [], rotationMuscleVolume: {}, mrvByMuscle: {},
+      weeks: [{ week: 1, phase: 'accumulation', sessions: [{ day: 1, sessionTag: 'Push', exercises: [{ muscle: 'chest', name: 'Жим', role: 'primary', character: 'тяж', sets: 5, repsRange: [6, 8], rir: 2, workSets: Array.from({ length: 5 }, () => ({ reps: 8, rir: 2, weight: 80 })) }] }] }],
+    };
+    const out = finalizeBBPlan(handmade, { reorder: false, level: 'intermediate' });
+    expect(out.weeks[0].sessions[0].exercises[0].sets).toBeGreaterThanOrEqual(2);
   });
 });

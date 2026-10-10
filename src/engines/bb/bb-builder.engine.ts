@@ -5439,6 +5439,11 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
         legsCnt: week.sessions.filter((s: any) => /Legs|Lower/i.test(s.sessionTag || '')).length || 1,
       } : null;
       const caps = rampCapsForWeek(Object.keys(finalTargets), (m: string) => Number((finalTargets as any)[m]?.targetSets) || 0, mult, slack, pplCounts, level);
+      // Кап пишется НАЗАД на неделю — это канонический потолок плана. Его
+      // читает finalizeBBPlan при повторной финализации (revalidate из
+      // «Коррекции»): без записи рампа забывалась после правок (замер:
+      // chest W1 29→34 — rampStart 0.85 переставал действовать).
+      (week as any).rampCap = caps;
       enforceRampWeeklyCap(week.sessions, caps);
     }
     // Согласование целей ПОСЛЕ рампа: reconcileVolumeTargets выше считал пик по

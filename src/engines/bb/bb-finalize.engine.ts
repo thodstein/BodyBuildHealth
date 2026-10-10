@@ -36,7 +36,11 @@ import { applyTaperToFinalWeeks, isDeloadLikeWeek } from './bb-autocoach.engine'
 import { analyzePlanStress } from './bb-injury-prevention.engine';
 import { annotateBackExercise, backQualityIssues, verticalPullProfile, classifyLegExercise, annotateArmExercise, armQualityIssues, classifyArmExercise, classifyBackExercise } from './bb-back-quality.engine';
 import { WEAK_TO_MUSCLE, isBBJunk } from './bb-builder.engine';
-import { normalizeWeekMrv } from './bb-builder.engine';
+// G1-рампа: кап недельного потолка «Вход в мезоцикл» переустанавливается на
+// revalidate (см. финал finalizeBBPlan). Импорт из билдера — функция уровня
+// модуля, вызывается только внутри функций (циклическая связь bb-builder ↔
+// bb-finalize существует и для normalizeWeekMrv ниже).
+import { normalizeWeekMrv, enforceRampWeeklyCap } from './bb-builder.engine';
 import { isMobilityRestricted } from './bb-mobility.engine';
 import { expandDonorMuscles, isSpecializationFocus, isSpecializationWeak, specResForWeekSchedule, tradeoffForWeek, type SpecializationSchedule } from './bb-specialization.engine';
 import { ANGLE_CLASSES, lengthenedBonus } from './bb-exercise-selection.engine';
@@ -5849,6 +5853,26 @@ for (const week of next.weeks) {
       })();
       (session as any).exercises = [...warmups, ...orderedRest];
     }
+  }
+  syncBBPlanSetShape(next);
+  // G1-рампа: переустановка недельного потолка «Вход в мезоцикл».
+  // Капы посчитаны билдером и приехали на неделях (week.rampCap). Без этого
+  // прохода revalidate («Коррекция» → finalizeBBPlan) их терял: объем-добавляющие
+  // пассы финализатора пересобирали неделю с другой базы — замер на ppl_6
+  // enhanced: chest W1 29→34, то есть rampStart 0.85 после правок переставал
+  // действовать. Положено ДО финального снимка (weeklyVolume / validation /
+  // balanceReport / report ниже), иначе он описывает версию плана, которой
+  // уже нет (тот же класс, что аудит 2026-09 (0.4)).
+  // Планы без капов (cycle/program-пути, hand-made) проход не трогает.
+  for (const week of next.weeks) {
+    const caps = (week as any).rampCap as Record<string, number> | undefined;
+    if (!caps) continue;
+    const wAny = week as any;
+    // Недели с назначенной кривой объёма не режем: авто-taper и prep-контур
+    // уже задали свой профиль (паритет с финальным применением в билдере).
+    if (wAny.taperApplied === true || wAny.taper === true || wAny.peakWeek === true
+      || wAny.contestPhase || (typeof wAny.prepProtocol === 'string' && wAny.prepProtocol)) continue;
+    enforceRampWeeklyCap(week.sessions, caps);
   }
   syncBBPlanSetShape(next);
   // Аудит 2026-09 (0.4): ФИНАЛЬНЫЙ снимок валидации и weeklyVolume.

@@ -26,6 +26,8 @@ import { applyDUPOverlay, recommendDUPMode } from '../../../engines/bb/bb-dup.en
 import { applyExecutionCorrections, type ExecutionCorrection } from '../../../engines/bb/bb-execution-corrections.engine';
 import { validateBBPlan, generateActionableRecommendations } from '../../../engines/bb/bb-validator.engine';
 import { finalizeBBPlan } from '../../../engines/bb/bb-finalize.engine';
+import { prioritizeBackSessions } from '../../../engines/bb/bb-finalize.engine';
+import { enforceRampWeeklyCap } from '../../../engines/bb/bb-builder.engine';
 import { exerciseFeatureBadges, techniqueChainParts, canonTechniqueId } from './bb-technique-display';
 import { calcBBPlanMetrics } from '../../../engines/bb/bb-metrics.engine';
 import { buildBBPlanReportText } from '../../../engines/bb/bb-report.engine';
@@ -2021,7 +2023,7 @@ const [bbVolumeRamp, setBbVolumeRamp] = useState<'standard' | 'preloaded' | 'fla
 
   const revalidateEditedPlan = (plan: BBPlan): BBPlan => {
     const edited = structuredClone(plan) as BBPlan;
-    return finalizeBBPlan(edited, {
+    const out = finalizeBBPlan(edited, {
       reorder: false,
       phaseSafety: true,
       methodology: bbMethodology,
@@ -2044,6 +2046,28 @@ const [bbVolumeRamp, setBbVolumeRamp] = useState<'standard' | 'preloaded' | 'fla
       gradedMuscles: edited.gradedMuscles,
       mobilityRestrictions: edited.mobilityRestrictions,
     });
+    // Паритет с buildBBPlan: тяговая сессия добивает спину до 30/сессию
+    // (60/нед). Без этого revalidate ТЕРЯЛ объём спины относительно сборки —
+    // замер ppl_6 enhanced: back W1 54→44, peak 56→46 (план перестал
+    // доходить до своей цели). Проход build-only, поэтому дублируем его здесь.
+    prioritizeBackSessions(out, {
+      level: bbLevel as any,
+      trainingYears: bbTrainingYears,
+      onCourse: peds.length > 0,
+      maxWorkingSets: edited.maxWorkingSets,
+    });
+    // Паритет с buildBBPlan (часть 2): после топ-апа спины переустановить
+    // недельный потолок рампы «Вход в мезоцикл» — иначе revalidate раздувал
+    // ранние недели к анкерной цели (замер: chest W1 29→34).
+    for (const week of out.weeks) {
+      const caps = (week as any).rampCap as Record<string, number> | undefined;
+      if (!caps) continue;
+      const wAny = week as any;
+      if (wAny.taperApplied === true || wAny.taper === true || wAny.peakWeek === true
+        || wAny.contestPhase || (typeof wAny.prepProtocol === 'string' && wAny.prepProtocol)) continue;
+      enforceRampWeeklyCap(week.sessions, caps);
+    }
+    return out;
   };
 
   const adjustVolume = (mult: number) => {
