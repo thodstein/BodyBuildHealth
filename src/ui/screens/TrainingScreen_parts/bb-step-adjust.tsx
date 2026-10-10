@@ -57,6 +57,8 @@ export interface BbAdjustStepProps {
   startDateInput: string;
   setStartDateInput: React.Dispatch<React.SetStateAction<string>>;
   currentWeek: WeekDateRange | undefined;
+  /** Режим конструктора (generic_split | programs) — маршрут «Перестроить план». */
+  planMode: string;
   savedPlans: SavedBBPlan[];
   showCompare: boolean;
   setShowCompare: React.Dispatch<React.SetStateAction<boolean>>;
@@ -94,7 +96,7 @@ export const BbAdjustStep: React.FC<BbAdjustStepProps> = ({
   builtPlan, metrics, setBuiltPlan, bbWorkMax, loadStrategy,
   exerciseEdits, setExerciseEdits, editsRef, commitEdits, editsHistory, redosHistory, undoEdits, redoEdits,
   bulkModal, setBulkModal, bulkField, setBulkField, bulkMode, setBulkMode, bulkValue, setBulkValue,
-  bbWeekSel, setBbWeekSel, bbWeeks, startDateInput, setStartDateInput, currentWeek,
+  bbWeekSel, setBbWeekSel, bbWeeks, startDateInput, setStartDateInput, currentWeek, planMode,
   savedPlans, showCompare, setShowCompare, diffVariantId, setDiffVariantId, diffPlan,
   peakWeekCategory, peakSpec,
   weakPoints, dupMode, flash, setStep, setExSwapModal,
@@ -238,7 +240,7 @@ export const BbAdjustStep: React.FC<BbAdjustStepProps> = ({
            <button style={BTN_GHOST} onClick={() => adjustVolume(1.1)}>📦 Объём +10%</button>
            <button style={BTN_GHOST} onClick={() => adjustWeight(1.05)}>⚖ Вес +5%</button>
            <button style={BTN_GHOST} onClick={() => adjustWeight(0.95)}>⚖ Вес -5%</button>
-           <button style={BTN_GHOST} onClick={() => { setExerciseEdits({}); setStep('split'); }}>🔄 Перестроить план</button>
+            <button style={BTN_GHOST} onClick={() => { setExerciseEdits({}); setStep(planMode === 'programs' ? 'ped' : 'split'); }}>🔄 Перестроить план</button>
             <button style={BTN_GHOST} onClick={handleSavePlan}>💾 Сохранить план</button>
             <button style={{ ...BTN_GHOST, borderColor:'#60a5fa', color:'#60a5fa' }} onClick={handleSaveToMyPlans}>💾 В Мои тренировки</button>
             <button style={{ ...BTN_GHOST, borderColor:'#a78bfa', color:'#a78bfa' }} onClick={handleSaveAsUserProgram}>📂 В Мои программы</button>

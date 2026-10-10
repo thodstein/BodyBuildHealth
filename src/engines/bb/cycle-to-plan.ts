@@ -10,7 +10,7 @@ import type { BBPhase } from './bb-types';
 import { femalePosteriorBoost } from './bb-demographics';
 import { getBBVolumeLandmarks, isWeak, abDominantPattern, normalizeWeekMrv } from './bb-builder.engine';
 import { syncBBPlanSetShape } from './bb-validator.engine';
-import { aggregateBBVolume, perExerciseCap, exerciseVolumeContributions } from './bb-volume.engine';
+import { aggregateBBVolume, perExerciseCap, exerciseVolumeContributions, BB_MRV_TOLERANCE } from './bb-volume.engine';
 import { buildBBVolumeTarget, computeMrvMult, regimeMrvMultFor, weeklyCapFor, perSessionMuscleCap, type BBVolumeTarget } from './bb-volume.engine';
 import { isRearDeltExercise, isMobilityRestricted } from './bb-builder.engine';
 import { buildExerciseInstructions, formatExerciseInstructions } from './bb-exercise-instructions.engine';
@@ -1786,6 +1786,10 @@ export function convertCycleToBBPlan(input: CycleToPlanInput): BBPlan {
     mobilityRestrictions: input.mobilityRestrictions,
     volumeScheme: cycleVolumeScheme,
   }, {
+    // G8-tail: личная калибровка MEV должна доезжать и до ГАРДОВ финалайзера.
+    // Цели уже учли её через withMEVCalibration(allLandmarks); без проброса
+    // гарды floor/feeder/repair спорили бы с целями о разных цифрах.
+    mevCalibration: loadMEVCalibration(),
     reorder: mode !== 'faithful',
     expandAllMuscles: mode === 'adapt',
     priorityMuscles: [...new Set([...weakPoints, ...specSchedule.blocks.flatMap(b => b.targets), ...(focusGroup ? [focusGroup] : [])])],
@@ -1921,13 +1925,22 @@ export function convertCycleToBBPlan(input: CycleToPlanInput): BBPlan {
       // Эффективный трим: валидатор меряет direct+indirect против plan.mrvByMuscle.
       // Ключи aggregateBBVolume канонические (core→abs, delt_*→shoulders), а
       // e.muscle может быть сырым — матчим через trueMuscleOf.
+      // Аудит 2026-10: допуск должен совпадать с валидатором бит-в-бит — иначе
+      // cycle/program-планы резались на ~15% жёстче, чем измеряет validateBBPlan
+      // (generic-путь и validator используют cap × BB_MRV_TOLERANCE, цели
+      // специализации — cap × 1.2; здесь стоял строгий `> cap`).
+      const weekSpecSet = new Set(weekRes.targets.map(t => String(t || '').toLowerCase()));
+      const tolFor = (muscle: string): number => {
+        const isSpecTarget = weekSpecSet.has(muscle) || (/^delt_/.test(muscle) && weekSpecSet.has('shoulders'));
+        return isSpecTarget ? 1.2 : BB_MRV_TOLERANCE;
+      };
       for (let guard = 0; guard < 40; guard++) {
         const vol = aggregateBBVolume(w.sessions);
         let worst: { muscle: string; over: number; cap: number } | null = null;
         for (const [muscle, values] of Object.entries(vol)) {
           const cap = caps[muscle] || mrvByMuscle[muscle];
-          if (cap > 0 && values.effectiveSets > cap) {
-            const over = values.effectiveSets - cap;
+          if (cap > 0 && values.effectiveSets > cap * tolFor(muscle)) {
+            const over = values.effectiveSets - cap * tolFor(muscle);
             if (!worst || over > worst.over) worst = { muscle, over, cap };
           }
         }
@@ -2963,6 +2976,8 @@ export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts)
     gradedMuscles: [...new Set(gradedInjuries.map(inj => inj.muscle))],
     mobilityRestrictions: opts.mobilityRestrictions,
   }, {
+    // G8-tail: та же проброска калибровки MEV в гарды финалайзера (program-путь).
+    mevCalibration: loadMEVCalibration(),
     reorder: mode !== 'faithful',
     expandAllMuscles: mode === 'adapt',
     priorityMuscles: [...new Set([...weakPoints, ...specSchedule.blocks.flatMap(b => b.targets), ...(focusGroup ? [focusGroup] : [])])],
@@ -3040,13 +3055,21 @@ export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts)
       // Эффективный трим: валидатор меряет direct+indirect против plan.mrvByMuscle.
       // Ключи aggregateBBVolume канонические (core→abs, delt_*→shoulders), а
       // e.muscle может быть сырым — матчим через trueMuscleOf.
+      // Аудит 2026-10: допуск 1-в-1 как у validateBBPlan (BB_MRV_TOLERANCE,
+      // цели специализации ×1.2) — строгий `> cap` резал program-планы
+      // жёстче, чем их же измеряет валидатор.
+      const weekSpecSet = new Set(weekRes.targets.map(t => String(t || '').toLowerCase()));
+      const tolFor = (muscle: string): number => {
+        const isSpecTarget = weekSpecSet.has(muscle) || (/^delt_/.test(muscle) && weekSpecSet.has('shoulders'));
+        return isSpecTarget ? 1.2 : BB_MRV_TOLERANCE;
+      };
       for (let guard = 0; guard < 40; guard++) {
         const vol = aggregateBBVolume(w.sessions);
         let worst: { muscle: string; over: number } | null = null;
         for (const [muscle, values] of Object.entries(vol)) {
           const cap = caps[muscle] || mrvByMuscle[muscle];
-          if (cap > 0 && values.effectiveSets > cap) {
-            const over = values.effectiveSets - cap;
+          if (cap > 0 && values.effectiveSets > cap * tolFor(muscle)) {
+            const over = values.effectiveSets - cap * tolFor(muscle);
             if (!worst || over > worst.over) worst = { muscle, over };
           }
         }

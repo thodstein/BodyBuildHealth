@@ -611,7 +611,7 @@ export const BbParamsStep: React.FC<BbParamsStepProps> = ({
         <BbRowSwitch checked={autoRegOn} onChange={setAutoRegOn} icon="🤖" accent="#22c55e"
           title="Авто-регуляция по готовности" desc="Объём/вес/RIR корректируются по сну, HRV, стрессу и ACWR (работает в обоих режимах)" />
         <BbRowSwitch checked={packingV2} onChange={setPackingV2} icon="📦" accent="#a78bfa" disabled={isPrograms}
-          title="Packing заливка" desc={isPrograms ? 'Только генерик-сплит — в режиме источника не действует' : 'Меньше движений: заливка 6/5/4 с пирамидой (спина/грудь)'} />
+          title="Packing заливка" desc={isPrograms ? 'Только генерик-сплит — в режиме источника не действует' : 'Сеты льются в терпеливые движения до их капа (6/5/4) с пирамидой весов; сумма сетов неизменна'} />
         {isPrograms && packingV2 && (
           <div style={{ ...NOTE, marginTop: 4, color: '#f59e0b' }}>⚠ Тогл включён, но в режиме источника не применяется (программа идёт дословно/адаптированно, без заливки).</div>
         )}

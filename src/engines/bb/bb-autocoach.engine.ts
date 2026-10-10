@@ -675,16 +675,21 @@ export function detectGarbageVolume(weeks: BBWeek[], weakPoints: string[], opts?
       // Разминочные упражнения — не мусор (не входят в объём).
       for (const e of s.exercises) {
         if ((e as any).warmupActivator) continue;
-        // Упражнение вне тега сессии (кроме рук и дельт — они работают во многих)
+        // Упражнение вне тега сессии (кросс-мышечный занос). Раньше IIFE этого
+        // правила заканчивался безусловным `return true` — ветка была
+        // недостижима и правило никогда не срабатывало (аудит 2026-10).
+        // Теперь набор запрещённых мышц 1-в-1 повторяет TAG-гигиену финализатора
+        // (bb-finalize: TAG hygiene), т.е. отчёт показывает ровно то, что
+        // гигиена физически уберёт. Теги без чёткого мышечного профиля
+        // (Upper/FullBody/Torso/Limbs/Arms/Glutes*) остаются пермиссивными:
+        // там разные группы в одной сессии — норма дизайна.
         const tagRelevant = s.sessionTag
           ? (() => {
-              const tagLower = s.sessionTag.toLowerCase();
-              if (tagLower.includes('push') && ['chest', 'shoulders', 'triceps'].includes(e.muscle)) return true;
-              if (tagLower.includes('pull') && ['back', 'biceps'].includes(e.muscle)) return true;
-              if (tagLower.includes('legs') && ['quads', 'hamstrings', 'glutes', 'calves'].includes(e.muscle)) return true;
-              if (tagLower.includes('upper') && ['chest', 'back', 'shoulders', 'biceps', 'triceps'].includes(e.muscle)) return true;
-              if (tagLower.includes('lower') && ['quads', 'hamstrings', 'glutes', 'calves', 'abs'].includes(e.muscle)) return true;
-              return true; // default: разрешить
+              const t = s.sessionTag.toLowerCase();
+              if (t.includes('push')) return !['back', 'quads', 'hamstrings', 'glutes', 'calves'].includes(e.muscle);
+              if (t.includes('pull')) return !['chest', 'quads', 'hamstrings', 'glutes', 'calves'].includes(e.muscle);
+              if (t.includes('legs') || t.includes('lower')) return !['chest', 'back', 'shoulders', 'triceps'].includes(e.muscle);
+              return true; // upper/fullbody/torso/limbs/arms — пермиссивно
             })()
           : true;
         if (!tagRelevant && !isWeak(e.muscle)) {
@@ -1130,6 +1135,21 @@ export function applyTaperToFinalWeeks(plan: BBPlan, _totalWeeks: number): BBPla
     const rirShift = TAPER_RIR_SHIFT[taperWeek] ?? 2;
     const taperTempo = TAPER_TEMPO[Math.min(taperWeek, TAPER_TEMPO.length - 1)] ?? '4-2-2-0';
     const intensityMult = 1.0; // вес сохраняется (Bosquet 2005)
+    // Аудит 2026-10: первая неделя 3-недельного окна получала множитель 1.0 /
+    // RIR +0 — фактически не являлась taper'ом, но помечалась `taper: true`.
+    // Следствия: (1) объем-добавляющие проходы финализатора её пропускали, хотя
+    // объём не сокращался; (2) в комментарий упражнения писалась ложь
+    // «📉 Taper: объём ×1.0, RIR +0».
+    // Решение: неделя остаётся помеченной (окно из 3 недель сохранено —
+    // «вход в пик» с тем же объёмом), но на ней ставится ФАКТИЧЕСКИЙ
+    // множитель `taperVolumeMult`. Гейты финализатора (isTaperPrepOrPeakWeek)
+    // пропускают только недели с реальной редукцией (<1): неделя входа
+    // остаётся рабочей и добирается fill'/PPL-гарантией как обычно.
+    // Комментарий тайпера пишется только при фактическом изменении.
+    const isRealTaper = volumeMult < 1 || rirShift > 0;
+    const taperNote = isRealTaper
+      ? ` | 📉 Taper: объём ×${volumeMult}, RIR +${rirShift}, темп ${taperTempo} (Bosquet 2005, Helms 2022).`
+      : '';
     const newSessions = w.sessions.map(s => ({
       ...s,
       exercises: s.exercises.map(e => {
@@ -1149,11 +1169,11 @@ export function applyTaperToFinalWeeks(plan: BBPlan, _totalWeeks: number): BBPla
           workSets,
           rir: Math.min(5, e.rir + rirShift),
           tempoSpec: taperTempo,
-          comment: (e.comment || '') + ` | 📉 Taper: объём ×${volumeMult}, RIR +${rirShift}, темп ${taperTempo} (Bosquet 2005, Helms 2022).`,
+          comment: (e.comment || '') + taperNote,
         };
       }),
     }));
-    return { ...w, sessions: newSessions, taper: true, taperApplied: true };
+    return { ...w, sessions: newSessions, taper: true, taperApplied: true, taperVolumeMult: volumeMult };
   });
 
   return { ...plan, weeks: newWeeks };

@@ -720,6 +720,13 @@ export const BbAutoConstructor: React.FC = () => {
       cycleDay,
       hasTrialPeak: hasTrial,
       experienceLevel,
+      // Аудит 2026-10: степперы «опыт подготовки»/«уровень гликогена» в шаге
+      // Contest питали ТОЛЬКО превью (buildTaperModifiers), а в сборку не
+      // уходили — buildContestPrepConfig() их не включал. Движок оба поля
+      // умеет: experience → модификаторы тайпера, glycogenLevel → бюджет
+      // карб-нагрузки пик-недели (glycogenAdjustedDose). «Показано = применяется».
+      experience: prepExperience != null ? { yearsTraining: prepExperience } : undefined,
+      glycogenLevel: prepGlycogenLevel,
       enhanced: peds.length > 0,
       prepCount: 0,
       showDate: prepShowDate,
@@ -1792,7 +1799,11 @@ export const BbAutoConstructor: React.FC = () => {
       return acuteChronicRatio(toDailyLoads(srpe));
     } catch { return null; }
   }, [builtPlan, allSrpeSessions]);
-  const metrics = useMemo(() => builtPlan ? calcBBPlanMetrics(builtPlan, 1) : null, [builtPlan]);
+  // Аудит 2026-10: mrvMultiplier был захардкожен 1 — на курсе (pedAdapt ×1.3-2.0)
+  // шаг «План» показывал натуральные MRV-капы и ложные «перебор MRV», тогда как
+  // сохранение варианта и таблица используют pedAdapt.combinedMrvMultiplier.
+  // План несёт итоговый множитель (bb-builder:4821) — берём его.
+  const metrics = useMemo(() => builtPlan ? calcBBPlanMetrics(builtPlan, Number((builtPlan as any).mrvMultiplier) || pedAdapt?.combinedMrvMultiplier || 1) : null, [builtPlan, pedAdapt]);
   // Epic F: единый отчёт качества (агрегирует validation/balance/rotation/safety, дедуп).
   const qualityReport = useMemo(() => {
     if (!builtPlan) return null;
@@ -2886,6 +2897,39 @@ export const BbAutoConstructor: React.FC = () => {
     if (vp.platePreset) setPlatePreset(vp.platePreset);
     if (Number.isFinite(vp.targetBodyFat)) setTargetBodyFat(Number(vp.targetBodyFat));
     if (Number.isFinite(vp.cycleDay)) setCycleDay(Number(vp.cycleDay));
+    // Аудит 2026-10: params варианта несёт не все входы билдера — при загрузке
+    // терялись стаж, травмы, мобильность, любимые/нелюбимые упражнения,
+    // fewerCompound/allowStrengthLifts/avoidAxial, автoreг, cross-meso,
+    // дата начала. «Загрузить вариант» + «Собрать» давало ДРУГОЙ план (другие
+    // капы, снятые safety-фильтры) без предупреждения.
+    // Фикс: добираем недостающие состояния из inputSnapshot плана — он пишется
+    // движком и уже корректен (generic bb-builder:4745 + cycle/program
+    // cycle-to-plan:1843/3202). Восстанавливаем только если вариант реально
+    // несёт эти поля (legacy-варианты без снапшота не трогаем).
+    const snap: any = (v.plan && (v.plan as any).inputSnapshot) || null;
+    if (snap && typeof snap === 'object') {
+      if (Number.isFinite(snap.trainingYears)) setBbTrainingYears(Number(snap.trainingYears));
+      if (Array.isArray(snap.injuries)) setInjuries(snap.injuries.map((i: any) => ({ ...i, from: typeof i?.from === 'string' && i.from ? i.from : '' })));
+      if (Array.isArray(snap.mobilityRestrictions)) setMobilityRestrictions(snap.mobilityRestrictions.filter((m: any) => typeof m === 'string'));
+      if (Array.isArray(snap.favoriteExercises)) setBbFavEx(snap.favoriteExercises.filter((x: any) => typeof x === 'string'));
+      if (Array.isArray(snap.excludedExercises)) setBbExclEx(snap.excludedExercises.filter((x: any) => typeof x === 'string'));
+      if (snap.fewerCompound != null) setFewerCompound(Boolean(snap.fewerCompound));
+      if (snap.avoidAxialLoad != null) setAvoidAxialLoadUi(Boolean(snap.avoidAxialLoad));
+      if (snap.autoDeload != null) setAutoDeload(Boolean(snap.autoDeload));
+      if (typeof snap.loadStrategy === 'string') setLoadStrategy(snap.loadStrategy);
+    }
+    // Рабочие максимумы: план несёт итоговый workMax (bb-builder:4820) — именно
+    // из него считались веса. Без восстановления «загрузить вариант» → «Собрать»
+    // пересчитывало веса от максимумов профиля (другой план).
+    const savedWm: any = (v.plan as any)?.workMax;
+    if (savedWm && typeof savedWm === 'object') {
+      const clean: Record<string, number> = {};
+      for (const [k, val] of Object.entries(savedWm)) {
+        const n = Number(val);
+        if (Number.isFinite(n) && n > 0) clean[k] = n;
+      }
+      if (Object.keys(clean).length > 0) setBbWorkMax(clean);
+    }
     setBbWeekSel(1);
     setStep('plan');
   };
@@ -2964,7 +3008,14 @@ export const BbAutoConstructor: React.FC = () => {
     const plan = applyEditsToPlan(builtPlan);
     const w = window.open('', '_blank');
     if (!w) { flash('Разрешите всплывающие окна для печати'); return; }
-    const esc = (s: string) => (s || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    // Аудит 2026-10: было только </> — `&` и кавычки не экранировались, из-за
+    // чего пользовательский текст ломал HTML-атрибуты/сущности в печати.
+    const esc = (s: any) => String(s ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
     const weeksHtml = plan.weeks.map(wk => {
       const sessionsHtml = wk.sessions.map((s, si) => {
         const exsHtml = s.exercises.map(e => {
@@ -3121,7 +3172,16 @@ export const BbAutoConstructor: React.FC = () => {
           const expl = bbExerciseExplanation(ex);
           for (let i = 0; i < (ws.length || ex.sets); i++) {
             const set = ws[i] || { reps: ex.repsRange?.[0] || 10, weight: 0, rir: ex.rir };
-            const esc = (v: any) => `"${String(v || '').replace(/"/g, '""')}"`;
+            // Аудит 2026-10: защита от формульной инъекции Excel/Sheets
+            // (`=СУММ(...)`, `+1`, `-2`, `@x` в названии/комментарии выполнялись
+            // при открытии файла). Тот же приём, что в остальных CSV-экспортах
+            // проекта: префикс апострофа.
+            const csvCell = (v: any) => {
+              let s = String(v ?? '');
+              if (/^[=+\-@]/.test(s)) s = `'${s}`;
+              return `"${s.replace(/"/g, '""')}"`;
+            };
+            const esc = csvCell;
             rows.push([
               wk.week, si + 1, esc(ex.exerciseName || ex.name), esc(ex.muscle), esc(expl.subgroup),
               ex.role, i + 1, set.reps, set.weight, set.rir,
@@ -3662,12 +3722,16 @@ export const BbAutoConstructor: React.FC = () => {
           setBbWeekSel={setBbWeekSel}
         />
         <BbQualityLoadChecks ctx={qualityLoadCtx} />
+        </div>
+        {/* Аудит 2026-10: «Далее»/«Назад» и ряд действий (сохранить/экспорт/в
+            программу) жили ВНУТРИ свёрнутой карточки «Тренировочная нагрузка
+            плана» — при её закрытии пропадала вся навигация шага «Качество» и
+            кнопки сохранения. Вынесены наружу: доступны в любом состоянии. */}
         <div style={{ display:'flex', gap:8, marginTop:10 }}>
           <button style={{ ...BTN, flex:1 }} onClick={() => setStep('adjust')}>Далее: ручная коррекция →</button>
           <button style={BTN_GHOST} onClick={() => setStep('weights')}>← Назад</button>
         </div>
         {renderActionRow(true)}
-          </div>
         <CollapsibleCard title="📤 Экспорт плана" defaultOpen={false} headerStyle={{ background: 'linear-gradient(135deg, rgba(96,165,250,0.12), rgba(96,165,250,0.04))', color: '#60a5fa' }} badge="PDF · CSV · тренеру">{quality && (
           <div style={{ marginTop:8 }}>
             <PlanExportCard
@@ -3723,6 +3787,7 @@ export const BbAutoConstructor: React.FC = () => {
       startDateInput={startDateInput}
       setStartDateInput={setStartDateInput}
       currentWeek={currentWeek}
+      planMode={planMode}
       savedPlans={savedPlans}
       showCompare={showCompare}
       setShowCompare={setShowCompare}

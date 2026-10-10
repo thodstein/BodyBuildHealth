@@ -28,6 +28,7 @@ import { bbExerciseTier } from './bb-exercise-tier.engine';
 import { isHardAdvanced, isPoolAllowed, swapExerciseForLevel } from './bb-exercise-levels.engine';
 import { isAxialLoadExercise } from '../exercise-selector.engine';
 import { computeVolumeLandmarks, getVolumeLandmarks } from '../volume-landmarks.engine';
+import { calibratedLandmarksFor, type MEVCalibration } from './bb-mev-calibration.engine';
 import { buildBBPlanReport } from './bb-report.engine';
 import { analyzeBBBalance } from './bb-balance.engine';
 import { buildExerciseInstructions } from './bb-exercise-instructions.engine';
@@ -774,7 +775,7 @@ function ensureQuadsCoverageForGluteTags(plan: any, options: BBFinalizeOptions):
   const excludedMuscles = new Set(options.excludedMuscles || []);
   const gradedMuscles = new Set(options.gradedMuscles || []);
   if (excludedMuscles.has('quads') || gradedMuscles.has('quads')) return;
-  const lm = getVolumeLandmarks(options.level || 'intermediate', 'quads');
+  const lm = lmForFinalize(options, 'quads');
   if (!lm) return;
   // Порог = валидаторный deficit-порог (0.7×MEV), минимум 3 сета.
   const floor = Math.max(3, Math.round(lm.mev * 0.7));
@@ -2529,10 +2530,11 @@ export interface BBFinalizeOptions {
   supersetMode?: 'none' | 'antagonist' | 'same_muscle' | 'giant';
   /** Схема объёма памп-изоляций: GVT 10×10 / FST-7 / 8×8 Gironda. */
   volumeScheme?: 'standard' | 'gvt' | 'fst7' | 'gironda';
+  /** Personal MEV calibration (G8): single landmark resolver for finalize guards. */
+  mevCalibration?: import('./bb-mev-calibration.engine').MEVCalibration | null;
   /** Режим ротации (forbid = primary frozen между неделями). */
   rotationMode?: 'forbid' | 'strict' | 'variety';
 }
-
 /** Специализация (методики Библиотеки): RIR-профиль (изоляции целевой мышцы
  *  добиваются до RIR 0-1), икры-спец (темп 2-2-1-0, сеты ≥4), спец-частота
  *  (целевая мышца ≥2×/нед — добавляем изоляции во вторую подходящую сессию). */
@@ -2552,11 +2554,37 @@ const SPEC_FREQ_TAGS: Record<string, string[]> = {
  */
 function isTaperPrepOrPeakWeek(w: any): boolean {
   if (!w) return false;
-  if (w.taper === true || w.taperApplied === true) return true;
-  if (w.contestPhase === 'taper' || w.contestPhase === 'peak_week') return true;
   if (w.peakWeek === true) return true;
+  if (w.contestPhase === 'taper' || w.contestPhase === 'peak_week') return true;
   if (typeof w.prepProtocol === 'string' && !String(w.prepProtocol).startsWith('Пропущена')) return true;
+  // Аудит 2026-10: общий авто-taper нумерует окно из 3 недель профилем
+  // [1.0, 0.75, 0.50]. Первая неделя («вход в пик») объём НЕ режет — гейт на
+  // ней не должен срабатывать, иначе fill/PPL-гарантия/top-up её пропускают и
+  // план отстаёт от цели объёма. Движок штампует фактический множитель
+  // `taperVolumeMult`; гейт работает только при реальной редукции (<1).
+  // Недели без штампа (legacy/ручная разметка) — как раньше: флаг = гейт.
+  if (w.taper === true || w.taperApplied === true) {
+    if (w.taperVolumeMult == null) return true;
+    return Number(w.taperVolumeMult) < 1;
+  }
   return false;
+}
+/**
+ * G8: единый резолвер ландмарков финализатора. Персональная калибровка
+ * (options.mevCalibration) приоритетнее популяционной таблицы - иначе гарды
+ * floor/feeder/repair читали один набор цифр, а builder целился в другой.
+ * Без калибровки поведение байт-в-байт (calibratedLandmarksFor возвращает
+ * популяционный ландмарк).
+ */
+function lmForFinalize(
+  options: { level?: string; mevCalibration?: MEVCalibration | null },
+  muscle: string,
+): ReturnType<typeof getVolumeLandmarks> {
+  try {
+    return calibratedLandmarksFor(options.level || 'intermediate', muscle, 7, options.mevCalibration ?? null) as ReturnType<typeof getVolumeLandmarks>;
+  } catch {
+    return getVolumeLandmarks(options.level || 'intermediate', muscle);
+  }
 }
 export function applySpecializationPass(plan: BBPlan, options: BBFinalizeOptions): void {
   const priority = options.priorityMuscles || [];
@@ -3237,7 +3265,7 @@ function addAdaptiveMEVFeeders(plan: BBPlan, options: BBFinalizeOptions): void {
     const deficitByMuscle = muscles
       .filter(muscle => !donors.has(muscle))
       .map((muscle: string) => {
-      const landmarks = getVolumeLandmarks(options.level!, muscle);
+      const landmarks = lmForFinalize(options, muscle);
       const effectiveSets = weekVolume[muscle]?.effectiveSets || 0;
       const target = plan.volumeTargets?.[muscle];
       const targetSets = target?.targetSets ?? landmarks?.mav ?? 0;
@@ -3579,7 +3607,7 @@ function ensureMuscleSessionCapacity(week: any, plan: BBPlan, options: BBFinaliz
       const t = plan.volumeTargets?.[m]?.targetSets || 0;
       if (t <= 0) continue;
       const f = freq.get(m) || 1;
-      const lm = getVolumeLandmarks(options.level || 'intermediate', m);
+      const lm = lmForFinalize(options, m);
       let perSessionGoal = Math.max(2, Math.ceil(Math.max(t, lm?.mev ?? 0) / f));
       if (m === 'back' && options.level === 'enhanced' && yrs >= 3 && !/FullBody/i.test(s.sessionTag || '')) {
         perSessionGoal = Math.max(perSessionGoal, perSessionMuscleCap({ muscle: 'back', level: options.level, trainingYears: yrs, onCourse }));
@@ -3961,7 +3989,7 @@ for (const week of next.weeks) {
           for (const m of seenInSession) sessionsWith.set(m, (sessionsWith.get(m) || 0) + 1);
         }
         for (const [muscle, freq] of sessionsWith) {
-          const lm = getVolumeLandmarks(options.level, muscle);
+          const lm = lmForFinalize(options, muscle);
           if (!lm) continue;
           // Малые группы — константный минимум (freq может раздуваться
           // промежуточными проходами, ломая guard): calves 5, traps 6 (MEV
@@ -4154,7 +4182,7 @@ for (const week of next.weeks) {
             if (['biceps', 'triceps', 'forearms'].includes(e.muscle)) continue;
             if (/жим|press|присед|squat|выпад|lunge|мост|hip.?thrust|разгибан.*ног|leg.?extension/i.test(e.name || '')) continue;
           }
-          const lm = getVolumeLandmarks(options.level, e.muscle);
+          const lm = lmForFinalize(options, e.muscle);
           if (!lm) continue;
           const weekDirect = weekVolume[e.muscle]?.directSets || 0;
           const f = freq.get(e.muscle) || 1;
@@ -4525,7 +4553,7 @@ for (const week of next.weeks) {
     const COMPOSITE_TARGETS = new Set(['shoulders', 'arms', 'legs', 'core', 'delts']);
     for (const [muscle, volume] of Object.entries(peakVolume)) {
       if (COMPOSITE_TARGETS.has(String(muscle).toLowerCase())) continue;
-      const landmarks = getVolumeLandmarks(options.level, muscle);
+      const landmarks = lmForFinalize(options, muscle);
       if (!landmarks) continue;
       targets[muscle] = buildBBVolumeTarget({
         muscle,
@@ -5070,7 +5098,7 @@ for (const week of next.weeks) {
     const upperOnlySplit = scheduleLegs.length > 0 && !scheduleLegs.some((d: any) => d?.kind === 'тренировка'
       && /Legs|Lower|FullBody|Glutes|Torso/i.test(String(d?.sessionTag || '')));
     for (const week of next.weeks) {
-      if ((week as any).phase === 'deload' || (week as any).deload) continue;
+      if ((week as any).phase === 'deload' || (week as any).deload || isTaperPrepOrPeakWeek(week)) continue;
       for (const s of week.sessions) {
         const t = String(s.sessionTag || '').toLowerCase();
         const forbidden: Set<string> | null =
@@ -5138,7 +5166,10 @@ for (const week of next.weeks) {
   // добавляющих спину (repair/баланс/фидеры могут дублировать вертикали).
   if (!options.preserveSource && (next as any).pattern?.id) {
     for (const week of next.weeks) {
-      if ((week as any).phase === 'deload' || (week as any).deload) continue;
+      // Тайпер/пик-недели структурно заморожены (объём-кривая + отбор уже заданы):
+      // замена вертикальной тяги на горизонтальную меняла бы состав недели, где
+      // по определению не должно быть новой работы.
+      if ((week as any).phase === 'deload' || (week as any).deload || isTaperPrepOrPeakWeek(week)) continue;
       for (const s of week.sessions) {
         const verts = s.exercises.filter((e: any) => !(e as any).warmupActivator
           && e.muscle === 'back' && classifyBackExercise(e.name).pattern === 'vertical_pull');
@@ -5205,7 +5236,10 @@ for (const week of next.weeks) {
     } catch { lateCap = 30; }
     const lateCaps = (next as any).mrvByMuscle || {};
     for (const week of next.weeks) {
-      if ((week as any).phase === 'deload' || (week as any).deload) continue;
+      // Аудит 2026-10: поздний PPL-топ-ап обязан пропускать taper/пик-недели, как
+      // это делает его ранний близнец (4907). Иначе добивка рук до минимума
+      // частично откатывала кривую тайпера (Bosquet 2005: объём только вниз).
+      if ((week as any).phase === 'deload' || (week as any).deload || isTaperPrepOrPeakWeek(week)) continue;
       for (const s of week.sessions) {
         const tag = s.sessionTag || '';
         // PPL-минимумы сессии (bb-ppl-invariant): руки 8 + шраги 5 в Pull.
@@ -5368,7 +5402,9 @@ for (const week of next.weeks) {
     let widowWeeks = 0;
     for (const week of next.weeks) {
       // Волна 5.3: единый детектор разгрузки (фаза/делод/флаг/legacy-комментарий).
-      if (isDeloadLikeWeek(week)) continue;
+      // Плюс taper/prep/пик: добивочный 1×20 — это НОВАЯ работа, её нельзя
+      // добавлять в неделю, где объём уже срезан по кривой тайпера.
+      if (isDeloadLikeWeek(week) || isTaperPrepOrPeakWeek(week)) continue;
       let qDirect = 0;
       for (const s of week.sessions) for (const ex of s.exercises) {
         if ((ex as any).warmupActivator) continue;

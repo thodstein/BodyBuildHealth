@@ -11,6 +11,7 @@
  * Israetel RP (mesocycle progression templates).
  */
 import type { BBPlan } from './bb-builder.engine';
+import { getVolumeLandmarks } from '../volume-landmarks.engine';
 
 export interface MesocycleProgression {
   /** Per-muscle peak-week веса из предыдущего плана (кг). */
@@ -60,6 +61,16 @@ export function extractMesocycleProgression(
   previousPlan: BBPlan,
   level: string = 'intermediate',
   goal: string = 'mass',
+  /**
+   * Аудит 2026-10 (G10): серия предыдущих мезоциклов (самый свежий первым,
+   * previousPlan НЕ входит). Раньше дельта объёма была плоской —
+   * aseDelta один раз, поэтому мезо #2 и мезо #10 получали +1/+2 сета
+   * одинаково, и progressive overload между мезо не работал. Теперь дельта
+   * КУМУЛЯТИВНА: сколько мезоциклов мышца тренировалась, столько базовых
+   * шагов, но с предохранителем: суммарная добавка ≤ 50% коридора
+   * (MRV−MEV), иначе кумуляция вывела бы мышцу за MRV.
+   */
+  priorPlans: BBPlan[] = [],
 ): MesocycleProgression {
   const peakWeights: Record<string, number> = {};
   const previousVolume: Record<string, number> = {};
@@ -106,8 +117,24 @@ export function extractMesocycleProgression(
 
   // Volume progression: +1-2 сета per muscle (зависит от level и goal)
   const baseDelta = goal === 'cut' ? 0 : goal === 'maintenance' ? 0 : level === 'beginner' ? 1 : level === 'enhanced' ? 2 : 1;
+  // G10: кумулятивная дельта по серии мезоциклов + предохранитель по коридору
+  // (MRV-MEV). Пустая серия = ровно прежнее поведение (baseDelta один раз).
+  const series = [previousPlan, ...(Array.isArray(priorPlans) ? priorPlans : [])]
+    .filter((p): p is BBPlan => !!p && Array.isArray(p.weeks))
+    .slice(0, 12);
+  const mesoTrained = (muscle: string): number => series.reduce((n, p) => (
+    p.weeks.some(w => (w.sessions || []).some(s => (s.exercises || []).some(e => e.muscle === muscle))) ? n + 1 : n
+  ), 0);
   for (const muscle of Object.keys(previousVolume)) {
-    volumeDelta[muscle] = baseDelta;
+    let delta = baseDelta * Math.max(1, mesoTrained(muscle));
+    try {
+      const lm = getVolumeLandmarks(level, muscle);
+      if (lm && lm.mrv > lm.mev) {
+        const cap = Math.floor((lm.mrv - lm.mev) * 0.5);
+        delta = Math.min(delta, cap);
+      }
+    } catch { /* без ландмарта — кумулятивная дельта без предохранителя */ }
+    volumeDelta[muscle] = delta;
   }
 
   // Weight progression: muscle-specific deltas.

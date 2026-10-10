@@ -33,7 +33,7 @@ import type { PEDAdaptation, CourseIntensity } from './bb-ped-adaptation.engine'
 import { adaptForPEDs, computeAASEquivDose } from './bb-ped-adaptation.engine';
 import type { Injury } from '../manual-plan-builder';
 import { prescribeLoad, applyPostPhaseProcessing, type LoadStrategy, type IntensityTechnique, type DeloadType } from './bb-autocoach.engine';
-import { applyFeedbackToBuild, autoUpdateWeakPoints, autoReplaceOnPlateau, computePerMuscleACWR, applyDiaryVolumeCorrection } from './bb-progression-feedback.engine';
+import { applyFeedbackToBuild, autoUpdateWeakPoints, autoReplaceOnPlateau, computePerMuscleACWR, applyDiaryVolumeCorrection, applyRegressedMuscleRelief } from './bb-progression-feedback.engine';
 import { extractMesocycleProgression, applyWeightProgression, applyVolumeProgression } from './bb-mesocycle-progression.engine';
 import { buildExerciseInstructions, cleanInstructionsText, tempoExplain } from './bb-exercise-instructions.engine';
 import { loadSessions as loadWorkoutSessions } from '../workout-logger.engine';
@@ -44,6 +44,21 @@ import { isPoolAllowed, isSkillEccentric } from './bb-exercise-levels.engine';
 import { packingCapFor, distributePackingSets, planPackingDrops, strictKeysFor, packingPatternOf, PACKING_MUSCLES } from './bb-packing.engine';
 import { computeVolumeLandmarks, type VolumeLandmarkRow } from '../volume-landmarks.engine';
 import { FEMALE_POSTERIOR_BOOST } from './bb-demographics';
+import { applyRecoveryRelief, type PainLevel } from './bb-recovery-relief.engine';
+
+/**
+ * Возрастной множитель MRV (opt-in в BBBuilderInput.age).
+ * 1.0 при отсутствии возраста и до 40 лет — поведение без изменений.
+ * Пороги: 40+ ×0.95, 50+ ×0.88, 60+ ×0.80 (mastersAdjust, bb-demographics).
+ */
+function mastersMrvMult(age?: number): number {
+  if (!Number.isFinite(age as number) || (age as number) <= 0) return 1;
+  const a = age as number;
+  if (a >= 60) return 0.8;
+  if (a >= 50) return 0.88;
+  if (a >= 40) return 0.95;
+  return 1;
+}
 // Фазовая периодизация (distributePhases) — ЕДИНЫЙ источник RIR/фаз/deload для ББ-плана.
 // Импорт distributePhases/getPhaseVolumeMult из UI-модуля намеренный: это каноническая
 // реализация, которую использует и ручной конструктор (phase-periodization).
@@ -99,6 +114,25 @@ export interface BBBuilderInput {
   level: string;                 // beginner/intermediate/advanced/enhanced
   /** Реальный стаж силовых тренировок. Не заменяется ярлыком level. */
   trainingYears?: number;
+  /**
+   * G5: боль-мониторинг (Silbernagel) - вердикт + локация. Opt-in: без поля
+   * поведение байт-в-байт. Красный = объём x0.6/RIR+2, жёлтый = x0.85/RIR+1,
+   * применительно к мышцам локации (колено -> квадрицепс, а не весь план).
+   */
+  painLevel?: PainLevel;
+  /** Локация боли (patellar/achilles/elbow/shoulder/lower_back/other). */
+  painLocation?: string | null;
+  /** Крепатура/усталость 0-10 (wellness-чек, readiness). >=7 -> объём x0.9. */
+  soreness010?: number | null;
+  /**
+   * Возраст (полных лет). Opt-in: без поля поведение байт-в-байт.
+   * Аудит 2026-10: `mastersAdjust`/`adjustVolumeForDemographic` (bb-demographics)
+   * существовали, но НЕ имели вызовов — 55-летний и 25-летний получали
+   * идентичные MRV-капы и объём. Подключено МЯГКО (только к целевой карте,
+   * 40+ → MRV×0.95/0.88/0.8), чтобы возраст влиял на объём, но не ломал
+   * калиброванные минимумы. Возраст ≤15 — доп. rationale про технику.
+   */
+  age?: number;
   /** Способность к bodyweight-упражнениям. Если нет данных — подтягивания
    *  не ставятся как primary; используется pulldown/assisted вместо них. */
   bodyweightCapability?: {
@@ -2774,9 +2808,17 @@ function buildSession(
     // distributeSetsByRole: 30 по 7 → 5,5,4,4,4,4,4.
     const roleCaps = pl.exDatas.map(() => perExerciseCap(level, pl.muscle, trainingYears, onCourse));
     const exMin = level === 'enhanced' && (trainingYears ?? 0) >= 3 ? 3 : 2;
-    // Packing-v2: залитое число сетов (сумма = pl.sets ровно, пирамида
-    // весов — ниже через backoffWeights). null (не feasible) → legacy.
-    const roleDist = distributeSetsByRole(pl.sets, pl.exDatas.length, roleCaps).map(v => Math.max(exMin, v));
+    // Packing-v2: залитое число сетов ИДЁМ ЧЕРЕЗ packing-движок, если он feasible.
+    // Аудит 2026-10: раньше packedSets считался и сразу выбрасывался — единственным
+    // следствием флага был packingApplied, который в enforceSessionRealism СНИМАЛ
+    // бюджет сетов сессии, т.е. opt-in отключал страховку, ничего не давая.
+    // distributePackingSets суммирует ровно в pl.sets (объём инвариантен) и
+    // уважает per-exercise капы (compound 5 / изоляция 4 / машина +1 / осевое −1),
+    // поэтому бюджет сессии остаётся в силе и с флагом тоже.
+    // null (нельзя распределить) → legacy ровный делёж.
+    const roleDist = (packedSets && packedSets.length === pl.exDatas.length)
+      ? packedSets.map(v => Math.max(exMin, v))
+      : distributeSetsByRole(pl.sets, pl.exDatas.length, roleCaps).map(v => Math.max(exMin, v));
     for (let ei = 0; ei < pl.exDatas.length; ei++) {
       const exData = pl.exDatas[ei];
       const wPct = (exData as any).substitutionWeightPct ?? 1.0;
@@ -3143,7 +3185,7 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
   const inputWorkMax = input.workMax || {};
   // PRO: cross-mesocycle continuity — прогрессия весов и объёма из предыдущего плана.
   const mesoProgression = input.previousPlan
-    ? extractMesocycleProgression(input.previousPlan, level, input.goal)
+    ? extractMesocycleProgression(input.previousPlan, level, input.goal, input.previousPlans)
     : null;
   // Epic A: персональная калибровка MEV (явный вход или авто из хранилища).
   const mevCal = input.mevCalibration !== undefined
@@ -3321,6 +3363,12 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
       const boost = level === 'enhanced' && (input.trainingYears ?? 0) >= 6 ? 1.35 : level === 'enhanced' ? 1.30 : 1.25;
       v = Math.round(v * boost);
     }
+    // Возрастная адаптация (opt-in, отсутствие age = байт-в-байт):
+    // 40+ → MRV×0.95, 50+ → ×0.88, 60+ → ×0.8 (bb-demographics.mastersAdjust).
+    // Применяется к целевой карте, а не к MRV-капу: восстановление ограничивает
+    // сколько целевого объёма иметь смысл, не ослабляя гарантий/минимумов.
+    const ageMult = mastersMrvMult(input.age);
+    if (ageMult < 1) v = Math.max(1, Math.round(v * ageMult));
     return v;
   };
   // Базовый целевой объём мышцы для резолвера (спец-блок или баланс).
@@ -3525,6 +3573,15 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
     for (const week of pd.weeks) phaseByWeek.set(week, pd.phase);
   }
   const phaseWeekCounter: Record<string, number> = { accumulation: 0, intensification: 0, deload: 0, peaking: 0 };
+  // Аудит 2026-10 (G1): плоский ramп от АБСОЛЮТНОЙ недели после делода давал
+  // пилу — W4=0.6 (разгрузка) → W5=0.93 (+55%), W8=0.6 → W9=1.00 (+67%).
+  // Про-практика (Israetel/RP): после разгрузки объём ВОЗВРАЩАЕТСЯ с меньшей
+  // базы и нарастает 2–3 недели, а не прыгает к прежнему уровню. Rate-limiter:
+  // рабочая неделя не может подняться больше чем на MAX_WEEK_RAMP к
+  // ФАКТИЧЕСКОМУ множителю предыдущей недели (включая делод). Первый сегмент
+  // (до любого делода) лимитером не трогается — ramп и так плавный.
+  let lastAppliedWeekMult: number | null = null;
+  const MAX_WEEK_RAMP = 1.2;
 
   const weeks: BBWeek[] = [];
   // Волна-1.4 (аудит 2026-09): cooldown-ротация ENFORCED — accessory-упражнение
@@ -3546,8 +3603,14 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
     // P5: Volume progression MEV→MAV→MRV (Helms 2022)
     // Week 1 = 0.85× (MEV), mid = 1.0× (MAV), last = 1.10× (MRV), deload = 0.6×
     const weekPhase = phaseByWeek.get(w) || 'accumulation';
-    const baseWeekVolumeMult = weekPhase === 'deload' ? 0.6
+    const isDeloadWeek = weekPhase === 'deload';
+    let baseWeekVolumeMult = isDeloadWeek ? 0.6
       : Math.min(1.10, 0.85 + ((w - 1) / Math.max(1, input.weeks - 1)) * 0.25);
+    // G1 rate-limiter: гасим пост-делодный скачок (см. lastAppliedWeekMult).
+    if (!isDeloadWeek && lastAppliedWeekMult != null) {
+      baseWeekVolumeMult = Math.min(baseWeekVolumeMult, lastAppliedWeekMult * MAX_WEEK_RAMP);
+    }
+    lastAppliedWeekMult = baseWeekVolumeMult;
     // Blast/Cruise: 8н blast ×1.15 / 4н cruise ×0.85 (повторяется), только при вкл.
     let blastMult = 1;
     if (input.blastCruiseEnabled) {
@@ -3929,6 +3992,7 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
       }
     }
   }
+
 
   // FIX-2: Прогрессия весов (double_progression) — реальный прогресс от недели к неделе.
   // До fix веса менялись ТОЛЬКО от сжатия RIR (3→0 = +14% за 8 нед), без истинной перегрузки.
@@ -4622,16 +4686,29 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
   }
   const workoutSessions = loadWorkoutSessions();
   if (workoutSessions.length > 0) {
-    // 1) Auto-weakPoints update
+    // 1) Auto-weakPoints update. Аудит 2026-10: регресс e1RM выведен в отдельный
+    //    канал `regressedMuscles` — падающая мышца получает РАЗГРУЗКУ, а не
+    //    максимальный объём «слабой группы» (инверсия профессиональной логики).
     const weakUpdate = autoUpdateWeakPoints(weakPoints, workoutSessions, workMax);
     if (weakUpdate.changes.length > 0) {
       rationale.push(...weakUpdate.changes);
+    }
+    if (weakUpdate.regressedMuscles.length > 0) {
+      const relief = applyRegressedMuscleRelief(finalPlan, weakUpdate.regressedMuscles);
+      if (relief.changes.length > 0) {
+        finalPlan = relief.plan;
+        rationale.push(...relief.changes);
+      }
     }
     // 2) Feedback-driven rebuild (веса из факта)
     finalPlan = applyFeedbackToBuild(finalPlan, workoutSessions, workMax, input.loadStrategy || 'double_progression');
     // Фаза 2.10: замкнуть per-muscle ACWR + adherence в ОБЪЁМ (сеты перегруженной
     // мышцы ↓, adherence<80% → масштаб). No-op без дневника.
-    const volCorrection = applyDiaryVolumeCorrection(finalPlan, workoutSessions);
+    // 2.10: коррекция per-muscle ACWR + adherence (на будущие недели плана
+    // масштаб применяется только при реальном недоборе ФАКТА; no-op без дневника).
+    // Аудит 2026-10: adherence считается по elapsed-неделям — передаём дату
+    // начала плана, иначе (без notёс date) окно = все недели, как раньше.
+    const volCorrection = applyDiaryVolumeCorrection(finalPlan, workoutSessions, { referenceISO: input.planStartWeek });
     if (volCorrection.changes.length > 0) {
       finalPlan = volCorrection.plan;
       rationale.push(...volCorrection.changes);
@@ -4776,6 +4853,11 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
       blastWeeks: input.blastWeeks,
       cruiseWeeks: input.cruiseWeeks,
     },
+    // Аудит 2026-10: generic-путь НЕ писал planStartWeek на уровень плана, хотя
+    // его читают bb-plan-fact (план vs факт), bb-visual (диапазоны недель) и
+    // новый adherence-контур — они молча падали на «неделя 1 = сегодня».
+    // Cycle/program-пути пишут его уже (cycle-to-plan:1871/3230).
+    planStartWeek: input.planStartWeek,
   };
   syncBBPlanSetShape(output);
   const validation =   validateBBPlan(output, { level, trainingYears: input.trainingYears, specializationTargets: [...weakPoints, ...allSpecTargets, ...(focusGroup ? [focusGroup] : [])] });
@@ -4797,6 +4879,7 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
     priorityMuscles: [...new Set([...weakPoints, ...allSpecTargets, ...(focusGroup ? [focusGroup] : [])])],
     specializationSchedule: specSchedule,
     specExplicitSchedule: hasExplicitSpecSchedule,
+    mevCalibration: mevCal,
     level,
     volumeGoal: input.volumeGoal,
     phaseSafety: true,
@@ -4847,6 +4930,23 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
     if (rehabResult.changes.length) {
       finalized.rationale.push(`🩹 Rehab-возврат: ${rehabResult.changes.slice(0, 6).join(' · ')}`);
       for (const m of input.rehabMuscles) finalized.rationale.push(rehabNotes(m, input.rehabWeekStart ?? 1));
+    }
+  }
+  // G5: численный эффект боли/крепатуры (Silbernagel pain-monitoring). Opt-in:
+  // без painLevel/soreness010 applyRecoveryRelief возвращает план без изменений.
+  // СТРОГО после финалайзера — иначе его объем-добавляющие проходы (fill,
+  // MEV-repair, arm-guarantee) вернули бы срезанное (проверено: ×0.9 у
+  // крепатуры Fully восстанавливался до 178/178).
+  {
+    const relief = applyRecoveryRelief(finalized, {
+      painLevel: input.painLevel,
+      painLocation: input.painLocation ?? null,
+      soreness010: input.soreness010 ?? null,
+    });
+    if (relief.changes.length > 0) {
+      finalized.weeks = relief.plan.weeks;
+      for (const ch of relief.changes) if (!finalized.rationale.includes(ch)) finalized.rationale.push(ch);
+      syncBBPlanSetShape(finalized);
     }
   }
   if (schemeDowngradeNotes.length) {

@@ -21,6 +21,24 @@ import { prescribeLoad, type LoadStrategy } from './bb-autocoach.engine';
 import { EXERCISE_CATALOG } from '../../core/exercise-catalog';
 import { trueMuscleOf } from '../movement-pattern';
 import { bbExerciseTier } from './bb-exercise-tier.engine';
+import { localIsoDate } from '../../core/local-date';
+
+/**
+ * Стартовые ISO-даты недель плана (неделя 1 = planStartWeek плана).
+ * Возвращает null, если даты нет — вызывающий тогда падает на «все недели».
+ */
+function planWeeksStartISO(plan: BBPlan, referenceISO?: string): (string | null)[] | null {
+  const base = String((plan as any)?.planStartWeek || referenceISO || '').slice(0, 10);
+  if (!base || !/^\d{4}-\d{2}-\d{2}$/.test(base)) return null;
+  const out: (string | null)[] = [];
+  for (let i = 0; i < (plan.weeks?.length || 0); i++) {
+    const d = new Date(`${base}T00:00:00`);
+    if (Number.isNaN(d.getTime())) { out.push(null); continue; }
+    d.setDate(d.getDate() + i * 7);
+    out.push(localIsoDate(d));
+  }
+  return out;
+}
 
 export interface ExerciseLastResult {
   exerciseName: string;
@@ -297,7 +315,7 @@ export function applyFeedbackToBuild(
 export function applyDiaryVolumeCorrection(
   plan: BBPlan,
   sessions: WorkoutSession[],
-  opts?: { maxAdherenceFloor?: number },
+  opts?: { maxAdherenceFloor?: number; referenceISO?: string },
 ): { plan: BBPlan; changes: string[] } {
   if (!sessions || sessions.length === 0 || !plan || !plan.weeks?.length) return { plan, changes: [] };
   // 26.09.2026 (аудит): идемпотентность. Повторный вызов на уже скорректированном плане
@@ -314,13 +332,32 @@ export function applyDiaryVolumeCorrection(
     if (v.zone === 'dangerous') muscleReduction[m] = 0.25;
     else if (v.zone === 'caution') muscleReduction[m] = 0.12;
   }
-  // 2) adherence: completed sessions / planned sessions
-  const plannedSessions = plan.weeks.reduce((s, w) => s + (w.sessions?.length || 0), 0);
-  const adherence = plannedSessions > 0 ? sessions.length / plannedSessions : 1;
+  // 2) adherence: выполненные сессии / запланированные — ТОЛЬКО по ПРОШЕДШИМ
+  //    неделям плана. Аудит 2026-10: раньше считалось «все сессии дневника /
+  //    все запланированные сессии плана» (до 2000 записей истории vs весь
+  //    мезоцикл). Два дефекта: (а) в середине мезо знаменатель включал ещё не
+  //    наступившие недели → флор 0.75 резал объём БУДУЩИХ недель; (б) история
+  //    прошлых мезоциклов обнуляла сигнал (40 записей / 36 плановых = 1.1).
+  //    Теперь: окно — elapsed-недели (referenceISO/сегодня), «недостаточно
+  //    данных» = 1.0 (не наказываем за отсутствие факта).
+  const weekStarts = planWeeksStartISO(plan, opts?.referenceISO);
+  const refISO = opts?.referenceISO || localIsoDate();
+  const plannedElapsed = weekStarts
+    ? plan.weeks.reduce((sum, w, i) => (weekStarts[i] && refISO >= weekStarts[i]) ? sum + (w.sessions?.length || 0) : sum, 0)
+    : plan.weeks.reduce((s, w) => s + (w.sessions?.length || 0), 0);
+  // Выполненные сессии в окне elapsed-недель (не вся история дневника).
+  const firstStart = weekStarts ? weekStarts.find(Boolean) : undefined;
+  const doneElapsed = weekStarts && firstStart
+    ? (refISO < firstStart ? 0 : sessions.filter(s => {
+        const d = String((s as any)?.date || '').slice(0, 10);
+        return d >= firstStart && d <= refISO;
+      }).length)
+    : sessions.length;
+  const adherence = plannedElapsed > 0 && doneElapsed > 0 ? doneElapsed / plannedElapsed : 1;
   let adherenceMult = 1;
   if (adherence < 0.8) {
     adherenceMult = Math.max(opts?.maxAdherenceFloor ?? 0.75, adherence);
-    changes.push(`📉 Adherence ${Math.round(adherence * 100)}% (<80%) — объём недель масштабирован ×${adherenceMult.toFixed(2)} (флор 0.75)`);
+    changes.push(`📉 Adherence ${Math.round(adherence * 100)}% (<80%, ${doneElapsed} из ${plannedElapsed} прошедших сессий) — объём недель масштабирован ×${adherenceMult.toFixed(2)} (флор 0.75)`);
   }
 
   const affected = Object.keys(muscleReduction).filter(m => muscleReduction[m]);
@@ -355,6 +392,60 @@ export function applyDiaryVolumeCorrection(
     };
   });
   return { plan: { ...plan, weeks: newWeeks }, changes };
+}
+
+/**
+ * Аудит 2026-10 (GAP-4): разгрузка мышцы по регрессу e1RM.
+ *
+ * Профессиональный ответ на падение e1RM конкретной мышцы — не «добавить
+ * объёма», а снять её нагрузку на ближайшие недели: fewer sets, higher RIR,
+ * без отказа. Глобальный per-muscle ACWR уже так умеет (dangerous −25%),
+ * но только по СКАЧКУ объёма; плавное накопление усталости (e1RM −5% при
+ * нормальном ACWR) не ловилось ничем, кроме discard'а autoUpdateWeakPoints.
+ *
+ * Срез только рабочих недель (deload/taper не трогаем — они уже разгружены),
+ * пол 2 сета (ниже — не рабочий объём), идемпотентность по маркеру.
+ */
+export function applyRegressedMuscleRelief(
+  plan: BBPlan,
+  regressedMuscles: string[],
+): { plan: BBPlan; changes: string[] } {
+  if (!plan || !plan.weeks?.length || !regressedMuscles.length) return { plan, changes: [] };
+  const MARK = '🔻 разгрузка по регрессу';
+  const already = plan.weeks.some(w => (w.sessions || []).some(s => (s.exercises || []).some(e => String(e.comment || '').includes(MARK))));
+  if (already) return { plan, changes: [] };
+  const targets = new Set(regressedMuscles.filter(Boolean));
+  let touched = 0;
+  const newWeeks = plan.weeks.map(w => {
+    if ((w as any).deload || String((w as any).phase || '').toLowerCase() === 'deload') return w;
+    return {
+      ...w,
+      sessions: w.sessions.map(s => ({
+        ...s,
+        exercises: s.exercises.map(ex => {
+          const muscle = String((ex as any).muscle || '');
+          if (!targets.has(muscle) || (ex as any).warmupActivator) return ex;
+          const cur = ex.sets || 0;
+          const next = Math.max(2, Math.round(cur * 0.75));
+          const rir = Math.min(5, (ex.rir ?? 2) + 1);
+          if (next >= cur && rir === (ex.rir ?? 2)) return ex;
+          touched++;
+          return {
+            ...ex,
+            sets: next,
+            workSets: (ex.workSets || []).slice(0, next).map((ws: any) => ({ ...ws, rir })),
+            rir,
+            comment: `${ex.comment || ''} | ${MARK}: e1RM мышцы ${muscle} падает — объём ×0.75, RIR +1 (восстановление вместо добавочного объёма).`,
+          };
+        }),
+      })),
+    };
+  });
+  if (!touched) return { plan, changes: [] };
+  return {
+    plan: { ...plan, weeks: newWeeks },
+    changes: [`🔻 Регресс e1RM [${[...targets].join(', ')}] — объём мышц ×0.75 и RIR +1 в рабочих неделях (восстановление, не добавочный объём).`],
+  };
 }
 
 
@@ -427,13 +518,22 @@ export function summarizeAutoRegulation(plan: BBPlan): {
  * - Падение ≥5% → группа стала слабее → добавляем (если ещё не в списке).
  *
  * Возвращает обновлённый weakPoints + список изменений для rationale.
+ *
+ * Аудит 2026-10 (GAP-3/4): результат `weakPoints` в билдере НЕ использовался —
+ * `autoUpdateWeakPoints` вызывался на 4620, а `volumeTargets` строился на 1000
+ * строк выше. Хуже того: падение e1RM → «слабая группа» → билдер давал мышце
+ * МАКСИМАЛЬНЫЙ объём (MAV × 1.2), т.е. регрессирующей от усталости мышце
+ * добавляли работу — ровно наоборот профессиональной логике (регресс =
+ * сигнал восстановления). Поэтому здесь разделены два канала:
+ * - `weakPoints` — только наклоны/отстающие (объём вверх, как было);
+ * - `regressedMuscles` — мышцы с падением e1RM ≥5% (объём ВНИЗ, RIR вверх).
  */
 export function autoUpdateWeakPoints(
   weakPoints: string[],
   sessions: WorkoutSession[],
   workMax: Record<string, number>,
-): { weakPoints: string[]; changes: string[] } {
-  if (!sessions || sessions.length < 4) return { weakPoints, changes: [] };
+): { weakPoints: string[]; changes: string[]; regressedMuscles: string[] } {
+  if (!sessions || sessions.length < 4) return { weakPoints, changes: [], regressedMuscles: [] };
 
   // Группируем сессии по неделям (по дате), берём e1RM топ-упражнения каждой мышцы
   const sorted = [...sessions].sort((a, b) => (a.date || '').localeCompare(b.date || ''));
@@ -454,6 +554,9 @@ export function autoUpdateWeakPoints(
 
   const changes: string[] = [];
   const updated = [...weakPoints];
+  // Аудит 2026-10: мышцы с падением e1RM — отдельный канал (объём ВНИЗ),
+  // а не «слабые» (объём ВВЕРХ). Наклон/отставание остаётся слабостью.
+  const regressed: string[] = [];
 
   // Для каждой weak группы: проверяем тренд
   for (const wp of weakPoints) {
@@ -470,6 +573,12 @@ export function autoUpdateWeakPoints(
         updated.splice(idx, 1);
         changes.push(`✅ ${wp}: e1RM вырос на ${growthPct.toFixed(1)}% за ${series.length} нед — убрана из слабых групп (цель достигнута).`);
       }
+    } else if (growthPct <= -5) {
+      // Регресс уже помеченной слабой группы — тоже в канал разгрузки.
+      if (!regressed.includes(wp)) {
+        regressed.push(wp);
+        changes.push(`🔻 ${wp}: e1RM упал на ${Math.abs(growthPct).toFixed(1)}% за ${series.length} нед — мышца разгружается (объём −25%, RIR +1), накопление усталости.`);
+      }
     }
   }
 
@@ -484,12 +593,17 @@ export function autoUpdateWeakPoints(
     if (first <= 0) continue;
     const declinePct = ((first - last) / first) * 100;
     if (declinePct >= 5) {
-      updated.push(m);
-      changes.push(`⚠ ${m}: e1RM упал на ${declinePct.toFixed(1)}% за ${series.length} нед — добавлена в слабые группы (регресс).`);
+      // Было: `updated.push(m)` — регрессирующая мышца получала МАКСИМАЛЬНЫЙ
+      // объём как «слабая». Профессиональный ответ — обратный: снять нагрузку,
+      // дать восстановиться. В слабые группы такая мышца НЕ попадает.
+      if (!regressed.includes(m)) {
+        regressed.push(m);
+        changes.push(`🔻 ${m}: e1RM упал на ${declinePct.toFixed(1)}% за ${series.length} нед — разгрузка мышцы (объём −25%, RIR +1) вместо добавления объёма.`);
+      }
     }
   }
 
-  return { weakPoints: updated, changes };
+  return { weakPoints: updated, changes, regressedMuscles: regressed };
 }
 
 /**
