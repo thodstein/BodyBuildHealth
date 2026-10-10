@@ -231,9 +231,15 @@ export function scaleRecipeToTarget(
   const _pc = _hc ? 1.4 : 1.2;
   const _cc = _hc ? 1.8 : 1.2;
   let s = Math.max(0.5, Math.min(heavyScaleMax, target.kcal / kcal));
-  if (t.p > 0) s = Math.min(s, (_pc * tp) / t.p);
-  if (t.f > 0) s = Math.min(s, (1.5 * tf) / t.f);
-  if (t.c > 0) s = Math.min(s, (_cc * tc) / t.c);
+  let macroCapped = false;
+  if (t.p > 0) { const pc = (_pc * tp) / t.p; if (pc < s) { s = pc; macroCapped = true; } }
+  if (t.f > 0) { const fc = (1.5 * tf) / t.f; if (fc < s) { s = fc; macroCapped = true; } }
+  if (t.c > 0) { const cc = (_cc * tc) / t.c; if (cc < s) { s = cc; macroCapped = true; } }
+  // P1-фикс: порционный пол ×0.5 молча отменял макро-кап (рецепт «орехи+мёд»
+  // возвращался ×0.5 = 4.9× жировой цели приёма). Катастрофический кап (<0.35 —
+  // порция физически не даёт ни одного приёма) → честный null; умеренный (0.35–0.5)
+  // — прежнее поведение (минимальная порция, остаток добирают топ-апы).
+  if (macroCapped && s < 0.35) return null;
   // Чистка-2026: квантование в порционный ряд (исходный рецепт = 1 порция).
   // Итерация D: ряд продлён до ×5 (компонентный скейл не ломает специи/масло).
   const PORTION_STEPS = [0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4, 5];
@@ -1686,13 +1692,19 @@ export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDa
     // порции»), а не «×1.37» — граммовки ингредиентов остаются пропорцией авторского
     // рецепта (компонентный скейл: специи/масло не раздуваются). Остаток закрывают сайды/посадка.
     const PORTION_STEPS = [0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4, 5];
-    const scaleOf = (kcal: number, p: number, f: number, c: number): number => {
-      const ideal = Math.max(0.5, Math.min(heavyScaleMax, targetKcal / Math.max(50, kcal)));
+    // Макро-кап приёма (по Б/Ж/У) до пола — для ранжира: кап ниже минимальной порции
+    // (×0.5) означает, что рецепт в приём НЕ влезает (P1-фикс: «орехи+мёд» возвращались
+    // с порционным полом ×0.5, давая 4.9× жировой цели приёма).
+    const capSOf = (p: number, f: number, c: number): number => {
       let capS = heavyScaleMax;
       if (p > 0) capS = Math.min(capS, (heavyProteinCap * (tgt.p || 30)) / p);
       if (f > 0) capS = Math.min(capS, (1.5 * (tgt.f || 15)) / f);
       if (c > 0) capS = Math.min(capS, (heavyCarbCap * (tgt.c || 40)) / c);
-      capS = Math.max(0.5, capS);
+      return capS;
+    };
+    const scaleOf = (kcal: number, p: number, f: number, c: number): number => {
+      const ideal = Math.max(0.5, Math.min(heavyScaleMax, targetKcal / Math.max(50, kcal)));
+      const capS = Math.max(0.5, capSOf(p, f, c));
       const hi = Math.min(ideal, capS);
       // ближайший шаг ряда к идеалу (tie — больший, сайд добьёт остаток)
       let best = PORTION_STEPS[0];
@@ -1709,7 +1721,10 @@ export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDa
         const t = decomposedFacts(r).totals;
         const s = t && t.kcal > 0 ? scaleOf(t.kcal, t.p, t.f, t.c) : 1;
         const scaled = t ? { kcal: t.kcal * s, p: t.p * s, f: t.f * s, c: t.c * s } : null;
-        const dBase = distOf(scaled, targetKcal, tgt.p || 30, tgt.f || 15, tgt.c || 40, _rankWeights);
+        let dBase = distOf(scaled, targetKcal, tgt.p || 30, tgt.f || 15, tgt.c || 40, _rankWeights);
+        // P1-фикс: рецепт, чей макро-кап ниже минимальной порции, в приём не влезает —
+        // сильный штраф ранга (реальный порционный пол ×0.5 его кап не соблюдает).
+        if (t && capSOf(t.p, t.f, t.c) < 0.5) dBase += 100;
         // §3E-carb-room (остаток E): на экстрим-полосе 25% ранга — «сколько У рецепт даёт
         // в цель приёма» (carb-fill), 10% — штраф за перебор белка ядра. Мясной рецепт
         // «точно по ккал» оставлял день +19% Б / −7% У: ядро резать нельзя, поэтому
@@ -2141,10 +2156,13 @@ export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDa
           const k = ns / p.ps;
           for (const it of (p.meal.items as any[])) {
             it.amount = Math.round((it.amount || 0) * k);
-            it.kcal = Math.round((it.kcal || 0) * k);
+            // P1-фикс: kcal из формулы МАКРОСОВ ПОСЛЕ округления (было it.kcal * k —
+            // табличные kcal FOOD_DB дрейфуют до ±6%, и день, сведённый корректором в
+            // ±3%, выезжал из коридора bjuFormula ≤3% после E4-оптимизатора).
             it.p = Math.round((it.p || 0) * k * 10) / 10;
             it.f = Math.round((it.f || 0) * k * 10) / 10;
             it.c = Math.round((it.c || 0) * k * 10) / 10;
+            it.kcal = Math.round(it.p * 4 + it.f * 9 + it.c * 4);
             if (it.fiber != null) it.fiber = Math.round(it.fiber * k * 10) / 10;
             if (it.leucine_mg != null) it.leucine_mg = Math.round(it.leucine_mg * k);
           }

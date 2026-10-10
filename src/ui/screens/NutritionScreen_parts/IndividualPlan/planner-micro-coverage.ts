@@ -9,8 +9,10 @@
  * бодибилдера (повышенный Mg/Zn при нагрузке, управление Fe на AAS-курсе).
  */
 
+import { getMicroFromFood } from "./planner-micro-reader";
+
 export interface FoodLike { id: string; amount: number; }
-export interface FoodDbLike { id: string; micros?: Record<string, number>; }
+export interface FoodDbLike { id: string; micros?: Record<string, number>; electrolytes_100g?: Record<string, number>; vitamins_100g?: Record<string, number>; trace_elements_100g?: Record<string, number>; macro_100g?: Record<string, number>; }
 
 export type Sex = 'male' | 'female';
 export type CyclePhase = 'course' | 'pct' | 'cutting' | 'bridge' | 'recovery' | 'maintenance' | undefined;
@@ -27,7 +29,7 @@ export interface MicroCoverageResult {
 }
 
 // Канонические RDA (мужчина 19-50, бодибилдер). Размерность — единицы micros в FOOD_DB.
-const RDA_BASE: Record<string, { male: number; female: number; unit: string; label: string }> = {
+export const RDA_BASE: Record<string, { male: number; female: number; unit: string; label: string }> = {
   Ca:   { male: 1000, female: 1000, unit: 'мг', label: 'Кальций' },
   Fe:   { male: 8,    female: 18,   unit: 'мг', label: 'Железо' },
   Mg:   { male: 420,  female: 320,  unit: 'мг', label: 'Магний' },
@@ -109,16 +111,26 @@ function normalizeMicroValue(key: string, value: number): number {
   return value;
 }
 
-/** Суммировать микронутриенты по всем items плана (через FOOD_DB lookup). */
+/** Суммировать микронутриенты по всем items плана. Единый читатель — planner-micro-reader
+ *  (раньше читал только food.micros и «не видел» v2-контейнеры: отчёт покрытия расходился
+ *  снотами движка на одном дне). */
 export function sumMicros(items: FoodLike[], foodDb: FoodDbLike[]): Record<string, number> {
   const totals: Record<string, number> = {};
   for (const it of items) {
     const food = foodDb.find(f => f.id === it.id);
-    if (!food || !food.micros) continue;
+    if (!food) continue;
     const r = (it.amount || 0) / 100;
-    for (const [k, v] of Object.entries(food.micros)) {
-      const nv = normalizeMicroValue(k, (v || 0));
-      totals[k] = (totals[k] || 0) + nv * r;
+    const keys = new Set<string>([
+      ...Object.keys(food.micros || {}),
+      ...Object.keys(food.electrolytes_100g || {}),
+      ...Object.keys(food.vitamins_100g || {}),
+      ...Object.keys(food.trace_elements_100g || {}),
+      ...Object.keys(food.macro_100g || {}),
+      ...Object.keys(RDA_BASE),
+    ]);
+    for (const k of keys) {
+      const nv = normalizeMicroValue(k, getMicroFromFood(food as any, k));
+      if (nv) totals[k] = (totals[k] || 0) + nv * r;
     }
   }
   for (const k of Object.keys(totals)) totals[k] = Math.round(totals[k] * 10) / 10;

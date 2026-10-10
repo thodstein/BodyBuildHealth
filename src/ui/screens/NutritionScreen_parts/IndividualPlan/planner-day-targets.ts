@@ -86,6 +86,8 @@ export interface DayTargetsResult {
   carbs: number;
   /** Человекочитаемый разбор: TDEE → модификаторы → макросы. Для карточки в Settings/Results. */
   breakdown: string[];
+  /** Кап углей сработал (день не добрал ккал до цели). UI: баннер «потолок ограничил». */
+  carbCapClipped?: boolean;
 }
 
 const atwater = (p: number, f: number, c: number) => Math.round(p * 4 + f * 9 + c * 4);
@@ -184,7 +186,12 @@ export function buildDayTargets(input: DayTargetsInput): DayTargetsResult {
     // (кето-набор на 4300+ ккал физически невозможен без углей; это фиксируется в breakdown).
     const ketoCarbCap = Math.max(20, Math.min(Math.round(kcalTarget * 0.06 / 4), 60));
     let carbsKeto = Math.min(carbsRaw, ketoCarbCap);
-    const fatsKeto = Math.max(fatFloorAbs, Math.round((kcalTarget - protein * 4 - carbsKeto * 4) / 9));
+    // P1-фикс: инсулиновый кап жира 0.5 г/кг СИЛЬНЕЕ стиля — раньше кето молча
+    // переписывал кап (150–190 г жиров на 100 кг вместо 50), а строка breakdown
+    // «инсулин: кап 0.5 г/кг сильнее пола» при этом врала.
+    const insulinFatCap = insulinUnits > 0 ? Math.max(20, Math.round(weight * 0.5)) : null;
+    let fatsKeto = Math.max(fatFloorAbs, Math.round((kcalTarget - protein * 4 - carbsKeto * 4) / 9));
+    if (insulinFatCap !== null && fatsKeto > insulinFatCap) { fatsKeto = insulinFatCap; carbsKeto = Math.max(0, Math.round((kcalTarget - protein * 4 - fatsKeto * 9) / 4)); }
     const fatsCapKeto = Math.round(weight * 3.0);
     if (fatsKeto > fatsCapKeto) {
       fatsFinal = fatsCapKeto;
@@ -231,5 +238,5 @@ export function buildDayTargets(input: DayTargetsInput): DayTargetsResult {
   if (dietStyle === 'highcarb') breakdown.push(`🍚 Стиль «Высоко-углеводный»: жиры на полу ${fatFloor} г/кг, угли = максимум до потолка`);
   breakdown.push(`Итог дня: ${kcal} ккал = Б ${protein}×4 + Ж ${fatsFinal}×9 + У ${carbs}×4`);
   if (kcal < kcalTarget * 0.92) breakdown.push(`⚠ Потолок углей срезал ${Math.round(kcalTarget - kcal)} ккал — увеличьте объём тренировок или бюджет («💰»), либо снимите потолок`);
-  return { kcal, protein, fats: fatsFinal, carbs, breakdown };
+  return { kcal, protein, fats: fatsFinal, carbs, breakdown, carbCapClipped: carbs < carbsFinal - 1 };
 }

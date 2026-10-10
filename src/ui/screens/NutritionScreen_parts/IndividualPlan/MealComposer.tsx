@@ -233,7 +233,7 @@ export const MealComposer: React.FC = () => {
           <div style={{ display:'flex', gap:6, justifyContent:'center' }}>
             {/* E7-фикс: setGenerated ВНУТРИ generatePlan после успешной сборки, а не до
                 (раньше кнопка маскировала пустой план при ошибке генерации) */}
-            <button onClick={async () => { await generatePlan(1); setGenerated(true); }} style={{
+            <button onClick={async () => { const ok = await generatePlan(1); setGenerated(ok !== false); }} style={{
               padding:'8px 16px', borderRadius:8, cursor:'pointer', fontSize:10, fontWeight:700,
               background:'linear-gradient(135deg,#00e68a,#00c8a0)', border:'none', color:'#000',
             }}>✨ Создать план</button>
@@ -357,13 +357,15 @@ export const MealComposer: React.FC = () => {
           </div>
 
           <div style={{ display:'flex', gap:6, justifyContent:'center', marginBottom:6 }}>
-            <button onClick={() => { setPlanDays(3); generatePlan(3); }} style={{
+            {/* P1-фикс: повторный клик по активному режиму перегенерировал план и
+                съедал правки (в Results аналогичные кнопки только переключают вид). */}
+            <button onClick={() => { if (planDays === 3) return; setPlanDays(3); generatePlan(3); }} style={{
               padding:'4px 10px', borderRadius:12, cursor:'pointer', fontSize:8, fontWeight:600,
               background: planDays===3?'rgba(0,230,138,0.12)':'rgba(255,255,255,0.03)',
               border: planDays===3?'1px solid rgba(0,230,138,0.25)':'1px solid rgba(255,255,255,0.06)',
               color: planDays===3?'#00e68a':'rgba(255,255,255,0.6)',
             }}>📅 3 дня</button>
-            <button onClick={() => { setPlanDays(7); generatePlan(7); }} style={{
+            <button onClick={() => { if (planDays === 7) return; setPlanDays(7); generatePlan(7); }} style={{
               padding:'4px 10px', borderRadius:12, cursor:'pointer', fontSize:8, fontWeight:600,
               background: planDays===7?'rgba(0,230,138,0.12)':'rgba(255,255,255,0.03)',
               border: planDays===7?'1px solid rgba(0,230,138,0.25)':'1px solid rgba(255,255,255,0.06)',

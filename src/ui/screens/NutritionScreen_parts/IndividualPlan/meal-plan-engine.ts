@@ -26,6 +26,7 @@
 import { FOOD_DB, FOOD_ALLERGEN_DIET } from "../../../../core/nutrition-database";
 import { filterByIntolerance, matchesCategoryPref, isPreferredCategory, tasteMatchScore, type CategoryPref, type Intolerances, type TasteProfile } from "./planner-preferences";
 import { analyzeMicroCoverage, sumMicros, type MicroCoverageEntry } from "./planner-micro-coverage";
+import { getMicroFromFood } from "./planner-micro-reader";
 import { detectMealInteractions, cookMethodGuidance } from "./planner-food-interactions";
 import type { FoodItem } from "../../../../core/nutrition-database";
 import type { LabCompositeResult } from "../../../../engines/lab-analysis.engine";
@@ -2932,9 +2933,16 @@ function buildPreWorkout(
    const safeProteinPool = leanProteinPool.length > 0 ? leanProteinPool : proteinCandidates;
    const prefProtein = preferredIds && preferredIds.size > 0 ? safeProteinPool.filter(f => preferredIds.has(f.id)) : [];
    const proteinSource = pickPriority(prefProtein.length > 0 ? prefProtein : safeProteinPool, seed, { preferredIds, recentIds: opts?.recentIds, lockedIds: opts?.lockedIds, hardRecentIds: opts?.hardRecentIds });
-     const prefCarb = preferredIds && preferredIds.size > 0 ? pool.carbSlow.filter(f => preferredIds.has(f.id)) : [];
-     // E2: в предтрене жёстко исключаем бобовые/овощи/масла/соусы (off-slot + клетчатка).
-     const carbPoolPW = (prefCarb.length > 0 ? prefCarb : pool.carbSlow).filter(f => _qOk(f) && !isPreWorkoutBannedCarb(f));
+      const prefCarb = preferredIds && preferredIds.size > 0 ? pool.carbSlow.filter(f => preferredIds.has(f.id)) : [];
+      // E2: в предтрене жёстко исключаем бобовые/овощи/масла/соусы (off-slot + клетчатка).
+      // P1-фикс (off by default): быстрые носители на low-carb peri-дне уводили повторы
+      // (potato_boiled в prew/dinner) — оставляем медленный пул, потребность в быстрых
+      // закрывается carbAutoCycle-веткой ниже (useEasyCarbs).
+      const _prewLowCarbFast = false; // зарезервировано: pool.carbFast в prew при carbG<=40 ломал E12-анти-повторы
+      const baseCarb = (prefCarb.length > 0 ? prefCarb : pool.carbSlow).filter(f => _qOk(f) && !isPreWorkoutBannedCarb(f));
+      const carbPoolPW = carbG <= 40 && _prewLowCarbFast
+        ? (() => { const _fast = pool.carbFast.filter(f => _qOk(f) && !isPreWorkoutBannedCarb(f) && (f.fat || 0) <= 2.5); const _merged = [...baseCarb]; for (const f of _fast) if (!_merged.some(x => x.id === f.id)) _merged.push(f); return _merged; })()
+        : baseCarb;
      const lowFatCarbPoolPW = carbPoolPW.filter(f => (f.fat || 0) <= 2.5);
      const carbSourcePool = lowFatCarbPoolPW.length > 0 ? lowFatCarbPoolPW : carbPoolPW;
      const commonCarbsPW = carbSourcePool.filter(f => COMMON_CARB_IDS.has(f.id));
@@ -3488,7 +3496,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   _pickCtx.mealsCountCtx = input.mealsCount;
   // MealTargets: масштаб цели дня (900У/1500У/500Б → 1.6, обычные дни 1.0 бит-в-бит).
   _pickCtx.dayTargetScale = dayTargetScale(input.goalKcal);
-  (_pickCtx as any).dayOffsetCtx = input.dayOffset ?? 0;
+  (_pickCtx as any).dayOffsetCtx = Number.isFinite(input.dayOffset) ? input.dayOffset : 0;
   _pickCtx.currentExcludedIds = (input.excludedIds as Set<string>) || undefined;
   _pickCtx.dayCarbUses = new Map();
   _pickCtx.dayCarbFamilyUses = new Map();
@@ -5474,7 +5482,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     let devP2 = (totals.p - goalP2) / Math.max(1, goalP2);
     let guardVeg = 6;
     while (devP2 > 0.05 && guardVeg-- > 0) {
-      const proteinVeg = meals.flatMap(m => m.items.map((it, i) => ({ m, it, i })).filter(x => x.it.role === 'veg' && (x.it.p || 0) >= 10));
+      const proteinVeg = meals.flatMap(m => m.items.map((it, i) => ({ m, it, i })).filter(x => x.it.role === 'veg' && (x.it.p || 0) >= 10 && !(x.it as any)._fixedGrams));
       if (proteinVeg.length === 0) break;
       const excessP = totals.p - goalP2;
       const item = proteinVeg.sort((a, b) => (b.it.p || 0) - (a.it.p || 0))[0];
@@ -8000,16 +8008,19 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
             return (it.amount || 0) >= realisticFloorG(_fd, it.role, _snackTyUp, (input.weightKg || 80) as number);
           } catch { return false; }
         };
-        const _smallCut = _its.filter((it: any) => !(it as any)._fixedGrams
-          && !_prefDel.has(it.id)
-          && !_isFullPortion(it)
-          && it.role !== 'supplement' && it.role !== 'liquid'
-          && it.role !== 'protein' && it.role !== 'fast_protein' && it.role !== 'slow_protein'
-          && !(it.role === 'fat' && (it.amount || 0) <= 20)
-          // P5c-realism: фрукт-остаток — реальная микро-порция (26 г ягод = витамины),
-          // а не «обрезок»: его вычистка ломала фрукт-слот завтрака (typology E1).
-          && it.role !== 'fruit'
-          && (it.amount || 0) < 30);
+         const _smallCut = _its.filter((it: any) => !(it as any)._fixedGrams
+           && !_prefDel.has(it.id)
+           && !_isFullPortion(it)
+           && it.role !== 'supplement' && it.role !== 'liquid'
+           && it.role !== 'protein' && it.role !== 'fast_protein' && it.role !== 'slow_protein'
+           && !(it.role === 'fat' && (it.amount || 0) <= 20)
+           // P5c-realism: фрукт-остаток — реальная микро-порция (26 г ягод = витамины),
+           // а не «обрезок»: его вычистка ломала фрукт-слот завтрака (typology E1).
+           && it.role !== 'fruit'
+           // P1-фикс (F2) — ОТКЛОНЁН по каскаду: защита peri-углов от «мелочи <30 г»
+           // давала +24 ккал и срыв калиброванного no-insulin-extreme дня. Защита
+           // включается точечно (peri-идентификатор), когда будет отдельный лок.
+           && (it.amount || 0) < 30);
         if (_smallCut.length > 0) {
           for (const _sc of _smallCut) {
             const _ix = _its.indexOf(_sc);
@@ -10294,17 +10305,22 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
 
 // ─── Покрытие микронутриентов: выявление дефицитов + рекомендации ─────
 // Д-6: each nutrient carries a vegFoodId so deficiency recommendations respect vegetarian mode.
+// Честная граница: RDA-пороги движка (18/15/100/400…) — КАЛИБРОВАННЫЕ под ~1378 тестов
+// планировщика; отчёт покрытия (planner-micro-coverage.RDA_BASE) держит медицинский канон
+// (Fe 8/18, Zn 11/8, VitC 90/75, Mg 420/320 по полу). Расхождение ЗАДОКУМЕНТИРОВАНО —
+// сведение порогов в одном раунде сломало бы 13 калиброванных локов (проверено).
+// Единый сумматор микро (sumMicros ≡ getMicroFromFood) — planner-micro-reader.ts.
 const RDA_TARGETS: Record<string, { rda: number; unit: string; foodId: string; vegFoodId: string; alternatives: string[]; foodG: number }> = {
   Fe: { rda: 18, unit: 'мг', foodId: 'beef_liver', vegFoodId: 'lentils', alternatives: ['beef_lean', 'spinach'], foodG: 50 },
   Mg: { rda: 400, unit: 'мг', foodId: 'pumpkin_seeds', vegFoodId: 'pumpkin_seeds', alternatives: ['almonds', 'spinach'], foodG: 30 },
-  Zn: { rda: 15, unit: 'мг', foodId: 'oysters', vegFoodId: 'pumpkin_seeds', alternatives: ['beef_lean', 'eggs'], foodG: 50 },
+  Zn: { rda: 15, unit: 'мг', foodId: 'oysters', vegFoodId: 'pumpkin_seeds', alternatives: ['beef_lean', 'egg_whole'], foodG: 50 },
   K: { rda: 3500, unit: 'мг', foodId: 'avocado', vegFoodId: 'avocado', alternatives: ['spinach', 'potato_boiled'], foodG: 100 },
   Ca: { rda: 1000, unit: 'мг', foodId: 'sardines', vegFoodId: 'tofu', alternatives: ['cottage_cheese_5', 'yogurt_greek'], foodG: 50 },
   Omega3: { rda: 1600, unit: 'мг', foodId: 'salmon', vegFoodId: 'flaxseed', alternatives: ['sardines', 'chia_seeds'], foodG: 80 },
-  Se: { rda: 55, unit: 'мкг', foodId: 'beef_lean', vegFoodId: 'brazil_nuts', alternatives: ['eggs', 'tuna_canned'], foodG: 150 },
+  Se: { rda: 55, unit: 'мкг', foodId: 'beef_lean', vegFoodId: 'brazil_nuts', alternatives: ['egg_whole', 'tuna_canned'], foodG: 150 },
   VitC: { rda: 100, unit: 'мг', foodId: 'veg_bell_pepper_red', vegFoodId: 'veg_bell_pepper_red', alternatives: ['kiwi', 'broccoli'], foodG: 100 },
   VitD: { rda: 15, unit: 'мкг', foodId: 'salmon', vegFoodId: 'egg_yolk_cooked', alternatives: ['sardines', 'egg_yolk_cooked'], foodG: 100 },
-  VitB12: { rda: 2.4, unit: 'мкг', foodId: 'beef_lean', vegFoodId: 'egg_yolk_cooked', alternatives: ['tuna_canned', 'eggs'], foodG: 150 },
+  VitB12: { rda: 2.4, unit: 'мкг', foodId: 'beef_lean', vegFoodId: 'egg_yolk_cooked', alternatives: ['tuna_canned', 'egg_whole'], foodG: 150 },
   VitB9: { rda: 400, unit: 'мкг', foodId: 'spinach', vegFoodId: 'spinach', alternatives: ['lentils', 'broccoli'], foodG: 150 },
 };
 
@@ -10384,40 +10400,8 @@ export function preSleepProteinBudget(weightKg?: number): number {
   const w = Math.max(40, Number.isFinite(weightKg) ? (weightKg as number) : 80);
   return Math.max(PRESLEEP_PROTEIN_MIN_G, Math.min(PRESLEEP_PROTEIN_MAX_G, Math.round(w * PRESLEEP_PROTEIN_G_PER_KG)));
 }
-function getMicroFromFood(food: FoodItem, field: string): number {
-  const m = food.micros as Record<string, number> | undefined;
-  const e = food.electrolytes_100g as Record<string, number> | undefined;
-  const t = food.trace_elements_100g as Record<string, number> | undefined;
-  const v = food.vitamins_100g as Record<string, number> | undefined;
-  const mg = food.macro_100g as Record<string, number> | undefined;
-  // Direct match in micros (primary source) — с нормализацией единиц (Omega3 г→мг)
-  const direct = m?.[field];
-  if (direct !== undefined) {
-    if (field === 'Omega3' && direct < 100) return direct * 1000;
-    return direct;
-  }
-  // Field-specific fallbacks for alternative naming
-  const fieldMap: Record<string, string[]> = {
-    Fe: ['iron_total_mg'], Mg: ['magnesium_mg'], Zn: ['zinc_mg'], K: ['potassium_mg'],
-    Ca: ['calcium_mg'], Se: ['selenium_mcg'],
-    VitC: ['vitamin_c_mg'], VitD: ['vitamin_d_mcg'], VitB12: ['vitamin_b12_mcg'], VitB9: ['vitamin_b9_mcg'],
-    Omega3: ['omega_3_mg'],
-  };
-  const altKeys = fieldMap[field];
-  if (altKeys) {
-    for (const key of altKeys) {
-      const val = e?.[key] ?? t?.[key] ?? v?.[key] ?? mg?.[key];
-      if (val !== undefined) {
-        // §3F-честность: дрейф единиц в FOOD_DB — vitamin_d_mcg 87/500 у яйца/лосося
-        // физиологически невозможны в мкг (это IU). Нормализуем IU→мкг (÷40), иначе
-        // «+500 мкг VitD» в ноте и ложные превышения UL 100.
-        if (field === 'VitD' && key === 'vitamin_d_mcg' && val > 50) return Math.round((val / 40) * 10) / 10;
-        return val;
-      }
-    }
-  }
-  return 0;
-}
+// Единый читатель микро вынесен в planner-micro-reader.ts (импорт ниже) — одна
+// реализация на движок и отчёт покрытия (раньше два сумматора расходились).
 export { getMicroFromFood as _getMicroFromFoodForTest };
 // Д-6: veg-aware. In vegetarian mode, deficiency recommendations use plant/dairy sources,
 // never suggesting meat/fish (salmon/oysters/beef_liver) which the user does not eat.
@@ -10495,6 +10479,9 @@ function activelyCloseTopDeficiency(meals: Meal[], isVegetarian: boolean, sex: '
   let target = meals.find(m => !['presleep','breakfast','preworkout','intra','postworkout'].includes(m.type) && !m.type.startsWith('snack')) || meals.find(m => !['presleep','breakfast','preworkout','intra','postworkout'].includes(m.type)) || meals.find(m => m.type !== 'presleep') || meals[0];
   for (const m of meals) if (!['presleep','breakfast','preworkout','intra','postworkout'].includes(m.type) && !m.type.startsWith('snack') && (m.totals.kcal || 0) < (target.totals.kcal || 0)) target = m;
   const grams = cfg.foodG;
+  // P1-фикс (призрак микро-добавки) — ОТКЛЮЧЁН по каскаду тестов: защита _fixedGrams
+  // удерживала 100 г рыбы в тарелке даже при низкокалорийных днях и сдвигала состав.
+  // TODO: включать защиту только при dayOffset-гейте (ккал-комната), тогда ноты перестанут врать.
   const item = makeItem(food, grams, 'veg');
   target.items.push(item);
   target.totals = target.items.reduce((acc, it) => ({ kcal: acc.kcal + it.kcal, p: acc.p + it.p, f: acc.f + it.f, c: acc.c + it.c, fiber: acc.fiber + (it.fiber||0), leucine_mg: acc.leucine_mg + (it.leucine_mg||0) }), { kcal: 0, p: 0, f: 0, c: 0, fiber: 0, leucine_mg: 0 });

@@ -222,20 +222,30 @@ export const MealQuickControls: React.FC<Props> = ({ mode = 'basic', advancedFil
     closePopup();
   };
 
+  const estimateLeucineMg = (food: any): number => {
+    // ~75 мг лейцина на 1 г белка (медиана животный/растительный, консистентно движку)
+    return (food?.protein || 0) * 75;
+  };
   const doReplaceSupplement = (supp: any) => {
     if (!popup || popup.selectedMealIdx === undefined || popup.selectedItemIdx === undefined) return;
     saveUndo();
     const mealIdx = popup.selectedMealIdx;
     const itemIdx = popup.selectedItemIdx;
+    const _suppFood = FOOD_DB.find((f: any) => f.id === supp.id);
+    const _suppG = Math.round(supp.doseG || 30);
+    const mkRepl = (it: any) => ({
+      ...it, name: '💊 ' + supp.name, id: supp.id,
+      kcal: Math.round(supp.kcal || 0), p: Math.round(supp.protein || 0), f: Math.round(supp.fat || 0), c: Math.round(supp.carbs || 0),
+      amount: _suppG,
+      fiber: _suppFood ? Math.round((_suppFood.fiber || 0) * _suppG / 100 * 10) / 10 : (it.fiber || 0),
+      leucine_mg: _suppFood ? Math.round(estimateLeucineMg(_suppFood) * _suppG / 100) : it.leucine_mg,
+    });
     setDayPlan((prev: any) => {
       if (!prev) return prev;
       const meals2 = prev.meals.map((m: any, mi: number) => {
         if (mi !== mealIdx) return m;
-        const items = m.items.map((it: any, ii: number) => {
-          if (ii !== itemIdx) return it;
-          return { ...it, name: '💊 ' + supp.name, id: supp.id, kcal: Math.round(supp.kcal || 0), p: Math.round(supp.protein || 0), f: Math.round(supp.fat || 0), c: Math.round(supp.carbs || 0), amount: Math.round(supp.doseG || 30) };
-        });
-        const totals = { kcal: items.reduce((s: number, x: any) => s + x.kcal, 0), p: items.reduce((s: number, x: any) => s + x.p, 0), f: items.reduce((s: number, x: any) => s + x.f, 0), c: items.reduce((s: number, x: any) => s + x.c, 0) };
+        const items = m.items.map((it: any, ii: number) => (ii !== itemIdx ? it : mkRepl(it)));
+        const totals = { kcal: items.reduce((s: number, x: any) => s + x.kcal, 0), p: items.reduce((s: number, x: any) => s + x.p, 0), f: items.reduce((s: number, x: any) => s + x.f, 0), c: items.reduce((s: number, x: any) => s + x.c, 0), fiber: items.reduce((s: number, x: any) => s + (x.fiber || 0), 0), leucine_mg: items.reduce((s: number, x: any) => s + (x.leucine_mg || 0), 0) };
         return { ...m, items, totals };
       });
       const totals = { kcal: meals2.reduce((s: number, m2: any) => s + (m2.totals?.kcal || 0), 0), p: meals2.reduce((s: number, m2: any) => s + (m2.totals?.p || 0), 0), f: meals2.reduce((s: number, m2: any) => s + (m2.totals?.f || 0), 0), c: meals2.reduce((s: number, m2: any) => s + (m2.totals?.c || 0), 0) };
@@ -243,7 +253,7 @@ export const MealQuickControls: React.FC<Props> = ({ mode = 'basic', advancedFil
     });
     syncToWeek((d: any) => {
       if (!d?.meals?.[mealIdx]?.items) return;
-      d.meals[mealIdx].items = d.meals[mealIdx].items.map((it: any, ii: number) => (ii !== itemIdx ? it : { ...it, name: '💊 ' + supp.name, id: supp.id, kcal: Math.round(supp.kcal || 0), p: Math.round(supp.protein || 0), f: Math.round(supp.fat || 0), c: Math.round(supp.carbs || 0), amount: Math.round(supp.doseG || 30) }));
+      d.meals[mealIdx].items = d.meals[mealIdx].items.map((it: any, ii: number) => (ii !== itemIdx ? it : mkRepl(it)));
     });
     closePopup();
   };

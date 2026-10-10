@@ -2563,14 +2563,17 @@ export const IndividualPlanSettings: React.FC = () => {
                     const existing = [...weightLogEntries];
                     const lastWeight = existing.length > 0 ? existing[existing.length - 1].weight : 80;
                     const byDate = new Map(existing.map(e => [e.date, e.weight]));
-                    const entries: { date: string; weight: number }[] = [];
-                    const step = p.id === 'daily' ? 1 : p.id === 'every2' ? 2 : p.id === 'every3' ? 3 : 4;
-                    for (let i = 0; i < p.slots; i++) {
-                      const d = new Date(); d.setDate(d.getDate() - (p.slots - 1 - i) * step);
-                      {/* FIX UTC-audit (B4): локальная дата, не UTC (около полуночи UTC+ съезжала на день) */}
-                      const ds = _toLocalIso(d);
-                      entries.push({ date: ds, weight: byDate.has(ds) ? byDate.get(ds) as number : lastWeight });
-                    }
+                     const entries: { date: string; weight: number; synthetic?: boolean }[] = [];
+                     const step = p.id === 'daily' ? 1 : p.id === 'every2' ? 2 : p.id === 'every3' ? 3 : 4;
+                     for (let i = 0; i < p.slots; i++) {
+                       const d = new Date(); d.setDate(d.getDate() - (p.slots - 1 - i) * step);
+                       {/* FIX UTC-audit (B4): локальная дата, не UTC (около полуночи UTC+ съезжала на день) */}
+                       const ds = _toLocalIso(d);
+                       const _known = byDate.has(ds);
+                       // P1-фикс: автозаполнение периодов НЕ пишет копии веса в канонический
+                       // лог «Профиль → Вес» (кнопка «Ежедневно» плодила фальшивые замеры).
+                       entries.push({ date: ds, weight: _known ? byDate.get(ds) as number : lastWeight, ...(_known ? {} : { synthetic: true }) });
+                     }
                     setWeightLogEntries(entries);
                   }} style={{
                     padding:'12px 8px', borderRadius:12, cursor:'pointer', textAlign:'center',

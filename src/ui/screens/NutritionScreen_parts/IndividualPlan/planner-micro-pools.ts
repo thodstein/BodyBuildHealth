@@ -8,6 +8,7 @@
  */
 
 import { FOOD_DB } from "../../../../core/nutrition-database";
+import { foodAvailableForPlan } from "./food-availability";
 
 /** Микро → продукты-источники (id FOOD_DB). Топ-2 на нутриент, вег-фолбэк. */
 export const MICRO_SOURCE_POOLS: Record<string, { ids: string[]; vegIds?: string[] }> = {
@@ -111,7 +112,7 @@ export function repairDiaasWeakLinks(
     if (vegIdx < 0) return m;
     const veg = m.items[vegIdx];
     const inMeal = new Set(m.items.map((it: any) => it.id));
-    const repl = COMPLETE_PROTEIN_IDS.find(id => !inMeal.has(id) && !(excludedIds && excludedIds.has(id)) && FOOD_DB.some(f => f.id === id));
+    const repl = COMPLETE_PROTEIN_IDS.find(id => !inMeal.has(id) && !(excludedIds && excludedIds.has(id)) && FOOD_DB.some(f => f.id === id) && foodAvailableForPlan({ id }));
     if (!repl) return m;
     const food = FOOD_DB.find(f => f.id === repl)!;
     const swapGrams = Math.max(20, Math.min(Math.round(veg.amount * 0.5), 150));
@@ -135,7 +136,11 @@ export function repairDiaasWeakLinks(
     }
     items.push({
       id: food.id, name: food.name, amount: swapGrams,
-      kcal: Math.round(food.kcal * factor), p: pG, f: Math.round(food.fat * factor), c: Math.round(food.carbs * factor),
+      // P1-фикс: kcal из формулы макросов (как makeItem), а не food.kcal из таблицы —
+      // у яйца 60 г разница 93 vs 99 ккал (6.4%), и день, только что сведённый
+      // корректором, уезжал. CONTRACT: kbjuFormulaDeviationPct ≤3%.
+      kcal: Math.round(pG * 4 + Math.round(food.fat * factor) * 9 + Math.round(food.carbs * factor) * 4),
+      p: pG, f: Math.round(food.fat * factor), c: Math.round(food.carbs * factor),
       fiber: Math.round((food.fiber || 0) * factor), role: 'protein',
     });
     const totals = items.reduce((acc, it) => ({

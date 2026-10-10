@@ -40,7 +40,7 @@ describe('microDeficitToPreferIds (4б)', () => {
     const r = microDeficitToPreferIds(
       [{ nutrient: 'Zn', pct: 30, status: 'deficit' }],
       false,
-      new Set(['oysters', 'beef_lean', 'pumpkin_seeds', 'beef_minced']),
+      new Set(['oysters', 'beef_lean', 'pumpkin_seeds', 'beef_minced']), // ����>�����: oysters/beef_minced � ������ id, ��� Zn ������ �� �����
     );
     expect(r.preferIds).toEqual([]);
     expect(r.note).toBeNull();

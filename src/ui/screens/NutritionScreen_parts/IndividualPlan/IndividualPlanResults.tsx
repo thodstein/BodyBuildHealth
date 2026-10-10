@@ -121,7 +121,7 @@ export const IndividualPlanResults: React.FC = () => {
     selectedWeek, setSelectedWeek,
     generated, setGenerated, dayPlan, threeDayPlan, resultsRef, planBusy,
     mealsCount,
-    renderMealList, effectiveKcal, effectiveP, effectiveF, effectiveC,
+    renderMealList, effectiveKcal, effectiveP, effectiveF, effectiveC, errorMsg,
     dayPlanNotes, setDayPlanNotes,
      autoCorrectPlan, allergens, allergenExcludedCount, excludedFoods, excludedCategories, healthIssues, dietPrefs,
 
@@ -178,10 +178,18 @@ export const IndividualPlanResults: React.FC = () => {
   const [calcDailyReport, setCalcDailyReport] = useState<DailyDietReport | null>(null);
   // 🟠8 — Checked shopping items state (must be at top level — Rules of Hooks)
   const [checked, setChecked] = useState<Set<string>>(() => { try { const v = JSON.parse(localStorage.getItem('he_shopping_checked') || '[]'); return new Set(Array.isArray(v) ? v.filter((x: any) => typeof x === 'string') : []); } catch { return new Set<string>(); } });
-  // E7: чекбоксы закупок сбрасываются при новом плане (раньше галочки «переезжали» между
+  // E7: чекбоксы закупок сбрасываются при НОВОМ плане (раньше галочки «переезжали» между
   // разными списками — «молоко уже отмечено» в чужом рационе).
+  // P1-фикс: ключ включает SUM totals, поэтому любая правка порции сбрасывала галочки.
+  // Теперь НОВЫЙ план = смена идентичности (число приёмов/дней/СОСТАВ id), а не суммы.
   const _planKeyRef = useRef<string>('');
-  const _planKey = `${dayPlan ? JSON.stringify(dayPlan.totals || {}) + (dayPlan.meals?.length || 0) : ''}|${weekPlan ? (weekPlan.days?.length || 0) : ''}|${threeDayPlan ? (threeDayPlan.days?.length || 0) : ''}`;
+  const _planKey = (() => {
+    const _ids = (d: any) => (d?.meals || []).map((m: any) => (m.items || []).map((it: any) => it.id || it.name).join(',')).join(';');
+    const _dayIds = dayPlan ? _ids(dayPlan) : '';
+    const _weekIds = weekPlan ? (weekPlan.days || []).map(_ids).join('/') : '';
+    const _threeIds = threeDayPlan ? (threeDayPlan.days || []).map(_ids).join('/') : '';
+    return `${_dayIds}|${_weekIds}|${_threeIds}`;
+  })();
   React.useEffect(() => {
     if (_planKey && _planKey !== _planKeyRef.current) {
       if (_planKeyRef.current !== '') setChecked(new Set());
@@ -995,6 +1003,16 @@ const doImportPlan = (raw: string): boolean => {
         </GlassCard>
       )}
 
+      {/* P0: ошибки генерации/сохранения молча терялись на табе «План» (errorMsg
+          рендерился только в Settings, а он размонтирован). Показываем на вкладке
+          плана; автоскрытие — 8с, чтобы ошибка не залипала после починки. */}
+      {errorMsg && (
+        <div role="alert" style={{ marginBottom:6, padding:'6px 10px', borderRadius:8, background:'rgba(239,68,68,0.08)', border:'1px solid rgba(239,68,68,0.25)', fontSize:10, color:'#ef4444', display:'flex', alignItems:'center', gap:8 }}>
+          <span style={{ flex:1 }}>⚠️ {errorMsg}</span>
+          <span onClick={() => setErrorMsg(null)} role="button" aria-label="Закрыть ошибку" style={{ cursor:'pointer', minHeight:32, minWidth:32, display:'inline-flex', alignItems:'center', justifyContent:'center', borderRadius:6, fontSize:11 }}>✕</span>
+        </div>
+      )}
+
       {generated && planDays === 1 && dayPlan && (<>
         <GlassCard title={`План на день${carbPeriodization !== 'none' ? (dayPlan.isTrainingDay ? ' 🏋️ Тренировочный' : ' 🛌 Отдых') : ''}`} icon="📋" color={dayPlan.isTrainingDay ? '#00e68a' : '#8b5cf6'} style={{ border: '1px solid rgba(0,230,138,0.15)' }}>
           {dayPlan.isTrainingDay !== undefined && <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.85)', marginBottom: 4 }}>{dayPlan.isTrainingDay ? 'Тренировочный день' : 'День отдыха'}{carbPeriodization !== 'none' && ` · циклирование: ${carbPeriodizationLabel(carbPeriodization)}`}{workScheduleEnabled && ` · 💼${dayPlan.isWorkDay ? ' Рабочий' : ' Выходной'}${dayPlan.isWorkDay && workStartTime ? ` ${workStartTime}-${workEndTime}` : ''}`}</div>}
@@ -1144,7 +1162,7 @@ const doImportPlan = (raw: string): boolean => {
                 <span style={{ color: '#f59e0b', fontSize: 8 }}>{dF}г</span>
                 <span style={{ color: '#f97316', fontSize: 8 }}>{dC}г</span>
               </div>
-              {renderMealList(d)}
+              {renderMealList(d, true, di + 1)}
             </div>
             );
           })}
@@ -1162,7 +1180,7 @@ const doImportPlan = (raw: string): boolean => {
                   border: selectedWeek === wi ? 'none' : '1px solid rgba(255,255,255,0.06)',
                 }} onClick={() => { setSelectedWeek(wi); if (monthPlan[wi]) setWeekPlan(monthPlan[wi]); }}>
                   Н{wi + 1}{monthPlan[wi]?.totals?.kcal ? ` · ${Math.round((monthPlan[wi].totals.kcal || 0) / 7)}` : ''}
-                  <span title={`Перегенерировать неделю ${wi + 1} (без сброса остальных)`} onClick={(e) => { e.stopPropagation(); setSelectedWeek(wi); generatePlan(7, wi, undefined, { skipUndo: true, async: true }); }} style={{ cursor:'pointer', fontSize:10, padding:'1px 4px', borderRadius:5, color: selectedWeek === wi ? 'rgba(255,255,255,0.85)' : '#a78bfa', background: 'rgba(255,255,255,0.1)' }}>🔄</span>
+                  <span title={`Перегенерировать неделю ${wi + 1} (без сброса остальных)`} onClick={async (e) => { e.stopPropagation(); setSelectedWeek(wi); loadMonthWeekIntoPlan(wi); const ok = await generatePlan(7, wi, undefined, { skipUndo: true, async: true }); if (ok !== false) loadMonthWeekIntoPlan(wi); }} style={{ cursor:'pointer', fontSize:10, padding:'1px 4px', borderRadius:5, color: selectedWeek === wi ? 'rgba(255,255,255,0.85)' : '#a78bfa', background: 'rgba(255,255,255,0.1)' }}>🔄</span>
                 </div>
               ))}
               <button onClick={() => { setMonthPlanMode(false); }} style={{
@@ -2404,7 +2422,7 @@ const doImportPlan = (raw: string): boolean => {
           {generated && dayPlan?.meals?.some((m: any) => m.recipeApplied) && (
             <div style={{ background:'rgba(24,24,27,0.5)', borderRadius:12, border:'1px solid rgba(249,115,22,0.06)', padding:'8px 6px', textAlign:'center' }}>
               <div style={{ display:'flex', gap:4 }}>
-                <button onClick={() => printPlanHtml('Меню дня по рецептам', buildRecipePlanPrintHtml(dayPlan, (weightMode === 'raw' ? 'raw' : 'cooked') as any))} title="Ингредиенты и пошаговые инструкции выбранных рецептов" className="plan-actbtn" style={{ flex:1, padding:'10px 6px', minHeight:44, borderRadius:10, cursor:'pointer', textAlign:'center', background:'rgba(249,115,22,0.1)', border:'1px solid rgba(249,115,22,0.3)', color:'#fb923c', fontWeight:700, fontSize:11, transition:'all 0.15s' }}>
+                <button onClick={() => { void printPlanHtml('Меню дня по рецептам', buildRecipePlanPrintHtml(dayPlan, (weightMode === 'raw' ? 'raw' : 'cooked') as any)).then((ok: boolean) => { if (!ok) setErrorMsg('Печать заблокирована браузером — разрешите всплывающие окна'); }); }} title="Ингредиенты и пошаговые инструкции выбранных рецептов" className="plan-actbtn" style={{ flex:1, padding:'10px 6px', minHeight:44, borderRadius:10, cursor:'pointer', textAlign:'center', background:'rgba(249,115,22,0.1)', border:'1px solid rgba(249,115,22,0.3)', color:'#fb923c', fontWeight:700, fontSize:11, transition:'all 0.15s' }}>
                   🖨 Печать меню
                 </button>
                 <button onClick={() => {
@@ -2896,11 +2914,11 @@ const doImportPlan = (raw: string): boolean => {
                           dayScore: (dayPlan as any)?.healthScore?.score ?? null,
                           dayStatus: (dayPlan as any)?.healthScore?.status ?? null,
                           coverage: (Array.isArray((dayPlan as any)?.microSummary?.coverage) ? (dayPlan as any).microSummary.coverage : []).map((c: any) => ({ nutrient: c.nutrient, pct: c.pct, status: c.status })),
-                        })); }} className="plan-actbtn" style={{ padding:'10px 12px', minHeight:44, borderRadius:10, cursor:'pointer', fontSize:11, fontWeight:700, background:'rgba(139,92,246,0.1)', border:'1px solid rgba(139,92,246,0.3)', color:'#a78bfa' }}>🖨 Печать отчёта</button>
+                         })).then((ok: boolean) => { if (!ok) setErrorMsg('Печать заблокирована браузером — разрешите всплывающие окна'); }); }} className="plan-actbtn" style={{ padding:'10px 12px', minHeight:44, borderRadius:10, cursor:'pointer', fontSize:11, fontWeight:700, background:'rgba(139,92,246,0.1)', border:'1px solid rgba(139,92,246,0.3)', color:'#a78bfa' }}>🖨 Печать отчёта</button>
                         <button onClick={() => { void printPlanHtml('План на день — таймлайн', buildMealTimelinePrintHtml(
                           (Array.isArray(dayPlan?.meals) ? dayPlan.meals : []).map((m: any) => ({ time: m.time, label: m.label, type: m.type, items: (m.items || []).map((it: any) => ({ name: it.name, amount: it.amount, id: it.id })), totals: m.totals || {} })),
                           { title: 'План на день', kcal: dayPlan?.totals?.kcal, trainStart, weightMode: (weightMode === 'raw' ? 'raw' : 'cooked') as any }
-                        )); }} className="plan-actbtn" style={{ padding:'10px 12px', minHeight:44, borderRadius:10, cursor:'pointer', fontSize:11, fontWeight:700, background:'rgba(6,182,212,0.1)', border:'1px solid rgba(6,182,212,0.3)', color:'#22d3ee' }}>⏳ Таймлайн (PDF)</button>
+                        )).then((ok: boolean) => { if (!ok) setErrorMsg('Печать заблокирована браузером — разрешите всплывающие окна'); }); }} className="plan-actbtn" style={{ padding:'10px 12px', minHeight:44, borderRadius:10, cursor:'pointer', fontSize:11, fontWeight:700, background:'rgba(6,182,212,0.1)', border:'1px solid rgba(6,182,212,0.3)', color:'#22d3ee' }}>⏳ Таймлайн (PDF)</button>
                       </span>
                     </div>
                     {/* Overall grade */}
