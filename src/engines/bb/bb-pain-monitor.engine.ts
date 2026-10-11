@@ -86,11 +86,13 @@ export function painMonitorVerdict(s: PainMonitorInput): PainMonitorVerdict {
       advice: 'Снизить объём до боли ≤3/10: меньше подходов/амплитуда/темп, без отказа; при >2 нед — врач',
     };
   }
-  if (m != null && m > 6) {
+  // Silbernagel: «на следующее утро должно быть <5». Значит m≥5 — уже нарушение правила
+  // (раньше red был только при m>6, и 5–6 уходило в жёлтый «удержать» вопреки своему же дисклеймеру).
+  if (m != null && m >= 5) {
     return {
       tested: true,
       level: 'red',
-      text: `${loc}: боль ${m}/10 на утро (>6) — красный`,
+      text: `${loc}: боль ${m}/10 на утро (≥5) — красный`,
       advice: 'Утро не восстанавливается — резать объём и вес, сон/питание; перепроверка 3–7 дней',
     };
   }
@@ -100,14 +102,6 @@ export function painMonitorVerdict(s: PainMonitorInput): PainMonitorVerdict {
       level: 'yellow',
       text: `${loc}: боль растёт от недели к неделе — жёлтый`,
       advice: 'Удержать объём и вес 3–7 дней (не повышать), затем перепроверка по правилу',
-    };
-  }
-  if (m != null && m >= 5) {
-    return {
-      tested: true,
-      level: 'yellow',
-      text: `${loc}: утром ${m}/10 (≥5) — жёлтый`,
-      advice: 'Удержать объём 3–7 дней, без повышения веса; к зелёному — утро <5',
     };
   }
   if (d == null) {
@@ -125,7 +119,6 @@ export function painMonitorVerdict(s: PainMonitorInput): PainMonitorVerdict {
     advice: 'Прогрессия +1 подход или +2.5% при спокойном утре; боль >5 днём или ≥5 утром — стоп-повышение',
   };
 }
-
 /** Компактная строка для экспорта/моста ('' — не заполнено). */
 export function painMonitorLine(s: PainMonitorInput): string {
   const v = painMonitorVerdict(s);

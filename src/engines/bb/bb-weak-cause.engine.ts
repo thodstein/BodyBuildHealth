@@ -39,6 +39,8 @@ export interface WeakCauseResult {
   confidence: number; // 0-1
   evidence: string[];
   fix: string;
+  /** true — подкрепить причину нечем (нет объёма/тренда/замеров): показываем как стартовую гипотезу. */
+  noData?: boolean;
 }
 
 const CLAMP01 = (v: number): number => Math.max(0, Math.min(1, Math.round(v * 100) / 100));
@@ -117,10 +119,13 @@ export function diagnoseWeakCause(input: WeakCauseInput): WeakCauseResult {
     ev.push(`Низкий SFR ${input.avgSfr} — стимул мимо цели`);
   }
 
-  // ── GENETICS: долго на MAV чисто, а дельта vs идеала большая ──
-  if ((input.weeksAtMavClean ?? 0) >= 12 && input.idealDeltaPct != null && input.idealDeltaPct <= -15) {
-    scores.genetics += 0.7;
-    ev.push(`12+ нед на MAV чисто, а vs идеала ${input.idealDeltaPct}% — рычаги/брюшко`);
+  // ── GENETICS: всё измеренное окно на MAV чисто, а дельта vs идеала большая ──
+  // Окно истории — 4 недели, поэтому ветка «12+ нед» была недостижима из живых данных
+  // (она врала бы «12 нед»). Честно: «всё окно на MAV» + сколько это недель.
+  const weeks = input.weeksAtMavClean ?? 0;
+  if (weeks >= 3 && input.idealDeltaPct != null && input.idealDeltaPct <= -15) {
+    scores.genetics += weeks >= 12 ? 0.7 : 0.5;
+    ev.push(`${weeks} нед (всё окно) на MAV чисто, а vs идеала ${input.idealDeltaPct}% — рычаги/брюшко`);
   } else if (input.idealDeltaPct != null && input.idealDeltaPct <= -25 && volOk) {
     scores.genetics += 0.4;
     ev.push(`vs идеала ${input.idealDeltaPct}% при объёме ${last} — вероятно генетика`);
@@ -138,10 +143,11 @@ export function diagnoseWeakCause(input: WeakCauseInput): WeakCauseResult {
       cause = k;
     }
   }
-  if (best <= 0) {
+  const noData = best <= 0;
+  if (noData) {
     cause = 'volume';
     best = 0.4;
-    ev.push('Данных мало — старт с объёма (MEV→MAV лесенка)');
+    ev.push('Данных мало — старт с объёма (MEV→MAV лестница)');
   }
 
   const fixes: Record<WeakCause, string> = {
@@ -152,7 +158,11 @@ export function diagnoseWeakCause(input: WeakCauseInput): WeakCauseResult {
     genetics: 'Длинная игра: unilateral + lengthened акцент + частота 4-5× малыми дозами, меряем 12 нед',
   };
 
-  return { cause, confidence: CLAMP01(Math.min(0.95, Math.max(0.4, best + 0.25))), evidence: ev.slice(0, 6), fix: fixes[cause] };
+  // «Данных мало» — это не «причина = объём», а стартовая гипотеза с честной уверенностью.
+  const confidence = noData
+    ? 0.3
+    : CLAMP01(Math.min(0.95, Math.max(0.4, best + 0.25)));
+  return { cause, confidence, evidence: ev.slice(0, 6), fix: fixes[cause], noData } as WeakCauseResult;
 }
 
 /** Пакетная диагностика 1-2 зон (тонкая обёртка для хаба). */
@@ -289,6 +299,8 @@ export function idealDeltaForZone(
   const w = num(wristCm);
   const scaleH = h ? h / 175 : 1;
   // [ключи замера, идеал Reeves при 175см, множитель McCallum от запястья]
+  // McCallum: рука/бицепс = 2.5×запястье, голень = 1.9×, шея = 2.05×, бедро = 3.0×.
+  // 2.5 на шее давало «идеальную шею» 42.5 см при запястье 17 (фактическая McCallum ~34.9).
   const table: Record<string, { keys: string[]; reeves: number; mcCallum?: number }> = {
     chest: { keys: ['chest'], reeves: 114, mcCallum: 6.5 },
     chest_upper: { keys: ['chest'], reeves: 114, mcCallum: 6.5 },
@@ -309,7 +321,7 @@ export function idealDeltaForZone(
     hamstrings: { keys: ['thighL', 'thighR', 'thigh'], reeves: 60, mcCallum: 3.0 },
     glutes: { keys: ['hips'], reeves: 96 },
     calves: { keys: ['calfL', 'calfR', 'calf'], reeves: 38, mcCallum: 2.0 },
-    traps: { keys: ['neck'], reeves: 40, mcCallum: 2.5 },
+    traps: { keys: ['neck'], reeves: 40, mcCallum: 2.05 },
   };
   const row = table[z];
   if (!row) return null;

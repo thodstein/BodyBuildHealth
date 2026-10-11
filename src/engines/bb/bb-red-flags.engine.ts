@@ -35,10 +35,12 @@ export function assessBbRedFlags(flags: BbRedFlags): BbRedFlagResult {
   const hard = !!(flags.acutePain || flags.swelling || flags.numbness);
   return {
     active: true,
+    // Флаг и текст должны говорить одно: мягкий флаг («щелчки с болью») вставку
+    // НЕ блокирует, поэтому текстом это больше не объявляется запретом.
     blocked: hard,
     items,
     text: hard
       ? `Стоп: ${items.join(', ')} — сначала врач, вставка объёма заблокирована`
-      : `Осторожно: ${items.join(', ')} — только техника без нагрузки, объём не вставляем`,
+      : `Осторожно: ${items.join(', ')} — щадящий режим; при боли в суставе вставку лучше отложить`,
   };
 }

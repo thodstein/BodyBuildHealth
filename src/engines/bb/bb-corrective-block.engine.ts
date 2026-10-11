@@ -17,6 +17,8 @@ export type BBCorrBlockFocus = 'Втягивание' | 'Прогрессия' |
 export interface BBCorrPickInput {
   corr: BBCorrective;
   why?: string[];
+  /** Причина зоны (для дозы) — прокидывается из карточки, чтобы блок не расходился с ней. */
+  cause?: BBWeakCause | null;
 }
 
 export interface BBCorrSessionItem {
@@ -93,11 +95,11 @@ export function correctiveFocusForWeek(i: number, weeks: number): BBCorrBlockFoc
   return i < first ? 'Втягивание' : 'Прогрессия';
 }
 
-function toItem(p: BBCorrPickInput, opts: { sets?: number; rirShift?: number; cause?: BBWeakCause | null } = {}): BBCorrSessionItem {
+function toItem(p: BBCorrPickInput, opts: { sets?: number; rirShift?: number; cause?: BBWeakCause | null; flags?: { readinessRed?: boolean; painYellow?: boolean; painRed?: boolean } } = {}): BBCorrSessionItem {
   const corr = p.corr;
   let dose: { sets: number; repsMin: number; repsMax: number; rir: number; tempo: string; restSec: number } | null = null;
   try {
-    const d = correctiveDose(corr, opts.cause ?? null, {});
+    const d = correctiveDose(corr, opts.cause ?? p.cause ?? null, opts.flags ?? {});
     if (d) dose = { sets: d.sets, repsMin: d.repsMin, repsMax: d.repsMax, rir: d.rir, tempo: d.tempo, restSec: corr.protocol.restSec };
   } catch { /* фолбэк ниже */ }
   const base = dose ?? {
@@ -127,21 +129,21 @@ function toItem(p: BBCorrPickInput, opts: { sets?: number; rirShift?: number; ca
 /** Одна сессия коррекции: порядок техника → сила → стабильность, ≤6 упражнений, без дублей. */
 export function correctiveSessionForBB(
   picks: BBCorrPickInput[],
-  opts: { max?: number; cause?: BBWeakCause | null } = {},
+  opts: { max?: number; cause?: BBWeakCause | null; flags?: { readinessRed?: boolean; painYellow?: boolean; painRed?: boolean } } = {},
 ): BBCorrSessionItem[] {
   const max = clamp(opts.max ?? 6, 1, 6);
   const seen = new Set<string>();
   const ordered = [...(picks || [])]
     .filter((p) => p && p.corr && !seen.has(p.corr.id) && (seen.add(p.corr.id), true))
     .sort((a, b) => PHASE_ORDER[a.corr.phase] - PHASE_ORDER[b.corr.phase]);
-  return ordered.slice(0, max).map((p) => toItem(p, { cause: opts.cause ?? null }));
+  return ordered.slice(0, max).map((p) => toItem(p, { cause: opts.cause ?? null, flags: opts.flags }));
 }
 
 /** Блок коррекции 4–8 нед: волна сетов, разгрузка в хвосте (RIR+1), фокус недели. */
 export function correctiveBlockForBB(
   picks: BBCorrPickInput[],
   weeks = 6,
-  opts: { max?: number; cause?: BBWeakCause | null } = {},
+  opts: { max?: number; cause?: BBWeakCause | null; flags?: { readinessRed?: boolean; painYellow?: boolean; painRed?: boolean } } = {},
 ): BBCorrBlock {
   const session = correctiveSessionForBB(picks, opts);
   const w = clamp(Math.round(weeks) || 6, 2, 12);

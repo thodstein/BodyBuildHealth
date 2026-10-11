@@ -35,13 +35,17 @@ export function pushLrSnapshot(
     ? history.filter((s) => s && typeof s.date === 'string' && typeof s.group === 'string')
     : [];
   if (!entry || typeof entry.group !== 'string') return list;
-  const next = [...list, {
+  const clean: BbLrSnapshot = {
     date: String(entry.date || ''),
     group: String(entry.group),
     weakSide: entry.weakSide === 'left' || entry.weakSide === 'right' ? entry.weakSide : null,
     asymPct: Number.isFinite(entry.asymPct as number) ? (entry.asymPct as number) : null,
     verdict: String(entry.verdict || ''),
-  }];
+  };
+  // Запись за (группа, дата) ЗАМЕНЯЕТСЯ: три клика «→ В ББ-авто» за один день иначе
+  // выглядели как «3 замера подряд» и запускали постоянную добивку слабой стороны.
+  const next = list.filter((s) => !(s.group === clean.group && s.date === clean.date));
+  next.push(clean);
   return next.slice(-Math.max(1, Math.round(cap)));
 }
 
@@ -67,7 +71,7 @@ export function summarizeLrDirection(history: BbLrSnapshot[] | null | undefined,
     persistent,
     flipped,
     text: persistent
-      ? `Перекос ${group}: слабее ${ru[last]} ${run} замера подряд — добивка оправдана`
+      ? `Перекос ${group}: слабее ${ru[last]} ${run} замера подряд — добивка оправдана${flipped ? ' (сторона плавала ранее — наблюдаем)' : ''}`
       : flipped
         ? `Перекос ${group}: сторона плавает — наблюдаем, добивку не фиксируем`
         : `Перекос ${group}: данных мало (${seq.length}) — следим дальше`,

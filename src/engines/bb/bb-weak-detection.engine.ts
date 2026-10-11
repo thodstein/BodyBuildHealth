@@ -3,7 +3,7 @@
  * Чистые функции, не мутируют план/дневник.
  * Источники: объём-факт vs MEV/MAV, e1RM-тренд из дневника, окружности vs идеал Reeves.
  */
-import { getVolumeLandmarks } from '../volume-landmarks.engine';
+import { getVolumeLandmarks, normMuscle } from '../volume-landmarks.engine';
 import { canonicalMuscle } from './bb-specialization.engine';
 import { epley1RM } from '../e1rm';
 import { trueMuscleOf } from '../movement-pattern';
@@ -16,8 +16,16 @@ export interface BBWeakCandidate {
   source: 'volume' | 'e1rm' | 'circumf';
 }
 
+/**
+ * Канон мышцы в EN-ключ объёма: сначала RU/легаси-нормализация (volume-landmarks знает
+ * «грудь»/«ноги»/«arms»), затем канон специализации. Раньше здесь стоял только
+ * canonicalMuscle: русский ключ дневника доезжал до кандидата как есть, и все
+ * downstream-сверки (объём-фактор, коррекции, инъекция) по нему молча no-op.
+ */
 function normMuscleKey(m: string): string {
-  return canonicalMuscle(String(m || '').toLowerCase().trim());
+  const raw = String(m || '').toLowerCase().trim();
+  if (!raw) return '';
+  return canonicalMuscle(normMuscle(raw) || raw);
 }
 
 /** Reeves ideal (см) при росте 175см/70кг: грудь 114, плечи ширина 50, талия 76, бедро 60, биц 40, предплечье 32, голень 38, шея 40.
@@ -41,7 +49,14 @@ export function idealReevesCircumference(measure: string, heightCm: number): num
   return Math.round(base * (heightCm / 175) * 10) / 10;
 }
 
-/** 1) Объём-факт vs ориентиры: fact < MEV или fact < 0.7*MAV while others >=MAV → кандидат */
+/**
+ * Канон слабости по объёму: сравниваем ПРЯМЫЕ сеты с ориентирами MEV/MAV/MRV.
+ * Ориентиры (Israetel RVL) — это direct near-failure sets; effective-объём
+ * (direct + EMG×indirect) несопоставим с ними: 12 сетов жима дают triceps effective
+ * 5.4 при нуле прямых сгибаний, и «не слабый» было бы прямым враньем.
+ * Pelland 2025 (Sports Med): fractional-учёт (indirect ×0.5) — метрика самого
+ * вмешательства, а не порога мышцы. Поэтому порог — по direct, effective — контекст.
+ */
 export function detectBBWeakByVolume(
   fact: Record<string, { directSets?: number; effectiveSets?: number }>,
   level: string,
@@ -59,14 +74,14 @@ export function detectBBWeakByVolume(
     const vals = Object.values(mavValues);
     return vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : 0;
   })();
-  const facts = muscles.map(m => fact[m]?.effectiveSets ?? fact[m]?.directSets ?? 0);
+  const facts = muscles.map(m => fact[m]?.directSets ?? fact[m]?.effectiveSets ?? 0);
   const factAvg = facts.length ? facts.reduce((a, b) => a + b, 0) / facts.length : 0;
-  const othersStrong = factAvg >= othersMavAvg * 0.85; // эвристика: средняя группа nær MAV
+  const othersStrong = factAvg >= othersMavAvg * 0.85; // эвристика: средняя группа около MAV
 
   for (const m of muscles) {
     const lm = getVolumeLandmarks(level, m);
     if (!lm) continue;
-    const sets = fact[m]?.effectiveSets ?? fact[m]?.directSets ?? 0;
+    const sets = fact[m]?.directSets ?? fact[m]?.effectiveSets ?? 0;
     if (sets < lm.mev) {
       const delta = lm.mev > 0 ? Math.round(((sets - lm.mev) / lm.mev) * 100) : -100;
       out.push({ muscle: normMuscleKey(m), reason: `Объём ${sets} < MEV ${lm.mev}`, deltaPct: delta, source: 'volume' });
@@ -77,7 +92,11 @@ export function detectBBWeakByVolume(
       out.push({ muscle: normMuscleKey(m), reason, deltaPct: delta, source: 'volume' });
     }
   }
-  // dedup по канонич
+  // Ключи приходят из Object.keys(fact) — они уникальны по построению, поэтому
+  // dedup-цикл был мёртвым (условие never fires). muscle — уже канонический
+  // ключ (normMuscleKey), но разные исходные ключи могут дать один и тот же канон
+  // («Грудь»/«chest»), поэтому дедуп оставлен осознанно — теперь он действительно
+  // может сработать.
   const seen = new Set<string>();
   const dedup: BBWeakCandidate[] = [];
   for (const c of out) {
@@ -105,7 +124,9 @@ function bucketE1rm28d(sessions: SessionLike[]): { recent: Record<string, number
   const countRecent: Record<string, number> = {};
   if (!Array.isArray(sessions) || sessions.length === 0) return { recent, old, countRecent };
   const sorted = [...sessions].sort((a, b) => (a.date || '').localeCompare(b.date || ''));
-  const now = sorted[sorted.length - 1]?.date ? new Date(sorted[sorted.length - 1].date).getTime() : Date.now();
+  // Окно «28д» — от СЕГОДНЯ (конвенция UnifiedIntelligenceHub: окна 7/28д от сегодня,
+  // иначе устаревший дневник показывал «тренд за 28 дней», который кончился месяцы назад).
+  const now = Math.max(Date.now(), sorted[sorted.length - 1]?.date ? new Date(sorted[sorted.length - 1].date).getTime() : 0);
   const DAY = 24 * 60 * 60 * 1000;
   const recentFrom = now - 7 * DAY;
   // Старое окно широкое (21–42д), чтобы редкий дневник тоже давал тренд; свежее — 7д
@@ -211,14 +232,16 @@ export function detectBBWeakByCircumf(
   };
   for (const [muscle, keys] of Object.entries(mapMuscleToMeas)) {
     let fact: number | null = null;
-    for (const k of keys) {
-      const v = meas[k];
-      const n = typeof v === 'string' ? parseFloat(v) : Number(v);
-      if (Number.isFinite(n) && n > 0) { fact = n; break; }
-      // среднее L/R
-      if (k === 'bicep' && meas['bicepL'] != null && meas['bicepR'] != null) {
-        const l = Number(meas['bicepL']), r = Number(meas['bicepR']);
-        if (Number.isFinite(l) && Number.isFinite(r)) { fact = (l + r) / 2; break; }
+    // Сначала среднее L/R, если оба заданы (раньше в списке первым шёл '_L', поэтому
+    // среднее никогда не вычислялось и отстающей считалась левая сторона).
+    const lR = Number((meas as any)[`${keys[0]}L`]);
+    const rR = Number((meas as any)[`${keys[0]}R`]);
+    if (Number.isFinite(lR) && Number.isFinite(rR) && lR > 0 && rR > 0) fact = (lR + rR) / 2;
+    if (fact == null) {
+      for (const k of keys) {
+        const v = meas[k];
+        const n = typeof v === 'string' ? parseFloat(v) : Number(v);
+        if (Number.isFinite(n) && n > 0) { fact = n; break; }
       }
     }
     if (fact == null) continue;
@@ -241,49 +264,60 @@ export function detectBBWeakByCircumf(
   return dedup.sort((a, b) => a.deltaPct - b.deltaPct);
 }
 
-/** Merge 3 источников, приоритет volume > e1rm > circumf, dedup по канонике */
+/**
+ * Merge 3 источников, dedup по канонике.
+ * Приоритет по надёжности источника: volume > e1rm > circumf (объём-факт и e1RM-тренд
+ * измеримы, окружность vs идеал — оценка по пропорциям). При отсутствии источника
+ * победителем НЕ становится более отрицательная оценка окружности.
+ */
 export function mergeBBWeakCandidates(
   a: BBWeakCandidate[],
   b: BBWeakCandidate[],
   c: BBWeakCandidate[],
 ): BBWeakCandidate[] {
-  const all = [...a, ...b, ...c];
+  const weight: Record<BBWeakCandidate['source'], number> = { volume: 3, e1rm: 2, circumf: 1 };
   const byMuscle = new Map<string, BBWeakCandidate>();
-  for (const cand of all) {
-    const key = cand.muscle;
-    const prev = byMuscle.get(key);
-    if (!prev) byMuscle.set(key, cand);
-    else {
-      // предпочитаем более отрицательный delta
-      if (cand.deltaPct < prev.deltaPct) byMuscle.set(key, cand);
-    }
+  for (const cand of [...a, ...b, ...c]) {
+    const prev = byMuscle.get(cand.muscle);
+    if (!prev) { byMuscle.set(cand.muscle, cand); continue; }
+    // надёжнее по источнику; при равном источнике — более отрицательная дельта
+    if (weight[cand.source] > weight[prev.source]) byMuscle.set(cand.muscle, cand);
+    else if (weight[cand.source] === weight[prev.source] && cand.deltaPct < prev.deltaPct) byMuscle.set(cand.muscle, cand);
   }
   return Array.from(byMuscle.values()).sort((x, y) => x.deltaPct - y.deltaPct);
 }
 
 /**
  * 28-дневная история объёма per-muscle из сессий дневника (MAX PRO).
- * Возвращает понедельные effective-сеты (4 недели: старые → новые) для причины volume/genetics.
+ * Возвращает понедельные ПРЯМЫЕ сеты (12 недель: старые → новые) для причины
+ * volume/genetics. Единицы — как у ориентиров MEV/MAV (direct): иначе причина
+ * «объём» и «слабость» говорили бы об одном и том же дне разными величинами.
+ *
+ * W3 (11.10.2026): окно было 4 недели — ветка genetics («всё окно на MAV чисто»)
+ * требовала 12 недель и была недостижима из живых данных. Теперь 12 недель.
  */
+const VOLUME_HISTORY_WEEKS = 12;
+
 export function volumeHistory28d(
-  sessions: Array<{ date: string; exercises: Array<{ exerciseName?: string; name?: string; muscleGroup?: string; muscle?: string; sets: Array<unknown> }> }>,
+  sessions: Array<{ date: string; exercises: Array<{ muscleGroup?: string; muscle?: string; sets: Array<unknown> }> }>,
 ): Record<string, number[]> {
   const out: Record<string, number[]> = {};
   if (!Array.isArray(sessions) || sessions.length === 0) return out;
   const sorted = [...sessions].sort((a, b) => (a.date || '').localeCompare(b.date || ''));
-  const lastT = sorted[sorted.length - 1]?.date ? new Date(sorted[sorted.length - 1].date).getTime() : Date.now();
+  const lastT = Math.max(Date.now(), sorted[sorted.length - 1]?.date ? new Date(sorted[sorted.length - 1].date).getTime() : 0);
   const DAY = 24 * 3600 * 1000;
-  const weeks: Array<Record<string, number>> = [{}, {}, {}, {}];
+  const weeks: Array<Record<string, number>> = Array.from({ length: VOLUME_HISTORY_WEEKS }, () => ({}));
+  const lastIdx = VOLUME_HISTORY_WEEKS - 1;
   for (const s of sorted) {
     const t = s.date ? new Date(s.date).getTime() : 0;
-    if (!t || lastT - t > 28 * DAY) continue;
-    const wi = Math.min(3, Math.max(0, 3 - Math.floor((lastT - t) / (7 * DAY))));
+    if (!t || lastT - t > VOLUME_HISTORY_WEEKS * 7 * DAY) continue;
+    const wi = Math.min(lastIdx, Math.max(0, lastIdx - Math.floor((lastT - t) / (7 * DAY))));
     for (const ex of (s.exercises || []) as any[]) {
-      const raw = (ex as any).muscleGroup || (ex as any).muscle || '';
-      const m = normMuscleKey(String(raw || '').toLowerCase());
-      if (!m) continue;
+      // Запись дневника несёт ровно одну группу упражнения → direct-сеты этой группы.
+      const exMuscle = normMuscleKey(String((ex as any).muscleGroup || (ex as any).muscle || ''));
+      if (!exMuscle) continue;
       const cnt = Array.isArray(ex.sets) ? ex.sets.length : 0;
-      weeks[wi][m] = (weeks[wi][m] || 0) + cnt;
+      weeks[wi][exMuscle] = (weeks[wi][exMuscle] || 0) + cnt;
     }
   }
   const muscles = new Set<string>();
@@ -291,7 +325,6 @@ export function volumeHistory28d(
   for (const m of muscles) out[m] = weeks.map((w) => w[m] || 0);
   return out;
 }
-
 /** Кандидаты по 28д-стабильности: 3+ нед ниже MAV → слабый (довесок к detectBBWeakByVolume). */
 export function detectBBWeakByVolumeStable(
   history: Record<string, number[]>,

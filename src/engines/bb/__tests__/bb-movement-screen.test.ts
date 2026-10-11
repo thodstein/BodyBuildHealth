@@ -77,12 +77,28 @@ describe('bb-movement-screen', () => {
     const r = resolveMovementDriver({ ...clean, kneeToWallCm: 6, kneeValgus: true });
     expect(r.driver).toBe('ankle');
   });
-  it('чистый паттерн + разрыв КТС ≥2 — слабый ankle-драйвер асимметрии', () => {
+  it('разрыв КТС ≥2 при чистом паттерне — драйвер голеностопа, асимметрия в правке', () => {
     const r = resolveMovementDriver({ ...clean, kneeToWallL: 8, kneeToWallR: 13 });
+    expect(r.driver).toBe('ankle');
+    expect(r.label).toMatch(/камбаловидная|асимметрия/);
+    // Ограничение худшей стороны (8<9) важнее одного разрыва — правка несёт асимметрию.
+    expect(r.fix).toMatch(/асимметрия/);
+  });
+  it('обе стороны ≥9, но разрыв ≥2 — чистый драйвер асимметрии', () => {
+    const r = resolveMovementDriver({ ...clean, kneeToWallL: 10, kneeToWallR: 14 });
     expect(r.driver).toBe('ankle');
     expect(r.label).toMatch(/асимметрия/);
     expect(r.confidence).toBeLessThan(0.7);
   });
+  it('пяти отрываются при чистом остальном паттерне — всё ещё драйвер голеностопа',
+    () => {
+      // Было: `ankleBad && (!depth||!trunk||valgus)` → при чистых соседях драйвер терялся,
+      // а ohsFailCodes в том же файле писал 'heels' (две функции одного файла противоречили).
+      // Стало: distal-first — признак ограниченной дорсифлексии сам по себе есть драйвер.
+      const r = resolveMovementDriver({ ...clean, heelsFlat: false });
+      expect(r.driver).toBe('ankle');
+      expect(ohsFailCodes({ ...clean, heelsFlat: false } as any)).toContain('heels');
+    });
   it('разрыв КТС <2 — тихо', () => {
     expect(resolveMovementDriver({ ...clean, kneeToWallL: 11, kneeToWallR: 12 }).driver).toBe('none');
   });
@@ -98,8 +114,29 @@ describe('bb-movement-screen', () => {
     const r = resolveMovementDriver({ ...clean, ankleDeg: 28, trunkUpright: false });
     expect(r.driver).toBe('ankle');
   });
-  it('изолированный гонометр без видимых компенсаций — не драйвер (честно)', () => {
-    expect(resolveMovementDriver({ ...clean, ankleDeg: 28 }).driver).toBe('none');
+  it('гонометр <35° без видимых компенсаций — драйвер голеностопа (граница PoinT GO 35–38°)', () => {
+    // Было: `driver:'none'` («паттерн чистый») при ankleDeg 28 — гонометр замерен, но не использовался.
+    const r = resolveMovementDriver({ ...clean, ankleDeg: 28 });
+    expect(r.driver).toBe('ankle');
+    expect(r.confidence).toBeGreaterThan(0);
+  });
+  it('пустой скрининг — не «паттерн чистый»', () => {
+    const r = resolveMovementDriver({ tested: false } as any);
+    expect(r.driver).toBe('none');
+    expect(r.tested).toBe(false);
+    expect(r.label).toMatch(/не заполнен/);
+  });
+  it('односторонний: ни одного ввода — «не проверялся», а не «обе стороны чистые»', () => {
+    const v = singleLegVerdict({ splitSquatL: null, splitSquatR: null, rdlL: null, rdlR: null });
+    expect(v.tested).toBe(false);
+    expect(v.text).toMatch(/не проверялся/);
+    expect(v.weakSide).toBeNull();
+  });
+  it('односторонний: только угломер без качественной оценки — не «чисто»', () => {
+    const v = singleLegVerdict({ splitSquatL: null, splitSquatR: null, rdlL: null, rdlR: null, fppaL: 10, fppaR: 12 });
+    expect(v.tested).toBe(true);
+    expect(v.weakSide).toBeNull();
+    expect(v.text).toMatch(/качественную оценку/);
   });
   it('гонометр в норме не ломает чистый паттерн', () => {
     expect(resolveMovementDriver({ ...clean, ankleDeg: 38 }).driver).toBe('none');

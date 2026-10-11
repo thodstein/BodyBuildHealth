@@ -48,7 +48,7 @@ export const BENCH_DISCLAIMER =
 
 const finite = (v: unknown): number | null => {
   const n = typeof v === 'number' ? v : parseFloat(String(v ?? ''));
-  return Number.isFinite(n) ? n : null;
+  return Number.isFinite(n) && n > 0 ? n : null;
 };
 
 /** Хват в биакромиальных ширинах (BAW). null — не хватает данных. */

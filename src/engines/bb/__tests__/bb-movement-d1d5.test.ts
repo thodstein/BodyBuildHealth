@@ -55,8 +55,16 @@ describe('bb-movement D2 шарнир + нагрузка', () => {
     expect(v.degraded).toBe(true);
     expect(v.text).toMatch(/снизь/);
   });
+  it('только база без веса — не «стабилен под нагрузкой»', () => {
+    // Было: {bodyweight:'pass'} → «Нагруженный присед: стабилен под нагрузкой».
+    // Под нагрузкой не мерили ничего — единственное, что отличает пробу (IJSPT 2024).
+    const v = loadedSquatVerdict({ bodyweight: 'pass', bar: null, working: null });
+    expect(v.degraded).toBe(false);
+    expect(v.loadedTested).toBe(false);
+    expect(v.text).toMatch(/только база без веса/);
+  });
   it('база нечиста — чинить паттерн, не вес', () => {
-    expect(loadedSquatVerdict({ bodyweight: 'fail', bar: null, working: null }).text).toMatch(/паттерн/);
+    expect(loadedSquatVerdict({ bodyweight: 'fail', bar: 'fail', working: null }).text).toMatch(/паттерн/);
   });
   it('пусто — тихо', () => {
     expect(loadedSquatVerdict({ bodyweight: null, bar: null, working: null }).degraded).toBe(false);
@@ -73,10 +81,26 @@ describe('bb-movement D3 YBT-LQ', () => {
     expect(v.warn).toBe(true);
     expect(v.text).toMatch(/левая/);
   });
-  it('композит <94 — note', () => {
+  it('только anterior без PM/PL — композит не выдумывается', () => {
+    // Было: композит считали из ОДНОГО anterior, нормированного на голень, и сравнивали
+    // с литературным 94% (ANT+PM+PL / 3×длина конечности) — порог был практически
+    // недостижим, проверка декоративна. Теперь честный неполный ввод.
     const v = ybtLqVerdict({ antL: 40, antR: 41, shinCm: 48 });
-    expect(v.warn).toBe(true);
-    expect(v.text).toMatch(/композит/);
+    expect(v.compositePct).toBeNull();
+    expect(v.compositeFull).toBe(false);
+    expect(v.warn).toBe(false);
+    expect(v.text).toMatch(/PM\/PL/);
+    const full = ybtLqVerdict({ antL: 55, antR: 56, pmL: 50, pmR: 51, plL: 50, plR: 51, limbCm: 80 });
+    expect(full.compositeFull).toBe(true);
+    expect(full.compositePct).toBeCloseTo(64.7, 0);
+    const low = ybtLqVerdict({ antL: 40, antR: 41, pmL: 35, pmR: 36, plL: 35, plR: 36, limbCm: 80 });
+    expect(low.warn).toBe(true);
+    expect(low.text).toMatch(/композит 45\.8/);
+  });
+  it('одна сторона anterior — не «норма», а неполный скрининг', () => {
+    const v = ybtLqVerdict({ antL: 60, antR: null, shinCm: 48 });
+    expect(v.asymCm).toBeNull();
+    expect(v.text).toMatch(/вторую сторону/);
   });
   it('пусто — не замерялся', () => {
     expect(ybtLqVerdict({ antL: null, antR: null, shinCm: null }).tested).toBe(false);

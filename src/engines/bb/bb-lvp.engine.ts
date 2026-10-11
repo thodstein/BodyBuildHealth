@@ -94,7 +94,10 @@ export function calibrateBbLvp(lift: string, points: BbLvpPoint[]): BbLvpProfile
   if (spread < 10) return null; // точки скучены — наклон неинформативен
   const lr = linReg(clean);
   if (!lr) return null;
-  if (lr.slope >= -0.0005) return null; // скорость не падает с весом — мусор
+  // Мусор: скорость практически не падает с весом. Референс (LVP приседа/жима 60→100% 1ПМ):
+  // ≈0.01–0.04 м/с на кг, поэтому порог −0.003 м/с/кг (≈0.03 м/с на 10 кг). Старый порог
+  // −0.0005 пропускал плоский профиль, и e1RM экстраполировался на десятки–сотни кг.
+  if (lr.slope > -0.003) return null; // скорость не падает с весом — мусор
   const valid = lr.r2 >= 0.85;
   const mvt = MVT[vbtLift] ?? 0.2;
   // e1RM — только при валидном профиле (иначе честно null, без выдумок)

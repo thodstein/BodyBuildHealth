@@ -56,6 +56,8 @@ export interface BbDiagIntakeInput {
   screenPriority?: unknown;
   /** PRO-CORR: детали коррекций библиотеки (хаб шлёт, без — тихо). */
   correctiveDetail?: unknown;
+  /** W5 (11.10.2026): статус диагностики — info-слой (bits/persist), сборку не меняет. */
+  diagStatus?: { screenTouched?: boolean; readinessLevel?: string; readinessNoData?: boolean; ybtCompositeFull?: boolean };
 }
 
 export interface BbDiagIntakeExtras {
@@ -183,6 +185,21 @@ export function resolveBbDiagIntakeExtras(d: BbDiagIntakeInput | null | undefine
       && (src.returnAction === undefined || src.returnAction === null)
       && (src.returnStage === undefined || src.returnStage === null),
   };
+
+  // W5: статус диагностики. Это ЧЕСТНОСТЬ payload'а, а не параметры сборки:
+  // приёмник только показывает/сохраняет — план меняется по кнопке пользователя.
+  const st = isRec(src.diagStatus) ? src.diagStatus : null;
+  if (st && st.screenTouched === false) {
+    bits.push('скрининг не пройден — вердикты драйвера/одностороннего/плеча без данных');
+  }
+  if (st && st.readinessNoData === true) {
+    extra.readiness = 'готовность: метрики восстановления не введены (сон/боль/скорость)';
+    bits.push(extra.readiness);
+  }
+  if (st && st.ybtCompositeFull === false && isRec(src.ybt)) {
+    extra.ybtComposite = 'YBT: композит неполный — для расчёта нужны PM/PL и длина конечности';
+    bits.push(extra.ybtComposite);
+  }
 
   const persist: BbDiagIntakeExtras['persist'] = {};
   if (movementDriver) persist.movementDriver = movementDriver;

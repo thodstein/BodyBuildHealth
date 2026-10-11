@@ -49,21 +49,27 @@ export interface LoadedSquatInput {
 }
 
 /** Деградация под нагрузкой: техника чистая налегке, но плывёт под весом. */
-export function loadedSquatVerdict(s: LoadedSquatInput): { degraded: boolean; text: string } {
+export function loadedSquatVerdict(s: LoadedSquatInput): { degraded: boolean; text: string; loadedTested: boolean } {
   const vals = [s.bodyweight, s.bar, s.working];
-  if (vals.every((v) => v == null)) return { degraded: false, text: 'Нагруженный присед: не проверялся' };
+  if (vals.every((v) => v == null)) return { degraded: false, text: 'Нагруженный присед: не проверялся', loadedTested: false };
+  // «Под нагрузкой» — это гриф/рабочий вес. Без них говорить «стабилен под нагрузкой» нельзя:
+  // единственное, что отличает пробу, — именно нагруженная часть.
+  if (s.bar == null && s.working == null) {
+    return { degraded: false, text: 'Нагруженный присед: проверена только база без веса — гриф/рабочий вес не вводили', loadedTested: false };
+  }
   const bwOk = s.bodyweight !== 'fail';
   const workFail = s.working === 'fail' || s.bar === 'fail';
   if (bwOk && workFail) {
     return {
       degraded: true,
       text: 'Нагруженный присед: налегке чисто, под весом плывёт → снизь рабочий вес до чистоты (техника первична), прибавка только через чистые повторы',
+      loadedTested: true,
     };
   }
   if (!bwOk) {
-    return { degraded: false, text: 'Нагруженный присед: база нечиста даже без веса — чини паттерн (драйвер выше), нагрузку не гнать' };
+    return { degraded: false, text: 'Нагруженный присед: база нечиста даже без веса — чини паттерн (драйвер выше), нагрузку не гнать', loadedTested: true };
   }
-  return { degraded: false, text: 'Нагруженный присед: стабилен под нагрузкой' };
+  return { degraded: false, text: 'Нагруженный присед: стабилен под нагрузкой', loadedTested: true };
 }
 
 export interface LoadedHingeInput {
@@ -75,20 +81,25 @@ export const HINGE_LOAD_NOTE =
   'Под >90% 3ПМ флексия позвоночника растёт даже у сильных (2025): нейтраль под весом — отдельный навык; трап-гриф снижает наклон торса (Stahl 2024)';
 
 /** Нагруженный шарнир (RDL/тяга): способность держать нейтраль под весом — навык, не «формальность». */
-export function loadedHingeVerdict(s: LoadedHingeInput): { degraded: boolean; text: string } {
+export function loadedHingeVerdict(s: LoadedHingeInput): { degraded: boolean; text: string; tested: boolean } {
   const vals = [s.rdl, s.floor];
-  if (vals.every((v) => v == null)) return { degraded: false, text: 'Нагруженный наклон: не проверялся' };
+  if (vals.every((v) => v == null)) return { degraded: false, text: 'Нагруженный наклон: не проверялся', tested: false };
+  // Один ввод — один вердикт: «нейтраль под весом» по двум движениям, если проверено одно.
   if (s.rdl !== 'fail' && s.floor !== 'fail') {
-    return { degraded: false, text: 'Нагруженный наклон: нейтраль держится под весом' };
+    const both = s.rdl != null && s.floor != null;
+    const which = both ? '' : s.rdl != null ? ' (RDL; тяга с пола не проверялась)' : ' (тяга с пола; RDL не проверялся)';
+    return { degraded: false, text: `Нагруженный наклон: нейтраль держится под весом${which}`, tested: true };
   }
   if (s.rdl !== 'fail' && s.floor === 'fail') {
     return {
       degraded: false,
       text: 'Нагруженный наклон: RDL чисто, тяга с пола плывёт → замена трап-гриф / тяга с блоков / RDL выше колен до чистоты',
+      tested: true,
     };
   }
   return {
     degraded: true,
     text: 'Нагруженный наклон: под весом поясница уходит → снизь вес до чистой нейтрали; замена трап-гриф / тяга с блоков / RDL выше колен',
+    tested: true,
   };
 }

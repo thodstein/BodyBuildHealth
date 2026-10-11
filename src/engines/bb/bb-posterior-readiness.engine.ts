@@ -78,6 +78,9 @@ export function nheVerdict(s: NheInput): NheVerdict {
   if (minReps != null) {
     if (minReps < 3) { level = 'very_weak'; bits.push(`контроль <3 повторов — эксцентрик слабый`); }
     else if (minReps < 5) { level = 'weak'; bits.push(`${minReps} контролируемых повторов (<5) — эксцентрик в работе`); }
+  } else if (minAngle != null) {
+    // Только угол без повторов: «в порядке» говорить нельзя — считаем только угол.
+    bits.push(`повторы не замерялись, контроль до ${minAngle}°`);
   }
   if (minAngle != null) {
     if (minAngle < 30) { level = 'very_weak'; bits.push(`контроль теряется на ${minAngle}° (<30) — падаешь в первой трети`); }
@@ -162,6 +165,10 @@ export function adductorVerdict(s: AdductorInput): AdductorVerdict {
     const prog = copenhagenProgression(cph as CphLevel);
     if (cph === 'L0') { if (level === 'ok') level = 'weak'; bits.push(`Copenhagen L0 — начни с изометрии, шаг: ${prog.next}`); }
     else bits.push(`Copenhagen ${cph} — шаг: ${prog.next}`);
+  }
+  // Одна сторона без пары: «0%» — это отсутствие данных, а не симметрия.
+  if (asym == null && (l != null || r != null)) {
+    bits.push('сжатие введено одной стороной — введи обе, иначе асимметрия не считается');
   }
   if (!bits.length) {
     return { tested: true, asymPct: asym, weakSide, level: 'ok', text: `Аддукторы: симметрично (${asym ?? 0}%) — Copenhagen не нужен как приоритет` };

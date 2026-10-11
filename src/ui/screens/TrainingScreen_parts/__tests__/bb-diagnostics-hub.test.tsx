@@ -125,11 +125,18 @@ describe('BBDiagnosticsHub', () => {
     expect(screen.queryByText(/нагрузку забирают соседи/)).toBeNull();
   });
   it('weak zone card shows e1RM trend chip from diary', () => {
+    // Окно 7/28д — от СЕГОДНЯ (конвенция хаба), поэтому даты дневника динамические:
+    // статичные ломались бы через месяц после написания теста.
+    const isoAgo = (days: number): string => {
+      const d = new Date();
+      d.setDate(d.getDate() - days);
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    };
     localStorage.setItem('he_workout_log_v1', JSON.stringify([
-      { date: '2026-07-20', exercises: [{ muscleGroup: 'chest', sets: [{ weightKg: 100, reps: 8 }] }] },
-      { date: '2026-08-21', exercises: [{ muscleGroup: 'chest', sets: [{ weightKg: 90, reps: 8 }] }] },
-      { date: '2026-08-22', exercises: [{ muscleGroup: 'chest', sets: [{ weightKg: 90, reps: 8 }] }] },
-      { date: '2026-08-22', exercises: [{ muscleGroup: 'back', sets: [{ weightKg: 80, reps: 8 }] }] },
+      { date: isoAgo(32), exercises: [{ muscleGroup: 'chest', sets: [{ weightKg: 100, reps: 8 }] }] },
+      { date: isoAgo(2), exercises: [{ muscleGroup: 'chest', sets: [{ weightKg: 90, reps: 8 }] }] },
+      { date: isoAgo(1), exercises: [{ muscleGroup: 'chest', sets: [{ weightKg: 90, reps: 8 }] }] },
+      { date: isoAgo(1), exercises: [{ muscleGroup: 'back', sets: [{ weightKg: 80, reps: 8 }] }] },
     ]));
     render(<BBDiagnosticsHub />);
     fireEvent.click(screen.getAllByText('Верх груди')[0]);

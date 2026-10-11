@@ -187,7 +187,13 @@ export function buildBBDiagnosticsCsv(
   plan?: any,
   meta?: { weakCauses?: Record<string, { cause: string; confidence: number; evidence: string[]; fix: string }>; weakHeads?: string[]; specBlock?: { lengthWeeks: number; donors: string[]; rationale: string[]; weeks: Array<{ week: number; targetSets: Record<string, number>; note: string }> } | null } & BBDiagnosticsPro2Meta,
 ): string {
-  const escCsv = (v: string | number) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+  // Защита от формульной инъекции Excel («=cmd», «+», «-», «@») + BOM для кириллицы.
+  const escCsv = (v: string | number): string => {
+    const s = String(v ?? '');
+    const guarded = /^[=+\-@]/.test(s) ? `'${s}` : s;
+    return `"${guarded.replace(/"/g, '""')}"`;
+  };
+  const VERIFICATION_PCT = `${Math.round(report.score.verification * 100)}%`;
   const lines: string[] = [];
   lines.push(['muscle', 'granular', 'source', 'deltaPct', 'reason'].map(escCsv).join(','));
   for (const c of report.weakCandidates) lines.push([c.muscle, c.granular || '', c.source, c.deltaPct, c.reason].map(escCsv).join(','));
@@ -195,7 +201,7 @@ export function buildBBDiagnosticsCsv(
   lines.push(['metric', 'value'].map(escCsv).join(','));
   lines.push(['score', report.score.score].map(escCsv).join(','));
   lines.push(['level', report.score.level].map(escCsv).join(','));
-  lines.push(['verification', report.score.verification].map(escCsv).join(','));
+  lines.push(['verification', VERIFICATION_PCT].map(escCsv).join(','));
   lines.push(['weakCanonical', report.weakMusclesCanonical.join('|')].map(escCsv).join(','));
   lines.push(['weakGranular', report.weakZonesGranular.join('|')].map(escCsv).join(','));
   if (meta?.weakHeads?.length) lines.push(['weakHeads', meta.weakHeads.join('|')].map(escCsv).join(','));
@@ -337,7 +343,8 @@ export function downloadHtml(html: string, filename: string): void {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 export function downloadCsv(csv: string, filename: string): void {
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+  // BOM — иначе Excel на Windows ломает кириллицу (прецедент combat/lab/intelligence-экспортов).
+  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url; a.download = filename; a.click();

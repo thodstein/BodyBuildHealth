@@ -32,6 +32,8 @@ export interface OHSResult {
   primaryDriver: string | null;
   recommendation: string;
   needsPhysio: boolean;
+  /** Заметка по плечу (если введён гониометр сгибания). */
+  shoulderNote?: string;
 }
 
 const SEGMENT_LABELS: Record<OHSSegment, string> = {
@@ -44,14 +46,27 @@ const SEGMENT_LABELS: Record<OHSSegment, string> = {
 };
 
 export function assessOHS(input: OHSInput): OHSResult {
+  // W1: поле `shoulderFlexionDeg` было объявлено (и норма 180° ему обещана), но не
+  // проверялось ни разу — обещание без механизма. Теперь при введённом гониометре
+  // сегмент «руки» честно падает, если плечо не дотягивает диапазон (атлет «держит
+  // руки над стопой» за счёт компенсации поясницей).
+  const shFlex = input.shoulderFlexionDeg != null && Number.isFinite(input.shoulderFlexionDeg) ? input.shoulderFlexionDeg : null;
+  const armPass = shFlex == null ? input.armsOverMidfoot : (input.armsOverMidfoot && shFlex >= OHS_NORMS.shoulderFlexion);
   const segments: OHSSegmentResult[] = [
     { segment: 'ankle', pass: input.heelsFlat, fault: input.heelsFlat ? undefined : 'Пятки отрываются', driver: 'ankle dorsiflexion <35°' },
     { segment: 'knee', pass: !input.kneeValgus, fault: input.kneeValgus ? 'Вальгус коленей' : undefined, driver: 'hip abductor weakness / ankle pronation' },
     { segment: 'hip', pass: input.hipBelowParallel, fault: input.hipBelowParallel ? undefined : 'Недостаточная глубина', driver: 'hip capsule / hamstring' },
     { segment: 'trunk', pass: input.trunkUpright, fault: input.trunkUpright ? undefined : 'Чрезмерный наклон вперед', driver: 'ankle + thoracic kyphosis' },
-    { segment: 'arm', pass: input.armsOverMidfoot, fault: input.armsOverMidfoot ? undefined : 'Руки падают вперед', driver: 'lat tightness / thoracic extension' },
+    { segment: 'arm', pass: armPass, fault: armPass ? undefined : (shFlex != null ? `Плечо: сгибание ${shFlex}° <180° — компенсация поясницей` : 'Руки падают вперед'), driver: 'lat tightness / thoracic extension' },
     { segment: 'lumbar', pass: input.lumbarNeutral, fault: input.lumbarNeutral ? undefined : 'Потеря нейтрали', driver: 'hip flexor shortness / core' },
   ];
+  const shoulderNote = shFlex == null
+    ? undefined
+    : shFlex < 165
+      ? `Плечо: сгибание ${shFlex}° (<165) — выраженное ограничение, оверхед через мобильность плеча/широчайших`
+      : shFlex < OHS_NORMS.shoulderFlexion
+        ? `Плечо: сгибание ${shFlex}° (норма ${OHS_NORMS.shoulderFlexion}°) — на границе, следи за компенсацией поясницей`
+        : `Плечо: сгибание ${shFlex}° — норма`;
   const passed = segments.filter(s => s.pass).length;
   const failed = 6 - passed;
   const totalScore = passed;
@@ -86,7 +101,7 @@ export function assessOHS(input: OHSInput): OHSResult {
 
   const needsPhysio = (input.kneeToWallCm != null && input.kneeToWallCm < 7) || (failed >= 4);
 
-  return { totalScore, passed, failed, level, segments, primaryDriver, recommendation, needsPhysio };
+  return { totalScore, passed, failed, level, segments, primaryDriver, recommendation, needsPhysio, shoulderNote };
 }
 
 export function ohsSegmentFailedCount(input: OHSInput): number {

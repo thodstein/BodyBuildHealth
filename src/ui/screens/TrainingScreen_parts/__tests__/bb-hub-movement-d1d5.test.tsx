@@ -10,12 +10,13 @@ const goScreening = () => {
 };
 
 describe('bb-hub D1 плечо у стены', () => {
-  it('блок рендерится, провал даёт thoracic-маршрут', () => {
+  it('блок рендерится, до ввода честно «не проверялся»', () => {
     goScreening();
     expect(document.querySelector('[data-bb="shoulder-screen"]')).not.toBeNull();
-    expect(screen.getByText(/Плечо у стены: чисто/)).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('switch', { name: /Рёбра вниз/ }));
-    expect(screen.getByText(/Плечо у стены:/).textContent).toMatch(/грудного|ролле/);
+    // Было: чистый стор печатал «Плечо у стены: чисто» — все пять входов были дефолтными true.
+    expect(screen.getByText(/Плечо у стены: не проверялся/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('switch', { name: /Бицепс у ушей/ }));
+    expect(screen.getByText(/Плечо у стены:/).textContent).toMatch(/растяжка широч|грудной/);
   });
   it('ротация: разрыв виден', () => {
     goScreening();

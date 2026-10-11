@@ -2,7 +2,14 @@
  * bb-diagnostics-hub.engine.ts — оркестратор ББ-диагностики (тонкий, без дублей).
  * Собирает 3 уникальных движка + чипы канонов (quality/volume/ACWR) в один отчёт.
  */
-import { detectBBWeakByVolume, detectBBWeakByE1rm, detectBBWeakByCircumf, mergeBBWeakCandidates, type BBWeakCandidate } from './bb-weak-detection.engine';
+import {
+  detectBBWeakByVolume,
+  detectBBWeakByE1rm,
+  detectBBWeakByCircumf,
+  mergeBBWeakCandidates,
+  type BBWeakCandidate,
+} from './bb-weak-detection.engine';
+import { getVolumeLandmarks } from '../volume-landmarks.engine';
 import { scoreBBSymmetry, type BBSymmetryResult } from './bb-symmetry.engine';
 import { analyzeBBStimulus, type BBStimulusResult } from './bb-stimulus.engine';
 import { scoreBB, type BBScoreResult } from './bb-scoring.engine';
@@ -102,12 +109,24 @@ export function buildBBDiagnosticsReport(input: BBDiagnosticsHubInput): BBDiagno
   } catch {}
 
   // volume issues для scoring
+  // ВАЖНО: volumeExceeding — это мышцы ВЫШЕ MRV (реальный перегруз). Раньше сюда подавался
+  // фильтр самых ОТСТАЮЩИХ кандидатов (deltaPct < -40), и пол «перегруз ≥2 мышц» срабатывал
+  // на недоборе, тогда как настоящий over-MRV не был виден нигде.
   let volumeIssues = 0;
   let volumeExceeding = 0;
-  if (input.factVolume) {
-    const volCands = byVol.length;
-    volumeIssues = volCands;
-    volumeExceeding = byVol.filter(c => c.deltaPct < -40).length;
+  if (input.factVolume && input.level) {
+    let overMrv = 0;
+    for (const [m, v] of Object.entries(input.factVolume)) {
+      try {
+        const lm = getVolumeLandmarks(input.level, m);
+        if (!lm || !lm.mrv) continue;
+        const sets = (v as { directSets?: number; effectiveSets?: number })?.directSets
+          ?? (v as { effectiveSets?: number })?.effectiveSets ?? 0;
+        if (sets > lm.mrv) overMrv += 1;
+      } catch { /* noop */ }
+    }
+    volumeExceeding = overMrv;
+    volumeIssues = byVol.length + overMrv;
   }
 
   const acwrDanger = input.perMuscleAcwr ? Object.values(input.perMuscleAcwr).filter(v => v.zone === 'dangerous').length : 0;

@@ -25,7 +25,9 @@ export interface BbTendonGuard {
 
 // Тяга/бицепс грузят дистальный бицепс и локоть; жимы над головой/брусья — плечо.
 const ELBOW_RE = /станов|тяга|подтягиван|deadlift|row|pull-?up|pulldown|сгибание|бицепс|молот|curl|hammer/i;
-const SHOULDER_RE = /жим стоя|армейск|overhead|ohp|брусья|dips|жим л[ёе]жа|bench|наклон|incline|махи|lateral/i;
+// ВАЖНО: 'наклон' убран — он матчил «Тяга штанги В НАКЛОНЕ» и «Гудморнинг (под наклоном)»,
+// относя спино-день к жимовым парам и раздувая shoulderSets до ложного stop.
+const SHOULDER_RE = /жим стоя|армейск|overhead|ohp|брусья|dips|жим л[ёе]жа|bench|incline (press|db|bar)|наклонн.*(жим|пресс)|махи|lateral/i;
 
 function setsOf(ex: any): number {
   if (Array.isArray(ex?.sets)) return ex.sets.length;

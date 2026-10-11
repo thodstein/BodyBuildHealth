@@ -6,9 +6,12 @@
  */
 import React, { useMemo, useState, useEffect } from 'react';
 import { CARD, ACCENT } from './training-ui';
+import { BbScreeningTab } from './bb-hub-screening-tab';
+import { BbCheckCard, BbNum, BbSheetSelect, bbNum } from './bb-hub-controls';
 import { applyToPlanner } from './planner-bridge';
 import { buildPro2Meta } from './bb-hub-export';
 import { localIsoDate } from './diary-shared';
+import { localIsoDateOffset } from '../../../core/local-date';
 import { scoreColor as bbScoreColor } from '../../../engines/bb/bb-scoring.engine';
 import { buildBBDiagnosticsReport } from '../../../engines/bb/bb-diagnostics-hub.engine';
 import { buildBBDiagnosticsHtml, buildBBDiagnosticsCsv, downloadHtml, downloadCsv } from '../../../engines/bb/bb-diagnostics-export.engine';
@@ -61,11 +64,15 @@ import { calibrateBbLvp, parseBbLvpText, loadBbLvpProfiles, saveBbLvpProfile, cl
 const STORAGE_KEY = 'he_bb_diagnostics_hub_v1';
 type BBTab = 'weak' | 'screening' | 'exercise' | 'stimulus' | 'symmetry';
 
-type BBState = {
+export type BBState = {
   weakManual: string[];
   circ: Record<string, string>;
   ohsHeelsFlat: boolean; ohsKneeValgus: boolean; ohsHipBelowParallel: boolean; ohsTrunkUpright: boolean; ohsArmsOverMidfoot: boolean; ohsLumbarNeutral: boolean;
   kneeToWallCm: string; ankleDeg: string; heelRetest: '' | 'better' | 'same';
+  /** Сгибание плеча по гониометру (градусы; норма 180°). */
+  shoulderFlexDeg: string;
+  /** Когда скрининг пройден в последний раз (ISO-дата) — для авто-напоминания о re-screen. */
+  screenDoneAt: string;
   /** КТС левая/правая (см). kneeToWallCm — legacy (мигрирует в обе при загрузке). */
   ktwL: string; ktwR: string;
   /** Скрининг v2: руки на бёдрах чистят поясницу (тест на широчайшие) + односторонний + снимок. */
@@ -124,6 +131,10 @@ type BBState = {
   pmLoc: '' | PainLocation; pmDuring: string; pmMorning: string; pmRising: boolean; pmNight: boolean; pmSharp: boolean;
   /** R3: задняя цепь — NHE (повторы/угол) + аддукторы (сжатие/уровень Copenhagen). */
   nheL: string; nheR: string; nheAngle: string; addL: string; addR: string; cphLevel: '' | CphLevel;
+  /** YBT-LQ: posteromedial / posterolateral / длина конечности (полный композит по протоколу). */
+  ybtPmL: string; ybtPmR: string; ybtPlL: string; ybtPlR: string; limbCm: string;
+  /** Скрининг вообще затронут (иначе все «чисто» — это дефолт, а не результат). */
+  screenTouched: boolean;
   /** Выбранное пользователем упражнение коррекции по зоне (⭐ = id записи библиотеки коррекций).
    *  Единственный источник выбора: карточка/экспорт/вставка/мост читают тот же мемо. */
   prefCorr: Record<string, string>;
@@ -133,7 +144,7 @@ const DEFAULT_STATE: BBState = {
   weakManual: [],
   circ: { heightCm: '175', weightKg: '80', neck: '', chest: '', waist: '', hips: '', bicepL: '', bicepR: '', thighL: '', thighR: '', calfL: '', calfR: '', shoulderWidth: '', forearmL: '', forearmR: '' },
   ohsHeelsFlat: true, ohsKneeValgus: false, ohsHipBelowParallel: true, ohsTrunkUpright: true, ohsArmsOverMidfoot: true, ohsLumbarNeutral: true,
-  kneeToWallCm: '', ankleDeg: '', heelRetest: '',
+  kneeToWallCm: '', ankleDeg: '', heelRetest: '', shoulderFlexDeg: '', screenDoneAt: '',
   ktwL: '', ktwR: '',
   handsOnHipsBetter: false,
   splitL: '', splitR: '', rdlL: '', rdlR: '',
@@ -160,6 +171,7 @@ const DEFAULT_STATE: BBState = {
   hingeDowel: '',
   sqBody: '', sqBar: '', sqWork: '',
   ybtL: '', ybtR: '', shinCm: '',
+  ybtPmL: '', ybtPmR: '', ybtPlL: '', ybtPlR: '', limbCm: '',
   painArc: false, scapWinging: false, videoTwoAngles: false,
   ktwStraightL: '', ktwStraightR: '', hipFlexDeg: '', ppTilt: false,
   rdlLoaded: '', floorLoaded: '',
@@ -167,6 +179,7 @@ const DEFAULT_STATE: BBState = {
   benchGripCm: '', benchTouch: '', benchScapula: '', benchAbduction: '', benchElbowsBelow: false, benchPain: false,
   pmLoc: '', pmDuring: '', pmMorning: '', pmRising: false, pmNight: false, pmSharp: false,
   nheL: '', nheR: '', nheAngle: '', addL: '', addR: '', cphLevel: '',
+  screenTouched: false,
   prefCorr: {},
 };
 
@@ -228,105 +241,6 @@ const circRu = (k: string): string => CIRC_RU[k] || k;
 const weakRu = (z: string): string => GRANULAR_OPTS.find((o) => o.id === z)?.label || MUSCLE_LABEL_RU[z] || z;
 const weakListRu = (zs: string[]): string => zs.map(weakRu).join(' · ');
 
-/** Компактная кнопка-карточка вместо галочки (44px, АПК-тап). */
-const BbCheckCard: React.FC<{ active: boolean; title: string; desc?: string; onToggle: () => void; accent?: string }> = ({ active, title, desc, onToggle, accent = '#00e68a' }) => (
-  <button
-    type="button"
-    role="switch"
-    aria-checked={active}
-    aria-pressed={active}
-    aria-label={title}
-    data-bb="check-card"
-    data-on={active ? '1' : '0'}
-    onClick={onToggle}
-    style={{
-      display: 'flex', alignItems: 'center', gap: 8, minHeight: 44, padding: '8px 10px', borderRadius: 12,
-      border: `1px solid ${active ? accent : 'rgba(255,255,255,0.10)'}`, cursor: 'pointer', textAlign: 'left',
-      background: active ? 'rgba(0,230,138,0.12)' : 'rgba(255,255,255,0.03)', color: '#fff', fontSize: 12, fontWeight: 700,
-    }}
-  >
-    <span aria-hidden style={{ width: 22, height: 22, borderRadius: 7, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: active ? accent : 'rgba(255,255,255,0.08)', color: active ? '#06281c' : '#fff', fontSize: 13, fontWeight: 900 }}>{active ? '✓' : ''}</span>
-    <span style={{ lineHeight: 1.25 }}>{title}{desc ? <span style={{ display: 'block', fontSize: 10, fontWeight: 500, color: '#fff', opacity: 0.85 }}>{desc}</span> : null}</span>
-  </button>
-);
-
-/** Красивое числовое поле: подпись + инпут 44px/16px + степпер. */
-const BbNum: React.FC<{ label: string; value: string; onChange: (v: string) => void; placeholder?: string; width?: number | string; step?: number; testId?: string }> = ({ label, value, onChange, placeholder, width = '100%', step, testId }) => (
-  <label data-bb="num-field" style={{ fontSize: 11, color: '#fff', display: 'block', minWidth: 0 }}>
-    <span style={{ display: 'block', marginBottom: 3, lineHeight: 1.2 }}>{label}</span>
-    <span style={{ display: 'flex', gap: 4, alignItems: 'stretch' }}>
-      {step ? (
-        <button type="button" data-bb="num-minus" aria-label={`Уменьшить ${label}`} onClick={() => { const n = parseFloat(value); onChange(Number.isFinite(n) ? String(Math.max(0, Math.round((n - step) * 10) / 10)) : ''); }} style={{ minWidth: 44, minHeight: 44, borderRadius: 10, border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.05)', color: '#fff', fontSize: 16, fontWeight: 800, cursor: 'pointer' }}>−</button>
-      ) : null}
-      <input
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-        inputMode="decimal"
-        data-bb="num-input"
-        data-testid={testId}
-        aria-label={label}
-        style={{ flex: 1, width, minHeight: 44, background: 'rgba(255,255,255,0.05)', color: '#fff', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '10px 10px', fontSize: 16 }}
-      />
-      {step ? (
-        <button type="button" data-bb="num-plus" aria-label={`Увеличить ${label}`} onClick={() => { const n = parseFloat(value); onChange(Number.isFinite(n) ? String(Math.round((n + step) * 10) / 10) : String(step)); }} style={{ minWidth: 44, minHeight: 44, borderRadius: 10, border: '1px solid rgba(0,230,138,0.30)', background: 'rgba(0,230,138,0.12)', color: '#fff', fontSize: 16, fontWeight: 800, cursor: 'pointer' }}>+</button>
-      ) : null}
-    </span>
-  </label>
-);
-
-/** Красивый попап-выбор вместо нативного селекта (кнопка 44px + шит). */
-const BbSheetSelect: React.FC<{ label: string; value: string; options: Array<{ id: string; label: string; hint?: string }>; onChange: (id: string) => void; testId?: string }> = ({ label, value, options, onChange, testId }) => {
-  const [open, setOpen] = useState(false);
-  const cur = options.find((o) => o.id === value) || null;
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [open ]);
-  return (
-    <span data-bb="sheet-select" style={{ display: 'block', minWidth: 0 }}>
-      <button
-        type="button"
-        aria-haspopup="dialog"
-        aria-expanded={open}
-        aria-label={`${label}: ${cur ? cur.label : 'не выбрано'}`}
-        data-bb="sheet-trigger"
-        data-testid={testId}
-        onClick={() => setOpen((o) => !o)}
-        style={{ width: '100%', minHeight: 44, display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', borderRadius: 12, border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.05)', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', textAlign: 'left' }}
-      >
-        <span style={{ fontSize: 10, fontWeight: 500, color: '#fff', opacity: 0.8 }}>{label}</span>
-        <span style={{ flex: 1 }}>{cur ? cur.label : '— выбери —'}</span>
-        <span aria-hidden style={{ color: '#fff', opacity: 0.8 }}>▾</span>
-      </button>
-      {open && (
-        <span data-bb="sheet-backdrop" onClick={() => setOpen(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 60, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
-          <span role="dialog" aria-modal="true" aria-label={label} data-bb="sheet-card" onClick={(e) => e.stopPropagation()} style={{ width: 'min(560px, 100%)', maxHeight: '70vh', overflowY: 'auto', background: '#101827', border: '1px solid rgba(255,255,255,0.12)', borderBottom: 'none', borderRadius: '18px 18px 0 0', padding: '12px 12px calc(16px + env(safe-area-inset-bottom, 0px))' }}>
-            <span style={{ display: 'block', width: 40, height: 4, borderRadius: 4, background: 'rgba(255,255,255,0.2)', margin: '0 auto 10px' }} />
-            <span style={{ display: 'block', fontSize: 13, fontWeight: 800, color: '#fff', marginBottom: 8 }}>{label}</span>
-            {options.map((o) => (
-              <button
-                key={o.id}
-                type="button"
-                aria-pressed={value === o.id}
-                data-bb="sheet-option"
-                data-active={value === o.id ? '1' : '0'}
-                onClick={() => { onChange(o.id); setOpen(false); }}
-                style={{ width: '100%', minHeight: 48, display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', marginBottom: 6, borderRadius: 12, border: `1px solid ${value === o.id ? 'rgba(0,230,138,0.45)' : 'rgba(255,255,255,0.10)'}`, background: value === o.id ? 'rgba(0,230,138,0.12)' : 'rgba(255,255,255,0.03)', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', textAlign: 'left' }}
-              >
-                <span aria-hidden style={{ width: 20, height: 20, borderRadius: 10, border: '1px solid rgba(255,255,255,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12 }}>{value === o.id ? '●' : ''}</span>
-                <span style={{ flex: 1 }}>{o.label}{o.hint ? <span style={{ display: 'block', fontSize: 10, fontWeight: 500, color: '#fff', opacity: 0.8 }}>{o.hint}</span> : null}</span>
-              </button>
-            ))}
-            <button type="button" data-bb="sheet-done" onClick={() => setOpen(false)} style={{ width: '100%', minHeight: 48, borderRadius: 12, border: 'none', background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#06281c', fontSize: 13, fontWeight: 800, cursor: 'pointer' }}>Готово</button>
-          </span>
-        </span>
-      )}
-    </span>
-  );
-};
 
 /* 3.11: единый парсинг плана ББ из localStorage (было 4 копии). */
 export function pickPlanFromSaved(parsed: unknown): any | null {
@@ -347,7 +261,7 @@ function readSavedBbPlan(): any | null {
 
 /** КТС: L/R приоритетнее legacy-одиночки; eff — худшая сторона (разница ≥2 см — см. драйвер). */
 function ktwOf(s: { ktwL?: string; ktwR?: string; kneeToWallCm?: string }): { l: number | null; r: number | null; eff: number | null } {
-  const num = (v: unknown): number | null => { const n = parseFloat(String(v ?? '')); return Number.isFinite(n) && n >= 0 ? n : null; };
+  const num = (v: unknown): number | null => { const n = bbNum(v as any); return n != null && n >= 0 ? n : null; };
   const l = num(s.ktwL) ?? num(s.kneeToWallCm);
   const r = num(s.ktwR) ?? num(s.kneeToWallCm);
   return { l, r, eff: l != null && r != null ? Math.min(l, r) : (l ?? r) };
@@ -370,6 +284,12 @@ export const BBDiagnosticsHub: React.FC = () => {
   });
   const [tab, setTab] = useState<BBTab>('weak');
   const [toast, setToast] = useState<string>('');
+  /**
+   * Скрининг «пройден» только после реального ввода. Дефолтные OHS-галочки все `true`
+   * (пользователь ещё ничего не отмечал) — без этого флага чистый стор печатал бы
+   * «Присед-тест 6/6 · хорошо» и «Драйвер не найден — паттерн чистый».
+   */
+  const touchScreen = () => setState((s) => (s.screenTouched ? s : { ...s, screenTouched: true, screenDoneAt: localIsoDate() }));
   const [measureHist, setMeasureHist] = useState<MeasureSnapshot[]>(() => {
     try {
       const raw = localStorage.getItem('he_bb_measure_history');
@@ -384,6 +304,9 @@ export const BBDiagnosticsHub: React.FC = () => {
   const [planNonce, setPlanNonce] = useState(0);
   // PRO-5 Э2: профиль читают мемы — бампим тик по profile-updated/storage (правка профиля без ремаунта)
   const [profileNonce, setProfileNonce] = useState(0);
+  // PRO-CORR: после записи he_bb_lr_history (applyToConstructor) флип-гейт и lrDirection
+  // считались по СТАРОМУ срезу — текст и мост уезжали на один клик назад.
+  const [lrHistNonce, setLrHistNonce] = useState(0);
   useEffect(() => {
     const bump = () => setProfileNonce((t) => t + 1);
     try {
@@ -398,7 +321,13 @@ export const BBDiagnosticsHub: React.FC = () => {
     };
   }, []);
 
-  useEffect(() => { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch {} }, [state]);
+  useEffect(() => {
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch {
+      // Тихий отказ терял настройки хаба (замеры/скрининг) без единого сигнала.
+      setToast('⚠ Настройки хаба не сохранились — переполнено хранилище (очисти старые планы/замеры)');
+      setTimeout(() => setToast(''), 3000);
+    }
+  }, [state]);
   // Э4 PRO-5: поиск упражнения в «Разборе» (план — первыми, каталог без произвольного среза)
   const [exQuery, setExQuery] = useState('');
   // Э6 PRO-5: LVP-калибровка (движок был без UI-потребителя) — аккордеон в «Разборе»
@@ -486,12 +415,13 @@ export const BBDiagnosticsHub: React.FC = () => {
 
   const factVolume = useMemo(() => {
     try {
-      // последние 7 дней факт (effective)
-      const now = Date.now();
-      const DAY = 24 * 3600 * 1000;
+      // последние 7 дней факт (effective). Окно — КАЛЕНДАРНОЕ (localIsoDateOffset):
+      // `new Date('YYYY-MM-DD')` — полночь UTC, и в зонах UTC− окно съезжало на сутки
+      // (сессия 6-дневной давности выпадала/заезжала).
+      const from = localIsoDateOffset(-7);
       const recent = diarySessions.filter((s: any) => {
-        const t = s.date ? new Date(s.date).getTime() : 0;
-        return t && now - t <= 7 * DAY;
+        const d = String(s.date || '').slice(0, 10);
+        return d && d >= from;
       });
       if (recent.length === 0) return null;
       // 3.11: факт-объём через канонический aggregateBBVolume (direct + EMG-indirect),
@@ -528,7 +458,8 @@ export const BBDiagnosticsHub: React.FC = () => {
     heelsFlat: state.ohsHeelsFlat, kneeValgus: state.ohsKneeValgus, hipBelowParallel: state.ohsHipBelowParallel,
     trunkUpright: state.ohsTrunkUpright, armsOverMidfoot: state.ohsArmsOverMidfoot, lumbarNeutral: state.ohsLumbarNeutral,
     kneeToWallCm: ktwOf(state).eff,
-    ankleDorsiflexDeg: state.ankleDeg ? parseFloat(state.ankleDeg) : null,
+    ankleDorsiflexDeg: bbNum(state.ankleDeg),
+    shoulderFlexionDeg: bbNum(state.shoulderFlexDeg),
     heelRaiseRetest: state.heelRetest === 'better' ? true : state.heelRetest === 'same' ? false : null,
   }), [state.ohsHeelsFlat, state.ohsKneeValgus, state.ohsHipBelowParallel, state.ohsTrunkUpright, state.ohsArmsOverMidfoot, state.ohsLumbarNeutral, state.ktwL, state.ktwR, state.kneeToWallCm, state.ankleDeg, state.heelRetest]);
 
@@ -554,7 +485,7 @@ export const BBDiagnosticsHub: React.FC = () => {
         return v;
       });
     } catch { return []; }
-  }, [diarySessions]);
+  }, [diarySessions, lrHistNonce]);
   // P2/P3: готовность + красные флаги
   const redFlags = useMemo(() => {
     try {
@@ -563,17 +494,19 @@ export const BBDiagnosticsHub: React.FC = () => {
   }, [state.acutePain, state.swelling, state.numbness, state.jointClickPain]);
   const readiness = useMemo(() => {
     try {
-      // Сон — из профиля; боль сегодня в хабе не спрашиваем (нет данных — нет штрафа, честно)
+      // Сон — из профиля; боль сегодня в хабе не спрашиваем (её место — суставы/ортопедия),
+      // VBT живёт в Анализе силы. Важно: без дневника ACWR не «0 перегруженных», а «нет
+      // данных» — иначе пустой стор выглядел бы измеренным «зелёным».
       const sl = profileSleep;
+      const hasAcwr = Object.keys(perMuscleAcwr as any).length > 0;
       const danger = Object.values(perMuscleAcwr as any).filter((v: any) => v?.zone === 'dangerous').length;
       return assessBbReadiness({
         sleepHours: Number.isFinite(sl as number) ? (sl as number) : null,
         pain010: null,
-        // VBT живёт в Анализе силы — сюда не входит (movement-only)
         vbtLossPct: null,
-        dangerMuscles: danger,
+        dangerMuscles: hasAcwr ? danger : null,
       });
-    } catch { return { level: 'green', reasons: [], advice: '' } as any; }
+    } catch { return { level: 'yellow', reasons: [], advice: '', tested: false, noData: true } as any; }
   }, [profileSleep, perMuscleAcwr]);
   // PRO-3 R2 + PRO-4 S3: return-to после стоп-флагов (ступень выбирается вручную) — гейт вставки
   const returnToPlan = useMemo(() => {
@@ -611,13 +544,13 @@ export const BBDiagnosticsHub: React.FC = () => {
       }
       return out;
     } catch { return []; }
-  }, [lrVerdicts]);
+  }, [lrVerdicts, lrHistNonce]);
 
   const measNum: Record<string, number> = useMemo(() => {
     const out: Record<string, number> = {};
     for (const [k, v] of Object.entries(state.circ)) {
-      const n = parseFloat(v as string);
-      if (Number.isFinite(n) && n > 0) out[k] = n;
+      const n = bbNum(v as string);
+      if (n != null && n > 0) out[k] = n;
     }
     return out;
   }, [state.circ]);
@@ -633,13 +566,13 @@ export const BBDiagnosticsHub: React.FC = () => {
     // Движения, не нагрузка: ACWR/VBT в скоринг не входят (их хабы — Интеллект/Анализ силы).
     // perMuscleAcwr остаётся тихим входом причин (weakCauses), но не штрафа баллов.
     perMuscleAcwr: null,
-    mobilityFails: ohs.failed,
+    mobilityFails: state.screenTouched ? ohs.failed : 0,
     vbtLossPct: null,
     hasDiary: diarySessions.length > 0,
     hasCircumf: Object.keys(measNum).some(k => ['chest','waist','bicepL','bicepR','thighL','thighR'].includes(k)),
     hasVbt: false,
     manualWeak: state.weakManual,
-  }), [level, factVolume, diarySessions, measNum, balance, ohs.failed, state.weakManual, savedPlan]);
+  }), [level, factVolume, diarySessions, measNum, balance, ohs.failed, state.screenTouched, state.weakManual, savedPlan]);
 
   // Э5-доводка (R3): макс перекос L/R — один мемо (было 5 копий расчёта в карточках/выдаче/мосте)
   const asymMax = useMemo(() => {
@@ -652,26 +585,27 @@ export const BBDiagnosticsHub: React.FC = () => {
   // Скрининг v2: драйвер + односторонний + коды/снимок (чистые функции движка)
   const moveDriver = useMemo(() => {
     try {
-      const numStr = (v: string): number | null => { const n = parseFloat(v); return Number.isFinite(n) ? n : null; };
       return resolveMovementDriver({
         heelsFlat: state.ohsHeelsFlat, kneeValgus: state.ohsKneeValgus, hipBelowParallel: state.ohsHipBelowParallel,
         trunkUpright: state.ohsTrunkUpright, armsOverMidfoot: state.ohsArmsOverMidfoot, lumbarNeutral: state.ohsLumbarNeutral,
         kneeToWallCm: ktwOf(state).eff,
         kneeToWallL: ktwOf(state).l,
         kneeToWallR: ktwOf(state).r,
-        ankleDeg: state.ankleDeg ? parseFloat(state.ankleDeg) : null,
+        ankleDeg: bbNum(state.ankleDeg),
         heelRetest: state.heelRetest === 'better' ? 'better' : state.heelRetest === 'same' ? 'same' : null,
         handsOnHipsBetter: state.handsOnHipsBetter || null,
         // R4: гастрокнемиус (прямое колено) + ROM сгибания бедра + задний наклон таза
-        ktwStraightL: numStr(state.ktwStraightL), ktwStraightR: numStr(state.ktwStraightR),
-        hipFlexionDeg: numStr(state.hipFlexDeg),
+        ktwStraightL: bbNum(state.ktwStraightL), ktwStraightR: bbNum(state.ktwStraightR),
+        hipFlexionDeg: bbNum(state.hipFlexDeg),
         ppTilt: state.ppTilt,
+        // Пока скрининг не тронут — «не заполнен», а не «паттерн чистый».
+        tested: state.screenTouched,
       });
-    } catch { return { driver: 'none', label: '—', fix: '', confidence: 0 } as any; }
-  }, [state.ohsHeelsFlat, state.ohsKneeValgus, state.ohsHipBelowParallel, state.ohsTrunkUpright, state.ohsArmsOverMidfoot, state.ohsLumbarNeutral, state.ktwL, state.ktwR, state.kneeToWallCm, state.ankleDeg, state.heelRetest, state.handsOnHipsBetter, state.ktwStraightL, state.ktwStraightR, state.hipFlexDeg, state.ppTilt]);
+    } catch { return { driver: 'none', label: '—', fix: '', confidence: 0, tested: false } as any; }
+  }, [state.ohsHeelsFlat, state.ohsKneeValgus, state.ohsHipBelowParallel, state.ohsTrunkUpright, state.ohsArmsOverMidfoot, state.ohsLumbarNeutral, state.ktwL, state.ktwR, state.kneeToWallCm, state.ankleDeg, state.heelRetest, state.handsOnHipsBetter, state.ktwStraightL, state.ktwStraightR, state.hipFlexDeg, state.ppTilt, state.screenTouched]);
   const singleLeg = useMemo(() => {
     try {
-      const num = (v: string): number | null => { const n = parseFloat(v); return Number.isFinite(n) && n >= 0 ? n : null; };
+      const num = (v: string): number | null => { const n = bbNum(v); return n != null && n >= 0 ? n : null; };
       return singleLegVerdict({
         splitSquatL: (state.splitL || null) as any, splitSquatR: (state.splitR || null) as any,
         rdlL: (state.rdlL || null) as any, rdlR: (state.rdlR || null) as any,
@@ -682,15 +616,16 @@ export const BBDiagnosticsHub: React.FC = () => {
   // D1–D5: плечо/шарнир/YBT/асимметрии/замены (чистые мемы, без TDZ — выше экспорта/моста)
   const shoulderV = useMemo(() => {
     try {
+      if (!state.screenTouched) return { pass: true, fails: [], locus: 'ok', text: 'Плечо у стены: не проверялся', tested: false };
       return shoulderWallVerdict({
         backOnWall: state.shBackOnWall, headOnWall: state.shHeadOnWall, bicepsAtEars: state.shBicepsAtEars,
         ribsDown: state.shRibsDown, noShrug: state.shNoShrug,
       });
-    } catch { return { pass: true, fails: [], locus: 'ok', text: '' } as any; }
-  }, [state.shBackOnWall, state.shHeadOnWall, state.shBicepsAtEars, state.shRibsDown, state.shNoShrug]);
+    } catch { return { pass: true, fails: [], locus: 'ok', text: '', tested: false } as any; }
+  }, [state.shBackOnWall, state.shHeadOnWall, state.shBicepsAtEars, state.shRibsDown, state.shNoShrug, state.screenTouched]);
   const rotV = useMemo(() => {
     try {
-      const n = (v: string): number | null => { const x = parseFloat(v); return Number.isFinite(x) && x >= 0 ? x : null; };
+      const n = (v: string): number | null => { const x = bbNum(v); return x != null && x >= 0 ? x : null; };
       return thoracicRotationVerdict({ rotL: n(state.rotL), rotR: n(state.rotR) });
     } catch { return { text: '', gap: null, low: false } as any; }
   }, [state.rotL, state.rotR]);
@@ -699,20 +634,25 @@ export const BBDiagnosticsHub: React.FC = () => {
   }, [state.hingeDowel]);
   const loadedV = useMemo(() => {
     try {
+      // Teen-гейт: рабочая нагрузка у 14–15 не измеряется (прецедент teenNote ББ-авто).
+      if (teenGate.blocked) return { degraded: false, text: teenGate.note };
       return loadedSquatVerdict({
         bodyweight: (state.sqBody || null) as any, bar: (state.sqBar || null) as any, working: (state.sqWork || null) as any,
       });
-    } catch { return { degraded: false, text: '' } as any; }
-  }, [state.sqBody, state.sqBar, state.sqWork]);
+    } catch { return { degraded: false, text: '' }; }
+  }, [state.sqBody, state.sqBar, state.sqWork, teenGate]);
   const ybtV = useMemo(() => {
     try {
-      const n = (v: string): number | null => { const x = parseFloat(v); return Number.isFinite(x) && x > 0 ? x : null; };
-      return ybtLqVerdict({ antL: n(state.ybtL), antR: n(state.ybtR), shinCm: n(state.shinCm) });
-    } catch { return { tested: false, asymCm: null, compositePct: null, warn: false, text: '' } as any; }
-  }, [state.ybtL, state.ybtR, state.shinCm]);
+      return ybtLqVerdict({
+        antL: bbNum(state.ybtL), antR: bbNum(state.ybtR), shinCm: bbNum(state.shinCm),
+        pmL: bbNum(state.ybtPmL), pmR: bbNum(state.ybtPmR), plL: bbNum(state.ybtPlL), plR: bbNum(state.ybtPlR),
+        limbCm: bbNum(state.limbCm),
+      });
+    } catch { return { tested: false, asymCm: null, compositePct: null, compositeFull: false, warn: false, text: '' } as any; }
+  }, [state.ybtL, state.ybtR, state.shinCm, state.ybtPmL, state.ybtPmR, state.ybtPlL, state.ybtPlR, state.limbCm]);
   const asymText = useMemo(() => {
     try {
-      const n = (v: string): number | null => { const x = parseFloat(v); return Number.isFinite(x) ? x : null; };
+      const n = (v: string): number | null => bbNum(v);
       const kl = n(state.ktwL); const kr = n(state.ktwR);
       const fl = n(state.fppaL); const fr = n(state.fppaR);
       return asymPriorityText({
@@ -729,7 +669,7 @@ export const BBDiagnosticsHub: React.FC = () => {
   // ── R1–R6 PRO-2: жим / боль-мониторинг / задняя цепь / шарнир-нагрузка / ER:IR (чистые мемы) ──
   const benchV = useMemo(() => {
     try {
-      const num = (v: string): number | null => { const n = parseFloat(v); return Number.isFinite(n) && n > 0 ? n : null; };
+      const num = (v: string): number | null => { const n = bbNum(v); return n != null && n > 0 ? n : null; };
       return benchScreenVerdict({
         gripCm: num(state.benchGripCm),
         biacromialCm: num(state.circ.shoulderWidth),
@@ -743,7 +683,7 @@ export const BBDiagnosticsHub: React.FC = () => {
   }, [state.benchGripCm, state.circ.shoulderWidth, state.benchTouch, state.benchScapula, state.benchAbduction, state.benchElbowsBelow, state.benchPain]);
   const painMon = useMemo(() => {
     try {
-      const num = (v: string): number | null => { const n = parseFloat(v); return Number.isFinite(n) ? n : null; };
+      const num = (v: string): number | null => { const n = bbNum(v); return n != null && n >= 0 ? n : null; };
       const input = {
         location: (state.pmLoc || null) as any,
         during010: num(state.pmDuring),
@@ -762,20 +702,26 @@ export const BBDiagnosticsHub: React.FC = () => {
       const g = assessBbTendonGuard(diarySessions as any, {
         level,
         painRedJoint: painMon.verdict.level === 'red' ? joint : null,
+        // W2: оживлены мёртвые параметры. `elbowPain` — заявленная боль в этом суставе
+        // (любой уровень, не только красный); `shoulderOhsFail` — провал плеча в
+        // присед-тесте (стеновый тест). Без них сухожильный стоп не видел ни того, ни
+        // другого, хотя хаб эти данные собирает.
+        elbowPain: state.pmLoc === 'elbow' && painMon.verdict.tested,
+        
       });
       return (g as any)[joint] as { text: string; level: string } | null;
     } catch { return null; }
-  }, [state.pmLoc, diarySessions, level, painMon.verdict.level]);
+  }, [state.pmLoc, diarySessions, level, painMon.verdict.level, painMon.verdict.tested, shoulderV]);
   const nheV = useMemo(() => {
     try {
-      const num = (v: string): number | null => { const n = parseFloat(v); return Number.isFinite(n) && n >= 0 ? n : null; };
+      const num = (v: string): number | null => { const n = bbNum(v); return n != null && n >= 0 ? n : null; };
       const angle = num(state.nheAngle);
       return nheVerdict({ repsL: num(state.nheL), repsR: num(state.nheR), breakAngleL: angle, breakAngleR: angle });
     } catch { return nheVerdict({}); }
   }, [state.nheL, state.nheR, state.nheAngle]);
   const adductorV = useMemo(() => {
     try {
-      const num = (v: string): number | null => { const n = parseFloat(v); return Number.isFinite(n) && n > 0 ? n : null; };
+      const num = (v: string): number | null => { const n = bbNum(v); return n != null && n > 0 ? n : null; };
       return adductorVerdict({ squeezeL: num(state.addL), squeezeR: num(state.addR), cphLevel: (state.cphLevel || '') as any });
     } catch { return adductorVerdict({}); }
   }, [state.addL, state.addR, state.cphLevel]);
@@ -788,7 +734,7 @@ export const BBDiagnosticsHub: React.FC = () => {
   const erIrV = useMemo(() => {
     try {
       if (teenGate.blocked) return erIrVerdict({});
-      const num = (v: string): number | null => { const n = parseFloat(v); return Number.isFinite(n) && n > 0 ? n : null; };
+      const num = (v: string): number | null => { const n = bbNum(v); return n != null && n > 0 ? n : null; };
       return erIrVerdict({ erKg: num(state.erKg), irKg: num(state.irKg) });
     } catch { return erIrVerdict({}); }
   }, [state.erKg, state.irKg, teenGate]);
@@ -819,7 +765,7 @@ export const BBDiagnosticsHub: React.FC = () => {
   // R7: R1–R6 коды снимка (жим/боль/NHE/аддукторы/бедро/шарнир-нагрузка/ER:IR)
   const v3Codes = useMemo(() => {
     try {
-      const n = (v: string): number | null => { const x = parseFloat(v); return Number.isFinite(x) ? x : null; };
+      const n = (v: string): number | null => bbNum(v);
       return v3FailCodes({
         benchLevel: benchV.level,
         nheAsymReps: nheV.asymReps,
@@ -848,7 +794,7 @@ export const BBDiagnosticsHub: React.FC = () => {
         // screenPriorityList (ScreenPriorityInput.erIr), НЕ поле моста. Контракт бриджа
         // (`erir`) собирается отдельно на строках выше/ниже и там уже корректен.
         // Переименовывать здесь нельзя — иначе строка ER:IR молча пропадёт из приоритетов.
-        erIr: erIrV.tested ? erIrV.text : null,
+        erIr: erIrV.tested ? { warn: erIrV.warn, text: erIrV.text } : null,
       });
     } catch { return []; }
   }, [painMon, moveDriver, asymText, painJointTendon, benchV, nheV, adductorV, loadedHingeV, erIrV, teenGate.blocked]);
@@ -885,11 +831,11 @@ export const BBDiagnosticsHub: React.FC = () => {
   }, [mmcAdvice]);
 
   // ── MAX PRO: причины слабых + McCallum + триада + спец-блок + топ-3 ──
-  const wristNum = state.wristCm ? parseFloat(state.wristCm) : NaN;
+  const wristNum = bbNum(state.wristCm) ?? NaN;
   const mcCallum = useMemo(() => (Number.isFinite(wristNum) && wristNum > 0 ? idealMcCallumMap(wristNum) : null), [wristNum]);
   const triadDev = useMemo(() => {
     try {
-      const n = (k: string): number | null => { const v = parseFloat((state.circ as any)[k] || ''); return Number.isFinite(v) && v > 0 ? v : null; };
+      const n = (k: string): number | null => { const v = bbNum((state.circ as any)[k]); return v != null && v > 0 ? v : null; };
       const b = n('bicepL') ?? n('bicepR') ?? (measNum as any).bicep ?? null;
       const c = n('calfL') ?? n('calfR') ?? null;
       const nk = n('neck');
@@ -930,14 +876,23 @@ export const BBDiagnosticsHub: React.FC = () => {
     try { weakCausesPayload = weakCauses as Record<string, unknown>; } catch { /* noop */ }
     try {
       specPayload = specBlock;
-      // топ-3 на каждую слабую зону (макс 6) + головки — из общего мемо exportHeads
+      // PRO-CORR-FIX: в мост едет ТОТ ЖЕ порядок, что и в инъекцию/экспорт — ⭐-выбор
+      // библиотеки первым, каталожный топ-3 только как добор. Раньше уходил чисто
+      // top3ByZone, и выбор звезды в приёмнике расходился с показанным/вставленным.
       const seen = new Set<string>();
       for (const z of report.weakZonesGranular.slice(0, 2)) {
         try {
-          // 3.11: единый источник ранжирования — мемо top3ByZone (без повторного вызова).
+          for (const r of (correctiveTopByZone[z] || [])) {
+            const id = String(r.corr.exerciseId || '').toLowerCase();
+            if (!id || seen.has(id)) continue;
+            seen.add(id); topIds.push(r.corr.exerciseId);
+          }
+        } catch { /* noop */ }
+        try {
           for (const r of (top3ByZone[z] || [])) {
             const id = String(r.id).toLowerCase();
-            if (!seen.has(id)) { seen.add(id); topIds.push(r.id); }
+            if (!id || seen.has(id)) continue;
+            seen.add(id); topIds.push(r.id);
           }
         } catch { /* noop */ }
       }
@@ -953,6 +908,7 @@ export const BBDiagnosticsHub: React.FC = () => {
         hist = pushLrSnapshot(hist, { date: today, group: v.group, weakSide: v.weakSide, asymPct: v.asymPct, verdict: v.verdict });
       }
       localStorage.setItem('he_bb_lr_history', JSON.stringify(hist));
+      setLrHistNonce((n) => n + 1);
     } catch { /* noop */ }
     applyToPlanner({
       kind: 'weakpoints',
@@ -1003,6 +959,16 @@ export const BBDiagnosticsHub: React.FC = () => {
         loadedHinge: !teenGate.blocked && !/не проверялся/.test(loadedHingeV.text) ? { text: loadedHingeV.text } : null,
         erir: !teenGate.blocked && erIrV.tested ? { text: erIrV.text } : null,
         screenPriority: screenPriority.length ? screenPriority : null,
+        // W5: честность статуса диагностики. ВСЁ это info-слой приёмника (bits/persist):
+        // сборку плана он не меняет — применение только по кнопке пользователя.
+        // W5: статус диагностики — info-слой приёмника (bits/persist), сборку не меняет.
+        // Отдельым ключом, не legacy-каналом readiness (сон, боль, скорость - чужие хабы;
+        diagStatus: {
+          screenTouched: state.screenTouched,
+          readinessLevel: (readiness as any)?.level ?? 'yellow',
+          readinessNoData: !!(readiness as any)?.noData,
+          ybtCompositeFull: !!(ybtV as any)?.compositeFull,
+        },
       },
       source: 'intellectual',
     });
@@ -1023,19 +989,24 @@ export const BBDiagnosticsHub: React.FC = () => {
     if (!state.ohsArmsOverMidfoot) restrictions.push('shoulder');
     if (!state.ohsLumbarNeutral) restrictions.push('lower_back');
     // D1: провал плеча у стены — тоже плечо в профиль (тот же канал, без дублей)
-    try { if (!(shoulderV as any)?.pass) restrictions.push('shoulder'); } catch { /* noop */ }
+    try { if (shoulderV && (shoulderV as any).tested && !(shoulderV as any).pass) restrictions.push('shoulder'); } catch { /* noop */ }
     const ktwEff = ktwOf(state).eff;
     if (ktwEff != null && ktwEff < 12) restrictions.push('ankle');
     const uniq = [...new Set(restrictions)];
     try {
       const raw = localStorage.getItem('he_profile_v2');
       const p = raw ? JSON.parse(raw) : {};
-      p.health = p.health || {}; p.health.mobilityRestrictions = uniq;
-      p.training = p.training || {}; (p.training as any).mobilityRestrictions = uniq;
+      // ЕДИНСТВЕННАЯ ошибка прошлого раунда: писали в корень (`p.health` / `p.training`),
+      // а loadTrainingProfile читает `p.settings.training` → ББ-авто не видел ограничений.
+      p.settings = p.settings || {};
+      p.settings.training = p.settings.training || {};
+      (p.settings.training as any).mobilityRestrictions = uniq;
+      p.settings.health = p.settings.health || {};
+      (p.settings.health as any).mobilityRestrictions = uniq;
       localStorage.setItem('he_profile_v2', JSON.stringify(p));
       try { window.dispatchEvent(new CustomEvent('profile-updated')); } catch {}
       const restrRu: Record<string, string> = { ankle: 'голеностоп', hip: 'таз', shoulder: 'плечо', lower_back: 'поясница' };
-      setToast(`✓ Подвижность ${uniq.map((r) => restrRu[r] || r).join(', ') || 'в порядке'} → профиль`);
+      setToast(`✓ Подвижность ${uniq.map((r) => restrRu[r] || r).join(', ') || 'в порядке'} → профиль (ББ-авто учтёт)`);
       setTimeout(() => setToast(''), 2500);
     } catch {}
   };
@@ -1221,8 +1192,8 @@ export const BBDiagnosticsHub: React.FC = () => {
         hist28: hist28 as any,
         e1rmTrend: e1rmTrend as any,
         meas: measNum as any,
-        heightCm: measNum.heightCm ?? (parseFloat(state.circ.heightCm || '') || null),
-        wristCm: state.wristCm ? parseFloat(state.wristCm) : null,
+        heightCm: measNum.heightCm ?? bbNum(state.circ.heightCm),
+        wristCm: bbNum(state.wristCm),
         canonicalOf: canonicalMuscle,
         auditFor: (z) => {
           const aud = (() => { try { return planAudit?.byMuscle?.[z]; } catch { return null; } })();
@@ -1272,7 +1243,7 @@ export const BBDiagnosticsHub: React.FC = () => {
       } catch { out[z] = []; }
     }
     return out;
-  }, [report.weakZonesGranular, report.symmetry.ratios, weakCauses, level, effSex, planAudit, inPlanExerciseIds, profileEquipment]);
+  }, [report.weakZonesGranular, report.symmetry.ratios, weakCauses, level, effSex, planAudit, inPlanExerciseIds, profileEquipment, asymMax]);
 
   // PRO-CORR: библиотека коррекций — зона + причина + сигналы скринингов (единый corrSignalsFor: паритет с экспортом/вставкой).
   // ⭐ Выбор пользователя поднимает запись наверх ОДИН ЗДЕСЬ — карточка, оба экспорта, блок волны,
@@ -1312,17 +1283,21 @@ export const BBDiagnosticsHub: React.FC = () => {
       } catch { out[z] = 0; }
     }
     return out;
-  }, [report.weakZonesGranular, weakCauses, level, profileEquipment, inPlanExerciseIds, moveDriver, benchV, nheV, adductorV, erIrV, painMon, hingeV, shoulderV, ybtV, asymText, teenGate, state.pmLoc, rotV, loadedHingeV]);
-
+  }, [report.weakZonesGranular, report.symmetry.ratios, weakCauses, level, profileEquipment, inPlanExerciseIds, moveDriver, benchV, nheV, adductorV, erIrV, painMon, hingeV, shoulderV, ybtV, asymText, teenGate, state.pmLoc, rotV, loadedHingeV]);
   // ROUND-10: блок коррекции (волна) — единый источник для карточки и экспорта (HTML/CSV/печать)
   const corrBlockLines = useMemo(() => {
     try {
-      const picks = Object.values(correctiveTopByZone).flat().map((r) => ({ corr: r.corr, why: r.why }));
-      const block = correctiveBlockForBB(picks, 6);
+      const flags = corrDoseFlags();
+      const picks = Object.entries(correctiveTopByZone).flatMap(([z, list]) =>
+        list.map((r) => ({ corr: r.corr, why: r.why, cause: (weakCauses as any)?.[z]?.cause ?? null })));
+      // PRO-CORR-FIX: доза блока — теми же входами, что карточка/экспорт/вставка.
+      // Без opts (cause=null, флаги {}) блок показывал другие сеты/RIR при жёлтой/красной боли
+      // и причине recovery — «показано ≠ вставится».
+      const block = correctiveBlockForBB(picks, 6, { flags });
       const lines = correctiveBlockExportLines(block);
       return lines.length ? { lines, block } : null;
     } catch { return null; }
-  }, [correctiveTopByZone]);
+  }, [correctiveTopByZone, weakCauses, readiness, painMon]);
 
   // Э5 PRO-5: единые входы выдачи — головки, детали коррекций и PRO-мета (HTML/CSV/мост одним объектом)
   const exportHeads = useMemo(() => {
@@ -1344,7 +1319,16 @@ export const BBDiagnosticsHub: React.FC = () => {
       }> = [];
       for (const z of report.weakZonesGranular.slice(0, 2)) {
         const r = (correctiveTopByZone[z] || [])[0];
-        if (!r) continue;
+        if (!r) {
+          // Зона без доступных коррекций молча исчезала из выгрузки, хотя инъекция
+          // для той же ситуации честно пишет «⊘ …». Пусто должна быть видна.
+          det.push({
+            id: 'none', zone: z, exerciseId: '',
+            protocol: 'недоступно под текущие фильтры (оборудование/подвижность/план)',
+            cues: [], source: 'фильтры хаба', reps: 0, repsMax: 0, rir: 0, phase: 'none', level: 'any',
+          });
+          continue;
+        }
         const dose = correctiveDose(r.corr, (weakCauses as any)?.[z]?.cause ?? null, corrDoseFlags());
         // K7: доза 1-в-1 с карточкой и вставкой (тот же workMax/loadFactor) — «выгружено = вставится».
         const hint = (() => { try { return correctiveWeightHint(r.corr.exerciseId, profileWorkMax, canonicalMuscle(z), { loadFactor: correctiveLoadFactor(r.corr.phase) }); } catch { return null; } })();
@@ -1598,8 +1582,8 @@ export const BBDiagnosticsHub: React.FC = () => {
     let meas: Record<string, number> = {};
     try {
       for (const [k, v] of Object.entries(state.circ)) {
-        const n = parseFloat(v as string);
-        if (Number.isFinite(n) && n > 0) meas[k] = n;
+        const n = bbNum(v as string);
+        if (n != null && n > 0) meas[k] = n;
       }
     } catch { /* noop */ }
     if (!Object.keys(meas).length) {
@@ -1748,7 +1732,7 @@ export const BBDiagnosticsHub: React.FC = () => {
             }
           }
         } catch { /* noop */ }
-        const r = injectBBWeakPoints(working, zones, { dayMap, targetSets, profTempo, preferredIds, corrective, correctiveCandidates: candidates, equipment: profileEquipment, mobilityRestrictions: profileMobility, workMax: profileWorkMax, weekIdxs: [wi], rirShift, volumeMult, unilateralTopUp, returnAction: retAct ?? undefined });
+        const r = injectBBWeakPoints(working, zones, { dayMap, targetSets, profTempo, preferredIds, corrective, correctiveCandidates: candidates, equipment: profileEquipment, mobilityRestrictions: profileMobility, workMax: profileWorkMax, weekIdxs: [wi], level, rirShift, volumeMult, unilateralTopUp, returnAction: retAct ?? undefined });
         working = r.plan;
         injected += r.injected;
         skippedBudget += r.skippedBudget;
@@ -1756,6 +1740,7 @@ export const BBDiagnosticsHub: React.FC = () => {
       } catch { /* noop */ }
     }
     // Честный счёт пропусков: «уже есть в днях» — это r.skippedDup, а не догадка.
+    // Только-техника — отдельная причина (ступень возврата), её нельзя писать как «бюджет».
     const skipNote = [
       skippedBudget > 0 ? `бюджет: ${skippedBudget}` : '',
       skippedDup > 0 ? `уже в плане: ${skippedDup}` : '',
@@ -1818,6 +1803,10 @@ export const BBDiagnosticsHub: React.FC = () => {
   const handleRestoreSnapshot = (idx: number) => {
     const snap: PlanSnapshot | null = planHistory[idx] || null;
     if (!snap) return;
+    // Восстановление снимка ≠ «инъекция в истории»: иначе кнопка «↩ Откатить вставку»
+    // оставалась живой и возвращала не тот план, откат которого обещал.
+    setHasInjectPrev(false);
+    try { localStorage.removeItem('he_bb_plan_saved_prev'); } catch { /* noop */ }
     try {
       localStorage.setItem('he_bb_plan_saved', JSON.stringify({ plan: snap.plan, date: new Date().toISOString() }));
     } catch {
@@ -1843,7 +1832,7 @@ export const BBDiagnosticsHub: React.FC = () => {
           </div>
           <div style={{ textAlign: 'center' }}>
             <div data-bb="score" style={{ width: 52, height: 52, borderRadius: 26, background: `conic-gradient(${sColor} ${score}%, rgba(255,255,255,0.06) 0)`, display: 'flex', alignItems: 'center', justifyContent: 'center', border: `2px solid ${sColor}`, fontWeight: 900, color: '#fff', fontSize: 14 }}>{score}</div>
-            <div style={{ fontSize: 9, color: sColor, fontWeight: 700, marginTop: 2 }}>{sLevel === 'ok' ? 'ОК' : sLevel === 'warn' ? 'ВНИМАНИЕ' : 'КРИТИЧНО'} · пров. {report.score.verification}</div>
+            <div style={{ fontSize: 9, color: sColor, fontWeight: 700, marginTop: 2 }}>{sLevel === 'ok' ? 'ОК' : sLevel === 'warn' ? 'ВНИМАНИЕ' : 'КРИТИЧНО'} · пров. {Math.round(report.score.verification * 100)}%</div>
           </div>
         </div>
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', fontSize: 10, marginBottom: 8 }}>
@@ -2058,6 +2047,11 @@ export const BBDiagnosticsHub: React.FC = () => {
               <b style={{ color: '#fff' }}>🔗 Смежные хабы (без дублей)</b>
               <div style={{ color: '#fff', marginTop: 4, fontSize: 10, lineHeight: 1.5 }}>
                 Скорость/VBT — <b>⚡ Анализ силы → VBT</b> · Сухожилия/возврат/боль — <b>🦴 Суставы и ортопедия</b> · Нагрузка/сон/готовность — <b>⚡ Интеллект</b> · Объём MEV/MRV — <b>📐 Объём-хаб</b> · Видеоразбор траектории — <b>ТА/СМ-хаб</b>
+              </div>
+              {/* AUDIT: «готовность» больше не прячется — при отсутствии метрик это
+                  видно, иначе «зелёный» выглядел измеренным результатом. */}
+              <div style={{ color: (readiness as any)?.level === 'red' ? '#ef4444' : (readiness as any)?.level === 'yellow' ? '#f59e0b' : '#22c55e', marginTop: 4 }} data-bb="readiness-line">
+                {(readiness as any)?.noData ? '⚠ ' : ''}Готовность: {((readiness as any)?.level === 'red' ? 'красный' : (readiness as any)?.level === 'yellow' ? 'жёлтый' : 'зелёный')}{(readiness as any)?.advice ? ` — ${(readiness as any).advice}` : ''}
               </div>
               {mmcAdvice && (
                 <div style={{ color: '#fff', marginTop: 4 }} data-bb="mmc-line">
@@ -2352,7 +2346,21 @@ export const BBDiagnosticsHub: React.FC = () => {
                 <BbCheckCard active={state.stimCheating} title="Читинг / раскачка" desc="включаю рывок корпусом" onToggle={() => setState(s => ({ ...s, stimCheating: !s.stimCheating }))} accent="#f59e0b" />
                 <BbCheckCard active={state.stimShortRom} title="Амплитуда укорочена" desc="не довожу до конца" onToggle={() => setState(s => ({ ...s, stimShortRom: !s.stimShortRom }))} accent="#f59e0b" />
               </div>
-              <div style={{ marginBottom: 6 }}><BbNum label="Отклонение в технике (например: локти вперёд)" value={state.stimSetupNote} onChange={(v) => setState(s => ({ ...s, stimSetupNote: v }))} placeholder="Опиши отклонение" /></div>
+              {/* Текст, а не число: у BbNum `inputMode="decimal"`, и RU-клавиатура
+                  предлагала цифры/запятую там, где нужно описать отклонение. */}
+              <div style={{ marginBottom: 6 }}>
+                <label data-bb="text-field" style={{ fontSize: 11, color: '#fff', display: 'block', minWidth: 0 }}>
+                  <span style={{ display: 'block', marginBottom: 3 }}>Отклонение в технике (например: локти вперёд)</span>
+                  <input
+                    value={state.stimSetupNote}
+                    onChange={(e) => setState(s => ({ ...s, stimSetupNote: e.target.value }))}
+                    placeholder="Опиши отклонение"
+                    aria-label="Отклонение в технике"
+                    data-bb="text-input"
+                    style={{ width: '100%', minHeight: 44, background: 'rgba(255,255,255,0.05)', color: '#fff', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '10px 10px', fontSize: 16 }}
+                  />
+                </label>
+              </div>
               {selectedDiagnosis?.stimulus?.record && selectedDiagnosis.stimulus.record.cheating.length > 0 && (
                 <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 6, alignItems: 'center' }}>
                   <span style={{ fontSize: 10, color: '#fff' }}>Проверь себя:</span>
@@ -2562,239 +2570,42 @@ export const BBDiagnosticsHub: React.FC = () => {
         )}
 
         {tab === 'screening' && (
-          <div data-bb="mobility-tab">
-            <div style={{ fontSize: 12, fontWeight: 800, color: '#fff', marginBottom: 6 }}>Скрининг — присед с руками вверх (6 признаков) + одна нога + драйвер</div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 6 }} data-bb="ohs-grid">
-              <BbCheckCard active={state.ohsHeelsFlat} title="Пятки плоско" desc="стопы не отрываются" onToggle={() => setState(s => ({ ...s, ohsHeelsFlat: !s.ohsHeelsFlat }))} />
-              <BbCheckCard active={!state.ohsKneeValgus} title="Без вальгуса" desc="колени не сводятся" onToggle={() => setState(s => ({ ...s, ohsKneeValgus: !s.ohsKneeValgus }))} />
-              <BbCheckCard active={state.ohsHipBelowParallel} title="Таз ниже параллели" desc="глубина приседа" onToggle={() => setState(s => ({ ...s, ohsHipBelowParallel: !s.ohsHipBelowParallel }))} />
-              <BbCheckCard active={state.ohsTrunkUpright} title="Корпус вертикально" desc="грудь вверх" onToggle={() => setState(s => ({ ...s, ohsTrunkUpright: !s.ohsTrunkUpright }))} />
-              <BbCheckCard active={state.ohsArmsOverMidfoot} title="Руки над стопой" desc="руки над серединой стопы" onToggle={() => setState(s => ({ ...s, ohsArmsOverMidfoot: !s.ohsArmsOverMidfoot }))} />
-              <BbCheckCard active={state.ohsLumbarNeutral} title="Нейтраль поясницы" desc="без округления" onToggle={() => setState(s => ({ ...s, ohsLumbarNeutral: !s.ohsLumbarNeutral }))} />
-              <BbCheckCard active={!state.ppTilt} title="Таз без «подворота»" desc="глубина до нейтрали таза (не ФАИ-паттерн)" onToggle={() => setState(s => ({ ...s, ppTilt: !s.ppTilt }))} />
-            </div>
-            <div style={{ padding: '8px 10px', borderRadius: 10, background: ohs.level === 'ok' ? 'rgba(34,197,94,0.08)' : ohs.level === 'warn' ? 'rgba(245,158,11,0.08)' : 'rgba(239,68,68,0.08)', border: `1px solid ${ohs.level === 'ok' ? 'rgba(34,197,94,0.18)' : ohs.level === 'warn' ? 'rgba(245,158,11,0.18)' : 'rgba(239,68,68,0.18)'}`, marginBottom: 6 }}>
-              <div style={{ fontSize: 12, fontWeight: 800, color: '#fff' }}>Присед-тест {ohs.totalScore}/6 · {ohs.level === 'ok' ? 'хорошо' : ohs.level === 'warn' ? 'есть замечания' : 'нужна работа'} · несдано {ohs.failed}{ohs.primaryDriver ? ` · ${ohs.primaryDriver}` : ''}</div>
-              <div style={{ fontSize: 11, color: '#fff', marginTop: 4 }}>{ohs.recommendation}</div>
-            </div>
-            <div style={{ padding: '8px 10px', borderRadius: 10, background: 'rgba(0,230,138,0.07)', border: '1px solid rgba(0,230,138,0.16)', marginBottom: 6 }} data-bb="driver-card">
-              <div style={{ fontSize: 12, fontWeight: 800, color: '#00e68a' }}>🎯 Драйвер: {moveDriver.label} ({Math.round(moveDriver.confidence * 100)}%)</div>
-              <div style={{ fontSize: 11, color: '#fff', marginTop: 4 }}>{moveDriver.fix}</div>
-              <div style={{ marginTop: 6 }}>
-                <BbCheckCard active={state.handsOnHipsBetter} title="Руки на бёдрах чистят поясницу" desc="присед с руками на бёдрах лучше — виноваты широчайшие" onToggle={() => setState((s) => ({ ...s, handsOnHipsBetter: !s.handsOnHipsBetter }))} accent="#60a5fa" />
-              </div>
-            </div>
-            <div style={{ padding: '8px 10px', borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', marginBottom: 6 }} data-bb="single-leg">
-              <div style={{ fontSize: 12, fontWeight: 800, color: '#fff', marginBottom: 6 }}>Одна нога — сплит-присед + RDL (5 повторов на сторону, качество)</div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 6 }}>
-                <BbSheetSelect label="Сплит-присед Л" value={state.splitL} onChange={(v) => setState((s) => ({ ...s, splitL: v as any }))} options={[{ id: '', label: 'Не проверял' }, { id: 'pass', label: 'Чисто' }, { id: 'fail', label: 'Гуляет' }]} testId="bb-split-l" />
-                <BbSheetSelect label="Сплит-присед П" value={state.splitR} onChange={(v) => setState((s) => ({ ...s, splitR: v as any }))} options={[{ id: '', label: 'Не проверял' }, { id: 'pass', label: 'Чисто' }, { id: 'fail', label: 'Гуляет' }]} testId="bb-split-r" />
-                <BbSheetSelect label="RDL на ноге Л" value={state.rdlL} onChange={(v) => setState((s) => ({ ...s, rdlL: v as any }))} options={[{ id: '', label: 'Не проверял' }, { id: 'pass', label: 'Чисто' }, { id: 'fail', label: 'Гуляет' }]} testId="bb-rdl-l" />
-                <BbSheetSelect label="RDL на ноге П" value={state.rdlR} onChange={(v) => setState((s) => ({ ...s, rdlR: v as any }))} options={[{ id: '', label: 'Не проверял' }, { id: 'pass', label: 'Чисто' }, { id: 'fail', label: 'Гуляет' }]} testId="bb-rdl-r" />
-              </div>
-              <div style={{ fontSize: 11, color: singleLeg.weakSide ? '#f59e0b' : '#22c55e' }} data-bb="single-leg-verdict">{singleLeg.text}</div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginTop: 6 }}>
-                <BbNum label="Угломер FPPA Л, ° (необязательно)" value={state.fppaL} onChange={(v) => setState(s => ({ ...s, fppaL: v }))} placeholder="—" step={1} testId="bb-fppa-l" />
-                <BbNum label="Угломер FPPA П, ° (необязательно)" value={state.fppaR} onChange={(v) => setState(s => ({ ...s, fppaR: v }))} placeholder="—" step={1} testId="bb-fppa-r" />
-              </div>
-              <div style={{ fontSize: 10, color: '#fff', opacity: 0.85, marginTop: 4 }}>Угломер — только tiebreak при чистой качественной оценке (разрыв ≥10°). Без угломера вердикт не меняется.</div>
-            </div>
-            <div style={{ padding: '8px 10px', borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', marginBottom: 6 }} data-bb="shoulder-screen">
-              <div style={{ fontSize: 12, fontWeight: 800, color: '#fff', marginBottom: 6 }}>Плечо у стены + ротация грудного (жим/ОHP-зона)</div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 6 }}>
-                <BbCheckCard active={state.shBackOnWall} title="Спина на стене" desc="пятки/ягодицы/лопатки плотно" onToggle={() => setState((s) => ({ ...s, shBackOnWall: !s.shBackOnWall }))} />
-                <BbCheckCard active={state.shHeadOnWall} title="Голова на стене" desc="затылок касается, поясница плоская" onToggle={() => setState((s) => ({ ...s, shHeadOnWall: !s.shHeadOnWall }))} />
-                <BbCheckCard active={state.shBicepsAtEars} title="Бицепс у ушей" desc="руки вверх без ухода вперёд" onToggle={() => setState((s) => ({ ...s, shBicepsAtEars: !s.shBicepsAtEars }))} />
-                <BbCheckCard active={state.shRibsDown} title="Рёбра вниз" desc="поясница не прогибается" onToggle={() => setState((s) => ({ ...s, shRibsDown: !s.shRibsDown }))} />
-                <BbCheckCard active={state.shNoShrug} title="Без шрагов" desc="плечи не к ушам" onToggle={() => setState((s) => ({ ...s, shNoShrug: !s.shNoShrug }))} />
-              </div>
-              <div style={{ fontSize: 11, color: shoulderV.pass ? '#22c55e' : '#f59e0b' }} data-bb="shoulder-verdict">{shoulderV.text}</div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginTop: 6 }}>
-                <BbNum label="Ротация грудного Л, °" value={state.rotL} onChange={(v) => setState(s => ({ ...s, rotL: v }))} placeholder="50" step={1} testId="bb-rot-l" />
-                <BbNum label="Ротация грудного П, °" value={state.rotR} onChange={(v) => setState(s => ({ ...s, rotR: v }))} placeholder="50" step={1} testId="bb-rot-r" />
-              </div>
-              <div style={{ fontSize: 11, color: '#fff', marginTop: 4 }} data-bb="rot-verdict">{rotV.text}</div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginTop: 6 }}>
-                <BbNum label="ER кг (ручной динам.)" value={state.erKg} onChange={(v) => setState(s => ({ ...s, erKg: v }))} placeholder="—" step={0.5} testId="bb-er-kg" />
-                <BbNum label="IR кг (ручной динам.)" value={state.irKg} onChange={(v) => setState(s => ({ ...s, irKg: v }))} placeholder="—" step={0.5} testId="bb-ir-kg" />
-              </div>
-              <div style={{ fontSize: 11, color: erIrV.warn ? '#f59e0b' : '#fff', marginTop: 4 }} data-bb="erir-verdict">{erIrV.text}</div>
-              {!teenGate.blocked && <div style={{ fontSize: 10, color: '#fff', opacity: 0.85, marginTop: 4 }} data-bb="erir-disclaimer">{ERIR_DISCLAIMER}</div>}
-              <div style={{ fontSize: 10, color: '#fff', opacity: 0.85, marginTop: 4 }}>Норма ротации ≥50°/сторона, разрыв ≥10° — чинить слабую. Тест стоя у стены, руки вверх, 3 повтора.</div>
-            </div>
-            <div style={{ padding: '8px 10px', borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', marginBottom: 6 }} data-bb="hinge-screen">
-              <div style={{ fontSize: 12, fontWeight: 800, color: '#fff', marginBottom: 6 }}>Шарнир (палка) + присед под нагрузкой</div>
-              <BbSheetSelect label="Палка: затылок/лопатки/крестец" value={state.hingeDowel} onChange={(v) => setState((s) => ({ ...s, hingeDowel: v as any }))} options={[{ id: '', label: 'Не проверял' }, { id: 'full', label: 'Держится (3 точки)' }, { id: 'lumbar_loss', label: 'Поясница отрывается' }, { id: 'neck_loss', label: 'Затылок отрывается' }, { id: 'both', label: 'Теряются обе' }]} testId="bb-hinge" />
-              <div style={{ fontSize: 11, color: hingeV.pass ? '#22c55e' : '#f59e0b', marginTop: 4 }} data-bb="hinge-verdict">{hingeV.text}</div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginTop: 6 }}>
-                <BbSheetSelect label="Присед без веса" value={state.sqBody} onChange={(v) => setState((s) => ({ ...s, sqBody: v as any }))} options={[{ id: '', label: '—' }, { id: 'pass', label: 'Чисто' }, { id: 'fail', label: 'Плывёт' }]} testId="bb-sq-body" />
-                <BbSheetSelect label="Гриф 20 кг" value={state.sqBar} onChange={(v) => setState((s) => ({ ...s, sqBar: v as any }))} options={[{ id: '', label: '—' }, { id: 'pass', label: 'Чисто' }, { id: 'fail', label: 'Плывёт' }]} testId="bb-sq-bar" />
-                <BbSheetSelect label="Рабочий вес" value={state.sqWork} onChange={(v) => setState((s) => ({ ...s, sqWork: v as any }))} options={[{ id: '', label: '—' }, { id: 'pass', label: 'Чисто' }, { id: 'fail', label: 'Плывёт' }]} testId="bb-sq-work" />
-              </div>
-              <div style={{ fontSize: 11, color: loadedV.degraded ? '#f59e0b' : '#fff', marginTop: 4 }} data-bb="loaded-verdict">{loadedV.text}</div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginTop: 6 }}>
-                <BbSheetSelect label="RDL под весом" value={state.rdlLoaded} onChange={(v) => setState((s) => ({ ...s, rdlLoaded: v as any }))} options={[{ id: '', label: '—' }, { id: 'pass', label: 'Нейтраль держится' }, { id: 'fail', label: 'Поясница уходит' }]} testId="bb-rdl-loaded" />
-                <BbSheetSelect label="Тяга с пола" value={state.floorLoaded} onChange={(v) => setState((s) => ({ ...s, floorLoaded: v as any }))} options={[{ id: '', label: '—' }, { id: 'pass', label: 'Нейтраль держится' }, { id: 'fail', label: 'Поясница уходит' }]} testId="bb-floor-loaded" />
-              </div>
-              <div style={{ fontSize: 11, color: loadedHingeV.degraded ? '#f59e0b' : '#fff', marginTop: 4 }} data-bb="loaded-hinge-verdict">{loadedHingeV.text}</div>
-              {!teenGate.blocked && <div style={{ fontSize: 10, color: '#fff', opacity: 0.85, marginTop: 4 }} data-bb="hinge-load-note">{HINGE_LOAD_NOTE}</div>}
-            </div>
-            <div style={{ padding: '8px 10px', borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', marginBottom: 6 }} data-bb="ybt-screen">
-              <div style={{ fontSize: 12, fontWeight: 800, color: '#fff', marginBottom: 6 }}>YBT-баланс (anterior, босиком)</div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6 }}>
-                <BbNum label="Anterior Л, см" value={state.ybtL} onChange={(v) => setState(s => ({ ...s, ybtL: v }))} placeholder="—" step={0.5} testId="bb-ybt-l" />
-                <BbNum label="Anterior П, см" value={state.ybtR} onChange={(v) => setState(s => ({ ...s, ybtR: v }))} placeholder="—" step={0.5} testId="bb-ybt-r" />
-                <BbNum label="Голень, см" value={state.shinCm} onChange={(v) => setState(s => ({ ...s, shinCm: v }))} placeholder="—" step={0.5} testId="bb-shin" />
-              </div>
-              <div style={{ fontSize: 11, color: ybtV.warn ? '#f59e0b' : '#fff', marginTop: 4 }} data-bb="ybt-verdict">{ybtV.text}</div>
-              <div style={{ fontSize: 10, color: '#fff', opacity: 0.85, marginTop: 4 }} data-bb="ybt-disclaimer">{YBT_DISCLAIMER} · пороги: асим &gt;4 см, композит &lt;94%.</div>
-              <div style={{ fontSize: 11, color: '#fff', marginTop: 4 }} data-bb="asym-priority">{asymText}</div>
-            </div>
-            <div style={{ padding: '8px 10px', borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', marginBottom: 6 }} data-bb="bench-screen">
-              <div style={{ fontSize: 12, fontWeight: 800, color: '#fff', marginBottom: 6 }}>Жим лёжа — хват и техника (главный плечевой риск)</div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 6 }}>
-                <BbNum label="Хват, см (между указательными)" value={state.benchGripCm} onChange={(v) => setState(s => ({ ...s, benchGripCm: v }))} placeholder="—" step={1} testId="bb-bench-grip" />
-                <BbNum label="Отведение плеча, °" value={state.benchAbduction} onChange={(v) => setState(s => ({ ...s, benchAbduction: v }))} placeholder="—" step={1} testId="bb-bench-abd" />
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 6 }}>
-                <BbSheetSelect label="Точка касания" value={state.benchTouch} onChange={(v) => setState((s) => ({ ...s, benchTouch: v as any }))} options={[{ id: '', label: 'Не проверял' }, { id: 'nipple', label: 'Линия сосков' }, { id: 'upper_abs', label: 'Живот (арка)' }, { id: 'neck', label: 'У шеи' }]} testId="bb-bench-touch" />
-                <BbSheetSelect label="Лопатки" value={state.benchScapula} onChange={(v) => setState((s) => ({ ...s, benchScapula: v as any }))} options={[{ id: '', label: '—' }, { id: 'retracted', label: 'Сведены' }, { id: 'neutral', label: 'Нейтрально' }, { id: 'released', label: 'Распущены' }]} testId="bb-bench-scapula" />
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 6 }}>
-                <BbCheckCard active={!state.benchElbowsBelow} title="Локти не ниже скамьи" desc="плечо в безопасном коридоре" onToggle={() => setState(s => ({ ...s, benchElbowsBelow: !s.benchElbowsBelow }))} />
-                <BbCheckCard active={!state.benchPain} title="Без боли в жиме" desc="боль → техника + правило боли" accent="#ef4444" onToggle={() => setState(s => ({ ...s, benchPain: !s.benchPain }))} />
-              </div>
-              <div style={{ fontSize: 11, color: benchV.level === 'fix' ? '#f59e0b' : '#fff' }} data-bb="bench-verdict">{benchV.text}</div>
-              {benchCorrections(benchV).length > 1 && (
-                <ul style={{ margin: '4px 0 0', paddingLeft: 18, fontSize: 10, color: '#fff', lineHeight: 1.5 }} data-bb="bench-fixes">
-                  {benchCorrections(benchV).map((f, i) => <li key={i}>{f}</li>)}
-                </ul>
-              )}
-              <div style={{ fontSize: 10, color: '#fff', opacity: 0.85, marginTop: 4 }} data-bb="bench-disclaimer">{BENCH_DISCLAIMER}{benchV.gripBaw != null ? ` · хват ${benchV.gripBaw} BAW` : ' · BAW — из ширины плеч в «Пропорциях»'}</div>
-            </div>
-            <div style={{ padding: '8px 10px', borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', marginBottom: 6 }} data-bb="pain-monitor">
-              <div style={{ fontSize: 12, fontWeight: 800, color: '#fff', marginBottom: 6 }}>Боль-мониторинг (правило ≤5 днём / &lt;5 утром)</div>
-              <BbSheetSelect label="Локация боли" value={state.pmLoc} onChange={(v) => setState((s) => ({ ...s, pmLoc: v as any }))} options={[{ id: '', label: 'Не заполнено' }, ...PAIN_LOCATIONS.map((p) => ({ id: p.id, label: p.label }))]} testId="bb-pm-loc" />
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginTop: 6, marginBottom: 6 }}>
-                <BbNum label="Боль во время, 0–10" value={state.pmDuring} onChange={(v) => setState(s => ({ ...s, pmDuring: v }))} placeholder="—" step={1} testId="bb-pm-during" />
-                <BbNum label="Боль на утро, 0–10" value={state.pmMorning} onChange={(v) => setState(s => ({ ...s, pmMorning: v }))} placeholder="—" step={1} testId="bb-pm-morning" />
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginBottom: 6 }}>
-                <BbCheckCard active={!state.pmRising} title="Не растёт по неделям" desc="тренд стабилен/падает" onToggle={() => setState(s => ({ ...s, pmRising: !s.pmRising }))} accent="#f59e0b" />
-                <BbCheckCard active={!state.pmNight} title="Без ночной боли" desc="ночью не беспокоит" accent="#ef4444" onToggle={() => setState(s => ({ ...s, pmNight: !s.pmNight }))} />
-                <BbCheckCard active={!state.pmSharp} title="Без резкой боли" desc="боль тупая, не «прострел»" accent="#ef4444" onToggle={() => setState(s => ({ ...s, pmSharp: !s.pmSharp }))} />
-              </div>
-              <div style={{ fontSize: 11, color: painMon.verdict.level === 'red' ? '#ef4444' : painMon.verdict.level === 'yellow' ? '#f59e0b' : '#fff' }} data-bb="pm-verdict">{painMon.verdict.text}</div>
-              {painMon.verdict.tested && <div style={{ fontSize: 11, color: '#fff', marginTop: 4 }} data-bb="pm-advice">{painMon.verdict.advice}</div>}
-              {state.pmLoc && <div style={{ fontSize: 10, color: '#fff', opacity: 0.85, marginTop: 4 }} data-bb="pm-provocation">Провокация: {provocationFor(state.pmLoc)}</div>}
-              {painJointTendon && <div style={{ fontSize: 11, color: '#fff', marginTop: 4 }} data-bb="pm-tendon">{painJointTendon.text}</div>}
-              <div style={{ fontSize: 10, color: '#fff', opacity: 0.85, marginTop: 4 }} data-bb="pm-disclaimer">{PAIN_MONITOR_DISCLAIMER}</div>
-            </div>
-            <div style={{ padding: '8px 10px', borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', marginBottom: 6 }} data-bb="posterior-readiness">
-              <div style={{ fontSize: 12, fontWeight: 800, color: '#fff', marginBottom: 6 }}>Задняя цепь — NHE (эксцентрик) + аддукторы</div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginBottom: 6 }}>
-                <BbNum label="NHE повторов Л" value={state.nheL} onChange={(v) => setState(s => ({ ...s, nheL: v }))} placeholder="—" step={1} testId="bb-nhe-l" />
-                <BbNum label="NHE повторов П" value={state.nheR} onChange={(v) => setState(s => ({ ...s, nheR: v }))} placeholder="—" step={1} testId="bb-nhe-r" />
-                <BbNum label="Контроль до угла, °" value={state.nheAngle} onChange={(v) => setState(s => ({ ...s, nheAngle: v }))} placeholder="—" step={5} testId="bb-nhe-angle" />
-              </div>
-              <div style={{ fontSize: 11, color: nheV.level === 'ok' || nheV.level === 'not_tested' ? '#fff' : '#f59e0b' }} data-bb="nhe-verdict">{nheV.text}</div>
-              <div style={{ fontSize: 10, color: '#fff', opacity: 0.85, marginTop: 4 }} data-bb="nhe-disclaimer">{NHE_DISCLAIMER}</div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginTop: 6, marginBottom: 6 }}>
-                <BbNum label="Сжатие аддукторов Л, кг" value={state.addL} onChange={(v) => setState(s => ({ ...s, addL: v }))} placeholder="—" step={1} testId="bb-add-l" />
-                <BbNum label="Сжатие аддукторов П, кг" value={state.addR} onChange={(v) => setState(s => ({ ...s, addR: v }))} placeholder="—" step={1} testId="bb-add-r" />
-              </div>
-              <BbSheetSelect label="Copenhagen, уровень" value={state.cphLevel} onChange={(v) => setState((s) => ({ ...s, cphLevel: v as any }))} options={[{ id: '', label: '—' }, { id: 'L0', label: 'L0 — изометрия' }, { id: 'L1', label: 'L1 — короткий рычаг' }, { id: 'L2', label: 'L2 — полный' }, { id: 'L3', label: 'L3 — динамика' }]} testId="bb-cph-level" />
-              <div style={{ fontSize: 11, color: adductorV.level === 'weak' ? '#f59e0b' : '#fff', marginTop: 4 }} data-bb="adductor-verdict">{adductorV.text}</div>
-              <div style={{ fontSize: 10, color: '#fff', opacity: 0.85, marginTop: 4 }} data-bb="adductor-honesty">{ADDUCTOR_HONESTY}</div>
-            </div>
-            <div style={{ padding: '8px 10px', borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', marginBottom: 6 }} data-bb="scap-video">
-              <div style={{ fontSize: 12, fontWeight: 800, color: '#fff', marginBottom: 6 }}>Лопатка/боль + видео + замены</div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 6 }}>
-                <BbCheckCard active={!state.painArc} title="Без боли 60–120°" desc="дуга подъёма чистая" onToggle={() => setState((s) => ({ ...s, painArc: !s.painArc }))} accent="#ef4444" />
-                <BbCheckCard active={!state.scapWinging} title="Лопатка стабильна" desc="без крыловидности" onToggle={() => setState((s) => ({ ...s, scapWinging: !s.scapWinging }))} accent="#60a5fa" />
-              </div>
-              {(state.painArc || state.scapWinging) && (
-                <div style={{ fontSize: 11, color: '#f59e0b', marginBottom: 6 }} data-bb="scap-note">
-                  {state.painArc ? 'Боль в дуге 60–120°: жимы над головой и тяги за голову — стоп до врача; нейтральный хват + лицо-тяги. ' : ''}
-                  {state.scapWinging ? 'Крыловидность: стена-слайды + серратус (кулак вверх у стены) 2×12, жим — с паузой и сведением.' : ''}
-                  Скрининг, не диагноз.
-                </div>
-              )}
-              <BbCheckCard active={state.videoTwoAngles} title="Видео с 2 ракурсов" desc="5 повторов, босиком, спереди + сбоку" onToggle={() => setState((s) => ({ ...s, videoTwoAngles: !s.videoTwoAngles }))} accent="#a855f7" />
-              <div style={{ fontSize: 10, color: '#fff', opacity: 0.85, marginTop: 4 }} data-bb="video-guide">{VIDEO_GUIDE}</div>
-              <div style={{ fontSize: 11, color: '#fff', marginTop: 6 }} data-bb="driver-subs">
-                Замены под драйвер: {driverSubs.prefer.length ? driverSubs.prefer.join(' · ') : '—'}
-                {driverSubs.avoid.length ? ` (убрать: ${driverSubs.avoid.join(' · ')})` : ''} — {driverSubs.note}
-              </div>
-              <div style={{ fontSize: 10, color: '#fff', opacity: 0.85, marginTop: 4 }} data-bb="screening-disclaimer">{SCREENING_DISCLAIMER}</div>
-            </div>
-            <div style={{ padding: '8px 10px', borderRadius: 10, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.16)', marginBottom: 6 }} data-bb="screen-priority">
-              <div style={{ fontSize: 12, fontWeight: 800, color: '#00e68a', marginBottom: 4 }}>🧭 Что чинить первым (горизонт 4–6 нед)</div>
-              <ol style={{ margin: 0, paddingLeft: 18, fontSize: 11, color: '#fff', lineHeight: 1.5 }}>
-                {screenPriority.map((p, i) => <li key={i}>{p}</li>)}
-              </ol>
-              {teenGate.blocked && <div style={{ fontSize: 10, color: '#f59e0b', marginTop: 4 }} data-bb="teen-gate">{teenGate.note}</div>}
-            </div>
-            <div style={{ padding: '8px 10px', borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', marginBottom: 6 }} data-bb="screen-history">
-              <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', marginBottom: 4 }}>
-                <b style={{ fontSize: 11, color: '#fff' }}>📸 Снимки скрининга ({screenHist.length})</b>
-                <button onClick={() => {
-                  // П1/R7: снимок v:3 — OHS + D1–D5 + R1–R6 коды (legacy без v / v:2 мигрируют в дельте, не регрессом)
-                  const entry = { date: localIsoDate(), fails: screenCodes, v: 3 };
-                  setScreenHist((prev) => {
-                    const next = [...prev, entry].slice(-10);
-                    try { localStorage.setItem('he_bb_screen_history', JSON.stringify(next)); } catch { /* noop */ }
-                    return next;
-                  });
-                  setToast(`✓ Снимок скрининга ${entry.date} сохранён`);
-                  setTimeout(() => setToast(''), 2000);
-                }} data-bb="screen-snapshot" style={{ minHeight: 44, padding: '8px 12px', borderRadius: 10, background: 'rgba(0,230,138,0.12)', border: '1px solid rgba(0,230,138,0.22)', color: '#00e68a', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>Снимок сегодня</button>
-              </div>
-              <div style={{ fontSize: 11, color: '#fff' }} data-bb="screen-delta">{screenDelta.text}</div>
-              {(screenDelta.tracked?.length ?? 0) > 0 && (
-                <div style={{ fontSize: 10, color: '#fff', marginTop: 2, opacity: 0.9 }} data-bb="screen-tracked" title={screenDelta.tracked.join(', ')}>
-                  Новый трекинг: {trackedRu(screenDelta.tracked)}
-                </div>
-              )}
-              {(() => {
-                try {
-                  const last = screenHist.length ? screenHist[screenHist.length - 1] : null;
-                  if (!last) return null;
-                  const days = Math.floor((Date.now() - new Date(last.date + 'T12:00:00').getTime()) / 86400000);
-                  if (days > 42) {
-                    return <div style={{ marginTop: 4, color: '#f59e0b' }} data-bb="screen-stale">⏰ Снимку {days} дн — пора перепроверить (норма re-screen 4–6 нед).</div>;
-                  }
-                  return null;
-                } catch { return null; }
-              })()}
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginBottom: 6 }} data-bb="ankle-grid">
-              <BbNum label="КТС левая, см" value={state.ktwL} onChange={(v) => setState(s => ({ ...s, ktwL: v }))} placeholder="12" step={0.5} testId="bb-ktw-l" />
-              <BbNum label="КТС правая, см" value={state.ktwR} onChange={(v) => setState(s => ({ ...s, ktwR: v }))} placeholder="12" step={0.5} testId="bb-ktw-r" />
-              <BbNum label="Голеностоп, °" value={state.ankleDeg} onChange={(v) => setState(s => ({ ...s, ankleDeg: v }))} placeholder="35" step={1} testId="bb-ankle-deg" />
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginBottom: 6 }} data-bb="ankle-straight">
-              <BbNum label="КТС прям. колено Л, см" value={state.ktwStraightL} onChange={(v) => setState(s => ({ ...s, ktwStraightL: v }))} placeholder="12" step={0.5} testId="bb-ktw-straight-l" />
-              <BbNum label="КТС прям. колено П, см" value={state.ktwStraightR} onChange={(v) => setState(s => ({ ...s, ktwStraightR: v }))} placeholder="12" step={0.5} testId="bb-ktw-straight-r" />
-              <BbNum label="Сгибание бедра, °" value={state.hipFlexDeg} onChange={(v) => setState(s => ({ ...s, hipFlexDeg: v }))} placeholder="120" step={1} testId="bb-hip-flex" />
-            </div>
-            <div style={{ display: 'flex', gap: 6, marginBottom: 6, alignItems: 'center', flexWrap: 'wrap' }} data-bb="heel-row">
-              <span style={{ fontSize: 12, color: '#fff', fontWeight: 700 }}>Подпятка 2,5 см</span>
-              <button onClick={() => setState(s => ({ ...s, heelRetest: 'better' }))} aria-pressed={state.heelRetest === 'better'} data-bb="heel-better" style={{ minHeight: 44, padding: '8px 14px', borderRadius: 999, border: '1px solid', borderColor: state.heelRetest === 'better' ? '#22c55e' : 'rgba(255,255,255,0.12)', background: state.heelRetest === 'better' ? 'rgba(34,197,94,0.14)' : 'rgba(255,255,255,0.04)', color: state.heelRetest === 'better' ? '#22c55e' : '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>Стало лучше</button>
-              <button onClick={() => setState(s => ({ ...s, heelRetest: 'same' }))} aria-pressed={state.heelRetest === 'same'} data-bb="heel-same" style={{ minHeight: 44, padding: '8px 14px', borderRadius: 999, border: '1px solid', borderColor: state.heelRetest === 'same' ? '#f59e0b' : 'rgba(255,255,255,0.12)', background: state.heelRetest === 'same' ? 'rgba(245,158,11,0.14)' : 'rgba(255,255,255,0.04)', color: state.heelRetest === 'same' ? '#f59e0b' : '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>Без изменений</button>
-              <button onClick={() => setState(s => ({ ...s, heelRetest: '' }))} data-bb="heel-reset" style={{ minHeight: 44, padding: '8px 14px', borderRadius: 999, border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.04)', color: '#fff', fontSize: 12, cursor: 'pointer' }}>Сброс</button>
-              <span style={{ fontSize: 11, color: '#fff' }}>Норма ≥{OHS_NORMS.kneeToWallCm.optimal} см · разница Л/П ≥2 см — чинить отстающую</span>
-            </div>
-            <div style={{ display: 'flex', gap: 6, marginTop: 6, flexWrap: 'wrap' }}>
-              <button onClick={applyMobilityToProfile} data-bb="mobility-to-profile" style={{ minHeight: 48, flex: '1 1 200px', padding: '10px 14px', borderRadius: 10, background: ohs.failed > 0 ? 'rgba(59,130,246,0.14)' : 'rgba(34,197,94,0.10)', border: `1px solid ${ohs.failed > 0 ? 'rgba(59,130,246,0.22)' : 'rgba(34,197,94,0.18)'}`, color: '#fff', fontSize: 13, fontWeight: 800, cursor: 'pointer' }}>→ В профиль {ohs.failed ? `(${ohs.failed}/6)` : '(порядок)'}</button>
-            </div>
-            <div style={{ fontSize: 11, color: '#fff', marginTop: 6 }}>Скорость/VBT — <b>⚡ Анализ силы</b> · Траектория/углы из видео — <b>ТА/СМ видеоразбор</b> · Суставы — <b>🦴 Суставы и ортопедия</b> · Нагрузка — <b>⚡ Интеллект</b> (здесь только скрининг, без дублей).</div>
-          </div>
+          <BbScreeningTab
+            state={state}
+            setState={setState}
+            setToast={setToast}
+            touchScreen={touchScreen}
+            ohs={ohs}
+            moveDriver={moveDriver}
+            singleLeg={singleLeg}
+            shoulderV={shoulderV}
+            rotV={rotV}
+            hingeV={hingeV}
+            loadedV={loadedV}
+            loadedHingeV={loadedHingeV}
+            ybtV={ybtV}
+            asymText={asymText}
+            driverSubs={driverSubs}
+            benchV={benchV}
+            painMon={painMon}
+            painJointTendon={painJointTendon}
+            nheV={nheV}
+            adductorV={adductorV}
+            erIrV={erIrV}
+            screenPriority={screenPriority}
+            screenHist={screenHist}
+            setScreenHist={setScreenHist}
+            screenCodes={screenCodes}
+            screenDelta={screenDelta}
+            teenGate={teenGate}
+            applyMobilityToProfile={applyMobilityToProfile}
+            trackedRu={trackedRu}
+          />
         )}
       </div>
 
       <div style={{ ...CARD, padding: 10, margin: 0, background: 'rgba(0,230,138,0.08)', border: '1px solid rgba(0,230,138,0.16)' }} data-bb="footer">
-        <div style={{ fontSize: 11, color: '#fff', marginBottom: 6 }}>Выбрано: {weakListRu(report.weakZonesGranular) || '— баланс'} · оценка {score} · пров. {report.score.verification} {report.score.floors.join(' · ')}</div>
+        <div style={{ fontSize: 11, color: '#fff', marginBottom: 6 }}>Выбрано: {weakListRu(report.weakZonesGranular) || '— баланс'} · оценка {score} · пров. {Math.round(report.score.verification * 100)}% {report.score.floors.join(' · ')}</div>
         <div style={{ fontSize: 11, color: '#fff', marginBottom: 6 }}>{report.findings.slice(0, 3).join(' · ') || '—'}</div>
         {sLevel === 'critical' && <div style={{ fontSize: 11, color: '#ef4444', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.18)', borderRadius: 8, padding: '8px 10px', marginBottom: 6 }}>⚠️ Критично — урезание предельного объёма и коррекция до пика. Проверь присед-тест + объём.</div>}
         {specBlock && (
@@ -2818,12 +2629,12 @@ export const BBDiagnosticsHub: React.FC = () => {
               if (zones.length) lines.push(`Зоны: ${zones.join(', ')}`);
               // упражнения — из ТОГО ЖЕ источника, что уходит в мост (top3ByZone → preferredExerciseIds)
               const names = report.weakZonesGranular.map((z) => {
-                const first = (top3ByZone[z] || [])[0];
+                const first = (correctiveTopByZone[z] || [])[0];
                 if (!first) return null;
                 try {
-                  const c = (EXERCISE_CATALOG as Array<{ id?: string; name?: string }>).find((e) => String(e.id).toLowerCase() === String(first.id).toLowerCase());
-                  return c?.name ? String(c.name) : first.id;
-                } catch { return first.id; }
+                  const c = (EXERCISE_CATALOG as Array<{ id?: string; name?: string }>).find((e) => String(e.id).toLowerCase() === String(first.corr.exerciseId).toLowerCase());
+                  return c?.name ? String(c.name) : first.corr.exerciseId;
+                } catch { return first.corr.exerciseId; }
               }).filter((x): x is string => !!x);
               if (names.length) lines.push(`Упражнения (⭐ первым): ${names.slice(0, 6).join(', ')}`);
               const det = Array.isArray(correctiveDetailForExport) ? correctiveDetailForExport.slice(0, 3) : [];

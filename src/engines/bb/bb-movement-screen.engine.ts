@@ -32,6 +32,8 @@ export interface OhsScreenInput {
   hipFlexionDeg?: number | null;
   /** Задний наклон таза в глубоком приседе («подворот») — глубина до нейтрали (PMC10987311 2024). */
   ppTilt?: boolean;
+  /** false — скрининг не пройден (нет ни одного замера): не выдаём «паттерн чистый» за результат. */
+  tested?: boolean;
 }
 
 export type MovementDriver = 'ankle' | 'hip' | 'thoracic' | 'shoulder' | 'core' | 'none';
@@ -41,10 +43,22 @@ export interface MovementDriverResult {
   label: string;
   fix: string;
   confidence: number; // 0-1
+  /** false — скрининг не заполнен: «драйвера нет» ≠ «паттерн чистый». */
+  tested: boolean;
 }
 
 /** Приоритет distal→proximal: голеностоп первичен (PoinT GO), дальше ТБС/грудь/плечо/кор. */
 export function resolveMovementDriver(input: OhsScreenInput): MovementDriverResult {
+  const NOT_TESTED: MovementDriverResult = {
+    driver: 'none',
+    label: 'Скрининг не заполнен',
+    fix: 'Пройди присед с руками вверх (6 признаков) + КТС + одну ногу — драйвер появится здесь',
+    confidence: 0,
+    tested: false,
+  };
+  // Единственный источник «пройден ли скрининг» — явный флаг вызывающей стороны
+  // (ведение скрининга в хабе: пока ни один контрол не тронут — «не заполнен»).
+  if (input.tested === false) return NOT_TESTED;
   const fin = (v: unknown): number | null => (v != null && Number.isFinite(v as number) ? (v as number) : null);
   const ktwL = fin(input.kneeToWallL) ?? fin(input.kneeToWallCm);
   const ktwR = fin(input.kneeToWallR) ?? fin(input.kneeToWallCm);
@@ -67,8 +81,11 @@ export function resolveMovementDriver(input: OhsScreenInput): MovementDriverResu
       : stGap != null && stGap >= 2 && stL != null && stR != null
         ? asymPart('КТС прям. колена', stL, stR)
         : '';
-  // 1. Голеностоп: пятки рвутся ИЛИ худшая КТС <9 ИЛИ гастрокнемиус <9 ИЛИ гонометр <35° ИЛИ подпятка чинит паттерн
-  if (input.heelRetest === 'better' || (ankleBad && (!input.hipBelowParallel || !input.trunkUpright || input.kneeValgus))) {
+  // 1. Голеностоп: подпятка чинит паттерн (решающий дифференциатор PoinT GO) ИЛИ сам признак
+  // ограниченной дорсифлексии (пятки рвутся / КТС <9 / гастрокнемиус <9 / гонометр <35°).
+  // ВАЖНО: компенсации в других сегментах НЕ требуются — distal-first канон; иначе провал
+  // «пякти отрываются» при чистом остальном паттерне уходил в «драйвер не найден».
+  if (input.heelRetest === 'better' || ankleBad) {
     let label = 'Голеностоп (дорсифлексия)';
     let fix = 'Мобилизация голеностопа ежедневно (колено к стене, MWM с лентой) + подъём пятки 2.5 см в приседе до нормы ≥12 см, перепроверка через 4–6 нед' + ankleAsymNote;
     if (gastrocBad && !(ktw != null && ktw < 9) && input.heelsFlat && !goniBad) {
@@ -85,6 +102,7 @@ export function resolveMovementDriver(input: OhsScreenInput): MovementDriverResu
       label,
       fix,
       confidence: input.heelRetest === 'better' ? 0.9 : 0.7,
+      tested: true,
     };
   }
   // 1b. Только асимметрия КТС при чистом паттерне: видимых компенсаций нет, но разрыв значим —
@@ -95,6 +113,7 @@ export function resolveMovementDriver(input: OhsScreenInput): MovementDriverResu
       label: 'Голеностоп (асимметрия сторон)',
       fix: 'Паттерн чистый, но стороны разъехались' + ankleAsymNote,
       confidence: 0.55,
+      tested: true,
     };
   }
   // 2. ТБС: вальгус без голеностопа / нет глубины при плоских пятках / ROM сгибания бедра <110°.
@@ -112,6 +131,7 @@ export function resolveMovementDriver(input: OhsScreenInput): MovementDriverResu
         label: 'Тазобедренный (сгибание бедра)',
         fix: `Сгибание бедра ${hipFlex}° (<110) ограничивает глубину: kneeling hip-flexor stretch 2–3×30 с + выпады с темпом + мёртвый жук/гоблет с паузой, cue «глубина до нейтрали таза»; перепроверка SLS` + ppNote + ankleAsymNote,
         confidence: 0.65,
+        tested: true,
       };
     }
     return {
@@ -119,6 +139,7 @@ export function resolveMovementDriver(input: OhsScreenInput): MovementDriverResu
       label: 'Тазобедренный (отведение/глубина)',
       fix: 'Комплекс 3×/нед 8 нед: средняя ягодичная + наружные ротаторы бедра (отведения, кламшеллы, сплит-присед с темпом) + голеностоп/стопа дистально (икры, свод) + cue «раздвинь пол стопами»; перепроверка SLS' + ppNote,
       confidence: 0.7,
+      tested: true,
     };
   }
   // 2b. Только задний наклон таза при чистом паттерне — контроль таза в глубине (слабый драйвер, Kim 2015/PMC10987311)
@@ -128,6 +149,7 @@ export function resolveMovementDriver(input: OhsScreenInput): MovementDriverResu
       label: 'ТБС (контроль таза в глубине)',
       fix: 'Паттерн чистый, но таз «подворачивается» внизу — глубина до нейтрали таза + мёртвый жук/гоблет с паузой 3 с; при боли в тазу — к врачу (ФАИ-паттерн, не диагноз)' + ankleAsymNote,
       confidence: 0.5,
+      tested: true,
     };
   }
   // 3. Грудной отдел / широчайшие: руки падают; руки на бёдрах чистят поясницу → широчайшие
@@ -140,6 +162,7 @@ export function resolveMovementDriver(input: OhsScreenInput): MovementDriverResu
         ? 'Растяжка широчайших в удлинённой позиции у рамы 3×15–20 с + тяги с паузой в растянутой, без жимов над головой до чистого скрининга'
         : 'Разгибание грудного на ролле посегментно T4–T10 + thread-the-needle 2–3×/нед 4 нед, перепроверка',
       confidence: 0.65,
+      tested: true,
     };
   }
   // 4. Кор: поясница гуляет при чистых руках/ногах
@@ -149,9 +172,10 @@ export function resolveMovementDriver(input: OhsScreenInput): MovementDriverResu
       label: 'Кор (стабильность поясницы)',
       fix: 'Мёртвый жук/планка с дыханием + гоблет-присед с паузой 3 с внизу, без осевой нагрузки в отказ до стабильности',
       confidence: 0.6,
+      tested: true,
     };
   }
-  return { driver: 'none', label: 'Драйвер не найден — паттерн чистый', fix: 'Поддерживающий объём + перепроверка через 6–8 нед', confidence: 1 };
+  return { driver: 'none', label: 'Драйвер не найден — паттерн чистый', fix: 'Поддерживающий объём + перепроверка через 6–8 нед', confidence: 1, tested: true };
 }
 
 /** Односторонний скрининг: сплит-присед + RDL на ноге (качество, не объём). */
@@ -169,26 +193,39 @@ export interface SingleLegScreen {
 
 export const FPPA_SIDE_GAP_DEG = 10;
 
-export function singleLegVerdict(s: SingleLegScreen): { weakSide: 'left' | 'right' | null; text: string } {
+export function singleLegVerdict(s: SingleLegScreen): { weakSide: 'left' | 'right' | null; text: string; tested: boolean } {
+  const fin = (v: unknown): number | null => (v != null && Number.isFinite(v as number) ? (v as number) : null);
+  const fl = fin(s.fppaL);
+  const fr = fin(s.fppaR);
   const failsL = [s.splitSquatL, s.rdlL].filter((v) => v === 'fail').length;
   const failsR = [s.splitSquatR, s.rdlR].filter((v) => v === 'fail').length;
+  const anyGrade = [s.splitSquatL, s.rdlL, s.splitSquatR, s.rdlR].some((v) => v != null);
+  // «Ни одного замера» ≠ «обе стороны чистые»: раньше пустой скрининг печатался как результат.
+  if (!anyGrade && fl == null && fr == null) {
+    return { weakSide: null, text: 'Односторонний: не проверялся', tested: false };
+  }
   if (failsL === 0 && failsR === 0) {
     // Угломер как tiebreak: качественная оценка чистая, но угломер видит разрыв
-    const fl = s.fppaL, fr = s.fppaR;
-    if (fl != null && fr != null && Number.isFinite(fl) && Number.isFinite(fr) && Math.abs(fl - fr) >= FPPA_SIDE_GAP_DEG) {
+    if (fl != null && fr != null && Math.abs(fl - fr) >= FPPA_SIDE_GAP_DEG) {
       const weak = fl > fr ? 'left' : 'right';
       return {
         weakSide: weak as 'left' | 'right',
         text: `Односторонний: качественная оценка чистая, но угломер FPPA ${fl}° vs ${fr}° (разрыв ≥${FPPA_SIDE_GAP_DEG}°) — слабее ${weak === 'left' ? 'левая' : 'правая'}, перепроверь движением`,
+        tested: true,
       };
     }
-    return { weakSide: null, text: 'Односторонний: обе стороны чистые' };
+    // Одна сторона без оценки — это не «чисто», а «неполный скрининг».
+    if (!anyGrade) {
+      return { weakSide: null, text: 'Односторонний: введён только угломер — качественную оценку (сплит/RDL) не проверяли', tested: true };
+    }
+    return { weakSide: null, text: 'Односторонний: обе стороны чистые', tested: true };
   }
-  if (failsL === failsR) return { weakSide: null, text: `Односторонний: обе стороны с замечаниями (${failsL}/${failsR}) — чинить симметрично` };
+  if (failsL === failsR) return { weakSide: null, text: `Односторонний: обе стороны с замечаниями (${failsL}/${failsR}) — чинить симметрично`, tested: true };
   const weak = failsL > failsR ? 'left' : 'right';
   return {
     weakSide: weak as 'left' | 'right',
     text: `Односторонний: слабее ${weak === 'left' ? 'левая' : 'правая'} (${Math.max(failsL, failsR)} vs ${Math.min(failsL, failsR)}) — унилатеральная первой в сессии`,
+    tested: true,
   };
 }
 
@@ -336,13 +373,14 @@ export function teenLoadedGate(age: number | null | undefined): { blocked: boole
 export interface ScreenPriorityInput {
   painLevel?: 'green' | 'yellow' | 'red' | 'not_tested' | null;
   painText?: string | null;
-  driver?: { driver: string; label: string; fix: string; confidence: number } | null;
+  driver?: { driver: string; label: string; fix: string; confidence: number; tested?: boolean } | null;
   asymText?: string | null;
   tendon?: { level: string; text: string } | null;
   bench?: { level: string; text: string } | null;
   posterior?: { nhe?: string | null; adductor?: string | null } | null;
   loadedHinge?: { degraded: boolean; text: string } | null;
-  erIr?: string | null;
+  /** Готовый вердикт ER:IR — приоритет по флагу warn, а не по парсингу текста (regex не ловит ratio >1.15). */
+  erIr?: { warn: boolean; text: string } | null;
 }
 
 /** Единый список «что чинить первым» (красная боль → драйвер → асимметрии → сухожилия → …). Max 5. */
@@ -353,14 +391,14 @@ export function screenPriorityList(s: ScreenPriorityInput | null | undefined): s
   if (s.painLevel === 'red') push(`Боль (красный): ${s.painText || 'разгрузка по правилу ≤5/<5'} — снизить объём до ≤3/10`);
   else if (s.painLevel === 'yellow') push(`Боль (жёлтый): ${s.painText || 'удержать объём 3–7 дней, не повышать вес'}`);
   const d = s.driver;
-  if (d && d.driver && d.driver !== 'none' && d.confidence >= 0.5) push(`${d.label}: ${d.fix}`);
+  if (d && d.driver && d.driver !== 'none' && d.confidence >= 0.5 && d.tested !== false) push(`${d.label}: ${d.fix}`);
   if (s.asymText && !/значимых нет/.test(s.asymText)) push(s.asymText);
   if (s.tendon && s.tendon.level === 'stop') push(`Сухожилия (стоп): ${s.tendon.text}`);
   if (s.loadedHinge?.degraded) push(`Шарнир под весом: ${s.loadedHinge.text}`);
   if (s.bench?.level === 'fix') push(`Жим: ${s.bench.text}`);
-  if (s.posterior?.nhe && !/в порядке/.test(s.posterior.nhe)) push(s.posterior.nhe);
-  if (s.posterior?.adductor && !/не замерялись|симметрично/.test(s.posterior.adductor)) push(s.posterior.adductor);
-  if (s.erIr && /0\.\d+ \(<0\.75\)/.test(s.erIr)) push(`Плечо ER:IR: ${s.erIr}`);
+  if (s.posterior?.nhe && !/в порядке|не замерялась/.test(s.posterior.nhe)) push(s.posterior.nhe);
+  if (s.posterior?.adductor && !/не замерялись|симметрично|одной стороной/.test(s.posterior.adductor)) push(s.posterior.adductor);
+  if (s.erIr?.warn) push(`Плечо ER:IR: ${s.erIr.text}`);
   if (!out.length) return ['Приоритетов нет: паттерн чистый — поддерживающий объём и перепроверка 6–8 нед'];
   return out;
 }

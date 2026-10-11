@@ -130,7 +130,10 @@ export function readLabAthleteCtx(): LabAthleteCtx {
   const health = (settings.health || {}) as Record<string, unknown>;
 
   const weakZones = strArr(
-    hub.weakPoints ?? hub.weakZones ?? hub.weakZonesGranular ?? [],
+    // «Дефолтный снапшот»: хаб диагностики хранит выбор как weakManual —
+    // раньше читались только имена, которых там нет (weakPoints/weakZones/…),
+    // и ExerciseLab всегда получал пустой список слабых зон.
+    hub.weakManual ?? hub.weakPoints ?? hub.weakZones ?? hub.weakZonesGranular ?? [],
   );
   const weakMusclesCanonical = strArr(hub.weakMusclesCanonical ?? []);
   const asymRaw = hub.asymPct ?? hub.symmetryAsymPct ?? (hub.symmetry as Record<string, unknown> | undefined)?.asymPct;

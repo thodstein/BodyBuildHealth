@@ -49,14 +49,22 @@ describe('weak-cause (5 причин)', () => {
 
 // ── A: 28д ──
 describe('volume 28d', () => {
+  // Окна 7/28д считаются от СЕГОДНЯ (конвенция хаба), поэтому даты — динамические:
+  // статичные ломались бы ровно через 28 дней после написания теста.
+  const isoAgo = (days: number): string => {
+    const d = new Date();
+    d.setDate(d.getDate() - days);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  };
   const mk = (date: string, muscle: string, sets: number) => ({
     date, exercises: [{ muscleGroup: muscle, sets: Array.from({ length: sets }, () => ({ weightKg: 50, reps: 10 })) }],
   });
-  it('history группирует 4 недели', () => {
-    const sessions = [mk('2026-08-06', 'chest', 8), mk('2026-08-13', 'chest', 10), mk('2026-08-20', 'chest', 12), mk('2026-08-27', 'chest', 14)];
+  it('history группирует 12 недель', () => {
+    // было→стало: окно было 4 недели (ветка genetics требовала 12 и была недостижима)
+    const sessions = [mk(isoAgo(21), 'chest', 8), mk(isoAgo(14), 'chest', 10), mk(isoAgo(7), 'chest', 12), mk(isoAgo(0), 'chest', 14)];
     const h = volumeHistory28d(sessions as any);
-    expect(h.chest.length).toBe(4);
-    expect(h.chest[3]).toBe(14);
+    expect(h.chest.length).toBe(12);
+    expect(h.chest[11]).toBe(14); // последний индекс — самая свежая неделя
   });
   it('stable находит 3+ нед ниже MAV', () => {
     const out = detectBBWeakByVolumeStable({ chest: [6, 6, 6, 6], back: [18, 18, 18, 18] }, 'intermediate');
@@ -362,17 +370,22 @@ describe('ideal-delta + weeks-at-mav', () => {
 
 // ── e1rmTrend28d + activation через живые входы ──
 describe('e1rm-trend + activation', () => {
+  const isoAgo = (days: number): string => {
+    const d = new Date();
+    d.setDate(d.getDate() - days);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  };
   const mkSession = (date: string, muscle: string, weightKg: number, reps: number) => ({
     date,
     exercises: [{ muscleGroup: muscle, sets: [{ weightKg, reps }] }],
   });
-  // old-окно 21–42д назад от последней даты, recent — последние 7д
+  // Окна от СЕГОДНЯ: old = 21–42д назад, recent = последние 7д.
   const sessions = [
-    mkSession('2026-07-20', 'chest', 100, 8), // old: e1RM ~126.7
-    mkSession('2026-07-21', 'chest', 100, 8),
-    mkSession('2026-08-20', 'chest', 100, 8), // recent: тот же вес → плато ~0%
-    mkSession('2026-08-21', 'chest', 100, 8),
-    mkSession('2026-08-22', 'back', 80, 10),
+    mkSession(isoAgo(32), 'chest', 100, 8), // old: e1RM ~126.7
+    mkSession(isoAgo(31), 'chest', 100, 8),
+    mkSession(isoAgo(2), 'chest', 100, 8), // recent: тот же вес → плато ~0%
+    mkSession(isoAgo(1), 'chest', 100, 8),
+    mkSession(isoAgo(0), 'back', 80, 10),
   ];
   it('тренд считает дельту и сессии', async () => {
     const mod = await import('../bb-weak-detection.engine');
@@ -385,8 +398,8 @@ describe('e1rm-trend + activation', () => {
   it('падение −6% ловится', async () => {
     const mod = await import('../bb-weak-detection.engine');
     const t = mod.e1rmTrend28d([
-      mkSession('2026-07-20', 'chest', 100, 8),
-      mkSession('2026-08-21', 'chest', 90, 8),
+      mkSession(isoAgo(32), 'chest', 100, 8),
+      mkSession(isoAgo(1), 'chest', 90, 8),
     ] as any);
     expect(t.chest.deltaPct).toBeLessThan(-5);
   });
@@ -410,6 +423,11 @@ describe('e1rm-trend + activation', () => {
 
 // ── Широкое old-окно + батч-сборка ──
 describe('e1rm wide window + batch', () => {
+  const isoAgo = (days: number): string => {
+    const d = new Date();
+    d.setDate(d.getDate() - days);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  };
   const mk = (date: string, muscle: string, weightKg: number, reps: number) => ({
     date,
     exercises: [{ muscleGroup: muscle, sets: [{ weightKg, reps }] }],
@@ -417,8 +435,8 @@ describe('e1rm wide window + batch', () => {
   it('замер 30д назад ловится (раньше окно 28–35д его резало на границе)', async () => {
     const mod = await import('../bb-weak-detection.engine');
     const t = mod.e1rmTrend28d([
-      mk('2026-07-23', 'chest', 100, 8), // 30д до 08-22
-      mk('2026-08-22', 'chest', 100, 8),
+      mk(isoAgo(30), 'chest', 100, 8),
+      mk(isoAgo(1), 'chest', 100, 8),
     ] as any);
     expect(t.chest).toBeDefined();
     expect(t.chest.sessions).toBe(1);
@@ -426,8 +444,8 @@ describe('e1rm wide window + batch', () => {
   it('замер 45д назад — всё ещё мимо', async () => {
     const mod = await import('../bb-weak-detection.engine');
     const t = mod.e1rmTrend28d([
-      mk('2026-07-08', 'chest', 100, 8),
-      mk('2026-08-22', 'chest', 100, 8),
+      mk(isoAgo(45), 'chest', 100, 8),
+      mk(isoAgo(1), 'chest', 100, 8),
     ] as any);
     expect(t.chest).toBeUndefined();
   });

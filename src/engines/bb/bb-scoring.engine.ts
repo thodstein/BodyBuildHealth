@@ -6,8 +6,8 @@ export type BBScoreLevel = 'ok' | 'warn' | 'critical';
 
 export interface BBScoreInput {
   weakCount: number;
-  volumeIssues: number; // кол-во мышц exceeding/approaching/below
-  volumeExceeding: number; // exceeding_mrv
+  volumeIssues: number; // кол-во мышц с дефицитом объёма (exceeding/below MEV/MAV)
+  volumeExceeding: number; // exceeding_mrv — мышцы ВЫШЕ MRV
   symmetryAsymPct: number | null; // макс L/R %
   symmetryIssues: number;
   stimulusPenalty: number; // 0-30 из bb-stimulus
@@ -71,7 +71,7 @@ export function scoreBB(input: BBScoreInput): BBScoreResult {
     if (score > 49) { score = 49; floors.push('асимметрия ≥12% → ≤49'); }
   }
   if (input.volumeExceeding >= 2) {
-    if (score > 59) { score = 59; floors.push('перегруз ≥2 мышц → ≤59'); }
+    if (score > 59) { score = 59; floors.push('перегруз ≥2 мышц выше MRV → ≤59'); }
   }
   if (input.acwrDanger >= 1) {
     if (score > 59) { score = 59; floors.push('ACWR danger ≥1 → ≤59'); }

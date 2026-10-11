@@ -8,15 +8,15 @@
 
 export interface ShoulderWallInput {
   /** Спина (лопатки+поясница) на стене — иначе тест невалиден, сначала позиция. */
-  backOnWall: boolean;
+  backOnWall?: boolean | null;
   /** Голова касается стены при плоской пояснице (Occiput-to-Wall — экстензия грудного). */
-  headOnWall: boolean;
+  headOnWall?: boolean | null;
   /** Бицепс у ушей в верхней точке (плечевое сгибание + ротация вверх). */
-  bicepsAtEars: boolean;
+  bicepsAtEars?: boolean | null;
   /** Рёбра не раздуваются, поясница плоская (нет «займа» у поясницы). */
-  ribsDown: boolean;
+  ribsDown?: boolean | null;
   /** Без шрагов к ушам (контроль, не диапазон). */
-  noShrug: boolean;
+  noShrug?: boolean | null;
 }
 
 export type ShoulderLocus = 'ok' | 'position' | 'flexion' | 'thoracic' | 'lats' | 'control';
@@ -26,16 +26,25 @@ export interface ShoulderWallVerdict {
   fails: string[];
   locus: ShoulderLocus;
   text: string;
+  /** false — ни один признак не отмечен пользователем (все входы опциональны). */
+  tested: boolean;
 }
 
 /** Overhead у стены: позиция первична, дальше — локус ограничения. */
 export function shoulderWallVerdict(s: ShoulderWallInput): ShoulderWallVerdict {
+  const touched = s.backOnWall != null || s.headOnWall != null || s.bicepsAtEars != null
+    || s.ribsDown != null || s.noShrug != null;
+  // Все пять входов опциональны: если ничего не отмечено, это «не проверялся», а НЕ «чисто».
+  if (!touched) {
+    return { pass: true, fails: [], locus: 'ok', text: 'Плечо у стены: не проверялся', tested: false };
+  }
   if (!s.backOnWall) {
     return {
       pass: false,
       fails: ['position'],
       locus: 'position',
       text: 'Плечо у стены: встань плотно (пятки/ягодицы/лопатки на стене) и перепроверь — без позиции тест невалиден',
+      tested: true,
     };
   }
   const fails: string[] = [];
@@ -44,7 +53,7 @@ export function shoulderWallVerdict(s: ShoulderWallInput): ShoulderWallVerdict {
   if (!s.ribsDown) fails.push('ribs');
   if (!s.noShrug) fails.push('shrug');
   if (!fails.length) {
-    return { pass: true, fails, locus: 'ok', text: 'Плечо у стены: чисто — жимы над головой разрешены по технике' };
+    return { pass: true, fails, locus: 'ok', text: 'Плечо у стены: чисто — жимы над головой разрешены по технике', tested: true };
   }
   // Локус: рёбра раздуваются = грудной отдел отдаёт движение пояснице;
   // голова отрывается при плоской пояснице = экстензия T-spine;
@@ -68,6 +77,7 @@ export function shoulderWallVerdict(s: ShoulderWallInput): ShoulderWallVerdict {
     fails,
     locus,
     text: `Плечо у стены: ${fails.join(' + ')} → ${fix[locus]}`,
+    tested: true,
   };
 }
 
@@ -76,7 +86,7 @@ export interface ThoracicRotationInput {
   rotR: number | null;
 }
 
-export const THORACIC_ROT_NORM = 50;
+export const THORACIC_ROT_NORM = 45;
 export const THORACIC_ROT_GAP = 10;
 
 export function thoracicRotationVerdict(s: ThoracicRotationInput): { text: string; gap: number | null; low: boolean } {
@@ -84,21 +94,30 @@ export function thoracicRotationVerdict(s: ThoracicRotationInput): { text: strin
   if (rotL == null && rotR == null) return { text: 'Ротация грудного: не замерялась', gap: null, low: false };
   const gap = rotL != null && rotR != null ? Math.abs(rotL - rotR) : null;
   const low = (rotL != null && rotL < THORACIC_ROT_NORM) || (rotR != null && rotR < THORACIC_ROT_NORM);
-  if (gap != null && gap >= THORACIC_ROT_GAP) {
-    const weak = (rotL ?? 99) < (rotR ?? 99) ? 'левая' : 'правая';
+  // Замерена одна сторона — это не «норма обеих», а неполный скрининг.
+  if (gap == null) {
+    const one = (rotL ?? rotR) as number;
+    return { text: `Ротация грудного: замерена одна сторона (${one}°) — введи вторую, иначе разрыв не виден`, gap: null, low };
+  }
+  if (gap >= THORACIC_ROT_GAP) {
+    const weak = (rotL as number) < (rotR as number) ? 'левая' : 'правая';
     return { text: `Ротация грудного: ${rotL}° vs ${rotR}° — слабее ${weak} (разрыв ≥${THORACIC_ROT_GAP}°): односторонние ротации + боковые наклоны, перепроверка через 4 нед`, gap, low };
   }
   if (low) {
-    return { text: `Ротация грудного: ${rotL ?? '—'}°/${rotR ?? '—'}° (<${THORACIC_ROT_NORM}°) — ограничение обеих сторон: ролл + ротации на четвереньках 2–3×/нед`, gap, low };
+    return { text: `Ротация грудного: ${rotL}°/${rotR}° (<${THORACIC_ROT_NORM}°) — ограничение обеих сторон: ролл + ротации на четвереньках 2–3×/нед`, gap, low };
   }
-  return { text: 'Ротация грудного: норма (≥50° обе стороны)', gap, low: false };
+  return { text: `Ротация грудного: норма (≥${THORACIC_ROT_NORM}° обе стороны)`, gap, low: false };
 }
 
 // ── R6: ER/IR-ratio (сила наружной / внутренней ротации) ──
+// Нормы здоровых взрослых ER:IR90 0.71–0.86 (IJSPT 2023, n=181, hand-held; Брэдли/МакКеон).
+// 0.75 — нижний квартиль здоровых (bump: здоровья порог, не «болезнь»); >1.15 НЕ травмоопасно
+// (высокая ER — это не дисбаланс риска), поэтому это проверка замера, а не warning.
 export const ERIR_RATIO_MIN = 0.75;
+export const ERIR_RATIO_HIGH = 1.15;
 
 export const ERIR_DISCLAIMER =
-  'ER/IR <0.75 — самый частый дисбаланс у плечевых атлетов (Intelangelo 2025, n=296); ручной динамометр надёжен (ICC>0.7). Экстраполяция с overhead-атлетов: для жимовиков — эвристика, не диагноз';
+  'ER/IR <0.75 — дисбаланс в сторону внутренних ротаторов (Intelangelo 2025, n=296; нормы здоровых 0.71–0.86, IJSPT 2023); ручной динамометр надежен (ICC>0.7). Экстраполяция с overhead-атлетов: для жимовиков — эвристика, не диагноз';
 
 export interface ErIrInput {
   erKg?: number | null;
@@ -113,8 +132,10 @@ export function erIrVerdict(s: ErIrInput): { tested: boolean; ratio: number | nu
   const er = fin(s.erKg);
   const ir = fin(s.irKg);
   if (er == null || ir == null) return { tested: false, ratio: null, warn: false, text: 'ER/IR: не замерялся' };
-  const ratio = Math.round((er / ir) * 100) / 100;
-  if (ratio < ERIR_RATIO_MIN) {
+  const raw = er / ir;
+  // Пороги сравниваем по НЕокруглённому значению: Math.round(1.5049)=1.5 раньше прятал «>1.5».
+  if (raw < ERIR_RATIO_MIN) {
+    const ratio = Math.round(raw * 100) / 100;
     return {
       tested: true,
       ratio,
@@ -122,13 +143,14 @@ export function erIrVerdict(s: ErIrInput): { tested: boolean; ratio: number | nu
       text: `ER/IR ${ratio} (<0.75): добавь наружную ротацию 2–3×/нед (лёжа на боку / кабель) — жимы не убирай`,
     };
   }
-  if (ratio > 1.15) {
+  const ratio = Math.round(raw * 100) / 100;
+  if (raw > ERIR_RATIO_HIGH) {
     return {
       tested: true,
       ratio,
       warn: true,
-      text: `ER/IR ${ratio} (>1.15) — нетипично: проверь технику замера/стороны (манжета не должна быть сильнее внутренних)`,
+      text: `ER/IR ${ratio} (>1.15) — нетипично для здоровых (0.71–1.15): проверь технику замера/стороны (манжета не должна быть сильнее внутренних)`,
     };
   }
-  return { tested: true, ratio, warn: false, text: `ER/IR ${ratio} — норма (0.75–1.15)` };
+  return { tested: true, ratio, warn: false, text: `ER/IR ${ratio} — в норме (норма 0.75–1.15)` };
 }

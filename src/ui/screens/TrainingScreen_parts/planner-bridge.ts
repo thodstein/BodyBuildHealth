@@ -67,6 +67,9 @@ export interface WeakpointsPayload { groups?: string[]; lift?: string; orthopedi
   loadedHinge?: { text: string } | null;
   erir?: { text: string } | null;
   screenPriority?: string[] | null;
+  /** W5 (11.10.2026): статус диагностики — info-слой приёмника (bits/persist), сборку не меняет.
+   *  Отдельным ключом, а НЕ legacy-каналом `readiness` (сон/боль/скорость — чужие хабы). */
+  diagStatus?: { screenTouched: boolean; readinessLevel: string; readinessNoData: boolean; ybtCompositeFull: boolean };
   /** @deprecated D1 (§9 BB-AUTO-EXHAUSTIVE-PRO): приёмник не читает (хаб всегда шлёт `null`
    *  by design — VBT живёт в Анализе силы). Оставлено для совместимости сохранённых payload'ов;
    *  новым кодом не заполнять. */

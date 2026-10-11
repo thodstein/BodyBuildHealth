@@ -14,9 +14,14 @@ describe('bb-pain-monitor R2 — правило Silbernagel', () => {
     expect(v.level).toBe('green');
     expect(v.text).toMatch(/зелёный/);
   });
-  it('жёлтый: утро = 5 (порог <5)', () => {
+  it('утро = 5 — красный (правило Silbernagel: на утро должно быть <5)', () => {
+    // Было: yellow при m=5..6 — противоречило своему же дисклеймеру «<5 на утро».
     const v = painMonitorVerdict({ during010: 3, nextMorning010: 5 });
-    expect(v.level).toBe('yellow');
+    expect(v.level).toBe('red');
+  });
+  it('утро = 4 — зелёный/жёлтая граница', () => {
+    const v = painMonitorVerdict({ during010: 3, nextMorning010: 4 });
+    expect(v.level).not.toBe('red');
   });
   it('жёлтый: боль растёт по неделям', () => {
     expect(painMonitorVerdict({ during010: 3, nextMorning010: 2, weeksRising: true }).level).toBe('yellow');
