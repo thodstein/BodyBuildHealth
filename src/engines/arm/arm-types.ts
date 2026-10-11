@@ -230,6 +230,9 @@ export interface ArmBuilderInput {
   intensityTechniques?: boolean;
   /** P1-10: недельные чек-ины — боль ≥4 две недели → разгрузка, вес-тренд в rationale. */
   checkins?: ArmWeeklyCheckin[];
+  /** 26.10.2026 (§8 п.1): перекос ротаторов плеча из диагностики (ER:IR risk) —
+   *  shoulder_stab получает приоритет объёма (баланс ротаторов, Pascoa 2026). */
+  shoulderPriority?: boolean;
 }
 
 export interface ArmInjury {

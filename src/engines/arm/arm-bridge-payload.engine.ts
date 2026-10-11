@@ -59,6 +59,9 @@ export interface ArmBridgeInput {
   /** D5 PRO-2: v2-флаги дозы/волны (опционально; конструктор без них — базовый путь). */
   tendonOverload?: boolean;
   waveWeek?: number | null;
+  /** 26.10.2026 (§8 п.1): перекос ротаторов плеча ER:IR (risk) — конструктор
+   *  поднимает приоритет shoulder_stab (баланс ротаторов, Pascoa 2026). */
+  shoulderRisk?: boolean;
 }
 
 export function buildArmBridgeData(i: ArmBridgeInput): Record<string, unknown> {
@@ -122,5 +125,7 @@ export function buildArmBridgeData(i: ArmBridgeInput): Record<string, unknown> {
     // D5 PRO-2: v2-флаги (только заполненные; пусто — ключей нет, приёмник базовым путём)
     ...(i.tendonOverload ? { armTendonOverload: true } : {}),
     ...(i.waveWeek != null ? { armWaveWeek: i.waveWeek } : {}),
+    // 26.10.2026: ER:IR risk (только заполненное)
+    ...(i.shoulderRisk ? { armShoulderRisk: true } : {}),
   };
 }

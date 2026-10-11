@@ -70,6 +70,7 @@ import { toDailyLoads, acuteChronicRatio } from '../../../engines/pro/training-l
 import { haptics } from '../../../core/native-bridge';
 import { printHtmlApk, shareOutcomeLabel, saveTextFileApk, saveCsvApk } from '../../../core/apk-share';
 import { OrthoScreenCard } from './OrthoScreenCard';
+import { erIrVerdict } from '../../../engines/arm/arm-shoulder-erir.engine';
 
 const STORAGE_KEY = 'he_arm_diagnostics_hub_v4';
 
@@ -1210,6 +1211,15 @@ export const ArmDiagnosticsHub: React.FC = () => {
       // D5 PRO-2: v2-флаги дозы/волны в мост (приёмник применит к инъекции)
       tendonOverload: (() => { try { return Number((tendonAcwr as any)?.ratio) >= 1.3; } catch { return false; } })(),
       waveWeek: (() => { const w = parseInt(String((state as any).corrWave || ''), 10); return Number.isFinite(w) && w >= 1 && w <= 3 ? w : null; })(),
+      // 26.10.2026 (§8 п.1): ER:IR risk → конструктор поднимает приоритет shoulder_stab
+      shoulderRisk: (() => {
+        try {
+          const er = parseFloat(state.erKg || ''), ir = parseFloat(state.irKg || '');
+          if (!(er > 0) || !(ir > 0)) return false;
+          const v = erIrVerdict({ erKg: er, irKg: ir });
+          return v.zone === 'risk';
+        } catch { return false; }
+      })(),
       bilateral: bilatP0 ? { weakArm: bilatP0.weakArm, weakSets: bilatP0.weakSets, strongSets: bilatP0.strongSets } : null,
       attempts: attHistP0,
       // PRO-3 P4: red-flags скрининга — в конструктор

@@ -21,6 +21,9 @@ export interface ArmSelectorInput {
   mobilityRestrictions?: string[];
   donorMuscles?: string[];
   specialization?: boolean;
+  /** 26.10.2026 (§8 п.3): перекос ротаторов плеча из диагностики (ER:IR < 0.64) —
+   *  сплит, дающий shoulder_stab чаще, получает бонус. Пусто = без бонуса. */
+  shoulderRisk?: boolean;
 }
 
 export interface ArmRankedPattern {
@@ -120,6 +123,13 @@ export function rankArmSplits(input: ArmSelectorInput): ArmRankedPattern[] {
         const hasMuscle = p.schedule.some((s) => wanted.some((m) => (TAG_MUSCLES_ARM[s.sessionTag || ''] || []).includes(m)));
         if (hasMuscle) { score += 8; rationale.push(`${gf} хват`); }
       }
+    }
+
+    // 26.10.2026 (§8 п.3): при перекосе ротаторов плеча (ER:IR) чаще тренируем
+    // стабилизаторы плеча — сплит с shoulder_stab в расписании получает бонус.
+    if (input.shoulderRisk) {
+      const hasShoulder = p.schedule.some((s) => (TAG_MUSCLES_ARM[s.sessionTag || ''] || []).includes('shoulder_stab'));
+      if (hasShoulder) { score += 10; rationale.push('shoulder_stab в сплите — баланс ротаторов (ER:IR)'); }
     }
 
     // weakPoints boost (granular → canonical via lower)

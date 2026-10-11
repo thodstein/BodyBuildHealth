@@ -25,6 +25,8 @@ import { diagnoseArmliftCause } from '../armlift-cause.engine';
 import { diagnosticCompleteness } from '../armlift-completeness.engine';
 import { getArmLandmarks } from '../arm-volume-landmarks.engine';
 import { ARM_SPLIT_PATTERNS } from '../arm-split-patterns';
+import { rankArmSplits } from '../arm-selector.engine';
+import { buildArmBridgeData } from '../arm-bridge-payload.engine';
 import { ARM_MUSCLES, ARM_MUSCLE_RU } from '../arm-types';
 import { SourceFileReader } from './helpers/source-reader';
 
@@ -279,12 +281,12 @@ describe('P2: perf + цикл-данные (остаток §7 отчёта)', (
     const body = src.text.slice(bodyStart, bodyEnd);
     expect(body).not.toContain('exercises.reduce');
   });
-  it('dobrorezov_44: фазы подготовки/базы разведены (deload на 24-й неделе)', () => {
+  it('dobrorezov_44: разгрузка каждую 4-ю неделю (deloadRule источника)', () => {
     const src = new SourceFileReader('src/engines/arm/arm-cycle-library.engine.ts');
     const i = src.text.indexOf("id: 'dobrorezov_44'");
     expect(i).toBeGreaterThan(0);
     const plan44 = src.text.slice(i, i + 500);
-    expect(plan44).toContain("w <= 23 ? 'accumulation' : w <= 24 ? 'deload'");
+    expect(plan44).toContain("w % 4 === 0 ? 'deload'");
     // сборка цикла совместима: 44 недели, ошибок нет
     const p: any = buildArmPlan({ ...BASE, weeks: 44, cycleId: 'dobrorezov_44', cycleConsent: true, patternId: 'arm_3_full' });
     expect(p.weeks.length).toBe(44);
@@ -296,6 +298,63 @@ describe('P2: честный порог тендона в диагностике
   it('tendon 20 при intermediate → critical (раньше порог >22 был недостижим из UI)', () => {
     const src = new SourceFileReader('src/engines/arm/arm-diagnostics-hub.engine.ts');
     expect(src.text).toMatch(/input\.tendonSets >= 18\) findings\.push\(\{ level: 'critical'/);
+  });
+});
+
+describe('§8 п.1/п.3: ER:IR risk доезжает до плана и выбора сплита', () => {
+  it('билдер: shoulderPriority поднимает shoulder_stab (+15%, кап MRV) с honest-строкой', () => {
+    const base: any = buildArmPlan({ ...BASE, weeks: 6, patternId: 'arm_3_full' });
+    const prio: any = buildArmPlan({ ...BASE, weeks: 6, patternId: 'arm_3_full', shoulderPriority: true });
+    const b = base.volumeTargets['shoulder_stab'].targetSets;
+    const p = prio.volumeTargets['shoulder_stab'].targetSets;
+    expect(p).toBeGreaterThanOrEqual(b);
+    expect(p).toBeLessThanOrEqual(prio.mrvByMuscle['shoulder_stab']);
+    if (p > b) {
+      expect(prio.rationale.some((r: string) => r.includes('shoulder_stab') && r.includes('ER:IR'))).toBe(true);
+      // другие мышцы не тронуты — «одна переменная за раз»
+      expect(prio.volumeTargets['wrist_flexors'].targetSets).toBe(base.volumeTargets['wrist_flexors'].targetSets);
+    }
+  });
+  it('билдер: без флага поведение байт-в-байт', () => {
+    const a: any = buildArmPlan({ ...BASE, weeks: 6 });
+    const b: any = buildArmPlan({ ...BASE, weeks: 6, shoulderPriority: false });
+    expect(b.volumeTargets['shoulder_stab'].targetSets).toBe(a.volumeTargets['shoulder_stab'].targetSets);
+  });
+  it('селектор: shoulderRisk дает бонус сплиту с shoulder_stab', () => {
+    const ranked = rankArmSplits({ level: 'intermediate', goal: 'strength', technique: 'balanced', discipline: 'armwrestling', daysPerWeek: 3, shoulderRisk: true } as any);
+    const withShoulder = ranked.find((r) => r.rationale.some((x) => x.includes('shoulder_stab')));
+    expect(withShoulder).toBeTruthy();
+    const plain = rankArmSplits({ level: 'intermediate', goal: 'strength', technique: 'balanced', discipline: 'armwrestling', daysPerWeek: 3 } as any);
+    const scoreWith = withShoulder!.score;
+    const same = plain.find((r) => r.pattern.id === withShoulder!.pattern.id)!;
+    expect(scoreWith).toBeGreaterThan(same.score);
+  });
+  it('мост: armShoulderRisk уезжает только при risk (пустой ключ без флага)', () => {
+    const base: any = buildArmBridgeData({
+      groups: ['cup'], technique: 'balanced', weakPoints: ['cup'],
+      biomechCards: [], corrections: [], scoring: null, diag: {}, angles: {}, force: null,
+      vbt: null, dynamic: null, bench: null, tendon: 8, findings: [], humerus: [], balance: [],
+      asymmetry: null, info: [], weakCauses: {}, topByPoint: {}, spec: null,
+      mobilityFails: [], acwrDanger: [], bilateral: null, attempts: [],
+    });
+    expect(base.armShoulderRisk).toBeUndefined();
+    const risk: any = buildArmBridgeData({
+      groups: ['cup'], technique: 'balanced', weakPoints: ['cup'],
+      biomechCards: [], corrections: [], scoring: null, diag: {}, angles: {}, force: null,
+      vbt: null, dynamic: null, bench: null, tendon: 8, findings: [], humerus: [], balance: [],
+      asymmetry: null, info: [], weakCauses: {}, topByPoint: {}, spec: null,
+      mobilityFails: [], acwrDanger: [], bilateral: null, attempts: [], shoulderRisk: true,
+    });
+    expect(risk.armShoulderRisk).toBe(true);
+  });
+  it('UI: конструктор читает armShoulderRisk и передает в сборку+селектор', () => {
+    const ui = new SourceFileReader('src/ui/screens/TrainingScreen_parts/ArmAutoConstructor.tsx');
+    expect(ui.text).toContain('setDiagShoulderRisk(true)');
+    expect(ui.text).toContain('shoulderPriority: diagShoulderRisk || undefined');
+    expect(ui.text).toContain('shoulderRisk: diagShoulderRisk || undefined');
+    const hub = new SourceFileReader('src/ui/screens/TrainingScreen_parts/ArmDiagnosticsHub.tsx');
+    expect(hub.text).toContain('shoulderRisk: (() => {');
+    expect(hub.text).toContain("v.zone === 'risk'");
   });
 });
 

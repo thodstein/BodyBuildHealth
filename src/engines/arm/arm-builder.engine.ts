@@ -589,6 +589,17 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
     const target = Math.min(mrv, Math.max(lm.mev, Math.round(lm.mav * (goal === 'hypertrophy' ? 1 : goal === 'strength' ? 0.9 : 0.85))));
     volumeTargets[m] = { muscle: m, frequency: freq, mev: lm.mev, mav: lm.mav, mrv, targetSets: target, minSetsPerSession: 2, maxSetsPerSession: perExerciseCap(m, level), rationale: `target ${target}` };
   }
+  // 26.10.2026 (§8 п.1): ER:IR risk (Pascoa 2026 — у армрестлеров ER/IR ≈0.57 против
+  // норматива 0.64–0.66) → стабилизаторы плеча получают +15% объёма (кап MRV).
+  // Одна переменная за раз: только shoulder_stab, остальные мышцы не трогаем.
+  if ((input as any).shoulderPriority && volumeTargets['shoulder_stab']) {
+    const vt = volumeTargets['shoulder_stab'];
+    const bumped = Math.min(vt.mrv, Math.round(vt.targetSets * 1.15));
+    if (bumped > vt.targetSets) {
+      selectionWarnings.push(`🩺 Баланс ротаторов плеча (ER:IR risk — диагностика): shoulder_stab ${vt.targetSets}→${bumped} сетов/нед (кап MRV ${vt.mrv}).`);
+      vt.targetSets = bumped;
+    }
+  }
 
   // TOP wave-13: masters 50+ — делоад каждая 3-я неделя (longevity Devon-трек).
   // Граница осознанная: 40–49 (master) хватает среза объёма ×0.9 из longevity;

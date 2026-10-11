@@ -767,6 +767,11 @@ const [rfdEstimated, setRfdEstimated] = useState<boolean>(false);
   const [axSideMax, setAxSideMax] = useState<boolean>(false);
   const [medAttKg, setMedAttKg] = useState<string[]>(['', '', '']);
   const [medAttOk, setMedAttOk] = useState<boolean[]>([true, true, true]);
+  // 26.10.2026 (§8 п.1): перекос ротаторов плеча из диагностики (ER:IR risk) —
+  // идёт в сборку как shoulderPriority и в селектор сплитов как shoulderRisk.
+  const [diagShoulderRisk, setDiagShoulderRisk] = useState<boolean>(() => {
+    try { return (localStorage.getItem('he_arm_last_diagnostics') || '').includes('"shoulderRisk":true'); } catch { return false; }
+  });
 
   useEffect(() => {
     if (profileSnapshot.bodyWeightKg) setProBw((prev) => (prev === '' ? String(profileSnapshot.bodyWeightKg) : prev));
@@ -1092,8 +1097,13 @@ const [rfdEstimated, setRfdEstimated] = useState<boolean>(false);
       }
       // сохраняем диагностику для печати — механизм-ориентированная + 12 точек
       try {
+        // 26.10.2026 (§8 п.1): ER:IR risk из моста → приоритет shoulder_stab в
+        // следующей сборке и бонус селектору сплитов (состояние живёт до сброса).
+        const shoulderRisk = payload.data?.armShoulderRisk === true;
+        if (shoulderRisk) setDiagShoulderRisk(true);
         const diagSnap: any = {
           benchLevel: bench?.level,
+          shoulderRisk: shoulderRisk || undefined,
           armWeakPoints: payload.data?.armWeakPoints,
           armBiomechCards: payload.data?.armBiomechCards,
           armCorrections: payload.data?.armCorrections,
@@ -1149,10 +1159,12 @@ const [rfdEstimated, setRfdEstimated] = useState<boolean>(false);
       gripFocus,
       weakPoints,
       specialization,
-      equipment: profileSnapshot.equipment,
-      injuries: profileSnapshot.injuries,
-      mobilityRestrictions: profileSnapshot.mobilityRestrictions,
-    });
+        equipment: profileSnapshot.equipment,
+        injuries: profileSnapshot.injuries,
+        mobilityRestrictions: profileSnapshot.mobilityRestrictions,
+        // 26.10.2026 (§8 п.3): ER:IR risk → бонус сплитам со shoulder_stab
+        shoulderRisk: diagShoulderRisk || undefined,
+      });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [level, goal, technique, discipline, daysPerWeek, gripFocus, weakPoints, specialization, cycId, profileSnapshot]);
 
@@ -1342,6 +1354,8 @@ const [rfdEstimated, setRfdEstimated] = useState<boolean>(false);
         intensityTechniques: intensityT || undefined,
         checkins: checkins.length ? checkins : undefined,
         readinessStatus: (pro7Readiness?.status === 'red' || pro7Readiness?.status === 'yellow' || pro7Readiness?.status === 'green') ? pro7Readiness.status : undefined,
+        // 26.10.2026 (§8 п.1): ER:IR risk из диагностики → приоритет shoulder_stab
+        shoulderPriority: diagShoulderRisk || undefined,
         ...profilePatch,
         weakPoints,
         focusGroup: focusGroup || undefined,

@@ -90,7 +90,7 @@ export const ARM_CYCLE_LIBRARY: ArmCycleTemplate[] = [
   {
     id: 'strengthlog_8', name: 'StrengthLog 8-week (стол + база)', discipline: 'armwrestling',
     weeks: 8, daysPerWeek: 4, level: ['intermediate', 'advanced'],
-    phases: phasesLinear(8, (w) => (w <= 4 ? 'accumulation' : w === 8 ? 'peaking' : 'intensification')),
+    phases: phasesLinear(8, (w) => (w === 4 ? 'deload' : w <= 4 ? 'accumulation' : w === 8 ? 'peaking' : 'intensification')),
     tablePerWeek: 1, rpe: 'Ф1 RPE 7–8, Ф2 RPE 8–9', deloadRule: 'Объём −1 сет на базе в Ф2, специфика не режется',
     taperPreset: 'classic', correctionPctDefault: 0.5,
     note: 'Ф1 (1–4) база умеренно, Ф2 (5–8) +5–10% на базе при закрытых повторах. Стол 1×/нед 20–30 мин не в отказ.',
@@ -122,7 +122,7 @@ export const ARM_CYCLE_LIBRARY: ArmCycleTemplate[] = [
   {
     id: 'kuznica_6_8', name: 'Кузница/Антонов (6 база + 8 предсоревн)', discipline: 'armwrestling',
     weeks: 14, daysPerWeek: 4, level: ['intermediate', 'advanced'],
-    phases: phasesLinear(14, (w) => (w <= 6 ? 'accumulation' : w <= 12 ? 'intensification' : w <= 13 ? 'peaking' : 'deload')),
+    phases: phasesLinear(14, (w) => (w === 6 ? 'deload' : w <= 6 ? 'accumulation' : w <= 12 ? 'intensification' : w <= 13 ? 'peaking' : 'deload')),
     tablePerWeek: 2, rpe: 'База RPE 7, предсоревн RPE 8–9', deloadRule: 'W14 лёгкая; для 1р–КМС→МС без слабых мест',
     taperPreset: 'classic', correctionPctDefault: 0.5,
     note: 'База 6н 3×/нед → предсоревн+соревн 8н 4×/нед. МСМК — только индивидуально.',
@@ -130,7 +130,7 @@ export const ARM_CYCLE_LIBRARY: ArmCycleTemplate[] = [
   {
     id: 'dobrorezov_44', name: 'Доброрезов 12-мес (12+12+8+12)', discipline: 'armwrestling',
     weeks: 44, daysPerWeek: 3, level: ['beginner', 'intermediate'],
-    phases: phasesLinear(44, (w) => (w <= 12 ? 'accumulation' : w <= 23 ? 'accumulation' : w <= 24 ? 'deload' : w <= 32 ? 'intensification' : w <= 43 ? 'peaking' : 'deload')),
+    phases: phasesLinear(44, (w) => (w % 4 === 0 ? 'deload' : w <= 23 ? 'accumulation' : w <= 32 ? 'intensification' : w <= 43 ? 'peaking' : 'deload')),
     tablePerWeek: 1, rpe: 'Подгот RPE 6–7 → база 7–8 → сила 8–9 → специализация по технике', deloadRule: 'Делоад каждая 4-я внутри блоков',
     taperPreset: 'classic', correctionPctDefault: 0.5,
     note: 'Годичный каркас нач→сред: подгот 12 + база 12 + сила 8 + специализация 12. Для годового плана.',
@@ -202,7 +202,7 @@ export const ARM_CYCLE_LIBRARY: ArmCycleTemplate[] = [
   {
     id: 'ivakin_arm_hand', name: 'Ivakin ARM/HAND 4× (эталон топролла)', discipline: 'armwrestling',
     weeks: 8, daysPerWeek: 4, level: ['intermediate', 'advanced'],
-    phases: phasesLinear(8, (w) => (w <= 4 ? 'accumulation' : w <= 7 ? 'intensification' : 'peaking')),
+    phases: phasesLinear(8, (w) => (w === 4 ? 'deload' : w <= 4 ? 'accumulation' : w <= 7 ? 'intensification' : 'peaking')),
     tablePerWeek: 1, rpe: 'Руки 4–8 повт (Скотт 6–7×6–8), кисть 6–8 повт (5–6 сетов)', deloadRule: 'Пн/Чт руки, Вт/Пт кисть; стол 1×/нед отдельно',
     taperPreset: 'classic', correctionPctDefault: 0.5,
     note: 'Taras Ivakin (золотой стандарт топролла по Larratt): руки и кисть в разные дни. Трицепс 4×6–8 обязателен (антагонист локтя).',
@@ -226,7 +226,7 @@ export const ARM_CYCLE_LIBRARY: ArmCycleTemplate[] = [
   {
     id: 'levan_pyramid_4', name: 'Levan pyramid 4× (%1RM, 3ч)', discipline: 'armwrestling',
     weeks: 8, daysPerWeek: 4, level: ['advanced', 'enhanced'],
-    phases: phasesLinear(8, (w) => (w <= 4 ? 'accumulation' : w <= 7 ? 'intensification' : 'peaking')),
+    phases: phasesLinear(8, (w) => (w === 4 ? 'deload' : w <= 4 ? 'accumulation' : w <= 7 ? 'intensification' : 'peaking')),
     tablePerWeek: 0, rpe: 'Пирамида %1RM: x20@50 → x10@65 → x7@80 → x3@90; отдых 5–10 мин', deloadRule: 'Стол 1×/мес; полная + частичная амплитуда; грудь/спина для общей силы',
     taperPreset: 'classic', correctionPctDefault: 0.5,
     note: 'Saginashvili: база не меняется с 2010-х — бицепс+кисть+пронация тяжёлыми пирамидами. Объём элитный: масштабировать вниз, становая бьёт по запястьям.',
