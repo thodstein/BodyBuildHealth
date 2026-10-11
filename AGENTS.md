@@ -150,8 +150,35 @@ NEW `bb-diagnostics-honesty.test.ts` **41/41** (все 10 P0-классов + п
 моих импортов там нет); `tsc` — 0 по моим файлам (1 ошибка проекта — чужая
 `meal-plan-engine.ts`). CRLF моих файлов нормализован в LF; BOM/U+FFFD 0.
 
+## ББ-диагностика: коммит `18d824ec` + ревизия write-only (Oct 11 2026, без пуша)
+
+Коммит `18d824ec` (34 файла, +2061/−578) — аудит «нет данных ≠ результат» + раунд
+«все 6». Отдельно выполнен последний пункт отчёта — ревизия write-only экспортов
+сцепки диагностики (сканер `.tmp/dead-exports.cjs` двумя сигналами: кросс-импорт
+включая тесты + использование внутри модуля — первая версия ловила только импорты
+и дала 12 ложных «мёртвых», перепроверка `Select-String` добавила same-file сигнал).
+
+- **Удалено (0 ссылок в проекте):** `ohsSegmentFailedCount`, `OHS_SEGMENT_LABELS`,
+  `SEGMENT_LABELS` (ohs), `levelLabel` (bb-scoring).
+- **Снят `export` (используются только внутри модуля):** `FPPA_SIDE_GAP_DEG`,
+  `THORACIC_ROT_GAP`, `ERIR_RATIO_HIGH`, `MAX_LR_SNAPSHOTS`, `KTW_CM_PER_DEG`,
+  `KTW_ASYM_CM`, `lrAsymPct`, `lrSetsFromSessions`.
+- **Оставлены экспортом (пороги/канон под локами + данные-контракт):**
+  `THORACIC_ROT_NORM`, `ERIR_RATIO_MIN`, `YBT_*`, `nheDose`, `adductorAsymPct`,
+  `copenhagenProgression`, `painLocationLabel`, `bbLvpLiftFor`, `kneeToWallDeg`,
+  `idealReevesCircumference`, `sideOfExercise`, `lrVerdictFor`, `BB_CORRECTIVES`.
+- **Моя ошибка, пойманная прогоном:** замена `levelLabel` копией тела `scoreColor`
+  создала дубль экспорта (esbuild «Multiple exports with the same name») — поймано
+  первым же запуском, восстановлено точечно; финальный tsc 0.
+- **Проверено:** tsc 0 по проекту; локальные круги 338/338; полный
+  `engines/bb` + `TrainingScreen_parts` — 442/447 файлов, 4707 тестов; единственный
+  красный `bb-contest-prep-advanced` (25) пред-существующий и вне диффа
+  (`git diff --stat` по `bb-contest-prep`/`bb-volume` пуст).
+- Отчёт: `docs/BB-DIAGNOSTICS-HUB-PRO-2-2026-10.md` §7. Без пуша (в очереди чужие WIP).
+
 ### Продолжение (ответ на «что осталось», оптимальный readiness)
 Readiness-P0 закрыт оптимально: `tested`/`noData` + **жёлтый** по умолчанию (не красный —
+
 не режем вставку без оснований; не зелёный — не разрешаем добивки вслепую); `pain010:0` и
 `dangerMuscles:0` = данные, `null` = нет; хаб шлёт `dangerMuscles:null` без дневника; вердикт
 впервые показан в хабе (`data-bb="readiness-line"`). Закрыты ещё 7 пунктов «осталось»: окно

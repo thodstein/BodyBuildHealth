@@ -191,7 +191,7 @@ export interface SingleLegScreen {
   fppaR?: number | null;
 }
 
-export const FPPA_SIDE_GAP_DEG = 10;
+const FPPA_SIDE_GAP_DEG = 10;
 
 export function singleLegVerdict(s: SingleLegScreen): { weakSide: 'left' | 'right' | null; text: string; tested: boolean } {
   const fin = (v: unknown): number | null => (v != null && Number.isFinite(v as number) ? (v as number) : null);

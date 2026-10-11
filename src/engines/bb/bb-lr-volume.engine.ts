@@ -64,7 +64,7 @@ export function countSets(ex: any): number {
 }
 
 /** Агрегация L/R сетов по группам рук/ног из сессий дневника. */
-export function lrSetsFromSessions(sessions: any[]): Record<string, LrSideSets> {
+function lrSetsFromSessions(sessions: any[]): Record<string, LrSideSets> {
   const out: Record<string, LrSideSets> = {};
   if (!Array.isArray(sessions)) return out;
   for (const s of sessions) {
@@ -93,7 +93,7 @@ export function lrSetsFromSessions(sessions: any[]): Record<string, LrSideSets> 
   return out;
 }
 
-export function lrAsymPct(left: number, right: number): number | null {
+function lrAsymPct(left: number, right: number): number | null {
   const mx = Math.max(Number(left) || 0, Number(right) || 0);
   if (!(mx > 0)) return null;
   return Math.round((Math.abs(Number(left) - Number(right)) / mx) * 1000) / 10;

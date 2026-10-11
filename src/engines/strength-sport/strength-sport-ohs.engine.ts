@@ -36,15 +36,6 @@ export interface OHSResult {
   shoulderNote?: string;
 }
 
-const SEGMENT_LABELS: Record<OHSSegment, string> = {
-  ankle: 'Голеностоп (пятки)',
-  knee: 'Колени',
-  hip: 'Таз/глубина',
-  trunk: 'Корпус',
-  arm: 'Руки',
-  lumbar: 'Поясница',
-};
-
 export function assessOHS(input: OHSInput): OHSResult {
   // W1: поле `shoulderFlexionDeg` было объявлено (и норма 180° ему обещана), но не
   // проверялось ни разу — обещание без механизма. Теперь при введённом гониометре
@@ -104,11 +95,6 @@ export function assessOHS(input: OHSInput): OHSResult {
   return { totalScore, passed, failed, level, segments, primaryDriver, recommendation, needsPhysio, shoulderNote };
 }
 
-export function ohsSegmentFailedCount(input: OHSInput): number {
-  return assessOHS(input).failed;
-}
-
-export const OHS_SEGMENT_LABELS = SEGMENT_LABELS;
 export const OHS_NORMS = {
   kneeToWallCm: { optimal: 12, cutoff: 9, severe: 7 },
   ankleDeg: { optimal: 35, range: '35-38°' },
@@ -124,8 +110,8 @@ export const OHS_NORMS = {
  * <18.5° с согнутым коленом / <11.5° с прямым (Korean Acad Rehab Med,
  * sens 91/86%, spec 81/79%). Разница сторон ≥2см — флаг асимметрии.
  */
-export const KTW_CM_PER_DEG = 3.6;
-export const KTW_ASYM_CM = 2;
+const KTW_CM_PER_DEG = 3.6;
+const KTW_ASYM_CM = 2;
 
 /** см → градусы DF (округление 0.1). */
 export function kneeToWallDeg(cm: number | null | undefined): number | null {

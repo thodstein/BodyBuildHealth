@@ -94,9 +94,3 @@ export function scoreColor(level: BBScoreLevel): string {
   if (level === 'warn') return '#f59e0b';
   return '#22c55e';
 }
-
-export function levelLabel(level: BBScoreLevel): string {
-  if (level === 'critical') return 'CRITICAL';
-  if (level === 'warn') return 'WARN';
-  return 'OK';
-}

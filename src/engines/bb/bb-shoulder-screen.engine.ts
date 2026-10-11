@@ -87,7 +87,7 @@ export interface ThoracicRotationInput {
 }
 
 export const THORACIC_ROT_NORM = 45;
-export const THORACIC_ROT_GAP = 10;
+const THORACIC_ROT_GAP = 10;
 
 export function thoracicRotationVerdict(s: ThoracicRotationInput): { text: string; gap: number | null; low: boolean } {
   const { rotL, rotR } = s;
@@ -114,7 +114,7 @@ export function thoracicRotationVerdict(s: ThoracicRotationInput): { text: strin
 // 0.75 — нижний квартиль здоровых (bump: здоровья порог, не «болезнь»); >1.15 НЕ травмоопасно
 // (высокая ER — это не дисбаланс риска), поэтому это проверка замера, а не warning.
 export const ERIR_RATIO_MIN = 0.75;
-export const ERIR_RATIO_HIGH = 1.15;
+const ERIR_RATIO_HIGH = 1.15;
 
 export const ERIR_DISCLAIMER =
   'ER/IR <0.75 — дисбаланс в сторону внутренних ротаторов (Intelangelo 2025, n=296; нормы здоровых 0.71–0.86, IJSPT 2023); ручной динамометр надежен (ICC>0.7). Экстраполяция с overhead-атлетов: для жимовиков — эвристика, не диагноз';

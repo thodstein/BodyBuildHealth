@@ -24,7 +24,7 @@ export interface BbLrDirection {
   text: string;
 }
 
-export const MAX_LR_SNAPSHOTS = 24;
+const MAX_LR_SNAPSHOTS = 24;
 
 export function pushLrSnapshot(
   history: BbLrSnapshot[] | null | undefined,
