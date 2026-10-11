@@ -252,6 +252,46 @@ describe('P2: прочие регрессии раунда', () => {
   });
 });
 
+describe('P2: отчёт — разбивка перебора MRV (прямые/косвенные)', () => {
+  it('пиковый перебор >MRV×1.15 печатается с долей прямых сетов', () => {
+    const src = new SourceFileReader('src/engines/arm/arm-report.engine.ts');
+    expect(src.text).toContain('aggregateArmVolume(plan.weeks');
+    expect(src.text).toContain('косвенные');
+    expect(src.text).toContain('MRV ${mrv}×1.15');
+  });
+  it('на плане без перебора extra-warning не появляется', () => {
+    const p: any = buildArmPlan({ ...BASE, weeks: 4 });
+    const rep = buildArmReport(p);
+    const extra = rep.warnings.filter((w) => w.includes('косвенные'));
+    // на интерmediate standard-плане перебора effective > MRV×1.15 быть не должно
+    expect(extra.length).toBe(0);
+  });
+});
+
+describe('P2: perf + цикл-данные (остаток §7 отчёта)', () => {
+  it('arm-duration: total-set считается один раз (без O(n^2) reduce на сете)', () => {
+    const src = new SourceFileReader('src/engines/arm/arm-duration.engine.ts');
+    expect(src.text).toContain('const totalSetsInSession = exercises.reduce(');
+    expect(src.text).toContain('const isLastSet = setCount + 1 === totalSetsInSession;');
+    // в теле set-цикла больше не должно быть reduce по exercises
+    const bodyStart = src.text.indexOf('for (let index = 0; index < count');
+    const bodyEnd = src.text.indexOf('setCount += 1;', bodyStart);
+    const body = src.text.slice(bodyStart, bodyEnd);
+    expect(body).not.toContain('exercises.reduce');
+  });
+  it('dobrorezov_44: фазы подготовки/базы разведены (deload на 24-й неделе)', () => {
+    const src = new SourceFileReader('src/engines/arm/arm-cycle-library.engine.ts');
+    const i = src.text.indexOf("id: 'dobrorezov_44'");
+    expect(i).toBeGreaterThan(0);
+    const plan44 = src.text.slice(i, i + 500);
+    expect(plan44).toContain("w <= 23 ? 'accumulation' : w <= 24 ? 'deload'");
+    // сборка цикла совместима: 44 недели, ошибок нет
+    const p: any = buildArmPlan({ ...BASE, weeks: 44, cycleId: 'dobrorezov_44', cycleConsent: true, patternId: 'arm_3_full' });
+    expect(p.weeks.length).toBe(44);
+    expect(p.rationale.some((r: string) => r.includes('dobrorezov') || r.includes('Доброрез'))).toBe(true);
+  });
+});
+
 describe('P2: честный порог тендона в диагностике (критик достижим)', () => {
   it('tendon 20 при intermediate → critical (раньше порог >22 был недостижим из UI)', () => {
     const src = new SourceFileReader('src/engines/arm/arm-diagnostics-hub.engine.ts');

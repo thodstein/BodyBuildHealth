@@ -130,7 +130,7 @@ export const ARM_CYCLE_LIBRARY: ArmCycleTemplate[] = [
   {
     id: 'dobrorezov_44', name: 'Доброрезов 12-мес (12+12+8+12)', discipline: 'armwrestling',
     weeks: 44, daysPerWeek: 3, level: ['beginner', 'intermediate'],
-    phases: phasesLinear(44, (w) => (w <= 12 ? 'accumulation' : w <= 24 ? 'accumulation' : w <= 32 ? 'intensification' : w <= 43 ? 'peaking' : 'deload')),
+    phases: phasesLinear(44, (w) => (w <= 12 ? 'accumulation' : w <= 23 ? 'accumulation' : w <= 24 ? 'deload' : w <= 32 ? 'intensification' : w <= 43 ? 'peaking' : 'deload')),
     tablePerWeek: 1, rpe: 'Подгот RPE 6–7 → база 7–8 → сила 8–9 → специализация по технике', deloadRule: 'Делоад каждая 4-я внутри блоков',
     taperPreset: 'classic', correctionPctDefault: 0.5,
     note: 'Годичный каркас нач→сред: подгот 12 + база 12 + сила 8 + специализация 12. Для годового плана.',

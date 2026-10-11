@@ -13,6 +13,7 @@ import type { VbtRecord } from './arm-vbt-capture.engine';
 import { ARM_BIOMECH, type ArmWeakPoint } from './arm-biomechanics.engine';
 import { ARM_CORRECTIONS } from './arm-weakpoint-corrections';
 import { scoreArm } from './arm-scoring.engine';
+import { erIrVerdict, type ErIrInput } from './arm-shoulder-erir.engine';
 
 export type ArmDiagLevel = 'ok' | 'warn' | 'critical';
 
@@ -73,6 +74,9 @@ export function buildArmDiagnosticsReport(input: {
   hasVbt?: boolean;
   hasGripHistory?: boolean;
   benchLevel?: string; // уровень бенчмарков (beginner..elite) → grip-ветка scoring
+  /** 26.10.2026: баланс ротаторов плеча (Pascoa 2026 — прямо показывает перекос в
+   *  внутреннюю ротацию у армрестлеров). Без замеров finding не пишется. */
+  erIr?: ErIrInput;
 }): ArmDiagnosticsReport {
   const detailed = diagnoseArmWeakDetailed({ weakTest: input.weakTest, weakPoints: input.weakPoints, technique: input.technique });
   const diag = detailed; // detailed расширяет base (weakMuscles/priorities/rationale сохранены)
@@ -117,10 +121,9 @@ export function buildArmDiagnosticsReport(input: {
   if (tableRatio < 0.3) findings.push({ level: 'warn', text: `Table sessions ${(tableRatio*100).toFixed(0)}% <30% — для армрестлинга мало стола (Кузнецов VIII ≥50%)`, exercise: 'table_pushdown_iso' });
   else if (tableRatio >= 0.5) findings.push({ level: 'ok', text: `Table sessions ${(tableRatio*100).toFixed(0)}% ≥50% — норма`, exercise: 'table_pushdown_iso' });
 
-// 26.10.2026 было→стало: порог critical >22 был недостижим — хаб клэмпит тендон-сеты в 22, т.е. из UI ветка невыла никогда.
-// Ковый порог 18 достижим из хаба (кап тендона для Л\П
-  // Tendon — сустав/сухожилие риск
-  if (input.tendonSets >= 18) findings.push({ level: 'critical', text: `Tendon ${input.tendonSets} ≥ 18 — CRITICAL (кап 18 для Л/П, выше выше)`, exercise: 'wrist_ext_bb' });
+  // 26.10.2026 было→стало: порог critical >22 был недостижим — хаб клэмпит ввод в 22, т.е. из UI ветка не срабатала.
+  // Новый порог 18 соответствует недельному капу 22/18/12 (checkTendonGuard).
+  if (input.tendonSets >= 18) findings.push({ level: 'critical', text: `Tendon ${input.tendonSets} ≥ 18 — CRITICAL (кап 18 для Л/П, выше)`, exercise: 'wrist_ext_bb' });
   else if (input.tendonSets > 18) findings.push({ level: 'warn', text: `Tendon сетов ${input.tendonSets} >18 — риск`, exercise: 'pronation_pulses' });
   else if (input.level === 'beginner' && input.tendonSets > 12) findings.push({ level: 'warn', text: `Tendon ${input.tendonSets} >12 для beginner — много`, exercise: 'wrist_ext_bb' });
   else findings.push({ level: 'ok', text: `Tendon ${input.tendonSets} — в допуске`, exercise: 'wrist_ext_bb' });
@@ -130,6 +133,20 @@ export function buildArmDiagnosticsReport(input: {
     if (fv.asymmetryPct >= 12) findings.push({ level: 'critical', text: `Асимметрия L/R ${fv.asymmetryPct}% ≥12% — CRITICAL (кап 12.47% элита)`, exercise: 'hammer_curl_thick' });
     else if (fv.asymmetryPct >= 7) findings.push({ level: 'warn', text: `Асимметрия L/R ${fv.asymmetryPct}% ≥7% — добавить слабую сторону (Bezkorovainyi)`, exercise: 'hammer_curl_thick' });
     else findings.push({ level: 'ok', text: `Асимметрия L/R ${fv.asymmetryPct}% — в допуске <7%`, exercise: 'hammer_curl_thick' });
+  }
+
+  // ER:IR ротаторы плеча (26.10.2026, Pascoa 2026): перекос во внутреннюю ротацию —
+  // часть механики перелома плеча; показываем только по факту замера.
+  const erir = erIrVerdict(input.erIr || {});
+  if (erir.warn) {
+    findings.push({
+      level: erir.zone === 'risk' ? 'critical' : 'warn',
+      text: erir.line,
+      exercise: 'external_rotation_band',
+    });
+    if (erir.fix) info.push(`ER:IR — ${erir.fix}`);
+  } else if (erir.zone === 'ok') {
+    findings.push({ level: 'ok', text: erir.line, exercise: 'external_rotation_band' });
   }
 
   // Humerus / Balance — суставные риски (механизм-ориентированы)

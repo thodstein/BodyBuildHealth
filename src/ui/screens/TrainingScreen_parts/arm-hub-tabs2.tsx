@@ -8,6 +8,7 @@ import { profileOpponent } from '../../../engines/arm/arm-matchup.engine';
 import { analyzeTableIq, tableIqTrend } from '../../../engines/arm/arm-table-iq.engine';
 import { ARM_BIOMECH } from '../../../engines/arm/arm-biomechanics.engine';
 import { HUMERUS_CHECKS, checkHumerusChecklist } from '../../../engines/arm/arm-humerus-checklist.engine';
+import { erIrVerdict } from '../../../engines/arm/arm-shoulder-erir.engine';
 import { AdSec, AdGrid, AdField, AdChip, AdSwitch, AdSheetSelect, AdBtn, AdBanner } from './arm-design-system';
 import { WP_LABEL_SHORT } from './arm-hub-shared';
 import { ArmPickBlock } from './arm-hub-pick';
@@ -336,6 +337,15 @@ export function HubPressureTab({ H }: { H: any }) {
 
 export function HubStrengthTab({ H }: { H: any }) {
   const { state, setState, dynamicReport, forceVecPro, bilatP0, bilatTrendP0, bilatHistP0, onSaveBilat, benchRes, handleAddTrialsToHistory, onResetDynamic, forceHistory, toggleWeakPoint } = H;
+  // 26.10.2026: вердикт баланса ротаторов плеча — чистый движок, без своих расчётов в UI.
+  const erIr = (() => {
+    try {
+      const er = parseFloat(state.erKg), ir = parseFloat(state.irKg);
+      return erIrVerdict(Number.isFinite(er) && er > 0 && Number.isFinite(ir) && ir > 0 ? { erKg: er, irKg: ir } : {});
+    } catch { return null; }
+  })();
+  const erIrLine = erIr ? erIr.line : 'ER:IR — нет замера (внешняя/внутренняя ротация)';
+  const erIrFix = erIr && erIr.warn ? erIr.fix : null;
   return (
     <div>
       <AdBanner tone="warn">
@@ -372,9 +382,23 @@ export function HubStrengthTab({ H }: { H: any }) {
             </div>
           )}
         </AdSec>
+        {/* 26.10.2026: баланс ротаторов плеча (Pascoa 2026) — вход ER/IR + вердикт */}
+        <AdSec title="Баланс ротаторов плеча — ER:IR" hook="erir">
+          <AdGrid cols="2">
+            <AdField label="Внешняя ротация (ER)">
+              <input inputMode="decimal" value={state.erKg ?? ''} onChange={e=>setState((s: any)=>({...s, erKg:e.target.value}))} placeholder="Нм/кг" aria-label="Внешняя ротация плеча" />
+            </AdField>
+            <AdField label="Внутренняя ротация (IR)">
+              <input inputMode="decimal" value={state.irKg ?? ''} onChange={e=>setState((s: any)=>({...s, irKg:e.target.value}))} placeholder="Нм/кг" aria-label="Внутренняя ротация плеча" />
+            </AdField>
+          </AdGrid>
+          <div className="ad-muted" data-arm="erir-line">
+            {erIrLine}
+          </div>
+          {erIrFix && <div className="ad-tip" data-arm="erir-fix">{erIrFix}</div>}
+        </AdSec>
         <AdSec title="Асимметрия L/R — единый вердикт">
-          {(()=>{
-            const ds = (dynamicReport as any)?.asymmetry?.asymmetryPct ?? null;
+          {(()=>{            const ds = (dynamicReport as any)?.asymmetry?.asymmetryPct ?? null;
             const gs = forceVecPro.asymmetryPct ?? null;
             const bs = bilatP0?.asymmetryPct ?? null;
             const vals = [ds, gs, bs].filter((v): v is number => typeof v === 'number' && Number.isFinite(v));

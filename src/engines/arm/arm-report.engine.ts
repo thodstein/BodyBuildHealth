@@ -4,6 +4,8 @@
 import type { ArmPlan, ArmReport } from './arm-types';
 import { calcArmMetrics, armMetricsSummary } from './arm-metrics.engine';
 import { isArmTendonMuscle } from './arm-tendon-sets.engine';
+import { aggregateArmVolume } from './arm-volume.engine';
+import { getArmLandmarks } from './arm-volume-landmarks.engine';
 
 export function buildArmReport(plan: ArmPlan): ArmReport {
   const metrics = calcArmMetrics(plan);
@@ -46,6 +48,25 @@ export function buildArmReport(plan: ArmPlan): ArmReport {
   if (maxTendon > 22) warnings.push(`Tendon load ${maxTendon} сетов/нед (пиковая неделя) — много сухожильной работы, добавить восстановление`);
   if (maxSide > 9) warnings.push(`Side pressure ${maxSide} сетов/нед (пиковая неделя) — проверить humerus guard`);
   if (metrics.tableSessionShare < 0.4 && plan.discipline === 'armwrestling') warnings.push('Table sessions <40% — для армрестлинга мало стола');
+
+  // 26.10.2026 (§7 плана): пиковый перебор MRV с РАЗБИВКОЙ прямой/косвенной.
+  // Было: валидатор говорил только «N сетов > MRV» — непонятно, прямая работа или
+  // косвенная (compound-нагрузка). Теперь в каждой строке — direct/effective.
+  const level = plan.level || 'intermediate';
+  const agg = aggregateArmVolume(plan.weeks as any);
+  const weekCount = Math.max(1, plan.weeks.length);
+  for (const [muscle, v] of Object.entries(agg)) {
+    const directPerWeek = v.directSets / weekCount;
+    const effectivePerWeek = v.effectiveSets / weekCount;
+    if (effectivePerWeek <= 0) continue;
+    const mrv = plan.mrvByMuscle?.[muscle] ?? getArmLandmarks(level, muscle).mrv;
+    if (!Number.isFinite(mrv) || mrv <= 0 || effectivePerWeek <= mrv * 1.15 + 1e-9) continue;
+    const r1 = (x: number) => Math.round(x * 10) / 10;
+    const directShare = effectivePerWeek > 0 ? Math.round((directPerWeek / effectivePerWeek) * 100) : 0;
+    warnings.push(
+      `Н{пик} ${muscle}: эффективно ${r1(effectivePerWeek)}/нед (прямые ${r1(directPerWeek)} · косвенные ${r1(effectivePerWeek - directPerWeek)} = ${directShare}% прямых) > MRV ${mrv}×1.15 — перебор в основном ${directShare >= 70 ? 'прямой работой' : 'косвенной нагрузкой'}.`
+    );
+  }
 
   return { summary, phaseRationale, volumeSummary, techniqueRationale, gripRationale, warnings };
 }

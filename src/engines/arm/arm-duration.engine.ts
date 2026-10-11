@@ -111,6 +111,13 @@ export function estimateArmSessionDuration(
   let restSeconds = 0;
   let setCount = 0;
   let exerciseCount = 0;
+  // 26.10.2026 was->now: total session sets were recomputed with a reduce on EVERY
+  // set (O(n^2) in session size). Computed once now; behaviour identical.
+  const totalSetsInSession = exercises.reduce((total, item) => {
+    if (!item) return total;
+    const direct = Number(item.sets);
+    return total + (Number.isFinite(direct) && direct > 0 ? direct : Array.isArray(item.workSets) ? item.workSets.length : 0);
+  }, 0);
   for (const exercise of exercises) {
     if (!exercise) continue;
     exerciseCount += 1;
@@ -126,11 +133,7 @@ export function estimateArmSessionDuration(
       const hold = positive(set?.holdSeconds ?? exercise.holdSeconds, 0);
       dynamicSeconds += reps * repSeconds;
       holdSeconds += hold;
-      const isLastSet = setCount + 1 === exercises.reduce((total, item) => {
-        if (!item) return total;
-        const direct = Number(item.sets);
-        return total + (Number.isFinite(direct) && direct > 0 ? direct : Array.isArray(item.workSets) ? item.workSets.length : 0);
-      }, 0);
+      const isLastSet = setCount + 1 === totalSetsInSession;
       if (options.includeFinalRest || !isLastSet) {
         restSeconds += restForSet(set, exercise, session || {}, { restSeconds: restOptions });
       }

@@ -151,6 +151,10 @@ type ArmDiagState = {
   pronHoldSec: string;
   cupHoldSec: string;
   cocLevel: string;
+  /** 26.10.2026: баланс ротаторов плеча (Pascoa 2026) — сила внешней/внутренней
+   *  ротации одним способом замера (Нм или кг). Пусто = finding не пишется. */
+  erKg?: string;
+  irKg?: string;
   /** P2: фаза срыва схватки setup/start/mid/pin — бонус ранжиру (пусто = без бонуса). */
   failurePoint?: string;
   /** D2 PRO-2: неделя микро-волны коррекции 1/2/3 (пусто = без волны, байт-в-байт). */
@@ -165,6 +169,7 @@ const DEFAULT_STATE: ArmDiagState = {
   vbtWeight: '', vbtReps: '', vbtVel: '', vbtVel2: '',
   fingerKg: '', fingerMs: '', hammerKg: '', hammerMs: '', hookKg: '', hookMs: '', cupKg: '', cupMs: '',
   wristCurlLb: '', pronHoldSec: '', cupHoldSec: '', cocLevel: '', failurePoint: '', corrWave: '',
+  erKg: '', irKg: '',
 };
 
 export const ArmDiagnosticsHub: React.FC = () => {
@@ -567,7 +572,11 @@ export const ArmDiagnosticsHub: React.FC = () => {
     weightClass: weightClassAuto,
     bodyWeightKg: bwNum,
     benchLevel: benchRes.level,
-  } as any), [state.cup, state.rising, state.pron, state.sup, state.side, state.back, state.weakPoints, state.level, state.technique, state.elbowDeg, state.wristDeg, state.forearmDeg, state.vbtWeight, state.vbtReps, state.vbtVel, (state as any).vbtVel2, state.rtKg, state.axleKg, state.pinchSec, state.sideKg, state.backKg, state.leftKg, state.rightKg, derivedTable, derivedTendon, anglesVerified, weightClassAuto, bwNum, benchRes.level, forceHistoryTick]);
+    // 26.10.2026: баланс ротаторов плеча (Pascoa 2026) — только по факту замера
+    erIr: (parseFloat(state.erKg || '') > 0 && parseFloat(state.irKg || '') > 0)
+      ? { erKg: parseFloat(state.erKg || '0'), irKg: parseFloat(state.irKg || '0') }
+      : undefined,
+  } as any), [state.cup, state.rising, state.pron, state.sup, state.side, state.back, state.weakPoints, state.level, state.technique, state.elbowDeg, state.wristDeg, state.forearmDeg, state.vbtWeight, state.vbtReps, state.vbtVel, (state as any).vbtVel2, state.rtKg, state.axleKg, state.pinchSec, state.sideKg, state.backKg, state.leftKg, state.rightKg, state.erKg, state.irKg, derivedTable, derivedTendon, anglesVerified, weightClassAuto, bwNum, benchRes.level, forceHistoryTick]);
 
   // ── P0 PRO: план → аудит → причины → топ-3 → Δ → спец-блок → дневник ──
   const armPlan = useMemo(() => {
