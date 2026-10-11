@@ -5,6 +5,8 @@
  * Хранилище — тот же `he_hrv_log`, что у strength-sport/combat (REUSE, толерантный парсинг обоих форматов).
  */
 
+import { localIsoDate } from '../../core/local-date';
+
 export interface HrvReading { date: string; rmssd: number; }
 export interface HrvBaseline {
   n: number; meanRmssd: number; meanLn: number; sdLn: number; cvPct: number; swc: number;
@@ -18,7 +20,9 @@ const CAP = 90;
 export const HRV_PROTOCOL_NOTE = 'Замер утром после пробуждения, сидя, 1 мин стабилизация + 1 мин запись (Plews/Buchheit). ≥3 замеров для базы, ≥5 дн/нед для точности.';
 
 function todayIso(): string {
-  try { return new Date().toISOString().slice(0, 10); } catch { return ''; }
+  // Канон календарной даты: UTC-toISOString вечером в UTC+X даёт «вчера»
+  // (date-canon-census; PL-ценз pl-date-census).
+  try { return localIsoDate(); } catch { return ''; }
 }
 
 /** Толерантное чтение: {date,hrvMs} (SS/combat) | {date,rmssd} | {date,hrv} | plain number[] (legacy-тесты). */

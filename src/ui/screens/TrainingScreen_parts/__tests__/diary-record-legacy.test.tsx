@@ -78,4 +78,59 @@ describe('DiaryRecordingForm с legacy-данными', () => {
       fireEvent.click(result);
     }).not.toThrow();
   });
+
+  it('VBT: скорость подхода из ручной формы пишется в дневник (§5-quat)', async () => {
+    const rtl = await import('@testing-library/react');
+    const saved: any[] = [];
+    const { container } = rtl.render(
+      <DiaryRecordingForm
+        diary={{ saveWorkoutLog: async (log: any) => { saved.push(log); }, saveStrengthLog: async () => {} } as any}
+        selectedWeek={1}
+        onSave={() => {}}
+        historyWorkouts={[]}
+      />
+    );
+    // Добавляем упражнение из каталога (как в тесте выше).
+    const search = container.querySelector('input[data-ex-search]') as HTMLInputElement;
+    rtl.fireEvent.change(search, { target: { value: 'жим' } });
+    rtl.fireEvent.click(rtl.screen.getByText('Жим штанги лёжа'));
+    // Заполняем вес (иначе пустой подход не попадает в запись).
+    const weight = container.querySelectorAll('input[data-set-input="1"]')[0] as HTMLInputElement;
+    rtl.fireEvent.change(weight, { target: { value: '100' } });
+    // Вводим скорость первого подхода.
+    const vel = container.querySelector('input[placeholder="v"]') as HTMLInputElement;
+    expect(vel).toBeTruthy();
+    rtl.fireEvent.change(vel, { target: { value: '0.85' } });
+    rtl.fireEvent.click(rtl.screen.getByText('💾 Сохранить тренировку'));
+    // Даём микротаск на resolve async-сохранения.
+    await new Promise(r => setTimeout(r, 30));
+    expect(saved.length).toBeGreaterThan(0);
+    const ex = saved[0].exercises[0];
+    expect(ex.sets[0].velocity).toBe(0.85);
+  });
+
+  it('VBT: пустая/мусорная скорость → undefined (не калечит статистику)', async () => {
+    const rtl = await import('@testing-library/react');
+    const saved: any[] = [];
+    const { container } = rtl.render(
+      <DiaryRecordingForm
+        diary={{ saveWorkoutLog: async (log: any) => { saved.push(log); }, saveStrengthLog: async () => {} } as any}
+        selectedWeek={1}
+        onSave={() => {}}
+        historyWorkouts={[]}
+      />
+    );
+    const search = container.querySelector('input[data-ex-search]') as HTMLInputElement;
+    rtl.fireEvent.change(search, { target: { value: 'жим' } });
+    rtl.fireEvent.click(rtl.screen.getByText('Жим штанги лёжа'));
+    const weight = container.querySelectorAll('input[data-set-input="1"]')[0] as HTMLInputElement;
+    rtl.fireEvent.change(weight, { target: { value: '100' } });
+    const vel = container.querySelector('input[placeholder="v"]') as HTMLInputElement;
+    rtl.fireEvent.change(vel, { target: { value: '42' } });   // 42 м/с — опечатка
+    rtl.fireEvent.change(vel, { target: { value: '' } });      // и очистка
+    rtl.fireEvent.click(rtl.screen.getByText('💾 Сохранить тренировку'));
+    await new Promise(r => setTimeout(r, 30));
+    expect(saved.length).toBeGreaterThan(0);
+    expect(saved[0].exercises[0].sets[0].velocity).toBeUndefined();
+  });
 });

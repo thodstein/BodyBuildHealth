@@ -228,6 +228,28 @@ velocity пишется только из SessionPlayer (ручная форма
 «часовой» долг в `src/engines/pro` (hrv-baseline, intelligence-load-forecast) —
 чужие зоны, остаются в общем цензе `date-canon-census`.
 
+## 5-quat. Раунд 4 (Oct 11 2026, без коммита) — четыре границы раунда 3 закрыты
+
+| # | Граница раунда 3 | Что сделано |
+|---|---|---|
+| 1 | velocity только из SessionPlayer | `DiaryRecordingForm` получила колонку «м/с» в редакторе подходов (санитизация 0..5, иначе undefined — как в логгере), «Повторить тренировку» переносит скорости, `handleSaveWorkout` пишет `velocity` в `StrengthLogEntry.sets[]`. NEW 2 теста: скорость доезжает до `saveWorkoutLog`; мусор/пусто → undefined. `QuickEntry` сознательно не тронут — это минимальная быстрая форма (без RIR-редактора и техники), контракт «одна строка = один сет». |
+| 2 | Экспорт через Blob (APK-мост не трогал) | PL-выдачи переведены на общий `core/apk-share`: `PLCompetitionTab.handleSeasonIcs` → `saveTextFileApk` (native — Documents+Share, web — `<a download>` с BOM); `PLPlanView` → `saveCsvApk` / `saveTextFileApk` для «📄 CSV» / «🖨 HTML» + статус через `shareOutcomeLabel`. Хендлеры асинхронные, тест экспорта переведён на `waitFor` (тост приходит после resolve моста). |
+| 3 | Часовой долг в `engines/pro` | `hrv-baseline.todayIso` и `intelligence-load-forecast.loadForecast` (ref по умолчанию) переведены на канон `core/local-date` — в UTC+X вечером HRV-замер и прогноз нагрузки уходили на «вчера». Долг проекта в общем цензе `date-canon-census` уменьшен (потолок только снижается). |
+| 4 | TZ-проверка условная | `pl-date-census` расширен: добавлен полдень UTC (ветвь «даты совпали»), в шапку вынесены явные кросс-зональные команды (`TZ=Pacific/Kiritimati` / `Etc/UTC` / `America/Los_Angeles`). Проверено фактически: 5/5 во всех трёх зонах; регресс (возврат UTC в имя файла) роняет 3 теста в UTC+14 — гард не зависит от зоны машины. `process.env.TZ`, заданный внутри процесса, zoneinfo не меняет — поэтому тест кодирует ожидания каноном `localIsoDate`, а не подменой зоны. |
+
+**Проверено:** `src/engines/lms`+`pro`+`SRCBScreen_parts` — **144 файла / 2132 теста, 0 падений**;
+`TrainingScreen_parts` — **176 файлов / 1628 тестов, 0 падений** (2 unhandled — чужие
+пред-существующие: `revokeObjectURL` ExerciseLab + `URL.revokeObjectURL` из
+незакоммиченного WIP `bb-diagnostics-export`, изолированно оба зелёные); глобальный
+ценз дат + apk-share потребители + support — 23 файла / 190; `tsc` 0 по моим файлам
+(единственная ошибка проекта — чужой `meal-plan-engine.ts:10562`);
+`verify:apk-design` OK.
+
+**Границы (честно):** дни ICS-сессий по-прежнему позиционные; `QuickEntry` без
+velocity по контракту минимальной формы; velocity в истории «Повторить тренировку»
+копируется, но не пересчитывается; нативный мост CSV/HTML отдаёт «📄/🖨 Отчёт … +
+💾 Сохранено/📤 Отправлено» — единая семантика с Labs/Support-выдачами.
+
 ## 6. Файлы сессии
 
 Движки: `lms-builder.engine.ts` (пик-блок/тапер/прикиды), `lms-macro-taper.engine.ts`,

@@ -45,6 +45,7 @@ import {
   plWeeklyCompliance, plWeeklyComplianceByDays, planFactDriftWarnings, driftWarningLine,
   plIntensityAdvisory, buildPLComplianceCsv, buildPLComplianceHtml,
 } from '../../../engines/lms/pl-season-pro.engine';
+import { saveCsvApk, saveTextFileApk, shareOutcomeLabel } from '../../../core/apk-share';
 import type { PMAutoRegMode } from '../../../engines/lms/pm-autoreg.engine';
 import { plBlockGroups, plExportRows, buildPLExcelWorkbook, downloadPLExcel, buildPLPrintHtml, printPLHtml, plShareDigest, plTelegramAppUrl, openPLShare, PL_BLOCK_LABEL, type PLBlockId, type PLBlockGroup } from './pl-export';
 import type { RepTempoOutput } from '../../../engines/rep-tempo-engine';
@@ -737,14 +738,14 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
                 if (!hasAny) return null;
                 const statusColor = (s: string) => s === 'done' ? '#22c55e' : s === 'partial' ? '#f59e0b' : s === 'missed' ? '#ef4444' : 'rgba(255,255,255,0.35)';
                 const statusLabel = (s: string) => s === 'done' ? '✓' : s === 'partial' ? '≈' : s === 'missed' ? '✗' : '·';
-                const download = (text: string, filename: string, mime: string, note: string) => {
+                // Выдача через общий APK-мост (§5-quat): в Capacitor WebView
+                // <a download> уводит файл в никуда — native идёт в Documents+Share.
+                const download = async (text: string, filename: string, mime: string, note: string) => {
                   try {
-                    const blob = new Blob([text], { type: mime });
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url; a.download = filename; a.click();
-                    URL.revokeObjectURL(url);
-                    onNote(note);
+                    const out = mime.startsWith('text/csv')
+                      ? await saveCsvApk(filename, text)
+                      : await saveTextFileApk(filename, text, mime);
+                    onNote(out === 'failed' ? `⚠ Не удалось выгрузить ${filename}.` : `${note} ${shareOutcomeLabel(out)}`);
                   } catch (e) { onNote('⚠ Ошибка выгрузки: ' + (e as Error).message); }
                 };
                 return (
@@ -828,12 +829,12 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
                               <button data-pl="fact-export-csv" onClick={() => download(
                                 buildPLComplianceCsv(exportInput),
                                 'pl-plan-fact.csv', 'text/csv;charset=utf-8',
-                                '📄 Отчёт «план vs факт» выгружен (pl-plan-fact.csv).',
+                                '📄 Отчёт «план vs факт» (pl-plan-fact.csv):',
                               )} style={{ padding: '4px 10px', borderRadius: 8, fontSize: 10, fontWeight: 700, cursor: 'pointer', border: '1px solid rgba(255,255,255,0.14)', background: 'rgba(255,255,255,0.03)', color: '#fff' }}>📄 CSV</button>
                               <button data-pl="fact-export-html" onClick={() => download(
                                 buildPLComplianceHtml(exportInput),
                                 'pl-plan-fact.html', 'text/html;charset=utf-8',
-                                '🖨 Отчёт «план vs факт» выгружен (pl-plan-fact.html) — можно печатать.',
+                                '🖨 Отчёт «план vs факт» (pl-plan-fact.html):',
                               )} style={{ padding: '4px 10px', borderRadius: 8, fontSize: 10, fontWeight: 700, cursor: 'pointer', border: '1px solid rgba(255,255,255,0.14)', background: 'rgba(255,255,255,0.03)', color: '#fff' }}>🖨 HTML</button>
                             </>
                           );

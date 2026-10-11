@@ -15,6 +15,7 @@
  *    факта с планом делается понедельно (E5, «средняя неделя плана»).
  */
 import { ewma, type DayLoad } from './training-load.engine';
+import { localIsoDate } from '../../core/local-date';
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 function addDays(dateStr: string, n: number): string {
@@ -56,7 +57,8 @@ export function loadForecast(dailyLoads: DayLoad[], referenceDate?: string, days
   const sorted = [...dailyLoads].sort((a, b) => a.date < b.date ? -1 : 1);
   const byDate: Record<string, number> = {};
   for (const d of sorted) if (DATE_RE.test(d.date)) byDate[d.date] = (byDate[d.date] || 0) + d.load;
-  const ref = referenceDate || (sorted.length ? sorted[sorted.length - 1].date : addDays(new Date().toISOString().slice(0, 10), 0));
+  // Канон календарной даты (date-canon-census): UTC-toISOString вечером даёт «вчера».
+  const ref = referenceDate || (sorted.length ? sorted[sorted.length - 1].date : addDays(localIsoDate(), 0));
   const hasData = Object.keys(byDate).length > 0;
   const series: number[] = [];
   for (let i = 13; i >= 0; i--) series.push(byDate[addDays(ref, -i)] ?? 0);

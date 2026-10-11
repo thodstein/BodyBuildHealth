@@ -29,6 +29,8 @@ interface SetRecord {
   notes?: string;
   /** Оценка техники: 5 (отлично) / 4 (норма) / 3 (слабо). */
   technique?: number;
+  /** Фактическая скорость штанги подхода (м/с) — VBT: потеря скорости best→last. */
+  velocity?: number;
 }
 
 interface ExerciseRecord {
@@ -331,7 +333,15 @@ export const DiaryRecordingForm: React.FC<DiaryRecordingFormProps> = ({ diary, s
       return {
         id: `${wid}_${i}`, date: logDate, exerciseId: e.exerciseId,
         exerciseName: cat?.name || e.exerciseId,
-        sets: completedSets.map(s => ({ weight: s.weight, reps: s.reps, rir: s.rir, rpe: s.rpe, notes: s.notes || undefined, techniqueScore: s.technique })),
+        sets: completedSets.map(s => ({
+          weight: s.weight, reps: s.reps, rir: s.rir, rpe: s.rpe,
+          // VBT-факт: санитизация как в логгере (0..5 м/с), иначе undefined.
+          velocity: Number.isFinite(s.velocity) && (s.velocity ?? 0) > 0 && (s.velocity ?? 0) <= 5
+            ? Math.round((s.velocity as number) * 100) / 100
+            : undefined,
+          notes: s.notes || undefined,
+          techniqueScore: s.technique,
+        })),
         totalVolume: completedSets.reduce((s, st) => s + st.weight * st.reps, 0),
         estimated1RM: Math.max(...completedSets.map(s => epley1RM(s.weight, s.reps)), 0),
         isCompound: cat?.type === 'compound', weekNumber: selectedWeek,
@@ -444,6 +454,7 @@ export const DiaryRecordingForm: React.FC<DiaryRecordingFormProps> = ({ diary, s
             exerciseName: ex.exerciseName.replace(/\s*\[superset:\d+\]/, ''),
             sets: (ex.sets || []).map((s: any) => ({
               weight: s.weight || 0, reps: s.reps || 10, rir: s.rir || 2, rpe: s.rpe || 7, completed: false,
+              velocity: Number.isFinite(s.velocity) && s.velocity > 0 && s.velocity <= 5 ? Math.round(s.velocity * 100) / 100 : undefined,
             })),
           }));
           setExercises(repeated);
@@ -673,12 +684,12 @@ export const DiaryRecordingForm: React.FC<DiaryRecordingFormProps> = ({ diary, s
                 )}
 
                 {/* Set header */}
-                <div style={{ display: 'grid', gridTemplateColumns: '20px 1fr 1fr 1fr 1fr 96px', gap: 3, marginBottom: 4, fontSize: 10, color: '#fff', textTransform: 'uppercase', paddingLeft: 2 }}>
-                  <span>#</span><span style={{ textAlign: 'center' }}>кг</span><span style={{ textAlign: 'center' }}>повт</span><span style={{ textAlign: 'center' }}>RPE</span><span style={{ textAlign: 'center' }}>RIR</span><span></span>
+                <div style={{ display: 'grid', gridTemplateColumns: '20px 1fr 1fr 1fr 1fr 1fr 96px', gap: 3, marginBottom: 4, fontSize: 10, color: '#fff', textTransform: 'uppercase', paddingLeft: 2 }}>
+                  <span>#</span><span style={{ textAlign: 'center' }}>кг</span><span style={{ textAlign: 'center' }}>повт</span><span style={{ textAlign: 'center' }}>RPE</span><span style={{ textAlign: 'center' }}>RIR</span><span style={{ textAlign: 'center' }}>м/с</span><span></span>
                 </div>
                 {ex.sets.map((set, setIdx) => (
                   <React.Fragment key={setIdx}>
-                    <div style={{ display: 'grid', gridTemplateColumns: '20px 1fr 1fr 1fr 1fr 96px', gap: 3, marginBottom: 3, alignItems: 'center' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '20px 1fr 1fr 1fr 1fr 1fr 96px', gap: 3, marginBottom: 3, alignItems: 'center' }}>
                       <span style={{ fontSize: 11, fontWeight: 700, color: ACCENT, textAlign: 'center' }}>{setIdx + 1}</span>
                       <input type="number" value={set.weight} disabled={isBWExercise({ name: ex.exerciseName })} data-set-input="1"
                         onChange={e => updateSet(exIdx, setIdx, { weight: parseFloat(e.target.value) || 0 })}
@@ -699,6 +710,15 @@ export const DiaryRecordingForm: React.FC<DiaryRecordingFormProps> = ({ diary, s
                         style={{ padding: '6px 4px', borderRadius: 5, background: '#18181b', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', fontSize: 12, textAlign: 'center', minHeight: isMobile ? 44 : 34 }} />
                       <input type="number" min={0} max={5} value={set.rir} data-set-input="1"
                         onChange={e => updateSet(exIdx, setIdx, { rir: parseInt(e.target.value) || 0 })}
+                        style={{ padding: '6px 4px', borderRadius: 5, background: '#18181b', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', fontSize: 12, textAlign: 'center', minHeight: isMobile ? 44 : 34 }} />
+                      {/* VBT-факт: скорость штанги подхода (м/с) — пишется в дневник,
+                          отчёты «план vs факт» считают потерю скорости по нему. */}
+                      <input type="number" step="0.01" min={0} max={5} value={set.velocity ?? ''} data-set-input="1"
+                        placeholder="v"
+                        onChange={e => {
+                          const v = parseFloat(e.target.value);
+                          updateSet(exIdx, setIdx, { velocity: Number.isFinite(v) && v > 0 && v <= 5 ? Math.round(v * 100) / 100 : undefined });
+                        }}
                         style={{ padding: '6px 4px', borderRadius: 5, background: '#18181b', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', fontSize: 12, textAlign: 'center', minHeight: isMobile ? 44 : 34 }} />
                       <div style={{ display: 'flex', gap: 2 }}>
                         <button onClick={() => setMmcOpen(prev => ({ ...prev, [`${exIdx}_${setIdx}`]: !prev[`${exIdx}_${setIdx}`] }))}

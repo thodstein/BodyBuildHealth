@@ -14,6 +14,14 @@
  *     «сегодня» в PL-функциях берутся из локального календаря, а не UTC;
  *     ICS-раскладка от переданных дат от часов не зависит.
  *
+ * TZ-независимость: ожидания считаются через канон `localIsoDate()`, поэтому
+ * ценз верен в любой зоне. Явные кросс-зональные прогоны (в CI/вручную):
+ *   TZ=Pacific/Kiritimati vitest run pl-date-census   (UTC+14)
+ *   TZ=Etc/UTC             vitest run pl-date-census   (UTC)
+ *   TZ=America/Los_Angeles vitest run pl-date-census   (UTC−7)
+ * (process.env.TZ, заданный УЖЕ внутри процесса, на его zoneinfo не влияет —
+ * поэтому в самом тесте зона не подменяется, а кодируется ожиданиями канона.)
+ *
  * Пойманный в этом раунде кейс: имя файла .ics было UTC — в вечерней зоне
  * календарь уезжал на «вчера».
  */
@@ -147,6 +155,24 @@ describe('ценз дат: поведение под замороженными 
       const res = plWeeklyCompliance(plan(), [], { currentWeek: 1 });
       expect(res.weeks.find(w => w.week === 1)!.status).toBe('missed');
       expect(plSeasonIcsFilename('pl-season')).toBe(`pl-season-${local}.ics`);
+    }
+  });
+
+  it('полдень UTC: локальная дата = календарь machine (обе ветви сверки)', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-06-15T12:00:00Z'));
+    const local = localIsoDate();
+    const utc = new Date('2026-06-15T12:00:00Z').toISOString().slice(0, 10);
+    // В машинах UTC−3…UTC+12 полдень UTC — тот же календарный день (ветвь
+    // «совпадает»); проверяем, что дефолт PL берёт именно локальную дату.
+    expect(local).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(plSeasonIcsFilename('pl-season')).toBe(`pl-season-${local}.ics`);
+    if (local === utc) {
+      // Совпали: поведение эквивалентно UTC-версии — фиксируем и это.
+      const res = plWeeklyCompliance(plan(), [], { currentWeek: 1 });
+      expect(res.weeks.find(w => w.week === 1)!.status).toBe('missed');
+    } else {
+      expect(plSeasonIcsFilename('pl-season')).not.toBe(`pl-season-${utc}.ics`);
     }
   });
 

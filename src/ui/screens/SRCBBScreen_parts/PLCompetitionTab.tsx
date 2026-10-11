@@ -29,6 +29,7 @@ import { TaperCoachCard } from './TaperCoachCard';
 import { usePLTaper } from './taper-state';
 import { getPeakCycles } from '../../../engines/lms/pl-peak-cycle-taper.engine';
 import { localIsoDateOffset } from '../../../core/local-date';
+import { saveTextFileApk, shareOutcomeLabel } from '../../../core/apk-share';
 
 // Фаза 3: кнопки — из единого кита training-ui.
 const BTN = TRAIN_BTN;
@@ -214,7 +215,9 @@ export const PLCompetitionTab: React.FC<{ api: PLCompetitionTabApi }> = ({ api }
   // 📅 Календарь сезона (.ics): соревнования из единого реестра + недели
   // пик-блоков с разметкой дат (аудит Oct 2026: сезон выгружался без календаря —
   // ICS был только у тапер-плана и макроцикла).
-  const handleSeasonIcs = () => {
+  // Раунд 4 (§5-quat): выдача идёт через общий APK-мост (core/apk-share) —
+  // в Capacitor WebView <a download> уводит файл в никуда; native — Documents+Share.
+  const handleSeasonIcs = async () => {
     if (!builtSrc) return;
     try {
       const ics = buildPLSeasonIcs(
@@ -232,14 +235,9 @@ export const PLCompetitionTab: React.FC<{ api: PLCompetitionTabApi }> = ({ api }
         onNote('⚠ Нечего выгружать: нет стартов с датами и недель пик-блока с разметкой — задайте дату старта или окно до старта.');
         return;
       }
-      const blob = new Blob([ics], { type: 'text/calendar;charset=utf-8' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'pl-season.ics';
-      a.click();
-      URL.revokeObjectURL(url);
-      onNote('📅 Календарь сезона сохранён (pl-season.ics) — старты и недели пик-блоков' + (seasonIcsWithSessions ? ' + события всех тренировочных сессий.' : '.'));
+      const out = await saveTextFileApk('pl-season.ics', ics, 'text/calendar;charset=utf-8');
+      if (out === 'failed') { onNote('⚠ Не удалось сохранить календарь сезона.'); return; }
+      onNote(`📅 Календарь сезона: ${shareOutcomeLabel(out)} (pl-season.ics) — старты и недели пик-блока` + (seasonIcsWithSessions ? ' + события всех тренировочных сессий.' : '.'));
     } catch (e) { onNote('⚠ Ошибка выгрузки календаря: ' + (e as Error).message); }
   };
 
