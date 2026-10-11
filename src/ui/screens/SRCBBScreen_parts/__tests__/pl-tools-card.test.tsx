@@ -31,8 +31,9 @@ const plan = { weeks: [{ week: 1, days: [{ exercises: [{ workSets: [{ weight: 10
 describe('PLToolsCard — честные данные', () => {
   it('Frequency Planner показывает переданные реальные объёмы', () => {
     render(<PLToolsCard level="II-KMS" days={4} totalSets={{ chest: 14, back: 18 }} e1RM={e1RM} />);
-    expect(screen.getByText(/chest 14п\/нед/)).toBeTruthy();
-    expect(screen.getByText(/back 18п\/нед/)).toBeTruthy();
+    // Группы подписаны по-русски (карточка была англоязычной в русском UI).
+    expect(screen.getByText(/грудь 14п\/нед/)).toBeTruthy();
+    expect(screen.getByText(/спина 18п\/нед/)).toBeTruthy();
   });
 
   it('без объёмов — подсказка «постройте план» вместо вымышленных цифр', () => {

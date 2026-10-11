@@ -590,7 +590,10 @@ const volumeHandler: Handler = (payload, { program: p, update, showToast }) => {
 };
 
 const peakHandler: Handler = (payload, { program: p, update, showToast }) => {
-  if (!p.bb) return;
+  // Аудит P1: PeakingPanel «🛠 Применить taper» приходит и вне ручного ББ-редактора
+  // (в ПЛ-авто bb-программы нет вовсе) — раньше был тихий return: кнопка живая,
+  // эффекта ноль. Теперь честное сообщение вместо молчания.
+  if (!p.bb) { showToast('⚠ Тапер ББ применяется в ручном конструкторе (ББ-редактор) — здесь план не изменён. ПЛ-тапер — вкладка «🏁 Соревнования».'); return; }
   // volumeMult — множитель объёма (сокращение сетов), rirTarget — целевой RIR для пиковой недели
   const volumeMult: number = Math.max(0.25, Math.min(1, Number(payload.data.volumeMult ?? 0.5)));
   const rirTarget: number = Math.max(0, Math.min(5, Number(payload.data.rirTarget ?? 2)));

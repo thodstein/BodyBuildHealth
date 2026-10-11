@@ -159,6 +159,10 @@ export interface LMSPlanWeek {
   postMeet?: boolean;
   /** Прикиды соревновательного дня (выход на пик до 105%) — вешается на финальную тапер-неделю. */
   meetAttempts?: MeetAttemptsInfo;
+  /** ПМ-строка, ОТ КОТОРОЙ посчитаны прикиды (planned federation PM при задании,
+   *  иначе pmRow недели). Держим на неделе, чтобы «🔄 Обновить прикиды» пересчитывало
+   *  от того же основания (иначе плановый ПМ федерации молча терялся). */
+  attemptPmRow?: Record<string, number>;
   /** Пометка недели тапера/прикидов (напр. «план федерации выше факта — прикиды от потолка»). */
   taperNote?: string;
   /** Дата начала недели (ISO) — календарная разметка (реверс от даты старта). */
@@ -1921,6 +1925,13 @@ export function appendPLTaperWeeks(
       const w = arr[i];
       if (w.taperWeek || w.meetWeek || w.mockMeet || w.postMeet) end = i; else break;
     }
+    // Aудит P1: авто-тапер сборки (applyPLTaper) режет последние недели цикла, а
+    // meta-deload может висеть на той же финальной неделе. Без этого шага пик-блок
+    // вставал ПОСЛЕ чужого тапера: получалось 3 «тапер-недели» при запрошенных 2 и
+    // объём скакал вверх перед стартом. Хвост [autoTaper…, deload] заменяем целиком.
+    if (end === arr.length && arr.length >= 2 && arr[arr.length - 1].deload && arr[arr.length - 2].taperWeek) {
+      end = arr.length - 2;
+    }
     return { weeks: arr.slice(0, end), removed: arr.length - end };
   })();
   const basePlanWeeks = trimmed.weeks;
@@ -2140,6 +2151,9 @@ export function appendPLTaperWeeks(
       const attempts = computeMeetAttemptsFromPmRow(row, peakStrategy);
       if (attempts) {
         week.meetAttempts = attempts;
+        // Основание прикидов сохраняем: «🔄 Обновить прикиды» пересчитывает от
+        // него же (иначе плановый ПМ федерации терялся при смене стратегии).
+        week.attemptPmRow = row;
         if (capped.length > 0) week.taperNote = `План федерации выше факта для: ${capped.join(', ')} — прикиды от реалистичного потолка (факт ×1.02).`;
       }
     }
@@ -2222,6 +2236,7 @@ export function appendPLTaperWeeks(
       macroPhase: 'competition' as const,
       [kind === 'mock' ? 'mockMeet' : 'meetWeek']: true,
       meetAttempts: attempts,
+      attemptPmRow: attemptRow,
       taperNote: kind === 'meet' && opts?.priming !== false
         ? '🔥 прайминг за 1-2 дня до старта: синглы 60/70% на основных лифтах (активация ЦНС), затем прикиды.' + (capped.length > 0 ? ` План федерации выше факта для: ${capped.join(', ')} — прикиды от реалистичного потолка (факт ×1.02).` : '')
         : (capped.length > 0 ? `План федерации выше факта для: ${capped.join(', ')} — прикиды от реалистичного потолка (факт ×1.02).` : undefined),
@@ -2249,6 +2264,9 @@ export function appendPLTaperWeeks(
   // 'pro' — усталость-зависимая кривая с праймингом.
   // При окне (windowWeeks) кривая = ramp (вход в пик) + глубокий тапер; mock
   // вставляется между ними (за 10-14 дней до старта), а не в начало блока.
+  // Aудит P1: окно ровно = mock + meet → кривая пуста, и mock молча терялся
+  // (pushMock жил внутри цикла). Превью и заметка обещают mock — публикуем его.
+  if (mockMeetOn && layout && taperCurvePoints.length === 0) pushMock();
   const taperMode: TaperMode = opts?.peakMode ?? 'classic';
   for (let i = 0; i < taperCurvePoints.length; i++) {
     if (layout && mockMeetOn && i === rampLen) pushMock();
@@ -2419,13 +2437,15 @@ export function appendPLTaperWeeks(
  * Пересчёт прикидов соревновательного дня на лету: обновляет meetAttempts на всех
  * неделях плана, где они есть (mock meet + финальная тапер-неделя), под выбранную
  * стратегию — без повторного добавления тапера. Не мутирует исходный план.
+ * Основание прикидов — `attemptPmRow` недели (плановый ПМ федерации, если задан),
+ * иначе pmRow недели: иначе «Обновить прикиды» молча сбрасывало план федерации.
  */
 export function refreshMeetAttempts(plan: LMSBuildOutput, strategy: MeetStrategy = 'balanced'): LMSBuildOutput {
   if (!plan || !Array.isArray(plan.weeks) || plan.weeks.length === 0) return plan;
   let changed = false;
   const weeks = plan.weeks.map(wk => {
     if (!wk.meetAttempts || wk.meetAttempts.strategy === strategy) return wk;
-    const attempts = computeMeetAttemptsFromPmRow(wk.pmRow, strategy);
+    const attempts = computeMeetAttemptsFromPmRow(wk.attemptPmRow ?? wk.pmRow, strategy);
     if (!attempts) return wk;
     changed = true;
     return { ...wk, meetAttempts: attempts };

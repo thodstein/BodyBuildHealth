@@ -361,16 +361,25 @@ describe('P1-11: ACWR zone uses "dangerous" not "danger"', () => {
 });
 
 // ── P2-4: plateau percentage threshold ──
+// Даты — ОТНОСИТЕЛЬНЫЕ (относительно «сегодня»): в findLastFact/findAllFacts окно
+// 90 дней, и захардкоженные даты делали тест время-зависимым (через 90 дней он
+// молча терял данные и падал — аудит 2026-10).
+const isoDaysBack = (n: number): string => {
+  const d = new Date();
+  d.setDate(d.getDate() - n);
+  const p = (v: number) => String(v).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+};
+
 describe('P2-4: plateau detection uses percentage threshold', () => {
   it('does not flag plateau for heavy lift with small absolute variance', () => {
-    // Squat at 180kg: 3 sessions with e1RM 180, 181, 180.5 → variance 1kg (< 2% of 180 = 3.6kg) → plateau
-    // But for heavy lifts, this IS a plateau (no real progress). Let's test that the threshold is proportional.
+    // Squat at 180kg: 3 sessions with e1RM 180, 181, 180 → variance 1kg.
     // 180kg max → threshold = max(1, 180*0.02) = 3.6kg. Variance 1kg < 3.6 → IS plateau.
     const input: DiaryAutoregInput = {
       historyWorkouts: [
-        { date: '2026-06-01', exercises: [{ exerciseName: 'Присед', date: '2026-06-01', sets: [{ weight: 180, reps: 1, rpe: 10, rir: 0 }], estimated1RM: 180 }] },
-        { date: '2026-06-15', exercises: [{ exerciseName: 'Присед', date: '2026-06-15', sets: [{ weight: 181, reps: 1, rpe: 10, rir: 0 }], estimated1RM: 181 }] },
-        { date: '2026-07-01', exercises: [{ exerciseName: 'Присед', date: '2026-07-01', sets: [{ weight: 180, reps: 1, rpe: 10, rir: 0 }], estimated1RM: 180 }] },
+        { date: isoDaysBack(60), exercises: [{ exerciseName: 'Присед', date: isoDaysBack(60), sets: [{ weight: 180, reps: 1, rpe: 10, rir: 0 }], estimated1RM: 180 }] },
+        { date: isoDaysBack(40), exercises: [{ exerciseName: 'Присед', date: isoDaysBack(40), sets: [{ weight: 181, reps: 1, rpe: 10, rir: 0 }], estimated1RM: 181 }] },
+        { date: isoDaysBack(20), exercises: [{ exerciseName: 'Присед', date: isoDaysBack(20), sets: [{ weight: 180, reps: 1, rpe: 10, rir: 0 }], estimated1RM: 180 }] },
       ] as any as WorkoutLog[],
       plannedExercises: [{
         name: 'Присед', plannedWeight: 180, plannedReps: 1, plannedSets: 3, plannedRir: 0, isMain: true,
@@ -387,9 +396,9 @@ describe('P2-4: plateau detection uses percentage threshold', () => {
     // New threshold: max(1, 10*0.02) = 1kg → 2 > 1 → NOT plateau ✓
     const input: DiaryAutoregInput = {
       historyWorkouts: [
-        { date: '2026-06-01', exercises: [{ exerciseName: 'Разведения', date: '2026-06-01', sets: [{ weight: 8, reps: 12, rpe: 8, rir: 2 }], estimated1RM: 8.6 }] },
-        { date: '2026-06-15', exercises: [{ exerciseName: 'Разведения', date: '2026-06-15', sets: [{ weight: 10, reps: 12, rpe: 8, rir: 2 }], estimated1RM: 10.7 }] },
-        { date: '2026-07-01', exercises: [{ exerciseName: 'Разведения', date: '2026-07-01', sets: [{ weight: 9, reps: 12, rpe: 8, rir: 2 }], estimated1RM: 9.6 }] },
+        { date: isoDaysBack(60), exercises: [{ exerciseName: 'Разведения', date: isoDaysBack(60), sets: [{ weight: 8, reps: 12, rpe: 8, rir: 2 }], estimated1RM: 8.6 }] },
+        { date: isoDaysBack(40), exercises: [{ exerciseName: 'Разведения', date: isoDaysBack(40), sets: [{ weight: 10, reps: 12, rpe: 8, rir: 2 }], estimated1RM: 10.7 }] },
+        { date: isoDaysBack(20), exercises: [{ exerciseName: 'Разведения', date: isoDaysBack(20), sets: [{ weight: 9, reps: 12, rpe: 8, rir: 2 }], estimated1RM: 9.6 }] },
       ] as any as WorkoutLog[],
       plannedExercises: [{
         name: 'Разведения', plannedWeight: 9, plannedReps: 12, plannedSets: 3, plannedRir: 2, isMain: false,

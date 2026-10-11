@@ -46,19 +46,6 @@ export function daysBetweenIso(dateIso: string, todayIso: string): number | null
   return Math.round((a - b) / DAY_MS);
 }
 
-/** Недель до старта из даты: round(дни/7), не меньше 0. */
-export function weeksToStartFromDate(dateIso: string, todayIso: string): number {
-  const d = daysBetweenIso(dateIso, todayIso);
-  if (d == null) return 0;
-  return Math.max(0, Math.round(d / 7));
-}
-
-/** Дата старта из «недель до старта» (неделя 1 = today). */
-export function dateFromWeeksToStart(weeksToStart: number, todayIso: string): string {
-  const w = Number.isFinite(weeksToStart) ? Math.max(0, Math.round(weeksToStart)) : 0;
-  return isoAddDays(todayIso, w * 7) ?? todayIso;
-}
-
 /** Неделя макроцикла для даты (неделя 1 = today), ≥1. */
 export function macroWeekForDateIso(dateIso: string, todayIso: string): number {
   const d = daysBetweenIso(dateIso, todayIso);
@@ -66,10 +53,28 @@ export function macroWeekForDateIso(dateIso: string, todayIso: string): number {
   return Math.max(1, Math.floor(d / 7) + 1);
 }
 
+/** Обратное к macroWeekForDateIso: недель до старта = номер недели старта.
+ *  Для даты-начала недели N возвращает N — контракт сезона ПЛ (старт в неделе N).
+ *  Аудит P1: было round(дни/7) — реестр и buildPLSeasonPeaks расходились на неделю. */
+export function weeksToStartFromDate(dateIso: string, todayIso: string): number {
+  return macroWeekForDateIso(dateIso, todayIso);
+}
+
+/**
+ * Дата старта из «недель до старта» (неделя 1 = today).
+ * Канон недель: `weeksToStart = N` ⇔ старт в НЕДЕЛЕ N плана (её начало = today +
+ * (N-1)×7). Ровно та же разметка, что у buildPLSeasonPeaks (compIdx = N-1) —
+ * раньше годовой план и сезон ПЛ расходились ровно на неделю.
+ */
+export function dateFromWeeksToStart(weeksToStart: number, todayIso: string): string {
+  const w = Number.isFinite(weeksToStart) ? Math.max(0, Math.round(weeksToStart)) : 0;
+  return isoAddDays(todayIso, Math.max(0, w - 1) * 7) ?? todayIso;
+}
+
 /** Дата события: явная `date`, иначе из `week` (неделя 1 = today). null — нет данных. */
 export function dateForCompetition(ev: CompetitionEvent, todayIso: string): string | null {
   if (ev.date && toLocalNoonUtc(ev.date) != null) return ev.date.slice(0, 10);
-  if (Number.isFinite(ev.week) && ev.week >= 1) return dateFromWeeksToStart(ev.week - 1, todayIso);
+  if (Number.isFinite(ev.week) && ev.week >= 1) return dateFromWeeksToStart(ev.week, todayIso);
   return null;
 }
 
@@ -128,11 +133,12 @@ export function mergeMeetRegistry(input: MergeMeetRegistryInput): MergeMeetRegis
       });
     } else {
       // Легаси-старт без события года → создаём событие (миграция).
+      // Контракт недель: weeksToStart = N ⇔ старт в неделе N (как в сезоне ПЛ).
       const date = dateFromWeeksToStart(legacy.weeksToStart, todayIso);
       const ev: CompetitionEvent = {
         id: legacy.id,
         name: legacy.name || 'Соревнование',
-        week: macroWeekForDateIso(date, todayIso),
+        week: Math.max(1, Math.round(legacy.weeksToStart)),
         date,
         priority: legacy.id === input.mainMeetId ? 'A' : 'B',
       };
@@ -147,7 +153,8 @@ export function mergeMeetRegistry(input: MergeMeetRegistryInput): MergeMeetRegis
   for (const ev of competitions) {
     if (usedEventIds.has(ev.id)) continue;
     const date = dateForCompetition(ev, todayIso);
-    const weeksToStart = date ? weeksToStartFromDate(date, todayIso) : (Number.isFinite(ev.week) ? Math.max(0, ev.week - 1) : 0);
+    // Контракт недель: старт в неделе ev.week ⇔ ev.week недель до старта.
+    const weeksToStart = date ? weeksToStartFromDate(date, todayIso) : (Number.isFinite(ev.week) ? Math.max(1, Math.round(ev.week)) : 1);
     meets.push({ id: ev.id, name: ev.name, weeksToStart, ...DEFAULT_EXTRAS, plannedPm: {}, strategy: 'balanced' });
     usedEventIds.add(ev.id);
   }
@@ -176,7 +183,8 @@ export function syncCompetitionsFromMeets(
   const result: CompetitionEvent[] = [];
   for (const meet of meets) {
     const prev = byId.get(meet.id);
-    const date = dateFromWeeksToStart(meet.weeksToStart, opts.todayIso);
+    const weeks = Math.max(1, Math.round(meet.weeksToStart));
+    const date = dateFromWeeksToStart(weeks, opts.todayIso);
     const priority: CompetitionEvent['priority'] = meet.id === opts.mainMeetId
       ? 'A'
       : (prev?.priority === 'A' ? 'B' : (prev?.priority ?? 'B'));
@@ -184,7 +192,7 @@ export function syncCompetitionsFromMeets(
       ...(prev ?? {}),
       id: meet.id,
       name: meet.name || prev?.name || 'Соревнование',
-      week: macroWeekForDateIso(date, opts.todayIso),
+      week: weeks,
       date,
       priority,
     });

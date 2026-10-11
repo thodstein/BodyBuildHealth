@@ -21,12 +21,14 @@ import { saveCompetitionPlan } from '../TrainingScreen_parts/CompetitionPlansVie
 import type { PeakWeekLayout, TaperMode, TaperWeightGoal } from '../../../engines/lms/lms-taper.engine';
 import type { TaperCoachCtx, TaperConfigRecommendation } from '../../../engines/lms/lms-taper-coach.engine';
 import { buildPLTaperPrintHtml, buildPLPeakWeekCutProtocol } from '../../../engines/lms/lms-taper-coach.engine';
+import { buildPLSeasonIcs } from '../../../engines/lms/pl-season-pro.engine';
 import { BTN as TRAIN_BTN, BTN_GHOST as TRAIN_BTN_GHOST, BbCard } from '../TrainingScreen_parts/training-ui';
 import { PopupNumber, PopupSelect, ExpandableCard } from './TrainingPopups';
 import { AutoRegModeSwitch } from './AutoRegModeSwitch';
 import { TaperCoachCard } from './TaperCoachCard';
 import { usePLTaper } from './taper-state';
 import { getPeakCycles } from '../../../engines/lms/pl-peak-cycle-taper.engine';
+import { localIsoDateOffset } from '../../../core/local-date';
 
 // Фаза 3: кнопки — из единого кита training-ui.
 const BTN = TRAIN_BTN;
@@ -85,12 +87,40 @@ export const PLCompetitionTab: React.FC<{ api: PLCompetitionTabApi }> = ({ api }
     peakCycleId, setPeakCycleId,
   } = t;
   const { peds, pedDoses, courseIntensity, pedAuto, autoRegMode, autoRegResult, plCalorieSurplus, plProteinPerKg, selectedCycleId, pmSquat, pmBench, pmDead } = cyc;
-  // P1-2: честный контур «встроен ↔ не встроен»: снимок недель до встраивания
-  // тапера позволяет реально вернуть план (а не только сбросить подпись).
-  const TAPER_PREV_KEY = 'he_pl_prev_weeks_v1';
+  // P1-2: честный контур «встроен ↔ не встроен»: снимок плана до встраивания
+  // тапера позволяет реально вернуть его (а не только сбросить подпись).
+  // Aудит P0: снимок — ПЛАН ЦЕЛИКОМ (метрики/лендмарки/рационал тоже), иначе
+  // откат возвращал weeks при отчётах тапер-плана; + fingerprint плана, чтобы
+  // устаревший снимок не ложился поверх свежесобранного цикла.
+  const TAPER_PREV_KEY = 'he_pl_prev_plan_v1';
+  const planFingerprint = (p: LMSBuildOutput | null): string =>
+    p ? `${p.weeks.length}:${p.weeks.map(w => w.week).join(',')}:${p.weeks[0]?.days.length ?? 0}` : '';
+  const readTaperSnapshot = (): { fingerprint: string; weeks: LMSBuildOutput['weeks']; cycleMetrics?: LMSBuildOutput['cycleMetrics']; plVolumeLandmarks?: LMSBuildOutput['plVolumeLandmarks']; progressionRationale?: string } | null => {
+    try {
+      const raw = sessionStorage.getItem(TAPER_PREV_KEY);
+      if (!raw) return null;
+      const snap = JSON.parse(raw);
+      if (!snap || !Array.isArray(snap.weeks) || snap.weeks.length === 0) return null;
+      return snap;
+    } catch { return null; }
+  };
   const [taperEmbedded, setTaperEmbedded] = React.useState<boolean>(() => {
     try { return !!sessionStorage.getItem(TAPER_PREV_KEY); } catch { return false; }
   });
+  const embeddedPlanRef = React.useRef<LMSBuildOutput | null>(null);
+  // Пересборка плана (смена цикла/параметров) обесценивает снимок: устаревший
+  // откат возвращал бы ЧУЖОЙ план поверх свежего (аудит P0 — потеря данных).
+  React.useEffect(() => {
+    if (!taperEmbedded) return;
+    if (builtSrc && builtSrc === embeddedPlanRef.current) return; // только что встроили
+    const snap = readTaperSnapshot();
+    if (!snap || snap.fingerprint !== planFingerprint(builtSrc)) {
+      try { sessionStorage.removeItem(TAPER_PREV_KEY); } catch { /* ignore */ }
+      embeddedPlanRef.current = null;
+      setTaperEmbedded(false);
+      setTaperNote('');
+    }
+  }, [builtSrc, taperEmbedded, setTaperNote]);
   const setAutoRegMode = (mode: AutoRegMode) => {
     // Реальный переключатель режима авторегуляции — state живёт в родительском SRCBBScreen.
     api.setAutoRegMode(mode);
@@ -111,12 +141,18 @@ export const PLCompetitionTab: React.FC<{ api: PLCompetitionTabApi }> = ({ api }
   }), [weeksToMeet, taperWeeksToAdd, peakMode, taperWeightGoal, mockMeetOn, meetWeekOn, postMeetOn, peakCycleId]);
   // C1: дата старта (ISO) — реверс от неё календарной разметки недель блока.
   // P2-6: реальная дата старта (ISO) — реверс календарной разметки от неё.
+  // Aудит P1: было `new Date(Date.now()+...).toISOString()` — в UTC+X утром дата
+  // уезжала на сутки назад; канон проекта — локальная дата (core/local-date).
   const derivedMeetDate = (() => {
-    try { return new Date(Date.now() + Math.max(0, weeksToMeet) * 7 * 86400000).toISOString().slice(0, 10); }
+    try { return localIsoDateOffset(Math.max(0, weeksToMeet) * 7); }
     catch { return undefined; }
   })();
   const [meetDateInput, setMeetDateInput] = React.useState<string>(derivedMeetDate ?? '');
   const meetRef = meetDateInput || derivedMeetDate;
+  // 📅 ICS сезона: опция «с тренировочными днями» — VEVENT на каждую сессию
+  // (раунд 3, §5-bis п.4). Дни цикла раскладываются позиционно от weekStart:
+  // СРЦ-цикл не хранит weekday, поэтому при другом расписании события сдвигаются.
+  const [seasonIcsWithSessions, setSeasonIcsWithSessions] = React.useState(false);
   // P2-5: протокол сгонки к категории на пик-неделю (вода/натрий/карбы).
   const peakCut = React.useMemo(() => buildPLPeakWeekCutProtocol(bw, targetBw), [bw, targetBw]);
   const fedRu: Record<string, string> = { ipf: 'IPF', fpr: 'FPR', wpc: 'WPC', other: 'Другая' };
@@ -173,6 +209,38 @@ export const PLCompetitionTab: React.FC<{ api: PLCompetitionTabApi }> = ({ api }
       setTaperNote(`📅 Сезон: ${meets.length} старт(ов) → ${season.weeks.length} нед`);
       onNote('📅 Тапер по всему сезону построен: ' + res.notes.join(' '));
     } catch (e) { onNote('⚠ Ошибка построения сезона: ' + (e as Error).message); }
+  };
+
+  // 📅 Календарь сезона (.ics): соревнования из единого реестра + недели
+  // пик-блоков с разметкой дат (аудит Oct 2026: сезон выгружался без календаря —
+  // ICS был только у тапер-плана и макроцикла).
+  const handleSeasonIcs = () => {
+    if (!builtSrc) return;
+    try {
+      const ics = buildPLSeasonIcs(
+        builtSrc.weeks,
+        meetList.map(m => ({ id: m.id, name: m.name, weeksToStart: m.weeksToStart, priority: m.id === mainMeetId ? 'A' as const : 'B' as const })),
+        {
+          todayIso: localIsoDateOffset(0),
+          // Даты недель сезона считаются от начала сезона ТОЛЬКО если план реально
+          // сезонный (seasonProvenance) — иначе недели без дат честно пропускаются.
+          seasonStart: (seasonIcsWithSessions && builtSrc.seasonProvenance?.length) ? (meetDateInput || undefined) : undefined,
+          withTrainingSessions: seasonIcsWithSessions,
+        },
+      );
+      if (!/BEGIN:VEVENT/.test(ics)) {
+        onNote('⚠ Нечего выгружать: нет стартов с датами и недель пик-блока с разметкой — задайте дату старта или окно до старта.');
+        return;
+      }
+      const blob = new Blob([ics], { type: 'text/calendar;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'pl-season.ics';
+      a.click();
+      URL.revokeObjectURL(url);
+      onNote('📅 Календарь сезона сохранён (pl-season.ics) — старты и недели пик-блоков' + (seasonIcsWithSessions ? ' + события всех тренировочных сессий.' : '.'));
+    } catch (e) { onNote('⚠ Ошибка выгрузки календаря: ' + (e as Error).message); }
   };
 
   return (
@@ -270,7 +338,7 @@ export const PLCompetitionTab: React.FC<{ api: PLCompetitionTabApi }> = ({ api }
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 6 }}>
         <PopupNumber label="Вес сейчас" value={bw} min={40} max={250} suffix=" кг" onChange={v => setBw(v)} />
         <PopupNumber label="Целевой вес (категория)" value={targetBw} min={40} max={250} suffix=" кг" onChange={v => setTargetBw(v)} />
-        <PopupNumber label="Недель до старта" value={weeksToMeet} min={1} max={26} suffix=" нед" hint="Окно пик-блока: на эти недели строится полный блок — вход в пик + mock + тапер + соревнования (+ пост). Раньше окно было информационным, теперь реально задаёт длину блока." onChange={v => setWeeksToMeet(v)} />
+        <PopupNumber label="Недель до старта" value={weeksToMeet} min={1} max={52} suffix=" нед" hint="Окно пик-блока: на эти недели строится полный блок — вход в пик + mock + тапер + соревнования (+ пост). Раньше окно было информационным, теперь реально задаёт длину блока." onChange={v => setWeeksToMeet(v)} />
         <PopupNumber label="Тапер-недель к циклу" value={taperWeeksToAdd} min={1} max={4} suffix="" hint="Сколько недель ГЛУБОКОГО снижения объёма внутри окна до старта" onChange={v => setTaperWeeksToAdd(v)} />
       </div>
       {/* P2-6: реальная дата старта (реверс календарной разметки) */}
@@ -377,7 +445,9 @@ export const PLCompetitionTab: React.FC<{ api: PLCompetitionTabApi }> = ({ api }
               peakCycleId: peakCycleId ?? undefined,
             });
             setTaperPlan(next);
-            const addCount = (mockMeetOn ? 1 : 0) + taperWeeksToAdd + (meetWeekOn ? 1 : 0) + (postMeetOn ? 1 : 0);
+            // Число добавленных недель — ИЗ ФАКТА (движок дописывает ещё и «вход в
+            // пик»); сумма переключателей раньше занижала его в 2 раза.
+            const addCount = Math.max(0, next.weeks.length - (builtSrc?.weeks.length ?? next.weeks.length));
             const cycNote = peakCycleId ? ` · 🏆 из цикла «${peakCycleId}»` : '';
             setTaperNote(`Тапер-план сгенерирован: +${addCount} нед${mockMeetOn ? ' · 🎯 mock meet' : ''}${meetWeekOn ? ' · 🏁 соревнования' : ''}${postMeetOn ? ' · 🔄 пост-старт' : ''}${peakMode === 'pl' ? ' · 🏁 ПЛ-пик-протокол' : peakMode === 'pro' ? ' · 🎯 про-тапер' : ' · 📉 классика'}${cycNote}${taperWeightGoal === 'lose' ? ' · ⬇ сгонка' : taperWeightGoal === 'gain' ? ' · ⬆ набор' : ''}${Object.keys(meetData.actualPm).length ? ' · по факт. ПМ после цикла' : ''}${Object.keys(meetData.plannedPm).length ? ' · прикиды от плана федерации' : ''} · пик ${MEET_STRATEGY_PCT_LABEL[attemptStrategy]}${autoRegMode === 'auto' ? ' · auto-regime: top-set×' + (autoRegResult?.topSetPctMultiplier ?? 1).toFixed(2) + ' · объём×' + (autoRegResult?.volumeMultiplier ?? 1).toFixed(2) + ' · RIR+' + (autoRegResult?.rirShift ?? 0) : ''}${autoRegMode === 'diary' ? ' · diary-regime active' : ''}`);
             onNote(`📋 Тапер-план готов (отдельная карточка — цикл не изменён).${peakCycleId ? ` Пиковый цикл «${peakCycleId}» — кривая тапера из цикла (соответствует ПЛ-авто).` : peakMode === 'pl' ? ' Режим: ПЛ-пик-протокол (объём 85/75/60%, интенсивность 90/95/100% ПМ, RIR→0).' : peakMode === 'pro' ? ' Режим: про-тапер (усталость-зависимый, прайминг).' : ' Режим: классический тапер (Bosquet, интенсивность сохранена).'}${taperWeightGoal === 'lose' ? ' Весовая цель: сгонка — объём ×0.9.' : taperWeightGoal === 'gain' ? ' Весовая цель: набор — полный объём.' : ''}${Object.keys(meetData.actualPm).length ? ' Тренировочные веса тапера от фактического ПМ после цикла.' : ''}${Object.keys(meetData.plannedPm).length ? ' Прикиды/попытки от планируемого ПМ федерации.' : ''} Чтобы встроить в weeks цикла — «Встроить в план».`);
@@ -511,7 +581,9 @@ export const PLCompetitionTab: React.FC<{ api: PLCompetitionTabApi }> = ({ api }
               peakCycleId: peakCycleId ?? undefined,
             });
             setBuiltSrc(next);
-            const addCount = (mockMeetOn ? 1 : 0) + taperWeeksToAdd + (meetWeekOn ? 1 : 0) + (postMeetOn ? 1 : 0);
+            // Число добавленных недель — ИЗ ФАКТА (движок дописывает ещё и «вход в
+            // пик»); сумма переключателей занижала его в 2 раза (аудит Oct 2026).
+            const addCount = Math.max(0, next.weeks.length - builtSrc.weeks.length);
             const cycNote2 = peakCycleId ? ` · 🏆 из цикла «${peakCycleId}»` : '';
             setTaperNote(`+${addCount} нед${mockMeetOn ? ' · 🎯 mock meet' : ''}${meetWeekOn ? ' · 🏁 соревнования' : ''}${postMeetOn ? ' · 🔄 пост-старт' : ''}${pedAuto && peds.length > 0 ? ' · 💉 PED-адаптация как в цикле' : ''}${cycNote2}${taperWeightGoal === 'lose' ? ' · ⬇ сгонка' : taperWeightGoal === 'gain' ? ' · ⬆ набор' : ''} · 🏁 пик ${MEET_STRATEGY_PCT_LABEL[attemptStrategy]}`);
             onNote(`📉 Пик-блок применён к активному циклу по окну ${weeksToMeet} нед: ${peakPreview.summary}${peakPreview.warnings.length ? ' ⚠ ' + peakPreview.warnings.join(' ⚠ ') : ''} — ${peakCycleId ? `пиковый цикл «${peakCycleId}» — кривая тапера из цикла (соответствует ПЛ-авто).` : peakMode === 'pl' ? 'ПЛ-пик-протокол (объём 85/75/60%, инт. 90/95/100%)' : peakMode === 'pro' ? 'про-тапер (усталость-зависимый)' : 'объём ×0.65/×0.45, RIR +1/+2 (Bosquet 2005)'}.${taperWeightGoal === 'lose' ? ' Весовая цель: сгонка — объём ×0.9.' : taperWeightGoal === 'gain' ? ' Весовая цель: набор — полный объём.' : ''}${mockMeetOn ? ' 🎯 Имитация соревнований (mock meet) добавлена перед тапером — прикиды-синглы.' : ''}${meetWeekOn ? ' 🏁 Неделя соревнований добавлена в конец — прикиды как подходы дня старта.' : ''}${postMeetOn ? ' 🔄 Пост-соревновательная неделя: объём ×0.5, RIR +3.' : ''} 🏁 Выход на пик: прикиды дня соревнований (${MEET_STRATEGY_LABEL[attemptStrategy]}, ${MEET_STRATEGY_PCT_LABEL[attemptStrategy]}) на финальной тапер-неделе.${pedAuto && peds.length > 0 ? ' 💉 PED-адаптация та же, что в цикле: прогрессия ПМ продолжена по курсу, adaptForPEDs (MRV/восст).' : ''} → откройте «📋 План цикла», чтобы увидеть результат.`);
@@ -527,25 +599,49 @@ export const PLCompetitionTab: React.FC<{ api: PLCompetitionTabApi }> = ({ api }
         >📅 Тапер по сезону ({meetList.length} старт)</button>
         <button
           disabled={!builtSrc}
+          onClick={handleSeasonIcs}
+          style={{ ...BTN_GHOST, flex: 1, minHeight: 44, border: builtSrc ? '1px solid rgba(96,165,250,0.4)' : '1px solid rgba(255,255,255,0.08)', color: builtSrc ? '#60a5fa' : 'rgba(255,255,255,0.3)', fontSize: 11, fontWeight: 700, background: builtSrc ? 'rgba(96,165,250,0.08)' : 'transparent' }}
+          title="Выгрузить сезон в календарь (.ics): соревнования из реестра стартов + недели пик-блоков с датами"
+        >📅 Календарь сезона (.ics)</button>
+        {/* §5-bis п.4: VEVENT на каждую тренировочную сессию сезона.
+            Тумблер НЕ disabled без плана — это предпочтение выгрузки. */}
+        <button
+          data-taper="ics-sessions"
+          onClick={() => setSeasonIcsWithSessions(v => !v)}
+          aria-pressed={seasonIcsWithSessions}
+          style={{ ...BTN_GHOST, flex: 1, minHeight: 44, border: seasonIcsWithSessions ? '1px solid rgba(52,211,153,0.5)' : '1px solid rgba(255,255,255,0.08)', color: seasonIcsWithSessions ? '#34d399' : 'rgba(255,255,255,0.3)', fontSize: 11, fontWeight: 700, background: seasonIcsWithSessions ? 'rgba(52,211,153,0.1)' : 'transparent' }}
+          title="Добавить в календарь событие на каждую тренировочную сессию сезона (дни раскладываются позиционно от недели — СРЦ-цикл не хранит weekday)"
+        >🏋 С тренировками ({seasonIcsWithSessions ? 'вкл' : 'выкл'})</button>
+        <button
+          disabled={!builtSrc}
           data-taper="state"
           onClick={() => {
             if (!builtSrc) return;
             if (taperNote) {
-              // Честный откат: если тапер реально встроен — возвращаем снимок недель.
+              // Честный откат: если тапер реально встроен — возвращаем снимок плана
+              // ЦЕЛИКОМ (weeks + метрики + лендмарки + рационал).
               let restored = false;
               try {
-                const raw = sessionStorage.getItem(TAPER_PREV_KEY);
-                const prev = raw ? JSON.parse(raw) : null;
-                if (Array.isArray(prev) && prev.length > 0) {
-                  setBuiltSrc({ ...builtSrc, weeks: prev });
+                const snap = readTaperSnapshot();
+                if (snap && snap.fingerprint === planFingerprint(builtSrc)) {
+                  setBuiltSrc({
+                    ...builtSrc,
+                    weeks: snap.weeks,
+                    cycleMetrics: snap.cycleMetrics ?? builtSrc.cycleMetrics,
+                    plVolumeLandmarks: snap.plVolumeLandmarks ?? builtSrc.plVolumeLandmarks,
+                    progressionRationale: snap.progressionRationale ?? builtSrc.progressionRationale,
+                  });
                   restored = true;
                 }
               } catch { /* снимок битый — честно сообщаем ниже */ }
               if (restored) {
                 try { sessionStorage.removeItem(TAPER_PREV_KEY); } catch { /* ignore */ }
+                embeddedPlanRef.current = null;
                 setTaperEmbedded(false);
                 setTaperNote('');
                 onNote('↩ Тапер убран из плана — восстановлена раскладка до встраивания.');
+              } else if (taperEmbedded) {
+                onNote('⚠ Снимок плана «до встраивания» устарел (план пересобран) — откат невозможен, постройте план заново.');
               } else {
                 onNote('ℹ️ Тапер сгенерирован отдельной карточкой и НЕ встроен в недели плана — встройте кнопкой «📌 Встроить в план», чтобы он попал в таблицу/печать.');
               }
@@ -667,8 +763,13 @@ export const PLCompetitionTab: React.FC<{ api: PLCompetitionTabApi }> = ({ api }
                   <div style={{ fontSize: 10, fontWeight: 800, color: '#93c5fd', marginBottom: 6 }}>📋 Сезон соревнований — прикиды по каждому старту</div>
                   {meetList.map(m => {
                     const isMain = m.id === mainMeetId;
-                    const row = { ...(taperActualPm || {}), ...(m.plannedPm || {}) };
-                    const hasRow = Object.values(m.plannedPm || {}).some(v => v > 0) || Object.values(taperActualPm || {}).some(v => v > 0);
+                    // Только положительные значения: нули «План ПМ в федерации»
+                    // (дефолт полей) затирали фактический ПМ, и лифт пропадал из
+                    // прикидов вовсе (resolveCompetitionLifts режет value>0).
+                    const pos = (o: Record<string, number> | undefined) =>
+                      Object.fromEntries(Object.entries(o ?? {}).filter(([, v]) => Number.isFinite(v) && v > 0));
+                    const row = { ...pos(taperActualPm), ...pos(m.plannedPm) };
+                    const hasRow = Object.values(row).some(v => v > 0);
                     const attempts = hasRow ? computeMeetAttemptsFromPmRow(row as Record<string, number>, m.strategy) : null;
                     return (
                       <div key={m.id} style={{ marginTop: 4, padding: 6, borderRadius: 8, background: isMain ? 'rgba(245,158,11,0.08)' : 'rgba(255,255,255,0.03)', border: `1px solid ${isMain ? 'rgba(245,158,11,0.3)' : 'rgba(255,255,255,0.08)'}` }}>
@@ -749,12 +850,12 @@ export const PLCompetitionTab: React.FC<{ api: PLCompetitionTabApi }> = ({ api }
                 </div>
               </div>
               {/* Прикиды */}
-              {[peakWk, mockWk, meetWk].filter(Boolean).map(wk => wk && (() => {
-                // База прикидов — из pmRow недели (без авторегуляции): переключение режима
-                // меняет отображаемые веса, а не накапливает множители поверх сохранённых.
-                const att = wk.meetAttempts
-                  ? computeMeetAttemptsFromPmRow(wk.pmRow, wk.meetAttempts.strategy) ?? wk.meetAttempts
-                  : null;
+                  {[peakWk, mockWk, meetWk].filter(Boolean).map(wk => wk && (() => {
+                    // База прикидов — из pmRow недели (без авторегуляции): переключение режима
+                    // меняет отображаемые веса, а не накапливает множители поверх сохранённых.
+                    const att = wk.meetAttempts
+                      ? computeMeetAttemptsFromPmRow(wk.pmRow, wk.meetAttempts.strategy) ?? wk.meetAttempts
+                      : null;
                 return (
                 <div key={wk.week} style={{ marginBottom: 8, padding: 8, borderRadius: 10, background: wk.meetWeek ? 'rgba(234,179,8,0.06)' : wk.mockMeet ? 'rgba(167,139,250,0.06)' : 'rgba(245,158,11,0.06)', border: `1px solid ${wk.meetWeek ? 'rgba(234,179,8,0.25)' : wk.mockMeet ? 'rgba(167,139,250,0.25)' : 'rgba(245,158,11,0.25)'}` }}>
                   <div style={{ fontSize: 10, fontWeight: 800, color: wk.meetWeek ? '#eab308' : wk.mockMeet ? '#a78bfa' : '#fbbf24', marginBottom: 4 }}>
@@ -811,14 +912,47 @@ export const PLCompetitionTab: React.FC<{ api: PLCompetitionTabApi }> = ({ api }
                     );
                   })()}
                   {att?.lifts[0] && (() => {
-                    const opener = scale(att.lifts[0].opener);
+                    const ov = taperAttemptOverride[att.lifts[0].name];
+                    // Разминка считается от ЭФФЕКТИВНОГО опенера (свои веса тоже
+                    // должны вести разминку; раньше база была только расчётной).
+                    const opener = ov ? scale(ov[0]) : scale(att.lifts[0].opener);
+                    const baseWarmup = att.lifts[0].warmup ?? [];
+                    const ratio = att.lifts[0].opener > 0 ? opener / scale(att.lifts[0].opener) : 1;
+                    const steps = baseWarmup.length > 0
+                      ? baseWarmup.map(s => ({ pct: s.pct, weight: Math.round(s.weight * ratio * 2) / 2, reps: s.reps }))
+                      : MEET_WARMUP_STEPS.map(p => ({ pct: p, weight: Math.round(opener * p * 2) / 2, reps: p < 0.7 ? 5 : p < 0.85 ? 3 : 1 }));
                     if (!opener) return null;
-                    const steps = MEET_WARMUP_STEPS.map(p => ({ pct: p, weight: Math.round(opener * p * 2) / 2, reps: p < 0.7 ? 5 : p < 0.85 ? 3 : 1 }));
                     return <div style={{ marginTop: 4, fontSize: 9, color: '#fff' }}>🔥 Разминка: {steps.map(s => `${Math.round(s.pct * 100)}%×${s.reps}`).join(' → ')} ({steps.map(s => s.weight).join('/')} кг)</div>;
                   })()}
                 </div>
                 );
               })())}
+              {/* 📌 Свои прикиды → В ПЛАН: печать/экспорт/сохранение видят те же веса,
+                  что показывает карточка (аудит P1: оверрайд жил только в UI). */}
+              {Object.keys(taperAttemptOverride).length > 0 && (
+                <button
+                  onClick={() => {
+                    const applyOverrides = (out: LMSBuildOutput): LMSBuildOutput => ({
+                      ...out,
+                      weeks: out.weeks.map(w => {
+                        if (!w.meetAttempts) return w;
+                        if (w.meetAttempts.lifts.every(l => !taperAttemptOverride[l.name])) return w;
+                        return { ...w, meetAttempts: { ...w.meetAttempts, lifts: w.meetAttempts.lifts.map(l => {
+                          const ov = taperAttemptOverride[l.name];
+                          if (!ov) return l;
+                          const [o, s2, t2] = ov.map(v => Math.round(v * 10) / 10);
+                          return { ...l, opener: o, second: s2, third: t2, target: t2 };
+                        }) } };
+                      }),
+                    });
+                    if (builtSrc) setBuiltSrc(applyOverrides(builtSrc));
+                    if (taperPlan) setTaperPlan(applyOverrides(taperPlan));
+                    onNote('📌 Свои прикиды внесены в план — печать, экспорт и сохранение увидят те же веса.');
+                  }}
+                  style={{ ...BTN_GHOST, minHeight: 38, fontSize: 10, border: '1px solid rgba(245,158,11,0.4)', color: '#f59e0b', background: 'rgba(245,158,11,0.08)' }}
+                  title="Записать введённые веса попыток в недели плана (прикиды в таблице/печати/экспорте совпадут с показанными)"
+                >📌 Внести свои прикиды в план</button>
+              )}
               {/* Последние тяжёлые */}
               <div style={{ fontSize: 9, color: '#fff', lineHeight: 1.5 }}>
                 ⏱ Последние тяжёлые до старта: присед — {LAST_HEAVY_DAYS.squat} дн. · жим — {LAST_HEAVY_DAYS.bench} дн. · тяга — {LAST_HEAVY_DAYS.deadlift} дн.
@@ -843,10 +977,32 @@ export const PLCompetitionTab: React.FC<{ api: PLCompetitionTabApi }> = ({ api }
                     <span key={i} title={d} style={{ padding: '3px 8px', borderRadius: 7, fontSize: 9, fontWeight: 700, background: 'rgba(234,179,8,0.08)', color: '#fbbf24', border: '1px solid rgba(234,179,8,0.2)', cursor: 'default' }}>{l}</span>
                   ))}
                 </div>
+                {/* 9 попыток = 9 возможностей: промах не «сгоревшая» попытка */}
+                <div style={{ marginTop: 6, padding: '6px 8px', borderRadius: 8, background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.2)', fontSize: 9, color: '#fbbf24', lineHeight: 1.45 }}>
+                  🎯 <b>Мимо третьей попытки?</b> Повторите ТОТ ЖЕ вес (не снижайте и не завышайте) — сознательно снятая попытка обнуляет шанс на рекорд (тренерская практика IPF/PTW: «9 попыток = 9 возможностей»). Между попытками — дыхание и активация, не новый разминочный подход.
+                </div>
               </div>
               {/* Действия */}
               <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
-                <button onClick={() => { try { sessionStorage.setItem(TAPER_PREV_KEY, JSON.stringify(builtSrc?.weeks ?? [])); } catch { /* ignore */ } setTaperEmbedded(true); setBuiltSrc(taperPlan); setTaperNote(`Встроено в weeks цикла: +${taperPlan.weeks.length - (builtSrc?.weeks.length ?? taperPlan.weeks.length)} нед тапера`); }} style={{ ...BTN_GHOST, minHeight: 38, fontSize: 10, border: '1px solid rgba(245,158,11,0.4)', color: '#f59e0b', background: 'rgba(245,158,11,0.08)' }} title="Встроить тапер-недели в weeks активного плана (календарь покажет с тапером)">📌 Встроить в план (weeks)</button>
+                <button onClick={() => {
+                  if (!builtSrc || !taperPlan) return;
+                  try {
+                    sessionStorage.setItem(TAPER_PREV_KEY, JSON.stringify({
+                      fingerprint: planFingerprint(builtSrc),
+                      weeks: builtSrc.weeks,
+                      cycleMetrics: builtSrc.cycleMetrics,
+                      plVolumeLandmarks: builtSrc.plVolumeLandmarks,
+                      progressionRationale: builtSrc.progressionRationale,
+                    }));
+                  } catch { /* ignore */ }
+                  setTaperEmbedded(true);
+                  setBuiltSrc(taperPlan);
+                  embeddedPlanRef.current = taperPlan;
+                  // Число добавленных недель — ИЗ ФАКТА плана (включая «вход в пик»),
+                  // а не из суммы переключателей: раньше заметка говорила «+5 нед»,
+                  // когда движок дописывал 9.
+                  setTaperNote(`Встроено в weeks цикла: +${Math.max(0, taperPlan.weeks.length - (builtSrc.weeks.length ?? 0))} нед тапера`);
+                }} style={{ ...BTN_GHOST, minHeight: 38, fontSize: 10, border: '1px solid rgba(245,158,11,0.4)', color: '#f59e0b', background: 'rgba(245,158,11,0.08)' }} title="Встроить тапер-недели в weeks активного плана (календарь покажет с тапером)">📌 Встроить в план (weeks)</button>
                 <button onClick={() => { if (taperPlan) setTaperPlan(refreshMeetAttempts(taperPlan, attemptStrategy)); }} style={{ ...BTN_GHOST, minHeight: 38, fontSize: 10, border: '1px solid rgba(139,92,246,0.4)', color: '#a78bfa', background: 'rgba(139,92,246,0.08)' }} title="Пересчитать прикиды под выбранную стратегию">🔄 Обновить прикиды</button>
                 <button
                   onClick={() => {

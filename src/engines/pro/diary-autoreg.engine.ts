@@ -128,14 +128,22 @@ export function findLastFact(historyWorkouts: WorkoutLog[], exerciseName: string
   return best;
 }
 
-/** Найти все логи по упражнению (для plateau-детекции). */
+/** Найти все логи по упражнению (для plateau-детекции).
+ *  Окно — ТО ЖЕ 90 дней, что и у findLastFact: иначе корректировка весов честно
+ *  говорит «нет данных дневника» (старше 90 дней), а плато-предупреждение всё
+ *  равно всплывает по полугодовой сессии — два несогласованных ответа. */
 function findAllFacts(historyWorkouts: WorkoutLog[], exerciseName: string): FactEntry[] {
   const out: FactEntry[] = [];
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - 90);
+  const cutoffStr = toLocalIso(cutoff);
   for (const wl of historyWorkouts) {
     for (const ex of wl.exercises) {
       if (nameMatch(ex.exerciseName, exerciseName)) {
         const sets = ex.sets || [];
         if (sets.length === 0) continue;
+        const date = ex.date || wl.date;
+        if (date < cutoffStr) continue;
         // лучший сет по e1RM
         let best = sets[0], bestE1RM = epley1RM(sets[0].weight, sets[0].reps);
         for (const s of sets) {

@@ -27,6 +27,21 @@ describe('session-mapper', () => {
       expect(log.exercises[0].sets[0].weight).toBe(100);
       expect(log.overallRPE).toBeGreaterThanOrEqual(0);
     });
+
+    it('velocityMs подхода доезжает до дневника (VBT-факт, §5-bis п.2)', () => {
+      const session = startSession('fullbody', 1);
+      const withEx = addExerciseToSession(session, { id: 'squat', name: 'Присед', pattern: 'squat', muscleGroup: 'quads' });
+      const logged = logSet(withEx, 0, { setNumber: 1, weightKg: 150, reps: 3, rpe: 8, rir: 1, velocityMs: 0.85 }).session;
+      const finished = finishSession(logged, 'VBT');
+      const log = sessionToWorkoutLog(finished);
+      expect(log.exercises[0].sets[0].velocity).toBe(0.85);
+      // И через маппер в StrengthLogEntry (единый дневник).
+      const entries = sessionToStrengthLogEntries(finished);
+      expect(entries[0].sets[0].velocity).toBe(0.85);
+      // Мусорная скорость (>5 м/с) отбрасывается логгером.
+      const bad = logSet(withEx, 0, { setNumber: 2, weightKg: 150, reps: 3, rpe: 8, rir: 1, velocityMs: 42 }).session;
+      expect(bad.exercises[0].sets[0].velocityMs).toBeUndefined();
+    });
   });
 
   describe('sessionsToWorkoutLogs', () => {

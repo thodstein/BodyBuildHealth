@@ -112,6 +112,7 @@ export function workoutLogToStrengthLogEntries(log: WorkoutLog): StrengthLogEntr
       reps: s.reps,
       rir: s.rir,
       rpe: s.rpe,
+      velocity: s.velocity,
       techniqueScore: s.techniqueScore,
       plannedWeight: s.plannedWeight,
       plannedReps: s.plannedReps,

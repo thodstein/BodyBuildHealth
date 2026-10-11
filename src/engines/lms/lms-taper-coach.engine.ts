@@ -50,8 +50,13 @@ export interface PmFeasibilityLift {
   forecast: number;
   planned: number;
   gapKg: number;
+  /** Дополнительные недели СВЕРХ окна при текущем темпе (0 — хватает темпа). */
   weeksNeeded: number;
   feasible: boolean;
+  /** Темп прогрессии (%/нед, доля), необходимый чтобы закрыть план В ОКНЕ. */
+  kReq?: number;
+  /** План закрывается умеренным ускорением темпа (kReq ≤ 2× текущего темпа). */
+  tightByTempo?: boolean;
 }
 
 export interface PmFeasibility {
@@ -86,21 +91,32 @@ export function pmFeasibility(ctx: TaperCoachCtx): PmFeasibility {
     const weeksNeeded = base > 0 && gapKg > 0
       ? Math.ceil(Math.log(plan / forecast) / Math.log(1 + k))
       : base > 0 ? 0 : Number.POSITIVE_INFINITY;
-    return { name, forecast: Math.round(forecast * 10) / 10, planned: plan, gapKg: Math.round(gapKg * 10) / 10, weeksNeeded, feasible: gapKg <= 0 };
+    // Aудит P1: «не хватает недель» vs «не хватает темпа» — разные вещи.
+    // weeksNeeded = дополнительные недели СВЕРХ окна; если их немного, план
+    // закрывается ускорением темпа (tight), если много — старт надо двигать
+    // (unrealistic). Порог — по ТРЕБУЕМОМУ темпу: plan достижим за окно при
+    // kReq = (plan/base)^(1/weeks)−1; kReq ≤ 2×k → на грани, иначе нереалистично.
+    const kReq = base > 0 && plan > base
+      ? Math.pow(plan / base, 1 / weeks) - 1
+      : 0;
+    // Нет базы прогноза вовсе (нет ни фактического, ни прогнозного ПМ) — закрыть
+    // план нечем: это не «на грани», а нереалистично (B4-fix ловит ложный tight).
+    const tightByTempo = base > 0 && kReq <= k * 2;
+    return { name, forecast: Math.round(forecast * 10) / 10, planned: plan, gapKg: Math.round(gapKg * 10) / 10, weeksNeeded, feasible: gapKg <= 0, kReq: Math.round(kReq * 1000) / 1000, tightByTempo };
   });
   const needsMore = lifts.filter(l => !l.feasible);
   const status: PmFeasibility['status'] = needsMore.length === 0 ? 'realistic'
-    : needsMore.every(l => l.weeksNeeded <= weeks) ? 'tight'
+    : needsMore.every(l => l.tightByTempo) ? 'tight'
     : 'unrealistic';
   const gapText = lifts.filter(l => !l.feasible).map(l =>
     l.weeksNeeded === Number.POSITIVE_INFINITY
       ? `${l.name}: нет базы для прогноза (заполните фактический/прогнозный ПМ)`
-      : `${l.name}: +${l.gapKg} кг (нужно ещё ${l.weeksNeeded} нед)`,
+      : `${l.name}: +${l.gapKg} кг (нужно ещё ${l.weeksNeeded} нед; темп ${(l.kReq! * 100).toFixed(2)}%/нед вместо ${(k * 100).toFixed(2)}%)`,
   ).join('; ');
   const summary = status === 'realistic'
     ? 'План ПМ в федерации достижим к старту при текущем темпе прогрессии.'
     : status === 'tight'
-      ? `План на грани: ${gapText}. Увеличьте темп прогрессии в финальных неделях или скорректируйте план.`
+      ? `План на грани: ${gapText}. Небольшое ускорение темпа в финальных неделях закрывает его.`
       : `План нереалистичен: ${gapText}. Пересмотрите целевые веса или перенесите старт.`;
   return { status, lifts, summary };
 }

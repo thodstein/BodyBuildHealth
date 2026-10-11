@@ -14,7 +14,7 @@ import { mesocyclePhaseForWeek, type MesocyclePhase } from '../../../engines/rir
 import { macroPhaseToLmsPhase } from '../../../engines/periodization/phase-bridge';
 import { shouldTrainToday, type AutoRegOutput } from '../../../engines/pro/autoregulation-pro.engine';
 import { LAST_HEAVY_DAYS } from '../../../engines/pro/taper.engine';
-import { competitionAttempts, MEET_STRATEGY_LABEL, MEET_STRATEGY_PCT_LABEL, MEET_WARMUP_STEPS } from '../../../engines/lms/competition-attempts';
+import { meetAttemptsFor, MEET_STRATEGY_LABEL, MEET_STRATEGY_PCT, MEET_STRATEGY_PCT_LABEL } from '../../../engines/lms/competition-attempts';
 import { adaptForPEDs, type PED } from '../../../engines/bb/bb-ped-adaptation.engine';
 import { getAllVolumeLandmarks } from '../../../engines/volume-landmarks.engine';
 import { modeMismatchWarning } from '../../../engines/lms/lms-selector.engine';
@@ -29,6 +29,9 @@ import {
   CARD as TRAIN_CARD, SMALL as TRAIN_SMALL, BTN as TRAIN_BTN, BTN_GHOST as TRAIN_BTN_GHOST, IN as TRAIN_IN,
   BbCard, BbFoldCard,
 } from '../TrainingScreen_parts/training-ui';
+// 4.4: единый a11y-паттерн inline-диалогов (Escape + фокус/возврат) — без него
+// полноэкранные попапы плана закрывались только тапом по ✕/фону.
+import { useInlineDialogA11y } from '../TrainingScreen_parts/bb-auto-constructor-shared';
 import { MetricCard, SaveButton } from './TrainingPopups';
 import { AutoRegModeSwitch } from './AutoRegModeSwitch';
 import { CalendarViewSwitch } from './CalendarViewSwitch';
@@ -37,6 +40,11 @@ import { DayCard, type PhaseKey } from '../TrainingScreen_parts/PlanOutput';
 import { usePLTaper } from './taper-state';
 import type { Lift, WeakPoint } from '../../../engines/lms/weakpoint-pl';
 import type { AutoRegMode, DiaryAutoregResult } from '../../../engines/pro/diary-autoreg.engine';
+import type { WorkoutLog } from '../../../core/types';
+import {
+  plWeeklyCompliance, plWeeklyComplianceByDays, planFactDriftWarnings, driftWarningLine,
+  plIntensityAdvisory, buildPLComplianceCsv, buildPLComplianceHtml,
+} from '../../../engines/lms/pl-season-pro.engine';
 import type { PMAutoRegMode } from '../../../engines/lms/pm-autoreg.engine';
 import { plBlockGroups, plExportRows, buildPLExcelWorkbook, downloadPLExcel, buildPLPrintHtml, printPLHtml, plShareDigest, plTelegramAppUrl, openPLShare, PL_BLOCK_LABEL, type PLBlockId, type PLBlockGroup } from './pl-export';
 import type { RepTempoOutput } from '../../../engines/rep-tempo-engine';
@@ -121,6 +129,10 @@ export interface PLPlanViewApi {
   linked: any;
   runFocus: any;
   diaryAutoreg: DiaryAutoregResult | null;
+  /** Дневник тренировок — для недельной сверки «план vs факт» и дрейфа % плана. */
+  historyWorkouts?: WorkoutLog[];
+  /** Текущая неделя плана (для статусов upcoming/missed). */
+  currentWeek?: number;
   calibratePmFromDiary: (lift: 'squat' | 'bench' | 'deadlift') => void;
   /** Установить ПМ0 из прогноза цикла (pmRow финальной/соревновательной недели). */
   applyPmFromCycle: (pm: { squat: number; bench: number; deadlift: number }) => void;
@@ -149,6 +161,7 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
     autoRegMode, setAutoRegMode, autoRegResult, bridgeRir, pmSquat, pmBench, pmDead, best,
     pmAutoRegMode, setPmAutoRegMode, periodizationMode, setPeriodizationMode, pmDiary,
     plWeakPoints, linked, runFocus, diaryAutoreg, calibratePmFromDiary, applyPmFromCycle,
+    historyWorkouts, currentWeek,
     e1rmSeries, exerciseE1rm, exTrendSeries, playerDays, selectedTrendEx, setSelectedTrendEx,
     tempoStr, getTempo, hasDeload, onRemoveDeload,
   } = api;
@@ -157,10 +170,17 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
 
   // 📤 Экспорт: цепочка Формат → Объём → (Блок/Неделя) → Экспорт.
   const [expOpen, setExpOpen] = useState(false);
+  // 4.4: единый a11y-паттерн полноэкранных диалогов (Escape + фокус/возврат).
+  // Хуки — на уровне компонента: внутри `{cond && ...}` React считает их
+  // «больше, чем в прошлый рендер» (условные хуки запрещены).
+  const pickerRef = useInlineDialogA11y(!!pickerDay, () => setPickerDay(null));
+  const expRef = useInlineDialogA11y(expOpen, () => setExpOpen(false));
   const [expFormat, setExpFormat] = useState<'xlsx' | 'pdf' | null>(null);
   const [expScope, setExpScope] = useState<'all' | 'block' | 'week' | 'full' | null>(null);
   const [expBlock, setExpBlock] = useState<PLBlockId | null>(null);
   const [expWeek, setExpWeek] = useState<number | null>(null);
+  // 📈 «План vs факт»: раскрытие разбивки по дням (раунд 3, §5-bis п.3).
+  const [factDaysOpen, setFactDaysOpen] = useState(false);
 
   const displayPhaseForWeek = (week: LMSBuildOutput['weeks'][number], totalWeeks: number): string => {
     return week.macroPhase
@@ -224,10 +244,10 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
                ? `🎯 Имитация соревнований (mock meet) · ${mockPctLabel}`
                : isPostMeetWeek(wk)
                ? `🔄 Пост-соревновательное восстановление (объём ×0.5, RIR +3)`
-               : isTaperWeek(wk)
-               ? (peakMode === 'pl' && wk.taperNote
-                 ? `🏁 ${wk.taperNote.split(':')[0].trim()} · ${Math.round(weekVolumeOf(wk) / Math.max(1, weekVolumeOf(W[W.length - taperWeeksToAdd - 1] ?? W[0]))) * 100}% объёма${wk.meetAttempts ? ' · прикиды' : ''}`
-                 : `📉 Тапер · ${Math.round(weekVolumeOf(wk) / Math.max(1, weekVolumeOf(W[W.length - taperWeeksToAdd - 1] ?? W[0]))) * 100}% объёма`)
+                : isTaperWeek(wk)
+                ? (peakMode === 'pl' && wk.taperNote
+                  ? `🏁 ${wk.taperNote.split(':')[0].trim()} · ${Math.round((weekVolumeOf(wk) / Math.max(1, weekVolumeOf(W[W.length - taperWeeksToAdd - 1] ?? W[0]))) * 100)}% объёма${wk.meetAttempts ? ' · прикиды' : ''}`
+                  : `📉 Тапер · ${Math.round((weekVolumeOf(wk) / Math.max(1, weekVolumeOf(W[W.length - taperWeeksToAdd - 1] ?? W[0]))) * 100)}% объёма`)
                : isDeloadWeek(wk)
                ? `🔋 Делод · объём снижен, интенсивность сохранена`
                : sourceWeek
@@ -465,11 +485,11 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
               })()}
               {/* Exercise picker popup */}
               {pickerDay && (
-                <div style={{ position:'fixed', inset:0, zIndex:200, display:'flex', background:'rgba(0,0,0,0.9)' }} onClick={() => setPickerDay(null)}>
-                  <div onClick={e => e.stopPropagation()} style={{ width:'100%', maxWidth:480, margin:'0 auto', background:'#18181b', display:'flex', flexDirection:'column' }}>
+                <div style={{ position:'fixed', inset:0, zIndex:200, display:'flex', background:'rgba(0,0,0,0.9)' }} onClick={() => setPickerDay(null)} role="presentation">
+                  <div ref={pickerRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label="Добавить упражнение в день" onClick={e => e.stopPropagation()} style={{ width:'100%', maxWidth:480, margin:'0 auto', background:'#18181b', display:'flex', flexDirection:'column', outline:'none' }}>
                     <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'12px 12px 0' }}>
                       <span style={{ fontSize:14, fontWeight:700, color:'var(--accent)' }}>＋ Упражнение в день</span>
-                      <button onClick={() => setPickerDay(null)} style={{ fontSize:11, color:'#ef4444', border:'none', background:'transparent', cursor:'pointer', padding:'4px 8px' }}>✕</button>
+                      <button onClick={() => setPickerDay(null)} style={{ fontSize:11, color:'#ef4444', border:'none', background:'transparent', cursor:'pointer', padding:'4px 8px', minHeight:44 }} aria-label="Закрыть">✕</button>
                     </div>
                     <div style={{ flex:1, overflowY:'auto', padding:'8px 12px 80px' }}>
                       <div style={{ display:'flex', flexWrap:'wrap', gap:4, marginBottom:8 }}>{CAT_GROUPS.map(g => <button key={g} onClick={() => { setPickerGroup(g); setPickerExName(''); }} style={{ padding:'5px 10px', borderRadius:16, fontSize:11, cursor:'pointer', border: pickerGroup===g?'1px solid var(--accent)':'1px solid rgba(255,255,255,0.08)', background: pickerGroup===g?'rgba(0,230,138,0.15)':'rgba(255,255,255,0.03)', color: pickerGroup===g?'var(--accent)':'#fff' }}>{GRP_RU[g]||g}</button>)}</div>
@@ -486,7 +506,7 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
                         <input type='number' value={pickerScheme.weight} onChange={e => setPickerScheme(s => ({ ...s, weight: +e.target.value }))} style={{ width:56, ...IN, padding:'4px', fontSize:11 }} />
                         <span style={{ fontSize:11, color:'#fff' }}>кг</span>
                       </div>
-                      <button onClick={() => addExToDay(pickerDay)} disabled={!pickerExName} style={{ width:'100%', padding:'10px', borderRadius:8, border:'none', cursor:'pointer', fontWeight:700, fontSize:11, background: pickerExName ? 'linear-gradient(135deg,var(--accent),#00c8a0)' : 'rgba(255,255,255,0.1)', color: pickerExName ? '#000' : 'rgba(255,255,255,0.3)' }}>Добавить в день</button>
+                      <button onClick={() => addExToDay(pickerDay)} disabled={!pickerExName} style={{ width:'100%', padding:'10px', minHeight:44, borderRadius:8, border:'none', cursor:'pointer', fontWeight:700, fontSize:11, background: pickerExName ? 'linear-gradient(135deg,var(--accent),#00c8a0)' : 'rgba(255,255,255,0.1)', color: pickerExName ? '#000' : 'rgba(255,255,255,0.3)' }}>Добавить в день</button>
                     </div>
                   </div>
                 </div>
@@ -497,7 +517,7 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
                   <span style={{ fontSize:11, fontWeight:700, color:calendarColor, background:calendarBadgeTint, padding:'2px 10px', borderRadius:8 }}>{calendarLabel}</span>
                 </div>
                 <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(36px, 1fr))', gap:4 }}>
-                   {W.map(w => { const ph = displayPhaseForWeek(w, totalW); const original = sourceCalendar?.[w.week - 1]; const taper = isTaperWeek(w); const mock = isMockWeek(w); const meet = isMeetWeek(w); const post = isPostMeetWeek(w); const deload = isDeloadWeek(w); const color = deload ? DELOAD_COLOR : original && sourceCalendar ? sourceWeekColor(original, sourceCalendar) : meet ? MEET_COLOR : mock ? MOCK_COLOR : post ? POST_COLOR : taper ? TAPER_COLOR : PH_COLOR[ph]; const tint = original && !deload ? `color-mix(in srgb, ${color} 13%, transparent)` : color + '1a'; const label = deload ? '🔋 Делод · объём снижен, интенсивность сохранена' : original ? `${SOURCE_PHASE_ORIGIN_LABEL[original.phaseOrigin]} · ${SOURCE_PHASE_LABEL[original.phase]} ${Math.round(original.intensityPct * 100)}% · ${original.volumeSets} сетов` : meet ? `🏁 Соревнования · прикиды ${MEET_STRATEGY_PCT_LABEL[w.meetAttempts?.strategy ?? attemptStrategy] ?? MEET_STRATEGY_PCT_LABEL.balanced}` : mock ? `🎯 Имитация соревнований (mock meet) · прикиды-синглы` : post ? `🔄 Пост-старт восстановление (объём ×0.5, RIR +3)` : taper ? `📉 Тапер · ${Math.round(weekVolumeOf(w) / Math.max(1, weekVolumeOf(W[W.length - taperWeeksToAdd - 1] ?? W[0]))) * 100}% объёма` : PH_RU[ph]; const active = w.week===wk.week; return <button key={w.week} onClick={() => setSrcWeek(w.week)} title={'Неделя '+w.week+': '+label} style={{ padding:'6px 0', borderRadius:8, border: active ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.08)', background: active ? color : tint, color: active ? '#000' : '#fff', fontSize:11, fontWeight:700, cursor:'pointer', minHeight:36, minWidth:0 }}>{deload ? '🔋' : meet ? '🏁' : mock ? '🎯' : post ? '🔄' : taper ? '📉' : w.week}</button>; })}
+                   {W.map(w => { const ph = displayPhaseForWeek(w, totalW); const original = sourceCalendar?.[w.week - 1]; const taper = isTaperWeek(w); const mock = isMockWeek(w); const meet = isMeetWeek(w); const post = isPostMeetWeek(w); const deload = isDeloadWeek(w); const color = deload ? DELOAD_COLOR : original && sourceCalendar ? sourceWeekColor(original, sourceCalendar) : meet ? MEET_COLOR : mock ? MOCK_COLOR : post ? POST_COLOR : taper ? TAPER_COLOR : PH_COLOR[ph]; const tint = original && !deload ? `color-mix(in srgb, ${color} 13%, transparent)` : color + '1a'; const label = deload ? '🔋 Делод · объём снижен, интенсивность сохранена' : original ? `${SOURCE_PHASE_ORIGIN_LABEL[original.phaseOrigin]} · ${SOURCE_PHASE_LABEL[original.phase]} ${Math.round(original.intensityPct * 100)}% · ${original.volumeSets} сетов` : meet ? `🏁 Соревнования · прикиды ${MEET_STRATEGY_PCT_LABEL[w.meetAttempts?.strategy ?? attemptStrategy] ?? MEET_STRATEGY_PCT_LABEL.balanced}` : mock ? `🎯 Имитация соревнований (mock meet) · прикиды-синглы` : post ? `🔄 Пост-старт восстановление (объём ×0.5, RIR +3)` : taper ? `📉 Тапер · ${Math.round((weekVolumeOf(w) / Math.max(1, weekVolumeOf(W[W.length - taperWeeksToAdd - 1] ?? W[0]))) * 100)}% объёма` : PH_RU[ph]; const active = w.week===wk.week; return <button key={w.week} onClick={() => setSrcWeek(w.week)} title={'Неделя '+w.week+': '+label} style={{ padding:'6px 0', borderRadius:8, border: active ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.08)', background: active ? color : tint, color: active ? '#000' : '#fff', fontSize:11, fontWeight:700, cursor:'pointer', minHeight:36, minWidth:0 }}>{deload ? '🔋' : meet ? '🏁' : mock ? '🎯' : post ? '🔄' : taper ? '📉' : w.week}</button>; })}
                 </div>
               </div>
               {/* Визуальный календарь мезоцикла: недели × дни с тоннажём и фазой */}
@@ -573,6 +593,7 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
                 const arMult = autoRegMode === 'auto' && autoRegResult ? autoRegResult.topSetPctMultiplier : 1;
                 // Попытки тоже масштабируются множителем режима на лету (паритет с карточкой прикидов).
                 const scale = (w: number) => Math.round(w * arMult * 10) / 10;
+                const round2 = (w: number) => Math.round(w * 10) / 10;
                 // База попыток — ПМ ПО ЦИКЛУ: прогноз pmRow финальной (соревновательной)
                 // недели уже учитывает пройденный цикл (прогрессия PM0→пик), а не
                 // «дневниковые» поля pmSquat/pmBench/pmDead (PM0 из профиля/калибровки).
@@ -595,7 +616,7 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
                 };
                 const cyclePmApplied = !!cycleKeyFor('squat') || !!cycleKeyFor('bench') || !!cycleKeyFor('dead');
                 return (
-                <MetricCard title={`🏁 Попытки на соревнования${W.some(isTaperWeek) ? ` · ${MEET_STRATEGY_PCT_LABEL[attemptStrategy] ?? MEET_STRATEGY_PCT_LABEL.balanced}` : ''}${autoRegMode === 'auto' ? ` · 🤖 режим авторегуляции${arMult !== 1 ? `: веса ×${arMult.toFixed(2)}` : ' (множитель 1.00)'}` : ''}`} icon="🏁" accent="#f59e0b">
+                <MetricCard title={`🏁 Попытки на соревнования${W.some(isTaperWeek) || W.some(isMeetWeek) ? ` · ${MEET_STRATEGY_PCT_LABEL[attemptStrategy] ?? MEET_STRATEGY_PCT_LABEL.balanced}` : ''}${autoRegMode === 'auto' ? ` · 🤖 режим авторегуляции${arMult !== 1 ? `: веса ×${arMult.toFixed(2)}` : ' (множитель 1.00)'}` : ''}`} icon="🏁" accent="#f59e0b">
                   <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 6, alignItems: 'center' }}>
                     <AutoRegModeSwitch value={autoRegMode} onChange={setAutoRegMode} />
                     <span style={{ fontSize: 9, color: autoRegMode === 'auto' && arMult !== 1 ? '#60a5fa' : '#fff' }}>
@@ -608,8 +629,14 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
                   </div>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6 }}>
                     {([['Присед', basePm.squat], ['Жим', basePm.bench], ['Становая', basePm.deadlift]] as const).map(([name, value]) => {
-                      const a = competitionAttempts(value);
-                      return <div key={name} style={{ padding: 6, borderRadius: 6, background: 'rgba(245,158,11,0.08)', fontSize: 10 }}><b>{name}</b><div>1: {scale(a.openerRange[0])}–{scale(a.openerRange[1])} кг</div><div>2: {scale(a.secondRange[0])}–{scale(a.secondRange[1])} кг</div><div>3: {scale(a.thirdRange[0])}–{scale(a.thirdRange[1])} кг</div><div style={{ color: '#f59e0b', marginTop: 3 }}>рекоменд.: {scale(a.opener)}/{scale(a.second)}/{scale(a.third)}</div></div>;
+                      // Канон MEET_STRATEGY_PCT (competition-attempts) — ТОТ ЖЕ источник,
+                      // что в appendPLTaperWeeks/PeakingPanel/печати. Раньше здесь жил
+                      // competitionAttempts (87.5/92.5/100) при подписи стратегии —
+                      // карточка противоречила сама себе и карточке прикидов ниже.
+                      const pct = MEET_STRATEGY_PCT[attemptStrategy] ?? MEET_STRATEGY_PCT.balanced;
+                      const a = meetAttemptsFor(value, attemptStrategy);
+                      const band = (center: number) => `${scale(round2(value * (center - 0.03)))}–${scale(round2(value * (center + 0.03)))}`;
+                      return <div key={name} style={{ padding: 6, borderRadius: 6, background: 'rgba(245,158,11,0.08)', fontSize: 10 }}><b>{name}</b><div>1: {band(pct.opener)} кг</div><div>2: {band(pct.second)} кг</div><div>3: {band(pct.third)} кг</div><div style={{ color: '#f59e0b', marginTop: 3 }}>рекоменд.: {scale(a.opener)}/{scale(a.second)}/{scale(a.third)}</div></div>;
                     })}
                   </div>
                   <div style={{ display: 'flex', gap: 6, marginTop: 6, alignItems: 'center', flexWrap: 'wrap' }}>
@@ -667,12 +694,15 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
                       </div>
                     ))}
                   </div>
-                  {/* Разминка по опенеру (канон warmupToOpener в MeetAttemptsInfo) — от масштабированного опенера */}
+                  {/* Разминка по опенеру — ИЗ ДВИЖКА (канон warmupToOpener в MeetAttemptsInfo):
+                      веса/повторы те же, что уйдут в план и экспорт, шаг блинов 2.5 кг.
+                      Локальный пересчёт с округлением 0.5 кг расходился с движком. */}
                   {(() => {
                     const first = base.lifts[0];
                     if (!first) return null;
                     const openerScaled = scale(first.opener);
-                    const steps = MEET_WARMUP_STEPS.map(p => ({ pct: p, weight: Math.round(openerScaled * p * 2) / 2, reps: p < 0.7 ? 5 : p < 0.85 ? 3 : 1 }));
+                    const steps = (first.warmup ?? []).map(s => ({ pct: s.pct, weight: scale(s.weight), reps: s.reps }));
+                    if (steps.length === 0) return null;
                     return (
                       <div style={{ marginTop: 6, fontSize: 10, color: '#fff', lineHeight: 1.5 }}>
                         🔥 Разминка под опенер {openerScaled} кг ({first.name}): {steps.map(s => `${Math.round(s.pct * 100)}%×${s.reps}`).join(' → ')} ({steps.map(s => s.weight).join('/')} кг)
@@ -693,6 +723,126 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
                 </MetricCard>
                 );
                 })()}
+              {/* 📈 План vs факт (недели): выполнение по дневнику, дрейф % плана,
+                  интенсивностная подсказка — остаток аудита Oct 2026 §5. */}
+              {(() => {
+                const compliance = plWeeklyCompliance(displaySrc, historyWorkouts ?? [], { currentWeek });
+                const drift = planFactDriftWarnings(historyWorkouts ?? []);
+                const intensity = plIntensityAdvisory(displaySrc, { sessions: historyWorkouts ?? [] });
+                // Разбивка по дням считается ТОЛЬКО при раскрытии (тяжелее недельной).
+                const days = factDaysOpen && compliance.hasDiary
+                  ? plWeeklyComplianceByDays(displaySrc, historyWorkouts ?? [], { currentWeek })
+                  : null;
+                const hasAny = compliance.hasDiary || drift.length > 0 || !!intensity.advisory;
+                if (!hasAny) return null;
+                const statusColor = (s: string) => s === 'done' ? '#22c55e' : s === 'partial' ? '#f59e0b' : s === 'missed' ? '#ef4444' : 'rgba(255,255,255,0.35)';
+                const statusLabel = (s: string) => s === 'done' ? '✓' : s === 'partial' ? '≈' : s === 'missed' ? '✗' : '·';
+                const download = (text: string, filename: string, mime: string, note: string) => {
+                  try {
+                    const blob = new Blob([text], { type: mime });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url; a.download = filename; a.click();
+                    URL.revokeObjectURL(url);
+                    onNote(note);
+                  } catch (e) { onNote('⚠ Ошибка выгрузки: ' + (e as Error).message); }
+                };
+                return (
+                  <MetricCard title="📈 План vs факт (недели)" icon="📈" accent="#22c55e">
+                    {compliance.hasDiary ? (
+                      <>
+                        <div style={{ fontSize: 10, color: '#fff', marginBottom: 4 }}>
+                          Выполнение: <b>{Math.round(compliance.overallPct * 100)}%</b> сетов плана по {compliance.past.length} прошедн. нед.
+                          {compliance.past.length === 0 && ' — в дневнике нет недель этого плана.'}
+                        </div>
+                        <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap', marginBottom: 4, alignItems: 'center' }}>
+                          {compliance.weeks.map(w => (
+                            <span key={w.week} title={`Нед ${w.week}: план ${w.plannedSets} сетов, факт ${w.factSets} (${Math.round(w.setsPct * 100)}%)${w.note ? ' · ' + w.note : ''}`}
+                              style={{ minWidth: 30, padding: '3px 5px', borderRadius: 6, fontSize: 10, fontWeight: 700, textAlign: 'center', color: statusColor(w.status), border: `1px solid ${statusColor(w.status)}55`, background: statusColor(w.status) + '14' }}>
+                              {w.week}{statusLabel(w.status)}
+                            </span>
+                          ))}
+                          {/* Разбивка по дням/упражнениям (§5-bis п.3) */}
+                          <button data-pl="fact-days-toggle" onClick={() => setFactDaysOpen(v => !v)} aria-pressed={factDaysOpen}
+                            style={{ marginLeft: 4, padding: '3px 8px', borderRadius: 6, fontSize: 10, fontWeight: 700, cursor: 'pointer', border: '1px solid rgba(255,255,255,0.14)', background: factDaysOpen ? 'rgba(34,197,94,0.12)' : 'rgba(255,255,255,0.03)', color: factDaysOpen ? '#22c55e' : '#fff' }}>
+                            {factDaysOpen ? '▲ Скрыть дни' : '▼ По дням'}
+                          </button>
+                        </div>
+                        {days && (
+                          <div data-pl="fact-days" style={{ margin: '2px 0 6px', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 4 }}>
+                            {days.weeks.filter(w => w.days.some(d => d.status !== 'upcoming')).map(w => (
+                              <div key={w.week} style={{ marginBottom: 4 }}>
+                                <div style={{ fontSize: 10, fontWeight: 700, color: '#fff' }}>Нед {w.week} — {w.factSets}/{w.plannedSets} сетов</div>
+                                {w.days.map(d => (
+                                  <div key={d.day} style={{ fontSize: 10, color: '#fff', lineHeight: 1.45, paddingLeft: 8 }}>
+                                    День {d.day}: {d.factSets}/{d.plannedSets} ({Math.round(d.setsPct * 100)}%){' '}
+                                    <span style={{ color: statusColor(d.status) }}>{statusLabel(d.status)}</span>
+                                    {d.exercises.filter(e => e.status !== 'done').length > 0 && (
+                                      <span style={{ color: '#f59e0b' }}> — не добито: {d.exercises.filter(e => e.status !== 'done').map(e => `${e.name} ${e.factSets}/${e.plannedSets}`).join(', ')}</span>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        {compliance.notes.map((n, i) => <div key={i} style={{ fontSize: 9, color: '#f59e0b' }}>⚠ {n}</div>)}
+                      </>
+                    ) : (
+                      <div style={{ fontSize: 10, color: '#fff' }}>Дневник тренировок пуст — недельная сверка появится после первых записей.</div>
+                    )}
+                    {drift.length > 0 && (
+                      <div data-pl="fact-drift" style={{ marginTop: 6, fontSize: 10, color: '#fbbf24', lineHeight: 1.45 }}>
+                        {driftWarningLine(drift)}
+                        {/* §5-bis п.1: при зафиксированном дрейфе предлагаем самому
+                            переключить авторегуляцию (сейчас — только текст). */}
+                        {autoRegMode === 'off' && (
+                          <button data-pl="drift-autoreg" onClick={() => setAutoRegMode('auto')}
+                            style={{ display: 'block', marginTop: 4, padding: '5px 10px', borderRadius: 8, fontSize: 10, fontWeight: 700, cursor: 'pointer', border: '1px solid rgba(96,165,250,0.4)', background: 'rgba(96,165,250,0.1)', color: '#60a5fa' }}>
+                            🤖 Включить авторегуляцию
+                          </button>
+                        )}
+                      </div>
+                    )}
+                    {intensity.advisory && (
+                      <div data-pl="vl-advisory" style={{ marginTop: 6, fontSize: 10, color: '#60a5fa', lineHeight: 1.45 }}>
+                        ⚡ {intensity.advisory}
+                        {intensity.source === 'diary-velocity' && (
+                          <span data-pl="vl-source" style={{ marginLeft: 4, fontSize: 9, color: '#22c55e' }}>· по факту дневника</span>
+                        )}
+                      </div>
+                    )}
+                    {/* §5-bis п.5: экспорт отчёта «план vs факт» (HTML/CSV) */}
+                    {compliance.hasDiary && (
+                      <div style={{ display: 'flex', gap: 6, marginTop: 6, flexWrap: 'wrap' }}>
+                        {/* Отчёт всегда с разбивкой по дням: если детали свёрнуты —
+                            считаем их на момент выгрузки. */}
+                        {(() => {
+                          const exportInput = {
+                            result: compliance,
+                            days: days ?? plWeeklyComplianceByDays(displaySrc, historyWorkouts ?? [], { currentWeek }),
+                            drift, advisory: intensity,
+                          };
+                          return (
+                            <>
+                              <button data-pl="fact-export-csv" onClick={() => download(
+                                buildPLComplianceCsv(exportInput),
+                                'pl-plan-fact.csv', 'text/csv;charset=utf-8',
+                                '📄 Отчёт «план vs факт» выгружен (pl-plan-fact.csv).',
+                              )} style={{ padding: '4px 10px', borderRadius: 8, fontSize: 10, fontWeight: 700, cursor: 'pointer', border: '1px solid rgba(255,255,255,0.14)', background: 'rgba(255,255,255,0.03)', color: '#fff' }}>📄 CSV</button>
+                              <button data-pl="fact-export-html" onClick={() => download(
+                                buildPLComplianceHtml(exportInput),
+                                'pl-plan-fact.html', 'text/html;charset=utf-8',
+                                '🖨 Отчёт «план vs факт» выгружен (pl-plan-fact.html) — можно печатать.',
+                              )} style={{ padding: '4px 10px', borderRadius: 8, fontSize: 10, fontWeight: 700, cursor: 'pointer', border: '1px solid rgba(255,255,255,0.14)', background: 'rgba(255,255,255,0.03)', color: '#fff' }}>🖨 HTML</button>
+                            </>
+                          );
+                        })()}
+                      </div>
+                    )}
+                  </MetricCard>
+                );
+              })()}
               {e1rmSeries.length > 0 && (() => {
                 const W = 300, H = 120, PADX = 26, PADY = 16;
                 const allVals = e1rmSeries.flatMap(s => s.pts.map(p => p.val));
@@ -860,17 +1010,27 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
                                  </span>
                                </div>
                               <div style={{ display:'flex', flexDirection:'column', gap:4, marginTop:6 }}>
-                                {(() => {
-                                  const allSets: { ws: typeof e.workSets[number]; blockIdx: number; setIdx: number }[] = [];
-                                  e.workSets.forEach((ws, bi) => { for (let r=0; r<ws.sets; r++) allSets.push({ ws, blockIdx: bi, setIdx: allSets.length }); });
-                                  const INM: React.CSSProperties = { background:'#18181b', color:'#fff', border:'1px solid rgba(255,255,255,0.1)', borderRadius:4, padding:'5px 4px', fontSize:12, textAlign:'center', minWidth:0 };
-                                  const IN_LBL: React.CSSProperties = { fontSize:9, color:'#fff', textTransform:'uppercase' as const, letterSpacing:0.5, textAlign:'center' as const };
-                                  return allSets.map(({ ws, blockIdx, setIdx }) => {
-                                    const k = setKey(wk.week, di, ei, setIdx);
-                                     const es = effSet(wk.week, di, ei, setIdx, ws, e.name);
-                                    return (
-                                      <div key={setIdx} style={{ background:'rgba(255,255,255,0.025)', borderRadius:6, padding:'4px 6px' }}>
-                                        <div style={{ fontSize:10, color:'#fff', marginBottom:2, fontWeight:600, display:'flex', justifyContent:'space-between' }}><span>Сет {setIdx+1}</span><span style={{ color:'#60a5fa', fontWeight:700 }}>{Math.round(es.pct*100)}%{es.pct > 1.1 && <span data-pl="test-attempt" title="Проходка источника: тестовый максимум выше 110% ПМ (не клампится)" style={{ marginLeft:4, fontSize:9, fontWeight:800, color:'#f59e0b' }}>⚡ проходка</span>}</span></div>
+                                 {(() => {
+                                   // Ключ правки = ИНДЕКС ПЕРВОГО СЕТА БЛОКА (flat). Контракт
+                                   // lms-effective-plan.applyDay: правка читается один раз на
+                                   // work-set блок (по его стартовому индексу). Раньше каждая
+                                   // строка блока писала свой ключ (_1, _2 …) — правки сетов
+                                   // 2..N молча терялись при «✓ Готово».
+                                   let flatIdx = 0;
+                                   const allSets: { ws: typeof e.workSets[number]; blockIdx: number; setIdx: number; rowNum: number }[] = [];
+                                   e.workSets.forEach((ws, bi) => {
+                                     const blockStart = flatIdx;
+                                     for (let r=0; r<ws.sets; r++) allSets.push({ ws, blockIdx: bi, setIdx: blockStart, rowNum: allSets.length + 1 });
+                                     flatIdx += ws.sets;
+                                   });
+                                   const INM: React.CSSProperties = { background:'#18181b', color:'#fff', border:'1px solid rgba(255,255,255,0.1)', borderRadius:4, padding:'5px 4px', fontSize:12, textAlign:'center', minWidth:0 };
+                                   const IN_LBL: React.CSSProperties = { fontSize:9, color:'#fff', textTransform:'uppercase' as const, letterSpacing:0.5, textAlign:'center' as const };
+                                   return allSets.map(({ ws, setIdx, rowNum }) => {
+                                     const k = setKey(wk.week, di, ei, setIdx);
+                                      const es = effSet(wk.week, di, ei, setIdx, ws, e.name);
+                                     return (
+                                       <div key={rowNum} style={{ background:'rgba(255,255,255,0.025)', borderRadius:6, padding:'4px 6px' }}>
+                                         <div style={{ fontSize:10, color:'#fff', marginBottom:2, fontWeight:600, display:'flex', justifyContent:'space-between' }}><span>Сет {rowNum}</span><span style={{ color:'#60a5fa', fontWeight:700 }}>{Math.round(es.pct*100)}%{es.pct > 1.1 && <span data-pl="test-attempt" title="Проходка источника: тестовый максимум выше 110% ПМ (не клампится)" style={{ marginLeft:4, fontSize:9, fontWeight:800, color:'#f59e0b' }}>⚡ проходка</span>}</span></div>
                                         <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:4 }}>
                                           <div><div style={IN_LBL}>Вес, кг</div><input type='number' value={es.weight} onChange={ev => setSrcEdits(prev => { const next = { ...prev, [k]: { ...(prev[k] ?? {}), weight: +ev.target.value } }; delete next[k].pct; return next; })} style={{ ...INM, width:'100%' }} /></div>
                                           <div><div style={IN_LBL}>Повторы</div><input type='number' value={es.reps} onChange={ev => setSrcEdits(prev => ({ ...prev, [k]: { ...prev[k], reps: +ev.target.value } }))} style={{ ...INM, width:'100%' }} /></div>
@@ -972,7 +1132,11 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
                             </div>
                           );
                         })}
-                        {(srcAdditions[dk] || []).map(a => (
+                         {/* Добавленные из каталога упражнения уже ВНУТРИ effectiveSrc
+                             (applyPLEffectiveOverlay кладёт их в day.exercises с
+                             load:'additional') — вне режима правки второй раз не рисуем,
+                             иначе один и тот же «＋» показывался дважды. */}
+                         {editMode && (srcAdditions[dk] || []).map(a => (
                           <div key={a.uid} style={{ padding:'6px 10px', marginBottom:6, background:'rgba(0,230,138,0.05)', borderRadius:10, border:'0.5px solid rgba(0,230,138,0.2)', display:'flex', alignItems:'center', justifyContent:'space-between', gap:6 }}>
                             <div style={{ minWidth:0, flex:1, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
                               <span style={{ fontSize:13, fontWeight:800, color:'#00e68a' }}>＋ {a.name}</span>
@@ -1142,11 +1306,11 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
                   </button>
                 );
                 return (
-                  <div style={{ position:'fixed', inset:0, zIndex:210, display:'flex', background:'rgba(0,0,0,0.9)' }} onClick={() => setExpOpen(false)}>
-                    <div onClick={e => e.stopPropagation()} style={{ width:'100%', maxWidth:480, margin:'0 auto', background:'#18181b', display:'flex', flexDirection:'column' }}>
+                  <div style={{ position:'fixed', inset:0, zIndex:210, display:'flex', background:'rgba(0,0,0,0.9)' }} onClick={() => setExpOpen(false)} role="presentation">
+                    <div ref={expRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label="Экспорт плана" onClick={e => e.stopPropagation()} style={{ width:'100%', maxWidth:480, margin:'0 auto', background:'#18181b', display:'flex', flexDirection:'column', outline:'none' }}>
                       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'12px 12px 0' }}>
                         <span style={{ fontSize:14, fontWeight:700, color:'#60a5fa' }}>📤 Экспорт плана</span>
-                        <button onClick={() => setExpOpen(false)} style={{ fontSize:11, color:'#ef4444', border:'none', background:'transparent', cursor:'pointer', padding:'4px 8px' }}>✕</button>
+                        <button onClick={() => setExpOpen(false)} style={{ fontSize:11, color:'#ef4444', border:'none', background:'transparent', cursor:'pointer', padding:'4px 8px', minHeight:44 }} aria-label="Закрыть">✕</button>
                       </div>
                       <div style={{ flex:1, overflowY:'auto', padding:'10px 12px', display:'flex', flexDirection:'column', gap:8 }}>
                         {!expFormat && <>

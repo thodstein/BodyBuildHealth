@@ -10,6 +10,9 @@ import { calibrateLVP as calibrateLVPCanonical, saveLVPProfile } from '../../../
 import type { VBTLift } from '../../../engines/pro/vbt.engine';
 import { BbCard, BbFoldCard } from '../TrainingScreen_parts/training-ui';
 
+const GRP_RU: Record<string, string> = { chest: 'грудь', back: 'спина', legs: 'ноги', shoulders: 'плечи', arms: 'руки', core: 'кор' };
+const LIFT_RU: Record<string, string> = { squat: 'присед', bench: 'жим', deadlift: 'тяга' };
+
 export const PLToolsCard: React.FC<{ level: string; days: number; totalSets: Record<string, number>; e1RM: Record<string, number>; hrvRatio?: number; acwr?: number; rpeDelta?: number; bodyWeight?: number; sex?: string; onApplyFrequency?: (plans: ReturnType<typeof planFrequency>[]) => void; plan?: { weeks: Array<{ week: number; days: Array<{ exercises: Array<{ workSets: Array<{ weight: number; reps: number; sets: number; pct: number }> }> }> }> } | null }> = ({ level, days, totalSets, e1RM, hrvRatio, acwr, rpeDelta, bodyWeight, sex, onApplyFrequency, plan }) => {
   const freqs = useMemo(() => Object.keys(totalSets).map(m => planFrequency(m, totalSets[m], days, level)), [totalSets, days, level]);
   const [lift, setLift] = useState<VBTLift>('squat');
@@ -84,7 +87,7 @@ export const PLToolsCard: React.FC<{ level: string; days: number; totalSets: Rec
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px,1fr))', gap: 6 }}>
           {freqs.map(f => (
             <div key={f.muscle} style={{ padding: 6, background: 'rgba(255,255,255,0.03)', borderRadius: 6, fontSize: 10 }}>
-              <b style={{ color: f.status === 'over' ? '#ef4444' : f.status === 'high' ? '#f59e0b' : '#22c55e' }}>{f.muscle} {f.totalSets}п/нед → {f.frequency}×</b>
+              <b style={{ color: f.status === 'over' ? '#ef4444' : f.status === 'high' ? '#f59e0b' : '#22c55e' }}>{GRP_RU[f.muscle] ?? f.muscle} {f.totalSets}п/нед → {f.frequency}×</b>
               <div style={{ color: '#fff' }}>{f.perSession.join(' / ')} сеты</div>
               <div style={{ color: '#fff' }}>{f.note}</div>
             </div>
@@ -94,7 +97,7 @@ export const PLToolsCard: React.FC<{ level: string; days: number; totalSets: Rec
       <BbCard icon="🏁" accent="#22c55e" title="Attempt Calculator (velocity)">
         <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
           {(['squat','bench','deadlift'] as VBTLift[]).map(l => (
-            <button key={l} onClick={() => setLift(l)} style={{ padding: '4px 8px', borderRadius: 6, fontSize: 10, fontWeight: 700, border: l === lift ? '1px solid #22c55e' : '1px solid rgba(255,255,255,0.1)', background: l === lift ? 'rgba(34,197,94,0.15)' : 'rgba(255,255,255,0.03)', color: '#fff' }}>{l}</button>
+            <button key={l} onClick={() => setLift(l)} style={{ padding: '4px 8px', borderRadius: 6, fontSize: 10, fontWeight: 700, border: l === lift ? '1px solid #22c55e' : '1px solid rgba(255,255,255,0.1)', background: l === lift ? 'rgba(34,197,94,0.15)' : 'rgba(255,255,255,0.03)', color: '#fff' }}>{LIFT_RU[l]}</button>
           ))}
         </div>
         <div style={{ fontSize: 10, lineHeight: 1.5 }}>

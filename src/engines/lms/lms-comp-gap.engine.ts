@@ -174,7 +174,9 @@ export function planBetweenCompetitions(
     }
 
     const rawFit = fitCycleToWeeks(chosen.cycle, Math.max(1, available), { minCycleFloor: 1 });
-    // Окна нет вовсе (до старта 0 недель) — только стартовая неделя с прикидами.
+    // Окна нет вовсе (до старта 0 недель). Раньше цикл здесь молча сжимался до
+    // 1 недели — обход контракта «любое изменение раскладки только по согласию».
+    // Теперь noWindow идёт ТЕМ ЖЕ согласованием, что и обычное сжатие.
     const noWindow = available < 1;
     let fitWeeks: number | null;
     let fitMode: GapSegment['fitMode'];
@@ -182,14 +184,24 @@ export function planBetweenCompetitions(
     let fittedCycle: SRCycleTemplate | null = rawFit.cycle;
     let fitNotes: string[] = [...rawFit.notes];
     if (noWindow) {
-      fitWeeks = 1;
-      fitMode = 'skip';
-      needsConsent = false;
-      // P1-6: раньше fittedCycle=null давал ПУСТУЮ неделю (дни без упражнений) на старте.
-      // Теперь берём одну базовую неделю цикла как стартовую (pmRow есть → прикиды
-      // сверху считаются), заметка честно это говорит.
-      fittedCycle = rawFit.cycle;
-      fitNotes = ['окно между стартами слишком мало — стартовая неделя собрана из 1 недели цикла «' + chosen.cycle.meta.title + '» (прикиды сверху), время не простаивает'];
+      const applied = rawFit.needsConsent
+        ? applyFitConsent(rawFit, opts.consents?.[j] === true)
+        : rawFit;
+      if (applied.mode === 'strict_skip') {
+        fitWeeks = null;
+        fitMode = 'strict_skip';
+        needsConsent = true;
+        fittedCycle = null;
+        fitNotes = [...rawFit.notes, '⛔ Требует согласия на изменение раскладки — сегмент пропущен'];
+      } else {
+        // P1-6: fittedCycle=null давал ПУСТУЮ неделю (дни без упражнений) на старте.
+        // Берём одну базовую неделю цикла как стартовую (pmRow есть → прикиды
+        // сверху считаются), заметка честно это говорит.
+        fitWeeks = 1;
+        fitMode = 'skip';
+        fittedCycle = applied.cycle;
+        fitNotes = ['окно между стартами слишком мало — стартовая неделя собрана из 1 недели цикла «' + chosen.cycle.meta.title + '» (прикиды сверху), время не простаивает'];
+      }
     } else if (rawFit.needsConsent) {
       needsConsent = true;
       const consent = opts.consents?.[j] === true;

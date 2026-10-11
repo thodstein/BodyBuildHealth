@@ -78,6 +78,16 @@ describe('PLCompetitionTab', () => {
     expect(offBtn.style.color).toBe('rgb(0, 0, 0)');
   });
 
+  it('тумблер «🏋 С тренировками» включает опцию ICS сессий (§5-bis п.4)', () => {
+    const a = api();
+    // Без плана кнопки выгрузки disabled, но тумблер доступен — он про сессию.
+    render(<PLCompetitionTab api={a} />);
+    const toggle = screen.getByText(/🏋 С тренировками \(выкл\)/);
+    expect((toggle as HTMLButtonElement).getAttribute('aria-pressed')).toBe('false');
+    fireEvent.click(toggle);
+    expect(screen.getByText(/🏋 С тренировками \(вкл\)/).getAttribute('aria-pressed')).toBe('true');
+  });
+
   it('кнопка «Тапер по сезону» рендерится с числом стартов и disabled без плана', () => {
     render(<PLCompetitionTab api={api()} />);
     const btn = screen.getByText(/Тапер по сезону/);

@@ -706,6 +706,9 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
         reps: a.reps,
         rpe: a.rpe || Math.max(1, 10 - t.rir),
         rir: a.rir,
+        // VBT-факт: скорость штанги этого подхода (м/с) — пишется в дневник,
+        // чтобы отчёты «план vs факт» считали потерю скорости ПО ФАКТУ.
+        velocityMs: vel[keyFor(ei, si)],
         notes: '',
         plannedWeight: t.weight,
         plannedReps: t.reps,

@@ -80,18 +80,28 @@ const MENTAL_ROUTINES: { step: string; duration: string; when: string }[] = [
   { step: 'Старт: команда судьи → техника + мощность', duration: 'весь подход', when: 'на выполнении' },
 ];
 
+/** Класс + класс НИЖЕ (если есть): «сколько сбросить до категории» — реальный расчёт. */
+function weightClassWithLighter(bw: number, fed: string, sex: 'male' | 'female' = 'male'): { cls: { name: string; min: number; max: number }; lighter: { name: string; min: number; max: number } | null } {
+  const cls = weightClass(bw, fed, sex);
+  // Классы контигуальны: класс ниже — тот, чей потолок = cls.min.
+  const table = sex === 'female' ? (FEMALE_TABLE[fed] || FEMALE_TABLE.ipf) : (MALE_TABLE[fed] || MALE_TABLE.ipf);
+  const idx = table.findIndex(c => c.name === cls.name);
+  return { cls, lighter: idx > 0 ? table[idx - 1] : null };
+}
+
+const MALE_TABLE: Record<string, { name: string; min: number; max: number }[]> = {
+  ipf: [{name:'до 59кг',min:0,max:59},{name:'до 66кг',min:59,max:66},{name:'до 74кг',min:66,max:74},{name:'до 83кг',min:74,max:83},{name:'до 93кг',min:83,max:93},{name:'до 105кг',min:93,max:105},{name:'до 120кг',min:105,max:120},{name:'свыше 120кг',min:120,max:999}],
+  fpr: [{name:'до 53кг',min:0,max:53},{name:'до 59кг',min:53,max:59},{name:'до 66кг',min:59,max:66},{name:'до 74кг',min:66,max:74},{name:'до 83кг',min:74,max:83},{name:'до 93кг',min:83,max:93},{name:'до 105кг',min:93,max:105},{name:'до 120кг',min:105,max:120},{name:'свыше 120кг',min:120,max:999}],
+  wpc: [{name:'до 56кг',min:0,max:56},{name:'до 67.5кг',min:56,max:67.5},{name:'до 75кг',min:67.5,max:75},{name:'до 82.5кг',min:75,max:82.5},{name:'до 90кг',min:82.5,max:90},{name:'до 100кг',min:90,max:100},{name:'до 110кг',min:100,max:110},{name:'до 125кг',min:110,max:125},{name:'свыше 125кг',min:125,max:999}],
+};
+const FEMALE_TABLE: Record<string, { name: string; min: number; max: number }[]> = {
+  ipf: [{name:'до 43кг',min:0,max:43},{name:'до 47кг',min:43,max:47},{name:'до 52кг',min:47,max:52},{name:'до 57кг',min:52,max:57},{name:'до 63кг',min:57,max:63},{name:'до 69кг',min:63,max:69},{name:'до 76кг',min:69,max:76},{name:'до 84кг',min:76,max:84},{name:'свыше 84кг',min:84,max:999}],
+  fpr: [{name:'до 43кг',min:0,max:43},{name:'до 47кг',min:43,max:47},{name:'до 52кг',min:47,max:52},{name:'до 57кг',min:52,max:57},{name:'до 63кг',min:57,max:63},{name:'до 69кг',min:63,max:69},{name:'до 76кг',min:69,max:76},{name:'до 84кг',min:76,max:84},{name:'свыше 84кг',min:84,max:999}],
+  wpc: [{name:'до 44кг',min:0,max:44},{name:'до 48кг',min:44,max:48},{name:'до 52кг',min:47,max:52},{name:'до 56кг',min:52,max:56},{name:'до 60кг',min:56,max:60},{name:'до 67.5кг',min:60,max:67.5},{name:'до 75кг',min:67.5,max:75},{name:'до 82.5кг',min:75,max:82.5},{name:'до 90кг',min:82.5,max:90},{name:'до 100кг',min:90,max:100},{name:'до 110кг',min:100,max:110},{name:'свыше 110кг',min:110,max:999}],
+};
+
 function weightClass(bw: number, fed: string, sex: 'male' | 'female' = 'male'): { name: string; min: number; max: number } {
-  const MALE: Record<string, { name: string; min: number; max: number }[]> = {
-    ipf: [{name:'до 59кг',min:0,max:59},{name:'до 66кг',min:59,max:66},{name:'до 74кг',min:66,max:74},{name:'до 83кг',min:74,max:83},{name:'до 93кг',min:83,max:93},{name:'до 105кг',min:93,max:105},{name:'до 120кг',min:105,max:120},{name:'свыше 120кг',min:120,max:999}],
-    fpr: [{name:'до 53кг',min:0,max:53},{name:'до 59кг',min:53,max:59},{name:'до 66кг',min:59,max:66},{name:'до 74кг',min:66,max:74},{name:'до 83кг',min:74,max:83},{name:'до 93кг',min:83,max:93},{name:'до 105кг',min:93,max:105},{name:'до 120кг',min:105,max:120},{name:'свыше 120кг',min:120,max:999}],
-    wpc: [{name:'до 56кг',min:0,max:56},{name:'до 67.5кг',min:56,max:67.5},{name:'до 75кг',min:67.5,max:75},{name:'до 82.5кг',min:75,max:82.5},{name:'до 90кг',min:82.5,max:90},{name:'до 100кг',min:90,max:100},{name:'до 110кг',min:100,max:110},{name:'до 125кг',min:110,max:125},{name:'свыше 125кг',min:125,max:999}],
-  };
-  const FEMALE: Record<string, { name: string; min: number; max: number }[]> = {
-    ipf: [{name:'до 43кг',min:0,max:43},{name:'до 47кг',min:43,max:47},{name:'до 52кг',min:47,max:52},{name:'до 57кг',min:52,max:57},{name:'до 63кг',min:57,max:63},{name:'до 69кг',min:63,max:69},{name:'до 76кг',min:69,max:76},{name:'до 84кг',min:76,max:84},{name:'свыше 84кг',min:84,max:999}],
-    fpr: [{name:'до 43кг',min:0,max:43},{name:'до 47кг',min:43,max:47},{name:'до 52кг',min:47,max:52},{name:'до 57кг',min:52,max:57},{name:'до 63кг',min:57,max:63},{name:'до 69кг',min:63,max:69},{name:'до 76кг',min:69,max:76},{name:'до 84кг',min:76,max:84},{name:'свыше 84кг',min:84,max:999}],
-    wpc: [{name:'до 44кг',min:0,max:44},{name:'до 48кг',min:44,max:48},{name:'до 52кг',min:48,max:52},{name:'до 56кг',min:52,max:56},{name:'до 60кг',min:56,max:60},{name:'до 67.5кг',min:60,max:67.5},{name:'до 75кг',min:67.5,max:75},{name:'до 82.5кг',min:75,max:82.5},{name:'до 90кг',min:82.5,max:90},{name:'до 100кг',min:90,max:100},{name:'до 110кг',min:100,max:110},{name:'свыше 110кг',min:110,max:999}],
-  };
-  const list = (sex === 'female' ? FEMALE[fed] || FEMALE.ipf : MALE[fed] || MALE.ipf);
+  const list = (sex === 'female' ? FEMALE_TABLE[fed] || FEMALE_TABLE.ipf : MALE_TABLE[fed] || MALE_TABLE.ipf);
   return list.find(c => bw <= c.max) || list[list.length - 1];
 }
 
@@ -161,7 +171,7 @@ export const PeakingPanel: React.FC<{ defaultKind?: 'pl' | 'bb' }> = ({ defaultK
     }
   };
 
-  const cls = useMemo(() => weightClass(bw, fed, (() => { try { return (getProfile().settings as any)?.personal?.sex === 'female' ? 'female' : 'male'; } catch { return 'male'; } })()), [bw, fed]);
+  const { cls, lighter } = useMemo(() => weightClassWithLighter(bw, fed, (() => { try { return (getProfile().settings as any)?.personal?.sex === 'female' ? 'female' : 'male'; } catch { return 'male'; } })()), [bw, fed]);
   // Канон (lms-taper.engine): единая кривая тапера — режим × длительность × пиковый цикл (интеграция).
   const taper = useMemo(() => buildPLTaperCurve({ taperWeeks: weeks, mode: taperMode, fatigue: Math.max(0, Math.min(100, Math.round(fatigue / 5))), peakCycleId: peakCycleId || undefined }), [weeks, taperMode, fatigue, peakCycleId]);
   // Прикиды — канон (competition-attempts.meetAttemptsFor), стратегия на выбор.
@@ -193,19 +203,13 @@ export const PeakingPanel: React.FC<{ defaultKind?: 'pl' | 'bb' }> = ({ defaultK
         pmBench: bench,
         pmDeadlift: deadlift,
       });
-      // Сохраняем вес ТОЛЬКО если он отличается от дефолтного 80 (иначе не перезаписываем профиль)
-      // Default = 80 (из useState). Если пользователь явно ввёл другой — он отличается.
-      // Чтобы не сохранять default, проверяем через источник — инициализирован ли bw из профиля.
-      if (bw > 0 && bw !== 80) {
+      // Аудит P1: было `bw !== 80` (дефолт useState) — при реальном весе 80 кг в
+      // профиль ничего не писалось, а тост утверждал «вес 80 кг сохранён».
+      // Теперь пишем, когда значение отличается от ТЕКУЩЕГО в профиле.
+      let curWeight: number | undefined;
+      try { curWeight = (getProfile().settings as any).personal?.weight; } catch { /* профиль недоступен */ }
+      if (bw > 0 && bw !== curWeight) {
         updateSection('personal', { weight: bw });
-      } else {
-        // Прочитаем текущий вес из профиля и сохраним (на случай если там уже есть)
-        const cur = getProfile();
-        const w = (cur.settings as any).personal?.weight;
-        if (w && w > 0) {
-          // Сохраняем тот же вес, не перезаписывая default
-          // (если пользователь НЕ ввёл вес, не трогаем значение)
-        }
       }
       // Также legacy-ключ для backward-compat с модулями, которые ещё читают training-profile
       const legacy = {
@@ -469,7 +473,20 @@ export const PeakingPanel: React.FC<{ defaultKind?: 'pl' | 'bb' }> = ({ defaultK
 
       <CalcSection icon="⚖️" title="Весовая категория" accent="#60a5fa" grid2>
         <CalcResult label="Категория" value={cls.name} accent="#60a5fa" hint={`Для ${bw} кг · ${fed.toUpperCase()}`} />
-        <CalcResult label="Нужно сбросить" value={bw > cls.max ? `${(bw - cls.max + 0.5).toFixed(1)} кг` : '0 кг'} accent="#f59e0b" hint={bw > cls.max ? 'Рекомендуется сушка' : 'Вес в норме'} />
+        {/* Аудит P1: условие было `bw > cls.max` — weightClass выбирает класс по
+            `bw <= c.max`, поэтому «Нужно сбросить» всегда показывало 0 кг даже при
+            весе на 10 кг выше лёгкой категории. Теперь считаем переход В КЛАСС НИЖЕ
+            (его потолок = cls.min): сколько сбросить, чтобы быть под ним. */}
+        {cls.min > 0 ? (
+          <CalcResult
+            label={`Сброс до «${lighter?.name ?? 'ниже'}»`}
+            value={`${Math.max(0, bw - cls.min + 0.5).toFixed(1)} кг`}
+            accent="#f59e0b"
+            hint={`до ${cls.min} кг (сейчас запас ${Math.max(0, cls.max - bw).toFixed(1)} кг до потолка «${cls.name}»)`}
+          />
+        ) : (
+          <CalcResult label="Запас до потолка" value={`${Math.max(0, cls.max - bw).toFixed(1)} кг`} hint={`«${cls.name}» — самая лёгкая категория федерации`} />
+        )}
       </CalcSection>
 
       <CalcSection icon="📉" title="Taper-кривая" accent="#a855f7" desc={`${weeks}-недельная пиковая фаза · ${TAPER_MODE_LABELS[taperMode]}${suggestedWeeks && suggestedWeeks !== weeks ? ` (по усталости рекомендуется ${suggestedWeeks} нед)` : ''}`}>

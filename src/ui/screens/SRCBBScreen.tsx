@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { LMS_CYCLES, getCycleById, normalizeCycleDirection } from '../../data/lms-cycles/lms-cycle-index';
 import { rankCycles, explainSelection } from '../../engines/lms/lms-selector.engine';
 import { buildLMSPlan, extractExercises, originalCycleWeeks, appendPLTaperWeeks, type LMSBuildOutput, type LMSBuildInput } from '../../engines/lms/lms-builder.engine';
@@ -108,6 +108,11 @@ function plToolGroupOf(group: string): 'chest' | 'back' | 'legs' | 'shoulders' |
   if (g === 'quads' || g === 'hamstrings' || g === 'glutes' || g === 'calves' || g === 'legs') return 'legs';
   return null;
 }
+
+/** Русские подписи групп Frequency Planner (карточка была англоязычной в русском UI). */
+const PL_TOOL_GROUP_RU: Record<string, string> = {
+  chest: 'грудь', back: 'спина', legs: 'ноги', shoulders: 'плечи', arms: 'руки', core: 'кор',
+};
 
 function getRecoveryMetrics(linked: any): Pick<LMSBuildInput, 'bodyFat' | 'leanMass' | 'hrvMs' | 'sleepHours' | 'stressLevel'> {
   const settings = linked.profile?.settings as Record<string, any> | undefined;
@@ -1823,13 +1828,22 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
             best: ranked[0] as never,
             plWeakPoints,
             linked, runFocus, diaryAutoreg, calibratePmFromDiary, applyPmFromCycle,
+            historyWorkouts, currentWeek: srcWeek,
             e1rmSeries, exerciseE1rm, exTrendSeries, playerDays, selectedTrendEx, setSelectedTrendEx,
             tempoStr, getTempo,
              hasDeload: planHasDeload(effectiveSrc ?? builtSrc),
             onRemoveDeload: handleRemoveDeload,
           }} />
            <BlockView plan={effectiveSrc ?? builtSrc} />
-           <PLToolsCard level={level} days={days} totalSets={plToolTotalSets} bodyWeight={linked.profile?.settings?.personal?.weight ?? bw} sex={linked.profile?.settings?.personal?.sex} e1RM={{ squat: pmSquat, bench: pmBench, deadlift: pmDead }} hrvRatio={linked.profile?.settings?.baselineHrvRatio} acwr={acwrData.ratio} rpeDelta={autoRegResult.rirShift} plan={effectiveSrc ?? builtSrc} onApplyFrequency={(plans)=>{ const m: Record<string, number[]> = {}; plans.forEach(p=>{ m[p.muscle]=Array.from({length:p.frequency},(_,i)=>i+1); }); setWeakGroupDayMap(m); setMethodNote(`📊 Частота применена: ${plans.map(p=>`${p.muscle} ${p.frequency}×`).join(', ')}`); }} />
+           <PLToolsCard level={level} days={days} totalSets={plToolTotalSets} bodyWeight={linked.profile?.settings?.personal?.weight ?? bw} sex={linked.profile?.settings?.personal?.sex} e1RM={{ squat: pmSquat, bench: pmBench, deadlift: pmDead }} hrvRatio={linked.profile?.settings?.baselineHrvRatio} acwr={acwrData.ratio} rpeDelta={autoRegResult.rirShift} plan={effectiveSrc ?? builtSrc} onApplyFrequency={(plans)=>{ const m: Record<string, number[]> = {}; plans.forEach(p=>{ m[p.muscle]=Array.from({length:p.frequency},(_,i)=>i+1); }); setWeakGroupDayMap(m);
+             // Аудит P1: раньше кнопка писала ТОЛЬКО weakGroupDayMap, а инъекция
+             // аксессуаров в lms-builder идёт по weakPoints — если группа ещё не
+             // выбрана слабой, «Применить в план» было тихим no-op при тосте «применена».
+             // Теперь частотный совет реально помечает группы слабыми.
+             const ru = PL_TOOL_GROUP_RU; const added = plans.map(p=>`${ru[p.muscle] ?? p.muscle} ${p.frequency}×`).join(', ');
+             setWeakPoints(prev => Array.from(new Set([...prev, ...plans.map(p=>p.muscle)])));
+             setMethodNote(`📊 Частота применена: ${added} — группы помечены слабыми, пересоберите план.`);
+           }} />
           {plSeasonMode === 'season' && (
             <div role="status" style={{ marginTop: 10, padding: '8px 12px', borderRadius: 10, background: 'rgba(139,92,246,0.06)', border: '1px solid rgba(139,92,246,0.2)', fontSize: 11, color: '#c4b5fd', lineHeight: 1.5 }}>
               {seasonNotes.length > 0 ? (

@@ -238,6 +238,10 @@ export function logSet(
   const reps = Math.max(0, Math.round(Number(set.reps) || 0));
   const rpe = Math.max(0, Math.min(10, Number(set.rpe) || 0));
   const rir = Math.max(0, Math.min(20, Number(set.rir) || 0));
+  // Скорость штанги (VBT): пишется только осмысленный диапазон (0..5 м/с —
+  // выше — опечатка/не тот снаряд), иначе undefined.
+  const rawVel = Number(set.velocityMs);
+  const velocityMs = Number.isFinite(rawVel) && rawVel > 0 && rawVel <= 5 ? Math.round(rawVel * 100) / 100 : undefined;
 
   if (weightKg <= 0 || reps <= 0) return { session, success: false, reason: 'Вес и повторения должны быть больше 0', discardReason: 'Вес и повторения должны быть больше 0' };
   if (weightKg > SET_LIMITS.maxWeightKg) return { session, success: false, reason: `Вес превышает лимит ${SET_LIMITS.maxWeightKg} кг`, discardReason: `Вес превышает лимит ${SET_LIMITS.maxWeightKg} кг` };
@@ -254,6 +258,7 @@ export function logSet(
     reps,
     rpe,
     rir,
+    velocityMs,
     isPR,
     notes: set.notes || '',
     techniqueScore: set.techniqueScore,

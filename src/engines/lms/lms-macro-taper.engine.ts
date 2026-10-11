@@ -312,11 +312,22 @@ export function buildPLSeasonPeaks(
   const total = maxWeek + 1 + postW;
 
   // Продлеваем базовые недели до длины сезона (повтор последней как наполнитель).
+  // ВАЖНО: копии НЕ наследуют пик-разметку — иначе уже размеченные недели
+  // (taperWeek/meetWeek/mockMeet/postMeet/rampWeek/taperNote) воспринимаются
+  // ниже как «обработанные» (alreadyMarked) и пик-блок сезона молча исчезает
+  // (аудит P0: сезон строился, но тапера/прикидов не было вовсе).
   const out: LMSPlanWeek[] = [];
   for (let i = 0; i < total; i++) {
     const src = base[i] ?? base[base.length - 1];
     const wk: LMSPlanWeek = { ...src, week: i + 1, macroPhase: undefined };
     delete (wk as { meetAttempts?: unknown }).meetAttempts;
+    delete (wk as { taperWeek?: unknown }).taperWeek;
+    delete (wk as { meetWeek?: unknown }).meetWeek;
+    delete (wk as { mockMeet?: unknown }).mockMeet;
+    delete (wk as { postMeet?: unknown }).postMeet;
+    delete (wk as { rampWeek?: unknown }).rampWeek;
+    delete (wk as { taperNote?: unknown }).taperNote;
+    delete (wk as { sourcePhase?: unknown }).sourcePhase;
     out.push(wk);
   }
 
