@@ -97,8 +97,11 @@ export function deloadEnforcement(
 }
 
 /** Годовая лестница: фазовые пресеты объёма (множитель к MRV-таргету). */
+// 26.10.2026 было→стало: note были на английском, а попадают в предупреждения
+// годового плана (MacrocyclePanel) — в русскоязычном продукте пользователь видел
+// латиницу. Переведено, семантика объёма/RIR сохранена.
 export const ARM_PHASE_PRESETS: Record<string, { volumeMult: number; rirShift: number; note: string }> = {
-  off_season: { volumeMult: 1, rirShift: 1, note: 'Off-season: containment/wrist integrity, RIR+1, tendon-care.' },
-  strength_power: { volumeMult: 1, rirShift: 0, note: 'Strength/power: интенсивность растёт, объём держится.' },
-  peaking: { volumeMult: 0.6, rirShift: 2, note: 'Peaking: −40% объёма, без максимума до старта.' },
+  off_season: { volumeMult: 1, rirShift: 1, note: 'Межсезонье: containment и целостность кисти, RIR+1, бережное отношение к сухожилиям.' },
+  strength_power: { volumeMult: 1, rirShift: 0, note: 'Сила/мощность: интенсивность растёт, объём держится.' },
+  peaking: { volumeMult: 0.6, rirShift: 2, note: 'Пик: −40% объёма, без максимума до старта.' },
 };

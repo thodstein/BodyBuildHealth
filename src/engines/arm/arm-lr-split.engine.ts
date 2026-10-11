@@ -47,16 +47,21 @@ export function planLrSplit(input: LrSplitInput = {}): LrSplit {
   }
   const bonus = pct >= 12 ? 1.25 : 1.15;
   const weakSets = Math.min(mrv, Math.round(base * bonus));
-  const strongSets = pct >= 12 ? base : base; // сильная — maintenance (не режем, держим)
+  // 26.10.2026 было→стало: сильная рука = `pct >= 12 ? base : base` (тавтология) и
+  // `withinMrv: weakSets <= mrv` всегда true (weakSets уже клампнута). Поле не несло
+  // информации. Теперь «в MRV» проверяет СУММУ слабой+сильной против MRV, а сильная
+  // рука честно снижается на поддержании (−10%) при ≥12%.
+  const strongSets = pct >= 12 ? Math.max(2, Math.round(base * 0.9)) : base;
+  const total = weakSets + strongSets;
   return {
     asymmetryPct: pct,
     weakArm,
     weakSets,
     strongSets,
     weakFreq: pct >= 12 ? 2 : 1,
-    withinMrv: weakSets <= mrv,
+    withinMrv: total <= mrv,
     note: pct >= 12
-      ? `Асимметрия ${pct}% ≥12% CRITICAL: слабая (${weakArm}) +25% ${weakSets} сетов 2×/нед, сильная maintenance ${strongSets} (кап MRV ${mrv}).`
+      ? `Асимметрия ${pct}% ≥12% CRITICAL: слабая (${weakArm}) +25% ${weakSets} сетов 2×/нед, сильная maintenance ${strongSets} (сумма ${total}${total <= mrv ? ' ≤' : ' ПРЕВЫШАЕТ'} MRV ${mrv}${total <= mrv ? '' : ' — снижьте базу'}).`
       : `Асимметрия ${pct}% ≥7%: слабая (${weakArm}) +15% ${weakSets} сетов 1×/нед добивка.`,
   };
 }

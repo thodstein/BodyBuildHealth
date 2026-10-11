@@ -30,7 +30,7 @@ export function buildArmTaperCurve(input: {
       const first = i === weeks;
       out.push({
         week: i,
-        volumePct: first ? 0.6 : 0.6,
+        volumePct: 0.6, // 26.10.2026: ветки тернарника были идентичны (first ? 0.6 : 0.6) — выбор RIR различает недели
         rirShift: first ? 1 : 2,
         sideMult: 0.5,
         label: first ? 'Table-Ready делоад: 60% объёма, RIR+1, без максимума' : 'Table-Ready пик: 60% объёма, RIR+2, только техника',

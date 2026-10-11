@@ -63,19 +63,44 @@ export function acwrMultFor(input: {
   diary?: Array<{ dateIso?: string; srpe?: number; sRPE?: number; durationMin?: number; minutes?: number }>;
 }): { mult: number; ratio: number | null; zone: 'ok' | 'caution' | 'danger' | 'none'; note: string | null } {
   const diary = Array.isArray(input.diary) ? input.diary : [];
-  const loads = diary
+  const withLoad = diary
     .map((d) => {
       const rpe = Number((d as { srpe?: unknown }).srpe ?? (d as { sRPE?: unknown }).sRPE);
       const mins = Number((d as { durationMin?: unknown }).durationMin ?? (d as { minutes?: unknown }).minutes ?? 60);
       if (!Number.isFinite(rpe) || rpe <= 0 || !Number.isFinite(mins) || mins <= 0) return null;
-      return rpe * mins;
+      const iso = String((d as { dateIso?: unknown }).dateIso || '');
+      return { iso: /^\d{4}-\d{2}-\d{2}$/.test(iso) ? iso : null, load: rpe * mins };
     })
-    .filter((v): v is number => v != null);
-  if (loads.length < 8) return { mult: 1, ratio: null, zone: 'none', note: null };
-  // Упрощённый coupled ACWR: острая (последние 7 нагрузок) / хроническая (все).
-  const acute = loads.slice(-7);
-  const avg = (a: number[]) => a.reduce((s, v) => s + v, 0) / Math.max(1, a.length);
-  const ratio = Math.round((avg(acute) / Math.max(1, avg(loads))) * 100) / 100;
+    .filter((v): v is { iso: string | null; load: number } => v != null);
+  if (withLoad.length < 8) return { mult: 1, ratio: null, zone: 'none', note: null };
+  const DAY = 86400000;
+  const toMs = (iso: string) => Date.parse(`${iso}T00:00:00Z`);
+  const distinctDays = (list: Array<{ iso: string | null }>): number => new Set(list.map((x) => x.iso).filter((x): x is string => !!x)).size;
+  // 26.10.2026 было→стало: «острая» неделя = последние 7 ЗАПИСЕЙ массива. Продюсер
+  // (loadSRPESessions) отдаёт порядок вставки — запись, исправленная задним числом,
+  // попадала в острую неделю → ложный danger и лишняя разгрузка первой недели.
+  // Теперь окна считаются по ДАТАМ: 7 дней и 28 дней от последней записи.
+  // Легаси-вход без дат — прежнее поведение (порядок массива).
+  const hasDates = withLoad.some((x) => x.iso != null);
+  let acute: number[], chronic: number[], acuteDays: number, chronicDays: number;
+  if (hasDates) {
+    const sorted = [...withLoad].sort((a, b) => (a.iso && b.iso ? toMs(a.iso) - toMs(b.iso) : withLoad.indexOf(a) - withLoad.indexOf(b)));
+    const latest = Math.max(...sorted.map((x) => (x.iso ? toMs(x.iso) : 0)));
+    const acuteList = sorted.filter((x) => x.iso != null && toMs(x.iso) > latest - 7 * DAY);
+    const chronicList = sorted.filter((x) => x.iso != null && toMs(x.iso) > latest - 28 * DAY);
+    if (acuteList.length === 0 || chronicList.length === 0) return { mult: 1, ratio: null, zone: 'none', note: null };
+    acute = acuteList.map((x) => x.load);
+    chronic = chronicList.map((x) => x.load);
+    acuteDays = Math.max(1, distinctDays(acuteList));
+    chronicDays = Math.max(1, distinctDays(chronicList));
+  } else {
+    acute = withLoad.slice(-7).map((x) => x.load);
+    chronic = withLoad.map((x) => x.load);
+    acuteDays = acute.length;
+    chronicDays = chronic.length;
+  }
+  const avg = (a: number[], days: number) => a.reduce((s, v) => s + v, 0) / Math.max(1, days);
+  const ratio = Math.round((avg(acute, acuteDays) / Math.max(1, avg(chronic, chronicDays))) * 100) / 100;
   if (ratio >= 1.5) return { mult: 0.65, ratio, zone: 'danger', note: `ACWR ${ratio} danger — объём ×0.65, RIR+2, делоад (дневник sRPE).` };
   if (ratio >= 1.3) return { mult: 0.85, ratio, zone: 'caution', note: `ACWR ${ratio} caution — объём ×0.85, RIR+1.` };
   return { mult: 1, ratio, zone: 'ok', note: null };

@@ -9,6 +9,10 @@
  */
 import { platformWrFor, planAttempts } from './arm-platform.engine';
 
+/** 26.10.2026: атрибуция рекордсмена RT по полу — было хардкодом 'Тюкалов 130.5' для обоих полов (женский WR — Гайдученко 77.2, 2012). */
+function wrHolderNote(sex: ArmliftSex): string {
+  return sex === 'female' ? 'Гайдученко 77.2, 2012' : 'Тюкалов 130.5, 2013';
+}
 export type ArmliftSex = 'male' | 'female';
 
 export interface ArmliftInput {
@@ -231,7 +235,7 @@ export function buildArmliftingReport(input: ArmliftInput): ArmliftingReport {
         implement: impl, label: IMPLEMENT_LABEL[impl] || impl,
         display: `${v} кг`, scorePct: p, internal: false,
         level: lvlOf(p), attempts: planAttempts(v),
-        note: `WR ${wr} кг (Тюкалов 130.5, 2013)`,
+        note: `WR ${wr} кг (${wrHolderNote(sex)})`,
       });
     };
     push(rtL, 'rolling_thunder_L');
@@ -245,7 +249,7 @@ export function buildArmliftingReport(input: ArmliftInput): ArmliftingReport {
         implement: 'rolling_thunder', label: IMPLEMENT_LABEL.rolling_thunder,
         display: `${rt} кг`, scorePct: p, internal: false,
         level: lvlOf(p), attempts: planAttempts(rt),
-        note: `WR ${wr} кг`,
+        note: `WR ${wr} кг (${wrHolderNote(sex)})`,
       });
     }
   }
@@ -445,7 +449,11 @@ function esc(s: unknown): string {
 
 function csvCell(s: unknown): string {
   const v = String(s ?? '');
-  return /[",\n;]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v;
+  // 26.10.2026: защита от формульной инъекции Excel (паритет с остальными
+  // экспортами проекта) — пользовательский текст (failDetail/lmsLabel) начинался
+  // с «=…» и выполнялся как формула.
+  const safe = /^[=+\-@]/.test(v) ? "'" + v : v;
+  return /[",\n;]/.test(safe) ? '"' + safe.replace(/"/g, '""') + '"' : safe;
 }
 
 /** BOM для Excel (явный код, без невидимых литералов — прецедент arm-diagnostics-export). */

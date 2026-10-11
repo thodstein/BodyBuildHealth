@@ -318,7 +318,7 @@ describe('arm-planner PRO: P0 — факт дневника, разминка, �
 
 describe('arm-planner PRO: каталог и CSV', () => {
   it('каталог: 91 упражнение, валидный, новые группы закрыты', () => {
-    expect(ARM_EXERCISES.length).toBe(91); // было 73 → 91 (PRO-PLAN: +18)
+    expect(ARM_EXERCISES.length).toBe(92); // 26.10.2026 было→стало: 92 (PRO-PLAN 91 + thumb_opposition_band для pinch mobility)
     expect(validateArmCatalog()).toEqual([]);
     const ids = new Set(ARM_EXERCISES.map((e) => e.id));
     for (const id of ['kingsmove_wrist_back', 'kingsmove_hold_iso', 'wrist_ext_db', 'wrist_ext_band', 'riser_lift_db', 'rising_hold_iso', 'finger_containment_hold', 'scott_hook_curl', 'hook_hold_iso', 'side_press_db_bench', 'side_hold_iso_pulley', 'back_pressure_low_row', 'back_hold_table_iso', 'machine_wrist_curl', 'machine_reverse_curl', 'press_chain_pushdown', 'kettlebell_hold', 'bodyweight_dead_hang']) {

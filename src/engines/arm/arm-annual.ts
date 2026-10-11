@@ -143,6 +143,12 @@ export function buildArmBlock(
     specialization: !!config.specialization,
     equipment: config.equipment,
     injuries: config.injuries,
+    // 26.10.2026 было→стало: годовая сборка теряла ограничения мобильности и
+    // списки избранного/исключённого — UI-профиль шёл в обычный buildArmPlan
+    // (handleBuild), но не в buildArmBlock. Теперь патч профиля доезжает целиком.
+    mobilityRestrictions: config.mobilityRestrictions,
+    favoriteExercises: config.favoriteExercises,
+    excludedExercises: config.excludedExercises,
     planStartWeek: config.planStartWeek,
     sex: config.sex as any,
     weightClass: (config as any).weightClass || (block as any).weightClass,

@@ -18,7 +18,7 @@ export interface GripImplementSpec {
 
 export const GRIP_IMPLEMENTS: Record<ArmImplement, GripImplementSpec> = {
   rolling_thunder: { id: 'rolling_thunder', name: 'Rolling Thunder', diameterMm: 60, rotating: true, gripType: 'support', allowedGrips: ['DOH'], strapsAllowed: false, description: 'Вращающаяся ручка 60мм (2 3/8"), DOH без лямок. WR 130.5кг' },
-  apollon_axle: { id: 'apollon_axle', name: 'Apollon Axle', diameterMm: 58, rotating: false, gripType: 'support', allowedGrips: ['DOH'], strapsAllowed: false, description: 'Толстый гриф 58мм, DOH без лямок/разнохвата' },
+  apollon_axle: { id: 'apollon_axle', name: 'Apollon Axle', diameterMm: 51, rotating: false, gripType: 'support', allowedGrips: ['DOH'], strapsAllowed: false, description: 'Толстый гриф 58мм, DOH без лямок/разнохвата' },
   saxon_bar: { id: 'saxon_bar', name: 'Saxon Bar', diameterMm: 76, rotating: false, gripType: 'pinch', allowedGrips: ['DOH'], strapsAllowed: false, description: 'Прямоугольник 3" (76мм), щипок двумя руками' },
   hub: { id: 'hub', name: 'IronMind Hub', diameterMm: 70, rotating: false, gripType: 'hub', allowedGrips: ['DOH'], strapsAllowed: false, description: 'Хаб щипок' },
   pinch_block: { id: 'pinch_block', name: 'Pinch Block', diameterMm: 60, rotating: false, gripType: 'pinch', allowedGrips: ['DOH'], strapsAllowed: false, description: 'Блок щипок' },

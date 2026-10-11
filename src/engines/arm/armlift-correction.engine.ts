@@ -8,6 +8,9 @@
  */
 import type { ArmliftWeakLink } from './armlift-diagnosis.engine';
 import type { ArmliftCause } from './armlift-cause.engine';
+// 26.10.2026: приватная копия CAUSE_RU убрана — единый источник armlift-cause.engine
+// (лейблы показываются в хабе, ленте истории и экспорте).
+import { ARMLIFT_CAUSE_RU as CAUSE_RU } from './armlift-cause.engine';
 import { getArmExerciseById } from '../../core/exercise-catalog-arm';
 
 export interface ArmliftCorrection {
@@ -107,8 +110,8 @@ const SUPPORT_MAX: PoolEntry[] = [
   { exId: 'raptor_3', protocol: 'Raptor: объёмные тройки DOH без лямок', dose: '5×3', freq: '2×/нед', source: 'AUSA Raptor volume', sets: 5, reps: [3, 3], restSec: 180, dayTag: 'SupportGrip', fixes: ['off_floor', 'mid'], warmup: 'Разминка: круги + Fat Gripz 1×12', causes: ['volume'], minLevel: 'advanced', phase: 'strength', cues: ['DOH толстый', 'Одинаковый хват все сеты'], progression: '+2.5%/нед', equipmentAlt: ['dumbbell'] },
   // ── ROUND-10 (третья ступень): каждая причина × фаза ≥4 ──
   { exId: 'napalm_handle_60', protocol: 'Силовая база 60 мм: тройки на 85% с паузой 2с', dose: '5×3', freq: '2×/нед', source: 'Napalm (силовая база)', sets: 5, reps: [3, 3], holdSeconds: 2, restSec: 180, dayTag: 'SupportGrip', fixes: ['off_floor'], causes: ['max_strength'], minLevel: 'intermediate', phase: 'strength', cues: ['Пауза 2с на старте', 'Без лямок'], progression: '+2.5 кг/нед', equipmentAlt: ['dumbbell', 'grip_tool'] },
-  { exId: 'raptor_3', protocol: 'Техничные тройки Raptor на 80–85% — траектория и постановка кисти под нагрузкой', dose: '5×3', freq: '2×/нед', source: 'ArmliftingUSA Raptor (техника под нагрузкой)', sets: 5, reps: [3, 3], restSec: 150, dayTag: 'SupportGrip', fixes: ['start', 'mid'], causes: ['technique', 'max_strength'], minLevel: 'intermediate', phase: 'strength', cues: ['Кисть «в замок» до старта', 'Старт плавный, без рывка', 'То же качество на 3-м репе'], progression: '+2.5 кг/нед при чистой технике', equipmentAlt: ['dumbbell', 'bodyweight'] },
-  { exId: 'farmer_walk_fat', protocol: 'Толстый гриф: объёмные тройки с добором — силовая база DOH', dose: '5×3–5', freq: '2×/нед', source: 'NSCA thick bar volume', sets: 5, reps: [3, 5], restSec: 150, dayTag: 'SupportGrip', fixes: ['mid', 'support'], causes: ['volume', 'max_strength'], minLevel: 'intermediate', phase: 'strength', cues: ['Стойка над снарядом', 'Хват до 3-го репа ровный'], progression: '+2.5 кг/нед', equipmentAlt: ['barbell', 'dumbbell'] },
+  { exId: 'raptor_3', protocol: 'Техничные тройки Raptor на 80–85% — траектория и постановка кисти под нагрузкой', dose: '5×3', freq: '2×/нед', source: 'ArmliftingUSA Raptor (техника под нагрузкой)', sets: 5, reps: [3, 3], restSec: 150, dayTag: 'SupportGrip', fixes: ['off_floor', 'mid'], causes: ['technique', 'max_strength'], minLevel: 'intermediate', phase: 'strength', cues: ['Кисть «в замок» до старта', 'Старт плавный, без рывка', 'То же качество на 3-м репе'], progression: '+2.5 кг/нед при чистой технике', equipmentAlt: ['dumbbell', 'bodyweight'] },
+  { exId: 'farmer_walk_fat', protocol: 'Толстый гриф: объёмные тройки с добором — силовая база DOH', dose: '5×3–5', freq: '2×/нед', source: 'NSCA thick bar volume', sets: 5, reps: [3, 5], restSec: 150, dayTag: 'SupportGrip', fixes: ['mid'], causes: ['volume', 'max_strength'], minLevel: 'intermediate', phase: 'strength', cues: ['Стойка над снарядом', 'Хват до 3-го репа ровный'], progression: '+2.5 кг/нед', equipmentAlt: ['barbell', 'dumbbell'] },
   { exId: 'fat_bar_deadlift', protocol: 'Силовая выносливость: 50 мм гриф на длинные сеты при 70%', dose: '3×10', freq: '2×/нед', source: 'NSCA thick bar endurance', sets: 3, reps: [8, 12], restSec: 120, dayTag: 'SupportGrip', fixes: ['mid'], causes: ['endurance', 'max_strength'], minLevel: 'beginner', phase: 'strength', cues: ['Дыхание ровное', 'Хват не перезажимать'], progression: '+1 повтор/нед', equipmentAlt: ['barbell', 'dumbbell'] },
 ];
 
@@ -135,9 +138,13 @@ const PINCH: PoolEntry[] = [
   { exId: 'euro_pinch_2h', protocol: 'Euro Pinch: тяжёлые тройки — техника постановки пальцев', dose: '5×3', freq: '2×/нед', source: 'Euro Pinch (сила/техника)', sets: 5, reps: [3, 3], restSec: 150, dayTag: 'PinchGrip', fixes: ['off_floor', 'hold_short'], warmup: 'Разминка: мел + 1×10–12 лёгким щипком', causes: ['max_strength'], minLevel: 'intermediate', phase: 'technique', cues: ['Две руки', 'Пальцы прямо, без рывка'], progression: '+2.5%/нед', equipmentAlt: ['dumbbell'] },
   { exId: 'hub_pinch', protocol: 'Hub: синглы с паузой 3с — стабильность щипка', dose: '5×1 + пауза', freq: '2×/нед', source: 'IronMind Hub (сила/стабильность 2)', sets: 5, reps: [1, 1], holdSeconds: 3, restSec: 150, dayTag: 'PinchGrip', fixes: ['off_floor', 'hold_short'], warmup: 'Разминка: круги запястий + 1×10 лёгким щипком', causes: ['max_strength'], minLevel: 'intermediate', phase: 'stability', cues: ['5 подушечек', 'Пауза 3с на пределе'], progression: '+1–2.5кг/нед', equipmentAlt: ['dumbbell'] },
   // ── ROUND-10 (третья ступень): причина × фаза ≥4 ──
-  { exId: 'anvil_hub', protocol: 'Anvil Hub на 85–90% — синглы с единой постановкой кисти (техника максимума)', dose: '4×1', freq: '2×/нед', source: 'ArmliftingUSA Anvil (техника максимума)', sets: 4, reps: [1, 1], restSec: 180, dayTag: 'PinchGrip', fixes: ['off_floor', 'start'], causes: ['max_strength', 'technique'], minLevel: 'advanced', phase: 'technique', cues: ['Кисть сверху, пальцы «крючком»', 'Отрыв плавный, без рывка'], progression: '+2.5 кг/нед чистых синглов', equipmentAlt: ['dumbbell', 'grip_tool'] },
+  { exId: 'anvil_hub', protocol: 'Anvil Hub на 85–90% — синглы с единой постановкой кисти (техника максимума)', dose: '4×1', freq: '2×/нед', source: 'ArmliftingUSA Anvil (техника максимума)', sets: 4, reps: [1, 1], restSec: 180, dayTag: 'PinchGrip', fixes: ['off_floor'], causes: ['max_strength', 'technique'], minLevel: 'advanced', phase: 'technique', cues: ['Кисть сверху, пальцы «крючком»', 'Отрыв плавный, без рывка'], progression: '+2.5 кг/нед чистых синглов', equipmentAlt: ['dumbbell', 'grip_tool'] },
   { exId: 'blockbuster_pinch', protocol: 'Blockbuster: одиночные с паузой — техника щипка держится под усталостью', dose: '4×1', freq: '2×/нед', source: 'Gods of Grip Blockbuster (техника/стабильность)', sets: 4, reps: [1, 1], holdSeconds: 2, restSec: 180, dayTag: 'PinchGrip', fixes: ['hold_long'], causes: ['technique', 'fatigue'], minLevel: 'intermediate', phase: 'stability', cues: ['Пауза 2с в 3 см от пола', 'Одинаковая постановка каждый сет'], progression: '+2.5 кг/нед', equipmentAlt: ['dumbbell', 'grip_tool'] },
   { exId: 'plate_pinch_hold', protocol: 'Щипок на стабильность: холд 15с на 70% (одинаковое положение кисти)', dose: '4×15с', freq: '3×/нед', source: 'NSCA plate pinch (стабильность)', sets: 4, reps: [1, 1], holdSeconds: 15, restSec: 120, dayTag: 'PinchGrip', fixes: ['hold_long'], causes: ['technique', 'fatigue'], minLevel: 'beginner', phase: 'stability', cues: ['Кисть по центру', 'Без разъезда пальцев'], progression: '+5с/нед', equipmentAlt: ['dumbbell', 'grip_tool'] },
+  // 26.10.2026 (PRO-аудит): пул PINCH по причине mobility имел 1 запись — при
+  // жестком большом пальце в топ-3 выходил единственный beginner-дрилл.
+  { exId: 'thumb_opposition_band', protocol: 'Оппозиция/отведение большого пальца с резиной — ROM без нагрузки', dose: '3x15', freq: '2-3x/нед', source: 'PRO mobility (PRO-аудит 26.10.2026)', sets: 3, reps: [12, 15], restSec: 60, dayTag: 'PinchGrip', fixes: ['hold_short'], causes: ['mobility'], minLevel: 'beginner', phase: 'technique', cues: ['полная амплитуда', 'без боли'], progression: 'амплитуда - нагрузка', equipmentAlt: ['band'], gentle: true },
+  { exId: 'plate_pinch_hold', protocol: 'Щипок на 50% веса: широкий хват и раскрытие пальцев — ROM под нагрузкой', dose: '3x10сек', freq: '2x/нед', source: 'PRO mobility (PRO-аудит 26.10.2026)', sets: 3, reps: [1, 1], holdSeconds: 10, restSec: 90, dayTag: 'PinchGrip', fixes: ['hold_short'], causes: ['mobility'], minLevel: 'beginner', phase: 'technique', cues: ['широко', 'палец раскрыт'], progression: '+5сек холда/нед', equipmentAlt: ['dumbbell'], gentle: true },
 ];
 
 const CRUSH: PoolEntry[] = [
@@ -210,6 +217,9 @@ export const IMPLEMENT_TO_EX: Record<string, string> = {
   coc_gripper: 'coc_gripper',
   silver_bullet: 'silver_bullet_hold',
   excalibur: 'excalibur_handle',
+  // 26.10.2026 было→стало: хаб мерит Raptor 1.75", а коррекция всегда вешала
+  // raptor_3 (3" — другой снаряд). Пока в пуле нет отдельной записи под 1.75",
+  // перенос помечен честно в source-строке записи (снаряд различается диаметром).
   raptor_175: 'raptor_3',
   country_crush: 'country_crush_2',
   grandfather_clock: 'grandfather_clock',
@@ -276,15 +286,8 @@ function altEquipmentOk(p: PoolEntry, allowed: string[] | undefined): boolean {
   );
 }
 
-const CAUSE_RU: Record<string, string> = {
-  technique: 'техника',
-  max_strength: 'сила',
-  endurance: 'выносливость',
-  volume: 'объём',
-  mobility: 'мобильность',
-  fatigue: 'щадящая',
-};
-
+// 26.10.2026: приватная копия CAUSE_RU убрана — единый источник armlift-cause.engine
+// (лейблы показываются в хабе, ленте истории и экспорте).
 function toCorrection(p: PoolEntry, reason: string, score: number): ArmliftCorrection {
   const cat = getArmExerciseById(p.exId) as any;
   const name = cat?.name || p.exId;

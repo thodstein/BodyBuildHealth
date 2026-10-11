@@ -3,6 +3,7 @@ import { buildArmPlan } from '../arm-builder.engine';
 import { finalizeArmPlan } from '../arm-finalize.engine';
 import { validateArmPlan } from '../arm-validator.engine';
 import { tableWeekKind, tableTimeSummary } from '../arm-table.engine';
+import { sessionLimitsForArm } from '../arm-volume.engine';
 import { buildArmTaperCurve } from '../arm-taper.engine';
 
 describe('arm-integration', () => {
@@ -20,7 +21,11 @@ describe('arm-integration', () => {
     for (const tech of ['hook','toproll','press','balanced'] as const) {
       let p: any = buildArmPlan({ discipline:'armwrestling', patternId:'arm_4_upper_lower', level:'intermediate', goal:'strength', technique: tech, weeks:2 });
       p = finalizeArmPlan(p,{ level:'intermediate' });
-      for (const wk of p.weeks) for (const sess of wk.sessions) expect(sess.exercises.length).toBeLessThanOrEqual(6);
+      // 26.10.2026: канон sessionLimitsForArm (TableTech — 7 по PRO F), не хардкод 6
+      for (const wk of p.weeks) for (const sess of wk.sessions) {
+        const cap = sessionLimitsForArm({ level:'intermediate', discipline:'armwrestling', sessionTag: sess.sessionTag }).maxExercises;
+        expect(sess.exercises.length).toBeLessThanOrEqual(cap);
+      }
     }
   });
   it('table week kinds 3/2/1', () => {

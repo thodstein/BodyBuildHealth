@@ -27,7 +27,7 @@ export const PLATFORM_RULES_2026: ImplementRule[] = [
     wrNote: 'WR 130.5/77.2 (верифицирован)',
   },
   {
-    implement: 'apollon_axle', name: 'Apollon Axle (58мм)',
+    implement: 'apollon_axle', name: 'Apollon Axle (2″ = 51 мм)',
     grip: 'Только DOH, без лямок/разнохвата/замка; сумо разрешено',
     timing: '60с с загрузки; 1с контроль + down-signal, хват до касания пола',
     attempts: 'До 4 заявок, шаг ≥5/10 кг, только вверх',

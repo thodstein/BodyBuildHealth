@@ -102,7 +102,8 @@ export function diagnoseArmlift(i: ArmliftDiagInput): ArmliftDiagnosis {
     };
   }
   // P3: мобильность под снаряд.
-  const pinchImpl = impl === 'saxon_bar' || impl === 'hub' || impl === 'pinch_block' || impl === 'anvil' || impl === 'grandfather_clock';
+  // 26.10.2026: +country_crush (щепковый снаряд — relevantTests=['Pinch-hold'])
+const pinchImpl = impl === 'saxon_bar' || impl === 'hub' || impl === 'pinch_block' || impl === 'anvil' || impl === 'grandfather_clock' || impl === 'country_crush';
   if (pinchImpl && i.thumbStiff) {
     return {
       weakLink: 'thumb', cause: 'mobility', confidence: 'med', title: TITLES.thumb,

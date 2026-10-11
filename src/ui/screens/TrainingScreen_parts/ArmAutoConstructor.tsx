@@ -665,7 +665,8 @@ export function ArmAutoConstructor() {
       const srpe = Number(proSrpe);
       const pain = Number(proPain);
       return assessArmReadiness({
-        diary: [{ dateIso: new Date().toISOString().slice(0, 10), srpe: Number.isFinite(srpe) ? srpe : undefined, elbowPain: Number.isFinite(pain) ? pain : undefined }],
+        // 26.10.2026: канон локальной даты (UTC давал «вчера» в вечерние часы UTC+X)
+        diary: [{ dateIso: localIsoDate(), srpe: Number.isFinite(srpe) ? srpe : undefined, elbowPain: Number.isFinite(pain) ? pain : undefined }],
         acwrRatio: pro7Acwr?.value,
       });
     } catch { return null; }
@@ -724,6 +725,7 @@ const [rfdEstimated, setRfdEstimated] = useState<boolean>(false);
   const [cycHookCap, setCycHookCap] = useState<string>('');
   const [cycCoc, setCycCoc] = useState<string>('');
   const [cycFlat, setCycFlat] = useState<boolean>(false);
+  const [cycFlatW, setCycFlatW] = useState<string>('');
   const [cycBlood, setCycBlood] = useState<boolean>(false);
   const [cycNever, setCycNever] = useState<boolean>(false);
   const [cycSingles, setCycSingles] = useState<boolean>(false);
@@ -770,6 +772,50 @@ const [rfdEstimated, setRfdEstimated] = useState<boolean>(false);
     if (profileSnapshot.bodyWeightKg) setProBw((prev) => (prev === '' ? String(profileSnapshot.bodyWeightKg) : prev));
     if (profileSnapshot.ageYears) setProAge((prev) => (prev === '' ? String(profileSnapshot.ageYears) : prev));
   }, [profileSnapshot.bodyWeightKg, profileSnapshot.ageYears]);
+
+  // J7: орто-гарды из моста — единая функция применения (closure над сеттерами).
+  const applyOrthoGuards = React.useCallback((og: any, opts?: { silent?: boolean }): string[] => {
+    const bits: string[] = [];
+    try {
+      if (og.pauseOverhead) bits.push('плечо-пауза');
+      if (og.closedChainOnly) {
+        bits.push('Beighton-щадящий');
+        setCycNever(true);
+      }
+      const mobW: string[] = Array.isArray(og.mobilityAdd)
+        ? Array.from(new Set<string>(og.mobilityAdd.map((m: unknown) => String(m)).filter((m: string) => ['wrist', 'forearm', 'elbow'].includes(m))))
+        : [];
+      if (mobW.length) {
+        bits.push(mobW.join('+'));
+        try {
+          applyArmMobilityToProfile(mobW);
+          localStorage.setItem('he_arm_ortho_mobility', JSON.stringify(mobW));
+        } catch {}
+      }
+      if (bits.length && !opts?.silent) flash(`🦴 Орто-гарды: ${bits.join(' · ')}`);
+    } catch { /* опционально */ }
+    return bits;
+  }, []);
+
+  // 26.10.2026 было→стало: he_arm_ortho_guards/flags были write-only — после
+  // перемонта «Без отказов» от орто-моста терялся, а ключи уходили в cloud-kv
+  // никому не нужными. Теперь mount-восстановление читает их: гарды исполняются
+  // функционально, флаги показываются строкой (реальный потребитель).
+  const [orthoFlagsLine, setOrthoFlagsLine] = useState<string>('');
+  useEffect(() => {
+    try {
+      const gRaw = typeof localStorage !== 'undefined' ? localStorage.getItem('he_arm_ortho_guards') : null;
+      if (gRaw) {
+        const og = JSON.parse(gRaw);
+        if (og && typeof og === 'object') applyOrthoGuards(og, { silent: true });
+      }
+      const fRaw = typeof localStorage !== 'undefined' ? localStorage.getItem('he_arm_ortho_flags') : null;
+      if (fRaw) {
+        const arr = JSON.parse(fRaw);
+        if (Array.isArray(arr) && arr.length) setOrthoFlagsLine(`🦴 Орто-скрининг: ${arr.map((x) => String(x)).join(', ')}`);
+      }
+    } catch { /* опционально */ }
+  }, [applyOrthoGuards]);
 
   const workMax = useMemo(() => {
     const wm: Record<string, number> = { ...profileSnapshot.workMax };
@@ -911,28 +957,12 @@ const [rfdEstimated, setRfdEstimated] = useState<boolean>(false);
       } catch {}
       // J7 орто-скрининг: гарды ИСПОЛНЯЮТСЯ.
       // mobilityAdd (wrist/forearm/elbow) → прямо в профиль (живой фильтр пула без ручной кнопки);
-      // Beighton closedChainOnly / teen → «Без отказов» (щадящий режим); всё — в персист + флеш.
+      // Beighton closedChainOnly / teen → «Без отказов» (щадящий режим).
       try {
         const og = payload.data?.orthoGuards;
         if (og && typeof og === 'object') {
-          localStorage.setItem('he_arm_ortho_guards', JSON.stringify(og));
-          const bits: string[] = [];
-          if ((og as any).pauseOverhead) bits.push('плечо-пауза');
-          if ((og as any).closedChainOnly) {
-            bits.push('Beighton-щадящий');
-            setCycNever(true);
-          }
-          const mobW: string[] = Array.isArray((og as any).mobilityAdd)
-            ? Array.from(new Set<string>((og as any).mobilityAdd.map((m: unknown) => String(m)).filter((m: string) => ['wrist', 'forearm', 'elbow'].includes(m))))
-            : [];
-          if (mobW.length) {
-            bits.push(mobW.join('+'));
-            try {
-              applyArmMobilityToProfile(mobW);
-              localStorage.setItem('he_arm_ortho_mobility', JSON.stringify(mobW));
-            } catch {}
-          }
-          if (bits.length) flash(`🦴 Орто-гарды: ${bits.join(' · ')}`);
+          try { localStorage.setItem('he_arm_ortho_guards', JSON.stringify(og)); } catch {}
+          applyOrthoGuards(og);
         }
         const of = payload.data?.orthoFlags;
         if (Array.isArray(of) && of.length) {
@@ -1057,7 +1087,8 @@ const [rfdEstimated, setRfdEstimated] = useState<boolean>(false);
         const map: Record<string,string> = { beginner:'beginner', intermediate:'intermediate', advanced:'advanced', competitive:'advanced', elite:'enhanced' };
         const lvl = map[String(bench.level)] || 'intermediate';
         setLevel(lvl);
-        try { localStorage.setItem('he_arm_last_bench_level', bench.level); } catch {}
+        // 26.10.2026: he_arm_last_bench_level убран как write-only — уровень уже
+        // применён функционально и сохранён в diagSnap.benchLevel (его читает печать).
       }
       // сохраняем диагностику для печати — механизм-ориентированная + 12 точек
       try {
@@ -1157,23 +1188,9 @@ const [rfdEstimated, setRfdEstimated] = useState<boolean>(false);
   const diarySessions = useMemo(() => {
     try { return loadHubDiarySessions(); } catch { return []; }
   }, [step, builtPlan]);
-  const factFeedback = useMemo(() => {
-    try { return builtPlan ? armFactFeedback(builtPlan, diarySessions as any, { windowDays: 28 }) : null; } catch { return null; }
-  }, [builtPlan, diarySessions]);
-  const compliance = useMemo(() => {
-    try {
-      const raw = typeof localStorage !== 'undefined' ? localStorage.getItem('he_arm_plan_built_at') : null;
-      // Приоритет: явная дата начала плана → дата сборки → сегодня.
-      const week1 = /^\d{4}-\d{2}-\d{2}$/.test(planStartDate)
-        ? planStartDate
-        : raw && /^\d{4}-\d{2}-\d{2}$/.test(raw) ? raw : localIsoDate();
-      return builtPlan ? armPlanCompliance(builtPlan, diarySessions as any, week1) : null;
-    } catch { return null; }
-  }, [builtPlan, diarySessions, planStartDate]);
-  // Паритет ББ/ТА: аудит покрытия 12 мёртвых точек прямо в конструкторе.
-  const planAudit = useMemo(() => {
-    try { return builtPlan ? auditArmPlan(builtPlan) : null; } catch { return null; }
-  }, [builtPlan]);
+  // factFeedback/compliance/planAudit считаются ОТ ПРАВЛЕНОГО плана (viewPlan) —
+  // объявлены ниже, после viewPlan (иначе TDZ): было builtPlan, из-за чего цифры
+  // выполнения/покрытия относились к базовому плану, а экспорт — к правленому.
   // P0-3: блоки специализации — добавить/править/удалить + превью расписания.
   const addSpecBlock = () => {
     setSpecBlocks((prev) => {
@@ -1182,7 +1199,18 @@ const [rfdEstimated, setRfdEstimated] = useState<boolean>(false);
       return [...prev, { weekStart: start, weekEnd: Math.max(start, end), targets: weakPoints.slice(0, 2), donors: [], mode: 'none' as const }];
     });
   };
-  const updateSpecBlock = (i: number, patch: Partial<UiSpecBlock>) => setSpecBlocks((prev) => prev.map((b, j) => (j === i ? { ...b, ...patch } : b)));
+  const updateSpecBlock = (i: number, patch: Partial<UiSpecBlock>) => setSpecBlocks((prev) => prev.map((b, j) => {
+    if (j !== i) return b;
+    const next = { ...b, ...patch };
+    // 26.10.2026 было→стало: инвертированный блок (weekStart 8 > weekEnd 3) молча
+    // выбросился движком (filter weekStart<=weekEnd) — «показано ≠ применяется».
+    // Теперь порядок недель нормализуется в самой правке.
+    if (next.weekEnd < next.weekStart) {
+      if (patch.weekEnd != null) next.weekStart = next.weekEnd;
+      else next.weekEnd = next.weekStart;
+    }
+    return next;
+  }));
   const removeSpecBlock = (i: number) => setSpecBlocks((prev) => prev.filter((_, j) => j !== i));
   const specSchedulePreview = useMemo(() => {
     try {
@@ -1197,13 +1225,17 @@ const [rfdEstimated, setRfdEstimated] = useState<boolean>(false);
   const checkinWeek = useMemo(() => {
     try {
       const raw = typeof localStorage !== 'undefined' ? localStorage.getItem('he_arm_plan_built_at') : null;
-      if (raw && /^\d{4}-\d{2}-\d{2}$/.test(raw)) {
-        const days = Math.floor((Date.parse(`${localIsoDate()}T00:00:00Z`) - Date.parse(`${raw}T00:00:00Z`)) / 86400000);
-        return Math.max(1, Math.min(weeks, Math.floor(days / 7) + 1));
-      }
+      // 26.10.2026 было→стало: week1 берётся тем же приоритетом, что и compliance
+      // (плановая дата начала → дата сборки → сегодня) — иначе при заданном
+      // planStartDate чек-ин подписывался не той неделей плана.
+      const week1 = /^\d{4}-\d{2}-\d{2}$/.test(planStartDate)
+        ? planStartDate
+        : raw && /^\d{4}-\d{2}-\d{2}$/.test(raw) ? raw : localIsoDate();
+      const days = Math.floor((Date.parse(`${localIsoDate()}T00:00:00Z`) - Date.parse(`${week1}T00:00:00Z`)) / 86400000);
+      return Math.max(1, Math.min(weeks, Math.floor(days / 7) + 1));
     } catch { /* noop */ }
     return 1;
-  }, [weeks, builtPlan]);
+  }, [weeks, builtPlan, planStartDate]);
   useEffect(() => {
     if (ciWeight !== '') return;
     const last = checkins.find((c) => Number(c.weightKg) > 0);
@@ -1247,6 +1279,28 @@ const [rfdEstimated, setRfdEstimated] = useState<boolean>(false);
           })));
       }
       if (snap.cycleId) setCycId(String(snap.cycleId));
+      // 26.10.2026 было→стало: восстановление теряло сплит/хват/слабые зоны/PED и
+      // все флаги циклов — после «📥 Загрузить» повторная сборка уходила от
+      // сохранённого варианта (сплит = текущий топ-ранжирование, специализация off).
+      if (snap.patternId) setPatternId(String(snap.patternId));
+      if (snap.gripFocus) setGripFocus(String(snap.gripFocus) as any);
+      if (snap.gripImplement) setProPlatImpl(String(snap.gripImplement) as any);
+      if (Array.isArray(snap.weakPoints)) setWeakPoints(snap.weakPoints.map((t: unknown) => String(t)).filter((t: string) => ARM_MUSCLES.includes(t as any)));
+      if (snap.focusGroup) setFocusGroup(String(snap.focusGroup));
+      setSpecialization(!!snap.specialization);
+      if (snap.pedDoses && typeof snap.pedDoses === 'object') {
+        const src = snap.pedDoses as Record<string, unknown>;
+        setPedDoses(Object.fromEntries(Object.entries(src).filter(([, v]) => Number(v) > 0).map(([k, v]) => [k, Number(v)])));
+      }
+      if (snap.courseIntensity) setCourseIntensity(String(snap.courseIntensity) as any);
+      for (const [key, setter] of [
+        ['cocWorking', setCycCoc], ['flatPyramid', setCycFlat], ['bloodflow', setCycBlood],
+        ['neverFail', setCycNever], ['heavySingles', setCycSingles], ['brzenkMode', setCycBrzenk],
+        ['akimovHook', setCycAkimov], ['compPeriod', setCycComp], ['forMode', setCycFor],
+        ['rpeParity', setCycRpe], ['medleyId', setCycMedley],
+      ] as Array<[string, (v: boolean) => void]>) {
+        if (snap[key] != null) setter(!!snap[key]);
+      }
     } catch { /* тихо */ }
   }, []);
 
@@ -1263,6 +1317,10 @@ const [rfdEstimated, setRfdEstimated] = useState<boolean>(false);
         profileAge: profileSnapshot.ageYears,
       };
       const profilePatch = armBuilderProfilePatch(profileSnapshot);
+      // 26.10.2026: sex приходит из профиля (адаптер) — до этого UI читал
+      // profile.personal.sex (undefined всегда), женщине строился мужской
+      // весовой класс/%WR/темп сгонки. Вход билдера тоже получает sex.
+      const sex = profileSnapshot.sex;
       let plan: any = buildArmPlan({
         discipline: discipline as any,
         patternId: pid,
@@ -1271,6 +1329,7 @@ const [rfdEstimated, setRfdEstimated] = useState<boolean>(false);
         technique: technique as any,
         weeks,
         daysPerWeek,
+        sex,
         gripFocus: gripFocus as any,
         // P2: снаряд платформы реально влияет на пул хвата (только армлифтинг).
         gripImplement: (discipline as string) === 'armlifting' ? (proPlatImpl as any) : undefined,
@@ -1350,7 +1409,9 @@ const [rfdEstimated, setRfdEstimated] = useState<boolean>(false);
         hookCapSets: parseFloat(cycHookCap) > 0 ? parseFloat(cycHookCap) : undefined,
         cocWorking: cycCoc || undefined,
         flatPyramid: cycFlat || undefined,
-        flatPyramidWeightKg: cycFlat && parseFloat(topLadderVal) > 0 ? parseFloat(topLadderVal) : undefined,
+        // 26.10.2026 было→стало: стартовый вес пирамиды брался из поля «Результат
+        // (кг/с)» лестницы — одно поле на два смысла, «25 с» давало пирамиду 25 кг.
+        flatPyramidWeightKg: cycFlat && parseFloat(cycFlatW) > 0 ? parseFloat(cycFlatW) : undefined,
         bloodflow: cycBlood || undefined,
         neverFail: cycNever || undefined,
         heavySingles: cycSingles || undefined,
@@ -1509,6 +1570,26 @@ const [rfdEstimated, setRfdEstimated] = useState<boolean>(false);
     const candidate = applyArmEdits(builtPlan, armEdits, workMax);
     return candidate === builtPlan ? builtPlan : refreshArmPlanSnapshot(candidate, level);
   }, [builtPlan, armEdits, workMax, level]);
+  // План↔факт / выполнение / аудит покрытия — по ПРАВЛЕНОМУ плану (viewPlan):
+  // ручные правки меняют сеты, и базовый builtPlan врал бы в «План vs факт»
+  // и в выборе худшей точки, тогда как печать/CSV ушли из viewPlan.
+  const factFeedback = useMemo(() => {
+    try { return viewPlan ? armFactFeedback(viewPlan, diarySessions as any, { windowDays: 28 }) : null; } catch { return null; }
+  }, [viewPlan, diarySessions]);
+  const compliance = useMemo(() => {
+    try {
+      const raw = typeof localStorage !== 'undefined' ? localStorage.getItem('he_arm_plan_built_at') : null;
+      // Приоритет: явная дата начала плана → дата сборки → сегодня.
+      const week1 = /^\d{4}-\d{2}-\d{2}$/.test(planStartDate)
+        ? planStartDate
+        : raw && /^\d{4}-\d{2}-\d{2}$/.test(raw) ? raw : localIsoDate();
+      return viewPlan ? armPlanCompliance(viewPlan, diarySessions as any, week1) : null;
+    } catch { return null; }
+  }, [viewPlan, diarySessions, planStartDate]);
+  // Паритет ББ/ТА: аудит покрытия 12 мёртвых точек прямо в конструкторе.
+  const planAudit = useMemo(() => {
+    try { return viewPlan ? auditArmPlan(viewPlan) : null; } catch { return null; }
+  }, [viewPlan]);
   useEffect(() => {
     if (!builtPlan || !viewPlan || editsCount === 0 || viewPlan === builtPlan) {
       if (editsCount === 0) committedEditsRef.current = '';
@@ -1657,7 +1738,19 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
               ))}
             </div>
             <AdSwitch checked={specialization} onChange={setSpecialization} label="Специализация (цель ×1.3, блоки ниже)" />
+            {specialization && (
+              <div>
+                <div className="ad-fl">Фокус-мышца (×1.3 без выбора целей)</div>
+                <div className="ad-chips">
+                  <AdChip active={focusGroup === ''} onClick={() => setFocusGroup('')}>— нет</AdChip>
+                  {['wrist_flexors','pronators','supinators','brachialis','risers','grip_support','grip_pinch','side_pressure','back_pressure'].map(m => (
+                    <AdChip key={m} active={focusGroup === m} onClick={() => setFocusGroup(focusGroup === m ? '' : m)}>{ARM_MUSCLE_RU[m] || m}</AdChip>
+                  ))}
+                </div>
+              </div>
+            )}
             {specialization && <span className="ad-tip">{specPreview.rationale}</span>}
+            {orthoFlagsLine && <AdBanner tone="warn">{orthoFlagsLine}</AdBanner>}
             {specialization && (
               <div data-arm="spec-blocks">
                 <div className="ad-muted">Блоки специализации: недели → цели → доноры (пусто = legacy-блок 6 нед + баланс).</div>
@@ -1859,7 +1952,7 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
               <AdSwitch checked={proStrap} onChange={setProStrap} label="Ожидается ремень" />
             </div>
             {(proBw || proAge || proPara !== 'none') && (()=>{ try {
-              const card = buildWafStartCard({ sex: linked?.profile?.personal?.sex, ageYears: parseFloat(proAge) || 30, bodyWeightKg: parseFloat(proBw) || 80, arm: proArm as any, para: proPara });
+              const card = buildWafStartCard({ sex: profileSnapshot.sex, ageYears: parseFloat(proAge) || 30, bodyWeightKg: parseFloat(proBw) || 80, arm: proArm as any, para: proPara });
               return <div className="ad-tip">WAF {card.ageGroup} · кат. {card.weightClass.label}{card.weightClass.label !== 'Open' ? ' кг' : ''} · {card.weighInNote}{proPara !== 'none' ? ` · Para ${proPara}` : ''}</div>;
             } catch { return null; } })()}
             {proSupermatch && (()=>{
@@ -1873,7 +1966,7 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
             } catch { return null; } })()}
             {(proBw && proTargetW && proDate) && (()=>{ try {
               const weeksOut = weeksUntilStart(undefined, proDate);
-              const cut = planWeightCut({ startKg: parseFloat(proBw), targetKg: parseFloat(proTargetW), weeksOut, sex: linked?.profile?.personal?.sex });
+              const cut = planWeightCut({ startKg: parseFloat(proBw), targetKg: parseFloat(proTargetW), weeksOut, sex: profileSnapshot.sex });
               return <div className="ad-tip">Сгонка: {cut.note}</div>;
             } catch { return null; } })()}
             <div>
@@ -1943,7 +2036,7 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
                 { id:'', label:'—' },
                 { id:'fat_gripz', label:'Fat Gripz', desc:'Накладки 50мм' },
                 { id:'rolling_thunder', label:'Rolling Thunder', desc:'Вращающаяся ручка 60мм' },
-                { id:'apollon_axle', label:'Axle', desc:'Толстый гриф 58мм' },
+                { id:'apollon_axle', label:'Axle', desc:'Apollon Axle 2″ (51 мм)' },
                 { id:'saxon_bar', label:'Saxon', desc:'Щипок 76мм' },
                 { id:'pinch_block', label:'Pinch Block', desc:'Блок щипок' },
                 { id:'hub', label:'Hub', desc:'Хаб IronMind' },
@@ -2006,7 +2099,7 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
             })()}
             {topLadder && (()=>{
               try {
-                const sex = linked?.profile?.personal?.sex || 'male';
+                const sex = profileSnapshot.sex || 'male';
                 return <div className="ad-tip">{ladderAdvice(topLadder, parseFloat(topLadderVal) || 0, sex)}</div>;
               } catch { return null; }
             })()}
@@ -2099,6 +2192,11 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
               {cycSingles && (
                 <AdField label="PRO-5: микрошаг синглов кг">
                   <input value={cycStep} onChange={e=>setCycStep(e.target.value)} placeholder="0.57" inputMode="decimal" aria-label="Микрошаг синглов кг" />
+                </AdField>
+              )}
+              {cycFlat && (
+                <AdField label="Стартовый вес пирамиды, кг">
+                  <input value={cycFlatW} onChange={e=>setCycFlatW(e.target.value)} placeholder="—" inputMode="decimal" aria-label="Стартовый вес пирамиды кг" />
                 </AdField>
               )}
               <AdField label="PRO-5: hook-кап сетов/нед">
@@ -2421,7 +2519,7 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
               <div>
                 <ArmHeatmap plan={viewPlan} onToast={flash} />
               </div>
-              <ArmRulebookPanel discipline={discipline} sex={linked?.profile?.personal?.sex} />
+              <ArmRulebookPanel discipline={discipline} sex={profileSnapshot.sex} />
               <div data-arm="pro7-card">
               <AdSec title="🩺 Готовность к нагрузке (ACWR, боль, возвращение)" hook="pro7">
                 <AdGrid cols="2">
@@ -2609,7 +2707,7 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
                       const t = parseFloat(proPlatTarget);
                       if (!(t > 0)) return 'Введите цель — покажем раскладку попыток и %WR.';
                       const att = planAttempts(t);
-                      const wr = platformWrFor(proPlatImpl, linked?.profile?.personal?.sex);
+                      const wr = platformWrFor(proPlatImpl, profileSnapshot.sex || 'male');
                       const pct = Math.round((t / wr) * 1000) / 10;
                       const lvl = pct >= 90 ? 'элита' : pct >= 70 ? 'соревновательный уровень' : 'база';
                       const orientir = platformIsInternal(proPlatImpl);
@@ -2638,7 +2736,7 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
                           const parsed = isJson ? parseArmResultJson(text) : parseArmResultCsv(text, proPlatImpl);
                           if (parsed.errors.length > 0) { flash(`⚠ Импорт результатов: ${parsed.errors[0]}`); return; }
                           if (parsed.entries.length === 0) { flash('⚠ Импорт результатов: распознанных попыток нет.'); return; }
-                          const log = applyArmResultImport(parsed, linked?.profile?.personal?.sex || 'male');
+                          const log = applyArmResultImport(parsed, profileSnapshot.sex || 'male');
                           flash(`📥 Импортировано попыток: ${parsed.entries.length} · снаряд ${parsed.implement} · лучший ${parsed.bestKg} кг (${parsed.wrPct}% WR)${parsed.warnings.length ? ` · замечаний: ${parsed.warnings.length}` : ''} · в журнале ${log.length}`);
                           setPlatformTick(t => t + 1);
                         };
@@ -2968,10 +3066,16 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
                 // yield кадра: тяжёлая сборка не фризит UI, видна busy-строка
                 await new Promise(r=>setTimeout(r, 30));
                 const res = yearBlocks.map((b: any)=>{
+                  // 26.10.2026 было→стало: год собирался БЕЗ травм/оборудования/мобильности
+                  // и цели — профиль с исключённым grip_support получал хватовые блоки,
+                  // «Масса предплечья» молча превращалась в strength (buildArmBlock берёт
+                  // цель из фазы). Теперь общий профиль-патч + goal/sex/daysPerWeek едут в блок.
                   const cfg: any = {
+                    ...armBuilderProfilePatch(profileSnapshot),
                     discipline, level, technique, gripFocus, workMax,
                     weakPoints, focusGroup: focusGroup || undefined, specialization,
                     patternId: patternId || undefined,
+                    goal, sex: profileSnapshot.sex, daysPerWeek,
                     taperEnabled: b.priority !== 'C',
                     competitionPriority: b.priority,
                     cycleId: yearSuggest ? b.suggestedCycleId : undefined,
@@ -2989,16 +3093,18 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
                    const totalWeeks = yearBlocks.reduce((a: number, b: any) => a + (b.weeks || 0), 0);
                    const macro = armYearBlocksToMacro(yearBlocks as any, totalWeeks || undefined);
                    let plan = annualPlanFromMacro(macro, { level, workMax, weakPoints });
-                   for (const src of yearBlocks as any[]) {
-                     plan = setAnnualBlockConfig(plan, src.blockKey, {
-                       discipline, level, technique, gripFocus, workMax,
-                       weakPoints, focusGroup: focusGroup || undefined, specialization,
-                       patternId: patternId || undefined,
-                       taper: { enabled: src.priority !== 'C', weeks: src.taperWeeks || 2 },
-                       cycleId: yearSuggest ? src.suggestedCycleId : undefined,
-                       cycleConsent: yearSuggest ? true : undefined,
-                     } as any);
-                   }
+                    for (const src of yearBlocks as any[]) {
+                      plan = setAnnualBlockConfig(plan, src.blockKey, {
+                        ...armBuilderProfilePatch(profileSnapshot),
+                        discipline, level, technique, gripFocus, workMax,
+                        weakPoints, focusGroup: focusGroup || undefined, specialization,
+                        patternId: patternId || undefined,
+                        goal, sex: profileSnapshot.sex, daysPerWeek,
+                        taper: { enabled: src.priority !== 'C', weeks: src.taperWeeks || 2 },
+                        cycleId: yearSuggest ? src.suggestedCycleId : undefined,
+                        cycleConsent: yearSuggest ? true : undefined,
+                      } as any);
+                    }
                    const outcome = buildAnnualPlan(plan, macro);
                    saveAnnualTrainingPlan(outcome.plan);
                    annualNote = `в общий годовой план: собрано ${outcome.built}, пропущено ${outcome.skipped}, ошибок ${outcome.failed}`;

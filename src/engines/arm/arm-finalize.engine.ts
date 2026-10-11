@@ -4,7 +4,7 @@
  */
 import type { ArmPlan } from './arm-types';
 import { getArmLandmarks } from './arm-volume-landmarks.engine';
-import { perExerciseCap, aggregateArmVolume } from './arm-volume.engine';
+import { perExerciseCap, aggregateArmVolume, sessionLimitsForArm } from './arm-volume.engine';
 import { getArmCycle } from './arm-cycle-library.engine';
 import { buildArmTaperCurve, applyArmTaperToWeeks, type ArmTaperMode } from './arm-taper.engine';
 import { armInjuryRepsCap, armInjuryVolumeFactor, armInjuryWeightFactor, mobilityBlockReason } from './arm-injury-guard.engine';
@@ -180,22 +180,27 @@ function capEnforcement(plan: ArmPlan, level: string): void {
 }
 
 function enforceSessionLimits(plan: ArmPlan, level: string): void {
-  const maxEx = level === 'enhanced' ? 8 : 6;
+  // 26.10.2026 было→стало: кап сессии был хардкодом 6 (enhanced 8) — он отменял
+  // исключение билдера sessionLimitsForArm (TableTech armwrestling = 7, armlifting 5/6,
+  // recoveryMult<0.8 −1) и резал сессию слепым splice без гарда «не удалять
+  // единственное упражнение мышцы». Теперь единый источник + тот же гард, что в билдере.
   for (const wk of plan.weeks) for (const sess of wk.sessions) {
-    if (sess.exercises.length > maxEx) {
-      // удаляем accessory последними
-      const toRemove = sess.exercises.length - maxEx;
-      const accessoryIdx: number[] = [];
-      sess.exercises.forEach((ex, i) => { if (ex.role === 'accessory') accessoryIdx.push(i); });
-      // удаляем с конца
-      let removed = 0;
-      for (let i = sess.exercises.length - 1; i >= 0 && removed < toRemove; i--) {
-        if (sess.exercises[i].role === 'accessory' || removed >= accessoryIdx.length) {
-          sess.exercises.splice(i, 1);
-          removed++;
-        }
+    const disc = String(plan.discipline || 'armwrestling');
+    const limits = sessionLimitsForArm({ level, discipline: disc, sessionTag: sess.sessionTag });
+    if (sess.exercises.length <= limits.maxExercises) continue;
+    const toRemove = sess.exercises.length - limits.maxExercises;
+    const priCount = sess.exercises.filter(e => e.role !== 'accessory').length;
+    let removed = 0;
+    for (let i = sess.exercises.length - 1; i >= 0 && removed < toRemove; i--) {
+      const ex = sess.exercises[i];
+      if (ex.role === 'accessory' || priCount + (sess.exercises.length - removed - priCount) > limits.maxExercises) {
+        const othersSameMus = sess.exercises.filter((e, idx) => e.muscle === ex.muscle && idx !== i).length;
+        if (ex.role !== 'accessory' && othersSameMus === 0) continue;
+        sess.exercises.splice(i, 1);
+        removed++;
       }
     }
+    if (sess.exercises.length > limits.maxExercises) sess.exercises.splice(limits.maxExercises);
   }
 }
 

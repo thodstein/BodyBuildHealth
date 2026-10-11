@@ -15,6 +15,7 @@
  * Чистый модуль (без localStorage/UI): вход — план + сессии дневника.
  */
 import type { ArmPlan, ArmDiarySessionFact } from './arm-types';
+import { localIsoDate } from '../../core/local-date';
 
 export type ArmFactStatus = 'beat' | 'on_track' | 'stalled' | 'no_data';
 export type ArmFactAction = 'increase' | 'hold' | 'back_off' | 'none';
@@ -266,7 +267,9 @@ function addDaysIso(iso: string, days: number): string {
  */
 export function armPlanCompliance(plan: ArmPlan | null | undefined, sessions: ArmDiarySessionFact[] | undefined, week1Iso: string, todayIso?: string): ArmComplianceResult | null {
   if (!plan || !Array.isArray(plan.weeks) || !/^\d{4}-\d{2}-\d{2}$/.test(String(week1Iso || ''))) return null;
-  const today = /^\d{4}-\d{2}-\d{2}$/.test(String(todayIso || '')) ? String(todayIso) : new Date().toISOString().slice(0, 10);
+  // 26.10.2026: дефолт «сегодня» — локальная дата (UTC давал «вчера» вечером UTC+X —
+  // выполненная неделя отмечалась missed)
+  const today = /^\d{4}-\d{2}-\d{2}$/.test(String(todayIso || '')) ? String(todayIso) : localIsoDate();
   const planNames = new Set<string>();
   for (const wk of plan.weeks || []) for (const s of wk.sessions || []) for (const e of s.exercises || []) {
     const k = normName(e.name);

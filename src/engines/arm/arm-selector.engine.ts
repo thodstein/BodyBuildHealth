@@ -93,7 +93,9 @@ export function rankArmSplits(input: ArmSelectorInput): ArmRankedPattern[] {
     } else if (technique === 'toproll') {
       if (['TableHeavy','TablePronation','GripHeavy'].some(t => p.schedule.some(s => s.sessionTag === t))) { score += 8; rationale.push('toproll → пронация/хват есть'); }
     } else if (technique === 'press') {
-      if (p.schedule.some(s => s.sessionTag === 'SidePress' || s.sessionTag === 'Support')) { score += 8; rationale.push('press → боковое есть'); }
+      // 26.10.2026: тега 'SidePress' в сплитах нет (боковое живёт в 'Support' и
+      // TableHeavy) — условие держалось только на ветке 'Support'.
+      if (p.schedule.some(s => s.sessionTag === 'Support' || s.sessionTag === 'TableHeavy' || s.sessionTag === 'TableTech')) { score += 8; rationale.push('press → боковое есть'); }
     }
 
     // discipline
@@ -102,11 +104,22 @@ export function rankArmSplits(input: ArmSelectorInput): ArmRankedPattern[] {
     if (discipline === 'hybrid' && p.id === 'hybrid_4_arm_pl') { score += 12; rationale.push('гибрид-сплит'); }
 
     // gripFocus
+    // 26.10.2026 было→стало: бонусы pinch/crush были недостижимы — ни один id сплита
+    // не содержит 'pinch'/'crush' (id: arm_*, grip_3_support, grip_4_mixed, hybrid_*).
+    // Теперь матчинг идёт по МЫШЦАМ сплита (TAG_MUSCLES_ARM), как и вся остальная логика.
     if (input.gripFocus) {
       const gf = input.gripFocus.toLowerCase();
-      if (gf === 'support' && p.id.includes('support')) { score += 8; rationale.push('support хват'); }
-      if (gf === 'pinch' && p.id.includes('pinch')) { score += 8; rationale.push('pinch хват'); }
-      if (gf === 'crush' && p.id.includes('crush')) { score += 8; rationale.push('crush хват'); }
+      const gripMuscles: Record<string, string[]> = {
+        support: ['grip_support'],
+        pinch: ['grip_pinch'],
+        crush: ['grip_crush'],
+        hub: ['grip_pinch'],
+      };
+      const wanted = gripMuscles[gf];
+      if (wanted) {
+        const hasMuscle = p.schedule.some((s) => wanted.some((m) => (TAG_MUSCLES_ARM[s.sessionTag || ''] || []).includes(m)));
+        if (hasMuscle) { score += 8; rationale.push(`${gf} хват`); }
+      }
     }
 
     // weakPoints boost (granular → canonical via lower)
@@ -145,7 +158,9 @@ export function rankArmSplits(input: ArmSelectorInput): ArmRankedPattern[] {
       const freq = muscleFreq(p);
       for (const im of injured) {
         if (freq[im] && freq[im] > 0) { score -= 20; warnings.push(`травма ${im} — сплит нагружает`); }
-        if (im === 'side_pressure' && p.schedule.some(s => s.sessionTag === 'SidePress')) {
+        // 26.10.2026: 'SidePress' не существует как тег сплита — штраф был недостижим.
+        // Боковое давление входит в TAG_MUSCLES_ARM тегов Support/TableHeavy.
+        if (im === 'side_pressure' && p.schedule.some(s => (TAG_MUSCLES_ARM[s.sessionTag || ''] || []).includes('side_pressure'))) {
           score -= 25; warnings.push('side_pressure травма + side сплит');
         }
       }

@@ -49,13 +49,29 @@ describe('arm-pro5 core (P6)', () => {
   it('acwrMultFor: мало данных — 1; danger/caution режут', () => {
     expect(acwrMultFor({}).mult).toBe(1);
     expect(acwrMultFor({}).zone).toBe('none');
-    const mk = (rpe: number, n: number, mins = 60) => Array.from({ length: n }, (_, i) => ({ dateIso: `2026-01-${String(i + 1).padStart(2, '0')}`, srpe: rpe, durationMin: mins }));
-    const danger = acwrMultFor({ diary: [...mk(5, 10), ...mk(13.4, 7)] });
+    // 26.10.2026: подпись теста — окна считаются по ДАТАМ (было: последние 7 записей
+    // массива). Дневник строится последовательными днями, как живой sRPE-лог.
+    const mkFrom = (rpe: number, n: number, startDay: number, mins = 60) => Array.from({ length: n }, (_, i) => {
+      const d = new Date(Date.UTC(2026, 0, startDay + i));
+      return { dateIso: d.toISOString().slice(0, 10), srpe: rpe, durationMin: mins };
+    });
+    const danger = acwrMultFor({ diary: [...mkFrom(5, 10, 1), ...mkFrom(13.4, 7, 11)] });
     expect(danger.zone).toBe('danger');
     expect(danger.mult).toBe(0.65);
-    const caution = acwrMultFor({ diary: [...mk(5, 10), ...mk(10, 7)] });
+    const caution = acwrMultFor({ diary: [...mkFrom(5, 10, 1), ...mkFrom(10, 7, 11)] });
     expect(caution.zone).toBe('caution');
     expect(caution.mult).toBe(0.85);
+  });
+  it('acwrMultFor: правка задним числом НЕ попадает в острую неделю', () => {
+    // 26.10.2026 (регресс P1): запись со старой датой в конце массива раньше считалась
+    // «свежей» → ложный danger. Теперь окно от последней ДАТЫ.
+    const mkFrom = (rpe: number, n: number, startDay: number, mins = 60) => Array.from({ length: n }, (_, i) => {
+      const d = new Date(Date.UTC(2026, 0, startDay + i));
+      return { dateIso: d.toISOString().slice(0, 10), srpe: rpe, durationMin: mins };
+    });
+    const diary = [...mkFrom(6, 20, 1), { dateIso: '2026-01-03', srpe: 18, durationMin: 60 }];
+    const r = acwrMultFor({ diary });
+    expect(r.zone).toBe('ok');
   });
   it('pedHonestyNote: неизвестный id помечается', () => {
     expect(pedHonestyNote(undefined)).toBeNull();
@@ -286,9 +302,13 @@ describe('arm-pro5 builder wiring', () => {
     expect(leg.rationale.some((r: string) => r.includes('legacy correctionPct'))).toBe(true);
   });
   it('ACWR danger режет MRV и пишет строку', () => {
-    const mk = (rpe: number, n: number) => Array.from({ length: n }, (_, i) => ({ dateIso: `2026-02-${String(i + 1).padStart(2, '0')}`, srpe: rpe, durationMin: 60 }));
+    // 26.10.2026: дневник последовательными датами (окна по дням, не по записям)
+    const mk = (rpe: number, n: number, startDay: number) => Array.from({ length: n }, (_, i) => {
+      const d = new Date(Date.UTC(2026, 1, startDay + i));
+      return { dateIso: d.toISOString().slice(0, 10), srpe: rpe, durationMin: 60 };
+    });
     const base: any = buildArmPlan({ ...BASE });
-    const danger: any = buildArmPlan({ ...BASE, diary: [...mk(5, 10), ...mk(13.4, 7)] });
+    const danger: any = buildArmPlan({ ...BASE, diary: [...mk(5, 10, 1), ...mk(13.4, 7, 11)] });
     expect(danger.mrvByMuscle.brachialis).toBeLessThan(base.mrvByMuscle.brachialis);
     expect(danger.rationale.some((r: string) => r.includes('ACWR'))).toBe(true);
   });

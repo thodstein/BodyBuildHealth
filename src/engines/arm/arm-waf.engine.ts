@@ -41,7 +41,11 @@ function classesToInfos(classes: Array<number | 'open'>, bwKg: number): WafClass
   });
 }
 
-/** Возрастной зачёт по полных лет (границы WAF). 70+ → ssgrandmaster70. */
+/**
+ * Возрастной зачёт по полным лет (границы WAF).
+ * 26.10.2026: <14 честно НЕ зачётная группа (WAF Sub-Junior = 14–15): раньше
+ * 12-летнему атлету строилась валидная карточка старта с категорией.
+ */
 export function wafAgeGroupFor(ageYears: number): WafAgeGroup {
   const a = Number.isFinite(ageYears) ? ageYears : 30;
   if (a < 14) return 'subjunior';
@@ -86,6 +90,9 @@ export function wafClassesFor(
     case 'sgrandmaster60':
       return m ? [70, 80, 90, 100, 'open'] : [60, 70, 80, 'open'];
     case 'ssgrandmaster70':
+      // Осознанное упрощение (не менялось): сетка весовых для 70+ в нашем каноне
+      // сведена к Open. Если правила WAF для SSGM зададут весовые — добавлять сюда
+      // by-замеру, не выдумывая (аналог master40/grandmaster50).
       return ['open'];
   }
 }
@@ -130,6 +137,8 @@ export interface WafStartCard {
   entriesCount: number; // 1 или 2 (both = левая+правая отдельно)
   strapNote: string;
   weighInNote: string;
+  /** 26.10.2026: непусто, если возраст вне зачётных групп WAF (<14). */
+  eligibilityNote?: string | null;
 }
 
 /**
@@ -157,12 +166,20 @@ export function buildWafStartCard(input: {
     input.strapExpected === false
       ? 'Ремень не ожидается — хват-упор на containment.'
       : 'Судейский ремень при срыве хвата — добавить strap-сессии (эпик D).';
+  // 26.10.2026 было→стало: ветка «Перевес … (план H)» была недостижима — wafClassFor
+  // ВСЕГДА возвращает первый подходящий класс (fits=true), поэтому текст про сгонку
+  // не показывался никогда. Теперь сгонка считается от ближайшей категории НИЖЕ веса
+  // (wafCutTargetFor) и попадает в ту же строку.
   const weighInNote =
     weightClass.label === 'Open'
-      ? 'Открытая — взвешивание формально, фокус на силу.'
+      ? 'Взвешивание в открытой категории, без потолка.'
       : weightClass.fits
-        ? `Зачёт до ${weightClass.label} кг, запас ${weightClass.deltaKg.toFixed(1)} кг.`
-        : `Перевес ${Math.abs(weightClass.deltaKg).toFixed(1)} кг — нужна сгонка (эпик H).`;
+        ? `Вес до ${weightClass.label} кг, запас ${weightClass.deltaKg.toFixed(1)} кг.${cutTarget ? ` До категории ${cutTarget.label} — сгонка ${Math.abs(cutTarget.deltaKg).toFixed(1)} кг (план H).` : ''}`
+        : `Перевес ${Math.abs(weightClass.deltaKg).toFixed(1)} кг до целой категории (план H).`;
+  // 26.10.2026: честный флаг «не зачётный возраст» (WAF Sub-Junior = 14–15 лет)
+  const eligibilityNote = ageYears < 14
+    ? '⚠ WAF Sub-Junior — 14–15 лет: до 14 лет зачётной категории нет (тренировка/локальные старры).'
+    : null;
   return {
     sex,
     ageYears,
@@ -174,6 +191,7 @@ export function buildWafStartCard(input: {
     entriesCount: arms.length,
     strapNote,
     weighInNote,
+    eligibilityNote,
   };
 }
 

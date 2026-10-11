@@ -7,7 +7,39 @@
  * Чистые функции.
  */
 
+import { localIsoDate } from '../../core/local-date';
+
 export type ArmliftCause = 'technique' | 'max_strength' | 'endurance' | 'volume' | 'mobility' | 'fatigue' | 'pain';
+
+/** Канон RU-лейблов причины (единый источник для хаба/экспорта/лог-ленты). */
+export const ARMLIFT_CAUSE_RU: Record<string, string> = {
+  technique: 'техника',
+  max_strength: 'сила',
+  endurance: 'выносливость',
+  volume: 'объём',
+  mobility: 'мобильность',
+  fatigue: 'щадящая',
+  pain: 'боль (стоп)',
+  // причина диагноза (armlift-diagnosis) — те же лейблы для совместимости
+  asymmetry: 'асимметрия рук',
+  strength: 'сила',
+};
+
+/** Канон RU-лейблов провала мобильности (armlift-mobility.fails). */
+export const ARMLIFT_MOBILITY_FAIL_RU: Record<string, string> = {
+  wrist_ext: 'разгибатели запястья',
+  wrist_flex: 'сгибатели запястья',
+  thumb_opp: 'оппозиция большого пальца',
+};
+
+/** Канон RU-лейблов зоны ACWR (паритет с LMS ACWR_ZONE_META). */
+export const ARMLIFT_ACWR_ZONE_RU: Record<string, string> = {
+  undertrained: 'недогруз',
+  ok: 'норма',
+  caution: 'осторожно',
+  danger: 'опасно',
+  dangerous: 'опасно',
+};
 
 export interface ArmliftCauseInput {
   implement?: string;
@@ -93,7 +125,8 @@ export function countGripSessions(
   try {
     if (!Array.isArray(log)) return null;
     const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - days);
-    const cut = cutoff.toISOString().slice(0, 10);
+    // 26.10.2026: локальная дата (UTC-срез сдвигал окно на сутки в UTC+X)
+    const cut = localIsoDate(cutoff);
     const impl = String(implement || '');
     let n = 0;
     for (const e of log) {
@@ -203,7 +236,8 @@ export function diagnoseArmliftCause(i: ArmliftCauseInput): ArmliftCauseResult {
   }
 
   // MOBILITY: явные ограничения под снаряд.
-  const pinchImpl = ['saxon_bar', 'hub', 'pinch_block', 'anvil', 'grandfather_clock'].includes(String(i.implement || ''));
+  // 26.10.2026: +country_crush (щепковый снаряд — relevantTests=['Pinch-hold'])
+const pinchImpl = ['saxon_bar', 'hub', 'pinch_block', 'anvil', 'grandfather_clock', 'country_crush'].includes(String(i.implement || ''));
   if (pinchImpl && i.thumbStiff) { scores.mobility += 0.55; ev.push('Большой жёсткий на щипковом снаряде'); }
   if (i.wristExtLimited || i.wristFlexLimited) { scores.mobility += 0.45; ev.push('Ограничение запястья режет позицию'); }
   // D13: измеренные ROM-провалы бьют сильнее toggles.

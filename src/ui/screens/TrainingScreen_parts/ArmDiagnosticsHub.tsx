@@ -388,6 +388,10 @@ export const ArmDiagnosticsHub: React.FC = () => {
   const forceVecPro = useMemo(() => estimateForceVector({
     rtKg: state.rtKg ? parseFloat(state.rtKg) : undefined,
     axleKg: state.axleKg ? parseFloat(state.axleKg) : undefined,
+    // 26.10.2026: знаменатель акселя — реальный снаряд замера (Saxon 133 = внутренний
+    // ориентир; Apollon = WR 237.5/137.9). Одно поле «axleKg» на два разных снаряда
+    // давало расхождение %WR между хабом и помостом.
+    axleImplement: (state.axleImpl === 'apollon' ? 'apollon_axle' : 'saxon_bar') as any,
     pinchSec: state.pinchSec ? parseFloat(state.pinchSec) : undefined,
     sideKg: state.sideKg ? parseFloat(state.sideKg) : undefined,
     backKg: state.backKg ? parseFloat(state.backKg) : undefined,
@@ -396,7 +400,7 @@ export const ArmDiagnosticsHub: React.FC = () => {
     bodyWeightKg: bwNum,
     sex: state.sex,
     weightClass: weightClassAuto,
-  } as any), [state.rtKg, state.axleKg, state.pinchSec, state.sideKg, state.backKg, state.leftKg, state.rightKg, bwNum, state.sex, weightClassAuto]);
+  } as any), [state.rtKg, state.axleKg, state.axleImpl, state.pinchSec, state.sideKg, state.backKg, state.leftKg, state.rightKg, bwNum, state.sex, weightClassAuto]);
 
   const angles = useMemo(() => estimateArmAngles({
     elbowDeg: parseFloat(state.elbowDeg) || 110,

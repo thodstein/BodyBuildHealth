@@ -10,6 +10,7 @@ import { getArmLandmarks, isTendonMuscle, TENDON_CAP, MUSCLE_CAP, tendonWeeklyLi
 import { canonicalizeArmMuscle } from './arm-tendon-sets.engine';
 import { computeArmRecoveryMult, computeArmBudget, sessionLimitsForArm, perExerciseCap, computeNutritionMult, tendonBudgetForLevel } from './arm-volume.engine';
 import { ARM_EXERCISES } from '../../core/exercise-catalog-arm';
+import { localIsoDate } from '../../core/local-date';
 import { classifyPed } from '../../data/ped-potency-table';
 import { buildArmSchedule, specializationMrvFactor, specForWeek } from './arm-specialization.engine';
 import { adaptForPEDs } from '../bb/bb-ped-adaptation.engine';
@@ -646,14 +647,24 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
       const isoStart = String((input as any).planStartWeek || '');
       const startOk = /^\d{4}-\d{2}-\d{2}$/.test(isoStart);
       const wOut = startOk ? weeksUntilStart(isoStart, iso) : weeksUntilStart(undefined, iso);
-      if (Number.isFinite(wOut) && wOut >= 1 && wOut <= weeks) {
-        const peakWeek = Math.max(1, Math.min(weeks, Math.round(wOut)));
+      // 26.10.2026 было→стало: weeksUntilStart клампит результат вниз до 1, поэтому
+      // дата в прошлом (=0 или отрицательная) давала «пик на неделе 1» — план строил
+      // тейпер на первую неделю, а ветка «вне окна плана» была недостижима для прошлого.
+      const anchorMs = Date.parse(`${startOk ? isoStart : localIsoDate()}T00:00:00Z`);
+      const startMs = Date.parse(`${iso}T00:00:00Z`);
+      const rawWeeks = Number.isFinite(anchorMs) && Number.isFinite(startMs) && startMs >= anchorMs
+        ? Math.ceil((startMs - anchorMs) / (7 * 86400000))
+        : 0;
+      if (rawWeeks >= 1 && rawWeeks <= weeks) {
+        const peakWeek = Math.max(1, Math.min(weeks, Math.round(rawWeeks)));
         const raw = String((input as any).calPriority || 'A').toUpperCase();
         const prio = (raw === 'A' || raw === 'B' || raw === 'C' ? raw : 'A') as 'A' | 'B' | 'C';
         peaksInput = [{ week: peakWeek, priority: prio, name: 'Старт из даты' }];
-        autoPeakNote = `🏁 Старт из даты ${iso}: авто-пик Н${peakWeek} (${prio}, ${wOut} нед от ${startOk ? 'начала плана' : 'сегодня'}) — тейпер-окно и восстановление построены.`;
+        autoPeakNote = `🏁 Старт из даты ${iso}: авто-пик Н${peakWeek} (${prio}, ${rawWeeks} нед от ${startOk ? 'начала плана' : 'сегодня'}) — тейпер-окно и восстановление построены.`;
       } else if (Number.isFinite(wOut)) {
-        autoPeakNote = `🏁 Дата старта ${iso} вне окна плана (${wOut} нед) — авто-пик не строился, только гейты готовности.`;
+        autoPeakNote = rawWeeks === 0
+          ? `🏁 Дата старта ${iso} уже прошла — авто-пик не строится, только гейты готовности.`
+          : `🏁 Дата старта ${iso} вне окна плана (${rawWeeks} нед) — авто-пик не строился, только гейты готовности.`;
       }
     }
   } catch { autoPeakNote = null; }
@@ -985,7 +996,7 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
         exercises.push({
           muscle: mus as any,
           name: exTpl.name,
-          role: 'primary',
+          role,
           character: effCh,
           sets: finalSets,
           repsRange: repsFinal,

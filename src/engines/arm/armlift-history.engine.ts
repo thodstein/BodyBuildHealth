@@ -25,6 +25,8 @@ export interface ArmliftRetestResult {
   text: string;
 }
 
+import { localIsoDate } from '../../core/local-date';
+
 const HISTORY_KEY = 'he_armlifting_diag_history';
 const HISTORY_CAP = 12;
 
@@ -34,7 +36,8 @@ function num(v: unknown): number | null {
 }
 
 export function saveDiagSnapshot(s: ArmliftDiagSnapshot): ArmliftDiagSnapshot[] {
-  const next = [...loadDiagHistory(), { ...s, date: s.date || new Date().toISOString().slice(0, 10) }].slice(-HISTORY_CAP);
+  // 26.10.2026: локальная дата (UTC давал «вчера» в вечерние часы UTC+X)
+  const next = [...loadDiagHistory(), { ...s, date: s.date || localIsoDate() }].slice(-HISTORY_CAP);
   try { localStorage.setItem(HISTORY_KEY, JSON.stringify(next)); } catch { /* noop */ }
   return next;
 }
@@ -53,7 +56,10 @@ export function loadDiagHistory(): ArmliftDiagSnapshot[] {
 }
 
 export function lastSnapshotFor(implement: string, excludeToday = true): ArmliftDiagSnapshot | null {
-  const today = new Date().toISOString().slice(0, 10);
+  // 26.10.2026: локальная дата — снапшот пишется localIsoDate(); в UTC+X утром
+  // UTC-«сегодня» было вчера, и «исключить сегодня» не исключало ничего →
+  // повторный ретест сразу после сохранения выдавал «Держится».
+  const today = localIsoDate();
   const list = loadDiagHistory().filter((s) => s.implement === implement && (!excludeToday || s.date !== today));
   return list.length ? list[list.length - 1] : null;
 }

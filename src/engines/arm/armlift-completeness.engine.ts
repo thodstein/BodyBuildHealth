@@ -28,7 +28,10 @@ function testCovered(test: string, i: ArmliftCompletenessInput): boolean {
   const pos = (v: number | null | undefined): boolean => v != null && Number.isFinite(v) && v > 0;
   if (test === 'Pinch-hold') return pos(i.pinchHoldSec);
   if (test === 'Farmer-hold') return pos(i.farmerHoldSec);
-  if (test === 'CoC') return i.cocLevel != null && Number.isFinite(i.cocLevel) && (i.cocLevel as number) >= 0;
+  // 26.10.2026 было→стало: CoC ≥0 считал «Trainer» (уровень 0) закрытым тестом —
+  // полнота диагностики получала +40% без реального замера. Теперь строго >0,
+  // как у всех остальных тестов.
+  if (test === 'CoC') return i.cocLevel != null && Number.isFinite(i.cocLevel) && (i.cocLevel as number) > 0;
   if (test === 'Silver') return pos(i.silverSec);
   return false;
 }

@@ -3,6 +3,7 @@ import { buildArmPlan } from '../arm-builder.engine';
 import { finalizeArmPlan } from '../arm-finalize.engine';
 import { validateArmPlan } from '../arm-validator.engine';
 import { ARM_SPLIT_PATTERNS } from '../arm-split-patterns';
+import { sessionLimitsForArm } from '../arm-volume.engine';
 
 describe('arm-matrix 576 PRO', () => {
   const levels = ['beginner','intermediate','advanced','enhanced'] as const;
@@ -55,12 +56,17 @@ describe('arm-matrix 576 PRO', () => {
     }
   });
 
-  it('session limit ≤8 enhanced, ≤6 natural', () => {
+  it('session limit: канон sessionLimitsForArm (≤8 enhanced, ≤6 natural, TableTech 7)', () => {
+    // 26.10.2026 было→стало: хардкод «enhanced 8 / natural 6» отменял исключение
+    // TableTech (7 мышц, PRO F) и жёсткие капы армлифтинга (5/6). Единый источник.
     for (const lvl of ['intermediate','enhanced'] as const) for (const pat of [ARM_SPLIT_PATTERNS.find(p=>p.id==='arm_5_specialized')!]) {
       let plan: any = buildArmPlan({ discipline:'armwrestling', patternId: pat.id, level: lvl, goal:'strength', technique:'balanced', weeks:2 });
       plan = finalizeArmPlan(plan, { level: lvl });
-      const cap = lvl==='enhanced' ? 8 : 6;
-      for (const wk of plan.weeks) for (const sess of wk.sessions) expect(sess.exercises.length).toBeLessThanOrEqual(cap);
+      for (const wk of plan.weeks) for (const sess of wk.sessions) {
+        const cap = sessionLimitsForArm({ level: lvl, discipline: 'armwrestling', sessionTag: sess.sessionTag }).maxExercises;
+        expect(sess.exercises.length).toBeLessThanOrEqual(cap);
+        expect(cap).toBeLessThanOrEqual(lvl === 'enhanced' ? 8 : 7);
+      }
     }
   });
 });

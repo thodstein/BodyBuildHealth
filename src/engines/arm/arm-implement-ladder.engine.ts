@@ -25,7 +25,7 @@ export const IMPLEMENT_LADDER: LadderRung[] = [
 export const LADDER_RU: Record<LadderRung, string> = {
   fat_gripz: 'Fat Gripz (стартер)',
   rolling_thunder: 'Rolling Thunder 60мм',
-  apollon_axle: 'Apollon Axle 58мм',
+  apollon_axle: 'Apollon Axle 2″ (51 мм)',
   saxon_bar: 'Saxon Bar 3"',
   pinch_block: 'Pinch Block',
   hub: 'IronMind Hub',

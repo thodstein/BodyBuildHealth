@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { buildArmPlan } from '../arm-builder.engine';
 import { finalizeArmPlan } from '../arm-finalize.engine';
 import { ARM_SPLIT_PATTERNS } from '../arm-split-patterns';
+import { sessionLimitsForArm } from '../arm-volume.engine';
 
 describe('arm-builder', () => {
   const base = { discipline: 'armwrestling' as const, patternId: 'arm_3_full', level: 'intermediate', goal: 'strength' as const, technique: 'balanced' as const, weeks: 4 };
@@ -62,10 +63,15 @@ describe('arm-builder', () => {
       }
     }
   });
-  it('session limit ≤6 для natural', () => {
+  it('session limit: канон sessionLimitsForArm (natural/армлифтинг/TableTech)', () => {
+    // 26.10.2026 было→стало: тест держал хардкод 6, а финализатор резал TableTech
+    // (7 мышц — PRO F) до него же. Теперь единый источник в обе стороны.
     let p: any = buildArmPlan({ ...base, weeks: 2, patternId: 'arm_5_specialized' });
     p = finalizeArmPlan(p, { level: 'intermediate' });
-    for (const wk of p.weeks) for (const sess of wk.sessions) expect(sess.exercises.length).toBeLessThanOrEqual(6);
+    for (const wk of p.weeks) for (const sess of wk.sessions) {
+      const cap = sessionLimitsForArm({ level: 'intermediate', discipline: 'armwrestling', sessionTag: sess.sessionTag }).maxExercises;
+      expect(sess.exercises.length).toBeLessThanOrEqual(cap);
+    }
   });
   it('armlifting — нет pronators в чистом grip', () => {
     const p = buildArmPlan({ discipline: 'armlifting', patternId: 'grip_3_support', level: 'intermediate', goal: 'strength', technique: 'balanced', weeks: 2 });

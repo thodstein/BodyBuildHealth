@@ -22,10 +22,14 @@ describe('arm-diagnostics-hub PRO (механизм-ориентированна
     expect(r.findings.find(f=>f.text.includes('Table sessions'))!.level).toBe('warn');
   });
   it('tendon → суставной finding', () => {
+    // 26.10.2026 было→стало: critical-ветка (>22) была недостижима — хаб клэмпит
+    // ввод в 22, т.е. из UI «критик» никогда не показывался. Новый порог 18
+    // достижим и соответствует недельному капу 22/18/12 из checkTendonGuard.
     const r = buildArmDiagnosticsReport({ weakTest:{}, grip:{}, level:'intermediate', technique:'balanced', tableSessions:2, totalSessions:4, tendonSets:20 });
     const tf = r.findings.find(f=>f.text.includes('Tendon'));
     expect(tf).toBeTruthy();
     expect(['warn','critical']).toContain(tf!.level);
+    expect(tf!.level).toBe('critical');
   });
   it('механизм-ориентированные риски есть, общего score нет', () => {
     const r = buildArmDiagnosticsReport({ weakTest:{cupFails:true, pronationFails:true, sidePressureFails:true}, grip:{rtKg:30}, level:'beginner', technique:'hook', tableSessions:0, totalSessions:4, tendonSets:20 });

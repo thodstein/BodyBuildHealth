@@ -122,11 +122,11 @@ export function perExerciseCap(muscle: string, level?: string): number {
   if (muscle === 'side_pressure') return 3; // humerus guard
   if (muscle === 'thumb' || muscle === 'risers') return 4;
   if (muscle === 'grip_pinch' || muscle === 'grip_crush' || muscle === 'grip_support') {
-    // хват — отдельные капы: support 5, pinch/crush 4 (hub отдельно)
+    // хват — отдельные капы: support 5 (enhanced 6), pinch/crush 4 (pinch enhanced 5)
     if (muscle === 'grip_support') return (level || '').toLowerCase() === 'enhanced' ? 6 : 5;
+    if (muscle === 'grip_pinch') return (level || '').toLowerCase() === 'enhanced' ? 5 : 4;
     return 4;
   }
-  if (muscle === 'grip_pinch' && (level || '').toLowerCase() === 'enhanced') return 5;
   const lvl = (level || '').toLowerCase();
   if (lvl === 'enhanced') return 6;
   return 5;

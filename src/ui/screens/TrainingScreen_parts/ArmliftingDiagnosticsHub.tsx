@@ -26,7 +26,7 @@ import { assessArmliftPainMap, ARMLIFT_PAIN_ZONES, type ArmliftPainZone } from '
 import { analyzeArmliftVideo } from '../../../engines/arm/armlift-video-flags.engine';
 import { planArmliftAttempts } from '../../../engines/arm/armlift-attempt-plan.engine';
 import { diagnoseArmlift, ARMLIFT_WEAK_LINK_SHORT_RU } from '../../../engines/arm/armlift-diagnosis.engine';
-import { diagnoseArmliftCause, countGripSessions, flexExtRatio } from '../../../engines/arm/armlift-cause.engine';
+import { diagnoseArmliftCause, countGripSessions, flexExtRatio, ARMLIFT_CAUSE_RU, ARMLIFT_MOBILITY_FAIL_RU, ARMLIFT_ACWR_ZONE_RU } from '../../../engines/arm/armlift-cause.engine';
 import { benchmarkPinchHold, benchmarkFarmerHold, benchmarkCoc, benchmarkSilverHold, overallGripLevel, ARMLIFT_LEVEL_RU, testProtocolFor } from '../../../engines/arm/armlift-benchmarks.engine';
 import { saveDiagSnapshot, lastSnapshotFor, retestVerdict, weeksBetween, loadDiagHistory, clearDiagHistory, historyDeltaFor, completenessTrend } from '../../../engines/arm/armlift-history.engine';
 import { assessArmliftMobility } from '../../../engines/arm/armlift-mobility.engine';
@@ -694,7 +694,10 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
         setTimeout(() => setToast(''), 2500);
         return;
       }
-      setToast(`✓ Годовой overlay: ${weeks.length} нед → недели года`);
+      // 26.10.2026 было→стало: тост обещал «в недели года», но he_armlift_annual_sync_v1
+      // не читает ни один прод-потребитель (годовой план свой) — фича была no-op.
+      // Теперь честно: снапшот сохранён для переноса (ручной/внешний перенос).
+      setToast(`✓ Годовой overlay: ${weeks.length} нед сохранено снапшотом (старт Н${parseInt(state.annualStartWeek) || 1}) — перенесите вручную в годовой план`);
       setTimeout(() => setToast(''), 2500);
     } catch { /* noop */ }
   };
@@ -958,7 +961,7 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
                   variant="amber" block hero
                   onClick={() => { setD({ implement: target, failurePoint: '', faultIds: [] }); setTab('diag'); }}
                 >
-                  → Диагностировать слабейший: {target}
+                  → Диагностировать слабейший: {(ARMLIFT_DIAG_IMPLEMENT_OPTS.find((o) => o.id === target)?.label) || target}
                 </AdBtn>
               </AdCta>
             );
@@ -1078,6 +1081,11 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
             <LiftNum label="Ладонь см" value={diag.handPalmCm} onChange={(v) => setD({ handPalmCm: v })} placeholder="19" aria="Ладонь см" />
             <LiftNum label="Большой см" value={diag.handThumbCm} onChange={(v) => setD({ handThumbCm: v })} placeholder="12" aria="Большой палец см" />
             <LiftNum label="Холд 70% сек" value={relevantTestsFor(diag.implement).includes('Pinch-hold') ? diag.pinchSubSec : diag.farmerSubSec} onChange={(v) => setD(relevantTestsFor(diag.implement).includes('Pinch-hold') ? { pinchSubSec: v } : { farmerSubSec: v })} placeholder="60" aria="Холд 70 процентов сек" />
+            {/* 26.10.2026: у медли релевантны ОБА холда (Pinch + Farmer), но поля было
+                одно — farmer-холд некуда ввести, а кривая его не видела. Добавлено второе. */}
+            {relevantTestsFor(diag.implement).includes('Pinch-hold') && relevantTestsFor(diag.implement).includes('Farmer-hold') && (
+              <LiftNum label="Farmer-холд 70% сек" value={diag.farmerSubSec} onChange={(v) => setD({ farmerSubSec: v })} placeholder="60" aria="Farmer холд 70 процентов сек" />
+            )}
           </AdGrid>
           <div className="ad-muted" data-arm="lift-hand">{hand.handNote}</div>
           {holdCurve && <div className="ad-muted" data-arm="lift-hold-curve">Кривая: {holdCurve.note}</div>}
@@ -1107,7 +1115,7 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
               {diagHistory.slice(-5).reverse().map((s, idx) => (
                 <div key={`${s.date}-${s.implement}-${idx}`} className="ad-row">
                   <span>{s.date} · {s.implement}</span>
-                  <span className="ad-muted">{s.weakLink} / {s.cause}</span>
+                  <span className="ad-muted">{ARMLIFT_WEAK_LINK_SHORT_RU[s.weakLink as keyof typeof ARMLIFT_WEAK_LINK_SHORT_RU] || s.weakLink} / {ARMLIFT_CAUSE_RU[s.cause] || s.cause}</span>
                 </div>
               ))}
               <AdBtn variant="ghost" onClick={() => { clearDiagHistory(); setHistTick((x) => x + 1); }}>✕ Очистить историю</AdBtn>
@@ -1121,7 +1129,7 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
           <div className="ad-row" aria-label="Диагностика: мобильность">
             <AdChip active={diag.thumbOppOk} onClick={() => setD({ thumbOppOk: !diag.thumbOppOk })}>{diag.thumbOppOk ? '✓ Большой достаёт до мизинца' : 'Большой до мизинца: проверить'}</AdChip>
             <AdChip active={diag.hipHingePoor} onClick={() => setD({ hipHingePoor: !diag.hipHingePoor })}>Hip hinge слабый</AdChip>
-            {mobility.fails.length > 0 && <span className="ad-tag">ROM-провал: {mobility.fails.join(', ')} · ретест через 2 нед</span>}
+            {mobility.fails.length > 0 && <span className="ad-tag">ROM-провал: {mobility.fails.map((f: string) => ARMLIFT_MOBILITY_FAIL_RU[f] || f).join(', ')} · ретест через 2 нед</span>}
           </div>
           <div className="ad-row">
             <AdChip active={diag.pain} tone={diag.pain ? 'red' : undefined} onClick={() => setD({ pain: !diag.pain })}>{diag.pain ? '🔴 Боль есть — стоп' : 'Боли нет'}</AdChip>
@@ -1129,7 +1137,7 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
             <AdChip active={diag.skinTear} tone={diag.skinTear ? 'red' : undefined} onClick={() => setD({ skinTear: !diag.skinTear })}>{diag.skinTear ? '🔴 Сорвана кожа — щипок стоп' : 'Кожа цела'}</AdChip>
             <AdChip active={diag.thumbWebPain} tone={diag.thumbWebPain ? 'red' : undefined} onClick={() => setD({ thumbWebPain: !diag.thumbWebPain })}>{diag.thumbWebPain ? '🔴 Перепонка болит' : 'Перепонка в норме'}</AdChip>
             {logStats.sessions28d != null && <span className="ad-tag">Журнал: {logStats.sessions28d} хват-сессий/28д</span>}
-            {acwr && <span className="ad-tag">ACWR {acwr.ratio} ({acwr.zone})</span>}
+            {acwr && <span className="ad-tag">ACWR {acwr.ratio} ({ARMLIFT_ACWR_ZONE_RU[acwr.zone] || acwr.zone})</span>}
           </div>
           <div className="lift-group">Карта боли (где — что разгрузить)</div>
           <div className="ad-row" aria-label="Диагностика: карта боли">
@@ -1170,7 +1178,7 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
           <div data-arm="lift-completeness" aria-label="Диагностика: полнота">
             Полнота диагностики: {completeness.pct}%{completeness.missing.length > 0 ? ` — довбей: ${completeness.missing.join(', ')}` : ' — вердикт честный'}
           </div>
-          <div data-arm="lift-diag-result"><b>{diagnosis.title}</b> · {cause.cause} ({Math.round(cause.confidence * 100)}%)</div>
+          <div data-arm="lift-diag-result"><b>{diagnosis.title}</b> · {ARMLIFT_CAUSE_RU[cause.cause] || cause.cause} ({Math.round(cause.confidence * 100)}%)</div>
           <div className="ad-muted">Факты: {cause.evidence.join(' · ')}</div>
           <div className="ad-muted">Чинить: {cause.fix} · {diagnosis.cues.join(' · ')}</div>
           <div className="ad-muted">{diagnosis.ruleNote}</div>
@@ -1208,7 +1216,7 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
       {tab === 'corr' && (<>
       <AdCard>
         <AdSec title="🔧 Коррекция" defaultOpen summary={`выбор снаряда → причина → методы с выбором упражнения`}>
-          <div data-arm="lift-corr-result"><b>{diagnosis.title}</b> · причина {cause.cause} ({Math.round(cause.confidence * 100)}%)</div>
+          <div data-arm="lift-corr-result"><b>{diagnosis.title}</b> · причина {ARMLIFT_CAUSE_RU[cause.cause] || cause.cause} ({Math.round(cause.confidence * 100)}%)</div>
           <div className="ad-muted">Чинить: {cause.fix}</div>
           <div className="ad-muted" data-arm="lift-corr-why">Почему: {cause.evidence.join(' · ')}</div>
           <div className="ad-list" data-arm="lift-corr-top">

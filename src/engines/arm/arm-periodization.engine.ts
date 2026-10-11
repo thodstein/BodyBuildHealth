@@ -176,6 +176,8 @@ export function planArmPeaks(
     windows: [], phaseOverrides: {}, volumeOverrides: {}, rirOverrides: {},
     taperWeeks: [], recoveryWeeks: [], markers: {}, notes: [],
   };
+  // 26.10.2026: пустой цикл (только комментарий внутри, 0 эффекта) удалён —
+  // поведение плана не менялось, убран мёртвый код.
   if (!Array.isArray(peaks) || peaks.length === 0 || weeks <= 0) return runtime;
   const seen = new Set<number>();
   const sorted = peaks
@@ -234,13 +236,6 @@ export function planArmPeaks(
     }
   }
   // Отметить фазу пика только если неделя не была разгрузкой естественного хвоста
-  // (иначе перезапись phaseMap уже верна и повторная установка не нужна).
-  for (const w of Object.keys(runtime.phaseOverrides)) {
-    const wk = Number(w);
-    if (runtime.phaseOverrides[wk] === 'peaking' && String(phaseMap[wk] || '') === 'deload') {
-      // старт стоит на запланированной разгрузке — оставляем фазу разгрузки, объём и так снижен
-    }
-  }
   return runtime;
 }
 

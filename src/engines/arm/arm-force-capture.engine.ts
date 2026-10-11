@@ -3,6 +3,8 @@
  * PRO: grip force (RT/Axle/Pinch) + table force (side/back), векторы, сравнение с нормами.
  */
 import { GRIP_IMPLEMENTS } from './arm-grip.engine';
+import { localIsoDate } from '../../core/local-date';
+import { platformWrFor, platformIsInternal } from './arm-platform.engine';
 
 export interface GripForceRecord {
   rtKg?: number;
@@ -31,7 +33,11 @@ export const RT_WORLD_CLASS_M = 130.5; // Tyukalov 2013, IronMind WR
 export const RT_WORLD_CLASS_F = 77.2; // Gaiduchenko 2012
 const RT_WORLD_CLASS = RT_WORLD_CLASS_M; // backward compat
 const RT_AVG = 55;
-const AXLE_WORLD_CLASS = 133; // ArmliftingUSA Saxon/Apollon ~133 inspir., оценка (Axle тяжелее RT но без вращения)
+// 26.10.2026: AXLE_WORLD_CLASS удалён как второй знаменатель акселя — единый
+// канон platformWrFor('apollon_axle'|'saxon_bar', sex). Оставлен экспортом с
+// @deprecated-пометкой (внешние потребители/тесты не ломались).
+/** @deprecated знаменатель акселя — используйте platformWrFor(implement, sex). */
+export const AXLE_WORLD_CLASS = 237.5; // Apollon's Axle WR, IronMind 2022
 const PINCH_GOOD_SEC = 15; // 15с = хорошо (15с hold = 100%)
 
 // Wave-1 Э1.5: экспорт `WAF_WEIGHT_CLASSES` УДАЛЁН — это была третья копия весовых классов
@@ -61,13 +67,21 @@ export function getBackRef(bwKg: number): number {
 }
 
 export function recordGripForce(r: GripForceRecord): GripForceRecord {
-  return { ...r, dateIso: r.dateIso || new Date().toISOString().slice(0, 10) };
+  // 26.10.2026: локальная дата (UTC давал «вчера» в вечерние часы UTC+X)
+  return { ...r, dateIso: r.dateIso || localIsoDate() };
 }
 
-export function estimateForceVector(r: GripForceRecord & { bodyWeightKg?: number; sex?: string; weightClass?: string; leftKg?: number; rightKg?: number }): ForceVector {
+export function estimateForceVector(r: GripForceRecord & { bodyWeightKg?: number; sex?: string; weightClass?: string; leftKg?: number; rightKg?: number; axleImplement?: string }): ForceVector {
   const wc = (r.weightClass || '').toString();
   const world = getRtWorldClass(r.sex);
-  const gripSupport = r.rtKg != null ? Math.max(0, Math.min(100, ((r.rtKg - RT_AVG) / (world - RT_AVG)) * 50 + 50)) : r.axleKg != null ? Math.max(0, Math.min(100, (r.axleKg / AXLE_WORLD_CLASS) * 100)) : 0;
+  // 26.10.2026 было→стало: axle считался от Saxon-ориентира 133, тогда как хаб
+  // армлифтинга и помост дают %WR от IronMind Apollon (237.5 M / 137.9 F) — один и
+  // тот же результат получал две разные оценки «world class» (90 vs 50).
+  // Теперь знаменатель берётся из общего канона platformWrFor (Apollon WR, Saxon 133).
+  const axleImpl = String(r.axleImplement || 'apollon_axle');
+  const axleWorld = platformWrFor(axleImpl, r.sex || 'male');
+  const axleInternal = platformIsInternal(axleImpl);
+  const gripSupport = r.rtKg != null ? Math.max(0, Math.min(100, ((r.rtKg - RT_AVG) / (world - RT_AVG)) * 50 + 50)) : r.axleKg != null ? Math.max(0, Math.min(100, (r.axleKg / axleWorld) * 100)) : 0;
   const gripPinch = r.pinchSec != null ? Math.max(0, Math.min(100, (r.pinchSec / PINCH_GOOD_SEC) * 100)) : r.pinchKg != null ? Math.max(0, Math.min(100, (r.pinchKg / 30) * 100)) : 0;
   const bw = r.bodyWeightKg && r.bodyWeightKg > 30 ? r.bodyWeightKg : 80;
   const sideRef = getSideRef(bw, wc);

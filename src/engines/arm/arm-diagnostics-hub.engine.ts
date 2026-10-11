@@ -117,8 +117,10 @@ export function buildArmDiagnosticsReport(input: {
   if (tableRatio < 0.3) findings.push({ level: 'warn', text: `Table sessions ${(tableRatio*100).toFixed(0)}% <30% — для армрестлинга мало стола (Кузнецов VIII ≥50%)`, exercise: 'table_pushdown_iso' });
   else if (tableRatio >= 0.5) findings.push({ level: 'ok', text: `Table sessions ${(tableRatio*100).toFixed(0)}% ≥50% — норма`, exercise: 'table_pushdown_iso' });
 
+// 26.10.2026 было→стало: порог critical >22 был недостижим — хаб клэмпит тендон-сеты в 22, т.е. из UI ветка невыла никогда.
+// Ковый порог 18 достижим из хаба (кап тендона для Л\П
   // Tendon — сустав/сухожилие риск
-  if (input.tendonSets > 22) findings.push({ level: 'critical', text: `Tendon ${input.tendonSets} >22 — CRITICAL (кап 22)`, exercise: 'wrist_ext_bb' });
+  if (input.tendonSets >= 18) findings.push({ level: 'critical', text: `Tendon ${input.tendonSets} ≥ 18 — CRITICAL (кап 18 для Л/П, выше выше)`, exercise: 'wrist_ext_bb' });
   else if (input.tendonSets > 18) findings.push({ level: 'warn', text: `Tendon сетов ${input.tendonSets} >18 — риск`, exercise: 'pronation_pulses' });
   else if (input.level === 'beginner' && input.tendonSets > 12) findings.push({ level: 'warn', text: `Tendon ${input.tendonSets} >12 для beginner — много`, exercise: 'wrist_ext_bb' });
   else findings.push({ level: 'ok', text: `Tendon ${input.tendonSets} — в допуске`, exercise: 'wrist_ext_bb' });

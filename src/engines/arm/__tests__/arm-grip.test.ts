@@ -9,9 +9,11 @@ describe('arm-grip', () => {
     expect(rt.allowedGrips).toEqual(['DOH']);
     expect(rt.strapsAllowed).toBe(false);
   });
-  it('Axle 58mm DOH no straps', () => {
+  it('Axle 51mm (2") DOH no straps', () => {
+    // 26.10.2026 было→стало: диаметр Apollon's Axle был 58 мм. IronMind: «two-inch
+    // diameter bar between the inside collars» = 51 мм (историческая ось Uni 1.93″).
     const ax = GRIP_IMPLEMENTS.apollon_axle;
-    expect(ax.diameterMm).toBe(58);
+    expect(ax.diameterMm).toBe(51);
     expect(ax.strapsAllowed).toBe(false);
   });
   it('Saxon pinch', () => {

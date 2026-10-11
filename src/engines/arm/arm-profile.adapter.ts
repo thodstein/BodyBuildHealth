@@ -10,6 +10,7 @@ export interface ArmProfileSnapshot {
   sleepHours?: number;
   stressLevel?: number;
   level?: ArmLevel;
+  sex?: 'male' | 'female';
   workMax: Record<string, number>;
   equipment: string[];
   injuries: ArmInjury[];
@@ -101,6 +102,8 @@ export function armProfileSnapshot(profile: UserProfile | null | undefined): Arm
   const rawLevel = String(training.level || p.trainingLevel || '').toLowerCase();
   const level = ['beginner', 'intermediate', 'advanced', 'enhanced'].includes(rawLevel) ? rawLevel as ArmLevel : undefined;
   const mobilityRestrictions = stringArray(health.mobilityRestrictions, training.mobilityRestrictions, p.mobilityRestrictions);
+  const rawSex = String(personal.sex || p.sex || '').toLowerCase();
+  const sex = rawSex === 'female' ? 'female' as const : rawSex === 'male' ? 'male' as const : undefined;
   return {
     ageYears: numberValue(personal.age, p.age),
     bodyWeightKg: numberValue(personal.weight, p.weight),
@@ -110,6 +113,7 @@ export function armProfileSnapshot(profile: UserProfile | null | undefined): Arm
     sleepHours: numberValue(lifestyle.sleepHours, p.sleepHours),
     stressLevel: numberValue(lifestyle.stressLevel, p.stressLevel),
     level,
+    sex,
     workMax,
     equipment: stringArray(training.equipment, p.equipment),
     injuries,

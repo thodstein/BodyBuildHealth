@@ -17,11 +17,18 @@ describe('arm TOP T7 L/R + Table-IQ', () => {
     expect(s.weakSets).toBe(12); // 10×1.15=11.5→12
     expect(s.weakFreq).toBe(1);
   });
-  it('≥12% — слабая +25% 2×/нед, кап MRV', () => {
+  it('≥12% — слабая +25% 2×/нед, честный кап MRV по СУММЕ рук', () => {
+    // 26.10.2026 было→стало: withinMrv проверял только слабую руку (всегда true —
+    // weakSets уже клампнуло). Теперь честно сумма слабой+сильной против MRV: при
+    // базе 10/10 и MRV 12 план перебирает и говорит об этом, а не «MRV соблюдён».
     const s = planLrSplit({ leftKg: 80, rightKg: 100, baseSets: 10, mrvSets: 12 });
-    expect(s.weakSets).toBe(12); // 12.5→кап 12
-    expect(s.withinMrv).toBe(true);
-    expect(s.note).toMatch(/CRITICAL/);
+    expect(s.weakSets).toBe(12); // 12.5→12
+    expect(s.weakSets + s.strongSets).toBeGreaterThan(12);
+    expect(s.withinMrv).toBe(false);
+    expect(s.note).toMatch(/ПРЕВЫШАЕТ/);
+    const ok = planLrSplit({ leftKg: 80, rightKg: 100, baseSets: 4, mrvSets: 40 });
+    expect(ok.withinMrv).toBe(true);
+    expect(ok.note).toMatch(/CRITICAL/);
   });
   it('Table-IQ: фолы и срывы дают рычаги', () => {
     const iq = analyzeTableIq({ bouts: [{ fouls: 2, slip: true, strap: true, centerHoldSec: 3, win: false, finishSec: 20 }, { fouls: 1, win: true, centerHoldSec: 8, finishSec: 8 }] });
