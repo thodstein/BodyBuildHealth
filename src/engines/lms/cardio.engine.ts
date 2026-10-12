@@ -3440,16 +3440,51 @@ export interface CardioSessionPhase {
   hrZone?: { min?: number; max?: number };
 }
 
+/** Формат длительности интервала: сек für <60, иначе минуты. */
+function fmtSec(sec: number): string {
+  if (!(sec > 0)) return '—';
+  if (sec < 60) return `${Math.round(sec)} сек`;
+  const m = Math.round(sec / 60);
+  return `${m} мин`;
+}
+
 /** Фазы сессии по типу: разминка / основная / заминка с минутами и пульсом. */
-export function cardioSessionProtocol(session: Pick<CardioSession, 'type' | 'durationMin'>, zones?: HeartZone[]): CardioSessionPhase[] {
+export function cardioSessionProtocol(session: Pick<CardioSession, 'type' | 'durationMin' | 'structured'>, zones?: HeartZone[]): CardioSessionPhase[] {
   const dur = Math.max(10, session.durationMin);
   const z = (idx: number) => zones?.[idx];
+  // PRO (аудит Oct 2026): структура интервалов берётся из единого источника
+  // `buildStructuredIntervals` (или из готовой структуры сессии-пресета) —
+  // раньше подпись была hardcoded «30 сек работа / 90 сек отдых», что врало
+  // про реальную математику 60/90 и не видело структуру пресета.
+  const blocks = session.structured && session.structured.length > 0
+    ? session.structured
+    : buildStructuredIntervals(session as CardioSession, zones);
+  const intervalNote = (fallbackIdx: number): { note: string; zone?: { min?: number; max?: number } } => {
+    const b = blocks[0];
+    if (b) {
+      return {
+        note: `${b.reps}×${fmtSec(b.workSec)} работа / ${fmtSec(b.restSec)} отдых (${b.note || 'интервалы'})`,
+        zone: b.targetHr ?? (z(fallbackIdx) ? { min: z(fallbackIdx)!.bpmMin, max: z(fallbackIdx)!.bpmMax } : undefined),
+      };
+    }
+    return { note: 'Интервалы в целевом диапазоне', zone: z(fallbackIdx) ? { min: z(fallbackIdx)!.bpmMin, max: z(fallbackIdx)!.bpmMax } : undefined };
+  };
   switch (session.type) {
     case 'hiit': {
       const work = Math.max(5, dur - 10);
+      const iv = intervalNote(3);
       return [
         { name: 'Разминка', minutes: 5, note: 'Лёгкий темп, плавное повышение пульса', hrZone: z(0) ? { min: z(0)!.bpmMin, max: z(0)!.bpmMax } : undefined },
-        { name: 'Интервалы', minutes: work, note: '30 сек работа / 90 сек отдых (Z4 → Z1)', hrZone: z(3) ? { min: z(3)!.bpmMin, max: z(3)!.bpmMax } : undefined },
+        { name: 'Интервалы', minutes: work, note: iv.note, hrZone: iv.zone },
+        { name: 'Заминка', minutes: 5, note: 'Лёгкий темп до восстановления пульса', hrZone: z(0) ? { min: z(0)!.bpmMin, max: z(0)!.bpmMax } : undefined },
+      ];
+    }
+    case 'miss': {
+      const work = Math.max(5, dur - 10);
+      const iv = intervalNote(2);
+      return [
+        { name: 'Разминка', minutes: 5, note: 'Лёгкий темп, плавное повышение пульса', hrZone: z(0) ? { min: z(0)!.bpmMin, max: z(0)!.bpmMax } : undefined },
+        { name: 'Темповые отрезки', minutes: work, note: iv.note, hrZone: iv.zone },
         { name: 'Заминка', minutes: 5, note: 'Лёгкий темп до восстановления пульса', hrZone: z(0) ? { min: z(0)!.bpmMin, max: z(0)!.bpmMax } : undefined },
       ];
     }
@@ -3462,10 +3497,9 @@ export function cardioSessionProtocol(session: Pick<CardioSession, 'type' | 'dur
     }
     default: {
       const main = Math.max(5, dur - 10);
-      const isMiss = session.type === 'miss';
       return [
         { name: 'Разминка', minutes: 5, note: 'Лёгкий темп, подготовка к работе', hrZone: z(0) ? { min: z(0)!.bpmMin, max: z(0)!.bpmMax } : undefined },
-        { name: 'Основная', minutes: main, note: isMiss ? 'Умеренный темп, Z3 (70-80%)' : 'Zone 2, разговорный темп (60-70%)', hrZone: isMiss ? (z(2) ? { min: z(2)!.bpmMin, max: z(2)!.bpmMax } : undefined) : (z(1) ? { min: z(1)!.bpmMin, max: z(1)!.bpmMax } : undefined) },
+        { name: 'Основная', minutes: main, note: 'Zone 2, разговорный темп (60-70%)', hrZone: z(1) ? { min: z(1)!.bpmMin, max: z(1)!.bpmMax } : undefined },
         { name: 'Заминка', minutes: 5, note: 'Снижение темпа, растяжка', hrZone: z(0) ? { min: z(0)!.bpmMin, max: z(0)!.bpmMax } : undefined },
       ];
     }

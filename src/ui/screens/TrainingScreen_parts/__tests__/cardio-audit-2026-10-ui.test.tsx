@@ -200,6 +200,62 @@ describe('PRO: мощность вело-сессии → TSS (powerTss)', () =>
   });
 });
 
+describe('PRO: персональные зоны из полевых тестов (personalZones)', () => {
+  it('есть LTHR-замер → блок «Ваши зоны сейчас» с диапазонами', async () => {
+    const { CardioFieldTestLog } = await import('../CardioFieldTestLog');
+    localStorage.removeItem('he_cardio_field_tests_v1');
+    const { saveFieldTestLogEntry } = await import('../../../../engines/lms/cardio.engine');
+    saveFieldTestLogEntry({ date: isoDaysAgo(5), kind: 'lthr30', lthr: 170 });
+    const c = buildCardioCycle({ goal: 'cut', totalWeeks: 4, id: 'pz-1', age: 30 });
+    render(<CardioFieldTestLog level="intermediate" cycle={c} />);
+    const el = document.querySelector('[data-fieldtest="zones"]');
+    expect(el).toBeTruthy();
+    const text = el!.textContent ?? '';
+    expect(text).toContain('Ваши зоны сейчас');
+    expect(text).toContain('170');
+    expect(text).toContain('Z2');
+    expect(text).toMatch(/HIIT|HR/); // hiitNote про контроль по мощности
+  });
+
+  it('замеров нет — блока зон нет (не выдумываем)', async () => {
+    const { CardioFieldTestLog } = await import('../CardioFieldTestLog');
+    localStorage.removeItem('he_cardio_field_tests_v1');
+    render(<CardioFieldTestLog level="intermediate" />);
+    expect(document.querySelector('[data-fieldtest="zones"]')).toBeNull();
+  });
+});
+
+describe('PRO: CTL по году кардио (cardioYearFactCtlSeries)', () => {
+  it('есть annual-кардио + журнал → строка CTL за год', async () => {
+    const { CardioDiaryStep } = await import('../CardioDiaryStep');
+    const c1 = buildCardioCycle({ goal: 'cut', totalWeeks: 6, id: 'yr-1', startDate: isoDaysAgo(30), age: 30, restingHr: 60 });
+    const c2 = buildCardioCycle({ goal: 'health', totalWeeks: 6, id: 'yr-2', startDate: isoDaysAgo(4), age: 30, restingHr: 60 });
+    localStorage.setItem('he_cardio_cycles', JSON.stringify([c1, c2]));
+    localStorage.setItem('he_annual_cardio_cycles', JSON.stringify({ blk1: 'yr-1', blk2: 'yr-2' }));
+    localStorage.setItem('he_cardio_sessions', JSON.stringify([
+      { id: 'y1', date: isoDaysAgo(20), type: 'zone2', durationMin: 40, completed: true, avgHr: 140 },
+      { id: 'y2', date: isoDaysAgo(10), type: 'zone2', durationMin: 45, completed: true, avgHr: 145 },
+    ]));
+    render(<CardioDiaryStep cycle={c2} acwr={null} recoveryLow={false} onChanged={() => {}} />);
+    // Переключаемся на таб «Аналитика».
+    fireEvent.click(screen.getByRole('button', { name: /Аналитика/ }));
+    const el = document.querySelector('[data-autotune="year-ctl"]');
+    expect(el).toBeTruthy();
+    const text = el!.textContent ?? '';
+    expect(text).toContain('CTL по году кардио');
+    expect(text).not.toContain('NaN');
+  });
+
+  it('без annual-кардио строки нет', async () => {
+    const { CardioDiaryStep } = await import('../CardioDiaryStep');
+    const c = buildCardioCycle({ goal: 'health', totalWeeks: 4, id: 'yr-3' });
+    localStorage.setItem('he_cardio_cycles', JSON.stringify([c]));
+    render(<CardioDiaryStep cycle={c} acwr={null} recoveryLow={false} onChanged={() => {}} />);
+    fireEvent.click(screen.getByRole('button', { name: /Аналитика/ }));
+    expect(document.querySelector('[data-autotune="year-ctl"]')).toBeNull();
+  });
+});
+
 describe('PRO: тренд durability из FIT-замеров (durabilityTrend)', () => {
   it('две сессии с decoupling → тренд и подпись', () => {
     const c = buildCardioCycle({ goal: 'cut', totalWeeks: 4, id: 'dtr-1' });

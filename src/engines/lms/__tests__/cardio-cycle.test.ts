@@ -801,11 +801,20 @@ describe('cardioSessionProtocol', () => {
     expect(p[1].note).toContain('Zone 2');
   });
 
-  it('hiit: интервалы 30/90 в Z4', () => {
-    const p = cardioSessionProtocol({ type: 'hiit', durationMin: 20 });
+  // Было→стало (аудит Oct 2026): подпись была hardcoded «30 сек работа /
+  // 90 сек отдых», что врало про реальную математику интервалов (60/90) и
+  // не видело структуру пресета. Теперь — из `buildStructuredIntervals`.
+  it('hiit: интервалы по движку (reps×работа/отдых) в Z4', () => {
+    const zones = lthrZones(170);
+    const p = cardioSessionProtocol({ type: 'hiit', durationMin: 20 }, zones);
     expect(p[1].name).toBe('Интервалы');
     expect(p[1].minutes).toBe(10);
-    expect(p[1].note).toContain('30 сек');
+    expect(p[1].note).toContain('работа');
+    expect(p[1].note).toContain('отдых');
+    expect(p[1].note).toContain('HIIT Z4');
+    // Целевая зона — из блока интервалов (Z4 по LTHR).
+    expect(p[1].hrZone?.min).toBe(zones[3].bpmMin);
+    expect(p[1].hrZone?.max).toBe(zones[3].bpmMax);
   });
 
   it('recovery: без разминки', () => {

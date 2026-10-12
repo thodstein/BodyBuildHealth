@@ -100,7 +100,9 @@ describe('P0-1 rebuildCycle — итоги цикла пересчитывают
     expect(moved).not.toBeNull();
     expectCycleTotals(moved!, 'moveCardioSessionInWeek');
 
-    const rescheduled = rescheduleCardioSession(c, todayLocalIso());
+    // Детерминированно: дата = старт цикла (понедельник) — у zone2-сессии
+    // dayOfWeek=0, поэтому перенос срабатывает в ЛЮБОЙ день запуска теста.
+    const rescheduled = rescheduleCardioSession(c, c.startDate ?? todayLocalIso());
     expect(rescheduled.changes.length).toBeGreaterThan(0);
     expectCycleTotals(rescheduled.cycle, 'rescheduleCardioSession');
   });

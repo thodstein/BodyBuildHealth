@@ -6,9 +6,11 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   saveCardioCycleVersion, saveCardioCycle, setActiveCardioCycle,
   cardioWeekForDate, CARDIO_PHASE_LABELS,
+  cardioYearPlan, cardioYearFactCtlSeries, maxHrByFormula, loadCardioCycles,
   type CardioCycle,
 } from '../../../engines/lms/cardio.engine';
 import { loadCardioLog, type CardioLogEntry } from '../../../engines/lms/cardio-diary.engine';
+import { loadAnnualCardioCycles } from '../../../engines/annual-training/annual-training-storage';
 import { loadSRPESessions, type SRPESession } from '../../../engines/pro/srpe-store';
 import { getWeightLog } from '../../../engines/profile-store';
 import { CardioDiaryPanel } from './CardioDiaryPanel';
@@ -64,6 +66,33 @@ export const CardioDiaryStep: React.FC<{
   }, [localCycle]);
 
   const [tab, setTab] = useState<'session' | 'analytics' | 'log'>('session');
+
+  // PRO (аудит Oct 2026): `cardioYearFactCtlSeries` был без потребителя —
+  // year-нагрузка считалась только по плану. Строим год из annual-кардио
+  // циклов и показываем фактическую CTL за весь год кардио.
+  const yearCtl = useMemo(() => {
+    try {
+      const map = loadAnnualCardioCycles();
+      const ids = new Set(Object.values(map));
+      if (ids.size === 0) return null;
+      const cycles = loadCardioCycles().filter(c => ids.has(c.id));
+      if (cycles.length === 0) return null;
+      const year = cardioYearPlan(cycles);
+      if (!year || log.length === 0) return null;
+      const maxHr = localCycle?.config?.age
+        ? maxHrByFormula(localCycle.config.age, localCycle.config.sex, (localCycle.config as { maxHrFormula?: 'classic' | 'tanaka' | 'gulati' }).maxHrFormula)
+        : undefined;
+      const series = cardioYearFactCtlSeries(year, log, {
+        restHr: localCycle?.config?.restingHr,
+        maxHr,
+        sex: localCycle?.config?.sex,
+      });
+      if (series.length === 0) return null;
+      const first = series[0], last = series[series.length - 1];
+      return { first, last, blocks: year.blocks.length, weeks: year.totalWeeks };
+    } catch { return null; }
+  }, [log, localCycle]);
+
   const TABS = [
     { id: 'session', label: 'Сегодня', icon: '⚡' },
     { id: 'analytics', label: 'Аналитика', icon: '📈' },
@@ -97,6 +126,11 @@ export const CardioDiaryStep: React.FC<{
       </div>
       {tab === 'analytics' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 11 }}>
+          {yearCtl && (
+            <div style={{ fontSize: 11, color: '#fff', background: 'rgba(96,165,250,0.07)', border: '1px solid rgba(59,130,246,0.24)', borderLeft: '3px solid #60a5fa', borderRadius: 10, padding: '8px 11px', fontVariantNumeric: 'tabular-nums', lineHeight: 1.5 }} data-autotune="year-ctl">
+              📅 CTL по году кардио ({yearCtl.blocks} бл., {yearCtl.weeks} нед): {yearCtl.first.ctl} → {yearCtl.last.ctl} · ATL {yearCtl.last.atl} · TSB {(yearCtl.last.tsb > 0 ? '+' : '')}{yearCtl.last.tsb}
+            </div>
+          )}
           <CardioVolumeChart cycle={localCycle} log={log} />
           <CardioAnalyticsDashboard cycle={localCycle} log={log} />
           <CardioAutoTunePanel cycle={localCycle} acwr={acwr} onChanged={reloadLog} />
@@ -106,7 +140,7 @@ export const CardioDiaryStep: React.FC<{
         <div style={{ display: 'flex', flexDirection: 'column', gap: 11 }}>
           <CardioImportPanel onImported={reloadLog} cycle={localCycle} />
           <CardioDiaryPanel cycle={localCycle} acwr={acwr} recoveryLow={recoveryLow} onApplyWeightAdjust={onApplyWeightAdjust} log={log} onLogChanged={reloadLog} />
-          <CardioFieldTestLog level={localCycle?.config?.level} equipment={localCycle?.config?.equipment} />
+          <CardioFieldTestLog level={localCycle?.config?.level} equipment={localCycle?.config?.equipment} cycle={localCycle} />
         </div>
       )}
     </div>

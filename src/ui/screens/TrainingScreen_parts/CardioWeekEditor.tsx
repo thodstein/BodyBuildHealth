@@ -9,6 +9,7 @@ import {
   loadCardioCycles, saveCardioCycle, setActiveCardioCycle, kcalForCardio,
   saveCardioCycleVersion, latestCardioCycleVersion, restoreCardioCycleVersion,
   cardioWeekForDate, cardioSafetyReport, cycleBodyWeight, cycleFfmKg, rebuildCycle, cardioWeekLegConflicts, cardioHiitInjectGate,
+  moveCardioSessionInWeek,
   type CardioCycle, type CardioType, type CardioSession, type CardioWeek,
 } from '../../../engines/lms/cardio.engine';
 import { CARD, ROW, LABEL, HINT_SM, BTN, BTN_PRIMARY, BTN_DANGER, BTN_SMALL, SelectInput } from './CardioUI';
@@ -159,11 +160,23 @@ export const CardioWeekEditor: React.FC<{ cycle: CardioCycle | null; onChanged?:
   const onDragOverDay = (day: number, e: React.DragEvent) => { e.preventDefault(); setDragOverDay(day); };
   const onDropDay = (day: number, e: React.DragEvent) => {
     e.preventDefault();
-    if (dragIdx == null) return;
+    if (dragIdx == null || !cycle || !week) return;
     const idx = dragIdx;
     setDragIdx(null);
     setDragOverDay(null);
-    updateSession(idx, { dayOfWeek: day });
+    // PRO (аудит Oct 2026): drag-and-drop теперь идёт через движок
+    // `moveCardioSessionInWeek` (единая точка: итоги недели/цикла
+    // пересчитываются там же, где и во всех адаптациях) — было ad-hoc
+    // обновление dayOfWeek через updateSession.
+    try {
+      saveCardioCycleVersion(cycle, `перенос сессии на ${DAY_LABELS_RU[day]}`);
+      const next = moveCardioSessionInWeek(cycle, week.week, idx, day);
+      if (!next) { flashMsg('⚠ Не удалось перенести сессию'); return; }
+      saveCardioCycle(next);
+      setActiveCardioCycle(next);
+      onChanged?.();
+      flashMsg(`↔ Сессия перенесена на ${DAY_LABELS_RU[day]}`);
+    } catch { flashMsg('⚠ Не удалось перенести сессию'); }
   };
 
   return (

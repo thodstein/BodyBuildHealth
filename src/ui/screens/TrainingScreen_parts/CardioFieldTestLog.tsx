@@ -6,6 +6,7 @@
 import React, { useMemo, useState } from 'react';
 import {
   loadFieldTestLog, saveFieldTestLogEntry, removeFieldTestLogEntry, responderFromLog, recommendFieldTest,
+  latestFieldTestMetrics, personalZones,
   type FieldTestLogEntry,
 } from '../../../engines/lms/cardio.engine';
 import { SectionCard, ROW, LABEL, BTN, BTN_PRIMARY, BTN_DANGER, Badge, EmptyState, NumberInput, HINT_SM } from './CardioUI';
@@ -13,10 +14,20 @@ import { SectionCard, ROW, LABEL, BTN, BTN_PRIMARY, BTN_DANGER, Badge, EmptyStat
 type Kind = FieldTestLogEntry['kind'];
 
 const KIND_META: Record<Kind, { label: string; hint: string }> = {
-  aet60: { label: 'AeT 60\'', hint: 'Steady 60\' @~75%FTP: drift и decoupling %' },
-  lthr30: { label: 'LTHR 30\'', hint: 'Friel: средняя ЧСС последних 20\'' },
-  ftp20: { label: 'FTP 20\'', hint: 'Средняя мощность 20\' (FTP = ×0.95)' },
+  aet60: { label: "AeT 60'", hint: "Steady 60' @~75%FTP: drift и decoupling %" },
+  lthr30: { label: 'LTHR 30\'', hint: "Friel: средняя ЧСС последних 20'" },
+  ftp20: { label: 'FTP 20\'', hint: "Средняя мощность 20' (FTP = ×0.95)" },
   talk: { label: 'Talk-test', hint: 'Потолок Z2 — ЧСС разговорного темпа' },
+};
+
+/** Подписи источника персональных зон (personalZones.source). */
+const ZONE_SOURCE_LABEL: Record<string, string> = {
+  lthr: "LTHR 30' (Friel)",
+  ftp: 'FTP 20\' (Coggan)',
+  cp: 'CP 3\'/12\'',
+  vdot: 'VDOT (Daniels)',
+  talk: 'talk-test',
+  age: 'возраст',
 };
 
 function todayIso(): string {
@@ -33,7 +44,8 @@ const numOrUndef = (v: string): number | undefined => {
 export const CardioFieldTestLog: React.FC<{
   level?: 'beginner' | 'intermediate' | 'advanced';
   equipment?: string[];
-}> = ({ level, equipment }) => {
+  cycle?: { config?: { age?: number; sex?: 'male' | 'female'; restingHr?: number; maxHrFormula?: 'classic' | 'tanaka' | 'gulati' } } | null;
+}> = ({ level, equipment, cycle }) => {
   const [log, setLog] = useState<FieldTestLogEntry[]>(() => {
     try { return loadFieldTestLog(); } catch { return []; }
   });
@@ -49,6 +61,25 @@ export const CardioFieldTestLog: React.FC<{
   const responder = useMemo(() => {
     try { return responderFromLog(log); } catch { return null; }
   }, [log]);
+
+  // PRO (аудит Oct 2026): `personalZones` был без потребителя, хотя это
+  // композитный резолвер «зоны из ваших полевых тестов» (LTHR > FTP > CP >
+  // VDOT > talk > возраст). Показываем, что дали замеры.
+  const zones = useMemo(() => {
+    try {
+      const m = latestFieldTestMetrics(log);
+      if (m.lthr == null && m.ftpWatts == null && m.talkHr == null) return null;
+      return personalZones({
+        lthr: m.lthr,
+        ftpWatts: m.ftpWatts,
+        talkZone2Hr: m.talkHr,
+        age: cycle?.config?.age,
+        restingHr: cycle?.config?.restingHr,
+        sex: cycle?.config?.sex,
+        formula: cycle?.config?.maxHrFormula,
+      });
+    } catch { return null; }
+  }, [log, cycle]);
 
   const valid = useMemo(() => {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return 'Дата — ГГГГ-ММ-ДД.';
@@ -145,6 +176,19 @@ export const CardioFieldTestLog: React.FC<{
       )}
       {responder && responder.responder != null && (
         <div style={{ fontSize: 11, color: responder.responder ? '#4ade80' : '#fbbf24' }}>{responder.note}</div>
+      )}
+      {zones && (
+        <div style={{ fontSize: 11, color: '#fff', background: 'rgba(96,165,250,0.07)', border: '1px solid rgba(59,130,246,0.24)', borderLeft: '3px solid #60a5fa', borderRadius: 10, padding: '8px 11px', lineHeight: 1.5 }} data-fieldtest="zones">
+          <div style={{ fontWeight: 800, marginBottom: 3 }}>
+            🎯 Ваши зоны сейчас · источник: {ZONE_SOURCE_LABEL[zones.source]}
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 4, fontVariantNumeric: 'tabular-nums' }}>
+            {zones.zones.map(z => (
+              <span key={z.zone}>{z.zone === 1 ? 'Z1' : z.zone === 2 ? 'Z2' : z.zone === 3 ? 'Z3' : z.zone === 4 ? 'Z4' : 'Z5'} {z.bpmMin}-{z.bpmMax}</span>
+            ))}
+          </div>
+          <div style={{ fontSize: 10, opacity: 0.85, marginTop: 3 }}>{zones.hiitNote}</div>
+        </div>
       )}
       {log.length === 0 ? (
         <>
