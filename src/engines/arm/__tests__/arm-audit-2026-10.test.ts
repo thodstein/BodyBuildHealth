@@ -25,7 +25,7 @@ import { diagnoseArmliftCause } from '../armlift-cause.engine';
 import { diagnosticCompleteness } from '../armlift-completeness.engine';
 import { getArmLandmarks } from '../arm-volume-landmarks.engine';
 import { ARM_SPLIT_PATTERNS } from '../arm-split-patterns';
-import { rankArmSplits } from '../arm-selector.engine';
+import { rankArmSplits, levelSessionCapacity, splitMaxSessionMuscles } from '../arm-selector.engine';
 import { buildArmBridgeData } from '../arm-bridge-payload.engine';
 import { ARM_MUSCLES, ARM_MUSCLE_RU } from '../arm-types';
 import { SourceFileReader } from './helpers/source-reader';
@@ -355,6 +355,40 @@ describe('§8 п.1/п.3: ER:IR risk доезжает до плана и выбо
     const hub = new SourceFileReader('src/ui/screens/TrainingScreen_parts/ArmDiagnosticsHub.tsx');
     expect(hub.text).toContain('shoulderRisk: (() => {');
     expect(hub.text).toContain("v.zone === 'risk'");
+  });
+});
+
+describe('§8 п.2: ёмкость дня сплита по уровню', () => {
+  it('ёмкость уровня: beginner 5 → enhanced 9', () => {
+    expect(levelSessionCapacity('beginner')).toBe(5);
+    expect(levelSessionCapacity('intermediate')).toBe(6);
+    expect(levelSessionCapacity('advanced')).toBe(8);
+    expect(levelSessionCapacity('enhanced')).toBe(9);
+    expect(levelSessionCapacity('unknown')).toBe(6); // fallback = intermediate
+  });
+  it('splitMaxSessionMuscles: TableTech (7 мышц) плотнее SupportGrip (4)', () => {
+    const table = ARM_SPLIT_PATTERNS.find((p) => p.schedule.some((d) => d.sessionTag === 'TableTech'))!;
+    const sparse = ARM_SPLIT_PATTERNS.find((p) => p.schedule.some((d) => d.sessionTag === 'SupportGrip'))!;
+    expect(splitMaxSessionMuscles(table)).toBe(7);
+    expect(splitMaxSessionMuscles(sparse)).toBe(4);
+  });
+  it('ранжирование: перебор дня при уровне = предупреждение и штраф', () => {
+    const table = ARM_SPLIT_PATTERNS.find((p) => p.schedule.some((d) => d.sessionTag === 'TableTech'))!;
+    const row = rankArmSplits({ level: 'beginner', goal: 'strength', technique: 'balanced', discipline: 'armwrestling', daysPerWeek: 3 } as any)
+      .find((r) => r.pattern.id === table.id)!;
+    expect(row.maxSessionMuscles).toBe(7);
+    expect(row.levelCapacity).toBe(5);
+    expect(row.warnings.some((w) => /мышц/.test(w) && /ёмкост/.test(w))).toBe(true);
+    // на enhanced ёмкость 9 — предупреждения ёмкости у того же сплита нет
+    const enh = rankArmSplits({ level: 'enhanced', goal: 'strength', technique: 'balanced', discipline: 'armwrestling', daysPerWeek: 3 } as any)
+      .find((r) => r.pattern.id === table.id)!;
+    expect(enh.warnings.some((w) => /ёмкост/.test(w))).toBe(false);
+  });
+  it('ранжирование: бонус сплиту с запасом ёмкости', () => {
+    const sparse = ARM_SPLIT_PATTERNS.find((p) => p.schedule.some((d) => d.sessionTag === 'SupportGrip'))!;
+    const row = rankArmSplits({ level: 'intermediate', goal: 'strength', technique: 'balanced', discipline: 'armwrestling', daysPerWeek: 3 } as any)
+      .find((r) => r.pattern.id === sparse.id)!;
+    expect(row.rationale.some((x) => /запасом/.test(x))).toBe(true);
   });
 });
 

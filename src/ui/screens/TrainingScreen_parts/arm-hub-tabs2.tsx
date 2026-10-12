@@ -12,6 +12,7 @@ import { erIrVerdict } from '../../../engines/arm/arm-shoulder-erir.engine';
 import { AdSec, AdGrid, AdField, AdChip, AdSwitch, AdSheetSelect, AdBtn, AdBanner } from './arm-design-system';
 import { WP_LABEL_SHORT } from './arm-hub-shared';
 import { ArmPickBlock } from './arm-hub-pick';
+import { ArmVideoTracker } from './arm-video-tracker';
 
 /** PRO-3 P8: позиционный чек-лист — локальный стейт ритуала (не персистится: проверка «сегодня»).
  * PRO-5 №5: провалы дублируются в he_arm_humerus_checks — мост в конструктор (ось/warmup). */
@@ -108,10 +109,12 @@ export function HubPressureTab({ H }: { H: any }) {
         )}
       </AdSec>
       <AdGrid cols="2">
-        <AdSec title="Humerus (side)">
-          <div className="ad-muted">{mockGuard.humerus.length? mockGuard.humerus.join(' · ') : '✓ Нет риска: side ≤3, RIR≥2, прогрессия ≤10%/нед'}</div>
-          <div className="ad-muted">Гвард плана: side &gt;6 первые 4 нед / &gt;9 / +10%/нед — детали во вкладке P0</div>
-        </AdSec>
+      <AdSec title="Humerus (side)">
+        <div className="ad-muted">{mockGuard.humerus.length? mockGuard.humerus.join(' · ') : '✓ Нет риска: side ≤3, RIR≥2, прогрессия ≤10%/нед'}</div>
+        <div className="ad-muted">Гвард плана: side &gt;6 первые 4 нед / &gt;9 / +10%/нед — детали во вкладке P0</div>
+      </AdSec>
+      {/* 26.10.2026: живое видео за столом (оффлайн) — трек кисти → тип траектории */}
+      <ArmVideoTracker />
         <AdSec title="🦴 Чек-лист плеча перед тяжёлым столом" collapsible defaultOpen={false} summary="5 чеков">
           <HumerusChecklist />
           <div className="ad-muted">Маркеры: ось «кисть–локоть–плечо», запястье не позади плеча (81% переломов — сломанная ось). Side-прогрессия ≤10%/нед, RIR≥2.</div>

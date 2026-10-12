@@ -31,6 +31,39 @@ export interface ArmRankedPattern {
   score: number;
   rationale: string[];
   warnings: string[];
+  /** 26.10.2026: максимум уникальных мышц в одном дне сплита (ёмкость дня). */
+  maxSessionMuscles?: number;
+  /** Ёмкость по уровню (сколько мышц день реально потянет). */
+  levelCapacity?: number;
+}
+
+/**
+ * Ёмкость дня по уровню: сколько УНИКАЛЬНЫХ мышц сессия реально нагрузит
+ * (зеркало BB `sessionMuscleRealism` + arm-практика). Ёмкость — не запрет,
+ * а скоринг: перебор = давняя сессия и расплывчатый стимул (RP-подход:
+ * 3–6 упражнений на мышечную группу в день).
+ */
+const LEVEL_SESSION_CAPACITY: Record<string, number> = {
+  beginner: 5,
+  intermediate: 6,
+  advanced: 8,
+  enhanced: 9,
+};
+
+export function levelSessionCapacity(level: string): number {
+  return LEVEL_SESSION_CAPACITY[normLevel(level)] ?? 6;
+}
+
+/** Уникальные мышцы самого плотного дня сплита. */
+export function splitMaxSessionMuscles(p: SplitPattern): number {
+  let best = 0;
+  for (const d of p.schedule) {
+    if (d.kind !== 'тренировка' || !d.sessionTag) continue;
+    const muscles = TAG_MUSCLES_ARM[d.sessionTag] || [d.sessionTag];
+    const uniq = new Set(muscles).size;
+    if (uniq > best) best = uniq;
+  }
+  return best;
 }
 
 function muscleFreq(p: SplitPattern): Record<string, number> {
@@ -75,6 +108,20 @@ export function rankArmSplits(input: ArmSelectorInput): ArmRankedPattern[] {
       else if (abs <= 1.2) { score += 10; rationale.push(`дней ${eff.toFixed(1)} близко к ${input.daysPerWeek}`); }
       else if (abs <= 2) { score -= 5; warnings.push(`дней ${eff.toFixed(1)} далеко от ${input.daysPerWeek}`); }
       else { score -= 15; warnings.push(`дней ${eff.toFixed(1)} сильно мимо ${input.daysPerWeek}`); }
+    }
+
+    // ёмкость дня (26.10.2026): перебор мышц в одном дне при вашем уровне = давняя
+    // сессия и расплывчатый стимул. Сплит, влезающий в ёмкость, получает бонус.
+    const capacity = levelSessionCapacity(lvl);
+    const maxMuscles = splitMaxSessionMuscles(p);
+    if (maxMuscles > capacity + 2) {
+      score -= 18; warnings.push(`день несёт ${maxMuscles} мышц — при уровне ${lvl} ёмкость ~${capacity}: сессия слишком плотная (расплывчатый стимул)`);
+    } else if (maxMuscles > capacity) {
+      score -= 8; warnings.push(`день несёт ${maxMuscles} мышц при ёмкости ~${capacity} — плотновато для ${lvl}`);
+    } else if (maxMuscles <= capacity - 2) {
+      score += 8; rationale.push(`день ${maxMuscles} мышц — с запасом для доборов`);
+    } else {
+      score += 4; rationale.push(`день ${maxMuscles} мышц ~ ёмкость ${capacity} (${lvl})`);
     }
 
     // goal bias
@@ -181,7 +228,7 @@ export function rankArmSplits(input: ArmSelectorInput): ArmRankedPattern[] {
       score -= 6; warnings.push('специализация → 2× недостаточно');
     }
 
-    out.push({ pattern: p, score, rationale, warnings });
+    out.push({ pattern: p, score, rationale, warnings, maxSessionMuscles: maxMuscles, levelCapacity: capacity });
   }
 
   out.sort((a, b) => b.score - a.score);
