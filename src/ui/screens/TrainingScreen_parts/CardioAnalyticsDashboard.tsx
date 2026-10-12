@@ -11,7 +11,7 @@ import {
   dailyPmcSeries, tssRampRate, interpretTsb,
   aerobicDecoupling, heatAltitudeHrAdd, cardioInterferenceV2,
   dailyTrimpMap, dailyTrimpFromLogEntry, maxHrByFormula, cardioEntryLoad,
-  cardioAnemiaSignals, cardioRestingHrSignal, durabilityTrend,
+  cardioAnemiaSignals, cardioRestingHrSignal, durabilityTrend, powerTss,
 } from '../../../engines/lms/cardio.engine';
 import { dateDaysAgo } from '../../../engines/lms/cardio-diary.engine';
 import { getProfile } from '../../../core/profile-manager';
@@ -140,15 +140,21 @@ export const CardioAnalyticsDashboard: React.FC<{ cycle: CardioCycle | null; log
   }, [cycle, log]);
 
   // PRO: PMC daily по факту (CTL/ATL/TSB) + рампа TSS.
-  // Нагрузка дня — канон dailyTrimpFromLogEntry (Banister при HR, иначе фактор):
-  // была inline-копия формулы с жёстким 220/226−age.
+  // Нагрузка дня — канон: мощность×FTP (вело) → Banister HR → фактор.
+  // P2-аудит: powerTss/runTss были без потребителя; HR-оценка на ровной
+  // вело-работе промахивается сильнее, чем мощность.
   const pmc = useMemo(() => {
     if (log.length < 7) return null;
     try {
-      const daily = log.filter(e => e.completed).map(e => ({
-        date: e.date,
-        load: dailyTrimpFromLogEntry(e, cfgHr.restHr, cfgHr.maxHr, cfgHr.sex),
-      }));
+      const ftp = (cycle?.config as { ftpWatts?: number } | undefined)?.ftpWatts;
+      const daily = log.filter(e => e.completed).map(e => {
+        const pw = e.avgPowerWatts;
+        if (ftp && pw && pw > 0) {
+          const t = powerTss(e.durationMin, pw, ftp);
+          if (t != null && t > 0) return { date: e.date, load: t };
+        }
+        return { date: e.date, load: dailyTrimpFromLogEntry(e, cfgHr.restHr, cfgHr.maxHr, cfgHr.sex) };
+      });
       const now = new Date();
       const ref = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
       const series = dailyPmcSeries(daily, { referenceIso: ref, days: 42 });

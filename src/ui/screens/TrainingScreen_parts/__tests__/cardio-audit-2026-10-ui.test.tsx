@@ -172,6 +172,34 @@ describe('PRO: журнал полевых тестов — подсказка �
   });
 });
 
+describe('PRO: мощность вело-сессии → TSS (powerTss)', () => {
+  // PMC-блок требует ≥7 записей в журнале — сеем неделю вело-сессий.
+  const weekLog = (powerBase: number) => Array.from({ length: 7 }, (_, i) => ({
+    id: `p${i}`, date: isoDaysAgo(i), type: 'zone2' as const, durationMin: 60,
+    completed: true, avgHr: 140, sport: 'bike' as const, avgPowerWatts: powerBase + i,
+  }));
+
+  it('вело-запись с мощностью: PMC считается без NaN', () => {
+    const c = buildCardioCycle({ goal: 'cut', totalWeeks: 4, id: 'pw-1', ftpWatts: 250, equipment: ['cycling'] });
+    const html = render(<CardioAnalyticsDashboard cycle={c} log={weekLog(200)} />);
+    const text = html.container.textContent ?? '';
+    expect(text).toContain('TSB');
+    expect(text).not.toContain('NaN');
+    html.unmount();
+  });
+
+  it('без FTP/мощности — прежняя HR-оценка (без вранья)', () => {
+    const c = buildCardioCycle({ goal: 'cut', totalWeeks: 4, id: 'pw-2' });
+    const log = Array.from({ length: 7 }, (_, i) => ({
+      id: `h${i}`, date: isoDaysAgo(i), type: 'zone2' as const, durationMin: 60,
+      completed: true, avgHr: 140,
+    }));
+    const html = render(<CardioAnalyticsDashboard cycle={c} log={log} />);
+    expect(html.container.textContent ?? '').not.toContain('NaN');
+    html.unmount();
+  });
+});
+
 describe('PRO: тренд durability из FIT-замеров (durabilityTrend)', () => {
   it('две сессии с decoupling → тренд и подпись', () => {
     const c = buildCardioCycle({ goal: 'cut', totalWeeks: 4, id: 'dtr-1' });

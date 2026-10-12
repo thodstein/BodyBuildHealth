@@ -72,9 +72,17 @@ export const CardioSessionTimer: React.FC<{ cycle: CardioCycle | null; onSaved?:
   });
   const [active, setActive] = useState<ActiveSession | null>(null);
   const [finished, setFinished] = useState<{ type: CardioType; durationMin: number } | null>(null);
-  const [rpe, setRpe] = useState('');
-  const [hr, setHr] = useState('');
-  const [km, setKm] = useState('');
+  // PRO (аудит Oct 2026): мощность имеет смысл только на вело-сессии — поле
+  // появляется, когда оборудование сессии/цикла = cycling (не шумим на беге).
+  const isPowerRelevant = useMemo(() => {
+    if (!finished) return false;
+    const eq = todaySessions.find(s => s.type === finished.type)?.equipment ?? cycle?.config?.equipment?.[0];
+    return eq === 'cycling';
+  }, [finished, todaySessions, cycle]);
+const [rpe, setRpe] = useState('');
+const [hr, setHr] = useState('');
+const [km, setKm] = useState('');
+const [power, setPower] = useState('');
   // Спринт 5.2 (аудит): дисциплина записывается в дневник. Раньше таймер вообще
   // не писал `sport` — ВСЕ сессии пользователя лежали как <other>, и пер-спортная
   // разбивка TID видела только импорт. По умолчанию <другое>: не выдумываем.
@@ -171,10 +179,10 @@ export const CardioSessionTimer: React.FC<{ cycle: CardioCycle | null; onSaved?:
 
   const save = () => {
     if (!finished) return;
-    const w = validateCardioLogFields({ rpe, hr, km });
-    if (w.rpe || w.hr || w.km) {
+    const w = validateCardioLogFields({ rpe, hr, km, power });
+    if (w.rpe || w.hr || w.km || w.power) {
       setWarnings(w);
-      flashMsg('⚠ Проверьте значения: ' + [w.rpe, w.hr, w.km].filter(Boolean).join('; '));
+      flashMsg('⚠ Проверьте значения: ' + [w.rpe, w.hr, w.km, w.power].filter(Boolean).join('; '));
       return;
     }
     setWarnings(null);
@@ -195,12 +203,16 @@ export const CardioSessionTimer: React.FC<{ cycle: CardioCycle | null; onSaved?:
       avgHr: Number(hr) > 0 ? Number(hr) : undefined,
       calories: estimateCardioEntryKcal(finished.type, finished.durationMin, weight ?? undefined),
       distanceKm: Number(km) > 0 ? Math.round(Number(km) * 10) / 10 : undefined,
+      // PRO (аудит Oct 2026): средняя мощность вело-сессии — TSS по мощности
+      // в PMC (точнее пульсовой оценки на ровной работе).
+      avgPowerWatts: isPowerRelevant && Number(power) > 0 ? Math.round(Number(power)) : undefined,
     });
     onSaved?.();
     setFinished(null);
     setRpe('');
     setHr('');
     setKm('');
+    setPower('');
     flashMsg('💾 Сессия записана в дневник');
   };
 
@@ -321,11 +333,14 @@ export const CardioSessionTimer: React.FC<{ cycle: CardioCycle | null; onSaved?:
             <input value={rpe} onChange={e => setRpe(e.target.value)} placeholder="RPE 1-10" inputMode="numeric" style={{ ...INPUT, width: 'auto' }} aria-label="RPE" />
             <input value={hr} onChange={e => setHr(e.target.value)} placeholder="ЧСС ср." inputMode="numeric" style={{ ...INPUT, width: 'auto' }} aria-label="ЧСС" />
             <input value={km} onChange={e => setKm(e.target.value)} placeholder="км" inputMode="decimal" style={{ ...INPUT, width: 'auto' }} aria-label="Км" title="Дистанция (для бега/езды)" />
+            {isPowerRelevant && (
+              <input value={power} onChange={e => setPower(e.target.value)} placeholder="Вт ср." inputMode="numeric" style={{ ...INPUT, width: 'auto' }} aria-label="Мощность" title="Средняя мощность вело-сессии (для TSS по мощности)" />
+            )}
             <button style={{ ...BTN_PRIMARY, minHeight: 44 }} onClick={save}>💾 Сохранить в дневник</button>
           </div>
           {warnings && (
             <div style={{ fontSize: 11, color: '#f87171', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 8, padding: '6px 8px' }} role="alert">
-              ⚠ {[warnings.rpe, warnings.hr, warnings.km].filter(Boolean).join(' · ')}
+              ⚠ {[warnings.rpe, warnings.hr, warnings.km, warnings.power].filter(Boolean).join(' · ')}
             </div>
           )}
           {(() => {

@@ -17,9 +17,10 @@ import {
   bumpCardioZone2Volume, bumpCardioZone2VolumeGuarded, applyCardioCompetitionCascade,
   cardioCyclePeriodAware, moveCardioSessionInWeek, rescheduleCardioSession,
   cardioAcwr, explainCardioChoice, buildCardioIcs, spreadSessionsAcrossDays,
-  cardioEntryLoad, maxHrByFormula, dailyTrimpMap, cardioHeartZones, cardioFactHrAdjustment,
+  cardioEntryLoad, maxHrByFormula, dailyTrimpMap, cardioHeartZones, cardioFactHrAdjustment, powerTss,
 } from '../cardio.engine';
 import { individualizedTaperPlan } from '../cardio-taper-pro.engine';
+import { validateCardioLogFields } from '../cardio-diary.engine';
 import { todayLocalIso, parseLocalIso, addDaysIso, weekStartIso, dayOfWeekIso } from '../cardio-date-utils.engine';
 
 const sumWeeksKcal = (c: { weeks: { totalKcal: number }[] }) =>
@@ -224,6 +225,24 @@ describe('P1-6 единая шкала нагрузки + формулы ЧСС�
     expect(maxHrByFormula(30, 'female', 'classic')).toBe(196);
     expect(maxHrByFormula(30, 'male', 'tanaka')).toBe(187);
     expect(maxHrByFormula(30, 'female', 'gulati')).toBe(180);
+  });
+});
+
+describe('P2 мощность вело-сессии: валидация и TSS по мощности', () => {
+  it('validateCardioLogFields: мощность вне разума честно отклоняется', () => {
+    expect(validateCardioLogFields({ power: '-5' }).power).toBeTruthy();
+    expect(validateCardioLogFields({ power: '1500' }).power).toBeTruthy();
+    expect(validateCardioLogFields({ power: '250' }).power).toBeUndefined();
+    expect(validateCardioLogFields({ power: '' }).power).toBeUndefined();
+  });
+
+  it('powerTss: монотонно и в разумных пределах', () => {
+    const low = powerTss(60, 150, 250);
+    const high = powerTss(60, 250, 250);
+    expect(low).toBeGreaterThan(0);
+    expect(high).toBeGreaterThan(low!);
+    expect(powerTss(60, 0, 250)).toBeNull();
+    expect(powerTss(60, 200, 0)).toBeNull();
   });
 });
 

@@ -60,6 +60,9 @@ export interface CardioLogEntry {
    *  Пишется при импорте .fit; по накопленным точкам считается тренд
    *  durability (движок cardio-durability: durabilityTrend). */
   decouplingPct?: number;
+  /** PRO: средняя мощность вело-сессии (Вт) — TSS по мощности (powerTss),
+   *  точнее пульсовой оценки. */
+  avgPowerWatts?: number;
 }
 
 export function loadCardioLog(): CardioLogEntry[] {
@@ -115,6 +118,7 @@ export interface CardioLogFieldWarnings {
   hr?: string;
   km?: string;
   minutes?: string;
+  power?: string;
 }
 
 export function validateCardioLogFields(fields: {
@@ -122,6 +126,7 @@ export function validateCardioLogFields(fields: {
   hr?: string | number;
   km?: string | number;
   minutes?: string | number;
+  power?: string | number;
 }): CardioLogFieldWarnings {
   const warnings: CardioLogFieldWarnings = {};
   const toNum = (v: string | number | undefined): number | null => {
@@ -142,6 +147,11 @@ export function validateCardioLogFields(fields: {
   const min = toNum(fields.minutes);
   if (min != null && min < 1) warnings.minutes = 'Длительность минимум 1 мин';
   else if (min != null && min > 600) warnings.minutes = 'Длительность слишком большая (макс 600 мин)';
+  // PRO (аудит Oct 2026): средняя мощность вело-сессии — для TSS по мощности
+  // (движок cardio-pmc.powerTss); точнее пульсовой оценки на ровной работе.
+  const power = toNum(fields.power);
+  if (power != null && power < 0) warnings.power = 'Мощность не может быть отрицательной';
+  else if (power != null && power > 1000) warnings.power = 'Мощность слишком большая (макс 1000 Вт)';
   return warnings;
 }
 
