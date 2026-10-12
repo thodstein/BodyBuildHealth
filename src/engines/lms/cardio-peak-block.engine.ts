@@ -1,8 +1,14 @@
 /**
  * cardio-peak-block.engine.ts — пик-блок под старт по приоритету A/B/C (P1-4).
  * Аналог PL-season: A (главный) — taper 2 нед + пик-неделя;
- * B (контрольный) — taper 1 нед + пик-неделя; C (тренировочный) —
- * без taper, старт внутри наращивания. Чистые функции.
+ * B (контрольный) — taper 1 нед, без пик-недели (объём −30%, HIIT убран);
+ * C (тренировочный) — без taper, старт внутри наращивания.
+ *
+ * P2-аудит: спека была ЕДИНСТВЕННЫМ источником окон тапера, но её вариант B
+ * расходился с реальным `applyCardioCompetitionCascade`: подсказка UI
+ * (`peakBlockHint`) обещала «taper 1 нед + пик-неделя», а каскад пик-неделю
+ * для B не строил. Сведено к одному источнику — спека описывает ровно то,
+ * что делает каскад (он теперь берёт окна отсюда).
  */
 
 export type CardioCompPriority = 'A' | 'B' | 'C';
@@ -23,8 +29,10 @@ export function peakBlockSpecFor(priority: CardioCompPriority): CardioPeakBlockS
   switch (priority) {
     case 'A':
       return { priority, taperWeeks: 2, peakWeek: true, taper: true, note: 'A (главный): taper 2 нед + пик-неделя.' };
+    // Было→стало (аудит P2): было peakWeek:true и нота «+ пик-неделя», но
+    // каскад пик для B не строил — подсказка врала. Теперь спека = факт.
     case 'B':
-      return { priority, taperWeeks: 1, peakWeek: true, taper: true, note: 'B (контрольный): taper 1 нед + пик-неделя.' };
+      return { priority, taperWeeks: 1, peakWeek: false, taper: true, note: 'B (контрольный): taper 1 нед (объём −30%, HIIT убран), без пик-недели.' };
     case 'C':
     default:
       return { priority: 'C', taperWeeks: 0, peakWeek: false, taper: false, note: 'C (тренировочный): без taper — старт внутри наращивания.' };

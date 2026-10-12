@@ -64,8 +64,31 @@ export function cardioHeartZones(
   }));
 }
 
-/** Пульс-зоны по LTHR (Friel 2017). */
-export function lthrZones(lthr: number): HeartZone[] {
+/**
+ * ЧССмакс по выбранной формуле (единая точка для UI, зон и TSS).
+ * P1-аудит: дашборд считал inline `220/226−age`, игнорируя выбор пользователя
+ * (Tanaka/Gulati) — TRIMP/CTL расходились с зонами плана.
+ */
+export function maxHrByFormula(age: number, sex?: 'male' | 'female', formula?: 'classic' | 'tanaka' | 'gulati'): number {
+  const a = Math.max(12, Math.min(90, age));
+  if (formula === 'tanaka') return maxHrTanaka(a);
+  if (formula === 'gulati') return maxHrGulati(a);
+  return maxHrClassic(a, sex);
+}
+
+/**
+ * Нагрузка записи кардио-дневника в единой шкале ACWR (Gabbett):
+ * минуты × RPE/10, RPE по умолчанию 6 («умеренно-тяжело»).
+ * P1-аудит: дашборд монотонности считал `мин × RPE/5` — вдвое другой
+ * scale, и «Monotony/Strain» были несравнимы с ACWR и «Нагрузкой дня».
+ */
+export function cardioEntryLoad(durationMin: number, rpe?: number | null): number {
+  if (!(durationMin > 0)) return 0;
+  const r = rpe != null && rpe > 0 ? rpe : 6;
+  return (durationMin * r) / 10;
+}
+
+/** Пульс-зоны по LTHR (Friel 2017). */export function lthrZones(lthr: number): HeartZone[] {
   const l = Math.max(80, Math.min(220, Math.round(lthr)));
   const ranges: { zone: number; label: string; min: number; max: number; purpose: string }[] = [
     { zone: 1, label: 'Z1 Recovery', min: 0, max: 81, purpose: 'Восстановление, разминка' },

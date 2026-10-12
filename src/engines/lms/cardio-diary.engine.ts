@@ -13,6 +13,7 @@
 import type { CardioCycle, CardioSession, CardioType } from './cardio.engine';
 import { cardioSessionsForDate, cardioWeekForDate, kcalForCardio } from './cardio.engine';
 import { todayLocalIso, addDaysIso, toLocalIso } from './cardio-date-utils.engine';
+import { cardioEntryLoad } from './cardio-physiology.engine';
 
 export const CARDIO_LOG_KEY = 'he_cardio_sessions';
 export const CARDIO_LOG_CAP = 500;
@@ -424,7 +425,10 @@ export function cardioDayLoad(
 ): CardioDayLoad {
   const planned = cycle ? (cardioSessionsForDate(cycle, dateIso, referenceIso ?? cycle.startDate)?.sessions ?? []) : [];
   const fact = cardioDayFact(log, dateIso);
-  const cardioLoad = fact.done.reduce((s, e) => s + e.durationMin * ((e.rpe ?? 5) / 10), 0);
+  // Единая шкала нагрузки канона физиологии (минуты × RPE/10, дефолт 6) —
+  // та же, что в ACWR и монотонности: «Нагрузка дня» больше не вдвое
+  // расходится с ACWR из-за дефолта 5 и другой формулы.
+  const cardioLoad = fact.done.reduce((s, e) => s + cardioEntryLoad(e.durationMin, e.rpe), 0);
   const strength = srpe.filter(s => s.date === dateIso);
   const strengthLoad = strength.reduce((s, x) => s + x.sRPE * x.durationMin, 0);
   return {

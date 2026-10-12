@@ -163,7 +163,7 @@ export const CardioPreviewStep: React.FC<{
     if (!cycle) return null;
     try {
       const legPerWeek = cycle.config?.legDays ? cycle.config.legDays.filter(d => d >= 0 && d <= 6).length || 2 : 2;
-      return interferenceForCycle(cycle as any, legPerWeek, cycle.config?.sex);
+      return interferenceForCycle(cycle, legPerWeek, cycle.config?.sex);
     } catch { return null; }
   }, [cycle]);
 

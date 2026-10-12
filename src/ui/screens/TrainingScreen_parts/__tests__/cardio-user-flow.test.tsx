@@ -240,10 +240,20 @@ describe('CardioConstructor — сценарий пользователя', () =
     fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
     fireEvent.click(screen.getByRole('button', { name: /Журнал/ }));
     expect(screen.getByText(/Вес стоит/)).toBeTruthy();
-    const z2Before = loadCardioCycles()[0].weeks[0].sessions.find(s => s.type === 'zone2')!.durationMin;
+    const before = loadCardioCycles()[0];
+    const z2Before = before.weeks[0].sessions.find(s => s.type === 'zone2')!.durationMin;
     fireEvent.click(screen.getByRole('button', { name: /Применить \+15 мин Zone 2/ }));
-    const z2After = loadCardioCycles()[0].weeks[0].sessions.find(s => s.type === 'zone2')!.durationMin;
-    expect(z2After).toBe(z2Before + 15);
+    const after = loadCardioCycles()[0];
+    const week0 = after.weeks[0];
+    const z2After = week0.sessions.find(s => s.type === 'zone2')!.durationMin;
+    // Было→стало (аудит P2): кнопка звала НЕ-guarded бамп и давала ровно +15 мин
+    // даже на 60-минутной неделе (+25% — нарушение правила 10%). Теперь бамп
+    // guarded: неделя растёт, но не более +10%, а причина капа честно показана.
+    expect(z2After).toBeGreaterThan(z2Before);
+    expect(week0.totalMinutes).toBeLessThanOrEqual(Math.round(before.weeks[0].totalMinutes * 1.1));
+    expect(screen.getByText(/рамках 10% правила|Бамп ограничен/)).toBeTruthy();
+    // Итоги цикла согласованы с неделями (P0-1).
+    expect(after.totalKcal).toBe(after.weeks.reduce((s, w) => s + w.totalKcal, 0));
   });
 
   it('протокол сессии открывается по клику на сессию в «Неделе по дням»', () => {

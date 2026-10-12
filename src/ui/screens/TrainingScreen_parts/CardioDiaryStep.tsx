@@ -104,9 +104,9 @@ export const CardioDiaryStep: React.FC<{
       )}
       {tab === 'log' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 11 }}>
-          <CardioImportPanel onImported={reloadLog} />
+          <CardioImportPanel onImported={reloadLog} cycle={localCycle} />
           <CardioDiaryPanel cycle={localCycle} acwr={acwr} recoveryLow={recoveryLow} onApplyWeightAdjust={onApplyWeightAdjust} log={log} onLogChanged={reloadLog} />
-          <CardioFieldTestLog />
+          <CardioFieldTestLog level={localCycle?.config?.level} equipment={localCycle?.config?.equipment} />
         </div>
       )}
     </div>

@@ -15,7 +15,7 @@ import {
 } from '../cardio-cycle-bridge';
 import { CARDIO_INTERVAL_PRESETS, getCardioIntervalPreset } from '../cardio-interval-presets.engine';
 import { validateCardioCycle } from '../cardio-plan-validate.engine';
-import { peakBlockSpecFor, applyPeakBlockToInput } from '../cardio-peak-block.engine';
+import { peakBlockSpecFor, applyPeakBlockToInput, peakBlockHint } from '../cardio-peak-block.engine';
 import { extractCardioProgression, cardioProgressionAdvice } from '../cardio-meso-progression.engine';
 import {
   saveCardioRecord, loadCardioRecords, removeCardioRecord, bestCardioRecord,
@@ -175,10 +175,17 @@ describe('валидатор', () => {
 });
 
 describe('пик-блок A/B/C', () => {
-  it('A: taper 2 + пик; B: taper 1 + пик; C: без taper', () => {
+  // Было→стало (аудит P2): спека B обещала peakWeek:true («taper 1 нед +
+  // пик-неделя»), но каскад стартов пик-неделю для B не строил — подсказка
+  // UI врала. Спека сведена с поведением каскада (единый источник окон).
+  it('A: taper 2 + пик; B: taper 1 БЕЗ пик-недели; C: без taper', () => {
     expect(peakBlockSpecFor('A')).toMatchObject({ taperWeeks: 2, peakWeek: true, taper: true });
-    expect(peakBlockSpecFor('B')).toMatchObject({ taperWeeks: 1, peakWeek: true, taper: true });
+    expect(peakBlockSpecFor('B')).toMatchObject({ taperWeeks: 1, peakWeek: false, taper: true });
     expect(peakBlockSpecFor('C')).toMatchObject({ taperWeeks: 0, peakWeek: false, taper: false });
+  });
+  it('подсказка UI (peakBlockHint) = факту спеки', () => {
+    expect(peakBlockHint('B')).toContain('без пик-недели');
+    expect(peakBlockHint('A')).toContain('пик-неделя');
   });
   it('applyPeakBlockToInput патчит taper/peakWeek', () => {
     const out = applyPeakBlockToInput({ taper: true, taperWeeks: 2, peakWeek: true }, 'C');

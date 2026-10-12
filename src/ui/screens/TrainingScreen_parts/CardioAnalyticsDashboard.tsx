@@ -10,7 +10,11 @@ import {
   timeInZones, polarizationIndex, classifyTid, tidPlanVsFact,
   dailyPmcSeries, tssRampRate, interpretTsb,
   aerobicDecoupling, heatAltitudeHrAdd, cardioInterferenceV2,
+  dailyTrimpMap, dailyTrimpFromLogEntry, maxHrByFormula, cardioEntryLoad,
+  cardioAnemiaSignals, cardioRestingHrSignal,
 } from '../../../engines/lms/cardio.engine';
+import { dateDaysAgo } from '../../../engines/lms/cardio-diary.engine';
+import { getProfile } from '../../../core/profile-manager';
 import type { CardioCycle } from '../../../engines/lms/cardio.engine';
 import type { CardioLogEntry } from '../../../engines/lms/cardio-diary.engine';
 
@@ -22,26 +26,27 @@ export const CardioAnalyticsDashboard: React.FC<{ cycle: CardioCycle | null; log
     try { return cardioHrCompliance(cycle, log, { days: 28 }); } catch { return null; }
   }, [cycle, log]);
 
+  // Единая модель ЧССмакс по конфигу цикла: раньше дашборд инлайнил
+  // 220/226−age и игнорировал выбор пользователя (Tanaka/Gulati) — TRIMP/CTL
+  // расходились с зонами плана.
+  const cfgHr = useMemo(() => {
+    const age = cycle?.config?.age;
+    if (!age) return { maxHr: undefined as number | undefined, restHr: cycle?.config?.restingHr, sex: cycle?.config?.sex ?? 'male' as 'male' | 'female' };
+    return {
+      maxHr: maxHrByFormula(age, cycle?.config?.sex, (cycle?.config as { maxHrFormula?: 'classic' | 'tanaka' | 'gulati' }).maxHrFormula),
+      restHr: cycle?.config?.restingHr,
+      sex: cycle?.config?.sex ?? 'male' as 'male' | 'female',
+    };
+  }, [cycle]);
+
+  // TRIMP 7д — канон dailyTrimpMap (Banister при HR+ЧСС покоя, иначе фактор).
   const trimp7 = useMemo(() => {
-    const factor: Record<string, number> = { zone2: 2, miss: 3, hiit: 5, recovery: 1 };
-    const cutoff = new Date();
-    cutoff.setHours(0, 0, 0, 0);
-    cutoff.setDate(cutoff.getDate() - 6);
-    const iso = cutoff.getFullYear() + '-' + String(cutoff.getMonth() + 1).padStart(2, '0') + '-' + String(cutoff.getDate()).padStart(2, '0');
-    const week = log.filter(e => e.completed && e.date >= iso);
-    // Banister HR где есть avgHr, иначе фактор — показывает реальную нагрузку с учётом пульса
-    return week.reduce((sum, e) => {
-      if (e.avgHr && cycle?.config?.restingHr && cycle?.config?.age) {
-        const maxHr = cycle.config.sex === 'female' ? 226 - cycle.config.age : 220 - cycle.config.age;
-        const hrr = Math.max(0, Math.min(1, (e.avgHr - cycle.config.restingHr) / (maxHr - cycle.config.restingHr)));
-        const k = cycle.config.sex === 'female' ? 0.86 : 0.64;
-        const b = cycle.config.sex === 'female' ? 1.67 : 1.92;
-        const t = e.durationMin * hrr * k * Math.exp(b * hrr);
-        if (t > 0) return sum + Math.round(t);
-      }
-      return sum + e.durationMin * (factor[e.type] ?? 2);
-    }, 0);
-  }, [log, cycle]);
+    const week = log.filter(e => e.completed && e.date >= dateDaysAgo(6));
+    const map = dailyTrimpMap(week, cfgHr.restHr, cfgHr.maxHr, cfgHr.sex);
+    let sum = 0;
+    for (const v of map.values()) sum += Math.round(v);
+    return sum;
+  }, [log, cfgHr]);
 
   const delta = s28.minutes > 0 ? Math.round(((s7.minutes * 4 - s28.minutes) / s28.minutes) * 100) : 0;
 
@@ -59,7 +64,9 @@ export const CardioAnalyticsDashboard: React.FC<{ cycle: CardioCycle | null; log
     if (log.length < 7) return null;
     const daily: number[] = [];
     const map = new Map<string, number>();
-    for (const e of log.filter(x => x.completed)) map.set(e.date, (map.get(e.date) ?? 0) + e.durationMin * (e.rpe ? e.rpe / 5 : 1));
+    // Единая шкала ACWR (канон cardioEntryLoad): было `мин × RPE/5` — вдвое
+    // другая амплитуда, и «Monotony/Strain» были несравнимы с ACWR.
+    for (const e of log.filter(x => x.completed)) map.set(e.date, (map.get(e.date) ?? 0) + cardioEntryLoad(e.durationMin, e.rpe));
     const dates = Array.from(map.keys()).sort();
     const last7 = dates.slice(-7);
     for (const d of last7) daily.push(map.get(d) ?? 0);
@@ -75,7 +82,7 @@ export const CardioAnalyticsDashboard: React.FC<{ cycle: CardioCycle | null; log
       const ref = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
       const series = cardioFactCtlSeries(log, {
         restHr: cycle?.config?.restingHr,
-        maxHr: cycle?.config?.age ? (cycle.config.sex === 'female' ? 226 - cycle.config.age : 220 - cycle.config.age) : undefined,
+        maxHr: cfgHr.maxHr,
         sex: cycle?.config?.sex,
         referenceIso: ref,
         days: 42,
@@ -87,19 +94,23 @@ export const CardioAnalyticsDashboard: React.FC<{ cycle: CardioCycle | null; log
 
   const hrDriftNote = useMemo(() => {
     if (log.length < 2) return null;
-    const withHr = log.filter(e => e.completed && e.avgHr && e.avgHr > 0).slice(0, 10);
+    // Журнал отсортирован DESC (свежие первыми). Сравниваем РАННЮЮ из двух
+    // последних HR-сессий с ПОСЛЕДНЕЙ: было first/second по индексу, то есть
+    // (новая − предпредыдущая)/предпредыдущая — при росте пульса знак уходил
+    // в минус и предупреждение о дрейфе не срабатывало никогда.
+    const withHr = log.filter(e => e.completed && e.avgHr && e.avgHr > 0).slice(0, 2);
     if (withHr.length < 2) return null;
-    const first = withHr[0].avgHr!;
-    const second = withHr[1].avgHr!;
-    const drift = cardioHrDrift(first, second);
-    return drift.warn ? `HR drift ${drift.driftPct}% >5% — признак утомления/обезвоживания` : null;
+    const earlier = withHr[1].avgHr!; // вторая по свежести = более ранняя
+    const latest = withHr[0].avgHr!;  // самая свежая
+    const drift = cardioHrDrift(earlier, latest);
+    return drift.warn ? `HR drift ${drift.driftPct}% >5% между последними HR-сессиями — признак утомления/обезвоживания` : null;
   }, [log]);
 
   const interference = useMemo(() => {
     if (!cycle) return null;
     try {
       const legPerWeek = cycle.config?.legDays ? cycle.config.legDays.filter(d => d >= 0 && d <= 6).length || 2 : 2;
-      return interferenceForCycle(cycle as any, legPerWeek, cycle.config?.sex);
+      return interferenceForCycle(cycle, legPerWeek, cycle.config?.sex);
     } catch { return null; }
   }, [cycle]);
 
@@ -128,23 +139,15 @@ export const CardioAnalyticsDashboard: React.FC<{ cycle: CardioCycle | null; log
     } catch { return null; }
   }, [cycle, log]);
 
-  // PRO: PMC daily по факту (CTL/ATL/TSB) + рампа TSS
+  // PRO: PMC daily по факту (CTL/ATL/TSB) + рампа TSS.
+  // Нагрузка дня — канон dailyTrimpFromLogEntry (Banister при HR, иначе фактор):
+  // была inline-копия формулы с жёстким 220/226−age.
   const pmc = useMemo(() => {
     if (log.length < 7) return null;
     try {
-      const factor: Record<string, number> = { zone2: 2, miss: 3, hiit: 5, recovery: 1 };
       const daily = log.filter(e => e.completed).map(e => ({
         date: e.date,
-        load: e.avgHr && cycle?.config?.restingHr && cycle?.config?.age
-          ? (() => {
-              const maxHr = cycle.config.sex === 'female' ? 226 - (cycle.config.age as number) : 220 - (cycle.config.age as number);
-              const hrr = Math.max(0, Math.min(1, ((e.avgHr as number) - (cycle.config.restingHr as number)) / (maxHr - (cycle.config.restingHr as number))));
-              const k = cycle.config.sex === 'female' ? 0.86 : 0.64;
-              const b = cycle.config.sex === 'female' ? 1.67 : 1.92;
-              const t = e.durationMin * hrr * k * Math.exp(b * hrr);
-              return t > 0 ? Math.round(t) : e.durationMin * (factor[e.type] ?? 2);
-            })()
-          : e.durationMin * (factor[e.type] ?? 2),
+        load: dailyTrimpFromLogEntry(e, cfgHr.restHr, cfgHr.maxHr, cfgHr.sex),
       }));
       const now = new Date();
       const ref = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
@@ -154,16 +157,18 @@ export const CardioAnalyticsDashboard: React.FC<{ cycle: CardioCycle | null; log
       const ramp = tssRampRate(daily, ref);
       return { ...last, rampPct: ramp.rampPct, rampWarn: ramp.warn, interp: interpretTsb(last.tsb) };
     } catch { return null; }
-  }, [log, cycle]);
+  }, [log, cfgHr]);
 
-  // PRO: durability — decoupling по двум последним HR-сессиям (Pa:Hr lite)
+  // PRO: durability — decoupling по двум ПОСЛЕДНИМ HR-сессиям (Pa:Hr lite).
+  // Журнал DESC (свежие первыми): берём первые две подходящие, а не
+  // slice(-4) — тот забирал четыре САМЫХ СТАРЫХ записи журнала.
   const durability = useMemo(() => {
-    const withHr = log.filter(e => e.completed && e.avgHr && e.avgHr > 0 && e.distanceKm && e.distanceKm > 0).slice(-4);
+    const withHr = log.filter(e => e.completed && e.avgHr && e.avgHr > 0 && e.distanceKm && e.distanceKm > 0).slice(0, 2);
     if (withHr.length < 2) return null;
     try {
       const eff = (e: typeof withHr[number]) => (e.distanceKm as number) / (e.durationMin / 60) / (e.avgHr as number);
-      const e1 = eff(withHr[0]);
-      const e2 = eff(withHr[withHr.length - 1]);
+      const e1 = eff(withHr[1]); // более ранняя
+      const e2 = eff(withHr[0]); // свежая
       if (!(e1 > 0) || !(e2 > 0)) return null;
       return aerobicDecoupling(e1, e2);
     } catch { return null; }
@@ -186,6 +191,47 @@ export const CardioAnalyticsDashboard: React.FC<{ cycle: CardioCycle | null; log
       return cardioInterferenceV2({ modality: mods.length ? mods : ['cycling'], frequencyPerWeek: 3, avgDurationMin: 30, legDaysPerWeek: legPerWeek, gap: 'separate_day', sex: cycle.config?.sex });
     } catch { return null; }
   }, [cycle]);
+
+  // PRO: анемия/железодефицит из анализов профиля (P2-аудит: раньше здесь был
+  // захардкожен текст про ферритин — движок cardioAnemiaSignals существовал,
+  // но не получал анализы). Честное «нет данных» вместо общего совета.
+  const anemia = useMemo(() => {
+    try {
+      const p = getProfile();
+      const s = (p?.settings?.labs?.summary ?? {}) as Record<string, { value?: number }>;
+      const pick = (names: string[]): number | undefined => {
+        for (const k of Object.keys(s)) {
+          if (names.includes(k.toUpperCase()) && Number.isFinite(s[k]?.value)) return Number(s[k].value);
+        }
+        return undefined;
+      };
+      const labs = {
+        ferritin: pick(['FERRITIN']),
+        hemoglobin: pick(['HGB', 'HB', 'HEMOGLOBIN']),
+        hct: pick(['HCT', 'HEMATOCRIT']),
+      };
+      if (labs.ferritin == null && labs.hemoglobin == null && labs.hct == null) return null;
+      return cardioAnemiaSignals(labs, cycle?.config?.sex);
+    } catch { return null; }
+  }, [cycle]);
+
+  // PRO: ЧСС покоя по дневнику АД (утренние замеры) — тренд 7д vs 21д.
+  const restHr = useMemo(() => {
+    try {
+      const raw = JSON.parse(localStorage.getItem('he_bp_diary') ?? '[]');
+      const arr = Array.isArray(raw) ? raw : [];
+      const entries: { date: string; hr: number }[] = [];
+      for (const e of arr) {
+        if (!e || typeof e.date !== 'string') continue;
+        const hr = Number(e.pulse ?? e.hr);
+        if (!(hr > 30 && hr < 140)) continue;
+        if (e.timeOfDay != null && e.timeOfDay !== 'morning') continue;
+        entries.push({ date: e.date, hr });
+      }
+      if (entries.length === 0) return null;
+      return cardioRestingHrSignal(entries);
+    } catch { return null; }
+  }, []);
 
   return (
     <div className="train-cardiostats" style={CARD}>
@@ -231,7 +277,21 @@ export const CardioAnalyticsDashboard: React.FC<{ cycle: CardioCycle | null; log
       {safety && <div style={{ fontSize: 11, color: '#fbbf24', background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.22)', borderRadius: 8, padding: '6px 8px' }}>🌡 Жара/высота: +{safety.addBpm} уд/мин к зонам — {safety.notes.join(' ')}</div>}
       {interfV2 && interfV2.level !== 'low' && <div style={{ fontSize: 11, color: '#93c5fd', background: 'rgba(59,130,246,0.07)', border: '1px solid rgba(59,130,246,0.22)', borderRadius: 8, padding: '6px 8px' }}>🔬 Interference v2 {interfV2.score}/10 ({interfV2.level}) — {interfV2.advice}</div>}
       {interference && interference.level !== 'low' && <div style={{ fontSize: 11, color: interference.level === 'high' ? '#f87171' : '#fbbf24', background: interference.level === 'high' ? 'rgba(239,68,68,0.08)' : 'rgba(245,158,11,0.08)', border: `1px solid ${interference.level === 'high' ? 'rgba(239,68,68,0.24)' : 'rgba(245,158,11,0.24)'}`, borderRadius: 8, padding: '6px 8px' }}>⚡ Interference {interference.score}/10 ({interference.level}) — {interference.advice}</div>}
-      <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: 8, padding: '6px 8px' }}>🩸 При ferritin &lt;30 мкг/л — железо 18мг + витамин C, контроль Hb; RED-S &lt;30 ккал/кг FFM — объём не повышать.</div>
+      {anemia && anemia.warnings.length > 0 && (
+        <div style={{ fontSize: 11, color: anemia.hbLow ? '#f87171' : '#fbbf24', background: anemia.hbLow ? 'rgba(239,68,68,0.08)' : 'rgba(245,158,11,0.08)', border: `1px solid ${anemia.hbLow ? 'rgba(239,68,68,0.22)' : 'rgba(245,158,11,0.22)'}`, borderRadius: 8, padding: '6px 8px' }} data-autotune="anemia">
+          🩸 {anemia.warnings.join(' ')}{anemia.hbLow ? ' Объём кардио −10%.' : ''}
+        </div>
+      )}
+      {!anemia && (
+        <div style={{ fontSize: 11, color: '#fff', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 8, padding: '6px 8px' }}>
+          🩸 Анализов (ферритин/Hb/HCT) в профиле нет — железодефицит оценить нечем. При ферритине &lt;30 мкг/л — железо 18 мг + витамин C, контроль Hb.
+        </div>
+      )}
+      {restHr && (restHr.warning || restHr.deltaPct != null) && (
+        <div style={{ fontSize: 11, color: restHr.warning ? '#f87171' : '#fff', background: restHr.warning ? 'rgba(239,68,68,0.08)' : 'rgba(255,255,255,0.02)', border: `1px solid ${restHr.warning ? 'rgba(239,68,68,0.22)' : 'rgba(255,255,255,0.06)'}`, borderRadius: 8, padding: '6px 8px' }}>
+          💓 ЧСС покоя (АД, утро): 7д {restHr.avg7 != null ? restHr.avg7.toFixed(0) : '—'} · 21д {restHr.avg21 != null ? restHr.avg21.toFixed(0) : '—'} уд/мин{restHr.deltaPct != null ? ` (${restHr.deltaPct > 0 ? '+' : ''}${restHr.deltaPct.toFixed(1)}%)` : ''}{restHr.warning ? ` — ${restHr.warning}` : ''}
+        </div>
+      )}
       <div style={HINT_SM}>TRIMP Banister (HRr×k·e^b·HRr) где есть HR, иначе фактор. Рост &gt;15% за неделю — риск перегруза. 80/20 — Seiler polarized.</div>
     </div>
   );

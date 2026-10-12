@@ -335,12 +335,15 @@ describe('день: план, факт, нагрузка (кардио-слой 
     expect(l.totalLoad).toBe(498);
   });
 
-  it('cardioDayLoad без RPE: дефолт 5 → cardioLoad = 0.5 × минуты', () => {
+  // Было→стало (аудит P1-6): дефолт был 5 («cardioDayLoad без RPE: дефолт 5»),
+  // теперь единая шкала канона cardioEntryLoad — дефолт 6, как в ACWR:
+  // «Нагрузка дня» больше не расходится вдвое с ACWR/монотонностью.
+  it('cardioDayLoad без RPE: единая шкала (дефолт 6) → cardioLoad = 0.6 × минуты', () => {
     const log = [entry({ date: '2026-01-05', durationMin: 20, completed: true })];
     const l = cardioDayLoad(null, log, [], '2026-01-05', REF);
-    expect(l.cardioLoad).toBe(10);
+    expect(l.cardioLoad).toBe(12);
     expect(l.strengthSessions).toBe(0);
-    expect(l.totalLoad).toBe(10);
+    expect(l.totalLoad).toBe(12);
   });
 });
 

@@ -8,7 +8,7 @@ import {
   spreadSessionsAcrossDays, DAY_LABELS_RU, CARDIO_PHASE_LABELS,
   loadCardioCycles, saveCardioCycle, setActiveCardioCycle, kcalForCardio,
   saveCardioCycleVersion, latestCardioCycleVersion, restoreCardioCycleVersion,
-  cardioWeekForDate, cardioSafetyReport, cycleBodyWeight, cardioWeekLegConflicts, cardioHiitInjectGate,
+  cardioWeekForDate, cardioSafetyReport, cycleBodyWeight, cycleFfmKg, rebuildCycle, cardioWeekLegConflicts, cardioHiitInjectGate,
   type CardioCycle, type CardioType, type CardioSession, type CardioWeek,
 } from '../../../engines/lms/cardio.engine';
 import { CARD, ROW, LABEL, HINT_SM, BTN, BTN_PRIMARY, BTN_DANGER, BTN_SMALL, SelectInput } from './CardioUI';
@@ -56,7 +56,9 @@ export const CardioWeekEditor: React.FC<{ cycle: CardioCycle | null; onChanged?:
   const saveWeek = (patch: (w: CardioWeek) => CardioWeek) => {
     if (!cycle || !week) return;
     saveCardioCycleVersion(cycle, `правка недели ${week.week}`);
-    const next = { ...cycle, weeks: cycle.weeks.map(w => (w.week === week.week ? rebuildTotals(patch(w)) : w)) };
+    // Итоги НЕДЕЛИ пересчитывает rebuildTotals, итоги ЦИКЛА — rebuildCycle:
+    // иначе cycle.totalKkal остаётся от сборки и hero/сводка/экспорт врут.
+    const next = rebuildCycle({ ...cycle, weeks: cycle.weeks.map(w => (w.week === week.week ? rebuildTotals(patch(w)) : w)) });
     saveCardioCycle(next);
     setActiveCardioCycle(next);
     onChanged?.();
@@ -76,10 +78,10 @@ export const CardioWeekEditor: React.FC<{ cycle: CardioCycle | null; onChanged?:
   const copyToNext = () => {
     if (!cycle || !week || week.week >= cycle.totalWeeks) return;
     saveCardioCycleVersion(cycle, 'копия недели');
-    const next = {
+    const next = rebuildCycle({
       ...cycle,
       weeks: cycle.weeks.map(w => (w.week === week.week + 1 ? { ...rebuildTotals({ ...week, week: week.week + 1 }), phase: w.phase, deload: w.deload, taper: w.taper, rationale: w.rationale } : w)),
-    };
+    });
     saveCardioCycle(next);
     setActiveCardioCycle(next);
     setWeekNo(Math.min(cycle.totalWeeks, week.week + 1));
@@ -108,11 +110,18 @@ export const CardioWeekEditor: React.FC<{ cycle: CardioCycle | null; onChanged?:
     flashMsg(`⛔ ${hiitGate.reason ?? 'HIIT запрещён мед-скринингом'} (${TYPE_LABEL[type]} не добавлен)`);
   };
 
+  // kcal считаем тем же движком и теми же входами (пол/FFM), что и сборка —
+  // иначе ручная правка недели расходится с планом по калориям.
   const bw = cycle ? cycleBodyWeight(cycle) : 80;
+  const ffm = cycle ? cycleFfmKg(cycle) : undefined;
+  const csex = cycle?.config?.sex;
 
   const scaleMinutes = (mult: number) => saveWeek(w => ({
     ...w,
-    sessions: w.sessions.map(s => ({ ...s, durationMin: Math.max(10, Math.round(s.durationMin * mult)), kcalPerSession: kcalForCardio(s.type, Math.max(10, Math.round(s.durationMin * mult)), bw, s.equipment) })),
+    sessions: w.sessions.map(s => {
+      const dur = Math.max(10, Math.round(s.durationMin * mult));
+      return { ...s, durationMin: dur, kcalPerSession: kcalForCardio(s.type, dur, bw, s.equipment, csex, ffm) };
+    }),
   }));
 
   const updateSession = (idx: number, patch: Partial<CardioSession>) => {
@@ -128,7 +137,7 @@ export const CardioWeekEditor: React.FC<{ cycle: CardioCycle | null; onChanged?:
       sessions: w.sessions.map((s, i) => {
         if (i !== idx) return s;
         const next = { ...s, ...patch };
-        next.kcalPerSession = kcalForCardio(next.type, next.durationMin, bw, next.equipment);
+        next.kcalPerSession = kcalForCardio(next.type, next.durationMin, bw, next.equipment, csex, ffm);
         return next;
       }),
     }));
@@ -140,7 +149,7 @@ export const CardioWeekEditor: React.FC<{ cycle: CardioCycle | null; onChanged?:
     if (!hiitGate.allowed && (newType === 'hiit' || newType === 'miss')) { gateFlash(newType); return; }
     saveWeek(w => ({
       ...w,
-      sessions: [...w.sessions, { type: newType, durationMin: 30, weeklyFrequency: 1, intensity: newType === 'hiit' ? 'high' : newType === 'recovery' ? 'low' : 'moderate', kcalPerSession: kcalForCardio(newType, 30, bw, undefined), purpose: 'Ручная сессия' }],
+      sessions: [...w.sessions, { type: newType, durationMin: 30, weeklyFrequency: 1, intensity: newType === 'hiit' ? 'high' : newType === 'recovery' ? 'low' : 'moderate', kcalPerSession: kcalForCardio(newType, 30, bw, undefined, csex, ffm), purpose: 'Ручная сессия' }],
     }));
   };
 

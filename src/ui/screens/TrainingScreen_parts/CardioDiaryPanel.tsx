@@ -89,46 +89,23 @@ export const CardioDiaryPanel: React.FC<{ cycle: CardioCycle | null; acwr?: numb
   const stats7 = useMemo(() => cardioLogStats(log, 7), [log]);
   const stats28 = useMemo(() => cardioLogStats(log, 28), [log]);
   const advice = useMemo(() => computeCardioAdvice(cycle, log, { acwr, recoveryLow }), [log, cycle, acwr, recoveryLow]);
+  // Серия дней подряд. Было три разных расчёта в одном memo (два из них —
+  // мёртвые: их результат перезатирался). Один проход: best по всем дням,
+  // current — серия, оканчивающаяся не позже «сегодня».
   const streak = useMemo(() => {
     const dates = Array.from(new Set(log.filter(e => e.completed).map(e => e.date))).sort();
     if (dates.length === 0) return { current: 0, best: 0 };
     let best = 1, cur = 1;
     for (let i = 1; i < dates.length; i++) {
-      const prev = new Date(dates[i - 1]).getTime();
-      const curD = new Date(dates[i]).getTime();
-      const diff = Math.round((curD - prev) / 86400000);
+      const diff = Math.round((new Date(dates[i]).getTime() - new Date(dates[i - 1]).getTime()) / 86400000);
       if (diff === 1) cur++;
       else { best = Math.max(best, cur); cur = 1; }
     }
     best = Math.max(best, cur);
-    // current streak: from today backwards
-    const today = todayIso();
-    let curStreak = 0;
-    let d = new Date(today);
-    const set = new Set(dates);
-    for (let i = 0; i < 30; i++) {
-      const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-      if (set.has(iso)) curStreak++;
-      else if (i === 0) { /* today not done yet, check yesterday */ }
-      else break;
-      d.setDate(d.getDate() - 1);
-      if (i === 0 && curStreak === 0) continue;
-      if (!set.has(iso) && curStreak > 0) break;
-    }
-    // simpler current: consecutive from latest date backwards
-    if (dates.length > 0) {
-      let c = 1;
-      for (let i = dates.length - 1; i > 0; i--) {
-        const diff = Math.round((new Date(dates[i]).getTime() - new Date(dates[i - 1]).getTime()) / 86400000);
-        if (diff === 1) c++; else break;
-      }
-      // if latest date not today, streak is c but may be broken
-      const latest = dates[dates.length - 1];
-      const diffToday = Math.round((new Date(today).getTime() - new Date(latest).getTime()) / 86400000);
-      if (diffToday > 1) curStreak = 0;
-      else curStreak = c;
-    }
-    return { current: curStreak, best };
+    // cur — серия, оканчивающаяся последней записью; если она старше
+    // «сегодня» больше чем на день — серия прервана.
+    const diffToday = Math.round((new Date(todayIso()).getTime() - new Date(dates[dates.length - 1]).getTime()) / 86400000);
+    return { current: diffToday > 1 ? 0 : cur, best };
   }, [log]);
   const shareWeek = () => {
     const txt = `Кардио 7д: ${stats7.sessions} сесс · ${stats7.minutes} мин${stats7.km > 0 ? ` · ${stats7.km} км` : ''}${stats7.avgPace ? ` · ${stats7.avgPace}` : ''} · стрик ${streak.current}д (лучший ${streak.best}д)`;

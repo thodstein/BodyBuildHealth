@@ -12,9 +12,10 @@
  */
 import React, { useState } from 'react';
 import { saveCardioLogEntry, importCardioEntries, estimateCardioEntryKcal, type CardioLogEntry } from '../../../engines/lms/cardio-diary.engine';
-import { parseCardioImport, parseCardioZipAsync, cardioImportFormatLabel } from '../../../engines/cardio-import.engine';
+import { parseCardioImport, parseCardioZipAsync, parseCardioFitRecords, fitDecoupling, fitHrZoneHistogram, fitSecondHalfDrop, cardioImportFormatLabel, type FitRecordPoint } from '../../../engines/cardio-import.engine';
 import { todayLocalIso, toLocalIso } from '../../../engines/lms/cardio-date-utils.engine';
 import { getWeightLog } from '../../../engines/profile-store';
+import { lthrZones, cardioHeartZones, type HeartZone, type CardioCycle } from '../../../engines/lms/cardio.engine';
 import { CARD, ROW, LABEL, HINT_SM, BTN, BTN_CTA, BTN_SMALL, CHIP, CHIP_ACTIVE } from './CardioUI';
 import type { CardioType } from '../../../engines/lms/cardio.engine';
 
@@ -37,9 +38,44 @@ function currentWeightKg(): number | undefined {
 
 const newId = () => `c-${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
 
-export const CardioImportPanel: React.FC<{ onImported?: () => void }> = ({ onImported }) => {
+/** Границы HR-зон для гистограммы FIT — из эталона цикла (LTHR > talk/возраст).
+ *  null → зоны неизвестны, гистограмма честно не показывается. */
+function zoneBoundsFromCycle(cycle: CardioCycle | null | undefined): number[] | null {
+  const cfg = cycle?.config as { lthr?: number; age?: number; sex?: 'male' | 'female'; restingHr?: number; maxHrFormula?: 'classic' | 'tanaka' | 'gulati' } | undefined;
+  try {
+    let zones: HeartZone[] | null = null;
+    if (cfg?.lthr != null && cfg.lthr >= 80 && cfg.lthr <= 220) zones = lthrZones(Math.round(cfg.lthr));
+    else if (cfg?.age != null) zones = cardioHeartZones(cfg.age, cfg.restingHr, undefined, cfg.sex, cfg.maxHrFormula);
+    if (!zones || zones.length < 5) return null;
+    return zones.slice(0, 4).map(z => z.bpmMax);
+  } catch { return null; }
+}
+
+interface FitAnalysis {
+  records: number;
+  mode: 'power' | 'speed' | null;
+  decouplingPct: number | null;
+  dropPct: number | null;
+  dropNote: string;
+  hist: { bounds: number[]; counts: number[] } | null;
+}
+
+/** PRO-разбор посекундных записей FIT (гистограмма зон, decoupling, затухание). */
+function analyzeFitRecords(records: FitRecordPoint[], bounds: number[] | null): FitAnalysis | null {
+  if (records.length < 10) return null;
+  const hasPower = records.some(r => r.powerWatts != null && r.powerWatts > 0);
+  const hasSpeed = records.some(r => r.speedKmh != null && r.speedKmh > 0);
+  const mode: 'power' | 'speed' | null = hasPower ? 'power' : hasSpeed ? 'speed' : null;
+  const decouplingPct = mode ? fitDecoupling(records, mode) : null;
+  const drop = fitSecondHalfDrop(records);
+  const hist = bounds ? { bounds, counts: fitHrZoneHistogram(records, bounds) } : null;
+  return { records: records.length, mode, decouplingPct, dropPct: drop.dropPct, dropNote: drop.note, hist };
+}
+
+export const CardioImportPanel: React.FC<{ onImported?: () => void; cycle?: CardioCycle | null }> = ({ onImported, cycle }) => {
   const [type, setType] = useState<CardioType>('zone2');
   const [preview, setPreview] = useState<{ entries: CardioLogEntry[]; warnings: string[]; format: string; fileName: string } | null>(null);
+  const [fit, setFit] = useState<FitAnalysis | null>(null);
   const [flash, setFlash] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [date, setDate] = useState(() => todayLocalIso());
@@ -60,19 +96,34 @@ export const CardioImportPanel: React.FC<{ onImported?: () => void }> = ({ onImp
     }
     setBusy(true);
     try {
-      const result = isZip
-        ? await parseCardioZipAsync(await f.arrayBuffer())
-        : isBinary
-          ? parseCardioImport(f.name, await f.arrayBuffer())
-          : parseCardioImport(f.name, await f.text());
+      let result;
+      let records: FitRecordPoint[] = [];
+      if (isZip) {
+        result = await parseCardioZipAsync(await f.arrayBuffer());
+      } else if (lower.endsWith('.fit')) {
+        // P2-аудит: FIT шёл через общий `parseCardioImport` — посекундные
+        // записи (HR/power/speed) отбрасывались, хотя движок умеет их вернуть
+        // (`parseCardioFitRecords`). PRO-разбор (зоны/decoupling/затухание)
+        // остался без поверхности. Теперь — полный разбор.
+        const detailed = parseCardioFitRecords(await f.arrayBuffer());
+        result = detailed.result;
+        records = detailed.records;
+      } else if (isBinary) {
+        result = parseCardioImport(f.name, await f.arrayBuffer());
+      } else {
+        result = parseCardioImport(f.name, await f.text());
+      }
       if (result.entries.length === 0) {
         setPreview({ entries: [], warnings: result.warnings, format: result.format, fileName: f.name });
+        setFit(null);
         say(`⚠ Импорт не удался: ${result.warnings[0] ?? 'нет записей'}`, 4000);
         return;
       }
       setPreview({ ...result, fileName: f.name });
+      setFit(analyzeFitRecords(records, zoneBoundsFromCycle(cycle)));
       const km = result.entries.reduce((s, x) => s + (x.distanceKm ?? 0), 0);
-      say(`📥 ${f.name}: ${result.entries.length} тренировр${result.entries.length === 1 ? 'а' : 'ок(и)'} · ${cardioImportFormatLabel(result.format)}${km > 0 ? ` · ${km.toFixed(1)} км` : ''} — проверьте превью`, 4000);
+      const fitTail = records.length >= 10 ? ' · PRO-разбор FIT готов' : '';
+      say(`📥 ${f.name}: ${result.entries.length} тренировр${result.entries.length === 1 ? 'а' : 'ок(и)'} · ${cardioImportFormatLabel(result.format)}${km > 0 ? ` · ${km.toFixed(1)} км` : ''}${fitTail} — проверьте превью`, 4000);
     } catch (err) {
       say(`⚠ Ошибка чтения файла: ${(err as Error).message}`, 4000);
     } finally {
@@ -99,6 +150,7 @@ export const CardioImportPanel: React.FC<{ onImported?: () => void }> = ({ onImp
       notes: `импорт ${preview.fileName}`,
     });
     setPreview(null);
+    setFit(null);
     say('💾 Импортированная сессия сохранена в дневник');
     onImported?.();
   };
@@ -161,6 +213,38 @@ export const CardioImportPanel: React.FC<{ onImported?: () => void }> = ({ onImp
           {preview.warnings.length > 0 && (
             <div style={{ fontSize: 11, color: '#fbbf24', lineHeight: 1.5 }}>
               {preview.warnings.slice(0, 3).join(' · ')}
+            </div>
+          )}
+          {fit && (
+            <div style={{ background: 'rgba(167,139,250,0.08)', border: '1px solid rgba(167,139,250,0.26)', borderLeft: '3px solid #a78bfa', borderRadius: 10, padding: '9px 11px', display: 'flex', flexDirection: 'column', gap: 5 }} data-cardio="fit-analysis">
+              <div style={{ fontSize: 11.5, fontWeight: 800, color: '#c4b5fd' }}>🔬 PRO-разбор FIT · {fit.records.toLocaleString('ru-RU')} записей</div>
+              {fit.hist && (() => {
+                const total = fit.hist!.counts.reduce((s, x) => s + x, 0);
+                if (total === 0) return null;
+                const labels = ['Z1', 'Z2', 'Z3', 'Z4', 'Z5'];
+                return (
+                  <div style={{ fontSize: 11, color: '#fff', fontVariantNumeric: 'tabular-nums', lineHeight: 1.5 }}>
+                    Пульс-зоны:{' '}
+                    {fit.hist!.counts.map((c, i) => (
+                      <span key={labels[i]} style={{ marginRight: 8 }}>{labels[i]} {Math.round((c / total) * 100)}%</span>
+                    ))}
+                    <span style={{ opacity: 0.75 }}> (границы {fit.hist!.bounds.join('/')})</span>
+                  </div>
+                );
+              })()}
+              {!fit.hist && (
+                <div style={{ fontSize: 11, color: '#fff', opacity: 0.8 }}>Зоны не заданы в параметрах цикла (LTHR/возраст) — гистограмма пульса недоступна.</div>
+              )}
+              {fit.decouplingPct != null && (
+                <div style={{ fontSize: 11, color: fit.decouplingPct < 5 ? '#4ade80' : fit.decouplingPct <= 10 ? '#fbbf24' : '#f87171', fontVariantNumeric: 'tabular-nums', lineHeight: 1.5 }}>
+                  Pa:HR decoupling {fit.decouplingPct}% ({fit.mode === 'power' ? 'мощность/пульс' : 'темп/пульс'}) — {fit.decouplingPct < 5 ? 'дюрабилити сильная (<5%)' : fit.decouplingPct <= 10 ? 'средняя (5–10%)' : 'слабая (>10%) — продлите базу'}.
+                </div>
+              )}
+              {fit.dropPct != null && (
+                <div style={{ fontSize: 11, color: fit.dropPct > 10 ? '#f87171' : '#4ade80', fontVariantNumeric: 'tabular-nums', lineHeight: 1.5 }}>
+                  {fit.dropNote}
+                </div>
+              )}
             </div>
           )}
           {single ? (

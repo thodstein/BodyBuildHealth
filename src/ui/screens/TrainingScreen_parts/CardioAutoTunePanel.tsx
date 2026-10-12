@@ -9,9 +9,10 @@ import {
   loadCardioCycles, saveCardioCycle, setActiveCardioCycle,
   saveCardioCycleVersion, latestCardioCycleVersion, restoreCardioCycleVersion,
   lthrZones, runningVdot, estimateLTHRFrom30Min, cyclingPowerZones, menstrualPhaseForDate, cardioCyclePeriodAware,
+  cardioFactHrAdjustment,
   type CardioCycle, type CardioTuneChange,
 } from '../../../engines/lms/cardio.engine';
-import { loadCardioLog, cardioHrCompliance } from '../../../engines/lms/cardio-diary.engine';
+import { loadCardioLog, cardioHrCompliance, loadCardioWellness, wellnessReadiness } from '../../../engines/lms/cardio-diary.engine';
 import { CARD, ROW, LABEL, HINT_SM, BTN, BTN_SMALL, BTN_PRIMARY, BTN_DANGER, NumberInput, Badge, Accordion } from './CardioUI';
 import { getProfile, updateSection } from '../../../core/profile-manager';
 import { connectBleHr, type BleHrState } from '../../../engines/lms/cardio-ble.engine';
@@ -147,9 +148,20 @@ export const CardioAutoTunePanel: React.FC<{
     flashMsg(v ? '⚡ Авто-применение включено: подстройки применяются сразу (с undo)' : 'Авто-применение выключено: только предпросмотр');
   };
 
+  // Готовность (wellness) — сигнал «сегодня»: автотюн обязан её учитывать,
+  // иначе подпись в дневнике «готовность влияет на автотюн» врала.
+  // Берём отметку за сегодня; нет — null (движок тогда решает по дневнику).
+  const wellnessR = useMemo(() => {
+    try {
+      const w = loadCardioWellness().find(x => x.date === todayIso());
+      return w ? wellnessReadiness(w) : null;
+    } catch { return null; }
+    // todayIso() — локальная дата дня рендера; пересчёт на каждый день достаточен.
+  }, []);
+
   const applyTune = () => {
     if (!cycle) return;
-    const r = autoTuneCardioCycle(cycle, loadCardioLog(), { acwr });
+    const r = autoTuneCardioCycle(cycle, loadCardioLog(), { acwr, wellnessReadiness: wellnessR });
     if (r.changes.length === 0) return;
     saveCardioCycleVersion(cycle, 'авто-подстройка');
     saveCardioCycle(r.cycle);
@@ -161,9 +173,25 @@ export const CardioAutoTunePanel: React.FC<{
 
   const previewTune = () => {
     if (!cycle) { flashMsg('⚠ Сначала соберите кардио-цикл'); return; }
-    const r = autoTuneCardioCycle(cycle, loadCardioLog(), { acwr });
+    const r = autoTuneCardioCycle(cycle, loadCardioLog(), { acwr, wellnessReadiness: wellnessR });
     if (r.changes.length === 0) { flashMsg('✅ Дневник соответствует плану — изменений нет'); return; }
     setPending({ changes: r.changes, reason: r.advice.reason });
+  };
+
+  /** PRO: факт-ЧСС против целевых зон. Если пульс по дневнику устойчиво выше
+   *  потолка Z2, будущим неделям зоны −5 уд/мин (движок cardioFactHrAdjustment).
+   *  P2-аудит: функция была без потребителя в UI. */
+  const applyFactHrZones = () => {
+    if (!cycle) { flashMsg('⚠ Сначала собройте кардио-цикл'); return; }
+    try {
+      const r = cardioFactHrAdjustment(cycle, loadCardioLog().map(e => ({ date: e.date, avgHr: e.avgHr })));
+      if (r.changes.length === 0) { flashMsg(r.notes[0] ?? '✅ Факт-ЧСС в пределах целевых зон'); return; }
+      saveCardioCycleVersion(cycle, '🎯 факт-ЧСС → зоны');
+      saveCardioCycle(r.cycle);
+      setActiveCardioCycle(r.cycle);
+      onChanged?.();
+      flashMsg(`🎯 Зоны скорректированы по факту: ${r.changes.length} нед (−5 уд/мин к будущим)`);
+    } catch { flashMsg('⚠ Не удалось скорректировать зоны по факту'); }
   };
 
   // Авто-режим: при изменении цикла/дневника — предпросмотр, а при
@@ -212,6 +240,7 @@ export const CardioAutoTunePanel: React.FC<{
           {autoMode ? '🟢 Включён' : '⚪ Выключен'}
         </button>
         <button style={{ ...BTN, minHeight: 44 }} onClick={previewTune} title="Показать, что изменится по текущему дневнику">🔄 Подстроить сейчас</button>
+        <button style={{ ...BTN, minHeight: 44 }} onClick={applyFactHrZones} title="Если факт-пульс выше потолка Z2 — будущим неделям зоны −5 уд/мин" data-autotune="fact-hr-zones">🎯 Факт-ЧСС → зоны</button>
         <button
           style={autoApply ? { ...BTN_PRIMARY, minHeight: 44, padding: '9px 14px' } : { ...BTN, minHeight: 44, padding: '9px 14px' }}
           onClick={() => toggleAutoApply(!autoApply)}
@@ -223,6 +252,10 @@ export const CardioAutoTunePanel: React.FC<{
         {hasVersion && <button style={{ ...BTN, minHeight: 44 }} onClick={undoVersion} title="Отменить последнюю авто-подстройку/правку">↩ Вернуть версию</button>}
       </div>
       {flash && <div style={{ fontSize: 11.5, fontWeight: 750, color: '#4ade80', background: 'rgba(0,230,138,0.08)', border: '1px solid rgba(0,230,138,0.28)', borderLeft: '3px solid #00e68a', borderRadius: 10, padding: '8px 11px', lineHeight: 1.5 }} role="status">{flash}</div>}
+
+      <div style={{ fontSize: 11, color: '#fff', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, padding: '7px 10px' }} data-autotune="wellness">
+        🧘 Готовность сегодня: {wellnessR != null ? `${wellnessR}/10` : 'нет отметки'} — {wellnessR != null ? (wellnessR < 4 ? 'низкая: автотюн снизит минуты и уберёт HIIT' : 'в норме: автотюн решает по дневнику') : 'отметьте в дневнике кардио (Wellness), учтём при подстройке'}
+      </div>
 
       {pending && (
         <div style={{ background: 'rgba(59,130,246,0.09)', border: '1px solid rgba(59,130,246,0.32)', borderLeft: '3px solid #60a5fa', borderRadius: 11, padding: 11, display: 'flex', flexDirection: 'column', gap: 7 }}>

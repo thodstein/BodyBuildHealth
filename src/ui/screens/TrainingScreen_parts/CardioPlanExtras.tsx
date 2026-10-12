@@ -18,11 +18,16 @@ export const CardioValidationCard: React.FC<{
 }> = ({ cycle, beginner, strict, onToggleStrict, onAddHiit }) => {
   const v = useMemo(() => {
     if (!cycle) return null;
-    const cfg = cycle.config as unknown as { redFlags?: string[]; age?: number } | undefined;
+    const cfg = cycle.config as unknown as { redFlags?: string[]; age?: number; competitions?: { week?: number }[] };
     const medicalBlock = (() => {
       try { return needsMedicalBlock(cfg?.redFlags, cfg?.age); } catch { return false; }
     })();
-    return validateCardioCycle(cycle, { beginner, strict, medicalBlock });
+    // P1-аудит: старты цикла не доезжали до валидатора — проверка «taper перед
+    // стартом» (no_taper) никогда не срабатывала в UI. Берём недели из конфига.
+    const competitionWeeks = Array.isArray(cfg?.competitions)
+      ? cfg.competitions.map(c => c?.week).filter((w): w is number => typeof w === 'number' && w > 0)
+      : [];
+    return validateCardioCycle(cycle, { beginner, strict, medicalBlock, competitionWeeks });
   }, [cycle, beginner, strict]);
   if (!cycle || !v) return null;
   const color = v.qualityScore >= 85 ? '#22c55e' : v.qualityScore >= 60 ? '#f59e0b' : '#ef4444';

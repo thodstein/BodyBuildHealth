@@ -30,8 +30,11 @@ import {
   dailyTrimpMap,
   cardioFactCtlSeries,
   cardioHrDrift,
+  cardioEntryLoad,
+  maxHrByFormula,
 } from './cardio-physiology.engine';
-import { addDaysIso, todayLocalIso, toLocalIso, parseLocalIso } from './cardio-date-utils.engine';
+
+import { addDaysIso, todayLocalIso, toLocalIso, parseLocalIso, weekStartIso, dayOfWeekIso } from './cardio-date-utils.engine';
 export { addDaysIso, todayLocalIso, toLocalIso } from './cardio-date-utils.engine';
 export type { HeartZone, VdotResult, CardioCtlPoint, CardioFactCtlPoint } from './cardio-physiology.engine';
 // PRO-уровень: новые движки (эпики A/B/D/E/F/G) — реэкспорт для UI, без циклов (только типы внутрь).
@@ -53,6 +56,9 @@ export { fuelingForSession, heatAcclimationPlan, altitudeNote } from './cardio-f
 export type { RacePrediction } from './cardio-race-predictor.engine';
 export { predictRaceTimes, predictorNote, RACE_WEEK_CHECKLIST, raceChecklistIcsLine } from './cardio-race-predictor.engine';
 export { zone2HonestyNote } from './cardio-zone2-honesty.engine';
+export type { CardioCompPriority, CardioPeakBlockSpec } from './cardio-peak-block.engine';
+export { peakBlockSpecFor, applyPeakBlockToInput, peakBlockHint } from './cardio-peak-block.engine';
+import { peakBlockSpecFor } from './cardio-peak-block.engine';
 import { fuelingForSession as fuelForSessionLocal, heatAcclimationPlan as heatAcclLocal, altitudeNote as altitudeNoteLocal } from './cardio-fueling.engine';
 import { zone2HonestyNote as honestyNoteLocal } from './cardio-zone2-honesty.engine';
 import { RACE_WEEK_CHECKLIST as RACE_CHECKLIST_LOCAL } from './cardio-race-predictor.engine';
@@ -97,6 +103,8 @@ export {
   dailyTrimpMap,
   cardioFactCtlSeries,
   cardioHrDrift,
+  cardioEntryLoad,
+  maxHrByFormula,
 } from './cardio-physiology.engine';
 
 // ─── Базовые типы — см. cardio-cycle-types.engine.ts (P1 PRO-2) ───
@@ -1310,7 +1318,7 @@ export function cardioCyclePeriodAware(
     return rebuildWeek(w, sessions, ['Лютеиновая фаза: интенсивное кардио заменено zone2 (RPE выше, задержка воды).']);
   });
   if (changes.length > 0) notes.push(`Менструальный цикл: скорректировано недель — ${changes.length}.`);
-  return { cycle: { ...cycle, weeks }, changes, notes };
+  return { cycle: rebuildCycle({ ...cycle, weeks }), changes, notes };
 }
 
 export interface CardioLabsLike {
@@ -1380,29 +1388,29 @@ export function applyCardioCompetitionCascade(
   let out = cycle;
   for (const comp of comps) {
     const priority = comp.priority ?? 'B';
+    // P2-аудит: окна тапера/пика жили inline в каскаде И отдельной спекой
+    // (`peakBlockSpecFor`) — они разошлись (B: спека обещала пик-неделю,
+    // каскад её не строил). Теперь каскад берёт окна ИЗ спеки: один источник.
+    const spec = peakBlockSpecFor(priority);
     const weeks = out.weeks.map(w => {
       const delta = comp.week - w.week;
       if (delta < 0 || w.taper || w.deload || w.phase === 'peak') return w;
-      if (priority === 'A') {
-        if (delta === 0) {
+      if (spec.taper) {
+        if (spec.peakWeek && delta === 0) {
           const sessions = [mkSession('recovery', 20, 1, 'День старта A: только лёгкая привычная активность', bw, undefined, sex)];
           return rebuildWeek({ ...w, phase: 'peak', taper: true }, sessions, ['ПЛ пик (A): только recovery 20 мин.']);
         }
-        if (delta <= 2) {
-          const mult = delta === 1 ? 0.5 : 0.7;
+        // B (spec.peakWeek=false): неделя старта тоже режется (−30%) — как было
+        // до сведения на спеку; A: окно delta 1..taperWeeks, старт — пик-неделя.
+        const inWindow = delta >= 1 && delta <= spec.taperWeeks;
+        const raceWeekTaper = delta === 0 && !spec.peakWeek;
+        if (inWindow || raceWeekTaper) {
+          const main = priority === 'A' ? (delta === 1 ? 0.5 : 0.7) : 0.7;
+          const dropMiss = priority === 'A' && delta === 1;
           const sessions = w.sessions
-            .filter(s => s.type !== 'hiit' && (delta === 1 || s.type !== 'miss'))
-            .map(s => recalcSessionKcal({ ...s, durationMin: Math.max(10, Math.round(s.durationMin * mult)), weeklyFrequency: Math.max(1, Math.round(s.weeklyFrequency * (delta === 1 ? 1 : 0.8))) }, bw, sex));
-          return rebuildWeek({ ...w, phase: 'taper', taper: true }, sessions, [`ПЛ taper (A) N-${delta}: объём снижен, HIIT${delta === 1 ? '/MISS' : ''} убраны.`]);
-        }
-        return w;
-      }
-      if (priority === 'B') {
-        if (delta === 0 || delta === 1) {
-          const sessions = w.sessions
-            .filter(s => s.type !== 'hiit')
-            .map(s => recalcSessionKcal({ ...s, durationMin: Math.max(10, Math.round(s.durationMin * 0.7)) }, bw, sex));
-          return rebuildWeek({ ...w, phase: 'taper', taper: true }, sessions, [`ПЛ taper (B) N-${delta}: объём −30%, HIIT убран.`]);
+            .filter(s => s.type !== 'hiit' && (!dropMiss || s.type !== 'miss'))
+            .map(s => recalcSessionKcal({ ...s, durationMin: Math.max(10, Math.round(s.durationMin * main)), weeklyFrequency: Math.max(1, Math.round(s.weeklyFrequency * (priority === 'A' && delta === 1 ? 1 : 0.8))) }, bw, sex));
+          return rebuildWeek({ ...w, phase: 'taper', taper: true }, sessions, [`ПЛ taper (${priority}) N-${delta}: объём снижен, HIIT${dropMiss ? '/MISS' : ''} убраны.`]);
         }
         return w;
       }
@@ -1413,7 +1421,7 @@ export function applyCardioCompetitionCascade(
       }
       return w;
     });
-    out = { ...out, weeks, rationale: [...out.rationale, `Каскад стартов ПЛ: ${priority} — неделя ${comp.week}.`] };
+    out = rebuildCycle({ ...out, weeks, rationale: [...out.rationale, `Каскад стартов ПЛ: ${priority} — неделя ${comp.week}.`] });
   }
   return out;
 }
@@ -1438,7 +1446,8 @@ export function cardioAcwr(
   if (entries.length < 2) return null;
   const ref = referenceIso ?? todayLocalIso();
   const refMs = new Date(ref).getTime();
-  const load = (e: CardioAcwrEntry) => (e.durationMin * (e.rpe && e.rpe > 0 ? e.rpe : 6)) / 10;
+  // Единая шкала нагрузки (канон cardioEntryLoad): минуты × RPE/10.
+  const load = (e: CardioAcwrEntry) => cardioEntryLoad(e.durationMin, e.rpe);
   const inWindow = (e: CardioAcwrEntry, from: number, to: number) => {
     const ms = new Date(e.date).getTime();
     // Верхняя граница хронического окна эксклюзивная — запись ровно на ref−7д
@@ -1495,9 +1504,15 @@ export function cardioRestingHrSignal(
   return { avg7, avg21, deltaPct, warning };
 }
 
-/** Факт-ЧСС против целевых зон: если в прошедших неделях средний факт-пульс
- *  устойчиво выше верхней границы zone2 (+5), будущим неделям целевые зоны
- *  снижаются на 5 уд/мин (не ниже 60/70). Прошедшие недели не меняются. */
+/** Факт-ЧСС против целевых зон: если средний факт-пульс (по всему дневнику
+ * ДО окончания целевой недели) выше верхней границы zone2 (+5), будущим
+ * неделям целевые зоны снижаются на 5 уд/мин (не ниже 60/70). Прошедшие
+ * недели не меняются.
+ *
+ * P2-аудит: было — факты искались ТОЛЬКО в окне самой целевой недели. Для
+ * будущих недель записей там нет по определению, поэтому коррекция зон не
+ * срабатывала никогда (противоречие с докустартом). Теперь для недели W
+ * берётся весь дневник до конца недели W (реальные прошлые недели + текущая). */
 export function cardioFactHrAdjustment(
   cycle: CardioCycle,
   log: { date: string; avgHr?: number }[],
@@ -1510,27 +1525,33 @@ export function cardioFactHrAdjustment(
   const weeks = cycle.weeks.map(w => {
     if (w.week <= currentWeek || w.phase === 'peak' || w.taper || w.deload) return w;
     const zone = w.sessions.find(s => s.targetHr)?.targetHr;
-    if (!zone) return w;
+    if (!zone || !cycle.startDate) return w;
     const min0 = zone.min ?? 110;
     const max0 = zone.max ?? 150;
-    const weekStart = addDaysIso(cycle.startDate!, (w.week - 1) * 7);
-    const weekEnd = addDaysIso(weekStart, 6);
-    const facts = (log ?? []).filter(e => e.avgHr && e.avgHr > 0 && e.date >= weekStart && e.date <= weekEnd);
+    // Все записи дневника до конца этой недели цикла (прошлые недели + факт
+    // текущей): именно они говорят, где реально ходит пульс.
+    const cutoff = addDaysIso(cycle.startDate, w.week * 7 - 1);
+    const facts = (log ?? []).filter(e => e.avgHr && e.avgHr > 0 && e.date <= cutoff);
     if (facts.length === 0) return w;
     const avgFact = facts.reduce((s, e) => s + e.avgHr!, 0) / facts.length;
     if (avgFact <= max0 + 5) return w;
     const sessions = w.sessions.map(s => {
       if (!s.targetHr) return s;
-      const min = Math.max(60, s.targetHr.min ?? min0 - 5);
-      const max = Math.max(70, s.targetHr.max ?? max0 - 5);
+      // P2-аудит (найдено локом): было `Math.max(70, s.targetHr.max ?? max0 - 5)` —
+      // вычитание жило ВНУТРИ nullish-ветки, поэтому при заданном max (а он
+      // задан всегда после сборки) «−5» не применялось никогда: changes-подпись
+      // обещала 140-146, факт оставался 140-151. Теперь −5 к фактическим
+      // границам с полом 60/70.
+      const min = Math.max(60, (s.targetHr.min ?? min0) - 5);
+      const max = Math.max(70, (s.targetHr.max ?? max0) - 5);
       return { ...s, targetHr: { min, max }, purpose: `${s.purpose ?? ''} (факт-ЧСС ${avgFact.toFixed(0)} > ${max0}: зона −5)`.trim() };
     });
     changes.push({ week: w.week, label: 'Факт-ЧСС выше зоны — целевые зоны −5 уд/мин', from: `${min0}-${max0}`, to: `${Math.max(60, min0 - 5)}-${Math.max(70, max0 - 5)}` });
     return { ...w, sessions };
   });
   if (changes.length === 0) notes.push('Факт-ЧСС в пределах целевых зон.');
-  else notes.push(`Факт-ЧСС: скорректированы зоны будущих недель — ${changes.length}.`);
-  return { cycle: { ...cycle, weeks }, changes, notes };
+  else notes.push(`Факт-ЧСС выше зон: скорректированы зоны будущих недель — ${changes.length}.`);
+  return { cycle: rebuildCycle({ ...cycle, weeks }), changes, notes };
 }
 
 export interface CardioPrepKcalAdvice {
@@ -1875,7 +1896,7 @@ export function bumpCardioZone2Volume(cycle: CardioCycle, addMin = 15): CardioCy
     });
     return rebuildWeek(w, sessions, ['⚖️ Zone 2 +' + addMin + ' мин (коррекция по весу)']);
   });
-  return { ...cycle, weeks, source: cycle.source };
+  return rebuildCycle({ ...cycle, weeks, source: cycle.source });
 }
 
 /** Безопасный бамп с правилом 10% (PRO): недельный объём не растёт >10%, иначе кап. Монотонность >2 — бамп запрещён. */
@@ -1887,6 +1908,7 @@ export function bumpCardioZone2VolumeGuarded(cycle: CardioCycle, addMin = 10, da
   const bw = cycleBodyWeight(cycle);
   const ffm = cycleFfmKg(cycle);
   const sex = cycle.config?.sex;
+  let anyCapped = false;
   const weeks = cycle.weeks.map(w => {
     if (w.deload || w.taper || w.phase === 'peak' || w.phase === 'transition') return w;
     const oldTotal = w.totalMinutes;
@@ -1897,11 +1919,18 @@ export function bumpCardioZone2VolumeGuarded(cycle: CardioCycle, addMin = 10, da
       const scale = capTotal / newTotal;
       sessions = sessions.map(s => s.type === 'zone2' ? recalcSessionKcal({ ...s, durationMin: Math.max(10, Math.round(s.durationMin * scale)) }, bw, sex, ffm) : s);
       newTotal = sessions.reduce((s, x) => s + x.durationMin * x.weeklyFrequency, 0);
+      anyCapped = true;
     }
     const capped = newTotal < oldTotal + addMin * w.sessions.filter(s => s.type === 'zone2').reduce((a, x) => a + x.weeklyFrequency, 0);
     return rebuildWeek(w, sessions, [capped ? `⚖️ Zone 2 +${addMin} мин (кап 10%: ${oldTotal}→${newTotal})` : `⚖️ Zone 2 +${addMin} мин (10% rule ok)`]);
   });
-  return { cycle: { ...cycle, weeks, source: cycle.source }, capped: false, reason: 'Бамп применён в рамках 10% правила.' };
+  return {
+    cycle: rebuildCycle({ ...cycle, weeks, source: cycle.source }),
+    // Честно: если хоть одна неделя уперлась в кап 10% — говорим, что бамп
+    // ограничен (раньше возвращалось «применён» даже при капе).
+    capped: anyCapped,
+    reason: anyCapped ? 'Кап 10%: часть недель увеличена меньше запрошенного.' : 'Бамп применён в рамках 10% правила.',
+  };
 }
 
 // ─── История версий цикла (undo авто-подстройки/правок) ───
@@ -2068,6 +2097,22 @@ function rebuildWeek(week: CardioWeek, sessions: CardioSession[], extraRationale
   return { ...week, sessions, totalMinutes, totalKcal, rationale: [...week.rationale, ...extraRationale] };
 }
 
+/**
+ * Пересчитать корневые итоги цикла после правки недель.
+ *
+ * rebuildWeek обновляет итоги НЕДЕЛИ, но `cycle.totalKcal`/`totalMinutes`
+ * проставлялись только на сборке — все адаптации (taper/tune/improve/bump/
+ * adapt/reschedule/move) возвращали `{...cycle, weeks}` с устаревшим
+ * totalKcal: hero-чипы, сводка, печать, .ics и мост в питание показывали
+ * старые ккал при уже других неделях. Единая точка: любая правка недель
+ * проходит через неё.
+ */
+export function rebuildCycle(cycle: CardioCycle): CardioCycle {
+  // CardioCycle несёт корневой totalKcal (минуты считаются по неделям).
+  const sum = cycle.weeks.reduce((s, w) => s + (Number.isFinite(w.totalKcal) ? w.totalKcal : 0), 0);
+  return { ...cycle, totalKcal: sum };
+}
+
 /** Пересчитать kcalPerSession под текущую длительность/оборудование.
  *  ЕДИНАЯ точка пересчёта: все адаптации (adapt/taper/tune/improve/bump)
  *  обязаны вызывать её при изменении durationMin — иначе минуты и ккал расходятся. */
@@ -2128,7 +2173,7 @@ export function adaptCardioToStrength(cycle: CardioCycle, ctx: StrengthContext):
   if (zone === 'dangerous') rationale.push('Адаптация к силовому плану: опасный ACWR.');
   else if (zone === 'caution') rationale.push('Адаптация к силовому плану: осторожный ACWR.');
   if (legDays >= 4) rationale.push('Адаптация к силовому плану: частые ноги → без HIIT/MISS.');
-  return { ...cycle, weeks, rationale, source: cycle.source };
+  return rebuildCycle({ ...cycle, weeks, rationale, source: cycle.source });
 }
 
 /**
@@ -2159,7 +2204,7 @@ export function applyPLCardioTaper(cycle: CardioCycle, opts: { competitionWeek: 
     }
     return w;
   });
-  return { ...cycle, weeks, rationale: [...cycle.rationale, `PL taper к неделе ${compWeek} применён.`] };
+  return rebuildCycle({ ...cycle, weeks, rationale: [...cycle.rationale, `PL taper к неделе ${compWeek} применён.`] });
 }
 
 /**
@@ -2192,7 +2237,7 @@ export function applyBBCardioTaper(cycle: CardioCycle, opts: { showWeek: number;
     }
     return w;
   });
-  return { ...cycle, weeks, rationale: [...cycle.rationale, `BB taper к неделе ${showWeek} применён.`] };
+  return rebuildCycle({ ...cycle, weeks, rationale: [...cycle.rationale, `BB taper к неделе ${showWeek} применён.`] });
 }
 
 /** Применить taper к циклу по типу направления. */
@@ -2244,7 +2289,7 @@ export function applyIndividualizedTaperToCycle(
     return rebuildWeek({ ...w, phase: 'taper', taper: true }, sessions, [`Индивид. taper N-${delta}: ×${mult} (план −${plan.reductionPct}% за ${plan.durationDays}д, прогноз +${plan.expectedGainPct}%).`]);
   });
   return {
-    cycle: { ...cycle, weeks, rationale: [...cycle.rationale, `Индивид. taper к неделе ${showWeek}: −${plan.reductionPct}% за ${plan.durationDays}д (exp τ=${plan.tauDays}д, прогноз +${plan.expectedGainPct}%).`] },
+    cycle: rebuildCycle({ ...cycle, weeks, rationale: [...cycle.rationale, `Индивид. taper к неделе ${showWeek}: −${plan.reductionPct}% за ${plan.durationDays}д (exp τ=${plan.tauDays}д, прогноз +${plan.expectedGainPct}%).`] }),
     changes,
   };
 }
@@ -2272,18 +2317,10 @@ function addMinutesToIcsDateTime(icsDateTime: string, minutes: number): string {
   return `${dt.getFullYear()}${pad(dt.getMonth() + 1)}${pad(dt.getDate())}T${pad(dt.getHours())}${pad(dt.getMinutes())}00`;
 }
 
-function dayStartIso(week: number, referenceIso?: string): string {
-  const ref = referenceIso ? new Date(referenceIso) : new Date();
-  const d = new Date(ref.getFullYear(), ref.getMonth(), ref.getDate() + (week - 1) * 7);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-}
-
-/** Дата конкретного дня недели (dow 0-6, Пн=0) внутри недели цикла. */
-function dayOfWeekIso(week: number, dow: number, referenceIso?: string): string {
-  const ref = referenceIso ? new Date(referenceIso) : new Date();
-  const d = new Date(ref.getFullYear(), ref.getMonth(), ref.getDate() + (week - 1) * 7 + dow);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-}
+// dayOfWeekIso/weekStartIso — канон из cardio-date-utils (локальный парс дат).
+// Раньше здесь жили приватные копии на `new Date(iso)`: 10-символьная дата
+// парсится как UTC-полночь, и в UTC−X события .ics и TCX уезжали на сутки
+// назад (стробая форма не ловилась стрocheчным guard'ом date-canon).
 
 /** Календарь .ics: кардио-события по дням недели (тип, минуты, фаза). Учитывает weeklyFrequency и dayOfWeek, DTEND = DTSTART + duration. */
 export function buildCardioIcs(cycle: CardioCycle, referenceIso?: string): string {
@@ -2295,7 +2332,7 @@ export function buildCardioIcs(cycle: CardioCycle, referenceIso?: string): strin
     'CALSCALE:GREGORIAN',
   ];
   for (const w of cycle.weeks) {
-    const baseDay = dayStartIso(w.week, ref);
+    const baseDay = weekStartIso(w.week, ref);
     for (let si = 0; si < w.sessions.length; si++) {
       const s = w.sessions[si];
       if (s.weeklyFrequency <= 0) continue;
@@ -2389,7 +2426,7 @@ export function buildCardioTcx(cycle: CardioCycle, referenceIso?: string): strin
   for (const w of cycle.weeks) {
     for (const s of w.sessions) {
       if (s.weeklyFrequency <= 0) continue;
-      const dateIso = s.dayOfWeek != null ? dayOfWeekIso(w.week, s.dayOfWeek, referenceIso) : dayStartIso(w.week, referenceIso);
+      const dateIso = s.dayOfWeek != null ? dayOfWeekIso(w.week, s.dayOfWeek, referenceIso) : weekStartIso(w.week, referenceIso);
       const start = dateIso + 'T' + '06:00:00Z';
       act++;
       lines.push(`  <Activities><Activity Sport="${tcxSportForSession(s, cycle)}" ActivityType="Manual">`);
@@ -2554,7 +2591,7 @@ export function rescheduleCardioSession(cycle: CardioCycle, dateIso: string, opt
   const week2 = rebuildWeek({ ...week, sessions }, sessions, []);
   const weeks = cycle.weeks.map(w => (w.week === week.week ? week2 : w));
   return {
-    cycle: { ...cycle, weeks },
+    cycle: rebuildCycle({ ...cycle, weeks }),
     changes: [{ week: week.week, label: 'Сессия перенесена', from: DAY_LABELS_RU[dow], to: DAY_LABELS_RU[next] }],
   };
 }
@@ -2818,7 +2855,9 @@ export const DAY_LABELS_RU = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', '�
 
 /** Раскладка сессий недели по дням (равномерно от reference-дня; сессии получают dayOfWeek). */
 export function spreadSessionsAcrossDays(week: CardioWeek, referenceIso?: string): CardioSession[] {
-  const ref = referenceIso ? new Date(referenceIso) : new Date();
+  // Канон cardio-date-utils: `new Date(iso)` парсит 10-символьную дату как
+  // UTC-полночь и в UTC−X сдвигает день недели — раскладка уезжала на сутки.
+  const ref = referenceIso ? parseLocalIso(referenceIso) : new Date();
   const startDow = (ref.getDay() + 6) % 7; // Пн=0
   const sessions: CardioSession[] = [];
   let dayIdx = startDow;
@@ -2897,6 +2936,7 @@ export interface CardioAdviceLike {
  * Авто-подстройка цикла по дневнику: «одна переменная за раз».
  * - adherence сессий <60% → частоту zone2/recovery −1;
  * - средний RPE ≥8 → минуты −10% (интенсивность не трогаем);
+ * - wellness (готовность) <4 → минуты −10% + HIIT убран (дневниковый сигнал);
  * - adherence >110% и RPE <6 → минуты +10% (для cut/recomp);
  * - ACWR ≥1.5 → HIIT убрать; ACWR 1.3-1.5 → минуты −15%;
  * - делод/taper/peak недели не трогаются.
@@ -2905,7 +2945,7 @@ export interface CardioAdviceLike {
 export function autoTuneCardioCycle(
   cycle: CardioCycle,
   log: { date: string; durationMin: number; rpe?: number; completed: boolean }[],
-  opts: { acwr?: number | null; referenceIso?: string } = {},
+  opts: { acwr?: number | null; referenceIso?: string; wellnessReadiness?: number | null } = {},
 ): CardioTuneResult {
   const parseLocal = parseLocalIso;
   const ref = opts.referenceIso ? parseLocal(opts.referenceIso) : new Date();
@@ -2954,6 +2994,18 @@ export function autoTuneCardioCycle(
       sessions = sessions.map(s => recalcSessionKcal({ ...s, durationMin: Math.max(10, Math.round(s.durationMin * 0.85)) }, bw, sex, ffm));
       const after = sessions.reduce((s, x) => s + x.durationMin * x.weeklyFrequency, 0);
       cw('ACWR осторожный → минуты −15%', `${before} мин`, `${after} мин`);
+    } else if (opts.wellnessReadiness != null && opts.wellnessReadiness < 4) {
+      // P0-аудит: wellness UI обещал «влияет на автотюн», но сигнал не доезжал
+      // до движка — панель сохраняла готовность в никуда. Низкая готовность
+      // (сон/стресс/крепатура/настроение) = та же логика, что высокая смена:
+      // минуты −10% и снятие HIIT, интенсивность не трогаем.
+      const before = sessions.reduce((s, x) => s + x.durationMin * x.weeklyFrequency, 0);
+      const hadHiit = sessions.some(s => s.type === 'hiit');
+      sessions = sessions
+        .filter(s => s.type !== 'hiit')
+        .map(s => recalcSessionKcal({ ...s, durationMin: Math.max(10, Math.round(s.durationMin * 0.9)) }, bw, sex, ffm));
+      const after = sessions.reduce((s, x) => s + x.durationMin * x.weeklyFrequency, 0);
+      cw(`Готовность ${opts.wellnessReadiness}/10 → минуты −10%${hadHiit ? ', HIIT убран' : ''}`, `${before} мин`, `${after} мин`);
     } else if (done.length > 0 && avgRpe >= 8) {
       const before = sessions.reduce((s, x) => s + x.durationMin * x.weeklyFrequency, 0);
       sessions = sessions.map(s => recalcSessionKcal({ ...s, durationMin: Math.max(10, Math.round(s.durationMin * 0.9)) }, bw, sex, ffm));
@@ -3026,7 +3078,7 @@ export function autoTuneCardioCycle(
 
   const totalBefore = cycle.weeks.reduce((s, w) => s + w.totalMinutes, 0);
   const totalAfter = weeks.reduce((s, w) => s + w.totalMinutes, 0);
-  const cycle2: CardioCycle = { ...cycle, weeks, source: cycle.source };
+  const cycle2: CardioCycle = rebuildCycle({ ...cycle, weeks, source: cycle.source });
   const advice: CardioAdviceLike = changes.length > 0
     ? { action: totalAfter < totalBefore ? 'reduce' : totalAfter > totalBefore ? 'increase' : 'keep', reason: `Авто-подстройка: ${changes.length} изменений (недель: ${[...new Set(changes.map(c => c.week))].join(', ')}).` }
     : { action: 'keep', reason: 'Данные дневника соответствуют плану — изменений нет.' };
@@ -3265,7 +3317,10 @@ export function explainCardioChoice(input: CardioCycleInput, cycle: CardioCycle)
   } else if (input.talkZone2Hr != null && input.talkZone2Hr >= 80 && input.talkZone2Hr <= 200) {
     lines.push(`Talk-test: потолок Z2 ${Math.round(input.talkZone2Hr)} уд/мин — зоны оценочные, перепроверьте LTHR-тестом.`);
   } else if (input.age != null) {
-    const zones = cardioHeartZones(input.age, input.restingHr, undefined, input.sex);
+    // Зоны — той же формулой, что и в сборке (cardio.engine:650): иначе
+    // объяснение показывало числа классической 220−age, когда план построен
+    // по Tanaka/Gulati (пользователь видел заведомо другие границы).
+    const zones = cardioHeartZones(input.age, input.restingHr, undefined, input.sex, (input as { maxHrFormula?: 'classic' | 'tanaka' | 'gulati' }).maxHrFormula);
     lines.push(`Возраст ${input.age}${input.sex === 'female' ? ' (жен.)' : ''}${input.restingHr != null && input.restingHr > 0 ? `, ЧСС покоя ${input.restingHr}` : ''}: зона Z2 = ${zones[1].bpmMin}-${zones[1].bpmMax} уд/мин.`);
   }
   const comps = (input.competitions ?? []).filter(c => c.week >= 1 && c.week <= (input.totalWeeks ?? 12));
@@ -3338,7 +3393,7 @@ export function improveCardioCycle(cycle: CardioCycle, opts: { daysAvailable?: n
     }
     return rebuildWeek(w, sessions, []);
   });
-  const cycle2: CardioCycle = { ...cycle, weeks, source: cycle.source };
+  const cycle2: CardioCycle = rebuildCycle({ ...cycle, weeks, source: cycle.source });
   if (improveMedicalBlock && (cycle.goal === 'cut' || cycle.goal === 'recomp' || cycle.goal === 'bb_prep') && s.hiitWeeks === 0) {
     cycle2.rationale = [...cycle2.rationale, 'Мед-блок: HIIT-добавка авто-улучшением пропущена — только Z2/recovery до врача.'];
   }
@@ -3517,7 +3572,7 @@ export function moveCardioSessionInWeek(cycle: CardioCycle, weekNo: number, sess
     const sessions = ww.sessions.map((s, i) => (i === sessionIdx ? { ...s, dayOfWeek: newDayOfWeek } : s));
     return { ...ww, sessions };
   });
-  return { ...cycle, weeks };
+  return rebuildCycle({ ...cycle, weeks });
 }
 
 /** Годовая CTL-серия факта (склейка по датам через cardioFactCtlSeries каждого цикла). */

@@ -5,7 +5,7 @@
  */
 import React, { useMemo, useState } from 'react';
 import {
-  loadFieldTestLog, saveFieldTestLogEntry, removeFieldTestLogEntry, responderFromLog,
+  loadFieldTestLog, saveFieldTestLogEntry, removeFieldTestLogEntry, responderFromLog, recommendFieldTest,
   type FieldTestLogEntry,
 } from '../../../engines/lms/cardio.engine';
 import { SectionCard, ROW, LABEL, BTN, BTN_PRIMARY, BTN_DANGER, Badge, EmptyState, NumberInput, HINT_SM } from './CardioUI';
@@ -30,7 +30,10 @@ const numOrUndef = (v: string): number | undefined => {
   return Number.isFinite(n) ? n : undefined;
 };
 
-export const CardioFieldTestLog: React.FC = () => {
+export const CardioFieldTestLog: React.FC<{
+  level?: 'beginner' | 'intermediate' | 'advanced';
+  equipment?: string[];
+}> = ({ level, equipment }) => {
   const [log, setLog] = useState<FieldTestLogEntry[]>(() => {
     try { return loadFieldTestLog(); } catch { return []; }
   });
@@ -144,7 +147,14 @@ export const CardioFieldTestLog: React.FC = () => {
         <div style={{ fontSize: 11, color: responder.responder ? '#4ade80' : '#fbbf24' }}>{responder.note}</div>
       )}
       {log.length === 0 ? (
-        <EmptyState icon="🔬" title="Замеров нет" desc="AeT 60' раз в месяц: drift + decoupling покажут responder/non-responder." />
+        <>
+          <EmptyState icon="🔬" title="Замеров нет" desc="AeT 60' раз в месяц: drift + decoupling покажут responder/non-responder." />
+          {level && (
+            <div style={{ fontSize: 11, color: '#c4b5fd', background: 'rgba(167,139,250,0.08)', border: '1px solid rgba(167,139,250,0.24)', borderLeft: '3px solid #a78bfa', borderRadius: 10, padding: '8px 11px', lineHeight: 1.5 }} data-fieldtest="recommend">
+              🎯 Следующий тест: {recommendFieldTest(level, equipment?.[0])}
+            </div>
+          )}
+        </>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
           {[...log].reverse().map(e => (

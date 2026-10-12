@@ -15,7 +15,7 @@ import {
   cardioSessionsForDate, cardioWeekForDate, cardioEquipmentLabel, cardioCycleSummary,
   cardioPlanVariants, explainCardioChoice, saveCardioCycleVersion, restoreCardioCycleVersion, clearCardioCycleHistory,
   loadCardioScenarios, saveCardioScenario, removeCardioScenario,
-  bumpCardioZone2Volume,
+  bumpCardioZone2VolumeGuarded, dailyTrimpMap, maxHrByFormula,
   cardioProfileFactors, cardioNutritionNotes, CARDIO_VARIANT_LABELS,
   latestFieldTestMetrics, kcalForCardio, cardioHiitInjectGate, lthrBySportFromInput,
   type CardioCycle, type CardioCycleInput, type CardioGoal, type CardioCompetitionRef, type CardioLevel, type CardioEquipment, type CardioVariant, type CardioScenario, type CardioSession,
@@ -28,6 +28,7 @@ import { hrvRecoveryMult, hrvSignalFromStore } from '../../../engines/pro/hrv-ba
 import { extractCardioProgression, cardioProgressionAdvice } from '../../../engines/lms/cardio-meso-progression.engine';
 import { getCardioIntervalPreset } from '../../../engines/lms/cardio-interval-presets.engine';
 import { CARDIO_RED_FLAGS } from '../../../engines/lms/cardio-red-flags.engine';
+import { loadCardioLog } from '../../../engines/lms/cardio-diary.engine';
 import { planFromStored, type BBContestPrepPlan } from '../../../engines/bb/bb-contest-prep.engine';
 import { buildAnnualCardioCycles, type AnnualCardioBuildOptions } from '../../../engines/annual-training/annual-training-cardio.engine';
 import {
@@ -120,6 +121,8 @@ interface WizardState {
   comps: CardioCompetitionRef[];
   wizardMode?: 'simple' | 'pro';
   bodyFatPct?: number;
+  /** Влажность % (влияет на зоны при жаре и коррекцию TSS). */
+  humidityPct?: number;
   periodizationModel?: 'linear' | 'polarized' | 'pyramidal' | 'pyramidal_polarized';
   maxHrFormula?: 'classic' | 'tanaka' | 'gulati';
 }
@@ -270,6 +273,7 @@ export const CardioConstructor: React.FC = () => {
   const [ftpWatts, setFtpWatts] = useState(() => String((wizard as WizardState).ftpWatts ?? fieldTestDefaults().ftpWatts ?? ''));
   const [talkHr, setTalkHr] = useState(() => String((wizard as WizardState).talkHr ?? fieldTestDefaults().talkHr ?? ''));
   const [tempC, setTempC] = useState(String((wizard as WizardState).tempC ?? ''));
+  const [humidityPct, setHumidityPct] = useState(String((wizard as WizardState).humidityPct ?? ''));
   const [altitudeM, setAltitudeM] = useState(String((wizard as WizardState).altitudeM ?? ''));
   // Темпы VDOT Daniels (текст «M:SS») — дописываются в сессии при сборке.
   const [easyPace, setEasyPace] = useState(String((wizard as WizardState).easyPace ?? ''));
@@ -527,6 +531,7 @@ export const CardioConstructor: React.FC = () => {
     const talkNum = Number(talkHr) >= 80 && Number(talkHr) <= 200 ? Math.round(Number(talkHr)) : undefined;
     const tempNum = tempC !== '' && Number.isFinite(Number(tempC)) ? Number(tempC) : undefined;
     const altNum = altitudeM !== '' && Number.isFinite(Number(altitudeM)) ? Math.round(Number(altitudeM)) : undefined;
+    const humNum = humidityPct !== '' && Number.isFinite(Number(humidityPct)) ? Math.max(0, Math.min(100, Math.round(Number(humidityPct)))) : undefined;
     // Один канон диапазона на превью и на реальную сборку.
     const lthrBySportNum = lthrBySportFromInput(lthrBySport);
     const base: CardioCycleInput = {
@@ -557,6 +562,7 @@ export const CardioConstructor: React.FC = () => {
       talkZone2Hr: talkNum,
       tempC: tempNum,
       altitudeM: altNum,
+      humidityPct: humNum,
       redFlags: redFlags.length > 0 ? [...redFlags] : undefined,
       tidSwitchWeek: tidSwitch ? Math.max(2, Math.ceil(totalWeeks / 2)) : undefined,
       durabilitySession: durabilityOn || undefined,
@@ -587,6 +593,7 @@ export const CardioConstructor: React.FC = () => {
     const talkNum2 = Number(talkHr) >= 80 && Number(talkHr) <= 200 ? Math.round(Number(talkHr)) : undefined;
     const tempNum2 = tempC !== '' && Number.isFinite(Number(tempC)) ? Number(tempC) : undefined;
     const altNum2 = altitudeM !== '' && Number.isFinite(Number(altitudeM)) ? Math.round(Number(altitudeM)) : undefined;
+    const humNum2 = humidityPct !== '' && Number.isFinite(Number(humidityPct)) ? Math.max(0, Math.min(100, Math.round(Number(humidityPct)))) : undefined;
     const lthrBySportNum2 = lthrBySportFromInput(lthrBySport);
     const base: CardioCycleInput = {
       goal,
@@ -617,6 +624,7 @@ export const CardioConstructor: React.FC = () => {
       talkZone2Hr: talkNum2,
       tempC: tempNum2,
       altitudeM: altNum2,
+      humidityPct: humNum2,
       redFlags: redFlags.length > 0 ? [...redFlags] : undefined,
       tidSwitchWeek: tidSwitch ? Math.max(2, Math.ceil(totalWeeks / 2)) : undefined,
       durabilitySession: durabilityOn || undefined,
@@ -643,6 +651,9 @@ export const CardioConstructor: React.FC = () => {
     setDaysAvailable(cfg.daysAvailable ?? daysAvailable);
     setRecoveryLow(cfg.recoveryLow ?? recoveryLow);
     if (cfg.bodyWeight != null) setBodyWeight(cfg.bodyWeight);
+    // P0-аудит: % жира принимал участие в сборке (kcal по FFM), но не
+    // восстанавливался при «⚙️ Изменить параметры» — пересборка теряла его.
+    if (typeof (cfg as { bodyFatPct?: number }).bodyFatPct === 'number') setBodyFatPct(String((cfg as { bodyFatPct?: number }).bodyFatPct));
     setComps(cfg.competitions ? cfg.competitions.map(c => ({ ...c })) : []);
     setTaperWeeks(cfg.taperWeeks ?? taperWeeks);
     if ((cfg as unknown as { taperModel?: 'step' | 'exponential' }).taperModel) setTaperModel((cfg as unknown as { taperModel?: 'step' | 'exponential' }).taperModel!);
@@ -671,6 +682,7 @@ export const CardioConstructor: React.FC = () => {
     if (cfg.ftpWatts != null) setFtpWatts(String(cfg.ftpWatts));
     if (cfg.talkZone2Hr != null) setTalkHr(String(cfg.talkZone2Hr));
     if (cfg.tempC != null) setTempC(String(cfg.tempC));
+    if (typeof (cfg as { humidityPct?: number }).humidityPct === 'number') setHumidityPct(String((cfg as { humidityPct?: number }).humidityPct));
     if (cfg.altitudeM != null) setAltitudeM(String(cfg.altitudeM));
     if (Array.isArray((cfg as { redFlags?: unknown }).redFlags)) {
       setRedFlags(((cfg as { redFlags?: unknown }).redFlags as unknown[]).filter(x => typeof x === 'string') as string[]);
@@ -924,12 +936,16 @@ export const CardioConstructor: React.FC = () => {
         factorSleep: factorsOn.sleep, factorStress: factorsOn.stress, factorHrv: factorsOn.hrv, factorPed: factorsOn.ped, factorJoints: factorsOn.joints,
         variant, comps, wizardMode,
         lthr, ftpWatts, talkHr, tempC, altitudeM,
+        // P2-аудит: % жира участвует в сборке (kcal по FFM), но не сохранялся
+        // в wizard-state — после перезагрузки молча возвращался к профильному.
+        bodyFatPct: Number(bodyFatPct) > 0 ? Number(bodyFatPct) : undefined,
+        humidityPct: Number(humidityPct) > 0 ? Number(humidityPct) : undefined,
         lthrBySport,
         easyPace, tempoPace, intervalPace, mesoOn, strictValidate, redFlags, tidSwitch, durabilityOn,
       };
       localStorage.setItem(WIZARD_KEY, JSON.stringify({ ...s, version: 2 }));
     } catch { /* ignore */ }
-  }, [goal, totalWeeks, daysAvailable, recoveryLow, bodyWeight, taperWeeks, taperModel, periodizationModel, maxHrFormula, taperEnabled, peakWeek, phaseSplit, level, equipment, lowImpact, age, sex, restingHr, legDays, factorsOn, variant, comps, wizardMode, lthr, lthrBySport, ftpWatts, talkHr, tempC, altitudeM, easyPace, tempoPace, intervalPace, mesoOn, strictValidate, redFlags, tidSwitch, durabilityOn]);
+  }, [goal, totalWeeks, daysAvailable, recoveryLow, bodyWeight, taperWeeks, taperModel, periodizationModel, maxHrFormula, taperEnabled, peakWeek, phaseSplit, level, equipment, lowImpact, age, sex, restingHr, legDays, factorsOn, variant, comps, wizardMode, lthr, lthrBySport, ftpWatts, talkHr, tempC, altitudeM, bodyFatPct, humidityPct, easyPace, tempoPace, intervalPace, mesoOn, strictValidate, redFlags, tidSwitch, durabilityOn]);
 
   const renameCycle = (name: string) => {
     if (!cycle) return;
@@ -953,12 +969,22 @@ export const CardioConstructor: React.FC = () => {
   const applyWeightAdjust = () => {
     if (!cycle) return;
     saveCardioCycleVersion(cycle, '⚖️ коррекция по весу');
-    const next = bumpCardioZone2Volume(cycle, 15);
-    saveCardioCycle(next);
-    setActiveCardioCycle(next);
-    setCycle(next);
+    // P2-аудит: UI звал НЕ-guarded бамп — рекомендация по весу могла нарушить
+    // правило 10% и монотонность. Считаем дневный TRIMP из журнала (единая
+    // шкала) и пропускаем через guarded-версию с честным сообщением о капе.
+    const cfg = cycle.config as { restingHr?: number; age?: number; sex?: 'male' | 'female'; maxHrFormula?: 'classic' | 'tanaka' | 'gulati' };
+    const maxHr = cfg.age ? maxHrByFormula(cfg.age, cfg.sex, cfg.maxHrFormula) : undefined;
+    const map = dailyTrimpMap(loadCardioLog().filter(e => e.completed), cfg.restingHr, maxHr, cfg.sex);
+    const dates = [...map.keys()].sort();
+    const last7 = dates.slice(-7).map(d => map.get(d) ?? 0);
+    const r = bumpCardioZone2VolumeGuarded(cycle, 15, last7);
+    saveCardioCycle(r.cycle);
+    setActiveCardioCycle(r.cycle);
+    setCycle(r.cycle);
     reload();
-    flashMsg('⚖️ Zone 2 +15 мин применено (отмена — «↩ Вернуть версию»)');
+    flashMsg(r.capped
+      ? `⚖️ Бамп ограничен: ${r.reason}`
+      : '⚖️ Zone 2 +15 мин применено в рамках 10% правила (отмена — «↩ Вернуть версию»)');
   };
 
   /** PRO taper-применение из вкладки «Тапер»: snapshot версии + save + flash (отмена — «↩ Вернуть версию»). */
@@ -971,38 +997,51 @@ export const CardioConstructor: React.FC = () => {
     flashMsg(`📉 Taper применён (отмена — «↩ Вернуть версию»)`);
   };
 
+  // Единый вход для «Вариантов» и «Почему»: РОВНО тот же набор параметров,
+  // что у реальной сборки (build). Раньше сюда не доезжали % жира, дни ног,
+  // модель тапера/периодизации, формула ЧССмакс, флаги скрининга и факторы —
+  // превью показывало ДРУГОЙ цикл, чем собиралось.
+  const planInputBase = useMemo(() => ({
+    goal, totalWeeks, daysAvailable, recoveryLow, bodyWeight,
+    bodyFatPct: Number(bodyFatPct) > 0 ? Math.max(3, Math.min(70, Number(bodyFatPct))) : undefined,
+    competitions: comps, taperWeeks, taper: taperEnabled, peakWeek, level, equipment, lowImpact,
+    age: Math.max(12, Math.min(90, Number(age) || 30)),
+    restingHr: Number(restingHr) > 0 ? Number(restingHr) : undefined,
+    sex,
+    legDays,
+    taperModel,
+    periodizationModel,
+    maxHrFormula,
+    lthr: Number(lthr) >= 80 && Number(lthr) <= 220 ? Math.round(Number(lthr)) : undefined,
+    lthrBySport: lthrBySportFromInput(lthrBySport),
+    ftpWatts: Number(ftpWatts) >= 30 && Number(ftpWatts) <= 800 ? Math.round(Number(ftpWatts)) : undefined,
+    talkZone2Hr: Number(talkHr) >= 80 && Number(talkHr) <= 200 ? Math.round(Number(talkHr)) : undefined,
+    tempC: tempC !== '' && Number.isFinite(Number(tempC)) ? Number(tempC) : undefined,
+    altitudeM: altitudeM !== '' && Number.isFinite(Number(altitudeM)) ? Math.round(Number(altitudeM)) : undefined,
+    humidityPct: Number(humidityPct) > 0 ? Math.max(0, Math.min(100, Math.round(Number(humidityPct)))) : undefined,
+    redFlags: redFlags.length > 0 ? [...redFlags] : undefined,
+    tidSwitchWeek: tidSwitch ? Math.max(2, Math.min(totalWeeks, Math.ceil(totalWeeks / 2))) : undefined,
+    durabilitySession: durabilityOn || undefined,
+    ...previewFactors,
+  }), [goal, totalWeeks, daysAvailable, recoveryLow, bodyWeight, bodyFatPct, humidityPct, comps, taperWeeks, taperEnabled, peakWeek, level, equipment, lowImpact, age, restingHr, sex, legDays, taperModel, periodizationModel, maxHrFormula, lthr, lthrBySport, ftpWatts, talkHr, tempC, humidityPct, altitudeM, redFlags, tidSwitch, durabilityOn, previewFactors]);
+
   const planVariants = useMemo(() => {
     if (step !== 'preview') return [];
     try {
       return cardioPlanVariants({
-        goal, totalWeeks, daysAvailable, recoveryLow, bodyWeight,
-        competitions: comps, taperWeeks, taper: taperEnabled, peakWeek, level, equipment, lowImpact,
-        age: Math.max(12, Math.min(90, Number(age) || 30)),
-        restingHr: Number(restingHr) > 0 ? Number(restingHr) : undefined,
-        sex,
+        ...planInputBase,
         phaseSplit: phaseSplit.auto ? undefined : { base: phaseSplit.base, build: phaseSplit.build, maintenance: phaseSplit.maintenance },
-        lthr: Number(lthr) >= 80 && Number(lthr) <= 220 ? Math.round(Number(lthr)) : undefined,
-        ftpWatts: Number(ftpWatts) >= 30 && Number(ftpWatts) <= 800 ? Math.round(Number(ftpWatts)) : undefined,
-        talkZone2Hr: Number(talkHr) >= 80 && Number(talkHr) <= 200 ? Math.round(Number(talkHr)) : undefined,
-        tempC: tempC !== '' && Number.isFinite(Number(tempC)) ? Number(tempC) : undefined,
-        altitudeM: altitudeM !== '' && Number.isFinite(Number(altitudeM)) ? Math.round(Number(altitudeM)) : undefined,
       });
     } catch { return []; }
-  }, [step, goal, totalWeeks, daysAvailable, recoveryLow, bodyWeight, comps, taperWeeks, taperEnabled, peakWeek, level, equipment, lowImpact, age, restingHr, sex, phaseSplit, lthr, ftpWatts, talkHr, tempC, altitudeM]);
+  }, [step, planInputBase, phaseSplit]);
 
   const planExplanation = useMemo(() => {
     if (!cycle || step !== 'preview') return [];
     return explainCardioChoice({
-      goal, totalWeeks, daysAvailable, recoveryLow, bodyWeight,
-      competitions: comps, taperWeeks, taper: taperEnabled, peakWeek, level, equipment, lowImpact,
-      age: Math.max(12, Math.min(90, Number(age) || 30)),
-      restingHr: Number(restingHr) > 0 ? Number(restingHr) : undefined,
-      sex,
-      lthr: Number(lthr) >= 80 && Number(lthr) <= 220 ? Math.round(Number(lthr)) : undefined,
-      ftpWatts: Number(ftpWatts) >= 30 && Number(ftpWatts) <= 800 ? Math.round(Number(ftpWatts)) : undefined,
-      talkZone2Hr: Number(talkHr) >= 80 && Number(talkHr) <= 200 ? Math.round(Number(talkHr)) : undefined,
+      ...planInputBase,
+      phaseSplit: phaseSplit.auto ? undefined : { base: phaseSplit.base, build: phaseSplit.build, maintenance: phaseSplit.maintenance },
     }, cycle);
-  }, [cycle, step, goal, totalWeeks, daysAvailable, recoveryLow, bodyWeight, comps, taperWeeks, taperEnabled, peakWeek, level, equipment, lowImpact, age, restingHr, sex, lthr, ftpWatts, talkHr]);
+  }, [cycle, step, planInputBase, phaseSplit]);
 
   // Цикл устарел относительно текущих параметров мастера (для предпросмотра).
   const effLevel = variant === 'gentle' ? ('beginner' as CardioLevel) : variant === 'intense' ? ('advanced' as CardioLevel) : level;
@@ -1031,6 +1070,9 @@ export const CardioConstructor: React.FC = () => {
     if (cfg.daysAvailable != null && cfg.daysAvailable !== daysAvailable) return true;
     if (!!cfg.recoveryLow !== effRecoveryLow) return true;
     if (cfg.bodyWeight != null && cfg.bodyWeight !== bodyWeight) return true;
+    // P0-аудит: % жира тоже параметр сборки (расход по FFM) — без сравнения
+    // правка жира не помечала цикл устаревшим, hero показывал старые ккал.
+    if (!same(cfg.bodyFatPct, Number(bodyFatPct) > 0 ? Math.max(3, Math.min(70, Number(bodyFatPct))) : undefined)) return true;
     if (cfg.taperWeeks != null && cfg.taperWeeks !== taperWeeks) return true;
     if (!!cfg.taper !== taperEnabled) return true;
     if (!!cfg.peakWeek !== peakWeek) return true;
@@ -1054,6 +1096,7 @@ export const CardioConstructor: React.FC = () => {
     if (!same(cfg.ftpWatts, Number(ftpWatts) >= 30 && Number(ftpWatts) <= 800 ? Math.round(Number(ftpWatts)) : undefined)) return true;
     if (!same(cfg.talkZone2Hr, Number(talkHr) >= 80 && Number(talkHr) <= 200 ? Math.round(Number(talkHr)) : undefined)) return true;
     if (!same(cfg.tempC, tempC !== '' && Number.isFinite(Number(tempC)) ? Number(tempC) : undefined)) return true;
+    if (!same(cfg.humidityPct, Number(humidityPct) > 0 ? Math.max(0, Math.min(100, Math.round(Number(humidityPct)))) : undefined)) return true;
     if (!same(cfg.altitudeM, altitudeM !== '' && Number.isFinite(Number(altitudeM)) ? Math.round(Number(altitudeM)) : undefined)) return true;
     // №4 PRO-2-добивка: новые флаги тоже пачкают параметры.
     // Флаги — множество: порядок кликов не важен (сортированные копии).
@@ -1073,7 +1116,7 @@ export const CardioConstructor: React.FC = () => {
     if (cfg.maxHrFormula != null && cfg.maxHrFormula !== maxHrFormula) return true;
     if (previewFactors.jointIssues !== undefined && !cfg.jointIssues) return true;
     return false;
-  }, [cycle, goal, totalWeeks, daysAvailable, effRecoveryLow, effLevel, bodyWeight, taperWeeks, taperEnabled, peakWeek, level, equipment, lowImpact, age, legDays, sex, restingHr, comps, phaseSplit, previewFactors, lthr, lthrBySport, ftpWatts, talkHr, tempC, altitudeM, easyPace, tempoPace, intervalPace, mesoOn, redFlags, tidSwitch, durabilityOn, taperModel, periodizationModel, maxHrFormula]);
+  }, [cycle, goal, totalWeeks, daysAvailable, effRecoveryLow, effLevel, bodyWeight, bodyFatPct, taperWeeks, taperEnabled, peakWeek, level, equipment, lowImpact, age, legDays, sex, restingHr, comps, phaseSplit, previewFactors, lthr, lthrBySport, ftpWatts, talkHr, tempC, humidityPct, altitudeM, easyPace, tempoPace, intervalPace, mesoOn, redFlags, tidSwitch, durabilityOn, taperModel, periodizationModel, maxHrFormula]);
 
   const resetParams = () => {
     setGoal('cut');
@@ -1100,6 +1143,7 @@ export const CardioConstructor: React.FC = () => {
     setFtpWatts('');
     setTalkHr('');
     setTempC('');
+    setHumidityPct('');
     setAltitudeM('');
     setEasyPace('');
     setTempoPace('');
@@ -1198,10 +1242,10 @@ export const CardioConstructor: React.FC = () => {
 
   /** Живой итог параметров для hero на шагах 1-3 (тот же предпросмотр движка). */
   const paramsPreview = useCardioParamsPreview({
-    goal, totalWeeks, daysAvailable, recoveryLow, phaseSplit, comps, bodyWeight,
+    goal, totalWeeks, daysAvailable, recoveryLow, phaseSplit, comps, bodyWeight, bodyFatPct,
     taperWeeks, taperModel, taperEnabled, peakWeek, previewFactors, level, equipment,
     lowImpact, age, sex, restingHr, legDays, periodizationModel, maxHrFormula,
-    lthr, ftpWatts, talkHr, tempC, altitudeM,
+    lthr, ftpWatts, talkHr, tempC, humidityPct, altitudeM,
     easyPace, tempoPace, intervalPace,
     mesoMult: mesoOn ? mesoInfo.mult : 1,
     redFlags,
@@ -1365,6 +1409,8 @@ export const CardioConstructor: React.FC = () => {
         <CardioAthleteSection
           age={age} setAge={setAge}
           bodyWeight={bodyWeight} setBodyWeight={setBodyWeight}
+          bodyFatPct={bodyFatPct} setBodyFatPct={setBodyFatPct}
+          maxHrFormula={maxHrFormula}
           restingHr={restingHr} setRestingHr={setRestingHr}
           sex={sex} setSex={setSex}
           level={level} setLevel={setLevel}
@@ -1374,6 +1420,7 @@ export const CardioConstructor: React.FC = () => {
           ftpWatts={ftpWatts} setFtpWatts={setFtpWatts}
           talkHr={talkHr} setTalkHr={setTalkHr}
           tempC={tempC} setTempC={setTempC}
+          humidityPct={humidityPct} setHumidityPct={setHumidityPct}
           altitudeM={altitudeM} setAltitudeM={setAltitudeM}
           easyPace={easyPace} setEasyPace={setEasyPace}
           tempoPace={tempoPace} setTempoPace={setTempoPace}
@@ -1506,7 +1553,7 @@ export const CardioConstructor: React.FC = () => {
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             <button style={BTN_GHOST} onClick={migrateFromPlan}>📦 Мигрировать недельный план</button>
           </div>
-          <CardioValidationCard cycle={cycle} beginner={level === 'beginner'} strict={strictValidate} onToggleStrict={() => setStrictValidate(v => !v)} onAddHiit={hiitGate.allowed ? () => addHiitToCycle('sit-8x20', {}, 1) : undefined} />
+          <CardioValidationCard cycle={cycle} beginner={effLevel === 'beginner'} strict={strictValidate} onToggleStrict={() => setStrictValidate(v => !v)} onAddHiit={hiitGate.allowed ? () => addHiitToCycle('sit-8x20', {}, 1) : undefined} />
           <CardioMesoRow advice={mesoInfo.advice} mult={mesoInfo.mult} on={mesoOn} onToggle={() => setMesoOn(v => !v)} />
           <CardioHiitSection onAdd={addHiitToCycle} totalWeeks={cycle?.totalWeeks} disabled={!cycle || !hiitGate.allowed} blockReason={hiitGate.reason} />
         </>

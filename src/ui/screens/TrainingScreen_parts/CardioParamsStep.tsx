@@ -83,6 +83,8 @@ export interface CardioParamsModel {
   phaseSplit: PhaseSplitState;
   comps: CardioCompetitionRef[];
   bodyWeight: number;
+  /** % жира (строка из инпута) — расход считается по FFM, hero обязан знать. */
+  bodyFatPct?: string;
   taperWeeks: number;
   taperModel?: CardioTaperModel;
   taperEnabled: boolean;
@@ -111,6 +113,8 @@ export interface CardioParamsModel {
   redFlags?: string[];
   tidSwitchWeek?: number;
   durabilitySession?: boolean;
+  /** Влажность % — зоны при жаре и коррекция TSS. */
+  humidityPct?: string;
 }
 
 /** Живой предпросмотр цикла из параметров мастера (та же сборка, что была в шаге 1). */
@@ -120,9 +124,9 @@ export function useCardioParamsPreview(m: CardioParamsModel): {
   tidPreview: { pi: number | null; model: string; label: string } | null;
 } {
   const { goal, totalWeeks, daysAvailable, recoveryLow, comps, phaseSplit, bodyWeight,
-    taperWeeks, taperModel, taperEnabled, peakWeek, previewFactors, level, equipment,
+    bodyFatPct, taperWeeks, taperModel, taperEnabled, peakWeek, previewFactors, level, equipment,
     lowImpact, age, restingHr, sex, legDays, periodizationModel, maxHrFormula,
-    lthr, ftpWatts, talkHr, tempC, altitudeM, easyPace, tempoPace, intervalPace, mesoMult,
+    lthr, ftpWatts, talkHr, tempC, altitudeM, humidityPct, easyPace, tempoPace, intervalPace, mesoMult,
     redFlags, tidSwitchWeek, durabilitySession } = m;
   const preview: { cycle: CardioCycle | null; warnings: string[] } = useMemo(() => {
     const warnings: string[] = [];
@@ -148,6 +152,10 @@ export function useCardioParamsPreview(m: CardioParamsModel): {
     const talkNum = Number(talkHr) >= 80 && Number(talkHr) <= 200 ? Math.round(Number(talkHr)) : undefined;
     const tempNum = tempC !== '' && Number.isFinite(Number(tempC)) ? Number(tempC) : undefined;
     const altNum = altitudeM !== '' && Number.isFinite(Number(altitudeM)) ? Math.round(Number(altitudeM)) : undefined;
+    const humNum = humidityPct !== '' && Number.isFinite(Number(humidityPct)) ? Math.max(0, Math.min(100, Math.round(Number(humidityPct)))) : undefined;
+    // Тот же FFM-вход, что у реальной сборки (build): hero без него считал
+    // расход по полному весу и расходился с итоговым планом.
+    const bfNum = Number(bodyFatPct) > 0 ? Math.max(3, Math.min(70, Number(bodyFatPct))) : undefined;
     try {
       const cycle = buildCardioCycle({
         goal,
@@ -155,6 +163,7 @@ export function useCardioParamsPreview(m: CardioParamsModel): {
         daysAvailable,
         recoveryLow,
         bodyWeight,
+        bodyFatPct: bfNum,
         competitions: comps,
         taperWeeks,
         taperModel,
@@ -176,6 +185,7 @@ export function useCardioParamsPreview(m: CardioParamsModel): {
         talkZone2Hr: talkNum,
         tempC: tempNum,
         altitudeM: altNum,
+        humidityPct: humNum,
         redFlags: redFlags && redFlags.length > 0 ? [...redFlags] : undefined,
         tidSwitchWeek,
         durabilitySession,
@@ -204,7 +214,7 @@ export function useCardioParamsPreview(m: CardioParamsModel): {
       if (note) warnings.push(note);
       return { cycle: finished, warnings };
     } catch { return { cycle: null, warnings }; }
-  }, [goal, totalWeeks, daysAvailable, recoveryLow, comps, phaseSplit, bodyWeight, taperWeeks, taperModel, taperEnabled, peakWeek, previewFactors, level, equipment, lowImpact, age, restingHr, sex, legDays, periodizationModel, maxHrFormula, lthr, ftpWatts, talkHr, tempC, altitudeM, easyPace, tempoPace, intervalPace, mesoMult, redFlags, tidSwitchWeek, durabilitySession]);
+  }, [goal, totalWeeks, daysAvailable, recoveryLow, comps, phaseSplit, bodyWeight, bodyFatPct, taperWeeks, taperModel, taperEnabled, peakWeek, previewFactors, level, equipment, lowImpact, age, restingHr, sex, legDays, periodizationModel, maxHrFormula, lthr, ftpWatts, talkHr, tempC, altitudeM, humidityPct, easyPace, tempoPace, intervalPace, mesoMult, redFlags, tidSwitchWeek, durabilitySession]);
 
   const s = preview.cycle ? cardioCycleSummary(preview.cycle) : null;
   // PRO: TID Polarization Index превью-цикла (раунд 9)
@@ -372,6 +382,10 @@ export const CardioGoalHorizonSection: React.FC<{
 export const CardioAthleteSection: React.FC<{
   age: string; setAge: (v: string) => void;
   bodyWeight: number; setBodyWeight: (n: number) => void;
+  /** % жира — расход считается по безжировой массе (FFM). */
+  bodyFatPct?: string; setBodyFatPct?: (v: string) => void;
+  /** Выбранная формула ЧССмакс — подсказка не должна врать про «220−возраст». */
+  maxHrFormula?: 'classic' | 'tanaka' | 'gulati';
   restingHr: string; setRestingHr: (v: string) => void;
   sex: 'male' | 'female'; setSex: (s: 'male' | 'female') => void;
   level: CardioLevel; setLevel: (l: CardioLevel) => void;
@@ -382,6 +396,8 @@ export const CardioAthleteSection: React.FC<{
   ftpWatts?: string; setFtpWatts?: (v: string) => void;
   talkHr?: string; setTalkHr?: (v: string) => void;
   tempC?: string; setTempC?: (v: string) => void;
+  /** Влажность % — влияет на зоны (жара+ВВ) и коррекцию TSS. */
+  humidityPct?: string; setHumidityPct?: (v: string) => void;
   altitudeM?: string; setAltitudeM?: (v: string) => void;
   /** Темпы VDOT Daniels, текст «M:SS» (E/T/I) — дописываются в сессии планом. */
   easyPace?: string; setEasyPace?: (v: string) => void;
@@ -392,7 +408,7 @@ export const CardioAthleteSection: React.FC<{
   onFromDiaryHr: () => void;
   onFromLog?: () => void;
   wizardMode?: 'simple' | 'pro';
-}> = ({ age, setAge, bodyWeight, setBodyWeight, restingHr, setRestingHr, sex, setSex, level, setLevel, recoveryLow, setRecoveryLow, lthr = '', setLthr, lthrBySport = {}, setLthrBySport, ftpWatts = '', setFtpWatts, talkHr = '', setTalkHr, tempC = '', setTempC, altitudeM = '', setAltitudeM, easyPace = '', setEasyPace, tempoPace = '', setTempoPace, intervalPace = '', setIntervalPace, onFromProfile, onSaveProfile, onFromDiaryHr, onFromLog, wizardMode = 'pro' }) => (
+}> = ({ age, setAge, bodyWeight, setBodyWeight, bodyFatPct, setBodyFatPct, maxHrFormula = 'classic', restingHr, setRestingHr, sex, setSex, level, setLevel, recoveryLow, setRecoveryLow, lthr = '', setLthr, lthrBySport = {}, setLthrBySport, ftpWatts = '', setFtpWatts, talkHr = '', setTalkHr, tempC = '', setTempC, humidityPct = '', setHumidityPct, altitudeM = '', setAltitudeM, easyPace = '', setEasyPace, tempoPace = '', setTempoPace, intervalPace = '', setIntervalPace, onFromProfile, onSaveProfile, onFromDiaryHr, onFromLog, wizardMode = 'pro' }) => (
   <>
     {/* ── 1. Пользователь — открыт ── */}
     <Accordion id="sec-user" title="Параметры пользователя" icon="👤" defaultOpen badge={<span style={{ fontSize: 11, color: '#fff', fontWeight: 700 }}>{age}л · {bodyWeight}кг · {CARDIO_LEVEL_LABELS[level]}</span>}>
@@ -404,8 +420,10 @@ export const CardioAthleteSection: React.FC<{
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
         <NumberInput label="Возраст" value={age} onChange={setAge} min={12} max={90} step={1} placeholder="30" ariaLabel="Возраст" width={90} suffix="лет" />
         <NumberInput label="Вес (кг)" value={String(bodyWeight)} onChange={v => setBodyWeight(Math.max(30, Math.min(300, Number(v) || 80)))} min={30} max={300} step={0.5} placeholder="80" ariaLabel="Вес" width={100} suffix="кг" />
+        {setBodyFatPct && <NumberInput label="Жир (%)" value={bodyFatPct ?? ''} onChange={v => setBodyFatPct(v)} min={3} max={70} step={0.5} placeholder="15" ariaLabel="Процент жира" width={100} suffix="%" />}
         <NumberInput label="ЧСС покоя" value={restingHr} onChange={setRestingHr} min={30} max={120} step={1} placeholder="60" ariaLabel="ЧСС покоя" width={100} suffix="уд/мин" />
       </div>
+      <div style={HINT_SM}>Расход ккал считается по безжировой массе (FFM), если известен % жира. {maxHrFormula === 'classic' ? 'Karvonen: ЧССмакс 220−возраст (жен. 226−).' : maxHrFormula === 'tanaka' ? 'ЧССмакс по Tanaka 208−0.7×возраст (мета-анализ 2024 точнее классики).' : 'ЧССмакс по Gulati 206−0.88×возраст (женская формула).'} Уровень меняет объём: новичок ×0.8 / продвинутый ×1.15.</div>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
         <div style={ROW}>
           <span style={LABEL}>Пол</span>
@@ -467,9 +485,10 @@ export const CardioAthleteSection: React.FC<{
         {setEasyPace && <div style={HINT_SM}>Темпы VDOT Daniels (M:SS/км) дописываются в сессии плана. Нет VDOT — оставьте пустыми.</div>}
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
           {setTempC && <NumberInput label="Жара" value={tempC} onChange={setTempC} min={-10} max={45} step={1} placeholder="22" ariaLabel="Температура" width={90} suffix="°C" />}
+          {setHumidityPct && <NumberInput label="Влажность" value={humidityPct} onChange={setHumidityPct} min={0} max={100} step={5} placeholder="50" ariaLabel="Влажность" width={90} suffix="%" />}
           {setAltitudeM && <NumberInput label="Высота" value={altitudeM} onChange={setAltitudeM} min={0} max={5000} step={50} placeholder="0" ariaLabel="Высота" width={100} suffix="м" />}
         </div>
-        <div style={HINT_SM}>Приоритет: LTHR 30' (Friel) → FTP 20' (Coggan) → talk-test → возраст. Жара &gt;25°C / высота &gt;1000м сдвигают зоны вверх. HIIT: HR занижает Z3 до 40% (Strepp 2024) — контролируйте по мощности/темпу.</div>
+        <div style={HINT_SM}>Приоритет: LTHR 30' (Friel) → FTP 20' (Coggan) → talk-test → возраст. Жара &gt;25°C / высота &gt;1000м сдвигают зоны вверх. Влажность &gt;70% на сессиях &gt;60 мин добавляет +2 уд/мин к зонам и корректирует TSS. HIIT: HR занижает Z3 до 40% (Strepp 2024) — контролируйте по мощности/темпу.</div>
       </Accordion>
     )}
   </>
@@ -619,6 +638,8 @@ export const CardioParamsStep: React.FC<{
   comps: CardioCompetitionRef[];
   bodyWeight: number;
   setBodyWeight: (n: number) => void;
+  /** % жира — расход считается по FFM, предпросмотр шага обязан знать. */
+  bodyFatPct?: string;
   taperWeeks: number;
   setTaperWeeks: (n: number) => void;
   taperEnabled: boolean;
@@ -663,9 +684,11 @@ export const CardioParamsStep: React.FC<{
   setTalkHr?: (v: string) => void;
   tempC?: string;
   setTempC?: (v: string) => void;
+  /** Влажность % — влияет на зоны при жаре и коррекцию TSS. */
+  humidityPct?: string;
   altitudeM?: string;
   setAltitudeM?: (v: string) => void;
-}> = ({ goal, setGoal, totalWeeks, setTotalWeeks, daysAvailable, setDaysAvailable, recoveryLow, setRecoveryLow, phaseSplit, setPhaseSplit, comps, bodyWeight, setBodyWeight, taperWeeks, setTaperWeeks, taperEnabled, setTaperEnabled, peakWeek, setPeakWeek, previewFactors, level, setLevel, equipment, setEquipment, lowImpact, setLowImpact, age, setAge, sex, setSex, restingHr, setRestingHr, legDays, setLegDays, factorsOn, onToggleFactor, factorsSummary, onFromProfile, onSaveProfile, onFromDiaryHr, onFromLog, onReset, wizardMode = 'pro', periodizationModel = 'linear', setPeriodizationModel, taperModel = 'step', setTaperModel, maxHrFormula = 'classic', setMaxHrFormula, lthr = '', setLthr, ftpWatts = '', setFtpWatts, talkHr = '', setTalkHr, tempC = '', setTempC, altitudeM = '', setAltitudeM }) => {
+}> = ({ goal, setGoal, totalWeeks, setTotalWeeks, daysAvailable, setDaysAvailable, recoveryLow, setRecoveryLow, phaseSplit, setPhaseSplit, comps, bodyWeight, setBodyWeight, bodyFatPct, taperWeeks, setTaperWeeks, taperEnabled, setTaperEnabled, peakWeek, setPeakWeek, previewFactors, level, setLevel, equipment, setEquipment, lowImpact, setLowImpact, age, setAge, sex, setSex, restingHr, setRestingHr, legDays, setLegDays, factorsOn, onToggleFactor, factorsSummary, onFromProfile, onSaveProfile, onFromDiaryHr, onFromLog, onReset, wizardMode = 'pro', periodizationModel = 'linear', setPeriodizationModel, taperModel = 'step', setTaperModel, maxHrFormula = 'classic', setMaxHrFormula, lthr = '', setLthr, ftpWatts = '', setFtpWatts, talkHr = '', setTalkHr, tempC = '', setTempC, humidityPct = '', altitudeM = '', setAltitudeM }) => {
   const preview: { cycle: CardioCycle | null; warnings: string[] } = useMemo(() => {
     const warnings: string[] = [];
     if (totalWeeks < 4) warnings.push('Цикл короче 4 недель — базовая фаза почти отсутствует.');
@@ -690,6 +713,10 @@ export const CardioParamsStep: React.FC<{
     const talkNum = Number(talkHr) >= 80 && Number(talkHr) <= 200 ? Math.round(Number(talkHr)) : undefined;
     const tempNum = tempC !== '' && Number.isFinite(Number(tempC)) ? Number(tempC) : undefined;
     const altNum = altitudeM !== '' && Number.isFinite(Number(altitudeM)) ? Math.round(Number(altitudeM)) : undefined;
+    const humNum = humidityPct !== '' && Number.isFinite(Number(humidityPct)) ? Math.max(0, Math.min(100, Math.round(Number(humidityPct)))) : undefined;
+    // Тот же FFM-вход, что у реальной сборки (build): hero без него считал
+    // расход по полному весу и расходился с итоговым планом.
+    const bfNum = Number(bodyFatPct) > 0 ? Math.max(3, Math.min(70, Number(bodyFatPct))) : undefined;
     try {
       const cycle = buildCardioCycle({
         goal,
@@ -697,6 +724,7 @@ export const CardioParamsStep: React.FC<{
         daysAvailable,
         recoveryLow,
         bodyWeight,
+        bodyFatPct: bfNum,
         competitions: comps,
         taperWeeks,
         taperModel,
@@ -718,6 +746,7 @@ export const CardioParamsStep: React.FC<{
         talkZone2Hr: talkNum,
         tempC: tempNum,
         altitudeM: altNum,
+        humidityPct: humNum,
         source: 'auto',
       });
       if (daysAvailable > 0 && daysAvailable < 7) {
@@ -789,8 +818,7 @@ export const CardioParamsStep: React.FC<{
         </div>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
           <div style={ROW}>
-            <span style={LABEL}>Пол</span>
-            <button style={sex === 'male' ? CHIP_ACTIVE : CHIP} onClick={() => setSex('male')} aria-label="Пол: мужской">♂ Мужской</button>
+            <span style={LABEL}>Пол</span>            <button style={sex === 'male' ? CHIP_ACTIVE : CHIP} onClick={() => setSex('male')} aria-label="Пол: мужской">♂ Мужской</button>
             <button style={sex === 'female' ? CHIP_ACTIVE : CHIP} onClick={() => setSex('female')} aria-label="Пол: женский">♀ Женский</button>
           </div>
           <div style={ROW}>
@@ -806,7 +834,7 @@ export const CardioParamsStep: React.FC<{
             </button>
           </div>
         </div>
-        <div style={HINT_SM}>Karvonen: ЧССмакс 220−возраст (жен. 226−). Уровень меняет объём: новичок ×0.8 / продвинутый ×1.15.</div>
+        <div style={HINT_SM}>{maxHrFormula === 'classic' ? 'Karvonen: ЧССмакс 220−возраст (жен. 226−).' : maxHrFormula === 'tanaka' ? 'ЧССмакс по Tanaka 208−0.7×возраст (мета-анализ 2024 точнее классики).' : 'ЧССмакс по Gulati 206−0.88×возраст (женская формула).'} Уровень меняет объём: новичок ×0.8 / продвинутый ×1.15.</div>
       </Accordion>
 
       {wizardMode === 'pro' && (setLthr || setFtpWatts || setTalkHr) && (
