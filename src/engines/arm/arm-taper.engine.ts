@@ -1,6 +1,7 @@
 /**
  * arm-taper.engine.ts — тейпер для арм-пика (как lms-taper / bb-peak).
- * 2–3 недели: объём ×0.65/0.45, RIR+1/+2, side −50% за 2 нед.
+ * 2–3 недели: объём ×0.65/0.45, RIR+1/+2, side-давление −50%/−70% от БАЗОВЫХ сетов
+ * (sideMult однократный от базы — подписи кривой не расходятся с математикой).
  */
 
 export type ArmTaperMode = 'classic' | 'peaking' | 'tableready_deload' | 'coc_deload' | 'toproll_taper' | 'none';
@@ -57,9 +58,25 @@ export function buildArmTaperCurve(input: {
       out.push({ week: 1, volumePct: 0.7, rirShift: 1, sideMult: 0.5, label: 'Toproll-тейпер: 70% объёма (−30% день 2), RIR+1' });
       return out;
     }
-    out.push({ week: 2, volumePct: 0.9, rirShift: 0, sideMult: 0.7, label: 'Toproll-тейпер-1: 90% (−10% день 1)' });
-    out.push({ week: 1, volumePct: 0.7, rirShift: 1, sideMult: 0.5, label: 'Toproll-тейпер-2: 70% (−30% день 2)' });
-    return out.slice(-weeks);
+    // 26.10.2026 было→стало: при weeks=3 кривая оставалась из 2 точек (slice(-3) на
+    // массиве из 2) — ранняя неделя окна не получала тейпер. Строим ровно weeks точек:
+    // пик 0.7 → 0.9 → более ранние 0.95 (ранняя разгрузка).
+    for (let i = weeks; i >= 1; i--) {
+      const last = i === 1;
+      const prev = i === 2;
+      out.push({
+        week: i,
+        volumePct: last ? 0.7 : prev ? 0.9 : 0.95,
+        rirShift: last ? 1 : 0,
+        sideMult: last ? 0.5 : prev ? 0.7 : 0.9,
+        label: last
+          ? 'Toproll-тейпер-2: 70% (−30% день 2)'
+          : prev
+            ? 'Toproll-тейпер-1: 90% (−10% день 1)'
+            : 'Toproll-тейпер-0: 95%, ранняя разгрузка',
+      });
+    }
+    return out;
   }
 
   if (weeks === 1) {
@@ -102,7 +119,10 @@ export function applyArmTaperToWeeks<T extends { week: number; sessions: Array<{
       for (const ex of sess.exercises) {
         const before = ex.sets;
         let after = Math.max(1, Math.round(before * point.volumePct));
-        if (ex.muscle === 'side_pressure') after = Math.max(1, Math.round(before * point.volumePct * point.sideMult));
+        // 26.10.2026 было→стало: sideMult умножался НА объём недели (sidePct × volumePct),
+        // поэтому «Тейпер-1: 65% объёма, RIR+1, side −50%» реально давал 32.5% базы
+        // (−67.5%) — подпись врала. sideMult теперь однократный от базы: ровно −50%/−30%.
+        if (ex.muscle === 'side_pressure') after = Math.max(1, Math.round(before * point.sideMult));
         ex.sets = after;
         ex.workSets = ex.workSets.slice(0, after);
         ex.rir = Math.min(5, ex.rir + point.rirShift);

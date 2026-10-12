@@ -609,7 +609,7 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
   try {
     const track = longevityTrackFor(Number((input as any).ageYears ?? 30));
     mastersDeload = track === 'grandmaster' || track === 'supergrand';
-  } catch { mastersDeload = false; markDegraded('masters-профиль недоступен — деload-каденс по умолчанию'); }
+  } catch { mastersDeload = false; markDegraded('masters-профиль недоступен — делод-каденс по умолчанию'); }
   // Именной цикл (P0): фазовая карта библиотеки поверх generic — только при
   // cycleId + (exact либо согласие на extend/shrink). Без cycleId — байт-в-байт.
   let phaseMap = distributeArmPhases(weeks, goal, mastersDeload ? 3 : 4);

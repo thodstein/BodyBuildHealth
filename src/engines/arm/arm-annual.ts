@@ -23,14 +23,6 @@ export interface ArmAnnualBuildResult {
   warnings: string[];
   taperApplied: boolean;
   peakApplied: boolean;
-  configHash: string;
-}
-
-function stableHash(obj: any): string {
-  const s = JSON.stringify(obj, Object.keys(obj).sort());
-  let h = 0;
-  for (let i = 0; i < s.length; i++) { h = ((h << 5) - h) + s.charCodeAt(i); h |= 0; }
-  return String(h);
 }
 
 export function armPlanToUserWeeks(plan: ArmPlan): UserWeek[] {
@@ -239,7 +231,10 @@ export function buildArmBlock(
     if (preset) warnings.push(`Фаза года «${block.phase}»: ${preset.note}`);
   } catch { /* опционально */ }
 
-  const configHash = stableHash({ input, blockWeeks: weeks, taperApplied });
+  // 26.10.2026 было→стало: configHash считался здесь своим stableHash'ом (массив-replacer
+  // в JSON.stringify слепнул к вложенным ключам), но annual-training/block-builders
+  // ВСЕГДА перетирал его своим configHashOf(...) — поле было мёртвым. Убран дубль;
+  // stale-детекция блока живёт в block-builders.
 
   return {
     blockKey: block.blockKey,
@@ -254,7 +249,6 @@ export function buildArmBlock(
     warnings,
     taperApplied,
     peakApplied: block.phase === 'peaking',
-    configHash,
   };
 }
 

@@ -4,7 +4,11 @@
  * Элита тянет обеими руками (WAF: левая и правая — отдельные зачёты).
  * Норма элиты — асимметрия ~12% (Bezkorovainyi), управляем донорским
  * перераспределением: слабая +15-25%, сильная — maintenance, сумма ≤ MRV.
+ * Даты истории — канон core/local-date (26.10.2026 было→стало: UTC-«сегодня»
+ * уводило вечернюю запись мер в «вчера» в UTC+X).
  */
+
+import { localIsoDate } from '../../core/local-date';
 
 export interface BilateralInput {
   leftKg?: number; // сила слабой/левой (RT, прон или cup — одна метрика)
@@ -116,7 +120,7 @@ export function saveBilateralEntry(leftKg: number, rightKg: number, dateIso?: st
   const pct = bilateralAsymmetryPct(leftKg, rightKg);
   if (pct == null) return loadBilateralHist();
   const entry: BilateralHistEntry = {
-    date: dateIso || new Date().toISOString().slice(0, 10),
+    date: dateIso || localIsoDate(),
     leftKg: Number(leftKg),
     rightKg: Number(rightKg),
     asymmetryPct: pct,

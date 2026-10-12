@@ -4,7 +4,10 @@
  * Правила ArmliftingUSA/IronMind: 1 минута на макс, промах = выбыл,
  * только DOH, без лямок. Симулятор: 3 попытки на снаряд, выбор веса,
  * итог + % от мирового рекорда.
+ * Даты журнала — канон core/local-date (26.10.2026 было→стало: UTC-«сегодня»).
  */
+
+import { localIsoDate } from '../../core/local-date';
 
 export interface PlatformAttempt {
   attempt: number; // 1-3
@@ -156,7 +159,7 @@ export function savePlatformLogEntry(input: { implement?: string; sex?: string; 
   const implement = input.implement || 'rolling_thunder';
   const wr = platformWrFor(implement, input.sex || 'male');
   const entry: PlatformLogEntry = {
-    date: input.dateIso || new Date().toISOString().slice(0, 10),
+    date: input.dateIso || localIsoDate(),
     implement,
     weightKg: Math.round(w * 10) / 10,
     success: !!input.success,

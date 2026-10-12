@@ -44,18 +44,40 @@ export function buildArmMacrocycle(input: {
 
   const hW = Math.max(2, Math.round(total * hPct));
   const sW = Math.max(2, Math.round(total * sPct));
-  const pWraw = Math.max(hasA ? 3 : 1, Math.round(total * pPct));
-  const pW = pWraw;
+  const pW = Math.max(hasA ? 3 : 1, Math.round(total * pPct));
+  // 26.10.2026 было→стало: минимумы фаз (2/2/3) добавляли недели ПОВЕРХ бюджета —
+  // при total 12 + приоритет A сумма блоков была 13 ≠ totalWeeks (annualPlanFromMacro
+  // считает totalWeeks от макро, а ref.weeks от блоков → validateAnnualPlan выдавал
+  // «сумма недель ≠» и outOfRange у последнего блока). Теперь бюджет делится:
+  // фазы, не влезшие в total, откусываются от более поздних (peaking → transition),
+  // сохраняя свои минимумы.
   const tW = Math.max(1, total - hW - sW - pW);
-
-  const phases: Array<{ phase: ArmMacroPhase; weeks: number }> = [
+  const fixed: Array<{ phase: ArmMacroPhase; weeks: number }> = [
     { phase: 'hypertrophy', weeks: hW },
     { phase: 'strength', weeks: sW },
     { phase: 'peaking', weeks: pW },
     { phase: 'transition', weeks: tW },
   ];
+  let sum = fixed.reduce((a, b) => a + b.weeks, 0);
+  // откусываем с конца (transition → peaking → strength), пока сумма > total
+  for (let i = fixed.length - 1; i >= 0 && sum > total; i--) {
+    const minWeeks = i === 2 ? (hasA ? 3 : 1) : i === 3 ? 1 : 2;
+    const cut = Math.min(fixed[i].weeks - minWeeks, sum - total);
+    if (cut > 0) { fixed[i].weeks -= cut; sum -= cut; }
+  }
+  // если total слишком мал под минимумы — сжимаем пропорционально до суммы total
+  if (sum > total) {
+    const scale = total / sum;
+    let acc = 0;
+    for (let i = 0; i < fixed.length; i++) {
+      const w = i === fixed.length - 1 ? total - acc : Math.max(1, Math.round(fixed[i].weeks * scale));
+      fixed[i].weeks = w;
+      acc += w;
+    }
+    sum = total;
+  }
 
-  for (const ph of phases) {
+  for (const ph of fixed) {
     if (ph.weeks <= 0) continue;
     blocks.push({ phase: ph.phase, weeks: ph.weeks, weekOffset: offset, description: `${ph.phase} ${ph.weeks} нед` });
     offset += ph.weeks;

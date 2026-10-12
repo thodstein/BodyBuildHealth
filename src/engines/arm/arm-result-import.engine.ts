@@ -9,6 +9,7 @@
  * отбрасываются с честной строкой-предупреждением. Импорт идёт в журнал
  * помоста (he_arm_platform_log) через savePlatformLogEntry.
  */
+import { localIsoDate } from '../../core/local-date';
 import { loadPlatformLog, platformWrFor, savePlatformLogEntry, type PlatformLogEntry } from './arm-platform.engine';
 
 export interface ArmResultImportAttempt {
@@ -79,17 +80,19 @@ function normalizeDate(raw: unknown, fallback: string, warnings: string[]): stri
   if (!value) return fallback;
   if (DATE_RE.test(value)) return value;
   const parsed = new Date(value);
-  if (Number.isFinite(parsed.getTime())) return parsed.toISOString().slice(0, 10);
+  if (Number.isFinite(parsed.getTime())) return localIsoDate(parsed);
   warnings.push(`Дата «${value}» не распознана — использована ${fallback}.`);
   return fallback;
 }
 
+/** 26.10.2026 было→стало: toISOString() даёт UTC-день — в UTC+X вечерняя запись
+ * уходила в журнал с «вчерашней» датой. Канон проекта — core/local-date. */
 function fallbackDate(): string {
-  return new Date().toISOString().slice(0, 10);
+  return localIsoDate();
 }
 
 /** Разбор JSON-импорта: объект или массив объектов со снарядом и попытками. */
-export function parseArmResultJson(raw: string): ArmResultImportResult {
+export function parseArmResultJson(raw: string, sex = 'male'): ArmResultImportResult {
   const warnings: string[] = [];
   const errors: string[] = [];
   const today = fallbackDate();
@@ -113,7 +116,7 @@ export function parseArmResultJson(raw: string): ArmResultImportResult {
   if (!implement) {
     // Снаряд не распознан — попытки не накапливаем: в журнал помоста запись без
     // снаряда бессмысленна, а «примерно угадать» нельзя.
-    return finalize({ entries: [], implement: '', dateIso, warnings, errors });
+    return finalize({ entries: [], implement: '', dateIso, warnings, errors, sex });
   }
   const entries: ArmResultImportAttempt[] = [];
   for (const [index, item] of attemptsRaw.entries()) {
@@ -127,11 +130,11 @@ export function parseArmResultJson(raw: string): ArmResultImportResult {
     if (entries.length >= MAX_ATTEMPTS) { warnings.push(`Больше ${MAX_ATTEMPTS} попыток не импортируем.`); break; }
   }
   if (attemptsRaw.length === 0) errors.push('В файле нет списка попыток (attempts).');
-  return finalize({ entries, implement: implement ?? '', dateIso, warnings, errors });
+  return finalize({ entries, implement: implement ?? '', dateIso, warnings, errors, sex });
 }
 
 /** Разбор CSV/текста: «снаряд,попытка,вес,результат» или «попытка,вес,результат». */
-export function parseArmResultCsv(raw: string, fallbackImplement = ''): ArmResultImportResult {
+export function parseArmResultCsv(raw: string, fallbackImplement = '', sex = 'male'): ArmResultImportResult {
   const warnings: string[] = [];
   const errors: string[] = [];
   const today = fallbackDate();
@@ -173,13 +176,16 @@ export function parseArmResultCsv(raw: string, fallbackImplement = ''): ArmResul
   }
   if (!implement) errors.push('Не указан снаряд (столбец «снаряд» или fallback).');
   if (entries.length === 0 && errors.length === 0) errors.push('В файле не нашлось ни одной распознанной попытки.');
-  return finalize({ entries, implement, dateIso, warnings, errors });
+  return finalize({ entries, implement, dateIso, warnings, errors, sex });
 }
 
-function finalize(input: { entries: ArmResultImportAttempt[]; implement: string; dateIso: string; warnings: string[]; errors: string[] }): ArmResultImportResult {
+function finalize(input: { entries: ArmResultImportAttempt[]; implement: string; dateIso: string; warnings: string[]; errors: string[]; sex?: string }): ArmResultImportResult {
   const best = input.entries.filter(e => e.success).reduce((max, e) => Math.max(max, e.weightKg), 0);
   const totalKg = input.entries.reduce((sum, e) => sum + e.weightKg, 0);
-  const wr = input.implement ? platformWrFor(input.implement, 'male') : 0;
+  // 26.10.2026 было→стало: WR считался по мужским цифрам даже для женщины — флеш
+  // «лчший X кг (Y% WR)» расходился с журналом помоста (savePlatformLogEntry знает
+  // пол). Один WR в обоих местах.
+  const wr = input.implement ? platformWrFor(input.implement, input.sex || 'male') : 0;
   const wrPct = wr > 0 && best > 0 ? Math.round((best / wr) * 1000) / 10 : 0;
   return {
     entries: input.entries,

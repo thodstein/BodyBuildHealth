@@ -1,8 +1,11 @@
 /**
  * arm-force-history.store.ts — недельные avg/max/min + fatigue index (WO2026106582A1 патент-график).
- * Хранение: localStorage he_arm_force_history + he_arm_force_trials (для Bezkorovainyi F100/F500).
+ * Хранение: he_arm_force_trials (для Bezkorovainyi F100/F500); недельная статистика
+ * считается на лету (buildWeeklyStats) — отдельного ключа истории нет (26.10.2026:
+ * he_arm_force_history писался, но никем не читался — убран по классу «dead write»).
  * avg 200→260, max 250→310, min 180→240, fatigue 10%→4.5% за 12 нед — тренд адаптации.
  */
+import { localIsoDate } from '../../core/local-date';
 import type { ArmForceTrial } from './arm-dynamic-force.engine';
 
 export interface WeeklyForceStats {
@@ -14,13 +17,14 @@ export interface WeeklyForceStats {
   fatiguePct: number; // (max-min)/max*100 %
   trials: number;
 }
-const LS_KEY = 'he_arm_force_history';
 const TRIALS_KEY = 'he_arm_force_trials';
 
 function safeJsonParse<T>(raw: string | null, fallback: T): T {
   try { return raw ? JSON.parse(raw) as T : fallback; } catch { return fallback; }
 }
-function toIso(d: Date): string { return d.toISOString().slice(0, 10); }
+// 26.10.2026 было→стало: toISOString() даёт UTC-день — в UTC+X вечерняя запись/снапшот
+// уходили под «вчерашней» датой. Канон проекта — core/local-date.
+function toIso(d: Date): string { return localIsoDate(d); }
 function weekStartIso(dateIso: string): string {
   const d = new Date(dateIso + 'T12:00:00');
   const day = (d.getDay() + 6) % 7; // Mon=0
@@ -39,13 +43,6 @@ export function addForceTrial(t: ArmForceTrial): void {
   arr.push({ ...t, dateIso: t.dateIso || toIso(new Date()) });
   saveForceTrials(arr);
 }
-export function loadWeeklyForceStats(): WeeklyForceStats[] {
-  return safeJsonParse<WeeklyForceStats[]>(typeof localStorage !== 'undefined' ? localStorage.getItem(LS_KEY) : null, []);
-}
-export function saveWeeklyForceStats(stats: WeeklyForceStats[]): void {
-  try { localStorage.setItem(LS_KEY, JSON.stringify(stats.slice(-52))); } catch {}
-}
-
 export function buildWeeklyStats(trials: ArmForceTrial[], weeks = 12): WeeklyForceStats[] {
   if (!trials.length) return [];
   // группируем по weekStartIso
@@ -65,13 +62,6 @@ export function buildWeeklyStats(trials: ArmForceTrial[], weeks = 12): WeeklyFor
     const fatiguePct = mx > 0 ? Math.round(((mx - mn) / mx) * 1000) / 10 : 0;
     return { week: idx + 1, weekStartIso: ws, avg: Math.round(avg * 10) / 10, max: Math.round(mx * 10) / 10, min: Math.round(mn * 10) / 10, fatiguePct, trials: arr.length };
   });
-}
-
-export function recalcWeeklyHistory(): WeeklyForceStats[] {
-  const trials = loadForceTrials();
-  const stats = buildWeeklyStats(trials, 12);
-  saveWeeklyForceStats(stats);
-  return stats;
 }
 
 export function fatigueTrend(stats: WeeklyForceStats[]): { first: number; last: number; delta: number; improving: boolean; text: string } | null {
@@ -126,7 +116,7 @@ export function loadArmMeasureHistory(): ArmMeasureSnapshot[] {
 }
 
 export function saveArmMeasureSnapshot(snap: Omit<ArmMeasureSnapshot, 'date'> & { date?: string }): ArmMeasureSnapshot[] {
-  const nums: ArmMeasureSnapshot = { date: snap.date || new Date().toISOString().slice(0, 10) };
+  const nums: ArmMeasureSnapshot = { date: snap.date || localIsoDate() };
   for (const k of ['rtKg', 'sideKg', 'backKg', 'leftKg', 'rightKg'] as const) {
     const v = Number((snap as any)[k]);
     if (Number.isFinite(v) && v > 0) (nums as any)[k] = Math.round(v * 10) / 10;

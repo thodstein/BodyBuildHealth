@@ -7,6 +7,8 @@
  * Каждый тест = один дефект: падает на старом коде, зелёный на исправленном.
  */
 import { describe, it, expect } from 'vitest';
+import { readFileSync, readdirSync, statSync } from 'node:fs';
+import * as path from 'node:path';
 import { buildArmPlan } from '../arm-builder.engine';
 import { finalizeArmPlan } from '../arm-finalize.engine';
 import { validateArmPlan } from '../arm-validator.engine';
@@ -25,7 +27,10 @@ import { diagnoseArmliftCause } from '../armlift-cause.engine';
 import { diagnosticCompleteness } from '../armlift-completeness.engine';
 import { getArmLandmarks } from '../arm-volume-landmarks.engine';
 import { ARM_SPLIT_PATTERNS } from '../arm-split-patterns';
-import { rankArmSplits, levelSessionCapacity, splitMaxSessionMuscles } from '../arm-selector.engine';
+import { rankArmSplits, levelSessionCapacity, splitMaxSessionMuscles, armSplitReport } from '../arm-selector.engine';
+import { buildArmMacrocycle } from '../arm-macrocycle.engine';
+import { buildArmTaperCurve, applyArmTaperToWeeks } from '../arm-taper.engine';
+import { parseArmResultJson } from '../arm-result-import.engine';
 import { buildArmBridgeData } from '../arm-bridge-payload.engine';
 import { ARM_MUSCLES, ARM_MUSCLE_RU } from '../arm-types';
 import { SourceFileReader } from './helpers/source-reader';
@@ -472,5 +477,109 @@ describe('движки: UTC-даты убраны (канон core/local-date)',
     const src = new SourceFileReader('src/engines/arm/arm-plan-feedback.engine.ts');
     expect(src.text).toContain('localIsoDate()');
     expect(src.text).not.toMatch(/String\(todayIso \|\| ''\) : new Date\(\)\.toISOString/);
+  });
+  // 26.10.2026 (свип «менее изученных»): файлы журналов/снапшотов, где дата
+  // ещё писалась через UTC — вечерняя запись уходила в «вчера» в UTC+X.
+  for (const f of [
+    'src/engines/arm/arm-platform.engine.ts',
+    'src/engines/arm/arm-bilateral.engine.ts',
+    'src/engines/arm/arm-redflags.store.ts',
+    'src/engines/arm/arm-force-history.store.ts',
+    'src/engines/arm/arm-result-import.engine.ts',
+  ]) {
+    it(`${f} — без toISOString().slice(0,10)`, () => {
+      const src = new SourceFileReader(f);
+      expect(src.text).not.toMatch(/toISOString\(\)\.slice\(0,\s*10\)/);
+    });
+  }
+});
+
+
+describe('раунд «менее изученных»: годовой макро, тейпер, импорт результатов, отчёт сплита', () => {
+  it('buildArmMacrocycle: сумма недель блоков === totalWeeks (12 нед + приоритет A)', () => {
+    for (const total of [4, 5, 8, 12, 16, 24, 52]) {
+      const m = buildArmMacrocycle({ totalWeeks: total, goal: 'strength', competitions: [{ week: 2, id: 'waf', priority: 'A' }] });
+      const sum = m.blocks.reduce((a, b) => a + b.weeks, 0);
+      expect(sum, `totalWeeks=${total}`).toBe(m.totalWeeks);
+      let off = 0;
+      for (const b of m.blocks) { expect(b.weekOffset).toBe(off); off += b.weeks; }
+    }
+  });
+  it('buildArmMacrocycle: цель hypertrophy тоже даёт бюджет без раздувания', () => {
+    const m = buildArmMacrocycle({ totalWeeks: 12, goal: 'hypertrophy' });
+    expect(m.blocks.reduce((a, b) => a + b.weeks, 0)).toBe(12);
+  });
+  it('arm-annual: мёртвый configHash-дубль убран (stale считает block-builders)', () => {
+    const code = new SourceFileReader('src/engines/arm/arm-annual.ts').text.replace(/\/\*[\s\S]*?\*\//g, '');
+    expect(code).not.toContain('function stableHash');
+    expect(code).not.toMatch(/configHash:/);
+  });
+  it('buildArmTaperCurve toproll_taper: 3 недели → ровно 3 точки (было 2 → ранняя без тейпера)', () => {
+    const c = buildArmTaperCurve({ taperWeeks: 3, mode: 'toproll_taper' });
+    expect(c.length).toBe(3);
+    expect(c[0].volumePct).toBeGreaterThanOrEqual(c[1].volumePct);
+    expect(c[1].volumePct).toBeGreaterThan(c[2].volumePct);
+    expect(c[2].volumePct).toBe(0.7);
+  });
+  it('applyArmTaperToWeeks: side-давление однократно от базы (подпись кривой не врёт)', () => {
+    const weeks: any[] = [{ week: 1, sessions: [{ exercises: [{ muscle: 'side_pressure', sets: 4, rir: 2, workSets: [{ rir: 2 }, { rir: 2 }, { rir: 2 }, { rir: 2 }] }] }] }];
+    applyArmTaperToWeeks(weeks, buildArmTaperCurve({ taperWeeks: 1 }));
+    expect(weeks[0].sessions[0].exercises[0].sets).toBe(1);
+  });
+  it('applyArmTaperToWeeks: «Тейпер-1: 65% объёма, RIR+1, side −50%» — side ровно −50%', () => {
+    const weeks: any[] = [
+      { week: 1, sessions: [{ exercises: [{ muscle: 'side_pressure', sets: 4, rir: 2, workSets: [{ rir: 2 }, { rir: 2 }, { rir: 2 }, { rir: 2 }] }] }] },
+      { week: 2, sessions: [{ exercises: [] }] },
+    ];
+    applyArmTaperToWeeks(weeks, buildArmTaperCurve({ taperWeeks: 2 }));
+    expect(weeks[0].sessions[0].exercises[0].sets).toBe(2);
+    expect(weeks[0].sessions[0].exercises[0].rir).toBe(3);
+  });
+  it('arm-result-import: %WR по полу, как в журнале помоста (было male у женщины)', () => {
+    const json = JSON.stringify({ date: '2026-10-12', implement: 'rt', attempts: [{ weightKg: 100, success: true }] });
+    const male = parseArmResultJson(json, 'male');
+    const female = parseArmResultJson(json, 'female');
+    const wrF = platformWrFor('rolling_thunder', 'female');
+    expect(Math.round((100 / wrF) * 1000) / 10).toBe(female.wrPct);
+    expect(female.wrPct).toBeGreaterThan(male.wrPct);
+  });
+  it('armSplitReport: частота и ёмкость отдельными строками (не только скоринг)', () => {
+    const ranked = rankArmSplits({ level: 'intermediate', goal: 'strength', daysPerWeek: 4 });
+    const rep = armSplitReport(ranked[0], 'intermediate');
+    expect(rep.lines.some(l => l.startsWith('Частота:'))).toBe(true);
+    expect(rep.lines.some(l => l.startsWith('Ёмкость дня:'))).toBe(true);
+    expect(rep.capacity.levelCapacity).toBe(levelSessionCapacity('intermediate'));
+    expect(rep.capacity.maxSessionMuscles).toBe(splitMaxSessionMuscles(ranked[0].pattern));
+  });
+  it('arm-report: предупреждение пикового перебора печатается без литерала «Н{пик}»', () => {
+    const plan = buildArmPlan({ totalWeeks: 4, daysPerWeek: 4, level: 'enhanced' });
+    const rep = buildArmReport(finalizeArmPlan(plan as any) as any);
+    for (const w of rep.warnings) expect(w).not.toContain('{пик}');
+  });
+  it('арм-зона: нет гибридной латиницы внутри русских слов (в UI не попадёт «магnezия»)', () => {
+    const roots = [
+      path.resolve(process.cwd(), 'src/engines/arm'),
+      path.resolve(process.cwd(), 'src/ui/screens/TrainingScreen_parts'),
+    ];
+    const out: string[] = [];
+    const walk = (dir: string) => {
+      for (const name of readdirSync(dir)) {
+        const p = path.join(dir, name);
+        const st = statSync(p);
+        if (st.isDirectory()) { walk(p); continue; }
+        if (!/\.(ts|tsx)$/.test(name) || /\.test\.(ts|tsx)$/.test(name)) continue;
+        if (/[\\/]__tests__[\\/]/.test(p)) continue;
+        const isArm = p.includes('engines') || /arm-|Arm/.test(name);
+        if (!isArm) continue;
+        const t = readFileSync(p, 'utf8');
+        const cleaned = t.replace(/\/[^/\n*]+\/[gimsuy]*/g, ' ').replace(/'(ПовтMin|ПовтMax)'/g, ' ');
+        for (const m of cleaned.matchAll(/[\u0400-\u04FF][A-Za-z]{1,5}(?=[\s\-"'<>,.;:()=+/\\|])/g)) {
+          const s = Math.max(0, m.index - 24);
+          out.push(`${path.relative(process.cwd(), p)}: …${cleaned.slice(s, m.index + 14).replace(/\s+/g, ' ')}`);
+        }
+      }
+    };
+    for (const r of roots) walk(r);
+    expect(out, out.slice(0, 10).join(' | ')).toEqual([]);
   });
 });

@@ -10,7 +10,7 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { buildArmPlan } from '../../../engines/arm/arm-builder.engine';
 import { finalizeArmPlan } from '../../../engines/arm/arm-finalize.engine';
-import { rankArmSplits } from '../../../engines/arm/arm-selector.engine';
+import { rankArmSplits, armSplitReport } from '../../../engines/arm/arm-selector.engine';
 import { buildArmSchedule } from '../../../engines/arm/arm-specialization.engine';
 import { armPlanSnapshotId, refreshArmPlanSnapshot } from '../../../engines/arm/arm-plan-snapshot.engine';
 import { buildArmPrintHtml, buildArmIcs, buildArmPlanCsv } from '../../../engines/arm/arm-export.engine';
@@ -2147,9 +2147,16 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
 
       {step === 'split' && (
         <AdCard className="ad-stepview">
-          <AdSec title="🗓 Выбор сплита" hint={`Ранжирование по уровню/цели/технике/хватe/дням (${daysPerWeek}/нед). Зелёный — лучший.`}>
+          <AdSec title="🗓 Выбор сплита" hint={`Ранжирование по уровню/цели/технике/хвате/дням (${daysPerWeek}/нед). Зелёный — лучший.`}>
             <AdSwitch checked={strictDays} onChange={setStrictDays} label={`Только точная частота ${daysPerWeek}×/нед`} />
             <SplitList ranked={rankedShown} patternId={patternId} onPick={pickSplit} />
+            {/* 26.10.2026 (§11 п.2): частота и ёмкость дня — отдельным отчётом,
+                а не только скорингом (раньше пользователь не видел ни того, ни другого). */}
+            {rankedShown.length > 0 && (
+              <div className="ad-tip" data-arm="split-report">
+                {armSplitReport(rankedShown[0], level).lines.join(' · ')}
+              </div>
+            )}
           </AdSec>
           <AdCta>
             <AdBtn variant="primary" block hero onClick={handleBuild}>⚡ Собрать план</AdBtn>
@@ -2747,7 +2754,8 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
                         reader.onload = () => {
                           const text = String(reader.result || '');
                           const isJson = /\.json$/i.test(f.name) || text.trim().startsWith('{') || text.trim().startsWith('[');
-                          const parsed = isJson ? parseArmResultJson(text) : parseArmResultCsv(text, proPlatImpl);
+                           const impSex = profileSnapshot.sex || 'male';
+                           const parsed = isJson ? parseArmResultJson(text, impSex) : parseArmResultCsv(text, proPlatImpl, impSex);
                           if (parsed.errors.length > 0) { flash(`⚠ Импорт результатов: ${parsed.errors[0]}`); return; }
                           if (parsed.entries.length === 0) { flash('⚠ Импорт результатов: распознанных попыток нет.'); return; }
                           const log = applyArmResultImport(parsed, profileSnapshot.sex || 'male');

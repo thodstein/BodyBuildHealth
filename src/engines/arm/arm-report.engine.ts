@@ -64,7 +64,7 @@ export function buildArmReport(plan: ArmPlan): ArmReport {
     const r1 = (x: number) => Math.round(x * 10) / 10;
     const directShare = effectivePerWeek > 0 ? Math.round((directPerWeek / effectivePerWeek) * 100) : 0;
     warnings.push(
-      `Н{пик} ${muscle}: эффективно ${r1(effectivePerWeek)}/нед (прямые ${r1(directPerWeek)} · косвенные ${r1(effectivePerWeek - directPerWeek)} = ${directShare}% прямых) > MRV ${mrv}×1.15 — перебор в основном ${directShare >= 70 ? 'прямой работой' : 'косвенной нагрузкой'}.`
+      `⚠ Пик ${muscle}: эффективно ${r1(effectivePerWeek)}/нед (прямые ${r1(directPerWeek)} · косвенные ${r1(effectivePerWeek - directPerWeek)} = ${directShare}% прямых) > MRV ${mrv}×1.15 — перебор в основном ${directShare >= 70 ? 'прямой работой' : 'косвенной нагрузкой'}.`
     );
   }
 

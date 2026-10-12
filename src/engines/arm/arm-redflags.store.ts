@@ -3,7 +3,10 @@
  * Было: 5 чипов в локальном useState HubP0Panel — история терялась.
  * Стало: `he_arm_diag_redflags` (кап 20 записей {date, ids}), битой стор → [].
  * Скрининг, не диагноз — стоп-правило решает UI/мост, не стор.
+ * Даты — канон core/local-date (26.10.2026 было→стало: UTC-«сегодня»).
  */
+
+import { localIsoDate } from '../../core/local-date';
 
 export interface ArmRedFlagDef {
   id: string;
@@ -30,7 +33,7 @@ const CAP = 20;
 
 function today(): string {
   try {
-    return new Date().toISOString().slice(0, 10);
+    return localIsoDate();
   } catch {
     return '';
   }

@@ -7,8 +7,10 @@
  *
  * Вход: дата старта + приоритет (A/B/C) + вес/цель. Выход: обратный отсчёт,
  * фаза, тейпер-окно, весогонка-статус, календарные вехи.
- * Чистый модуль без импортов.
+ * Календарная дата — только через core/local-date (UTC-парсь ломал недели в UTC+X).
  */
+
+import { parseLocalIsoDate } from '../../core/local-date';
 
 export type CalPriority = 'A' | 'B' | 'C';
 export type CalPhase = 'base' | 'strength' | 'taper' | 'peak' | 'past';
@@ -43,11 +45,16 @@ function num(v: unknown, fb: number): number {
   return Number.isFinite(n) ? n : fb;
 }
 
+/** 26.10.2026 было→стало: `new Date('YYYY-MM-DD')` парсит date-only как UTC-полночь —
+ * в UTC+X ранним утром weeksOut округлялся ceil'ом на +1 неделя. Канон проекта —
+ * core/local-date (parseLocalIsoDate — локальный полдень, localIsoDate — локальный день). */
 export function calWeeksOut(fromIso?: string, startIso?: string): number {
   try {
-    const from = fromIso ? new Date(fromIso) : new Date();
-    const to = startIso ? new Date(startIso) : new Date();
-    if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime())) return 8;
+    const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
+    const parseDay = (iso: string): Date | null => (DATE_ONLY.test(iso) ? parseLocalIsoDate(iso) : new Date(iso));
+    const from = fromIso ? parseDay(fromIso) : new Date();
+    const to = startIso ? parseDay(startIso) : new Date();
+    if (!from || !to || Number.isNaN(from.getTime()) || Number.isNaN(to.getTime())) return 8;
     return Math.max(0, Math.ceil((to.getTime() - from.getTime()) / (7 * DAY)));
   } catch {
     return 8;
@@ -130,7 +137,7 @@ export function buildArmCalendar(input: ArmCalendarInput = {}): ArmCalendar {
     `T-${weeksOut} нед: фаза ${phase} (${seriesNote})`,
     taperWeeks > 0 ? `Тейпер последние ${taperWeeks} нед.` : 'Без отдельного тейпера (C).',
     lossKg > 0 ? `Вес: ${cutNote}` : 'Вес: в категории.',
-    'Финал: contest-sim неделя + чеклист (магnezия/ремень/60с на выход).',
+    'Финал: contest-sim неделя + чеклист (магнезия/ремень/60с на выход).',
   ];
   return {
     weeksOut,

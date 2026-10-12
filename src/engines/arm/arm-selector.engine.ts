@@ -38,6 +38,40 @@ export interface ArmRankedPattern {
 }
 
 /**
+ * Отчёт по частоте и ёмкости дня (26.10.2026 §11 п.2): раньше частота и ёмкость
+ * жили только внутри скоринга rankArmSplits — пользователь их не видел. Теперь
+ * чистая функция превращает их в человеческие строки для шага «Сплит».
+ */
+export interface ArmSplitReport {
+  splitName: string;
+  capacity: { maxSessionMuscles: number; levelCapacity: number; over: boolean };
+  freq: Record<string, number>;
+  lines: string[];
+}
+
+const REPORT_MUSCLES = ['side_pressure', 'rising', 'pronation', 'supination', 'cup', 'biceps', 'triceps', 'wrist_flexors', 'shoulders', 'back'];
+
+export function armSplitReport(r: ArmRankedPattern, level: string): ArmSplitReport {
+  const freq = r.pattern ? muscleFreq(r.pattern) : {};
+  const cap = r.maxSessionMuscles ?? (r.pattern ? splitMaxSessionMuscles(r.pattern) : 0);
+  const lvlCap = r.levelCapacity ?? levelSessionCapacity(level);
+  const over = cap > lvlCap;
+  const parts = REPORT_MUSCLES
+    .filter(m => (freq[m] ?? 0) > 0)
+    .sort((a, b) => (freq[b] ?? 0) - (freq[a] ?? 0))
+    .slice(0, 4)
+    .map(m => `${m} ×${Math.round((freq[m] ?? 0) * 10) / 10}/нед`);
+  const lines: string[] = [];
+  if (parts.length > 0) lines.push(`Частота: ${parts.join(' · ')}`);
+  lines.push(
+    over
+      ? `Ёмкость дня: ${cap} мышц > вашей ${lvlCap} (уровень ${level}) — сессия может выйти давной, стимул размоется`
+      : `Ёмкость дня: ${cap} мышц ≤ вашей ${lvlCap} (уровень ${level}) — нагрузка распределится`
+  );
+  return { splitName: r.pattern?.name ?? '', capacity: { maxSessionMuscles: cap, levelCapacity: lvlCap, over }, freq, lines };
+}
+
+/**
  * Ёмкость дня по уровню: сколько УНИКАЛЬНЫХ мышц сессия реально нагрузит
  * (зеркало BB `sessionMuscleRealism` + arm-практика). Ёмкость — не запрет,
  * а скоринг: перебор = давняя сессия и расплывчатый стимул (RP-подход:
