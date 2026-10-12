@@ -79,4 +79,18 @@ describe('PRO-разбор FIT (records → зоны/decoupling/затухани
     await waitFor(() => expect(screen.getByText(/проверьте превью/)).toBeTruthy());
     expect(document.querySelector('[data-cardio="fit-analysis"]')).toBeNull();
   });
+
+  it('сохранение FIT-сессии пишет decoupling в журнал (для тренда durability)', async () => {
+    const { loadCardioLog } = await import('../../../../engines/lms/cardio-diary.engine');
+    render(<CardioImportPanel />);
+    await feedFit();
+    // Одиночная сессия → кнопка «Сохранить как ZONE2».
+    fireEvent.click(screen.getByRole('button', { name: /Сохранить как/i }));
+    const log = loadCardioLog();
+    expect(log).toHaveLength(1);
+    expect(log[0].source).toBe('import');
+    // Decoupling из FIT-записей доехал до журнала.
+    expect(typeof log[0].decouplingPct).toBe('number');
+    expect(log[0].decouplingPct).toBeGreaterThan(0);
+  });
 });

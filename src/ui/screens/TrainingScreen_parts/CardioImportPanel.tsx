@@ -145,6 +145,9 @@ export const CardioImportPanel: React.FC<{ onImported?: () => void; cycle?: Card
       calories: estimateCardioEntryKcal(type, src.durationMin, currentWeightKg()),
       distanceKm: src.distanceKm ?? undefined,
       rpe: src.rpe ?? undefined,
+      // PRO (аудит Oct 2026): decoupling из FIT-записей пишем в журнал —
+      // по накопленным точкам дашборд считает тренд durability.
+      decouplingPct: fit?.decouplingPct ?? undefined,
       sport: src.sport,               // спринт 5: одиночная сессия тоже помнит дисциплину
       source: 'import',               // это импорт, даже если тип/дату выбрал пользователь
       notes: `импорт ${preview.fileName}`,

@@ -7316,3 +7316,12 @@ ull → default. Реальные значения лежат в UnifiedSettings
 - **CSS `§118 + §118.2`** (`styles-native.css`, только `html.app-native`, без hex): табы/кнопки 44–48px, press 0.97, focus-visible лайм, tabular, safe-area top+56 для пульта, 380px-схлопывания, reduced-motion.
 - **Проверено**: NEW `session-widgets-pack` **15/15** (9 виджетов + helpers + §118-guard + док) + `tsc --noEmit` **0 по всему проекту** + `verify:apk-design` OK. НЕ ПУШИЛ.
 
+### Продолжение (раунд 4, Oct 12 2026: decoupling FIT → журнал → тренд durability)
+Соответствующее пояснение: цепочка Pa:HR decoupling была разомкнута — FIT-анализ
+считал decoupling в превью импорта, но не записывал никуда, а движок
+`durabilityTrend` не имел потребителя. Замкнуто: `.fit` → `fitDecoupling` →
+новое поле `CardioLogEntry.decouplingPct` (только одиночная сессия — для
+многосессионного файла decoupling целого файла нельзя приписывать каждой
+сессии) → тренд в дашборде («📊 Тренд durability (FIT-замеры)», точка = сессия
+≥60 мин). Тесты: +3 UI. Итог: lms + кардио-UI **1582/1582 (91 файл)**,
+соседи 24/24, `tsc` 0 по моим файлам, `verify:apk-design` OK.

@@ -172,6 +172,32 @@ describe('PRO: журнал полевых тестов — подсказка �
   });
 });
 
+describe('PRO: тренд durability из FIT-замеров (durabilityTrend)', () => {
+  it('две сессии с decoupling → тренд и подпись', () => {
+    const c = buildCardioCycle({ goal: 'cut', totalWeeks: 4, id: 'dtr-1' });
+    const log = [
+      { id: 'n', date: isoDaysAgo(1), type: 'zone2' as const, durationMin: 75, completed: true, decouplingPct: 4 },
+      { id: 'p', date: isoDaysAgo(10), type: 'zone2' as const, durationMin: 75, completed: true, decouplingPct: 8 },
+    ];
+    const html = render(<CardioAnalyticsDashboard cycle={c} log={log} />);
+    const el = document.querySelector('[data-autotune="durability-trend"]');
+    expect(el).toBeTruthy();
+    // Свежий замер (4) лучше раннего (8) → decoupling улучшается.
+    expect(el!.textContent).toContain('Durability улучшается');
+    html.unmount();
+  });
+
+  it('одна точка — тренда нет (нужно ≥2)', () => {
+    const c = buildCardioCycle({ goal: 'cut', totalWeeks: 4, id: 'dtr-2' });
+    const log = [
+      { id: 'n', date: isoDaysAgo(1), type: 'zone2' as const, durationMin: 75, completed: true, decouplingPct: 4 },
+    ];
+    const html = render(<CardioAnalyticsDashboard cycle={c} log={log} />);
+    expect(document.querySelector('[data-autotune="durability-trend"]')).toBeNull();
+    html.unmount();
+  });
+});
+
 describe('P1-6 дашборт: единая шкала нагрузки (TRIMP/monotony)', () => {
   it('TRIMP считается движком (не inline-копией) и не NaN', () => {
     const c = buildCardioCycle({ goal: 'cut', totalWeeks: 4, id: 'trimp-1' });

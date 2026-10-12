@@ -56,6 +56,10 @@ export interface CardioLogEntry {
   /** Sprint 5.3 provenance: откуда запись и когда обновлена. */
   source?: 'manual' | 'import' | 'wearable' | 'derived';
   updatedAt?: string;
+  /** PRO (аудит Oct 2026): Pa:HR decoupling из посекундных записей FIT.
+   *  Пишется при импорте .fit; по накопленным точкам считается тренд
+   *  durability (движок cardio-durability: durabilityTrend). */
+  decouplingPct?: number;
 }
 
 export function loadCardioLog(): CardioLogEntry[] {

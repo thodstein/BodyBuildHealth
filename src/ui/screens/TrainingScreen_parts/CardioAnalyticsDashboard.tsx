@@ -11,7 +11,7 @@ import {
   dailyPmcSeries, tssRampRate, interpretTsb,
   aerobicDecoupling, heatAltitudeHrAdd, cardioInterferenceV2,
   dailyTrimpMap, dailyTrimpFromLogEntry, maxHrByFormula, cardioEntryLoad,
-  cardioAnemiaSignals, cardioRestingHrSignal,
+  cardioAnemiaSignals, cardioRestingHrSignal, durabilityTrend,
 } from '../../../engines/lms/cardio.engine';
 import { dateDaysAgo } from '../../../engines/lms/cardio-diary.engine';
 import { getProfile } from '../../../core/profile-manager';
@@ -174,6 +174,20 @@ export const CardioAnalyticsDashboard: React.FC<{ cycle: CardioCycle | null; log
     } catch { return null; }
   }, [log]);
 
+  // PRO: тренд durability по накопленным decoupling-точкам журнала (FIT-импорт).
+  // P2-аудит: `durabilityTrend` был без потребителя, а decoupling из FIT
+  // никуда не записывался — теперь журнал несёт точки, тренд считается.
+  const durabilityTr = useMemo(() => {
+    if (log.length < 2) return null;
+    try {
+      const points = log
+        .filter(e => e.completed && Number.isFinite(e.decouplingPct) && e.durationMin >= 60)
+        .map(e => ({ date: e.date, durationMin: e.durationMin, decouplingPct: e.decouplingPct as number }));
+      if (points.length < 2) return null;
+      return durabilityTrend(points);
+    } catch { return null; }
+  }, [log]);
+
   // PRO: safety жара/высота из конфига цикла
   const safety = useMemo(() => {
     if (!cycle) return null;
@@ -274,6 +288,11 @@ export const CardioAnalyticsDashboard: React.FC<{ cycle: CardioCycle | null; log
       )}
       {pmc && <div style={{ fontSize: 11, color: '#fff', background: 'rgba(167,139,250,0.07)', border: '1px solid rgba(167,139,250,0.22)', borderRadius: 8, padding: '6px 8px' }}>📊 PMC daily: CTL {pmc.ctl} · ATL {pmc.atl} · TSB {pmc.tsb > 0 ? '+' : ''}{pmc.tsb} — {pmc.interp}{pmc.rampPct != null ? ` · Рампа ${pmc.rampPct}%/нед` : ''}{pmc.rampWarn ? ` · ⚠ ${pmc.rampWarn}` : ''}</div>}
       {durability && <div style={{ fontSize: 11, color: durability.level === 'strong' ? '#4ade80' : durability.level === 'moderate' ? '#fbbf24' : '#f87171', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: '6px 8px' }}>🏃 Durability decoupling {durability.decouplingPct}% ({durability.level}) — {durability.advice}</div>}
+      {durabilityTr && (
+        <div style={{ fontSize: 11, color: durabilityTr.trend === 'improving' ? '#4ade80' : durabilityTr.trend === 'worsening' ? '#f87171' : '#fff', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: '6px 8px' }} data-autotune="durability-trend">
+          📊 Тренд durability (FIT-замеры): {durabilityTr.delta != null ? `${durabilityTr.delta > 0 ? '+' : ''}${durabilityTr.delta} п.п.` : '—'} — {durabilityTr.note}
+        </div>
+      )}
       {safety && <div style={{ fontSize: 11, color: '#fbbf24', background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.22)', borderRadius: 8, padding: '6px 8px' }}>🌡 Жара/высота: +{safety.addBpm} уд/мин к зонам — {safety.notes.join(' ')}</div>}
       {interfV2 && interfV2.level !== 'low' && <div style={{ fontSize: 11, color: '#93c5fd', background: 'rgba(59,130,246,0.07)', border: '1px solid rgba(59,130,246,0.22)', borderRadius: 8, padding: '6px 8px' }}>🔬 Interference v2 {interfV2.score}/10 ({interfV2.level}) — {interfV2.advice}</div>}
       {interference && interference.level !== 'low' && <div style={{ fontSize: 11, color: interference.level === 'high' ? '#f87171' : '#fbbf24', background: interference.level === 'high' ? 'rgba(239,68,68,0.08)' : 'rgba(245,158,11,0.08)', border: `1px solid ${interference.level === 'high' ? 'rgba(239,68,68,0.24)' : 'rgba(245,158,11,0.24)'}`, borderRadius: 8, padding: '6px 8px' }}>⚡ Interference {interference.score}/10 ({interference.level}) — {interference.advice}</div>}
