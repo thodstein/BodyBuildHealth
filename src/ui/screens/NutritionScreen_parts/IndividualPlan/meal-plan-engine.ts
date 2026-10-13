@@ -10487,9 +10487,10 @@ function closeFoodDeficiencies(meals: Meal[], isVegetarian = false, sex: 'male'|
 // микронутриента (<60% RDA) в самый лёгкий приём. Возвращает note (или null).
 // Aug 28: продукт уважает аллергены/непереносимости/категории (opts) — раньше только excludedIds.
 // §4.1 (призрак микро-добавки): kcalGate — ккал дня против цели на момент добавки;
-// защита _fixedGrams включается только при комнате <90% цели (см. ниже). Возвращается
-// ссылка на item — конец buildDayPlan пересчитывает ноту по ФАКТИЧЕСКИМ граммам.
-function activelyCloseTopDeficiency(meals: Meal[], isVegetarian: boolean, sex: 'male'|'female'|'other', excludedIds: Set<string>, opts?: { allergenTags?: Set<string>; intolerances?: Intolerances; categoryPref?: CategoryPref }, kcalGate: { kcalNow: number; kcalTarget: number } = { kcalNow: 0, kcalTarget: 0 }): { note: string | null; micro?: { item: any; foodId: string; foodName: string; grams: number; key: string; unit: string; rda: number; before: number } } {
+// защита _fixedGrams включается только при комнате <90% цели (см. ниже). Payload
+// _microClosure БЕЗ ссылки на item (иначе круг в JSON.stringify) — конец buildDayPlan
+// пересчитывает ноту по ФАКТИЧЕСКИМ граммам, ища пункт по маркеру.
+function activelyCloseTopDeficiency(meals: Meal[], isVegetarian: boolean, sex: 'male'|'female'|'other', excludedIds: Set<string>, opts?: { allergenTags?: Set<string>; intolerances?: Intolerances; categoryPref?: CategoryPref }, kcalGate: { kcalNow: number; kcalTarget: number } = { kcalNow: 0, kcalTarget: 0 }): { note: string | null; micro?: { foodId: string; foodName: string; grams: number; key: string; unit: string; rda: number; before: number } } {
   const _foodAllowed = (f: any): boolean => {
     if (excludedIds.has(f.id)) return false;
     if (!opts) return true;
