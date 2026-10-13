@@ -31,15 +31,21 @@ export function diagnoseSMAnthro(input: SMAnthroInput): SMAnthroResult | null {
   const h = input.heightCm;
   const s = input.armSpanCm;
   const p = input.platformCm;
-  if ((h == null || !Number.isFinite(h) || h <= 0) && (p == null || !Number.isFinite(p as number))) return null;
-  const height = h != null && Number.isFinite(h) && h > 0 ? h : 178;
+  // Рост и платформа — обязательны: совет печатает ОБА числа
+  // («Рост 178см + платформа 120см») и считает tacky-высоту. Раньше при вводе
+  // одного из них второй молча подставлялся дефолтом 178/140, и подсказка
+  // выдавала догадку за факт (аудит-2026-10).
+  const hasH = h != null && Number.isFinite(h) && h > 0;
+  const hasP = p != null && Number.isFinite(p as number) && (p as number) > 0;
+  if (!hasH || !hasP) return null;
+  const height = h as number;
+  const platform = p as number;
   let diffCm: number | null = null;
   let build: SMAnthroResult['build'] = 'unknown';
-  if (s != null && Number.isFinite(s) && s > 0 && h != null && Number.isFinite(h) && h > 0) {
-    diffCm = Math.round(s - h);
+  if (s != null && Number.isFinite(s) && s > 0) {
+    diffCm = Math.round(s - height);
     build = diffCm > 5 ? 'long' : diffCm < -5 ? 'short' : 'average';
   }
-  const platform = p != null && Number.isFinite(p) && (p as number) > 0 ? (p as number) : 140;
   // Преимущество платформы: высоким (≥185) загрузка на 140 легче, низким (≤175) пикап легче
   let platformAdvantage: SMAnthroResult['platformAdvantage'] = 'neutral';
   if (height >= 185) platformAdvantage = 'tall';
@@ -58,6 +64,9 @@ export function diagnoseSMAnthro(input: SMAnthroInput): SMAnthroResult | null {
     pickupAdvice = `Длинные руки (+${diffCm}см): обхват камня глубже, high-hips как RDL — не приседай низко.`;
   } else if (build === 'short') {
     pickupAdvice = `Короткие руки (${diffCm}см): садись ниже к камню, пальцы глубже под сферу, tacky на предплечья.`;
+  } else if (build === 'unknown') {
+    // Размах НЕ измерен — не выдаём «пропорции средние» за факт.
+    pickupAdvice = 'Размах рук не измерен — high-hips старт, пальцы под камень, руки-крюки (не тянуть).';
   } else {
     pickupAdvice = 'Пропорции средние: high-hips старт, пальцы под камень, руки-крюки (не тянуть).';
   }

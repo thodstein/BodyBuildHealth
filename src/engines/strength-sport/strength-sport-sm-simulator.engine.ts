@@ -13,6 +13,7 @@
 import type { StrengthSportPlan } from './strength-sport.types';
 import { auditSMPlan } from './strength-sport-sm-plan-audit.engine';
 import { SM_BIOMECH, type SMWeakPoint } from './strength-sport-sm-biomechanics.engine';
+import { basePmForSM } from './strength-sport-sm-injection.engine';
 
 export interface SMSimAction {
   weakPoint: SMWeakPoint;
@@ -36,25 +37,18 @@ export interface SMSimDelta {
   summary: string;
 }
 
-/** Оценка базы ПМ движения по токену коррекции (как в sm-injection). */
+/**
+ * База ПМ для оценки веса коррекции. ДЕЛЕГИРУЕТ канону инъекции
+ * (`basePmForSM`), а не держит свою копию токенов: аудит-2026-10 показал, что
+ * локальная копия расходилась с инъекцией на КАЖДОЙ группе —
+ *   - `plate_pinch`: `low.includes('pin')` ⊂ 'pinch' уводил в ветку лога →
+ *     60 кг в превью против 20 кг в плане;
+ *   - `sm_core_brace_*` (plank): падала в `backSquat ?? 80` → 48 кг на планке;
+ *   - `sm_log_dip_*`: выставлено 0.60 интенсивности вместо 65% от записи.
+ * Превью теперь = то, что вставится.
+ */
 export function estimateSMCorrBasePm(corrId: string, wm: Record<string, number>): number {
-  const low = String(corrId).toLowerCase();
-  if (low.includes('log') || low.includes('axle') || low.includes('viking') || low.includes('circus') || low.includes('press') || low.includes('jerk') || low.includes('pin')) {
-    const w = (wm as Record<string, number>).logPress ?? (wm as Record<string, number>).axlePress ?? (wm as Record<string, number>).overheadPress ?? 60;
-    return w as number;
-  }
-  if (low.includes('yoke') || low.includes('farmers') || low.includes('frame') || low.includes('husafell') || low.includes('conan') || low.includes('shield') || low.includes('carry') || low.includes('walk')) {
-    const w = (wm as Record<string, number>).farmersWalk ?? (wm as Record<string, number>).yokeWalk ?? 140;
-    return w as number;
-  }
-  if (low.includes('stone') || low.includes('sandbag') || low.includes('keg') || low.includes('tire') || low.includes('sled')) {
-    const w = (wm as Record<string, number>).atlasStone ?? (wm as Record<string, number>).sandbagLoad ?? 100;
-    return w as number;
-  }
-  if (low.includes('squat') || low.includes('front')) return (wm as Record<string, number>).backSquat ?? 100;
-  if (low.includes('pull') || low.includes('deadlift') || low.includes('rdl') || low.includes('deficit')) return (wm as Record<string, number>).deadlift ?? 120;
-  if (low.includes('pinch') || low.includes('grip') || low.includes('plank') || low.includes('suitcase') || low.includes('hang') || low.includes('hammer')) return 20;
-  return (wm as Record<string, number>).backSquat ?? 80;
+  return basePmForSM(corrId, wm);
 }
 
 export function isSMCarryCorr(corrId: string): boolean {

@@ -97,8 +97,15 @@ export function loadSMProgress(): SMProgressEntry[] {
   }
 }
 
-export function saveSMProgress(hist: SMProgressEntry[]): void {
+/** Возвращает true только при РЕАЛЬНОЙ записи. Раньше было `void` + `catch {}`:
+ *  при переполнении хранилища хаб безусловно показывал «✓ Прогресс сохранён»,
+ *  а запись молча исчезала (fallback catch в хабе был недостижим — функция не
+ *  бросала). Паритет с `saveSMLVPProfile` (возвращает boolean). */
+export function saveSMProgress(hist: SMProgressEntry[]): boolean {
   try {
     if (typeof localStorage !== 'undefined') localStorage.setItem(SM_PROGRESS_KEY, JSON.stringify(hist.slice(-60)));
-  } catch { /* noop */ }
+    return true;
+  } catch {
+    return false;
+  }
 }

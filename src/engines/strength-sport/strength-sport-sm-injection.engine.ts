@@ -14,7 +14,13 @@ import '../../core/exercise-catalog-ta-supplement';
 
 const KNOWN_SM_CORR_IDS = new Set(Object.values(SM_FALLBACK_BY_WP));
 
-function basePmForSM(id: string, wm: any): number {
+/**
+ * База ПМ инъекции по id коррекции. ЭКСПОРТИРУЕТСЯ как канон: симулятор
+ * (`estimateSMCorrBasePm`) обязан считать через НЕЁ, иначе превью показывает
+ * не тот вес, который вставится в план (аудит-2026-10: 'plate_pinch' уходил в
+ * ветку лога из-за `low.includes('pin')` ⊂ 'pinch' и получал 60 кг вместо 20).
+ */
+export function basePmForSM(id: string, wm: any): number {
   const low = id.toLowerCase();
   if (low.includes('log') || low.includes('axle') || low.includes('viking') || low.includes('circus')) return wm.logPress || wm.axlePress || wm.overheadPress || 60;
   if (low.includes('yoke') || low.includes('farmers') || low.includes('frame') || low.includes('husafell') || low.includes('conan') || low.includes('shield') || low.includes('duck') || low.includes('zercher') || low.includes('carry')) return wm.farmersWalk || wm.yokeWalk || 140;

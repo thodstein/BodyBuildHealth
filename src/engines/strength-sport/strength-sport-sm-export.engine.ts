@@ -70,6 +70,13 @@ ${snap.movement && snap.movement.length ? `<h2>Движение (P1–P8)</h2><u
 </body></html>`;
 }
 
+/**
+ * BOM (\uFEFF) ПРЯМО В СТРОКЕ, а не в слое скачивания: APK-путь
+ * (`saveCsvApk` → `saveTextFileApk` native-ветка) пишет текст КАК ЕСТЬ, а
+ * web-ветка добавляет BOM сама. Без BOM в строке кириллица в findings/причинах
+ * открывалась мусором (Excel). Web-ветка apk-share strips ведущий BOM перед
+ * своим префиксом — двойного BOM не будет.
+ */
 export function buildSMCsv(snap: SMDiagnosticSnapshot): string {
   // Защита от CSV-формул: значение, начинающееся с = + - @, Excel/LibreOffice
   // исполнит его как формулу. Префикс `'` — тот же приём, что в экспорте дневников.
@@ -102,7 +109,7 @@ export function buildSMCsv(snap: SMDiagnosticSnapshot): string {
     ['movement', (snap.movement || []).join('; ')],
     ['findings', snap.findings.join('; ')],
   ];
-  return rows.map(r => r.map(escCsv).join(',')).join('\n');
+  return '\uFEFF' + rows.map(r => r.map(escCsv).join(',')).join('\n');
 }
 
 export function downloadSMHtml(html: string, filename = 'strongman-report.html'): void {

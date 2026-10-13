@@ -1249,11 +1249,12 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
     };
     try {
       const hist = loadSMProgress();
-      saveSMProgress(appendSMProgress(hist, entry as never));
-      setToast('✓ Прогресс сохранён (лимит 60)');
-      setTimeout(() => setToast(''), 2000);
+      // saveSMProgress возвращает false при переполнении хранилища — прежний
+      // `catch` был недостижим (функция не бросала) и «✓ сохранено» врало.
+      const ok = saveSMProgress(appendSMProgress(hist, entry as never));
+      setToast(ok ? '✓ Прогресс сохранён (лимит 60)' : '⚠ Прогресс НЕ сохранён — хранилище переполнено');
+      setTimeout(() => setToast(''), ok ? 2000 : 3000);
     } catch {
-      // Wave-0 Э0.4: раньше здесь был пустой catch — при сбое записи пользователь не видел НИЧЕГО
       setToast('⚠ Прогресс не сохранён — хранилище переполнено');
       setTimeout(() => setToast(''), 3000);
     }

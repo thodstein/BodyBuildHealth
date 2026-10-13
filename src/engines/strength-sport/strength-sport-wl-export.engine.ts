@@ -116,7 +116,9 @@ export function buildWLCsv(snap: WLDiagnosticSnapshot): string {
     ['notes', (snap.notes || []).join('; ')],
     ['findings', snap.findings.join('; ')],
   ];
-  return rows.map(r => r.map(escCsv).join(',')).join('\n');
+  // BOM в строке — иначе APK-native пишет кириллицу без него (Excel-мохибейк),
+  // а web-ветка apk-share strips ведущий BOM перед своим префиксом.
+  return '\uFEFF' + rows.map(r => r.map(escCsv).join(',')).join('\n');
 }
 
 export function downloadWLHtml(html: string, filename = 'ta-report.html'): void {

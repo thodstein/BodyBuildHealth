@@ -696,7 +696,9 @@ interface SMCatInfo {
   name?: string;
 }
 
-function smCatalogLookup(id: string): SMCatInfo {
+/** Доступ к каталогу для фильтров/ранжира и для тестов инварианта
+ *  «показано = вставится» (снаряд/стоимость берутся по РЕАЛЬНОМУ exId записи). */
+export function smCatalogLookup(id: string): SMCatInfo {
   try {
     const hit = (TA_CATALOG_SUPPLEMENT as unknown as Array<{ id?: string; equipment?: string; fatigueCost?: number; name?: string }> || []).find((e) => e?.id === id);
     if (hit) return { equipment: hit.equipment, fatigueCost: hit.fatigueCost, name: hit.name };
@@ -743,7 +745,12 @@ export function correctivesForSMWeakPoint(phase: SMWeakPoint, opts: SMCorrective
   const list = eqFilter.length
     ? all.filter((c) => {
         try {
-          const exId = SM_CORR_EXID[c.phase]?.[c.kind] ?? '';
+          // Реальный id ЗАПИСИ, а не фазовый канон: `sm_log_dip_fatigue` — это
+          // sled_push_sprint (диски), а `SM_CORR_EXID.log_dip.stability` —
+          // suitcase_carry (гантели). Фильтровать по канону = прятать то, что
+          // реально вставится, и показывать то, что не вставится
+          // (аудит-2026-10: «показано = вставится»).
+          const exId = exIdForSMCorrective(c) || (SM_CORR_EXID[c.phase]?.[c.kind] ?? '');
           const need = String(smCatalogLookup(exId).equipment || '').toLowerCase();
           if (!need || need === 'bodyweight' || need === 'universal') return true;
           return eqFilter.includes(need);
@@ -766,7 +773,9 @@ export function correctivesForSMWeakPoint(phase: SMWeakPoint, opts: SMCorrective
     // Усталость: дорогие (fatigueCost>7) уходят вниз, дешёвые — вверх (без скрытия)
     if (opts.fatigueSensitive) {
       try {
-        const exId = SM_CORR_EXID[c.phase]?.[c.kind] ?? '';
+        // Та же запись, что и в инъекции (см. фильтр оборудования выше) —
+        // fatigueCost чужого фагового упражнения врал бы в ранжировании.
+        const exId = exIdForSMCorrective(c) || (SM_CORR_EXID[c.phase]?.[c.kind] ?? '');
         const cost = smCatalogLookup(exId).fatigueCost ?? 7;
         score += cost <= 6 ? 5 : cost >= 8 ? -10 : 0;
       } catch { /* noop */ }

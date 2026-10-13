@@ -108,7 +108,9 @@ export async function saveTextFileApk(filename: string, text: string, mime = 'te
     }
   }
   try {
-    const blob = new Blob(['\uFEFF' + text], { type: mime });
+    // Идемпотентность BOM: производители, которые несут BOM в самой строке
+    // (диагностические CSV зоны ТА/стронг), иначе получали бы ДВА BOM на вебе.
+    const blob = new Blob(['\uFEFF' + text.replace(/^\uFEFF/, '')], { type: mime });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
