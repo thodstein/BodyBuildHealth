@@ -2,7 +2,7 @@
  * Тесты сессий растяжки (stretch-session.engine.ts): генератор по фокусу,
  * лимит времени, типы подходов, лог и статистика.
  */
-import { describe, expect, it, beforeEach } from 'vitest';
+import { describe, expect, it, beforeEach, afterEach, vi } from 'vitest';
 import {
   STRETCH_FOCUSES, buildStretchSession, stretchExerciseLabel,
   loadStretchLog, upsertStretchLog, stretchLogForDate, stretchStats, sanitizeStretchLog,
@@ -11,6 +11,15 @@ import {
 
 const iso = (d: Date) => d.toISOString().slice(0, 10);
 const daysAgo = (n: number) => { const d = new Date(); d.setDate(d.getDate() - n); return iso(d); };
+
+// PRO-3 (детерминизм): тест сеял записи «1-3 дня назад» и проверял недельную
+// сумму при неделе, начинающейся с понедельника. На понедельник/вторник часть
+// записей уезжает в ПРЕДЫДУЩУЮ неделю → `weekMin` был 15/0 вместо 25, и лог
+// падал в зависимости от дня запуска (воспроизведено вторником 13.10.2026).
+// Часы фиксируются на среде: 1 день назад = вт, 2 = пн (обе внутри недели),
+// 3 = вс (предыдущая неделя — и та запись не выполнена).
+beforeEach(() => { vi.useFakeTimers(); vi.setSystemTime(new Date('2026-10-14T12:00:00')); });
+afterEach(() => { vi.useRealTimers(); });
 
 describe('STRETCH_FOCUSES и buildStretchSession', () => {
   it('5 фокусов с подписями и группами', () => {

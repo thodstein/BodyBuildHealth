@@ -60,13 +60,30 @@ describe('хабы арма: канон дат', () => {
 
   it('силовая попытка и снимок берут канон, а не UTC-день', () => {
     const { код } = КОД_ФАЙЛА(ХАБЫ[0]);
-    // «dateIso» новой попытки — ключ записи, разрыв этого клюша и есть тот дефект.
+    // «dateIso» новой попытки — ключ записи, разрыв этого ключа и есть тот дефект.
     expect(код, 'dateIso попытки должен считаться по канону').toMatch(/dateIso:\s*localIsoDate\(\)/);
-    // Имена выгрузок: 3 у армрестлинга + 3 у армлифтинга.
-    const arm = КОД_ФАЙЛА(ХАБЫ[0]).код.match(/arm-(?:diagnostics|plan)-\$\{localIsoDate\(\)\}/g) || [];
-    const lift = КОД_ФАЙЛА(ХАБЫ[1]).код.match(/armlift(?:ing)?[\w-]*-\$\{localIsoDate\(\)\}/g) || [];
-    expect(arm.length, 'ожидались 3 имени выгрузки с каноном в армрестлинге').toBe(3);
-    expect(lift.length, 'ожидались 3 имени выгрузки с каноном в армлифтинге').toBe(3);
+    // Имена выгрузок: армрестлинг и армлифтинг. Раньше здесь были магические
+    // счётчики 3/3 — они устарели, когда в round-10 подключили .ics плана, а в
+    // армлифтинг добавили ICS (стало 3+1=4). Вместо счётчика теперь ИНВАРИАНТ:
+    // каждое имя файла выгрузки/печати в хабах построено каноном, т.е. ни одно
+    // не уедет на вчерашний день в UTC+X. Он переносит любые будущие выгрузки.
+    for (const rel of ХАБЫ) {
+      const к = КОД_ФАЙЛА(rel).код;
+      // Все шаблоны имён файлов вида `<префикс>-${...}.<ext>` в хабе
+      const names = к.match(/`[\w-]*-(\d{4}-\d{2}-\d{2}|\$\{[^}]*localIsoDate\(\)[^}]*\})\.[a-z]{2,4}`/g) || [];
+      expect(names.length, `${rel}: не найдено ни одной выгрузки с датой в имени`).toBeGreaterThan(0);
+      const utf = names.filter(n => !/localIsoDate\(\)/.test(n));
+      expect(utf, `${rel}: имена файлов без канона (уедут на вчера в UTC+X)`).toEqual([]);
+      // и канон в них действительно вызывается, а не лежит в строке
+      expect(names.filter(n => /\$\{localIsoDate\(\)\}/.test(n)).length, `${rel}: ни одного имени с localIsoDate()`).toBe(names.length);
+    }
+    // якорные имена на месте (регресс на удаление выгрузки)
+    const arm = КОД_ФАЙЛА(ХАБЫ[0]).код;
+    expect(arm).toContain('arm-diagnostics-${localIsoDate()}.html');
+    expect(arm).toContain('arm-diagnostics-${localIsoDate()}.csv');
+    expect(arm).toContain('arm-plan-${localIsoDate()}.ics');
+    const lift = КОД_ФАЙЛА(ХАБЫ[1]).код;
+    expect(lift).toMatch(/armlift(?:ing)?[\w-]*-\$\{localIsoDate\(\)\}\.html/);
   });
 
   it('touchedAt остаётся событием во времени, а не календарным днём', () => {

@@ -1625,8 +1625,29 @@ const SetEditor: React.FC<{ sets: UserSet[]; onChange: (s: UserSet[]) => void; m
       <div className="editor-sets-heading" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
         <div style={{ flex: 1 }}>
           <div className="editor-kicker">СХЕМА ПОДХОДОВ</div>
-          <div className="editor-sets-help">Повторы × RIR @ вес · отдых · техники</div>
+          <div className="editor-sets-help">Повторы × RIR @ вес · отдых · техники{sets.some(s => s.holdSeconds != null) ? ' · холд' : ''}</div>
         </div>
+        {/* PRO-3: удержание (изометрия шеи/кора). UserSet.holdSeconds был в типе
+            и писался экспортом единоборств, но НЕ рендерился и НЕ редактировался:
+            импортированный combat-план показывал «1×R3 @0кг» без секунд, теряя
+            смысл подхода. Тумблер включает холд на всех сетах блока. */}
+        <button
+          type="button"
+          onClick={() => {
+            const on = sets.length > 0 && sets.every(s => s.holdSeconds != null);
+            onChange(sets.map(s => on
+              ? (() => { const { holdSeconds: _drop, ...rest } = s; return rest; })()
+              : { ...s, holdSeconds: s.holdSeconds ?? 20, ...(typeof s.reps === 'number' && s.reps > 1 ? { reps: 1 } : {}) }));
+          }}
+          title={sets.length > 0 && sets.every(s => s.holdSeconds != null)
+            ? 'Убрать удержание — сеты станут обычными повторными'
+            : 'Включить удержание (изометрия): повторы примут = 1, появится поле «холд, с»'}
+          aria-pressed={sets.length > 0 && sets.every(s => s.holdSeconds != null)}
+          style={{ fontSize: 10, fontWeight: 700, padding: '4px 8px', borderRadius: 8, cursor: 'pointer', minHeight: 44,
+            border: sets.length > 0 && sets.every(s => s.holdSeconds != null) ? '1px solid rgba(34,197,94,0.35)' : '1px solid rgba(255,255,255,0.10)',
+            background: sets.length > 0 && sets.every(s => s.holdSeconds != null) ? 'rgba(34,197,94,0.14)' : 'rgba(255,255,255,0.04)',
+            color: sets.length > 0 && sets.every(s => s.holdSeconds != null) ? '#22c55e' : 'rgba(255,255,255,0.60)' }}
+        >⏱ {sets.length > 0 && sets.every(s => s.holdSeconds != null) ? 'холд вкл' : 'холд'}</button>
         {wm > 0 && <button type="button" onClick={() => setWeightMode(m => m === 'kg' ? 'pct' : m === 'pct' ? 'velocity' : 'kg')} style={{ fontSize: 10, fontWeight: 700, padding: '4px 8px', borderRadius: 8, border: weightMode !== 'kg' ? '1px solid rgba(0,230,138,0.35)' : '1px solid rgba(255,255,255,0.10)', background: weightMode !== 'kg' ? 'rgba(0,230,138,0.14)' : 'rgba(255,255,255,0.04)', color: weightMode !== 'kg' ? '#00e68a' : 'rgba(255,255,255,0.60)', cursor: 'pointer' }}>{weightMode === 'kg' ? 'кг' : weightMode === 'pct' ? '%1RM' : 'м/с'} · сменить</button>}
         <select value={sets[0]?.setKind || 'normal'} onChange={e => { const v=e.target.value as any; onChange(sets.map(s=> ({...s, setKind: v}))); }} style={{ fontSize: 10, padding: '4px 6px', borderRadius: 6, background: 'rgba(255,255,255,0.04)', color: '#fff', border: '1px solid rgba(255,255,255,0.08)' }} title="Тип сета"><option value="normal">сет</option><option value="amrap">AMRAP</option><option value="emom">EMOM</option><option value="cluster">кластер</option><option value="dropset">дроп</option><option value="myo">myo</option></select>
         <span style={{ fontSize: 11, fontWeight: 800, color: 'rgba(255,255,255,0.55)', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 20, padding: '2px 8px' }}>{sets.length} шт.</span>
@@ -1640,12 +1661,13 @@ const SetEditor: React.FC<{ sets: UserSet[]; onChange: (s: UserSet[]) => void; m
           <span style={{ width: 60, textAlign: 'center' }}>Вес кг</span>
           <span style={{ width: 46, textAlign: 'center' }}>Отдых</span>
           <span style={{ width: 56, textAlign: 'center' }}>Темп</span>
+          {sets.some(s => s.holdSeconds != null) && <span style={{ width: 44, textAlign: 'center' }}>Холд</span>}
           <span style={{ flex: 1 }} />
         </div>
       )}
       {sets.length > 1 && (
         <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-          <button type="button" onClick={() => { const f=sets[0]; if(f) onChange(sets.map(s=> ({ ...s, tempo: f.tempo, restSec: f.restSec })) ); }} style={{ fontSize: 10, padding: '3px 8px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.60)', cursor: 'pointer' }}>↕ Копировать RIR/темп/отдых с 1-го</button>
+          <button type="button" onClick={() => { const f=sets[0]; if(f) onChange(sets.map(s=> ({ ...s, tempo: f.tempo, restSec: f.restSec, holdSeconds: f.holdSeconds, ...(f.holdSeconds != null && typeof s.reps === 'number' && s.reps > 1 ? { reps: 1 } : {}) })) ); }} style={{ fontSize: 10, padding: '3px 8px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.60)', cursor: 'pointer' }}>↕ Копировать RIR/темп/отдых/холд с 1-го</button>
           <button type="button" onClick={() => { const f=sets[0]; if(f?.weight!=null) onChange(sets.map(s=> ({ ...s, weight: f.weight })) ); }} style={{ fontSize: 10, padding: '3px 8px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.60)', cursor: 'pointer' }}>↕ Вес с 1-го</button>
         </div>
       )}
@@ -1695,7 +1717,13 @@ const SetEditor: React.FC<{ sets: UserSet[]; onChange: (s: UserSet[]) => void; m
               <input type="number" style={{ ...IN, padding: '4px 6px', fontSize: 11, width: 36, minHeight: 44, textAlign:'center' }} value={Math.floor((s.restSec ?? 90) / 60)} min={0} max={20} onChange={e => { const v = Number(e.target.value); if (Number.isFinite(v)) upd(i, { restSec: Math.max(0, Math.round(v)) * 60 }); }} title="отдых (мин)" placeholder="отд" aria-label="Отдых в минутах" inputMode="numeric" />
               <span style={{ fontSize: 11, color: DIM }}>м</span>
             </div>
-            <input type="text" style={{ ...IN, padding: '4px 6px', fontSize: 11, width: 56, minHeight: 44 }} value={s.tempo || ''} onChange={e => upd(i, { tempo: e.target.value })} placeholder="2-1-1-0" title="Темп (2-1-1-0)" />
+             <input type="text" style={{ ...IN, padding: '4px 6px', fontSize: 11, width: 56, minHeight: 44 }} value={s.tempo || ''} onChange={e => upd(i, { tempo: e.target.value })} placeholder="2-1-1-0" title="Темп (2-1-1-0)" />
+             {s.holdSeconds != null && (
+               <>
+                 <input type="number" style={{ ...IN, padding: '4px 6px', fontSize: 11, width: 42, minHeight: 44, textAlign: 'center' }} value={s.holdSeconds} min={3} max={120} onChange={e => { const v = Number(e.target.value); if (Number.isFinite(v)) upd(i, { holdSeconds: Math.max(3, Math.min(120, Math.round(v))) }); }} title="Удержание (сек) — изометрия шеи/кора" placeholder="сек" aria-label={`Удержание подхода ${i + 1} в секундах`} inputMode="numeric" />
+                 <span style={{ fontSize: 10, color: '#22c55e', fontWeight: 700 }}>с</span>
+               </>
+             )}
             <button style={{ border: 'none', background: 'rgba(239,68,68,0.08)', color: '#ef4444', cursor: 'pointer', fontSize: 11, padding: '4px 8px', minHeight: 32, borderRadius: 6, borderWidth: 0 }} onClick={() => confirmDelete(i)} title="Удалить подход">✕</button>
            </div>
        <div className="editor-techniques" style={{ display: 'flex', gap: 4, marginTop: 6, flexWrap: 'wrap', padding: '6px 8px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>

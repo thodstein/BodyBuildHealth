@@ -15,6 +15,7 @@ import { saveCombatPlan, loadCombatPlans, removeCombatPlan, migrateAllCombatStor
 import { applyCombatMesocycle, combatMesocycleHash, shouldApplyCombatMesocycle } from '../../../engines/combat/combat-mesocycle';
 import { buildAnnualATR, saveAnnualCB, loadAnnualCB, removeAnnualCB, buildAnnualPrintHtml, buildAnnualIcs, addCompetitionToAnnual, removeCompetitionFromAnnual, autoAnnualWithFightTaper, buildAnnualPlans } from '../../../engines/combat/combat-annual';
 import { autoCombatCyclePhase } from '../../../engines/combat/combat-female-cycle';
+import { parseHoldSeconds } from '../../../engines/combat/combat-core.engine';
 import { AnnualCard } from './combat-annual-card';
 import { CbCampIntelCard } from './cb-camp-intel';
 import { buildCombatPrintHtml, downloadCombatCsv, buildCombatPlanIcs } from '../../../engines/combat/combat-print.engine';
@@ -505,12 +506,21 @@ export const CombatConstructor: React.FC = () => {
       if (patch.reps != null) {
         const raw = patch.reps.trim();
         ex.reps = raw;
-        if (/с|c/i.test(raw)) {
+        // PRO-3: холд резолвится КАНОНОМ parseHoldSeconds — только цифра перед
+        // «с». Прежняя проверка была пустой веткой по регекспу, который ловил ещё
+        // и латинскую «c»: правка повторов такой строкой молча не доезжала до
+        // workSets, а заменить «20с» на «30с» было нельзя — holdSeconds оставался
+        // от сборки и расходился с подписью.
+        const hold = parseHoldSeconds(raw);
+        if (hold != null) {
+          ex.holdSeconds = hold;
+          ex.workSets = ex.workSets.map(s => ({ ...s, reps: 1, holdSeconds: hold }));
         } else {
           const parts = raw.split('-').map(n => parseInt(n, 10));
           const a = parts[0]; const b = parts[1];
           const avg = Number.isFinite(a) && Number.isFinite(b) ? Math.round((a + b) / 2) : (Number.isFinite(a) ? a : 5);
-          ex.workSets = ex.workSets.map(s => ({ ...s, reps: avg }));
+          if (ex.holdSeconds != null) ex.holdSeconds = undefined;
+          ex.workSets = ex.workSets.map(s => { const { holdSeconds: _drop, ...rest } = s; return { ...rest, reps: avg }; });
         }
       }
       if (patch.rir != null) { if (patch.rir < 0 || patch.rir > 5) { setMsg('RIR 0–5'); setTimeout(() => setMsg(''), 1800); return prev; } ex.rir = patch.rir; ex.workSets = ex.workSets.map(s => ({ ...s, rir: patch.rir! })); }

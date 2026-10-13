@@ -375,7 +375,7 @@ export const CombatPlanView: React.FC<Props> = ({
                         }}>
                           <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                             <span style={{ fontSize: 12.5, fontWeight: 700, color: '#fff', flex: '1 1 160px', fontFamily:'-apple-system, system-ui, sans-serif' }}>
-                              {ex.name} <span style={{ fontWeight: 500, color: '#fff' }}>— <Highlight color="#a855f7">{ex.sets}×{ex.reps}</Highlight>{ex.weight ? <> · <Highlight>{ex.weight}кг</Highlight></> : ''} · <Highlight>RIR{ex.rir}</Highlight></span>
+                               {ex.name} <span style={{ fontWeight: 500, color: '#fff' }}>— <Highlight color="#a855f7">{ex.sets}×{ex.reps}</Highlight>{ex.holdSeconds != null ? <> · <Highlight color="#22c55e">холд {ex.holdSeconds}с</Highlight></> : ''}{ex.weight ? <> · <Highlight>{ex.weight}кг</Highlight></> : ''} · <Highlight>RIR{ex.rir}</Highlight></span>
                               <span style={{ fontSize: 11, color: TEXT_3, marginLeft: 6, fontVariantNumeric:'tabular-nums' }}>· {ex.tempo} · {ex.restSeconds}с</span>
                               {ex.comment?.includes('Тапер') && <Highlight color="#60a5fa">тапер</Highlight>}
                               {ex.comment?.includes('Весогонка') && <Highlight color="#ff9f0a">весогонка</Highlight>}
@@ -400,7 +400,7 @@ export const CombatPlanView: React.FC<Props> = ({
 
                           {ex.comment && <div style={{ fontSize: 11, color: '#fff', background: 'rgba(168,85,247,0.06)', borderLeft: '2px solid rgba(168,85,247,0.28)', padding: '6px 8px', borderRadius: 8 }}>{ex.comment}</div>}
                           {ex.warmupSets && ex.warmupSets.length > 0 && <div style={{ fontSize: 11, color: TEXT_3 }}>Разминка: {ex.warmupSets.map(s => `${s.reps}×${s.weight}кг`).join(' → ')} → рабочие</div>}
-                          <div style={{ fontSize: 11, color: '#fff', fontFamily: 'ui-monospace, monospace' }}>Сеты: {ex.workSets.map(s => `${s.reps}×${s.weight ? s.weight + 'кг' : '—'} RIR${s.rir}`).join(' · ')}</div>
+                          <div style={{ fontSize: 11, color: '#fff', fontFamily: 'ui-monospace, monospace' }}>Сеты: {ex.workSets.map(s => `${s.reps}×${s.weight ? s.weight + 'кг' : '—'} RIR${s.rir}${s.holdSeconds != null ? ` холд ${s.holdSeconds}с` : ''}`).join(' · ')}</div>
                         </div>
                       ))}
                     </div>

@@ -27,7 +27,12 @@ export function buildCombatPrintHtml(plan: CombatPlan): string {
   const weeks = plan.weeksData.map(w => {
     const col = phaseColor[w.phase] || '#a855f7';
     const sessRows = w.sessions.map(s => {
-      const exRows = s.exercises.map(e => `<tr><td>${escHtml(e.name)}</td><td>${e.sets}×${escHtml(e.reps)}</td><td>${e.weight}кг</td><td>RIR${e.rir}</td><td>${escHtml(e.tempo||'')}</td><td>${e.restSeconds||''}с</td><td>${escHtml(e.comment||'')}</td></tr>`).join('');
+      const exRows = s.exercises.map(e => {
+        // PRO-3: удержание (изометрия шеи/кора) в печати — иначе «3×1» на бумаге
+        // не читалось как «3 подхода по 20 секунд».
+        const hold = e.holdSeconds != null ? ` холд ${e.holdSeconds}с` : '';
+        return `<tr><td>${escHtml(e.name)}</td><td>${e.sets}×${escHtml(e.reps)}${hold}</td><td>${e.weight}кг</td><td>RIR${e.rir}</td><td>${escHtml(e.tempo||'')}</td><td>${e.restSeconds||''}с</td><td>${escHtml(e.comment||'')}</td></tr>`;
+      }).join('');
       return `<h4>День ${s.day} · ${escHtml(cbSessionTagName(s.sessionTag))} · ${escHtml(s.character)} · ${s.durationMin||''} мин</h4><table border="1" cellpadding="4" cellspacing="0" style="border-collapse:collapse;width:100%;font-size:11px"><tr><th>Упражнение</th><th>Сеты×Повт</th><th>Вес</th><th>RIR</th><th>Темп</th><th>Отдых</th><th>Коммент</th></tr>${exRows}</table>`;
     }).join('');
     const bg = col + '14';
