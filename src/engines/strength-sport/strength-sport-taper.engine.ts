@@ -34,6 +34,21 @@ export const TAPER_CESSATION_DAYS: Record<string, number> = {
   circus_db_medley: 5,
   farmers_walk_heavy: 5,
   zercher_carry: 5,
+  // PRO (замер Winwood 2018 n=454): squat 6.6±3.2д, bench 5.7±2.1д —
+  // в таблице их не было, присед получал дефолт 5 и резался раньше времени.
+  back_squat: 6,
+  front_squat: 6,
+  squat: 6,
+  hack_squat: 6,
+  bench_bar: 5,
+  // PRO: олимпийская классика 5.1±1.5д — тоже была на дефолте 5 (совпало
+  // случайно, но явная запись защищает от смены дефолта).
+  snatch: 5,
+  clean_and_jerk: 5,
+  push_jerk: 5,
+  split_jerk: 5,
+  pause_jerk: 5,
+  push_press: 5,
   keg_toss: 4,
   keg_over_bar: 4,
   sandbag_toss: 4,
@@ -45,6 +60,19 @@ export const TAPER_CESSATION_DAYS: Record<string, number> = {
   sled_drag: 3,
   sled_push: 3,
 };
+
+/**
+ * PRO: половая поправка длительности тейпера (Winwood 2018, n=454).
+ * Стронг: женщины 9.5±5.5д vs мужчины 8.3±4.8д (женский тейпер ДЛЬШНЕ);
+ * ТА: женщины 5.3±1.8д vs мужчины 8.6±4.6д (женский КОРОЧЕ — и это measured,
+ * не оценка). Поэтому поправка считается отдельно по режиму, а не «женщине
+ * всегда меньше»: силовой экстрим и ТА расходятся в разные стороны.
+ */
+export function taperLengthDaysFor(mode: string, sex?: string): number {
+  if (mode === 'weightlifting') return sex === 'female' ? 5 : 8;
+  if (mode === 'strongman') return sex === 'female' ? 10 : 8;
+  return 7;
+}
 
 // Winwood step taper: volume -45.5%, frequency same/down, intensity ~50% last week, assistance 0
 export interface TaperWeekPlan {

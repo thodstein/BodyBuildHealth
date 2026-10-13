@@ -7,19 +7,17 @@ import React from 'react';
 import type { StrengthSportPlan } from '../../../engines/strength-sport/strength-sport.types';
 import type { OutsideLoad } from '../../../engines/outside-load.engine';
 import { buildStrengthSportReport } from '../../../engines/strength-sport/strength-sport-finalize.engine';
-import { buildStrengthCsv, downloadStrengthCsv, downloadStrengthXlsx, buildStrengthPrintHtml, shareStrengthDigest, downloadStrengthIcs } from '../../../engines/strength-sport/strength-sport-export';
+import { buildStrengthPrintHtml, shareStrengthDigest, downloadStrengthIcs, downloadStrengthCsv, downloadStrengthXlsx } from '../../../engines/strength-sport/strength-sport-export';
 import { buildWLMeetPlan, wlAttemptRationale } from '../../../engines/strength-sport/strength-sport-attempts.engine';
-import { buildSMEventPlan, smEventRationale } from '../../../engines/strength-sport/strength-sport-strongman-attempts.engine';
+import { buildSMEventPlan, smEventRationale, SM_STRATEGY_PCT } from '../../../engines/strength-sport/strength-sport-strongman-attempts.engine';
 import { EVENT_META } from '../../../engines/strength-sport/strength-sport-event-types';
-import { TAPER_CESSATION_DAYS } from '../../../engines/strength-sport/strength-sport-taper.engine';
+import { TAPER_CESSATION_DAYS, cessationDaysFor, taperLengthDaysFor } from '../../../engines/strength-sport/strength-sport-taper.engine';
 import { buildConditioningRationale } from '../../../engines/strength-sport/strength-sport-conditioning';
 import { moveAnnualBlock } from '../../../engines/strength-sport/strength-sport-annual';
 import { activeSeasonBlockForDate } from '../../../engines/strength-sport/strength-sport-season-planner.engine';
 import { CARD, BTN, BTN_PRIMARY, BTN_SMALL, INPUT, TEXT_2, TEXT_3, ACCENT, ACCENT_STRONG, ACCENT_SOFT, STRONG_SOFT, ACCENT_BORDER, STRONG_BORDER, ACCENT_GRAD, SectionCard, StatTile, Badge, InfoBanner, GroupHeading, CardHeader, Highlight, HighlightStrong, ChipToggle, Divider } from './StrengthUI';
 import { StrengthGantt, StrengthHeatmap, EventCard } from './StrengthUI';
 import { MODE_RU, LEVEL_RU, PHASE_RU, ruLabel } from './StrengthUI';
-
-void buildStrengthCsv;
 
 type Props = {
   plan: StrengthSportPlan;
@@ -43,6 +41,12 @@ type Props = {
   rankedCycles: { cycle: { meta: { id: string; title: string } }; blocked?: string }[];
   msg?: string;
   setMsg: (s: string) => void;
+  /** Длина межсезонья (GPP) сезона 2 пиков — реальный вход buildAnnualMultiPeak (был readOnly-заглушка). */
+  seasonGppWeeks: number;
+  setSeasonGppWeeks: (n: number) => void;
+  /** Длина перехода между пиками. */
+  seasonTransWeeks: number;
+  setSeasonTransWeeks: (n: number) => void;
   onExportProgram: () => void;
   onBuildSeason: () => void;
   onBuildAnnualFromCycles: () => void;
@@ -52,7 +56,9 @@ export const StrengthSportPlanView: React.FC<Props> = ({
   plan, mode, modeColor, days, bodyweight, sex, outside, outsideMetrics,
   expandedWeek, onToggleWeek, onUpdateEx, onUpdateSet, onMoveEx, onMedleyChange,
   annual, onAnnualChange, annualCycleSel, onAnnualCycleSel, rankedCycles,
-  msg, setMsg, onExportProgram, onBuildSeason, onBuildAnnualFromCycles,
+  msg, setMsg,
+  seasonGppWeeks, setSeasonGppWeeks, seasonTransWeeks, setSeasonTransWeeks,
+  onExportProgram, onBuildSeason, onBuildAnnualFromCycles,
 }) => {
   const doMsg = (m: string, ms = 1800) => { setMsg?.(m); setTimeout(() => setMsg?.(''), ms); };
   /** «Где я в сезоне»: активный блок по дате старта годового плана. */
@@ -108,7 +114,8 @@ export const StrengthSportPlanView: React.FC<Props> = ({
 
       <SectionCard icon="🗓️" title="Gantt фаз" subtitle="Накопление · интенсификация · пик · taper 1-2нед перед стартом" collapsible defaultOpen={false} summary={`${plan.weeks} нед · ${plan.weeksData.length} блоков`}>
         <StrengthGantt weeks={plan.weeksData} totalWeeks={plan.weeks} />
-        <div style={{ fontSize:12, color: TEXT_3, background:'rgba(255,255,255,0.035)', padding:'10px 12px', borderRadius:12, border:'0.5px solid rgba(255,255,255,0.05)', lineHeight:1.5 }}>Тапер <span style={{ color:'#30D158', fontWeight:700 }}>зелёный</span> 1-2нед (объём ×0.45/0.65) выносится отдельной фазой в Gantt — как в annual-training taperWeeksForBlock</div>
+        <div style={{ fontSize:12, color: TEXT_3, background:'rgba(255,255,255,0.035)', padding:'10px 12px', borderRadius:12, border:'0.5px solid rgba(255,255,255,0.05)', lineHeight:1.5 }}>
+          Тапер <span style={{ color:'#30D158', fontWeight:700 }}>зелёный</span> 1-2 нед выносится отдельной фазой в Gantt. С датой старта работает <b>дат-тейпер</b>: per-event cessation (йок/камень/тяга 7-8 д, лог/фермер 5-6 д) + Winwood W-1 <b>×0.45 int ×0.50</b>, W-2 <b>×0.55 int ×0.75</b>; модель toro4 — мягче (<b>×0.65</b>). Без даты — внешний тапер <b>×0.55 → ×0.45</b>.</div>
       </SectionCard>
 
       {plan.mode === 'weightlifting' && (plan.workMax.snatch || 0) > 0 && (plan.workMax.cleanJerk || (plan.workMax as any).clean || 0) > 0 && (() => {
@@ -119,7 +126,7 @@ export const StrengthSportPlanView: React.FC<Props> = ({
               <Badge color="#0a84ff" bg="rgba(10,132,255,0.12)" border="rgba(10,132,255,0.22)">Тотал <Highlight color="#0a84ff">{meet.total}кг</Highlight></Badge>
               {meet.sinclair && <Badge color="#30d158" bg="rgba(48,209,88,0.10)" border="rgba(48,209,88,0.18)">Sinclair <Highlight color="#30d158">{meet.sinclair}</Highlight></Badge>}
               {(meet as any).robi && <Badge color="#a855f7" bg="rgba(168,85,247,0.10)" border="rgba(168,85,247,0.18)">Robi <Highlight color="#a855f7">{(meet as any).robi}</Highlight></Badge>}
-              <Badge>кат. {(() => { try{ const c=(plan.inputSnapshot as any)?.bodyweight; return c? c+'кг':'' }catch{return ''} })()}</Badge>
+              <Badge>вес {bodyweight}кг</Badge>
             </div>
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
               <div style={{ background:'rgba(255,255,255,0.035)', padding:'14px 16px', borderRadius:16, border:'0.5px solid rgba(255,255,255,0.07)' }}>
@@ -138,10 +145,10 @@ export const StrengthSportPlanView: React.FC<Props> = ({
         ) : null;
       })()}
       {(plan.inputSnapshot as any)?.contest?.events?.length ? (
-        <SectionCard icon="🏆" title="Контест-пакет" subtitle={`${(plan.inputSnapshot as any).contest.events.length} ивентов · ${(plan.inputSnapshot as any).contestStrategy||'balanced'} · taper Winwood 8.6д`} strong collapsible defaultOpen={false} summary={`${(plan.inputSnapshot as any).contest.events.length} ивентов · ${(plan.inputSnapshot as any).contestStrategy||'balanced'}`}>
+        <SectionCard icon="🏆" title="Контест-пакет" subtitle={`${(plan.inputSnapshot as any).contest.events.length} ивентов · ${(plan.inputSnapshot as any).contestStrategy||'balanced'} · тапер ≈${taperLengthDaysFor(plan.mode, sex)}д`} strong collapsible defaultOpen={false} summary={`${(plan.inputSnapshot as any).contest.events.length} ивентов · ${(plan.inputSnapshot as any).contestStrategy||'balanced'}`}>
           <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
             {(plan.inputSnapshot as any).contest.events.map((e:any, i:number)=> (
-              <span key={i} style={{ padding:'7px 12px', borderRadius:12, background:'rgba(245,158,11,0.10)', border:'0.5px solid rgba(245,158,11,0.20)', fontSize:12, fontWeight:600, color:'#fff' }}><HighlightStrong>{(EVENT_META as any)[e.id]?.label || e.id}</HighlightStrong> {e.format} {e.weight?`${e.weight}кг`:''} {e.distanceM?`${e.distanceM}м`:''} {e.timeCapS?`cap${e.timeCapS}с`:''} {e.heightCm?`${e.heightCm}см`:''} {e.turn?'разв.':''} {(TAPER_CESSATION_DAYS as any)[e.id] ? `· cess ${(TAPER_CESSATION_DAYS as any)[e.id]}д`:''}</span>
+              <span key={i} style={{ padding:'7px 12px', borderRadius:12, background:'rgba(245,158,11,0.10)', border:'0.5px solid rgba(245,158,11,0.20)', fontSize:12, fontWeight:600, color:'#fff' }}><HighlightStrong>{(EVENT_META as any)[e.id]?.label || e.id}</HighlightStrong> {e.format} {e.weight?`${e.weight}кг`:''} {e.distanceM?`${e.distanceM}м`:''} {e.timeCapS?`cap${e.timeCapS}с`:''} {e.heightCm?`${e.heightCm}см`:''} {e.turn?'разв.':''} {TAPER_CESSATION_DAYS[e.id] ? `· cess ${cessationDaysFor(e.id, sex)}д` : ''}</span>
             ))}
           </div>
           <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginTop:6 }}>
@@ -154,7 +161,7 @@ export const StrengthSportPlanView: React.FC<Props> = ({
               return rows;
             })()}
           </div>
-          <InfoBanner tone="strong">Прогрессия: 85%→100% к контесту · дистанции/высота/cap/разворот из пакета · medley по implements контеста · стратегия { (plan.inputSnapshot as any).contestStrategy } → 85/92/98 vs 90/97/102%</InfoBanner>
+            <InfoBanner tone="strong">Прогрессия: 85%→100% к контесту · дистанции/высота/cap/разворот из пакета · medley по implements контеста · стратегия { (plan.inputSnapshot as any).contestStrategy } → {(() => { const s=(plan.inputSnapshot as any).contestStrategy; const p=(SM_STRATEGY_PCT as any)[s] || SM_STRATEGY_PCT.balanced; return `${Math.round(p.opener*100)}/${Math.round(p.second*100)}/${Math.round(p.third*100)}%`; })()}</InfoBanner>
         </SectionCard>
       ) : null}
       {(() => {
@@ -289,7 +296,7 @@ export const StrengthSportPlanView: React.FC<Props> = ({
 
       {annual && (
         <>
-        <SectionCard icon="🗓️" title="Годовой план" subtitle={`${annual.totalWeeks} нед · ${annual.blocks.length} блоков · синхронизация Stark`} collapsible defaultOpen={false} summary={`${annual.totalWeeks} нед · ${annual.blocks.length} блоков`}>
+        <SectionCard icon="🗓️" title="Годовой план" subtitle={`${annual.totalWeeks} нед · ${annual.blocks.length} блоков · синхронизация с дневником`} collapsible defaultOpen={false} summary={`${annual.totalWeeks} нед · ${annual.blocks.length} блоков`}>
           <CardHeader icon="🗓️" title={`Годовой · ${annual.totalWeeks} нед`} subtitle={`${annual.blocks.length} блоков · ${plan.weeks} нед текущий`} />
           <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
             {annual.blocks.map((b:any) => {
@@ -331,14 +338,16 @@ export const StrengthSportPlanView: React.FC<Props> = ({
             <button onClick={onBuildAnnualFromCycles} style={{ ...BTN_SMALL, background:'linear-gradient(135deg, #0A84FF, #30D158)', color:'#fff', border:'none' }}>📚 Год из циклов ({annualCycleSel?.length || 3})</button>
           </SectionCard>
         {plan.mode==='strongman' && (
-          <SectionCard icon="🗓️" title="Сезон — Multi-peak (PRO)" subtitle="GPP 4w + 2×camp 8-12w + transition 2w (season planner)" collapsible defaultOpen={false} summary="GPP 4w · 2 пика · transition 2w">
-            <GroupHeading icon="🏁" text="Сезон 2 пика" desc="GPP + camp→пик + transition + camp→пик — backend готов, фронт Season Planner"/>
+          <SectionCard icon="🗓️" title="Сезон — Multi-peak (PRO)" subtitle={`GPP ${seasonGppWeeks}w + 2 пика + transition ${seasonTransWeeks}w`} collapsible defaultOpen={false} summary={`GPP ${seasonGppWeeks}w · 2 пика · transition ${seasonTransWeeks}w`}>
+            <GroupHeading icon="🏁" text="Сезон 2 пика" desc="GPP + camp→пик + transition + camp→пик — длину межсезонья и перехода задаёте вы"/>
             <div style={{ display:'flex', gap:10, alignItems:'center', flexWrap:'wrap' }}>
-              <span style={{ fontSize:13, fontWeight:700, color:TEXT_2 }}>GPP</span><input type="number" value={4} style={{ width:72, ...INPUT, padding:'12px 8px', fontSize:14, fontWeight:700, textAlign:'center', minHeight:52 }} readOnly />
-              <span style={{ fontSize:13, fontWeight:700, color:TEXT_2 }}>Transition</span><input type="number" value={2} style={{ width:72, ...INPUT, padding:'12px 8px', fontSize:14, fontWeight:700, textAlign:'center', minHeight:52 }} readOnly />
+              <span style={{ fontSize:13, fontWeight:700, color:TEXT_2 }}>GPP</span>
+              <input type="number" min={2} max={8} value={seasonGppWeeks} onChange={e=> setSeasonGppWeeks(Math.max(2, Math.min(8, Number(e.target.value)||4)))} style={{ width:72, ...INPUT, padding:'12px 8px', fontSize:14, fontWeight:700, textAlign:'center', minHeight:52 }} />
+              <span style={{ fontSize:13, fontWeight:700, color:TEXT_2 }}>Переход</span>
+              <input type="number" min={1} max={4} value={seasonTransWeeks} onChange={e=> setSeasonTransWeeks(Math.max(1, Math.min(4, Number(e.target.value)||2)))} style={{ width:72, ...INPUT, padding:'12px 8px', fontSize:14, fontWeight:700, textAlign:'center', minHeight:52 }} />
               <button onClick={onBuildSeason} style={{ ...BTN_SMALL, background:'linear-gradient(135deg, #f59e0b, #ef4444)', color:'#fff', border:'none' }}>✦ Собрать сезон 2 пика</button>
             </div>
-            <InfoBanner tone="strong">Multi-peak: GPP 4w + peak1 ({plan.weeks}w) + trans 2w + peak2 6w — {annual.totalWeeks}w → ~{annual.totalWeeks+8}w сезон</InfoBanner>
+            <InfoBanner tone="strong">Multi-peak: GPP {seasonGppWeeks}w + пик 1 ({plan.weeks}w) + переход {seasonTransWeeks}w + пик 2 (~{Math.max(4, plan.weeks - 2)}w) — даты стартов из календаря конструктора</InfoBanner>
           </SectionCard>
         )}
         </>

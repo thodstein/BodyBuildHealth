@@ -59,7 +59,9 @@ export function useStrengthSportWizard() {
   // Интернет-цикл ТА/стронга (ss-cycles): дословный режим по умолчанию
   const [cycleId, setCycleId] = useState<string>(() => { try { return localStorage.getItem('he_ss_cycle_v1') || ''; } catch { return ''; } });
   const [cycleMode, setCycleMode] = useState<'faithful'|'adapt'>(() => { try { return (localStorage.getItem('he_ss_cycle_mode_v1') as any) || 'faithful'; } catch { return 'faithful'; } });
-  const [cycleConsent, setCycleConsent] = useState<boolean>(false);
+  // P1: согласие на daily-max теперь персистится. Раньше утекало при перезагрузке —
+  // пользователь снова упирался в гейт болгарского цикла, хотя уже соглашался.
+  const [cycleConsent, setCycleConsent] = useState<boolean>(() => { try { return localStorage.getItem('he_ss_cycle_consent_v1') === '1'; } catch { return false; } });
   // Ручной выбор циклов для годовой сборки (null = авто топ-3), персист
   const [annualCycleSel, setAnnualCycleSel] = useState<string[] | null>(() => {
     try {
@@ -238,8 +240,9 @@ export function useStrengthSportWizard() {
     if (!contest || mode !== 'strongman') return null;
     try { return simulateContest(contest as any, workMax as any, contestStrategy as any); } catch { return null; }
   }, [contest, workMax, contestStrategy, mode]);
-  useEffect(() => { try { localStorage.setItem('he_ss_cycle_v1', cycleId); } catch {} }, [cycleId]);
+  useEffect(() => { try { if (cycleId) localStorage.setItem('he_ss_cycle_v1', cycleId); else localStorage.removeItem('he_ss_cycle_v1'); } catch {} }, [cycleId]);
   useEffect(() => { try { localStorage.setItem('he_ss_cycle_mode_v1', cycleMode); } catch {} }, [cycleMode]);
+  useEffect(() => { try { if (cycleConsent) localStorage.setItem('he_ss_cycle_consent_v1', '1'); else localStorage.removeItem('he_ss_cycle_consent_v1'); } catch {} }, [cycleConsent]);
   // Ранжирование интернет-циклов под текущие параметры (селектор ss-cycles)
   const rankedCycles = useMemo(() => {
     try {
@@ -260,9 +263,14 @@ export function useStrengthSportWizard() {
         const week = arr.slice(-7).reduce((a:any, s:any)=> a + (s.load || s.sRPE || s.rpe || 0), 0);
         setDiaryLoad(week);
         try{
+          // P1: окно EWMA должно быть ХРОНОЛОГИЧЕСКИМ. `Object.values(daily)`
+          // отдаёт порядок вставки ключей, а не даты — при записях не по порядку
+          // (ручной ввод, импорт) «последние 28 дней» брали случайный срез и
+          // ACWR мог показать danger на спокойной неделе (и наоборот).
           const daily: Record<string, number> = {};
           for(const s of arr){ const d=(s.date||'').slice(0,10); if(d) daily[d]=(daily[d]||0)+(s.load||s.sRPE||s.rpe||0); }
-          const vals = Object.values(daily).slice(-28);
+          const days = Object.keys(daily).sort();
+          const vals = days.slice(-28).map(d => daily[d]);
           const ew = acwrEwmaSS(vals as number[]);
           if(ew) setAcwr({ ratio: ew.ratio, zone: ew.zone });
         }catch{}

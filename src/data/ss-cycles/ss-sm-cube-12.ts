@@ -96,6 +96,8 @@ function buildWeek(w: number): SSDaySpec[] {
   const rot = ROT[(w - 1) % 3];
   const ev = EVENTS[(w - 1) % 3];
   const ev2 = EVENTS[w % 3];
+  // третий ивент — оставшийся в ротации (не дубль ev/ev2)
+  const ev3 = EVENTS.find((e) => e.id !== ev.id && e.id !== ev2.id) ?? EVENTS[0];
   return [
     day('squat_day', rot[0] === 'explosive' ? 'памп' : 'тяж',
       ex('back_squat', `Присед — ${rot[0] === 'heavy' ? 'тяжёлый' : rot[0] === 'explosive' ? 'скоростной' : 'повторный'}`, 'legs', 1.3, styleSets(rot[0], wave)),
@@ -114,7 +116,10 @@ function buildWeek(w: number): SSDaySpec[] {
     day('event_day', 'тяж',
       ex(ev.id, `${ev.name} — ротация недели`, 'strongman', 1.2, [s(0.75 + wave * 0.03, 1, 4, { distanceM: 20, timeCapS: 60 })]),
       ex(ev2.id, `${ev2.name} — второй ивент`, 'strongman', 1.0, [s(0.70 + wave * 0.03, 1, 3, { distanceM: 20, timeCapS: 60 })]),
-      ex('atlas_stone_load', 'Камни/мешок — загрузка', 'strongman', 0.9, [s(0.70, 2, 3, { timeCapS: 60 })]),
+      // P1: третий ивент = ОСТАВШИЙСЯ из ротации. Раньше стоял хардкод
+      // `atlas_stone_load`, и когда в ev/ev2 уже был камень (нед 2,3,5,6,8,9)
+      // сессия получала дубль id — слот затирался, план врал про 3 ивента.
+      ex(ev3.id, `${ev3.name} — третий ивент`, 'strongman', 0.9, [s(0.70, 2, 3, { timeCapS: 60 })]),
     ),
   ];
 }

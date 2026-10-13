@@ -144,6 +144,44 @@ export const STRENGTH_SPORT_PATTERNS: StrengthSportPattern[] = [
     level: ['beginner', 'intermediate', 'advanced', 'enhanced'],
     description: 'Минимум для совместимости с field-работой. Ивенты — по возможности в deadlift_day.',
   },
+  {
+    // PRO: 5-дневный стронг раньше НЕ имел паттерна — recommendStrengthSportPattern
+    // молча отдавал sm_4 и план выдавал 4 сессии при просьбе 5 (UI врал «5×/нед»).
+    // Отдельный overhead-день (лог/аксель) — самая отстающая дисциплина SM (Winwood 2018).
+    id: 'sm_5',
+    name: 'Стронг 5×/нед — объём + жим',
+    mode: 'strongman',
+    rotationDays: 7, sessionsPerRotation: 5,
+    schedule: [
+      { kind: 'тренировка', character: 'тяж', sessionTag: 'overhead_day' },
+      { kind: 'тренировка', character: 'тяж', sessionTag: 'deadlift_day' },
+      { kind: 'отдых', character: null },
+      { kind: 'тренировка', character: 'тяж', sessionTag: 'squat_day' },
+      { kind: 'тренировка', character: 'памп', sessionTag: 'event_day' },
+      { kind: 'тренировка', character: 'тяж', sessionTag: 'overhead_day' },
+      { kind: 'отдых', character: null },
+    ],
+    level: ['advanced', 'enhanced'],
+    description: 'Лог/Тяга/Присед/Ивенты + второй overhead — частота над головой под соревнование.',
+  },
+  {
+    // PRO: 6-дневный (сессия «лёг» в конце недели — восстановление перед выходным)
+    id: 'sm_6',
+    name: 'Стронг 6×/нед — максимум частоты',
+    mode: 'strongman',
+    rotationDays: 7, sessionsPerRotation: 6,
+    schedule: [
+      { kind: 'тренировка', character: 'тяж', sessionTag: 'overhead_day' },
+      { kind: 'тренировка', character: 'тяж', sessionTag: 'deadlift_day' },
+      { kind: 'тренировка', character: 'памп', sessionTag: 'squat_day' },
+      { kind: 'тренировка', character: 'тяж', sessionTag: 'overhead_day' },
+      { kind: 'тренировка', character: 'тяж', sessionTag: 'event_day' },
+      { kind: 'тренировка', character: 'лёг', sessionTag: 'accessory_day' },
+      { kind: 'отдых', character: null },
+    ],
+    level: ['enhanced'],
+    description: 'Только восстанавливаемость: 2 overhead + тяга + присед-памп + ивенты + тех/восстановление.',
+  },
   // ——— HYBRID ———
   {
     id: 'hyb_3',
@@ -178,6 +216,41 @@ export const STRENGTH_SPORT_PATTERNS: StrengthSportPattern[] = [
     ],
     level: ['intermediate', 'advanced', 'enhanced'],
     description: 'Рывок / Толчок / Присед / Ивенты.',
+  },
+  {
+    // PRO: паритет — гибридный режим тоже должен уметь 5-6 дней (иначе молча даёт 4).
+    id: 'hyb_5',
+    name: 'Гибрид 5×/нед',
+    mode: 'hybrid',
+    rotationDays: 7, sessionsPerRotation: 5,
+    schedule: [
+      { kind: 'тренировка', character: 'тяж', sessionTag: 'snatch_day' },
+      { kind: 'тренировка', character: 'тяж', sessionTag: 'clean_day' },
+      { kind: 'отдых', character: null },
+      { kind: 'тренировка', character: 'тяж', sessionTag: 'squat_day' },
+      { kind: 'тренировка', character: 'памп', sessionTag: 'event_day' },
+      { kind: 'тренировка', character: 'тяж', sessionTag: 'technique_day' },
+      { kind: 'отдых', character: null },
+    ],
+    level: ['advanced', 'enhanced'],
+    description: 'Рывок / Толчок / Присед / Ивенты + техника.',
+  },
+  {
+    id: 'hyb_6',
+    name: 'Гибрид 6×/нед',
+    mode: 'hybrid',
+    rotationDays: 7, sessionsPerRotation: 6,
+    schedule: [
+      { kind: 'тренировка', character: 'тяж', sessionTag: 'snatch_day' },
+      { kind: 'тренировка', character: 'тяж', sessionTag: 'clean_day' },
+      { kind: 'тренировка', character: 'тяж', sessionTag: 'squat_day' },
+      { kind: 'тренировка', character: 'памп', sessionTag: 'event_day' },
+      { kind: 'тренировка', character: 'тяж', sessionTag: 'pull_day' },
+      { kind: 'тренировка', character: 'лёг', sessionTag: 'accessory_day' },
+      { kind: 'отдых', character: null },
+    ],
+    level: ['enhanced'],
+    description: 'Максимальная частота ТА + ивенты. Только при восстановлении.',
   },
   // ——— ROLLING (как BB 3/1) ———
   {

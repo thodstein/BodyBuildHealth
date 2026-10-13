@@ -772,6 +772,12 @@ export function buildStrengthSportPlan(input: StrengthSportInput): StrengthSport
         const minSets = id === 'tire_flip' ? 1 : 2;
         // Winwood precise SM + Pritchard WL taper (10-14д, vol -40% int 88-92%)
         let winwoodTaper: any = null;
+        // Датированный тейпер (cessation каждой сессии + Winwood) — приоритетнее
+        // внешнего `taperWeeks`: он точнее (per-event дни до старта), а внешний
+        // остаётся для планов БЕЗ competitionDate. Раньше результат дат-тейпера
+        // затирался цепочкой `else if (taper …)` ниже — per-event cessation был
+        // фактически мёртв (неделя старта получала внешний ×0.92 вместо ×0.50).
+        let dateTapered = false;
         if (compDateAny && startDateAny && (mode === 'strongman' || mode === 'weightlifting')) {
           try {
             const wkStart = new Date(startDateAny); wkStart.setDate(wkStart.getDate() + (w - 1) * 7);
@@ -782,6 +788,7 @@ export function buildStrengthSportPlan(input: StrengthSportInput): StrengthSport
                 finalSets = Math.max(minSets, Math.round(built.sets * (mode === 'weightlifting' ? 0.60 : 0.45)));
                 finalWeight = Math.round(built.weight * (mode === 'weightlifting' ? 0.90 : 0.50) / 2.5) * 2.5;
                 finalRir = mode === 'weightlifting' ? 2 : 3;
+                dateTapered = true;
               } else if (daysOut <= 14 && daysOut >= 0) {
                 if (mode === 'weightlifting') {
                   winwoodTaper = daysOut <= 7 ? WL_TAPER[1] : WL_TAPER[2];
@@ -800,7 +807,8 @@ export function buildStrengthSportPlan(input: StrengthSportInput): StrengthSport
           finalSets = Math.max(minSets, Math.round(built.sets * winwoodTaper.volumeMult));
           finalWeight = Math.round(built.weight * winwoodTaper.intensityPctMult / 2.5) * 2.5;
           finalRir = winwoodTaper.assistance === 'none' ? 3 : winwoodTaper.assistance === 'reduced' ? 2 : built.rir;
-        } else if (taper && !deload) { const toroLast = (input as any).blockModel === 'toro4' && w === weeks; finalSets = Math.max(minSets, Math.round(built.sets * (toroLast ? 0.65 : 0.55))); finalWeight = Math.round(built.weight * (toroLast ? 0.65 : 0.92) / 2.5) * 2.5; finalRir = 1; }
+        } else if (dateTapered) { /* дат-тейпер уже применил свои значения — не затираем внешним */ }
+        else if (taper && !deload) { const toroLast = (input as any).blockModel === 'toro4' && w === weeks; finalSets = Math.max(minSets, Math.round(built.sets * (toroLast ? 0.65 : 0.55))); finalWeight = Math.round(built.weight * (toroLast ? 0.65 : 0.92) / 2.5) * 2.5; finalRir = 1; }
         else if (taper && deload) { finalSets = Math.max(minSets, Math.round(built.sets * 0.45)); finalWeight = Math.round(built.weight * 0.90 / 2.5) * 2.5; finalRir = 1; }
         else if (deload) { finalSets = Math.max(minSets, Math.round(built.sets * 0.6)); finalWeight = Math.round(built.weight * 0.6 / 2.5) * 2.5; finalRir = 4; }
         // Contest weight progression: если контест задал вес для этого ивента — подгоняем прогрессию к нему
@@ -907,7 +915,9 @@ export function buildStrengthSportPlan(input: StrengthSportInput): StrengthSport
           role: isPrimary ? 'primary' : 'accessory',
           character: deload ? 'лёг' : (character as any) || 'тяж',
           sets: finalSets,
-          reps: `${built.reps[0]}-${built.reps[1]}`,
+          // P1-честность: у переносокок reps=lifts — «6-10» врало (реальные
+          // подходы: 1 повтор × дистанция). Подпись теперь = факту.
+          reps: isCarryEvent(id) ? `${finalSets}×${(workSets[0] as any)?.distanceM ?? 20}м` : `${built.reps[0]}-${built.reps[1]}`,
           rir: finalRir,
           weight: finalWeight,
           workSets,
@@ -995,9 +1005,21 @@ export function buildStrengthSportPlan(input: StrengthSportInput): StrengthSport
         const condArr = conditioningForWeek(w, weeks, mode, !!outsideMetrics);
         if (condArr.length && (condArr[0].system !== 'aerobic' || w <= 4)) {
           const cond = condArr[0];
-          const condExId = cond.system === 'alactic' ? 'sled_push_sprint' : cond.system === 'lactic' ? 'tire_flip' : 'sled_push_sprint';
+          // P1: aerobic-кондиция (Zone2 30′) не имеет смысла в подходе «1×покрышка/сани»
+          // — это 30 минут непрерывной работы, а не сет. Раньше aerobic шёл в
+          // cond_day как sled_push_sprint с весом 0 (раньше был «вес 0, reps 1,
+          // отдых 0» — бессмысленная строка плана). Для aerobic кондиция остаётся
+          // рекомендацией (rationale), а отдельный cond_day строится только для
+          // alactic/lactic, где подходы реальны.
+          if (cond.system === 'aerobic') {
+            if (!rationale.includes(`Кондиция (рекомендация): ${cond.protocol}`)) {
+              rationale.push(`Кондиция (рекомендация): ${cond.protocol} ${cond.durationMin}′ RPE${cond.rpe} — вне зала, отдельным днём`);
+            }
+          } else {
+          const condExId = cond.system === 'alactic' ? 'sled_push_sprint' : 'tire_flip';
           const condMeta = getExerciseMeta(condExId) || { name: cond.protocol, group: 'legs', pattern: 'carry' };
-          const ws = { reps: 1, rir: 3, weight: 0, tempo: 'X-0-X-0', restSeconds: cond.restS } as any;
+          const condSets = 3;
+          const ws = { reps: cond.system === 'lactic' ? 1 : condSets, rir: 3, weight: 0, tempo: 'X-0-X-0', restSeconds: cond.restS || 60, timeCapS: cond.system === 'lactic' ? 60 : undefined } as any;
           const condEx: StrengthSportExercise = {
             id: condExId,
             name: `${condMeta.name} · кондиция ${cond.system}`,
@@ -1005,17 +1027,18 @@ export function buildStrengthSportPlan(input: StrengthSportInput): StrengthSport
             pattern: condMeta.pattern,
             role: 'accessory',
             character: 'лёг',
-            sets: 3,
-            reps: '1',
+            sets: condSets,
+            reps: cond.system === 'lactic' ? '60с' : `${condSets}×10с`,
             rir: 3,
             weight: 0,
-            workSets: [ws, { ...ws }, { ...ws }],
+            workSets: Array.from({ length: condSets }, () => ({ ...ws })),
             warmupSets: [],
             tempo: 'X-0-X-0',
-            restSeconds: cond.restS,
+            restSeconds: cond.restS || 60,
             comment: `Кондиция ${cond.system}: ${cond.protocol} ${cond.durationMin}′ RPE${cond.rpe} · ${cond.note}`,
           };
           sessions.push({ day: 7, week: w, sessionTag: 'cond_day', character: 'лёг', focus: 'conditioning', exercises: [condEx], durationMin: cond.durationMin + 5 } as any);
+          }
         }
       } catch {}
     }

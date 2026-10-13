@@ -9,9 +9,9 @@ import {
   scoreCheckin, pushCheckin, SS_CHECKIN_CAP,
   deloadWeeksFor, autoDeloadEffective, DELOAD_VS_TAPER_NOTE,
   shouldClearVbt, progHashOf,
-  cessationDaysFor, OPENER_SINGLE_NOTE,
+  cessationDaysForBase, OPENER_SINGLE_NOTE,
 } from '../strength-sport-planner-pro.engine';
-import { taperMultForWeek } from '../strength-sport-taper.engine';
+import { taperMultForWeek, cessationDaysFor } from '../strength-sport-taper.engine';
 import { isKvExcludedKey } from '../../../core/cloud-kv';
 
 describe('P1 весовая категория', () => {
@@ -118,9 +118,14 @@ describe('P6 гигиена', () => {
 
 describe('P7 cessation + opener', () => {
   it('Ж-cessation короче М; без пола — база', () => {
-    expect(cessationDaysFor(7, 'female')).toBe(7);
-    expect(cessationDaysFor(7, 'male')).toBe(8);
-    expect(cessationDaysFor(7)).toBe(7);
+    // числовой вариант (planner-pro) переименован: одно имя с табличным
+    // cessationDaysFor(eventId, sex) из taper.engine было ловушкой импорта.
+    expect(cessationDaysForBase(7, 'female')).toBe(7);
+    expect(cessationDaysForBase(7, 'male')).toBe(8);
+    expect(cessationDaysForBase(7)).toBe(7);
+    // табличный вариант — канон cessation по ивентам (re-export, не дубль)
+    expect(cessationDaysFor('yoke_walk', 'male')).toBe(8);
+    expect(cessationDaysFor('log_press', 'female')).toBe(5);
     expect(OPENER_SINGLE_NOTE).toContain('Opener');
   });
 });

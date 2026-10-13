@@ -164,11 +164,20 @@ export function progHashOf(p: Record<string, unknown>): string {
 }
 
 // ——— P7: половой cessation + opener ———
-/** Дни cessation с половой поправкой (syst.review 2026: М 4.5 / Ж 3.9). Без пола — база, байт-в-байт. */
-export function cessationDaysFor(baseDays: number, sex?: SmSex | string): number {
+/**
+ * Дни cessation из БАЗОВЫХ дней с половой поправкой
+ * (syst.review 2026: М 4.5 / Ж 3.9). Без пола — база, байт-в-байт.
+ *
+ * ВНИМАНИЕ: это НЕ `cessationDaysFor(eventId, sex)` из taper.engine —
+ * тот берёт дни из таблицы событий. Разные сигнатуры при одном имени были
+ * ловушкой (импорт из "не того" файла давал молча неверное поведение),
+ * поэтому числовой вариант переименован.
+ */
+export function cessationDaysForBase(baseDays: number, sex?: SmSex | string): number {
   const b = Number(baseDays) || 5;
   if (sex === 'male') return b + 1;
   return b;
 }
 
-export const OPENER_SINGLE_NOTE = 'Opener 90% 1×1 — репетиция старта (последняя неделя)';
+// Канон OPENER-ноты — в taper.engine (дубль удалён, ре-экспорт для совместимости).
+export { OPENER_SINGLE_NOTE } from './strength-sport-taper.engine';

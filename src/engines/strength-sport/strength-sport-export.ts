@@ -6,7 +6,17 @@ import type { StrengthSportPlan } from './strength-sport.types';
 import { buildWLMeetPlan } from './strength-sport-attempts.engine';
 
 function escHtml(s: string): string { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
-function escCsv(s: string | number): string { const v = String(s).replace(/"/g,'""'); return /[",\n;]/.test(v) ? `"${v}"` : v; }
+// P1 (аудит 2026-10): CSV был открыт формульной инъекции Excel. Значение,
+// начинающееся с `=`, `+`, `-` или `@`, Excel/Sheets исполняют как формулу —
+// имя упражнения вида `=cmd|' /C calc'!A0` выполнялось при открытии файла.
+// Префикс `'` гасит исполнение, сохраняя содержимое (прецедент: трен-дневник).
+const CSV_FORMULA = /^[=+\-@]/;
+function escCsv(s: string | number): string {
+  let v = String(s);
+  if (CSV_FORMULA.test(v)) v = `'${v}`;
+  v = v.replace(/"/g, '""');
+  return /[",\n;]/.test(v) ? `"${v}"` : v;
+}
 
 export interface StrengthExportRow { week:number; phase:string; day:number; tag:string; character:string; exercise:string; sets:number; reps:string; weight:number; pct:number; rir:number; tempo:string; rest:number; comment:string; distanceM?: number; timeCapS?: number; }
 
@@ -130,7 +140,10 @@ export function buildStrengthPrintHtml(plan: StrengthSportPlan): string {
   const proSection = buildStrengthProSection((plan as any).inputSnapshot);
   const gantt = buildPhaseGantt(plan);
   const headerHtml = buildPrintHeader(plan);
-  const summary = `<div style="margin:10px 0;padding:12px 14px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;font-size:12px;line-height:1.55;color:#1f2937"><b>${title}</b> · ${plan.weeksData.map(w=>`Н${w.week}:${w.phase}${(w as any).taper?' taper':''}${w.deload?' дел':''} ${w.totalSets}сет`).join(' | ')}<br/>Бюджет: ${plan.rationale.join(' | ')}</div>`;
+  // P1 (аудит 2026-10): rationale несёт пользовательский текст моста (слабые
+  // точки, имя контеста). В HTML он обязан быть экранирован — иначе `<script>`
+  // в имени точки исполнялся при печати плана.
+  const summary = `<div style="margin:10px 0;padding:12px 14px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;font-size:12px;line-height:1.55;color:#1f2937"><b>${title}</b> · ${plan.weeksData.map(w=>`Н${w.week}:${escHtml(w.phase)}${(w as any).taper?' taper':''}${w.deload?' дел':''} ${w.totalSets}сет`).join(' | ')}<br/>Бюджет: ${escHtml(plan.rationale.join(' | '))}</div>`;
   return `<!doctype html><html><head><meta charset="utf-8"><title>${title}</title><style>body{font-family:system-ui,-apple-system,'Segoe UI',Arial,sans-serif;padding:20px;max-width:1020px;margin:0 auto;color:#111;line-height:1.45} table{border-collapse:collapse;width:100%} table tr:nth-child(even) td{background:#f8fafc} @media print{body{padding:0;max-width:none} header{break-inside:avoid} section.gantt{break-inside:avoid} table{break-inside:auto} tr{break-inside:avoid}}</style></head><body>${headerHtml}${gantt}${extra}${proSection}${medleySection}${summary}<table>${header}${body}</table><script>window.onload=()=> setTimeout(()=> window.print(), 300)</script></body></html>`;
 }
 
@@ -146,10 +159,13 @@ export function downloadStrengthCsv(plan: StrengthSportPlan){
 export function buildStrengthXlsxHtml(plan: StrengthSportPlan): string {
   const rows = strengthExportRows(plan);
   const esc = escHtml;
+  // P1 (аудит 2026-10): XLS-HTML тоже исполняет формулы Excel — ячейка,
+  // начинающаяся с `=`, должна быть погашена префиксом (как в CSV).
+  const escCell = (v: string | number) => { const t = String(v); return esc(CSV_FORMULA.test(t) ? `'${t}` : t); };
   const title = `Стронг+ТА ${esc(plan.mode)} ${plan.weeks}нед ${esc(plan.level)} — ${new Date().toLocaleDateString('ru-RU')}`;
   const header = ['Неделя','Фаза','День','Тренировка','Характер','Упражнение','Сеты','Повторы','Вес','%ПМ','RIR','Темп','Отдыхс','Дист','ВремяCap','Комментарий'];
   const th = header.map(h=> `<th style="background:#0A84FF;color:#fff;font-weight:700;padding:6px;border:1px solid #1e40af">${esc(h)}</th>`).join('');
-  const tr = rows.map(r=> `<tr>${[r.week, esc(r.phase), r.day, esc(r.tag), esc(r.character), esc(r.exercise), r.sets, esc(r.reps), r.weight, r.pct, r.rir, esc(r.tempo), r.rest, r.distanceM||'', r.timeCapS||'', esc(r.comment)].map((v,i)=> `<td style="padding:4px 6px;border:1px solid #d1d5db;${i===5?'font-weight:600':''}">${v}</td>`).join('')}</tr>`).join('');
+  const tr = rows.map(r=> `<tr>${[r.week, esc(r.phase), r.day, esc(r.tag), esc(r.character), escCell(r.exercise), r.sets, escCell(r.reps), r.weight, r.pct, r.rir, escCell(r.tempo), r.rest, r.distanceM||'', r.timeCapS||'', escCell(r.comment)].map((v,i)=> `<td style="padding:4px 6px;border:1px solid #d1d5db;${i===5?'font-weight:600':''}">${v}</td>`).join('')}</tr>`).join('');
   // Excel-compatible HTML with BOM, meta, column widths and header styles (proper Excel header)
   return `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="utf-8"><!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet><x:Name>Strength</x:Name><x:WorksheetOptions><x:DisplayGridlines/><x:Print><x:ValidPrinterInfo/><x:PaperSizeIndex>9</x:PaperSizeIndex></x:Print></x:WorksheetOptions></x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]--><style>table{border-collapse:collapse} th{background:#0A84FF;color:#fff} td{vertical-align:top}</style></head><body><h2 style="font-family:Arial">${title}</h2><table border="1"><colgroup><col width="50"><col width="80"><col width="50"><col width="90"><col width="60"><col width="180"><col width="40"><col width="60"><col width="60"><col width="50"><col width="40"><col width="80"><col width="60"><col width="50"><col width="60"><col width="220"></colgroup><tr>${th}</tr>${tr}</table><p style="font-size:9px;color:#6b7280">BodyBuildHealth · ${esc(plan.patternId)} · ${plan.weeksData.length} нед · ${rows.length} строк</p></body></html>`;
 }

@@ -167,33 +167,40 @@ export function finalizeStrengthSportPlan(plan: StrengthSportPlan, opts?: Finali
   }
 
   // Объём per-lift vs landmarks (зальный) — P0-4 расширение
-  for (const wk of plan.weeksData) {
-    if (wk.deload) continue;
-    const liftsSnatch = wk.sessions.flatMap(s=> s.exercises.filter(e=> ['snatch','hang_snatch','power_snatch','muscle_snatch','snatch_balance','overhead_squat_v2'].includes(e.id))).reduce((a,e)=> a + e.workSets.reduce((x,s)=> x+s.reps,0),0);
-    const liftsClean = wk.sessions.flatMap(s=> s.exercises.filter(e=> ['clean_and_jerk','hang_clean','power_clean','muscle_clean','push_jerk','split_jerk','clean_pull'].includes(e.id))).reduce((a,e)=> a + e.workSets.reduce((x,s)=> x+s.reps,0),0);
-    const liftsSquat = wk.sessions.flatMap(s=> s.exercises.filter(e=> ['back_squat','front_squat','squat','hack_squat','front_squat_clean_grip','overhead_squat_v2'].includes(e.id))).reduce((a,e)=> a + e.sets,0);
-    const liftsPull = wk.sessions.flatMap(s=> s.exercises.filter(e=> ['snatch_pull','clean_pull','rdl','deadlift','sumo_dl','axle_deadlift'].includes(e.id))).reduce((a,e)=> a + e.sets,0);
-    const liftsOverhead = wk.sessions.flatMap(s=> s.exercises.filter(e=> ['log_press','axle_press','push_press','ohp','circus_db_press','push_jerk','split_jerk','db_press','bench_bar'].includes(e.id))).reduce((a,e)=> a + e.sets,0);
-    // carry дистанция из EVENT_META + fallback
-    const CARRY_DIST: Record<string, number> = { yoke_walk:20, farmers_walk_heavy:40, frame_carry:20, husafell_carry:40, conan_wheel:30, shield_carry:20, duck_walk:20, truck_pull:20, arm_over_arm:20, zercher_carry:20, sled_push_sprint:25, sled_push:20, tire_flip:15, sandbag_shoulder:15, sandbag_carry:30, sandbag_load:0, sandbag_over_bar:0, keg_toss:0, keg_over_bar:0, car_deadlift_18:0, car_deadlift_side:0 };
-    const carryIds = ['farmers_walk_heavy','yoke_walk','frame_carry','husafell_carry','conan_wheel','shield_carry','duck_walk','truck_pull','arm_over_arm','zercher_carry','sled_push_sprint','tire_flip','sandbag_shoulder','sandbag_carry','sandbag_over_bar','sled_push','sled_drag'];
-    const carrySets = wk.sessions.flatMap(s=> s.exercises.filter(e=> carryIds.includes(e.id))).reduce((a,e)=> a+e.sets,0);
-    const carryMeters = wk.sessions.flatMap(s=> s.exercises.filter(e=> carryIds.includes(e.id))).reduce((a,e)=> {
+  const CARRY_DIST: Record<string, number> = { yoke_walk:20, farmers_walk_heavy:40, frame_carry:20, husafell_carry:40, conan_wheel:30, shield_carry:20, duck_walk:20, truck_pull:20, arm_over_arm:20, zercher_carry:20, sled_push_sprint:25, sled_push:20, tire_flip:15, sandbag_shoulder:15, sandbag_carry:30, sandbag_load:0, sandbag_over_bar:0, keg_toss:0, keg_over_bar:0, car_deadlift_18:0, car_deadlift_side:0 };
+  const carryIds = ['farmers_walk_heavy','yoke_walk','frame_carry','husafell_carry','conan_wheel','shield_carry','duck_walk','truck_pull','arm_over_arm','zercher_carry','sled_push_sprint','tire_flip','sandbag_shoulder','sandbag_carry','sandbag_over_bar','sled_push','sled_drag'];
+  // Камни = loading_race (Winwood: загрузка/через планку/на плечо).
+  // P1: `circus_db_medley` здесь был ошибкой — это overhead-ивент (гантели-лестница,
+  // жим), он уже считается в liftsOverhead. Двойной счёт завышал «камни» примерно
+  // на 16 подъёмов и давал ложный перебор MRV каждую неделю.
+  const stoneIds = ['atlas_stone_load','atlas_stone_over_bar','natural_stone_shoulder','stone_lift','sandbag_shoulder','sandbag_load','sandbag_over_bar','tire_flip','keg_toss','keg_over_bar','keg_load'];
+  const holdIds = ['conan_wheel','shield_carry','sandbag_carry'];
+  const dragIds = ['truck_pull','arm_over_arm','sled_drag','sled_push'];
+  const gripIds = ['farmers_walk_heavy','yoke_walk','frame_carry','husafell_carry','zercher_carry','sandbag_carry','conan_wheel','shield_carry'];
+  // PRO: метрики считаются ПОСЛЕ enforce (раньше warning печатался на значениях
+  // ДО резки и врал: «385м > MRV 380» при уже разрезанном плане) — метрика и
+  // подпись теперь описывают один и тот же план.
+  const measureWeek = (wk: any) => ({
+    liftsSnatch: wk.sessions.flatMap((s:any)=> s.exercises.filter((e:any)=> ['snatch','hang_snatch','power_snatch','muscle_snatch','snatch_balance','overhead_squat_v2'].includes(e.id))).reduce((a:number,e:any)=> a + e.workSets.reduce((x:number,s:any)=> x+s.reps,0),0),
+    liftsClean: wk.sessions.flatMap((s:any)=> s.exercises.filter((e:any)=> ['clean_and_jerk','hang_clean','power_clean','muscle_clean','push_jerk','split_jerk','clean_pull'].includes(e.id))).reduce((a:number,e:any)=> a + e.workSets.reduce((x:number,s:any)=> x+s.reps,0),0),
+    liftsSquat: wk.sessions.flatMap((s:any)=> s.exercises.filter((e:any)=> ['back_squat','front_squat','squat','hack_squat','front_squat_clean_grip','overhead_squat_v2'].includes(e.id))).reduce((a:number,e:any)=> a+e.sets,0),
+    liftsPull: wk.sessions.flatMap((s:any)=> s.exercises.filter((e:any)=> ['snatch_pull','clean_pull','rdl','deadlift','sumo_dl','axle_deadlift'].includes(e.id))).reduce((a:number,e:any)=> a+e.sets,0),
+    liftsOverhead: wk.sessions.flatMap((s:any)=> s.exercises.filter((e:any)=> ['log_press','axle_press','push_press','ohp','circus_db_press','push_jerk','split_jerk','db_press','bench_bar'].includes(e.id))).reduce((a:number,e:any)=> a+e.sets,0),
+    carrySets: wk.sessions.flatMap((s:any)=> s.exercises.filter((e:any)=> carryIds.includes(e.id))).reduce((a:number,e:any)=> a+e.sets,0),
+    carryMeters: wk.sessions.flatMap((s:any)=> s.exercises.filter((e:any)=> carryIds.includes(e.id))).reduce((a:number,e:any)=> {
       const d = (e.workSets[0] as any)?.distanceM ?? CARRY_DIST[e.id] ?? 20;
       return a + e.sets * d;
-    }, 0);
-    const stoneIds = ['atlas_stone_load','atlas_stone_over_bar','natural_stone_shoulder','stone_lift','sandbag_shoulder','sandbag_load','sandbag_over_bar','tire_flip','keg_toss','keg_over_bar','keg_load','circus_db_medley'];
-    const stoneLifts = wk.sessions.flatMap(s=> s.exercises.filter(e=> stoneIds.includes(e.id))).reduce((a,e)=> a + e.workSets.reduce((x,s)=> x+s.reps,0),0);
-    // hold / drag отдельные
-    const holdIds = ['conan_wheel','shield_carry','sandbag_carry'];
-    const holdSets = wk.sessions.flatMap(s=> s.exercises.filter(e=> holdIds.includes(e.id))).reduce((a,e)=> a+e.sets,0);
-    const dragIds = ['truck_pull','arm_over_arm','sled_drag','sled_push'];
-    const dragMeters = wk.sessions.flatMap(s=> s.exercises.filter(e=> dragIds.includes(e.id))).reduce((a,e)=> {
+    }, 0),
+    stoneLifts: wk.sessions.flatMap((s:any)=> s.exercises.filter((e:any)=> stoneIds.includes(e.id))).reduce((a:number,e:any)=> a + e.workSets.reduce((x:number,s:any)=> x+s.reps,0),0),
+    holdSets: wk.sessions.flatMap((s:any)=> s.exercises.filter((e:any)=> holdIds.includes(e.id))).reduce((a:number,e:any)=> a+e.sets,0),
+    dragMeters: wk.sessions.flatMap((s:any)=> s.exercises.filter((e:any)=> dragIds.includes(e.id))).reduce((a:number,e:any)=> {
       const d = (e.workSets[0] as any)?.distanceM ?? 20;
       return a + e.sets * d;
-    },0);
-    const gripIds = ['farmers_walk_heavy','yoke_walk','frame_carry','husafell_carry','zercher_carry','sandbag_carry','conan_wheel','shield_carry','farmers_walk'];
-    const gripSets = wk.sessions.flatMap(s=> s.exercises.filter(e=> gripIds.includes(e.id))).reduce((a,e)=> a+e.sets,0);
+    },0),
+    gripSets: wk.sessions.flatMap((s:any)=> s.exercises.filter((e:any)=> gripIds.includes(e.id))).reduce((a:number,e:any)=> a+e.sets,0),
+  });
+  for (const wk of plan.weeksData) {
+    if (wk.deload) continue;
     const lvl = plan.level;
     const lmS = getWL(lvl,'snatch');
     const lmC = getWL(lvl,'cleanJerk');
@@ -205,17 +212,6 @@ export function finalizeStrengthSportPlan(plan: StrengthSportPlan, opts?: Finali
     const lmGrip = getStrong(lvl,'grip');
     const lmHold = getStrong(lvl,'hold');
     const lmDrag = getStrong(lvl,'drag');
-    if (lmS && liftsSnatch > lmS.mrv) warnings.push(`Нед ${wk.week}: рывок ${liftsSnatch} подъёмов > MRV ${lmS.mrv} — перебор.`);
-    if (lmC && liftsClean > lmC.mrv) warnings.push(`Нед ${wk.week}: толчок ${liftsClean} подъёмов > MRV ${lmC.mrv}.`);
-    if (lmS && liftsSnatch < lmS.mev && plan.mode !== 'strongman') warnings.push(`Нед ${wk.week}: рывок ${liftsSnatch} < MEV ${lmS.mev} — недобор объёма.`);
-    if (lmSq && liftsSquat > lmSq.mrv) warnings.push(`Нед ${wk.week}: присед ${liftsSquat} сетов > MRV ${lmSq.mrv}.`);
-    if (lmPull && liftsPull > lmPull.mrv) warnings.push(`Нед ${wk.week}: тяги ${liftsPull} сетов > MRV ${lmPull.mrv}.`);
-    if (lmPress && liftsOverhead > lmPress.mrv) warnings.push(`Нед ${wk.week}: жим/лог ${liftsOverhead} сетов > MRV ${lmPress.mrv}.`);
-    if (lmCarry && carryMeters > lmCarry.mrv) warnings.push(`Нед ${wk.week}: переноски ${carryMeters}м > MRV ${lmCarry.mrv}м.`);
-    if (lmStone && stoneLifts > lmStone.mrv) warnings.push(`Нед ${wk.week}: камни ${stoneLifts} подъёмов > MRV ${lmStone.mrv}.`);
-    if (lmGrip && gripSets > lmGrip.mrv) warnings.push(`Нед ${wk.week}: хват ${gripSets} сетов > MRV ${lmGrip.mrv} — перебор (фермер+йок+рама).`);
-    if (lmHold && holdSets > lmHold.mrv) warnings.push(`Нед ${wk.week}: удержания ${holdSets} сетов > MRV ${lmHold.mrv} (Конана/щит).`);
-    if (lmDrag && dragMeters > lmDrag.mrv) warnings.push(`Нед ${wk.week}: тяга ${dragMeters}м > MRV ${lmDrag.mrv}м (трак/сани).`);
     // PRO enforce: если перебор > MRV — режем accessory до MRV (как BB normalizeWeekMrv)
     const enforceCategory = (ids: string[], current: number, mrv: number, isLifts: boolean) => {
       if (current <= mrv) return;
@@ -229,22 +225,102 @@ export function finalizeStrengthSportPlan(plan: StrengthSportPlan, opts?: Finali
             // lifts — уменьшаем reps на 1 на сет (снижает lifts на sets)
             for (const ws of ex.workSets) { if (ws.reps > 1) { ws.reps -= 1; over -= 1; if (over <= 0) break; } }
             ex.reps = `${ex.workSets[0]?.reps || 1}-${ex.workSets[0]?.reps || 1}`;
+            // P1: если повторы уже на полу 1, но перебор остался — снимаем сеты
+            // (иначе «камни 24 > MRV 22» оставалось в плане после enforce).
+            while (over > 0 && ex.sets > 2) {
+              ex.sets -= 1; ex.workSets = ex.workSets.slice(0, ex.sets); over -= 1;
+              ex.reps = `${ex.workSets[0]?.reps || 1}-${ex.workSets[0]?.reps || 1}`;
+            }
           } else {
             if (ex.sets > 2) { ex.sets -= 1; ex.workSets = ex.workSets.slice(0, ex.sets); over -= 1; }
+            // P1: если резать сеты больше некуда (всё на полу 2), но перебор
+            // остался — режем reps этих подходов (для lifts-категорий это
+            // единственный доступный рычаг). Иначе MRV превышается молча
+            // (наблюдалось: неделя 3 «камни 24 > MRV 22» после enforce).
+            while (over > 0 && ex.sets <= 2) {
+              let cut = false;
+              for (const ws of ex.workSets) { if (ws.reps > 1) { ws.reps -= 1; over -= 1; cut = true; if (over <= 0) break; } }
+              if (!cut) break;
+              const rs = ex.workSets.map(s => s.reps);
+              ex.reps = `${Math.min(...rs)}-${Math.max(...rs)}`;
+            }
           }
         }
       }
       wk.totalSets = wk.sessions.reduce((a,s)=> a + s.exercises.reduce((x,e)=> x+e.sets,0),0);
     };
-    if (lmSq && liftsSquat > lmSq.mrv) enforceCategory(['back_squat','front_squat','squat','hack_squat','front_squat_clean_grip','overhead_squat_v2','pause_squat','tempo_squat'], liftsSquat, lmSq.mrv, false);
-    if (lmPull && liftsPull > lmPull.mrv) enforceCategory(['snatch_pull','clean_pull','rdl','deadlift','sumo_dl','axle_deadlift','car_deadlift_18','car_deadlift_side','deadlift_max','deficit_pull','pause_pull'], liftsPull, lmPull.mrv, false);
-    if (lmPress && liftsOverhead > lmPress.mrv) enforceCategory(['log_press','axle_press','viking_press','push_press','ohp','circus_db_press','circus_db_medley','push_jerk','split_jerk','db_press','bench_bar','pin_press'], liftsOverhead, lmPress.mrv, false);
-    if (lmCarry && carryMeters > lmCarry.mrv) enforceCategory(['farmers_walk_heavy','yoke_walk','frame_carry','husafell_carry','conan_wheel','shield_carry','duck_walk','zercher_carry','sled_push_sprint','sandbag_carry','sled_push'], carrySets, Math.round(lmCarry.mrv / 25), false);
-    if (lmGrip && gripSets > lmGrip.mrv) enforceCategory(['farmers_walk_heavy','yoke_walk','frame_carry','husafell_carry','zercher_carry','sandbag_carry','conan_wheel','shield_carry'], gripSets, lmGrip.mrv, false);
-    if (lmHold && holdSets > lmHold.mrv) enforceCategory(['conan_wheel','shield_carry'], holdSets, lmHold.mrv, false);
-    if (lmDrag && dragMeters > lmDrag.mrv) enforceCategory(['truck_pull','arm_over_arm','sled_drag','sled_push'], Math.round(dragMeters/20), lmDrag.mrv, false);
-    if (lmS && liftsSnatch > lmS.mrv) enforceCategory(['snatch','hang_snatch','power_snatch','muscle_snatch','snatch_balance','overhead_squat_v2','deficit_snatch','block_snatch','pause_snatch'], liftsSnatch, lmS.mrv, true);
-    if (lmC && liftsClean > lmC.mrv) enforceCategory(['clean_and_jerk','hang_clean','power_clean','muscle_clean','push_jerk','split_jerk','clean_pull','deficit_clean','block_clean','pause_clean'], liftsClean, lmC.mrv, true);
+    // P1-честность: любая резка sets/distance/reps обязана обновить подпись `reps`
+    // упражнения — иначе подпись мышц (carry «3×20м» при 2 сетах) врёт факту.
+    const syncRepLabels = () => {
+      for (const sess of wk.sessions) for (const ex of sess.exercises) {
+        const ws0: any = ex.workSets?.[0];
+        if (ws0 && ws0.distanceM) {
+          ex.reps = `${ex.sets}×${ws0.distanceM}м`;
+        } else if (ex.workSets?.length) {
+          // подпись из фактических повторов (первый→последний)
+          const rs = ex.workSets.map((s: any) => s.reps).filter((r: any) => Number.isFinite(r));
+          if (rs.length && rs.every((r: number) => r > 0)) {
+            const lo = Math.min(...rs), hi = Math.max(...rs);
+            ex.reps = lo === hi ? String(lo) : `${lo}-${hi}`;
+          }
+        }
+      }
+    };
+    // Метрики до резки — на них решает enforce (сравниваем с MRV).
+    let m0 = measureWeek(wk);
+    if (lmSq && m0.liftsSquat > lmSq.mrv) enforceCategory(['back_squat','front_squat','squat','hack_squat','front_squat_clean_grip','overhead_squat_v2','pause_squat','tempo_squat'], m0.liftsSquat, lmSq.mrv, false);
+    if (lmPull && m0.liftsPull > lmPull.mrv) enforceCategory(['snatch_pull','clean_pull','rdl','deadlift','sumo_dl','axle_deadlift','car_deadlift_18','car_deadlift_side','deadlift_max','deficit_pull','pause_pull'], m0.liftsPull, lmPull.mrv, false);
+    if (lmPress && m0.liftsOverhead > lmPress.mrv) enforceCategory(['log_press','axle_press','viking_press','push_press','ohp','circus_db_press','circus_db_medley','push_jerk','split_jerk','db_press','bench_bar','pin_press'], m0.liftsOverhead, lmPress.mrv, false);
+    // Камни: раньше был ТОЛЬКО warning без enforce (перебор каждый план не лечился).
+    if (lmStone && m0.stoneLifts > lmStone.mrv) enforceCategory(stoneIds, m0.stoneLifts, lmStone.mrv, true);
+    if (lmS && m0.liftsSnatch > lmS.mrv) enforceCategory(['snatch','hang_snatch','power_snatch','muscle_snatch','snatch_balance','overhead_squat_v2','deficit_snatch','block_snatch','pause_snatch'], m0.liftsSnatch, lmS.mrv, true);
+    if (lmC && m0.liftsClean > lmC.mrv) enforceCategory(['clean_and_jerk','hang_clean','power_clean','muscle_clean','push_jerk','split_jerk','clean_pull','deficit_clean','block_clean','pause_clean'], m0.liftsClean, lmC.mrv, true);
+    // Carry: единицы — МЕТРЫ (как warning). Раньше передавались СЕТЫ против mrv/25 —
+    // при переборе метров enforce резал не то и не до конца.
+    if (lmCarry && m0.carryMeters > lmCarry.mrv) {
+      let overM = m0.carryMeters - lmCarry.mrv;
+      for (const sess of wk.sessions) {
+        for (let i = sess.exercises.length - 1; i >= 0 && overM > 0; i--) {
+          const ex = sess.exercises[i];
+          if (!carryIds.includes(ex.id)) continue;
+          if (ex.role !== 'accessory' && sess.exercises.filter(e => carryIds.includes(e.id) && e.role === 'primary').length <= 1) continue;
+          const d = (ex.workSets[0] as any)?.distanceM ?? CARRY_DIST[ex.id] ?? 20;
+          // сначала режем длину подхода, потом сеты — как на реальном делоде
+          while (overM > 0 && (ex.workSets[0] as any)?.distanceM && (ex.workSets[0] as any).distanceM > 10) {
+            (ex.workSets[0] as any).distanceM = Math.max(10, (ex.workSets[0] as any).distanceM - 10);
+            overM -= 10;
+          }
+          if (ex.sets > 2 && overM > 0) { ex.sets -= 1; ex.workSets = ex.workSets.slice(0, ex.sets); overM -= d; }
+        }
+      }
+      wk.totalSets = wk.sessions.reduce((a,s)=> a + s.exercises.reduce((x,e)=> x+e.sets,0),0);
+    }
+    if (lmGrip && m0.gripSets > lmGrip.mrv) enforceCategory(['farmers_walk_heavy','yoke_walk','frame_carry','husafell_carry','zercher_carry','sandbag_carry','conan_wheel','shield_carry'], m0.gripSets, lmGrip.mrv, false);
+    if (lmHold && m0.holdSets > lmHold.mrv) enforceCategory(['conan_wheel','shield_carry'], m0.holdSets, lmHold.mrv, false);
+    if (lmDrag && m0.dragMeters > lmDrag.mrv) enforceCategory(['truck_pull','arm_over_arm','sled_drag','sled_push'], Math.round(m0.dragMeters/20), lmDrag.mrv, false);
+    // PRO-честность: перебор печатается ПОСЛЕ резки, по фактическому плану.
+    // Раньше warning считался на значениях ДО enforce и врал числами.
+    const m1 = measureWeek(wk);
+    if (lmS && m1.liftsSnatch > lmS.mrv) warnings.push(`Нед ${wk.week}: рывок ${m1.liftsSnatch} подъёмов > MRV ${lmS.mrv} — перебор (среда не даёт срезать).`);
+    if (lmC && m1.liftsClean > lmC.mrv) warnings.push(`Нед ${wk.week}: толчок ${m1.liftsClean} подъёмов > MRV ${lmC.mrv}.`);
+    if (lmS && m1.liftsSnatch < lmS.mev && plan.mode !== 'strongman') warnings.push(`Нед ${wk.week}: рывок ${m1.liftsSnatch} < MEV ${lmS.mev} — недобор объёма.`);
+    if (lmSq && m1.liftsSquat > lmSq.mrv) warnings.push(`Нед ${wk.week}: присед ${m1.liftsSquat} сетов > MRV ${lmSq.mrv}.`);
+    if (lmPull && m1.liftsPull > lmPull.mrv) warnings.push(`Нед ${wk.week}: тяги ${m1.liftsPull} сетов > MRV ${lmPull.mrv}.`);
+    if (lmPress && m1.liftsOverhead > lmPress.mrv) warnings.push(`Нед ${wk.week}: жим/лог ${m1.liftsOverhead} сетов > MRV ${lmPress.mrv}.`);
+    if (lmCarry && m1.carryMeters > lmCarry.mrv) warnings.push(`Нед ${wk.week}: переноски ${m1.carryMeters}м > MRV ${lmCarry.mrv}м.`);
+    if (lmStone && m1.stoneLifts > lmStone.mrv) warnings.push(`Нед ${wk.week}: камни ${m1.stoneLifts} подъёмов > MRV ${lmStone.mrv}.`);
+    if (lmGrip && m1.gripSets > lmGrip.mrv) warnings.push(`Нед ${wk.week}: хват ${m1.gripSets} сетов > MRV ${lmGrip.mrv} — перебор (фермер+йок+рама).`);
+    if (lmHold && m1.holdSets > lmHold.mrv) warnings.push(`Нед ${wk.week}: удержания ${m1.holdSets} сетов > MRV ${lmHold.mrv} (Конана/щит).`);
+    if (lmDrag && m1.dragMeters > lmDrag.mrv) warnings.push(`Нед ${wk.week}: тяга ${m1.dragMeters}м > MRV ${lmDrag.mrv}м (трак/сани).`);
+    // Показатели для остальных проверок недели — по фактическому плану (после резки)
+    const carryMeters = m1.carryMeters;
+    const stoneLifts = m1.stoneLifts;
+    const gripSets = m1.gripSets;
+    const liftsSnatch = m1.liftsSnatch;
+    const liftsClean = m1.liftsClean;
+    const liftsOverhead = m1.liftsOverhead;
+    const liftsPull = m1.liftsPull;
+    const carrySets = m1.carrySets;
     // Weekly axial load score (High axial: yoke, stone, squat, dead) — Winwood
     // QL mandate: yoke/frame heavy → suitcase 1× + side plank if missing (McGill QL)
     const maxYokeAll = Math.max(0, ...wk.sessions.flatMap(s=> s.exercises.filter(e=> ['yoke_walk','frame_carry','conan_wheel','shield_carry'].includes(e.id)).flatMap(e=> e.workSets.map(ws=> ws.weight))));
@@ -339,10 +415,13 @@ export function finalizeStrengthSportPlan(plan: StrengthSportPlan, opts?: Finali
         warnings.push(`Нед ${wk.week}: mixed grip тяга — используйте hook grip / лямки (Heazlewood 2025 distal biceps, supination → разрыв).`);
       }
       if (hasBicepsRisk) {
-        warnings.push(`Нед ${wk.week}: 🦾 бицепс риск (камень/покрышка) — добавлен hammer curl 3×12, без супинации, lap 2с.`);
-        const hasHammer = wk.sessions.some(s=> s.exercises.some(e=> e.id.includes('hammer') || e.id.includes('bicep') ));
+        // P1-честность: строка теперь только если prehab РЕАЛЬНО добавлен
+        // (раньше «добавлен hammer curl» печаталась всегда, даже когда hammer
+        // уже был в плане и инъекции не происходило).
+        const hasHammer = wk.sessions.some(s=> s.exercises.some(e=> e.id.includes('hammer') || e.id.includes('bicep') || e.id.includes('curl')));
         if (!hasHammer) {
           let targetBi = [...wk.sessions].sort((a,b)=> (a.exercises.reduce((x,e)=>x+e.sets,0)) - (b.exercises.reduce((x,e)=>x+e.sets,0)))[0];
+          let injected = false;
           if (targetBi) {
             let curBi = wk.sessions.reduce((a,s)=> a + s.exercises.reduce((x,e)=>x+e.sets,0),0);
             while (curBi + 2 > lim.maxSets) {
@@ -354,9 +433,15 @@ export function finalizeStrengthSportPlan(plan: StrengthSportPlan, opts?: Finali
               let idx=-1; for(let i=targetBi.exercises.length-1;i>=0;i--) if((targetBi.exercises[i] as any).role==='accessory'){ idx=i; break; }
               if(idx>=0) targetBi.exercises.splice(idx,1); else targetBi.exercises.pop();
             }
-            targetBi.exercises.push({ id:'hammer_curl', name:'Молоток', group:'arms', pattern:'carry', role:'accessory', character:'памп', sets:2, reps:'12', rir:2, weight:12, workSets:[{ reps:12, rir:2, weight:12, pct:60, tempo:'2-0-1-0', restSeconds:60 } as any, { reps:12, rir:2, weight:12, pct:60, tempo:'2-0-1-0', restSeconds:60 } as any], tempo:'2-0-1-0', restSeconds:60, isCompetitionLift:false, comment:'Biceps prehab hammer 3×12' } as any);
-            wk.totalSets = wk.sessions.reduce((a,s)=> a + s.exercises.reduce((x,e)=> x+e.sets,0),0);
+            if (targetBi.exercises.length + 1 <= lim.maxExercises) {
+              targetBi.exercises.push({ id:'hammer_curl', name:'Молоток', group:'arms', pattern:'carry', role:'accessory', character:'памп', sets:2, reps:'12', rir:2, weight:12, workSets:[{ reps:12, rir:2, weight:12, pct:60, tempo:'2-0-1-0', restSeconds:60 } as any, { reps:12, rir:2, weight:12, pct:60, tempo:'2-0-1-0', restSeconds:60 } as any], tempo:'2-0-1-0', restSeconds:60, isCompetitionLift:false, comment:'Biceps prehab hammer 3×12' } as any);
+              wk.totalSets = wk.sessions.reduce((a,s)=> a + s.exercises.reduce((x,e)=> x+e.sets,0),0);
+              injected = true;
+            }
           }
+          warnings.push(injected
+            ? `Нед ${wk.week}: 🦾 бицепс риск (камень/покрышка) — добавлен hammer curl 3×12, без супинации, lap 2с.`
+            : `Нед ${wk.week}: 🦾 бицепс риск (камень/покрышка) — hammer curl не влез в лимиты сессии; добавьте вручную 2×12 без супинации.`);
         }
       }
     }
@@ -364,9 +449,13 @@ export function finalizeStrengthSportPlan(plan: StrengthSportPlan, opts?: Finali
     if (plan.mode === 'strongman' && (carryMeters > 200 || axialSets >= 10)) {
       const hasQl = wk.sessions.some(s=> s.exercises.some(e=> e.id.includes('suitcase') || e.id.includes('side_plank') || e.id.includes('sandbag_carry')));
       if (!hasQl) {
-        if (wk.week % 2 === 1) warnings.push(`Нед ${wk.week}: QL — добавлен suitcase carry 2×20м + side plank 2×30с (McGill yoke QL compensation).`);
-        // auto-inject 1× suitcase as accessory if budget allows
+        // auto-inject suitcase carry как accessory (если бюджет позволяет).
+        // P1-честность: раньше подпись обещала «suitcase + side plank», а
+        // в план уезжал только suitcase — side plank не добавлялся никогда.
+        // Теперь подпись = факту (что реально вставилось), а side plank —
+        // рекомендация без фантома.
         let targetQl = [...wk.sessions].sort((a,b)=> (a.exercises.reduce((x,e)=>x+e.sets,0)) - (b.exercises.reduce((x,e)=>x+e.sets,0)))[0];
+        let injected = false;
         if (targetQl) {
           let curQl = wk.sessions.reduce((a,s)=> a + s.exercises.reduce((x,e)=>x+e.sets,0),0);
           while (curQl + 2 > lim.maxSets) {
@@ -378,16 +467,27 @@ export function finalizeStrengthSportPlan(plan: StrengthSportPlan, opts?: Finali
             let idx=-1; for(let i=targetQl.exercises.length-1;i>=0;i--) if((targetQl.exercises[i] as any).role==='accessory'){ idx=i; break; }
             if(idx>=0) targetQl.exercises.splice(idx,1); else targetQl.exercises.pop();
           }
-          targetQl.exercises.push({ id:'sandbag_carry', name:'Чемоданная переноска', group:'back', pattern:'carry', role:'accessory', character:'памп', sets:2, reps:'20м', rir:2, weight:32, workSets:[{ reps:1, rir:2, weight:32, pct:60, tempo:'1-0-1-0', restSeconds:60, distanceM:20 } as any, { reps:1, rir:2, weight:32, pct:60, tempo:'1-0-1-0', restSeconds:60, distanceM:20 } as any], tempo:'1-0-1-0', restSeconds:60, isCompetitionLift:false, comment:'QL prehab suitcase 20м' } as any);
-          wk.totalSets = wk.sessions.reduce((a,s)=> a + s.exercises.reduce((x,e)=> x+e.sets,0),0);
+          if (targetQl.exercises.length + 1 <= lim.maxExercises) {
+            targetQl.exercises.push({ id:'sandbag_carry', name:'Чемоданная переноска', group:'back', pattern:'carry', role:'accessory', character:'памп', sets:2, reps:'2×20м', rir:2, weight:32, workSets:[{ reps:1, rir:2, weight:32, pct:60, tempo:'1-0-1-0', restSeconds:60, distanceM:20 } as any, { reps:1, rir:2, weight:32, pct:60, tempo:'1-0-1-0', restSeconds:60, distanceM:20 } as any], tempo:'1-0-1-0', restSeconds:60, isCompetitionLift:false, comment:'QL prehab suitcase 20м' } as any);
+            wk.totalSets = wk.sessions.reduce((a,s)=> a + s.exercises.reduce((x,e)=> x+e.sets,0),0);
+            injected = true;
+          }
+        }
+        if (wk.week % 2 === 1) {
+          warnings.push(injected
+            ? `Нед ${wk.week}: QL — вставлен suitcase carry 2×20м (McGill yoke QL compensation) + совет: side plank 2×30с.`
+            : `Нед ${wk.week}: QL — suitcase не влез в лимиты сессии; совет: side plank 2×30с + suitcase 2×20м вручную.`);
         }
       }
     }
-    // Conditioning PRO: стронг 1-2/нед вне зала кондиция — auto-inject 1× conditioning per week (реальная инъекция)
+    // Conditioning PRO: стронг 1-2/нед вне зала кондиция — рекомендация всегда,
+    // реальная инъекция — ТОЛЬКО если билдер не сделал отдельный cond_day
+    // (иначе кондиция дублировалась: и cond_day, и элемент внутри сессии).
     if (plan.mode === 'strongman' && !plan.outsideMetrics) {
       const condNote = `Кондиция: ${['alactic 8×10с/50с','lactic 5×60с/90с','aerobic Zone2 30′'][wk.week % 3]} — по фазе`;
       if (wk.week === 1 && !warnings.some(w=> w.includes('Кондиция'))) warnings.push(condNote);
-      if (wk.week % 2 === 0 && wk.sessions.length < lim.maxExercises) {
+      const hasCondDay = wk.sessions.some(s => s.sessionTag === 'cond_day');
+      if (wk.week % 2 === 0 && !hasCondDay) {
         const hasCond = wk.sessions.some(s=> s.exercises.some(e=> e.id.includes('sled') || e.id.includes('tire') || e.id.includes('sprint')));
         if (!hasCond && (wk.totalSets||0) + 2 <= lim.maxSets) {
           const condId = wk.week % 4 === 0 ? 'sled_push_sprint' : wk.week % 4 === 2 ? 'tire_flip' : 'sled_drag';
@@ -398,7 +498,7 @@ export function finalizeStrengthSportPlan(plan: StrengthSportPlan, opts?: Finali
             wk.totalSets = wk.sessions.reduce((a,s)=> a + s.exercises.reduce((x,e)=> x+e.sets,0),0);
             warnings.push(`Нед ${wk.week}: кондиция ${condNote.split(':')[1]?.trim()} — добавлен ${condName} 2× (auto)`);
           } else {
-            warnings.push(`Нед ${wk.week}: кондиция ${condNote.split(':')[1]?.trim()} — добавлен tire/sled элемент`);
+            warnings.push(`Нед ${wk.week}: кондиция ${condNote.split(':')[1]?.trim()} — не влез в лимиты сессии`);
           }
         }
       }
@@ -454,6 +554,9 @@ export function finalizeStrengthSportPlan(plan: StrengthSportPlan, opts?: Finali
       // стронг: carry vs stone баланс soft check
       if (carrySets > stoneLifts * 2) warnings.push(`Нед ${wk.week}: перекос в переноски ${carrySets} сетов vs камни ${stoneLifts} — добавьте камни.`);
     }
+    // P1: подписи `reps` синхронизированы с фактом ПОСЛЕ всех резок/инъекций недели
+    // (carry «3×20м» при 2 сетах после MRV-enforce = вранье подписи).
+    syncRepLabels();
   }
 
   plan.validation = { ok: errors.length === 0, warnings: [...new Set(warnings)], errors };

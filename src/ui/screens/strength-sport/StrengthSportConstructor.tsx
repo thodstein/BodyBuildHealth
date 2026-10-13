@@ -117,6 +117,12 @@ export const StrengthSportConstructor: React.FC = () => {
   const initialSeason = React.useMemo(() => { try { return loadSeasonPlan(); } catch { return null; } }, []);
   const [seasonPresetId, setSeasonPresetId] = React.useState<string>(initialSeason?.presetId || '');
   const [seasonPlan, setSeasonPlan] = React.useState<SSSeasonPlan | null>(initialSeason);
+  // Длина межсезонья/перехода сезона 2 пиков. Раньше в UI стояли readOnly-заглушки
+  // «4»/«2», а сборка брала хардкод — вход выглядел живым, но не делал ничего.
+  const [seasonGppWeeks, setSeasonGppWeeks] = React.useState<number>(() => { try { const v = Number(localStorage.getItem('he_ss_season_gpp')); return (Number.isFinite(v) && v >= 2 && v <= 8) ? v : 4; } catch { return 4; } });
+  const [seasonTransWeeks, setSeasonTransWeeks] = React.useState<number>(() => { try { const v = Number(localStorage.getItem('he_ss_season_trans')); return (Number.isFinite(v) && v >= 1 && v <= 4) ? v : 2; } catch { return 2; } });
+  React.useEffect(() => { try { localStorage.setItem('he_ss_season_gpp', String(seasonGppWeeks)); } catch {} }, [seasonGppWeeks]);
+  React.useEffect(() => { try { localStorage.setItem('he_ss_season_trans', String(seasonTransWeeks)); } catch {} }, [seasonTransWeeks]);
   const pullFromProfile = () => {
     try {
       const raw = localStorage.getItem('he_profile_v2');
@@ -229,7 +235,11 @@ export const StrengthSportConstructor: React.FC = () => {
       // планы их по-прежнему читают — обратная совместимость не сломана.
       patternId: patternId || undefined,
       diaryTrend: diaryTrend || undefined,
-      taperWeeks: goal==='peaking' ? taperWeeks : undefined,
+      // Тапер: goal=peaking ИЛИ задана дата старта. Раньше селектор жил только
+      // под goal=peaking — спортсмен сборного цикла (goal='strength') с датой
+      // старта получал план без внешнего тейпера, хотя датированный cessation
+      // уже считался. Профессионально: дата старта = тейпер, независимо от цели.
+      taperWeeks: (goal==='peaking' || competitionDate) ? taperWeeks : undefined,
       weakPoints: weakPoints.length ? weakPoints : undefined,
       // Planner PRO P1–P7 (дефолты движка = старое поведение)
       weightClass: weightClassForInput(mode, weightClass, bodyweight, sex as any),
@@ -392,6 +402,8 @@ export const StrengthSportConstructor: React.FC = () => {
       if (wc) localStorage.setItem('he_strength_weightcut_payload', JSON.stringify(wc));
     } catch {}
     let annualFailed = false;
+    // P1: статус моста SS-год → общий годовой план (отказ/пересечение недель).
+    let annualSyncNote = '';
     try {
       setBuildStage('Собираем год…'); await tick();
       const hist = loadStrengthSportPlans().slice(0, 6);
@@ -404,7 +416,10 @@ export const StrengthSportConstructor: React.FC = () => {
         const ann = competitionDate ? buildAnnualWithTaper(hist, { competitionDate, taperWeeks }) : buildAnnualFromSS(hist);
         saveAnnualSS(ann);
         setAnnual(ann);
-        try { syncStrengthAnnualToGeneral(ann); } catch {}
+        // P1: мост возвращает статус — отказ/пересечение больше не молчаливый
+        const sync = syncStrengthAnnualToGeneral(ann);
+        if (!sync.ok) annualSyncNote = ` · ⚠ год: ${sync.note || 'не синхронизирован'}`;
+        else if (sync.note) annualSyncNote = ` · ${sync.note}`;
         try {
           localStorage.setItem('he_strength_annual_sync_v1', JSON.stringify({ updatedAt: new Date().toISOString(), totalWeeks: ann.totalWeeks, blocks: ann.blocks.map(b=> ({ startWeek: b.startWeek, weeks: b.weeks, mode: b.mode })) }));
           window.dispatchEvent(new CustomEvent('he-strength-annual-updated', { detail: ann }));
@@ -414,8 +429,8 @@ export const StrengthSportConstructor: React.FC = () => {
     // Итоговое сообщение — по факту записи. Раньше тут стояло безусловное «✦ План собран»,
     // и честное предупреждение (ставилось выше) затиралось этим же кадром.
     // Тот же принцип — с годом: его провал не должен исчезнуть под «собрано».
-    const annualNote = annualFailed ? ' · ⚠ год не собран (пустая история планов)' : '';
-    if (saved) { setMsg(`✦ План собран${annualNote}`); setTimeout(()=>setMsg(''), annualFailed ? 4500 : 2200); }
+    const annualNote = annualFailed ? ' · ⚠ год не собран (пустая история планов)' : annualSyncNote;
+    if (saved) { setMsg(`✦ План собран${annualNote}`); setTimeout(()=>setMsg(''), (annualFailed || annualSyncNote.startsWith(' · ⚠')) ? 4500 : 2200); }
     else { setMsg(`⚠ План собран, но НЕ сохранён (нет места в хранилище) — после перезагрузки пропадёт${annualNote}`); setTimeout(()=>setMsg(''), 4500); }
     setStep('plan');
     setHasSpecPrev(false); // новый id плана — старый снапшот stale, откат его честно отклонит
@@ -687,10 +702,11 @@ export const StrengthSportConstructor: React.FC = () => {
 
   const handleBuildSeason = () => {
     try{
+      if (!plan) { setMsg('⛔ Сначала соберите план — сезон строится от текущего блока'); setTimeout(()=>setMsg(''),2400); return; }
       const p2 = buildStrengthSportPlan({ mode:'strongman', goal:'peaking', level, weeks:6, daysPerWeek: days, workMax, competitionDate, startDate: localIsoDate(), contest, contestStrategy } as any);
-      const ann2 = buildAnnualMultiPeak([plan!, p2], { competitions: [{date: competitionDate || localIsoDate(new Date(Date.now()+ 60*86400000))}, {date: localIsoDate(new Date(Date.now()+ 150*86400000))}], gppWeeks:4, transitionWeeks:2 });
-      saveAnnualSS(ann2); setAnnual(ann2); setMsg('✦ Сезон 2 пика собран'); setTimeout(()=>setMsg(''),2200);
-    }catch{}
+      const ann2 = buildAnnualMultiPeak([plan, p2], { competitions: [{date: competitionDate || localIsoDate(new Date(Date.now()+ 60*86400000))}, {date: localIsoDate(new Date(Date.now()+ 150*86400000))}], gppWeeks: seasonGppWeeks, transitionWeeks: seasonTransWeeks });
+      saveAnnualSS(ann2); setAnnual(ann2); setMsg(`✦ Сезон 2 пика собран (GPP ${seasonGppWeeks}н · переход ${seasonTransWeeks}н)`); setTimeout(()=>setMsg(''),2400);
+    }catch(e){ const m = e instanceof Error ? e.message : String(e); try { console.warn('[SS season]', m); } catch {} setMsg(`⛔ Сезон не собран: ${m}`); setTimeout(()=>setMsg(''),3400); }
   };
 
   const handleBuildAnnualFromCycles = () => {
@@ -701,8 +717,11 @@ export const StrengthSportConstructor: React.FC = () => {
       const base: any = { mode, goal, level, workMax, equipment, injuries, mobilityRestrictions: mobility, sex, bodyweight, age, cycleConsent, methodology, dupMode, intensityTech, outsideLoad: outsideEnabled ? outside : null, acwr: acwr as any, weakPoints: weakPoints.length ? weakPoints : undefined, contest: mode==='strongman' ? contest : undefined, contestStrategy: mode==='strongman' ? contestStrategy : undefined, startDate: localIsoDate() };
       const ann3 = buildAnnualFromSSCycles(picked, base, { cycleMode, competitionDate: competitionDate || undefined, taperWeeks });
       saveAnnualSS(ann3); setAnnual(ann3);
-      try { syncStrengthAnnualToGeneral(ann3); } catch {}
-      setMsg(`✦ Год из циклов: ${picked.length} блока (${ann3.totalWeeks}нед)`); setTimeout(()=>setMsg(''),2200);
+      const sync = syncStrengthAnnualToGeneral(ann3);
+      setMsg(sync.ok
+        ? `✦ Год из циклов: ${picked.length} блока (${ann3.totalWeeks}нед)${sync.note ? ` · ${sync.note}` : ''}`
+        : `⚠ Год собран, но не синхронизирован с общим планом: ${sync.note || 'неизвестно'}`);
+      setTimeout(() => setMsg(''), sync.ok ? 2200 : 3800);
     }catch(e){ const m = e instanceof Error ? e.message : String(e); try { console.warn('[SS annual-from-cycles]', m); } catch {} setMsg(`⛔ ${m}`); setTimeout(()=>setMsg(''),4600); }
   };
 
@@ -750,11 +769,11 @@ export const StrengthSportConstructor: React.FC = () => {
         cycleMode, competitionDate: competitionDate || undefined, taperWeeks,
       });
       saveAnnualSS(ann); setAnnual(ann);
-      try { syncStrengthAnnualToGeneral(ann); } catch {}
+      const sync = syncStrengthAnnualToGeneral(ann);
       setSeasonPlan(season);
       try { saveSeasonPlan(season); } catch { /* квота/ssr — тихо */ }
-      setMsg(`✦ Сезон собран: ${ann.blocks.length} блоков · ${ann.totalWeeks} нед${v.warnings.length ? ` · ⚠ ${v.warnings.length}` : ''}`);
-      setTimeout(()=>setMsg(''),3200);
+      setMsg(`✦ Сезон собран: ${ann.blocks.length} блоков · ${ann.totalWeeks} нед${v.warnings.length ? ` · ⚠ ${v.warnings.length}` : ''}${sync.ok ? (sync.note ? ` · ${sync.note}` : '') : ` · ⚠ ${sync.note || 'не синхронизирован с общим планом'}`}`);
+      setTimeout(() => setMsg(''), (!sync.ok || v.warnings.length) ? 4200 : 3200);
     } catch (e) {
       const m = e instanceof Error ? e.message : String(e);
       try { console.warn('[SS season-pro]', m); } catch {}
@@ -970,7 +989,7 @@ export const StrengthSportConstructor: React.FC = () => {
               <StrengthPopupNumber label="Возраст" value={age} min={14} max={65} onChange={v=> setAge(v)} strong={mode==='strongman'} />
               <Field label="Дата пика"><input type="date" value={competitionDate} onChange={e=> setCompetitionDate(e.target.value)} style={INPUT} /></Field>
             </div>
-            {goal==='peaking' && competitionDate && (
+            {(goal==='peaking' || competitionDate) && (
               <StrengthPopupSelect label="Тапер" value={String(taperWeeks)} onChange={v=> setTaperWeeks(Number(v))} options={[{id:'1',label:'1 неделя',desc:'объём −45%'},{id:'2',label:'2 недели',desc:'−35% → −55%'}]} />
             )}
             {acwr && <InfoBanner tone={acwr.zone==='dangerous'?'warn': acwr.zone==='caution'?'warn':'info'}><Highlight color={acwr.zone==='dangerous'?'#ff3b30':acwr.zone==='caution'?'#ff9f0a':'#30d158'}>ACWR {acwr.ratio}</Highlight> · {ruLabel(ZONE_RU, acwr.zone)} {acwr.zone==='dangerous'?'— объём ×0.60, RIR+2': acwr.zone==='caution'?'— объём ×0.85, RIR+1':'— оптимум'}</InfoBanner>}
@@ -1444,6 +1463,10 @@ export const StrengthSportConstructor: React.FC = () => {
           rankedCycles={rankedCycles}
           msg={msg}
           setMsg={setMsg}
+          seasonGppWeeks={seasonGppWeeks}
+          setSeasonGppWeeks={setSeasonGppWeeks}
+          seasonTransWeeks={seasonTransWeeks}
+          setSeasonTransWeeks={setSeasonTransWeeks}
           onExportProgram={exportToUserProgram}
           onBuildSeason={handleBuildSeason}
           onBuildAnnualFromCycles={handleBuildAnnualFromCycles}

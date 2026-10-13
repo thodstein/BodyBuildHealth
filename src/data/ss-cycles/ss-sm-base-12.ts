@@ -47,7 +47,9 @@ function monday(w: number, bump: number): SSDaySpec {
     ex('ohp', 'Жим стоя со стоек x5', 'shoulders', 1.2, [s(0.78 + bump, 5, 3)]),
     ex('pullup', 'Подтягивания 5x10', 'back', 0.6, [s(0, 10, 5)], { bodyweight: true }),
     ex('face_pull', 'Протяжка к лицу', 'shoulders', 0.4, [s(0.30, 20, 5)], { base: 'overheadPress', baseMult: 1, role: 'accessory' }),
-    ex('ohp', 'Жим сидя с пола (Z-press)', 'shoulders', 0.7, [s(0.50, 8, 2)]),
+    // P1: был `ohp` — дубль id с жимом со стоек выше в той же сессии (вес/роли
+    // затирались, сессия теряла слот). Z-press — строгий жим сидя = `ohp_seated`.
+    ex('ohp_seated', 'Жим сидя с пола (Z-press)', 'shoulders', 0.7, [s(0.50, 8, 2)]),
     ex('lateral_raise', 'Подъёмы 3-направления', 'shoulders', 0.4, [s(0.15, 10, 3)], { base: 'overheadPress', baseMult: 1, role: 'accessory' }),
     ex('hammer_curl', 'Молотки', 'shoulders', 0.4, [s(0.20, 12, 3)], { base: 'bench', role: 'accessory' }),
     ex('tricep_pushdown', 'Трицепс на блоке', 'shoulders', 0.4, [s(0.15, 20, 3)], { base: 'bench', role: 'accessory' }));
