@@ -5,6 +5,7 @@
  */
 import type { ArmWeakPoint } from './arm-biomechanics.engine';
 import { ARM_BIOMECH } from './arm-biomechanics.engine';
+import { localIsoDate } from '../../core/local-date';
 
 export interface ArmDiarySession {
   date: string;
@@ -61,10 +62,16 @@ function dayNum(iso: string): number {
   return Number.isFinite(t) ? Math.floor(t / 86400000) : NaN;
 }
 
-export function armVolumeHistory28d(sessions: ArmDiarySession[]): Record<string, number[]> {
+export function armVolumeHistory28d(sessions: ArmDiarySession[], referenceIso?: string): Record<string, number[]> {
   const out: Record<string, number[]> = {};
   try {
-    const today = Math.floor(Date.now() / 86400000);
+    // Аудит 2026-10: индекс массива = номер недели (3..0 = самая старая..текущая).
+    // Было: пушились только НЕПУСТЫЕ бакеты → у разных мышц разная длина, индекс ≠ неделя,
+    // а weak-cause видел мышцу, заброшенную 3 недели, как «текущую» и выдавал «3 нед подряд
+    // <3 сетов» для трёх ПРОИЗВОЛЬНЫХ (в т.ч. несмежных) недель. Теперь плотный массив 4.
+    // Плюс дефолт «сегодня» — локальная дата (UTC-день съезжал в вечерние часы UTC+X).
+    const today = referenceIso ? dayNum(referenceIso.slice(0, 10)) : dayNum(localIsoDate());
+    if (!Number.isFinite(today)) return out;
     for (let w = 3; w >= 0; w--) {
       const from = today - (w + 1) * 7;
       const to = today - w * 7;
@@ -79,9 +86,10 @@ export function armVolumeHistory28d(sessions: ArmDiarySession[]): Record<string,
           bucket[m] = (bucket[m] || 0) + cnt;
         }
       }
+      const idx = 3 - w;
       for (const [m, v] of Object.entries(bucket)) {
-        if (!out[m]) out[m] = [];
-        out[m].push(v);
+        if (!out[m]) out[m] = [0, 0, 0, 0];
+        out[m][idx] += v;
       }
     }
   } catch { /* noop */ }
@@ -89,7 +97,8 @@ export function armVolumeHistory28d(sessions: ArmDiarySession[]): Record<string,
 }
 
 export function detectArmWeakByE1rm(sessions: ArmDiarySession[], referenceIso?: string): ArmMuscleTrend[] {
-  const refDay = referenceIso ? dayNum(referenceIso.slice(0, 10)) : Math.floor(Date.now() / 86400000);
+  // Аудит 2026-10 было→стало: дефолт was UTC-день — в UTC+X вечером окна recent/old съезжали
+  const refDay = referenceIso ? dayNum(referenceIso.slice(0, 10)) : dayNum(localIsoDate());
   if (!Number.isFinite(refDay)) return [];
   const recent: Record<string, number[]> = {};
   const old: Record<string, number[]> = {};

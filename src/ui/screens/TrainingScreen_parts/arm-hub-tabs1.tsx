@@ -4,7 +4,8 @@
  * Строки, плейсхолдеры, inputMode и aria 1-в-1.
  */
 import React from 'react';
-import { getRtWorldClass } from '../../../engines/arm/arm-force-capture.engine';
+import { getRtWorldClass, getSideRef, getBackRef } from '../../../engines/arm/arm-force-capture.engine';
+import { armliftNormsFor, normPct } from '../../../engines/arm/arm-norms-table.engine';
 import { wafSeniorClassFor } from '../../../engines/arm/arm-norms-table.engine';
 import { benchAdviceForLevel } from '../../../engines/arm/arm-benchmarks.engine';
 import { ARM_BIOMECH, angleJointForWeakPoint, isValidAngleForArmWeakPoint, vbtThresholdForWeakPoint } from '../../../engines/arm/arm-biomechanics.engine';
@@ -57,33 +58,48 @@ export function HubGripTab({ H }: { H: any }) {
             <div className="ad-hero-name">Support {forceVecPro.gripSupport} · Pinch {forceVecPro.gripPinch}<span>Side {forceVecPro.sidePressure} · Back {forceVecPro.backPressure}</span></div>
             {forceVecPro.asymmetryPct!=null && <span className="ad-tag" data-sev={forceVecPro.asymmetryPct>=12?'bad':forceVecPro.asymmetryPct>=7?'warn':'ok'}>Асим {forceVecPro.asymmetryPct}%</span>}
           </div>
-          <div className="ad-muted">WR M {getRtWorldClass('male')}кг / Ж {getRtWorldClass('female')}кг · Axle {state.axleImpl === 'apollon' ? '237.5/137.9' : 133} · Side ref {(bwNum*0.6).toFixed(0)}кг</div>
+          <div className="ad-muted">WR M {getRtWorldClass('male')}кг / Ж {getRtWorldClass('female')}кг · Axle {state.axleImpl === 'apollon' ? '237.5/137.9' : 133} · Side ориентир {getSideRef(bwNum, weightClassAuto).toFixed(0)}кг</div>
           {(() => {
             const ci = wafSeniorClassFor(bwNum, state.sex);
             return <div className="ad-muted" data-arm="waf-class">Класс WAF: {ci.label} (ты {bwNum}кг){ci.toNext != null ? ` · до −${ci.cls}: −${ci.toNext}кг` : ' · открытая — без сгонки'}</div>;
           })()}
           <div className="ad-muted" data-arm="waf-class-senior-note">Класс выше посчитан по сетке Senior. Masters, Junior и Youth имеют другие границы, а возраст в хабе не спрашивается — точный класс по возрасту и Para считает конструктор (чип «Para-класс WAF»).</div>
           {(()=>{
+            // Аудит 2026-10 раунд-3 было→стало: нормы считались инлайном (включая хардкод
+            // `state.sex === 'female' ? 137.9 : 237.5` для Apollon — вторая копия PLATFORM_WR,
+            // которая разъехалась бы при смене рекорда). Теперь единый источник —
+            // `armliftNormsFor` + `normPct` (движок `arm-norms-table`).
+            const norms = armliftNormsFor(state.sex);
+            const normRow = (impl: string) => norms.find((x) => x.implement === impl);
             const rows: Array<{ n: string; v: string }> = [];
             const rt = parseFloat(state.rtKg);
-            if (Number.isFinite(rt) && rt > 0) {
-              const wr = state.sex === 'female' ? getRtWorldClass('female') : getRtWorldClass('male');
-              rows.push({ n: 'RT vs WR', v: `${rt}кг = ${Math.round((rt / wr) * 100)}% WR (${wr}кг)` });
+            const rtRow = normRow('rolling_thunder');
+            if (Number.isFinite(rt) && rt > 0 && rtRow) {
+              const pct = normPct(rt, rtRow.wrKg);
+              rows.push({ n: `RT vs WR (${rtRow.source})`, v: `${rt}кг = ${pct}% WR (${rtRow.wrKg}кг)` });
             }
             const ax = parseFloat(state.axleKg);
             if (Number.isFinite(ax) && ax > 0) {
               const ap = state.axleImpl === 'apollon';
-              const wr = ap ? (state.sex === 'female' ? 137.9 : 237.5) : 133;
-              rows.push({ n: ap ? 'Axle vs Apollon WR' : 'Axle vs Saxon-ориентир', v: `${ax}кг = ${Math.round((ax / wr) * 100)}% (${wr}кг)` });
+              const axRow = normRow(ap ? 'apollon_axle' : 'saxon_bar');
+              if (axRow) {
+                const pct = normPct(ax, axRow.wrKg);
+                const mark = axRow.internal ? ' (внутренний ориентир, не WR)' : '';
+                rows.push({ n: ap ? 'Axle vs Apollon WR' : 'Axle vs Saxon-ориентир', v: `${ax}кг = ${pct}% (${axRow.wrKg}кг)${mark}` });
+              }
             }
             const ex = parseFloat(state.excalKg);
-            if (Number.isFinite(ex) && ex > 0) rows.push({ n: 'Excalibur 50мм', v: `${ex}кг · норматив SAR по своей весовой (ред. 01.07.2025)` });
+            const exRow = normRow('excalibur');
+            if (Number.isFinite(ex) && ex > 0) rows.push({ n: 'Excalibur 50мм', v: `${ex}кг · ${exRow?.source || 'норматив SAR по весовой'}` });
             const pin = parseFloat(state.pinchSec);
-            if (Number.isFinite(pin) && pin > 0) rows.push({ n: 'Pinch vs норма', v: `${pin}с ${pin >= 10 ? '✓ ≥10с' : '⚠ <10с — чинить'}` });
+            const pinRow = normRow('pinch_block');
+            if (Number.isFinite(pin) && pin > 0) rows.push({ n: `Pinch vs норма (${pinRow?.source || 'внутренний ориентир'})`, v: `${pin}с ${pin >= 10 ? '✓ ≥10с' : '⚠ <10с — чинить'}` });
             const sd = parseFloat(state.sideKg);
-            if (Number.isFinite(sd) && sd > 0) rows.push({ n: 'Side vs WAF-норма', v: `${sd}кг vs ${Math.round(bwNum * 0.6)}кг (${Math.round((sd / Math.max(1, bwNum * 0.6)) * 100)}%)` });
+            const sideRefV = getSideRef(bwNum, weightClassAuto);
+            if (Number.isFinite(sd) && sd > 0) rows.push({ n: 'Side vs ориентир', v: `${sd}кг vs ${sideRefV.toFixed(0)}кг (${Math.round((sd / Math.max(1, sideRefV)) * 100)}%)` });
             const bk = parseFloat(state.backKg);
-            if (Number.isFinite(bk) && bk > 0) rows.push({ n: 'Back vs WAF-норма', v: `${bk}кг vs ${Math.round(bwNum * 0.8)}кг (${Math.round((bk / Math.max(1, bwNum * 0.8)) * 100)}%)` });
+            const backRefV = getBackRef(bwNum);
+            if (Number.isFinite(bk) && bk > 0) rows.push({ n: 'Back vs ориентир', v: `${bk}кг vs ${backRefV.toFixed(0)}кг (${Math.round((bk / Math.max(1, backRefV)) * 100)}%)` });
             if (!rows.length) return null;
             return (
               <div data-arm="norms-table">
@@ -94,7 +110,7 @@ export function HubGripTab({ H }: { H: any }) {
             );
           })()}
           {platformP0 && (
-            <div className="ad-muted">🏟 Помост RT: {platformP0.bestKg}кг = <b>{platformP0.wrPct}% WR</b> ({platformP0.worldRecordKg}кг) · попытки {platformP0.plan.join('/')} · {platformP0.note}</div>
+            <div className="ad-muted">🏟 Помост RT: {platformP0.bestKg}кг = <b>{platformP0.wrPct}% WR</b> ({platformP0.worldRecordKg}кг) · попытки {platformP0.plan.join('/')}{platformP0.fromLog ? ` · журнал: ${platformP0.attemptsUsed}` : ' · нет журнала — по текущему RT'} · {platformP0.note}</div>
           )}
           <div className="ad-muted">Весогонка WAF: М −0.5%/нед · Ж −0.4%/нед · L/R — отдельные зачёты</div>
           <div className="ad-row">
@@ -125,7 +141,7 @@ export function HubGripTab({ H }: { H: any }) {
         </AdSec>
         <AdSec title="📟 Приборы — VBT" collapsible defaultOpen={false} summary="скорость · пороги">
         <AdSec title="VBT">
-          <div className="ad-muted">{vbt.advice} {vbt.e1RM? `· e1RM ${vbt.e1RM}кг` : ''} · zone <b>{vbt.zone}</b></div>
+          <div className="ad-muted">{vbt.advice} {vbt.e1RM? `· e1RM ${vbt.e1RM}кг` : ''} · zone <b>{vbt.zone}</b>{vbt.velocityLossPct != null && !state.vbtVel && (H.trackCycles || []).length >= 2 ? ' · источник: видео-трек (best→last)' : ''}</div>
           <div className="ad-muted">Пороги loss по точке — внутренние эвристики хаба (LVP-профилей для рук не опубликовано)</div>
           {vbtThP0 && <div className="ad-muted">Пороги точки {state.weakPoints[0]}: warn {vbtThP0.warnPct}% / stop {vbtThP0.stopPct}%</div>}
           {vbtThP0 && vbt.velocityLossPct != null && (
@@ -150,7 +166,7 @@ export function HubGripTab({ H }: { H: any }) {
               <input inputMode="decimal" value={state.vbtVel2 || ''} onChange={e=>setState((s: any)=>({...s, vbtVel2:e.target.value}))} placeholder="м/с" aria-label="VBT скорость второго подхода м/с" />
             </AdField>
           </div>
-          {state.vbtVel && !(state as any).vbtVel2 && <div className="ad-muted">Замер один: best≈ввод+0.2 (оценка) — введи скорость 2-го подхода для честного loss</div>}
+          {state.vbtVel && !(state as any).vbtVel2 && <div className="ad-muted">Замер один: loss считается между 1-м и 2-м подходом — введи скорость 2-го подхода (без второго замера loss не оценивается)</div>}
         </AdSec>
         </AdSec>
       </AdGrid>

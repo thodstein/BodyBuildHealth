@@ -14,6 +14,8 @@ export interface FoulRiskInput {
   slipLosing?: number | null; // срывов в проигрыше
   foulHistory?: number | null; // фолов всего
   bouts?: number | null; // схваток всего
+  /** Аудит 2026-10: фальстарты из P2 (stFalse) — иначе строка риска была вечным «нет данных». */
+  falseStart?: number | null;
 }
 
 export interface FoulRisk {
@@ -61,14 +63,18 @@ export function assessFoulRisk(input: FoulRiskInput = {}): FoulRiskResult {
   const losing = num(input.slipLosing) ?? 0;
   const fouls = num(input.foulHistory) ?? 0;
   const bouts = num(input.bouts);
+  const falseStart = num(input.falseStart);
   const vals: Record<string, number | null> = {
     elbow_lift: elbow, shoulder_line: shoulder, peg_loss: peg,
   };
   // slip-уровень: losing-слипы опаснее clean (фол+поражение при >2/3).
+  // Аудит 2026-10 было→стало: 1 и 10 чистых срывов давали один «low» — хронический срыв
+  // не эскалировался. Теперь и чистые масштабируются (≥2 = mid), losing приоритетнее.
+  const slipTotal = clean + losing;
   let slipLvl: number | null = null;
-  if (clean + losing > 0) slipLvl = losing > 0 ? (losing >= 2 ? 3 : 2) : 1;
+  if (slipTotal > 0) slipLvl = losing > 0 ? (losing >= 2 ? 3 : 2) : clean >= 2 ? 2 : 1;
   vals['slip'] = slipLvl;
-  vals['false_start'] = null; // идёт из P2, здесь не дублируем оценкой
+  vals['false_start'] = falseStart != null && falseStart > 0 ? Math.min(3, falseStart) : null;
   const risks: FoulRisk[] = META.map((m) => {
     const v = vals[m.id];
     if (v == null) {

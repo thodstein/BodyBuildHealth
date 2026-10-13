@@ -18,9 +18,9 @@ describe('arm P2 E13: platform', () => {
     expect(r.wrPct).toBe(52.1);
     expect(r.worldRecordKg).toBe(130.5);
   });
-  it('female WR 77.2', () => {
-    expect(platformWrFor('rolling_thunder', 'female')).toBe(77.2);
-    const r = scorePlatform({ implement: 'rolling_thunder', sex: 'female', attempts: [{ attempt: 1, weightKg: 77.2, success: true }] });
+  it('female WR 80.0', () => { // аудит 2026-10 было→стало: 77.2 → 80.0 (Mason 2024)
+    expect(platformWrFor('rolling_thunder', 'female')).toBe(80.0);
+    const r = scorePlatform({ implement: 'rolling_thunder', sex: 'female', attempts: [{ attempt: 1, weightKg: 80.0, success: true }] });
     expect(r.wrPct).toBe(100);
   });
   it('planAttempts 90/96/102', () => {

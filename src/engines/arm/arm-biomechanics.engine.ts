@@ -313,6 +313,30 @@ export function vbtThresholdForWeakPoint(wp: ArmWeakPoint): { warnPct: number; s
 
 export interface JointAnglesInput { elbow?: number; wrist?: number; forearm?: number; shoulder?: number; }
 
+/**
+ * Канон: каким замером валидировать точку. Аудит 2026-10 было→стало: обе копии
+ * (`autoValidateArmAngles` и дубль в `arm-diagnostics-hub.engine`) резолвили сустав
+ * подстрокой по `keyJoint`, и `rising_top` («разгибатели пальцев/risers (radial
+ * deviation)») не матчил ни одну ветку — точка проверялась по ЛОКТЮ (или пропускалась).
+ * Теперь единственный резолвер — `angleJointForWeakPoint`; строки только фолбэк.
+ */
+export function armAngleValueForWeakPoint(wp: ArmWeakPoint, angles: JointAnglesInput): number | null {
+  const bio = ARM_BIOMECH[wp];
+  if (!bio) return null;
+  const joint = angleJointForWeakPoint(wp);
+  if (joint === 'none') return null;
+  if (joint === 'wrist') return Number.isFinite(Number(angles?.wrist)) ? Number(angles!.wrist) : null;
+  if (joint === 'elbow') return Number.isFinite(Number(angles?.elbow)) ? Number(angles!.elbow) : null;
+  if (joint === 'forearm') return Number.isFinite(Number(angles?.forearm)) ? Number(angles!.forearm) : null;
+  // фолбэк для записей без angleJoint: строковая эвристика (канон ARM_BIOMECH покрыт выше)
+  const key = bio.keyJoint.toLowerCase();
+  if (key.includes('лучезапяст') || key.includes('кист') || key.includes('wrist') || key.includes('flexion')) return Number.isFinite(Number(angles?.wrist)) ? Number(angles!.wrist) : null;
+  if (key.includes('локт') || key.includes('локоть') || key.includes('elbow') || key.includes('flex')) return Number.isFinite(Number(angles?.elbow)) ? Number(angles!.elbow) : null;
+  if (key.includes('предплечье') || key.includes('прона') || key.includes('супи') || key.includes('forearm') || key.includes('pron') || key.includes('sup')) return Number.isFinite(Number(angles?.forearm)) ? Number(angles!.forearm) : null;
+  if (key.includes('плеч') || key.includes('shoulder') || key.includes('adduction') || key.includes('internal')) return Number.isFinite(Number(angles?.shoulder)) ? Number(angles!.shoulder) : null;
+  return null;
+}
+
 export function autoValidateArmAngles(angles: JointAnglesInput, weakPoints?: ArmWeakPoint[]): Array<{ weakPoint: ArmWeakPoint; angle: number; valid: boolean; recommendation: string }> {
   const out: Array<{ weakPoint: ArmWeakPoint; angle: number; valid: boolean; recommendation: string }> = [];
   const wps = weakPoints && weakPoints.length ? weakPoints : (Object.keys(ARM_BIOMECH) as ArmWeakPoint[]);
@@ -320,13 +344,7 @@ export function autoValidateArmAngles(angles: JointAnglesInput, weakPoints?: Arm
     const bio = ARM_BIOMECH[wp];
     if (!bio) continue;
     if (angleJointForWeakPoint(wp) === 'none') continue;
-    const key = bio.keyJoint.toLowerCase();
-    let angleVal: number | undefined;
-    if (key.includes('лучезапяст') || key.includes('кист') || key.includes('wrist') || key.includes('flexion')) angleVal = angles.wrist;
-    else if (key.includes('локт') || key.includes('локоть') || key.includes('elbow') || key.includes('flex')) angleVal = angles.elbow;
-    else if (key.includes('предплечье') || key.includes('прона') || key.includes('супи') || key.includes('forearm') || key.includes('pron') || key.includes('sup')) angleVal = angles.forearm;
-    else if (key.includes('плеч') || key.includes('shoulder') || key.includes('adduction') || key.includes('internal')) angleVal = angles.shoulder;
-    else angleVal = angles.elbow ?? angles.wrist ?? angles.forearm;
+    const angleVal = armAngleValueForWeakPoint(wp, angles);
     if (angleVal == null || !Number.isFinite(angleVal)) continue;
     const valid = isValidAngleForArmWeakPoint(wp, angleVal);
     out.push({ weakPoint: wp, angle: angleVal, valid, recommendation: valid ? `${bio.label}: угол ${angleVal}° в диапазоне ${bio.angleRangeDeg[0]}-${bio.angleRangeDeg[1]}° ✅` : `${bio.label}: ${angleVal}° вне ${bio.angleRangeDeg[0]}-${bio.angleRangeDeg[1]}° → ${bio.loadCues}` });

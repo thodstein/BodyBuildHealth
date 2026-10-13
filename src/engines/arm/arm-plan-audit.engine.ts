@@ -2,11 +2,23 @@
  * arm-plan-audit.engine.ts — аудит арм-плана по 12 мёртвым точкам (E1 P0).
  * Parity: bb `auditPlanExercises` + TA E1 `auditTAPlan`, упрощённо под арм.
  * Чистые функции: какие точки покрыты планом, table/gym и static/dynamic сплиты, дубли.
+ *
+ * Аудит 2026-10 (3 фикса):
+ *  1. Покрытие матчилось ТОЛЬКО по базе ARM_CORRECTIONS, хотя ранжир/инъекция вставляют
+ *     упражнения из расширенного пула (POOL_TOPUP) — точка после ротации/⭐ числилась
+ *     непокрытой, coveragePct был занижен, worstArmPoint выбирал фактически покрытую точку.
+ *     Теперь единый пул `poolWithTopup`.
+ *  2. `byPoint.sets` суммировался по ВСЕМ неделям плана, а пороги weak-cause («0–2 сета —
+ *     не покрыта») рассчитаны на НЕДЕЛЮ → на 12-недельном плане причина «объём» не
+ *     выявлялась никогда. Добавлены setsLastWeek/setsPerWeek.
+ *  3. Дубли считались по ВСЕМУ плану, хотя комментарий обещал «неделю-1» — штатная ротация
+ *     (wrist_curl_db в трех разных днях) помечалась дублем, а реальное 12-недельное
+ *     повторение одного id в одной сессии — нет. Теперь скоуп недели 1.
  */
 import type { ArmPlan } from './arm-types';
 import type { ArmWeakPoint } from './arm-biomechanics.engine';
 import { ARM_WEAK_POINTS } from './arm-biomechanics.engine';
-import { ARM_CORRECTIONS } from './arm-weakpoint-corrections';
+import { poolWithTopup } from './arm-correction-pro2.engine';
 
 export interface ArmPlanAudit {
   covered: ArmWeakPoint[];
@@ -17,7 +29,7 @@ export interface ArmPlanAudit {
   tableRatio: number;
   staticSets: number;
   dynamicSets: number;
-  byPoint: Record<string, { sets: number; sessions: string[] }>;
+  byPoint: Record<string, { sets: number; setsLastWeek: number | null; setsPerWeek: number | null; sessions: string[] }>;
   duplicates: string[];
 }
 
@@ -40,22 +52,40 @@ function planExerciseIds(plan: ArmPlan): Array<{ id: string; sessionTag: string;
 export function auditArmPlan(plan: ArmPlan | null | undefined): ArmPlanAudit | null {
   if (!plan || !Array.isArray((plan as any)?.weeks) || (plan as any).weeks.length === 0) return null;
   const items = planExerciseIds(plan);
-  const byPoint: Record<string, { sets: number; sessions: string[] }> = {};
+  const byPoint: Record<string, { sets: number; setsLastWeek: number | null; setsPerWeek: number | null; sessions: string[] }> = {};
   const covered: ArmWeakPoint[] = [];
   for (const wp of ARM_WEAK_POINTS) {
-    const corr = ARM_CORRECTIONS[wp];
+    // Аудит 2026-10 (1): единый пул с топапом — иначе вставленная/ранжированная коррекция
+    // из POOL_TOPUP не засчитывалась как покрытие.
+    const pool = poolWithTopup(wp).map((s) => s.toLowerCase());
     let sets = 0;
+    let setsLastWeek = 0;
+    let hasLastWeek = false;
     const sessions = new Set<string>();
-    for (const cand of corr?.exercises || []) {
-      const low = cand.toLowerCase();
-      for (const it of items) {
-        if (it.id === low) {
-          sets += it.sets;
-          if (it.sessionTag) sessions.add(it.sessionTag);
-        }
-      }
+    for (const it of items) {
+      if (!pool.includes(it.id)) continue;
+      sets += it.sets;
+      if (it.sessionTag) sessions.add(it.sessionTag);
     }
-    byPoint[wp] = { sets, sessions: Array.from(sessions) };
+    // Аудит 2026-10 (2): недельный норм — последняя РАБОЧАЯ неделя плана (не делод)
+    for (let i = (plan as any).weeks.length - 1; i >= 0; i--) {
+      const wk: any = (plan as any).weeks[i];
+      if (!wk || wk.deload || wk.taper) continue;
+      let t = 0;
+      for (const s of wk?.sessions || []) for (const ex of (s as any)?.exercises || []) {
+        const id = String((ex as any)?.exerciseId || '').toLowerCase();
+        if (pool.includes(id)) t += (Number((ex as any)?.sets) || 0);
+      }
+      setsLastWeek = t;
+      hasLastWeek = true;
+      break;
+    }
+    byPoint[wp] = {
+      sets,
+      setsLastWeek: hasLastWeek ? setsLastWeek : null,
+      setsPerWeek: hasLastWeek ? Math.round((sets / (plan as any).weeks.length) * 100) / 100 : null,
+      sessions: Array.from(sessions),
+    };
     if (sets > 0) covered.push(wp);
   }
   const missing = ARM_WEAK_POINTS.filter((w) => !covered.includes(w));
@@ -71,11 +101,17 @@ export function auditArmPlan(plan: ArmPlan | null | undefined): ArmPlanAudit | n
     else dynamicSets += it.sets;
   }
   const total = tableSets + gymSets;
-  // дубли: один id в 2+ сессиях недели-1 (норма для ротации — помечаем только 3+)
+  // Аудит 2026-10 (3): дубли считаются по ПЕРВОЙ неделе (как и обещал комментарий) —
+  // по всему плану их давала бы штатная ротация упражнения между днями микро-цикла.
   const byIdSessions = new Map<string, Set<string>>();
-  for (const it of items) {
-    if (!byIdSessions.has(it.id)) byIdSessions.set(it.id, new Set());
-    if (it.sessionTag) byIdSessions.get(it.id)!.add(it.sessionTag);
+  const w0: any = (plan as any).weeks[0];
+  for (const s of w0?.sessions || []) {
+    for (const ex of (s as any)?.exercises || []) {
+      const id = String((ex as any)?.exerciseId || '').toLowerCase();
+      if (!id) continue;
+      if (!byIdSessions.has(id)) byIdSessions.set(id, new Set());
+      if (s?.sessionTag) byIdSessions.get(id)!.add(String(s.sessionTag));
+    }
   }
   const duplicates: string[] = [];
   for (const [id, set] of byIdSessions) if (set.size >= 3) duplicates.push(id);

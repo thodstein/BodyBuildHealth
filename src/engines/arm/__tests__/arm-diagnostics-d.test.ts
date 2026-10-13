@@ -2,9 +2,13 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { computeArmPerMuscleACWR, worstArmAcwrZone, armAcwrSummary, armAcwrZoneFor } from '../arm-acwr.engine';
 import { loadPlatformLog, savePlatformLogEntry } from '../arm-platform.engine';
 import { diagnoseArmWeakCause } from '../arm-weak-cause.engine';
+import { localIsoDateOffset } from '../../../core/local-date';
 
+// Аудит 2026-10 было→стало: даты сессий брались как `new Date(now - N*86400000).toISOString()`
+// (UTC), а дефолт-референс окна 28д был UTC-днём. Референс переведён на локальный канон
+// (localIsoDate), поэтому и тестовые даты должны быть локальными — иначе окно съезжает.
 function dSess(daysAgo: number, muscle: string, nSets: number) {
-  const d = new Date(Date.now() - daysAgo * 86400000).toISOString().slice(0, 10);
+  const d = localIsoDateOffset(-daysAgo);
   return { date: d, exercises: [{ muscle, sets: Array.from({ length: nSets }, () => ({ weightKg: 30, reps: 8 })) }] } as any;
 }
 

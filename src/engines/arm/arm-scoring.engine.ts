@@ -11,8 +11,9 @@ export type ScoreLevel = 'ok' | 'warn' | 'critical';
 export interface ArmScoringInput {
   weakCount: number; // 0-3 (мёртвые точки)
   asymmetryPct?: number | null;
-  sideSetsWeek1?: number;
-  tendonSets?: number;
+  /** Аудит 2026-10: null — план не подключён, side-объём не измерен (было 0 → «в допуске»). */
+  sideSetsWeek1?: number | null;
+  tendonSets?: number | null;
   tendonLimit?: number; // 12/16/18/22 по уровню
   gripLevel?: string; // bench level
   hasVideo?: boolean;
@@ -71,9 +72,12 @@ export function scoreArm(input: ArmScoringInput): ArmScoringResult {
     } else if (input.sideSetsWeek1 > 6) {
       penalties.push(PENALTY.humerusWarn);
       findings.push({ level: 'warn', text: `Side ${input.sideSetsWeek1} >6 ранние нед` });
-    } else if (input.sideSetsWeek1 >= 0) {
+    } else {
       findings.push({ level: 'ok', text: `Side ${input.sideSetsWeek1} — в допуске` });
     }
+  } else {
+    // Аудит 2026-10: 0 сетов выдавался за «в допуске», хотя план просто не подключён
+    findings.push({ level: 'ok', text: 'Side: план не подключён — humerus-объём не оценен' });
   }
 
   if (input.tendonSets != null) {
@@ -88,12 +92,14 @@ export function scoreArm(input: ArmScoringInput): ArmScoringResult {
     } else {
       findings.push({ level: 'ok', text: `Tendon ${input.tendonSets} — в допуске` });
     }
+    // Аудит 2026-10: ветка beginner была мертва — общая (>lim) перехватывала все >12 раньше.
+    // Теперь newcomer-проверка идёт ПЕРВОЙ по существу: лимит лимитом, но отдельная строка.
     if (input.level === 'beginner' && input.tendonSets > 12) {
-      if (!findings.some(f => f.text.includes('Tendon') && f.level !== 'ok')) {
-        penalties.push(PENALTY.tendonWarn);
-        findings.push({ level: 'warn', text: `Tendon ${input.tendonSets} >12 для beginner` });
-      }
+      findings.push({ level: 'warn', text: `Tendon ${input.tendonSets} >12 для beginner (лимит новичка 12)` });
+      if (!penalties.length) penalties.push(PENALTY.tendonWarn);
     }
+  } else {
+    findings.push({ level: 'ok', text: 'Tendon: план не подключён — недельная нагрузка не оценена' });
   }
 
   if (input.gripLevel) {

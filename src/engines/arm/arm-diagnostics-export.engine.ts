@@ -55,8 +55,12 @@ function esc(s: unknown): string {
     .replace(/"/g, '&quot;');
 }
 
+// Аудит 2026-10 было→стало: CSV не защищал от формульной инъекции Excel — строка
+// пользователя (`causeFix`/`simDelta`/`failDetail`), начинающаяся с = + - @, выполнялась
+// как формула. Паритет с bb-diagnostics-export / arm-export / armlifting-diagnostics.
 function csvCell(s: unknown): string {
-  const v = String(s ?? '');
+  let v = String(s ?? '');
+  if (/^[=+\-@\t\r]/.test(v)) v = "'" + v;
   return /[",\n;]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v;
 }
 

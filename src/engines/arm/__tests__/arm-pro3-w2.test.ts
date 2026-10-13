@@ -90,7 +90,7 @@ describe('PRO-3 W2 P3: WAF-классы и нормы', () => {
     const m = armliftNormsFor('male');
     const f = armliftNormsFor('female');
     expect(m.find((n) => n.implement === 'rolling_thunder')?.wrKg).toBe(130.5);
-    expect(f.find((n) => n.implement === 'rolling_thunder')?.wrKg).toBe(77.2);
+    expect(f.find((n) => n.implement === 'rolling_thunder')?.wrKg).toBe(80.0); // аудит 2026-10 было→стало: 77.2 → 80.0
     const ex = m.find((n) => n.implement === 'excalibur');
     expect(ex?.wrKg).toBeNull();
     expect(ex?.source).toContain('SAR');

@@ -35,7 +35,7 @@ export interface PlatformResult {
  * Grandfather Clock 90/50 и Anvil 30/16 (только лидерборды; лучший известный Country Crush 2"
  * ~198 кг Dingey 2021 GripSport — выше нашего числа, т.е. это точно не WR). */
 export const PLATFORM_WR: Record<string, { maleKg: number; femaleKg: number; name: string }> = {
-  rolling_thunder: { maleKg: 130.5, femaleKg: 77.2, name: 'Rolling Thunder' },
+  rolling_thunder: { maleKg: 130.5, femaleKg: 80.0, name: 'Rolling Thunder' },
   apollon_axle: { maleKg: 237.5, femaleKg: 137.9, name: 'Apollon Axle' },
   saxon_bar: { maleKg: 133, femaleKg: 70, name: 'Saxon Bar (ориентир)' },
   hub: { maleKg: 44.8, femaleKg: 28.51, name: 'IronMind Hub' },

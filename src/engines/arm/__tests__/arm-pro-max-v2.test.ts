@@ -127,9 +127,9 @@ describe('arm PRO MAX v2 — force history 12 нед', () => {
 
 // ── Force vector PRO (WR 130.5/77.2, WAF, asymmetry) ──
 describe('arm PRO MAX v2 — force vector', () => {
-  it('WR M 130.5 vs F 77.2', () => {
+  it('WR M 130.5 vs F 80.0', () => { // аудит 2026-10 было→стало: 77.2 → 80.0 (Mason 2024)
     expect(getRtWorldClass('male')).toBe(130.5);
-    expect(getRtWorldClass('female')).toBe(77.2);
+    expect(getRtWorldClass('female')).toBe(80.0);
   });
   it('sideRef WAF scaling', () => {
     const r55 = getSideRef(55, '55');

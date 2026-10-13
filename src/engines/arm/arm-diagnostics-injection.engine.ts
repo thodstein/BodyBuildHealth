@@ -23,7 +23,15 @@ export interface ArmInjectionOpts {
   /** Индексы недель для инъекции (default [0] — обратно совместимо). Хаб P0 передаёт все не-делод недели. */
   weekIdxs?: number[];
   /** Целевые сеты точки из спец-блока (weakPoint → sets). */
+  /** weakPoint → целевые сеты (один на все недели). */
   targetSets?: Record<string, number>;
+  /**
+   * Аудит 2026-10 было→стало: спец-блок показывает ВОЛНУ (нед.3–4 +1 сет, стресс −1), но в
+   * план ехал только `targetSets` недели-1 — во все недели вставлялись одинаковые сеты
+   * («показано ≠ вставится»). Теперь можно задать сеты ПО НОМЕРУ НЕДЕЛИ ПЛАНА
+   * (ключ — `week.week`, 1-based). Приоритет: targetSetsByWeek > targetSets > волна > доза.
+   */
+  targetSetsByWeek?: Record<number, Record<string, number>>;
   /**
    * П.1: ранжированный порядок кандидатов (weakPoint → exerciseIds по приоритету
    * ранжира). Без записи — базовый порядок ARM_CORRECTIONS (байт-в-байт).
@@ -56,6 +64,31 @@ export interface ArmInjectionOpts {
 
 export const ARM_PLAN_PREV_KEY = 'he_arm_plan_saved_prev';
 
+/**
+ * Аудит 2026-10 раунд-2: спец-наборы хаба адресованы номерам недель СПЕЦ-БЛОКА (1..n),
+ * а инъекция принимает номера недель ПЛАНА (week.week). Без этого моста wave не доезжала:
+ * все недели получали сеты недели-1. Матчинг: k-я рабочая (не делод) неделя плана ← неделя k блока.
+ */
+export function specTargetSetsByPlanWeek(
+  specSets: Record<string, Record<number, number>> | undefined,
+  plan: ArmPlan,
+  points: ArmWeakPoint[],
+): Record<number, Record<string, number>> {
+  const out: Record<number, Record<string, number>> = {};
+  if (!specSets || !plan?.weeks?.length || !points?.length) return out;
+  const working = plan.weeks.filter((w) => !(w as any).deload);
+  working.forEach((wk, k) => {
+    const specW = k + 1;
+    const per: Record<string, number> = {};
+    for (const wp of points) {
+      const v = specSets[wp]?.[specW];
+      if (v != null && Number.isFinite(Number(v))) per[wp] = Math.max(1, Math.min(6, Math.round(Number(v))));
+    }
+    if (Object.keys(per).length) out[Number(wk.week)] = per;
+  });
+  return out;
+}
+
 export function saveArmPlanPrev(rawJson: string): void {
   try { localStorage.setItem(ARM_PLAN_PREV_KEY, rawJson); } catch { /* noop */ }
 }
@@ -83,7 +116,9 @@ function computeBudgetArm(plan: ArmPlan, level: string): number {
   return map[lvl] ?? 85;
 }
 
-function findSessionForWeakPoint(week: any, wp: ArmWeakPoint, dayMap?: Record<string,string>): any {
+/** П.3/аудит 2026-10: экспортировано — симулятор обязан выбирать ту же сессию, что инъекция
+ *  (иначе dup-гейт считает «дубль уже в неделе» там, где инъекция вставит в другой день). */
+export function findSessionForWeakPoint(week: any, wp: ArmWeakPoint, dayMap?: Record<string,string>): any {
   const customTag = dayMap?.[wp];
   if (customTag) {
     const s = week.sessions.find((x: any) => x.sessionTag === customTag);
@@ -176,9 +211,13 @@ export function injectArmCorrections(plan: ArmPlan, weakPoints: ArmWeakPoint[], 
       };
       // PRO-2 волна: targetSets приоритетнее, затем волна, затем доза
       const waveSets = opts.waveWeek != null ? waveSetsFor(dose.sets, opts.waveWeek) : dose.sets;
-      const wantSets = opts.targetSets?.[wp] != null && Number.isFinite(Number(opts.targetSets[wp]))
-        ? Math.max(1, Math.min(6, Math.round(Number(opts.targetSets[wp]))))
-        : waveSets;
+      const weekNo = Number((week as any).week);
+      const perWeek = opts.targetSetsByWeek?.[weekNo];
+      const pick = (src: Record<string, number> | undefined): number | null => {
+        const v = src?.[wp];
+        return v != null && Number.isFinite(Number(v)) ? Math.max(1, Math.min(6, Math.round(Number(v)))) : null;
+      };
+      const wantSets = pick(perWeek) ?? pick(opts.targetSets) ?? waveSets;
       // находим первый не-дубликат из списка коррекций (ранжир первым, затем база)
       let exId: string | null = null;
       let catalogEx: any = null;

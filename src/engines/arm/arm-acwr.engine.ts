@@ -5,8 +5,10 @@
  * parity BB `computePerMuscleACWR` + PL ACWR-зоны ok <1.3 / caution 1.3–1.5 / danger ≥1.5.
  */
 import { toDailyLoads, acuteChronicRatio } from '../pro/training-load.engine';
+import { localIsoDate } from '../../core/local-date';
 import type { ArmPlan } from './arm-types';
 import { canonicalizeArmMuscle, isArmTendonMuscle } from './arm-tendon-sets.engine';
+import { armMuscleOfExercise } from './arm-diary-weak-detection.engine';
 
 export interface ArmAcwrInput {
   sessions: Array<{ dateIso: string; sRpe: number; durationMin: number; isTendon?: boolean; isTable?: boolean }>;
@@ -73,7 +75,7 @@ export interface ArmMuscleAcwr {
 
 export interface ArmAcwrDaySession {
   date: string;
-  exercises: Array<{ muscleGroup?: string; muscle?: string; sets: Array<unknown> }>;
+  exercises: Array<{ muscleGroup?: string; muscle?: string; exerciseName?: string; name?: string; exerciseId?: string; sets: Array<unknown> }>;
 }
 
 function dayNum(iso: string): number {
@@ -81,9 +83,14 @@ function dayNum(iso: string): number {
   return Number.isFinite(t) ? Math.floor(t / 86400000) : NaN;
 }
 
-function muscleOf(ex: { muscleGroup?: string; muscle?: string }): string | null {
-  const m = String((ex as any)?.muscleGroup || (ex as any)?.muscle || '').toLowerCase().trim();
-  return m || null;
+function muscleOf(ex: { muscleGroup?: string; muscle?: string; exerciseName?: string; name?: string; exerciseId?: string }): string | null {
+  const direct = String((ex as any)?.muscleGroup || (ex as any)?.muscle || '').toLowerCase().trim();
+  if (direct) return direct;
+  // Аудит 2026-10 было→стало: живые писатели дневника (DiaryRecordingForm/ExecutionZone/
+  // QuickEntry) пишут только имя/id, `hub-diary` оставляет muscleGroup=undefined →
+  // canonicalizeArmMuscle(null) → continue → per-muscle ACWR был ПУСТ ВСЕГДА (фича D2 мертва).
+  // Единый экстрактор с `armMuscleOfExercise` (тот же, что у diary-weak-detection).
+  try { return armMuscleOfExercise(ex as any); } catch { return null; }
 }
 
 export function armAcwrZoneFor(ratio: number | null): ArmAcwrZone {
@@ -97,7 +104,9 @@ export function armAcwrZoneFor(ratio: number | null): ArmAcwrZone {
 export function armDailyLoadsByMuscle(sessions: ArmAcwrDaySession[], referenceIso?: string): Record<string, number[]> {
   const out: Record<string, number[]> = {};
   try {
-    const ref = referenceIso ? dayNum(referenceIso.slice(0, 10)) : Math.floor(Date.now() / 86400000);
+    // Аудит 2026-10 было→стало: дефолт был UTC-днём (Math.floor(Date.now()/86400000)) —
+    // в UTC+X вечером/ночью «сегодня» уезжало на сутки, окно 28д съезжало. Канон — localIsoDate.
+    const ref = referenceIso ? dayNum(referenceIso.slice(0, 10)) : dayNum(localIsoDate());
     if (!Number.isFinite(ref)) return out;
     for (const s of sessions || []) {
       const d = dayNum(String((s as any)?.date || '').slice(0, 10));

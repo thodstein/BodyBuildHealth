@@ -75,18 +75,34 @@ export function mobilityBlockReason(ex: { muscle?: string; substitutionGroup?: s
   return null;
 }
 
+function sideSetsOf(wk: any): number {
+  let s = 0;
+  for (const sess of wk?.sessions || []) for (const ex of sess?.exercises || []) if (ex.muscle === 'side_pressure') s += (Number(ex.sets) || 0);
+  return s;
+}
+
+/** Целевой (не промодулированный недельным множителем) объём side: sets / weekMult. */
+function sideTargetOf(wk: any): number {
+  const raw = sideSetsOf(wk);
+  const mult = Number(wk?.weekMult);
+  if (Number.isFinite(mult) && mult > 0.2 && mult <= 1.5) return raw / mult;
+  return raw;
+}
+
 export function checkHumerusGuard(plan: { weeks: Array<{ week: number; sessions: Array<{ exercises: Array<{ muscle: string; sets: number }> }> }> }): string[] {
   const warnings: string[] = [];
   for (const wk of plan.weeks) {
-    let sideSets = 0;
-    for (const sess of wk.sessions) for (const ex of sess.exercises) if (ex.muscle === 'side_pressure') sideSets += ex.sets;
+    const sideSets = sideSetsOf(wk);
     if (wk.week <= 4 && sideSets > 6) warnings.push(`Н${wk.week}: side_pressure ${sideSets} сетов >6 первые 4 нед — humerus risk (≤3/нед рекомендовано)`);
     if (sideSets > 9) warnings.push(`Н${wk.week}: side_pressure ${sideSets} сетов — превышен cap 9`);
   }
-  // прогрессия ≤10%/нед — проверка между неделями
+  // прогрессия ≤10%/нед между ЦЕЛЕВЫМИ объёмами (с нормализацией микро-цикла).
+  // Аудит 2026-10 было→стало: сравнивались сырые сеты недель, а билдер масштабирует их
+  // weekMult (moderate 1.0 / heavy 0.85 / stress 0.55 / deload 0.6 / peaking 0.45) —
+  // возврат со stress на moderate давал «+82% >10%/нед» в плане, где ничего не выросло.
   for (let i = 1; i < plan.weeks.length; i++) {
-    const prev = plan.weeks[i-1].sessions.reduce((s, ss) => s + ss.exercises.filter(e => e.muscle === 'side_pressure').reduce((a,e)=>a+e.sets,0),0);
-    const cur = plan.weeks[i].sessions.reduce((s, ss) => s + ss.exercises.filter(e => e.muscle === 'side_pressure').reduce((a,e)=>a+e.sets,0),0);
+    const prev = sideTargetOf(plan.weeks[i-1]);
+    const cur = sideTargetOf(plan.weeks[i]);
     if (prev > 0 && cur > prev * 1.11) warnings.push(`Н${plan.weeks[i].week}: side_pressure прогрессия ${(cur/prev*100-100).toFixed(0)}% >10%/нед`);
   }
   return warnings;

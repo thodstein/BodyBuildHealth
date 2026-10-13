@@ -147,7 +147,7 @@ describe('P2: константы хвата/платформы — единый 
   });
   it('RT WR по полу (IronMind)', () => {
     expect(getRtWorldClass('male')).toBe(130.5);
-    expect(getRtWorldClass('female')).toBe(77.2);
+    expect(getRtWorldClass('female')).toBe(80.0); // аудит 2026-10 было→стало: 77.2 → 80.0 (Mason 2024)
   });
 });
 
@@ -198,7 +198,7 @@ describe('P2: отчёт и честность данных', () => {
   it('подпись RT несёт владельца по полу', () => {
     const src = new SourceFileReader('src/engines/arm/armlifting-diagnostics.engine.ts');
     expect(src.text).toContain('wrHolderNote');
-    expect(src.text).toMatch(/Гайдученко 77\.2, 2012/);
+    expect(src.text).toMatch(/Mason 80\.0, 2024/); // аудит 2026-10 было→стало: Gaiduchenko 77.2 → Mason 80.0
     expect(src.text).toMatch(/Тюкалов 130\.5, 2013/);
   });
   it('apollon диаметр = 2" (51 мм), не 58', () => {

@@ -32,7 +32,7 @@ describe('arm-platform (эпик J)', () => {
     expect(platformRotationForWeek(4)).toBe('support');
   });
   it('женский WR ниже', () => {
-    expect(platformWrFor('rolling_thunder', 'female')).toBe(77.2);
+    expect(platformWrFor('rolling_thunder', 'female')).toBe(80.0); // аудит 2026-10 было→стало: 77.2 → 80.0
     expect(platformWrFor('rolling_thunder', 'male')).toBe(130.5);
   });
   it('PRO-4 добивка-3: несверенные знаменатели — internal (эпик J без источников)', () => {

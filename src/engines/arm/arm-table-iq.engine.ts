@@ -63,15 +63,14 @@ export function analyzeTableIq(input: TableIqInput = {}): TableIq {
   const strapRate = Math.round((bouts.filter((b) => b.strap).length / n) * 100);
   const avgCenterSec = avg(bouts.map((b) => Number(b.centerHoldSec ?? NaN)));
   const avgFinishSec = avg(bouts.filter((b) => b.win).map((b) => Number(b.finishSec ?? NaN)));
-  const levers: string[] = [];
-  if (foulRate >= 1) levers.push(`Фолы ${foulRate}/схватку ≥1: foul_freeze + referee-grip дриллы, игра чище (2 fouls = поражение).`);
-  else if (foulRate >= 0.5) levers.push(`Фолы ${foulRate}/схватку: 30% ready-go репетиция, старт только по Go.`);
-  if (slipRate >= 40) levers.push(`Срывы ${slipRate}%: containment + cup, 1 strap-сессия/нед заранее.`);
-  else if (strapRate >= 50) levers.push(`Ремень ${strapRate}%: борьба уходит в ремень — готовить strap-изометрию 4×10с.`);
-  if (avgCenterSec != null && avgCenterSec < 5) levers.push(`Центр ${avgCenterSec}с <5с: back pressure + drag сначала, бок только по выигранной.`);
-  if (avgFinishSec != null && avgFinishSec > 12) levers.push(`Финиш ${avgFinishSec}с >12с: side-изометрия 10–20с + пин-холды в слабом углу.`);
-  if (!levers.length) levers.push('Стол чистый: держать волну table 3/2/1, специализация по матчапу.');
-  if (winPct < 40) levers.push(`Победы ${winPct}% <40%: разведка стиля + матчап-план, спарринг 70% (не красная линия).`);
+  const core: string[] = [];
+  if (foulRate >= 1) core.push(`Фолы ${foulRate}/схватку ≥1: foul_freeze + referee-grip дриллы, игра чище (2 fouls = поражение).`);
+  else if (foulRate >= 0.5) core.push(`Фолы ${foulRate}/схватку: 30% ready-go репетиция, старт только по Go.`);
+  if (slipRate >= 40) core.push(`Срывы ${slipRate}%: containment + cup, 1 strap-сессия/нед заранее.`);
+  else if (strapRate >= 50) core.push(`Ремень ${strapRate}%: борьба уходит в ремень — готовить strap-изометрию 4×10с.`);
+  if (avgCenterSec != null && avgCenterSec < 5) core.push(`Центр ${avgCenterSec}с <5с: back pressure + drag сначала, бок только по выигранной.`);
+  if (avgFinishSec != null && avgFinishSec > 12) core.push(`Финиш ${avgFinishSec}с >12с: side-изометрия 10–20с + пин-холды в слабом углу.`);
+  if (!core.length) core.push('Стол чистый: держать волну table 3/2/1, специализация по матчапу.');
   // P1-движения: мода фазы срыва (только заполненные, без угадывания).
   const phaseCounts = new Map<string, number>();
   for (const b of bouts) {
@@ -80,11 +79,17 @@ export function analyzeTableIq(input: TableIqInput = {}): TableIq {
       phaseCounts.set(ph, (phaseCounts.get(ph) || 0) + 1);
     }
   }
+  const winLever = winPct < 40 ? [`Победы ${winPct}% <40%: разведка стиля + матчап-план, спарринг 70% (не красная линия).`] : [];
+  const phaseLever: string[] = [];
   if (phaseCounts.size) {
     const top = Array.from(phaseCounts.entries()).sort((a, b) => b[1] - a[1])[0];
     const phaseRu = top[0] === 'setup' ? 'постановка' : top[0] === 'readygo' ? 'Ready…Go' : top[0] === 'start' ? 'старт' : top[0] === 'mid' ? 'середина' : 'пин';
-    levers.push(`Слабая фаза: ${phaseRu} (${top[1]}/${n}) — чинить её векторы первым (см. фазовую карту).`);
+    phaseLever.push(`Слабая фаза: ${phaseRu} (${top[1]}/${n}) — чинить её векторы первым (см. фазовую карту).`);
   }
+  // Аудит 2026-10 было→стало: рычаги фазы/побед пушились ПОСЛЕ основных, а `slice(0,3)`
+  // их отбрасывал — при живом журнале (фолы + срывы + центр) „Слабая фаза“ и „Победы <40%“
+  // не показывались никогда. Теперь приоритет: фаза → победы → основные.
+  const levers = [...phaseLever, ...winLever, ...core].slice(0, 3);
   return {
     bouts: n, winPct, foulRate, slipRate, strapRate, avgCenterSec, avgFinishSec,
     levers: levers.slice(0, 3),

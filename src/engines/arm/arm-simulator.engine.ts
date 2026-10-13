@@ -10,7 +10,7 @@ import { ARM_CORRECTIONS } from './arm-weakpoint-corrections';
 import { doseForCause } from './arm-correction-dose.engine';
 import { doseForCauseV2, waveSetsFor, shouldUseDoseV2 } from './arm-correction-pro2.engine';
 import type { ArmWeakCause } from './arm-weak-cause.engine';
-import { estimateArmCorrectionWeight } from './arm-diagnostics-injection.engine';
+import { estimateArmCorrectionWeight, findSessionForWeakPoint } from './arm-diagnostics-injection.engine';
 import { armTendonSetForExercises, isArmTendonMuscle } from './arm-tendon-sets.engine';
 
 export interface ArmSimDelta {
@@ -34,6 +34,12 @@ export interface ArmSimOpts {
   tendonOverload?: boolean;
   age50plus?: boolean;
   waveWeek?: number;
+  /** Аудит 2026-10 было→стало: симулятор показывал Δ/≈кг для `corr.exercises[0]` (база),
+   *  тогда как инъекция едет по `rankedIds` (ранжир + ⭐) — «показано ≠ вставится».
+   *  Теперь принимает тот же порядок кандидатов. */
+  rankedIds?: string[];
+  /** Тот же dayMap, что у инъекции (weakPoint → sessionTag). */
+  dayMap?: Record<string, string>;
 }
 
 const BUDGET_BY_LEVEL: Record<string, number> = { beginner: 60, intermediate: 85, advanced: 110, enhanced: 135 };
@@ -84,7 +90,9 @@ export function simulateArmInjection(
   const before = audit ? audit.covered.length : 0;
   const alreadyCovered = audit ? (audit.byPoint[point]?.sets ?? 0) > 0 : false;
   const after = audit ? before + (alreadyCovered ? 0 : 1) : 1;
-  const ex = exerciseId || corr.exercises[0];
+  // Аудит 2026-10: тот же порядок кандидатов, что инъекция (⭐/ранжир первым)
+  const order = (opts.rankedIds && opts.rankedIds.length ? opts.rankedIds : corr.exercises) as string[];
+  const ex = exerciseId || order[0] || corr.exercises[0];
   let blocked: string | null = null;
   let estWeight: number | null = null;
   try {
@@ -93,8 +101,12 @@ export function simulateArmInjection(
     if (week) {
       const weeklySets = week.sessions.reduce((a: number, s: any) => a + s.exercises.reduce((aa: number, e: any) => aa + (e.sets || 0), 0), 0);
       const budget = opts.budget ?? BUDGET_BY_LEVEL[String(opts.level || (plan as any)?.level || 'intermediate')] ?? 85;
-      const dup = week.sessions.some((s: any) => s.exercises.some((e: any) => e.exerciseId === ex));
-      if (dup) blocked = `дубль ${ex} уже в неделе`;
+      // Аудит 2026-10 было→стало: dup считался по ЛЮБОЙ сессии недели, а инъекция дедупит
+      // только в выбранной (`id@sessionTag`) — симулятор врал «дубль уже в неделе», когда
+      // инъекция реально вставила бы в другой день. Теперь та же сессия, что у инъекции.
+      const targetSession = findSessionForWeakPoint(week, point, opts.dayMap);
+      const dup = !!targetSession && targetSession.exercises.some((e: any) => e.exerciseId === ex);
+      if (dup) blocked = `дубль ${ex} уже в сессии ${targetSession?.sessionTag || ''}`.trim();
       else if (weeklySets + wantSets > budget) blocked = `budget ${budget}: ${weeklySets}+${wantSets}`;
       else {
         // порядок гейтов 1-в-1 как инъекция: humerus → tendon → session

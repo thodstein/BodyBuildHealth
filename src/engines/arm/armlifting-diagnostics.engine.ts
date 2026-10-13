@@ -9,9 +9,9 @@
  */
 import { platformWrFor, planAttempts } from './arm-platform.engine';
 
-/** 26.10.2026: атрибуция рекордсмена RT по полу — было хардкодом 'Тюкалов 130.5' для обоих полов (женский WR — Гайдученко 77.2, 2012). */
+/** Аудит 2026-10 было→стало: женский WR — Mason 80.0 кг, 21.08.2024 (Gaiduchenko 77.2 побит). */
 function wrHolderNote(sex: ArmliftSex): string {
-  return sex === 'female' ? 'Гайдученко 77.2, 2012' : 'Тюкалов 130.5, 2013';
+  return sex === 'female' ? 'Mason 80.0, 2024' : 'Тюкалов 130.5, 2013';
 }
 export type ArmliftSex = 'male' | 'female';
 

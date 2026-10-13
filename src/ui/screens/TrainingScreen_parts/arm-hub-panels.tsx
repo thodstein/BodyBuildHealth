@@ -77,7 +77,7 @@ export function HubHead({ H }: { H: any }) {
         })()}
       </div>
       <div className="ad-row" data-arm="hub-tags">
-        <span className="ad-tag">Table {(report.tableRatio*100).toFixed(0)}% (3/2/1) · Tendon {report.tendonLoad}/22 · WAF {weightClassAuto}кг</span>
+        <span className="ad-tag">Table {(report.tableRatio*100).toFixed(0)}% (3/2/1) · Tendon {report.tendonLoad ?? '—'}/22 · WAF {weightClassAuto}кг</span>
         <span className="ad-tag">{benchRes.level} · {Math.round(benchRes.avgScore*10)/10} (сила {forceVecPro.scoreReliable ? forceVecPro.totalScore : '—'})</span>
         {report.asymmetryPct!=null && <span className="ad-tag">Асимметрия {report.asymmetryPct}%</span>}
       </div>

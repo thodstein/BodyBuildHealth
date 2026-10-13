@@ -323,6 +323,11 @@ export interface ArmWeek {
   deload?: boolean;
   taper?: boolean;
   tableRatio?: number;
+  /** Аудит 2026-10: множитель микро-цикла (moderate 1.0 / heavy 0.85 / stress 0.55 /
+   *  deload 0.6 / peaking 0.45). Сохраняется, чтобы гварды (humerus-прогрессия) сравнивали
+   *  ЦЕЛЕВОЙ объём, а не промодулированный вывод недели — иначе возврат со stress на moderate
+   *  даёт ложное «+82% >10%/нед». */
+  weekMult?: number;
   sessions: ArmSession[];
   note?: string;
   /** Мезо-блок недели (профессиональный контур периодизации). */

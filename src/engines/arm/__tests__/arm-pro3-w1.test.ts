@@ -82,13 +82,15 @@ describe('PRO-3 W1 P2: Force честный', () => {
     expect(r.humerusWarnings[0]).toContain('план не подключён');
     expect(r.humerusWarnings[0]).not.toContain('8 сетов');
   });
-  it('без плана scoring не ставит side=8 (sideSetsWeek1=0)', () => {
+  it('без плана scoring не ставит side=8 (sideSetsWeek1=null → честное «нет данных»)', () => {
+    // Аудит 2026-10 было→стало: без подключённого плана стор писал «Side 0 — в допуске»,
+    // т.е. непройденная проверка выглядела пройденной. Теперь честный «план не подключён».
     const r = buildArmDiagnosticsReport({
       weakTest: { sidePressureFails: true }, grip: {},
       vbtRecords: [{ weight: 50, reps: 5, velocityMs: 1.0 }, { weight: 50, reps: 5, velocityMs: 0.5 }],
       level: 'intermediate', technique: 'press', tableSessions: 2, totalSessions: 4, tendonSets: 8,
     });
     const sideFinding = r.scoring?.findings.find((f) => f.text.startsWith('Side'));
-    expect(sideFinding?.text).toContain('Side 0');
+    expect(sideFinding?.text).toContain('план не подключён');
   });
 });

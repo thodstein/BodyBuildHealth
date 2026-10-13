@@ -11,6 +11,11 @@ export type ArmWeakCause = 'volume' | 'technique' | 'mobility' | 'fatigue' | 'st
 
 export interface ArmWeakCauseInput {
   point: ArmWeakPoint;
+  /** Аудит 2026-10 было→стало: поле называлось `factSets7d`, но получало СУММУ сетов по всем
+   *  неделям плана — пороги «0–2 сета = не покрыта» недельные, и на 12-недельном плане
+   *  причина «объём» не выявлялась никогда. Теперь слот несёт НЕДЕЛЬНЫЙ норм. */
+  factSetsWeek?: number | null;
+  /** @deprecated легаси-алиас (совместимость внешних вызовов) — трактуется как factSetsWeek. */
   factSets7d?: number | null;
   hist28?: number[];
   e1rmDeltaPct?: number | null;
@@ -20,6 +25,9 @@ export interface ArmWeakCauseInput {
   mobilityFail?: boolean;
   vbtLossPct?: number | null;
   vbtWarnPct?: number | null;
+  /** Аудит 2026-10: раньше «stop» выводился как warn+10, хотя канон `vbtThresholdForWeakPoint`
+   *  даёт stopPct явно (cup/rising 20 при warn 12). Два потребителя одного замера спорили. */
+  vbtStopPct?: number | null;
   benchLevel?: string | null;
   sleepHours?: number | null;
   sideBackRefRatio?: number | null; // факт side/back vs bw-ref 0..1+ (null = нет данных)
@@ -46,7 +54,8 @@ export function diagnoseArmWeakCause(input: ArmWeakCauseInput): ArmWeakCauseResu
   const ev: string[] = [];
   const scores: Record<ArmWeakCause, number> = { volume: 0, technique: 0, mobility: 0, fatigue: 0, strength: 0 };
   const hist = Array.isArray(input.hist28) ? input.hist28.filter((n) => Number.isFinite(n)) : [];
-  const last = input.factSets7d != null && Number.isFinite(input.factSets7d) ? Number(input.factSets7d) : hist.length ? hist[hist.length - 1] : null;
+  const weekSets = input.factSetsWeek ?? input.factSets7d ?? null;
+  const last = weekSets != null && Number.isFinite(Number(weekSets)) ? Number(weekSets) : hist.length ? hist[hist.length - 1] : null;
 
   // VOLUME: факт 0-2 при норме 3+ или падающая история
   if (last != null && last <= 0) {
@@ -81,9 +90,10 @@ export function diagnoseArmWeakCause(input: ArmWeakCauseInput): ArmWeakCauseResu
     ev.push(`Сон ${input.sleepHours}ч < 6.5`);
   }
   const warn = input.vbtWarnPct ?? 15;
-  if (input.vbtLossPct != null && input.vbtLossPct >= warn + 10) {
+  const stop = input.vbtStopPct ?? (warn + 10);
+  if (input.vbtLossPct != null && input.vbtLossPct >= stop) {
     scores.fatigue += 0.3;
-    ev.push(`VBT ${input.vbtLossPct}% ≥ stop (~${warn + 10}%)`);
+    ev.push(`VBT ${input.vbtLossPct}% ≥ stop ${stop}%`);
   } else if (input.vbtLossPct != null && input.vbtLossPct >= warn) {
     scores.fatigue += 0.15;
     ev.push(`VBT ${input.vbtLossPct}% ≥ warn ${warn}%`);

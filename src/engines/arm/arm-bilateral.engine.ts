@@ -59,7 +59,7 @@ export function planBilateralVolume(input: BilateralInput): BilateralPlan {
       weakSets: Math.round(half),
       strongSets: Math.round(half),
       totalSets: Math.round(half) * 2,
-      withinMrv: Math.round(half) * 2 <= mrv * 2,
+      withinMrv: true,
       note: 'Нет данных L/R — поровну. Введите силу обеих рук.',
     };
   }
@@ -73,21 +73,21 @@ export function planBilateralVolume(input: BilateralInput): BilateralPlan {
     strongArm = input.dominantArm;
   }
   const bonus = bilateralWeakBonus(asym);
-  // Сильная — maintenance 0.85× базы, слабая — база + бонус; сумма под кап 2×MRV... нет:
-  // кап — суммарный бюджет обеих рук не должен превышать 2×MRV одной? Нет — руки разные,
-  // лимит системный: total ≤ 2*mrv, и каждая ≤ mrv.
-  let weakSets = Math.round(base * (1 + bonus));
-  let strongSets = Math.round(base * 0.85);
-  weakSets = Math.min(mrv, Math.max(2, weakSets));
-  strongSets = Math.min(mrv, Math.max(2, strongSets));
+  // Сильная — maintenance 0.85× базы, слабая — база + бонус; кап каждой руки — mrv.
+  const idealWeak = Math.round(base * (1 + bonus));
+  const idealStrong = Math.round(base * 0.85);
+  let weakSets = Math.min(mrv, Math.max(2, idealWeak));
+  let strongSets = Math.min(mrv, Math.max(2, idealStrong));
   const totalSets = weakSets + strongSets;
-  const withinMrv = weakSets <= mrv && strongSets <= mrv;
+  // Аудит 2026-10 было→стало: withinMrv считался ПОСЛЕ клампа к mrv, т.е. был всегда true —
+  // инвариант «зелёный по построению». Теперь честно: влезли ли ИДЕАЛЬные сеты в бюджет.
+  const withinMrv = idealWeak <= mrv && idealStrong <= mrv && totalSets <= mrv * 2;
   const note =
     asym >= 12
       ? `Асимметрия ${asym}% ≥12% — слабая (${weakArm}) +25%, сильная maintenance.`
       : asym >= 7
         ? `Асимметрия ${asym}% — слабая (${weakArm}) +15%.`
-        : `Симметрия ${asym}% — норма, руки поровну с лёгким акцентом на недоминантную.`;
+        : `Симметрия ${asym}% — норма: слабая база (${weakArm}), сильная −15% технический акцент.`;
   return { asymmetryPct: asym, weakArm, strongArm, weakSets, strongSets, totalSets, withinMrv, note };
 }
 

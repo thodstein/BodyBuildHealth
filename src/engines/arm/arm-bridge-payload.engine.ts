@@ -34,7 +34,8 @@ export interface ArmBridgeInput {
   vbt: unknown;
   dynamic: unknown;
   bench: unknown;
-  tendon: number;
+  /** Аудит 2026-10: null — план не подключён, недельная нагрузка сухожилий не выдумывается. */
+  tendon: number | null;
   findings: unknown[];
   humerus: string[];
   balance: string[];

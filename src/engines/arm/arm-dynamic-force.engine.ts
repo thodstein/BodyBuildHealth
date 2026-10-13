@@ -11,10 +11,17 @@ export interface ArmForceTrial {
   bwKg?: number;
   hand?: 'left' | 'right';
   dateIso?: string;
-  // опционально ранние отсечки для точного F100/F500 (если нет — экстраполируем линейно)
+  // опционально ранние отсечки для точного F100/F500 (если нет — экстраполяция линейно)
   f100Kg?: number;
   f500Kg?: number;
   t05FKg?: number; // время достижения 0.5F мс
+  /**
+   * Аудит 2026-10: проба синтезирована хабом из полей L/R (RT-кг + фиктивное время), а не
+   * снята прибором. В `metrics` такие пробы не идут (иначе ftIndex/tactic/explosivePct
+   * молча считаются от RT-килограммов), но `calcAsymmetry` их использует — это единственный
+   * источник L/R-асимметрии.
+   */
+  synthetic?: boolean;
 }
 export interface ArmDynamicMetrics {
   fMax: number; // кг
@@ -38,6 +45,8 @@ export interface ArmDynamicMetrics {
    */
   f100Estimated: boolean;
   f500Estimated: boolean;
+  /** Аудит 2026-10: t0.5F не измерено — оценена как ~42% времени до Fmax (см. calcDynamicMetrics). */
+  t05FEstimated: boolean;
   /** Оценка построена из одиночной пробы «сила+время» — надёжность средняя (тренд полезнее абсолюта). */
   derivedFromSingleTrial: boolean;
 }
@@ -72,6 +81,7 @@ export function calcDynamicMetrics(t: ArmForceTrial): ArmDynamicMetrics {
   // обязаны попадать в хаб/мост, иначе реконструкция выглядит как измерение прибора.
   const f100Measured = t.f100Kg != null && Number.isFinite(t.f100Kg);
   const f500Measured = t.f500Kg != null && Number.isFinite(t.f500Kg);
+  const t05FMeasured = t.t05FKg != null && Number.isFinite(t.t05FKg);
   let f100: number;
   if (f100Measured) f100 = Math.min(f, t.f100Kg as number);
   else {
@@ -79,7 +89,6 @@ export function calcDynamicMetrics(t: ArmForceTrial): ArmDynamicMetrics {
     f100 = Math.min(f, round1(f * k * 0.75));
     // калибр по Bezkorovainyi: у атлета 62кг F100 46кг при F~? — ~60% от Fmax в 100мс у взрывных
     if (tMs < 900) f100 = Math.min(f, Math.max(f100, f * 0.35));
-    if (f100 < 11 && f >= 55) f100 = 11; // гарант >10 для средних сил (тест 60кг 1200мс)
   }
   let f500: number;
   if (f500Measured) f500 = Math.min(f, t.f500Kg as number);
@@ -89,9 +98,10 @@ export function calcDynamicMetrics(t: ArmForceTrial): ArmDynamicMetrics {
     f500 = Math.min(f, round1(f * ratio));
   }
   const f500_t500 = f500 / 0.5; // кг/с
-  const t05F = t.t05FKg != null && Number.isFinite(t.t05FKg) ? t.t05FKg : Math.round(tMs * 0.42); // ~42% времени до половины силы (градиент)
+  const t05F = t05FMeasured ? (t.t05FKg as number) : Math.round(tMs * 0.42); // ~42% времени до половины силы (градиент)
   const gradient = t05F != null && f > 0 ? round2(t05F / (0.5 * f)) : null; // мс/кг
-  const slowIndex = f > f500 ? (f - f500) / ((tMs - 500) / 1000) : 0; // кг/с после 500мс
+  // Аудит 2026-10: при tMs<500 делитель ((tMs-500)/1000) отрицателен → slowIndex<0 и avgSlow ломался.
+  const slowIndex = f > f500 && tMs > 500 ? (f - f500) / ((tMs - 500) / 1000) : 0; // кг/с после 500мс
   const explosivePct = f > 0 ? Math.round((f100 / f) * 100) : 0;
   const fastPct = f > 0 ? Math.round((f500 / f) * 100) : 0;
   return {
@@ -109,6 +119,7 @@ export function calcDynamicMetrics(t: ArmForceTrial): ArmDynamicMetrics {
     fastPct,
     f100Estimated: !f100Measured,
     f500Estimated: !f500Measured,
+    t05FEstimated: !t05FMeasured,
     derivedFromSingleTrial: !f100Measured || !f500Measured,
   };
 }
@@ -133,7 +144,8 @@ export function calcAsymmetry(trials: ArmForceTrial[]): ArmAsymmetry | null {
 export function buildDynamicReport(trials: ArmForceTrial[]): ArmDynamicReport {
   const map: Record<string, ArmDynamicMetrics | null> = { finger_flex: null, hammer: null, hook: null, cup: null };
   for (const ex of ['finger_flex', 'hammer', 'hook', 'cup'] as ArmDynamicTest[]) {
-    const t = trials.find(x => x.exercise === ex);
+    // Аудит 2026-10: синтетические L/R-пробы не считаются метриками (см. ArmForceTrial.synthetic)
+    const t = trials.find(x => x.exercise === ex && !(x as ArmForceTrial).synthetic);
     if (t) map[ex] = calcDynamicMetrics(t);
   }
   const vals = Object.values(map).filter(Boolean) as ArmDynamicMetrics[];

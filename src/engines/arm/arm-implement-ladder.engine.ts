@@ -2,7 +2,7 @@
  * arm-implement-ladder.engine.ts — TOP T3: лестница инвентаря + нормы.
  *
  * Источники: ArmliftingUSA (Fat Gripz — стартер; RT/Axle/Saxon — база),
- * IronMind (RT WR M130.5 Tyukalov 2013 / F77.2 Gaiduchenko 2012; Axle, Hub,
+ * IronMind (RT WR M130.5 Tyukalov 2013 / F80.0 Mason 2024; Axle, Hub,
  * Silver Bullet — секунды, не кг), GodsOfGrip 6-week RT (max-таблица),
  * SAR 2024 (разряды по имплементам).
  *
@@ -46,7 +46,7 @@ export const LADDER_GRIP: Record<LadderRung, 'support' | 'pinch' | 'crush' | 'hu
  * Опорные ориентиры лестницы (муж/жен, кг; Silver Bullet — секунды).
  *
  * ВНИМАНИЕ (честность шкал, P2-13): это НЕ единая WR-таблица помоста.
- *  - `rolling_thunder` — действующий WR IronMind (Tyukalov 2013 / Gaiduchenko 2012);
+ *  - `rolling_thunder` — действующий WR IronMind (Tyukalov 2013 / Mason 2024);
  *  - остальные — пороговые/исторические ориентиры промоушена (например, Axle 210 —
  *    истор. рекорд, действующий WR площадки 237.5/137.9; Hub/Pinch — другие снаряды
  *    и ширина, чем в PLATFORM_WR). Для процентов помоста сверяйтесь с PLATFORM_WR.
@@ -55,7 +55,7 @@ export const LADDER_SCALE_NOTE = 'Лестница: RT — действующи�
 
 export const LADDER_WR: Record<LadderRung, { male: number; female: number; unit: 'kg' | 'sec' }> = {
   fat_gripz: { male: 0, female: 0, unit: 'kg' }, // стартер без WR
-  rolling_thunder: { male: 130.5, female: 77.2, unit: 'kg' },
+  rolling_thunder: { male: 130.5, female: 80.0, unit: 'kg' }, // аудит 2026-10: 77.2 → 80.0 (Mason 2024)
   apollon_axle: { male: 210, female: 110, unit: 'kg' },
   saxon_bar: { male: 100, female: 55, unit: 'kg' },
   pinch_block: { male: 60, female: 32, unit: 'kg' },

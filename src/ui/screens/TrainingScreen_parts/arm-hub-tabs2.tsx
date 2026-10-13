@@ -5,6 +5,7 @@
  */
 import React from 'react';
 import { profileOpponent } from '../../../engines/arm/arm-matchup.engine';
+import { getSideRef, getBackRef } from '../../../engines/arm/arm-force-capture.engine';
 import { analyzeTableIq, tableIqTrend } from '../../../engines/arm/arm-table-iq.engine';
 import { ARM_BIOMECH } from '../../../engines/arm/arm-biomechanics.engine';
 import { HUMERUS_CHECKS, checkHumerusChecklist } from '../../../engines/arm/arm-humerus-checklist.engine';
@@ -114,13 +115,13 @@ export function HubPressureTab({ H }: { H: any }) {
         <div className="ad-muted">Гвард плана: side &gt;6 первые 4 нед / &gt;9 / +10%/нед — детали во вкладке P0</div>
       </AdSec>
       {/* 26.10.2026: живое видео за столом (оффлайн) — трек кисти → тип траектории */}
-      <ArmVideoTracker />
+      <ArmVideoTracker onCycles={H.onTrackCycles} />
         <AdSec title="🦴 Чек-лист плеча перед тяжёлым столом" collapsible defaultOpen={false} summary="5 чеков">
           <HumerusChecklist />
           <div className="ad-muted">Маркеры: ось «кисть–локоть–плечо», запястье не позади плеча (81% переломов — сломанная ось). Side-прогрессия ≤10%/нед, RIR≥2.</div>
         </AdSec>
         <AdSec title="Side/Back vs норма WAF">
-          <div className="ad-muted">Side ref {Math.round(bwNum*0.6)}кг · Back ref {Math.round(bwNum*0.8)}кг · WAF {weightClassAuto} (вектор и асимметрия — во вкладке «✊ Хват»)</div>
+          <div className="ad-muted">Side {getSideRef(bwNum, weightClassAuto).toFixed(0)}кг · Back {getBackRef(bwNum).toFixed(0)}кг · WAF {weightClassAuto} (вектор и асимметрия — во вкладке «✊ Хват»)</div>
         </AdSec>
       </AdGrid>
       <AdSec title="🗓 Стол — периодизация 3/2/1 (Кузнецов VIII) — ≥50% стол">
@@ -362,16 +363,25 @@ export function HubStrengthTab({ H }: { H: any }) {
           ['hammerKg','hammerMs','Hammer кг/мс'],
           ['hookKg','hookMs','Hook кг/мс'],
           ['cupKg','cupMs','Cup кг/мс'],
-        ].map(([kKg,kMs,label])=> (
+        ].map(([kKg,kMs,label])=> {
+          const kT = `${kKg.replace('Kg','T05Ms')}`;
+          return (
           <AdSec key={kKg} title={label} hook="ftest">
             <AdField label="Сила, кг">
-              <input inputMode="decimal" value={(state as any)[kKg]} onChange={e=>setState((s: any)=>({...s, [kKg]:e.target.value}))} placeholder="кг" />
+              <input inputMode="decimal" value={(state as any)[kKg]} onChange={e=>setState((s: any)=>({...s, [kKg]:e.target.value}))} placeholder="кг" aria-label={`${label} сила кг`} />
             </AdField>
             <AdField label="Время, мс">
-              <input inputMode="numeric" value={(state as any)[kMs]} onChange={e=>setState((s: any)=>({...s, [kMs]:e.target.value}))} placeholder="мс" />
+              <input inputMode="numeric" value={(state as any)[kMs]} onChange={e=>setState((s: any)=>({...s, [kMs]:e.target.value}))} placeholder="мс" aria-label={`${label} время мс`} />
+            </AdField>
+            {/* Аудит 2026-10 раунд-2: измеримый t0.5F (время до половины силы) — он задаёт
+                ГРАДИЕНТ (главный предиктор взрывной силы по PoinT GO RFD-2026), а раньше
+                всегда оценивался как ~42% времени и показывался как измерение. */}
+            <AdField label="t0.5F, мс (опц.)">
+              <input inputMode="numeric" value={(state as any)[kT] ?? ''} onChange={e=>setState((s: any)=>({...s, [kT]:e.target.value}))} placeholder="мс" aria-label={`${label} t0.5F мс`} />
             </AdField>
           </AdSec>
-        ))}
+          );
+        })}
       </AdGrid>
       <AdGrid cols="2">
         <AdSec title="Динамика — F/t градиент" hook="dyn">
@@ -381,7 +391,7 @@ export function HubStrengthTab({ H }: { H: any }) {
           </div>
           {dynamicReport && (dynamicReport as any).metrics && (
             <div className="ad-muted">
-              {Object.entries((dynamicReport as any).metrics).map(([k,v]: any)=> v ? <div key={k}>{k}: F{v.fMax} F/t{v.ftIndex} {v.ftIndex < 30 ? '⚠ низкая — чинить' : '✓ в допуске'} · F100{v.f100}({v.explosivePct}%) F500{v.f500}({v.fastPct}%) t0.5F{v.t05F}мс</div> : null)}
+              {Object.entries((dynamicReport as any).metrics).map(([k,v]: any)=> v ? <div key={k}>{k}: F{v.fMax} F/t{v.ftIndex} {v.ftIndex < 30 ? '⚠ низкая — чинить' : '✓ в допуске'} · F100{v.f100}({v.explosivePct}%){v.f100Estimated ? '~оц' : '✓'} F500{v.f500}({v.fastPct}%){v.f500Estimated ? '~оц' : '✓'} t0.5F{v.t05F}мс{v.t05FEstimated ? '~оц' : '✓'} · градиент {v.gradient}мс/кг</div> : null)}
             </div>
           )}
         </AdSec>
@@ -509,7 +519,7 @@ export function HubRecoveryTab({ H }: { H: any }) {
           <div className="ad-muted">{tendonAcwr? `Tendon — факт` : 'нет tendon-данных'}</div>
         </AdSec>
         <AdSec title={`Tendon Load · лимит ${tendonWeeklyLimit(state.level)}`}>
-          <div className="ad-muted">{report.tendonLoad} сетов/нед · Side MRV {H.landmarks.side.mrv} · TendonCap 1.2× vs Muscle 1.7×</div>
+          <div className="ad-muted">{report.tendonLoad != null ? `${report.tendonLoad} сетов/нед` : 'план не подключён — недельная нагрузка не оценена'} · Side MRV {H.landmarks.side.mrv} · TendonCap 1.2× vs Muscle 1.7×</div>
           <div className="ad-muted">Beginner 12 / Inter 16 / Adv 18 / Enh 22 — GripStrength F1 3с эксцентрик</div>
         </AdSec>
         <AdSec title="Дополнительно">

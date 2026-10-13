@@ -28,9 +28,9 @@ describe('PRO-4 A1: честные WR (добивка: сверены с IronMin
     expect(r.rows[0].scorePct).toBe(100);
     expect(r.rows[0].internal).toBe(false);
   });
-  it('RT WR неизменен 130.5/77.2', () => {
+  it('RT WR неизменен 130.5/80.0', () => { // аудит 2026-10 было→стало: 77.2 → 80.0 (Mason 2024)
     expect(platformWrFor('rolling_thunder', 'male')).toBe(130.5);
-    expect(platformWrFor('rolling_thunder', 'female')).toBe(77.2);
+    expect(platformWrFor('rolling_thunder', 'female')).toBe(80.0);
   });
   it('Silver: опорные времена без %', () => {
     const r = buildArmliftingReport({ silverSec: 55.6, silverGripper: '3', sex: 'male' });

@@ -24,7 +24,10 @@ describe('arm TOP T5 longevity + rehab', () => {
   });
   it('rehab фазы по неделям', () => {
     expect(buildRehabPlan({ injury: 'humerus', weeksSince: 1 }).phase).toBe(0);
-    expect(buildRehabPlan({ injury: 'humerus', weeksSince: 8 }).phase).toBe(2);
+    // аудит 2026-10 было→стало: humerus на 8-й неделе получал фазу 2 (условие капа
+    // `w<6 && phase>1` было невыполнимо) — теперь консолидация держит фазу 1 до 10 нед.
+    expect(buildRehabPlan({ injury: 'humerus', weeksSince: 8 }).phase).toBe(1);
+    expect(buildRehabPlan({ injury: 'humerus', weeksSince: 16 }).phase).toBeGreaterThan(1);
     expect(buildRehabPlan({ injury: 'ucl', weeksSince: 15 }).phase).toBe(4);
   });
   it('боль откатывает фазу', () => {

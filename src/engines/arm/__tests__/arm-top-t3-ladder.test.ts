@@ -7,9 +7,9 @@ describe('arm TOP T3 лестница инвентаря', () => {
     expect(IMPLEMENT_LADDER[1]).toBe('rolling_thunder');
     expect(IMPLEMENT_LADDER[IMPLEMENT_LADDER.length - 1]).toBe('coc_bullet');
   });
-  it('%WR считается от M130.5/F77.2 для RT', () => {
+  it('%WR считается от M130.5/F80.0 для RT', () => { // аудит 2026-10 было→стало: 77.2 → 80.0
     expect(ladderWrPct('rolling_thunder', 65.25, 'male')).toBe(50);
-    expect(ladderWrPct('rolling_thunder', 38.6, 'female')).toBe(50);
+    expect(ladderWrPct('rolling_thunder', 40.0, 'female')).toBe(50); // 50% от WR 80.0
     expect(ladderWrPct('fat_gripz', 100, 'male')).toBeNull();
   });
   it('промоушен при ≥55% RT', () => {

@@ -18,8 +18,8 @@ describe('W-AL движок: вердикт по снарядам', () => {
     expect(rt.internal).toBe(false);
     expect(rt.attempts.length).toBe(3);
   });
-  it('RT жен — женский WR 77.2', () => {
-    const r = buildArmliftingReport({ rtKg: 38.6, sex: 'female' });
+  it('RT жен — женский WR 80.0', () => { // аудит 2026-10 было→стало: 77.2 → 80.0 (Mason 2024)
+    const r = buildArmliftingReport({ rtKg: 40.0, sex: 'female' });
     expect(r.rows[0].scorePct).toBe(50);
   });
   it('Axle saxon (ориентир) vs apollon (WR 237.5, добивка PRO-4)', () => {

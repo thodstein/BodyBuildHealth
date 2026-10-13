@@ -24,7 +24,7 @@ export const PLATFORM_RULES_2026: ImplementRule[] = [
     timing: '60с с объявления, попыток внутри минуты — без лимита; 1с контроль + down-signal',
     attempts: 'До 4 заявок, только вверх (last-man-standing)',
     fouls: ['Касание тела/проводка по ноге', 'Непараллельная ручка', 'Ранний сброс до сигнала'],
-    wrNote: 'WR 130.5/77.2 (верифицирован)',
+    wrNote: 'WR 130.5/80.0 (верифицирован)', // аудит 2026-10: 77.2 → 80.0 Mason 2024
   },
   {
     implement: 'apollon_axle', name: 'Apollon Axle (2″ = 51 мм)',

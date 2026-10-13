@@ -148,6 +148,13 @@ type ArmDiagState = {
   hookMs: string;
   cupKg: string;
   cupMs: string;
+  /** Аудит 2026-10 раунд-2: измеримый t0.5F (мс до половины силы) на каждый из 4 тестов.
+   *  Он задаёт ГРАДИЕНТ — главный предиктор взрывной силы (PoinT GO RFD-2026).
+   *  Пусто = оценка (~42% времени), помечается `~оц` в выводе. */
+  fingerT05Ms?: string;
+  hammerT05Ms?: string;
+  hookT05Ms?: string;
+  cupT05Ms?: string;
   wristCurlLb: string;
   pronHoldSec: string;
   cupHoldSec: string;
@@ -241,6 +248,8 @@ export const ArmDiagnosticsHub: React.FC = () => {
     };
   }, []);
   const [bilatTick, setBilatTick] = useState(0);
+  // Аудит 2026-10 раунд-3: циклы видео-трека (vMax) → источник VBT-потери без ручного ввода
+  const [trackCycles, setTrackCycles] = useState<any[]>([]);
   const [mobWristFlex, setMobWristFlex] = useState((p1saved as any).mobWristFlex !== false);
   const [mobWristExt, setMobWristExt] = useState((p1saved as any).mobWristExt !== false);
   const [mobPron, setMobPron] = useState((p1saved as any).mobPron !== false);
@@ -427,11 +436,26 @@ export const ArmDiagnosticsHub: React.FC = () => {
     const w = parseFloat(state.vbtWeight);
     const r = parseInt(state.vbtReps, 10);
     const v = parseFloat(state.vbtVel);
-    if (!Number.isFinite(w) || !Number.isFinite(r) || !Number.isFinite(v)) return diagnoseVbt([]);
-    // E9 P1: exerciseId топ-коррекции + weakPoint первой точки → пороги точки, иначе legacy
     const wp0 = state.weakPoints[0];
     const ex0 = (() => { try { return wp0 ? ARM_CORRECTIONS[wp0]?.exercises[0] : undefined; } catch { return undefined; } })();
-    // PRO-3 P1: два реальных замера — честный loss; один замер — оценка best≈ввод+0.2 (видно в UI)
+    if (!Number.isFinite(w) || !Number.isFinite(r) || !Number.isFinite(v)) {
+      // Аудит 2026-10 раунд-3: без ручного ввода скоростей берём их из видео-трека —
+      // лучший и последний цикл дают честный loss (раньше трекер был тупиком: его vMax
+      // никто не потреблял, и VBT-потеря требовала ручного ввода).
+      const cyc = (trackCycles || []).filter((c: any) => Number.isFinite(Number(c?.vMax)) && Number(c.vMax) > 0);
+      if (cyc.length >= 2) {
+        const best = Math.max(...cyc.map((c: any) => Number(c.vMax)));
+        const last = Number(cyc[cyc.length - 1].vMax);
+        return diagnoseVbt([
+          { weight: 0, reps: 0, velocityMs: best, exerciseId: ex0, weakPoint: wp0 } as any,
+          { weight: 0, reps: 0, velocityMs: last, exerciseId: ex0, weakPoint: wp0 } as any,
+        ]);
+      }
+      return diagnoseVbt([]);
+    }
+    // PRO-3 P1 + аудит 2026-10: два РЕАЛЬНЫХ замера — честный loss.
+    // Было: при одном замере подставлялся синтетический `v+0.2`, и loss = 0.2/(v+0.2)
+    // давал 25% при v=0.6 (зона stop — «риск tendon») из воздуха. Честнее: loss = null.
     const v2 = parseFloat((state as any).vbtVel2);
     if (Number.isFinite(v2) && v2 > 0) {
       return diagnoseVbt([
@@ -439,11 +463,8 @@ export const ArmDiagnosticsHub: React.FC = () => {
         { weight: w, reps: r, velocityMs: v2, exerciseId: ex0, weakPoint: wp0 } as any,
       ]);
     }
-    return diagnoseVbt([
-      { weight: w, reps: r, velocityMs: v + 0.2, exerciseId: ex0, weakPoint: wp0 } as any,
-      { weight: w, reps: r, velocityMs: v, exerciseId: ex0, weakPoint: wp0 } as any,
-    ]);
-  }, [state.vbtWeight, state.vbtReps, state.vbtVel, (state as any).vbtVel2, state.weakPoints]);
+    return diagnoseVbt([{ weight: w, reps: r, velocityMs: v, exerciseId: ex0, weakPoint: wp0 } as any]);
+  }, [state.vbtWeight, state.vbtReps, state.vbtVel, (state as any).vbtVel2, state.weakPoints, trackCycles]);
 
   // E9 P1: какие пороги сейчас действуют на VBT-карточке
   const vbtThP0 = useMemo(() => {
@@ -457,21 +478,28 @@ export const ArmDiagnosticsHub: React.FC = () => {
   // Dynamic trials (Bezkorovainyi 4 теста)
   const dynamicTrials = useMemo(() => {
     const arr: any[] = [];
-    const mk = (ex: string, kgS: string, msS: string) => {
+    // Аудит 2026-10 раунд-2: 4-й аргумент — измеримый t0.5F (время до половины силы);
+    // он переводит градиент из оценки в измерение (PoinT GO RFD-2026).
+    const mk = (ex: string, kgS: string, msS: string, tS?: string) => {
       const kg = parseFloat(kgS); const ms = parseFloat(msS);
-      if (Number.isFinite(kg) && kg>0 && Number.isFinite(ms) && ms>0) arr.push({ exercise: ex, forceKg: kg, timeMs: ms, bwKg: bwNum });
+      const t = parseFloat(String(tS ?? ''));
+      if (Number.isFinite(kg) && kg>0 && Number.isFinite(ms) && ms>0) {
+        arr.push({ exercise: ex, forceKg: kg, timeMs: ms, bwKg: bwNum, ...(Number.isFinite(t) && t>0 ? { t05FKg: t } : {}) });
+      }
     };
-    mk('finger_flex', state.fingerKg, state.fingerMs);
-    mk('hammer', state.hammerKg, state.hammerMs);
-    mk('hook', state.hookKg, state.hookMs);
-    mk('cup', state.cupKg, state.cupMs);
+    mk('finger_flex', state.fingerKg, state.fingerMs, state.fingerT05Ms);
+    mk('hammer', state.hammerKg, state.hammerMs, state.hammerT05Ms);
+    mk('hook', state.hookKg, state.hookMs, state.hookT05Ms);
+    mk('cup', state.cupKg, state.cupMs, state.cupT05Ms);
     // если есть left/right отдельно — добавим как отдельные точки для асимметрии (если оба введены)
     if (state.leftKg && state.rightKg) {
       const lk = parseFloat(state.leftKg); const rk = parseFloat(state.rightKg);
       if (Number.isFinite(lk) && Number.isFinite(rk) && lk>0 && rk>0) {
-        // добавим hook left/right для asymmetry calc
-        arr.push({ exercise: 'hook', forceKg: lk, timeMs: 1200, bwKg: bwNum, hand: 'left' } as any);
-        arr.push({ exercise: 'hook', forceKg: rk, timeMs: 1200, bwKg: bwNum, hand: 'right' } as any);
+        // добавим hook left/right для asymmetry calc.
+        // Аудит 2026-10: помечаем synthetic — иначе единственная найденная проба `hook`
+        // считала бы ftIndex/tMax/explosivePct от RT-килограммов с выдуманным временем.
+        arr.push({ exercise: 'hook', forceKg: lk, timeMs: 1200, bwKg: bwNum, hand: 'left', synthetic: true } as any);
+        arr.push({ exercise: 'hook', forceKg: rk, timeMs: 1200, bwKg: bwNum, hand: 'right', synthetic: true } as any);
       }
     }
     return arr;
@@ -499,38 +527,43 @@ export const ArmDiagnosticsHub: React.FC = () => {
   }, [forceHistoryTick]);
 
   // Tendon sets + table ratio now from derived estimates (not hardcoded 2/4)
-  // tendon/table из реального builtPlan (he_arm_last_plan) — факт, иначе оценка
+  // tendon/table из реального builtPlan (he_arm_last_plan) — факт, иначе честный null
   const derivedTendon = useMemo(() => {
     try {
       const raw = typeof localStorage !== 'undefined' ? localStorage.getItem('he_arm_last_plan') : null;
       if (raw) {
-        const plan = JSON.parse(raw);
-        if (plan?.weeks?.length) {
-          let total = 0;
-          for (const wk of plan.weeks) for (const sess of wk.sessions) for (const ex of sess.exercises) if (['wrist_flexors','pronators','supinators','risers','thumb','ulnar_deviators','radial_deviators','wrist_extensors'].includes(ex.muscle)) total += ex.sets;
-          const avg = Math.round(total / plan.weeks.length);
-          if (Number.isFinite(avg) && avg>0) return Math.min(22, avg);
+        const parsed = JSON.parse(raw);
+        const weeks: any[] = parsed?.plan?.weeks || parsed?.weeks || [];
+        if (weeks.length) {
+          // Аудит 2026-10 было→стало: было СРЕДНЕЕ по всем неделям плана, а капы 12/18/22 —
+          // НЕДЕЛЬНЫЕ. Теперь максимум по неделям; без плана — null (раньше выдумывалось 8..22).
+          let worst = 0;
+          for (const wk of weeks) {
+            let t = 0;
+            for (const sess of wk?.sessions || []) for (const ex of sess?.exercises || []) {
+              if (['wrist_flexors','pronators','supinators','risers','thumb','ulnar_deviators','radial_deviators','wrist_extensors'].includes(ex?.muscle)) t += (Number(ex?.sets) || 0);
+            }
+            if (t > worst) worst = t;
+          }
+          if (worst > 0) return Math.min(22, worst);
         }
       }
     } catch {}
-    let base = 8;
-    if (state.cup) base += 4;
-    if (state.pron) base += 6;
-    if (state.sup) base += 4;
-    if (benchRes.level === 'advanced' || benchRes.level === 'competitive') base += 2;
-    return Math.min(22, base);
+    return null;
   }, [state.cup, state.pron, state.sup, benchRes.level, forceHistoryTick]);
 
   const derivedTable = useMemo(() => {
     try {
       const raw = typeof localStorage !== 'undefined' ? localStorage.getItem('he_arm_last_plan') : null;
       if (raw) {
-        const plan = JSON.parse(raw);
-        if (plan?.weeks?.length) {
+        const parsed = JSON.parse(raw);
+        const weeks: any[] = parsed?.plan?.weeks || parsed?.weeks || [];
+        if (weeks.length) {
           let totalTable = 0, totalSess = 0;
-          for (const wk of plan.weeks) {
-            totalTable += wk.sessions.filter((s:any)=> s.tableTime).length;
-            totalSess += wk.sessions.length;
+          for (const wk of weeks) {
+            const sess = wk?.sessions || [];
+            totalTable += sess.filter((s:any)=> s.tableTime).length;
+            totalSess += sess.length;
           }
           if (totalSess>0) {
             const ratio = totalTable / totalSess;
@@ -541,9 +574,8 @@ export const ArmDiagnosticsHub: React.FC = () => {
         }
       }
     } catch {}
-    if (state.technique === 'press') return { table: 2, total: 4 };
-    if (state.level === 'beginner') return { table: 1, total: 3 };
-    return { table: 2, total: 4 };
+    // Аудит 2026-10: без плана доля стола не выдумывается (было 2/4 по технике/уровню)
+    return null;
   }, [state.technique, state.level, forceHistoryTick]);
 
   const report = useMemo(() => buildArmDiagnosticsReport({
@@ -560,14 +592,14 @@ export const ArmDiagnosticsHub: React.FC = () => {
       const wp0 = (state.weakPoints as any)[0];
       const ex0 = (() => { try { return wp0 ? (ARM_CORRECTIONS as any)[wp0]?.exercises[0] : undefined; } catch { return undefined; } })();
       const mk = (vel: number) => ({ weight: parseFloat(state.vbtWeight), reps: parseInt(state.vbtReps || '5', 10), velocityMs: vel, exerciseId: ex0, weakPoint: wp0 });
-      // PRO-3 P1: паритет с vbt-мемо — два реальных замера, иначе оценка best≈ввод+0.2
+      // Аудит 2026-10: без второго замера loss не выдумывается (было mk(v+0.2) → фантомный stop)
       const v2raw = parseFloat((state as any).vbtVel2);
       if (Number.isFinite(v2raw) && v2raw > 0) return [mk(parseFloat(state.vbtVel)), mk(v2raw)];
-      return [mk(parseFloat(state.vbtVel)), mk(parseFloat(state.vbtVel) + 0.2)];
+      return [mk(parseFloat(state.vbtVel))];
     })() : [],
     level: state.level,
     technique: state.technique,
-    tableSessions: derivedTable.table, totalSessions: derivedTable.total, tendonSets: derivedTendon,
+    tableSessions: derivedTable?.table ?? null, totalSessions: derivedTable?.total ?? null, tendonSets: derivedTendon,
     anglesVerified,
     sex: state.sex,
     weightClass: weightClassAuto,
@@ -718,10 +750,22 @@ export const ArmDiagnosticsHub: React.FC = () => {
     const rt = parseFloat(state.rtKg);
     if (!Number.isFinite(rt) || rt <= 0) return null;
     try {
-      const res = scorePlatform({ implement: 'rolling_thunder', sex: state.sex, attempts: [{ attempt: 1, weightKg: rt, success: true }] });
-      return { ...res, plan: planAttempts(rt) };
+      // Аудит 2026-10 раунд-2 было→стало: скармливалась ОДНА искусственная удачная попытка
+      // `[{ attempt:1, weightKg: rt, success:true }]` — attemptsUsed всегда 1, реальный журнал
+      // (включая провалы) в расчёт не шёл, и «все сорваны» недостижимо.
+      const log = (() => { try { return loadPlatformLog(); } catch { return []; } })()
+        .filter((e: any) => (e?.implement || 'rolling_thunder') === 'rolling_thunder' && Number.isFinite(Number(e?.weightKg)) && e.weightKg > 0);
+      const attempts = log.length
+        ? log.map((e: any, i: number) => ({ attempt: i + 1, weightKg: Number(e.weightKg), success: e.success !== false }))
+        : [{ attempt: 1, weightKg: rt, success: true }];
+      const res = scorePlatform({ implement: 'rolling_thunder', sex: state.sex, attempts });
+      return {
+        ...res,
+        fromLog: log.length > 0,
+        plan: planAttempts(log.length ? Math.max(...log.map((e: any) => Number(e.weightKg))) : rt),
+      };
     } catch { return null; }
-  }, [state.rtKg, state.sex]);
+  }, [state.rtKg, state.sex, attTick]);
 
   const [measureTick, setMeasureTick] = useState(0);
   const measureHistP0 = useMemo(() => {
@@ -751,7 +795,10 @@ export const ArmDiagnosticsHub: React.FC = () => {
       const hist = armVolumeHistory28d(diarySessionsP0 as any) as Record<string, number[]>;
       for (const wp of state.weakPoints) {
         const bio = ARM_BIOMECH[wp];
-        const fact = armAudit?.byPoint?.[wp]?.sets ?? null;
+        // Аудит 2026-10 было→стало: брался `sets` — сумма по ВСЕМ неделям плана, а пороги
+        // weak-cause («0–2 сета — не покрыта») недельные → на длинном плане причина «объём»
+        // не выявлялась никогда. Теперь последняя рабочая неделя.
+        const fact = armAudit?.byPoint?.[wp]?.setsLastWeek ?? null;
         const m0 = bio?.weakMuscles?.[0];
         const h = (m0 && (hist as any)[m0]) || [];
         const trend = diaryTrendsP0.find((t) => bio?.weakMuscles?.includes(t.muscle));
@@ -772,7 +819,7 @@ export const ArmDiagnosticsHub: React.FC = () => {
         const refRatio = wp.startsWith('side_') ? sideR : wp.startsWith('back_') ? backR : (sideR != null && backR != null ? Math.min(sideR, backR) : sideR ?? backR);
         out[wp] = diagnoseArmWeakCause({
           point: wp,
-          factSets7d: fact,
+          factSetsWeek: fact,
           hist28: h.length ? h : fact != null ? [fact] : [],
           e1rmDeltaPct: trend ? trend.deltaPct : null,
           e1rmSessions: trend ? trend.sessions : 0,
@@ -781,6 +828,8 @@ export const ArmDiagnosticsHub: React.FC = () => {
           mobilityFail: mobilityFailForWeakPoint(armMobility.fails, wp),
           vbtLossPct: vbt.velocityLossPct,
           vbtWarnPct: th.warnPct,
+          // Аудит 2026-10: ранжир и причина теперь смотрят на ОДИН канон stopPct (было warn+10)
+          vbtStopPct: th.stopPct,
           sleepHours: Number.isFinite(sleepNum) ? sleepNum : null,
           benchLevel: benchRes.level,
           sideBackRefRatio: refRatio,
@@ -848,10 +897,16 @@ export const ArmDiagnosticsHub: React.FC = () => {
     try { saveArmPlanPrev(raw); } catch { /* noop */ }
     const idx = (plan.weeks || []).map((_: any, i: number) => i).filter((i: number) => !(plan.weeks[i] as any)?.deload);
     const targetSets: Record<string, number> = {};
+    const targetSetsByWeek: Record<number, Record<string, number>> = {};
     try {
       const sb = buildArmSpecBlock({ weakPoints: points as any, level: state.level, weeks: parseInt(specWeeks) || 6, technique: state.technique });
       const w0 = sb.weeks[0];
       if (w0) for (const p of points) if ((w0.targetSets as any)?.[p] != null) targetSets[p] = (w0.targetSets as any)[p];
+      // Аудит 2026-10: волна спец-блока доезжает до плана по номерам недель (было: только неделя-1)
+      for (let k = 0; k < idx.length && k < sb.weeks.length; k++) {
+        const planWeek = Number((plan.weeks[idx[k]] as any)?.week) || idx[k] + 1;
+        targetSetsByWeek[planWeek] = sb.weeks[k].targetSets as any;
+      }
     } catch { /* noop */ }
     let working = plan;
     let injected = 0;
@@ -888,7 +943,7 @@ export const ArmDiagnosticsHub: React.FC = () => {
     const waveW = parseInt(String((state as any).corrWave || ''), 10);
     const waveWeek = Number.isFinite(waveW) && waveW >= 1 && waveW <= 3 ? waveW : null;
     try {
-      const r = injectArmCorrections(working, points as any, { weekIdxs: idx, targetSets, level: state.level, gatedSideIso: gatedSide, rankedIds, causes, tendonOverload, ...(waveWeek != null ? { waveWeek } : {}) });
+      const r = injectArmCorrections(working, points as any, { weekIdxs: idx, targetSets, targetSetsByWeek, level: state.level, gatedSideIso: gatedSide, rankedIds, causes, tendonOverload, ...(waveWeek != null ? { waveWeek } : {}) });
       working = r.plan;
       injected = r.injected;
       skipped = r.skippedBudget + r.skippedDup + r.skippedHumerus;
@@ -964,6 +1019,9 @@ export const ArmDiagnosticsHub: React.FC = () => {
           if (Object.keys(cs).length) simOpts.causes = cs;
           if (tendonOv) simOpts.tendonOverload = true;
           if (waveW != null) simOpts.waveWeek = waveW;
+          // Аудит 2026-10: симулятор получает тот же порядок кандидатов и dayMap, что инъекция
+          simOpts.rankedIds = orderedTopFor(wp).map((t: any) => String(t.id));
+          if (armSpecP0?.dayMap) simOpts.dayMap = armSpecP0.dayMap;
           sim = simulateArmInjection(armPlan as any, wp, null, simOpts)?.summary;
         } catch { /* noop */ }
         let spec1: number | undefined;
@@ -1138,19 +1196,32 @@ export const ArmDiagnosticsHub: React.FC = () => {
         elbowLift: numOrNull(flElbow), shoulderLine: numOrNull(flShoulder), pegLoss: numOrNull(flPeg),
         slipClean: numOrNull(flClean) ?? 0, slipLosing: numOrNull(flLosing) ?? 0,
         foulHistory: tiq.reduce((s, b) => s + (Number((b as any).fouls ?? 0) || 0), 0), bouts: tiq.length || null,
+        // Аудит 2026-10: фальстарты P2 доезжают до фол-профиля (было вечное «нет данных»)
+        falseStart: numOrNull(stFalse),
       });
     } catch { return null; }
-  }, [flElbow, flShoulder, flPeg, flClean, flLosing, tiq]);
+  }, [flElbow, flShoulder, flPeg, flClean, flLosing, tiq, stFalse]);
   const mvDanger = useMemo(() => {
     try {
       return assessHumerusDanger({
         losing: dgLosing || null, sideMax: dgSideMax || null,
         elbowDeg: numOrNull(dgElbow), fatigue: dgFatigue || null,
         teen: state.ageBand === 'teen' || null, pressAttempt: dgPress || null,
-        axisOk: null,
+        // Аудит 2026-10 было→стало: axisOk жёстко передавался null — две самые серьёзные
+        // стоп-ветки («ось разбита», «пресс на разбитой оси») не срабатывали НИКОГДА.
+        // Теперь ось берётся из чек-листа `he_arm_humerus_checks` (нет данных → null).
+        axisOk: (() => {
+          try {
+            const raw = typeof localStorage !== 'undefined' ? localStorage.getItem('he_arm_humerus_checks') : null;
+            if (!raw) return null;
+            const j = JSON.parse(raw);
+            const failed: unknown = j?.failed;
+            return Array.isArray(failed) ? !failed.map(String).includes('axis') : null;
+          } catch { return null; }
+        })(),
       });
     } catch { return null; }
-  }, [dgLosing, dgSideMax, dgFatigue, dgPress, dgElbow, state.ageBand]);
+  }, [dgLosing, dgSideMax, dgFatigue, dgPress, dgElbow, state.ageBand, forceHistoryTick]);
 
   const toggleWeakPoint = (wp: ArmWeakPoint) => {
     try { void haptics('light'); } catch { /* no-op */ }
@@ -1406,6 +1477,7 @@ export const ArmDiagnosticsHub: React.FC = () => {
     flClean, setFlClean, flLosing, setFlLosing, mvFoul,
     dgLosing, setDgLosing, dgSideMax, setDgSideMax, dgFatigue, setDgFatigue,
     dgPress, setDgPress, dgElbow, setDgElbow, mvDanger,
+    onTrackCycles: setTrackCycles,
   };
 
   return (

@@ -1128,6 +1128,8 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
       phase,
       deload: isDeload,
       taper,
+      // Аудит 2026-10: множитель микро-цикла едет в план — гварды нормализуют им объём
+      weekMult: Math.round(weekMult * 1000) / 1000,
       tableRatio: sessions.filter(s => s.tableTime).length / Math.max(1, sessions.length),
       sessions,
       ...(weekNote ? { note: weekNote } : {}),

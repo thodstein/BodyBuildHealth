@@ -10,7 +10,7 @@
  */
 import React, { useRef, useState } from 'react';
 import { AdBtn, AdField, AdSec, AdGrid } from './arm-design-system';
-import { buildTrackFromFrames, calibratePixelsPerCm, videoTrackLine, type FrameObservation } from '../../../engines/arm/arm-video-tracking.engine';
+import { buildTrackFromFrames, calibratePixelsPerCm, videoTrackLine, type FrameObservation, type VideoTrackCycle } from '../../../engines/arm/arm-video-tracking.engine';
 import { classifyArmTrajectory, suggestWeakPointsForTrack, type ArmTrajectoryType } from '../../../engines/arm/arm-video-analysis.engine';
 
 const SAMPLE_W = 160;
@@ -44,7 +44,13 @@ function frameMotion(prev: Uint8ClampedArray | null, cur: Uint8ClampedArray): { 
   return { cx: Math.round((sx / area) * 10) / 10, cy: Math.round((sy / area) * 10) / 10, area };
 }
 
-export function ArmVideoTracker() {
+/**
+ * Аудит 2026-10 раунд-3: трекер отдаёт per-cycle `vMax`, но его никто не потреблял —
+ * VBT-потеря в хабе бралась ТОЛЬКО из ручного ввода скоростей. Необязательный
+ * `onCycles` позволяет хабу использовать лучший/последний цикл как замер скорости.
+ * Без пропа поведение прежнее (другие вызовы не затронуты).
+ */
+export function ArmVideoTracker({ onCycles }: { onCycles?: (cycles: VideoTrackCycle[]) => void }) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [status, setStatus] = useState<string>('');
@@ -150,6 +156,8 @@ export function ArmVideoTracker() {
       setNotes(res.notes);
       if (!res.quality.ok) { setReason(res.quality.reason || 'трек не построен'); return; }
       setReason('');
+      // Аудит 2026-10 раунд-3: циклы трека уезжают в хаб (vMax → VBT-потеря)
+      try { onCycles?.(res.cycles); } catch { /* noop — трекер самодостаточен */ }
       const type = classifyArmTrajectory(res.points);
       setTrackType(type);
       setSuggestions((suggestWeakPointsForTrack(type) || []).map((s) => s.point));

@@ -51,7 +51,16 @@ export function buildArmSpecBlock(input: {
       if (kind === 'stress') sets = Math.max(2, base - 1);
       targetSets[wp] = sets;
     }
-    const note = kind === 'moderate' ? 'Техника 8-12 @60-65%' : kind === 'heavy' ? 'Объём +1 сет @65-70%' : 'Стресс-контроль: −1 сет, изометрия';
+    // Аудит 2026-10 было→стало: note выводился из `kind` («Объём +1 сет» для любой heavy),
+    // хотя +1 даётся только на неделях 3–4 — на неделе 5 подпись обещала +1 при факте базы.
+    // Теперь текст считается от ФАКТИЧЕСКОЙ дельты к базе точки.
+    const firstBase = points.length ? (ARM_CORRECTIONS[points[0]]?.sets ?? 3) : 3;
+    const delta = (targetSets[points[0]] ?? firstBase) - firstBase;
+    const note = delta > 0
+      ? `Объём +${delta} сет @65-70%`
+      : delta < 0
+        ? `Стресс-контроль: ${delta} сет, изометрия`
+        : 'Техника 8-12 @60-65%';
     weeks.push({ week: w, kind, targetSets, note });
   }
   const summary = points.length

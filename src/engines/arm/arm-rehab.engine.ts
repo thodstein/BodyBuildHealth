@@ -87,12 +87,33 @@ export function buildRehabPlan(input: RehabInput = {}): RehabPlan {
   // Боль откатывает фазу назад (защита)
   if (pain >= 5 && phase >= 2) phase = 1;
   else if (pain >= 3 && phase >= 3) phase = 2;
-  if (injury === 'humerus' && input.surgery !== false && w < 6 && phase > 1) phase = 1; // перелом — консервативно
-  const redFlags = [
-    'Деформация/отёк/онемение (radial nerve!) — немедленно к врачу + рентген.',
-    'Spiral humerus часто требует операции + пластина — не «перетерпеть».',
+  // Аудит 2026-10 было→стало: условие `w < 6 && phase > 1` было невыполнимо (w<6 ⇒ phase≤1),
+  // т.е. защита «перелом — консервативно» не работала: humerus на 8-й неделе получал фазу 2
+  // (лёгкие pron/sup + изометрия). Теперь порог привязан к реальным срокам консолидации.
+  if (injury === 'humerus' && input.surgery !== false) {
+    if (w < 10 && phase > 1) phase = 1;
+    else if (w < 14 && phase > 2) phase = 2;
+  }
+  // Аудит 2026-10: red-flags были универсальными — при тендините запястья показывался
+  // «Spiral humerus часто требует операции». Теперь общий пул + специфика травмы.
+  const redFlags: Record<string, string[]> = {
+    humerus: [
+      'Spiral humerus часто требует операции + пластина — не «перетерпеть».',
+      'Деформация/отёк/онемение (radial nerve!) — немедленно к врачу + рентген.',
+    ],
+    elbow: [
+      'UCL/медиальный эпикондил: острая боль при хвате — врач до любой нагрузки.',
+      'Онемение мизинца/безымянного — нерв, стоп.',
+    ],
+    wrist: [
+      'Тендинит: утренняя боль >5 — стоп, объём ×0.5.',
+      'Онемение пальцев — нерв/проводка, врач.',
+    ],
+  };
+  const general = [
     'Повторная острая боль на фазе — откат на фазу назад + врач при >недели.',
+    'Деформация/отёк/онемение (radial nerve!) — немедленно к врачу + рентген.',
   ];
   const note = `${injury}: фаза ${phase} (${PHASES[phase].title}) — ${PHASES[phase].weeks}. Union + full ROM — критерии, не сроки.`;
-  return { injury, phase, phases: PHASES, current: PHASES[phase], redFlags, note };
+  return { injury, phase, phases: PHASES, current: PHASES[phase], redFlags: [...(redFlags[injury] || []), ...general], note };
 }

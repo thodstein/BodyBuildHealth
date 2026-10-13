@@ -10,7 +10,7 @@ import { estimateForceVector, forceAdvice } from './arm-force-capture.engine';
 import { diagnoseVbt } from './arm-vbt-capture.engine';
 import type { GripForceRecord } from './arm-force-capture.engine';
 import type { VbtRecord } from './arm-vbt-capture.engine';
-import { ARM_BIOMECH, type ArmWeakPoint } from './arm-biomechanics.engine';
+import { ARM_BIOMECH, type ArmWeakPoint, armAngleValueForWeakPoint } from './arm-biomechanics.engine';
 import { ARM_CORRECTIONS } from './arm-weakpoint-corrections';
 import { scoreArm } from './arm-scoring.engine';
 import { erIrVerdict, type ErIrInput } from './arm-shoulder-erir.engine';
@@ -34,7 +34,8 @@ export interface ArmDiagnosticsReport {
   forceVector?: ReturnType<typeof estimateForceVector>;
   vbt?: ReturnType<typeof diagnoseVbt>;
   tableRatio: number;
-  tendonLoad: number;
+  /** Аудит 2026-10: null — план не подключён (недельная нагрузка сухожилий не оценена). */
+  tendonLoad: number | null;
   asymmetryPct?: number;
   info: string[]; // доп. инфо без уровня
   // PRO detailed (12 мёртвых точек)
@@ -61,9 +62,9 @@ export function buildArmDiagnosticsReport(input: {
   vbtRecords?: VbtRecord[];
   level: string;
   technique: string;
-  tableSessions: number;
-  totalSessions: number;
-  tendonSets: number;
+  tableSessions: number | null;
+  totalSessions: number | null;
+  tendonSets: number | null;
   sex?: string;
   weightClass?: string;
   bodyWeightKg?: number;
@@ -100,9 +101,10 @@ export function buildArmDiagnosticsReport(input: {
   if (diag.priorities.length === 0) findings.push({ level: 'ok', text: 'Слабые зоны не выявлены — баланс' });
 
   // Force — нейтрально, но оставляем как факт (не риск)
-  const fAdv = forceAdvice(fv);
+  const fAdv = forceAdvice(fv, gripWithMeta);
   for (const t of fAdv) {
-    const lvl: ArmDiagLevel = t.startsWith('✓') ? 'ok' : 'warn';
+    // Аудит 2026-10: forceAdvice помечает факты ✓, технические подсказки →
+    const lvl: ArmDiagLevel = t.startsWith('✓') || t.startsWith('→') ? 'ok' : 'warn';
     findings.push({ level: lvl, text: t });
   }
 
@@ -116,15 +118,21 @@ export function buildArmDiagnosticsReport(input: {
   const sideLm = getArmLandmarks(input.level, 'side_pressure');
   if (sideLm.mrv <= 9) findings.push({ level: 'ok', text: `Side MRV ${sideLm.mrv} — низкий (humerus), кап 3/нед первые 4 нед`, exercise: 'side_press_table' });
 
-  // Table — факт
-  const tableRatio = input.totalSessions ? input.tableSessions / input.totalSessions : 0;
-  if (tableRatio < 0.3) findings.push({ level: 'warn', text: `Table sessions ${(tableRatio*100).toFixed(0)}% <30% — для армрестлинга мало стола (Кузнецов VIII ≥50%)`, exercise: 'table_pushdown_iso' });
+  // Table — факт (аудит 2026-10: без плана хаб выдумывал 2/4 сессий — теперь честный null)
+  const tableKnown = input.tableSessions != null && input.totalSessions != null && input.totalSessions > 0;
+  const tableRatio = tableKnown ? (input.tableSessions as number) / (input.totalSessions as number) : 0;
+  if (!tableKnown) {
+    info.push('Стол: план не подключён — доля столовых сессий не оценена (подключи план из Арм-конструктора)');
+  } else if (tableRatio < 0.3) findings.push({ level: 'warn', text: `Table sessions ${(tableRatio*100).toFixed(0)}% <30% — для армрестлинга мало стола (Кузнецов VIII ≥50%)`, exercise: 'table_pushdown_iso' });
   else if (tableRatio >= 0.5) findings.push({ level: 'ok', text: `Table sessions ${(tableRatio*100).toFixed(0)}% ≥50% — норма`, exercise: 'table_pushdown_iso' });
+  else findings.push({ level: 'ok', text: `Table sessions ${(tableRatio*100).toFixed(0)}% — норма`, exercise: 'table_pushdown_iso' });
 
-  // 26.10.2026 было→стало: порог critical >22 был недостижим — хаб клэмпит ввод в 22, т.е. из UI ветка не срабатала.
+  // Аудит 2026-10 было→стало: порог critical >22 был недостижим — хаб клэмпит ввод в 22, т.е. из UI ветка не срабатывала.
   // Новый порог 18 соответствует недельному капу 22/18/12 (checkTendonGuard).
-  if (input.tendonSets >= 18) findings.push({ level: 'critical', text: `Tendon ${input.tendonSets} ≥ 18 — CRITICAL (кап 18 для Л/П, выше)`, exercise: 'wrist_ext_bb' });
-  else if (input.tendonSets > 18) findings.push({ level: 'warn', text: `Tendon сетов ${input.tendonSets} >18 — риск`, exercise: 'pronation_pulses' });
+  // Плюс: без подключённого плана недельная нагрузка сухожилий не оценивается (было 8..22 из головы).
+  if (input.tendonSets == null) {
+    info.push('Сухожилия: план не подключён — недельная нагрузка не оценена (подключи план из Арм-конструктора)');
+  } else if (input.tendonSets >= 18) findings.push({ level: 'critical', text: `Tendon ${input.tendonSets} ≥ 18 — CRITICAL (кап 18 для Л/П, выше)`, exercise: 'wrist_ext_bb' });
   else if (input.level === 'beginner' && input.tendonSets > 12) findings.push({ level: 'warn', text: `Tendon ${input.tendonSets} >12 для beginner — много`, exercise: 'wrist_ext_bb' });
   else findings.push({ level: 'ok', text: `Tendon ${input.tendonSets} — в допуске`, exercise: 'wrist_ext_bb' });
 
@@ -191,8 +199,12 @@ export function buildArmDiagnosticsReport(input: {
     const hasVbt = !!input.hasVbt || (input.vbtRecords && input.vbtRecords.length>0);
     const hasGripHistory = !!input.hasGripHistory;
     if (hasVideo || hasVbt || hasGripHistory || corrections.length>0) {
-      const sideSets = (input.actualPlan?.weeks?.[0]?.sessions || []).reduce((a: number, s: any) => a + s.exercises.filter((e: any)=> e.muscle==='side_pressure').reduce((aa:number,e:any)=>aa+(e.sets||0),0),0);
-      // PRO-3 P2: без плана sideSets=0 честно (раньше sidePlanned подставлял 8 — псевдо-warn)
+      // Аудит 2026-10 было→стало: sideSetsWeek1 = 0 без плана давал «Side 0 — в допуске»
+      // (непокрытая проверка выглядела пройденной). Теперь null = «план не подключён».
+      const w0 = input.actualPlan?.weeks?.[0];
+      const sideSets = w0
+        ? (w0.sessions || []).reduce((a: number, s: any) => a + (s.exercises || []).filter((e: any)=> e.muscle==='side_pressure').reduce((aa:number,e:any)=>aa+(Number(e.sets)||0),0),0)
+        : null;
       scoring = scoreArm({
         weakCount: weakPoints.length,
         asymmetryPct: fv.asymmetryPct ?? null,
@@ -205,19 +217,20 @@ export function buildArmDiagnosticsReport(input: {
       });
     }
   } catch {}
-  // angle validation для detailed
+  // angle validation для detailed.
+  // Аудит 2026-10 было→стало: здесь была ВТОРАЯ копия строковой эвристики сустава, и
+  // `rising_top` (radial deviation) не матчил ни одну ветку — точка молча пропускалась.
+  // Теперь единый канон `armAngleValueForWeakPoint` (как в `autoValidateArmAngles`).
   if (input.angles) {
-    const vals = Object.values(ARM_BIOMECH);
+    const allBio = Object.values(ARM_BIOMECH);
     for (const card of biomechCards) {
-      const bio = vals.find(v => v.weakPoint === card.weakPoint);
-      if (!bio || !input.angles) continue;
-      // уже в biomechCards есть, но добавим cue если вне диапазона
-      const key = bio.keyJoint.toLowerCase();
-      let av: number | undefined;
-      if (key.includes('лучезапяст') || key.includes('кист')) av = input.angles.wristDeg;
-      else if (key.includes('локт')) av = input.angles.elbowDeg;
-      else if (key.includes('предплеч') || key.includes('прона') || key.includes('супи')) av = input.angles.forearmDeg;
-      if (av != null && (av < bio.angleRangeDeg[0] || av > bio.angleRangeDeg[1])) {
+      const bio = allBio.find((v) => v.weakPoint === card.weakPoint);
+      if (!bio) continue;
+      const av = armAngleValueForWeakPoint(card.weakPoint, {
+        wrist: input.angles.wristDeg, elbow: input.angles.elbowDeg, forearm: input.angles.forearmDeg,
+      });
+      if (av == null) continue;
+      if (av < bio.angleRangeDeg[0] || av > bio.angleRangeDeg[1]) {
         findings.push({ level: 'warn', text: `${bio.label}: твой ${av}° вне ${bio.angleRangeDeg[0]}-${bio.angleRangeDeg[1]}° → ${bio.loadCues}`, exercise: bio.corrections[0] });
       }
     }

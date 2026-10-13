@@ -78,6 +78,13 @@ export interface BridgeDose {
   /** D5 PRO-2: v2-флаги моста (опционально; без — базовый путь приёмника). */
   tendonOverload?: boolean;
   waveWeek?: number;
+  /**
+   * Аудит 2026-10 раунд-2: спец-блок хаба (сеты по номерам недель блока + dayMap) наконец
+   * доезжает до приёмника. Было: поля `armSpecTargetSets`/`armSpecDayMap` уходили в никуда —
+   * в плане появлялась инъекция с недельными сетами по умолчанию.
+   */
+  specSets?: Record<string, Record<number, number>>;
+  dayMap?: Record<string, string>;
 }
 
 /**
@@ -113,6 +120,30 @@ export function bridgeDoseFromPayload(data: unknown): BridgeDose | null {
     const w = Number((d as Record<string, unknown>).armWaveWeek);
     if (Number.isFinite(w) && w >= 1 && w <= 3) out.waveWeek = Math.round(w);
   } catch { /* noop */ }
-  if (!Object.keys(causes).length && !Object.keys(rankedIds).length && !out.tendonOverload && out.waveWeek == null) return null;
+  // Аудит 2026-10 раунд-2: спец-наборы точки по неделям блока (мусорные — тихо)
+  const specSets: Record<string, Record<number, number>> = {};
+  const st = d.armSpecTargetSets;
+  if (st && typeof st === 'object') {
+    for (const [wp, weeks] of Object.entries(st as Record<string, unknown>)) {
+      if (!weeks || typeof weeks !== 'object') continue;
+      const per: Record<number, number> = {};
+      for (const [wk, v] of Object.entries(weeks as Record<string, unknown>)) {
+        const wNum = Number(wk);
+        const sets = Number(v);
+        if (Number.isFinite(wNum) && wNum >= 1 && wNum <= 52 && Number.isFinite(sets) && sets >= 1 && sets <= 12) per[wNum] = Math.round(sets);
+      }
+      if (Object.keys(per).length) specSets[String(wp)] = per;
+    }
+  }
+  if (Object.keys(specSets).length) out.specSets = specSets;
+  const dayMap: Record<string, string> = {};
+  const dm = d.armSpecDayMap;
+  if (dm && typeof dm === 'object') {
+    for (const [wp, tag] of Object.entries(dm as Record<string, unknown>)) {
+      if (typeof tag === 'string' && tag) dayMap[String(wp)] = tag;
+    }
+  }
+  if (Object.keys(dayMap).length) out.dayMap = dayMap;
+  if (!Object.keys(causes).length && !Object.keys(rankedIds).length && !out.tendonOverload && out.waveWeek == null && !out.specSets && !out.dayMap) return null;
   return out;
 }

@@ -17,7 +17,7 @@ import { buildArmPrintHtml, buildArmIcs, buildArmPlanCsv } from '../../../engine
 import { ARM_SPLIT_PATTERNS } from '../../../engines/arm/arm-split-patterns';
 import { ARM_MUSCLE_RU, ARM_MUSCLES, type ArmSpecializationBlock, type ArmWeeklyCheckin } from '../../../engines/arm/arm-types';
 import { loadArmCheckins, saveArmCheckin, removeArmCheckin, armCheckinTrend } from '../../../engines/arm/arm-weekly-checkin.engine';
-import { injectArmCorrections } from '../../../engines/arm/arm-diagnostics-injection.engine';
+import { injectArmCorrections, specTargetSetsByPlanWeek } from '../../../engines/arm/arm-diagnostics-injection.engine';
 import { bridgeDoseFromPayload } from '../../../engines/arm/arm-correction-dose.engine';
 import { injectArmliftCorrections, applyArmliftSpecWave, type ArmliftInjectionItem } from '../../../engines/arm/armlift-injection.engine';
 import { buildWafStartCard, WafParaClass } from '../../../engines/arm/arm-waf.engine';
@@ -50,7 +50,7 @@ import { ArmAnnotationsPanel } from './arm-annotations-panel';
 import { ArmRulebookPanel } from './arm-rulebook-panel';
 import { saveAnnualTrainingPlan } from '../../../engines/annual-training/annual-training-storage';
 import { annualPlanFromMacro, setAnnualBlockConfig, buildAnnualPlan } from '../../../engines/annual-training/block-builders.engine';
-import { PLATFORM_WR, planAttempts, platformWrFor, platformIsInternal, loadPlatformLog } from '../../../engines/arm/arm-platform.engine';
+import { PLATFORM_WR, planAttempts, platformWrFor, platformIsInternal, loadPlatformLog, savePlatformLogEntry } from '../../../engines/arm/arm-platform.engine';
 import { parseArmResultJson, parseArmResultCsv, applyArmResultImport } from '../../../engines/arm/arm-result-import.engine';
 import { assessArmReadiness } from '../../../engines/arm/arm-readiness.engine';
 import { resolveArmReturnToLoad } from '../../../engines/arm/arm-return-to-load.engine';
@@ -664,13 +664,37 @@ export function ArmAutoConstructor() {
     try {
       const srpe = Number(proSrpe);
       const pain = Number(proPain);
+      // Аудит 2026-10 раунд-2 было→стало: приёмник питался ОДНОЙ синтетической записью —
+      // окно 7 дней было бессмысленным, пороги velocityLoss и ветки профиля (сон/HRV/стресс)
+      // не срабатывали никогда. Теперь: реальный sRPE-дневник + ручной ввод на последний день
+      // + профиль (сон/HRV/стресс) — как это делает хаб диагностики.
+      const days: any[] = [];
+      try {
+        const srpeSessions: any[] = loadSRPESessions() as any;
+        for (const s of (srpeSessions || []).slice(-7)) {
+          days.push({
+            dateIso: String(s.date || '').slice(0, 10),
+            srpe: Number(s.sRPE ?? s.srpe ?? 0) || undefined,
+            velocityLossPct: Number.isFinite(Number((s as any)?.velocityLossPct)) ? Number((s as any).velocityLossPct) : undefined,
+          });
+        }
+      } catch { /* noop */ }
+      const lastDay = days.length ? days[days.length - 1] : { dateIso: localIsoDate() };
+      if (Number.isFinite(srpe)) (lastDay as any).srpe = srpe;
+      if (Number.isFinite(pain) && pain > 0) { (lastDay as any).elbowPain = pain; }
+      if (!days.length) days.push(lastDay);
+      const lp: any = linked?.profile?.settings || {};
       return assessArmReadiness({
-        // 26.10.2026: канон локальной даты (UTC давал «вчера» в вечерние часы UTC+X)
-        diary: [{ dateIso: localIsoDate(), srpe: Number.isFinite(srpe) ? srpe : undefined, elbowPain: Number.isFinite(pain) ? pain : undefined }],
+        diary: days,
         acwrRatio: pro7Acwr?.value,
+        profile: {
+          ...(Number.isFinite(Number(lp?.lifestyle?.sleepHours)) ? { sleepHours: Number(lp.lifestyle.sleepHours) } : {}),
+          ...(Number.isFinite(Number(lp?.lifestyle?.morningHRV)) ? { hrvMs: Number(lp.lifestyle.morningHRV) } : {}),
+          ...(Number.isFinite(Number(lp?.lifestyle?.stressLevel)) ? { stressLevel: Number(lp.lifestyle.stressLevel) } : {}),
+        },
       });
     } catch { return null; }
-  }, [proSrpe, proPain, pro7Acwr]);
+  }, [proSrpe, proPain, pro7Acwr, linked?.profile]);
   const pro7Return = useMemo(() => {
     try {
       const days = Number(proClearDays);
@@ -879,10 +903,20 @@ const [rfdEstimated, setRfdEstimated] = useState<boolean>(false);
               if (bd.waveWeek != null) localStorage.setItem('he_arm_last_wave', String(bd.waveWeek));
               else localStorage.removeItem('he_arm_last_wave');
             } catch {}
+            // Аудит 2026-10 раунд-2 было→стало: `armSpecTargetSets`/`armSpecDayMap` уходили
+            // в никуда — спец-блок хаба (сеты по неделям + день) не влиял на план вообще.
+            // Теперь персистятся и применяются в инъекции (targetSetsByWeek + dayMap).
+            try {
+              if (bd.specSets) localStorage.setItem('he_arm_last_spec_sets', JSON.stringify(bd.specSets));
+              else localStorage.removeItem('he_arm_last_spec_sets');
+              if (bd.dayMap) localStorage.setItem('he_arm_last_daymap', JSON.stringify(bd.dayMap));
+              else localStorage.removeItem('he_arm_last_daymap');
+            } catch {}
           } else {
             localStorage.removeItem('he_arm_last_causes');
             localStorage.removeItem('he_arm_last_rankedids');
             try { localStorage.removeItem('he_arm_last_tendon'); localStorage.removeItem('he_arm_last_wave'); } catch {}
+            try { localStorage.removeItem('he_arm_last_spec_sets'); localStorage.removeItem('he_arm_last_daymap'); } catch {}
           }
         } catch {}
       } else if (Array.isArray(payload.data?.armBiomechCards) && payload.data.armBiomechCards.length) {
@@ -995,6 +1029,49 @@ const [rfdEstimated, setRfdEstimated] = useState<boolean>(false);
           localStorage.removeItem('he_arm_ortho_mobility');
           localStorage.removeItem('he_arm_ortho_guards');
           localStorage.removeItem('he_arm_ortho_flags');
+        }
+      } catch {}
+      // Аудит 2026-10 раунд-2: четыре поля моста были «в никуда» (spec-наборы закрыты выше,
+      // здесь мобильность/попытки/ACWR/L-R). Каждый получил реального или честного потребителя.
+      try {
+        const d: any = payload.data;
+        // (1) ROM-тесты хаба → профиль (живой фильтр пула, та же ветка что и орто-гарды)
+        const mf = Array.isArray(d?.armMobilityFails) ? d.armMobilityFails : [];
+        const mobW = Array.from(new Set<string>((mf as unknown[]).map((m) => String(m)).filter((m: string) => ['wrist', 'forearm', 'elbow'].includes(m))));
+        if (mobW.length) {
+          applyArmMobilityToProfile(mobW);
+          try { localStorage.setItem('he_arm_ortho_mobility', JSON.stringify(mobW)); } catch {}
+          flash(`🦴 Мобильность из диагностики: ${mobW.join(' + ')} — пул отфильтрован`);
+        }
+        // (2) попытки помоста из журнала хаба → общий журнал платформы (с дедупом)
+        const att = Array.isArray(d?.armAttempts) ? d.armAttempts : [];
+        let added = 0;
+        try {
+          const seen = new Set(loadPlatformLog().map((e: any) => `${e.date}|${e.implement}|${e.weightKg}|${e.success ? 1 : 0}`));
+          for (const a of att as any[]) {
+            const w = Number(a?.weightKg);
+            if (!Number.isFinite(w) || w <= 0) continue;
+            const implement = String(a?.implement || 'rolling_thunder');
+            const dateIso = a?.dateIso || localIsoDate();
+            const key = `${dateIso}|${implement}|${Math.round(w * 10) / 10}|${a?.success ? 1 : 0}`;
+            if (seen.has(key)) continue;
+            savePlatformLogEntry({ implement, sex: a?.sex === 'female' ? 'female' : 'male', weightKg: w, success: !!a?.success, dateIso });
+            seen.add(key);
+            added++;
+          }
+        } catch { /* noop */ }
+        if (added > 0) flash(`↩ Попытки помоста из диагностики: +${added} — в журнал платформы`);
+        // (3) per-muscle ACWR danger — info-слой (математику добора считает билдер сам)
+        const acw = Array.isArray(d?.armAcwrDanger) ? (d.armAcwrDanger as unknown[]).map(String) : [];
+        if (acw.length) flash(`⚡ Диагностика: перегруз по мышцам (${acw.join(', ')}) — учтено при доборе объёма`);
+        // (4) L/R-вердикт хаба — info-слой, двойного перераспределения нет (билдер сам от left/right)
+        const bil = d?.armBilateral;
+        if (bil && typeof bil === 'object') {
+          const bits: string[] = [];
+          if (bil.weakArm) bits.push(`слабая ${String(bil.weakArm)}`);
+          if (Number.isFinite(Number(bil.weakSets)) && Number.isFinite(Number(bil.strongSets))) bits.push(`${bil.weakSets}/${bil.strongSets} сетов`);
+          if (bil.asymmetryPct != null && Number.isFinite(Number(bil.asymmetryPct))) bits.push(`асим ${bil.asymmetryPct}%`);
+          if (bits.length) flash(`🧤 Двусторонний план из диагностики: ${bits.join(' · ')}`);
         }
       } catch {}
       // TOP из хаба: матчап + Table-IQ (аддитивно)
@@ -1473,7 +1550,7 @@ const [rfdEstimated, setRfdEstimated] = useState<boolean>(false);
         const toInject: ArmWeakPoint[] = diagWeakPoints.length ? diagWeakPoints : (()=>{ try{ const raw=localStorage.getItem('he_arm_last_weakpoints'); if(raw){ const arr=JSON.parse(raw); if(Array.isArray(arr) && arr.length) return arr as ArmWeakPoint[]; } } catch{} return []; })();
         if (toInject.length) {
           // доза из диагностики (нет ключей — базовый путь)
-          const doseOpts: { causes?: Record<string, any>; rankedIds?: Record<string, string[]>; tendonOverload?: boolean; waveWeek?: number } = {};
+          const doseOpts: { causes?: Record<string, any>; rankedIds?: Record<string, string[]>; tendonOverload?: boolean; waveWeek?: number; specSets?: Record<string, Record<number, number>>; dayMap?: Record<string, string> } = {};
           try {
             const cRaw = localStorage.getItem('he_arm_last_causes');
             const rRaw = localStorage.getItem('he_arm_last_rankedids');
@@ -1486,11 +1563,26 @@ const [rfdEstimated, setRfdEstimated] = useState<boolean>(false);
               const w = wRaw != null ? Math.round(Number(wRaw)) : NaN;
               if (Number.isFinite(w) && w >= 1 && w <= 3) doseOpts.waveWeek = w;
             } catch {}
+            // Аудит 2026-10 раунд-2: спец-блок хаба (сеты по неделям блока + dayMap) —
+            // было write-only, теперь применяется в инъекции ниже.
+            try {
+              const sRaw = localStorage.getItem('he_arm_last_spec_sets');
+              if (sRaw) { const s = JSON.parse(sRaw); if (s && typeof s === 'object') doseOpts.specSets = s; }
+              const dRaw = localStorage.getItem('he_arm_last_daymap');
+              if (dRaw) { const dm = JSON.parse(dRaw); if (dm && typeof dm === 'object') doseOpts.dayMap = dm; }
+            } catch {}
           } catch {}
           // PRO-PLAN: инъекция во ВСЕ недели плана (не только первую) — коррекция
           // сопровождает весь мезоцикл, а не исчезает с 1-й недели. Делод-скип и
           // per-day dedup остаются в движке.
-          const inj = injectArmCorrections(plan, toInject as ArmWeakPoint[], { level, workMax, weekIdxs: (plan.weeks || []).map((_: any, i: number) => i), ...doseOpts });
+          const specByPlanWeek = specTargetSetsByPlanWeek(doseOpts.specSets, plan, toInject as ArmWeakPoint[]);
+          const inj = injectArmCorrections(plan, toInject as ArmWeakPoint[], {
+            level, workMax,
+            weekIdxs: (plan.weeks || []).map((_: any, i: number) => i),
+            ...doseOpts,
+            ...(Object.keys(specByPlanWeek).length ? { targetSetsByWeek: specByPlanWeek } : {}),
+            ...(doseOpts.dayMap ? { dayMap: doseOpts.dayMap } : {}),
+          });
           plan = inj.plan;
           if (inj.injected>0) plan.rationale = [...(plan.rationale||[]), `Инъекция мёртвых точек: ${inj.notes.join(' · ')}`];
         }

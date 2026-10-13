@@ -6,7 +6,7 @@
 import type { ArmWeakPoint } from './arm-biomechanics.engine';
 import { ARM_BIOMECH, vbtThresholdForWeakPoint } from './arm-biomechanics.engine';
 import { ARM_CORRECTIONS } from './arm-weakpoint-corrections';
-import { POOL_TOPUP, roleOf } from './arm-correction-pro2.engine';
+import { POOL_TOPUP, roleOf, poolWithTopup } from './arm-correction-pro2.engine';
 import { getArmExerciseById } from '../../core/exercise-catalog-arm';
 import type { ArmWeakCause } from './arm-weak-cause.engine';
 
@@ -73,8 +73,9 @@ export function rankCorrectionsForArm(point: ArmWeakPoint, ctx: ArmRankCtx = {})
   if (!corr) return [];
   const inPlan = new Set((ctx.inPlanIds || []).map((s) => String(s).toLowerCase()));
   const out: ArmRankedCorrection[] = [];
-  // PRO-2: пул базы + топап-хвост (порядок базы цел — топап только расширяет выбор)
-  const pool = [...corr.exercises, ...(POOL_TOPUP[point] || []).filter((id) => !corr.exercises.includes(id))];
+  // PRO-2: пул базы + топап-хвост (порядок базы цел — топап только расширяет выбор).
+  // Аудит 2026-10: было inline-дублем тела `poolWithTopup` (второй источник того же пула).
+  const pool = poolWithTopup(point);
   for (const id of pool) {
     const cat = getArmExerciseById(id);
     const name = cat?.name || id;
@@ -173,18 +174,15 @@ export function rankCorrectionsForArm(point: ArmWeakPoint, ctx: ArmRankCtx = {})
         reasons.push('уровень — тяжёлая');
       }
     }
-    // P1-движения: точка своей фазы схватки (без fixesPhase — по канону точек).
-    // Локальная карта (без импорта match-phases — ранжир не тянет фазовый движок).
+    // P1-движения: точка своей фазы схватки.
+    // Аудит 2026-10 было→стало: здесь была ЛОКАЛЬНАЯ карта «точка→фаза», которая расходилась
+    // с каноном `fixesPhase` (sup_cup fixesPhase [setup,start] vs карта 'mid'; contain_fingers
+    // в карте отсутствовал вовсе) — бонус +6 «чинит фазу срыва» и +4 «точка слабой фазы»
+    // срабатывали при РАЗНЫХ matchPhase, а UI подписывал «топ-3 получит +4 точкам фазы».
+    // Теперь оба бонуса считаются от одного канона `fixesPhase`.
     const mp = String(ctx.matchPhase || '').toLowerCase();
     if (mp === 'setup' || mp === 'readygo' || mp === 'start' || mp === 'mid' || mp === 'pin') {
-      const pointPhase: Record<string, string> = {
-        contain_fingers: 'setup',
-        cup_start: 'start', pron_open: 'start', rising_top: 'start', back_start: 'start',
-        cup_hold: 'mid', pron_lock: 'mid', sup_cup: 'mid', sup_drag: 'mid',
-        side_mid: 'mid', back_drag: 'mid',
-        side_pin: 'pin',
-      };
-      if (pointPhase[point] === mp) {
+      if (fixes.map(String).map((s: string) => s.toLowerCase()).includes(mp)) {
         score += 4;
         reasons.push('точка слабой фазы');
       }
