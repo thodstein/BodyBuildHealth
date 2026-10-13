@@ -28,6 +28,7 @@ import { saveUserProgram } from '../../../engines/user-program/program-store';
 import { SS_CYCLES, getSSCycleById } from '../../../data/ss-cycles/ss-cycle-index';
 import { recommendSSCycle } from '../../../engines/strength-sport/strength-sport-ss-selector.engine';
 import { buildSSCyclePlan } from '../../../engines/strength-sport/strength-sport-ss-cycle-to-plan.engine';
+import { pctForEditedWeight, pctAnchorOf, editedSetPct } from '../../../engines/strength-sport/strength-sport-load-edit.engine';
 import { localIsoDate } from '../../../engines/workout-logger.engine';
 import { buildAnnualFromSSCycles } from '../../../engines/strength-sport/strength-sport-ss-annual.engine';
 import { seasonPresetsFor, recommendSeasonPlan, seasonInputSignature, buildSeasonPlan, validateSeasonPeriodization, seasonSummaryLines, seasonPlanWeekCells, buildSeasonSummaryText, buildSeasonPrintHtml, buildSeasonIcs, saveSeasonPlan, loadSeasonPlan, clearSeasonPlan, SEASON_PHASE_META, type SSSeasonPlan } from '../../../engines/strength-sport/strength-sport-season-planner.engine';
@@ -610,18 +611,13 @@ export const StrengthSportConstructor: React.FC = () => {
       if (!ex) return prev;
       if (patch.weight != null) {
         ex.weight = patch.weight;
-        const wmAny: any = (prev as any)?.inputSnapshot?.workMax || workMax || {};
-        let base = 100;
-        const lid = ex.id;
-        if (['snatch','hang_snatch','power_snatch','muscle_snatch','deficit_snatch','block_snatch','pause_snatch','snatch_pull','pause_pull','deficit_pull','snatch_balance','overhead_squat_v2'].includes(lid) || lid.includes('snatch')) base = wmAny.snatch || 60;
-        else if (['clean_and_jerk','hang_clean','power_clean','muscle_clean','deficit_clean','block_clean','pause_clean','push_jerk','split_jerk','clean_pull','front_squat_clean_grip','jerk_dip','jerk_recovery','behind_neck_jerk'].includes(lid) || lid.includes('clean') || lid.includes('jerk')) base = wmAny.cleanJerk || wmAny.clean || wmAny.frontSquat || 80;
-        else if (['squat','back_squat','front_squat','hack_squat','front_squat_clean_grip','pause_squat','overhead_squat_v2'].includes(lid) || lid.includes('squat')) base = wmAny.backSquat || wmAny.frontSquat || 100;
-        else if (['deadlift','sumo_dl','axle_deadlift','car_deadlift_18','rdl','deficit_pull','pause_pull'].includes(lid)) base = wmAny.deadlift || 120;
-        else if (['yoke_walk','frame_carry','husafell_carry','farmers_walk_heavy','sandbag_carry','zercher_carry'].includes(lid)) base = wmAny.farmersWalk || wmAny.yokeWalk || 140;
-        else if (['atlas_stone_load','stone_lift','sandbag_load','sandbag_shoulder','keg_toss'].includes(lid)) base = wmAny.atlasStone || 100;
-        else if (['ohp','push_press','log_press','axle_press','circus_db_press','bench_bar','jerk_recovery','behind_neck_jerk'].includes(lid)) base = wmAny.overheadPress || wmAny.bench || wmAny.logPress || 60;
-        const newPct = base ? Math.round(patch.weight / base * 100) : 0;
-        ex.workSets = ex.workSets.map(s => ({ ...s, weight: patch.weight!, pct: newPct || s.pct }));
+        // % ПМ — ОТНОСИТЕЛЬНО собственной строки (её вес / её %), а не по цепочке
+        // догадок «id упражнения → чей максимум взять базой»: жим лога больше не
+        // считает базой жим лёжа, махи/икры/предплечья не считают базой 100 кг.
+        // Нет осмысленной пары (вес,%) — pct остаётся как был: честное «не оценивается».
+        const rowPct = pctForEditedWeight(pctAnchorOf(ex.workSets), patch.weight);
+        ex.workSets = ex.workSets.map(s => ({ ...s, weight: patch.weight!, pct: rowPct ?? s.pct }));
+        if (rowPct != null) (ex as any).pct = rowPct;
       }
       if (patch.reps != null) {
         ex.reps = patch.reps;
@@ -645,8 +641,12 @@ export const StrengthSportConstructor: React.FC = () => {
       const ex = copy.weeksData[wkIdx]?.sessions.find(s=> s.day===day)?.exercises.find(e=> e.id===exId);
       if(!ex || !ex.workSets[setIdx]) return prev;
       if(patch.weight!=null){
-        if(patch.weight<0 || patch.weight>600) return prev;
+        if(patch.weight<0||patch.weight>600) return prev;
+        // Правка ОДНОГО подхода: его % ПМ пересчитывается от него же (иначе подход
+        // продолжал заявлять старый процент при новом весе — таблица врала).
+        const setPct = editedSetPct(ex.workSets[setIdx], patch.weight);
         (ex.workSets[setIdx] as any).weight = patch.weight;
+        if (setPct != null) (ex.workSets[setIdx] as any).pct = setPct;
         ex.weight = Math.round(ex.workSets.reduce((a,s)=>a+s.weight,0)/ex.workSets.length);
       }
       if(patch.reps!=null) (ex.workSets[setIdx] as any).reps = Math.max(1, Math.min(20, patch.reps));
@@ -682,7 +682,7 @@ export const StrengthSportConstructor: React.FC = () => {
       outside: plan.outsideMetrics,
       validation: plan.validation,
     };
-    try { saveUserProgram(prog); setMsg('✦ Экспортировано в библиотеку'); setTimeout(()=>setMsg(''),2200); } catch {}
+    try { saveUserProgram(prog); setMsg('✦ Экспортировано в библиотеку'); setTimeout(()=>setMsg(''),2200); } catch (e) { setMsg('⚠ Экспорт НЕ сохранён (нет места в хранилище)'); setTimeout(()=>setMsg(''),2500); }
     try { localStorage.setItem('he_last_strength_program', JSON.stringify(prog)); } catch {}
     try { navigator.clipboard?.writeText(JSON.stringify(prog, null, 2)); } catch {}
   };
