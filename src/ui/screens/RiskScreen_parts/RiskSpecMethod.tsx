@@ -1,6 +1,6 @@
 // Механизм-ориентированная модель риска — UI (качественное оформление)
 // Данные курса → из linked.course (Фарма), анализы → из linked.labs, поддержка → из калькулятора
-import React, { lazy, Suspense, useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { calculateTzSpecRisk, DRUG_CLASSES, getCategoryLabel, type TzSpecInput, type TzSpecResult, type TzSpecOrganResult, type TzSpecMechanismResult } from '../../../engines/risk-engine-tz-spec';
 import { buildTzInputCore, normalizeFlatLabs } from '../../../engines/support-plan/engine-helpers';
 import { useDataLink } from '../../../core/data-link';
@@ -9,8 +9,6 @@ import { PHARMA_DB } from '../../../core/pharma-database';
 import { DRUG_DB } from '../../../data/support-db';
 import { resolvePedAlias } from '../../../data/ped-alias-map';
 import { RiskVerificationList } from './RiskVerificationList';
-
-const TZRisk3DModel = lazy(() => import('./TZRisk3DModel').then(module => ({ default: module.TZRisk3DModel })));
 
 const ACCENT = '#00e68a';
 
@@ -23,10 +21,10 @@ const SYSTEM_COLORS: Record<string, { accent: string; bg: string; border: string
   hematologic:  { accent: '#14b8a6', bg: 'rgba(20,184,166,0.08)',  border: 'rgba(20,184,166,0.20)' },
 };
 
-// Канон цвета риска — общий для всего экрана «Риски». Раньше здесь и в 3D-модели
-// жили две копии с порогами 25/50/75, из-за чего один и тот же процент в шапке
-// вкладки и в чипах 3D окрашивался по-разному (20–25% — жёлтый здесь, зелёный
-// в RiskOverview).
+// Канон цвета риска — общий для всего экрана «Риски» (единые пороги 25/50/75
+// через getRiskColor). Раньше в интерфейсе жили локальные копии шкалы, из-за
+// чего один и тот же процент в шапке вкладки и в карточках систем мог
+// окрашиваться по-разному (20–25% — жёлтый здесь, зелёный в RiskOverview).
 const riskColor = (pct: number): string => getRiskColor(pct);
 
 const riskLabel = (pct: number): string => {
@@ -104,7 +102,6 @@ const ArcGauge: React.FC<{ value: number; size?: number; stroke?: number; label?
 
 export const RiskSpecMethod: React.FC<{ subTab?: string }> = ({ subTab }) => {
   const linked = useDataLink();
-  const profileSex: 'male' | 'female' = linked.profile?.settings?.personal?.sex === 'female' ? 'female' : 'male';
   const course = linked.course || [];
   const labs = linked.labs || [];
   const [forceNoLabs, setForceNoLabs] = useState(false);
@@ -284,30 +281,6 @@ export const RiskSpecMethod: React.FC<{ subTab?: string }> = ({ subTab }) => {
         {/* Тот же набор анализов, что у движка (снапшот калькулятора приоритетнее) — иначе
             цифры верификации во вкладке расходятся с карточкой «верифицировано анализами» */}
         <RiskVerificationList labMap={buildInputs?.labValues || labMap} result={result} />
-      </div>
-    );
-  }
-
-  // ── 3D sub-tab ──
-  if (subTab === 'tz_3d') {
-    if (!result) {
-      return <div style={{ textAlign: 'center', padding: 60, color: '#fff', fontSize: 13, lineHeight: 1.5 }}>
-        Сначала загрузите данные курса во вкладке «Обзор»
-      </div>;
-    }
-    return (
-      <div>
-        <div style={CARD}>
-          <div style={{ fontSize: 15, fontWeight: 800, color: ACCENT, marginBottom: 4 }}>🧊 3D модель рисков</div>
-          <div style={{ fontSize: 12, color: '#fff', lineHeight: 1.5 }}>
-            Визуализация риска по 6 системам на анатомической модели · Цвет = уровень риска системы
-          </div>
-        </div>
-        <div style={{ minHeight: 400 }}>
-          <Suspense fallback={<div style={{ padding: 20, textAlign: 'center', color: '#fff' }}>Загрузка 3D-модели…</div>}>
-            <TZRisk3DModel tzResult={result} sex={profileSex} />
-          </Suspense>
-        </div>
       </div>
     );
   }

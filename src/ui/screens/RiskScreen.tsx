@@ -78,7 +78,6 @@ const TAB_LABELS: Record<string, string> = {
   clinical: '🩺 Клиника',
   info: 'ℹ️ Инфо',
   tz_spec: '🧬 Механизм-ориентированная',
-  tz_3d: '🧊 3D модель',
 };
 
 /** ⚠️ Дисклеймер расчётов — APK PRO: белый текст 12px, тач-зона норм. */
@@ -661,7 +660,6 @@ export const RiskScreen: React.FC<{ initialSubTab?: string; onNavigate?: (screen
     pk: '💊 Фармакокинетика',
     key_risks: '🔑 Ключевые',
     history: '📜 История и пороги',
-    tz_3d: '🧊 3D модель',
     analyses: '🔬 Анализы',
   };
 
@@ -1068,7 +1066,7 @@ export const RiskScreen: React.FC<{ initialSubTab?: string; onNavigate?: (screen
                   { id: 'basic', icon: 'file' as NativeIconName, title: 'Вероятностная модель', desc: 'Мультипликативная вероятностная модель риска. Обзор, динамика, механизмы.', color: '#22c55e', subs: 'Обзор • Динамика • Механизмы' },
                   { id: 'montecarlo', icon: 'cpu' as NativeIconName, title: 'Монте Карло (V7)', desc: 'Органы, матрица рисков, временной ряд, чувствительность, фармакокинетика.', color: '#8b5cf6', subs: '5 подвкладок' },
                   { id: 'mdss', icon: 'heart' as NativeIconName, title: 'MDSS', desc: 'Medical Decision Support System — Hill+MC+Sigmoid модель прогнозирования.', color: '#f97316', subs: '' },
-                  { id: 'clinical', icon: 'cross' as NativeIconName, title: 'Клиника', desc: '3D модель, комплаенс, клинические риски и анализы.', color: '#3b82f6', subs: '3D • Комплаенс • Патологии • Анализы' },
+                  { id: 'clinical', icon: 'cross' as NativeIconName, title: 'Клиника', desc: 'Комплаенс, клинические риски и анализы.', color: '#3b82f6', subs: 'Комплаенс • Патологии • Анализы' },
                 ].map(card => (
                   <button key={card.id} onClick={() => {
                     setCalcPage(card.id as any);
@@ -1121,7 +1119,7 @@ export const RiskScreen: React.FC<{ initialSubTab?: string; onNavigate?: (screen
               : calcPage === 'clinical' ? CLINICAL_SUBTABS as readonly string[]
               : calcPage === 'mdss' ? ['mdss'] as const
               : ['overview'] as const)
-            : mainTab === 'tz_spec' ? ['overview', 'tz_3d', 'analyses'] as const
+            : mainTab === 'tz_spec' ? ['overview', 'analyses'] as const
             : mainTab === 'clinical' ? CLINICAL_SUBTABS as readonly string[]
             : ['info', 'reports'] as readonly string[]
           ).map(t => (

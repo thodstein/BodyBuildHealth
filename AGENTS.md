@@ -1,5 +1,33 @@
 # AGENTS.md - BioStackAIScreen + BB-builder
 
+## Риски: вкладка «3D модель» удалена из механизм-ориентированной модели (Oct 13 2026)
+
+По требованию пользователя убрана под-вкладка `tz_3d` («🧊 3D модель») из раздела
+«🧬 Механизм-ориентированная» и сама 3D-модель — целиком, вместе с движком и ассетами.
+
+- `RiskScreen.tsx`: из навигации `tz_spec` убран `'tz_3d'` (остались «Обзор»/«Анализы»),
+  удалены метки из `TAB_LABELS`/`SUBTAB_LABELS`; в карточке «Клиника» убрано упоминание 3D.
+- `RiskSpecMethod.tsx`: удалён рендер под-вкладки 3D, lazy-импорт `TZRisk3DModel`,
+  неиспользуемые `lazy/Suspense` из импорта и `profileSex` (единственным потребителем
+  была модель).
+- Удалены файлы: `RiskScreen_parts/TZRisk3DModel.tsx`, `RiskScreen_parts/Risk3DModel.tsx`
+  (легаси-модель, 0 прод-импортёров), мёртвые WebGL-компоненты того же семейства
+  `components/Organ3D.tsx` и `components/HumanBody3D.tsx` (0 импортёров),
+  движок `engines/organ-shape.engine.ts` (единственный потребитель — удалённая модель)
+  и его тест, тесты `TZRisk3DModel.test.ts`, `TZRisk3DModel-apk.test.tsx`,
+  `organ-assets-integrity.test.ts`.
+- Удалены осиротевшие ассеты: `public/bodybuilder.glb` + вся папка `public/organs/`
+  (9 файлов, ~18 МБ). `public/hulk.glb` оставлен — используется дневником здоровья
+  (`PainZone3D`, зоны боли) совместно с `engines/mesh-zone-mapping.ts`.
+- CSS: убраны правила `.organ-3d-container`, `.human-body-*`, `.human-body-xray-toggle`,
+  `.human-body-system-indicators` и переменные `--organ-3d-*` из `styles.css`.
+  Собственная SVG-модель V7 (`.risk-v7-3d` в `V7RiskDisplay.tsx`) не тронута — это
+  другой раздел (Монте Карло), не механизм-ориентированная модель.
+- Проверено: `tsc --noEmit` 0 (проект), риск-круг + профиль-дневники
+  **444/444 (42 файла)**, `rest-hooks-native` 68/68, `verify:apk-design` OK.
+  Ссылок на удалённые модули/ассеты в `src` и `scripts` — ноль (проверено grep).
+
+
 ## Кардиоконструктор: PRO-аудит «довести до профессионального инструмента» (Oct 12 2026, без коммита)
 
 По промту «проведи полный анализ кардиоконструктор и исследования интернет, чего не хватает
