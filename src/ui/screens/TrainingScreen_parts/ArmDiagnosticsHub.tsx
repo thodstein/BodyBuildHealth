@@ -484,7 +484,7 @@ export const ArmDiagnosticsHub: React.FC = () => {
       const kg = parseFloat(kgS); const ms = parseFloat(msS);
       const t = parseFloat(String(tS ?? ''));
       if (Number.isFinite(kg) && kg>0 && Number.isFinite(ms) && ms>0) {
-        arr.push({ exercise: ex, forceKg: kg, timeMs: ms, bwKg: bwNum, ...(Number.isFinite(t) && t>0 ? { t05FKg: t } : {}) });
+        arr.push({ exercise: ex, forceKg: kg, timeMs: ms, bwKg: bwNum, ...(Number.isFinite(t) && t>0 ? { t05FMs: t } : {}) });
       }
     };
     mk('finger_flex', state.fingerKg, state.fingerMs, state.fingerT05Ms);

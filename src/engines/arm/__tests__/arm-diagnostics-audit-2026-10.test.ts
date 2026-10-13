@@ -27,6 +27,7 @@ import { buildArmSpecBlock } from '../arm-spec-block.engine';
 import { injectArmCorrections, specTargetSetsByPlanWeek } from '../arm-diagnostics-injection.engine';
 import { bridgeDoseFromPayload } from '../arm-correction-dose.engine';
 import { armliftNormsFor, normPct } from '../arm-norms-table.engine';
+import { platformRotationForWeek } from '../arm-platform.engine';
 import { buildArmDiagnosticsReport } from '../arm-diagnostics-hub.engine';
 import { buildArmDiagnosticsCsv } from '../arm-diagnostics-export.engine';
 import { localIsoDateOffset } from '../../../core/local-date';
@@ -61,7 +62,7 @@ describe('A2: динамика силы без выдуманных F100/t0.5F',
     expect(m.f100Estimated).toBe(true);
   });
   it('t0.5F помечен оценкой, когда не измерен', () => {
-    const measured = calcDynamicMetrics({ exercise: 'hook', forceKg: 60, timeMs: 1200, t05FKg: 500 });
+    const measured = calcDynamicMetrics({ exercise: 'hook', forceKg: 60, timeMs: 1200, t05FMs: 500 });
     const estimated = calcDynamicMetrics({ exercise: 'hook', forceKg: 60, timeMs: 1200 });
     expect(measured.t05FEstimated).toBe(false);
     expect(estimated.t05FEstimated).toBe(true);
@@ -518,14 +519,48 @@ describe('раунд-3: нормы из arm-norms-table', () => {
   });
 });
 
-// ─── Раунд-2: измеримый t0.5F ───
+// ─── Раунд-3: мисномер t05FKg исправлен без ломки + ротация помоста ───
+describe('раунд-3: мисномер t05FKg', () => {
+  it('t05FMs — правильное имя (мс), алиас t05FKg читается (было→стало)', () => {
+    const neu = calcDynamicMetrics({ exercise: 'hook', forceKg: 60, timeMs: 1200, t05FMs: 300 });
+    expect(neu.t05FEstimated).toBe(false);
+    expect(neu.t05F).toBe(300);
+    const legacy = calcDynamicMetrics({ exercise: 'hook', forceKg: 60, timeMs: 1200, t05FKg: 300 });
+    expect(legacy.t05FEstimated).toBe(false);
+    expect(legacy.t05F).toBe(300);
+    const both = calcDynamicMetrics({ exercise: 'hook', forceKg: 60, timeMs: 1200, t05FMs: 400, t05FKg: 300 });
+    expect(both.t05F).toBe(400);
+  });
+  it('молчание полей — оценка сохраняется', () => {
+    expect(calcDynamicMetrics({ exercise: 'hook', forceKg: 60, timeMs: 1200 }).t05FEstimated).toBe(true);
+  });
+});
+
+describe('раунд-3: ротация снарядов помоста', () => {
+  it('недели идут по циклу support → pinch → crush', () => {
+    expect(platformRotationForWeek(1)).toBe('support');
+    expect(platformRotationForWeek(2)).toBe('pinch');
+    expect(platformRotationForWeek(3)).toBe('crush');
+    expect(platformRotationForWeek(4)).toBe('support'); // цикл замкнут
+  });
+  it('невалидная неделя может быть 1 (не NaN/отрицательная)', () => {
+    expect(platformRotationForWeek(0)).toBe('support');
+    expect(platformRotationForWeek(1.4)).toBe('support');
+  });
+});
+
+// ─── Раунд-2: измеримый t0.5F (градиент — предиктор взрывной силы) ───
 describe('раунд-2: измеримый t0.5F переводит градиент в измерение', () => {
-  it('с полем t05FKg градиент считается от измерения (не от оценки 42%)', () => {
-    const m = calcDynamicMetrics({ exercise: 'hook', forceKg: 60, timeMs: 1200, t05FKg: 300 });
+  it('с полем t05FMs градиент считается от измерения (не от оценки 42%)', () => {
+    const m = calcDynamicMetrics({ exercise: 'hook', forceKg: 60, timeMs: 1200, t05FMs: 300 });
     expect(m.t05FEstimated).toBe(false);
     expect(m.t05F).toBe(300);
     // 300/(0.5*60) = 10 мс/кг — против оценки 504/30 = 16.8
     expect(m.gradient).toBe(10);
+  });
+  it('новое имя приоритетнее легаси-алиаса', () => {
+    const both = calcDynamicMetrics({ exercise: 'hook', forceKg: 60, timeMs: 1200, t05FMs: 400, t05FKg: 300 });
+    expect(both.t05F).toBe(400);
   });
   it('без поля — оценка сохраняется и помечена', () => {
     const m = calcDynamicMetrics({ exercise: 'hook', forceKg: 60, timeMs: 1200 });

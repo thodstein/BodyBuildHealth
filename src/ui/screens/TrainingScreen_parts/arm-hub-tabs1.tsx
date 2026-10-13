@@ -12,7 +12,7 @@ import { ARM_BIOMECH, angleJointForWeakPoint, isValidAngleForArmWeakPoint, vbtTh
 import type { ArmWeakPoint } from '../../../engines/arm/arm-biomechanics.engine';
 import { ARM_CORRECTIONS } from '../../../engines/arm/arm-weakpoint-corrections';
 import { saveArmMeasureSnapshot } from '../../../engines/arm/arm-force-history.store';
-import { savePlatformLogEntry } from '../../../engines/arm/arm-platform.engine';
+import { savePlatformLogEntry, platformRotationForWeek } from '../../../engines/arm/arm-platform.engine';
 import { AdSec, AdGrid, AdField, AdChip, AdBtn, AdBanner } from './arm-design-system';
 import { WEAK_GROUPS, WP_LABEL_SHORT } from './arm-hub-shared';
 import { ArmPickBlock } from './arm-hub-pick';
@@ -109,9 +109,20 @@ export function HubGripTab({ H }: { H: any }) {
               </div>
             );
           })()}
-          {platformP0 && (
-            <div className="ad-muted">🏟 Помост RT: {platformP0.bestKg}кг = <b>{platformP0.wrPct}% WR</b> ({platformP0.worldRecordKg}кг) · попытки {platformP0.plan.join('/')}{platformP0.fromLog ? ` · журнал: ${platformP0.attemptsUsed}` : ' · нет журнала — по текущему RT'} · {platformP0.note}</div>
-          )}
+            {platformP0 && (
+              <>
+                <div className="ad-muted">🏟 Помост RT: {platformP0.bestKg}кг = <b>{platformP0.wrPct}% WR</b> ({platformP0.worldRecordKg}кг) · попытки {platformP0.plan.join('/')}{platformP0.fromLog ? ` · журнал: ${platformP0.attemptsUsed}` : ' · нет журнала — по текущему RT'} · {platformP0.note}</div>
+                {/* Аудит 2026-10 раунд-3: ротация снарядов помоста по неделям (support → pinch → crush)
+                    была без UI-потребителя — хаб пишет реальные попытки, но волну снарядов не показывал. */}
+                <div className="ad-muted" data-arm="platform-rotation">
+                  Ротация снарядов по неделям (цикл 3): {Array.from({ length: 6 }, (_, i) => {
+                    const r = platformRotationForWeek(i + 1);
+                    const ru = r === 'support' ? 'хват (RT/Axle)' : r === 'pinch' ? 'щипок' : 'сдавливание (CoC)';
+                    return `Н${i + 1} ${ru}`;
+                  }).join(' · ')}
+                </div>
+              </>
+            )}
           <div className="ad-muted">Весогонка WAF: М −0.5%/нед · Ж −0.4%/нед · L/R — отдельные зачёты</div>
           <div className="ad-row">
             <AdBtn variant="dark" onClick={() => { saveArmMeasureSnapshot({ rtKg: parseFloat(state.rtKg), sideKg: parseFloat(state.sideKg), backKg: parseFloat(state.backKg), leftKg: parseFloat(state.leftKg), rightKg: parseFloat(state.rightKg) }); setMeasureTick((x: number) => x + 1); }}>📸 Снапшот замеров</AdBtn>

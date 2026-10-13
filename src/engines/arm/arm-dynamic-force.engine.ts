@@ -14,11 +14,19 @@ export interface ArmForceTrial {
   // опционально ранние отсечки для точного F100/F500 (если нет — экстраполяция линейно)
   f100Kg?: number;
   f500Kg?: number;
-  t05FKg?: number; // время достижения 0.5F мс
   /**
-   * Аудит 2026-10: проба синтезирована хабом из полей L/R (RT-кг + фиктивное время), а не
+   * Время достижения 0.5F, мс (не кг!). Аудит 2026-10 раунд-3 было→стало: поле называлось
+   * `t05FKg`, хотя в нём миллисекунды — мисномер вводил в заблуждение при чтении
+   * (`t05FKg: 300` выглядело как 300 кг). Переименовано в `t05FMs`; старое имя оставлено
+   * @deprecated-алиасом и читается (внешние вызовы/сохранённые данные не ломаются).
+   */
+  t05FMs?: number;
+  /** @deprecated используйте `t05FMs` (ms — не кг). */
+  t05FKg?: number;
+  /**
+   * Аудит 2026-10 раунд-2: проба синтезирована хабом из полей L/R (RT-кг + фиктивное время), а не
    * снята прибором. В `metrics` такие пробы не идут (иначе ftIndex/tactic/explosivePct
-   * молча считаются от RT-килограммов), но `calcAsymmetry` их использует — это единственный
+   * молча считались от RT-килограммов), но `calcAsymmetry` их использует — это единственный
    * источник L/R-асимметрии.
    */
   synthetic?: boolean;
@@ -81,7 +89,11 @@ export function calcDynamicMetrics(t: ArmForceTrial): ArmDynamicMetrics {
   // обязаны попадать в хаб/мост, иначе реконструкция выглядит как измерение прибора.
   const f100Measured = t.f100Kg != null && Number.isFinite(t.f100Kg);
   const f500Measured = t.f500Kg != null && Number.isFinite(t.f500Kg);
-  const t05FMeasured = t.t05FKg != null && Number.isFinite(t.t05FKg);
+  // Аудит 2026-10 раунд-3: новое имя `t05FMs` приоритетнее, легаси-алиас читается
+  const t05MeasuredRaw = t.t05FMs != null && Number.isFinite(t.t05FMs)
+    ? Number(t.t05FMs)
+    : (t.t05FKg != null && Number.isFinite(t.t05FKg) ? Number(t.t05FKg) : null);
+  const t05FMeasured = t05MeasuredRaw != null && t05MeasuredRaw > 0;
   let f100: number;
   if (f100Measured) f100 = Math.min(f, t.f100Kg as number);
   else {
@@ -98,7 +110,7 @@ export function calcDynamicMetrics(t: ArmForceTrial): ArmDynamicMetrics {
     f500 = Math.min(f, round1(f * ratio));
   }
   const f500_t500 = f500 / 0.5; // кг/с
-  const t05F = t05FMeasured ? (t.t05FKg as number) : Math.round(tMs * 0.42); // ~42% времени до половины силы (градиент)
+  const t05F = t05FMeasured ? (t05MeasuredRaw as number) : Math.round(tMs * 0.42); // ~42% времени до половины силы (оценка)
   const gradient = t05F != null && f > 0 ? round2(t05F / (0.5 * f)) : null; // мс/кг
   // Аудит 2026-10: при tMs<500 делитель ((tMs-500)/1000) отрицателен → slowIndex<0 и avgSlow ломался.
   const slowIndex = f > f500 && tMs > 500 ? (f - f500) / ((tMs - 500) / 1000) : 0; // кг/с после 500мс
