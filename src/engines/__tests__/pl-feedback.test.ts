@@ -2,7 +2,12 @@ import { describe, it, expect } from 'vitest';
 import { buildLMSPlan } from '../lms/lms-builder.engine';
 import { computePLPlanFeedback, summarizePLFeedback } from '../lms/lms-progression-feedback.engine';
 import { CYCLE_01 } from '../../data/lms-cycles/cycle-01';
+import { localIsoDateOffset } from '../../core/local-date';
 import type { WorkoutSession } from '../workout-logger.engine';
+
+// Time-bomb fix (Oct 2026): хардкод дат 2026-07-01 протух — buildLastResultIndex режет
+// окно 90 дней, все факты дневника уезжали за горизонт → source=plan вместо fact.
+const daysAgo = (n: number) => localIsoDateOffset(-n);
 
 const pmMap = { 'Присед': 150, 'Жим лежа': 110, 'Становая тяга': 180 };
 
@@ -68,7 +73,7 @@ describe('computePLPlanFeedback', () => {
     const plan = buildPlan();
     const lastDay = plan.weeks[plan.weeks.length - 1].days[0];
     const exName = lastDay.exercises[0].name;
-    const sessions = [makeSession(exName, '2026-07-01', [{ weight: 100, reps: 5, rir: 2 }])];
+    const sessions = [makeSession(exName, daysAgo(45), [{ weight: 100, reps: 5, rir: 2 }])];
     const feedback = computePLPlanFeedback(plan, sessions);
     const f = feedback.find(fb => fb.planExerciseName === exName);
     expect(f).toBeDefined();
@@ -78,7 +83,7 @@ describe('computePLPlanFeedback', () => {
 
   it('fuzzy match: «Жим лёжа» в плане, «Жим штанги лёжа» в дневнике', () => {
     const plan = buildPlan();
-    const sessions = [makeSession('Жим штанги лёжа', '2026-07-01', [{ weight: 90, reps: 5, rir: 2 }])];
+    const sessions = [makeSession('Жим штанги лёжа', daysAgo(45), [{ weight: 90, reps: 5, rir: 2 }])];
     const feedback = computePLPlanFeedback(plan, sessions);
     const f = feedback.find(fb => /жим.*лёж/i.test(fb.planExerciseName));
     if (f) {
@@ -92,7 +97,7 @@ describe('computePLPlanFeedback', () => {
     const lastDay = plan.weeks[plan.weeks.length - 1].days[0];
     const exName = lastDay.exercises[0].name;
     const plannedRir = lastDay.exercises[0].workSets[0].rir;
-    const sessions = [makeSession(exName, '2026-07-01', [{ weight: 100, reps: 5, rir: 0 }])];
+    const sessions = [makeSession(exName, daysAgo(45), [{ weight: 100, reps: 5, rir: 0 }])];
     const feedback = computePLPlanFeedback(plan, sessions);
     const f = feedback.find(fb => fb.planExerciseName === exName);
     expect(f).toBeDefined();
@@ -105,7 +110,7 @@ describe('computePLPlanFeedback', () => {
     const exName = plan.weeks.at(-1)!.days[0].exercises[0].name;
     const feedback = computePLPlanFeedback(
       plan,
-      [makeSession(exName, '2026-07-01', [{ weight: 100, reps: 5, rir: 2 }])],
+      [makeSession(exName, daysAgo(45), [{ weight: 100, reps: 5, rir: 2 }])],
       80,
       'rpe_based',
     );
@@ -119,7 +124,7 @@ describe('summarizePLFeedback', () => {
     const plan = buildPlan();
     const lastDay = plan.weeks[plan.weeks.length - 1].days[0];
     const exName = lastDay.exercises[0].name;
-    const sessions = [makeSession(exName, '2026-07-01', [{ weight: 100, reps: 5, rir: 2 }])];
+    const sessions = [makeSession(exName, daysAgo(45), [{ weight: 100, reps: 5, rir: 2 }])];
     const feedback = computePLPlanFeedback(plan, sessions);
     const summary = summarizePLFeedback(feedback);
     expect(summary.withFact).toBeGreaterThan(0);
@@ -140,7 +145,7 @@ describe('summarizePLFeedback', () => {
   it('не называет единичный тяжёлый подход плато', () => {
     const plan = buildPlan();
     const exName = plan.weeks.at(-1)!.days[0].exercises[0].name;
-    const feedback = computePLPlanFeedback(plan, [makeSession(exName, '2026-07-01', [{ weight: 100, reps: 5, rir: 0 }])]);
+    const feedback = computePLPlanFeedback(plan, [makeSession(exName, daysAgo(45), [{ weight: 100, reps: 5, rir: 0 }])]);
     expect(summarizePLFeedback(feedback).plateau).toBe(0);
   });
 });

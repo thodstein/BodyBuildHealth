@@ -1411,12 +1411,16 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
 
           // ACWR-авто-делод: корректируем объём (все упражнения) и RIR
           sets = Math.round(sets * acwrVolMod);
-          // Ф1.2: meta-делод (meta.deloadWeeks) — объём ×0.5 с флором (faithful сохраняет источник)
-          if (metaDeload && !faithful) sets = Math.max(1, Math.round(sets * 0.5));
           if (!faithful) sets = Math.max(isMain ? 1 : 2, sets);
           // Авторегуляция: объём (все) — применяется поверх ACWR
           sets = Math.round(sets * arVolMult);
           if (!faithful) sets = Math.max(isMain ? 1 : 2, sets);
+          // Ф1.2: meta-делод (meta.deloadWeeks) — объём ×0.5 с флором 1 (faithful сохраняет источник).
+          // ПОСЛЕ всех флоров: иначе floor «аксессуары ≥ 2» возвращает сеты и заявленная
+          // разгрузка доходит только до базовых движений. Было: цикл cycle-bb-m-hit-6
+          // (делоды W3/W6) давал делод-неделю 16 сетов против тапер-недели перед ней 13 —
+          // авторская разгрузка выходила тяжелее инференции тапера.
+          if (metaDeload && !faithful) sets = Math.max(1, Math.round(sets * 0.5));
 
            // Расчётный вес с авторегуляцией (topSetPctMultiplier)
            const baseWeight = workWeight(pm, s.pct);

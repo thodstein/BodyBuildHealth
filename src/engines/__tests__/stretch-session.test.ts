@@ -8,9 +8,13 @@ import {
   loadStretchLog, upsertStretchLog, stretchLogForDate, stretchStats, sanitizeStretchLog,
   STRETCH_LOG_KEY,
 } from '../stretch-session.engine';
+import { localIsoDateOffset } from '../../core/local-date';
 
-const iso = (d: Date) => d.toISOString().slice(0, 10);
-const daysAgo = (n: number) => { const d = new Date(); d.setDate(d.getDate() - n); return iso(d); };
+// TZ-фикс (Oct 2026): хелпер был `toISOString().slice(0,10)` — UTC-день. Движок
+// считает неделю по ЛОКАЛЬНОМУ понедельнику, поэтому на машинах с положительным
+// смещением «2 дня назад» уезжало на UTC-11-е (вне недели) → weekMin 15 вместо 25.
+// Календарные даты — только канон core/local-date.
+const daysAgo = (n: number) => localIsoDateOffset(-n);
 
 // PRO-3 (детерминизм): тест сеял записи «1-3 дня назад» и проверял недельную
 // сумму при неделе, начинающейся с понедельника. На понедельник/вторник часть

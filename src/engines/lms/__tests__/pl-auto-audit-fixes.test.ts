@@ -16,6 +16,11 @@ import { buildLMSPlan } from '../lms-builder.engine';
 import { CYCLE_01 } from '../../../data/lms-cycles/cycle-01';
 import type { WorkoutSession, WorkoutExercise } from '../../workout-logger.engine';
 import type { WorkoutLog } from '../../../core/types';
+import { localIsoDateOffset } from '../../../core/local-date';
+
+// Time-bomb fix (Oct 2026): хардкод daysAgo(10) вышел за 90-дневное окно движков
+// (findLastFact/buildLastResultIndex) — факты дневника стали невидимыми.
+const daysAgo = (n: number) => localIsoDateOffset(-n);
 
 const pmMap = { 'Присед': 150, 'Жим лежа': 110, 'Становая тяга': 180 };
 
@@ -177,7 +182,7 @@ describe('P1-3: fuzzy match logic', () => {
   it('matches «Жим лёжа» with «Жим штанги лёжа» (was false negative)', () => {
     const plan = buildLMSPlan({ template: CYCLE_01, pmMap, fallbackPm: 80, mode: 'natural', weeksOverride: 12 });
     // The fuzzy match should now work: "жим лёжа" ↔ "жим штанги лёжа" share 2 tokens (жим, лёжа)
-    const sessions = [makeSession('Жим штанги лёжа', '2026-07-15', [{ weight: 90, reps: 5, rir: 2 }])];
+    const sessions = [makeSession('Жим штанги лёжа', daysAgo(10), [{ weight: 90, reps: 5, rir: 2 }])];
     const feedback = computePLPlanFeedback(plan, sessions);
     const benchFeedback = feedback.find(f => /жим.*лёж/i.test(f.planExerciseName));
     if (benchFeedback) {
@@ -189,7 +194,7 @@ describe('P1-3: fuzzy match logic', () => {
   it('does NOT match generic «жим» with «Жим гантелей стоя» (was false positive)', () => {
     const plan = buildLMSPlan({ template: CYCLE_01, pmMap, fallbackPm: 80, mode: 'natural', weeksOverride: 12 });
     // "жим" alone (1 token, length <= 2 when filtered) should NOT match "жим гантелей стоя"
-    const sessions = [makeSession('Жим гантелей стоя', '2026-07-15', [{ weight: 40, reps: 8, rir: 2 }])];
+    const sessions = [makeSession('Жим гантелей стоя', daysAgo(10), [{ weight: 40, reps: 8, rir: 2 }])];
     const feedback = computePLPlanFeedback(plan, sessions);
     // No exercise in the plan should incorrectly match the OHP session
     const matchedFact = feedback.find(f => f.last != null && f.last.topWeight === 40);
@@ -209,7 +214,7 @@ describe('P1-5: topSetOf by e1RM not weight', () => {
     const lastDay = plan.weeks[plan.weeks.length - 1].days[0];
     const exName = lastDay.exercises[0].name;
     const session: WorkoutSession = {
-      sessionId: 's1', date: '2026-07-15', startTime: '10:00', endTime: '11:00', durationMin: 60, focus: 'test',
+      sessionId: 's1', date: daysAgo(10), startTime: '10:00', endTime: '11:00', durationMin: 60, focus: 'test',
       exercises: [{
         exerciseId: exName.toLowerCase(), exerciseName: exName, pattern: 'squat', muscleGroup: 'legs', order: 1,
         sets: [
@@ -278,10 +283,10 @@ describe('P1-7: diary-autoreg zero e1RM guard', () => {
   it('falls back to planned weight when e1RM=0 (not weight increase)', () => {
     const input: DiaryAutoregInput = {
       historyWorkouts: [{
-        date: '2026-07-15',
+        date: daysAgo(10),
         exercises: [{
           exerciseName: 'Присед',
-          date: '2026-07-15',
+          date: daysAgo(10),
           sets: [{ weight: 0, reps: 0, rpe: undefined, rir: undefined }],
           estimated1RM: 0,
         }],
@@ -305,10 +310,10 @@ describe('P1-7: diary-autoreg zero e1RM guard', () => {
   it('still adjusts when valid e1RM data is present', () => {
     const input: DiaryAutoregInput = {
       historyWorkouts: [{
-        date: '2026-07-15',
+        date: daysAgo(10),
         exercises: [{
           exerciseName: 'Присед',
-          date: '2026-07-15',
+          date: daysAgo(10),
           sets: [{ weight: 130, reps: 5, rpe: 9.5, rir: 0.5 }],
           estimated1RM: 145,
         }],

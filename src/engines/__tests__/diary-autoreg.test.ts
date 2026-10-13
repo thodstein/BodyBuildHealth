@@ -1,6 +1,12 @@
 import { describe, it, expect } from 'vitest';
 import { buildDiaryAutoreg } from '../pro/diary-autoreg.engine';
+import { localIsoDateOffset } from '../../core/local-date';
 import type { WorkoutLog } from '../../core/types';
+
+// Time-bomb fix (Oct 2026): хардкод дат 2026-06-01/2026-07-01 протух — движок режет
+// окно 90 дней (findLastFact/findAllFacts), все факты уезжали за горизонт → fallback.
+// Даты теперь относительные (дней назад), интервалы между сессиями сохранены.
+const daysAgo = (n: number) => localIsoDateOffset(-n);
 
 function makeWorkoutLog(exerciseName: string, date: string, sets: { weight: number; reps: number; rpe?: number; rir?: number }[], estimated1RM?: number): WorkoutLog {
   return {
@@ -30,7 +36,7 @@ describe('buildDiaryAutoreg', () => {
   ];
 
   it('факт RPE 9.5, план RIR 2 (RPE 8) → вес снижен', () => {
-    const history = [makeWorkoutLog('Жим лёжа', '2026-07-01', [{ weight: 82, reps: 5, rpe: 9.5 }])];
+    const history = [makeWorkoutLog('Жим лёжа', daysAgo(45), [{ weight: 82, reps: 5, rpe: 9.5 }])];
     const r = buildDiaryAutoreg({ historyWorkouts: history, plannedExercises });
     const adj = r.perExercise.get('Жим лёжа');
     expect(adj).toBeDefined();
@@ -41,7 +47,7 @@ describe('buildDiaryAutoreg', () => {
 
   it('факт RPE 6, план RIR 2 (RPE 8) → вес повышен', () => {
     // e1RM из факта (90кг×(1+5/30)=105) выше планового (80кг @ RPE 8 ≈ 96)
-    const history = [makeWorkoutLog('Жим лёжа', '2026-07-01', [{ weight: 90, reps: 5, rpe: 6 }], 105)];
+    const history = [makeWorkoutLog('Жим лёжа', daysAgo(45), [{ weight: 90, reps: 5, rpe: 6 }], 105)];
     const r = buildDiaryAutoreg({ historyWorkouts: history, plannedExercises });
     const adj = r.perExercise.get('Жим лёжа');
     expect(adj).toBeDefined();
@@ -50,7 +56,7 @@ describe('buildDiaryAutoreg', () => {
   });
 
   it('факт RPE 8, план RIR 2 (RPE 8) → без изменений', () => {
-    const history = [makeWorkoutLog('Жим лёжа', '2026-07-01', [{ weight: 80, reps: 5, rpe: 8 }])];
+    const history = [makeWorkoutLog('Жим лёжа', daysAgo(45), [{ weight: 80, reps: 5, rpe: 8 }])];
     const r = buildDiaryAutoreg({ historyWorkouts: history, plannedExercises });
     const adj = r.perExercise.get('Жим лёжа');
     expect(adj).toBeDefined();
@@ -69,7 +75,7 @@ describe('buildDiaryAutoreg', () => {
   });
 
   it('factRPE ≥ 9.5 → -1 подход', () => {
-    const history = [makeWorkoutLog('Жим лёжа', '2026-07-01', [{ weight: 85, reps: 5, rpe: 9.5 }])];
+    const history = [makeWorkoutLog('Жим лёжа', daysAgo(45), [{ weight: 85, reps: 5, rpe: 9.5 }])];
     const r = buildDiaryAutoreg({ historyWorkouts: history, plannedExercises });
     const adj = r.perExercise.get('Жим лёжа');
     expect(adj!.adjustedSets).toBe(plannedExercises[0].plannedSets - 1);
@@ -78,9 +84,9 @@ describe('buildDiaryAutoreg', () => {
 
   it('plateau: 3+ сессии без роста e1RM → plateauWarning', () => {
     const history = [
-      makeWorkoutLog('Жим лёжа', '2026-06-01', [{ weight: 80, reps: 5 }], 93),
-      makeWorkoutLog('Жим лёжа', '2026-06-15', [{ weight: 81, reps: 5 }], 94),
-      makeWorkoutLog('Жим лёжа', '2026-07-01', [{ weight: 80, reps: 5 }], 93),
+      makeWorkoutLog('Жим лёжа', daysAgo(75), [{ weight: 80, reps: 5 }], 93),
+      makeWorkoutLog('Жим лёжа', daysAgo(60), [{ weight: 81, reps: 5 }], 94),
+      makeWorkoutLog('Жим лёжа', daysAgo(45), [{ weight: 80, reps: 5 }], 93),
     ];
     const r = buildDiaryAutoreg({ historyWorkouts: history, plannedExercises });
     expect(r.plateauWarnings.length).toBeGreaterThan(0);
@@ -89,16 +95,16 @@ describe('buildDiaryAutoreg', () => {
 
   it('не считает плато, если средняя из трёх сессий была заметно сильнее', () => {
     const history = [
-      makeWorkoutLog('Жим лёжа', '2026-06-01', [{ weight: 80, reps: 5 }], 93),
-      makeWorkoutLog('Жим лёжа', '2026-06-15', [{ weight: 80, reps: 5 }], 100),
-      makeWorkoutLog('Жим лёжа', '2026-07-01', [{ weight: 80, reps: 5 }], 93),
+      makeWorkoutLog('Жим лёжа', daysAgo(75), [{ weight: 80, reps: 5 }], 93),
+      makeWorkoutLog('Жим лёжа', daysAgo(60), [{ weight: 80, reps: 5 }], 100),
+      makeWorkoutLog('Жим лёжа', daysAgo(45), [{ weight: 80, reps: 5 }], 93),
     ];
     const r = buildDiaryAutoreg({ historyWorkouts: history, plannedExercises });
     expect(r.plateauWarnings).toHaveLength(0);
   });
 
   it('fuzzy match: «Жим лёжа» в плане, «Жим штанги лёжа» в дневнике', () => {
-    const history = [makeWorkoutLog('Жим штанги лёжа', '2026-07-01', [{ weight: 82, reps: 5, rpe: 9 }])];
+    const history = [makeWorkoutLog('Жим штанги лёжа', daysAgo(45), [{ weight: 82, reps: 5, rpe: 9 }])];
     const r = buildDiaryAutoreg({ historyWorkouts: history, plannedExercises });
     const adj = r.perExercise.get('Жим лёжа');
     expect(adj).toBeDefined();
@@ -108,8 +114,8 @@ describe('buildDiaryAutoreg', () => {
 
   it('берёт последнюю сессию (по дате)', () => {
     const history = [
-      makeWorkoutLog('Жим лёжа', '2026-06-01', [{ weight: 70, reps: 5, rpe: 7 }]),
-      makeWorkoutLog('Жим лёжа', '2026-07-01', [{ weight: 82, reps: 5, rpe: 9.5 }]),
+      makeWorkoutLog('Жим лёжа', daysAgo(75), [{ weight: 70, reps: 5, rpe: 7 }]),
+      makeWorkoutLog('Жим лёжа', daysAgo(45), [{ weight: 82, reps: 5, rpe: 9.5 }]),
     ];
     const r = buildDiaryAutoreg({ historyWorkouts: history, plannedExercises });
     const adj = r.perExercise.get('Жим лёжа');
@@ -119,7 +125,7 @@ describe('buildDiaryAutoreg', () => {
 
   it('summary считает adjusted/unchanged/noData', () => {
     const history = [
-      makeWorkoutLog('Жим лёжа', '2026-07-01', [{ weight: 82, reps: 5, rpe: 9.5 }]),
+      makeWorkoutLog('Жим лёжа', daysAgo(45), [{ weight: 82, reps: 5, rpe: 9.5 }]),
       // Присед — нет данных
     ];
     const r = buildDiaryAutoreg({ historyWorkouts: history, plannedExercises });
@@ -128,7 +134,7 @@ describe('buildDiaryAutoreg', () => {
   });
 
   it('RPE не задан → вычисляется через rpeFromLoad', () => {
-    const history = [makeWorkoutLog('Жим лёжа', '2026-07-01', [{ weight: 80, reps: 5 }], 100)]; // e1RM=100
+    const history = [makeWorkoutLog('Жим лёжа', daysAgo(45), [{ weight: 80, reps: 5 }], 100)]; // e1RM=100
     const r = buildDiaryAutoreg({ historyWorkouts: history, plannedExercises });
     const adj = r.perExercise.get('Жим лёжа');
     expect(adj).toBeDefined();

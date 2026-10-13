@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildBBContestPrepPlan, buildPeakWeek, PER_MUSCLE_TAPER_MULT, getPerMuscleTaperMult, validateBBContestPrepConfig, configFromPlan } from '../bb-contest-prep.engine';
+import { buildBBContestPrepPlan, buildPeakWeek, PER_MUSCLE_TAPER_MULT, getPerMuscleTaperMult, validateBBContestPrepConfig, configFromPlan, isoAddDays, isoToday } from '../bb-contest-prep.engine';
 import { computeMuscleBalance } from '../bb-volume.engine';
 
 function baseCfg(overrides: any = {}) {
@@ -12,7 +12,9 @@ function baseCfg(overrides: any = {}) {
     experienceLevel: 'intermediate' as const,
     enhanced: false,
     prepCount: 1,
-    showDate: '2026-10-10',
+    // Time-bomb fix (Oct 2026): хардкод '2026-10-10' протух — валидатор отклоняет
+    // дату шоу в прошлом, buildPeakWeek отдавал [] и все чтения peak[0] падали (25 тестов).
+    showDate: isoAddDays(isoToday(), 60),
     weeksOut: 3,
     trainingProtocol: 'bb' as const,
     carbLoadStrategy: 'moderate' as const,

@@ -46,11 +46,14 @@ describe('Course → Profile sync (course-sync.ts)', () => {
     expect(flags.hasSERM).toBe(true);
     expect(flags.hasSARMs).toBe(true);
     expect(flags.hasMGF).toBe(true);
-    expect(flags.ghIU).toBe(4);
-    expect(flags.insulinIU).toBe(10);
-    expect(flags.igfMcg).toBe(50);
-    expect(flags.clenMcg).toBe(80);
-    expect(flags.t3Mcg).toBe(25);
+    // Канон недельных доз (weeklyDose): доза за приём × частоту в неделю.
+    // Зеркало derivePedFlagsFromSubstances читает profile.currentSubstances,
+    // куда mapCourseToSubstances тоже пишет недельную дозу — цифры сходятся.
+    expect(flags.ghIU).toBe(28); // 4 IU daily × 7
+    expect(flags.insulinIU).toBe(70); // 10 IU daily × 7
+    expect(flags.igfMcg).toBe(350); // 50 mcg daily × 7
+    expect(flags.clenMcg).toBe(560); // 80 mcg daily × 7
+    expect(flags.t3Mcg).toBe(175); // 25 mcg daily × 7
   });
 
   it('2. derivePedFlagsFromCourse: пустой курс → пустой результат', async () => {
@@ -69,12 +72,14 @@ describe('Course → Profile sync (course-sync.ts)', () => {
     ];
     const subs = mapCourseToSubstances(course);
     expect(subs).toHaveLength(3);
+    // Канон недельных доз: 500 мг × 2 в неделю = 1000 мг/нед
     expect(subs[0].id).toBe('test_enan');
     expect(subs[0].name).toBe('Тестостерон энантат');
-    expect(subs[0].doseMg).toBe(500);
+    expect(subs[0].doseMg).toBe(1000);
     expect(subs[0].startWeek).toBe(1);
     expect(subs[0].endWeek).toBe(12);
     expect(subs[0].route).toBe('inject');
+    // HCG 1000 IU × 2 = 2000 IU/нед
     expect(subs[2].id).toBe('hcg');
     // HCG → oral route (sublingual)
     expect(subs[2].route).toBe('oral');
@@ -106,14 +111,15 @@ describe('Course → Profile sync (course-sync.ts)', () => {
     const course = [
       { id: '1', substanceId: 'test_enan', doseValue: 500, doseUnit: 'mg', frequency: '2x/wk', startWeek: 1, endWeek: 12 },
     ];
-    const existing = [{ id: 'test_enan', name: 'T', doseMg: 500, unit: 'mg', route: 'inject' as const, startWeek: 1, endWeek: 12 }];
+    // existing несёт ту же недельную дозу, что и mapCourseToSubstances (500×2=1000)
+    const existing = [{ id: 'test_enan', name: 'T', doseMg: 1000, unit: 'mg', route: 'inject' as const, startWeek: 1, endWeek: 12 }];
     expect(hasCourseDiff(course, existing)).toBe(false);
   });
 
-  it('7. hasCourseDiff: false при пустом курсе', async () => {
+  it('7. hasCourseDiff: true при очистке курса (удаление всех веществ = дифф)', async () => {
     const { hasCourseDiff } = await import('../course-sync');
     const existing = [{ id: 'test_enan', name: 'T', doseMg: 500, unit: 'mg', route: 'inject' as const, startWeek: 1, endWeek: 12 }];
-    expect(hasCourseDiff([], existing)).toBe(false);
+    expect(hasCourseDiff([], existing)).toBe(true);
   });
 
   it('8. derivePedFlagsFromSubstances: выводит флаги из currentSubstances', async () => {

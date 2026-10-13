@@ -421,7 +421,11 @@ function editDistance(a: string, b: string): number {
  */
 function wordMatches(queryWord: string, candidate: string, maxDist: number): boolean {
   if (candidate.includes(queryWord)) return true;
-  if (queryWord.length >= 3 && queryWord.includes(candidate)) return true;
+  // Частичное совпадение слова («рис пропаренный» → «рис», «куриная» → «курица»).
+  // Кандидат обязан быть не короче 3 символов: иначе 1–2-буквенные слова названий
+  // («фалафель В пите», «молоко И сахар») матчили любой запрос, содержащий такую
+  // букву, — мусор вроде «квыртзп хщшгнекв» уходил в реальный продукт.
+  if (candidate.length >= 3 && queryWord.includes(candidate)) return true;
   if (queryWord.length >= 5 && candidate.length >= 5) {
     if (maxDist <= 0) return false;
     // Для длинных слов допускаем 2 ошибки: русские падежи меняют больше одного
