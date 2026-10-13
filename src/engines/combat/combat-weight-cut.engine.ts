@@ -164,11 +164,14 @@ export function weightCutNutritionForWeek(
       water = protocol.waterMode === 'load_cut' ? Math.min(bodyweightKg > 110 ? 5000 : 8000, rawWater) : Math.round(bodyweightKg * 30);
     }
     if (bodyweightKg > 110 && water > 5000) water = 5000;
+    // Натрий в протоколе АБСОЛЮТНЫЙ (мг/сут), а not мл/кг — масштабировать его
+    // под массу нечем (источник даёт фиксированные значения). Раньше здесь был
+    // `Math.min(sodium, 5000)` на значениях 3000/4000 — заведомый no-op, который
+    // вдобавок печатал «Na ≤5г» как будто корректировка состоялась.
     sodium = protocol.sodiumMode === 'moderate_cut' ? 3000 : 4000;
-    if (bodyweightKg > 110) sodium = Math.min(sodium, 5000);
     notes.push(`Тапер: углеводы ↓ до ${carbs}г, вода ${water}мл (load перед сливом), клетчатка ${fiber}г`);
     if (isSameDay) notes.push('Same-day: острая дегидратация минимизирована — упор на жир/гликоген, не воду');
-    if (bodyweightKg > 110) notes.push('Heavy >110кг: вода cap 5л, Na ≤5г');
+    if (bodyweightKg > 110) notes.push('Heavy >110кг: вода ограничена 5л (масштаб мл/кг); натрий остаётся абсолютным — корректировку согласуй с врачом');
   } else if (ph === 'fight_week') {
     carbs = protocol.carbMode === 'deplete_reload' ? Math.round(bodyweightKg * 1) : Math.round(bodyweightKg * 2);
     if (isSameDay) {
@@ -177,13 +180,12 @@ export function weightCutNutritionForWeek(
       notes.push('Same-day 1-2ч: угли не ниже 3г/кг — нет времени на рефид');
     }
     water = protocol.waterMode === 'load_cut' ? (isSameDay ? Math.round(bodyweightKg * 25) : 2000) : Math.round(bodyweightKg * 20);
-    if (bodyweightKg > 110 && water > 3500) water = 3500;
+    // Натрий абсолютный (см. комментарий в taper-ветке): clamp >110 был no-op.
     sodium = protocol.sodiumMode === 'moderate_cut' ? 1500 : 2500;
-    if (bodyweightKg > 110) sodium = Math.min(sodium, 3500);
     notes.push(`Fight week: вода ${water}мл + Na ${sodium}мг + угли ${carbs}г (клетчатка ${fiber}г) → взвешивание → рефид 8г/кг + вода 150% + Na 1г/л за 12-24ч`);
     if (!isSameDay) notes.push(`ORS ${protocol.orsSodiumMmolPerDl ?? 65} mmol/дл 1-1.5л/ч сразу после, угли ≤60г/ч, волокно <10г`);
     if (protocol.heatSessions) notes.push('Сауна 15-20′×3 + sweat suit — компенсация ↓ объёма зала (≤4% BM/24ч по ISSN)');
-    if (bodyweightKg > 110) notes.push('Heavy >110кг: вода/Na скорректированы под массу');
+    if (bodyweightKg > 110) notes.push('Heavy >110кг: вода масштабируется мл/кг, натрий остаётся абсолютным — подбирай с врачом');
   } else {
     // camp — дефицит -15-20% TDEE, но ккал считаем вне (нужен TDEE), здесь только макро-ориентир
     carbs = protocol.carbMode === 'deplete_reload' ? Math.round(bodyweightKg * 4) : Math.round(bodyweightKg * 5);
@@ -191,6 +193,14 @@ export function weightCutNutritionForWeek(
     if (bodyweightKg > 110 && water > 4500) water = 4500;
     sodium = 5000;
     if (bodyweightKg > 110) notes.push('Heavy >110кг: вода cap 4.5л');
+    // PRO-3: `dailyStepsTarget` был write-only — ползунок «Шаги · Nк/день» в UI
+    // менял протокол, но ни один consumer его не читал (план/печать/CSV его не
+    // несли). Теперь цель шагов печатается в camp-неделях (ACSM/ISSN: 8-10к/день
+    // вместе с белком 2.2г/кг защищают lean mass на дефиците).
+    if (typeof protocol.dailyStepsTarget === 'number' && protocol.dailyStepsTarget > 0) {
+      const k = Math.round(protocol.dailyStepsTarget / 100) / 10;
+      notes.push(`Шаги: цель ${k}к/день — на дефиците ходьба (не минус еда) держит lean mass`);
+    }
   }
   // жиры: female ≥0.8г/кг (мин 40г RED-S), male ≥0.6 (мин 30г) — как bb-contest-prep + recovery-budget
   const fatPerKg = sex === 'female' ? 0.8 : 0.6;
@@ -223,11 +233,19 @@ export function weightCutRehydrationNotes(lossKg: number): string[] {
   ];
 }
 
-export function validateWeightCutProtocol(p: WeightCutProtocol, opts?: { bodyweightKg?: number; sex?: 'male'|'female'; discipline?: string }): string[] {
+export function validateWeightCutProtocol(p: WeightCutProtocol, opts?: { bodyweightKg?: number; sex?: 'male'|'female'; discipline?: string; planWeeks?: number | null }): string[] {
   const errs: string[] = [];
   if (p.targetLossKg > 8) errs.push('Сгонка >8кг — высокий риск, требуется врач');
   if (p.targetLossKg / p.weeksOut > 1.5) errs.push(`Темп ${(p.targetLossKg / p.weeksOut).toFixed(1)}кг/нед >1.5 — агрессивно, риск срыва`);
   if (p.targetLossKg > 5 && p.weeksOut < 8) errs.push('При сгонке >5кг нужно ≥8 нед');
+  // PRO-3: фазы весогонки (camp/taper/fight_week) считаются от ДЛИНЫ ПЛНА,
+  // а не от `weeksOut` протокола. Без этой проверки протокол проходил как
+  // «безопасные 10 недель», а выдавался за 4 — реальный темп в 2.5× выше
+  // заявленного, и ни одной ошибки. Теперь это блок.
+  const planWeeks = opts?.planWeeks;
+  if (planWeeks != null && Number.isFinite(planWeeks) && planWeeks >= 1 && planWeeks < p.weeksOut) {
+    errs.push(`План ${planWeeks}нед короче протокола сгонки ${p.weeksOut}нед — реальный темп ${(p.targetLossKg / planWeeks).toFixed(1)}кг/нед вместо ${(p.targetLossKg / p.weeksOut).toFixed(1)}: увеличьте план или сократите сгонку`);
+  }
   // ISSN: острая потеря воды ≤4% BM /24ч
   if (p.startWeightKg && p.targetLossKg / p.startWeightKg > 0.04 && p.weeksOut <= 1) errs.push(`Острая потеря ${(p.targetLossKg/p.startWeightKg*100).toFixed(1)}% BM за 1нед >4% — ISSN лимит 2-4% /24ч`);
   // female cap 5%
@@ -245,9 +263,9 @@ export function validateWeightCutProtocol(p: WeightCutProtocol, opts?: { bodywei
   return errs;
 }
 
-export function weightCutSafetyBanner(p: WeightCutProtocol | null, bodyweightKg?: number, sex?: 'male'|'female'): string | null {
+export function weightCutSafetyBanner(p: WeightCutProtocol | null, bodyweightKg?: number, sex?: 'male'|'female', planWeeks?: number | null): string | null {
   if (!p) return null;
-  const errs = validateWeightCutProtocol(p, { bodyweightKg, sex, discipline: undefined });
+  const errs = validateWeightCutProtocol(p, { bodyweightKg, sex, discipline: undefined, planWeeks });
   if (errs.some(e => e.includes('врач') || e.includes('Same-day') || e.includes('подтвержд'))) return `⚠️ Требуется врач: ${errs[0]}`;
   if (errs.length) return `⚠️ ${errs[0]}`;
   return null;

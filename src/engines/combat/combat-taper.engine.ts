@@ -54,8 +54,22 @@ export function taperVolumeMultiplier(week: number, totalWeeks: number, cfg: Tap
 export function buildTaperRationale(cfg: TaperConfig | null | undefined, totalWeeks: number): string[] {
   if (!cfg || !cfg.fightDate) return [];
   const fw = fightWeekIndex(cfg.fightDate, cfg.startDate, totalWeeks);
-  const tw = cfg.taperWeeks || 1;
-  return [`Тапер ${tw}нед к бою ${cfg.fightDate} (нед ${fw}): объём 0.65→0.45, интенсивность 90-95%, спарринг ↓30%`, 'Heat acclimation: сауна 15-20′×3/нед в тапер (опционально)'];
+  // тот же кламп, что и у scMult — иначе rationale печатает «3нед»/«0нед»,
+  // а кривая строится на tw=2/tw=1
+  const tw = Math.max(1, Math.min(2, Math.round(cfg.taperWeeks || 1)));
+  // Объёмные множители БЕРЁМ из той же scMult, что и применяется к плану, —
+  // строка больше не может пообещать 0.65→0.45 на тапере в 1 неделю.
+  const vols: string[] = [];
+  for (let w = Math.max(1, fw - tw + 1); w <= fw; w++) {
+    const m = scMult(w, totalWeeks, cfg, false);
+    if (m < 1) vols.push(`×${m.toFixed(2)}`);
+  }
+  const curve = vols.length ? vols.join('→') : '×1.00';
+  const sp = taperSplitForWeek(fw, totalWeeks, cfg, false);
+  return [
+    `Тапер ${tw}нед к бою ${cfg.fightDate} (нед ${fw}): объём зала ${curve}, интенсивность 90-95%, hard-sparring ×${sp.sparringHard.toFixed(2)} (${sp.sparringHard === 0 ? 'запрещён' : 'техника'}), кондиция ×${sp.cond.toFixed(2)}`,
+    'Heat acclimation: сауна 15-20′×3/нед в тапер (опционально)',
+  ];
 }
 
 // ── P1 PRO: единый тапер (Bosquet 2007 + Boxing Science + fight-week практика) ──

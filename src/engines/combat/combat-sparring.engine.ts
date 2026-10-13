@@ -20,20 +20,24 @@ export interface SparringLoad {
 
 const DEFAULT_DURATION: Record<'hard' | 'tech' | 'wrest' | 'cond', number> = { hard: 90, tech: 60, wrest: 75, cond: 40 };
 
+/** Кламп 0..4 — единый для обеих функций (иначе weeklyLoad и sessionsPerWeek
+ *  расходились на out-of-range входе: 7 hard → нагрузка от 4, сессий 7). */
+function clamp4(v: number | undefined): number { return Math.max(0, Math.min(4, Math.round(Number(v) || 0))); }
+
 export function sparringWeeklyLoad(s: SparringLoad): number {
   // scale: hard 90×8.5=765 vs outside generic 90×7=630 — намеренно выше: hard spar RPE 8-9 (ЦНС-удар, 6мин раунд) vs тех 5.5; дельта 0.10 в volumeMultiplier обоснована Boxing Science
-  const hard = Math.max(0, Math.min(4, Math.round(s.hardSparSessions || 0))) * 90 * 8.5;
-  const tech = Math.max(0, Math.min(4, Math.round(s.techSparSessions || 0))) * 60 * 5.5;
-  const wrest = Math.max(0, Math.min(4, Math.round(s.wrestlingSessions || 0))) * 75 * 7.5;
-  const cond = Math.max(0, Math.min(4, Math.round(s.conditioningSessions || 0))) * 40 * 6;
+  const hard = clamp4(s.hardSparSessions) * 90 * 8.5;
+  const tech = clamp4(s.techSparSessions) * 60 * 5.5;
+  const wrest = clamp4(s.wrestlingSessions) * 75 * 7.5;
+  const cond = clamp4(s.conditioningSessions) * 40 * 6;
   const base = hard + tech + wrest + cond;
   // P1-18: журнальная средняя длительность масштабирует нагрузку (факт вместо фабрики)
   if (typeof s.avgDurationMin === 'number' && Number.isFinite(s.avgDurationMin) && s.avgDurationMin > 0) {
     const counts = {
-      hard: Math.max(0, Math.min(4, Math.round(s.hardSparSessions || 0))),
-      tech: Math.max(0, Math.min(4, Math.round(s.techSparSessions || 0))),
-      wrest: Math.max(0, Math.min(4, Math.round(s.wrestlingSessions || 0))),
-      cond: Math.max(0, Math.min(4, Math.round(s.conditioningSessions || 0))),
+      hard: clamp4(s.hardSparSessions),
+      tech: clamp4(s.techSparSessions),
+      wrest: clamp4(s.wrestlingSessions),
+      cond: clamp4(s.conditioningSessions),
     };
     const totalSessions = counts.hard + counts.tech + counts.wrest + counts.cond;
     if (totalSessions > 0) {
@@ -47,30 +51,37 @@ export function sparringWeeklyLoad(s: SparringLoad): number {
 
 export function sparringToOutsideLoad(s: SparringLoad | null | undefined, discipline?: string): OutsideLoad | null {
   if (!s) return null;
-  const totalSessions = (s.hardSparSessions || 0) + (s.techSparSessions || 0) + (s.wrestlingSessions || 0) + (s.conditioningSessions || 0);
+  // PRO-3: те же клампы, что у sparringWeeklyLoad — раньше totalSessions/avgRPE
+  // считались по СЫРЫМ значениям, и вход 7 hard давал load от 4 сессий, но
+  // sessionsPerWeek=7 и средний RPE от семи «восьми с половиной».
+  const hard = clamp4(s.hardSparSessions);
+  const tech = clamp4(s.techSparSessions);
+  const wrest = clamp4(s.wrestlingSessions);
+  const cond = clamp4(s.conditioningSessions);
+  const totalSessions = hard + tech + wrest + cond;
   if (totalSessions === 0) return null;
   const wl = sparringWeeklyLoad(s);
   // P1-18: длительность из журнала, иначе — взвешенные дефолты
   const avgDuration = (typeof s.avgDurationMin === 'number' && Number.isFinite(s.avgDurationMin) && s.avgDurationMin > 0)
     ? Math.round(s.avgDurationMin)
-    : Math.round(( (s.hardSparSessions||0)*90 + (s.techSparSessions||0)*60 + (s.wrestlingSessions||0)*75 + (s.conditioningSessions||0)*40) / totalSessions);
-  const avgRPE = totalSessions > 0 ? ((s.hardSparSessions||0)*8.5 + (s.techSparSessions||0)*5.5 + (s.wrestlingSessions||0)*7.5 + (s.conditioningSessions||0)*6) / totalSessions : 6;
+    : Math.round((hard * 90 + tech * 60 + wrest * 75 + cond * 40) / totalSessions);
+  const avgRPE = totalSessions > 0 ? ((hard * 8.5 + tech * 5.5 + wrest * 7.5 + cond * 6) / totalSessions) : 6;
   // high дни — hard spar дни + wrestling (если >=2)
   let highDays: number[] = [];
   if (Array.isArray(s.hardDays) && s.hardDays.length) highDays = [...s.hardDays];
   else {
-    if ((s.hardSparSessions || 0) >= 2) highDays = [1, 4];
-    else if ((s.hardSparSessions || 0) === 1) highDays = [2];
-    if ((s.wrestlingSessions || 0) >= 2) highDays = [...new Set([...highDays, 0, 3])].sort((a,b)=>a-b);
+    if (hard >= 2) highDays = [1, 4];
+    else if (hard === 1) highDays = [2];
+    if (wrest >= 2) highDays = [...new Set([...highDays, 0, 3])].sort((a,b)=>a-b);
   }
   highDays = [...new Set(highDays.map(n=> Math.max(0, Math.min(6, Math.round(Number(n))))))].sort((a,b)=>a-b);
-  const interference: OutsideLoad['interference'] = wl >= 1500 || (s.hardSparSessions||0) >= 2 ? 'high' : wl >= 800 ? 'medium' : 'low';
+  const interference: OutsideLoad['interference'] = wl >= 1500 || hard >= 2 ? 'high' : wl >= 800 ? 'medium' : 'low';
   const type: OutsideLoad['type'] = (() => {
     const d = (discipline||'').toLowerCase();
     if (d.includes('box') || d.includes('kick')) return 'ring';
     if (d.includes('mma') || d.includes('wrest') || d.includes('борь')) return 'mat';
     // эвристика по составу: ударный спарринг без борьбы → ring
-    if ((s.hardSparSessions||0) > 0 && (s.wrestlingSessions||0) === 0) return 'ring';
+    if (hard > 0 && wrest === 0) return 'ring';
     return 'mat';
   })();
   return {
@@ -80,22 +91,22 @@ export function sparringToOutsideLoad(s: SparringLoad | null | undefined, discip
     type,
     highIntensityDays: highDays,
     interference,
-    note: `sparring hard${s.hardSparSessions||0}/tech${s.techSparSessions||0}/wrest${s.wrestlingSessions||0}`,
+    note: `sparring hard${hard}/tech${tech}/wrest${wrest}`,
   };
 }
 
 export function sparringSummary(s: SparringLoad | null | undefined): string {
   if (!s) return 'Спарринг: не задан';
   const wl = sparringWeeklyLoad(s);
-  return `Спарринг ${wl} load: hard ${s.hardSparSessions||0}× (RPE 8.5) / tech ${s.techSparSessions||0}× / борьба ${s.wrestlingSessions||0}× → вне зала ${ (s.hardSparSessions||0)+(s.techSparSessions||0)+(s.wrestlingSessions||0)}×`;
+  return `Спарринг ${wl} load: hard ${clamp4(s.hardSparSessions)}× (RPE 8.5) / tech ${clamp4(s.techSparSessions)}× / борьба ${clamp4(s.wrestlingSessions)}× → вне зала ${clamp4(s.hardSparSessions)+clamp4(s.techSparSessions)+clamp4(s.wrestlingSessions)}×`;
 }
 
 export function validateSparringLoad(s: SparringLoad): string[] {
   const errs: string[] = [];
-  const total = (s.hardSparSessions||0)+(s.techSparSessions||0)+(s.wrestlingSessions||0)+(s.conditioningSessions||0);
+  const total = clamp4(s.hardSparSessions)+clamp4(s.techSparSessions)+clamp4(s.wrestlingSessions)+clamp4(s.conditioningSessions);
   if (total > 7) errs.push(`Суммарно ${total} спарринг-сессий >7 — перегруз`);
-  if ((s.hardSparSessions||0) > 3) errs.push('Hard spar >3×/нед — риск ЦНС, снизьте до 2×');
-  if ((s.hardSparSessions||0) >= 2 && (s.wrestlingSessions||0) >= 3) errs.push('Hard spar 2× + борьба 3× — высокая нагрузка, нужен делод 2× зал');
+  if (clamp4(s.hardSparSessions) > 3) errs.push('Hard spar >3×/нед — риск ЦНС, снизьте до 2×');
+  if (clamp4(s.hardSparSessions) >= 2 && clamp4(s.wrestlingSessions) >= 3) errs.push('Hard spar 2× + борьба 3× — высокая нагрузка, нужен делод 2× зал');
   return errs;
 }
 

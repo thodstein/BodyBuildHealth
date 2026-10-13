@@ -203,12 +203,15 @@ export function weightForCombatExerciseResolved(
 ): number {
   const bw = getCombatWorkMax(exId, opts.workMaxByExercise, opts.workMax, opts.bodyweight);
   const base = bw ?? DEFAULTS[exId] ?? 50;
-  // bodyweight / hold
-  if (exId === 'pullup' || exId === 'gi_grip_pullup' || exId.includes('pinch') || exId.includes('carry') && exId !== 'suitcase_carry') {
-    // carry — keep weight, pullup/pinch — bodyweight (0)
-    if (exId.includes('pullup') || exId.includes('pinch') || exId.includes('roller')) return 0;
-  }
   const gm = opts.goalMult ?? 1;
   const om = opts.outsideMult != null && opts.outsideMult < 0.75 ? 0.93 : 1;
+  // bodyweight / hold / self-loaded: pullup, pinch и валик — упражнения БЕЗ
+  // внешнего веса. PRO-3: `roller` добавлен в условие — раньше он не проходил
+  // внешний guard (нет 'pullup'/'pinch'/'carry' в id) и доезжал до DEFAULTS=5кг,
+  // хотя combat-builder считает тот же валик нулевым (bodyweightIds).
+  if (exId.includes('pullup') || exId.includes('pinch') || exId.includes('roller')) return 0;
+  if (exId.includes('carry') && exId !== 'suitcase_carry') {
+    // carry — вес сохраняем
+  }
   return Math.round((base * gm * om) / 2.5) * 2.5;
 }

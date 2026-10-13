@@ -22,7 +22,12 @@ export const CB_GROUP_IDS: Record<string, string[]> = {
     'landmine_rotation', 'landmine_180', 'pallof_rotation_press', 'med_ball_throw',
     'med_ball_slam', 'med_ball_rot_throw', 'sledge_hammer', 'battle_rope',
   ],
-  plyo: ['box_jump', 'depth_jump', 'broad_jump', 'med_ball_slam', 'med_ball_throw', 'med_ball_rot_throw', 'sledge_hammer', 'battle_rope'],
+  // PRO-3: `plyo` НЕ дублирует id ротации (med_ball_*/sledge/battle_rope были в
+  // обеих группах) — финализатор считал `weekGroupSets` отдельно для каждой
+  // группы, и одни и те же сеты резались дважды (снятие «плиометрики» уносило
+  // ротацию), а warning называл жертву не тем именем. Три рабочих прыжка
+  // остаются plyo; медибол/кувалда/канаты — честно ротация.
+  plyo: ['box_jump', 'depth_jump', 'broad_jump'],
   unilateral: ['bulgarian_split_heavy', 'single_leg_rdl_combat', 'cossack_squat', 'step_up', 'single_arm_row'],
   core_anti: ['deadbug', 'hollow_hold', 'side_plank', 'ab_wheel', 'copenhagen_plank'],
   prehab: ['face_pull', 'band_external_rotation', 'band_pull_apart', 'ytw_raise'],

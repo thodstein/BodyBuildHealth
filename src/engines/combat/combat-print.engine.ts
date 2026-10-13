@@ -13,7 +13,14 @@ const CB_RU_STYLE: Record<string, string> = { striker: 'ударник', grapple
 const CB_RU_MODE: Record<string, string> = { stable: 'стабильно', load_cut: 'загрузка-срез', moderate_cut: 'плавный срез', deplete_reload: 'слив-загрузка' };
 
 function escHtml(s: string): string { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;').replace(/`/g,'&#96;'); }
-function escCsv(v: any): string { const s = String(v ?? ''); if (/[",\n;]/.test(s)) return `"${s.replace(/"/g,'""')}"`; return s; }
+/** PRO-3: защита от формульной инъекции Excel (`= + - @` → префикс `'`) —
+ *  тот же канон, что в arm/PL/трен-экспортах. Единственный экспорт зоны без него. */
+function escCsv(v: any): string {
+  let s = String(v ?? '');
+  if (/^[=+\-@]/.test(s)) s = `'${s}`;
+  if (/[",\n;]/.test(s)) return `"${s.replace(/"/g,'""')}"`;
+  return s;
+}
 
 export function buildCombatPrintHtml(plan: CombatPlan): string {
   const phaseColor: Record<string,string> = { accumulation:'#3b82f6', transmutation:'#a855f7', realization:'#ef4444', transition:'#f59e0b', gpp:'#10b981', power:'#f97316', taper:'#06b6d4', deload:'#eab308', conjugate:'#6366f1' };

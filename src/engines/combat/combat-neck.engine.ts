@@ -97,9 +97,15 @@ export function neckProgressionFor(level: number): NeckLevelProg {
   return NECK_LEVELS[l] || NECK_LEVELS[1];
 }
 
-export function neckWeeklyPlan(trainingLevel: string, week?: number, phase?: string): NeckExercise[] {
+/**
+ * Недельный набор шеи по уровню атлета и фазе.
+ * PRO-3: параметр `week` убран — он никогда не использовался (вся «недельная»
+ * логика живёт в билдере), а `Math.min(4, base + 0)` был буквальным no-op'ом:
+ * transmutation/power получали ровно тот же уровень, что и ветка по умолчанию.
+ */
+export function neckWeeklyPlan(trainingLevel: string, _week?: number, phase?: string): NeckExercise[] {
   const base = trainingLevel === 'beginner' ? 1 : trainingLevel === 'intermediate' ? 2 : trainingLevel === 'advanced' ? 3 : 4;
-  const phaseLvl = phase === 'accumulation' || phase === 'gpp' ? base : phase === 'transmutation' || phase === 'power' ? Math.min(4, base + 0) : phase === 'realization' || phase === 'taper' ? Math.max(1, base - 1) : base;
+  const phaseLvl = phase === 'accumulation' || phase === 'gpp' ? base : phase === 'transmutation' || phase === 'power' ? base : phase === 'realization' || phase === 'taper' ? Math.max(1, base - 1) : base;
   const prog = neckProgressionFor(phaseLvl);
   return prog.exercises;
 }

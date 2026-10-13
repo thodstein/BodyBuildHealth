@@ -89,8 +89,9 @@ describe('E4.5 — кондиционирование: стоимость бюд
     const plan = { ...mkPlan(), conditioning: { weeks: 2, sessions: [[{ id: 'c1', modality: 'alactic', durationMin: 90, description: 'x', exercises: [] }], []] } } as any;
     render(<CbCampIntelCard plan={plan} />);
     expect(screen.getByText(/Бюджет кондиционирования/)).toBeTruthy();
-    // 90 мин × 0.08 = 7.2 → 7% бюджета
-    expect(screen.getByText(/съедает 7% бюджета/)).toBeTruthy();
+    // было→стало: conditioningBudgetCost возвращает ЗАЛ-СЕТЫ (мин × 0.08), а не
+    // проценты. 90 мин × 0.08 = 7.2 → 7 сетов; подпись больше не приписывает «%».
+    expect(screen.getByText(/съедает 7 зал-сетов/)).toBeTruthy();
   });
 
   it('аэробная поддержка подсвечивается при ≥5 внешних сессий', () => {

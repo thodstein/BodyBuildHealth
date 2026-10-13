@@ -31,10 +31,12 @@ export function isAxialLoadExerciseCB(id: string): boolean {
   const low = id.toLowerCase();
   // осевая компрессия: присед/тяга + тяж. переноски/камни/йок (JSI >2.5×BW)
   if ((low.includes('squat') || low.includes('dead') || low.includes('yoke') || low.includes('stone') || low.includes('atlas') || low.includes('log_press')) && !low.includes('bug')) return true;
-  // carry: farmer/yoke тяжёлые — осевые; suitcase — нет (односторонний anti-lateral)
+  // carry: farmer/yoke/sled тяжёлые — осевые; suitcase — нет (односторонний anti-lateral).
+  // PRO-3: вложенное тернарное «? true : ... ? true : false» было тавтологией
+  // (внутри if(low.includes('farmer')||'farmers'||'yoke') оно всегда true).
   if (low.includes('carry')) {
     if (low.includes('suitcase')) return false;
-    if (low.includes('farmer') || low.includes('farmers') || low.includes('yoke') || low.includes('sled')) return low.includes('farmer') || low.includes('farmers') || low.includes('yoke') ? true : low.includes('sled') ? true : false;
+    if (low.includes('farmer') || low.includes('farmers') || low.includes('yoke') || low.includes('sled')) return true;
   }
   if (low.includes('farmer') || low.includes('farmers') || low.includes('yoke')) return true;
   return false;

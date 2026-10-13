@@ -5,7 +5,7 @@
 import type { CombatPlan } from './combat.types';
 import { weightCutNutritionForWeek, weightCutFiberForWeek, weightCutOrsProtocol, combatWeightCutToMealInput } from './combat-weight-cut.engine';
 
-export function combatToNutritionPayload(plan: CombatPlan): { kcal: number | null; proteinG: number | null; carbsG: number | null; fatG: number | null; fiberG: number | null; waterMl: number | null; sodiumMg: number | null; note: string; weighInType?: string; orsMmol?: number; mealInput?: any } {
+export function combatToNutritionPayload(plan: CombatPlan): { kcal: number | null; proteinG: number | null; carbsG: number | null; fatG: number | null; fiberG: number | null; waterMl: number | null; sodiumMg: number | null; weeklyTrainingKcal?: number | null; note: string; weighInType?: string; orsMmol?: number; mealInput?: any } {
   const bw = (plan.inputSnapshot as any)?.bodyweight || 80;
   const sex = (plan.inputSnapshot as any)?.sex || 'male';
   const wcProtocol = (plan.inputSnapshot as any)?.weightCutProtocol || null;
@@ -31,11 +31,25 @@ export function combatToNutritionPayload(plan: CombatPlan): { kcal: number | nul
   }
   const weeks = plan.weeksData;
   const avgSets = weeks.reduce((a, w) => a + (w.totalSets || 0), 0) / Math.max(1, weeks.length);
-  const kcal = Math.round(avgSets * 38 * (plan.weeksData[0]?.sessions.length || 3) / 3);
+  const sessionsPerWeek = Math.max(1, weeks[0]?.sessions?.length || 3);
+  // Расход силовой части за НЕДЕЛЮ (сеты × ~38 ккал/сет). Это НЕ целевые ккал
+  // дня: раньше именно это число уезжало в `kcal`, а читатель
+  // (IndividualPlanContext.applyCombatNutrition) пихал его в manualKcal —
+  // ДНЕВНУЮ цель — и получал ration на ~800…5000 ккал, который вдобавок
+  // противоречил макросам того же объекта (P 2.0 / C 5 / F 0.6 г/кг = 2672 ккал
+  // при kcal≈1520). Теперь ккал-цель = Atwater от публикуемых макро-целей
+  // (конвенция проекта «kcal из формулы макросов»), а недельный расход вынесен
+  // в отдельное честное поле и в note (плюс TDEE — как и была обещана строка).
+  const weeklyTrainingKcal = Math.round(avgSets * 38 * sessionsPerWeek / 3);
   const protein = Math.round(bw * ((plan.goal === 'weight_cut') ? 2.3 : 2.0));
   const carbs = Math.round(bw * ((plan.goal === 'weight_cut') ? 3 : 5));
   const fat = Math.round(bw * (sex === 'female' ? 0.8 : 0.6));
-  return { kcal, proteinG: protein, carbsG: carbs, fatG: fat, fiberG: 28, waterMl: Math.round(bw * 35), sodiumMg: 5000, note: `Оценка под план ${plan.discipline} avg ${Math.round(avgSets)} сетов/нед — ккал ${kcal} ориентир + TDEE` };
+  const kcal = protein * 4 + carbs * 4 + fat * 9;
+  return {
+    kcal, proteinG: protein, carbsG: carbs, fatG: fat, fiberG: 28,
+    waterMl: Math.round(bw * 35), sodiumMg: 5000, weeklyTrainingKcal,
+    note: `Оценка под план ${plan.discipline} avg ${Math.round(avgSets)} сетов/нед · расход зала ~${weeklyTrainingKcal} ккал/нед — прибавь к своему TDEE; дневная цель ${kcal} ккал = P${protein}/C${carbs}/F${fat} (Atwater)`,
+  };
 }
 
 export function combatToCardioPayload(plan: CombatPlan): { zone2MinPerWeek: number; hiitSessions: number; totalConditioningMin: number; outsideLoad: number | null; needsAerobicMaintenance: boolean } | null {

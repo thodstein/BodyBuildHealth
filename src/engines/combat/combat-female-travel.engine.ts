@@ -50,11 +50,24 @@ export const HOTEL_POOL: string[] = [
   'calf_raise',
 ];
 
-/** Hotel-фильтр пула: пересечение с HOTEL_POOL; пусто → deadbug/side_plank (доступны всегда). */
-export function travelPoolFilter(pool: string[], travelMode: string | null | undefined): string[] {
+/**
+ * Hotel-фильтр пула: пересечение с HOTEL_POOL.
+ * PRO-3: `exclude` — необязательный стоп-список (id упражнений, запрещённых
+ * травмой/исключением/мобильностью). Раньше при пустом пересечении функция
+ * возвращала жёсткий ['deadbug','side_plank'] — и deadbug прямо противоречит
+ * травме спины, т.е. отельный план ВНЕЗАПНО получал запрещённое упражнение
+ * (у всех остальных fallback-пулов билдера единый admitCombatExercise-гейт).
+ */
+export function travelPoolFilter(pool: string[], travelMode: string | null | undefined, exclude?: string[]): string[] {
   if (travelMode !== 'hotel') return pool;
-  const out = pool.filter(id => HOTEL_POOL.includes(id));
-  return out.length ? out : ['deadbug', 'side_plank'];
+  const banned = new Set((exclude || []).map(s => s.toLowerCase()));
+  const safe = (id: string) => !banned.has(id.toLowerCase());
+  const out = pool.filter(id => HOTEL_POOL.includes(id) && safe(id));
+  if (out.length) return out;
+  // fallback: те же «всегда доступные» свои-вес позиции, что и раньше, —
+  // но вычеркнутые стоп-списком не возвращаются (дефицит доберёт билдер).
+  const always = ['deadbug', 'side_plank'].filter(safe);
+  return always.length ? always : HOTEL_POOL.filter(safe).slice(0, 2);
 }
 
 /** Мультипликатор объёма в дороге: hotel ×0.9 (поддержание, без зала). */

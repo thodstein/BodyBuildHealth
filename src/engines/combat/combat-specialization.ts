@@ -18,6 +18,8 @@ export function accentForFightStyle(style: FightStyle | undefined, discipline: D
   if (!style || style==='hybrid') return { rotational: 1.0, neck: 1.0, grip: 1.0, legs: 1.0, plyo: 1.0 };
   if (style==='striker') return { rotational: 1.2, plyo: 1.15, legs: 1.05, neck: 1.0, grip: 0.95 };
   if (style==='grappler') return { neck: 1.15, grip: 1.15, legs: 1.1, unilateral: 1.15, pull: 1.1, rotational: 0.95 };
+  // PRO-3: `return` ниже был недостижим (все значения style разобраны выше) —
+  // финальный откат уже сделан первой веткой (не-striker/grappler).
   return { rotational: 1.0, neck: 1.0, grip: 1.0 };
 }
 export function styleNarrative(style: FightStyle | undefined, discipline: Discipline): string {

@@ -18,7 +18,13 @@ export function applyCombatMesocycle(prev: CombatPlan | null, nextInput: CombatI
   const acwrDanger = (nextInput as any).acwr?.zone === 'dangerous';
   const trends: any[] = (nextInput as any).diaryTrendCB || [];
   const hasPlateau = Array.isArray(trends) && trends.some((t:any)=> typeof t.changePct==='number' && t.changePct < -5);
-  const hasWarnings = Array.isArray((nextInput as any).warnings) && (nextInput as any).warnings.length > 4;
+  // PRO-3: `(nextInput as any).warnings` не объявлено в CombatInput и никем не
+  // пишется — вторая половина условия была мертва (`plateauHold` всегда сводился
+  // к Plateau diary). Вместо выдумывания поля берём РЕАЛЬНЫЙ источник предупреждений
+  // предыдущего плана: >=5 warnings'ов в его validation = тот же сигнал
+  // «цикл идёт тяжело», а не пустой сотрудник.
+  const prevWarn: any[] = Array.isArray((prev as any).validation?.warnings) ? (prev as any).validation.warnings : [];
+  const hasWarnings = prevWarn.length > 4;
   const plateauHold = hasPlateau || hasWarnings;
   const factor = acwrDanger ? 0.97 : 1.0;
   const busted = acwrDanger || plateauHold;

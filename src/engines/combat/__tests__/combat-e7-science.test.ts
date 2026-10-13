@@ -226,24 +226,33 @@ describe('E7.5 — session-RPE: 10 минут достаточно (PMID 2457060
 });
 
 describe('E7 — source-guard: движки не разъезжаются с каноном', () => {
-  it('builder режет сгон на 5% (не на другое число)', () => {
+  // PRO-3 (было→стало): прежние три теста проверяли лишь НАЛИЧИЕ цифр
+  // `0.05`/`0.08` в тексте движков — это проходило и при полностью разъезжейнихся
+  // копиях порогов (литерал в builder + ДРУГОЙ литерал в safety = «зелено»).
+  // Побочно строки 0.05/0.08 встречались в комментариях, так что гард был
+  // вакуумным по построению. Теперь проверяется настоящий инвариант: оба движка
+  // ЧИТАЮТ канон combat-science, а не держат свои копии.
+  it('builder режет сгон по канону CUT_WARN_PCT, а не по своему литералу', () => {
     const s = read('combat-builder.engine.ts');
-    expect(s).toMatch(/pct\s*>\s*0\.05/);
+    expect(s).toContain('CUT_WARN_PCT');
+    expect(s).not.toMatch(/pct\s*>\s*0\.05/);
   });
 
-  it('safety блокирует сборку на 8%', () => {
+  it('safety блокирует по канону CUT_BLOCK_PCT, а не по своему литералу', () => {
     const s = read('combat-safety.engine.ts');
-    expect(s).toMatch(/pct\s*>\s*0\.08/);
+    expect(s).toContain('CUT_BLOCK_PCT');
+    expect(s).not.toMatch(/pct\s*>\s*0\.08/);
   });
 
-  it('канон и движки используют ОДНО значение — расхождения быть не может', () => {
+  it('оба движка берут порог из combat-science — расхождение невозможно', () => {
     const builder = read('combat-builder.engine.ts');
     const safety = read('combat-safety.engine.ts');
-    // пороги канона обязаны встречаться в обоих движках
-    expect(builder).toContain('0.05');
-    expect(safety).toContain('0.08');
-    expect(CUT_WARN_PCT).toBeCloseTo(0.05, 3);
-    expect(CUT_BLOCK_PCT).toBeCloseTo(0.08, 3);
+    expect(builder).toMatch(/from '\.\/combat-science'/);
+    expect(safety).toMatch(/from '\.\/combat-science'/);
+    expect(builder).toMatch(/CUT_WARN_PCT/);
+    expect(safety).toMatch(/CUT_BLOCK_PCT/);
+    // canon объявляет себя единым источником — и теперь это правда
+    expect(read('combat-science.ts')).toContain('единый канон');
   });
 
   it('непроверяемый порог плана НЕ внедрён в движок', () => {

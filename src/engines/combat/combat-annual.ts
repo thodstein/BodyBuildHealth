@@ -196,7 +196,11 @@ export function buildAnnualPlans(annual: AnnualCB, opts?: AnnualPlanBuildOptions
       if (isTaperBlock && !b.fightDate) applyExplicitMiniTaper(plan);
       plan = finalizeCombatPlan(plan);
       if (isTaperBlock) {
-        const cut = target <= 1 ? `×${TAPER_SC_FIGHT}` : `×${TAPER_SC_PRE}→×${TAPER_SC_FIGHT}`;
+        // PRO-3: множители в строке берём из ТОЙ ЖЕ ветки, что и применяет
+        // applyExplicitMiniTaper (n<=1 → FIGHT_SHORT, иначе PRE→FIGHT). Раньше
+        // для 1-недельного блока печаталось ×0.45, а срезалось ×0.55.
+        const n = plan.weeksData.length;
+        const cut = n <= 1 ? `×${TAPER_SC_FIGHT_SHORT}` : `×${TAPER_SC_PRE}→×${TAPER_SC_FIGHT}`;
         plan.rationale.push(`🔻 Mini-taper блока: объём ${cut} (единый источник combat-taper; Bosquet 2007)`);
       }
       b.plan = plan;
@@ -317,7 +321,8 @@ export function addCompetitionToAnnual(annual: AnnualCB, comp: AnnualCBCompetiti
           for(const b of next.blocks) if (w>=b.startWeek && w< b.startWeek+b.weeks) b.fightDate = comp.date;
           return next;
         }
-        // найдём блок, содержащий taperStart
+        // найдём блок, содержащий taperStart (`taperStart < start+weeks` —
+        // последняя неделя блока включена: при weeks=7, start=1 это 7 ≤ 7).
         const idx = next.blocks.findIndex(b => taperStart >= b.startWeek && taperStart < b.startWeek + b.weeks);
         if (idx >= 0) {
           const b = next.blocks[idx];

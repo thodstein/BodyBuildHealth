@@ -16,7 +16,7 @@ import {
 import { buildConditioningRationale, conditioningSessionsForWeek } from './combat-conditioning.engine';
 import { filterByTierCB, filterByInjuryCB, selectDiverseCB, tierForCB, gentleFactorForCB, repsCapForCB, admitCombatExercise, type CombatAdmitCtx } from './combat-selection';
 import { accentForDiscipline, accentForFightStyle, styleNarrative } from './combat-specialization';
-import { fightEnergyProfile } from './combat-science';
+import { fightEnergyProfile, CUT_WARN_PCT } from './combat-science';
 import { tempoForCB, restForCB } from './combat-loading';
 import { adaptForPEDsCombat } from './combat-ped-adaptation';
 import { filterByMobilityCB, isAxialLoadExerciseCB, isMobilityRestrictedCB } from './combat-mobility';
@@ -25,7 +25,7 @@ import { applyCombatDUP } from './combat-dup';
 import { applyCombatIntensity } from './combat-intensity';
 import { weightForCombatExerciseResolved } from './combat-workmax';
 import { sparringToOutsideLoad, sparringWeeklyLoad, sparringSummary } from './combat-sparring.engine';
-import { teenCombatGates, hasWeightManipulation, neckExtensionCutoffKg, concussionProtocol, sparringSafetyErrors, teenNeckIsoFallback } from './combat-safety.engine';
+import { teenCombatGates, hasWeightManipulation, neckExtensionCutoffKg, concussionProtocol, sparringSafetyErrors, teenNeckIsoFallback, NECK_FLEX_EXT_CUTOFF } from './combat-safety.engine';
 import { weightToClassBoundary, weightClassLine } from './combat-weight-class.engine';
 import { femaleCutTempoDefault, femaleCombatNotes, travelPoolFilter, travelVolumeMult, travelTaperNote } from './combat-female-travel.engine';
 import { cycleModulationFor } from './combat-female-cycle';
@@ -276,8 +276,13 @@ function filterPool(ids: string[], input: CombatInput): string[] {
       if (out.length===0) out = ['deadbug','side_plank'];
     }
   }
-  // P5 travel: отель — только свой вес (верх ограничен честно)
-  out = travelPoolFilter(out, (input as any).travelMode);
+  // P5 travel: отель — только свой вес (верх ограничен честно).
+  // PRO-3: стоп-список исключений передаём ВНУТРЬ фильтра — иначе его
+  // собственный fallback возвращал deadbug/side_plank даже при травме спины.
+  out = travelPoolFilter(out, (input as any).travelMode, [
+    ...(input.excludedExercises || []).map(String),
+    ...(Array.isArray(input.injuries) ? (input.injuries as any[]).map((i: any) => typeof i === 'string' ? i : (i?.id ?? i?.name ?? '')).filter(Boolean) : []),
+  ]);
   // P0: финальный safety-гейт — ни один fallback/globalSafe не возвращает
   // исключённое, teen-запрещённое, травмированное или недоступное по оборудованию
   const ctx = admitCtxFor(input);
@@ -481,7 +486,10 @@ export function buildCombatPlan(input: CombatInput): CombatPlan {
   // P1-20: снижение ×0.85 применяется только при goal=weight_cut — rationale больше не врёт
   if (input.weightCutKg && input.weightCutKg > 0 && !wcProtocol && goal === 'weight_cut') rationale.push(`Весогонка: −${input.weightCutKg} кг → объём ×0.85, без отказа`);
   if (wcProtocol) {
-    rationale.push(`Протокол весогонки: ${wcProtocol.targetLossKg}кг за ${wcProtocol.weeksOut}нед · вода ${CB_RU_MODE[wcProtocol.waterMode] || wcProtocol.waterMode} · Na ${CB_RU_MODE[wcProtocol.sodiumMode] || wcProtocol.sodiumMode} · угли ${CB_RU_MODE[wcProtocol.carbMode] || wcProtocol.carbMode}${wcProtocol.heatSessions?' · сауна':''}`);
+    // PRO-3: в строке печатаем СКОЛЬКО НЕДЕЛЬ реально отдаёт план, а не только
+    // weeksOut протокола — фазы (camp/taper/fight_week) строятся от длины плана.
+    const delivered = Math.min(weeks, wcProtocol.weeksOut);
+    rationale.push(`Протокол весогонки: ${wcProtocol.targetLossKg}кг за ${wcProtocol.weeksOut}нед · в плане ${delivered}нед · вода ${CB_RU_MODE[wcProtocol.waterMode] || wcProtocol.waterMode} · Na ${CB_RU_MODE[wcProtocol.sodiumMode] || wcProtocol.sodiumMode} · угли ${CB_RU_MODE[wcProtocol.carbMode] || wcProtocol.carbMode}${wcProtocol.heatSessions?' · сауна':''}`);
     const nut = weightCutNutritionForWeek(1, weeks, wcProtocol, input.bodyweight || 80, input.sex as any);
     if (nut.kcal) rationale.push(`Питание W1: ${nut.kcal}ккал P${nut.proteinG}/C${nut.carbsG} · вода ${nut.waterMl}мл Na ${nut.sodiumMg}мг`);
     rationale.push(weightCutRehydrationNotes(wcProtocol.targetLossKg)[0]);
@@ -968,15 +976,18 @@ export function buildCombatPlan(input: CombatInput): CombatPlan {
   if (input.weightCutKg && input.weightCutKg > 3 && goal !== 'weight_cut') {
     warnings.push(`Весогонка ${input.weightCutKg} кг без режима weight_cut — объём не снижен должным образом.`);
   }
-  // P1-гейт: сгонка >5% массы без weight_cut-режима — блок (ISSN)
+  // P1-гейт: сгонка >5% массы без weight_cut-режима — блок (ISSN).
+  // PRO-3: порог берём из единого канона combat-science (CUT_WARN_PCT), а не
+  // инлайновым литералом — комментарий канона обещал «единый источник», но ни
+  // один движок его не читал, и правка порога молча не действовала бы.
   if (input.weightCutKg && input.bodyweight && input.bodyweight > 30 && goal !== 'weight_cut') {
     const pct = input.weightCutKg / input.bodyweight;
-    if (pct > 0.05) errors.push(`Сгонка ${(pct * 100).toFixed(1)}% массы без режима weight_cut — включите weight_cut или уменьшите до ≤5%`);
+    if (pct > CUT_WARN_PCT) errors.push(`Сгонка ${(pct * 100).toFixed(1)}% массы без режима weight_cut — включите weight_cut или уменьшите до ≤${Math.round(CUT_WARN_PCT * 100)}%`);
   }
   // P1-гейт: same-day взвешивание + сгонка >5% — блок (нет времени на регидратацию, GSSI/ISSN)
   if (wcProtocol?.weighInType === 'same_day_2h' && input.weightCutKg && input.bodyweight && input.bodyweight > 30) {
     const pct = input.weightCutKg / input.bodyweight;
-    if (pct > 0.05) errors.push(`Same-day взвешивание (1–2ч) + сгонка ${(pct * 100).toFixed(1)}% >5% — нет времени на регидратацию, режьте до ≤5%`);
+    if (pct > CUT_WARN_PCT) errors.push(`Same-day взвешивание (1–2ч) + сгонка ${(pct * 100).toFixed(1)}% >${Math.round(CUT_WARN_PCT * 100)}% — нет времени на регидратацию, режьте до ≤${Math.round(CUT_WARN_PCT * 100)}%`);
   }
   // P1-гейт: шея ниже MEV при жёстких спаррингах — блок (Collins: шея = защита)
   {
@@ -1062,11 +1073,13 @@ export function buildCombatPlan(input: CombatInput): CombatPlan {
     } else if (conc.stage === 'limited' && hardSpar > conc.maxHardSpar) {
       errors.push(`1 сотрясение за 12 мес: hard spar ${hardSpar}× > лимита ${conc.maxHardSpar}× — снизьте до technical`);
     }
-    // flex/ext-баланс шеи (cutoff 0.74 — риск ×3)
+    // flex/ext-баланс шеи: cutoff из ЕДИНОГО канона combat-safety
+    // (NECK_FLEX_EXT_CUTOFF, Kelshaw 2024) — литерал 0.74 был третьей копией
+    // числа и расходился бы с ConcussionProtocol.
     if (typeof input.neckFlexExtRatio === 'number' && Number.isFinite(input.neckFlexExtRatio) && input.neckFlexExtRatio > 0) {
-      if (input.neckFlexExtRatio > 0.74) {
-        if (hardSpar > 0) errors.push(`Шея flex/ext ${input.neckFlexExtRatio.toFixed(2)} >0.74 (риск ×3) при hard spar — сначала экстензия`);
-        else warnings.push(`Шея flex/ext ${input.neckFlexExtRatio.toFixed(2)} >0.74 — добейте экстензию (cutoff подростков регби)`);
+      if (input.neckFlexExtRatio > NECK_FLEX_EXT_CUTOFF) {
+        if (hardSpar > 0) errors.push(`Шея flex/ext ${input.neckFlexExtRatio.toFixed(2)} >${NECK_FLEX_EXT_CUTOFF} (риск ×3) при hard spar — сначала экстензия`);
+        else warnings.push(`Шея flex/ext ${input.neckFlexExtRatio.toFixed(2)} >${NECK_FLEX_EXT_CUTOFF} — добейте экстензию (cutoff подростков регби)`);
       }
     }
     // измеренная экстензия vs cutoff 3.71 N/кг
@@ -1114,9 +1127,9 @@ export function buildCombatPlan(input: CombatInput): CombatPlan {
     }
     // ISSN-чеклист протокола: мед-пункты → errors, советы → warnings (дедуп с P1-гейтами)
     if (wcProtocol) {
-      const items = validateWeightCutProtocol(wcProtocol, { bodyweightKg: bw, sex: input.sex as any });
+      const items = validateWeightCutProtocol(wcProtocol, { bodyweightKg: bw, sex: input.sex as any, planWeeks: weeks });
       for (const item of items) {
-        const medical = item.includes('врач') || item.includes('подтвержд');
+        const medical = item.includes('врач') || item.includes('подтвержд') || item.includes('короче протокола');
         if (medical) {
           if (!errors.includes(item)) errors.push(item);
           continue;

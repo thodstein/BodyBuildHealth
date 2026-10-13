@@ -219,13 +219,22 @@ export const CombatConstructor: React.FC = () => {
   }, []);
 
   /* P4-добивка: смена дисциплины/пола/свода сбрасывает чужой лимит категории (бокс 80кг ≠ MMA-лимит) */
+  // PRO-3: эффект висел только на [discipline, sex, weightClassRuleset], поэтому
+  // лимит, восстановленный из `he_combat_session` и невалидный для текущего
+  // свода, выживал при МОНТИРОВАНИИ (и уезжал в weightToClassBoundary в билдере),
+  // пока пользователь не поменял одну из трёх зависимостей. Добавлен флаг
+  // «первый прогон сделан» — на маунте проверка тоже выполняется.
+  const weightClassCheckedRef = React.useRef(false);
   React.useEffect(() => {
     const key = weightClassRuleset || discipline;
-    if (weightClassLimitKg && !weightClassLimitValid(key, sex, weightClassLimitKg)) {
-      setWeightClass('');
-      setWeightClassLimitKg(0);
-      setMsg('Категория сброшена под дисциплину — выберите заново');
-      setTimeout(() => setMsg(''), 2600);
+    if (!weightClassCheckedRef.current || discipline || sex || weightClassRuleset) {
+      weightClassCheckedRef.current = true;
+      if (weightClassLimitKg && !weightClassLimitValid(key, sex, weightClassLimitKg)) {
+        setWeightClass('');
+        setWeightClassLimitKg(0);
+        setMsg('Категория сброшена под дисциплину — выберите заново');
+        setTimeout(() => setMsg(''), 2600);
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [discipline, sex, weightClassRuleset]);
@@ -449,7 +458,12 @@ export const CombatConstructor: React.FC = () => {
         const c = combatToCardioPayload(p);
         return c ? { planId: p.id, ...c } : null;
       })();
+      // PRO-3: при пересборке без кондиции/низкой внезальной payload обязан
+      // ПРОПАДАТЬ. Раньше ключ оставался от прошлого плана, и CardioConstructor
+      // (обработчик события перечитывает тот же ключ) продолжал советовать
+      // Zone2/HIIT уже удалённого цикла.
       if (cardio) localStorage.setItem('he_combat_cardio_payload', JSON.stringify(cardio));
+      else { try { localStorage.removeItem('he_combat_cardio_payload'); } catch {} }
       window.dispatchEvent(new CustomEvent('he-combat-updated', { detail: { planId: p.id, nutrition: nut, cardio } }));
     } catch {}
     try { const hist = loadCombatPlans().slice(0, 6); const ann = autoAnnualWithFightTaper(hist); saveAnnualCB(ann); setAnnual(ann); } catch {}

@@ -513,8 +513,13 @@ export function gripSummary(rows: GripEntry[]): GripSummary {
 
   const maxPeak = Math.max(bestL, bestR);
   const asymmetryPct = maxPeak > 0 ? Math.round((Math.abs(bestL - bestR) / maxPeak) * 1000) / 10 : null;
+  // PRO-3: «ниже СВОЕГО пика» — значит делитель обязан быть пик ИМЕННО той руки,
+  // которая сейчас слабее. Раньше знаменателем был max(bestL,bestR) — пик
+  // СИЛЬНОЙ руки, и план честно печатал «−24%» при реальных −5% от своего пика.
+  const worstIsLeft = (latestL as number) <= (latestR as number);
+  const worstPeak = worstIsLeft ? bestL : bestR;
   const worstLatest = Math.min(latestL as number, latestR as number);
-  const dropFromPeakPct = maxPeak > 0 ? Math.round(((maxPeak - worstLatest) / maxPeak) * 1000) / 10 : null;
+  const dropFromPeakPct = worstPeak > 0 ? Math.round(((worstPeak - worstLatest) / worstPeak) * 1000) / 10 : null;
 
   let level: GripLevel = 'ok';
   let note = 'Хват держится у своего пика.';
@@ -523,7 +528,7 @@ export function gripSummary(rows: GripEntry[]): GripSummary {
     note = `Пики рук разошлись на ${asymmetryPct}% — проверьте хват и цепь слабой руки.`;
   } else if (dropFromPeakPct !== null && dropFromPeakPct >= 15) {
     level = 'dropped';
-    note = `Слабая рука на ${dropFromPeakPct}% ниже своего пика — похоже на уход формы.`;
+    note = `${worstIsLeft ? 'Левая' : 'Правая'} рука на ${dropFromPeakPct}% ниже своего пика (${worstLatest} vs ${worstPeak}кг) — похоже на уход формы.`;
   }
   return { bestL, bestR, latestL, latestR, asymmetryPct, dropFromPeakPct, level, note, source: GRIP_SOURCE };
 }

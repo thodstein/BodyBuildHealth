@@ -7,6 +7,8 @@
  * Boxing Science / 369MMAFIT fight-week (hard spar за 10–14 дней, дальше technical).
  */
 
+import { CUT_BLOCK_PCT } from './combat-science';
+
 export interface CombatRedFlag {
   id: string;
   label: string;
@@ -89,6 +91,14 @@ export function neckExtensionCutoffKg(bodyweightKg: number | null | undefined): 
   return Math.round(bodyweightKg * 0.378 * 10) / 10;
 }
 
+/**
+ * Единый канон порога flex/ext шеи (Kelshaw 2024, подростки регби):
+ * отношение сгибателей к разгибателям >0.74 — тройной риск сотрясения.
+ * Раньше 0.74 был инлайновым литералом в ConcussionProtocol и отдельной копией
+ * в combat-builder — «единый источник» на деле был двумя.
+ */
+export const NECK_FLEX_EXT_CUTOFF = 0.74;
+
 export interface ConcussionProtocol {
   stage: 'clear' | 'limited' | 'blocked';
   maxHardSpar: number;
@@ -106,7 +116,7 @@ export function concussionProtocol(history: number | null | undefined): Concussi
       stage: 'blocked',
       maxHardSpar: 0,
       neckLevelMin: 2,
-      flexExtMax: 0.74,
+      flexExtMax: NECK_FLEX_EXT_CUTOFF,
       checklist: [
         'Покой до исчезновения симптомов (минимум 7–14 дней)',
         'Лёгкая аэробка → тех-работа без контакта → спарринг только после врача',
@@ -120,7 +130,7 @@ export function concussionProtocol(history: number | null | undefined): Concussi
       stage: 'limited',
       maxHardSpar: 1,
       neckLevelMin: 2,
-      flexExtMax: 0.74,
+      flexExtMax: NECK_FLEX_EXT_CUTOFF,
       checklist: [
         'Hard spar ≤1×/нед, только technical сверх того',
         'Шея уровень ≥2, flex/ext ≤0.74',
@@ -170,15 +180,30 @@ export function screenCombatRedFlags(input: {
   const flags: CombatRedFlag[] = [];
   const teen = teenCombatGates(input.age);
   if (teen.isTeen) {
-    flags.push({ id: 'teen', label: 'Подросток 14–15: только изометрия шеи, без hard spar и весогонки-манипуляций', blocksBuild: false });
+    // PRO-3: `isometricNeckOnly`/`noHardSpar`/`noWeightManipulation` были
+    // write-only — экран дублировал их смысл литералами. Теперь подпись
+    // собирается из самого объекта гейтов.
+    flags.push({
+      id: 'teen',
+      label: `Подросток 14–15: ${teen.isometricNeckOnly ? 'только изометрия шеи' : 'ограниченная шея'}, ${teen.noHardSpar ? 'без hard spar' : 'hard spar ограничен'}, ${teen.noWeightManipulation ? 'без весогонки-манипуляций' : 'манипуляции ограничены'}`,
+      blocksBuild: false,
+    });
     if (input.manipulation) flags.push({ id: 'teen_cut', label: 'Подросткам запрещены водные/Na/угле-манипуляции и сауна (только gradual под врачом)', blocksBuild: true });
   }
   const conc = concussionProtocol(input.concussionHistory);
   if (conc.stage === 'blocked') flags.push({ id: 'concussion2', label: `Сотрясения ×${Math.round(input.concussionHistory || 0)} за 12 мес — до врача (return-протокол)`, blocksBuild: true });
-  else if (conc.stage === 'limited') flags.push({ id: 'concussion1', label: '1 сотрясение за 12 мес — hard spar ≤1×, шея ≥L2, flex/ext ≤0.74', blocksBuild: false });
+  else if (conc.stage === 'limited') {
+    // PRO-3: числа берём из САМОГО протокола, а не дублируем литералами —
+    // раньше `maxHardSpar`/`neckLevelMin`/`flexExtMax` были write-only, и правка
+    // протокола не доезжала до экрана.
+    flags.push({ id: 'concussion1', label: `1 сотрясение за 12 мес — hard spar ≤${conc.maxHardSpar}×, шея ≥L${conc.neckLevelMin}, flex/ext ≤${conc.flexExtMax}`, blocksBuild: false });
+  }
   if (typeof input.weightCutKg === 'number' && typeof input.bodyweightKg === 'number' && input.bodyweightKg > 30) {
     const pct = input.weightCutKg / input.bodyweightKg;
-    if (pct > 0.08) flags.push({ id: 'cut8', label: `Сгонка ${(pct * 100).toFixed(1)}% >8% — требуется врач`, blocksBuild: true });
+    // PRO-3: порог из единого канона combat-science (CUT_BLOCK_PCT) — канон
+    // объявлял себя «единым источником», но движки держали свои литералы, и
+    // правка канона не меняла бы поведение.
+    if (pct > CUT_BLOCK_PCT) flags.push({ id: 'cut8', label: `Сгонка ${(pct * 100).toFixed(1)}% >${Math.round(CUT_BLOCK_PCT * 100)}% — требуется врач`, blocksBuild: true });
   }
   const blocked = flags.some(f => f.blocksBuild);
   const text = flags.length

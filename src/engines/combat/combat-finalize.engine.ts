@@ -295,7 +295,12 @@ export function finalizeCombatPlan(plan: CombatPlan): CombatPlan {
   // localStorage больше не читается (числа HRV живут на экране мониторинга).
   const hrvGrade = (plan.inputSnapshot as any)?.hrvGrade;
   if (hrvGrade && hrvGrade !== 'optimal') {
-    warnings.push(`HRV: ${hrvGrade === 'dangerous' ? 'недовосстановление' : 'внимание'} (${hrvGrade}) — RIR+1, объём −10-15%`);
+    // PRO-3: строка обязана называть ФАКТИЧЕСКИЙ множитель. computeRecoveryMultiplier
+    // даёт caution ×0.95 (−5%) и dangerous ×0.85 (−15%) — старое «−10-15%» врало
+    // про внимание и было правдой только для опасной зоны.
+    const mult = hrvGrade === 'dangerous' ? 0.85 : 0.95;
+    const pct = Math.round((1 - mult) * 100);
+    warnings.push(`HRV: ${hrvGrade === 'dangerous' ? 'недовосстановление' : 'внимание'} (${hrvGrade}) — RIR+1, объём −${pct}%`);
   }
 
   // Весогонка: проверка дефицита
