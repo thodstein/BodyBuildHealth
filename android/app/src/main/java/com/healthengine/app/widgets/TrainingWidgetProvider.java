@@ -13,11 +13,10 @@ import com.healthengine.app.R;
 
 import org.json.JSONObject;
 
-import java.text.SimpleDateFormat;
-import java.util.Date;
-import java.util.Locale;
-
-/** Homescreen-виджет «Тренировка»: последняя/текущая сессия + кнопка открыть. */
+/**
+ * Homescreen-виджет «Тренировка»: что делать сейчас (живая сессия / план дня),
+ * прогресс подходами и две кнопки — «Начать/+ Сет» и «Открыть».
+ */
 public class TrainingWidgetProvider extends AppWidgetProvider {
 
     @Override
@@ -42,24 +41,37 @@ public class TrainingWidgetProvider extends AppWidgetProvider {
         String title = d.optString("title", "");
         String subtitle = d.optString("subtitle", "");
         String meta = d.optString("meta", "");
+        String actionLabel = d.optString("actionLabel", "");
+        String actionTarget = d.optString("actionTarget", "");
+        int progress = Math.max(0, Math.min(100, d.optInt("progress", 0)));
+        boolean live = d.optBoolean("live", false);
         if (title.isEmpty()) {
             v.setTextViewText(R.id.w_training_title, "Тренировка");
             v.setTextViewText(R.id.w_training_sub, "Откройте план недели");
             v.setTextViewText(R.id.w_training_meta, "Health Engine");
+            v.setProgressBar(R.id.w_training_progress, 100, 0, false);
+            v.setTextViewText(R.id.w_training_act, "▶ Начать");
         } else {
             v.setTextViewText(R.id.w_training_title, title);
             v.setTextViewText(R.id.w_training_sub, subtitle.isEmpty() ? " " : subtitle);
             String stamp = "";
             long at = d.optLong("updatedAt", 0L);
             if (at > 0) {
-                stamp = new SimpleDateFormat("dd.MM HH:mm", Locale.getDefault())
-                        .format(new Date(at));
+                stamp = new java.text.SimpleDateFormat("dd.MM HH:mm", java.util.Locale.getDefault())
+                        .format(new java.util.Date(at));
             }
             String metaLine = meta.isEmpty() ? stamp : (stamp.isEmpty() ? meta : meta + " · " + stamp);
             v.setTextViewText(R.id.w_training_meta, metaLine.isEmpty() ? " " : metaLine);
+            v.setProgressBar(R.id.w_training_progress, 100, progress, false);
+            v.setTextViewText(R.id.w_training_act, actionLabel.isEmpty() ? (live ? "+ Сет" : "▶ Начать") : actionLabel);
         }
         v.setOnClickPendingIntent(R.id.w_training_root, openApp(context, WidgetStore.TARGET_TRAINING, 11));
         v.setOnClickPendingIntent(R.id.w_training_open, openApp(context, WidgetStore.TARGET_TRAINING, 12));
+        // Действие: живая сессия — быстрый сет, иначе — открыть проведение.
+        String act = actionTarget.isEmpty()
+                ? (live ? WidgetStore.TARGET_TRAINING_QUICK : WidgetStore.TARGET_TRAINING_RUN)
+                : actionTarget;
+        v.setOnClickPendingIntent(R.id.w_training_act, openApp(context, act, 13));
         return v;
     }
 

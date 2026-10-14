@@ -3,9 +3,11 @@
  * D7 вырезал журнал попыток и LMS из хаба как «соревы» — и правильно:
  * журнал живёт в конструкторе. Но выбор opener и 60-сек окно — это движение
  * помоста, диагностика без него не доводится до заявки.
- * Здесь только read-only план попыток от замера: opener ~92% / вторая ~98% /
- * третья — рекорд, шаг округления по величине снаряда. Без стораджа.
+ * Здесь только read-only план попыток от замера: проценты — канон
+ * `ATTEMPT_LADDER_PCT` (90/96/102, тот же источник, что у строчек отчёта),
+ * округление — по шагу снаряда. Без стораджа.
  */
+import { ATTEMPT_LADDER_PCT } from './arm-platform.engine';
 
 export interface ArmliftAttemptPlan {
   implement: string;
@@ -35,15 +37,13 @@ export function planArmliftAttempts(
 ): ArmliftAttemptPlan | null {
   if (!Number.isFinite(bestKg) || bestKg <= 0) return null;
   const step = attemptStepFor(bestKg);
-  const opener = roundToStep(bestKg * 0.92, step);
-  const second = roundToStep(bestKg * 0.98, step);
-  const third = roundToStep(bestKg * 1.02, step);
+  const [opener, second, third] = ATTEMPT_LADDER_PCT.map((p) => roundToStep(bestKg * p, step));
   return {
     implement,
     label: label || implement,
     opener,
     second,
     third,
-    note: '60 сек на попытку, промах = выбыл (AUSA/IronMind); opener обязан сесть — третья за рекордом',
+    note: `60 сек на попытку, промах = выбыл (AUSA/IronMind); лесенка ${ATTEMPT_LADDER_PCT.map((p) => Math.round(p * 100)).join('/')}% — opener обязан сесть, третья за рекордом`,
   };
 }

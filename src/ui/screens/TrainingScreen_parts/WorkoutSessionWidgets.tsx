@@ -3,7 +3,11 @@
  * Только UI-слой поверх существующих SessionPlayer / he_workout_log_v2.
  * Без чужих правок: самодостаточные карточки, монтируются 1 строкой где угодно.
  */
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
+import {
+  loadActiveSession, loadSessions, summarizeActiveSession,
+  type ActiveSessionSummary,
+} from '../../../engines/workout-logger.engine';
 
 const WHITE = '#fff';
 const ACCENT = '#00e68a';
@@ -20,50 +24,106 @@ const GHOST_BTN: React.CSSProperties = {
 };
 const TABULAR: React.CSSProperties = { fontVariantNumeric: 'tabular-nums' };
 
+/** Событие «записать следующий подход» — слушает SessionPlayer (фаза main). */
+export function requestQuickSet(): void {
+  try { window.dispatchEvent(new Event('he-workout-quick-set')); } catch { /* noop */ }
+}
+
+/**
+ * Живое состояние виджетов: перечитываем при записи подхода (событие от плеера),
+ * по storage (другое окно/вкладка) и на фокус — пульт не должен «залипать»
+ * на старом числе сетов, пока тренировка идёт.
+ */
+export function useWorkoutLive(): WorkoutWidgetState | null {
+  const [state, setState] = useState<WorkoutWidgetState | null>(() => readLastWorkout());
+  const refresh = React.useCallback(() => setState(readLastWorkout()), []);
+  useEffect(() => {
+    const onLive = () => refresh();
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === 'he_workout_active_v1' || e.key === 'he_workout_log_v2' || e.key === null) refresh();
+    };
+    const onFocus = () => refresh();
+    window.addEventListener('he-workout-live-update', onLive);
+    window.addEventListener('he-workout-quick-set', onLive);
+    window.addEventListener('storage', onStorage);
+    window.addEventListener('focus', onFocus);
+    return () => {
+      window.removeEventListener('he-workout-live-update', onLive);
+      window.removeEventListener('he-workout-quick-set', onLive);
+      window.removeEventListener('storage', onStorage);
+      window.removeEventListener('focus', onFocus);
+    };
+  }, [refresh]);
+  return state;
+}
+
 export interface WidgetExercise { name: string; done: number; total: number; weight?: number }
 export interface WorkoutWidgetState {
   dayLabel: string;
   exercises: WidgetExercise[];
   startedAt?: number;
+  /** Живая (незавершённая) сессия: approaching/total считаются по факту подходов. */
+  live?: ActiveSessionSummary;
 }
 
 function readLastWorkout(): WorkoutWidgetState | null {
   try {
-    const raw = localStorage.getItem('he_workout_log_v2');
-    if (!raw) return null;
-    const arr = JSON.parse(raw);
-    if (!Array.isArray(arr) || arr.length === 0) return null;
-    const last = arr[arr.length - 1] as any;
+    const live = summarizeActiveSession(loadActiveSession());
+    const arr = loadSessions();
+    const last = Array.isArray(arr) && arr.length > 0 ? arr[0] : null;
+    if (live) {
+      const exs: WidgetExercise[] = [];
+      const liveSession = loadActiveSession();
+      (liveSession?.exercises ?? []).slice(0, 6).forEach((e) => {
+        exs.push({
+          name: String(e?.exerciseName ?? 'Упражнение'),
+          done: Array.isArray(e?.sets) ? e.sets.length : 0,
+          total: Math.max(1, Array.isArray(e?.sets) ? e.sets.length : 1),
+          weight: Number(e?.sets?.[0]?.weightKg ?? 0) || undefined,
+        });
+      });
+      return {
+        dayLabel: live.currentExercise || live.focus,
+        exercises: exs,
+        startedAt: liveSession?.savedAt,
+        live,
+      };
+    }
+    if (!last) return null;
     const exs: WidgetExercise[] = Array.isArray(last?.exercises)
       ? last.exercises.slice(0, 6).map((e: any) => ({
-        name: String(e?.name ?? e?.exerciseName ?? 'Упражнение'),
+        name: String(e?.exerciseName ?? 'Упражнение'),
         done: Array.isArray(e?.sets) ? e.sets.length : 0,
         total: Array.isArray(e?.sets) ? e.sets.length : 0,
-        weight: Number(e?.sets?.[0]?.weight ?? 0) || undefined,
+        weight: Number(e?.sets?.[0]?.weightKg ?? 0) || undefined,
       }))
       : [];
-    return { dayLabel: String(last?.date ?? 'Последняя тренировка'), exercises: exs, startedAt: Number(last?.startedAt) || undefined };
+    return { dayLabel: String(last?.focus ?? last?.date ?? 'Последняя тренировка'), exercises: exs };
   } catch { return null; }
 }
 
 /* ── A1: «Пульт зала» — липкая мини-полоса ─────────────────────────────── */
 export const WorkoutMiniPult: React.FC<{ state?: WorkoutWidgetState | null; onOpen?: () => void; onNextSet?: () => void }> = ({ state, onOpen, onNextSet }) => {
-  const s = state ?? readLastWorkout();
-  const done = (s?.exercises ?? []).reduce((a, e) => a + e.done, 0);
-  const total = (s?.exercises ?? []).reduce((a, e) => a + e.total, 0);
+  const s = state ?? useWorkoutLive();
+  const live = s?.live;
+  const done = live ? live.setsDone : (s?.exercises ?? []).reduce((a, e) => a + e.done, 0);
+  const total = live ? Math.max(live.setsDone, live.setsPlanned) : (s?.exercises ?? []).reduce((a, e) => a + e.total, 0);
   const pct = total > 0 ? Math.round((done / total) * 100) : 0;
   return (
     <div data-widget="workout-pult" role="status" aria-label={`Пульт тренировки, выполнено ${pct} процентов`}
-      style={{ ...CARD, position: 'sticky', top: 0, zIndex: 20, display: 'flex', gap: 10, alignItems: 'center' }}>
+      style={{ ...CARD, position: 'sticky', top: 0, zIndex: 20, display: 'flex', gap: 10, alignItems: 'center', borderColor: live ? 'rgba(0,230,138,0.28)' : undefined }}>
       <div style={{ width: 44, height: 44, borderRadius: 12, background: 'rgba(0,230,138,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22 }} aria-hidden>🏋️</div>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ color: WHITE, fontSize: 13, fontWeight: 800, ...TABULAR }}>{s?.dayLabel ?? 'Тренировки пока нет'} · {done}/{total}</div>
+        <div style={{ color: WHITE, fontSize: 13, fontWeight: 800, ...TABULAR, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          {live ? `● Идёт · ${live.focus}` : (s?.dayLabel ?? 'Тренировки пока нет')} · {done}/{total}
+        </div>
         <div role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100}
           style={{ height: 6, borderRadius: 4, background: 'rgba(255,255,255,0.10)', marginTop: 6 }}>
           <div style={{ width: `${pct}%`, height: '100%', borderRadius: 4, background: ACCENT }} />
         </div>
+        {live && <div style={{ color: WHITE, fontSize: 10, marginTop: 4, ...TABULAR }}>{live.volumeKg.toLocaleString()} кг{live.currentExercise ? ` · ${live.currentExercise}` : ''}</div>}
       </div>
-      <button type="button" data-act="pult-next" onClick={onNextSet} style={{ ...BIG_BTN, minWidth: 96 }} aria-label="Записать следующий сет">+ Сет</button>
+      <button type="button" data-act="pult-next" onClick={() => { requestQuickSet(); onNextSet?.(); }} style={{ ...BIG_BTN, minWidth: 96 }} aria-label="Записать следующий сет">+ Сет</button>
       <button type="button" data-act="pult-open" onClick={onOpen} style={{ ...GHOST_BTN, minWidth: 64, padding: '12px 10px' }} aria-label="Открыть проведение">↗</button>
     </div>
   );
@@ -71,12 +131,17 @@ export const WorkoutMiniPult: React.FC<{ state?: WorkoutWidgetState | null; onOp
 
 /* ── A2: «Карточка дня» — спокойная карточка на Главную/Дневник ────────── */
 export const WorkoutDayCard: React.FC<{ state?: WorkoutWidgetState | null; onOpen?: () => void; onSkip?: () => void }> = ({ state, onOpen, onSkip }) => {
-  const s = state ?? readLastWorkout();
+  const s = state ?? useWorkoutLive();
+  const live = s?.live;
   return (
     <section data-widget="workout-daycard" aria-label="Тренировка дня" style={CARD}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-        <div style={{ color: WHITE, fontSize: 14, fontWeight: 800 }}>🏋️ {s?.dayLabel ?? 'Сегодня — отдых или свободная'}</div>
-        <div style={{ color: WHITE, fontSize: 12, ...TABULAR }}>{(s?.exercises ?? []).length} упр.</div>
+        <div style={{ color: WHITE, fontSize: 14, fontWeight: 800, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {live ? `● Идёт · ${live.focus}` : `🏋️ ${s?.dayLabel ?? 'Сегодня — отдых или свободная'}`}
+        </div>
+        <div style={{ color: WHITE, fontSize: 12, ...TABULAR, flexShrink: 0 }}>
+          {live ? `${live.setsDone} подх. · ${live.progressPct}%` : `${(s?.exercises ?? []).length} упр.`}
+        </div>
       </div>
       {(s?.exercises ?? []).slice(0, 4).map((e, i) => (
         <div key={i} data-ex={e.name} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid rgba(255,255,255,0.05)', minHeight: 44, alignItems: 'center' }}>
@@ -85,7 +150,7 @@ export const WorkoutDayCard: React.FC<{ state?: WorkoutWidgetState | null; onOpe
         </div>
       ))}
       <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
-        <button type="button" data-act="day-start" onClick={onOpen} style={{ ...BIG_BTN, flex: 2 }} aria-label="Начать проведение тренировки">▶ Начать</button>
+        <button type="button" data-act="day-start" onClick={onOpen} style={{ ...BIG_BTN, flex: 2 }} aria-label={live ? 'Продолжить проведение тренировки' : 'Начать проведение тренировки'}>{live ? '▶ Продолжить' : '▶ Начать'}</button>
         <button type="button" data-act="day-skip" onClick={onSkip} style={{ ...GHOST_BTN, flex: 1 }} aria-label="Пропустить тренировку">Пропуск</button>
       </div>
     </section>
@@ -94,7 +159,8 @@ export const WorkoutDayCard: React.FC<{ state?: WorkoutWidgetState | null; onOpe
 
 /* ── A3: «BIG-режим» — огромные кнопки для зала одной рукой ────────────── */
 export const WorkoutBigMode: React.FC<{ state?: WorkoutWidgetState | null; onDoneSet?: (exIdx: number) => void; onFinish?: () => void }> = ({ state, onDoneSet, onFinish }) => {
-  const s = state ?? readLastWorkout();
+  const s = state ?? useWorkoutLive();
+  const live = s?.live;
   const [idx, setIdx] = useState(0);
   const exs = useMemo(() => s?.exercises ?? [], [s]);
   const cur = exs[idx];
@@ -103,11 +169,12 @@ export const WorkoutBigMode: React.FC<{ state?: WorkoutWidgetState | null; onDon
       <div style={{ color: WHITE, fontSize: 12 }}>Упражнение {exs.length ? idx + 1 : 0} из {exs.length}</div>
       <div style={{ color: WHITE, fontSize: 20, fontWeight: 800, margin: '6px 0' }}>{cur?.name ?? 'Нет упражнений'}</div>
       <div style={{ color: WHITE, fontSize: 28, fontWeight: 800, ...TABULAR }}>{cur ? `${cur.done}/${cur.total}` : '—'}</div>
+      {live && <div style={{ color: WHITE, fontSize: 12, marginTop: 2, ...TABULAR }}>{live.setsDone} подх. · {live.volumeKg.toLocaleString()} кг · {live.progressPct}%</div>}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 10 }}>
         <button type="button" data-act="big-prev" disabled={idx === 0} onClick={() => setIdx(i => Math.max(0, i - 1))} style={{ ...GHOST_BTN, minHeight: 56 }} aria-label="Предыдущее упражнение">‹ Назад</button>
         <button type="button" data-act="big-next" disabled={idx >= exs.length - 1} onClick={() => setIdx(i => Math.min(exs.length - 1, i + 1))} style={{ ...GHOST_BTN, minHeight: 56 }} aria-label="Следующее упражнение">Далее ›</button>
       </div>
-      <button type="button" data-act="big-done" onClick={() => cur && onDoneSet?.(idx)} style={{ ...BIG_BTN, width: '100%', minHeight: 64, fontSize: 18, marginTop: 8 }} aria-label="Готово, записать сет">✅ ГОТОВО</button>
+      <button type="button" data-act="big-done" onClick={() => { requestQuickSet(); if (cur) onDoneSet?.(idx); }} style={{ ...BIG_BTN, width: '100%', minHeight: 64, fontSize: 18, marginTop: 8 }} aria-label="Готово, записать сет">✅ ГОТОВО</button>
       <button type="button" data-act="big-finish" onClick={onFinish} style={{ ...GHOST_BTN, width: '100%', marginTop: 8 }} aria-label="Завершить тренировку">Завершить</button>
     </section>
   );

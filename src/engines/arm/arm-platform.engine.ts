@@ -25,30 +25,70 @@ export interface PlatformResult {
   note: string;
 }
 
-/** Мировые ориентиры (муж, открытая) — сверены с IronMind 2025–2026 (добивка PRO-4).
- * RT 130.5 Тюкалов 2013; Apollon 237.5 Carl Myerscough 16.12.2022 (IronMind news
- * 21.12.2022 / rules-and-world-records) / 137.9 Гайдученко 03.03.2019;
- * Hub 44.80 Толонен 10.02.2019 / 28.51 Кулагина 20.12.2021.
+/** Мировые ориентиры. Сверено 14.10.2026 со страницами IronMind (© 2025) и Wikipedia:
+ * RT 130.5 Тюкалов 30.06.2013 Visegrip Viking (V3; IronMind);
+ *     Ж 80.0 — Hafsa Mason, West Coast Arm Sports «Hands of Doom II», 21.08.2024
+ *     (Wikipedia, ред. 24.12.2025). Честная оговорка: страница IronMind на момент сверки
+ *     всё ещё числит женский WR 77.2 (Гайдученко 22.09.2012) — 80.0 признан не всеми
+ *     органами, поэтому подпись показывает оба факта.
+ * Apollon 237.5 Carl Myerscough 16.12.2022 / Ж 137.9 Lyudmila Gaiduchenko 02.03.2019 (IronMind);
+ * Hub 44.80 Harri Tolonen 10.02.2019 / Ж 28.51 Anzhela Kulagina 20.12.2021 (IronMind);
+ * IronMind Block (щипковый блок) 51.40 Harri Tolonen 09.06.2018 /
+ *     Ж 31.55 Rebecca Roberts 13.05.2017 (IronMind) — есть ДЕЙСТВУЮЩИЙ WR, поэтому
+ *     «единого WR нет» было неверно: у блоков разная ширина/высота, но ориентир есть.
+ * CoC-ступени — официальная poundage-таблица IronMind (No.3 = 280 lb = 127.0 кг =
+ *     плоскость сертификации), гриппер в кг не меряется напрямую.
  * ВНУТРЕННИЕ ориентиры хаба (`platformIsInternal`, фиксированного WR нет):
- * Saxon 133 (только классы APL/лидерборды AUSA); Pinch-блок 80/45 (единого WR нет —
- * ширина/1H-2H/федерация, Gods of Grip 2024–2025); CoC-экв 55/30 (гриппер не меряется в кг);
+ * Saxon 133 (классы APL/лидерборды AUSA; GripSport: Saxon 3"×4" 133.13 Helms 2025);
  * Grandfather Clock 90/50 и Anvil 30/16 (только лидерборды; лучший известный Country Crush 2"
- * ~198 кг Dingey 2021 GripSport — выше нашего числа, т.е. это точно не WR). */
-export const PLATFORM_WR: Record<string, { maleKg: number; femaleKg: number; name: string }> = {
-  rolling_thunder: { maleKg: 130.5, femaleKg: 80.0, name: 'Rolling Thunder' },
-  apollon_axle: { maleKg: 237.5, femaleKg: 137.9, name: 'Apollon Axle' },
+ * ~198.04 кг Dingey 2021 GripSport — выше нашего числа, т.е. это точно не WR). */
+export const PLATFORM_WR: Record<string, { maleKg: number; femaleKg: number; name: string; wrRef?: string }> = {
+  rolling_thunder: { maleKg: 130.5, femaleKg: 80.0, name: 'Rolling Thunder', wrRef: 'Тюкалов 130.5, 30.06.2013 · Ж Hafsa Mason 80.0, 21.08.2024' },
+  apollon_axle: { maleKg: 237.5, femaleKg: 137.9, name: 'Apollon Axle', wrRef: 'Майерско 237.5, 16.12.2022 · Ж Гайдученко 137.9, 02.03.2019' },
   saxon_bar: { maleKg: 133, femaleKg: 70, name: 'Saxon Bar (ориентир)' },
-  hub: { maleKg: 44.8, femaleKg: 28.51, name: 'IronMind Hub' },
-  pinch_block: { maleKg: 80, femaleKg: 45, name: 'Pinch Block' },
-  coc_gripper: { maleKg: 55, femaleKg: 30, name: 'CoC (эквивалент)' },
+  hub: { maleKg: 44.8, femaleKg: 28.51, name: 'IronMind Hub', wrRef: 'Толонен 44.80, 10.02.2019 · Ж Кулагина 28.51, 20.12.2021' },
+  // 80/45 — внутренний ориентир хаба для щипковых блоков РАЗНОЙ ширины/высоты
+  // (к % не сводятся). Действующий WR канонического IronMind Block: М 51.40 / Ж 31.55.
+  pinch_block: { maleKg: 80, femaleKg: 45, name: 'Pinch Block', wrRef: 'внутр. ориентир хаба · WR IronMind Block 51.40/31.55 (Толонен 2018 / Робертс 2017)' },
+  // Гриппер в кг не меряется: знаменатель — официальная poundage-оценка No.3 (280 lb),
+  // на которой стоит программа сертификации IronMind.
+  coc_gripper: { maleKg: 127.0, femaleKg: 127.0, name: 'CoC (No.3 = 280 lb)', wrRef: 'IronMind poundage No.3 = 280 lb ≈ 127.0 кг (оценка, не замер)' },
   grandfather_clock: { maleKg: 90, femaleKg: 50, name: 'Grandfather Clock' },
   anvil: { maleKg: 30, femaleKg: 16, name: 'SSE Anvil' },
   country_crush: { maleKg: 100, femaleKg: 55, name: 'Country Crush' },
 };
 
+/**
+ * Официальная poundage-лестница CoC (IronMind/Wikipedia): ступень → кг-эквивалент.
+ * Рейтинги приблизительные (IronMind сам просит не злоупотреблять ими), но это
+ * единственная опубликованная шкала — на ней строится ordinal-оценка.
+ */
+export const COC_ORDINAL_KG: Record<string, number> = {
+  guide: 27.2, sport: 36.3, trainer: 45.4, '0.5': 54.4, 1: 63.5, '1.5': 76.0,
+  2: 88.5, '2.5': 107.7, 3: 127.0, '3.5': 146.3, 4: 165.6,
+};
+
+/** Плоскость сертификации IronMind — No.3 (280 lb). */
+export const COC_CERT_LEVEL = 3;
+
+/** true → снаряд есть в таблице выше (иначе % не считается — без молчаливой подмены). */
+export function platformWrKnown(implement: string): boolean {
+  return !!PLATFORM_WR[String(implement || '')];
+}
+
+/**
+ * WR/ориентир в кг. Неизвестный снаряд → 0 (вызывающие обязаны дать «нет %»):
+ * раньше молча подставлялся Rolling Thunder, и % чужого снаряда выдавался за RT.
+ */
 export function platformWrFor(implement: string, sex: string): number {
-  const rec = PLATFORM_WR[implement] || PLATFORM_WR['rolling_thunder'];
+  const rec = PLATFORM_WR[String(implement || '')];
+  if (!rec) return 0;
   return (sex || '').toLowerCase() === 'female' ? rec.femaleKg : rec.maleKg;
+}
+
+/** Подпись источника знаменателя (для честных note-строк; пусто — внутренний). */
+export function platformWrRef(implement: string): string {
+  return PLATFORM_WR[String(implement || '')]?.wrRef || '';
 }
 
 /** PRO-4 добивка-3: какие знаменатели — внутренние ориентиры, а не WR (см. шапку). */
@@ -66,12 +106,19 @@ export function platformIsInternal(implement: string): boolean {
   return !!PLATFORM_INTERNAL[String(implement || '')];
 }
 
-/** План попыток: opener 90%, second 95-97%, third 101-103% от цели (лесенка для зала). */
+/**
+ * Канон лесенницы попыток помоста: opener / вторая / третья в долях лучшего
+ * результата. Один источник для хаба, конструктора и плана попыток — раньше
+ * хаб считал 92/98/102, а строчки отчёта 90/96/102 (две цифры у одного спортсмена).
+ */
+export const ATTEMPT_LADDER_PCT = [0.9, 0.96, 1.02] as const;
+
+/** План попыток: opener 90%, second 96%, third 102% от цели (лесенка для зала). */
 export function planAttempts(targetKg: number): number[] {
   const t = Number(targetKg);
   if (!Number.isFinite(t) || t <= 0) return [];
   const r = (v: number) => Math.round(v * 2) / 2;
-  return [r(t * 0.9), r(t * 0.96), r(t * 1.02)];
+  return ATTEMPT_LADDER_PCT.map((p) => r(t * p));
 }
 
 /**

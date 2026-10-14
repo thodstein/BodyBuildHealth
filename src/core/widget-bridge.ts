@@ -12,7 +12,7 @@
 import { Capacitor, registerPlugin } from '@capacitor/core';
 
 export type WidgetKind = 'training' | 'timer' | 'compliance' | 'nutrition';
-export type WidgetTarget = 'training' | 'nutrition' | 'support' | 'home';
+export type WidgetTarget = 'training' | 'training_run' | 'training_quick' | 'nutrition' | 'support' | 'home';
 export type TimerAction = 'preset' | 'start' | 'pause' | 'toggle' | 'reset';
 
 export interface QueuedItem {
@@ -34,7 +34,10 @@ export interface TimerState {
 }
 
 interface WidgetBridgeNative {
-  syncTraining(o: { title: string; subtitle: string; meta: string }): Promise<{ ok: boolean }>;
+  syncTraining(o: {
+    title: string; subtitle: string; meta: string;
+    progress?: number; live?: boolean; actionLabel?: string; actionTarget?: string;
+  }): Promise<{ ok: boolean }>;
   syncCompliance(o: { pct: number; label: string; detail: string }): Promise<{ ok: boolean }>;
   syncNutrition(o: { kcal: number; targetKcal: number; protein: number; waterMl: number }): Promise<{ ok: boolean }>;
   queueWater(o: { ml: number }): Promise<{ ok: boolean; queue: number }>;
@@ -167,21 +170,40 @@ export function readFallbackSnapshot(key: string): unknown {
 
 /* ---------------- sync ---------------- */
 
-export async function syncTrainingWidget(input: {
+export interface TrainingWidgetInput {
   title: string;
   subtitle: string;
   meta: string;
-}): Promise<boolean> {
+  /** Прогресс подходов живой/последней сессии, 0..100. */
+  progress?: number;
+  /** Живая (незавершённая) сессия — виджет показывает «+ Сет». */
+  live?: boolean;
+  /** Подпись кнопки действия («+ Сет» / «▶ Начать» / «▶ Продолжить»). */
+  actionLabel?: string;
+  /** Deep-link кнопки: training (зона) или training_run (сразу проведение). */
+  actionTarget?: string;
+}
+
+export async function syncTrainingWidget(input: TrainingWidgetInput): Promise<boolean> {
+  const payload = {
+    title: input.title,
+    subtitle: input.subtitle,
+    meta: input.meta,
+    progress: clampPct(input.progress ?? 0),
+    live: !!input.live,
+    actionLabel: (input.actionLabel ?? '').slice(0, 40),
+    actionTarget: (input.actionTarget ?? '').slice(0, 40),
+  };
   const p = plugin();
   if (p) {
     try {
-      await p.syncTraining(input);
+      await p.syncTraining(payload);
       return true;
     } catch {
       /* fallback ниже */
     }
   }
-  fbSnapshot('training', { ...input, updatedAt: Date.now() });
+  fbSnapshot('training', { ...payload, updatedAt: Date.now() });
   return false;
 }
 

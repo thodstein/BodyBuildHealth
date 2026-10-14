@@ -9,6 +9,8 @@ import {
   getLastSession, getRecentPRs, type WorkoutSession, type CachedProgress,
   getExerciseProgress, cacheExerciseProgress, cacheSessionStats, getWorkoutStats,
   compareWithPrevious, getCachedProgressForExercise, localIsoDate,
+  saveActiveSession, loadActiveSession, clearActiveSession, summarizeActiveSession,
+  type ActiveSession, type ActiveSessionSummary,
 } from '../../../engines/workout-logger.engine';
 import { generateWarmup, upsertWarmupLog, warmupLabel, warmupSpecificLabel, WARMUP_SKIP_REASONS, type WarmupInput, type WarmupMode } from '../../../engines/warmup.engine';
 import { generateCooldown, upsertCooldownLog, cooldownLabel, COOLDOWN_SKIP_REASONS, type CooldownInput } from '../../../engines/cooldown.engine';
@@ -142,8 +144,14 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
   useNativeWakeLock(phase === 'warmup' || phase === 'main' || phase === 'cooldown');
   const [session, setSession] = useState<WorkoutSession | null>(null);
   const [done, setDone] = useState<WorkoutSession | null>(null);
+  // Незавершённая сессия из автосейва — живёт между закрытиями приложения.
+  const [resumeFrom, setResumeFrom] = useState<ActiveSession | null>(() => {
+    try { return loadActiveSession(); } catch { return null; }
+  });
   // Защита от двойного сохранения (finish вызывается из «Завершить» и из exitSession)
   const savedRef = useRef(false);
+  // Троттлинг пушей снапшота на homescreen-виджет (АПК).
+  const widgetPushRef = useRef(0);
   const [warmupBlocks, setWarmupBlocks] = useState<WarmupBlock[]>([]);
   const [cooldownBlocks, setCooldownBlocks] = useState<CooldownBlock[]>([]);
   const [warmupDone, setWarmupDone] = useState<Record<string, boolean>>({});
@@ -227,6 +235,8 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
    const [timerExIdx, setTimerExIdx] = useState<number>(-1);
    const [timerPreset, setTimerPreset] = useState<'compound' | 'isolation' | 'pump' | 'custom'>('compound');
    const [customRestSec, setCustomRestSec] = useState<number>(90);
+   // Ручная добавка к отдыху («+15с» в зале) — план-цель не переписываем.
+   const [restAddSec, setRestAddSec] = useState<number>(0);
    const timerRef = useRef<number | null>(null);
    const [sessionTimerSec, setSessionTimerSec] = useState<number>(0);
    const [sessionTimerRunning, setSessionTimerRunning] = useState<boolean>(false);
@@ -275,10 +285,11 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
     };
 
     const currentRestSec = useMemo(() => {
-      if (timerExIdx >= 0 && day?.exercises[timerExIdx]?.restSec) return day.exercises[timerExIdx].restSec;
-      if (timerPreset === 'custom') return customRestSec;
-      return 90; // default
-    }, [timerExIdx, day, timerPreset, customRestSec]);
+      const base = timerExIdx >= 0 && day?.exercises[timerExIdx]?.restSec
+        ? day.exercises[timerExIdx].restSec
+        : timerPreset === 'custom' ? customRestSec : 90;
+      return base + restAddSec;
+    }, [timerExIdx, day, timerPreset, customRestSec, restAddSec]);
 
    // авто-таймер: обратный отсчёт
    useEffect(() => {
@@ -402,11 +413,12 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
          }
        }
      }
-     const rest = getRestTime(ei);
-     setTimerExIdx(ei);
-     setTimerSec(rest);
-     setTimerRunning(true);
-   }, [day, getRestTime, supersetMode, circuitMode, supersetExercises, getSupersetRestTime]);
+      const rest = getRestTime(ei);
+      setTimerExIdx(ei);
+      setRestAddSec(0);
+      setTimerSec(rest);
+      setTimerRunning(true);
+    }, [day, getRestTime, supersetMode, circuitMode, supersetExercises, getSupersetRestTime]);
 
   const skipRestTimer = useCallback(() => {
      setTimerRunning(false);
@@ -586,7 +598,7 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
     setCooldownBlocks(generateCooldown(cooldownInput));
     setPhase('cooldown');
     setCooldownDone({});
-
+    clearActiveSession();
     try { saveSRPESession({ date: finished.date, sRPE: sessionRPE, durationMin: Math.max(finished.durationMin || 0, sessionDur) }); } catch { /* ignore */ }
     // RIR-калибровка: записываем фактические RIR по подходам
     try { recordSessionRIR(finished, { exercises: day.exercises.map(ex => ({ name: ex.name, targetSets: ex.targetSets })) }); } catch { /* ignore */ }
@@ -673,9 +685,32 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
          else if (timerExIdx >= 0) startRestTimer(timerExIdx);
        }
      };
-     window.addEventListener('keydown', handler);
-     return () => window.removeEventListener('keydown', handler);
-   }, [phase, day, actual, timerRunning, timerExIdx]);
+      window.addEventListener('keydown', handler);
+      return () => window.removeEventListener('keydown', handler);
+  }, [phase, day, actual, timerRunning, timerExIdx]);
+
+  // Живая сессия: автосейв каждого подхода (переживает закрытие приложения).
+  React.useEffect(() => {
+    if (phase !== 'main' || !session) return;
+    const plannedSets = (day?.exercises ?? []).reduce((s, ex) => s + (Array.isArray(ex.targetSets) ? ex.targetSets.length : 0), 0);
+    saveActiveSession(session, plannedSets);
+    // Виджеты/пульт в этом же экране перечитывают живое состояние.
+    try { window.dispatchEvent(new Event('he-workout-live-update')); } catch { /* noop */ }
+    // Живой прогресс на homescreen-виджет (АПК), троттлинг 5с.
+    const now = Date.now();
+    if (now - widgetPushRef.current > 5000) {
+      widgetPushRef.current = now;
+      void import('../../native/widget-sync')
+        .then(m => m.pushTrainingWidget())
+        .catch(() => { /* web/TG — виджетов нет */ });
+    }
+  }, [phase, session]);
+
+  // Завершение/сброс — живой сессии нет, пульт показывает последнюю тренировку.
+  React.useEffect(() => {
+    try { window.dispatchEvent(new Event('he-workout-live-update')); } catch { /* noop */ }
+  }, [phase]);
+
 
 
   const toggleWarmup = (blockIdx: number, exIdx: number) => {
@@ -724,11 +759,55 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
         const completed = Object.keys(prev).filter(k => k.startsWith(`${ei}_`) && prev[k]).length;
         return { ...prev, [String(ei)]: { completed: Math.min(completed + 1, total), total } };
       });
-     // авто-старт таймера отдыха после подхода
-     if (autoStartRest) {
-       startRestTimer(ei);
-     }
-   };
+      // авто-старт таймера отдыха после подхода
+      if (autoStartRest) {
+        startRestTimer(ei);
+      }
+    };
+
+  /** Продолжить автосохранённую тренировку: восстанавливаем подходы и таймер. */
+  const resumeSavedSession = (saved: WorkoutSession) => {
+    const rebuilt: Record<string, { weight: number; reps: number; rpe: number; rir?: number; tempo?: string }> = {};
+    (saved.exercises || []).forEach((ex, ei) => {
+      (ex.sets || []).forEach((st, si) => {
+        rebuilt[keyFor(ei, si)] = {
+          weight: st.weightKg, reps: st.reps, rpe: st.rpe,
+          rir: st.rir, tempo: st.actualTempo || st.plannedTempo,
+        };
+      });
+    });
+    const progress: Record<string, { completed: number; total: number }> = {};
+    (saved.exercises || []).forEach((ex, ei) => {
+      const planned = day?.exercises?.[ei]?.targetSets?.length ?? (ex.sets || []).length;
+      progress[String(ei)] = { completed: Math.min((ex.sets || []).length, planned), total: planned };
+    });
+    setActual(rebuilt);
+    setExerciseProgress(progress);
+    setExDone({});
+    setRestHistory([]);
+    setWarmupDone({});
+    savedRef.current = false;
+    setSessionTimerSec(0);
+    setSessionTimerRunning(true);
+    setSession(saved);
+    setResumeFrom(null);
+    setPhase('main');
+  };
+
+
+  // ── Быстрый сет из дока/виджета («+ Сет» без прокрутки к подходу) ──
+  React.useEffect(() => {
+    const onQuickSet = () => {
+      if (phase !== 'main' || !day || !Array.isArray(day.exercises)) return;
+      for (let ei = 0; ei < day.exercises.length; ei++) {
+        for (let si = 0; si < day.exercises[ei].targetSets.length; si++) {
+          if (!actual[keyFor(ei, si)]) { logOne(ei, si); return; }
+        }
+      }
+    };
+    window.addEventListener('he-workout-quick-set', onQuickSet as EventListener);
+    return () => window.removeEventListener('he-workout-quick-set', onQuickSet as EventListener);
+  }, [phase, day, actual, logOne]);
 
   // batch skip: залогировать все подходы упражнения плановыми весами
   const skipExercise = useCallback((ei: number) => {
@@ -1001,6 +1080,32 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
             </span>
             <span style={{ fontSize: 18, opacity: 0.7 }}>→</span>
           </button>
+          {/* ── Продолжение автосохранённой тренировки (после закрытия приложения) ── */}
+          {resumeFrom && (() => {
+            const sum = summarizeActiveSession(resumeFrom, (day?.exercises ?? []).reduce((s, ex) => s + ex.targetSets.length, 0));
+            if (!sum) return null;
+            const sameDay = (resumeFrom.exercises || []).length === (day?.exercises ?? []).length
+              && (resumeFrom.exercises || []).every((ex, i) => (day?.exercises?.[i]?.name || '') === ex.exerciseName);
+            return (
+              <div data-session="resume" style={{ marginTop: 8, padding: 12, borderRadius: 14, background: 'linear-gradient(135deg, rgba(0,230,138,0.10), rgba(59,130,246,0.07))', border: '1px solid rgba(0,230,138,0.22)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+                  <div style={{ color: '#fff', fontSize: 13, fontWeight: 800 }}>⏯ Незавершённая тренировка</div>
+                  <span style={{ fontSize: 10, fontWeight: 800, color: '#00e68a', fontVariantNumeric: 'tabular-nums' }}>{sum.progressPct}%</span>
+                </div>
+                <div style={{ color: '#fff', fontSize: 11, marginTop: 4 }}>
+                  {sum.focus} · {sum.date} · {sum.setsDone} подходов · {sum.volumeKg.toLocaleString()} кг
+                </div>
+                {sum.currentExercise && <div style={{ color: '#fff', fontSize: 10, marginTop: 2, opacity: 0.85 }}>Последнее: {sum.currentExercise}</div>}
+                {!sameDay && (
+                  <div style={{ color: '#f59e0b', fontSize: 10, marginTop: 4 }}>⚠ План дня изменился — продолжить можно, но цель подходов будет от текущего дня.</div>
+                )}
+                <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                  <button type="button" data-act="resume-go" onClick={() => resumeSavedSession(resumeFrom)} style={{ ...BTN, flex: 2, minHeight: 48 }}>▶ Продолжить</button>
+                  <button type="button" data-act="resume-drop" onClick={() => { clearActiveSession(); setResumeFrom(null); }} style={{ ...BTN_GHOST, flex: 1, minHeight: 48 }}>Сбросить</button>
+                </div>
+              </div>
+            );
+          })()}
           {/* оценка длительности */}
           {day && Array.isArray(day.exercises) && day.exercises.length > 0 && (() => {
             const totalSets = day.exercises.reduce((s, ex) => s + ex.targetSets.length, 0);
@@ -1696,14 +1801,14 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
                          {/* Вес + повторы — крупные степперы для зала */}
                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
                           <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, padding: 6, display: 'flex', alignItems: 'center', gap: 4 }}>
-                            <button type="button" onClick={() => { hapticImpact('light'); setActual(p => ({ ...p, [k]: { ...a, weight: Math.max(0, Math.round((a.weight - 2.5) * 10) / 10) } })); }} style={{ width: 36, height: 36, borderRadius: 8, border: '1px solid rgba(255,255,255,0.10)', background: 'rgba(255,255,255,0.06)', color: '#fff', fontSize: 16, fontWeight: 800, flexShrink: 0, cursor: 'pointer' }}>−</button>
+                            <button type="button" onClick={() => { hapticImpact('light'); setActual(p => ({ ...p, [k]: { ...a, weight: Math.max(0, Math.round((a.weight - 2.5) * 10) / 10) } })); }} style={{ width: 44, height: 44, borderRadius: 10, border: '1px solid rgba(255,255,255,0.10)', background: 'rgba(255,255,255,0.06)', color: '#fff', fontSize: 18, fontWeight: 800, flexShrink: 0, cursor: 'pointer' }}>−</button>
                             <input style={{ ...IN, flex: 1, minWidth: 0, textAlign: 'center', fontSize: 16, fontWeight: 700, padding: '6px 2px' }} type="number" inputMode="decimal" value={a.weight} onChange={e => setActual(p => ({ ...p, [k]: { ...a, weight: +e.target.value } }))} aria-label="вес" />
-                            <button type="button" onClick={() => { hapticImpact('light'); setActual(p => ({ ...p, [k]: { ...a, weight: Math.round((a.weight + 2.5) * 10) / 10 } })); }} style={{ width: 36, height: 36, borderRadius: 8, border: '1px solid rgba(0,230,138,0.22)', background: 'rgba(0,230,138,0.12)', color: '#00e68a', fontSize: 16, fontWeight: 800, flexShrink: 0, cursor: 'pointer' }}>+</button>
+                            <button type="button" onClick={() => { hapticImpact('light'); setActual(p => ({ ...p, [k]: { ...a, weight: Math.round((a.weight + 2.5) * 10) / 10 } })); }} style={{ width: 44, height: 44, borderRadius: 10, border: '1px solid rgba(0,230,138,0.22)', background: 'rgba(0,230,138,0.12)', color: '#00e68a', fontSize: 18, fontWeight: 800, flexShrink: 0, cursor: 'pointer' }}>+</button>
                           </div>
                           <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, padding: 6, display: 'flex', alignItems: 'center', gap: 4 }}>
-                            <button type="button" onClick={() => { hapticImpact('light'); setActual(p => ({ ...p, [k]: { ...a, reps: Math.max(1, a.reps - 1) } })); }} style={{ width: 36, height: 36, borderRadius: 8, border: '1px solid rgba(255,255,255,0.10)', background: 'rgba(255,255,255,0.06)', color: '#fff', fontSize: 16, fontWeight: 800, flexShrink: 0, cursor: 'pointer' }}>−</button>
+                            <button type="button" onClick={() => { hapticImpact('light'); setActual(p => ({ ...p, [k]: { ...a, reps: Math.max(1, a.reps - 1) } })); }} style={{ width: 44, height: 44, borderRadius: 10, border: '1px solid rgba(255,255,255,0.10)', background: 'rgba(255,255,255,0.06)', color: '#fff', fontSize: 18, fontWeight: 800, flexShrink: 0, cursor: 'pointer' }}>−</button>
                             <input style={{ ...IN, flex: 1, minWidth: 0, textAlign: 'center', fontSize: 16, fontWeight: 700, padding: '6px 2px' }} type="number" inputMode="numeric" value={a.reps} onChange={e => setActual(p => ({ ...p, [k]: { ...a, reps: +e.target.value } }))} aria-label="повт" />
-                            <button type="button" onClick={() => { hapticImpact('light'); setActual(p => ({ ...p, [k]: { ...a, reps: a.reps + 1 } })); }} style={{ width: 36, height: 36, borderRadius: 8, border: '1px solid rgba(0,230,138,0.22)', background: 'rgba(0,230,138,0.12)', color: '#00e68a', fontSize: 16, fontWeight: 800, flexShrink: 0, cursor: 'pointer' }}>+</button>
+                            <button type="button" onClick={() => { hapticImpact('light'); setActual(p => ({ ...p, [k]: { ...a, reps: a.reps + 1 } })); }} style={{ width: 44, height: 44, borderRadius: 10, border: '1px solid rgba(0,230,138,0.22)', background: 'rgba(0,230,138,0.12)', color: '#00e68a', fontSize: 18, fontWeight: 800, flexShrink: 0, cursor: 'pointer' }}>+</button>
                           </div>
                         </div>
                         {/* RPE пилюли + VBT + кнопки */}
@@ -1717,9 +1822,9 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
                              <input style={{ ...IN, width: 74, textAlign: 'center', padding: '6px 4px', fontSize: 11 }} type="text" placeholder={plannedTempo ? `темп ${plannedTempo}` : 'темп факт'} value={a.tempo ?? ''} onChange={e => setActual(p => ({ ...p, [k]: { ...a, tempo: e.target.value } }))} aria-label="темп факт" />
                            </div>
                            <input style={{ ...IN, width: 56, textAlign: 'center', padding: '6px 4px', fontSize: 11 }} type="number" step="0.01" placeholder="v м/с" value={vel[k] ?? ""} onChange={e => setVel(p => ({ ...p, [k]: +e.target.value }))} aria-label="скорость м/с" />
-                          <button style={{ ...(logged ? BTN_GHOST : { ...BTN, background: 'linear-gradient(135deg,#00e68a,#00c853)', boxShadow: '0 4px 14px rgba(0,230,138,0.28)', minHeight: 36, padding: '8px 14px', borderRadius: 10, fontSize: 13 }), flexShrink: 0, minWidth: 64 }} onClick={() => logOne(ei, si)}>{logged ? '✓' : 'OK'}</button>
-                          {!logged && (
-                            <button style={{ ...BTN_GHOST, fontSize: 11, padding: '8px 10px', borderRadius: 10, minHeight: 36 }} onClick={() => {
+                           <button style={{ ...(logged ? BTN_GHOST : { ...BTN, background: 'linear-gradient(135deg,#00e68a,#00c853)', boxShadow: '0 4px 14px rgba(0,230,138,0.28)', minHeight: 44, padding: '10px 14px', borderRadius: 12, fontSize: 14 }), flexShrink: 0, minWidth: 68 }} onClick={() => logOne(ei, si)}>{logged ? '✓' : 'OK'}</button>
+                           {!logged && (
+                             <button style={{ ...BTN_GHOST, fontSize: 11, padding: '10px 10px', borderRadius: 12, minHeight: 44 }} onClick={() => {
                               hapticImpact('light');
                                setActual(p => ({ ...p, [k]: { weight: t.weight, reps: t.reps, rpe: Math.max(1, 10 - t.rir), rir: t.rir, tempo: plannedTempo } }));
                               setTimeout(() => logOne(ei, si), 30);
@@ -1732,7 +1837,7 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
                         const allLogged = ex.targetSets.every((_, si) => !!actual[keyFor(ei, si)]);
                         if (allLogged || ex.targetSets.length === 0) return null;
                         return (
-                          <button style={{ width: '100%', marginTop: 4, padding: '4px 0', borderRadius: 6, border: '1px dashed rgba(255,255,255,0.1)', background: 'transparent', color: 'var(--text-faint)', fontSize: 10, cursor: 'pointer' }} onClick={() => skipExercise(ei)}>
+                          <button style={{ width: '100%', marginTop: 4, minHeight: 40, padding: '10px 0', borderRadius: 10, border: '1px dashed rgba(255,255,255,0.12)', background: 'transparent', color: 'var(--text-faint)', fontSize: 11, cursor: 'pointer' }} onClick={() => skipExercise(ei)}>
                             ⏭ Пропустить упражнение (залогировать планом)
                           </button>
                         );
@@ -2166,32 +2271,32 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
              </div>
            )}
             
-            <button style={{ ...BTN_GHOST, width: '100%', marginTop: 8 }} onClick={() => {
-              if (!done) return;
-              const lines: string[] = [];
-              lines.push(`🏋️ Тренировка: ${done.focus} — ${done.date}`);
-              lines.push(`⏱ ${done.startTime}–${done.endTime} (${done.durationMin} мин)`);
-              lines.push(`📊 Тоннаж: ${done.totalVolume.toLocaleString()} кг · Подходы: ${done.totalSets} · Повторы: ${done.totalReps}`);
-              if (topE1RM.e1rm > 0) lines.push(`🎯 Лучший 1RM: ${topE1RM.exercise} ${topE1RM.weight}кг×${topE1RM.reps} → ${topE1RM.e1rm}кг`);
-              lines.push('');
-              done.exercises.forEach(ex => {
-                lines.push(`${ex.exerciseName} (${ex.muscleGroup})`);
-                ex.sets.forEach(s => {
-                  lines.push(`  #${s.setNumber} ${s.weightKg}кг×${s.reps} RPE${s.rpe} e1RM~${Math.round(s.weightKg * (1 + s.reps / 30))}кг${s.isPR ? ' 🏆 PR' : ''}`);
-                });
-                lines.push(`  Итого: ${ex.totalVolume}кг · лучший 1RM: ${ex.best1RM}кг`);
-              });
-              if (nextSuggestions.length > 0) {
-                lines.push('');
-                lines.push('📈 Следующая сессия:');
-                nextSuggestions.forEach(s => lines.push(`  ${s.name} → ${s.nextWeight}кг×${s.nextReps} (${s.note})`));
-              }
-              const text = lines.join('\n');
-              navigator.clipboard?.writeText(text).then(() => {
-                hapticNotify('success');
-              }).catch(() => {});
-            }}>📋 Копировать сводку</button>
-            <button style={{ ...BTN_GHOST, width: '100%', marginTop: 8 }} onClick={() => { setDone(null); setWarmupBlocks([]); setCooldownBlocks([]); setSession(null); savedRef.current = false; setPhase('ready'); }}>← Новая тренировка</button>
+             <button style={{ ...BTN_GHOST, width: '100%', marginTop: 8 }} onClick={() => {
+               if (!done) return;
+               const lines: string[] = [];
+               lines.push(`🏋️ Тренировка: ${done.focus} — ${done.date}`);
+               lines.push(`⏱ ${done.startTime}–${done.endTime} (${done.durationMin} мин)`);
+               lines.push(`📊 Тоннаж: ${done.totalVolume.toLocaleString()} кг · Подходы: ${done.totalSets} · Повторы: ${done.totalReps}`);
+               if (topE1RM.e1rm > 0) lines.push(`🎯 Лучший 1RM: ${topE1RM.exercise} ${topE1RM.weight}кг×${topE1RM.reps} → ${topE1RM.e1rm}кг`);
+               lines.push('');
+               done.exercises.forEach(ex => {
+                 lines.push(`${ex.exerciseName} (${ex.muscleGroup})`);
+                 ex.sets.forEach(s => {
+                   lines.push(`  #${s.setNumber} ${s.weightKg}кг×${s.reps} RPE${s.rpe} e1RM~${Math.round(s.weightKg * (1 + s.reps / 30))}кг${s.isPR ? ' 🏆 PR' : ''}`);
+                 });
+                 lines.push(`  Итого: ${ex.totalVolume}кг · лучший 1RM: ${ex.best1RM}кг`);
+               });
+               if (nextSuggestions.length > 0) {
+                 lines.push('');
+                 lines.push('📈 Следующая сессия:');
+                 nextSuggestions.forEach(s => lines.push(`  ${s.name} → ${s.nextWeight}кг×${s.nextReps} (${s.note})`));
+               }
+               const text = lines.join('\n');
+               navigator.clipboard?.writeText(text).then(() => {
+                 hapticNotify('success');
+               }).catch(() => {});
+             }}>📋 Копировать сводку</button>
+             <button style={{ ...BTN_GHOST, width: '100%', marginTop: 8 }} onClick={() => { setDone(null); setWarmupBlocks([]); setCooldownBlocks([]); setSession(null); savedRef.current = false; clearActiveSession(); setPhase('ready'); }}>← Новая тренировка</button>
             {days.length > 1 && dayIdx < days.length - 1 && (
               <button style={{ ...BTN, width: '100%', marginTop: 8 }} onClick={() => {
                 setDone(null); setWarmupBlocks([]); setCooldownBlocks([]); setSession(null); savedRef.current = false;
@@ -2220,7 +2325,8 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
                 <div style={{ width: `${Math.max(0, Math.min(100, ((currentRestSec - timerSec) / Math.max(1, currentRestSec)) * 100))}%`, height: '100%', background: timerSec <= 10 ? '#fff' : '#000', transition: 'width 1s linear' }} />
               </div>
             </div>
-            <button onClick={() => { hapticImpact('light'); setTimerRunning(false); setTimerSec(0); }} style={{ padding: '10px 14px', borderRadius: 10, border: 'none', background: timerSec <= 10 ? '#fff' : '#000', color: timerSec <= 10 ? '#ef4444' : '#fff', fontWeight: 800, fontSize: 12, cursor: 'pointer', flexShrink: 0, minHeight: 40 }}>Пропустить</button>
+            <button onClick={() => { hapticImpact('light'); setTimerRunning(false); setTimerSec(0); }} style={{ padding: '10px 14px', borderRadius: 10, border: 'none', background: timerSec <= 10 ? '#fff' : '#000', color: timerSec <= 10 ? '#ef4444' : '#fff', fontWeight: 800, fontSize: 12, cursor: 'pointer', flexShrink: 0, minHeight: 44 }}>Пропустить</button>
+             <button onClick={() => { hapticImpact('light'); setRestAddSec(v => v + 15); setTimerSec(v => v + 15); }} aria-label="Плюс 15 секунд отдыха" style={{ padding: '10px 12px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.25)', background: 'transparent', color: 'inherit', fontWeight: 800, fontSize: 12, cursor: 'pointer', flexShrink: 0, minHeight: 44 }}>+15</button>
           </div>
         )}
 

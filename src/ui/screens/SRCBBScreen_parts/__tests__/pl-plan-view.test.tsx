@@ -3,7 +3,7 @@
  * рендер календаря, план-таблицы, тапер-меток и карточки прикидов без падений.
  */
 import { describe, expect, it } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { useState } from 'react';
 import { PLPlanView, type PLPlanViewApi } from '../PLPlanView';
 import type { LMSBuildOutput } from '../../../../engines/lms/lms-builder.engine';
@@ -308,7 +308,7 @@ describe('PLPlanView', () => {
     expect(document.querySelector('[data-pl="vl-source"]')?.textContent).toContain('по факту дневника');
   });
 
-  it('экспорт отчёта «план vs факт»: CSV/HTML скачиваются с тостом (§5-bis п.5)', () => {
+  it('экспорт отчёта «план vs факт»: CSV/HTML через общий APK-мост (§5-quat)', async () => {
     Object.defineProperty(URL, 'createObjectURL', { value: () => 'blob:test', writable: true, configurable: true });
     Object.defineProperty(URL, 'revokeObjectURL', { value: () => {}, writable: true, configurable: true });
     const a = api();
@@ -319,8 +319,9 @@ describe('PLPlanView', () => {
     a.onNote = n => { notes.push(n); };
     render(<PLPlanView api={a} />);
     fireEvent.click(screen.getByText('📄 CSV'));
-    expect(notes.join(' ')).toContain('pl-plan-fact.csv');
+    // Мост асинхронный (web — Blob, native — Documents+Share) — ждём тост.
+    await waitFor(() => expect(notes.join(' ')).toContain('pl-plan-fact.csv'));
     fireEvent.click(screen.getByText('🖨 HTML'));
-    expect(notes.join(' ')).toContain('pl-plan-fact.html');
+    await waitFor(() => expect(notes.join(' ')).toContain('pl-plan-fact.html'));
   });
 });

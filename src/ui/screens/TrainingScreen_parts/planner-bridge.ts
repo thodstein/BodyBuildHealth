@@ -32,6 +32,17 @@ export type PlannerApplyKind = 'split' | 'pri' | 'weakpoints' | 'pm' | 'tempo' |
 
 export interface SplitPayload { cycle: string[][]; name?: string }
 export interface PmPayload { squat?: number; bench?: number; dead?: number; lift?: string; value?: number }
+/**
+ * Неделя спец-блока армлифтинга в мосте (зеркало `ArmliftSpecWeek`).
+ * Аудит 2026-10 было→стало: тип объявлял только `{week,focus,target,volume}`,
+ * а хаб отправляет ещё `targetSets`/`dayMap`/`detail` — получатель терял их молча.
+ */
+export interface ArmliftSpecWeekPayload {
+  week: number; focus: string; target: string; volume: string;
+  targetSets?: Record<string, number>;
+  dayMap?: Record<string, string>;
+  detail?: string;
+}
 export interface WeakpointsPayload { groups?: string[]; lift?: string; orthopedic?: unknown; currentPain?: string[]; diagnosticExerciseMap?: Record<string, string[]>; diagnosticDayMap?: Record<string, number[]>; plWeakPoints?: { lift: string; weakPoint: string; days?: number[] }[]; weakGroupExerciseMap?: Record<string, string[]>; weakGroupDayMap?: Record<string, number[]>;
   /** Movement PRO P2/P4/P5 (LiftMasterCard/PlDeadpoints → ПЛ/ручной): всё опционально, приёмник валидирует. */
   diagnosticWeakSide?: 'left' | 'right' | null;
@@ -112,7 +123,7 @@ export interface WeakpointsPayload { groups?: string[]; lift?: string; orthopedi
   /** PRO-3 W-AL (ArmliftingDiagnosticsHub → ArmAutoConstructor) + P4 red-flags: всё опционально. */
   armDiscipline?: string;
   armLiftingVerdict?: string;
-  armLifting?: { weakest: string | null; avgPct: number | null; totalKg: number; rows: Array<{ implement: string; display: string; scorePct: number | null; level: string; internal: boolean }>; weakestWr?: string | null; avgWrPct?: number | null; avgInternalPct?: number | null; prescription?: string; weightClass?: string; rulesNote?: string; lms?: { label: string; steps: number[] }; diagWeakLink?: string; diagCause?: string; diagConfidence?: string; diagImplement?: string; diagFailurePoint?: string; diagFaultIds?: string[]; diagCues?: string[]; diagCorrections?: Array<{ id: string; title: string; protocol: string }>; diagSpecBlock?: Array<{ week: number; focus: string; target: string; volume: string }>; diagCauseDetail?: { cause: string; confidence: number; evidence: string[]; fix: string }; armliftExercises?: Array<{ exId: string; sets: number; dayTag?: string; intensityPct?: number; rir?: number }>; armliftSpec?: Array<{ week: number; targetSets: Record<string, number>; dayMap: Record<string, string> }>; armliftWeakArmNote?: string; armliftOrderNote?: string; armliftCompleteness?: { pct: number; missing: string[] } };
+  armLifting?: { weakest: string | null; avgPct: number | null; totalKg: number; rows: Array<{ implement: string; display: string; scorePct: number | null; level: string; internal: boolean }>; weakestWr?: string | null; avgWrPct?: number | null; avgInternalPct?: number | null; prescription?: string; weightClass?: string; rulesNote?: string; lms?: { label: string; steps: number[] }; diagWeakLink?: string; diagCause?: string; diagConfidence?: string; diagImplement?: string; diagFailurePoint?: string; diagFaultIds?: string[]; diagCues?: string[]; diagCorrections?: Array<{ id: string; title: string; protocol: string }>; diagSpecBlock?: ArmliftSpecWeekPayload[]; diagCauseDetail?: { cause: string; confidence: number; evidence: string[]; fix: string }; armliftExercises?: Array<{ exId: string; sets: number; dayTag?: string; intensityPct?: number; rir?: number; holdSeconds?: number }>; armliftSpec?: Array<{ week: number; targetSets: Record<string, number>; dayMap: Record<string, string> }>; armliftWeakArmNote?: string; armliftOrderNote?: string; armliftCompleteness?: { pct: number; missing: string[] } };
   armRedFlags?: string[];
   armProfile?: { leftKg?: number; rightKg?: number; bwKg?: number; rtKg?: number; pinchKg?: number; hubKg?: number };
   /** PRO-5 №5: ось/warmup из humerus-чеклиста хаба (всё опционально, приёмник только добавляет флаги). */

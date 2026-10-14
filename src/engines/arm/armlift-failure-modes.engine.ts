@@ -241,6 +241,22 @@ export function relevantTestsFor(implement: string): string[] {
  * D15: слабейший снаряд вердикта → снаряд диагностики.
  * L/R-суффиксы режем (рука — в асимметрии, не в снаряде); чужое — null.
  */
+/**
+ * Канон «щипковый снаряд» (аудит 2026-10): раньше один и тот же список из 6 id
+ * был продублирован inline в `armlift-diagnosis` и `armlift-cause` — обе копии
+ * правились раздельно («+country_crush» дважды), следующая правка разошлась бы.
+ * L/R-суффиксы (`pinch_block_L`) маппятся на базу, как в diagImplementForReportWeakest.
+ */
+const PINCH_IMPLEMENTS = new Set<string>([
+  'saxon_bar', 'hub', 'pinch_block', 'anvil', 'grandfather_clock', 'country_crush',
+]);
+
+/** true → снаряд щипковый: релевантны тесты pinch и мобильность большого пальца. */
+export function isPinchImplement(implement: string): boolean {
+  const base = String(implement || '').replace(/_[LR]$/, '');
+  return PINCH_IMPLEMENTS.has(base);
+}
+
 export function diagImplementForReportWeakest(weakest: string | null): ArmliftDiagImplement | null {
   if (!weakest) return null;
   const base = String(weakest).replace(/_[LR]$/, '') as ArmliftDiagImplement;

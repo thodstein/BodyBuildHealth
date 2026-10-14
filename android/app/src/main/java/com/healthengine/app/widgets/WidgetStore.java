@@ -30,6 +30,10 @@ public final class WidgetStore {
 
     /** Targets for JS router (DashboardNative). */
     public static final String TARGET_TRAINING = "training";
+    /** Сразу вкладка «Проведение тренировки» (runtime) зоны тренировок. */
+    public static final String TARGET_TRAINING_RUN = "training_run";
+    /** Открыть проведение и записать следующий подход (быстрый сет с рабочего стола). */
+    public static final String TARGET_TRAINING_QUICK = "training_quick";
     public static final String TARGET_NUTRITION = "nutrition";
     public static final String TARGET_SUPPORT = "support";
     public static final String TARGET_HOME = "home";

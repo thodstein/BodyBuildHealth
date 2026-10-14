@@ -30,8 +30,10 @@ describe('bb-corrective-ui', () => {
     expect(prev!.textContent).toMatch(/Зоны: /);
     expect(prev!.textContent).toMatch(/Коррекции: /);
     expect(prev!.textContent).toMatch(/Блок: /);
-    // паритет: упражнения превью — из того же источника, что уходит в мост (top3ByZone → preferredExerciseIds)
-    expect(HUB_SRC).toContain('const first = (top3ByZone[z] || [])[0];');
+    // паритет: упражнения превью — из того же источника, что уходит в мост
+    // (⭐-выбор библиотеки первым → preferredExerciseIds), а не из каталожного ранкера
+    expect(HUB_SRC).toContain("const first = (correctiveTopByZone[z] || [])[0];");
+    expect(HUB_SRC).toContain('for (const r of (correctiveTopByZone[z] || [])) {');
   });
   it('ROUND-10: без слабых зон превью честно говорит «нечего отправлять»', () => {
     render(<BBDiagnosticsHub />);

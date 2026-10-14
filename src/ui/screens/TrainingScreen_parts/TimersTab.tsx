@@ -11,12 +11,38 @@ const PRESETS: Preset[] = [
   { name: 'Tabata', work: 20, rest: 10, rounds: 8 },
   { name: 'EMOM', work: 40, rest: 20, rounds: 10 },
   { name: 'AMRAP', work: 300, rest: 0, rounds: 1 },
-  { name: 'Drop Set', work: 45, rest: 10, rounds: 6 },
-  { name: 'Эндurance', work: 300, rest: 60, rounds: 4 },
+  { name: 'Drop-сет', work: 45, rest: 10, rounds: 6 },
+  { name: 'Выносливость', work: 300, rest: 60, rounds: 4 },
 ];
 
 interface TimersTabProps {
   initialSettings?: { work: number; rest: number; rounds: number };
+}
+
+/** Локальный короткий бип (без CDN — офлайн-АПК). */
+function playBeep(freq = 880, ms = 200): void {
+  try {
+    const AC = (window as any).AudioContext || (window as any).webkitAudioContext;
+    if (!AC) return;
+    const ctx = new AC();
+    const o = ctx.createOscillator();
+    const g = ctx.createGain();
+    o.type = 'sine'; o.frequency.value = freq;
+    o.connect(g); g.connect(ctx.destination);
+    g.gain.setValueAtTime(0.16, ctx.currentTime);
+    o.start();
+    window.setTimeout(() => { try { o.stop(); ctx.close(); } catch { /* noop */ } }, ms);
+  } catch { /* noop */ }
+}
+
+/** Голосовая подсказка фазы (если браузер/WebView умеет речь). */
+function speak(text: string): void {
+  try {
+    if (!('speechSynthesis' in window)) return;
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = 'ru-RU'; u.rate = 1;
+    window.speechSynthesis.speak(u);
+  } catch { /* noop */ }
 }
 
 export const TimersTab: React.FC<TimersTabProps> = ({ initialSettings }) => {
@@ -41,6 +67,7 @@ export const TimersTab: React.FC<TimersTabProps> = ({ initialSettings }) => {
     return { work: initialSettings?.work || 60, rest: initialSettings?.rest || 30, rounds: initialSettings?.rounds || 3 };
   });
   const intervalRef = React.useRef<number | null>(null);
+  const warnedRef = React.useRef<number>(0);
   const [roundHistory, setRoundHistory] = React.useState<{ round: number; phase: 'work' | 'rest'; duration: number; timestamp: string }[]>([]);
 
   React.useEffect(() => {
@@ -53,6 +80,7 @@ export const TimersTab: React.FC<TimersTabProps> = ({ initialSettings }) => {
   const start = () => {
     if (isRunning) return;
     setIsRunning(true);
+    warnedRef.current = 0;
     setCurrentRound(1);
     setPhase('work');
     setTimeLeft(totalSec);
@@ -65,6 +93,7 @@ export const TimersTab: React.FC<TimersTabProps> = ({ initialSettings }) => {
 
   const reset = () => {
     stop();
+    warnedRef.current = 0;
     setCurrentRound(0);
     setPhase('work');
     setTimeLeft(0);
@@ -75,9 +104,11 @@ export const TimersTab: React.FC<TimersTabProps> = ({ initialSettings }) => {
     if (phase === 'work') {
       if (currentRound >= rounds) { stop(); setTimeLeft(0); return; }
       setPhase('rest');
+      warnedRef.current = 0;
       setTimeLeft(restSec);
     } else {
       setPhase('work');
+      warnedRef.current = 0;
       setCurrentRound(r => r + 1);
       setTimeLeft(totalSec);
     }
@@ -87,10 +118,7 @@ export const TimersTab: React.FC<TimersTabProps> = ({ initialSettings }) => {
     if (type === 'complete') {
       hapticNotify('success');
       if (navigator.vibrate) navigator.vibrate([300, 100, 300]);
-      try {
-        const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
-        audio.play().catch(() => {});
-      } catch {}
+      try { playBeep(880, 320); } catch {}
     } else if (type === 'phase') {
       hapticNotify('success');
       if (navigator.vibrate) navigator.vibrate([150, 50, 150]);
@@ -107,25 +135,35 @@ export const TimersTab: React.FC<TimersTabProps> = ({ initialSettings }) => {
           if (phase === 'work') {
             setRoundHistory(h => [...h, { round: currentRound, phase: 'work', duration: totalSec, timestamp: new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) }]);
             notify('phase');
-            if (currentRound >= rounds) { notify('complete'); setRoundHistory(h => [...h, { round: currentRound, phase: 'rest', duration: 0, timestamp: new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) }]); stop(); return 0; }
+            speak(phase === 'work' ? 'Отдых' : 'Работа');
+            if (currentRound >= rounds) { notify('complete'); speak('Тренировка завершена'); setRoundHistory(h => [...h, { round: currentRound, phase: 'rest', duration: 0, timestamp: new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) }]); stop(); return 0; }
             setPhase('rest');
             return restSec;
           } else {
             setRoundHistory(h => [...h, { round: currentRound, phase: 'rest', duration: restSec, timestamp: new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) }]);
             notify('phase');
+            speak('Работа');
             setPhase('work');
             setCurrentRound(r => r + 1);
             return totalSec;
           }
         }
-        if (prev <= 3) notify('warning');
+        // Предупреждение — один раз на последние 3 секунды, не каждый тик.
+        if (prev <= 4 && warnedRef.current !== prev) {
+          warnedRef.current = prev;
+          notify('warning');
+        }
         return prev - 1;
       });
     }, 1000);
     return () => { if (intervalRef.current) { clearInterval(intervalRef.current); intervalRef.current = null; } };
-  }, [isRunning, phase, currentRound, rounds, totalSec, restSec, timeLeft]);
+    // timeLeft вне deps: иначе интервал пересоздаётся каждую секунду.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isRunning, phase, currentRound, rounds, totalSec, restSec]);
 
-  const pct = phase === 'work' ? (timeLeft / totalSec) * 100 : (timeLeft / restSec) * 100;
+  // Доля прогресса: при нулевом отдыхе (AMRAP) > не делим на 0 — полная шкала работы.
+  const phaseLen = phase === 'work' ? Math.max(1, totalSec) : Math.max(1, restSec);
+  const pct = timeLeft > 0 ? Math.max(0, Math.min(100, (timeLeft / phaseLen) * 100)) : 0;
 
   const applyPreset = (preset: Preset) => {
     if (isRunning) return;
@@ -175,7 +213,7 @@ export const TimersTab: React.FC<TimersTabProps> = ({ initialSettings }) => {
     <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
       {PRESETS.map(preset => (
         <button key={preset.name} onClick={() => applyPreset(preset)} disabled={isRunning}
-          style={{ padding: '6px 10px', borderRadius: 8, fontSize: 11, cursor: 'pointer', border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.04)', color: '#fff' }}>
+          style={{ minHeight: 44, padding: '10px 12px', borderRadius: 12, fontSize: 12, fontWeight: 700, cursor: 'pointer', border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.04)', color: '#fff' }}>
           {preset.name}
         </button>
       ))}
@@ -185,17 +223,17 @@ export const TimersTab: React.FC<TimersTabProps> = ({ initialSettings }) => {
       <div>
         <label style={{ fontSize: 10, color: '#fff' }}>Работа (с)</label>
         <input type="number" min={5} max={600} value={totalSec || ''} onChange={e => { const v = parseInt(e.target.value) || 60; setTotalSec(v); setSettings(s => ({ ...s, work: v })); }} disabled={isRunning}
-          style={{ width: '100%', padding: '8px', borderRadius: 8, textAlign: 'center', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', fontSize: 14, boxSizing: 'border-box' }} />
+          style={{ width: '100%', minHeight: 48, padding: '12px 8px', borderRadius: 12, textAlign: 'center', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', fontSize: 16, boxSizing: 'border-box' }} />
       </div>
       <div>
         <label style={{ fontSize: 10, color: '#fff' }}>Отдых (с)</label>
         <input type="number" min={5} max={600} value={restSec || ''} onChange={e => { const v = parseInt(e.target.value) || 30; setRestSec(v); setSettings(s => ({ ...s, rest: v })); }} disabled={isRunning}
-          style={{ width: '100%', padding: '8px', borderRadius: 8, textAlign: 'center', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', fontSize: 14, boxSizing: 'border-box' }} />
+          style={{ width: '100%', minHeight: 48, padding: '12px 8px', borderRadius: 12, textAlign: 'center', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', fontSize: 16, boxSizing: 'border-box' }} />
       </div>
       <div>
         <label style={{ fontSize: 10, color: '#fff' }}>Раунды</label>
         <input type="number" min={1} max={20} value={rounds || ''} onChange={e => { const v = parseInt(e.target.value) || 3; setRounds(v); setSettings(s => ({ ...s, rounds: v })); }} disabled={isRunning}
-          style={{ width: '100%', padding: '8px', borderRadius: 8, textAlign: 'center', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', fontSize: 14, boxSizing: 'border-box' }} />
+          style={{ width: '100%', minHeight: 48, padding: '12px 8px', borderRadius: 12, textAlign: 'center', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', fontSize: 16, boxSizing: 'border-box' }} />
       </div>
     </div>
 
@@ -222,6 +260,12 @@ export const TimersTab: React.FC<TimersTabProps> = ({ initialSettings }) => {
         style={{ padding: '12px 20px', borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)', cursor: 'pointer',
           background: 'rgba(255,255,255,0.04)', color: '#fff', fontSize: 14 }}>
         ↺ Сброс
+      </button>
+      <button onClick={() => { hapticImpact('light'); setTimeLeft(v => v + 30); }} disabled={!isRunning}
+        aria-label="Плюс 30 секунд"
+        style={{ padding: '12px 14px', borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)', cursor: 'pointer',
+          background: 'rgba(0,230,138,0.10)', color: '#00e68a', fontSize: 14, fontWeight: 700, opacity: isRunning ? 1 : 0.5 }}>
+        +30с
       </button>
     </div>
 

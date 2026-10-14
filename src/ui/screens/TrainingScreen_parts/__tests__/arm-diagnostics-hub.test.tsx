@@ -455,11 +455,15 @@ describe('ArmDiagnosticsHub PRO', () => {
   it('F1: селект снаряда Axle меняет норму 133 ↔ 237.5', () => {
     render(<ArmDiagnosticsHub />);
     fireEvent.change(screen.getByPlaceholderText('100'), { target: { value: '200' } });
-    expect(document.body.textContent).toContain('Axle vs Saxon-ориентир');
-    expect(document.body.textContent).toContain('150%');
-    fireEvent.click(screen.getByText(/Apollon \(М/));
+    expect(document.body.textContent).toContain('Axle vs Saxon-');
+    // аудит 2026-10 раунд-3 было→стало: проценты округлялись до целого (150%) — теперь
+    // единый `normPct` даёт десятые (150.4%), синхронно с движком норм
+    expect(document.body.textContent).toContain('150.4%');
+    fireEvent.click(screen.getByText(/Apollon \(/));
     expect(document.body.textContent).toContain('Axle vs Apollon WR');
-    expect(document.body.textContent).toContain('84%');
+    // аудит 2026-10 раунд-3 было→стало: процент округлялся до целого (84%) — теперь
+    // единый `normPct` даёт десятые (84.2%), это честнее и синхронно с движком норм
+    expect(document.body.textContent).toContain('84.2%');
   });
 
   it('F2: teen-гейт 14–15 показывает MHE-баннер', () => {
@@ -522,8 +526,10 @@ describe('ArmDiagnosticsHub PRO', () => {
     render(<ArmDiagnosticsHub />);
     fireEvent.change(screen.getByPlaceholderText('40'), { target: { value: '45' } });
     expect(document.body.textContent).toContain('Excalibur 50мм');
-    expect(document.body.textContent).toContain('SAR по своей весовой');
-    expect(document.body.textContent).toContain('не калибровка');
+    // аудит 2026-10 раунд-3 было→стало: текст норматива был inline-дублем — теперь
+    // берётся из движка `armliftNormsFor` (единый источник подписи)
+    expect(document.body.textContent).toContain('SAR по весовой');
+    expect(document.body.textContent).toContain('ориентир');
   });
 
   it('D2: per-muscle danger виден в Recovery', () => {

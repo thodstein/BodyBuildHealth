@@ -15,12 +15,23 @@ describe('PRO-4 UI: хаб армлифтинга', () => {
     expect(screen.getByLabelText(/Вес тела кг/)).toBeTruthy();
     expect(screen.getByLabelText(/Raptor кг/)).toBeTruthy();
   });
-  it('вес тела едет в конструктор, классов нет (соревы удалены)', () => {
+  // Аудит 2026-10: граница «в хабе классовых строк нет» СОХРАНЯЕТСЯ (соревновательная
+  // часть хаба удалена осознанно), но мёртвое поле моста закрыто: `weightClass` теперь
+  // уезжает в payload (конструктор держал за ним ветку «когда отправят»), а в DOM хаба
+  // класса по-прежнему нет. Проверяется и то, и другое.
+  it('вес тела едет в конструктор: в payload класс, в DOM хабе — нет', () => {
     clear();
     render(<ArmliftingDiagnosticsHub />);
     fireEvent.change(screen.getByLabelText(/Вес тела кг/), { target: { value: '85' } });
     expect(document.body.textContent).not.toContain('М-90');
     expect((screen.getByLabelText(/Вес тела кг/) as HTMLInputElement).value).toBe('85');
+    fireEvent.change(screen.getByLabelText(/RT кг/), { target: { value: '100' } });
+    fireEvent.click(screen.getByLabelText(/Применить в Арм-конструктор/));
+    const raw = localStorage.getItem('he_planner_apply') || '';
+    expect(raw).toContain('weightClass');
+    expect(raw).toContain('М-90');
+    expect(raw).toContain('rulesNote');
+    expect(raw).toContain('"lms"');
   });
   it('L/R дают асимметрию и рецепт, без last-man-standing', () => {
     clear();
@@ -31,12 +42,19 @@ describe('PRO-4 UI: хаб армлифтинга', () => {
     expect(document.body.textContent).toContain('Рецепт:');
     expect(document.body.textContent).not.toContain('Last-man-standing');
   });
-  it('чек-листа правил нет (соревы удалены), фолы живут в диагностике', () => {
+  // Аудит 2026-10 было→стало: нумерованного чек-листа «Правило 1..5» нет и не было,
+  // но и значимого ввода правил тоже не было — движок `assessLiftRules` висел без
+  // UI, и «замер по правилам» нельзя было ни отметить, ни отправить. Теперь это
+  // чипы в табе «Диагностика» + строка вердикта + поле `rulesNote` в мост.
+  it('чек-лист правил — чипы с вердиктом; фолы живут в диагностике', () => {
     clear();
     render(<ArmliftingDiagnosticsHub />);
     expect(screen.queryByLabelText(/Правило 1/)).toBeNull();
     fireEvent.click(screen.getByText('🔍 Диагностика'));
+    expect(screen.getByLabelText('Диагностика: правила замера')).toBeTruthy();
     expect(screen.getByLabelText('Диагностика: фолы')).toBeTruthy();
+    fireEvent.click(screen.getByText('DOH, без лямок'));
+    expect(document.body.textContent).toContain('чек-лист правил не заполнен');
   });
   it('старые контракты целы: RT кг, CoC, Excalibur, Введи замеры, экспорт', () => {
     clear();

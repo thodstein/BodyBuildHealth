@@ -127,6 +127,9 @@ export function getISOWeekYear(dateStr: string): number {
 // ═══════════════════════════════════════════════════════════════════════════
 
 const LOG_KEY = 'he_workout_log_v2';
+/** Живая (незавершённая) сессия: переживает закрытие приложения/свитка,
+ *  кормит виджеты/пульт и позволяет продолжить тренировку. */
+const ACTIVE_SESSION_KEY = 'he_workout_active_v1';
 const PROGRESS_CACHE_KEY = 'he_workout_progress_cache';
 const STATS_CACHE_KEY = 'he_workout_stats_cache';
 const TRIM_KEY = 'he_workout_log_trimmed';
@@ -316,6 +319,82 @@ export function deleteSession(sessionId: string): boolean {
   if (next.length === sessions.length) return false;
   saveSessions(next);
   return true;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Live (active) session — незавершённая тренировка
+// ═══════════════════════════════════════════════════════════════════════════
+
+/** Стоит ли хранить сессию как «живую»: без подходов хранить нечего. */
+export function isActiveSessionWorthSaving(session: WorkoutSession | null | undefined): boolean {
+  return !!session && (session.exercises || []).some(e => (e.sets || []).length > 0);
+}
+
+/** Живая сессия + служебные поля (когда сохранена, сколько сетов в плане дня). */
+export type ActiveSession = WorkoutSession & { savedAt?: number; plannedSetsTotal?: number };
+
+/** Сохранить живую сессию (автосейв каждого подхода).
+ *  plannedSets — плановое число подходов дня: без него прогресс живой сессии
+ *  нечестен (2/2 = 100% при восьми запланированных). */
+export function saveActiveSession(session: WorkoutSession | null | undefined, plannedSets?: number): boolean {
+  if (!isActiveSessionWorthSaving(session) || !session) return false;
+  try {
+    const planned = Math.max(0, Math.round(Number(plannedSets) || 0));
+    const payload: ActiveSession = { ...session, savedAt: Date.now() };
+    if (planned > 0) payload.plannedSetsTotal = planned;
+    localStorage.setItem(ACTIVE_SESSION_KEY, JSON.stringify(payload));
+    return true;
+  } catch { return false; }
+}
+
+/** Прочитать живую сессию (битые/пустые данные → null). */
+export function loadActiveSession(): ActiveSession | null {
+  try {
+    const raw = localStorage.getItem(ACTIVE_SESSION_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object' || !Array.isArray(parsed.exercises)) return null;
+    if (!isActiveSessionWorthSaving(parsed)) return null;
+    return parsed as ActiveSession;
+  } catch { return null; }
+}
+
+/** Сбросить живую сессию (после сохранения или отказа). */
+export function clearActiveSession(): void {
+  try { localStorage.removeItem(ACTIVE_SESSION_KEY); } catch { /* ignore */ }
+}
+
+/** Сводка живой сессии для пульта/виджетов: сеты, тоннаж, текущее упражнение. */
+export interface ActiveSessionSummary {
+  sessionId: string;
+  focus: string;
+  date: string;
+  setsDone: number;
+  setsPlanned: number;
+  volumeKg: number;
+  currentExercise: string;
+  progressPct: number;
+}
+export function summarizeActiveSession(session: WorkoutSession | null | undefined, plannedSets?: number): ActiveSessionSummary | null {
+  if (!session || !isActiveSessionWorthSaving(session)) return null;
+  const setsDone = (session.exercises || []).reduce((s, e) => s + (e.sets || []).length, 0);
+  const volumeKg = (session.exercises || []).reduce((s, e) => s + (e.totalVolume || 0), 0);
+  const lastWithSets = [...(session.exercises || [])].reverse().find(e => (e.sets || []).length > 0);
+  const planned = Math.max(
+    Math.round(Number(plannedSets) || 0),
+    Math.round(Number((session as ActiveSession).plannedSetsTotal) || 0),
+    setsDone,
+  );
+  return {
+    sessionId: session.sessionId,
+    focus: session.focus || 'Тренировка',
+    date: session.date,
+    setsDone,
+    setsPlanned: planned,
+    volumeKg: Math.round(volumeKg),
+    currentExercise: lastWithSets?.exerciseName || (session.exercises || [])[0]?.exerciseName || '',
+    progressPct: planned > 0 ? Math.max(0, Math.min(100, Math.round((setsDone / planned) * 100))) : 0,
+  };
 }
 
 /** Убрать legacy-маркеры из имени упражнения («[superset:1]», «[note:...]»), которыми

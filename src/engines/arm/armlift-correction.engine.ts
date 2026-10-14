@@ -307,6 +307,12 @@ function toCorrection(p: PoolEntry, reason: string, score: number): ArmliftCorre
  * D11 E2: CoC-лестница по уровню (ступени IronMind; правило 10–12).
  * Рабочий гриппер (5–7 в отказ) + целевой (негативы/частички/холды 3–5с).
  * Возвращает PoolEntry для ранжира (имена — из каталога в toCorrection).
+ *
+ * Аудит 2026-10 было→стало: ветки `lv < 2.5` и финальный `return` были
+ * побайтово одинаковыми (`coc_no2` + `goalId: null`) — «прогрессия» выше №2
+ * существовала только в тексте. Причина структурная: в каталоге нет гриппера
+ * старше No.2, поэтому лестница физически упирается в него. Теперь это сказано
+ * прямо, а `cocLadderPool` на уровне ≥2.5 уводит цель в overcrush-холд.
  */
 export function cocLadderFor(level: number | null | undefined): { workId: string; goalId: string | null } {
   const lv = Number(level);
@@ -314,7 +320,8 @@ export function cocLadderFor(level: number | null | undefined): { workId: string
   if (lv < 1) return { workId: 'coc_trainer', goalId: 'coc_no1' };
   if (lv < 1.5) return { workId: 'coc_no1', goalId: 'coc_no1_5' };
   if (lv < 2) return { workId: 'coc_no1_5', goalId: 'coc_no2' };
-  if (lv < 2.5) return { workId: 'coc_no2', goalId: null };
+  // Потолок каталога — No.2: дальше цель не ступень гриппера, а overcrush-холд
+  // (см. cocLadderPool: goalId=null → holding-протокол).
   return { workId: 'coc_no2', goalId: null };
 }
 

@@ -5,14 +5,31 @@
  * Скоринг причин с evidence: technique / max_strength / endurance / volume / mobility / fatigue.
  * Боль — жёсткий гейт (не причина для нагрузки).
  * Чистые функции.
+ *
+ * Аудит 2026-10: пороги холдов/асимметрии читаются из канона
+ * `armlift-benchmarks` (были инлайн-числами, расходящимися с diagnosis и бенчмарком);
+ * список щипковых снарядов — канон `isPinchImplement` (был inline-копией).
  */
 
 import { localIsoDate } from '../../core/local-date';
+import {
+  PINCH_WEAK_SEC, PINCH_MID_SEC, FARMER_WEAK_SEC, FARMER_MID_SEC,
+  COC_WEAK_LEVEL, SILVER_WEAK_SEC, SILVER_MID_SEC, ASYM_EVIDENCE_PCT,
+} from './armlift-benchmarks.engine';
+import { isPinchImplement } from './armlift-failure-modes.engine';
+import { ARMLIFT_DIAG_CAUSE_RU } from './armlift-diagnosis.engine';
 
 export type ArmliftCause = 'technique' | 'max_strength' | 'endurance' | 'volume' | 'mobility' | 'fatigue' | 'pain';
 
-/** Канон RU-лейблов причины (единый источник для хаба/экспорта/лог-ленты). */
+/**
+ * Канон RU-лейблов причины (единый источник для хаба/экспорта/лог-ленты).
+ * Аудит 2026-10 было→стало: словарь был один на ДВА разных юниона («strength»/
+ * «asymmetry» добавлены «для совместимости» — латка, закрывавшая коллизию имён
+ * типов). Теперь причины диагноза лебезины своим каноном `ARMLIFT_DIAG_CAUSE_RU`,
+ * а этот словарь — явный мерж, а не импровизация.
+ */
 export const ARMLIFT_CAUSE_RU: Record<string, string> = {
+  ...ARMLIFT_DIAG_CAUSE_RU,
   technique: 'техника',
   max_strength: 'сила',
   endurance: 'выносливость',
@@ -20,9 +37,6 @@ export const ARMLIFT_CAUSE_RU: Record<string, string> = {
   mobility: 'мобильность',
   fatigue: 'щадящая',
   pain: 'боль (стоп)',
-  // причина диагноза (armlift-diagnosis) — те же лейблы для совместимости
-  asymmetry: 'асимметрия рук',
-  strength: 'сила',
 };
 
 /** Канон RU-лейблов провала мобильности (armlift-mobility.fails). */
@@ -189,29 +203,29 @@ export function diagnoseArmliftCause(i: ArmliftCauseInput): ArmliftCauseResult {
 
   // MAX_STRENGTH: срыв внизу + короткие холды + слабый crush.
   if (fp === 'off_floor' || fp === 'close_fail') { scores.max_strength += 0.45; ev.push('Срыв внизу/не закрыл — пик силы'); }
-  if (pinch != null && pinch < 10) { scores.max_strength += 0.35; ev.push(`Pinch-hold ${pinch}с < 10с`); }
-  if (farmer != null && farmer < 15) { scores.max_strength += 0.25; ev.push(`Farmer-hold ${farmer}с < 15с`); }
+  if (pinch != null && pinch < PINCH_WEAK_SEC) { scores.max_strength += 0.35; ev.push(`Pinch-hold ${pinch}с < ${PINCH_WEAK_SEC}с`); }
+  if (farmer != null && farmer < FARMER_WEAK_SEC) { scores.max_strength += 0.25; ev.push(`Farmer-hold ${farmer}с < ${FARMER_WEAK_SEC}с`); }
   // D21: per-hand щипок в evidence — если обе руки заполнены, указываем слабую.
   const pinchL = num((i as any).pinchL);
   const pinchR = num((i as any).pinchR);
   const asym = num((i as any).asymmetryPct);
-  if (pinchL != null && pinchR != null && asym != null && asym >= 10) {
+  if (pinchL != null && pinchR != null && asym != null && asym >= ASYM_EVIDENCE_PCT) {
     const weak = pinchL < pinchR ? `левая ${pinchL}кг слабее правой ${pinchR}кг` : `правая ${pinchR}кг слабее левой ${pinchL}кг`;
     // Техника/асимметрия — не сила, поэтому evidence, без очков (асимметрия уже скорит).
     ev.push(`Щипок по рукам: ${weak} (асимметрия ${asym}%)`);
   }
   const coc = num(i.cocLevel);
-  if (coc != null && coc < 2) { scores.max_strength += 0.35; ev.push(`CoC №${coc} < №2 — crush-пик`); }
+  if (coc != null && coc < COC_WEAK_LEVEL) { scores.max_strength += 0.35; ev.push(`CoC №${coc} < №${COC_WEAK_LEVEL} — crush-пик`); }
   const silv = num(i.silverSec);
   const grip = i.silverGripper ? ` (№${i.silverGripper})` : '';
-  if (silv != null && silv < 20) { scores.endurance += 0.3; ev.push(`Silver-hold ${silv}с${grip} < 20с — crush-выносливость`); }
-  else if (silv != null && silv >= 20 && silv < 45) { scores.endurance += 0.15; ev.push(`Silver-hold ${silv}с${grip} — середина`); }
+  if (silv != null && silv < SILVER_WEAK_SEC) { scores.endurance += 0.3; ev.push(`Silver-hold ${silv}с${grip} < ${SILVER_WEAK_SEC}с — crush-выносливость`); }
+  else if (silv != null && silv >= SILVER_WEAK_SEC && silv < SILVER_MID_SEC) { scores.endurance += 0.15; ev.push(`Silver-hold ${silv}с${grip} — середина`); }
 
   // ENDURANCE: срыв в удержании/середине при живом старте.
   if (fp === 'hold_long' || fp === 'mid') { scores.endurance += 0.45; ev.push('Держит старт, плывёт дальше — выносливость'); }
-  if (fp === 'hold_short' && pinch != null && pinch >= 10) { scores.endurance += 0.25; ev.push('Пик есть, холд короткий — перевод в endurance'); }
-  if (pinch != null && pinch >= 10 && pinch < 20) { scores.endurance += 0.2; ev.push(`Pinch-hold ${pinch}с — середина`); }
-  if (farmer != null && farmer >= 15 && farmer < 30) { scores.endurance += 0.2; ev.push(`Farmer-hold ${farmer}с — середина`); }
+  if (fp === 'hold_short' && pinch != null && pinch >= PINCH_WEAK_SEC) { scores.endurance += 0.25; ev.push('Пик есть, холд короткий — перевод в endurance'); }
+  if (pinch != null && pinch >= PINCH_WEAK_SEC && pinch < PINCH_MID_SEC) { scores.endurance += 0.2; ev.push(`Pinch-hold ${pinch}с — середина`); }
+  if (farmer != null && farmer >= FARMER_WEAK_SEC && farmer < FARMER_MID_SEC) { scores.endurance += 0.2; ev.push(`Farmer-hold ${farmer}с — середина`); }
 
   // VOLUME: редкие сессии + стоящий тренд при редкости.
   if (sess28 != null && sess28 <= 2) { scores.volume += 0.5; ev.push(`Хват-сессий за 28д: ${sess28} (норма 8–12)`); }
@@ -236,8 +250,7 @@ export function diagnoseArmliftCause(i: ArmliftCauseInput): ArmliftCauseResult {
   }
 
   // MOBILITY: явные ограничения под снаряд.
-  // 26.10.2026: +country_crush (щепковый снаряд — relevantTests=['Pinch-hold'])
-const pinchImpl = ['saxon_bar', 'hub', 'pinch_block', 'anvil', 'grandfather_clock', 'country_crush'].includes(String(i.implement || ''));
+  const pinchImpl = isPinchImplement(String(i.implement || ''));
   if (pinchImpl && i.thumbStiff) { scores.mobility += 0.55; ev.push('Большой жёсткий на щипковом снаряде'); }
   if (i.wristExtLimited || i.wristFlexLimited) { scores.mobility += 0.45; ev.push('Ограничение запястья режет позицию'); }
   // D13: измеренные ROM-провалы бьют сильнее toggles.

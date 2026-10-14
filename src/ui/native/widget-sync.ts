@@ -11,6 +11,8 @@ import {
   getLastSession,
   getSessionsByWeek,
   getISOWeekNumber,
+  loadActiveSession,
+  summarizeActiveSession,
 } from '../../engines/workout-logger.engine';
 import { getAdherenceStats } from '../../engines/symptom-adherence.engine';
 import { calcNutrition } from '../../engines/nutrition.engine';
@@ -63,16 +65,42 @@ export interface WidgetSyncResult {
   nutritionOk: boolean;
 }
 
-function collectTraining(): { title: string; subtitle: string; meta: string } {
+function collectTraining(): {
+  title: string; subtitle: string; meta: string;
+  progress: number; live: boolean; actionLabel: string; actionTarget: string;
+} {
   const last = safe(() => getLastSession(), null);
   const today = todayLocalISO();
   const week = safe(() => getSessionsByWeek(getISOWeekNumber(today)).length, 0);
   const total = safe(() => getWorkoutStats().totalSessions ?? 0, 0);
+
+  // Живая сессия: прогресс по факту подходов + действие «+ Сет».
+  try {
+    const active = summarizeActiveSession(loadActiveSession());
+    if (active) {
+      return {
+        title: `● Идёт · ${active.focus}`,
+        subtitle: `${active.currentExercise || 'Тренировка'} · ${active.setsDone} подх.`,
+        meta: `${active.volumeKg.toLocaleString()} кг · ${active.progressPct}%`,
+        progress: active.progressPct,
+        live: true,
+        actionLabel: '+ Сет',
+        actionTarget: 'training_quick',
+      };
+    }
+  } catch {
+    /* живой сессии нет — показываем историю */
+  }
+
   if (!last) {
     return {
       title: 'Тренировка',
       subtitle: week > 0 ? `На неделе: ${week}` : 'План недели ждёт',
       meta: total > 0 ? `всего ${total}` : 'Health Engine',
+      progress: 0,
+      live: false,
+      actionLabel: '▶ Начать',
+      actionTarget: 'training_run',
     };
   }
   const vol = last.totalVolume > 0 ? ` · ${(last.totalVolume / 1000).toFixed(1)} т` : '';
@@ -80,6 +108,10 @@ function collectTraining(): { title: string; subtitle: string; meta: string } {
     title: last.focus || 'Тренировка',
     subtitle: `${last.date} · ${last.totalSets} подходов${vol}`,
     meta: `на неделе ${week} · всего ${total}`,
+    progress: 0,
+    live: false,
+    actionLabel: '▶ Начать',
+    actionTarget: 'training_run',
   };
 }
 
@@ -196,6 +228,15 @@ export function applyWidgetQueue(items: QueuedItem[]): { waterMl: number; foods:
     }
   }
   return { waterMl, foods };
+}
+
+/** Только виджет тренировки — живой прогресс во время проведения (APK). */
+export async function pushTrainingWidget(): Promise<boolean> {
+  try {
+    return await syncTrainingWidget(collectTraining());
+  } catch {
+    return false;
+  }
 }
 
 /**

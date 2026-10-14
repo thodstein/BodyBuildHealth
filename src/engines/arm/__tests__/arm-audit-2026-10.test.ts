@@ -198,8 +198,12 @@ describe('P2: отчёт и честность данных', () => {
   it('подпись RT несёт владельца по полу', () => {
     const src = new SourceFileReader('src/engines/arm/armlifting-diagnostics.engine.ts');
     expect(src.text).toContain('wrHolderNote');
-    expect(src.text).toMatch(/Mason 80\.0, 2024/); // аудит 2026-10 было→стало: Gaiduchenko 77.2 → Mason 80.0
-    expect(src.text).toMatch(/Тюкалов 130\.5, 2013/);
+    // Аудит 2026-10 было→стало: «Mason 80.0, 2024» → «Ж Hafsa Mason 80.0, 21.08.2024».
+    // Имя открыто: раньше подпись не давала найти рекорд, а расхождение со страницей
+    // IronMind (всё ещё 77.2 Гайдученко 2012) не было видно пользователю.
+    expect(src.text).toMatch(/Ж Hafsa Mason 80\.0, 21\.08\.2024/);
+    expect(src.text).toMatch(/Гайдученко 77\.2, 2012/);
+    expect(src.text).toMatch(/Тюкалов 130\.5, 30\.06\.2013/);
   });
   it('apollon диаметр = 2" (51 мм), не 58', () => {
     const src = new SourceFileReader('src/core/exercise-catalog-arm.ts');

@@ -35,7 +35,10 @@ export function sessionOrderNote(corrections: ArmliftCorrection[]): string {
   const ids = (corrections || []).map((c) => c.exId);
   const bits: string[] = ['Хват — в конце тренировки, после тяг'];
   if (ids.includes('saxon_bar') && ids.includes('hub_pinch')) bits.push('Saxon до Hub');
-  if (ids.some((id) => /plate_pinch_hold|country_crush_3|euro_pinch_2h|blockbuster_pinch/.test(id))) {
+  // 14.10.2026 было→стало: матч был только по «country_crush_3», тогда как ранг
+  // (orderRank) ловит ЛЮБОЙ country_crush — день с country_crush_2 получал порядок
+  // «щипок», но подсказку «широкий → узкий» не видел (ранг и текст расходились).
+  if (ids.some((id) => /plate_pinch_hold|country_crush|euro_pinch_2h|blockbuster_pinch|little_big_horn/.test(id))) {
     bits.push('Щипок: широкий → узкий по мере отказа');
   }
   if (ids.some((id) => /wrist_ext_bb|wrist_roller|reverse_ez_curl|lever_top|finger_containment|indian_clubs|sledge_choke|ulnar_dev|radial_dev/.test(id))) {

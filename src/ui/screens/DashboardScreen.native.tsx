@@ -177,6 +177,21 @@ export const DashboardNative: React.FC<Props> = ({ onNavigate }) => {
       try {
         const target = await consumeWidgetLaunchTarget();
         if (!alive || !target || target === 'home') return;
+        if (target === 'training_run') {
+          onNavigate?.('training');
+          window.dispatchEvent(new CustomEvent('training-open-tab', { detail: 'runtime' }));
+          return;
+        }
+        if (target === 'training_quick') {
+          onNavigate?.('training');
+          window.dispatchEvent(new CustomEvent('training-open-tab', { detail: 'runtime' }));
+          // Даём плееру смонтироваться и записать первый незалогированный подход.
+          window.setTimeout(() => {
+            if (!alive) return;
+            window.dispatchEvent(new Event('he-workout-quick-set'));
+          }, 700);
+          return;
+        }
         if (target === 'training' || target === 'nutrition' || target === 'support') {
           onNavigate?.(target);
         }

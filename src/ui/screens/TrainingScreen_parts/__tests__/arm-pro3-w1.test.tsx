@@ -12,12 +12,14 @@ describe('PRO-3 W1 UI: честность', () => {
     fireEvent.click(screen.getByText(/Sup cup/));
     expect(document.body.textContent).toContain('вне топ-3');
   });
-  it('P1: поле скорости 2-го подхода есть + хинт оценки при одном замере', () => {
+  it('P1: поле скорости 2-го подхода есть + один замер не даёт loss', () => {
     render(<ArmDiagnosticsHub />);
     expect(screen.getByLabelText(/VBT скорость м\/с/)).toBeTruthy();
     expect(screen.getByLabelText(/VBT скорость второго подхода/)).toBeTruthy();
-    fireEvent.change(screen.getByLabelText(/VBT скорость м\/с/), { target: { value: '0.8' } });
-    expect(document.body.textContent).toContain('best≈ввод+0.2');
+    fireEvent.change(screen.getByLabelText(/VBT скорость м\/с/), { target: { value: '0.6' } });
+    // аудит 2026-10: без 2-го замера loss null — синтетический `+0.2` больше не выдумывает stop-зону
+    expect(document.body.textContent).toContain('loss не оценивается');
+    expect(document.body.textContent).not.toContain('best≈ввод+0.2');
   });
   it('P2: hero показывает «недостаточно данных» без замеров', () => {
     const { container } = render(<ArmDiagnosticsHub />);

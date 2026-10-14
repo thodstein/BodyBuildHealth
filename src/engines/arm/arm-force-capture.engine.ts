@@ -34,11 +34,13 @@ export interface ForceVector {
   axleInternal?: boolean;
 }
 
-export const RT_WORLD_CLASS_M = 130.5; // Tyukalov 2013, IronMind WR
-// Аудит 2026-10 было→стало: 77.2 (Gaiduchenko 2012) — рекорд побит: Hafsa Mason 80.0 кг,
-// West Coast Arm Sports «Hands of Doom II», 21.08.2024 (IronMind/Wikipedia). Женщина на
+// Аудит 2026-10 было→стало: 77.2 (Гайдученко 22.09.2012) — рекорд побит: Hafsa Mason 80.0 кг,
+// West Coast Arm Sports «Hands of Doom II», 21.08.2024 (Wikipedia, ред. 24.12.2025). Женщина на
 // уровне мирового рекорда получала 96.5/100 — «world class» была недостижима.
-export const RT_WORLD_CLASS_F = 80.0; // Mason 2024
+// 14.10.2026: третья копия чисел RT демонтирована — читается из канона PLATFORM_WR
+// (ironmind.com на ту же дату всё ещё числит 77.2, поэтому note показывает оба факта).
+export const RT_WORLD_CLASS_M = platformWrFor('rolling_thunder', 'male');
+export const RT_WORLD_CLASS_F = platformWrFor('rolling_thunder', 'female');
 const RT_WORLD_CLASS = RT_WORLD_CLASS_M; // backward compat
 const RT_AVG = 55;
 // 26.10.2026: AXLE_WORLD_CLASS удалён как второй знаменатель акселя — единый
@@ -92,7 +94,8 @@ export function estimateForceVector(r: GripForceRecord & { bodyWeightKg?: number
   const gripSupport = r.rtKg != null ? Math.max(0, Math.min(100, ((r.rtKg - RT_AVG) / (world - RT_AVG)) * 50 + 50)) : r.axleKg != null ? Math.max(0, Math.min(100, (r.axleKg / axleWorld) * 100)) : 0;
   // Аудит 2026-10 было→стало: знаменатель щипка был фиксированный 30 кг — любой атлет выше
   // промежуточного уровня видел 100/100, вектор переставал различать. Теперь единый канон
-  // pinch_block (80/45 — ВНУТРЕННИЙ ориентир хаба, единого WR на PowerPinch нет).
+  // pinch_block (80/45 — ВНУТРЕННИЙ ориентир хаба для блоков разной ширины; действующий
+  // WR канонического IronMind Block — 51.40/31.55, см. platformWrRef).
   const pinchRef = platformWrFor('pinch_block', r.sex || 'male');
   const gripPinch = r.pinchSec != null ? Math.max(0, Math.min(100, (r.pinchSec / PINCH_GOOD_SEC) * 100)) : r.pinchKg != null ? Math.max(0, Math.min(100, (r.pinchKg / pinchRef) * 100)) : 0;
   const bw = r.bodyWeightKg && r.bodyWeightKg > 30 ? r.bodyWeightKg : 80;

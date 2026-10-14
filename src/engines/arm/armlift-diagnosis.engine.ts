@@ -3,7 +3,17 @@
  * Вход: снаряд + точка срыва + фолы техники + тест-батарея + мобильность + боль/асимметрия.
  * Выход: слабое звено + причина + уверенность + кью. Чистая функция.
  * Приоритет (как в arm-weak-cause): боль > техника (>=2 фола) > асимметрия > мобильность > тесты > точка срыва.
+ *
+ * Аудит 2026-10 было→стало:
+ *  - `ArmliftCause` переименован в `ArmliftDiagCause` — имя пересекалось с юнионом
+ *    причин `armlift-cause.engine` (два разных типа с одним именем в одном хабе);
+ *  - порог farmer «<20с» → канон `FARMER_WEAK_SEC` (15с): diagnosis расходился с cause
+ *    и бенчмарком на один и тот же замер;
+ *  - список щипковых снарядов → канон `isPinchImplement` (был inline-копией в двух файлах).
  */
+
+import { PINCH_WEAK_SEC, PINCH_MID_SEC, FARMER_WEAK_SEC, ASYM_WEAK_PCT } from './armlift-benchmarks.engine';
+import { isPinchImplement } from './armlift-failure-modes.engine';
 
 export type ArmliftWeakLink =
   | 'thumb'
@@ -15,7 +25,7 @@ export type ArmliftWeakLink =
   | 'asymmetry'
   | 'conditioning';
 
-export type ArmliftCause = 'pain' | 'technique' | 'asymmetry' | 'mobility' | 'strength' | 'endurance' | 'fatigue';
+export type ArmliftDiagCause = 'pain' | 'technique' | 'asymmetry' | 'mobility' | 'strength' | 'endurance' | 'fatigue';
 
 export interface ArmliftDiagInput {
   implement?: string;
@@ -35,7 +45,7 @@ export interface ArmliftDiagInput {
 
 export interface ArmliftDiagnosis {
   weakLink: ArmliftWeakLink;
-  cause: ArmliftCause;
+  cause: ArmliftDiagCause;
   confidence: 'high' | 'med' | 'low';
   title: string;
   cues: string[];
@@ -63,6 +73,19 @@ export const ARMLIFT_WEAK_LINK_SHORT_RU: Record<ArmliftWeakLink, string> = {
   technique: 'техника',
   asymmetry: 'асимметрия рук',
   conditioning: 'боль (стоп)',
+};
+
+/** Канон RU-лейблов причины ДИАГНОЗА (своя лейбла для своего юниона: раньше
+ * хаб лебезил значения диагноза через словарь причин скоринга, залатывая
+ * расхождение двумя «совместимости»-записями). */
+export const ARMLIFT_DIAG_CAUSE_RU: Record<ArmliftDiagCause, string> = {
+  pain: 'боль (стоп)',
+  technique: 'техника',
+  asymmetry: 'асимметрия рук',
+  mobility: 'мобильность',
+  strength: 'сила',
+  endurance: 'выносливость',
+  fatigue: 'щадящая',
 };
 
 function num(v: number | null | undefined): number | null {
@@ -94,7 +117,7 @@ export function diagnoseArmlift(i: ArmliftDiagInput): ArmliftDiagnosis {
     };
   }
   // P2: асимметрия >15% (клинический порог щипка, Mathiowetz-практика).
-  if (asym != null && asym > 15) {
+  if (asym != null && asym > ASYM_WEAK_PCT) {
     return {
       weakLink: 'asymmetry', cause: 'asymmetry', confidence: 'high', title: TITLES.asymmetry,
       cues: ['Слабая рука первой в неделе, +1 подход слабой', 'Симметрия — тот же снаряд, та же рука-позиция'],
@@ -102,8 +125,7 @@ export function diagnoseArmlift(i: ArmliftDiagInput): ArmliftDiagnosis {
     };
   }
   // P3: мобильность под снаряд.
-  // 26.10.2026: +country_crush (щепковый снаряд — relevantTests=['Pinch-hold'])
-const pinchImpl = impl === 'saxon_bar' || impl === 'hub' || impl === 'pinch_block' || impl === 'anvil' || impl === 'grandfather_clock' || impl === 'country_crush';
+  const pinchImpl = isPinchImplement(impl);
   if (pinchImpl && i.thumbStiff) {
     return {
       weakLink: 'thumb', cause: 'mobility', confidence: 'med', title: TITLES.thumb,
@@ -126,21 +148,21 @@ const pinchImpl = impl === 'saxon_bar' || impl === 'hub' || impl === 'pinch_bloc
       ruleNote: 'Слабые ECRL/ECRB/ECU → включается EDC и открывает пальцы (SBS 2024).',
     };
   }
-  if (pinch != null && pinch < 10) {
+  if (pinch != null && pinch < PINCH_WEAK_SEC) {
     return {
       weakLink: 'thumb', cause: 'strength', confidence: 'med', title: TITLES.thumb,
       cues: ['Plate pinch 3×20–30с, 2–3×/нед, шаг +2.5–5%', 'Hub-подъёмы лёгкие 3×5 — аддуктор большого'],
-      ruleNote: `Pinch-hold ${pinch}с < 10с — пиковая сила большого (ожидание +15–30% за 8–12 нед).`,
+      ruleNote: `Pinch-hold ${pinch}с < ${PINCH_WEAK_SEC}с — пиковая сила большого (ожидание +15–30% за 8–12 нед).`,
     };
   }
-  if (farmer != null && farmer < 20) {
+  if (farmer != null && farmer < FARMER_WEAK_SEC) {
     return {
       weakLink: 'support_endurance', cause: 'endurance', confidence: 'med', title: TITLES.support_endurance,
       cues: ['Farmer 3×20–40м + вис 3×30–45с', 'Толстый гриф после тяг, не до (NSCA)'],
-      ruleNote: `Farmer-hold ${farmer}с < 20с — support выносливость, не пик.`,
+      ruleNote: `Farmer-hold ${farmer}с < ${FARMER_WEAK_SEC}с — support выносливость, не пик.`,
     };
   }
-  if (pinch != null && pinch < 20) {
+  if (pinch != null && pinch < PINCH_MID_SEC) {
     return {
       weakLink: 'thumb', cause: 'endurance', confidence: 'low', title: TITLES.thumb,
       cues: ['Pinch-серии 3×30с + flips лёгкие', 'Шаг объёма +5–10%/нед, сухожилия 8–12 нед'],

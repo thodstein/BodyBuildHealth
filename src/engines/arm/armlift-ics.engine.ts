@@ -21,7 +21,7 @@ function toDateStr(d: Date): string {
 }
 
 function mondayOfWeek(ref: Date, weekIdx: number): Date {
-  const d = new Date(ref.getFullYear(), ref.getMonth(), ref.getDate());
+  const d = new Date(ref.getFullYear(), ref.getMonth(), ref.getDate(), 12);
   const dow = (d.getDay() + 6) % 7; // Пн=0
   d.setDate(d.getDate() - dow + weekIdx * 7);
   return d;
@@ -33,14 +33,26 @@ export interface ArmliftIcsOpts {
   implement?: string;
 }
 
+/**
+ * Календарная дата «yyyy-mm-dd» → Date (локальный полдень, без UTC-сдвига).
+ * Аудит 2026-10 было→стало: regex `^\d{4}-\d{2}-\d{2}$` пропускал «2026-13-45»,
+ * а `new Date(2026, 12, 45)` НЕ даёт Invalid Date — JS молча перекатывает дату
+ * в 2027-02-14, и гард `isFinite(getTime())` не срабатывал никогда. Событие
+ * спец-блока уезжало в молча сдвинутую дату. Теперь компоненты проверяются.
+ */
+function parseIsoDate(s: string): Date | null {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return null;
+  const [y, m, d] = s.split('-').map(Number);
+  if (m < 1 || m > 12 || d < 1 || d > 31) return null;
+  const dt = new Date(y, m - 1, d, 12, 0, 0, 0);
+  // защита от 31 февраля и подобного: пересобранная дата должна совпасть
+  if (dt.getFullYear() !== y || dt.getMonth() !== m - 1 || dt.getDate() !== d) return null;
+  return dt;
+}
+
 export function buildArmliftIcs(spec: ArmliftSpecWeek[] | null | undefined, opts: ArmliftIcsOpts = {}): string | null {
   if (!Array.isArray(spec) || spec.length === 0) return null;
-  let ref = new Date();
-  if (opts.startDate && /^\d{4}-\d{2}-\d{2}$/.test(opts.startDate)) {
-    const p = opts.startDate.split('-').map(Number);
-    ref = new Date(p[0], p[1] - 1, p[2]);
-    if (!Number.isFinite(ref.getTime())) ref = new Date();
-  }
+  let ref = parseIsoDate(opts.startDate || '') || (() => { const n = new Date(); return new Date(n.getFullYear(), n.getMonth(), n.getDate(), 12); })();
   const title = opts.title || 'Армлифтинг спец-блок';
   const stamp = toDateStr(new Date());
   const events = spec.map((w) => {

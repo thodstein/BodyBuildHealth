@@ -11,7 +11,7 @@ import { TimersTab } from './TimersTab';
 import { SessionWidgetsDock } from './SessionWidgetsDock';
 import { selectSetScheme } from '../../../engines/set-scheme.engine';
 import { selectTempo, formatTempo } from '../../../engines/tempo.engine';
-import { getCachedProgressForExercise } from '../../../engines/workout-logger.engine';
+import { getCachedProgressForExercise, localIsoDate } from '../../../engines/workout-logger.engine';
 import { isBodyweightExercise as isBWExercise } from '../../../engines/movement-pattern';
 import { activeRampRows } from '../../../engines/warmup-ramp.engine';
 import { generateWarmup, warmupLabel, warmupSpecificLabel, upsertWarmupLog } from '../../../engines/warmup.engine';
@@ -22,6 +22,27 @@ import { NativeIcon } from '../../native/NativeIcons';
 import type { TrainingTab } from './shared';
 
 const isDumbbellEx = (n?: string) => !!(n && /гантел|dumbbell/i.test(n));
+
+/** День микроцикла (plan-форма) → PlayerDay для проф-плеера SessionPlayer.
+ *  Один источник логирования: тёплый код ExecutionZone больше не ведёт свой
+ *  «ручной» учёт сетов (были UTC-дата, RPE=7 и 1RM от последнего подхода). */
+const playerDayFromMicro = (day: any): PlayerDay => {
+  const exercises = ((day?.exercises || []) as any[]).map((ex: any, i: number) => {
+    const sets = Math.max(1, Math.min(20, Math.round(Number(ex?.sets)) || 3));
+    const weight = Math.max(0, Number(ex?.weight) || 0);
+    const reps = Math.max(1, Math.round(Number(ex?.reps)) || 10);
+    const rir = ex?.rir == null ? 2 : Math.max(0, Math.min(6, Math.round(Number(ex.rir))));
+    const bodyweight = isBWExercise(ex) || weight <= 0;
+    const targetSets = Array.from({ length: sets }, () => ({ weight: bodyweight ? 0 : weight, reps, rir }));
+    return {
+      name: ex?.name || `Упражнение ${i + 1}`,
+      muscleGroup: String(ex?.muscleGroup || ex?.group || 'other'),
+      targetSets,
+      restSec: Math.max(20, Math.round(Number(ex?.restSec)) || 90),
+    };
+  });
+  return { label: String(day?.day || day?.label || 'День'), exercises };
+};
 
 type RuntimeLogEntry = { sets: { weight: number; reps: number; rpe: number; rir: number }[]; completed: boolean };
 type PlRuntime = { days: PlayerDay[]; focus: string; week: number; track: string };
@@ -61,28 +82,6 @@ export const ExecutionZone: React.FC<Props> = (p) => {
   const [execWarmupMode, setExecWarmupMode] = React.useState<import('../../../engines/warmup.engine').WarmupMode>(() => {
     try { const v = localStorage.getItem('he_warmup_mode') as import('../../../engines/warmup.engine').WarmupMode | null; return v === 'quick' || v === 'full' ? v : 'standard'; } catch { return 'standard'; }
   });
-  const [restTimer, setRestTimer] = React.useState(0);
-  const [restTarget, setRestTarget] = React.useState(90);
-  const restTimerRef = React.useRef<NodeJS.Timeout | null>(null);
-  // Rest timer effect + haptic/voice при завершении
-  React.useEffect(() => {
-    if (restTimer > 0) {
-      restTimerRef.current = setTimeout(() => setRestTimer(prev => {
-        if (prev <= 1) {
-          try { hapticNotify('success'); } catch {}
-          try { if (navigator.vibrate) navigator.vibrate([200, 100, 200]); } catch {}
-          try {
-            if ('speechSynthesis' in window) {
-              const u = new SpeechSynthesisUtterance('Отдых завершён');
-              u.lang = 'ru-RU'; u.rate = 1; window.speechSynthesis.speak(u);
-            }
-          } catch {}
-        }
-        return prev - 1;
-      }), 1000);
-      return () => { if (restTimerRef.current) clearTimeout(restTimerRef.current); };
-    }
-  }, [restTimer]);
   // Wake Lock — экран не гаснет в зале
   React.useEffect(() => {
     let lock: any = null;
@@ -191,10 +190,10 @@ export const ExecutionZone: React.FC<Props> = (p) => {
                             <span style={{ width: 28, height: 28, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#000', fontSize: 12, fontWeight: 800 }}>#{selectedWeek}</span>
                             <div>
                               <div style={{ fontSize: 11, fontWeight: 800, color: '#00e68a', lineHeight: 1 }}>Неделя {selectedWeek} · {trainingDaysList.length} тренировки · {currentMicrocycle.mesocycleType || ''}</div>
-                              <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.60)' }}>{totalSetsWeek} сетов · {totalVolWeek.toLocaleString()} кг недельный объём</div>
+                              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.60)' }}>{totalSetsWeek} сетов · {totalVolWeek.toLocaleString()} кг недельный объём</div>
                             </div>
                           </div>
-                          <span style={{ fontSize: 9, fontWeight: 700, padding: '3px 7px', borderRadius: 20, background: 'rgba(0,230,138,0.12)', color: '#00e68a', border: '1px solid rgba(0,230,138,0.20)', whiteSpace: 'nowrap' }}>понедельно</span>
+                          <span style={{ fontSize: 10, fontWeight: 700, padding: '3px 7px', borderRadius: 20, background: 'rgba(0,230,138,0.12)', color: '#00e68a', border: '1px solid rgba(0,230,138,0.20)', whiteSpace: 'nowrap' }}>понедельно</span>
                         </div>
                         <div style={{ display: 'flex', gap: 4 }}>
                           {weekDays.map((wd, wi) => {
@@ -209,8 +208,8 @@ export const ExecutionZone: React.FC<Props> = (p) => {
                                 border: isSelected ? '1px solid rgba(0,230,138,0.28)' : isTraining ? '1px solid rgba(255,255,255,0.07)' : '1px solid rgba(255,255,255,0.04)',
                                 opacity: isTraining ? 1 : 0.45,
                               }}>
-                                <div style={{ fontSize: 8, fontWeight: 700, color: isSelected ? '#00e68a' : isTraining ? '#fff' : 'rgba(255,255,255,0.35)' }}>{wd}</div>
-                                <div style={{ fontSize: 8, fontWeight: 700, color: isSelected ? '#00e68a' : isTraining ? 'rgba(255,255,255,0.70)' : 'rgba(255,255,255,0.25)', marginTop: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{label.slice(0, 6)}</div>
+                                <div style={{ fontSize: 10, fontWeight: 700, color: isSelected ? '#00e68a' : isTraining ? '#fff' : 'rgba(255,255,255,0.35)' }}>{wd}</div>
+                                <div style={{ fontSize: 10, fontWeight: 700, color: isSelected ? '#00e68a' : isTraining ? 'rgba(255,255,255,0.70)' : 'rgba(255,255,255,0.25)', marginTop: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{label.slice(0, 6)}</div>
                                 <div style={{ width: 5, height: 5, borderRadius: 5, margin: '3px auto 0', background: isSelected ? '#00e68a' : isTraining ? 'rgba(255,255,255,0.22)' : 'transparent', boxShadow: isSelected ? '0 0 6px rgba(0,230,138,0.45)' : 'none' }} />
                               </div>
                             );
@@ -243,13 +242,13 @@ export const ExecutionZone: React.FC<Props> = (p) => {
                           transition: 'all 0.2s',
                         }}>
                           <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: active ? 'linear-gradient(90deg,#00e68a,#00c853)' : 'linear-gradient(90deg, rgba(255,255,255,0.06), transparent)' }} />
-                          <div style={{ fontSize: 8, fontWeight: 800, letterSpacing: 0.4, textTransform: 'uppercase', color: active ? '#00e68a' : 'rgba(255,255,255,0.50)', marginBottom: 3 }}>День {di + 1}{active ? ' •' : ''}</div>
+                          <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: 0.4, textTransform: 'uppercase', color: active ? '#00e68a' : 'rgba(255,255,255,0.50)', marginBottom: 3 }}>День {di + 1}{active ? ' •' : ''}</div>
                           <div style={{ fontSize: 11, fontWeight: 800, color: '#fff', lineHeight: 1.1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{day.day || `День ${di + 1}`}</div>
                           <div style={{ display: 'flex', gap: 4, marginTop: 5 }}>
-                            <span style={{ fontSize: 8, fontWeight: 700, padding: '1px 5px', borderRadius: 20, background: active ? 'rgba(0,230,138,0.13)' : 'rgba(255,255,255,0.06)', color: active ? '#00e68a' : '#fff', border: `1px solid ${active ? 'rgba(0,230,138,0.20)' : 'rgba(255,255,255,0.07)'}` }}>{exCnt} упр.</span>
-                            <span style={{ fontSize: 8, padding: '1px 5px', borderRadius: 20, background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.62)', border: '1px solid rgba(255,255,255,0.06)' }}>{sets} сет.</span>
+                            <span style={{ fontSize: 10, fontWeight: 700, padding: '1px 5px', borderRadius: 20, background: active ? 'rgba(0,230,138,0.13)' : 'rgba(255,255,255,0.06)', color: active ? '#00e68a' : '#fff', border: `1px solid ${active ? 'rgba(0,230,138,0.20)' : 'rgba(255,255,255,0.07)'}` }}>{exCnt} упр.</span>
+                            <span style={{ fontSize: 10, padding: '1px 5px', borderRadius: 20, background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.62)', border: '1px solid rgba(255,255,255,0.06)' }}>{sets} сет.</span>
                           </div>
-                          {active && <span style={{ position: 'absolute', top: 6, right: 7, width: 16, height: 16, borderRadius: 16, background: '#00e68a', color: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 800 }}>✓</span>}
+                          {active && <span style={{ position: 'absolute', top: 6, right: 7, width: 16, height: 16, borderRadius: 16, background: '#00e68a', color: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 800 }}>✓</span>}
                         </button>
                       );
                     })}
@@ -353,13 +352,13 @@ export const ExecutionZone: React.FC<Props> = (p) => {
                             <span style={{ width: 28, height: 28, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg,#f97316,#ea580c)', color: '#fff', flexShrink: 0 }}><NativeIcon name="zap" size={14} /></span>
                             <div style={{ minWidth: 0 }}>
                               <div style={{ fontSize: 11, fontWeight: 800, color: '#fff', lineHeight: 1 }}>Разминка дня · персональная</div>
-                              <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.62)', lineHeight: 1.2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.62)', lineHeight: 1.2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                 {groups.length > 0 ? groups.join(', ') : 'общая'} · {warmupBlocksExec.length} блока · {total} пунктов · ~{mins} мин
                               </div>
                             </div>
                           </div>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
-                            <span style={{ fontSize: 9, fontWeight: 700, padding: '3px 7px', borderRadius: 20, background: pct === 100 ? '#22c55e' : 'rgba(255,255,255,0.07)', color: pct === 100 ? '#000' : '#fff', border: '1px solid rgba(255,255,255,0.08)' }}>{done}/{total} · {pct}%</span>
+                            <span style={{ fontSize: 10, fontWeight: 700, padding: '3px 7px', borderRadius: 20, background: pct === 100 ? '#22c55e' : 'rgba(255,255,255,0.07)', color: pct === 100 ? '#000' : '#fff', border: '1px solid rgba(255,255,255,0.08)' }}>{done}/{total} · {pct}%</span>
                             <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)' }}>{warmupOpen ? '▲' : '▼'}</span>
                           </div>
                         </div>
@@ -377,7 +376,7 @@ export const ExecutionZone: React.FC<Props> = (p) => {
                                     setExecWarmupMode(m);
                                     try { localStorage.setItem('he_warmup_mode', m); } catch {}
                                     setExecWarmupDone({});
-                                  }} style={{ flex: 1, minWidth: 60, padding: '4px 6px', borderRadius: 8, cursor: 'pointer', fontSize: 8, fontWeight: 700, background: active ? cfg.bg : 'rgba(255,255,255,0.04)', color: active ? cfg.color : 'rgba(255,255,255,0.55)', border: `1px solid ${active ? cfg.border : 'rgba(255,255,255,0.07)'}`, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
+                                  }} style={{ flex: 1, minWidth: 60, padding: '4px 6px', borderRadius: 8, cursor: 'pointer', fontSize: 10, fontWeight: 700, background: active ? cfg.bg : 'rgba(255,255,255,0.04)', color: active ? cfg.color : 'rgba(255,255,255,0.55)', border: `1px solid ${active ? cfg.border : 'rgba(255,255,255,0.07)'}`, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
                                     <span>{cfg.label}</span><span style={{ fontSize: 7, opacity: 0.85 }}>{cfg.sub}</span>
                                   </button>
                                 );
@@ -395,9 +394,9 @@ export const ExecutionZone: React.FC<Props> = (p) => {
                                 <div key={bi} style={{ borderRadius: 10, padding: '8px 8px 6px', background: bDone === bTotal && bTotal > 0 ? 'rgba(34,197,94,0.06)' : 'rgba(255,255,255,0.03)', border: `1px solid ${bDone === bTotal && bTotal > 0 ? 'rgba(34,197,94,0.18)' : meta.border}`, borderLeft: `3px solid ${bDone === bTotal && bTotal > 0 ? '#22c55e' : meta.color}` }}>
                                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
                                     <span style={{ fontSize: 10, fontWeight: 800, color: bDone === bTotal && bTotal > 0 ? '#22c55e' : meta.color, display: 'inline-flex', alignItems: 'center', gap: 4 }}><NativeIcon name={meta.icon} size={11} /> {meta.title}</span>
-                                    <span style={{ fontSize: 8, fontWeight: 700, padding: '2px 6px', borderRadius: 20, background: meta.bg, color: meta.color, border: `1px solid ${meta.border}`, display: 'inline-flex', alignItems: 'center', gap: 3 }}><NativeIcon name="clock" size={8} /> {b.durationSec}с · {bDone}/{bTotal}</span>
+                                    <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 6px', borderRadius: 20, background: meta.bg, color: meta.color, border: `1px solid ${meta.border}`, display: 'inline-flex', alignItems: 'center', gap: 3 }}><NativeIcon name="clock" size={8} /> {b.durationSec}с · {bDone}/{bTotal}</span>
                                   </div>
-                                  {b.notes && <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.62)', marginBottom: 5, lineHeight: 1.3 }}>{b.notes}</div>}
+                                  {b.notes && <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.62)', marginBottom: 5, lineHeight: 1.3 }}>{b.notes}</div>}
                                   <div style={{ height: 2, borderRadius: 1, background: 'rgba(255,255,255,0.06)', overflow: 'hidden', marginBottom: 6 }}>
                                     <div style={{ height: '100%', width: `${bPct}%`, background: bDone === bTotal && bTotal > 0 ? '#22c55e' : meta.color, transition: 'width 0.3s ease' }} />
                                   </div>
@@ -427,14 +426,14 @@ export const ExecutionZone: React.FC<Props> = (p) => {
                                             <span style={{ flex: 1, minWidth: 0 }}>
                                               <span style={{ fontSize: 10.5, fontWeight: isDone ? 600 : 700, color: isDone ? 'rgba(255,255,255,0.74)' : '#fff', textDecoration: isDone ? 'line-through' : 'none', lineHeight: 1.3, display: 'block', wordBreak: 'break-word' }}>{elabel}</span>
                                               <span style={{ display: 'flex', gap: 5, flexWrap: 'wrap', alignItems: 'center', marginTop: 3 }}>
-                                                <span style={{ fontSize: 8, fontWeight: 800, padding: '1px 6px', borderRadius: 20, background: isDone ? 'rgba(34,197,94,0.13)' : meta.bg, color: isDone ? '#86efac' : meta.color, border: `1px solid ${isDone ? 'rgba(34,197,94,0.20)' : meta.border}` }}>{edose}</span>
-                                                {'note' in ex && (ex as any).note && <span style={{ fontSize: 8, color: isDone ? 'rgba(255,255,255,0.40)' : 'rgba(255,255,255,0.58)', lineHeight: 1.3 }}>{(ex as any).note}</span>}
+                                                <span style={{ fontSize: 10, fontWeight: 800, padding: '1px 6px', borderRadius: 20, background: isDone ? 'rgba(34,197,94,0.13)' : meta.bg, color: isDone ? '#86efac' : meta.color, border: `1px solid ${isDone ? 'rgba(34,197,94,0.20)' : meta.border}` }}>{edose}</span>
+                                                {'note' in ex && (ex as any).note && <span style={{ fontSize: 10, color: isDone ? 'rgba(255,255,255,0.40)' : 'rgba(255,255,255,0.58)', lineHeight: 1.3 }}>{(ex as any).note}</span>}
                                               </span>
                                             </span>
                                             <span style={{
                                               width: 22, height: 22, borderRadius: 22, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 1,
                                               background: isDone ? '#22c55e' : 'rgba(255,255,255,0.06)', color: isDone ? '#000' : 'rgba(255,255,255,0.34)',
-                                              border: `1px solid ${isDone ? '#22c55e' : 'rgba(255,255,255,0.08)'}`, fontSize: 9, fontWeight: 800,
+                                              border: `1px solid ${isDone ? '#22c55e' : 'rgba(255,255,255,0.08)'}`, fontSize: 10, fontWeight: 800,
                                             }}>{isDone ? '✓' : '○'}</span>
                                           </button>
                                         </li>
@@ -444,7 +443,7 @@ export const ExecutionZone: React.FC<Props> = (p) => {
                                 </div>
                               );
                             })}
-                            <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.38)', textAlign: 'center', lineHeight: 1.3 }}>
+                            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.38)', textAlign: 'center', lineHeight: 1.3 }}>
                               Отмечайте пункты — прогресс сохранится до старта · без ленты — bodyweight-замены уже включены · подводящие — с % и кг в подсказке
                             </div>
                           </div>
@@ -466,7 +465,7 @@ export const ExecutionZone: React.FC<Props> = (p) => {
                       });
                       const total = warmupBlocksExec.reduce((s,b)=>s+b.exercises.length,0);
                       const done = Object.values(execWarmupDone).filter(Boolean).length;
-                      upsertWarmupLog({ date: new Date().toISOString().slice(0,10), done: done>0, quality: done>0 ? (done/total>=0.8?4: done/total>=0.5?3:2) : null, totalItems: total, doneItems: done });
+                      upsertWarmupLog({ date: localIsoDate(), done: done>0, quality: done>0 ? (done/total>=0.8?4: done/total>=0.5?3:2) : null, totalItems: total, doneItems: done });
                     } catch {}
                     setRuntimeStarted(true); setRuntimeLogs({}); setRuntimeExIdx(0);
                   }} style={{
@@ -511,15 +510,15 @@ export const ExecutionZone: React.FC<Props> = (p) => {
                               return (
                                 <div key={i} style={{ padding: 8, borderRadius: 8, background: 'rgba(0,230,138,0.04)', border: '1px solid rgba(0,230,138,0.12)' }}>
                                   <div style={{ fontSize: 10, fontWeight: 600, color: '#fff', marginBottom: 3 }}>{cached.exerciseName}</div>
-                                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: '#fff' }}>
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: '#fff' }}>
                                     <span>1RM {cached.bestE1RM}кг</span>
                                     <span style={{ color: trendColor }}>{trendIcon} {cached.e1RMDelta > 0 ? '+' : ''}{cached.e1RMDelta}</span>
                                   </div>
-                                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: '#fff', marginTop: 2 }}>
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: '#fff', marginTop: 2 }}>
                                     <span>Объём {cached.totalVolume.toLocaleString()}</span>
                                     <span style={{ color: trendColor }}>{trendIcon} {cached.weightDelta > 0 ? '+' : ''}{cached.weightDelta}кг</span>
                                   </div>
-                                  <div style={{ fontSize: 9, color: '#fff', marginTop: 2 }}>{cached.sessions} сессий · {cached.lastDate}</div>
+                                  <div style={{ fontSize: 10, color: '#fff', marginTop: 2 }}>{cached.sessions} сессий · {cached.lastDate}</div>
                                 </div>
                               );
                             })}
@@ -535,423 +534,34 @@ export const ExecutionZone: React.FC<Props> = (p) => {
               )}
             </div>
           ) : (
-            <>
-              {/* Active workout */}
-              {currentMicrocycle && trainingDaysList.length > 0 && (() => {
-                const day = trainingDaysList[safeRuntimeDay];
-                if (!day) return null;
-                const exercises = day.exercises || [];
-                const ex = exercises[runtimeExIdx];
-                if (!ex) return (
-                  <div className="card" style={{ textAlign: 'center', padding: 20 }}>
-                    <div style={{ fontSize: 28, marginBottom: 8 }}>🏆</div>
-                    <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 4 }}>Тренировка завершена!</div>
-                    <div style={{ fontSize: 11, color: '#fff', marginBottom: 12 }}>
-                      {Object.values(runtimeLogs).filter(l => l.completed).length} из {exercises.length} упражнений выполнено
-                    </div>
-                    {/* Summary stats */}
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginBottom: 12, fontSize: 10 }}>
-                      {(() => {
-                        const totalSets = Object.values(runtimeLogs).reduce((s, l) => s + l.sets.length, 0);
-                        const totalVolume = Object.values(runtimeLogs).reduce((s, l) => s + l.sets.reduce((ss, st) => ss + st.weight * st.reps, 0), 0);
-                        const max1RM = Object.values(runtimeLogs).reduce((max, l) => {
-                          const local = l.sets.reduce((m, st) => Math.max(m, Math.round(st.weight * (1 + st.reps / 30))), 0);
-                          return Math.max(max, local);
-                        }, 0);
-                        return (
-                          <>
-                            <div style={{ background: 'rgba(0,230,138,0.08)', borderRadius: 6, padding: 6 }}>
-                              <div style={{ color: '#fff', fontSize: 10 }}>Подходов</div>
-                              <div style={{ fontWeight: 700, color: 'var(--accent)' }}>{totalSets}</div>
-                            </div>
-                            <div style={{ background: 'rgba(0,230,138,0.08)', borderRadius: 6, padding: 6 }}>
-                              <div style={{ color: '#fff', fontSize: 10 }}>Тоннаж</div>
-                              <div style={{ fontWeight: 700, color: 'var(--accent)' }}>{totalVolume.toLocaleString()} кг</div>
-                            </div>
-                            <div style={{ background: 'rgba(0,230,138,0.08)', borderRadius: 6, padding: 6 }}>
-                              <div style={{ color: '#fff', fontSize: 10 }}>Макс 1RM</div>
-                              <div style={{ fontWeight: 700, color: 'var(--accent)' }}>{max1RM} кг</div>
-                            </div>
-                          </>
-                        );
-                      })()}
-                    </div>
-                    {/* Session comparison with previous */}
-                    {(() => {
-                      const completedEntries = Object.entries(runtimeLogs).filter(([_, l]) => l.completed && l.sets.length > 0);
-                      if (completedEntries.length === 0) return null;
-                      // Build comparison data inline
-                      const comparisons = completedEntries.map(([exId, log]) => {
-                        const exName = EXERCISE_CATALOG.find(e => e.id === exId)?.name || exId;
-                        const currentVol = log.sets.reduce((s, st) => s + st.weight * st.reps, 0);
-                        const current1RM = Math.max(...log.sets.map(st => Math.round(st.weight * (1 + st.reps / 30))), 0);
-                        const currentMaxW = Math.max(...log.sets.map(st => st.weight), 0);
-                        return { exName, currentVol, current1RM, currentMaxW, sets: log.sets.length };
-                      });
-                      return (
-                        <div style={{ marginBottom: 12, textAlign: 'left' }}>
-                          <div style={{ fontSize: 10, fontWeight: 600, color: '#fff', marginBottom: 4 }}>📊 Сводка по упражнениям</div>
-                          {comparisons.map((c, i) => (
-                            <div key={i} style={{
-                              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                              padding: '4px 8px', borderRadius: 6, background: 'rgba(255,255,255,0.02)',
-                              marginBottom: 2, fontSize: 10,
-                            }}>
-                              <span style={{ color: '#fff', flex: 1 }}>{c.exName}</span>
-                              <span style={{ color: 'var(--accent)', fontWeight: 600, minWidth: 60, textAlign: 'right' }}>
-                                {c.sets}×{c.currentMaxW}кг
-                              </span>
-                              <span style={{ color: '#fff', minWidth: 50, textAlign: 'right' }}>
-                                {c.currentVol.toLocaleString()}кг
-                              </span>
-                              <span style={{ color: '#fff', minWidth: 50, textAlign: 'right' }}>
-                                1RM {c.current1RM}
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                      );
-                    })()}
-                    <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
-                      <button onClick={async () => {
-                        // Save completed workout to IndexedDB
-                        const completedExercises = Object.entries(runtimeLogs)
-                          .filter(([_, log]) => log.sets.length > 0)
-                          .map(([exId, log]) => ({
-                            exerciseId: exId,
-                            exerciseName: EXERCISE_CATALOG.find(e => e.id === exId)?.name || exId,
-                            sets: log.sets,
-                            totalVolume: log.sets.reduce((sum, s) => sum + s.weight * s.reps, 0),
-                            maxWeight: Math.max(...log.sets.map(s => s.weight), 0),
-                            estimated1RM: log.sets.length > 0
-                              ? Math.round(log.sets[log.sets.length - 1].weight * (1 + log.sets[log.sets.length - 1].reps / 30))
-                              : 0,
-                          }));
-                        if (completedExercises.length > 0) {
-                          const dateStr = new Date().toISOString().split('T')[0];
-                          const ts = Date.now();
-                          const strengthEntries = completedExercises.map((ex, i) => ({
-                            id: `log_${ts}_${i}`,
-                            date: dateStr,
-                            exerciseId: ex.exerciseId,
-                            exerciseName: ex.exerciseName,
-                            sets: ex.sets,
-                            totalVolume: ex.totalVolume,
-                            estimated1RM: ex.estimated1RM,
-                            isCompound: EXERCISE_CATALOG.find(e => e.id === ex.exerciseId)?.type === 'compound',
-                            weekNumber: selectedWeek,
-                          }));
-                          await diary.saveWorkoutLog({
-                            id: `workout_${ts}`,
-                            date: dateStr,
-                            duration: Math.round(runtimeExIdx * 5 + completedExercises.reduce((s, e) => s + e.sets.length, 0) * 3),
-                            exercises: strengthEntries,
-                            overallRPE: 7,
-                            recoveryBefore: recovery,
-                            split: trainingOutput?.splitName || 'custom',
-                            weekNumber: selectedWeek,
-                          });
-                          for (const se of strengthEntries) {
-                            await diary.saveStrengthLog(se);
-                          }
-                          // Reload stats and history
-                          await loadDiaryStats();
-                        }
-                        setRestTimer(0);
-                        setRuntimeStarted(false);
-                        setRuntimeLogs({});
-                      }} style={{
-                        padding: '8px 20px', borderRadius: 8, border: 'none', cursor: 'pointer',
-                        background: 'var(--accent)', color: '#000', fontWeight: 600, fontSize: 13,
-                      }}>✓ Завершить</button>
-                    </div>
-                  </div>
-                );
-
-                const log = runtimeLogs[ex.exerciseId || ex.name] || { sets: [], completed: false };
-                const totalSets = ex.sets || 3;
-                const currentSet = log.sets.length + 1;
-
-                const last1RM = log.sets.length > 0
-                  ? Math.round(log.sets[log.sets.length - 1].weight * (1 + log.sets[log.sets.length - 1].reps / 30))
-                  : 0;
-
-                const estimatedVolume = log.sets.reduce((s, st) => s + st.weight * st.reps, 0);
-                const avgRPE = log.sets.length > 0 ? Math.round(log.sets.reduce((s, st) => s + st.rpe, 0) / log.sets.length * 10) / 10 : 0;
-
-                const scheme = selectSetScheme({
-                  goal, movementPattern: 'squat' as MovementPattern, difficultyLevel: level === 'beginner' ? 'low' : level === 'intermediate' ? 'medium' : 'high',
-                  techniqueIssues: [], riskFlags: {}, fatigueScore: 0.3, repPattern: 'normal', isPrimaryLift: runtimeExIdx === 0,
-                });
-                const tempo = selectTempo(goal, [], {}, ex.isCompound);
-
-                return (
-                  <div className="card" style={{ padding: '10px 12px' }}>
-                    {/* Exercise header */}
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                      <div>
-                        <span style={{ fontSize: 10, color: '#fff' }}>Упражнение {runtimeExIdx + 1}/{exercises.length}</span>
-                        <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--accent)' }}>{ex.name}</div>
-                      </div>
-                      <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>  
-                        <span style={{ fontSize: 10, padding: '2px 5px', borderRadius: 3, background: 'rgba(0,230,138,0.1)', color: '#00e68a' }}>{scheme?.schemeType || 'straight'}</span>
-                        <span style={{ fontSize: 10, padding: '2px 5px', borderRadius: 3, background: 'rgba(34,197,94,0.1)', color: '#22c55e' }}>{formatTempo(tempo)}</span>
-                      </div>
-                    </div>
-
-                    {/* Target */}
-                    <div style={{ display: 'flex', gap: 12, marginBottom: 4, fontSize: 10, color: '#fff' }}>
-                      <span>Цель: {ex.sets}×{ex.reps}</span>
-                      <span>RIR: {ex.rir}</span>
-                      {ex.weight && <span>Вес: {ex.weight}кг | ~{Math.round(ex.weight * (1 + Number(ex.reps) / 30))}кг 1RM</span>}
-                    </div>
-
-                    {/* Technique note */}
-                    {ex.technique && (
-                      <div style={{ marginBottom: 6, padding: '5px 8px', background: 'rgba(0,230,138,0.05)', borderRadius: 6, fontSize: 10, color: '#fff', lineHeight: 1.4 }}>
-                        <span style={{ fontWeight: 600, color: 'var(--accent)' }}>🎯 </span>{ex.technique}
-                      </div>
-                    )}
-
-                    {/* Warmup ramp-up (first set only) — единый канон warmup-ramp.engine */}
-                    {log.sets.length === 0 && ex.weight && (() => {
-                      const rows = activeRampRows(Number(ex.weight));
-                      if (rows.length === 0) return null;
-                      return (
-                        <div style={{ marginBottom: 6, padding: '5px 8px', background: 'rgba(255,145,0,0.05)', borderRadius: 6, fontSize: 10 }}>
-                          <div style={{ fontWeight: 600, color: '#ff9100', marginBottom: 3, display: 'flex', alignItems: 'center', gap: 6 }}><NativeIcon name="zap" size={12} /> Разминочные подходы</div>
-                          <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.min(rows.length, 5)}, 1fr)`, gap: 2, color: '#fff' }}>
-                            {rows.map(wu => (
-                              <div key={wu.pct} style={{ textAlign: 'center', padding: '2px 4px', background: 'rgba(255,145,0,0.08)', borderRadius: 3 }}>
-                                <div style={{ color: '#ff9100', fontWeight: 600 }}>{wu.bar ? 'гриф' : `~${wu.load}кг`}</div>
-                                <div style={{ fontSize: 10 }}>{wu.reps} повт</div>
-                                <div style={{ fontSize: 10 }}>{wu.bar ? '—' : `${Math.round(wu.pct * 100)}%`}</div>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      );
-                    })()}
-
-                    {/* Progress bar */}
-                    <div style={{ background: 'rgba(255,255,255,0.05)', borderRadius: 4, height: 6, marginBottom: 8, overflow: 'hidden' }}>
-                      <div style={{ width: `${(currentSet / totalSets) * 100}%`, height: '100%', background: 'var(--accent)', borderRadius: 4, transition: 'width 0.3s' }} />
-                    </div>
-
-                    {/* Previous sets log */}
-                    {log.sets.length > 0 && (
-                      <div style={{ marginBottom: 8 }}>
-                        <div style={{ fontSize: 10, fontWeight: 600, color: '#fff', marginBottom: 2 }}>Выполнено:</div>
-                        {log.sets.map((s, si) => (
-                          <div key={si} style={{ display: 'flex', gap: 8, fontSize: 10, padding: '2px 0' }}>
-                            <span style={{ fontWeight: 600, minWidth: 16 }}>#{si + 1}</span>
-                            <span>{s.weight}кг × {s.reps}</span>
-                            <span style={{ color: '#fff' }}>RPE {s.rpe}</span>
-                            <span style={{ color: '#fff' }}>RIR {s.rir}</span>
-                            <span style={{ color: 'var(--accent)' }}>1RM ~{Math.round(s.weight * (1 + s.reps / 30))}кг</span>
-                          </div>
-                        ))}
-                        {last1RM > 0 && (
-                          <div style={{ fontSize: 10, color: 'var(--accent)', marginTop: 2 }}>1RM последний: {last1RM}кг | Объём: {estimatedVolume}кг | RPE ср: {avgRPE}</div>
-                        )}
-                        {/* Autoregulation hint */}
-                        {log.sets.length >= 1 && (() => {
-                          const lastSet = log.sets[log.sets.length - 1];
-                          const isBW = isBWExercise(ex);
-                          let hint = '';
-                          let hintColor = '#fff';
-                          if (isBW) {
-                            if (lastSet.rpe <= 5 && lastSet.rir >= 3) {
-                              hint = 'Лёгкий подход: можно добавить 1-2 повтора в следующем подходе.';
-                              hintColor = '#22c55e';
-                            } else if (lastSet.rpe >= 9.5 && lastSet.rir <= 0) {
-                              hint = 'На пределе: завершите упражнение или сократите повторения.';
-                              hintColor = '#ef4444';
-                            } else if (lastSet.rpe >= 8.5 && lastSet.rir <= 1) {
-                              hint = 'Высокая интенсивность: сохраняйте объём, не идите в отказ.';
-                              hintColor = '#f59e0b';
-                            }
-                          } else {
-                            if (lastSet.rpe <= 5 && lastSet.rir >= 3) {
-                              hint = 'Подход лёгкий: можно добавить 2.5-5 кг или 1-2 повтора в следующем подходе.';
-                              hintColor = '#22c55e';
-                            } else if (lastSet.rpe >= 9.5 && lastSet.rir <= 0) {
-                              hint = 'Подход на пределе: снизьте вес на 5-10% или завершите упражнение.';
-                              hintColor = '#ef4444';
-                            } else if (lastSet.rpe >= 8.5 && lastSet.rir <= 1) {
-                              hint = 'Высокая тяжесть: сохраняйте вес, но не идите в отказ.';
-                              hintColor = '#f59e0b';
-                            }
-                          }
-                          if (!hint) return null;
-                          return <div style={{ fontSize: 10, color: hintColor, marginTop: 2, fontWeight: 600 }}>{hint}</div>;
-                        })()}
-
-                        {/* Rest timer */}
-                        {restTimer > 0 && (
-                          <div style={{
-                            marginTop: 6, padding: '8px 12px', borderRadius: 8,
-                            background: restTimer <= 10 ? 'rgba(239,68,68,0.1)' : 'rgba(0,230,138,0.06)',
-                            border: `1px solid ${restTimer <= 10 ? 'rgba(239,68,68,0.2)' : 'rgba(0,230,138,0.15)'}`,
-                            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                          }}>
-                            <div>
-                              <div style={{ fontSize: 9, color: '#fff' }}>Отдых</div>
-                              <div style={{ fontSize: 18, fontWeight: 800, color: restTimer <= 10 ? '#ef4444' : 'var(--accent)' }}>
-                                {Math.floor(restTimer / 60)}:{(restTimer % 60).toString().padStart(2, '0')}
-                              </div>
-                            </div>
-                            <button onClick={() => setRestTimer(0)} style={{
-                              padding: '6px 12px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.08)',
-                              background: 'transparent', color: '#fff', cursor: 'pointer', fontSize: 10,
-                            }}>Пропустить</button>
-                          </div>
-                        )}
-
-                        {/* Rest timer settings */}
-                        {restTimer === 0 && log.sets.length > 0 && (
-                          <div style={{ display: 'flex', gap: 4, marginTop: 4, alignItems: 'center' }}>
-                            <span style={{ fontSize: 9, color: '#fff' }}>Отдых:</span>
-                            {[60, 90, 120, 180].map(sec => (
-                              <button key={sec} onClick={() => setRestTarget(sec)} style={{
-                                padding: '3px 8px', borderRadius: 5, fontSize: 9, cursor: 'pointer',
-                                border: `1px solid ${restTarget === sec ? 'var(--accent)' : 'rgba(255,255,255,0.06)'}`,
-                                background: restTarget === sec ? 'rgba(0,230,138,0.1)' : 'transparent',
-                                color: restTarget === sec ? 'var(--accent)' : '#fff',
-                              }}>{sec}с</button>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {/* Gym-удобный ввод сета — крупные степперы, блины, один тап */}
-                    {!log.completed && (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                        {/* Вес + повторы — крупные карточки со степперами */}
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                          {/* Вес */}
-                          <div style={{ background: isBWExercise(ex) ? 'rgba(255,255,255,0.03)' : 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 14, padding: 10, opacity: isBWExercise(ex) ? 0.55 : 1 }}>
-                            <div style={{ fontSize: 9, fontWeight: 800, color: 'rgba(255,255,255,0.55)', letterSpacing: 0.5, textTransform: 'uppercase', textAlign: 'center', marginBottom: 6 }}>Вес {isDumbbellEx(ex.name) ? '×2 гант.' : ''}</div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                              <button type="button" disabled={isBWExercise(ex)} onClick={() => { hapticImpact('light'); setRuntimeSetW(v => Math.max(0, Math.round((v - 2.5) * 10) / 10)); }} style={{ width: 42, height: 42, borderRadius: 10, border: '1px solid rgba(255,255,255,0.10)', background: 'rgba(255,255,255,0.06)', color: '#fff', fontSize: 16, fontWeight: 800, cursor: isBWExercise(ex) ? 'not-allowed' : 'pointer', flexShrink: 0 }}>−</button>
-                              <input type="number" inputMode="decimal" value={runtimeSetW} disabled={isBWExercise(ex)} onChange={e => setRuntimeSetW(parseFloat(e.target.value) || 0)} style={{ flex: 1, minWidth: 0, padding: '8px 4px', borderRadius: 10, background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.10)', color: '#fff', fontSize: 22, fontWeight: 800, textAlign: 'center', boxSizing: 'border-box' }} />
-                              <button type="button" disabled={isBWExercise(ex)} onClick={() => { hapticImpact('light'); setRuntimeSetW(v => Math.round((v + 2.5) * 10) / 10); }} style={{ width: 42, height: 42, borderRadius: 10, border: '1px solid rgba(0,230,138,0.22)', background: 'rgba(0,230,138,0.12)', color: '#00e68a', fontSize: 18, fontWeight: 800, cursor: isBWExercise(ex) ? 'not-allowed' : 'pointer', flexShrink: 0 }}>+</button>
-                            </div>
-                            <div style={{ display: 'flex', gap: 4, marginTop: 6, justifyContent: 'center' }}>
-                              {[-5, 5].map(d => (
-                                <button key={d} type="button" disabled={isBWExercise(ex)} onClick={() => { hapticImpact('light'); setRuntimeSetW(v => Math.max(0, Math.round((v + d) * 10) / 10)); }} style={{ flex: 1, padding: '5px 0', borderRadius: 8, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.75)', fontSize: 11, fontWeight: 700, cursor: isBWExercise(ex) ? 'not-allowed' : 'pointer' }}>{d > 0 ? `+${d}` : d}</button>
-                              ))}
-                            </div>
-                            {/* Визуализация блинов для зала */}
-                            { !isBWExercise(ex) && runtimeSetW > 0 && (() => {
-                              const handle = isDumbbellEx(ex.name) ? 2 : 20;
-                              const r = calculatePlates(runtimeSetW, handle);
-                              if (r.platesPerSide.length === 0) return <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.45)', textAlign: 'center', marginTop: 6 }}>гриф {handle} кг — блины не нужны</div>;
-                              return (
-                                <div style={{ marginTop: 6, padding: '6px 8px', borderRadius: 8, background: 'rgba(0,0,0,0.18)', border: '1px solid rgba(255,255,255,0.06)' }}>
-                                  <div style={{ display: 'flex', gap: 2, justifyContent: 'center', alignItems: 'center', flexWrap: 'wrap' }}>
-                                    {r.platesPerSide.map((p, idx) => (
-                                      <span key={idx} style={{ display: 'inline-flex', alignItems: 'center', gap: 3, padding: '2px 6px', borderRadius: 20, background: p.plate >= 20 ? 'rgba(239,68,68,0.15)' : p.plate >= 10 ? 'rgba(245,158,11,0.15)' : 'rgba(59,130,246,0.15)', border: `1px solid ${p.plate >= 20 ? 'rgba(239,68,68,0.25)' : p.plate >= 10 ? 'rgba(245,158,11,0.25)' : 'rgba(59,130,246,0.25)'}`, color: p.plate >= 20 ? '#f87171' : p.plate >= 10 ? '#fbbf24' : '#60a5fa', fontSize: 10, fontWeight: 700 }}>{p.plate}×{p.count}</span>
-                                    ))}
-                                    <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.55)', marginLeft: 4 }}>{isDumbbellEx(ex.name) ? `на гантель ${handle}кг` : `на гриф ${handle}кг`}</span>
-                                  </div>
-                                </div>
-                              );
-                            })()}
-                          </div>
-                          {/* Повторы */}
-                          <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 14, padding: 10 }}>
-                            <div style={{ fontSize: 9, fontWeight: 800, color: 'rgba(255,255,255,0.55)', letterSpacing: 0.5, textTransform: 'uppercase', textAlign: 'center', marginBottom: 6 }}>Повторы</div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                              <button type="button" onClick={() => { hapticImpact('light'); setRuntimeSetR(v => Math.max(1, v - 1)); }} style={{ width: 42, height: 42, borderRadius: 10, border: '1px solid rgba(255,255,255,0.10)', background: 'rgba(255,255,255,0.06)', color: '#fff', fontSize: 18, fontWeight: 800, cursor: 'pointer', flexShrink: 0 }}>−</button>
-                              <input type="number" inputMode="numeric" value={runtimeSetR} onChange={e => setRuntimeSetR(Math.max(1, Math.round(parseFloat(e.target.value) || 0)))} style={{ flex: 1, minWidth: 0, padding: '8px 4px', borderRadius: 10, background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.10)', color: '#fff', fontSize: 22, fontWeight: 800, textAlign: 'center', boxSizing: 'border-box' }} />
-                              <button type="button" onClick={() => { hapticImpact('light'); setRuntimeSetR(v => v + 1); }} style={{ width: 42, height: 42, borderRadius: 10, border: '1px solid rgba(0,230,138,0.22)', background: 'rgba(0,230,138,0.12)', color: '#00e68a', fontSize: 18, fontWeight: 800, cursor: 'pointer', flexShrink: 0 }}>+</button>
-                            </div>
-                            <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.45)', textAlign: 'center', marginTop: 6 }}>цель {ex.reps} · RIR {ex.rir ?? '—'}</div>
-                          </div>
-                        </div>
-                        {/* RPE / RIR — пилюли для быстрого тапа в зале */}
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                          <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 12, padding: 8 }}>
-                            <div style={{ fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.55)', textAlign: 'center', marginBottom: 6 }}>RPE</div>
-                            <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', justifyContent: 'center' }}>
-                              {[6, 7, 8, 9, 10].map(v => (
-                                <button key={v} type="button" onClick={() => { hapticImpact('light'); setRuntimeSetRP(v); setRuntimeSetRI(Math.max(0, 10 - v)); }} style={{ minWidth: 36, height: 36, borderRadius: 10, border: runtimeSetRP === v ? '1px solid rgba(0,230,138,0.30)' : '1px solid rgba(255,255,255,0.08)', background: runtimeSetRP === v ? 'linear-gradient(135deg, rgba(0,230,138,0.16), rgba(16,185,129,0.10))' : 'rgba(255,255,255,0.04)', color: runtimeSetRP === v ? '#00e68a' : '#fff', fontSize: 13, fontWeight: 800, cursor: 'pointer' }}>{v}</button>
-                              ))}
-                            </div>
-                          </div>
-                          <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 12, padding: 8 }}>
-                            <div style={{ fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.55)', textAlign: 'center', marginBottom: 6 }}>RIR</div>
-                            <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', justifyContent: 'center' }}>
-                              {[0, 1, 2, 3, 4].map(v => (
-                                <button key={v} type="button" onClick={() => { hapticImpact('light'); setRuntimeSetRI(v); setRuntimeSetRP(Math.max(1, 10 - v)); }} style={{ minWidth: 36, height: 36, borderRadius: 10, border: runtimeSetRI === v ? '1px solid rgba(0,230,138,0.30)' : '1px solid rgba(255,255,255,0.08)', background: runtimeSetRI === v ? 'linear-gradient(135deg, rgba(0,230,138,0.16), rgba(16,185,129,0.10))' : 'rgba(255,255,255,0.04)', color: runtimeSetRI === v ? '#00e68a' : '#fff', fontSize: 13, fontWeight: 800, cursor: 'pointer' }}>{v}</button>
-                              ))}
-                            </div>
-                          </div>
-                        </div>
-                        <button onClick={() => {
-                          hapticImpact('medium');
-                          const newLog = { ...log, sets: [...log.sets, { weight: runtimeSetW, reps: runtimeSetR, rpe: runtimeSetRP, rir: runtimeSetRI }] };
-                          setRuntimeLogs({ ...runtimeLogs, [ex.exerciseId || ex.name]: newLog });
-                          setRestTimer(restTarget);
-                          try { hapticNotify('success'); } catch {}
-                        }} style={{
-                          width: '100%', padding: '14px 12px', borderRadius: 14, border: 'none', cursor: 'pointer',
-                          background: 'linear-gradient(135deg, #00e68a, #00c853)', color: '#000', fontWeight: 800, fontSize: 15, minHeight: 52,
-                          boxShadow: '0 6px 18px rgba(0,230,138,0.28)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                          marginBottom: 4,
-                        }}>✓ Записать подход {currentSet}/{totalSets} · {runtimeSetW}×{runtimeSetR}</button>
-                        <button onClick={() => {
-                          const newLog = { ...log, completed: true };
-                          setRuntimeLogs({ ...runtimeLogs, [ex.exerciseId || ex.name]: newLog });
-                          if (runtimeExIdx < exercises.length - 1) setRuntimeExIdx(runtimeExIdx + 1);
-                        }} style={{
-                          width: '100%', padding: 6, borderRadius: 6, border: '1px solid rgba(255,255,255,0.08)', cursor: 'pointer',
-                          background: 'transparent', color: '#fff', fontSize: 11,
-                        }}>Пропустить →</button>
-                      </div>
-                    )}
-                    {log.completed && (
-                      <div style={{ textAlign: 'center', padding: 8, background: 'rgba(0,230,138,0.1)', borderRadius: 6 }}>
-                        <span style={{ color: '#22c55e', fontWeight: 600 }}>✓ Выполнено — {log.sets.length} подхода(ов)</span>
-                        <div style={{ marginTop: 6 }}>
-                          <button onClick={() => {
-                            if (runtimeExIdx < exercises.length - 1) setRuntimeExIdx(runtimeExIdx + 1);
-                          }} style={{
-                            padding: '8px 16px', borderRadius: 6, border: 'none', cursor: 'pointer',
-                            background: 'var(--accent)', color: '#000', fontWeight: 600, fontSize: 13,
-                          }}>Следующее упражнение →</button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                );
-              })()}
-            </>
+            // Проведение: проф-плеер (разминка → подходы → заминка → итоги).
+            // Логирование сетов, блины, VBT, RIR, сравнение с прошлой сессией,
+            // таймер отдыха, автосейв живой сессии — всё в SessionPlayer.
+            <div className="card" style={{ padding: '10px 12px', border: '1px solid rgba(var(--train-accent-rgb, 0,230,138),0.22)', background: 'rgba(var(--train-accent-rgb, 0,230,138),0.05)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                <div style={{ minWidth: 0 }}>
+                  <h3 style={{ margin: 0, fontSize: 13, color: 'var(--accent)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <NativeIcon name="play" size={12} /> Проведение тренировки
+                  </h3>
+                  <p style={{ fontSize: 10, color: '#fff', margin: '2px 0 0' }}>
+                    {trainingDaysList[safeRuntimeDay]?.day || `День ${safeRuntimeDay + 1}`} · неделя {selectedWeek}
+                    {trainingDaysList[safeRuntimeDay]?.exercises?.length ? ` · ${trainingDaysList[safeRuntimeDay].exercises.length} упр.` : ''}
+                  </p>
+                </div>
+                <button onClick={() => { setRuntimeStarted(false); setRuntimeExIdx(0); }} aria-label="Свернуть проведение" style={{ padding: '8px 12px', minHeight: 44, borderRadius: 10, border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.05)', color: '#fff', cursor: 'pointer', fontSize: 11, display: 'inline-flex', alignItems: 'center', gap: 5, flexShrink: 0 }}>
+                  <NativeIcon name="pause" size={10} /> Свернуть
+                </button>
+              </div>
+              <SessionPlayer
+                days={trainingDaysList.length > 0 ? [playerDayFromMicro(trainingDaysList[safeRuntimeDay])] : []}
+                weekNumber={selectedWeek}
+                focus={trainingOutput?.splitName || currentMicrocycle?.mesocycleType || trainingDaysList[safeRuntimeDay]?.day || 'Тренировка'}
+                onSaved={loadDiaryStats}
+              />
+            </div>
           )}
         </div>
         </InfoErrorBoundary>
-      )}
-      {/* Липкий нижний таймер для зала — поверх контента, всегда виден */}
-      {tab === 'runtime' && runtimeStarted && restTimer > 0 && (
-        <div style={{
-          position: 'fixed', bottom: 'var(--tabbar-lift, calc(var(--nav-height) + 46px))', left: 12, right: 12, zIndex: 45,
-          display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px', borderRadius: 16,
-          background: restTimer <= 10 ? 'linear-gradient(135deg, #ef4444, #dc2626)' : 'linear-gradient(135deg, #00e68a, #00c853)',
-          color: restTimer <= 10 ? '#fff' : '#000', boxShadow: '0 10px 28px rgba(0,0,0,0.32)', border: '1px solid rgba(255,255,255,0.18)',
-          backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)',
-        }}>
-          <span style={{ width: 36, height: 36, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.14)', color: '#fff', fontWeight: 800, flexShrink: 0 }}><NativeIcon name="clock" size={16} /></span>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 10, fontWeight: 700, opacity: 0.8, lineHeight: 1 }}>Отдых · {restTimer <= 10 ? 'готовьтесь!' : 'восстановление'}</div>
-            <div style={{ fontSize: 22, fontWeight: 800, lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>{String(Math.floor(restTimer / 60)).padStart(2, '0')}:{String(restTimer % 60).padStart(2, '0')}</div>
-            <div style={{ height: 4, borderRadius: 2, background: 'rgba(0,0,0,0.15)', overflow: 'hidden', marginTop: 4 }}>
-              <div style={{ width: `${Math.max(0, Math.min(100, ((restTarget - restTimer) / Math.max(1, restTarget)) * 100))}%`, height: '100%', background: restTimer <= 10 ? '#fff' : '#000', transition: 'width 1s linear' }} />
-            </div>
-          </div>
-          <button onClick={() => { hapticImpact('light'); setRestTimer(0); }} style={{ padding: '10px 14px', borderRadius: 10, border: 'none', background: restTimer <= 10 ? '#fff' : '#000', color: restTimer <= 10 ? '#ef4444' : '#fff', fontWeight: 800, fontSize: 12, cursor: 'pointer', flexShrink: 0, minHeight: 40 }}>Пропустить</button>
-        </div>
       )}
       {tab === 'timers' && <InfoErrorBoundary label="Таймеры"><TimersTab initialSettings={timerInitialSettings} /></InfoErrorBoundary>}
     </>

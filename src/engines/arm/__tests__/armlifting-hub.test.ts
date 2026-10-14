@@ -50,12 +50,15 @@ describe('W-AL движок: вердикт по снарядам', () => {
     expect(r.totalKg).toBe(40);
     expect(r.verdict).toContain('Excalibur');
   });
-  it('CoC ordinal: №2 → 70, №3 → 100', () => {
-    expect(cocLevelToPct(2)).toBe(70);
+  // Аудит 2026-10 было→стало: №2 → 70 (округлённая оценка) → 69.7 (точная доля
+  // официальной poundage-лестницы IronMind: 195 lb / 280 lb).
+  // №3 = плоскость сертификации = 100.
+  it('CoC ordinal: №2 → 69.7, №3 → 100', () => {
+    expect(cocLevelToPct(2)).toBe(69.7);
     expect(cocLevelToPct(3)).toBe(100);
     const r = buildArmliftingReport({ cocLevel: 2, sex: 'male' });
     expect(r.rows[0].internal).toBe(true);
-    expect(r.rows[0].scorePct).toBe(70);
+    expect(r.rows[0].scorePct).toBe(69.7);
   });
   it('Pinch 15 с → 100 (внутренний ориентир)', () => {
     const r = buildArmliftingReport({ pinchSec: 15, sex: 'male' });

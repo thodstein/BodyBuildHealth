@@ -12,12 +12,14 @@ import {
   buildArmliftingReport,
   liftTrendFromLog,
   prescriptionForWeakest,
+  assessLiftRules,
 } from '../../../engines/arm/armlifting-diagnostics.engine';
 import { auditArmliftPlan, worstArmliftLink, ARMLIFT_AUDIT_LINKS } from '../../../engines/arm/armlift-plan-audit.engine';
 import { buildArmliftingHtml, buildArmliftingCsv } from '../../../engines/arm/armlifting-diagnostics.engine';
 import { buildArmliftIcs } from '../../../engines/arm/armlift-ics.engine';
 import { printHtmlApk, shareOutcomeLabel, saveTextFileApk, saveCsvApk } from '../../../core/apk-share';
-import { loadPlatformLog } from '../../../engines/arm/arm-platform.engine';
+import { armliftClassFor, armliftClassLine } from '../../../engines/arm/armlift-weight-class.engine';
+import { loadPlatformLog, planLastManStanding } from '../../../engines/arm/arm-platform.engine';
 import { failuresFor, faultsFor, movementFor, relevantTestsFor, diagImplementForReportWeakest, ARMLIFT_DIAG_IMPLEMENT_OPTS } from '../../../engines/arm/armlift-failure-modes.engine';
 import { attemptTimelineFor, phaseForFailurePoint } from '../../../engines/arm/armlift-attempt-timeline.engine';
 import { assessArmliftConditions } from '../../../engines/arm/armlift-conditions.engine';
@@ -27,8 +29,7 @@ import { analyzeArmliftVideo } from '../../../engines/arm/armlift-video-flags.en
 import { planArmliftAttempts } from '../../../engines/arm/armlift-attempt-plan.engine';
 import { diagnoseArmlift, ARMLIFT_WEAK_LINK_SHORT_RU } from '../../../engines/arm/armlift-diagnosis.engine';
 import { diagnoseArmliftCause, countGripSessions, flexExtRatio, ARMLIFT_CAUSE_RU, ARMLIFT_MOBILITY_FAIL_RU, ARMLIFT_ACWR_ZONE_RU } from '../../../engines/arm/armlift-cause.engine';
-import { benchmarkPinchHold, benchmarkFarmerHold, benchmarkCoc, benchmarkSilverHold, overallGripLevel, ARMLIFT_LEVEL_RU, testProtocolFor } from '../../../engines/arm/armlift-benchmarks.engine';
-import { saveDiagSnapshot, lastSnapshotFor, retestVerdict, weeksBetween, loadDiagHistory, clearDiagHistory, historyDeltaFor, completenessTrend } from '../../../engines/arm/armlift-history.engine';
+import { benchmarkPinchHold, benchmarkFarmerHold, benchmarkCoc, benchmarkSilverHold, overallGripLevel, ARMLIFT_LEVEL_RU, testProtocolFor } from '../../../engines/arm/armlift-benchmarks.engine';import { saveDiagSnapshot, lastSnapshotFor, retestVerdict, weeksBetween, loadDiagHistory, clearDiagHistory, historyDeltaFor, completenessTrend } from '../../../engines/arm/armlift-history.engine';
 import { assessArmliftMobility } from '../../../engines/arm/armlift-mobility.engine';
 import { loadSRPESessions } from '../../../engines/pro/srpe-store';
 import { toDailyLoads, acuteChronicRatio } from '../../../engines/pro/training-load.engine';
@@ -50,6 +51,15 @@ const LIFT_LEVEL_COLOR: Record<string, string> = {
   none: '#94a3b8',
 };
 const liftLevelColor = (level: string): string => LIFT_LEVEL_COLOR[level] ?? '#f59e0b';
+
+/** Аудит 2026-10: 5 пунктов чек-листа правил IronMind (порядок = assessLiftRules). */
+const RULES_CHECK_ITEMS = [
+  'Оригинальный снаряд',
+  'DOH, без лямок',
+  'Мел + протирка',
+  'Центр ручки',
+  'Диски калиброваны',
+];
 
 /** PRO-визуал: карточка числового замера 48px (HubNum-стиль).
  *  Контракты 1-в-1: input с тем же aria-label/inputMode/placeholder/value/onChange. */
@@ -90,6 +100,8 @@ type DiagState = {
   pinchSubSec: string; farmerSubSec: string;
   /** PRO-6 M8: карта боли (зоны + красные флаги). */
   painZones: string[]; condNumb: boolean; condSwell: boolean; condNight: boolean;
+  /** Аудит 2026-10: чек-лист «замер по правилам» IronMind (5 пунктов). */
+  rulesChecks: Array<boolean | undefined>;
   /** PRO-6 M6: видео-лайт (ручной угломер, пусто = тихо). CSV-импорт убран 2026-09-27. */
   videoWristDeg: string; videoParallelBad: boolean;
 };
@@ -108,6 +120,10 @@ const DEFAULT_DIAG: DiagState = {
   pinchSubSec: '', farmerSubSec: '',
   painZones: [], condNumb: false, condSwell: false, condNight: false,
   videoWristDeg: '', videoParallelBad: false,
+  /** Аудит 2026-10: чек-лист правил IronMind — был только декларацией в шапке хаба
+   *  (`assessLiftRules` без единого UI-потребителя), поэтому «замер по правилам»
+   *  нельзя было ни подтвердить, ни отправить в мост. */
+  rulesChecks: [],
 };
 function loadDiag(): DiagState {
   try {
@@ -119,6 +135,9 @@ function loadDiag(): DiagState {
       faultIds: Array.isArray((j as any).faultIds) ? (j as any).faultIds.filter((x: any) => typeof x === 'string') : [],
       specWeeks: (j as any).specWeeks === 6 ? 6 : 4,
       condRtVersion: ['v1', 'v2', 'v3'].includes((j as any).condRtVersion) ? (j as any).condRtVersion : 'unknown',
+      rulesChecks: Array.isArray((j as any).rulesChecks)
+        ? (j as any).rulesChecks.slice(0, 5).map((x: any) => (typeof x === 'boolean' ? x : undefined))
+        : [],
       painZones: Array.isArray((j as any).painZones)
         ? (j as any).painZones.filter((x: any) => typeof x === 'string' && ARMLIFT_PAIN_ZONES.some((z) => z.id === x))
         : [],
@@ -500,6 +519,38 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
   /** PRO-6 M2: фазовая лента попытки (setup → фазы срыва → down). */
   const timeline = useMemo(() => attemptTimelineFor(diag.implement), [diag.implement]);
   const failPhase = phaseForFailurePoint(diag.implement, diag.failurePoint);
+  /**
+   * Аудит 2026-10: три поля моста, которые конструктор ждал, а хаб не слал
+   * (`weightClass` / `rulesNote` / `lms`) — приёмник держал за ними мёртвые ветки.
+   * Теперь все три считаются из того, что пользователь реально заполнил.
+   */
+  const rulesCheck = useMemo(
+    () => assessLiftRules(diag.rulesChecks),
+    [diag.rulesChecks],
+  );
+  const weightClass = useMemo(() => {
+    const bw = f(state.bwKg);
+    if (bw == null) return null;
+    return armliftClassFor(bw, state.sex).label;
+  }, [state.bwKg, state.sex]);
+  const weightClassLine = useMemo(() => {
+    const bw = f(state.bwKg);
+    if (bw == null) return null;
+    return armliftClassLine(bw, state.sex);
+  }, [state.bwKg, state.sex]);
+  /** Лесенка last-man-standing (Armlifting USA 2026): только вверх, промах = выбыл. */
+  const lmsForWeakest = useMemo(() => {
+    const target = report.weakestWr || report.weakest;
+    if (!target) return null;
+    const row = report.rows.find((r) => r.implement === target);
+    if (!row) return null;
+    const m = /([\d.]+)\s*кг/.exec(row.display || '');
+    const kg = m ? parseFloat(m[1]) : NaN;
+    if (!Number.isFinite(kg) || kg <= 0) return null;
+    const steps = planLastManStanding(kg);
+    if (steps.length < 2) return null;
+    return { label: row.label, steps };
+  }, [report]);
   /** PRO-6 M5: условия замера — грязный замер режет слабость. */
   const conditions = useMemo(() => assessArmliftConditions({
     implement: diag.implement,
@@ -607,6 +658,11 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
           armliftCompleteness: completeness,
           armliftSpec: specBlock.map((w) => ({ week: w.week, targetSets: w.targetSets, dayMap: w.dayMap })),
           armliftWeakArmNote: asymForDiag != null && asymForDiag > 15 ? 'слабой рукой первой' : undefined,
+          /** Аудит 2026-10 было→стало: три поля, которые тип моста объявлял, а хаб
+           *  не отправлял — конструктор держал за ними мёртвые ветки («когда отправят»). */
+          ...(weightClass ? { weightClass } : {}),
+          ...(rulesCheck.note ? { rulesNote: rulesCheck.official ? rulesCheck.note : `Замер НЕ зачётный: ${rulesCheck.note}` } : {}),
+          ...(lmsForWeakest ? { lms: lmsForWeakest } : {}),
           ...movementBridge,
         },
         armProfile: {
@@ -1175,6 +1231,30 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
             <LiftNum label="Диаметр грифа мм" value={diag.condDiameterMm} onChange={(v) => setD({ condDiameterMm: v })} placeholder="60.3" aria="Диаметр грифа мм" />
           </AdGrid>
           <div className="ad-muted" data-arm="lift-conditions">{conditions.conditionsNote}</div>
+          {/* Аудит 2026-10: чек-лист правил IronMind наконец получил ввод — раньше
+              движок assessLiftRules существовал, но «замер по правилам» нельзя было
+              ни отметить, ни отправить (шапка хаба это обещала). */}
+          <div className="lift-group">Замер по правилам (IronMind/AUSA)</div>
+          <div className="ad-row" aria-label="Диагностика: правила замера">
+            {RULES_CHECK_ITEMS.map((label, i) => (
+              <AdChip
+                key={label}
+                active={diag.rulesChecks[i] === true}
+                onClick={() => {
+                  const next = RULES_CHECK_ITEMS.map((_, j) => (j === i ? !(diag.rulesChecks[j] === true) : diag.rulesChecks[j]));
+                  setD({ rulesChecks: next });
+                }}
+              >
+                {diag.rulesChecks[i] === true ? '✓ ' : ''}{label}
+              </AdChip>
+            ))}
+          </div>
+          <div className="ad-muted" data-arm="lift-rules">{rulesCheck.note}</div>
+          {lmsForWeakest && (
+            <div className="ad-muted" data-arm="lift-lms">
+              LMS ({lmsForWeakest.label}): {lmsForWeakest.steps.join(' → ')} — только вверх, промах = выбыл.
+            </div>
+          )}
           <div data-arm="lift-completeness" aria-label="Диагностика: полнота">
             Полнота диагностики: {completeness.pct}%{completeness.missing.length > 0 ? ` — довбей: ${completeness.missing.join(', ')}` : ' — вердикт честный'}
           </div>
@@ -1287,7 +1367,9 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
       <AdCard>
         <div id="lift-bridge" />
         <AdSec title="📦 Что уедет в конструктор" collapsible defaultOpen={false} summary={report.filled ? 'армлифтинг' : 'пока пусто'}>
-          <div className="ad-muted">Bridge: <code>weakpoints</code> + <code>armDiscipline: armlifting</code> → конструктор встанет в дисциплину «Армлифтинг». Слабейший снаряд, класс, рецепт, last-man-standing — в payload. Упражнения коррекции ({correctionsOrdered.map((c) => c.exId).join(', ') || '—'}) встанут в недели плана при сборке в дисциплине «Армлифтинг».</div>
+          <div className="ad-muted">Bridge: <code>weakpoints</code> + <code>armDiscipline: armlifting</code> → конструктор встанет в дисциплину «Армлифтинг». В payload: слабейший снаряд, рецепт, last-man-standing{lmsForWeakest ? ` (${lmsForWeakest.steps.join(' → ')})` : ''}, вердикт правил замера{rulesCheck.official ? ' (зачётный)' : ' (не зачётный)'} и весовая категория. Упражнения коррекции ({correctionsOrdered.map((c) => c.exId).join(', ') || '—'}) встанут в недели плана при сборке в дисциплине «Армлифтинг».
+            {/* Аудит 2026-10 было→стало: этот текст обещал класс/рецепт/LMS, которые фактически не отправлялись — «показано ≠ применяется». Теперь все читаются из заполненных полей. Сами классы хабу не показываем (соревновательная часть удалена осознанно). */}
+          </div>
           {correctionsOrdered.length > 0 && (
             <div data-arm="lift-bridge-preview" style={{ marginTop: 6, padding: '10px 12px', borderRadius: 10, background: 'rgba(34,197,94,0.06)', border: '1px solid rgba(34,197,94,0.18)' }}>
               <div style={{ fontSize: 13, fontWeight: 800, color: '#22c55e' }}>📋 Что встанет в план ({Math.min(3, correctionsOrdered.length)} упр. · {specBlock.length || 1} нед)</div>

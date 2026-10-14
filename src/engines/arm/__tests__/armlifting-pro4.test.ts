@@ -32,10 +32,18 @@ describe('PRO-4 A1: честные WR (добивка: сверены с IronMin
     expect(platformWrFor('rolling_thunder', 'male')).toBe(130.5);
     expect(platformWrFor('rolling_thunder', 'female')).toBe(80.0);
   });
-  it('Silver: опорные времена без %', () => {
+  // Аудит 2026-10 было→стало: опорное время №3 было «~55.6с (Суховаров 2017)» —
+  // ни число, ни год не сходились с официальной таблицей IronMind.
+  // Действующий WR М №3: Dmitriy Suhovarov 58.53 с, 14.05.2016.
+  it('Silver: опорные времена — действующие WR IronMind', () => {
     const r = buildArmliftingReport({ silverSec: 55.6, silverGripper: '3', sex: 'male' });
     expect(r.rows[0].scorePct).toBeNull();
-    expect(r.rows[0].note).toContain('55.6');
+    expect(r.rows[0].note).toContain('58.53');
+    expect(r.rows[0].note).toContain('Суховаров');
+    const r4 = buildArmliftingReport({ silverSec: 10, silverGripper: '4', sex: 'male' });
+    expect(r4.rows[0].note).toContain('30.98');
+    const r2 = buildArmliftingReport({ silverSec: 40, silverGripper: '2', sex: 'female' });
+    expect(r2.rows[0].note).toContain('45.42');
   });
 });
 
@@ -62,13 +70,18 @@ describe('PRO-4 A9: раздельный avg + тотал только кг', ()
 });
 
 describe('PRO-4 A2/A3: pinch кг+сек и Silver Bullet', () => {
-  it('pinch кг и сек — оба internal (единого WR нет), вне avgWR', () => {
+  // Аудит 2026-10 было→стало: note утверждал «единого WR нет» — это было неверно:
+  // у канонического IronMind Block есть действующий WR (М 51.40 Толонен 09.06.2018 /
+  // Ж 31.55 Робертс 13.05.2017). Теперь note называет WR и явно помечает 80/45 как
+  // внутренний ориентир хаба (блоки разной ширины к одному % не сводятся).
+  it('pinch кг и сек — оба internal, WR назван честно, вне avgWR', () => {
     const r = buildArmliftingReport({ pinchKg: 40, pinchSec: 15, sex: 'male' });
     const kg = r.rows.find((x) => x.implement === 'pinch_block')!;
     const hold = r.rows.find((x) => x.implement === 'pinch_hold')!;
     expect(kg.internal).toBe(true);
     expect(kg.scorePct).toBe(50);
-    expect(kg.note).toContain('единого WR нет');
+    expect(kg.note).toContain('внутренний ориентир 80');
+    expect(kg.note).toContain('WR IronMind Block 51.40/31.55');
     expect(hold.internal).toBe(true);
     expect(hold.scorePct).toBe(100);
     expect(r.avgWrPct).toBeNull();
@@ -80,7 +93,7 @@ describe('PRO-4 A2/A3: pinch кг+сек и Silver Bullet', () => {
     const s = r.rows.find((x) => x.implement === 'silver_bullet')!;
     expect(s.scorePct).toBeNull();
     expect(s.display).toContain('№3');
-    expect(s.note).toContain('личный рекорд');
+    expect(s.note).toContain('WR');
   });
 });
 

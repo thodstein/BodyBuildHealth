@@ -1,9 +1,32 @@
 /**
- * armlift-benchmarks.engine.ts — уровни тест-батареи хвата (PRO-5 D10 E1).
- * Пороги из синтеза: PoinT GO 2026 (pinch 2×10кг: <10/<25/<45с; вис/холды),
- * pinch-прогрессия (60с → следующий вес), CoC-лестница IronMind.
- * Итог — по слабейшему тесту (философия слабого звена). Чистые функции.
+ * armlift-benchmarks.engine.ts — уровни тест-батареи хвата (PRO-5 D10 E1) +
+ * канон порогов холдов (аудит 2026-10).
+ *
+ * ЕДИНЫЙ ИСТОЧНИК ПОРОГОВ. До аудита одно и то же число жило в трёх файлах с
+ * разными значениями: «слабый farmer» был <20 в diagnosis, <15 в cause и <15 в
+ * бенчмарке — один замер давал три разных диагноза. Теперь все читают отсюда.
+ *
+ * Пороги из синтеза: PoinT GO 2026 (pinch 2×10кг), pinch-прогрессия (60с →
+ * следующий вес), CoC-лестница IronMind. Итог — по слабейшему тесту
+ * (философия слабого звена). Чистые функции.
  */
+
+/**
+ * Семантика «слабое звено» (отличие от бенчмарк-лестницы уровня, которая грубее):
+ *  - < WEAK = проблема этого качества (пик силы / выносливость);
+ *  - WEAK..MID = «середина»: держит, но плывёт.
+ */
+export const PINCH_WEAK_SEC = 10;
+export const PINCH_MID_SEC = 20;
+export const FARMER_WEAK_SEC = 15;
+export const FARMER_MID_SEC = 30;
+export const COC_WEAK_LEVEL = 2;
+export const SILVER_WEAK_SEC = 20;
+export const SILVER_MID_SEC = 45;
+/** Порог межручной асимметрии: 15% — клинический (Mathiowetz-практика). */
+export const ASYM_WEAK_PCT = 15;
+/** Ниже 10% асимметрия — фон, evidence о слабой руке не пишем. */
+export const ASYM_EVIDENCE_PCT = 10;
 
 export type ArmliftTestLevel = 'beginner' | 'intermediate' | 'advanced' | 'elite';
 

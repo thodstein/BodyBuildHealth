@@ -151,7 +151,9 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSu
   useEffect(() => {
     const h = (e: Event) => {
       const t = (e as CustomEvent).detail as string | undefined;
-      if (t === 'bb_diagnostics_hub' || t === 'bb_diagnostics') goTab('bb_diagnostics_hub' as TrainingTab);
+      // Deep-link из homescreen-виджета «Тренировка»: сразу вкладка проведения.
+      if (t === 'runtime' || t === 'timers') goTab(t as TrainingTab);
+      else if (t === 'bb_diagnostics_hub' || t === 'bb_diagnostics') goTab('bb_diagnostics_hub' as TrainingTab);
     };
     window.addEventListener('training-open-tab', h);
     return () => window.removeEventListener('training-open-tab', h);

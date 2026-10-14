@@ -3,15 +3,24 @@
  * Отдельный дом снарядов: раньше жили гостем в табе «Хват» арм-хаба.
  * PRO-4: честные WR (A1), pinch кг+сек (A2), Silver Bullet (A3), L/R (A7),
  * новые снаряды фактом без % (A6), раздельный avg (A9), тренд/рецепт (A10).
- * Без выдуманных чисел: WR — существующий PLATFORM_WR (`arm-platform`, сверен с IronMind:
- * RT Тюкалов 130.5/2013, Apollon Майерско 237.5/Гайдученко 137.9, Hub Толонен 44.80/Кулагина 28.51),
+ * Без выдуманных чисел: WR — существующий PLATFORM_WR (`arm-platform`, сверено 14.10.2026
+ * с IronMind: RT Тюкалов 130.5/2013, Apollon Майерско 237.5/Гайдученко 137.9,
+ * Hub Толонен 44.80/Кулагина 28.51, IronMind Block 51.40/31.55),
  * pinch-сек/CoC/Silver — внутренние ориентиры, несверенные снаряды — факт без %.
+ * Оговорка: женский RT 80.0 (Hafsa Mason 2024, Wikipedia) — страница правил IronMind
+ * на ту же дату всё ещё числит 77.2 (Гайдученко 2012); подпись показывает оба факта.
  */
-import { platformWrFor, planAttempts } from './arm-platform.engine';
+import { platformWrFor, platformWrRef, planAttempts, COC_ORDINAL_KG } from './arm-platform.engine';
 
-/** Аудит 2026-10 было→стало: женский WR — Mason 80.0 кг, 21.08.2024 (Gaiduchenko 77.2 побит). */
+/** Аудит 2026-10 было→стало: женский WR — Hafsa Mason 80.0 кг, 21.08.2024
+ * (West Coast Arm Sports «Hands of Doom II», Wikipedia ред. 24.12.2025);
+ * прежний 77.2 Гайдученко 22.09.2012 побит. Честная оговорка: страница
+ * правил IronMind на сверку 14.10.2026 всё ещё числит 77.2 — рекорд признан
+ * не всеми органами. */
 function wrHolderNote(sex: ArmliftSex): string {
-  return sex === 'female' ? 'Mason 80.0, 2024' : 'Тюкалов 130.5, 2013';
+  return sex === 'female'
+    ? 'Ж Hafsa Mason 80.0, 21.08.2024 (стр. IronMind: Гайдученко 77.2, 2012)'
+    : 'Тюкалов 130.5, 30.06.2013';
 }
 export type ArmliftSex = 'male' | 'female';
 
@@ -113,31 +122,63 @@ function lvlOf(pct: number | null): ArmliftRow['level'] {
   return 'base';
 }
 
-/** CoC-уровень → грубая оценка % от №3 (280lb): ordinal, не калибровка. */
+/**
+ * CoC-уровень → % от плоскости сертификации (IronMind No.3 = 280 lb).
+ * Проценты считаются от официальной poundage-лестницы `COC_ORDINAL_KG`
+ * (IronMind/Wikipedia) — это ЕДИНСТВЕННАЯ опубликованная шкала, близость
+ * ступеней в кг видна пользователю, «эквивалент 55 кг» выдуман.
+ * Аудит 2026-10 было→стало: ступени ≥3 все давали 100%, т.е. закрывший CoC №4
+ * (сделали это единицы) получал ту же оценку, что и закрывший №3.
+ */
 export function cocLevelToPct(level: number): number | null {
   if (!Number.isFinite(level) || level < 0) return null;
-  if (level >= 3) return 100;
-  if (level >= 2.5) return 85;
-  if (level >= 2) return 70;
-  if (level >= 1.5) return 60;
-  if (level >= 1) return 50;
-  if (level > 0) return 36;
-  return null;
+  const key = String(level);
+  const kg = COC_ORDINAL_KG[key];
+  if (kg == null) {
+    // Нецелая ступень между опубликованными — честная оценка интерполяцией.
+    if (level > 0 && level < 4) {
+      const lo = Math.floor(level * 2) / 2;
+      const hi = Math.ceil(level * 2) / 2;
+      const a = COC_ORDINAL_KG[String(lo)];
+      const b = COC_ORDINAL_KG[String(hi)];
+      if (a != null && b != null) {
+        const t = (level - lo) / (hi - lo || 1);
+        return Math.round(((a + (b - a) * t) / COC_ORDINAL_KG['3']) * 1000) / 10;
+      }
+    }
+    return null;
+  }
+  return Math.round((kg / COC_ORDINAL_KG['3']) * 1000) / 10;
 }
 
 function pctOf(valueKg: number, wrKg: number): number {
+  // 14.10.2026: знаменатель 0 (неизвестный снаряд) больше не даёт Infinity/NaN.
+  if (!(wrKg > 0) || !Number.isFinite(valueKg) || valueKg <= 0) return 0;
   return Math.round((valueKg / wrKg) * 1000) / 10;
 }
 
+/** Note-строка знаменателя из канона (было: три шаблона с числами, продублированными
+ * из PLATFORM_WR вручную — правка таблицы молча расходилась с текстом). */
+function wrNoteFor(impl: string, wrKg: number, internal: boolean): string {
+  const ref = platformWrRef(impl);
+  if (!internal && ref) return `WR ${wrKg} кг (${ref})`;
+  return internal ? `внутренний ориентир ${wrKg} кг (${ref || 'шкала хаба'})` : `WR ${wrKg} кг`;
+}
+
 /**
- * Опорные времена Silver Bullet (добивка PRO-4, IronMind/APL, не нормативы):
- * М №3 ~55.6с Суховаров 2017, М №4 ~7.2с Суховаров 2017, Ж №2 ~45.4с Уоттлз 2014.
+ * Опорные времена CoC Silver Bullet (IronMind, сверено 14.10.2026):
+ * М №3 — Dmitriy Suhovarov 58.53 с, 14.05.2016 (действующий WR);
+ * М №4 — Tanner Merkle 30.98 с, 27.01.2019 (действующий WR);
+ * Ж №2 — Amy Wattles 45.42 с, 26.01.2014 (действующий WR).
+ * Аудит 2026-10 было→стало: стояли «№3 ~55.6с (Суховаров 2017)» и
+ * «№4 ~7.2с (Суховаров 2017)» — ни число, ни год, ни атлет №4 не сходились
+ * с официальной таблицей; пользователю показывали неверные рекорды.
  */
 export function silverRefNote(gripper: string): string {
   const g = String(gripper || '3');
-  if (g === '4') return 'опорное время М №4 ~7.2с (Суховаров 2017) — личный рекорд и лидерборд';
-  if (g === '2') return 'опорное время Ж №2 ~45.4с (Уоттлз 2014) — личный рекорд и лидерборд';
-  return 'опорное время М №3 ~55.6с (Суховаров 2017) — личный рекорд и лидерборд';
+  if (g === '4') return 'WR М №4 30.98 с (Таннер Меркл, 27.01.2019) — ориентир, лидерборд IronMind';
+  if (g === '2') return 'WR Ж №2 45.42 с (Эми Уоттлз, 26.01.2014) — ориентир, лидерборд IronMind';
+  return 'WR М №3 58.53 с (Дмитрий Суховаров, 14.05.2016) — ориентир, лидерборд IronMind';
 }
 
 function asymPct(l: number | null, r: number | null): number | null {
@@ -235,7 +276,7 @@ export function buildArmliftingReport(input: ArmliftInput): ArmliftingReport {
         implement: impl, label: IMPLEMENT_LABEL[impl] || impl,
         display: `${v} кг`, scorePct: p, internal: false,
         level: lvlOf(p), attempts: planAttempts(v),
-        note: `WR ${wr} кг (${wrHolderNote(sex)})`,
+        note: wrNoteFor(impl, wr, false) + (impl.startsWith('rolling_thunder') ? ` · ${wrHolderNote(sex)}` : ''),
       });
     };
     push(rtL, 'rolling_thunder_L');
@@ -249,7 +290,7 @@ export function buildArmliftingReport(input: ArmliftInput): ArmliftingReport {
         implement: 'rolling_thunder', label: IMPLEMENT_LABEL.rolling_thunder,
         display: `${rt} кг`, scorePct: p, internal: false,
         level: lvlOf(p), attempts: planAttempts(rt),
-        note: `WR ${wr} кг (${wrHolderNote(sex)})`,
+        note: wrNoteFor('rolling_thunder', wr, false) + ` · ${wrHolderNote(sex)}`,
       });
     }
   }
@@ -264,18 +305,20 @@ export function buildArmliftingReport(input: ArmliftInput): ArmliftingReport {
       display: `${ax} кг`, scorePct: p, internal: !apollon,
       level: lvlOf(p), attempts: planAttempts(ax),
       note: apollon
-        ? `Apollon WR ${wr} кг (М Майерско 237.5, 2022 / Ж Гайдученко 137.9, 2019)`
-        : `Saxon-ориентир ${wr} кг (внутренний, сверяется с Saxon 3×4 лидербордом)`,
+        ? wrNoteFor('apollon_axle', wr, false)
+        : `${wrNoteFor('saxon_bar', wr, true)} (сверяется с Saxon 3"×4" лидербордом)`,
     });
   }
-  // Pinch кг отдельно от удержания (A2 + добивка: единого WR нет —
-  // рекорды зависят от ширины/1H-2H/федерации, Gods of Grip 2024–2025,
-  // поэтому 80/45 — внутренний ориентир, в avgWR не входит)
+  // Pinch кг отдельно от удержания (A2 + добивка): щипковые блоки различаются
+  // шириной/высотой/1H-2H и по федерациям (Gods of Grip 2024–2025), поэтому 80/45 —
+  // внутренний ориентир хаба, в avgWR не входит. Действующий WR канонического
+  // IronMind Block (сверено 14.10.2026): М 51.40 Толонен 09.06.2018 /
+  // Ж 31.55 Робертс 13.05.2017 — идёт в note-строку, чтобы «80» не выглядело рекордом.
   // Pinch: по-рукам приоритетнее общего (D13, прецедент RT/Hub A7)
   const pinchL = num(input.pinchL);
   const pinchR = num(input.pinchR);
   const pinchAsymPct = asymPct(pinchL, pinchR);
-  const pinchNote = (wr: number): string => `внутренний ориентир ${wr} кг (единого WR нет — ширина/1H-2H/федерация)`;
+  const pinchNote = (wr: number): string => wrNoteFor('pinch_block', wr, true);
   if (pinchL != null || pinchR != null) {
     const wr = platformWrFor('pinch_block', sex);
     const push = (v: number | null, impl: string) => {
@@ -320,7 +363,7 @@ export function buildArmliftingReport(input: ArmliftInput): ArmliftingReport {
       implement: 'coc_gripper', label: IMPLEMENT_LABEL.coc_gripper,
       display: `№${coc}`, scorePct: pct, internal: true,
       level: lvlOf(pct), attempts: [],
-      note: 'фунт-рейтинг IronMind — ordinal, не калибровка',
+      note: `ступени IronMind (No.3 = 280 lb ≈ 127 кг — плоскость сертификации); poundage-оценка, не замер`,
     });
   }
   // Silver Bullet — время отдельно (A3 + добивка: опорные времена IronMoney/APL)
@@ -347,7 +390,7 @@ export function buildArmliftingReport(input: ArmliftInput): ArmliftingReport {
         implement: impl, label: IMPLEMENT_LABEL[impl] || impl,
         display: `${v} кг`, scorePct: p, internal: false,
         level: lvlOf(p), attempts: planAttempts(v),
-        note: `Hub WR ${wr} кг (М Толонен 44.80, 2019 / Ж Кулагина 28.51, 2021)`,
+        note: wrNoteFor(impl, wr, false),
       });
     };
     push(hubL, 'hub_L');
@@ -361,7 +404,7 @@ export function buildArmliftingReport(input: ArmliftInput): ArmliftingReport {
         implement: 'hub', label: IMPLEMENT_LABEL.hub,
         display: `${hub} кг`, scorePct: p, internal: false,
         level: lvlOf(p), attempts: planAttempts(hub),
-        note: `Hub WR ${wr} кг (М Толонен 44.80, 2019 / Ж Кулагина 28.51, 2021)`,
+        note: wrNoteFor('hub', wr, false),
       });
     }
   }
@@ -412,9 +455,17 @@ export function buildArmliftingReport(input: ArmliftInput): ArmliftingReport {
     avgWrPct = avg(wrScored);
   }
   avgInternalPct = avg(intScored);
-  // PRO-4 A9: тотал — только кг одной природы (секунды/CoC-уровни не суммируем)
+  // PRO-4 A9: тотал — только кг одной природы (секунды/CoC-уровни не суммируем).
+  // 14.10.2026 было→стало: при одновременном вводе «RT кг» и «RT левая/правая»
+  // в тотал уходили ВСЕ три числа (85+90+95=285), хотя строка снаряда стротся по
+  // L/R и общий ввод игнорируется. Теперь тотал считает ту же альтернативу, что и
+  // строки: пара рук вытесняет общий замер своего снаряда.
   const kgParts: Array<number | null> = [
-    rtL, rtR, num(input.rtKg), ax, pinchL, pinchR, num(input.pinchKg), hubL, hubR, num(input.hubKg), ex,
+    ...(rtL != null || rtR != null ? [rtL, rtR] : [num(input.rtKg)]),
+    ax,
+    ...(pinchL != null || pinchR != null ? [pinchL, pinchR] : [num(input.pinchKg)]),
+    ...(hubL != null || hubR != null ? [hubL, hubR] : [num(input.hubKg)]),
+    ex,
     num(input.raptorKg), num(input.crushKg), num(input.clockKg), num(input.anvilKg), num(input.saxonMedleyKg),
   ];
   const totalKg = Math.round(
