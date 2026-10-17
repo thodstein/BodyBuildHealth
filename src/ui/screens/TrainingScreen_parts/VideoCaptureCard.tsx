@@ -103,6 +103,7 @@ export const VideoCaptureCard: React.FC<{ lift: Lift; onResult?: (r: VideoAnalys
   const [isTg, setIsTg] = useState(false);
   const [shareMsg, setShareMsg] = useState<string | null>(null);
   const [isNative, setIsNative] = useState(false);
+  const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
   const [manualVelocity, setManualVelocity] = useState('');
   const [manualElbow, setManualElbow] = useState('');
   const [manualGrip, setManualGrip] = useState('');

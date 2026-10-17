@@ -861,7 +861,14 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
           </InfoErrorBoundary>
           <InfoErrorBoundary label="Привычки недели"><HabitWeekCard historyWorkouts={safeHistoryWorkouts} /></InfoErrorBoundary>
           <InfoErrorBoundary label="Тренировочные миксы"><MixDiarySection hasTrainingToday={safeHistoryWorkouts.some(w => w.date === localIsoDate())} /></InfoErrorBoundary>
-          <InfoErrorBoundary label="Форма записи"><RecordModeSelector diary={diary} historyWorkouts={safeHistoryWorkouts} selectedWeek={selectedWeek} onSave={onRefresh}
+          <InfoErrorBoundary label="Форма записи"><InfoErrorBoundary label="Сводка дневника">
+            <div style={{ ...style.card, display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center', padding: '10px 12px' }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: '#fff' }}>Сегодня: {safeHistoryWorkouts.filter(w => w.date === localIsoDate()).length}</div>
+              <div style={{ fontSize: 11, color: '#fff' }}>Всего: {safeHistoryWorkouts.length}</div>
+              <div style={{ fontSize: 11, color: '#fff' }}>Последняя: {safeHistoryWorkouts[0]?.date || '—'}</div>
+            </div>
+          </InfoErrorBoundary>
+          <RecordModeSelector diary={diary} historyWorkouts={safeHistoryWorkouts} selectedWeek={selectedWeek} onSave={onRefresh}
             sub={recordSub} onSubChange={setRecordSub}
             pendingTemplate={planToRecord?.day} templateKey={planToRecord?.nonce} onTemplateApplied={() => setPlanToRecord(null)} /></InfoErrorBoundary>
         </div>

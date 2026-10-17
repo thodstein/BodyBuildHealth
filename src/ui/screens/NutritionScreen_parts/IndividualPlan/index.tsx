@@ -131,7 +131,7 @@ const IndividualPlanInner: React.FC<{ embedded?: boolean }> = ({ embedded }) => 
           border:'1px solid rgba(255,255,255,0.07)', borderRadius:16,
           boxShadow:'0 8px 28px rgba(0,0,0,0.32), inset 0 1px 0 rgba(255,255,255,0.06)',
           backdropFilter:'blur(14px)', WebkitBackdropFilter:'blur(14px)',
-          position: embedded ? 'static' : 'sticky', top: 0, zIndex: 20,
+          position: 'static', top: 0, zIndex: 20,
         }}>
           {visibleTabs.map(t => {
             const active = activeTab === t.key;

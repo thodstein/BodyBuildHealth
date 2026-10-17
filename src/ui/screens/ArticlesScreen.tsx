@@ -896,7 +896,7 @@ export const ArticlesScreen: React.FC = () => {
   return (
     <div className="screen articles-list" style={{ fontFamily: FONT, paddingBottom: 'calc(20px + 72px + env(safe-area-inset-bottom,0px))', background:'transparent' }}>
       {/* premium toolbar — APK PRO: 56px, тач 44px */}
-      <div className="articles-toolbar" style={{ display:'flex', alignItems:'center', gap:8, padding:'8px 0 10px', flexShrink:0, minHeight:56, position:'sticky', top:0, zIndex:20, backdropFilter:'blur(16px)', WebkitBackdropFilter:'blur(16px)', background:'rgba(10,10,15,0.86)', margin:'-6px -6px 0', paddingLeft:6, paddingRight:6, borderBottom:'1px solid rgba(255,255,255,0.07)' }}>
+      <div className="articles-toolbar" style={{ display:'flex', alignItems:'center', gap:8, padding:'8px 0 10px', flexShrink:0, minHeight:56, position: 'static', top:0, zIndex:20, backdropFilter:'blur(16px)', WebkitBackdropFilter:'blur(16px)', background:'rgba(10,10,15,0.86)', margin:'-6px -6px 0', paddingLeft:6, paddingRight:6, borderBottom:'1px solid rgba(255,255,255,0.07)' }}>
         <button onClick={() => setPage('hero')} aria-label="Назад к категориям" style={{
           minHeight:44, padding:'10px 16px', cursor:'pointer', fontSize:13, fontWeight:800,
           color:'#fff', border:'1px solid rgba(255,255,255,0.12)', background:'rgba(255,255,255,0.07)',
@@ -914,7 +914,7 @@ export const ArticlesScreen: React.FC = () => {
       </div>
 
       {/* Фильтры — липкая панель: поиск + категории всегда под рукой */}
-      <div className="articles-filterbar" style={{ position:'sticky', top:64, zIndex:15, margin:'0 -6px 12px', padding:'10px 6px 8px', background:'rgba(10,10,15,0.88)', backdropFilter:'blur(16px)', WebkitBackdropFilter:'blur(16px)', borderBottom:'1px solid rgba(255,255,255,0.06)' }}>
+      <div className="articles-filterbar" style={{ position: 'static', top:64, zIndex:15, margin:'0 -6px 12px', padding:'10px 6px 8px', background:'rgba(10,10,15,0.88)', backdropFilter:'blur(16px)', WebkitBackdropFilter:'blur(16px)', borderBottom:'1px solid rgba(255,255,255,0.06)' }}>
       {/* Search bar — glass */}
       <div style={{ position:'relative', marginBottom:8 }}>
         <svg style={{ position:'absolute', left:12, top:'50%', transform:'translateY(-50%)', width:15, height:15, color:'#fff', fill:'none', stroke:'currentColor', strokeWidth:2, strokeLinecap:'round' }} viewBox="0 0 24 24">

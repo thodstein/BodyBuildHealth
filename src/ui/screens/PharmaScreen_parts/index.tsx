@@ -155,7 +155,7 @@ export const PharmaScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubT
   return (
     <div className="screen pharma pharma-inner" style={{ padding:'0 12px 0', display:'flex', flexDirection:'column', height:'100%', minHeight:0, overflow:'hidden' }}>
       {/* topbar — 56px, sticky, safe-area, стекло */}
-      <div className="pharma-head" style={{ display:'flex', alignItems:'center', gap:10, flexShrink:0, minHeight:56, padding:'10px 12px', margin:'0 -12px 0', background:'linear-gradient(180deg, rgba(9,18,34,0.92), rgba(9,18,34,0.78))', backdropFilter:'blur(20px)', WebkitBackdropFilter:'blur(20px)', borderBottom:'1px solid rgba(140,190,255,0.12)', position:'sticky', top:0, zIndex:20 }}>
+      <div className="pharma-head" style={{ display:'flex', alignItems:'center', gap:10, flexShrink:0, minHeight:56, padding:'10px 12px', margin:'0 -12px 0', background:'linear-gradient(180deg, rgba(9,18,34,0.92), rgba(9,18,34,0.78))', backdropFilter:'blur(20px)', WebkitBackdropFilter:'blur(20px)', borderBottom:'1px solid rgba(140,190,255,0.12)', position: 'static', top:0, zIndex:20 }}>
         <button onClick={() => setPage('main')} aria-label="Назад" style={{
           display:'inline-flex', alignItems:'center', justifyContent:'center', gap:6, minWidth:44, minHeight:44, padding:'0 14px', borderRadius:14, fontSize:13, cursor:'pointer', fontWeight:800,
           background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.10)', color:'#fff', flexShrink:0,
@@ -216,7 +216,7 @@ export const PharmaScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubT
       )}
 
       {/* subtabs — липкие пилюли 44px, скролл-лента, glow активной */}
-      <div className="pharma-subtabs" style={{ display:'flex', gap:8, overflowX:'auto', overflowY:'hidden', scrollbarWidth:'none', WebkitOverflowScrolling:'touch' as any, flexWrap:'nowrap', flexShrink:0, padding:'10px 12px 10px', margin:'0 -12px 8px', background:'linear-gradient(180deg, rgba(5,11,22,0.92), rgba(5,11,22,0.75))', backdropFilter:'blur(16px)', WebkitBackdropFilter:'blur(16px)', borderBottom:'1px solid rgba(255,255,255,0.04)', position:'sticky', top:56, zIndex:15, scrollSnapType:'x proximity' as any }}>
+      <div className="pharma-subtabs" style={{ display:'flex', gap:8, overflowX:'auto', overflowY:'hidden', scrollbarWidth:'none', WebkitOverflowScrolling:'touch' as any, flexWrap:'nowrap', flexShrink:0, padding:'10px 12px 10px', margin:'0 -12px 8px', background:'linear-gradient(180deg, rgba(5,11,22,0.92), rgba(5,11,22,0.75))', backdropFilter:'blur(16px)', WebkitBackdropFilter:'blur(16px)', borderBottom:'1px solid rgba(255,255,255,0.04)', position: 'static', top:56, zIndex:15, scrollSnapType:'x proximity' as any }}>
       {page === 'course' && (
         <span style={{
           display:'inline-flex', alignItems:'center', gap:7, padding:'9px 14px', fontSize:12, fontWeight:900, whiteSpace:'nowrap', flexShrink:0,

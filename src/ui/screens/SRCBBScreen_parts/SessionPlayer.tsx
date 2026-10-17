@@ -20,6 +20,7 @@ import { hapticImpact, hapticNotify } from '../../../core/telegram';
 import { useNativeWakeLock } from '../../native/useWakeLock';
 import { velocityLoss, velocityLossZone, thresholdForIntent, type VBTIntent } from '../../../engines/pro/vbt.engine';
 import { calculatePlates } from '../../../engines/gym-competition.engine';
+import { widgetTimerCommand } from '../../../core/widget-bridge';
 import { saveSRPESession } from '../../../engines/pro/srpe-store';
 import { StrengthDiary } from '../../../engines/strength-diary.engine';
 import { useTrainingProfile } from '../TrainingScreen_parts/training-profile';
@@ -88,18 +89,30 @@ const SkipBar: React.FC<{ reasons: string[]; onSkip: (reason: string) => void; l
   const [open, setOpen] = useState(false);
   const [reason, setReason] = useState(reasons[0] || 'другое');
   return (
-    <div style={{ marginTop: 8 }}>
-      <button type="button" style={{ ...BTN_GHOST, width: '100%', color: '#fff', borderColor: 'rgba(255,255,255,0.08)' }} onClick={() => setOpen(v => !v)}>
+    <div style={{ marginTop: 8 }} data-session="skip-bar">
+      <button type="button" style={{ ...BTN_GHOST, width: '100%', color: '#fff', borderColor: 'rgba(255,255,255,0.08)' }} onClick={() => setOpen(v => !v)}
+        data-session="skip-trigger" aria-expanded={open}>
         ⏭ Пропустить {label} {open ? '▲' : '▼'}
       </button>
       {open && (
-        <div style={{ marginTop: 6, display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
-          <select value={reason} onChange={e => setReason(e.target.value)} aria-label={`Причина пропуска ${label}`}
-            style={{ ...IN, flex: 1, minWidth: 160, minHeight: 40 }}>
-            {reasons.map(r => <option key={r} value={r}>{r}</option>)}
-          </select>
-          <button type="button" style={{ ...BTN, flex: 1, minWidth: 120 }} onClick={() => { onSkip(reason); setOpen(false); }}>
-            Пропустить
+        <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }} data-session="skip-reasons">
+            {reasons.map(r => (
+              <button type="button" key={r} onClick={() => setReason(r)} data-session="skip-reason"
+                aria-pressed={reason === r}
+                style={{
+                  ...BTN_GHOST, flex: '1 1 120px', minHeight: 44, fontSize: 11,
+                  background: reason === r ? 'rgba(0,230,138,0.12)' : 'rgba(255,255,255,0.04)',
+                  borderColor: reason === r ? 'var(--accent)' : 'rgba(255,255,255,0.08)',
+                  color: reason === r ? 'var(--accent)' : '#fff',
+                }}>
+                {r}
+              </button>
+            ))}
+          </div>
+          <button type="button" style={{ ...BTN, width: '100%', minHeight: 44 }} data-session="skip-confirm"
+            onClick={() => { onSkip(reason); setOpen(false); }}>
+            Пропустить: {reason}
           </button>
         </div>
       )}
@@ -208,6 +221,20 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
     // Разворачиваемая техника упражнения (по имени упражнения)
     const [techOpen, setTechOpen] = useState<Record<string, boolean>>({});
     const [autoStartRest, setAutoStartRest] = useState<boolean>(true);
+  // Настройки уведомлений таймера (P2-1): звук/вибрация/голос. Хранятся в localStorage.
+  const [timerSoundSettings, setTimerSoundSettings] = useState<{ sound: boolean; vibrate: boolean; voice: boolean }>(() => {
+    try {
+      const raw = localStorage.getItem('he_timer_sound_settings');
+      if (raw) {
+        const p = JSON.parse(raw);
+        return { sound: p?.sound !== false, vibrate: p?.vibrate !== false, voice: p?.voice !== false };
+      }
+    } catch { /* ignore */ }
+    return { sound: true, vibrate: true, voice: true };
+  });
+  useEffect(() => {
+    try { localStorage.setItem('he_timer_sound_settings', JSON.stringify(timerSoundSettings)); } catch { /* ignore */ }
+  }, [timerSoundSettings]);
     const [exerciseProgress, setExerciseProgress] = useState<Record<string, { completed: number; total: number }>>({});
     const [restHistory, setRestHistory] = useState<{ exercise: string; duration: number; timestamp: string }[]>([]);
    const [timerSettings, setTimerSettings] = useState<{
@@ -299,9 +326,9 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
          if (prev <= 1) { 
            setTimerRunning(false); 
            // Уведомление при завершении таймера
-           hapticNotify('success');
+           if (timerSoundSettings.vibrate) if (timerSoundSettings.vibrate) hapticNotify('success');
            // Вибрация: паттерн зависит от типа таймера
-           if (navigator.vibrate) {
+           if (timerSoundSettings.vibrate && navigator.vibrate) {
              if (timerExIdx >= 0) {
                navigator.vibrate([200, 100, 200]); // двойная вибрация для отдыха между подходами
              } else {
@@ -309,12 +336,24 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
              }
            }
            // Звук
-           try {
-             const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
-             audio.play().catch(() => {});
+           if (timerSoundSettings.sound) try {
+              const Ctx = (window as any).AudioContext || (window as any).webkitAudioContext;
+              if (Ctx) {
+                const ctx = new Ctx();
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.type = 'sine';
+                osc.frequency.value = 880;
+                gain.gain.value = 0.18;
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.start();
+                osc.stop(ctx.currentTime + 0.18);
+                osc.onended = () => { try { ctx.close(); } catch {} };
+              }
            } catch { /* browser block */ }
            // Голосовое уведомление
-           speakRestComplete(timerExIdx);
+           if (timerSoundSettings.voice) if (timerSoundSettings.voice) speakRestComplete(timerExIdx);
            // Запись в историю отдыха
            if (timerExIdx >= 0 && day?.exercises[timerExIdx]) {
              const ex = day.exercises[timerExIdx];
@@ -353,7 +392,7 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
        setInterExTimerSec(prev => {
          if (prev <= 1) { 
            setInterExTimerRunning(false); 
-           hapticNotify('success');
+           if (timerSoundSettings.vibrate) hapticNotify('success');
          }
          return prev - 1;
        });
@@ -418,6 +457,8 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
       setRestAddSec(0);
       setTimerSec(rest);
       setTimerRunning(true);
+      // Синхронизация виджета таймера на домашнем экране (APK) с отдыхом сессии.
+      try { void widgetTimerCommand('preset', rest); } catch { /* web/TG no-op */ }
     }, [day, getRestTime, supersetMode, circuitMode, supersetExercises, getSupersetRestTime]);
 
   const skipRestTimer = useCallback(() => {
@@ -575,7 +616,7 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
 
   const finish = () => {
     if (!session || !day || !Array.isArray(day.exercises)) return;
-    hapticNotify('success');
+    if (timerSoundSettings.vibrate) hapticNotify('success');
     const finished = finishSession(session, `${focus} — ${day?.label}`);
     savedRef.current = true;
     try { onSaved?.(); } catch { /* ignore */ }
@@ -599,6 +640,7 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
     setPhase('cooldown');
     setCooldownDone({});
     clearActiveSession();
+    try { localStorage.removeItem('he_workout_rest_timer_v1'); } catch { /* ignore */ }
     try { saveSRPESession({ date: finished.date, sRPE: sessionRPE, durationMin: Math.max(finished.durationMin || 0, sessionDur) }); } catch { /* ignore */ }
     // RIR-калибровка: записываем фактические RIR по подходам
     try { recordSessionRIR(finished, { exercises: day.exercises.map(ex => ({ name: ex.name, targetSets: ex.targetSets })) }); } catch { /* ignore */ }
@@ -635,8 +677,11 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
   };
 
   const exitSession = () => {
-    // «Завершить и выйти» должно СОХРАНЯТЬ тренировку: если есть подходы и ещё не сохранено — сохраняем.
+    // Подтверждение, чтобы не потерять незаписанные подходы при случайном тапе.
     if (session && session.exercises.some(e => (e.sets || []).length > 0) && !savedRef.current) {
+      try {
+        if (typeof window !== 'undefined' && !window.confirm('Завершить тренировку и сохранить подходы?')) return;
+      } catch { /* ignore */ }
       finish();
       return;
     }
@@ -658,6 +703,7 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
         skipCooldownReasonRef.current = null;
       } catch { /* дневник заминки недоступен — не блокируем выход */ }
     }
+    try { localStorage.removeItem('he_workout_rest_timer_v1'); } catch { /* ignore */ }
     setPhase('done');
   };
 
@@ -705,6 +751,16 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
         .catch(() => { /* web/TG — виджетов нет */ });
     }
   }, [phase, session]);
+
+  // Автосейв таймера отдыха живой сессии (восстановление после сворачивания).
+  React.useEffect(() => {
+    if (phase !== 'main') return;
+    try {
+      localStorage.setItem('he_workout_rest_timer_v1', JSON.stringify({
+        remainingSec: timerSec, running: timerRunning, timerExIdx, restAddSec, savedAt: Date.now(),
+      }));
+    } catch { /* ignore */ }
+  }, [phase, timerSec, timerRunning, timerExIdx, restAddSec]);
 
   // Завершение/сброс — живой сессии нет, пульт показывает последнюю тренировку.
   React.useEffect(() => {
@@ -791,6 +847,18 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
     setSessionTimerRunning(true);
     setSession(saved);
     setResumeFrom(null);
+    try {
+      const raw = localStorage.getItem('he_workout_rest_timer_v1');
+      if (raw) {
+        const t = JSON.parse(raw);
+        if (t && typeof t.remainingSec === 'number') {
+          setTimerSec(Math.max(0, t.remainingSec));
+          setTimerRunning(!!t.running);
+          setTimerExIdx(typeof t.timerExIdx === 'number' ? t.timerExIdx : -1);
+          setRestAddSec(typeof t.restAddSec === 'number' ? t.restAddSec : 0);
+        }
+      }
+    } catch { /* ignore */ }
     setPhase('main');
   };
 
@@ -1964,6 +2032,16 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
                   }}>
                     {autoStartRest ? '▶ Авто' : '⏸ Ручной'}
                   </button>
+                  <button type="button" aria-pressed={timerSoundSettings.sound} onClick={() => { hapticImpact('light'); setTimerSoundSettings(v => ({...v, sound: !v.sound})); }} style={{ padding: '4px 10px', borderRadius: 20, fontSize: 10, fontWeight: 700, cursor: 'pointer', border: timerSoundSettings.sound ? '1px solid rgba(0,230,138,0.30)' : '1px solid rgba(255,255,255,0.08)', background: timerSoundSettings.sound ? 'linear-gradient(135deg, rgba(0,230,138,0.14), rgba(16,185,129,0.08))' : 'rgba(255,255,255,0.04)', color: timerSoundSettings.sound ? '#00e68a' : 'rgba(255,255,255,0.65)', transition: 'all 0.2s' }}>
+                    {timerSoundSettings.sound ? 'Звук on' : 'Звук off'}
+                  </button>
+                  <button type="button" aria-pressed={timerSoundSettings.vibrate} onClick={() => { hapticImpact('light'); setTimerSoundSettings(v => ({...v, vibrate: !v.vibrate})); }} style={{ padding: '4px 10px', borderRadius: 20, fontSize: 10, fontWeight: 700, cursor: 'pointer', border: timerSoundSettings.vibrate ? '1px solid rgba(0,230,138,0.30)' : '1px solid rgba(255,255,255,0.08)', background: timerSoundSettings.vibrate ? 'linear-gradient(135deg, rgba(0,230,138,0.14), rgba(16,185,129,0.08))' : 'rgba(255,255,255,0.04)', color: timerSoundSettings.vibrate ? '#00e68a' : 'rgba(255,255,255,0.65)', transition: 'all 0.2s' }}>
+                    {timerSoundSettings.vibrate ? 'Вибро on' : 'Вибро off'}
+                  </button>
+                  <button type="button" aria-pressed={timerSoundSettings.voice} onClick={() => { hapticImpact('light'); setTimerSoundSettings(v => ({...v, voice: !v.voice})); }} style={{ padding: '4px 10px', borderRadius: 20, fontSize: 10, fontWeight: 700, cursor: 'pointer', border: timerSoundSettings.voice ? '1px solid rgba(0,230,138,0.30)' : '1px solid rgba(255,255,255,0.08)', background: timerSoundSettings.voice ? 'linear-gradient(135deg, rgba(0,230,138,0.14), rgba(16,185,129,0.08))' : 'rgba(255,255,255,0.04)', color: timerSoundSettings.voice ? '#00e68a' : 'rgba(255,255,255,0.65)', transition: 'all 0.2s' }}>
+                    {timerSoundSettings.voice ? 'Голос on' : 'Голос off'}
+                  </button>
+
                 </div>
                
                {/* кнопка отдыха между упражнениями */}
@@ -2293,7 +2371,7 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
                }
                const text = lines.join('\n');
                navigator.clipboard?.writeText(text).then(() => {
-                 hapticNotify('success');
+                 if (timerSoundSettings.vibrate) hapticNotify('success');
                }).catch(() => {});
              }}>📋 Копировать сводку</button>
              <button style={{ ...BTN_GHOST, width: '100%', marginTop: 8 }} onClick={() => { setDone(null); setWarmupBlocks([]); setCooldownBlocks([]); setSession(null); savedRef.current = false; clearActiveSession(); setPhase('ready'); }}>← Новая тренировка</button>

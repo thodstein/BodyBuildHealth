@@ -19,6 +19,7 @@ import { groupsFromExercises } from '../../../engines/warmup-day.engine';
 import { calculatePlates } from '../../../engines/gym-competition.engine';
 import { hapticImpact, hapticNotify } from '../../../core/telegram';
 import { NativeIcon } from '../../native/NativeIcons';
+import { useNativeWakeLock } from '../../native/useWakeLock';
 import type { TrainingTab } from './shared';
 
 const isDumbbellEx = (n?: string) => !!(n && /гантел|dumbbell/i.test(n));
@@ -82,27 +83,8 @@ export const ExecutionZone: React.FC<Props> = (p) => {
   const [execWarmupMode, setExecWarmupMode] = React.useState<import('../../../engines/warmup.engine').WarmupMode>(() => {
     try { const v = localStorage.getItem('he_warmup_mode') as import('../../../engines/warmup.engine').WarmupMode | null; return v === 'quick' || v === 'full' ? v : 'standard'; } catch { return 'standard'; }
   });
-  // Wake Lock — экран не гаснет в зале
-  React.useEffect(() => {
-    let lock: any = null;
-    let released = false;
-    const request = async () => {
-      try {
-        if (runtimeStarted && 'wakeLock' in navigator) {
-          // @ts-ignore
-          lock = await (navigator as any).wakeLock.request('screen');
-        }
-      } catch {}
-    };
-    if (runtimeStarted) request();
-    const onVis = () => { if (document.visibilityState === 'visible' && runtimeStarted && !lock) request(); };
-    document.addEventListener('visibilitychange', onVis);
-    return () => {
-      released = true;
-      document.removeEventListener('visibilitychange', onVis);
-      try { lock?.release?.(); } catch {}
-    };
-  }, [runtimeStarted]);
+  // Wake Lock — единый хук (только APK, web/TG no-op)
+  useNativeWakeLock(runtimeStarted);
   // Безопасные производные: мемоизированы чтобы не пересчитывать и не фризить вкладку на каждом тике таймера
   const trainingDaysList: any[] = React.useMemo(() => {
     try { return ((currentMicrocycle?.days || []) as any[]).filter((d: any) => d && d.isTraining); }

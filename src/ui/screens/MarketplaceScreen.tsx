@@ -104,7 +104,7 @@ export const MarketplaceScreen: React.FC = () => {
   return (
     <div className="screen marketplace market-root" style={{ paddingBottom: 0, fontFamily: FONT, background:'transparent' }}>
       {/* premium header */}
-      <div className="market-head" style={{ padding:'10px 12px 8px', display:'flex', alignItems:'center', gap:10, position:'sticky', top:0, zIndex:2, background:'rgba(10,10,15,0.58)', backdropFilter:'blur(14px)', WebkitBackdropFilter:'blur(14px)', margin:'-6px -6px 0', paddingLeft:12, paddingRight:12, borderBottom:'1px solid rgba(255,255,255,0.05)' }}>
+      <div className="market-head" style={{ padding:'10px 12px 8px', display:'flex', alignItems:'center', gap:10, position: 'static', top:0, zIndex:2, background:'rgba(10,10,15,0.58)', backdropFilter:'blur(14px)', WebkitBackdropFilter:'blur(14px)', margin:'-6px -6px 0', paddingLeft:12, paddingRight:12, borderBottom:'1px solid rgba(255,255,255,0.05)' }}>
         <div style={{ width:34, height:34, borderRadius:11, background:`linear-gradient(135deg, ${shopA(0.18)}, ${shopA(0.06)})`, border:`1px solid ${shopA(0.20)}`, display:'flex', alignItems:'center', justifyContent:'center', color:SHOP_ACC, boxShadow:`0 4px 16px ${shopA(0.18)}` }}><NativeIcon name="bag" size={17} /></div>
         <div style={{ flex:1, minWidth:0 }}>
           <h2 style={{ margin:0, fontSize:17, fontWeight:900, color:'#fff', letterSpacing:'-0.03em', lineHeight:1 }}>Магазин</h2>

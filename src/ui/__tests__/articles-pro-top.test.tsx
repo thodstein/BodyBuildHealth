@@ -413,12 +413,12 @@ describe('ArticlesScreen PRO TOP', () => {
     expect(big).not.toContain('font-size:13px');
   });
 
-  it('32. панель фильтров липкая', () => {
+  it('32. панель фильтров зафиксирована', () => {
     const { container } = render(<ArticlesScreen />);
     goToList(container);
     const bar = container.querySelector('.articles-filterbar') as HTMLElement;
     expect(bar).not.toBeNull();
-    expect(bar.getAttribute('style')).toContain('sticky');
+    expect(bar.getAttribute('style')).toContain('static');
     expect(bar.querySelector('.articles-search')).not.toBeNull();
     expect(bar.querySelector('.articles-chips')).not.toBeNull();
   });

@@ -182,6 +182,14 @@ export interface TrainingWidgetInput {
   actionLabel?: string;
   /** Deep-link кнопки: training (зона) или training_run (сразу проведение). */
   actionTarget?: string;
+  /** Следующее упражнение живой сессии (для виджета). */
+  nextExercise?: string;
+  /** Прогресс выполнения плана недели, 0..100. */
+  weekProgress?: number;
+  /** Дата последней завершённой сессии. */
+  lastSessionDate?: string;
+  /** Тоннаж последней завершённой сессии, кг. */
+  lastSessionVolume?: number;
 }
 
 export async function syncTrainingWidget(input: TrainingWidgetInput): Promise<boolean> {
@@ -193,6 +201,10 @@ export async function syncTrainingWidget(input: TrainingWidgetInput): Promise<bo
     live: !!input.live,
     actionLabel: (input.actionLabel ?? '').slice(0, 40),
     actionTarget: (input.actionTarget ?? '').slice(0, 40),
+    nextExercise: (input.nextExercise ?? '').slice(0, 80),
+    weekProgress: clampPct(input.weekProgress ?? 0),
+    lastSessionDate: (input.lastSessionDate ?? '').slice(0, 16),
+    lastSessionVolume: Math.max(0, Math.round(input.lastSessionVolume ?? 0)),
   };
   const p = plugin();
   if (p) {

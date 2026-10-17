@@ -1247,7 +1247,7 @@ const kbju = useMemo(()=> calcKBJU(input), [input]);
         <div style={{ ...CARD, padding:'8px 12px', background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', fontSize:10, color:'rgba(255,255,255,0.55)', textAlign:'center' }}>📓 Нет данных дневника 7д — веди дневник питания, появится факт vs TDEE + EA live</div>
       )}
 
-      <div style={{ position:'sticky', top:0, zIndex:5, margin:'-2px -8px 10px', padding:'8px 8px', background:'rgba(10,10,12,0.72)', backdropFilter:'blur(10px)', borderBottom:'1px solid rgba(255,255,255,0.06)', display:'flex', gap:6, overflowX:'auto', scrollbarWidth:'none' }}>
+      <div style={{ position: 'static', top:0, zIndex:5, margin:'-2px -8px 10px', padding:'8px 8px', background:'rgba(10,10,12,0.72)', backdropFilter:'blur(10px)', borderBottom:'1px solid rgba(255,255,255,0.06)', display:'flex', gap:6, overflowX:'auto', scrollbarWidth:'none' }}>
         {MODE_DEFS.map(({m,label,icon,desc,accent,evidence})=> (
           <button key={m} onClick={()=> setMode(m)} title={`${desc} · ${evidence}`} aria-pressed={mode===m} className="mh-mode" style={{
             flex:'0 0 auto', display:'flex', alignItems:'center', gap:4, padding:'7px 10px', borderRadius:20, cursor:'pointer', fontSize:10, fontWeight:800, whiteSpace:'nowrap', minHeight:44,

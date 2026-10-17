@@ -404,7 +404,7 @@ export const DrugDetailCard: React.FC<{ sub: PharmaSubstance; detail?: PharmaDet
         </div>
       )}
 
-      <div style={{ display:'flex', gap:8, position:'sticky', bottom:0, paddingTop:8, background:'linear-gradient(180deg, transparent, #18181b 28%)' }}>
+      <div style={{ display:'flex', gap:8, position: 'static', bottom:0, paddingTop:8, background:'linear-gradient(180deg, transparent, #18181b 28%)' }}>
         <button onClick={handleAddToCourse} style={{
           flex:1, padding:'11px 12px', borderRadius:12, border:'1px solid rgba(0,230,138,0.22)', cursor:'pointer',
           fontSize:12, fontWeight:800, background:'linear-gradient(135deg, #00e68a, #00b368)', color:'#000', boxShadow:'0 4px 14px rgba(0,230,138,0.22)',

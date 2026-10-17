@@ -131,7 +131,7 @@ export const ReportsScreen: React.FC = () => {
 
   return (
     <div className="rep-screen" style={{ padding: '0 0 80px', maxWidth: 900, margin: '0 auto' }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, padding: '12px 0', flexShrink: 0, position: 'sticky', top: 0, zIndex: 20, background: '#18181b', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, padding: '12px 0', flexShrink: 0, position: 'static', top: 0, zIndex: 20, background: '#18181b', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
         <div style={{ fontSize: 15, fontWeight: 700, color: '#fff' }}>📊 Комплексный отчёт</div>
         <div style={{ display: 'flex', gap: 6 }}>
           <button onClick={() => setType('weekly')} style={{ padding: '6px 12px', borderRadius: 8, fontSize: 11, fontWeight: 600, background: type === 'weekly' ? colors.primary : 'rgba(255,255,255,0.08)', color: type === 'weekly' ? '#000' : '#fff', border: 'none', cursor: 'pointer' }}>7д</button>

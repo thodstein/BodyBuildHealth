@@ -41,7 +41,7 @@ export const PeriodizationHub: React.FC<{ initialMode?: PeriodizationHubMode }> 
         .train-periodhub .ph-hub-nav button:focus-visible { outline: 2px solid ${ACCENT}; outline-offset: 1px; }
       `}</style>
       {/* Компактная плавающая шапка: одна строка, не закрывает контент */}
-      <div className="ph-hub-nav" style={{ position:'sticky', top:0, zIndex:20, background:'rgba(10,10,14,0.88)', backdropFilter:'blur(12px)', border:'1px solid rgba(255,255,255,0.07)', borderRadius:12, padding:'6px', margin:'0 0 10px', display:'flex', gap:6, alignItems:'center', overflowX:'auto', scrollbarWidth:'none', boxShadow:'0 6px 20px rgba(0,0,0,0.35)' }}>
+      <div className="ph-hub-nav" style={{ position: 'static', top:0, zIndex:20, background:'rgba(10,10,14,0.88)', backdropFilter:'blur(12px)', border:'1px solid rgba(255,255,255,0.07)', borderRadius:12, padding:'6px', margin:'0 0 10px', display:'flex', gap:6, alignItems:'center', overflowX:'auto', scrollbarWidth:'none', boxShadow:'0 6px 20px rgba(0,0,0,0.35)' }}>
         <button onClick={() => setHeroOpen(v => !v)} title="О хабе" aria-label="О хабе периодизации" style={{ flex:'0 0 auto', width:36, height:36, borderRadius:10, display:'flex', alignItems:'center', justifyContent:'center', background:'linear-gradient(135deg,#a855f7,#7c3aed)', color:'#fff', fontWeight:900, fontSize:15, border:'none', cursor:'pointer' }}>📈</button>
         <div style={{ flex:'0 0 auto', minWidth:0, lineHeight:1.15, marginRight:2 }}>
           <div style={{ fontSize:12, fontWeight:900, color:'#fff', whiteSpace:'nowrap' }}>Периодизация</div>

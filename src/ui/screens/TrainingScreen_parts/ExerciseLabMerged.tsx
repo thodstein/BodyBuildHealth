@@ -204,7 +204,7 @@ const ExerciseLabMerged: React.FC<{
       )}
 
       {/* 4 шага — sticky, удобно */}
-      <div style={{ position:'sticky', top:0, zIndex:5, margin:'-2px -8px 12px', padding:'8px 8px', background:'rgba(10,10,12,0.72)', backdropFilter:'blur(10px)', borderBottom:'1px solid rgba(255,255,255,0.06)', display:'flex', gap:6, overflowX:'auto', scrollbarWidth:'none' }}>
+      <div style={{ position: 'static', top:0, zIndex:5, margin:'-2px -8px 12px', padding:'8px 8px', background:'rgba(10,10,12,0.72)', backdropFilter:'blur(10px)', borderBottom:'1px solid rgba(255,255,255,0.06)', display:'flex', gap:6, overflowX:'auto', scrollbarWidth:'none' }}>
         {MODE_DEFS.map(({ m, label, icon, desc }) => {
           const active = mode === m;
           return (
@@ -243,7 +243,7 @@ const ExerciseLabMerged: React.FC<{
       {catalogOpen && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 100, background: 'rgba(0,0,0,0.6)', display: 'flex', justifyContent: 'center', alignItems: 'flex-start', padding: '12px 8px', overflowY: 'auto' }}>
           <div style={{ width: '100%', maxWidth: 760, background: '#18181b', borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)', maxHeight: '90vh', overflowY: 'auto', position: 'relative' }}>
-            <button onClick={() => setCatalogOpen(false)} style={{ position: 'sticky', top: 8, right: 8, float: 'right', margin: 8, padding: '6px 10px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.06)', color: '#fff', cursor: 'pointer', fontSize: 11, zIndex: 1 }}>✕ Закрыть каталог</button>
+            <button onClick={() => setCatalogOpen(false)} style={{ position: 'static', top: 8, right: 8, float: 'right', margin: 8, padding: '6px 10px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.06)', color: '#fff', cursor: 'pointer', fontSize: 11, zIndex: 1 }}>✕ Закрыть каталог</button>
             <div style={{ paddingTop: 8 }}>
               <ExerciseLabCatalog onSelectExercise={handleSelectExercise} />
             </div>

@@ -1,0 +1,1 @@
+",230,138,0.28)', minHeight: 44, padding: '10px 14px', borderRadius: 12, fontSize: 14 }), flexShrink: 0, minWidth: 68 }} onClick={() => logOne(ei, si)}>{logged ? '✓' : 'OK'}</button>\n                           {!logged && (\n                 "

@@ -62,7 +62,7 @@ export const PlannerSteps: React.FC<{
   hook?: Record<string, any>;
   className?: string;
 }> = ({ groups, defs, active, onGo, hook, className }) => (
-  <div className={className || 'planner-steps'} aria-label="Шаги" {...(hook || {})} style={{ position: 'sticky', top: 0, zIndex: 30, background: 'rgb(20,20,23)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 10, padding: '5px 6px', display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+  <div className={className || 'planner-steps'} aria-label="Шаги" {...(hook || {})} style={{ position: 'static', top: 0, zIndex: 30, background: 'rgb(20,20,23)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 10, padding: '5px 6px', display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
     {groups.map((g, gi) => (
       <span key={g.name} style={{ display: 'flex', alignItems: 'center', gap: 4, flex: '1 1 auto', minWidth: 0, flexWrap: 'wrap' }}>
         <span aria-hidden style={{ fontSize: 9, fontWeight: 800, color: '#fff', letterSpacing: 0.5 }}>{g.name}</span>

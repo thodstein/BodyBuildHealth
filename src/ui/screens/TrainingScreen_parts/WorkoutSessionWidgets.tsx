@@ -111,7 +111,7 @@ export const WorkoutMiniPult: React.FC<{ state?: WorkoutWidgetState | null; onOp
   const pct = total > 0 ? Math.round((done / total) * 100) : 0;
   return (
     <div data-widget="workout-pult" role="status" aria-label={`Пульт тренировки, выполнено ${pct} процентов`}
-      style={{ ...CARD, position: 'sticky', top: 0, zIndex: 20, display: 'flex', gap: 10, alignItems: 'center', borderColor: live ? 'rgba(0,230,138,0.28)' : undefined }}>
+      style={{ ...CARD, position: 'static', top: 0, zIndex: 20, display: 'flex', gap: 10, alignItems: 'center', borderColor: live ? 'rgba(0,230,138,0.28)' : undefined }}>
       <div style={{ width: 44, height: 44, borderRadius: 12, background: 'rgba(0,230,138,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22 }} aria-hidden>🏋️</div>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ color: WHITE, fontSize: 13, fontWeight: 800, ...TABULAR, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>

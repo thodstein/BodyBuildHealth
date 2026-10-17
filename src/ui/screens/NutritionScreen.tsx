@@ -1622,7 +1622,7 @@ export const NutritionScreen: React.FC<{ initialSubTab?: string }> = ({ initialS
         display:'flex', flexDirection:'column', alignItems:'stretch', gap:0, padding:'8px 12px 8px', flexShrink:0,
         background:'#18181b',
         borderBottom:'1px solid rgba(255,255,255,0.06)',
-        position:'sticky', top:0, zIndex:20,
+        position: 'static', top:0, zIndex:20,
       }}>
         {/* Единый ряд навигации: назад + бургер + текущий раздел. Дубль-подпись раздела убран. */}
         <div className="nutrition-nav-compact" style={{

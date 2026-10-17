@@ -1,0 +1,23 @@
+# Кэши и временные файлы
+node_modules/
+dist/
+dist-native/
+build/
+coverage/
+.cache/
+.vite/
+.turbo/
+.rollup.cache/
+.eslintcache/
+.pytest_cache/
+__pycache__/
+.next/
+tmp_scripts/
+scratch/
+test_dir/
+.tmp-*
+*.log
+*.tsbuildinfo
+android/app/build/
+android/build/
+android/.gradle/

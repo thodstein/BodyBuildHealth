@@ -1007,7 +1007,7 @@ export const RiskScreen: React.FC<{ initialSubTab?: string; onNavigate?: (screen
 
       {/* ─── TOP NAV BAR — APK PRO: 56px, тач 44px, белый текст ─── */}
       {mainTab !== 'hero' && (
-        <div className="risk-topnav" style={{ position:'sticky', top:0, zIndex:20, backdropFilter:'blur(16px)', WebkitBackdropFilter:'blur(16px)', background:'rgba(10,12,18,0.86)', borderBottom:'1px solid rgba(255,255,255,0.08)', display:'flex', alignItems:'center', gap:10, padding:'8px 12px', flexShrink:0, minHeight:56 }}>
+        <div className="risk-topnav" style={{ position: 'static', top:0, zIndex:20, backdropFilter:'blur(16px)', WebkitBackdropFilter:'blur(16px)', background:'rgba(10,12,18,0.86)', borderBottom:'1px solid rgba(255,255,255,0.08)', display:'flex', alignItems:'center', gap:10, padding:'8px 12px', flexShrink:0, minHeight:56 }}>
           <button onClick={() => setMainTab('hero')} aria-label="Назад к обзору рисков" style={{ minHeight:44, padding:'10px 16px', cursor:'pointer', fontSize:13, fontWeight:800, color:'#fff', border:'1px solid rgba(255,255,255,0.12)', background:'rgba(255,255,255,0.07)', borderRadius:999, display:'flex', alignItems:'center', gap:6 }}>← Обзор</button>
           <div style={{ width:1, height:24, background:'rgba(255,255,255,0.10)', flexShrink:0 }} />
           <div style={{ display:'flex', alignItems:'center', gap:10, flex:1, minWidth:0 }}>
@@ -1099,7 +1099,7 @@ export const RiskScreen: React.FC<{ initialSubTab?: string; onNavigate?: (screen
           {(mainTab !== 'calculations' || calcPage !== 'hero') && (
             <>
               {/* Sub-tab pills + back button for calculations — APK PRO: липкая лента, тач 44px */}
-              <div className="risk-subtabs" style={{ display: 'flex', gap: 8, overflowX: 'auto', overflowY: 'hidden', padding: '10px 12px', margin: '0 -12px', scrollbarWidth: 'none', alignItems: 'center', borderBottom: '1px solid rgba(255,255,255,0.07)', flexWrap: 'nowrap' as const, position: 'sticky', top: 56, zIndex: 15, background: 'rgba(10,12,18,0.88)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)' }}>
+              <div className="risk-subtabs" style={{ display: 'flex', gap: 8, overflowX: 'auto', overflowY: 'hidden', padding: '10px 12px', margin: '0 -12px', scrollbarWidth: 'none', alignItems: 'center', borderBottom: '1px solid rgba(255,255,255,0.07)', flexWrap: 'nowrap' as const, position: 'static', top: 56, zIndex: 15, background: 'rgba(10,12,18,0.88)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)' }}>
                 {mainTab === 'calculations' && (
                   <button onClick={() => {
                     if (basicPage !== 'main') { setBasicPage('main'); return; }

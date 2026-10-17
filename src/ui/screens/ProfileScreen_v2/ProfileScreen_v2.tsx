@@ -114,7 +114,7 @@ export const ProfileScreen_v2: React.FC<{ onNavigate?: (screen: string) => void;
         background: 'rgba(16,16,18,0.85)',
         backdropFilter: 'blur(20px) saturate(160%)', WebkitBackdropFilter: 'blur(20px) saturate(160%)',
         borderBottom: '1px solid rgba(255,255,255,0.08)',
-        position: 'sticky', top: 0, zIndex: 20,
+        position: 'static', top: 0, zIndex: 20,
       }}>
         <button
           onClick={() => setTab(null)}

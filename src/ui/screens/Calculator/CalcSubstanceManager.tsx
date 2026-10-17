@@ -230,7 +230,7 @@ export const CalcSubstanceManager: React.FC<Props> = ({ finalRec, onApplyChanges
     padding: '12px 14px 10px', overflowY: 'auto', flex: 1,
   };
   const stickyHeader: React.CSSProperties = {
-    position: 'sticky', top: -12, zIndex: 10, background: '#1a1a1d',
+    position: 'static', top: -12, zIndex: 10, background: '#1a1a1d',
     padding: '12px 14px 8px', marginBottom: 4, borderBottom: '1px solid rgba(255,255,255,0.06)',
   };
 

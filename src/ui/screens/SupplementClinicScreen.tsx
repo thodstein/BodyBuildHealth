@@ -53,7 +53,7 @@ export const SupplementClinicScreen: React.FC = () => {
 
       <div style={{
         display: 'flex', gap: 8, flexWrap: 'wrap', margin: '14px 0 4px',
-        position: 'sticky', top: 48, zIndex: 5, background: 'var(--bg)', padding: '6px 0',
+        position: 'static', top: 48, zIndex: 5, background: 'var(--bg)', padding: '6px 0',
       }}>
         {TABS.map((t) => {
           const active = tab === t.id;

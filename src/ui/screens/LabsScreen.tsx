@@ -773,7 +773,7 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
 
       {/* ─── TOP NAV BAR — sticky от верха скролла, шторка телефона — в padding с fallback 24px (env=0 в APK WebView) ─── */}
       {mainTab !== 'hero' && (
-        <div className="labs-topnav" style={{ position:'sticky', top:0, zIndex:30, backdropFilter:'blur(20px)', WebkitBackdropFilter:'blur(20px)', background:'linear-gradient(180deg, rgba(21,38,66,0.92), rgba(12,23,40,0.92))', borderBottom:'1px solid rgba(140,190,255,0.14)', display:'flex', alignItems:'center', gap:10, padding:'10px 12px', paddingTop:'calc(10px + max(env(safe-area-inset-top, 0px), 24px))', flexShrink:0, boxShadow:'0 8px 24px rgba(0,0,0,0.35)', minHeight:56 }}>
+        <div className="labs-topnav" style={{ position: 'static', top:0, zIndex:30, backdropFilter:'blur(20px)', WebkitBackdropFilter:'blur(20px)', background:'linear-gradient(180deg, rgba(21,38,66,0.92), rgba(12,23,40,0.92))', borderBottom:'1px solid rgba(140,190,255,0.14)', display:'flex', alignItems:'center', gap:10, padding:'10px 12px', paddingTop:'calc(10px + max(env(safe-area-inset-top, 0px), 24px))', flexShrink:0, boxShadow:'0 8px 24px rgba(0,0,0,0.35)', minHeight:56 }}>
           <button onClick={() => setMainTab('hero')} aria-label="Назад в Лабораторию" style={{
             minHeight:44, minWidth:44, padding:'10px 14px', cursor:'pointer', fontSize:13, fontWeight:800, color:'#fff', border:'1px solid rgba(140,190,255,0.16)', background:'rgba(21,38,66,0.70)', borderRadius:999, display:'flex', alignItems:'center', justifyContent:'center', gap:6, flexShrink:0,
           }}>←</button>

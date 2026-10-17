@@ -122,7 +122,7 @@ export const RiskVerificationList: React.FC<{ labMap: Record<string, number>; re
       </div>
 
       {/* EXPORT — липкая удобная лента (ниже сабтабов 56+67: зазор 9px) */}
-      <div className="risk-verify-export" style={{ ...CARD, display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', position:'sticky', top:132, zIndex:10 }}>
+      <div className="risk-verify-export" style={{ ...CARD, display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', position: 'static', top:132, zIndex:10 }}>
         <span style={{ fontSize: 13, fontWeight: 800, color: '#fff' }}>📤 Экспорт:</span>
         <button onClick={() => void copyText()} style={EXPORT_BTN}>{copied ? '✅ Скопировано' : '📋 Текст'}</button>
         <button onClick={() => void downloadCsv()} style={EXPORT_BTN}>📊 CSV</button>

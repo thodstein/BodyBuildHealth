@@ -91,7 +91,7 @@ export const NutritionReference: React.FC = () => {
       ]} />
 
       {/* Единственный поиск (дубль удалён) — липкий, как положено топ-уровню */}
-      <div data-ref="search" style={{ ...modernCardBg, padding: 12, position: 'sticky', top: 0, zIndex: 5 }}>
+      <div data-ref="search" style={{ ...modernCardBg, padding: 12, position: 'static', top: 0, zIndex: 5 }}>
         <input
           value={search}
           onChange={e => setSearch(e.target.value)}

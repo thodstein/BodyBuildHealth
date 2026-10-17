@@ -767,7 +767,7 @@ export const UnifiedIntelligenceHub: React.FC = () => {
       </div>
 
       {/* sticky nav */}
-      <div style={{ position:'sticky', top:0, zIndex:5, margin:'-2px -8px 10px', padding:'8px 8px 8px', background:'rgba(10,10,12,0.72)', backdropFilter:'blur(10px)', borderBottom:'1px solid rgba(255,255,255,0.06)', display:'flex', gap:6, overflowX:'auto', scrollbarWidth:'none' }}>
+      <div style={{ position: 'static', top:0, zIndex:5, margin:'-2px -8px 10px', padding:'8px 8px 8px', background:'rgba(10,10,12,0.72)', backdropFilter:'blur(10px)', borderBottom:'1px solid rgba(255,255,255,0.06)', display:'flex', gap:6, overflowX:'auto', scrollbarWidth:'none' }}>
         {SECTIONS.map(s=> (
           <button key={s.id} onClick={()=> scrollTo(s.id)} aria-pressed={active===s.id} aria-label={`Раздел: ${s.label}. ${s.desc}`} style={{
             flex:'0 0 auto', display:'flex', alignItems:'center', gap:6, padding:'7px 11px', minHeight:44, borderRadius:20, cursor:'pointer', fontSize:11, fontWeight:800, whiteSpace:'nowrap',

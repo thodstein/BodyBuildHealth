@@ -153,7 +153,7 @@ type LiftState = {
   cocLevel: string; silverSec: string; silverGripper: string;
   excalKg: string; hubKg: string; hubL: string; hubR: string;
   raptorKg: string; crushKg: string; clockKg: string; anvilKg: string; medleyKg: string;
-  sex: string; bwKg: string; age: string; gripKg: string; schemaVersion: number;
+  sex: string; bwKg: string; age: string; gripKg: string; schemaVersion: number; consent: boolean;
   /** ROUND-10: старт-неделя года для overlay спец-блока (паритет со стронгом/ТА). */
   annualStartWeek: string;
 };
@@ -163,7 +163,7 @@ const DEFAULT_STATE: LiftState = {
   pinchSec: '', pinchKg: '', pinchL: '', pinchR: '', cocLevel: '', silverSec: '', silverGripper: '3',
   excalKg: '', hubKg: '', hubL: '', hubR: '',
   raptorKg: '', crushKg: '', clockKg: '', anvilKg: '', medleyKg: '',
-  sex: 'male', bwKg: '80', age: '', gripKg: '', schemaVersion: 1, annualStartWeek: '1',
+  sex: 'male', bwKg: '80', age: '', gripKg: '', schemaVersion: 1, consent: false, annualStartWeek: '1',
 };
 
 /** PRO-3 W6: сид из арм-хаба — замеры не дублируются вручную.
@@ -212,6 +212,7 @@ function loadState(): LiftState {
       age: pick(j, 'age', ''),
       gripKg: pick(j, 'gripKg', ''),
       schemaVersion: typeof (j as any).schemaVersion === 'number' ? (j as any).schemaVersion : 1,
+      consent: (j as any).consent === true,
       annualStartWeek: (() => {
         const v = pick(j, 'annualStartWeek', '1');
         const n = parseInt(v, 10);
@@ -1472,6 +1473,10 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
           <AdBtn variant="ghost" onClick={handleSaveAnnual}>🗓 В годовой план</AdBtn>
         </span>
         <AdBtn variant="ghost" data-arm="export-print" onClick={handlePrint}>🖨 Печать</AdBtn>
+        <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#fff' }}>
+          <input type="checkbox" checked={state.consent} onChange={(e) => set({ consent: e.target.checked })} />
+          Согласие на хранение данных здоровья
+        </label>
         <AdBtn variant="ghost" data-arm="export-profile" onClick={handleExportProfile}>📤 Профиль JSON</AdBtn>
         <label style={{ display: 'inline-flex' }}>
           <AdBtn variant="ghost" data-arm="import-profile" onClick={() => document.getElementById('lift-profile-import')?.click()}>📥 Импорт профиля</AdBtn>

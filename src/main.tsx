@@ -18,6 +18,7 @@ import { registerSW } from './core/service-worker';
 import { initRealtime } from './core/realtime-sync';
 import { initErrorHandler, markBooted } from './core/error-handler';
 import { optimizeDBSpace } from './core/performance-optimizer';
+import { runStorageMigrations } from './core/storage-migration';
 import { ensureAdmin } from './core/auth-manager';
 import './styles.css';
 // styles-native*.css — ТОЛЬКО APK: грузятся динамическим import ниже отдельным
@@ -302,6 +303,7 @@ async function bootstrap() {
   }
 
   bootStamp('bootstrap-start');
+  try { runStorageMigrations(); } catch (e) { console.warn('runStorageMigrations failed:', e); }
   let dbOk = true;
   try {
     // db.init() сам ретраит (3 попытки, blocked/таймаут не убивают запуск),

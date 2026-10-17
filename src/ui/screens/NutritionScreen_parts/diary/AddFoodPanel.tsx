@@ -220,7 +220,7 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
   return (
     <div className="nd-add" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
       {/* Search — плавающая закреплённая строка (sticky): поиск + приёмы всегда под рукой */}
-      <div className="nd-search nd-add-sticky" style={{ padding: 14, borderRadius: 18, background: '#18181b', border: '1px solid rgba(255,255,255,0.08)', boxShadow: '0 2px 12px rgba(0,0,0,0.15)', position:'sticky', top:0, zIndex:18 }}>
+      <div className="nd-search nd-add-sticky" style={{ padding: 14, borderRadius: 18, background: '#18181b', border: '1px solid rgba(255,255,255,0.08)', boxShadow: '0 2px 12px rgba(0,0,0,0.15)', position: 'static', top:0, zIndex:18 }}>
         <div style={{ display:'flex', gap:6, alignItems:'center' }}>
           <input type="text" value={foodSearch} onChange={e => onFoodSearchChange(e.target.value)}
             aria-label="Поиск продуктов" placeholder="🔍 Поиск продуктов... (начните вводить 2 буквы)" autoFocus

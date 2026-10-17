@@ -56,7 +56,7 @@ const collapsibleCard = (accent: string): React.CSSProperties => ({
 const headerBtnStyle = (accent: string, isCollapsed: boolean): React.CSSProperties => ({
   width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
   padding: '11px 12px', cursor: 'pointer', border: 'none', textAlign: 'left' as const,
-  position: 'sticky', top: 0, zIndex: 5, backdropFilter: 'blur(8px)' as any,
+  position: 'static', top: 0, zIndex: 5, backdropFilter: 'blur(8px)' as any,
   background: isCollapsed
     ? `linear-gradient(135deg, ${accent}14, rgba(255,255,255,0.02))`
     : `linear-gradient(135deg, ${accent}22, ${accent}0F)`,
@@ -574,7 +574,7 @@ export const LiftMasterCard: React.FC<{
         </div>
       )}
       {/* Навигация по блокам */}
-      <div style={{ display:'flex', gap:4, flexWrap:'wrap', marginBottom:8, position:'sticky', top:0, zIndex:6, background:'rgba(10,10,12,0.85)', backdropFilter:'blur(8px)', padding:'6px 0' }}>
+      <div style={{ display:'flex', gap:4, flexWrap:'wrap', marginBottom:8, position:'static', top:0, zIndex:6, background:'rgba(10,10,12,0.85)', backdropFilter:'blur(8px)', padding:'6px 0' }}>
         {['0 Безопасность','1 Слабые мышцы','2 Слабые точки','3 Мёртвые точки','4 Траектория','5 Геометрия','6 VBT','6b Видео','7 Срывы','8 RIR','9 Мезо','10 Лимитеры'].map((label, idx) => (
           <button key={label} onClick={() => { const el = document.getElementById('sec-' + idx); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' }); }} style={{ minHeight:32, padding:'4px 8px', borderRadius:8, cursor:'pointer', border:'1px solid rgba(255,255,255,0.1)', background:'rgba(255,255,255,0.04)', color:'#ffffff', fontSize:9, fontWeight:700 }}>{label}</button>
         ))}

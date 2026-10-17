@@ -200,7 +200,7 @@ export const PharmaPeptideCalc: React.FC = () => {
             <div style={{ marginTop:10, maxHeight:140, overflowY:'auto', border:'1px solid rgba(255,255,255,0.06)', borderRadius:10, background:'rgba(0,0,0,0.16)' }}>
               <table style={{ width:'100%', fontSize:10, borderCollapse:'collapse' }}>
                 <thead>
-                  <tr style={{ background:'rgba(255,255,255,0.04)', position:'sticky', top:0 }}>
+                  <tr style={{ background:'rgba(255,255,255,0.04)', position: 'static', top:0 }}>
                     <th style={{ padding:'6px 8px', textAlign:'left', color:'#fff', fontSize:10 }}>День</th>
                     <th style={{ padding:'6px 8px', color:'#fff' }}>💉</th>
                     <th style={{ padding:'6px 8px', textAlign:'right', color:'#fff' }}>Конц.</th>
