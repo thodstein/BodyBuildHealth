@@ -111,7 +111,13 @@ export const VideoCaptureCard: React.FC<{ lift: Lift; onResult?: (r: VideoAnalys
   useEffect(() => {
     try { setIsTg(!!(window as any).Telegram?.WebApp); } catch { setIsTg(false); }
     try { setIsNative(isNativeApp()); } catch { setIsNative(false); }
+    const on = () => setIsOnline(true);
+    const off = () => setIsOnline(false);
+    window.addEventListener('online', on);
+    window.addEventListener('offline', off);
     return () => {
+      window.removeEventListener('online', on);
+      window.removeEventListener('offline', off);
       streamRef.current?.getTracks().forEach(t => t.stop());
       if (fileUrlRef.current) { try { URL.revokeObjectURL(fileUrlRef.current); } catch {} }
     };
@@ -243,6 +249,7 @@ export const VideoCaptureCard: React.FC<{ lift: Lift; onResult?: (r: VideoAnalys
   return (
     <div className="train-videocap" style={{ padding: 12, borderRadius: 10, background: 'rgba(24,24,27,0.45)', border: '1px dashed rgba(56,189,248,0.25)', marginTop: 8 }}>
       <div style={{ fontSize: 11, fontWeight: 800, color: ACCENT }}>📹 Видео-анализ · {g.title}</div>
+      {!isOnline && <div style={{ marginTop: 4, fontSize: 10, color: '#fbbf24', background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)', padding: '4px 6px', borderRadius: 6 }}>Офлайн: CV недоступен — используйте ручной ввод ниже.</div>}
       <div style={{ fontSize: 10, color: DIM, marginTop: 2, lineHeight: 1.4 }}>
         {isNative ? 'АПК: съёмка идёт системной камерой телефона, видео откроется на весь экран.' : isTg ? 'Telegram Mini App — камера по клику, HTTPS.' : 'Браузер — камера по клику.'} {g.cam}
       </div>
