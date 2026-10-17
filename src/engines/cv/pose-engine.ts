@@ -21,12 +21,20 @@ async function getLandmarker(): Promise<any | null> {
     try {
       const vision: any = await import('@mediapipe/tasks-vision');
       const { PoseLandmarker, FilesetResolver } = vision;
-      const fileset = await FilesetResolver.forVisionTasks(
-        'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm'
-      );
+  // Локальные ассеты (офлайн) → CDN fallback
+  let wasmPath = '/mediapipe/wasm';
+  let modelPath = '/mediapipe/pose_landmarker_lite.task';
+  try {
+    const r = await fetch(wasmPath + '/vision_wasm_internal.js', { method: 'HEAD' });
+    if (!r.ok) throw new Error('no local wasm');
+  } catch {
+    wasmPath = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm';
+    modelPath = 'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task';
+  }
+  const fileset = await FilesetResolver.forVisionTasks(wasmPath);
       const lm = await PoseLandmarker.createFromOptions(fileset, {
         baseOptions: {
-          modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task',
+      modelAssetPath: modelPath,
           delegate: 'GPU',
         },
         runningMode: 'VIDEO',
