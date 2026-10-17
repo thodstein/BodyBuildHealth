@@ -548,16 +548,10 @@ export async function recognizeImageTextOffline(
     const corePath = nativeApp
       ? `${opts.corePath.replace(/\/$/, '')}/tesseract-core-lstm.wasm.js`
       : opts.corePath;
-    worker = await Tesseract.createWorker('rus+eng', 1, {
+    const createWorkerWithLang = async (lang: string) => Tesseract.createWorker(lang, 1, {
       workerPath: opts.workerPath,
       corePath,
-      // Только когда задан (локальные ассеты). В CDN-режиме langPath пустой,
-      // и тогда не должен попадать в опции: tesseract.js достроит URL на язык.
       ...(opts.langPath ? { langPath: opts.langPath } : {}),
-      // Capacitor Android WebView can reject Tesseract's default Blob-backed
-      // worker even when the bundled worker asset is available. In APK use
-      // the same-origin worker directly; web/TG still need the Blob wrapper
-      // because their worker script may be served from a different origin.
       workerBlobURL: !nativeApp,
       logger: (m: any) => {
         if (m?.status === 'recognizing text' && typeof m?.progress === 'number') {
@@ -565,6 +559,19 @@ export async function recognizeImageTextOffline(
         }
       },
     });
+    // Сначала пробуем двуязычную модель (рус+англ): бланки содержат
+    // русские названия и латинские аббревиатуры. Если она не поднялась
+    // (например, повреждён один из traineddata), честно падаем на один
+    // язык, чтобы не терять распознавание целиком.
+    try {
+      worker = await createWorkerWithLang('rus+eng');
+    } catch {
+      try {
+        worker = await createWorkerWithLang('rus');
+      } catch {
+        worker = await createWorkerWithLang('eng');
+      }
+    }
   } catch (e) {
     throw new Error(`движок OCR не запустился (worker/core/lang): ${(e as Error)?.message || String(e)}`);
   }
