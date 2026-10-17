@@ -13,7 +13,7 @@ import { loadCooldownLog, cooldownAdherence, cooldownQualityTrend } from '../../
 import { loadStretchLog } from '../../../engines/stretch-session.engine';
 import { Sparkline } from './Sparkline';
 import { MiniBarChart } from './DiaryChart';
-import { WorkoutWeekCard, DiaryEmptyState } from './diary-cards';
+import { WorkoutWeekCard, DiaryEmptyState, DiarySkeletonCard } from './diary-cards';
 import { diaryStyles as style, GRP_RU, GROUP_COLORS, ACCENT } from './diary-tokens';
 import { useDiaryHub, type DiaryHubCtx } from './diary-hub-context';
 import { mrvBaseForLevel, bestE1rmSeriesForWeek } from './diary-shared';
@@ -871,6 +871,7 @@ export const DiaryHistoryView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
               </div>
             );
           })()}
+          {isPending && <DiarySkeletonCard lines={4} />}
           {visibleHistory.map(([week, workouts], wi) => (
             <WorkoutWeekCard
               key={week}

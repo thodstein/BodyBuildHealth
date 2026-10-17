@@ -14,4 +14,6 @@
     <string name="widget_nutrition_desc">Ккал дня, вода в один тап, быстрый переход в дневник</string>
     <string name="tile_water_label">HE · Вода +250</string>
     <string name="tile_water_desc">Быстрая запись воды без открытия приложения</string>
+    <string name="widget_quickset_label">HE Быстрый сет</string>
+    <string name="widget_quickset_desc">Записать подход в один тап</string>
 </resources>

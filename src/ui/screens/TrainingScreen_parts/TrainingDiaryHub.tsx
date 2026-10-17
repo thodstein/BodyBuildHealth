@@ -246,6 +246,15 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
   const [myTrainingExs, setMyTrainingExs] = useState<{ name: string; sets: number; reps: number; rir: number }[]>([]);
   // Принудительная перерисовка блока «Сегодня» (быстрые отметки рутин/протоколов)
   const [, forceHub] = useState(0);
+  const [isOnline, setIsOnline] = useState<boolean>(() => (typeof navigator !== 'undefined' ? navigator.onLine : true));
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const on = () => { setIsOnline(true); onRefresh(); };
+    const off = () => setIsOnline(false);
+    window.addEventListener('online', on);
+    window.addEventListener('offline', off);
+    return () => { window.removeEventListener('online', on); window.removeEventListener('offline', off); };
+  }, [onRefresh]);
 
   // План на сегодня (для предпросмотра разминки/заминки во вкладках)
   const planDayToday = useMemo(() => {
@@ -580,6 +589,11 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
       {/* ═══ MODE: RECORD ═══ — quick entry + full form */}
       {mode === 'record' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {!isOnline && (
+            <div style={{ ...style.card, border: '1px solid rgba(245,158,11,0.35)', background: 'rgba(245,158,11,0.08)', padding: '8px 12px', fontSize: 11, color: '#f59e0b', fontWeight: 700 }}>
+              Офлайн: данные сохраняются локально и синхронизируются при восстановлении сети
+            </div>
+          )}
           {/* 🏁 Активный contest prep — сводная карточка (видна всегда в дневнике); клик → BB-планировщик */}
           <BBContestPrepActiveCard onOpen={() => {
             try { localStorage.setItem('he_training_planning_track', 'bb'); } catch { /* ignore */ }

@@ -369,6 +369,14 @@ export const SectionHeader: React.FC<{ icon: string; title: string; hint?: strin
 
 /* ─── DiaryEmptyState — единое пустое состояние ─── */
 
+export const DiarySkeletonCard: React.FC<{ lines?: number }> = ({ lines = 3 }) => (
+  <div style={{ ...style.card, padding: 12, animation: 'pulse 1.2s ease-in-out infinite' }}>
+    {Array.from({ length: lines }).map((_, i) => (
+      <div key={i} style={{ height: 10, borderRadius: 6, background: 'rgba(255,255,255,0.08)', marginBottom: i === lines - 1 ? 0 : 8, width: i === lines - 1 ? '60%' : '100%' }} />
+    ))}
+  </div>
+);
+
 export const DiaryEmptyState: React.FC<{
   icon: string;
   title: string;

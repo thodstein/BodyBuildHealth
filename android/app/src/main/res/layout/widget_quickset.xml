@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/w_quickset_root"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="@drawable/widget_bg"
+    android:orientation="vertical"
+    android:padding="12dp"
+    android:gravity="center"
+    android:contentDescription="Быстрый сет">
+
+    <TextView
+        android:id="@+id/w_quickset_title"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Быстрый сет"
+        android:textColor="#C9F73A"
+        android:textSize="12sp"
+        android:textStyle="bold" />
+
+    <TextView
+        android:id="@+id/w_quickset_sub"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:text="Записать подход"
+        android:textColor="#E2ECFF"
+        android:textSize="10sp" />
+
+    <TextView
+        android:id="@+id/w_quickset_act"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:background="@drawable/widget_action"
+        android:gravity="center"
+        android:padding="10dp"
+        android:text="+ Сет"
+        android:textColor="#C9F73A"
+        android:textSize="14sp"
+        android:textStyle="bold" />
+</LinearLayout>

@@ -3903,3 +3903,5 @@ html:not([data-theme="light"]):not([data-apk-theme="light"]) textarea::placehold
   min-height: 40px;
   min-width: 40px;
 }
+
+@media (max-width: 380px) { .hub-diary { padding: 6px !important; } .td-subnav-btn { min-width: 72px !important; font-size: 10px !important; } }
