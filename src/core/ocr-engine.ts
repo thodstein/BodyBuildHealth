@@ -598,9 +598,9 @@ export async function recognizeImageTextOffline(
         blockTexts.push(text);
         report((i + 1) * perPass);
         if (purpose === 'labs') {
-          // A complete lab pass should contain several canonical markers.
-          // Keep trying variants when only a title/footer or one row was read.
-          if (labOcrCandidateQuality(text).labCount >= 4) break;
+          // Пробуем ВСЕ варианты кадра, а не останавливаемся на первых 4
+          // маркерах: один вариант может дать 4 маркера, а другой — 20.
+          // Выбор лучшего идёт по labOcrCandidateQuality после цикла.
         } else {
           // Nutrition screenshots use macro labels for their early-exit gate.
           if (isCompleteOcrText(text) && !isNutritionDiaryOcrText(text)) break;
@@ -608,9 +608,37 @@ export async function recognizeImageTextOffline(
       }
       let best = purpose === 'labs' ? pickBestLabOcrText(blockTexts) : pickBestOcrText(blockTexts);
       if (purpose === 'labs') {
-        if (labOcrCandidateQuality(best).labCount >= 4) return best;
+        // Не выходим досрочно: разреженный проход PSM-11 может добавить
+        // недостающие строки, которых нет в блочном проходе.
       } else if (isCompleteOcrText(best) && !isNutritionDiaryOcrText(best)) {
         return best;
+      }
+      // Лабораторные бланки содержат латинские аббревиатуры (HbA1c, TSH,
+      // ALT, HDL …), которые русская модель читает как мусор. Дополнительный
+      // английский проход по лучшему кадру возвращает ровно эти метки; мы
+      // склеиваем тексты, а парсеры ниже дедуплицируют маркеры по коду.
+      if (purpose === 'labs') {
+        try {
+          const { resolveTesseractOptions, tesseractWorkerOptions } = await import('../engines/ocr-assets');
+          const o = await resolveTesseractOptions();
+          const engWorker = await Tesseract.createWorker('eng', 1, tesseractWorkerOptions(o));
+          try {
+            if (typeof engWorker.setParameters === 'function') {
+              await engWorker.setParameters({
+                tessedit_pageseg_mode: '6',
+                preserve_interword_spaces: '1',
+                user_defined_dpi: '220',
+              });
+            }
+            const engText = String((await engWorker.recognize(inputs[0].blob))?.data?.text || '');
+            if (engText.trim()) {
+              const combined = `${best}\\n${engText}`;
+              if (labOcrCandidateQuality(combined).score > labOcrCandidateQuality(best).score) best = combined;
+            }
+          } finally {
+            try { await engWorker.terminate(); } catch { /* ignore */ }
+          }
+        } catch { /* английский проход опционален */ }
       }
       // FatSecret Android uses right-aligned macro columns. A sparse-text pass
       // recovers rows that PSM 6 commonly drops, especially on narrow screens.
@@ -756,7 +784,7 @@ export async function processUploadedFile(
       // локальный результат сразу, без 70 секунд ожидания двух таймаутов.
       if (isNativeApp()) {
         try {
-          const offlineText = await recognizeImageTextOffline(file, 90_000, opts?.onProgress, 'labs');
+          const offlineText = await recognizeImageTextOffline(file, 90_000, opts?.onProgress, 'nutrition');
           if (offlineText.trim().length > 2) {
             warnings.push('Фото распознано оффлайн на устройстве (АПК-режим).');
             serverResult = { text: offlineText };
