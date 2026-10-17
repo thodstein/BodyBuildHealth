@@ -33,6 +33,8 @@ let cached: AppPlatform | null = null;
 export function isCapacitorNative(): boolean {
   try {
     if (typeof window === 'undefined') return false;
+    // APK/WebView могут не выставить window.Capacitor, но протокол выдаёт нативное окружение.
+    if (/^file:|^capacitor:|^ionic:/i.test(window.location?.protocol || '')) return true;
     const cap = (window as unknown as { Capacitor?: unknown }).Capacitor as
       | { isNativePlatform?: () => boolean; getPlatform?: () => string; platform?: string }
       | undefined;

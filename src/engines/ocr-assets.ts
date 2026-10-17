@@ -142,7 +142,12 @@ export async function resolveTesseractOptions(): Promise<{
   // Capacitor bundles these files into the APK. Some Android WebViews reject
   // HEAD/Range probes even though the bundled assets are readable by Tesseract;
   // probing here would incorrectly switch to an unavailable CDN.
-  if (isCapacitorNative()) return { ...local, source: 'local', langPath: local.langPath };
+  // В APK/WebView ассеты лежат локально (file:// или capacitor://). Даже если
+  // Capacitor-объект не распознался, протокол выдаёт нативное окружение —
+  // пробовать сеть (CDN) в таком случае бессмысленно и ломает оффлайн-OCR.
+  const isNativeLike = isCapacitorNative()
+    || (typeof window !== 'undefined' && /^file:|^capacitor:|^ionic:/i.test(window.location?.protocol || ''));
+  if (isNativeLike) return { ...local, source: 'local', langPath: local.langPath };
   const workerOk = await localAssetAvailable(local.workerPath);
   if (workerOk) {
     // Ядро, которое getCore запросит первым на большинстве современных
@@ -174,7 +179,9 @@ export async function resolvePdfjsWorkerSrc(): Promise<{ workerSrc: string; sour
   const local = getOcrAssetPaths('local');
   // PDF parsing in the APK uses the main thread because Capacitor WebViews
   // frequently reject module workers and external CDN URLs.
-  if (isCapacitorNative()) return { workerSrc: local.pdfjsWorkerSrc, source: 'local' };
+  const isNativeLike = isCapacitorNative()
+    || (typeof window !== 'undefined' && /^file:|^capacitor:|^ionic:/i.test(window.location?.protocol || ''));
+  if (isNativeLike) return { workerSrc: local.pdfjsWorkerSrc, source: 'local' };
   const localOk = await localAssetAvailable(local.pdfjsWorkerSrc);
   if (localOk) {
     return { workerSrc: local.pdfjsWorkerSrc, source: 'local' };
