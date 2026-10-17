@@ -68,11 +68,14 @@ export interface WidgetSyncResult {
 function collectTraining(): {
   title: string; subtitle: string; meta: string;
   progress: number; live: boolean; actionLabel: string; actionTarget: string;
+  nextExercise: string; weekProgress: number; lastSessionDate: string; lastSessionVolume: number;
 } {
   const last = safe(() => getLastSession(), null);
   const today = todayLocalISO();
   const week = safe(() => getSessionsByWeek(getISOWeekNumber(today)).length, 0);
   const total = safe(() => getWorkoutStats().totalSessions ?? 0, 0);
+  const daysPerWeek = safe(() => Number((getProfile() as any)?.settings?.training?.daysPerWeek) || 4, 4);
+  const weekProgress = Math.max(0, Math.min(100, Math.round((week / Math.max(1, daysPerWeek)) * 100)));
 
   // Живая сессия: прогресс по факту подходов + действие «+ Сет».
   try {
@@ -86,6 +89,10 @@ function collectTraining(): {
         live: true,
         actionLabel: '+ Сет',
         actionTarget: 'training_quick',
+        nextExercise: active.currentExercise || '',
+        weekProgress,
+        lastSessionDate: '',
+        lastSessionVolume: 0,
       };
     }
   } catch {
@@ -101,6 +108,10 @@ function collectTraining(): {
       live: false,
       actionLabel: '▶ Начать',
       actionTarget: 'training_run',
+      nextExercise: '',
+      weekProgress,
+      lastSessionDate: '',
+      lastSessionVolume: 0,
     };
   }
   const vol = last.totalVolume > 0 ? ` · ${(last.totalVolume / 1000).toFixed(1)} т` : '';
@@ -112,6 +123,10 @@ function collectTraining(): {
     live: false,
     actionLabel: '▶ Начать',
     actionTarget: 'training_run',
+    nextExercise: '',
+    weekProgress,
+    lastSessionDate: last.date || '',
+    lastSessionVolume: last.totalVolume || 0,
   };
 }
 

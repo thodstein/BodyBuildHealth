@@ -57,6 +57,10 @@ public class WidgetBridgePlugin extends Plugin {
             obj.put("live", call.getBoolean("live", false));
             obj.put("actionLabel", call.getString("actionLabel", ""));
             obj.put("actionTarget", call.getString("actionTarget", ""));
+            obj.put("nextExercise", call.getString("nextExercise", ""));
+            obj.put("weekProgress", Math.max(0, Math.min(100, call.getInt("weekProgress", 0))));
+            obj.put("lastSessionDate", call.getString("lastSessionDate", ""));
+            obj.put("lastSessionVolume", Math.max(0, call.getInt("lastSessionVolume", 0)));
             obj.put("updatedAt", System.currentTimeMillis());
             WidgetStore.putJson(ctx, WidgetStore.KEY_TRAINING, obj);
             TrainingWidgetProvider.updateAll(ctx);

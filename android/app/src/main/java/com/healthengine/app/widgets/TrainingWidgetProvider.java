@@ -43,6 +43,10 @@ public class TrainingWidgetProvider extends AppWidgetProvider {
         String meta = d.optString("meta", "");
         String actionLabel = d.optString("actionLabel", "");
         String actionTarget = d.optString("actionTarget", "");
+        String nextExercise = d.optString("nextExercise", "");
+        int weekProgress = Math.max(0, Math.min(100, d.optInt("weekProgress", 0)));
+        String lastSessionDate = d.optString("lastSessionDate", "");
+        int lastSessionVolume = Math.max(0, d.optInt("lastSessionVolume", 0));
         int progress = Math.max(0, Math.min(100, d.optInt("progress", 0)));
         boolean live = d.optBoolean("live", false);
         if (title.isEmpty()) {
@@ -53,7 +57,11 @@ public class TrainingWidgetProvider extends AppWidgetProvider {
             v.setTextViewText(R.id.w_training_act, "▶ Начать");
         } else {
             v.setTextViewText(R.id.w_training_title, title);
-            v.setTextViewText(R.id.w_training_sub, subtitle.isEmpty() ? " " : subtitle);
+            String subLine = subtitle.isEmpty() ? " " : subtitle;
+            if (!nextExercise.isEmpty() && live) {
+                subLine = subLine + "\n next: " + nextExercise;
+            }
+            v.setTextViewText(R.id.w_training_sub, subLine);
             String stamp = "";
             long at = d.optLong("updatedAt", 0L);
             if (at > 0) {
@@ -61,6 +69,14 @@ public class TrainingWidgetProvider extends AppWidgetProvider {
                         .format(new java.util.Date(at));
             }
             String metaLine = meta.isEmpty() ? stamp : (stamp.isEmpty() ? meta : meta + " · " + stamp);
+            if (weekProgress > 0) {
+                metaLine = (metaLine.isEmpty() ? "" : metaLine + " · ") + "нед " + weekProgress + "%";
+            }
+            if (!live && !lastSessionDate.isEmpty()) {
+                String last = "посл. " + lastSessionDate;
+                if (lastSessionVolume > 0) last = last + " · " + (lastSessionVolume / 1000f) + "т";
+                metaLine = (metaLine.isEmpty() ? "" : metaLine + " · ") + last;
+            }
             v.setTextViewText(R.id.w_training_meta, metaLine.isEmpty() ? " " : metaLine);
             v.setProgressBar(R.id.w_training_progress, 100, progress, false);
             v.setTextViewText(R.id.w_training_act, actionLabel.isEmpty() ? (live ? "+ Сет" : "▶ Начать") : actionLabel);
