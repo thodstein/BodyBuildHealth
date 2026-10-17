@@ -295,11 +295,21 @@ export function migrateToUnified(): UnifiedSettings {
       fat: manualF ?? 0,
       carbs: manualC ?? 0,
     };
+    // Ручные цели КБЖУ есть → ручной режим должен быть включён, иначе
+    // планировщик игнорирует manualTargets (читает их только при kbjuMode='manual').
+    if ((manualKcal ?? 0) > 0 || (manualP ?? 0) > 0 || (manualF ?? 0) > 0 || (manualC ?? 0) > 0) {
+      s.nutrition.kbjuMode = 'manual';
+    }
   }
   const manualG = safeNum('he_manual_g_per_kg');
   if (manualG !== undefined) s.nutrition.manualGPerKg = manualG;
   const kbjuMode = safeStr('he_kbju_mode');
-  if (kbjuMode === 'auto' || kbjuMode === 'manual') s.nutrition.kbjuMode = kbjuMode;
+  // Ручные цели КБЖУ присутствуют → не даём явному 'auto' из старых сохранений
+  // заглушить ручной режим (иначе manualTargets молча игнорируются планировщиком).
+  const _hasManualTargets = !!(s.nutrition.manualTargets && ([s.nutrition.manualTargets.kcal, s.nutrition.manualTargets.protein, s.nutrition.manualTargets.fat, s.nutrition.manualTargets.carbs].some((x: any) => typeof x === 'number' && x > 0)));
+  if (kbjuMode === 'profile') s.nutrition.kbjuMode = 'profile';
+  else if (_hasManualTargets) s.nutrition.kbjuMode = 'manual';
+  else if (kbjuMode === 'auto' || kbjuMode === 'manual') s.nutrition.kbjuMode = kbjuMode;
 
   const eveningLowCarb = safeStr('he_evening_low_carb');
   if (eveningLowCarb === 'true' || eveningLowCarb === '1') s.nutrition.eveningLowCarb = true;

@@ -732,6 +732,9 @@ const kbju = useMemo(()=> calcKBJU(input), [input]);
         const next = { ...(cur?.settings || {}) } as any;
         const nut = { ...(next.nutrition || {}) } as any;
         nut.manualTargets = { kcal: tgt.kcal, protein: tgt.p, fat: tgt.f, carbs: tgt.c };
+        // Ручные цели записаны → включаем ручной режим КБЖУ, иначе планировщик
+        // игнорирует manualTargets (читает их только при kbjuMode='manual').
+        nut.kbjuMode = 'manual';
         next.nutrition = nut;
         updateProfile({ settings: next } as any);
         profileWritten = true;

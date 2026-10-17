@@ -298,9 +298,9 @@ const FATSECRET_TOTAL_REGEX = /итого|всего|total|daily\s+total|сум�
 const FATSUCCESS_MACRO_LINE = /(\d+(?:[.,]\d+)?(?:\s+\d+)*)\s*(ккал|кал|kcal|белки?|жиры?|углевод|угл|жиры|бел|протеин|б|ж|у|carb|protein|fat|calori|cal|energy)/gi;
 const MFP_LINE_REGEX = /^(.+?)\s+(\d+(?:[.,]\d+)?)\s*(?:(?:г|мл|шт|oz|serving|srvg|slice|cup|tbsp|шт|кус|порц|ml|g|pcs)[,.]?\s*)?(\d+(?:[.,]\d+)?)\s*(ккал|кал|kcal|cal)/i;
 const MFP_MEAL_HEADING = /^(?:breakfast|lunch|dinner|snack(?:\s*\d+)?|brunch|завтрак|обед|ужин|перекус(?:\s*\d+)?|полдник|бранч)(?:\s*[:\-].*)?$/i;
-const MFP_UI_NOISE = /^(?:(?:my\s*fitness\s*pal|myfitnesspal)(?:\s+food\s+diary)?|fatsecret|diary|food diary|nutrition|today|yesterday|add food|add exercise|quick add|edit diary|дневник|питание|сегодня|вчера|добавить еду|добавить продукт|упражнения|цели|назад|готово|сохранить|итого|всего|total|daily total|calories remaining|remaining|calories|калории|калорий осталось|осталось|свернуть|копировать|premium|home|more|settings|search)$/i;
+const MFP_UI_NOISE = /^(?:(?:my\s*fitness\s*pal|myfitnesspal)(?:\s+food\s+diary)?|fatsecret|diary|food diary|nutrition|today|yesterday|add food|add exercise|quick add|edit diary|дневник(?:\s+питания)?|питание|сегодня|вчера|добавить еду|добавить продукт|упражнения|цели?|цель|назад|готово|сохранить|итого|всего|total|daily total|calories remaining|remaining|calories|калории|калорий осталось|осталось(?:\s+калорий)?|свернуть|копировать|premium|home|more|settings|search)$/i;
 const DATE_ONLY_LINE = /^(?:\d{4}[-/.]\d{1,2}[-/.]\d{1,2}|\d{1,2}[-/.]\d{1,2}(?:[-/.]\d{2,4})?)$/;
-const MFP_TOTAL_OR_UI_LINE = /^(?:(?:total|итого|всего)(?:\s+\d+(?:[.,]\d+)?\s*(?:ккал|кал|kcal|cal))?|calories?\s+(?:goal|remaining|consumed|burned)|daily\s+(?:total|goal)|(?:goal|remaining)\s+calories|total\s+(?:calories|protein|fat|carbs?)|калории\s+(?:цель|осталось|употреблено)|калорий\s+осталось|цель\s+калорий|daily\s+summary)(?:\s|$)/i;
+const MFP_TOTAL_OR_UI_LINE = /^(?:(?:total|итого|всего)(?:\s+\d+(?:[.,]\d+)?\s*(?:ккал|кал|kcal|cal))?|calories?\s+(?:goal|remaining|consumed|burned)|daily\s+(?:total|goal)|(?:goal|remaining)\s+calories|total\s+(?:calories|protein|fat|carbs?)|калории\s+(?:цель|осталось|употреблено|осталось\s+калорий)?|калорий\s+осталось|осталось\s+калорий|цель\s+калорий|дневник\s+питания|daily\s+summary)(?:\s|$)/i;
 const INLINE_MACRO_REGEX = /(?:total\s+)?(?:белки?|белок|протеин|protein|\bp\b|б)\s*[:\-]?\s*(\d+(?:\s+\d+)*(?:[.,]\d+)?)/i;
 const INLINE_FAT_REGEX = /(?:total\s+)?(?:жиры?|жир|fat|\bf\b|ж)\s*[:\-]?\s*(\d+(?:\s+\d+)*(?:[.,]\d+)?)/i;
 const INLINE_CARB_REGEX = /(?:углеводы?|углевод|угл|у|carbohydrates?|carbs?|carb|\bc\b)\s*[:\-]?\s*(\d+(?:\s+\d+)*(?:[.,]\d+)?)/i;
@@ -949,7 +949,7 @@ function mfpFoodRow(line: string): { name: string; portion: { qty: string; grams
 /** Parses compact, exported and OCR-split MyFitnessPal diary layouts. */
 export function parseMyFitnessPalText(text: string): ParsedMeal[] {
   if (typeof text !== 'string' || !text.trim()) return [];
-  if (!/(?:my\s*fitness\s*pal|myfitnesspal|food\s+diary|calories\s+(?:goal|remaining)|калорий\s+осталось)/i.test(text)) return [];
+  if (!/(?:my\s*fitness\s*pal|myfitnesspal|mfp|food\s+diary|calories\s+(?:goal|remaining)|калорий?\s+осталось|осталось\s+калорий?|калории\s+осталось|цель\s+калорий)/i.test(text)) return [];
   const now = new Date();
   const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
   const lines = text.split(/\r?\n/).map(normalizeOcrArtifacts).filter(Boolean);
@@ -1218,7 +1218,7 @@ export function parseNutritionText(text: string): ParsedMeal[] {
   if (typeof text !== 'string' || !text.trim()) return [];
   // Provider layouts are parsed on their own so the generic screenshot/export
   // fallbacks cannot add a second, shifted interpretation of the same columns.
-  if (/(?:my\s*fitness\s*pal|myfitnesspal|food\s+diary|calories\s+(?:goal|remaining)|калорий\s+осталось)/i.test(text)) {
+  if (/(?:my\s*fitness\s*pal|myfitnesspal|mfp|food\s+diary|calories\s+(?:goal|remaining)|калорий?\s+осталось|осталось\s+калорий?|калории\s+осталось|цель\s+калорий)/i.test(text)) {
     const mfpMeals = parseMyFitnessPalText(text);
     if (mfpMeals.length > 0) return mfpMeals;
   }

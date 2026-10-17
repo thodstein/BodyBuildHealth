@@ -669,7 +669,7 @@ export interface UnifiedSettings {
     potassiumG: number;           // г/день
     alcoholPerWeek: number;       // стандартных дринков
     /** КБЖУ: режим выбора целей (auto = по профилю, manual = ручные цифры) */
-    kbjuMode?: 'auto' | 'manual';
+    kbjuMode?: 'auto' | 'manual' | 'profile';
     /** Ручные цели КБЖУ (если kbjuMode='manual') */
     manualTargets?: { kcal: number; protein: number; fat: number; carbs: number };
     /** Ручной г/кг белка (override proteinPerKg) */

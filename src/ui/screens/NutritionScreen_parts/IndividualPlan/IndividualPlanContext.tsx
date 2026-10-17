@@ -899,13 +899,25 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
   // manualGPerKg только в ручном режиме, поэтому режим должен быть виден в useMemo.
   const [kbjuMode, setKbjuMode] = useState<'auto' | 'manual' | 'profile'>(() => {
     // P1-fix: читаем из Profile (UnifiedSettings.nutrition.kbjuMode)
+    // FIX: если в профиле есть ручные цели КБЖУ, но режим не помечен 'manual'
+    // (миграция/старые сохранения/MetabolicHub), включаем ручной режим автоматически —
+    // иначе manualTargets молча игнорируются планировщиком.
+    const _hasManualTargets = (mt: any) => !!mt && [mt.kcal, mt.protein, mt.fat, mt.carbs, mt.protein, mt.fat, mt.carbs].some((x: any) => typeof x === 'number' && x > 0);
     try {
       const v = (s as any)?.nutrition?.kbjuMode;
-      if (v === 'manual' || v === 'profile' || v === 'auto') return v;
+      const mt = (s as any)?.nutrition?.manualTargets;
+      if (v === 'manual' || v === 'profile') return v;
+      if (_hasManualTargets(mt)) return 'manual';
+      if (v === 'auto') return 'auto';
     } catch {}
     try {
       const v = localStorage.getItem('he_kbju_mode');
-      if (v === 'manual' || v === 'profile' || v === 'auto') return v;
+      const hasManualLocal = ['he_manual_kcal', 'he_manual_p', 'he_manual_f', 'he_manual_c'].some(k => {
+        try { const x = localStorage.getItem(k); return x !== null && Number(x) > 0; } catch { return false; }
+      }) || (() => { try { const g = JSON.parse(localStorage.getItem('he_manual_g_per_kg') || 'null'); return !!(g && (g.protein > 0 || g.fat > 0 || g.carbs > 0)); } catch { return false; } })();
+      if (v === 'manual' || v === 'profile') return v;
+      if (hasManualLocal) return 'manual';
+      if (v === 'auto') return 'auto';
     } catch {}
     return 'auto';
   });
@@ -3076,6 +3088,25 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
           });
         } else if (s.nutrition.proteinPerKg && typeof s.nutrition.proteinPerKg === 'number') {
           setManualGPerKg({ protein: s.nutrition.proteinPerKg, fat: 0, carbs: 0 });
+        }
+        // FIX: подтягиваем ручные цели КБЖУ + режим из профиля (иначе «Из профиля»
+        // не применял ручной КБЖУ к планированию).
+        const _mt = (s.nutrition as any).manualTargets;
+        if (_mt && typeof _mt === 'object') {
+          if (typeof _mt.kcal === 'number' && _mt.kcal > 0) setManualKcal(_mt.kcal);
+          if (typeof _mt.protein === 'number' && _mt.protein > 0) setManualP(_mt.protein);
+          if (typeof _mt.fat === 'number' && _mt.fat > 0) setManualF(_mt.fat);
+          if (typeof _mt.carbs === 'number' && _mt.carbs > 0) setManualC(_mt.carbs);
+        }
+        if (s.nutrition.kbjuMode === 'manual' || s.nutrition.kbjuMode === 'profile' || s.nutrition.kbjuMode === 'auto') {
+          // если есть ручные цели, не даём auto затереть ручной режим
+          if ((s.nutrition.kbjuMode === 'auto') && _mt && [(_mt as any).kcal, (_mt as any).protein, (_mt as any).fat, (_mt as any).carbs].some((x: any) => typeof x === 'number' && x > 0)) {
+            setKbjuMode('manual');
+          } else {
+            setKbjuMode(s.nutrition.kbjuMode);
+          }
+        } else if (_mt && [(_mt as any).kcal, (_mt as any).protein, (_mt as any).fat, (_mt as any).carbs].some((x: any) => typeof x === 'number' && x > 0)) {
+          setKbjuMode('manual');
         }
         if (s.nutrition.sodiumG) {/* stored */}
         if (s.nutrition.eveningLowCarb) setEveningLowCarb(s.nutrition.eveningLowCarb);

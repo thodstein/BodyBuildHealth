@@ -16,4 +16,10 @@
     <string name="tile_water_desc">Быстрая запись воды без открытия приложения</string>
     <string name="widget_quickset_label">HE Быстрый сет</string>
     <string name="widget_quickset_desc">Записать подход в один тап</string>
+    <string name="widget_waterquick_label">HE Вода +250</string>
+    <string name="widget_waterquick_desc">Добавить 250 мл воды в один тап</string>
+    <string name="widget_today_label">HE Сегодня</string>
+    <string name="widget_today_desc">План дня и переход в проведение</string>
+    <string name="widget_week_label">HE Неделя</string>
+    <string name="widget_week_desc">Обзор недели и переход в дневник</string>
 </resources>
