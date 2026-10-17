@@ -88,7 +88,13 @@ async function recognizeImage(buffer: Buffer): Promise<string> {
   // текст уже получен.
   let eng = '';
   try { eng = (await recognizePass(buffer, 'eng')).trim(); } catch { /* опциональный проход */ }
-  if (eng && nutritionOcrScore(eng, 'eng') > 0) {
+  // Бланки анализов (Инвитро/Хеликс/Гемотест/КДЛ) и скриншоты питания
+  // содержат латинские аббревиатуры (HbA1c, TSH, ALT, HDL, LDL, GFR,
+  // CRP и т.д.), которые русская модель читает как мусор. Поэтому
+  // английский проход добавляем ВСЕГДА, когда он вернул непустой текст —
+  // даже если nutritionOcrScore = 0 (чистый бланк без макро-этикеток).
+  // Парсеры ниже дедуплицируют маркеры по коду, дублей строк не будет.
+  if (eng.trim()) {
     if (!rus) return eng;
     return `${rus}\n${eng}`;
   }

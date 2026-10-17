@@ -408,12 +408,16 @@ function candidateScore(value: ParsedLabValue): number {
   return Math.max(0, Math.min(1, score / 8));
 }
 
-const PROVIDER_HEADERS: Record<string, string[]> = {
+export const PROVIDER_HEADERS: Record<string, string[]> = {
   invitro: ['наименование', 'результат', 'референс', 'единицы'],
   gemotest: ['наименование', 'результат', 'референс', 'ед'],
   kdl: ['наименование', 'результат', 'референс', 'единицы'],
   helix: ['показатель', 'результат', 'референс', 'единицы'],
 };
+
+export function detectProvider(text: string): string | null {
+  return detectProviderFromText(text);
+}
 
 function detectProviderFromText(text: string): string | null {
   const lower = text.toLowerCase();
