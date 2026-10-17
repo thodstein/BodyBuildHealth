@@ -90,6 +90,8 @@ export interface ArmliftingReport {
   verdict: string;
   /** PRO-4 A10: рецепт по слабейшему (строки CoC FAQ / pinch-протокола, без новой математики). */
   prescription: string;
+  /** Источник нормативной базы (честная подпись, без выдуманных перцентилей). */
+  normSource: string;
 }
 
 const IMPLEMENT_LABEL: Record<string, string> = {
@@ -485,7 +487,7 @@ export function buildArmliftingReport(input: ArmliftInput): ArmliftingReport {
   } else {
     verdict = `Только факты без % (${rows.map((r) => r.label).join(', ')}) — добавь RT/Hub/Pinch-кг для %WR`;
   }
-  return { rows, filled: rows.length, weakest, weakestWr, avgPct, avgWrPct, avgInternalPct, rtAsymPct, hubAsymPct, pinchAsymPct, totalKg, verdict, prescription };
+  return { rows, filled: rows.length, weakest, weakestWr, avgPct, avgWrPct, avgInternalPct, rtAsymPct, hubAsymPct, pinchAsymPct, totalKg, verdict, prescription, normSource: 'Нормы: % от WR IronMind/Armlifting USA; уровни base/comp/elite по %WR; внутренние ориентиры — хаб' };
 }
 
 // ── PRO-3 W5c + PRO-4: экспорт вердикта (HTML/CSV) ─────────────────────────

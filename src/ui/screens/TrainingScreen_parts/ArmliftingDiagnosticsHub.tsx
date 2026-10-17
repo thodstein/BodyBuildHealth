@@ -29,7 +29,7 @@ import { analyzeArmliftVideo } from '../../../engines/arm/armlift-video-flags.en
 import { planArmliftAttempts } from '../../../engines/arm/armlift-attempt-plan.engine';
 import { diagnoseArmlift, ARMLIFT_WEAK_LINK_SHORT_RU } from '../../../engines/arm/armlift-diagnosis.engine';
 import { diagnoseArmliftCause, countGripSessions, flexExtRatio, ARMLIFT_CAUSE_RU, ARMLIFT_MOBILITY_FAIL_RU, ARMLIFT_ACWR_ZONE_RU } from '../../../engines/arm/armlift-cause.engine';
-import { benchmarkPinchHold, benchmarkFarmerHold, benchmarkCoc, benchmarkSilverHold, overallGripLevel, ARMLIFT_LEVEL_RU, testProtocolFor } from '../../../engines/arm/armlift-benchmarks.engine';import { saveDiagSnapshot, lastSnapshotFor, retestVerdict, weeksBetween, loadDiagHistory, clearDiagHistory, historyDeltaFor, completenessTrend } from '../../../engines/arm/armlift-history.engine';
+import { benchmarkPinchHold, benchmarkFarmerHold, benchmarkCoc, benchmarkSilverHold, overallGripLevel, ARMLIFT_LEVEL_RU, testProtocolFor } from '../../../engines/arm/armlift-benchmarks.engine';import { saveDiagSnapshot, lastSnapshotFor, retestVerdict, retestReliability, weeksBetween, loadDiagHistory, clearDiagHistory, historyDeltaFor, completenessTrend } from '../../../engines/arm/armlift-history.engine';
 import { assessArmliftMobility } from '../../../engines/arm/armlift-mobility.engine';
 import { loadSRPESessions } from '../../../engines/pro/srpe-store';
 import { toDailyLoads, acuteChronicRatio } from '../../../engines/pro/training-load.engine';
@@ -94,7 +94,7 @@ type DiagState = {
   specWeeks: 4 | 6;
   /** PRO-6 M5: условия замера (режут ложные слабости). */
   condRtVersion: string; condUncalib: boolean; condLiquid: boolean; condCold: boolean;
-  condDiameterMm: string;
+  condDiameterMm: string; condPlateCorrectionKg: string;
   /** PRO-6 M3/M4: рука + второй холд (опционально, пусто = тихо). */
   handSpanCm: string; handPalmCm: string; handThumbCm: string;
   pinchSubSec: string; farmerSubSec: string;
@@ -115,7 +115,7 @@ const DEFAULT_DIAG: DiagState = {
   skinTear: false, thumbWebPain: false,
   specWeeks: 4,
   condRtVersion: 'unknown', condUncalib: false, condLiquid: false, condCold: false,
-  condDiameterMm: '',
+  condDiameterMm: '', condPlateCorrectionKg: '',
   handSpanCm: '', handPalmCm: '', handThumbCm: '',
   pinchSubSec: '', farmerSubSec: '',
   painZones: [], condNumb: false, condSwell: false, condNight: false,
@@ -141,6 +141,7 @@ function loadDiag(): DiagState {
       painZones: Array.isArray((j as any).painZones)
         ? (j as any).painZones.filter((x: any) => typeof x === 'string' && ARMLIFT_PAIN_ZONES.some((z) => z.id === x))
         : [],
+      condPlateCorrectionKg: typeof (j as any).condPlateCorrectionKg === 'string' ? (j as any).condPlateCorrectionKg : '',
     };
   } catch { return DEFAULT_DIAG; }
 }
@@ -152,7 +153,7 @@ type LiftState = {
   cocLevel: string; silverSec: string; silverGripper: string;
   excalKg: string; hubKg: string; hubL: string; hubR: string;
   raptorKg: string; crushKg: string; clockKg: string; anvilKg: string; medleyKg: string;
-  sex: string; bwKg: string;
+  sex: string; bwKg: string; age: string; gripKg: string; schemaVersion: number;
   /** ROUND-10: старт-неделя года для overlay спец-блока (паритет со стронгом/ТА). */
   annualStartWeek: string;
 };
@@ -162,7 +163,7 @@ const DEFAULT_STATE: LiftState = {
   pinchSec: '', pinchKg: '', pinchL: '', pinchR: '', cocLevel: '', silverSec: '', silverGripper: '3',
   excalKg: '', hubKg: '', hubL: '', hubR: '',
   raptorKg: '', crushKg: '', clockKg: '', anvilKg: '', medleyKg: '',
-  sex: 'male', bwKg: '80', annualStartWeek: '1',
+  sex: 'male', bwKg: '80', age: '', gripKg: '', schemaVersion: 1, annualStartWeek: '1',
 };
 
 /** PRO-3 W6: сид из арм-хаба — замеры не дублируются вручную.
@@ -208,6 +209,14 @@ function loadState(): LiftState {
       clockKg: pick(j, 'clockKg', ''), anvilKg: pick(j, 'anvilKg', ''), medleyKg: pick(j, 'medleyKg', ''),
       sex: pick(j, 'sex', 'male') === 'female' ? 'female' : 'male',
       bwKg: pick(j, 'bwKg', '80'),
+      age: pick(j, 'age', ''),
+      gripKg: pick(j, 'gripKg', ''),
+      schemaVersion: typeof (j as any).schemaVersion === 'number' ? (j as any).schemaVersion : 1,
+      annualStartWeek: (() => {
+        const v = pick(j, 'annualStartWeek', '1');
+        const n = parseInt(v, 10);
+        return Number.isFinite(n) && n >= 1 && n <= 52 ? String(n) : '1';
+      })(),
     };
   } catch {
     return DEFAULT_STATE;
@@ -291,6 +300,16 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
   const trend = useMemo(() => {
     try { return liftTrendFromLog(loadPlatformLog()); } catch { return []; }
   }, []);
+  /** Справочная оценка общей силы хвата (Jamar), не снаряды. */
+  const gripNorm = useMemo(() => {
+    const g = f(state.gripKg);
+    if (g == null) return null;
+    const male = state.sex !== 'female';
+    const age = f(state.age) ?? 30;
+    const good = male ? (age < 40 ? g >= 45 : g >= 35) : (age < 40 ? g >= 28 : g >= 22);
+    const weak = male ? (age < 40 ? g < 35 : g < 25) : (age < 40 ? g < 22 : g < 16);
+    return weak ? 'ниже нормы (справочно)' : good ? 'норма/выше (справочно)' : 'средний (справочно)';
+  }, [state.gripKg, state.sex, state.age]);
 
   // ROUND-10: план армлифтинга → аудит покрытия 5 звеньев (тот же план, что строит Арм-конструктор)
   const liftPlan = useMemo(() => {
@@ -506,11 +525,21 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
     ];
     const list = pairs
       .filter(([, p, c]) => p != null && c != null)
-      .map(([t, p, c]) => ({ test: t, text: `${t}: ${retestVerdict(p, c, weeks).text}` }));
+      .map(([t, p, c]) => {
+        const v = retestVerdict(p, c, weeks);
+        const rel = retestReliability(p, c);
+        const warn = rel.warning ? ` · ${rel.warning}` : '';
+        return { test: t, text: `${t}: ${v.text}${warn}` };
+      });
+    const reliabilityWarnings = pairs
+      .filter(([, p, c]) => p != null && c != null)
+      .map(([, p, c]) => retestReliability(p, c).warning)
+      .filter((w): w is string => !!w);
     return {
       prev: { date: prev.date },
       list,
       due: list.length === 0 && weeks >= 4 ? `Прошло ${weeks} нед с замера ${prev.date} — пора перетест` : null,
+      reliabilityWarnings,
     };
   }, [diag.implement, diag.pinchHoldSec, diag.farmerHoldSec, state.cocLevel, state.silverSec]);
   const diagFaults = useMemo(() => faultsFor(diag.implement), [diag.implement]);
@@ -559,7 +588,8 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
     liquidChalk: diag.condLiquid,
     coldGym: diag.condCold,
     barDiameterMm: diag.condDiameterMm ? parseFloat(diag.condDiameterMm) : null,
-  }), [diag.implement, diag.condRtVersion, diag.condUncalib, diag.condLiquid, diag.condCold, diag.condDiameterMm]);
+    plateCorrectionKg: diag.condPlateCorrectionKg ? parseFloat(diag.condPlateCorrectionKg) : null,
+  }), [diag.implement, diag.condRtVersion, diag.condUncalib, diag.condLiquid, diag.condCold, diag.condDiameterMm, diag.condPlateCorrectionKg]);
   /** PRO-6 M3: рука — только текст, %WR не трогаем. */
   const hand = useMemo(() => assessArmliftHand({
     implement: diag.implement,
@@ -667,6 +697,7 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
         },
         armProfile: {
           ...(Number.isFinite(bw) && bw > 0 ? { bwKg: bw } : {}),
+          ...(f(state.age) != null ? { age: f(state.age) as number } : {}),
           ...(rtBest != null ? { rtKg: rtBest } : {}),
           ...(f(state.pinchKg) != null ? { pinchKg: f(state.pinchKg) as number } : {}),
           ...(hubBest != null ? { hubKg: hubBest } : {}),
@@ -772,6 +803,29 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
       setToast(shareOutcomeLabel(o));
       setTimeout(() => setToast(''), 2500);
     } catch { setToast('⚠ CSV не собран'); setTimeout(() => setToast(''), 2500); }
+  };
+
+  /** Волна 5: бэкап/импорт полного профиля (замеры + диагностика) в JSON. */
+  const handleExportProfile = async () => {
+    try {
+      const payload = { schemaVersion: 1, state, diag };
+      const o = await saveTextFileApk(`armlifting-profile-${localIsoDate()}.json`, JSON.stringify(payload, null, 2), 'application/json;charset=utf-8');
+      setToast(shareOutcomeLabel(o));
+      setTimeout(() => setToast(''), 2500);
+    } catch { setToast('⚠ Профиль не собран'); setTimeout(() => setToast(''), 2500); }
+  };
+  const handleImportProfile = async (file: File | null) => {
+    if (!file) return;
+    try {
+      const text = await file.text();
+      const j = JSON.parse(text);
+      if (!j || j.schemaVersion !== 1 || typeof j.state !== 'object' || typeof j.diag !== 'object') {
+        setToast('⚠ Неверный файл профиля'); setTimeout(() => setToast(''), 2500); return;
+      }
+      save(j.state as LiftState);
+      saveDiag(j.diag as DiagState);
+      setToast('✓ Профиль импортирован'); setTimeout(() => setToast(''), 2500);
+    } catch { setToast('⚠ Не удалось импортировать профиль'); setTimeout(() => setToast(''), 2500); }
   };
 
   /** АПК-безопасная печать: window.open().print() в Capacitor WebView не работает
@@ -922,7 +976,7 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
           {([['pomost', '📏 Замеры'], ['diag', '🔍 Диагностика'], ['corr', '🔧 Коррекция']] as Array<[DiagTab, string]>).map(([id, label]) => (
             <AdChip key={id} active={tab === id} onClick={() => setTab(id)}>{label}</AdChip>
           ))}
-          <AdBtn variant="amber" data-arm="lift-apply-top" aria-label="Применить в Арм-конструктор" onClick={applyToConstructor}>→ Применить</AdBtn>
+          <AdBtn variant="amber" data-arm="lift-apply-top" aria-label="Применить замеры в конструктор" onClick={applyToConstructor}>→ Применить</AdBtn>
         </div>
         <div className="ad-muted">📏 Замеры — вход диагностики (%WR, слабейший). 🔍 Диагностика — точка срыва + фолы + тесты + причина. 🔧 Коррекция — упражнения + спец-блок волной.</div>
       </AdCard>      {tab === 'pomost' && (<>
@@ -952,6 +1006,8 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
           <div className="lift-group">⚖️ Вес тела (едет в конструктор)</div>
           <AdGrid cols="auto-sm">
             <LiftNum label="Вес тела кг" value={state.bwKg} onChange={(v) => set({ bwKg: v })} placeholder="80" aria="Вес тела кг" />
+            <LiftNum label="Возраст лет" value={state.age} onChange={(v) => set({ age: v })} placeholder="30" aria="Возраст лет" />
+            <LiftNum label="Общая сила хвата кг (Jamar)" value={state.gripKg} onChange={(v) => set({ gripKg: v })} placeholder="45" aria="Общая сила хвата кг" />
           </AdGrid>
           <div className="ad-row">
             <AdChip active={state.axleImpl !== 'apollon'} onClick={() => set({ axleImpl: 'saxon' })}>Saxon (ориентир)</AdChip>
@@ -984,6 +1040,17 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
         <div id="lift-verdict-sec" />
         <AdSec title="📊 Вердикт по снарядам" defaultOpen summary={report.filled ? `${report.filled} сн.` : 'введи замеры'}>
           <div data-arm="lift-verdict"><b>{report.verdict}</b></div>
+          <div className="ad-muted" data-arm="lift-norm-source" style={{ fontSize: 11, marginTop: 4 }}>{report.normSource}</div>
+          {trend.length > 0 && (
+            <div className="ad-muted" data-arm="lift-trend" style={{ fontSize: 11, marginTop: 4 }}>
+              Тренд: {trend.map((t) => `${t.implement} ${t.deltaKg > 0 ? '+' : ''}${t.deltaKg} кг (${t.deltaPct > 0 ? '+' : ''}${t.deltaPct}%)`).join(' · ')}
+            </div>
+          )}
+          {gripNorm && (
+            <div className="ad-muted" data-arm="lift-grip-norm" style={{ fontSize: 11, marginTop: 4 }}>
+              Общая сила хвата: {state.gripKg} кг — {gripNorm} (Jamar-ориентир, не снаряд)
+            </div>
+          )}
           {!report.filled && (
             <AdBanner tone="info">Введи хотя бы один снаряд выше — %WR и слабейший снаряд появятся здесь, дальше иди в Диагностику.</AdBanner>
           )}
@@ -1150,6 +1217,11 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
               Прошлый замер {retests.prev.date}: {retests.list.map((r) => r.text).join(' · ')}
             </div>
           )}
+          {retests.reliabilityWarnings && retests.reliabilityWarnings.length > 0 && (
+            <div className="ad-muted" data-arm="lift-retest-reliability" style={{ color: '#f59e0b' }}>
+              ⚠ {retests.reliabilityWarnings.join(' · ')}
+            </div>
+          )}
           {completeness.missing.includes('мобильность') && (
             <div className="ad-muted" data-arm="lift-mob-hint">Для честного вердикта — вбей градусы разгибания/сгибания и проверь мизинец большим</div>
           )}
@@ -1229,6 +1301,7 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
           </div>
           <AdGrid cols="auto-sm">
             <LiftNum label="Диаметр грифа мм" value={diag.condDiameterMm} onChange={(v) => setD({ condDiameterMm: v })} placeholder="60.3" aria="Диаметр грифа мм" />
+            <LiftNum label="Поправка дисков кг" value={diag.condPlateCorrectionKg} onChange={(v) => setD({ condPlateCorrectionKg: v })} placeholder="0" aria="Поправка дисков кг" />
           </AdGrid>
           <div className="ad-muted" data-arm="lift-conditions">{conditions.conditionsNote}</div>
           {/* Аудит 2026-10: чек-лист правил IronMind наконец получил ввод — раньше
@@ -1399,6 +1472,11 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
           <AdBtn variant="ghost" onClick={handleSaveAnnual}>🗓 В годовой план</AdBtn>
         </span>
         <AdBtn variant="ghost" data-arm="export-print" onClick={handlePrint}>🖨 Печать</AdBtn>
+        <AdBtn variant="ghost" data-arm="export-profile" onClick={handleExportProfile}>📤 Профиль JSON</AdBtn>
+        <label style={{ display: 'inline-flex' }}>
+          <AdBtn variant="ghost" data-arm="import-profile" onClick={() => document.getElementById('lift-profile-import')?.click()}>📥 Импорт профиля</AdBtn>
+          <input id="lift-profile-import" type="file" accept="application/json" style={{ display: 'none' }} onChange={(e) => handleImportProfile(e.target.files?.[0] ?? null)} />
+        </label>
       </div>
     </AdRoot>
   );

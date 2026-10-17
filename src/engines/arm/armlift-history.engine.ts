@@ -64,6 +64,21 @@ export function lastSnapshotFor(implement: string, excludeToday = true): Armlift
   return list.length ? list[list.length - 1] : null;
 }
 
+/** Надёжность перетеста: коэффициент вариации между двумя замерами (CV, %).
+ *  >10% → предупреждение о шуме измерения (ICC требует ≥3 замеров — здесь честный CV). */
+export function retestReliability(prev: number | null | undefined, curr: number | null | undefined): { cvPct: number | null; warning: string | null } {
+  const p = num(prev);
+  const c = num(curr);
+  if (p == null || c == null) return { cvPct: null, warning: null };
+  const mean = (p + c) / 2;
+  if (!(mean > 0)) return { cvPct: null, warning: null };
+  const sd = Math.sqrt(((p - mean) ** 2 + (c - mean) ** 2) / 2);
+  const cv = (sd / mean) * 100;
+  const cvPct = Math.round(cv * 10) / 10;
+  const warning = cvPct > 10 ? `Шум измерения ${cvPct}% (>10%) — повтори замер по протоколу` : null;
+  return { cvPct, warning };
+}
+
 /** Вердикт перетеста одного теста: порог роста 5%, стагнация от 4 нед. */
 export function retestVerdict(prev: number | null | undefined, curr: number | null | undefined, weeksApart?: number | null): ArmliftRetestResult {
   const p = num(prev);

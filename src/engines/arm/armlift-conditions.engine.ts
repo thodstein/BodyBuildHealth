@@ -19,6 +19,8 @@ export interface ArmliftConditionsInput {
   coldGym?: boolean;
   /** Диаметр грифа мм, если известен (RT канон 60.3). */
   barDiameterMm?: number | null;
+  /** Поправка массы дисков, кг (факт − номинал). 0/пусто = не применять. */
+  plateCorrectionKg?: number | null;
 }
 
 export interface ArmliftConditionsResult {
@@ -26,6 +28,8 @@ export interface ArmliftConditionsResult {
   trainingOnly: boolean;
   notes: string[];
   conditionsNote: string;
+  /** Поправка массы дисков, кг (0 — не применялась). */
+  weightAdjustmentKg: number;
 }
 
 const RT_CANON_MM = 60.3;
@@ -45,6 +49,10 @@ export function assessArmliftConditions(i: ArmliftConditionsInput): ArmliftCondi
   if (i.uncalibratedPlates) {
     notes.push('Диски не калиброваны — вес спорный (AUSA: калиброванные или взвешенные)');
   }
+  const plateCorr = Number(i.plateCorrectionKg);
+  if (Number.isFinite(plateCorr) && plateCorr !== 0) {
+    notes.push(`Поправка дисков ${plateCorr > 0 ? '+' : ''}${plateCorr} кг — вес скорректирован, замер тренировочный`);
+  }
   if (i.liquidChalk) {
     notes.push('Жидкий мел — запрещён IronMind, замер тренировочный');
   }
@@ -55,12 +63,14 @@ export function assessArmliftConditions(i: ArmliftConditionsInput): ArmliftCondi
   if (d != null && Number.isFinite(d) && d > 0 && Math.abs(d - RT_CANON_MM) > 2) {
     notes.push(`Диаметр ${d} мм ≠ канон RT ${RT_CANON_MM} мм — сравнивать %WR нельзя`);
   }
+  const weightAdjustmentKg = Number.isFinite(Number(i.plateCorrectionKg)) ? Number(i.plateCorrectionKg) : 0;
   if (!notes.length) {
-    return { trainingOnly: false, notes: [], conditionsNote: 'Условия чистые — замер идёт в зачёт' };
+    return { trainingOnly: false, notes: [], conditionsNote: 'Условия чистые — замер идёт в зачёт', weightAdjustmentKg };
   }
   return {
     trainingOnly: true,
     notes,
     conditionsNote: `Замер тренировочный: ${notes.join(' · ')}`,
+    weightAdjustmentKg,
   };
 }
