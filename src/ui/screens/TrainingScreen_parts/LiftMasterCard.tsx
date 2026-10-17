@@ -56,6 +56,7 @@ const collapsibleCard = (accent: string): React.CSSProperties => ({
 const headerBtnStyle = (accent: string, isCollapsed: boolean): React.CSSProperties => ({
   width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
   padding: '11px 12px', cursor: 'pointer', border: 'none', textAlign: 'left' as const,
+  position: 'sticky', top: 0, zIndex: 5, backdropFilter: 'blur(8px)' as any,
   background: isCollapsed
     ? `linear-gradient(135deg, ${accent}14, rgba(255,255,255,0.02))`
     : `linear-gradient(135deg, ${accent}22, ${accent}0F)`,
@@ -290,6 +291,8 @@ export const LiftMasterCard: React.FC<{
   const [asymMidR, setAsymMidR] = useState('');
   const [asymLockL, setAsymLockL] = useState('');
   const [asymLockR, setAsymLockR] = useState('');
+  const [dualLeft, setDualLeft] = useState('');
+  const [dualRight, setDualRight] = useState('');
   const [asymL, setAsymL] = useState(initial.asymL);
   const [asymR, setAsymR] = useState(initial.asymR);
   const asymDiag = useMemo(()=>{
@@ -532,7 +535,7 @@ export const LiftMasterCard: React.FC<{
         {(Object.keys(LIFT_RU) as Lift[]).map(l=>{ const on=lift===l; return <button key={l} onClick={()=>{ setLift(l); setPhase('' as WeakPoint|''); setIssues([]); }} style={{ minHeight:32, padding:'5px 10px', borderRadius:14, cursor:'pointer', border: on?'1px solid '+ACCENT:'1px solid rgba(255,255,255,0.1)', background: on?'rgba(0,230,138,0.15)':'transparent', color: on?ACCENT:DIM, fontWeight:700, fontSize:10 }}>{LIFT_RU[l]}{on?' ✓':''}</button>; })}
       </div>
       {/* антропометрия редактор */}
-      <div style={collapsibleCard('#a78bfa')}>
+      <div id="sec-0" style={collapsibleCard('#a78bfa')}>
         <button onClick={()=> toggleCollapsed('secAnthro')} aria-expanded={!collapsed['secAnthro']} style={headerBtnStyle('#a78bfa', !!collapsed['secAnthro'])}>
           <span style={{ display:'flex', alignItems:'center', gap:8, minWidth:0 }}>
             <span style={{ width:26, height:26, borderRadius:7, display:'flex', alignItems:'center', justifyContent:'center', background:'linear-gradient(135deg,#a78bfa,#8b5cf6)', boxShadow:'0 2px 8px rgba(167,139,250,0.35)', fontSize:13, flexShrink:0 }}>📏</span>
@@ -565,8 +568,24 @@ export const LiftMasterCard: React.FC<{
         </div>
       </div>}</div>
 
+      {typeof navigator !== 'undefined' && !navigator.onLine && (
+        <div style={{ padding:8, borderRadius:8, background:'rgba(245,158,11,0.08)', border:'1px solid rgba(245,158,11,0.2)', marginBottom:8, fontSize:10, color:'#fbbf24', lineHeight:1.4 }}>
+          Офлайн-режим: CV-видео недоступно, используйте ручной ввод и Kinovea CSV.
+        </div>
+      )}
+      {/* Навигация по блокам */}
+      <div style={{ display:'flex', gap:4, flexWrap:'wrap', marginBottom:8, position:'sticky', top:0, zIndex:6, background:'rgba(10,10,12,0.85)', backdropFilter:'blur(8px)', padding:'6px 0' }}>
+        {['0 Безопасность','1 Слабые мышцы','2 Слабые точки','3 Мёртвые точки','4 Траектория','5 Геометрия','6 VBT','6b Видео','7 Срывы','8 RIR','9 Мезо','10 Лимитеры'].map((label, idx) => (
+          <button key={label} onClick={() => { const el = document.getElementById('sec-' + idx); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' }); }} style={{ minHeight:32, padding:'4px 8px', borderRadius:8, cursor:'pointer', border:'1px solid rgba(255,255,255,0.1)', background:'rgba(255,255,255,0.04)', color:'#ffffff', fontSize:9, fontWeight:700 }}>{label}</button>
+        ))}
+      </div>
+      {sessions.length === 0 && totalSelected === 0 && (
+        <div style={{ padding:10, borderRadius:10, background:'rgba(56,189,248,0.08)', border:'1px solid rgba(56,189,248,0.2)', marginBottom:8, fontSize:10, color:'#ffffff', lineHeight:1.4 }}>
+          <b>Онбординг:</b> выберите движение выше, затем пройдите блоки 0→10. Добавьте данные (VBT, Kinovea, L/R) — мастер подстроит рекомендации. Без дневника подсказки будут базовыми.
+        </div>
+      )}
       {/* ── 0. Безопасность: red-флаги + зачёт IPF ── */}
-      <div style={collapsibleCard(redRes.blocked ? '#ef4444' : '#f59e0b')}>
+      <div id="sec-1" style={collapsibleCard(redRes.blocked ? '#ef4444' : '#f59e0b')}>
         <button data-lift="safety" aria-label="Безопасность и зачёт" onClick={()=> toggleCollapsed('sec0')} aria-expanded={!collapsed['sec0']} style={headerBtnStyle(redRes.blocked ? '#ef4444' : '#f59e0b', !!collapsed['sec0'])}>
           <span style={{ display:'flex', alignItems:'center', gap:8, minWidth:0 }}>
             <span style={{ width:26, height:26, borderRadius:7, display:'flex', alignItems:'center', justifyContent:'center', background: redRes.blocked ? 'linear-gradient(135deg,#ef4444,#dc2626)' : 'linear-gradient(135deg,#f59e0b,#d97706)', boxShadow:'0 2px 8px rgba(245,158,11,0.35)', fontSize:13, flexShrink:0 }}>🛡</span>
@@ -600,7 +619,7 @@ export const LiftMasterCard: React.FC<{
         </div>}</div>
 
       {/* ── 1. Слабые мышцы + BB-грануляр ── */}
-      <div style={collapsibleCard('#4ade80')}>
+      <div id="sec-2" style={collapsibleCard('#4ade80')}>
         <button onClick={()=> toggleCollapsed('sec1')} aria-expanded={!collapsed['sec1']} style={headerBtnStyle('#4ade80', !!collapsed['sec1'])}>
           <span style={{ display:'flex', alignItems:'center', gap:8, minWidth:0 }}>
             <span style={{ width:26, height:26, borderRadius:7, display:'flex', alignItems:'center', justifyContent:'center', background:'linear-gradient(135deg,#4ade80,#22c55e)', boxShadow:'0 2px 8px rgba(74,222,128,0.35)', fontSize:13, flexShrink:0 }}>💪</span>
@@ -693,7 +712,7 @@ export const LiftMasterCard: React.FC<{
       </div>}</div>
 
       {/* ── 2. Слабые точки ── */}
-      <div style={collapsibleCard('#a855f7')}>
+      <div id="sec-3" style={collapsibleCard('#a855f7')}>
         <button onClick={()=> toggleCollapsed('sec2')} aria-expanded={!collapsed['sec2']} style={headerBtnStyle('#a855f7', !!collapsed['sec2'])}>
           <span style={{ display:'flex', alignItems:'center', gap:8, minWidth:0 }}>
             <span style={{ width:26, height:26, borderRadius:7, display:'flex', alignItems:'center', justifyContent:'center', background:'linear-gradient(135deg,#a855f7,#7c3aed)', boxShadow:'0 2px 8px rgba(168,85,247,0.35)', fontSize:13, flexShrink:0 }}>🎯</span>
@@ -733,7 +752,7 @@ export const LiftMasterCard: React.FC<{
       </div>}</div>
 
       {/* ── 3. Мёртвые точки ── */}
-      <div style={collapsibleCard('#60a5fa')}>
+      <div id="sec-4" style={collapsibleCard('#60a5fa')}>
         <button onClick={()=> toggleCollapsed('sec3')} aria-expanded={!collapsed['sec3']} style={headerBtnStyle('#60a5fa', !!collapsed['sec3'])}>
           <span style={{ display:'flex', alignItems:'center', gap:8, minWidth:0 }}>
             <span style={{ width:26, height:26, borderRadius:7, display:'flex', alignItems:'center', justifyContent:'center', background:'linear-gradient(135deg,#60a5fa,#3b82f6)', boxShadow:'0 2px 8px rgba(96,165,250,0.35)', fontSize:13, flexShrink:0 }}>🧱</span>
@@ -764,7 +783,7 @@ export const LiftMasterCard: React.FC<{
       </div>}</div>
 
       {/* ── 4. Движение штанги ── */}
-      <div style={collapsibleCard('#f59e0b')}>
+      <div id="sec-5" style={collapsibleCard('#f59e0b')}>
         <button onClick={()=> toggleCollapsed('sec4')} aria-expanded={!collapsed['sec4']} style={headerBtnStyle('#f59e0b', !!collapsed['sec4'])}>
           <span style={{ display:'flex', alignItems:'center', gap:8, minWidth:0 }}>
             <span style={{ width:26, height:26, borderRadius:7, display:'flex', alignItems:'center', justifyContent:'center', background:'linear-gradient(135deg,#f59e0b,#d97706)', boxShadow:'0 2px 8px rgba(245,158,11,0.35)', fontSize:13, flexShrink:0 }}>📈</span>
@@ -784,6 +803,15 @@ export const LiftMasterCard: React.FC<{
           <svg width="100%" height="90" viewBox="0 0 220 90" style={{ background: 'rgba(0,0,0,0.25)', borderRadius: 8 }}>
             <rect x="90" y="10" width="40" height="70" fill="rgba(0,230,138,0.08)" stroke="#00e68a" strokeDasharray="4 3" />
             <text x="110" y="8" fontSize="8" fill="#00e68a" textAnchor="middle">target-zone</text>
+            {kinoveaResult && kinoveaResult.points && kinoveaResult.points.length > 2 ? (
+              <polyline points={kinoveaResult.points.map((p, idx) => {
+                const xs = kinoveaResult.points.map(q=>q.x); const ys = kinoveaResult.points.map(q=>q.y);
+                const minX = Math.min(...xs), maxX = Math.max(...xs); const minY = Math.min(...ys), maxY = Math.max(...ys);
+                const x = 30 + ((p.x - minX) / Math.max(0.001, maxX - minX)) * 160;
+                const y = 80 - ((p.y - minY) / Math.max(0.001, maxY - minY)) * 60;
+                return x + "," + y;
+              }).join(" ")} fill="none" stroke="#38bdf8" strokeWidth="1.5" />
+            ) : null}
             {kinoveaResult ? (
               <ellipse cx="110" cy="45" rx={Math.max(4, kinoveaResult.xLoop * 4)} ry="22" fill="none" stroke="#f59e0b" strokeWidth="2" />
             ) : (
@@ -804,6 +832,21 @@ export const LiftMasterCard: React.FC<{
             </div>
             {asymDiag && <div role="status" style={{ marginTop:4, fontSize:10, color: asymDiag.verdict==='ok' ? '#4ade80' : asymDiag.verdict==='watch' ? '#fbbf24' : '#f87171', lineHeight:1.4 }}>{asymDiag.text}</div>}
             {kinoveaResult && <div role="status" style={{ marginTop:4, fontSize:10, color:'#38bdf8', lineHeight:1.4 }}>Наклон штанги из Kinovea: {kinoveaResult.xBias > 0 ? '+' : ''}{kinoveaResult.xBias} см · xLoop {kinoveaResult.xLoop} см</div>}
+            <div style={{ marginTop:6, padding:6, borderRadius:8, background:'rgba(14,165,233,0.05)', border:'1px solid rgba(14,165,233,0.15)' }}>
+              <div style={{ fontSize:10, fontWeight:800, color:'#0ea5e9', marginBottom:4 }}>Двойной сенсор L/R (скорости втулок)</div>
+              <div style={{ display:'flex', gap:6, flexWrap:'wrap', alignItems:'center' }}>
+                <input placeholder="Левая м/с" value={dualLeft} onChange={e=>setDualLeft(e.target.value)} style={{ width:80, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.15)', color:'#fff', borderRadius:6, padding:'4px 6px', fontSize:11 }} />
+                <input placeholder="Правая м/с" value={dualRight} onChange={e=>setDualRight(e.target.value)} style={{ width:80, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.15)', color:'#fff', borderRadius:6, padding:'4px 6px', fontSize:11 }} />
+                {(() => {
+                  const l = parseFloat(dualLeft), r = parseFloat(dualRight);
+                  if (!Number.isFinite(l) || !Number.isFinite(r) || l <= 0 || r <= 0) return null;
+                  const pct = Math.round((Math.abs(l - r) / Math.max(l, r)) * 1000) / 10;
+                  const weaker = l < r ? 'левая' : 'правая';
+                  const verdict = pct >= 15 ? 'выраженная' : pct >= 10 ? 'наблюдение' : 'норма';
+                  return <span style={{ fontSize:10, color: pct >= 15 ? '#f87171' : pct >= 10 ? '#fbbf24' : '#4ade80' }}>Δ {pct}% · слабее {weaker} · {verdict}</span>;
+                })()}
+              </div>
+            </div>
             <div style={{ marginTop:6, padding:6, borderRadius:8, background:'rgba(168,85,247,0.05)', border:'1px solid rgba(168,85,247,0.15)' }}>
               <div style={{ fontSize:10, fontWeight:800, color:'#c084fc', marginBottom:4 }}>Фазовая асимметрия L/R (по фазам)</div>
               {[
@@ -842,7 +885,7 @@ export const LiftMasterCard: React.FC<{
       </div>}</div>
 
       {/* ── 5. Геометрия техники — для выбранного движения ── */}
-      <div style={collapsibleCard('#38bdf8')}>
+      <div id="sec-6" style={collapsibleCard('#38bdf8')}>
         <button onClick={()=> toggleCollapsed('sec5')} aria-expanded={!collapsed['sec5']} style={headerBtnStyle('#38bdf8', !!collapsed['sec5'])}>
           <span style={{ display:'flex', alignItems:'center', gap:8, minWidth:0 }}>
             <span style={{ width:26, height:26, borderRadius:7, display:'flex', alignItems:'center', justifyContent:'center', background:'linear-gradient(135deg,#38bdf8,#0ea5e9)', boxShadow:'0 2px 8px rgba(56,189,248,0.35)', fontSize:13, flexShrink:0 }}>📐</span>
@@ -878,7 +921,7 @@ export const LiftMasterCard: React.FC<{
       </div>}</div>
 
       {/* ── 6. VBT ── */}
-      <div style={collapsibleCard('#f472b6')}>
+      <div id="sec-7" style={collapsibleCard('#f472b6')}>
         <button onClick={()=> toggleCollapsed('sec6')} aria-expanded={!collapsed['sec6']} style={headerBtnStyle('#f472b6', !!collapsed['sec6'])}>
           <span style={{ display:'flex', alignItems:'center', gap:8, minWidth:0 }}>
             <span style={{ width:26, height:26, borderRadius:7, display:'flex', alignItems:'center', justifyContent:'center', background:'linear-gradient(135deg,#f472b6,#ec4899)', boxShadow:'0 2px 8px rgba(244,114,182,0.35)', fontSize:13, flexShrink:0 }}>⚡</span>
@@ -947,7 +990,7 @@ export const LiftMasterCard: React.FC<{
       </div>}</div>
 
       {/* ── 6b. Видео + гид ── */}
-      <div style={collapsibleCard('#0ea5e9')}>
+      <div id="sec-8" style={collapsibleCard('#0ea5e9')}>
         <button onClick={()=> toggleCollapsed('secVideo')} aria-expanded={!collapsed['secVideo']} style={headerBtnStyle('#0ea5e9', !!collapsed['secVideo'])}>
           <span style={{ display:'flex', alignItems:'center', gap:8, minWidth:0 }}>
             <span style={{ width:26, height:26, borderRadius:7, display:'flex', alignItems:'center', justifyContent:'center', background:'linear-gradient(135deg,#0ea5e9,#0284c7)', boxShadow:'0 2px 8px rgba(14,165,233,0.35)', fontSize:13, flexShrink:0 }}>📹</span>
@@ -1043,7 +1086,7 @@ export const LiftMasterCard: React.FC<{
         </div>}</div>
 
       {/* ── 7. Дневник срывы ── */}
-      <div style={collapsibleCard('#fbbf24')}>
+      <div id="sec-9" style={collapsibleCard('#fbbf24')}>
         <button onClick={()=> toggleCollapsed('sec7')} aria-expanded={!collapsed['sec7']} style={headerBtnStyle('#fbbf24', !!collapsed['sec7'])}>
           <span style={{ display:'flex', alignItems:'center', gap:8, minWidth:0 }}>
             <span style={{ width:26, height:26, borderRadius:7, display:'flex', alignItems:'center', justifyContent:'center', background:'linear-gradient(135deg,#fbbf24,#f59e0b)', boxShadow:'0 2px 8px rgba(251,191,36,0.35)', fontSize:13, flexShrink:0 }}>💥</span>
@@ -1061,7 +1104,7 @@ export const LiftMasterCard: React.FC<{
       </div>}</div>
 
       {/* ── 8. RIR-калибровка ── */}
-      <div style={collapsibleCard('#60a5fa')}>
+      <div id="sec-10" style={collapsibleCard('#60a5fa')}>
         <button onClick={()=> toggleCollapsed('sec8')} aria-expanded={!collapsed['sec8']} style={headerBtnStyle('#60a5fa', !!collapsed['sec8'])}>
           <span style={{ display:'flex', alignItems:'center', gap:8, minWidth:0 }}>
             <span style={{ width:26, height:26, borderRadius:7, display:'flex', alignItems:'center', justifyContent:'center', background:'linear-gradient(135deg,#60a5fa,#3b82f6)', boxShadow:'0 2px 8px rgba(96,165,250,0.35)', fontSize:13, flexShrink:0 }}>🎚️</span>
@@ -1080,7 +1123,7 @@ export const LiftMasterCard: React.FC<{
 
       {/* ── 9. Коррекция мезоцикла ── */}
       {profile && (
-        <div style={collapsibleCard('#a78bfa')}>
+        <div id="sec-11" style={collapsibleCard('#a78bfa')}>
           <button onClick={()=> toggleCollapsed('sec9')} aria-expanded={!collapsed['sec9']} style={headerBtnStyle('#a78bfa', !!collapsed['sec9'])}>
             <span style={{ display:'flex', alignItems:'center', gap:8, minWidth:0 }}>
               <span style={{ width:26, height:26, borderRadius:7, display:'flex', alignItems:'center', justifyContent:'center', background:'linear-gradient(135deg,#a78bfa,#8b5cf6)', boxShadow:'0 2px 8px rgba(167,139,250,0.35)', fontSize:13, flexShrink:0 }}>🔄</span>
@@ -1109,7 +1152,7 @@ export const LiftMasterCard: React.FC<{
       )}
 
       {/* ── 10. Остальные лимитирующие — ПОЛНЫЙ СПИСОК для выбранного движения ── */}
-      <div style={collapsibleCard('#a78bfa')}>
+      <div id="sec-12" style={collapsibleCard('#a78bfa')}>
         <button onClick={()=> toggleCollapsed('sec10')} aria-expanded={!collapsed['sec10']} style={headerBtnStyle('#a78bfa', !!collapsed['sec10'])}>
           <span style={{ display:'flex', alignItems:'center', gap:8, minWidth:0 }}>
             <span style={{ width:26, height:26, borderRadius:7, display:'flex', alignItems:'center', justifyContent:'center', background:'linear-gradient(135deg,#a78bfa,#7c3aed)', boxShadow:'0 2px 8px rgba(167,139,250,0.35)', fontSize:13, flexShrink:0 }}>🧩</span>
