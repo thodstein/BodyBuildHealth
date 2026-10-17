@@ -613,6 +613,19 @@ export async function recognizeImageTextOffline(
       } else if (isCompleteOcrText(best) && !isNutritionDiaryOcrText(best)) {
         return best;
       }
+      // PSM-4 (одна колонка) часто лучше PSM-6 для плотных таблиц бланков:
+      // пробуем, если блочный проход дал мало маркеров.
+      if (purpose === 'labs' && labOcrCandidateQuality(best).labCount < 10) {
+        try {
+          await setPsm('4' as any);
+          progressWindow.base = 0.82;
+          progressWindow.span = 0.03;
+          const psm4Text = String((await worker.recognize(inputs[0].blob))?.data?.text || '');
+          if (psm4Text.trim() && labOcrCandidateQuality(`${best}\\n${psm4Text}`).score > labOcrCandidateQuality(best).score) {
+            best = `${best}\\n${psm4Text}`;
+          }
+        } catch { /* PSM-4 опционален */ }
+      }
       // Лабораторные бланки содержат латинские аббревиатуры (HbA1c, TSH,
       // ALT, HDL …), которые русская модель читает как мусор. Дополнительный
       // английский проход по лучшему кадру возвращает ровно эти метки; мы

@@ -318,7 +318,48 @@ export function resolveLabMarker(name: string): string {
   const visualSynonym = Object.keys(SYNONYM_MAP).find(key => key === normalized);
   if (visualSynonym) return mapToUcumCode(SYNONYM_MAP[visualSynonym].toUpperCase());
 
+  // OCR-толерантный fallback: опечатки/лишние пробелы в названии маркера
+  // («Аланинаминотранс фераза», «Креатини») не должны ломать распознавание.
+  // Ищем ближайший синоним по расстоянию Левенштейна, но только если он
+  // уникален и достаточно близок (≤2 правок) и имя достаточно длинное,
+  // чтобы не цеплять случайные короткие совпадения.
+  if (trimmed.length >= 4) {
+    let bestKey: string | null = null;
+    let bestDist = 3;
+    let bestCount = 0;
+    const needle = trimmed.toLowerCase();
+    for (const key of Object.keys(SYNONYM_MAP)) {
+      const d = levenshtein(needle, key);
+      if (d < bestDist) {
+        bestDist = d;
+        bestKey = key;
+        bestCount = 1;
+      } else if (d === bestDist && bestKey !== null) {
+        bestCount += 1;
+      }
+    }
+    if (bestKey && bestDist <= 2 && bestCount === 1) {
+      return mapToUcumCode(SYNONYM_MAP[bestKey].toUpperCase());
+    }
+  }
+
   return upper;
+}
+
+function levenshtein(a: string, b: string): number {
+  if (a === b) return 0;
+  if (!a.length) return b.length;
+  if (!b.length) return a.length;
+  let prev = Array.from({ length: b.length + 1 }, (_, i) => i);
+  for (let i = 1; i <= a.length; i++) {
+    const cur = [i];
+    for (let j = 1; j <= b.length; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + cost);
+    }
+    prev = cur;
+  }
+  return prev[b.length];
 }
 
 /** 0..1 position within reference range; null if unknown. */
