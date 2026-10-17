@@ -103,6 +103,9 @@ export const VideoCaptureCard: React.FC<{ lift: Lift; onResult?: (r: VideoAnalys
   const [isTg, setIsTg] = useState(false);
   const [shareMsg, setShareMsg] = useState<string | null>(null);
   const [isNative, setIsNative] = useState(false);
+  const [manualVelocity, setManualVelocity] = useState('');
+  const [manualElbow, setManualElbow] = useState('');
+  const [manualGrip, setManualGrip] = useState('');
 
   useEffect(() => {
     try { setIsTg(!!(window as any).Telegram?.WebApp); } catch { setIsTg(false); }
@@ -288,6 +291,19 @@ export const VideoCaptureCard: React.FC<{ lift: Lift; onResult?: (r: VideoAnalys
       </div>
       {isNative && <div style={{ marginTop: 6, fontSize: 10, color: '#fff', lineHeight: 1.4 }}>Нажмите «Снять на камеру» — откроется камера телефона. После съёмки видео покажется на весь экран, а разбор появится под карточкой.</div>}
 
+      <div style={{ marginTop: 8, padding: 8, borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}>
+        <div style={{ fontSize: 10, fontWeight: 800, color: '#fff', marginBottom: 4 }}>✍️ Ручной ввод (если CV недоступен)</div>
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+          <label style={{ fontSize: 10, color: '#fff' }}>Скорость (м/с): <input value={manualVelocity} onChange={e=>setManualVelocity(e.target.value)} placeholder="0.48" style={{ width: 70, marginLeft: 4, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.15)', color: '#fff', borderRadius: 6, padding: '4px 6px', fontSize: 11 }} /></label>
+          <label style={{ fontSize: 10, color: '#fff' }}>Локти (°): <input value={manualElbow} onChange={e=>setManualElbow(e.target.value)} placeholder="52" style={{ width: 60, marginLeft: 4, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.15)', color: '#fff', borderRadius: 6, padding: '4px 6px', fontSize: 11 }} /></label>
+          <label style={{ fontSize: 10, color: '#fff' }}>Хват (×): <input value={manualGrip} onChange={e=>setManualGrip(e.target.value)} placeholder="1.42" style={{ width: 60, marginLeft: 4, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.15)', color: '#fff', borderRadius: 6, padding: '4px 6px', fontSize: 11 }} /></label>
+          <button data-vc="manual-apply" onClick={() => {
+            const v = parseFloat(manualVelocity); const e = parseFloat(manualElbow); const g = parseFloat(manualGrip);
+            const r = { elbowAvgDeg: Number.isFinite(e) ? e : 0, gripRatio: Number.isFinite(g) ? g : 0, barVelocity: Number.isFinite(v) && v > 0 ? v : null, bridge: null, note: 'Ручной ввод (не CV) — используйте для реальных замеров.' };
+            setResult(r); onResult?.(r);
+          }} style={{ ...labelBtn('rgba(255,255,255,0.06)', 'rgba(255,255,255,0.12)', '#fff'), minHeight: 40 }}>Применить</button>
+        </div>
+      </div>
       {result && (
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
           <button data-vc="play" aria-label="Открыть видео на весь экран" onClick={() => { if (fileUrlRef.current) setStage({ kind: 'file', url: fileUrlRef.current, name: 'Видео подхода' }); }} style={labelBtn('rgba(14,165,233,0.12)', 'rgba(14,165,233,0.3)', ACCENT)}>🔍 Видео на весь экран</button>

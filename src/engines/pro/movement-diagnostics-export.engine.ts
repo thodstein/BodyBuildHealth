@@ -25,6 +25,14 @@ export interface MovementDiagnosticsExportInput {
   vbtZone: string;
   videoNote: string;
   kinoveaXLoop: number | null;
+  kinoveaXBias?: number | null;
+  kinoveaTurnoverMs?: number | null;
+  asymmetryPct?: number | null;
+  asymmetryVerdict?: string;
+  vbtMetric?: string;
+  vbtThreshold?: number | null;
+  vbtPauseMs?: number | null;
+  lvpR2?: number | null;
   createdAt?: string;
 }
 
@@ -67,6 +75,14 @@ export function buildMovementDiagnosticsCsv(inp: MovementDiagnosticsExportInput)
     ['Потеря скорости, %', inp.vbtLossPct != null ? String(inp.vbtLossPct) : '—'],
     ['VBT зона', inp.vbtZone || '—'],
     ['Kinovea xLoop, см', inp.kinoveaXLoop != null ? String(inp.kinoveaXLoop) : '—'],
+    ['Kinovea смещение, см', inp.kinoveaXBias != null ? String(inp.kinoveaXBias) : '—'],
+    ['Kinovea turnover, мс', inp.kinoveaTurnoverMs != null ? String(inp.kinoveaTurnoverMs) : '—'],
+    ['Асимметрия, %', inp.asymmetryPct != null ? String(inp.asymmetryPct) : '—'],
+    ['Вердикт асимметрии', inp.asymmetryVerdict || '—'],
+    ['VBT метрика', inp.vbtMetric || '—'],
+    ['VBT VL-порог, %', inp.vbtThreshold != null ? String(inp.vbtThreshold) : '—'],
+    ['VBT пауза, мс', inp.vbtPauseMs != null ? String(inp.vbtPauseMs) : '—'],
+    ['LVP r²', inp.lvpR2 != null ? String(inp.lvpR2) : '—'],
     ['Видео', inp.videoNote || '—'],
     ['Дата', inp.createdAt || new Date().toISOString().slice(0, 10)],
   ];
@@ -90,6 +106,13 @@ export function buildMovementDiagnosticsHtml(inp: MovementDiagnosticsExportInput
     + (inp.kinoveaXLoop != null
       ? li('Kinovea xLoop', `${fmt(inp.kinoveaXLoop, 1)} см ${barLoopFlag(inp.kinoveaXLoop) === 'crit' ? '(крит. >6)' : barLoopFlag(inp.kinoveaXLoop) === 'warn' ? '(внимание ≥4)' : '(норма)'}`)
       : '')
+    + (inp.kinoveaXBias != null ? li('Kinovea смещение', `${fmt(inp.kinoveaXBias, 1)} см`) : '')
+    + (inp.kinoveaTurnoverMs != null ? li('Kinovea turnover', `${inp.kinoveaTurnoverMs} мс`) : '')
+    + (inp.asymmetryPct != null ? li('Асимметрия', `${fmt(inp.asymmetryPct, 1)}% ${inp.asymmetryVerdict || ''}`) : '')
+    + (inp.vbtMetric ? li('VBT метрика', inp.vbtMetric) : '')
+    + (inp.vbtThreshold != null ? li('VBT VL-порог', `${inp.vbtThreshold}%`) : '')
+    + (inp.vbtPauseMs != null ? li('VBT пауза', `${inp.vbtPauseMs} мс`) : '')
+    + (inp.lvpR2 != null ? li('LVP r²', fmt(inp.lvpR2, 3)) : '')
     + li('Видео', inp.videoNote || '—')
     + `</table><p style="font-size:11px;color:#666;">Скорость из видео — оценка (не LPT). Снимайте строго сбоку 90°, штатив, 2–3 м.</p></body></html>`;
 }

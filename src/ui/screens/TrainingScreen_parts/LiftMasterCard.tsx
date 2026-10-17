@@ -24,11 +24,11 @@ import { diagnoseMovement, barPathIssuesForLift, BAR_PATH_ISSUES, phaseForReps, 
 import { analyzePhaseAssistance, analyzeStickingCorrections, analyzeBarPathAssistance, protocolFromCycle } from '../../../engines/pro/lift-assistance.engine';
 import { WEAK_POINTS_BY_LIFT, diagnoseWeakPoint, type Lift, type WeakPoint } from '../../../engines/lms/weakpoint-pl';
 import { detectWeakMusclesByE1rm, snapshotWeakE1rm, diffWeakE1rm, type E1rmSnapshot } from '../../../engines/pro/weak-muscle-detection.engine';
-import { diagnoseVelocity, thresholdForGoal, mvtForPLLift, lvrStale } from '../../../engines/pro/vbt.engine';
+import { diagnoseVelocity, thresholdForGoal, mvtForPLLift, lvrStale, adjustVelocityForMetric, calibrateLVP, type VelocityLossThreshold } from '../../../engines/pro/vbt.engine';
 import { getPLWeakGroupExerciseCandidates, diagnosticProtocolFromCycle } from '../../../engines/lms/lms-builder.engine';
 import type { SRCycleTemplate } from '../../../data/lms-cycles/lms-types';
 import { applyToPlanner } from './planner-bridge';
-import { parseKinoveaCSV, analyzeBarTracking } from '../../../engines/strength-sport/strength-sport-video.engine';
+import { parseKinoveaCSV, analyzeBarTracking, type BarTrackingResult } from '../../../engines/strength-sport/strength-sport-video.engine';
 import { barLoopFlag } from '../../../engines/pro/bar-path-core.engine';
 import { diagnoseAsymmetry } from '../../../engines/pro/pl-asymmetry.engine';
 import { RULE_CHECKS, checkLiftRules } from '../../../engines/pro/pl-competition-rules.engine';
@@ -133,6 +133,26 @@ const WEAK_MUSCLE_DETAIL: Array<{ id: string; label: string; subs: Array<{ sub: 
     { sub: 'obliques', label: 'Косые/антиротация', patterns: ['rotation', 'anti_rotation'] },
   ]},
 ];
+
+function exerciseMatchesLift(name: string, lift: Lift): boolean {
+  const n = name.toLowerCase().replace(/ё/g, 'е');
+  const patterns: Record<Lift, RegExp> = {
+    bench: /жим.*(леж|груд)|bench|жим лежа/i,
+    squat: /присед|squat/i,
+    deadlift: /становая.*(классик)?|deadlift(?!.*сумо)/i,
+    ohp: /жим.*(стоя|армейск)|ohp|overhead/i,
+    row: /тяга.*(наклон|в наклон)|row/i,
+    pulldown: /верхнего блока|pulldown|тяга.*блок/i,
+    incline_press: /наклон|incline/i,
+    sumo: /сумо|sumo/i,
+    biceps: /бицепс|curl|сгибание.*рук/i,
+    triceps: /трицепс|tricep|разгибание.*рук/i,
+    calf: /икр|calf|подъем.*нос/i,
+    shrug: /шраг|shrug|трапец/i,
+  };
+  const re = patterns[lift];
+  return re ? re.test(n) : false;
+}
 
 const MASTER_KEY = 'he_lift_master_v1';
 const TREND_KEY = 'he_lift_master_trend_v1';
@@ -264,6 +284,12 @@ export const LiftMasterCard: React.FC<{
   const [weakMuscleGroups, setWeakMuscleGroups] = useState<string[]>(initial.weakMuscleGroups);
   const [weakMuscleSubs, setWeakMuscleSubs] = useState<string[]>(initial.weakMuscleSubs);
   const [asymSide, setAsymSide] = useState<'left'|'right'|null>(initial.asymSide);
+  const [asymStartL, setAsymStartL] = useState('');
+  const [asymStartR, setAsymStartR] = useState('');
+  const [asymMidL, setAsymMidL] = useState('');
+  const [asymMidR, setAsymMidR] = useState('');
+  const [asymLockL, setAsymLockL] = useState('');
+  const [asymLockR, setAsymLockR] = useState('');
   const [asymL, setAsymL] = useState(initial.asymL);
   const [asymR, setAsymR] = useState(initial.asymR);
   const asymDiag = useMemo(()=>{
@@ -276,6 +302,13 @@ export const LiftMasterCard: React.FC<{
   const [vbtWeight, setVbtWeight] = useState(initial.vbtWeight);
   const [vbtGoal, setVbtGoal] = useState(initial.vbtGoal || 'strength');
   const [vbtUpdatedAt, setVbtUpdatedAt] = useState<number | null>(initial.vbtUpdatedAt);
+  const [vbtThreshold, setVbtThreshold] = useState<VelocityLossThreshold>(20);
+  const [vbtMetric, setVbtMetric] = useState<'mcv' | 'mpv' | 'peak'>('mcv');
+  const [vbtPauseMs, setVbtPauseMs] = useState('');
+  const [lvpPoints, setLvpPoints] = useState<Array<{ pct: number; velocity: number }>>([]);
+  const [lvpPctInput, setLvpPctInput] = useState('');
+  const [lvpVelInput, setLvpVelInput] = useState('');
+  const [lvpResult, setLvpResult] = useState<{ slope: number; intercept: number; r2: number } | null>(null);
   const [redFlags, setRedFlags] = useState<RedFlagId[]>(initial.redFlags);
   const [ruleChecks, setRuleChecks] = useState<Record<string, boolean>>(initial.ruleChecks);
   const redRes = useMemo(()=> checkRedFlags(redFlags), [redFlags]);
@@ -300,10 +333,14 @@ export const LiftMasterCard: React.FC<{
   const [shoulderInput, setShoulderInput] = useState('');
   const [kinoveaText, setKinoveaText] = useState('');
   const [kinoveaMsg, setKinoveaMsg] = useState<string | null>(null);
+  const [kinoveaResult, setKinoveaResult] = useState<BarTrackingResult | null>(null);
   const [videoNote, setVideoNote] = useState('');
   const [shareMsg, setShareMsg] = useState<string | null>(null);
-  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>(() => {
+    try { return JSON.parse(localStorage.getItem('he_lift_master_collapsed_v1') || '{}'); } catch { return {}; }
+  });
   const toggleCollapsed = (id: string) => setCollapsed(p => ({ ...p, [id]: !p[id] }));
+  useEffect(() => { try { localStorage.setItem('he_lift_master_collapsed_v1', JSON.stringify(collapsed)); } catch {} }, [collapsed]);
   useEffect(()=>{
     try{
       const raw = JSON.parse(localStorage.getItem('he_profile_v2')||'null');
@@ -313,9 +350,9 @@ export const LiftMasterCard: React.FC<{
     }catch{}
   }, []);
 
-  useEffect(()=>{ saveMaster({ lift, phase, issues, selectedGeom, daysGeom, selectedDiag, daysDiag, weakMuscleGroups, weakMuscleSubs, asymSide, asymL, asymR, vbtBest, vbtLast, vbtWeight, vbtGoal, vbtUpdatedAt, redFlags, ruleChecks }); }, [phase, issues, selectedGeom, daysGeom, selectedDiag, daysDiag, weakMuscleGroups, weakMuscleSubs, asymSide, asymL, asymR, vbtBest, vbtLast, vbtWeight, vbtGoal, vbtUpdatedAt, redFlags, ruleChecks]);
+  useEffect(()=>{ saveMaster({ lift, phase, issues, selectedGeom, daysGeom, selectedDiag, daysDiag, weakMuscleGroups, weakMuscleSubs, asymSide, asymL, asymR, vbtBest, vbtLast, vbtWeight, vbtGoal, vbtUpdatedAt, redFlags, ruleChecks }); }, [lift, phase, issues, selectedGeom, daysGeom, selectedDiag, daysDiag, weakMuscleGroups, weakMuscleSubs, asymSide, asymL, asymR, vbtBest, vbtLast, vbtWeight, vbtGoal, vbtUpdatedAt, redFlags, ruleChecks]);
 
-  const diag = useMemo(()=> unifiedLiftDiagnosis({ lift, phase, barPathIssues: issues, vbtBest, vbtLast, vbtWeight, sessions, template }), [lift, phase, issues, vbtBest, vbtLast, vbtWeight, sessions, template]);
+  const diag = useMemo(()=> unifiedLiftDiagnosis({ lift, phase, barPathIssues: issues, vbtBest, vbtLast, vbtWeight, vbtThreshold, sessions, template }), [lift, phase, issues, vbtBest, vbtLast, vbtWeight, vbtThreshold, sessions, template]);
   const effectivePhase = diag.phases.effectivePhase;
   const movement = diag.phases.movement;
 
@@ -337,7 +374,7 @@ export const LiftMasterCard: React.FC<{
     let totalHard=0;
     for (const w of sessions) for (const e of (w.exercises||[])) {
       const en = (e.exerciseName||e.exerciseId||'').toLowerCase();
-      if (!en.includes('жим') && !en.includes('bench')) continue;
+      if (!exerciseMatchesLift(en, lift)) continue;
       for (const s of (e.sets||[])) {
         const weight = s.weightKg||s.weight||0, reps=s.reps||0;
         const rpe = (s.rpe&&s.rpe>0)?s.rpe:(s.rir!=null?10-s.rir:0);
@@ -357,17 +394,18 @@ export const LiftMasterCard: React.FC<{
     try {
       const raw = JSON.parse(localStorage.getItem('he_profile_v2') || 'null');
       const personal = raw?.personal ?? raw?.settings?.personal ?? {};
-      const armSpan = personal?.armSpanCm;
-      const height = personal?.height;
-      if (typeof armSpan === 'number' && typeof height === 'number' && height>0) {
+      const armSpan = parseFloat(armSpanInput) || (typeof personal?.armSpanCm === 'number' ? personal.armSpanCm : NaN);
+      const height = typeof personal?.height === 'number' ? personal.height : NaN;
+      if (Number.isFinite(armSpan) && Number.isFinite(height) && height>0) {
         const diff = Math.round(armSpan - height);
         if (diff > 5) return `🦴 Длинные руки (размах +${diff}см к росту) → рекомендуем уже хват (1.0×) + локти 30-45° tucked + акцент на трицепс/широчайшие.`;
         if (diff < -5) return `🦴 Короткие руки (размах ${diff}см) → выгодно шире хват (до 81см) + локти 60-70° flared + грудь-доминант.`;
       }
-      if (typeof personal?.shoulderWidthCm === 'number') return `🦴 Ширина плеч ${personal.shoulderWidthCm}см — ориентир: narrow = 1.0× биакром., wide = 1.5×.`;
+      const sh = parseFloat(shoulderInput) || (typeof personal?.shoulderWidthCm === 'number' ? personal.shoulderWidthCm : NaN);
+      if (Number.isFinite(sh)) return `🦴 Ширина плеч ${sh}см — ориентир: narrow = 1.0× биакром., wide = 1.5×.`;
       return null;
     } catch { return null; }
-  }, []);
+  }, [armSpanInput, shoulderInput]);
 
   const toggleWeakGroup = (g:string)=> setWeakMuscleGroups(cur=> cur.includes(g)?cur.filter(x=>x!==g):[...cur,g]);
   const toggleWeakSub = (k:string)=> setWeakMuscleSubs(cur=> cur.includes(k)?cur.filter(x=>x!==k):[...cur,k]);
@@ -407,22 +445,13 @@ export const LiftMasterCard: React.FC<{
       setTrendBase(snap);
     }
     // 1) слабые мышцы + слабые точки + bar-path + sticking через weakpoints
-    const weakGroups = [...new Set([...weakMuscleSubs.map(k=>k.split('|')[0]), ...groupsForPhase(lift, effectivePhase as WeakPoint).filter(Boolean)])];
+    const phaseGroups = effectivePhase ? groupsForPhase(lift, effectivePhase as WeakPoint) : [];
+    const weakGroups = [...new Set([...weakMuscleSubs.map(k=>k.split('|')[0]), ...phaseGroups.filter(Boolean)])];
     const plWeakPoints = effectivePhase ? [{ lift, weakPoint: effectivePhase, days: daysDiag[`${lift}|${effectivePhase}`] ?? [] }] : [];
     // добавим technique_geometry как диагностические? Нет — как limiter
     const diagnosticExerciseMap: Record<string,string[]> = { ...selectedDiag };
-    // добавим выделенные слабые мышцы (по циклу) — 5 кандидатов каждая
-    for (const k of weakMuscleSubs) {
-      const [group, subId] = k.split('|');
-      const detail = WEAK_MUSCLE_DETAIL.find(d=>d.id===group);
-      const sub = detail?.subs.find(s=>s.sub===subId);
-      if (!sub) continue;
-      const cands = template ? getPLWeakGroupExerciseCandidates(template, group).filter(ex=> sub.patterns.includes(ex.movementPattern||'')).filter(ex=> !sub.nameRe || sub.nameRe.test(`${ex.name} ${ex.targetMuscle||''}`)).slice(0,5) : [];
-      const key = `${group}|${subId}`;
-      // если пользователь отметил конкретные упражнения — уже в selectedDiag, иначе не добавляем автоматом
-      void cands;
-      void key;
-    }
+    // Слабые мышцы (выбранные подгруппы) уже отражены в selectedDiag через muscleAnalyses —
+    // дополнительная автогенерация кандидатов не требуется (избегаем дублей в планировщике).
     // weakpoints apply (P2: слабая сторона едет только при замере ≥10%)
     const weakSide = asymDiag && asymDiag.verdict !== 'ok' ? asymDiag.weaker : (asymSide ?? null);
     // P5: протокол каждого имени из раскладки цикла — мост вставит показанное, не фикс
@@ -529,8 +558,8 @@ export const LiftMasterCard: React.FC<{
               if(raw.personal) raw.personal=personal; else if(raw.settings?.personal) raw.settings.personal=personal; else raw.personal=personal;
               localStorage.setItem('he_profile_v2', JSON.stringify(raw));
               // force re-render hint
-              setArmSpanInput(''); setShoulderInput('');
-              location.reload();
+              if (Number.isFinite(ns) && ns > 0) setArmSpanInput(String(ns));
+               if (Number.isFinite(sh) && sh > 0) setShoulderInput(String(sh));
             }catch{}
           }} style={{ ...btn, background:'rgba(167,139,250,0.15)', color:'#a78bfa', border:'1px solid rgba(167,139,250,0.3)' }}>💾 Сохранить</button>
         </div>
@@ -743,6 +772,21 @@ export const LiftMasterCard: React.FC<{
         <div style={{ display:'flex', gap:5, flexWrap:'wrap', marginTop:8 }}>
           {barPathIssuesForLift(lift).map(iss=>{ const on=issues.includes(iss); return <button key={iss} onClick={()=>toggleIssue(iss)} style={{ minHeight:34, padding:'5px 8px', borderRadius:7, cursor:'pointer', border: on?'1px solid #a855f7':'1px solid rgba(255,255,255,0.1)', background: on?'rgba(168,85,247,0.14)':'transparent', color: on?'#c084fc':DIM, fontSize:10 }}>{ISSUE_RU[iss]}</button>; })}
         </div>
+        <div style={{ marginTop: 6 }}>
+          <svg width="100%" height="90" viewBox="0 0 220 90" style={{ background: 'rgba(0,0,0,0.25)', borderRadius: 8 }}>
+            <rect x="90" y="10" width="40" height="70" fill="rgba(0,230,138,0.08)" stroke="#00e68a" strokeDasharray="4 3" />
+            <text x="110" y="8" fontSize="8" fill="#00e68a" textAnchor="middle">target-zone</text>
+            {kinoveaResult ? (
+              <ellipse cx="110" cy="45" rx={Math.max(4, kinoveaResult.xLoop * 4)} ry="22" fill="none" stroke="#f59e0b" strokeWidth="2" />
+            ) : (
+              <text x="110" y="48" fontSize="9" fill="#ffffff" textAnchor="middle">нет данных Kinovea</text>
+            )}
+            <line x1="20" y1="45" x2="200" y2="45" stroke="rgba(255,255,255,0.15)" />
+          </svg>
+        </div>
+        <div style={{ marginTop: 6, padding: 6, borderRadius: 8, background: 'rgba(245,158,11,0.05)', border: '1px solid rgba(245,158,11,0.15)', fontSize: 9, color: '#ffffff', lineHeight: 1.4 }}>
+          <b>Легенда heatmapping:</b> xLoop &lt;4 см — норма (зелёный), 4–6 — внимание (жёлтый), &gt;6 — критично (красный). Target-zone: жим лёжа — J-образная кривая к лицу; присед — вертикаль над серединой стопы; тяга — вертикаль над серединой стопы.
+        </div>
         {issues.includes('asymmetric' as BarPathIssue) && (
           <div style={{ marginTop:6, padding:6, borderRadius:8, background:'rgba(168,85,247,0.06)', border:'1px solid rgba(168,85,247,0.15)' }}>
             <div style={{ fontSize:10, color:DIM, marginBottom:4 }}>⚖️ Замер сторон (e1RM или вес×повторы одной схемы):</div>
@@ -751,6 +795,27 @@ export const LiftMasterCard: React.FC<{
               <label style={{ fontSize:10, color:DIM }}>Правая: <input data-lift="asym-r" aria-label="Правая сторона, кг" type="number" step="0.5" min="0" value={asymR} onChange={e=>setAsymR(e.target.value)} placeholder="100" style={{ width:70, marginLeft:4, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.15)', color:'#fff', borderRadius:6, padding:'4px 6px', fontSize:12 }} /></label>
             </div>
             {asymDiag && <div role="status" style={{ marginTop:4, fontSize:10, color: asymDiag.verdict==='ok' ? '#4ade80' : asymDiag.verdict==='watch' ? '#fbbf24' : '#f87171', lineHeight:1.4 }}>{asymDiag.text}</div>}
+            {kinoveaResult && <div role="status" style={{ marginTop:4, fontSize:10, color:'#38bdf8', lineHeight:1.4 }}>Наклон штанги из Kinovea: {kinoveaResult.xBias > 0 ? '+' : ''}{kinoveaResult.xBias} см · xLoop {kinoveaResult.xLoop} см</div>}
+            <div style={{ marginTop:6, padding:6, borderRadius:8, background:'rgba(168,85,247,0.05)', border:'1px solid rgba(168,85,247,0.15)' }}>
+              <div style={{ fontSize:10, fontWeight:800, color:'#c084fc', marginBottom:4 }}>Фазовая асимметрия L/R (по фазам)</div>
+              {[
+                { label: 'Старт', l: asymStartL, r: asymStartR, setL: setAsymStartL, setR: setAsymStartR },
+                { label: 'Середина', l: asymMidL, r: asymMidR, setL: setAsymMidL, setR: setAsymMidR },
+                { label: 'Дожим', l: asymLockL, r: asymLockR, setL: setAsymLockL, setR: setAsymLockR },
+              ].map(ph => {
+                const lp = parseFloat(ph.l), rp = parseFloat(ph.r);
+                const pct = (Number.isFinite(lp) && Number.isFinite(rp) && lp > 0 && rp > 0) ? Math.round((Math.abs(lp - rp) / Math.max(lp, rp)) * 1000) / 10 : null;
+                const verdict = pct == null ? '' : pct >= 15 ? 'выраженная' : pct >= 10 ? 'наблюдение' : 'норма';
+                return (
+                  <div key={ph.label} style={{ display:'flex', gap:6, flexWrap:'wrap', alignItems:'center', marginTop:4 }}>
+                    <span style={{ fontSize:10, color:'#ffffff', minWidth:70 }}>{ph.label}</span>
+                    <input placeholder="L" value={ph.l} onChange={e=>ph.setL(e.target.value)} style={{ width:60, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.15)', color:'#fff', borderRadius:6, padding:'4px 6px', fontSize:11 }} />
+                    <input placeholder="R" value={ph.r} onChange={e=>ph.setR(e.target.value)} style={{ width:60, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.15)', color:'#fff', borderRadius:6, padding:'4px 6px', fontSize:11 }} />
+                    {pct != null && <span style={{ fontSize:10, color: pct >= 15 ? '#f87171' : pct >= 10 ? '#fbbf24' : '#4ade80' }}>{pct}% · {verdict}</span>}
+                  </div>
+                );
+              })}
+            </div>
             <div style={{ fontSize:10, color:DIM, marginTop:4, marginBottom:4 }}>Какая сторона слабее (если замера нет)?</div>
             <div style={{ display:'flex', gap:5 }}>
               {(['left','right'] as const).map(side=>{ const on=asymSide===side; return <button key={side} onClick={()=>setAsymSide(cur=> cur===side?null:side)} style={{ minHeight:44, padding:'10px 14px', borderRadius:7, cursor:'pointer', border: on?'1px solid #a855f7':'1px solid rgba(255,255,255,0.1)', background: on?'rgba(168,85,247,0.18)':'transparent', color: on?'#c084fc':DIM, fontSize:12, fontWeight:700 }}>{side==='left'?'Левая':'Правая'}{on?' ✓':''}</button>; })}
@@ -796,8 +861,8 @@ export const LiftMasterCard: React.FC<{
                 <button onClick={()=>addGeom(opt, an.items.filter(i=>i.optimal).map(i=>i.exercise.name))} style={{ ...btn, background:'rgba(56,189,248,0.15)', color:'#38bdf8', border:'1px solid rgba(56,189,248,0.3)' }}>➕ Рекомендуемое</button>
                 <button onClick={()=>addGeom(opt, an.items.map(i=>i.exercise.name))} style={{ ...btn, background:'rgba(96,165,250,0.12)', color:'#60a5fa', border:'1px solid rgba(96,165,250,0.25)' }}>➕ Все</button>
                 <span style={{ fontSize:9, color:DIM }}>Дни:</span>
-                <button onClick={()=>{ setDaysGeom(cur=>{ const n={...cur}; delete n[k]; return n; }); }} style={{ padding:'3px 7px', borderRadius:6, cursor:'pointer', fontSize:9, border: !daysGeom[k]?.length?'1px solid #38bdf8':'1px solid rgba(255,255,255,0.1)', background: !daysGeom[k]?.length?'rgba(56,189,248,0.12)':'transparent', color: !daysGeom[k]?.length?'#38bdf8':DIM }}>Авто</button>
-                {Array.from({length:Math.max(1,dayCount)},(_,i)=>i+1).map(d=> <button key={d} onClick={()=>toggleGeomDay(opt,d)} style={{ padding:'3px 7px', borderRadius:6, cursor:'pointer', fontSize:9, border: daysGeom[k]?.includes(d)?'1px solid #38bdf8':'1px solid rgba(255,255,255,0.1)', background: daysGeom[k]?.includes(d)?'rgba(56,189,248,0.12)':'transparent', color: daysGeom[k]?.includes(d)?'#38bdf8':DIM }}>Д{d}</button>)}
+                <button onClick={()=>{ setDaysGeom(cur=>{ const n={...cur}; delete n[k]; return n; }); }} style={{ minHeight:44, minWidth:44, padding:'8px 10px', borderRadius:6, cursor:'pointer', fontSize:9, border: !daysGeom[k]?.length?'1px solid #38bdf8':'1px solid rgba(255,255,255,0.1)', background: !daysGeom[k]?.length?'rgba(56,189,248,0.12)':'transparent', color: !daysGeom[k]?.length?'#38bdf8':DIM }}>Авто</button>
+                {Array.from({length:Math.max(1,dayCount)},(_,i)=>i+1).map(d=> <button key={d} onClick={()=>toggleGeomDay(opt,d)} style={{ minHeight:44, minWidth:44, padding:'8px 10px', borderRadius:6, cursor:'pointer', fontSize:9, border: daysGeom[k]?.includes(d)?'1px solid #38bdf8':'1px solid rgba(255,255,255,0.1)', background: daysGeom[k]?.includes(d)?'rgba(56,189,248,0.12)':'transparent', color: daysGeom[k]?.includes(d)?'#38bdf8':DIM }}>Д{d}</button>)}
               </div>
             </div>
           );
@@ -823,6 +888,24 @@ export const LiftMasterCard: React.FC<{
           <span style={{ fontSize:10, color:DIM }}>Цель:</span>
           {([['strength','Сила · 20%'],['speed','Скорость · 10%'],['mass','Масса · 25%']] as const).map(([g,label])=>{ const on=vbtGoal===g; return <button key={g} data-lift="vbt-goal" aria-label={`VBT цель ${label}`} onClick={()=>{ setVbtGoal(g); touchVbt(); }} style={{ minHeight:44, padding:'10px 12px', borderRadius:8, cursor:'pointer', border: on?'1px solid #f472b6':'1px solid rgba(255,255,255,0.1)', background: on?'rgba(244,114,182,0.15)':'transparent', color: on?'#f472b6':DIM, fontSize:12, fontWeight:700 }}>{label}{on?' ✓':''}</button>; })}
         </div>
+        <div style={{ display:'flex', gap:5, flexWrap:'wrap', marginTop:6, alignItems:'center' }}>
+          <span style={{ fontSize:10, color:'#ffffff' }}>�������:</span>
+          {(['mcv','mpv','peak'] as const).map(m=>{ const on=vbtMetric===m; const label = m==='mcv'?'Mean':m==='mpv'?'MPV':'Peak'; return <button key={m} data-lift="vbt-metric" onClick={()=>setVbtMetric(m)} style={{ minHeight:32, padding:'4px 8px', borderRadius:8, cursor:'pointer', border: on?'1px solid #f472b6':'1px solid rgba(255,255,255,0.1)', background: on?'rgba(244,114,182,0.15)':'transparent', color: on?'#f472b6':'#ffffff', fontSize:10, fontWeight:700 }}>{label}{on?' ?':''}</button>; })}
+          <label style={{ fontSize:10, color:'#ffffff' }}>VL-����� %: <input type="number" min="5" max="60" step="5" value={vbtThreshold} onChange={e=>{ const v=parseFloat(e.target.value); if(Number.isFinite(v)&&v>0) setVbtThreshold(v as VelocityLossThreshold); touchVbt(); }} style={{ width:60, marginLeft:4, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.15)', color:'#fff', borderRadius:6, padding:'4px 6px', fontSize:11 }} /></label>
+          <label style={{ fontSize:10, color:'#ffffff' }}>����� (��): <input type="number" min="0" step="50" value={vbtPauseMs} onChange={e=>setVbtPauseMs(e.target.value)} placeholder="���: 1000-2000" style={{ width:80, marginLeft:4, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.15)', color:'#fff', borderRadius:6, padding:'4px 6px', fontSize:11 }} /></label>
+        </div>
+        <div style={{ marginTop:8, padding:8, borderRadius:8, background:'rgba(244,114,182,0.05)', border:'1px solid rgba(244,114,182,0.18)' }}>
+          <div style={{ fontSize:10, fontWeight:800, color:'#f472b6', marginBottom:4 }}>LVP-���������� (3+ �����: %1RM / ��������)</div>
+          <div style={{ display:'flex', gap:6, flexWrap:'wrap', alignItems:'center', marginBottom:6 }}>
+            <label style={{ fontSize:10, color:'#ffffff' }}>%1RM: <input type="number" min="30" max="100" step="5" value={lvpPctInput} onChange={e=>setLvpPctInput(e.target.value)} placeholder="80" style={{ width:60, marginLeft:4, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.15)', color:'#fff', borderRadius:6, padding:'4px 6px', fontSize:11 }} /></label>
+            <label style={{ fontSize:10, color:'#ffffff' }}>��������: <input type="number" min="0.1" step="0.01" value={lvpVelInput} onChange={e=>setLvpVelInput(e.target.value)} placeholder="0.60" style={{ width:70, marginLeft:4, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.15)', color:'#fff', borderRadius:6, padding:'4px 6px', fontSize:11 }} /></label>
+            <button data-lift="lvp-add" onClick={()=>{ const p=parseFloat(lvpPctInput)/100, v=parseFloat(lvpVelInput); if (Number.isFinite(p)&&p>0&&Number.isFinite(v)&&v>0) { setLvpPoints(cur=>[...cur,{pct:p,velocity:v}]); setLvpPctInput(''); setLvpVelInput(''); } }} style={{ ...btn, background:'rgba(244,114,182,0.15)', color:'#f472b6', border:'1px solid rgba(244,114,182,0.3)' }}>+ �����</button>
+            <button data-lift="lvp-calibrate" onClick={()=>{ const r = calibrateLVP(lvpPoints); setLvpResult(r); }} style={{ ...btn, background:'rgba(255,255,255,0.06)', color:'#fff', border:'1px solid rgba(255,255,255,0.12)' }}>�����������</button>
+            <button data-lift="lvp-clear" onClick={()=>{ setLvpPoints([]); setLvpResult(null); }} style={{ ...btn, background:'transparent', color:'#ffffff', border:'1px solid rgba(255,255,255,0.12)' }}>X</button>
+          </div>
+          {lvpPoints.length>0 && <div style={{ fontSize:9, color:'#ffffff', lineHeight:1.4, marginBottom:4 }}>�����: {lvpPoints.length} � {lvpPoints.map(p=>`${Math.round(p.pct*100)}%/${p.velocity}`).join(', ')}</div>}
+          {lvpResult && <div role="status" style={{ fontSize:10, color:'#f472b6', lineHeight:1.4 }}>r2={lvpResult.r2.toFixed(3)} � slope={lvpResult.slope.toFixed(3)} � intercept={lvpResult.intercept.toFixed(3)} {lvpResult.r2<0.9?' ������ �������� (����� >=3 �����)':''}</div>}
+        </div>
         {vbtStale?.stale && <div role="status" style={{ marginTop:6, fontSize:10, color:'#fbbf24', lineHeight:1.4 }}>⚠ Замеру {vbtStale.weeksAgo} нед. — LVP дрейфует, перекалибруйте (введите свежие скорости).</div>}
         <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginTop:6, alignItems:'center' }}>
           <label style={{ fontSize:10, color:DIM }}>Лучший (м/с): <input type="number" step="0.01" min="0" value={vbtBest} onChange={e=>{ setVbtBest(e.target.value); touchVbt(); }} placeholder="0.60" style={{ width:70, marginLeft:4, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.15)', color:'#fff', borderRadius:6, padding:'4px 6px', fontSize:11 }} /></label>
@@ -833,8 +916,10 @@ export const LiftMasterCard: React.FC<{
           const best=parseFloat(vbtBest), last=parseFloat(vbtLast);
           if (!Number.isFinite(best)||!Number.isFinite(last)||best<=0||last<=0||last>best) return <div style={{ marginTop:6, fontSize:10, color:'#ffffff' }}>Введите скорости (последний не может быть быстрее лучшего).</div>;
           const weight=parseFloat(vbtWeight);
-          const d=diagnoseVelocity(lift, best, last, Number.isFinite(weight)&&weight>0?weight:undefined, thresholdForGoal(vbtGoal));
-          const vbtPhase=(d.suggestedPhase ?? effectivePhase) as WeakPoint|null;
+           const bestAdj = adjustVelocityForMetric(best, vbtMetric);
+           const lastAdj = adjustVelocityForMetric(last, vbtMetric);
+           const d=diagnoseVelocity(lift, bestAdj, lastAdj, Number.isFinite(weight)&&weight>0?weight:undefined, vbtThreshold);
+           const vbtPhase=(d.suggestedPhase ?? effectivePhase) as WeakPoint|null;
           const vbtSticking = vbtPhase ? analyzeStickingCorrections(lift, vbtPhase, template ?? undefined) : null;
           const vbtKey=`${lift}|vbt|${vbtPhase??'none'}`;
           return (
@@ -859,7 +944,7 @@ export const LiftMasterCard: React.FC<{
           <span style={{ display:'flex', alignItems:'center', gap:8, minWidth:0 }}>
             <span style={{ width:26, height:26, borderRadius:7, display:'flex', alignItems:'center', justifyContent:'center', background:'linear-gradient(135deg,#0ea5e9,#0284c7)', boxShadow:'0 2px 8px rgba(14,165,233,0.35)', fontSize:13, flexShrink:0 }}>📹</span>
             <span style={{ minWidth:0 }}>
-              <span style={{ fontSize:11, fontWeight:800, color:'#0ea5e9' }}>Видео-анализ · BlazePose</span>
+              <span style={{ fontSize:11, fontWeight:800, color:'#0ea5e9' }}>Видео-анализ · MVP (оценка, не LPT)</span>
               <span style={{ fontSize:9, color:'#fff', opacity:0.72, display:'block', marginTop:1 }}>Запись → скорость штанги → углы → автоподстановка в VBT</span>
             </span>
           </span>
@@ -867,13 +952,13 @@ export const LiftMasterCard: React.FC<{
         </button>
         {!collapsed['secVideo'] && <div style={{ padding:12 }}>
           <VideoCaptureCard lift={lift} onResult={r=>{
-            if (r.barVelocity!=null) {
+            if (typeof r.barVelocity === 'number' && Number.isFinite(r.barVelocity) && r.barVelocity > 0) {
               const v = r.barVelocity;
               setVbtBest((v+0.15).toFixed(2));
               setVbtLast(v.toFixed(2));
               touchVbt();
             }
-            setVideoNote(`Локти ${r.elbowAvgDeg ?? '—'}° · хват ${r.gripRatio ?? '—'} · скорость ${r.barVelocity ?? '—'} м/с · ${r.note}`);
+            setVideoNote(`Локти ${r.elbowAvgDeg ?? '—'}° · хват ${r.gripRatio ?? '—'} · скорость ${r.barVelocity ?? '—'} м/с · ${r.note} (оценка, не LPT)`);
           }} />
           {/* Kinovea CSV импорт (углы — да, скорость — оценка) */}
           <div style={{ marginTop:8, padding:8, borderRadius:8, background:'rgba(14,165,233,0.05)', border:'1px solid rgba(14,165,233,0.18)' }}>
@@ -897,9 +982,11 @@ export const LiftMasterCard: React.FC<{
                 const r = analyzeBarTracking(pts);
                 if (!r) { setKinoveaMsg('Точек мало для анализа (нужно ≥2).'); return; }
                 const badge = barLoopFlag(r.xLoop) === 'crit' ? 'крит. >6' : barLoopFlag(r.xLoop) === 'warn' ? 'внимание ≥4' : 'норма';
-                setKinoveaMsg(`xLoop ${r.xLoop} см (${badge}) · yMax ${r.yMax} см · vmax ${r.vmax} м/с (оценка) · точек ${r.points.length}`);
+                const tilt = (r.xBias > 0 ? '+' : '') + r.xBias + ' cm';
+                const turn = (r.turnoverMs != null) ? (' � turnover ' + r.turnoverMs + ' ms') : '';
+                setKinoveaMsg('xLoop ' + r.xLoop + ' cm (' + badge + ') � �������� ' + tilt + ' � yMax ' + r.yMax + ' �� � vmax ' + r.vmax + ' �/� (������)' + turn + ' � ����� ' + r.points.length);
               }} style={{ minHeight:44, padding:'10px 14px', borderRadius:10, cursor:'pointer', background:'rgba(14,165,233,0.15)', color:'#0ea5e9', border:'1px solid rgba(14,165,233,0.3)', fontWeight:700, fontSize:12 }}>📊 Разобрать CSV</button>
-              <button data-lift="clear-kinovea" aria-label="Очистить Kinovea" onClick={()=>{ setKinoveaText(''); setKinoveaMsg(null); }} style={{ minHeight:44, padding:'10px 14px', borderRadius:10, cursor:'pointer', background:'transparent', color:'#fff', border:'1px solid rgba(255,255,255,0.12)', fontWeight:700, fontSize:12 }}>✕ Очистить</button>
+              <button data-lift="clear-kinovea" aria-label="Очистить Kinovea" onClick={()=>{ setKinoveaText(''); setKinoveaMsg(null); setKinoveaResult(null); }} style={{ minHeight:44, padding:'10px 14px', borderRadius:10, cursor:'pointer', background:'transparent', color:'#fff', border:'1px solid rgba(255,255,255,0.12)', fontWeight:700, fontSize:12 }}>✕ Очистить</button>
             </div>
             {kinoveaMsg && <div role="status" style={{ marginTop:6, fontSize:10, color:'#0ea5e9', lineHeight:1.4 }}>{kinoveaMsg}</div>}
           </div>
@@ -1048,8 +1135,8 @@ export const LiftMasterCard: React.FC<{
                       <button onClick={()=>addGeom(opt, an.items.filter(i=>i.optimal).map(i=>i.exercise.name))} style={{ ...btn, background:col.bg, color:col.color, border:`1px solid ${col.color}40` }}>➕ Рекомендуемое</button>
                       <button onClick={()=>addGeom(opt, an.items.map(i=>i.exercise.name))} style={{ ...btn, background:'rgba(255,255,255,0.04)', color:DIM, border:'1px solid rgba(255,255,255,0.1)' }}>➕ Все</button>
                       <span style={{ fontSize:9, color:DIM }}>Дни:</span>
-                      <button onClick={()=>{ setDaysGeom(cur=>{ const n={...cur}; delete n[k]; return n; }); }} style={{ padding:'3px 7px', borderRadius:6, cursor:'pointer', fontSize:9, border: !daysGeom[k]?.length?`1px solid ${col.color}`:'1px solid rgba(255,255,255,0.1)', background: !daysGeom[k]?.length?col.bg:'transparent', color: !daysGeom[k]?.length?col.color:DIM }}>Авто</button>
-                      {Array.from({length:Math.max(1,dayCount)},(_,i)=>i+1).map(d=> <button key={d} onClick={()=>toggleGeomDay(opt,d)} style={{ padding:'3px 7px', borderRadius:6, cursor:'pointer', fontSize:9, border: daysGeom[k]?.includes(d)?`1px solid ${col.color}`:'1px solid rgba(255,255,255,0.1)', background: daysGeom[k]?.includes(d)?col.bg:'transparent', color: daysGeom[k]?.includes(d)?col.color:DIM }}>Д{d}</button>)}
+                      <button onClick={()=>{ setDaysGeom(cur=>{ const n={...cur}; delete n[k]; return n; }); }} style={{ minHeight:44, minWidth:44, padding:'8px 10px', borderRadius:6, cursor:'pointer', fontSize:9, border: !daysGeom[k]?.length?`1px solid ${col.color}`:'1px solid rgba(255,255,255,0.1)', background: !daysGeom[k]?.length?col.bg:'transparent', color: !daysGeom[k]?.length?col.color:DIM }}>Авто</button>
+                      {Array.from({length:Math.max(1,dayCount)},(_,i)=>i+1).map(d=> <button key={d} onClick={()=>toggleGeomDay(opt,d)} style={{ minHeight:44, minWidth:44, padding:'8px 10px', borderRadius:6, cursor:'pointer', fontSize:9, border: daysGeom[k]?.includes(d)?`1px solid ${col.color}`:'1px solid rgba(255,255,255,0.1)', background: daysGeom[k]?.includes(d)?col.bg:'transparent', color: daysGeom[k]?.includes(d)?col.color:DIM }}>Д{d}</button>)}
                     </div>
                   </div>
                 );
