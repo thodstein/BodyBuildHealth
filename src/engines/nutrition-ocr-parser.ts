@@ -985,7 +985,7 @@ export function parseMyFitnessPalText(text: string): ParsedMeal[] {
     const dateMatch = line.match(/^(\d{4}[-/.]\d{1,2}[-/.]\d{1,2}|\d{1,2}[-/.]\d{1,2}(?:[-/.]\d{2,4})?|(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+\d{1,2},?\s*\d{0,4})$/i);
     if (dateMatch) { flush(); date = normalizeScreenshotDate(dateMatch[1], today, true); meal = null; column = null; continue; }
 
-    const heading = line.match(/^(breakfast|lunch|dinner|snacks?(?:\s*\d+)?|brunch|завтрак|обед|ужин|перекус(?:\s*\d+)?|полдник|бранч)\b\s*(?:[:\-]\s*)?(.*)$/i);
+    const heading = line.match(/^(breakfast|lunch|dinner|snacks?(?:\s*\d+)?|brunch|завтрак|обед|ужин|перекус(?:\s*\d+)?|полдник|бранч)(?![А-Яа-яЁёA-Za-z])\s*(?:[:\-]\s*)?(.*)$/i);
     if (heading) {
       flush();
       const label = heading[1].toLowerCase();
@@ -1064,7 +1064,7 @@ export function parseMyFitnessPalText(text: string): ParsedMeal[] {
     }
 
     const name = line.replace(/\s*[›>‹]+\s*$/, '').trim();
-    if (/[A-Za-zА-Яа-яЁё]/.test(name) && !/^\d/.test(name) && !/^(?:protein|fat|carbs?|calories?|белки?|жиры?|углеводы?|goal|remaining|exercise)\b/i.test(name)) {
+    if (/[A-Za-zА-Яа-яЁё]/.test(name) && !/^\d/.test(name) && !/^(?:protein|fat|carbs?|calories?|белки?|жиры?|углеводы?|goal|remaining|exercise)(?![А-Яа-яЁёA-Za-z])/i.test(name)) {
       // A compact MFP food row can be followed by its separate (fat, carbs,
       // protein) columns; don't create a new food from that numeric row.
       flush(); ensureMeal();
