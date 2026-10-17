@@ -257,6 +257,8 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
   }, []);
   /** PRO-5 D7: 3 таба — Замеры + Диагностика движений + Коррекция. Соревы удалены из хаба. */
   const [tab, setTab] = useState<DiagTab>('pomost');
+  /** Пошаговый мастер замера (не скрывает поля — тесты ожидают aria-label). */
+  const [liftStep, setLiftStep] = useState<0 | 1 | 2>(0);
   const [diag, setDiag] = useState<DiagState>(loadDiag);
   const saveDiag = (d: DiagState) => {
     setDiag(d);
@@ -898,6 +900,16 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
             </div>
             <div className="ad-muted">слабейший: {report.filled ? weakestLabel : 'введи замеры'}</div>
           </div>
+        </div>
+        <div className="ad-row" data-arm="lift-wizard" style={{ gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
+          {([0, 1, 2] as const).map((s) => (
+            <AdChip key={s} active={liftStep === s} onClick={() => setLiftStep(s)}>
+              {s === 0 ? '1 Снаряды' : s === 1 ? '2 Условия' : '3 Диагностика'}
+            </AdChip>
+          ))}
+          <span className="ad-muted" style={{ fontSize: 11, marginLeft: 4 }}>
+            {liftStep === 0 ? 'Введи RT/Axle/Pinch/CoC/Hub/Excalibur' : liftStep === 1 ? 'Версия RT, диски, мел, диаметр, поправка' : 'Точка срыва, фолы, тесты, причина'}
+          </span>
         </div>
         <div className="ad-row" data-arm="lift-tags">
           {report.rtAsymPct != null && <span className="ad-tag">RT-асимметрия {report.rtAsymPct}%</span>}
