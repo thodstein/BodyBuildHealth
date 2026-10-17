@@ -527,7 +527,7 @@ export const LiftMasterCard: React.FC<{
         </div>
       )}
       {/* выбор движения — sticky */}
-      <div style={{ ...CARD, display:'flex', gap:5, flexWrap:'wrap', alignItems:'center', position:'sticky', top:0, zIndex:4, backdropFilter:'blur(10px)' as any, background:'rgba(10,10,12,0.72)', border:'1px solid rgba(255,255,255,0.06)' }}>
+      <div style={{ ...CARD, display:'flex', gap:5, flexWrap:'wrap', alignItems:'center', position: 'static', top:0, zIndex:4, backdropFilter:'blur(10px)' as any, background:'rgba(10,10,12,0.72)', border:'1px solid rgba(255,255,255,0.06)' }}>
         <div style={{ fontSize:11, fontWeight:800, color:ACCENT, marginRight:6 }}>Движение:</div>
         {(Object.keys(LIFT_RU) as Lift[]).map(l=>{ const on=lift===l; return <button key={l} onClick={()=>{ setLift(l); setPhase('' as WeakPoint|''); setIssues([]); }} style={{ minHeight:32, padding:'5px 10px', borderRadius:14, cursor:'pointer', border: on?'1px solid '+ACCENT:'1px solid rgba(255,255,255,0.1)', background: on?'rgba(0,230,138,0.15)':'transparent', color: on?ACCENT:DIM, fontWeight:700, fontSize:10 }}>{LIFT_RU[l]}{on?' ✓':''}</button>; })}
       </div>
@@ -623,11 +623,19 @@ export const LiftMasterCard: React.FC<{
               {id:'bb_lateral_mid', label:'Средняя дельта'}, {id:'bb_rear_cable', label:'Задняя дельта'}, {id:'bb_front_raise', label:'Передняя дельта'},
               {id:'bb_triceps_long', label:'Трицепс длинная'}, {id:'bb_triceps_lateral', label:'Трицепс латер.'}, {id:'bb_triceps_medial', label:'Трицепс медиал.'},
               {id:'bb_biceps_long', label:'Бицепс длинная'}, {id:'bb_biceps_short', label:'Бицепс короткая'}, {id:'bb_brachialis', label:'Брахиалис'},
+               {id:'bb_floor_press', label:'Жим с пола (локдаун)'}, {id:'bb_board_press', label:'Жим с досок (дожим)'},
+               {id:'bb_deficit_dl', label:'Тяга с дефицитом (старт)'}, {id:'bb_rack_pull', label:'Тяга с плинтов (дожим)'},
+               {id:'bb_tempo_squat', label:'Темповой присед'}, {id:'bb_front_squat', label:'Фронтальный присед'},
+               {id:'bb_good_morning', label:'Гудморнинг (наклоны)'}, {id:'bb_pause_bench', label:'Жим с паузой (старт)'},
             ].map(g=>{
               const k = `bb|${g.id}`; const on = selectedDiag[k]?.length>0;
               return <button key={g.id} onClick={()=>{
                 const name = (()=>{
-                  const m: Record<string,string> = { bb_cable_upper:'Сведение в кроссовере с верхнего блока (верх груди)', bb_cable_mid:'Сведение в кроссовере (середина груди)', bb_cable_lower:'Сведение в кроссовере с нижнего блока (низ груди)', bb_lateral_mid:'Махи в стороны с задержкой (средняя дельта)', bb_rear_cable:'Отведение на заднюю дельту в кроссовере', bb_front_raise:'Подъём гантелей перед собой (передняя дельта)', bb_triceps_long:'Французский жим с гантелью над головой (длинная головка трицепса)', bb_triceps_lateral:'Разгибание с канатной рукоятью (латеральная головка)', bb_triceps_medial:'Разгибание обратным хватом (медиальная головка)', bb_biceps_long:'Подъём гантели на наклонной (длинная головка бицепса)', bb_biceps_short:'Подъём на скамье Скотта (короткая головка бицепса)', bb_brachialis:'Молот с канатной рукоятью (брахиалис)' };
+                  const m: Record<string,string> = { bb_cable_upper:'Сведение в кроссовере с верхнего блока (верх груди)', bb_cable_mid:'Сведение в кроссовере (середина груди)', bb_cable_lower:'Сведение в кроссовере с нижнего блока (низ груди)', bb_lateral_mid:'Махи в стороны с задержкой (средняя дельта)', bb_rear_cable:'Отведение на заднюю дельту в кроссовере', bb_front_raise:'Подъём гантелей перед собой (передняя дельта)', bb_triceps_long:'Французский жим с гантелью над головой (длинная головка трицепса)', bb_triceps_lateral:'Разгибание с канатной рукоятью (латеральная головка)', bb_triceps_medial:'Разгибание обратным хватом (медиальная головка)', bb_biceps_long:'Подъём гантели на наклонной (длинная головка бицепса)', bb_biceps_short:'Подъём на скамье Скотта (короткая головка бицепса)', bb_brachialis:'Молот с канатной рукоятью (брахиалис)',
+                   bb_floor_press:'Жим с пола (floor press)', bb_board_press:'Жим с досок (board press)',
+                   bb_deficit_dl:'Становая тяга с дефицитом', bb_rack_pull:'Тяга с плинтов (rack pull)',
+                   bb_tempo_squat:'Темповой присед (5-3-0)', bb_front_squat:'Фронтальные приседания',
+                   bb_good_morning:'Гудморнинг (наклоны со штангой)', bb_pause_bench:'Жим штанги лёжа' };
                   return m[g.id] ?? g.id;
                 })();
                 if (on) setSelectedDiag(cur=>{ const n={...cur}; delete n[k]; return n; });
