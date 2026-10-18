@@ -766,7 +766,7 @@ export const UnifiedIntelligenceHub: React.FC = () => {
         </div>
       </div>
 
-      {/* sticky nav */}
+      {/* навигация по секциям — обычный ряд в потоке (не липкая шапка) */}
       <div style={{ position: 'static', top:0, zIndex:5, margin:'-2px -8px 10px', padding:'8px 8px 8px', background:'rgba(10,10,12,0.72)', backdropFilter:'blur(10px)', borderBottom:'1px solid rgba(255,255,255,0.06)', display:'flex', gap:6, overflowX:'auto', scrollbarWidth:'none' }}>
         {SECTIONS.map(s=> (
           <button key={s.id} onClick={()=> scrollTo(s.id)} aria-pressed={active===s.id} aria-label={`Раздел: ${s.label}. ${s.desc}`} style={{

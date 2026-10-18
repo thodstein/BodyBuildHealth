@@ -5,6 +5,29 @@
 
 import '@testing-library/jest-dom/vitest';
 
+// jsdom не реализует Blob-URL API: URL.createObjectURL/revokeObjectURL — undefined.
+// Экспорт-хендлеры движков освобождают blob-URL через setTimeout(…, 1000): таймер
+// срабатывает уже после того, как тест снял свой локальный стаб, и uncaught
+// exception (URL.revokeObjectURL is not a function) валит весь тест-файл.
+// Глобальный fallback делает оба метода доступными всегда. Тесты, которым
+// нужна имитация «API нет» (pl-export-mobile, planner-coach-export),
+// переопределяют/удаляют их явно — методы объявлены configurable, так что
+// defineProperty/delete в тестах работают как раньше.
+if (typeof URL.createObjectURL !== 'function') {
+  Object.defineProperty(URL, 'createObjectURL', {
+    value: () => `blob:jsdom-${Math.random().toString(36).slice(2)}`,
+    writable: true,
+    configurable: true,
+  });
+}
+if (typeof URL.revokeObjectURL !== 'function') {
+  Object.defineProperty(URL, 'revokeObjectURL', {
+    value: () => {},
+    writable: true,
+    configurable: true,
+  });
+}
+
 // Mock localStorage
 const localStorageMock = (() => {
   let store: Record<string, string> = {};

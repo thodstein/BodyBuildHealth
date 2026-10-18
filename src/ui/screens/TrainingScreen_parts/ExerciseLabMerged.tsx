@@ -203,7 +203,7 @@ const ExerciseLabMerged: React.FC<{
         </div>
       )}
 
-      {/* 4 шага — sticky, удобно */}
+      {/* 4 шага — лента в потоке (не липкая шапка) */}
       <div style={{ position: 'static', top:0, zIndex:5, margin:'-2px -8px 12px', padding:'8px 8px', background:'rgba(10,10,12,0.72)', backdropFilter:'blur(10px)', borderBottom:'1px solid rgba(255,255,255,0.06)', display:'flex', gap:6, overflowX:'auto', scrollbarWidth:'none' }}>
         {MODE_DEFS.map(({ m, label, icon, desc }) => {
           const active = mode === m;

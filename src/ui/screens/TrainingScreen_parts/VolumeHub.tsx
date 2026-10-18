@@ -93,7 +93,7 @@ export const VolumeHub: React.FC<{ initialMode?: HubMode; initialWeight?: number
         })}
       </div>
 
-      {/* sticky nav */}
+      {/* навигация по блокам — обычный ряд в потоке (не липкая шапка) */}
       <div style={{ position: 'static', top:0, zIndex:5, margin:'-2px -8px 10px', padding:'8px 8px 8px', background:'rgba(10,10,12,0.72)', backdropFilter:'blur(10px)', borderBottom:'1px solid rgba(255,255,255,0.06)', display:'flex', gap:6, overflowX:'auto', scrollbarWidth:'none' }}>
         {MODE_DEFS.map(({ m, label, icon, desc }) => {
           const isActive = mode === m;

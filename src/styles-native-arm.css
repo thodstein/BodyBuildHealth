@@ -3,7 +3,7 @@
  *
  * База редизайна — arm-design.css (все платформы). Здесь ТОЛЬКО то, что
  * уместно лишь в нативном WebView: safe-area, глубокие тени, glow,
- * усиленный blur, липкие CTA, snap-ленты. Логика подачи — в базовых
+ * усиленный blur, snap-ленты. Логика подачи — в базовых
  * классах .ad-*.
  *
  * Правила слоя (как в styles-native.css / styles-native-strongman.css):
@@ -98,11 +98,10 @@ html.app-native .train-arm.arm-apk .ad-hero-score {
   box-shadow: 0 8px 24px var(--arm-glow), inset 0 1px 0 rgba(255, 255, 255, 0.45) !important;
 }
 
-/* ─── 4. ШАГИ — липкая стеклянная лента со snap ──────────────────── */
+/* ─── 4. ШАГИ — стеклянная лента со snap, в потоке ───────────────── */
+/* НЕ sticky: раньше лента липла к верху экрана (top: safe-area, z-index 5)
+   и наезжала на контент планировщика/хаба. Теперь обычный ряд в потоке. */
 html.app-native .train-arm.arm-apk .ad-steps {
-  position: sticky !important;
-  top: env(safe-area-inset-top, 0px) !important;
-  z-index: 5 !important;
   padding: 8px !important;
   margin: 0 -4px 12px !important;
   border-radius: 19px !important;
@@ -115,9 +114,6 @@ html.app-native .train-arm.arm-apk .ad-steps {
 }
 
 html.app-native .train-armdiag.arm-apk .ad-steps {
-  position: sticky !important;
-  top: env(safe-area-inset-top, 0px) !important;
-  z-index: 5 !important;
   padding: 8px !important;
   margin: 0 -4px 12px !important;
   border-radius: 19px !important;
@@ -427,7 +423,7 @@ html.app-native .train-arm.arm-apk .ad-toast {
   animation: armApkPop 0.3s cubic-bezier(0.22, 0.68, 0, 1) !important;
 }
 
-/* ─── 15. EMPTY + CTA — пустые состояния и липкая панель ──────────── */
+/* ─── 15. EMPTY + CTA — пустые состояния и панель действий ─────────── */
 html.app-native .train-arm.arm-apk .ad-empty {
   border-radius: 18px !important;
   -webkit-backdrop-filter: blur(16px) !important;
@@ -442,21 +438,14 @@ html.app-native .train-arm.arm-apk .ad-empty-t {
   font-size: 15px !important;
 }
 
+/* CTA-панель низа — в потоке (не липнет к низу вьюпорта и не перекрывает контент). */
 html.app-native .train-arm.arm-apk .ad-cta {
-  position: sticky !important;
-  bottom: max(env(safe-area-inset-bottom, 0px), 10px) !important;
-  z-index: 4 !important;
   border-radius: 18px !important;
   background: rgba(9, 18, 34, 0.9) !important;
-  -webkit-backdrop-filter: blur(20px) !important;
-  backdrop-filter: blur(20px) !important;
   box-shadow: 0 -8px 28px rgba(0, 0, 0, 0.5) !important;
 }
 
 html.app-native .train-armdiag.arm-apk .ad-cta {
-  position: sticky !important;
-  bottom: max(env(safe-area-inset-bottom, 0px), 10px) !important;
-  z-index: 4 !important;
   border-radius: 18px !important;
 }
 
@@ -891,9 +880,9 @@ html.app-native .train-arm.arm-apk .ad-sheet-value {
 }
 
 /* ─── 25. НОЛЬ БОКОВОГО СКРОЛЛА + ШИТЫ СТРОГО ПО ВЬЮПОРТУ ────────── */
-/* Страничный скролл вправо давали отрицательные поля липких лент
- * (ad-steps margin 0 -4px) — режем переполнение, липкость цела
- * (clip, в отличие от hidden, sticky не ломает). */
+/* Страничный скролл вправо давали отрицательные поля лент
+ * (ad-steps margin 0 -4px) — режем переполнение (clip, в отличие от
+ * hidden, не создает скролл-контейнер и не ломает layout). */
 html.app-native body {
   overflow-x: clip !important;
 }
@@ -947,12 +936,10 @@ html.app-native .train-arm.arm-apk [data-arm='export-actions'] .ad-btn:focus-vis
   outline-offset: 2px !important;
 }
 
-/* ─── 27. ПЛАН: липкая лента недель для длинных планов ───────────── */
-/* Лента пилюль держится под липкой лентой шагов (та же glass-подача). */
+/* ─── 27. ПЛАН: лента недель для длинных планов ──────────────────── */
+/* НЕ sticky: лента пилюль недель раньше липла под «липкой» лентой шагов
+   и вместе с ней перекрывала содержимое плана. Теперь обычный ряд в потоке. */
 html.app-native .train-arm.arm-apk [data-arm='week-pills'] {
-  position: sticky !important;
-  top: calc(env(safe-area-inset-top, 0px) + 64px) !important;
-  z-index: 4 !important;
   background: rgba(9, 18, 34, 0.92) !important;
   border-radius: 14px !important;
   padding: 6px 4px 8px !important;

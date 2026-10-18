@@ -257,8 +257,6 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
   }, []);
   /** PRO-5 D7: 3 таба — Замеры + Диагностика движений + Коррекция. Соревы удалены из хаба. */
   const [tab, setTab] = useState<DiagTab>('pomost');
-  /** Пошаговый мастер замера (не скрывает поля — тесты ожидают aria-label). */
-  const [liftStep, setLiftStep] = useState<0 | 1 | 2>(0);
   const [diag, setDiag] = useState<DiagState>(loadDiag);
   const saveDiag = (d: DiagState) => {
     setDiag(d);
@@ -901,16 +899,6 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
             <div className="ad-muted">слабейший: {report.filled ? weakestLabel : 'введи замеры'}</div>
           </div>
         </div>
-        <div className="ad-row" data-arm="lift-wizard" style={{ gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
-          {([0, 1, 2] as const).map((s) => (
-            <AdChip key={s} active={liftStep === s} onClick={() => setLiftStep(s)}>
-              {s === 0 ? '1 Снаряды' : s === 1 ? '2 Условия' : '3 Диагностика'}
-            </AdChip>
-          ))}
-          <span className="ad-muted" style={{ fontSize: 11, marginLeft: 4 }}>
-            {liftStep === 0 ? 'Введи RT/Axle/Pinch/CoC/Hub/Excalibur' : liftStep === 1 ? 'Версия RT, диски, мел, диаметр, поправка' : 'Точка срыва, фолы, тесты, причина'}
-          </span>
-        </div>
         <div className="ad-row" data-arm="lift-tags">
           {report.rtAsymPct != null && <span className="ad-tag">RT-асимметрия {report.rtAsymPct}%</span>}
           {report.hubAsymPct != null && <span className="ad-tag">Hub-асимметрия {report.hubAsymPct}%</span>}
@@ -944,8 +932,16 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
             );
           } catch { return null; }
         })()}
-        {/* ROUND-10: аудит собранного плана — покрытие 5 звеньев (паритет с ТА/стронг/арм/ББ) */}
-        <div data-arm="lift-plan-audit" style={{ marginTop: 8, padding: '8px 10px', borderRadius: 10, background: '#0a1629', border: '1px solid rgba(59,130,246,0.28)', fontSize: 11, lineHeight: 1.5 }}>
+        {/* ROUND-10: аудит собранного плана — вынесен ИЗ шапки-окна в компактную
+            сворачиваемую секцию ниже. Раньше герой = шапка + чипы мастера +
+            покрытие + аудит плана + «Как пользоваться» ≈ 2 экрана: он закрывал
+            собой весь контент хаба до самого низа. Теперь шапка — компактная,
+            как в ТА/арм-хабе, а аудит плана лежит своей карточкой после ряда
+            табов (контент хаба виден сразу). */}
+      </AdCard>
+
+      <AdCard>
+        <div data-arm="lift-plan-audit" style={{ margin: 0, padding: '8px 10px', borderRadius: 10, background: '#0a1629', border: '1px solid rgba(59,130,246,0.28)', fontSize: 11, lineHeight: 1.5 }}>
           {liftAudit ? (
             <>
               <b style={{ color: '#fff' }}>📋 Аудит плана: покрытие звеньев {liftAudit.covered.length}/{ARMLIFT_AUDIT_LINKS.length} ({liftAudit.coveragePct}%) · сетов {liftAudit.totalSets} · стол {Math.round(liftAudit.tableRatio * 100)}%</b>

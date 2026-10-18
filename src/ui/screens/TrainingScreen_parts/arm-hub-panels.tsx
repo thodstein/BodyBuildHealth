@@ -521,7 +521,7 @@ export function HubAction({ H }: { H: any }) {
 }
 
 /** Нижняя панель действий — 1-в-1 с ТА-хабом: «Применить» + экспорт.
- *  Кнопки липятся к низу (.ad-cta) — на телефоне всегда под рукой. */
+ *  Кнопки в потоке в конце хаба (.ad-cta больше не липнет к низу — не перекрывает контент). */
 export function HubActionBar({ H }: { H: any }) {
   const {
     applyToConstructor, state, diag, handleRollbackP0, hasInjectPrev,

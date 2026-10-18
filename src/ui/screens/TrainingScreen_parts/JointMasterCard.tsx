@@ -126,7 +126,7 @@ export const JointMasterCard: React.FC = () => {
       </div>
       </section>
 
-      {/* sticky pills — навигация по 8 секциям */}
+      {/* пилюли-навигация по 8 секциям — обычный ряд в потоке (не липкая шапка) */}
       <div style={{ position: 'static', top:0, zIndex:5, margin:'-2px -8px 10px', padding:'8px 8px', background:'rgba(10,10,12,0.72)', backdropFilter:'blur(10px)', borderBottom:'1px solid rgba(255,255,255,0.06)', display:'flex', gap:6, overflowX:'auto', scrollbarWidth:'none' }}>
         {SECTIONS.map(s=> (
           <button key={s.id} onClick={()=> scrollTo(s.id)} style={{
