@@ -31,6 +31,8 @@ interface SetRecord {
   technique?: number;
   /** Фактическая скорость штанги подхода (м/с) — VBT: потеря скорости best→last. */
   velocity?: number;
+  /** Пауза на груди (жим) — IPF-стиль. */
+  pause?: boolean;
 }
 
 interface ExerciseRecord {
@@ -335,6 +337,7 @@ export const DiaryRecordingForm: React.FC<DiaryRecordingFormProps> = ({ diary, s
         exerciseName: cat?.name || e.exerciseId,
         sets: completedSets.map(s => ({
           weight: s.weight, reps: s.reps, rir: s.rir, rpe: s.rpe,
+          pause: s.pause === true ? true : undefined,
           // VBT-факт: санитизация как в логгере (0..5 м/с), иначе undefined.
           velocity: Number.isFinite(s.velocity) && (s.velocity ?? 0) > 0 && (s.velocity ?? 0) <= 5
             ? Math.round((s.velocity as number) * 100) / 100
@@ -739,6 +742,15 @@ export const DiaryRecordingForm: React.FC<DiaryRecordingFormProps> = ({ diary, s
                           title={set.technique ? `Техника: ${set.technique}/5` : 'Оценить технику (нет)'}>
                           {set.technique ? (set.technique === 5 ? '✅' : set.technique === 4 ? '🎯' : '⚠️') : '🎯'}
                         </button>
+                        {/жим.*(леж|груд)|bench/i.test(ex.exerciseName) && (
+                          <button onClick={() => updateSet(exIdx, setIdx, { pause: !set.pause })} title="Пауза на груди (IPF-стиль, без отбива)"
+                            aria-pressed={!!set.pause}
+                            style={{ width: 22, height: 22, borderRadius: 4, border: 'none', cursor: 'pointer', fontSize: 9,
+                              background: set.pause ? 'rgba(0,230,138,0.15)' : 'rgba(255,255,255,0.05)',
+                              color: set.pause ? '#00e68a' : '#fff' }}>
+                            ⏸
+                          </button>
+                        )}
                         <button onClick={() => {
                           const updated = [...exercises];
                           const ex2 = { ...updated[exIdx] };

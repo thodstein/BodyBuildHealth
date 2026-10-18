@@ -3,6 +3,7 @@ import { render, screen, cleanup } from '@testing-library/react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import React from 'react';
 import { LiftMasterCard, BB_GRANULAR_GROUPS } from '../LiftMasterCard';
+import { meetAttemptsFor, warmupToOpener } from '../../../../engines/lms/competition-attempts';
 import { EXERCISE_CATALOG } from '../../../../core/exercise-catalog';
 
 afterEach(()=>{ cleanup(); localStorage.removeItem('he_lift_master_v1'); });
@@ -35,6 +36,27 @@ describe('LiftMasterCard — единый инструмент движения 
   it('кнопка добавления в ПЛ-авто присутствует', () => {
     render(<LiftMasterCard sessions={[]} />);
     expect(screen.getByText(/Добавить в ПЛ-авто/)).toBeTruthy();
+  });
+
+  it('секция 11 «День старта» рендерится: стратегии, попытки по ПМ, нормы', () => {
+    const html = renderToStaticMarkup(<LiftMasterCard sessions={[]} profile={{ bodyWeight: 83, pmSquat: 180, pmBench: 120, pmDead: 200 } as any} />);
+    expect(html).toContain('11 · День старта');
+    expect(html).toContain('Консервативная 90/95.5/100%');
+    expect(html).toContain('Сбалансированная 92/96/102%');
+    expect(html).toContain('Агрессивная 93/97/105%');
+    expect(html).toContain('Относительная сила');
+    expect(html).toContain('DOTS');
+  });
+
+  it('секция 11: попытки считаются от введённых ПМ и округляются до 2.5 кг', () => {
+    // Чистая логика движка попыток (UI-инпуты секции 11 ведут в эти функции)
+    const a = meetAttemptsFor(100, 'balanced');
+    expect(a.opener).toBe(92.5);
+    expect(a.second).toBe(95);
+    expect(a.third).toBe(102.5);
+    const w = warmupToOpener(a.opener);
+    expect(w[0].pct).toBe(0.4);
+    expect(w[w.length - 1].pct).toBe(0.9);
   });
 
   it('BB-грануляр: 20 кнопок, все id существуют в EXERCISE_CATALOG (нет фейковых/сырых id)', () => {

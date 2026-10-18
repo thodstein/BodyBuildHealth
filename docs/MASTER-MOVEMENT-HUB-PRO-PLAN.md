@@ -252,3 +252,31 @@
 - `weakpoint-pl-audit.test`: строгая проверка «каждое имя точно в EXERCISE_CATALOG» (без ослабляющего объединения с LMS), новый тест «нет самолифтов», тест паритета `deadlift.sumo_*` ↔ `sumo.sumo_*`.
 - `lift-master-card.test`: все 20 id BB-грануляра существуют в каталоге и уникальны; `pl_bench_pause` = «Жим с паузой».
 - `weakpoint-pl.test`: deadlift/start — дефицит есть, rack pull отсутствует.
+
+## 13. Доработка хаба по приоритетам 1–7 (18.10.2026)
+
+Реализован полный список доработок из раздела 6 + поле паузы в дневник (C1).
+
+**Diary-слой (C1 — пауза на груди, IPF-стиль):**
+- `WorkoutSet.pause?` (workout-logger), `StrengthLogEntry.sets[].pause?` (core/types), сквозной маппинг `logSet` → `workoutLogToSession` → `sessionToWorkoutLog` (оба направления, оба whitelist-слоя IndexedDB + localStorage-зеркало).
+- UI: тоггл «⏸ Пауза» в DiarySetRow (опц. `showPause`, виден только для жима), QuickEntry (completeSet хранит pause), DiaryRecordingForm (иконка ⏸ в строке сета), SessionEditorModal (колонка «пауза», patchSet поддерживает pause).
+
+**Хаб (`LiftMasterCard.tsx`):**
+- A2 — секция 6: «Тренировочный максимум»: консенсус 1RM (`estimate1RMConsensus`) по лучшему сету дневника лифта + ТМ 90% (`trainingMax`), разброс формул.
+- A3 — секция 6: «Готовность (первый подход)»: ожидаемая скорость `expectedVelocityFromCalib(lvpResult, pct)` (in-session LVP) или канонический `velocityForPct` vs факт (`vbtLast`, метрика-скорректированный) → `dailyReadinessCheck` → действие (по плану / −20% объёма / делод).
+- A4 — секция 6: «RPE vs скорость»: последний тяжёлый сет дневника лифта (rpe≥7) против RPE по скорости → скрытая усталость / призыв перекалибровать LVP.
+- A1 — новая секция 11 «День старта»: дата старта (`weeksToStartFromDate`/`daysBetweenIso`), стратегия попыток (3 пресета `MEET_STRATEGY_PCT_LABEL`), ПМ по трём лифтам (ввод или фолбэк `profile.pm*`), попытки `meetAttemptsFor` (округление 2.5 кг) + лестница разминки `warmupToOpener`, тапер-подсказки по неделям до старта.
+- A5 — секция 11: относительная сила `relativeStrengthFullReport` (сумма, DOTS, класс, per-lift rs), пол из `he_profile_v2.personal.sex` (нет пола → честное предупреждение).
+- B8 — видео: pose-engine собирает покадровые данные (barX/barY, колени hip-knee-ankle, ширина плеч) в обоих путях (main + worker); `computeMovementSeries` считает петлю/дрейф грифа в см (масштаб по ширине плеч из `he_profile_v2`, дефолт 40) и фазу срыва (кадр минимальной восходящей скорости → угол колена → `phaseForJointAngle`); VideoCaptureCard прокидывает `shoulderWidthCm` и расширенный Result; хаб показывает «Bar-path из видео» + «Фаза срыва (видео)» с кнопкой «Применить фазу».
+- B9 — история недельных срезов: `he_lift_master_history_v1` (один срез на лифт в ISO-неделю, cap 60), блок «📜 История» в секции 2 с диффом против прошлого среза.
+- B11 — тренд срывов: `diaryHint.top3` — распределение `phaseForReps` за 28 дней, рендер «Тренд срывов».
+- C1-потребление: счётчик паузных сетов жима за 28 дней (секция 2) + IPF-подсказка при нуле.
+
+**Мост в планер (B7):**
+- `appendDiagnosticsToPL` валидирует имена против EXERCISE_CATALOG (срез суффикса «(слабая: …)»): нераспознанные пропускаются и репортятся тостом «пропущены нераспознанные» (out-параметр `skippedOut`).
+
+**Тесты:**
+- Новый `lift-master-pro-features.test`: `phaseForJointAngle` (squat/deadlift диапазоны, отсутствие точек у лифта → null), pause round-trip через `logSet` + `workoutLogToSession`, `dailyReadinessCheck` пороги, `rpeVbtDiscrepancy` флаги, `estimate1RMConsensus`.
+- `lift-master-card.test`: рендер секции 11 (стратегии/нормы/DOTS), логика попыток.
+- `planner-bridge-handlers.test`: синтетические имена заменены каталогными, новый тест валидации имён.
+- Приёмка: `npm run type-check` ✓, целевые vitest ✓, `npm run verify:apk-design` ✓.

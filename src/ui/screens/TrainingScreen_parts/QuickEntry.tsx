@@ -36,6 +36,8 @@ interface SetRecord {
   rpe: number;
   rir: number;
   completed: boolean;
+  /** Пауза на груди (жим) — IPF-стиль. */
+  pause?: boolean;
 }
 
 interface ExerciseRecord {
@@ -197,13 +199,13 @@ export const QuickEntry: React.FC<QuickEntryProps> = ({
     setCurrentSetIdx(currentEx.sets.length);
   }, [currentEx, currentExIdx, exercises, pushUndo]);
 
-  const completeSet = useCallback((weight: number, reps: number, rpe: number, rir: number) => {
+  const completeSet = useCallback((weight: number, reps: number, rpe: number, rir: number, pause?: boolean) => {
     if (!currentEx) return;
     setExercises(prev => {
       const updated = [...prev];
       const ex = { ...updated[currentExIdx] };
       const sets = [...ex.sets];
-      sets[currentSetIdx] = { weight, reps, rpe, rir, completed: true };
+      sets[currentSetIdx] = { weight, reps, rpe, rir, completed: true, pause: pause === true ? true : undefined };
       ex.sets = sets;
       updated[currentExIdx] = ex;
       return updated;
@@ -251,7 +253,7 @@ export const QuickEntry: React.FC<QuickEntryProps> = ({
         date: dateStr,
         exerciseId: ex.exerciseId,
         exerciseName: ex.exerciseName,
-        sets: completedSets.map(s => ({ weight: s.weight, reps: s.reps, rir: s.rir, rpe: s.rpe })),
+        sets: completedSets.map(s => ({ weight: s.weight, reps: s.reps, rir: s.rir, rpe: s.rpe, pause: s.pause === true ? true : undefined })),
         totalVolume: completedSets.reduce((s, st) => s + st.weight * st.reps, 0),
         estimated1RM: Math.max(...completedSets.map(s => epley1RM(s.weight, s.reps)), 0),
         isCompound: EXERCISE_CATALOG.find(e => e.id === ex.exerciseId)?.type === 'compound',
@@ -516,9 +518,10 @@ export const QuickEntry: React.FC<QuickEntryProps> = ({
                       exerciseId={ex.exerciseId}
                       exerciseName={ex.exerciseName}
                       date={new Date().toISOString().split('T')[0]}
-                      onComplete={(w, r, rpe, rir) => {
+                      showPause={/жим.*(леж|груд)|bench/i.test(ex.exerciseName)}
+                      onComplete={(w, r, rpe, rir, pause) => {
                         setCurrentSetIdx(setIdx);
-                        completeSet(w, r, rpe, rir);
+                        completeSet(w, r, rpe, rir, pause);
                       }}
                       onSkip={() => {
                         setExercises(prev => {

@@ -79,6 +79,12 @@ export interface VideoAnalysisResult {
   barVelocity: number | null;
   bridge: boolean | null;
   note: string;
+  /** B8: горизонтальный путь грифа (см, масштаб по ширине плеч) и дрейф. */
+  barXLoopCm?: number | null;
+  barXDriftCm?: number | null;
+  /** B8: угол колена в кадре минимальной восходящей скорости + каноническая фаза. */
+  stickingKneeDeg?: number | null;
+  stickingPhase?: string | null;
 }
 
 function mockAnalyze(lift: Lift): VideoAnalysisResult {
@@ -90,7 +96,7 @@ function mockAnalyze(lift: Lift): VideoAnalysisResult {
 
 type Stage = { kind: 'live' } | { kind: 'file'; url: string; name: string } | null;
 
-export const VideoCaptureCard: React.FC<{ lift: Lift; onResult?: (r: VideoAnalysisResult) => void }> = ({ lift, onResult }) => {
+export const VideoCaptureCard: React.FC<{ lift: Lift; shoulderWidthCm?: number; onResult?: (r: VideoAnalysisResult) => void }> = ({ lift, shoulderWidthCm, onResult }) => {
   const stageVideoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const fileUrlRef = useRef<string | null>(null);
@@ -201,10 +207,10 @@ export const VideoCaptureCard: React.FC<{ lift: Lift; onResult?: (r: VideoAnalys
         // воркер с прогрессом, фолбэк на главный поток
         let m: any = null;
         try {
-          m = await analyzeVideoWithWorker(vid as any, lift, (p) => setProgress(p));
+          m = await analyzeVideoWithWorker(vid as any, lift, (p) => setProgress(p), { shoulderWidthCm });
         } catch (e) {
           console.warn('[video] worker failed, fallback', e);
-          m = await analyzeVideoElement(vid as any, lift);
+          m = await analyzeVideoElement(vid as any, lift, { shoulderWidthCm });
         }
         if (m && (m.elbowAvgDeg != null || m.barVelocity != null)) {
           out = {
@@ -212,6 +218,10 @@ export const VideoCaptureCard: React.FC<{ lift: Lift; onResult?: (r: VideoAnalys
             gripRatio: m.gripRatio ?? 0,
             barVelocity: m.barVelocity ?? null,
             bridge: m.bridge ?? null,
+            barXLoopCm: m.barXLoopCm ?? null,
+            barXDriftCm: m.barXDriftCm ?? null,
+            stickingKneeDeg: m.stickingKneeDeg ?? null,
+            stickingPhase: m.stickingPhase ?? null,
             note: m.elbowAvgDeg != null ? 'CV-анализ BlazePose (воркер, локально, блины — по запястьям; трекинг дисков — след. шаг).' : 'Поза не распознана — использован мок.',
           };
         }

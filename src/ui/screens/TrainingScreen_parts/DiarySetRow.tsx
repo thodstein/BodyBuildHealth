@@ -14,6 +14,8 @@ export interface DiarySetData {
   rir: number;
   rpe: number;
   completed: boolean;
+  /** Пауза на груди (жим) — IPF-стиль. */
+  pause?: boolean;
 }
 
 interface DiarySetRowProps {
@@ -22,7 +24,8 @@ interface DiarySetRowProps {
   isCurrent: boolean;
   isBodyweight: boolean;
   prevData: { weight: number; reps: number; rir: number } | null;
-  onComplete: (weight: number, reps: number, rpe: number, rir: number) => void;
+  /** 5-й аргумент — pause (жим с паузой на груди, IPF-стиль). */
+  onComplete: (weight: number, reps: number, rpe: number, rir: number, pause?: boolean) => void;
   onSkip: () => void;
   /** When true, show compact inline grid (for DiaryRecordingForm). Default: false (full row for QuickEntry). */
   compact?: boolean;
@@ -31,16 +34,19 @@ interface DiarySetRowProps {
   exerciseName?: string;
   /** Date of the workout (YYYY-MM-DD). Default: today. */
   date?: string;
+  /** Показывать переключатель «Пауза на груди» (жим). По умолчанию скрыт. */
+  showPause?: boolean;
 }
 
 export const DiarySetRow: React.FC<DiarySetRowProps> = ({
   set, setNumber, isCurrent, isBodyweight, prevData, onComplete, onSkip, compact,
-  exerciseId, exerciseName, date,
+  exerciseId, exerciseName, date, showPause,
 }) => {
   const [weight, setWeight] = useState(set.weight || prevData?.weight || 0);
   const [reps, setReps] = useState(set.reps || prevData?.reps || 10);
   const [rpe, setRpe] = useState(set.rpe || 7);
   const [rir, setRir] = useState(set.rir ?? prevData?.rir ?? 2);
+  const [pause, setPause] = useState(set.pause ?? false);
   const [mmcOpen, setMmcOpen] = useState(false);
 
   useEffect(() => {
@@ -106,7 +112,17 @@ export const DiarySetRow: React.FC<DiarySetRowProps> = ({
       </div>
       {!compact && (
         <div style={{ display: 'flex', gap: 6 }}>
-          <button onClick={() => onComplete(weight, reps, rpe, rir)} disabled={weight <= 0 || reps <= 0}
+          {showPause && (
+            <button onClick={() => setPause(p => !p)} title="Пауза на груди (IPF-стиль, без отбива)"
+              aria-pressed={pause}
+              style={{
+                padding: '10px', borderRadius: 8, cursor: 'pointer', fontSize: 11, minHeight: 40,
+                border: pause ? '1px solid #00e68a' : '1px solid rgba(255,255,255,0.08)',
+                background: pause ? 'rgba(0,230,138,0.12)' : 'transparent',
+                color: pause ? '#00e68a' : '#fff', fontWeight: 700,
+              }}>⏸ Пауза</button>
+          )}
+          <button onClick={() => onComplete(weight, reps, rpe, rir, pause)} disabled={weight <= 0 || reps <= 0}
             style={{
               flex: 2, padding: '10px', borderRadius: 8, border: 'none', cursor: 'pointer',
               background: weight > 0 && reps > 0 ? 'linear-gradient(135deg, #00e68a, #00c853)' : 'rgba(255,255,255,0.05)',

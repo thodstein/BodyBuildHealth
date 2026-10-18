@@ -18,6 +18,7 @@ import type { Macrocycle } from '../../../engines/lms/macrocycle.engine';
 import { DESIGNER_PHASE_VISUAL } from './phase-visual-tokens';
 import { clampRir } from '../../../engines/bb/bb-utils';
 import { diagnoseWeakPoint, type Lift, type WeakPoint } from '../../../engines/lms/weakpoint-pl';
+import { EXERCISE_CATALOG } from '../../../core/exercise-catalog';
 import {
   importProgramIntoAnnualBlock,
 } from '../../../engines/annual-training/block-builders.engine';
@@ -182,6 +183,7 @@ function appendDiagnosticsToPL(
   diagnosticDayMap: Record<string, number[]>,
   weakSide?: 'left' | 'right' | null,
   protocolMap?: Record<string, { pct?: number; reps?: number; sets?: number; rir?: number }>,
+  skippedOut?: string[],
 ): PLProgramBody | null {
   const diagNames = Object.values(diagnosticExerciseMap ?? {}).flatMap(list =>
     Array.isArray(list) ? list.filter((n): n is string => typeof n === 'string') : []);
@@ -209,9 +211,18 @@ function appendDiagnosticsToPL(
   // P5: протокол из diagnosticProtocolMap (карточка считает из раскладки цикла —
   // показанное = вставленное); без карты — legacy фикс 3×10@60% RIR2.
   // P2: слабая сторона — +1 сет унилатеральным (гантель/одна рука/выпады/болгарские).
+  // Валидация имени: вставляем только то, что резолвится в каталоге/LMS
+  // (иначе prescription в дневнике не сможет найти упражнение) — нераспознанные
+  // пропускаются, счётчик возвращается в поле skippedNames.
   const isUni = (n: string) => /гантел|одной рук|выпад|болгарск|одной ног|одна ног|single|unilateral|сплит/i.test(n ?? '');
+  const knownName = (n: string): boolean => {
+    if (!n) return false;
+    const clean = n.replace(/\s*\(слабая:.*\)\s*$/, '');
+    return EXERCISE_CATALOG.some(e => e.name.toLowerCase() === clean.toLowerCase());
+  };
   const protoMap: Record<string, { pct?: number; reps?: number; sets?: number; rir?: number }> =
     (protocolMap && typeof protocolMap === 'object' ? protocolMap : {}) as Record<string, { pct?: number; reps?: number; sets?: number; rir?: number }>;
+  const skippedNames: string[] = [];
   const cleanProto = (name: string): { pct: number; reps: number; sets: number; rir: number } => {
     const raw = protoMap[name];
     const num = (v: unknown, fb: number, lo: number, hi: number) =>
@@ -228,6 +239,7 @@ function appendDiagnosticsToPL(
     const names = Array.isArray(list) ? list.filter((n): n is string => typeof n === 'string') : [];
     const configuredDays = (diagnosticDayMap?.[key] ?? []).filter((d): d is number => typeof d === 'number');
     names.forEach((name, index) => {
+      if (!knownName(name)) { skippedNames.push(name); if (skippedOut) skippedOut.push(name); return; }
       const dayIdx = configuredDays.length > 0 ? dayOf(configuredDays[index % configuredDays.length]) : dayOf(undefined);
       const bonus = weakSide && isUni(name) ? 1 : 0;
       const label = bonus ? `${name} (слабая: ${weakSide === 'left' ? 'левая' : 'правая'})` : name;
@@ -278,8 +290,12 @@ const weakpointsHandler: Handler = (payload, { program: p, onChange, showToast, 
       const rawProtoMap: unknown = (payload as { data?: { diagnosticProtocolMap?: unknown } }).data?.diagnosticProtocolMap;
       const diagnosticProtocolMap = (rawProtoMap && typeof rawProtoMap === 'object' ? rawProtoMap : undefined) as
         | Record<string, { pct?: number; reps?: number; sets?: number; rir?: number }> | undefined;
-      const extended = appendDiagnosticsToPL(plBody, plWeakPoints, diagnosticExerciseMap, diagnosticDayMap, diagnosticWeakSide, diagnosticProtocolMap);
-      if (extended) next = { ...next, pl: extended };
+      const skippedOut: string[] = [];
+      const extended = appendDiagnosticsToPL(plBody, plWeakPoints, diagnosticExerciseMap, diagnosticDayMap, diagnosticWeakSide, diagnosticProtocolMap, skippedOut);
+      if (extended) {
+        next = { ...next, pl: extended };
+        if (skippedOut.length) showToast('🔗 Слабые группы: ' + (groups.join(', ') || 'нет') + ' · пропущены нераспознанные: ' + skippedOut.slice(0, 5).join(', '));
+      }
       else { skippedDiagnostics = true; skipReason = 'диагностические упражнения пропущены (программа из каталога циклов, не custom)'; }
     }
   }

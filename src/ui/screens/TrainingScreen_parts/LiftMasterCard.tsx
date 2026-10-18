@@ -24,7 +24,13 @@ import { diagnoseMovement, barPathIssuesForLift, BAR_PATH_ISSUES, phaseForReps, 
 import { analyzePhaseAssistance, analyzeStickingCorrections, analyzeBarPathAssistance, protocolFromCycle } from '../../../engines/pro/lift-assistance.engine';
 import { WEAK_POINTS_BY_LIFT, diagnoseWeakPoint, type Lift, type WeakPoint } from '../../../engines/lms/weakpoint-pl';
 import { detectWeakMusclesByE1rm, snapshotWeakE1rm, diffWeakE1rm, type E1rmSnapshot } from '../../../engines/pro/weak-muscle-detection.engine';
-import { diagnoseVelocity, thresholdForGoal, mvtForPLLift, lvrStale, adjustVelocityForMetric, calibrateLVP, type VelocityLossThreshold } from '../../../engines/pro/vbt.engine';
+import { diagnoseVelocity, thresholdForGoal, mvtForPLLift, lvrStale, adjustVelocityForMetric, calibrateLVP, dailyReadinessCheck, expectedVelocityFromCalib, rpeVbtDiscrepancy, trainingMax, velocityForPct, type VelocityLossThreshold, type VBTLift } from '../../../engines/pro/vbt.engine';
+import { estimate1RMConsensus } from '../../../engines/pro/estimate1rm.engine';
+import { epley1RM } from '../../../engines/e1rm';
+import { meetAttemptsFor, warmupToOpener, MEET_STRATEGY_PCT_LABEL, type MeetStrategy } from '../../../engines/lms/competition-attempts';
+import { daysBetweenIso, weeksToStartFromDate } from '../../../engines/lms/pl-meet-registry.engine';
+import { relativeStrengthFullReport, type Sex } from '../../../engines/pro/relative-strength.engine';
+import { getISOWeekNumber } from '../../../engines/workout-logger.engine';
 import { getPLWeakGroupExerciseCandidates, diagnosticProtocolFromCycle } from '../../../engines/lms/lms-builder.engine';
 import type { SRCycleTemplate } from '../../../data/lms-cycles/lms-types';
 import { applyToPlanner } from './planner-bridge';
@@ -100,6 +106,9 @@ const LIFT_RU: Record<Lift, string> = {
   sumo: 'Становая тяга (сумо)', biceps: 'Подъём на бицепс',
   triceps: 'Трицепс', calf: 'Икры', shrug: 'Шраги (трапеции)',
 };
+const STRENGTH_CLASS_RU: Record<string, string> = {
+  novice: 'Новичок', intermediate: 'Средний', advanced: 'Продвинутый', elite: 'Элита', world_class: 'Мировой уровень',
+};
 const PHASE_RU: Record<string, string> = {
   off_chest: 'Сход с груди', mid: 'Средняя точка', lockout: 'Дожим', start: 'Старт',
   bottom: 'Низ (выход из ямы)', sumo_start: 'Сумо: старт', sumo_lockout: 'Сумо: дожим',
@@ -173,6 +182,32 @@ function exerciseMatchesLift(name: string, lift: Lift): boolean {
 
 const MASTER_KEY = 'he_lift_master_v1';
 const TREND_KEY = 'he_lift_master_trend_v1';
+/** История недельных срезов диагностики (B9): фаза/bar-path/слабые на дату. */
+const HISTORY_KEY = 'he_lift_master_history_v1';
+
+interface MasterHistoryEntry { ts: number; lift: Lift; phase: WeakPoint | ''; issues: BarPathIssue[]; weakCount: number; }
+
+function loadMasterHistory(): MasterHistoryEntry[] {
+  try {
+    const raw = JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]');
+    if (!Array.isArray(raw)) return [];
+    return raw
+      .filter((h: any) => h && typeof h.ts === 'number' && typeof h.lift === 'string')
+      .slice(-60) as MasterHistoryEntry[];
+  } catch { return []; }
+}
+/** Один срез на лифт в неделю: тот же ISO-период — перезапись, иначе добавление (cap 60). */
+function pushMasterHistory(entry: MasterHistoryEntry): MasterHistoryEntry[] {
+  const arr = loadMasterHistory();
+  const isoOf = (ts: number) => new Date(ts).toISOString().slice(0, 10);
+  const weekOf = (ts: number) => `${getISOWeekNumber(isoOf(ts))}/${isoOf(ts).slice(0, 4)}`;
+  const w = weekOf(entry.ts);
+  const idx = arr.findIndex(h => h.lift === entry.lift && weekOf(h.ts) === w);
+  if (idx >= 0) arr[idx] = entry; else arr.push(entry);
+  const trimmed = arr.slice(-60);
+  try { localStorage.setItem(HISTORY_KEY, JSON.stringify(trimmed)); } catch {}
+  return trimmed;
+}
 
 function loadTrend(): E1rmSnapshot | null {
   try {
@@ -199,6 +234,10 @@ interface MasterState {
   vbtGoal: string; vbtUpdatedAt: number | null;
   redFlags: RedFlagId[];
   ruleChecks: Record<string, boolean>;
+  /** День старта (секция 11): дата, стратегия, соревновательные ПМ. */
+  meetDate: string;
+  meetStrategy: MeetStrategy;
+  meetMaxS: string; meetMaxB: string; meetMaxD: string;
 }
 
 function isRecord(v: unknown): v is Record<string, unknown> { return !!v && typeof v === 'object' && !Array.isArray(v); }
@@ -249,8 +288,13 @@ function loadMaster(): MasterState {
       vbtUpdatedAt: typeof raw.vbtUpdatedAt==='number' && Number.isFinite(raw.vbtUpdatedAt) ? raw.vbtUpdatedAt : null,
       redFlags: Array.isArray(raw.redFlags) ? raw.redFlags.filter((f: unknown): f is RedFlagId => f === 'sharp_pain' || f === 'swelling' || f === 'numbness' || f === 'dizzy' || f === 'painful_click') : [],
       ruleChecks: cleanRuleChecks(raw.ruleChecks),
+      meetDate: typeof raw.meetDate === 'string' ? raw.meetDate.slice(0, 10) : '',
+      meetStrategy: raw.meetStrategy === 'conservative' || raw.meetStrategy === 'aggressive' ? raw.meetStrategy : 'balanced',
+      meetMaxS: typeof raw.meetMaxS === 'string' ? raw.meetMaxS.slice(0, 20) : '',
+      meetMaxB: typeof raw.meetMaxB === 'string' ? raw.meetMaxB.slice(0, 20) : '',
+      meetMaxD: typeof raw.meetMaxD === 'string' ? raw.meetMaxD.slice(0, 20) : '',
     };
-  } catch { return { lift:'bench', phase:'' as WeakPoint|'', issues:[], selectedGeom:{}, daysGeom:{}, selectedDiag:{}, daysDiag:{}, weakMuscleGroups:[], weakMuscleSubs:[], asymSide:null, asymL:'', asymR:'', vbtBest:'', vbtLast:'', vbtWeight:'', vbtGoal:'strength', vbtUpdatedAt:null, redFlags:[], ruleChecks:{} }; }
+  } catch { return { lift:'bench', phase:'' as WeakPoint|'', issues:[], selectedGeom:{}, daysGeom:{}, selectedDiag:{}, daysDiag:{}, weakMuscleGroups:[], weakMuscleSubs:[], asymSide:null, asymL:'', asymR:'', vbtBest:'', vbtLast:'', vbtWeight:'', vbtGoal:'strength', vbtUpdatedAt:null, redFlags:[], ruleChecks:{}, meetDate:'', meetStrategy:'balanced' as MeetStrategy, meetMaxS:'', meetMaxB:'', meetMaxD:'' }; }
 }
 function saveMaster(s: MasterState) { try{ localStorage.setItem(MASTER_KEY, JSON.stringify(s)); }catch{} }
 function cleanRuleChecks(raw: unknown): Record<string, boolean> {
@@ -330,6 +374,15 @@ export const LiftMasterCard: React.FC<{
   const [lvpResult, setLvpResult] = useState<{ slope: number; intercept: number; r2: number } | null>(null);
   const [redFlags, setRedFlags] = useState<RedFlagId[]>(initial.redFlags);
   const [ruleChecks, setRuleChecks] = useState<Record<string, boolean>>(initial.ruleChecks);
+  const [meetDate, setMeetDate] = useState(initial.meetDate);
+  const [meetStrategy, setMeetStrategy] = useState<MeetStrategy>(initial.meetStrategy);
+  const [meetMaxS, setMeetMaxS] = useState(initial.meetMaxS);
+  const [meetMaxB, setMeetMaxB] = useState(initial.meetMaxB);
+  const [meetMaxD, setMeetMaxD] = useState(initial.meetMaxD);
+  const [masterHistory, setMasterHistory] = useState<MasterHistoryEntry[]>(loadMasterHistory);
+  const [bwSex, setBwSex] = useState<Sex>('male');
+  const [videoBarLoop, setVideoBarLoop] = useState<{ xLoop: number; flag: string } | null>(null);
+  const [videoSticking, setVideoSticking] = useState<{ phase: string; deg: number } | null>(null);
   const redRes = useMemo(()=> checkRedFlags(redFlags), [redFlags]);
   const ruleDefs = useMemo(()=> RULE_CHECKS[lift] ?? [], [lift]);
   const ruleRes = useMemo(()=>{
@@ -366,10 +419,12 @@ export const LiftMasterCard: React.FC<{
       const personal = raw?.personal ?? raw?.settings?.personal ?? {};
       if (typeof personal.armSpanCm==='number') setArmSpanInput(String(personal.armSpanCm));
       if (typeof personal.shoulderWidthCm==='number') setShoulderInput(String(personal.shoulderWidthCm));
+      if (personal.sex==='female') setBwSex('female');
+      else if (personal.sex==='male') setBwSex('male');
     }catch{}
   }, []);
 
-  useEffect(()=>{ saveMaster({ lift, phase, issues, selectedGeom, daysGeom, selectedDiag, daysDiag, weakMuscleGroups, weakMuscleSubs, asymSide, asymL, asymR, vbtBest, vbtLast, vbtWeight, vbtGoal, vbtUpdatedAt, redFlags, ruleChecks }); }, [lift, phase, issues, selectedGeom, daysGeom, selectedDiag, daysDiag, weakMuscleGroups, weakMuscleSubs, asymSide, asymL, asymR, vbtBest, vbtLast, vbtWeight, vbtGoal, vbtUpdatedAt, redFlags, ruleChecks]);
+  useEffect(()=>{ saveMaster({ lift, phase, issues, selectedGeom, daysGeom, selectedDiag, daysDiag, weakMuscleGroups, weakMuscleSubs, asymSide, asymL, asymR, vbtBest, vbtLast, vbtWeight, vbtGoal, vbtUpdatedAt, redFlags, ruleChecks, meetDate, meetStrategy, meetMaxS, meetMaxB, meetMaxD }); setMasterHistory(pushMasterHistory({ ts: Date.now(), lift, phase, issues: [...issues], weakCount: weakMuscleSubs.length })); }, [lift, phase, issues, selectedGeom, daysGeom, selectedDiag, daysDiag, weakMuscleGroups, weakMuscleSubs, asymSide, asymL, asymR, vbtBest, vbtLast, vbtWeight, vbtGoal, vbtUpdatedAt, redFlags, ruleChecks, meetDate, meetStrategy, meetMaxS, meetMaxB, meetMaxD]);
 
   const diag = useMemo(()=> unifiedLiftDiagnosis({ lift, phase, barPathIssues: issues, vbtBest, vbtLast, vbtWeight, vbtThreshold, sessions, template }), [lift, phase, issues, vbtBest, vbtLast, vbtWeight, vbtThreshold, sessions, template]);
   const effectivePhase = diag.phases.effectivePhase;
@@ -405,9 +460,89 @@ export const LiftMasterCard: React.FC<{
       }
     }
     if (!totalHard || !Object.keys(counts).length) return null;
-    const top = Object.entries(counts).sort((a,b)=>b[1]-a[1])[0];
-    return { phase: top[0] as WeakPoint, count: top[1], totalHard };
+    const sorted = Object.entries(counts).sort((a,b)=>b[1]-a[1]);
+    const top = sorted[0];
+    return { phase: top[0] as WeakPoint, count: top[1], totalHard, top3: sorted.slice(0,3) as Array<[string, number]> };
   }, [sessions, lift]);
+
+  // Консенсус 1RM по лучшему сету дневника этого лифта (A2) + последний тяжёлый сет.
+  const lift1rm = useMemo(()=>{
+    let best: { weight:number; reps:number; e1rm:number } | null = null;
+    let lastHard: { weight:number; reps:number; rpe:number } | null = null;
+    let lastHardDate = '';
+    for (const w of sessions) for (const e of (w.exercises||[])) {
+      const en=(e.exerciseName||e.exerciseId||'').toLowerCase();
+      if (!exerciseMatchesLift(en, lift)) continue;
+      for (const s of (e.sets||[])) {
+        const weight=s.weightKg||s.weight||0, reps=s.reps||0;
+        if (weight<=0||reps<=0) continue;
+        const e1=epley1RM(weight,reps);
+        if (!best||e1>best.e1rm) best={weight,reps,e1rm:e1};
+        const rpe=(s.rpe&&s.rpe>0)?s.rpe:(s.rir!=null?10-s.rir:0);
+        if (rpe>=7&&((w.date||'')>=lastHardDate)) { lastHardDate=w.date||''; lastHard={weight,reps,rpe}; }
+      }
+    }
+    return { best, lastHard, consensus: best ? estimate1RMConsensus(best.weight, best.reps) : null };
+  }, [sessions, lift]);
+
+  // Паузная работа (C1): сеты с флагом pause по лифту за 28 дней (жим лёжа).
+  const pauseSets = useMemo(()=>{
+    if (lift!=='bench') return 0;
+    const cutoff = new Date(Date.now()-28*86400000).toISOString().slice(0,10);
+    let cnt=0;
+    for (const w of sessions) {
+      if ((w.date||'') < cutoff) continue;
+      for (const e of (w.exercises||[])) {
+        const en=(e.exerciseName||e.exerciseId||'').toLowerCase();
+        if (!exerciseMatchesLift(en, lift)) continue;
+        for (const s of (e.sets||[])) if (s.pause===true) cnt++;
+      }
+    }
+    return cnt;
+  }, [sessions, lift]);
+
+  // Лифты, для которых VBT-движок имеет канонические профили (сумо → становая).
+  const vbtLift: VBTLift | null = lift==='sumo' ? 'deadlift'
+    : (['squat','bench','deadlift','ohp','row'] as Lift[]).includes(lift) ? (lift as VBTLift) : null;
+
+  // ── День старта (секция 11): попытки/разминка/нормы ──
+  const meetMaxState: Record<'meetMaxS'|'meetMaxB'|'meetMaxD', string> = { meetMaxS, meetMaxB, meetMaxD };
+  const setMeetMax = (key: 'meetMaxS'|'meetMaxB'|'meetMaxD', v: string) => {
+    if (key==='meetMaxS') setMeetMaxS(v); else if (key==='meetMaxB') setMeetMaxB(v); else setMeetMaxD(v);
+  };
+  const daysToMeet = useMemo(()=> meetDate ? daysBetweenIso(meetDate, new Date().toISOString().slice(0,10)) : null, [meetDate]);
+  const meetRows = useMemo(()=>{
+    const profilePm: Record<string, number> = { squat: profile?.pmSquat ?? 0, bench: profile?.pmBench ?? 0, deadlift: profile?.pmDead ?? 0 };
+    const defs: Array<{ lift:'squat'|'bench'|'deadlift'; label:string; max:string }> = [
+      { lift:'squat', label:'Присед', max: meetMaxS },
+      { lift:'bench', label:'Жим лёжа', max: meetMaxB },
+      { lift:'deadlift', label:'Тяга', max: meetMaxD },
+    ];
+    const rows: Array<{ lift:string; label:string; attempts: ReturnType<typeof meetAttemptsFor>; warmup: Array<{ pct:number; weight:number; reps:number }> }> = [];
+    for (const d of defs) {
+      const pm = parseFloat(d.max) || profilePm[d.lift] || 0;
+      if (pm<=0) continue;
+      const attempts = meetAttemptsFor(pm, meetStrategy);
+      rows.push({ lift:d.lift, label:d.label, attempts, warmup: warmupToOpener(attempts.opener) });
+    }
+    return rows;
+  }, [meetMaxS, meetMaxB, meetMaxD, meetStrategy, profile?.pmSquat, profile?.pmBench, profile?.pmDead]);
+  const sexFromProfile = useMemo(()=>{
+    try {
+      const raw = JSON.parse(localStorage.getItem('he_profile_v2')||'null');
+      const personal = raw?.personal ?? raw?.settings?.personal ?? {};
+      return personal.sex==='male'||personal.sex==='female';
+    } catch { return false; }
+  }, []);
+  const relReport = useMemo(()=>{
+    // ПМ: введённые вручную → из профиля (pmSquat/pmBench/pmDead) → нет данных.
+    const s = parseFloat(meetMaxS) || (profile?.pmSquat ?? 0);
+    const b = parseFloat(meetMaxB) || (profile?.pmBench ?? 0);
+    const d = parseFloat(meetMaxD) || (profile?.pmDead ?? 0);
+    const bw = profile?.bodyWeight ?? 0;
+    if (s<=0||b<=0||d<=0||bw<=0) return null;
+    return relativeStrengthFullReport(s, b, d, bw, bwSex);
+  }, [meetMaxS, meetMaxB, meetMaxD, profile?.bodyWeight, profile?.pmSquat, profile?.pmBench, profile?.pmDead, bwSex]);
 
   const anthroHint = useMemo(()=>{
     try {
@@ -755,8 +890,32 @@ export const LiftMasterCard: React.FC<{
         {diaryHint && (
           <div style={{ marginTop:6, padding:7, borderRadius:8, background:'rgba(251,191,36,0.07)', border:'1px solid rgba(251,191,36,0.25)', fontSize:10, color:'#fbbf24', lineHeight:1.5 }}>
             📊 Дневник: {diaryHint.count} из {diaryHint.totalHard} тяжёлых подходов срываются в «{PHASE_RU[diaryHint.phase]||diaryHint.phase}» (эвристика phaseForReps).
+            {diaryHint.top3 && diaryHint.top3.length>1 && (
+              <div style={{ marginTop:2, fontSize:9, color:DIM }}>Тренд срывов (28д): {diaryHint.top3.map(([p,c])=>`${PHASE_RU[p]||p} ${c}`).join(' · ')}</div>
+            )}
           </div>
         )}
+        {lift==='bench' && (
+          <div style={{ marginTop:6, padding:7, borderRadius:8, background:'rgba(0,230,138,0.05)', border:'1px solid rgba(0,230,138,0.18)', fontSize:10, lineHeight:1.5, color: pauseSets>0?'#00e68a':'#fbbf24' }}>
+            {pauseSets>0
+              ? `⏸ Паузная работа: ${pauseSets} паузных сетов за 28 дней — старт «на паузе» отрабатывается.`
+              : '⏸ Паузных сетов нет за 28 дней — IPF-отбив под запретом: добавьте 1-2 жима с паузой в неделю (⏸ в дневнике или «Жим с паузой»).'}
+          </div>
+        )}
+        {masterHistory.filter(h=>h.lift===lift).length>0 && (()=>{
+          const mine = masterHistory.filter(h=>h.lift===lift).slice(-4).reverse();
+          const prev = mine[1];
+          return (
+            <div style={{ marginTop:6, padding:7, borderRadius:8, background:'rgba(96,165,250,0.05)', border:'1px solid rgba(96,165,250,0.18)', fontSize:9, lineHeight:1.5 }}>
+              <span style={{ color:'#60a5fa', fontWeight:700 }}>📜 История ({masterHistory.filter(h=>h.lift===lift).length} срезов):</span>
+              {mine.map((h,i)=> (
+                <div key={h.ts} style={{ color:DIM, marginTop:1 }}>
+                  {new Date(h.ts).toLocaleDateString('ru-RU')} — фаза {h.phase?(PHASE_RU[h.phase]||h.phase):'—'} · bar-path {h.issues.length} · слабых {h.weakCount}{i===0&&prev?` (было: фаза ${prev.phase?(PHASE_RU[prev.phase]||prev.phase):'—'}, bar-path ${prev.issues.length})`:''}
+                </div>
+              ))}
+            </div>
+          );
+        })()}
         {movement && (
           <div style={{ marginTop:8 }}>
             <div style={{ fontWeight:800, color:'#ef4444', fontSize:12 }}>⚠ {movement.weakPoint.label}</div>
@@ -981,6 +1140,14 @@ export const LiftMasterCard: React.FC<{
           {lvpPoints.length>0 && <div style={{ fontSize:9, color:'#ffffff', lineHeight:1.4, marginBottom:4 }}>�����: {lvpPoints.length} � {lvpPoints.map(p=>`${Math.round(p.pct*100)}%/${p.velocity}`).join(', ')}</div>}
           {lvpResult && <div role="status" style={{ fontSize:10, color:'#f472b6', lineHeight:1.4 }}>r2={lvpResult.r2.toFixed(3)} � slope={lvpResult.slope.toFixed(3)} � intercept={lvpResult.intercept.toFixed(3)} {lvpResult.r2<0.9?' ������ �������� (����� >=3 �����)':''}</div>}
         </div>
+        {lift1rm.consensus && lift1rm.best && (
+          <div style={{ marginTop:8, padding:8, borderRadius:8, background:'rgba(251,191,36,0.06)', border:'1px solid rgba(251,191,36,0.2)', fontSize:10, lineHeight:1.5 }}>
+            <span style={{ fontWeight:800, color:'#fbbf24' }}>🏆 Тренировочный максимум (консенсус {lift1rm.consensus.n} формул)</span>
+            <div style={{ color:DIM, marginTop:2 }}>
+              Лучший сет дневника: {lift1rm.best.weight}×{lift1rm.best.reps} → e1RM ≈ <b>{lift1rm.consensus.value} кг</b> (разброс {(lift1rm.consensus.max-lift1rm.consensus.min).toFixed(1)} кг) · ТМ 90%: {trainingMax(lift1rm.consensus.value)} кг
+            </div>
+          </div>
+        )}
         {vbtStale?.stale && <div role="status" style={{ marginTop:6, fontSize:10, color:'#fbbf24', lineHeight:1.4 }}>⚠ Замеру {vbtStale.weeksAgo} нед. — LVP дрейфует, перекалибруйте (введите свежие скорости).</div>}
         <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginTop:6, alignItems:'center' }}>
           <label style={{ fontSize:10, color:DIM }}>Лучший (м/с): <input type="number" step="0.01" min="0" value={vbtBest} onChange={e=>{ setVbtBest(e.target.value); touchVbt(); }} placeholder="0.60" style={{ width:70, marginLeft:4, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.15)', color:'#fff', borderRadius:6, padding:'4px 6px', fontSize:11 }} /></label>
@@ -1008,6 +1175,34 @@ export const LiftMasterCard: React.FC<{
                   {vbtSticking.items.map((it:any,idx:number)=> <ExerciseRow key={idx} item={it} selected={!!selectedDiag[vbtKey]?.includes(it.exercise.name)} onToggle={()=>toggleDiag(vbtKey,it.exercise.name)} onAdd={()=>addDiag(vbtKey,[it.exercise.name])} />)}
                 </div>
               )}
+              {vbtLift && (()=>{
+                // Готовность первым подходом (A3): ожидаемая скорость для этого веса
+                // (LVP-калибровка или канонический профиль) vs фактическая (vbtLast).
+                const e1 = lift1rm.consensus?.value ?? 0;
+                const w = Number.isFinite(weight)&&weight>0 ? weight : 0;
+                if (e1<=0 || w<=0) return null;
+                const pct = Math.min(1, w/e1);
+                const expected = expectedVelocityFromCalib(lvpResult, pct) ?? velocityForPct(vbtLift, pct);
+                if (expected==null || expected<=0) return null;
+                const rc = dailyReadinessCheck(expected, lastAdj);
+                const actRu: Record<string,string> = { 'as-planned':'работаем по плану', 'reduce-volume-20':'снизить объём ~20%', 'deload':'делод' };
+                return (
+                  <div style={{ marginTop:6, padding:7, borderRadius:7, background:'rgba(56,189,248,0.06)', border:'1px solid rgba(56,189,248,0.2)', fontSize:10, lineHeight:1.45 }}>
+                    <span style={{ color:'#38bdf8', fontWeight:700 }}>🎯 Готовность (первый подход):</span> <span style={{ color:DIM }}>ожидание {expected.toFixed(2)} м/с @ {Math.round(pct*100)}% ({w} кг) · факт {lastAdj.toFixed(2)} · падение {rc.dropPct}% → {actRu[rc.action]}</span>
+                  </div>
+                );
+              })()}
+              {vbtLift && lastAdj>0 && lift1rm.lastHard && lift1rm.lastHard.rpe>0 && (()=>{
+                // RPE vs скорость (A4): расхождение самооценки и механики — скрытая усталость.
+                const disc = rpeVbtDiscrepancy(lift1rm.lastHard!.rpe, lastAdj, vbtLift, lift1rm.lastHard!.reps);
+                if (disc.flag==='ok') return null;
+                const flagRu: Record<string,string> = { 'ok':'', 'hidden-fatigue':'⚠ Скрытая усталость: RPE по скорости ниже самооценки — снизьте интенсивность следующей тяжёлой.', 'calibrate':'⚠ Скорость не согласуется с RPE — перекалибруйте LVP (3+ точки).' };
+                return (
+                  <div style={{ marginTop:5, fontSize:10, lineHeight:1.45, color: disc.flag==='hidden-fatigue'?'#fbbf24':DIM }}>
+                    RPE: дневник {lift1rm.lastHard!.rpe} ({lift1rm.lastHard!.weight}×{lift1rm.lastHard!.reps}) vs по скорости {disc.rpeByVelocity} (Δ{disc.delta>0?'+':''}{disc.delta}) — {flagRu[disc.flag]}
+                  </div>
+                );
+              })()}
             </div>
           );
         })()}
@@ -1026,15 +1221,31 @@ export const LiftMasterCard: React.FC<{
           <span style={{ width:22, height:22, borderRadius:6, display:'flex', alignItems:'center', justifyContent:'center', background: collapsed['secVideo'] ? 'rgba(255,255,255,0.06)' : 'rgba(14,165,233,0.18)', border:`1px solid ${collapsed['secVideo'] ? 'rgba(255,255,255,0.08)' : 'rgba(14,165,233,0.28)'}`, color: collapsed['secVideo'] ? 'rgba(255,255,255,0.5)' : '#0ea5e9', fontSize:10, transform: collapsed['secVideo'] ? 'rotate(-90deg)' : 'rotate(0deg)', transition:'transform 0.2s' }}>{collapsed['secVideo'] ? '▶' : '▼'}</span>
         </button>
         {!collapsed['secVideo'] && <div style={{ padding:12 }}>
-          <VideoCaptureCard lift={lift} onResult={r=>{
+          <VideoCaptureCard lift={lift} shoulderWidthCm={parseFloat(shoulderInput)||undefined} onResult={r=>{
             if (typeof r.barVelocity === 'number' && Number.isFinite(r.barVelocity) && r.barVelocity > 0) {
               const v = r.barVelocity;
               setVbtBest((v+0.15).toFixed(2));
               setVbtLast(v.toFixed(2));
               touchVbt();
             }
-            setVideoNote(`Локти ${r.elbowAvgDeg ?? '—'}° · хват ${r.gripRatio ?? '—'} · скорость ${r.barVelocity ?? '—'} м/с · ${r.note} (оценка, не LPT)`);
+            setVideoBarLoop(r.barXLoopCm != null && Number.isFinite(r.barXLoopCm) ? { xLoop: r.barXLoopCm, flag: barLoopFlag(r.barXLoopCm) } : null);
+            setVideoSticking(r.stickingPhase && r.stickingKneeDeg != null ? { phase: r.stickingPhase, deg: r.stickingKneeDeg } : null);
+            setVideoNote(`Локти ${r.elbowAvgDeg ?? '—'}° · хват ${r.gripRatio ?? '—'} · скорость ${r.barVelocity ?? '—'} м/с${r.barXLoopCm != null ? ` · петля ${r.barXLoopCm} см (${barLoopFlag(r.barXLoopCm)==='crit'?'крит':barLoopFlag(r.barXLoopCm)==='warn'?'внимание':'норма'})` : ''} · ${r.note} (оценка, не LPT)`);
           }} />
+          {videoBarLoop && (
+            <div style={{ marginTop:6, padding:7, borderRadius:8, background: videoBarLoop.flag==='crit'?'rgba(239,68,68,0.07)':'rgba(14,165,233,0.05)', border:`1px solid ${videoBarLoop.flag==='crit'?'rgba(239,68,68,0.25)':'rgba(14,165,233,0.18)'}`, fontSize:10, lineHeight:1.45 }}>
+              <span style={{ color:'#0ea5e9', fontWeight:700 }}>〰 Bar-path из видео:</span> <span style={{ color:DIM }}>горизонтальный путь {videoBarLoop.xLoop} см — {videoBarLoop.flag==='crit'?'критическая петля (>6): жим в «J-траекторию», проверьте лопатки/мост':videoBarLoop.flag==='warn'?'повышенная петля (≥4): держите гриф над серединой стопы':'норма (<4 см)'}</span>
+            </div>
+          )}
+          {videoSticking && (
+            <div style={{ marginTop:6, padding:7, borderRadius:8, background:'rgba(168,85,247,0.05)', border:'1px solid rgba(168,85,247,0.18)', fontSize:10, lineHeight:1.45, display:'flex', gap:6, flexWrap:'wrap', alignItems:'center' }}>
+              <span style={{ color:'#c084fc', fontWeight:700 }}>🕸 Фаза срыва (видео):</span>
+              <span style={{ color:DIM }}>угол колена {videoSticking.deg}° в точке минимальной скорости{videoSticking.phase?` → похоже на «${PHASE_RU[videoSticking.phase]||videoSticking.phase}»`:''} (оценка)</span>
+              {videoSticking.phase && (WEAK_POINTS_BY_LIFT[lift]??[]).includes(videoSticking.phase as WeakPoint) && (
+                <button onClick={()=>setPhase(videoSticking.phase as WeakPoint)} style={{ ...btn, background:'rgba(168,85,247,0.15)', color:'#c084fc', border:'1px solid rgba(168,85,247,0.3)' }}>Применить фазу</button>
+              )}
+            </div>
+          )}
           {/* Kinovea CSV импорт (углы — да, скорость — оценка) */}
           <div style={{ marginTop:8, padding:8, borderRadius:8, background:'rgba(14,165,233,0.05)', border:'1px solid rgba(14,165,233,0.18)' }}>
             <div style={{ fontSize:10, fontWeight:800, color:'#0ea5e9' }}>📊 Kinovea CSV — трекинг штанги (t,x,y)</div>
@@ -1220,6 +1431,63 @@ export const LiftMasterCard: React.FC<{
           );
         })}
       </div>}</div>
+
+      {/* ── 11. День старта: попытки · разминка · нормы · относительная сила ── */}
+      <div id="sec-13" style={collapsibleCard('#f59e0b')}>
+        <button onClick={()=> toggleCollapsed('secMeet')} aria-expanded={!collapsed['secMeet']} style={headerBtnStyle('#f59e0b', !!collapsed['secMeet'])}>
+          <span style={{ display:'flex', alignItems:'center', gap:8, minWidth:0 }}>
+            <span style={{ width:26, height:26, borderRadius:7, display:'flex', alignItems:'center', justifyContent:'center', background:'linear-gradient(135deg,#f59e0b,#d97706)', boxShadow:'0 2px 8px rgba(245,158,11,0.35)', fontSize:13, flexShrink:0 }}>🏆</span>
+            <span style={{ minWidth:0 }}>
+              <span style={{ fontSize:11, fontWeight:800, color:'#f59e0b' }}>11 · День старта{meetDate && daysToMeet != null ? ` · ${daysToMeet>=0?`через ${Math.ceil(daysToMeet/7)} нед.`:`${-daysToMeet} дн. назад`}` : ''}</span>
+              <span style={{ fontSize:9, color:'#fff', opacity:0.72, display:'block', marginTop:1 }}>Попытки · разминка до стартера · DOTS/нормы</span>
+            </span>
+          </span>
+          <span style={{ width:22, height:22, borderRadius:6, display:'flex', alignItems:'center', justifyContent:'center', background: collapsed['secMeet'] ? 'rgba(255,255,255,0.06)' : 'rgba(245,158,11,0.18)', border:`1px solid ${collapsed['secMeet'] ? 'rgba(255,255,255,0.08)' : 'rgba(245,158,11,0.28)'}`, color: collapsed['secMeet'] ? 'rgba(255,255,255,0.5)' : '#f59e0b', fontSize:10, transform: collapsed['secMeet'] ? 'rotate(-90deg)' : 'rotate(0deg)', transition:'transform 0.2s' }}>{collapsed['secMeet'] ? '▶' : '▼'}</span>
+        </button>
+        {!collapsed['secMeet'] && <div style={{ padding:12 }}>
+          <div style={{ fontSize:10, color:DIM, lineHeight:1.4 }}>Соревновательные попытки по стратегии (округление 2.5 кг) и лестница разминки до стартера. ПМ можно взять из консенсуса 1RM секции 6 или ввести вручную.</div>
+          <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginTop:8, alignItems:'center' }}>
+            <label style={{ fontSize:10, color:'#ffffff' }}>Дата старта: <input type="date" value={meetDate} onChange={e=>setMeetDate(e.target.value)} style={{ width:140, marginLeft:4, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.15)', color:'#fff', borderRadius:6, padding:'4px 6px', fontSize:11 }} /></label>
+            {meetDate && daysToMeet != null && (
+              <span style={{ fontSize:10, color:'#f59e0b', fontWeight:700 }}>{daysToMeet>0?`${daysToMeet} дн. (${Math.ceil(daysToMeet/7)} нед.) до старта`:daysToMeet===0?'Старт сегодня':`${-daysToMeet} дн. после старта`}</span>
+            )}
+          </div>
+          <div style={{ display:'flex', gap:4, flexWrap:'wrap', marginTop:6, alignItems:'center' }}>
+            <span style={{ fontSize:10, color:DIM }}>Стратегия:</span>
+            {(['conservative','balanced','aggressive'] as MeetStrategy[]).map(s=>{ const on=meetStrategy===s; const label = s==='conservative'?`Консервативная ${MEET_STRATEGY_PCT_LABEL[s]}`:s==='balanced'?`Сбалансированная ${MEET_STRATEGY_PCT_LABEL[s]}`:`Агрессивная ${MEET_STRATEGY_PCT_LABEL[s]}`; return <button key={s} onClick={()=>setMeetStrategy(s)} aria-pressed={on} style={{ minHeight:44, padding:'8px 10px', borderRadius:8, cursor:'pointer', fontSize:10, border: on?'1px solid #f59e0b':'1px solid rgba(255,255,255,0.1)', background: on?'rgba(245,158,11,0.15)':'transparent', color: on?'#f59e0b':DIM, fontWeight:700 }}>{label}{on?' ✓':''}</button>; })}
+          </div>
+          <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginTop:6 }}>
+            {([['meetMaxS', 'Присед'], ['meetMaxB', 'Жим'], ['meetMaxD', 'Тяга']] as const).map(([key,label])=>(
+              <label key={key} style={{ fontSize:10, color:'#ffffff' }}>{label} ПМ: <input type="number" step="2.5" min="0" value={meetMaxState[key]} placeholder={`${label} ПМ`} onChange={e=>setMeetMax(key, e.target.value)} style={{ width:76, marginLeft:4, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.15)', color:'#fff', borderRadius:6, padding:'4px 6px', fontSize:11 }} /></label>
+            ))}
+          </div>
+          {meetDate && daysToMeet!=null && daysToMeet>0 && (
+            <div style={{ marginTop:6, fontSize:10, color:DIM, lineHeight:1.5 }}>
+              📅 Тапер: {daysToMeet>28?'силовой блок — специализация ближе к старту':daysToMeet>14?'специализация: интенсивность ↑, объём ↓':daysToMeet>7?'интенсификация: тяжело и мало':'финальный deload: объём ↓↓, раскрытие на старте'}.
+            </div>
+          )}
+          {meetRows.length>0 && (
+            <div style={{ marginTop:8 }}>
+              {meetRows.map(r=>(
+                <div key={r.lift} style={{ marginTop:6, padding:8, borderRadius:8, background:'rgba(245,158,11,0.05)', border:'1px solid rgba(245,158,11,0.18)' }}>
+                  <div style={{ fontSize:10, fontWeight:800, color:'#f59e0b' }}>{r.label} · цель {r.attempts.target} кг</div>
+                  <div style={{ fontSize:10, color:DIM, marginTop:2, lineHeight:1.4 }}>Попытки: {r.attempts.opener} → {r.attempts.second} → {r.attempts.third} кг</div>
+                  <div style={{ fontSize:9, color:DIM, marginTop:2, lineHeight:1.4 }}>Разминка: {r.warmup.map(w=>`${Math.round(w.pct*100)}% ${w.weight}×${w.reps}`).join(' → ')}</div>
+                </div>
+              ))}
+            </div>
+          )}
+          {relReport && (
+            <div style={{ marginTop:8, padding:8, borderRadius:8, background:'rgba(34,211,238,0.05)', border:'1px solid rgba(34,211,238,0.18)' }}>
+              <div style={{ fontSize:10, fontWeight:800, color:'#22d3ee' }}>⚖️ Относительная сила (сумма {relReport.total} кг @ {profile?.bodyWeight} кг, {bwSex==='female'?'жен':bwSex==='male'?'муж':''})</div>
+              <div style={{ fontSize:10, color:DIM, marginTop:2, lineHeight:1.5 }}>
+                DOTS {relReport.dots} · класс: {STRENGTH_CLASS_RU[relReport.classification.class]} · относительная {relReport.relative.toFixed(2)}×
+                <div style={{ marginTop:2 }}>Присед {relReport.lifts.squat.value} кг ({relReport.lifts.squat.rs.toFixed(2)}×, {STRENGTH_CLASS_RU[relReport.lifts.squat.class]}) · Жим {relReport.lifts.bench.value} кг ({relReport.lifts.bench.rs.toFixed(2)}×, {STRENGTH_CLASS_RU[relReport.lifts.bench.class]}) · Тяга {relReport.lifts.deadlift.value} кг ({relReport.lifts.deadlift.rs.toFixed(2)}×, {STRENGTH_CLASS_RU[relReport.lifts.deadlift.class]})</div>
+              </div>
+              {sexFromProfile===false && <div style={{ fontSize:9, color:'#fbbf24', marginTop:3 }}>Пол не указан в профиле — расчёт по «муж». Поправьте пол в настройках.</div>}
+            </div>
+          )}
+        </div>}</div>
 
       {/* ── Footer ── */}
       <button onClick={applyAll} style={{ width:'100%', minHeight:44, marginTop:10, border:'none', borderRadius:9, cursor:'pointer', background:'linear-gradient(135deg,#00e68a,#00c853)', color:'#000', fontWeight:800 }}>

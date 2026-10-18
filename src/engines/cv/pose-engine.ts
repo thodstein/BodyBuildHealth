@@ -5,12 +5,66 @@
  * Фолбэк — мок, если WASM не загрузился (офлайн / CSP).
  */
 import type { Lift } from '../lms/weakpoint-pl';
+import { phaseForJointAngle } from '../pro/lift-diagnostics.engine';
+
+/** Кадр с распознанной позой — для расчёта траектории/срыва (B8). */
+interface MovementFrame {
+  t: number;             // сек от начала видео
+  barX: number;          // нормализованный x грифа (центр запястий)
+  barY: number;          // нормализованный y грифа (экранные координаты, вниз +)
+  kneeDeg: number | null; // угол колена (hip-knee-ankle), усреднённый по видимым ногам
+  shoulderW: number;     // нормализованная ширина плеч (масштаб см)
+}
+
+/**
+ * Траектория + срыв из покадровых данных (B8, оценка):
+ *  - масштаб см: реальная ширина плеч (или 40 см по умолчанию);
+ *  - xLoop — суммарный горизонтальный путь, xDrift — дрейф конец−старт;
+ *  - срыв — кадр минимальной восходящей скорости штанги → угол колена → фаза.
+ */
+function computeMovementSeries(frames: MovementFrame[], lift: Lift, shoulderWidthCm?: number): Pick<PoseMetrics, 'kneeAvgDeg'|'barXLoopCm'|'barXDriftCm'|'stickingKneeDeg'|'stickingPhase'> {
+  if (frames.length < 3) return {};
+  const shoulderW = frames.map(f => f.shoulderW).filter(w => w > 0.01).sort((a, b) => a - b);
+  const medianSW = shoulderW.length ? shoulderW[Math.floor(shoulderW.length / 2)] : 0;
+  if (medianSW <= 0.01) return {};
+  const cmPerUnit = (shoulderWidthCm && shoulderWidthCm > 20 ? shoulderWidthCm : 40) / medianSW;
+
+  let xLoop = 0;
+  for (let i = 1; i < frames.length; i++) xLoop += Math.abs(frames[i].barX - frames[i - 1].barX);
+  const barXLoopCm = Math.round(xLoop * cmPerUnit * 10) / 10;
+  const barXDriftCm = Math.round((frames[frames.length - 1].barX - frames[0].barX) * cmPerUnit * 10) / 10;
+
+  // Скорость подъёма (см/с): y экранный вниз +, подъём = y убывает.
+  let stickingKneeDeg: number | null = null;
+  let minUpV = Infinity;
+  let kneeSum = 0, kneeCnt = 0;
+  for (let i = 1; i < frames.length - 1; i++) {
+    const dt = frames[i].t - frames[i - 1].t;
+    const upV = dt > 0 ? ((frames[i - 1].barY - frames[i].barY) / dt) * cmPerUnit : 0;
+    if (upV > 0 && upV < minUpV) {
+      minUpV = upV;
+      stickingKneeDeg = frames[i].kneeDeg;
+    }
+    if (frames[i].kneeDeg != null) { kneeSum += frames[i].kneeDeg!; kneeCnt++; }
+  }
+  const kneeAvgDeg = kneeCnt ? Math.round(kneeSum / kneeCnt) : null;
+  const kneeLifts: Lift[] = ['squat', 'deadlift', 'sumo'];
+  const stickingPhase = stickingKneeDeg != null && kneeLifts.includes(lift)
+    ? phaseForJointAngle(lift, stickingKneeDeg)
+    : null;
+  return { kneeAvgDeg, barXLoopCm, barXDriftCm, stickingKneeDeg, stickingPhase };
+}
 
 export interface PoseMetrics {
   elbowAvgDeg: number | null; // средний угол локтя (bench)
   gripRatio: number | null;   // отношение хвата к ширине плеч
   barVelocity: number | null; // м/с оценка по запястьям
   bridge: boolean | null;
+  kneeAvgDeg?: number | null;    // средний угол колена (squat/deadlift/sumo)
+  barXLoopCm?: number | null;    // суммарный горизонтальный путь грифа, см (масштаб по ширине плеч)
+  barXDriftCm?: number | null;   // горизонтальный дрейф грифа (конец − старт), см
+  stickingKneeDeg?: number | null; // угол колена в кадре минимальной восходящей скорости
+  stickingPhase?: string | null;   // каноническая фаза (lift-diagnostics STICKING_POINTS), оценка
 }
 
 let landmarkerPromise: Promise<any> | null = null;
@@ -116,7 +170,7 @@ function refinedBarY(imageData: ImageData, lWr: {x:number;y:number}, rWr: {x:num
  * Анализ видео-элемента: семплирует кадры (5 fps, до 40 кадров) и считает метрики.
  * Возвращает PoseMetrics или null если поза не найдена.
  */
-export async function analyzeVideoElement(video: HTMLVideoElement, lift: Lift): Promise<PoseMetrics | null> {
+export async function analyzeVideoElement(video: HTMLVideoElement, lift: Lift, opts?: { shoulderWidthCm?: number }): Promise<PoseMetrics | null> {
   const lm = await getLandmarker();
   if (!lm) return null;
   const duration = video.duration;
@@ -131,6 +185,7 @@ export async function analyzeVideoElement(video: HTMLVideoElement, lift: Lift): 
   const elbowAngles: number[] = [];
   const gripRatios: number[] = [];
   const wristYs: number[] = [];
+  const mvFrames: MovementFrame[] = [];
   let bridgeVotes = 0, bridgeTotal = 0;
 
   // Для скорости нужен timestamps
@@ -177,6 +232,16 @@ export async function analyzeVideoElement(video: HTMLVideoElement, lift: Lift): 
       } catch { /* ignore — оставляем rawY */ }
       wristYs.push(barY);
       timestamps.push(t);
+      // B8: покадровые данные — колени и x грифа
+      const lKnee = lmks[25], rKnee = lmks[26], lAnkle = lmks[27], rAnkle = lmks[28];
+      let kneeDeg: number | null = null;
+      if (lHip && rHip) {
+        const legs: number[] = [];
+        if (lKnee && lAnkle && (lKnee.visibility ?? 1) > 0.3 && (lAnkle.visibility ?? 1) > 0.3) legs.push(angle(lHip, lKnee, lAnkle));
+        if (rHip && rKnee && rAnkle && (rKnee.visibility ?? 1) > 0.3 && (rAnkle.visibility ?? 1) > 0.3) legs.push(angle(rHip, rKnee, rAnkle));
+        if (legs.length) kneeDeg = Math.round(legs.reduce((a, b) => a + b, 0) / legs.length);
+      }
+      mvFrames.push({ t, barX: (lWr.x + rWr.x) / 2, barY, kneeDeg, shoulderW: shoulderWidth });
       if (lHip && rHip) {
         // мост: таз выше плеч? y меньше = выше
         const shoulderY = (lSh.y + rSh.y)/2;
@@ -206,12 +271,13 @@ export async function analyzeVideoElement(video: HTMLVideoElement, lift: Lift): 
     if (barVelocity < 0.1) barVelocity = null;
   }
   const bridge = bridgeTotal>0 ? (bridgeVotes/bridgeTotal > 0.6) : null;
+  const mvSeries = computeMovementSeries(mvFrames, lift, opts?.shoulderWidthCm);
 
   // фильтр по лифту: для приседа локти не важны
   if (lift === 'squat' || lift === 'deadlift' || lift === 'sumo') {
-    return { elbowAvgDeg: null, gripRatio: null, barVelocity, bridge };
+    return { elbowAvgDeg: null, gripRatio: null, barVelocity, bridge, ...mvSeries };
   }
-  return { elbowAvgDeg, gripRatio, barVelocity, bridge };
+  return { elbowAvgDeg, gripRatio, barVelocity, bridge, ...mvSeries };
 }
 
 export function interpretMetrics(m: PoseMetrics | null, lift: Lift): { label:string; suggestion:string } | null {
@@ -239,7 +305,7 @@ function canUseWorker(): boolean {
  * Тот же анализ, но через WebWorker (не блокирует главный поток).
  * Фолбэк на analyzeVideoElement если воркер недоступен / упал.
  */
-export async function analyzeVideoWithWorker(video: HTMLVideoElement, lift: Lift, onProgress?: (p:number)=>void): Promise<PoseMetrics | null> {
+export async function analyzeVideoWithWorker(video: HTMLVideoElement, lift: Lift, onProgress?: (p:number)=>void, opts?: { shoulderWidthCm?: number }): Promise<PoseMetrics | null> {
   if (!canUseWorker()) return analyzeVideoElement(video, lift);
   let worker: Worker | null = null;
   try {
@@ -292,6 +358,7 @@ export async function analyzeVideoWithWorker(video: HTMLVideoElement, lift: Lift
   const gripRatios: number[] = [];
   const wristYs: number[] = [];
   const timestamps: number[] = [];
+  const mvFrames: MovementFrame[] = [];
   let bridgeVotes = 0, bridgeTotal = 0;
 
   for (let idx=0; idx<frames.length; idx++) {
@@ -329,6 +396,16 @@ export async function analyzeVideoWithWorker(video: HTMLVideoElement, lift: Lift
     if (refined != null && Math.abs(refined - rawY) < 0.08) barY = refined * 0.7 + rawY * 0.3;
     wristYs.push(barY);
     timestamps.push(ts);
+    // B8: покадровые данные — колени и x грифа
+    const lKnee = lmks[25], rKnee = lmks[26], lAnkle = lmks[27], rAnkle = lmks[28];
+    let kneeDeg: number | null = null;
+    if (lHip && rHip) {
+      const legs: number[] = [];
+      if (lKnee && lAnkle && (lKnee.visibility ?? 1) > 0.3 && (lAnkle.visibility ?? 1) > 0.3) legs.push(angle(lHip, lKnee, lAnkle));
+      if (rHip && rKnee && rAnkle && (rKnee.visibility ?? 1) > 0.3 && (rAnkle.visibility ?? 1) > 0.3) legs.push(angle(rHip, rKnee, rAnkle));
+      if (legs.length) kneeDeg = Math.round(legs.reduce((a, b) => a + b, 0) / legs.length);
+    }
+    mvFrames.push({ t: ts, barX: (lWr.x + rWr.x) / 2, barY, kneeDeg, shoulderW: shoulderWidth });
     if (lHip && rHip) {
       bridgeTotal++;
       if ((lHip.y + rHip.y)/2 < (lSh.y + rSh.y)/2 + 0.05) bridgeVotes++;
@@ -351,6 +428,7 @@ export async function analyzeVideoWithWorker(video: HTMLVideoElement, lift: Lift
     if (barVelocity < 0.1) barVelocity = null;
   }
   const bridge = bridgeTotal>0 ? (bridgeVotes/bridgeTotal > 0.6) : null;
-  if (lift === 'squat' || lift === 'deadlift' || lift === 'sumo') return { elbowAvgDeg: null, gripRatio: null, barVelocity, bridge };
-  return { elbowAvgDeg, gripRatio, barVelocity, bridge };
+  const mvSeries = computeMovementSeries(mvFrames, lift, opts?.shoulderWidthCm);
+  if (lift === 'squat' || lift === 'deadlift' || lift === 'sumo') return { elbowAvgDeg: null, gripRatio: null, barVelocity, bridge, ...mvSeries };
+  return { elbowAvgDeg, gripRatio, barVelocity, bridge, ...mvSeries };
 }

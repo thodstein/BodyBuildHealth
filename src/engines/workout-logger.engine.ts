@@ -42,6 +42,8 @@ export interface WorkoutSet {
   actualTempo?: string;
   /** Оценка техники выполнения подхода: 3 (слабо) / 4 (норма) / 5 (отлично). */
   techniqueScore?: number;
+  /** Пауза на груди (жим) — IPF-стиль, без отбива. */
+  pause?: boolean;
 }
 
 /** Лимиты валидации подходов (guard от опечаток и повреждённых данных). */
@@ -270,6 +272,7 @@ export function logSet(
     plannedRir: set.plannedRir,
     plannedTempo: set.plannedTempo,
     actualTempo: set.actualTempo,
+    pause: set.pause === true ? true : undefined,
   }];
   ex.totalVolume = ex.sets.reduce((s, st) => s + st.weightKg * st.reps, 0);
   ex.best1RM = Math.max(ex.best1RM, estimated1RM);
@@ -455,6 +458,7 @@ export function workoutLogToSession(log: WorkoutLog): WorkoutSession {
       plannedRir: st.plannedRir,
       plannedTempo: st.plannedTempo,
       actualTempo: st.actualTempo,
+      pause: st.pause === true ? true : undefined,
     }));
     return {
       exerciseId: ex.exerciseId,

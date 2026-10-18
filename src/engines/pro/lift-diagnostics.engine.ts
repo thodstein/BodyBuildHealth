@@ -107,6 +107,20 @@ export interface LiftDiagnosis {
   assistanceIntensityPct: number;
 }
 
+/**
+ * Фаза по углу сустава из видео (B8): сопоставляет измеренный угол (колено —
+ * присед/тяга) с каноническими диапазонами STICKING_POINTS. Оценочный маппинг.
+ */
+export function phaseForJointAngle(lift: Lift, angleDeg: number): WeakPoint | null {
+  const sp = STICKING_POINTS[lift];
+  if (!sp) return null;
+  for (const [phase, info] of Object.entries(sp)) {
+    const [a, b] = info.angleRangeDeg;
+    if (angleDeg >= a && angleDeg <= b) return phase as WeakPoint;
+  }
+  return null;
+}
+
 /** Полная диагностика по движению + слабой фазе. */
 export function diagnoseLift(lift: Lift, weakPoint: WeakPoint): LiftDiagnosis | null {
   const sp = STICKING_POINTS[lift]?.[weakPoint];

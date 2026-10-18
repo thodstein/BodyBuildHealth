@@ -307,16 +307,16 @@ describe('planner bridge handlers', () => {
     applyBridgePayloadDispatch(payload('weakpoints', {
       groups: ['chest'],
       plWeakPoints: [{ lift: 'bench', weakPoint: 'lockout', days: [1] }],
-      diagnosticExerciseMap: { 'bench|barpath|forward_drift': ['Мой ассистент'] },
+      diagnosticExerciseMap: { 'bench|barpath|forward_drift': ['Жим узким хватом'] },
       diagnosticDayMap: { 'bench|barpath|forward_drift': [3] },
     }), ctx);
     const applied = ctx.onChange.mock.calls[0][0];
     expect(applied.pl.weakPoints).toEqual(['chest']);
     const week1 = applied.pl.customWeeks[0];
     const allNames = week1.days.flatMap((d: any) => d.exercises.map((e: any) => e.name));
-    expect(allNames).toContain('Мой ассистент');
-    // «Мой ассистент» — в указанный день 3
-    expect(week1.days[2].exercises.map((e: any) => e.name)).toContain('Мой ассистент');
+    expect(allNames).toContain('Жим узким хватом');
+    // «Жим узким хватом» — в указанный день 3
+    expect(week1.days[2].exercises.map((e: any) => e.name)).toContain('Жим узким хватом');
     // Слабые точки дают тяжёлый + памп ассистенты из диагностики
     expect(allNames.length).toBeGreaterThan(2);
   });
@@ -329,7 +329,7 @@ describe('planner bridge handlers', () => {
     ctx.program = prog;
     applyBridgePayloadDispatch(payload('weakpoints', {
       groups: ['back'],
-      diagnosticExerciseMap: { 'bench|barpath|forward_drift': ['Мой ассистент'] },
+      diagnosticExerciseMap: { 'bench|barpath|forward_drift': ['Жим узким хватом'] },
     }), ctx);
     const applied = ctx.onChange.mock.calls[0][0];
     expect(applied.pl.weakPoints).toEqual(['back']);
@@ -337,8 +337,22 @@ describe('planner bridge handlers', () => {
     expect(ctx.showToast).toHaveBeenCalledWith(expect.stringContaining('пропущены'));
   });
 
-  it('weakpoints без диагностики сохраняет прежнее поведение (только группы)', () => {
+  it('валидация имён: несуществующие в каталоге пропускаются с тостом (без сырых строк в плане)', () => {
     const ctx = context('pl');
+    ctx.program = createBlank('pl');
+    applyBridgePayloadDispatch(payload('weakpoints', {
+      groups: ['chest'],
+      diagnosticExerciseMap: { 'bench|lockout': ['Жим с паузой', 'Фейковое упражнение XYZ', 'планка-самолифт'] },
+    }), ctx);
+    const applied = ctx.onChange.mock.calls[0][0];
+    const names = applied.pl.customWeeks[0].days.flatMap((d: any) => d.exercises.map((e: any) => e.name));
+    expect(names).toContain('Жим с паузой');
+    expect(names).not.toContain('Фейковое упражнение XYZ');
+    expect(names).not.toContain('планка-самолифт');
+    expect(ctx.showToast).toHaveBeenCalledWith(expect.stringContaining('пропущены нераспознанные'));
+  });
+
+  it('weakpoints без диагностики сохраняет прежнее поведение (только группы)', () => {    const ctx = context('pl');
     ctx.program = createBlank('pl');
     applyBridgePayloadDispatch(payload('weakpoints', { groups: ['legs'] }), ctx);
     const applied = ctx.onChange.mock.calls[0][0];
@@ -351,11 +365,11 @@ describe('planner bridge handlers', () => {
     ctx.program = createBlank('pl');
     applyBridgePayloadDispatch(payload('weakpoints', {
       groups: ['chest'],
-      diagnosticExerciseMap: { 'bench|lockout': ['Протокольный'] },
-      diagnosticProtocolMap: { 'Протокольный': { pct: 0.7, reps: 8, sets: 4, rir: 1 } },
+      diagnosticExerciseMap: { 'bench|lockout': ['Жим с паузой'] },
+      diagnosticProtocolMap: { 'Жим с паузой': { pct: 0.7, reps: 8, sets: 4, rir: 1 } },
     }), ctx);
     const applied = ctx.onChange.mock.calls[0][0];
-    const ex = applied.pl.customWeeks[0].days.flatMap((d: any) => d.exercises).find((e: any) => e.name === 'Протокольный');
+    const ex = applied.pl.customWeeks[0].days.flatMap((d: any) => d.exercises).find((e: any) => e.name === 'Жим с паузой');
     expect(ex).toBeTruthy();
     expect(ex.sets[0]).toMatchObject({ pct: 0.7, reps: 8, sets: 4, rir: 1 });
   });
@@ -365,11 +379,11 @@ describe('planner bridge handlers', () => {
     ctx.program = createBlank('pl');
     applyBridgePayloadDispatch(payload('weakpoints', {
       groups: [],
-      diagnosticExerciseMap: { 'bench|lockout': ['Мусорный'] },
-      diagnosticProtocolMap: { 'Мусорный': { pct: NaN, reps: 999, sets: -2, rir: 'x' } },
+      diagnosticExerciseMap: { 'bench|lockout': ['Жим узким хватом'] },
+      diagnosticProtocolMap: { 'Жим узким хватом': { pct: NaN, reps: 999, sets: -2, rir: 'x' } },
     }), ctx);
     const applied = ctx.onChange.mock.calls[0][0];
-    const ex = applied.pl.customWeeks[0].days.flatMap((d: any) => d.exercises).find((e: any) => e.name === 'Мусорный');
+    const ex = applied.pl.customWeeks[0].days.flatMap((d: any) => d.exercises).find((e: any) => e.name === 'Жим узким хватом');
     expect(ex).toBeTruthy();
     // NaN→дефолт, выход за границы→кламп (reps ≤30, sets ≥1): ничего не бросает
     expect(ex.sets[0]).toMatchObject({ pct: 0.6, reps: 30, sets: 1, rir: 2 });
@@ -393,7 +407,7 @@ describe('planner bridge handlers', () => {
     ctx2.program = createBlank('pl');
     applyBridgePayloadDispatch(payload('weakpoints', {
       groups: ['chest'],
-      diagnosticExerciseMap: { 'bench|lockout': ['Стоп-упражнение'] },
+      diagnosticExerciseMap: { 'bench|lockout': ['Жим с паузой'] },
       redBlocked: true,
     }), ctx2);
     const applied2 = ctx2.onChange.mock.calls[0][0];
