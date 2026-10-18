@@ -3,7 +3,7 @@
  * serverOcrImage падает (нет ./api) → recognizeImageTextOffline (tesseract замокан)
  * → parseNutritionText → готовые meals. Доказывает, что АПК-путь доводит фото до очереди.
  */
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 vi.mock('tesseract.js', () => ({
   createWorker: vi.fn(async () => ({
@@ -17,6 +17,28 @@ vi.mock('tesseract.js', () => ({
 import { processUploadedFile, recognizeImageTextOffline } from '../ocr-engine';
 
 describe('Оффлайн-распознавание тарелки', () => {
+  let originalFetch: typeof fetch;
+  let cobDescriptor: PropertyDescriptor | undefined;
+
+  beforeEach(() => {
+    // jsdom не декодирует изображения и делает реальные сетевые пробы:
+    // без стабов createImageBitmap/Image/fetch молчат до 15с-таймаутов
+    // prepareImageForServer и тесты падают по 5с-лимиту vitest.
+    originalFetch = globalThis.fetch;
+    globalThis.fetch = (async () => {
+      throw new TypeError('offline test env');
+    }) as typeof fetch;
+    vi.stubGlobal('createImageBitmap', undefined as unknown as typeof createImageBitmap);
+    cobDescriptor = Object.getOwnPropertyDescriptor(URL, 'createObjectURL');
+    if (cobDescriptor) Object.defineProperty(URL, 'createObjectURL', { ...cobDescriptor, value: undefined });
+  });
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+    vi.unstubAllGlobals();
+    if (cobDescriptor) Object.defineProperty(URL, 'createObjectURL', cobDescriptor);
+  });
+
   it('recognizeImageTextOffline возвращает текст из worker', async () => {
     const file = new File(['x'.repeat(64)], 'food.jpg', { type: 'image/jpeg' });
     const text = await recognizeImageTextOffline(file, 15_000);

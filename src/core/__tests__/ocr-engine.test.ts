@@ -286,6 +286,11 @@ describe('OCR endpoint routing', () => {
   it('keeps nutrition photos on the image OCR endpoint', async () => {
     const source = await import('../ocr-engine?route-test=1');
     const file = new File(['not-a-real-image'], 'food.jpg', { type: 'image/jpeg' });
+    // jsdom не декодирует изображения: без стабов createImageBitmap/Image
+    // молчат до 15с-таймаутов prepareImageForServer и тест падает по таймауту.
+    vi.stubGlobal('createImageBitmap', undefined as unknown as typeof createImageBitmap);
+    const cobDescriptor = Object.getOwnPropertyDescriptor(URL, 'createObjectURL');
+    if (cobDescriptor) Object.defineProperty(URL, 'createObjectURL', { ...cobDescriptor, value: undefined });
     const originalFetch = globalThis.fetch;
     let requestedUrl = '';
     globalThis.fetch = (async (input: RequestInfo | URL) => {
@@ -298,8 +303,10 @@ describe('OCR endpoint routing', () => {
       expect(result.meals.length).toBeGreaterThan(0);
     } finally {
       globalThis.fetch = originalFetch;
+      vi.unstubAllGlobals();
+      if (cobDescriptor) Object.defineProperty(URL, 'createObjectURL', cobDescriptor);
     }
-  });
+  }, 30_000);
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
