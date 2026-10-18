@@ -85,13 +85,6 @@ export interface PeriodizationInput {
    * применяется — цели фазы абсолютны (как и в генераторе).
    */
   dayModsByOffset?: (offset: number, isTraining: boolean) => { kcalMod?: number; carbMod?: number; kcalDelta?: number } | null;
-  /**
-   * B1-fix (2026-10-18): ручной режим КБЖУ — цели зафиксированы пользователем.
-   * Гейтит ВСЕ моды цели: периодизацию, тяжёлый день, фазу цикла, дефицит
-   * категории, спец-дни (рефид/читмил/фастинг/диет-брейк). Зеркалит
-   * Context.buildOneDay, чтобы карточка «показано = сгенерируется».
-   */
-  manualLocked?: boolean;
 }
 
 export interface PeriodizationDay {
@@ -286,11 +279,10 @@ function buildDay(
 
   // Единый канон периодизации углеводов (тот же, что в генерации).
   const perio = applyCarbPeriodizationMods(input.carbPeriodization, offset, isTraining);
-  const _manualLocked = !!input.manualLocked;
-  let dayKcalMod = _manualLocked ? 1 : perio.dayKcalMod;
-  let dayCarbMod = _manualLocked ? 1 : perio.dayCarbMod;
-  let isRefeedPeriodization = _manualLocked ? false : perio.isRefeedDay;
-  if (isHeavy && !_manualLocked) { dayKcalMod *= 1.05; dayCarbMod *= 1.25; }
+  let dayKcalMod = perio.dayKcalMod;
+  let dayCarbMod = perio.dayCarbMod;
+  let isRefeedPeriodization = perio.isRefeedDay;
+  if (isHeavy) { dayKcalMod *= 1.05; dayCarbMod *= 1.25; }
   // §4.2: моды генерации (менструальная фаза × дефицит категории) — применяются ДО
   // спец-дней, ровно в порядке Context.buildOneDay (refeed ниже «затирает» мод,
   // cheat/fast берят max/min — как в генераторе). Без callback — прежнее поведение.
@@ -298,10 +290,8 @@ function buildDay(
   try {
     const _dm = input.dayModsByOffset ? input.dayModsByOffset(offset, isTraining) : null;
     if (_dm) {
-      if (!_manualLocked) {
-        if (_dm.kcalMod && _dm.kcalMod > 0) dayKcalMod *= _dm.kcalMod;
-        if (_dm.carbMod && _dm.carbMod > 0) dayCarbMod *= _dm.carbMod;
-      }
+      if (_dm.kcalMod && _dm.kcalMod > 0) dayKcalMod *= _dm.kcalMod;
+      if (_dm.carbMod && _dm.carbMod > 0) dayCarbMod *= _dm.carbMod;
       if (_dm.kcalDelta) _dayKcalDelta = Math.round(_dm.kcalDelta);
     }
   } catch { /* callback от потребителя — best-effort */ }
@@ -311,16 +301,14 @@ function buildDay(
   const isCheat = special?.type === 'cheat_meal';
   const isFast = special?.type === 'fast';
   const isDietBreakSpecial = special?.type === 'diet_break';
-  if (!_manualLocked) {
-    if (special?.type === 'refeed') { dayKcalMod = 1.12; dayCarbMod = 2.2; isRefeedPeriodization = true; }
-    if (isCheat && !isRefeedPeriodization) { dayKcalMod = Math.max(dayKcalMod, 1.12); }
-    if (isFast) { dayKcalMod = Math.min(dayKcalMod, 0.75); dayCarbMod = Math.min(dayCarbMod, 0.7); }
-    if (isDietBreakSpecial) {
-      // E23: полноценный день на поддержании — калории к TDEE, углеводы выше (дефицит пауза).
-      const _maintMod = (input.maintenanceKcal && input.maintenanceKcal > 0) ? (input.maintenanceKcal / Math.max(1, base.kcal || 1)) : 1.12;
-      dayKcalMod = Math.max(dayKcalMod, _maintMod);
-      dayCarbMod = Math.max(dayCarbMod, 1.15);
-    }
+  if (special?.type === 'refeed') { dayKcalMod = 1.12; dayCarbMod = 2.2; isRefeedPeriodization = true; }
+  if (isCheat && !isRefeedPeriodization) { dayKcalMod = Math.max(dayKcalMod, 1.12); }
+  if (isFast) { dayKcalMod = Math.min(dayKcalMod, 0.75); dayCarbMod = Math.min(dayCarbMod, 0.7); }
+  if (isDietBreakSpecial) {
+    // E23: полноценный день на поддержании — калории к TDEE, углеводы выше (дефицит пауза).
+    const _maintMod = (input.maintenanceKcal && input.maintenanceKcal > 0) ? (input.maintenanceKcal / Math.max(1, base.kcal || 1)) : 1.12;
+    dayKcalMod = Math.max(dayKcalMod, _maintMod);
+    dayCarbMod = Math.max(dayCarbMod, 1.15);
   }
 
   // База дня после периодизации (та же арифметика, что в Context.buildOneDay).

@@ -44,12 +44,6 @@ interface Props {
    * Без них карточка показывала «старую» цель (±8% расхождения с выдачей).
    */
   dayModsByOffset?: (offset: number, isTraining: boolean) => { kcalMod?: number; carbMod?: number; kcalDelta?: number } | null;
-  /**
-   * B1-fix (2026-10-18): ручной режим КБЖУ (kbjuMode='manual') — цели зафиксированы
-   * пользователем, карточка периодизации не применяет моды цели (периодизация/
-   * тяжёлый день/фаза/дефицит/спец-дни) — «показано = сгенерируется».
-   */
-  manualLocked?: boolean;
 }
 
 const PREP_ACCENT = '#f59e0b';
@@ -96,7 +90,7 @@ const DayMarkers: React.FC<{ d: PeriodizationDay }> = ({ d }) => (
 
 export const NutritionPeriodizationCard: React.FC<Props> = ({
   prepPlan, base, goal, carbPeriodization, isTrainingDayForOffset,
-  heavyTrainDay, dayLabels, postShowTrack, todayIso, specialMeals, weightLog, maintenanceKcal, onOpenDay, dayModsByOffset, manualLocked,
+  heavyTrainDay, dayLabels, postShowTrack, todayIso, specialMeals, weightLog, maintenanceKcal, onOpenDay, dayModsByOffset,
 }) => {
   const mode: 'prep' | 'general' = prepPlan ? 'prep' : 'general';
   const accent = mode === 'prep' ? PREP_ACCENT : GENERAL_ACCENT;
@@ -136,7 +130,7 @@ export const NutritionPeriodizationCard: React.FC<Props> = ({
     } catch { return 'e'; }
   }, [dayModsByOffset]);
 
-  const sig = `${mode}|${startDate}|${horizonEff}|${baseKey}|${goal}|${carbPeriodization}|${trainSig}|${heavyTrainDay || ''}|${postShowTrack || ''}|${prepPlan?.id || ''}|${prepPlan?.updatedAt || ''}|${specialKey}|${weightSig}|${maintenanceKcal || 0}|${modsSig}|${manualLocked ? '1' : '0'}`;
+  const sig = `${mode}|${startDate}|${horizonEff}|${baseKey}|${goal}|${carbPeriodization}|${trainSig}|${heavyTrainDay || ''}|${postShowTrack || ''}|${prepPlan?.id || ''}|${prepPlan?.updatedAt || ''}|${specialKey}|${weightSig}|${maintenanceKcal || 0}|${modsSig}`;
 
   const periodization = useMemo(() => buildNutritionPeriodization({
     startDate,
@@ -153,7 +147,6 @@ export const NutritionPeriodizationCard: React.FC<Props> = ({
     weightLog,
     maintenanceKcal,
     dayModsByOffset,
-    manualLocked,
   }), [sig]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const horizonOptions = useMemo(() => {

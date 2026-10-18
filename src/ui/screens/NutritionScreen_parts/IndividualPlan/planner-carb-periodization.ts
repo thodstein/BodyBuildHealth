@@ -145,7 +145,6 @@ export function expectedWeekKcal(
   heavyTrainDay?: string | undefined | null,
   dayLabels?: string[],
   dayMods?: (offset: number, isTrain: boolean) => { kcalMod?: number; kcalDelta?: number } | null,
-  manualLocked?: boolean,
 ): number {
   const kcal = Math.max(1200, effectiveKcal || 0);
   let total = 0;
@@ -153,16 +152,13 @@ export function expectedWeekKcal(
   for (let i = 0; i < 7; i++) {
     const offset = base + i;
     const isTrain = !!(isTrainDays && isTrainDays[i]);
-    // B1-fix (2026-10-18): в ручном режиме КБЖУ цели зафиксированы пользователем —
-    // периодизация, тяжёлый день и моды цели callback'а не применяются.
-    // Дневниковая компенсация (kcalDelta) сохраняется — компенсирует факт, а не цель.
-    let mod = manualLocked ? 1 : applyCarbPeriodizationMods(mode, offset, isTrain).dayKcalMod;
-    if (!manualLocked && Array.isArray(dayLabels) && dayLabels.length === 7 && isHeavyDayForOffset(heavyTrainDay, offset, dayLabels)) mod *= 1.05;
+    let mod = applyCarbPeriodizationMods(mode, offset, isTrain).dayKcalMod;
+    if (Array.isArray(dayLabels) && dayLabels.length === 7 && isHeavyDayForOffset(heavyTrainDay, offset, dayLabels)) mod *= 1.05;
     let delta = 0;
     try {
       const dm = dayMods ? dayMods(offset, isTrain) : null;
       if (dm) {
-        if (!manualLocked && dm.kcalMod && dm.kcalMod > 0) mod *= dm.kcalMod;
+        if (dm.kcalMod && dm.kcalMod > 0) mod *= dm.kcalMod;
         if (dm.kcalDelta) delta = Math.round(dm.kcalDelta);
       }
     } catch { /* callback от потребителя — best-effort */ }

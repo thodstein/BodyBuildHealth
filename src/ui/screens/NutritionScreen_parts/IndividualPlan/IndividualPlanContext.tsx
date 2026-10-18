@@ -3504,23 +3504,13 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
         // Legacy cyclingMode/dietPauseMode/periodizationEnabled удалены из генерации.
         const isTrain = isTrainDay(offset);
         const _perio = applyCarbPeriodizationMods(carbPeriodization, offset, isTrain);
-        // B1-fix (2026-10-18): гейт модификаторов при ручном режиме КБЖУ (kbjuMode='manual') —
-        // цели зафиксированы пользователем, поэтому периодизация/тяжёлый день/фаза цикла/
-        // дефицит категории/спец-дни НЕ сдвигают ккал/БЖУ (иначе manual молча игнорировался).
-        // Дневниковая компенсация (diaryComp) сохраняется — она компенсирует факт съеденного,
-        // а не цель. Пик-неделя (bbPrepPlan/bbPrepConfig) — исключение: явный план, заданный
-        // пользователем, перекрывает manual (см. _applyPrepTargets ниже).
-        const _manualLocked = kbjuMode === 'manual';
-        let dayKcalMod = _manualLocked ? 1 : _perio.dayKcalMod, dayCarbMod = _manualLocked ? 1 : _perio.dayCarbMod;
-        let isRefeedDay = _manualLocked ? false : _perio.isRefeedDay;
-        const _manualPerioNote = _manualLocked && (_perio.dayKcalMod !== 1 || _perio.dayCarbMod !== 1 || _perio.isRefeedDay)
-          ? '🔒 Ручной режим КБЖУ: периодизация дня не применена — калории/БЖУ зафиксированы вами.'
-          : undefined;
+        let dayKcalMod = _perio.dayKcalMod, dayCarbMod = _perio.dayCarbMod;
+        let isRefeedDay = _perio.isRefeedDay;
         // Эпик 6: день тяжёлых ног/высокого объёма — угли +25%, ккал +5%
         // (Helms 2014/2019: legs/high-volume день — максимальная гликогеновая ёмкость).
         // heavyTrainDay — день недели из DAY_LABELS; применяется поверх периодизации.
         const _isHeavyDay = isHeavyDayForOffset(heavyTrainDay, offset, DAY_LABELS);
-        if (_isHeavyDay && !_manualLocked) { dayKcalMod *= 1.05; dayCarbMod *= 1.25; }
+        if (_isHeavyDay) { dayKcalMod *= 1.05; dayCarbMod *= 1.25; }
         // #1 Женская фаза цикла: ручной выбор — оверрайд; иначе авто-фаза из календаря
         // (Эпик 7: средняя длина + последний лог начала периода, he_cycle_log).
         const _cyclePhaseEff: MenstrualPhase = (sex === 'female')
@@ -3530,7 +3520,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
           ? `📅 Фаза цикла рассчитана по календарю: ${CYCLE_PHASE_RU[_cyclePhaseEff]} (длина цикла ${autoCyclePhase().length} дн). Ручной выбор в настройках перекрывает.`
           : undefined;
         const _mp = (sex === 'female') ? getMenstrualPhaseNutrition(_cyclePhaseEff) : null;
-        if (_mp && !_manualLocked) { dayKcalMod *= _mp.kcalMod; dayCarbMod *= _mp.carbMod; }
+        if (_mp) { dayKcalMod *= _mp.kcalMod; dayCarbMod *= _mp.carbMod; }
         // #2 Кости/кальций для женщин: повышенный Ca при низком %жира/аменорее/менопаузе.
         const _caInfo = (sex === 'female') ? getCalciumTarget('female', bfPct, _cyclePhaseEff, age) : null;
         const _boneNotes: string[] = [];
@@ -3542,7 +3532,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
         const _categoryNote: string | undefined = _bbCat ? `${_bbCat.label}: целевой %жира ~${_bbCat.targetBodyFatPct}% — ${_bbCat.note}` : undefined;
         // #3 Категория -> агрессивность дефицита при сушке (суше категории -> больше дефицит, с капом RED-S).
         // #3+#7 Категория + target-BF: комбинированный дефицит-мод (более консервативный, без RED-S).
-        if (_bbCat && !_manualLocked) { const _defMod = getCombinedDeficitMod(bfPct, _bbCat.targetBodyFatPct, goal === 'cutting' || goal === 'fat_loss'); dayKcalMod *= _defMod; }
+        if (_bbCat) { const _defMod = getCombinedDeficitMod(bfPct, _bbCat.targetBodyFatPct, goal === 'cutting' || goal === 'fat_loss'); dayKcalMod *= _defMod; }
         // #4 Пик-неделя ББ: legacy-множители удалены — единый план через bbContestPrepPlan
         let _peakNote: string | undefined = undefined;
         // #10 Жизненные этапы / контрацепция.
@@ -3573,7 +3563,6 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
         // Приоритет источников: единый план (goals.bbContestPrepPlan, покрывает и подготовку)
         // → legacy конфиг (goals.bbPeakConfig, только пик-неделя).
         const _specialNotes: string[] = [];
-        if (_manualPerioNote) _specialNotes.push(_manualPerioNote);
         const _specialMealOverrides: { targetLabel: string; kind: 'cheat' | 'refeed' | 'fast' | 'custom'; p?: number; c?: number; f?: number }[] = [];
         let _fastingDay = false;
         try {
@@ -3583,43 +3572,31 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
             if (!isRefeedDay) {
               const _rf = _todaySpecial.find((m: any) => m.type === 'refeed');
               if (_rf) {
-                if (_manualLocked) {
-                  _specialNotes.push('🔄 Рефид по расписанию — НЕ применён к целям дня: ручной режим КБЖУ (калории/БЖУ зафиксированы вами).');
-                } else {
-                  isRefeedDay = true;
-                  dayKcalMod = 1.12; dayCarbMod = 2.2;
-                  _specialNotes.push('🔄 Рефид по расписанию: углеводы ×2.2, жиры снижены — восстановление гликогена и лептина.');
-                }
+                isRefeedDay = true;
+                dayKcalMod = 1.12; dayCarbMod = 2.2;
+                _specialNotes.push('🔄 Рефид по расписанию: углеводы ×2.2, жиры снижены — восстановление гликогена и лептина.');
               }
             }
             const _cm = _todaySpecial.find((m: any) => m.type === 'cheat_meal');
             if (_cm && !isRefeedDay) {
-              if (!_manualLocked) dayKcalMod = Math.max(dayKcalMod, 1.12);
-              _specialNotes.push(_manualLocked
-                ? '🍔 Читмил по расписанию — цели дня НЕ изменены (ручной режим КБЖУ). Один приём — свободный выбор (до 1500 ккал). Не компенсировать на следующий день.'
-                : '🍔 Читмил по расписанию: калорийность дня повышена, один приём — свободный выбор (до 1500 ккал). Не компенсировать на следующий день.');
+              dayKcalMod = Math.max(dayKcalMod, 1.12);
+              _specialNotes.push('🍔 Читмил по расписанию: калорийность дня повышена, один приём — свободный выбор (до 1500 ккал). Не компенсировать на следующий день.');
             }
             const _fast = _todaySpecial.find((m: any) => m.type === 'fast');
             if (_fast) {
               _fastingDay = true;
-              if (!_manualLocked) { dayKcalMod = Math.min(dayKcalMod, 0.75); dayCarbMod = Math.min(dayCarbMod, 0.7); }
-              _specialNotes.push(_manualLocked
-                ? '⏳ Фастинг по расписанию: структура дня изменена (приёмов меньше, первый приём позже); калорийность дня НЕ изменена — ручной режим КБЖУ.'
-                : '⏳ Фастинг по расписанию: калорийность снижена, приёмов меньше, первый приём позже (окно ~8 ч, напр. 12:00–20:00).');
+              dayKcalMod = Math.min(dayKcalMod, 0.75); dayCarbMod = Math.min(dayCarbMod, 0.7);
+              _specialNotes.push('⏳ Фастинг по расписанию: калорийность снижена, приёмов меньше, первый приём позже (окно ~8 ч, напр. 12:00–20:00).');
             }
             // E23: диет-брейк — ПОЛНОЦЕННЫЙ день/неделя на поддержании (калории к поддержанию,
             // углеводы выше, дефицит приостановлен). Календарь пишет по одному такому дню на каждый
             // день брейк-недели. Калорийность — от TDEE профиля (или +12% к цели дефицита).
             const _db = _todaySpecial.find((m: any) => m.type === 'diet_break');
             if (_db) {
-              if (!_manualLocked) {
-                const _maint = Math.max(1200, Math.round((calcTargets as any)?.tdee || baseGoalKcal * 1.12));
-                dayKcalMod = Math.max(dayKcalMod, _maint / Math.max(1, baseGoalKcal));
-                dayCarbMod = Math.max(dayCarbMod, 1.15);
-                _specialNotes.push('🏖 Diet break: день на поддержании — калории к поддержанию, углеводы выше, дефицит приостановлен (гормоны/лептин/психика).');
-              } else {
-                _specialNotes.push('🏖 Diet break по расписанию — НЕ применён к целям дня: ручной режим КБЖУ (калории/БЖУ зафиксированы вами).');
-              }
+              const _maint = Math.max(1200, Math.round((calcTargets as any)?.tdee || baseGoalKcal * 1.12));
+              dayKcalMod = Math.max(dayKcalMod, _maint / Math.max(1, baseGoalKcal));
+              dayCarbMod = Math.max(dayCarbMod, 1.15);
+              _specialNotes.push('🏖 Diet break: день на поддержании — калории к поддержанию, углеводы выше, дефицит приостановлен (гормоны/лептин/психика).');
             }
             // E6 (спецприём → замена приёма): записи календаря с replaceMeal РЕАЛЬНО
             // перестраивают целевой приём (раньше только баннер «замена: Ужин»).
@@ -4357,44 +4334,37 @@ const [errorMsg, setErrorMsg] = useState<string | null>(null);
   // спец-дни применяет вызывающая сторона — тем же порядком, что в генераторе).
   const dayModsByOffset = useCallback((offset: number, isTraining: boolean): { kcalMod: number; carbMod: number; kcalDelta: number } => {
     let kcalMod = 1, carbMod = 1, kcalDelta = 0;
-    // B1-fix (2026-10-18): зеркало гейта ручного режима — в kbjuMode='manual' цели
-    // зафиксированы пользователем, поэтому добавочные моды (фаза цикла × дефицит
-    // категории) нейтральны, как и периодизация/спец-дни у вызывающей стороны.
-    // Дневниковая компенсация (kcalDelta) сохраняется — она про факт, а не про цель.
-    const _manualLocked = kbjuMode === 'manual';
     try {
       // Полный мод дня (периодизация + тяжёлый + добавочные) — нужен только для
       // демпфирования компенсации; спец-дни он тоже учитывает (refeed «затирает»).
       const _baseK = Math.max(1200, effectiveKcal || weight * 30 || 2500);
-      let _fullMod = _manualLocked ? 1 : applyCarbPeriodizationMods(carbPeriodization, offset, !!isTraining).dayKcalMod;
-      if (!_manualLocked && isHeavyDayForOffset(heavyTrainDay, offset, DAY_LABELS)) _fullMod *= 1.05;
-      if (!_manualLocked && sex === 'female') {
+      let _fullMod = applyCarbPeriodizationMods(carbPeriodization, offset, !!isTraining).dayKcalMod;
+      if (isHeavyDayForOffset(heavyTrainDay, offset, DAY_LABELS)) _fullMod *= 1.05;
+      if (sex === 'female') {
         const _ph: MenstrualPhase = ((cyclePhase as MenstrualPhase) && (cyclePhase as MenstrualPhase) !== 'none')
           ? (cyclePhase as MenstrualPhase) : autoCyclePhase().phase;
         const _mp = _ph ? getMenstrualPhaseNutrition(_ph) : null;
         if (_mp) { kcalMod *= _mp.kcalMod; carbMod *= _mp.carbMod; _fullMod *= _mp.kcalMod; }
       }
       const _bbCat = getBBCategory(bbCategory, sex);
-      if (_bbCat && !_manualLocked) {
+      if (_bbCat) {
         const _defMod = getCombinedDeficitMod(bodyFatPct, _bbCat.targetBodyFatPct, goal === 'cutting' || goal === 'fat_loss');
         kcalMod *= _defMod;
         _fullMod *= _defMod;
       }
       // Спец-дни по расписанию — те же моды, что в buildOneDay (refeed затирает).
-      if (!_manualLocked) {
-        try {
-          const _sm = JSON.parse(localStorage.getItem('he_special_meals') || '[]');
-          if (Array.isArray(_sm)) {
-            const _today = _sm.filter((m: any) => m && m.date === isoAddDays(isoToday(), offset));
-            const _isRefeed = _today.some((m: any) => m.type === 'refeed');
-            const _isCheat = _today.some((m: any) => m.type === 'cheat_meal');
-            const _isFast = _today.some((m: any) => m.type === 'fast');
-            if (_isRefeed) _fullMod = 1.12;
-            else if (_isCheat) _fullMod = Math.max(_fullMod, 1.12);
-            else if (_isFast) _fullMod = Math.min(_fullMod, 0.75);
-          }
-        } catch { /* storage — best-effort */ }
-      }
+      try {
+        const _sm = JSON.parse(localStorage.getItem('he_special_meals') || '[]');
+        if (Array.isArray(_sm)) {
+          const _today = _sm.filter((m: any) => m && m.date === isoAddDays(isoToday(), offset));
+          const _isRefeed = _today.some((m: any) => m.type === 'refeed');
+          const _isCheat = _today.some((m: any) => m.type === 'cheat_meal');
+          const _isFast = _today.some((m: any) => m.type === 'fast');
+          if (_isRefeed) _fullMod = 1.12;
+          else if (_isCheat) _fullMod = Math.max(_fullMod, 1.12);
+          else if (_isFast) _fullMod = Math.min(_fullMod, 0.75);
+        }
+      } catch { /* storage — best-effort */ }
       if (diaryAdaptation) {
         const _comp = computeRollingCompensation(
           { kcal: _baseK, p: Math.max(80, effectiveP || weight * 2 || 160), f: Math.max(30, effectiveF || weight * 0.8 || 70), c: Math.max(50, effectiveC || weight * 3.5 || 300) },
@@ -4408,7 +4378,7 @@ const [errorMsg, setErrorMsg] = useState<string | null>(null);
       }
     } catch { /* best-effort: без модов показываем базовую цель */ }
     return { kcalMod, carbMod, kcalDelta };
-  }, [sex, cyclePhase, bbCategory, bodyFatPct, goal, diaryAdaptation, effectiveKcal, effectiveP, effectiveF, effectiveC, weight, carbPeriodization, heavyTrainDay, kbjuMode]);
+  }, [sex, cyclePhase, bbCategory, bodyFatPct, goal, diaryAdaptation, effectiveKcal, effectiveP, effectiveF, effectiveC, weight, carbPeriodization, heavyTrainDay]);
 
   const ctx = useMemo<Omit<PlanCtx, 'renderMealList'>>(() => ({
     profile, s, courseEntries, annualPhase, combatNutrition,
