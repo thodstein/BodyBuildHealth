@@ -6,7 +6,10 @@ const ACCENT = '#00e68a';
 const GRP_RU: Record<string, string> = { chest: 'Грудь', back: 'Спина', legs: 'Ноги', shoulders: 'Плечи', arms: 'Руки', core: 'Кор', hamstrings: 'Бицепс бедра', glutes: 'Ягодицы', calves: 'Икры', triceps: 'Трицепс', biceps: 'Бицепс', quads: 'Квадрицепсы' };
 const ru = (g: string) => GRP_RU[g] || g;
 const ws = (d: Date) => { const x = new Date(d); const day = (x.getDay() + 6) % 7; x.setDate(x.getDate() - day); x.setHours(0, 0, 0, 0); return x; };
-const iso = (d: Date) => d.toISOString().slice(0, 10);
+// Границы недели — только в локальном времени: toISOString() (UTC) сдвигает
+// воскресенье на субботу в UTC+зонах, и сессии текущей недели выпадают из
+// диапазона, из-за чего карточка возвращала null каждое воскресенье.
+const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
 const weekAgg = (sessions: WorkoutLog[], weeksAgo: number) => {
   const now = new Date();
