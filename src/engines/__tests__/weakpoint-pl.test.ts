@@ -24,9 +24,12 @@ describe('diagnoseWeakPoint', () => {
     expect(d.intensityPct).toBeGreaterThan(0);
   });
 
-  it('deadlift/start → тяга из ямы', () => {
+  it('deadlift/start → дефицит (= тяга из ямы), без rack pull (это локдаун)', () => {
     const d = diagnoseWeakPoint('deadlift', 'start');
-    expect(d.assistance.some(a => /ямы|плинт/i.test(a))).toBe(true);
+    // Дефицитная тяга = «тяга из ямы» (увеличенная амплитуда стартовой фазы).
+    expect(d.assistance.some(a => /дефицит|ямы/i.test(a))).toBe(true);
+    // Rack pull — упражнение дожима (выше колен), в старте быть не должен.
+    expect(d.assistance.some(a => /плинт/i.test(a))).toBe(false);
   });
 
   it('deadlift/lockout → тяга с плинтов', () => {

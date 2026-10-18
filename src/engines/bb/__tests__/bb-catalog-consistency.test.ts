@@ -30,10 +30,13 @@ describe('5.1 каталог: гигиена', () => {
     }
   });
 
-  it('trueMuscleOf покрывает ≥529 записей (43 NULL — соревновательные/переноски, дизайн)', () => {
+  it('trueMuscleOf покрывает ≥529 записей (44 NULL — соревновательные/ПЛ/переноски, дизайн)', () => {
     const nonNull = cat.filter((e) => trueMuscleOf(e)).length;
     expect(nonNull).toBeGreaterThanOrEqual(529);
-    expect(cat.length - nonNull).toBeLessThanOrEqual(43);
+    // 43 исходных (становая/дефицит/rack pull/переноски/олимпийские) + 1 новая
+    // ПЛ-коррекция `deadlift_pause` («Становая с паузой ниже колен») — по дизайну
+    // trueMuscleOf все ПЛ-движения с «станов*» в имени → null (не для ББ-пулов).
+    expect(cat.length - nonNull).toBeLessThanOrEqual(44);
   });
 });
 

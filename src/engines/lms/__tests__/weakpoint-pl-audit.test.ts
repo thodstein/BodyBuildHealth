@@ -13,12 +13,28 @@ import { EXERCISE_CATALOG } from '../../../core/exercise-catalog';
 
 const norm = (s: string) => s.toLowerCase().replace(/ё/g, 'е').trim();
 
-const catalogNames = new Set<string>([
-  ...LMS_EXERCISES.map(e => norm(e.name)),
-  ...EXERCISE_CATALOG.map(e => norm(e.name)),
-]);
+// Строгий инвариант: имена ассистентов обязаны быть ТОЧНО в EXERCISE_CATALOG
+// (с нормализацией ё→е). Объединение с LMS_EXERCISES ослабляло проверку:
+// LMS-only имена («Становая тяга из ямы») проходили аудит, но у них нет
+// каталогных метаданных (id/оборудование/паттерн) — prescription молча
+// подставлял дефолты (id 'assist_N', equipment 'barbell').
+const catalogNames = new Set<string>(EXERCISE_CATALOG.map(e => norm(e.name)));
 
 const LIFTS = Object.keys(WEAK_POINTS_BY_LIFT) as Lift[];
+
+// База лифта не может быть собственным «ассистентом» (самолифт в диагностике —
+// бессмысленная инъекция самого движения). Для изолированных лифтов
+// (biceps/triceps/calf/shrug) объёмные варианты базы допустимы — не проверяем.
+const SELF_LIFT_NAMES: Partial<Record<Lift, string[]>> = {
+  bench: ['Жим штанги лёжа'],
+  incline_press: ['Жим штанги на наклонной (30°)'],
+  squat: ['Приседания со штангой'],
+  deadlift: ['Становая тяга (классика)', 'Становая тяга сумо'],
+  sumo: ['Становая тяга сумо'],
+  ohp: ['Армейский жим стоя'],
+  row: ['Тяга штанги в наклоне (прямой хват)'],
+  pulldown: ['Тяга верхнего блока (прямой)'],
+};
 
 describe('weakpoint-pl: диагностика мёртвых точек', () => {
   it('каждый lift × weakPoint возвращает диагноз и НЕ утекает unresolved-названия', () => {
@@ -71,6 +87,31 @@ describe('weakpoint-pl: диагностика мёртвых точек', () =>
     const d = diagnoseWeakPoint('bench', 'nonexistent' as Lift['bench']);
     expect(d.assistance).toEqual([]);
     expect(d.rationale).toBe('диагноз не определён');
+  });
+
+  it('базовый лифт не является собственным ассистентом (нет самолифтов)', () => {
+    for (const lift of LIFTS) {
+      const selfNames = (SELF_LIFT_NAMES[lift] ?? []).map(norm);
+      if (!selfNames.length) continue;
+      for (const point of WEAK_POINTS_BY_LIFT[lift]) {
+        const d = diagnoseWeakPoint(lift, point);
+        for (const a of d.assistance) {
+          expect(selfNames, `${lift}/${point}: «${a}» — самолифт в ассистентах`).not.toContain(norm(a));
+        }
+      }
+    }
+  });
+
+  it('одноимённые weak-point (deadlift.sumo_* ↔ sumo.sumo_*) дают согласованные списки', () => {
+    // sumo_mid есть только у отдельного лифта sumo (у deadlift 5 точек без него) —
+    // сравниваем только общие для обоих лифтов точки.
+    const shared = WEAK_POINTS_BY_LIFT.sumo.filter(p => (WEAK_POINTS_BY_LIFT.deadlift as readonly string[]).includes(p));
+    expect(shared.length).toBeGreaterThan(0);
+    for (const point of shared) {
+      const a = diagnoseWeakPoint('deadlift', point).assistance;
+      const b = diagnoseWeakPoint('sumo', point).assistance;
+      expect(b, `sumo/${point}`).toEqual(a);
+    }
   });
 
   it('новые движения: sumo (отдельная тяга) и biceps — полный диагноз и резолв из каталога', () => {

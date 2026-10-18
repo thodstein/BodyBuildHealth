@@ -28,6 +28,7 @@ import { diagnoseVelocity, thresholdForGoal, mvtForPLLift, lvrStale, adjustVeloc
 import { getPLWeakGroupExerciseCandidates, diagnosticProtocolFromCycle } from '../../../engines/lms/lms-builder.engine';
 import type { SRCycleTemplate } from '../../../data/lms-cycles/lms-types';
 import { applyToPlanner } from './planner-bridge';
+import { getExerciseById } from '../../../core/exercise-catalog';
 import { parseKinoveaCSV, analyzeBarTracking, type BarTrackingResult } from '../../../engines/strength-sport/strength-sport-video.engine';
 import { barLoopFlag } from '../../../engines/pro/bar-path-core.engine';
 import { diagnoseAsymmetry } from '../../../engines/pro/pl-asymmetry.engine';
@@ -49,6 +50,20 @@ const CARD: React.CSSProperties = {
   border: '1px solid rgba(255,255,255,0.08)', marginTop: 8,
 };
 const btn: React.CSSProperties = { padding: '5px 10px', borderRadius: 7, cursor: 'pointer', fontSize: 10, fontWeight: 700, minHeight: 32 };
+
+// Точечные BB-упражнения секции «Слабые мышцы»: 12 изолятов по головкам (bb_*)
+// + 8 ПЛ-спецдвижений. Экспортировано для теста: каждый id обязан существовать
+// в EXERCISE_CATALOG (см. lift-master-card.test.tsx).
+export const BB_GRANULAR_GROUPS: { id: string; label: string }[] = [
+  {id:'bb_cable_upper', label:'Верх груди (ключичная)'}, {id:'bb_cable_mid', label:'Середина груди'}, {id:'bb_cable_lower', label:'Низ груди'},
+  {id:'bb_lateral_mid', label:'Средняя дельта'}, {id:'bb_rear_cable', label:'Задняя дельта'}, {id:'bb_front_raise', label:'Передняя дельта'},
+  {id:'bb_triceps_long', label:'Трицепс длинная'}, {id:'bb_triceps_lateral', label:'Трицепс латер.'}, {id:'bb_triceps_medial', label:'Трицепс медиал.'},
+  {id:'bb_biceps_long', label:'Бицепс длинная'}, {id:'bb_biceps_short', label:'Бицепс короткая'}, {id:'bb_brachialis', label:'Брахиалис'},
+  {id:'bench_floor', label:'Жим с пола (старт)'}, {id:'bench_board', label:'Жим с досок (дожим)'},
+  {id:'deadlift_deficit', label:'Тяга с дефицитом (старт)'}, {id:'rack_pull', label:'Тяга с плинтов (дожим)'},
+  {id:'squat_tempo', label:'Темповой присед'}, {id:'front_squat', label:'Фронтальный присед'},
+  {id:'good_morning', label:'Гудморнинг (наклоны)'}, {id:'pl_bench_pause', label:'Жим с паузой (старт)'},
+];
 // ── красивые сворачиваемые заголовки-карточки ──
 const collapsibleCard = (accent: string): React.CSSProperties => ({
   ...CARD, padding: 0, overflow: 'hidden', borderLeft: `3px solid ${accent}`, borderRadius: 12,
@@ -56,7 +71,8 @@ const collapsibleCard = (accent: string): React.CSSProperties => ({
 const headerBtnStyle = (accent: string, isCollapsed: boolean): React.CSSProperties => ({
   width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
   padding: '11px 12px', cursor: 'pointer', border: 'none', textAlign: 'left' as const,
-  position: 'static', top: 0, zIndex: 5, backdropFilter: 'blur(8px)' as any,
+  /* Шапка секции — обычный в потоке (раньше была sticky top:0 и наезжала на контент). */
+  position: 'static',
   background: isCollapsed
     ? `linear-gradient(135deg, ${accent}14, rgba(255,255,255,0.02))`
     : `linear-gradient(135deg, ${accent}22, ${accent}0F)`,
@@ -529,7 +545,7 @@ export const LiftMasterCard: React.FC<{
           {anthroHint} <span style={{ color:DIM }}>(задаётся ниже; пока без видео — планируем VBT/видео-замер скорости и углов).</span>
         </div>
       )}
-      {/* выбор движения — sticky */}
+      {/* выбор движения — ряд в потоке (не липкая шапка) */}
       <div style={{ ...CARD, display:'flex', gap:5, flexWrap:'wrap', alignItems:'center', position: 'static', top:0, zIndex:4, backdropFilter:'blur(10px)' as any, background:'rgba(10,10,12,0.72)', border:'1px solid rgba(255,255,255,0.06)' }}>
         <div style={{ fontSize:11, fontWeight:800, color:ACCENT, marginRight:6 }}>Движение:</div>
         {(Object.keys(LIFT_RU) as Lift[]).map(l=>{ const on=lift===l; return <button key={l} onClick={()=>{ setLift(l); setPhase('' as WeakPoint|''); setIssues([]); }} style={{ minHeight:32, padding:'5px 10px', borderRadius:14, cursor:'pointer', border: on?'1px solid '+ACCENT:'1px solid rgba(255,255,255,0.1)', background: on?'rgba(0,230,138,0.15)':'transparent', color: on?ACCENT:DIM, fontWeight:700, fontSize:10 }}>{LIFT_RU[l]}{on?' ✓':''}</button>; })}
@@ -573,10 +589,26 @@ export const LiftMasterCard: React.FC<{
           Офлайн-режим: CV-видео недоступно, используйте ручной ввод и Kinovea CSV.
         </div>
       )}
-      {/* Навигация по блокам */}
-      <div style={{ display:'flex', gap:4, flexWrap:'wrap', marginBottom:8, position:'static', top:0, zIndex:6, background:'rgba(10,10,12,0.85)', backdropFilter:'blur(8px)', padding:'6px 0' }}>
-        {['0 Безопасность','1 Слабые мышцы','2 Слабые точки','3 Мёртвые точки','4 Траектория','5 Геометрия','6 VBT','6b Видео','7 Срывы','8 RIR','9 Мезо','10 Лимитеры'].map((label, idx) => (
-          <button key={label} onClick={() => { const el = document.getElementById('sec-' + idx); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' }); }} style={{ minHeight:32, padding:'4px 8px', borderRadius:8, cursor:'pointer', border:'1px solid rgba(255,255,255,0.1)', background:'rgba(255,255,255,0.04)', color:'#ffffff', fontSize:9, fontWeight:700 }}>{label}</button>
+      {/* Навигация по блокам — обычный ряд в потоке (раньше была sticky top:0 и перекрывала контент).
+          Пары id↔метка явные: секция sec-0 = «Антропометрия» (без пункта в навигации),
+          поэтому «0 Безопасность» обязан вести в sec-1, а не в sec-0 — раньше лента
+          была сдвинута на один блок и все кнопки вели не туда. */}
+      <div style={{ display:'flex', gap:4, flexWrap:'wrap', marginBottom:8, padding:'6px 0' }}>
+        {([
+          ['sec-1', '1 Безопасность'],
+          ['sec-2', '2 Слабые мышцы'],
+          ['sec-3', '3 Слабые точки'],
+          ['sec-4', '4 Мёртвые точки'],
+          ['sec-5', '5 Траектория'],
+          ['sec-6', '6 Геометрия'],
+          ['sec-7', '7 VBT'],
+          ['sec-8', '8 Видео'],
+          ['sec-9', '9 Срывы'],
+          ['sec-10', '10 RIR'],
+          ['sec-11', '11 Мезо'],
+          ['sec-12', '12 Лимитеры'],
+        ] as Array<[string, string]>).map(([id, label]) => (
+          <button key={id} onClick={() => { const el = document.getElementById(id); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' }); }} style={{ minHeight:32, padding:'4px 8px', borderRadius:8, cursor:'pointer', border:'1px solid rgba(255,255,255,0.1)', background:'rgba(255,255,255,0.04)', color:'#ffffff', fontSize:9, fontWeight:700 }}>{label}</button>
         ))}
       </div>
       {sessions.length === 0 && totalSelected === 0 && (
@@ -625,7 +657,7 @@ export const LiftMasterCard: React.FC<{
             <span style={{ width:26, height:26, borderRadius:7, display:'flex', alignItems:'center', justifyContent:'center', background:'linear-gradient(135deg,#4ade80,#22c55e)', boxShadow:'0 2px 8px rgba(74,222,128,0.35)', fontSize:13, flexShrink:0 }}>💪</span>
             <span style={{ minWidth:0 }}>
               <span style={{ fontSize:11, fontWeight:800, color:'#4ade80', display:'flex', alignItems:'center', gap:6, flexWrap:'wrap' }}>1 · Слабые мышцы · BB-грануляр {weakMuscleSubs.length>0 && <span style={{ fontSize:9, padding:'1px 6px', borderRadius:20, background:'rgba(74,222,128,0.18)', border:'1px solid rgba(74,222,128,0.28)', color:'#4ade80' }}>{weakMuscleSubs.length} выбр.</span>}</span>
-              <span style={{ fontSize:9, color:'#fff', opacity:0.72, display:'block', marginTop:1, lineHeight:1.2 }}>5 ассистентов из цикла + 12 BB-изолятов по головкам</span>
+              <span style={{ fontSize:9, color:'#fff', opacity:0.72, display:'block', marginTop:1, lineHeight:1.2 }}>5 ассистентов из цикла + 20 точечных BB-упражнений</span>
             </span>
           </span>
           <span style={{ display:'flex', alignItems:'center', gap:6, flexShrink:0 }}>
@@ -633,36 +665,21 @@ export const LiftMasterCard: React.FC<{
           </span>
         </button>
         {!collapsed['sec1'] && <div style={{ padding:12 }}>
-        <div style={{ fontSize:10, color:DIM, lineHeight:1.4 }}>Выберите слабую мышцу — 5 ассистентов из раскладки цикла. Ниже — 12 гранулярных BB-изолятов (верх/середина/низ груди, 3 головки дельт, 3 трицепса, 3 бицепса) — точечно по головкам.</div>
+        <div style={{ fontSize:10, color:DIM, lineHeight:1.4 }}>Выберите слабую мышцу — 5 ассистентов из раскладки цикла. Ниже — 20 точечных BB-упражнений: 12 изолятов по головкам (верх/середина/низ груди, 3 головки дельт, 3 трицепса, 3 бицепса) + 8 ПЛ-спецдвижений (жим с пола/досок, тяга с дефицитом/плинтов, темповой/фронтальный присед, гудморнинг, паузный жим).</div>
         <div style={{ marginTop:8, padding:8, borderRadius:8, background:'rgba(236,72,153,0.05)', border:'1px solid rgba(236,72,153,0.15)' }}>
-          <div style={{ fontSize:10, fontWeight:700, color:'#ec4899', marginBottom:6 }}>💎 BB-грануляр — 12 изолятов по головкам</div>
+          <div style={{ fontSize:10, fontWeight:700, color:'#ec4899', marginBottom:6 }}>💎 BB-грануляр — 20 точечных упражнений</div>
           <div style={{ display:'flex', gap:4, flexWrap:'wrap' }}>
-            {[
-              {id:'bb_cable_upper', label:'Верх груди (ключичная)'}, {id:'bb_cable_mid', label:'Середина груди'}, {id:'bb_cable_lower', label:'Низ груди'},
-              {id:'bb_lateral_mid', label:'Средняя дельта'}, {id:'bb_rear_cable', label:'Задняя дельта'}, {id:'bb_front_raise', label:'Передняя дельта'},
-              {id:'bb_triceps_long', label:'Трицепс длинная'}, {id:'bb_triceps_lateral', label:'Трицепс латер.'}, {id:'bb_triceps_medial', label:'Трицепс медиал.'},
-              {id:'bb_biceps_long', label:'Бицепс длинная'}, {id:'bb_biceps_short', label:'Бицепс короткая'}, {id:'bb_brachialis', label:'Брахиалис'},
-               {id:'bb_floor_press', label:'Жим с пола (локдаун)'}, {id:'bb_board_press', label:'Жим с досок (дожим)'},
-               {id:'bb_deficit_dl', label:'Тяга с дефицитом (старт)'}, {id:'bb_rack_pull', label:'Тяга с плинтов (дожим)'},
-               {id:'bb_tempo_squat', label:'Темповой присед'}, {id:'bb_front_squat', label:'Фронтальный присед'},
-               {id:'bb_good_morning', label:'Гудморнинг (наклоны)'}, {id:'bb_pause_bench', label:'Жим с паузой (старт)'},
-            ].map(g=>{
+            {BB_GRANULAR_GROUPS.map(g=>{
               const k = `bb|${g.id}`; const on = selectedDiag[k]?.length>0;
               return <button key={g.id} onClick={()=>{
-                const name = (()=>{
-                  const m: Record<string,string> = { bb_cable_upper:'Сведение в кроссовере с верхнего блока (верх груди)', bb_cable_mid:'Сведение в кроссовере (середина груди)', bb_cable_lower:'Сведение в кроссовере с нижнего блока (низ груди)', bb_lateral_mid:'Махи в стороны с задержкой (средняя дельта)', bb_rear_cable:'Отведение на заднюю дельту в кроссовере', bb_front_raise:'Подъём гантелей перед собой (передняя дельта)', bb_triceps_long:'Французский жим с гантелью над головой (длинная головка трицепса)', bb_triceps_lateral:'Разгибание с канатной рукоятью (латеральная головка)', bb_triceps_medial:'Разгибание обратным хватом (медиальная головка)', bb_biceps_long:'Подъём гантели на наклонной (длинная головка бицепса)', bb_biceps_short:'Подъём на скамье Скотта (короткая головка бицепса)', bb_brachialis:'Молот с канатной рукоятью (брахиалис)',
-                   bb_floor_press:'Жим с пола (floor press)', bb_board_press:'Жим с досок (board press)',
-                   bb_deficit_dl:'Становая тяга с дефицитом', bb_rack_pull:'Тяга с плинтов (rack pull)',
-                   bb_tempo_squat:'Темповой присед (5-3-0)', bb_front_squat:'Фронтальные приседания',
-                   bb_good_morning:'Гудморнинг (наклоны со штангой)', bb_pause_bench:'Жим штанги лёжа' };
-                  return m[g.id] ?? g.id;
-                })();
+                // Название — из EXERCISE_CATALOG по реальному id (головки bb_* + ПЛ-спецдвижения).
+                const name = getExerciseById(g.id)?.name ?? g.label;
                 if (on) setSelectedDiag(cur=>{ const n={...cur}; delete n[k]; return n; });
                 else addDiag(k, [name]);
               }} style={{ padding:'4px 8px', borderRadius:7, cursor:'pointer', fontSize:9, border: on?'1px solid #ec4899':'1px solid rgba(255,255,255,0.1)', background: on?'rgba(236,72,153,0.12)':'rgba(255,255,255,0.02)', color: on?'#ec4899':DIM, fontWeight:700 }}>{g.label}{on?' ✓':''}</button>;
             })}
           </div>
-          <div style={{ fontSize:9, color:DIM, marginTop:6, lineHeight:1.3 }}>Клик — добавить/убрать изолят (протокол гипертрофии блока 8: 3×10 @65% RIR2, дни Авто). Точная головка — из EXERCISE_CATALOG bb_*.</div>
+          <div style={{ fontSize:9, color:DIM, marginTop:6, lineHeight:1.3 }}>Клик — добавить/убрать (протокол гипертрофии блока 8: 3×10 @65% RIR2, дни Авто). Название берётся из EXERCISE_CATALOG по реальному id.</div>
         </div>
         <div style={{ display:'flex', gap:5, flexWrap:'wrap', marginTop:6 }}>
           {WEAK_MUSCLE_DETAIL.map(d=>{ const on=weakMuscleGroups.includes(d.id); return <button key={d.id} onClick={()=>toggleWeakGroup(d.id)} style={{ minHeight:32, padding:'5px 10px', borderRadius:14, cursor:'pointer', border: on?'1px solid #4ade80':'1px solid rgba(255,255,255,0.08)', background: on?'rgba(74,222,128,0.15)':'transparent', color: on?'#4ade80':DIM, fontWeight:700, fontSize:10 }}>{d.label}{on?' ✓':''}</button>; })}
@@ -728,6 +745,13 @@ export const LiftMasterCard: React.FC<{
         <div style={{ display:'flex', gap:5, flexWrap:'wrap', marginTop:6 }}>
           {(WEAK_POINTS_BY_LIFT[lift]??[]).map(p=>{ const on=effectivePhase===p; return <button key={p} onClick={()=>setPhase(p as WeakPoint)} style={{ minHeight:34, padding:'5px 10px', borderRadius:8, cursor:'pointer', border: on?'1px solid #a855f7':'1px solid rgba(255,255,255,0.1)', background: on?'rgba(168,85,247,0.16)':'transparent', color: on?'#c084fc':DIM, fontWeight:700, fontSize:10 }}>{PHASE_RU[p]||p}</button>; })}
         </div>
+        {effectivePhase && (
+          <div style={{ display:'flex', gap:4, flexWrap:'wrap', alignItems:'center', marginTop:6 }}>
+            <span style={{ fontSize:9, color:DIM }}>Дни инъекции:</span>
+            <button onClick={()=>{ const k=`${lift}|${effectivePhase}`; setDaysDiag(cur=>{ const n={...cur}; delete n[k]; return n; }); }} style={{ minHeight:44, minWidth:44, padding:'8px 10px', borderRadius:6, cursor:'pointer', fontSize:9, border: !daysDiag[`${lift}|${effectivePhase}`]?.length?'1px solid #a855f7':'1px solid rgba(255,255,255,0.1)', background: !daysDiag[`${lift}|${effectivePhase}`]?.length?'rgba(168,85,247,0.16)':'transparent', color: !daysDiag[`${lift}|${effectivePhase}`]?.length?'#c084fc':DIM }}>Авто</button>
+            {Array.from({length:Math.max(1,dayCount)},(_,i)=>i+1).map(d=> <button key={d} onClick={()=>toggleDiagDay(`${lift}|${effectivePhase}`, d)} style={{ minHeight:44, minWidth:44, padding:'8px 10px', borderRadius:6, cursor:'pointer', fontSize:9, border: daysDiag[`${lift}|${effectivePhase}`]?.includes(d)?'1px solid #a855f7':'1px solid rgba(255,255,255,0.1)', background: daysDiag[`${lift}|${effectivePhase}`]?.includes(d)?'rgba(168,85,247,0.16)':'transparent', color: daysDiag[`${lift}|${effectivePhase}`]?.includes(d)?'#c084fc':DIM }}>Д{d}</button>)}
+          </div>
+        )}
         {diaryHint && (
           <div style={{ marginTop:6, padding:7, borderRadius:8, background:'rgba(251,191,36,0.07)', border:'1px solid rgba(251,191,36,0.25)', fontSize:10, color:'#fbbf24', lineHeight:1.5 }}>
             📊 Дневник: {diaryHint.count} из {diaryHint.totalHard} тяжёлых подходов срываются в «{PHASE_RU[diaryHint.phase]||diaryHint.phase}» (эвристика phaseForReps).

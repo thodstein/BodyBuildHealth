@@ -2,7 +2,8 @@ import { describe, expect, it, afterEach } from 'vitest';
 import { render, screen, cleanup } from '@testing-library/react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import React from 'react';
-import { LiftMasterCard } from '../LiftMasterCard';
+import { LiftMasterCard, BB_GRANULAR_GROUPS } from '../LiftMasterCard';
+import { EXERCISE_CATALOG } from '../../../../core/exercise-catalog';
 
 afterEach(()=>{ cleanup(); localStorage.removeItem('he_lift_master_v1'); });
 
@@ -34,5 +35,28 @@ describe('LiftMasterCard — единый инструмент движения 
   it('кнопка добавления в ПЛ-авто присутствует', () => {
     render(<LiftMasterCard sessions={[]} />);
     expect(screen.getByText(/Добавить в ПЛ-авто/)).toBeTruthy();
+  });
+
+  it('BB-грануляр: 20 кнопок, все id существуют в EXERCISE_CATALOG (нет фейковых/сырых id)', () => {
+    // Регрессия: агент добавил 8 кнопок с несуществующими id (bb_floor_press и т.д.)
+    // и маппил bb_pause_bench на базовый «Жим штанги лёжа» вместо «Жим с паузой».
+    expect(BB_GRANULAR_GROUPS).toHaveLength(20);
+    expect(new Set(BB_GRANULAR_GROUPS.map(g => g.id)).size).toBe(20);
+    const byId = new Map(EXERCISE_CATALOG.map(e => [e.id, e.name]));
+    for (const g of BB_GRANULAR_GROUPS) {
+      expect(byId.has(g.id), `id ${g.id} отсутствует в EXERCISE_CATALOG`).toBe(true);
+      // Название для инъекции в план обязано быть каталогным (не сырой id).
+      expect(byId.get(g.id), `имя ${g.id}`).toBeTruthy();
+    }
+    // Паузный жим — отдельное упражнение, а не базовый жим штанги.
+    expect(byId.get('pl_bench_pause')).toBe('Жим с паузой');
+  });
+
+  it('рандерит все 20 кнопок BB-грануляра', () => {
+    const html = renderToStaticMarkup(<LiftMasterCard sessions={[]} />);
+    expect(html).toContain('Жим с пола (старт)');
+    expect(html).toContain('Тяга с дефицитом (старт)');
+    expect(html).toContain('Жим с паузой (старт)');
+    expect(html).toContain('20 точечных упражнений');
   });
 });
