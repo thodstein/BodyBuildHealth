@@ -206,11 +206,14 @@ export function buildDayTargets(input: DayTargetsInput): DayTargetsResult {
   } else {
     carbsFinal = Math.round(carbsRaw);
   }
+  // Волна-3 чистка (2026-10-18): тернарники `kbjuMode === 'manual'` были мёртвыми —
+  // в manual/profile buildDayTargets завершается ранним return (:143/:159), код ниже
+  // достижим только в auto-режиме.
   const carbs = computeDieteticCarbTarget({
     weightKg: weight, rawCarbsG: carbsFinal, insulinTotalUnits: insulinUnits,
     goalPhase, trainingVolumeMinPerWeek: vol, budget: input.budget,
-    carbGPerKg: input.carbCapGPerKg ?? (input.kbjuMode === 'manual' ? 0 : undefined),
-    minCarbG: input.kbjuMode === 'manual' || dietStyle === 'keto' ? 0 : undefined,
+    carbGPerKg: input.carbCapGPerKg,
+    minCarbG: dietStyle === 'keto' ? 0 : undefined,
   });
   const kcal = atwater(protein, fatsFinal, carbs);
 

@@ -69,6 +69,26 @@ type PlannerBoundaryState = { error: Error | null };
 
 class PlannerErrorBoundary extends React.Component<React.PropsWithChildren, PlannerBoundaryState> {
   state: PlannerBoundaryState = { error: null };
+  // B4-fix (2026-10-18): ключи he_planner_last_error / he_planner_last_render_error
+  // больше не write-only — при монтировании читаем ошибку прошлой сессии (read-once,
+  // ключ очищается) и показываем баннер «что случилось в прошлый раз».
+  lastStored: { message: string; at: string; key: string } | null = null;
+
+  constructor(props: React.PropsWithChildren) {
+    super(props);
+    for (const key of ['he_planner_last_render_error', 'he_planner_last_error']) {
+      try {
+        const raw = localStorage.getItem(key);
+        if (!raw) continue;
+        localStorage.removeItem(key);
+        const parsed = JSON.parse(raw);
+        if (parsed && typeof parsed.message === 'string' && parsed.message) {
+          this.lastStored = { message: parsed.message.slice(0, 400), at: typeof parsed.at === 'string' ? parsed.at : '', key };
+        }
+        if (this.lastStored) break;
+      } catch {}
+    }
+  }
 
   static getDerivedStateFromError(error: Error): PlannerBoundaryState {
     return { error };
@@ -81,7 +101,18 @@ class PlannerErrorBoundary extends React.Component<React.PropsWithChildren, Plan
   }
 
   render() {
-    if (!this.state.error) return this.props.children;
+    if (!this.state.error) return (
+      <>
+        {this.lastStored && (
+          <div style={{ margin: 8, padding: 10, borderRadius: 12, background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.25)', color: '#fff', fontSize: 9, lineHeight: 1.5 }}>
+            <span style={{ fontWeight: 800, color: '#f59e0b' }}>⚠️ Прошлая сессия упала с ошибкой</span>
+            {this.lastStored.at ? ` (${new Date(this.lastStored.at).toLocaleString()})` : ''}
+            {': '}<span style={{ color: 'rgba(255,255,255,0.75)', wordBreak: 'break-word' }}>{this.lastStored.message}</span>
+          </div>
+        )}
+        {this.props.children}
+      </>
+    );
     return (
       <div style={{ margin: 8, padding: 14, borderRadius: 12, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)', color: '#fff' }}>
         <div style={{ fontSize: 12, fontWeight: 800, color: '#ef4444', marginBottom: 6 }}>Ошибка отображения планировщика</div>

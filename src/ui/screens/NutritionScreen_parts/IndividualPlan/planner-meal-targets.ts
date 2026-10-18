@@ -105,10 +105,18 @@ export function applyMealTargetOverrides(
     }
   }
 
-  const appliedLabels = overrides.filter(o => meals.some(m => m.label === o.label));
+  // B5-fix (2026-10-18): в заметке — РЕАЛЬНО применённый масштаб (отношение итогов
+  // приёма после всех проходов к исходным), а не идеальный scaleFor до клампа
+  // 0.7-1.4 / белок-флора / возможного отката дня ±5% (заметка врала при срабатывании
+  // инварианта: показывала ×1.40, а фактически применён, напр., ×1.08).
+  const appliedLabels = overrides.filter(o => next.some(m => m.label === o.label));
   for (const ov of appliedLabels) {
-    const t = meals.find(m => m.label === ov.label)?.totals || { kcal: 0, p: 0, f: 0, c: 0 };
-    notes.push(`🎯 Приём «${ov.label}»: масштаб ×${scaleFor(meals.find(m => m.label === ov.label)!)?.toFixed(2) ?? '—'} к цели Б${ov.p ?? '—'}/Ж${ov.f ?? '—'}/У${ov.c ?? '—'}`);
+    const orig = meals.find(m => m.label === ov.label);
+    const fin = next.find(m => m.label === ov.label);
+    const origK = (orig ? (orig.totals?.kcal ?? recalc(orig.items || []).kcal) : 0) || 0;
+    const finK = (fin ? (fin.totals?.kcal ?? recalc(fin.items || []).kcal) : 0) || 0;
+    const real = origK > 0 ? finK / origK : null;
+    notes.push(`🎯 Приём «${ov.label}»: масштаб ×${real !== null ? real.toFixed(2) : '—'} к цели Б${ov.p ?? '—'}/Ж${ov.f ?? '—'}/У${ov.c ?? '—'}`);
   }
   return { meals: next, notes };
 }

@@ -477,7 +477,7 @@ export const IndividualPlanSettings: React.FC = () => {
       )}
 
       {/* Кнопка генерации (Pro Engine — единый движок) */}
-      {true && (
+      {(
        <GlassCard title="🧬 Генерация плана" icon="🧬" color="#00e68a">
          <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:4, marginBottom:8 }}>
            {[
@@ -544,7 +544,7 @@ export const IndividualPlanSettings: React.FC = () => {
       </GlassCard>
       )}
 
-      {true && (
+      {(
       <GlassCard title="Пользователь" icon="👤" color="#a78bfa">
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginBottom: 6 }}>
           <PopupNumber label="⚖️ Вес (кг)" value={weight} min={30} max={250} suffix="кг" onChange={setWeight} />
@@ -759,7 +759,7 @@ export const IndividualPlanSettings: React.FC = () => {
 
       {/* v6: Диетические паузы → объединены в «Периодизация углеводов» (см. карту Циклирование) */}
 
-      {true && (
+      {(
       <GlassCard title="Цель" icon="🎯" color="#00e68a">
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
           {GOALS.map(g => (
@@ -1068,7 +1068,7 @@ export const IndividualPlanSettings: React.FC = () => {
       </GlassCard>
       )}
 
-      {true && (
+      {(
       <GlassCard title="Привязка к тренировке" icon="🏋️" color="#22c55e">
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
           <button onClick={() => setLinkToTraining(!linkToTraining)} style={{
@@ -1167,7 +1167,7 @@ export const IndividualPlanSettings: React.FC = () => {
       </GlassCard>
       )}
 
-      {true && (
+      {(
       <GlassCard title="КБЖУ" icon="📊" color="#00e68a">
         <div style={{ display: 'flex', gap: 4, marginBottom: 10 }}>
           {(['auto', 'manual', 'profile'] as const).map(mode => {
@@ -1551,7 +1551,7 @@ export const IndividualPlanSettings: React.FC = () => {
       </GlassCard>
       )}
 
-      {true && (
+      {(
       <GlassCard title="Расписание" icon="⏰" color="#06b6d4">
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 8 }}>
           <PopupSelect label="Пробуждение" value={wakeTime} options={TIME_OPTIONS} onChange={setWakeTime} />
@@ -1599,7 +1599,7 @@ export const IndividualPlanSettings: React.FC = () => {
       )}
 
         {/* Work Schedule — доступно во всех режимах (еда на работе нужна всем) */}
-        {true && (
+        {(
         <GlassCard title="💼 Работа" icon="💼" color="#60a5fa">
           <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
             <div style={{ display:'flex', alignItems:'center', gap:6 }}>
@@ -1709,7 +1709,7 @@ export const IndividualPlanSettings: React.FC = () => {
 
       {/* Чистка-2026 (P3): единая карточка «Исключения» — аллергены + исключённые продукты +
           диеты + непереносимости + нелюбимые категории (ранее 4 карточки редактировали пересекающиеся наборы) */}
-      {true && (
+      {(
       <GlassCard title="Исключения" icon="🚫" color="#ef4444">
         <div style={{ fontSize: 9, fontWeight: 700, color: '#ef4444', marginBottom: 4 }}>⚠️ Аллергены</div>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, marginBottom: 10 }}>
@@ -1816,7 +1816,7 @@ export const IndividualPlanSettings: React.FC = () => {
       </GlassCard>
       )}
 
-      {true && (
+      {(
       <GlassCard title="Проблемы со здоровьем" icon="🩺" color="#06b6d4">
         <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginBottom: 8, lineHeight: 1.5 }}>
           Отметьте проблемы — план автоматически исключит продукты, которые их усугубляют. Например, отёки → снижение натрия, диабет → низкий GI, подагра → низкие пурины.
@@ -1883,7 +1883,7 @@ export const IndividualPlanSettings: React.FC = () => {
       </GlassCard>
       )}
 
-      {true && (
+      {(
       <GlassCard title="Тип плана питания" icon="📋" color="#a855f7">
         {/* Чистка-2026 (P5): вегетарианство — один источник (тип плана), dietPrefs синхронизируется автоматически */}
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
@@ -1986,7 +1986,7 @@ export const IndividualPlanSettings: React.FC = () => {
       )}
 
       {/* Чистка-2026 (P3): «Предпочтения и исключения» → «Предпочтения» (исключения — в отдельной карточке) */}
-      {true && (
+      {(
       <GlassCard title="Предпочтения" icon="🍎" color="#f59e0b">
         <div style={{ marginBottom: 8 }}>
           <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:4 }}>

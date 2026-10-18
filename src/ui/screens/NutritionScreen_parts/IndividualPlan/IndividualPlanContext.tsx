@@ -902,7 +902,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     // FIX: если в профиле есть ручные цели КБЖУ, но режим не помечен 'manual'
     // (миграция/старые сохранения/MetabolicHub), включаем ручной режим автоматически —
     // иначе manualTargets молча игнорируются планировщиком.
-    const _hasManualTargets = (mt: any) => !!mt && [mt.kcal, mt.protein, mt.fat, mt.carbs, mt.protein, mt.fat, mt.carbs].some((x: any) => typeof x === 'number' && x > 0);
+    const _hasManualTargets = (mt: any) => !!mt && [mt.kcal, mt.protein, mt.fat, mt.carbs].some((x: any) => typeof x === 'number' && x > 0);
     try {
       const v = (s as any)?.nutrition?.kbjuMode;
       const mt = (s as any)?.nutrition?.manualTargets;
@@ -1162,6 +1162,13 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
         }
         setSurplusPct(nextPct);
         try { (window as any).showToast?.(`Профицит ${nextPct}% (${d > 0 ? '+' : ''}${d} ккал/день) — перегенерируйте план (✨)`, 'success'); } catch {}
+        return;
+      }
+      // B2-fix (2026-10-18): в profile-режиме цели дня приходят из профиля — «±ккал»
+      // молча перетирал связь с профилем ручным снапшотом (setKbjuMode('manual') +
+      // setManualKcal) и показывал «успех». Честный no-op с подсказкой.
+      if (kbjuMode === 'profile') {
+        try { (window as any).showToast?.('В profile-режиме план берёт КБЖУ из профиля — измените цели в профиле (или переключитесь в ручной режим).', 'warning'); } catch {}
         return;
       }
       const next = Math.max(1200, Math.round((base + d) / 10) * 10);
@@ -3178,9 +3185,17 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
       // A2-fix (2026-10-18): не оставляем просроченные manualTargets при mode ≠ manual —
       // иначе инициализатор (миграционная ветка) возвращал режим manual после каждой
       // перезагрузки и пользователь не мог навсегда переключиться в auto.
-      if (kbjuMode === 'manual' && manualKcal !== null && manualP !== null && manualF !== null && manualC !== null) {
-        next.nutrition.manualTargets = { kcal: manualKcal, protein: manualP, fat: manualF, carbs: manualC };
-      } else if (kbjuMode !== 'manual') {
+      // B3-fix (2026-10-18): сохраняем и ЧАСТИЧНЫЙ ввод (хотя бы одно поле задано) —
+      // раньше требовались все четыре, из-за чего запись только ккал (или только БЖУ)
+      // терялась при сохранении профиля; читатели (:962-983) берут поля по одному.
+      if (kbjuMode === 'manual') {
+        const _mt: { kcal?: number; protein?: number; fat?: number; carbs?: number } = {};
+        if (manualKcal !== null) _mt.kcal = manualKcal;
+        if (manualP !== null) _mt.protein = manualP;
+        if (manualF !== null) _mt.fat = manualF;
+        if (manualC !== null) _mt.carbs = manualC;
+        if (Object.keys(_mt).length > 0) next.nutrition.manualTargets = _mt;
+      } else {
         delete next.nutrition.manualTargets;
       }
       // P1-фикс: режим 'profile' затирался в 'auto' (инициализатор принимает только
