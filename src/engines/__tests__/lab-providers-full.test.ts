@@ -1,8 +1,61 @@
 import { describe, expect, it } from 'vitest';
-import { parseLabText } from '../pdf-parser.engine';
-import { parseLabText as parseProviderAware } from '../../core/lab-auto-parser';
+import { parseLabText, detectProvider as detectProviderPdf } from '../pdf-parser.engine';
+import { parseLabText as parseProviderAware, detectProvider as detectProviderCore } from '../../core/lab-auto-parser';
 import { parseLabResults } from '../biomarker-regex-engine';
 import { mapToUcumCode } from '../../core/labs-mapping';
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Детекция провайдера: реальные бланки печатают бренд кириллицей, а OCR
+// фото перемешивает алфавиты посимвольно («ГеmоТесТ», «КДL»).
+// ═══════════════════════════════════════════════════════════════════════════
+describe('Детекция провайдера бланка (кириллица и OCR-микс)', () => {
+  it.each([
+    ['ГЕМОТЕСТ\nНаименование\tРезультат', 'gemotest'],
+    ['Медицинская лаборатория Гемотест\nДата: 20.03.2024', 'gemotest'],
+    ['ГеmоТесТ — результаты исследований', 'gemotest'],
+    ['gemotest.ru personal report', 'gemotest'],
+    ['ИНВИТРО\nНаименование\tРезультат', 'invitro'],
+    ['Инвитро. Результаты анализов', 'invitro'],
+    ['ИНВИТРO (O латинское)', 'invitro'],
+    ['Лабораторная служба Хеликс', 'helix'],
+    ['ХЕЛИКС — результаты', 'helix'],
+    ['КДЛ — Клинико-диагностическая лаборатория', 'kdl'],
+    ['КДL результат лечения', 'kdl'],
+    ['kdl.ru report', 'kdl'],
+    ['Список покупок: молоко, хлеб', 'unknown'],
+  ])('%s → %s', (text, expected) => {
+    expect(detectProviderPdf(text)).toBe(expected === 'unknown' ? null : expected);
+    expect(detectProviderCore(text)).toBe(expected);
+  });
+
+  it('КДЛ не ловится внутри посторонних слов', () => {
+    expect(detectProviderPdf('пакет клидлеровских услуг')).toBeNull();
+    expect(detectProviderCore('пакет клидлеровских услуг')).toBe('unknown');
+  });
+
+  it('кириллический ГЕМОТЕСТ активирует провайдерскую таблицу', () => {
+    // Раньше детекция знала только латиницу 'gemotest', и строка-заголовок
+    // реального бланка «Наименование Результат Референс Ед.» не включала
+    // провайдерский разбор (спасал только generic-парсер).
+    const result = parseLabText(`ГЕМОТЕСТ
+Наименование\tРезультат\tРеференс\tЕд.
+Глюкоза\t5,4\t3,9-5,5\tммоль/л
+Креатинин\t92\t62-106\tмкмоль/л`);
+    expect(result.values.map(v => v.code)).toEqual(expect.arrayContaining(['GLU', 'CREAT']));
+    expect(result.values.find(v => v.code === 'GLU')).toMatchObject({ value: 5.4, refLow: 3.9, refHigh: 5.5 });
+  });
+
+  it('заголовок Хеликс «Ед. изм.» активирует провайдерский разбор', () => {
+    // Хеликс печатает «Ед. изм.», а не «Единицы» — раньше заголовок не
+    // матчился и провайдерский разбор пропускался.
+    const result = parseLabText(`Хеликс
+Показатель\tРезультат\tРеференсные значения\tЕд. изм.
+Креатинин\t88\t74-110\tмкмоль/л
+ТТГ\t2,1\t0,4-4,0\tмЕд/л`);
+    expect(result.values.find(v => v.code === 'CREAT')).toMatchObject({ value: 88, refLow: 74, refHigh: 110 });
+    expect(result.values.find(v => v.code === 'TSH')).toMatchObject({ value: 2.1 });
+  });
+});
 
 const runAllParsers = (text: string) => {
   const pdf = parseLabText(text);

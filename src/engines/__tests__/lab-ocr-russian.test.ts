@@ -16,6 +16,22 @@ describe('Russian laboratory OCR parsing', () => {
     expect(parseLabReference('<41')).toMatchObject({ high: 41 });
     expect(parseLabReference('>1.0')).toMatchObject({ low: 1 });
     expect(parseLabReference('от 0 до 5.5')).toMatchObject({ low: 0, high: 5.5 });
+    // Односторонние границы реальных бланков Инвитро/КДЛ: «до N» — верх,
+    // «не менее N» — низ. Дата «от 15.03.2024» не должна стать референсом.
+    expect(parseLabReference('до 41')).toMatchObject({ high: 41 });
+    expect(parseLabReference('не более 6.0')).toMatchObject({ high: 6 });
+    expect(parseLabReference('не менее 3.5')).toMatchObject({ low: 3.5 });
+    expect(parseLabReference('от 0.15')).toMatchObject({ low: 0.15 });
+    expect(parseLabReference('от 15.03.2024')).toEqual({});
+  });
+
+  it('parses one-sided Russian references in full rows', () => {
+    const result = parseLabText('Билирубин общий 12,5 до 21 мкмоль/л\nФолиевая кислота 12 не менее 3.1 нг/мл');
+    const bil = result.values.find(v => v.code === 'BIL');
+    expect(bil?.refHigh).toBe(21);
+    expect(bil?.isAbnormal).toBe(false);
+    const fol = result.values.find(v => v.code === 'FOLATE');
+    expect(fol?.refLow).toBe(3.1);
   });
 
   it('prefers a duplicate row that contains laboratory references', () => {

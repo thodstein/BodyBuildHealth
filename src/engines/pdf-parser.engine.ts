@@ -450,6 +450,24 @@ function extractRefRange(text: string): { low?: number; high?: number } {
       }
     }
   }
+  // Односторонние границы из реальных бланков Инвитро/КДЛ/Хеликс:
+  // «до 21», «не более 6.0» — верхняя граница; «не менее 3.5», «от 0.15» —
+  // нижняя. Диапазоны «от N до M» уже отработаны выше, а «от 15.03.2024»
+  // (дата) отсекается lookahead'ом: число не может кончаться на точку,
+  // за которой идёт цифра.
+  const startBoundary = "(?:^|[\\s(\\[«»\"''])";
+  const num = '(\\d+(?:[.,]\\d+)?)';
+  const highOnly = text.match(new RegExp(`${startBoundary}(?:до|не\\s*более|(?<!не\\s?)менее|≤)\\s*${num}(?=$|[^0-9.,])`, 'i'));
+  const lowOnly = text.match(new RegExp(`${startBoundary}(?:не\\s*менее|от|≥)\\s*${num}(?=$|[^0-9.,])`, 'i'));
+  const high = highOnly ? parseFloat(highOnly[1].replace(',', '.')) : undefined;
+  const low = lowOnly ? parseFloat(lowOnly[1].replace(',', '.')) : undefined;
+  if (high !== undefined && Number.isFinite(high) && high >= 0 && high < 100000
+    && (low === undefined || low < high)) {
+    return { ...(low !== undefined ? { low } : {}), high };
+  }
+  if (low !== undefined && Number.isFinite(low) && low >= 0 && low < 100000) {
+    return { low };
+  }
   return {};
 }
 
@@ -474,11 +492,35 @@ function candidateScore(value: ParsedLabValue): number {
   return Math.max(0, Math.min(1, score / 8));
 }
 
-export const PROVIDER_HEADERS: Record<string, string[]> = {
-  invitro: ['наименование', 'результат', 'референс', 'единицы'],
-  gemotest: ['наименование', 'результат', 'референс', 'ед'],
-  kdl: ['наименование', 'результат', 'референс', 'единицы'],
-  helix: ['показатель', 'результат', 'референс', 'единицы'],
+/**
+ * Варианты строки-заголовка таблицы у каждого провайдера. Совпадение —
+ * «все слова варианта есть в строке». Порядок колонок не важен: заголовок
+ * служит только маркером начала таблицы.
+ *
+ * Реальные бланки пишут единицы по-разному («Единицы», «Ед. изм.»,
+ * «Единица измерения»), а референсы — «Референс», «Референсные значения»,
+ * «Реф. значения». Раньше строгое «единницы» отсекало Хеликс и часть КДЛ.
+ */
+export const PROVIDER_HEADERS: Record<string, string[][]> = {
+  invitro: [
+    ['наименование', 'результат', 'референс', 'едини'],
+    ['наименование', 'результат', 'референс', 'ед'],
+    ['наименование', 'результат', 'реф', 'ед'],
+  ],
+  gemotest: [
+    ['наименование', 'результат', 'референс', 'ед'],
+    ['наименование', 'результат', 'реф', 'ед'],
+  ],
+  kdl: [
+    ['наименование', 'результат', 'референс', 'едини'],
+    ['наименование', 'результат', 'референс', 'ед'],
+    ['наименование', 'результат', 'реф', 'ед'],
+  ],
+  helix: [
+    ['показател', 'результат', 'референс', 'едини'],
+    ['показател', 'результат', 'референс', 'ед'],
+    ['показател', 'результат', 'реф', 'ед'],
+  ],
 };
 
 export function detectProvider(text: string): string | null {
@@ -487,10 +529,19 @@ export function detectProvider(text: string): string | null {
 
 function detectProviderFromText(text: string): string | null {
   const lower = text.toLowerCase();
-  if (lower.includes('gemotest')) return 'gemotest';
-  if (lower.includes('инвитро') || lower.includes('invitro')) return 'invitro';
-  if (lower.includes('helix') || lower.includes('хеликс')) return 'helix';
-  if (lower.includes('kdl') || lower.includes('кдл')) return 'kdl';
+  // Реальные бланки печатают бренд кириллицей («ГЕМОТЕСТ», «ИНВИТРО»,
+  // «Хеликс», «КДЛ»), а OCR фото часто перемешивает кириллицу и латиницу
+  // посимвольно («ГеmоТесТ», «КДL»). Символьные классы допускают оба
+  // алфавита в каждой позиции; латинские бренды проверяются отдельно.
+  if (/gemotest|г[еeё][мm][оo0][тt][еeё][сc]?[тt]/.test(lower)) return 'gemotest';
+  if (/invitro|[иi][нн][вв][иi]?[тt][рр][оo0]/.test(lower)) return 'invitro';
+  if (/helix|[хx][еe][лl][иi][кк][сc]/.test(lower)) return 'helix';
+  // КДЛ — 3 буквы: нужны границы слова, чтобы не ловить случайные «кдл»
+  // внутри длинных слов (например, «скдл» не существует, но «кдлито» может).
+  // «/» не считается границей слова: единица «нг/дл» («мг/дл») иначе
+  // ложно детектируется как «КДЛ».
+  if (/(?:^|[^а-яa-z0-9/])k?дл(?:[^а-яa-z]|$)/.test(lower)) return 'kdl';
+  if (/(?:^|[^а-яa-z0-9/])[кk][дd][лl](?:[^а-яa-z]|$)/.test(lower)) return 'kdl';
   return null;
 }
 
@@ -726,9 +777,13 @@ function tryParseTableRows(lines: string[], provider: string | null): ParsedLabV
           refLow = ref.low;
           refHigh = ref.high;
         }
+        // Gemotest rows carry service codes (A09.05.023 / 01-01.001) before
+        // the result column: the first numeric cell is then a fragment of
+        // the code, not the result. Such cells must never become the value.
+        const isServiceCode = /^[a-zа-яё]?\d{2}[.-]\d{2}[.-]\d{2,3}$/i.test(cell.trim().replace(/\(.*$/, ''));
         // Names such as 25(OH)D, T3, T4 and HbA1c contain digits which are
         // not the measured result. Never use the marker/name cell as value.
-        const num = isNameCell ? null : extractResultNumber(cell);
+        const num = isNameCell || isServiceCode ? null : extractResultNumber(cell);
         if (num !== null && num > 0 && cell.length < 80) {
           if (val === null) {
             val = num;
@@ -775,13 +830,15 @@ function tryParseTableRows(lines: string[], provider: string | null): ParsedLabV
 }
 
 function providerSpecificParse(lines: string[], provider: string): ParsedLabValue[] {
-  const headers = PROVIDER_HEADERS[provider];
-  if (!headers) return [];
+  const headerVariants = PROVIDER_HEADERS[provider];
+  if (!headerVariants) return [];
 
-  const headerLineIdx = lines.findIndex(l => {
+  const matchesHeader = (l: string): boolean => {
     const lower = l.toLowerCase();
-    return headers.every(h => lower.includes(h));
-  });
+    return headerVariants.some(variant => variant.every(h => lower.includes(h)));
+  };
+
+  const headerLineIdx = lines.findIndex(matchesHeader);
 
   const dataLines = headerLineIdx >= 0
     ? lines.slice(headerLineIdx + 1).filter(l => l.trim().length > 0)

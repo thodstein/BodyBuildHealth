@@ -56,10 +56,18 @@ export async function readFileAsArrayBuffer(file: File | Blob): Promise<ArrayBuf
   });
 }
 
-async function prepareImageForServer(file: File): Promise<Blob> {
+async function prepareImageForServer(
+  file: File,
+  limits?: { maxSide?: number; maxPixels?: number },
+): Promise<Blob> {
   if (typeof document === 'undefined') return file;
-  const maxSide = 1280;
-  const maxPixels = 1_600_000;
+  // Дефолт (1280/1.6МП) заточен под аплоад на сервер: экономия трафика.
+  // Для оффлайн-OCR бланка анализов разрешение — главный фактор точности:
+  // цифры референсных колонок ~8-10pt, и на 1280px они становятся неразборчивы.
+  // Лабовый режим поднимает лимиты (1800/2.6МП) — цифры читаются, память
+  // в WebView ещё удерживается.
+  const maxSide = limits?.maxSide ?? 1280;
+  const maxPixels = limits?.maxPixels ?? 1_600_000;
   const withTimeout = <T>(promise: Promise<T>, ms: number, message: string): Promise<T> => Promise.race([
     promise,
     new Promise<T>((_, reject) => setTimeout(() => reject(new Error(message)), ms)),
@@ -527,7 +535,10 @@ export async function recognizeImageTextOffline(
     throw new Error('движок OCR не загрузился (tesseract.js). Пересоберите АПК: npm run build:native.');
   }
   let upload: Blob = file;
-  try { upload = await prepareImageForServer(file); } catch { /* исходник как есть */ }
+  // Лабовый режим: крупные лимиты разрешения (мелкие цифры бланка),
+  // дефолт — экономный для скриншотов еды.
+  const imageLimits = purpose === 'labs' ? { maxSide: 1800, maxPixels: 2_600_000 } : undefined;
+  try { upload = await prepareImageForServer(file, imageLimits); } catch { /* исходник как есть */ }
   // Варианты кадра: предобработка (тёмная тема и т.д.) или сырой вход,
   // если canvas недоступен (jsdom/старый WebView).
   let inputs: Array<{ kind: string; blob: Blob }> = [{ kind: 'raw', blob: upload }];
@@ -559,24 +570,32 @@ export async function recognizeImageTextOffline(
         }
       },
     });
+    // Создание воркера тоже под таймаутом: зависший createWorker (битый
+    // traineddata / недогруженное ядро) иначе подвешивает всю функцию,
+    // и в UI остаётся вечная «загрузка» без ошибки.
+    const withWorkerTimeout = <T>(p: Promise<T>): Promise<T> => Promise.race([
+      p,
+      new Promise<T>((_, reject) =>
+        setTimeout(() => reject(new Error('воркер OCR не поднялся за 45с')), 45_000)),
+    ]);
     // Сначала пробуем двуязычную модель (рус+англ): бланки содержат
     // русские названия и латинские аббревиатуры. Если она не поднялась
     // (например, повреждён один из traineddata), честно падаем на один
     // язык, чтобы не терять распознавание целиком.
     try {
-      worker = await createWorkerWithLang('rus+eng');
+      worker = await withWorkerTimeout(createWorkerWithLang('rus+eng'));
     } catch {
       try {
-        worker = await createWorkerWithLang('rus');
+        worker = await withWorkerTimeout(createWorkerWithLang('rus'));
       } catch {
-        worker = await createWorkerWithLang('eng');
+        worker = await withWorkerTimeout(createWorkerWithLang('eng'));
       }
     }
   } catch (e) {
     throw new Error(`движок OCR не запустился (worker/core/lang): ${(e as Error)?.message || String(e)}`);
   }
   try {
-    const { scoreOcrText, isGoodOcrText, isCompleteOcrText, isNutritionDiaryOcrText, pickBestOcrText } = await import('../engines/ocr-preprocess');
+    const { scoreOcrText, isGoodOcrText, isCompleteOcrText, isNutritionDiaryOcrText, pickBestOcrText, hasMacroLabels } = await import('../engines/ocr-preprocess');
     const setPsm = async (mode: '6' | '11') => {
       if (typeof worker.setParameters === 'function') {
         await worker.setParameters({
@@ -590,6 +609,10 @@ export async function recognizeImageTextOffline(
     await setPsm('6');
     const run: Promise<string> = (async () => {
       const blockTexts: string[] = [];
+      const startedAt = Date.now();
+      // Бюджет nutrition-проходов по вариантам кадра: остаток времени
+      // резервируем разреженному проходу, чтобы уложиться в timeoutMs.
+      const nutritionBudgetMs = Math.max(15_000, Math.min(timeoutMs * 0.55, 55_000));
       const perPass = 0.85 / Math.max(1, inputs.length);
       for (let i = 0; i < inputs.length; i++) {
         progressWindow.base = i * perPass;
@@ -602,8 +625,15 @@ export async function recognizeImageTextOffline(
           // маркерах: один вариант может дать 4 маркера, а другой — 20.
           // Выбор лучшего идёт по labOcrCandidateQuality после цикла.
         } else {
-          // Nutrition screenshots use macro labels for their early-exit gate.
-          if (isCompleteOcrText(text) && !isNutritionDiaryOcrText(text)) break;
+          // Nutrition: выходим досрочно, как только кадр дал осмысленный
+          // текст со строками «… ккал» или полный макро-текст. Раньше гейт
+          // требовал isCompleteOcrText && !isNutritionDiaryOcrText — для
+          // скриншотов FatSecret/MyFitnessPal (колонки макросов отдельными
+          // строками) он не срабатывал никогда: гонялись ВСЕ варианты кадра,
+          // и на телефоне это выглядело как вечная «загрузка».
+          if (isCompleteOcrText(text)) break;
+          if (isGoodOcrText(text) && isNutritionDiaryOcrText(text) && /(?:ккал|kcal|cal\b)/i.test(text)) break;
+          if (Date.now() - startedAt > nutritionBudgetMs) break;
         }
       }
       let best = purpose === 'labs' ? pickBestLabOcrText(blockTexts) : pickBestOcrText(blockTexts);
@@ -611,6 +641,12 @@ export async function recognizeImageTextOffline(
         // Не выходим досрочно: разреженный проход PSM-11 может добавить
         // недостающие строки, которых нет в блочном проходе.
       } else if (isCompleteOcrText(best) && !isNutritionDiaryOcrText(best)) {
+        return best;
+      } else if (hasMacroLabels(best) && /(?:\d+(?:[.,]\d+)?\s*(?:ккал|kcal|cal)\b)/i.test(best)) {
+        // Строки с ккал и колонки макросов уже распознаны блочным проходом:
+        // разреженный PSM-11 добавит только время (на телефоне — ещё ~минута
+        // «загрузки»), а не новые данные.
+        report(1);
         return best;
       }
       // PSM-4 (одна колонка) часто лучше PSM-6 для плотных таблиц бланков:
@@ -621,8 +657,8 @@ export async function recognizeImageTextOffline(
           progressWindow.base = 0.82;
           progressWindow.span = 0.03;
           const psm4Text = String((await worker.recognize(inputs[0].blob))?.data?.text || '');
-          if (psm4Text.trim() && labOcrCandidateQuality(`${best}\\n${psm4Text}`).score > labOcrCandidateQuality(best).score) {
-            best = `${best}\\n${psm4Text}`;
+          if (psm4Text.trim() && labOcrCandidateQuality(`${best}\n${psm4Text}`).score > labOcrCandidateQuality(best).score) {
+            best = `${best}\n${psm4Text}`;
           }
         } catch { /* PSM-4 опционален */ }
       }
@@ -645,7 +681,7 @@ export async function recognizeImageTextOffline(
             }
             const engText = String((await engWorker.recognize(inputs[0].blob))?.data?.text || '');
             if (engText.trim()) {
-              const combined = `${best}\\n${engText}`;
+              const combined = `${best}\n${engText}`;
               if (labOcrCandidateQuality(combined).score > labOcrCandidateQuality(best).score) best = combined;
             }
           } finally {
@@ -685,10 +721,15 @@ export async function recognizeImageTextOffline(
  * Process an uploaded file (PDF, image, or text) for lab analysis or nutrition data.
  * Returns parsed labs and meals ready for auto-input.
  * opts.onProgress (0..1) — прогресс оффлайн-OCR скриншотов (АПК).
+ * opts.purpose — для каких данных оптимизировать оффлайн-OCR фото:
+ * 'labs' включает лабовые проходы (PSM-4 плотной таблицы, английский
+ * проход для латинских аббревиатур HbA1c/TSH/ALT, рейт проходов по числу
+ * распознанных маркеров) и повышенное разрешение кадра; 'nutrition'
+ * (дефолт) — ранний выход по макросам и рейт по «текстовости».
  */
 export async function processUploadedFile(
   file: File,
-  opts?: { onProgress?: (fraction: number) => void },
+  opts?: { onProgress?: (fraction: number) => void; purpose?: 'labs' | 'nutrition' },
 ): Promise<OCRResult> {
   const warnings: string[] = [];
   let labs: ParsedLabValue[] = [];
@@ -797,7 +838,7 @@ export async function processUploadedFile(
       // локальный результат сразу, без 70 секунд ожидания двух таймаутов.
       if (isNativeApp()) {
         try {
-          const offlineText = await recognizeImageTextOffline(file, 90_000, opts?.onProgress, 'nutrition');
+          const offlineText = await recognizeImageTextOffline(file, 90_000, opts?.onProgress, opts?.purpose ?? 'nutrition');
           if (offlineText.trim().length > 2) {
             warnings.push('Фото распознано оффлайн на устройстве (АПК-режим).');
             serverResult = { text: offlineText };
@@ -818,13 +859,13 @@ export async function processUploadedFile(
         // АПК/оффлайн: серверные ./api/* в WebView недоступны — пробуем
         // локальный tesseract, дальше общий парсинг rawText как обычно.
         try {
-          // 'nutrition' — режим общего пути изображений: он обслуживает и бланки
-          // анализов, и скриншоты приложений (FatSecret/MyFitnessPal). В режиме
-          // 'labs' разреженный проход не склеивался с блочным, и колонки
-          // макросов FatSecret (отдельными строками) терялись. Для бланка
-          // это не хуже: маркеры дедуплицируются по коду, первое вхождение
-          // побеждает, а блочный проход идёт первым.
-          const offlineText = await recognizeImageTextOffline(file, 90_000, opts?.onProgress, 'nutrition');
+          // purpose: дефолт 'nutrition' — скриншоты приложений (FatSecret/
+          // MyFitnessPal). Лабы передают opts.purpose='labs': лабовые
+          // проходы (PSM-4, английский) идут только в этом режиме, а
+          // разреженный проход склеивается с блочным корректным переводом
+          // строки (раньше там был литеральный "\\n" — строки не разделялись
+          // и колонки терялись).
+          const offlineText = await recognizeImageTextOffline(file, 90_000, opts?.onProgress, opts?.purpose ?? 'nutrition');
           if (offlineText.trim().length <= 2) {
             return { text: '', labs: [], meals: [], source, confidence: 0, warnings };
           }

@@ -42,6 +42,21 @@ export function parseLabReference(text: string): { low?: number; high?: number; 
   if (fromTo) return { low: Number(fromTo[1]), high: Number(fromTo[2]), text: `${fromTo[1]}-${fromTo[2]}` };
   const range = source.match(new RegExp(`(?:^|[\\s(\\[])(\\d+(?:\\.\\d+)?)\\s*(?:-|\\.\\.)\\s*(\\d+(?:\\.\\d+)?)(?=$|[\\s)\\],;:])`));
   if (range) return { low: Number(range[1]), high: Number(range[2]), text: `${range[1]}-${range[2]}` };
+  // Односторонние границы реальных бланков: «до 21», «не более 6.0» — верх;
+  // «не менее 3.5», «от 0.15» — низ. Дата «от 15.03.2024» отсекается
+  // lookahead'ом (число не кончается на точку перед цифрой).
+  const startBoundary = "(?:^|[\\s(\\[«»\"''])";
+  const highOnly = source.match(new RegExp(`${startBoundary}(?:до|не\\s*более|(?<!не\\s?)менее|≤)\\s*${n}(?=$|[^0-9.,])`, 'i'));
+  const lowOnly = source.match(new RegExp(`${startBoundary}(?:не\\s*менее|от|≥)\\s*${n}(?=$|[^0-9.,])`, 'i'));
+  const high = highOnly ? Number(highOnly[1]) : undefined;
+  const low = lowOnly ? Number(lowOnly[1]) : undefined;
+  if (high !== undefined && Number.isFinite(high) && high >= 0 && high < 100000
+    && (low === undefined || low < high)) {
+    return { ...(low !== undefined ? { low } : {}), high, text: low !== undefined ? `${low}-${high}` : `<${high}` };
+  }
+  if (low !== undefined && Number.isFinite(low) && low >= 0 && low < 100000) {
+    return { low, text: `>${low}` };
+  }
   return {};
 }
 
@@ -81,10 +96,17 @@ function parseStructuredLine(line: string, provider: ParsedLabResult['provider']
 
 export function detectProvider(text: string): ParsedLabResult['provider'] {
   const lower = text.toLowerCase();
-  if (lower.includes('gemotest')) return 'gemotest';
-  if (lower.includes('инвитро') || lower.includes('invitro')) return 'invitro';
-  if (lower.includes('helix') || lower.includes('хеликс')) return 'helix';
-  if (lower.includes('kdl') || lower.includes('кдл')) return 'kdl';
+  // Реальные бланки печатают бренд кириллицей («ГЕМОТЕСТ», «ИНВИТРО»,
+  // «Хеликс», «КДЛ»), а OCR фото часто перемешивает кириллицу и латиницу
+  // посимвольно («ГеmоТесТ», «КДL»). Символьные классы допускают оба
+  // алфавита в каждой позиции; латинские бренды проверяются отдельно.
+  if (/gemotest|г[еeё][мm][оo0][тt][еeё][сc]?[тt]/.test(lower)) return 'gemotest';
+  if (/invitro|[иi][нн][вв][иi]?[тt][рр][оo0]/.test(lower)) return 'invitro';
+  if (/helix|[хx][еe][лl][иi][кк][сc]/.test(lower)) return 'helix';
+  // «/» не считается границей слова: единица «нг/дл» («мг/дл») иначе
+  // ложно детектируется как «КДЛ».
+  if (/(?:^|[^а-яa-z0-9/])k?дл(?:[^а-яa-z]|$)/.test(lower)) return 'kdl';
+  if (/(?:^|[^а-яa-z0-9/])[кk][дd][лl](?:[^а-яa-z]|$)/.test(lower)) return 'kdl';
   return 'unknown';
 }
 

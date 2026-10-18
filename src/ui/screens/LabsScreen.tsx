@@ -614,8 +614,13 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
       // пользователь видел "Таймаут" и считал, что "не работает".
       const ocrTimeoutMs = isNativeApp() ? 120000 : 30000;
       const ocrTimeoutLabel = isNativeApp() ? '120с' : '30с';
+      // purpose: 'labs' — включает лабовые проходы оффлайн-OCR фото в АПК
+      // (PSM-4 плотной таблицы, английский проход для латинских аббревиатур
+      // HbA1c/TSH/ALT, выбор прохода по числу распознанных маркеров) и
+      // повышенное разрешение кадра. Дневник еды продолжает использовать
+      // дефолтный 'nutrition'-режим.
       const result: any = await Promise.race([
-        processUploadedFile(file),
+        processUploadedFile(file, { purpose: 'labs' }),
         new Promise((_, rej) => setTimeout(() => rej(new Error(`Таймаут обработки файла (${ocrTimeoutLabel}). На телефоне первое распознавание может занять до 2 минут — попробуйте ещё раз (модели уже закэшированы).`)), ocrTimeoutMs)),
       ]);
       if (requestId !== ocrRequestRef.current) return;
