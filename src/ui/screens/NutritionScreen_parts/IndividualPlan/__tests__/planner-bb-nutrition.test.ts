@@ -58,5 +58,17 @@ describe('applyBBNutritionToTargets (Ф4.25)', () => {
       expect(r.kcal).toBe(2470);
       expect(r.breakdown.some(b => b.includes('справочно'))).toBe(true);
     });
+
+    it('фикс «не в ту карточку»: введённый вручную kcal возвращается как есть, даже если макросы сходятся иначе', () => {
+      // Пользователь ввёл kcal = 3000, макросы дают Atwater 2470 — раньше locked
+      // защищал только БЖУ, а kcal молча пересчитывался в 2470 (Atwater).
+      const r = applyBBNutritionToTargets({ ...base(), kcal: 3000, bbNote: null, todayDow: 1, locked: true });
+      expect(r.kcal).toBe(3000);
+    });
+
+    it('locked без переданного kcal — fallback на Atwater (обратная совместимость)', () => {
+      const r = applyBBNutritionToTargets({ ...base(), bbNote: null, todayDow: 1, locked: true });
+      expect(r.kcal).toBe(2470);
+    });
   });
 });

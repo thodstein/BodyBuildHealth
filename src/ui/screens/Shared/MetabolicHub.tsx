@@ -719,13 +719,12 @@ const kbju = useMemo(()=> calcKBJU(input), [input]);
   const applyKBJU = ()=>{
     try{
       const tgt = onAAS ? kbju.aas : kbju.nat;
-      const payload = { kcal: tgt.kcal, p: tgt.p, f: tgt.f, c: tgt.c, protPerKg: tgt.protPerKg, pal: tgt.pal, bmr: tgt.bmr, ts: Date.now(), source: 'metabolic-hub' };
-      localStorage.setItem('he_planner_kbju_suggestion', JSON.stringify(payload));
-      // РЕАЛЬНЫЙ мост (Wave-0 Э0.4): пишем в профиль `nutrition.manualTargets` — единственный
-      // канал, который Планировщик читает на живую (`IndividualPlanContext.tsx:884-908` + saveToProfile
-      // :3035). Раньше здесь стояло `void curNut` — ключ был write-only, а UI и тост обещали
-      // «планировщик подхватит». Теперь подхватывает. Ручной режим НЕ включаем принудительно:
-      // это решение пользователя; мы только кладём значения, которые он может принять.
+      // A1-fix (2026-10-18): удалены write-only ключи he_planner_kbju_suggestion /
+      // he_metabolic_last_kbju и мёртвое событие he-kbju-suggestion — никто их не
+      // читал (аудит §2 A1, HUBS-PRO-MASTER-PLAN.md:128,152). Реальный мост — запись
+      // в профиль (ниже): IndividualPlanContext читает manualTargets + kbjuMode.
+      // Мост в планировщик: пишем в профиль `nutrition.manualTargets` + `kbjuMode='manual'` —
+      // единственный канал, который Планировщик читает на живую (IndividualPlanContext).
       let profileWritten = false;
       try{
         const cur = getProfile();
@@ -739,8 +738,6 @@ const kbju = useMemo(()=> calcKBJU(input), [input]);
         updateProfile({ settings: next } as any);
         profileWritten = true;
       }catch(e){ console.warn('[metabolic] не записал manualTargets в профиль', e); }
-      localStorage.setItem('he_metabolic_last_kbju', JSON.stringify(payload));
-      window.dispatchEvent(new CustomEvent('he-kbju-suggestion', { detail: payload }));
       const txt = `КБЖУ ${tgt.kcal}ккал Б${tgt.p} Ж${tgt.f} У${tgt.c} → ${profileWritten
         ? 'записано в профиль (Планировщик подхватит в режиме «КБЖУ — Ручной»)'
         : 'скопировано. Вставь в Планировщике (КБЖУ → Ручной)'}.`;
@@ -1394,7 +1391,7 @@ const kbju = useMemo(()=> calcKBJU(input), [input]);
                  <button onClick={applyKBJU} className="mh-act" style={{ flex:1, padding:'12px 10px', minHeight:48, borderRadius:12, border:'none', cursor:'pointer', background:'linear-gradient(135deg,#f59e0b,#d97706)', color:'#000', fontWeight:800, fontSize:12 }}>🍽 Применить к плану питания</button>
                 <button onClick={()=> { const s = onAAS? kbju.aas:kbju.nat; const t=`КБЖУ ${s.kcal} Б${s.p} Ж${s.f} У${s.c} (P${s.protPerKg})`; void shareOrCopyText('КБЖУ из Метаболики', t).then(ok => showToast(ok ? 'Скопировано: '+t : t)); }} className="mh-act" style={{ padding:'12px', minHeight:48, minWidth:48, borderRadius:12, border:'1px solid rgba(255,255,255,0.10)', background:'rgba(255,255,255,0.04)', color:'#fff', fontWeight:700, fontSize:12, cursor:'pointer' }}>⎘ Копировать</button>
               </div>
-              <div style={{ marginTop:6, fontSize:9, color:'rgba(255,255,255,0.45)', lineHeight:1.35 }}>«Применить» пишет цели в <code style={{ background:'rgba(255,255,255,0.06)', padding:'1px 5px', borderRadius:5, color:'#fff' }}>Профиль → Питание → Ручные цели</code> — Планировщик читает их на живую, но включает режим «КБЖУ — Ручной» только вы (иначе это решение за вас). Дубликат-буфер <code style={{ background:'rgba(255,255,255,0.06)', padding:'1px 5px', borderRadius:5, color:'#fff' }}>he_planner_kbju_suggestion</code> — только для экспорта. Потолок У — 5г/кг (6 на ААС, ≤8 с инсулином) — из `planner-targets`.</div>
+              <div style={{ marginTop:6, fontSize:9, color:'rgba(255,255,255,0.45)', lineHeight:1.35 }}>«Применить» пишет цели в <code style={{ background:'rgba(255,255,255,0.06)', padding:'1px 5px', borderRadius:5, color:'#fff' }}>Профиль → Питание → Ручные цели</code> — Планировщик читает их на живую и включает режим «КБЖУ — Ручной» (иначе manualTargets игнорируются планировщиком). Кнопка «⎘ Копировать» дублирует значения в буфер обмена для ручного переноса. Потолок У — 5г/кг (6 на ААС, ≤8 с инсулином) — из `planner-targets`.</div>
             </div>
           )}
           {mode==='fat' && (

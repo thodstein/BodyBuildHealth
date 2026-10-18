@@ -165,6 +165,7 @@ export const IndividualPlanResults: React.FC = () => {
     setPlanTab,
     addPlanToDiary,
     dayModsByOffset,
+    kbjuMode,
   } = usePlanCtx();
 
   const [showCalcPopup, setShowCalcPopup] = useState(false);
@@ -635,6 +636,7 @@ const doImportPlan = (raw: string): boolean => {
               carbPeriodization={carbPeriodization}
               isTrainingDayForOffset={(offset) => isTrainingDayFor(buildTrainSchedule(linkToTraining, trainStart, trainEnd, trainingDays, trainScheduleType, trainPattern), offset)}
               dayModsByOffset={dayModsByOffset}
+              manualLocked={kbjuMode === 'manual'}
               heavyTrainDay={heavyTrainDay}
               dayLabels={DAY_LABELS}
               todayIso={localIsoDate(new Date())}
@@ -1203,7 +1205,7 @@ const doImportPlan = (raw: string): boolean => {
             const weekIdx = monthPlanMode ? (selectedWeek || 0) : 0;
             const isTrainArr = (Array.isArray(weekPlan?.days) ? weekPlan.days : []).map((d: any) => !!d?.isTrainingDay);
             const planK = monthPlanMode
-              ? expectedWeekKcal(effectiveKcal, carbPeriodization, weekIdx, isTrainArr, heavyTrainDay, DAY_LABELS, dayModsByOffset)
+              ? expectedWeekKcal(effectiveKcal, carbPeriodization, weekIdx, isTrainArr, heavyTrainDay, DAY_LABELS, dayModsByOffset, kbjuMode === 'manual')
               : Math.round((effectiveKcal || 0) * 7);
             const factK = Math.round(weekPlan.totals?.kcal || 0);
             const devK = planK > 0 ? Math.round((factK - planK) / planK * 100) : 0;

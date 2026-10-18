@@ -19,6 +19,9 @@ export interface BBNutritionTargetsInput {
   carbs: number;
   bbNote: BBNutritionNote | null;
   todayDow?: number; // Пн=1 .. Вс=7; по умолчанию сегодня
+  /** Калораж цели из buildDayTargets (в manual-режиме — введённое пользователем значение).
+   *  В locked-режиме возвращается как есть; без него — Atwater от макросов. */
+  kcal?: number;
   /** Ручной режим КБЖУ: пользователь задал точные цели — ББ-план НЕ сдвигает
    *  углеводы/жиры по трен-дням и НЕ подменяет калораж (только заметки). */
   locked?: boolean;
@@ -55,7 +58,15 @@ export function applyBBNutritionToTargets(input: BBNutritionTargetsInput): BBNut
   }
   const atwater = Math.round(input.protein * 4 + carbs * 4 + fats * 9);
   const bbKcal = (note && note.kcal != null && Number.isFinite(note.kcal) && (note.kcal as number) > 0) ? Math.round(note.kcal as number) : null;
-  const kcal = (!input.locked && bbKcal && Math.abs(bbKcal - atwater) / Math.max(1, atwater) <= 0.15) ? bbKcal : atwater;
+  // Фикс «ручной ввод КБЖУ попадает не в ту карточку» (2026-10-18): в locked (ручном)
+  // режиме калораж пользователя НЕ пересчитывается через Atwater от макросов —
+  // возвращается как введён. Раньше locked защищал только БЖУ, а kcal молча
+  // заменялся суммой макросов: карточки и движок получали значение, отличное
+  // от ручного ввода (докстринг при этом обещал «НЕ подменяет калораж»).
+  const manualKcal = (input.kcal != null && Number.isFinite(input.kcal) && input.kcal > 0) ? Math.round(input.kcal) : null;
+  const kcal = (!input.locked && bbKcal && Math.abs(bbKcal - atwater) / Math.max(1, atwater) <= 0.15)
+    ? bbKcal
+    : (input.locked && manualKcal) ? manualKcal : atwater;
   if (bbKcal) {
     breakdown.push(input.locked
       ? `🎯 Целевой калораж ББ-плана: ${bbKcal} ккал — справочно (ручной режим КБЖУ, цели не подменяются); объём ~${note?.weeklySets ?? '—'} сетов/нед.`

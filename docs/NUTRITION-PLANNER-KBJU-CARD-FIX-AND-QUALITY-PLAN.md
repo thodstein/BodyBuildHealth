@@ -1,0 +1,105 @@
+# План-отчёт: ручной ввод КБЖУ («не в ту карточку») + аудит багов планировщика
+
+Дата: 2026-10-18. Цель: качество. Связано: `NUTRITION-PLANNER-TUNING-PLAN.md` (§7.6), `HUBS-PRO-MASTER-PLAN.md`, `NUTRITION-MACRO-SINGLE-SOURCE-PLAN.md`.
+
+---
+
+## 1. Исправлено сразу: ручной КБЖУ терял ккал (та самая «не та карточка»)
+
+### Симптом
+Пользователь в ручном режиме вводит ккал (например, 3000) при макросах, дающих Atwater 2430. Карточки и генератор плана показывали/использовали **2430**, а не введённые 3000 — введённое значение «улетало не туда».
+
+### Корневая причина
+`applyBBNutritionToTargets` (planner-bb-nutrition.ts) в locked-режиме защищал только БЖУ, но **kcal молча пересчитывался через Atwater от макросов**, хотя докстринг обещал «НЕ подменяет калораж». Режим `manual` не доносил `dayTargets.kcal` в функцию вообще.
+
+### Фикс (внесён)
+1. `planner-bb-nutrition.ts`:
+   - В `BBNutritionTargetsInput` добавлено опциональное `kcal` (калораж цели из `buildDayTargets`).
+   - Locked-ветка: `kcal = manualKcal ?? atwater` — введённый пользователем калораж возвращается как есть; без передачи — fallback на Atwater (обратная совместимость).
+2. `IndividualPlanContext.tsx` (~строка 1102): в вызов добавлено `kcal: dayTargets.kcal`.
+3. Тесты `__tests__/planner-bb-nutrition.test.ts`: +2 кейса — locked+kcal возвращает введённое значение; locked без kcal → Atwater.
+
+Проверка: `vitest run planner-bb-nutrition.test.ts planner-manual-kbju.test.tsx` — **11/11 pass** (замок «planner-manual-kbju 2/2» из tuning-плана не сломан). `npm run type-check` — в процессе (см. §6).
+
+Теперь корректно: карточка «Быстрый КБЖУ» (minimal), карточка «КБЖУ» (pro), карточка «Целевое КБЖУ», `applyKcalAdjust` и `goalKcal` движка — везде одно и то же введённое значение.
+
+---
+
+## 2. Аудит: подтверждённые баги (приоритизированы)
+
+### P1 — функциональные дефекты
+| # | Что | Где | Суть |
+|---|-----|-----|------|
+| A1 | `he_planner_kbju_suggestion` пишется, но никогда не читается | `MetabolicHub.tsx:723` (писатель), `:743` (мёртвое событие `he-kbju-suggestion`), `:1397` (ложный текст «планировщик подхватит») | Мост Метаболический хаб → планировщик не работает. Известно по `HUBS-PRO-MASTER-PLAN.md:128,152` |
+| A2 | Просроченные `manualTargets` в профиле силой возвращают режим `manual` после каждой перезагрузки | `IndividualPlanContext.tsx:905-911` (инициализатор), `:1137` (switchKbjuMode), `:3172-3174` (saveToProfile) | Инициализатор проверяет `_hasManualTargets(mt)` **раньше** явного `'auto'`; `saveToProfile` никогда не удаляет сохранённый `manualTargets`. Пользователь не может навсегда переключиться в auto |
+| A3 | Инсулин-эффект засеивает только `manualKcal`, не переключая режим | `IndividualPlanContext.tsx:3254-3256` (сеяние), `:1663` (персист), `:915-919` (init) | В auto значение игнорируется планом, но персистится в `he_manual_kcal` → при следующей загрузке инициализатор видит его и молча включает режим manual, который пользователь не выбирал |
+
+### P2 — согласованность политики / UX
+| # | Что | Где | Суть |
+|---|-----|-----|------|
+| B1 | В manual-режиме ккал всё ещё умножается на модификаторы особых дней (рефид ×1.12, читмил ×1.12, голодание ×0.75, diet break, тяжёлый день ×1.05, фаза цикла) | `IndividualPlanContext.tsx:3487-3578, 3635` | Непоследовательно: циклирование углеводов ББ-плана в manual отключено (locked), `manualTargetsLocked` в движке защищает только MPS-потолок (`meal-plan-engine.ts:9012`), а модификаторы калоража применяются. Либо задокументировать как «особые дни перекрывают ручные цели», либо гейтить по `kbjuMode !== 'manual'` |
+| B2 | `applyKcalAdjust` в режиме profile — тихий no-op с ложным тостом успеха | `IndividualPlanContext.tsx:1142-1159` + `profileTargets` `:989-995` (зашит `surplusPct: 10`) | В profile-режиме изменение процента не влияет на цели, но UI рапортует «перегенерируйте план» |
+| B3 | `saveToProfile` отбрасывает частично заданные ручные цели (все 4 должны быть non-null) | `IndividualPlanContext.tsx:3172-3174` | Частичный ввод легален (`buildDayTargets` выводит недостающее), но в профиль не попадает — выживает только через legacy `he_manual_*` |
+| B4 | Write-only диагностические ключи `he_planner_last_error` / `he_planner_last_render_error` | `IndividualPlanContext.tsx:4045`, `index.tsx:80` | Пишутся, никем не читаются; error boundary только упоминает имя ключа. Либо читать и показывать, либо осознанно оставить как артефакты поддержки |
+| B5 | Заметка meal-override показывает масштаб до отката (pre-rollback scale) | `planner-meal-targets.ts:108-111` | После ±5% rollback отчётный «масштаб ×N к цели» может отличаться от реально применённого — мелкая нечестность текста |
+
+### P3 — чистота кода
+- `planner-day-targets.ts:212-213`: мёртвые ветки `kbjuMode === 'manual'` (manual выходит раньше, строка 144).
+- `IndividualPlanContext.tsx:905`: дубли в списке `_hasManualTargets`: `[mt.kcal, mt.protein, mt.fat, mt.carbs, mt.protein, mt.fat, mt.carbs]`.
+- `IndividualPlanSettings.tsx:1170`: всегда-истинная обёртка `{true && (` вокруг карточки КБЖУ.
+- `planner-meal-targets.ts:110`: вычисленная, но не используемая переменная `t`.
+- `he_food_allergens` / `he_health_issues` в Settings — двойная запись ради legacy-миграции (`unified-profile.ts:276,278`); долг, не баг.
+
+---
+
+## 3. Проверено и признано корректным
+- Мост manual-kcal → движок (после фикса §1): `buildDayTargets` manual → `dayTargets.kcal` → locked-ветка `applyBBNutritionToTargets` → `baseGoalKcal` → `goalKcal`. Цепочка цела.
+- `switchKbjuMode` засеивает все 4 значения при входе в manual и чистит при выходе.
+- Источники отображения во всех карточках согласованы (после фикса §1): minimal-герой, pro-карточка КБЖУ, «Целевое КБЖУ», ручные инпуты (`manualX ?? effectiveX`).
+- Потолок углеводов отключён в manual (`carbCapGPerKg: 0`, `carbCapClipped: false`).
+- Персист-эффекты `he_manual_*`, `he_kbju_mode`, `he_manual_g_per_kg` и мост `plan-targets` работают.
+- События `planner-apply` ↔ слушатель, `he-hematology-advice` ↔ слушатель — живые.
+- Перепись ~45 localStorage-ключей папки IndividualPlan: у всех есть читатели (кроме указанных в §2 B4 и метаболических ключей A1/B-списка хаба).
+- Guards в `planner-day-targets.ts` / `planner-meal-targets.ts`: клампы веса/пресетов/жира, `Math.max(1200, kcal)`, защита от деления на ноль, пол белка 0.8× — NaN/отрицательных путей нет.
+- `applyKcalAdjust` в bulk-auto честно отказывается при `nextPct === surplusPct` (варнинг-тост вместо ложного успеха).
+
+---
+
+## 4. План работ (качество)
+
+### Волна 1 — P1 — ✅ ВЫПОЛНЕНА (2026-10-18)
+1. **A1** ✅: удалены write-only ключи `he_planner_kbju_suggestion` / `he_metabolic_last_kbju` и мёртвое событие `he-kbju-suggestion` из `MetabolicHub.tsx:719-752`; исправлен ложный текст `:1397` (теперь честно: «Применить» пишет в профиль, планировщик включает режим «Ручной»; кнопка «⎘ Копировать» — для ручного переноса). Реальный мост (профиль → планировщик) уже работал и сохранён.
+2. **A2** ✅: инициализатор `kbjuMode` теперь проверяет явный `'auto'` ДО просроченных manualTargets (обе ветки — профиль и localStorage); `saveToProfile` удаляет `next.nutrition.manualTargets` при `kbjuMode !== 'manual'`.
+3. **A3** ✅: инсулин-подсказка (+10% ккал) применяется только при `kbjuModeRef.current === 'manual'`; добавлен `kbjuModeRef` (эффект зависит от `[injectionsSignature, goal]`, режим читается через ref).
+
+### Волна 2 — P2, согласованность политики — ✅ ВЫПОЛНЕНА (2026-10-18, B1)
+4. **B1** ✅: применён вариант (б) — гейт модификаторов по `kbjuMode === 'manual'`. Цели зафиксированы пользователем, поэтому НЕ сдвигают ккал/БЖУ: периодизация дня, тяжёлый день (×1.05/×1.25), фаза цикла, дефицит BB-категории, спец-дни (рефид/читмил/голодание/diet break). Спец-дни дают честные заметки («НЕ применён к целям: ручной режим КБЖУ») и сохраняют структурные изменения (фастинг — меньше приёмов, замена приёма). **Дневниковая компенсация (diaryComp) сохранена** — компенсирует факт съеденного, а не цель. Пик-неделя (bbPrepPlan) — исключение: явный план пользователя, перекрывает manual.
+   Точки гейта (зеркалят друг друга — «показано = сгенерируется»):
+   - `IndividualPlanContext.tsx` → `buildOneDay` (`_manualLocked`, ~:3513-3620) и preview-callback `dayModsByOffset` (~:4364-4400, `kbjuMode` добавлен в deps);
+   - `planner-nutrition-periodization.engine.ts` → новое поле `manualLocked?` в `PeriodizationInput`, гейт в `buildDay` (периодизация/тяжёлый/спец-дни; dayMods от card'а уже нейтральны, но сгейтены повторно);
+   - `planner-carb-periodization.ts` → `expectedWeekKcal(..., manualLocked?)`: мод=1, дельта diaryComp сохраняется;
+   - `NutritionPeriodizationCard.tsx` → проп `manualLocked?`, включён в memo-ключ `sig`, проброшен в движок;
+   - `IndividualPlanResults.tsx` → `kbjuMode` из контекста, `manualLocked={kbjuMode === 'manual'}` в карточку и в `expectedWeekKcal`.
+5. **B2**: в profile-режиме `applyKcalAdjust` показывать честный тост «в profile-режиме измените цели в профиле» вместо ложного успеха.
+6. **B3**: `saveToProfile` сохранять частичные manualTargets (объект с nullable-полями), `_hasManualTargets` уже умеет «хотя бы одно поле».
+7. **B4**: EITHER читатель в error boundary (показ последней ошибки из хранилища), EITHER пометить код-комментарием «intentional support artifact».
+8. **B5**: в заметке meal-override использовать реально применённый масштаб `1 + (s-1)*c`.
+
+### Волна 3 — P3, чистка
+9. Убрать мёртвые ветки `planner-day-targets.ts:212-213`, дубли `_hasManualTargets`, `{true && (`, неиспользуемую `t`.
+10. Прогнать `npm run verify:apk-design` (карточки — APK-facing UI).
+
+### Верификация на каждом шаге
+`npm run type-check` (запущен, см. §6) + `vitest run` по затронутым тест-файлам + для UI-правок `npm run verify:apk-design`. Коммитов не делаем (по правилам AGENTS.md).
+
+---
+
+## 5. Риски
+- **A2-фикс меняет поведение существующих пользователей**: у тех, кто ранее сохранял manualTargets и ожидал auto-возврат к manual после перезагрузки, режим теперь останется auto. Это и есть заявленное исправление, но стоит отметить в changelog.
+- **B1**: гейт модификаторов в manual может «удивить» пользователей, полагающихся на рефид-дни. Требует явного решения продукта.
+- Фикс §1 меняет `goalKcal` движка в manual-режиме: если пользователь вводит ккал, сильно расходящийся с суммой макросов, дни будут сходиться по макросам, а ккал-ось честно уйдёт в «лучший достижимый вариант» (предупреждение о согласованности целей уже существует — проверено, поведение задокументировано).
+
+## 6. Статус верификации
+- Тесты: **весь каталог `__tests__/` — 151 файл, 1456 тестов — pass** (вкл. 2 новых регресса в `planner-bb-nutrition.test.ts`; замок `planner-manual-kbju` 2/2 цел) — после фикса §1, Волны 1 и Волны 2 (B1).
+- `npm run type-check`: **0 ошибок в файлах планировщика** (IndividualPlan/*). Полный прогон показывает 13 ошибок в чужом параллельном WIP (`LiftMasterCard.tsx` и др., TrainingScreen_parts) — не относится к этой работе, файлы меняются другой сессией в момент проверки.
+- `npm run verify:apk-design`: **pass** (после правок `MetabolicHub.tsx`, карточки периодизации и Results).
