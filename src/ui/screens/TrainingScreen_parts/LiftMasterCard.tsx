@@ -185,14 +185,14 @@ const TREND_KEY = 'he_lift_master_trend_v1';
 /** История недельных срезов диагностики (B9): фаза/bar-path/слабые на дату. */
 const HISTORY_KEY = 'he_lift_master_history_v1';
 
-interface MasterHistoryEntry { ts: number; lift: Lift; phase: WeakPoint | ''; issues: BarPathIssue[]; weakCount: number; }
+interface MasterHistoryEntry { ts: number; lift: Lift; phase: WeakPoint | ''; issues: BarPathIssue[]; weakCount: number; e1rmBest?: number | null }
 
 function loadMasterHistory(): MasterHistoryEntry[] {
   try {
     const raw = JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]');
     if (!Array.isArray(raw)) return [];
     return raw
-      .filter((h: any) => h && typeof h.ts === 'number' && typeof h.lift === 'string')
+      .filter((h: any) => h && typeof h.ts === 'number' && typeof h.lift === 'string' && (h.e1rmBest == null || typeof h.e1rmBest === 'number'))
       .slice(-60) as MasterHistoryEntry[];
   } catch { return []; }
 }
@@ -238,6 +238,8 @@ interface MasterState {
   meetDate: string;
   meetStrategy: MeetStrategy;
   meetMaxS: string; meetMaxB: string; meetMaxD: string;
+  /** LVP-калибровка per-lift (начало/наклон, м/с): персистентная готовность между сессиями. */
+  lvp: Record<string, { slope: number; intercept: number; r2: number }>;
 }
 
 function isRecord(v: unknown): v is Record<string, unknown> { return !!v && typeof v === 'object' && !Array.isArray(v); }
@@ -293,8 +295,9 @@ function loadMaster(): MasterState {
       meetMaxS: typeof raw.meetMaxS === 'string' ? raw.meetMaxS.slice(0, 20) : '',
       meetMaxB: typeof raw.meetMaxB === 'string' ? raw.meetMaxB.slice(0, 20) : '',
       meetMaxD: typeof raw.meetMaxD === 'string' ? raw.meetMaxD.slice(0, 20) : '',
+      lvp: cleanLvp(raw.lvp),
     };
-  } catch { return { lift:'bench', phase:'' as WeakPoint|'', issues:[], selectedGeom:{}, daysGeom:{}, selectedDiag:{}, daysDiag:{}, weakMuscleGroups:[], weakMuscleSubs:[], asymSide:null, asymL:'', asymR:'', vbtBest:'', vbtLast:'', vbtWeight:'', vbtGoal:'strength', vbtUpdatedAt:null, redFlags:[], ruleChecks:{}, meetDate:'', meetStrategy:'balanced' as MeetStrategy, meetMaxS:'', meetMaxB:'', meetMaxD:'' }; }
+  } catch { return { lift:'bench', phase:'' as WeakPoint|'', issues:[], selectedGeom:{}, daysGeom:{}, selectedDiag:{}, daysDiag:{}, weakMuscleGroups:[], weakMuscleSubs:[], asymSide:null, asymL:'', asymR:'', vbtBest:'', vbtLast:'', vbtWeight:'', vbtGoal:'strength', vbtUpdatedAt:null, redFlags:[], ruleChecks:{}, meetDate:'', meetStrategy:'balanced' as MeetStrategy, meetMaxS:'', meetMaxB:'', meetMaxD:'', lvp:{} }; }
 }
 function saveMaster(s: MasterState) { try{ localStorage.setItem(MASTER_KEY, JSON.stringify(s)); }catch{} }
 function cleanRuleChecks(raw: unknown): Record<string, boolean> {
@@ -302,6 +305,21 @@ function cleanRuleChecks(raw: unknown): Record<string, boolean> {
   const out: Record<string, boolean> = {};
   for (const [k, v] of Object.entries(raw)) {
     if (typeof v === 'boolean') out[k.slice(0, 80)] = v;
+  }
+  return out;
+}
+
+/** LVP-калибровки per-lift: только конечные числа, ключ = имя лифта. */
+function cleanLvp(raw: unknown): Record<string, { slope: number; intercept: number; r2: number }> {
+  if (!isRecord(raw)) return {};
+  const out: Record<string, { slope: number; intercept: number; r2: number }> = {};
+  for (const [k, v] of Object.entries(raw)) {
+    const o = v as { slope?: unknown; intercept?: unknown; r2?: unknown } | null;
+    if (o && typeof o.slope === 'number' && Number.isFinite(o.slope)
+      && typeof o.intercept === 'number' && Number.isFinite(o.intercept)
+      && typeof o.r2 === 'number' && Number.isFinite(o.r2)) {
+      out[k.slice(0, 40)] = { slope: o.slope, intercept: o.intercept, r2: o.r2 };
+    }
   }
   return out;
 }
@@ -379,10 +397,11 @@ export const LiftMasterCard: React.FC<{
   const [meetMaxS, setMeetMaxS] = useState(initial.meetMaxS);
   const [meetMaxB, setMeetMaxB] = useState(initial.meetMaxB);
   const [meetMaxD, setMeetMaxD] = useState(initial.meetMaxD);
+  const [lvpSaved, setLvpSaved] = useState<Record<string, { slope: number; intercept: number; r2: number }>>(initial.lvp);
   const [masterHistory, setMasterHistory] = useState<MasterHistoryEntry[]>(loadMasterHistory);
   const [bwSex, setBwSex] = useState<Sex>('male');
   const [videoBarLoop, setVideoBarLoop] = useState<{ xLoop: number; flag: string } | null>(null);
-  const [videoSticking, setVideoSticking] = useState<{ phase: string; deg: number } | null>(null);
+  const [videoSticking, setVideoSticking] = useState<{ phase: string; joint: 'knee' | 'elbow'; deg: number } | null>(null);
   const redRes = useMemo(()=> checkRedFlags(redFlags), [redFlags]);
   const ruleDefs = useMemo(()=> RULE_CHECKS[lift] ?? [], [lift]);
   const ruleRes = useMemo(()=>{
@@ -424,7 +443,7 @@ export const LiftMasterCard: React.FC<{
     }catch{}
   }, []);
 
-  useEffect(()=>{ saveMaster({ lift, phase, issues, selectedGeom, daysGeom, selectedDiag, daysDiag, weakMuscleGroups, weakMuscleSubs, asymSide, asymL, asymR, vbtBest, vbtLast, vbtWeight, vbtGoal, vbtUpdatedAt, redFlags, ruleChecks, meetDate, meetStrategy, meetMaxS, meetMaxB, meetMaxD }); setMasterHistory(pushMasterHistory({ ts: Date.now(), lift, phase, issues: [...issues], weakCount: weakMuscleSubs.length })); }, [lift, phase, issues, selectedGeom, daysGeom, selectedDiag, daysDiag, weakMuscleGroups, weakMuscleSubs, asymSide, asymL, asymR, vbtBest, vbtLast, vbtWeight, vbtGoal, vbtUpdatedAt, redFlags, ruleChecks, meetDate, meetStrategy, meetMaxS, meetMaxB, meetMaxD]);
+  useEffect(()=>{ saveMaster({ lift, phase, issues, selectedGeom, daysGeom, selectedDiag, daysDiag, weakMuscleGroups, weakMuscleSubs, asymSide, asymL, asymR, vbtBest, vbtLast, vbtWeight, vbtGoal, vbtUpdatedAt, redFlags, ruleChecks, meetDate, meetStrategy, meetMaxS, meetMaxB, meetMaxD, lvp: lvpSaved }); }, [lift, phase, issues, selectedGeom, daysGeom, selectedDiag, daysDiag, weakMuscleGroups, weakMuscleSubs, asymSide, asymL, asymR, vbtBest, vbtLast, vbtWeight, vbtGoal, vbtUpdatedAt, redFlags, ruleChecks, meetDate, meetStrategy, meetMaxS, meetMaxB, meetMaxD, lvpSaved]);
 
   const diag = useMemo(()=> unifiedLiftDiagnosis({ lift, phase, barPathIssues: issues, vbtBest, vbtLast, vbtWeight, vbtThreshold, sessions, template }), [lift, phase, issues, vbtBest, vbtLast, vbtWeight, vbtThreshold, sessions, template]);
   const effectivePhase = diag.phases.effectivePhase;
@@ -485,9 +504,15 @@ export const LiftMasterCard: React.FC<{
     return { best, lastHard, consensus: best ? estimate1RMConsensus(best.weight, best.reps) : null };
   }, [sessions, lift]);
 
-  // Паузная работа (C1): сеты с флагом pause по лифту за 28 дней (жим лёжа).
+  // Недельный срез истории (B9): один на лифт в ISO-неделю, с e1RM консенсуса.
+  useEffect(()=>{
+    setMasterHistory(pushMasterHistory({ ts: Date.now(), lift, phase, issues: [...issues], weakCount: weakMuscleSubs.length, e1rmBest: lift1rm.consensus?.value ?? null }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lift, phase, issues, weakMuscleSubs.length, lift1rm.consensus?.value]);
+
+  // Паузная работа (C1): сеты с флагом pause по лифту за 28 дней (жим/присед/тяга).
   const pauseSets = useMemo(()=>{
-    if (lift!=='bench') return 0;
+    if (!(lift==='bench'||lift==='squat'||lift==='deadlift'||lift==='sumo')) return 0;
     const cutoff = new Date(Date.now()-28*86400000).toISOString().slice(0,10);
     let cnt=0;
     for (const w of sessions) {
@@ -895,11 +920,13 @@ export const LiftMasterCard: React.FC<{
             )}
           </div>
         )}
-        {lift==='bench' && (
+        {(lift==='bench'||lift==='squat'||lift==='deadlift'||lift==='sumo') && (
           <div style={{ marginTop:6, padding:7, borderRadius:8, background:'rgba(0,230,138,0.05)', border:'1px solid rgba(0,230,138,0.18)', fontSize:10, lineHeight:1.5, color: pauseSets>0?'#00e68a':'#fbbf24' }}>
             {pauseSets>0
-              ? `⏸ Паузная работа: ${pauseSets} паузных сетов за 28 дней — старт «на паузе» отрабатывается.`
-              : '⏸ Паузных сетов нет за 28 дней — IPF-отбив под запретом: добавьте 1-2 жима с паузой в неделю (⏸ в дневнике или «Жим с паузой»).'}
+              ? `⏸ Паузная работа: ${pauseSets} паузных сетов за 28 дней${lift==='bench'?' — старт «на паузе» без отбива отрабатывается.':' — пауза в слабой фазе отрабатывается.'}`
+              : lift==='bench'
+                ? '⏸ Паузных сетов нет за 28 дней — IPF-отбив под запретом: добавьте 1-2 жима с паузой в неделю (⏸ в дневнике или «Жим с паузой»).'
+                : '⏸ Паузных сетов нет за 28 дней — паузные варианты (⏸ в дневнике) точечно грузят слабую фазу.'}
           </div>
         )}
         {masterHistory.filter(h=>h.lift===lift).length>0 && (()=>{
@@ -910,7 +937,7 @@ export const LiftMasterCard: React.FC<{
               <span style={{ color:'#60a5fa', fontWeight:700 }}>📜 История ({masterHistory.filter(h=>h.lift===lift).length} срезов):</span>
               {mine.map((h,i)=> (
                 <div key={h.ts} style={{ color:DIM, marginTop:1 }}>
-                  {new Date(h.ts).toLocaleDateString('ru-RU')} — фаза {h.phase?(PHASE_RU[h.phase]||h.phase):'—'} · bar-path {h.issues.length} · слабых {h.weakCount}{i===0&&prev?` (было: фаза ${prev.phase?(PHASE_RU[prev.phase]||prev.phase):'—'}, bar-path ${prev.issues.length})`:''}
+                  {new Date(h.ts).toLocaleDateString('ru-RU')} — фаза {h.phase?(PHASE_RU[h.phase]||h.phase):'—'} · bar-path {h.issues.length} · слабых {h.weakCount}{h.e1rmBest!=null?` · e1RM ${h.e1rmBest} кг`:''}{i===0&&prev?` (было: фаза ${prev.phase?(PHASE_RU[prev.phase]||prev.phase):'—'}, bar-path ${prev.issues.length}${prev.e1rmBest!=null?`, e1RM ${prev.e1rmBest}`:''})`:''}
                 </div>
               ))}
             </div>
@@ -1134,8 +1161,8 @@ export const LiftMasterCard: React.FC<{
             <label style={{ fontSize:10, color:'#ffffff' }}>%1RM: <input type="number" min="30" max="100" step="5" value={lvpPctInput} onChange={e=>setLvpPctInput(e.target.value)} placeholder="80" style={{ width:60, marginLeft:4, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.15)', color:'#fff', borderRadius:6, padding:'4px 6px', fontSize:11 }} /></label>
             <label style={{ fontSize:10, color:'#ffffff' }}>��������: <input type="number" min="0.1" step="0.01" value={lvpVelInput} onChange={e=>setLvpVelInput(e.target.value)} placeholder="0.60" style={{ width:70, marginLeft:4, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.15)', color:'#fff', borderRadius:6, padding:'4px 6px', fontSize:11 }} /></label>
             <button data-lift="lvp-add" onClick={()=>{ const p=parseFloat(lvpPctInput)/100, v=parseFloat(lvpVelInput); if (Number.isFinite(p)&&p>0&&Number.isFinite(v)&&v>0) { setLvpPoints(cur=>[...cur,{pct:p,velocity:v}]); setLvpPctInput(''); setLvpVelInput(''); } }} style={{ ...btn, background:'rgba(244,114,182,0.15)', color:'#f472b6', border:'1px solid rgba(244,114,182,0.3)' }}>+ �����</button>
-            <button data-lift="lvp-calibrate" onClick={()=>{ const r = calibrateLVP(lvpPoints); setLvpResult(r); }} style={{ ...btn, background:'rgba(255,255,255,0.06)', color:'#fff', border:'1px solid rgba(255,255,255,0.12)' }}>�����������</button>
-            <button data-lift="lvp-clear" onClick={()=>{ setLvpPoints([]); setLvpResult(null); }} style={{ ...btn, background:'transparent', color:'#ffffff', border:'1px solid rgba(255,255,255,0.12)' }}>X</button>
+            <button data-lift="lvp-calibrate" onClick={()=>{ const r = calibrateLVP(lvpPoints); setLvpResult(r); if (r) setLvpSaved(prev => ({ ...prev, [lift]: { slope: r.slope, intercept: r.intercept, r2: r.r2 } })); }} style={{ ...btn, background:'rgba(255,255,255,0.06)', color:'#fff', border:'1px solid rgba(255,255,255,0.12)' }}>�����������</button>
+            <button data-lift="lvp-clear" onClick={()=>{ setLvpPoints([]); setLvpResult(null); setLvpSaved(prev => { const n = { ...prev }; delete n[lift]; return n; }); }} style={{ ...btn, background:'transparent', color:'#ffffff', border:'1px solid rgba(255,255,255,0.12)' }}>X</button>
           </div>
           {lvpPoints.length>0 && <div style={{ fontSize:9, color:'#ffffff', lineHeight:1.4, marginBottom:4 }}>�����: {lvpPoints.length} � {lvpPoints.map(p=>`${Math.round(p.pct*100)}%/${p.velocity}`).join(', ')}</div>}
           {lvpResult && <div role="status" style={{ fontSize:10, color:'#f472b6', lineHeight:1.4 }}>r2={lvpResult.r2.toFixed(3)} � slope={lvpResult.slope.toFixed(3)} � intercept={lvpResult.intercept.toFixed(3)} {lvpResult.r2<0.9?' ������ �������� (����� >=3 �����)':''}</div>}
@@ -1182,13 +1209,15 @@ export const LiftMasterCard: React.FC<{
                 const w = Number.isFinite(weight)&&weight>0 ? weight : 0;
                 if (e1<=0 || w<=0) return null;
                 const pct = Math.min(1, w/e1);
-                const expected = expectedVelocityFromCalib(lvpResult, pct) ?? velocityForPct(vbtLift, pct);
+                // Приоритет: калибровка этой сессии → сохранённая per-lift → канонический профиль.
+                const cal = lvpResult ?? lvpSaved[lift] ?? null;
+                const expected = expectedVelocityFromCalib(cal, pct) ?? velocityForPct(vbtLift, pct);
                 if (expected==null || expected<=0) return null;
                 const rc = dailyReadinessCheck(expected, lastAdj);
                 const actRu: Record<string,string> = { 'as-planned':'работаем по плану', 'reduce-volume-20':'снизить объём ~20%', 'deload':'делод' };
                 return (
                   <div style={{ marginTop:6, padding:7, borderRadius:7, background:'rgba(56,189,248,0.06)', border:'1px solid rgba(56,189,248,0.2)', fontSize:10, lineHeight:1.45 }}>
-                    <span style={{ color:'#38bdf8', fontWeight:700 }}>🎯 Готовность (первый подход):</span> <span style={{ color:DIM }}>ожидание {expected.toFixed(2)} м/с @ {Math.round(pct*100)}% ({w} кг) · факт {lastAdj.toFixed(2)} · падение {rc.dropPct}% → {actRu[rc.action]}</span>
+                    <span style={{ color:'#38bdf8', fontWeight:700 }}>🎯 Готовность (первый подход):</span> <span style={{ color:DIM }}>ожидание {expected.toFixed(2)} м/с @ {Math.round(pct*100)}% ({w} кг; {lvpResult?'калибровка сессии':cal?'сохранённая калибровка':'канон'}) · факт {lastAdj.toFixed(2)} · падение {rc.dropPct}% → {actRu[rc.action]}</span>
                   </div>
                 );
               })()}
@@ -1229,7 +1258,8 @@ export const LiftMasterCard: React.FC<{
               touchVbt();
             }
             setVideoBarLoop(r.barXLoopCm != null && Number.isFinite(r.barXLoopCm) ? { xLoop: r.barXLoopCm, flag: barLoopFlag(r.barXLoopCm) } : null);
-            setVideoSticking(r.stickingPhase && r.stickingKneeDeg != null ? { phase: r.stickingPhase, deg: r.stickingKneeDeg } : null);
+            const stickDeg = r.stickingKneeDeg ?? r.stickingElbowDeg;
+            setVideoSticking(r.stickingPhase && stickDeg != null ? { phase: r.stickingPhase, joint: r.stickingKneeDeg != null ? 'knee' : 'elbow', deg: stickDeg } : null);
             setVideoNote(`Локти ${r.elbowAvgDeg ?? '—'}° · хват ${r.gripRatio ?? '—'} · скорость ${r.barVelocity ?? '—'} м/с${r.barXLoopCm != null ? ` · петля ${r.barXLoopCm} см (${barLoopFlag(r.barXLoopCm)==='crit'?'крит':barLoopFlag(r.barXLoopCm)==='warn'?'внимание':'норма'})` : ''} · ${r.note} (оценка, не LPT)`);
           }} />
           {videoBarLoop && (
@@ -1240,7 +1270,7 @@ export const LiftMasterCard: React.FC<{
           {videoSticking && (
             <div style={{ marginTop:6, padding:7, borderRadius:8, background:'rgba(168,85,247,0.05)', border:'1px solid rgba(168,85,247,0.18)', fontSize:10, lineHeight:1.45, display:'flex', gap:6, flexWrap:'wrap', alignItems:'center' }}>
               <span style={{ color:'#c084fc', fontWeight:700 }}>🕸 Фаза срыва (видео):</span>
-              <span style={{ color:DIM }}>угол колена {videoSticking.deg}° в точке минимальной скорости{videoSticking.phase?` → похоже на «${PHASE_RU[videoSticking.phase]||videoSticking.phase}»`:''} (оценка)</span>
+              <span style={{ color:DIM }}>угол {videoSticking.joint==='knee'?'колена':'локтя'} {videoSticking.deg}° в точке минимальной скорости{videoSticking.phase?` → похоже на «${PHASE_RU[videoSticking.phase]||videoSticking.phase}»`:''} (оценка)</span>
               {videoSticking.phase && (WEAK_POINTS_BY_LIFT[lift]??[]).includes(videoSticking.phase as WeakPoint) && (
                 <button onClick={()=>setPhase(videoSticking.phase as WeakPoint)} style={{ ...btn, background:'rgba(168,85,247,0.15)', color:'#c084fc', border:'1px solid rgba(168,85,247,0.3)' }}>Применить фазу</button>
               )}
@@ -1456,10 +1486,20 @@ export const LiftMasterCard: React.FC<{
             <span style={{ fontSize:10, color:DIM }}>Стратегия:</span>
             {(['conservative','balanced','aggressive'] as MeetStrategy[]).map(s=>{ const on=meetStrategy===s; const label = s==='conservative'?`Консервативная ${MEET_STRATEGY_PCT_LABEL[s]}`:s==='balanced'?`Сбалансированная ${MEET_STRATEGY_PCT_LABEL[s]}`:`Агрессивная ${MEET_STRATEGY_PCT_LABEL[s]}`; return <button key={s} onClick={()=>setMeetStrategy(s)} aria-pressed={on} style={{ minHeight:44, padding:'8px 10px', borderRadius:8, cursor:'pointer', fontSize:10, border: on?'1px solid #f59e0b':'1px solid rgba(255,255,255,0.1)', background: on?'rgba(245,158,11,0.15)':'transparent', color: on?'#f59e0b':DIM, fontWeight:700 }}>{label}{on?' ✓':''}</button>; })}
           </div>
-          <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginTop:6 }}>
+          <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginTop:6, alignItems:'center' }}>
             {([['meetMaxS', 'Присед'], ['meetMaxB', 'Жим'], ['meetMaxD', 'Тяга']] as const).map(([key,label])=>(
               <label key={key} style={{ fontSize:10, color:'#ffffff' }}>{label} ПМ: <input type="number" step="2.5" min="0" value={meetMaxState[key]} placeholder={`${label} ПМ`} onChange={e=>setMeetMax(key, e.target.value)} style={{ width:76, marginLeft:4, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.15)', color:'#fff', borderRadius:6, padding:'4px 6px', fontSize:11 }} /></label>
             ))}
+          </div>
+          <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginTop:6 }}>
+            {(profile?.pmSquat ?? 0) > 0 && (profile?.pmBench ?? 0) > 0 && (profile?.pmDead ?? 0) > 0 && (
+              <button onClick={()=>{ setMeetMaxS(String(profile!.pmSquat)); setMeetMaxB(String(profile!.pmBench)); setMeetMaxD(String(profile!.pmDead)); }} style={{ ...btn, background:'rgba(34,211,238,0.1)', color:'#22d3ee', border:'1px solid rgba(34,211,238,0.25)' }}>⇩ Из профиля (pmS/pmB/pmD)</button>
+            )}
+            {lift1rm.consensus && (lift==='squat'||lift==='bench'||lift==='deadlift'||lift==='sumo') && (
+              <button onClick={()=>{ const v = String(lift1rm.consensus!.value); if (lift==='squat') setMeetMaxS(v); else if (lift==='bench') setMeetMaxB(v); else setMeetMaxD(v); }} style={{ ...btn, background:'rgba(251,191,36,0.1)', color:'#fbbf24', border:'1px solid rgba(251,191,36,0.25)' }}>
+                ⇩ Консенсус {lift1rm.consensus.value} кг → {lift==='squat'?'присед':lift==='bench'?'жим':'тяга'}
+              </button>
+            )}
           </div>
           {meetDate && daysToMeet!=null && daysToMeet>0 && (
             <div style={{ marginTop:6, fontSize:10, color:DIM, lineHeight:1.5 }}>

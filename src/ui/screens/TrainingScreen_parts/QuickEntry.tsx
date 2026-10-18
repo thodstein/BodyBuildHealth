@@ -518,7 +518,7 @@ export const QuickEntry: React.FC<QuickEntryProps> = ({
                       exerciseId={ex.exerciseId}
                       exerciseName={ex.exerciseName}
                       date={new Date().toISOString().split('T')[0]}
-                      showPause={/жим.*(леж|груд)|bench/i.test(ex.exerciseName)}
+                      showPause={/жим.*(леж|груд)|bench|присед|squat|станов|deadlift/i.test(ex.exerciseName)}
                       onComplete={(w, r, rpe, rir, pause) => {
                         setCurrentSetIdx(setIdx);
                         completeSet(w, r, rpe, rir, pause);

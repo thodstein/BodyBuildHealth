@@ -6,7 +6,7 @@
  *  - estimate1RMConsensus (A2: консенсус 1RM для секции «Тренировочный максимум»).
  */
 import { describe, expect, it } from 'vitest';
-import { phaseForJointAngle } from '../lift-diagnostics.engine';
+import { phaseForJointAngle, phaseForBenchElbowDeg } from '../lift-diagnostics.engine';
 import { logSet, startSession, addExerciseToSession, workoutLogToSession } from '../../workout-logger.engine';
 import { dailyReadinessCheck, rpeVbtDiscrepancy, velocityForPct } from '../vbt.engine';
 import { estimate1RMConsensus } from '../estimate1rm.engine';
@@ -26,6 +26,18 @@ describe('B8: phaseForJointAngle — угол колена → фаза срыв
   it('вне диапазонов или для лифта без точек — null', () => {
     expect(phaseForJointAngle('squat', 200)).toBeNull();
     expect(phaseForJointAngle('incline', 45)).toBeNull();
+  });
+});
+
+describe('B8: phaseForBenchElbowDeg — срыв жима по углу локтя (2D-прокси)', () => {
+  it('грудь → off_chest, проход → mid, дожим → lockout', () => {
+    expect(phaseForBenchElbowDeg(45)).toBe('off_chest');
+    expect(phaseForBenchElbowDeg(90)).toBe('mid');
+    expect(phaseForBenchElbowDeg(160)).toBe('lockout');
+  });
+  it('границы: <30 (мусор) и ≥180 → null', () => {
+    expect(phaseForBenchElbowDeg(10)).toBeNull();
+    expect(phaseForBenchElbowDeg(180)).toBeNull();
   });
 });
 

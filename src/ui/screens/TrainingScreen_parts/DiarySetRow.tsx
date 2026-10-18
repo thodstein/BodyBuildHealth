@@ -113,7 +113,7 @@ export const DiarySetRow: React.FC<DiarySetRowProps> = ({
       {!compact && (
         <div style={{ display: 'flex', gap: 6 }}>
           {showPause && (
-            <button onClick={() => setPause(p => !p)} title="Пауза на груди (IPF-стиль, без отбива)"
+            <button onClick={() => setPause(p => !p)} title="Пауза: на груди (жим, IPF) / в яме (присед) / ниже колен (тяга)"
               aria-pressed={pause}
               style={{
                 padding: '10px', borderRadius: 8, cursor: 'pointer', fontSize: 11, minHeight: 40,

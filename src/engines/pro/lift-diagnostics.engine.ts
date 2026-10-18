@@ -121,6 +121,27 @@ export function phaseForJointAngle(lift: Lift, angleDeg: number): WeakPoint | nu
   return null;
 }
 
+/**
+ * Фаза срыва жима по углу ЛОКТЯ из видео (B8): 2D-прокси — угол
+ * плечо-локоть-запястье в кадре минимальной скорости штанги.
+ * Диапазоны отличаются от канонических STICKING_POINTS (плечо/гориз. сгибание):
+ *  - off_chest: локоть сильно согнут (гриф у груди) ~[30,70]°;
+ *  - mid: проход ~[70,120]°;
+ *  - lockout: локоть почти выпрямлен ~[120,180]°.
+ */
+const BENCH_ELBOW_RANGES: Array<[WeakPoint, number, number]> = [
+  ['off_chest', 30, 70],
+  ['mid', 70, 120],
+  ['lockout', 120, 180],
+];
+
+export function phaseForBenchElbowDeg(angleDeg: number): WeakPoint | null {
+  for (const [phase, a, b] of BENCH_ELBOW_RANGES) {
+    if (angleDeg >= a && angleDeg < b) return phase;
+  }
+  return null;
+}
+
 /** Полная диагностика по движению + слабой фазе. */
 export function diagnoseLift(lift: Lift, weakPoint: WeakPoint): LiftDiagnosis | null {
   const sp = STICKING_POINTS[lift]?.[weakPoint];

@@ -5,7 +5,7 @@
  * Фолбэк — мок, если WASM не загрузился (офлайн / CSP).
  */
 import type { Lift } from '../lms/weakpoint-pl';
-import { phaseForJointAngle } from '../pro/lift-diagnostics.engine';
+import { phaseForJointAngle, phaseForBenchElbowDeg } from '../pro/lift-diagnostics.engine';
 
 /** Кадр с распознанной позой — для расчёта траектории/срыва (B8). */
 interface MovementFrame {
@@ -13,6 +13,7 @@ interface MovementFrame {
   barX: number;          // нормализованный x грифа (центр запястий)
   barY: number;          // нормализованный y грифа (экранные координаты, вниз +)
   kneeDeg: number | null; // угол колена (hip-knee-ankle), усреднённый по видимым ногам
+  elbowDeg: number | null; // угол локтя (shoulder-elbow-wrist), усреднённый
   shoulderW: number;     // нормализованная ширина плеч (масштаб см)
 }
 
@@ -22,7 +23,7 @@ interface MovementFrame {
  *  - xLoop — суммарный горизонтальный путь, xDrift — дрейф конец−старт;
  *  - срыв — кадр минимальной восходящей скорости штанги → угол колена → фаза.
  */
-function computeMovementSeries(frames: MovementFrame[], lift: Lift, shoulderWidthCm?: number): Pick<PoseMetrics, 'kneeAvgDeg'|'barXLoopCm'|'barXDriftCm'|'stickingKneeDeg'|'stickingPhase'> {
+function computeMovementSeries(frames: MovementFrame[], lift: Lift, shoulderWidthCm?: number): Pick<PoseMetrics, 'kneeAvgDeg'|'barXLoopCm'|'barXDriftCm'|'stickingKneeDeg'|'stickingElbowDeg'|'stickingPhase'> {
   if (frames.length < 3) return {};
   const shoulderW = frames.map(f => f.shoulderW).filter(w => w > 0.01).sort((a, b) => a - b);
   const medianSW = shoulderW.length ? shoulderW[Math.floor(shoulderW.length / 2)] : 0;
@@ -36,6 +37,7 @@ function computeMovementSeries(frames: MovementFrame[], lift: Lift, shoulderWidt
 
   // Скорость подъёма (см/с): y экранный вниз +, подъём = y убывает.
   let stickingKneeDeg: number | null = null;
+  let stickingElbowDeg: number | null = null;
   let minUpV = Infinity;
   let kneeSum = 0, kneeCnt = 0;
   for (let i = 1; i < frames.length - 1; i++) {
@@ -44,15 +46,17 @@ function computeMovementSeries(frames: MovementFrame[], lift: Lift, shoulderWidt
     if (upV > 0 && upV < minUpV) {
       minUpV = upV;
       stickingKneeDeg = frames[i].kneeDeg;
+      stickingElbowDeg = frames[i].elbowDeg;
     }
     if (frames[i].kneeDeg != null) { kneeSum += frames[i].kneeDeg!; kneeCnt++; }
   }
   const kneeAvgDeg = kneeCnt ? Math.round(kneeSum / kneeCnt) : null;
   const kneeLifts: Lift[] = ['squat', 'deadlift', 'sumo'];
-  const stickingPhase = stickingKneeDeg != null && kneeLifts.includes(lift)
-    ? phaseForJointAngle(lift, stickingKneeDeg)
-    : null;
-  return { kneeAvgDeg, barXLoopCm, barXDriftCm, stickingKneeDeg, stickingPhase };
+  // Срыв: колено для ног-лифтов, локоть для жимов (2D-прокси угла сгибания).
+  let stickingPhase: string | null = null;
+  if (kneeLifts.includes(lift) && stickingKneeDeg != null) stickingPhase = phaseForJointAngle(lift, stickingKneeDeg);
+  else if ((lift === 'bench' || lift === 'incline_press') && stickingElbowDeg != null) stickingPhase = phaseForBenchElbowDeg(stickingElbowDeg);
+  return { kneeAvgDeg, barXLoopCm, barXDriftCm, stickingKneeDeg, stickingElbowDeg, stickingPhase };
 }
 
 export interface PoseMetrics {
@@ -64,6 +68,7 @@ export interface PoseMetrics {
   barXLoopCm?: number | null;    // суммарный горизонтальный путь грифа, см (масштаб по ширине плеч)
   barXDriftCm?: number | null;   // горизонтальный дрейф грифа (конец − старт), см
   stickingKneeDeg?: number | null; // угол колена в кадре минимальной восходящей скорости
+  stickingElbowDeg?: number | null; // угол локтя в кадре минимальной восходящей скорости (жим)
   stickingPhase?: string | null;   // каноническая фаза (lift-diagnostics STICKING_POINTS), оценка
 }
 
@@ -142,6 +147,32 @@ function rgbToHsv(r: number, g: number, b: number): { h:number; s:number; v:numb
  * самый тёмный ряд (V минимален, S низкая — чёрные блины или тень штанги).
  * Возвращает null если не нашлось — фолбэк на avgWristY.
  */
+/**
+ * Трекинг грифа по X (блины/рукава): сканируем колонки вокруг зоны между запястьями
+ * (± расширение на блины), берём середину самой тёмной непрерывной зоны — это ось грифа.
+ * Точнее центра запястий: блины темнее и контрастнее рук.
+ */
+function refinedBarX(imageData: ImageData, lWr: {x:number;y:number}, rWr: {x:number;y:number}, w: number, h: number): number | null {
+  const avgY = Math.round(((lWr.y + rWr.y) / 2) * h);
+  const ax = Math.max(1, Math.round(Math.min(lWr.x, rWr.x) * w) - 8);
+  const bx = Math.min(w - 2, Math.round(Math.max(lWr.x, rWr.x) * w) + 8);
+  const y0 = Math.max(1, avgY - 8);
+  const y1 = Math.min(h - 2, avgY + 8);
+  let first = -1, last = -1;
+  for (let x = ax; x <= bx; x++) {
+    let sumV = 0, cnt = 0;
+    for (let y = y0; y <= y1; y++) {
+      const idx = (y * w + x) * 4;
+      const { s, v } = rgbToHsv(imageData.data[idx], imageData.data[idx + 1], imageData.data[idx + 2]);
+      if (v > 0.04 && v < 0.55) { sumV += v + s * 0.5; cnt++; }
+    }
+    if (cnt < 2) continue;
+    if (sumV / cnt < 0.5) { if (first < 0) first = x; last = x; }
+  }
+  if (first < 0 || last - first < 10) return null;
+  return ((first + last) / 2) / w;
+}
+
 function refinedBarY(imageData: ImageData, lWr: {x:number;y:number}, rWr: {x:number;y:number}, w: number, h: number): number | null {
   const avgY = (lWr.y + rWr.y) / 2;
   const ax = Math.round(Math.min(lWr.x, rWr.x) * w);
@@ -221,7 +252,9 @@ export async function analyzeVideoElement(video: HTMLVideoElement, lift: Lift, o
       if (shoulderWidth > 0.01) gripRatios.push(gripWidth / shoulderWidth);
       // bar — уточняем по тёмной полосе блинов (HSV), фолбэк на запястья
       const rawY = (lWr.y + rWr.y) / 2;
+      const rawX = (lWr.x + rWr.x) / 2;
       let barY: number = rawY;
+      let barX: number = rawX;
       try {
         const img = ctx.getImageData(0, 0, w, h);
         const refined = refinedBarY(img, lWr, rWr, w, h);
@@ -229,10 +262,13 @@ export async function analyzeVideoElement(video: HTMLVideoElement, lift: Lift, o
           // бленд 70% блины /30% запястья — устойчивее чем чистые запястья
           barY = refined * 0.7 + rawY * 0.3;
         }
-      } catch { /* ignore — оставляем rawY */ }
+        // трекинг блинов по X: ось самой тёмной зоны (рукав/блины) вместо центра запястий
+        const refinedX = refinedBarX(img, lWr, rWr, w, h);
+        if (refinedX != null && Math.abs(refinedX - rawX) < 0.12) barX = refinedX * 0.7 + rawX * 0.3;
+      } catch { /* ignore — оставляем raw */ }
       wristYs.push(barY);
       timestamps.push(t);
-      // B8: покадровые данные — колени и x грифа
+      // B8: покадровые данные — колени, локти и x грифа
       const lKnee = lmks[25], rKnee = lmks[26], lAnkle = lmks[27], rAnkle = lmks[28];
       let kneeDeg: number | null = null;
       if (lHip && rHip) {
@@ -241,7 +277,10 @@ export async function analyzeVideoElement(video: HTMLVideoElement, lift: Lift, o
         if (rHip && rKnee && rAnkle && (rKnee.visibility ?? 1) > 0.3 && (rAnkle.visibility ?? 1) > 0.3) legs.push(angle(rHip, rKnee, rAnkle));
         if (legs.length) kneeDeg = Math.round(legs.reduce((a, b) => a + b, 0) / legs.length);
       }
-      mvFrames.push({ t, barX: (lWr.x + rWr.x) / 2, barY, kneeDeg, shoulderW: shoulderWidth });
+      const elbows: number[] = [];
+      if (avg > 10 && avg < 180) elbows.push(avg);
+      const elbowDeg = elbows.length ? Math.round(elbows[0]) : null;
+      mvFrames.push({ t, barX, barY, kneeDeg, elbowDeg, shoulderW: shoulderWidth });
       if (lHip && rHip) {
         // мост: таз выше плеч? y меньше = выше
         const shoulderY = (lSh.y + rSh.y)/2;
@@ -391,12 +430,16 @@ export async function analyzeVideoWithWorker(video: HTMLVideoElement, lift: Lift
     const gripWidth = dist(lWr, rWr);
     if (shoulderWidth > 0.01) gripRatios.push(gripWidth / shoulderWidth);
     const rawY = (lWr.y + rWr.y) / 2;
+    const rawX = (lWr.x + rWr.x) / 2;
     let barY: number = rawY;
+    let barX: number = rawX;
     const refined = refinedBarY(imageData, lWr, rWr, w, h);
     if (refined != null && Math.abs(refined - rawY) < 0.08) barY = refined * 0.7 + rawY * 0.3;
+    const refinedX = refinedBarX(imageData, lWr, rWr, w, h);
+    if (refinedX != null && Math.abs(refinedX - rawX) < 0.12) barX = refinedX * 0.7 + rawX * 0.3;
     wristYs.push(barY);
     timestamps.push(ts);
-    // B8: покадровые данные — колени и x грифа
+    // B8: покадровые данные — колени, локти и x грифа
     const lKnee = lmks[25], rKnee = lmks[26], lAnkle = lmks[27], rAnkle = lmks[28];
     let kneeDeg: number | null = null;
     if (lHip && rHip) {
@@ -405,7 +448,8 @@ export async function analyzeVideoWithWorker(video: HTMLVideoElement, lift: Lift
       if (rHip && rKnee && rAnkle && (rKnee.visibility ?? 1) > 0.3 && (rAnkle.visibility ?? 1) > 0.3) legs.push(angle(rHip, rKnee, rAnkle));
       if (legs.length) kneeDeg = Math.round(legs.reduce((a, b) => a + b, 0) / legs.length);
     }
-    mvFrames.push({ t: ts, barX: (lWr.x + rWr.x) / 2, barY, kneeDeg, shoulderW: shoulderWidth });
+    const elbowDeg = avg > 10 && avg < 180 ? Math.round(avg) : null;
+    mvFrames.push({ t: ts, barX, barY, kneeDeg, elbowDeg, shoulderW: shoulderWidth });
     if (lHip && rHip) {
       bridgeTotal++;
       if ((lHip.y + rHip.y)/2 < (lSh.y + rSh.y)/2 + 0.05) bridgeVotes++;

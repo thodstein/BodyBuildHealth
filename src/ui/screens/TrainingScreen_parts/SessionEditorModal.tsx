@@ -163,7 +163,7 @@ export const SessionEditorModal: React.FC<Props> = ({ workout, onClose, onSave }
                     title={s.techniqueScore ? `Техника: ${s.techniqueScore}/5` : 'Оценить технику'}>
                     {s.techniqueScore ? (s.techniqueScore === 5 ? '✅' : s.techniqueScore === 4 ? '🎯' : '⚠️') : '🎯'}
                   </button>
-                  <button onClick={() => patchSet(ei, si, { pause: !s.pause })} title="Пауза на груди (IPF-стиль, без отбива)" aria-pressed={!!s.pause}
+                  <button onClick={() => patchSet(ei, si, { pause: !s.pause })} title="Пауза: на груди (жим, IPF) / в яме (присед) / ниже колен (тяга)" aria-pressed={!!s.pause}
                     style={{ height: 36, borderRadius: 5, border: 'none', cursor: 'pointer', fontSize: 11,
                       background: s.pause ? 'rgba(0,230,138,0.15)' : 'rgba(255,255,255,0.05)',
                       color: s.pause ? '#00e68a' : '#fff' }}>

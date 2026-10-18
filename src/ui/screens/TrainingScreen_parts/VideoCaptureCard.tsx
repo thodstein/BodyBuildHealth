@@ -84,6 +84,8 @@ export interface VideoAnalysisResult {
   barXDriftCm?: number | null;
   /** B8: угол колена в кадре минимальной восходящей скорости + каноническая фаза. */
   stickingKneeDeg?: number | null;
+  /** B8: угол локтя в кадре минимальной скорости (жим). */
+  stickingElbowDeg?: number | null;
   stickingPhase?: string | null;
 }
 
@@ -221,6 +223,7 @@ export const VideoCaptureCard: React.FC<{ lift: Lift; shoulderWidthCm?: number; 
             barXLoopCm: m.barXLoopCm ?? null,
             barXDriftCm: m.barXDriftCm ?? null,
             stickingKneeDeg: m.stickingKneeDeg ?? null,
+            stickingElbowDeg: m.stickingElbowDeg ?? null,
             stickingPhase: m.stickingPhase ?? null,
             note: m.elbowAvgDeg != null ? 'CV-анализ BlazePose (воркер, локально, блины — по запястьям; трекинг дисков — след. шаг).' : 'Поза не распознана — использован мок.',
           };

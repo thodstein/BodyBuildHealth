@@ -742,8 +742,8 @@ export const DiaryRecordingForm: React.FC<DiaryRecordingFormProps> = ({ diary, s
                           title={set.technique ? `Техника: ${set.technique}/5` : 'Оценить технику (нет)'}>
                           {set.technique ? (set.technique === 5 ? '✅' : set.technique === 4 ? '🎯' : '⚠️') : '🎯'}
                         </button>
-                        {/жим.*(леж|груд)|bench/i.test(ex.exerciseName) && (
-                          <button onClick={() => updateSet(exIdx, setIdx, { pause: !set.pause })} title="Пауза на груди (IPF-стиль, без отбива)"
+                        {/жим.*(леж|груд)|bench|присед|squat|станов|deadlift/i.test(ex.exerciseName) && (
+                          <button onClick={() => updateSet(exIdx, setIdx, { pause: !set.pause })} title="Пауза: на груди (жим, IPF) / в яме (присед) / ниже колен (тяга)"
                             aria-pressed={!!set.pause}
                             style={{ width: 22, height: 22, borderRadius: 4, border: 'none', cursor: 'pointer', fontSize: 9,
                               background: set.pause ? 'rgba(0,230,138,0.15)' : 'rgba(255,255,255,0.05)',
