@@ -522,7 +522,7 @@ export const CATEGORY_TIMING: Record<string, SubstanceTiming> = {
   liver: { slot: 'morning_food', reason: 'Препарат для печени — с едой.' },
   bile: { slot: 'morning_food', reason: 'Желчегонное — с едой, особенно с завтраком.' },
   choleretic: { slot: 'morning_food', reason: 'Желчегонное — с едой для стимуляции оттока желчи.' },
-  bile_acid: { slot: 'night_empty', reason: 'TUDCA/УДХК — перед сном натощак (2+ ч после ужина). Жёлчные кислоты конкурируют с пищей, утром — всасывание ↓.' },
+  bile_acid: { slot: 'morning_food', reason: 'TUDCA/УДХК — С ЕДОЙ в 2-3 приёма (лейбл УДХК 13-15 мг/кг: приём с едой обязателен). «Натощак на ночь» — устаревший вариант, конфликтует с протоколом Печени.' },
   detox: { slot: 'morning_empty', reason: 'Детокс — натощак для максимальной абсорбции.' },
   // Иммунитет
   immunomodulator: { slot: 'morning_food', reason: 'Иммуномодулятор — с завтраком.' },

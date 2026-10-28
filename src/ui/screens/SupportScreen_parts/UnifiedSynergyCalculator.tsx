@@ -233,7 +233,7 @@ export const LAB_MONITOR_DB: Record<string, LabMon[]> = {
     { markerRu:'Триглицериды (TG)', markerEn:'TRIGLYCERIDES', system:'cardio', when:'Каждые 8 нед', target:'<1.7 ммоль/л', condition:'↓ TG → ↑ чувствительность к инсулину', note:'Мио-инозитол 4 г/сут ↓ TG на 15-20% за 3 мес. Эффект медленный.' },
   ],
   red_yeast: [
-    { markerRu:'АЛТ', markerEn:'ALT', system:'hepatic', when:'Через 4 нед, затем каждые 8 нед', target:'<40 Ед/л', condition:'↑ АЛТ → статины в составе', note:'Красный рис — природный статин (монаколин K). Контроль АЛТ. При ↑ >80 — отменить.', tier2:'ALT 80-200 — STOP, добавить бергамот', tier3:'ALT >200 — STOP, врача' },
+    { markerRu:'АЛТ', markerEn:'ALT', system:'hepatic', when:'Через 4 нед, затем каждые 8 нед', target:'<40 Ед/л', condition:'↑ АЛТ → статины в составе', note:'Красный рис — природный статин (монаколин K). Контроль АЛТ. Порог отмены — 3×ВГН (>120), а не 80: при 80-120 перепроверить и не наращивать дозу.', tier2:'ALT 120-200 — STOP, 80-120 — перепроверить', tier3:'ALT >200 — STOP, врач' },
     { markerRu:'КФК (CK)', markerEn:'CK', system:'metabolic', when:'Через 4 нед, затем каждые 8 нед', target:'<200 Ед/л', condition:'↑ CK → мышечная токсичность (редко для монаколина)', note:'Миопатия от красного риса реже, чем от синтетических статинов, но возможна. При болях в мышцах — контроль CK.', tier2:'CK >1000 — STOP, добавить CoQ10' },
   ],
   metformin_er: [  // alias for metformin

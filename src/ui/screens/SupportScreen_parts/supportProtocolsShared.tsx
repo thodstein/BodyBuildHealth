@@ -194,14 +194,19 @@ export const CROSS_CAPS: Array<{ key: string; label: string; cap: number; unit: 
   { key: 'mg', label: 'Магний (сумма всех модулей)', cap: 800, unit: 'мг/сут', step: 50 },
   { key: 'telmi', label: 'Телмисартан (все модули)', cap: 80, unit: 'мг/сут', step: 10 },
   { key: 'zn', label: 'Цинк (сумма всех модулей)', cap: 50, unit: 'мг/сут', step: 5 },
+  { key: 'cu', label: 'Медь (обязательна при Zn ≥25 мг)', cap: 2, unit: 'мг/сут', step: 0.5 },
+  { key: 'b6', label: 'Витамин B6 (сумма всех модулей)', cap: 100, unit: 'мг/сут', step: 10 },
   { key: 'd3', label: 'Витамин D3 (хронически)', cap: 4000, unit: 'МЕ/сут', step: 500 },
+  { key: 'se', label: 'Селен (сумма всех модулей)', cap: 200, unit: 'мкг/сут', step: 25 },
+  { key: 'omega', label: 'Омега-3 (EPA+DHA, сумма; >4 г — осознанно)', cap: 6, unit: 'г/сут', step: 0.5 },
   { key: 'ashwa', label: 'Ашваганда (сумма всех модулей)', cap: 600, unit: 'мг/сут', step: 100 },
 ];
 
 /** Живой калькулятор кросс-капов: впишите СУММАРНЫЕ сутки из всех протоколов — покажет превышения. */
 export const CrossCapCalculator: React.FC = () => {
-  const [vals, setVals] = React.useState<Record<string, number>>({ nac: 0, mg: 0, telmi: 0, zn: 0, d3: 0, ashwa: 0 });
+  const [vals, setVals] = React.useState<Record<string, number>>({ nac: 0, mg: 0, telmi: 0, zn: 0, cu: 0, b6: 0, d3: 0, se: 0, omega: 0, ashwa: 0 });
   const over = CROSS_CAPS.filter((c) => (vals[c.key] || 0) > c.cap);
+  const znVals = vals.zn || 0;
   return (
     <div data-capcalc="root" style={{ borderRadius: 14, padding: '12px 14px', background: 'rgba(59,130,246,0.06)', border: '1px solid rgba(59,130,246,0.18)' }}>
       <div style={{ fontSize: 12, fontWeight: 850, color: '#60a5fa', marginBottom: 4 }}>🧮 Кросс-капы: просуммируйте дозы из ВСЕХ протоколов</div>
@@ -227,6 +232,11 @@ export const CrossCapCalculator: React.FC = () => {
       {over.length > 0 && (
         <div style={{ fontSize: 11, fontWeight: 800, color: '#fca5a5', marginTop: 6 }}>
           🛑 Превышено позиций: {over.length} — снизьте суммарную дозу до капа, иначе риск из баннеров протоколов ({over.map((c) => c.label).join('; ')})
+        </div>
+      )}
+      {znVals >= 25 && (vals.cu || 0) === 0 && (
+        <div data-capcalc="cu-missing" style={{ fontSize: 11, fontWeight: 800, color: '#fcd34d', marginTop: 6 }}>
+          ⚠ Zn {znVals} мг/сут без меди: при цинке ≥25 мг/сут медь 1-2 мг/сут ОБЯЗАТЕЛЬНА (цинк ↑ металлотионеин → блок всасывания Cu). Без меди 2-3 мес — дефицит Cu: анемия, нейропатия, ↓ ЛПВП. 50 мг Zn — курсом 8-12 нед, не годами
         </div>
       )}
     </div>
@@ -303,12 +313,16 @@ export const PRE_CYCLE_LABS: Array<{ marker: string; target: string }> = [
   { marker:'Липиды: ЛПВП / ЛПНП / ТГ', target:'ЛПВП >40 · ЛПНП <130 · ТГ <150 мг/дл' },
   { marker:'Печень: АЛТ / АСТ / ГГТ / ЩФ / билирубин', target:'АЛТ/АСТ <40 · ГГТ <55 · бил <21 мкмоль/л' },
   { marker:'Кровь: Hct / Hb / PLT / фибриноген', target:'Hct 42-50% · Hb 13.5-17.5 · PLT 150-350' },
-  { marker:'Гормоны: T общ / E2 / PRL / ЛГ / ФСГ', target:'E2 20-60 пг/мл · PRL <600 мМЕ/л' },
-  { marker:'Почки: креатинин / СКФ + цистатин C при массе >100 кг', target:'СКФ >90 · UACR <30' },
+  { marker:'Гормоны: T общ / E2 / PRL / ЛГ / ФСГ (канон: пг/мл для E2/T, мМЕ/л для PRL, нмоль/л для T)', target:'E2 20-60 пг/мл (73-220 пмоль/л) · PRL <600 мМЕ/л (<28 нг/мл) · T 12-30 нмоль/л' },
+  { marker:'E2 и общий T — метод (иммуноанализ лжёт)', target:'Предпочтительно LC-MS/MS; на ЕCLIA Е2 <40 пг/мл и T на нандролоне — ненадёжны' },
+  { marker:'Креатин моногидрат 3-5 г/сут — базис (уровень C)', target:'Сила/объём, нейтрален к СС-риску. ⚠ Поднимает креатинин на 5-15% — отметить приём/дозу/дату отмены, иначе ложная «ХБП». С цистатином C всегда' },
+  { marker:'Почки: креатинин / СКФ + цистатин C (масса >100 кг или приём креатина)', target:'СКФ >90 · UACR <30' },
   { marker:'Глюкоза натощак / HbA1c', target:'<5.6 ммоль/л · <6.0%' },
   { marker:'K⁺ / Na⁺ / Mg²⁺', target:'K 3.5-5.0 · Na 135-145 · Mg >0.75' },
   { marker:'ЭКГ (+ ЭХО при стаже ААС / GH / дозах >1 г/нед)', target:'QTc <450м/<460ж · ФВ >55%' },
   { marker:'ПСА (мужчины >40)', target:'<2.5 нг/мл' },
+  { marker:'Биотин в приёме — отменить перед забором', target:'Пауза ≥72 ч (5 мг) / ≥3-4 сут (10 мг+): ломает ТТГ/тропонин/ферритин/ПСА/ПРЛ' },
+  { marker:'Забор крови: условия', target:'Утро 7-9 ч, натощак, после обычной воды, без тренировки/сауны/алкоголя накануне ≥24 ч' },
   { marker:'Спермограмма (при планах фертильности)', target:'До курса (база для ПКТ)' },
   { marker:'УЗИ ЖКБ (перед берберином/УДХК/TUDCA)', target:'Нет камней/сладжа (иначе — колика)' },
 ];
@@ -316,7 +330,7 @@ export const PRE_CYCLE_LABS: Array<{ marker: string; target: string }> = [
 export const STOP_COURSE_TABLE: Array<{ cond: string; action: string }> = [
   { cond:'АД >160/100', action:'Стоп курса' },
   { cond:'ЛПВП <20 мг/дл', action:'Немедленный стоп' },
-  { cond:'Hct >54% (симптомы гипервязкости — раньше)', action:'Стоп + флеботомия' },
+  { cond:'Hct >54% (симптомы гипервязкости — раньше)', action:'Дозу ААС ↓/стоп; флеботомия — с врачом по ситуации' },
   { cond:'АЛТ/АСТ >5×ВГН или билирубин >34 мкмоль/л', action:'Стоп оральных + гепатолог' },
   { cond:'E2 >120 + симптомы / E2 <20 (перелечили)', action:'AI-титрация / отмена AI' },
   { cond:'PRL >2000 + головные боли/поля зрения', action:'МРТ + эндокринолог' },

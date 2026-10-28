@@ -417,3 +417,196 @@ describe('support-protocol-audit: раунд-2 (гармонизация + ге�
     expect(P('supportProtocolProlactin.tsx')).toContain('не РКИ');
   });
 });
+
+describe('support-protocol-audit: волна 2 (фактические пороги и единицы)', () => {
+  it('статины: порог 3×ВГН, а не 2× (ACC/AHA 2022, AASLD)', () => {
+    const t = P('supportProtocolCardio.tsx');
+    expect(t).toContain('3×ВГН');
+    expect(t).toContain('ACC/AHA 2022');
+    expect(t).not.toContain('КОНТРАИНДИЦИРОВАНЫ при АЛТ/АСТ >2×ВГН');
+    expect(t).toContain('КФК >10×ВГН');
+  });
+  it('TUDCA: не «противопоказан» в фазе 4, УДХК предпочтительна', () => {
+    const t = P('supportProtocolHepatic.tsx');
+    expect(t).not.toContain('TUDCA — ПРОТИВОПОКАЗАН');
+    expect(t).toContain('УДХК предпочтительна');
+    expect(t).toContain('ОТМЕНА оральных ААС');
+    expect(t).not.toContain('ВСЕ пероральные БАДы/гепатопротекторы — ОТМЕНИТЬ');
+  });
+  it('УДХК: приём с едой, а не «на ночь»', () => {
+    const t = P('supportProtocolHepatic.tsx');
+    expect(t).toContain('С едой 2-3×/день');
+    expect(t).not.toContain("timing:'На ночь', note:'Золотой стандарт");
+  });
+  it('ашваганда: снижает ТТГ (направление), DILI + кейсы тиреотоксикоза', () => {
+    const t = P('supportProtocolThyroid.tsx');
+    expect(t).toContain('СНИЖАЕТ');
+    expect(t).not.toContain('Повышает ТТГ, T4 и T3');
+    expect(t).toContain('DILI');
+    expect(t).toContain('Curry 2019');
+    expect(t).toContain('6 нед');
+  });
+  it('E2: единый порог 60 + целевой 20-40 + канон единиц пг/мл', () => {
+    const t = P('supportProtocolE2.tsx');
+    expect(t).toContain('20-40 пг/мл');
+    expect(t).not.toContain('ТОЛЬКО при E2 {\'>\'}80');
+    expect(t).toContain('3.67');
+    expect(t).toContain('LC-MS/MS');
+  });
+  it('постцикл: E2 в пг/мл с пересчётом, кортизол/PRL с единицами', () => {
+    const t = P('supportProtocolPostCycle.tsx');
+    expect(t).toContain('пмоль/л');
+    expect(t).toContain('нмоль/л');
+    expect(t).toContain('мМЕ/л');
+  });
+  it('биотин: интерференция анализа + пауза 72 ч', () => {
+    const t = P('supportProtocolHair.tsx');
+    expect(t).toContain('72 ч');
+    expect(t).toContain('стрептавидин');
+    expect(t).not.toContain('5000-10000 мкг');
+  });
+  it('креатин→креатинин: причина в почечном мониторинге', () => {
+    const t = P('supportProtocolRenal.tsx');
+    expect(t).toContain('5-15%');
+    expect(t).toContain('Naeini 2025');
+    expect(t).toContain('цистатином C');
+  });
+  it('цинк: медь 1-2 мг обязательна при Zn ≥25 мг, 50 мг — 8-12 нед', () => {
+    for (const f of [
+      'supportProtocolAcne.tsx',
+      'supportProtocolHair.tsx',
+      'supportProtocolImmune.tsx',
+      'supportProtocolE2.tsx',
+    ]) {
+      expect(P(f)).toContain('1-2 мг');
+    }
+    expect(P('supportProtocolImmune.tsx')).toContain('8-12 нед');
+    expect(SUPPORT_DOSING.zinc.warnings.join(' ')).toContain(
+      'copper_1_2mg_mandatory_at_25mg',
+    );
+  });
+  it('B6: 10-25 мг база, кап 100 мг, нейропатия >200 мг', () => {
+    const t = P('supportProtocolProlactin.tsx');
+    expect(t).toContain('10-25 мг');
+    expect(t).toContain('100 мг');
+    expect(t).toContain('нейропати');
+    expect(SUPPORT_DOSING.vitamin_b6.warnings.join(' ')).toContain(
+      'cap_100mg_short_course',
+    );
+  });
+  it('флеботомия: интервалы вместо «вплоть до ежедневно»', () => {
+    const t = P('supportProtocolCardio.tsx');
+    expect(t).toContain('1-2×/нед до Hct <48%');
+    expect(t).toContain('Assi 2014');
+  });
+  it('pre-cycle: креатин в базисе, метод T/E2, пауза биотина, условия забора', () => {
+    const m = PRE_CYCLE_LABS.map((x) => `${x.marker} ${x.target}`).join(' ');
+    expect(m).toContain('Креатин моногидрат');
+    expect(m).toContain('LC-MS/MS');
+    expect(m).toContain('Биотин');
+    expect(m).toContain('Забор крови');
+  });
+  it('GH: метформин — по глюкозе, а не «обязательно»', () => {
+    const t = P('supportProtocolGH.tsx');
+    expect(t).toContain('НЕ обязателен');
+    expect(t).not.toContain('Обязательно на GH');
+  });
+  it('реестр: медь/биотин/креатин + новые варнинги', () => {
+    expect(SUPPORT_DOSING.copper.doseRange.max).toBe(2);
+    expect(SUPPORT_DOSING.creatine.doseRange.max).toBe(5);
+    expect(SUPPORT_DOSING.biotin.warnings.join(' ')).toContain('pause_72h');
+    expect(SUPPORT_DOSING.tudca.warnings.join(' ')).toContain(
+      'not_contraindicated_at_alt_5x_uln_but_udca_preferred',
+    );
+    expect(SUPPORT_DOSING.ashwagandha.warnings.join(' ')).toContain(
+      'lowers_tsh_not_raises',
+    );
+  });
+  it('кросс-капы: медь и B6 добавлены, предупреждение «Zn без Cu»', () => {
+    const t = P('supportProtocolsShared.tsx');
+    expect(t).toContain("key: 'cu'");
+    expect(t).toContain("key: 'b6'");
+    expect(t).toContain('cu-missing');
+  });
+  it('стоп-таблица: Hct >54% — сначала доза, флеботомия по ситуации', () => {
+    const hct = STOP_COURSE_TABLE.find((x) => x.cond.includes('Hct'));
+    expect(hct?.action).toContain('Дозу');
+    expect(hct?.action).toContain('по ситуации');
+  });
+});
+
+describe('support-protocol-audit: волна 3 (остаточные единицы и пробелы)', () => {
+  it('нейро: PRL в мМЕ/л + макропролактин, кортизол с нмоль/л и условием забора', () => {
+    const t = P('supportProtocolNeuro.tsx');
+    expect(t).toContain('мМЕ/л');
+    expect(t).not.toContain("target:'< 15 нг/мл'");
+    expect(t).toContain('макропролактин');
+    expect(t).toContain('нмоль/л');
+    expect(t).toContain('утренний забор');
+  });
+  it('нейро: DHEA/прегненолон — показание по DHEA-S, а не «всем»', () => {
+    const t = P('supportProtocolNeuro.tsx');
+    expect(t).toContain('DHEA-S <150');
+    expect(t).toContain('прегненолон-сульфат');
+  });
+  it('E2: PRL в мМЕ/л с макропролактин-гейтом', () => {
+    const t = P('supportProtocolE2.tsx');
+    expect(t).toContain('600 мМЕ/л');
+    expect(t).toContain('макропролактин');
+  });
+  it('пролактин: референс 2.8-28 нг/мл, макропролактин до каберголина', () => {
+    const t = P('supportProtocolProlactin.tsx');
+    expect(t).toContain('60-600 мМЕ/л (2.8-28 нг/мл)');
+    expect(t).toContain('сначала макропролактин');
+  });
+  it('GLP-1: потеря мышц + белок 1.6-2.2 г/кг + креатин + сохранение силы', () => {
+    const t = P('supportProtocolGLP1.tsx');
+    expect(t).toContain('1.6-2.2 г/кг');
+    expect(t).toContain('тощая');
+    expect(t).toContain('Креатин моногидрат 3-5 г');
+    expect(t).toContain('сила');
+    expect(t).toContain('Альбумин');
+  });
+  it('тирео: цинк с медью; без опечатки «тре Moupe»', () => {
+    const t = P('supportProtocolThyroid.tsx');
+    expect(t).toContain('медь 1-2 мг');
+    expect(t).not.toContain('Moupe');
+  });
+  it('печень: цинк с медью, а не «30-50 мг» без пары', () => {
+    const t = P('supportProtocolHepatic.tsx');
+    expect(t).toContain('медь 1-2 мг');
+  });
+  it('GI: цинк-карнозин считается как элементарный Zn + медь', () => {
+    const t = P('supportProtocolGI.tsx');
+    expect(t).toContain('элементарного Zn');
+    expect(t).toContain('медь 1-2 мг');
+  });
+  it('постцикл: цинк 30 мг + медь', () => {
+    const t = P('supportProtocolPostCycle.tsx');
+    expect(t).toContain('медь 1-2 мг');
+  });
+  it('интеракции: Zn+Cu — HIGH при ≥25 мг, а не «только >50 мг»', () => {
+    const t = P('supportProtocolInteractions.tsx');
+    expect(t).toContain('Zn ≥25 мг');
+    expect(t).toContain('ОБЯЗАТЕЛЬНА');
+    expect(t).not.toContain('При длительном приёме Zn >50 мг');
+  });
+  it('ферритин: единая цель 40-100 (донации 40-70), острофазность', () => {
+    for (const f of [
+      'supportProtocolHemato.tsx',
+      'supportProtocolHepatic.tsx',
+      'supportProtocolNeuro.tsx',
+    ]) {
+      expect(P(f), f).toContain('40-100');
+    }
+    expect(P('supportProtocolHair.tsx')).not.toContain("action:'{'<'}70 — дефицит железа. Ассоциирован");
+  });
+  it('кросс-капы: селен и омега-3 добавлены', () => {
+    const t = P('supportProtocolsShared.tsx');
+    expect(t).toContain("key: 'se'");
+    expect(t).toContain("key: 'omega'");
+  });
+  it('мито/стеатоз: омега-3 >4 г не превышать вслепую', () => {
+    expect(P('supportProtocolSteatosis.tsx')).toContain('риск ФП');
+  });
+});

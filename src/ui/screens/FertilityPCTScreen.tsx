@@ -1614,7 +1614,7 @@ export const FertilityPCTScreen: React.FC<{ initialTab?: FertTab; restrictToMode
                     <span><b>NAC + TUDCA</b></span><span>NAC ускоряет выведение жёлчных кислот → ↓ эффективность TUDCA. Разнести приём на ≥4 ч</span>
                   </div>
                   <div style={{ display:'flex', justifyContent:'space-between', padding:'4px 6px', background:'rgba(245,158,11,0.05)', borderRadius:4 }}>
-                    <span><b>Ашваганда + Левотироксин</b></span><span>Ашваганда ↑ Т4 и ↑ ТТГ (ложный гипотиреоз). Контроль ТТГ через 4 нед при комбинации</span>
+                    <span><b>Ашваганда + Левотироксин</b></span><span>Ашваганда ↓ ТТГ (Т4/Т3 могут расти) → на заместительной дозе маскирует передоз. Контроль ТТГ через 6 нед после старта/отмены ашваганды</span>
                   </div>
                   <div style={{ display:'flex', justifyContent:'space-between', padding:'4px 6px', borderRadius:4 }}>
                     <span><b>Se 200 мкг + VitE 800 МЕ + антикоагулянты</b></span><span>Потенцирование антикоагуляции → ↑ риск кровотечения. Избегать с НПВС, контроль INR</span>

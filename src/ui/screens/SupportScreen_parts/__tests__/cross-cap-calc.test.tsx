@@ -10,13 +10,21 @@ import { CrossCapCalculator, CROSS_CAPS } from '../supportProtocolsShared';
 afterEach(cleanup);
 
 describe('cross-cap-calc: рендер и гейты', () => {
-  it('показывает все 5 капов из CROSS_CAPS', () => {
+  it('показывает все капы из CROSS_CAPS', () => {
     const { container } = render(<CrossCapCalculator />);
     expect(container.querySelector('[data-capcalc="root"]')).not.toBeNull();
     for (const c of CROSS_CAPS) {
       expect(container.querySelector(`[data-capcalc="${c.key}"]`)).not.toBeNull();
     }
-    expect(CROSS_CAPS.map((c) => c.cap)).toEqual([4000, 800, 80, 50, 4000, 600]);
+    expect(CROSS_CAPS.map((c) => c.cap)).toEqual([4000, 800, 80, 50, 2, 100, 4000, 200, 6, 600]);
+  });
+  it('Zn без меди: подсказка «медь обязательна» + гейт по 50 мг', () => {
+    const { getByLabelText, queryByText } = render(<CrossCapCalculator />);
+    expect(queryByText(/cu-missing|без меди/)).toBeNull();
+    fireEvent.change(getByLabelText(/Цинк/), { target: { value: '25' } });
+    expect(queryByText(/без меди/)).not.toBeNull();
+    fireEvent.change(getByLabelText(/Медь/), { target: { value: '1' } });
+    expect(queryByText(/без меди/)).toBeNull();
   });
   it('превышение NAC подсвечивается', () => {
     const { container, getByLabelText, getByText } = render(<CrossCapCalculator />);
