@@ -516,6 +516,13 @@ export interface UnifiedSettings {
     level: 'beginner' | 'intermediate' | 'advanced' | 'enhanced';
     daysPerWeek: number;
     minutesPerSession: number;
+    /**
+     * B22 (аудит 2026-10): тип тренинга, выбранный пользователем.
+     * Раньше не сохранялся вовсе, а при загрузке профиля ВЫВОДИЛСЯ из `daysPerWeek`
+     * (3 дня → «mixed»), из-за чего фактический тип (силовые/кардио/HIIT) терялся
+     * и менял PAL вместе с рекомендациями. `undefined` — старый профиль.
+     */
+    trainType?: 'strength' | 'cardio' | 'mixed' | 'hiit';
     primaryGoal: 'bulk' | 'cut' | 'maintenance' | 'strength' | 'hypertrophy' | 'rehab' | 'recomposition' | 'health';
     weakPoints: string[];         // отстающие группы мышц
     pmSquat: number;              // 1RM присед
@@ -654,6 +661,13 @@ export interface UnifiedSettings {
   // ─────────── 5. ПИТАНИЕ ───────────
   nutrition: {
     dietType: 'omnivore' | 'vegetarian' | 'vegan' | 'pescatarian' | 'keto' | 'paleo' | 'mediterranean';
+    /**
+     * B21 (аудит 2026-10): полный набор диетических предпочтений.
+     * Раньше в профиль писалось только `dietType = dietPrefs[0]`, и пользователь с
+     * ['vegetarian','halal'] терял второй пункт для всех остальных экранов.
+     * `dietType` сохранён как первый элемент — для обратной совместимости.
+     */
+    dietTypes?: Array<'omnivore' | 'vegetarian' | 'vegan' | 'pescatarian' | 'keto' | 'paleo' | 'mediterranean'>;
     mealsPerDay: number;
     cookingSkill: 'none' | 'basic' | 'intermediate' | 'advanced';
     foodAllergies: string[];

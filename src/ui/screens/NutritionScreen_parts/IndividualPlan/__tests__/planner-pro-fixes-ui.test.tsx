@@ -11,7 +11,7 @@ import React from "react";
 import { useRenderMealList } from "../MealListRender";
 
 const baseCtx: any = {
-  dayPlan: null, draggedItem: null, dropTarget: null, editItem: null, replacingItem: null,
+  dayPlan: null, draggedItem: null, dropTarget: null, editItem: null,
   editAmount: 0, quickAddMealIdx: null, quickAddSearch: '', preferredFoods: [],
   lockedFoodIds: new Set(), healthIssues: [], plannerMode: 'simple', weightMode: 'cooked',
   findSimilarFoods: () => [], trainStart: '', trainEnd: '', effectiveKcal: 2000, effectiveP: 120,

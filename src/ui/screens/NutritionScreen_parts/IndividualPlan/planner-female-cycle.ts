@@ -204,8 +204,10 @@ export function computeEnergyAvailability(
   trainDurationMin: number,
   trainIntensity: 'low' | 'medium' | 'high',
   sex: 'male' | 'female',
+  /** B16: `true`, если % жира пользователь не указывал (LBM — заглушка). */
+  bodyFatEstimated = false,
 ): EnergyAvailabilityResult {
-  const r = computeEA({ intakeKcal, weightKg, lbmKg, isTrainingDay, trainDurationMin, trainIntensity });
+  const r = computeEA({ intakeKcal, weightKg, lbmKg, isTrainingDay, trainDurationMin, trainIntensity, bodyFatEstimated });
   let note: string | null = r.note || null;
   if (r.status === 'severe') {
     note = `⛔ RED-S SEVERE: EA ${r.ea} ккал/кг FFM/день (<20) — критический дефицит. Немедленно ↑ккал +500-700 или ↓EEE. Риск: кости/гормоны/иммунитет/MPS.`;
@@ -214,6 +216,11 @@ export function computeEnergyAvailability(
     note = '⚠️ RED-S риск: Energy Availability = ' + r.ea + ' ккал/кг FFM/день (<30). Дефицит слишком глубокий относительно тренировочной нагрузки — ' + lowEf + '. Увеличьте ккал на +300-500 или снизьте объём тренировок. Целевой EA: 40-45 (женщины), ≥40 (мужчины).';
   } else if (r.status === 'reduced') {
     note = '🟡 EA = ' + r.ea + ' ккал/кг FFM/день (30-45, сниженная зона). Контролируйте восстановление/цикл/либидо; не задерживайтесь долго.';
+  }
+  // B16: пометка «оценка по весу» переживает перезапись текста выше.
+  if (bodyFatEstimated) {
+    const caution = '⚪ EA посчитана по весу: % жира не указан, оценка КОНСЕРВАТИВНАЯ. Укажите % жира для точности.';
+    note = note ? `${caution}\n${note}` : caution;
   }
   return { ea: r.ea, exerciseKcal: r.eee, status: r.status, note };
 }

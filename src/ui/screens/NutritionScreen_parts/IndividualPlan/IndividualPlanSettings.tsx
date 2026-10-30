@@ -57,6 +57,8 @@ const INJ_LABEL_TO_PHARMA: Record<string, string> = {
   'пептид': 'bpc157', 'ААС': 'testosterone_enanthate',
 };
 import { applyCarbPeriodizationMods, carbPeriodizationLabel } from './planner-carb-periodization';
+import { readSpecialMeals, addSpecialMeals, removeSpecialMeal, subscribeSpecialMeals } from './planner-special-meals-store';
+import { PLANNER_BOUNDS, validatePlannerInputs } from './planner-input-validation';
 import { autoCyclePhase, getCycleLog, saveCyclePeriod, clearCycleLog, CYCLE_PHASE_RU } from './planner-cycle-calendar';
 import { computeEnergyAvailability } from './planner-female-cycle';
 import { checkTargetsConsistency, PLANNER_CONVERGENCE_PCT } from './day-target-corrector';
@@ -64,43 +66,9 @@ import { getRecipes, type Recipe } from '../../../../engines/nutrition-periodiza
 
 
 // P3.2: Collapsible section for compact settings
-const SETTINGS_SECTIONS_KEY = 'he_plan_settings_collapsed';
-const useCollapsedSections = () => {
-  const [collapsed, setCollapsed] = React.useState<Set<string>>(() => {
-    try { const v = JSON.parse(localStorage.getItem(SETTINGS_SECTIONS_KEY) || '[]'); return new Set(Array.isArray(v) ? v.filter((x: any) => typeof x === 'string') : []); } catch { return new Set(); }
-  });
-  const toggle = (id: string) => setCollapsed(prev => {
-    const next = new Set(prev);
-    if (next.has(id)) next.delete(id); else next.add(id);
-    try { localStorage.setItem(SETTINGS_SECTIONS_KEY, JSON.stringify([...next])); } catch {}
-    return next;
-  });
-  return { collapsed, toggle };
-};
-const CollapsibleSection: React.FC<{ id: string; title: string; icon: string; color: string; children: React.ReactNode }> = ({ id, title, icon, color, children }) => {
-  const { collapsed, toggle } = useCollapsedSections();
-  const isCollapsed = collapsed.has(id);
-  return (
-    <div style={{ marginBottom: 6 }}>
-      <div onClick={() => toggle(id)} style={{
-        display: 'flex', alignItems: 'center', gap: 8, padding: '9px 12px', cursor: 'pointer',
-        fontSize: 11, fontWeight: 800, color, letterSpacing: '-0.15px',
-        background: `linear-gradient(135deg, ${color}14, ${color}06)`, borderRadius: 12, marginBottom: isCollapsed ? 0 : 6,
-        border: `1px solid ${color}18`, boxShadow: `0 2px 10px ${color}0d`,
-        userSelect: 'none', transition:'all 0.18s ease',
-      }}>
-        <span style={{
-          width:22, height:22, borderRadius:7, display:'flex', alignItems:'center', justifyContent:'center',
-          background: `${color}16`, border:`1px solid ${color}22`, fontSize: 9, transition: 'transform 0.2s', transform: isCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)', flexShrink:0,
-        }}>▼</span>
-        <span style={{ fontSize: 14, filter:'drop-shadow(0 1px 2px rgba(0,0,0,0.2))' }}>{icon}</span>
-        <span style={{flex:1}}>{title}</span>
-        <span style={{fontSize:9, color:'rgba(255,255,255,0.32)', fontWeight:600}}>{isCollapsed ? 'развернуть' : 'свернуть'}</span>
-      </div>
-      {!isCollapsed && <div style={{ animation: 'fadeSlideIn 0.22s cubic-bezier(0.16,1,0.3,1)' }}>{children}</div>}
-    </div>
-  );
-};
+// B34 (аудит 2026-10): удалён мёртвый `CollapsibleSection` и ключ `he_plan_settings_collapsed`.
+// Компонент не рендерился НИ РАЗУ (настройки собираются плоским списком GlassCard),
+// поэтому ключ только занимал место в localStorage и в списке ключей для очистки.
 
 // Рекомендация числа приёмов — единый источник в planner-meal-count (ёмкость
 // нормальной тарелки: белок 0.45 г/кг 45–70 г, угли ≤120 г, ккал ≤900; часы —
@@ -185,25 +153,17 @@ export const IndividualPlanSettings: React.FC = () => {
   } = usePlanCtx();
 
   // P1-11: валидация ввода перед генерацией (TMA-роль: не позволить абсурдные комбинации).
-  const _validatePlannerInput = (): string | null => {
-    if (weight < 30) return 'Вес слишком низок (<30 кг). Проверьте значение.';
-    if (weight > 250) return 'Вес слишком высок (>250 кг). Проверьте значение.';
-    if (height < 100) return 'Рост слишком низок (<100 см) — нереалистично для взрослого.';
-    if (age < 14) return 'Возраст <14 лет. Планировщик не предназначен для детей и подростков.';
-    if (age > 100) return 'Возраст >100 лет. Проверьте значение.';
-    const _bmi = weight / Math.pow(height / 100, 2);
-    if (_bmi < 14) return `BMI=${_bmi.toFixed(1)} — критично низкий (<14). Возможна анорексия. Обсудите с лечащим врачом.`;
-    if (_bmi > 60) return `BMI=${_bmi.toFixed(1)} — критично высокий (>60). Подходит только при медицинской поддержке.`;
-    if (bodyFatPct > 0) {
-      if (sex === 'male' && bodyFatPct < 3) return `% жира ${bodyFatPct}% — опасно низкий (<3% для мужчин). Риск потери ЛБМ и эндокринных нарушений.`;
-      if (sex === 'female' && bodyFatPct < 8) return `% жира ${bodyFatPct}% — опасно низкий (<8% для женщин). Риск аменореи/RED-S.`;
-    }
-    if (sex === 'female' && lifeStage === 'pregnancy' && (goal === 'cutting' || goal === 'fat_loss')) {
-      return 'Агрессивная сушка во время беременности недопустима. Установите цель «Поддержка» и проконсультируйтесь с гинекологом.';
-    }
-    if (sleepHours < 4) return 'Сон <4 ч критично низкий — расчёт КБЖУ с применением такого ввода опасен.';
-    return null;
-  };
+  // FIX B27 (аудит 2026-10): проверки вынесены в `planner-input-validation.ts`, чтобы
+  // границы возраста/веса/роста были ОДНИМ источником правды для инпутов и валидации
+  // (раньше инпут возраста разрешал 120, а валидация отклоняла всё >100).
+  const _validatePlannerInput = (): string | null => validatePlannerInputs({
+    weight, height, age,
+    sex: sex as 'male' | 'female',
+    bodyFatPct,
+    lifeStage,
+    goal,
+    sleepHours,
+  });
 
 
   const [showSpecialMealModal, setShowSpecialMealModal] = useState(false);
@@ -221,9 +181,11 @@ export const IndividualPlanSettings: React.FC = () => {
   const [specialMealDate, setSpecialMealDate] = useState(() => _toLocalIso(new Date()));
   const [specialMealNotes, setSpecialMealNotes] = useState('');
   const [selectedMealToReplace, setSelectedMealToReplace] = useState('');
-  const [specialMeals, setSpecialMeals] = useState<{ type: string; typeLabel: string; date: string; notes: string; replaceMeal?: string }[]>(() => {
-    try { const v = JSON.parse(localStorage.getItem('he_special_meals') || '[]'); return Array.isArray(v) ? v : []; } catch { return []; }
-  });
+  const [specialMeals, setSpecialMeals] = useState<{ type: string; typeLabel: string; date: string; notes: string; replaceMeal?: string }[]>(() => readSpecialMeals() as any);
+  // FIX B18 (аудит 2026-10): подписка на изменения ключа из других мест (календарь
+  // рефидов). Раньше снимок читался ОДИН раз при монтировании, поэтому добавленные
+  // календарём рефиды не показывались здесь — и затирались при следующей записи.
+  React.useEffect(() => subscribeSpecialMeals(list => setSpecialMeals(list as any)), []);
   // FIX audit (dead-code): 5 picker-состояний удалены — заменены PopupSelect,
   // их сеттеры никогда не вызывались.
   const [showWorkFoodPicker, setShowWorkFoodPicker] = useState(false);
@@ -341,9 +303,9 @@ export const IndividualPlanSettings: React.FC = () => {
             Минимальный режим: только базовые данные и расчёт сухого КБЖУ. Расширенные настройки сохранены и доступны после возврата в Pro.
           </div>
           <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:5, marginBottom:6 }}>
-            <PopupNumber label="Вес" value={weight} min={30} max={250} suffix="кг" onChange={setWeight} />
-            <PopupNumber label="Рост" value={height} min={100} max={250} suffix="см" onChange={setHeight} />
-            <PopupNumber label="Возраст" value={age} min={14} max={100} suffix="лет" onChange={setAge} />
+            <PopupNumber label="Вес" value={weight} min={PLANNER_BOUNDS.weight.min} max={PLANNER_BOUNDS.weight.max} suffix="кг" onChange={setWeight} />
+            <PopupNumber label="Рост" value={height} min={PLANNER_BOUNDS.height.min} max={PLANNER_BOUNDS.height.max} suffix="см" onChange={setHeight} />
+            <PopupNumber label="Возраст" value={age} min={PLANNER_BOUNDS.age.min} max={PLANNER_BOUNDS.age.max} suffix="лет" onChange={setAge} />
           </div>
           <div style={{ display:'grid', gridTemplateColumns:'1fr', gap:5, marginBottom:6 }}>
             <PopupSelect label="Пол" value={sex} options={[{id:'male',label:'Мужской'},{id:'female',label:'Женский'}]} onChange={v => setSex(v as 'male'|'female')} />
@@ -402,15 +364,30 @@ export const IndividualPlanSettings: React.FC = () => {
           )}
           {kbjuMode === 'manual' && (() => {
             // E0.3 (feasibility-гейт): ккал обязан ≈ 4Б+4У+9Ж. Иначе день сведётся к
-            // макросам, а «ккал-ось» останется честным best-effort — предупреждаем ДО генерации.
+            // FIX B20 (аудит 2026-10): раньше здесь честно писалось «день сойдётся по
+            // макросам, ккал-ось — лучший достижимый вариант», т.е. интерфейс ПРИЗНАВАЛ,
+            // что сходимости не будет. После правки buildDayTargets ккал-цель в ручном
+            // режиме ВСЕГДА приводится к 4Б+4У+9Ж (набор целей не может быть
+            // противоречивым), поэтому текст говорит ровно то, что произойдёт.
             const c = checkTargetsConsistency(manualKcal ?? effectiveKcal, manualP ?? effectiveP, manualF ?? effectiveF, manualC ?? effectiveC);
             if (c.consistent) return null;
             return (
               <div data-kbju-feasibility="1" role="alert" style={{ fontSize:9, color:'#fff', padding:'5px 8px', marginBottom:7, background:'rgba(245,158,11,0.10)', border:'1px solid rgba(245,158,11,0.35)', borderRadius:6, lineHeight:1.4 }}>
-                ⚖️ Цели несогласованы: ккал {manualKcal ?? effectiveKcal} ≠ 4Б+4У+9Ж = {c.atwaterKcal} г. Расхождение {c.devPct}% (канон ≤{PLANNER_CONVERGENCE_PCT}%). День сойдётся по макросам, ккал-ось — лучший достижимый вариант. Выровняйте ккал или макросы.
+                ⚖️ Введено {manualKcal ?? effectiveKcal} ккал, но 4Б+4У+9Ж = {c.atwaterKcal} ккал (расхождение {c.devPct}%). Калорийность будет приведена к БЖУ — {c.atwaterKcal} ккал, чтобы день реально сходился (канон ≤{PLANNER_CONVERGENCE_PCT}%). Если нужны именно {manualKcal ?? effectiveKcal} ккал — измените белки/жиры/углеводы.
               </div>
             );
           })()}
+          {kbjuMode === 'manual' && (
+            // FIX B20: показываем РЕАЛЬНЫЕ цели, которые получит движок (после приведения
+            // ккал к БЖУ и применения физиологического минимума жира). Раньше пользователь
+            // видел только свои введённые числа и не понимал, что план собирается по другим.
+            <div data-kbju-effective="1" style={{ fontSize:9, color:'rgba(255,255,255,0.85)', padding:'5px 8px', marginBottom:7, background:'rgba(0,230,138,0.06)', border:'1px solid rgba(0,230,138,0.18)', borderRadius:6, lineHeight:1.45 }}>
+              🎯 План будет собран на: <b style={{color:'#00e68a'}}>{Math.round(effectiveKcal)} ккал</b> · <b style={{color:'#3b82f6'}}>Б {Math.round(effectiveP)}</b> · <b style={{color:'#f59e0b'}}>Ж {Math.round(effectiveF)}</b> · <b style={{color:'#f97316'}}>У {Math.round(effectiveC)}</b>
+              {(() => { const aw = Math.round(effectiveP * 4 + effectiveF * 9 + effectiveC * 4); const dev = effectiveKcal > 0 ? Math.abs(aw - effectiveKcal) / effectiveKcal * 100 : 0; const ok = dev <= PLANNER_CONVERGENCE_PCT; return (
+                <span style={{ marginLeft:6, fontWeight:800, color: ok ? '#86efac' : '#fbbf24' }}>{ok ? `✓ согласовано (±${Math.round(dev)}%)` : `⚠ БЖУ=${aw} ккал, расхождение ${Math.round(dev)}%`}</span>
+              ); })()}
+            </div>
+          )}
           {errorMsg && <div style={{ fontSize:9, color:'#ef4444', padding:'5px 8px', marginBottom:6, background:'rgba(239,68,68,0.06)', borderRadius:6 }}>⚠️ {errorMsg}</div>}
           <button onClick={() => { try { const err = _validatePlannerInput(); if (err) { setErrorMsg(err); return; } setErrorMsg(null); generatePlan(1); setPlanTab('plan'); } catch (e: any) { setErrorMsg('Ошибка: ' + (e?.message || String(e))); } }} style={{ ...greenBtn, width:'100%' }}>⚡ Рассчитать и создать рацион</button>
         </GlassCard>
@@ -547,9 +524,11 @@ export const IndividualPlanSettings: React.FC = () => {
       {(
       <GlassCard title="Пользователь" icon="👤" color="#a78bfa">
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginBottom: 6 }}>
-          <PopupNumber label="⚖️ Вес (кг)" value={weight} min={30} max={250} suffix="кг" onChange={setWeight} />
-          <PopupNumber label="📏 Рост (см)" value={height} min={100} max={250} suffix="см" onChange={setHeight} />
-          <PopupNumber label="🎂 Возраст" value={age} min={14} max={120} suffix="лет" onChange={setAge} />
+          <PopupNumber label="⚖️ Вес (кг)" value={weight} min={PLANNER_BOUNDS.weight.min} max={PLANNER_BOUNDS.weight.max} suffix="кг" onChange={setWeight} />
+          <PopupNumber label="📏 Рост (см)" value={height} min={PLANNER_BOUNDS.height.min} max={PLANNER_BOUNDS.height.max} suffix="см" onChange={setHeight} />
+          {/* FIX B27: границы возраста — из общего PLANNER_BOUNDS (раньше здесь стояло 120,
+              а валидация отклоняла >100: ввод принимался, а генерация падала с ошибкой). */}
+          <PopupNumber label="🎂 Возраст" value={age} min={PLANNER_BOUNDS.age.min} max={PLANNER_BOUNDS.age.max} suffix="лет" onChange={setAge} />
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 6 }}>
           <PopupSelect label="🧑 Пол" value={sex} options={[{id:'male',label:'Мужской'},{id:'female',label:'Женский'}]} onChange={v => setSex(v as 'male'|'female')} />
@@ -1002,17 +981,19 @@ export const IndividualPlanSettings: React.FC = () => {
             }}>+ Выбрать</button>
           </div>
           {takenSupplements.length > 0 && (
-            <div style={{ display:'flex', flexWrap:'wrap', gap:2 }}>
-              {takenSupplements.slice(0,12).map(sid => {
+            // FIX B28 (аудит 2026-10): стоял `slice(0,12)` — при 13+ БАДах остальные
+            // прятались за «+N» и их НЕЛЬЗЯ было удалить из профиля. Теперь рендерятся
+            // все; при большом списке контейнер прокручивается.
+            <div style={{ display:'flex', flexWrap:'wrap', gap:2, maxHeight: takenSupplements.length > 12 ? 120 : undefined, overflowY: takenSupplements.length > 12 ? 'auto' : undefined, paddingRight: takenSupplements.length > 12 ? 4 : undefined }}>
+              {takenSupplements.map(sid => {
                 const sub = SUPPORT_CATALOG_DATA[sid] || ALL_SUBSTANCES.find(s => s.id === sid);
                 return (
                   <span key={sid} style={{ fontSize:9, padding:'2px 6px', borderRadius:4, background:'rgba(139,92,246,0.08)', color:'#a78bfa', display:'flex', alignItems:'center', gap:4 }}>
                     {sub?.name || sid}
-                    <span onClick={() => setTakenSupplements(takenSupplements.filter(x => x !== sid))} style={{ cursor:'pointer', color:'#ef4444', fontWeight:700 }}>×</span>
+                    <span onClick={() => setTakenSupplements(takenSupplements.filter(x => x !== sid))} title="Убрать из профиля" style={{ cursor:'pointer', color:'#ef4444', fontWeight:700 }}>×</span>
                   </span>
                 );
               })}
-              {takenSupplements.length > 12 && <span style={{ fontSize:9, color:'rgba(255,255,255,0.85)', padding:'2px 4px' }}>+{takenSupplements.length-12}</span>}
             </div>
           )}
         </div>
@@ -2719,7 +2700,7 @@ export const IndividualPlanSettings: React.FC = () => {
                   {m.replaceMeal && <span style={{ color:'#00e68a', marginLeft:4, fontSize:10, background:'rgba(0,230,138,0.08)', padding:'1px 5px', borderRadius:4 }}>↻ {m.replaceMeal}</span>}
                   {m.notes && <div style={{ color:'rgba(255,255,255,0.85)', marginTop:2, fontSize:10 }}>{m.notes}</div>}
                 </div>
-                <button onClick={() => { const upd = specialMeals.filter((_, j) => j !== i); setSpecialMeals(upd); persistPlannerValue('he_special_meals', upd); }} style={{ background:'rgba(239,68,68,0.1)', border:'none', color:'#ef4444', cursor:'pointer', borderRadius:4, padding:'2px 6px', fontSize:9 }}>✕</button>
+                <button onClick={() => { const res = removeSpecialMeal(m); setSpecialMeals(res.list as any); }} style={{ background:'rgba(239,68,68,0.1)', border:'none', color:'#ef4444', cursor:'pointer', borderRadius:4, padding:'2px 6px', fontSize:9 }}>✕</button>
               </div>
             ))}
           </div>
@@ -2787,13 +2768,15 @@ export const IndividualPlanSettings: React.FC = () => {
               <button onClick={() => {
                 const typeLabels: Record<string, string> = { cheat_meal:'🍔 Читмил', refeed:'🍝 Рефид', fast:'⏳ Фастинг' };
                 const newItem = { type: specialMealType, typeLabel: typeLabels[specialMealType], date: specialMealDate, notes: specialMealNotes, replaceMeal: selectedMealToReplace || undefined };
-                const upd = [...specialMeals, newItem];
-                // FIX button-audit: state-закрытие ПОСЛЕ persist (иначе при QuotaExceeded модалка
+                // FIX B18: read-modify-write от АКТУАЛЬНОГО содержимого ключа в момент клика.
+                // Раньше писался `[...снимок_из_state, newItem]` — и рефиды, добавленные
                 // не закрывалась и повторный клик плодил дубликаты)
+                const res = addSpecialMeals([newItem]);
                 setSelectedMealToReplace('');
                 setShowSpecialMealPopup(false);
-                setSpecialMeals(upd);
-                persistPlannerValue('he_special_meals', upd);
+                setSpecialMeals(res.list as any);
+                if (!res.persisted) flash('Не удалось сохранить: хранилище недоступно (приватный режим?).');
+                else if (res.added === 0) flash('Такой приём на эту дату уже есть — дубль не создан.');
               }} style={{ flex:1, padding:'10px', borderRadius:10, cursor:'pointer', border:'none', background:'linear-gradient(135deg,#f97316,#fb923c)', color:'#fff', fontSize:10, fontWeight:700 }}>✓ Сохранить</button>
             </div>
           </div>

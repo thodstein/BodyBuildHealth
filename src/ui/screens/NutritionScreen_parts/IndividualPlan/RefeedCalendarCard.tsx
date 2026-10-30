@@ -7,6 +7,7 @@ import React, { useMemo, useState } from 'react';
 import { GlassCard } from './ui';
 import { buildRefeedCalendar } from './planner-refeed-calendar.engine';
 import { shiftIsoDate } from '../../../../core/local-date';
+import { addSpecialMeals } from './planner-special-meals-store';
 
 interface Props {
   goal: string;
@@ -24,26 +25,20 @@ export const RefeedCalendarCard: React.FC<Props> = ({ goal, startDate, bodyFatPc
 
   const addToCalendar = () => {
     try {
-      const raw = JSON.parse(localStorage.getItem('he_special_meals') || '[]');
-      const list = Array.isArray(raw) ? raw.filter((m: any) => m && typeof m.date === 'string') : [];
-      const have = new Set(list.map((m: any) => `${m.date}:${m.type}`));
-      let added = 0;
+      // FIX B18: единый стор — добавление к АКТУАЛЬНОМУ содержимому ключа + событие
+      // для подписчиков (настройки больше не затирают календарные рефиды).
+      const incoming: Array<{ type: string; date: string }> = [];
       for (const w of cal.weeks) {
-        for (const d of w.refeedDates) {
-          if (!have.has(`${d}:refeed`)) { list.push({ date: d, type: 'refeed' }); have.add(`${d}:refeed`); added++; }
-        }
+        for (const d of w.refeedDates) incoming.push({ date: d, type: 'refeed' });
         if (w.isDietBreak) {
           // E23: полноценная неделя на поддержании — 7 дней типа 'diet_break'
           // (Context поднимает калории к поддержанию + углеводы выше).
-          for (let k = 0; k < 7; k++) {
-            const d = shiftIsoDate(w.dateStart, k);
-            if (!have.has(`${d}:diet_break`)) { list.push({ date: d, type: 'diet_break' }); have.add(`${d}:diet_break`); added++; }
-          }
+          for (let k = 0; k < 7; k++) incoming.push({ date: shiftIsoDate(w.dateStart, k), type: 'diet_break' });
         }
       }
-      localStorage.setItem('he_special_meals', JSON.stringify(list.slice(-400)));
-      try { window.dispatchEvent(new Event('storage')); } catch {}
-      (window as any).showToast?.(added > 0 ? `📅 ${added} рефид-дн. добавлены в календарь — применится при генерации плана` : 'Рефиды уже в календаре', added > 0 ? 'success' : 'info');
+      const res = addSpecialMeals(incoming);
+      if (!res.persisted) { (window as any).showToast?.('Не удалось записать календарь', 'error'); return; }
+      (window as any).showToast?.(res.added > 0 ? `📅 ${res.added} рефид-дн. добавлены в календарь — применится при генерации плана` : 'Рефиды уже в календаре', res.added > 0 ? 'success' : 'info');
     } catch { (window as any).showToast?.('Не удалось записать календарь', 'error'); }
   };
 

@@ -133,6 +133,38 @@ export function plannerGoalCategory(goal: string): string {
   return GOAL_MAP[goal] || 'maintenance';
 }
 
+/**
+ * B11 (аудит 2026-10): «клинический потолок» и «потолок волны» — РАЗНЫЕ вещи.
+ *
+ * `carbCapGPerKg` (5–10 г/кг) ограничивает БАЗОВУЮ цель дня. Карб-периодизация
+ * сознательно поднимает базовую цель на тренировочных днях (`dayCarbMod` до ×1.25,
+ * рефид ×2.2) — это волна, а не превышение клинического потолка. Проблема была в
+ * том, что волна ничем не ограничивалась сверху: на большом bulk база 10 г/кг × 1.25
+ * давала 12.5 г/кг и выше, а вся защита от перебора (инсулин, HV) живёт в потолке.
+ *
+ * Решение: у волны свой абсолютный предел — 12 г/кг (Slater: гликогенная
+ * суперкомпенсация; выше не встречается даже у соревнующихся). Явные дни
+ * суперкомпенсации (рефид/карб-лоад) от предела освобождены — там превышение
+ * базы и есть цель, и оно видно пользователю отдельной заметкой.
+ */
+export const CARB_WAVE_HARD_CAP_G_PER_KG = 12;
+
+export function applyCarbWave(
+  baseCarbsG: number,
+  waveMod: number,
+  weightKg: number,
+  opts?: { allowSupercompensation?: boolean },
+): { carbsG: number; waveClipped: boolean } {
+  const w = Math.max(1, Number(weightKg) || 0);
+  const mod = Number.isFinite(waveMod) && waveMod > 0 ? waveMod : 1;
+  const planned = Math.max(50, Math.round((Number(baseCarbsG) || 0) * mod));
+  if (opts?.allowSupercompensation) return { carbsG: planned, waveClipped: false };
+  const ceil = Math.max(50, Math.round(w * CARB_WAVE_HARD_CAP_G_PER_KG));
+  if (planned <= ceil) return { carbsG: planned, waveClipped: false };
+  return { carbsG: ceil, waveClipped: true };
+}
+
+
 // ─── П2 (Роунд-2, Aug 28): совет автокоррекции калорий по темпу веса ──────
 // Единый контур «план → факт → коррекция»: недельный темп из лога веса vs
 // целевой темп цели → ±150-250 ккал ОДНОЙ переменной (калории), без стэкинга.
@@ -195,6 +227,26 @@ const GOAL_MAP: Record<string, string> = {
   health: 'health',
 };
 
+/**
+ * B17 (аудит 2026-10): веса для адаптации калорийности.
+ *
+ * В «Адаптации веса» есть записи, созданные автогенерацией (сид текущего веса при
+ * первом открытии), они помечены `synthetic: true`. Раньше в `weightLogWeek` уходили
+ * ВСЕ записи, поэтому тренд считался по фейковым замерам и молча менял калораж
+ * (3 одинаковых сида = «вес не падает» → урезание дефицита).
+ *
+ * Теперь в адаптацию попадают только записи, сделанные пользователем, в порядке дат.
+ */
+export function realWeightSeries(entries: Array<{ date?: string; weight?: number; synthetic?: boolean }> | null | undefined): number[] {
+  if (!Array.isArray(entries)) return [];
+  return entries
+    .filter(e => e && !e.synthetic)
+    .map(e => ({ date: String(e.date || ''), weight: Number(e.weight) }))
+    .filter(e => Number.isFinite(e.weight) && e.weight > 0)
+    .sort((a, b) => a.date.localeCompare(b.date))
+    .map(e => e.weight);
+}
+
 export function computePlannerTargets(input: PlannerTargetInput): PlannerTargets {
   const {
     weightKg: _weight, heightCm: height, age, sex, goal, phase, bodyFatPct,
@@ -235,8 +287,7 @@ export function computePlannerTargets(input: PlannerTargetInput): PlannerTargets
   // P2-фикс: loss-коррекция веса применяется только к дефицит-целям (cut/recomp) — на масс/
   // поддержании «недобор потери» ложно резал калораж набора.
   const _lossGoal = engineGoal === 'cut' || engineGoal === 'recomp';
-  if (weightAdaptMode && _lossGoal && weightLogWeek.length >= 2) {
-    // FIX input-audit: фильтруем 0/отрицательные записи — они давали ложный «сброс веса»
+  if (weightAdaptMode && _lossGoal && weightLogWeek.length >= 2) {    // FIX input-audit: фильтруем 0/отрицательные записи — они давали ложный «сброс веса»
     // (80 → 0 = «потеря 80кг») и молча поднимали калораж до +20%
     const validW = weightLogWeek.filter(w => Number.isFinite(w) && w > 0);
     if (validW.length >= 2) {
@@ -259,8 +310,7 @@ export function computePlannerTargets(input: PlannerTargetInput): PlannerTargets
     }
   }
 
-  const targetsV2 = (() => {
-    try {
+  const targetsV2 = (() => {    try {
       return calcNutritionV2({
         weightKg: weight, heightCm: height, age, sex: sex || 'male',
         pal, goal: engineGoal as any, bodyFatPercent: bodyFatPct,

@@ -88,6 +88,17 @@ export interface DayTargetsResult {
   breakdown: string[];
   /** Кап углей сработал (день не добрал ккал до цели). UI: баннер «потолок ограничил». */
   carbCapClipped?: boolean;
+  /**
+   * B32 (аудит 2026-10): сколько углей было ДО применения диетпотолка.
+   *
+   * Баннер в UI показывает «цель N г/кг > потолка», и это N раньше бралось из
+   * `calcTargets.carbs` / `profileTargets.carbs` — то есть из ДРУГОГО источника, чем
+   * тот, к которому движок реально применил кап. В итоге число в кнопке «Снять
+   * потолок» не совпадало с тем, что ограничивалось на самом деле (в auto-режиме
+   * `calcTargets.carbs` — остаток научной цепи ДО правок ББ-плана/стиля питания).
+   * Теперь значение приходит из той же функции, что и `carbCapClipped`.
+   */
+  carbsBeforeCap?: number;
 }
 
 const atwater = (p: number, f: number, c: number) => Math.round(p * 4 + f * 9 + c * 4);
@@ -118,29 +129,155 @@ export function buildDayTargets(input: DayTargetsInput): DayTargetsResult {
     const gProtein = Number((gpk as any)?.protein) > 0 ? Math.round(weight * Number((gpk as any).protein)) : 0;
     const gFat = Number((gpk as any)?.fat) > 0 ? Math.round(weight * Number((gpk as any).fat)) : 0;
     const gCarbs = Number((gpk as any)?.carbs) > 0 ? Math.round(weight * Number((gpk as any).carbs)) : 0;
-    const p = manual.p !== null && manual.p !== undefined && Number(manual.p) > 0
-      ? Math.max(0, Math.round(Number(manual.p)))
-      : gProtein;
-    const fRaw = manual.f !== null && manual.f !== undefined && Number(manual.f) > 0
-      ? Math.max(0, Math.round(Number(manual.f)))
-      : gFat;
-    const f = Math.max(Math.round(weight * fatFloor), fRaw);
-    let c: number;
-    if (manual.c !== null && manual.c !== undefined && Number(manual.c) > 0) {
-      c = Math.round(Number(manual.c));
-    } else if (gCarbs > 0) {
-      c = gCarbs;
-    } else if (Number(manual.kcal) > 0 && p > 0) {
-      // P0-Atwater: остаток углей считаем по ВЫЧИСЛЕННЫМ p/f, а не по сырым
-      // manual.p/manual.f. Раньше ветка требовала «сырой жир > 0»: при вводе
-      // «ккал + белок» без жиров (f поднимался до пола) условие падало → c = 0,
-      // и цель «2000 ккал · Б160 · Ж48 · У0» не сходилась на ~900 ккал.
-      c = Math.max(0, Math.round((Number(manual.kcal) - p * 4 - f * 9) / 4));
-    } else {
-      c = 0;
+
+    // ─── FIX B19/B20 (аудит 2026-10): ручной режим = ЯВНЫЕ граммы пользователя ──
+    // Было три дефекта, из-за которых «ручное КБЖУ» не работало как ручное:
+    //  1) жир молча поднимался до диетологического пола (`fatFloor` = 0.8 г/кг):
+    //     ввели Ж 30 при 80 кг → на выходе 64 г. Пользователь видел не свои цифры.
+    //  2) если были заданы ккал И все три макроса, целью оставался введённый kcal,
+    //     хотя БЖУ давали другую сумму по Атwater. Набор целей становился внутренне
+    //     ПРОТИВОРЕЧИВЫМ (нельзя одновременно попасть в 2000 ккал и в Б150/Ж70/У200
+    //     = 2030 ккал), и корректор честно не мог сойтись лучше 3% — «ползунок
+    //     сходимости» всегда краснел в ручном режиме.
+    //  3) если пользователь не задал ни граммов, ни ккал — все цели становились 0
+    //     и рацион «не собирался».
+    // Новый контракт (детерминированный и всегда внутренне согласованный):
+    //  • явные граммы Б/Ж/У — приоритет; г/кг — только фолбэк для незаполненных;
+    //  • жир не переписывается диетполом: применяется только физиологический
+    //    минимум незаменимых ЖК (0.3 г/кг) и это ЯВНО пишется в разборе;
+    //  • ккал не может противоречить БЖУ: если заданы все три макроса, ккал
+    //    считается по Атwater (а расхождение с введённым ккал показывается);
+    //  • если цели пусты — берём нейтральные цели профиля (план собирается).
+    const pGiven = manual.p !== null && manual.p !== undefined && Number(manual.p) > 0;
+    const fGiven = manual.f !== null && manual.f !== undefined && Number(manual.f) > 0;
+    const cGiven = manual.c !== null && manual.c !== undefined && Number(manual.c) > 0;
+    const kcalGiven = Number(manual.kcal) > 0;
+    const notes: string[] = [];
+
+    let p = pGiven ? Math.max(0, Math.round(Number(manual.p))) : gProtein;
+    let f = fGiven ? Math.max(0, Math.round(Number(manual.f))) : gFat;
+    let c = cGiven ? Math.max(0, Math.round(Number(manual.c))) : gCarbs;
+
+    // Физиологический минимум жира (незаменимые ЖК) — единственная причина,
+    // по которой ручной жир всё же корректируется. Порог низкий и явный.
+    const essentialFatG = Math.max(15, Math.round(weight * 0.3));
+    if (f > 0 && f < essentialFatG) {
+      notes.push(`Ж ${f} г ниже физиологического минимума (${essentialFatG} г = 0.3 г/кг) — поднято до минимума`);
+      f = essentialFatG;
     }
-    const kcal = Number(manual.kcal) > 0 ? Math.round(Number(manual.kcal)) : atwater(p, f, c);
-    return { kcal, protein: p, fats: f, carbs: c, breakdown: [`Ручной режим: ${kcal} ккал · Б ${p} · Ж ${f} · У ${c}`] };
+
+    // Требование пользователя (2026-10-30): ЛЮБОЙ не введённый параметр считается
+    // автоматически — по тем же научным правилам, что и авто-режим (пресет белка,
+    // норма жира с учётом инсулина, потолок углей, стиль питания). Раньше незаполненный
+    // макрос оставался нулём (ввёл только белок → 720 ккал, Ж 0, У 0), а при полном
+    // отсутствии ввода брались «нейтральные цели профиля», игнорируя науку.
+    // Ленивая рекурсия: auto-ветка не содержит ручных полей, поэтому цикл невозможен.
+    const autoForFill = () => buildDayTargets({ ...input, kbjuMode: 'auto', manual: undefined });
+
+    // Добираем незаполненные макросы из ккал (если ккал задан).
+    const missing = (v: number) => !(v > 0);
+    if (kcalGiven) {
+      const k = Math.round(Number(manual.kcal));
+      if (missing(p) && missing(f) && missing(c)) {
+        // только ккал: белок — пресет, жир — пол, угли — остаток
+        p = Math.round(Math.min(weight * 2.6, weight * preset));
+        f = Math.max(essentialFatG, Math.round(weight * fatFloor));
+        c = Math.max(0, Math.round((k - p * 4 - f * 9) / 4));
+        notes.push(`из ${k} ккал: белок по пресету ${p} г, жир по полу ${f} г, угли — остаток`);
+      } else if (missing(f) && missing(c) && p > 0) {
+        // заданы только ккал (+возможно белок): жир — по диетологическому полу,
+        // угли — остаток. Раньше здесь жир забирал ВСЮ калорийность (угли 0).
+        f = Math.max(essentialFatG, Math.round(weight * fatFloor));
+        c = Math.max(0, Math.round((k - p * 4 - f * 9) / 4));
+      } else if (missing(c) && p > 0 && f > 0) {
+        // BUG-фикс: остаток углей считаем по ВЫЧИСЛЕННЫМ p/f, а не по сырым manual.*
+        c = Math.max(0, Math.round((k - p * 4 - f * 9) / 4));
+      } else if (missing(f) && p > 0 && c > 0) {
+        const rest = k - p * 4 - c * 4;
+        f = Math.max(essentialFatG, Math.round(rest / 9));
+      } else if (missing(p) && missing(c) && f > 0) {
+        // Задан только жир (+ккал): делим остаток между белком и углеводами в
+        // АВТО-ПРОПОРЦИИ, иначе белок съедал всю калорийность, а углеводы = 0.
+        const auto = autoForFill();
+        const rest = Math.max(0, k - f * 9);
+        const autoSum = auto.protein * 4 + auto.carbs * 4;
+        const t = autoSum > 0 ? rest / autoSum : 0;
+        p = Math.max(0, Math.round(auto.protein * t));
+        c = Math.max(0, Math.round(auto.carbs * t));
+        notes.push(`из ${k} ккал при заданном жире: белок и углеводы — в авто-пропорции (${p} г / ${c} г)`);
+      } else if (missing(p) && missing(f) && c > 0) {
+        // Заданы только углеводы (+ккал): остаток делим между белком и жиром
+        // в авто-пропорции, с полом незаменимых ЖК.
+        const auto = autoForFill();
+        const rest = Math.max(0, k - c * 4);
+        const autoSum = auto.protein * 4 + auto.fats * 9;
+        const t = autoSum > 0 ? rest / autoSum : 0;
+        p = Math.max(0, Math.round(auto.protein * t));
+        f = Math.max(essentialFatG, Math.round(auto.fats * t));
+        notes.push(`из ${k} ккал при заданных углеводах: белок и жир — в авто-пропорции (${p} г / ${f} г)`);
+      }
+    }
+
+    // ─── автодосчёт всего, что пользователь не ввёл ───────────────────────────
+    // Единое правило: незаполненный макрос считается автоматически, а не остаётся 0.
+    //  • белок/жир — из авто-цели (пресет + норма жира с учётом инсулина и стиля);
+    //  • углеводы — остаток до ВВЕДЁННЫХ ккал, если они есть; иначе — авто-значение
+    //    (с диетпотолком/кето-поправкой, чтобы автодосчёт не пробивал кап).
+    if (!pGiven && !fGiven && !cGiven && !kcalGiven && !(gProtein > 0) && !(gFat > 0) && !(gCarbs > 0)) {
+      // Ничего не введено → полный авто-расчёт (кап углей, стиль, инсулин).
+      const auto = autoForFill();
+      notes.push('цели не заданы — все три макроса посчитаны автоматически (как в авто-режиме)');
+      const breakdown = [`Ручной режим (автодосчёт): ${auto.kcal} ккал · Б ${auto.protein} · Ж ${auto.fats} · У ${auto.carbs}`, ...notes];
+      return { kcal: auto.kcal, protein: auto.protein, fats: auto.fats, carbs: auto.carbs, breakdown, carbsBeforeCap: auto.carbsBeforeCap ?? auto.carbs };
+    }
+    if (missing(p) || missing(f) || missing(c)) {
+      const auto = autoForFill();
+      if (missing(p)) {
+        p = auto.protein;
+        notes.push(`белок не задан — посчитан автоматически: ${p} г (пресет)`);
+      }
+      if (missing(f)) {
+        f = Math.max(essentialFatG, auto.fats);
+        notes.push(`жир не задан — посчитан автоматически: ${f} г (норма)`);
+      }
+      if (missing(c)) {
+        if (kcalGiven) {
+          const k = Math.round(Number(manual.kcal));
+          c = Math.max(0, Math.round((k - p * 4 - f * 9) / 4));
+          notes.push(`углеводы не заданы — остаток до введённых ${k} ккал: ${c} г`);
+        } else {
+          c = auto.carbs;
+          notes.push(`углеводы не заданы — посчитаны автоматически: ${c} г (с диетпотолком/стилем)`);
+        }
+      }
+    }
+
+    // Итоговые ккал: если заданы все три макроса — ккал ПРОИЗВОДНЫЙ (Атwater),
+    // иначе набор целей был бы противоречивым и сходимость недостижима.
+    const atwaterKcal = atwater(p, f, c);
+    let kcal: number;
+    if (pGiven && fGiven && cGiven) {
+      kcal = atwaterKcal;
+      if (kcalGiven) {
+        const entered = Math.round(Number(manual.kcal));
+        const devPct = entered > 0 ? Math.abs(entered - atwaterKcal) / entered * 100 : 0;
+        if (devPct > 3) {
+          notes.push(`введено ${entered} ккал, но Б ${p} + Ж ${f} + У ${c} = ${atwaterKcal} ккал (расхождение ${Math.round(devPct)}%) — цель по ккал приведена к БЖУ`);
+        }
+      }
+    } else if (kcalGiven) {
+      kcal = Math.round(Number(manual.kcal));
+      // страховка: если остаток ушёл в минус/ноль, набор неисполним — берём Атwater
+      if (Math.abs(kcal - atwaterKcal) / Math.max(1, kcal) > 0.15) {
+        notes.push(`ккал ${kcal} не сходятся с БЖУ (${atwaterKcal}) — цель по ккал приведена к БЖУ`);
+        kcal = atwaterKcal;
+      }
+    } else {
+      kcal = atwaterKcal;
+    }
+    const breakdown = [`Ручной режим: ${kcal} ккал · Б ${p} · Ж ${f} · У ${c}`, ...notes];
+    // B32: в ручном режиме диетпотолок не применяется, «до капа» == итог.
+    return { kcal, protein: p, fats: f, carbs: c, breakdown, carbsBeforeCap: c };
   }
 
   // ─── profile: нейтральные цели профиля + диетпотолок (прежнее поведение) ────
@@ -148,13 +285,15 @@ export function buildDayTargets(input: DayTargetsInput): DayTargetsResult {
     const p = Math.max(0, Math.round(prof.protein || 0));
     const f = Math.max(Math.round(weight * fatFloor), Math.max(0, Math.round(prof.fats || 0)));
     const vol = Math.max(0, Number(input.trainingVolumeMinPerWeek) || 0);
+    // B32: ровно то значение, которое уходит в кап (а не пересчёт «похожего» поля).
+    const rawCarbsProfile = Math.max(0, Math.round(prof.carbs || 0));
     const c = computeDieteticCarbTarget({
-      weightKg: weight, rawCarbsG: Math.max(0, Math.round(prof.carbs || 0)), insulinTotalUnits: insulinUnits,
+      weightKg: weight, rawCarbsG: rawCarbsProfile, insulinTotalUnits: insulinUnits,
       goalPhase: plannerGoalCategory(input.goal || ''), trainingVolumeMinPerWeek: vol, budget: input.budget,
     });
     const kcal = atwater(p, f, c);
     return {
-      kcal, protein: p, fats: f, carbs: c,
+      kcal, protein: p, fats: f, carbs: c, carbsBeforeCap: rawCarbsProfile,
       breakdown: [`Профиль (без модификаторов): ${kcal} ккал · Б ${p} · Ж ${f} · У ${c} (потолок углей применён)`],
     };
   }
@@ -241,5 +380,5 @@ export function buildDayTargets(input: DayTargetsInput): DayTargetsResult {
   if (dietStyle === 'highcarb') breakdown.push(`🍚 Стиль «Высоко-углеводный»: жиры на полу ${fatFloor} г/кг, угли = максимум до потолка`);
   breakdown.push(`Итог дня: ${kcal} ккал = Б ${protein}×4 + Ж ${fatsFinal}×9 + У ${carbs}×4`);
   if (kcal < kcalTarget * 0.92) breakdown.push(`⚠ Потолок углей срезал ${Math.round(kcalTarget - kcal)} ккал — увеличьте объём тренировок или бюджет («💰»), либо снимите потолок`);
-  return { kcal, protein, fats: fatsFinal, carbs, breakdown, carbCapClipped: carbs < carbsFinal - 1 };
+  return { kcal, protein, fats: fatsFinal, carbs, breakdown, carbCapClipped: carbs < carbsFinal - 1, carbsBeforeCap: carbsFinal };
 }

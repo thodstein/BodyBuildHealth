@@ -14,6 +14,13 @@ export interface EAInput {
   weightKg: number;
   lbmKg: number; // if 0, derived from bodyFatPct or 0.85*weight
   bodyFatPct?: number;
+  /**
+   * B16 (аудит 2026-10): % жира НЕ известен, `bodyFatPct` — заглушка.
+   * Раньше в FFM уходили условные 15%/22%, и EA получалась ЗАВЫШЕННОЙ →
+   * ложное «optimal» при фактическом дефиците (ложно-отрицательный RED-S).
+   * При `true` FFM считается по весу (верхняя граница) — оценка консервативная.
+   */
+  bodyFatEstimated?: boolean;
   isTrainingDay: boolean;
   trainDurationMin?: number; // 0 if rest
   trainIntensity?: 'low' | 'medium' | 'high';
@@ -34,7 +41,12 @@ export function computeEA(input: EAInput): EAResult {
   const w = Math.max(30, Number(input.weightKg) || 80);
   let ffm = Number(input.lbmKg) || 0;
   if (!ffm || ffm <= 0) {
-    if (typeof input.bodyFatPct === 'number' && input.bodyFatPct > 3 && input.bodyFatPct < 60) {
+    if (input.bodyFatEstimated) {
+      // B16: данных о составе тела нет → КОНСЕРВАТИВНО считаем всю массу тощей
+      // (FFM = вес). Это даёт НИЖНЮЮ границу EA, то есть повод проверить раньше,
+      // а не ложное «optimal» на заниженном FFM.
+      ffm = w;
+    } else if (typeof input.bodyFatPct === 'number' && input.bodyFatPct > 3 && input.bodyFatPct < 60) {
       ffm = w * (1 - input.bodyFatPct / 100);
     } else {
       ffm = w * 0.85;
@@ -71,6 +83,12 @@ export function computeEA(input: EAInput): EAResult {
     status = 'reduced';
     zoneLabel = '🟡 EA reduced 30-45';
     note = `🟡 EA ${ea} ккал/кг FFM/день (30-45, сниженная зона). Контролируйте восстановление/цикл/либидо; не задерживайтесь долго. Цель ≥45.`;
+  }
+  // B16: без % жира статус «optimal» не должен выглядеть как измеренный факт.
+  if (input.bodyFatEstimated) {
+    const caution = '⚪ EA посчитана по весу: % жира не указан, оценка КОНСЕРВАТИВНАЯ (FFM = вес). Укажите % жира для точности.';
+    note = note ? `${caution}\n${note}` : caution;
+    if (status === 'optimal') zoneLabel = '⚪ EA optimal (оценка по весу)';
   }
   return { ea, ffm: Math.round(ffm), eee, status, note, zoneLabel };
 }

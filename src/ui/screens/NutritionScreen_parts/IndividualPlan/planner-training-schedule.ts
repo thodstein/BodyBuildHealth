@@ -55,8 +55,28 @@ export function normalizeTrainSchedule(raw: any): TrainSchedule {
   };
 }
 
-/** Тренировочный ли день offset (0 = первый день плана). Отрицательные offset корректны. */
-export function isTrainingDayFor(schedule: TrainSchedule, offset: number): boolean {
+/**
+ * Индекс дня недели для offset = 0 (0 = Пн … 6 = Вс).
+ * `weeklyDays` индексируется по дню недели (0 = Пн), а `offset` во всём
+ * планировщике отсчитывается от СЕГОДНЯ (`_prepDate = isoAddDays(isoToday(), offset)`).
+ * Поэтому база обязана быть сегодняшним днём недели, иначе весь график съезжает.
+ * Та же формула, что в `planner-work.ts` (isWorkDayForIndex).
+ */
+export function todayDowBase(now: Date = new Date()): number {
+  return (now.getDay() + 6) % 7;
+}
+
+/**
+ * Тренировочный ли день offset (0 = СЕГОДНЯ, не «первый день плана»).
+ *
+ * FIX B4 (аудит 2026-10): раньше `weekly`-ветка читала `weeklyDays[offset % 7]`,
+ * то есть offset 0 всегда означал Понедельник, независимо от реальной даты.
+ * Сегодняшний понедельник это маскировал; в любой другой день недели график
+ * тренировок, peri-workout приёмы, carb-periodization и карточка периодизации
+ * смещались на `todayDowBase()` дней. Теперь база — день недели, `dowBase`
+ * можно передать явно (тесты / детерминизм / сдвиг на старт плана).
+ */
+export function isTrainingDayFor(schedule: TrainSchedule, offset: number, dowBase?: number): boolean {
   if (!schedule.enabled) return false;
   switch (schedule.scheduleType) {
     case 'eod': {
@@ -71,7 +91,8 @@ export function isTrainingDayFor(schedule: TrainSchedule, offset: number): boole
       return pos < work;
     }
     default: {
-      const pos = ((offset % 7) + 7) % 7;
+      const base = typeof dowBase === 'number' && Number.isFinite(dowBase) ? Math.trunc(dowBase) : todayDowBase();
+      const pos = (((offset + base) % 7) + 7) % 7;
       return !!schedule.weeklyDays[pos];
     }
   }
@@ -79,8 +100,10 @@ export function isTrainingDayFor(schedule: TrainSchedule, offset: number): boole
 
 /** Число тренировочных дней в 7-дневном окне (для сводки/профиля daysPerWeek). */
 export function weeklyTrainingCount(schedule: TrainSchedule): number {
+  // Окно 0..6 покрывает все 7 дней недели, поэтому количество не зависит от базы;
+  // dowBase: 0 передаём явно, чтобы результат не зависел от дня запуска (детерминизм).
   let n = 0;
-  for (let d = 0; d < 7; d++) if (isTrainingDayFor(schedule, d)) n++;
+  for (let d = 0; d < 7; d++) if (isTrainingDayFor(schedule, d, 0)) n++;
   return n;
 }
 

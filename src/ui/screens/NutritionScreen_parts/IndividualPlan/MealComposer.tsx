@@ -82,6 +82,7 @@ export const MealComposer: React.FC = () => {
     DAY_LABELS, planDays, setPlanDays,
     selectedDayIndex, setSelectedDayIndex,
     generated, setGenerated,
+    openWeekDayForEdit, openThreeDayForEdit,
     renderMealList,
     recipePickerMeal, setRecipePickerMeal, replaceMealWithRecipe, addSecondRecipeToMeal,
     favoriteRecipes, isFavoriteRecipe, toggleFavoriteRecipe,
@@ -336,13 +337,18 @@ export const MealComposer: React.FC = () => {
           <div style={{ display:'flex', gap:4, justifyContent:'center', flexWrap:'wrap' }}>
             {DAY_LABELS.map((label: string, idx: number) => {
               // E3-паритет: клик по дню = ПРОСМОТР существующего дня (неделя/3дн), регенерация только если дня нет
+              // FIX B8 (аудит 2026-10): раньше здесь день копировался в dayPlan, но НЕ помечался
+              // как «редактируемый день недели/3-дневки». Дальше 🕒-время, 📋-дубль и правки
+              // состава синхронизировались только в dayPlan → при возврате к неделе правок не было.
+              // Теперь идём через штатные openWeekDayForEdit/openThreeDayForEdit.
               const openDay = () => {
-                setPlanDays(1); setSelectedDayIndex(idx);
                 const weekDay = weekPlan?.days?.[idx];
                 const threeDay = planDays === 3 ? threeDayPlan?.days?.[idx] : null;
-                if (weekDay) { try { setDayPlan(JSON.parse(JSON.stringify(weekDay))); } catch { setDayPlan(weekDay); } }
-                else if (threeDay) { try { setDayPlan(JSON.parse(JSON.stringify(threeDay))); } catch { setDayPlan(threeDay); } }
-                else { generatePlan(1, undefined, idx); }
+                if (planDays === 3 && threeDay) { openThreeDayForEdit(idx); return; }
+                if (weekDay) { openWeekDayForEdit(idx); return; }
+                if (threeDay) { openThreeDayForEdit(idx); return; }
+                setPlanDays(1); setSelectedDayIndex(idx);
+                generatePlan(1, undefined, idx);
               };
               return (
                 <button key={idx} onClick={openDay} style={{

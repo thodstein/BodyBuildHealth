@@ -1162,10 +1162,14 @@ function snackNutPool(pool: ReturnType<typeof buildFoodPools>): FoodItem[] {
 // «завтрак→обед» оставался пустым (жалоба: «между завтраком и обедом 6 часов без еды»).
 // Теперь каждый перекус встаёт в середину самого большого из оставшихся разрывов
 // (largest-gap-first) — перекусы распределяются равномерно по дню.
-function gapFillTimes(fixedMin: number[], count: number): number[] {
+function gapFillTimes(fixedMin: number[], count: number, maxMin?: number): number[] {
   const pts = [...fixedMin].filter(v => Number.isFinite(v)).sort((a, b) => a - b);
   const result: number[] = [];
   if (pts.length < 2) return result;
+  // FIX B15 (аудит 2026-10): жёсткая верхняя граница окна приёмов (отбой − запас).
+  // Раньше «вынужденная точка» уходила до 23:30 даже при отбое 22:00: последние приёмы
+  // вставали ПОСЛЕ отбоя, а preSleep при этом помечался «за 30 мин до сна».
+  const cap = Number.isFinite(maxMin as number) ? (maxMin as number) : 1410;
   for (let i = 0; i < count; i++) {
     let bestGap = -1, bestIdx = -1;
     for (let j = 1; j < pts.length; j++) {
@@ -1178,23 +1182,24 @@ function gapFillTimes(fixedMin: number[], count: number): number[] {
     // E17 (чистота выдачи): время приёма округляем до 5 мин (08:23 → 08:25),
     // иначе меню выглядит машинной свалкой. Шаг 5 сохраняет разрывы ≥90/150.
     if (bestGap >= 150) {
-      const mid = Math.round((pts[bestIdx - 1] + pts[bestIdx]) / 2 / 5) * 5;
+      const mid = Math.min(cap, Math.round((pts[bestIdx - 1] + pts[bestIdx]) / 2 / 5) * 5);
       result.push(mid);
       pts.push(mid);
       pts.sort((a, b) => a - b);
       continue;
     }
     if (bestGap >= 90) {
-      const mid = Math.round((pts[bestIdx - 1] + pts[bestIdx]) / 2 / 5) * 5;
+      const mid = Math.min(cap, Math.round((pts[bestIdx - 1] + pts[bestIdx]) / 2 / 5) * 5);
       result.push(mid);
       pts.push(mid);
       pts.sort((a, b) => a - b);
       continue;
     }
-    // Вынужденная точка: максимум расстояния до ближайшего приёма в окне 05:00–23:30.
+    // Вынужденная точка: максимум расстояния до ближайшего приёма в окне 05:00–23:30
+    // (и не позже cap — B15).
     let bestM = -1, bestDist = -1;
     const lo = Math.max(300, Math.min(...pts) - 150);
-    const hi = Math.min(1410, Math.max(...pts) + 150);
+    const hi = Math.min(cap, Math.max(...pts) + 150);
     for (let m = lo; m <= hi; m += 10) {
       let d = Infinity;
       for (const p of pts) { const dd = Math.abs(p - m); if (dd < d) d = dd; }
@@ -3555,6 +3560,17 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   let tLunch = input.lunchTime || '12:30';
   let tDinner = input.dinnerTime || '19:00';
   const tBed = input.bedTime || '22:00';
+  // FIX B15 (аудит 2026-10): единая верхняя граница окна приёмов = отбой − 45 мин
+  // (последний приём минимум за 45 мин до сна; pre-sleep остаётся за 30 мин до сна).
+  // undefined — окно сна не «вечернее» (ночная смена / отбой после полуночи):
+  // в этом случае границу не применяем, чтобы не ломать распорядок.
+  const _bedCapMin: number | undefined = (() => {
+    const b = timeStrToMinutes(tBed);
+    const w = timeStrToMinutes(input.wakeTime || '07:30');
+    if (b === null || b < 300) return undefined;
+    if (w !== null && b <= w) return undefined;
+    return b - 45;
+  })();
   // P1-3 (план разнообразия): недельный гейт «одна крупа ≤2 дней недели» —
   // семейства с ≥2 днями в ledger-week добавляются к бану recent-семейств
   // (fresh-гейт ≥2 в buildWholeMeal не даёт голода). undefined = legacy бит-в-байт.
@@ -3716,7 +3732,15 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   //    при сессии 90+ мин попадало ВНУТРЬ тренировки — баг распределения).
   const _sessionMin = input.trainDurationMin && input.trainDurationMin > 0 ? input.trainDurationMin : 60;
   const prewMin = trainWindow ? (input.trainStartMin || 0) - 90 : NaN;
-  const postwMin = trainWindow ? (input.trainStartMin || 0) + _sessionMin + 30 : NaN;
+  // FIX B15: пост-трен не может уехать за отбой. Если тренировка заканчивается позже
+  // «отбой − 45 мин», приём физически невозможен до сна — оставляем сразу после
+  // тренировки (лучше поздно, чем ложно «до сна»), но если окно есть — подрезаем.
+  const _postwRaw = trainWindow ? (input.trainStartMin || 0) + _sessionMin + 30 : NaN;
+  const postwMin = Number.isFinite(_postwRaw) && _bedCapMin !== undefined
+    && _postwRaw > _bedCapMin
+    && (input.trainStartMin || 0) + _sessionMin <= _bedCapMin
+    ? _bedCapMin
+    : _postwRaw;
   // Training-aware: ужин и другие приёмы (завтрак/обед/ужин/перекус/preSleep) не ставятся
   // во время тренировки ±60 мин (пери-приёмы pre/intra/post уже вокруг тренировки)
   if (trainWindow) {
@@ -3735,16 +3759,26 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
       const before = (trainStart - 90 + 1440) % 1440;
       return t < trainStart ? before : after;
     };
+    // FIX B15 (аудит 2026-10): сдвиг «после тренировки» мог уехать за отбой
+    // (вечерняя сессия 21:00–22:30 при отбое 22:30 → приём в 00:00). Верхняя
+    // граница — отбой − 45 мин; если и она внутри тренировочного окна, приём всё
+    // равно ставим в границу (лучше чуть раньше, чем после отбоя).
+    const shiftAwayClamped = (t: number) => {
+      const r = shiftAway(t);
+      if (_bedCapMin === undefined) return r;
+      return r > _bedCapMin ? _bedCapMin : r;
+    };
     const fmtM = (m: number) => String(Math.floor(m/60)).padStart(2,'0') + ':' + String(m%60).padStart(2,'0');
     const adjustStr = (s: string) => {
       const mm = timeStrToMinutes(s);
       if (mm === null || !isConflict(mm)) return s;
-      return fmtM(shiftAway(mm));
+      return fmtM(shiftAwayClamped(mm));
     };
     tBreakfast = adjustStr(tBreakfast);
     tLunch = adjustStr(tLunch);
     tDinner = adjustStr(tDinner);
-    tPreSleep = adjustStr(tPreSleep);
+    // B15: pre-sleep привязан к отбою (за 30 мин до сна) и НЕ сдвигается тренировкой —
+    // иначе «за 30 мин до сна» переставало быть правдой.
     tSnack = adjustStr(tSnack);
   }
   // Carb periodization: тренировка → 25% pre+30% post+15% lunch; отдых → 30/30/20
@@ -3853,7 +3887,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   if (intraEligible && _keep.has('intra')) _fixedPts.push((input.trainStartMin || 0) + 30);
   const _snackOrder = ['snack', 'snack2', 'snack3', 'snack4', 'snack5', 'snack6'];
   const _keptSnacks = _snackOrder.filter(r => _keep.has(r));
-  const _snackTimes = gapFillTimes(_fixedPts, _keptSnacks.length);
+  const _snackTimes = gapFillTimes(_fixedPts, _keptSnacks.length, _bedCapMin);
   const _snackTimeOf = (role: string): string => {
     const i = _keptSnacks.indexOf(role);
     if (i >= 0 && i < _snackTimes.length) return fmtMin(_snackTimes[i]);
@@ -3861,7 +3895,8 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     // а не тот же самый час — иначе два приёма сливаются в один момент.
     const base = _toMin2(tSnack);
     const off = Math.max(0, i) * 30;
-    const m = Number.isFinite(base) ? Math.min(1400, base + off) : 930;
+    const hardHi = _bedCapMin ?? 1400;
+    const m = Number.isFinite(base) ? Math.min(hardHi, base + off) : Math.min(hardHi, 930);
     return fmtMin(m);
   };
   // FIX 2.2 (БАГ-10): preSleep резервировал углеводную долю 0.3 в _wSum, но никогда её не отдавал
@@ -4020,6 +4055,18 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   // Snack on non-training days to fill MPS gap (lunch 12:30 → dinner 19:00 = 6.5h)
   // P2-fix: бюджет перекуса сразу 25г (mTOR порог), а не 15г с добивкой сывороткой — тогда usedP/residualP корректны
   const snackP = Math.max(25, Math.round(mpsPerMeal * 0.6));
+  // B12 (аудит 2026-10) — ОТЛОЖЕНО, ПРОВЕРЕНО ЭКСПЕРИМЕНТАЛЬНО.
+  // Доли жира по приёмам (0.20/0.15/0.22/0.10×N) не суммируются в 1: 3 приёма → Σ=0.57,
+  // 6 приёмов → Σ=1.17. Остаток дня добирается точечными добавками/корректором.
+  // Пробная нормировка ломает выстроенные инварианты качества. Проверены ДВА варианта:
+  //  1) полная нормировка Σ→1 (и вверх, и вниз) — 16 сломанных инвариантов;
+  //  2) только «перебор» Σ>1 (этот файл, прогон 2026-10-29) — 5 падений:
+  //     сходимость 2600 ккал → 5.0%, жир дня 73/80 (8.2%), HV-снек 34.9У из 40,
+  //     snack-minimum 34.9У из цели 76У, R-1500 dev 4.1% (порог 3.1%).
+  // Вывод: доли жира связаны с порционными капами и добором углеводов нелинейно;
+  // нужен отдельный прогон настройки (менять доли + капы + добор вместе), а не
+  // механическое масштабирование. Оставлено как есть — текущее распределение
+  // даёт сходимость ≤3% и не нарушает капсов, что важнее «красоты» процентов.
   const snackF = Math.round(fatTotal * 0.10);
   const hasSnack = _keep.has('snack');
 
@@ -4141,6 +4188,8 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
       }
     }
   }
+  // B12: доли жира ОСТАВЛЕНЫ как были (см. разбор причин у snackF выше) — перебор
+  // Σ>1 не нормируется сознательно: это ломает сходимость и капсы порций.
   const mealBudget = {
     breakfast: { p: roleP.breakfast ?? evenRegularP, c: breakC, f: Math.round(fatTotal * 0.20) },
     lunch: { p: roleP.lunch ?? evenRegularP, c: lunchC, f: Math.round(fatTotal * 0.15) },
@@ -4782,18 +4831,46 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
         }
       }
       // добить вес до 350г овощами, если всё ещё пусто (<300г) — без перегруза (>650г)
+      // FIX B1 (аудит 2026-10): раньше здесь был хардкод broccoli/cucumber/tomato и
+      // единственной проверкой было «этого продукта ещё нет в приёме». В результате
+      // наполнитель тарелки докладывал аллерген/исключённый продукт/запрещённую
+      // интолерантностью позицию УЖЕ ПОСЛЕ всех фильтров пула.
+      // FIX B1 (аудит 2026-10): порядок и граммовки оставлены прежними (состав дня и
+      // сходимость не меняются), но каждый кандидат проходит ТЕ ЖЕ гейты, что и пул
+      // buildFoodPools: исключённые продукты, аллергены, интолерантности, категория.
+      // Если предпочтительный овощ заблокирован — берём следующий из vegGreen/vegColor.
       let curW2 = m.items.reduce((s,x)=>s+x.amount,0);
       if (curW2 >0 && curW2 < 300) {
-        const vegPoolDense = [{id:'broccoli', amount:100}, {id:'cucumber', amount:100}, {id:'tomato', amount:100}];
-        for (const v of vegPoolDense) {
+        const _vegTagSet = _pickCtx.allergenTags;
+        const _vegAllowed = (f: any): boolean => {
+          if (!f || !f.id) return false;
+          if (_pickCtx.currentExcludedIds && _pickCtx.currentExcludedIds.has(f.id)) return false;
+          if (_vegTagSet && _vegTagSet.size > 0) {
+            const diet = FOOD_ALLERGEN_DIET[f.id];
+            const tags = (diet && Array.isArray(diet.allergens)) ? diet.allergens : (f.allergens || []);
+            if ([..._vegTagSet].some(t => tags.includes(t))) return false;
+          }
+          try { if (input.intolerances && !filterByIntolerance(f, input.intolerances)) return false; } catch {}
+          try { if (_pickCtx.categoryPref && !matchesCategoryPref(f, _pickCtx.categoryPref)) return false; } catch {}
+          if (m.items.some((x: any) => x.id === f.id)) return false;
+          return true;
+        };
+        // Прежний приоритет + расширенный список овощей на замену заблокированным.
+        const _vegPreferred = ['broccoli', 'cucumber', 'tomato']
+          .map(id => FOOD_DB.find(x => x.id === id))
+          .filter((f): f is any => !!f && _vegAllowed(f));
+        const _vegSpare = [...(pool.vegGreen || []), ...(pool.vegColor || [])]
+          .filter((f: any) => _vegAllowed(f) && !_vegPreferred.some(pf => pf.id === f.id));
+        const vegPoolDense = [..._vegPreferred, ..._vegSpare];
+        let _vegAdded = 0;
+        for (const f of vegPoolDense) {
+          if (_vegAdded >= 3) break;
           if (curW2 >= 320) break;
-          const f = FOOD_DB.find(x=>x.id===v.id);
-          if (!f || m.items.some(x=>x.id===f.id)) continue;
           const add = Math.min(80, 350 - curW2);
           if (add <30) break;
           const it2 = { id:f.id, name:f.name, amount:add, kcal:Math.round(f.kcal*add/100), p:Math.round(f.protein*add/100*10)/10, f:Math.round(f.fat*add/100*10)/10, c:Math.round(f.carbs*add/100*10)/10, fiber:Math.round(f.fiber*add/100*10)/10, leucine_mg:0, role:'veg' as const };
           it2.kcal = Math.round(4*it2.p+9*it2.f+4*it2.c);
-          m.items.push(it2 as any); curW2 += add;
+          m.items.push(it2 as any); curW2 += add; _vegAdded++;
         }
       }
     }

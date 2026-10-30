@@ -88,16 +88,23 @@ ${mood}
 </body></html>`;
 }
 
-export function printDayReport(html: string): void {
+/**
+ * FIX B24 (аудит 2026-10): функция возвращала `void`, а вызывающий код проверял
+ * `if (!ok)` — то есть `ok` был всегда `true`. Заблокированный попап или запрет
+ * записи в новое окно давали «готово» при отсутствии печати.
+ * Теперь честный `boolean`.
+ */
+export function printDayReport(html: string): boolean {
   try {
     const w = window.open('', '_blank', 'width=820,height=900');
-    if (!w) return;
+    if (!w) return false; // попап заблокирован браузером
     w.document.write(html);
     w.document.close();
     w.focus();
-    window.setTimeout(() => { try { w.print(); } catch {} }, 250);
+    window.setTimeout(() => { try { w.print(); } catch { /* печать отменена пользователем */ } }, 250);
+    return true;
   } catch {
-    // печать недоступна — игнорируем
+    return false;
   }
 }
 
@@ -209,12 +216,46 @@ export function downloadCoachExport(html: string, filename: string): boolean {
 // window.open().print() и <a download> в WebView-АПК не работают/немы:
 // печать уходит файлом в Documents + Share-диалог, текст — в системный Share.
 
-/** Поделиться текстом или скопировать: native — Share-диалог, иначе clipboard. */
+/**
+ * FIX B24 (аудит 2026-10): раньше `await navigator.clipboard?.writeText(text)` при
+ * отсутствии clipboard давал `await undefined` → всегда `true`, и пользователь видел
+ * «скопировано» при реальном провале. Теперь: проверяем наличие API, а при его
+ * отсутствии используем fallback через `textarea` + `execCommand('copy')` с проверкой
+ * результата.
+ */
 export async function shareOrCopyText(title: string, text: string): Promise<boolean> {
   if (isCapacitorNative()) {
     try { if (await shareText({ title, text })) return true; } catch { /* fallback ниже */ }
   }
-  try { await navigator.clipboard?.writeText(text); return true; } catch { return false; }
+  try {
+    const cb = typeof navigator !== 'undefined' ? (navigator as any).clipboard : null;
+    if (cb && typeof cb.writeText === 'function') {
+      await cb.writeText(text);
+      return true;
+    }
+  } catch { /* запрет доступа к буферу — пробуем fallback */ }
+  return copyTextFallback(text);
+}
+
+/** Fallback-копирование без Clipboard API: textarea + execCommand. Возвращает факт успеха. */
+function copyTextFallback(text: string): boolean {
+  try {
+    if (typeof document === 'undefined') return false;
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    // Вне видимой области, но всё ещё «в документе» — иначе execCommand не сработает.
+    ta.setAttribute('readonly', '');
+    ta.style.position = 'fixed';
+    ta.style.top = '-1000px';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    ta.setSelectionRange(0, ta.value.length);
+    const exec = (document as any).execCommand;
+    const ok = typeof exec === 'function' ? !!document.execCommand('copy') : false;
+    document.body.removeChild(ta);
+    return ok;
+  } catch { return false; }
 }
 
 /** Печать HTML: native — HTML-файл в Documents + Share, иначе print-окно. */
@@ -222,7 +263,9 @@ export async function printPlanHtml(title: string, html: string): Promise<boolea
   if (isCapacitorNative()) {
     try { return await saveTextFile(`${title}.html`, html); } catch { return false; }
   }
-  try { printDayReport(html); return true; } catch { return false; }
+  // FIX B24: печатаем через printDayReport и возвращаем ЕГО результат
+  // (раньше возвращался безусловный `true` даже при заблокированном попапе).
+  return printDayReport(html);
 }
 
 /** Файл тренеру: native — Documents + Share, иначе скачивание Blob. */
@@ -373,16 +416,18 @@ ${trainRow}
 ${sorted.length === 0 ? '<p style="font-size:12px;color:#888">Нет приёмов.</p>' : `<table><tr><th>Время</th><th>Приём</th><th>Продукты</th><th>Ккал</th><th>БЖУ</th></tr>${rows}</table>`}
 </body></html>`;
 }
-export function printMealTimeline(html: string): void {
+/** FIX B24: честный `boolean` (см. printDayReport). */
+export function printMealTimeline(html: string): boolean {
   try {
     const w = window.open('', '_blank', 'width=820,height=900');
-    if (!w) return;
+    if (!w) return false;
     w.document.write(html);
     w.document.close();
     w.focus();
-    window.setTimeout(() => { try { w.print(); } catch {} }, 250);
+    window.setTimeout(() => { try { w.print(); } catch { /* печать отменена */ } }, 250);
+    return true;
   } catch {
-    // печать недоступна — игнорируем
+    return false;
   }
 }
 

@@ -205,6 +205,30 @@ export function weekdayIndexForIso(iso: string): number {
 }
 
 /**
+ * B10: сдвиг между «offset от startDate» (контракт этого движка) и «offset от
+ * сегодня» (контракт всех колбэков планировщика: isTrainingDayForOffset,
+ * dayModsByOffset).
+ *
+ * Движок строит даты как `shiftIsoDate(startDate, offset)`, а график тренировок и
+ * модификаторы дня считаются от СЕГОДНЯ. Если startDate ≠ сегодня (режим подготовки
+ * к соревнованиям), то без приведения день `offset` получал дату startDate+offset,
+ * но тренировочный статус и рефиды — от сегодня+offset. Ошибка ровно на
+ * |startDate − сегодня| дней.
+ *
+ * @returns число, которое нужно ПРИБАВИТЬ к offset-от-startDate, чтобы получить offset-от-сегодня.
+ */
+export function startDateOffsetShift(startDate: string, todayIso: string): number {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(startDate)) || !/^\d{4}-\d{2}-\d{2}$/.test(String(todayIso))) return 0;
+  const a = parseLocalIsoDate(startDate);
+  const b = parseLocalIsoDate(todayIso);
+  if (!a || !b) return 0;
+  // Считаем в UTC-полночь, чтобы переход на летнее время не давал 0.958 суток.
+  const ms = Date.UTC(a.getFullYear(), a.getMonth(), a.getDate()) - Date.UTC(b.getFullYear(), b.getMonth(), b.getDate());
+  const days = Math.round(ms / 86400000);
+  return Number.isFinite(days) ? days : 0;
+}
+
+/**
  * Горизонт периодизации для контест-препа: от старта подготовки до конца
  * post-show-окна (12 нед после шоу), в неделях. Для general-режима — `minWeeks`.
  */

@@ -10,13 +10,14 @@
  * Только подача: печать, горизонт, раскрытие недель. Логики расчёта здесь нет.
  */
 
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { GlassCard } from './ui';
 import type { GoalId, CarbPeriodization } from './types';
 import type { BBContestPrepPlan } from '../../../../engines/bb/bb-contest-prep.engine';
 import {
   buildNutritionPeriodization,
   prepPeriodizationHorizon,
+  startDateOffsetShift,
   PERIODIZATION_GOAL_RU,
   type PeriodizationBase,
   type PeriodizationDay,
@@ -105,11 +106,36 @@ export const NutritionPeriodizationCard: React.FC<Props> = ({
   // каждый рендер родителя, поэтому мемоизируем по ЗНАЧЕНИЯМ (иначе пересчёт на
   // каждый рендер). trainSig сэмплирует график на 14 дней (weekly/EOD/pattern).
   const baseKey = `${base.kcal}|${base.proteinG}|${base.fatG}|${base.carbsG}|${base.waterMl}|${base.sodiumMg}`;
-  const trainSig = useMemo(
-    () => Array.from({ length: 14 }, (_, i) => (isTrainingDayForOffset(i) ? '1' : '0')).join(''),
-    [isTrainingDayForOffset],
-  );
   const startDate = mode === 'prep' && prepPlan ? prepPlan.preparation.startDate : todayIso;
+  // FIX B10 (аудит 2026-10): движок периодизации объявляет offset как «дни ОТ startDate»
+  // (planner-nutrition-periodization.engine: `date = shiftIsoDate(startDate, offset)`),
+  // а все колбэки планировщика (`isTrainingDayForOffset`, `dayModsByOffset`) считают offset
+  // от СЕГОДНЯ. При подготовке к соревнованиям startDate ≠ сегодня → день 5 получал дату
+  // startDate+5, но график тренировок и модификаторы дня (цикл, компенсация дневника,
+  // рефиды) брались для сегодня+5. Ошибка ровно на |startDate − сегодня| дней.
+  // Здесь приводим offset от startDate к offset от сегодня — единая точка.
+  const _startShiftDays = useMemo(
+    () => startDateOffsetShift(startDate, todayIso),
+    [startDate, todayIso],
+  );
+  const offsetFromToday = useCallback(
+    (offsetFromStart: number): number => offsetFromStart + _startShiftDays,
+    [_startShiftDays],
+  );
+  const isTrainingDayForOffsetAligned = useCallback(
+    (offsetFromStart: number): boolean => {
+      try { return !!isTrainingDayForOffset(offsetFromToday(offsetFromStart)); } catch { return false; }
+    },
+    [isTrainingDayForOffset, offsetFromToday],
+  );
+  const dayModsAligned = useMemo(() => {
+    if (!dayModsByOffset) return undefined;
+    return (offsetFromStart: number, isRefeed: boolean) => dayModsByOffset(offsetFromToday(offsetFromStart), isRefeed);
+  }, [dayModsByOffset, offsetFromToday]);
+  const trainSig = useMemo(
+    () => Array.from({ length: 14 }, (_, i) => (isTrainingDayForOffsetAligned(i) ? '1' : '0')).join(''),
+    [isTrainingDayForOffsetAligned],
+  );
   const specialKey = useMemo(
     () => (specialMeals || []).map(s => `${s.date}:${s.type}`).sort().join(','),
     [specialMeals],
@@ -121,14 +147,14 @@ export const NutritionPeriodizationCard: React.FC<Props> = ({
   // Подпись модов (§4.2): фиксируем выход dayModsByOffset на 14 дней в sig —
   // иначе мемо «не заметит» смену фазы цикла/компенсации (колбэк пересоздаётся).
   const modsSig = useMemo(() => {
-    if (!dayModsByOffset) return '0';
+    if (!dayModsAligned) return '0';
     try {
       return Array.from({ length: 14 }, (_, i) => {
-        const dm = dayModsByOffset(i, false) || {};
+        const dm = dayModsAligned(i, false) || {};
         return `${(dm.kcalMod ?? 1).toFixed(3)}/${(dm.carbMod ?? 1).toFixed(3)}/${dm.kcalDelta ?? 0}`;
       }).join(',');
     } catch { return 'e'; }
-  }, [dayModsByOffset]);
+  }, [dayModsAligned]);
 
   const sig = `${mode}|${startDate}|${horizonEff}|${baseKey}|${goal}|${carbPeriodization}|${trainSig}|${heavyTrainDay || ''}|${postShowTrack || ''}|${prepPlan?.id || ''}|${prepPlan?.updatedAt || ''}|${specialKey}|${weightSig}|${maintenanceKcal || 0}|${modsSig}`;
 
@@ -139,14 +165,14 @@ export const NutritionPeriodizationCard: React.FC<Props> = ({
     base,
     goal,
     carbPeriodization,
-    isTrainingDayForOffset,
+    isTrainingDayForOffset: isTrainingDayForOffsetAligned,
     heavyTrainDay,
     dayLabels,
     postShowTrack,
     specialMeals,
     weightLog,
     maintenanceKcal,
-    dayModsByOffset,
+    dayModsByOffset: dayModsAligned,
   }), [sig]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const horizonOptions = useMemo(() => {

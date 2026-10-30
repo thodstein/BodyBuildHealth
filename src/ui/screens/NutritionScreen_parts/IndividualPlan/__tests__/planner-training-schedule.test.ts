@@ -17,20 +17,44 @@ const eod = (): TrainSchedule => ({ ...DEFAULT_TRAIN_SCHEDULE, enabled: true, sc
 const pattern = (work: number, off: number): TrainSchedule => ({ ...DEFAULT_TRAIN_SCHEDULE, enabled: true, scheduleType: 'pattern', pattern: { work, off } });
 
 describe('isTrainingDayFor — weekly', () => {
+  // FIX B4: база дня недели теперь = СЕГОДНЯ (dowBase), а не «offset 0 = Пн».
+  // Для проверки самой раскладки передаём dowBase: 0 явно (= Пн).
   it('фиксированные дни недели: Пн/Ср/Пт = тренировка, Вт/Чт = отдых', () => {
     const s = weekly([true, false, true, false, true, false, false]);
-    expect([0, 1, 2, 3, 4, 5, 6].map(d => isTrainingDayFor(s, d))).toEqual([true, false, true, false, true, false, false]);
+    expect([0, 1, 2, 3, 4, 5, 6].map(d => isTrainingDayFor(s, d, 0))).toEqual([true, false, true, false, true, false, false]);
   });
 
   it('повторяется каждые 7 дней (offset 7 = offset 0)', () => {
     const s = weekly([false, true, false, false, false, false, false]);
-    expect(isTrainingDayFor(s, 8)).toBe(true); // 8 % 7 = 1
-    expect(isTrainingDayFor(s, 0)).toBe(false);
+    expect(isTrainingDayFor(s, 8, 0)).toBe(true); // (8+0) % 7 = 1
+    expect(isTrainingDayFor(s, 0, 0)).toBe(false);
   });
 
   it('отрицательные offset корректны (-1 = 6-й день)', () => {
     const s = weekly([false, false, false, false, false, false, true]);
-    expect(isTrainingDayFor(s, -1)).toBe(true);
+    expect(isTrainingDayFor(s, -1, 0)).toBe(true);
+  });
+
+  // B4-регрессия: offset 0 обязан означать СЕГОДНЯШНИЙ день недели.
+  it('B4: offset 0 = сегодняшний день недели, а не понедельник', () => {
+    // Пн..Вс = только среда (индекс 2)
+    const s = weekly([false, false, true, false, false, false, false]);
+    // Если сегодня среда (dowBase=2), то offset 0 — тренировка
+    expect(isTrainingDayFor(s, 0, 2)).toBe(true);
+    // Если сегодня понедельник (dowBase=0), offset 0 — отдых, а offset 2 — тренировка
+    expect(isTrainingDayFor(s, 0, 0)).toBe(false);
+    expect(isTrainingDayFor(s, 2, 0)).toBe(true);
+    // Сдвиг на день: со вторника (dowBase=1) тренировка попадает на offset 1
+    expect(isTrainingDayFor(s, 1, 1)).toBe(true);
+  });
+
+  it('B4: график идёт по календарю (одна и та же дата = один и тот же статус)', () => {
+    const s = weekly([true, false, false, false, true, false, false]); // Пн, Пт
+    // Сегодня четверг (dowBase=3): offset 4 = понедельник следующей недели → тренировка
+    expect(isTrainingDayFor(s, 4, 3)).toBe(true);
+    // ...и статус не зависит от того, как далеко мы ушли вперёд
+    expect(isTrainingDayFor(s, 11, 3)).toBe(true);
+    expect(isTrainingDayFor(s, 3, 3)).toBe(false);
   });
 });
 

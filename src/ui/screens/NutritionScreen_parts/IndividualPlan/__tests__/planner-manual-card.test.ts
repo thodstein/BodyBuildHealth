@@ -32,10 +32,14 @@ describe('ручная карточка: г/кг собираются в рац�
     expect(r.fats).toBe(Math.round(90 * 1.0));
     expect(r.carbs).toBe(Math.round(90 * 4.0));
   });
-  it('без г/кг — legacy: пустые граммы дают ~0, а не мусор', () => {
+  it('B20: без г/кг и без граммов — нейтральные цели профиля (не нули)', () => {
+    // Раньше здесь ожидались нули: «рацион не собирается» считалось нормой.
+    // После FIX B20 пустой ручной режим падает на нейтральные цели профиля,
+    // чтобы кнопка «Рассчитать и создать рацион» всегда давала план.
     const r = buildDayTargets(IN({}));
-    expect(r.protein).toBe(0);
-    expect(r.carbs).toBe(0);
+    expect(r.protein).toBeGreaterThan(0);
+    expect(r.carbs).toBeGreaterThan(0);
+    expect(r.kcal).toBe(4 * r.protein + 9 * r.fats + 4 * r.carbs);
   });
   it('рацион сходится под г/кг-цели (сквозной прогон движка)', () => {
     const t = buildDayTargets(IN({

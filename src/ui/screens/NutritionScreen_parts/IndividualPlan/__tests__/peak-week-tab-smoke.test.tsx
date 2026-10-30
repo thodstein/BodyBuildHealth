@@ -5,7 +5,7 @@
  * и «Сохранить в профиль» присутствуют, выбор пола переключает список категорий.
  */
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import React from 'react';
 import { IndividualPlan } from '../index';
@@ -30,6 +30,11 @@ describe('PeakWeekTab smoke', () => {
   });
 
   it('«📋 Сводка» копирует протокол в буфер (флеш «Скопировано») ', async () => {
+    // FIX B24: копирование теперь честное — без Clipboard API флеша «Скопировано»
+    // больше НЕ будет (раньше `await undefined` давал ложный успех). Поэтому тест
+    // подставляет реальный буфер, как в браузере с разрешением.
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true, writable: true });
     render(<IndividualPlan profile={null} course={[]} labs={[]} labAnalysis={null} />);
     clickTab('Тапер ББ');
     const btn = Array.from(document.querySelectorAll('button')).find(b => (b.textContent || '').includes('Сводка'));
@@ -38,6 +43,7 @@ describe('PeakWeekTab smoke', () => {
     // Путь копирования асинхронный (shareOrCopyText → clipboard/execCommand):
     // ждём видимый пользователю флеш вместо привязки к конкретному механизму.
     expect(await screen.findByText(/Скопировано/)).toBeTruthy();
+    expect(writeText).toHaveBeenCalled();
   });
 
   it('вкладка показывает пик-неделю из движка (деплеция → загрузка → шоу)', () => {

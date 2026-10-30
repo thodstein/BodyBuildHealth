@@ -131,7 +131,10 @@ export function migratePlannerStorage(): void {
       'he_user_recipes', 'he_nutrition_supps', 'he_intolerances', 'he_preferred_by_meal',
       'he_locked_foods', 'he_weight_log_entries', 'he_shopping_checked', 'he_special_meals',
       'he_planner_labs', 'he_planner_pharma', 'he_planner_histamine',
-      'he_taste_profile', 'he_plan_settings_collapsed', 'he_manual_g_per_kg',
+      'he_taste_profile', 'he_manual_g_per_kg',
+      // legacy-ключ: компонент `CollapsibleSection` удалён (B34), но у старых
+      // пользователей ключ остался в хранилище — чистим при сбросе.
+      'he_plan_settings_collapsed',
     ];
     // P1-fix: keys that MUST be arrays. If a stored value is an object (not array),
     // it's corrupted and would crash downstream .filter/.map/.length calls.

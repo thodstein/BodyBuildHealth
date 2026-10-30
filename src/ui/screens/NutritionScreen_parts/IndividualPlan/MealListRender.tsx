@@ -28,11 +28,19 @@ const _similarFoodsCache = new WeakMap<object, any[]>();
 // Этап 3 (Пробел-1): редактирование времени — через модал (без window.prompt).
 // Эпик E: запись через ctx.updateMealTime — синк в weekPlan при weekEditDay
 // (раньше писали только dayPlan, правки недели терялись).
-function useMealTimeEdit(saveUndo: () => void, applyTime: (mealIdx: number, time: string) => void) {
+//
+// FIX B8 (аудит 2026-10): модалка теперь несёт `dayIdx` того дня, у которого нажали
+// «🕒». Раньше updateMealTime(mealIdx, time) не знал день вовсе и писал только в
+// dayPlan (+ weekPlan при weekEditDay). В компоновщике (`openDay` без weekEditDay)
+// правка времени и дубль приёма не доезжали до weekPlan/threeDayPlan —
+// пользователь видел изменение на экране, возвращался в неделю — правки нет.
+function useMealTimeEdit(saveUndo: () => void, applyTime: (mealIdx: number, time: string, dayIdx?: number) => void) {
   const planRef = React.useRef<any>(null);
+  const dayRef = React.useRef<number>(0);
   const [edit, setEdit] = React.useState<{ idx:number; value:string } | null>(null);
-  const open = (idx:number, plan?: any) => {
+  const open = (idx:number, plan?: any, dayIdx?: number) => {
     planRef.current = plan;
+    dayRef.current = typeof dayIdx === 'number' ? dayIdx : 0;
     const cur = (plan || planRef.current)?.meals?.[idx]?.time || '12:00';
     setEdit({ idx, value: cur });
   };
@@ -43,7 +51,7 @@ function useMealTimeEdit(saveUndo: () => void, applyTime: (mealIdx: number, time
     if (mt.length !== 2) return;
     const h = parseInt(mt[0],10), mm = parseInt(mt[1],10);
     if (isNaN(h)||isNaN(mm)||h<0||h>23||mm<0||mm>59) return;
-    applyTime(edit.idx, `${String(h).padStart(2,'0')}:${String(mm).padStart(2,'0')}`);
+    applyTime(edit.idx, `${String(h).padStart(2,'0')}:${String(mm).padStart(2,'0')}`, dayRef.current);
     setEdit(null);
   };
   const modal = edit ? (
@@ -396,13 +404,13 @@ export function useRenderMealList(ctx: Omit<PlanCtx, 'renderMealList'>) {
                 <div style={{display:'flex',alignItems:'center',gap:6, overflowX:'auto', maxWidth:'100%', paddingBottom:2, scrollbarWidth:'none', flexWrap:'nowrap'}}>
                   <span style={{fontSize:10,fontWeight:800,color:'rgba(255,255,255,0.85)', whiteSpace:'nowrap', flexShrink:0}}>{mealKcal} ккал</span>
                   <span onClick={()=>{ const ov = readMealTarget(m.label); setMealTargetEditor({ mi, label: m.label, p: ov?.p ? String(ov.p) : '', f: ov?.f ? String(ov.f) : '', c: ov?.c ? String(ov.c) : '' }); }} className="plan-mact" style={{fontSize:11,padding:'5px 8px',minHeight:40,minWidth:40,display:'inline-flex',alignItems:'center',justifyContent:'center',flexShrink:0,borderRadius:4,background:'rgba(249,115,22,0.08)',border:'1px solid rgba(249,115,22,0.15)',color:'#fb923c',cursor:'pointer',fontWeight:600}} title="Цель приёма (Б/Ж/У слота)">🎯</span>
-                  <span onClick={()=>timeEdit.open(mi, dayPlan)} className="plan-mact" style={{fontSize:11,padding:'5px 8px',minHeight:40,minWidth:40,display:'inline-flex',alignItems:'center',justifyContent:'center',flexShrink:0,borderRadius:4,background:'rgba(59,130,246,0.06)',border:'1px solid rgba(59,130,246,0.12)',color:'#60a5fa',cursor:'pointer',fontWeight:600}} title="Изменить время приёма">🕒</span>
+                  <span onClick={()=>timeEdit.open(mi, d, dayIdx)} className="plan-mact" style={{fontSize:11,padding:'5px 8px',minHeight:40,minWidth:40,display:'inline-flex',alignItems:'center',justifyContent:'center',flexShrink:0,borderRadius:4,background:'rgba(59,130,246,0.06)',border:'1px solid rgba(59,130,246,0.12)',color:'#60a5fa',cursor:'pointer',fontWeight:600}} title="Изменить время приёма">🕒</span>
                   <span onClick={()=>setRecipePickerMeal({dayIdx,mealIdx:mi,label:m.label})} className="plan-mact" style={{fontSize:11,padding:'5px 8px',minHeight:40,minWidth:40,display:'inline-flex',alignItems:'center',justifyContent:'center',flexShrink:0,borderRadius:4,background:'rgba(139,92,246,0.08)',border:'1px solid rgba(139,92,246,0.15)',color:'#a78bfa',cursor:'pointer',fontWeight:600}}>🍳</span>
                   <span onClick={()=>{setQuickAddMealIdx(mi);setQuickAddSearch('');}} className="plan-mact" style={{fontSize:11,padding:'5px 8px',minHeight:40,minWidth:40,display:'inline-flex',alignItems:'center',justifyContent:'center',flexShrink:0,borderRadius:4,background:'rgba(0,230,138,0.08)',border:'1px solid rgba(0,230,138,0.15)',color:'#00e68a',cursor:'pointer',fontWeight:600}}>+</span>
                   <span onClick={()=>{ try { // E7: локальная дата (toISOString уезжал на завтра вечером в UTC+3..+12)
                     const _d = new Date(); const _iso = `${_d.getFullYear()}-${String(_d.getMonth()+1).padStart(2,'0')}-${String(_d.getDate()).padStart(2,'0')}`;
                     const data=readDiaryV2(); if(!data[_iso]) data[_iso]={meals:{}}; const label=m.label||'Приём пищи'; if(!data[_iso].meals[label]) data[_iso].meals[label]=[]; (m.items||[]).forEach((it:any)=>{ (data[_iso].meals[label] as any).push({ name:it.name, qty:`${it.amount||100} г` as any, kcal:Math.round(it.kcal||0), p:Math.round((it.p||0)*10)/10, f:Math.round((it.f||0)*10)/10, c:Math.round((it.c||0)*10)/10, category:it.category, foodId:it.id, micros:it.micros });}); writeDiaryV2(data); if(typeof (window as any).showToast==='function') (window as any).showToast(`📒 ${label} → дневник`, 'success'); } catch {} }} className="plan-mact" style={{fontSize:11,padding:'5px 8px',minHeight:40,minWidth:40,display:'inline-flex',alignItems:'center',justifyContent:'center',flexShrink:0,borderRadius:4,background:'rgba(0,230,138,0.06)',border:'1px solid rgba(0,230,138,0.2)',color:'#00e68a',cursor:'pointer',fontWeight:600}} title="Добавить приём в дневник">📒</span>
-                  <span onClick={()=>{ /* E2: единый ctx-хелпер — синк в weekPlan при weekEditDay */ (ctx as any).duplicateMeal?.(mi); }} className="plan-mact" style={{fontSize:11,padding:'5px 8px',minHeight:40,minWidth:40,display:'inline-flex',alignItems:'center',justifyContent:'center',flexShrink:0,borderRadius:4,background:'rgba(99,102,241,0.06)',border:'1px solid rgba(99,102,241,0.12)',color:'#818cf8',cursor:'pointer',fontWeight:600}}>📋</span>
+                  <span onClick={()=>{ /* E2: единый ctx-хелпер — синк в weekPlan/threeDayPlan (B8: с адресацией дня) */ (ctx as any).duplicateMeal?.(mi, dayIdx); }} className="plan-mact" style={{fontSize:11,padding:'5px 8px',minHeight:40,minWidth:40,display:'inline-flex',alignItems:'center',justifyContent:'center',flexShrink:0,borderRadius:4,background:'rgba(99,102,241,0.06)',border:'1px solid rgba(99,102,241,0.12)',color:'#818cf8',cursor:'pointer',fontWeight:600}}>📋</span>
                   <span onClick={()=>removeMealRebalanced(dayIdx, mi)} title="Пропустить приём — день пересоберётся без него" className="plan-mact" style={{fontSize:11,padding:'5px 8px',minHeight:40,minWidth:40,display:'inline-flex',alignItems:'center',justifyContent:'center',flexShrink:0,borderRadius:4,background:'rgba(239,68,68,0.06)',border:'1px solid rgba(239,68,68,0.12)',color:'#ef4444',cursor:'pointer',fontWeight:600}}>✕</span>
                 </div>
               </div>

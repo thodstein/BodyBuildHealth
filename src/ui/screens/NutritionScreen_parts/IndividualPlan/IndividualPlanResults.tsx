@@ -1,6 +1,7 @@
 import React, { useState, useRef } from "react";
 import { addToCart } from "../../../../core/nutrition-utils";
 import { FOOD_DB } from "../../../../core/nutrition-database";
+import { pickReplaceIdxForIssue } from "./planner-issue-replace";
 import { getRecipesByMeal } from "../../../../engines/nutrition-periodization.engine";
 import { filterRecipesByHardRestrictions } from "./recipe-engine";
 import { ALLERGEN_LIST, HEALTH_ISSUES } from "./types";
@@ -29,6 +30,7 @@ import { MealQuickControls } from "./MealQuickControls";
 import { readDiaryV2 } from "../diary-storage-v2";
 import { buildDayReportPrintHtml, buildMealTimelinePrintHtml, buildRecipePlanPrintHtml, buildCoachExportHtml, shareOrCopyText, printPlanHtml, downloadCoachFile } from "./planner-day-print";
 import { buildDayBriefing } from "./planner-briefing";
+import { avgKcalPerDay } from "./planner-average";
 import { explainDayPlan } from "./planner-day-explain";
 import { scoreDayComposition } from "./planner-composition-quality";
 import {
@@ -112,6 +114,76 @@ export const _normalizeImportedPlan = (p: any) => {
   return { ...p, meals, totals: sumDayTotals(meals) };
 };
 
+/**
+ * FIX B23 (аудит 2026-10): кнопка «Копировать» клала в буфер ЧЕЛОВЕКОЧИТАЕМЫЙ текст,
+ * а «Импорт» ожидал JSON и подсказка прямо отсылала к «Копировать» — пара функций
+ * была нефункциональна по замыслу (скопировал → вставил → «неверный формат»).
+ *
+ * Решение: «Копировать» остаётся человекочитаемым (его пересылают тренеру в чат),
+ * а рядом появляется отдельная кнопка «JSON» — машинный формат для «Импорта».
+ * Импорт принимает и «голый» план, и обёртки `{ plan }` / `{ dayPlan }`.
+ */
+export const buildPlanExportJson = (plan: any): string => {
+  if (!plan || typeof plan !== 'object') return '';
+  try {
+    // compact JSON: одна строка удобнее для буфера/чата, чем pretty-print
+    return JSON.stringify({ schema: 'he_plan_v1', plan });
+  } catch {
+    return '';
+  }
+};
+
+export type ImportPlanResult =
+  | { ok: true; plan: any; blocked: string[] }
+  | { ok: false; reason: string };export const importPlanFromText = (raw: string): ImportPlanResult => {
+  const text = String(raw ?? '').trim();
+  if (!text) return { ok: false, reason: 'пусто — вставьте JSON плана' };
+  let parsed: any;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    return {
+      ok: false,
+      reason: 'это не JSON. Скопируйте план кнопкой «⧉ JSON» и вставьте сюда — человекочитаемый текст для импорта не подходит',
+    };
+  }
+  // Обёртка экспорта ({ schema, plan }) и частые варианты — разворачиваем.
+  const candidate = (parsed && typeof parsed === 'object' && !Array.isArray(parsed.meals))
+    ? (parsed.plan ?? parsed.dayPlan ?? parsed)
+    : parsed;
+  const check = _validateImportedPlan(candidate);
+  if (!check.ok) return { ok: false, reason: `неверная структура плана: ${check.reason}` };
+  return { ok: true, plan: _normalizeImportedPlan(candidate), blocked: check.blocked };
+};
+
+/**
+ * FIX B25 (аудит 2026-10): какой день реально видит пользователь.
+ *
+ * Экспорт/печать брали `dayPlan` — это зеркало дня РЕДАКТИРОВАНИЯ, а в 3/7-дневном
+ * виде оно не обязано совпадать с выбранным днём (при генерации недели dayPlan
+ * остаётся первым днём). Из-за этого «Файл тренеру» всегда отдавал день 1.
+ *
+ * Правила те же, что во всём остальном UI (`MealComposer`, карточки приёмов).
+ */
+export function resolveVisibleDayPlan(args: {
+  planDays: number;
+  selectedDayIndex: number;
+  dayPlan: any;
+  threeDayPlan?: any;
+  weekPlan?: any;
+}): { day: any; index: number; total: number } {
+  const { planDays, dayPlan, threeDayPlan, weekPlan } = args;
+  const total = planDays === 3 ? 3 : planDays === 7 ? 7 : 1;
+  const index = Math.max(0, Math.min(Number(args.selectedDayIndex) || 0, total - 1));
+  const fromMulti = planDays === 3
+    ? threeDayPlan?.days?.[index]
+    : planDays === 7
+      ? weekPlan?.days?.[index]
+      : undefined;
+  // fallback на dayPlan — если мультидневный план ещё не собран
+  return { day: fromMulti || dayPlan, index, total };
+}
+
 export const IndividualPlanResults: React.FC = () => {
   const {
     generatePlan, planDays, setPlanDays, selectedDayIndex, setSelectedDayIndex,
@@ -150,7 +222,7 @@ export const IndividualPlanResults: React.FC = () => {
     generateRiskReport, riskReport,
     generateDrugCompatReport, drugCompatReport,
     generateFullNutritionReport, nutritionReport, activeReports,
-    editItem, setEditItem, editAmount, setEditAmount, replacingItem, setReplacingItem,
+    editItem, setEditItem, editAmount, setEditAmount,
     removeFoodItem, replaceFoodItem, findSimilarFoods, updateItemAmount,
     setDayPlan, setThreeDayPlan, planTargets, planType, variety,
     linkToTraining, trainStart,
@@ -206,13 +278,23 @@ export const IndividualPlanResults: React.FC = () => {
   const [abDiff, setAbDiff] = useState<AbDiffResult | null>(null);
   const [abShowDiff, setAbShowDiff] = useState(false);
 
+/**
+ * B5: выбор «жертвы» для замены вынесен в отдельный модуль
+ * `planner-issue-replace.ts` (там же объяснение, почему нельзя было искать
+ * предложенный продукт внутри приёма — его там заведомо нет).
+ */
+
   const analyzePlanIssues = () => {
     // FIX button-audit: активный план по view + клэмп индекса (иначе после недельного вида
     // threeDayPlan.days[3..6] = undefined → попап зависал на «Анализ рациона...»)
     const _di = Math.max(0, Math.min(selectedDayIndex, planDays === 3 ? 2 : planDays === 7 ? 6 : 0));
     const activePlan = planDays === 1 ? dayPlan : planDays === 3 ? threeDayPlan?.days?.[_di] : weekPlan?.days?.[_di];
     if (!activePlan || !Array.isArray(activePlan.meals)) { setCorrectIssues([]); return; }
-    if (plannerMode !== 'pro') { setCalcResults(null); setCalcDailyReport(null); return; }
+    // FIX B6 (аудит 2026-10): здесь стоял `if (plannerMode !== 'pro') { ...; return; }`.
+    // Кнопка «🔀 Корректировка рациона» рендерится по одному условию `generated`,
+    // т.е. доступна и в simple/minimal — попап открывался, анализ молча не запускался,
+    // и экран навсегда замирал на «Анализ рациона...». Сам анализ (low protein / high fat /
+    // лейцин / клетчатка / DIAAS) не требует pro-режима, поэтому выполняем его всегда.
     const profile = getDefaultProfile();
     profile.phase = (v2Phase as any) || 'LEAN_MASS';
     profile.pharma.AAS_ORAL = v2Pharma.AAS_ORAL || false;
@@ -410,12 +492,15 @@ export const IndividualPlanResults: React.FC = () => {
 
 // E7: импорт плана — doImportPlan использует state-сеттеры компонента, валидатор/нормализатор вынесены на модульный уровень выше.
 const doImportPlan = (raw: string): boolean => {
+  // FIX B23: разбор/валидация/нормализация — в одном месте (importPlanFromText),
+  // чтобы тест проверял ровно то, что делает кнопка.
+  const res = importPlanFromText(raw);
+  if (!res.ok) {
+    setErrorMsg(res.reason.endsWith('.') ? res.reason : `${res.reason}.`);
+    return false;
+  }
   try {
-    const parsed = JSON.parse(raw);
-    const check = _validateImportedPlan(parsed);
-    if (!check.ok) { setErrorMsg(`Неверная структура плана: ${check.reason}.`); return false; }
-    const normalized = _normalizeImportedPlan(parsed);
-    setDayPlan(normalized);
+    setDayPlan(res.plan);
     setGenerated(true);
     setPlanDays(1); // FIX button-audit: импорт всегда показывает 1-дневный план
     setErrorMsg(null);
@@ -428,7 +513,7 @@ const doImportPlan = (raw: string): boolean => {
     (healthIssues || []).forEach((hi: string) => {
       HEALTH_ISSUES.find(h => h.id === hi)?.foodIds?.forEach(fid => blockedSet.add(fid));
     });
-    const blockedHere = Array.from(new Set(check.blocked.filter(id => blockedSet.has(id))));
+    const blockedHere = Array.from(new Set(res.blocked.filter(id => blockedSet.has(id))));
     if (blockedHere.length > 0) {
       setErrorMsg(`План импортирован, но ${blockedHere.length} продукт(ов) не проходят ваши ограничения: ${blockedHere.slice(0, 5).join(', ')}${blockedHere.length > 5 ? '…' : ''}. Проверьте состав.`);
     } else if (typeof (window as any).showToast === 'function') {
@@ -504,6 +589,13 @@ const doImportPlan = (raw: string): boolean => {
         isVegetarian: (dietPrefs || []).includes('vegetarian'),
       })
     : [];
+
+  // FIX B25 (аудит 2026-10): «Печать/Файл тренеру» брали `dayPlan` (зеркало дня
+  // редактирования), а в 3/7-дневном виде это не выбранный день — экспортировался
+  // первый. Здесь — явный «видимый день» по тем же правилам, что и в остальном UI.
+  const _visible = resolveVisibleDayPlan({ planDays, selectedDayIndex, dayPlan, threeDayPlan, weekPlan });
+  const visibleDayPlan: any = _visible.day;
+  const _visibleDayIdx = _visible.index;
 
   return (
     <>
@@ -775,6 +867,16 @@ const doImportPlan = (raw: string): boolean => {
               void shareOrCopyText('План питания', txt).then(ok => { if (!ok) setErrorMsg('Не удалось скопировать план.'); });
             }} className="plan-actbtn" style={{ flex:1, padding:'10px 8px', minHeight:44, borderRadius:10, cursor:'pointer', border:'1px solid rgba(96,165,250,0.2)', background:'rgba(96,165,250,0.06)', color:'#60a5fa', fontSize:11, fontWeight:700 }}>📤 Копировать</button>
             <button onClick={() => setImportModalOpen(true)} className="plan-actbtn" style={{ flex:1, padding:'10px 8px', minHeight:44, borderRadius:10, cursor:'pointer', border:'1px solid rgba(249,115,22,0.2)', background:'rgba(249,115,22,0.06)', color:'#f97316', fontSize:11, fontWeight:700 }}>📥 Импорт</button>
+            {/* FIX B23: машинный формат для «Импорта» — отдельной кнопкой, чтобы
+                человекочитаемое «Копировать» не ломало восстановление плана. */}
+            <button onClick={() => {
+              const json = buildPlanExportJson(dayPlan);
+              if (!json) { setErrorMsg('Нет плана для экспорта.'); return; }
+              void shareOrCopyText('План питания (JSON)', json).then(ok => {
+                if (!ok) setErrorMsg('Не удалось скопировать JSON плана.');
+                else if (typeof (window as any).showToast === 'function') (window as any).showToast('⧉ JSON плана скопирован — вставьте его в «Импорт»', 'success');
+              });
+            }} className="plan-actbtn" title="Скопировать план в машинном формате (для «Импорта» на другом устройстве)" aria-label="Скопировать план как JSON" style={{ flex:1, padding:'10px 8px', minHeight:44, borderRadius:10, cursor:'pointer', border:'1px solid rgba(168,85,247,0.2)', background:'rgba(168,85,247,0.06)', color:'#a78bfa', fontSize:11, fontWeight:700 }}>⧉ JSON</button>
           </div>
         </GlassCard>
       </>)}
@@ -1144,7 +1246,7 @@ const doImportPlan = (raw: string): boolean => {
         <GlassCard title="План на 3 дня" icon="📋" color="#00e68a" style={{ border: '1px solid rgba(0,230,138,0.15)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 10, marginBottom: 8, padding: '6px 10px', borderRadius: 8, background: 'rgba(0,230,138,0.04)', border: '1px solid rgba(0,230,138,0.1)' }}>
             <span style={{ color: '#00e68a', fontWeight: 700 }}>📊 Всего: {Math.round(threeDayPlan.totals?.kcal || 0)} ккал</span>
-            <span style={{ color: 'rgba(255,255,255,0.85)' }}>Среднее: {Math.round((threeDayPlan.totals?.kcal || 0) / 3)} ккал/день</span>
+            <span style={{ color: 'rgba(255,255,255,0.85)' }}>Среднее: {avgKcalPerDay(threeDayPlan.totals?.kcal || 0, threeDayPlan.days?.length || 3)} ккал/день</span>
           </div>
           {threeDayPlan.days.map((d: any, di: number) => {
             const dKcal = Math.round(d.totals?.kcal || 0);
@@ -1181,7 +1283,7 @@ const doImportPlan = (raw: string): boolean => {
                   color: selectedWeek === wi ? '#fff' : 'rgba(255,255,255,0.85)',
                   border: selectedWeek === wi ? 'none' : '1px solid rgba(255,255,255,0.06)',
                 }} onClick={() => { setSelectedWeek(wi); if (monthPlan[wi]) setWeekPlan(monthPlan[wi]); }}>
-                  Н{wi + 1}{monthPlan[wi]?.totals?.kcal ? ` · ${Math.round((monthPlan[wi].totals.kcal || 0) / 7)}` : ''}
+                  Н{wi + 1}{monthPlan[wi]?.totals?.kcal ? ` · ${avgKcalPerDay(monthPlan[wi].totals.kcal || 0, monthPlan[wi].days?.length || 7)}` : ''}
                   <span title={`Перегенерировать неделю ${wi + 1} (без сброса остальных)`} onClick={async (e) => { e.stopPropagation(); setSelectedWeek(wi); loadMonthWeekIntoPlan(wi); const ok = await generatePlan(7, wi, undefined, { skipUndo: true, async: true }); if (ok !== false) loadMonthWeekIntoPlan(wi); }} style={{ cursor:'pointer', fontSize:10, padding:'1px 4px', borderRadius:5, color: selectedWeek === wi ? 'rgba(255,255,255,0.85)' : '#a78bfa', background: 'rgba(255,255,255,0.1)' }}>🔄</span>
                 </div>
               ))}
@@ -1193,7 +1295,7 @@ const doImportPlan = (raw: string): boolean => {
           )}
            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, marginBottom: 8, padding: '6px 10px', borderRadius: 8, background: 'rgba(0,230,138,0.04)', border: '1px solid rgba(0,230,138,0.1)' }}>
              <span style={{ color: '#00e68a', fontWeight: 700 }}>📊 За неделю: {Math.round(weekPlan.totals?.kcal || 0)} ккал</span>
-             <span style={{ color: 'rgba(255,255,255,0.85)' }}>Среднее: {Math.round((weekPlan.totals?.kcal || 0) / 7)} ккал/день</span>
+             <span style={{ color: 'rgba(255,255,255,0.85)' }}>Среднее: {avgKcalPerDay(weekPlan.totals?.kcal || 0, weekPlan.days?.length || 7)} ккал/день</span>
           </div>
           {/* Эпик-хвост (9а): неделя vs план — ккал и Б/Ж/У против целей */}
           {(() => {
@@ -1522,11 +1624,16 @@ const doImportPlan = (raw: string): boolean => {
             💾 Сохранить в мои планы
           </button>
           <button onClick={() => {
-            const ok = addPlanToDiary();
-            if (ok) {
-              const msg = planDays === 7 ? `📒 Неделя (${weekPlan?.days?.length || 7} дн) → дневник` : planDays === 3 ? '📒 3 дня → дневник' : '📒 День → дневник';
+            const res = addPlanToDiary();
+            if (res.ok) {
+              const scope = planDays === 7 ? `Неделя (${weekPlan?.days?.length || 7} дн)` : planDays === 3 ? '3 дня' : 'День';
+              // FIX B3: честное сообщение — сколько записей реально добавлено и
+              // сколько уже было (раньше при повторном нажатии всё дублировалось молча).
+              const msg = res.added > 0
+                ? `📒 ${scope} → дневник${res.skipped > 0 ? ` (+${res.skipped} уже было)` : ''}`
+                : `📒 ${scope} уже в дневнике — дублей не создано`;
               // @ts-ignore
-              if (typeof (window as any).showToast === 'function') (window as any).showToast(msg, 'success');
+              if (typeof (window as any).showToast === 'function') (window as any).showToast(msg, res.added > 0 ? 'success' : 'info');
               else alert(msg);
             }
           }} style={{
@@ -2421,33 +2528,39 @@ const doImportPlan = (raw: string): boolean => {
               <div style={{ fontSize:10, color:'rgba(255,255,255,0.75)', marginTop:4, lineHeight:1.2 }}>План приготовления на несколько дней</div>
             </div>
           )}
-          {generated && dayPlan?.meals?.some((m: any) => m.recipeApplied) && (
+          {/* FIX B25 (аудит 2026-10): блок был заперт за `recipeApplied` — у большинства
+              пользователей (без применённых рецептов) печати и файла тренеру не было вовсе.
+              Теперь доступен всегда при наличии плана; печать корректно работает и без рецептов
+              (перечисляет продукты), а экспорт берёт ВИДИМЫЙ день, а не первый. */}
+          {generated && visibleDayPlan?.meals?.length > 0 && (
             <div style={{ background:'rgba(24,24,27,0.5)', borderRadius:12, border:'1px solid rgba(249,115,22,0.06)', padding:'8px 6px', textAlign:'center' }}>
               <div style={{ display:'flex', gap:4 }}>
-                <button onClick={() => { void printPlanHtml('Меню дня по рецептам', buildRecipePlanPrintHtml(dayPlan, (weightMode === 'raw' ? 'raw' : 'cooked') as any)).then((ok: boolean) => { if (!ok) setErrorMsg('Печать заблокирована браузером — разрешите всплывающие окна'); }); }} title="Ингредиенты и пошаговые инструкции выбранных рецептов" className="plan-actbtn" style={{ flex:1, padding:'10px 6px', minHeight:44, borderRadius:10, cursor:'pointer', textAlign:'center', background:'rgba(249,115,22,0.1)', border:'1px solid rgba(249,115,22,0.3)', color:'#fb923c', fontWeight:700, fontSize:11, transition:'all 0.15s' }}>
+                <button onClick={() => { void printPlanHtml('Меню дня', buildRecipePlanPrintHtml(visibleDayPlan, (weightMode === 'raw' ? 'raw' : 'cooked') as any)).then((ok: boolean) => { if (!ok) setErrorMsg('Печать заблокирована браузером — разрешите всплывающие окна'); }); }} title="Меню дня: продукты, а для выбранных рецептов — ингредиенты и шаги" className="plan-actbtn" style={{ flex:1, padding:'10px 6px', minHeight:44, borderRadius:10, cursor:'pointer', textAlign:'center', background:'rgba(249,115,22,0.1)', border:'1px solid rgba(249,115,22,0.3)', color:'#fb923c', fontWeight:700, fontSize:11, transition:'all 0.15s' }}>
                   🖨 Печать меню
                 </button>
                 <button onClick={() => {
                   try {
                     const html = buildCoachExportHtml({
                       dateIso: localIsoDate(new Date()),
-                      totals: dayPlan.totals || { kcal: 0, p: 0, f: 0, c: 0 },
+                      totals: visibleDayPlan.totals || { kcal: 0, p: 0, f: 0, c: 0 },
                       goals: { kcal: effectiveKcal || 0, p: effectiveP || 0, f: effectiveF || 0, c: effectiveC || 0 },
-                      isTrainingDay: !!dayPlan.isTrainingDay,
-                      meals: dayPlan.meals || [],
+                      isTrainingDay: !!visibleDayPlan.isTrainingDay,
+                      meals: visibleDayPlan.meals || [],
                       shopping: (shoppingList as any[])?.filter((s: any) => s.id !== 'unknown_x') || [],
-                      notes: [...(dayPlan.proNotes || []), ...(dayPlanNotes ? [`💬 ${dayPlanNotes}`] : [])],
+                      notes: [...(visibleDayPlan.proNotes || []), ...(dayPlanNotes ? [`💬 ${dayPlanNotes}`] : [])],
                       weightMode: (weightMode === 'raw' ? 'raw' : 'cooked') as any,
                     });
                     void downloadCoachFile(html, `plan-coach-${localIsoDate(new Date())}.html`).then(ok => {
                       if (typeof (window as any).showToast === 'function') (window as any).showToast(ok ? '📤 Файл для тренера готов' : 'Не удалось создать файл', ok ? 'success' : 'warning');
                     });
-                  } catch {}
-                }} title="План + рецепты + закупки одним HTML-файлом" className="plan-actbtn" style={{ flex:1, padding:'10px 6px', minHeight:44, borderRadius:10, cursor:'pointer', textAlign:'center', background:'rgba(59,130,246,0.1)', border:'1px solid rgba(59,130,246,0.3)', color:'#60a5fa', fontWeight:700, fontSize:11, transition:'all 0.15s' }}>
+                  } catch { setErrorMsg('Не удалось собрать файл для тренера.'); }
+                }} title="План выбранного дня + рецепты + закупки одним HTML-файлом" className="plan-actbtn" style={{ flex:1, padding:'10px 6px', minHeight:44, borderRadius:10, cursor:'pointer', textAlign:'center', background:'rgba(59,130,246,0.1)', border:'1px solid rgba(59,130,246,0.3)', color:'#60a5fa', fontWeight:700, fontSize:11, transition:'all 0.15s' }}>
                   📤 Файл тренеру
                 </button>
               </div>
-              <div style={{ fontSize:10, color:'rgba(255,255,255,0.75)', marginTop:4, lineHeight:1.2 }}>Рецепты дня на печать · план+закупки файлом</div>
+              <div style={{ fontSize:10, color:'rgba(255,255,255,0.75)', marginTop:4, lineHeight:1.2 }}>
+                {planDays === 1 ? 'День' : planDays === 3 ? `День ${_visibleDayIdx + 1} из 3` : `День ${_visibleDayIdx + 1} из 7`} · печать и файл тренеру
+              </div>
             </div>
           )}
           {generated && plannerMode === 'pro' && (
@@ -2650,7 +2763,7 @@ const doImportPlan = (raw: string): boolean => {
         <div style={{ position: 'fixed', inset: 0, zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(6px)', padding: 16 }} onClick={() => setImportModalOpen(false)}>
           <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 420, padding: 18, borderRadius: 16, background: 'linear-gradient(135deg,#1a1c26,#18181b)', border: '1px solid rgba(249,115,22,0.25)', boxShadow: '0 16px 40px rgba(0,0,0,0.5)' }}>
             <div style={{ fontSize: 14, fontWeight: 800, color: '#f97316', marginBottom: 4 }}>📥 Импорт плана</div>
-            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', marginBottom: 10 }}>Вставьте JSON плана (кнопка «📤 Копировать» выше)</div>
+            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', marginBottom: 10 }}>Вставьте JSON плана (кнопка «⧉ JSON» рядом с «Копировать»)</div>
             <textarea
               value={importText}
               onChange={e => setImportText(e.target.value)}
@@ -3123,17 +3236,22 @@ const doImportPlan = (raw: string): boolean => {
                                   const activeMeal = planDays === 1 ? dayPlan?.meals?.[meal.mealIdx] : (planDays === 3 ? threeDayPlan?.days?.[selectedDayIndex]?.meals?.[meal.mealIdx] : weekPlan?.days?.[selectedDayIndex]?.meals?.[meal.mealIdx]);
                                   return (
                                   <button key={si} onClick={() => {
-                                    const itemIdx = activeMeal?.items?.findIndex((it: any) => {
-                                      const food = FOOD_DB.find(f => f.id === it.id || f.name === it.name);
-                                      return food?.id === s.foodId || it.name === s.name;
-                                    });
+                                    // FIX B5 (аудит 2026-10): раньше здесь искался предложенный
+                                    // продукт ВНУТРИ текущего приёма — а предложения формируются с
+                                    // явным `!currentFoodIds.has(f.id)`, т.е. его там заведомо нет.
+                                    // itemIdx всегда был −1 → replaceFoodItem не вызывался, кнопка
+                                    // была мёртвой. Теперь ищем «жертву» — позицию в приёме, из-за
+                                    // которой возникла проблема (см. pickReplaceIdxForIssue), и
+                                    // меняем ИМЕННО её на предложенный продукт.
                                     const target = FOOD_DB.find(f => f.id === s.foodId);
-                                    if (itemIdx !== undefined && itemIdx >= 0 && target) {
-                                      // FIX button-audit: replaceFoodItem сам вызывает saveUndo — убран дубль
-                                      replaceFoodItem(dayIdx, meal.mealIdx, itemIdx, target);
+                                    const items = activeMeal?.items || [];
+                                    const victimIdx = pickReplaceIdxForIssue(items, issue.type);
+                                    if (target && victimIdx >= 0 && items[victimIdx]) {
+                                      // replaceFoodItem сам вызывает saveUndo — дубль не нужен
+                                      replaceFoodItem(dayIdx, meal.mealIdx, victimIdx, target);
                                       analyzePlanIssues();
                                     }
-                                  }} style={{ padding:'3px 8px', borderRadius:6, fontSize:10, cursor:'pointer', background:'rgba(0,230,138,0.08)', border:'1px solid rgba(0,230,138,0.2)', color:'#00e68a', fontWeight:600 }}>
+                                  }} title={`Заменить «${(activeMeal?.items?.[pickReplaceIdxForIssue(activeMeal?.items || [], issue.type)]?.name) || '—'}» на «${s.name}»`} style={{ padding:'3px 8px', borderRadius:6, fontSize:10, cursor:'pointer', background:'rgba(0,230,138,0.08)', border:'1px solid rgba(0,230,138,0.2)', color:'#00e68a', fontWeight:600 }}>
                                     {s.name} <span style={{ fontWeight:400, color:'rgba(255,255,255,0.75)' }}>({s.reason})</span>
                                   </button>
                                   );
@@ -3142,12 +3260,23 @@ const doImportPlan = (raw: string): boolean => {
                                   // E7-фикс: «🔄 Все» собирает ВСЕ замены в ОДИН saveUndo и один setDayPlan
                                   // (раньше каждая позиция мутировала план отдельно, а replaceFoodItem
                                   // внутри forEach терял актуальный state — часть замен могла не примениться)
+                                  //
+                                  // FIX B9 (аудит 2026-10): замена шла «вручную», поэтому
+                                  //   • у новых позиций не пересчитывались клетчатка и лейцин (в приёме
+                                  //     оставались значения СТАРОГО продукта → ложные «низкий лейцин /
+                                  //     низкая клетчатка» и неверные итоги дня);
+                                  //   • totals приёма/дня собирались без fiber/leucine;
+                                  //   • итоги weekPlan/threeDayPlan вообще не обновлялись (оставались
+                                  //     старые суммы недели, хотя дни изменились).
+                                  // Теперь всё считается едиными хелперами sumMealTotals/sumDayTotals.
                                   const dayIdx = planDays === 7 ? selectedDayIndex + 7 : planDays === 3 ? selectedDayIndex + 1 : 0;
                                   const activePlan = planDays === 1 ? dayPlan : (planDays === 3 ? threeDayPlan?.days?.[selectedDayIndex] : weekPlan?.days?.[selectedDayIndex]);
                                   if (!activePlan?.meals?.[meal.mealIdx]) return;
-                                  saveUndo();
                                   const mealItems = [...activePlan.meals[meal.mealIdx].items];
                                   const suggestions = issue.suggestion || [];
+                                  let changed = false;
+                                  const leucinePer100 = (f: any): number =>
+                                    f?.amino_acid_profile_100g?.leucine_mg ?? f?.micros?.Leucine ?? (f?.protein ? Math.round(f.protein * 75) : 0);
                                   mealItems.forEach((it: any, i: number) => {
                                     const similar = findSimilarFoods(it);
                                     if (similar.length === 0) return;
@@ -3162,14 +3291,28 @@ const doImportPlan = (raw: string): boolean => {
                                       p: Math.round((targetFood.protein || 0) * ratio * 10) / 10,
                                       f: Math.round((targetFood.fat || 0) * ratio * 10) / 10,
                                       c: Math.round((targetFood.carbs || 0) * ratio * 10) / 10,
+                                      fiber: Math.round((targetFood.fiber || 0) * ratio * 10) / 10,
+                                      leucine_mg: Math.round(leucinePer100(targetFood) * ratio),
                                     };
+                                    changed = true;
                                   });
-                                  const totals = { kcal: mealItems.reduce((s: number, x: any) => s + (x.kcal || 0), 0), p: mealItems.reduce((s: number, x: any) => s + (x.p || 0), 0), f: mealItems.reduce((s: number, x: any) => s + (x.f || 0), 0), c: mealItems.reduce((s: number, x: any) => s + (x.c || 0), 0) };
+                                  if (!changed) return; // нечего менять — не пишем «пустую» правку в undo
+                                  saveUndo();
+                                  const totals = sumMealTotals(mealItems);
                                   const newMeals = activePlan.meals.map((m: any, mi2: number) => (mi2 === meal.mealIdx ? { ...m, items: mealItems, totals } : m));
-                                  const apply = (p: any) => ({ ...p, meals: newMeals, totals: newMeals.reduce((s: number, m: any) => ({ kcal: s + (m.totals?.kcal || 0), p: s + (m.totals?.p || 0), f: s + (m.totals?.f || 0), c: s + (m.totals?.c || 0) }), { kcal: 0, p: 0, f: 0, c: 0 }) });
+                                  const apply = (p: any) => ({ ...p, meals: newMeals, totals: sumDayTotals(newMeals) });
+                                  // Итоги мульти-плана по всем дням (с клетчаткой и лейцином).
+                                  const multiTotals = (days: any[]) => days.reduce((s: any, d: any) => ({
+                                    kcal: s.kcal + (d?.totals?.kcal || 0),
+                                    p: s.p + (d?.totals?.p || 0),
+                                    f: s.f + (d?.totals?.f || 0),
+                                    c: s.c + (d?.totals?.c || 0),
+                                    fiber: s.fiber + (d?.totals?.fiber || 0),
+                                    leucine_mg: s.leucine_mg + (d?.totals?.leucine_mg || 0),
+                                  }), { kcal: 0, p: 0, f: 0, c: 0, fiber: 0, leucine_mg: 0 });
                                   if (dayIdx === 0) setDayPlan((prev: any) => apply(prev));
-                                  else if (planDays === 3) setThreeDayPlan((prev: any) => { const days = [...prev.days]; days[selectedDayIndex] = apply(prev.days[selectedDayIndex]); return { ...prev, days }; });
-                                  else setWeekPlan((prev: any) => { const days = [...prev.days]; days[selectedDayIndex] = apply(prev.days[selectedDayIndex]); return { ...prev, days }; });
+                                  else if (planDays === 3) setThreeDayPlan((prev: any) => { const days = [...prev.days]; days[selectedDayIndex] = apply(prev.days[selectedDayIndex]); return { ...prev, days, totals: multiTotals(days) }; });
+                                  else setWeekPlan((prev: any) => { const days = [...prev.days]; days[selectedDayIndex] = apply(prev.days[selectedDayIndex]); return { ...prev, days, totals: multiTotals(days) }; });
                                   analyzePlanIssues();
                                 }} style={{ padding:'3px 8px', borderRadius:6, fontSize:10, cursor:'pointer', background:'rgba(139,92,246,0.08)', border:'1px solid rgba(139,92,246,0.2)', color:'#a78bfa', fontWeight:600 }}>
                                   🔄 Все

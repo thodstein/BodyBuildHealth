@@ -375,7 +375,7 @@ describe('P1b/P4: UI выдачи (бейдж коктейля, live-цель)',
     // Прямой рендер списка с тегированным шейком (без зависимости от состава автоплана):
     // движок тегирует порошок ≥20 г (проверено выше), UI обязан показать бейдж.
     const stubCtx: any = {
-      dayPlan: null, draggedItem: null, dropTarget: null, editItem: null, replacingItem: null,
+      dayPlan: null, draggedItem: null, dropTarget: null, editItem: null,
       editAmount: 0, quickAddMealIdx: null, quickAddSearch: '', preferredFoods: [],
       lockedFoodIds: new Set(), healthIssues: [], plannerMode: 'simple', weightMode: 'cooked',
       findSimilarFoods: () => [], trainStart: '', trainEnd: '', effectiveKcal: 2000, effectiveP: 120,

@@ -310,7 +310,14 @@ export const PeakWeekTab: React.FC = () => {
       flash(() => {});
     }
   };
-  const removePrep = () => { clearContestPrepEverywhere(); setBBPrepConfig(null); setDraft(defaultConfig(sex, weight, bbCategory)); };
+  const removePrep = () => {
+    clearContestPrepEverywhere();
+    setBBPrepConfig(null);
+    setDraft(defaultConfig(sex, weight, bbCategory));
+    // FIX B7: раньше план на экране оставался с prep-целями до ручной регенерации —
+    // пользователь «удалил преп», а калории/макросы не менялись. Перегенерируем сразу.
+    try { applyBBPeakToPlan(null as any); } catch { /* ignore */ }
+  };
 
   const [copyFlash, setCopyFlash] = useState(false);
   const fallbackCopy = (text: string) => {

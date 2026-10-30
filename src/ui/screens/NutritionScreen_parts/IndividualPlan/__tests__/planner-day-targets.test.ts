@@ -99,10 +99,19 @@ describe('buildDayTargets — auto: наука задаёт калораж', () 
   });
 });
 
-describe('buildDayTargets — manual (обратно-совместимо)', () => {
-  it('все ручные значения заданы — используются как есть', () => {
+describe('buildDayTargets — manual (явные граммы пользователя)', () => {
+  // FIX B19/B20 (аудит 2026-10): контракт ручного режима изменён осознанно.
+  //  • граммы Б/Ж/У пользователя — закон; диетологический пол жира их не переписывает
+  //    (остаётся только физиологический минимум незаменимых ЖК 0.3 г/кг);
+  //  • ккал НЕ может противоречить БЖУ: если заданы все три макроса, калорийность
+  //    приводится к 4Б+4У+9Ж (иначе набор целей недостижим и сходимость ≤3% невозможна);
+  //  • если цели пусты — берутся нейтральные цели профиля (а не нули).
+  it('все ручные значения заданы — граммы как есть, ккал приведён к БЖУ', () => {
     const r = buildDayTargets(IN({ kbjuMode: 'manual', manual: { kcal: 3200, p: 180, f: 90, c: 330 } }));
-    expect(r).toMatchObject({ kcal: 3200, protein: 180, fats: Math.max(64, 90), carbs: 330 });
+    const aw = 180 * 4 + 90 * 9 + 330 * 4; // 2850
+    expect(r).toMatchObject({ protein: 180, fats: 90, carbs: 330 });
+    expect(r.kcal).toBe(aw); // введённые 3200 противоречат БЖУ (10.9%) → цель по ккал приводится
+    expect(r.breakdown.join(' ')).toContain('приведена к БЖУ');
   });
 
   it('manualC = null → угли выводятся из manualKcal − Б − Ж', () => {
@@ -110,12 +119,20 @@ describe('buildDayTargets — manual (обратно-совместимо)', () 
     expect(r.carbs).toBe(Math.round((3000 - 170 * 4 - 80 * 9) / 4));
   });
 
-  it('manual: жиры не ниже пола 0.8 г/кг', () => {
+  it('B19: ручной жир НЕ поднимается диетологическим полом 0.8 г/кг', () => {
     const r = buildDayTargets(IN({ kbjuMode: 'manual', manual: { kcal: 2800, p: 180, f: 30, c: 200 } }));
-    expect(r.fats).toBe(64);
+    // 30 г > физиологического минимума (0.3 г/кг = 24 г) → остаётся ровно 30
+    expect(r.fats).toBe(30);
+    expect(r.breakdown.join(' ')).not.toContain('физиологического минимума');
   });
 
-  it('manual: ккал и белок без сырого жира дают углы по фактическому полу', () => {
+  it('B19: ниже физиологического минимума — поднимается до 0.3 г/кг и это сказано в разборе', () => {
+    const r = buildDayTargets(IN({ kbjuMode: 'manual', manual: { kcal: 2800, p: 180, f: 5, c: 200 } }));
+    expect(r.fats).toBe(Math.max(15, Math.round(80 * 0.3))); // 24
+    expect(r.breakdown.join(' ')).toContain('физиологического минимума');
+  });
+
+  it('manual: ккал + белок без жиров/углей — жир по полу, угли остатком', () => {
     const r = buildDayTargets(IN({ kbjuMode: 'manual', manual: { kcal: 2000, p: 160, f: 0, c: null } }));
     expect(r).toMatchObject({ protein: 160, fats: 64, carbs: 196 });
     expect(r.kcal).toBe(2000);
@@ -124,6 +141,15 @@ describe('buildDayTargets — manual (обратно-совместимо)', () 
   it('manual: ручные углы ниже 50 г не повышаются скрытым диетологическим полом', () => {
     const r = buildDayTargets(IN({ kbjuMode: 'manual', manual: { kcal: 1000, p: 100, f: 40, c: 10 } }));
     expect(r.carbs).toBe(10);
+  });
+
+  it('B20: пустые цели → нейтральные цели профиля, а не нули (рацион собирается)', () => {
+    const r = buildDayTargets(IN({ kbjuMode: 'manual', manual: {} }));
+    expect(r.protein).toBeGreaterThan(0);
+    expect(r.fats).toBeGreaterThan(0);
+    expect(r.carbs).toBeGreaterThan(0);
+    expect(r.kcal).toBeGreaterThan(0);
+    expect(r.breakdown.join(' ')).toContain('цели не заданы');
   });
 
   it('carbCapOverride снимает контекстный потолок, но не ручные значения', () => {
@@ -141,6 +167,93 @@ describe('buildDayTargets — manual (обратно-совместимо)', () 
   it('keto + инсулин честно сообщает о конфликте гликемического пола', () => {
     const r = buildDayTargets(IN({ dietStyle: 'keto', insulinTotalUnits: 10, calcTargets: base({ kcal: 2200, tdee: 2200 }) }));
     expect(r.breakdown.join(' ')).toContain('Конфликт');
+  });
+});
+
+describe('buildDayTargets — manual: незаполненные параметры считаются автоматически', () => {
+  // Требование (2026-10-30): любой НЕ введённый пользователем параметр в ручном
+  // режиме считается автоматически. Было: ввёл только белок → день 720 ккал,
+  // Ж 0, У 0 (рацион не собирается); пустой ввод → «нейтральный профиль» в обход науки.
+  const auto = () => buildDayTargets(IN());
+  const manual = (m: any) => buildDayTargets(IN({ kbjuMode: 'manual', manual: m }));
+  const aw = (r: { protein: number; fats: number; carbs: number }) => Math.round(r.protein * 4 + r.fats * 9 + r.carbs * 4);
+
+  it('введён ТОЛЬКО белок — жир и углеводы считаются автоматически', () => {
+    const r = manual({ p: 180 });
+    expect(r.protein).toBe(180);
+    expect(r.fats).toBeGreaterThan(0);
+    expect(r.carbs).toBeGreaterThan(0);
+    expect(r.fats).toBe(auto().fats);   // норма жира из авто-цели
+    expect(r.carbs).toBe(auto().carbs); // углеводы с диетпотолком/стилем
+    expect(r.kcal).toBe(aw(r));
+    expect(r.breakdown.join(' ')).toContain('жир не задан — посчитан автоматически');
+    expect(r.breakdown.join(' ')).toContain('углеводы не заданы');
+  });
+
+  it('введён ТОЛЬКО жир — белок и углеводы считаются автоматически', () => {
+    const r = manual({ f: 100 });
+    expect(r.fats).toBe(100);
+    expect(r.protein).toBe(auto().protein);
+    expect(r.carbs).toBeGreaterThan(0);
+    expect(r.kcal).toBe(aw(r));
+  });
+
+  it('введены ТОЛЬКО углеводы — белок и жир считаются автоматически', () => {
+    const r = manual({ c: 300 });
+    expect(r.carbs).toBe(300);
+    expect(r.protein).toBe(auto().protein);
+    expect(r.fats).toBe(auto().fats);
+    expect(r.kcal).toBe(aw(r));
+  });
+
+  it('не введено ничего — полный авто-расчёт, а не «нейтральный профиль»', () => {
+    const r = manual({});
+    const a = auto();
+    expect([r.protein, r.fats, r.carbs, r.kcal]).toEqual([a.protein, a.fats, a.carbs, a.kcal]);
+    expect(r.breakdown.join(' ')).toContain('посчитаны автоматически');
+  });
+
+  it('ккал + только жир: белок и углеводы делятся в авто-пропорции (белок не съедает день)', () => {
+    const r = manual({ kcal: 2400, f: 80 });
+    expect(r.fats).toBe(80);
+    expect(r.protein).toBeGreaterThan(0);
+    expect(r.carbs).toBeGreaterThan(0);
+    // Углеводы не обнулены и день сходится к введённым ккал (в пределах округления).
+    expect(Math.abs(r.kcal - 2400) / 2400).toBeLessThanOrEqual(0.02);
+    expect(Math.abs(r.kcal - aw(r)) / r.kcal).toBeLessThanOrEqual(0.03);
+  });
+
+  it('ккал + только углеводы: белок и жир делятся в авто-пропорции', () => {
+    const r = manual({ kcal: 2400, c: 250 });
+    expect(r.carbs).toBe(250);
+    expect(r.protein).toBeGreaterThan(0);
+    expect(r.fats).toBeGreaterThanOrEqual(24); // пол незаменимых ЖК
+    expect(Math.abs(r.kcal - 2400) / 2400).toBeLessThanOrEqual(0.03);
+    expect(Math.abs(r.kcal - aw(r)) / r.kcal).toBeLessThanOrEqual(0.03);
+  });
+
+  it('инвариант: ккал и БЖУ согласованы в пределах канона 3% для любой комбинации', () => {
+    const cases: any[] = [
+      { p: 150 }, { f: 70 }, { c: 200 }, { kcal: 2000 },
+      { kcal: 2000, p: 150 }, { kcal: 2000, f: 60 }, { kcal: 2000, c: 200 },
+      { kcal: 2000, p: 150, f: 60 }, { kcal: 2000, p: 150, c: 200 }, { kcal: 2000, f: 60, c: 200 },
+      { p: 150, f: 60 }, { p: 150, c: 200 }, { f: 60, c: 200 },
+      { p: 150, f: 60, c: 200 }, { p: 150, f: 60, c: 200, kcal: 2000 }, {},
+    ];
+    for (const m of cases) {
+      const r = manual(m);
+      expect(r.kcal, `набор ${JSON.stringify(m)}`).toBeGreaterThan(0);
+      expect(Math.abs(r.kcal - aw(r)) / r.kcal, `согласованность ${JSON.stringify(m)}`).toBeLessThanOrEqual(0.03);
+      expect(r.protein, `Б в ${JSON.stringify(m)}`).toBeGreaterThan(0);
+      expect(r.fats, `Ж в ${JSON.stringify(m)}`).toBeGreaterThan(0);
+      expect(r.carbs, `У в ${JSON.stringify(m)}`).toBeGreaterThanOrEqual(0);
+    }
+  });
+
+  it('все три макроса заданы — ккал ровно по Атwater (введённый ккал уступает)', () => {
+    const r = manual({ kcal: 2000, p: 150, f: 60, c: 200 });
+    expect(r.kcal).toBe(aw(r)); // 150*4 + 60*9 + 200*4 = 1940
+    expect(r.kcal).toBe(1940);
   });
 });
 

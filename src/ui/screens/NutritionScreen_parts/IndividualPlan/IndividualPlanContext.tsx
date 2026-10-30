@@ -14,7 +14,8 @@ import { updateSection } from "../../../../core/profile-manager";
 import { getWeightLog, saveWeightLog } from "../../../../engines/profile-store";
 import { getNutritionV2Data, saveNutritionV2Data } from "../../../../core/nutrition-v2-data";
 import { ALL_SUBSTANCES } from "../../../../data/support-substances";
-import { computePlannerTargets, contextualCarbCapGPerKg, plannerGoalCategory } from "./planner-targets";
+import { computePlannerTargets, contextualCarbCapGPerKg, plannerGoalCategory, realWeightSeries, applyCarbWave, CARB_WAVE_HARD_CAP_G_PER_KG } from "./planner-targets";
+import { writeMealsToPlanDay, shouldMirrorToDayPlan, mergePlanDayIntoDiary } from "./planner-plan-write";
 import { buildDayTargets } from "./planner-day-targets";
 import { awakeHoursFromTimes, planMealStructure } from "./planner-meal-count";
 import { isWorkDayForIndex } from "./planner-work";
@@ -65,7 +66,8 @@ import {
 import type { DrugInjection, MealPrepStep, SavedPlan } from "./types";
 import { getProfileSafe, GlassCard, PillBtn, inputStyle, selectStyle, greenBtn, reportPillStyle } from "./ui";
 import { readDiaryV2, writeDiaryV2 } from "../diary-storage-v2";
-
+import { dietPrefsToNutritionPatch, dietPrefsFromNutrition } from "./planner-diet-prefs";
+import { resolveTrainType, isTrainType } from "./planner-train-type";
 export interface PlanCtx {
   profile: UserProfile | null;
   labs: LabPoint[];
@@ -210,7 +212,6 @@ intolerances: Intolerances; setIntolerances: (v: any) => void;
   expandedSavedId: number | null; setExpandedSavedId: (v: any) => void;
   editItem: any; setEditItem: (v: any) => void;
   editAmount: number; setEditAmount: (v: number) => void;
-  replacingItem: any; setReplacingItem: (v: any) => void;
   recipePickerMeal: any; setRecipePickerMeal: (v: any) => void;
   dayPlanNotes: string; setDayPlanNotes: (v: string) => void;
   draggedItem: any; setDraggedItem: (v: any) => void;
@@ -219,6 +220,8 @@ intolerances: Intolerances; setIntolerances: (v: any) => void;
   undoLast: () => void;
   weekEditDay: number | null;
   openWeekDayForEdit: (di: number) => void;
+  /** B8: открыть день 3-дневного плана для правки (dayPlan = копия дня, синк обратно). */
+  openThreeDayForEdit: (di: number) => void;
   switchPlanDays: (d: 1 | 3 | 7) => void;
   userRecipes: any[]; setUserRecipes: (v: any) => void;
   showRecipeCreator: boolean; setShowRecipeCreator: (v: boolean) => void;
@@ -266,8 +269,8 @@ addSnackComboToMeal: (dayIdx: number, mealIdx: number) => void;
   removeMealRebalanced: (dayIdx: number, mealIdx: number) => void;
   /** P4b: 🎯-цель приёма применить сразу к текущему дню (рескейл + ребаланс + синк). */
   applyMealTargetNow: (label: string, dayIdx?: number) => void;
-  updateMealTime: (mealIdx: number, time: string) => void;
-  duplicateMeal: (mealIdx: number) => void;
+  updateMealTime: (mealIdx: number, time: string, dayIdx?: number) => void;
+  duplicateMeal: (mealIdx: number, dayIdx?: number) => void;
   toggleAllergen: (id: string) => void;
   toggleHealthIssue: (id: string) => void;
   loadSavedPlan: (plan: SavedPlan) => void;
@@ -284,7 +287,10 @@ addSnackComboToMeal: (dayIdx: number, mealIdx: number) => void;
   autoCorrectPlan: () => void;
   saveCurrentPlan: () => void;
   /** FatSecret-уровень: 1-клик добавление текущего плана (день/выбранный день недели) в дневник питания */
-  addPlanToDiary: (dateISO?: string) => boolean;
+  /** B3: возвращает не только «успех», но и сколько реально добавлено/пропущено
+   *  (пропущено = уже было в дневнике на эту дату). Нужно, чтобы UI мог честно
+   *  сказать «уже в дневнике», а не «добавлено» при повторном нажатии. */
+  addPlanToDiary: (dateISO?: string) => { ok: boolean; added: number; skipped: number };
   generateMealPrep: () => void;
   mealPrepPlan: any;
   setMealPrepPlan: (v: any) => void;
@@ -324,8 +330,9 @@ addSnackComboToMeal: (dayIdx: number, mealIdx: number) => void;
   combatNutrition: any;
   cyclePhase: string; setCyclePhase: (v: any) => void;
   bbCategory: BBCategory; setBBCategory: (v: any) => void;
-  peakWeekEnabled: boolean; setPeakWeekEnabled: (v: boolean) => void;
-  peakWeekShowDay: number; setPeakWeekShowDay: (v: number) => void;
+  // B29 (аудит 2026-10): `peakWeekEnabled` / `peakWeekShowDay` удалены — они были
+  // производными от `bbPrepConfig`, но никем не читались, а их сеттеры
+  // (`setPeakWeekEnabled(true)` — молчаливый no-op) создавали ложный контракт.
   /** Единая система тапера ББ (bb-contest-prep.engine): конфиг пикинг-недели. */
   bbPrepConfig: BBContestPrepConfig | null; setBBPrepConfig: (v: BBContestPrepConfig | null) => void;
   /** Единый контест-преп план (goals.bbContestPrepPlan) — для периодизации питания вперёд. */
@@ -545,8 +552,23 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
       );
     } catch { return null; }
   });
+  // FIX B7 (аудит 2026-10): ref-зеркала prep-плана/конфига.
+  // `generatePlan` — обычная функция рендера, она замкнута на bbPrepPlan/bbPrepConfig.
+  // Когда prep-конфиг сохраняется и план генерируется В ТОМ ЖЕ обработчике
+  // (`applyBBPeakToPlan`: setBBPrepConfig(cfg) > generatePlan()), замыкание видит
+  // СТАРЫЕ значения > первый клик «Применить тапер-план ББ» генерировал план без
+  // prep-целей, и только второй клик давал правильный результат.
+  // Через ref значение доступно немедленно, в том же тике.
+  const bbPrepPlanRef = useRef<BBContestPrepPlan | null>(bbPrepPlan);
+  const bbPrepConfigRef = useRef<BBContestPrepConfig | null>(bbPrepConfig);
+  // Страховка: держим ref в актуальном состоянии при любых изменениях состояния
+  // (миграция, внешние события he-bb-contest-prep-updated и т.д.).
+  useEffect(() => { bbPrepPlanRef.current = bbPrepPlan; }, [bbPrepPlan]);
+  useEffect(() => { bbPrepConfigRef.current = bbPrepConfig; }, [bbPrepConfig]);
   const setBBPrepConfig = (cfg: BBContestPrepConfig | null) => {
     if (!cfg) {
+      bbPrepConfigRef.current = null;
+      bbPrepPlanRef.current = null;
       setBBPrepConfigState(null);
       setBBPrepPlan(null);
       try { clearContestPrepEverywhere(); } catch {}
@@ -558,45 +580,26 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     try {
       const plan = saveContestPrepEverywhere(cfg, { source: 'planner', taperWeeks: cfg.weeksOut });
       if (plan) {
+        bbPrepConfigRef.current = cfg;
+        bbPrepPlanRef.current = plan;
         setBBPrepConfigState(cfg);
         setBBPrepPlan(plan);
         return;
       }
     } catch {}
     // fallback — старая логика, если сборка плана не удалась
+    bbPrepConfigRef.current = cfg;
+    bbPrepPlanRef.current = null;
     setBBPrepConfigState(cfg);
     setBBPrepPlan(null);
     try {
       updateSection('goals', { bbPeakConfig: serializeBBPrepConfig(cfg), peakWeek: true, peakShowDay: cfg.showDate });
     } catch {}
   };
-  // legacy peakWeekEnabled/peakShowDay — теперь производные от bbPrepConfig (единый план)
-  const peakWeekEnabled = !!bbPrepConfig;
-  const setPeakWeekEnabled = (v: boolean) => { if (!v) setBBPrepConfig(null); };
-  const peakWeekShowDay = (() => {
-    try {
-      if (bbPrepConfig?.showDate) {
-        const d = new Date(bbPrepConfig.showDate);
-        if (!isNaN(d.getTime())) return d.getDay();
-      }
-      const v = (s as any)?.goals?.peakShowDay;
-      if (typeof v === 'string') {
-        const d2 = new Date(v);
-        if (!isNaN(d2.getTime())) return d2.getDay();
-      }
-    } catch {}
-    return 6;
-  })();
-  const setPeakWeekShowDay = (n: number) => {
-    try {
-      const base = bbPrepConfig || legacyConfigFromProfile((s as any)?.goals, (s as any)?.personal);
-      if (!base) return;
-      const d = new Date();
-      d.setDate(d.getDate() + (n - d.getDay() + 7) % 7);
-      const iso = localIsoDate(d);
-      setBBPrepConfig({ ...base, showDate: iso });
-    } catch {}
-  };
+  // B29 (аудит 2026-10): блок `peakWeekEnabled` / `peakWeekShowDay` удалён.
+  // Значения были производными от `bbPrepConfig`, но их не читал ни один экран;
+  // `setPeakWeekEnabled(true)` при этом молча ничего не делал. Сброс «тапера»
+  // теперь делается напрямую через `setBBPrepConfig(null)`.
   // 🏁 Живая синхронизация: событие he-bb-contest-prep-updated из BB Auto / питания
   // (собран/изменён prep-план) → перечитать единый план из профиля.
   useEffect(() => {
@@ -665,7 +668,6 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
       try { clearContestPrepEverywhere(); } catch {}
       setBBPrepConfigState(null);
       setBBPrepPlan(null);
-      setPeakWeekEnabled(false);
     } else {
       setBBPrepConfig(cfg);
     }
@@ -756,7 +758,9 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
       // иначе при следующем маунте сид стал бы «настоящим» замером)
       localStorage.setItem('he_weight_log_entries', JSON.stringify(weightLogEntries));
     } catch {}
-    setWeightLogWeek(weightLogEntries.filter(e => Number.isFinite(e.weight) && e.weight > 0).map(e => e.weight));
+    // FIX B17 (аудит 2026-10): в адаптацию уходят только РЕАЛЬНЫЕ замеры пользователя
+    // (синтетический сид веса больше не двигает калорийность).
+    setWeightLogWeek(realWeightSeries(weightLogEntries));
   }, [weightLogEntries]);
   const [metabolicAdaptEnabled, setMetabolicAdaptEnabled] = useState<boolean>(!!_pf.metabolicAdaptEnabled);
   const [metabolicAdaptPct, setMetabolicAdaptPct] = useState<number>(typeof _pf.metabolicAdaptPct === 'number' ? _pf.metabolicAdaptPct : 10);
@@ -1030,6 +1034,17 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     setCarbCapOverrideState(v);
     try { localStorage.setItem('he_planner_cap_override', v ? '1' : '0'); } catch {}
   };
+  // B33: синхронизация флага между вкладками/экранами. Без подписки на `storage`
+  // состояние оставалось бы снятым до перезагрузки при правке из другой вкладки.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const onStorage = (e: StorageEvent) => {
+      if (e.key !== 'he_planner_cap_override') return;
+      setCarbCapOverrideState(e.newValue === '1');
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, []);
 
   // Эпик A (NUTRITION-PLANNER-QUALITY-PLAN): фактические цели дня — единая чистая функция
   // buildDayTargets (planner-day-targets.ts). Наука (TDEE→surplus→фаза→фарма→weight-adapt→
@@ -1119,10 +1134,15 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
   const effectiveP = bbApplied.protein;
   const effectiveF = bbApplied.fats;
   const effectiveC = bbApplied.carbs;
-  const _rawCForCap = kbjuMode === 'manual' ? dayTargets.carbs : kbjuMode === 'profile' ? profileTargets.carbs : calcTargets.carbs;
-  // P1-9: «Снять потолок» — явный оверрайд (читается из стореджа напрямую: блок
-  // вычисляется до useState-объявлений, замыкание перегенерируется на каждый рендер).
-  const _capOverride = (() => { try { return localStorage.getItem('he_planner_cap_override') === '1'; } catch { return false; } })();
+  // B32 (аудит 2026-10): «до потолка» — из ТОЙ ЖЕ функции, что применила потолок.
+  // Раньше бралось из calcTargets/profileTargets, то есть из другого источника
+  // (в auto-режиме это остаток научной цепи до правок ББ-плана и стиля питания),
+  // и число в кнопке «Снять потолок» не совпадало с реально ограниченным.
+  const _rawCForCap = dayTargets.carbsBeforeCap ?? dayTargets.carbs;
+  // B33 (аудит 2026-10): оверрайд читается из СОСТОЯНИЯ, а не из localStorage в теле
+  // рендера. Раньше кнопка «Снять потолок» меняла `carbCapOverride`, но баннер
+  // продолжал смотреть в localStorage напрямую — при рассинхроне (другая вкладка,
+  // сброс стореджа, повторный маунт) UI показывал устаревший флаг.
   const carbCapGPerKg = (() => {
     try {
       const schedule = buildTrainSchedule(linkToTraining, trainStart, trainEnd, trainingDays, trainScheduleType, trainPattern);
@@ -1134,7 +1154,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
   // цепи) с капом — врал в обе стороны (ложное «да» на сушке, ложное «нет» на bulk).
   // Теперь флаг считает buildDayTargets: сравнивает остаток ДО потолка с углами после.
   const carbCapClipped = (() => {
-    try { if (_capOverride || kbjuMode === 'manual') return false; return dayTargets.carbCapClipped === true; } catch { return false; }
+    try { if (carbCapOverride || kbjuMode === 'manual') return false; return dayTargets.carbCapClipped === true; } catch { return false; }
   })();
   // Kcal из чистой логики (Atwater-консистентно + целевой калораж ББ-плана в пределах 15%).
   const effectiveKcal = bbApplied.kcal;
@@ -1584,7 +1604,8 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
   const [expandedSavedId, setExpandedSavedId] = useState<number | null>(null);
   const [editItem, setEditItem] = useState<{ dayIdx: number; mealIdx: number; itemIdx: number } | null>(null);
   const [editAmount, setEditAmount] = useState<number>(0);
-  const [replacingItem, setReplacingItem] = useState<{ dayIdx: number; mealIdx: number; itemIdx: number } | null>(null);
+  // B30 (аудит 2026-10): состояние `replacingItem` удалено — оно выставлялось,
+  // но НИГДЕ не рендерилось (мёртвый UI-индикатор замены продукта).
   const [recipePickerMeal, setRecipePickerMeal] = useState<{ dayIdx: number; mealIdx: number; label: string } | null>(null);
   // P4a-диалог: второй рецепт не влез в закрытый приём — явный выбор пользователя
   // (shrink ×0.65 / комната из перекусов / мини / отмена) вместо тихого отказа.
@@ -1926,6 +1947,8 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
   // FIX button-audit: при открытии дня недели для редактирования dayPlan становится копией
   // этого дня; правки синхронизируются обратно в weekPlan (раньше терялись при возврате к неделе).
   const [weekEditDay, setWeekEditDay] = useState<number | null>(null);
+  // B8: то же для 3-дневного плана (раньше такого указателя не было вовсе).
+  const [threeEditDay, setThreeEditDay] = useState<number | null>(null);
   // E4-fix: правки недели (weekEditDay) в режиме месяца возвращаются в monthPlan[selectedWeek] —
   // раньше возврат к «Списку недель» затирал правки, т.к. monthPlan хранит собственные копии недель.
   // Генерация месяца не затрагивается: weekEditDay = null при генерации (сброс в generatePlan).
@@ -1942,11 +1965,43 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     if (!weekPlan?.days?.[di]) return;
     try { setDayPlan(JSON.parse(JSON.stringify(weekPlan.days[di]))); } catch { setDayPlan(weekPlan.days[di]); }
     setWeekEditDay(di);
+    setThreeEditDay(null);
     setPlanDays(1);
     setSelectedDayIndex(di);
   };
+  // FIX B8 (аудит 2026-10): симметрично неделе — открытие дня 3-дневного плана.
+  // Раньше компоновщик копировал день в dayPlan и переключал planDays на 1, но НЕ
+  // помечал, откуда день взят. Дальше правки (🕐 время, 📋 дубль, замена продукта)
+  // писались только в dayPlan и терялись при возврате к 3 дням/неделе.
+  const openThreeDayForEdit = (di: number) => {
+    if (!threeDayPlan?.days?.[di]) return;
+    try { setDayPlan(JSON.parse(JSON.stringify(threeDayPlan.days[di]))); } catch { setDayPlan(threeDayPlan.days[di]); }
+    setThreeEditDay(di);
+    setWeekEditDay(null);
+    setPlanDays(1);
+    setSelectedDayIndex(di);
+  };
+  /**
+   * Записать обновлённый список приёмов в конкретный день конкретного плана.
+   * B8: единая точка записи для 🕐/📋 и прочих «приёмо-уровневых» операций,
+   * чтобы они могли адресовать день по dayIdx (0 = dayPlan, 1..3 = three, 7..13 = week).
+   */
+  const _writeMealsToPlanDay = (planKey: 'week' | 'three', day: number, applyToMeals: (meals: any[]) => any[]) => {
+    // B8: запись в конкретный день конкретного плана вынесена в чистый хелпер
+    // (planner-plan-write.ts) — там же пересчитываются итоги дня и плана.
+    if (planKey === 'week') {
+      const next = writeMealsToPlanDay(weekPlan, day, applyToMeals);
+      if (next) setWeekPlan(next);
+      return;
+    }
+    const next = writeMealsToPlanDay(threeDayPlan, day, applyToMeals);
+    if (next) setThreeDayPlan(next as any);
+  };
+  /** Нужно ли зеркалить правку в dayPlan (он — копия видимого дня). */
+  const _shouldMirrorToDayPlan = (planKey: 'week' | 'three', day: number): boolean =>
+    shouldMirrorToDayPlan(planKey, day, weekEditDay, threeEditDay);
   const switchPlanDays = (d: 1 | 3 | 7) => {
-    if (d !== 1) setWeekEditDay(null);
+    if (d !== 1) { setWeekEditDay(null); setThreeEditDay(null); }
     setPlanDays(d);
   };
   const _applyDayPlanMealUpdate = (mealIdx: number, updater: (items: any[]) => any[], opts?: { compositionChange?: boolean }) => {
@@ -1969,6 +2024,12 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     setDayPlan((prev: any) => _applyMeta(updateMealsInPlan(prev, mealIdx, updater)));
     if (weekEditDay !== null && weekPlan?.days?.[weekEditDay]) {
       updateMultiDayPlan(weekPlan, weekEditDay, mealIdx, updater, opts?.compositionChange);
+    }
+    // B8: правки, сделанные из карточки «3 дня»/компоновщика, обязаны доехать
+    // и до threeDayPlan — раньше они жили только в dayPlan и терялись.
+    // updateMultiDayPlan сам выбирает нужный сеттер по длине days (3 > threeDayPlan).
+    if (threeEditDay !== null && threeDayPlan?.days?.[threeEditDay]) {
+      updateMultiDayPlan(threeDayPlan as any, threeEditDay, mealIdx, updater, opts?.compositionChange);
     }
   };
 
@@ -2099,7 +2160,6 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     } else if (resolved.plan === 'week') {
       updateMultiDayPlan(weekPlan, resolved.day, mealIdx, items => { items[itemIdx] = replacement; return items; }, true);
     }
-    setReplacingItem(null);
   };
 
   const updateItemAmount = (dayIdx: number, mealIdx: number, itemIdx: number, newAmount: number) => {
@@ -2298,9 +2358,27 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
   // Эпик E: единые операции правки дня, синхронные в weekPlan при weekEditDay
   // (раньше 🕒-время/дубль из MealListRender и QuickControls писали только dayPlan —
   // правки недели терялись при возврате).
-  const updateMealTime = (mealIdx: number, time: string) => {
+  //
+  // FIX B8 (аудит 2026-10): добавлен необязательный `dayIdx` и синк в threeDayPlan.
+  // До этого функция не знала, о каком дне речь, и умела писать только в dayPlan /
+  // weekPlan[weekEditDay]. В 3-дневном плане и в компоновщике (после открытия дня
+  // недели без weekEditDay) правки времени и дубль приёма терялись.
+  const updateMealTime = (mealIdx: number, time: string, dayIdx?: number) => {
     saveUndo();
     const applyTime = (meals: any[]) => meals.map((m: any, i: number) => (i === mealIdx ? { ...m, time } : m));
+    const _resolved = (typeof dayIdx === 'number' && dayIdx > 0) ? _resolvePlanDay(dayIdx) : null;
+    if (_resolved && _resolved.plan !== 'day') {
+      const key: 'week' | 'three' = _resolved.plan === 'week' ? 'week' : 'three';
+      _writeMealsToPlanDay(key, _resolved.day, applyTime);
+      if (_shouldMirrorToDayPlan(key, _resolved.day)) {
+        setDayPlan((prev: any) => {
+          if (!prev?.meals?.[mealIdx]) return prev;
+          const meals = applyTime(prev.meals);
+          return { ...prev, meals, totals: sumDayTotals(meals as any) };
+        });
+      }
+      return;
+    }
     setDayPlan((prev: any) => {
       if (!prev?.meals?.[mealIdx]) return prev;
       const meals = applyTime(prev.meals);
@@ -2316,10 +2394,25 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
         setWeekPlan({ ...weekPlan, days, totals: sumMultiTotals(days) });
       }
     }
+    if (threeEditDay !== null && threeDayPlan?.days?.[threeEditDay]) {
+      const days = [...threeDayPlan.days];
+      const d = JSON.parse(JSON.stringify(days[threeEditDay]));
+      if (d?.meals?.[mealIdx]) {
+        d.meals = applyTime(d.meals);
+        d.totals = sumDayTotals(d.meals);
+        days[threeEditDay] = d;
+        setThreeDayPlan({ ...threeDayPlan, days, totals: sumMultiTotals(days) } as any);
+      }
+    }
   };
 
-  const duplicateMeal = (mealIdx: number) => {
-    const src = dayPlan?.meals?.[mealIdx];
+  const duplicateMeal = (mealIdx: number, dayIdx?: number) => {
+    // B8: источник берём из адресованного дня (если он задан), иначе из dayPlan
+    const _resolved = (typeof dayIdx === 'number' && dayIdx > 0) ? _resolvePlanDay(dayIdx) : null;
+    const _srcDay = _resolved && _resolved.plan !== 'day'
+      ? (_resolved.plan === 'week' ? weekPlan?.days?.[_resolved.day] : threeDayPlan?.days?.[_resolved.day])
+      : dayPlan;
+    const src = _srcDay?.meals?.[mealIdx];
     if (!src) return;
     saveUndo();
     const insertAfter = (meals: any[]): any[] => {
@@ -2332,19 +2425,41 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
       out.splice(Math.min(mealIdx + 1, out.length), 0, copy);
       return out;
     };
-    setDayPlan((prev: any) => {
-      if (!prev?.meals) return prev;
-      const meals = insertAfter(prev.meals);
-      return { ...prev, meals, totals: sumDayTotals(meals as any) };
-    });
-    if (weekEditDay !== null && weekPlan?.days?.[weekEditDay]) {
-      const days = [...weekPlan.days];
-      const d = JSON.parse(JSON.stringify(days[weekEditDay]));
-      if (d?.meals) {
-        d.meals = insertAfter(d.meals);
-        d.totals = sumDayTotals(d.meals);
-        days[weekEditDay] = d;
-        setWeekPlan({ ...weekPlan, days, totals: sumMultiTotals(days) });
+    if (_resolved && _resolved.plan !== 'day') {
+      const key: 'week' | 'three' = _resolved.plan === 'week' ? 'week' : 'three';
+      _writeMealsToPlanDay(key, _resolved.day, insertAfter);
+      if (_shouldMirrorToDayPlan(key, _resolved.day)) {
+        setDayPlan((prev: any) => {
+          if (!prev?.meals) return prev;
+          const meals = insertAfter(prev.meals);
+          return { ...prev, meals, totals: sumDayTotals(meals as any) };
+        });
+      }
+    } else {
+      setDayPlan((prev: any) => {
+        if (!prev?.meals) return prev;
+        const meals = insertAfter(prev.meals);
+        return { ...prev, meals, totals: sumDayTotals(meals as any) };
+      });
+      if (weekEditDay !== null && weekPlan?.days?.[weekEditDay]) {
+        const days = [...weekPlan.days];
+        const d = JSON.parse(JSON.stringify(days[weekEditDay]));
+        if (d?.meals) {
+          d.meals = insertAfter(d.meals);
+          d.totals = sumDayTotals(d.meals);
+          days[weekEditDay] = d;
+          setWeekPlan({ ...weekPlan, days, totals: sumMultiTotals(days) });
+        }
+      }
+      if (threeEditDay !== null && threeDayPlan?.days?.[threeEditDay]) {
+        const days = [...threeDayPlan.days];
+        const d = JSON.parse(JSON.stringify(days[threeEditDay]));
+        if (d?.meals) {
+          d.meals = insertAfter(d.meals);
+          d.totals = sumDayTotals(d.meals);
+          days[threeEditDay] = d;
+          setThreeDayPlan({ ...threeDayPlan, days, totals: sumMultiTotals(days) } as any);
+        }
       }
     }
     if (typeof (window as any).showToast === 'function') (window as any).showToast('📋 Приём продублирован', 'success');
@@ -3061,7 +3176,11 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
         if (s.personal.bodyFat !== undefined) setBodyFatPct(s.personal.bodyFat);
       }
       if (s.training) {
-        if (s.training.daysPerWeek) setTrainType(s.training.daysPerWeek >= 5 ? 'strength' : s.training.daysPerWeek >= 3 ? 'mixed' : 'cardio');
+        // FIX B22 (аудит 2026-10): раньше тип тренинга ВСЕГДА выводился из дней
+        // (`daysPerWeek >= 3 > 'mixed'`), затирая выбор пользователя. Теперь берём
+        // сохранённый тип, а эвристика по дням осталась только для старых профилей.
+        const _tt = resolveTrainType((s.training as any).trainType, s.training.daysPerWeek);
+        if ((s.training as any).trainType || s.training.daysPerWeek) setTrainType(_tt);
         if (s.training.minutesPerSession) {
           // не подменяем minutesPerSession напрямую, маппим в workout duration
         }
@@ -3085,9 +3204,10 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
         if (s.lifestyle.wakeTime) setWakeTime(s.lifestyle.wakeTime);
       }
       if (s.nutrition) {
-        if (s.nutrition.dietType && s.nutrition.dietType !== 'omnivore') {
-          setDietPrefs([s.nutrition.dietType as 'vegetarian' | 'vegan' | 'pescatarian' | 'keto' | 'paleo' | 'mediterranean']);
-        }
+        // FIX B21: сначала полный набор (`dietTypes`), иначе — одиночный `dietType`
+        // для профилей, сохранённых до фикса.
+        const _dt = dietPrefsFromNutrition(s.nutrition);
+        if (_dt.length) setDietPrefs(_dt as any);
         // mealsPerDay теперь АВТО (ёмкость тарелки) — из профиля не подтягиваем.
         if (s.nutrition.foodAllergies) setAllergens(s.nutrition.foodAllergies);
         if (s.nutrition.foodIntolerances) setIntolerances({ ...intolerances, ...Object.fromEntries((Array.isArray(s.nutrition.foodIntolerances) ? s.nutrition.foodIntolerances : []).map((a: string) => [a, true])) });
@@ -3154,9 +3274,22 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
       if (bodyFatPct !== undefined && bodyFatPct !== null) next.personal.bodyFat = bodyFatPct;
       if (!next.training) next.training = {};
       if (goal) next.training.primaryGoal = goal;
+      // FIX B22 (аудит 2026-10): тип тренинга теперь СОХРАНЯЕТСЯ (раньше только
+      // выводился из дней при загрузке — выбор пользователя терялся).
+      if (isTrainType(trainType)) next.training.trainType = trainType;
       // FIX train-bind: график тренировок в профиль (по кнопке «Сохранить в профиль»)
       next.training.schedule = buildTrainSchedule(linkToTraining, trainStart, trainEnd, trainingDays, trainScheduleType, trainPattern);
-      next.training.daysPerWeek = [0, 1, 2, 3, 4, 5, 6].filter(d => isTrainingDayFor(next.training.schedule, d)).length;
+      // FIX B2 (аудит 2026-10): раньше здесь безусловно писалось
+      //   daysPerWeek = число «тренировочных» дней расписания.
+      // При ВЫКЛЮЧЕННОЙ привязке isTrainingDayFor() возвращает false для всех 7 дней
+      // > в профиль уходило daysPerWeek = 0. Дальше это читалось как
+      // workoutsPerWeek (Context:999) > PAL = 1.2 + 0*0.075 = 1.2 > TDEE падал на ~20%
+      // во ВСЕХ экранах, которые берут профиль. Теперь при выключенной привязке поле
+      // не трогаем вовсе — там остаётся то, что пользователь задал сам.
+      if (linkToTraining) {
+        const _weeklyTrainDays = [0, 1, 2, 3, 4, 5, 6].filter(d => isTrainingDayFor(next.training.schedule, d, 0)).length;
+        if (_weeklyTrainDays > 0) next.training.daysPerWeek = _weeklyTrainDays;
+      }
       if (!next.lifestyle) next.lifestyle = {};
       if (dailySteps !== undefined) next.lifestyle.dailySteps = dailySteps;
       if (sleepHours !== undefined) next.lifestyle.sleepHours = sleepHours;
@@ -3164,7 +3297,9 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
       if (bedTime) next.lifestyle.bedtime = bedTime;
       if (wakeTime) next.lifestyle.wakeTime = wakeTime;
       if (!next.nutrition) next.nutrition = {};
-      if (dietPrefs.length) next.nutrition.dietType = (dietPrefs[0] as any) || 'omnivore';
+      // FIX B21 (аудит 2026-10): сохраняем ВЕСЬ набор предпочтений, а не только первое.
+      // `dietType` остаётся первым элементом — его читают другие экраны (обратная совместимость).
+      Object.assign(next.nutrition, dietPrefsToNutritionPatch(dietPrefs));
       if (mealsCount) next.nutrition.mealsPerDay = mealsCount;
       if (allergens.length) next.nutrition.foodAllergies = allergens;
       if (excludedFoods.length) next.nutrition.excludedFoods = excludedFoods;
@@ -3404,6 +3539,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
      setPlanDays(days);
      if (dayIndex !== undefined) setSelectedDayIndex(dayIndex);
      setWeekEditDay(null); // FIX button-audit: новая генерация сбрасывает редактирование недели
+     setThreeEditDay(null); // B8: и редактирование 3-дневного дня тоже
 
         // v6: V2 — единственный движок (classic удалён). simple/minimal — пресеты pro (quality:'basic' + variety/budget).
         if (true) {
@@ -3633,31 +3769,59 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
         }
         const _effMealsRaw = _fastingDay ? Math.max(3, (opts?.overrides?.mealsCount ?? mealsCount) - 1) : (opts?.overrides?.mealsCount ?? mealsCount);
         const _effMealsCount = _effMealsRaw;
-        const _inPrepWindow = bbPrepPlan ? prepPhaseForDate(bbPrepPlan, _prepDate) !== null : false;
+        // FIX B7: читаем prep-план/конфиг из ref — они актуальны уже в том же тике,
+        // где их только что выставили (setState приходит на следующем рендере).
+        const _bbPrepPlan = bbPrepPlanRef.current;
+        const _bbPrepConfig = bbPrepConfigRef.current;
+        const _inPrepWindow = _bbPrepPlan ? prepPhaseForDate(_bbPrepPlan, _prepDate) !== null : false;
         // 🗓 Годовой план: активный блок на дату (для подсказки про contest prep).
         const _annualPhase = annualPlan ? annualPlanPhaseForDate(annualPlan, _prepDate) : null;
-        const _peakTargets = bbPrepPlan && _inPrepWindow
-          ? nutritionTargetsForPrepDate(_prepDate, bbPrepPlan, {
+        // B19-доп (запрос пользователя, 2026-10-29): РУЧНОЕ КБЖУ — ИСТОЧНИК ИСТИНЫ.
+        // Пользователь ввёл граммы сам, поэтому ни волна периодизации, ни «тяжёлый»
+        // день, ни фаза цикла, ни спецприёмы не имеют права их масштабировать: иначе
+        // баннер «План будет собран на: …» врёт. Что было: ручные 310 г углеводов на
+        // рефиде становились 682 г (×2.2), жир 80 г → 40 г (рефид делит жир пополам),
+        // тяжёлый день молча добавлял +25% углеводов к введённому числу.
+        if (kbjuMode === 'manual') {
+          dayKcalMod = 1; dayCarbMod = 1; isRefeedDay = false;
+          // Заметки выше обещают «углеводы ×2.2 / углеводы выше / день на поддержании» —
+          // в ручном режиме это неправда, поэтому убираем их, а не оставляем врать.
+          for (let _ni = _specialNotes.length - 1; _ni >= 0; _ni--) {
+            if (/×2\.2|×1\.25|углеводы выше|поддержании/.test(_specialNotes[_ni])) _specialNotes.splice(_ni, 1);
+          }
+          _specialNotes.push('🔒 Ручное КБЖУ: цели дня — ровно введённые вами граммы. Волна периодизации, тяжёлый день, фаза цикла и спецприёмы их не масштабируют.');
+        }
+        // B11 (аудит 2026-10): волна карб-периодизации больше не безлимитна. Базовая цель
+        // (baseGoalC) уже ограничена клиническим потолком в buildDayTargets, а сама волна
+        // ограничена абсолютным пределом 12 г/кг (см. applyCarbWave). Дни явной
+        // суперкомпенсации (рефид/карб-лоад) и ручной режим (пользователь сам задал
+        // граммы, потолок в нём уже отключён через carbCapGPerKg = 0) — исключения.
+        const _waveC = applyCarbWave(baseGoalC, dayCarbMod, weight, { allowSupercompensation: isRefeedDay || kbjuMode === 'manual' });
+        if (_waveC.waveClipped) {
+          _specialNotes.push(`🔁 Волна карб-периодизации ограничена физиологическим пределом ${CARB_WAVE_HARD_CAP_G_PER_KG} г/кг (${Math.round(weight * CARB_WAVE_HARD_CAP_G_PER_KG)} г): выше этого уровня углеводы не дают дополнительного гликогена.`);
+        }
+        const _peakTargets = _bbPrepPlan && _inPrepWindow
+          ? nutritionTargetsForPrepDate(_prepDate, _bbPrepPlan, {
               kcal: Math.round(Math.max(1200, baseGoalKcal * dayKcalMod) + (_diaryActive ? diaryComp.delta.kcal * _dampK : 0)),
               proteinG: Math.round(Math.max(80, baseGoalP) + (_diaryActive ? diaryComp.delta.p : 0)),
               fatG: Math.round(Math.max(30, baseGoalF * (isRefeedDay ? 0.5 : 1)) + (_diaryActive ? diaryComp.delta.f : 0)),
-              carbsG: Math.round(Math.max(50, baseGoalC * dayCarbMod) + (_diaryActive ? diaryComp.delta.c * _dampC : 0)),
+              carbsG: Math.round(_waveC.carbsG + (_diaryActive ? diaryComp.delta.c * _dampC : 0)),
               waterMl: 3000,
               sodiumMg: PREP_SODIUM_BASE_MG,
             }, { isHeavyTrainDay: isTrainDay(offset) })
-          : bbPrepConfig
+          : _bbPrepConfig
             ? computePeakWeekNutritionTargets(_prepDate, {
                 kcal: Math.round(Math.max(1200, baseGoalKcal * dayKcalMod) + (_diaryActive ? diaryComp.delta.kcal * _dampK : 0)),
                 proteinG: Math.round(Math.max(80, baseGoalP) + (_diaryActive ? diaryComp.delta.p : 0)),
                 fatG: Math.round(Math.max(30, baseGoalF * (isRefeedDay ? 0.5 : 1)) + (_diaryActive ? diaryComp.delta.f : 0)),
-                carbsG: Math.round(Math.max(50, baseGoalC * dayCarbMod) + (_diaryActive ? diaryComp.delta.c * _dampC : 0)),
+                carbsG: Math.round(_waveC.carbsG + (_diaryActive ? diaryComp.delta.c * _dampC : 0)),
                 waterMl: 3000,
                 sodiumMg: PREP_SODIUM_BASE_MG,
-              }, bbPrepConfig)
+              }, _bbPrepConfig)
             : null;
         if (_peakTargets?.phase) _peakNote = _peakTargets.note;
-        else if (bbPrepPlan && _peakTargets?.note) _peakNote = _peakTargets.note;
-        else if (_annualPhase && _annualPhase.block.ref.kind === 'BB' && _annualPhase.block.ref.phase === 'contest_prep' && !bbPrepPlan && !bbPrepConfig && !_peakNote) {
+        else if (_bbPrepPlan && _peakTargets?.note) _peakNote = _peakTargets.note;
+        else if (_annualPhase && _annualPhase.block.ref.kind === 'BB' && _annualPhase.block.ref.phase === 'contest_prep' && !_bbPrepPlan && !_bbPrepConfig && !_peakNote) {
           _peakNote = '🏁 Годовой план: эта неделя — contest prep, но prep-план не собран. Соберите «🏁 Contest prep» в ББ-авто (или включите «🎭 Пик-неделю» у блока в Годовом плане) — иначе цели подготовки не применяются.';
         }
         const _applyPrepTargets = !!(_peakTargets && (_peakTargets.phase || _inPrepWindow));
@@ -3669,7 +3833,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
           goalKcal: _applyPrepTargets ? _peakTargets.kcal : Math.round(Math.max(1200, baseGoalKcal * dayKcalMod) + (_diaryActive ? diaryComp.delta.kcal * _dampK : 0)),
           goalProteinG: _applyPrepTargets ? _peakTargets.proteinG : Math.round(Math.max(80, baseGoalP) + (_diaryActive ? diaryComp.delta.p : 0)),
           goalFatG: _applyPrepTargets ? _peakTargets.fatG : Math.round(Math.max(30, baseGoalF * (isRefeedDay ? 0.5 : 1)) + (_diaryActive ? diaryComp.delta.f : 0)),
-           goalCarbsG: _applyPrepTargets ? _peakTargets.carbsG : Math.round(Math.max(50, baseGoalC * dayCarbMod) + (_diaryActive ? diaryComp.delta.c * _dampC : 0)),
+           goalCarbsG: _applyPrepTargets ? _peakTargets.carbsG : Math.round(_waveC.carbsG + (_diaryActive ? diaryComp.delta.c * _dampC : 0)),
            manualTargetsLocked: kbjuMode === 'manual',
            // P0-фикс: привязка к тренировке больше НЕ гейтится по plannerMode —
            // тумблер «Привязать к тренировкам» включён → пред-/пост-трен и тайминг
@@ -3722,7 +3886,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
           // P1-9: «Снять потолок» — 0 = явный «без потолка» в движке; без оверрайда
           // движок использует свой дефолт (байт-в-байт, как раньше). Ручной КБЖУ —
           // цели пользователя: потолок углеводов не применяем (0 = без потолка).
-          carbCapGPerKg: (_capOverride || kbjuMode === 'manual') ? 0 : undefined,
+          carbCapGPerKg: (carbCapOverride || kbjuMode === 'manual') ? 0 : undefined,
           wakeTime, lunchTime, dinnerTime, bedTime,
           // Хвост-3: floor/MPS-модификаторы стиля питания теперь из ЕДИНОГО источника
           // (planTypeFloorMods в planner-day-targets) — движок сам выводит их из planType.
@@ -3758,7 +3922,16 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
             isWorkDay: (()=>{ try{ if(!workScheduleEnabled) return workFood === 'portable'; return isWorkDayForIndex(offset, { enabled: true, scheduleType: workScheduleType, workDays }); }catch{ return false; }})(),
           };
         // #1 RED-S / Energy Availability: критично для женщин-спортсменок (EA < 30 ккал/кг FFM).
-        const _ea = computeEnergyAvailability(input.goalKcal, weight, lbmKg, !!input.isTrainingDay, input.trainDurationMin || 60, (trainIntensity as any) || 'medium', sex);
+        // FIX B16 (аудит 2026-10): при ОТСУТСТВИИ % жира в EA уходила выдуманная LBM
+        // (15%/22% заглушка) — EA завышалась и статус мог быть ложно-«optimal».
+        // Теперь: флаг «оценка», FFM считается по весу (нижняя граница EA) + явная пометка.
+        const _bfEstimated = !(bodyFatPct > 3);
+        const _ea = computeEnergyAvailability(
+          input.goalKcal, weight,
+          _bfEstimated ? 0 : lbmKg,
+          !!input.isTrainingDay, input.trainDurationMin || 60, (trainIntensity as any) || 'medium',
+          sex, _bfEstimated,
+        );
         // Эпик-хвост: hungerLevel удалён из генерации полностью (множитель белка,
         // prefer-овощи и hungerNote были шумовым сигналом).
         const _redSNote: string | undefined = _ea.note || undefined;
@@ -4241,44 +4414,37 @@ const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   // FatSecret-уровень: 1-клик в дневник — берёт видимый план (1 день / выбранный день 3/7) и пишет в nutrition_diary_v2
   // При planDays===7/3 добавляет ВСЮ неделю/3 дня на последовательные даты (FatSecret-замена: недельный план разом)
-  const addPlanToDiary = useCallback((dateISO?: string): boolean => {
+  // FIX B3 (аудит 2026-10): запись сделана ИДЕМПОТЕНТНОЙ. Раньше это был голый
+  // `push` в массив приёма, поэтому повторное нажатие (или двойной клик) удваивало
+  // каждый продукт, а вместе с ним калории/БЖУ за день — дневник, компенсация
+  // следующего дня и вся отчётность считались по мусору. Теперь каждая запись
+  // помечается стабильным `planTag`, и повторная вставка того же продукта в тот же
+  // приём на ту же дату пропускается.
+  const addPlanToDiary = useCallback((dateISO?: string): { ok: boolean; added: number; skipped: number } => {
     try {
       // E7: локальная дата (UTC-сдвиг уезжал на завтра вечером в UTC+3..+12)
       const _now = new Date();
       const baseDate = dateISO || `${_now.getFullYear()}-${String(_now.getMonth()+1).padStart(2,'0')}-${String(_now.getDate()).padStart(2,'0')}`;
       const data = readDiaryV2();
       const addDay = (src: any, dateStr: string) => {
-        if (!src?.meals || !Array.isArray(src.meals) || src.meals.length === 0) return 0;
-        if (!data[dateStr]) data[dateStr] = { meals: {} };
-        let added = 0;
-        src.meals.forEach((m: any) => {
-          const label = m.label || 'Приём пищи';
-          if (!data[dateStr].meals[label]) data[dateStr].meals[label] = [];
-          (Array.isArray(m.items) ? m.items : []).forEach((it: any) => {
-          (data[dateStr].meals[label] as any).push({
-            name: it.name, qty: `${it.amount || 100} г` as any, kcal: Math.round(it.kcal || 0),
-            p: Math.round((it.p || 0) * 10) / 10, f: Math.round((it.f || 0) * 10) / 10, c: Math.round((it.c || 0) * 10) / 10,
-            category: (it as any).category, foodId: it.id || (it as any).foodId, micros: (it as any).micros,
-          });
-            added++;
-          });
-        });
-        return added;
+        // B3: идемпотентное слияние — стабильный planTag, повтор не плодит дубли.
+        const r = mergePlanDayIntoDiary(data, src, dateStr);
+        return r;
       };
-      let totalAdded = 0;
+      let totalAdded = 0, totalSkipped = 0;
       if (planDays === 7 && weekPlan?.days) {
         const base = new Date(baseDate);
         weekPlan.days.forEach((d: any, i: number) => {
           const dt = new Date(base); dt.setDate(base.getDate() + i);
           const iso = localIsoDate(dt);
-          totalAdded += addDay(d, iso);
+          const r = addDay(d, iso); totalAdded += r.added; totalSkipped += r.skipped;
         });
       } else if (planDays === 3 && threeDayPlan?.days) {
         const base = new Date(baseDate);
         threeDayPlan.days.forEach((d: any, i: number) => {
           const dt = new Date(base); dt.setDate(base.getDate() + i);
           const iso = localIsoDate(dt);
-          totalAdded += addDay(d, iso);
+          const r = addDay(d, iso); totalAdded += r.added; totalSkipped += r.skipped;
         });
       } else {
         let source: any = null;
@@ -4288,17 +4454,20 @@ const [errorMsg, setErrorMsg] = useState<string | null>(null);
         else source = dayPlan;
         if (!source?.meals || !Array.isArray(source.meals) || source.meals.length === 0) {
           setErrorMsg('Нет сгенерированного плана для добавления в дневник');
-          return false;
+          return { ok: false, added: 0, skipped: 0 };
         }
-        totalAdded += addDay(source, baseDate);
+        const r = addDay(source, baseDate); totalAdded += r.added; totalSkipped += r.skipped;
       }
-      if (totalAdded === 0) { setErrorMsg('Нет сгенерированного плана для добавления в дневник'); return false; }
-      writeDiaryV2(data);
+      if (totalAdded === 0 && totalSkipped === 0) {
+        setErrorMsg('Нет сгенерированного плана для добавления в дневник');
+        return { ok: false, added: 0, skipped: 0 };
+      }
+      if (totalAdded > 0) writeDiaryV2(data);   // без изменений не перезаписываем дневник
       setErrorMsg(null);
-      return true;
+      return { ok: true, added: totalAdded, skipped: totalSkipped };
     } catch (e: any) {
       setErrorMsg('Не удалось добавить в дневник: ' + (e?.message || String(e)));
-      return false;
+      return { ok: false, added: 0, skipped: 0 };
     }
   }, [dayPlan, planDays, selectedDayIndex, threeDayPlan, weekPlan]);
 
@@ -4429,7 +4598,7 @@ const [errorMsg, setErrorMsg] = useState<string | null>(null);
     kbjuMode, setKbjuMode, switchKbjuMode,
     manualKcal, setManualKcal, manualP, setManualP, manualF, setManualF, manualC, setManualC,
     resultsRef, budget, setBudget, proteinPreset, setProteinPreset,
-    variety, setVariety, diaryAdaptation, setDiaryAdaptation, varietyStrictness, setVarietyStrictness, varietyLevel, setVarietyLevel, hvStyle, setHvStyle, carbCapOverride, setCarbCapOverride, bbCategory, setBBCategory, peakWeekEnabled, setPeakWeekEnabled, peakWeekShowDay, setPeakWeekShowDay, bbPrepConfig, setBBPrepConfig, bbPrepPlan, applyBBPeakToPlan, applyKcalAdjust, supportStackSupplements: supportStack, supplementsForMeal, applyCombatNutrition, lifeStage, setLifeStage, wakeTime, setWakeTime, bedTime, setBedTime,
+    variety, setVariety, diaryAdaptation, setDiaryAdaptation, varietyStrictness, setVarietyStrictness, varietyLevel, setVarietyLevel, hvStyle, setHvStyle, carbCapOverride, setCarbCapOverride, bbCategory, setBBCategory, bbPrepConfig, setBBPrepConfig, bbPrepPlan, applyBBPeakToPlan, applyKcalAdjust, supportStackSupplements: supportStack, supplementsForMeal, applyCombatNutrition, lifeStage, setLifeStage, wakeTime, setWakeTime, bedTime, setBedTime,
     lunchTime, setLunchTime, dinnerTime, setDinnerTime, mealsCount,
     workFood, setWorkFood, allergens, setAllergens, healthIssues, setHealthIssues,
     morningTrainLoad, setMorningTrainLoad,
@@ -4447,7 +4616,7 @@ const [errorMsg, setErrorMsg] = useState<string | null>(null);
     weekPlan, setWeekPlan, shoppingList, setShoppingList, waterCalc, setWaterCalc,
     savedPlans, setSavedPlans, expandedSavedId, setExpandedSavedId,
     lockedFoodIds, toggleLockFood,
-    editItem, setEditItem, editAmount, setEditAmount, replacingItem, setReplacingItem,
+    editItem, setEditItem, editAmount, setEditAmount,
     recipePickerMeal, setRecipePickerMeal,
     dayPlanNotes, setDayPlanNotes, draggedItem, setDraggedItem, dropTarget, setDropTarget,
     undoStack, setUndoStack, userRecipes, setUserRecipes,
@@ -4464,7 +4633,7 @@ const [errorMsg, setErrorMsg] = useState<string | null>(null);
     pickRecipeOption, moreRecipeOptions, refreshRecipeSuggestions, removeMealRebalanced,
     applyMealTargetNow,
     updateMealTime, duplicateMeal,
-    weekEditDay, openWeekDayForEdit, switchPlanDays,
+    weekEditDay, openWeekDayForEdit, openThreeDayForEdit, switchPlanDays,
     addFoodToMeal, addSnackComboToMeal, undoLast,
     toggleAllergen, toggleHealthIssue, loadSavedPlan,
     autofillFromProfile, saveToProfile,
@@ -4500,7 +4669,7 @@ const [errorMsg, setErrorMsg] = useState<string | null>(null);
     errorMsg, setErrorMsg,
     planTab, setPlanTab,
     labs,
-  }), [addPlanToDiary, weight, height, age, sex, dailySteps, cookTimeMin, combatNutrition, _rawCForCap, applyCombatNutrition, cookingSkill, cookingFrequency, batchCooking, cravingMode, cravingDays, lazyDayMode, lazyDayDays, surplusPct, trainType, trainIntensity, householdActivity, bodyFatPct, sleepHours, sleepQuality, stressLevel, cyclePhase, weightAdaptMode, weightLogWeek, expectedLossKgWeek, showWeightAdaptModal, weightLogEntries, weightLogPeriod, metabolicAdaptEnabled, metabolicAdaptPct, manualGPerKg, monthPlanMode, monthPlan, selectedWeek, goal, phase, goalUserSet, injections, injName, injTime, injDose, injUnit, injType, injEster, trainStart, trainEnd, linkToTraining, trainScheduleType, trainPattern, manualKcal, manualP, manualF, manualC, kbjuMode, budget, proteinPreset, variety, varietyLevel, wakeTime, bedTime, lunchTime, dinnerTime, workFood, morningTrainLoad, mealsCount, allergens, healthIssues, eveningLowCarb, nightCarbs, addMilkToBreakfast, breakfastStyle, breakfastTemplate, planType, preferredFoods, quickAddMealIdx, quickAddSearch, customNotes, excludedFoods, dietPrefs, allergenExcludedCount, planTargets, carbPeriodization, heavyTrainDay, workScheduleEnabled, workStartTime, workEndTime, workDays, workScheduleType, trainingDays, generated, planDays, selectedDayIndex, planView, dayPlan, threeDayPlan, weekPlan, shoppingList, waterCalc, savedPlans, lockedFoodIds, expandedSavedId, editItem, editAmount, replacingItem, recipePickerMeal, dayPlanNotes, draggedItem, dropTarget, undoStack, userRecipes, showRecipeCreator, showAddDrug, showDrugTypePicker, takenSupplements, showSuppPicker, suppSearch, newRecipe, v2Phase, v2Labs, v2Pharma, histamineSensitive, errorMsg, planTab, specialMealMode, specialMealGoal, specialMealProteinG, specialMealFatG, specialMealCarbsG, specialMealTiming, specialMealReplaceMode, specialMealReplaceTarget, cheatMealPlan, carbloadPlan, butchPlan, cravingPlan, lazyDayPlan, recommendations, mealPrepPlan, mealPrepDays, activeReports, allergenReport, nutrientReport, qualityReport, riskReport, drugCompatReport, nutritionReport, profile, s, courseEntries, labAnalysis, labs, bbPrepConfig, bbPrepPlan, applyKcalAdjust, supportStack, autoGoal, injectDrugTypes, calcTargets, profileTargets, effectiveKcal, effectiveP, effectiveF, effectiveC, allergenExcludedCount, diaryAdaptation, bbCategory, dayModsByOffset]);
+  }), [addPlanToDiary, weight, height, age, sex, dailySteps, cookTimeMin, combatNutrition, _rawCForCap, applyCombatNutrition, cookingSkill, cookingFrequency, batchCooking, cravingMode, cravingDays, lazyDayMode, lazyDayDays, surplusPct, trainType, trainIntensity, householdActivity, bodyFatPct, sleepHours, sleepQuality, stressLevel, cyclePhase, weightAdaptMode, weightLogWeek, expectedLossKgWeek, showWeightAdaptModal, weightLogEntries, weightLogPeriod, metabolicAdaptEnabled, metabolicAdaptPct, manualGPerKg, monthPlanMode, monthPlan, selectedWeek, goal, phase, goalUserSet, injections, injName, injTime, injDose, injUnit, injType, injEster, trainStart, trainEnd, linkToTraining, trainScheduleType, trainPattern, manualKcal, manualP, manualF, manualC, kbjuMode, budget, proteinPreset, variety, varietyLevel, wakeTime, bedTime, lunchTime, dinnerTime, workFood, morningTrainLoad, mealsCount, allergens, healthIssues, eveningLowCarb, nightCarbs, addMilkToBreakfast, breakfastStyle, breakfastTemplate, planType, preferredFoods, quickAddMealIdx, quickAddSearch, customNotes, excludedFoods, dietPrefs, allergenExcludedCount, planTargets, carbPeriodization, heavyTrainDay, workScheduleEnabled, workStartTime, workEndTime, workDays, workScheduleType, trainingDays, generated, planDays, selectedDayIndex, planView, dayPlan, threeDayPlan, weekPlan, shoppingList, waterCalc, savedPlans, lockedFoodIds, expandedSavedId, editItem, editAmount, recipePickerMeal, dayPlanNotes, draggedItem, dropTarget, undoStack, userRecipes, showRecipeCreator, showAddDrug, showDrugTypePicker, takenSupplements, showSuppPicker, suppSearch, newRecipe, v2Phase, v2Labs, v2Pharma, histamineSensitive, errorMsg, planTab, specialMealMode, specialMealGoal, specialMealProteinG, specialMealFatG, specialMealCarbsG, specialMealTiming, specialMealReplaceMode, specialMealReplaceTarget, cheatMealPlan, carbloadPlan, butchPlan, cravingPlan, lazyDayPlan, recommendations, mealPrepPlan, mealPrepDays, activeReports, allergenReport, nutrientReport, qualityReport, riskReport, drugCompatReport, nutritionReport, profile, s, courseEntries, labAnalysis, labs, bbPrepConfig, bbPrepPlan, applyKcalAdjust, supportStack, autoGoal, injectDrugTypes, calcTargets, profileTargets, effectiveKcal, effectiveP, effectiveF, effectiveC, allergenExcludedCount, diaryAdaptation, bbCategory, dayModsByOffset]);
 
   const renderMealList = useRenderMealList({ ...ctx, plannerMode });
   const finalCtx = useMemo<PlanCtx>(() => ({ ...ctx, plannerMode, setPlannerMode, generationMode, setGenerationMode, weightMode, setWeightMode, favoriteRecipes, toggleFavoriteRecipe, isFavoriteRecipe, pickRecipeOption, moreRecipeOptions, refreshRecipeSuggestions, removeMealRebalanced, updateMealTime, duplicateMeal, renderMealList, annualPhase, bbPrepPlan }), [ctx, plannerMode, generationMode, weightMode, favoriteRecipes, pickRecipeOption, moreRecipeOptions, refreshRecipeSuggestions, removeMealRebalanced, updateMealTime, duplicateMeal, renderMealList, annualPhase, bbPrepPlan]);
