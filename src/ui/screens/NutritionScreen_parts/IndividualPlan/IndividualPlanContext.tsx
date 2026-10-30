@@ -1160,7 +1160,15 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
   const effectiveKcal = bbApplied.kcal;
   dayTargetsBreakdown.push(...bbApplied.breakdown);
 
-  const switchKbjuMode = (mode: typeof kbjuMode) => { if (mode === 'manual' && kbjuMode !== 'manual') { setManualKcal(effectiveKcal); setManualP(effectiveP); setManualF(effectiveF); setManualC(effectiveC); } if (mode !== 'manual') { setManualKcal(null); setManualP(null); setManualF(null); setManualC(null); } setKbjuMode(mode); };
+  // FIX manual-г/кг (2026-10-30): при входе в ручной режим синхронизируем карточку
+  // «Ввод в г/кг веса» с текущими целями. Раньше там оставались нули/старый профиль,
+  // хотя граммы уже заполнены — карточка выглядела пустой и «не работала».
+  const _gPerKgFromTargets = (p: number, f: number, c: number) => {
+    const w = Number(weight) > 0 ? Number(weight) : 0;
+    const r = (v: number) => (w > 0 ? Math.round((v / w) * 100) / 100 : 0);
+    return { protein: r(p), fat: r(f), carbs: r(c) };
+  };
+  const switchKbjuMode = (mode: typeof kbjuMode) => { if (mode === 'manual' && kbjuMode !== 'manual') { setManualKcal(effectiveKcal); setManualP(effectiveP); setManualF(effectiveF); setManualC(effectiveC); setManualGPerKg(_gPerKgFromTargets(effectiveP, effectiveF, effectiveC)); } if (mode !== 'manual') { setManualKcal(null); setManualP(null); setManualF(null); setManualC(null); } setKbjuMode(mode); };
 
   // E20/E23: применить коррекцию недельного разбора (±150 ккал).
   //  - режим НАБОРА (bulk) и НЕ manual → правим профицит %, план остаётся авто (без manual);

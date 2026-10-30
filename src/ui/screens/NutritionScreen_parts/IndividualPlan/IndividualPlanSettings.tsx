@@ -231,6 +231,43 @@ export const IndividualPlanSettings: React.FC = () => {
   const [recentPreset, setRecentPreset] = useState<string | null>(null);
   // FIX button-audit: локальный toast вместо alert() (window.showToast нигде не определён)
   const [toastMsg, setToastMsg] = useState<string | null>(null);
+
+  // FIX manual-г/кг (2026-10-30, жалоба «в новую карточку данные вводятся, но не
+  // применяются»): карточка «Ввод в г/кг веса» писала ТОЛЬКО в manualGPerKg, а
+  // ручные цели строятся из явных граммов (они заполняются при входе в ручной
+  // режим). Итог: вводишь 2.5 / 1 / 4 г/кг — плитки и план не меняются, работает
+  // только правка старых плиток. Теперь г/кг и граммы — двусторонняя связка:
+  // г/кг × вес веса → граммы того же макроса, а правка граммов обновляет г/кг.
+  const _gramsFromGPerKg = (v: number) => Math.round(v * Math.max(1, weight));
+  const _setGramState = (kind: 'protein' | 'fat' | 'carbs', grams: number | null) => {
+    if (kind === 'protein') setManualP(grams);
+    else if (kind === 'fat') setManualF(grams);
+    else setManualC(grams);
+  };
+  /** Калории — по Атwater, как только заданы все три макроса: иначе в карточке
+   *  остаётся «старая» калорийность, а план собирается на другую (B20-контракт). */
+  const _syncKcalFromMacros = (p: number | null, f: number | null, c: number | null) => {
+    if (p && f && c && p > 0 && f > 0 && c > 0) setManualKcal(p * 4 + f * 9 + c * 4);
+  };
+  const setManualGramValue = (kind: 'protein' | 'fat' | 'carbs', grams: number | null) => {
+    _setGramState(kind, grams);
+    // Держим г/кг в синхроне, иначе две карточки показывают разные числа.
+    setManualGPerKg((prev: Record<string, number>) => ({ ...prev, [kind]: grams !== null && weight > 0 ? Math.round((grams / weight) * 100) / 100 : 0 }));
+    const next = { p: manualP, f: manualF, c: manualC, [kind === 'protein' ? 'p' : kind === 'fat' ? 'f' : 'c']: grams } as any;
+    _syncKcalFromMacros(next.p, next.f, next.c);
+  };
+  const setManualGPerKgValue = (kind: 'protein' | 'fat' | 'carbs', v: number) => {
+    setManualGPerKg((prev: Record<string, number>) => ({ ...prev, [kind]: v }));
+    // 0 = поле очищено: граммы не трогаем (иначе ввод «0.5» стирал бы макрос
+    // на первом же символе). Ненулевое значение сразу становится граммами.
+    // Г/кг не пересчитываем обратно из граммов — иначе округление дралось бы с вводом.
+    if (v > 0) {
+      const grams = _gramsFromGPerKg(v);
+      _setGramState(kind, grams);
+      const next = { p: manualP, f: manualF, c: manualC, [kind === 'protein' ? 'p' : kind === 'fat' ? 'f' : 'c']: grams } as any;
+      _syncKcalFromMacros(next.p, next.f, next.c);
+    }
+  };
   const [hematAdv, setHematAdv] = React.useState<any>(null);
   React.useEffect(()=>{
     try{ const raw=localStorage.getItem('he_hematology_advice'); if(raw) setHematAdv(JSON.parse(raw)); }catch{}
@@ -1288,9 +1325,9 @@ export const IndividualPlanSettings: React.FC = () => {
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 5, marginBottom: 8 }}>
                   {[
                     { l:'Калории', v: mvKcal, c:'#00e68a', unit:'ккал', perKg: perKgKcal, setter: setManualKcal },
-                    { l:'Белки', v: mvP, c:'#3b82f6', unit:'г', perKg: perKgP, setter: setManualP },
-                    { l:'Жиры', v: mvF, c:'#f59e0b', unit:'г', perKg: perKgF, setter: setManualF },
-                    { l:'Углеводы', v: mvC, c:'#f97316', unit:'г', perKg: perKgC, setter: setManualC },
+                    { l:'Белки', v: mvP, c:'#3b82f6', unit:'г', perKg: perKgP, setter: (v: any) => setManualGramValue('protein', v) },
+                    { l:'Жиры', v: mvF, c:'#f59e0b', unit:'г', perKg: perKgF, setter: (v: any) => setManualGramValue('fat', v) },
+                    { l:'Углеводы', v: mvC, c:'#f97316', unit:'г', perKg: perKgC, setter: (v: any) => setManualGramValue('carbs', v) },
                   ].map(m => {
                     const pct = mvKcal > 0 && m.l !== 'Калории'
                       ? Math.round(({ 'Калории': mvKcal, 'Белки': mvP * 4, 'Жиры': mvF * 9, 'Углеводы': mvC * 4 }[m.l] || 0) / mvKcal * 100)
@@ -1333,9 +1370,9 @@ export const IndividualPlanSettings: React.FC = () => {
                 <div style={{ marginTop:10, marginBottom:6, fontSize:9, color:'rgba(255,255,255,0.8)', letterSpacing:0.5, textTransform:'uppercase' }}>Ввод в г/кг веса{hasGPerKg ? ` (${Math.round(mvKcal)} ккал)` : ''}</div>
                 <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:5, marginBottom:8 }}>
                   {[
-                    { l:'Белки', v: manualGPerKg.protein, c:'#3b82f6', unit:'г/кг', setter: (val: number) => setManualGPerKg({...manualGPerKg, protein: val}) },
-                    { l:'Жиры', v: manualGPerKg.fat, c:'#f59e0b', unit:'г/кг', setter: (val: number) => setManualGPerKg({...manualGPerKg, fat: val}) },
-                    { l:'Углеводы', v: manualGPerKg.carbs, c:'#f97316', unit:'г/кг', setter: (val: number) => setManualGPerKg({...manualGPerKg, carbs: val}) },
+                    { l:'Белки', v: manualGPerKg.protein, c:'#3b82f6', unit:'г/кг', setter: (val: number) => setManualGPerKgValue('protein', val) },
+                    { l:'Жиры', v: manualGPerKg.fat, c:'#f59e0b', unit:'г/кг', setter: (val: number) => setManualGPerKgValue('fat', val) },
+                    { l:'Углеводы', v: manualGPerKg.carbs, c:'#f97316', unit:'г/кг', setter: (val: number) => setManualGPerKgValue('carbs', val) },
                   ].map(m => (
                     <div key={m.l} style={{
                       textAlign:'center', borderRadius:10, padding:'8px 4px',
@@ -1354,6 +1391,7 @@ export const IndividualPlanSettings: React.FC = () => {
                   ))}
                 </div>
                 <div style={{fontSize:9,color:'rgba(255,255,255,0.85)',marginBottom:4}}>Введите любые значения — недостающие рассчитаются автоматически</div>
+                <div style={{ fontSize: 9, color: 'rgba(96,165,250,0.75)', marginBottom: 4, lineHeight: 1.4 }}>🔗 Граммы и г/кг связаны: значение в г/кг × вес = граммы того же макроса (правка в любой карточке применяется сразу).</div>
                 <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)', marginBottom: 4, lineHeight: 1.4 }}>💡 Бюджет и пресет белка скрыты — в ручном режиме они не применяются.</div>
                 {/* Keep manual mode active: switching to auto here discarded the user's values on generation. */}
                 {/* FIX audit (B1): кнопка «✓ Применить» была no-op (setKbjuMode('manual') внутри
