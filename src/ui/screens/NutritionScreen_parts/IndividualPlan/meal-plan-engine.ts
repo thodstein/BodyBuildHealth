@@ -6681,6 +6681,11 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     // Единый источник для всех путей (simple/minimal/pro → buildDayPlan).
     // Окна уколов locked (маркер): их граммы — доза, коррекции их не трогают
     // (гейты внутри корректора); день сходится С окнами в totals.
+    // B38 (честная отчётность): вердикт корректора НЕ печатаем на месте. Поздние проходы
+    // (капы §3D, финальный добор) часто доводят день до нормы, и примечание «осталось
+    // отклонение 24.8%» висело на сошедшемся дне (замер: финал 0.5%). Печатаем в финале,
+    // по ФИНАЛЬНЫМ тоталам.
+    let _corrVerdict: { before: number; pct: number } | null = null;
     {
       const _norm = normalizeMacroTargets(input.goalKcal, input.goalProteinG, input.goalFatG, input.goalCarbsG);
       const _targets = { kcal: _norm.kcal, p: _norm.p, f: _norm.f, c: _norm.c };
@@ -6723,8 +6728,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
           totals.c = Math.round(_afterTotals.c * 10) / 10;
           totals.fiber = Math.round((_corr.meals as any).reduce((s: number, m: any) => s + (m.totals?.fiber || m.items.reduce((a: number, it: any) => a + (it.fiber || 0), 0)), 0) * 10) / 10;
           totals.leucine_mg = (_corr.meals as any).reduce((s: number, m: any) => s + (m.totals?.leucine_mg || m.items.reduce((a: number, it: any) => a + (it.leucine_mg || 0), 0)), 0);
-          if (_corr.deviationPct > 3) notes.push(`⚠ Корректор дневных целей: осталось отклонение ${_corr.deviationPct}% (>3%) — проверьте пулы/капы`);
-          else if (_beforeDev > 0.03) notes.push(`✓ Корректор дневных целей: сведено к ≤3% (было ${Math.round(_beforeDev * 100)}% → ${_corr.deviationPct}%)`);
+          if (_corr.deviationPct > 3 || _beforeDev > 0.03) _corrVerdict = { before: _beforeDev, pct: _corr.deviationPct };
         }
       }
       // P2-финал: клетчаточный кап 85 г — корректор клампит свои добавки, но build-овые
@@ -6792,6 +6796,46 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
       if (_po) _periGuard(_po, postwCarbG);
       const _in = meals.find((m: any) => m.type === 'intra');
       if (_in) _periGuard(_in, intraCarbG);
+      // B39 (этап 3): ЖИР В ПЕРИ-ОКНАХ. Физиология окна: предтрен ≤5 г, пост-трен и интра —
+      // практически без жира (жир тормозит опорожнение желудка и ресинтез гликогена).
+      // Замер: на дне 1240 ккал «Пост-трен» получал 20 г оливкового масла = 209 ккал
+      // (17% дневного жира). Правило безопасности: срезаем ТОЛЬКО перебор дня по жиру
+      // (никогда не создаём дефицит) — иначе «было +8% → стало −14%».
+      recalcDayTotals(meals, totals);
+      let _fatCutBudget = Math.max(0, totals.f - (input.goalFatG || 0));
+      const _periFatGuard = (m: any, capF: number): void => {
+        if (!m || _fatCutBudget < 2) return;
+        const _sumF = () => (m.items || []).reduce((s: number, x: any) => s + (x.f || 0), 0);
+        let fNow = _sumF();
+        if (fNow <= capF + 0.5) return;
+        const fats = (m.items || [])
+          .filter((x: any) => (x as any)._fixedGrams !== true && (x.f || 0) > 0 && (x.f || 0) / Math.max(1, x.amount || 1) > 0.15)
+          .sort((a: any, b: any) => (b.f || 0) - (a.f || 0));
+        for (const x of fats) {
+          if (fNow <= capF + 0.5 || _fatCutBudget < 1) break;
+          const fPerG = (x.f || 0) / Math.max(1, x.amount || 1);
+          const needF = Math.min(fNow - capF, _fatCutBudget);
+          const cutG = Math.min(x.amount || 0, Math.ceil(needF / Math.max(0.01, fPerG)));
+          if (cutG < 1) break;
+          const newAmt = (x.amount || 0) - cutG;
+          const cutF = cutG * fPerG;
+          if (newAmt < 5) {
+            const idx = (m.items || []).indexOf(x);
+            if (idx >= 0) m.items.splice(idx, 1);
+          } else {
+            const r = newAmt / Math.max(1, x.amount || 1);
+            x.amount = Math.round(newAmt);
+            x.p = +(x.p * r).toFixed(1); x.f = +(x.f * r).toFixed(1); x.c = +(x.c * r).toFixed(1);
+            x.kcal = Math.round(4 * x.p + 9 * x.f + 4 * x.c); x.fiber = Math.round((x.fiber || 0) * r * 10) / 10;
+          }
+          _fatCutBudget = Math.max(0, _fatCutBudget - cutF);
+          fNow = _sumF();
+        }
+        m.totals = mealTotalsOf(m.items);
+      };
+      _periFatGuard(_pw, PREW_FAT_MAX_G);
+      _periFatGuard(_po, 5);
+      _periFatGuard(_in, 1);
       const _ps = meals.find((m: any) => m.type === 'presleep');
       if (_ps) {
         _ps.items.forEach((x: any) => {
@@ -10302,9 +10346,236 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
       }
     } catch { /* best-effort гигиена — не ломаем генерацию */ }
 
+    // Триггер «белок перебирается» для B40/B42 ниже. Лечим не любую цифру: работаем,
+    // только когда ПЕРЕБОР БЕЛКА — блокирующая ось дня (не меньше остальных отклонений).
+    // Иначе правка уносит калорийность дней, где белок и так не главная проблема
+    // (контроль 90 кг/3000 ккал: белок +3.7% при ккал −5.7% → 2830 → 2802 ккал).
+    const PROTEIN_FIT_TRIGGER = 1.03;
+    const _dayDevOf = (got: number, tgt: number) => (tgt > 0 ? Math.abs(got - tgt) / tgt : 0);
+    const _proteinIsBottleneck = (goalP: number) => {
+      if (goalP <= 0) return false;
+      const dP = _dayDevOf(totals.p, goalP);
+      if (dP <= PROTEIN_FIT_TRIGGER - 1) return false;
+      const dOther = Math.max(
+        _dayDevOf(totals.kcal, input.goalKcal || 0),
+        _dayDevOf(totals.f, input.goalFatG || 0),
+        _dayDevOf(totals.c, input.goalCarbsG || 0),
+      );
+      return dP >= dOther * 0.75;
+    };
+    // ─── B40 (этап 1): «невидимый» белок углеводных носителей ───
+    // Замер (50 комбинаций ручного режима): у носителей овсянка 13 г Б/100, картофель
+    // 6.3 г Б/100 при цели 120 г Б на день они приносят 39–56 г белка — 31–40% всего
+    // перебора, при нормальном белковом якоре. Меняем носитель на низкобелковый
+    // эквивалент той же КАЛОРИЙНОСТИ (рис 2.7 Б/28 У): белок уходит, углеводы приходят.
+    {
+      recalcDayTotals(meals, totals);
+      const _gp40 = input.goalProteinG || 0;
+      // Решение «работаем ли с белком» принимается ОДИН раз (до правок): внутри цикла
+      // белок и углеводы меняются местами и признак «блокирующая ось» скачет.
+      const _pFit40 = _proteinIsBottleneck(_gp40);
+      const _pOver40 = () => _gp40 > 0 && totals.p > _gp40 * PROTEIN_FIT_TRIGGER;
+      if (_pFit40) {
+        const _CARB_REPL = ['rice_white', 'buckwheat', 'pasta_durum', 'couscous', 'potato_boiled'];
+        for (const m of meals as any[]) {
+          if (!_pOver40()) break;
+          if (['preworkout', 'postworkout', 'intra'].includes(String(m.type))) continue;
+          const _have = new Set((m.items || []).map((x: any) => x.id));
+          for (const it of (m.items || []) as any[]) {
+            if (!_pOver40()) break;
+            if (it.role !== 'carb_slow' && it.role !== 'carb_fast') continue;
+            if ((it as any)._fixedGrams) continue;
+            const _srcC = (it.c || 0) / Math.max(1, it.amount || 1);
+            const _srcP = (it.p || 0) / Math.max(1, it.amount || 1);
+            if (_srcC <= 0.02 || _srcP / _srcC <= 0.16) continue;
+            const _srcFd: any = FOOD_DB.find((f: any) => f.id === it.id);
+            const _srcState = _srcFd?.foodState;
+            const _rid = _CARB_REPL.find((id) => {
+              if (id === it.id || _have.has(id)) return false;
+              if (_pickCtx.currentExcludedIds && _pickCtx.currentExcludedIds.has(id)) return false;
+              if (input.excludedIds && input.excludedIds.has(id)) return false;
+              // Ротация стейплов между днями — жёсткое окно прошлого дня: замена носителя
+              // не должна навязывать один и тот же рис каждый день (тест
+              // planner-variety-guarantees: смежные дни делят ≤3 стейпл-id).
+              if (typeof effRecentIds === 'function' && (() => { const _r = effRecentIds(); return !!_r && _r.has(id); })()) return false;
+              const f: any = FOOD_DB.find((x: any) => x.id === id);
+              if (!f || !foodPassesCtxAllergens(f) || !foodAvailableForPlan(f)) return false;
+              {
+                // Проверка «состояния» продукта (dry/cooked) оставлена строгой: замер
+                // показал, что разрешение картофель↔рис поперёк состояний уводит день
+                // по углеводам (S1 5пр/трен 5.8% → 28.0%), т.к. меняется и вес порции.
+                if ((f.foodState || undefined) !== (_srcState || undefined)) return false;
+              }
+              const c = (f.carbs || 0) / 100, p = (f.protein || 0) / 100;
+              return c > 0.12 && p / c < 0.13;
+            });
+            if (!_rid) continue;
+            const _rf: any = FOOD_DB.find((x: any) => x.id === _rid);
+            // B40: замена ИЗОКАЛОРИЙНАЯ, а не изоуглеводная. Иначе вместе с белком
+            // уходит калорийность (белок «держал» ккал дня), и провал переезжает на ось
+            // ккал. Равные ккал + меньше белка = больше углеводов, а углеводы на этих
+            // днях как раз недобираются.
+            const _newG = Math.max(5, Math.round((it.kcal || 0) / ((_rf.kcal || 1) / 100) / 5) * 5);
+            const _pNew = +((((_rf.protein || 0) * _newG) / 100)).toFixed(1);
+            const _oldP = it.p || 0;
+            if (_pNew >= _oldP - 1) continue;
+            notes.push(`🔁 «${m.label}»: ${it.name} → ${_rf.name} ${_newG} г (белок носителя ${_oldP.toFixed(1)} → ${_pNew} г: день перебирает белок)`);
+            it.id = _rid;
+            it.name = _rf.name;
+            it.amount = _newG;
+            it.p = _pNew;
+            it.f = +((((_rf.fat || 0) * _newG) / 100)).toFixed(1);
+            it.c = +((((_rf.carbs || 0) * _newG) / 100)).toFixed(1);
+            // Ккал — по энергетике ПРОДУКТА (поле kcal), а не 4/9/4 из макросов: иначе
+            // изокалорийная замена тихо теряет 3–5% ккал (клетчатка/вода в продукте) и
+            // день уезжает по калорийности.
+            it.kcal = (_rf.kcal || 0) > 0
+              ? Math.round((_rf.kcal * _newG) / 100)
+              : Math.round(4 * it.p + 9 * it.f + 4 * it.c);
+            it.fiber = +((((_rf.fiber || 0) * _newG) / 100)).toFixed(1);
+            _have.add(_rid);
+          }
+          m.totals = mealTotalsOf(m.items);
+          recalcDayTotals(meals, totals);
+        }
+      }
+    }
+
+    // ─── B42 (этап 2): белка не хватает на все приёмы ───
+    // Замер S2 (цель 120 г Б, запрошено 7 → построено 10 приёмов): приёмы несут
+    // 14.5 / 14.4 / 23.0 / 26.0 / 8.8 / 10.5 / 1.0 / 11.2 / 27.6 / 22.7 = 159.7 г.
+    // 10 приёмов × минимальная осмысленная порция (>13 г Б) уже больше цели — сколько
+    // ни крути полы, арифметика не сходится. Поэтому «лишние» перекусы делаем
+    // углеводными: белок перекуса переводим в углеводы ИЗОКАЛОРИЙНО (калории дня
+    // сохраняются, белок уходит, углеводы приходят — обе оси в нужную сторону).
+    // Качество: MPS держим — оставляем минимум 4 белковых приёма в день.
+    let _b42Changed = false;
+    {
+      recalcDayTotals(meals, totals);
+      const _gp42 = input.goalProteinG || 0;
+      const _P_ROLES = new Set(['protein', 'fast_protein', 'slow_protein']);
+      const _proteinMeals = () => (meals as any[]).filter((m) => (m.items || []).some((x: any) => _P_ROLES.has(String(x.role)) && (x.p || 0) >= 8)).length;
+      const _fit42 = _proteinIsBottleneck(_gp42);
+      const _pOver42 = () => _gp42 > 0 && totals.p > _gp42 * PROTEIN_FIT_TRIGGER;
+      let _guard42 = 12;
+      while (_fit42 && _pOver42() && _guard42-- > 0 && _proteinMeals() > 4) {
+        // кандидат: углеводный/фруктовый приём (не окно, не ужин/обед), где белок 8–18 г
+        let _best: { m: any; items: any[]; p: number } | null = null;
+        for (const m of meals as any[]) {
+          const _t = String(m.type || '');
+          if (!_t.startsWith('snack')) continue;
+          const _pItems = (m.items || []).filter((x: any) => _P_ROLES.has(String(x.role)) && !(x as any)._fixedGrams);
+          const _pSum = _pItems.reduce((s: number, x: any) => s + (x.p || 0), 0);
+          if (_pSum < 8 || _pSum > 18) continue;
+          if (!_best || _pSum < _best.p) _best = { m, items: _pItems, p: _pSum };
+        }
+        if (!_best) break;
+        // 1) подрезаем белковый якорь перекуса РОВНО под перебор (B42 v4: на «plain 2600»
+        //    перебор был 3 г, а B42 удалял якорь на 16 г → день проваливался в минус
+        //    (165 г при цели 175) и рецептурный путь перелетал по ккал на 4.9%);
+        //    2) освободившиеся калории возвращаем В ДЕФИЦИТНУЮ ось.
+        const _overG42 = Math.max(0, totals.p - _gp42);
+        const _keepP42 = Math.max(0, _best.p - _overG42 + 1);
+        let _freed = 0;
+        let _removedP = 0;
+        if (_keepP42 < 4) {
+          // якорь меньше перебора — убираем целиком (перекус становится углеводным)
+          _freed = _best.items.reduce((s: number, x: any) => s + (x.kcal || 0), 0);
+          _removedP = _best.items.reduce((s: number, x: any) => s + (x.p || 0), 0);
+          _best.m.items = (_best.m.items || []).filter((x: any) => !_best!.items.includes(x));
+        } else {
+          // подрезка: та же раскладка, но белка ровно столько, сколько нужно
+          const _k42 = _keepP42 / _best.p;
+          for (const it of _best.items) {
+            const _fd42: any = FOOD_DB.find((f: any) => f.id === it.id);
+            if (!_fd42) continue;
+            const _oldKcal = it.kcal || 0;
+            const _oldP = it.p || 0;
+            const g = Math.max(10, Math.round(((it.amount || 0) * _k42) / 5) * 5);
+            it.amount = g;
+            it.p = +(((_fd42.protein || 0) * g) / 100).toFixed(1);
+            it.f = +(((_fd42.fat || 0) * g) / 100).toFixed(1);
+            it.c = +(((_fd42.carbs || 0) * g) / 100).toFixed(1);
+            it.kcal = (_fd42.kcal || 0) > 0 ? Math.round((_fd42.kcal * g) / 100) : Math.round(4 * it.p + 9 * it.f + 4 * it.c);
+            it.fiber = +((((_fd42.fiber || 0) * g) / 100)).toFixed(1);
+            _freed += Math.max(0, _oldKcal - it.kcal);
+            _removedP += Math.max(0, _oldP - it.p);
+          }
+          _best.m.totals = mealTotalsOf(_best.m.items);
+          recalcDayTotals(meals, totals);
+        }
+        // Компенсация калорий — ТОЛЬКО в оси, где день реально недобирает, и не больше
+        // самого недобора. Иначе изокалорийная добавка перелетает цель (M2 6пр/отдых:
+        // жир 2.6% → 5.4%).
+        // B42 v3 (жир — ДНЕВНОЙ, а не «в этом приёме»): белок-перекус уносит и свой жир
+        // (курица 40 г = 3 г Ж). Искать жировой пункт только в том же приёме нельзя — в
+        // перекусе его нет, и день проваливался по жиру (M1 7пр/трен Ж 10.0% → 22.5%,
+        // 18 конфигураций хуже по жиру). Берём жировой пункт в ОБЕД/УЖИН/перекусе,
+        // завтрак — последним (там жир уже свален).
+        let _left = _freed;
+        const _fatHost = (() => {
+          if ((input.goalFatG || 0) - totals.f <= 0.5) return null;
+          for (const t of ['lunch', 'dinner', 'snack', 'snack2', 'snack3', 'presleep', 'breakfast']) {
+            const mm = (meals as any[]).find((x: any) => String(x.type) === t);
+            const it = (mm?.items || []).find((x: any) => x.role === 'fat' && !(x as any)._fixedGrams);
+            if (it) return { m: mm, it };
+          }
+          return null;
+        })();
+        const _carbIt = (_best.m.items || []).find((x: any) => (x.role === 'carb_slow' || x.role === 'carb_fast' || x.role === 'fruit') && !(x as any)._fixedGrams);
+        const _axes: Array<{ it: any; m: any; unit: number }> = [
+          { it: _fatHost?.it, m: _fatHost?.m, unit: 9 },
+          { it: _carbIt, m: _best.m, unit: 4 },
+        ].filter((a) => !!a.it) as any;
+        for (const ax of _axes) {
+          if (_left < 8) break;
+          const _gapKcal = ax.unit === 9
+            ? ((input.goalFatG || 0) - totals.f) * 9
+            : ((input.goalCarbsG || 0) - totals.c) * 4;
+          // Компенсируем только РЕАЛЬНЫЙ недобор (≥2.5% оси): иначе микродобор сам
+          // выводит день за канон (S2 5пр/отдых: У 1.7% → 3.4% при белке 2.6 → 3.1%).
+          const _axisGoalKcal = ax.unit === 9 ? (input.goalFatG || 0) * 9 : (input.goalCarbsG || 0) * 4;
+          if (_gapKcal < _axisGoalKcal * 0.025) continue;
+          const _take = Math.min(_left, Math.max(0, _gapKcal));
+          if (_take < 8) continue;
+          const _addG = Math.max(5, Math.round(_take / ax.unit / 5) * 5);
+          const _r = (ax.it.amount + _addG) / Math.max(1, ax.it.amount);
+          ax.it.amount += _addG;
+          ax.it.p = +((ax.it.p * _r).toFixed(1));
+          ax.it.f = +((ax.it.f * _r).toFixed(1));
+          ax.it.c = +((ax.it.c * _r).toFixed(1));
+          // Ккал — по энергетике продукта (см. B40 выше): 4/9/4 из макросов теряет
+          // 3–5% ккал на клетчатке/воде и уводит день по калорийности.
+          const _fdAx: any = FOOD_DB.find((f: any) => f.id === ax.it.id);
+          ax.it.kcal = (_fdAx?.kcal || 0) > 0
+            ? Math.round((_fdAx.kcal * ax.it.amount) / 100)
+            : Math.round(4 * ax.it.p + 9 * ax.it.f + 4 * ax.it.c);
+          ax.it.fiber = +(((ax.it.fiber || 0) * _r).toFixed(1));
+          ax.m.totals = mealTotalsOf(ax.m.items);
+          recalcDayTotals(meals, totals);
+          _left -= _addG * ax.unit;
+        }
+        _best.m.totals = mealTotalsOf(_best.m.items);
+        recalcDayTotals(meals, totals);
+        _b42Changed = true;
+        notes.push(`🍎 «${_best.m.label}»: белковый якорь подрезан под цель (−${_removedP.toFixed(1)} г белка → +${Math.round(_freed - _left)} ккал в недобор) — на цель ${_gp42} г белка ${(meals as any[]).length} приёмов не хватает`);
+      }
+    }
+    // §3J-честность: «Сводка MPS» посчитана ДО этого прохода, а B42 меняет тарелки
+    // (перекус может потерять белковый якорь). Витрина должна совпадать с финалом —
+    // иначе нота обещает 2 feedings при фактическом 1 (тест planner-honesty-fixes §3J).
+    if (_b42Changed) {
+      const _idxMps = notes.findIndex((n) => n.startsWith('Сводка MPS:'));
+      if (_idxMps >= 0) {
+        const _feedF = (meals as any[]).filter((m: any) => (m.totals?.p || 0) >= 25).length;
+        const _avgP = Math.round(totals.p / Math.max(1, (meals as any[]).length));
+        const _leu = Math.round((totals.leucine_mg || 0) / Math.max(1, _feedF)) / 1000;
+        notes[_idxMps] = `Сводка MPS: ${_feedF} feedings × ${_avgP} г/meal, ${_leu} г лейцина (порог ${LEU_THRESHOLD_MG / 1000} г)`;
+      }
+    }
+
     // Витрина MPS должна совпадать с ФИНАЛЬНЫМ планом (санитайзеры E17/E18 меняют items).
     if (typeof _refreshMpsFromMeals === 'function') _refreshMpsFromMeals();
-
     // ─── P4/E0: честный флаг сходимости products-пути (ФИНАЛЬНЫЙ totals) ───
     // Считается здесь, ПОСЛЕ всех писателей и reconciliation. Канон допуска —
     // PLANNER_CONVERGENCE_PCT (3%). >3% — только честный best-effort с ЯВНОЙ
@@ -10326,6 +10597,15 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
           notes.push(`⚠ «Не сошлось»: отклонение дня от целей ${_dayDevPctP4}% (канон ${PLANNER_CONVERGENCE_PCT}%) — пулы/капы/полы реализма не дали закрыть цель, итог честный best-effort`);
         }
       }
+      // B38: вердикт корректора печатается ЗДЕСЬ и по ФИНАЛЬНЫМ тоталам. Если финал
+      // сошёлся — сообщаем «сведено» (с исходным отклонением), если нет — молчим:
+      // честное «⚠ Не сошлось» выше уже назвало финальную цифру, второй число не нужно.
+      if (_corrVerdict && _dayDevPctP4 <= PLANNER_CONVERGENCE_PCT) {
+        const _beforePct = Math.round(_corrVerdict.before * 100);
+        if (_beforePct > PLANNER_CONVERGENCE_PCT) {
+          notes.push(`✓ Корректор дневных целей: сведено к ≤${PLANNER_CONVERGENCE_PCT}% (было ${_beforePct}% → финал ${_dayDevPctP4}%)`);
+        }
+      }
     }
 
     // ─── §3F-честность: «Точность рациона» ПОСЛЕ reconciliation ───
@@ -10333,16 +10613,39 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     // ПОСЛЕ финального пасса подгонки порций (иначе note-vs-факт расходятся).
     {
       const _gP = input.goalProteinG || adjustedProteinG;
+      // B38 (честная отчётность): Ж/У меряем от ЦЕЛЕЙ ПОЛЬЗОВАТЕЛЯ. Раньше — от внутренних
+      // fatTotal/carbsTotal, которые уже ужаты клиническим потолком/карб-форвардом: день
+      // сходился в 0.2%, а примечание показывало «У 56%»/«У 166%» и советовало «проверьте
+      // пулы продуктов». Пользователь читал это как «сходимость >3%».
+      const _gC = input.goalCarbsG || carbsTotal;
+      const _gF = input.goalFatG || fatTotal;
       const _dP = Math.abs(totals.p - _gP) / Math.max(1, _gP);
-      const _dC = Math.abs(totals.c - carbsTotal) / Math.max(1, carbsTotal);
-      const _dF = Math.abs(totals.f - fatTotal) / Math.max(1, fatTotal);
+      const _dC = Math.abs(totals.c - _gC) / Math.max(1, _gC);
+      const _dF = Math.abs(totals.f - _gF) / Math.max(1, _gF);
       const _maxDev = Math.max(_dP, _dC, _dF);
       if (_maxDev <= 0.02) {
-        notes.push(`🎯 Точность рациона: Б ${totals.p}/${_gP}г, Ж ${totals.f}/${fatTotal}г, У ${totals.c}/${carbsTotal}г (отклонение ≤2%)`);
+        notes.push(`🎯 Точность рациона: Б ${totals.p}/${_gP}г, Ж ${totals.f}/${_gF}г, У ${totals.c}/${_gC}г (отклонение ≤2%)`);
       } else if (_maxDev <= 0.05) {
         notes.push(`✓ Точность рациона: отклонение ≤5% (Б ${Math.round(_dP * 100)}%, Ж ${Math.round(_dF * 100)}%, У ${Math.round(_dC * 100)}%)`);
       } else {
         notes.push(`⚠ Точность рациона: отклонение >5% (Б ${Math.round(_dP * 100)}%, Ж ${Math.round(_dF * 100)}%, У ${Math.round(_dC * 100)}%) — проверьте пулы продуктов`);
+      }
+      // B38: если движок работал от УЖАТОЙ цели (потолок), называем причину прямо —
+      // это ограничение цели, а не потеря продуктов в пулах.
+      {
+        const _clampedC = _gC > 0 && carbsTotal > 0 && Math.abs(carbsTotal - _gC) / _gC > 0.03
+          && Math.abs(totals.c - carbsTotal) < Math.abs(totals.c - _gC);
+        const _clampedF = _gF > 0 && fatTotal > 0 && Math.abs(fatTotal - _gF) / _gF > 0.03
+          && Math.abs(totals.f - fatTotal) < Math.abs(totals.f - _gF);
+        const _parts: string[] = [];
+        if (_clampedC) {
+          const _capTxt = _carbCeiling !== Infinity ? `клинический потолок ${Math.round(_carbCeiling)} г` : 'рабочая цель движка';
+          _parts.push(`углеводы ${Math.round(carbsTotal)} г вместо ${Math.round(_gC)} г — ${_capTxt}`);
+        }
+        if (_clampedF) _parts.push(`жиры ${Math.round(fatTotal)} г вместо ${Math.round(_gF)} г — раскладка дня под углеводы`);
+        if (_parts.length > 0) {
+          notes.push(`ℹ️ Проценты точности посчитаны от ваших целей: движок вёл день к своей рабочей цели (${_parts.join('; ')}). Это ограничение цели, а не потеря продуктов.`);
+        }
       }
       if (adjustedProteinG > 0 && Math.abs(adjustedProteinG - _gP) / _gP > 0.05) {
         const _dAdj = Math.abs(totals.p - adjustedProteinG) / Math.max(1, adjustedProteinG);

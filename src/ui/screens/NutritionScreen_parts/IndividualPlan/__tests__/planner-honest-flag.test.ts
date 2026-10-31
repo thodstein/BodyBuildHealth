@@ -31,7 +31,10 @@ describe('P4 honest flag (products: не сошлось при >8%)', () => {
         { type: 'инсулин', name: 'В', time: '19:30', dose: 40, esterType: 'short' },
       ] as any,
     } as any);
-    expect((p as any).deviationPct).toBeGreaterThan(8);
+    // Интервал «не сошлось» намеренно завязан на канон сходимости (3%), а не на 8%:
+    // после этапа 1+2 (B40/B42) этот экстремальный день 1500У сошёлся лучше
+    // (>8% → 6.5%), но канон не взят — флаг обязан остаться честным.
+    expect((p as any).deviationPct).toBeGreaterThan(3);
     expect((p as any).withinTolerance).toBe(false);
     expect(((p as any).notes || []).join('\n')).toMatch(/не сошлось/i);
   });
