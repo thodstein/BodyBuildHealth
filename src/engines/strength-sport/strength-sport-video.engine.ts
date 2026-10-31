@@ -228,6 +228,8 @@ export interface BarRepSegment {
   vmax: number;
   xBias: number;
   durationMs: number;
+  /** Номер подхода внутри тренировки (1-based). Не задан → считается первый подход. */
+  setIndex?: number;
 }
 
 /**
@@ -517,6 +519,8 @@ export interface BarRepSnapshot {
   amplitude: number;
   /** Прореженные точки: [[x,y], …] (не больше maxPoints). */
   points: Array<[number, number]>;
+  /** Номер подхода внутри тренировки (1-based), если размечен. */
+  setIndex?: number;
 }
 
 /** Прореживает повтор до maxPoints так, чтобы сохранить форму траектории (равномерно по индексу). */
@@ -537,6 +541,7 @@ export function snapshotBarRep(rep: BarRepSegment, maxPoints = 24): BarRepSnapsh
     xLoop: Math.round(rep.xLoop * 10) / 10,
     amplitude: Math.round(rep.amplitude * 10) / 10,
     points,
+    ...(rep.setIndex && rep.setIndex > 0 ? { setIndex: Math.round(rep.setIndex) } : {}),
   };
 }
 
@@ -566,4 +571,135 @@ export function compareBarSessions(prev: BarRepSnapshot | null | undefined, cur:
     prevVmax: prev.vmax, curVmax: cur.vmax, deltaPct, deltaXLoopCm, deltaAmplitudeCm, verdict,
     text: `${head}: ${prev.vmax.toFixed(2)} → ${cur.vmax.toFixed(2)} м/с (${deltaPct > 0 ? '+' : ''}${deltaPct}%) · xLoop ${deltaXLoopCm > 0 ? '+' : ''}${deltaXLoopCm} см`,
   };
+}
+
+/** Сводка heatmap для отчёта: доля медленных отрезков и точка срыва.
+ *  Раскраска без чисел не проверяема — эти цифры едут в CSV/HTML. */
+export interface HeatSummary {
+  segments: number;
+  /** Доля отрезков, окрашенных как «медленно», %. */
+  slowPct: number;
+  /** Доля отрезков «быстро», %. */
+  fastPct: number;
+  /** Высота (см, в координатах трекинга) самого медленного отрезка — вероятная точка срыва. */
+  stickingHeightCm: number | null;
+  /** Скорость на этом отрезке, см/с. */
+  stickingSpeedCmS: number | null;
+}
+
+export function heatSummary(points: BarPoint[]): HeatSummary | null {
+  const segs = barSpeedHeat(points);
+  if (!segs.length) return null;
+  const slow = segs.filter((s) => s.level === 'slow').length;
+  const fast = segs.filter((s) => s.level === 'fast').length;
+  let worst = segs[0];
+  for (const s of segs) if (s.speed < worst.speed) worst = s;
+  return {
+    segments: segs.length,
+    slowPct: Math.round((slow / segs.length) * 100),
+    fastPct: Math.round((fast / segs.length) * 100),
+    stickingHeightCm: Math.round(((worst.y1 + worst.y2) / 2) * 10) / 10,
+    stickingSpeedCmS: Math.round(worst.speed * 10) / 10,
+  };
+}
+
+/** Номер подхода повтора: без метки — первый подход. */
+export function repSetIndex(rep: BarRepSegment): number {
+  const n = Number(rep.setIndex);
+  return Number.isFinite(n) && n > 0 ? Math.round(n) : 1;
+}
+
+/** Статистика по подходам (для «подход vs подход», а не только повтор vs повтор). */
+export interface BarSetStat {
+  setIndex: number;
+  reps: number;
+  /** Средний vmax подхода, м/с. */
+  vmaxMean: number;
+  /** Минимальный vmax подхода (худший повтор), м/с. */
+  vmaxMin: number;
+  xLoopMean: number;
+}
+
+export function barSetStats(reps: BarRepSegment[]): BarSetStat[] {
+  if (!Array.isArray(reps) || !reps.length) return [];
+  const bySet = new Map<number, BarRepSegment[]>();
+  for (const r of reps) {
+    const key = repSetIndex(r);
+    const list = bySet.get(key);
+    if (list) list.push(r); else bySet.set(key, [r]);
+  }
+  const mean = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : 0);
+  return [...bySet.entries()]
+    .sort((a, b) => a[0] - b[0])
+    .map(([setIndex, list]) => ({
+      setIndex,
+      reps: list.length,
+      vmaxMean: Math.round(mean(list.map((r) => r.vmax)) * 100) / 100,
+      vmaxMin: Math.round(Math.min(...list.map((r) => r.vmax)) * 100) / 100,
+      xLoopMean: Math.round(mean(list.map((r) => r.xLoop)) * 10) / 10,
+    }));
+}
+
+/** Сравнение «первый подход vs последний подход» по одноимённым повторам. */
+export interface BarSetOverlay {
+  sets: number;
+  firstSet: BarSetStat;
+  lastSet: BarSetStat;
+  /** Δ среднего vmax, %: минус — падение от подхода к подходу. */
+  deltaPct: number;
+  first: BarRepSegment;
+  last: BarRepSegment;
+  text: string;
+}
+
+export function barSetOverlay(reps: BarRepSegment[]): BarSetOverlay | null {
+  const stats = barSetStats(reps);
+  if (stats.length < 2) return null;
+  const firstSet = stats[0];
+  const lastSet = stats[stats.length - 1];
+  const first = reps.find((r) => repSetIndex(r) === firstSet.setIndex);
+  const last = reps.find((r) => repSetIndex(r) === lastSet.setIndex);
+  if (!first || !last) return null;
+  const deltaPct = firstSet.vmaxMean > 0
+    ? Math.round(((lastSet.vmaxMean - firstSet.vmaxMean) / firstSet.vmaxMean) * 100)
+    : 0;
+  const head = deltaPct <= -5 ? 'скорость падает от подхода к подходу'
+    : deltaPct >= 5 ? 'скорость растёт от подхода к подходу'
+    : 'скорость между подходами держится';
+  return {
+    sets: stats.length,
+    firstSet,
+    lastSet,
+    deltaPct,
+    first,
+    last,
+    text: `Подходы ${stats.length}: vmax ${firstSet.vmaxMean.toFixed(2)}→${lastSet.vmaxMean.toFixed(2)} м/с `
+      + `(${deltaPct > 0 ? '+' : ''}${deltaPct}%) · ${head}`,
+  };
+}
+
+/** Масштаб CSV: Kinovea отдаёт сантиметры (k=1), «сырые» пиксели требуют «см на единицу». */
+export function scaleBarPoints(points: BarPoint[], cmPerUnit: number): BarPoint[] {
+  if (!Array.isArray(points) || !points.length) return [];
+  const k = Number.isFinite(cmPerUnit) && cmPerUnit > 0 ? cmPerUnit : 1;
+  if (k === 1) return points;
+  return points.map((p) => ({
+    t: p.t,
+    x: Math.round(p.x * k * 100) / 100,
+    y: Math.round(p.y * k * 100) / 100,
+  }));
+}
+
+/** Индекс последней точки с t <= time (наложение оверлея на видео). -1 — пусто. */
+export function pointIndexAtTime(points: ReadonlyArray<{ t: number }>, time: number): number {
+  if (!Array.isArray(points) || !points.length) return -1;
+  if (!Number.isFinite(time)) return points.length - 1;
+  let lo = 0;
+  let hi = points.length - 1;
+  let ans = -1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    if (points[mid].t <= time) { ans = mid; lo = mid + 1; } else hi = mid - 1;
+  }
+  return ans;
 }

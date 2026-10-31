@@ -32,6 +32,14 @@ export interface MovementDiagnosticsExportInput {
   kinoveaReps?: number | null;
   /** Overlay: изменение vmax первого→последнего повтора, % (отрицательное = потеря). */
   overlayVelocityLossPct?: number | null;
+  /** Heatmap: доля «медленных» отрезков траектории, %. */
+  heatSlowPct?: number | null;
+  /** Heatmap: высота самого медленного отрезка — вероятная точка срыва, см. */
+  heatStickingHeightCm?: number | null;
+  /** Heatmap: скорость в точке срыва, см/с. */
+  heatStickingSpeedCmS?: number | null;
+  /** Вес штанги на записи: сравнение сессий честно только при равном весе. */
+  weightKg?: number | null;
   /** Оценка качества съёмки (высота камеры / дистанция / ракурс): ok|rough|unknown + причина. */
   captureQuality?: string;
   asymmetryPct?: number | null;
@@ -97,6 +105,10 @@ export function buildMovementDiagnosticsCsv(inp: MovementDiagnosticsExportInput)
     ['Kinovea turnover, мс', inp.kinoveaTurnoverMs != null ? String(inp.kinoveaTurnoverMs) : '—'],
     ['Kinovea повторов, шт', inp.kinoveaReps != null ? String(inp.kinoveaReps) : '—'],
     ['Overlay потеря vmax, %', inp.overlayVelocityLossPct != null ? String(inp.overlayVelocityLossPct) : '—'],
+    ['Heatmap медленных отрезков, %', inp.heatSlowPct != null ? String(inp.heatSlowPct) : '—'],
+    ['Точка срыва, см', inp.heatStickingHeightCm != null ? String(inp.heatStickingHeightCm) : '—'],
+    ['Скорость в точке срыва, см/с', inp.heatStickingSpeedCmS != null ? String(inp.heatStickingSpeedCmS) : '—'],
+    ['Вес штанги на записи, кг', inp.weightKg != null ? String(inp.weightKg) : '—'],
     ['Качество съёмки', inp.captureQuality || '—'],
     ['Асимметрия, %', inp.asymmetryPct != null ? String(inp.asymmetryPct) : '—'],
     ['Вердикт асимметрии', inp.asymmetryVerdict || '—'],
@@ -110,7 +122,8 @@ export function buildMovementDiagnosticsCsv(inp: MovementDiagnosticsExportInput)
   return rows.map((r) => r.map(csvCell).join(',')).join('\n');
 }
 
-export function buildMovementDiagnosticsHtml(inp: MovementDiagnosticsExportInput): string {  const li = (k: string, v: string) =>
+export function buildMovementDiagnosticsHtml(inp: MovementDiagnosticsExportInput): string {
+  const li = (k: string, v: string) =>
     `<tr><td style="padding:6px 8px;border:1px solid #ddd;color:#555;">${esc(k)}</td><td style="padding:6px 8px;border:1px solid #ddd;">${esc(v)}</td></tr>`;
   const vbtLine =
     inp.vbtBest != null && inp.vbtLast != null
@@ -130,6 +143,17 @@ export function buildMovementDiagnosticsHtml(inp: MovementDiagnosticsExportInput
     + (inp.kinoveaTurnoverMs != null ? li('Kinovea turnover', `${inp.kinoveaTurnoverMs} мс`) : '')
     + (inp.kinoveaReps != null ? li('Kinovea повторов', `${inp.kinoveaReps} шт`) : '')
     + (inp.overlayVelocityLossPct != null ? li('Overlay: потеря vmax', `${fmt(inp.overlayVelocityLossPct, 0)}% от первого повтора к последнему`) : '')
+    + (inp.heatSlowPct != null
+      ? li(
+          'Скорость по траектории',
+          `${fmt(inp.heatSlowPct, 0)}% отрезков медленные`
+            + (inp.heatStickingHeightCm != null
+              ? ` · срыв на ${fmt(inp.heatStickingHeightCm, 0)} см`
+                + (inp.heatStickingSpeedCmS != null ? ` (${fmt(inp.heatStickingSpeedCmS, 0)} см/с)` : '')
+              : ''),
+        )
+      : '')
+    + (inp.weightKg != null ? li('Вес штанги на записи', `${fmt(inp.weightKg, 1)} кг`) : '')
     + (inp.captureQuality ? li('Качество съёмки', inp.captureQuality) : '')
     + (inp.asymmetryPct != null ? li('Асимметрия', `${fmt(inp.asymmetryPct, 1)}% ${inp.asymmetryVerdict || ''}`) : '')
     + (inp.vbtMetric ? li('VBT метрика', vbtMetricRu(inp.vbtMetric)) : '')

@@ -6,6 +6,7 @@ import {
   canRecordTrajectory,
   renderTrajectoryPng,
   recordTrajectoryWebm,
+  recordVideoWithOverlay,
 } from '../trajectory-overlay.engine';
 
 describe('mapTrajectoryPoints — проекция см → пиксели канвы', () => {
@@ -81,6 +82,17 @@ describe('растровый/видео-оверлей в не-браузерн�
   it('recordTrajectoryWebm без поддержки записи возвращает null', async () => {
     const webm = await recordTrajectoryWebm({ liftRu: 'Присед', points: [{ x: 0, y: 0 }, { x: 1, y: 10 }] });
     expect(webm).toBeNull();
+  });
+
+  it('recordVideoWithOverlay без MediaRecorder возвращает null, а не падает', async () => {
+    const file = new Blob([new Uint8Array([0, 1, 2, 3])], { type: 'video/mp4' });
+    const out = await recordVideoWithOverlay({ file, liftRu: 'Присед', points: [{ x: 0, y: 0, t: 0 }, { x: 1, y: 10, t: 0.2 }] });
+    expect(out).toBeNull();
+  });
+
+  it('recordVideoWithOverlay без точек не пытается декодировать видео', async () => {
+    const file = new Blob([new Uint8Array([0])], { type: 'video/mp4' });
+    expect(await recordVideoWithOverlay({ file, liftRu: 'Присед', points: [] })).toBeNull();
   });
 
   it('renderTrajectoryPng без точек возвращает null даже при наличии canvas', async () => {

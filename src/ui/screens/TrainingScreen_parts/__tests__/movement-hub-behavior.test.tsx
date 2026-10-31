@@ -424,6 +424,164 @@ describe('LiftMasterCard — поведение (не только смоук)',
     const { container } = render(<LiftMasterCard sessions={[]} />);
     expect(container.querySelector('[data-lift="export-overlay-png"]')).toBeTruthy();
     expect(container.querySelector('[data-lift="export-overlay-video"]')).toBeTruthy();
+    expect(container.querySelector('[data-lift="video-overlay-file"]'), 'видео подхода с траекторией').toBeTruthy();
+  });
+
+  it('heat-сводка под графиком: цифры, а не только цвет', () => {
+    const { container } = render(<LiftMasterCard sessions={[]} />);
+    const area = container.querySelector('[data-lift="kinovea-text"]') as HTMLTextAreaElement;
+    act(() => { fireEvent.change(area, { target: { value: buildRepCsv([0.8]) } }); });
+    click(container.querySelector('[data-lift="parse-kinovea"]'));
+
+    const summary = container.querySelector('[data-lift="heat-summary"]');
+    expect(summary, 'heat-сводка').toBeTruthy();
+    const text = summary!.textContent || '';
+    expect(text).toContain('медленных отрезков');
+    expect(text).toMatch(/\d+%/);
+    expect(text).toContain('минимум скорости на');
+  });
+
+  it('поиск по блокам находит и раскрывает нужную секцию', () => {
+    // всё свёрнуто — «8 Видео» пуст и по ленте его не найти
+    localStorage.setItem('he_lift_master_collapsed_v1', JSON.stringify({ secVideo: true }));
+    const { container } = render(<LiftMasterCard sessions={[]} />);
+    expect(container.querySelector('[data-lift="kinovea-text"]')).toBeNull();
+
+    const input = container.querySelector('[data-lift="hub-search"]') as HTMLInputElement;
+    expect(input).toBeTruthy();
+    act(() => { fireEvent.change(input, { target: { value: 'видео' } }); });
+
+    const hits = Array.from(container.querySelectorAll('[data-lift="hub-search-hit"]'));
+    expect(hits.length, 'результаты поиска').toBeGreaterThan(0);
+    const videoHit = hits.find(h => (h.textContent || '').includes('8 Видео'));
+    expect(videoHit, 'блок «Видео» в результатах').toBeTruthy();
+    click(videoHit!);
+    expect(container.querySelector('[data-lift="kinovea-text"]'), 'секция раскрыта поиском').toBeTruthy();
+    expect((input as HTMLInputElement).value, 'запрос очищен после перехода').toBe('');
+  });
+
+  it('поиск не выдумывает результаты и понимает синонимы', () => {
+    const { container } = render(<LiftMasterCard sessions={[]} />);
+    const input = container.querySelector('[data-lift="hub-search"]') as HTMLInputElement;
+    act(() => { fireEvent.change(input, { target: { value: 'kinovea' } }); });
+    const hit = container.querySelector('[data-lift="hub-search-hit"]');
+    expect(hit!.textContent).toContain('Видео');
+
+    act(() => { fireEvent.change(input, { target: { value: 'zzzz' } }); });
+    expect(container.querySelector('[data-lift="hub-search-hit"]')).toBeNull();
+    expect(container.textContent).toContain('Ничего не нашлось');
+  });
+
+  it('подходы: «Новый подход» и сравнение «подход vs подход»', () => {
+    const { container } = render(<LiftMasterCard sessions={[]} />);
+    const area = container.querySelector('[data-lift="kinovea-text"]') as HTMLTextAreaElement;
+    const add = () => click(container.querySelector('[data-lift="rep-series-add"]'));
+
+    act(() => { fireEvent.change(area, { target: { value: buildRepCsv([0.8]) } }); });
+    add();
+    click(container.querySelector('[data-lift="rep-set-next"]'));
+    expect(container.textContent).toContain('подход 2');
+
+    act(() => { fireEvent.change(area, { target: { value: buildRepCsv([1.2]) } }); });
+    add();
+
+    expect(container.querySelectorAll('[data-lift="rep-series-item"]').length).toBe(2);
+    const series = container.querySelector('[data-lift="rep-series"]')!.textContent || '';
+    expect(series).toContain('Подход 1 · 1 повт.');
+    expect(series).toContain('Подход 2 · 1 повт.');
+
+    const cmp = container.querySelector('[data-lift="set-compare"]');
+    expect(cmp, 'сравнение подходов').toBeTruthy();
+    expect(cmp!.textContent).toContain('Подходы 2');
+    expect(cmp!.textContent).toMatch(/растёт|падает|держится/);
+  });
+
+  it('лимит серии 12 повторов соблюдается и честно сообщается', () => {
+    const { container } = render(<LiftMasterCard sessions={[]} />);
+    const area = container.querySelector('[data-lift="kinovea-text"]') as HTMLTextAreaElement;
+    act(() => { fireEvent.change(area, { target: { value: buildRepCsv([0.8, 0.9, 1.0]) } }); });
+    for (let i = 0; i < 5; i++) click(container.querySelector('[data-lift="rep-series-add"]'));
+
+    expect(container.querySelectorAll('[data-lift="rep-series-item"]').length).toBe(12);
+    expect(container.querySelector('[data-lift="kinovea-msg"]')!.textContent).toContain('лимит');
+    expect(container.textContent).toContain('Серия повторов: 12/12');
+  });
+
+  it('серия переносится как эталон на другое движение', () => {
+    const { container } = render(<LiftMasterCard sessions={[]} />);
+    const area = container.querySelector('[data-lift="kinovea-text"]') as HTMLTextAreaElement;
+    act(() => { fireEvent.change(area, { target: { value: buildRepCsv([0.8, 0.9]) } }); });
+    click(container.querySelector('[data-lift="rep-series-add"]'));
+
+    click(container.querySelector('[data-lift="series-copy-squat"]'));
+    const saved = JSON.parse(localStorage.getItem(MASTER_KEY) || '{}');
+    expect(saved.series?.squat?.reps?.length).toBe(2);
+
+    click(container.querySelector('[data-lift-nav="squat"]'));
+    const cmp = container.querySelector('[data-lift="session-compare"]');
+    expect(cmp, 'эталон виден в приседе').toBeTruthy();
+    expect(cmp!.textContent).toContain('2 повт.');
+  });
+
+  it('вес в сохранённой серии пишется и предупреждает о разнице', () => {
+    localStorage.setItem(MASTER_KEY, JSON.stringify({
+      lift: 'bench',
+      vbtWeight: '100',
+      series: { bench: { savedAt: Date.now() - 86_400_000, weightKg: 110, reps: [{ index: 1, vmax: 0.6, xLoop: 2, amplitude: 40, points: [[0, 0], [0, 40]] }] } },
+    }));
+    const { container } = render(<LiftMasterCard sessions={[]} />);
+    const warn = container.querySelector('[data-lift="weight-mismatch"]');
+    expect(warn, 'предупреждение о разнице веса').toBeTruthy();
+    expect(warn!.textContent).toContain('110');
+    expect(warn!.textContent).toContain('100');
+
+    // При том же весе предупреждения нет и вес попадает в персист.
+    act(() => { fireEvent.change(container.querySelector('[data-lift="kinovea-text"]')!, { target: { value: buildRepCsv([0.8]) } }); });
+    click(container.querySelector('[data-lift="rep-series-add"]'));
+    expect(container.querySelector('[data-lift="weight-mismatch"]')).toBeTruthy();
+    click(container.querySelector('[data-lift="series-save"]'));
+    const saved = JSON.parse(localStorage.getItem(MASTER_KEY) || '{}');
+    expect(saved.series.bench.weightKg).toBe(100);
+  });
+
+  it('масштаб CSV «см на единицу» реально меняет метрики', () => {
+    const { container } = render(<LiftMasterCard sessions={[]} />);
+    const area = container.querySelector('[data-lift="kinovea-text"]') as HTMLTextAreaElement;
+    act(() => { fireEvent.change(area, { target: { value: buildRepCsv([0.8]) } }); });
+    click(container.querySelector('[data-lift="parse-kinovea"]'));
+    const xLoop1 = Number(/xLoop ([\d.]+) см/.exec(container.querySelector('[data-lift="kinovea-msg"]')!.textContent || '')![1]);
+
+    const scale = container.querySelector('[data-lift="kinovea-scale"]') as HTMLInputElement;
+    act(() => { fireEvent.change(scale, { target: { value: '2' } }); });
+    click(container.querySelector('[data-lift="parse-kinovea"]'));
+    const xLoop2 = Number(/xLoop ([\d.]+) см/.exec(container.querySelector('[data-lift="kinovea-msg"]')!.textContent || '')![1]);
+    expect(xLoop2).toBeCloseTo(xLoop1 * 2, 0);
+  });
+
+  it('интерактивные элементы хаба не меньше 44 px', () => {
+    const { container } = render(<LiftMasterCard sessions={[]} />);
+    // «Быстрый старт» исчезает после первых данных — проверяем до заполнения.
+    const quickHide = container.querySelector('[data-lift="quick-start-hide"]') as HTMLElement;
+    expect(quickHide).toBeTruthy();
+    expect(parseFloat(quickHide.style.minHeight || '0')).toBeGreaterThanOrEqual(44);
+
+    const area = container.querySelector('[data-lift="kinovea-text"]') as HTMLTextAreaElement;
+    act(() => { fireEvent.change(area, { target: { value: buildRepCsv([0.8, 0.9]) } }); });
+    click(container.querySelector('[data-lift="rep-series-add"]'));
+    // «Наложить прошлую» появляется только после сохранения серии.
+    click(container.querySelector('[data-lift="series-save"]'));
+
+    const selectors = [
+      'hub-search', 'kinovea-scale', 'rep-series-add', 'rep-set-next', 'rep-series-clear',
+      'series-save', 'session-overlay-toggle', 'capture-side-left',
+      'capture-device-phone', 'export-csv', 'export-overlay-video', 'video-overlay-file',
+    ];
+    for (const sel of selectors) {
+      const el = container.querySelector(`[data-lift="${sel}"]`);
+      expect(el, sel).toBeTruthy();
+      const h = parseFloat((el as HTMLElement).style.minHeight || '0');
+      expect(h, `${sel}: minHeight`).toBeGreaterThanOrEqual(44);
+    }
   });
 });
 

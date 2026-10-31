@@ -39,11 +39,11 @@ describe('movement-diagnostics-export', () => {
     const csv = buildMovementDiagnosticsCsv({ ...BASE, issuesRu: ['=cmd|evil'] });
     const lines = csv.split('\n');
     expect(lines[0]).toContain('Поле');
-    // Шапка + 22 метрики: хаб-мастер передаёт все поддерживаемые поля
-    // (Kinovea-наклон/turnover/повторы, overlay-потеря vmax, качество съёмки,
-    // асимметрия, метрика/порог/пауза VBT, LVP r²).
-    expect(lines.length).toBe(23);
-    for (const field of ['Kinovea turnover', 'Kinovea повторов', 'Overlay потеря vmax', 'Качество съёмки', 'Асимметрия', 'VBT метрика', 'VBT VL-порог', 'VBT пауза', 'LVP r²']) {
+    // Шапка + 26 метрик: хаб-мастер передаёт все поддерживаемые поля
+    // (Kinovea-наклон/turnover/повторы, overlay-потеря vmax, heat-сводка и вес,
+    // качество съёмки, асимметрия, метрика/порог/пауза VBT, LVP r²).
+    expect(lines.length).toBe(27);
+    for (const field of ['Kinovea turnover', 'Kinovea повторов', 'Overlay потеря vmax', 'Heatmap медленных отрезков', 'Точка срыва', 'Скорость в точке срыва', 'Вес штанги на записи', 'Качество съёмки', 'Асимметрия', 'VBT метрика', 'VBT VL-порог', 'VBT пауза', 'LVP r²']) {
       expect(csv).toContain(field);
     }
     expect(csv).toContain("'=cmd|evil");

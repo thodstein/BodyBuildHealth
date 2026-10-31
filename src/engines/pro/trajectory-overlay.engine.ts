@@ -9,10 +9,13 @@
  * точкам трекинга (Kinovea/CSV): видно траекторию, heatmap скорости, target-zone
  * и справку прошлой сессии. Если canvas/MediaRecorder недоступны — функции
  * возвращают null, вызывающая сторона показывает честное сообщение.
+ *
+ * recordVideoWithOverlay — исключение: там наоборот, берётся исходный видеофайл,
+ * а траектория рисуется панелью поверх кадров (см. комментарий функции).
  */
 
 // Единый источник heatmapping — движок трекинга штанги (см. barSpeedHeat).
-import { barSpeedHeat, BAR_HEAT_COLORS } from '../strength-sport/strength-sport-video.engine';
+import { barSpeedHeat, BAR_HEAT_COLORS, pointIndexAtTime } from '../strength-sport/strength-sport-video.engine';
 
 export interface OverlayPoint { x: number; y: number; t?: number }
 
@@ -269,4 +272,151 @@ export async function recordTrajectoryWebm(inp: TrajectoryRenderInput, opts?: { 
   rec.stop();
   try { stream.getTracks().forEach((t) => t.stop()); } catch {}
   return done;
+}
+
+/** Область отрисовки оверлея поверх видео: панель справа + нижняя подпись. */
+function overlayPanelRect(w: number, h: number) {
+  const panelW = Math.round(w * 0.38);
+  const panelH = Math.round(h * 0.46);
+  return { x: w - panelW - 12, y: 12, w: panelW, h: panelH };
+}
+
+/**
+ * Видео подхода с наложенной траекторией (webm).
+ *
+ * Честно: позиция штанги в кадре не известна (нет калибровки «см → пиксель видео»),
+ * поэтому траектория рисуется отдельной панелью в правом верхнем углу и
+ * синхронизируется с воспроизведением по времени трека. Сам подход при этом
+ * перекодируется в webm — картинка видео сохраняется, но это уже не оригинал.
+ *
+ * Возвращает null, если MediaRecorder/captureStream/video недоступны или файл
+ * не декодируется.
+ */
+export async function recordVideoWithOverlay(
+  inp: TrajectoryRenderInput & { file: Blob; offsetSec?: number },
+  opts?: { w?: number; h?: number },
+): Promise<Blob | null> {
+  if (!canRecordTrajectory()) return null;
+  if (!inp.file || typeof inp.file.size !== 'number') return null;
+  const pts = inp.points?.length ? inp.points : (inp.firstRep ?? []);
+  if (pts.length < 2) return null;
+  if (typeof document === 'undefined') return null;
+  const URLRef = (globalThis as unknown as { URL?: typeof URL }).URL;
+  if (!URLRef || typeof URLRef.createObjectURL !== 'function') return null;
+
+  const url = URLRef.createObjectURL(inp.file);
+  const video = document.createElement('video');
+  video.muted = true;
+  video.playsInline = true;
+  video.preload = 'auto';
+  video.src = url;
+
+  try {
+    await new Promise<void>((resolve, reject) => {
+      let settled = false;
+      const ok = () => { if (!settled) { settled = true; resolve(); } };
+      const fail = () => { if (!settled) { settled = true; reject(new Error('video-decode')); } };
+      video.onloadedmetadata = ok;
+      video.onloadeddata = ok;
+      video.onerror = fail;
+      // jsdom/WebView без декодера может не прислать ни одного события
+      setTimeout(fail, 8000);
+    });
+    if (!(video.videoWidth > 0) || !(video.videoHeight > 0)) return null;
+
+    const maxW = opts?.w ?? 720;
+    const scale = Math.min(1, maxW / video.videoWidth);
+    const w = Math.round(video.videoWidth * scale);
+    const h = Math.round(video.videoHeight * scale);
+    const canvas = document.createElement('canvas');
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+
+    const stream = (canvas as unknown as { captureStream: (fps?: number) => MediaStream }).captureStream(30);
+    const MR = (window as unknown as { MediaRecorder?: new (s: MediaStream, o?: { mimeType?: string }) => MediaRecorder }).MediaRecorder;
+    if (typeof MR !== 'function') return null;
+    let rec: MediaRecorder;
+    try { rec = new MR(stream, { mimeType: 'video/webm' }); }
+    catch { try { rec = new MR(stream); } catch { return null; } }
+    const chunks: Blob[] = [];
+    rec.ondataavailable = (e: BlobEvent) => { if (e.data && e.data.size > 0) chunks.push(e.data); };
+    const done = new Promise<Blob | null>((resolve) => {
+      rec.onstop = () => resolve(chunks.length ? new Blob(chunks, { type: 'video/webm' }) : null);
+      rec.onerror = () => resolve(null);
+    });
+
+    const panel = overlayPanelRect(w, h);
+    const xs = pts.map((p) => p.x), ys = pts.map((p) => p.y);
+    const minX = Math.min(...xs), maxX = Math.max(...xs);
+    const minY = Math.min(...ys), maxY = Math.max(...ys);
+    const px = (x: number) => panel.x + 10 + ((x - minX) / Math.max(0.001, maxX - minX)) * (panel.w - 20);
+    const py = (y: number) => panel.y + panel.h - 12 - ((y - minY) / Math.max(0.001, maxY - minY)) * (panel.h - 44);
+
+    const drawFrame = () => {
+      ctx.clearRect(0, 0, w, h);
+      try { ctx.drawImage(video, 0, 0, w, h); } catch { /* кадр ещё не готов */ }
+      // панель траектории
+      ctx.fillStyle = 'rgba(11,15,20,0.78)';
+      ctx.fillRect(panel.x, panel.y, panel.w, panel.h);
+      ctx.strokeStyle = BAR_HEAT_COLORS.mid;
+      ctx.lineWidth = 1;
+      ctx.strokeRect(panel.x + 0.5, panel.y + 0.5, panel.w - 1, panel.h - 1);
+      ctx.fillStyle = '#e5e7eb';
+      ctx.font = '600 13px sans-serif';
+      ctx.fillText(inp.liftRu, panel.x + 10, panel.y + 20);
+      const idx = pointIndexAtTime(pts.map((p, i) => ({ t: p.t ?? i / 30 })), Math.max(0, video.currentTime - (inp.offsetSec ?? 0)));
+      if (idx > 0) {
+        ctx.beginPath();
+        for (let i = 0; i <= idx; i++) {
+          const sx2 = px(pts[i].x), sy2 = py(pts[i].y);
+          if (i === 0) ctx.moveTo(sx2, sy2); else ctx.lineTo(sx2, sy2);
+        }
+        ctx.strokeStyle = BAR_HEAT_COLORS.fast;
+        ctx.lineWidth = 3;
+        ctx.stroke();
+      }
+      if (idx >= 0) {
+        const head = pts[idx];
+        ctx.fillStyle = BAR_HEAT_COLORS.slow;
+        ctx.beginPath();
+        ctx.arc(px(head.x), py(head.y), 5, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.fillStyle = '#d1d5db';
+      ctx.font = '600 13px sans-serif';
+      const footer = [
+        inp.xLoopCm != null ? `xLoop ${inp.xLoopCm.toFixed(1)} см` : '',
+        inp.vmax != null ? `vmax ${inp.vmax.toFixed(2)} м/с` : '',
+      ].filter(Boolean).join(' · ') || '—';
+      ctx.fillText(footer, 12, h - 28);
+      ctx.fillStyle = '#9ca3af';
+      ctx.font = '500 12px sans-serif';
+      ctx.fillText('скорость из видео — оценка (не LPT)', 12, h - 10);
+    };
+
+    rec.start();
+    await video.play();
+    await new Promise<void>((resolve) => {
+      const tick = () => {
+        if (video.ended || video.paused) { drawFrame(); resolve(); return; }
+        drawFrame();
+        if (typeof video.requestVideoFrameCallback === 'function') {
+          video.requestVideoFrameCallback(() => tick());
+        } else {
+          setTimeout(tick, 33);
+        }
+      };
+      tick();
+    });
+    rec.stop();
+    try { stream.getTracks().forEach((t) => t.stop()); } catch {}
+    return await done;
+  } catch {
+    return null;
+  } finally {
+    try { video.pause(); } catch {}
+    try { URLRef.revokeObjectURL(url); } catch {}
+  }
 }

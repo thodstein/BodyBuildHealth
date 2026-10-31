@@ -202,12 +202,17 @@ for (const hook of [
   'data-lift="export-svg"', 'data-lift="export-overlay-png"', 'data-lift="export-overlay-video"',
   'data-lift="series-save"', 'data-lift="session-compare"', 'data-lift="bar-heat"',
   'data-lift="quick-start"', 'data-lift="quick-start-hide"',
+  'data-lift="hub-search"', 'data-lift="hub-search-hit"', 'data-lift="heat-summary"',
+  'data-lift="rep-set-next"', 'data-lift="set-compare"', 'data-lift="kinovea-scale"',
+  'series-copy-', 'data-lift="weight-mismatch"', 'data-lift="video-overlay-file"',
   'data-lift-nav=',
 ]) mustContain(LIFT_HUB, hook, `lift hub hook ${hook}`);
 // Дефолт-коллапс: 14 раскрытых блоков давали ~214 КБ HTML и ~500 кнопок за рендер.
 mustContain(LIFT_HUB, 'DEFAULT_COLLAPSED', 'lift hub default collapse');
-// Навигация обязана содержать 13 пунктов (1…13) — столько же, сколько карточек.
-mustContain(LIFT_HUB, "'sec-13', '13 Старт'", 'lift hub nav 13');
+// Карта блоков — единый источник для ленты и поиска: 14 пунктов (антропометрия + 1…13).
+mustContain(LIFT_HUB, 'HUB_SECTIONS', 'lift hub sections map');
+mustContain(LIFT_HUB, "'sec-13'", 'lift hub nav 13');
+mustContain(LIFT_HUB, "'13 Старт'", 'lift hub nav 13 label');
 {
   const hub = readFileSync(join(root, LIFT_HUB), 'utf-8');
   if (/\(\s*v\s*\+\s*0\.15\s*\)/.test(hub) || /vbtBest\s*\(\s*\(?\s*v\s*\+\s*0\.15/.test(hub)) {
@@ -217,6 +222,12 @@ mustContain(LIFT_HUB, "'sec-13', '13 Старт'", 'lift hub nav 13');
   if (/data-lift="apply-all"[^>]*minHeight:3\d/.test(hub)) {
     fails.push(`TAP-44 в ${LIFT_HUB}: apply-all меньше 44px`);
   }
+  // Все интерактивные элементы хаба — не меньше 44px (WCAG 2.5.5):
+  // раньше кнопки серии/съёмки были 22–32px и на телефоне не нажимались.
+  const small = hub.split(/\r?\n/)
+    .map((l, i) => ({ l, i: i + 1 }))
+    .filter(({ l }) => /<(button|input)\b/.test(l) && /minHeight:(2\d|3\d)\b/.test(l));
+  if (small.length) fails.push(`TAP-44 в ${LIFT_HUB}:${small[0].i} — тап-таргет ${/minHeight:(\d+)/.exec(small[0].l)?.[1]}px`);
 }
 
 // 7d. Mojibake-бан: битые символы (U+FFFD) в файлах хаба — признак порванной кодировки.

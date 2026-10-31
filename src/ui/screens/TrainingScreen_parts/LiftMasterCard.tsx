@@ -44,13 +44,13 @@ import { getPLWeakGroupExerciseCandidates, diagnosticProtocolFromCycle } from '.
 import type { SRCycleTemplate } from '../../../data/lms-cycles/lms-types';
 import { applyToPlanner } from './planner-bridge';
 import { getExerciseById } from '../../../core/exercise-catalog';
-import { parseKinoveaCSV, analyzeBarTracking, segmentBarReps, barRepOverlay, videoQualityForCapture, barSpeedHeat, BAR_HEAT_COLORS, snapshotBarRep, compareBarSessions, type BarTrackingResult, type BarRepSegment, type BarRepSnapshot, type VideoCaptureMeta } from '../../../engines/strength-sport/strength-sport-video.engine';
+import { parseKinoveaCSV, analyzeBarTracking, segmentBarReps, barRepOverlay, videoQualityForCapture, barSpeedHeat, BAR_HEAT_COLORS, snapshotBarRep, compareBarSessions, barSetStats, barSetOverlay, heatSummary, scaleBarPoints, repSetIndex, type BarTrackingResult, type BarRepSegment, type BarRepSnapshot, type VideoCaptureMeta } from '../../../engines/strength-sport/strength-sport-video.engine';
 import { barLoopFlag } from '../../../engines/pro/bar-path-core.engine';
 import { diagnoseAsymmetry } from '../../../engines/pro/pl-asymmetry.engine';
 import { RULE_CHECKS, checkLiftRules } from '../../../engines/pro/pl-competition-rules.engine';
 import { RED_FLAGS, checkRedFlags, type RedFlagId } from '../../../engines/pro/pl-red-flags.engine';
 import { buildMovementDiagnosticsHtml, buildMovementDiagnosticsCsv, buildTrajectorySvg, movementDiagnosticsFilename, type MovementDiagnosticsExportInput } from '../../../engines/pro/movement-diagnostics-export.engine';
-import { renderTrajectoryPng, recordTrajectoryWebm, canRecordTrajectory, dataUrlToBlob } from '../../../engines/pro/trajectory-overlay.engine';
+import { renderTrajectoryPng, recordTrajectoryWebm, recordVideoWithOverlay, canRecordTrajectory, dataUrlToBlob } from '../../../engines/pro/trajectory-overlay.engine';
 import { copyOrShareText, saveCsvApk, printHtmlApk, saveTextFileApk, saveBlobApk, shareOutcomeLabel } from '../../../core/apk-share';
 import { VideoCaptureCard } from './VideoCaptureCard';
 import StickingPointAnalysisCard from './StickingPointAnalysisCard';
@@ -275,7 +275,7 @@ interface MasterState {
   /** Параметры захвата видео: влияют на достоверность xLoop/vmax (Shah 2026). */
   capture: { heightM: string; distM: string; side: string; device: string };
   /** Прошлая серия повторов per-lift — для сравнения «прошлая сессия vs текущая». */
-  series?: Record<string, { savedAt: number; reps: BarRepSnapshot[] }>;
+  series?: Record<string, { savedAt: number; weightKg?: number | null; reps: BarRepSnapshot[] }>;
 }
 
 function isRecord(v: unknown): v is Record<string, unknown> { return !!v && typeof v === 'object' && !Array.isArray(v); }
@@ -380,9 +380,12 @@ function cleanSeries(raw: unknown): NonNullable<MasterState['series']> {
         const x = Number(p[0]), y = Number(p[1]);
         if (Number.isFinite(x) && Number.isFinite(y)) pts.push([x, y]);
       }
-      reps.push({ index: Number.isFinite(index) ? index : reps.length + 1, vmax, xLoop, amplitude, points: pts });
+      reps.push({ index: Number.isFinite(index) ? index : reps.length + 1, vmax, xLoop, amplitude, points: pts, setIndex: (() => { const s = Number(r.setIndex); return Number.isFinite(s) && s > 0 ? Math.round(s) : undefined; })() });
     }
-    if (reps.length) out[key] = { savedAt, reps };
+    if (reps.length) {
+      const w = Number(val.weightKg);
+      out[key] = { savedAt, reps, ...(Number.isFinite(w) && w > 0 ? { weightKg: Math.round(w * 10) / 10 } : {}) };
+    }
   }
   return out;
 }
@@ -411,6 +414,32 @@ export const DEFAULT_COLLAPSED: Record<string, boolean> = {
 /** Множество допустимых id движений — единый источник для валидации персиста. */
 export const ALL_LIFTS = Object.keys(LIFT_RU) as Lift[];
 const isLiftId = (v: unknown): v is Lift => typeof v === 'string' && (ALL_LIFTS as string[]).includes(v);
+
+/** Карта блоков хаба: навигация, поиск и «быстрый старт» прыгают по одному списку.
+ *  words — то, что реально ищут («видео», «xLoop», «1ПМ»), а не текст заголовка. */
+export const HUB_SECTIONS: Array<{ id: string; label: string; key: string; words: string }> = [
+  { id: 'sec-0', label: 'Антропометрия', key: 'secAnthro', words: 'размах рук ширина плеч хват локти геометрия' },
+  { id: 'sec-1', label: '1 Безопасность', key: 'sec0', words: 'красные флаги правила зачёт соревнование травмы' },
+  { id: 'sec-2', label: '2 Слабые мышцы', key: 'sec1', words: 'мышцы отставание e1rm дневник' },
+  { id: 'sec-3', label: '3 Слабые точки', key: 'sec2', words: 'фаза движения стикинг point срыв' },
+  { id: 'sec-4', label: '4 Мёртвые точки', key: 'sec3', words: 'мёртвая точка диапазон угол' },
+  { id: 'sec-5', label: '5 Траектория', key: 'sec4', words: 'bar path траектория xloop отклонения' },
+  { id: 'sec-6', label: '6 Геометрия', key: 'sec5', words: 'углы геометрия техника' },
+  { id: 'sec-7', label: '7 VBT', key: 'sec6', words: 'скорость vbt м/с lvp 1пм порог vl' },
+  { id: 'sec-8', label: '8 Видео', key: 'secVideo', words: 'видео csv kinovea серия повторов heatmap экспорт png webm' },
+  { id: 'sec-9', label: '9 Срывы', key: 'sec7', words: 'срывы дневник rpe тяжёлые подходы' },
+  { id: 'sec-10', label: '10 RIR', key: 'sec8', words: 'rir калибровка bias' },
+  { id: 'sec-11', label: '11 Мезо', key: 'sec9', words: 'мезо объём подходы коррекция' },
+  { id: 'sec-12', label: '12 Лимитеры', key: 'sec10', words: 'лимитеры ограничители приоритет' },
+  { id: 'sec-13', label: '13 Старт', key: 'secMeet', words: 'старт встреча дата попытки стратегия' },
+];
+
+/** Поиск по блокам хаба: пустой запрос — ничего не показываем. */
+export function searchHubSections(query: string): typeof HUB_SECTIONS {
+  const q = query.trim().toLowerCase();
+  if (q.length < 2) return [];
+  return HUB_SECTIONS.filter((s) => `${s.label} ${s.words}`.toLowerCase().includes(q)).slice(0, 6);
+}
 
 /** Фазовая асимметрия L/R: только строки; числовая санитизация — при разборе в UI. */
 function cleanAsymPhase(raw: unknown): MasterState['asymPhase'] {
@@ -560,6 +589,12 @@ export const LiftMasterCard: React.FC<{
   const [kinoveaResult, setKinoveaResult] = useState<BarTrackingResult | null>(null);
   /** Повторы, нарезанные из Kinovea-серии (для overlay «первый vs последний»). */
   const [kinoveaReps, setKinoveaReps] = useState<BarRepSegment[]>([]);
+  /** Текущий подход внутри тренировки: новые повторы получают setIndex. */
+  const [curSet, setCurSet] = useState(1);
+  /** Масштаб CSV («см на единицу»): Kinovea отдаёт см → 1, «сырые» пиксели требуют калибровки. */
+  const [kinoveaScale, setKinoveaScale] = useState('1');
+  /** Поиск по блокам хаба (14 раскрывающихся секций — иначе их не найти). */
+  const [hubQuery, setHubQuery] = useState('');
   /** Прошлые серии повторов per-lift (персист) — сравнение «прошлая сессия vs текущая». */
   const [seriesStore, setSeriesStore] = useState<NonNullable<MasterState['series']>>(initial.series ?? {});
   /** Наложение прошлой сессии на текущую траекторию. */
@@ -648,12 +683,33 @@ export const LiftMasterCard: React.FC<{
   const captureQuality = useMemo(()=> videoQualityForCapture(captureMeta), [captureMeta]);
   /** Heatmapping: отрезки траектории, окрашенные по скорости (нужно ≥2 точки с временем). */
   const kinoveaHeat = useMemo(()=> kinoveaResult ? barSpeedHeat(kinoveaResult.points) : [], [kinoveaResult]);
+  /** Сводка heatmap числами — едет в CSV/HTML и в подпись под графиком. */
+  const kinoveaHeatSummary = useMemo(()=> kinoveaResult ? heatSummary(kinoveaResult.points) : null, [kinoveaResult]);
+  /** Подходы: средний vmax по подходу и сравнение «первый подход vs последний». */
+  const kinoveaSetStats = useMemo(()=> barSetStats(kinoveaReps), [kinoveaReps]);
+  const kinoveaSetOverlay = useMemo(()=> barSetOverlay(kinoveaReps), [kinoveaReps]);
+  /** Текущий вес: если он отличается от сохранённого, сравнение сессий нечестно. */
+  const curWeightKg = useMemo(()=> { const w = parseFloat(vbtWeight); return Number.isFinite(w) && w > 0 ? Math.round(w * 10) / 10 : null; }, [vbtWeight]);
+  /** Разбор CSV с масштабом: если файл в пикселях, «см на единицу» делает метрики осмысленными. */
+  const parseScaledPoints = useCallback((text: string) => {
+    const raw = parseKinoveaCSV(text);
+    if (!raw) return null;
+    const k = parseFloat(kinoveaScale);
+    return scaleBarPoints(raw, Number.isFinite(k) && k > 0 ? k : 1);
+  }, [kinoveaScale]);
   /** Сохранённая серия прошлого раза для текущего движения. */
   const savedSeries = seriesStore[lift] ?? null;
   const curFirstSnapshot = useMemo(()=> kinoveaReps.length ? snapshotBarRep(kinoveaReps[0]) : null, [kinoveaReps]);
   const sessionCompare = useMemo(()=> compareBarSessions(savedSeries?.reps?.[0], curFirstSnapshot), [savedSeries, curFirstSnapshot]);
   /** Прошлая сессия в виде {x,y} — для SVG/PNG/видео-оверлея (в персисте точки компактные). */
   const savedRepPoints = useMemo(()=> (savedSeries?.reps?.[0]?.points ?? []).map(([x, y]) => ({ x, y })), [savedSeries]);
+  /** Вес прошлой записи vs текущий: при разнице >2.5% сравнение vmax нечестно. */
+  const weightMismatch = useMemo(()=> {
+    const prev = savedSeries?.weightKg ?? null;
+    if (prev == null || curWeightKg == null || prev <= 0) return null;
+    const diff = Math.abs(curWeightKg - prev);
+    return diff / prev > 0.025 ? { prev, cur: curWeightKg, diffKg: Math.round(diff * 10) / 10 } : null;
+  }, [savedSeries, curWeightKg]);
 
   // diary hint (каноника phaseForReps)
   const diaryHint = useMemo(()=>{
@@ -886,6 +942,10 @@ export const LiftMasterCard: React.FC<{
       kinoveaTurnoverMs: kinoveaResult && kinoveaResult.turnoverMs != null ? kinoveaResult.turnoverMs : null,
       kinoveaReps: kinoveaReps.length > 0 ? kinoveaReps.length : null,
       overlayVelocityLossPct: kinoveaOverlay ? kinoveaOverlay.velocityLossPct : null,
+      heatSlowPct: kinoveaHeatSummary ? kinoveaHeatSummary.slowPct : null,
+      heatStickingHeightCm: kinoveaHeatSummary ? kinoveaHeatSummary.stickingHeightCm : null,
+      heatStickingSpeedCmS: kinoveaHeatSummary ? kinoveaHeatSummary.stickingSpeedCmS : null,
+      weightKg: curWeightKg,
       captureQuality: captureQuality.flag === 'unknown' ? 'не задано'
         : `${captureQuality.flag === 'ok' ? 'в норме' : 'грубо'} — ${captureQuality.reason}`,
       asymmetryPct: asymDiag ? asymDiag.pct : null,
@@ -960,6 +1020,38 @@ export const LiftMasterCard: React.FC<{
         <div style={{ fontSize:11, fontWeight:800, color:ACCENT, marginRight:6 }}>Движение:</div>
         {(Object.keys(LIFT_RU) as Lift[]).map(l=>{ const on=lift===l; return <button key={l} data-lift-nav={l} onClick={()=>setLift(l)} style={{ minHeight:44, padding:'6px 10px', borderRadius:14, cursor:'pointer', border: on?'1px solid '+ACCENT:'1px solid rgba(255,255,255,0.1)', background: on?'rgba(0,230,138,0.15)':'transparent', color: on?ACCENT:DIM, fontWeight:700, fontSize:10 }}>{LIFT_RU[l]}{on?' ✓':''}</button>; })}
       </div>
+      {/* Поиск по блокам: 14 свёрнутых секций — глазами по ленте их не найти. */}
+      <div style={{ ...CARD, border:'1px solid rgba(56,189,248,0.18)', background:'rgba(56,189,248,0.05)' }}>
+        <div style={{ display:'flex', gap:6, alignItems:'center' }}>
+          <input
+            data-lift="hub-search"
+            aria-label="Поиск по блокам хаба"
+            type="search"
+            placeholder="Поиск по блокам: видео, vmax, мезо…"
+            value={hubQuery}
+            onChange={e=>setHubQuery(e.target.value)}
+            onKeyDown={e=>{
+              if (e.key !== 'Enter') return;
+              const hit = searchHubSections(hubQuery)[0];
+              if (hit) { jumpToSection(hit.key, hit.id); setHubQuery(''); }
+            }}
+            style={{ flex:'1 1 150px', minHeight:44, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.15)', color:'#fff', borderRadius:10, padding:'10px 12px', fontSize:12 }}
+          />
+          {hubQuery !== '' && (
+            <button data-lift="hub-search-clear" aria-label="Очистить поиск" onClick={()=>setHubQuery('')} style={{ minHeight:44, minWidth:44, borderRadius:10, cursor:'pointer', background:'transparent', color:'#fff', border:'1px solid rgba(255,255,255,0.14)', fontSize:14 }}>✕</button>
+          )}
+        </div>
+        {hubQuery.trim().length >= 2 && (
+          <div style={{ display:'flex', gap:4, flexWrap:'wrap', marginTop:6 }}>
+            {searchHubSections(hubQuery).map(hit => (
+              <button key={hit.id} data-lift="hub-search-hit" data-section={hit.id} onClick={()=>{ jumpToSection(hit.key, hit.id); setHubQuery(''); }} style={{ minHeight:44, padding:'8px 12px', borderRadius:8, cursor:'pointer', background:'rgba(56,189,248,0.12)', color:'#38bdf8', border:'1px solid rgba(56,189,248,0.28)', fontSize:11, fontWeight:700 }}>{hit.label}</button>
+            ))}
+            {searchHubSections(hubQuery).length === 0 && (
+              <span style={{ fontSize:10, color:'#fff', opacity:0.6 }}>Ничего не нашлось — попробуйте «видео», «VBT», «срывы».</span>
+            )}
+          </div>
+        )}
+      </div>
       {/* Быстрый старт: пока ничего не заполнено — три честных шага вместо пустых блоков. */}
       {!onboardHidden && nothingFilled && (
         <div data-lift="quick-start" style={{ ...CARD, border:'1px solid rgba(0,230,138,0.22)', background:'rgba(0,230,138,0.06)' }}>
@@ -968,7 +1060,7 @@ export const LiftMasterCard: React.FC<{
             <button data-lift="quick-start-hide" aria-label="Скрыть быстрый старт" onClick={()=>{
               setOnboardHidden(true);
               try { localStorage.setItem('he_lift_master_onboard_v1', '1'); } catch {}
-            }} style={{ minHeight:32, padding:'4px 10px', borderRadius:8, cursor:'pointer', background:'transparent', color:'#fff', border:'1px solid rgba(255,255,255,0.14)', fontSize:10 }}>Скрыть</button>
+            }} style={{ minHeight:44, padding:'8px 12px', borderRadius:8, cursor:'pointer', background:'transparent', color:'#fff', border:'1px solid rgba(255,255,255,0.14)', fontSize:11 }}>Скрыть</button>
           </div>
           <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
             {[
@@ -1030,21 +1122,7 @@ export const LiftMasterCard: React.FC<{
       {/* Навигация по блокам — обычный ряд в потоке. Номера совпадают с заголовками карточек
           (1→13); «Антропометрия» (sec-0) — настройка без номера и без пункта в ленте. */}
       <div style={{ display:'flex', gap:4, flexWrap:'wrap', marginBottom:8, padding:'6px 0' }}>
-        {([
-          ['sec-1', '1 Безопасность', 'sec0'],
-          ['sec-2', '2 Слабые мышцы', 'sec1'],
-          ['sec-3', '3 Слабые точки', 'sec2'],
-          ['sec-4', '4 Мёртвые точки', 'sec3'],
-          ['sec-5', '5 Траектория', 'sec4'],
-          ['sec-6', '6 Геометрия', 'sec5'],
-          ['sec-7', '7 VBT', 'sec6'],
-          ['sec-8', '8 Видео', 'secVideo'],
-          ['sec-9', '9 Срывы', 'sec7'],
-          ['sec-10', '10 RIR', 'sec8'],
-          ['sec-11', '11 Мезо', 'sec9'],
-          ['sec-12', '12 Лимитеры', 'sec10'],
-          ['sec-13', '13 Старт', 'secMeet'],
-        ] as Array<[string, string, string]>).map(([id, label, collapseKey]) => (
+        {HUB_SECTIONS.filter(s => s.id !== 'sec-0').map(({ id, label, key: collapseKey }) => (
           <button
             key={id}
             data-lift="nav-jump"
@@ -1370,6 +1448,21 @@ export const LiftMasterCard: React.FC<{
               : 'ℹ В файле не найдено ≥2 полных повторов (низ→верх) — overlay недоступен, траектория показана как есть.'}
           </div>
         )}
+        {/* Числовая heat-сводка: цвет без цифр не проверяем, а в CSV эти значения уходят. */}
+        {kinoveaHeatSummary && (
+          <div data-lift="heat-summary" role="status" style={{ marginTop:6, display:'flex', gap:10, flexWrap:'wrap', alignItems:'center', fontSize:10, color:'#e5e7eb' }}>
+            <span style={{ display:'inline-flex', alignItems:'center', gap:4 }}><span style={{ width:14, height:6, borderRadius:3, background:BAR_HEAT_COLORS.fast }} />быстро</span>
+            <span style={{ display:'inline-flex', alignItems:'center', gap:4 }}><span style={{ width:14, height:6, borderRadius:3, background:BAR_HEAT_COLORS.mid }} />средне</span>
+            <span style={{ display:'inline-flex', alignItems:'center', gap:4 }}><span style={{ width:14, height:6, borderRadius:3, background:BAR_HEAT_COLORS.slow }} />медленно</span>
+            <span style={{ color:'#fbbf24' }}>
+              медленных отрезков {kinoveaHeatSummary.slowPct}%
+              {kinoveaHeatSummary.stickingHeightCm != null
+                ? ` · минимум скорости на ${kinoveaHeatSummary.stickingHeightCm} см`
+                  + (kinoveaHeatSummary.stickingSpeedCmS != null ? ` (${kinoveaHeatSummary.stickingSpeedCmS} см/с)` : '')
+                : ''}
+            </span>
+          </div>
+        )}
         <div style={{ marginTop: 6, padding: 6, borderRadius: 8, background: 'rgba(245,158,11,0.05)', border: '1px solid rgba(245,158,11,0.15)', fontSize: 9, color: '#ffffff', lineHeight: 1.4 }}>
           <b>Легенда heatmapping:</b> xLoop &lt;4 см — норма (зелёный), 4–6 — внимание (жёлтый), &gt;6 — критично (красный). Target-zone: жим лёжа — J-образная кривая к лицу; присед — вертикаль над серединой стопы; тяга — вертикаль над серединой стопы.
         </div>
@@ -1506,7 +1599,7 @@ export const LiftMasterCard: React.FC<{
             <label style={{ fontSize:10, color:'#ffffff' }}>Скорость: <input type="number" min="0.1" step="0.01" value={lvpVelInput} onChange={e=>setLvpVelInput(e.target.value)} placeholder="0.60" style={{ width:70, marginLeft:4, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.15)', color:'#fff', borderRadius:6, padding:'4px 6px', fontSize:11 }} /></label>
             <button data-lift="lvp-add" onClick={()=>{ const p=parseFloat(lvpPctInput)/100, v=parseFloat(lvpVelInput); if (Number.isFinite(p)&&p>0&&Number.isFinite(v)&&v>0) { setLvpPoints(cur=>[...cur,{pct:p,velocity:v}]); setLvpPctInput(''); setLvpVelInput(''); } }} style={{ ...btn, background:'rgba(244,114,182,0.15)', color:'#f472b6', border:'1px solid rgba(244,114,182,0.3)' }}>+ точка</button>
             <button data-lift="lvp-calibrate" onClick={()=>{ const r = calibrateLVP(lvpPoints); setLvpResult(r); if (r) setLvpSaved(prev => ({ ...prev, [lift]: { slope: r.slope, intercept: r.intercept, r2: r.r2 } })); }} style={{ ...btn, background:'rgba(255,255,255,0.06)', color:'#fff', border:'1px solid rgba(255,255,255,0.12)' }}>Калибровать</button>
-            <button data-lift="lvp-clear" onClick={()=>{ setLvpPoints([]); setLvpResult(null); setLvpSaved(prev => { const n = { ...prev }; delete n[lift]; return n; }); }} style={{ ...btn, background:'transparent', color:'#ffffff', border:'1px solid rgba(255,255,255,0.12)' }}>X</button>
+            <button data-lift="lvp-clear" aria-label="Очистить LVP-калибровку" onClick={()=>{ setLvpPoints([]); setLvpResult(null); setLvpSaved(prev => { const n = { ...prev }; delete n[lift]; return n; }); }} style={{ ...btn, background:'transparent', color:'#ffffff', border:'1px solid rgba(255,255,255,0.12)' }}>X</button>
           </div>
           {lvpPoints.length>0 && <div style={{ fontSize:9, color:'#ffffff', lineHeight:1.4, marginBottom:4 }}>Точки: {lvpPoints.length} · {lvpPoints.map(p=>`${Math.round(p.pct*100)}%/${p.velocity}`).join(', ')}</div>}
           {lvpResult && <div role="status" style={{ fontSize:10, color:'#f472b6', lineHeight:1.4 }}>r2={lvpResult.r2.toFixed(3)} · slope={lvpResult.slope.toFixed(3)} · intercept={lvpResult.intercept.toFixed(3)} {lvpResult.r2<0.9?' — мало данных (нужно ≥3 точки)':''}</div>}
@@ -1638,6 +1731,13 @@ export const LiftMasterCard: React.FC<{
           <div style={{ marginTop:8, padding:8, borderRadius:8, background:'rgba(14,165,233,0.05)', border:'1px solid rgba(14,165,233,0.18)' }}>
             <div style={{ fontSize:10, fontWeight:800, color:'#0ea5e9' }}>📊 Kinovea CSV — трекинг штанги (t,x,y)</div>
             <div style={{ fontSize:9, color:'#fff', marginTop:2, lineHeight:1.4 }}>Файл из Kinovea или вставка текста. Углы/дистанции валидны при 90° и 5 м; скорость — оценка, не LPT.</div>
+            {/* Масштаб CSV: без него «сырые» пиксели дают xLoop в 100 раз больше реального. */}
+            <div style={{ display:'flex', gap:6, flexWrap:'wrap', alignItems:'center', marginTop:6 }}>
+              <label style={{ fontSize:10, color:DIM }}>Масштаб, см/ед
+                <input data-lift="kinovea-scale" aria-label="Масштаб CSV: сантиметров на единицу" type="number" step="0.01" min="0.001" value={kinoveaScale} onChange={e=>setKinoveaScale(e.target.value)} style={{ width:72, minHeight:44, marginLeft:4, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.15)', color:'#fff', borderRadius:8, padding:'10px 8px', fontSize:12 }} />
+              </label>
+              <span style={{ fontSize:9, color:'#fff', opacity:0.6, lineHeight:1.35, flex:'1 1 160px' }}>Kinovea уже в см → 1. Если CSV в пикселях, впишите см на единицу (например 0.25).</span>
+            </div>
             <label data-lift="import-kinovea" aria-label="Импорт Kinovea CSV файлом" style={{ display:'inline-flex', alignItems:'center', minHeight:44, padding:'10px 14px', borderRadius:10, border:'1px solid rgba(14,165,233,0.3)', background:'rgba(14,165,233,0.1)', color:'#0ea5e9', fontSize:12, fontWeight:700, cursor:'pointer', marginTop:6 }}>
               📁 Импорт Kinovea CSV
               <input type="file" accept=".csv,text/csv" aria-label="Kinovea CSV файл" style={{ display:'none' }} onChange={e=>{
@@ -1651,7 +1751,7 @@ export const LiftMasterCard: React.FC<{
             <textarea data-lift="kinovea-text" aria-label="Текст Kinovea CSV" value={kinoveaText} onChange={e=>setKinoveaText(e.target.value)} placeholder="Frame,Time,X,Y …" rows={3} style={{ width:'100%', marginTop:6, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.15)', color:'#fff', borderRadius:8, padding:'8px 10px', fontSize:12, fontFamily:'monospace' }} />
             <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginTop:6 }}>
               <button data-lift="parse-kinovea" aria-label="Разобрать Kinovea CSV" onClick={()=>{
-                const pts = parseKinoveaCSV(kinoveaText);
+                const pts = parseScaledPoints(kinoveaText);
                 if (!pts) { setKinoveaMsg('CSV не распознан — нужны колонки t,x,y (разделитель , или ;).'); return; }
                 const r = analyzeBarTracking(pts, captureMeta);
                 if (!r) { setKinoveaMsg('Точек мало для анализа (нужно ≥2).'); return; }
@@ -1661,62 +1761,105 @@ export const LiftMasterCard: React.FC<{
                 const reps = segmentBarReps(pts);
                 const overlay = barRepOverlay(reps);
                 setKinoveaResult(r);
-                setKinoveaReps(reps);
+                setKinoveaReps(reps.map(s => ({ ...s, setIndex: curSet })));
                 setKinoveaMsg('xLoop ' + r.xLoop + ' см (' + badge + ') · наклон ' + tilt + ' · yMax ' + r.yMax + ' см · vmax ' + r.vmax + ' м/с (оценка)' + turn + ' · точек ' + r.points.length + (overlay ? ' · повторов ' + overlay.reps : ''));
               }} style={{ minHeight:44, padding:'10px 14px', borderRadius:10, cursor:'pointer', background:'rgba(14,165,233,0.15)', color:'#0ea5e9', border:'1px solid rgba(14,165,233,0.3)', fontWeight:700, fontSize:12 }}>📊 Разобрать CSV</button>
               <button data-lift="rep-series-add" aria-label="Добавить это видео в серию повторов" onClick={()=>{
-                const pts = parseKinoveaCSV(kinoveaText);
+                const pts = parseScaledPoints(kinoveaText);
                 if (!pts) { setKinoveaMsg('CSV не распознан — нужны колонки t,x,y.'); return; }
                 const segs = segmentBarReps(pts);
                 if (!segs.length) { setKinoveaMsg('В этом файле не нашёл полный повтор (низ→верх) — overlay нельзя построить.'); return; }
-                setKinoveaReps(cur => [...cur, ...segs.map((s, i) => ({ ...s, index: cur.length + i + 1 }))]);
-                setKinoveaMsg(`＋ добавлено повторов: ${segs.length} (в серии будет ${kinoveaReps.length + segs.length}).`);
+                // Лимит серии — тот же, что в персисте (12): иначе память и сравнение расходятся.
+                const room = 12 - kinoveaReps.length;
+                if (room <= 0) { setKinoveaMsg('В серии уже 12 повторов — это лимит. Очистите серию или сохраните её.'); return; }
+                const take = segs.slice(0, room);
+                setKinoveaReps(cur => [...cur, ...take.map((s, i) => ({ ...s, index: cur.length + i + 1, setIndex: curSet }))]);
+                setKinoveaMsg(`＋ добавлено повторов: ${take.length} (подход ${curSet})`
+                  + (segs.length > take.length ? ` · остальные ${segs.length - take.length} не влезли: лимит 12.` : `.`));
               }} style={{ minHeight:44, padding:'10px 14px', borderRadius:10, cursor:'pointer', background:'rgba(245,158,11,0.15)', color:'#f59e0b', border:'1px solid rgba(245,158,11,0.3)', fontWeight:700, fontSize:12 }}>＋ В серию</button>
-              <button data-lift="clear-kinovea" aria-label="Очистить Kinovea" onClick={()=>{ setKinoveaText(''); setKinoveaMsg(null); setKinoveaResult(null); setKinoveaReps([]); }} style={{ minHeight:44, padding:'10px 14px', borderRadius:10, cursor:'pointer', background:'transparent', color:'#fff', border:'1px solid rgba(255,255,255,0.12)', fontWeight:700, fontSize:12 }}>✕ Очистить</button>
+              <button data-lift="clear-kinovea" aria-label="Очистить Kinovea" onClick={()=>{ setKinoveaText(''); setKinoveaMsg(null); setKinoveaResult(null); setKinoveaReps([]); setCurSet(1); }} style={{ minHeight:44, padding:'10px 14px', borderRadius:10, cursor:'pointer', background:'transparent', color:'#fff', border:'1px solid rgba(255,255,255,0.12)', fontWeight:700, fontSize:12 }}>✕ Очистить</button>
             </div>
-            {kinoveaMsg && <div role="status" style={{ marginTop:6, fontSize:10, color:'#0ea5e9', lineHeight:1.4 }}>{kinoveaMsg}</div>}
+            {kinoveaMsg && <div data-lift="kinovea-msg" role="status" style={{ marginTop:6, fontSize:10, color:'#0ea5e9', lineHeight:1.4 }}>{kinoveaMsg}</div>}
             {/* Склейка повторов: реальные экспорты Kinovea обычно по одному повтору, поэтому overlay
                 собирается из нескольких файлов — серия живёт до «Очистить». */}
             {kinoveaReps.length > 0 && (
               <div data-lift="rep-series" style={{ marginTop:8, padding:7, borderRadius:8, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.09)' }}>
                 <div style={{ display:'flex', alignItems:'center', gap:6, flexWrap:'wrap' }}>
-                  <span style={{ fontSize:10, fontWeight:800, color:'#f59e0b' }}>Серия повторов: {kinoveaReps.length}</span>
-                  <button data-lift="rep-series-clear" aria-label="Очистить серию повторов" onClick={()=>{ setKinoveaReps([]); setKinoveaMsg('Серия очищена.'); }} style={{ minHeight:32, padding:'4px 8px', borderRadius:6, cursor:'pointer', background:'transparent', color:'#fff', border:'1px solid rgba(255,255,255,0.12)', fontSize:10 }}>✕ Очистить серию</button>
+                  <span style={{ fontSize:10, fontWeight:800, color:'#f59e0b' }}>Серия повторов: {kinoveaReps.length}/12</span>
+                  <span style={{ fontSize:10, color:'#fbbf24', opacity:0.9 }}>· подход {curSet}</span>
+                  <button data-lift="rep-set-next" aria-label="Начать новый подход" onClick={()=>{
+                    setCurSet(n => n + 1);
+                    setKinoveaMsg(`Подход ${curSet + 1}: следующие повторы пойдут в него.`);
+                  }} style={{ minHeight:44, padding:'8px 12px', borderRadius:8, cursor:'pointer', background:'rgba(0,230,138,0.12)', color:'#00e68a', border:'1px solid rgba(0,230,138,0.28)', fontSize:11, fontWeight:700 }}>➕ Новый подход</button>
+                  <button data-lift="rep-series-clear" aria-label="Очистить серию повторов" onClick={()=>{ setKinoveaReps([]); setCurSet(1); setKinoveaMsg('Серия очищена.'); }} style={{ minHeight:44, padding:'8px 12px', borderRadius:8, cursor:'pointer', background:'transparent', color:'#fff', border:'1px solid rgba(255,255,255,0.12)', fontSize:11 }}>✕ Очистить серию</button>
                 </div>
-                <div style={{ display:'flex', gap:4, flexWrap:'wrap', marginTop:5 }}>
-                  {kinoveaReps.map((s, i)=>(
-                    <span key={`${s.index}-${i}`} data-lift="rep-series-item" style={{ display:'inline-flex', alignItems:'center', gap:4, padding:'2px 4px 2px 7px', borderRadius:20, background:'rgba(245,158,11,0.12)', border:'1px solid rgba(245,158,11,0.25)', fontSize:10, color:'#fbbf24' }}>
-                      П{s.index}: {s.vmax != null ? `${s.vmax.toFixed(2)} м/с` : '—'}
-                      <button aria-label={`Удалить повтор ${s.index}`} onClick={()=> setKinoveaReps(cur => cur.filter((_, k)=> k !== i).map((r, k)=>({ ...r, index: k + 1 })))} style={{ minWidth:22, minHeight:22, borderRadius:11, cursor:'pointer', background:'transparent', color:'#fbbf24', border:'1px solid rgba(245,158,11,0.3)', fontSize:10, lineHeight:1 }}>✕</button>
-                    </span>
-                  ))}
-                </div>
+                {/* Чипы повторов по подходам: «П1» внутри подхода — иначе 12 повторов в одну кашу. */}
+                {kinoveaSetStats.map(set => (
+                  <div key={set.setIndex} style={{ marginTop:6 }}>
+                    <div style={{ fontSize:9, fontWeight:800, color:'#fbbf24', opacity:0.9 }}>
+                      Подход {set.setIndex} · {set.reps} повт. · ср. vmax {set.vmaxMean.toFixed(2)} м/с · худший {set.vmaxMin.toFixed(2)} · xLoop {set.xLoopMean.toFixed(1)} см
+                    </div>
+                    <div style={{ display:'flex', gap:4, flexWrap:'wrap', marginTop:4 }}>
+                      {kinoveaReps.map((s, i) => ({ s, i })).filter(({ s }) => repSetIndex(s) === set.setIndex).map(({ s, i })=>(
+                        <span key={`${s.index}-${i}`} data-lift="rep-series-item" style={{ display:'inline-flex', alignItems:'center', gap:2, padding:'2px 2px 2px 7px', borderRadius:22, background:'rgba(245,158,11,0.12)', border:'1px solid rgba(245,158,11,0.25)', fontSize:10, color:'#fbbf24' }}>
+                          П{s.index}: {s.vmax != null ? `${s.vmax.toFixed(2)} м/с` : '—'}
+                          <button aria-label={`Удалить повтор ${s.index}`} onClick={()=> setKinoveaReps(cur => cur.filter((_, k)=> k !== i).map((r, k)=>({ ...r, index: k + 1 })))} style={{ minWidth:44, minHeight:44, borderRadius:22, cursor:'pointer', background:'transparent', color:'#fbbf24', border:'1px solid rgba(245,158,11,0.3)', fontSize:12, lineHeight:1 }}>✕</button>
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+                {/* Подход vs подход: падение среднего vmax — ранний признак перебора объёма. */}
+                {kinoveaSetOverlay && (
+                  <div role="status" data-lift="set-compare" style={{ marginTop:6, fontSize:10, lineHeight:1.45, color: kinoveaSetOverlay.deltaPct <= -5 ? '#f87171' : '#fbbf24' }}>
+                    {kinoveaSetOverlay.text}
+                  </div>
+                )}
                 {kinoveaReps.length < 2 && <div style={{ marginTop:4, fontSize:9, color:'#fff', opacity:0.7 }}>Добавьте ещё один файл кнопкой «＋ В серию» — overlay заработает с 2 повторов.</div>}
                 <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginTop:6 }}>
                   <button data-lift="series-save" aria-label="Запомнить серию для сравнения со следующей сессией" onClick={()=>{
-                    setSeriesStore(s => ({ ...s, [lift]: { savedAt: Date.now(), reps: kinoveaReps.map(r => snapshotBarRep(r)) } }));
-                    setKinoveaMsg(`💾 Серия сохранена (${kinoveaReps.length} повт.) — на следующей тренировке будет сравнение.`);
-                  }} style={{ minHeight:32, padding:'4px 9px', borderRadius:6, cursor:'pointer', background:'rgba(14,165,233,0.12)', color:'#0ea5e9', border:'1px solid rgba(14,165,233,0.25)', fontSize:10 }}>💾 Запомнить серию</button>
+                    setSeriesStore(s => ({ ...s, [lift]: { savedAt: Date.now(), weightKg: curWeightKg, reps: kinoveaReps.map(r => snapshotBarRep(r)) } }));
+                    setKinoveaMsg(`💾 Серия сохранена (${kinoveaReps.length} повт.${curWeightKg ? ` · ${curWeightKg} кг` : ''}) — на следующей тренировке будет сравнение.`);
+                  }} style={{ minHeight:44, padding:'8px 12px', borderRadius:8, cursor:'pointer', background:'rgba(14,165,233,0.12)', color:'#0ea5e9', border:'1px solid rgba(14,165,233,0.25)', fontSize:11, fontWeight:700 }}>💾 Запомнить серию</button>
                   {savedSeries && (
                     <button data-lift="series-forget" aria-label="Удалить сохранённую серию прошлого раза" onClick={()=>{
                       setSeriesStore(s => { const next = { ...s }; delete next[lift]; return next; });
                       setCompareOn(false);
                       setKinoveaMsg('Сохранённая серия удалена.');
-                    }} style={{ minHeight:32, padding:'4px 9px', borderRadius:6, cursor:'pointer', background:'transparent', color:'#fff', border:'1px solid rgba(255,255,255,0.12)', fontSize:10 }}>🗑 Забыть прошлую</button>
+                    }} style={{ minHeight:44, padding:'8px 12px', borderRadius:8, cursor:'pointer', background:'transparent', color:'#fff', border:'1px solid rgba(255,255,255,0.12)', fontSize:11 }}>🗑 Забыть прошлую</button>
                   )}
+                </div>
+                {/* Эталон на другое движение: сравнение «присед vs присед» и разбор переноса техники. */}
+                <div style={{ marginTop:6 }}>
+                  <div style={{ fontSize:9, color:'#fff', opacity:0.6, marginBottom:3 }}>Сохранить эту серию как эталон для другого движения:</div>
+                  <div style={{ display:'flex', gap:4, flexWrap:'wrap' }}>
+                    {ALL_LIFTS.filter(l => l !== lift).map(l => (
+                      <button key={l} data-lift={`series-copy-${l}`} aria-label={`Сохранить серию как эталон для ${LIFT_RU[l]}`} onClick={()=>{
+                        const reps = kinoveaReps.map(r => snapshotBarRep(r));
+                        setSeriesStore(s => ({ ...s, [l]: { savedAt: Date.now(), weightKg: curWeightKg, reps } }));
+                        setKinoveaMsg(`Серия скопирована как эталон для «${LIFT_RU[l]}» (${reps.length} повт.).`);
+                      }} style={{ minHeight:44, padding:'8px 12px', borderRadius:8, cursor:'pointer', background:'rgba(148,163,184,0.1)', color:'#cbd5e1', border:'1px solid rgba(148,163,184,0.28)', fontSize:11 }}>→ {LIFT_RU[l]}</button>
+                    ))}
+                  </div>
                 </div>
                 {/* Сравнение сессий: одноимённый повтор (обычно первый) прошлого раза vs текущий. */}
                 {savedSeries && (
                   <div data-lift="session-compare" style={{ marginTop:6, paddingTop:6, borderTop:'1px solid rgba(255,255,255,0.08)' }}>
                     <div style={{ fontSize:9, color:'#fff', opacity:0.65 }}>
-                      Прошлая сессия: {new Date(savedSeries.savedAt).toLocaleDateString('ru-RU')} · {savedSeries.reps.length} повт.
+                      Прошлая сессия: {new Date(savedSeries.savedAt).toLocaleDateString('ru-RU')} · {savedSeries.reps.length} повт. · {savedSeries.weightKg ? `${savedSeries.weightKg} кг` : 'вес не указан'}
                     </div>
+                    {weightMismatch && (
+                      <div data-lift="weight-mismatch" role="status" style={{ marginTop:3, fontSize:9, color:'#fbbf24', lineHeight:1.4 }}>
+                        ⚠ Вес изменился: {weightMismatch.prev} → {weightMismatch.cur} кг ({weightMismatch.diffKg > 0 ? `±${weightMismatch.diffKg}` : '0'} кг).
+                        Сравнение скорости честно только при равном весе.
+                      </div>
+                    )}
                     {sessionCompare ? (
                       <>
                         <div role="status" style={{ marginTop:3, fontSize:10, lineHeight:1.45, color: sessionCompare.verdict === 'worse' ? '#f87171' : sessionCompare.verdict === 'better' ? '#4ade80' : '#fbbf24' }}>
                           {sessionCompare.text}
                         </div>
-                        <button data-lift="session-overlay-toggle" aria-pressed={compareOn} onClick={()=> setCompareOn(v => !v)} style={{ minHeight:32, padding:'4px 9px', borderRadius:6, cursor:'pointer', marginTop:4, background: compareOn ? 'rgba(148,163,184,0.2)' : 'transparent', color:'#e2e8f0', border:'1px solid rgba(255,255,255,0.12)', fontSize:10 }}>{compareOn ? '⇄ Скрыть наложение' : '⇄ Наложить прошлую'}</button>
+                        <button data-lift="session-overlay-toggle" aria-pressed={compareOn} onClick={()=> setCompareOn(v => !v)} style={{ minHeight:44, padding:'8px 12px', borderRadius:8, cursor:'pointer', marginTop:4, background: compareOn ? 'rgba(148,163,184,0.2)' : 'transparent', color:'#e2e8f0', border:'1px solid rgba(255,255,255,0.12)', fontSize:11 }}>{compareOn ? '⇄ Скрыть наложение' : '⇄ Наложить прошлую'}</button>
                         {compareOn && curFirstSnapshot && curFirstSnapshot.points.length > 1 && (
                           <svg data-lift="session-overlay" width="100%" height="90" viewBox="0 0 220 90" style={{ marginTop:6, background:'rgba(0,0,0,0.25)', borderRadius:8 }}>
                             {(() => {
@@ -1753,14 +1896,19 @@ export const LiftMasterCard: React.FC<{
               <div data-lift="session-compare" style={{ marginTop:8, padding:7, borderRadius:8, background:'rgba(148,163,184,0.06)', border:'1px solid rgba(148,163,184,0.18)' }}>
                 <div style={{ fontSize:10, fontWeight:800, color:'#cbd5e1' }}>📌 Прошлая сессия (сохранена)</div>
                 <div style={{ marginTop:3, fontSize:10, color:'#fff', opacity:0.75 }}>
-                  {new Date(savedSeries.savedAt).toLocaleDateString('ru-RU')} · {savedSeries.reps.length} повт. · vmax {savedSeries.reps[0].vmax.toFixed(2)} м/с · xLoop {savedSeries.reps[0].xLoop.toFixed(1)} см
+                  {new Date(savedSeries.savedAt).toLocaleDateString('ru-RU')} · {savedSeries.reps.length} повт. · vmax {savedSeries.reps[0].vmax.toFixed(2)} м/с · xLoop {savedSeries.reps[0].xLoop.toFixed(1)} см{savedSeries.weightKg ? ` · ${savedSeries.weightKg} кг` : ''}
                 </div>
+                {weightMismatch && (
+                  <div data-lift="weight-mismatch" role="status" style={{ marginTop:3, fontSize:9, color:'#fbbf24', lineHeight:1.4 }}>
+                    ⚠ Текущий вес в VBT — {weightMismatch.cur} кг против {weightMismatch.prev} кг на записи. Сравнивайте скорость при равном весе.
+                  </div>
+                )}
                 <div style={{ marginTop:3, fontSize:9, color:'#fff', opacity:0.6 }}>Разберите CSV текущего подхода и нажмите «＋ В серию» — появится сравнение «прошлая vs текущая».</div>
                 <button data-lift="series-forget" aria-label="Удалить сохранённую серию прошлого раза" onClick={()=>{
                   setSeriesStore(s => { const next = { ...s }; delete next[lift]; return next; });
                   setCompareOn(false);
                   setKinoveaMsg('Сохранённая серия удалена.');
-                }} style={{ minHeight:32, marginTop:5, padding:'4px 9px', borderRadius:6, cursor:'pointer', background:'transparent', color:'#fff', border:'1px solid rgba(255,255,255,0.12)', fontSize:10 }}>🗑 Забыть прошлую</button>
+                }} style={{ minHeight:44, marginTop:5, padding:'8px 12px', borderRadius:8, cursor:'pointer', background:'transparent', color:'#fff', border:'1px solid rgba(255,255,255,0.12)', fontSize:11 }}>🗑 Забыть прошлую</button>
               </div>
             )}
           </div>
@@ -1779,12 +1927,12 @@ export const LiftMasterCard: React.FC<{
               {(['left','right','front'] as const).map(s=>{
                 const on = capture.side === s;
                 const ru = s === 'left' ? 'слева' : s === 'right' ? 'справа' : 'фронт';
-                return <button key={s} data-lift={`capture-side-${s}`} aria-pressed={on} onClick={()=> setCapture(c=>({ ...c, side: on ? '' : s }))} style={{ minHeight:32, padding:'4px 9px', borderRadius:7, cursor:'pointer', border: on ? '1px solid #94a3b8' : '1px solid rgba(255,255,255,0.1)', background: on ? 'rgba(148,163,184,0.2)' : 'transparent', color: on ? '#e2e8f0' : DIM, fontSize:10 }}>{ru}</button>;
+                return <button key={s} data-lift={`capture-side-${s}`} aria-pressed={on} onClick={()=> setCapture(c=>({ ...c, side: on ? '' : s }))} style={{ minHeight:44, padding:'8px 12px', borderRadius:8, cursor:'pointer', border: on ? '1px solid #94a3b8' : '1px solid rgba(255,255,255,0.1)', background: on ? 'rgba(148,163,184,0.2)' : 'transparent', color: on ? '#e2e8f0' : DIM, fontSize:11 }}>{ru}</button>;
               })}
               {(['phone','kinovea','enode'] as const).map(d=>{
                 const on = capture.device === d;
                 const ru = d === 'phone' ? 'телефон' : d === 'kinovea' ? 'Kinovea' : 'Enode';
-                return <button key={d} data-lift={`capture-device-${d}`} aria-pressed={on} onClick={()=> setCapture(c=>({ ...c, device: on ? '' : d }))} style={{ minHeight:32, padding:'4px 9px', borderRadius:7, cursor:'pointer', border: on ? '1px solid #94a3b8' : '1px solid rgba(255,255,255,0.1)', background: on ? 'rgba(148,163,184,0.2)' : 'transparent', color: on ? '#e2e8f0' : DIM, fontSize:10 }}>{ru}</button>;
+                return <button key={d} data-lift={`capture-device-${d}`} aria-pressed={on} onClick={()=> setCapture(c=>({ ...c, device: on ? '' : d }))} style={{ minHeight:44, padding:'8px 12px', borderRadius:8, cursor:'pointer', border: on ? '1px solid #94a3b8' : '1px solid rgba(255,255,255,0.1)', background: on ? 'rgba(148,163,184,0.2)' : 'transparent', color: on ? '#e2e8f0' : DIM, fontSize:11 }}>{ru}</button>;
               })}
             </div>
             <div role="status" style={{ marginTop:6, fontSize:10, lineHeight:1.4, color: captureQuality.flag === 'ok' ? '#4ade80' : captureQuality.flag === 'rough' ? '#fbbf24' : '#cbd5e1' }}>
@@ -1852,6 +2000,29 @@ export const LiftMasterCard: React.FC<{
                 const o = await saveBlobApk(movementDiagnosticsFilename(lift, 'webm'), blob);
                 setShareMsg(shareOutcomeLabel(o)); setTimeout(()=>setShareMsg(null), 2500);
               }} style={{ minHeight:44, padding:'10px 14px', borderRadius:10, cursor:'pointer', background:'rgba(255,255,255,0.06)', color:'#fff', border:'1px solid rgba(255,255,255,0.12)', fontWeight:700, fontSize:12 }}>▶ Видео-оверлей</button>
+              {/* Видео подхода с траекторией: берём исходный файл и пишем композит (MediaRecorder). */}
+              <label data-lift="video-overlay-file" aria-label="Наложить траекторию на видео подхода" style={{ display:'inline-flex', alignItems:'center', minHeight:44, padding:'10px 14px', borderRadius:10, border:'1px solid rgba(56,189,248,0.28)', background:'rgba(56,189,248,0.1)', color:'#38bdf8', fontSize:12, fontWeight:700, cursor:'pointer' }}>
+                🎬 Видео с траекторией
+                <input type="file" accept="video/*" aria-label="Видео подхода для наложения" style={{ display:'none' }} onChange={async (e)=>{
+                  const f = e.target.files?.[0];
+                  e.target.value = '';
+                  if (!f) return;
+                  const pts = kinoveaResult ? kinoveaResult.points : [];
+                  if (pts.length < 2) { setShareMsg('Сначала разберите CSV — без точек накладывать нечего.'); setTimeout(()=>setShareMsg(null), 3500); return; }
+                  if (!canRecordTrajectory()) { setShareMsg('Запись видео не поддерживается этим браузером.'); setTimeout(()=>setShareMsg(null), 3500); return; }
+                  setShareMsg('⏺ Накладываю траекторию: видео проигрывается в реальном времени…');
+                  const blob = await recordVideoWithOverlay({
+                    file: f,
+                    liftRu: LIFT_RU[lift],
+                    points: pts,
+                    xLoopCm: kinoveaResult ? kinoveaResult.xLoop : null,
+                    vmax: kinoveaResult ? kinoveaResult.vmax : null,
+                  });
+                  if (!blob) { setShareMsg('Не удалось: видео не декодировалось или запись недоступна (PNG остаётся).'); setTimeout(()=>setShareMsg(null), 4000); return; }
+                  const o = await saveBlobApk(movementDiagnosticsFilename(lift, 'webm'), blob);
+                  setShareMsg(shareOutcomeLabel(o)); setTimeout(()=>setShareMsg(null), 2500);
+                }} />
+              </label>
               <button data-lift="share" aria-label="Поделиться диагностикой" onClick={async ()=>{
                 const t = `Диагностика ${LIFT_RU[lift]}: фаза ${(PHASE_RU as Record<string,string>)[String(effectivePhase ?? '')] ?? '—'} · откл. ${issues.map(i=>ISSUE_RU[i]).join('; ') || '—'} · VBT ${vbtBest || '—'}→${vbtLast || '—'} м/с${videoNote ? ` · Видео: ${videoNote}` : ''}`;
                 const o = await copyOrShareText(t, 'Диагностика движений');
