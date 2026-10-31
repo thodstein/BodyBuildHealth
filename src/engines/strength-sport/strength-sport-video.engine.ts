@@ -208,9 +208,170 @@ export function analyzeBarTracking(points: BarPoint[]): BarTrackingResult | null
   return { points: filtered, fps, yMax: Math.round(yMax), xLoop: Math.round(xLoop * 10) / 10, vmax, hAcc, duration: Math.round(duration * 100) / 100, xBias, turnoverMs };
 }
 
+// ── Overlay повторов (P1 #11): нарезка одной траектории на повторы ──────────
+
+/** Один повтор, вырезанный из траектории по вертикальным экстремумам. */
+export interface BarRepSegment {
+  /** 1-based номер повтора в серии. */
+  index: number;
+  /** Точки этого повтора (сглаженные, как в основном анализе). */
+  points: BarPoint[];
+  startT: number;
+  endT: number;
+  /** Амплитуда вертикали внутри повтора (max y − min y), см. */
+  amplitude: number;
+  yMax: number;
+  yMin: number;
+  xLoop: number;
+  vmax: number;
+  xBias: number;
+  durationMs: number;
+}
+
+/**
+ * Режет траекторию штанги на повторы: повтор = путь от нижней точки к верхней.
+ * Kinovea обычно отдаёт одну серию, поэтому «первый vs последний повтор» без
+ * нарезки посчитать нельзя. Возвращает [] если движения слишком мало или
+ * повтор один — тогда overlay честно недоступен.
+ */
+export function segmentBarReps(
+  points: BarPoint[],
+  opts?: { minProminenceCm?: number; minRepMs?: number },
+): BarRepSegment[] {
+  if (!Array.isArray(points) || points.length < 8) return [];
+  const fps = (() => {
+    const dts = points.slice(1).map((p, i) => p.t - points[i].t).filter(dt => dt > 0 && dt < 0.2);
+    if (!dts.length) return 30;
+    const med = dts.sort((a, b) => a - b)[Math.floor(dts.length / 2)];
+    return med > 0 ? Math.round(1 / med) : 30;
+  })();
+  const filtered = butterworth12Hz(points, fps);
+  const ys = filtered.map(p => p.y);
+  const lo = Math.min(...ys);
+  const hi = Math.max(...ys);
+  const span = hi - lo;
+  if (!(span > 2)) return [];
+  const prom = opts?.minProminenceCm ?? Math.max(2, Math.min(span * 0.25, 8));
+  const minRepMs = opts?.minRepMs ?? 250;
+
+  // Кандидаты в экстремумы: локальные min/max в окне ±0.35 с с перепадом ≥ prom.
+  // Привязка к окну, а не к общему диапазону: иначе «уставший» повтор с меньшей
+  // амплитудой (напр. 30 см в серии 40/40/30) не считался бы повтором вовсе.
+  const w = Math.max(2, Math.round(fps * 0.35));
+  const bottomsRaw: number[] = [];
+  const topsRaw: number[] = [];
+  for (let i = 0; i < ys.length; i++) {
+    const a = Math.max(0, i - w);
+    const b = Math.min(ys.length - 1, i + w);
+    let maxV = -Infinity;
+    let minV = Infinity;
+    for (let j = a; j <= b; j++) {
+      if (ys[j] > maxV) maxV = ys[j];
+      if (ys[j] < minV) minV = ys[j];
+    }
+    if (maxV - minV < prom) continue;
+    if (ys[i] >= maxV - 1e-9) topsRaw.push(i);
+    if (ys[i] <= minV + 1e-9) bottomsRaw.push(i);
+  }
+  // Плато/дребезг у края: склеиваем близкие кандидаты, оставляя самый крайний.
+  const collapse = (idx: number[], pick: 'min' | 'max'): number[] => {
+    const out: number[] = [];
+    for (const i of idx) {
+      const last = out[out.length - 1];
+      if (last != null && i - last <= Math.max(3, Math.round(fps * 0.3))) {
+        if ((pick === 'min' && ys[i] < ys[last]) || (pick === 'max' && ys[i] > ys[last])) out[out.length - 1] = i;
+      } else out.push(i);
+    }
+    return out;
+  };
+  const bottoms = collapse(bottomsRaw, 'min');
+  const tops = collapse(topsRaw, 'max');
+
+  // Повтор = ближайший верх после низа. Верх без предшествующего низа не повтор.
+  const pairs: Array<[number, number]> = [];
+  let pendingBottom: number | null = null;
+  const events = [
+    ...bottoms.map(i => ({ i, kind: 'b' as const })),
+    ...tops.map(i => ({ i, kind: 't' as const })),
+  ].sort((a, b) => a.i - b.i);
+  for (const ev of events) {
+    if (ev.kind === 'b') { pendingBottom = ev.i; continue; }
+    if (pendingBottom == null) continue;
+    pairs.push([pendingBottom, ev.i]);
+    pendingBottom = null;
+  }
+
+  const reps: BarRepSegment[] = [];
+  for (const [a, b] of pairs) {
+    const amplitude = Math.round((ys[b] - ys[a]) * 10) / 10;
+    if (amplitude < prom) continue;
+    const durationMs = Math.round((points[b].t - points[a].t) * 1000);
+    if (!(durationMs >= minRepMs)) continue;
+    const slice = points.slice(a, b + 1);
+    const m = analyzeBarTracking(slice);
+    if (!m) continue;
+    reps.push({
+      index: reps.length + 1,
+      points: m.points,
+      startT: Math.round(points[a].t * 100) / 100,
+      endT: Math.round(points[b].t * 100) / 100,
+      amplitude,
+      yMax: Math.round(Math.max(...ys.slice(a, b + 1))),
+      yMin: Math.round(Math.min(...ys.slice(a, b + 1))),
+      xLoop: m.xLoop,
+      vmax: m.vmax,
+      xBias: m.xBias,
+      durationMs,
+    });
+  }
+  return reps;
+}
+
+/** Сводка overlay «первый vs последний повтор». null — повторов меньше двух. */
+export interface BarRepOverlay {
+  reps: number;
+  first: BarRepSegment;
+  last: BarRepSegment;
+  /** Изменение vmax первого→последнего повтора, %: отрицательное = потеря скорости. */
+  velocityLossPct: number;
+  xLoopDeltaCm: number;
+  amplitudeDeltaCm: number;
+  verdict: 'ok' | 'warn' | 'crit';
+  text: string;
+}
+
+export function barRepOverlay(reps: BarRepSegment[]): BarRepOverlay | null {
+  if (!Array.isArray(reps) || reps.length < 2) return null;
+  const first = reps[0];
+  const last = reps[reps.length - 1];
+  const v0 = first.vmax;
+  const v1 = last.vmax;
+  const velocityLossPct = v0 > 0 ? Math.round(((v1 - v0) / v0) * 100) : 0;
+  const verdict: BarRepOverlay['verdict'] =
+    v0 > 0 && velocityLossPct <= -25 ? 'crit' : v0 > 0 && velocityLossPct <= -15 ? 'warn' : 'ok';
+  const xLoopDeltaCm = Math.round((last.xLoop - first.xLoop) * 10) / 10;
+  const amplitudeDeltaCm = Math.round((last.amplitude - first.amplitude) * 10) / 10;
+  const verdictText =
+    verdict === 'crit' ? 'критическая потеря скорости' : verdict === 'warn' ? 'заметная потеря скорости' : 'скорость держится';
+  const sign = (n: number) => (n > 0 ? '+' : '');
+  return {
+    reps: reps.length,
+    first,
+    last,
+    velocityLossPct,
+    xLoopDeltaCm,
+    amplitudeDeltaCm,
+    verdict,
+    text:
+      `Повторы: ${reps.length} · vmax ${v0.toFixed(2)}→${v1.toFixed(2)} м/с (${sign(velocityLossPct)}${velocityLossPct}%)` +
+      ` · xLoop ${first.xLoop}→${last.xLoop} см (${sign(xLoopDeltaCm)}${xLoopDeltaCm})` +
+      ` · амплитуда ${first.amplitude}→${last.amplitude} см (${sign(amplitudeDeltaCm)}${amplitudeDeltaCm})` +
+      ` → ${verdictText}`,
+  };
+}
+
 // Force provider abstraction (loadsol insoles, force plate)
-export interface ForceSample { t: number; leftN: number; rightN: number; totalN: number; }
-export interface ForceProvider {
+export interface ForceSample { t: number; leftN: number; rightN: number; totalN: number; }export interface ForceProvider {
   name: string;
   getSamples(): ForceSample[];
   getPeakForce(): number;

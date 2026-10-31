@@ -27,6 +27,10 @@ export interface MovementDiagnosticsExportInput {
   kinoveaXLoop: number | null;
   kinoveaXBias?: number | null;
   kinoveaTurnoverMs?: number | null;
+  /** Сколько повторов нарезано из Kinovea-серии (overlay первый vs последний). */
+  kinoveaReps?: number | null;
+  /** Overlay: изменение vmax первого→последнего повтора, % (отрицательное = потеря). */
+  overlayVelocityLossPct?: number | null;
   asymmetryPct?: number | null;
   asymmetryVerdict?: string;
   vbtMetric?: string;
@@ -77,6 +81,8 @@ export function buildMovementDiagnosticsCsv(inp: MovementDiagnosticsExportInput)
     ['Kinovea xLoop, см', inp.kinoveaXLoop != null ? String(inp.kinoveaXLoop) : '—'],
     ['Kinovea смещение, см', inp.kinoveaXBias != null ? String(inp.kinoveaXBias) : '—'],
     ['Kinovea turnover, мс', inp.kinoveaTurnoverMs != null ? String(inp.kinoveaTurnoverMs) : '—'],
+    ['Kinovea повторов, шт', inp.kinoveaReps != null ? String(inp.kinoveaReps) : '—'],
+    ['Overlay потеря vmax, %', inp.overlayVelocityLossPct != null ? String(inp.overlayVelocityLossPct) : '—'],
     ['Асимметрия, %', inp.asymmetryPct != null ? String(inp.asymmetryPct) : '—'],
     ['Вердикт асимметрии', inp.asymmetryVerdict || '—'],
     ['VBT метрика', inp.vbtMetric || '—'],
@@ -108,6 +114,8 @@ export function buildMovementDiagnosticsHtml(inp: MovementDiagnosticsExportInput
       : '')
     + (inp.kinoveaXBias != null ? li('Kinovea смещение', `${fmt(inp.kinoveaXBias, 1)} см`) : '')
     + (inp.kinoveaTurnoverMs != null ? li('Kinovea turnover', `${inp.kinoveaTurnoverMs} мс`) : '')
+    + (inp.kinoveaReps != null ? li('Kinovea повторов', `${inp.kinoveaReps} шт`) : '')
+    + (inp.overlayVelocityLossPct != null ? li('Overlay: потеря vmax', `${fmt(inp.overlayVelocityLossPct, 0)}% от первого повтора к последнему`) : '')
     + (inp.asymmetryPct != null ? li('Асимметрия', `${fmt(inp.asymmetryPct, 1)}% ${inp.asymmetryVerdict || ''}`) : '')
     + (inp.vbtMetric ? li('VBT метрика', inp.vbtMetric) : '')
     + (inp.vbtThreshold != null ? li('VBT VL-порог', `${inp.vbtThreshold}%`) : '')

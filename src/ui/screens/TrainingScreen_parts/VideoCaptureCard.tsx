@@ -79,6 +79,9 @@ export interface VideoAnalysisResult {
   barVelocity: number | null;
   bridge: boolean | null;
   note: string;
+  /** true — значения получены из CV по реальному видео; false/undefined — мок, демо или
+   *  фолбэк «поза не распознана». Хаб пишет в VBT только измеренные результаты. */
+  measured?: boolean;
   /** B8: горизонтальный путь грифа (см, масштаб по ширине плеч) и дрейф. */
   barXLoopCm?: number | null;
   barXDriftCm?: number | null;
@@ -90,10 +93,10 @@ export interface VideoAnalysisResult {
 }
 
 function mockAnalyze(lift: Lift): VideoAnalysisResult {
-  // MVP мок — следующий прирост заменит на BlazePose
-  if (lift === 'bench') return { elbowAvgDeg: 52, gripRatio: 1.42, barVelocity: 0.48, bridge: true, note: 'Мок-разбор (след. шаг — BlazePose).' };
-  if (lift === 'squat') return { elbowAvgDeg: 0, gripRatio: 0, barVelocity: 0.62, bridge: null, note: 'Мок: глубина и трекинг коленей.' };
-  return { elbowAvgDeg: 0, gripRatio: 0, barVelocity: 0.55, bridge: null, note: 'Мок-разбор.' };
+  // MVP мок — следующий прирост заменит на BlazePose. measured:false — значения НЕ считаются замером.
+  if (lift === 'bench') return { elbowAvgDeg: 52, gripRatio: 1.42, barVelocity: 0.48, bridge: true, measured: false, note: 'Мок-разбор (след. шаг — BlazePose).' };
+  if (lift === 'squat') return { elbowAvgDeg: 0, gripRatio: 0, barVelocity: 0.62, bridge: null, measured: false, note: 'Мок: глубина и трекинг коленей.' };
+  return { elbowAvgDeg: 0, gripRatio: 0, barVelocity: 0.55, bridge: null, measured: false, note: 'Мок-разбор.' };
 }
 
 type Stage = { kind: 'live' } | { kind: 'file'; url: string; name: string } | null;
@@ -215,6 +218,7 @@ export const VideoCaptureCard: React.FC<{ lift: Lift; shoulderWidthCm?: number; 
           m = await analyzeVideoElement(vid as any, lift, { shoulderWidthCm });
         }
         if (m && (m.elbowAvgDeg != null || m.barVelocity != null)) {
+          const realPose = m.elbowAvgDeg != null && Number.isFinite(Number(m.elbowAvgDeg));
           out = {
             elbowAvgDeg: m.elbowAvgDeg ?? 0,
             gripRatio: m.gripRatio ?? 0,
@@ -225,7 +229,9 @@ export const VideoCaptureCard: React.FC<{ lift: Lift; shoulderWidthCm?: number; 
             stickingKneeDeg: m.stickingKneeDeg ?? null,
             stickingElbowDeg: m.stickingElbowDeg ?? null,
             stickingPhase: m.stickingPhase ?? null,
-            note: m.elbowAvgDeg != null ? 'CV-анализ BlazePose (воркер, локально, блины — по запястьям; трекинг дисков — след. шаг).' : 'Поза не распознана — использован мок.',
+            // Замером считаем только распознанную позу: иначе скорость — оценка/мок.
+            measured: realPose,
+            note: realPose ? 'CV-анализ BlazePose (воркер, локально, блины — по запястьям; трекинг дисков — след. шаг).' : 'Поза не распознана — использован мок.',
           };
         }
       } catch (e) {
@@ -320,7 +326,7 @@ export const VideoCaptureCard: React.FC<{ lift: Lift; shoulderWidthCm?: number; 
           <label style={{ fontSize: 10, color: '#fff' }}>Хват (×): <input value={manualGrip} onChange={e=>setManualGrip(e.target.value)} placeholder="1.42" style={{ width: 60, marginLeft: 4, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.15)', color: '#fff', borderRadius: 6, padding: '4px 6px', fontSize: 11 }} /></label>
           <button data-vc="manual-apply" onClick={() => {
             const v = parseFloat(manualVelocity); const e = parseFloat(manualElbow); const g = parseFloat(manualGrip);
-            const r = { elbowAvgDeg: Number.isFinite(e) ? e : 0, gripRatio: Number.isFinite(g) ? g : 0, barVelocity: Number.isFinite(v) && v > 0 ? v : null, bridge: null, note: 'Ручной ввод (не CV) — используйте для реальных замеров.' };
+            const r = { elbowAvgDeg: Number.isFinite(e) ? e : 0, gripRatio: Number.isFinite(g) ? g : 0, barVelocity: Number.isFinite(v) && v > 0 ? v : null, bridge: null, measured: true, note: 'Ручной ввод (не CV) — ваш замер, записывается в VBT.' };
             setResult(r); onResult?.(r);
           }} style={{ ...labelBtn('rgba(255,255,255,0.06)', 'rgba(255,255,255,0.12)', '#fff'), minHeight: 40 }}>Применить</button>
         </div>

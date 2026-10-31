@@ -74,6 +74,9 @@ import { InfoErrorBoundary } from './SupportScreen_parts/SupportScreenData';
 import { subscribePlannerApply, setPlannerSource } from './TrainingScreen_parts/planner-bridge';
 import { getCycleById, normalizeCycleDirection } from '../../data/lms-cycles/lms-cycle-index';
 import { saveTrainingProfile, loadTrainingProfile } from './TrainingScreen_parts/training-profile';
+import { loadSRPESessions } from '../../engines/pro/srpe-store';
+import { acuteChronicRatio, toDailyLoads, weeklyMonotony } from '../../engines/pro/training-load.engine';
+import { epley1RM } from '../../engines/e1rm';
 
 /** TrainingHeroStats — полоска статистики hero, ТОЛЬКО APK (isNativeApp гейт в hero).
  *  Telegram её не рендерит вообще. Все источники в try/catch. */
@@ -292,6 +295,80 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSu
   const [logRIR, setLogRIR] = useState(2);
   const [historyWorkouts, setHistoryWorkouts] = useState<WorkoutLog[]>([]);
   const [historyExpanded, setHistoryExpanded] = useState<string | null>(null);
+
+  /** Живые входы «Мастера движений» (вкладка Диагностика → коррекция мезоцикла).
+   *  Раньше в хаб уходили константы (missedSessions=0, currentVolume=18, currentRir=2),
+   *  а ACWR/монотонность не передавались вовсе — коррекция считалась «из воздуха». */
+  const hubDiagnostics = useMemo(() => {
+    let acwr: number | undefined;
+    let monotony: number | undefined;
+    try {
+      const srpe = loadSRPESessions();
+      if (srpe.length >= 2) {
+        const daily = toDailyLoads(srpe);
+        const r = acuteChronicRatio(daily).ratio;
+        const m = weeklyMonotony(daily).monotony;
+        if (Number.isFinite(r) && r > 0) acwr = Math.round(r * 100) / 100;
+        if (Number.isFinite(m) && m > 0) monotony = Math.round(m * 100) / 100;
+      }
+    } catch { /* нет sRPE-логов — оставляем undefined, карточка честно скажет */ }
+
+    const iso = (d: number) => new Date(d).toISOString().slice(0, 10);
+    const cutoff7 = iso(Date.now() - 7 * 86400000);
+    const cutoff14 = iso(Date.now() - 14 * 86400000);
+    let sets7 = 0;
+    let rirSum = 0;
+    let rirN = 0;
+    const dayKeys7 = new Set<string>();
+    const e1rmRows: Array<{ name: string; date: string; e1rm: number }> = [];
+
+    for (const w of (historyWorkouts as any[])) {
+      const date = String(w?.date || '');
+      for (const e of (w?.exercises || [])) {
+        const name = String(e?.exerciseName || e?.exerciseId || '');
+        for (const s of (e?.sets || [])) {
+          const weight = Number(s?.weightKg ?? s?.weight ?? 0);
+          const reps = Number(s?.reps ?? 0);
+          const rir = s?.rir != null ? Number(s.rir) : (s?.rpe ? 10 - Number(s.rpe) : null);
+          if (weight > 0 && reps > 0 && name) e1rmRows.push({ name, date, e1rm: Math.round(epley1RM(weight, reps) * 10) / 10 });
+          if (date >= cutoff7) {
+            dayKeys7.add(date || `w${sets7}`);
+            sets7++;
+            if (rir != null && Number.isFinite(rir)) { rirSum += rir; rirN++; }
+          } else if (date >= cutoff14 && rir != null && Number.isFinite(rir)) {
+            rirSum += rir; rirN++;
+          }
+        }
+      }
+    }
+
+    // Динамика e1RM по упражнениям: лучший сет до/после середины окна истории.
+    const dates = e1rmRows.map(r => r.date).filter(Boolean).sort();
+    const midDate = dates.length ? dates[Math.floor(dates.length / 2)] : '';
+    const acc = new Map<string, { before: number; after: number }>();
+    for (const r of e1rmRows) {
+      const cur = acc.get(r.name) ?? { before: 0, after: 0 };
+      if (midDate && r.date > midDate) cur.after = Math.max(cur.after, r.e1rm);
+      else cur.before = Math.max(cur.before, r.e1rm);
+      acc.set(r.name, cur);
+    }
+    const exercises = [...acc.entries()]
+      .filter(([, v]) => v.before > 0 && v.after > 0)
+      .map(([name, v]) => ({ name, e1rmBefore: v.before, e1rmAfter: v.after }))
+      .slice(0, 8);
+
+    const plannedWeekly = Number(tprofile?.daysPerWeek ?? 0) || 0;
+    const missedSessions = plannedWeekly > 0 ? Math.max(0, plannedWeekly - dayKeys7.size) : 0;
+
+    return {
+      acwr,
+      monotony,
+      exercises,
+      currentVolume: sets7,
+      currentRir: rirN > 0 ? Math.round((rirSum / rirN) * 10) / 10 : 2,
+      missedSessions,
+    };
+  }, [historyWorkouts, tprofile?.daysPerWeek]);
 
   // Runtime (live workout) state
   const [runtimeDay, setRuntimeDay] = useState<number>(() => { try { const v = JSON.parse(localStorage.getItem('he_runtime_day') || '1'); return typeof v === 'number' ? v : 1; } catch { return 1; } });
@@ -925,7 +1002,7 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSu
             {effectiveTab === 'strength_analysis' && <InfoErrorBoundary label="Анализ силы"><StrengthAnalysisHub initialMode={tab === 'calc_vbt' ? 'vbt' : tab === 'rel_strength' ? 'relstrength' : tab === 'pl_norms' ? 'norms' : tab === 'strength' ? 'analytics' : '1rm'} /></InfoErrorBoundary>}
             {effectiveTab === 'joints_ortho' && <InfoErrorBoundary label="Суставы и ортопедия — единый инструмент"><JointMasterCard /></InfoErrorBoundary>}
             {effectiveTab === 'quality_hub' && <InfoErrorBoundary label="Качество программы"><QualityHub onBuildPlan={() => goPlannerManual()} /></InfoErrorBoundary>}
-            {effectiveTab === 'diagnostics_hub' && <InfoErrorBoundary label="Диагностика движения"><DiagnosticsHub sessions={historyWorkouts} tprofile={tprofile} readinessRecovery={readiness?.recovery ?? 70} readinessFatigue={readiness?.fatigue ?? 30} mesoWeeks={mesoLength} missedSessions={0} currentVolume={18} currentRir={2} /></InfoErrorBoundary>}
+            {effectiveTab === 'diagnostics_hub' && <InfoErrorBoundary label="Диагностика движения"><DiagnosticsHub sessions={historyWorkouts} tprofile={tprofile} readinessRecovery={readiness?.recovery ?? 70} readinessFatigue={readiness?.fatigue ?? 30} mesoWeeks={mesoLength} missedSessions={hubDiagnostics.missedSessions} currentVolume={hubDiagnostics.currentVolume} currentRir={hubDiagnostics.currentRir} acwr={hubDiagnostics.acwr} monotony={hubDiagnostics.monotony} exercises={hubDiagnostics.exercises} /></InfoErrorBoundary>}
             {effectiveTab === 'arm_diagnostics_hub' && <InfoErrorBoundary label="Арм-диагностика"><ArmDiagnosticsHub /></InfoErrorBoundary>}
             {(effectiveTab as string) === 'arm_lifting_diagnostics' && <InfoErrorBoundary label="Армлифтинг-диагностика"><ArmliftingDiagnosticsHub /></InfoErrorBoundary>}
             {effectiveTab === 'wl_diagnostics_hub' && <InfoErrorBoundary label="ТА-диагностика"><WLDiagnosticsHub /></InfoErrorBoundary>}
@@ -979,8 +1056,6 @@ import { VolumeOptimizerTab } from './TrainingScreen_parts/VolumeOptimizerTab';
 import ExerciseLabMerged from './TrainingScreen_parts/ExerciseLabMerged';
 import { appendReadinessToday } from './TrainingScreen_parts/readiness-history';
 import { useTrainingProfile } from './TrainingScreen_parts/training-profile';
-import { loadSRPESessions } from '../../engines/pro/srpe-store';
-import { acuteChronicRatio, toDailyLoads } from '../../engines/pro/training-load.engine';
 import { SessionPlayer, type PlayerDay } from './SRCBBScreen_parts/SessionPlayer';
 import { TimersTab } from './TrainingScreen_parts/TimersTab';
 import { ProgressTab } from './TrainingScreen_parts/ProgressTab';

@@ -185,6 +185,50 @@ for (const f of ['CombatConstructor.tsx', 'CombatPlanView.tsx', 'CombatUI.tsx', 
   if (native.length) mustContain(p, 'NO_NATIVE_SELECT', `нативный контрол в ${f}: ${native[0].trim().slice(0, 60)}`);
 }
 
+// 7c. Хаб «Мастер движений» (LiftMasterCard): APK-хуки, дефолт-коллапс и честный VBT.
+// Без гейда молчаливый откат ломал всё: навигация вела не в те секции, а «лучший»
+// замер VBT фабриковался (+0.15 м/с) и уезжал в персист/диагностику/экспорт.
+const LIFT_HUB = 'src/ui/screens/TrainingScreen_parts/LiftMasterCard.tsx';
+for (const hook of [
+  'data-lift="safety"', 'data-lift="red-flag"', 'data-lift="red-block-banner"',
+  'data-lift="apply-all"', 'data-lift="nav-jump"', 'data-lift="phase-option"',
+  'data-lift="vbt-metric"', 'data-lift="lvp-add"', 'data-lift="lvp-clear"',
+  'data-lift="import-kinovea"', 'data-lift="parse-kinovea"', 'data-lift="kinovea-tilt"',
+  'data-lift="export-html"', 'data-lift="export-csv"', 'data-lift="share"',
+  'data-lift="video-not-measured"',
+  'data-lift="rep-overlay"',
+  'data-lift-nav=',
+]) mustContain(LIFT_HUB, hook, `lift hub hook ${hook}`);
+// Дефолт-коллапс: 14 раскрытых блоков давали ~214 КБ HTML и ~500 кнопок за рендер.
+mustContain(LIFT_HUB, 'DEFAULT_COLLAPSED', 'lift hub default collapse');
+// Навигация обязана содержать 13 пунктов (1…13) — столько же, сколько карточек.
+mustContain(LIFT_HUB, "'sec-13', '13 Старт'", 'lift hub nav 13');
+{
+  const hub = readFileSync(join(root, LIFT_HUB), 'utf-8');
+  if (/\(\s*v\s*\+\s*0\.15\s*\)/.test(hub) || /vbtBest\s*\(\s*\(?\s*v\s*\+\s*0\.15/.test(hub)) {
+    fails.push(`SYNTH-VBT в ${LIFT_HUB}: «лучший» замер фабрикуется прибавкой 0.15`);
+  }
+  // Кнопки применения/экспорта должны быть 44px (APK-тап).
+  if (/data-lift="apply-all"[^>]*minHeight:3\d/.test(hub)) {
+    fails.push(`TAP-44 в ${LIFT_HUB}: apply-all меньше 44px`);
+  }
+}
+
+// 7d. Mojibake-бан: битые символы (U+FFFD) в файлах хаба — признак порванной кодировки.
+// В LiftMasterCard их было 11 (тексты VBT/LVP/Kinovea), и это попадало в UI АПК.
+// (Остальной репозиторий исторически содержит такие символы — чистим адресно.)
+for (const rel of [
+  'src/ui/screens/TrainingScreen_parts/LiftMasterCard.tsx',
+  'src/ui/screens/TrainingScreen_parts/DiagnosticsHub.tsx',
+  'src/ui/screens/TrainingScreen_parts/MesoCorrectionCard.tsx',
+  'src/ui/screens/TrainingScreen_parts/planner-bridge-handlers.ts',
+]) {
+  const p = join(root, rel);
+  if (!existsSync(p)) { fails.push(`MISS file ${rel}`); continue; }
+  const line = readFileSync(p, 'utf-8').split(/\r?\n/).findIndex(l => l.includes('\uFFFD'));
+  if (line >= 0) fails.push(`MOJIBAKE ${rel}:${line + 1}`);
+}
+
 // 8. Секции native-слоя на месте (молчаливый откат хвоста файла).
 for (const sec of [
   '67. SUPPORT + SECONDARY HEADS',

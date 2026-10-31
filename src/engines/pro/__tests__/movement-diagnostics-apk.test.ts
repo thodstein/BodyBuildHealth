@@ -35,11 +35,17 @@ describe('movement-diagnostics-export', () => {
     const html = buildMovementDiagnosticsHtml({ ...BASE, vbtBest: null, vbtLast: null });
     expect(html).toContain('не измерена');
   });
-  it('CSV: шапка + 12 строк + защита от формульной инъекции', () => {
+  it('CSV: шапка + все поля экспорта + защита от формульной инъекции', () => {
     const csv = buildMovementDiagnosticsCsv({ ...BASE, issuesRu: ['=cmd|evil'] });
     const lines = csv.split('\n');
     expect(lines[0]).toContain('Поле');
-    expect(lines.length).toBe(12);
+    // Шапка + 21 метрика: хаб-мастер передаёт все поддерживаемые поля
+    // (Kinovea-наклон/turnover/повторы, overlay-потеря vmax, асимметрия,
+    // метрика/порог/пауза VBT, LVP r²).
+    expect(lines.length).toBe(22);
+    for (const field of ['Kinovea turnover', 'Kinovea повторов', 'Overlay потеря vmax', 'Асимметрия', 'VBT метрика', 'VBT VL-порог', 'VBT пауза', 'LVP r²']) {
+      expect(csv).toContain(field);
+    }
     expect(csv).toContain("'=cmd|evil");
   });
   it('имя файла по лифту и расширению', () => {

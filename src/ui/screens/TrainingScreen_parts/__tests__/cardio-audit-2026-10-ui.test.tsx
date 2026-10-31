@@ -1,4 +1,4 @@
-/**
+﻿/**
  * cardio-audit-2026-10-ui.test.tsx — UI-лок аудита кардиоконструктора (Oct 2026).
  * P0-1: редактор недели пересчитывает итоги цикла (totalKcal).
  * P0-3: wellness (готовность) реально влияет на авто-подстройку.
@@ -8,7 +8,7 @@
  */
 import React from 'react';
 import { describe, expect, it, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, within } from '@testing-library/react';
 import { CardioAnalyticsDashboard } from '../CardioAnalyticsDashboard';
 import { CardioWeekEditor } from '../CardioWeekEditor';
 import { CardioAutoTunePanel } from '../CardioAutoTunePanel';
@@ -236,9 +236,10 @@ describe('PRO: CTL по году кардио (cardioYearFactCtlSeries)', () => 
       { id: 'y1', date: isoDaysAgo(20), type: 'zone2', durationMin: 40, completed: true, avgHr: 140 },
       { id: 'y2', date: isoDaysAgo(10), type: 'zone2', durationMin: 45, completed: true, avgHr: 145 },
     ]));
-    render(<CardioDiaryStep cycle={c2} acwr={null} recoveryLow={false} onChanged={() => {}} />);
-    // Переключаемся на таб «Аналитика».
-    fireEvent.click(screen.getByRole('button', { name: /Аналитика/ }));
+    const view = render(<CardioDiaryStep cycle={c2} acwr={null} recoveryLow={false} onChanged={() => {}} />);
+    // Переключаемся на таб «Аналитика» (строго в своём контейнере: под нагрузкой
+    // в body могут остаться корни предыдущих тестов).
+    fireEvent.click(within(view.container).getByRole('button', { name: /Аналитика/ }));
     const el = document.querySelector('[data-autotune="year-ctl"]');
     expect(el).toBeTruthy();
     const text = el!.textContent ?? '';
@@ -250,8 +251,8 @@ describe('PRO: CTL по году кардио (cardioYearFactCtlSeries)', () => 
     const { CardioDiaryStep } = await import('../CardioDiaryStep');
     const c = buildCardioCycle({ goal: 'health', totalWeeks: 4, id: 'yr-3' });
     localStorage.setItem('he_cardio_cycles', JSON.stringify([c]));
-    render(<CardioDiaryStep cycle={c} acwr={null} recoveryLow={false} onChanged={() => {}} />);
-    fireEvent.click(screen.getByRole('button', { name: /Аналитика/ }));
+    const view2 = render(<CardioDiaryStep cycle={c} acwr={null} recoveryLow={false} onChanged={() => {}} />);
+    fireEvent.click(within(view2.container).getByRole('button', { name: /Аналитика/ }));
     expect(document.querySelector('[data-autotune="year-ctl"]')).toBeNull();
   });
 });

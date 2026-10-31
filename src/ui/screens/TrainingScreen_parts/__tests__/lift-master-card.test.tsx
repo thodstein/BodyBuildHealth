@@ -6,23 +6,51 @@ import { LiftMasterCard, BB_GRANULAR_GROUPS } from '../LiftMasterCard';
 import { meetAttemptsFor, warmupToOpener } from '../../../../engines/lms/competition-attempts';
 import { EXERCISE_CATALOG } from '../../../../core/exercise-catalog';
 
-afterEach(()=>{ cleanup(); localStorage.removeItem('he_lift_master_v1'); });
+/** Раскрывает все блоки: по умолчанию открыты только «Безопасность» и «Слабые мышцы»
+ *  (перф: 14 раскрытых блоков ≈ 214 КБ HTML). Тестам на содержимое нужно всё. */
+const openAll = () => localStorage.setItem('he_lift_master_collapsed_v1', '{}');
+
+afterEach(()=>{ cleanup(); localStorage.removeItem('he_lift_master_v1'); localStorage.removeItem('he_lift_master_collapsed_v1'); });
 
 describe('LiftMasterCard — единый инструмент движения (универсальный)', () => {
-  it('рендерится 8+ блоков заголовков', () => {
+  it('рендерит 13 пронумерованных блоков, номера совпадают с навигацией', () => {
+    openAll();
     const html = renderToStaticMarkup(<LiftMasterCard sessions={[]} />);
     expect(html).toContain('— единый инструмент');
-    expect(html).toContain('1 · Слабые мышцы');
-    expect(html).toContain('2 · Слабые точки');
-    expect(html).toContain('3 · Мёртвые точки');
-    expect(html).toContain('4 · Движение штанги');
-    expect(html).toContain('5 · Геометрия техники');
-    expect(html).toContain('6 · VBT');
-    expect(html).toContain('7 · Срывы');
-    expect(html).toContain('8 · RIR-калибровка');
-    expect(html).toContain('10 · Остальные лимитирующие');
+    const headers = [
+      '1 · Безопасность и зачёт',
+      '2 · Слабые мышцы',
+      '3 · Слабые точки',
+      '4 · Мёртвые точки',
+      '5 · Движение штанги',
+      '6 · Геометрия техники',
+      '7 · VBT',
+      '8 · Видео-анализ',
+      '9 · Срывы',
+      '10 · RIR-калибровка',
+      '11 · Коррекция мезоцикла',
+      '12 · Остальные лимитирующие',
+      '13 · День старта',
+    ];
+    for (const h of headers) expect(html, `заголовок «${h}»`).toContain(h);
+    // Навигация: 13 пунктов, каждый номер ведёт в существующую секцию sec-N.
+    const nav = [...html.matchAll(/data-lift="nav-jump"[^>]*>(\d+) /g)].map(m => Number(m[1]));
+    expect(nav).toEqual([1,2,3,4,5,6,7,8,9,10,11,12,13]);
+    for (const n of nav) expect(html).toContain(`id="sec-${n}"`);
   });
+
+  it('по умолчанию свёрнуты все блоки, кроме «Безопасности» и «Слабых мышц»', () => {
+    localStorage.removeItem('he_lift_master_collapsed_v1');
+    const html = renderToStaticMarkup(<LiftMasterCard sessions={[]} />);
+    // Шапки видны всегда.
+    expect(html).toContain('13 · День старта');
+    // Тело «Безопасности» раскрыто, тело геометрии — нет.
+    expect(html).toContain('data-lift="red-flag"');
+    expect(html).not.toContain('Узкий хват');
+  });
+
   it('геометрия показывает 8 параметров (разведение локтей и т.д.)', () => {
+    openAll();
     const html = renderToStaticMarkup(<LiftMasterCard sessions={[]} />);
     expect(html).toContain('Узкий хват');
     expect(html).toContain('Широкий хват');
@@ -33,14 +61,16 @@ describe('LiftMasterCard — единый инструмент движения 
     expect(html).toContain('Кисть нейтраль');
     expect(html).toContain('Точка касания');
   });
+
   it('кнопка добавления в ПЛ-авто присутствует', () => {
     render(<LiftMasterCard sessions={[]} />);
     expect(screen.getByText(/Добавить в ПЛ-авто/)).toBeTruthy();
   });
 
-  it('секция 11 «День старта» рендерится: стратегии, попытки по ПМ, нормы', () => {
+  it('секция 13 «День старта» рендерится: стратегии, попытки по ПМ, нормы', () => {
+    openAll();
     const html = renderToStaticMarkup(<LiftMasterCard sessions={[]} profile={{ bodyWeight: 83, pmSquat: 180, pmBench: 120, pmDead: 200 } as any} />);
-    expect(html).toContain('11 · День старта');
+    expect(html).toContain('13 · День старта');
     expect(html).toContain('Консервативная 90/95.5/100%');
     expect(html).toContain('Сбалансированная 92/96/102%');
     expect(html).toContain('Агрессивная 93/97/105%');
@@ -48,8 +78,8 @@ describe('LiftMasterCard — единый инструмент движения 
     expect(html).toContain('DOTS');
   });
 
-  it('секция 11: попытки считаются от введённых ПМ и округляются до 2.5 кг', () => {
-    // Чистая логика движка попыток (UI-инпуты секции 11 ведут в эти функции)
+  it('секция 13: попытки считаются от введённых ПМ и округляются до 2.5 кг', () => {
+    // Чистая логика движка попыток (UI-инпуты секции 13 ведут в эти функции)
     const a = meetAttemptsFor(100, 'balanced');
     expect(a.opener).toBe(92.5);
     expect(a.second).toBe(95);
@@ -74,7 +104,8 @@ describe('LiftMasterCard — единый инструмент движения 
     expect(byId.get('pl_bench_pause')).toBe('Жим с паузой');
   });
 
-  it('рандерит все 20 кнопок BB-грануляра', () => {
+  it('рендерит все 20 кнопок BB-грануляра', () => {
+    openAll();
     const html = renderToStaticMarkup(<LiftMasterCard sessions={[]} />);
     expect(html).toContain('Жим с пола (старт)');
     expect(html).toContain('Тяга с дефицитом (старт)');

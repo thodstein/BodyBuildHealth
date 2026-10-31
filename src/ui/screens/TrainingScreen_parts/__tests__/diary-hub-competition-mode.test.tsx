@@ -61,7 +61,8 @@ describe('Дневник тренировок — режим «Соревнов�
     expect(() => {
       render(<TrainingDiaryHub {...props} initialMode="record" />);
     }).not.toThrow();
-    expect(screen.getByText(/Последняя:/)).toBeTruthy();
+    // «Последняя:» встречается дважды: карточка «Сегодня» (сплит/объём) и сводка истории (дата).
+    expect(screen.getAllByText(/Последняя:/).length).toBeGreaterThan(0);
     // «Сегодня» показывает 0 упр. вместо краша
     expect(screen.getByText(/0 упр\./)).toBeTruthy();
   });
@@ -73,14 +74,14 @@ describe('Дневник тренировок — режим «Соревнов�
     expect(() => {
       render(<TrainingDiaryHub {...props} initialMode="record" />);
     }).not.toThrow();
-    expect(screen.getByText(/Последняя:/)).toBeTruthy();
+    expect(screen.getAllByText(/Последняя:/).length).toBeGreaterThan(0);
     expect(screen.getByText(/0 упр\./)).toBeTruthy();
   });
 
   it('битая история не-массивом НЕ роняет дневник при открытии', () => {
     const props = { ...baseProps, historyWorkouts: {} as any };
     expect(() => render(<TrainingDiaryHub {...props} initialMode="record" />)).not.toThrow();
-    expect(screen.getByText(/Сегодня/)).toBeTruthy();
+    expect(screen.getAllByText(/Сегодня/).length).toBeGreaterThan(0);
   });
 
   it('подвкладка «Рекомендации»: SSR рендерится (ББ-секции) и не содержит ПЛ-текстов', () => {

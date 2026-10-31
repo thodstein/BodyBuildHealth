@@ -17,13 +17,13 @@ const props = {
 };
 
 describe('DiagnosticsHub: единый инструмент движения', () => {
-  it('рендерит Мастер движения (9 лифтов) без дублей суставов', () => {
+  it('рендерит Мастер движения (12 движений) без дублей суставов', () => {
     const html = renderToStaticMarkup(<DiagnosticsHub {...props} />);
     expect(html).toContain('Диагностика движения');
     expect(html).toContain('срывы');
     expect(html).toContain('RIR-калибровка');
     expect(html).toContain('мезоцикла');
-    expect(html).toContain('9 движений');
+    expect(html).toContain('12 движений');
     expect(html).not.toContain('Суставы + ортопедия');
   });
 

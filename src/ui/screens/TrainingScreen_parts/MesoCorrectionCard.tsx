@@ -8,8 +8,9 @@ const GLASS: React.CSSProperties = { background: 'rgba(24,24,27,0.6)', borderRad
 
 interface Props {
   profile: TrainingProfile;
-  acwr: number;
-  monotony: number;
+  /** Не передано — нет sRPE-логов: считаем нейтральным и честно пишем об этом. */
+  acwr?: number;
+  monotony?: number;
   avgReadiness: number;
   mesoWeeks: number;
   missedSessions: number;
@@ -22,6 +23,10 @@ const MesoCorrectionCard: React.FC<Props> = ({
   profile, acwr, monotony, avgReadiness, mesoWeeks, missedSessions,
   exercises, currentVolume, currentRir,
 }) => {
+  const acwrInputMissing = !(typeof acwr === 'number' && Number.isFinite(acwr) && acwr > 0);
+  const monotonyInputMissing = !(typeof monotony === 'number' && Number.isFinite(monotony) && monotony > 0);
+  const acwrVal = acwrInputMissing ? 1 : (acwr as number);
+  const monotonyVal = monotonyInputMissing ? 1 : (monotony as number);
   const input: MesoCorrectionInput = useMemo(() => {
     const rirStats = loadRirCalibrationStats();
     return {
@@ -29,15 +34,15 @@ const MesoCorrectionCard: React.FC<Props> = ({
       rirBias: rirStats.bias,
       rirConsistency: rirStats.consistency,
       mesoWeeks,
-      avgAcwr: acwr,
-      monotony,
+      avgAcwr: acwrVal,
+      monotony: monotonyVal,
       avgReadiness,
       missedSessions,
       profile,
       currentVolume,
       currentRir,
     };
-  }, [exercises, mesoWeeks, acwr, monotony, avgReadiness, missedSessions, profile, currentVolume, currentRir]);
+  }, [exercises, mesoWeeks, acwrVal, monotonyVal, avgReadiness, missedSessions, profile, currentVolume, currentRir]);
 
   const output = useMemo(() => analyzeMesoCycle(input), [input]);
 
@@ -46,6 +51,20 @@ const MesoCorrectionCard: React.FC<Props> = ({
     if (s === 'warning') return '#ffaa00';
     return ACCENT;
   };
+
+  // Объём → множитель к текущим сетам, RIR → сдвиг. Делод-первым при критике объёма.
+  const volumeKnown = currentVolume > 0;
+  const rawMult = volumeKnown ? output.recommendedVolume / currentVolume : 1;
+  const mult = Math.min(1.5, Math.max(0.5, output.needsDeloadFirst ? Math.min(rawMult, 0.6) : rawMult));
+  const rirShift = output.recommendedRir - currentRir;
+  const meaningful = (volumeKnown && Math.abs(mult - 1) >= 0.01) || rirShift !== 0;
+  const dataNote = [
+    acwrInputMissing ? 'ACWR: нет sRPE-логов (взят нейтральный 1.0)' : `ACWR ${acwrVal.toFixed(2)}`,
+    monotonyInputMissing ? 'монотонность: нет данных' : `монотонность ${monotonyVal.toFixed(2)}`,
+    `готовность ${Math.round(avgReadiness)}`,
+    missedSessions > 0 ? `пропусков ${missedSessions}` : null,
+    exercises.length ? `упражнений в динамике ${exercises.length}` : 'динамики e1RM пока нет',
+  ].filter(Boolean).join(' · ');
 
   return (
     <div className="train-mesocorr" style={GLASS}>
@@ -56,10 +75,10 @@ const MesoCorrectionCard: React.FC<Props> = ({
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 6, marginBottom: 8 }}>
         <div style={{ background: 'rgba(255,255,255,0.04)', borderRadius: 8, padding: 8, textAlign: 'center' }}>
           <div style={{ fontSize: 10, color: '#fff', marginBottom: 2 }}>Объём</div>
-          <div style={{ fontSize: 16, fontWeight: 800, color: output.recommendedVolume > currentVolume ? ACCENT : '#ff4444' }}>
-            {output.recommendedVolume} <span style={{ fontSize: 10, color: '#fff' }}>сетов</span>
+          <div style={{ fontSize: 16, fontWeight: 800, color: volumeKnown && output.recommendedVolume > currentVolume ? ACCENT : volumeKnown ? '#ff4444' : '#fff' }}>
+            {volumeKnown ? output.recommendedVolume : '—'} <span style={{ fontSize: 10, color: '#fff' }}>сетов</span>
           </div>
-          <div style={{ fontSize: 10, color: '#fff' }}>было {currentVolume}</div>
+          <div style={{ fontSize: 10, color: '#fff' }}>{volumeKnown ? `было ${currentVolume}` : 'нет данных'}</div>
         </div>
         <div style={{ background: 'rgba(255,255,255,0.04)', borderRadius: 8, padding: 8, textAlign: 'center' }}>
           <div style={{ fontSize: 10, color: '#fff', marginBottom: 2 }}>RIR</div>
@@ -93,7 +112,29 @@ const MesoCorrectionCard: React.FC<Props> = ({
       ))}
 <div style={{ marginTop: 8, padding: 12, borderRadius: 12, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.2)' }}>
         <div style={{ fontSize: 10, color: '#fff', marginBottom: 8 }}>🔗 Применить коррекцию мезоцикла к планировщику — рекомендуемый объём {output.recommendedVolume} сет/нед, RIR→{output.recommendedRir}, делод каждые {output.recommendedDeloadFreq} нед.</div>
-        <button onClick={() => applyToPlanner({ kind: 'mrv', label: 'Мезо-коррекция: MRV ' + output.recommendedVolume + ' сет/нед, RIR→' + output.recommendedRir, data: { mrv: output.recommendedVolume } })} style={{ width: '100%', padding: 12, borderRadius: 10, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#000', fontWeight: 800, fontSize: 13, minHeight: 44 }}>🛠 Применить коррекцию мезо к планировщику</button>
+        {/* Мост: kind 'pri' (объём × множитель + сдвиг RIR) работает и для ББ, и для ПЛ.
+            Раньше здесь был kind 'mrv' — чисто ББ-канал: в ПЛ-плане кнопка молча ничего не делала. */}
+        <button
+          data-lift="meso-apply"
+          disabled={!meaningful}
+          aria-disabled={!meaningful}
+          onClick={() => {
+            if (!meaningful) return;
+            applyToPlanner({
+              kind: 'pri',
+              label: `Мезо-коррекция: объём ×${mult.toFixed(2)}${rirShift !== 0 ? `, RIR ${rirShift > 0 ? '+' : ''}${rirShift}` : ''}`,
+              data: { volumeMult: Number(mult.toFixed(2)), rirShift },
+            });
+          }}
+          style={{ width: '100%', padding: 12, borderRadius: 10, border: 'none', cursor: meaningful ? 'pointer' : 'not-allowed', opacity: meaningful ? 1 : 0.55, background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#000', fontWeight: 800, fontSize: 13, minHeight: 44 }}
+        >
+          {meaningful
+            ? `🛠 Применить: объём ×${mult.toFixed(2)}${rirShift !== 0 ? `, RIR ${rirShift > 0 ? '+' : ''}${rirShift}` : ''}`
+            : '🛠 Изменений нет — план уже соответствует рекомендации'}
+        </button>
+        <div style={{ fontSize: 9, color: '#fff', opacity: 0.7, marginTop: 6, lineHeight: 1.4 }}>
+          {dataNote}
+        </div>
       </div>
     </div>
   );

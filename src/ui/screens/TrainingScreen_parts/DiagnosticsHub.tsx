@@ -1,5 +1,5 @@
 /** DiagnosticsHub.tsx — ДИАГНОСТИКА ДВИЖЕНИЯ.
- *  Анализ техники по 9 лифтам: углы суставов, траектория штанги, скорость (VBT), видео (BlazePose) и подбор коррекций.
+ *  Анализ техники по 12 движениям: углы суставов, траектория штанги, скорость (VBT), видео (BlazePose) и подбор коррекций.
  *  Заголовки — кнопки-карточки, скрыть/раскрыть по клику. */
 import React, { useMemo } from 'react';
 import { LiftMasterCard } from './LiftMasterCard';
@@ -20,10 +20,17 @@ export interface DiagnosticsHubProps {
   missedSessions: number;
   currentVolume: number;
   currentRir: number;
+  /** Реальный ACWR из SRPE-логов (раньше хаб получал только константу). */
+  acwr?: number;
+  /** Реальная монотонность недели (>2 — риск). */
+  monotony?: number;
+  /** Топ-упражнения e1RM до/после мезоцикла для коррекции. */
+  exercises?: Array<{ name: string; e1rmBefore: number; e1rmAfter: number }>;
 }
 
 export const DiagnosticsHub: React.FC<DiagnosticsHubProps> = ({
   sessions, tprofile, readinessRecovery, readinessFatigue, mesoWeeks, missedSessions, currentVolume, currentRir,
+  acwr, monotony, exercises,
 }) => {
   const template = useMemo(() => {
     try {
@@ -56,7 +63,7 @@ export const DiagnosticsHub: React.FC<DiagnosticsHubProps> = ({
             <div style={{ fontSize:15, fontWeight:900, color:'#fff', lineHeight:1 }}>Диагностика движения</div>
             <div style={{ fontSize:10, color:'#fff', lineHeight:1.3, opacity:0.9 }}>Выбери движение — получи углы, траекторию, скорость и точечные коррекции. Видео — по желанию.</div>
           </div>
-          <span style={{ fontSize:9, padding:'4px 8px', borderRadius:20, background:'rgba(96,165,250,0.12)', border:'1px solid rgba(96,165,250,0.22)', color:'#60a5fa', fontWeight:800, whiteSpace:'nowrap' }}>9 движений</span>
+          <span style={{ fontSize:9, padding:'4px 8px', borderRadius:20, background:'rgba(96,165,250,0.12)', border:'1px solid rgba(96,165,250,0.22)', color:'#60a5fa', fontWeight:800, whiteSpace:'nowrap' }}>12 движений</span>
         </div>
         <div style={{ fontSize:10, color:'#fff', background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', borderRadius:10, padding:'8px 10px', lineHeight:1.45 }}>
           Нажми на заголовок карточки — скрыть/раскрыть блок. Протокол берётся из цикла, видео считает скорость автоматически.
@@ -72,7 +79,7 @@ export const DiagnosticsHub: React.FC<DiagnosticsHubProps> = ({
           </button>
         </div>
       </div>
-      <LiftMasterCard dayCount={dayCount} template={template as any} sessions={sessions as any} profile={tprofile as any} readinessRecovery={readinessRecovery} readinessFatigue={readinessFatigue} mesoWeeks={mesoWeeks} missedSessions={missedSessions} currentVolume={currentVolume} currentRir={currentRir} />
+      <LiftMasterCard dayCount={dayCount} template={template as any} sessions={sessions as any} profile={tprofile as any} readinessRecovery={readinessRecovery} readinessFatigue={readinessFatigue} mesoWeeks={mesoWeeks} missedSessions={missedSessions} currentVolume={currentVolume} currentRir={currentRir} acwr={acwr} monotony={monotony} exercises={exercises} />
     </div>
   );
 };
