@@ -101,13 +101,16 @@ export function getMicroTargets(sex: Sex, weightKg: number, phase: CyclePhase, i
   });
 }
 
-const MICRO_CONVERSIONS: Record<string, (v: number) => number> = {
-  Omega3: (v: number) => v < 100 ? v * 1000 : v,
-};
-
-function normalizeMicroValue(key: string, value: number): number {
-  const conv = MICRO_CONVERSIONS[key];
-  if (conv) return conv(value);
+/**
+ * Единицы микро — канон в `planner-micro-reader.getMicroFromFood` (там же г→мг для Omega3
+ * и IU→мкг для VitD). Здесь нормализации НЕТ: раньше стояла повторная «v < 100 → v*1000»,
+ * и она применялась к уже нормализованным миллиграммам, то есть к продуктам с малым
+ * содержанием ω-3 (брокколи 50 мг/100, индейка 40 мг/100, рис 10 мг/100) — они
+ * превращались в 50 000 / 40 000 / 10 000 мг. Итог: на любом дне с овощами отчёт печатал
+ * «⚠ Омега-3: 94 730 мг > верхнего предела 6 000 мг — избыток» при фактических 1 124 мг
+ * (56% RDA), то есть скрывал реальный дефицит и советовал убрать рыбу.
+ */
+function normalizeMicroValue(_key: string, value: number): number {
   return value;
 }
 

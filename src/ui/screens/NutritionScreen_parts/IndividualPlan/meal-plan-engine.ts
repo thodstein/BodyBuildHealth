@@ -10576,6 +10576,28 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
 
     // Витрина MPS должна совпадать с ФИНАЛЬНЫМ планом (санитайзеры E17/E18 меняют items).
     if (typeof _refreshMpsFromMeals === 'function') _refreshMpsFromMeals();
+    // Честная строка «белок по приёмам». Раньше она печаталась ДО сборки тарелок, по
+    // плановому ровному делению (evenRegularP), и противоречила факту: «Белок равномерно:
+    // 44г/приём» при фактических 48/55/17/48/47. Пересчитываем по финальным тарелкам и,
+    // если разброс большой, прямо называем приём, который недобирает (это и есть
+    // бодибилдинг-смысл: 4–5 кормлений по ≥0.3 г/кг, а не «в среднем по 44 г»).
+    {
+      const _idxPNote = notes.findIndex((n) => typeof n === 'string' && n.startsWith('Белок равномерно:'));
+      const _pMains = (meals as any[]).filter((m) => !['preworkout', 'postworkout', 'intra'].includes(String(m.type)) && (m.totals?.p || 0) > 0);
+      if (_idxPNote >= 0 && _pMains.length > 0) {
+        const _pVals = _pMains.map((m) => m.totals.p || 0);
+        const _pMin = Math.min(..._pVals);
+        const _pMax = Math.max(..._pVals);
+        const _wKg = input.weightKg || 0;
+        const _gpk = (v: number) => (_wKg > 0 ? Math.round((v / _wKg) * 100) / 100 : 0);
+        const _even = Math.round(totals.p / _pMains.length);
+        const _list = _pVals.map((v) => Math.round(v)).join('/');
+        const _weak = _pMains.find((m) => _wKg > 0 && (m.totals.p || 0) / _wKg < 0.3 && (m.totals.p || 0) < _even * 0.85);
+        notes[_idxPNote] = _weak
+          ? `Белок по приёмам: ${_list} г (${_gpk(_pMin)}–${_gpk(_pMax)} г/кг) — «${_weak.label}» недобирает (${Math.round(_weak.totals.p)} г), цель ≥0.30 г/кг: добавьте 20–25 г белка или объедините приём`
+          : `Белок равномерно: ${_list} г (${_gpk(_pMin)}–${_gpk(_pMax)} г/кг, ${_pMains.length} основных) — всего ${Math.round(totals.p)} г`;
+      }
+    }
     // ─── P4/E0: честный флаг сходимости products-пути (ФИНАЛЬНЫЙ totals) ───
     // Считается здесь, ПОСЛЕ всех писателей и reconciliation. Канон допуска —
     // PLANNER_CONVERGENCE_PCT (3%). >3% — только честный best-effort с ЯВНОЙ
