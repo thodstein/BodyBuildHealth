@@ -82,7 +82,7 @@ export function vbtMetricRu(metric?: string | null): string {
   return VBT_METRIC_RU[metric] ?? metric;
 }
 
-export function movementDiagnosticsFilename(lift: Lift, ext: 'html' | 'csv' | 'svg' | 'png' | 'webm'): string {
+export function movementDiagnosticsFilename(lift: Lift, ext: 'html' | 'csv' | 'svg' | 'png' | 'webm' | 'mp4'): string {
   const d = new Date();
   const pad = (n: number) => String(n).padStart(2, '0');
   const stamp = `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}`;

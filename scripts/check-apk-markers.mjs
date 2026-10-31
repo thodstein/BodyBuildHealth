@@ -205,6 +205,8 @@ for (const hook of [
   'data-lift="hub-search"', 'data-lift="hub-search-hit"', 'data-lift="heat-summary"',
   'data-lift="rep-set-next"', 'data-lift="set-compare"', 'data-lift="kinovea-scale"',
   'series-copy-', 'data-lift="weight-mismatch"', 'data-lift="video-overlay-file"',
+  'data-lift="video-calib"', 'data-lift="video-calib-file"', 'data-lift="video-calib-frame"',
+  'data-lift="video-calib-save"', 'data-lift="video-calib-state"', 'data-lift="video-calib-clear"',
   'data-lift-nav=',
 ]) mustContain(LIFT_HUB, hook, `lift hub hook ${hook}`);
 // Дефолт-коллапс: 14 раскрытых блоков давали ~214 КБ HTML и ~500 кнопок за рендер.
@@ -229,6 +231,10 @@ mustContain(LIFT_HUB, "'13 Старт'", 'lift hub nav 13 label');
     .filter(({ l }) => /<(button|input)\b/.test(l) && /minHeight:(2\d|3\d)\b/.test(l));
   if (small.length) fails.push(`TAP-44 в ${LIFT_HUB}:${small[0].i} — тап-таргет ${/minHeight:(\d+)/.exec(small[0].l)?.[1]}px`);
 }
+
+// Видео-оверлей: калибровка «см → пиксель» и контейнер mp4/webm — ядро новой фичи.
+mustContain('src/engines/pro/trajectory-overlay.engine.ts', 'export function mapTrackToVideo', 'video calibration map');
+mustContain('src/engines/pro/trajectory-overlay.engine.ts', 'export function preferredVideoMime', 'video mp4 preference');
 
 // 7d. Mojibake-бан: битые символы (U+FFFD) в файлах хаба — признак порванной кодировки.
 // В LiftMasterCard их было 11 (тексты VBT/LVP/Kinovea), и это попадало в UI АПК.

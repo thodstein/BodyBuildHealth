@@ -50,7 +50,7 @@ import { diagnoseAsymmetry } from '../../../engines/pro/pl-asymmetry.engine';
 import { RULE_CHECKS, checkLiftRules } from '../../../engines/pro/pl-competition-rules.engine';
 import { RED_FLAGS, checkRedFlags, type RedFlagId } from '../../../engines/pro/pl-red-flags.engine';
 import { buildMovementDiagnosticsHtml, buildMovementDiagnosticsCsv, buildTrajectorySvg, movementDiagnosticsFilename, type MovementDiagnosticsExportInput } from '../../../engines/pro/movement-diagnostics-export.engine';
-import { renderTrajectoryPng, recordTrajectoryWebm, recordVideoWithOverlay, canRecordTrajectory, dataUrlToBlob } from '../../../engines/pro/trajectory-overlay.engine';
+import { renderTrajectoryPng, recordTrajectoryWebm, recordVideoWithOverlay, canRecordTrajectory, dataUrlToBlob, grabVideoFrame, calibrationFromTaps, preferredVideoMime, isCalibrationSane, type VideoCalibration } from '../../../engines/pro/trajectory-overlay.engine';
 import { copyOrShareText, saveCsvApk, printHtmlApk, saveTextFileApk, saveBlobApk, shareOutcomeLabel } from '../../../core/apk-share';
 import { VideoCaptureCard } from './VideoCaptureCard';
 import StickingPointAnalysisCard from './StickingPointAnalysisCard';
@@ -276,6 +276,8 @@ interface MasterState {
   capture: { heightM: string; distM: string; side: string; device: string };
   /** Прошлая серия повторов per-lift — для сравнения «прошлая сессия vs текущая». */
   series?: Record<string, { savedAt: number; weightKg?: number | null; reps: BarRepSnapshot[] }>;
+  /** Калибровка «см → пиксель видео» per-lift: без неё траектория рисуется панелью. */
+  videoCalib?: Record<string, VideoCalibration>;
 }
 
 function isRecord(v: unknown): v is Record<string, unknown> { return !!v && typeof v === 'object' && !Array.isArray(v); }
@@ -338,8 +340,9 @@ function loadMaster(): MasterState {
       lvp: cleanLvp(raw.lvp),
       capture: cleanCapture(raw.capture),
       series: cleanSeries(raw.series),
+      videoCalib: cleanVideoCalib(raw.videoCalib),
     };
-  } catch { return { lift:'bench', phase:'' as WeakPoint|'', issues:[], selectedGeom:{}, daysGeom:{}, selectedDiag:{}, daysDiag:{}, weakMuscleGroups:[], weakMuscleSubs:[], asymSide:null, asymL:'', asymR:'', vbtBest:'', vbtLast:'', vbtWeight:'', vbtGoal:'strength', vbtUpdatedAt:null, vbtPauseMs:'', asymPhase:{ startL:'', startR:'', midL:'', midR:'', lockL:'', lockR:'' }, dualSensor:{ left:'', right:'' }, perLift:{}, redFlags:[], ruleChecks:{}, meetDate:'', meetStrategy:'balanced' as MeetStrategy, meetMaxS:'', meetMaxB:'', meetMaxD:'', lvp:{}, capture:{ heightM:'', distM:'', side:'', device:'' }, series:{} }; }
+  } catch { return { lift:'bench', phase:'' as WeakPoint|'', issues:[], selectedGeom:{}, daysGeom:{}, selectedDiag:{}, daysDiag:{}, weakMuscleGroups:[], weakMuscleSubs:[], asymSide:null, asymL:'', asymR:'', vbtBest:'', vbtLast:'', vbtWeight:'', vbtGoal:'strength', vbtUpdatedAt:null, vbtPauseMs:'', asymPhase:{ startL:'', startR:'', midL:'', midR:'', lockL:'', lockR:'' }, dualSensor:{ left:'', right:'' }, perLift:{}, redFlags:[], ruleChecks:{}, meetDate:'', meetStrategy:'balanced' as MeetStrategy, meetMaxS:'', meetMaxB:'', meetMaxD:'', lvp:{}, capture:{ heightM:'', distM:'', side:'', device:'' }, series:{}, videoCalib:{} }; }
 }
 function saveMaster(s: MasterState) { try{ localStorage.setItem(MASTER_KEY, JSON.stringify(s)); }catch{} }
 function cleanRuleChecks(raw: unknown): Record<string, boolean> {
@@ -386,6 +389,23 @@ function cleanSeries(raw: unknown): NonNullable<MasterState['series']> {
       const w = Number(val.weightKg);
       out[key] = { savedAt, reps, ...(Number.isFinite(w) && w > 0 ? { weightKg: Math.round(w * 10) / 10 } : {}) };
     }
+  }
+  return out;
+}
+
+/** Калибровки «см → пиксель видео»: только конечные числа в правдоподобных пределах. */
+function cleanVideoCalib(raw: unknown): Record<string, VideoCalibration> {
+  if (!isRecord(raw)) return {};
+  const out: Record<string, VideoCalibration> = {};
+  for (const [k, v] of Object.entries(raw)) {
+    if (k.length > 20 || !isRecord(v)) continue;
+    const c: VideoCalibration = {
+      videoX: Number(v.videoX), videoY: Number(v.videoY),
+      trackX: Number(v.trackX), trackY: Number(v.trackY),
+      pxPerCm: Number(v.pxPerCm),
+      ...(v.mirrorX === true ? { mirrorX: true } : {}),
+    };
+    if (isCalibrationSane(c)) out[k] = c;
   }
   return out;
 }
@@ -597,6 +617,16 @@ export const LiftMasterCard: React.FC<{
   const [hubQuery, setHubQuery] = useState('');
   /** Прошлые серии повторов per-lift (персист) — сравнение «прошлая сессия vs текущая». */
   const [seriesStore, setSeriesStore] = useState<NonNullable<MasterState['series']>>(initial.series ?? {});
+  /** Калибровки кадра per-lift: «см трека → пиксель видео». */
+  const [videoCalib, setVideoCalib] = useState<NonNullable<MasterState['videoCalib']>>(initial.videoCalib ?? {});
+  /** Превью кадра и тапы: якорь (штанга на 0 с) → два конца известного отрезка. */
+  const [calibFrame, setCalibFrame] = useState<{ dataUrl: string; width: number; height: number } | null>(null);
+  const [calibAnchor, setCalibAnchor] = useState<{ videoX: number; videoY: number } | null>(null);
+  const [calibRefA, setCalibRefA] = useState<{ videoX: number; videoY: number } | null>(null);
+  const [calibRefB, setCalibRefB] = useState<{ videoX: number; videoY: number } | null>(null);
+  const [calibRefCm, setCalibRefCm] = useState('45');
+  const [calibMirror, setCalibMirror] = useState(false);
+  const [calibMsg, setCalibMsg] = useState<string | null>(null);
   /** Наложение прошлой сессии на текущую траекторию. */
   const [compareOn, setCompareOn] = useState(false);
   const [videoNote, setVideoNote] = useState('');
@@ -633,7 +663,7 @@ export const LiftMasterCard: React.FC<{
     }catch{}
   }, []);
 
-  useEffect(()=>{ saveMaster({ lift, phase, issues, selectedGeom, daysGeom, selectedDiag, daysDiag, weakMuscleGroups, weakMuscleSubs, asymSide, asymL, asymR, vbtBest, vbtLast, vbtWeight, vbtGoal, vbtUpdatedAt, vbtPauseMs, asymPhase: { startL: asymStartL, startR: asymStartR, midL: asymMidL, midR: asymMidR, lockL: asymLockL, lockR: asymLockR }, dualSensor: { left: dualLeft, right: dualRight }, perLift, redFlags, ruleChecks, meetDate, meetStrategy, meetMaxS, meetMaxB, meetMaxD, lvp: lvpSaved, capture, series: seriesStore }); }, [lift, phase, issues, selectedGeom, daysGeom, selectedDiag, daysDiag, weakMuscleGroups, weakMuscleSubs, asymSide, asymL, asymR, vbtBest, vbtLast, vbtWeight, vbtGoal, vbtUpdatedAt, vbtPauseMs, asymStartL, asymStartR, asymMidL, asymMidR, asymLockL, asymLockR, dualLeft, dualRight, perLift, redFlags, ruleChecks, meetDate, meetStrategy, meetMaxS, meetMaxB, meetMaxD, lvpSaved, capture, seriesStore]);
+  useEffect(()=>{ saveMaster({ lift, phase, issues, selectedGeom, daysGeom, selectedDiag, daysDiag, weakMuscleGroups, weakMuscleSubs, asymSide, asymL, asymR, vbtBest, vbtLast, vbtWeight, vbtGoal, vbtUpdatedAt, vbtPauseMs, asymPhase: { startL: asymStartL, startR: asymStartR, midL: asymMidL, midR: asymMidR, lockL: asymLockL, lockR: asymLockR }, dualSensor: { left: dualLeft, right: dualRight }, perLift, redFlags, ruleChecks, meetDate, meetStrategy, meetMaxS, meetMaxB, meetMaxD, lvp: lvpSaved, capture, series: seriesStore, videoCalib }); }, [lift, phase, issues, selectedGeom, daysGeom, selectedDiag, daysDiag, weakMuscleGroups, weakMuscleSubs, asymSide, asymL, asymR, vbtBest, vbtLast, vbtWeight, vbtGoal, vbtUpdatedAt, vbtPauseMs, asymStartL, asymStartR, asymMidL, asymMidR, asymLockL, asymLockR, dualLeft, dualRight, perLift, redFlags, ruleChecks, meetDate, meetStrategy, meetMaxS, meetMaxB, meetMaxD, lvpSaved, capture, seriesStore, videoCalib]);
 
   /** Переключение лифта: сохраняем фазу/отклонения текущего и восстанавливаем выбор целевого.
    *  Раньше общий state обнулялся — пользователь терял выбранную фазу после каждого щелчка. */
@@ -697,6 +727,36 @@ export const LiftMasterCard: React.FC<{
     const k = parseFloat(kinoveaScale);
     return scaleBarPoints(raw, Number.isFinite(k) && k > 0 ? k : 1);
   }, [kinoveaScale]);
+  /** Текущая калибровка кадра для движения. */
+  const curCalib = videoCalib[lift] ?? null;
+  /** Кандидат калибровки из тапов: считается на лету, пока не сохранён. */
+  const calibCandidate = useMemo(() => {
+    const first = kinoveaResult?.points?.[0];
+    if (!first || !calibAnchor || !calibRefA || !calibRefB) return null;
+    return calibrationFromTaps({
+      anchor: { videoX: calibAnchor.videoX, videoY: calibAnchor.videoY, trackX: first.x, trackY: first.y },
+      refA: calibRefA,
+      refB: calibRefB,
+      refCm: parseFloat(calibRefCm),
+      mirrorX: calibMirror,
+    });
+  }, [kinoveaResult, calibAnchor, calibRefA, calibRefB, calibRefCm, calibMirror]);
+  /** Тап по кадру: якорь → точка A эталона → точка B эталона. */
+  const onCalibTap = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    if (!calibFrame) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const relX = (e.clientX - rect.left) / Math.max(1, rect.width);
+    const relY = (e.clientY - rect.top) / Math.max(1, rect.height);
+    // Тап по превью пересчитывается в пиксели исходного видео.
+    const pt = { videoX: Math.round(relX * calibFrame.width), videoY: Math.round(relY * calibFrame.height) };
+    if (!calibAnchor) { setCalibAnchor(pt); setCalibMsg('Якорь поставлен. Теперь два конца эталонного отрезка (например, край→край блина).'); return; }
+    if (!calibRefA) { setCalibRefA(pt); setCalibMsg('Точка A есть. Ткните точку B эталона.'); return; }
+    if (!calibRefB) { setCalibRefB(pt); setCalibMsg('Точка B есть. Укажите реальную длину отрезка в см.'); return; }
+    setCalibMsg('Тапы заполнены — сбросьте их, чтобы переснять кадр.');
+  }, [calibFrame, calibAnchor, calibRefA, calibRefB]);
+  const resetCalibTaps = () => {
+    setCalibAnchor(null); setCalibRefA(null); setCalibRefB(null);
+  };
   /** Сохранённая серия прошлого раза для текущего движения. */
   const savedSeries = seriesStore[lift] ?? null;
   const curFirstSnapshot = useMemo(()=> kinoveaReps.length ? snapshotBarRep(kinoveaReps[0]) : null, [kinoveaReps]);
@@ -1912,6 +1972,83 @@ export const LiftMasterCard: React.FC<{
               </div>
             )}
           </div>
+          {/* Калибровка кадра: без неё видео-оверлей может быть только панелью.
+              Якорь = штанга на 0 с трека, эталон = известное расстояние в кадре. */}
+          <div data-lift="video-calib" style={{ marginTop:8, padding:8, borderRadius:8, background:'rgba(56,189,248,0.05)', border:'1px solid rgba(56,189,248,0.2)' }}>
+            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:6, flexWrap:'wrap' }}>
+              <div style={{ fontSize:10, fontWeight:800, color:'#38bdf8' }}>🎯 Калибровка кадра для видео-линии</div>
+              <span data-lift="video-calib-state" role="status" style={{ fontSize:9, color: curCalib ? '#4ade80' : '#fbbf24' }}>
+                {curCalib ? `✓ откалибровано · ${curCalib.pxPerCm.toFixed(1)} px/см` : 'не откалибровано — линия будет панелью'}
+              </span>
+            </div>
+            <div style={{ marginTop:4, fontSize:9, color:'#fff', opacity:0.7, lineHeight:1.45 }}>
+              Шаг 1: загрузите видео и ткните в штангу на первом кадре (это точка начала трека).
+              Шаг 2: ткните два края известного отрезка (диаметр блина, ширина стойки) и укажите его длину.
+            </div>
+            <div style={{ display:'flex', gap:6, flexWrap:'wrap', alignItems:'center', marginTop:6 }}>
+              <label data-lift="video-calib-file" aria-label="Видео для калибровки кадра" style={{ display:'inline-flex', alignItems:'center', minHeight:44, padding:'10px 14px', borderRadius:10, border:'1px solid rgba(56,189,248,0.28)', background:'rgba(56,189,248,0.1)', color:'#38bdf8', fontSize:12, fontWeight:700, cursor:'pointer' }}>
+                📷 Кадр из видео
+                <input type="file" accept="video/*" aria-label="Видео подхода для калибровки" style={{ display:'none' }} onChange={async (e)=>{
+                  const f = e.target.files?.[0];
+                  e.target.value = '';
+                  if (!f) return;
+                  setCalibMsg('⏳ Достаю кадр…');
+                  const frame = await grabVideoFrame(f, { timeSec: 0 });
+                  if (!frame) { setCalibFrame(null); setCalibMsg('Кадр не получился: видео не декодировалось в этом WebView.'); return; }
+                  setCalibFrame(frame);
+                  resetCalibTaps();
+                  setCalibMsg('Кадр готов: ткните в штангу (начало трека).');
+                }} />
+              </label>
+              <label style={{ fontSize:10, color:DIM }}>Эталон, см
+                <input data-lift="video-calib-ref-cm" aria-label="Реальная длина эталонного отрезка, см" type="number" step="0.5" min="1" value={calibRefCm} onChange={e=>setCalibRefCm(e.target.value)} style={{ width:78, minHeight:44, marginLeft:4, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.15)', color:'#fff', borderRadius:8, padding:'10px 8px', fontSize:12 }} />
+              </label>
+              <button data-lift="video-calib-mirror" aria-pressed={calibMirror} aria-label="Съёмка с зеркалом по горизонтали" onClick={()=>setCalibMirror(v => !v)} style={{ minHeight:44, padding:'8px 12px', borderRadius:8, cursor:'pointer', border: calibMirror ? '1px solid #38bdf8' : '1px solid rgba(255,255,255,0.12)', background: calibMirror ? 'rgba(56,189,248,0.18)' : 'transparent', color: calibMirror ? '#38bdf8' : DIM, fontSize:11 }}>⇄ зеркало X</button>
+              <button data-lift="video-calib-taps-reset" aria-label="Сбросить точки калибровки" onClick={()=>{ resetCalibTaps(); setCalibMsg('Точки сброшены — начните с якоря.'); }} style={{ minHeight:44, padding:'8px 12px', borderRadius:8, cursor:'pointer', background:'transparent', color:'#fff', border:'1px solid rgba(255,255,255,0.12)', fontSize:11 }}>↺ Сбросить точки</button>
+              {curCalib && (
+                <button data-lift="video-calib-clear" aria-label="Удалить калибровку кадра" onClick={()=>{
+                  setVideoCalib(s => { const next = { ...s }; delete next[lift]; return next; });
+                  setCalibMsg('Калибровка удалена — линия вернётся на панель.');
+                }} style={{ minHeight:44, padding:'8px 12px', borderRadius:8, cursor:'pointer', background:'transparent', color:'#f87171', border:'1px solid rgba(248,113,113,0.3)', fontSize:11 }}>🗑 Удалить калибровку</button>
+              )}
+            </div>
+            {calibFrame && (
+              <div
+                data-lift="video-calib-frame"
+                role="button"
+                tabIndex={0}
+                aria-label="Кадр видео: ткните в штангу и в эталонный отрезок"
+                onClick={onCalibTap}
+                style={{ position:'relative', marginTop:6, borderRadius:8, overflow:'hidden', border:'1px solid rgba(56,189,248,0.25)', cursor:'crosshair', lineHeight:0 }}
+              >
+                <img src={calibFrame.dataUrl} alt="Кадр для калибровки" style={{ width:'100%', display:'block' }} draggable={false} />
+                {[
+                  { pt: calibAnchor, color:'#00e68a', label:'якорь' },
+                  { pt: calibRefA, color:'#f59e0b', label:'A' },
+                  { pt: calibRefB, color:'#f59e0b', label:'B' },
+                ].filter(m => m.pt).map((m, i) => (
+                  <span key={i} style={{ position:'absolute', left:`${((m.pt!.videoX / Math.max(1, calibFrame.width)) * 100).toFixed(2)}%`, top:`${((m.pt!.videoY / Math.max(1, calibFrame.height)) * 100).toFixed(2)}%`, transform:'translate(-50%,-50%)', width:14, height:14, borderRadius:7, background:m.color, border:'2px solid #0b0f14', boxShadow:'0 0 0 1px rgba(255,255,255,0.35)' }} />
+                ))}
+              </div>
+            )}
+            {calibMsg && <div data-lift="video-calib-msg" role="status" style={{ marginTop:5, fontSize:10, color:'#38bdf8', lineHeight:1.45 }}>{calibMsg}</div>}
+            {calibCandidate && (
+              <div style={{ marginTop:5, display:'flex', gap:6, flexWrap:'wrap', alignItems:'center' }}>
+                <span role="status" style={{ fontSize:10, color:'#e5e7eb' }}>
+                  Масштаб: {calibCandidate.pxPerCm.toFixed(2)} px/см · эталон {calibRefCm} см
+                </span>
+                <button data-lift="video-calib-save" aria-label="Сохранить калибровку кадра" onClick={()=>{
+                  setVideoCalib(s => ({ ...s, [lift]: calibCandidate }));
+                  setCalibMsg(`Калибровка сохранена (${calibCandidate.pxPerCm.toFixed(2)} px/см) — «Видео с траекторией» нарисует линию по грифу.`);
+                }} style={{ minHeight:44, padding:'8px 12px', borderRadius:8, cursor:'pointer', background:'rgba(74,222,128,0.14)', color:'#4ade80', border:'1px solid rgba(74,222,128,0.3)', fontSize:11, fontWeight:700 }}>💾 Сохранить калибровку</button>
+              </div>
+            )}
+            {!kinoveaResult && (
+              <div style={{ marginTop:4, fontSize:9, color:'#fbbf24', lineHeight:1.4 }}>
+                Нужны точки трека: сначала разберите CSV — якорь привязывается к его первой точке.
+              </div>
+            )}
+          </div>
           {/* Качество съёмки: без метаданных vmax/xLoop нельзя сравнивать между сессиями. */}
           <div data-lift="capture-quality" style={{ marginTop:8, padding:8, borderRadius:8, background:'rgba(148,163,184,0.05)', border:'1px solid rgba(148,163,184,0.18)' }}>
             <div style={{ fontSize:10, fontWeight:800, color:'#cbd5e1' }}>🎥 Качество съёмки</div>
@@ -2010,16 +2147,20 @@ export const LiftMasterCard: React.FC<{
                   const pts = kinoveaResult ? kinoveaResult.points : [];
                   if (pts.length < 2) { setShareMsg('Сначала разберите CSV — без точек накладывать нечего.'); setTimeout(()=>setShareMsg(null), 3500); return; }
                   if (!canRecordTrajectory()) { setShareMsg('Запись видео не поддерживается этим браузером.'); setTimeout(()=>setShareMsg(null), 3500); return; }
-                  setShareMsg('⏺ Накладываю траекторию: видео проигрывается в реальном времени…');
+                  const ext = preferredVideoMime().ext;
+                  setShareMsg(curCalib
+                    ? '⏺ Пишу видео с линией по калибровке…'
+                    : '⏺ Пишу видео с панелью траектории (без калибровки кадра)…');
                   const blob = await recordVideoWithOverlay({
                     file: f,
                     liftRu: LIFT_RU[lift],
                     points: pts,
                     xLoopCm: kinoveaResult ? kinoveaResult.xLoop : null,
                     vmax: kinoveaResult ? kinoveaResult.vmax : null,
+                    calibration: curCalib,
                   });
                   if (!blob) { setShareMsg('Не удалось: видео не декодировалось или запись недоступна (PNG остаётся).'); setTimeout(()=>setShareMsg(null), 4000); return; }
-                  const o = await saveBlobApk(movementDiagnosticsFilename(lift, 'webm'), blob);
+                  const o = await saveBlobApk(movementDiagnosticsFilename(lift, ext), blob);
                   setShareMsg(shareOutcomeLabel(o)); setTimeout(()=>setShareMsg(null), 2500);
                 }} />
               </label>

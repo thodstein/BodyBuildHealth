@@ -282,18 +282,160 @@ function overlayPanelRect(w: number, h: number) {
 }
 
 /**
- * Видео подхода с наложенной траекторией (webm).
+ * Калибровка «см трека → пиксель видео».
  *
- * Честно: позиция штанги в кадре не известна (нет калибровки «см → пиксель видео»),
- * поэтому траектория рисуется отдельной панелью в правом верхнем углу и
- * синхронизируется с воспроизведением по времени трека. Сам подход при этом
- * перекодируется в webm — картинка видео сохраняется, но это уже не оригинал.
+ * Без неё траектория может рисоваться только панелью: неизвестно, где штанга
+ * в кадре. Пользователь один раз указывает точку штанги в кадре (anchor),
+ * соответствующую точке трека, и известное расстояние между двумя точками кадра
+ * (например, диаметр блина) — этого достаточно для масштаба и сдвига.
+ */
+export interface VideoCalibration {
+  /** Точка в кадре (пиксели видео), соответствующая точке трека ниже. */
+  videoX: number;
+  videoY: number;
+  /** Координаты трека (см), привязанные к этой точке. */
+  trackX: number;
+  trackY: number;
+  /** Пикселей видео на 1 см трека. */
+  pxPerCm: number;
+  /** Съёмка с противоположной стороны / зеркало: инвертировать горизонталь. */
+  mirrorX?: boolean;
+}
+
+/** Набор тапов для калибровки: якорь (штанга) + два конца известного отрезка. */
+export interface CalibrationTaps {
+  anchor: { videoX: number; videoY: number; trackX: number; trackY: number };
+  refA: { videoX: number; videoY: number };
+  refB: { videoX: number; videoY: number };
+  /** Реальная длина отрезка refA→refB, см. */
+  refCm: number;
+  mirrorX?: boolean;
+}
+
+/** Правдоподобность калибровки: 0.05…200 px/см (отсекает опечатки и битые данные). */
+export function isCalibrationSane(c: VideoCalibration | null | undefined): boolean {
+  if (!c) return false;
+  const nums = [c.videoX, c.videoY, c.trackX, c.trackY, c.pxPerCm];
+  if (!nums.every((n) => Number.isFinite(n))) return false;
+  return c.pxPerCm > 0.05 && c.pxPerCm < 200;
+}
+
+/** Пиксели видео для точек трека (y трека растёт вверх, в кадре — вниз). */
+export function mapTrackToVideo(
+  points: ReadonlyArray<{ x: number; y: number }>,
+  calib: VideoCalibration,
+): Array<[number, number]> {
+  if (!Array.isArray(points) || !points.length) return [];
+  if (!isCalibrationSane(calib)) return [];
+  const k = calib.pxPerCm;
+  const mx = calib.mirrorX ? -1 : 1;
+  return points.map((p) => [
+    calib.videoX + (p.x - calib.trackX) * k * mx,
+    calib.videoY - (p.y - calib.trackY) * k,
+  ]);
+}
+
+/** Масштаб из двух тапов известной длины; null — если тап не дал масштаба. */
+export function calibrationFromTaps(t: CalibrationTaps): VideoCalibration | null {
+  if (!t || !t.anchor || !t.refA || !t.refB) return null;
+  const distPx = Math.hypot(t.refB.videoX - t.refA.videoX, t.refB.videoY - t.refA.videoY);
+  if (!(t.refCm > 0) || !(distPx > 0)) return null;
+  const calib: VideoCalibration = {
+    videoX: t.anchor.videoX,
+    videoY: t.anchor.videoY,
+    trackX: t.anchor.trackX,
+    trackY: t.anchor.trackY,
+    pxPerCm: distPx / t.refCm,
+    ...(t.mirrorX ? { mirrorX: true } : {}),
+  };
+  return isCalibrationSane(calib) ? calib : null;
+}
+
+/** Контейнер записи: mp4, если WebView умеет (Chrome 126+), иначе webm. */
+export function preferredVideoMime(): { mime: string; ext: 'mp4' | 'webm' } {
+  try {
+    const MR = (globalThis as unknown as { MediaRecorder?: { isTypeSupported?: (t: string) => boolean } }).MediaRecorder;
+    if (typeof MR?.isTypeSupported === 'function') {
+      for (const mime of ['video/mp4;codecs=avc1.42E01E', 'video/mp4']) {
+        try { if (MR.isTypeSupported(mime)) return { mime, ext: 'mp4' }; } catch { /* пробуем следующий */ }
+      }
+    }
+  } catch { /* нет MediaRecorder — останется webm */ }
+  return { mime: 'video/webm', ext: 'webm' };
+}
+
+/**
+ * Кадр видео как data:URL — по нему пользователь тыкает в штангу для калибровки.
+ * Возвращает null, если видео не декодировалось или canvas недоступен.
+ */
+export async function grabVideoFrame(
+  file: Blob,
+  opts?: { timeSec?: number; maxW?: number },
+): Promise<{ dataUrl: string; width: number; height: number } | null> {
+  if (!canUseCanvas() || !file || typeof document === 'undefined') return null;
+  const URLRef = (globalThis as unknown as { URL?: typeof URL }).URL;
+  if (!URLRef || typeof URLRef.createObjectURL !== 'function') return null;
+  const url = URLRef.createObjectURL(file);
+  const video = document.createElement('video');
+  video.muted = true;
+  video.playsInline = true;
+  video.preload = 'auto';
+  video.src = url;
+  try {
+    await new Promise<void>((resolve, reject) => {
+      let settled = false;
+      const ok = () => { if (!settled) { settled = true; resolve(); } };
+      const fail = () => { if (!settled) { settled = true; reject(new Error('video-decode')); } };
+      video.onloadeddata = ok;
+      video.onerror = fail;
+      setTimeout(fail, 8000);
+    });
+    if (!(video.videoWidth > 0) || !(video.videoHeight > 0)) return null;
+    const t = Math.max(0, opts?.timeSec ?? 0);
+    if (t > 0) {
+      await new Promise<void>((resolve) => {
+        video.onseeked = () => resolve();
+        try { video.currentTime = Math.min(t, Math.max(0, (video.duration || t) - 0.01)); }
+        catch { resolve(); }
+        setTimeout(resolve, 3000);
+      });
+    }
+    const maxW = opts?.maxW ?? 480;
+    const k = Math.min(1, maxW / video.videoWidth);
+    const w = Math.round(video.videoWidth * k);
+    const h = Math.round(video.videoHeight * k);
+    const canvas = document.createElement('canvas');
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+    ctx.drawImage(video, 0, 0, w, h);
+    const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+    // Возвращаем натуральные размеры: тапы по превью пересчитываются в пиксели видео.
+    return { dataUrl, width: video.videoWidth, height: video.videoHeight };
+  } catch {
+    return null;
+  } finally {
+    try { video.pause(); } catch {}
+    try { URLRef.revokeObjectURL(url); } catch {}
+  }
+}
+
+/**
+ * Видео подхода с наложенной траекторией.
+ *
+ * Два режима:
+ * - с калибровкой (`calibration`) — траектория рисуется прямо по кадру, по грифу;
+ * - без неё — честная панель траектории в углу (позиция штанги в кадре неизвестна).
+ *
+ * Контейнер — mp4, если WebView его пишет, иначе webm; картинка видео
+ * перекодируется, то есть это не оригинальный файл.
  *
  * Возвращает null, если MediaRecorder/captureStream/video недоступны или файл
  * не декодируется.
  */
 export async function recordVideoWithOverlay(
-  inp: TrajectoryRenderInput & { file: Blob; offsetSec?: number },
+  inp: TrajectoryRenderInput & { file: Blob; offsetSec?: number; calibration?: VideoCalibration | null },
   opts?: { w?: number; h?: number },
 ): Promise<Blob | null> {
   if (!canRecordTrajectory()) return null;
@@ -303,6 +445,7 @@ export async function recordVideoWithOverlay(
   if (typeof document === 'undefined') return null;
   const URLRef = (globalThis as unknown as { URL?: typeof URL }).URL;
   if (!URLRef || typeof URLRef.createObjectURL !== 'function') return null;
+  const container = preferredVideoMime();
 
   const url = URLRef.createObjectURL(inp.file);
   const video = document.createElement('video');
@@ -338,15 +481,20 @@ export async function recordVideoWithOverlay(
     const MR = (window as unknown as { MediaRecorder?: new (s: MediaStream, o?: { mimeType?: string }) => MediaRecorder }).MediaRecorder;
     if (typeof MR !== 'function') return null;
     let rec: MediaRecorder;
-    try { rec = new MR(stream, { mimeType: 'video/webm' }); }
-    catch { try { rec = new MR(stream); } catch { return null; } }
+    try { rec = new MR(stream, { mimeType: container.mime }); }
+    catch {
+      try { rec = new MR(stream, { mimeType: container.ext === 'mp4' ? 'video/mp4' : 'video/webm' }); }
+      catch { try { rec = new MR(stream); } catch { return null; } }
+    }
     const chunks: Blob[] = [];
     rec.ondataavailable = (e: BlobEvent) => { if (e.data && e.data.size > 0) chunks.push(e.data); };
     const done = new Promise<Blob | null>((resolve) => {
-      rec.onstop = () => resolve(chunks.length ? new Blob(chunks, { type: 'video/webm' }) : null);
+      rec.onstop = () => resolve(chunks.length ? new Blob(chunks, { type: container.mime.split(';')[0] }) : null);
       rec.onerror = () => resolve(null);
     });
 
+    const calib = isCalibrationSane(inp.calibration) ? inp.calibration! : null;
+    const mapped = calib ? mapTrackToVideo(pts, calib) : null;
     const panel = overlayPanelRect(w, h);
     const xs = pts.map((p) => p.x), ys = pts.map((p) => p.y);
     const minX = Math.min(...xs), maxX = Math.max(...xs);
@@ -354,35 +502,57 @@ export async function recordVideoWithOverlay(
     const px = (x: number) => panel.x + 10 + ((x - minX) / Math.max(0.001, maxX - minX)) * (panel.w - 20);
     const py = (y: number) => panel.y + panel.h - 12 - ((y - minY) / Math.max(0.001, maxY - minY)) * (panel.h - 44);
 
+    const times = pts.map((p, i) => ({ t: p.t ?? i / 30 }));
+
     const drawFrame = () => {
       ctx.clearRect(0, 0, w, h);
       try { ctx.drawImage(video, 0, 0, w, h); } catch { /* кадр ещё не готов */ }
-      // панель траектории
-      ctx.fillStyle = 'rgba(11,15,20,0.78)';
-      ctx.fillRect(panel.x, panel.y, panel.w, panel.h);
-      ctx.strokeStyle = BAR_HEAT_COLORS.mid;
-      ctx.lineWidth = 1;
-      ctx.strokeRect(panel.x + 0.5, panel.y + 0.5, panel.w - 1, panel.h - 1);
-      ctx.fillStyle = '#e5e7eb';
-      ctx.font = '600 13px sans-serif';
-      ctx.fillText(inp.liftRu, panel.x + 10, panel.y + 20);
-      const idx = pointIndexAtTime(pts.map((p, i) => ({ t: p.t ?? i / 30 })), Math.max(0, video.currentTime - (inp.offsetSec ?? 0)));
-      if (idx > 0) {
-        ctx.beginPath();
-        for (let i = 0; i <= idx; i++) {
-          const sx2 = px(pts[i].x), sy2 = py(pts[i].y);
-          if (i === 0) ctx.moveTo(sx2, sy2); else ctx.lineTo(sx2, sy2);
+      const idx = pointIndexAtTime(times, Math.max(0, video.currentTime - (inp.offsetSec ?? 0)));
+      if (mapped) {
+        // Калиброванный режим: линия по грифу, без панели.
+        if (idx > 0) {
+          ctx.beginPath();
+          for (let i = 0; i <= idx; i++) {
+            const bx = mapped[i][0] * scale, by = mapped[i][1] * scale;
+            if (i === 0) ctx.moveTo(bx, by); else ctx.lineTo(bx, by);
+          }
+          ctx.strokeStyle = BAR_HEAT_COLORS.fast;
+          ctx.lineWidth = 3;
+          ctx.stroke();
         }
-        ctx.strokeStyle = BAR_HEAT_COLORS.fast;
-        ctx.lineWidth = 3;
-        ctx.stroke();
-      }
-      if (idx >= 0) {
-        const head = pts[idx];
-        ctx.fillStyle = BAR_HEAT_COLORS.slow;
-        ctx.beginPath();
-        ctx.arc(px(head.x), py(head.y), 5, 0, Math.PI * 2);
-        ctx.fill();
+        if (idx >= 0 && mapped[idx]) {
+          ctx.fillStyle = BAR_HEAT_COLORS.slow;
+          ctx.beginPath();
+          ctx.arc(mapped[idx][0] * scale, mapped[idx][1] * scale, 5, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      } else {
+        // панель траектории (без калибровки позиция штанги в кадре неизвестна)
+        ctx.fillStyle = 'rgba(11,15,20,0.78)';
+        ctx.fillRect(panel.x, panel.y, panel.w, panel.h);
+        ctx.strokeStyle = BAR_HEAT_COLORS.mid;
+        ctx.lineWidth = 1;
+        ctx.strokeRect(panel.x + 0.5, panel.y + 0.5, panel.w - 1, panel.h - 1);
+        ctx.fillStyle = '#e5e7eb';
+        ctx.font = '600 13px sans-serif';
+        ctx.fillText(inp.liftRu, panel.x + 10, panel.y + 20);
+        if (idx > 0) {
+          ctx.beginPath();
+          for (let i = 0; i <= idx; i++) {
+            const sx2 = px(pts[i].x), sy2 = py(pts[i].y);
+            if (i === 0) ctx.moveTo(sx2, sy2); else ctx.lineTo(sx2, sy2);
+          }
+          ctx.strokeStyle = BAR_HEAT_COLORS.fast;
+          ctx.lineWidth = 3;
+          ctx.stroke();
+        }
+        if (idx >= 0) {
+          const head = pts[idx];
+          ctx.fillStyle = BAR_HEAT_COLORS.slow;
+          ctx.beginPath();
+          ctx.arc(px(head.x), py(head.y), 5, 0, Math.PI * 2);
+          ctx.fill();
+        }
       }
       ctx.fillStyle = '#d1d5db';
       ctx.font = '600 13px sans-serif';
@@ -393,7 +563,7 @@ export async function recordVideoWithOverlay(
       ctx.fillText(footer, 12, h - 28);
       ctx.fillStyle = '#9ca3af';
       ctx.font = '500 12px sans-serif';
-      ctx.fillText('скорость из видео — оценка (не LPT)', 12, h - 10);
+      ctx.fillText(mapped ? 'линия по калибровке кадра · скорость — оценка (не LPT)' : 'скорость из видео — оценка (не LPT)', 12, h - 10);
     };
 
     rec.start();

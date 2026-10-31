@@ -558,6 +558,41 @@ describe('LiftMasterCard — поведение (не только смоук)',
     expect(xLoop2).toBeCloseTo(xLoop1 * 2, 0);
   });
 
+  it('калибровка кадра: статус, персист и удаление', () => {
+    const calib = { videoX: 320, videoY: 240, trackX: 0, trackY: 0, pxPerCm: 12.5 };
+    localStorage.setItem(MASTER_KEY, JSON.stringify({ lift: 'bench', videoCalib: { bench: calib } }));
+    const { container } = render(<LiftMasterCard sessions={[]} />);
+
+    const state = container.querySelector('[data-lift="video-calib-state"]')!;
+    expect(state.textContent).toContain('откалибровано');
+    expect(state.textContent).toContain('12.5');
+
+    click(container.querySelector('[data-lift="video-calib-clear"]'));
+    const saved = JSON.parse(localStorage.getItem(MASTER_KEY) || '{}');
+    expect(saved.videoCalib?.bench).toBeUndefined();
+    expect(container.querySelector('[data-lift="video-calib-state"]')!.textContent).toContain('не откалибровано');
+  });
+
+  it('битая калибровка из персиста не применяется', () => {
+    localStorage.setItem(MASTER_KEY, JSON.stringify({
+      lift: 'bench',
+      videoCalib: {
+        bench: { videoX: 'x', videoY: 1, trackX: 0, trackY: 0, pxPerCm: 12 },
+        squat: { videoX: 1, videoY: 2, trackX: 0, trackY: 0, pxPerCm: 0 },
+      },
+    }));
+    const { container } = render(<LiftMasterCard sessions={[]} />);
+    expect(container.querySelector('[data-lift="video-calib-state"]')!.textContent).toContain('не откалибровано');
+  });
+
+  it('калибровка кадра честно требует точек трека', () => {
+    const { container } = render(<LiftMasterCard sessions={[]} />);
+    const block = container.querySelector('[data-lift="video-calib"]')!;
+    expect(block.textContent).toContain('сначала разберите CSV');
+    expect(container.querySelector('[data-lift="video-calib-file"]')).toBeTruthy();
+    expect(container.querySelector('[data-lift="video-calib-frame"]')).toBeNull();
+  });
+
   it('интерактивные элементы хаба не меньше 44 px', () => {
     const { container } = render(<LiftMasterCard sessions={[]} />);
     // «Быстрый старт» исчезает после первых данных — проверяем до заполнения.
@@ -575,6 +610,7 @@ describe('LiftMasterCard — поведение (не только смоук)',
       'hub-search', 'kinovea-scale', 'rep-series-add', 'rep-set-next', 'rep-series-clear',
       'series-save', 'session-overlay-toggle', 'capture-side-left',
       'capture-device-phone', 'export-csv', 'export-overlay-video', 'video-overlay-file',
+      'video-calib-ref-cm', 'video-calib-mirror', 'video-calib-taps-reset',
     ];
     for (const sel of selectors) {
       const el = container.querySelector(`[data-lift="${sel}"]`);
