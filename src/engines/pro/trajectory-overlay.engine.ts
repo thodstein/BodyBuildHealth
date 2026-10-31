@@ -335,8 +335,22 @@ export function mapTrackToVideo(
   ]);
 }
 
-/** Масштаб из двух тапов известной длины; null — если тап не дал масштаба. */
-export function calibrationFromTaps(t: CalibrationTaps): VideoCalibration | null {
+/**
+ * Доля точек трека, попавших в кадр после калибровки: если она мала, якорь или
+ * масштаб неверны, и линия на видео уйдёт за край.
+ */
+export function calibrationFrameFit(
+  mapped: ReadonlyArray<[number, number]>,
+  w: number,
+  h: number,
+): number {
+  if (!mapped.length || !(w > 0) || !(h > 0)) return 0;
+  let inside = 0;
+  for (const [x, y] of mapped) if (x >= 0 && x <= w && y >= 0 && y <= h) inside++;
+  return inside / mapped.length;
+}
+
+/** Масштаб из двух тапов известной длины; null — если тап не дал масштаба. */export function calibrationFromTaps(t: CalibrationTaps): VideoCalibration | null {
   if (!t || !t.anchor || !t.refA || !t.refB) return null;
   const distPx = Math.hypot(t.refB.videoX - t.refA.videoX, t.refB.videoY - t.refA.videoY);
   if (!(t.refCm > 0) || !(distPx > 0)) return null;
@@ -495,6 +509,8 @@ export async function recordVideoWithOverlay(
 
     const calib = isCalibrationSane(inp.calibration) ? inp.calibration! : null;
     const mapped = calib ? mapTrackToVideo(pts, calib) : null;
+    // В кадре ли линия: иначе честно пишем, что калибровка не сходится.
+    const fit = mapped ? calibrationFrameFit(mapped, video.videoWidth, video.videoHeight) : 0;
     const panel = overlayPanelRect(w, h);
     const xs = pts.map((p) => p.x), ys = pts.map((p) => p.y);
     const minX = Math.min(...xs), maxX = Math.max(...xs);
@@ -563,7 +579,9 @@ export async function recordVideoWithOverlay(
       ctx.fillText(footer, 12, h - 28);
       ctx.fillStyle = '#9ca3af';
       ctx.font = '500 12px sans-serif';
-      ctx.fillText(mapped ? 'линия по калибровке кадра · скорость — оценка (не LPT)' : 'скорость из видео — оценка (не LPT)', 12, h - 10);
+      ctx.fillText(mapped
+        ? (fit >= 0.6 ? 'линия по калибровке кадра · скорость — оценка (не LPT)' : `линия вне кадра (${Math.round(fit * 100)}% точек) — проверьте калибровку · скорость — оценка (не LPT)`)
+        : 'скорость из видео — оценка (не LPT)', 12, h - 10);
     };
 
     rec.start();

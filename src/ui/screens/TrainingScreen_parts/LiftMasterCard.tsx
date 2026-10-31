@@ -50,7 +50,7 @@ import { diagnoseAsymmetry } from '../../../engines/pro/pl-asymmetry.engine';
 import { RULE_CHECKS, checkLiftRules } from '../../../engines/pro/pl-competition-rules.engine';
 import { RED_FLAGS, checkRedFlags, type RedFlagId } from '../../../engines/pro/pl-red-flags.engine';
 import { buildMovementDiagnosticsHtml, buildMovementDiagnosticsCsv, buildTrajectorySvg, movementDiagnosticsFilename, type MovementDiagnosticsExportInput } from '../../../engines/pro/movement-diagnostics-export.engine';
-import { renderTrajectoryPng, recordTrajectoryWebm, recordVideoWithOverlay, canRecordTrajectory, dataUrlToBlob, grabVideoFrame, calibrationFromTaps, preferredVideoMime, isCalibrationSane, type VideoCalibration } from '../../../engines/pro/trajectory-overlay.engine';
+import { renderTrajectoryPng, recordTrajectoryWebm, recordVideoWithOverlay, canRecordTrajectory, dataUrlToBlob, grabVideoFrame, calibrationFromTaps, preferredVideoMime, isCalibrationSane, calibrationFrameFit, mapTrackToVideo, type VideoCalibration } from '../../../engines/pro/trajectory-overlay.engine';
 import { copyOrShareText, saveCsvApk, printHtmlApk, saveTextFileApk, saveBlobApk, shareOutcomeLabel } from '../../../core/apk-share';
 import { VideoCaptureCard } from './VideoCaptureCard';
 import StickingPointAnalysisCard from './StickingPointAnalysisCard';
@@ -460,8 +460,8 @@ export const HUB_SECTIONS: Array<{ id: string; label: string; key: string; words
   { id: 'sec-4', label: '4 Мёртвые точки', key: 'sec3', words: 'мёртвая точка диапазон угол' },
   { id: 'sec-5', label: '5 Траектория', key: 'sec4', words: 'bar path траектория xloop отклонения' },
   { id: 'sec-6', label: '6 Геометрия', key: 'sec5', words: 'углы геометрия техника' },
-  { id: 'sec-7', label: '7 VBT', key: 'sec6', words: 'скорость vbt м/с lvp 1пм порог vl' },
-  { id: 'sec-8', label: '8 Видео', key: 'secVideo', words: 'видео csv kinovea серия повторов heatmap экспорт png webm' },
+  { id: 'sec-7', label: '7 VBT', key: 'sec6', words: 'скорость vbt м/с lvp 1пм порог vl вес дневник подстановка' },
+  { id: 'sec-8', label: '8 Видео', key: 'secVideo', words: 'видео csv kinovea серия повторов heatmap экспорт png webm калибровка кадра пиксель px см смещение трека mp4' },
   { id: 'sec-9', label: '9 Срывы', key: 'sec7', words: 'срывы дневник rpe тяжёлые подходы' },
   { id: 'sec-10', label: '10 RIR', key: 'sec8', words: 'rir калибровка bias' },
   { id: 'sec-11', label: '11 Мезо', key: 'sec9', words: 'мезо объём подходы коррекция' },
@@ -778,6 +778,13 @@ export const LiftMasterCard: React.FC<{
   const resetCalibTaps = () => {
     setCalibAnchor(null); setCalibRefA(null); setCalibRefB(null);
   };
+  /** Доля точек трека в кадре для сохранённой калибровки — видно, сходится ли она. */
+  const calibFit = useMemo(() => {
+    if (!curCalib || !calibFrame || !kinoveaResult?.points?.length) return null;
+    const mapped = mapTrackToVideo(kinoveaResult.points, curCalib);
+    if (!mapped.length) return null;
+    return Math.round(calibrationFrameFit(mapped, calibFrame.width, calibFrame.height) * 100);
+  }, [curCalib, calibFrame, kinoveaResult]);
   /** Сохранённая серия прошлого раза для текущего движения. */
   const savedSeries = seriesStore[lift] ?? null;
   const curFirstSnapshot = useMemo(()=> kinoveaReps.length ? snapshotBarRep(kinoveaReps[0]) : null, [kinoveaReps]);
@@ -2099,6 +2106,13 @@ export const LiftMasterCard: React.FC<{
                 ].filter(m => m.pt).map((m, i) => (
                   <span key={i} style={{ position:'absolute', left:`${((m.pt!.videoX / Math.max(1, calibFrame.width)) * 100).toFixed(2)}%`, top:`${((m.pt!.videoY / Math.max(1, calibFrame.height)) * 100).toFixed(2)}%`, transform:'translate(-50%,-50%)', width:14, height:14, borderRadius:7, background:m.color, border:'2px solid #0b0f14', boxShadow:'0 0 0 1px rgba(255,255,255,0.35)' }} />
                 ))}
+              </div>
+            )}
+            {calibFit != null && (
+              <div data-lift="video-calib-fit" role="status" style={{ marginTop:5, fontSize:10, color: calibFit >= 60 ? '#4ade80' : '#fbbf24', lineHeight:1.4 }}>
+                {calibFit >= 60
+                  ? `Точек трека в кадре: ${calibFit}% — линия ляжет по грифу.`
+                  : `Точек трека в кадре: только ${calibFit}% — якорь или масштаб сходятся плохо, линия уйдёт за край.`}
               </div>
             )}
             {calibMsg && <div data-lift="video-calib-msg" role="status" style={{ marginTop:5, fontSize:10, color:'#38bdf8', lineHeight:1.45 }}>{calibMsg}</div>}

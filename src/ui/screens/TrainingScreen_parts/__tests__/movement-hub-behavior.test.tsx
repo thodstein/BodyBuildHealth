@@ -472,6 +472,20 @@ describe('LiftMasterCard — поведение (не только смоук)',
     expect(container.textContent).toContain('Ничего не нашлось');
   });
 
+  it('поиск находит калибровку кадра и подстановку веса по синонимам', () => {
+    const { container } = render(<LiftMasterCard sessions={[]} />);
+    const input = container.querySelector('[data-lift="hub-search"]') as HTMLInputElement;
+
+    act(() => { fireEvent.change(input, { target: { value: 'калибровка кадра' } }); });
+    expect(container.querySelector('[data-lift="hub-search-hit"]')!.textContent).toContain('Видео');
+
+    act(() => { fireEvent.change(input, { target: { value: 'пиксель' } }); });
+    expect(container.querySelector('[data-lift="hub-search-hit"]')!.textContent).toContain('Видео');
+
+    act(() => { fireEvent.change(input, { target: { value: 'подстановка' } }); });
+    expect(container.querySelector('[data-lift="hub-search-hit"]')!.textContent).toContain('VBT');
+  });
+
   it('подходы: «Новый подход» и сравнение «подход vs подход»', () => {
     const { container } = render(<LiftMasterCard sessions={[]} />);
     const area = container.querySelector('[data-lift="kinovea-text"]') as HTMLTextAreaElement;

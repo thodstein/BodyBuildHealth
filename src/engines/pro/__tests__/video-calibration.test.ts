@@ -3,6 +3,7 @@ import {
   mapTrackToVideo,
   calibrationFromTaps,
   isCalibrationSane,
+  calibrationFrameFit,
   preferredVideoMime,
   grabVideoFrame,
   type VideoCalibration,
@@ -102,6 +103,22 @@ describe('preferredVideoMime — контейнер под WebView', () => {
   it('isTypeSupported бросает — не падаем, остаётся webm', () => {
     vi.stubGlobal('MediaRecorder', { isTypeSupported: () => { throw new Error('nope'); } });
     expect(preferredVideoMime()).toEqual({ mime: 'video/webm', ext: 'webm' });
+  });
+});
+
+describe('calibrationFrameFit — калибровка сходится с кадром', () => {
+  it('считает долю точек в пределах кадра', () => {
+    const mapped: Array<[number, number]> = [[10, 10], [100, 100], [-5, 10], [50, 500]];
+    expect(calibrationFrameFit(mapped, 200, 200)).toBe(0.5);
+  });
+
+  it('пустые данные и нулевой кадр — 0, а не NaN', () => {
+    expect(calibrationFrameFit([], 200, 200)).toBe(0);
+    expect(calibrationFrameFit([[1, 1]], 0, 0)).toBe(0);
+  });
+
+  it('все точки внутри кадра — 1', () => {
+    expect(calibrationFrameFit([[0, 0], [200, 200]], 200, 200)).toBe(1);
   });
 });
 

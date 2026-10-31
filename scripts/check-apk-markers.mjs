@@ -207,6 +207,7 @@ for (const hook of [
   'series-copy-', 'data-lift="weight-mismatch"', 'data-lift="video-overlay-file"',
   'data-lift="video-calib"', 'data-lift="video-calib-file"', 'data-lift="video-calib-frame"',
   'data-lift="video-calib-save"', 'data-lift="video-calib-state"', 'data-lift="video-calib-clear"',
+  'data-lift="video-calib-fit"',
   'data-lift="video-offset"', 'data-lift="vbt-weight"', 'data-lift="vbt-weight-from-diary"',
   'data-lift-nav=',
 ]) mustContain(LIFT_HUB, hook, `lift hub hook ${hook}`);
@@ -236,6 +237,7 @@ mustContain(LIFT_HUB, "'13 Старт'", 'lift hub nav 13 label');
 // Видео-оверлей: калибровка «см → пиксель» и контейнер mp4/webm — ядро новой фичи.
 mustContain('src/engines/pro/trajectory-overlay.engine.ts', 'export function mapTrackToVideo', 'video calibration map');
 mustContain('src/engines/pro/trajectory-overlay.engine.ts', 'export function preferredVideoMime', 'video mp4 preference');
+mustContain('src/engines/pro/trajectory-overlay.engine.ts', 'export function calibrationFrameFit', 'video calibration fit');
 
 // 7d. Mojibake-бан: битые символы (U+FFFD) в файлах хаба — признак порванной кодировки.
 // В LiftMasterCard их было 11 (тексты VBT/LVP/Kinovea), и это попадало в UI АПК.
