@@ -6,11 +6,11 @@
  *  - split     : { cycle: string[][], name }                       — структура дней (группы мышц)
  *  - pm        : { squat?, bench?, dead?, lift?, value? }          — предельные максимумы (все или один)
  *  - weakpoints: { groups: string[], lift?, plWeakPoints?, diagnosticExerciseMap?, diagnosticDayMap?, weakGroupExerciseMap?, weakGroupDayMap? } — слабые группы + диагностика движения (карточка «Слабые мышцы → Слабые точки → Мёртвые точки → Движение штанги»)
- *  - pri       : { volumeMult, rirShift }                          — готовность → объём/RIR
+ *  - pri       : { volumeMult, rirShift, volumeSets? }             — готовность → объём/RIR;
+ *                volumeSets — абсолютная цель «сет/мышцу/нед» (MRV/мезо-карточки, работает и на ПЛ)
  *  - tempo     : { eccentric, bottomPause, concentric, topPause, label, mode? } — темп повторений
  *  - tempo_rollback: {} — откат последнего применения темпа (снимок he_tempo_prev_v1)
  *  - rir       : { rirShift, label }                               — корректировка RIR
- *  - mrv       : { mrv: number, label }                            — индивидуальный MRV (сет/м/нед)
  *  - deload    : { volumeMult, rirShift, weeks: number[], label }  — делод-недели
  *  - volume    : { sets: Record<string, number>, label }           — целевой объём по группам
  *  - peak      : { volumeMult, rirTarget, label }                   — пиковая неделя (объём ↓, RIR→target)
@@ -28,7 +28,7 @@
 const KEY = 'he_planner_apply';
 type Listener = (payload: PlannerApply | null) => void;
 
-export type PlannerApplyKind = 'split' | 'pri' | 'weakpoints' | 'pm' | 'tempo' | 'tempo_rollback' | 'rir' | 'mrv' | 'deload' | 'volume' | 'peak' | 'methodology' | 'program' | 'design' | 'macrocycle' | 'cardio' | 'annual_block' | 'limiter' | 'bb_nutrition' | 'arm_cycle' | 'ss_cycle' | 'combat_cycle' | 'cycle';
+export type PlannerApplyKind = 'split' | 'pri' | 'weakpoints' | 'pm' | 'tempo' | 'tempo_rollback' | 'rir' | 'deload' | 'volume' | 'peak' | 'methodology' | 'program' | 'design' | 'macrocycle' | 'cardio' | 'annual_block' | 'limiter' | 'bb_nutrition' | 'arm_cycle' | 'ss_cycle' | 'combat_cycle' | 'cycle';
 
 export interface SplitPayload { cycle: string[][]; name?: string }
 export interface PmPayload { squat?: number; bench?: number; dead?: number; lift?: string; value?: number }
@@ -151,7 +151,6 @@ export interface TempoPayload { eccentric: number; bottomPause?: number; concent
 /** Откат последнего применения темпа (данные не нужны — читается снимок he_tempo_prev_v1). */
 export interface TempoRollbackPayload { [key: string]: unknown }
 export interface RirPayload { rirShift: number; label?: string }
-export interface MrvPayload { mrv: number; label?: string }
 export interface DeloadPayload { volumeMult: number; rirShift: number; weeks: number[]; label?: string }
 export interface VolumePayload { sets: Record<string, number>; label?: string }
 export interface PeakPayload { volumeMult?: number; rirTarget?: number; label?: string; weeks?: unknown; protocol?: unknown; peakCycleId?: string }
@@ -180,7 +179,7 @@ export interface LimiterPayload {
   limiterDayMap?: Record<string, number[]>;
 }
 
-export type PlannerApplyData = SplitPayload | PmPayload | WeakpointsPayload | PriPayload | TempoPayload | TempoRollbackPayload | RirPayload | MrvPayload | DeloadPayload | VolumePayload | PeakPayload | MethodologyPayload | ProgramPayload | DesignPayload | MacrocyclePayload | CardioPayload | AnnualBlockPayload | LimiterPayload | BBNutritionPayload | ArmCyclePayload | SSCyclePayload | CombatCyclePayload | CyclePayload;
+export type PlannerApplyData = SplitPayload | PmPayload | WeakpointsPayload | PriPayload | TempoPayload | TempoRollbackPayload | RirPayload | DeloadPayload | VolumePayload | PeakPayload | MethodologyPayload | ProgramPayload | DesignPayload | MacrocyclePayload | CardioPayload | AnnualBlockPayload | LimiterPayload | BBNutritionPayload | ArmCyclePayload | SSCyclePayload | CombatCyclePayload | CyclePayload;
 
 /** Типобезопасная карта данных для публичного канала. */
 export interface PlannerApplyDataByKind {
@@ -191,7 +190,6 @@ export interface PlannerApplyDataByKind {
   tempo: TempoPayload;
   tempo_rollback: TempoRollbackPayload;
   rir: RirPayload;
-  mrv: MrvPayload;
   deload: DeloadPayload;
   volume: VolumePayload & Record<string, unknown>;
   peak: PeakPayload;

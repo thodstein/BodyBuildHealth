@@ -48,6 +48,13 @@ describe('movement-diagnostics-export', () => {
     }
     expect(csv).toContain("'=cmd|evil");
   });
+  it('VBT-метрика в отчёте — по-русски, без id «mcv»', () => {
+    const csv = buildMovementDiagnosticsCsv({ ...BASE, vbtMetric: 'mcv' });
+    const html = buildMovementDiagnosticsHtml({ ...BASE, vbtMetric: 'peak' });
+    expect(csv).toContain('средняя концентрическая (MCV)');
+    expect(csv).not.toContain('"mcv"');
+    expect(html).toContain('пиковая (Peak)');
+  });
   it('имя файла по лифту и расширению', () => {
     expect(movementDiagnosticsFilename('squat', 'html')).toMatch(/^movement-squat-\d{8}\.html$/);
     expect(movementDiagnosticsFilename('bench', 'csv')).toMatch(/\.csv$/);

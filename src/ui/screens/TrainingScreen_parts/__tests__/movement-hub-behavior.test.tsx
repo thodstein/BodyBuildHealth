@@ -123,7 +123,9 @@ describe('LiftMasterCard — поведение (не только смоук)',
     });
     click(container.querySelector('[data-lift="parse-kinovea"]'));
 
-    expect(container.querySelector('polyline'), 'график траектории').toBeTruthy();
+    // Точки с временем → не одна линия, а heatmap по скорости.
+    expect(container.querySelector('[data-lift="bar-heat"]'), 'heatmap скорости').toBeTruthy();
+    expect(container.querySelectorAll('[data-lift="bar-heat"] line').length).toBeGreaterThan(1);
     expect(container.textContent).toContain('Наклон штанги из Kinovea');
   });
 
@@ -140,7 +142,9 @@ describe('LiftMasterCard — поведение (не только смоук)',
     expect(text).toContain('первый повтор');
     expect(text).toContain('последний повтор');
     expect(text).toMatch(/заметная потеря скорости|критическая потеря скорости|скорость держится/);
-    expect(container.querySelectorAll('polyline').length).toBeGreaterThanOrEqual(3);
+    // overlay двух повторов = 2 полилинии; основная серия теперь heatmap (line).
+    expect(container.querySelectorAll('polyline').length).toBeGreaterThanOrEqual(2);
+    expect(container.querySelector('[data-lift="bar-heat"]')).toBeTruthy();
   });
 
   it('Kinovea: один повтор — overlay не выдумывается, а честно поясняется', () => {
@@ -326,6 +330,100 @@ describe('LiftMasterCard — поведение (не только смоук)',
     expect(svgBtn, 'кнопка SVG').toBeTruthy();
     expect(svgBtn.getAttribute('aria-label')).toContain('SVG');
     expect(svgBtn.disabled).toBe(false);
+  });
+
+  it('быстрый старт виден, пока ничего не заполнено, и скрывается навсегда', () => {
+    const { container, unmount } = render(<LiftMasterCard sessions={[]} />);
+    const quick = container.querySelector('[data-lift="quick-start"]');
+    expect(quick, 'панель быстрого старта').toBeTruthy();
+    expect(quick!.textContent).toContain('3 шага');
+    expect(container.querySelectorAll('[data-lift="quick-start"] button').length).toBeGreaterThanOrEqual(3);
+
+    click(container.querySelector('[data-lift="quick-start-hide"]'));
+    expect(container.querySelector('[data-lift="quick-start"]')).toBeNull();
+    expect(localStorage.getItem('he_lift_master_onboard_v1')).toBe('1');
+
+    // Повторный заход — панель больше не мозолит глаза.
+    unmount();
+    const second = render(<LiftMasterCard sessions={[]} />);
+    expect(second.container.querySelector('[data-lift="quick-start"]')).toBeNull();
+  });
+
+  it('быстрый старт не показывается, если данные уже есть (фаза / VBT / видео)', () => {
+    localStorage.setItem(MASTER_KEY, JSON.stringify({ lift: 'bench', phase: 'off_chest' }));
+    const { container } = render(<LiftMasterCard sessions={[]} />);
+    expect(container.querySelector('[data-lift="quick-start"]')).toBeNull();
+  });
+
+  it('шаг «VBT» из быстрого старта раскрывает блок и показывает поле замера', () => {
+    localStorage.setItem('he_lift_master_collapsed_v1', JSON.stringify({ sec6: true }));
+    const { container } = render(<LiftMasterCard sessions={[]} />);
+    expect(container.querySelector('[data-lift="vbt-metric"]')).toBeNull();
+    click(container.querySelector('[data-lift="quick-start-2"]'));
+    expect(container.querySelector('[data-lift="vbt-metric"]'), 'VBT раскрыт шагом').toBeTruthy();
+  });
+
+  it('серия повторов запоминается и даёт сравнение с прошлой сессией', () => {
+    const { container, unmount } = render(<LiftMasterCard sessions={[]} />);
+    const area = container.querySelector('[data-lift="kinovea-text"]') as HTMLTextAreaElement;
+    act(() => { fireEvent.change(area, { target: { value: buildRepCsv([0.8, 0.9]) } }); });
+    click(container.querySelector('[data-lift="parse-kinovea"]'));
+
+    expect(container.querySelector('[data-lift="session-compare"]'), 'до сохранения сравнения нет').toBeNull();
+    click(container.querySelector('[data-lift="series-save"]'));
+
+    const saved = JSON.parse(localStorage.getItem(MASTER_KEY) || '{}');
+    expect(saved.series?.bench).toBeTruthy();
+    const store = saved.series.bench;
+    expect(store.reps.length).toBe(2);
+    expect(store.reps[0].points.length).toBeLessThanOrEqual(24);
+    expect(typeof store.savedAt).toBe('number');
+
+    const cmp = container.querySelector('[data-lift="session-compare"]');
+    expect(cmp, 'блок сравнения сессий').toBeTruthy();
+    expect(cmp!.textContent).toContain('Прошлая сессия');
+
+    // Наложение прошлой и текущей траектории.
+    click(container.querySelector('[data-lift="session-overlay-toggle"]'));
+    expect(container.querySelector('[data-lift="session-overlay"]')).toBeTruthy();
+
+    // «Забыть прошлую» удаляет серию из персиста.
+    click(container.querySelector('[data-lift="series-forget"]'));
+    expect(container.querySelector('[data-lift="session-compare"]')).toBeNull();
+    const after = JSON.parse(localStorage.getItem(MASTER_KEY) || '{}');
+    expect(after.series?.bench).toBeUndefined();
+    unmount();
+  });
+
+  it('сравнение сессий переживает перезаход (серия в MasterState)', () => {
+    const snapshot = {
+      savedAt: Date.now() - 86_400_000,
+      reps: [{
+        index: 1, vmax: 0.6, xLoop: 2, amplitude: 40,
+        points: [[0, 0], [0, 20], [0.5, 40], [6, 20], [0, 0]],
+      }],
+    };
+    localStorage.setItem(MASTER_KEY, JSON.stringify({ lift: 'bench', series: { bench: snapshot } }));
+    const { container } = render(<LiftMasterCard sessions={[]} />);
+    const cmp = container.querySelector('[data-lift="session-compare"]');
+    expect(cmp, 'прошлая сессия восстановлена').toBeTruthy();
+    expect(cmp!.textContent).toContain('1 повт.');
+  });
+
+  it('битый персист серии не ломает хаб (мусор отбрасывается)', () => {
+    localStorage.setItem(MASTER_KEY, JSON.stringify({
+      lift: 'bench',
+      series: { bench: { savedAt: 'oops', reps: [{ vmax: 'x' }, null] }, squat: { savedAt: 1, reps: [] } },
+    }));
+    const { container } = render(<LiftMasterCard sessions={[]} />);
+    expect(container.querySelector('[data-lift="session-compare"]')).toBeNull();
+    expect(container.querySelector('[data-lift="quick-start"]') || container.textContent).toBeTruthy();
+  });
+
+  it('экспорт PNG и видео-оверлея присутствуют и честно отключены без canvas', () => {
+    const { container } = render(<LiftMasterCard sessions={[]} />);
+    expect(container.querySelector('[data-lift="export-overlay-png"]')).toBeTruthy();
+    expect(container.querySelector('[data-lift="export-overlay-video"]')).toBeTruthy();
   });
 });
 

@@ -461,3 +461,109 @@ export function videoQualityForCapture(meta: VideoCaptureMeta): VideoQuality {
   if (hasD && ((d as number) > 8 || (d as number) < 2)) return { flag: 'rough', reason: `Дистанция ${d}м вне 2–8м: перспективные искажения xLoop.` };
   return { flag: 'ok', reason: 'Геометрия съёмки в допуске — xLoop сравним.' };
 }
+
+/**
+ * Heatmapping траектории по скорости (gap #11): каждый отрезок между соседними
+ * точками красится по скорости (см/с), а не вся линия одним цветом.
+ * Границы — по перцентилям самой серии, а не абсолютные м/с: разные лифты и
+ * разные масштабы съёмки дают разный диапазон, поэтому «быстро» = верхняя треть.
+ */
+export interface BarHeatSegment {
+  x1: number; y1: number; x2: number; y2: number;
+  /** Скорость отрезка, см/с. */
+  speed: number;
+  level: 'slow' | 'mid' | 'fast';
+}
+
+export function barSpeedHeat(points: BarPoint[], opts?: { slowPct?: number; fastPct?: number }): BarHeatSegment[] {
+  if (!Array.isArray(points) || points.length < 2) return [];
+  const slowPct = opts?.slowPct ?? 0.33;
+  const fastPct = opts?.fastPct ?? 0.66;
+  const raw: Array<{ x1: number; y1: number; x2: number; y2: number; speed: number }> = [];
+  for (let i = 1; i < points.length; i++) {
+    const a = points[i - 1];
+    const b = points[i];
+    const dt = b.t - a.t;
+    // Без валидного времени скорость не выдумываем — отрезок пропускаем.
+    if (!Number.isFinite(dt) || dt <= 0) continue;
+    const dist = Math.hypot(b.x - a.x, b.y - a.y);
+    const speed = dist / dt;
+    if (!Number.isFinite(speed)) continue;
+    raw.push({ x1: a.x, y1: a.y, x2: b.x, y2: b.y, speed: Math.round(speed * 10) / 10 });
+  }
+  if (!raw.length) return [];
+  const sorted = raw.map(r => r.speed).sort((a, b) => a - b);
+  const q = (p: number) => sorted[Math.min(sorted.length - 1, Math.max(0, Math.round(p * (sorted.length - 1))))];
+  const lo = q(slowPct);
+  const hi = q(fastPct);
+  return raw.map(r => ({
+    ...r,
+    level: r.speed <= lo ? 'slow' : r.speed >= hi ? 'fast' : 'mid',
+  }));
+}
+
+/** Цвета heatmap: медленно (срыв) — красный, середина — жёлтый, быстро — зелёный. */
+export const BAR_HEAT_COLORS: Record<BarHeatSegment['level'], string> = {
+  slow: '#f87171',
+  mid: '#fbbf24',
+  fast: '#00e68a',
+};
+
+/** Компактное представление повтора для персиста (точи → массив [x,y] с прореживанием). */
+export interface BarRepSnapshot {
+  index: number;
+  vmax: number;
+  xLoop: number;
+  amplitude: number;
+  /** Прореженные точки: [[x,y], …] (не больше maxPoints). */
+  points: Array<[number, number]>;
+}
+
+/** Прореживает повтор до maxPoints так, чтобы сохранить форму траектории (равномерно по индексу). */
+export function snapshotBarRep(rep: BarRepSegment, maxPoints = 24): BarRepSnapshot {
+  const src = rep.points ?? [];
+  const n = Math.max(0, Math.min(maxPoints, src.length));
+  const points: Array<[number, number]> = [];
+  if (n === 1) points.push([Math.round(src[0].x * 10) / 10, Math.round(src[0].y * 10) / 10]);
+  else if (n > 1) {
+    for (let i = 0; i < n; i++) {
+      const p = src[Math.round((i * (src.length - 1)) / (n - 1))];
+      points.push([Math.round(p.x * 10) / 10, Math.round(p.y * 10) / 10]);
+    }
+  }
+  return {
+    index: rep.index,
+    vmax: Math.round(rep.vmax * 100) / 100,
+    xLoop: Math.round(rep.xLoop * 10) / 10,
+    amplitude: Math.round(rep.amplitude * 10) / 10,
+    points,
+  };
+}
+
+/** Сравнение «прошлая сессия vs текущая» по одноимённым повторам (обычно первый vs первый). */
+export interface BarSessionCompare {
+  /** vmax прошлой сессии (первый повтор), м/с. */
+  prevVmax: number;
+  /** vmax текущей сессии (первый повтор), м/с. */
+  curVmax: number;
+  /** Δvmax, %: отрицательное — скорость упала (усталость/форма). */
+  deltaPct: number;
+  deltaXLoopCm: number;
+  deltaAmplitudeCm: number;
+  verdict: 'better' | 'same' | 'worse';
+  text: string;
+}
+
+export function compareBarSessions(prev: BarRepSnapshot | null | undefined, cur: BarRepSnapshot | null | undefined): BarSessionCompare | null {
+  if (!prev || !cur) return null;
+  if (!(prev.vmax > 0) || !(cur.vmax > 0)) return null;
+  const deltaPct = Math.round(((cur.vmax - prev.vmax) / prev.vmax) * 100);
+  const deltaXLoopCm = Math.round((cur.xLoop - prev.xLoop) * 10) / 10;
+  const deltaAmplitudeCm = Math.round((cur.amplitude - prev.amplitude) * 10) / 10;
+  const verdict: BarSessionCompare['verdict'] = deltaPct <= -5 ? 'worse' : deltaPct >= 5 ? 'better' : 'same';
+  const head = verdict === 'worse' ? 'vmax ниже прошлой сессии' : verdict === 'better' ? 'vmax выше прошлой сессии' : 'vmax на уровне прошлой сессии';
+  return {
+    prevVmax: prev.vmax, curVmax: cur.vmax, deltaPct, deltaXLoopCm, deltaAmplitudeCm, verdict,
+    text: `${head}: ${prev.vmax.toFixed(2)} → ${cur.vmax.toFixed(2)} м/с (${deltaPct > 0 ? '+' : ''}${deltaPct}%) · xLoop ${deltaXLoopCm > 0 ? '+' : ''}${deltaXLoopCm} см`,
+  };
+}

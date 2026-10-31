@@ -75,4 +75,42 @@ describe('buildTrajectorySvg — экспорт траектории штанг�
     });
     expect(svg).toContain('качество: ok');
   });
+
+  it('heatmap: с временем серия рисуется цветными отрезками и легендой скоростей', () => {
+    // t растёт: медленный старт, быстрая середина, медленный финиш
+    const withT = [
+      { x: 0, y: 0, t: 0 },
+      { x: 0.5, y: 5, t: 1 },
+      { x: 1, y: 20, t: 1.2 },
+      { x: 1.5, y: 35, t: 1.4 },
+      { x: 2, y: 45, t: 2.4 },
+    ];
+    const svg = buildTrajectorySvg({ liftRu: 'Присед', series: withT });
+    expect(svg).toContain('быстро');
+    expect(svg).toContain('медленно (срыв)');
+    expect(svg).toContain('#00e68a'); // fast
+    expect(svg).toContain('#f87171'); // slow
+    // серия разбита на отрезки, а не одной полилинией
+    expect(svg.match(/<line /g)?.length ?? 0).toBeGreaterThanOrEqual(3);
+    expect(svg).not.toContain('NaN');
+  });
+
+  it('heat=false отключает раскраску по скорости (обычная линия)', () => {
+    const withT = REP.map((p, i) => ({ ...p, t: i * 0.5 }));
+    const svg = buildTrajectorySvg({ liftRu: 'Присед', series: withT, heat: false });
+    expect(svg).not.toContain('медленно (срыв)');
+    expect(svg.match(/<path /g)?.length).toBe(1);
+  });
+
+  it('справка прошлой сессии: серая линия, легенда и строка сравнения', () => {
+    const svg = buildTrajectorySvg({
+      liftRu: 'Присед',
+      series: REP,
+      prevRep: REP.map((p) => ({ x: p.x - 1, y: p.y })),
+      sessionText: 'vmax ниже прошлой сессии: 0.55 → 0.48 м/с (−13%) · xLoop +0.5 см',
+    });
+    expect(svg).toContain('прошлая сессия');
+    expect(svg).toContain('vmax ниже прошлой сессии');
+    expect(svg).toContain('stroke-dasharray="2 3"');
+  });
 });

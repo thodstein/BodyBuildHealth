@@ -44,13 +44,14 @@ import { getPLWeakGroupExerciseCandidates, diagnosticProtocolFromCycle } from '.
 import type { SRCycleTemplate } from '../../../data/lms-cycles/lms-types';
 import { applyToPlanner } from './planner-bridge';
 import { getExerciseById } from '../../../core/exercise-catalog';
-import { parseKinoveaCSV, analyzeBarTracking, segmentBarReps, barRepOverlay, videoQualityForCapture, type BarTrackingResult, type BarRepSegment, type VideoCaptureMeta } from '../../../engines/strength-sport/strength-sport-video.engine';
+import { parseKinoveaCSV, analyzeBarTracking, segmentBarReps, barRepOverlay, videoQualityForCapture, barSpeedHeat, BAR_HEAT_COLORS, snapshotBarRep, compareBarSessions, type BarTrackingResult, type BarRepSegment, type BarRepSnapshot, type VideoCaptureMeta } from '../../../engines/strength-sport/strength-sport-video.engine';
 import { barLoopFlag } from '../../../engines/pro/bar-path-core.engine';
 import { diagnoseAsymmetry } from '../../../engines/pro/pl-asymmetry.engine';
 import { RULE_CHECKS, checkLiftRules } from '../../../engines/pro/pl-competition-rules.engine';
 import { RED_FLAGS, checkRedFlags, type RedFlagId } from '../../../engines/pro/pl-red-flags.engine';
 import { buildMovementDiagnosticsHtml, buildMovementDiagnosticsCsv, buildTrajectorySvg, movementDiagnosticsFilename, type MovementDiagnosticsExportInput } from '../../../engines/pro/movement-diagnostics-export.engine';
-import { copyOrShareText, saveCsvApk, printHtmlApk, saveTextFileApk, shareOutcomeLabel } from '../../../core/apk-share';
+import { renderTrajectoryPng, recordTrajectoryWebm, canRecordTrajectory, dataUrlToBlob } from '../../../engines/pro/trajectory-overlay.engine';
+import { copyOrShareText, saveCsvApk, printHtmlApk, saveTextFileApk, saveBlobApk, shareOutcomeLabel } from '../../../core/apk-share';
 import { VideoCaptureCard } from './VideoCaptureCard';
 import StickingPointAnalysisCard from './StickingPointAnalysisCard';
 import { RIRCalibrationCard } from './RIRCalibrationCard';
@@ -273,6 +274,8 @@ interface MasterState {
   lvp: Record<string, { slope: number; intercept: number; r2: number }>;
   /** Параметры захвата видео: влияют на достоверность xLoop/vmax (Shah 2026). */
   capture: { heightM: string; distM: string; side: string; device: string };
+  /** Прошлая серия повторов per-lift — для сравнения «прошлая сессия vs текущая». */
+  series?: Record<string, { savedAt: number; reps: BarRepSnapshot[] }>;
 }
 
 function isRecord(v: unknown): v is Record<string, unknown> { return !!v && typeof v === 'object' && !Array.isArray(v); }
@@ -334,8 +337,9 @@ function loadMaster(): MasterState {
       meetMaxD: typeof raw.meetMaxD === 'string' ? raw.meetMaxD.slice(0, 20) : '',
       lvp: cleanLvp(raw.lvp),
       capture: cleanCapture(raw.capture),
+      series: cleanSeries(raw.series),
     };
-  } catch { return { lift:'bench', phase:'' as WeakPoint|'', issues:[], selectedGeom:{}, daysGeom:{}, selectedDiag:{}, daysDiag:{}, weakMuscleGroups:[], weakMuscleSubs:[], asymSide:null, asymL:'', asymR:'', vbtBest:'', vbtLast:'', vbtWeight:'', vbtGoal:'strength', vbtUpdatedAt:null, vbtPauseMs:'', asymPhase:{ startL:'', startR:'', midL:'', midR:'', lockL:'', lockR:'' }, dualSensor:{ left:'', right:'' }, perLift:{}, redFlags:[], ruleChecks:{}, meetDate:'', meetStrategy:'balanced' as MeetStrategy, meetMaxS:'', meetMaxB:'', meetMaxD:'', lvp:{}, capture:{ heightM:'', distM:'', side:'', device:'' } }; }
+  } catch { return { lift:'bench', phase:'' as WeakPoint|'', issues:[], selectedGeom:{}, daysGeom:{}, selectedDiag:{}, daysDiag:{}, weakMuscleGroups:[], weakMuscleSubs:[], asymSide:null, asymL:'', asymR:'', vbtBest:'', vbtLast:'', vbtWeight:'', vbtGoal:'strength', vbtUpdatedAt:null, vbtPauseMs:'', asymPhase:{ startL:'', startR:'', midL:'', midR:'', lockL:'', lockR:'' }, dualSensor:{ left:'', right:'' }, perLift:{}, redFlags:[], ruleChecks:{}, meetDate:'', meetStrategy:'balanced' as MeetStrategy, meetMaxS:'', meetMaxB:'', meetMaxD:'', lvp:{}, capture:{ heightM:'', distM:'', side:'', device:'' }, series:{} }; }
 }
 function saveMaster(s: MasterState) { try{ localStorage.setItem(MASTER_KEY, JSON.stringify(s)); }catch{} }
 function cleanRuleChecks(raw: unknown): Record<string, boolean> {
@@ -348,12 +352,39 @@ function cleanRuleChecks(raw: unknown): Record<string, boolean> {
 }
 
 /** Параметры захвата: только известные ракурсы/устройства, числа как строки ввода. */
-function cleanCapture(raw: unknown): MasterState['capture'] {
-  const o = isRecord(raw) ? raw : {};
+function cleanCapture(raw: unknown): MasterState['capture'] {  const o = isRecord(raw) ? raw : {};
   const str = (v: unknown, max = 8) => (typeof v === 'string' ? v.slice(0, max) : '');
   const side = o.side === 'left' || o.side === 'right' || o.side === 'front' ? o.side : '';
   const device = o.device === 'kinovea' || o.device === 'enode' || o.device === 'phone' ? o.device : '';
   return { heightM: str(o.heightM), distM: str(o.distM), side, device };
+}
+
+/** Прошлые серии повторов: только конечные числа, ≤12 повторов по ≤24 точки.
+ *  Bit-мусор в localStorage не должен ломать сравнение сессий. */
+function cleanSeries(raw: unknown): NonNullable<MasterState['series']> {
+  if (!isRecord(raw)) return {};
+  const out: NonNullable<MasterState['series']> = {};
+  for (const [key, val] of Object.entries(raw)) {
+    if (key.length > 20 || !isRecord(val)) continue;
+    const savedAt = Number(val.savedAt);
+    if (!Number.isFinite(savedAt) || savedAt <= 0) continue;
+    const repsRaw = Array.isArray(val.reps) ? val.reps : [];
+    const reps: BarRepSnapshot[] = [];
+    for (const r of repsRaw.slice(0, 12)) {
+      if (!isRecord(r)) continue;
+      const vmax = Number(r.vmax), xLoop = Number(r.xLoop), amplitude = Number(r.amplitude), index = Number(r.index);
+      if (!Number.isFinite(vmax) || !Number.isFinite(xLoop) || !Number.isFinite(amplitude)) continue;
+      const pts: Array<[number, number]> = [];
+      for (const p of Array.isArray(r.points) ? r.points.slice(0, 24) : []) {
+        if (!Array.isArray(p) || p.length < 2) continue;
+        const x = Number(p[0]), y = Number(p[1]);
+        if (Number.isFinite(x) && Number.isFinite(y)) pts.push([x, y]);
+      }
+      reps.push({ index: Number.isFinite(index) ? index : reps.length + 1, vmax, xLoop, amplitude, points: pts });
+    }
+    if (reps.length) out[key] = { savedAt, reps };
+  }
+  return out;
 }
 
 /** LVP-калибровки per-lift: только конечные числа, ключ = имя лифта. */function cleanLvp(raw: unknown): Record<string, { slope: number; intercept: number; r2: number }> {
@@ -529,6 +560,10 @@ export const LiftMasterCard: React.FC<{
   const [kinoveaResult, setKinoveaResult] = useState<BarTrackingResult | null>(null);
   /** Повторы, нарезанные из Kinovea-серии (для overlay «первый vs последний»). */
   const [kinoveaReps, setKinoveaReps] = useState<BarRepSegment[]>([]);
+  /** Прошлые серии повторов per-lift (персист) — сравнение «прошлая сессия vs текущая». */
+  const [seriesStore, setSeriesStore] = useState<NonNullable<MasterState['series']>>(initial.series ?? {});
+  /** Наложение прошлой сессии на текущую траекторию. */
+  const [compareOn, setCompareOn] = useState(false);
   const [videoNote, setVideoNote] = useState('');
   /** Пояснение «демо-оценка не записана в VBT» (честность данных). */
   const [videoMsg, setVideoMsg] = useState<string | null>(null);
@@ -542,6 +577,15 @@ export const LiftMasterCard: React.FC<{
     } catch { return { ...DEFAULT_COLLAPSED }; }
   });
   const toggleCollapsed = (id: string) => setCollapsed(p => ({ ...p, [id]: !p[id] }));
+  /** Онбординг «Быстрый старт»: скрывается навсегда по кнопке (флаг в localStorage). */
+  const [onboardHidden, setOnboardHidden] = useState<boolean>(() => {
+    try { return localStorage.getItem('he_lift_master_onboard_v1') === '1'; } catch { return false; }
+  });
+  /** Раскрыть блок и прокрутить к нему (шаги быстрого старта). */
+  const jumpToSection = useCallback((key: string, domId: string) => {
+    setCollapsed(prev => ({ ...prev, [key]: false }));
+    try { document.getElementById(domId)?.scrollIntoView({ block: 'start', behavior: 'smooth' }); } catch {}
+  }, []);
   useEffect(() => { try { localStorage.setItem('he_lift_master_collapsed_v1', JSON.stringify(collapsed)); } catch {} }, [collapsed]);
   useEffect(()=>{
     try{
@@ -554,7 +598,7 @@ export const LiftMasterCard: React.FC<{
     }catch{}
   }, []);
 
-  useEffect(()=>{ saveMaster({ lift, phase, issues, selectedGeom, daysGeom, selectedDiag, daysDiag, weakMuscleGroups, weakMuscleSubs, asymSide, asymL, asymR, vbtBest, vbtLast, vbtWeight, vbtGoal, vbtUpdatedAt, vbtPauseMs, asymPhase: { startL: asymStartL, startR: asymStartR, midL: asymMidL, midR: asymMidR, lockL: asymLockL, lockR: asymLockR }, dualSensor: { left: dualLeft, right: dualRight }, perLift, redFlags, ruleChecks, meetDate, meetStrategy, meetMaxS, meetMaxB, meetMaxD, lvp: lvpSaved, capture }); }, [lift, phase, issues, selectedGeom, daysGeom, selectedDiag, daysDiag, weakMuscleGroups, weakMuscleSubs, asymSide, asymL, asymR, vbtBest, vbtLast, vbtWeight, vbtGoal, vbtUpdatedAt, vbtPauseMs, asymStartL, asymStartR, asymMidL, asymMidR, asymLockL, asymLockR, dualLeft, dualRight, perLift, redFlags, ruleChecks, meetDate, meetStrategy, meetMaxS, meetMaxB, meetMaxD, lvpSaved, capture]);
+  useEffect(()=>{ saveMaster({ lift, phase, issues, selectedGeom, daysGeom, selectedDiag, daysDiag, weakMuscleGroups, weakMuscleSubs, asymSide, asymL, asymR, vbtBest, vbtLast, vbtWeight, vbtGoal, vbtUpdatedAt, vbtPauseMs, asymPhase: { startL: asymStartL, startR: asymStartR, midL: asymMidL, midR: asymMidR, lockL: asymLockL, lockR: asymLockR }, dualSensor: { left: dualLeft, right: dualRight }, perLift, redFlags, ruleChecks, meetDate, meetStrategy, meetMaxS, meetMaxB, meetMaxD, lvp: lvpSaved, capture, series: seriesStore }); }, [lift, phase, issues, selectedGeom, daysGeom, selectedDiag, daysDiag, weakMuscleGroups, weakMuscleSubs, asymSide, asymL, asymR, vbtBest, vbtLast, vbtWeight, vbtGoal, vbtUpdatedAt, vbtPauseMs, asymStartL, asymStartR, asymMidL, asymMidR, asymLockL, asymLockR, dualLeft, dualRight, perLift, redFlags, ruleChecks, meetDate, meetStrategy, meetMaxS, meetMaxB, meetMaxD, lvpSaved, capture, seriesStore]);
 
   /** Переключение лифта: сохраняем фазу/отклонения текущего и восстанавливаем выбор целевого.
    *  Раньше общий state обнулялся — пользователь терял выбранную фазу после каждого щелчка. */
@@ -602,6 +646,14 @@ export const LiftMasterCard: React.FC<{
     device: (capture.device || null) as VideoCaptureMeta['device'],
   }), [capture]);
   const captureQuality = useMemo(()=> videoQualityForCapture(captureMeta), [captureMeta]);
+  /** Heatmapping: отрезки траектории, окрашенные по скорости (нужно ≥2 точки с временем). */
+  const kinoveaHeat = useMemo(()=> kinoveaResult ? barSpeedHeat(kinoveaResult.points) : [], [kinoveaResult]);
+  /** Сохранённая серия прошлого раза для текущего движения. */
+  const savedSeries = seriesStore[lift] ?? null;
+  const curFirstSnapshot = useMemo(()=> kinoveaReps.length ? snapshotBarRep(kinoveaReps[0]) : null, [kinoveaReps]);
+  const sessionCompare = useMemo(()=> compareBarSessions(savedSeries?.reps?.[0], curFirstSnapshot), [savedSeries, curFirstSnapshot]);
+  /** Прошлая сессия в виде {x,y} — для SVG/PNG/видео-оверлея (в персисте точки компактные). */
+  const savedRepPoints = useMemo(()=> (savedSeries?.reps?.[0]?.points ?? []).map(([x, y]) => ({ x, y })), [savedSeries]);
 
   // diary hint (каноника phaseForReps)
   const diaryHint = useMemo(()=>{
@@ -834,7 +886,8 @@ export const LiftMasterCard: React.FC<{
       kinoveaTurnoverMs: kinoveaResult && kinoveaResult.turnoverMs != null ? kinoveaResult.turnoverMs : null,
       kinoveaReps: kinoveaReps.length > 0 ? kinoveaReps.length : null,
       overlayVelocityLossPct: kinoveaOverlay ? kinoveaOverlay.velocityLossPct : null,
-      captureQuality: captureQuality.flag === 'unknown' ? 'не задано' : `${captureQuality.flag} — ${captureQuality.reason}`,
+      captureQuality: captureQuality.flag === 'unknown' ? 'не задано'
+        : `${captureQuality.flag === 'ok' ? 'в норме' : 'грубо'} — ${captureQuality.reason}`,
       asymmetryPct: asymDiag ? asymDiag.pct : null,
       asymmetryVerdict: asymDiag ? asymDiag.text : '',
       vbtMetric,
@@ -852,6 +905,16 @@ export const LiftMasterCard: React.FC<{
   const selectedDiagCount = Object.values(scopedDiag).reduce((s,n)=>s+n.length,0);
   const totalSelected = selectedGeomCount + selectedDiagCount + weakMuscleSubs.length;
   const totalSelectedAllLifts = Object.values(selectedGeom).reduce((s,n)=>s+n.length,0) + Object.values(selectedDiag).reduce((s,n)=>s+n.length,0) + weakMuscleSubs.length;
+  /** Ничего не заполнено → вместо пустых блоков показываем «Быстрый старт». */
+  const nothingFilled = !phase
+    && !String(vbtLast).trim()
+    && !kinoveaResult
+    && kinoveaReps.length === 0
+    && totalSelected === 0
+    && issues.length === 0
+    && redFlags.length === 0
+    && !String(capture.heightM).trim()
+    && !String(capture.distM).trim();
 
   // analyses for weak muscle subs
   const muscleAnalyses = useMemo(()=>{
@@ -897,6 +960,34 @@ export const LiftMasterCard: React.FC<{
         <div style={{ fontSize:11, fontWeight:800, color:ACCENT, marginRight:6 }}>Движение:</div>
         {(Object.keys(LIFT_RU) as Lift[]).map(l=>{ const on=lift===l; return <button key={l} data-lift-nav={l} onClick={()=>setLift(l)} style={{ minHeight:44, padding:'6px 10px', borderRadius:14, cursor:'pointer', border: on?'1px solid '+ACCENT:'1px solid rgba(255,255,255,0.1)', background: on?'rgba(0,230,138,0.15)':'transparent', color: on?ACCENT:DIM, fontWeight:700, fontSize:10 }}>{LIFT_RU[l]}{on?' ✓':''}</button>; })}
       </div>
+      {/* Быстрый старт: пока ничего не заполнено — три честных шага вместо пустых блоков. */}
+      {!onboardHidden && nothingFilled && (
+        <div data-lift="quick-start" style={{ ...CARD, border:'1px solid rgba(0,230,138,0.22)', background:'rgba(0,230,138,0.06)' }}>
+          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:8, marginBottom:6 }}>
+            <div style={{ fontSize:11, fontWeight:800, color:ACCENT }}>🚀 Быстрый старт — 3 шага для {LIFT_RU[lift]}</div>
+            <button data-lift="quick-start-hide" aria-label="Скрыть быстрый старт" onClick={()=>{
+              setOnboardHidden(true);
+              try { localStorage.setItem('he_lift_master_onboard_v1', '1'); } catch {}
+            }} style={{ minHeight:32, padding:'4px 10px', borderRadius:8, cursor:'pointer', background:'transparent', color:'#fff', border:'1px solid rgba(255,255,255,0.14)', fontSize:10 }}>Скрыть</button>
+          </div>
+          <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+            {[
+              { n:1, key:'sec2', dom:'sec-3', text:'Слабая точка в фазе движения', hint:'что тормозит штангу' },
+              { n:2, key:'sec6', dom:'sec-7', text:'Замер скорости (VBT)', hint:'лучшая и последняя, м/с' },
+              { n:3, key:'secVideo', dom:'sec-8', text:'Видео сбоку и разбор CSV', hint:'xLoop, серия повторов, экспорт' },
+            ].map(step => (
+              <button key={step.n} data-lift={`quick-start-${step.n}`} onClick={()=> jumpToSection(step.key, step.dom)} style={{ display:'flex', alignItems:'center', gap:8, textAlign:'left', minHeight:44, padding:'8px 10px', borderRadius:10, cursor:'pointer', background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.08)', color:'#fff' }}>
+                <span style={{ width:20, height:20, borderRadius:6, flexShrink:0, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(0,230,138,0.18)', color:ACCENT, fontSize:11, fontWeight:800 }}>{step.n}</span>
+                <span style={{ minWidth:0 }}>
+                  <span style={{ display:'block', fontSize:11, fontWeight:700 }}>{step.text}</span>
+                  <span style={{ display:'block', fontSize:9, color:'#fff', opacity:0.65, marginTop:1 }}>{step.hint}</span>
+                </span>
+              </button>
+            ))}
+          </div>
+          <div style={{ marginTop:6, fontSize:9, color:'#fff', opacity:0.6, lineHeight:1.4 }}>Данные сохраняются на устройстве; хаб ничего не отправляет в сеть. Шаги можно пропускать в любом порядке.</div>
+        </div>
+      )}
       {/* антропометрия редактор */}
       <div id="sec-0" style={collapsibleCard('#a78bfa')}>
         <button onClick={()=> toggleCollapsed('secAnthro')} aria-expanded={!collapsed['secAnthro']} style={headerBtnStyle('#a78bfa', !!collapsed['secAnthro'])}>
@@ -1212,13 +1303,28 @@ export const LiftMasterCard: React.FC<{
             <rect x="90" y="10" width="40" height="70" fill="rgba(0,230,138,0.08)" stroke="#00e68a" strokeDasharray="4 3" />
             <text x="110" y="8" fontSize="8" fill="#00e68a" textAnchor="middle">target-zone</text>
             {kinoveaResult && kinoveaResult.points && kinoveaResult.points.length > 2 ? (
-              <polyline points={kinoveaResult.points.map((p, idx) => {
-                const xs = kinoveaResult.points.map(q=>q.x); const ys = kinoveaResult.points.map(q=>q.y);
-                const minX = Math.min(...xs), maxX = Math.max(...xs); const minY = Math.min(...ys), maxY = Math.max(...ys);
-                const x = 30 + ((p.x - minX) / Math.max(0.001, maxX - minX)) * 160;
-                const y = 80 - ((p.y - minY) / Math.max(0.001, maxY - minY)) * 60;
-                return x + "," + y;
-              }).join(" ")} fill="none" stroke="#38bdf8" strokeWidth="1.5" />
+              kinoveaHeat.length ? (
+                /* Heatmapping: цвет отрезка = скорость (медленно = срыв). */
+                <g data-lift="bar-heat">
+                  {(() => {
+                    const xs = kinoveaResult.points.map(q=>q.x); const ys = kinoveaResult.points.map(q=>q.y);
+                    const minX = Math.min(...xs), maxX = Math.max(...xs); const minY = Math.min(...ys), maxY = Math.max(...ys);
+                    const mx = (v: number) => 30 + ((v - minX) / Math.max(0.001, maxX - minX)) * 160;
+                    const my = (v: number) => 80 - ((v - minY) / Math.max(0.001, maxY - minY)) * 60;
+                    return kinoveaHeat.map((s, i) => (
+                      <line key={i} x1={mx(s.x1)} y1={my(s.y1)} x2={mx(s.x2)} y2={my(s.y2)} stroke={BAR_HEAT_COLORS[s.level]} strokeWidth="1.8" strokeLinecap="round" />
+                    ));
+                  })()}
+                </g>
+              ) : (
+                <polyline points={kinoveaResult.points.map((p, idx) => {
+                  const xs = kinoveaResult.points.map(q=>q.x); const ys = kinoveaResult.points.map(q=>q.y);
+                  const minX = Math.min(...xs), maxX = Math.max(...xs); const minY = Math.min(...ys), maxY = Math.max(...ys);
+                  const x = 30 + ((p.x - minX) / Math.max(0.001, maxX - minX)) * 160;
+                  const y = 80 - ((p.y - minY) / Math.max(0.001, maxY - minY)) * 60;
+                  return x + "," + y;
+                }).join(" ")} fill="none" stroke="#38bdf8" strokeWidth="1.5" />
+              )
             ) : null}
             {kinoveaResult ? (
               <ellipse cx="110" cy="45" rx={Math.max(4, kinoveaResult.xLoop * 4)} ry="22" fill="none" stroke="#f59e0b" strokeWidth="2" />
@@ -1389,7 +1495,7 @@ export const LiftMasterCard: React.FC<{
         </div>
         <div style={{ display:'flex', gap:5, flexWrap:'wrap', marginTop:6, alignItems:'center' }}>
           <span style={{ fontSize:10, color:'#ffffff' }}>Метрика:</span>
-          {(['mcv','mpv','peak'] as const).map(m=>{ const on=vbtMetric===m; const label = m==='mcv'?'Mean':m==='mpv'?'MPV':'Peak'; return <button key={m} data-lift="vbt-metric" onClick={()=>setVbtMetric(m)} aria-pressed={on} style={{ minHeight:44, padding:'10px 10px', borderRadius:8, cursor:'pointer', border: on?'1px solid #f472b6':'1px solid rgba(255,255,255,0.1)', background: on?'rgba(244,114,182,0.15)':'transparent', color: on?'#f472b6':'#ffffff', fontSize:10, fontWeight:700 }}>{label}{on?' ✓':''}</button>; })}
+          {(['mcv','mpv','peak'] as const).map(m=>{ const on=vbtMetric===m; const label = m==='mcv'?'Средняя':m==='mpv'?'MPV':'Пиковая'; return <button key={m} data-lift="vbt-metric" title={m==='mcv'?'Средняя скорость концентрической фазы':m==='mpv'?'Средняя скорость по всему подъёму':'Пиковая скорость'} onClick={()=>setVbtMetric(m)} aria-pressed={on} style={{ minHeight:44, padding:'10px 10px', borderRadius:8, cursor:'pointer', border: on?'1px solid #f472b6':'1px solid rgba(255,255,255,0.1)', background: on?'rgba(244,114,182,0.15)':'transparent', color: on?'#f472b6':'#ffffff', fontSize:10, fontWeight:700 }}>{label}{on?' ✓':''}</button>; })}
           <label style={{ fontSize:10, color:'#ffffff' }}>VL-порог %: <input type="number" min="5" max="60" step="5" value={vbtThreshold} onChange={e=>{ const v=parseFloat(e.target.value); if(Number.isFinite(v)&&v>0) setVbtThreshold(v as VelocityLossThreshold); touchVbt(); }} style={{ width:60, marginLeft:4, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.15)', color:'#fff', borderRadius:6, padding:'4px 6px', fontSize:11 }} /></label>
           <label style={{ fontSize:10, color:'#ffffff' }}>Пауза (мс): <input type="number" min="0" step="50" value={vbtPauseMs} onChange={e=>setVbtPauseMs(e.target.value)} placeholder="напр: 1000-2000" style={{ width:80, marginLeft:4, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.15)', color:'#fff', borderRadius:6, padding:'4px 6px', fontSize:11 }} /></label>
         </div>
@@ -1586,6 +1692,75 @@ export const LiftMasterCard: React.FC<{
                   ))}
                 </div>
                 {kinoveaReps.length < 2 && <div style={{ marginTop:4, fontSize:9, color:'#fff', opacity:0.7 }}>Добавьте ещё один файл кнопкой «＋ В серию» — overlay заработает с 2 повторов.</div>}
+                <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginTop:6 }}>
+                  <button data-lift="series-save" aria-label="Запомнить серию для сравнения со следующей сессией" onClick={()=>{
+                    setSeriesStore(s => ({ ...s, [lift]: { savedAt: Date.now(), reps: kinoveaReps.map(r => snapshotBarRep(r)) } }));
+                    setKinoveaMsg(`💾 Серия сохранена (${kinoveaReps.length} повт.) — на следующей тренировке будет сравнение.`);
+                  }} style={{ minHeight:32, padding:'4px 9px', borderRadius:6, cursor:'pointer', background:'rgba(14,165,233,0.12)', color:'#0ea5e9', border:'1px solid rgba(14,165,233,0.25)', fontSize:10 }}>💾 Запомнить серию</button>
+                  {savedSeries && (
+                    <button data-lift="series-forget" aria-label="Удалить сохранённую серию прошлого раза" onClick={()=>{
+                      setSeriesStore(s => { const next = { ...s }; delete next[lift]; return next; });
+                      setCompareOn(false);
+                      setKinoveaMsg('Сохранённая серия удалена.');
+                    }} style={{ minHeight:32, padding:'4px 9px', borderRadius:6, cursor:'pointer', background:'transparent', color:'#fff', border:'1px solid rgba(255,255,255,0.12)', fontSize:10 }}>🗑 Забыть прошлую</button>
+                  )}
+                </div>
+                {/* Сравнение сессий: одноимённый повтор (обычно первый) прошлого раза vs текущий. */}
+                {savedSeries && (
+                  <div data-lift="session-compare" style={{ marginTop:6, paddingTop:6, borderTop:'1px solid rgba(255,255,255,0.08)' }}>
+                    <div style={{ fontSize:9, color:'#fff', opacity:0.65 }}>
+                      Прошлая сессия: {new Date(savedSeries.savedAt).toLocaleDateString('ru-RU')} · {savedSeries.reps.length} повт.
+                    </div>
+                    {sessionCompare ? (
+                      <>
+                        <div role="status" style={{ marginTop:3, fontSize:10, lineHeight:1.45, color: sessionCompare.verdict === 'worse' ? '#f87171' : sessionCompare.verdict === 'better' ? '#4ade80' : '#fbbf24' }}>
+                          {sessionCompare.text}
+                        </div>
+                        <button data-lift="session-overlay-toggle" aria-pressed={compareOn} onClick={()=> setCompareOn(v => !v)} style={{ minHeight:32, padding:'4px 9px', borderRadius:6, cursor:'pointer', marginTop:4, background: compareOn ? 'rgba(148,163,184,0.2)' : 'transparent', color:'#e2e8f0', border:'1px solid rgba(255,255,255,0.12)', fontSize:10 }}>{compareOn ? '⇄ Скрыть наложение' : '⇄ Наложить прошлую'}</button>
+                        {compareOn && curFirstSnapshot && curFirstSnapshot.points.length > 1 && (
+                          <svg data-lift="session-overlay" width="100%" height="90" viewBox="0 0 220 90" style={{ marginTop:6, background:'rgba(0,0,0,0.25)', borderRadius:8 }}>
+                            {(() => {
+                              const prev = savedSeries.reps[0].points;
+                              const cur = curFirstSnapshot.points;
+                              const all = [...prev, ...cur];
+                              const minX = Math.min(...all.map(p=>p[0])), maxX = Math.max(...all.map(p=>p[0]));
+                              const minY = Math.min(...all.map(p=>p[1])), maxY = Math.max(...all.map(p=>p[1]));
+                              const toPts = (arr: Array<[number, number]>) => arr.map(([x, y]) =>
+                                (30 + ((x - minX) / Math.max(0.001, maxX - minX)) * 160).toFixed(1) + ',' +
+                                (80 - ((y - minY) / Math.max(0.001, maxY - minY)) * 60).toFixed(1)
+                              ).join(' ');
+                              return (
+                                <>
+                                  <polyline points={toPts(prev)} fill="none" stroke="#94a3b8" strokeWidth="1.5" strokeDasharray="3 3" />
+                                  <polyline points={toPts(cur)} fill="none" stroke="#38bdf8" strokeWidth="1.8" />
+                                </>
+                              );
+                            })()}
+                          </svg>
+                        )}
+                        <div style={{ marginTop:3, fontSize:9, color:'#fff', opacity:0.6 }}>· · прошлая сессия · — текущая (первый повтор)</div>
+                      </>
+                    ) : (
+                      <div style={{ marginTop:3, fontSize:10, color:'#fff', opacity:0.7 }}>Добавьте повтор в текущую серию — сравнение появится здесь.</div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+            {/* Сохранённая серия без текущей: показываем справку и «забыть», иначе данные
+                «висят» в персисте без единого способа их увидеть. */}
+            {savedSeries && kinoveaReps.length === 0 && (
+              <div data-lift="session-compare" style={{ marginTop:8, padding:7, borderRadius:8, background:'rgba(148,163,184,0.06)', border:'1px solid rgba(148,163,184,0.18)' }}>
+                <div style={{ fontSize:10, fontWeight:800, color:'#cbd5e1' }}>📌 Прошлая сессия (сохранена)</div>
+                <div style={{ marginTop:3, fontSize:10, color:'#fff', opacity:0.75 }}>
+                  {new Date(savedSeries.savedAt).toLocaleDateString('ru-RU')} · {savedSeries.reps.length} повт. · vmax {savedSeries.reps[0].vmax.toFixed(2)} м/с · xLoop {savedSeries.reps[0].xLoop.toFixed(1)} см
+                </div>
+                <div style={{ marginTop:3, fontSize:9, color:'#fff', opacity:0.6 }}>Разберите CSV текущего подхода и нажмите «＋ В серию» — появится сравнение «прошлая vs текущая».</div>
+                <button data-lift="series-forget" aria-label="Удалить сохранённую серию прошлого раза" onClick={()=>{
+                  setSeriesStore(s => { const next = { ...s }; delete next[lift]; return next; });
+                  setCompareOn(false);
+                  setKinoveaMsg('Сохранённая серия удалена.');
+                }} style={{ minHeight:32, marginTop:5, padding:'4px 9px', borderRadius:6, cursor:'pointer', background:'transparent', color:'#fff', border:'1px solid rgba(255,255,255,0.12)', fontSize:10 }}>🗑 Забыть прошлую</button>
               </div>
             )}
           </div>
@@ -1637,14 +1812,46 @@ export const LiftMasterCard: React.FC<{
                   series: kinoveaResult ? kinoveaResult.points : null,
                   firstRep: kinoveaOverlay ? kinoveaOverlay.first.points : null,
                   lastRep: kinoveaOverlay ? kinoveaOverlay.last.points : null,
+                  prevRep: savedRepPoints,
                   xLoopCm: kinoveaResult ? kinoveaResult.xLoop : null,
                   vmax: kinoveaResult ? kinoveaResult.vmax : null,
                   overlayText: kinoveaOverlay ? kinoveaOverlay.text : '',
-                  captureQuality: captureQuality.flag === 'unknown' ? '' : `${captureQuality.flag} — ${captureQuality.reason}`,
+                  sessionText: sessionCompare ? sessionCompare.text : '',
+                  captureQuality: captureQuality.flag === 'unknown' ? '' : `${captureQuality.flag === 'ok' ? 'в норме' : 'грубо'} — ${captureQuality.reason}`,
                 });
                 const o = await saveTextFileApk(movementDiagnosticsFilename(lift, 'svg'), svg, 'image/svg+xml;charset=utf-8');
                 setShareMsg(shareOutcomeLabel(o)); setTimeout(()=>setShareMsg(null), 2500);
               }} style={{ minHeight:44, padding:'10px 14px', borderRadius:10, cursor:'pointer', background:'rgba(56,189,248,0.12)', color:'#38bdf8', border:'1px solid rgba(56,189,248,0.28)', fontWeight:700, fontSize:12 }}>🖼 SVG траектории</button>
+              <button data-lift="export-overlay-png" aria-label="Сохранить кадр с оверлеем (PNG)" onClick={async ()=>{
+                const png = await renderTrajectoryPng({
+                  liftRu: LIFT_RU[lift],
+                  points: kinoveaResult ? kinoveaResult.points : null,
+                  firstRep: kinoveaOverlay ? kinoveaOverlay.first.points : null,
+                  lastRep: kinoveaOverlay ? kinoveaOverlay.last.points : null,
+                  prevRep: savedRepPoints,
+                  xLoopCm: kinoveaResult ? kinoveaResult.xLoop : null,
+                  vmax: kinoveaResult ? kinoveaResult.vmax : null,
+                });
+                if (!png) { setShareMsg('PNG недоступен: нет данных траектории или canvas не поддерживается.'); setTimeout(()=>setShareMsg(null), 3000); return; }
+                const blob = dataUrlToBlob(png);
+                if (!blob) { setShareMsg('Не удалось собрать PNG-файл.'); setTimeout(()=>setShareMsg(null), 3000); return; }
+                const o = await saveBlobApk(movementDiagnosticsFilename(lift, 'png'), blob);
+                setShareMsg(shareOutcomeLabel(o)); setTimeout(()=>setShareMsg(null), 2500);
+              }} style={{ minHeight:44, padding:'10px 14px', borderRadius:10, cursor:'pointer', background:'rgba(168,85,247,0.12)', color:'#c084fc', border:'1px solid rgba(168,85,247,0.28)', fontWeight:700, fontSize:12 }}>🖼 Кадр с оверлеем</button>
+              <button data-lift="export-overlay-video" aria-label="Записать анимацию траектории с оверлеем" onClick={async ()=>{
+                if (!canRecordTrajectory()) { setShareMsg('Запись видео не поддерживается этим браузером — используйте PNG.'); setTimeout(()=>setShareMsg(null), 3000); return; }
+                setShareMsg('⏺ Записываю анимацию…');
+                const blob = await recordTrajectoryWebm({
+                  liftRu: LIFT_RU[lift],
+                  points: kinoveaResult ? kinoveaResult.points : null,
+                  prevRep: savedRepPoints,
+                  xLoopCm: kinoveaResult ? kinoveaResult.xLoop : null,
+                  vmax: kinoveaResult ? kinoveaResult.vmax : null,
+                });
+                if (!blob) { setShareMsg('Анимацию собрать не удалось (нет точек).'); setTimeout(()=>setShareMsg(null), 3000); return; }
+                const o = await saveBlobApk(movementDiagnosticsFilename(lift, 'webm'), blob);
+                setShareMsg(shareOutcomeLabel(o)); setTimeout(()=>setShareMsg(null), 2500);
+              }} style={{ minHeight:44, padding:'10px 14px', borderRadius:10, cursor:'pointer', background:'rgba(255,255,255,0.06)', color:'#fff', border:'1px solid rgba(255,255,255,0.12)', fontWeight:700, fontSize:12 }}>▶ Видео-оверлей</button>
               <button data-lift="share" aria-label="Поделиться диагностикой" onClick={async ()=>{
                 const t = `Диагностика ${LIFT_RU[lift]}: фаза ${(PHASE_RU as Record<string,string>)[String(effectivePhase ?? '')] ?? '—'} · откл. ${issues.map(i=>ISSUE_RU[i]).join('; ') || '—'} · VBT ${vbtBest || '—'}→${vbtLast || '—'} м/с${videoNote ? ` · Видео: ${videoNote}` : ''}`;
                 const o = await copyOrShareText(t, 'Диагностика движений');

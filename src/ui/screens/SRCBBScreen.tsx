@@ -1208,6 +1208,16 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
        pendingApplyRef.current = p;
     } else if (p.kind === 'pri') {
       setPriAdjust({ volumeMult: (p.data?.volumeMult ?? 1) as number, rirShift: (p.data?.rirShift ?? 0) as number });
+      // Абсолютная цель «сет/мышцу/нед» (карточки MRV/мезо/прогрессии): в ББ это ориентир
+      // авто-конструктора (раньше приходило легаси-каналом kind:'mrv').
+      const targetSets = Number(p.data?.volumeSets);
+      if (Number.isFinite(targetSets) && targetSets > 0) {
+        if (tabForApply === 'bb') { setMrvOverride(Math.round(targetSets)); pendingApplyRef.current = p; }
+        else {
+          // Честность (аудит P1-1): в ПЛ объём задаёт раскладка цикла — «применить» тут нечего, не молчим.
+          setMethodNote(`🛠 Цель ${Math.round(targetSets)} сет/мышца/нед — ориентир ББ-авто. В ПЛ объём задаёт цикл: смените цикл/ассистентов, а для разгрузки используйте «Применить делод».`);
+        }
+      }
     } else if (p.kind === 'split') {
       if (tabForApply === 'bb') { setBbDays(p.data?.cycle?.length || bbDays); pendingApplyRef.current = p; }
     } else if (p.kind === 'tempo') {
@@ -1215,13 +1225,6 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
     } else if (p.kind === 'rir') {
       // объединить со существующим priAdjust: добавка к RIR
       setRirShiftAdjust((p.data?.rirShift ?? 0) as number);
-    } else if (p.kind === 'mrv') {
-      if (tabForApply === 'bb') { setMrvOverride((p.data?.mrv ?? null) as number | null); pendingApplyRef.current = p; }
-      else {
-        // Честность (аудит P1-1): MRV-оверрайд — настройка ББ-авто (сетов/мышца/нед);
-        // в ПЛ объём задаёт раскладка цикла, «применить» тут нечего — не молчим.
-        setMethodNote(`🛠 MRV ${p.data?.mrv ?? '—'} сет/мышца/нед — настройка ББ-авто. В ПЛ объём задаёт цикл: смените цикл/ассистентов, а для разгрузки используйте «Применить делод».`);
-      }
     } else if (p.kind === 'deload') {
       const vol = Math.min(1, Math.max(0.2, (p.data?.volumeMult ?? 0.5) as number));
       const rir = Math.min(6, Math.max(0, Math.round((p.data?.rirShift ?? 3) as number)));

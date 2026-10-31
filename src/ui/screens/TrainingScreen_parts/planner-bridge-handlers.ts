@@ -510,38 +510,9 @@ const rirHandler: Handler = (payload, { program: p, update, showToast }) => {
   showToast('🔗 RIR-сдвиг: ' + payload.label);
 };
 
-/** Легаси-канал «MRV-кап» (ББ-онли, сохраняется для совместимости API). Карточки MRV/мезо
- *  теперь шлют `pri` с `volumeSets` — тот же расчёт, но и на ПЛ. */
-const mrvHandler: Handler = (payload, { program: p, update, showToast }) => {
-  if (!p.bb || namedBBBlocks(p.bb.weeks) === 0) {
-    showToast('⚠ MRV не применён: план не изменён (MRV-кап работает на собранной ББ-программе; для ПЛ — кнопка «Применить» в карточке)', 'warning');
-    return;
-  }
-  const rawTarget = Math.round(Number(payload.data.mrv) || 0);
-  if (rawTarget <= 0) {
-    showToast('⚠ MRV должен быть положительным числом');
-    return;
-  }
-  const target = Math.min(60, rawTarget);
-  const weeks = p.bb.weeks.map(week => {
-    if (week.deload) return week;
-    const byMuscle: Record<string, number> = {};
-    for (const session of week.sessions) for (const block of session.blocks) {
-      byMuscle[block.muscle] = (byMuscle[block.muscle] ?? 0) + block.sets.length;
-    }
-    const factorByMuscle: Record<string, number> = {};
-    for (const [muscle, current] of Object.entries(byMuscle)) factorByMuscle[muscle] = current > 0 ? Math.min(1, target / current) : 1;
-    return { ...week, sessions: week.sessions.map(session => ({ ...session, blocks: session.blocks.map(block => {
-      const factor = factorByMuscle[block.muscle] ?? 1;
-      const count = Math.max(1, Math.min(block.sets.length, Math.round(block.sets.length * factor)));
-      // P0: защита от factor < 1/block.sets.length → count = 0
-      const safeCount = Math.max(1, count);
-      return { ...block, sets: block.sets.slice(0, safeCount) };
-    }) })) };
-  });
-  update({ bb: { ...p.bb, weeks } });
-  showToast('🔗 MRV применён: ' + target + ' сет/мышцу/нед');
-};
+/** Легаси-канал «MRV-кап» удалён (аудит волны 4): карточки MRV/мезо/прогрессии шлют
+ *  `pri` с `volumeSets`, а тот же расчёт делает priHandler — и на ББ, и на ПЛ.
+ *  Устаревший payload с `kind:'mrv'` теперь честно попадает в «не применима». */
 
 const deloadHandler: Handler = (payload, { program: p, update, showToast }) => {
   const deloadWeeks: number[] = Array.isArray(payload.data.weeks)
@@ -932,7 +903,6 @@ export const BRIDGE_HANDLERS: Record<string, Handler> = {
   tempo: tempoHandler,
   tempo_rollback: tempoRollbackHandler,
   rir: rirHandler,
-  mrv: mrvHandler,
   deload: deloadHandler,
   volume: volumeHandler,
   peak: peakHandler,

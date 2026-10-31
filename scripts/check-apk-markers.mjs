@@ -199,7 +199,9 @@ for (const hook of [
   'data-lift="rep-overlay"',
   'data-lift="rep-series-add"', 'data-lift="rep-series-clear"', 'data-lift="rep-series"',
   'data-lift="capture-quality"', 'data-lift="capture-height"', 'data-lift="capture-dist"',
-  'data-lift="export-svg"',
+  'data-lift="export-svg"', 'data-lift="export-overlay-png"', 'data-lift="export-overlay-video"',
+  'data-lift="series-save"', 'data-lift="session-compare"', 'data-lift="bar-heat"',
+  'data-lift="quick-start"', 'data-lift="quick-start-hide"',
   'data-lift-nav=',
 ]) mustContain(LIFT_HUB, hook, `lift hub hook ${hook}`);
 // Дефолт-коллапс: 14 раскрытых блоков давали ~214 КБ HTML и ~500 кнопок за рендер.

@@ -119,14 +119,13 @@ describe('planner bridge handlers', () => {
     expect(String(ctx.showToast.mock.calls.at(-1)?.[0] ?? '')).toContain('ПЛ');
   });
 
-  it('kind:mrv вне ББ честно сообщает, что план не изменён', () => {
+  it('устаревший kind:mrv больше не применяется (канал удалён, план не изменён)', () => {
     const update = vi.fn();
     const ctx = context('pl', update);
     seedPLWeeks(ctx, 1);
-    applyBridgePayloadDispatch(payload('mrv', { mrv: 10 }), ctx);
+    expect(applyBridgePayloadDispatch(payload('mrv' as PlannerApply['kind'], { mrv: 10 }), ctx)).toBe(false);
     expect(update).not.toHaveBeenCalled();
-    const toast = String(ctx.showToast.mock.calls.at(-1)?.[0] ?? '');
-    expect(toast).toContain('план не изменён');
+    expect(String(ctx.showToast.mock.calls.at(-1)?.[0] ?? '')).toContain('не применима');
   });
 
   it('deload applies both volume and intensity reduction', () => {    const update = vi.fn();
@@ -240,24 +239,26 @@ describe('planner bridge handlers', () => {
     expect(toast).toContain('недели не выбраны');
   });
 
-  it('MRV recommendation reduces non-deload weekly muscle volume', () => {
+  it('pri с volumeSets выше текущего объёма не добавляет сеты (только сокращение)', () => {
+    const update = vi.fn();
+    const ctx = context('bb', update);
+    seedBlock(ctx);
+    ctx.program.bb!.weeks[0].sessions[0].blocks[0].sets = Array.from({ length: 4 }, () => ({ reps: 8, rir: 2, weight: 100, restSec: 120 }));
+    applyBridgePayloadDispatch(payload('pri', { volumeMult: 1, rirShift: 0, volumeSets: 12 }), ctx);
+    const patch = update.mock.calls[0][0];
+    expect(patch.bb.weeks[0].sessions[0].blocks[0].sets).toHaveLength(4);
+    expect(String(ctx.showToast.mock.calls.at(-1)?.[0] ?? '')).toContain('цель ≤ 12 сет/мышцу/нед');
+  });
+
+  it('pri с volumeSets=0 игнорирует абсолютную цель и работает по множителю', () => {
     const update = vi.fn();
     const ctx = context('bb', update);
     seedBlock(ctx);
     ctx.program.bb!.weeks[0].sessions[0].blocks[0].sets = Array.from({ length: 8 }, () => ({ reps: 8, rir: 2, weight: 100, restSec: 120 }));
-    applyBridgePayloadDispatch(payload('mrv', { mrv: 4 }), ctx);
+    applyBridgePayloadDispatch(payload('pri', { volumeMult: 0.5, rirShift: 0, volumeSets: 0 }), ctx);
     const patch = update.mock.calls[0][0];
     expect(patch.bb.weeks[0].sessions[0].blocks[0].sets).toHaveLength(4);
-    expect(ctx.showToast).toHaveBeenCalledWith(expect.stringContaining('MRV применён'));
-  });
-
-  it('MRV recommendation rejects invalid values without changing the plan', () => {
-    const update = vi.fn();
-    const ctx = context('bb', update);
-    seedBlock(ctx);
-    applyBridgePayloadDispatch(payload('mrv', { mrv: 0 }), ctx);
-    expect(update).not.toHaveBeenCalled();
-    expect(ctx.showToast).toHaveBeenCalledWith(expect.stringContaining('положительным'));
+    expect(String(ctx.showToast.mock.calls.at(-1)?.[0] ?? '')).not.toContain('сет/мышцу/нед');
   });
 
   it('volume adds one accessory block with the requested set count', () => {
