@@ -273,6 +273,17 @@ async function bootstrap() {
     // Нативный хром (статус-бар/сплэш) никогда не должен стопить старт:
     // зависший вызов плагина = вечный спиннер только в APK.
     try { await withTimeout(initNativeChrome(), 8000, 'native-chrome'); } catch (e) { console.warn('initNativeChrome failed:', e); }
+    // Новая встроенная сборка APK важнее ранее скачанного OTA-бандла:
+    // без сброса старый бандл перекрывает свежий dist и правки не видны.
+    try {
+      const { ensureBuiltInBundleForThisBuild, reloadToLiveBundle } = await import('./core/live-update');
+      const reset = await withTimeout(ensureBuiltInBundleForThisBuild(), 5000, 'ota-reset');
+      if (reset) {
+        console.warn('[bootstrap] OTA-бандл сброшен на встроенный — перезагрузка');
+        const reloaded = await reloadToLiveBundle();
+        if (reloaded) return;
+      }
+    } catch (e) { console.warn('OTA reset check failed:', e); }
   }
 
   let isTg = false;

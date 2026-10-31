@@ -127,14 +127,23 @@ export function useDiaryQueue({ diaryData, selectedDate, mealType, usdaFoods, sa
       setOcrError(prev => (prev as any) || (nativeOcr ? 'Зависло на телефоне. Попробуйте фото при хорошем свете или вставьте текст вручную через «Текст».' : 'Зависло на телефоне. Попробуйте кнопку «Фото/файл» → выберите скриншот из галереи (не «Камера»).'));
     }, hardMs) as any;
     let lastPct = -1;
+    let sawProgress = false;
     const onOcrProgress = (fraction: number) => {
+      sawProgress = true;
       const pct = Math.round(fraction * 100);
       if (pct >= lastPct + 10 || pct >= 100) {
         lastPct = pct;
         setOcrHint(`⏳ Распознаём скриншот… ${pct}% (текст+цифры КБЖУ)`);
       }
     };
+    // Первый запуск оффлайн-движка (ядро + rus/eng traineddata) на телефоне
+    // занимает 10-30с ДО первого процента прогресса. Без этой подсказки
+    // экран выглядит как «зависло на загрузке».
+    let stageTimer: number | undefined;
     try {
+      stageTimer = window.setTimeout(() => {
+        if (!sawProgress) setOcrHint('⏳ Готовим движок OCR (первый запуск дольше обычного)…');
+      }, 12_000) as any;
       const result: any = await Promise.race([
         processUploadedFile(file, { onProgress: onOcrProgress }),
         new Promise<never>((_, reject) => setTimeout(() => reject(new Error(nativeOcr ? 'Оффлайн-распознавание не ответило за 120 секунд.' : 'Мобильный OCR не ответил за 45 секунд. Проверьте интернет и попробуйте скриншот меньшего размера.')), raceMs)),
@@ -154,7 +163,7 @@ export function useDiaryQueue({ diaryData, selectedDate, mealType, usdaFoods, sa
         setOcrError(result.warnings?.[0] || 'Не удалось распознать данные питания. Попробуйте более чёткий скриншот.');
       }
     } catch (e) { setOcrError('Ошибка: ' + (e instanceof Error ? e.message : String(e))); }
-    finally { if (backup) clearTimeout(backup); if (hard) clearTimeout(hard); setOcrFileLoading(false); }
+    finally { if (stageTimer) clearTimeout(stageTimer); if (backup) clearTimeout(backup); if (hard) clearTimeout(hard); setOcrFileLoading(false); }
    }, [convertOCRItems, usdaFoods]);
 
   const handleOCR = useCallback(() => {

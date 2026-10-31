@@ -5,6 +5,12 @@ import path from 'path';
 
 export default defineConfig(({ command }) => ({
   base: './',
+  // Метка сборки: меняется при каждом `npm run build`. По ней APK понимает,
+  // что установлена НОВАЯ встроенная сборка, и сбрасывает ранее скачанный
+  // OTA-бандл (иначе он молча перекрывает свежий dist и «фиксы не приезжают»).
+  define: {
+    __APP_BUILD__: JSON.stringify(Date.now()),
+  },
   plugins: [
     react(),
     VitePWA({

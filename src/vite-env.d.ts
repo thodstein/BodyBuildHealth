@@ -1,5 +1,9 @@
 /// <reference types="vite/client" />
 
+/** Метка сборки (vite define): меняется при каждом `npm run build`. */
+declare const __APP_BUILD__: number;
+
+
 interface Window {
   Telegram: {
     WebApp: {

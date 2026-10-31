@@ -137,3 +137,63 @@ export async function resetToBuiltInBundle(): Promise<boolean> {
     return false;
   }
 }
+
+const BUILD_MARKER_KEY = 'he_app_build_marker_v1';
+
+/**
+ * OTA-бандл живёт в данных приложения и переживает установку нового APK:
+ * скачанный однажды бандл молча перекрывает свежий встроенный dist, и правки
+ * из новой сборки «не приезжают» — приложение выглядит так же, как до фикса.
+ *
+ * Здесь: при запуске сборки с новой меткой (__APP_BUILD__ меняется на каждом
+ * `npm run build`) активный OTA-бандл сбрасывается на встроенный. Возвращает
+ * true, если нужен reload (вызывающий делает reloadToLiveBundle()).
+ * Идемпотентно: после сброса метка совпадает → повторных сбросов нет.
+ */
+export async function ensureBuiltInBundleForThisBuild(): Promise<boolean> {
+  try {
+    const buildMarker =
+      typeof __APP_BUILD__ !== 'undefined' ? String(__APP_BUILD__) : '';
+    if (!buildMarker) return false;
+    let stored = '';
+    try {
+      stored = localStorage.getItem(BUILD_MARKER_KEY) || '';
+    } catch {
+      return false;
+    }
+    if (!stored) {
+      // Первый запуск после появления метки — запоминаем и ничего не трогаем.
+      try {
+        localStorage.setItem(BUILD_MARKER_KEY, buildMarker);
+      } catch {
+        /* ignore */
+      }
+      return false;
+    }
+    if (stored === buildMarker) return false;
+    // Новая встроенная сборка: старый OTA-бандл сбросить, иначе правки
+    // в APK останутся невидимыми до ручного вмешательства.
+    let hasBundle = false;
+    try {
+      const id = await getLiveBundleId();
+      hasBundle = Boolean(id);
+      if (hasBundle) await resetToBuiltInBundle();
+    } catch {
+      /* ignore */
+    }
+    try {
+      localStorage.setItem(BUILD_MARKER_KEY, buildMarker);
+    } catch {
+      /* ignore */
+    }
+    return hasBundle;
+  } catch {
+    return false;
+  }
+}
+
+/** Версия активного OTA-бандла (для диагностики/баннера обновлений). */
+export async function describeLiveBundle(): Promise<string> {
+  const id = await getLiveBundleId();
+  return id ? `OTA ${id}` : 'встроенный dist';
+}
