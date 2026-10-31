@@ -207,6 +207,7 @@ for (const hook of [
   'series-copy-', 'data-lift="weight-mismatch"', 'data-lift="video-overlay-file"',
   'data-lift="video-calib"', 'data-lift="video-calib-file"', 'data-lift="video-calib-frame"',
   'data-lift="video-calib-save"', 'data-lift="video-calib-state"', 'data-lift="video-calib-clear"',
+  'data-lift="video-offset"', 'data-lift="vbt-weight"', 'data-lift="vbt-weight-from-diary"',
   'data-lift-nav=',
 ]) mustContain(LIFT_HUB, hook, `lift hub hook ${hook}`);
 // Дефолт-коллапс: 14 раскрытых блоков давали ~214 КБ HTML и ~500 кнопок за рендер.

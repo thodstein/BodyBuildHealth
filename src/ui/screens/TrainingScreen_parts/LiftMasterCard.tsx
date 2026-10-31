@@ -278,6 +278,8 @@ interface MasterState {
   series?: Record<string, { savedAt: number; weightKg?: number | null; reps: BarRepSnapshot[] }>;
   /** Калибровка «см → пиксель видео» per-lift: без неё траектория рисуется панелью. */
   videoCalib?: Record<string, VideoCalibration>;
+  /** Смещение начала трека относительно начала видео, с (per-lift). */
+  videoOffsetSec?: Record<string, number>;
 }
 
 function isRecord(v: unknown): v is Record<string, unknown> { return !!v && typeof v === 'object' && !Array.isArray(v); }
@@ -341,8 +343,9 @@ function loadMaster(): MasterState {
       capture: cleanCapture(raw.capture),
       series: cleanSeries(raw.series),
       videoCalib: cleanVideoCalib(raw.videoCalib),
+      videoOffsetSec: cleanVideoOffset(raw.videoOffsetSec),
     };
-  } catch { return { lift:'bench', phase:'' as WeakPoint|'', issues:[], selectedGeom:{}, daysGeom:{}, selectedDiag:{}, daysDiag:{}, weakMuscleGroups:[], weakMuscleSubs:[], asymSide:null, asymL:'', asymR:'', vbtBest:'', vbtLast:'', vbtWeight:'', vbtGoal:'strength', vbtUpdatedAt:null, vbtPauseMs:'', asymPhase:{ startL:'', startR:'', midL:'', midR:'', lockL:'', lockR:'' }, dualSensor:{ left:'', right:'' }, perLift:{}, redFlags:[], ruleChecks:{}, meetDate:'', meetStrategy:'balanced' as MeetStrategy, meetMaxS:'', meetMaxB:'', meetMaxD:'', lvp:{}, capture:{ heightM:'', distM:'', side:'', device:'' }, series:{}, videoCalib:{} }; }
+  } catch { return { lift:'bench', phase:'' as WeakPoint|'', issues:[], selectedGeom:{}, daysGeom:{}, selectedDiag:{}, daysDiag:{}, weakMuscleGroups:[], weakMuscleSubs:[], asymSide:null, asymL:'', asymR:'', vbtBest:'', vbtLast:'', vbtWeight:'', vbtGoal:'strength', vbtUpdatedAt:null, vbtPauseMs:'', asymPhase:{ startL:'', startR:'', midL:'', midR:'', lockL:'', lockR:'' }, dualSensor:{ left:'', right:'' }, perLift:{}, redFlags:[], ruleChecks:{}, meetDate:'', meetStrategy:'balanced' as MeetStrategy, meetMaxS:'', meetMaxB:'', meetMaxD:'', lvp:{}, capture:{ heightM:'', distM:'', side:'', device:'' }, series:{}, videoCalib:{}, videoOffsetSec:{} }; }
 }
 function saveMaster(s: MasterState) { try{ localStorage.setItem(MASTER_KEY, JSON.stringify(s)); }catch{} }
 function cleanRuleChecks(raw: unknown): Record<string, boolean> {
@@ -360,6 +363,18 @@ function cleanCapture(raw: unknown): MasterState['capture'] {  const o = isRecor
   const side = o.side === 'left' || o.side === 'right' || o.side === 'front' ? o.side : '';
   const device = o.device === 'kinovea' || o.device === 'enode' || o.device === 'phone' ? o.device : '';
   return { heightM: str(o.heightM), distM: str(o.distM), side, device };
+}
+
+/** Смещения трека: только конечные неотрицательные секунды в разумных пределах. */
+function cleanVideoOffset(raw: unknown): Record<string, number> {
+  if (!isRecord(raw)) return {};
+  const out: Record<string, number> = {};
+  for (const [k, v] of Object.entries(raw)) {
+    if (k.length > 20) continue;
+    const n = Number(v);
+    if (Number.isFinite(n) && n >= 0 && n <= 600) out[k] = Math.round(n * 100) / 100;
+  }
+  return out;
 }
 
 /** Прошлые серии повторов: только конечные числа, ≤12 повторов по ≤24 точки.
@@ -600,6 +615,8 @@ export const LiftMasterCard: React.FC<{
     setRuleChecks(cur=>{ if (v == null) { const n = { ...cur }; delete n[k]; return n; } return { ...cur, [k]: v }; });
   };
   const touchVbt = ()=> setVbtUpdatedAt(Date.now());
+  /** Откуда взялся вес в VBT — чтобы после подстановки было видно источник. */
+  const [vbtWeightNote, setVbtWeightNote] = useState<string | null>(null);
   const vbtStale = useMemo(()=> lvrStale(vbtUpdatedAt), [vbtUpdatedAt]);
   const vbtMvt = useMemo(()=> mvtForPLLift(lift), [lift]);
   const [armSpanInput, setArmSpanInput] = useState('');
@@ -619,6 +636,8 @@ export const LiftMasterCard: React.FC<{
   const [seriesStore, setSeriesStore] = useState<NonNullable<MasterState['series']>>(initial.series ?? {});
   /** Калибровки кадра per-lift: «см трека → пиксель видео». */
   const [videoCalib, setVideoCalib] = useState<NonNullable<MasterState['videoCalib']>>(initial.videoCalib ?? {});
+  /** Смещение начала трека относительно начала видео, с (per-lift). */
+  const [videoOffset, setVideoOffset] = useState<NonNullable<MasterState['videoOffsetSec']>>(initial.videoOffsetSec ?? {});
   /** Превью кадра и тапы: якорь (штанга на 0 с) → два конца известного отрезка. */
   const [calibFrame, setCalibFrame] = useState<{ dataUrl: string; width: number; height: number } | null>(null);
   const [calibAnchor, setCalibAnchor] = useState<{ videoX: number; videoY: number } | null>(null);
@@ -663,7 +682,7 @@ export const LiftMasterCard: React.FC<{
     }catch{}
   }, []);
 
-  useEffect(()=>{ saveMaster({ lift, phase, issues, selectedGeom, daysGeom, selectedDiag, daysDiag, weakMuscleGroups, weakMuscleSubs, asymSide, asymL, asymR, vbtBest, vbtLast, vbtWeight, vbtGoal, vbtUpdatedAt, vbtPauseMs, asymPhase: { startL: asymStartL, startR: asymStartR, midL: asymMidL, midR: asymMidR, lockL: asymLockL, lockR: asymLockR }, dualSensor: { left: dualLeft, right: dualRight }, perLift, redFlags, ruleChecks, meetDate, meetStrategy, meetMaxS, meetMaxB, meetMaxD, lvp: lvpSaved, capture, series: seriesStore, videoCalib }); }, [lift, phase, issues, selectedGeom, daysGeom, selectedDiag, daysDiag, weakMuscleGroups, weakMuscleSubs, asymSide, asymL, asymR, vbtBest, vbtLast, vbtWeight, vbtGoal, vbtUpdatedAt, vbtPauseMs, asymStartL, asymStartR, asymMidL, asymMidR, asymLockL, asymLockR, dualLeft, dualRight, perLift, redFlags, ruleChecks, meetDate, meetStrategy, meetMaxS, meetMaxB, meetMaxD, lvpSaved, capture, seriesStore, videoCalib]);
+  useEffect(()=>{ saveMaster({ lift, phase, issues, selectedGeom, daysGeom, selectedDiag, daysDiag, weakMuscleGroups, weakMuscleSubs, asymSide, asymL, asymR, vbtBest, vbtLast, vbtWeight, vbtGoal, vbtUpdatedAt, vbtPauseMs, asymPhase: { startL: asymStartL, startR: asymStartR, midL: asymMidL, midR: asymMidR, lockL: asymLockL, lockR: asymLockR }, dualSensor: { left: dualLeft, right: dualRight }, perLift, redFlags, ruleChecks, meetDate, meetStrategy, meetMaxS, meetMaxB, meetMaxD, lvp: lvpSaved, capture, series: seriesStore, videoCalib, videoOffsetSec: videoOffset }); }, [lift, phase, issues, selectedGeom, daysGeom, selectedDiag, daysDiag, weakMuscleGroups, weakMuscleSubs, asymSide, asymL, asymR, vbtBest, vbtLast, vbtWeight, vbtGoal, vbtUpdatedAt, vbtPauseMs, asymStartL, asymStartR, asymMidL, asymMidR, asymLockL, asymLockR, dualLeft, dualRight, perLift, redFlags, ruleChecks, meetDate, meetStrategy, meetMaxS, meetMaxB, meetMaxD, lvpSaved, capture, seriesStore, videoCalib, videoOffset]);
 
   /** Переключение лифта: сохраняем фазу/отклонения текущего и восстанавливаем выбор целевого.
    *  Раньше общий state обнулялся — пользователь терял выбранную фазу после каждого щелчка. */
@@ -729,6 +748,8 @@ export const LiftMasterCard: React.FC<{
   }, [kinoveaScale]);
   /** Текущая калибровка кадра для движения. */
   const curCalib = videoCalib[lift] ?? null;
+  /** Смещение начала трека: кадр берётся с этой секунды и это его первая точка. */
+  const curOffset = videoOffset[lift] ?? 0;
   /** Кандидат калибровки из тапов: считается на лету, пока не сохранён. */
   const calibCandidate = useMemo(() => {
     const first = kinoveaResult?.points?.[0];
@@ -813,6 +834,23 @@ export const LiftMasterCard: React.FC<{
       }
     }
     return { best, lastHard, consensus: best ? estimate1RMConsensus(best.weight, best.reps) : null };
+  }, [sessions, lift]);
+
+  // Последний рабочий вес этого лифта из дневника — чтобы не вбивать его руками в VBT/серию.
+  const diaryLastWeight = useMemo(()=>{
+    let last: { weight: number; reps: number; date: string } | null = null;
+    for (const w of sessions) for (const e of (w.exercises||[])) {
+      const en = (e.exerciseName||e.exerciseId||'').toLowerCase();
+      if (!exerciseMatchesLift(en, lift)) continue;
+      const date = w.date || '';
+      for (const s of (e.sets||[])) {
+        const weight = s.weightKg||s.weight||0, reps = s.reps||0;
+        if (!(weight>0) || !(reps>0)) continue;
+        // Поздняя дата важнее; при равной дате выигрывает более поздний сет в списке.
+        if (!last || date >= last.date) last = { weight, reps, date };
+      }
+    }
+    return last;
   }, [sessions, lift]);
 
   // Недельный срез истории (B9): один на лифт в ISO-неделю, с e1RM консенсуса.
@@ -1676,8 +1714,23 @@ export const LiftMasterCard: React.FC<{
         <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginTop:6, alignItems:'center' }}>
           <label style={{ fontSize:10, color:DIM }}>Лучший (м/с): <input type="number" step="0.01" min="0" value={vbtBest} onChange={e=>{ setVbtBest(e.target.value); touchVbt(); }} placeholder="0.60" style={{ width:70, marginLeft:4, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.15)', color:'#fff', borderRadius:6, padding:'4px 6px', fontSize:11 }} /></label>
           <label style={{ fontSize:10, color:DIM }}>Последний (м/с): <input type="number" step="0.01" min="0" value={vbtLast} onChange={e=>{ setVbtLast(e.target.value); touchVbt(); }} placeholder="0.40" style={{ width:70, marginLeft:4, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.15)', color:'#fff', borderRadius:6, padding:'4px 6px', fontSize:11 }} /></label>
-          <label style={{ fontSize:10, color:DIM }}>Вес (кг): <input type="number" step="0.5" min="0" value={vbtWeight} onChange={e=>{ setVbtWeight(e.target.value); touchVbt(); }} placeholder="100" style={{ width:64, marginLeft:4, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.15)', color:'#fff', borderRadius:6, padding:'4px 6px', fontSize:11 }} /></label>
+          <label style={{ fontSize:10, color:DIM }}>Вес (кг): <input data-lift="vbt-weight" aria-label="Вес штанги для VBT, кг" type="number" step="0.5" min="0" value={vbtWeight} onChange={e=>{ setVbtWeight(e.target.value); touchVbt(); }} placeholder="100" style={{ width:64, marginLeft:4, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.15)', color:'#fff', borderRadius:6, padding:'4px 6px', fontSize:11 }} /></label>
+          <button
+            data-lift="vbt-weight-from-diary"
+            aria-label="Взять вес последнего сета этого движения из дневника"
+            aria-disabled={!diaryLastWeight}
+            onClick={()=>{
+              if (!diaryLastWeight) return;
+              setVbtWeight(String(diaryLastWeight.weight));
+              setVbtWeightNote(`Вес ${diaryLastWeight.weight} кг × ${diaryLastWeight.reps} из дневника (${diaryLastWeight.date || 'без даты'}).`);
+              touchVbt();
+            }}
+            style={{ minHeight:44, padding:'10px 12px', borderRadius:6, cursor: diaryLastWeight?'pointer':'default', border:'1px solid rgba(244,114,182,0.28)', background:'rgba(244,114,182,0.1)', color: diaryLastWeight?'#f472b6':DIM, fontSize:11, fontWeight:700, opacity: diaryLastWeight?1:0.55 }}
+          >
+            📒 {diaryLastWeight ? `Вес из дневника · ${diaryLastWeight.weight} кг` : 'Вес из дневника — нет сетов'}
+          </button>
         </div>
+        {vbtWeightNote && <div data-lift="vbt-weight-source" role="status" style={{ marginTop:5, fontSize:10, color:'#f472b6', lineHeight:1.4 }}>{vbtWeightNote}</div>}
         {(()=>{
           const best=parseFloat(vbtBest), last=parseFloat(vbtLast);
           if (!Number.isFinite(best)||!Number.isFinite(last)||best<=0||last<=0||last>best) return <div style={{ marginTop:6, fontSize:10, color:'#ffffff' }}>Введите скорости (последний не может быть быстрее лучшего).</div>;
@@ -1978,11 +2031,11 @@ export const LiftMasterCard: React.FC<{
             <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:6, flexWrap:'wrap' }}>
               <div style={{ fontSize:10, fontWeight:800, color:'#38bdf8' }}>🎯 Калибровка кадра для видео-линии</div>
               <span data-lift="video-calib-state" role="status" style={{ fontSize:9, color: curCalib ? '#4ade80' : '#fbbf24' }}>
-                {curCalib ? `✓ откалибровано · ${curCalib.pxPerCm.toFixed(1)} px/см` : 'не откалибровано — линия будет панелью'}
+                {curCalib ? `✓ откалибровано · ${curCalib.pxPerCm.toFixed(1)} px/см` : 'не откалибровано — линия будет панелью'}{curOffset > 0 ? ` · трек с ${curOffset} с` : ''}
               </span>
             </div>
             <div style={{ marginTop:4, fontSize:9, color:'#fff', opacity:0.7, lineHeight:1.45 }}>
-              Шаг 1: загрузите видео и ткните в штангу на первом кадре (это точка начала трека).
+              Шаг 1: загрузите видео — кадр берётся с «смещения трека»; ткните в штангу, это его первая точка.
               Шаг 2: ткните два края известного отрезка (диаметр блина, ширина стойки) и укажите его длину.
             </div>
             <div style={{ display:'flex', gap:6, flexWrap:'wrap', alignItems:'center', marginTop:6 }}>
@@ -1993,7 +2046,7 @@ export const LiftMasterCard: React.FC<{
                   e.target.value = '';
                   if (!f) return;
                   setCalibMsg('⏳ Достаю кадр…');
-                  const frame = await grabVideoFrame(f, { timeSec: 0 });
+                  const frame = await grabVideoFrame(f, { timeSec: curOffset });
                   if (!frame) { setCalibFrame(null); setCalibMsg('Кадр не получился: видео не декодировалось в этом WebView.'); return; }
                   setCalibFrame(frame);
                   resetCalibTaps();
@@ -2002,6 +2055,23 @@ export const LiftMasterCard: React.FC<{
               </label>
               <label style={{ fontSize:10, color:DIM }}>Эталон, см
                 <input data-lift="video-calib-ref-cm" aria-label="Реальная длина эталонного отрезка, см" type="number" step="0.5" min="1" value={calibRefCm} onChange={e=>setCalibRefCm(e.target.value)} style={{ width:78, minHeight:44, marginLeft:4, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.15)', color:'#fff', borderRadius:8, padding:'10px 8px', fontSize:12 }} />
+              </label>
+              <label style={{ fontSize:10, color:DIM }}>Смещение трека, с
+                <input
+                  data-lift="video-offset"
+                  aria-label="Смещение начала трека относительно начала видео, секунды"
+                  type="number" step="0.05" min="0" max="600" value={String(curOffset)}
+                  onChange={e=>{
+                    const raw = e.target.value;
+                    setVideoOffset(o => {
+                      const next = { ...o };
+                      const n = parseFloat(raw);
+                      if (raw === '' || !Number.isFinite(n) || n <= 0) delete next[lift];
+                      else next[lift] = Math.min(600, Math.round(n * 100) / 100);
+                      return next;
+                    });
+                  }}
+                  style={{ width:78, minHeight:44, marginLeft:4, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.15)', color:'#fff', borderRadius:8, padding:'10px 8px', fontSize:12 }} />
               </label>
               <button data-lift="video-calib-mirror" aria-pressed={calibMirror} aria-label="Съёмка с зеркалом по горизонтали" onClick={()=>setCalibMirror(v => !v)} style={{ minHeight:44, padding:'8px 12px', borderRadius:8, cursor:'pointer', border: calibMirror ? '1px solid #38bdf8' : '1px solid rgba(255,255,255,0.12)', background: calibMirror ? 'rgba(56,189,248,0.18)' : 'transparent', color: calibMirror ? '#38bdf8' : DIM, fontSize:11 }}>⇄ зеркало X</button>
               <button data-lift="video-calib-taps-reset" aria-label="Сбросить точки калибровки" onClick={()=>{ resetCalibTaps(); setCalibMsg('Точки сброшены — начните с якоря.'); }} style={{ minHeight:44, padding:'8px 12px', borderRadius:8, cursor:'pointer', background:'transparent', color:'#fff', border:'1px solid rgba(255,255,255,0.12)', fontSize:11 }}>↺ Сбросить точки</button>
@@ -2158,6 +2228,7 @@ export const LiftMasterCard: React.FC<{
                     xLoopCm: kinoveaResult ? kinoveaResult.xLoop : null,
                     vmax: kinoveaResult ? kinoveaResult.vmax : null,
                     calibration: curCalib,
+                    offsetSec: curOffset,
                   });
                   if (!blob) { setShareMsg('Не удалось: видео не декодировалось или запись недоступна (PNG остаётся).'); setTimeout(()=>setShareMsg(null), 4000); return; }
                   const o = await saveBlobApk(movementDiagnosticsFilename(lift, ext), blob);

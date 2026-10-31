@@ -593,6 +593,54 @@ describe('LiftMasterCard — поведение (не только смоук)',
     expect(container.querySelector('[data-lift="video-calib-frame"]')).toBeNull();
   });
 
+  it('вес из дневника: берёт последний сет этого движения, а не любой', () => {
+    const sessions = [{
+      sessionId: 's1', date: '2026-08-10', exercises: [
+        { exerciseId: 'squat_1', exerciseName: 'Приседания со штангой', sets: [{ weightKg: 140, reps: 2, rpe: 9 }] },
+        { exerciseId: 'bench_1', exerciseName: 'Жим лёжа', sets: [{ weightKg: 200, reps: 1, rpe: 9 }] },
+      ],
+    }, {
+      sessionId: 's2', date: '2026-08-20', exercises: [
+        { exerciseId: 'squat_1', exerciseName: 'Приседания со штангой', sets: [{ weightKg: 145, reps: 3, rpe: 8 }] },
+      ],
+    }] as any;
+    const { container } = render(<LiftMasterCard sessions={sessions} />);
+    click(container.querySelector('[data-lift-nav="squat"]'));
+
+    click(container.querySelector('[data-lift="vbt-weight-from-diary"]'));
+    const input = container.querySelector('[data-lift="vbt-weight"]') as HTMLInputElement;
+    expect(input.value).toBe('145');
+    const note = container.querySelector('[data-lift="vbt-weight-source"]');
+    expect(note!.textContent).toContain('145 кг × 3');
+    expect(note!.textContent).toContain('2026-08-20');
+    // Вес сохраняется в персист вместе с остальным состоянием мастера.
+    expect(JSON.parse(localStorage.getItem(MASTER_KEY) || '{}').vbtWeight).toBe('145');
+  });
+
+  it('без сетов в дневнике кнопка веса недоступна и честно об этом пишет', () => {
+    const { container } = render(<LiftMasterCard sessions={[]} />);
+    const btn = container.querySelector('[data-lift="vbt-weight-from-diary"]')!;
+    expect(btn.getAttribute('aria-disabled')).toBe('true');
+    expect(btn.textContent).toContain('нет сетов');
+  });
+
+  it('смещение трека сохраняется и переживает перезапуск', () => {
+    const { container, unmount } = render(<LiftMasterCard sessions={[]} />);
+    const input = container.querySelector('[data-lift="video-offset"]') as HTMLInputElement;
+    act(() => { fireEvent.change(input, { target: { value: '1.35' } }); });
+    expect(JSON.parse(localStorage.getItem(MASTER_KEY) || '{}').videoOffsetSec.bench).toBe(1.35);
+    unmount();
+
+    const second = render(<LiftMasterCard sessions={[]} />);
+    expect((second.container.querySelector('[data-lift="video-offset"]') as HTMLInputElement).value).toBe('1.35');
+  });
+
+  it('мусорное смещение трека из персиста отбрасывается', () => {
+    localStorage.setItem(MASTER_KEY, JSON.stringify({ lift: 'bench', videoOffsetSec: { bench: 9999, squat: -3 } }));
+    const { container } = render(<LiftMasterCard sessions={[]} />);
+    expect((container.querySelector('[data-lift="video-offset"]') as HTMLInputElement).value).toBe('0');
+  });
+
   it('интерактивные элементы хаба не меньше 44 px', () => {
     const { container } = render(<LiftMasterCard sessions={[]} />);
     // «Быстрый старт» исчезает после первых данных — проверяем до заполнения.
@@ -611,6 +659,7 @@ describe('LiftMasterCard — поведение (не только смоук)',
       'series-save', 'session-overlay-toggle', 'capture-side-left',
       'capture-device-phone', 'export-csv', 'export-overlay-video', 'video-overlay-file',
       'video-calib-ref-cm', 'video-calib-mirror', 'video-calib-taps-reset',
+      'video-offset', 'vbt-weight-from-diary',
     ];
     for (const sel of selectors) {
       const el = container.querySelector(`[data-lift="${sel}"]`);
