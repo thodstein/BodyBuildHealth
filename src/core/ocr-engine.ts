@@ -535,9 +535,12 @@ export async function recognizeImageTextOffline(
     throw new Error('движок OCR не загрузился (tesseract.js). Пересоберите АПК: npm run build:native.');
   }
   let upload: Blob = file;
-  // Лабовый режим: крупные лимиты разрешения (мелкие цифры бланка),
-  // дефолт — экономный для скриншотов еды.
-  const imageLimits = purpose === 'labs' ? { maxSide: 1800, maxPixels: 2_600_000 } : undefined;
+  // Разрешение — главный фактор точности OCR, а не экономии: для бланков
+  // цифры мелкие (1800), для скриншотов еды текст 22-24px и тоже требует
+  // нативного масштаба (2400 — типичный телефонный скрин 1080×2340).
+  const imageLimits = purpose === 'labs'
+    ? { maxSide: 1800, maxPixels: 2_600_000 }
+    : { maxSide: 2400, maxPixels: 4_000_000 };
   try { upload = await prepareImageForServer(file, imageLimits); } catch { /* исходник как есть */ }
   // Варианты кадра: предобработка (тёмная тема и т.д.) или сырой вход,
   // если canvas недоступен (jsdom/старый WebView).

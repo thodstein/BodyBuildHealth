@@ -545,4 +545,42 @@ describe('nutrition-ocr-parser', () => {
       expect(quantityToGrams('2 0 0 мл')).toBe(200);
     });
   });
+
+  describe('компактные строки дневника (реальные скриншоты FatSecret/MFP)', () => {
+    it('разбирает «Имя / 200 г · 330 ккал · Б 40 Ж 10 У 0» с пустыми строками', () => {
+      const meals = parseNutritionText([
+        'Завтрак',
+        '',
+        'Куриная грудка',
+        '',
+        '200 г - 330 ккал - Б 40 Ж10У0',
+        'Рис отварной',
+        '',
+        '150 г- 195 ккал Б4Ж1У42',
+      ].join('\n'));
+      const items = meals.flatMap(meal => meal.items);
+      expect(items.map(item => [item.name, item.qtyGrams, item.kcal])).toEqual([
+        ['Куриная грудка', 200, 165],
+        ['Рис отварной', 150, 130],
+      ]);
+      expect(items[0]).toMatchObject({ p: 20, f: 5, c: 0 });
+    });
+
+    it('не превращает остаток колонок «200 г - 330 ккал» в продукт', () => {
+      const meals = parseNutritionText(['Завтрак', '200 г - 330 ккал - Б 40 Ж10У0'].join('\n'));
+      const items = meals.flatMap(meal => meal.items);
+      expect(items).toEqual([]);
+    });
+
+    it('разбирает колоночную вёрстку «200 г 330 ккал Б40 Ж10 У0»', () => {
+      const meals = parseNutritionText([
+        'Обед',
+        'Творог 5%',
+        '200 г 242 ккал Б34 Ж10 У6',
+      ].join('\n'));
+      const items = meals.flatMap(meal => meal.items);
+      expect(items.map(item => [item.name, item.qtyGrams])).toEqual([['Творог 5%', 200]]);
+      expect(items[0].kcal).toBe(121);
+    });
+  });
 });

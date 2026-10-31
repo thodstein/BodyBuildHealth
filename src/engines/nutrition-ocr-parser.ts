@@ -38,14 +38,26 @@ function reconstructFoodRows(lines: string[]): string[] {
   const quantityOnly = /^\d+(?:[.,]\d+)?\s*(?:г|мл|g|ml|шт|pcs?|кус(?:ок|ка)?|порц(?:ия|ии)?|serving|slice|cup|tbsp|tsp|oz)$/i;
   const nutritionOnly = /(?:\d+(?:[.,]\d+)?\s*(?:ккал|кал|kcal|cal|calories?)|(?:белки?|жиры?|углевод|угл|protein|fat|carbohydrates?|carbs?|carb|б|ж|у)\s*[:\-]?\s*\d)/i;
   const macroOnly = /^(?:(?:total\s+)?(?:protein|fat|carbohydrates?|carbs?|carb)|белки?|жиры?|углеводы?|угл|б|ж|у)\s*[:\-]?\s*\d+(?:[.,]\d+)?(?:\s*(?:г|g))?$/i;
-  const foodHeading = /^(?!завтрак|обед|ужин|перекус|бранч|полдник|breakfast|lunch|dinner|snack|итого|всего|total|натрий|калий|магний|кальций|железо|цинк|фосфор|витамин|sodium|potassium|magnesium|calcium|iron|zinc|phosphorus|fiber|клетчатка)[^\d]{2,}$/i;
+  const nameLine = (line: string) =>
+    /[А-Яа-яЁёA-Za-z]{2,}/.test(line) &&
+    !nutritionOnly.test(line) &&
+    !/^(?:завтрак|обед|ужин|перекус|бранч|полдник|breakfast|lunch|dinner|snack|итого|всего|total|натрий|калий|магний|кальций|железо|цинк|фосфор|витамин|sodium|potassium|magnesium|calcium|iron|zinc|phosphorus|fiber|клетчатка)(?![А-Яа-яЁёA-Za-z])/i.test(line);
+  // Компактная строка дневника: количество + ккал (+ макросы) в одной строке:
+  //   «200 г · 330 ккал · Б 40 Ж 10 У 0», «200 г - 330 ккал - Б40 Ж10У0».
+  // В реальных скриншотах FatSecret/MyFitnessPal имя продукта стоит строкой
+  // ВЫШЕ, поэтому без склейки парсер брал «200 г -» за название продукта —
+  // именно из-за этого распознавание «не работало».
+  // ВАЖНО: `\b` в JS не срабатывает после кириллицы (\w = [A-Za-z0-9_]),
+  // поэтому «200 г» + пробел границу слова не даёт — используем negative
+  // lookahead на букву/цифру.
+  const startsWithQuantity = /^\d+(?:[.,]\d+)?\s*(?:г|g|r|мл|ml|шт|pcs?)(?![А-Яа-яЁёA-Za-z0-9])/i;
 
   for (let index = 0; index < lines.length; index += 1) {
     const current = lines[index].trim();
     const next = lines[index + 1]?.trim() || '';
     const afterNext = lines[index + 2]?.trim() || '';
 
-    if (foodHeading.test(current) && quantityOnly.test(next) && nutritionOnly.test(afterNext)) {
+    if (nameLine(current) && quantityOnly.test(next) && nutritionOnly.test(afterNext)) {
       const row = [current, next, afterNext];
       let end = index + 3;
       while (end < lines.length && row.length < 7 && macroOnly.test(lines[end])) {
@@ -56,7 +68,13 @@ function reconstructFoodRows(lines: string[]): string[] {
       index = end - 1;
       continue;
     }
-    if (foodHeading.test(current) && quantityOnly.test(next)) {
+    // Имя отдельной строкой + компактная строка «200 г … ккал …» сразу под ним.
+    if (nameLine(current) && startsWithQuantity.test(next) && nutritionOnly.test(next)) {
+      result.push(`${current} ${next}`);
+      index += 1;
+      continue;
+    }
+    if (nameLine(current) && quantityOnly.test(next)) {
       result.push(`${current} ${next}`);
       index += 1;
       continue;
@@ -758,6 +776,15 @@ export function parseNutritionScreenshot(text: string): ParsedMeal[] {
       continue;
     }
 
+    // Компактная строка «Имя 200 г · 330 ккал · Б 40 Ж 10 У 0» должна
+    // разбираться ДО общих regex-ов: FATSECRET_ITEM_REGEX иначе «съедает»
+    // часть числа 330 как количество (33 г) и берёт «200 г -» за название.
+    const compactItem = parseCompactDiaryRow(line);
+    if (compactItem !== undefined) {
+      if (compactItem) currentMeal.items.push(compactItem);
+      continue;
+    }
+
     const fsMatch = line.match(FATSECRET_ITEM_REGEX);
     if (fsMatch) {
       const name = fsMatch[1].trim();
@@ -784,6 +811,10 @@ export function parseNutritionScreenshot(text: string): ParsedMeal[] {
       // Try to extract name (text before first number)
       const nameMatch = line.match(/^(.+?)\s*\d/);
       const name = nameMatch ? nameMatch[1].trim() : 'Неизвестно';
+      // Строка, начинающаяся с числа, — это остаток колонок, а не продукт:
+      // раньше из неё рождались позиции «200 г -» с выдуманными макросами.
+      const nameLooksReal = (name.match(/[А-Яа-яЁёA-Za-z]/g) || []).length >= 2;
+      if (!nameLooksReal) continue;
       const qtyMatch = line.match(/(\d+(?:[.,]\d+)?)\s*(г|мл|шт|кусок|ложк|порц)/i);
       const qty = qtyMatch ? qtyMatch[0] : '100 г';
       currentMeal.items.push(normalizeItem(name, qty, macros.kcal, macros.p, macros.f, macros.c));
@@ -837,6 +868,60 @@ function parseUnlabeledMacroRow(line: string): ParsedMeal['items'][number] | nul
   if (!match) return null;
   const [, name, qty, unit, kcal, p, f, c] = match;
   return normalizeItem(name.trim(), `${numberFrom(qty, 100)} ${unit}`, numberFrom(kcal, 0), numberFrom(p, 0), numberFrom(f, 0), numberFrom(c, 0));
+}
+
+/** OCR часто путает ноль с буквой «О»: «Ж1О» → «Ж 10», «УО» → «У 0». */
+function repairOcrZero(text: string): string {
+  return text
+    .replace(/(\d)\s*[ОоOo](?=[\s.,;|)]|$)/g, '$10')
+    .replace(/([БбЖжУуCcPpFf])\s*[ОоOo](?=[\s.,;|)]|$)/g, '$1 0');
+}
+
+/**
+ * Компактная строка дневника питания: название, количество, калории и
+ * макросы в ОДНОЙ строке. Именно так выглядят скриншоты FatSecret и
+ * MyFitnessPal после OCR:
+ *
+ *   «Куриная грудка 200 г · 330 ккал · Б 40 Ж 10 У 0»
+ *   «Куриная грудка 200 г - 330 ккал - Б40 Ж10У0»
+ *
+ * Раньше такие строки не разбирались ни одним специализированным правилом,
+ * попадали в общий fallback и превращались в позиции с названием «200 г -»
+ * и случайными цифрами — из-за этого распознавание дневника «не работало».
+ */
+function parseCompactDiaryRow(line: string): ParsedMeal['items'][number] | null | undefined {
+  // Строка колонок без названия: «200 г - 330 ккал - Б 40 …» → пропустить.
+  const namelessCompact = /^\d+(?:[.,]\d+)?\s*(?:г|g|мл|ml|шт|pcs?)(?![А-Яа-яЁёA-Za-z0-9])[\s\-–—·•,;:|/]*\d+(?:[.,]\d+)?\s*(?:ккал|кал|kcal|cal)/i;
+  if (namelessCompact.test(line)) return null;
+  const compact = line.match(/^(.+?)\s+(\d+(?:[.,]\d+)?)\s*(г|g|мл|ml|шт|pcs?)(?![А-Яа-яЁёA-Za-z0-9])\s*(?:[·•.,;:|/\\\-–—]|\s)*(\d+(?:[.,]\d+)?)\s*(?:ккал|кал|kcal|cal)(.*)$/i);
+  if (!compact) return undefined;
+  const [, rawName, qty, unit, kcalRaw, rawTail] = compact;
+  const name = rawName.replace(/[·•|,;:\-–—\s]+$/g, '').trim();
+  // Компактная строка БЕЗ названия продукта («200 г - 330 ккал - …») —
+  // это остаток колонок. Сигналим null (пропустить), иначе общий regex
+  // превращает её в позицию «200 г -» с выдуманными цифрами.
+  const letterCount = (name.match(/[А-Яа-яЁёA-Za-z]/g) || []).length;
+  if (letterCount < 2) return null;
+
+  const tail = repairOcrZero(rawTail);
+  const numeric = (raw?: string) => {
+    if (!raw) return 0;
+    const value = Number.parseFloat(raw.replace(/\s+/g, '').replace(/[ОоOo]/g, '0').replace(',', '.'));
+    return Number.isFinite(value) ? value : 0;
+  };
+  const labeled = (pattern: RegExp) => numeric(tail.match(pattern)?.[1]);
+  // ВАЖНО: без `\b` после кириллицы — в JS `\b` опирается на \w=[A-Za-z0-9_],
+  // поэтому `\bб\b` никогда не срабатывает на русской «б».
+  const VALUE = '(\\d+(?:\\s+\\d+)*(?:[.,]\\d+)?)';
+  let p = labeled(new RegExp('(?:бел[а-яё]*|протеин\\w*|protein|п|б)\\s*[:\\-.]?\\s*' + VALUE, 'i'));
+  let f = labeled(new RegExp('(?:жир[а-яё]*|fat|f|ж)\\s*[:\\-.]?\\s*' + VALUE, 'i'));
+  let c = labeled(new RegExp('(?:угл[а-яё]*|carb\\w*|c|у)\\s*[:\\-.]?\\s*' + VALUE, 'i'));
+  if (!p && !f && !c) {
+    // Подписи потерялись при OCR — берём три числа подряд в порядке Б-Ж-У.
+    const bare = [...tail.matchAll(/(\d+(?:[.,]\d+)?)/g)].map(m => numeric(m[1])).filter(v => Number.isFinite(v));
+    if (bare.length >= 2) [p, f, c] = [bare[0], bare[1], bare[2] ?? 0];
+  }
+  return normalizeItem(name, `${numeric(qty)} ${unit}`, numeric(kcalRaw), p, f, c);
 }
 
 function normalizeScreenshotDate(raw: string | undefined, fallback: string, usDateOrder = false): string {
@@ -1125,6 +1210,14 @@ export function parseFatSecretText(text: string): ParsedMeal[] {
     const delimitedItem = parseDelimitedItem(line);
     if (delimitedItem) {
       currentMeal.items.push(delimitedItem);
+      continue;
+    }
+
+    // Компактная строка дневника: «Имя 200 г · 330 ккал · Б 40 Ж 10 У 0».
+    // Разбирается до общих regex-ов, иначе «330» распадается на «33» + «0».
+    const compactItem = parseCompactDiaryRow(line);
+    if (compactItem !== undefined) {
+      if (compactItem) currentMeal.items.push(compactItem);
       continue;
     }
 

@@ -140,9 +140,12 @@ export async function preprocessVariantsForOcr(source: HTMLCanvasElement | Blob)
       const bitmap = await createImageBitmap(source).catch(() => null);
       if (!bitmap) return [];
       base = document.createElement('canvas');
-      // Кап по длинной стороне: скрин 1080×2400 → ~720×1600, текст цел,
-      // воркер на телефоне не задыхается.
-      const cap = 1600;
+      // Кап по длинной стороне. Раньше было 1600: скриншот 1080×2400
+      // сжимался до 738×1600, и мелкий текст дневника (22-24px) становился
+      // нечитаемым — OCR путал «330» с «33О», «Белки 40» с «Белки 311».
+      // 2400 сохраняет телефонный скриншот 1:1: точность важнее скорости,
+      // распознавание одного кадра всё равно ~2-3 с.
+      const cap = 2400;
       const scale = Math.min(1, cap / Math.max(bitmap.width, bitmap.height));
       base.width = Math.max(1, Math.round(bitmap.width * scale));
       base.height = Math.max(1, Math.round(bitmap.height * scale));
