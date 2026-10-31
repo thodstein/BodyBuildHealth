@@ -4,6 +4,18 @@ import { getLabNorm } from '../engines/lab-norms.engine';
 
 const SYNONYM_MAP = synonyms as Record<string, string>;
 
+/** Служебные слова бланка — fuzzy-сопоставление маркеров для них запрещено. */
+const NON_MARKER_WORDS = new Set([
+  'дата', 'время', 'заказ', 'номер', 'пациент', 'пациентка', 'возраст', 'пол',
+  'врач', 'лаборатория', 'результат', 'норма', 'референс', 'единица', 'итог',
+  'всего', 'сумма', 'скидка', 'оплата', 'адрес', 'телефон', 'сайт', 'страница',
+  'лист', 'отчет', 'комментарий', 'примечание', 'исследование', 'материал',
+  'биоматериал', 'способ', 'метод', 'тест', 'проба', 'образец', 'штрих', 'код',
+  'статус', 'готов', 'готовность', 'выдан', 'подписан', 'исполнитель', 'услуга',
+  'комплекс', 'профиль', 'панель', 'каталог', 'направление', 'договор', 'счет',
+  'касса', 'квитанция', 'итого', 'диагноз', 'показатель', 'наименование',
+]);
+
 /** Maps LAB_PATTERNS codes to UCUM_MAP keys where they differ */
 const CODE_ALIAS: Record<string, string> = {
   // ── pdf-parser engine codes ──
@@ -168,35 +180,75 @@ const CODE_ALIAS: Record<string, string> = {
   'URINE_OXALATES': 'URINE_OXALATE',
   'PROTEIN_URINE_24H': 'PROTEIN_24H',
   'URINE_PROTEIN_24H': 'PROTEIN_24H',
+  // ── Коды BIOMARKER_DICTIONARY, у которых не было UCUM-канона ──
+  // Без алиаса один и тот же показатель приходил дважды: «CHOL» из
+  // табличного парсера и «Cholesterol_Total» из regex-движка.
+  'CHOLESTEROL_TOTAL': 'CHOL',
+  'TESTOSTERONE_TOTAL': 'TT',
+  'TESTOSTERONE_FREE': 'FT',
+  'NT-PROBNP': 'NT_PROBNP',
+  // APOB/APOA1/EPO/PTH остаются собственными кодами: их ждут риск-движок,
+  // каталог и кардио-панели (см. risk-calculator-v2, LabsCatalogTab).
 };
 
+/**
+ * Канонический ключ единицы измерения.
+ *
+ * Порядок замен критичен: активность (МЕ/мЕд/мкМЕ) разбирается ДО массовых
+ * единиц, иначе кириллическая «д» в «мЕд» превращается в латинскую и
+ * «мЕд/л» перестаёт распознаваться как mIU/L — коэффициент для пролактина
+ * (mIU/L → ng/mL) не применялся, значение сохранялось как «240 ng/mL»
+ * вместо 11.3 ng/mL.
+ */
 function unitKey(unit: string): string {
-  return unit.toLowerCase()
+  let key = unit.toLowerCase()
+    .replace(/ё/g, 'е')
     .replace(/[µμ]/g, 'u')
     .replace(/\?/g, 'u')
-    .replace(/д/g, 'd')
-    .replace(/ё/g, 'е')
-    .replace(/[\s.]/g, '')
-    .replace(/мкмоль/g, 'umol')
-    .replace(/пмоль/g, 'pmol')
-    .replace(/ммоль\/моль/g, 'mmol/mol')
-    .replace(/нмоль/g, 'nmol')
-    .replace(/ммоль/g, 'mmol')
-    .replace(/мкме/g, 'uiu')
-    .replace(/мке?д/g, 'uiu')
+    .replace(/[\s.]/g, '');
+
+  // Активность: мкМЕ < мМЕ < МЕ/Ед. Более длинные префиксы — первыми.
+  key = key
+    .replace(/мкме\/мл/g, 'uiu/ml')
+    .replace(/мкме\/л/g, 'uiu/l')
+    .replace(/мкмед\/мл/g, 'uiu/ml')
+    .replace(/мкмед\/л/g, 'uiu/l')
+    .replace(/мкед\/мл/g, 'uiu/ml')
+    .replace(/мкед\/л/g, 'uiu/l')
+    .replace(/мке\/мл/g, 'uiu/ml')
+    .replace(/мке\/л/g, 'uiu/l')
+    .replace(/мкмед|мкме|мкед|мке/g, 'uiu')
+    .replace(/мме\/мл/g, 'miu/ml')
+    .replace(/мме\/л/g, 'miu/l')
+    .replace(/мед\/мл/g, 'miu/ml')
+    .replace(/мед\/л/g, 'miu/l')
+    .replace(/ме\/мл/g, 'miu/ml')
     .replace(/ме\/л/g, 'miu/l')
-    .replace(/мкед/g, 'miu')
-    .replace(/мед/g, 'miu')
-    .replace(/мме?д/g, 'miu')
+    .replace(/мме|мед/g, 'miu');
+
+  // Концентрации и массы. «нмоль/пмоль» — до «моль».
+  key = key
+    .replace(/ммоль\/моль/g, 'mmol/mol')
+    .replace(/мкмоль/g, 'umol')
+    .replace(/нмоль/g, 'nmol')
+    .replace(/пмоль/g, 'pmol')
     .replace(/ммоль/g, 'mmol')
+    .replace(/моль/g, 'mol')
+    .replace(/мкг/g, 'ug')
     .replace(/мг/g, 'mg')
     .replace(/нг/g, 'ng')
     .replace(/пг/g, 'pg')
-    .replace(/мкг/g, 'ug')
     .replace(/мл/g, 'ml')
-    .replace(/литр|л(?![a-z])/g, 'l')
-    .replace(/ед/g, 'u')
-    .replace(/г/g, 'g');
+    .replace(/дл/g, 'dl')
+    .replace(/мкл/g, 'ul')
+    .replace(/литр/g, 'l')
+    .replace(/мм\/ч/g, 'mm/h')
+    .replace(/сек(?:унд[а-я]*)?/g, 'sec')
+    .replace(/фл/g, 'fl')
+    .replace(/л(?![a-z])/g, 'l')
+    .replace(/г(?![a-z])/g, 'g');
+
+  return key;
 }
 
 /** Convert common Russian/foreign lab units to the canonical UCUM_MAP unit. */
@@ -264,6 +316,16 @@ export function normalizeLabMeasurement(code: string, value: number, unit: strin
     case 'D_DIMER': if (from.includes('ng/ml')) factor = 0.001; break;
     default: break;
   }
+  // Концентрацию нельзя «переименовать» без коэффициента: раньше неизвестная
+  // или обрезанная единица (например, «моль/л» вместо «нмоль/л») отдавала
+  // исходное число с каноническим ярлыком — 18.4 нмоль/л тестостерона
+  // превращалось в «18.4 ng/dL» (реально 530). Если обе единицы — массовые
+  // концентрации, а правило пересчёта не найдено, честно оставляем исходную
+  // единицу, чтобы UI не показывал ложную норму.
+  const massUnit = /(?:mol|g|mg|ug|ng|pg)\//;
+  if (factor === 1 && from && from !== target && massUnit.test(from) && massUnit.test(target)) {
+    return { value: round(value), unit: unit.trim() };
+  }
   return { value: round(value * factor), unit: info.prefUnit };
 }
 
@@ -323,12 +385,21 @@ export function resolveLabMarker(name: string): string {
   // Ищем ближайший синоним по расстоянию Левенштейна, но только если он
   // уникален и достаточно близок (≤2 правок) и имя достаточно длинное,
   // чтобы не цеплять случайные короткие совпадения.
-  if (trimmed.length >= 4) {
+  //
+  // P0: служебные слова бланка («Дата», «Норма», «Заказ»…) НЕЛЬЗЯ пропускать
+  // через fuzzy. «Дата» отличается от «дгэа» на 2 правки и раньше давала
+  // ложный ДГЭА-С со значением даты (12.08.2026 → 12.08 ug/dL).
+  const normalizedWord = trimmed.toLowerCase().replace(/[^а-яёa-z0-9]/g, '');
+  const isNonMarkerWord = NON_MARKER_WORDS.has(normalizedWord) || /\d/.test(normalizedWord);
+  if (trimmed.length >= 5 && !isNonMarkerWord) {
     let bestKey: string | null = null;
     let bestDist = 3;
     let bestCount = 0;
     const needle = trimmed.toLowerCase();
     for (const key of Object.keys(SYNONYM_MAP)) {
+      // Короткие ключи («дгэа», «лг», «ттг») не участвуют в fuzzy:
+      // расстояние в 1–2 правки для них статистически ничего не значит.
+      if (key.length < 5) continue;
       const d = levenshtein(needle, key);
       if (d < bestDist) {
         bestDist = d;

@@ -420,11 +420,14 @@ describe('Reference range preservation through save/load cycle', () => {
     expect(hdl!.refLow).toBe(1.0);
     expect(hdl!.isAbnormal).toBe(false); // 1.1 > 1.0
 
-    // TESTO maps to TT (Total Testosterone) via mapToUcumCode
+    // TESTO maps to TT (Total Testosterone) via mapToUcumCode.
+    // Канонические единицы приложения для TT — ng/dL, поэтому и значение,
+    // и граница «>12 нмоль/л» пересчитываются (12 × 28.84 = 346.08).
     const test = result.labs.find(l => l.code === 'TT');
     expect(test).toBeDefined();
-    expect(test!.refLow).toBe(12);
-    expect(test!.isAbnormal).toBe(true); // 10.5 < 12
+    expect(test!.unit).toBe('ng/dL');
+    expect(test!.refLow).toBeCloseTo(346.08, 1);
+    expect(test!.isAbnormal).toBe(true); // 10.5 нмоль/л < 12 нмоль/л
   });
 
   it('full pipeline: 52-marker Invitro panel → all ref ranges preserved', async () => {

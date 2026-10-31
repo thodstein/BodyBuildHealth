@@ -56,8 +56,8 @@ const LAB_PATTERNS: { code: string; names: string[]; unitPatterns: string[]; ref
   { code: 'ESR', names: ['СОЭ', 'ESR', 'скорость оседания', 'РОЭ'], unitPatterns: ['мм/ч', 'mm/h'] },
   { code: 'FER', names: ['ферритин', 'Ferritin', 'FER'], unitPatterns: ['мкг/л', 'ug/L', 'нг/мл', 'ng/mL', 'мк/л'] },
   { code: 'TSH', names: ['ТТГ', 'TSH', 'тиреотропный', 'тиротропин'], unitPatterns: ['мЕд/л', 'mIU/L', 'мМЕ/л', 'мЕд/мл'] },
-  { code: 'FT4', names: ['Т4 свободный', 'Т4 св', 'FT4', 'Free T4', 'тироксин свободный'], unitPatterns: ['пмоль/л', 'pmol/L'] },
-  { code: 'FT3', names: ['Т3 свободный', 'Т3 св', 'FT3', 'Free T3', 'трийодтиронин свободный'], unitPatterns: ['пмоль/л', 'pmol/L'] },
+  { code: 'FT4', names: ['Т4 свободный', 'Т4 св', 'T4 свободный', 'T4 св', 'FT4', 'Free T4', 'тироксин свободный'], unitPatterns: ['пмоль/л', 'pmol/L'] },
+  { code: 'FT3', names: ['Т3 свободный', 'Т3 св', 'T3 свободный', 'T3 св', 'FT3', 'Free T3', 'трийодтиронин свободный'], unitPatterns: ['пмоль/л', 'pmol/L'] },
   { code: 'T4', names: ['Т4 общий', 'тироксин общий', 'Total T4'], unitPatterns: ['нмоль/л', 'nmol/L'] },
   { code: 'T3', names: ['Т3 общий', 'трийодтиронин общий', 'Total T3'], unitPatterns: ['нмоль/л', 'nmol/L'] },
   { code: 'TESTO', names: ['тестостерон', 'Testosterone', 'тестостерон общий', 'общий тестостерон'], unitPatterns: ['нмоль/л', 'nmol/L', 'нг/мл', 'ng/mL', 'нг/дл', 'ng/dL'] },
@@ -311,21 +311,17 @@ function normalizeOcrText(text: string): string {
 
 function extractNumber(text: string): number | null {
   // Try to find the first standalone number that looks like a lab value (not part of a range)
-  const allNums = text.match(/[\d]+[.,]?[\d]*/g);
-  if (!allNums) return null;
-  // Filter: skip numbers that appear in ANY reference range (not just the first).
-  // OCR often duplicates ranges, and treating range bounds as values is the
-  // main source of misidentified markers.
-  const rangeNums = new Set<string>();
-  const rangeMatches = text.matchAll(/(\d+[.,]?\d*)\s*[-–]\s*(\d+[.,]?\d*)/g);
-  for (const m of rangeMatches) {
-    rangeNums.add(m[1]);
-    rangeNums.add(m[2]);
+  const rangeSpans: Array<[number, number]> = [];
+  for (const m of text.matchAll(/(\d+[.,]?\d*)\s*[-–]\s*(\d+[.,]?\d*)/g)) {
+    rangeSpans.push([m.index ?? 0, (m.index ?? 0) + m[0].length]);
   }
-  for (const n of allNums) {
-    if (rangeNums.has(n)) continue;
+  for (const m of text.matchAll(/\+?[\d]+[.,]?[\d]*/g)) {
+    const start = m.index ?? 0;
+    // Позиционная проверка: значение, равное границе диапазона («75» при
+    // референсе «75 - 250»), раньше отбрасывалось вместе с границей.
+    if (rangeSpans.some(([a, b]) => start >= a && start < b)) continue;
     // Skip if it looks like a year, phone number, etc.
-    const clean = n.replace(',', '.');
+    const clean = m[0].replace('+', '').replace(',', '.');
     const val = parseFloat(clean);
     if (isNaN(val) || val < 0) continue;
     return val;
@@ -384,17 +380,17 @@ function extractQualitativeScore(text: string): number | null {
 
 function extractResultNumber(text: string): number | null {
   const cleaned = text.replace(/\b(?:от|до|референс|норма|ref)\b/gi, ' ');
-  const numbers = cleaned.match(/\d+[.,]?\d*/g) || [];
-  // Exclude ALL numbers that appear in ANY reference range, not just the first.
-  const rangeNumbers = new Set<string>();
-  const rangeMatches = cleaned.matchAll(/(\d+[.,]?\d*)\s*[-–]\s*(\d+[.,]?\d*)/g);
-  for (const m of rangeMatches) {
-    rangeNumbers.add(m[1]);
-    rangeNumbers.add(m[2]);
+  // Exclude numbers that are INSIDE a reference range by position. Раньше
+  // сравнение шло по строке: значение «75» при референсе «75 - 250»
+  // отбрасывалось вместе с границей.
+  const rangeSpans: Array<[number, number]> = [];
+  for (const m of cleaned.matchAll(/(\d+[.,]?\d*)\s*[-–]\s*(\d+[.,]?\d*)/g)) {
+    rangeSpans.push([m.index ?? 0, (m.index ?? 0) + m[0].length]);
   }
-  for (const token of numbers) {
-    if (rangeNumbers.has(token)) continue;
-    const value = Number(token.replace(',', '.'));
+  for (const m of cleaned.matchAll(/(?<![\d.,])\d+[.,]?\d*/g)) {
+    const start = m.index ?? 0;
+    if (rangeSpans.some(([a, b]) => start >= a && start < b)) continue;
+    const value = Number(m[0].replace(',', '.'));
     if (Number.isFinite(value) && value > 0) return value;
   }
   return null;
@@ -405,11 +401,25 @@ function extractResultNumber(text: string): number | null {
 // therefore used to return 09 or 023 instead of 5.00. Prefer the number
 // immediately preceding a laboratory unit, including a valid zero.
 function extractNumberBeforeUnit(text: string): number | null {
-  const unit = '(?:мк\s*моль|ммоль|моль|мг|нг|пг|мкг|мкМЕ|м\s*[ЕEеe]д|мМЕ|МЕ|ЕД|Е|ед|г|мл|л)\\s*\\/\\s*(?:дл|мл|л)|(?:umol|mmol|nmol|pmol|mg|ng|pg|ug|mIU|MIU|IU|U|g)\\s*\\/\\s*(?:dL|mL|L)|%|сек|s\\b|meq\\/l';
+  // нмоль/пмоль — ДО «моль», иначе lookahead не видит «75 нмоль/л»
+  // и значение не находится вовсе.
+  const unit = '(?:мк\\s*моль|н\\s*моль|п\\s*моль|ммоль|моль|мкг|мг|нг|пг|мкМЕ|м\\s*[ЕEеe]д|мМЕ|МЕ|ЕД|Е|ед|г|мл|л)\\s*\\/\\s*(?:дл|мл|л)|(?:umol|mmol|nmol|pmol|mg|ng|pg|ug|mIU|MIU|IU|U|g)\\s*\\/\\s*(?:dL|mL|L)|%|сек|s\\b|meq\\/l';
   const matches = [...text.matchAll(new RegExp(`(\\d+[.,]?\\d*)\\s*[+*]*\\s*(?=${unit})`, 'gi'))];
-  if (matches.length === 0) return null;
-  const value = Number(matches[matches.length - 1][1].replace(',', '.'));
-  return Number.isFinite(value) ? value : null;
+  // Формат «значение референс единица»: последнее число перед единицей —
+  // верхняя граница референса («1,2 0-5 мг/л» → 5). Границы диапазона
+  // отбрасываем и берём настоящее значение.
+  for (let i = matches.length - 1; i >= 0; i--) {
+    const m = matches[i];
+    const start = m.index ?? 0;
+    const numEnd = start + m[1].length;
+    const before = text.slice(Math.max(0, start - 4), start);
+    const after = text.slice(numEnd, numEnd + 4);
+    if (/[-–]\s*$/.test(before)) continue;
+    if (/^\s*[-–]/.test(after)) continue;
+    const value = Number(m[1].replace(',', '.'));
+    if (Number.isFinite(value)) return value;
+  }
+  return null;
 }
 
 function extractRefRange(text: string): { low?: number; high?: number } {
@@ -475,7 +485,12 @@ function extractUnit(text: string): string {
   // Match lab units in both Russian and English forms. Include common OCR
   // variants: spaces inside units (мк моль/л), missing slash (ммоль л),
   // and abbreviated prefixes (мЕд, мМЕ).
-  const match = text.match(/(?:мк\s*моль|ммоль|моль|мг|нг|пг|мкг|м\s*[ЕEеe]д|мМЕ|МЕ|ЕД|Е|ед|г|мл|л)\s*\/\s*(?:дл|мл|л)|(?:umol|mmol|nmol|pmol|mg|ng|pg|ug|mIU|MIU|IU|U|g)\s*\/\s*(?:dL|mL|L)|%|сек|s\b|\/сут|\/24\s*ч|meq\/l|ммоль\/моль/i);
+  //
+  // P0: наномоль/пикомоль ОБЯЗАНЫ стоять в альтернативе ДО «моль».
+  // Раньше «нмоль/л» матчилось как «моль/л», префикс терялся, и
+  // normalizeLabMeasurement не мог применить коэффициент (тестостерон
+  // 18.4 нмоль/л сохранялся как 18.4 ng/dL вместо 530.7).
+  const match = text.match(/(?:мк\s*моль|ммоль|н\s*моль|п\s*моль|моль|мг|нг|пг|мкг|мк\s*МЕ|м\s*[ЕEеe]д|мМЕ|МЕ|ЕД|Е|ед|г|мл|л)\s*\/\s*(?:дл|мл|л)|(?:umol|mmol|nmol|pmol|mg|ng|pg|ug|mIU|MIU|IU|U|g)\s*\/\s*(?:dL|mL|L)|%|сек|s\b|\/сут|\/24\s*ч|meq\/l|ммоль\/моль|(?:кл|тыс|млн)\s*\/\s*(?:мкл|мл|л)|фл|fl\b/i);
   return match?.[0].replace(/\s+/g, '') || '';
 }
 
@@ -751,11 +766,13 @@ function tryParseTableRows(lines: string[], provider: string | null): ParsedLabV
     // matching name), чтобы "креатинин мочи" попадал в CREATININE_URINE, а не CREAT.
     let bestLabDef: typeof LAB_PATTERNS[number] | null = null;
     let bestNameLen = 0;
+    let bestNameText = '';
     for (const labDef of LAB_PATTERNS) {
       for (const n of labDef.names) {
         if (containsLabName(combined, n) && n.length > bestNameLen) {
           bestNameLen = n.length;
           bestLabDef = labDef;
+          bestNameText = n;
         }
       }
     }
@@ -768,36 +785,58 @@ function tryParseTableRows(lines: string[], provider: string | null): ParsedLabV
       let refLow: number | undefined;
       let refHigh: number | undefined;
 
+      // Референс берём из всей строки: он может стоять до единицы
+      // («62 - 106 мкмоль/л») или в отдельной колонке.
+      const lineRef = extractRefRange(line);
+      refLow = lineRef.low;
+      refHigh = lineRef.high;
+      unit = extractUnit(line);
+
       for (let ci = 0; ci < cols.length; ci++) {
         const cell = cols[ci];
-        const isNameCell = labDef.names.some(name => containsLabName(cell, name));
-        // Extract reference range from any cell that has a range pattern
         const ref = extractRefRange(cell);
-        if (ref.low !== undefined || ref.high !== undefined) {
+        if ((ref.low !== undefined || ref.high !== undefined) && refLow === undefined && refHigh === undefined) {
           refLow = ref.low;
           refHigh = ref.high;
-        }
-        // Gemotest rows carry service codes (A09.05.023 / 01-01.001) before
-        // the result column: the first numeric cell is then a fragment of
-        // the code, not the result. Such cells must never become the value.
-        const isServiceCode = /^[a-zа-яё]?\d{2}[.-]\d{2}[.-]\d{2,3}$/i.test(cell.trim().replace(/\(.*$/, ''));
-        // Names such as 25(OH)D, T3, T4 and HbA1c contain digits which are
-        // not the measured result. Never use the marker/name cell as value.
-        const num = isNameCell || isServiceCode ? null : extractResultNumber(cell);
-        if (num !== null && num > 0 && cell.length < 80) {
-          if (val === null) {
-            val = num;
-          }
-        }
-        // Полуколичественный fallback для качественных тестов ОАМ
-        if (val === null && !isNameCell && labDef.code.endsWith('_QR')) {
-          const q = extractQualitativeScore(cell);
-          if (q !== null) val = q;
         }
         const cellUnit = extractUnit(cell) || (isUnitCell(cell) ? cell : '');
         if (cellUnit && !unit) unit = cellUnit;
       }
 
+      // Название маркера вырезаем ДО поиска значения. Имена вида «25-ОН
+      // витамин D» и «Т4» содержат цифры: при разбиении по пробелам «25»
+      // становилось результатом (25 нмоль/л вместо 75), а «T4» — значением 4.
+      const nameRegex = bestNameText
+        ? new RegExp(bestNameText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i')
+        : null;
+      const valueLine = nameRegex ? line.replace(nameRegex, ' ') : line;
+      // Табличная строка (табы / 3+ пробела) — это настоящие колонки:
+      // значение ищем по ячейкам, пропуская ячейку с названием маркера.
+      // Строку из одного пробела (OCR обычного текста) делим по словам уже
+      // после вырезания названия — иначе «25-ОН витамин D 75 75 - 250»
+      // отдаёт 25 из названия.
+      const columnar = hasTab || hasTripleSpace;
+      const cellsForValue = columnar
+        ? cols.filter(cell => !labDef.names.some(n => containsLabName(cell, n)))
+        : valueLine.split(colDelim).map(c => c.trim()).filter(Boolean);
+
+      for (const cell of cellsForValue) {
+        // Gemotest rows carry service codes (A09.05.023 / 01-01.001) before
+        // the result column: the first numeric cell is then a fragment of
+        // the code, not the result. Such cells must never become the value.
+        const isServiceCode = /^[a-zа-яё]?\d{2}[.-]\d{2}[.-]\d{2,3}$/i.test(cell.replace(/\(.*$/, ''));
+        if (isServiceCode) continue;
+        const num = extractResultNumber(cell);
+        if (num !== null && num > 0 && cell.length < 80) {
+          val = num;
+          break;
+        }
+      }
+      // Строка не делилась на ячейки (обычный текст OCR) — берём число
+      // перед единицей, но только если оно не является границей диапазона.
+      if (val === null) {
+        val = extractNumberBeforeUnit(valueLine) ?? extractNumber(valueLine.replace(/[^\d.,\s\-–]/g, ' '));
+      }
       // Полуколичественный fallback из всей строки, если ячейки не дали значение
       if (val === null && labDef.code.endsWith('_QR')) {
         const q = extractQualitativeScore(line);
@@ -893,14 +932,18 @@ function tryParseLabFromLine(line: string): { code: string; name: string; value:
   const valueText = nameMatchText
     ? line.replace(new RegExp(nameMatchText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'), ' ')
     : line;
-    // Try extractNumber first (filters out ALL range numbers). If it fails
-    // (all numbers were in ranges), try extractResultNumber as fallback —
-    // it has the same logic but can catch edge cases where the value is
-    // adjacent to a range without a clear separator.
-    let val = extractNumberBeforeUnit(valueText);
-    if (val === null) val = extractNumber(valueText.replace(/[^\d.,\s\-–]/g, ' '));
-    if (val === null) {
-      val = extractResultNumber(valueText);
+    // Начинаем поиск значения ПОСЛЕ названия маркера. Имена вида
+    // «25-ОН витамин D» и «Т4» содержат цифры: без этого «25» из названия
+    // становилось результатом (25 нмоль/л вместо 75).
+    const nameIdx = nameMatchText ? line.toLowerCase().indexOf(nameMatchText.toLowerCase()) : -1;
+    const afterName = nameIdx >= 0 ? line.slice(nameIdx + nameMatchText.length) : valueText;
+    const searchTexts = /\d/.test(afterName) && afterName !== valueText ? [afterName, valueText] : [valueText];
+    let val: number | null = null;
+    for (const src of searchTexts) {
+      val = extractNumberBeforeUnit(src);
+      if (val === null) val = extractNumber(src.replace(/[^\d.,\s\-–]/g, ' '));
+      if (val === null) val = extractResultNumber(src);
+      if (val !== null) break;
     }
     // When the marker name contains digits (e.g. "Витамин D 25-OH"), the
     // generic sanitize→extractNumber path may pick the name-suffix number

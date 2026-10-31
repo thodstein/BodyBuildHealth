@@ -61,6 +61,15 @@ async function prepareImageForServer(
   limits?: { maxSide?: number; maxPixels?: number },
 ): Promise<Blob> {
   if (typeof document === 'undefined') return file;
+  // Без рабочего 2d-контекста сжатие невозможно: раньше код всё равно шёл
+  // в <img>-декодирование и висел 15 секунд на таймауте (jsdom, WebView без
+  // canvas), из-за чего распознавание выглядело «зависшим».
+  try {
+    const probe = document.createElement('canvas');
+    if (typeof probe.getContext !== 'function' || !probe.getContext('2d')) return file;
+  } catch {
+    return file;
+  }
   // Дефолт (1280/1.6МП) заточен под аплоад на сервер: экономия трафика.
   // Для оффлайн-OCR бланка анализов разрешение — главный фактор точности:
   // цифры референсных колонок ~8-10pt, и на 1280px они становятся неразборчивы.
@@ -229,8 +238,13 @@ function mergeParsedResults(
       unit: normalized.unit,
       refLow,
       refHigh,
-      isAbnormal: refHigh !== undefined
-        ? normalized.value > refHigh || (refLow !== undefined && normalized.value < refLow)
+      // Явный референс из бланка важнее среднепопуляционных границ UCUM_MAP.
+      // Раньше при односторонней границе «>12» (только refLow) проверялся
+      // лишь refHigh, и отклонение терялось: значение ниже нижней границы
+      // помечалось нормой по общим uln/lln.
+      isAbnormal: refLow !== undefined || refHigh !== undefined
+        ? (refHigh !== undefined && normalized.value > refHigh)
+          || (refLow !== undefined && normalized.value < refLow)
         : info ? normalized.value > info.uln || normalized.value < info.lln : table?.isAbnormal,
       raw: isUsefulRawLine(table?.raw) ? table?.raw : undefined,
     };
