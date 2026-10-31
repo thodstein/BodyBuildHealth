@@ -139,7 +139,13 @@ export interface WeakpointsPayload { groups?: string[]; lift?: string; orthopedi
   combatAsymmetry?: 'left' | 'right' | null;
   combatSparringCap?: number | null;
 }
-export interface PriPayload { volumeMult: number; rirShift: number }
+export interface PriPayload {
+  volumeMult: number;
+  rirShift: number;
+  /** Абсолютная цель: рабочих сетов на мышцу в неделю (≤ — только сокращение).
+   *  Нужна карточкам MRV/мезо/прогрессии: без неё кнопка работала только на ББ. */
+  volumeSets?: number;
+}
 export type TempoApplyMode = 'all' | 'compound' | 'isolation' | 'skip_deload';
 export interface TempoPayload { eccentric: number; bottomPause?: number; concentric: number; topPause?: number; label?: string; mode?: TempoApplyMode }
 /** Откат последнего применения темпа (данные не нужны — читается снимок he_tempo_prev_v1). */

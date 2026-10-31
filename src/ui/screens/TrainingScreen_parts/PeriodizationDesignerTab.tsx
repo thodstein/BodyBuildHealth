@@ -1023,7 +1023,7 @@ export const PeriodizationDesignerTab: React.FC<{ initialUnifiedMode?: 'micro' |
                         })}
                       </div>
                       <div style={{ fontSize: 10, color: DIM, textAlign: 'center', marginTop: 4 }}>▮ Объём · %1RM вверху</div>
-                      <button onClick={() => applyToPlanner({ kind: 'mrv', label: 'Прогрессия: ' + weeks + 'н', data: { mrv: 18 } })} style={{ ...btn, width: '100%', minHeight: 38, marginTop: 8, background: accent+'18', borderColor: accent+'33', color: accent }}>🛠 Применить прогрессию</button>
+                      <button onClick={() => applyToPlanner({ kind: 'pri', label: 'Прогрессия: ' + weeks + 'н · объём ≤ 18 сет/м/нед', data: { volumeMult: 1, rirShift: 0, volumeSets: 18 } })} style={{ ...btn, width: '100%', minHeight: 38, marginTop: 8, background: accent+'18', borderColor: accent+'33', color: accent }}>🛠 Применить прогрессию</button>
                     </div>
                   );
                 })()}

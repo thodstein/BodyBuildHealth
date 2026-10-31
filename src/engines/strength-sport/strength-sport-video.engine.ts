@@ -144,7 +144,7 @@ function butterworth12Hz(points: BarPoint[], fps = 30): BarPoint[] {
   return out;
 }
 
-export function analyzeBarTracking(points: BarPoint[]): BarTrackingResult | null {
+export function analyzeBarTracking(points: BarPoint[], meta?: VideoCaptureMeta): BarTrackingResult | null {
   if (!points || points.length < 2) return null;
   const fps = (()=> {
     const dts = points.slice(1).map((p,i)=> p.t - points[i].t).filter(dt=>dt>0&&dt<0.2);
@@ -205,7 +205,9 @@ export function analyzeBarTracking(points: BarPoint[]): BarTrackingResult | null
   if (hAcc <= 0.2) hAcc = 0.8;
   const xMean = xs.reduce((a, b) => a + b, 0) / xs.length;
   const xBias = Math.round((xMean - xs[0]) * 10) / 10;
-  return { points: filtered, fps, yMax: Math.round(yMax), xLoop: Math.round(xLoop * 10) / 10, vmax, hAcc, duration: Math.round(duration * 100) / 100, xBias, turnoverMs };
+  // Качество съёмки: заполняем объявленное поле, если хаб передал параметры захвата.
+  const quality: BarTrackingResult['quality'] = meta ? videoQualityForCapture(meta).flag : 'unknown';
+  return { points: filtered, fps, yMax: Math.round(yMax), xLoop: Math.round(xLoop * 10) / 10, vmax, hAcc, duration: Math.round(duration * 100) / 100, xBias, turnoverMs, quality };
 }
 
 // ── Overlay повторов (P1 #11): нарезка одной траектории на повторы ──────────

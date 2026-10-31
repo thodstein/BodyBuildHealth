@@ -44,13 +44,13 @@ import { getPLWeakGroupExerciseCandidates, diagnosticProtocolFromCycle } from '.
 import type { SRCycleTemplate } from '../../../data/lms-cycles/lms-types';
 import { applyToPlanner } from './planner-bridge';
 import { getExerciseById } from '../../../core/exercise-catalog';
-import { parseKinoveaCSV, analyzeBarTracking, segmentBarReps, barRepOverlay, type BarTrackingResult, type BarRepSegment } from '../../../engines/strength-sport/strength-sport-video.engine';
+import { parseKinoveaCSV, analyzeBarTracking, segmentBarReps, barRepOverlay, videoQualityForCapture, type BarTrackingResult, type BarRepSegment, type VideoCaptureMeta } from '../../../engines/strength-sport/strength-sport-video.engine';
 import { barLoopFlag } from '../../../engines/pro/bar-path-core.engine';
 import { diagnoseAsymmetry } from '../../../engines/pro/pl-asymmetry.engine';
 import { RULE_CHECKS, checkLiftRules } from '../../../engines/pro/pl-competition-rules.engine';
 import { RED_FLAGS, checkRedFlags, type RedFlagId } from '../../../engines/pro/pl-red-flags.engine';
-import { buildMovementDiagnosticsHtml, buildMovementDiagnosticsCsv, movementDiagnosticsFilename, type MovementDiagnosticsExportInput } from '../../../engines/pro/movement-diagnostics-export.engine';
-import { copyOrShareText, saveCsvApk, printHtmlApk, shareOutcomeLabel } from '../../../core/apk-share';
+import { buildMovementDiagnosticsHtml, buildMovementDiagnosticsCsv, buildTrajectorySvg, movementDiagnosticsFilename, type MovementDiagnosticsExportInput } from '../../../engines/pro/movement-diagnostics-export.engine';
+import { copyOrShareText, saveCsvApk, printHtmlApk, saveTextFileApk, shareOutcomeLabel } from '../../../core/apk-share';
 import { VideoCaptureCard } from './VideoCaptureCard';
 import StickingPointAnalysisCard from './StickingPointAnalysisCard';
 import { RIRCalibrationCard } from './RIRCalibrationCard';
@@ -271,6 +271,8 @@ interface MasterState {
   meetMaxS: string; meetMaxB: string; meetMaxD: string;
   /** LVP-калибровка per-lift (начало/наклон, м/с): персистентная готовность между сессиями. */
   lvp: Record<string, { slope: number; intercept: number; r2: number }>;
+  /** Параметры захвата видео: влияют на достоверность xLoop/vmax (Shah 2026). */
+  capture: { heightM: string; distM: string; side: string; device: string };
 }
 
 function isRecord(v: unknown): v is Record<string, unknown> { return !!v && typeof v === 'object' && !Array.isArray(v); }
@@ -331,8 +333,9 @@ function loadMaster(): MasterState {
       meetMaxB: typeof raw.meetMaxB === 'string' ? raw.meetMaxB.slice(0, 20) : '',
       meetMaxD: typeof raw.meetMaxD === 'string' ? raw.meetMaxD.slice(0, 20) : '',
       lvp: cleanLvp(raw.lvp),
+      capture: cleanCapture(raw.capture),
     };
-  } catch { return { lift:'bench', phase:'' as WeakPoint|'', issues:[], selectedGeom:{}, daysGeom:{}, selectedDiag:{}, daysDiag:{}, weakMuscleGroups:[], weakMuscleSubs:[], asymSide:null, asymL:'', asymR:'', vbtBest:'', vbtLast:'', vbtWeight:'', vbtGoal:'strength', vbtUpdatedAt:null, vbtPauseMs:'', asymPhase:{ startL:'', startR:'', midL:'', midR:'', lockL:'', lockR:'' }, dualSensor:{ left:'', right:'' }, perLift:{}, redFlags:[], ruleChecks:{}, meetDate:'', meetStrategy:'balanced' as MeetStrategy, meetMaxS:'', meetMaxB:'', meetMaxD:'', lvp:{} }; }
+  } catch { return { lift:'bench', phase:'' as WeakPoint|'', issues:[], selectedGeom:{}, daysGeom:{}, selectedDiag:{}, daysDiag:{}, weakMuscleGroups:[], weakMuscleSubs:[], asymSide:null, asymL:'', asymR:'', vbtBest:'', vbtLast:'', vbtWeight:'', vbtGoal:'strength', vbtUpdatedAt:null, vbtPauseMs:'', asymPhase:{ startL:'', startR:'', midL:'', midR:'', lockL:'', lockR:'' }, dualSensor:{ left:'', right:'' }, perLift:{}, redFlags:[], ruleChecks:{}, meetDate:'', meetStrategy:'balanced' as MeetStrategy, meetMaxS:'', meetMaxB:'', meetMaxD:'', lvp:{}, capture:{ heightM:'', distM:'', side:'', device:'' } }; }
 }
 function saveMaster(s: MasterState) { try{ localStorage.setItem(MASTER_KEY, JSON.stringify(s)); }catch{} }
 function cleanRuleChecks(raw: unknown): Record<string, boolean> {
@@ -344,8 +347,16 @@ function cleanRuleChecks(raw: unknown): Record<string, boolean> {
   return out;
 }
 
-/** LVP-калибровки per-lift: только конечные числа, ключ = имя лифта. */
-function cleanLvp(raw: unknown): Record<string, { slope: number; intercept: number; r2: number }> {
+/** Параметры захвата: только известные ракурсы/устройства, числа как строки ввода. */
+function cleanCapture(raw: unknown): MasterState['capture'] {
+  const o = isRecord(raw) ? raw : {};
+  const str = (v: unknown, max = 8) => (typeof v === 'string' ? v.slice(0, max) : '');
+  const side = o.side === 'left' || o.side === 'right' || o.side === 'front' ? o.side : '';
+  const device = o.device === 'kinovea' || o.device === 'enode' || o.device === 'phone' ? o.device : '';
+  return { heightM: str(o.heightM), distM: str(o.distM), side, device };
+}
+
+/** LVP-калибровки per-lift: только конечные числа, ключ = имя лифта. */function cleanLvp(raw: unknown): Record<string, { slope: number; intercept: number; r2: number }> {
   if (!isRecord(raw)) return {};
   const out: Record<string, { slope: number; intercept: number; r2: number }> = {};
   for (const [k, v] of Object.entries(raw)) {
@@ -491,6 +502,8 @@ export const LiftMasterCard: React.FC<{
   const [bwSex, setBwSex] = useState<Sex>('male');
   const [videoBarLoop, setVideoBarLoop] = useState<{ xLoop: number; flag: string } | null>(null);
   const [videoSticking, setVideoSticking] = useState<{ phase: string; joint: 'knee' | 'elbow'; deg: number } | null>(null);
+  /** Метаданные съёмки: без них качество xLoop/vmax не проверить. */
+  const [capture, setCapture] = useState(initial.capture);
   const redRes = useMemo(()=> checkRedFlags(redFlags), [redFlags]);
   const ruleDefs = useMemo(()=> RULE_CHECKS[lift] ?? [], [lift]);
   const ruleRes = useMemo(()=>{
@@ -541,7 +554,7 @@ export const LiftMasterCard: React.FC<{
     }catch{}
   }, []);
 
-  useEffect(()=>{ saveMaster({ lift, phase, issues, selectedGeom, daysGeom, selectedDiag, daysDiag, weakMuscleGroups, weakMuscleSubs, asymSide, asymL, asymR, vbtBest, vbtLast, vbtWeight, vbtGoal, vbtUpdatedAt, vbtPauseMs, asymPhase: { startL: asymStartL, startR: asymStartR, midL: asymMidL, midR: asymMidR, lockL: asymLockL, lockR: asymLockR }, dualSensor: { left: dualLeft, right: dualRight }, perLift, redFlags, ruleChecks, meetDate, meetStrategy, meetMaxS, meetMaxB, meetMaxD, lvp: lvpSaved }); }, [lift, phase, issues, selectedGeom, daysGeom, selectedDiag, daysDiag, weakMuscleGroups, weakMuscleSubs, asymSide, asymL, asymR, vbtBest, vbtLast, vbtWeight, vbtGoal, vbtUpdatedAt, vbtPauseMs, asymStartL, asymStartR, asymMidL, asymMidR, asymLockL, asymLockR, dualLeft, dualRight, perLift, redFlags, ruleChecks, meetDate, meetStrategy, meetMaxS, meetMaxB, meetMaxD, lvpSaved]);
+  useEffect(()=>{ saveMaster({ lift, phase, issues, selectedGeom, daysGeom, selectedDiag, daysDiag, weakMuscleGroups, weakMuscleSubs, asymSide, asymL, asymR, vbtBest, vbtLast, vbtWeight, vbtGoal, vbtUpdatedAt, vbtPauseMs, asymPhase: { startL: asymStartL, startR: asymStartR, midL: asymMidL, midR: asymMidR, lockL: asymLockL, lockR: asymLockR }, dualSensor: { left: dualLeft, right: dualRight }, perLift, redFlags, ruleChecks, meetDate, meetStrategy, meetMaxS, meetMaxB, meetMaxD, lvp: lvpSaved, capture }); }, [lift, phase, issues, selectedGeom, daysGeom, selectedDiag, daysDiag, weakMuscleGroups, weakMuscleSubs, asymSide, asymL, asymR, vbtBest, vbtLast, vbtWeight, vbtGoal, vbtUpdatedAt, vbtPauseMs, asymStartL, asymStartR, asymMidL, asymMidR, asymLockL, asymLockR, dualLeft, dualRight, perLift, redFlags, ruleChecks, meetDate, meetStrategy, meetMaxS, meetMaxB, meetMaxD, lvpSaved, capture]);
 
   /** Переключение лифта: сохраняем фазу/отклонения текущего и восстанавливаем выбор целевого.
    *  Раньше общий state обнулялся — пользователь терял выбранную фазу после каждого щелчка. */
@@ -581,6 +594,14 @@ export const LiftMasterCard: React.FC<{
   const barAnalyses = useMemo(()=> Object.fromEntries(issues.map(i=>[i, analyzeBarPathAssistance(lift, i, template ?? undefined)])), [issues, lift, template]);
   /** Overlay «первый vs последний повтор» из нарезанной Kinovea-серии. */
   const kinoveaOverlay = useMemo(()=> barRepOverlay(kinoveaReps), [kinoveaReps]);
+  /** Метаданные съёмки для оценки качества (высота/дистанция/ракурс/устройство). */
+  const captureMeta = useMemo<VideoCaptureMeta>(()=>({
+    heightM: Number.parseFloat(capture.heightM) || null,
+    distM: Number.parseFloat(capture.distM) || null,
+    side: (capture.side || null) as VideoCaptureMeta['side'],
+    device: (capture.device || null) as VideoCaptureMeta['device'],
+  }), [capture]);
+  const captureQuality = useMemo(()=> videoQualityForCapture(captureMeta), [captureMeta]);
 
   // diary hint (каноника phaseForReps)
   const diaryHint = useMemo(()=>{
@@ -813,6 +834,7 @@ export const LiftMasterCard: React.FC<{
       kinoveaTurnoverMs: kinoveaResult && kinoveaResult.turnoverMs != null ? kinoveaResult.turnoverMs : null,
       kinoveaReps: kinoveaReps.length > 0 ? kinoveaReps.length : null,
       overlayVelocityLossPct: kinoveaOverlay ? kinoveaOverlay.velocityLossPct : null,
+      captureQuality: captureQuality.flag === 'unknown' ? 'не задано' : `${captureQuality.flag} — ${captureQuality.reason}`,
       asymmetryPct: asymDiag ? asymDiag.pct : null,
       asymmetryVerdict: asymDiag ? asymDiag.text : '',
       vbtMetric,
@@ -1525,7 +1547,7 @@ export const LiftMasterCard: React.FC<{
               <button data-lift="parse-kinovea" aria-label="Разобрать Kinovea CSV" onClick={()=>{
                 const pts = parseKinoveaCSV(kinoveaText);
                 if (!pts) { setKinoveaMsg('CSV не распознан — нужны колонки t,x,y (разделитель , или ;).'); return; }
-                const r = analyzeBarTracking(pts);
+                const r = analyzeBarTracking(pts, captureMeta);
                 if (!r) { setKinoveaMsg('Точек мало для анализа (нужно ≥2).'); return; }
                 const badge = barLoopFlag(r.xLoop) === 'crit' ? 'крит. >6' : barLoopFlag(r.xLoop) === 'warn' ? 'внимание ≥4' : 'норма';
                 const tilt = (r.xBias > 0 ? '+' : '') + r.xBias + ' см';
@@ -1536,9 +1558,64 @@ export const LiftMasterCard: React.FC<{
                 setKinoveaReps(reps);
                 setKinoveaMsg('xLoop ' + r.xLoop + ' см (' + badge + ') · наклон ' + tilt + ' · yMax ' + r.yMax + ' см · vmax ' + r.vmax + ' м/с (оценка)' + turn + ' · точек ' + r.points.length + (overlay ? ' · повторов ' + overlay.reps : ''));
               }} style={{ minHeight:44, padding:'10px 14px', borderRadius:10, cursor:'pointer', background:'rgba(14,165,233,0.15)', color:'#0ea5e9', border:'1px solid rgba(14,165,233,0.3)', fontWeight:700, fontSize:12 }}>📊 Разобрать CSV</button>
+              <button data-lift="rep-series-add" aria-label="Добавить это видео в серию повторов" onClick={()=>{
+                const pts = parseKinoveaCSV(kinoveaText);
+                if (!pts) { setKinoveaMsg('CSV не распознан — нужны колонки t,x,y.'); return; }
+                const segs = segmentBarReps(pts);
+                if (!segs.length) { setKinoveaMsg('В этом файле не нашёл полный повтор (низ→верх) — overlay нельзя построить.'); return; }
+                setKinoveaReps(cur => [...cur, ...segs.map((s, i) => ({ ...s, index: cur.length + i + 1 }))]);
+                setKinoveaMsg(`＋ добавлено повторов: ${segs.length} (в серии будет ${kinoveaReps.length + segs.length}).`);
+              }} style={{ minHeight:44, padding:'10px 14px', borderRadius:10, cursor:'pointer', background:'rgba(245,158,11,0.15)', color:'#f59e0b', border:'1px solid rgba(245,158,11,0.3)', fontWeight:700, fontSize:12 }}>＋ В серию</button>
               <button data-lift="clear-kinovea" aria-label="Очистить Kinovea" onClick={()=>{ setKinoveaText(''); setKinoveaMsg(null); setKinoveaResult(null); setKinoveaReps([]); }} style={{ minHeight:44, padding:'10px 14px', borderRadius:10, cursor:'pointer', background:'transparent', color:'#fff', border:'1px solid rgba(255,255,255,0.12)', fontWeight:700, fontSize:12 }}>✕ Очистить</button>
             </div>
             {kinoveaMsg && <div role="status" style={{ marginTop:6, fontSize:10, color:'#0ea5e9', lineHeight:1.4 }}>{kinoveaMsg}</div>}
+            {/* Склейка повторов: реальные экспорты Kinovea обычно по одному повтору, поэтому overlay
+                собирается из нескольких файлов — серия живёт до «Очистить». */}
+            {kinoveaReps.length > 0 && (
+              <div data-lift="rep-series" style={{ marginTop:8, padding:7, borderRadius:8, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.09)' }}>
+                <div style={{ display:'flex', alignItems:'center', gap:6, flexWrap:'wrap' }}>
+                  <span style={{ fontSize:10, fontWeight:800, color:'#f59e0b' }}>Серия повторов: {kinoveaReps.length}</span>
+                  <button data-lift="rep-series-clear" aria-label="Очистить серию повторов" onClick={()=>{ setKinoveaReps([]); setKinoveaMsg('Серия очищена.'); }} style={{ minHeight:32, padding:'4px 8px', borderRadius:6, cursor:'pointer', background:'transparent', color:'#fff', border:'1px solid rgba(255,255,255,0.12)', fontSize:10 }}>✕ Очистить серию</button>
+                </div>
+                <div style={{ display:'flex', gap:4, flexWrap:'wrap', marginTop:5 }}>
+                  {kinoveaReps.map((s, i)=>(
+                    <span key={`${s.index}-${i}`} data-lift="rep-series-item" style={{ display:'inline-flex', alignItems:'center', gap:4, padding:'2px 4px 2px 7px', borderRadius:20, background:'rgba(245,158,11,0.12)', border:'1px solid rgba(245,158,11,0.25)', fontSize:10, color:'#fbbf24' }}>
+                      П{s.index}: {s.vmax != null ? `${s.vmax.toFixed(2)} м/с` : '—'}
+                      <button aria-label={`Удалить повтор ${s.index}`} onClick={()=> setKinoveaReps(cur => cur.filter((_, k)=> k !== i).map((r, k)=>({ ...r, index: k + 1 })))} style={{ minWidth:22, minHeight:22, borderRadius:11, cursor:'pointer', background:'transparent', color:'#fbbf24', border:'1px solid rgba(245,158,11,0.3)', fontSize:10, lineHeight:1 }}>✕</button>
+                    </span>
+                  ))}
+                </div>
+                {kinoveaReps.length < 2 && <div style={{ marginTop:4, fontSize:9, color:'#fff', opacity:0.7 }}>Добавьте ещё один файл кнопкой «＋ В серию» — overlay заработает с 2 повторов.</div>}
+              </div>
+            )}
+          </div>
+          {/* Качество съёмки: без метаданных vmax/xLoop нельзя сравнивать между сессиями. */}
+          <div data-lift="capture-quality" style={{ marginTop:8, padding:8, borderRadius:8, background:'rgba(148,163,184,0.05)', border:'1px solid rgba(148,163,184,0.18)' }}>
+            <div style={{ fontSize:10, fontWeight:800, color:'#cbd5e1' }}>🎥 Качество съёмки</div>
+            <div style={{ display:'flex', gap:6, flexWrap:'wrap', alignItems:'center', marginTop:6 }}>
+              <label style={{ fontSize:10, color:DIM }}>Высота, м
+                <input data-lift="capture-height" aria-label="Высота камеры, м" type="number" step="0.1" min="0" value={capture.heightM} onChange={e=> setCapture(c=>({ ...c, heightM: e.target.value }))} placeholder="1.2" style={{ width:64, marginLeft:4, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.15)', color:'#fff', borderRadius:6, padding:'4px 6px', fontSize:11 }} />
+              </label>
+              <label style={{ fontSize:10, color:DIM }}>Дистанция, м
+                <input data-lift="capture-dist" aria-label="Дистанция до штанги, м" type="number" step="0.1" min="0" value={capture.distM} onChange={e=> setCapture(c=>({ ...c, distM: e.target.value }))} placeholder="3" style={{ width:64, marginLeft:4, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.15)', color:'#fff', borderRadius:6, padding:'4px 6px', fontSize:11 }} />
+              </label>
+            </div>
+            <div style={{ display:'flex', gap:4, flexWrap:'wrap', marginTop:6 }}>
+              {(['left','right','front'] as const).map(s=>{
+                const on = capture.side === s;
+                const ru = s === 'left' ? 'слева' : s === 'right' ? 'справа' : 'фронт';
+                return <button key={s} data-lift={`capture-side-${s}`} aria-pressed={on} onClick={()=> setCapture(c=>({ ...c, side: on ? '' : s }))} style={{ minHeight:32, padding:'4px 9px', borderRadius:7, cursor:'pointer', border: on ? '1px solid #94a3b8' : '1px solid rgba(255,255,255,0.1)', background: on ? 'rgba(148,163,184,0.2)' : 'transparent', color: on ? '#e2e8f0' : DIM, fontSize:10 }}>{ru}</button>;
+              })}
+              {(['phone','kinovea','enode'] as const).map(d=>{
+                const on = capture.device === d;
+                const ru = d === 'phone' ? 'телефон' : d === 'kinovea' ? 'Kinovea' : 'Enode';
+                return <button key={d} data-lift={`capture-device-${d}`} aria-pressed={on} onClick={()=> setCapture(c=>({ ...c, device: on ? '' : d }))} style={{ minHeight:32, padding:'4px 9px', borderRadius:7, cursor:'pointer', border: on ? '1px solid #94a3b8' : '1px solid rgba(255,255,255,0.1)', background: on ? 'rgba(148,163,184,0.2)' : 'transparent', color: on ? '#e2e8f0' : DIM, fontSize:10 }}>{ru}</button>;
+              })}
+            </div>
+            <div role="status" style={{ marginTop:6, fontSize:10, lineHeight:1.4, color: captureQuality.flag === 'ok' ? '#4ade80' : captureQuality.flag === 'rough' ? '#fbbf24' : '#cbd5e1' }}>
+              {captureQuality.flag === 'ok' ? '✓ ' : captureQuality.flag === 'rough' ? '⚠ ' : 'ℹ '}
+              {captureQuality.reason}
+            </div>
           </div>
           {/* Выдача: HTML / CSV / Поделиться (АПК-слой) */}
           <div style={{ marginTop:8, padding:8, borderRadius:8, background:'rgba(0,230,138,0.05)', border:'1px solid rgba(0,230,138,0.15)' }}>
@@ -1554,6 +1631,20 @@ export const LiftMasterCard: React.FC<{
                 const o = await saveCsvApk(movementDiagnosticsFilename(lift, 'csv'), csv);
                 setShareMsg(shareOutcomeLabel(o)); setTimeout(()=>setShareMsg(null), 2500);
               }} style={{ minHeight:44, padding:'10px 14px', borderRadius:10, cursor:'pointer', background:'rgba(255,255,255,0.06)', color:'#fff', border:'1px solid rgba(255,255,255,0.12)', fontWeight:700, fontSize:12 }}>📊 CSV</button>
+              <button data-lift="export-svg" aria-label="Сохранить траекторию штанги в SVG" onClick={async ()=>{
+                const svg = buildTrajectorySvg({
+                  liftRu: LIFT_RU[lift],
+                  series: kinoveaResult ? kinoveaResult.points : null,
+                  firstRep: kinoveaOverlay ? kinoveaOverlay.first.points : null,
+                  lastRep: kinoveaOverlay ? kinoveaOverlay.last.points : null,
+                  xLoopCm: kinoveaResult ? kinoveaResult.xLoop : null,
+                  vmax: kinoveaResult ? kinoveaResult.vmax : null,
+                  overlayText: kinoveaOverlay ? kinoveaOverlay.text : '',
+                  captureQuality: captureQuality.flag === 'unknown' ? '' : `${captureQuality.flag} — ${captureQuality.reason}`,
+                });
+                const o = await saveTextFileApk(movementDiagnosticsFilename(lift, 'svg'), svg, 'image/svg+xml;charset=utf-8');
+                setShareMsg(shareOutcomeLabel(o)); setTimeout(()=>setShareMsg(null), 2500);
+              }} style={{ minHeight:44, padding:'10px 14px', borderRadius:10, cursor:'pointer', background:'rgba(56,189,248,0.12)', color:'#38bdf8', border:'1px solid rgba(56,189,248,0.28)', fontWeight:700, fontSize:12 }}>🖼 SVG траектории</button>
               <button data-lift="share" aria-label="Поделиться диагностикой" onClick={async ()=>{
                 const t = `Диагностика ${LIFT_RU[lift]}: фаза ${(PHASE_RU as Record<string,string>)[String(effectivePhase ?? '')] ?? '—'} · откл. ${issues.map(i=>ISSUE_RU[i]).join('; ') || '—'} · VBT ${vbtBest || '—'}→${vbtLast || '—'} м/с${videoNote ? ` · Видео: ${videoNote}` : ''}`;
                 const o = await copyOrShareText(t, 'Диагностика движений');

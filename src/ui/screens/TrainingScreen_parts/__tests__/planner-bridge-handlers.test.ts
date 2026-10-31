@@ -84,8 +84,52 @@ describe('planner bridge handlers', () => {
     expect(sets[0].rir).toBe(3);
   });
 
-  it('deload applies both volume and intensity reduction', () => {
+  // ── volumeSets: абсолютная цель «сет/мышцу/нед» вместо ББ-онли kind:'mrv' ──
+  it('pri с volumeSets сокращает объём ББ по мышцам до цели', () => {
     const update = vi.fn();
+    const ctx = context('bb', update);
+    seedBlock(ctx);
+    ctx.program.bb!.weeks[0].sessions[0].blocks[0].sets = Array.from({ length: 8 }, () => ({ reps: 8, rir: 2, weight: 100, restSec: 120 }));
+    applyBridgePayloadDispatch(payload('pri', { volumeMult: 1, rirShift: 0, volumeSets: 4 }), ctx);
+    const patch = update.mock.calls[0][0];
+    expect(patch.bb.weeks[0].sessions[0].blocks[0].sets).toHaveLength(4);
+    expect(String(ctx.showToast.mock.calls.at(-1)?.[0] ?? '')).toContain('≤ 4 сет/мышцу/нед');
+  });
+
+  it('pri с volumeSets не трогает делод-неделю (иначе разгрузка теряет смысл)', () => {
+    const update = vi.fn();
+    const ctx = context('bb', update);
+    seedBlock(ctx);
+    ctx.program.bb!.weeks[0].sessions[0].blocks[0].sets = Array.from({ length: 8 }, () => ({ reps: 8, rir: 2, weight: 100, restSec: 120 }));
+    ctx.program.bb!.weeks[0].deload = true;
+    applyBridgePayloadDispatch(payload('pri', { volumeMult: 1, rirShift: 0, volumeSets: 2 }), ctx);
+    const patch = update.mock.calls[0][0];
+    expect(patch.bb.weeks[0].sessions[0].blocks[0].sets).toHaveLength(8);
+  });
+
+  it('pri с volumeSets работает и на ПЛ (было молчание при kind:mrv)', () => {
+    const update = vi.fn();
+    const ctx = context('pl', update);
+    seedPLWeeks(ctx, 2); // 4 сета/нед → цель 2 = множитель 0.5
+    applyBridgePayloadDispatch(payload('pri', { volumeMult: 1, rirShift: 1, volumeSets: 2 }), ctx);
+    const patch = update.mock.calls[0][0];
+    const week = patch.pl.customWeeks[0];
+    expect(week.days[0].exercises[0].sets[0].sets).toBe(2);
+    expect(week.days[0].exercises[0].sets[0].rir).toBe(3);
+    expect(String(ctx.showToast.mock.calls.at(-1)?.[0] ?? '')).toContain('ПЛ');
+  });
+
+  it('kind:mrv вне ББ честно сообщает, что план не изменён', () => {
+    const update = vi.fn();
+    const ctx = context('pl', update);
+    seedPLWeeks(ctx, 1);
+    applyBridgePayloadDispatch(payload('mrv', { mrv: 10 }), ctx);
+    expect(update).not.toHaveBeenCalled();
+    const toast = String(ctx.showToast.mock.calls.at(-1)?.[0] ?? '');
+    expect(toast).toContain('план не изменён');
+  });
+
+  it('deload applies both volume and intensity reduction', () => {    const update = vi.fn();
     const ctx = context('bb', update);
     seedBlock(ctx);
     ctx.program.bb!.weeks[0].sessions[0].blocks[0].sets = [

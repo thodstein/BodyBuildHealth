@@ -88,9 +88,26 @@ function namedBBBlocks(weeks: { sessions?: { blocks?: { exerciseName?: string }[
   return n;
 }
 
+/** Средний недельный объём ПЛ (сумма рабочих сетов всех упражнений за неделю).
+ *  Нужен, чтобы абсолютную цель «сет/нед» перевести в множитель для ПЛ. */
+function plWeeklySets(weeks: NonNullable<PLProgramBody['customWeeks']>): number {
+  if (!weeks.length) return 0;
+  let total = 0;
+  for (const w of weeks) for (const d of w.days ?? []) for (const e of d.exercises ?? []) {
+    for (const st of e.sets ?? []) total += Math.max(0, Number(st.sets) || 0);
+  }
+  return total / weeks.length;
+}
+
+/** Множитель объёма ПЛ под абсолютную цель сетов/нед (только сокращение). */
+function plVolumeMult(weeks: NonNullable<PLProgramBody['customWeeks']>, target: number): number {
+  const current = plWeeklySets(weeks);
+  if (current <= 0 || !(target > 0)) return 1;
+  return Math.max(0.25, Math.min(1, target / current));
+}
+
 /** ПЛ-неделя: объём ×mult и сдвиг RIR. Вес в PL — это % от 1RM (PLSet.pct), поэтому
- *  для делода режется именно pct, а не абсолютный вес. Возвращает 0, если менять нечего. */
-function applyPriToPLWeeks(
+ *  для делода режется именно pct, а не абсолютный вес. Возвращает 0, если менять нечего. */function applyPriToPLWeeks(
   weeks: NonNullable<PLProgramBody['customWeeks']>,
   mult: number,
   rirShift: number,
@@ -124,15 +141,28 @@ function applyPriToPLWeeks(
 const priHandler: Handler = (payload, { program: p, update, showToast }) => {
   const mult = Math.max(0.25, Math.min(2, Number(payload.data.volumeMult ?? 1) || 1));
   const rirShift: number = Number.isFinite(Number(payload.data.rirShift)) ? Number(payload.data.rirShift) : 0;
+  // Абсолютная цель «сет/мышцу/нед» (MRV, мезо, прогрессия): карточки присылают её вместо
+  // множителя, чтобы одна кнопка честно работала и на ББ, и на ПЛ. Только сокращаем (≤).
+  const absRaw = Number(payload.data.volumeSets);
+  const absTarget = Number.isFinite(absRaw) && absRaw > 0 ? Math.min(60, Math.round(absRaw)) : null;
   const scopes: string[] = [];
   if (p.bb && namedBBBlocks(p.bb.weeks) > 0) {
-    const weeks = p.bb.weeks.map(w => ({
+    const perMuscle: Record<string, number> = {};
+    if (absTarget != null) {
+      for (const w of p.bb.weeks) for (const s of w.sessions) for (const b of s.blocks) {
+        perMuscle[b.muscle] = (perMuscle[b.muscle] ?? 0) + (b.sets?.length ?? 0);
+      }
+    }
+    const factorOf = (muscle: string) => absTarget != null
+      ? ((perMuscle[muscle] ?? 0) > 0 ? Math.min(1, absTarget / perMuscle[muscle]) : 1)
+      : mult;
+    const weeks = p.bb.weeks.map(w => ((absTarget != null && w.deload) ? w : {
       ...w,
       sessions: w.sessions.map(s => ({
         ...s,
         blocks: s.blocks.map(b => {
           const sourceSets = b.sets ?? [];
-          const targetCount = Math.max(1, Math.round(sourceSets.length * mult));
+          const targetCount = Math.max(1, Math.round(sourceSets.length * factorOf(b.muscle)));
           const sets = Array.from({ length: targetCount }, (_, index) => {
             const source = sourceSets[index % Math.max(1, sourceSets.length)] ?? { reps: 8, rir: 2, weight: 0, restSec: 90 };
             return { ...source, rir: clampRir((source.rir ?? 2) + rirShift) };
@@ -147,7 +177,9 @@ const priHandler: Handler = (payload, { program: p, update, showToast }) => {
   // P0-было: при program.pl обработчик молчал, но показывал успешный тост. Теперь ПЛ-недели
   // пересчитываются по тому же правилу (в PL вес = % от 1RM, поэтому объём/RIR — по ним).
   if (namedPLExercises(p.pl?.customWeeks) > 0) {
-    const { weeks } = applyPriToPLWeeks(p.pl!.customWeeks!, mult, rirShift);
+    // Для ПЛ мышц нет → целимся в средний недельный объём (все упражнения недели).
+    const plMult = absTarget != null ? plVolumeMult(p.pl!.customWeeks!, absTarget) : mult;
+    const { weeks } = applyPriToPLWeeks(p.pl!.customWeeks!, plMult, rirShift);
     update({ pl: { ...p.pl!, customWeeks: weeks } });
     scopes.push('ПЛ');
   }
@@ -155,7 +187,8 @@ const priHandler: Handler = (payload, { program: p, update, showToast }) => {
     showToast('⚠ Коррекция не применена: в программе нет изменяемых тренировок (нужна собранная программа ББ или ПЛ с customWeeks).', 'warning');
     return;
   }
-  showToast('🔗 Готовность применена (' + scopes.join(' + ') + '): ' + payload.label);
+  showToast('🔗 Готовность применена (' + scopes.join(' + ') + '): ' + payload.label
+    + (absTarget != null ? ' · цель ≤ ' + absTarget + ' сет/мышцу/нед' : ''));
 };
 
 /** ПЛ-упражнение каталога СРЦ → lift ручной программы (custom PL). */
@@ -477,9 +510,11 @@ const rirHandler: Handler = (payload, { program: p, update, showToast }) => {
   showToast('🔗 RIR-сдвиг: ' + payload.label);
 };
 
+/** Легаси-канал «MRV-кап» (ББ-онли, сохраняется для совместимости API). Карточки MRV/мезо
+ *  теперь шлют `pri` с `volumeSets` — тот же расчёт, но и на ПЛ. */
 const mrvHandler: Handler = (payload, { program: p, update, showToast }) => {
-  if (!p.bb) {
-    showToast('🔗 MRV рекомендация: ' + payload.label + ' (доступно только для ББ)');
+  if (!p.bb || namedBBBlocks(p.bb.weeks) === 0) {
+    showToast('⚠ MRV не применён: план не изменён (MRV-кап работает на собранной ББ-программе; для ПЛ — кнопка «Применить» в карточке)', 'warning');
     return;
   }
   const rawTarget = Math.round(Number(payload.data.mrv) || 0);

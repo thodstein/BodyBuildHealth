@@ -17,7 +17,6 @@ import { loadSRPESessions } from '../../../engines/pro/srpe-store';
 import { acuteChronicRatio, toDailyLoads, weeklyMonotony } from '../../../engines/pro/training-load.engine';
 import { loadReadinessHistory } from './readiness-history';
 import { RIRCalibrationCard } from './RIRCalibrationCard';
-import MesoCorrectionCard from './MesoCorrectionCard';
 import { MuscleProgressCard } from './MuscleProgressCard';
 import { VolumeTrendCard } from './VolumeTrendCard';
 import { LoadRadarCard } from './LoadRadarCard';

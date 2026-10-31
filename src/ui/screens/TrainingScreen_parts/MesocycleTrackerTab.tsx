@@ -330,7 +330,7 @@ export const MesocycleTrackerTab: React.FC = () => {
       </div>
           <div style={{ marginTop: 8, padding: 12, borderRadius: 12, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.2)' }}>
         <div style={{ fontSize: 10, color: '#fff', marginBottom: 8 }}>🔗 Применить конфигурацию мезоцикла к планировщику: стартовый объём и RIR.</div>
-        <button onClick={() => { const m = mesos[0]; if (m) applyToPlanner({ kind: 'mrv', label: 'Мезо: ' + m.startVolumeSets + ' сет/нед, RIR ' + m.startRIR, data: { mrv: m.startVolumeSets } }); }} style={{ width: '100%', padding: 12, borderRadius: 10, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#000', fontWeight: 800, fontSize: 13, minHeight: 44 }}>🛠 Применить мезо к планировщику</button>
+        <button onClick={() => { const m = mesos[0]; if (m) applyToPlanner({ kind: 'pri', label: 'Мезо: объём ≤ ' + m.startVolumeSets + ' сет/нед (RIR ' + m.startRIR + ' — справочно)', data: { volumeMult: 1, rirShift: 0, volumeSets: m.startVolumeSets } }); }} style={{ width: '100%', padding: 12, borderRadius: 10, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#000', fontWeight: 800, fontSize: 13, minHeight: 44 }}>🛠 Применить мезо к планировщику</button>
       </div>
 </div>
   );

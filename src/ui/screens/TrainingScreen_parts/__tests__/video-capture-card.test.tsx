@@ -44,8 +44,7 @@ describe('VideoCaptureCard — полноэкранное видео', () => {
     expect(stop).toHaveBeenCalled();
   });
 
-  it('камера отклонена → понятная подсказка, окно не открывается', async () => {
-    Object.defineProperty(navigator, 'mediaDevices', {
+  it('камера отклонена → понятная подсказка, окно не открывается', async () => {    Object.defineProperty(navigator, 'mediaDevices', {
       configurable: true,
       value: { getUserMedia: vi.fn().mockRejectedValue({}) },
     });
@@ -55,5 +54,38 @@ describe('VideoCaptureCard — полноэкранное видео', () => {
 
     await waitFor(() => expect(document.querySelector('[data-vc="stage"]')).toBeNull());
     expect(screen.getByText(/Камера отклонена/)).toBeTruthy();
+  });
+
+  it('история разборов (he_cv_reports) читается и честно делит замер/оценку', () => {
+    const base = { elbowAvgDeg: 52, gripRatio: 1.42, barVelocity: 0.48, bridge: null, note: '' };
+    localStorage.setItem('he_cv_reports', JSON.stringify([
+      { ts: Date.now(), lift: 'bench', fileName: 'measured.mp4', result: { ...base, measured: true } },
+      { ts: Date.now() - 86_400_000, lift: 'bench', fileName: 'mock.mp4', result: { ...base, measured: false } },
+      // битые записи не должны ломать карточку
+      { ts: 'nope' },
+      null,
+    ]));
+
+    const { container } = render(<VideoCaptureCard lift="bench" />);
+    const history = container.querySelector('[data-vc="history"]');
+    expect(history, 'блок истории').toBeTruthy();
+    const items = container.querySelectorAll('[data-vc="history-item"]');
+    expect(items.length).toBe(2);
+    expect(items[0].textContent).toContain('замер');
+    expect(items[1].textContent).toContain('оценка');
+    expect(history!.textContent).toContain('Хранится только на устройстве');
+
+    fireEvent.click(container.querySelector('[data-vc="history-clear"]')!);
+    expect(container.querySelector('[data-vc="history"]')).toBeNull();
+    expect(localStorage.getItem('he_cv_reports')).toBeNull();
+    localStorage.removeItem('he_cv_reports');
+  });
+
+  it('битый JSON в he_cv_reports не роняет карточку и не рисует историю', () => {
+    localStorage.setItem('he_cv_reports', '{not json');
+    const { container } = render(<VideoCaptureCard lift="bench" />);
+    expect(container.querySelector('[data-vc="history"]')).toBeNull();
+    expect(container.textContent).toContain('Как снимать');
+    localStorage.clear();
   });
 });

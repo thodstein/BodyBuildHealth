@@ -240,7 +240,7 @@ export const MRVEstimatorTab: React.FC = () => {
       {est.mrvVolume != null && (
         <div style={{ marginTop: 8, padding: 12, borderRadius: 12, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.2)' }}>
           <div style={{ fontSize: 10, color: '#fff', marginBottom: 8 }}>🔗 Применить индивидуальный MRV (<b style={{ color: '#00e68a' }}>{perMuscleSets} сет/м/нед</b>) к планировщику — объём плана будет ограничен этой величиной.</div>
-          <button onClick={() => applyToPlanner({ kind: 'mrv', label: 'MRV ' + perMuscleSets + ' сет/м/нед', data: { mrv: perMuscleSets } })} style={{ width: '100%', padding: 12, borderRadius: 10, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#000', fontWeight: 800, fontSize: 13, minHeight: 44 }}>🛠 Применить MRV к планировщику</button>
+          <button onClick={() => applyToPlanner({ kind: 'pri', label: 'MRV ≤ ' + perMuscleSets + ' сет/м/нед', data: { volumeMult: 1, rirShift: 0, volumeSets: perMuscleSets } })} style={{ width: '100%', padding: 12, borderRadius: 10, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#000', fontWeight: 800, fontSize: 13, minHeight: 44 }}>🛠 Применить MRV к планировщику</button>
         </div>
       )}
     </div>

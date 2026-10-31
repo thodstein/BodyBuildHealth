@@ -197,6 +197,9 @@ for (const hook of [
   'data-lift="export-html"', 'data-lift="export-csv"', 'data-lift="share"',
   'data-lift="video-not-measured"',
   'data-lift="rep-overlay"',
+  'data-lift="rep-series-add"', 'data-lift="rep-series-clear"', 'data-lift="rep-series"',
+  'data-lift="capture-quality"', 'data-lift="capture-height"', 'data-lift="capture-dist"',
+  'data-lift="export-svg"',
   'data-lift-nav=',
 ]) mustContain(LIFT_HUB, hook, `lift hub hook ${hook}`);
 // Дефолт-коллапс: 14 раскрытых блоков давали ~214 КБ HTML и ~500 кнопок за рендер.

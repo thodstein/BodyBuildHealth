@@ -18,6 +18,20 @@ import { copyOrShareText, saveTextFileApk, shareOutcomeLabel } from '../../../co
 const ACCENT = '#38bdf8';
 const DIM = '#fff';
 
+/** Локальная история видео-разборов (не в облако: тяжёлые данные). */
+interface CvReportEntry { ts: number; lift: string; fileName: string; result: VideoAnalysisResult }
+const CV_HISTORY_KEY = 'he_cv_reports';
+/** Читаем только валидные записи: битый JSON не должен ронять карточку. */
+function loadCvReports(max = 20): CvReportEntry[] {
+  try {
+    const raw = JSON.parse(localStorage.getItem(CV_HISTORY_KEY) || '[]');
+    if (!Array.isArray(raw)) return [];
+    return raw
+      .filter((e: unknown): e is CvReportEntry => !!e && typeof e === 'object' && typeof (e as CvReportEntry).ts === 'number' && !!(e as CvReportEntry).result)
+      .slice(0, max);
+  } catch { return []; }
+}
+
 const LIFT_GUIDE: Record<Lift, { title: string; cam: string; dist: string; height: string; light: string; markers: string[]; bad: string[] }> = {
   bench: {
     title: 'Жим лёжа — боковой ракурс 45°',
@@ -118,6 +132,8 @@ export const VideoCaptureCard: React.FC<{ lift: Lift; shoulderWidthCm?: number; 
   const [manualVelocity, setManualVelocity] = useState('');
   const [manualElbow, setManualElbow] = useState('');
   const [manualGrip, setManualGrip] = useState('');
+  /** История видео-разборов (последние замеры) — читается из тех же записей, что пишем выше. */
+  const [cvHistory, setCvHistory] = useState<CvReportEntry[]>(() => loadCvReports());
 
   useEffect(() => {
     try { setIsTg(!!(window as any).Telegram?.WebApp); } catch { setIsTg(false); }
@@ -242,9 +258,11 @@ export const VideoCaptureCard: React.FC<{ lift: Lift; shoulderWidthCm?: number; 
       onResult?.(out);
       // сохранить отчёт локально для истории (не в облако — тяжёлый)
       try {
-        const raw = JSON.parse(localStorage.getItem('he_cv_reports') || '[]');
-        raw.unshift({ ts: Date.now(), lift, fileName: f.name, result: out });
-        localStorage.setItem('he_cv_reports', JSON.stringify(raw.slice(0, 20)));
+        const raw = JSON.parse(localStorage.getItem(CV_HISTORY_KEY) || '[]');
+        const list = Array.isArray(raw) ? raw : [];
+        list.unshift({ ts: Date.now(), lift, fileName: f.name, result: out });
+        localStorage.setItem(CV_HISTORY_KEY, JSON.stringify(list.slice(0, 20)));
+        setCvHistory(loadCvReports());
       } catch {}
     } catch (e: any) {
       setError(e?.message || 'Ошибка обработки видео');
@@ -331,6 +349,29 @@ export const VideoCaptureCard: React.FC<{ lift: Lift; shoulderWidthCm?: number; 
           }} style={{ ...labelBtn('rgba(255,255,255,0.06)', 'rgba(255,255,255,0.12)', '#fff'), minHeight: 40 }}>Применить</button>
         </div>
       </div>
+      {cvHistory.length > 0 && (
+        <div data-vc="history" style={{ marginTop: 8, padding: 8, borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 10, fontWeight: 800, color: '#fff' }}>🗂 Последние разборы</span>
+            <button data-vc="history-clear" aria-label="Очистить историю разборов" onClick={() => { try { localStorage.removeItem(CV_HISTORY_KEY); } catch {} setCvHistory([]); }} style={{ minHeight: 28, padding: '2px 8px', borderRadius: 6, cursor: 'pointer', background: 'transparent', color: DIM, border: '1px solid rgba(255,255,255,0.12)', fontSize: 9 }}>✕ очистить</button>
+          </div>
+          <div style={{ marginTop: 4, display: 'flex', flexDirection: 'column', gap: 3 }}>
+            {cvHistory.slice(0, 3).map((h, i) => {
+              const measured = h.result.measured === true;
+              const when = new Date(h.ts);
+              const stamp = `${String(when.getDate()).padStart(2, '0')}.${String(when.getMonth() + 1).padStart(2, '0')}`;
+              return (
+                <div key={`${h.ts}-${i}`} data-vc="history-item" style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', fontSize: 9.5, color: DIM, lineHeight: 1.4 }}>
+                  <span style={{ color: '#fff', opacity: 0.6 }}>{stamp}</span>
+                  <span style={{ color: measured ? '#4ade80' : '#fbbf24', fontWeight: 700 }}>{measured ? 'замер' : 'оценка'}</span>
+                  <span>локоть {h.result.elbowAvgDeg ?? '—'}° · хват {h.result.gripRatio ?? '—'} · {h.result.barVelocity ?? '—'} м/с</span>
+                </div>
+              );
+            })}
+          </div>
+          <div style={{ marginTop: 3, fontSize: 9, color: DIM, opacity: 0.6 }}>Хранится только на устройстве. «оценка» = мок/демо, в VBT не пишется.</div>
+        </div>
+      )}
       {result && (
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
           <button data-vc="play" aria-label="Открыть видео на весь экран" onClick={() => { if (fileUrlRef.current) setStage({ kind: 'file', url: fileUrlRef.current, name: 'Видео подхода' }); }} style={labelBtn('rgba(14,165,233,0.12)', 'rgba(14,165,233,0.3)', ACCENT)}>🔍 Видео на весь экран</button>

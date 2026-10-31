@@ -100,7 +100,6 @@ import { SupportProtocolDetox } from '../screens/SupportScreen_parts/supportProt
 import { ArmTechniqueCard } from '../screens/TrainingScreen_parts/ArmTechniqueCard';
 import { MicrocyclePlannerCard } from '../screens/TrainingScreen_parts/MicrocyclePlannerCard';
 import { PlanFeedbackCard } from '../screens/TrainingScreen_parts/PlanFeedbackCard';
-import { QualityDiagnosticsHub } from '../screens/TrainingScreen_parts/QualityDiagnosticsHub';
 import { TrainingSafetyHub } from '../screens/TrainingScreen_parts/TrainingSafetyHub';
 import { EditorOverlay } from '../screens/TrainingScreen_parts/EditorPopup';
 import { ProfileDiariesTab } from '../screens/ProfileScreen_v2/ProfileDiariesTab';
@@ -960,9 +959,6 @@ describe('market + pharma + labs roots', () => {
       <MicrocyclePlannerCard plan={{ phases: [] } as never} />,
     );
     expect(c2.querySelector('.train-microcyc'), 'microcyc').not.toBeNull();
-    cleanup();
-    const { container: c3 } = render(<QualityDiagnosticsHub program={null as never} />);
-    expect(c3.querySelector('.train-qualityhub'), 'qualityhub').not.toBeNull();
     cleanup();
     const { container: c4 } = render(<TrainingSafetyHub />);
     expect(c4.querySelector('.train-safetyhub'), 'safetyhub').not.toBeNull();

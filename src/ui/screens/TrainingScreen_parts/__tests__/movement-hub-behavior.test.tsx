@@ -240,6 +240,93 @@ describe('LiftMasterCard — поведение (не только смоук)',
     expect(container.textContent).not.toContain('Точки: 1');
     expect(pct).toBeTruthy();
   });
+
+  it('склейка повторов: два одиночных файла дают overlay «первый vs последний»', () => {
+    const { container } = render(<LiftMasterCard sessions={[]} />);
+    const area = container.querySelector('[data-lift="kinovea-text"]') as HTMLTextAreaElement;
+    const addToSeries = () => click(container.querySelector('[data-lift="rep-series-add"]'));
+
+    // Файл №1 — один повтор: серия из 1, overlay ещё не строится.
+    act(() => { fireEvent.change(area, { target: { value: buildRepCsv([0.8]) } }); });
+    addToSeries();
+    expect(container.querySelector('[data-lift="rep-series"]'), 'блок серии').toBeTruthy();
+    expect(container.querySelectorAll('[data-lift="rep-series-item"]').length).toBe(1);
+    expect(container.querySelector('[data-lift="rep-overlay"]')).toBeNull();
+    expect(container.textContent).toContain('Серия повторов: 1');
+
+    // Файл №2 — ещё один повтор: серия из 2 → overlay появляется.
+    act(() => { fireEvent.change(area, { target: { value: buildRepCsv([1.0]) } }); });
+    addToSeries();
+    expect(container.querySelectorAll('[data-lift="rep-series-item"]').length).toBe(2);
+    const overlay = container.querySelector('[data-lift="rep-overlay"]');
+    expect(overlay, 'overlay из склеенной серии').toBeTruthy();
+    expect(overlay!.textContent).toContain('Повторы: 2');
+    // Перенумерация: чипы идут П1, П2.
+    const chips = Array.from(container.querySelectorAll('[data-lift="rep-series-item"]')).map(c => c.textContent || '');
+    expect(chips[0].startsWith('П1')).toBe(true);
+    expect(chips[1].startsWith('П2')).toBe(true);
+  });
+
+  it('склейка повторов: удаление одного и очистка серии убирают overlay', () => {
+    const { container } = render(<LiftMasterCard sessions={[]} />);
+    const area = container.querySelector('[data-lift="kinovea-text"]') as HTMLTextAreaElement;
+    act(() => { fireEvent.change(area, { target: { value: buildRepCsv([0.8]) } }); });
+    click(container.querySelector('[data-lift="rep-series-add"]'));
+    act(() => { fireEvent.change(area, { target: { value: buildRepCsv([1.0]) } }); });
+    click(container.querySelector('[data-lift="rep-series-add"]'));
+    expect(container.querySelector('[data-lift="rep-overlay"]')).toBeTruthy();
+
+    // Удалили повтор №1 → остался один, overlay честно пропадает.
+    click(container.querySelector('[aria-label="Удалить повтор 1"]'));
+    expect(container.querySelectorAll('[data-lift="rep-series-item"]').length).toBe(1);
+    expect(container.querySelector('[data-lift="rep-overlay"]')).toBeNull();
+
+    click(container.querySelector('[data-lift="rep-series-clear"]'));
+    expect(container.querySelector('[data-lift="rep-series"]')).toBeNull();
+  });
+
+  it('склейка повторов: файл без полного повтора не попадает в серию', () => {
+    const { container } = render(<LiftMasterCard sessions={[]} />);
+    const area = container.querySelector('[data-lift="kinovea-text"]') as HTMLTextAreaElement;
+    // Монотонный подъём без спуска — повтора нет.
+    act(() => { fireEvent.change(area, { target: { value: 'time,x,y\n0,0,0\n0.1,1,10\n0.2,2,20\n0.3,3,30' } }); });
+    click(container.querySelector('[data-lift="rep-series-add"]'));
+    expect(container.querySelector('[data-lift="rep-series"]')).toBeNull();
+    expect(container.textContent).toContain('не нашёл полный повтор');
+  });
+
+  it('качество съёмки: бейдж честно меняется по метаданным и персистится', () => {
+    const { container } = render(<LiftMasterCard sessions={[]} />);
+    const badge = () => container.querySelector('[data-lift="capture-quality"]')!.textContent || '';
+    // Без метаданных — unknown.
+    expect(badge()).toContain('Нет метаданных');
+
+    click(container.querySelector('[data-lift="capture-side-front"]'));
+    expect(badge()).toContain('Вид спереди');
+
+    // Сбоку + высота 3 м → камера высоко.
+    click(container.querySelector('[data-lift="capture-side-left"]'));
+    const height = container.querySelector('[data-lift="capture-height"]') as HTMLInputElement;
+    act(() => { fireEvent.change(height, { target: { value: '3' } }); });
+    expect(badge()).toContain('Камера высоко');
+
+    // Допустимая геометрия → ok.
+    act(() => { fireEvent.change(height, { target: { value: '1.2' } }); });
+    const dist = container.querySelector('[data-lift="capture-dist"]') as HTMLInputElement;
+    act(() => { fireEvent.change(dist, { target: { value: '3' } }); });
+    expect(badge()).toContain('в допуске');
+
+    const saved = JSON.parse(localStorage.getItem(MASTER_KEY) || '{}');
+    expect(saved.capture).toEqual({ heightM: '1.2', distM: '3', side: 'left', device: '' });
+  });
+
+  it('экспорт траектории (SVG) доступен рядом с HTML/CSV/поделиться', () => {
+    const { container } = render(<LiftMasterCard sessions={[]} />);
+    const svgBtn = container.querySelector('[data-lift="export-svg"]') as HTMLButtonElement;
+    expect(svgBtn, 'кнопка SVG').toBeTruthy();
+    expect(svgBtn.getAttribute('aria-label')).toContain('SVG');
+    expect(svgBtn.disabled).toBe(false);
+  });
 });
 
 describe('exerciseMatchesLift — варианты не смешиваются', () => {
