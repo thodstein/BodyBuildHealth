@@ -2778,6 +2778,18 @@ export const LiftMasterCard: React.FC<{
                   <span data-lift="angle-basis">ракурс: {angleCheck.basis === 'side' ? 'сбоку' : angleCheck.basis === 'front' ? 'спереди' : 'не указан'}</span>
                 </div>
               )}
+              {/*
+                Параметры съёмки и замер — разные проверки, и они могут разойтись.
+                Без этой строки «✓ геометрия в допуске» читается как «всё хорошо»,
+                хотя ниже тот же блок говорит об отклонении. Замер по данным не
+                отменяет параметры, но и молчать о расхождении нельзя.
+              */}
+              {captureQuality.flag === 'ok' && angleCheck && angleCheck.flag !== 'ok' && angleCheck.flag !== 'unknown' && (
+                <div data-lift="angle-vs-meta" style={{ marginTop:4, fontSize:9, lineHeight:1.4, color:DIM }}>
+                  ℹ Параметры съёмки в допуске, но по самому замеру есть отклонение — смотрите строку выше:
+                  это либо техника, либо камера стоит не так, как указано в параметрах.
+                </div>
+              )}
             </div>
           </div>
           {/* Выдача: HTML / CSV / Поделиться (АПК-слой) */}

@@ -199,7 +199,7 @@ for (const hook of [
   'data-lift="rep-overlay"',
   'data-lift="rep-series-add"', 'data-lift="rep-series-clear"', 'data-lift="rep-series"',
   'data-lift="capture-quality"', 'data-lift="capture-height"', 'data-lift="capture-dist"',
-  'data-lift="angle-check"', 'data-lift="angle-drift"', 'data-lift="angle-skew"', 'data-lift="angle-basis"',
+  'data-lift="angle-check"', 'data-lift="angle-drift"', 'data-lift="angle-skew"', 'data-lift="angle-basis"', 'data-lift="angle-vs-meta"',
   'data-lift="export-svg"', 'data-lift="export-overlay-png"', 'data-lift="export-overlay-video"',
   'data-lift="series-save"', 'data-lift="session-compare"', 'data-lift="bar-heat"',
   'data-lift="quick-start"', 'data-lift="quick-start-hide"',

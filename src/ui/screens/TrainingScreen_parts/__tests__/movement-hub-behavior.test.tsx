@@ -911,6 +911,42 @@ describe('LiftMasterCard — поведение (не только смоук)',
     expect(front.container.querySelector('[data-lift="angle-drift"]')!.textContent).toContain('боковой уход');
   });
 
+  it('параметры съёмки в допуске, а замер с отклонением — расхождение названо', () => {
+    const csv = ['time,x,y'];
+    for (let i = 0; i < 20; i++) csv.push(`${(i * 0.05).toFixed(2)},${100 + i * 1.5},${50 + i * 4}`);
+    // Параметры «идеальные»: высота 1.2 м, дистанция 3 м, сбоку — вердикт по метаданным ok.
+    localStorage.setItem('he_lift_master_v1', JSON.stringify({
+      lift: 'bench',
+      capture: { side: 'left', heightM: '1.2', distM: '3' },
+    }));
+    const { container } = render(<LiftMasterCard sessions={[]} />);
+    act(() => { fireEvent.change(container.querySelector('[data-lift="kinovea-text"]')!, { target: { value: csv.join('\n') } }); });
+    click(container.querySelector('[data-lift="parse-kinovea"]'));
+
+    // Верхняя строка блока говорит «в допуске», и без пояснения это читается как «всё хорошо».
+    expect(container.querySelector('[data-lift="capture-quality"]')!.textContent).toContain('Геометрия съёмки в допуске');
+    const cross = container.querySelector('[data-lift="angle-vs-meta"]');
+    expect(cross).not.toBeNull();
+    expect(cross!.textContent).toContain('по самому замеру есть отклонение');
+    expect(cross!.textContent).toContain('либо техника, либо камера стоит не так');
+  });
+
+  it('когда замер согласен с параметрами — лишней строки нет', () => {
+    const csv = ['time,x,y'];
+    for (let i = 0; i < 20; i++) csv.push(`${(i * 0.05).toFixed(2)},100,${50 + i * 4}`);
+    localStorage.setItem('he_lift_master_v1', JSON.stringify({
+      lift: 'bench',
+      capture: { side: 'left', heightM: '1.2', distM: '3' },
+    }));
+    const { container } = render(<LiftMasterCard sessions={[]} />);
+    act(() => { fireEvent.change(container.querySelector('[data-lift="kinovea-text"]')!, { target: { value: csv.join('\n') } }); });
+    click(container.querySelector('[data-lift="parse-kinovea"]'));
+
+    expect(container.querySelector('[data-lift="capture-quality"]')!.textContent).toContain('Геометрия съёмки в допуске');
+    expect(container.querySelector('[data-lift="angle-check"]')!.textContent).toContain('✓');
+    expect(container.querySelector('[data-lift="angle-vs-meta"]')).toBeNull();
+  });
+
   it('ракурс по замеру: с перспективой появляется разброс масштаба по высоте', () => {
     localStorage.setItem('he_lift_master_v1', JSON.stringify({
       lift: 'bench',
