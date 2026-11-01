@@ -1,5 +1,5 @@
 /**
- * Регрессия «пакета качества» (QG1–QG17) планировщика.
+ * Регрессия «пакета качества» (QG1–QG18) планировщика.
  *
  * Зачем: сходимость дня ≤3% ловит только КБЖУ. Жалобы шли на «съедобность»:
  * «19 г малины», «жир всего дня в одном приёме», «овощей 190 г», «в обед 12 г белка»,
@@ -39,6 +39,10 @@
  *   масляных пунктов 1-6 г (QG17)  10           0
  *   ось «порции» (QG17)            90.2         90.9
  *   средняя оценка дня (QG17)      90.4         90.6
+ *   дней с Ca < 70% RDA (QG18)     3/30         0/30
+ *   дней с молочкой (QG18)         18/30        20/30
+ *   микро ниже 70% в дне (QG18)    3.57         3.50
+ *   средняя оценка дня (QG18)      90.6         90.7
  */
 import { describe, it, expect } from 'vitest';
 import { buildDayPlan, type MealPlanInput } from '../meal-plan-engine';
@@ -890,6 +894,146 @@ describe('масло — порцией, а не «5 г в тарелке» (QG1
       manualTargetsLocked: true, kbjuMode: 'manual',
     } as unknown as MealPlanInput);
     const notes = ((manual.notes || []) as string[]).filter((n) => n.startsWith('🧴 Масло порцией:'));
+    expect(notes.join(' | ')).toBe('');
+  });
+});
+
+describe('кальций молочкой, а не «просто так» (QG18)', () => {
+  // Замер после QG17: Ca ниже 70% RDA остался ровно в 3 днях из 30 — S1/4/тр (609 мг,
+  // 61%), S1/4/отд (665 мг, 67%), M2/4/отд (585 мг, 59%) при цели 1000 мг. Все три —
+  // четырёхприёмные: в таком дне нет пред-сна, где молочку ставит QG3, а рыбу QG13 уже
+  // обменяла. Сыр как «плотный кальций» (720 мг/100 г) закрыл только один день: в двух
+  // других белок дня ровно на цели (S1: 101 г при 100), все белковые пункты на полу
+  // порции — срезать 4.8–7.2 г белка неоткуда. Работает продукт с максимальным Ca НА
+  // ГРАММ БЕЛКА: кефир/молоко — 43 мг Ca на грамм белка (сыр 30, творог 6.7), поэтому
+  // 100–150 г напитка приносят 3–4.5 г белка, и день дотягивается до цели, а не улетает.
+  // Углеводы напитка снимаются с гарнира (пол 30 г), жир — с масла (пол 7 г), а срез
+  // белка/жира/углеводов считается по ПЕРЕЛЁТУ над целями дня, поэтому КБЖУ дня остаются
+  // в цели, канон 3% не растёт, а оценка дня не падает.
+  const CA_RDA = 1000;
+  const ca = (d: Day) => Number((sumMicros(
+    items(d).map(({ x }) => ({ id: x.id, amount: x.amount })), FOOD_DB as any,
+  ) as any)?.Ca || 0);
+  const dairyItems = (d: Day) => items(d).filter(({ x }) => DAIRY_RE.test(String(x.id)));
+  const dairyNotes = (d: Day) => (d.plan.notes as string[] || [])
+    .filter((n) => typeof n === 'string' && n.startsWith('🥛 Кальций молочкой:'));
+  /** Дни, которые стадия обязана была закрыть (замер до неё). */
+  const TARGET_IDS = ['S1/4/тр', 'S1/4/отд', 'M2/4/отд'];
+
+  it('ни одного дня с Ca < 70% RDA (было 3: 61%, 67%, 59%)', () => {
+    const low = DAYS.filter((d) => ca(d) < CA_RDA * 0.7)
+      .map((d) => `${d.id}:${Math.round((ca(d) / CA_RDA) * 100)}%`);
+    expect(low.join(', ')).toBe('');
+  });
+
+  it('в дефицитных днях стоит молочка порцией и Ca дошёл до цели', () => {
+    const bad: string[] = [];
+    for (const d of DAYS.filter((x) => TARGET_IDS.includes(x.id))) {
+      const dairy = dairyItems(d);
+      const g = dairy.reduce((s, { x }) => s + (Number(x.amount) || 0), 0);
+      if (!dairy.length) { bad.push(`${d.id}: молочки нет`); continue; }
+      if (g < 100) bad.push(`${d.id}: молочки всего ${g} г`);
+      if (ca(d) < CA_RDA * 0.7) bad.push(`${d.id}: Ca ${Math.round((ca(d) / CA_RDA) * 100)}%`);
+    }
+    expect(bad.join(' | ')).toBe('');
+  });
+
+  it('дни, где кальций уже был в норме, стадия не трогает', () => {
+    // 27 из 30 дней в норме — молочку туда не добавляем: правка «на всякий случай»
+    // двигает КБЖУ без причины.
+    const bad = DAYS.filter((d) => !TARGET_IDS.includes(d.id) && dairyNotes(d).length > 0)
+      .map((d) => d.id);
+    expect(bad.join(', ')).toBe('');
+  });
+
+  it('порция молочки — еда: 100–300 г, граммы целые', () => {
+    const bad: string[] = [];
+    for (const d of DAYS) {
+      for (const n of dairyNotes(d)) {
+        const parts = n.split(';');
+        for (const p of parts) {
+          const mm = p.match(/(\d+) г/);
+          if (!mm) continue;
+          const g = Number(mm[1]);
+          if (g < 100 || g > 300) bad.push(`${d.id}: ${g} г`);
+          if (!Number.isInteger(g)) bad.push(`${d.id}: дробные ${g}`);
+        }
+      }
+    }
+    expect(bad.slice(0, 5).join(' | ')).toBe('');
+  });
+
+  it('молочка не съедает тарелку: приёмы остаются едой (≥100 ккал)', () => {
+    // Срез гарнира идёт до пола 30 г, масла — до 7 г; ниже приём не опускается.
+    const bad: string[] = [];
+    for (const d of DAYS.filter((x) => dairyNotes(x).length > 0)) {
+      for (const m of d.meals) {
+        const k = Number(m.totals?.kcal) || 0;
+        if ((m.items || []).length >= 2 && k < 100) bad.push(`${d.id}/${m.type}: ${Math.round(k)} ккал`);
+      }
+    }
+    expect(bad.slice(0, 5).join(' | ')).toBe('');
+  });
+
+  it('Na остаётся в коридоре ≤125% цели (кефир/молоко солёные)', () => {
+    const bad: string[] = [];
+    for (const d of DAYS.filter((x) => dairyNotes(x).length > 0)) {
+      const na = Number((sumMicros(
+        items(d).map(({ x }) => ({ id: x.id, amount: x.amount })), FOOD_DB as any,
+      ) as any)?.Na || 0);
+      const goal = d.plan.isTrainingDay ? 3000 : 2300;
+      if (na > goal * 1.25) bad.push(`${d.id}: Na ${Math.round(na)} мг`);
+    }
+    expect(bad.slice(0, 5).join(' | ')).toBe('');
+  });
+
+  it('нота не врёт: названный Ca = факт по тарелке (±2 мг и % цели)', () => {
+    const bad: string[] = [];
+    for (const d of DAYS) for (const n of dairyNotes(d)) {
+      const mm = n.match(/Ca (\d+) → (\d+) мг \((\d+)% цели\)/);
+      if (!mm) { bad.push(`${d.id}: формат ноты`); continue; }
+      const after = Number(mm[2]);
+      const pct = Number(mm[3]);
+      const fact = Math.round(ca(d));
+      const factPct = Math.round((fact / CA_RDA) * 100);
+      if (Math.abs(after - fact) > 2) bad.push(`${d.id}: нота ${after} мг, факт ${fact} мг`);
+      if (Math.abs(pct - factPct) > 1) bad.push(`${d.id}: нота ${pct}%, факт ${factPct}%`);
+    }
+    expect(bad.slice(0, 5).join(' | ')).toBe('');
+  });
+
+  it('канон не хуже: дней вне 3% ≤ 5 из 30', () => {
+    const out = DAYS.filter((d) => d.plan.withinTolerance === false).map((d) => d.id);
+    expect(out.length, `вне канона: ${out.join(', ')}`).toBeLessThanOrEqual(5);
+  });
+
+  it('молочка не вытесняет чужую еду: ни один id не исчез из дня', () => {
+    const bad: string[] = [];
+    for (const d of DAYS.filter((x) => dairyNotes(x).length > 0)) {
+      for (const { m } of items(d)) {
+        for (const it of (m.items || [])) {
+          if (String(it.id) === 'kefir' || String(it.id) === 'milk') continue;
+          if ((Number(it.amount) || 0) <= 0) bad.push(`${d.id}: ${it.id} ${it.amount} г`);
+        }
+      }
+    }
+    expect(bad.slice(0, 5).join(' | ')).toBe('');
+  });
+
+  it('ручной режим не трогаем: в ручном дне молочки от стадии нет', () => {
+    const tgt: any = buildDayTargets({
+      weightKg: 90, presetGPerKg: 2.0, fatFloorGPerKg: 0.8, kbjuMode: 'manual',
+      goal: 'maintenance', dietStyle: 'classic',
+    } as any);
+    const manual = buildDayPlan({
+      weightKg: 90, lbmKg: 73, bodyFatPct: 19, sex: 'male',
+      goalKcal: tgt.kcal, goalProteinG: tgt.protein, goalFatG: tgt.fats, goalCarbsG: tgt.carbs,
+      mealsCount: 4, isTrainingDay: false, trainStartMin: 18 * 60, trainDurationMin: 75,
+      allowIntraWorkout: true, budget: 'medium', dayOffset: 0, cyclePhase: 'none',
+      variety: 'medium', eveningLowCarb: false, goal: 'maintenance',
+      manualTargetsLocked: true, kbjuMode: 'manual',
+    } as unknown as MealPlanInput);
+    const notes = ((manual.notes || []) as string[]).filter((n) => n.startsWith('🥛 Кальций молочкой:'));
     expect(notes.join(' | ')).toBe('');
   });
 });

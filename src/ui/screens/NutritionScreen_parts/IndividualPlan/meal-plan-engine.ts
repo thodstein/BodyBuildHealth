@@ -13209,6 +13209,280 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
           }
         }
       }
+
+      // ── QG18: кальций молочкой — Ca без лишнего белка и жира ────────────────
+      // Замер после QG13/QG16/QG17: Ca ниже 70% RDA остался в 3 днях из 30 —
+      // S1/4/тр 61% (609 мг), S1/4/рест 67% (665), M2/4/рест 59% (585) при цели
+      // 1000 мг. Все три — четырёхприёмные дни: молочки в них нет вовсе (в 4-приёмном
+      // дне нет пред-сна, где её ставит QG3), рыба уже обменена (QG13), а дефицит
+      // маленький — 34–110 мг до порога.
+      // Почему не «просто добавить творог». Первая версия стадии ставила сыр
+      // (720 мг Ca/100 г — самый плотный кальций БД) и снимала его белок и жир
+      // внутри приёма. Она закрыла один день из трёх: в двух других белок дня
+      // стоит ровно на цели (S1: 101 г при 100), и все белковые пункты уже на полу
+      // порции (индейка 40 г, творог 42 г), а сыр несёт 4.8–7.2 г белка на 15–30 г.
+      // Срез невозможен → день уезжает по белку на 4–7% — гард справедливо
+      // отбраковывает.
+      // Что работает: продукт с максимальным кальцием НА ГРАММ БЕЛКА. Кефир и
+      // молоко дают 43 мг Ca на грамм белка (творог 5% — 6.7, сыр — 30), поэтому
+      // 100–150 г напитка закрывают дефицит всего 3–4.5 г белка — это уже
+      // «дотягивание до цели», а не перелёт. Углеводы напитка (4–4.7 г/100 г)
+      // снимаются с гарнира того же приёма (пол 30 г), жир (1–2.5 г/100 г) — с
+      // масла (пол 7 г), а срез белка/жира считается не «по молочке», а по
+      // ПЕРЕЛЁТУ над целями дня: если день ниже цели по оси, молочка его дотягивает
+      // и срез не нужен вовсе.
+      // Порядок продуктов — по Ca на грамм белка и по цене в углеводах: кефир,
+      // молоко, затем сыр (жирный, но без крахмала — когда гарнир резать нечем),
+      // затем йогурт и творог (худший Ca/белок, только как запас).
+      // Ручной/портативный режим, дни с инсулиновыми окнами, аллергия на молочку
+      // (dairy в allergenTags — фильтрует `_ok10`) и дни, где продукт уже стоит,
+      // не трогаем.
+      if (_vegFree && !((input as any).injections && (input as any).injections.length)) {
+        const _sex18 = input.sex === 'female' ? 'female' : 'male';
+        const _caGoal18 = Number((RDA_BASE as any)?.Ca?.[_sex18] || 1000);
+        const _micro18 = (key: string) => Number((sumMicros(
+          (meals as any[]).flatMap((m: any) => (m.items || []).map((it: any) => ({ id: it.id, amount: it.amount }))),
+          FOOD_DB as any,
+        ) as any)?.[key] || 0);
+        const _ca18 = () => _micro18('Ca');
+        // Натриевый коридор дня — по базовой цели (3000 трен / 2300 отдых), ровно
+        // как его меряет гард QG8.
+        const _naTarget18 = Number((input as any).sodiumTargetOverride) > 0
+          ? Number((input as any).sodiumTargetOverride)
+          : (input.isTrainingDay ? 3000 : 2300);
+        const _hasItem18 = (id: string) => (meals as any[]).some((m: any) => ((m.items || []) as any[]).some((x: any) => String(x.id) === id));
+        const _prods18: Array<{ fd: any; role: any; gs: number[] }> = [];
+        const _addProd18 = (id: string, role: any, gs: number[]) => {
+          if (_hasItem18(id) || _fav10(id)) return;
+          const fd: any = _ok10(id) ? FOOD_DB.find((f: any) => f.id === id) : null;
+          if (fd) _prods18.push({ fd, role, gs });
+        };
+        _addProd18('kefir', 'liquid', [100, 150, 200, 250, 300]);
+        _addProd18('milk', 'liquid', [100, 150, 200, 250, 300]);
+        _addProd18('cheese_hard', 'fat', [15, 20, 25, 30, 35, 40]);
+        _addProd18('yogurt_greek', 'slow_protein', [150, 200, 250]);
+        _addProd18('cottage_cheese_5', 'slow_protein', [100, 150, 200]);
+        if (_prods18.length > 0 && _ca18() < _caGoal18 * 0.7) {
+          const _isWindow18 = (mm: any) => ['preworkout', 'postworkout', 'intra', 'presleep'].includes(String(mm.type));
+          // «Чистое масло» — то же определение, что у QG15/QG17: срез идёт с него,
+          // а не с орехов/пасты (их растит QG11) и не с рыбьего жира.
+          const _pureFat18 = (x: any) => {
+            const amt = Number(x.amount) || 0;
+            if (!(amt > 0) || x._fixedGrams || _fav10(String(x.id))) return false;
+            const per100 = (v: any) => ((Number(v) || 0) / amt) * 100;
+            return x.role === 'fat' && per100(x.f) >= 85 && per100(x.p) <= 2 && per100(x.c) <= 2;
+          };
+          // Белковый пункт для среза: плотный белок (≥13 г/100 г), не молочка
+          // (иначе срезали бы то, что только что поставили) и не сардины — они
+          // сами несут кальций (QG13), срез увёз бы половину прибавки.
+          const _protItem18 = (x: any) => {
+            const id = String(x.id || '');
+            if (x._fixedGrams || _fav10(id)) return false;
+            if (!(x.role === 'protein' || x.role === 'fast_protein')) return false;
+            if (/^(sardines|cheese_|cottage_cheese|kefir|milk|yogurt)/.test(id)) return false;
+            const amt = Number(x.amount) || 0;
+            if (!(amt > 0)) return false;
+            return ((Number(x.p) || 0) / amt) * 100 >= 13;
+          };
+          const _w18 = Number(input.weightKg) || 0;
+          const _protFloor18 = _w18 >= 80 ? 75 : 40;
+          // Сколько должно ОСТАТЬСЯ в белковом пункте после среза, чтобы «порция мяса»
+          // не превратилась в обрезок: 100 г у крупного атлета, 60 г у мелкого. Порог
+          // «это еда» (75/40) — нижняя граница допустимого, но резать курицу 50 → 40
+          // ради 100 г кефира — это не обмен, а порча тарелки (замер: recipe-режим
+          // матрицы такие обрезки доносит до 30–35 г в основном приёме).
+          const _protKeep18 = _w18 >= 80 ? 100 : 60;
+          // Окна тренировки и предсон не трогаем ни как хозяина, ни как донора:
+          // белок там принадлежит таймингу (правило QG14/QG15).
+          const _hostOrder18 = (host: any) => [host, ...(meals as any[]).filter((mm: any) => mm !== host && !_isWindow18(mm) && ((mm.items || []) as any[]).length > 0)];
+          // Срез жира: сначала масло ТОГО ЖЕ приёма (иначе доля жира приёма растёт),
+          // затем масло дня. Пол масла — 7 г (правило QG1): «4 г масла» не порция.
+          const _trimFat18 = (host: any, need: number): number => {
+            let left = need;
+            for (const mm of _hostOrder18(host)) {
+              if (left <= 0.6) break;
+              const fats = ((mm.items || []) as any[]).filter(_pureFat18)
+                .sort((a: any, b: any) => (Number(b.amount) || 0) - (Number(a.amount) || 0));
+              for (const it of fats) {
+                if (left <= 0.6) break;
+                const amt = Number(it.amount) || 0;
+                const perG = (Number(it.f) || 0) / Math.max(1, amt);
+                if (!(perG > 0)) continue;
+                const cut = Math.min(Math.round(left / perG), amt - 7);
+                if (cut < 1) continue;
+                Object.assign(it, _scale10(it, amt - cut));
+                left -= cut * perG;
+              }
+            }
+            return left;
+          };
+          // Срез белка: самый крупный белковый пункт приёма (затем дня) до порции.
+          const _trimProt18 = (host: any, need: number): number => {
+            let left = need;
+            for (const mm of _hostOrder18(host)) {
+              if (left <= 0.4) break;
+              const prots = ((mm.items || []) as any[]).filter(_protItem18)
+                .sort((a: any, b: any) => (Number(b.p) || 0) - (Number(a.p) || 0));
+              for (const it of prots) {
+                if (left <= 0.4) break;
+                const amt = Number(it.amount) || 0;
+                const perG = (Number(it.p) || 0) / Math.max(1, amt);
+                if (!(perG > 0)) continue;
+                const cut = Math.min(Math.round(left / perG), amt - Math.max(_protFloor18, _protKeep18));
+                if (cut < 1) continue;
+                Object.assign(it, _scale10(it, amt - cut));
+                left -= cut * perG;
+              }
+            }
+            return left;
+          };
+          // Срез углеводов — только если молочка их принесла (кефир 4 г/100 г,
+          // молоко 4.7): гарнир того же приёма, пол 30 г (правило QG1).
+          const _carbItem18 = (x: any) => {
+            const amt = Number(x.amount) || 0;
+            if (!(amt > 0) || x._fixedGrams || _fav10(String(x.id))) return false;
+            if (x.role !== 'carb_slow' && x.role !== 'carb_fast') return false;
+            return ((Number(x.c) || 0) / amt) * 100 >= 20;
+          };
+          const _trimCarb18 = (host: any, need: number): number => {
+            let left = need;
+            for (const mm of _hostOrder18(host)) {
+              if (left <= 1.0) break;
+              const carbs = ((mm.items || []) as any[]).filter(_carbItem18)
+                .sort((a: any, b: any) => (Number(b.amount) || 0) - (Number(a.amount) || 0));
+              for (const it of carbs) {
+                if (left <= 1.0) break;
+                const amt = Number(it.amount) || 0;
+                const perG = (Number(it.c) || 0) / Math.max(1, amt);
+                if (!(perG > 0)) continue;
+                // «овсянка 15 г» — уже не гарнир: ниже 30 г не режем.
+                const cut = Math.min(Math.round(left / perG), amt - 30);
+                if (cut < 1) continue;
+                Object.assign(it, _scale10(it, amt - cut));
+                left -= cut * perG;
+              }
+            }
+            return left;
+          };
+          const _q18 = () => {
+            const cov = _pickCtx.qualityMode === 'full'
+              ? analyzeMicroCoverage(
+                sumMicros((meals as any[]).flatMap((m: any) => (m.items || []).map((it: any) => ({ id: it.id, amount: it.amount }))), FOOD_DB as any),
+                (input.sex || 'male') as any, input.weightKg, input.cyclePhase as any, !!input.isTrainingDay,
+                input.calciumTargetOverride, input.sodiumTargetOverride,
+              ).coverage
+              : [];
+            const lowN = cov.filter((c: any) => (c.pct || 0) < 70).length;
+            return scoreDayQuality(meals as any[], {
+              weightKg: Number(input.weightKg) || 0,
+              microCoverage: cov.length > 0 ? { lowCount: lowN, total: cov.length } : undefined,
+            });
+          };
+          const _ca018 = _ca18();
+          const _p018 = Number(totals.p) || 0;
+          const _f018 = Number(totals.f) || 0;
+          const _c018 = Number(totals.c) || 0;
+          const _k018 = Number(totals.kcal) || 0;
+          const _dev018 = _dev10();
+          const _q018 = _q18();
+          const _goalP18 = Number(input.goalProteinG) || 0;
+          const _goalF18 = Number(input.goalFatG) || 0;
+          const _goalC18 = Number(input.goalCarbsG) || 0;
+          const _goalK18 = Number(input.goalKcal) || 0;
+          const _devOf18 = (v: number, goal: number) => (goal > 0 ? Math.abs(v - goal) / goal : 0);
+          // Приём-хозяин: где больше всего «лишнего» белка над порцией — там срез
+          // безболезненнее. Окна тренировки и предсон не трогаем (тайминг).
+          const _hosts18 = (meals as any[])
+            .filter((mm: any) => ((mm.items || []) as any[]).length > 0 && !_isWindow18(mm))
+            .sort((a: any, b: any) => {
+              const room = (mm: any) => ((mm.items || []) as any[]).filter(_protItem18)
+                .reduce((s: number, x: any) => s + Math.max(0, (Number(x.amount) || 0) - _protFloor18), 0);
+              return room(b) - room(a);
+            });
+          const swaps18: string[] = [];
+          let _done18 = false;
+          for (const prod of _prods18) {
+            if (_done18) break;
+            // Порция: сначала та, что закрывает 80% RDA, затем ближние к ней —
+            // «кефира 50 мл» не бывает, пол продукта — свой минимум.
+            const _caPerG = (Number((prod.fd.micros as any)?.Ca) || 0) / 100;
+            const _want = _caPerG > 0
+              ? Math.ceil(((_caGoal18 * 0.8 - _ca018) / _caPerG) / 5) * 5
+              : prod.gs[0];
+            const _gs = [...prod.gs].sort((a, b) => Math.abs(a - _want) - Math.abs(b - _want));
+            for (const g of _gs) {
+              if (_done18) break;
+              for (const m of _hosts18) {
+                const sd = _snapDayAll();
+                (m.items as any[]).push(_mk10(prod.fd, g, prod.role));
+                recalcMealTotals(meals as any[]);
+                recalcDayTotals(meals, totals);
+                // Догоняем день до ЕГО ЖЕ целей, а не «срезаем ровно молочку»:
+                // белок — с плотного белкового пункта (до порции 75/40 г), жир — с
+                // масла (до 7 г), углеводы — с гарнира (до 30 г). Если день был
+                // НИЖЕ цели по оси, срез не нужен — молочка его дотягивает.
+                const overP = _goalP18 > 0 ? (Number(totals.p) || 0) - _goalP18 : 0;
+                const overF = _goalF18 > 0 ? (Number(totals.f) || 0) - _goalF18 : 0;
+                const overC = _goalC18 > 0 ? (Number(totals.c) || 0) - _goalC18 : 0;
+                const leftP = overP > 0.4 ? _trimProt18(m, overP) : 0;
+                const leftF = overF > 0.6 ? _trimFat18(m, overF) : 0;
+                const leftC = overC > 1.0 ? _trimCarb18(m, overC) : 0;
+                // Остаток среза не отбраковывает пробу сам по себе: он значит лишь
+                // «день на этой оси чуть выше цели», а это меряют точные гарды ниже
+                // (отклонение по каждой оси не растёт). Раньше порог «остаток ≤1.2»
+                // блокировал случаи, где срезать было просто нечего: день и так стоял
+                // на цели по белку.
+                void leftP; void leftF; void leftC;
+                recalcMealTotals(meals as any[]);
+                recalcDayTotals(meals, totals);
+                const ok18 = (_ca18() - _ca018 >= 60)
+                  && (_naTarget18 <= 0 || _micro18('Na') <= _naTarget18 * 1.25)
+                  && _dev10() <= _dev018 + 0.0005
+                  && _devOf18(Number(totals.p) || 0, _goalP18) <= _devOf18(_p018, _goalP18) + 0.005
+                  && _devOf18(Number(totals.f) || 0, _goalF18) <= _devOf18(_f018, _goalF18) + 0.005
+                  && _devOf18(Number(totals.c) || 0, _goalC18) <= _devOf18(_c018, _goalC18) + 0.005
+                  && _devOf18(Number(totals.kcal) || 0, _goalK18) <= _devOf18(_k018, _goalK18) + 0.005
+                  && (Number(totals.fiber) || 0) <= _qgFiberCap
+                  && _q18().total >= _q018.total
+                  && _q18().proteinSpread >= _q018.proteinSpread - 1e-6
+                  && _q18().fatSpread >= _q018.fatSpread - 1e-6;
+                if (ok18) {
+                  usedTodayIds.add(String(prod.fd.id));
+                  allFoodsUsed.push(String(prod.fd.id));
+                  swaps18.push(`«${String(m.type)}» ${String(prod.fd.name)} ${g} г`);
+                  _done18 = true;
+                } else {
+                  _restoreDayAll(sd);
+                }
+                if (_done18) break;
+              }
+            }
+          }
+          if (swaps18.length > 0) {
+            // Числа в чужих нотах пересчитываем по факту: QG13 назвала Ca и % цели
+            // («Ca 609 мг (61% цели)»), QG8 — натрий, QG10 — витамин A: молочка их
+            // меняет (Ca +130–260 мг, Na +50–190, у сыра ещё A +60 мкг на 30 г), и
+            // нота не имеет права врать.
+            const _caNow18 = Math.round(_ca18());
+            const _caPct18 = Math.round((_caNow18 / Math.max(1, _caGoal18)) * 100);
+            const _iCa18 = notes.findIndex((n) => typeof n === 'string' && n.startsWith('🐟 Кальций:'));
+            if (_iCa18 >= 0) {
+              notes[_iCa18] = String(notes[_iCa18]).replace(/Ca \d+ мг \(\d+% цели\)/, `Ca ${_caNow18} мг (${_caPct18}% цели)`);
+            }
+            const _iNa18 = notes.findIndex((n) => typeof n === 'string' && n.startsWith('🧂 Натрий'));
+            if (_iNa18 >= 0) {
+              const _naNow18 = Math.round(_micro18('Na'));
+              notes[_iNa18] = String(notes[_iNa18]).replace(/~?\d+ мг Na/, `${_naNow18} мг Na`);
+            }
+            const _aGoal18 = Number((RDA_BASE as any)?.VitA?.[_sex18] || 900);
+            const _iA18 = notes.findIndex((n) => typeof n === 'string' && n.startsWith('🥕 Овощи и витамин A:'));
+            if (_iA18 >= 0 && _aGoal18 > 0) {
+              notes[_iA18] = String(notes[_iA18]).replace(/A \d+% цели/, `A ${Math.round((_micro18('VitA') / _aGoal18) * 100)}% цели`);
+            }
+            notes.push(`🥛 Кальций молочкой: ${swaps18.join('; ')} — излишек над целями дня снят с белкового пункта, масла и гарнира (КБЖУ дня в цели); Ca ${Math.round(_ca018)} → ${_caNow18} мг (${_caPct18}% цели)`);
+          }
+        }
+      }
     }
 
     // Витрина MPS должна совпадать с ФИНАЛЬНЫМ планом (санитайзеры E17/E18 меняют items).
