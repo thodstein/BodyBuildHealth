@@ -63,6 +63,11 @@ export interface MovementDiagnosticsExportInput {
   /** Горизонтальный ход штанги, % вертикального хода (один из замеров ракурса). */
   angleDriftPct?: number | null;
   /**
+   * По какому ракурсу читается горизонталь: спереди та же цифра — боковой уход по телу,
+   * поэтому подпись метрики в отчёте меняется, иначе число читается неверно.
+   */
+  angleBasis?: 'side' | 'front' | 'unknown';
+  /**
    * Чем нанесена линия на видео: panel — панель без калибровки, calibration — единый
    * масштаб (px/см), perspective — по 4 привязкам. Отчёт без этого не воспроизводим.
    */
@@ -201,7 +206,7 @@ export function buildMovementDiagnosticsCsv(inp: MovementDiagnosticsExportInput)
     ['Вес штанги на записи, кг', inp.weightKg != null ? String(inp.weightKg) : '—'],
     ['Качество съёмки', inp.captureQuality || '—'],
     ['Съёмка: параметры', inp.captureDetails || '—'],
-    ['Горизонтальный ход штанги, % хода', inp.angleDriftPct != null ? String(inp.angleDriftPct) : '—'],
+    [angleDriftLabel(inp.angleBasis), inp.angleDriftPct != null ? String(inp.angleDriftPct) : '—'],
     ['Проверка ракурса', inp.angleCheck || '—'],
     ['Наложение линии на видео', videoOverlayModeRu(inp.videoOverlayMode)],
     ['Масштаб калибровки кадра, px/см', inp.videoScalePxPerCm != null ? String(inp.videoScalePxPerCm) : '—'],
@@ -221,8 +226,16 @@ export function buildMovementDiagnosticsCsv(inp: MovementDiagnosticsExportInput)
   return rows.map((r) => r.map(csvCell).join(',')).join('\n');
 }
 
-/** Строка «чем нанесена линия на видео» для HTML: режим + масштаб/разброс/смещение. */
-function videoOverlayRuLine(inp: MovementDiagnosticsExportInput): string {
+/**
+ * Подпись метрики ухода штанги: сбоку горизонталь в кадре — это путь штанги,
+ * спереди — уход вбок по телу. Одна цифра, но читается по-разному, поэтому и
+ * название в отчёте разное: иначе число понимают неверно.
+ */
+export function angleDriftLabel(basis?: 'side' | 'front' | 'unknown'): string {
+  return basis === 'front' ? 'Боковой уход штанги, % хода' : 'Горизонтальный ход штанги, % хода';
+}
+
+/** Строка «чем нанесена линия на видео» для HTML: режим + масштаб/разброс/смещение. */function videoOverlayRuLine(inp: MovementDiagnosticsExportInput): string {
   const parts: string[] = [videoOverlayModeRu(inp.videoOverlayMode)];
   if (inp.videoScalePxPerCm != null) parts.push(`единый масштаб ${fmt(inp.videoScalePxPerCm, 2)} px/см`);
   if (inp.videoPerspSkewPct != null) parts.push(`разброс масштаба ${inp.videoPerspSkewPct}%`);

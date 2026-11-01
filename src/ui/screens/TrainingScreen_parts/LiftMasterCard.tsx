@@ -1385,6 +1385,7 @@ export const LiftMasterCard: React.FC<{
       ].filter(Boolean).join(' · ') || null,
       angleCheck: angleCheck ? angleCheck.reason : '',
       angleDriftPct: angleCheck ? angleCheck.driftPct : null,
+      angleBasis: angleCheck ? angleCheck.basis : undefined,
       videoOverlayMode: kinoveaResult ? (curPersp ? 'perspective' : curCalib ? 'calibration' : 'panel') : '',
       videoScalePxPerCm: curCalib ? Math.round(curCalib.pxPerCm * 100) / 100 : null,
       videoPerspSkewPct: curPersp ? perspectiveSkewPct(curPersp) : null,

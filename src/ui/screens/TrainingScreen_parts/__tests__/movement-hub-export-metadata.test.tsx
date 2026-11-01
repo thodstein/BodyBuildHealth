@@ -122,4 +122,51 @@ describe('хаб → CSV: как нанесена линия на видео', (
     expect(rowValue(csv, 'Проверка ракурса')).toBe('"—"');
     expect(rowValue(csv, 'Горизонтальный ход штанги, % хода')).toBe('"—"');
   });
+
+  it('экран и отчёт не расходятся: числа хаба совпадают с CSV', async () => {    const rows = ['time,x,y'];
+    for (let i = 0; i < 20; i++) rows.push(`${(i * 0.05).toFixed(2)},${100 + i * 1.5},${50 + i * 4}`);
+    localStorage.setItem(MASTER_KEY, JSON.stringify({
+      lift: 'bench',
+      videoPersp: { bench: { anchors: ANCHORS, vA: -8, vB: 520, vC: 0.004, fitPx: 0.1, frameW: 1280, frameH: 720 } },
+      capture: { side: 'left', heightM: '1.2', distM: '3', device: 'phone' },
+    }));
+    const { container } = render(<LiftMasterCard sessions={[]} />);
+    act(() => {
+      fireEvent.change(container.querySelector('[data-lift="kinovea-text"]')!, { target: { value: rows.join('\n') } });
+    });
+    act(() => { fireEvent.click(container.querySelector('[data-lift="parse-kinovea"]')!); });
+
+    const num = (el: Element | null, what: string): string => {
+      const m = /(\d+(?:\.\d+)?)\s*%/.exec(el?.textContent ?? '');
+      expect(m, `${what}: число в тексте «${el?.textContent}»`).toBeTruthy();
+      return m![1];
+    };
+    const screenDrift = num(container.querySelector('[data-lift="angle-drift"]'), 'ход штанги на экране');
+    const screenSkew = num(container.querySelector('[data-lift="angle-skew"]'), 'разброс масштаба на экране');
+    const perspState = container.querySelector('[data-lift="video-persp-state"]')!.textContent ?? '';
+    expect(perspState).toContain(`разброс масштаба ${screenSkew}%`);
+    const msg = container.querySelector('[data-lift="kinovea-msg"]')!.textContent ?? '';
+    const xLoop = /xLoop ([\d.]+) см/.exec(msg)?.[1];
+    expect(xLoop, `xLoop в сообщении разбора: «${msg}»`).toBeTruthy();
+
+    await act(async () => { fireEvent.click(container.querySelector('[data-lift="export-csv"]')!); });
+    expect(savedCsv.length).toBe(1);
+    const csv = savedCsv[0];
+    expect(rowValue(csv, 'Горизонтальный ход штанги, % хода')).toBe(`"${screenDrift}"`);
+    expect(rowValue(csv, 'Разброс масштаба по высоте, %')).toBe(`"${screenSkew}"`);
+    expect(rowValue(csv, 'Kinovea xLoop, см')).toBe(`"${xLoop}"`);
+    // Ракурс задан, но разброс масштаба 31% важнее хода — вердикт про перспективу.
+    expect(rowValue(csv, 'Проверка ракурса')).toContain('перспективу по 4 кадрам');
+    expect(rowValue(csv, 'Проверка ракурса')).not.toContain('не указан');
+  });
+
+  it('вид спереди: метрика подписана «боковой уход», вердикт — про технику', async () => {
+    const rows = ['time,x,y'];
+    for (let i = 0; i < 20; i++) rows.push(`${(i * 0.05).toFixed(2)},${100 + i * 1.5},${50 + i * 4}`);
+    const csv = await exportCsv({ capture: { side: 'front' } }, rows.join('\n'), '1');
+    expect(rowValue(csv, 'Боковой уход штанги, % хода')).toBe('"37.5"');
+    // Старой подписи быть не должно: иначе цифру прочтут как путь вглубь кадра.
+    expect(csv).not.toContain('"Горизонтальный ход штанги, % хода"');
+    expect(rowValue(csv, 'Проверка ракурса')).toContain('сигнал техники');
+  });
 });
