@@ -1,11 +1,11 @@
 /**
- * Регрессия «пакета качества» (QG1–QG9) планировщика.
+ * Регрессия «пакета качества» (QG1–QG10) планировщика.
  *
  * Зачем: сходимость дня ≤3% ловит только КБЖУ. Жалобы шли на «съедобность»:
  * «19 г малины», «жир всего дня в одном приёме», «овощей 190 г», «в обед 12 г белка»,
- * «натрий 43% цели, а в совете — добавьте соли», «витамин E 24% RDA». Пакет QG правит
- * именно это — и эти тесты фиксируют результат, чтобы следующая правка движка не
- * откатила его молча.
+ * «натрий 43% цели, а в совете — добавьте соли», «витамин E 24% RDA», «в обед курица и
+ * картофель, витамина A 4%». Пакет QG правит именно это — и эти тесты фиксируют
+ * результат, чтобы следующая правка движка не откатила его молча.
  *
  * Пороги подобраны по замеру на одном и том же наборе профилей:
  *   метрика                        без пакета   с пакетом
@@ -17,6 +17,8 @@
  *   дней с молочкой               15/30        18/30
  *   Na, среднее от цели дня        41%          88%
  *   VitE, среднее от RDA           24%          63%
+ *   VitA < 70% RDA                14/30        1/30 (QG10)
+ *   дней совсем без овощей         6/30        0/30 (QG10)
  */
 import { describe, it, expect } from 'vitest';
 import { buildDayPlan, type MealPlanInput } from '../meal-plan-engine';
@@ -261,6 +263,71 @@ describe('пакет качества: витамин E и семейные кв
       }
     }
     expect(dup.slice(0, 4).join(' | ')).toBe('');
+  });
+});
+
+describe('овощи и витамин A в тарелке (QG10)', () => {
+  // RDA_BASE: VitA 900 мкг (муж), 700 мкг (жен).
+  const RDA_A = { male: 900, female: 700 } as const;
+  const vitAOf = (d: Day) => Number((sumMicros(
+    items(d).map(({ x }) => ({ id: x.id, amount: x.amount })),
+    FOOD_DB as any,
+  ) as any)?.VitA || 0);
+  const vegG = (d: Day) => items(d).reduce((s, { x }) => s + (x.role === 'veg' ? (x.amount || 0) : 0), 0);
+
+  it('нет ни одного дня без овощей (было 8 из 72 конфигураций)', () => {
+    const empty = DAYS.filter((d) => vegG(d) === 0).map((d) => d.id);
+    expect(empty.slice(0, 5).join(', ')).toBe('');
+  });
+
+  it('витамин A: дней ниже 70% RDA ≤ 6 из 30 (было 14), среднее ≥ 110%', () => {
+    const pcts = DAYS.map((d) => {
+      const rda = RDA_A[(d.plan.sex as 'male' | 'female') || 'male'] || 900;
+      return Math.round((vitAOf(d) / rda) * 100);
+    });
+    const below70 = pcts.filter((v) => v < 70).length;
+    expect(below70, `дней с VitA < 70% RDA: ${below70}/${pcts.length}`).toBeLessThanOrEqual(6);
+    const avg = Math.round(pcts.reduce((s, v) => s + v, 0) / pcts.length);
+    expect(avg, `VitA: ${avg}% RDA (было 97% с провалами 1–30%)`).toBeGreaterThanOrEqual(110);
+  });
+
+  it('овощной пол: дней с овощами < 200 г ≤ 3 из 30 (было 7)', () => {
+    const bad = DAYS.filter((d) => vegG(d) < 200);
+    expect(bad.length, `дней с овощами < 200 г: ${bad.map((d) => `${d.id}:${vegG(d)}г`).join(' | ')}`).toBeLessThanOrEqual(3);
+  });
+
+  it('овощем не становятся сок, фрукт или суп: «200 г морковного сока» — не овощ', () => {
+    const bad: string[] = [];
+    for (const d of DAYS) for (const { x } of items(d)) {
+      if (x.role !== 'veg') continue;
+      const id = String(x.id);
+      if (/juice|smoothie|soup|borscht|pickled|sauerkraut/.test(id)) bad.push(`${d.id}:${id}`);
+      if (/^(fruit_|berry_|berries)/.test(id)) bad.push(`${d.id}:${id}`);
+    }
+    expect(bad.slice(0, 5).join(' | ')).toBe('');
+  });
+
+  it('овощ не съедает гарнир: carb_slow не ниже 30 г', () => {
+    const bad: string[] = [];
+    for (const d of DAYS) for (const { x } of items(d)) {
+      if (x.role !== 'carb_slow' || x._fixedGrams) continue;
+      const g = x.amount || 0;
+      if (g > 0 && g < 30) bad.push(`${d.id}:${x.id} ${g}г`);
+    }
+    expect(bad.slice(0, 5).join(' | ')).toBe('');
+  });
+
+  it('витамин A взялся из овоща, а не из «концентрата»: плотность в коридоре 150–2000 мкг/100 г', () => {
+    const bad: string[] = [];
+    for (const d of DAYS) for (const { x } of items(d)) {
+      if (x.role !== 'veg') continue;
+      const fd: any = FOOD_DB.find((f: any) => f.id === x.id);
+      const a = Number(fd?.micros?.VitA || 0);
+      // Ни один день не строит витамин A на соке/концентрате: овощ — не «морковный
+      // сок 9000 мкг/100 г» и не «сушёный шиповник 4200».
+      if (a > 2000) bad.push(`${d.id}:${x.id} ${a}мкг/100г`);
+    }
+    expect(bad.slice(0, 5).join(' | ')).toBe('');
   });
 });
 

@@ -11787,6 +11787,344 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
       }
     }
 
+    // ── QG10: овощной пол и каротиновый овощ — на днях вне пакета ───────────
+    // Замер (72 конфигурации: 5 профилей × 4/5/6 приёмов × тренировка/отдых ×
+    // сдвиги 0–3): 6 дней получали НОЛЬ овощей — «обед» из куриной грудки, 300 г
+    // картофеля и 19 г крыжовника. Там же, где овощ был, это чаще всего цукини или
+    // огурец (10 и 0 мкг витамина A /100 г), поэтому витамин A проваливался ниже
+    // 30% RDA в 23 днях из 72 при медиане 59%, а ось «микро» в оценке качества —
+    // худшая (57 против 79–98 у остальных).
+    // Причина: пакет качества на днях с отклонением >8% откатывается ЦЕЛИКОМ, и
+    // овощной пол (QG5) уезжает вместе с ним; поздний корректор доводит числа уже
+    // без овощей. Здесь — только безопасная часть: углеводы приёма не меняются
+    // (крахмал того же приёма балансируется в обе стороны), поэтому стадия идёт
+    // после откатов и обязана день не ухудшить. Ручной КБЖУ и портативный режим
+    // не трогаются.
+    {
+      const _vegFree = !(!!(input as any).manualTargetsLocked
+        || String((input as any).kbjuMode || '') === 'manual'
+        || !!input.portableMode);
+      const _ok10 = (id: string) => {
+        const fd: any = FOOD_DB.find((f: any) => f.id === id);
+        return !!fd && !(combinedExcluded && combinedExcluded.has(id))
+          && !(input.excludedIds && input.excludedIds.has(id))
+          && foodPassesCtxAllergens(fd) && foodAvailableForPlan(fd);
+      };
+      // Любимый продукт пользователя не меняем: замер поймал регресс «любимый лук
+      // (VitA 0) заменён на морковь» — предпочтение важнее коридора витамина.
+      const _fav10 = (id: string) => !!input.preferredIds && input.preferredIds.has(id);
+      const _scale10 = (it: any, newG: number): any => {
+        const k = newG / Math.max(1, Number(it.amount) || 1);
+        const r1 = (v: any) => Math.round((Number(v) || 0) * k * 10) / 10;
+        return {
+          ...it, amount: newG,
+          p: r1(it.p), f: r1(it.f), c: r1(it.c), fiber: r1(it.fiber),
+          kcal: Math.round((Number(it.kcal) || 0) * k),
+          leucine_mg: Math.round((Number(it.leucine_mg) || 0) * k),
+        };
+      };
+      const _dev10 = () => {
+        const g = (k: number, t: number) => (t > 0 ? Math.abs(k - t) / t : 0);
+        return Math.max(
+          g(totals.kcal || 0, Number(input.goalKcal) || 0),
+          g(totals.p || 0, Number(input.goalProteinG) || 0),
+          g(totals.f || 0, Number(input.goalFatG) || 0),
+          g(totals.c || 0, Number(input.goalCarbsG) || 0),
+        );
+      };
+      // Отклонение на ВХОДЕ стадии: сравнивать «стало хуже» можно только с ним.
+      // Пошаговое сравнение оказалось ловушкой — каждый шаг проходил допуск, а
+      // суммарно день уезжал с 3.9% до 13% (замер).
+      const _devStart10 = _dev10();
+      const _worse10 = () => {
+        const canon = PLANNER_CONVERGENCE_PCT / 100;
+        const now = _dev10();
+        // За канон не выходим никогда, если на входе стадии были внутри.
+        if (_devStart10 <= canon && now > canon) return true;
+        // Внутри канона допускаем 0.5 п.п. на день (это всё ещё «≤3%»), а на дне,
+        // который уже вне канона, — те же 0.5 п.п. к исходному промаху: канон там
+        // уже пропущен, и доля таких дней не растёт.
+        return now > _devStart10 + 0.005;
+      };
+      // Клетчатка: строго по капу (без «+0.5»). Мягкий допуск пропускал день на
+      // 85.4 г при капе 85 — ровно то, что ловит E16/`planner-realism-guarantees`.
+      const _fiberOk10 = () => (Number(totals.fiber) || 0) <= _qgFiberCap;
+      const _mk10 = (fd: any, grams: number, role: MealItem['role']): any => {
+        const g = Math.max(5, Math.round(grams / 5) * 5);
+        const r = g / 100;
+        const p = Math.round((fd.protein || 0) * r * 10) / 10;
+        const f = Math.round((fd.fat || 0) * r * 10) / 10;
+        const c = Math.round((fd.carbs || 0) * r * 10) / 10;
+        return {
+          id: fd.id, name: fd.name, amount: g, role, kcal: Math.round(4 * p + 9 * f + 4 * c),
+          p, f, c, fiber: Math.round((fd.fiber || 0) * r * 10) / 10,
+          leucine_mg: Math.round(getLeucine(fd) * r),
+        };
+      };
+      const _vegPairs10 = () => (meals as any[])
+        .flatMap((m) => ((m.items || []) as any[]).filter((x: any) => x.role === 'veg').map((x: any) => ({ m, x })));
+      const _vegG10 = () => _vegPairs10().reduce((s, p) => s + (Number(p.x.amount) || 0), 0);
+      const _vita10 = () => Number((sumMicros(
+        (meals as any[]).flatMap((m) => (m.items || []).map((it: any) => ({ id: it.id, amount: it.amount }))),
+        FOOD_DB as any,
+      ) as any)?.VitA || 0);
+      const _vitaGoal10 = Number((RDA_BASE as any)?.VitA?.[input.sex === 'female' ? 'female' : 'male'] || 900);
+      const _aOf10 = (id: string) => Number((FOOD_DB.find((f: any) => f.id === id)?.micros as any)?.VitA || 0);
+      // Баланс крахмала того же приёма ПОД УГЛЕВОДЫ овоща (не под ккал): срез «по
+      // ккал» уводил ось C (овощ отдаёт 20 г углеводов, рис срезался на 9 г) и
+      // гард сходимости отбивал замену на дне, стоящем ровно на каноне. Работает в
+      // ОБЕ стороны: если новый овощ углеводов отдаёт меньше старого, гарнир
+      // добирается — иначе день теряет углеводы и уезжает по оси C.
+      const _balanceCarb10 = (m: any, deltaC: number): number => {
+        if (Math.abs(deltaC) < 0.5) return 0;
+        const carbs = ((m.items || []) as any[])
+          .filter((x: any) => (x.role === 'carb_slow' || x.role === 'carb_fast') && !x._fixedGrams)
+          .sort((a: any, b: any) => (Number(b.c) || 0) - (Number(a.c) || 0));
+        if (deltaC > 0) {
+          let left = deltaC;
+          for (const it of carbs) {
+            if (left <= 0.5) break;
+            const amt = Number(it.amount) || 0;
+            const perG = (Number(it.c) || 0) / Math.max(1, amt);
+            if (!(perG > 0)) continue;
+            // Гарнир не опускается ниже 40 г: «30 г риса» — это уже не гарнир.
+            const canG = Math.min(Math.floor(left / perG), amt - 40);
+            if (canG < 5) continue;
+            Object.assign(it, _scale10(it, amt - canG));
+            left -= canG * perG;
+          }
+          return Math.max(0, deltaC - left);
+        }
+        // Овощ «легче» прежнего — возвращаем углеводы в гарнир.
+        let left = -deltaC;
+        for (const it of carbs) {
+          if (left <= 0.5) break;
+          const amt = Number(it.amount) || 0;
+          const perG = (Number(it.c) || 0) / Math.max(1, amt);
+          if (!(perG > 0)) continue;
+          const capG = edibilityCapFor(String(it.id), 400);
+          const addG = Math.min(Math.floor(left / perG / 5) * 5, capG - amt);
+          if (addG < 5) continue;
+          Object.assign(it, _scale10(it, amt + addG));
+          left -= addG * perG;
+        }
+        return Math.max(0, -deltaC - left);
+      };
+      // Куда ставить овощ: обед и ужин — в первую очередь, перекусы — как запасной
+      // вариант (овощ в снеке — это «морковные палочки», вполне по-кухонному).
+      const _hostOrder10 = ['lunch', 'dinner', 'snack', 'snack2', 'snack3', 'breakfast', 'presleep'];
+      // Что вообще считается «порцией овощей». Сок, смузи, суп, соленья, приправы —
+      // не овощной гарнир: «200 г морковного сока» закрывает цифру витамина A и
+      // выглядит абсурдом (замер первой версии стадии: A уезжал в 2576% цели).
+      // Фрукты в дне стоят ролью fruit — ими овощной пол не закрываем.
+      const _vegish10 = (fd: any) => {
+        const id = String(fd && fd.id || '');
+        if (!id) return false;
+        if (/juice|smoothie|soup|borscht|kimchi|sauerkraut|pickled|seaweed|nori|supp_|herb_|spice|oil_|sauce/.test(id)) return false;
+        if (/^(fruit_|berry_|berries|apple|pear|peach|plum|cherry|kiwi|banana|orange|grape|melon|watermelon|pineapple|pomelo|apricot|nectarine|persimmon|passion|papaya|mango|fig_|date_|raisin|cranberry|avocado)/.test(id)) return false;
+        return true;
+      };
+      // Разумная плотность витамина A: 150–1000 мкг/100 г и не больше 12 г
+      // углеводов. Ниже — «пустой» овощ (огурец 0, цукини 10), выше — концентрат
+      // (морковный сок 9000) или батат-сквош 13 г углеводов, который в обмен на
+      // каротин съедает полдник гарнира.
+      const _aBand10 = (id: string) => {
+        const fd: any = FOOD_DB.find((f: any) => f.id === id);
+        const a = _aOf10(id);
+        const c = Number(fd && fd.carbs) || 0;
+        return a >= 150 && a <= 1000 && c <= 12;
+      };
+      // Каротин «за калорию»: кресс/шпинат (469–1600 мкг, 11–23 ккал) выгоднее
+      // моркови (835 мкг, 41 ккал) и тем более сквоша (1200 мкг, 56 ккал и 13 г
+      // углеводов) — замена не съедает гарнир и не двигает сходимость.
+      const _aEff10 = (id: string) => {
+        const fd: any = FOOD_DB.find((f: any) => f.id === id);
+        return _aOf10(id) / ((Number(fd && fd.kcal) || 0) + 15);
+      };
+      const _pick10 = (onlyCarotene: boolean): any => _pickList10(onlyCarotene)[0] || null;
+      const _pickList10 = (onlyCarotene: boolean): any[] => {
+        const base = [...((pool as any)?.vegGreen || []), ...((pool as any)?.vegColor || [])];
+        const seen = new Set<string>();
+        const poolCands: any[] = [];
+        for (const fd of base) {
+          if (!fd) continue;
+          const id = String(fd.id);
+          if (seen.has(id)) continue;
+          seen.add(id);
+          if (!_vegish10(fd) || !_ok10(id)) continue;
+          poolCands.push(fd);
+        }
+        // Если пул дня собран из «пустых» овощей (цукини/огурец/капуста), добавляем
+        // каротиновый запас: иначе день с овощами всё равно даёт 4–30% витамина A.
+        const bestPoolA = poolCands.reduce((m, fd) => Math.max(m, _aOf10(fd.id)), 0);
+        if (bestPoolA < 100 || onlyCarotene) {
+          for (const id of ['carrot', 'pumpkin', 'spinach', 'kale', 'veg_bell_pepper_red']) {
+            if (seen.has(id)) continue;
+            const fd: any = _ok10(id) ? FOOD_DB.find((f: any) => f.id === id) : null;
+            if (!fd) continue;
+            seen.add(id);
+            poolCands.push(fd);
+          }
+        }
+        const band = poolCands.filter((fd) => _aBand10(fd.id));
+        const list = band.length > 0 ? band : poolCands;
+        list.sort((a: any, b: any) => {
+          const ua = usedTodayIds.has(a.id) ? 1 : 0;
+          const ub = usedTodayIds.has(b.id) ? 1 : 0;
+          if (ua !== ub) return ua - ub;         // сначала продукты, которых в дне ещё нет
+          return _aEff10(b.id) - _aEff10(a.id);  // затем лучший каротин за калорию
+        });
+        return list;
+      };
+      // Снимок приёма и откат НА МЕСТЕ. Раньше откат подменял массив `items`, и
+      // следующие правки в цикле шли в «осиротевшие» объекты: день рассыпался
+      // (замер: 3.4% → 24% без единой успешной замены).
+      const _snapMeal10 = (m: any): any[] => ((m.items || []) as any[]).map((it: any) => ({ it, s: { ...it } }));
+      const _restoreMeal10 = (m: any, snap: any[]) => {
+        if ((m.items || []).length > snap.length) (m.items as any[]).length = snap.length;
+        for (const e of snap) Object.assign(e.it, e.s);
+        m.totals = mealTotalsOf(m.items);
+        recalcDayTotals(meals, totals);
+      };
+      // Добавить овощ в приём: рост пункта + баланс крахмала того же приёма + гард дня.
+      const _placeVeg10 = (m: any, fd: any, grams: number): boolean => {
+        const g = Math.max(50, Math.round(grams / 10) * 10);
+        const _snapM = _snapMeal10(m);
+        const item = _mk10(fd, g, 'veg');
+        (m.items as any[]).push(item);
+        _balanceCarb10(m, Number(item.c) || 0);
+        m.totals = mealTotalsOf(m.items);
+        recalcDayTotals(meals, totals);
+        if (_worse10() || !_fiberOk10()) {
+          _restoreMeal10(m, _snapM);
+          return false;
+        }
+        usedTodayIds.add(fd.id);
+        allFoodsUsed.push(fd.id);
+        return true;
+      };
+      // Подмена овоща в том же приёме (цукини → шпинат/морковь): граммы те же,
+      // углеводы балансируются гарниром. Одна замена на пункт — иначе стадия
+      // «ратифицирует» свой же результат (цукини → шпинат → паприка → ...).
+      const _swapVeg10 = (m: any, it: any, fd: any, grams: number): boolean => {
+        const g = Math.max(30, Math.min(edibilityCapFor(fd.id, 250), Math.round(grams / 10) * 10));
+        const _snapM = _snapMeal10(m);
+        const oldC = Number(it.c) || 0;
+        const item = _mk10(fd, g, 'veg');
+        Object.assign(it, item);
+        const dC = Number(item.c) - oldC;
+        if (Math.abs(dC) >= 0.5) _balanceCarb10(m, dC);
+        m.totals = mealTotalsOf(m.items);
+        recalcDayTotals(meals, totals);
+        if (_worse10() || !_fiberOk10()) {
+          _restoreMeal10(m, _snapM);
+          return false;
+        }
+        usedTodayIds.add(fd.id);
+        allFoodsUsed.push(fd.id);
+        return true;
+      };
+      if (_vegFree) {
+        const _changed: string[] = [];
+        // (1) Каротин: овощ есть, но витамина A день не набирает (цукини 10 мкг,
+        //     огурец 0, капуста 0) — меняем самый «пустой» овощ в том же приёме на
+        //     каротиновый. Граммы подбираем так, чтобы НЕ выросли ни ккал, ни
+        //     углеводы приёма: замена должна быть бесплатной по сходимости, иначе
+        //     гард отбивает её на дне, стоящем ровно на каноне.
+        if (_vita10() < _vitaGoal10 * 0.6) {
+          const _cands = _pickList10(true);
+          // Одна замена на пункт и не больше двух на день: иначе стадия начинает
+          // «улучшать» уже заменённый овощ и ратифицирует свой же результат.
+          const _done10 = new Set<any>();
+          const _flat = _vegPairs10()
+            .filter((p) => _hostOrder10.slice(0, 5).includes(String(p.m.type)) && !p.x._fixedGrams
+              && !_fav10(String(p.x.id))
+              && (Number(p.x.amount) || 0) >= 60 && _aOf10(String(p.x.id)) < 150)
+            .sort((a, b) => (Number(b.x.amount) || 0) - (Number(a.x.amount) || 0));
+          let _swaps10 = 0;
+          for (const p of _flat) {
+            if (_vita10() >= _vitaGoal10 * 0.8 || _swaps10 >= 2) break;
+            if (_done10.has(p.x)) continue;
+            const oldK = Number(p.x.kcal) || 0;
+            const oldG = Number(p.x.amount) || 0;
+            for (const fd of _cands) {
+              if (fd.id === p.x.id) continue;
+              if (((p.m.items || []) as any[]).some((x: any) => x.id === fd.id)) continue;
+              const perA = Number(fd.micros?.VitA || 0) / 100;
+              const perK = Number(fd.kcal || 0) / 100;
+              if (!(perA > 0) || !(perK > 0)) continue;
+              const gK = oldK / perK;                        // столько же ккал
+              // Граммы: сначала «грамм-в-грамм», потом чуть меньше — но НЕ сильно:
+              // овощ сам несёт белок и жир (капуста 200 г = 3.8 г белка), и сжатие
+              // порции уводит день по жиру/белку (замер: 200→60 г давало +2.6 п.п.).
+              let _okSwap = false;
+              for (const g of [oldG, Math.round(oldG * 0.7 / 10) * 10]) {
+                if (g < 60) continue;                        // меньше 60 г — не порция
+                if (perA * g < 200) continue;                // замена должна дать каротин
+                if (g > gK * 1.35) continue;                 // не дороже исходного овоща на треть
+                if (_swapVeg10(p.m, p.x, fd, g)) {
+                  _done10.add(p.x);
+                  _swaps10++;
+                  _changed.push(`${String(fd.name).toLowerCase()} ${Math.round(g)} г вместо «пустого» овоща`);
+                  _okSwap = true;
+                  break;
+                }
+              }
+              if (_okSwap) break;
+            }
+          }
+        }
+        // (2) Пол: если овоща в дне меньше 200 г — растим то, что есть (в том числе
+        //     только что поставленный каротиновый овощ: 200 г шпината — это 100% A).
+        for (const p of _vegPairs10()) {
+          if (_vegG10() >= 200) break;
+          const x = p.x;
+          if (x._fixedGrams) continue;
+          if (!_hostOrder10.includes(String(p.m.type))) continue;
+          const cap = Math.min(edibilityCapFor(x.id, 250), 250);
+          const addG = Math.min(200 - _vegG10(), cap - (Number(x.amount) || 0));
+          if (addG < 20) continue;
+          const _snapM2 = _snapMeal10(p.m);
+          const addC = ((Number(x.c) || 0) / Math.max(1, Number(x.amount) || 1)) * addG;
+          Object.assign(x, _scale10(x, (Number(x.amount) || 0) + addG));
+          _balanceCarb10(p.m, addC);
+          p.m.totals = mealTotalsOf(p.m.items);
+          recalcDayTotals(meals, totals);
+          if (_worse10() || !_fiberOk10()) {
+            _restoreMeal10(p.m, _snapM2);
+            continue;
+          }
+          _changed.push(`${String(x.name).toLowerCase()} до ${Number(x.amount)} г`);
+        }
+        // (3) Пол: если овоща нет вовсе — ставим его в первый свободный приём.
+        //     Пробуем несколько приёмов и убывающие порции: если в обеде нечего
+        //     срезать под овощ (всё «фиксированное»), пол всё равно добираем ужином.
+        let _added10 = 0;
+        for (const h of _hostOrder10) {
+          if (_vegG10() >= 200 || _added10 >= 2) break;
+          const host: any = meals.find((m: any) => String(m.type) === h
+            && !((m.items || []) as any[]).some((x: any) => x.role === 'veg'));
+          if (!host) continue;
+          const fd = _pick10(_vita10() < _vitaGoal10 * 0.7);
+          if (!fd) break;
+          const want = Math.min(200 - _vegG10(), edibilityCapFor(fd.id, 250), 200);
+          if (want < 50) continue;
+          for (const g of [want, Math.round(want * 0.6 / 10) * 10, 50]) {
+            if (g < 50) continue;
+            if (_placeVeg10(host, fd, g)) {
+              _added10++;
+              _changed.push(`${String(fd.name).toLowerCase()} ${Math.round(g / 10) * 10} г в ${String(host.label || host.type).toLowerCase()}`);
+              break;
+            }
+          }
+        }
+        if (_changed.length > 0) {
+          const _uniq = [...new Set(_changed)];
+          notes.push(`🥕 Овощи и витамин A: ${_uniq.join('; ')} — ${Math.round(_vegG10())} г овощей в дне, A ${Math.round((_vita10() / Math.max(1, _vitaGoal10)) * 100)}% цели (КБЖУ дня те же: овощ вместо части гарнира)`);
+        }
+      }
+    }
+
     // Витрина MPS должна совпадать с ФИНАЛЬНЫМ планом (санитайзеры E17/E18 меняют items).
     if (typeof _refreshMpsFromMeals === 'function') _refreshMpsFromMeals();
     // Честная строка «белок по приёмам». Раньше она печаталась ДО сборки тарелок, по
