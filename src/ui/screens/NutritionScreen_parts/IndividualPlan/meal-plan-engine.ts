@@ -1,4 +1,4 @@
-/**
+﻿/**
  * meal-plan-engine.ts — профессиональный движок генерации рациона бодибилдера.
  *
  * Принципы (на основе клинической спортивной диетологии):
@@ -12887,6 +12887,196 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
             // берётся не везде — и это видно в тексте.
             const _minMain14 = Math.min(..._withItems14().filter((mm: any) => _isMain14(mm)).map((mm: any) => _pOf14(mm)));
             notes.push(`🥩 Белок по приёмам: ${moves14.join('; ')} — те же граммы белка на день; минимум по основным приёмам ${Math.round(_minMain14)} г при пороге 0.30 г/кг (${Math.round(_need14)} г)`);
+          }
+        }
+      }
+
+      // ── QG15: жир по приёмам — ни один основной приём выше 35% жира дня ──────
+      // Замер (30 дней): ось «жир в одном приёме» 81.4, и в 9 днях из 30 есть
+      // основной приём выше 35% жира дня. Виновник в каждом дне один и тот же —
+      // завтрак с гхи 7–30 г (S2/5/тр: 34.8 г жира = 48% дня), реже обед с
+      // 23–26 г масла (S1/4/рест: 42%). Белок и углеводы этих приёмов на цели,
+      // перегруз идёт по «пустому» жиру (масло/гхи на 100% из жира).
+      // Стадия переносит граммы масла из самого жирного основного приёма в
+      // приёмы с запасом до 35%. День не меняет ни ккал, ни макросов ВООБЩЕ
+      // (тот же продукт, те же граммы, просто в другой тарелке), поэтому
+      // сходимость ухудшиться не может по построению. Окна тренировки и
+      // предсон не бывают приёмниками: жир там некуда тратить.
+      {
+        const _skip15 = !_vegFree || !!((input as any).injections && (input as any).injections.length);
+        if (!_skip15) {
+          const _isMain15 = (mm: any) => !['preworkout', 'postworkout', 'intra', 'presleep'].includes(String(mm.type));
+          const _fatOf15 = (mm: any) => Number(mm.totals?.f) || 0;
+          const _dayF15 = () => Number(totals.f) || 0;
+          const _lim15 = 0.35;
+          // Только «чистый» жир: масло, гхи, топлёное. Орехи/семечки/пасты
+          // несут белок и клетчатку — их перенос менял бы не только жир.
+          const _pureFat15 = (x: any) => {
+            if (x._fixedGrams) return false;
+            const amt = Number(x.amount) || 0;
+            if (!(amt > 0)) return false;
+            const per100 = (v: any) => ((Number(v) || 0) / amt) * 100;
+            return x.role === 'fat' && per100(x.f) >= 85 && per100(x.p) <= 2 && per100(x.c) <= 2;
+          };
+          // Приёмники: сначала обед и ужин (там масло и так уместно), потом
+          // перекусы. Завтрак — только если он не источник.
+          const _prio15 = (mm: any): number => {
+            const t = String(mm.type);
+            return t === 'dinner' ? 0 : t === 'lunch' ? 1 : t === 'snack2' ? 2 : t === 'snack' ? 3 : 4;
+          };
+          const _withItems15 = () => (meals as any[]).filter((mm: any) => ((mm.items || []) as any[]).length > 0);
+          // Снимок дня: перенос правит две тарелки — откат одной оставил бы день
+          // половинчатым (та же ловушка, что в QG12/QG13/QG14).
+          const _snapDay15 = () => ({
+            tots: { ...totals },
+            meals: (meals as any[]).map((m: any) => ({
+              m, mt: { ...(m.totals || {}) },
+              snap: ((m.items || []) as any[]).map((it: any) => ({ it, s: { ...it } })),
+            })),
+          });
+          const _restoreDay15 = (sd: any) => {
+            for (const e of sd.meals) {
+              if ((e.m.items || []).length > e.snap.length) (e.m.items as any[]).length = e.snap.length;
+              for (const it of e.snap) {
+                for (const k of Object.keys(it.it)) if (!(k in it.s)) delete it.it[k];
+                Object.assign(it.it, it.s);
+              }
+              e.m.totals = { ...e.mt };
+            }
+            Object.assign(totals, sd.tots);
+          };
+          const _t0_15 = {
+            kcal: Number(totals.kcal) || 0, p: Number(totals.p) || 0,
+            f: Number(totals.f) || 0, c: Number(totals.c) || 0,
+          };
+          // Перенос макронейтрален ПО ПОСТРОЕНИЮ: тот же продукт, те же граммы,
+          // просто в другой тарелке. Допуск нужен только на округление пункта
+          // (_scale10 округляет граммы до 0.1 и ккал до целого): проверяем «день
+          // не поехал» по энергии (1 г жира = 9 ккал), а не точное равенство.
+          const _drift15 = () => Math.max(
+            Math.abs((Number(totals.kcal) || 0) - _t0_15.kcal),
+            Math.abs((Number(totals.p) || 0) - _t0_15.p) * 4,
+            Math.abs((Number(totals.f) || 0) - _t0_15.f) * 9,
+            Math.abs((Number(totals.c) || 0) - _t0_15.c) * 4,
+          );
+          const _maxShare15 = (list: any[]) => {
+            const dayF = _dayF15();
+            if (!(dayF > 0)) return 0;
+            const mains = list.filter((mm: any) => _isMain15(mm) && ((mm.items || []) as any[]).length > 0);
+            return mains.length ? Math.max(...mains.map((mm: any) => _fatOf15(mm) / dayF)) : 0;
+          };
+          const _q15 = () => {
+            const cov = _pickCtx.qualityMode === 'full'
+              ? analyzeMicroCoverage(
+                sumMicros((meals as any[]).flatMap((m: any) => (m.items || []).map((it: any) => ({ id: it.id, amount: it.amount }))), FOOD_DB as any),
+                (input.sex || 'male') as any, input.weightKg, input.cyclePhase as any, !!input.isTrainingDay,
+                input.calciumTargetOverride, input.sodiumTargetOverride,
+              ).coverage
+              : [];
+            const lowN = cov.filter((c: any) => (c.pct || 0) < 70).length;
+            return scoreDayQuality(meals as any[], {
+              weightKg: Number(input.weightKg) || 0,
+              microCoverage: cov.length > 0 ? { lowCount: lowN, total: cov.length } : undefined,
+            });
+          };
+          const moves15: string[] = [];
+          const _q0_15 = _q15();
+          const _share0_15 = _maxShare15(meals as any[]);
+          // До трёх проходов: перегруженных основных приёмов в дне бывает два
+          // (S1/4/рест: завтрак 41% и ужин 42%), после каждого переноса максимум
+          // пересчитывается — доли остальных приёмов зависят от того же дня.
+          for (let pass = 0; pass < 3; pass++) {
+            const mains = _withItems15().filter((mm: any) => _isMain15(mm));
+            if (!mains.length) break;
+            const dayF = _dayF15();
+            if (!(dayF > 0)) break;
+            const src = mains.slice().sort((a: any, b: any) => _fatOf15(b) - _fatOf15(a))[0];
+            if (!(_fatOf15(src) / dayF > _lim15 + 0.001)) break;
+            const over = _fatOf15(src) - _lim15 * dayF;          // сколько жира лишнего
+            const srcItems = ((src.items || []) as any[]).filter(_pureFat15)
+              .sort((a: any, b: any) => (Number(b.f) || 0) - (Number(a.f) || 0));
+            if (!srcItems.length) break;
+            // Приёмники с запасом до 35%.
+            const dests = _withItems15()
+              .filter((mm: any) => mm !== src && _isMain15(mm) && _lim15 * dayF - _fatOf15(mm) >= 1)
+              .sort((a: any, b: any) => _prio15(a) - _prio15(b)
+                || (_lim15 * dayF - _fatOf15(b)) - (_lim15 * dayF - _fatOf15(a)));
+            if (!dests.length) break;
+            const sd = _snapDay15();
+            const movesAtStart = moves15.length;
+            let left = over;
+            let moved = 0;
+            for (const it of srcItems) {
+              if (left < 1) break;
+              const amt = Number(it.amount) || 0;
+              const perG = (Number(it.f) || 0) / Math.max(1, amt);
+              if (!(perG > 0)) continue;
+              const proto = { ...it };
+              // Сначала ДОГОВАРИВАЕМСЯ, куда уедет жир, и только потом режем
+              // источник: рез «на сколько просит день» терял жир в воздухе, когда
+              // приёмник места не давал.
+              // Новый пункт масла не создаём меньше «это еда» (7 г, правило QG1):
+              // «гхи 3 г» в чужой тарелке — не порция, а мусор в счёте пунктов
+              // (ось «порции» проседала ровно на таких добавках). Слияние в уже
+              // существующий пункт того же продукта — любой объём.
+              const plan15: Array<{ dn: any; take: number }> = [];
+              let rest = Math.min(Math.floor(left / perG), Math.floor(amt));
+              for (const dn of dests) {
+                if (rest < 1) break;
+                const room = Math.floor(_lim15 * dayF - _fatOf15(dn));
+                if (room < 1) continue;
+                const same = ((dn.items || []) as any[]).filter((x: any) => String(x.id) === String(proto.id))[0];
+                // Если день просит меньше «порции» (бывает 1–6 г), едем порцией
+                // 7 г: лишний грамм жира уходит из перегруженного приёма в пустой,
+                // то есть работает туда же, куда и всё остальное.
+                const take = same ? Math.min(rest, room) : Math.min(Math.max(rest, 7), room);
+                if (!same && take < 7) continue;
+                plan15.push({ dn, take });
+                rest -= take;
+              }
+              if (!plan15.length) continue;
+              const realCut = plan15.reduce((s, p) => s + p.take, 0);
+              if (realCut < 1) continue;
+              for (const p of plan15) {
+                const had = ((p.dn.items || []) as any[]).filter((x: any) => String(x.id) === String(proto.id))[0];
+                if (had) Object.assign(had, _scale10(had, (Number(had.amount) || 0) + p.take));
+                else (p.dn.items as any[]).push({ ..._scale10(proto, p.take) });
+              }
+              Object.assign(it, _scale10(it, amt - realCut));
+              if (Number(it.amount) < 7) {
+                const mm: any = src;
+                mm.items = ((mm.items || []) as any[]).filter((x: any) => x !== it);
+              }
+              // Итоги пересчитываем сразу: «комната до 35%» следующего источника
+              // считается по фактическим тарелкам, а не по устаревшим totals.
+              recalcMealTotals(meals as any[]);
+              recalcDayTotals(meals, totals);
+              left -= realCut * perG;
+              moved += realCut;
+              moves15.push(`«${String(src.type)}» ${String(proto.name || proto.id)} −${realCut} г → ${plan15.map((p) => `«${String(p.dn.type)}» +${p.take} г`).join(', ')}`);
+            }
+            recalcMealTotals(meals as any[]);
+            recalcDayTotals(meals, totals);
+            const shareNow = _maxShare15(meals as any[]);
+            // День принимаем, только если максимум реально упал и день не поехал
+            // по энергии: макронейтральность — свойство механики (тот же продукт),
+            // а допуск 6 ккал покрывает округление пункта, не больше.
+            const ok15 = moved >= 1 && shareNow < _share0_15 - 1e-6
+              && _drift15() <= 6 && _q15().total >= _q0_15.total;
+            if (!ok15) {
+              _restoreDay15(sd);
+              moves15.length = movesAtStart;   // нота не имеет права обещать откатанное
+              break;
+            }
+          }
+          if (moves15.length > 0) {
+            const _end15 = Math.round(_maxShare15(meals as any[]) * 100);
+            const _start15 = Math.round(_share0_15 * 100);
+            notes.push(
+              _end15 <= 35
+                ? `🧈 Жир по приёмам: ${moves15.join('; ')} — те же КБЖУ дня, максимум жира в основном приёме ${_end15}% (норма ≤35%)`
+                : `🧈 Жир по приёмам: ${moves15.join('; ')} — те же КБЖУ дня, доля жира в самом жирном приёме снижена с ${_start15}% до ${_end15}% (остаток — жир того же приёма, переносить больше некуда)`,
+            );
           }
         }
       }

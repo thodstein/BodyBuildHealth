@@ -1,5 +1,5 @@
 /**
- * Регрессия «пакета качества» (QG1–QG14) планировщика.
+ * Регрессия «пакета качества» (QG1–QG15) планировщика.
  *
  * Зачем: сходимость дня ≤3% ловит только КБЖУ. Жалобы шли на «съедобность»:
  * «19 г малины», «жир всего дня в одном приёме», «овощей 190 г», «в обед 12 г белка»,
@@ -29,6 +29,9 @@
  *   B12, среднее от RDA (после QG13) 57%       198% (QG13)
  *   ось «белок осн. приёма»        80.4         82.4 (QG14)
  *   дней с приёмом <0.30 г/кг      24/30        18/30 (QG14)
+ *   ось «жир в одном приёме»       81.4         93.7 (QG15)
+ *   дней с приёмом ≥36% жира дня   9/30         5/30 (QG15)
+ *   макс. доля жира (среднее)      34.9%        32.6% (QG15)
  */
 import { describe, it, expect } from 'vitest';
 import { buildDayPlan, type MealPlanInput } from '../meal-plan-engine';
@@ -562,6 +565,87 @@ describe('белок в каждом основном приёме (QG14)', () =
       manualTargetsLocked: true, kbjuMode: 'manual',
     } as unknown as MealPlanInput);
     const notes = ((manual.notes || []) as string[]).filter((n) => n.startsWith('🥩 Белок по приёмам:'));
+    expect(notes.join(' | ')).toBe('');
+  });
+});
+
+describe('жир не сваливается в один основной приём (QG15)', () => {
+  // Замер: ось «жир в одном приёме» 81.4 — худшая в пакете после микро, и в 9
+  // днях из 30 есть основной приём выше 35% жира дня. Виновник всегда один:
+  // завтрак с гхи 7–30 г (S2/5/тр: 34.8 г жира = 48% дня при норме 15) или обед
+  // с 23–26 г масла (S1/4/рест: 42%). Стадия переносит граммы масла в приёмы с
+  // запасом до 35%, поэтому день не меняет ни ккал, ни макросов — только адрес
+  // жира. Окна тренировки и предсон приёмниками не бывают: жир там некуда тратить.
+  const MAIN = ['breakfast', 'lunch', 'dinner', 'snack', 'snack2'];
+  const mains = (d: Day) => d.meals.filter((m: any) => MAIN.includes(String(m.type)));
+  const fatOf = (m: any) => Number(m?.totals?.f) || 0;
+  const shareOf = (d: Day, m: any) => (d.totF > 0 ? fatOf(m) / d.totF : 0);
+  const maxShare = (d: Day) => Math.max(...mains(d).map((m: any) => shareOf(d, m)));
+  const axis = (d: Day) => Math.max(0, Math.min(100, 100 - Math.max(0, maxShare(d) - 0.35) * (100 / 0.15)));
+  const moveNotes = (d: Day) => (d.plan.notes as string[])
+    .filter((n) => typeof n === 'string' && n.startsWith('🧈 Жир по приёмам:'));
+  const noteDays = DAYS.filter((d) => moveNotes(d).length > 0);
+
+  it('ось «жир в одном приёме» в среднем ≥ 90 (было 81.4)', () => {
+    const avg = DAYS.reduce((s, d) => s + axis(d), 0) / DAYS.length;
+    expect(Math.round(avg)).toBeGreaterThanOrEqual(90);
+  });
+
+  it('дней с явным перевесом жира в одном приёме (≥36% дня): ≤ 6 из 30 (было 9)', () => {
+    // Порог 35.5 — чтобы тест не ловил день, который округляется в «ровно 35%»:
+    // ось штрафует каждый процент сверх 35, но «перевесом» считаем явный выход.
+    const bad = DAYS.filter((d) => maxShare(d) > 0.355).map((d) => `${d.id}:${Math.round(maxShare(d) * 100)}%`);
+    expect(bad.length, `выше порога: ${bad.join(', ')}`).toBeLessThanOrEqual(6);
+  });
+
+  it('самая жирная тарелка дня в среднем ≤ 33.5% жира (было 34.9%)', () => {
+    const avg = (DAYS.reduce((s, d) => s + maxShare(d), 0) / DAYS.length) * 100;
+    expect(Math.round(avg * 10) / 10).toBeLessThanOrEqual(33.5);
+  });
+
+  it('перенос реально происходит: дней с нотой о переносе ≥ 6 (было 0)', () => {
+    expect(noteDays.map((d) => d.id).join(', ')).not.toBe('');
+    expect(noteDays.length).toBeGreaterThanOrEqual(6);
+  });
+
+  it('перенос не трогает окна тренировки и предсон', () => {
+    // Жир из пост-воркаута или в предсон — против тайминга: там ценятся белок и
+    // углеводы, а масло только размазывает калории по «пустым» приёмам.
+    const bad: string[] = [];
+    for (const d of noteDays) {
+      for (const n of moveNotes(d)) {
+        if (/«(preworkout|postworkout|intra|presleep)»/.test(n)) bad.push(`${d.id}: ${n.slice(0, 70)}`);
+      }
+    }
+    expect(bad.slice(0, 3).join(' | ')).toBe('');
+  });
+
+  it('нота не врёт: названный максимум доли жира = факт (±1 п.п.)', () => {
+    const bad: string[] = [];
+    for (const d of noteDays) {
+      const n = moveNotes(d)[0];
+      const m = n.match(/максимум жира в основном приёме (\d+)%/) || n.match(/снижена с (\d+)% до (\d+)%/);
+      const claimed = Number(m ? (m.length > 2 ? m[2] : m[1]) : NaN);
+      const fact = Math.round(maxShare(d) * 100);
+      if (!Number.isFinite(claimed) || Math.abs(claimed - fact) > 1) bad.push(`${d.id}: нота ${claimed}, факт ${fact}`);
+    }
+    expect(bad.slice(0, 5).join(' | ')).toBe('');
+  });
+
+  it('ручной режим не трогаем: в ручном дне переносов нет', () => {
+    const tgt: any = buildDayTargets({
+      weightKg: 90, presetGPerKg: 2.0, fatFloorGPerKg: 0.8, kbjuMode: 'manual',
+      goal: 'maintenance', dietStyle: 'classic',
+    } as any);
+    const manual = buildDayPlan({
+      weightKg: 90, lbmKg: 73, bodyFatPct: 19, sex: 'male',
+      goalKcal: tgt.kcal, goalProteinG: tgt.protein, goalFatG: tgt.fats, goalCarbsG: tgt.carbs,
+      mealsCount: 4, isTrainingDay: true, trainStartMin: 18 * 60, trainDurationMin: 75,
+      allowIntraWorkout: true, budget: 'medium', dayOffset: 0, cyclePhase: 'none',
+      variety: 'medium', eveningLowCarb: false, goal: 'maintenance',
+      manualTargetsLocked: true, kbjuMode: 'manual',
+    } as unknown as MealPlanInput);
+    const notes = ((manual.notes || []) as string[]).filter((n) => n.startsWith('🧈 Жир по приёмам:'));
     expect(notes.join(' | ')).toBe('');
   });
 });
