@@ -108,7 +108,7 @@ describe('хаб → CSV: как нанесена линия на видео', (
     const rows = ['time,x,y'];
     for (let i = 0; i < 20; i++) rows.push(`${(i * 0.05).toFixed(2)},${100 + i * 1.5},${50 + i * 4}`);
     // Масштаб 1: файл уже в сантиметрах после детекта мм — цифры ракурса читаемые.
-    const csv = await exportCsv({}, rows.join('\n'), '1');
+    const csv = await exportCsv({ capture: { side: 'left' } }, rows.join('\n'), '1');
     // 2.85 см горизонтали на 7.6 см хода = 37.5% — отчёт называет и число, и обе версии.
     expect(rowValue(csv, 'Горизонтальный ход штанги, % хода')).toBe('"37.5"');
     const verdict = rowValue(csv, 'Проверка ракурса');

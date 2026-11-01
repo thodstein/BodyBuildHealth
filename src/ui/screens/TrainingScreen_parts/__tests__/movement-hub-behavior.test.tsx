@@ -877,11 +877,38 @@ describe('LiftMasterCard — поведение (не только смоук)',
 
     const box = container.querySelector('[data-lift="angle-check"]')!;
     expect(box.textContent).toContain('⚠');
-    expect(box.textContent).toContain('не различить');
+    // Ракурс не указан → вердикт не выбирает трактовку за пользователя.
+    expect(box.textContent).toContain('не указан');
+    expect(box.textContent).toContain('станет однозначным');
     expect(box.textContent).toContain('«спереди/сбоку»');
     expect(container.querySelector('[data-lift="angle-drift"]')!.textContent).toContain('37.5%');
     // Перспектива не калибрована — второй цифры честно нет, а не «0%».
     expect(container.querySelector('[data-lift="angle-skew"]')).toBeNull();
+  });
+
+  it('ракурс из метаданных меняет трактовку: «сбоку» — две версии, «фронт» — уход вбок', () => {
+    const csv = ['time,x,y'];
+    for (let i = 0; i < 20; i++) csv.push(`${(i * 0.05).toFixed(2)},${100 + i * 1.5},${50 + i * 4}`);
+
+    // Сбоку: горизонталь — путь плюс возможный наклон камеры.
+    localStorage.setItem('he_lift_master_v1', JSON.stringify({ lift: 'bench', capture: { side: 'left' } }));
+    const side = render(<LiftMasterCard sessions={[]} />);
+    act(() => { fireEvent.change(side.container.querySelector('[data-lift="kinovea-text"]')!, { target: { value: csv.join('\n') } }); });
+    click(side.container.querySelector('[data-lift="parse-kinovea"]'));
+    const sideBox = side.container.querySelector('[data-lift="angle-check"]')!;
+    expect(sideBox.textContent).toContain('не перпендикулярно');
+    expect(sideBox.textContent).toContain('не различить');
+    cleanup();
+
+    // Фронт: та же цифра — уже боковой уход штанги, то есть сигнал техники.
+    localStorage.setItem('he_lift_master_v1', JSON.stringify({ lift: 'bench', capture: { side: 'front' } }));
+    const front = render(<LiftMasterCard sessions={[]} />);
+    act(() => { fireEvent.change(front.container.querySelector('[data-lift="kinovea-text"]')!, { target: { value: csv.join('\n') } }); });
+    click(front.container.querySelector('[data-lift="parse-kinovea"]'));
+    const frontBox = front.container.querySelector('[data-lift="angle-check"]')!;
+    expect(frontBox.textContent).toContain('сигнал техники');
+    expect(frontBox.textContent).not.toContain('не перпендикулярно');
+    expect(front.container.querySelector('[data-lift="angle-drift"]')!.textContent).toContain('боковой уход');
   });
 
   it('ракурс по замеру: с перспективой появляется разброс масштаба по высоте', () => {

@@ -50,7 +50,7 @@ describe('cameraAngleCheck — ракурс по замеру, без догад
   });
 
   it('горизонтальный ход выше порога → drift, и в причине ДВЕ версии без выбора', () => {
-    const r = cameraAngleCheck(path({ dxCm: 10, dyCm: 40 }))!;
+    const r = cameraAngleCheck(path({ dxCm: 10, dyCm: 40 }), { side: 'right' })!;
     expect(r.driftPct).toBe(25);
     expect(r.flag).toBe('drift');
     expect(r.reason).toContain('либо техника');
@@ -102,5 +102,52 @@ describe('cameraAngleCheck — ракурс по замеру, без догад
       expect(r.azimuthKnown).toBe(false);
       expect(r.reason).toContain('«спереди/сбоку»');
     }
+  });
+
+  it('одиночный выброс трекера не создаёт ложного «ухода»', () => {
+    const clean = path({ dxCm: 0 });
+    // Одна точка улетела на 20 см — это глюк трекера, а не уход штанги.
+    const spiked = clean.map((p, i) => (i === 15 ? { ...p, x: p.x + 20 } : p));
+    const r = cameraAngleCheck(spiked)!;
+    expect(r.driftPct).toBe(0);
+    expect(r.flag).toBe('ok');
+  });
+
+  it('выброс по вертикали не занижает уход (иначе «ok» был бы фальшивым)', () => {
+    const pts = path({ dxCm: 10, dyCm: 40 }).map((p, i) => (i === 20 ? { ...p, y: p.y + 400 } : p));
+    const r = cameraAngleCheck(pts)!;
+    expect(r.driftPct).toBe(25);
+    expect(r.flag).toBe('drift');
+  });
+
+  it('«спереди» меняет трактовку: уход = техника, а не косая камера', () => {
+    const r = cameraAngleCheck(path({ dxCm: 10, dyCm: 40 }), { side: 'front' })!;
+    expect(r.basis).toBe('front');
+    expect(r.flag).toBe('drift');
+    expect(r.reason).toContain('боковой уход');
+    expect(r.reason).toContain('сигнал техники');
+    expect(r.reason).not.toContain('не перпендикулярно');
+  });
+
+  it('«сбоку» — две версии причины без выбора', () => {
+    const r = cameraAngleCheck(path({ dxCm: 10, dyCm: 40 }), { side: 'left' })!;
+    expect(r.basis).toBe('side');
+    expect(r.reason).toContain('не перпендикулярно');
+    expect(r.reason).toContain('не различить');
+  });
+
+  it('ракурс не указан — цифра есть, трактовки нет', () => {
+    const r = cameraAngleCheck(path({ dxCm: 10, dyCm: 40 }))!;
+    expect(r.basis).toBe('unknown');
+    expect(r.driftPct).toBe(25);
+    expect(r.reason).toContain('не указан');
+    expect(r.reason).toContain('станет однозначным');
+  });
+
+  it('длинная серия (20 000 точек) не роняет стек и считается', () => {
+    const big = Array.from({ length: 20_000 }, (_, i) => ({ t: i / 60, x: 100 + i * 0.0005, y: 50 + i * 0.01 }));
+    const r = cameraAngleCheck(big)!;
+    expect(r).not.toBeNull();
+    expect(r.driftPct).toBe(5);
   });
 });

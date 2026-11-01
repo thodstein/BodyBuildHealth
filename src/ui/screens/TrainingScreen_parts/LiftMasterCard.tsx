@@ -423,7 +423,8 @@ function cleanRuleChecks(raw: unknown): Record<string, boolean> {
 }
 
 /** Параметры захвата: только известные ракурсы/устройства, числа как строки ввода. */
-function cleanCapture(raw: unknown): MasterState['capture'] {  const o = isRecord(raw) ? raw : {};
+function cleanCapture(raw: unknown): MasterState['capture'] {
+  const o = isRecord(raw) ? raw : {};
   const str = (v: unknown, max = 8) => (typeof v === 'string' ? v.slice(0, max) : '');
   const side = o.side === 'left' || o.side === 'right' || o.side === 'front' ? o.side : '';
   const device = o.device === 'kinovea' || o.device === 'enode' || o.device === 'phone' ? o.device : '';
@@ -781,13 +782,39 @@ export const LiftMasterCard: React.FC<{
   const grabPerspFrame = useCallback(async (timeSec?: number) => {
     if (!perspFile) return null;
     const el = perspVideoRef.current;
-    if (!perspSessionRef.current && el) {
+    // Сессию открываем только на уже декодированном видео: иначе каждый клик ждал бы
+    // появления данных до 8 с, а разовый путь ниже справляется сам.
+    if (!perspSessionRef.current && el && el.readyState >= 2) {
       perspSessionRef.current = await openVideoFramesFrom(el);
     }
     const session = perspSessionRef.current;
     if (session) return session.grab(timeSec);
     return grabVideoFrame(perspFile, { timeSec });
   }, [perspFile]);
+  /** Кадр по кнопке взят один раз: второй клик во время работы ничего не ломает. */
+  const perspBusyRef = useRef(false);
+  /**
+   * Захват кадра для точки — одна логика для обеих кнопок: 📷 берёт введённое время,
+   * ⤓ — позицию мини-плеера. Серия захватов не запускается параллельно: два seek
+   * подряд показывают в плеере не тот момент, который пользователь выбрал.
+   */
+  const capturePerspFrame = useCallback(async (i: number, timeSec: number) => {
+    if (!perspFile) { setPerspMsg('Сначала выберите видео.'); return; }
+    if (perspBusyRef.current) return;
+    perspBusyRef.current = true;
+    const tt = Math.round(timeSec * 100) / 100;
+    setPerspRows((rows) => rows.map((r, j) => (j === i ? { ...r, timeSec: String(tt), tap: null } : r)));
+    setPerspMsg(`⏳ Беру кадр ${i + 1} на ${tt} с…`);
+    try {
+      const frame = await grabPerspFrame(tt);
+      if (!frame) { setPerspMsg('Кадр не получился: видео не декодировалось в этом WebView.'); return; }
+      setPerspRows((rows) => rows.map((r, j) => (j === i ? { ...r, timeSec: String(tt), frame, tap: null } : r)));
+      setPerspPreview(null);
+      setPerspMsg(`Кадр ${i + 1} (${tt} с) готов — ткните в штангу.`);
+    } finally {
+      perspBusyRef.current = false;
+    }
+  }, [perspFile, grabPerspFrame]);
   /** Превью кадра и тапы: якорь (штанга на 0 с) → два конца известного отрезка. */
   const [calibFrame, setCalibFrame] = useState<{ dataUrl: string; width: number; height: number } | null>(null);
   const [calibAnchor, setCalibAnchor] = useState<{ videoX: number; videoY: number } | null>(null);
@@ -980,11 +1007,14 @@ export const LiftMasterCard: React.FC<{
   const curPersp = videoPersp[lift] ?? null;
   /**
    * Ракурс по замеру: горизонтальный ход штанги и разброс масштаба по высоте.
-   * Ракурс «спереди/сбоку» так не определяется — он остаётся в метаданных съёмки.
+   * Ракурс «спереди/сбоку» так не определяется — он берётся из метаданных съёмки
+   * и меняет трактовку горизонтали (сбоку — путь вглубь, спереди — уход вбок).
    */
   const angleCheck = useMemo(
-    () => (kinoveaResult ? cameraAngleCheck(kinoveaResult.points, { skewPct: curPersp ? perspectiveSkewPct(curPersp) : null }) : null),
-    [kinoveaResult, curPersp],
+    () => (kinoveaResult
+      ? cameraAngleCheck(kinoveaResult.points, { skewPct: curPersp ? perspectiveSkewPct(curPersp) : null, side: captureMeta.side })
+      : null),
+    [kinoveaResult, curPersp, captureMeta],
   );
   /** Подсказка времён для четырёх кадров: 5%, 35%, 65%, 95% длительности трека. */
   const perspSuggestedTimes = useMemo(() => {
@@ -2589,6 +2619,11 @@ export const LiftMasterCard: React.FC<{
                         const v = e.target.value;
                         setPerspRows((rows) => rows.map((r, j) => (j === i ? { ...r, timeSec: v, tap: null } : r)));
                         setPerspPreview(null);
+                        // Введённое время сразу показываем в плеере: кадр, который возьмём, видно глазами.
+                        const t = Number.parseFloat(v);
+                        if (Number.isFinite(t) && t >= 0 && perspVideoRef.current) {
+                          try { perspVideoRef.current.currentTime = t; } catch { /* плеер ещё не готов */ }
+                        }
                       }}
                       style={{ width:82, minHeight:44, marginLeft:4, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.15)', color:'#fff', borderRadius:8, padding:'10px 8px', fontSize:12 }}
                     />
@@ -2601,12 +2636,7 @@ export const LiftMasterCard: React.FC<{
                       const t = parseFloat(row.timeSec);
                       if (!perspFile) { setPerspMsg('Сначала выберите видео.'); return; }
                       if (!Number.isFinite(t) || t < 0) { setPerspMsg('Укажите время кадра в секундах.'); return; }
-                      setPerspMsg(`⏳ Достаю кадр ${i + 1}…`);
-                      const frame = await grabPerspFrame(t);
-                      if (!frame) { setPerspMsg('Кадр не получился: видео не декодировалось в этом WebView.'); return; }
-                      setPerspRows((rows) => rows.map((r, j) => (j === i ? { ...r, frame, tap: null } : r)));
-                      setPerspPreview(null);
-                      setPerspMsg(`Кадр ${i + 1} готов — ткните в штангу.`);
+                      await capturePerspFrame(i, t);
                     }}
                     style={{ minHeight:44, padding:'8px 12px', borderRadius:8, cursor:(perspFile && Number.isFinite(parseFloat(row.timeSec))) ? 'pointer' : 'default', background:'rgba(168,85,247,0.14)', color:'#a855f7', border:'1px solid rgba(168,85,247,0.3)', fontSize:11, fontWeight:700, opacity:(perspFile && Number.isFinite(parseFloat(row.timeSec))) ? 1 : 0.55 }}
                   >📷 Кадр</button>
@@ -2621,14 +2651,7 @@ export const LiftMasterCard: React.FC<{
                         setPerspMsg('Мини-плеер не готов: включите видео и поставьте нужный момент.');
                         return;
                       }
-                      const tt = Math.round(t * 100) / 100;
-                      setPerspRows((rows) => rows.map((r, j) => (j === i ? { ...r, timeSec: String(tt) } : r)));
-                      setPerspMsg(`⏳ Беру кадр ${i + 1} на ${tt} с…`);
-                      const frame = await grabPerspFrame(tt);
-                      if (!frame) { setPerspMsg('Кадр не получился: видео не декодировалось в этом WebView.'); return; }
-                      setPerspRows((rows) => rows.map((r, j) => (j === i ? { ...r, frame, tap: null } : r)));
-                      setPerspPreview(null);
-                      setPerspMsg(`Кадр ${i + 1} (${tt} с) готов — ткните в штангу.`);
+                      await capturePerspFrame(i, t);
                     }}
                     style={{ minHeight:44, minWidth:44, padding:'8px 10px', borderRadius:8, cursor:perspFile ? 'pointer' : 'default', background:'rgba(168,85,247,0.08)', color:'#c084fc', border:'1px solid rgba(168,85,247,0.24)', fontSize:12, fontWeight:700, opacity:perspFile ? 1 : 0.55 }}
                   >⤓</button>
@@ -2740,8 +2763,9 @@ export const LiftMasterCard: React.FC<{
               </div>
               {angleCheck && (angleCheck.driftPct != null || angleCheck.skewPct != null) && (
                 <div style={{ marginTop:4, display:'flex', gap:10, flexWrap:'wrap', fontSize:9, color:DIM }}>
-                  {angleCheck.driftPct != null && <span data-lift="angle-drift">горизонтальный ход: {angleCheck.driftPct}% хода</span>}
+                  {angleCheck.driftPct != null && <span data-lift="angle-drift">{angleCheck.basis === 'front' ? 'боковой уход' : 'горизонтальный ход'}: {angleCheck.driftPct}% хода</span>}
                   {angleCheck.skewPct != null && <span data-lift="angle-skew">разброс масштаба по высоте: {angleCheck.skewPct}%</span>}
+                  <span data-lift="angle-basis">ракурс: {angleCheck.basis === 'side' ? 'сбоку' : angleCheck.basis === 'front' ? 'спереди' : 'не указан'}</span>
                 </div>
               )}
             </div>
