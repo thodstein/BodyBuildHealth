@@ -75,16 +75,18 @@ describe('labs-apk-loader', () => {
     }
   });
 
-  it('4. АПК-фикс Sep 2026: нативный таймаут 120с (оффлайн-OCR не убивается на 30с)', async () => {
+  it('4. АПК-фикс Sep 2026: нативный таймаут 200с (оффлайн-OCR не убивается на 30с)', async () => {
     const fs = await import('fs');
     const path = await import('path');
     const src = fs.readFileSync(
       path.join(process.cwd(), 'src', 'ui', 'screens', 'LabsScreen.tsx'),
       'utf-8',
     );
-    // Нативный путь ждёт до 2 минут (первая загрузка WASM+моделей 45–90с).
-    expect(src).toContain('120000');
-    expect(src).toContain('isNativeApp() ? 120000 : 30000');
+    // Нативный путь ждёт до 200с: бюджет распознавания — 150с (старт воркера
+    // до 85с + проходы), плюс запас на медленный WebView. Таймаут UI 120с
+    // обрывал уже идущее распознавание и выглядел как «движок не запустился».
+    expect(src).toContain('200000');
+    expect(src).toContain('isNativeApp() ? 200000 : 30000');
   });
 
   it('5. АПК-фикс Sep 2026: фото идёт через dataUrlToFileAsync (без atob-OOM)', async () => {

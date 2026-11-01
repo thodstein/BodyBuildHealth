@@ -2,11 +2,14 @@
  * lab-apk-labs-purpose.test.ts — purpose='labs' в оффлайн-OCR АПК.
  *
  * Раньше АПК-ветка фото бланка всегда шла в recognizeImageTextOffline с
- * purpose='nutrition': лабовые проходы (PSM-4 плотной таблицы, английский
- * проход для латинских аббревиатур HbA1c/TSH/ALT, рейт проходов по числу
- * распознанных маркеров) не включались никогда, хотя были написаны.
- * Тест доказывает, что processUploadedFile(file, { purpose: 'labs' })
+ * purpose='nutrition': лабовые проходы (PSM-4 плотной таблицы, ранжирование
+ * проходов по числу распознанных маркеров) не включались никогда, хотя были
+ * написаны. Тест доказывает, что processUploadedFile(file, { purpose: 'labs' })
  * прогоняет лабовый пайплайн проходов, а дефолтный вызов (дневник еды) — нет.
+ *
+ * Отдельный английский воркер убран намеренно: двуязычная модель `rus+eng`
+ * читает латинские аббревиатуры (ALT/AST/HbA1c), а eng-воркер переписывал
+ * русский текст латинскими двойниками и давал ложные маркеры + лишние 10–20с.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
@@ -45,13 +48,13 @@ beforeEach(() => {
 });
 
 describe('АПК: purpose=labs включает лабовые проходы OCR', () => {
-  it('PSM-4 и английский проход выполняются только в лабовом режиме', async () => {
+  it('лабовые проходы (PSM-4/PSM-11) выполняются только в лабовом режиме', async () => {
     const file = new File(['x'.repeat(64)], 'lab-photo.jpg', { type: 'image/jpeg' });
     const result = await processUploadedFile(file, { purpose: 'labs' });
 
-    // Основной двуязычный воркер + дополнительный английский (HbA1c/TSH/ALT).
-    expect(workerLangs[0]).toBe('rus+eng');
-    expect(workerLangs).toContain('eng');
+    // Один двуязычный воркер: латинские метки читает модель rus+eng,
+    // отдельный eng-воркер не запускается (он давал мусорные маркеры).
+    expect(workerLangs).toEqual(['rus+eng']);
 
     // Блочный PSM-6 → PSM-4 плотной таблицы → PSM-11 разреженный.
     expect(psmModes).toContain('6');

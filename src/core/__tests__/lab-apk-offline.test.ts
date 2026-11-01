@@ -35,10 +35,9 @@ describe('АПК-оффлайн распознавание анализов (ф�
     const codes = result.labs.map(l => l.code);
     // Финальные коды — UCUM-канон (mapToUcumCode): креатинин → CREATININE.
     expect(codes).toEqual(expect.arrayContaining(['ALT', 'GLU', 'CREATININE']));
-    // APK WebView must load the bundled same-origin worker directly, not via
-    // Tesseract's default Blob worker (blocked on some Capacitor Android builds).
+    // APK WebView: ядро выбираем явно (plain LSTM), иначе старая SIMD-проба
+    // даёт ложное срабатывание и компиляция wasm падает.
     expect((createWorker as any).mock.calls[0][2]).toMatchObject({
-      workerBlobURL: false,
       corePath: expect.stringMatching(/\/tesseract\/core\/tesseract-core-lstm\.wasm\.js$/),
     });
   });

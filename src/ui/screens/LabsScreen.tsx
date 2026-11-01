@@ -25,7 +25,7 @@ import { LabsSchedule } from './LabsScreen_parts/LabsSchedule';
 import { LabsOverview } from './LabsScreen_parts/LabsOverview';
 import LabsCatalogTab from './LabsScreen_parts/LabsCatalogTab';
 import LabsProblemPanelsTab from './LabsScreen_parts/LabsProblemPanelsTab';
-import { processUploadedFile, saveParsedLabs, type ParsedLabValue, type OCRResult } from '../../core/ocr-engine';
+import { describeOcrFailure, processUploadedFile, saveParsedLabs, type ParsedLabValue, type OCRResult } from '../../core/ocr-engine';
 import { applyLabsSummaryToProfile } from '../../core/labs-profile-sync';
 import { getProfile, updateProfile } from '../../core/profile-manager';
 import { PopupNumber, PopupBool, PopupSelect } from '../components/PopupXxx';
@@ -218,6 +218,8 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
   const [showImport, setShowImport] = useState(false);
   const [ocrResult, setOcrResult] = useState<OCRResult | null>(null);
   const [ocrLoading, setOcrLoading] = useState(false);
+  const [ocrProgress, setOcrProgress] = useState(0);
+  const [diagCopied, setDiagCopied] = useState(false);
   const [selectedLabs, setSelectedLabs] = useState<Set<string>>(new Set());
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
@@ -606,21 +608,24 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
     }
     setOcrLoading(true);
     setOcrResult(null);
+    setOcrProgress(0);
     setSelectedLabs(new Set());
     try {
       // АПК-фикс Sep 2026: оффлайн-OCR на устройстве (WASM 3.4МБ + 2 языковые
       // модели 5.6МБ + компиляция + распознавание) на первом запуске занимает
       // 45–90с на среднем телефоне. Общий таймаут 30с убивал его всегда —
       // пользователь видел "Таймаут" и считал, что "не работает".
-      const ocrTimeoutMs = isNativeApp() ? 120000 : 30000;
-      const ocrTimeoutLabel = isNativeApp() ? '120с' : '30с';
+      // Бюджет распознавания в АПК — 150с (движок + проходы), таймаут UI
+      // должен быть больше, иначе телефон обрывает уже начатое распознавание.
+      const ocrTimeoutMs = isNativeApp() ? 200000 : 30000;
+      const ocrTimeoutLabel = isNativeApp() ? '200с' : '30с';
       // purpose: 'labs' — включает лабовые проходы оффлайн-OCR фото в АПК
       // (PSM-4 плотной таблицы, английский проход для латинских аббревиатур
       // HbA1c/TSH/ALT, выбор прохода по числу распознанных маркеров) и
       // повышенное разрешение кадра. Дневник еды продолжает использовать
       // дефолтный 'nutrition'-режим.
       const result: any = await Promise.race([
-        processUploadedFile(file, { purpose: 'labs' }),
+        processUploadedFile(file, { purpose: 'labs', onProgress: (p) => setOcrProgress(p) }),
         new Promise((_, rej) => setTimeout(() => rej(new Error(`Таймаут обработки файла (${ocrTimeoutLabel}). На телефоне первое распознавание может занять до 2 минут — попробуйте ещё раз (модели уже закэшированы).`)), ocrTimeoutMs)),
       ]);
       if (requestId !== ocrRequestRef.current) return;
@@ -632,6 +637,31 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
     }
     if (requestId === ocrRequestRef.current) setOcrLoading(false);
   }, []);
+
+  // Диагностика нераспознавания: показывает, читаются ли встроенные файлы OCR
+  // и на каком этапе всё упало. Без неё «движок OCR не запустился» с телефона
+  // не отличить от «нет сети» / «битая сборка».
+  const copyOcrDiagnostics = useCallback(async () => {
+    const firstWarning = ocrResult?.warnings?.[0] || '';
+    let text = '';
+    try { text = await describeOcrFailure(firstWarning); } catch (e) { text = `diag failed: ${(e as Error)?.message || String(e)}`; }
+    try {
+      if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(text);
+      else throw new Error('clipboard api unavailable');
+    } catch {
+      try {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0;';
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+      } catch { /* ignore */ }
+    }
+    setDiagCopied(true);
+    setTimeout(() => setDiagCopied(false), 2500);
+  }, [ocrResult]);
 
   const confirmOcrLabs = useCallback(async () => {
     if (!ocrResult) return;
@@ -2259,9 +2289,19 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
             </div>
             <div style={{ flex:1, overflowY:'auto', padding:'14px 16px calc(16px + env(safe-area-inset-bottom,0px))', maxHeight:'72vh' }}>
               {ocrLoading && (
-                <div style={{ textAlign:'center', padding:40 }}>
+                <div style={{ textAlign:'center', padding:40 }} role="status" aria-live="polite">
                   <div className="loading-spinner" style={{ margin:'0 auto 16px' }} />
-                  <div style={{ fontSize:13, color:'#fff' }}>Распознаю документ...</div>
+                  <div style={{ fontSize:13, color:'#fff' }}>
+                    Распознаю документ...{ocrProgress > 0 ? ` ${Math.round(ocrProgress * 100)}%` : ''}
+                  </div>
+                  {/* Первый запуск в АПК компилирует wasm и грузит модели —
+                      без прогресса это выглядит как зависшее приложение. */}
+                  <div style={{ width:'100%', maxWidth:260, height:6, borderRadius:999, background:'rgba(255,255,255,0.12)', margin:'12px auto 0', overflow:'hidden' }}>
+                    <div style={{ width:`${Math.max(4, Math.round(ocrProgress * 100))}%`, height:'100%', borderRadius:999, background:'var(--accent, #00e68a)', transition:'width 0.3s ease' }} />
+                  </div>
+                  <div style={{ fontSize:11, color:'#fff', opacity:0.7, marginTop:10 }}>
+                    {ocrProgress > 0 ? 'Распознавание на устройстве…' : 'Готовлю движок OCR (первый раз дольше)…'}
+                  </div>
                 </div>
               )}
               {!ocrLoading && !ocrResult && (
@@ -2314,6 +2354,15 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                   {ocrResult.warnings.length > 0 && (
                     <div role="alert" style={{ marginBottom: 8, padding: '8px 10px', borderRadius: 8, background: 'rgba(245,158,11,0.10)', border: '1px solid rgba(245,158,11,0.28)', color: '#f59e0b', fontSize: 11, lineHeight: 1.4 }}>
                       {ocrResult.warnings.map((warning, index) => <div key={`${index}-${warning}`}>⚠ {warning}</div>)}
+                      {ocrResult.labs.length === 0 && (
+                        <button
+                          type="button"
+                          onClick={() => void copyOcrDiagnostics()}
+                          style={{ marginTop: 8, padding: '8px 10px', borderRadius: 8, border: '1px solid rgba(245,158,11,0.35)', background: 'rgba(245,158,11,0.12)', color: '#f59e0b', fontWeight: 700, fontSize: 11, cursor: 'pointer', minHeight: 40, width: '100%' }}
+                        >
+                          {diagCopied ? '✅ Диагностика скопирована' : '📋 Скопировать диагностику (для поддержки)'}
+                        </button>
+                      )}
                     </div>
                   )}
                   {ocrResult.labs.length === 0 && ocrResult.text.trim().length > 0 && (

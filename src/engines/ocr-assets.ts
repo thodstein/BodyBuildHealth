@@ -172,6 +172,120 @@ export async function resolveTesseractOptions(): Promise<{
   return { workerPath: cdn.workerPath, corePath: cdn.corePath, langPath: cdn.langPath, source: 'cdn' };
 }
 
+/** Одна попытка поднять воркер tesseract. */
+export interface OcrWorkerAttempt {
+  /** Метка для диагностики/логов («local-direct», «local-blob», «cdn-blob»). */
+  label: string;
+  workerPath: string;
+  corePath: string;
+  langPath?: string;
+  source: 'local' | 'cdn';
+  /** true — воркер создаётся из Blob (importScripts), false — напрямую по URL. */
+  blobWorker: boolean;
+}
+
+/**
+ * Упорядоченный список попыток запуска воркера.
+ *
+ * Порядок важен: локальные ассеты лежат в APK/dist и не требуют сети, поэтому
+ * пробуем их ПЕРВЫМИ и без предварительного HEAD-проба (WebView умеет отвечать
+ * ошибкой на HEAD, хотя сам файл читается). CDN — только последняя попытка и
+ * только когда устройство в сети: в офлайне он гарантированно даёт
+ * «Failed to fetch», который пользователь видит как «нет соединения».
+ *
+ * В АПК дополнительно перебираем два механизма создания воркера: прямой URL
+ * (работает в Capacitor WebView) и Blob-обёртка (обходной путь, если WebView
+ * отказывается грузить скрипт воркера из перехваченного `https://localhost`).
+ */
+export function tesseractWorkerAttempts(opts?: {
+  nativeLike?: boolean;
+  online?: boolean;
+}): OcrWorkerAttempt[] {
+  const nativeLike = opts?.nativeLike === true;
+  const online = opts?.online !== false;
+  const local = getOcrAssetPaths('local');
+  const cdn = getOcrAssetPaths('cdn');
+  // В APK ядро выбираем явно (-lstm): SIMD-проба на старых WebView даёт
+  // ложное срабатывание, после которого падает компиляция wasm.
+  const nativeCore = (corePath: string) => `${corePath.replace(/\/$/, '')}/tesseract-core-lstm.wasm.js`;
+  const list: OcrWorkerAttempt[] = [];
+  if (nativeLike) {
+    // Blob-воркер первым: это штатный механизм tesseract.js (он же работает в
+    // десктопном Chromium), и он не зависит от того, как WebView отдаёт скрипт
+    // воркера по абсолютному `https://localhost`-URL.
+    list.push({
+      label: 'local-blob',
+      workerPath: local.workerPath,
+      corePath: nativeCore(local.corePath),
+      langPath: local.langPath,
+      source: 'local',
+      blobWorker: true,
+    });
+    list.push({
+      label: 'local-direct',
+      workerPath: local.workerPath,
+      corePath: nativeCore(local.corePath),
+      langPath: local.langPath,
+      source: 'local',
+      blobWorker: false,
+    });
+  } else {
+    list.push({
+      label: 'local-blob',
+      workerPath: local.workerPath,
+      corePath: local.corePath,
+      langPath: local.langPath,
+      source: 'local',
+      blobWorker: true,
+    });
+  }
+  if (online) {
+    list.push({
+      label: 'cdn-blob',
+      workerPath: cdn.workerPath,
+      corePath: cdn.corePath,
+      langPath: cdn.langPath,
+      source: 'cdn',
+      blobWorker: true,
+    });
+  }
+  return list;
+}
+
+/** Результат проверки одного ассета OCR (для экрана диагностики). */
+export interface OcrAssetProbe {
+  url: string;
+  ok: boolean;
+  status: number | null;
+  error?: string;
+}
+
+/** Проверить, читаются ли ассеты OCR по текущим путям. Никогда не бросает. */
+export async function probeOcrAssets(): Promise<OcrAssetProbe[]> {
+  const local = getOcrAssetPaths('local');
+  const base = local.corePath.replace(/\/$/, '');
+  const lang = (local.langPath || '').replace(/\/$/, '');
+  const urls = [
+    local.workerPath,
+    `${base}/tesseract-core-lstm.wasm.js`,
+    `${base}/tesseract-core-lstm.wasm`,
+    lang ? `${lang}/rus.traineddata.gz` : '',
+    lang ? `${lang}/eng.traineddata.gz` : '',
+  ].filter(Boolean);
+  const out: OcrAssetProbe[] = [];
+  for (const url of urls) {
+    try {
+      const res = await fetch(url, { method: 'GET', cache: 'no-store' });
+      // Тело не читаем: достаточно статуса и того, что запрос не заблокирован.
+      out.push({ url, ok: res.ok, status: res.status });
+      try { await res.body?.cancel(); } catch { /* ignore */ }
+    } catch (e) {
+      out.push({ url, ok: false, status: null, error: (e as Error)?.message || String(e) });
+    }
+  }
+  return out;
+}
+
 /**
  * Resolve pdfjs worker src with automatic CDN fallback.
  */

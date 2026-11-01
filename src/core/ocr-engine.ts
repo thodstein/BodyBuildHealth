@@ -512,6 +512,107 @@ async function serverOcrImage(file: File): Promise<{ text: string; meals?: Parse
   throw new Error(`Серверный OCR недоступен. ${errors.join(' · ')}`);
 }
 
+/** Последняя ошибка запуска воркера — для экрана диагностики. */
+let lastOcrBootError = '';
+/** Механизм, на котором воркер поднялся (диагностика). */
+let lastOcrWorkerSource = '';
+
+/** Диагностика офлайн-OCR: что именно не читается в текущей сборке. */
+export async function describeOcrFailure(error?: unknown): Promise<string> {
+  const lines: string[] = [];
+  try {
+    const { isNativeApp } = await import('./app-platform');
+    lines.push(`platform: ${isNativeApp() ? 'native' : 'web'} | online: ${typeof navigator === 'undefined' ? '?' : navigator.onLine ? 'yes' : 'no'}`);
+  } catch { /* ignore */ }
+  try { lines.push(`ua: ${typeof navigator !== 'undefined' ? navigator.userAgent : '?'}`); } catch { /* ignore */ }
+  try {
+    lines.push(`location: ${typeof location !== 'undefined' ? location.href : '?'}`);
+  } catch { /* ignore */ }
+  try {
+    const { probeOcrAssets } = await import('../engines/ocr-assets');
+    const probes = await probeOcrAssets();
+    for (const p of probes) {
+      lines.push(`asset ${p.ok ? 'OK' : 'FAIL'} ${p.status ?? '-'} ${p.url}${p.error ? ` (${p.error})` : ''}`);
+    }
+  } catch (e) {
+    lines.push(`asset probe failed: ${(e as Error)?.message || String(e)}`);
+  }
+  const msg = error instanceof Error ? error.message : error ? String(error) : '';
+  if (msg) lines.push(`error: ${msg}`);
+  if (lastOcrWorkerSource) lines.push(`worker: ${lastOcrWorkerSource}`);
+  if (lastOcrBootError && lastOcrBootError !== msg) lines.push(`boot: ${lastOcrBootError}`);
+  return lines.join('\n');
+}
+
+/**
+ * Поднять воркер Tesseract по списку попыток (локальные ассеты → CDN).
+ *
+ * Раньше здесь была одна попытка «local-or-CDN» без запаса по времени:
+ * на первом запуске в АПК компиляция wasm (3.4 МБ) и загрузка двух языковых
+ * моделей (5.6 МБ) занимают десятки секунд, таймаут 45с срабатывал, и все
+ * три языковых повтора стартовали воркер заново — приложение гарантированно
+ * показывало «движок OCR не запустился», хотя ассеты на месте.
+ */
+async function openOcrWorker(
+  Tesseract: any,
+  cfg: { nativeApp: boolean; budgetMs: number; logger: (m: any) => void },
+): Promise<{ worker: any; used: { workerPath: string; corePath: string; langPath?: string; blobWorker: boolean } }> {
+  const { tesseractWorkerAttempts } = await import('../engines/ocr-assets');
+  const online = typeof navigator === 'undefined' ? true : navigator.onLine !== false;
+  const attempts = tesseractWorkerAttempts({ nativeLike: cfg.nativeApp, online });
+  const deadline = Date.now() + cfg.budgetMs;
+  const errors: string[] = [];
+  const withTimeout = <T>(p: Promise<T>, ms: number, label: string): Promise<T> => Promise.race([
+    p,
+    new Promise<T>((_, reject) => setTimeout(() => reject(new Error(`${label}: таймаут ${Math.round(ms / 1000)}с`)), ms)),
+  ]);
+  for (let i = 0; i < attempts.length; i++) {
+    const a = attempts[i];
+    const left = deadline - Date.now();
+    // На повторный механизм нужно хотя бы 15с, иначе это только задержка.
+    if (left < 15_000) { errors.push(`${a.label}: пропущено (бюджет времени)`); break; }
+    // Первая попытка забирает почти всё окно: именно она платит за компиляцию.
+    const perAttempt = i === 0 ? left : Math.min(left, 45_000);
+    // Двуязычная модель — основная; одиночная русская — только если первая
+    // упала БЫСТРО (битый/недоступный traineddata), а не по таймауту.
+    const langs = ['rus+eng', 'rus'];
+    let mechanismDead = false;
+    for (let li = 0; li < langs.length; li++) {
+      const leftForLang = deadline - Date.now();
+      if (li > 0 && leftForLang < 20_000) break;
+      const timeout = li === 0 ? perAttempt : Math.min(45_000, leftForLang);
+      const startedAt = Date.now();
+      try {
+        const worker = await withTimeout(
+          Tesseract.createWorker(langs[li], 1, {
+            workerPath: a.workerPath,
+            corePath: a.corePath,
+            ...(a.langPath ? { langPath: a.langPath } : {}),
+            workerBlobURL: a.blobWorker,
+            logger: cfg.logger,
+          }),
+          timeout,
+          `${a.label}/${langs[li]}`,
+        );
+        const used = { workerPath: a.workerPath, corePath: a.corePath, langPath: a.langPath, blobWorker: a.blobWorker };
+        return { worker, used };
+      } catch (e) {
+        const took = Date.now() - startedAt;
+        const msg = (e as Error)?.message || String(e);
+        errors.push(`${a.label}/${langs[li]}: ${msg}`);
+        // Долгий отказ = медленное устройство/большая модель. Менять механизм
+        // бессмысленно: следующая попытка снова начнёт с нуля и снова не успеет.
+        if (took > 20_000) { mechanismDead = true; break; }
+        // Ошибка загрузки самого воркера/ядра — повтор с другим языком заведомо
+        // даст тот же результат: сразу переходим к следующему механизму.
+        if (/worker|importScripts|failed to fetch|network|404|not found|script/i.test(msg)) break;
+      }
+    }
+    if (mechanismDead) break;
+  }
+  throw new Error(errors.join(' · ') || 'нет доступного механизма запуска OCR');
+}
+
 /**
  * Оффлайн-распознавание фото/скриншота еды (АПК и нет сети): локальный
  * tesseract.js rus+eng, ассеты из бандла (/tesseract, sync-ocr-assets) —
@@ -530,18 +631,12 @@ export async function recognizeImageTextOffline(
   onProgress?: (fraction: number) => void,
   purpose: 'labs' | 'nutrition' = 'nutrition',
 ): Promise<string> {
+  const fnStart = Date.now();
   const report = (fraction: number) => {
     try {
       onProgress?.(Math.max(0, Math.min(1, Number.isFinite(fraction) ? fraction : 0)));
     } catch { /* ignore */ }
   };
-  let opts: { workerPath: string; corePath: string; langPath?: string };
-  try {
-    const { resolveTesseractOptions } = await import('../engines/ocr-assets');
-    opts = await resolveTesseractOptions();
-  } catch (e) {
-    throw new Error(`движок OCR не настроился: ${(e as Error)?.message || String(e)}`);
-  }
   let Tesseract: any;
   try {
     Tesseract = await import('tesseract.js') as any;
@@ -568,48 +663,24 @@ export async function recognizeImageTextOffline(
   let worker: any;
   try {
     const nativeApp = isNativeApp();
-    // Older Android System WebViews can advertise SIMD support but fail while
-    // compiling Tesseract's SIMD/relaxed-SIMD core. The generic corePath makes
-    // Tesseract choose that variant at runtime. APK assets include the plain
-    // LSTM core too; selecting it explicitly avoids that false-positive probe
-    // and keeps offline recognition independent from CDN fallback.
-    const corePath = nativeApp
-      ? `${opts.corePath.replace(/\/$/, '')}/tesseract-core-lstm.wasm.js`
-      : opts.corePath;
-    const createWorkerWithLang = async (lang: string) => Tesseract.createWorker(lang, 1, {
-      workerPath: opts.workerPath,
-      corePath,
-      ...(opts.langPath ? { langPath: opts.langPath } : {}),
-      workerBlobURL: !nativeApp,
+    // Бюджет на запуск воркера: на первом запуске в АПК это компиляция wasm
+    // (3.4 МБ) + загрузка двух языковых моделей (5.6 МБ). Дальше модели уже
+    // в кэше IndexedDB, и тот же путь проходится за секунды.
+    const bootBudgetMs = Math.min(Math.max(Math.round(timeoutMs * 0.55), 45_000), 85_000);
+    const boot = await openOcrWorker(Tesseract, {
+      nativeApp,
+      budgetMs: bootBudgetMs,
       logger: (m: any) => {
         if (m?.status === 'recognizing text' && typeof m?.progress === 'number') {
           report(progressWindow.base + progressWindow.span * m.progress);
         }
       },
     });
-    // Создание воркера тоже под таймаутом: зависший createWorker (битый
-    // traineddata / недогруженное ядро) иначе подвешивает всю функцию,
-    // и в UI остаётся вечная «загрузка» без ошибки.
-    const withWorkerTimeout = <T>(p: Promise<T>): Promise<T> => Promise.race([
-      p,
-      new Promise<T>((_, reject) =>
-        setTimeout(() => reject(new Error('воркер OCR не поднялся за 45с')), 45_000)),
-    ]);
-    // Сначала пробуем двуязычную модель (рус+англ): бланки содержат
-    // русские названия и латинские аббревиатуры. Если она не поднялась
-    // (например, повреждён один из traineddata), честно падаем на один
-    // язык, чтобы не терять распознавание целиком.
-    try {
-      worker = await withWorkerTimeout(createWorkerWithLang('rus+eng'));
-    } catch {
-      try {
-        worker = await withWorkerTimeout(createWorkerWithLang('rus'));
-      } catch {
-        worker = await withWorkerTimeout(createWorkerWithLang('eng'));
-      }
-    }
+    worker = boot.worker;
+    lastOcrWorkerSource = `${boot.used.blobWorker ? 'blob' : 'direct'} ${boot.used.workerPath}`;
   } catch (e) {
-    throw new Error(`движок OCR не запустился (worker/core/lang): ${(e as Error)?.message || String(e)}`);
+    lastOcrBootError = (e as Error)?.message || String(e);
+    throw new Error(`движок OCR не запустился (worker/core/lang): ${lastOcrBootError}`);
   }
   try {
     const { scoreOcrText, isGoodOcrText, isCompleteOcrText, isNutritionDiaryOcrText, pickBestOcrText, hasMacroLabels } = await import('../engines/ocr-preprocess');
@@ -627,14 +698,22 @@ export async function recognizeImageTextOffline(
     const run: Promise<string> = (async () => {
       const blockTexts: string[] = [];
       const startedAt = Date.now();
+      // Остаток общего бюджета распознавания. Опциональные проходы (PSM-4,
+      // отдельный английский воркер, PSM-11) выполняются только если на них
+      // реально хватает времени: иначе телефон упирался в таймаут UI.
+      const recDeadline = Date.now() + Math.max(20_000, timeoutMs - (Date.now() - fnStart));
+      const timeLeft = () => recDeadline - Date.now();
       // Бюджет nutrition-проходов по вариантам кадра: остаток времени
       // резервируем разреженному проходу, чтобы уложиться в timeoutMs.
       const nutritionBudgetMs = Math.max(15_000, Math.min(timeoutMs * 0.55, 55_000));
-      const perPass = 0.85 / Math.max(1, inputs.length);
-      for (let i = 0; i < inputs.length; i++) {
+      // Лабам хватает двух вариантов кадра (серый + инверсия/контраст):
+      // каждый дополнительный проход — это +10–20с на телефоне.
+      const passInputs = purpose === 'labs' ? inputs.slice(0, 2) : inputs;
+      const perPass = 0.85 / Math.max(1, passInputs.length);
+      for (let i = 0; i < passInputs.length; i++) {
         progressWindow.base = i * perPass;
         progressWindow.span = perPass;
-        const text = String((await worker.recognize(inputs[i].blob))?.data?.text || '');
+        const text = String((await worker.recognize(passInputs[i].blob))?.data?.text || '');
         blockTexts.push(text);
         report((i + 1) * perPass);
         if (purpose === 'labs') {
@@ -668,51 +747,35 @@ export async function recognizeImageTextOffline(
       }
       // PSM-4 (одна колонка) часто лучше PSM-6 для плотных таблиц бланков:
       // пробуем, если блочный проход дал мало маркеров.
-      if (purpose === 'labs' && labOcrCandidateQuality(best).labCount < 10) {
+      if (purpose === 'labs' && labOcrCandidateQuality(best).labCount < 10 && timeLeft() > 30_000) {
         try {
           await setPsm('4' as any);
           progressWindow.base = 0.82;
           progressWindow.span = 0.03;
-          const psm4Text = String((await worker.recognize(inputs[0].blob))?.data?.text || '');
+          const psm4Text = String((await worker.recognize(passInputs[0].blob))?.data?.text || '');
           if (psm4Text.trim() && labOcrCandidateQuality(`${best}\n${psm4Text}`).score > labOcrCandidateQuality(best).score) {
             best = `${best}\n${psm4Text}`;
           }
         } catch { /* PSM-4 опционален */ }
       }
-      // Лабораторные бланки содержат латинские аббревиатуры (HbA1c, TSH,
-      // ALT, HDL …), которые русская модель читает как мусор. Дополнительный
-      // английский проход по лучшему кадру возвращает ровно эти метки; мы
-      // склеиваем тексты, а парсеры ниже дедуплицируют маркеры по коду.
-      if (purpose === 'labs') {
-        try {
-          const { resolveTesseractOptions, tesseractWorkerOptions } = await import('../engines/ocr-assets');
-          const o = await resolveTesseractOptions();
-          const engWorker = await Tesseract.createWorker('eng', 1, tesseractWorkerOptions(o));
-          try {
-            if (typeof engWorker.setParameters === 'function') {
-              await engWorker.setParameters({
-                tessedit_pageseg_mode: '6',
-                preserve_interword_spaces: '1',
-                user_defined_dpi: '220',
-              });
-            }
-            const engText = String((await engWorker.recognize(inputs[0].blob))?.data?.text || '');
-            if (engText.trim()) {
-              const combined = `${best}\n${engText}`;
-              if (labOcrCandidateQuality(combined).score > labOcrCandidateQuality(best).score) best = combined;
-            }
-          } finally {
-            try { await engWorker.terminate(); } catch { /* ignore */ }
-          }
-        } catch { /* английский проход опционален */ }
-      }
+      // Латинские аббревиатуры (ALT, AST, HbA1c, TSH) двуязычная модель
+      // `rus+eng` читает корректно — отдельный английский проход не нужен.
+      // Проверено на реальном бланке Хеликс: eng-воркер переписывал русский
+      // текст латинскими двойниками («АЛТ» → «ANT», «Тестостерон общий» →
+      // «TecTocTepoH obLumii»), склейка давала ложные маркеры (HGB 4 г/л,
+      // ANION_GAP 120) и стоила ещё ~10–20с на телефоне.
       // FatSecret Android uses right-aligned macro columns. A sparse-text pass
       // recovers rows that PSM 6 commonly drops, especially on narrow screens.
       // Только когда блочный проход дал мало — иначе это лишний полный проход.
+      // И только если на проход реально осталось время.
+      if (timeLeft() < 12_000) {
+        report(1);
+        return best;
+      }
       await setPsm('11');
       progressWindow.base = 0.85;
       progressWindow.span = 0.15;
-      const sparseText = String((await worker.recognize(inputs[0].blob))?.data?.text || '');
+      const sparseText = String((await worker.recognize(passInputs[0].blob))?.data?.text || '');
       report(1);
       if (purpose === 'labs') {
         if (labOcrCandidateQuality(sparseText).score > labOcrCandidateQuality(best).score) return sparseText;
@@ -855,7 +918,11 @@ export async function processUploadedFile(
       // локальный результат сразу, без 70 секунд ожидания двух таймаутов.
       if (isNativeApp()) {
         try {
-          const offlineText = await recognizeImageTextOffline(file, 90_000, opts?.onProgress, opts?.purpose ?? 'nutrition');
+          // Бюджет АПК: первый запуск платит за компиляцию wasm и языковые
+          // модели; на повторных прогонах модели уже в кэше. Лабы гоняют
+          // несколько проходов, поэтому им нужен запас больше.
+          const offlineBudgetMs = opts?.purpose === 'labs' ? 150_000 : 120_000;
+          const offlineText = await recognizeImageTextOffline(file, offlineBudgetMs, opts?.onProgress, opts?.purpose ?? 'nutrition');
           if (offlineText.trim().length > 2) {
             warnings.push('Фото распознано оффлайн на устройстве (АПК-режим).');
             serverResult = { text: offlineText };
