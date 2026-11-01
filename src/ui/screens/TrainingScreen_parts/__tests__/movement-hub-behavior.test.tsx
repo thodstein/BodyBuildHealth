@@ -983,6 +983,9 @@ describe('LiftMasterCard — поведение (не только смоук)',
     expect(container.querySelector('[data-lift="ref-no-video"]')).toBeTruthy();
     expect(container.querySelector('[data-lift="ref-frame"]')).toBeNull();
     expect(container.querySelector('[data-lift="ref-result"]')).toBeNull();
+    expect(container.querySelector('[data-lift="ref-xloop-fix"]')).toBeNull();
+    // Кадра калибровки ещё нет — за основу его взять неоткуда.
+    expect(container.querySelector('[data-lift="ref-grab-calib"]')).toBeNull();
     click(container.querySelector('[data-lift="ref-grab"]'));
     expect(container.querySelector('[data-lift="ref-msg"]')!.textContent).toContain('Сначала выберите видео');
     // Длина эталона — ввод пользователя и она персистится вместе с замером.
@@ -1036,6 +1039,44 @@ describe('LiftMasterCard — поведение (не только смоук)',
     expect(container.querySelector('[data-lift="ref-saved"]')).toBeNull();
     expect(container.querySelector('[data-lift="angle-azimuth"]')).toBeNull();
     expect(container.querySelector('[data-lift="angle-basis"]')!.textContent).not.toContain('(измерено)');
+  });
+
+  it('эталон в кадре: поправка горизонтали названа и не подменяет измеренный xLoop', () => {
+    const csv = ['time,x,y'];
+    for (let i = 0; i < 20; i++) csv.push(`${(i * 0.05).toFixed(2)},${100 + i * 1.5},${50 + i * 4}`);
+    localStorage.setItem(MASTER_KEY, JSON.stringify({
+      lift: 'bench',
+      // 25°: cos φ = 0.906 — поправка +10.4%, точность ±0.7% при эталоне 300 px.
+      refAngle: { bench: { azimuthDeg: 25, ratio: 0.906, lengthCm: 131, atSec: null, spanPx: 300 } },
+    }));
+    const { container } = render(<LiftMasterCard sessions={[]} />);
+    act(() => { fireEvent.change(container.querySelector('[data-lift="kinovea-text"]')!, { target: { value: csv.join('\n') } }); });
+    click(container.querySelector('[data-lift="parse-kinovea"]'));
+
+    const fix = container.querySelector('[data-lift="ref-xloop-fix"]')!;
+    expect(fix.textContent).toContain('xLoop с поправкой на ракурс');
+    expect(fix.textContent).toContain('поправка +10.4%');
+    expect(fix.textContent).toContain('точность ±0.7%');
+    // Подмена измерения оценкой запрещена: это сказано прямо под числом.
+    expect(fix.textContent).toContain('Оценка для сравнения сессий');
+    // Измеренный xLoop остаётся в блоке разбора — поправка живёт рядом, а не вместо.
+    expect(container.querySelector('[data-lift="kinovea-msg"]')!.textContent).toContain('xLoop');
+  });
+
+  it('эталон в кадре: почти спереди поправка отклонена, а не удвоена', () => {
+    const csv = ['time,x,y'];
+    for (let i = 0; i < 20; i++) csv.push(`${(i * 0.05).toFixed(2)},${100 + i * 1.5},${50 + i * 4}`);
+    localStorage.setItem(MASTER_KEY, JSON.stringify({
+      lift: 'bench',
+      refAngle: { bench: { azimuthDeg: 60, ratio: 0.5, lengthCm: 131, atSec: null, spanPx: 300 } },
+    }));
+    const { container } = render(<LiftMasterCard sessions={[]} />);
+    act(() => { fireEvent.change(container.querySelector('[data-lift="kinovea-text"]')!, { target: { value: csv.join('\n') } }); });
+    click(container.querySelector('[data-lift="parse-kinovea"]'));
+
+    const fix = container.querySelector('[data-lift="ref-xloop-fix"]')!;
+    expect(fix.textContent).toContain('не исправляется');
+    expect(fix.textContent).not.toContain('xLoop с поправкой');
   });
 
   it('интерактивные элементы хаба не меньше 44 px', () => {

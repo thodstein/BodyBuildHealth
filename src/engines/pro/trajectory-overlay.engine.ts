@@ -577,6 +577,8 @@ export interface ReferenceAngleResult {
   flag: 'ok' | 'unknown';
   /** Пикселей на сантиметр, по которым считалось (для отчёта). */
   pxPerCm: number;
+  /** Наблюдаемая длина отрезка в пикселях кадра: задаёт точность замера (±тап/длина). */
+  spanPx: number;
   reason: string;
 }
 
@@ -607,6 +609,7 @@ export function referenceAngleCheck(
     expectedCm: lengthCm,
     ratio: 0,
     pxPerCm: Number.isFinite(pxPerCm) ? (pxPerCm as number) : 0,
+    spanPx: Number.isFinite(dPx) ? Math.round(dPx * 10) / 10 : 0,
   };
   if (!Number.isFinite(pxPerCm) || !((pxPerCm as number) > 0.05 && (pxPerCm as number) < 200)) {
     return {
@@ -650,6 +653,101 @@ export function referenceAngleCheck(
     flag: 'ok',
     azimuthDeg: deg,
     reason: `${reason} Направление «слева/справа» по одному кадру не определяется — эталон даёт только угол к плоскости.`,
+  };
+}
+
+/**
+ * Вход поправки горизонтали: достаточно результата замера эталона или его
+ * сохранённой копии (`ratio` — это и есть cos φ).
+ */
+export interface HorizontalFixInput {
+  /** observed / expected из замера эталона (cos φ). */
+  ratio: number;
+  /** Отклонение камеры от плоскости движения, град. */
+  azimuthDeg: number | null;
+  /** Наблюдаемая длина эталона в кадре, px: от неё зависит точность поправки. */
+  spanPx?: number | null;
+}
+
+export interface ReferenceHCorrection {
+  /** Значение с поправкой, см; null — поправлять нечем или нельзя. */
+  correctedCm: number | null;
+  /** Сколько прибавилось к измеренному, %. */
+  pct: number | null;
+  /** Точность поправки, % (± из точности тапа по эталону); null — не оценить. */
+  errPct: number | null;
+  flag: 'ok' | 'negligible' | 'refused' | 'unknown';
+  reason: string;
+}
+
+/** Дальше 40° поправка > 30% и умножает ошибку тапа — честнее переснять, чем «исправлять». */
+const REF_FIX_MAX_AZ = 40;
+/** Одно нажатие по кадру ≈ ±1.5 px; два конца дают √2·1.5. */
+const REF_TAP_PX = 1.5;
+
+/**
+ * Поправка горизонтальной метрики (xLoop, боковое смещение) на измеренный ракурс.
+ *
+ * Физика: при повороте камеры вокруг вертикали на φ горизонтальные расстояния в
+ * кадре сжимаются в cos φ раз, вертикальные — нет. Значит истинная горизонталь
+ * = измеренная / cos φ = измеренная / ratio. Это ровно то же число, что «потеря
+ * горизонтали» в вердикте, только в обратную сторону.
+ *
+ * Что важно про честность: поправка **не** делает плохую съёмку хорошей. Она
+ * переносит измерение в плоскость движения с погрешностью из точности тапа и с
+ * допущением, что эталон лежал ровно поперёк движения в плоскости штанги.
+ * Поэтому: при поправке меньше точности тапа она не применяется (`negligible`),
+ * за 40° не применяется вообще (`refused`), и везде это оценка, а не замена съёмке.
+ */
+export function referenceHorizontalCorrection(
+  valueCm: number | null | undefined,
+  ref: HorizontalFixInput | null | undefined,
+  opts?: { tapPx?: number; maxAzimuthDeg?: number },
+): ReferenceHCorrection {
+  if (valueCm == null || !Number.isFinite(valueCm) || valueCm <= 0) {
+    return {
+      correctedCm: null, pct: null, errPct: null, flag: 'unknown',
+      reason: 'Горизонтальной метрики нет — поправлять нечего.',
+    };
+  }
+  const ratio = ref?.ratio;
+  if (ref == null || !Number.isFinite(ratio) || !((ratio as number) > 0) || (ratio as number) > 1.12) {
+    return {
+      correctedCm: null, pct: null, errPct: null, flag: 'unknown',
+      reason: 'Ракурс не измерен — поправка не считается (метрика остаётся как есть).',
+    };
+  }
+  const r = ratio as number;
+  const spanPx = ref.spanPx;
+  const tapPx = opts?.tapPx ?? REF_TAP_PX;
+  const errPct = spanPx != null && Number.isFinite(spanPx) && spanPx > 0
+    ? Math.round((Math.SQRT2 * tapPx / spanPx) * 1000) / 10
+    : null;
+  const pct = Math.round((1 / r - 1) * 1000) / 10;
+  const maxAz = opts?.maxAzimuthDeg ?? REF_FIX_MAX_AZ;
+  const az = ref.azimuthDeg;
+  if (az != null && Number.isFinite(az) && az > maxAz) {
+    return {
+      correctedCm: null, pct, errPct, flag: 'refused',
+      reason: `Камера отклонена на ${Math.round(az)}° — поправка ${Math.round(pct)}% умножила бы и ошибку замера. `
+        + 'Такой ракурс не исправляется: снимайте ближе к плоскости движения.',
+    };
+  }
+  const round2 = (v: number) => Math.round(v * 100) / 100;
+  if (errPct != null && Math.abs(pct) <= errPct) {
+    return {
+      correctedCm: round2(valueCm), pct, errPct, flag: 'negligible',
+      reason: `Поправка ${pct}% не больше точности замера эталона ±${errPct}% — не применяю, значение оставлено как измерено.`,
+    };
+  }
+  return {
+    correctedCm: round2(valueCm / r),
+    pct,
+    errPct,
+    flag: 'ok',
+    reason: `Горизонталь умножена на 1/cos φ = ${round2(1 / r)} (поправка +${pct}%)`
+      + (errPct != null ? `, точность ±${errPct}% — по точности тапа эталона.` : '; точность поправки не оценена (нет длины эталона в пикселях).')
+      + ' Это оценка: она выравнивает сравнение между сессиями, но не заменяет съёмку в плоскости движения.',
   };
 }
 

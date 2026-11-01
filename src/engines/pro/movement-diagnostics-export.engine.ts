@@ -75,6 +75,13 @@ export interface MovementDiagnosticsExportInput {
   /** Реальная длина эталона в кадре, см (гриф между насечками, ширина стойки). */
   refLengthCm?: number | null;
   /**
+   * xLoop, перенесённый в плоскость движения по измеренному ракурсу (`измеренный / cos φ`).
+   * Это оценка: она выравнивает сравнение сессий, но не заменяет съёмку сбоку.
+   */
+  xLoopRefCorrectedCm?: number | null;
+  /** На сколько процентов подняли xLoop этой поправкой. */
+  xLoopRefCorrectionPct?: number | null;
+  /**
    * Чем нанесена линия на видео: panel — панель без калибровки, calibration — единый
    * масштаб (px/см), perspective — по 4 привязкам. Отчёт без этого не воспроизводим.
    */
@@ -217,6 +224,8 @@ export function buildMovementDiagnosticsCsv(inp: MovementDiagnosticsExportInput)
     ['Проверка ракурса', inp.angleCheck || '—'],
     ['Угол камеры по эталону, °', inp.refAzimuthDeg != null ? String(inp.refAzimuthDeg) : '—'],
     ['Эталон в кадре, см', inp.refLengthCm != null ? String(inp.refLengthCm) : '—'],
+    ['xLoop с поправкой на ракурс, см', inp.xLoopRefCorrectedCm != null ? String(inp.xLoopRefCorrectedCm) : '—'],
+    ['Поправка xLoop на ракурс, %', inp.xLoopRefCorrectionPct != null ? String(inp.xLoopRefCorrectionPct) : '—'],
     ['Наложение линии на видео', videoOverlayModeRu(inp.videoOverlayMode)],
     ['Масштаб калибровки кадра, px/см', inp.videoScalePxPerCm != null ? String(inp.videoScalePxPerCm) : '—'],
     ['Разброс масштаба по высоте, %', inp.videoPerspSkewPct != null ? String(inp.videoPerspSkewPct) : '—'],
@@ -292,6 +301,13 @@ export function buildMovementDiagnosticsHtml(inp: MovementDiagnosticsExportInput
     + (inp.refAzimuthDeg != null
       ? li('Угол камеры по эталону', `${fmt(inp.refAzimuthDeg, 0)}° от плоскости движения`
         + (inp.refLengthCm != null ? ` (эталон ${fmt(inp.refLengthCm, 0)} см)` : ''))
+      : '')
+    + (inp.xLoopRefCorrectedCm != null
+      ? li('xLoop с поправкой на ракурс',
+        `${fmt(inp.xLoopRefCorrectedCm, 2)} см`
+        + (inp.kinoveaXLoop != null ? ` (измерено ${fmt(inp.kinoveaXLoop, 2)} см` : ' (')
+        + (inp.xLoopRefCorrectionPct != null ? `, поправка +${fmt(inp.xLoopRefCorrectionPct, 1)}%` : '')
+        + '; оценка — не замена съёмке в плоскости движения)')
       : '')
     + ((inp.videoOverlayMode || inp.videoScalePxPerCm != null || inp.videoPerspSkewPct != null || inp.videoOffsetSec != null)
       ? li('Наложение линии на видео', videoOverlayRuLine(inp)) : '')

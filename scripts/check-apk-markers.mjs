@@ -201,9 +201,9 @@ for (const hook of [
   'data-lift="capture-quality"', 'data-lift="capture-height"', 'data-lift="capture-dist"',
   'data-lift="angle-check"', 'data-lift="angle-drift"', 'data-lift="angle-skew"', 'data-lift="angle-basis"', 'data-lift="angle-vs-meta"',
   'data-lift="angle-azimuth"', 'data-lift="ref-block"', 'data-lift="ref-length"',
-  'data-lift="ref-grab"', 'data-lift="ref-no-video"', 'data-lift="ref-frame"',
+  'data-lift="ref-grab"', 'data-lift="ref-grab-calib"', 'data-lift="ref-no-video"', 'data-lift="ref-frame"',
   'data-lift="ref-result"', 'data-lift="ref-save"', 'data-lift="ref-saved"',
-  'data-lift="ref-clear"', 'data-lift="ref-msg"',
+  'data-lift="ref-clear"', 'data-lift="ref-msg"', 'data-lift="ref-xloop-fix"',
   'data-lift="export-svg"', 'data-lift="export-overlay-png"', 'data-lift="export-overlay-video"',
   'data-lift="series-save"', 'data-lift="session-compare"', 'data-lift="bar-heat"',
   'data-lift="quick-start"', 'data-lift="quick-start-hide"',
@@ -278,6 +278,10 @@ mustContain('src/engines/pro/trajectory-overlay.engine.ts', 'export function per
 mustContain('src/engines/pro/movement-diagnostics-export.engine.ts', 'Угол камеры по эталону', 'measured azimuth in report');
 mustContain('src/ui/screens/TrainingScreen_parts/LiftMasterCard.tsx', 'referenceAngleCheck(', 'hub measures angle by reference');
 mustContain('src/ui/screens/TrainingScreen_parts/LiftMasterCard.tsx', 'azimuthDeg: curRefAngle', 'measured azimuth reaches verdict');
+// Поправка горизонтали на ракурс: измеренное делится на cos φ, но помечается как оценка.
+mustContain('src/engines/pro/trajectory-overlay.engine.ts', 'export function referenceHorizontalCorrection', 'horizontal metric fix by measured angle');
+mustContain('src/engines/pro/movement-diagnostics-export.engine.ts', 'xLoop с поправкой на ракурс', 'corrected horizontal in report');
+mustContain('src/ui/screens/TrainingScreen_parts/LiftMasterCard.tsx', 'referenceHorizontalCorrection(', 'hub applies horizontal fix');
 
 // 7d. Mojibake-бан: битые символы (U+FFFD) в файлах хаба — признак порванной кодировки.
 // В LiftMasterCard их было 11 (тексты VBT/LVP/Kinovea), и это попадало в UI АПК.

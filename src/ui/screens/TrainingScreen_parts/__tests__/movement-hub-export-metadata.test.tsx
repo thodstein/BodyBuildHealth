@@ -235,6 +235,35 @@ describe('хаб → отчёт: ракурс, измеренный по эта�
     const csv = await exportCsv({}, CSV_POINTS);
     expect(rowValue(csv, 'Угол камеры по эталону, °')).toBe('"—"');
     expect(rowValue(csv, 'Эталон в кадре, см')).toBe('"—"');
+    expect(rowValue(csv, 'xLoop с поправкой на ракурс, см')).toBe('"—"');
+    expect(rowValue(csv, 'Поправка xLoop на ракурс, %')).toBe('"—"');
+  });
+
+  it('поправка xLoop на ракурс — отдельные числа, замер остаётся рядом', async () => {
+    const rows = ['time,x,y'];
+    for (let i = 0; i < 20; i++) rows.push(`${(i * 0.05).toFixed(2)},${100 + i * 1.5},${50 + i * 4}`);
+    const csv = await exportCsv({
+      refAngle: { bench: { azimuthDeg: 25, ratio: 0.906, lengthCm: 131, atSec: 2.5, spanPx: 300 } },
+      refLengthCm: '131',
+    }, rows.join('\n'), '1');
+    // cos 25° = 0.906 → поправка +10.4%: число, а не текст «примерно».
+    expect(rowValue(csv, 'Поправка xLoop на ракурс, %')).toBe('"10.4"');
+    expect(rowValue(csv, 'xLoop с поправкой на ракурс, см')).toMatch(/^"\d+(\.\d+)?"$/);
+    // Измеренный xLoop никуда не делся: поправка — дополнение, а не подмена.
+    expect(rowValue(csv, 'Kinovea xLoop, см')).not.toBe('"—"');
+  });
+
+  it('поправка меньше точности тапа — в отчёт не идёт как число', async () => {
+    const rows = ['time,x,y'];
+    for (let i = 0; i < 20; i++) rows.push(`${(i * 0.05).toFixed(2)},${100 + i * 1.5},${50 + i * 4}`);
+    // ratio 0.99 (8°), но эталон 40 px: ±5.3% точности больше самой поправки.
+    const csv = await exportCsv({
+      refAngle: { bench: { azimuthDeg: 8, ratio: 0.99, lengthCm: 131, atSec: null, spanPx: 40 } },
+    }, rows.join('\n'), '1');
+    expect(rowValue(csv, 'Поправка xLoop на ракурс, %')).toBe('"—"');
+    expect(rowValue(csv, 'xLoop с поправкой на ракурс, см')).toBe('"—"');
+    // Сам замер ракурса при этом на месте — отброшена только поправка.
+    expect(rowValue(csv, 'Угол камеры по эталону, °')).toBe('"8"');
   });
 
   it('HTML-отчёт объясняет замер: угол и по какому эталону он снят', async () => {
@@ -250,5 +279,8 @@ describe('хаб → отчёт: ракурс, измеренный по эта�
     expect(savedHtml[0]).toContain('Угол камеры по эталону');
     expect(savedHtml[0]).toContain('12° от плоскости движения');
     expect(savedHtml[0]).toContain('эталон 131 см');
+    // Поправка горизонтали — с оговоркой, что это оценка, а не новая правда.
+    expect(savedHtml[0]).toContain('xLoop с поправкой на ракурс');
+    expect(savedHtml[0]).toContain('не замена съёмке в плоскости движения');
   });
 });

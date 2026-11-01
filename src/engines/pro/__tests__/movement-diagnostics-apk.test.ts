@@ -40,12 +40,13 @@ describe('movement-diagnostics-export', () => {
     const csv = buildMovementDiagnosticsCsv({ ...BASE, issuesRu: ['=cmd|evil'] });
     const lines = csv.split('\n');
     expect(lines[0]).toContain('Поле');
-    // Шапка + 37 метрик: хаб-мастер передаёт все поддерживаемые поля
+    // Шапка + 39 метрик: хаб-мастер передаёт все поддерживаемые поля
     // (Kinovea-наклон/turnover/повторы, overlay-потеря vmax, heat-сводка и вес,
-    // качество и параметры съёмки, ракурс по замеру и угол камеры по эталону,
-    // чем нанесена линия на видео, асимметрия, метрика/порог/пауза VBT, LVP r²).
-    expect(lines.length).toBe(38);
-    for (const field of ['Kinovea turnover', 'Kinovea повторов', 'Overlay потеря vmax', 'Heatmap медленных отрезков', 'Точка срыва', 'Скорость в точке срыва', 'Вес штанги на записи', 'Качество съёмки', 'Съёмка: параметры', 'Горизонтальный ход штанги', 'Проверка ракурса', 'Угол камеры по эталону', 'Эталон в кадре', 'Наложение линии на видео', 'Масштаб калибровки кадра', 'Разброс масштаба по высоте', 'Привязок перспективы', 'Смещение трека от начала видео', 'Масштаб CSV', 'Асимметрия', 'VBT метрика', 'VBT VL-порог', 'VBT пауза', 'LVP r²']) {
+    // качество и параметры съёмки, ракурс по замеру, угол камеры по эталону и
+    // поправка горизонтали, чем нанесена линия на видео, асимметрия,
+    // метрика/порог/пауза VBT, LVP r²).
+    expect(lines.length).toBe(40);
+    for (const field of ['Kinovea turnover', 'Kinovea повторов', 'Overlay потеря vmax', 'Heatmap медленных отрезков', 'Точка срыва', 'Скорость в точке срыва', 'Вес штанги на записи', 'Качество съёмки', 'Съёмка: параметры', 'Горизонтальный ход штанги', 'Проверка ракурса', 'Угол камеры по эталону', 'Эталон в кадре', 'xLoop с поправкой на ракурс', 'Поправка xLoop на ракурс', 'Наложение линии на видео', 'Масштаб калибровки кадра', 'Разброс масштаба по высоте', 'Привязок перспективы', 'Смещение трека от начала видео', 'Масштаб CSV', 'Асимметрия', 'VBT метрика', 'VBT VL-порог', 'VBT пауза', 'LVP r²']) {
       expect(csv).toContain(field);
     }
     expect(csv).toContain("'=cmd|evil");
@@ -108,6 +109,29 @@ describe('movement-diagnostics-export', () => {
     expect(html).toContain('12° от плоскости движения');
     expect(html).toContain('эталон 131 см');
     expect(buildMovementDiagnosticsHtml({ ...BASE })).not.toContain('Угол камеры по эталону');
+  });
+  it('поправка xLoop на ракурс — число рядом с измеренным, с оговоркой «оценка»', () => {
+    const inp = {
+      ...BASE,
+      kinoveaXLoop: 2.85,
+      refAzimuthDeg: 25,
+      refLengthCm: 131,
+      xLoopRefCorrectedCm: 3.15,
+      xLoopRefCorrectionPct: 10.4,
+    };
+    const csv = buildMovementDiagnosticsCsv(inp);
+    const val = (field: string) => csv.split('\n').find((l) => l.startsWith(`"${field}","`))!;
+    expect(val('xLoop с поправкой на ракурс, см')).toBe('"xLoop с поправкой на ракурс, см","3.15"');
+    expect(val('Поправка xLoop на ракурс, %')).toBe('"Поправка xLoop на ракурс, %","10.4"');
+    // Измеренное значение остаётся отдельной строкой — поправка его не подменяет.
+    expect(val('Kinovea xLoop, см')).toBe('"Kinovea xLoop, см","2.85"');
+
+    const html = buildMovementDiagnosticsHtml(inp);
+    expect(html).toContain('3.15 см');
+    expect(html).toContain('поправка +10.4%');
+    expect(html).toContain('оценка — не замена съёмке в плоскости движения');
+    // Без поправки строки нет вовсе, а не «0 см».
+    expect(buildMovementDiagnosticsHtml({ ...BASE, kinoveaXLoop: 2.85 })).not.toContain('с поправкой на ракурс');
   });
   it('VBT-метрика в отчёте — по-русски, без id «mcv»', () => {
     const csv = buildMovementDiagnosticsCsv({ ...BASE, vbtMetric: 'mcv' });

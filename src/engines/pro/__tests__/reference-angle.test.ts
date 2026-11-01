@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   referenceAngleCheck,
+  referenceHorizontalCorrection,
   perspectiveTrackYForVideoY,
   perspectiveLocalScale,
   type PerspectiveCalibration,
@@ -101,8 +102,73 @@ describe('referenceAngleCheck — угол камеры по эталону в �
   });
 });
 
-describe('perspectiveTrackYForVideoY — обратная связь перспективы', () => {
-  const calib: PerspectiveCalibration = {
+describe('referenceHorizontalCorrection — поправка горизонтали на ракурс', () => {
+  /** ratio = cos φ: 0.906 — камера отклонена на 25°, 0.5 — на 60°. */
+  const ok25 = { ratio: 0.906, azimuthDeg: 25, spanPx: 300 };
+
+  it('нет значения или ракурса → unknown, а не «0% поправки»', () => {
+    expect(referenceHorizontalCorrection(null, ok25).flag).toBe('unknown');
+    expect(referenceHorizontalCorrection(0, ok25).flag).toBe('unknown');
+    expect(referenceHorizontalCorrection(NaN, ok25).flag).toBe('unknown');
+    expect(referenceHorizontalCorrection(10, null).flag).toBe('unknown');
+    // ratio > 1.12 — это не угол, а сломанный замер: поправку по нему не считаем.
+    expect(referenceHorizontalCorrection(10, { ratio: 1.3, azimuthDeg: 0, spanPx: 300 }).flag).toBe('unknown');
+    expect(referenceHorizontalCorrection(10, { ratio: 0, azimuthDeg: 25, spanPx: 300 }).flag).toBe('unknown');
+  });
+
+  it('25°: измеренное делится на cos φ, поправка названа числом', () => {
+    const r = referenceHorizontalCorrection(10, ok25)!;
+    expect(r.flag).toBe('ok');
+    expect(r.pct).toBe(10.4);
+    expect(r.correctedCm).toBe(11.04);
+    expect(r.errPct).toBe(0.7);
+    // Поправка — это перенос в плоскость движения, а не «исправленная правда».
+    expect(r.reason).toContain('оценка');
+    expect(r.reason).toContain('не заменяет');
+  });
+
+  it('поправка меньше точности тапа → не применяется (negligible)', () => {
+    // ratio 0.99 — 8°, но эталон всего 40 px: точность ±5.3% больше самой поправки.
+    const r = referenceHorizontalCorrection(10, { ratio: 0.99, azimuthDeg: 8, spanPx: 40 })!;
+    expect(r.flag).toBe('negligible');
+    expect(r.correctedCm).toBe(10);
+    expect(r.reason).toContain('не больше точности замера');
+  });
+
+  it('почти спереди: поправка отклонена, а не «домножена» на 2', () => {
+    const r = referenceHorizontalCorrection(10, { ratio: 0.5, azimuthDeg: 60, spanPx: 300 })!;
+    expect(r.flag).toBe('refused');
+    expect(r.correctedCm).toBeNull();
+    expect(r.pct).toBe(100);
+    expect(r.reason).toContain('не исправляется');
+  });
+
+  it('без длины эталона в пикселях поправка есть, но точность честно не оценена', () => {
+    const r = referenceHorizontalCorrection(10, { ratio: 0.906, azimuthDeg: 25 })!;
+    expect(r.flag).toBe('ok');
+    expect(r.errPct).toBeNull();
+    expect(r.reason).toContain('точность поправки не оценена');
+  });
+
+  it('точность тапа настраивается (а не зашита в текст)', () => {
+    const coarse = referenceHorizontalCorrection(10, ok25, { tapPx: 4 })!;
+    expect(coarse.errPct).toBe(1.9);
+    const lenient = referenceHorizontalCorrection(10, { ratio: 0.99, azimuthDeg: 8, spanPx: 40 }, { tapPx: 0.2 })!;
+    // точный тап: ±0.7% — уже не «в пределах шума», поправка применяется
+    expect(lenient.flag).toBe('ok');
+  });
+
+  it('замер угла несёт длину эталона в пикселях — от неё зависит точность', () => {
+    const r = referenceAngleCheck(
+      { a: { x: 0, y: 0 }, b: { x: 300, y: 400 }, lengthCm: 250 },
+      { pxPerCm: 2 },
+    )!;
+    expect(r.spanPx).toBe(500);
+    expect(r.ratio).toBe(1);
+  });
+});
+
+describe('perspectiveTrackYForVideoY — обратная связь перспективы', () => {  const calib: PerspectiveCalibration = {
     anchors: [
       { timeSec: 0.1, trackX: 0, trackY: 0, videoX: 100, videoY: 520 },
       { timeSec: 0.4, trackX: 0.5, trackY: 16.7, videoX: 104, videoY: 362.2 },

@@ -50,7 +50,7 @@ import { diagnoseAsymmetry } from '../../../engines/pro/pl-asymmetry.engine';
 import { RULE_CHECKS, checkLiftRules } from '../../../engines/pro/pl-competition-rules.engine';
 import { RED_FLAGS, checkRedFlags, type RedFlagId } from '../../../engines/pro/pl-red-flags.engine';
 import { buildMovementDiagnosticsHtml, buildMovementDiagnosticsCsv, buildTrajectorySvg, movementDiagnosticsFilename, buildHeatTrendCsv, type MovementDiagnosticsExportInput } from '../../../engines/pro/movement-diagnostics-export.engine';
-import { renderTrajectoryPng, recordTrajectoryWebm, recordVideoWithOverlay, canRecordTrajectory, dataUrlToBlob, grabVideoFrame, openVideoFramesFrom, calibrationFromTaps, preferredVideoMime, isCalibrationSane, calibrationFrameFit, calibrationFrameFitOf, mapTrackToVideo, referenceAngleCheck, perspectiveTrackYForVideoY, perspectiveFromAnchors, isPerspectiveSane, perspectiveSkewPct, perspectiveLocalScale, perspectiveFrameFit, renderFrameWithMapping, mapTrackToVideoPerspective, type VideoCalibration, type PerspectiveCalibration, type VideoFrameSession } from '../../../engines/pro/trajectory-overlay.engine';
+import { renderTrajectoryPng, recordTrajectoryWebm, recordVideoWithOverlay, canRecordTrajectory, dataUrlToBlob, grabVideoFrame, openVideoFramesFrom, calibrationFromTaps, preferredVideoMime, isCalibrationSane, calibrationFrameFit, calibrationFrameFitOf, mapTrackToVideo, referenceAngleCheck, referenceHorizontalCorrection, perspectiveTrackYForVideoY, perspectiveFromAnchors, isPerspectiveSane, perspectiveSkewPct, perspectiveLocalScale, perspectiveFrameFit, renderFrameWithMapping, mapTrackToVideoPerspective, type VideoCalibration, type PerspectiveCalibration, type VideoFrameSession } from '../../../engines/pro/trajectory-overlay.engine';
 import { copyOrShareText, saveCsvApk, printHtmlApk, saveTextFileApk, saveBlobApk, shareOutcomeLabel } from '../../../core/apk-share';
 import { VideoCaptureCard } from './VideoCaptureCard';
 import StickingPointAnalysisCard from './StickingPointAnalysisCard';
@@ -348,7 +348,15 @@ interface MasterState {
    * Ракурс, измеренный по эталону в кадре (per-lift). Хранится результат, а не тапы:
    * тапы живут в пикселях конкретного кадра, а угол — свойство съёмки этой сессии.
    */
-  refAngle?: Record<string, { azimuthDeg: number; ratio: number; lengthCm: number; atSec: number | null }>;
+  refAngle?: Record<string, {
+    azimuthDeg: number;
+    /** observed / expected = cos φ; из него же считается поправка горизонтали. */
+    ratio: number;
+    lengthCm: number;
+    atSec: number | null;
+    /** Длина эталона в пикселях кадра — задаёт точность поправки (±тап/длина). */
+    spanPx?: number | null;
+  }>;
   /** Длина эталона в кадре, см: гриф между насечками, ширина стойки/скамьи. */
   refLengthCm?: string;
 }
@@ -465,8 +473,9 @@ function cleanVideoPersp(raw: unknown): Record<string, PerspectiveCalibration> {
 }
 
 /**
- * Ракурс по эталону: угол в 0…90° и осмысленная длина. Мусор отбрасывается —
- * иначе вердикт «камера в плоскости» строился бы на битом замере.
+ * Ракурс по эталону: угол в 0…90°, положительный ratio (это cos φ) и осмысленная
+ * длина. Мусор отбрасывается — иначе вердикт «камера в плоскости» и поправка
+ * горизонтали строились бы на битом замере.
  */
 function cleanRefAngle(raw: unknown): NonNullable<MasterState['refAngle']> {
   if (!isRecord(raw)) return {};
@@ -477,8 +486,12 @@ function cleanRefAngle(raw: unknown): NonNullable<MasterState['refAngle']> {
     const lengthCm = Number(v.lengthCm);
     const ratio = Number(v.ratio);
     if (!(deg >= 0 && deg <= 90) || !(lengthCm > 0 && lengthCm <= 500)) continue;
+    // ratio > 1.12 — это не угол, а эталон ближе камеры/не та длина (см. referenceAngleCheck).
+    if (!(ratio > 0) || ratio > 1.12) continue;
     const atSec = typeof v.atSec === 'number' && Number.isFinite(v.atSec) && v.atSec >= 0 ? v.atSec : null;
-    out[k] = { azimuthDeg: Math.round(deg), ratio: Number.isFinite(ratio) ? ratio : 0, lengthCm, atSec };
+    const spanRaw = Number(v.spanPx);
+    const spanPx = Number.isFinite(spanRaw) && spanRaw > 0 ? spanRaw : null;
+    out[k] = { azimuthDeg: Math.round(deg), ratio, lengthCm, atSec, spanPx };
   }
   return out;
 }
@@ -1101,6 +1114,14 @@ export const LiftMasterCard: React.FC<{
   );
   /** Короткая строка ракурса для картинок — один текст на SVG, PNG и отчёт. */
   const angleShortText = useMemo(() => cameraAngleShortLine(angleCheck), [angleCheck]);
+  /**
+   * Поправка горизонтали на измеренный ракурс. Считается по сохранённому замеру,
+   * а не по черновику: вердикт и отчёт должны опираться на одно и то же число.
+   */
+  const xLoopFix = useMemo(
+    () => referenceHorizontalCorrection(kinoveaResult ? kinoveaResult.xLoop : null, curRefAngle),
+    [kinoveaResult, curRefAngle],
+  );
   /** Подсказка времён для четырёх кадров: 5%, 35%, 65%, 95% длительности трека. */
   const perspSuggestedTimes = useMemo(() => {
     const pts = kinoveaResult?.points;
@@ -1217,7 +1238,13 @@ export const LiftMasterCard: React.FC<{
     const lengthCm = Number.parseFloat(refLength);
     setRefAngle((s) => ({
       ...s,
-      [lift]: { azimuthDeg: refCandidate.azimuthDeg as number, ratio: refCandidate.ratio, lengthCm, atSec: refFrame?.timeSec ?? null },
+      [lift]: {
+        azimuthDeg: refCandidate.azimuthDeg as number,
+        ratio: refCandidate.ratio,
+        lengthCm,
+        atSec: refFrame?.timeSec ?? null,
+        spanPx: refCandidate.spanPx,
+      },
     }));
     setRefMsg(`Ракурс применён: камера ${refCandidate.azimuthDeg}° от плоскости движения. Горизонталь теперь трактуется по замеру, а не по догадке.`);
   }, [refCandidate, refLength, refFrame, lift]);
@@ -1233,6 +1260,23 @@ export const LiftMasterCard: React.FC<{
     setRefFrame(null);
     setRefMsg('Замер ракурса убран — вернулись к метаданным съёмки.');
   }, [lift]);
+
+  /**
+   * Взять за основу уже снятый кадр калибровки. Это тот же кадр, по которому
+   * считался px/см, — значит масштаб и координаты гарантированно совпадают,
+   * и ракурс можно измерить, даже не открыв блок перспективы.
+   */
+  const useCalibFrameAsRef = useCallback(() => {
+    if (!calibFrame) { setRefMsg('Кадр калибровки ещё не взят — возьмите его в блоке калибровки кадра.'); return; }
+    setRefFrame({
+      dataUrl: calibFrame.dataUrl,
+      width: calibFrame.width,
+      height: calibFrame.height,
+      timeSec: curOffset > 0 ? curOffset : null,
+    });
+    setRefTaps([]);
+    setRefMsg('Кадр калибровки взят за основу: ткните два конца эталона.');
+  }, [calibFrame, curOffset]);
   /** Сохранённая серия прошлого раза для текущего движения. */
   const savedSeries = seriesStore[lift] ?? null;
   const curFirstSnapshot = useMemo(()=> kinoveaReps.length ? snapshotBarRep(kinoveaReps[0]) : null, [kinoveaReps]);
@@ -1522,6 +1566,9 @@ export const LiftMasterCard: React.FC<{
       angleBasis: angleCheck ? angleCheck.basis : undefined,
       refAzimuthDeg: curRefAngle ? curRefAngle.azimuthDeg : null,
       refLengthCm: curRefAngle ? curRefAngle.lengthCm : null,
+      // Только когда поправка реально применена: «поправка меньше точности» в отчёт не идёт как число.
+      xLoopRefCorrectedCm: xLoopFix.flag === 'ok' ? xLoopFix.correctedCm : null,
+      xLoopRefCorrectionPct: xLoopFix.flag === 'ok' ? xLoopFix.pct : null,
       videoOverlayMode: kinoveaResult ? (curPersp ? 'perspective' : curCalib ? 'calibration' : 'panel') : '',
       videoScalePxPerCm: curCalib ? Math.round(curCalib.pxPerCm * 100) / 100 : null,
       videoPerspSkewPct: curPersp ? perspectiveSkewPct(curPersp) : null,
@@ -2945,11 +2992,14 @@ export const LiftMasterCard: React.FC<{
                     />
                   </label>
                   <button data-lift="ref-grab" aria-label="Взять кадр из мини-плеера для эталона" onClick={grabRefFrame} style={{ minHeight:44, padding:'6px 12px', borderRadius:8, cursor:'pointer', background:'rgba(56,189,248,0.12)', color:'#38bdf8', border:'1px solid rgba(56,189,248,0.28)', fontWeight:700, fontSize:11 }}>⤓ Кадр из плеера</button>
+                  {calibFrame && (
+                    <button data-lift="ref-grab-calib" aria-label="Взять кадр калибровки за основу замера ракурса" onClick={useCalibFrameAsRef} style={{ minHeight:44, padding:'6px 12px', borderRadius:8, cursor:'pointer', background:'rgba(148,163,184,0.12)', color:'#cbd5e1', border:'1px solid rgba(148,163,184,0.3)', fontSize:11 }}>⤓ Кадр калибровки</button>
+                  )}
                   {curRefAngle && <button data-lift="ref-clear" aria-label="Убрать сохранённый замер ракурса" onClick={clearRefAngle} style={{ minHeight:44, padding:'6px 12px', borderRadius:8, cursor:'pointer', background:'transparent', color:DIM, border:'1px solid rgba(255,255,255,0.12)', fontSize:11 }}>Убрать замер</button>}
                 </div>
-                {!perspFile && (
+                {!perspFile && !calibFrame && (
                   <div data-lift="ref-no-video" style={{ marginTop:4, fontSize:9, color:'#fbbf24', lineHeight:1.4 }}>
-                    Кадр берётся из видео в блоке перспективы — выберите его там, иначе масштаб кадра не совпадёт с калибровкой.
+                    Кадр берётся из калибровки кадра или из видео в блоке перспективы — иначе масштаб не совпадёт с треком.
                   </div>
                 )}
                 {refFrame && (
@@ -2985,6 +3035,28 @@ export const LiftMasterCard: React.FC<{
                   </div>
                 )}
                 {refMsg && <div data-lift="ref-msg" role="status" style={{ marginTop:4, fontSize:9, color:'#cbd5e1', lineHeight:1.4 }}>{refMsg}</div>}
+                {/*
+                  Поправка горизонтали: камера не в плоскости движения сжимает
+                  горизонталь в cos φ раз, поэтому сравнение сессий «как есть»
+                  сравнивает не технику, а ракурсы. Здесь — перенос в плоскость
+                  движения с явной оговоркой, что это оценка.
+                */}
+                {curRefAngle && xLoopFix.flag !== 'unknown' && (
+                  <div
+                    data-lift="ref-xloop-fix"
+                    role="status"
+                    style={{ marginTop:6, fontSize:9, lineHeight:1.45, color: xLoopFix.flag === 'ok' ? '#4ade80' : xLoopFix.flag === 'refused' ? '#fbbf24' : DIM }}
+                  >
+                    {xLoopFix.flag === 'ok' && kinoveaResult && (
+                      <b>
+                        xLoop с поправкой на ракурс: {xLoopFix.correctedCm} см
+                        {' '}(измерено {Math.round(kinoveaResult.xLoop * 100) / 100} см, поправка +{xLoopFix.pct}%{xLoopFix.errPct != null ? `, точность ±${xLoopFix.errPct}%` : ''})
+                      </b>
+                    )}
+                    {xLoopFix.flag === 'ok' && <div style={{ marginTop:2, color:DIM }}>Оценка для сравнения сессий — измеренное значение в отчёте остаётся как есть.</div>}
+                    {xLoopFix.flag !== 'ok' && xLoopFix.reason}
+                  </div>
+                )}
               </div>
             </div>
           </div>
