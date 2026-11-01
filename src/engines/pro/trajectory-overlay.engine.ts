@@ -30,6 +30,14 @@ export interface TrajectoryRenderInput {
   prevRep?: ReadonlyArray<OverlayPoint> | null;
   xLoopCm?: number | null;
   vmax?: number | null;
+  /** Готовая строка overlay («Повторы: 3 · vmax 0.52→0.44 …»). */
+  overlayText?: string;
+  /** Готовая строка сравнения сессий («vmax ниже прошлой сессии: …»). */
+  sessionText?: string;
+  /** Без префикса: «в норме — Геометрия съёмки в допуске» (префикс добавляет рендер). */
+  captureQuality?: string;
+  /** Короткая строка ракурса («⚠ ход 37.5% — либо техника, либо камера не под 90°»). */
+  angleText?: string;
 }
 
 const PAD = { x: 70, top: 70, bottom: 110 };
@@ -100,18 +108,18 @@ export function canRecordTrajectory(): boolean {
   } catch { return false; }
 }
 
-function paintBase(ctx: CanvasRenderingContext2D, w: number, h: number, title: string) {
+function paintBase(ctx: CanvasRenderingContext2D, w: number, h: number, title: string, padBottom: number = PAD.bottom) {
   ctx.fillStyle = '#0b0f14';
   ctx.fillRect(0, 0, w, h);
   // target-zone — центральная треть рабочей области
   const innerW = w - 2 * PAD.x;
   const zx = PAD.x + innerW / 3;
   ctx.fillStyle = 'rgba(0,230,138,0.07)';
-  ctx.fillRect(zx, PAD.top, innerW / 3, h - PAD.top - PAD.bottom);
+  ctx.fillRect(zx, PAD.top, innerW / 3, h - PAD.top - padBottom);
   ctx.strokeStyle = '#00e68a';
   ctx.setLineDash([8, 6]);
   ctx.lineWidth = 2;
-  ctx.strokeRect(zx, PAD.top, innerW / 3, h - PAD.top - PAD.bottom);
+  ctx.strokeRect(zx, PAD.top, innerW / 3, h - PAD.top - padBottom);
   ctx.setLineDash([]);
   ctx.fillStyle = '#00e68a';
   ctx.font = '600 14px sans-serif';
@@ -121,14 +129,58 @@ function paintBase(ctx: CanvasRenderingContext2D, w: number, h: number, title: s
   ctx.fillText(`Траектория штанги — ${title}`, PAD.x, 40);
 }
 
+/** Строка подписи под графиком: текст + цвет (раскладка чистая, тестируется без canvas). */
+export interface TrajectoryPngLine { text: string; color: string }
+
+/**
+ * Подписи под графиком PNG — тот же набор, что в SVG-выгрузке. Раньше PNG нёс
+ * только xLoop/vmax, и картинка, пересланная отдельно от отчёта, шла без оговорок
+ * о качестве съёмки и ракурсе, хотя её читают как самостоятельный вывод.
+ */
+export function trajectoryPngLines(inp: TrajectoryRenderInput): TrajectoryPngLine[] {
+  const out: TrajectoryPngLine[] = [];
+  if (inp.overlayText?.trim()) out.push({ text: inp.overlayText, color: '#e5e7eb' });
+  if (inp.sessionText?.trim()) out.push({ text: inp.sessionText, color: '#cbd5e1' });
+  if (inp.captureQuality?.trim()) out.push({ text: `качество: ${inp.captureQuality}`, color: '#d1d5db' });
+  if (inp.angleText?.trim()) out.push({ text: inp.angleText, color: '#fbbf24' });
+  return out;
+}
+
+/**
+ * Раскладка PNG: под каждую подпись картинка растёт на 20 px, а нижний отступ
+ * увеличивается на столько же — значит график не сжимается и подписи не лезут на него.
+ */
+export function trajectoryPngLayout(
+  inp: TrajectoryRenderInput,
+  base?: { w?: number; h?: number },
+): { w: number; h: number; padBottom: number; lines: TrajectoryPngLine[] } {
+  const lines = trajectoryPngLines(inp);
+  const extra = lines.length * 20;
+  return { w: base?.w ?? 960, h: (base?.h ?? 640) + extra, padBottom: PAD.bottom + extra, lines };
+}
+
+/** Обрезать строку по ширине канвы: лучше «…», чем текст, уехавший за край. */
+function fitText(ctx: CanvasRenderingContext2D, text: string, maxW: number): string {
+  if (!(maxW > 0) || ctx.measureText(text).width <= maxW) return text;
+  let lo = 0;
+  let hi = text.length;
+  while (lo < hi) {
+    const mid = Math.ceil((lo + hi) / 2);
+    if (ctx.measureText(`${text.slice(0, mid)}…`).width <= maxW) lo = mid;
+    else hi = mid - 1;
+  }
+  return `${text.slice(0, lo)}…`;
+}
+
 /**
  * PNG «кадр с оверлеем»: траектория (heatmap по скорости), target-zone, overlay
  * первого/последнего повтора, справка прошлой сессии и подписи метрик.
  * Возвращает data:URL или null, если canvas недоступен/нет точек.
  */
 export async function renderTrajectoryPng(inp: TrajectoryRenderInput, size?: { w: number; h: number }): Promise<string | null> {
-  const w = size?.w ?? 960;
-  const h = size?.h ?? 640;
+  const layout = trajectoryPngLayout(inp, size);
+  const { w, h } = layout;
+  const padBottom = layout.padBottom;
   if (!canUseCanvas()) return null;
   const hasAny = (inp.points?.length ?? 0) + (inp.firstRep?.length ?? 0) + (inp.lastRep?.length ?? 0) + (inp.prevRep?.length ?? 0);
   if (!hasAny) return null;
@@ -137,7 +189,7 @@ export async function renderTrajectoryPng(inp: TrajectoryRenderInput, size?: { w
   canvas.height = h;
   const ctx = canvas.getContext('2d');
   if (!ctx) return null;
-  paintBase(ctx, w, h, inp.liftRu);
+  paintBase(ctx, w, h, inp.liftRu, padBottom);
 
   const overlay = !!(inp.firstRep?.length && inp.lastRep?.length);
   const all = [...(inp.points ?? []), ...(inp.firstRep ?? []), ...(inp.lastRep ?? []), ...(inp.prevRep ?? [])];
@@ -148,7 +200,7 @@ export async function renderTrajectoryPng(inp: TrajectoryRenderInput, size?: { w
   const minX = Math.min(...xs), maxX = Math.max(...xs);
   const minY = Math.min(...ys), maxY = Math.max(...ys);
   const sx = (x: number) => PAD.x + ((x - minX) / Math.max(0.001, maxX - minX)) * (w - 2 * PAD.x);
-  const sy = (y: number) => h - PAD.bottom - ((y - minY) / Math.max(0.001, maxY - minY)) * (h - PAD.top - PAD.bottom);
+  const sy = (y: number) => h - padBottom - ((y - minY) / Math.max(0.001, maxY - minY)) * (h - PAD.top - padBottom);
 
   const stroke = (pts: ReadonlyArray<OverlayPoint>, color: string, width: number, dash: number[] = []) => {
     if (pts.length < 2) return;
@@ -187,17 +239,26 @@ export async function renderTrajectoryPng(inp: TrajectoryRenderInput, size?: { w
     }
   }
 
-  // подписи
+  // подписи: метрики, затем те же строки, что в SVG, затем оговорка «оценка»
   const footer: string[] = [];
   if (inp.xLoopCm != null) footer.push(`xLoop ${inp.xLoopCm.toFixed(1)} см`);
   if (inp.vmax != null) footer.push(`vmax ${inp.vmax.toFixed(2)} м/с`);
+  const maxTextW = w - 2 * PAD.x;
+  let textY = h - padBottom + 18;
   ctx.fillStyle = '#d1d5db';
   ctx.font = '600 17px sans-serif';
-  ctx.fillText(footer.join(' · ') || '—', PAD.x, h - PAD.bottom + 34);
+  ctx.fillText(fitText(ctx, footer.join(' · ') || '—', maxTextW), PAD.x, textY);
+  ctx.font = '500 13px sans-serif';
+  for (const line of layout.lines) {
+    textY += 20;
+    ctx.fillStyle = line.color;
+    ctx.fillText(fitText(ctx, line.text, maxTextW), PAD.x, textY);
+  }
   ctx.fillStyle = '#6b7280';
-  ctx.font = '500 14px sans-serif';
-  ctx.fillText('скорость из видео — оценка (не LPT)', PAD.x, h - 24);
+  ctx.font = '500 12px sans-serif';
+  ctx.fillText('скорость из видео — оценка (не LPT)', PAD.x, h - 10);
   if (!overlay && inp.points?.length) {
+    ctx.font = '600 14px sans-serif';
     ctx.fillStyle = BAR_HEAT_COLORS.fast; ctx.fillText('быстро', w - 190, PAD.top + 12);
     ctx.fillStyle = BAR_HEAT_COLORS.mid; ctx.fillText('средне', w - 190, PAD.top + 32);
     ctx.fillStyle = BAR_HEAT_COLORS.slow; ctx.fillText('медленно (срыв)', w - 190, PAD.top + 52);
@@ -1070,6 +1131,13 @@ export async function recordVideoWithOverlay(
         inp.vmax != null ? `vmax ${inp.vmax.toFixed(2)} м/с` : '',
       ].filter(Boolean).join(' · ') || '—';
       ctx.fillText(footer, 12, h - 28);
+      // Строка ракурса: видео тоже пересылают отдельно от отчёта, и цифра без
+      // оговорки читается как приговор технике.
+      if (inp.angleText?.trim()) {
+        ctx.fillStyle = inp.angleText.trim().startsWith('⚠') ? '#fbbf24' : '#9ca3af';
+        ctx.font = '500 12px sans-serif';
+        ctx.fillText(fitText(ctx, inp.angleText.trim(), w - 24), 12, h - 46);
+      }
       ctx.fillStyle = '#9ca3af';
       ctx.font = '500 12px sans-serif';
       ctx.fillText(drawn

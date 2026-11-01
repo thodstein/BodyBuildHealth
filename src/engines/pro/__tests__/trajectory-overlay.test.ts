@@ -7,6 +7,8 @@ import {
   renderTrajectoryPng,
   recordTrajectoryWebm,
   recordVideoWithOverlay,
+  trajectoryPngLines,
+  trajectoryPngLayout,
 } from '../trajectory-overlay.engine';
 
 describe('mapTrajectoryPoints — проекция см → пиксели канвы', () => {
@@ -97,5 +99,62 @@ describe('растровый/видео-оверлей в не-браузерн�
 
   it('renderTrajectoryPng без точек возвращает null даже при наличии canvas', async () => {
     expect(await renderTrajectoryPng({ liftRu: 'Присед' })).toBeNull();
+  });
+});
+
+describe('trajectoryPngLines / trajectoryPngLayout — подписи PNG как в SVG', () => {
+  it('без оговорок подписей нет и раскладка не растёт', () => {
+    const layout = trajectoryPngLayout({ liftRu: 'Присед' });
+    expect(layout.lines).toEqual([]);
+    expect(layout.h).toBe(640);
+    expect(layout.padBottom).toBe(110);
+  });
+
+  it('ракурс едет в картинку с тем же предупреждением, что в отчёте', () => {
+    const layout = trajectoryPngLayout({
+      liftRu: 'Присед',
+      angleText: '⚠ ход 37.5% — либо техника, либо камера не под 90°',
+    });
+    expect(layout.lines.map((l) => l.text)).toEqual(['⚠ ход 37.5% — либо техника, либо камера не под 90°']);
+    // Под подпись картинка выросла, и нижний отступ вырос на столько же — график не сжался.
+    expect(layout.h).toBe(660);
+    expect(layout.padBottom).toBe(130);
+    expect(layout.h - layout.padBottom).toBe(640 - 110);
+  });
+
+  it('качество съёмки получает префикс, остальные строки — нет', () => {
+    const lines = trajectoryPngLines({
+      liftRu: 'Присед',
+      captureQuality: 'в норме — Геометрия съёмки в допуске',
+      overlayText: 'Повторы: 3 · vmax 0.52→0.44 м/с',
+    });
+    expect(lines[0].text).toBe('Повторы: 3 · vmax 0.52→0.44 м/с');
+    expect(lines[1].text).toBe('качество: в норме — Геометрия съёмки в допуске');
+  });
+
+  it('порядок подписей фиксирован: наложение → сравнение → качество → ракурс', () => {
+    const lines = trajectoryPngLines({
+      liftRu: 'Присед',
+      overlayText: 'наложение',
+      sessionText: 'сравнение',
+      captureQuality: 'качество',
+      angleText: 'ракурс',
+    });
+    expect(lines.map((l) => l.text)).toEqual(['наложение', 'сравнение', 'качество: качество', 'ракурс']);
+    // Ракурс — предупреждение, поэтому он единственный цветом внимания.
+    expect(lines[3].color).toBe('#fbbf24');
+  });
+
+  it('пустые и пробельные строки не занимают места', () => {
+    const lines = trajectoryPngLines({ liftRu: 'Присед', overlayText: '   ', sessionText: '', captureQuality: ' ', angleText: undefined });
+    expect(lines).toEqual([]);
+    expect(trajectoryPngLayout({ liftRu: 'Присед', angleText: '' }).h).toBe(640);
+  });
+
+  it('свой размер канвы сохраняется, рост идёт поверх него', () => {
+    const layout = trajectoryPngLayout({ liftRu: 'Присед', angleText: 'ракурс', sessionText: 'сравнение' }, { w: 480, h: 320 });
+    expect(layout.w).toBe(480);
+    expect(layout.h).toBe(360);
+    expect(layout.padBottom).toBe(150);
   });
 });

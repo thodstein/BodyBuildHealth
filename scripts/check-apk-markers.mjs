@@ -266,6 +266,8 @@ mustContain('src/engines/pro/movement-diagnostics-export.engine.ts', 'export fun
 mustContain('src/engines/strength-sport/strength-sport-video.engine.ts', 'export function cameraAngleCheck', 'angle check by measurement');
 mustContain('src/engines/strength-sport/strength-sport-video.engine.ts', 'export function cameraAngleShortLine', 'short angle line for shared image');
 mustContain('src/engines/pro/movement-diagnostics-export.engine.ts', 'angleText', 'angle line in trajectory image');
+mustContain('src/engines/pro/trajectory-overlay.engine.ts', 'export function trajectoryPngLayout', 'png text layout like svg');
+mustContain('src/engines/pro/trajectory-overlay.engine.ts', 'export function trajectoryPngLines', 'png annotations list');
 
 // 7d. Mojibake-бан: битые символы (U+FFFD) в файлах хаба — признак порванной кодировки.
 // В LiftMasterCard их было 11 (тексты VBT/LVP/Kinovea), и это попадало в UI АПК.

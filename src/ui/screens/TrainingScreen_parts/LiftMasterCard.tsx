@@ -909,6 +909,13 @@ export const LiftMasterCard: React.FC<{
     device: (capture.device || null) as VideoCaptureMeta['device'],
   }), [capture]);
   const captureQuality = useMemo(()=> videoQualityForCapture(captureMeta), [captureMeta]);
+  /**
+   * Подписи для выгрузок собираются один раз: SVG, PNG и видео-оверлей несут один
+   * и тот же набор оговорок, иначе картинка, пересланная отдельно, читается как вывод.
+   */
+  const captureQualityText = captureQuality.flag === 'unknown'
+    ? ''
+    : `${captureQuality.flag === 'ok' ? 'в норме' : 'грубо'} — ${captureQuality.reason}`;
   /** Heatmapping: отрезки траектории, окрашенные по скорости (нужно ≥2 точки с временем). */
   const kinoveaHeat = useMemo(()=> kinoveaResult ? barSpeedHeat(kinoveaResult.points) : [], [kinoveaResult]);
   /** Сводка heatmap числами — едет в CSV/HTML и в подпись под графиком. */
@@ -1016,6 +1023,8 @@ export const LiftMasterCard: React.FC<{
       : null),
     [kinoveaResult, curPersp, captureMeta],
   );
+  /** Короткая строка ракурса для картинок — один текст на SVG, PNG и отчёт. */
+  const angleShortText = useMemo(() => cameraAngleShortLine(angleCheck), [angleCheck]);
   /** Подсказка времён для четырёх кадров: 5%, 35%, 65%, 95% длительности трека. */
   const perspSuggestedTimes = useMemo(() => {
     const pts = kinoveaResult?.points;
@@ -2796,8 +2805,8 @@ export const LiftMasterCard: React.FC<{
                   vmax: kinoveaResult ? kinoveaResult.vmax : null,
                   overlayText: kinoveaOverlay ? kinoveaOverlay.text : '',
                   sessionText: sessionCompare ? sessionCompare.text : '',
-                  angleText: cameraAngleShortLine(angleCheck) ?? '',
-                  captureQuality: captureQuality.flag === 'unknown' ? '' : `${captureQuality.flag === 'ok' ? 'в норме' : 'грубо'} — ${captureQuality.reason}`,
+                  angleText: angleShortText ?? '',
+                  captureQuality: captureQualityText,
                 });
                 const o = await saveTextFileApk(movementDiagnosticsFilename(lift, 'svg'), svg, 'image/svg+xml;charset=utf-8');
                 setShareMsg(shareOutcomeLabel(o)); setTimeout(()=>setShareMsg(null), 2500);
@@ -2811,6 +2820,11 @@ export const LiftMasterCard: React.FC<{
                   prevRep: savedRepPoints,
                   xLoopCm: kinoveaResult ? kinoveaResult.xLoop : null,
                   vmax: kinoveaResult ? kinoveaResult.vmax : null,
+                  // Тот же набор подписей, что в SVG: PNG пересылают отдельно от отчёта.
+                  overlayText: kinoveaOverlay ? kinoveaOverlay.text : '',
+                  sessionText: sessionCompare ? sessionCompare.text : '',
+                  angleText: angleShortText ?? '',
+                  captureQuality: captureQualityText,
                 });
                 if (!png) { setShareMsg('PNG недоступен: нет данных траектории или canvas не поддерживается.'); setTimeout(()=>setShareMsg(null), 3000); return; }
                 const blob = dataUrlToBlob(png);
@@ -2857,6 +2871,7 @@ export const LiftMasterCard: React.FC<{
                     calibration: curCalib,
                     perspective: curPersp,
                     offsetSec: curOffset,
+                    angleText: angleShortText ?? '',
                   });
                   if (!blob) { setShareMsg('Не удалось: видео не декодировалось или запись недоступна (PNG остаётся).'); setTimeout(()=>setShareMsg(null), 4000); return; }
                   const o = await saveBlobApk(movementDiagnosticsFilename(lift, ext), blob);
