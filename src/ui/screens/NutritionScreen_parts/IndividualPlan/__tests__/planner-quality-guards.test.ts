@@ -1,5 +1,5 @@
 /**
- * Регрессия «пакета качества» (QG1–QG12) планировщика.
+ * Регрессия «пакета качества» (QG1–QG13) планировщика.
  *
  * Зачем: сходимость дня ≤3% ловит только КБЖУ. Жалобы шли на «съедобность»:
  * «19 г малины», «жир всего дня в одном приёме», «овощей 190 г», «в обед 12 г белка»,
@@ -24,6 +24,9 @@
  *   ось «порции» (0-100)           85.7         90.1 (QG11)
  *   дней с яйцом целиком           0/30         7/30 (QG12)
  *   B12, среднее от RDA           57%          62.5% (QG12)
+ *   дней с Ca < 70% RDA           16/30        3/30 (QG13)
+ *   Ca, среднее от RDA            73%          88%  (QG13)
+ *   B12, среднее от RDA (после QG13) 57%       198% (QG13)
  */
 import { describe, it, expect } from 'vitest';
 import { buildDayPlan, type MealPlanInput } from '../meal-plan-engine';
@@ -410,6 +413,87 @@ describe('желток в тарелке: витамины яйца, а не «�
   it('B12 в среднем ≥ 60% RDA (было 57%)', () => {
     const avg = DAYS.reduce((s, d) => s + b12(d), 0) / DAYS.length;
     expect((avg / B12_RDA) * 100, `средний B12: ${avg.toFixed(2)} мкг`).toBeGreaterThanOrEqual(60);
+  });
+});
+
+describe('кальций из рыбы, а не из ноты (QG13)', () => {
+  // Замер на этих же 30 днях: Ca ниже 70% RDA в 16 днях из 30 (среднее 73%,
+  // минимум 42%). Кальций держат порошки (whey/casein 890 мг/100 г) и творог
+  // 100 г, а еда дня — курица 40 г, поллок 40 г, яйцо и крупы, где кальция нет.
+  // Кейл (269 мг/100 г) закрывал 14 дней, но приносил +2.2 г растительного белка
+  // на 100 г, а дни уже стоят ровно на цели по белку — первая версия стадии
+  // проигрывала по сходимости. Сардины (382 мг Ca, 8.9 мкг B12, 5 мкг D на 100 г
+  // при 25 г белка) меняют мясо на рыбу белок-в-белок, а жир рыбы снимается с
+  // масла дня. Белок, калории и клетчатка не меняются, день не имеет права
+  // стать хуже по оценке качества, выехать из канона 3% или из коридора Na.
+  const CA_RDA = 1000;
+  const B12_RDA = 2.4;
+  const ca = (d: Day) => Number((sumMicros(
+    items(d).map(({ x }) => ({ id: x.id, amount: x.amount })), FOOD_DB as any,
+  ) as any)?.Ca || 0);
+  const b12 = (d: Day) => Number((sumMicros(
+    items(d).map(({ x }) => ({ id: x.id, amount: x.amount })), FOOD_DB as any,
+  ) as any)?.VitB12 || 0);
+  const sardines = (d: Day) => items(d).filter(({ x }) => String(x.id) === 'sardines');
+  const swapNotes = (d: Day) => (d.plan.notes as string[])
+    .filter((n) => typeof n === 'string' && n.startsWith('🐟 Кальций:'));
+
+  it('Ca ниже 70% RDA: дней ≤ 3 из 30 (было 16)', () => {
+    const low = DAYS.filter((d) => ca(d) < CA_RDA * 0.7)
+      .map((d) => `${d.id}:${Math.round((ca(d) / CA_RDA) * 100)}%`);
+    expect(low.length, `Ca ниже 70%: ${low.join(', ')}`).toBeLessThanOrEqual(3);
+  });
+
+  it('Ca в среднем ≥ 85% RDA (было 73%)', () => {
+    const avg = DAYS.reduce((s, d) => s + ca(d), 0) / DAYS.length;
+    expect(Math.round((avg / CA_RDA) * 100), `средний Ca: ${Math.round(avg)} мг`)
+      .toBeGreaterThanOrEqual(85);
+  });
+
+  it('кальций закрывает рыба: дни с сардинами ≥ 12 из 30 (было 0)', () => {
+    const withSard = DAYS.filter((d) => sardines(d).length > 0).map((d) => d.id);
+    expect(withSard.length, `дней с рыбой: ${withSard.join(', ')}`).toBeGreaterThanOrEqual(12);
+  });
+
+  it('обмен не больше двух приёмов в день', () => {
+    const bad: string[] = [];
+    for (const d of DAYS) {
+      const notes = swapNotes(d);
+      if (!notes.length) continue;
+      const swaps = (notes[0].match(/→ сардины/g) || []).length;
+      if (swaps > 2) bad.push(`${d.id}: ${swaps} обмена`);
+    }
+    expect(bad.slice(0, 5).join(' | ')).toBe('');
+  });
+
+  it('QG13 не выводит новые дни из канона: дней вне 3% ≤ 6 из 30 (было 5)', () => {
+    // Дни, которые были вне канона ДО стадии (S1/5/тр, S1/6/тр, S2/5/тр, S2/6/тр),
+    // она не «лечит» и не ухудшает: отклонение там 10.1 → 9.9, 13.3 → 12.9 и т.д.
+    const out = DAYS.filter((d) => d.plan.withinTolerance === false).map((d) => d.id);
+    expect(out.length, `вне канона: ${out.join(', ')}`).toBeLessThanOrEqual(6);
+  });
+
+  it('B12 растёт вместе с кальцием: среднее ≥ 150% RDA (было 63%)', () => {
+    const avg = DAYS.reduce((s, d) => s + b12(d), 0) / DAYS.length;
+    expect(Math.round((avg / B12_RDA) * 100), `средний B12: ${avg.toFixed(1)} мкг`)
+      .toBeGreaterThanOrEqual(150);
+  });
+
+  it('ручной режим не трогаем: в ручных днях обмена нет', () => {
+    const tgt: any = buildDayTargets({
+      weightKg: 90, presetGPerKg: 2.0, fatFloorGPerKg: 0.8, kbjuMode: 'manual',
+      goal: 'maintenance', dietStyle: 'classic',
+    } as any);
+    const manual = buildDayPlan({
+      weightKg: 90, lbmKg: 73, bodyFatPct: 19, sex: 'male',
+      goalKcal: tgt.kcal, goalProteinG: tgt.protein, goalFatG: tgt.fats, goalCarbsG: tgt.carbs,
+      mealsCount: 4, isTrainingDay: true, trainStartMin: 18 * 60, trainDurationMin: 75,
+      allowIntraWorkout: true, budget: 'medium', dayOffset: 0, cyclePhase: 'none',
+      variety: 'medium', eveningLowCarb: false, goal: 'maintenance',
+      manualTargetsLocked: true, kbjuMode: 'manual',
+    } as unknown as MealPlanInput);
+    const notes = ((manual.notes || []) as string[]).filter((n) => n.startsWith('🐟 Кальций:'));
+    expect(notes.join(' | ')).toBe('');
   });
 });
 

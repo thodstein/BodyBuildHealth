@@ -12446,6 +12446,240 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
           notes.push(`🍳 Желток в тарелке: яйцо целиком ${_changed12[0]} — белок сохранён, жир желтка снят с масла дня (КБЖУ те же); B12 ${Math.round(_micro12('VitB12') * 10) / 10} мкг (${_pB12}% цели), витамин D ${Math.round(_micro12('VitD') * 10) / 10} мкг, A ${Math.round(_micro12('VitA'))} мкг`);
         }
       }
+      // ── QG13: кальций из рыбы (постное мясо/рыба → сардины) ─────────────────
+      // Замер (30 дней того же харнесса): Ca ниже 70% RDA в 16 днях из 30 при
+      // среднем 73% и цели 1000 мг — самая крупная достижимая дыра после QG1–QG12
+      // (витамин D и Omega-3 упираются в квоту рыбы в сборке). Причина
+      // структурная: кальций в этих днях держат порошки (whey/casein 890 мг/100 г)
+      // и творог 100 г, а «еда» дня — курица 40 г, поллок 40 г, яйцо и крупы, где
+      // кальция нет вовсе.
+      // Почему НЕ овощ и НЕ молочка. Первая версия стадии меняла «пустой» овощ на
+      // кейл (269 мг/100 г). Замер: кальций закрывался в 14 днях, но день
+      // проигрывал по белку — кейл приносит +2.2 г растительного белка на 100 г, а
+      // дни уже стоят ровно на цели (S1: 100 г при цели 100). Срез белка не
+      // спасал: курица в этих днях идёт порцией 40 г, ниже уже не порция, а
+      // «курица 25 г» роняет ось «порции». Молочка ещё хуже: творог/кефир — это
+      // 3–18 г белка на порцию при 120–130 мг кальция, т.е. белок растёт сильнее
+      // кальция. Кальций без белка в БД есть только у «воды», но это не еда.
+      // Сардины —единственный обычный продукт, который даёт 382 мг кальция на
+      // 25 г белка вместе с B12 (8.9 мкг), витамином D (5 мкг) и омега-3, т.е.
+      // меняет мясо на рыбу белок-в-белок и заодно поднимает три оси микро,
+      // которые сейчас самые слабые. Жир рыбы (11 г/100 г) снимается с масла дня.
+      // Ручной/портативный режим и дни с инсулиновыми окнами не трогаем.
+      if (_vegFree && !((input as any).injections && (input as any).injections.length)) {
+        const _caGoal13 = Number((RDA_BASE as any)?.Ca?.[input.sex === 'female' ? 'female' : 'male'] || 1000);
+        // Порог стадии — 70% RDA: ниже него кальциевый обмен уже не «половина
+        // нормы», а дефицит, который видит и отчёт покрытия.
+        const _caNeed13 = _caGoal13 * 0.7;
+        const _micro13 = (key: string) => Number((sumMicros(
+          (meals as any[]).flatMap((m: any) => (m.items || []).map((it: any) => ({ id: it.id, amount: it.amount }))),
+          FOOD_DB as any,
+        ) as any)?.[key] || 0);
+        const _ca13 = () => _micro13('Ca');
+        // Натриевый коридор дня. Потолок считаем от БАЗОВОЙ цели (3000 трен / 2300
+        // отдых) — ровно так его меряет гард «Na ≤125% цели»: план не несёт
+        // weightKg, и «+5 мг/кг» в цели там не участвует. Считать потолок от
+        // «тяжёлой» цели значило бы разрешить дню выехать из коридора.
+        const _naTarget13 = Number((input as any).sodiumTargetOverride) > 0
+          ? Number((input as any).sodiumTargetOverride)
+          : (input.isTrainingDay ? 3000 : 2300);
+        const _na13 = () => _micro13('Na');
+        const _eGoal13 = Number((RDA_BASE as any)?.VitE?.[input.sex === 'female' ? 'female' : 'male'] || 15);
+        const _devStart13 = _dev10();
+        const _worse13 = () => {
+          const canon = PLANNER_CONVERGENCE_PCT / 100;
+          const now = _dev10();
+          // Та же политика, что у QG12: в каноне допускаем 0.5 п.п., за канон не
+          // выходим вовсе; день, стоявший вне канона, не сдвигаем.
+          if (_devStart13 <= canon) return now > Math.min(canon, _devStart13 + 0.005);
+          return now > _devStart13 + 0.0005;
+        };
+        const _fiberOk13 = () => (Number(totals.fiber) || 0) <= _qgFiberCap;
+        const _q13 = () => {
+          const cov = _pickCtx.qualityMode === 'full'
+            ? analyzeMicroCoverage(
+              sumMicros((meals as any[]).flatMap((m: any) => (m.items || []).map((it: any) => ({ id: it.id, amount: it.amount }))), FOOD_DB as any),
+              (input.sex || 'male') as any, input.weightKg, input.cyclePhase as any, !!input.isTrainingDay,
+              input.calciumTargetOverride, input.sodiumTargetOverride,
+            ).coverage
+            : [];
+          const lowN = cov.filter((c: any) => (c.pct || 0) < 70).length;
+          return scoreDayQuality(meals as any[], {
+            weightKg: Number(input.weightKg) || 0,
+            microCoverage: cov.length > 0 ? { lowCount: lowN, total: cov.length } : undefined,
+          });
+        };
+        // Снимок ДНЯ (тарелки + итоги): баланс углеводов правит гарнир, срез
+        // белка — белковый пункт; откат одного приёма оставил бы день половинчатым.
+        const _snapDay13 = () => ({
+          tots: { ...totals },
+          meals: (meals as any[]).map((m: any) => ({
+            m, mt: { ...(m.totals || {}) },
+            snap: ((m.items || []) as any[]).map((it: any) => ({ it, s: { ...it } })),
+          })),
+        });
+        const _restoreDay13 = (sd: any) => {
+          for (const e of sd.meals) {
+            if ((e.m.items || []).length > e.snap.length) (e.m.items as any[]).length = e.snap.length;
+            for (const it of e.snap) {
+              for (const k of Object.keys(it.it)) if (!(k in it.s)) delete it.it[k];
+              Object.assign(it.it, it.s);
+            }
+            e.m.totals = { ...e.mt };
+          }
+          Object.assign(totals, sd.tots);
+        };
+        // Порог «это порция цельного белка» — тот же, что у QG12 и у гарантии
+        // реалистичности тарелки (≥80 кг: пункт 75 г, иначе 40 г).
+        const _protFloor13 = (Number(input.weightKg) || 0) >= 80 ? 75 : 40;
+        // Чистый жир (масло/ги) — единственный донор среза: у «жировых» пунктов
+        // вроде сыра 24 г белка на 100 г, и срез увозил бы белок. Орехи/пасты не
+        // трогаем — их растит QG11 (та же логика, что в QG12).
+        const _isNut13 = (id: string) => /^(cashew|almonds?|walnuts?|hazelnuts?|peanuts?|pistachios?|pecan|macadamia|brazil_nut|seed_|sunflower_seeds|pumpkin_seeds|sesame_seeds)/i.test(id);
+        const _pureFat13 = (x: any) => {
+          const id = String(x.id || '');
+          const amt = Number(x.amount) || 0;
+          if (!(amt > 0)) return false;
+          const per100 = (v: any) => ((Number(v) || 0) / amt) * 100;
+          return x.role === 'fat' && per100(x.f) >= 50 && per100(x.p) <= 5
+            && !_isNut13(id) && !/paste|butter_p|cheese/i.test(id);
+        };
+        // Витамин E на грамм продукта. Нерафинированное подсолнечное масло — это
+        // 41 мг E/100 г, гхи — 0.8: срез жира обязан идти сначала с E-бедного
+        // источника, иначе стадия «убирает жир» вместе с витамином E, который
+        // только что поставил QG9 (замер: нота «11 мг» против факта 8 мг).
+        const _ePerG13 = (x: any) => {
+          const fd: any = FOOD_DB.find((f: any) => f.id === String(x.id));
+          if (!fd) return 0;
+          return Number((fd.micros as any)?.VitE) || 0;
+        };
+        // Источники жира: приёмы в порядке убывания ДОЛИ жира дня. Срез идёт с
+        // самого «жирного» приёма — тогда максимальная доля жира в приёме падает,
+        // и ось «жир в одном приёме» не может просесть от самой стадии (замер
+        // версии «сначала свой приём»: день 84 → 83 ровно на этой оси).
+        const _fatShare13 = (mm: any) => (Number(totals.f) || 0) > 0
+          ? (Number(mm.totals?.f) || 0) / (Number(totals.f) || 1)
+          : 0;
+        const _isMain13 = (mm: any) => !['preworkout', 'postworkout', 'intra', 'presleep'].includes(String(mm.type));
+        const _fatSource13 = (): any[] => (meals as any[])
+          .filter((mm: any) => ((mm.items || []) as any[]).length > 0)
+          .sort((a: any, b: any) =>
+            (_isMain13(b) ? _fatShare13(b) : -1) - (_isMain13(a) ? _fatShare13(a) : -1));
+        const _trimOil13 = (grams: number, mode: 'ceil' | 'floor'): number => {
+          let left = grams;
+          for (const mm of _fatSource13()) {
+            if (left <= 0.3) break;
+            const fats = ((mm.items || []) as any[])
+              .filter((x: any) => !x._fixedGrams && _pureFat13(x))
+              .sort((a: any, b: any) => _ePerG13(a) - _ePerG13(b)
+                || (Number(b.f) || 0) - (Number(a.f) || 0));
+            for (const it of fats) {
+              if (left <= 0.3) break;
+              const amt = Number(it.amount) || 0;
+              if (amt <= 7) continue;                     // <7 г — уже не порция масла
+              const perG = (Number(it.f) || 0) / Math.max(1, amt);
+              if (!(perG > 0)) continue;
+              const raw = left / perG;
+              const cut = Math.min(mode === 'ceil' ? Math.ceil(raw) : Math.floor(raw), amt - 7);
+              if (cut < 1) continue;
+              Object.assign(it, _scale10(it, amt - cut));
+              left -= cut * perG;
+            }
+          }
+          return left;
+        };
+        // Сардины — единственный обычный продукт, который несёт кальций
+        // (382 мг/100 г) ВМЕСТЕ с B12 (8.9 мкг), витамином D (5 мкг) и омега-3, при
+        // 25 г белка и 11 г жира на 100 г. Отсюда обмен «постное мясо/рыба ↔
+        // сардины» — белок-в-белок, а пришедший жир снимается с масла дня. Ни один
+        // другой продукт БД не даёт столько кальция на грамм белка: сыр плотнее
+        // (720 мг, 30 мг/г белка), но это жировой продукт, а не замена мясу, и его
+        // 27 г жира на 100 г не снимаются одним маслом.
+        const _has13 = (id: string) => (meals as any[]).some((m: any) => ((m.items || []) as any[]).some((x: any) => String(x.id) === id));
+        // Постное мясо/рыба — источник, который можно заменить рыбой без сдвига
+        // белка: ≥16 г белка и ≤8 г жира на 100 г. Жирная рыба (лосось, макрель)
+        // уже стоит по квоте QG7 и остаётся как есть.
+        const _lean13 = (x: any) => {
+          const id = String(x.id || '');
+          if (!(x.role === 'protein' || x.role === 'fast_protein')) return false;
+          if (x._fixedGrams || _fav10(id) || id === 'sardines') return false;
+          if (!/^(chicken_breast|chicken_thigh|turkey_breast|beef_lean|beef_minced|pollock|cod|white_fish|tuna_canned|hake|tilapia|pike_perch|zander)/.test(id)) return false;
+          const amt = Number(x.amount) || 0;
+          if (amt < 40) return false;
+          const per100P = ((Number(x.p) || 0) / Math.max(1, amt)) * 100;
+          const per100F = ((Number(x.f) || 0) / Math.max(1, amt)) * 100;
+          return per100P >= 16 && per100F <= 8;
+        };
+        const sard13: any = _ok10('sardines') && !_fav10('sardines') && !_has13('sardines')
+          ? FOOD_DB.find((f: any) => f.id === 'sardines')
+          : null;
+        if (sard13 && _ca13() < _caNeed13) {
+          const sardCap = Math.min(Number(edibilityCapFor('sardines', 200)) || 200, 200);
+          const q0 = _q13();
+          const swaps13: string[] = [];
+          // Не больше двух обменов в день: одной порции сардин (+191 мг) не
+          // хватает дням на 42–52% RDA, а третий рыбный приём — это уже «рыбный
+          // день», а не рацион атлета.
+          for (let pass = 0; pass < 2 && _ca13() < _caNeed13; pass++) {
+            const cands13 = (meals as any[])
+              .flatMap((m: any) => ((m.items || []) as any[]).filter(_lean13).map((x: any) => ({ m, x })))
+              .sort((a: any, b: any) => (Number(b.x.amount) || 0) - (Number(a.x.amount) || 0));
+            let done = false;
+            for (const { m, x } of cands13) {
+              if (done) break;
+              const P0 = Number(x.p) || 0;
+              const F0 = Number(x.f) || 0;
+              // Граммы сардин — из равенства белка (25 г/100 г), шаг 5 г, порция
+              // не меньше 40 г (иначе это «гарнир к рыбе», а не белковый пункт).
+              const wantG = Math.round((((P0 / Math.max(1, Number(sard13.protein) || 25)) * 100) / 5)) * 5;
+              const g = Math.max(40, Math.min(wantG, sardCap));
+              const Pnew = ((Number(sard13.protein) || 0) * g) / 100;
+              if (Math.abs(Pnew - P0) > 0.8) continue;
+              const dF = ((Number(sard13.fat) || 0) * g) / 100 - F0;
+              for (const mode of ['ceil', 'floor'] as const) {
+                const sd = _snapDay13();
+                const ca0 = _ca13();
+                const eBase13 = _micro13('VitE');
+                const oldName = String(x.name || x.id);
+                Object.assign(x, _mk10(sard13, g, 'protein'));
+                if (dF > 0.5) _trimOil13(dF, mode);
+                recalcMealTotals(meals as any[]);
+                recalcDayTotals(meals, totals);
+                // Сардины солёные (350 мг Na/100 г): день не имеет права выехать
+                // из натриевого коридора QG8 (65–125% цели) — иначе «соль в тарелке»
+                // становится «солью в рыбе» и коридор ломается.
+                const _naOver13 = _naTarget13 > 0 && _na13() > _naTarget13 * 1.25;
+                // Витамин E: жир меняем на рыбий, но не в ущерб гарантии QG9 —
+                // если день был в норме по E, он и остаётся в норме.
+                const _eLost13 = eBase13 >= _eGoal13 * 0.62 && _micro13('VitE') < _eGoal13 * 0.62;
+                if (_naOver13 || _eLost13 || _worse13() || !_fiberOk13() || _q13().total < q0.total || _ca13() <= ca0 + 1) {
+                  _restoreDay13(sd);
+                  continue;
+                }
+                usedTodayIds.add('sardines');
+                allFoodsUsed.push('sardines');
+                swaps13.push(`«${String(m.type)}» ${oldName} → сардины ${g} г`);
+                done = true;
+                break;
+              }
+            }
+          }
+          if (swaps13.length > 0) {
+            // Нота QG9 считает E по тарелке В МОМЕНТ своей стадии: после обмена
+            // жира числа в ней устаревают («нота 11 мг, факт 8 мг»). Пересчитываем
+            // ровно теми же словами — нота не имеет права врать.
+            const _eIdx13 = notes.findIndex((n) => typeof n === 'string' && n.startsWith('🌻 Витамин E:'));
+            if (_eIdx13 >= 0) {
+              notes[_eIdx13] = String(notes[_eIdx13]).replace(
+                /E \d+ мг из \d+ мг/,
+                `E ${Math.round(_micro13('VitE'))} мг из ${Math.round(_eGoal13)} мг`,
+              );
+            }
+            const _pCa13 = Math.round((_ca13() / Math.max(1, _caGoal13)) * 100);
+            notes.push(`🐟 Кальций: ${swaps13.join('; ')} — белок тот же, жир рыбы снят с масла дня (КБЖУ те же); Ca ${Math.round(_ca13())} мг (${_pCa13}% цели), B12 ${Math.round(_micro13('VitB12') * 10) / 10} мкг, витамин D ${Math.round(_micro13('VitD') * 10) / 10} мкг`);
+          }
+        }
+      }
     }
 
     // Витрина MPS должна совпадать с ФИНАЛЬНЫМ планом (санитайзеры E17/E18 меняют items).
