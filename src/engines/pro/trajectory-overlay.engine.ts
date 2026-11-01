@@ -532,6 +532,127 @@ export function perspectiveSkewPct(c: PerspectiveCalibration): number | null {
   return Math.round(Math.abs(1 - hi / lo) * 100);
 }
 
+/**
+ * Обратное к вертикальной связи перспективы: высота трека (см) по пикселю кадра.
+ * Нужна, чтобы взять локальный масштаб именно на той высоте, где лежит эталон:
+ * `Y = (vA·y + vB)/(vC·y + 1)` → `y = (vB − Y)/(Y·vC − vA)`.
+ * null — если связь в этой точке вырождена (знаменатель ~0).
+ */
+export function perspectiveTrackYForVideoY(c: PerspectiveCalibration, videoY: number): number | null {
+  if (!c || !isPerspectiveSane(c) || !Number.isFinite(videoY)) return null;
+  const den = videoY * c.vC - c.vA;
+  if (!Number.isFinite(den) || Math.abs(den) < 1e-9) return null;
+  const y = (c.vB - videoY) / den;
+  return Number.isFinite(y) ? y : null;
+}
+
+/**
+ * Эталон в кадре — отрезок известной длины, лежащий ПОПЕРЁК движения штанги
+ * (гриф между насечками, ширина стойки или скамьи).
+ *
+ * Физика простая и проверяемая: камера в плоскости движения видит такой отрезок
+ * в истинную длину, а повёрнутая на угол φ — укороченным примерно в cos φ раз.
+ * Значит `cos φ = наблюдаемая длина / (реальная длина × масштаб)`, и угол
+ * считается, а не угадывается.
+ *
+ * Почему не диск: блин круглый, его видимая ширина почти не зависит от азимута —
+ * по нему угол не измерить (для масштаба он годится).
+ */
+export interface ReferenceSpan {
+  a: { x: number; y: number };
+  b: { x: number; y: number };
+  /** Реальная длина отрезка, см. */
+  lengthCm: number;
+}
+
+export interface ReferenceAngleResult {
+  /** Наблюдаемая длина отрезка в кадре, см (по масштабу кадра). */
+  observedCm: number;
+  /** Ожидаемая длина при камере в плоскости движения, см. */
+  expectedCm: number;
+  /** observed / expected: 1 — камера в плоскости, 0 — отрезок вдоль луча зрения. */
+  ratio: number;
+  /** Отклонение камеры от плоскости движения, град; null — измерить нельзя. */
+  azimuthDeg: number | null;
+  flag: 'ok' | 'unknown';
+  /** Пикселей на сантиметр, по которым считалось (для отчёта). */
+  pxPerCm: number;
+  reason: string;
+}
+
+/** Отрезок короче 24 px: ошибка тапа в 1 px даёт уже >4° — мерить нечего. */
+const REF_MIN_PX = 24;
+/** Отрезок не может быть длиннее 5 м — это опечатка в длине, а не эталон. */
+const REF_MAX_CM = 500;
+
+/**
+ * Угол камеры по эталону в кадре; null — входные данные бессмысленны.
+ *
+ * `pxPerCm` берётся из калибровки кадра или перспективы: без масштаба кадра
+ * «длина в кадре» — просто пиксели, и угол из них не следует. Поэтому без
+ * масштаба результат честно `unknown`, а не «0°».
+ */
+export function referenceAngleCheck(
+  span: ReferenceSpan | null | undefined,
+  opts?: { pxPerCm?: number | null },
+): ReferenceAngleResult | null {
+  if (!span || !span.a || !span.b) return null;
+  const { a, b, lengthCm } = span;
+  if (![a.x, a.y, b.x, b.y].every((n) => Number.isFinite(n))) return null;
+  if (!(lengthCm > 0) || lengthCm > REF_MAX_CM) return null;
+  const pxPerCm = opts?.pxPerCm;
+  const dPx = Math.hypot(b.x - a.x, b.y - a.y);
+  const base: Omit<ReferenceAngleResult, 'reason' | 'flag' | 'azimuthDeg'> = {
+    observedCm: 0,
+    expectedCm: lengthCm,
+    ratio: 0,
+    pxPerCm: Number.isFinite(pxPerCm) ? (pxPerCm as number) : 0,
+  };
+  if (!Number.isFinite(pxPerCm) || !((pxPerCm as number) > 0.05 && (pxPerCm as number) < 200)) {
+    return {
+      ...base,
+      flag: 'unknown',
+      azimuthDeg: null,
+      reason: 'Без масштаба кадра угол не измерить: сначала калибровка кадра (два тапа по отрезку) или перспектива по четырём точкам.',
+    };
+  }
+  if (!(dPx >= REF_MIN_PX)) {
+    return {
+      ...base,
+      flag: 'unknown',
+      azimuthDeg: null,
+      reason: `Эталон в кадре всего ${Math.round(dPx)} px: ошибка тапа в 1 px съедает больше 4° — ткните точнее или возьмите отрезок длиннее.`,
+    };
+  }
+  const observedCm = dPx / (pxPerCm as number);
+  const ratio = observedCm / lengthCm;
+  base.observedCm = Math.round(observedCm * 10) / 10;
+  base.ratio = Math.round(ratio * 1000) / 1000;
+  if (ratio > 1.12) {
+    return {
+      ...base,
+      flag: 'unknown',
+      azimuthDeg: null,
+      reason: `Эталон виден на ${Math.round((ratio - 1) * 100)}% длиннее, чем должен: он ближе к камере, чем калибровочная плоскость, `
+        + 'или указана не та длина. Поставьте эталон в плоскости движения штанги (например, ширина стойки на уровне грифа) либо уточните калибровку — угол не выдаю.',
+    };
+  }
+  const deg = Math.round((Math.acos(Math.min(1, Math.max(0, ratio))) * 180) / Math.PI);
+  const lost = Math.round((1 - Math.cos((deg * Math.PI) / 180)) * 100);
+  const reason = deg <= 15
+    ? `Камера в плоскости движения (отклонение ${deg}°): горизонталь кадра несёт путь штанги, xLoop сравним между сессиями.`
+    : deg <= 40
+      ? `Камера отклонена от плоскости движения на ${deg}°: горизонталь укорочена примерно на ${lost}%, xLoop и боковые метрики занижены. `
+        + 'Сравнимо внутри одной сессии, но не с боковой съёмкой.'
+      : `Камера почти спереди (отклонение ${deg}°): горизонталь кадра — не путь штанги, xLoop и скорости по пути несравнимы с боковым видом.`;
+  return {
+    ...base,
+    flag: 'ok',
+    azimuthDeg: deg,
+    reason: `${reason} Направление «слева/справа» по одному кадру не определяется — эталон даёт только угол к плоскости.`,
+  };
+}
+
 /** Решение 3×3 методом Крамера (без зависимостей). */
 function solve3(m: number[][], v: number[]): [number, number, number] | null {
   const det = (a: number[][]) =>

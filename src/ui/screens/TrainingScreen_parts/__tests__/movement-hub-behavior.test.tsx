@@ -972,6 +972,72 @@ describe('LiftMasterCard — поведение (не только смоук)',
     expect(skew!.textContent).toContain('разброс масштаба по высоте');
   });
 
+  it('эталон в кадре: блок есть, без видео/кадра угол не выдумывается', () => {
+    const { container } = render(<LiftMasterCard sessions={[]} />);
+    const block = container.querySelector('[data-lift="ref-block"]')!;
+    expect(block).toBeTruthy();
+    expect(block.textContent).toContain('поперёк движения');
+    // Диск как эталон не годится — это сказано прямо, иначе измерят «что попало».
+    expect(block.textContent).toContain('Диск не подходит');
+    // Видео не выбрано: кадр взять неоткуда, и блок честно говорит почему.
+    expect(container.querySelector('[data-lift="ref-no-video"]')).toBeTruthy();
+    expect(container.querySelector('[data-lift="ref-frame"]')).toBeNull();
+    expect(container.querySelector('[data-lift="ref-result"]')).toBeNull();
+    click(container.querySelector('[data-lift="ref-grab"]'));
+    expect(container.querySelector('[data-lift="ref-msg"]')!.textContent).toContain('Сначала выберите видео');
+    // Длина эталона — ввод пользователя и она персистится вместе с замером.
+    const len = container.querySelector('[data-lift="ref-length"]') as HTMLInputElement;
+    act(() => { fireEvent.change(len, { target: { value: '131' } }); });
+    expect(JSON.parse(localStorage.getItem(MASTER_KEY) || '{}').refLengthCm).toBe('131');
+  });
+
+  it('эталон в кадре: сохранённый замер делает трактовку однозначной', () => {
+    const csv = ['time,x,y'];
+    for (let i = 0; i < 20; i++) csv.push(`${(i * 0.05).toFixed(2)},${100 + i * 1.5},${50 + i * 4}`);
+    localStorage.setItem(MASTER_KEY, JSON.stringify({
+      lift: 'bench',
+      refAngle: { bench: { azimuthDeg: 7, ratio: 0.99, lengthCm: 131, atSec: 3.25 } },
+      refLengthCm: '131',
+    }));
+    const { container } = render(<LiftMasterCard sessions={[]} />);
+    act(() => { fireEvent.change(container.querySelector('[data-lift="kinovea-text"]')!, { target: { value: csv.join('\n') } }); });
+    click(container.querySelector('[data-lift="parse-kinovea"]'));
+
+    // Сохранённый замер виден и знает, по какому кадру он снят.
+    const saved = container.querySelector('[data-lift="ref-saved"]')!;
+    expect(saved.textContent).toContain('камера 7°');
+    expect(saved.textContent).toContain('эталон 131 см');
+    expect(saved.textContent).toContain('3.25 с');
+    // Ракурс берётся из замера, а не из метаданных.
+    expect(container.querySelector('[data-lift="angle-basis"]')!.textContent).toContain('(измерено)');
+    expect(container.querySelector('[data-lift="angle-azimuth"]')!.textContent).toContain('камера 7°');
+    const box = container.querySelector('[data-lift="angle-check"]')!;
+    expect(box.textContent).toContain('измерен по эталону');
+    // Измеренный боковой ракурс снимает «либо техника, либо камера».
+    expect(box.textContent).toContain('а техника');
+    expect(box.textContent).not.toContain('не различить');
+  });
+
+  it('эталон в кадре: битый замер отбрасывается, а не становится вердиктом', () => {
+    const csv = ['time,x,y'];
+    for (let i = 0; i < 20; i++) csv.push(`${(i * 0.05).toFixed(2)},${100 + i * 1.5},${50 + i * 4}`);
+    localStorage.setItem(MASTER_KEY, JSON.stringify({
+      lift: 'bench',
+      // 200° — не угол к плоскости; 0 см — не эталон: обе записи мусор.
+      refAngle: {
+        bench: { azimuthDeg: 200, ratio: 1, lengthCm: 0, atSec: null },
+        squat: { azimuthDeg: 40, ratio: 0.77, lengthCm: 100, atSec: 2 },
+      },
+    }));
+    const { container } = render(<LiftMasterCard sessions={[]} />);
+    act(() => { fireEvent.change(container.querySelector('[data-lift="kinovea-text"]')!, { target: { value: csv.join('\n') } }); });
+    click(container.querySelector('[data-lift="parse-kinovea"]'));
+
+    expect(container.querySelector('[data-lift="ref-saved"]')).toBeNull();
+    expect(container.querySelector('[data-lift="angle-azimuth"]')).toBeNull();
+    expect(container.querySelector('[data-lift="angle-basis"]')!.textContent).not.toContain('(измерено)');
+  });
+
   it('интерактивные элементы хаба не меньше 44 px', () => {
     const { container } = render(<LiftMasterCard sessions={[]} />);
     // «Быстрый старт» исчезает после первых данных — проверяем до заполнения.

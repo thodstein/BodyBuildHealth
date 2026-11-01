@@ -492,9 +492,18 @@ export interface CameraAngleCheck {
   basis: 'side' | 'front' | 'unknown';
   /** Пояснение по цифрам + чего по одному треку узнать нельзя. */
   reason: string;
-  /** Ракурс «спереди/сбоку» по одной 2D-траектории не определяется — нужен эталон в кадре. */
-  azimuthKnown: false;
+  /**
+   * Угол отклонения камеры от плоскости движения, измеренный по эталону в кадре;
+   * null — эталон не указан. Это единственный способ узнать «спереди/сбоку» по
+   * замеру: по одной 2D-траектории ракурс не восстанавливается.
+   */
+  azimuthDeg: number | null;
+  /** true — ракурс измерен по эталону; false — основан на метаданных или неизвестен. */
+  azimuthKnown: boolean;
 }
+
+/** Угол, после которого горизонталь кадра перестаёт быть путём штанги (почти фронт). */
+const FRONT_AZIMUTH_DEG = 60;
 
 /**
  * Убрать одиночные глюки трекера: точка, которая резко расходится с ходом соседей.
@@ -537,14 +546,22 @@ function spanOf(values: number[]): number {
 /**
  * Разбор ракурса по замеру; null — точек слишком мало, чтобы что-то утверждать.
  *
- * `side` из метаданных съёмки меняет смысл горизонтали: сбоку это направление
- * движения плюс возможный наклон камеры, спереди — уход штанги вбок по телу.
- * Без `side` цифра остаётся цифрой, и вердикт так и говорит, вместо того чтобы
- * выбрать трактовку за пользователя.
+ * `azimuthDeg` (из эталона в кадре) важнее метаданных: он измерен, а не заявлен,
+ * и сразу делает трактовку горизонтали однозначной. `side` из метаданных нужен
+ * как резерв, когда эталона нет: сбоку это направление движения плюс возможный
+ * наклон камеры, спереди — уход штанги вбок по телу. Без обоих цифра остаётся
+ * цифрой, и вердикт так и говорит, вместо того чтобы выбрать трактовку за
+ * пользователя.
  */
 export function cameraAngleCheck(
   points: BarPoint[],
-  opts?: { skewPct?: number | null; side?: VideoSide | '' | null; driftLimitPct?: number; skewLimitPct?: number },
+  opts?: {
+    skewPct?: number | null;
+    side?: VideoSide | '' | null;
+    azimuthDeg?: number | null;
+    driftLimitPct?: number;
+    skewLimitPct?: number;
+  },
 ): CameraAngleCheck | null {
   if (!Array.isArray(points) || points.length < 8) return null;
   const rawX: number[] = [];
@@ -554,21 +571,31 @@ export function cameraAngleCheck(
     if (Number.isFinite(p?.y)) rawY.push(p.y);
   }
   if (rawX.length < 8 || rawY.length < 8) return null;
-  const basis: CameraAngleCheck['basis'] =
-    opts?.side === 'front' ? 'front' : opts?.side === 'left' || opts?.side === 'right' ? 'side' : 'unknown';
+  const azRaw = opts?.azimuthDeg;
+  const azimuthDeg = azRaw != null && Number.isFinite(azRaw) && azRaw >= 0 && azRaw <= 90
+    ? Math.round(azRaw)
+    : null;
+  const azimuthKnown = azimuthDeg != null;
+  // Измеренный ракурс перекрывает метаданные: он не «заявлен», а получен из кадра.
+  const basis: CameraAngleCheck['basis'] = azimuthKnown
+    ? (azimuthDeg! > FRONT_AZIMUTH_DEG ? 'front' : 'side')
+    : opts?.side === 'front' ? 'front' : opts?.side === 'left' || opts?.side === 'right' ? 'side' : 'unknown';
   const skewLimit = opts?.skewLimitPct ?? 3;
   const driftLimit = opts?.driftLimitPct ?? 20;
   const skewRaw = opts?.skewPct;
   const skewPct = skewRaw != null && Number.isFinite(skewRaw) && skewRaw >= 0
     ? Math.round(skewRaw * 10) / 10
     : null;
-  const caveat = basis === 'unknown'
-    ? ' Ракурс «спереди/сбоку» по одной траектории не определяется — укажите его в метаданных съёмки, иначе горизонталь не трактовать.'
-    : ' Ракурс «спереди/сбоку» по одной траектории не определяется — он взят из метаданных съёмки.';
+  const caveat = azimuthKnown
+    ? ` Ракурс измерен по эталону в кадре: камера отклонена от плоскости движения на ${azimuthDeg}°.`
+      + ' Направление «слева/справа» по одному кадру не определяется.'
+    : basis === 'unknown'
+      ? ' Ракурс «спереди/сбоку» по одной траектории не определяется — укажите эталон в кадре (или ракурс в метаданных съёмки), иначе горизонталь не трактовать.'
+      : ' Ракурс «спереди/сбоку» по одной траектории не определяется — он взят из метаданных съёмки, а не измерен.';
   const ySpan = spanOf(dropSpikes(rawY));
   if (!(ySpan > 2)) {
     return {
-      flag: 'unknown', skewPct, driftPct: null, basis, azimuthKnown: false,
+      flag: 'unknown', skewPct, driftPct: null, basis, azimuthDeg, azimuthKnown,
       reason: 'Ход штанги по вертикали меньше 2 см — ракурс по такому треку не проверить.' + caveat,
     };
   }
@@ -576,7 +603,7 @@ export function cameraAngleCheck(
   const driftPct = Math.round((xSpan / ySpan) * 1000) / 10;
   if (skewPct != null && skewPct > skewLimit) {
     return {
-      flag: 'tilt', skewPct, driftPct, basis, azimuthKnown: false,
+      flag: 'tilt', skewPct, driftPct, basis, azimuthDeg, azimuthKnown,
       reason: `Масштаб по высоте кадра плывёт на ${skewPct}% (порог ${skewLimit}%): камера наклонена или снимает сверху/снизу, `
         + 'сантиметры вверху и внизу разные. Включите перспективу по 4 кадрам, иначе высоты и скорости по траектории искажены.' + caveat,
     };
@@ -585,20 +612,24 @@ export function cameraAngleCheck(
     const driftReason = basis === 'front'
       ? `Штанга уходит вбок на ${driftPct}% хода (порог ${driftLimit}%). При виде спереди это боковой уход штанги — `
         + 'сигнал техники, а не наклона камеры. Для xLoop и скоростей снимайте строго сбоку.'
-      : basis === 'side'
-        ? `Штанга уходит по горизонтали на ${driftPct}% вертикального хода (порог ${driftLimit}%): `
-          + 'это либо техника — штанга действительно гуляет, либо камера стоит не перпендикулярно движению. '
-          + 'По одному треку их не различить — переснимите строго сбоку, чтобы отделить одно от другого.'
-        : `Штанга уходит по горизонтали на ${driftPct}% вертикального хода (порог ${driftLimit}%), но ракурс в метаданных не указан: `
-          + 'непонятно, это вбок по телу (техника) или путь уходит вглубь кадра (камера не перпендикулярна движению). '
-          + 'По одной траектории «спереди/сбоку» не определить — укажите ракурс, и вердикт станет однозначным.';
+      : azimuthKnown
+        ? `Штанга уходит по горизонтали на ${driftPct}% вертикального хода (порог ${driftLimit}%). `
+          + `Ракурс измерен: камера в плоскости движения (отклонение ${azimuthDeg}°), значит это не оптический обман камеры, `
+          + 'а техника — штанга действительно гуляет вбок. Смотрите отведение/увод, а не ракурс.'
+        : basis === 'side'
+          ? `Штанга уходит по горизонтали на ${driftPct}% вертикального хода (порог ${driftLimit}%): `
+            + 'это либо техника — штанга действительно гуляет, либо камера стоит не перпендикулярно движению. '
+            + 'По одному треку их не различить — укажите эталон в кадре, чтобы измерить угол, или переснимите строго сбоку.'
+          : `Штанга уходит по горизонтали на ${driftPct}% вертикального хода (порог ${driftLimit}%), но ракурс не измерен: `
+            + 'непонятно, это вбок по телу (техника) или путь уходит вглубь кадра (камера не перпендикулярна движению). '
+            + 'По одной траектории «спереди/сбоку» не определить — укажите эталон в кадре, и вердикт станет однозначным.';
     return {
-      flag: 'drift', skewPct, driftPct, basis, azimuthKnown: false,
-      reason: driftReason + (basis === 'unknown' ? '' : caveat),
+      flag: 'drift', skewPct, driftPct, basis, azimuthDeg, azimuthKnown,
+      reason: driftReason + (basis === 'unknown' && !azimuthKnown ? '' : caveat),
     };
   }
   return {
-    flag: 'ok', skewPct, driftPct, basis, azimuthKnown: false,
+    flag: 'ok', skewPct, driftPct, basis, azimuthDeg, azimuthKnown,
     reason: (skewPct != null
       ? `Геометрия ровная: горизонтальный ход ${driftPct}%, разброс масштаба по высоте ${skewPct}% — метрики сравнимы между сессиями.`
       : `Горизонтальный ход ${driftPct}% в пределах нормы, но перспектива не калибрована: разброс масштаба по высоте не проверен.`) + caveat,
@@ -614,6 +645,7 @@ export function cameraAngleShortLine(c: CameraAngleCheck | null): string | null 
   if (!c) return null;
   if (c.flag === 'unknown') return 'ракурс не проверен: ход по вертикали < 2 см';
   const parts: string[] = [];
+  if (c.azimuthDeg != null) parts.push(`камера ${c.azimuthDeg}°`);
   if (c.driftPct != null) parts.push(`${c.basis === 'front' ? 'уход вбок' : 'ход'} ${c.driftPct}%`);
   if (c.skewPct != null) parts.push(`масштаб по высоте ${c.skewPct}%`);
   const what = parts.join(' · ') || 'нет данных';
@@ -622,6 +654,8 @@ export function cameraAngleShortLine(c: CameraAngleCheck | null): string | null 
   // Спереди «камера не под 90° к движению» не бывает по определению: там уход вбок —
   // это техника, и подсказка про камеру вводила бы в заблуждение.
   if (c.basis === 'front') return `⚠ ${what} — боковой ход штанги (техника)`;
+  // Ракурс измерен и он боковой: значит «либо техника, либо камера» уже не «либо».
+  if (c.azimuthKnown) return `⚠ ${what} — штанга гуляет вбок: это техника, камера в плоскости`;
   return `⚠ ${what} — либо техника, либо камера не под 90°`;
 }
 

@@ -7,15 +7,16 @@ import React from 'react';
  * перехватываем сохранение и смотрим сам CSV. Так проверяется, что отчёт
  * объясняет, чем нанесена линия на видео (без этого его не воспроизвести).
  */
-const { savedCsv, savedText } = vi.hoisted(() => ({
+const { savedCsv, savedText, savedHtml } = vi.hoisted(() => ({
   savedCsv: [] as string[],
   savedText: [] as Array<{ name: string; text: string }>,
+  savedHtml: [] as string[],
 }));
 
 vi.mock('../../../../core/apk-share', () => ({
   copyOrShareText: async () => 'saved',
   saveCsvApk: async (_name: string, csv: string) => { savedCsv.push(csv); return 'saved'; },
-  printHtmlApk: async () => 'saved',
+  printHtmlApk: async (html: string) => { savedHtml.push(html); return 'saved'; },
   saveTextFileApk: async (name: string, text: string) => { savedText.push({ name, text }); return 'saved'; },
   saveBlobApk: async () => 'saved',
   shareOutcomeLabel: () => 'сохранено',
@@ -38,6 +39,7 @@ beforeEach(() => {
   localStorage.setItem('he_lift_master_collapsed_v1', '{}');
   savedCsv.length = 0;
   savedText.length = 0;
+  savedHtml.length = 0;
 });
 
 afterEach(() => {
@@ -209,5 +211,44 @@ describe('хаб → CSV: как нанесена линия на видео', (
     const svg = savedText[0].text;
     expect(svg).toContain('боковой ход штанги (техника)');
     expect(svg).not.toContain('не под 90°');
+  });
+});
+
+describe('хаб → отчёт: ракурс, измеренный по эталону в кадре', () => {
+  const refSeed = {
+    refAngle: { bench: { azimuthDeg: 12, ratio: 0.978, lengthCm: 131, atSec: 2.5 } },
+    refLengthCm: '131',
+  };
+
+  it('угол и длина эталона — отдельные строки CSV, а не только текст вердикта', async () => {
+    const rows = ['time,x,y'];
+    for (let i = 0; i < 20; i++) rows.push(`${(i * 0.05).toFixed(2)},${100 + i * 1.5},${50 + i * 4}`);
+    const csv = await exportCsv(refSeed, rows.join('\n'), '1');
+    expect(rowValue(csv, 'Угол камеры по эталону, °')).toBe('"12"');
+    expect(rowValue(csv, 'Эталон в кадре, см')).toBe('"131"');
+    // Вердикт несёт оговорку «это замер», а не «кажется, сбоку».
+    expect(rowValue(csv, 'Проверка ракурса')).toContain('измерен по эталону');
+    expect(rowValue(csv, 'Проверка ракурса')).toContain('слева/справа');
+  });
+
+  it('без эталона строки честно пустые — «—», а не выдуманный 0°', async () => {
+    const csv = await exportCsv({}, CSV_POINTS);
+    expect(rowValue(csv, 'Угол камеры по эталону, °')).toBe('"—"');
+    expect(rowValue(csv, 'Эталон в кадре, см')).toBe('"—"');
+  });
+
+  it('HTML-отчёт объясняет замер: угол и по какому эталону он снят', async () => {
+    localStorage.setItem(MASTER_KEY, JSON.stringify({ lift: 'bench', ...refSeed }));
+    const { container } = render(<LiftMasterCard sessions={[]} />);
+    act(() => {
+      fireEvent.change(container.querySelector('[data-lift="kinovea-text"]')!, { target: { value: CSV_POINTS } });
+    });
+    act(() => { fireEvent.click(container.querySelector('[data-lift="parse-kinovea"]')!); });
+    await act(async () => { fireEvent.click(container.querySelector('[data-lift="export-html"]')!); });
+
+    expect(savedHtml.length).toBe(1);
+    expect(savedHtml[0]).toContain('Угол камеры по эталону');
+    expect(savedHtml[0]).toContain('12° от плоскости движения');
+    expect(savedHtml[0]).toContain('эталон 131 см');
   });
 });

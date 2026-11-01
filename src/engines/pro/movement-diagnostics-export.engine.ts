@@ -68,6 +68,13 @@ export interface MovementDiagnosticsExportInput {
    */
   angleBasis?: 'side' | 'front' | 'unknown';
   /**
+   * Угол камеры к плоскости движения, измеренный по эталону в кадре (0…90°).
+   * Отдельно от текста вердикта: отчёт должен нести и саму цифру замера.
+   */
+  refAzimuthDeg?: number | null;
+  /** Реальная длина эталона в кадре, см (гриф между насечками, ширина стойки). */
+  refLengthCm?: number | null;
+  /**
    * Чем нанесена линия на видео: panel — панель без калибровки, calibration — единый
    * масштаб (px/см), perspective — по 4 привязкам. Отчёт без этого не воспроизводим.
    */
@@ -208,6 +215,8 @@ export function buildMovementDiagnosticsCsv(inp: MovementDiagnosticsExportInput)
     ['Съёмка: параметры', inp.captureDetails || '—'],
     [angleDriftLabel(inp.angleBasis), inp.angleDriftPct != null ? String(inp.angleDriftPct) : '—'],
     ['Проверка ракурса', inp.angleCheck || '—'],
+    ['Угол камеры по эталону, °', inp.refAzimuthDeg != null ? String(inp.refAzimuthDeg) : '—'],
+    ['Эталон в кадре, см', inp.refLengthCm != null ? String(inp.refLengthCm) : '—'],
     ['Наложение линии на видео', videoOverlayModeRu(inp.videoOverlayMode)],
     ['Масштаб калибровки кадра, px/см', inp.videoScalePxPerCm != null ? String(inp.videoScalePxPerCm) : '—'],
     ['Разброс масштаба по высоте, %', inp.videoPerspSkewPct != null ? String(inp.videoPerspSkewPct) : '—'],
@@ -280,6 +289,10 @@ export function buildMovementDiagnosticsHtml(inp: MovementDiagnosticsExportInput
     + (inp.captureQuality ? li('Качество съёмки', inp.captureQuality) : '')
     + (inp.captureDetails ? li('Съёмка: параметры', inp.captureDetails) : '')
     + (inp.angleCheck ? li('Ракурс по замеру', inp.angleCheck) : '')
+    + (inp.refAzimuthDeg != null
+      ? li('Угол камеры по эталону', `${fmt(inp.refAzimuthDeg, 0)}° от плоскости движения`
+        + (inp.refLengthCm != null ? ` (эталон ${fmt(inp.refLengthCm, 0)} см)` : ''))
+      : '')
     + ((inp.videoOverlayMode || inp.videoScalePxPerCm != null || inp.videoPerspSkewPct != null || inp.videoOffsetSec != null)
       ? li('Наложение линии на видео', videoOverlayRuLine(inp)) : '')
     + (inp.asymmetryPct != null ? li('Асимметрия', `${fmt(inp.asymmetryPct, 1)}% ${inp.asymmetryVerdict || ''}`) : '')

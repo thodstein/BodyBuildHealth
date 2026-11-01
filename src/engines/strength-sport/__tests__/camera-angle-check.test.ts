@@ -140,8 +140,41 @@ describe('cameraAngleCheck — ракурс по замеру, без догад
     const r = cameraAngleCheck(path({ dxCm: 10, dyCm: 40 }))!;
     expect(r.basis).toBe('unknown');
     expect(r.driftPct).toBe(25);
-    expect(r.reason).toContain('не указан');
+    expect(r.azimuthDeg).toBeNull();
+    expect(r.azimuthKnown).toBe(false);
+    expect(r.reason).toContain('не измерен');
+    expect(r.reason).toContain('укажите эталон в кадре');
     expect(r.reason).toContain('станет однозначным');
+  });
+
+  it('ракурс измерен по эталону: basis выводится из угла, а не из метаданных', () => {
+    const side = cameraAngleCheck(path({ dxCm: 0 }), { azimuthDeg: 8 })!;
+    expect(side.azimuthDeg).toBe(8);
+    expect(side.azimuthKnown).toBe(true);
+    expect(side.basis).toBe('side');
+    expect(side.reason).toContain('измерен по эталону');
+    expect(side.reason).toContain('отклонена от плоскости движения на 8°');
+
+    // 60° и выше — уже не боковой вид, даже если в метаданных написано «сбоку».
+    const front = cameraAngleCheck(path({ dxCm: 0 }), { azimuthDeg: 72, side: 'left' })!;
+    expect(front.basis).toBe('front');
+    expect(front.azimuthDeg).toBe(72);
+  });
+
+  it('измеренный боковой ракурс снимает «либо техника, либо камера»', () => {
+    const r = cameraAngleCheck(path({ dxCm: 10, dyCm: 40 }), { azimuthDeg: 6 })!;
+    expect(r.flag).toBe('drift');
+    expect(r.reason).toContain('камера в плоскости движения (отклонение 6°)');
+    expect(r.reason).toContain('а техника');
+    expect(r.reason).not.toContain('не различить');
+  });
+
+  it('неправдоподобный угол эталона (-5, 120, NaN) не применяется', () => {
+    for (const bad of [-5, 120, NaN, Number.POSITIVE_INFINITY]) {
+      const r = cameraAngleCheck(path({ dxCm: 0 }), { azimuthDeg: bad })!;
+      expect(r.azimuthKnown).toBe(false);
+      expect(r.azimuthDeg).toBeNull();
+    }
   });
 
   it('длинная серия (20 000 точек) не роняет стек и считается', () => {

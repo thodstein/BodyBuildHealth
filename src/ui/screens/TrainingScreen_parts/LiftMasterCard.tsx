@@ -50,7 +50,7 @@ import { diagnoseAsymmetry } from '../../../engines/pro/pl-asymmetry.engine';
 import { RULE_CHECKS, checkLiftRules } from '../../../engines/pro/pl-competition-rules.engine';
 import { RED_FLAGS, checkRedFlags, type RedFlagId } from '../../../engines/pro/pl-red-flags.engine';
 import { buildMovementDiagnosticsHtml, buildMovementDiagnosticsCsv, buildTrajectorySvg, movementDiagnosticsFilename, buildHeatTrendCsv, type MovementDiagnosticsExportInput } from '../../../engines/pro/movement-diagnostics-export.engine';
-import { renderTrajectoryPng, recordTrajectoryWebm, recordVideoWithOverlay, canRecordTrajectory, dataUrlToBlob, grabVideoFrame, openVideoFramesFrom, calibrationFromTaps, preferredVideoMime, isCalibrationSane, calibrationFrameFit, calibrationFrameFitOf, mapTrackToVideo, perspectiveFromAnchors, isPerspectiveSane, perspectiveSkewPct, perspectiveLocalScale, perspectiveFrameFit, renderFrameWithMapping, mapTrackToVideoPerspective, type VideoCalibration, type PerspectiveCalibration, type VideoFrameSession } from '../../../engines/pro/trajectory-overlay.engine';
+import { renderTrajectoryPng, recordTrajectoryWebm, recordVideoWithOverlay, canRecordTrajectory, dataUrlToBlob, grabVideoFrame, openVideoFramesFrom, calibrationFromTaps, preferredVideoMime, isCalibrationSane, calibrationFrameFit, calibrationFrameFitOf, mapTrackToVideo, referenceAngleCheck, perspectiveTrackYForVideoY, perspectiveFromAnchors, isPerspectiveSane, perspectiveSkewPct, perspectiveLocalScale, perspectiveFrameFit, renderFrameWithMapping, mapTrackToVideoPerspective, type VideoCalibration, type PerspectiveCalibration, type VideoFrameSession } from '../../../engines/pro/trajectory-overlay.engine';
 import { copyOrShareText, saveCsvApk, printHtmlApk, saveTextFileApk, saveBlobApk, shareOutcomeLabel } from '../../../core/apk-share';
 import { VideoCaptureCard } from './VideoCaptureCard';
 import StickingPointAnalysisCard from './StickingPointAnalysisCard';
@@ -344,6 +344,13 @@ interface MasterState {
   videoOffsetSec?: Record<string, number>;
   /** Перспективная калибровка по 3 кадрам (камера под углом); приоритетнее единого масштаба. */
   videoPersp?: Record<string, PerspectiveCalibration>;
+  /**
+   * Ракурс, измеренный по эталону в кадре (per-lift). Хранится результат, а не тапы:
+   * тапы живут в пикселях конкретного кадра, а угол — свойство съёмки этой сессии.
+   */
+  refAngle?: Record<string, { azimuthDeg: number; ratio: number; lengthCm: number; atSec: number | null }>;
+  /** Длина эталона в кадре, см: гриф между насечками, ширина стойки/скамьи. */
+  refLengthCm?: string;
 }
 
 function isRecord(v: unknown): v is Record<string, unknown> { return !!v && typeof v === 'object' && !Array.isArray(v); }
@@ -409,8 +416,10 @@ function loadMaster(): MasterState {
       videoCalib: cleanVideoCalib(raw.videoCalib),
       videoOffsetSec: cleanVideoOffset(raw.videoOffsetSec),
       videoPersp: cleanVideoPersp(raw.videoPersp),
+      refAngle: cleanRefAngle(raw.refAngle),
+      refLengthCm: typeof raw.refLengthCm === 'string' ? raw.refLengthCm.slice(0, 6) : '',
     };
-  } catch { return { lift:'bench', phase:'' as WeakPoint|'', issues:[], selectedGeom:{}, daysGeom:{}, selectedDiag:{}, daysDiag:{}, weakMuscleGroups:[], weakMuscleSubs:[], asymSide:null, asymL:'', asymR:'', vbtBest:'', vbtLast:'', vbtWeight:'', vbtGoal:'strength', vbtUpdatedAt:null, vbtPauseMs:'', asymPhase:{ startL:'', startR:'', midL:'', midR:'', lockL:'', lockR:'' }, dualSensor:{ left:'', right:'' }, perLift:{}, redFlags:[], ruleChecks:{}, meetDate:'', meetStrategy:'balanced' as MeetStrategy, meetMaxS:'', meetMaxB:'', meetMaxD:'', lvp:{}, capture:{ heightM:'', distM:'', side:'', device:'' }, series:{}, videoCalib:{}, videoOffsetSec:{}, videoPersp:{} }; }
+  } catch { return { lift:'bench', phase:'' as WeakPoint|'', issues:[], selectedGeom:{}, daysGeom:{}, selectedDiag:{}, daysDiag:{}, weakMuscleGroups:[], weakMuscleSubs:[], asymSide:null, asymL:'', asymR:'', vbtBest:'', vbtLast:'', vbtWeight:'', vbtGoal:'strength', vbtUpdatedAt:null, vbtPauseMs:'', asymPhase:{ startL:'', startR:'', midL:'', midR:'', lockL:'', lockR:'' }, dualSensor:{ left:'', right:'' }, perLift:{}, redFlags:[], ruleChecks:{}, meetDate:'', meetStrategy:'balanced' as MeetStrategy, meetMaxS:'', meetMaxB:'', meetMaxD:'', lvp:{}, capture:{ heightM:'', distM:'', side:'', device:'' }, series:{}, videoCalib:{}, videoOffsetSec:{}, videoPersp:{}, refAngle:{}, refLengthCm:'' }; }
 }
 function saveMaster(s: MasterState) { try{ localStorage.setItem(MASTER_KEY, JSON.stringify(s)); }catch{} }
 function cleanRuleChecks(raw: unknown): Record<string, boolean> {
@@ -451,6 +460,25 @@ function cleanVideoPersp(raw: unknown): Record<string, PerspectiveCalibration> {
         : {}),
     };
     if (isPerspectiveSane(c)) out[k] = c;
+  }
+  return out;
+}
+
+/**
+ * Ракурс по эталону: угол в 0…90° и осмысленная длина. Мусор отбрасывается —
+ * иначе вердикт «камера в плоскости» строился бы на битом замере.
+ */
+function cleanRefAngle(raw: unknown): NonNullable<MasterState['refAngle']> {
+  if (!isRecord(raw)) return {};
+  const out: NonNullable<MasterState['refAngle']> = {};
+  for (const [k, v] of Object.entries(raw)) {
+    if (k.length > 20 || !isRecord(v)) continue;
+    const deg = Number(v.azimuthDeg);
+    const lengthCm = Number(v.lengthCm);
+    const ratio = Number(v.ratio);
+    if (!(deg >= 0 && deg <= 90) || !(lengthCm > 0 && lengthCm <= 500)) continue;
+    const atSec = typeof v.atSec === 'number' && Number.isFinite(v.atSec) && v.atSec >= 0 ? v.atSec : null;
+    out[k] = { azimuthDeg: Math.round(deg), ratio: Number.isFinite(ratio) ? ratio : 0, lengthCm, atSec };
   }
   return out;
 }
@@ -741,6 +769,17 @@ export const LiftMasterCard: React.FC<{
     { timeSec: '', frame: null, tap: null },
     { timeSec: '', frame: null, tap: null },
   ]);
+  /**
+   * Эталон в кадре — отрезок известной длины поперёк движения (гриф между насечками,
+   * ширина стойки). Два тапа по нему дают угол камеры к плоскости движения:
+   * без эталона «спереди/сбоку» по одной траектории не восстановить.
+   */
+  const [refLength, setRefLength] = useState(initial.refLengthCm ?? '');
+  const [refFrame, setRefFrame] = useState<{ dataUrl: string; width: number; height: number; timeSec: number | null } | null>(null);
+  const [refTaps, setRefTaps] = useState<Array<{ videoX: number; videoY: number }>>([]);
+  const [refMsg, setRefMsg] = useState<string | null>(null);
+  /** Сохранённые замеры ракурса per-lift (в master, чтобы не терять между сессиями). */
+  const [refAngle, setRefAngle] = useState<NonNullable<MasterState['refAngle']>>(initial.refAngle ?? {});
   /** Видео для нарезки трёх кадров: в памяти, файл не персистится. */
   const [perspFile, setPerspFile] = useState<File | null>(null);
   /**
@@ -861,7 +900,7 @@ export const LiftMasterCard: React.FC<{
     }catch{}
   }, []);
 
-  useEffect(()=>{ saveMaster({ lift, phase, issues, selectedGeom, daysGeom, selectedDiag, daysDiag, weakMuscleGroups, weakMuscleSubs, asymSide, asymL, asymR, vbtBest, vbtLast, vbtWeight, vbtGoal, vbtUpdatedAt, vbtPauseMs, asymPhase: { startL: asymStartL, startR: asymStartR, midL: asymMidL, midR: asymMidR, lockL: asymLockL, lockR: asymLockR }, dualSensor: { left: dualLeft, right: dualRight }, perLift, redFlags, ruleChecks, meetDate, meetStrategy, meetMaxS, meetMaxB, meetMaxD, lvp: lvpSaved, capture, series: seriesStore, videoCalib, videoOffsetSec: videoOffset, videoPersp }); }, [lift, phase, issues, selectedGeom, daysGeom, selectedDiag, daysDiag, weakMuscleGroups, weakMuscleSubs, asymSide, asymL, asymR, vbtBest, vbtLast, vbtWeight, vbtGoal, vbtUpdatedAt, vbtPauseMs, asymStartL, asymStartR, asymMidL, asymMidR, asymLockL, asymLockR, dualLeft, dualRight, perLift, redFlags, ruleChecks, meetDate, meetStrategy, meetMaxS, meetMaxB, meetMaxD, lvpSaved, capture, seriesStore, videoCalib, videoOffset, videoPersp]);
+  useEffect(()=>{ saveMaster({ lift, phase, issues, selectedGeom, daysGeom, selectedDiag, daysDiag, weakMuscleGroups, weakMuscleSubs, asymSide, asymL, asymR, vbtBest, vbtLast, vbtWeight, vbtGoal, vbtUpdatedAt, vbtPauseMs, asymPhase: { startL: asymStartL, startR: asymStartR, midL: asymMidL, midR: asymMidR, lockL: asymLockL, lockR: asymLockR }, dualSensor: { left: dualLeft, right: dualRight }, perLift, redFlags, ruleChecks, meetDate, meetStrategy, meetMaxS, meetMaxB, meetMaxD, lvp: lvpSaved, capture, series: seriesStore, videoCalib, videoOffsetSec: videoOffset, videoPersp, refAngle, refLengthCm: refLength }); }, [lift, phase, issues, selectedGeom, daysGeom, selectedDiag, daysDiag, weakMuscleGroups, weakMuscleSubs, asymSide, asymL, asymR, vbtBest, vbtLast, vbtWeight, vbtGoal, vbtUpdatedAt, vbtPauseMs, asymStartL, asymStartR, asymMidL, asymMidR, asymLockL, asymLockR, dualLeft, dualRight, perLift, redFlags, ruleChecks, meetDate, meetStrategy, meetMaxS, meetMaxB, meetMaxD, lvpSaved, capture, seriesStore, videoCalib, videoOffset, videoPersp, refAngle, refLength]);
 
   /** Переключение лифта: сохраняем фазу/отклонения текущего и восстанавливаем выбор целевого.
    *  Раньше общий state обнулялся — пользователь терял выбранную фазу после каждого щелчка. */
@@ -1017,11 +1056,48 @@ export const LiftMasterCard: React.FC<{
    * Ракурс «спереди/сбоку» так не определяется — он берётся из метаданных съёмки
    * и меняет трактовку горизонтали (сбоку — путь вглубь, спереди — уход вбок).
    */
+  /** Сохранённый замер ракурса по эталону для текущего движения. */
+  const curRefAngle = refAngle[lift] ?? null;
+  /**
+   * Масштаб кадра для эталона. У перспективы он локальный (зависит от высоты),
+   * поэтому берём высоту самого эталона, а не среднюю по видео: иначе угол
+   * считался бы по чужому масштабу.
+   */
+  const refScalePxPerCm = useMemo(() => {
+    if (refTaps.length < 2) return null;
+    const midY = (refTaps[0].videoY + refTaps[1].videoY) / 2;
+    if (curPersp) {
+      const yTrack = perspectiveTrackYForVideoY(curPersp, midY);
+      if (yTrack != null) {
+        const s = perspectiveLocalScale(curPersp, yTrack);
+        if (s > 0) return s;
+      }
+    }
+    return isCalibrationSane(curCalib) ? curCalib.pxPerCm : null;
+  }, [refTaps, curPersp, curCalib]);
+  /** Черновой замер по двум тапам: показывается сразу, к ракурсу применяется кнопкой. */
+  const refCandidate = useMemo(() => {
+    const lenCm = Number.parseFloat(refLength);
+    if (refTaps.length < 2 || !Number.isFinite(lenCm) || lenCm <= 0) return null;
+    return referenceAngleCheck(
+      {
+        a: { x: refTaps[0].videoX, y: refTaps[0].videoY },
+        b: { x: refTaps[1].videoX, y: refTaps[1].videoY },
+        lengthCm: lenCm,
+      },
+      { pxPerCm: refScalePxPerCm },
+    );
+  }, [refTaps, refLength, refScalePxPerCm]);
   const angleCheck = useMemo(
     () => (kinoveaResult
-      ? cameraAngleCheck(kinoveaResult.points, { skewPct: curPersp ? perspectiveSkewPct(curPersp) : null, side: captureMeta.side })
+      ? cameraAngleCheck(kinoveaResult.points, {
+        skewPct: curPersp ? perspectiveSkewPct(curPersp) : null,
+        side: captureMeta.side,
+        // Измеренный по эталону угол важнее метаданных: он получен из кадра.
+        azimuthDeg: curRefAngle?.azimuthDeg ?? null,
+      })
       : null),
-    [kinoveaResult, curPersp, captureMeta],
+    [kinoveaResult, curPersp, captureMeta, curRefAngle],
   );
   /** Короткая строка ракурса для картинок — один текст на SVG, PNG и отчёт. */
   const angleShortText = useMemo(() => cameraAngleShortLine(angleCheck), [angleCheck]);
@@ -1108,6 +1184,55 @@ export const LiftMasterCard: React.FC<{
     setPerspMsg(`Точка ${i + 1}: штанга отмечена. Нужны все четыре точки на разных высотах.`);
     setPerspPreview(null);
   }, []);
+
+  /** Кадр для эталона — из того же мини-плеера, что и перспектива (координаты совпадут). */
+  const grabRefFrame = useCallback(async () => {
+    if (!perspFile) { setRefMsg('Сначала выберите видео в блоке перспективы: кадр должен быть из того же видео, иначе масштаб не совпадёт.'); return; }
+    const el = perspVideoRef.current;
+    const t = typeof el?.currentTime === 'number' && Number.isFinite(el.currentTime) ? el.currentTime : undefined;
+    setRefMsg('⏳ Достаю кадр…');
+    const frame = await grabPerspFrame(t);
+    if (!frame) { setRefMsg('Кадр не получился: видео не декодировалось в этом WebView.'); return; }
+    setRefFrame({ dataUrl: frame.dataUrl, width: frame.width, height: frame.height, timeSec: t ?? null });
+    setRefTaps([]);
+    setRefMsg('Ткните один конец эталона, затем второй — по прямой линии в реальности.');
+  }, [perspFile, grabPerspFrame]);
+
+  /** Тап по кадру эталона: ровно две точки; третий тап начинает заново, а не копит мусор. */
+  const onRefTap = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    if (!refFrame) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const relX = (e.clientX - rect.left) / Math.max(1, rect.width);
+    const relY = (e.clientY - rect.top) / Math.max(1, rect.height);
+    const tap = { videoX: Math.round(relX * refFrame.width), videoY: Math.round(relY * refFrame.height) };
+    setRefTaps((prev) => (prev.length >= 2 ? [tap] : [...prev, tap]));
+  }, [refFrame]);
+
+  /** Применить замер к ракурсу: с этого момента горизонталь трактуется однозначно. */
+  const applyRefAngle = useCallback(() => {
+    if (!refCandidate || refCandidate.flag !== 'ok' || refCandidate.azimuthDeg == null) {
+      setRefMsg('Угол не измерен — применять нечего.');
+      return;
+    }
+    const lengthCm = Number.parseFloat(refLength);
+    setRefAngle((s) => ({
+      ...s,
+      [lift]: { azimuthDeg: refCandidate.azimuthDeg as number, ratio: refCandidate.ratio, lengthCm, atSec: refFrame?.timeSec ?? null },
+    }));
+    setRefMsg(`Ракурс применён: камера ${refCandidate.azimuthDeg}° от плоскости движения. Горизонталь теперь трактуется по замеру, а не по догадке.`);
+  }, [refCandidate, refLength, refFrame, lift]);
+
+  /** Убрать сохранённый замер: ракурс снова будет только по метаданным. */
+  const clearRefAngle = useCallback(() => {
+    setRefAngle((s) => {
+      const next = { ...s };
+      delete next[lift];
+      return next;
+    });
+    setRefTaps([]);
+    setRefFrame(null);
+    setRefMsg('Замер ракурса убран — вернулись к метаданным съёмки.');
+  }, [lift]);
   /** Сохранённая серия прошлого раза для текущего движения. */
   const savedSeries = seriesStore[lift] ?? null;
   const curFirstSnapshot = useMemo(()=> kinoveaReps.length ? snapshotBarRep(kinoveaReps[0]) : null, [kinoveaReps]);
@@ -1395,6 +1520,8 @@ export const LiftMasterCard: React.FC<{
       angleCheck: angleCheck ? angleCheck.reason : '',
       angleDriftPct: angleCheck ? angleCheck.driftPct : null,
       angleBasis: angleCheck ? angleCheck.basis : undefined,
+      refAzimuthDeg: curRefAngle ? curRefAngle.azimuthDeg : null,
+      refLengthCm: curRefAngle ? curRefAngle.lengthCm : null,
       videoOverlayMode: kinoveaResult ? (curPersp ? 'perspective' : curCalib ? 'calibration' : 'panel') : '',
       videoScalePxPerCm: curCalib ? Math.round(curCalib.pxPerCm * 100) / 100 : null,
       videoPerspSkewPct: curPersp ? perspectiveSkewPct(curPersp) : null,
@@ -2775,7 +2902,8 @@ export const LiftMasterCard: React.FC<{
                 <div style={{ marginTop:4, display:'flex', gap:10, flexWrap:'wrap', fontSize:9, color:DIM }}>
                   {angleCheck.driftPct != null && <span data-lift="angle-drift">{angleCheck.basis === 'front' ? 'боковой уход' : 'горизонтальный ход'}: {angleCheck.driftPct}% хода</span>}
                   {angleCheck.skewPct != null && <span data-lift="angle-skew">разброс масштаба по высоте: {angleCheck.skewPct}%</span>}
-                  <span data-lift="angle-basis">ракурс: {angleCheck.basis === 'side' ? 'сбоку' : angleCheck.basis === 'front' ? 'спереди' : 'не указан'}</span>
+                  <span data-lift="angle-basis">ракурс: {angleCheck.basis === 'side' ? 'сбоку' : angleCheck.basis === 'front' ? 'спереди' : 'не указан'}{angleCheck.azimuthKnown ? ' (измерено)' : ''}</span>
+                  {angleCheck.azimuthDeg != null && <span data-lift="angle-azimuth">по эталону: камера {angleCheck.azimuthDeg}°</span>}
                 </div>
               )}
               {/*
@@ -2790,6 +2918,74 @@ export const LiftMasterCard: React.FC<{
                   это либо техника, либо камера стоит не так, как указано в параметрах.
                 </div>
               )}
+              {/*
+                Эталон в кадре: без него «спереди/сбоку» по одной траектории не
+                восстановить, и вердикт честно оставляет две версии. Отрезок
+                известной длины поперёк движения даёт угол через укорочение cos φ.
+              */}
+              <div data-lift="ref-block" style={{ marginTop:8, paddingTop:6, borderTop:'1px dashed rgba(148,163,184,0.2)' }}>
+                <div style={{ fontSize:10, fontWeight:800, color:'#cbd5e1' }}>📏 Эталон в кадре — ракурс по замеру</div>
+                <div style={{ marginTop:4, fontSize:9, color:DIM, lineHeight:1.45 }}>
+                  Отрезок известной длины <b>поперёк движения</b>: гриф между насечками ≈ 131 см, ширина стойки или скамьи.
+                  Ткните его концы на кадре — угол считается по укорочению, а не угадывается.
+                  Диск не подходит: он круглый и с любого ракурса виден одинаково.
+                </div>
+                <div style={{ display:'flex', gap:6, flexWrap:'wrap', alignItems:'flex-end', marginTop:6 }}>
+                  <label style={{ fontSize:9, color:DIM, display:'flex', flexDirection:'column', gap:2 }}>длина эталона, см
+                    <input
+                      data-lift="ref-length"
+                      type="number"
+                      inputMode="decimal"
+                      min={1}
+                      max={500}
+                      placeholder="131"
+                      value={refLength}
+                      onChange={(e)=> setRefLength(e.target.value.replace(/[^0-9.,]/g, '').slice(0, 6))}
+                      style={{ width:84, minHeight:32, padding:'6px 8px', borderRadius:8, background:'rgba(0,0,0,0.35)', border:'1px solid rgba(255,255,255,0.14)', color:'#fff', fontSize:11 }}
+                    />
+                  </label>
+                  <button data-lift="ref-grab" aria-label="Взять кадр из мини-плеера для эталона" onClick={grabRefFrame} style={{ minHeight:44, padding:'6px 12px', borderRadius:8, cursor:'pointer', background:'rgba(56,189,248,0.12)', color:'#38bdf8', border:'1px solid rgba(56,189,248,0.28)', fontWeight:700, fontSize:11 }}>⤓ Кадр из плеера</button>
+                  {curRefAngle && <button data-lift="ref-clear" aria-label="Убрать сохранённый замер ракурса" onClick={clearRefAngle} style={{ minHeight:44, padding:'6px 12px', borderRadius:8, cursor:'pointer', background:'transparent', color:DIM, border:'1px solid rgba(255,255,255,0.12)', fontSize:11 }}>Убрать замер</button>}
+                </div>
+                {!perspFile && (
+                  <div data-lift="ref-no-video" style={{ marginTop:4, fontSize:9, color:'#fbbf24', lineHeight:1.4 }}>
+                    Кадр берётся из видео в блоке перспективы — выберите его там, иначе масштаб кадра не совпадёт с калибровкой.
+                  </div>
+                )}
+                {refFrame && (
+                  <div data-lift="ref-frame" role="button" aria-label="Кадр эталона: ткните два конца известного отрезка" onClick={onRefTap} style={{ position:'relative', marginTop:6, borderRadius:8, overflow:'hidden', border:'1px solid rgba(56,189,248,0.3)', cursor:'crosshair', lineHeight:0 }}>
+                    <img src={refFrame.dataUrl} alt="Кадр для замера ракурса по эталону" style={{ width:'100%', display:'block' }} draggable={false} />
+                    {refTaps.map((t, i) => (
+                      <span key={i} data-lift={`ref-tap-${i}`} style={{ position:'absolute', left:`${((t.videoX / Math.max(1, refFrame.width)) * 100).toFixed(2)}%`, top:`${((t.videoY / Math.max(1, refFrame.height)) * 100).toFixed(2)}%`, transform:'translate(-50%,-50%)', width:14, height:14, borderRadius:7, background: i === 0 ? '#38bdf8' : '#f472b6', border:'2px solid #0b0f14', boxShadow:'0 0 0 1px rgba(255,255,255,0.35)' }} />
+                    ))}
+                  </div>
+                )}
+                {refFrame && refTaps.length < 2 && (
+                  <div style={{ marginTop:4, fontSize:9, color:DIM }}>
+                    Ткните {refTaps.length === 0 ? 'первый' : 'второй'} конец эталона.
+                  </div>
+                )}
+                {refCandidate && (
+                  <div data-lift="ref-result" role="status" style={{ marginTop:6, fontSize:10, lineHeight:1.45, color: refCandidate.flag === 'ok' ? '#4ade80' : '#fbbf24' }}>
+                    <div style={{ fontWeight:700 }}>
+                      {refCandidate.flag === 'ok' ? `камера ${refCandidate.azimuthDeg}° от плоскости движения` : 'угол не измерен'}
+                      {` · видно ${refCandidate.observedCm} см из ${refCandidate.expectedCm} см`}
+                    </div>
+                    <div style={{ marginTop:2, color:'#cbd5e1' }}>{refCandidate.reason}</div>
+                    {refCandidate.flag === 'ok' && (
+                      <button data-lift="ref-save" aria-label="Применить измеренный ракурс к вердикту" onClick={applyRefAngle} style={{ marginTop:6, minHeight:44, padding:'6px 12px', borderRadius:8, cursor:'pointer', background:'rgba(74,222,128,0.12)', color:'#4ade80', border:'1px solid rgba(74,222,128,0.3)', fontWeight:700, fontSize:11 }}>💾 Применить к ракурсу</button>
+                    )}
+                  </div>
+                )}
+                {curRefAngle && (
+                  <div data-lift="ref-saved" style={{ marginTop:6, fontSize:9, color:DIM, lineHeight:1.45 }}>
+                    Применён замер: камера {curRefAngle.azimuthDeg}° · эталон {curRefAngle.lengthCm} см
+                    {curRefAngle.atSec != null ? ` · кадр ${curRefAngle.atSec.toFixed(2)} с` : ''}
+                    {' '}— угол идёт в вердикт ракурса и в выгрузки.
+                  </div>
+                )}
+                {refMsg && <div data-lift="ref-msg" role="status" style={{ marginTop:4, fontSize:9, color:'#cbd5e1', lineHeight:1.4 }}>{refMsg}</div>}
+              </div>
             </div>
           </div>
           {/* Выдача: HTML / CSV / Поделиться (АПК-слой) */}
