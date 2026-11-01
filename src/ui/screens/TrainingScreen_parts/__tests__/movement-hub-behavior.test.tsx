@@ -1,7 +1,7 @@
 import { describe, expect, it, afterEach, beforeEach } from 'vitest';
 import { render, cleanup, fireEvent, act } from '@testing-library/react';
 import React from 'react';
-import { LiftMasterCard, exerciseMatchesLift } from '../LiftMasterCard';
+import { LiftMasterCard, exerciseMatchesLift, weeklyHeatTrend, heatTrendVerdict } from '../LiftMasterCard';
 import { getPlannerApply, subscribePlannerApply, clearPlannerApply, type PlannerApply } from '../planner-bridge';
 
 const openAll = () => localStorage.setItem('he_lift_master_collapsed_v1', '{}');
@@ -653,6 +653,76 @@ describe('LiftMasterCard — поведение (не только смоук)',
     localStorage.setItem(MASTER_KEY, JSON.stringify({ lift: 'bench', videoOffsetSec: { bench: 9999, squat: -3 } }));
     const { container } = render(<LiftMasterCard sessions={[]} />);
     expect((container.querySelector('[data-lift="video-offset"]') as HTMLInputElement).value).toBe('0');
+  });
+
+  it('динамика heat: недели сортируются, чужой лифт и пустые недели отбрасываются', () => {
+    const day = (iso: string) => new Date(`${iso}T12:00:00.000Z`).getTime();
+    const mk = (iso: string, lift: string, slowPct: number | null, xLoopCm?: number) => ({
+      ts: day(iso), lift, phase: '', issues: [], weakCount: 0, slowPct, ...(xLoopCm != null ? { xLoopCm } : {}),
+    } as any);
+    const history = [
+      mk('2026-10-20', 'bench', 24, 2.1),
+      mk('2026-10-06', 'bench', 41, 3.4),
+      mk('2026-10-13', 'bench', 33, 2.9),
+      mk('2026-10-13', 'squat', 50),
+      mk('2026-10-27', 'bench', null), // неделя без разбора траектории
+    ];
+    const rows = weeklyHeatTrend(history, 'bench');
+    expect(rows.map(r => r.slowPct)).toEqual([41, 33, 24]);
+    expect(rows.map(r => r.xLoopCm)).toEqual([3.4, 2.9, 2.1]);
+    expect(weeklyHeatTrend(history, 'bench', 2).map(r => r.slowPct)).toEqual([33, 24]);
+    expect(weeklyHeatTrend(history, 'deadlift')).toEqual([]);
+  });
+
+  it('вердикт динамики heat честен: порог 3 п.п., одиночная неделя — без вывода', () => {
+    const row = (slowPct: number, xLoopCm?: number) => ({ ts: 0, slowPct, xLoopCm: xLoopCm ?? null, vmaxMS: null });
+    expect(heatTrendVerdict([row(40)])).toBeNull();
+    expect(heatTrendVerdict([])).toBeNull();
+
+    const better = heatTrendVerdict([row(40, 3.4), row(32, 2.6)]);
+    expect(better!.deltaSlowPct).toBe(-8);
+    expect(better!.text).toContain('меньше на 8 п.п.');
+    expect(better!.text).toContain('xLoop 3.4 → 2.6 см');
+
+    const worse = heatTrendVerdict([row(24), row(31)]);
+    expect(worse!.deltaSlowPct).toBe(7);
+    expect(worse!.text).toContain('больше на 7 п.п.');
+
+    const flat = heatTrendVerdict([row(30), row(31)]);
+    expect(flat!.text).toContain('без изменений');
+  });
+
+  it('блок динамики heat показывает недели и вывод по тренду', () => {
+    const day = (iso: string) => new Date(`${iso}T12:00:00.000Z`).getTime();
+    localStorage.setItem('he_lift_master_history_v1', JSON.stringify([
+      { ts: day('2026-10-06'), lift: 'bench', phase: '', issues: [], weakCount: 0, slowPct: 40, xLoopCm: 3.2, vmaxMS: 0.42 },
+      { ts: day('2026-10-13'), lift: 'bench', phase: '', issues: [], weakCount: 0, slowPct: 34, xLoopCm: 2.9, vmaxMS: 0.45 },
+      { ts: day('2026-10-20'), lift: 'bench', phase: '', issues: [], weakCount: 0, slowPct: 27, xLoopCm: 2.4, vmaxMS: 0.48 },
+      { ts: day('2026-10-20'), lift: 'squat', phase: '', issues: [], weakCount: 0, slowPct: 55, xLoopCm: 5.1, vmaxMS: 0.3 },
+    ]));
+    const { container } = render(<LiftMasterCard sessions={[]} />);
+    expect(container.querySelector('[data-lift="heat-trend"]')).toBeTruthy();
+    const rows = container.querySelectorAll('[data-lift="heat-trend-row"]');
+    expect(rows.length).toBe(3);
+    expect(rows[0].textContent).toContain('медленных 27%');
+    expect(container.querySelector('[data-lift="heat-trend-verdict"]')!.textContent).toContain('меньше на 13 п.п.');
+
+    // Присед не протекает в тренд жима.
+    click(container.querySelector('[data-lift-nav="squat"]'));
+    expect(container.querySelector('[data-lift="heat-trend"]')!.textContent).toContain('медленных 55%');
+  });
+
+  it('пустая неделя не стирает метрики уже сохранённого среза', () => {
+    // Срез текущей недели с метриками: перезапуск без CSV не должен их обнулить.
+    localStorage.setItem('he_lift_master_history_v1', JSON.stringify([
+      { ts: Date.now(), lift: 'bench', phase: '', issues: [], weakCount: 0, slowPct: 29, xLoopCm: 2.7, vmaxMS: 0.44 },
+    ]));
+    render(<LiftMasterCard sessions={[]} />);
+    const saved = JSON.parse(localStorage.getItem('he_lift_master_history_v1') || '[]');
+    const bench = saved.filter((h: any) => h.lift === 'bench');
+    expect(bench.length).toBe(1);
+    expect(bench[0].slowPct).toBe(29);
+    expect(bench[0].xLoopCm).toBe(2.7);
   });
 
   it('интерактивные элементы хаба не меньше 44 px', () => {

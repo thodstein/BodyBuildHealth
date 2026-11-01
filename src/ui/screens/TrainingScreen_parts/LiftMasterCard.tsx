@@ -209,7 +209,21 @@ const TREND_KEY = 'he_lift_master_trend_v1';
 /** История недельных срезов диагностики (B9): фаза/bar-path/слабые на дату. */
 const HISTORY_KEY = 'he_lift_master_history_v1';
 
-interface MasterHistoryEntry { ts: number; lift: Lift; phase: WeakPoint | ''; issues: BarPathIssue[]; weakCount: number; e1rmBest?: number | null }
+interface MasterHistoryEntry {
+  ts: number; lift: Lift; phase: WeakPoint | ''; issues: BarPathIssue[]; weakCount: number; e1rmBest?: number | null;
+  /** Доля медленных отрезков heatmap, % (только если траекторию реально разбирали). */
+  slowPct?: number | null;
+  /** Отклонение траектории (xLoop), см. */
+  xLoopCm?: number | null;
+  /** vmax концентрической фазы, м/с. */
+  vmaxMS?: number | null;
+}
+
+/** Правдоподобные пределы метрик: мусор в localStorage не должен портить тренд. */
+const inRange = (v: unknown, min: number, max: number): number | null => {
+  const n = Number(v);
+  return Number.isFinite(n) && n >= min && n <= max ? Math.round(n * 10) / 10 : null;
+};
 
 function loadMasterHistory(): MasterHistoryEntry[] {
   try {
@@ -217,20 +231,68 @@ function loadMasterHistory(): MasterHistoryEntry[] {
     if (!Array.isArray(raw)) return [];
     return raw
       .filter((h: any) => h && typeof h.ts === 'number' && typeof h.lift === 'string' && (h.e1rmBest == null || typeof h.e1rmBest === 'number'))
+      .map((h: any) => ({
+        ...h,
+        slowPct: inRange(h.slowPct, 0, 100),
+        xLoopCm: inRange(h.xLoopCm, 0, 200),
+        vmaxMS: inRange(h.vmaxMS, 0, 10),
+      }))
       .slice(-60) as MasterHistoryEntry[];
   } catch { return []; }
 }
-/** Один срез на лифт в неделю: тот же ISO-период — перезапись, иначе добавление (cap 60). */
+/** Один срез на лифт в неделю: тот же ISO-период — перезапись, иначе добавление (cap 60).
+ *  Метрики, которых в новом срезе нет (CSV не разбирали), берутся из прежнего среза той же недели. */
 function pushMasterHistory(entry: MasterHistoryEntry): MasterHistoryEntry[] {
   const arr = loadMasterHistory();
   const isoOf = (ts: number) => new Date(ts).toISOString().slice(0, 10);
   const weekOf = (ts: number) => `${getISOWeekNumber(isoOf(ts))}/${isoOf(ts).slice(0, 4)}`;
   const w = weekOf(entry.ts);
   const idx = arr.findIndex(h => h.lift === entry.lift && weekOf(h.ts) === w);
-  if (idx >= 0) arr[idx] = entry; else arr.push(entry);
+  if (idx >= 0) {
+    const prev = arr[idx];
+    arr[idx] = {
+      ...prev, ...entry,
+      e1rmBest: entry.e1rmBest ?? prev.e1rmBest ?? null,
+      slowPct: entry.slowPct ?? prev.slowPct ?? null,
+      xLoopCm: entry.xLoopCm ?? prev.xLoopCm ?? null,
+      vmaxMS: entry.vmaxMS ?? prev.vmaxMS ?? null,
+    };
+  } else arr.push(entry);
   const trimmed = arr.slice(-60);
   try { localStorage.setItem(HISTORY_KEY, JSON.stringify(trimmed)); } catch {}
   return trimmed;
+}
+
+/** Одна неделя динамики heat для лифта. */
+export interface HeatTrendRow { ts: number; slowPct: number; xLoopCm: number | null; vmaxMS: number | null }
+
+/** Недели, где реально разбирали траекторию (есть heat-сводка), от старой к новой. */
+export function weeklyHeatTrend(history: MasterHistoryEntry[], lift: Lift, limit = 6): HeatTrendRow[] {
+  const rows = (Array.isArray(history) ? history : [])
+    .filter(h => h && h.lift === lift && Number.isFinite(h.slowPct as number))
+    .map(h => ({
+      ts: h.ts,
+      slowPct: Math.max(0, Math.min(100, Number(h.slowPct))),
+      xLoopCm: Number.isFinite(h.xLoopCm as number) ? Number(h.xLoopCm) : null,
+      vmaxMS: Number.isFinite(h.vmaxMS as number) ? Number(h.vmaxMS) : null,
+    }))
+    .sort((a, b) => a.ts - b.ts);
+  return rows.slice(-Math.max(1, limit));
+}
+
+/** Вывод по недельной динамике: порог 3 п.п. — чтобы не выдавать шум за прогресс. */
+export function heatTrendVerdict(rows: HeatTrendRow[]): { deltaSlowPct: number; text: string } | null {
+  if (!Array.isArray(rows) || rows.length < 2) return null;
+  const first = rows[0], last = rows[rows.length - 1];
+  const deltaSlowPct = Math.round(last.slowPct - first.slowPct);
+  const parts: string[] = [];
+  if (deltaSlowPct <= -3) parts.push(`медленных отрезков меньше на ${Math.abs(deltaSlowPct)} п.п. — скорость держится`);
+  else if (deltaSlowPct >= 3) parts.push(`медленных отрезков больше на ${deltaSlowPct} п.п. — срыв усиливается`);
+  else parts.push(`доля медленных отрезков без изменений (±${Math.abs(deltaSlowPct)} п.п.)`);
+  if (first.xLoopCm != null && last.xLoopCm != null) {
+    parts.push(`xLoop ${first.xLoopCm.toFixed(1)} → ${last.xLoopCm.toFixed(1)} см`);
+  }
+  return { deltaSlowPct, text: parts.join(' · ') };
 }
 
 function loadTrend(): E1rmSnapshot | null {
@@ -461,7 +523,7 @@ export const HUB_SECTIONS: Array<{ id: string; label: string; key: string; words
   { id: 'sec-5', label: '5 Траектория', key: 'sec4', words: 'bar path траектория xloop отклонения' },
   { id: 'sec-6', label: '6 Геометрия', key: 'sec5', words: 'углы геометрия техника' },
   { id: 'sec-7', label: '7 VBT', key: 'sec6', words: 'скорость vbt м/с lvp 1пм порог vl вес дневник подстановка' },
-  { id: 'sec-8', label: '8 Видео', key: 'secVideo', words: 'видео csv kinovea серия повторов heatmap экспорт png webm калибровка кадра пиксель px см смещение трека mp4' },
+  { id: 'sec-8', label: '8 Видео', key: 'secVideo', words: 'видео csv kinovea серия повторов heatmap экспорт png webm калибровка кадра пиксель px см смещение трека mp4 динамика тренд недели heat' },
   { id: 'sec-9', label: '9 Срывы', key: 'sec7', words: 'срывы дневник rpe тяжёлые подходы' },
   { id: 'sec-10', label: '10 RIR', key: 'sec8', words: 'rir калибровка bias' },
   { id: 'sec-11', label: '11 Мезо', key: 'sec9', words: 'мезо объём подходы коррекция' },
@@ -862,9 +924,15 @@ export const LiftMasterCard: React.FC<{
 
   // Недельный срез истории (B9): один на лифт в ISO-неделю, с e1RM консенсуса.
   useEffect(()=>{
-    setMasterHistory(pushMasterHistory({ ts: Date.now(), lift, phase, issues: [...issues], weakCount: weakMuscleSubs.length, e1rmBest: lift1rm.consensus?.value ?? null }));
+    setMasterHistory(pushMasterHistory({
+      ts: Date.now(), lift, phase, issues: [...issues], weakCount: weakMuscleSubs.length, e1rmBest: lift1rm.consensus?.value ?? null,
+      // Метрики из разобранного CSV; без него null — тогда push сохранит метрики прежнего среза этой недели.
+      slowPct: kinoveaHeatSummary ? kinoveaHeatSummary.slowPct : null,
+      xLoopCm: kinoveaResult ? kinoveaResult.xLoop : null,
+      vmaxMS: kinoveaResult ? kinoveaResult.vmax : null,
+    }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lift, phase, issues, weakMuscleSubs.length, lift1rm.consensus?.value]);
+  }, [lift, phase, issues, weakMuscleSubs.length, lift1rm.consensus?.value, kinoveaHeatSummary?.slowPct, kinoveaResult?.xLoop, kinoveaResult?.vmax]);
 
   // Паузная работа (C1): сеты с флагом pause по лифту за 28 дней (жим/присед/тяга).
   const pauseSets = useMemo(()=>{
@@ -1568,6 +1636,46 @@ export const LiftMasterCard: React.FC<{
             </span>
           </div>
         )}
+        {/* Динамика heat по неделям: только недели, где реально разбирали CSV. */}
+        {(() => {
+          const rows = weeklyHeatTrend(masterHistory, lift);
+          if (!rows.length) return null;
+          const verdict = heatTrendVerdict(rows);
+          const W = 240, H = 34, pad = 4;
+          const values = rows.map(r => r.slowPct);
+          const minV = Math.min(...values), maxV = Math.max(...values);
+          const span = Math.max(1, maxV - minV);
+          const pts = rows.map((r, i) => {
+            const x = rows.length === 1 ? W / 2 : pad + (i * (W - pad * 2)) / (rows.length - 1);
+            const y = H - pad - ((r.slowPct - minV) / span) * (H - pad * 2);
+            return [x, y] as const;
+          });
+          const tone = verdict ? (verdict.deltaSlowPct <= -3 ? '#4ade80' : verdict.deltaSlowPct >= 3 ? '#f87171' : DIM) : DIM;
+          return (
+            <div data-lift="heat-trend" style={{ marginTop:6, padding:7, borderRadius:8, background:'rgba(251,191,36,0.05)', border:'1px solid rgba(251,191,36,0.2)' }}>
+              <div style={{ fontSize:10, fontWeight:800, color:'#fbbf24' }}>📈 Динамика heat по неделям · {rows.length} срез(ов)</div>
+              <svg viewBox={`0 0 ${W} ${H}`} width="100%" height={40} preserveAspectRatio="none" role="img" aria-label="Доля медленных отрезков траектории по неделям">
+                <polyline points={pts.map(p => p.join(',')).join(' ')} fill="none" stroke="#fbbf24" strokeWidth={2} strokeLinejoin="round" />
+                {pts.map((p, i) => <circle key={i} cx={p[0]} cy={p[1]} r={2.5} fill="#fbbf24" />)}
+              </svg>
+              {rows.slice().reverse().slice(0, 4).map(r => (
+                <div key={r.ts} data-lift="heat-trend-row" style={{ fontSize:9, color:'#fff', opacity:0.85, marginTop:1 }}>
+                  {new Date(r.ts).toLocaleDateString('ru-RU')} — медленных {r.slowPct}%
+                  {r.xLoopCm != null ? ` · xLoop ${r.xLoopCm.toFixed(1)} см` : ''}
+                  {r.vmaxMS != null ? ` · vmax ${r.vmaxMS.toFixed(2)} м/с` : ''}
+                </div>
+              ))}
+              {verdict && (
+                <div data-lift="heat-trend-verdict" role="status" style={{ marginTop:4, fontSize:10, color:tone, lineHeight:1.45 }}>
+                  {verdict.text}
+                </div>
+              )}
+              {!verdict && (
+                <div style={{ marginTop:4, fontSize:9, color:DIM }}>Одна неделя с разбором — динамика появится со вторым CSV.</div>
+              )}
+            </div>
+          );
+        })()}
         <div style={{ marginTop: 6, padding: 6, borderRadius: 8, background: 'rgba(245,158,11,0.05)', border: '1px solid rgba(245,158,11,0.15)', fontSize: 9, color: '#ffffff', lineHeight: 1.4 }}>
           <b>Легенда heatmapping:</b> xLoop &lt;4 см — норма (зелёный), 4–6 — внимание (жёлтый), &gt;6 — критично (красный). Target-zone: жим лёжа — J-образная кривая к лицу; присед — вертикаль над серединой стопы; тяга — вертикаль над серединой стопы.
         </div>

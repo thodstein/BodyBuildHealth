@@ -207,7 +207,7 @@ for (const hook of [
   'series-copy-', 'data-lift="weight-mismatch"', 'data-lift="video-overlay-file"',
   'data-lift="video-calib"', 'data-lift="video-calib-file"', 'data-lift="video-calib-frame"',
   'data-lift="video-calib-save"', 'data-lift="video-calib-state"', 'data-lift="video-calib-clear"',
-  'data-lift="video-calib-fit"',
+  'data-lift="video-calib-fit"', 'data-lift="heat-trend"', 'data-lift="heat-trend-row"', 'data-lift="heat-trend-verdict"',
   'data-lift="video-offset"', 'data-lift="vbt-weight"', 'data-lift="vbt-weight-from-diary"',
   'data-lift-nav=',
 ]) mustContain(LIFT_HUB, hook, `lift hub hook ${hook}`);
@@ -215,6 +215,8 @@ for (const hook of [
 mustContain(LIFT_HUB, 'DEFAULT_COLLAPSED', 'lift hub default collapse');
 // Карта блоков — единый источник для ленты и поиска: 14 пунктов (антропометрия + 1…13).
 mustContain(LIFT_HUB, 'HUB_SECTIONS', 'lift hub sections map');
+mustContain(LIFT_HUB, 'export function weeklyHeatTrend', 'heat weekly trend');
+mustContain(LIFT_HUB, 'export function heatTrendVerdict', 'heat trend verdict');
 mustContain(LIFT_HUB, "'sec-13'", 'lift hub nav 13');
 mustContain(LIFT_HUB, "'13 Старт'", 'lift hub nav 13 label');
 {
