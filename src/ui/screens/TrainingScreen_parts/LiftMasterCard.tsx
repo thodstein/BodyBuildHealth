@@ -50,7 +50,7 @@ import { diagnoseAsymmetry } from '../../../engines/pro/pl-asymmetry.engine';
 import { RULE_CHECKS, checkLiftRules } from '../../../engines/pro/pl-competition-rules.engine';
 import { RED_FLAGS, checkRedFlags, type RedFlagId } from '../../../engines/pro/pl-red-flags.engine';
 import { buildMovementDiagnosticsHtml, buildMovementDiagnosticsCsv, buildTrajectorySvg, movementDiagnosticsFilename, buildHeatTrendCsv, type MovementDiagnosticsExportInput } from '../../../engines/pro/movement-diagnostics-export.engine';
-import { renderTrajectoryPng, recordTrajectoryWebm, recordVideoWithOverlay, canRecordTrajectory, dataUrlToBlob, grabVideoFrame, calibrationFromTaps, preferredVideoMime, isCalibrationSane, calibrationFrameFit, mapTrackToVideo, perspectiveFromAnchors, isPerspectiveSane, perspectiveSkewPct, perspectiveLocalScale, type VideoCalibration, type PerspectiveCalibration } from '../../../engines/pro/trajectory-overlay.engine';
+import { renderTrajectoryPng, recordTrajectoryWebm, recordVideoWithOverlay, canRecordTrajectory, dataUrlToBlob, grabVideoFrame, calibrationFromTaps, preferredVideoMime, isCalibrationSane, calibrationFrameFit, calibrationFrameFitOf, mapTrackToVideo, perspectiveFromAnchors, isPerspectiveSane, perspectiveSkewPct, perspectiveLocalScale, perspectiveFrameFit, renderFrameWithMapping, mapTrackToVideoPerspective, type VideoCalibration, type PerspectiveCalibration } from '../../../engines/pro/trajectory-overlay.engine';
 import { copyOrShareText, saveCsvApk, printHtmlApk, saveTextFileApk, saveBlobApk, shareOutcomeLabel } from '../../../core/apk-share';
 import { VideoCaptureCard } from './VideoCaptureCard';
 import StickingPointAnalysisCard from './StickingPointAnalysisCard';
@@ -444,6 +444,10 @@ function cleanVideoPersp(raw: unknown): Record<string, PerspectiveCalibration> {
       anchors,
       vA: Number(v.vA), vB: Number(v.vB), vC: Number(v.vC), fitPx: Number(v.fitPx),
       ...(v.mirrorX === true ? { mirrorX: true } : {}),
+      // Размеры кадра — только парой: одинокое значение бессмысленно для проверки попадания.
+      ...(Number(v.frameW) > 0 && Number(v.frameH) > 0
+        ? { frameW: Number(v.frameW), frameH: Number(v.frameH) }
+        : {}),
     };
     if (isPerspectiveSane(c)) out[k] = c;
   }
@@ -504,6 +508,10 @@ function cleanVideoCalib(raw: unknown): Record<string, VideoCalibration> {
       trackX: Number(v.trackX), trackY: Number(v.trackY),
       pxPerCm: Number(v.pxPerCm),
       ...(v.mirrorX === true ? { mirrorX: true } : {}),
+      // Размеры кадра — только парой: одинокое значение бессмысленно для проверки попадания.
+      ...(Number(v.frameW) > 0 && Number(v.frameH) > 0
+        ? { frameW: Number(v.frameW), frameH: Number(v.frameH) }
+        : {}),
     };
     if (isCalibrationSane(c)) out[k] = c;
   }
@@ -736,6 +744,8 @@ export const LiftMasterCard: React.FC<{
   const [perspFile, setPerspFile] = useState<File | null>(null);
   const [perspMirror, setPerspMirror] = useState(false);
   const [perspMsg, setPerspMsg] = useState<string | null>(null);
+  /** Предпросмотр линии на кадре перспективы: какой кадр и готовая картинка. */
+  const [perspPreview, setPerspPreview] = useState<{ idx: number; url: string } | null>(null);
   /** Превью кадра и тапы: якорь (штанга на 0 с) → два конца известного отрезка. */
   const [calibFrame, setCalibFrame] = useState<{ dataUrl: string; width: number; height: number } | null>(null);
   const [calibAnchor, setCalibAnchor] = useState<{ videoX: number; videoY: number } | null>(null);
@@ -744,6 +754,8 @@ export const LiftMasterCard: React.FC<{
   const [calibRefCm, setCalibRefCm] = useState('45');
   const [calibMirror, setCalibMirror] = useState(false);
   const [calibMsg, setCalibMsg] = useState<string | null>(null);
+  /** Предпросмотр линии по кадру (до сохранения калибровки). */
+  const [calibPreview, setCalibPreview] = useState<string | null>(null);
   /** Наложение прошлой сессии на текущую траекторию. */
   const [compareOn, setCompareOn] = useState(false);
   const [videoNote, setVideoNote] = useState('');
@@ -878,11 +890,49 @@ export const LiftMasterCard: React.FC<{
   };
   /** Доля точек трека в кадре для сохранённой калибровки — видно, сходится ли она. */
   const calibFit = useMemo(() => {
-    if (!curCalib || !calibFrame || !kinoveaResult?.points?.length) return null;
-    const mapped = mapTrackToVideo(kinoveaResult.points, curCalib);
+    if (!curCalib || !kinoveaResult?.points?.length) return null;
+    // Кадр в памяти точнее: после перезагрузки остаётся сохранённый размер кадра.
+    if (calibFrame) {
+      const mapped = mapTrackToVideo(kinoveaResult.points, curCalib);
+      if (!mapped.length) return null;
+      return Math.round(calibrationFrameFit(mapped, calibFrame.width, calibFrame.height) * 100);
+    }
+    const saved = calibrationFrameFitOf(curCalib, kinoveaResult.points);
+    return saved == null ? null : Math.round(saved * 100);
+  }, [curCalib, calibFrame, kinoveaResult]);
+
+  /** Доля точек трека в кадре для ещё не сохранённого кандидата — видно до «Сохранить». */
+  const calibCandidateFit = useMemo(() => {
+    if (!calibCandidate || !calibFrame || !kinoveaResult?.points?.length) return null;
+    const mapped = mapTrackToVideo(kinoveaResult.points, calibCandidate);
     if (!mapped.length) return null;
     return Math.round(calibrationFrameFit(mapped, calibFrame.width, calibFrame.height) * 100);
-  }, [curCalib, calibFrame, kinoveaResult]);
+  }, [calibCandidate, calibFrame, kinoveaResult]);
+
+  /** Предпросмотр линии на кадре: проверка калибровки без записи всего видео. */
+  const showCalibPreview = useCallback(async () => {
+    if (!calibCandidate) return;
+    if (!calibFrame) { setCalibMsg('Сначала возьмите кадр из видео.'); return; }
+    if (!kinoveaResult?.points?.length) { setCalibMsg('Нужны точки трека: сначала разберите CSV.'); return; }
+    const mapped = mapTrackToVideo(kinoveaResult.points, calibCandidate);
+    if (mapped.length < 2) { setCalibMsg('Точек трека слишком мало для линии.'); return; }
+    const fit = Math.round(calibrationFrameFit(mapped, calibFrame.width, calibFrame.height) * 100);
+    const anchors = [calibAnchor, calibRefA, calibRefB]
+      .filter((p): p is { videoX: number; videoY: number } => !!p)
+      .map((p) => [p.videoX, p.videoY] as [number, number]);
+    const url = await renderFrameWithMapping(calibFrame, mapped, {
+      anchors,
+      caption: `калибровка ${calibCandidate.pxPerCm.toFixed(2)} px/см · в кадре ${fit}%`,
+    });
+    if (!url) {
+      setCalibMsg('Предпросмотр недоступен в этом WebView — линия всё равно нарисуется в видео.');
+      return;
+    }
+    setCalibPreview(url);
+    setCalibMsg(`Проверка на кадре: точек трека в кадре ${fit}%.`);
+  }, [calibCandidate, calibFrame, kinoveaResult, calibAnchor, calibRefA, calibRefB]);
+  // Точки/кадр изменились — старый предпросмотр уже не про этот кадр.
+  useEffect(() => { setCalibPreview(null); }, [calibCandidate, calibFrame]);
 
   /** Сохранённая перспектива для движения. */
   const curPersp = videoPersp[lift] ?? null;
@@ -911,6 +961,48 @@ export const LiftMasterCard: React.FC<{
       { mirrorX: perspMirror },
     );
   }, [kinoveaResult, perspRows, perspMirror, curOffset]);
+  /** Размер кадра для проверки попадания: вынутый кадр или сохранённый в калибровке. */
+  const perspFrameDims = useMemo(() => {
+    const f = perspRows.find((r) => r.frame)?.frame;
+    if (f) return { width: f.width, height: f.height };
+    if (curPersp?.frameW && curPersp?.frameH) return { width: curPersp.frameW, height: curPersp.frameH };
+    return null;
+  }, [perspRows, curPersp]);
+  /** Доля точек трека в кадре для сохранённой перспективы — без повторной выемки кадра. */
+  const perspFitSaved = useMemo(() => {
+    if (!curPersp || !kinoveaResult?.points?.length) return null;
+    const f = perspectiveFrameFit(curPersp, kinoveaResult.points);
+    return f == null ? null : Math.round(f * 100);
+  }, [curPersp, kinoveaResult]);
+  /** То же для кандидата (ещё не сохранённого). */
+  const perspCandidateFit = useMemo(() => {
+    if (!perspCandidate || !perspFrameDims || !kinoveaResult?.points?.length) return null;
+    const mapped = mapTrackToVideoPerspective(kinoveaResult.points, perspCandidate);
+    if (!mapped.length) return null;
+    return Math.round(calibrationFrameFit(mapped, perspFrameDims.width, perspFrameDims.height) * 100);
+  }, [perspCandidate, perspFrameDims, kinoveaResult]);
+  /** Предпросмотр перспективы на одном из четырёх кадров — до сохранения. */
+  const showPerspPreview = useCallback(async (idx: number) => {
+    const calib = perspCandidate ?? curPersp;
+    if (!calib) { setPerspMsg('Сначала заполните четыре точки перспективы.'); return; }
+    const row = perspRows[idx];
+    if (!row?.frame) { setPerspMsg(`Кадр ${idx + 1} не вынут — нажмите «📷 Кадр».`); return; }
+    if (!kinoveaResult?.points?.length) { setPerspMsg('Нужны точки трека: сначала разберите CSV.'); return; }
+    const mapped = mapTrackToVideoPerspective(kinoveaResult.points, calib);
+    if (mapped.length < 2) { setPerspMsg('Точки трека не легли в кадр — проверьте привязки.'); return; }
+    const fit = Math.round(calibrationFrameFit(mapped, row.frame.width, row.frame.height) * 100);
+    const skew = perspectiveSkewPct(calib);
+    const url = await renderFrameWithMapping(row.frame, mapped, {
+      anchors: calib.anchors.map((a) => [a.videoX, a.videoY] as [number, number]),
+      caption: `перспектива${skew != null ? ` · разброс ${skew}%` : ''} · в кадре ${fit}%`,
+    });
+    if (!url) {
+      setPerspMsg('Предпросмотр недоступен в этом WebView — линия всё равно нарисуется в видео.');
+      return;
+    }
+    setPerspPreview({ idx, url });
+    setPerspMsg(`Проверка на кадре ${idx + 1}: точек трека в кадре ${fit}%.`);
+  }, [perspCandidate, curPersp, perspRows, kinoveaResult]);
   /** Тап по кадру N: пиксели исходного видео, не превью. */
   const onPerspTap = useCallback((i: number, e: React.MouseEvent<HTMLDivElement>) => {
     setPerspRows((rows) => {
@@ -925,6 +1017,7 @@ export const LiftMasterCard: React.FC<{
       return next;
     });
     setPerspMsg(`Точка ${i + 1}: штанга отмечена. Нужны все четыре точки на разных высотах.`);
+    setPerspPreview(null);
   }, []);
   /** Сохранённая серия прошлого раза для текущего движения. */
   const savedSeries = seriesStore[lift] ?? null;
@@ -1178,6 +1271,9 @@ export const LiftMasterCard: React.FC<{
       : null;
     const lvp = lvpResult ?? lvpSaved[lift] ?? null;
     const pauseMs = parseFloat(vbtPauseMs);
+    const SIDE_RU: Record<string, string> = { left: 'слева', right: 'справа', front: 'фронт' };
+    const DEVICE_RU: Record<string, string> = { phone: 'телефон', kinovea: 'Kinovea', enode: 'Enode' };
+    const csvK = parseFloat(kinoveaScale);
     return {
       lift, liftRu: LIFT_RU[lift],
       phase: effectivePhase ?? '',
@@ -1200,6 +1296,19 @@ export const LiftMasterCard: React.FC<{
       weightKg: curWeightKg,
       captureQuality: captureQuality.flag === 'unknown' ? 'не задано'
         : `${captureQuality.flag === 'ok' ? 'в норме' : 'грубо'} — ${captureQuality.reason}`,
+      // Отчёт должен объяснять, откуда взялась линия: без этого его нельзя воспроизвести.
+      captureDetails: [
+        capture.heightM.trim() ? `камера ${capture.heightM.trim()} м` : '',
+        capture.distM.trim() ? `дистанция ${capture.distM.trim()} м` : '',
+        capture.side ? SIDE_RU[capture.side] ?? '' : '',
+        capture.device ? DEVICE_RU[capture.device] ?? '' : '',
+      ].filter(Boolean).join(' · ') || null,
+      videoOverlayMode: kinoveaResult ? (curPersp ? 'perspective' : curCalib ? 'calibration' : 'panel') : '',
+      videoScalePxPerCm: curCalib ? Math.round(curCalib.pxPerCm * 100) / 100 : null,
+      videoPerspSkewPct: curPersp ? perspectiveSkewPct(curPersp) : null,
+      videoPerspAnchors: curPersp ? curPersp.anchors.length : null,
+      videoOffsetSec: curOffset > 0 ? curOffset : null,
+      csvScaleCmPerUnit: Number.isFinite(csvK) && csvK > 0 ? csvK : null,
       asymmetryPct: asymDiag ? asymDiag.pct : null,
       asymmetryVerdict: asymDiag ? asymDiag.text : '',
       vbtMetric,
@@ -2317,11 +2426,22 @@ export const LiftMasterCard: React.FC<{
               <div style={{ marginTop:5, display:'flex', gap:6, flexWrap:'wrap', alignItems:'center' }}>
                 <span role="status" style={{ fontSize:10, color:'#e5e7eb' }}>
                   Масштаб: {calibCandidate.pxPerCm.toFixed(2)} px/см · эталон {calibRefCm} см
+                  {calibCandidateFit != null ? ` · в кадре ${calibCandidateFit}%` : ''}
                 </span>
+                <button data-lift="video-calib-preview" aria-label="Проверить линию на кадре" onClick={()=>{ void showCalibPreview(); }} style={{ minHeight:44, padding:'8px 12px', borderRadius:8, cursor:'pointer', background:'rgba(56,189,248,0.12)', color:'#38bdf8', border:'1px solid rgba(56,189,248,0.28)', fontSize:11, fontWeight:700 }}>👁 Проверить на кадре</button>
                 <button data-lift="video-calib-save" aria-label="Сохранить калибровку кадра" onClick={()=>{
-                  setVideoCalib(s => ({ ...s, [lift]: calibCandidate }));
+                  // Размер кадра запоминаем: по нему потом проверяется попадание в кадр без кадра.
+                  const saved = calibFrame
+                    ? { ...calibCandidate, frameW: calibFrame.width, frameH: calibFrame.height }
+                    : calibCandidate;
+                  setVideoCalib(s => ({ ...s, [lift]: saved }));
                   setCalibMsg(`Калибровка сохранена (${calibCandidate.pxPerCm.toFixed(2)} px/см) — «Видео с траекторией» нарисует линию по грифу.`);
                 }} style={{ minHeight:44, padding:'8px 12px', borderRadius:8, cursor:'pointer', background:'rgba(74,222,128,0.14)', color:'#4ade80', border:'1px solid rgba(74,222,128,0.3)', fontSize:11, fontWeight:700 }}>💾 Сохранить калибровку</button>
+              </div>
+            )}
+            {calibPreview && (
+              <div data-lift="video-calib-preview-img" style={{ marginTop:6, borderRadius:8, overflow:'hidden', border:'1px solid rgba(56,189,248,0.3)', lineHeight:0 }}>
+                <img src={calibPreview} alt="Предпросмотр: линия по грифу на кадре" style={{ width:'100%', display:'block' }} draggable={false} />
               </div>
             )}
             {!kinoveaResult && (
@@ -2336,7 +2456,7 @@ export const LiftMasterCard: React.FC<{
               <div style={{ fontSize:10, fontWeight:800, color:'#a855f7' }}>📐 Перспектива по 4 кадрам</div>
               <span data-lift="video-persp-state" role="status" style={{ fontSize:9, color: curPersp ? '#4ade80' : '#fbbf24' }}>
                 {curPersp
-                  ? `✓ перспектива · разброс масштаба ${perspectiveSkewPct(curPersp) ?? 0}% (приоритет над единым масштабом)`
+                  ? `✓ перспектива · разброс масштаба ${perspectiveSkewPct(curPersp) ?? 0}%${perspFitSaved != null ? ` · в кадре ${perspFitSaved}%` : ''} (приоритет над единым масштабом)`
                   : 'не настроена — работает единый масштаб'}
               </span>
             </div>
@@ -2392,6 +2512,7 @@ export const LiftMasterCard: React.FC<{
                       onChange={(e)=>{
                         const v = e.target.value;
                         setPerspRows((rows) => rows.map((r, j) => (j === i ? { ...r, timeSec: v, tap: null } : r)));
+                        setPerspPreview(null);
                       }}
                       style={{ width:82, minHeight:44, marginLeft:4, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.15)', color:'#fff', borderRadius:8, padding:'10px 8px', fontSize:12 }}
                     />
@@ -2408,6 +2529,7 @@ export const LiftMasterCard: React.FC<{
                       const frame = await grabVideoFrame(perspFile, { timeSec: t });
                       if (!frame) { setPerspMsg('Кадр не получился: видео не декодировалось в этом WebView.'); return; }
                       setPerspRows((rows) => rows.map((r, j) => (j === i ? { ...r, frame, tap: null } : r)));
+                      setPerspPreview(null);
                       setPerspMsg(`Кадр ${i + 1} готов — ткните в штангу.`);
                     }}
                     style={{ minHeight:44, padding:'8px 12px', borderRadius:8, cursor:(perspFile && Number.isFinite(parseFloat(row.timeSec))) ? 'pointer' : 'default', background:'rgba(168,85,247,0.14)', color:'#a855f7', border:'1px solid rgba(168,85,247,0.3)', fontSize:11, fontWeight:700, opacity:(perspFile && Number.isFinite(parseFloat(row.timeSec))) ? 1 : 0.55 }}
@@ -2440,15 +2562,40 @@ export const LiftMasterCard: React.FC<{
                 <div style={{ marginTop:6, display:'flex', gap:8, flexWrap:'wrap', alignItems:'center' }}>
                   <span role="status" style={{ fontSize:10, color:'#e5e7eb' }}>
                     Масштаб снизу {lo.toFixed(2)} px/см → сверху {hi.toFixed(2)} px/см (разброс {skew}%) · невязка {perspCandidate.fitPx} px
+                    {perspCandidateFit != null ? ` · в кадре ${perspCandidateFit}%` : ''}
                   </span>
                   {skew > 60 && <span style={{ fontSize:9, color:'#fbbf24' }}>⚠ разброс слишком большой — проверьте, что точки взяты на разных высотах</span>}
                   <button data-lift="persp-save" aria-label="Сохранить перспективную калибровку" onClick={()=>{
-                    setVideoPersp((s) => ({ ...s, [lift]: perspCandidate }));
+                    // Размер кадра запоминаем: по нему потом проверяется попадание в кадр без нового кадра.
+                    const dims = perspRows.find((r) => r.frame)?.frame ?? null;
+                    const saved = dims ? { ...perspCandidate, frameW: dims.width, frameH: dims.height } : perspCandidate;
+                    setVideoPersp((s) => ({ ...s, [lift]: saved }));
                     setPerspMsg(`Перспектива сохранена: разброс масштаба ${skew}%, невязка ${perspCandidate.fitPx} px. «Видео с траекторией» нарисует линию с учётом перспективы.`);
                   }} style={{ minHeight:44, padding:'8px 12px', borderRadius:8, cursor:'pointer', background:'rgba(74,222,128,0.14)', color:'#4ade80', border:'1px solid rgba(74,222,128,0.3)', fontSize:11, fontWeight:700 }}>💾 Сохранить перспективу</button>
                 </div>
               );
             })()}
+            {/* Проверка линии на кадре: до этого попадание в гриф видно было только после записи видео. */}
+            {(perspCandidate || curPersp) && perspRows.some((r) => r.frame) && (
+              <div style={{ marginTop:6, display:'flex', gap:6, flexWrap:'wrap', alignItems:'center' }}>
+                <span style={{ fontSize:9, color:DIM }}>👁 Проверить на кадре:</span>
+                {perspRows.map((r, i) => (r.frame ? (
+                  <button
+                    key={i}
+                    data-lift={`persp-preview-tab-${i}`}
+                    aria-pressed={perspPreview?.idx === i}
+                    aria-label={`Показать линию на кадре ${i + 1}`}
+                    onClick={()=>{ void showPerspPreview(i); }}
+                    style={{ minHeight:44, padding:'8px 12px', borderRadius:8, cursor:'pointer', border: perspPreview?.idx === i ? '1px solid #a855f7' : '1px solid rgba(168,85,247,0.25)', background: perspPreview?.idx === i ? 'rgba(168,85,247,0.2)' : 'rgba(168,85,247,0.08)', color:'#a855f7', fontSize:11, fontWeight:700 }}
+                  >кадр {i + 1}</button>
+                ) : null))}
+              </div>
+            )}
+            {perspPreview && (
+              <div data-lift="persp-preview-img" style={{ marginTop:6, borderRadius:8, overflow:'hidden', border:'1px solid rgba(168,85,247,0.3)', lineHeight:0 }}>
+                <img src={perspPreview.url} alt={`Предпросмотр перспективы на кадре ${perspPreview.idx + 1}`} style={{ width:'100%', display:'block' }} draggable={false} />
+              </div>
+            )}
             {!perspCandidate && (
               <div style={{ marginTop:5, fontSize:9, color:DIM, lineHeight:1.4 }}>
                 {!kinoveaResult

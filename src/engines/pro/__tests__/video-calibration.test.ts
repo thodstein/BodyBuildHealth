@@ -4,6 +4,7 @@ import {
   calibrationFromTaps,
   isCalibrationSane,
   calibrationFrameFit,
+  calibrationFrameFitOf,
   preferredVideoMime,
   grabVideoFrame,
   type VideoCalibration,
@@ -48,6 +49,34 @@ describe('isCalibrationSane — правдоподобность масштаб�
     expect(isCalibrationSane({ ...CALIB, videoX: Number.NaN })).toBe(false);
     expect(isCalibrationSane(null)).toBe(false);
     expect(isCalibrationSane(undefined)).toBe(false);
+  });
+
+  it('размер кадра необязателен, но мусорный — отбрасывается', () => {
+    expect(isCalibrationSane({ ...CALIB, frameW: 1280, frameH: 720 })).toBe(true);
+    expect(isCalibrationSane({ ...CALIB, frameW: 0, frameH: 720 })).toBe(false);
+    expect(isCalibrationSane({ ...CALIB, frameW: 1280, frameH: Number.NaN })).toBe(false);
+    expect(isCalibrationSane({ ...CALIB, frameW: 50000, frameH: 720 })).toBe(false);
+  });
+});
+
+describe('calibrationFrameFitOf — «в кадре N %» после перезагрузки', () => {
+  const ptsAll = [{ x: 0, y: 0 }, { x: 0, y: 10 }, { x: 0, y: 20 }];
+  const pts = [{ x: 0, y: 0 }, { x: 0, y: 10 }, { x: 0, y: 20 }, { x: 0, y: 50 }];
+
+  it('точки в кадре 1280×720 → 1 (все 100%)', () => {
+    expect(calibrationFrameFitOf({ ...CALIB, frameW: 1280, frameH: 720 }, ptsAll)).toBe(1);
+  });
+
+  it('кадр ниже линии (200 px) → попадает половина точек', () => {
+    // y трека 0,10,20,50 см → пиксели 300,200,100,-200: в кадр 200 px попадают 200 и 100.
+    expect(calibrationFrameFitOf({ ...CALIB, frameW: 200, frameH: 200 }, pts)).toBe(0.5);
+  });
+
+  it('без размера кадра и по битой калибровке — null, а не выдуманные проценты', () => {
+    expect(calibrationFrameFitOf(CALIB, pts)).toBeNull();
+    expect(calibrationFrameFitOf({ ...CALIB, frameW: 1280, frameH: 720, pxPerCm: Number.NaN }, pts)).toBeNull();
+    expect(calibrationFrameFitOf({ ...CALIB, frameW: 1280, frameH: 720 }, [])).toBeNull();
+    expect(calibrationFrameFitOf(null, pts)).toBeNull();
   });
 });
 

@@ -300,6 +300,9 @@ export interface VideoCalibration {
   pxPerCm: number;
   /** Съёмка с противоположной стороны / зеркало: инвертировать горизонталь. */
   mirrorX?: boolean;
+  /** Размер кадра видео, px: нужен, чтобы проверить «сколько точек трека попало в кадр» без кадра. */
+  frameW?: number;
+  frameH?: number;
 }
 
 /** Набор тапов для калибровки: якорь (штанга) + два конца известного отрезка. */
@@ -317,7 +320,28 @@ export function isCalibrationSane(c: VideoCalibration | null | undefined): boole
   if (!c) return false;
   const nums = [c.videoX, c.videoY, c.trackX, c.trackY, c.pxPerCm];
   if (!nums.every((n) => Number.isFinite(n))) return false;
-  return c.pxPerCm > 0.05 && c.pxPerCm < 200;
+  if (!(c.pxPerCm > 0.05 && c.pxPerCm < 200)) return false;
+  // Размер кадра необязателен, но если записан — только правдоподобный.
+  if (c.frameW != null || c.frameH != null) {
+    const ok = (n: unknown) => typeof n === 'number' && Number.isFinite(n) && n > 0 && n <= 20000;
+    if (!ok(c.frameW) || !ok(c.frameH)) return false;
+  }
+  return true;
+}
+
+/**
+ * Доля точек трека в кадре для сохранённой калибровки (0…1) или null, если
+ * размер кадра неизвестен. Нужна, чтобы видеть сходимость после перезагрузки.
+ */
+export function calibrationFrameFitOf(
+  c: VideoCalibration | null | undefined,
+  points: ReadonlyArray<{ x: number; y: number }>,
+): number | null {
+  if (!c || !isCalibrationSane(c) || !Array.isArray(points) || !points.length) return null;
+  if (!(c.frameW! > 0) || !(c.frameH! > 0)) return null;
+  const mapped = mapTrackToVideo(points, c);
+  if (!mapped.length) return null;
+  return calibrationFrameFit(mapped, c.frameW!, c.frameH!);
 }
 
 /** Пиксели видео для точек трека (y трека растёт вверх, в кадре — вниз). */
@@ -388,6 +412,9 @@ export interface PerspectiveCalibration {
   fitPx: number;
   /** Съёмка с противоположной стороны / зеркало: инвертировать горизонталь. */
   mirrorX?: boolean;
+  /** Размер кадра видео, px: нужен, чтобы проверить «сколько точек трека попало в кадр» без кадра. */
+  frameW?: number;
+  frameH?: number;
 }
 
 /** Одна привязка перспективы: время трека и пиксель штанги в кадре на этот момент. */
@@ -411,7 +438,27 @@ export function isPerspectiveSane(c: PerspectiveCalibration | null | undefined):
     const s = perspectiveLocalScale(c, a.trackY);
     if (!(s > 0.05 && s < 200)) return false;
   }
+  // Размер кадра необязателен, но если записан — только правдоподобный.
+  if (c.frameW != null || c.frameH != null) {
+    const ok = (n: unknown) => typeof n === 'number' && Number.isFinite(n) && n > 0 && n <= 20000;
+    if (!ok(c.frameW) || !ok(c.frameH)) return false;
+  }
   return true;
+}
+
+/**
+ * Доля точек трека в кадре для сохранённой перспективы (0…1) или null, если
+ * размер кадра неизвестен. Без кадра проверить попадание больше нечем.
+ */
+export function perspectiveFrameFit(
+  c: PerspectiveCalibration | null | undefined,
+  points: ReadonlyArray<{ x: number; y: number }>,
+): number | null {
+  if (!c || !isPerspectiveSane(c) || !Array.isArray(points) || !points.length) return null;
+  if (!(c.frameW! > 0) || !(c.frameH! > 0)) return null;
+  const mapped = mapTrackToVideoPerspective(points, c);
+  if (!mapped.length) return null;
+  return calibrationFrameFit(mapped, c.frameW!, c.frameH!);
 }
 
 /** Разброс масштаба по высоте привязок, %: 0 — перспективы нет, 15 — верх в 1.15 раза мельче. */
@@ -566,6 +613,145 @@ export function mapTrackToVideoPerspective(
     out.push([origin.videoX + (p.x - origin.trackX) * s * mx, yv]);
   }
   return out;
+}
+
+/** Параметры отрисовки линии поверх кадра (для тестов и предпросмотра). */
+export interface FrameMappingDrawInput {
+  w: number;
+  h: number;
+  /** Пиксели видео; множатся на `scale` при отрисовке. */
+  mapped: ReadonlyArray<[number, number]>;
+  /** Масштаб превью: кадр рисуется уменьшенным, координаты — те же. */
+  scale?: number;
+  /** Точки привязки (пиксели видео) — обводятся фиолетовым. */
+  anchors?: ReadonlyArray<[number, number]>;
+  /** Подпись внизу кадра («калибровка 8.2 px/см · в кадре 97%»). */
+  caption?: string;
+}
+
+/**
+ * Рисует линию трека поверх уже нарисованного кадра. Вынесено отдельно от canvas,
+ * чтобы логику отрисовки можно было проверить без браузера.
+ */
+export function drawFrameWithMapping(ctx: CanvasRenderingContext2D, inp: FrameMappingDrawInput): void {
+  const mapped = inp.mapped ?? [];
+  if (!ctx || mapped.length < 2) return;
+  const k = inp.scale && inp.scale > 0 ? inp.scale : 1;
+  const w = Math.max(1, inp.w);
+  const h = Math.max(1, inp.h);
+
+  const at = (i: number): [number, number] => [mapped[i][0] * k, mapped[i][1] * k];
+  const line = (color: string, width: number, from: number, to: number) => {
+    ctx.strokeStyle = color;
+    ctx.lineWidth = width;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    for (let i = from; i <= to; i++) {
+      const [x, y] = at(i);
+      if (i === from) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+  };
+  const dot = (x: number, y: number, r: number, fill: string) => {
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fillStyle = fill;
+    ctx.fill();
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = '#0b0f14';
+    ctx.stroke();
+  };
+
+  // Тёмный ореол: линия читается и на светлом блине, и на тёмном зале.
+  line('rgba(11,15,20,0.65)', 6, 0, mapped.length - 1);
+  // Одна линия цветом «быстро» — ровно как в recordVideoWithOverlay: предпросмотр
+  // не должен обещать больше, чем будет в готовом файле.
+  line(BAR_HEAT_COLORS.fast, 3, 0, mapped.length - 1);
+
+  const [sx, sy] = at(0);
+  const [ex, ey] = at(mapped.length - 1);
+  dot(sx, sy, 4, '#e5e7eb');
+  dot(ex, ey, 6, BAR_HEAT_COLORS.fast);
+  for (const [ax, ay] of inp.anchors ?? []) {
+    if (!Number.isFinite(ax) || !Number.isFinite(ay)) continue;
+    dot(ax * k, ay * k, 7, '#a855f7');
+  }
+
+  const caption = inp.caption ?? '';
+  if (caption) {
+    ctx.font = '600 13px sans-serif';
+    let tw = w;
+    try {
+      const m = ctx.measureText?.(caption);
+      if (m && Number.isFinite(m.width)) tw = Math.min(w, m.width + 16);
+    } catch { /* останется полная ширина */ }
+    ctx.fillStyle = 'rgba(11,15,20,0.72)';
+    ctx.fillRect(0, h - 24, tw, 24);
+    ctx.fillStyle = '#e5e7eb';
+    ctx.fillText(caption, 8, h - 8);
+  }
+}
+
+/** data:URL → <img>; null, если среда не декодировала картинку за отведённое время. */
+function loadImage(dataUrl: string, timeoutMs = 5000): Promise<HTMLImageElement | null> {
+  return new Promise((resolve) => {
+    if (typeof document === 'undefined' || typeof dataUrl !== 'string' || !dataUrl.startsWith('data:')) {
+      resolve(null);
+      return;
+    }
+    const img = document.createElement('img');
+    let done = false;
+    const finish = (v: HTMLImageElement | null) => { if (!done) { done = true; resolve(v); } };
+    img.onload = () => finish(img);
+    img.onerror = () => finish(null);
+    setTimeout(() => finish(null), timeoutMs);
+    try { img.src = dataUrl; } catch { finish(null); }
+  });
+}
+
+/**
+ * Предпросмотр наложения на кадр: линия трека поверх реального кадра видео.
+ *
+ * Зачем: до этого калибровка и перспектива проверялись только числами (px/см,
+ * невязка). Промах в тапе обнаруживался после записи всего видео. Здесь линия
+ * рисуется на одном кадре — до сохранения калибровки.
+ *
+ * Возвращает data:URL (JPEG) или null, если canvas/кадр недоступны.
+ */
+export async function renderFrameWithMapping(
+  frame: { dataUrl: string; width: number; height: number },
+  mapped: ReadonlyArray<[number, number]>,
+  opts?: Omit<FrameMappingDrawInput, 'w' | 'h' | 'mapped' | 'scale'> & { maxW?: number },
+): Promise<string | null> {
+  if (!canUseCanvas()) return null;
+  if (!frame || typeof frame.dataUrl !== 'string' || !frame.dataUrl.startsWith('data:')) return null;
+  if (!Array.isArray(mapped) || mapped.length < 2) return null;
+  if (!mapped.every(([x, y]) => Number.isFinite(x) && Number.isFinite(y))) return null;
+
+  const img = await loadImage(frame.dataUrl);
+  if (!img) return null;
+  const w0 = img.naturalWidth || img.width || frame.width;
+  const h0 = img.naturalHeight || img.height || frame.height;
+  if (!(w0 > 0) || !(h0 > 0)) return null;
+
+  const k = Math.min(1, (opts?.maxW ?? 720) / w0);
+  const w = Math.max(1, Math.round(w0 * k));
+  const h = Math.max(1, Math.round(h0 * k));
+  const canvas = document.createElement('canvas');
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return null;
+  try {
+    ctx.drawImage(img, 0, 0, w, h);
+  } catch { return null; }
+
+  drawFrameWithMapping(ctx, {
+    w, h, mapped, scale: k,
+    anchors: opts?.anchors,
+    caption: opts?.caption ?? '',
+  });
+  try { return canvas.toDataURL('image/jpeg', 0.78); } catch { return null; }
 }
 
 /** Контейнер записи: mp4, если WebView умеет (Chrome 126+), иначе webm. */

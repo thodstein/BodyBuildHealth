@@ -607,6 +607,24 @@ describe('LiftMasterCard — поведение (не только смоук)',
     expect(container.querySelector('[data-lift="video-calib-frame"]')).toBeNull();
   });
 
+  it('калибровка: доля точек в кадре считается по сохранённому размеру кадра', () => {
+    // Кадр после перезагрузки в памяти отсутствует — проверка идёт по frameW/frameH.
+    localStorage.setItem(MASTER_KEY, JSON.stringify({
+      lift: 'bench',
+      videoCalib: { bench: { videoX: 100, videoY: 300, trackX: 0, trackY: 0, pxPerCm: 10, frameW: 1280, frameH: 720 } },
+    }));
+    const { container } = render(<LiftMasterCard sessions={[]} />);
+    act(() => {
+      fireEvent.change(container.querySelector('[data-lift="kinovea-text"]')!, {
+        target: { value: 'time,x,y\n0,0,0\n0.1,0,10\n0.2,0,20' },
+      });
+    });
+    act(() => { fireEvent.click(container.querySelector('[data-lift="parse-kinovea"]')!); });
+    const fit = container.querySelector('[data-lift="video-calib-fit"]');
+    expect(fit).toBeTruthy();
+    expect(fit!.textContent).toContain('100%');
+  });
+
   it('вес из дневника: берёт последний сет этого движения, а не любой', () => {
     const sessions = [{
       sessionId: 's1', date: '2026-08-10', exercises: [
@@ -756,6 +774,30 @@ describe('LiftMasterCard — поведение (не только смоук)',
     const saved = JSON.parse(localStorage.getItem(MASTER_KEY) || '{}');
     expect(saved.videoPersp?.bench).toBeUndefined();
     expect(container.querySelector('[data-lift="video-persp-state"]')!.textContent).toContain('не настроена');
+  });
+
+  it('перспектива: доля точек трека в кадре считается по сохранённому размеру кадра', () => {
+    const anchors = [
+      { timeSec: 0.1, trackX: 0, trackY: 0, videoX: 100, videoY: 520 },
+      { timeSec: 0.4, trackX: 0.5, trackY: 16.7, videoX: 104, videoY: 362.2 },
+      { timeSec: 0.7, trackX: 1, trackY: 33.3, videoX: 108, videoY: 223.8 },
+      { timeSec: 1.0, trackX: 1.5, trackY: 50, videoX: 112, videoY: 100 },
+    ];
+    localStorage.setItem(MASTER_KEY, JSON.stringify({
+      lift: 'bench',
+      videoPersp: { bench: { anchors, vA: -8, vB: 520, vC: 0.004, fitPx: 0.1, frameW: 1280, frameH: 720 } },
+    }));
+    const { container } = render(<LiftMasterCard sessions={[]} />);
+    act(() => {
+      fireEvent.change(container.querySelector('[data-lift="kinovea-text"]')!, {
+        target: { value: 'time,x,y\n0,0,0\n0.1,1,10\n0.2,2,20\n0.3,3,30' },
+      });
+    });
+    act(() => { fireEvent.click(container.querySelector('[data-lift="parse-kinovea"]')!); });
+    const state = container.querySelector('[data-lift="video-persp-state"]')!;
+    expect(state.textContent).toContain('в кадре 100%');
+    // Без вынутых кадров предпросмотра быть не может — и он не фабрикуется.
+    expect(container.querySelector('[data-lift="persp-preview-img"]')).toBeNull();
   });
 
   it('перспектива: мусор в персисте не применяется, без CSV точек нет', () => {

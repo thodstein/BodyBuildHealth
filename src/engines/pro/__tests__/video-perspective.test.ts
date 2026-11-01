@@ -5,6 +5,7 @@ import {
   isPerspectiveSane,
   perspectiveLocalScale,
   perspectiveSkewPct,
+  perspectiveFrameFit,
   type PerspectiveCalibration,
 } from '../trajectory-overlay.engine';
 
@@ -133,5 +134,61 @@ describe('isPerspectiveSane / perspectiveSkewPct — защита от мусо�
     const broken = { ...good, vA: Number.NaN };
     expect(mapTrackToVideoPerspective([{ x: 0, y: 0 }], broken)).toEqual([]);
     expect(mapTrackToVideoPerspective([], good)).toEqual([]);
+  });
+});
+
+describe('perspectiveFrameFit — попадание в кадр без повторной выемки кадра', () => {
+  const calib: PerspectiveCalibration = {
+    anchors: [
+      { timeSec: 0.1, trackX: 0, trackY: 0, videoX: 100, videoY: 520 },
+      { timeSec: 0.4, trackX: 0.5, trackY: 16.7, videoX: 104, videoY: 362.2 },
+      { timeSec: 0.7, trackX: 1, trackY: 33.3, videoX: 108, videoY: 223.8 },
+      { timeSec: 1.0, trackX: 1.5, trackY: 50, videoX: 112, videoY: 100 },
+    ],
+    vA: -8, vB: 520, vC: 0.004, fitPx: 0,
+    frameW: 1280, frameH: 720,
+  };
+  const points = [
+    { x: 0, y: 0 }, { x: 0.5, y: 16.7 }, { x: 1, y: 33.3 }, { x: 1.5, y: 50 },
+  ];
+
+  it('все точки в кадре → 1 (100%)', () => {
+    expect(perspectiveFrameFit(calib, points)).toBe(1);
+  });
+
+  it('кадр ниже линии (300 px) → попадает половина точек', () => {
+    expect(perspectiveFrameFit({ ...calib, frameH: 300 }, points)).toBe(0.5);
+  });
+
+  it('без размера кадра и по битой калибровке — null, а не выдуманные проценты', () => {
+    const { frameW, frameH, ...noDims } = calib;
+    expect(frameW).toBe(1280); expect(frameH).toBe(720);
+    expect(perspectiveFrameFit(noDims as PerspectiveCalibration, points)).toBeNull();
+    expect(perspectiveFrameFit({ ...calib, vA: Number.NaN }, points)).toBeNull();
+    expect(perspectiveFrameFit(calib, [])).toBeNull();
+    expect(perspectiveFrameFit(null, points)).toBeNull();
+  });
+});
+
+describe('isPerspectiveSane — размер кадра необязателен, но если есть — правдоподобен', () => {
+  const base: PerspectiveCalibration = {
+    anchors: [
+      { timeSec: 0.1, trackX: 0, trackY: 0, videoX: 100, videoY: 520 },
+      { timeSec: 0.4, trackX: 0.5, trackY: 16.7, videoX: 104, videoY: 362.2 },
+      { timeSec: 0.7, trackX: 1, trackY: 33.3, videoX: 108, videoY: 223.8 },
+      { timeSec: 1.0, trackX: 1.5, trackY: 50, videoX: 112, videoY: 100 },
+    ],
+    vA: -8, vB: 520, vC: 0.004, fitPx: 0,
+  };
+
+  it('без размеров кадра калибровка остаётся рабочей', () => {
+    expect(isPerspectiveSane(base)).toBe(true);
+  });
+
+  it('нулевые/огромные размеры отбрасываются', () => {
+    expect(isPerspectiveSane({ ...base, frameW: 0, frameH: 720 })).toBe(false);
+    expect(isPerspectiveSane({ ...base, frameW: 1280, frameH: -1 })).toBe(false);
+    expect(isPerspectiveSane({ ...base, frameW: 99999, frameH: 720 })).toBe(false);
+    expect(isPerspectiveSane({ ...base, frameW: 1280, frameH: 720 })).toBe(true);
   });
 });

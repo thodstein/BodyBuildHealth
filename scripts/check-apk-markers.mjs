@@ -212,6 +212,8 @@ for (const hook of [
   'data-lift="video-persp"', 'data-lift="video-persp-state"', 'data-lift="persp-file"',
   'data-lift="persp-mirror"', 'data-lift="persp-reset"', 'persp-grab-', 'data-lift="persp-save"',
   'data-lift="persp-clear"', 'data-lift="persp-msg"',
+  'data-lift="persp-preview-img"', 'persp-preview-tab-',
+  'data-lift="video-calib-preview"', 'data-lift="video-calib-preview-img"',
   'data-lift="video-offset"', 'data-lift="vbt-weight"', 'data-lift="vbt-weight-from-diary"',
   'data-lift-nav=',
 ]) mustContain(LIFT_HUB, hook, `lift hub hook ${hook}`);
@@ -244,9 +246,15 @@ mustContain(LIFT_HUB, "'13 Старт'", 'lift hub nav 13 label');
 mustContain('src/engines/pro/trajectory-overlay.engine.ts', 'export function mapTrackToVideo', 'video calibration map');
 mustContain('src/engines/pro/trajectory-overlay.engine.ts', 'export function preferredVideoMime', 'video mp4 preference');
 mustContain('src/engines/pro/trajectory-overlay.engine.ts', 'export function calibrationFrameFit', 'video calibration fit');
+mustContain('src/engines/pro/trajectory-overlay.engine.ts', 'export function calibrationFrameFitOf', 'video calibration frame fit');
 mustContain('src/engines/pro/trajectory-overlay.engine.ts', 'export function perspectiveFromAnchors', 'video perspective fit');
 mustContain('src/engines/pro/trajectory-overlay.engine.ts', 'export function mapTrackToVideoPerspective', 'video perspective map');
+mustContain('src/engines/pro/trajectory-overlay.engine.ts', 'export function perspectiveFrameFit', 'video perspective frame fit');
+mustContain('src/engines/pro/trajectory-overlay.engine.ts', 'export function drawFrameWithMapping', 'frame preview draw');
+mustContain('src/engines/pro/trajectory-overlay.engine.ts', 'export async function renderFrameWithMapping', 'frame preview render');
 mustContain('src/engines/pro/movement-diagnostics-export.engine.ts', 'export function buildHeatTrendCsv', 'heat trend csv export');
+// Отчёт обязан фиксировать, чем нанесена линия на видео (иначе его не воспроизвести).
+mustContain('src/engines/pro/movement-diagnostics-export.engine.ts', 'Наложение линии на видео', 'overlay mode in report');
 
 // 7d. Mojibake-бан: битые символы (U+FFFD) в файлах хаба — признак порванной кодировки.
 // В LiftMasterCard их было 11 (тексты VBT/LVP/Kinovea), и это попадало в UI АПК.

@@ -12,6 +12,20 @@ import type { BarPathIssue } from './lift-diagnostics.engine';
 import { barLoopFlag } from './bar-path-core.engine';
 import { barSpeedHeat, BAR_HEAT_COLORS } from '../strength-sport/strength-sport-video.engine';
 
+export type VideoOverlayMode = 'panel' | 'calibration' | 'perspective';
+
+const VIDEO_OVERLAY_MODE_RU: Record<VideoOverlayMode, string> = {
+  panel: 'панель (без калибровки кадра)',
+  calibration: 'калибровка кадра (единый px/см)',
+  perspective: 'перспектива (4 привязки, масштаб по высоте)',
+};
+
+/** Человеческая подпись режима наложения — одна на CSV и HTML. */
+export function videoOverlayModeRu(mode: VideoOverlayMode | '' | null | undefined): string {
+  if (!mode || !(mode in VIDEO_OVERLAY_MODE_RU)) return '—';
+  return VIDEO_OVERLAY_MODE_RU[mode as VideoOverlayMode];
+}
+
 export interface MovementDiagnosticsExportInput {
   lift: Lift;
   liftRu: string;
@@ -42,6 +56,23 @@ export interface MovementDiagnosticsExportInput {
   weightKg?: number | null;
   /** Оценка качества съёмки (высота камеры / дистанция / ракурс): ok|rough|unknown + причина. */
   captureQuality?: string;
+  /** Метаданные съёмки строкой (высота/дистанция/ракурс/устройство) — как вводил пользователь. */
+  captureDetails?: string | null;
+  /**
+   * Чем нанесена линия на видео: panel — панель без калибровки, calibration — единый
+   * масштаб (px/см), perspective — по 4 привязкам. Отчёт без этого не воспроизводим.
+   */
+  videoOverlayMode?: VideoOverlayMode | '';
+  /** Единый масштаб калибровки кадра, px/см. */
+  videoScalePxPerCm?: number | null;
+  /** Разброс масштаба по высоте при перспективе, %. */
+  videoPerspSkewPct?: number | null;
+  /** Сколько привязок у перспективы (4+), шт. */
+  videoPerspAnchors?: number | null;
+  /** Смещение начала трека от начала видео, с. */
+  videoOffsetSec?: number | null;
+  /** Масштаб разбора CSV: см на единицу файла (1 — файл уже в см). */
+  csvScaleCmPerUnit?: number | null;
   asymmetryPct?: number | null;
   asymmetryVerdict?: string;
   vbtMetric?: string;
@@ -165,6 +196,13 @@ export function buildMovementDiagnosticsCsv(inp: MovementDiagnosticsExportInput)
     ['Скорость в точке срыва, см/с', inp.heatStickingSpeedCmS != null ? String(inp.heatStickingSpeedCmS) : '—'],
     ['Вес штанги на записи, кг', inp.weightKg != null ? String(inp.weightKg) : '—'],
     ['Качество съёмки', inp.captureQuality || '—'],
+    ['Съёмка: параметры', inp.captureDetails || '—'],
+    ['Наложение линии на видео', videoOverlayModeRu(inp.videoOverlayMode)],
+    ['Масштаб калибровки кадра, px/см', inp.videoScalePxPerCm != null ? String(inp.videoScalePxPerCm) : '—'],
+    ['Разброс масштаба по высоте, %', inp.videoPerspSkewPct != null ? String(inp.videoPerspSkewPct) : '—'],
+    ['Привязок перспективы, шт', inp.videoPerspAnchors != null ? String(inp.videoPerspAnchors) : '—'],
+    ['Смещение трека от начала видео, с', inp.videoOffsetSec != null ? String(inp.videoOffsetSec) : '—'],
+    ['Масштаб CSV, см/ед', inp.csvScaleCmPerUnit != null ? String(inp.csvScaleCmPerUnit) : '—'],
     ['Асимметрия, %', inp.asymmetryPct != null ? String(inp.asymmetryPct) : '—'],
     ['Вердикт асимметрии', inp.asymmetryVerdict || '—'],
     ['VBT метрика', vbtMetricRu(inp.vbtMetric)],
@@ -175,6 +213,17 @@ export function buildMovementDiagnosticsCsv(inp: MovementDiagnosticsExportInput)
     ['Дата', inp.createdAt || new Date().toISOString().slice(0, 10)],
   ];
   return rows.map((r) => r.map(csvCell).join(',')).join('\n');
+}
+
+/** Строка «чем нанесена линия на видео» для HTML: режим + масштаб/разброс/смещение. */
+function videoOverlayRuLine(inp: MovementDiagnosticsExportInput): string {
+  const parts: string[] = [videoOverlayModeRu(inp.videoOverlayMode)];
+  if (inp.videoScalePxPerCm != null) parts.push(`единый масштаб ${fmt(inp.videoScalePxPerCm, 2)} px/см`);
+  if (inp.videoPerspSkewPct != null) parts.push(`разброс масштаба ${inp.videoPerspSkewPct}%`);
+  if (inp.videoPerspAnchors != null) parts.push(`привязок ${inp.videoPerspAnchors}`);
+  if (inp.videoOffsetSec != null) parts.push(`трек с ${fmt(inp.videoOffsetSec, 2)} с`);
+  if (inp.csvScaleCmPerUnit != null && inp.csvScaleCmPerUnit !== 1) parts.push(`CSV ${fmt(inp.csvScaleCmPerUnit, 2)} см/ед`);
+  return parts.join(' · ');
 }
 
 export function buildMovementDiagnosticsHtml(inp: MovementDiagnosticsExportInput): string {
@@ -210,6 +259,9 @@ export function buildMovementDiagnosticsHtml(inp: MovementDiagnosticsExportInput
       : '')
     + (inp.weightKg != null ? li('Вес штанги на записи', `${fmt(inp.weightKg, 1)} кг`) : '')
     + (inp.captureQuality ? li('Качество съёмки', inp.captureQuality) : '')
+    + (inp.captureDetails ? li('Съёмка: параметры', inp.captureDetails) : '')
+    + ((inp.videoOverlayMode || inp.videoScalePxPerCm != null || inp.videoPerspSkewPct != null || inp.videoOffsetSec != null)
+      ? li('Наложение линии на видео', videoOverlayRuLine(inp)) : '')
     + (inp.asymmetryPct != null ? li('Асимметрия', `${fmt(inp.asymmetryPct, 1)}% ${inp.asymmetryVerdict || ''}`) : '')
     + (inp.vbtMetric ? li('VBT метрика', vbtMetricRu(inp.vbtMetric)) : '')
     + (inp.vbtThreshold != null ? li('VBT VL-порог', `${inp.vbtThreshold}%`) : '')
