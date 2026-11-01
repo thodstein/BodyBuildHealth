@@ -41,14 +41,14 @@ afterEach(() => {
   localStorage.clear();
 });
 
-async function exportCsv(seed: Record<string, unknown>): Promise<string> {
+async function exportCsv(seed: Record<string, unknown>, csvText = CSV_POINTS, scale = '0.01'): Promise<string> {
   localStorage.setItem(MASTER_KEY, JSON.stringify({ lift: 'bench', ...seed }));
   const { container } = render(<LiftMasterCard sessions={[]} />);
   act(() => {
-    fireEvent.change(container.querySelector('[data-lift="kinovea-text"]')!, { target: { value: CSV_POINTS } });
+    fireEvent.change(container.querySelector('[data-lift="kinovea-text"]')!, { target: { value: csvText } });
   });
   act(() => {
-    fireEvent.change(container.querySelector('[data-lift="kinovea-scale"]')!, { target: { value: '0.01' } });
+    fireEvent.change(container.querySelector('[data-lift="kinovea-scale"]')!, { target: { value: scale } });
   });
   act(() => {
     fireEvent.click(container.querySelector('[data-lift="parse-kinovea"]')!);
@@ -102,5 +102,24 @@ describe('хаб → CSV: как нанесена линия на видео', (
     expect(csv).toContain('слева');
     expect(csv).toContain('телефон');
     expect(rowValue(csv, 'Масштаб калибровки кадра, px/см')).toBe('"—"');
+  });
+
+  it('ракурс по замеру: горизонтальный ход и вердикт идут в отчёт', async () => {
+    const rows = ['time,x,y'];
+    for (let i = 0; i < 20; i++) rows.push(`${(i * 0.05).toFixed(2)},${100 + i * 1.5},${50 + i * 4}`);
+    // Масштаб 1: файл уже в сантиметрах после детекта мм — цифры ракурса читаемые.
+    const csv = await exportCsv({}, rows.join('\n'), '1');
+    // 2.85 см горизонтали на 7.6 см хода = 37.5% — отчёт называет и число, и обе версии.
+    expect(rowValue(csv, 'Горизонтальный ход штанги, % хода')).toBe('"37.5"');
+    const verdict = rowValue(csv, 'Проверка ракурса');
+    expect(verdict).toContain('по горизонтали');
+    expect(verdict).toContain('не различить');
+    expect(verdict).toContain('«спереди/сбоку»');
+  });
+
+  it('мало точек: ракурс не выдумывается, в отчёте «—»', async () => {
+    const csv = await exportCsv({});
+    expect(rowValue(csv, 'Проверка ракурса')).toBe('"—"');
+    expect(rowValue(csv, 'Горизонтальный ход штанги, % хода')).toBe('"—"');
   });
 });

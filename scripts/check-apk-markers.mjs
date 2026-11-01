@@ -199,6 +199,7 @@ for (const hook of [
   'data-lift="rep-overlay"',
   'data-lift="rep-series-add"', 'data-lift="rep-series-clear"', 'data-lift="rep-series"',
   'data-lift="capture-quality"', 'data-lift="capture-height"', 'data-lift="capture-dist"',
+  'data-lift="angle-check"', 'data-lift="angle-drift"', 'data-lift="angle-skew"',
   'data-lift="export-svg"', 'data-lift="export-overlay-png"', 'data-lift="export-overlay-video"',
   'data-lift="series-save"', 'data-lift="session-compare"', 'data-lift="bar-heat"',
   'data-lift="quick-start"', 'data-lift="quick-start-hide"',
@@ -259,6 +260,9 @@ mustContain('src/engines/pro/trajectory-overlay.engine.ts', 'export async functi
 mustContain('src/engines/pro/movement-diagnostics-export.engine.ts', 'export function buildHeatTrendCsv', 'heat trend csv export');
 // Отчёт обязан фиксировать, чем нанесена линия на видео (иначе его не воспроизвести).
 mustContain('src/engines/pro/movement-diagnostics-export.engine.ts', 'Наложение линии на видео', 'overlay mode in report');
+// Ракурс проверяется по замеру: вердикт и горизонтальный ход — в отчёте, иначе цифры не с чем сверить.
+mustContain('src/engines/pro/movement-diagnostics-export.engine.ts', 'Проверка ракурса', 'angle check in report');
+mustContain('src/engines/strength-sport/strength-sport-video.engine.ts', 'export function cameraAngleCheck', 'angle check by measurement');
 
 // 7d. Mojibake-бан: битые символы (U+FFFD) в файлах хаба — признак порванной кодировки.
 // В LiftMasterCard их было 11 (тексты VBT/LVP/Kinovea), и это попадало в UI АПК.

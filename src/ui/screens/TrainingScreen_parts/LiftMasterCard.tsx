@@ -44,7 +44,7 @@ import { getPLWeakGroupExerciseCandidates, diagnosticProtocolFromCycle } from '.
 import type { SRCycleTemplate } from '../../../data/lms-cycles/lms-types';
 import { applyToPlanner } from './planner-bridge';
 import { getExerciseById } from '../../../core/exercise-catalog';
-import { parseKinoveaCSV, analyzeBarTracking, segmentBarReps, barRepOverlay, videoQualityForCapture, barSpeedHeat, BAR_HEAT_COLORS, snapshotBarRep, compareBarSessions, barSetStats, barSetOverlay, heatSummary, scaleBarPoints, repSetIndex, type BarTrackingResult, type BarRepSegment, type BarRepSnapshot, type VideoCaptureMeta } from '../../../engines/strength-sport/strength-sport-video.engine';
+import { parseKinoveaCSV, analyzeBarTracking, segmentBarReps, barRepOverlay, videoQualityForCapture, cameraAngleCheck, barSpeedHeat, BAR_HEAT_COLORS, snapshotBarRep, compareBarSessions, barSetStats, barSetOverlay, heatSummary, scaleBarPoints, repSetIndex, type BarTrackingResult, type BarRepSegment, type BarRepSnapshot, type VideoCaptureMeta } from '../../../engines/strength-sport/strength-sport-video.engine';
 import { barLoopFlag } from '../../../engines/pro/bar-path-core.engine';
 import { diagnoseAsymmetry } from '../../../engines/pro/pl-asymmetry.engine';
 import { RULE_CHECKS, checkLiftRules } from '../../../engines/pro/pl-competition-rules.engine';
@@ -978,6 +978,14 @@ export const LiftMasterCard: React.FC<{
 
   /** Сохранённая перспектива для движения. */
   const curPersp = videoPersp[lift] ?? null;
+  /**
+   * Ракурс по замеру: горизонтальный ход штанги и разброс масштаба по высоте.
+   * Ракурс «спереди/сбоку» так не определяется — он остаётся в метаданных съёмки.
+   */
+  const angleCheck = useMemo(
+    () => (kinoveaResult ? cameraAngleCheck(kinoveaResult.points, { skewPct: curPersp ? perspectiveSkewPct(curPersp) : null }) : null),
+    [kinoveaResult, curPersp],
+  );
   /** Подсказка времён для четырёх кадров: 5%, 35%, 65%, 95% длительности трека. */
   const perspSuggestedTimes = useMemo(() => {
     const pts = kinoveaResult?.points;
@@ -1345,6 +1353,8 @@ export const LiftMasterCard: React.FC<{
         capture.side ? SIDE_RU[capture.side] ?? '' : '',
         capture.device ? DEVICE_RU[capture.device] ?? '' : '',
       ].filter(Boolean).join(' · ') || null,
+      angleCheck: angleCheck ? angleCheck.reason : '',
+      angleDriftPct: angleCheck ? angleCheck.driftPct : null,
       videoOverlayMode: kinoveaResult ? (curPersp ? 'perspective' : curCalib ? 'calibration' : 'panel') : '',
       videoScalePxPerCm: curCalib ? Math.round(curCalib.pxPerCm * 100) / 100 : null,
       videoPerspSkewPct: curPersp ? perspectiveSkewPct(curPersp) : null,
@@ -2719,6 +2729,21 @@ export const LiftMasterCard: React.FC<{
             <div role="status" style={{ marginTop:6, fontSize:10, lineHeight:1.4, color: captureQuality.flag === 'ok' ? '#4ade80' : captureQuality.flag === 'rough' ? '#fbbf24' : '#cbd5e1' }}>
               {captureQuality.flag === 'ok' ? '✓ ' : captureQuality.flag === 'rough' ? '⚠ ' : 'ℹ '}
               {captureQuality.reason}
+            </div>
+            {/* Ракурс по замеру: только измеримые сигналы, без догадки «спереди/сбоку». */}
+            <div data-lift="angle-check" style={{ marginTop:8, paddingTop:6, borderTop:'1px solid rgba(148,163,184,0.18)' }}>
+              <div style={{ fontSize:10, fontWeight:800, color:'#cbd5e1' }}>📐 Ракурс по замеру</div>
+              <div role="status" style={{ marginTop:4, fontSize:10, lineHeight:1.4, color: angleCheck?.flag === 'ok' ? '#4ade80' : angleCheck && angleCheck.flag !== 'unknown' ? '#fbbf24' : '#cbd5e1' }}>
+                {!angleCheck
+                  ? 'ℹ Разберите CSV-трек — геометрию съёмки проверим по самому замеру.'
+                  : `${angleCheck.flag === 'ok' ? '✓ ' : angleCheck.flag === 'unknown' ? 'ℹ ' : '⚠ '}${angleCheck.reason}`}
+              </div>
+              {angleCheck && (angleCheck.driftPct != null || angleCheck.skewPct != null) && (
+                <div style={{ marginTop:4, display:'flex', gap:10, flexWrap:'wrap', fontSize:9, color:DIM }}>
+                  {angleCheck.driftPct != null && <span data-lift="angle-drift">горизонтальный ход: {angleCheck.driftPct}% хода</span>}
+                  {angleCheck.skewPct != null && <span data-lift="angle-skew">разброс масштаба по высоте: {angleCheck.skewPct}%</span>}
+                </div>
+              )}
             </div>
           </div>
           {/* Выдача: HTML / CSV / Поделиться (АПК-слой) */}

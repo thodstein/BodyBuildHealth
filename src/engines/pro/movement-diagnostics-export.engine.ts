@@ -58,6 +58,10 @@ export interface MovementDiagnosticsExportInput {
   captureQuality?: string;
   /** Метаданные съёмки строкой (высота/дистанция/ракурс/устройство) — как вводил пользователь. */
   captureDetails?: string | null;
+  /** Вердикт «ракурс по замеру» текстом: что видно по траектории и чего по ней не узнать. */
+  angleCheck?: string;
+  /** Горизонтальный ход штанги, % вертикального хода (один из замеров ракурса). */
+  angleDriftPct?: number | null;
   /**
    * Чем нанесена линия на видео: panel — панель без калибровки, calibration — единый
    * масштаб (px/см), perspective — по 4 привязкам. Отчёт без этого не воспроизводим.
@@ -197,6 +201,8 @@ export function buildMovementDiagnosticsCsv(inp: MovementDiagnosticsExportInput)
     ['Вес штанги на записи, кг', inp.weightKg != null ? String(inp.weightKg) : '—'],
     ['Качество съёмки', inp.captureQuality || '—'],
     ['Съёмка: параметры', inp.captureDetails || '—'],
+    ['Горизонтальный ход штанги, % хода', inp.angleDriftPct != null ? String(inp.angleDriftPct) : '—'],
+    ['Проверка ракурса', inp.angleCheck || '—'],
     ['Наложение линии на видео', videoOverlayModeRu(inp.videoOverlayMode)],
     ['Масштаб калибровки кадра, px/см', inp.videoScalePxPerCm != null ? String(inp.videoScalePxPerCm) : '—'],
     ['Разброс масштаба по высоте, %', inp.videoPerspSkewPct != null ? String(inp.videoPerspSkewPct) : '—'],
@@ -260,6 +266,7 @@ export function buildMovementDiagnosticsHtml(inp: MovementDiagnosticsExportInput
     + (inp.weightKg != null ? li('Вес штанги на записи', `${fmt(inp.weightKg, 1)} кг`) : '')
     + (inp.captureQuality ? li('Качество съёмки', inp.captureQuality) : '')
     + (inp.captureDetails ? li('Съёмка: параметры', inp.captureDetails) : '')
+    + (inp.angleCheck ? li('Ракурс по замеру', inp.angleCheck) : '')
     + ((inp.videoOverlayMode || inp.videoScalePxPerCm != null || inp.videoPerspSkewPct != null || inp.videoOffsetSec != null)
       ? li('Наложение линии на видео', videoOverlayRuLine(inp)) : '')
     + (inp.asymmetryPct != null ? li('Асимметрия', `${fmt(inp.asymmetryPct, 1)}% ${inp.asymmetryVerdict || ''}`) : '')

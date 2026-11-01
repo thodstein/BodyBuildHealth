@@ -465,6 +465,80 @@ export function videoQualityForCapture(meta: VideoCaptureMeta): VideoQuality {
 }
 
 /**
+ * Вердикт «ракурс по замеру»: что реально видно по самой траектории.
+ *
+ * Видно два измеримых сигнала:
+ * - `skewPct` — насколько масштаб «сантиметров» плывёт по высоте кадра (только если
+ *   перспектива откалибрована): камера наклонена или снимает сверху/снизу;
+ * - `driftPct` — горизонтальный ход штанги в процентах от вертикального. Это может
+ *   быть и техника лифтера, и камера не перпендикулярно движению — по одному треку
+ *   их не различить, поэтому вердикт так и говорит.
+ *
+ * Чего НЕ видно: «спереди или сбоку». Для этого в кадре нужен эталон (линейка,
+ * диск, стойка известной длины). Поэтому `azimuthKnown` всегда false, а ракурс
+ * остаётся ручным полем метаданных — гадать подпись было бы ложью.
+ */
+export interface CameraAngleCheck {
+  flag: 'ok' | 'tilt' | 'drift' | 'unknown';
+  /** Разброс масштаба по высоте кадра, %; null — перспектива не калибрована. */
+  skewPct: number | null;
+  /** Горизонтальный ход штанги, % вертикального хода; null — ход по вертикали слишком мал. */
+  driftPct: number | null;
+  /** Пояснение по цифрам + чего по одному треку узнать нельзя. */
+  reason: string;
+  /** Ракурс «спереди/сбоку» по одной 2D-траектории не определяется — нужен эталон в кадре. */
+  azimuthKnown: false;
+}
+
+/** Разбор ракурса по замеру; null — точек слишком мало, чтобы что-то утверждать. */
+export function cameraAngleCheck(
+  points: BarPoint[],
+  opts?: { skewPct?: number | null; driftLimitPct?: number; skewLimitPct?: number },
+): CameraAngleCheck | null {
+  if (!Array.isArray(points) || points.length < 8) return null;
+  const xs = points.map((p) => p.x).filter((v) => Number.isFinite(v));
+  const ys = points.map((p) => p.y).filter((v) => Number.isFinite(v));
+  if (xs.length < 8 || ys.length < 8) return null;
+  const skewLimit = opts?.skewLimitPct ?? 3;
+  const driftLimit = opts?.driftLimitPct ?? 20;
+  const skewRaw = opts?.skewPct;
+  const skewPct = skewRaw != null && Number.isFinite(skewRaw) && skewRaw >= 0
+    ? Math.round(skewRaw * 10) / 10
+    : null;
+  const caveat = ' Ракурс «спереди/сбоку» по одной траектории не определяется — укажите его в метаданных съёмки.';
+  const ySpan = Math.max(...ys) - Math.min(...ys);
+  if (!(ySpan > 2)) {
+    return {
+      flag: 'unknown', skewPct, driftPct: null, azimuthKnown: false,
+      reason: 'Ход штанги по вертикали меньше 2 см — ракурс по такому треку не проверить.' + caveat,
+    };
+  }
+  const xSpan = Math.max(...xs) - Math.min(...xs);
+  const driftPct = Math.round((xSpan / ySpan) * 1000) / 10;
+  if (skewPct != null && skewPct > skewLimit) {
+    return {
+      flag: 'tilt', skewPct, driftPct, azimuthKnown: false,
+      reason: `Масштаб по высоте кадра плывёт на ${skewPct}% (порог ${skewLimit}%): камера наклонена или снимает сверху/снизу, `
+        + 'сантиметры вверху и внизу разные. Включите перспективу по 4 кадрам, иначе высоты и скорости по траектории искажены.' + caveat,
+    };
+  }
+  if (driftPct > driftLimit) {
+    return {
+      flag: 'drift', skewPct, driftPct, azimuthKnown: false,
+      reason: `Штанга уходит по горизонтали на ${driftPct}% вертикального хода (порог ${driftLimit}%): `
+        + 'это либо техника — штанга действительно гуляет, либо камера стоит не перпендикулярно движению. '
+        + 'По одному треку их не различить — переснимите строго сбоку, чтобы отделить одно от другого.' + caveat,
+    };
+  }
+  return {
+    flag: 'ok', skewPct, driftPct, azimuthKnown: false,
+    reason: skewPct != null
+      ? `Геометрия ровная: горизонтальный ход ${driftPct}%, разброс масштаба по высоте ${skewPct}% — метрики сравнимы между сессиями.` + caveat
+      : `Горизонтальный ход ${driftPct}% в пределах нормы, но перспектива не калибрована: разброс масштаба по высоте не проверен.` + caveat,
+  };
+}
+
+/**
  * Heatmapping траектории по скорости (gap #11): каждый отрезок между соседними
  * точками красится по скорости (см/с), а не вся линия одним цветом.
  * Границы — по перцентилям самой серии, а не абсолютные м/с: разные лифты и

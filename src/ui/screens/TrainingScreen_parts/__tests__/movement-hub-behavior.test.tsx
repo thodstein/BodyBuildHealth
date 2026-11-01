@@ -866,6 +866,49 @@ describe('LiftMasterCard — поведение (не только смоук)',
     expect(container.querySelector('[data-lift="persp-msg"]')!.textContent).toContain('Сначала выберите видео');
   });
 
+  it('ракурс по замеру: горизонтальный ход и вердикт, без догадки «спереди/сбоку»', () => {
+    const { container } = render(<LiftMasterCard sessions={[]} />);
+    // Без разбора трека блок честно говорит, что проверять пока нечего.
+    expect(container.querySelector('[data-lift="angle-check"]')!.textContent).toContain('Разберите CSV-трек');
+    const rows = ['time,x,y'];
+    for (let i = 0; i < 20; i++) rows.push(`${(i * 0.05).toFixed(2)},${100 + i * 1.5},${50 + i * 4}`);
+    act(() => { fireEvent.change(container.querySelector('[data-lift="kinovea-text"]')!, { target: { value: rows.join('\n') } }); });
+    click(container.querySelector('[data-lift="parse-kinovea"]'));
+
+    const box = container.querySelector('[data-lift="angle-check"]')!;
+    expect(box.textContent).toContain('⚠');
+    expect(box.textContent).toContain('не различить');
+    expect(box.textContent).toContain('«спереди/сбоку»');
+    expect(container.querySelector('[data-lift="angle-drift"]')!.textContent).toContain('37.5%');
+    // Перспектива не калибрована — второй цифры честно нет, а не «0%».
+    expect(container.querySelector('[data-lift="angle-skew"]')).toBeNull();
+  });
+
+  it('ракурс по замеру: с перспективой появляется разброс масштаба по высоте', () => {
+    localStorage.setItem('he_lift_master_v1', JSON.stringify({
+      lift: 'bench',
+      videoPersp: {
+        bench: {
+          anchors: [
+            { timeSec: 0.1, trackX: 0, trackY: 0, videoX: 100, videoY: 520 },
+            { timeSec: 0.4, trackX: 0.5, trackY: 16.7, videoX: 104, videoY: 362.2 },
+            { timeSec: 0.7, trackX: 1, trackY: 33.3, videoX: 108, videoY: 223.8 },
+            { timeSec: 1.0, trackX: 1.5, trackY: 50, videoX: 112, videoY: 100 },
+          ],
+          vA: -8, vB: 520, vC: 0.004, fitPx: 0.1,
+        },
+      },
+    }));
+    const { container } = render(<LiftMasterCard sessions={[]} />);
+    const rows = ['time,x,y'];
+    for (let i = 0; i < 20; i++) rows.push(`${(i * 0.05).toFixed(2)},${100 + i * 1.5},${50 + i * 4}`);
+    act(() => { fireEvent.change(container.querySelector('[data-lift="kinovea-text"]')!, { target: { value: rows.join('\n') } }); });
+    click(container.querySelector('[data-lift="parse-kinovea"]'));
+    const skew = container.querySelector('[data-lift="angle-skew"]');
+    expect(skew, 'разброс масштаба из сохранённой перспективы').toBeTruthy();
+    expect(skew!.textContent).toContain('разброс масштаба по высоте');
+  });
+
   it('интерактивные элементы хаба не меньше 44 px', () => {
     const { container } = render(<LiftMasterCard sessions={[]} />);
     // «Быстрый старт» исчезает после первых данных — проверяем до заполнения.
