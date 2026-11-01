@@ -213,6 +213,7 @@ for (const hook of [
   'data-lift="persp-mirror"', 'data-lift="persp-reset"', 'persp-grab-', 'data-lift="persp-save"',
   'data-lift="persp-clear"', 'data-lift="persp-msg"',
   'data-lift="persp-preview-img"', 'persp-preview-tab-',
+  'data-lift="persp-player"', 'data-lift="persp-player-unavailable"', 'persp-grab-player-',
   'data-lift="video-calib-preview"', 'data-lift="video-calib-preview-img"',
   'data-lift="video-offset"', 'data-lift="vbt-weight"', 'data-lift="vbt-weight-from-diary"',
   'data-lift-nav=',
@@ -252,6 +253,9 @@ mustContain('src/engines/pro/trajectory-overlay.engine.ts', 'export function map
 mustContain('src/engines/pro/trajectory-overlay.engine.ts', 'export function perspectiveFrameFit', 'video perspective frame fit');
 mustContain('src/engines/pro/trajectory-overlay.engine.ts', 'export function drawFrameWithMapping', 'frame preview draw');
 mustContain('src/engines/pro/trajectory-overlay.engine.ts', 'export async function renderFrameWithMapping', 'frame preview render');
+// Одна сессия кадров на файл: четыре кадра перспективы не должны декодировать видео четыре раза.
+mustContain('src/engines/pro/trajectory-overlay.engine.ts', 'export async function openVideoFramesFrom', 'video frame session from element');
+mustContain('src/engines/pro/trajectory-overlay.engine.ts', 'export async function openVideoFrames', 'video frame session');
 mustContain('src/engines/pro/movement-diagnostics-export.engine.ts', 'export function buildHeatTrendCsv', 'heat trend csv export');
 // Отчёт обязан фиксировать, чем нанесена линия на видео (иначе его не воспроизвести).
 mustContain('src/engines/pro/movement-diagnostics-export.engine.ts', 'Наложение линии на видео', 'overlay mode in report');

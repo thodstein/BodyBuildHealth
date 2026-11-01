@@ -768,59 +768,156 @@ export function preferredVideoMime(): { mime: string; ext: 'mp4' | 'webm' } {
 }
 
 /**
- * Кадр видео как data:URL — по нему пользователь тыкает в штангу для калибровки.
- * Возвращает null, если видео не декодировалось или canvas недоступен.
+ * Кадр видео: data:URL + **натуральные** размеры видео — в них измеряются тапы
+ * пользователя (превью показывается масштабированным, тап пересчитывается).
  */
-export async function grabVideoFrame(
+export interface GrabbedFrame {
+  dataUrl: string;
+  width: number;
+  height: number;
+}
+
+/**
+ * Открытая сессия кадров: один `<video>` на файл и сколько угодно кадров из него.
+ *
+ * Зачем: `grabVideoFrame` на каждый кадр создаёт новый объект-URL и заново
+ * декодирует видео. Для четырёх кадров перспективы это четыре декодирования
+ * одного файла — на телефоне секунды ожидания и лишняя память.
+ */
+export interface VideoFrameSession {
+  /**
+   * Кадр на `timeSec`; без аргумента — на текущей позиции (мини-плеер).
+   * `null` — если кадр не удалось взять (seek не состоялся, canvas недоступен).
+   */
+  grab(timeSec?: number, opts?: { maxW?: number }): Promise<GrabbedFrame | null>;
+  close(): void;
+}
+
+/** Ждать событие, ошибку или таймаут: true — дождались события. */
+function once(el: EventTarget, ev: string, timeoutMs: number): Promise<boolean> {
+  return new Promise((resolve) => {
+    let timer: ReturnType<typeof setTimeout> | null = setTimeout(() => finish(false), timeoutMs);
+    function finish(ok: boolean) {
+      if (timer == null) return;
+      clearTimeout(timer);
+      timer = null;
+      el.removeEventListener(ev, onOk);
+      el.removeEventListener('error', onErr);
+      resolve(ok);
+    }
+    function onOk() { finish(true); }
+    function onErr() { finish(false); }
+    el.addEventListener(ev, onOk);
+    el.addEventListener('error', onErr);
+  });
+}
+
+/** Ширина превью кадра: дальше 480 px смысла нет — тапы по такому кадру и так точны. */
+const FRAME_MAX_W = 480;
+
+/** Текущий кадр видео → data:URL. Размеры возвращаются натуральные. */
+function drawFrameFromVideo(video: HTMLVideoElement, maxW = FRAME_MAX_W): GrabbedFrame | null {
+  const w0 = video.videoWidth;
+  const h0 = video.videoHeight;
+  if (!(w0 > 0) || !(h0 > 0)) return null;
+  const k = Math.min(1, Math.max(1, maxW) / w0);
+  const w = Math.max(1, Math.round(w0 * k));
+  const h = Math.max(1, Math.round(h0 * k));
+  const canvas = document.createElement('canvas');
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return null;
+  try { ctx.drawImage(video, 0, 0, w, h); } catch { return null; }
+  try {
+    return { dataUrl: canvas.toDataURL('image/jpeg', 0.8), width: w0, height: h0 };
+  } catch { return null; }
+}
+
+/** Сессия на готовом элементе видео: seek по очереди, кадр с текущей позиции. */
+function makeFrameSession(video: HTMLVideoElement, onClose: () => void): VideoFrameSession {
+  let chain: Promise<unknown> = Promise.resolve();
+  const grab = (timeSec?: number, opts?: { maxW?: number }): Promise<GrabbedFrame | null> => {
+    const run = async (): Promise<GrabbedFrame | null> => {
+      if (typeof timeSec === 'number' && Number.isFinite(timeSec) && timeSec >= 0) {
+        const dur = video.duration;
+        const t = Number.isFinite(dur) && dur > 0 ? Math.min(timeSec, Math.max(0, dur - 0.05)) : timeSec;
+        if (Math.abs(video.currentTime - t) > 0.001) {
+          // Один seek за раз: два параллельных дают кадр не с того момента.
+          try { video.currentTime = t; } catch { return null; }
+          if (!(await once(video, 'seeked', 6000))) return null;
+        }
+      }
+      return drawFrameFromVideo(video, opts?.maxW);
+    };
+    const next = chain.then(run, run);
+    chain = next.then(() => undefined, () => undefined);
+    return next;
+  };
+  return { grab, close: onClose };
+}
+
+/**
+ * Сессия кадров поверх существующего `<video>` (мини-плеер): один декодер на
+ * сессию, элементы UI не трогаем — `close()` ничего не останавливает.
+ */
+export async function openVideoFramesFrom(
+  video: HTMLVideoElement | null | undefined,
+): Promise<VideoFrameSession | null> {
+  if (!canUseCanvas() || !video) return null;
+  if (video.readyState < 2) {
+    if (!(await once(video, 'loadeddata', 8000))) return null;
+  }
+  if (!(video.videoWidth > 0) || !(video.videoHeight > 0)) return null;
+  return makeFrameSession(video, () => { /* элемент принадлежит UI */ });
+}
+
+/** Сессия кадров по файлу: свой скрытый `<video>`, `close()` освобождает URL. */
+export async function openVideoFrames(
   file: Blob,
-  opts?: { timeSec?: number; maxW?: number },
-): Promise<{ dataUrl: string; width: number; height: number } | null> {
+  opts?: { maxW?: number },
+): Promise<VideoFrameSession | null> {
   if (!canUseCanvas() || !file || typeof document === 'undefined') return null;
   const URLRef = (globalThis as unknown as { URL?: typeof URL }).URL;
   if (!URLRef || typeof URLRef.createObjectURL !== 'function') return null;
-  const url = URLRef.createObjectURL(file);
+  let url: string;
+  try { url = URLRef.createObjectURL(file); } catch { return null; }
   const video = document.createElement('video');
   video.muted = true;
   video.playsInline = true;
   video.preload = 'auto';
   video.src = url;
-  try {
-    await new Promise<void>((resolve, reject) => {
-      let settled = false;
-      const ok = () => { if (!settled) { settled = true; resolve(); } };
-      const fail = () => { if (!settled) { settled = true; reject(new Error('video-decode')); } };
-      video.onloadeddata = ok;
-      video.onerror = fail;
-      setTimeout(fail, 8000);
-    });
-    if (!(video.videoWidth > 0) || !(video.videoHeight > 0)) return null;
-    const t = Math.max(0, opts?.timeSec ?? 0);
-    if (t > 0) {
-      await new Promise<void>((resolve) => {
-        video.onseeked = () => resolve();
-        try { video.currentTime = Math.min(t, Math.max(0, (video.duration || t) - 0.01)); }
-        catch { resolve(); }
-        setTimeout(resolve, 3000);
-      });
-    }
-    const maxW = opts?.maxW ?? 480;
-    const k = Math.min(1, maxW / video.videoWidth);
-    const w = Math.round(video.videoWidth * k);
-    const h = Math.round(video.videoHeight * k);
-    const canvas = document.createElement('canvas');
-    canvas.width = w;
-    canvas.height = h;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return null;
-    ctx.drawImage(video, 0, 0, w, h);
-    const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
-    // Возвращаем натуральные размеры: тапы по превью пересчитываются в пиксели видео.
-    return { dataUrl, width: video.videoWidth, height: video.videoHeight };
-  } catch {
+  const inner = await openVideoFramesFrom(video);
+  if (!inner) {
+    try { URLRef.revokeObjectURL(url); } catch { /* уже освобождён */ }
     return null;
+  }
+  return {
+    grab: (timeSec?: number, o?: { maxW?: number }) => inner.grab(timeSec, { maxW: o?.maxW ?? opts?.maxW }),
+    close: () => {
+      try { video.pause(); } catch { /* уже остановлено */ }
+      try { video.removeAttribute('src'); video.load(); } catch { /* элемент вне DOM */ }
+      try { URLRef.revokeObjectURL(url); } catch { /* уже освобождён */ }
+    },
+  };
+}
+
+/**
+ * Кадр видео как data:URL — по нему пользователь тыкает в штангу для калибровки.
+ * Разовая операция: открывает сессию и сразу закрывает. Если кадров нужно много —
+ * держите сессию `openVideoFrames`, иначе файл декодируется заново на каждый кадр.
+ * Возвращает null, если видео не декодировалось или canvas недоступен.
+ */
+export async function grabVideoFrame(
+  file: Blob,
+  opts?: { timeSec?: number; maxW?: number },
+): Promise<GrabbedFrame | null> {
+  const session = await openVideoFrames(file, { maxW: opts?.maxW });
+  if (!session) return null;
+  try {
+    return await session.grab(opts?.timeSec ?? 0);
   } finally {
-    try { video.pause(); } catch {}
-    try { URLRef.revokeObjectURL(url); } catch {}
+    session.close();
   }
 }
 

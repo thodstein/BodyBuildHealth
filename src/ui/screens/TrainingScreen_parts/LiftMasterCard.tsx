@@ -23,7 +23,7 @@
  * Срывы (StickingPointAnalysisCard) — ОТДЕЛЬНО: авто-анализ дневника RPE≥8, не ручной ввод.
  * Оставляет LimiterCalculatorCard как эксперт-режим (категория-first), данный мастер — lift-first.
  */
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   LIMITER_CATEGORIES, limiterOptionsFor, analyzeLimiterOption, limiterOptionById,
   type LimiterOption, type LimiterCategory, type LimiterExerciseItem,
@@ -50,7 +50,7 @@ import { diagnoseAsymmetry } from '../../../engines/pro/pl-asymmetry.engine';
 import { RULE_CHECKS, checkLiftRules } from '../../../engines/pro/pl-competition-rules.engine';
 import { RED_FLAGS, checkRedFlags, type RedFlagId } from '../../../engines/pro/pl-red-flags.engine';
 import { buildMovementDiagnosticsHtml, buildMovementDiagnosticsCsv, buildTrajectorySvg, movementDiagnosticsFilename, buildHeatTrendCsv, type MovementDiagnosticsExportInput } from '../../../engines/pro/movement-diagnostics-export.engine';
-import { renderTrajectoryPng, recordTrajectoryWebm, recordVideoWithOverlay, canRecordTrajectory, dataUrlToBlob, grabVideoFrame, calibrationFromTaps, preferredVideoMime, isCalibrationSane, calibrationFrameFit, calibrationFrameFitOf, mapTrackToVideo, perspectiveFromAnchors, isPerspectiveSane, perspectiveSkewPct, perspectiveLocalScale, perspectiveFrameFit, renderFrameWithMapping, mapTrackToVideoPerspective, type VideoCalibration, type PerspectiveCalibration } from '../../../engines/pro/trajectory-overlay.engine';
+import { renderTrajectoryPng, recordTrajectoryWebm, recordVideoWithOverlay, canRecordTrajectory, dataUrlToBlob, grabVideoFrame, openVideoFramesFrom, calibrationFromTaps, preferredVideoMime, isCalibrationSane, calibrationFrameFit, calibrationFrameFitOf, mapTrackToVideo, perspectiveFromAnchors, isPerspectiveSane, perspectiveSkewPct, perspectiveLocalScale, perspectiveFrameFit, renderFrameWithMapping, mapTrackToVideoPerspective, type VideoCalibration, type PerspectiveCalibration, type VideoFrameSession } from '../../../engines/pro/trajectory-overlay.engine';
 import { copyOrShareText, saveCsvApk, printHtmlApk, saveTextFileApk, saveBlobApk, shareOutcomeLabel } from '../../../core/apk-share';
 import { VideoCaptureCard } from './VideoCaptureCard';
 import StickingPointAnalysisCard from './StickingPointAnalysisCard';
@@ -742,10 +742,52 @@ export const LiftMasterCard: React.FC<{
   ]);
   /** Видео для нарезки трёх кадров: в памяти, файл не персистится. */
   const [perspFile, setPerspFile] = useState<File | null>(null);
+  /**
+   * Мини-плеер перспективы: один `<video>` на сессию — и просмотр, и кадры.
+   * Раньше каждый кадр декодировал файл заново (4 кадра = 4 декодирования).
+   */
+  const perspVideoRef = useRef<HTMLVideoElement | null>(null);
+  const perspSessionRef = useRef<VideoFrameSession | null>(null);
+  const [perspUrl, setPerspUrl] = useState<string | null>(null);
   const [perspMirror, setPerspMirror] = useState(false);
   const [perspMsg, setPerspMsg] = useState<string | null>(null);
   /** Предпросмотр линии на кадре перспективы: какой кадр и готовая картинка. */
   const [perspPreview, setPerspPreview] = useState<{ idx: number; url: string } | null>(null);
+  /** URL мини-плеера: один объект-URL на выбранный файл, освобождается при смене файла. */
+  useEffect(() => {
+    // Новый файл — новая сессия: старый декодер закрываем, чтобы не держать память.
+    perspSessionRef.current?.close();
+    perspSessionRef.current = null;
+    if (!perspFile) { setPerspUrl(null); return; }
+    let url: string | null = null;
+    try {
+      url = typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function'
+        ? URL.createObjectURL(perspFile)
+        : null;
+    } catch { url = null; }
+    setPerspUrl(url);
+    return () => {
+      if (url) { try { URL.revokeObjectURL(url); } catch { /* уже освобождён */ } }
+    };
+  }, [perspFile]);
+  useEffect(() => () => {
+    perspSessionRef.current?.close();
+    perspSessionRef.current = null;
+  }, []);
+  /**
+   * Кадр для перспективы из общей сессии: тот же `<video>`, что и мини-плеер.
+   * Если плеер не поднялся (нет canvas/декодера) — честный разовый путь.
+   */
+  const grabPerspFrame = useCallback(async (timeSec?: number) => {
+    if (!perspFile) return null;
+    const el = perspVideoRef.current;
+    if (!perspSessionRef.current && el) {
+      perspSessionRef.current = await openVideoFramesFrom(el);
+    }
+    const session = perspSessionRef.current;
+    if (session) return session.grab(timeSec);
+    return grabVideoFrame(perspFile, { timeSec });
+  }, [perspFile]);
   /** Превью кадра и тапы: якорь (штанга на 0 с) → два конца известного отрезка. */
   const [calibFrame, setCalibFrame] = useState<{ dataUrl: string; width: number; height: number } | null>(null);
   const [calibAnchor, setCalibAnchor] = useState<{ videoX: number; videoY: number } | null>(null);
@@ -2473,6 +2515,7 @@ export const LiftMasterCard: React.FC<{
                   e.target.value = '';
                   if (!f) return;
                   setPerspFile(f);
+                  setPerspPreview(null);
                   setPerspRows((rows) => rows.map((r, i) => ({
                     ...r,
                     timeSec: perspSuggestedTimes?.[i] ?? r.timeSec,
@@ -2498,6 +2541,29 @@ export const LiftMasterCard: React.FC<{
                 }} style={{ minHeight:44, padding:'8px 12px', borderRadius:8, cursor:'pointer', background:'transparent', color:'#f87171', border:'1px solid rgba(248,113,113,0.3)', fontSize:11 }}>🗑 Удалить</button>
               )}
             </div>
+            {/* Один <video> на сессию: и просмотр, и все четыре кадра (без повторных декодирований). */}
+            {perspUrl ? (
+              <div style={{ marginTop:6 }}>
+                <video
+                  ref={perspVideoRef}
+                  data-lift="persp-player"
+                  aria-label="Мини-плеер: поставьте нужный момент и возьмите кадр кнопкой ⤓ у точки"
+                  src={perspUrl}
+                  controls
+                  playsInline
+                  preload="auto"
+                  style={{ width:'100%', maxHeight:200, borderRadius:8, background:'#000', display:'block' }}
+                />
+                <div style={{ marginTop:4, fontSize:9, color:DIM, lineHeight:1.45 }}>
+                  Поставьте момент в плеере и нажмите ⤓ у нужной точки — время и кадр подставятся сами.
+                  Точное время можно ввести и вручную, кнопка 📷 берёт кадр по нему.
+                </div>
+              </div>
+            ) : perspFile ? (
+              <div data-lift="persp-player-unavailable" style={{ marginTop:6, fontSize:9, color:'#fbbf24', lineHeight:1.45 }}>
+                Мини-плеер недоступен в этом WebView — работайте по времени кадра (поле «время в видео»).
+              </div>
+            ) : null}
             {perspRows.map((row, i) => (
               <div key={i} style={{ marginTop:6, padding:6, borderRadius:8, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(168,85,247,0.16)' }}>
                 <div style={{ display:'flex', gap:6, alignItems:'center', flexWrap:'wrap' }}>
@@ -2526,7 +2592,7 @@ export const LiftMasterCard: React.FC<{
                       if (!perspFile) { setPerspMsg('Сначала выберите видео.'); return; }
                       if (!Number.isFinite(t) || t < 0) { setPerspMsg('Укажите время кадра в секундах.'); return; }
                       setPerspMsg(`⏳ Достаю кадр ${i + 1}…`);
-                      const frame = await grabVideoFrame(perspFile, { timeSec: t });
+                      const frame = await grabPerspFrame(t);
                       if (!frame) { setPerspMsg('Кадр не получился: видео не декодировалось в этом WebView.'); return; }
                       setPerspRows((rows) => rows.map((r, j) => (j === i ? { ...r, frame, tap: null } : r)));
                       setPerspPreview(null);
@@ -2534,6 +2600,28 @@ export const LiftMasterCard: React.FC<{
                     }}
                     style={{ minHeight:44, padding:'8px 12px', borderRadius:8, cursor:(perspFile && Number.isFinite(parseFloat(row.timeSec))) ? 'pointer' : 'default', background:'rgba(168,85,247,0.14)', color:'#a855f7', border:'1px solid rgba(168,85,247,0.3)', fontSize:11, fontWeight:700, opacity:(perspFile && Number.isFinite(parseFloat(row.timeSec))) ? 1 : 0.55 }}
                   >📷 Кадр</button>
+                  <button
+                    data-lift={`persp-grab-player-${i}`}
+                    aria-label={`Взять кадр ${i + 1} на текущем времени плеера`}
+                    aria-disabled={!perspFile}
+                    onClick={async ()=>{
+                      if (!perspFile) { setPerspMsg('Сначала выберите видео.'); return; }
+                      const t = perspVideoRef.current?.currentTime;
+                      if (typeof t !== 'number' || !Number.isFinite(t) || t < 0) {
+                        setPerspMsg('Мини-плеер не готов: включите видео и поставьте нужный момент.');
+                        return;
+                      }
+                      const tt = Math.round(t * 100) / 100;
+                      setPerspRows((rows) => rows.map((r, j) => (j === i ? { ...r, timeSec: String(tt) } : r)));
+                      setPerspMsg(`⏳ Беру кадр ${i + 1} на ${tt} с…`);
+                      const frame = await grabPerspFrame(tt);
+                      if (!frame) { setPerspMsg('Кадр не получился: видео не декодировалось в этом WebView.'); return; }
+                      setPerspRows((rows) => rows.map((r, j) => (j === i ? { ...r, frame, tap: null } : r)));
+                      setPerspPreview(null);
+                      setPerspMsg(`Кадр ${i + 1} (${tt} с) готов — ткните в штангу.`);
+                    }}
+                    style={{ minHeight:44, minWidth:44, padding:'8px 10px', borderRadius:8, cursor:perspFile ? 'pointer' : 'default', background:'rgba(168,85,247,0.08)', color:'#c084fc', border:'1px solid rgba(168,85,247,0.24)', fontSize:12, fontWeight:700, opacity:perspFile ? 1 : 0.55 }}
+                  >⤓</button>
                   {row.tap && <span style={{ fontSize:9, color:'#4ade80', fontWeight:700 }}>✓ отмечено</span>}
                 </div>
                 {row.frame && (

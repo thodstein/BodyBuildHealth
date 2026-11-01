@@ -1,4 +1,4 @@
-import { describe, expect, it, afterEach, beforeEach } from 'vitest';
+import { describe, expect, it, afterEach, beforeEach, vi } from 'vitest';
 import { render, cleanup, fireEvent, act } from '@testing-library/react';
 import React from 'react';
 import { LiftMasterCard, exerciseMatchesLift, weeklyHeatTrend, heatTrendVerdict } from '../LiftMasterCard';
@@ -817,6 +817,55 @@ describe('LiftMasterCard — поведение (не только смоук)',
     expect(container.querySelector('[data-lift="persp-save"]')).toBeNull();
   });
 
+  it('мини-плеер перспективы: один <video> на файл, без createObjectURL — честная плашка', () => {
+    const hadCreate = typeof (URL as unknown as { createObjectURL?: unknown }).createObjectURL === 'function';
+    const create = vi.fn(() => 'blob:player');
+    const revoke = vi.fn();
+    if (!hadCreate) {
+      Object.defineProperty(URL, 'createObjectURL', { value: create, configurable: true });
+      Object.defineProperty(URL, 'revokeObjectURL', { value: revoke, configurable: true });
+    }
+    try {
+      const { container, unmount } = render(<LiftMasterCard sessions={[]} />);
+      const fileInput = container.querySelector('[data-lift="persp-file"] input')!;
+      act(() => {
+        fireEvent.change(fileInput, {
+          target: { files: [new File(['v'], 'set.mp4', { type: 'video/mp4' })] },
+        });
+      });
+      const player = container.querySelector('[data-lift="persp-player"]') as HTMLVideoElement | null;
+      if (!hadCreate) {
+        // Один элемент: и просмотр, и все кадры — без повторных декодирований.
+        expect(player).toBeTruthy();
+        expect(player!.getAttribute('src')).toBe('blob:player');
+        expect(player!.hasAttribute('controls')).toBe(true);
+        expect(player!.playsInline).toBe(true);
+        unmount();
+        // Файл выгружен — объект-URL освобождён, память не течёт.
+        expect(revoke).toHaveBeenCalledWith('blob:player');
+      } else {
+        // Среда сама умеет createObjectURL — проверяем, что плеер получил src.
+        expect(player).toBeTruthy();
+        expect(player!.getAttribute('src')).toBeTruthy();
+      }
+    } finally {
+      if (!hadCreate) {
+        delete (URL as unknown as { createObjectURL?: unknown }).createObjectURL;
+        delete (URL as unknown as { revokeObjectURL?: unknown }).revokeObjectURL;
+      }
+    }
+  });
+
+  it('точка перспективы без видео: ⤓ честно просит выбрать видео, кадров не выдумывает', () => {
+    const { container } = render(<LiftMasterCard sessions={[]} />);
+    expect(container.querySelectorAll('[data-lift^="persp-grab-player-"]').length).toBe(4);
+    expect(container.querySelector('[data-lift="persp-player"]')).toBeNull();
+    const btn = container.querySelector('[data-lift="persp-grab-player-0"]')!;
+    expect(btn.getAttribute('aria-disabled')).toBe('true');
+    click(btn);
+    expect(container.querySelector('[data-lift="persp-msg"]')!.textContent).toContain('Сначала выберите видео');
+  });
+
   it('интерактивные элементы хаба не меньше 44 px', () => {
     const { container } = render(<LiftMasterCard sessions={[]} />);
     // «Быстрый старт» исчезает после первых данных — проверяем до заполнения.
@@ -836,7 +885,7 @@ describe('LiftMasterCard — поведение (не только смоук)',
       'capture-device-phone', 'export-csv', 'export-overlay-video', 'video-overlay-file',
       'video-calib-ref-cm', 'video-calib-mirror', 'video-calib-taps-reset',
       'video-offset', 'vbt-weight-from-diary',
-      'persp-mirror', 'persp-reset', 'persp-grab-0', 'persp-time-0',
+      'persp-mirror', 'persp-reset', 'persp-grab-0', 'persp-time-0', 'persp-grab-player-0',
     ];
     for (const sel of selectors) {
       const el = container.querySelector(`[data-lift="${sel}"]`);
