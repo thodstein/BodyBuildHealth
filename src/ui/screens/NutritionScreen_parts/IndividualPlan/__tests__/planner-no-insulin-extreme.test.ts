@@ -83,14 +83,18 @@ describe('§3A-2 no-insulin экстрим: матрица train/rest × инс�
     // (оливковое/авокадо/орехи), экзотический корнеплод (таро) → обычный носитель из ДРУГОГО
     // семейства (семейство-осознанно, разнообразие 7-дневки цело) — 2807/183.9/74.6/350
     // → 2830/186.6/75.8/350.3. Это улучшение реализма (не «мусор»), не регресс.
+    // было→стало (QG12, ноябрь 2026, «желток в тарелке»): завтрак-омлет из одного яичного
+    // белка (80 г egg_white) стал яйцом целиком 80 г + белок 80 г в ужине на месте; жир желтка
+    // списан с масла того же приёма → 2830/186.6/75.8/350.3 → 2833/187.9/75.6/350.3.
+    // Оценка качества дня та же (86), сходимость чуть лучше (5.7% → 5.6%), белок +1.3 г.
     const p = buildDayPlan(base({
       weightKg: 90, lbmKg: 75, bodyFatPct: 14, goalKcal: 3000, goalProteinG: 180, goalFatG: 80, goalCarbsG: 340,
       mealsCount: 5, isTrainingDay: true, trainStartMin: 17 * 60, trainDurationMin: 90, allowIntraWorkout: true,
       budget: 'medium' as const, dayOffset: 0,
     }));
-    expect(p.totals.kcal).toBe(2830);
-    expect(p.totals.p).toBe(186.6);
-    expect(p.totals.f).toBe(75.8);
+    expect(p.totals.kcal).toBe(2833);
+    expect(p.totals.p).toBe(187.9);
+    expect(p.totals.f).toBe(75.6);
     expect(p.totals.c).toBe(350.3);
   });
 });

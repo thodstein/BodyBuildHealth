@@ -93,13 +93,16 @@ describe('§4.1 «призрак микро-добавки» — нота опи
     expect(Math.round(item.amount)).toBe(claimed);
   });
 
-  it('калиброванный контрольный день (90кг/3000 train) byte-identical: 2830/186.6/75.8/350.3', () => {
+  it('калиброванный контрольный день (90кг/3000 train): 2833/187.9/75.6/350.3', () => {
     // Защита НЕ включается на сходящемся дне — состав дня не двигается (прошлая
     // попытка защиты «всегда» давала 2717). Нота при этом честная (совет).
+    // QG12 («желток в тарелке»): завтрак-омлет из одного яичного белка стал яйцом
+    // целиком, жир желтка списан с масла того же приёма — 2830/186.6/75.8/350.3
+    // → 2833/187.9/75.6/350.3 (оценка качества 86 → 86, сходимость 5.7% → 5.6%).
     const p = buildDayPlan(CONVERGED[0][1]);
-    expect(p.totals.kcal).toBe(2830);
-    expect(p.totals.p).toBe(186.6);
-    expect(p.totals.f).toBe(75.8);
+    expect(p.totals.kcal).toBe(2833);
+    expect(p.totals.p).toBe(187.9);
+    expect(p.totals.f).toBe(75.6);
     expect(p.totals.c).toBe(350.3);
     const note = microNote(p);
     if (note) expect(note.startsWith('🧬')).toBe(false);

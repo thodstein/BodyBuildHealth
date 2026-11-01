@@ -1,5 +1,5 @@
 /**
- * Регрессия «пакета качества» (QG1–QG11) планировщика.
+ * Регрессия «пакета качества» (QG1–QG12) планировщика.
  *
  * Зачем: сходимость дня ≤3% ловит только КБЖУ. Жалобы шли на «съедобность»:
  * «19 г малины», «жир всего дня в одном приёме», «овощей 190 г», «в обед 12 г белка»,
@@ -22,6 +22,8 @@
  *   пунктов фрукта < 80 г          53           22   (QG11)
  *   пунктов орехов < 15 г          19           17   (QG11)
  *   ось «порции» (0-100)           85.7         90.1 (QG11)
+ *   дней с яйцом целиком           0/30         7/30 (QG12)
+ *   B12, среднее от RDA           57%          62.5% (QG12)
  */
 import { describe, it, expect } from 'vitest';
 import { buildDayPlan, type MealPlanInput } from '../meal-plan-engine';
@@ -363,6 +365,51 @@ describe('порции: фрукт и орехи — еда, а не украш�
   it('QG11 не выводит день из канона: дней вне 3% ≤ 8 из 30 (было 5)', () => {
     const out = DAYS.filter((d) => d.plan.withinTolerance === false);
     expect(out.length, `вне канона: ${out.map((d) => d.id).join(', ')}`).toBeLessThanOrEqual(8);
+  });
+});
+
+describe('желток в тарелке: витамины яйца, а не «белок без желтка» (QG12)', () => {
+  // Замер на этих же 30 днях: во ВСЕХ 30 днях завтрак — омлет из одного яичного
+  // белка (egg_white 40–290 г), и ни в одном дне нет яйца целиком. Белок яйца —
+  // это 0 мкг B12, 0 мкг витамина D и 0 мкг витамина A, при том что B12 ниже
+  // 70% RDA был в 13 днях из 30 (в среднем 68% RDA). Желток заменяет часть масла
+  // того же приёма, поэтому КБЖУ дня не растут (сходимость не хуже), а день не
+  // имеет права стать хуже по оценке качества.
+  const eggs = (d: Day) => items(d).filter(({ x }) => String(x.id) === 'egg_whole');
+  const b12 = (d: Day) => Number((sumMicros(
+    items(d).map(({ x }) => ({ id: x.id, amount: x.amount })), FOOD_DB as any,
+  ) as any)?.VitB12 || 0);
+  const B12_RDA = 2.4;
+
+  it('яйцо целиком стоит в дне, а не только белок: дней ≥ 5 из 30 (было 0)', () => {
+    const withEgg = DAYS.filter((d) => eggs(d).length > 0).map((d) => d.id);
+    expect(withEgg.length, `дней с яйцом целиком: ${withEgg.join(', ')}`).toBeGreaterThanOrEqual(5);
+  });
+
+  it('яиц в дне не больше двух (≤ 100 г) и не больше одного такого блюда', () => {
+    const bad: string[] = [];
+    for (const d of DAYS) {
+      const e = eggs(d);
+      if (e.length > 1) bad.push(`${d.id}: ${e.length} пункта`);
+      const g = e.reduce((s, { x }) => s + (Number(x.amount) || 0), 0);
+      if (g > 100) bad.push(`${d.id}: ${g} г`);
+    }
+    expect(bad.slice(0, 5).join(' | ')).toBe('');
+  });
+
+  it('желток оплачен маслом того же приёма: день с яйцом остаётся в каноне 3%', () => {
+    const bad = DAYS.filter((d) => eggs(d).length > 0 && d.plan.withinTolerance === false).map((d) => d.id);
+    expect(bad.slice(0, 5).join(' | ')).toBe('');
+  });
+
+  it('B12: дней ниже 70% RDA ≤ 21 из 30 (было 22)', () => {
+    const low = DAYS.filter((d) => b12(d) < B12_RDA * 0.7).map((d) => `${d.id}:${b12(d).toFixed(1)}мкг`);
+    expect(low.length, `B12 ниже 70%: ${low.slice(0, 6).join(', ')}`).toBeLessThanOrEqual(21);
+  });
+
+  it('B12 в среднем ≥ 60% RDA (было 57%)', () => {
+    const avg = DAYS.reduce((s, d) => s + b12(d), 0) / DAYS.length;
+    expect((avg / B12_RDA) * 100, `средний B12: ${avg.toFixed(2)} мкг`).toBeGreaterThanOrEqual(60);
   });
 });
 

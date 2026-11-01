@@ -12244,6 +12244,208 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
           notes.push(`🍒 Порции: ${[...new Set(_changed11)].join('; ')} — фрукт/орехи доведены до еды (день не хуже: фрукт меняется на часть гарнира, орехи — на часть масла)`);
         }
       }
+      // ── QG12: желток в тарелке (витамины яйца, а не «белок без желтка») ────
+      // Замер (30 дней: 5 профилей × 4/5/6 приёмов × тренировка/отдых): во ВСЕХ
+      // 30 днях завтрак — омлет из одного яичного белка (egg_white 40–290 г), и ни
+      // в одном дне нет яйца целиком. Белок яйца — это 0 мкг B12, 0 мкг витамина D
+      // и 0 мкг витамина A: «чистый протеин» ровно там, где самые провальные оси
+      // микро лежат рядом, в желтке (B12 ниже 70% RDA в 22 днях из 30 при среднем
+      // 57% RDA, витамин D — в 29 из 30). Диетологически это и есть «выбросить
+      // половину яйца»: желток отдают, а витамины его — нет.
+      // Замена: egg_white → egg_whole с сохранением белка (11 г/100 г в белке
+      // против 13 г/100 г в яйце), а жир желтка вычитается из масла дня (сам приём,
+      // затем только более жирные приёмы) — КБЖУ дня не меняются, меняется
+      // источник жира. Остаток белка остаётся белком порцией («1 яйцо + 1 белок»).
+      // Ручной/портативный режим и дни с инсулиновыми окнами не трогаем.
+      if (_vegFree && !((input as any).injections && (input as any).injections.length)) {
+        const _devStart12 = _dev10();
+        const _worse12 = () => {
+          const canon = PLANNER_CONVERGENCE_PCT / 100;
+          const now = _dev10();
+          // В каноне допускаем 0.5 п.п. (день остаётся ≤3%): масло и яйцо имеют
+          // разную плотность жира, и срез целыми граммами даёт остаток ±1 г
+          // (≈1.4% дневного жира) — при нулевом допуске стадия не проходила
+          // почти нигде. За канон не выходим, день вне канона не сдвигаем вовсе.
+          if (_devStart12 <= canon) return now > Math.min(canon, _devStart12 + 0.005);
+          return now > _devStart12 + 0.0005;
+        };
+        const _fiberOk12 = () => (Number(totals.fiber) || 0) <= _qgFiberCap;
+        const _isNut12 = (id: string) => /^(cashew|almonds?|walnuts?|hazelnuts?|peanuts?|pistachios?|pecan|macadamia|brazil_nut|seed_|sunflower_seeds|pumpkin_seeds|sesame_seeds)/i.test(id);
+        const _has12 = (id: string) => (meals as any[]).some((m: any) => ((m.items || []) as any[]).some((x: any) => String(x.id) === id));
+        // Суточный кэп яиц тот же, что у движка (иначе день пробивает квоту).
+        const _eggCap12 = eggCatchupCap(quotaWeightScale(input.weightKg || 70));
+        const _micro12 = (key: string) => Number((sumMicros(
+          (meals as any[]).flatMap((m: any) => (m.items || []).map((it: any) => ({ id: it.id, amount: it.amount }))),
+          FOOD_DB as any,
+        ) as any)?.[key] || 0);
+        // Оценка качества дня ровно та же, что увидит пользователь (тот же
+        // scoreDayQuality + покрытие микро). Гард по сходимости не ловит просадку
+        // осей: замер дал два дня, где КБЖУ сошлись, а «белок по приёмам» и
+        // «порции» упали на 1–2 пункта итога. Инвариант стадии — день не хуже.
+        const _q12 = () => {
+          const cov = _pickCtx.qualityMode === 'full'
+            ? analyzeMicroCoverage(
+              sumMicros((meals as any[]).flatMap((m: any) => (m.items || []).map((it: any) => ({ id: it.id, amount: it.amount }))), FOOD_DB as any),
+              (input.sex || 'male') as any, input.weightKg, input.cyclePhase as any, !!input.isTrainingDay,
+              input.calciumTargetOverride, input.sodiumTargetOverride,
+            ).coverage
+            : [];
+          const lowN = cov.filter((c: any) => (c.pct || 0) < 70).length;
+          return scoreDayQuality(meals as any[], {
+            weightKg: Number(input.weightKg) || 0,
+            microCoverage: cov.length > 0 ? { lowCount: lowN, total: cov.length } : undefined,
+          });
+        };
+        // Снимок ДНЯ (тарелки + итоги), а не приёма: срез жира уходит и в другие
+        // приёмы, поэтому откат одного приёма оставил бы день с «половинчатым»
+        // маслом. Итоги дня тоже восстанавливаем как есть: пересчёт из тарелок
+        // давал другое число, чем книжка движка (замер: отказ стадии менял
+        // контрольный день 2937/178.6 → 2944/182.2, хотя ни один пункт не менялся).
+        const _snapDay12 = () => ({
+          tots: { ...totals },
+          meals: (meals as any[]).map((m: any) => ({
+            m, mt: { ...(m.totals || {}) },
+            snap: ((m.items || []) as any[]).map((it: any) => ({ it, s: { ...it } })),
+          })),
+        });
+        const _restoreDay12 = (sd: any) => {
+          for (const e of sd.meals) {
+            if ((e.m.items || []).length > e.snap.length) (e.m.items as any[]).length = e.snap.length;
+            for (const it of e.snap) {
+              for (const k of Object.keys(it.it)) if (!(k in it.s)) delete it.it[k];
+              Object.assign(it.it, it.s);
+            }
+            e.m.totals = { ...e.mt };
+          }
+          Object.assign(totals, sd.tots);
+        };
+        // Жир желтка снимаем ТОЛЬКО с чистого масла того же приёма (масла/ги/
+        // сливочное): у «жировых» пунктов вроде сыра 25 г белка на 100 г, и срез
+        // 10 г увозил 2.5 г белка (замер: белок дня −2.7 г, «белок по приёмам» −9,
+        // «порции» −2). Орехи/пасты тоже не трогаем: их растит QG11. Ниже 7 г
+        // масло не режем — это уже не порция (ось «порции» считает пункт <7 г за
+        // половину), поэтому такой пункт просто не трогаем и ищем следующий.
+        const _pureFat12 = (x: any) => {
+          const id = String(x.id || '');
+          const amt = Number(x.amount) || 0;
+          if (!(amt > 0)) return false;
+          const per100 = (v: any) => ((Number(v) || 0) / amt) * 100;
+          return x.role === 'fat' && per100(x.f) >= 50 && per100(x.p) <= 5
+            && !_isNut12(id) && !/paste|butter_p|cheese/i.test(id);
+        };
+        // Источники жира: сам приём и те приёмы, что СЕЙЧАС жирнее его (перекладка
+        // жира в яйцо из более жирного приёма не увеличивает максимальную долю
+        // жира в приёме — ось «жир в одном приёме» не проседает, а день выравнивается).
+        // Считаем по книжке движка (m.totals), НЕ пересчитывая приёмы: пересчёт
+        // перед снимком менял день даже там, где стадия ничего не сделала.
+        const _fatSource12 = (host: any, hostF: number): any[] => [
+          host,
+          ...(meals as any[])
+            .filter((m: any) => m !== host && (Number(m.totals?.f) || 0) > hostF)
+            .sort((a: any, b: any) => (Number(b.totals?.f) || 0) - (Number(a.totals?.f) || 0)),
+        ];
+        const _trimmable12 = (m: any): number => ((m.items || []) as any[])
+          .filter((x: any) => !x._fixedGrams && _pureFat12(x) && (Number(x.amount) || 0) > 7)
+          .reduce((s: number, x: any) => {
+            const amt = Number(x.amount) || 0;
+            return s + ((Number(x.f) || 0) * (amt - 7)) / Math.max(1, amt);
+          }, 0);
+        const _trimOil12 = (grams: number, host: any, dF: number, mode: 'ceil' | 'floor'): number => {
+          let left = grams;
+          for (const m of _fatSource12(host, (Number(host.totals?.f) || 0) + dF)) {
+            if (left <= 0.3) break;
+            const fats = ((m.items || []) as any[])
+              .filter((x: any) => !x._fixedGrams && _pureFat12(x))
+              .sort((a: any, b: any) => (Number(b.f) || 0) - (Number(a.f) || 0));
+            for (const it of fats) {
+              if (left <= 0.3) break;
+              const amt = Number(it.amount) || 0;
+              if (amt <= 7) continue;
+              const perG = (Number(it.f) || 0) / Math.max(1, amt);
+              if (!(perG > 0)) continue;
+              // Дробных граммов не режем. Направление округления важно: остаток
+              // 0.4 г жира выбивал день из канона, поэтому пробуем и вверх, и вниз.
+              const raw = left / perG;
+              const cut = Math.min(mode === 'ceil' ? Math.ceil(raw) : Math.floor(raw), amt - 7);
+              if (cut < 1) continue;
+              Object.assign(it, _scale10(it, amt - cut));
+              left -= cut * perG;
+            }
+          }
+          return left;
+        };
+        const _changed12: string[] = [];
+        const _availFat12 = (host: any): number => _fatSource12(host, Number(host.totals?.f) || 0)
+          .reduce((s: number, m: any) => s + _trimmable12(m), 0);
+        // Любимый белок пользователя не подменяем; если яйцо целиком уже стоит в
+        // дне — второй такой же пункт не плодим.
+        const _eggFood: any = _ok10('egg_whole') && !_fav10('egg_white') && !_has12('egg_whole')
+          ? FOOD_DB.find((f: any) => f.id === 'egg_whole')
+          : null;
+        if (_eggFood) {
+          const whites = (meals as any[]).flatMap((m: any) => ((m.items || []) as any[])
+            .filter((x: any) => String(x.id) === 'egg_white' && !x._fixedGrams)
+            .map((x: any) => ({ m, x })));
+          for (const { m, x } of whites) {
+            const E = Number(x.amount) || 0;
+            if (E < 30) continue;                       // меньше — не яичное блюдо
+            // Сколько яйца целиком ставим. Хотим «белок-в-белок» (11 г/100 г в
+            // белке против 13 г/100 г в яйце) и не больше 2 яиц (100 г) и суточного
+            // кэпа движка; но жир желтка платится маслом ЭТОГО приёма, поэтому при
+            // нехватке масла берём столько яйца, сколько жира есть (остаток белка
+            // остаётся белком: «1 яйцо + 1 белок» — обычный завтрак атлета).
+            const capW = Math.min(_eggCap12, 100);
+            // Порог «это порция белка»: у атлета ≥80 кг цельный белок в основном
+            // приёме не мельче 75 г («треска 57 г» — гарантия реалистичности
+            // тарелки), у остальных — 40 г. И яйцо, и остаток белка его проходят.
+            const minW = (Number(input.weightKg) || 0) >= 80 ? 75 : 40;
+            const wantW = Math.min(capW, Math.max(minW, Math.round(((E * 11) / 13) / 5) * 5));
+            const availF = _availFat12(m);
+            // Жир яйца ≈ 11 г / 100 г.
+            const fitW = Math.min(capW, Math.floor(availF / 0.11 / 5) * 5);
+            const cands = [...new Set([wantW, fitW])].filter((w) => w >= minW && w <= capW).sort((a, b) => b - a);
+            const whiteFood: any = FOOD_DB.find((f: any) => f.id === 'egg_white');
+            let applied = 0;
+            const q0 = _q12();
+            for (const W of cands) {
+              // Остаток белка в том же приёме, чтобы белок дня не уехал, — но тоже
+              // порцией (иначе «белок 30 г» в основном приёме ломает сытность).
+              const restW0 = whiteFood ? Math.round(((E * 11 - W * 13) / 11) / 5) * 5 : 0;
+              const restW = restW0 >= minW ? restW0 : 0;
+              for (const mode of ['ceil', 'floor'] as const) {
+                const sd = _snapDay12();
+                const f0 = Number(x.f) || 0;
+                Object.assign(x, _mk10(_eggFood, W, 'protein'));
+                if (restW >= minW && whiteFood) (m.items as any[]).push(_mk10(whiteFood, restW, 'protein'));
+                const dF = (Number(x.f) || 0) - f0;
+                if (dF > 0.5) _trimOil12(dF, m, dF, mode);
+                // Пересчитываем ВСЕ приёмы: срез жира мог пройти по нескольким
+                // пунктам, и устаревшие totals сбивали гард (замер: день «не
+                // сошёлся» на 2 г жира, которых в тарелке уже не было).
+                recalcMealTotals(meals as any[]);
+                recalcDayTotals(meals, totals);
+                if (_worse12() || !_fiberOk12() || _q12().total < q0.total) {
+                  _restoreDay12(sd);
+                  continue;
+                }
+                applied = W;
+                break;
+              }
+              if (applied) break;
+            }
+            if (!applied) continue;
+            usedTodayIds.add('egg_whole');
+            allFoodsUsed.push('egg_whole');
+            _changed12.push(`${applied} г вместо ${Math.round(E)} г яичного белка`);
+            break;                                       // одно яичное блюдо в день
+          }
+        }
+        if (_changed12.length > 0) {
+          const _bGoal12 = Number((RDA_BASE as any)?.VitB12?.[input.sex === 'female' ? 'female' : 'male'] || 2.4);
+          const _pB12 = Math.round((_micro12('VitB12') / Math.max(0.1, _bGoal12)) * 100);
+          notes.push(`🍳 Желток в тарелке: яйцо целиком ${_changed12[0]} — белок сохранён, жир желтка снят с масла дня (КБЖУ те же); B12 ${Math.round(_micro12('VitB12') * 10) / 10} мкг (${_pB12}% цели), витамин D ${Math.round(_micro12('VitD') * 10) / 10} мкг, A ${Math.round(_micro12('VitA'))} мкг`);
+        }
+      }
     }
 
     // Витрина MPS должна совпадать с ФИНАЛЬНЫМ планом (санитайзеры E17/E18 меняют items).
