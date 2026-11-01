@@ -19,6 +19,7 @@ import { describe, it, expect } from 'vitest';
 import { buildDayPlan, type MealPlanInput } from '../meal-plan-engine';
 import { buildDayTargets } from '../planner-day-targets';
 import { scoreDayQuality } from '../planner-quality-score';
+import { sumMicros } from '../planner-micro-coverage';
 import { FOOD_DB } from '../../../../../core/nutrition-database';
 
 type Profile = { id: string; w: number; lbm: number; bf: number; sex: 'male' | 'female' };
@@ -156,6 +157,45 @@ describe('пакет качества: недельные квоты (QG7)', () 
     }
     expect(ids.some((i) => /^(salmon|mackerel|sardines|herring|red_fish|trout)/.test(i)), 'жирная рыба в неделе').toBe(true);
     expect(ids.some((i) => /^(lentils|chickpeas|tofu)/.test(i)), 'бобовые в неделе').toBe(true);
+  });
+});
+
+describe('пакет качества: соль в тарелке, а не в ноте (QG8)', () => {
+  const naOf = (d: Day) => Number((sumMicros(
+    items(d).map(({ x }) => ({ id: x.id, amount: x.amount })),
+    FOOD_DB as any,
+  ) as any)?.Na || 0);
+
+  it('натрий в коридоре 65–125% цели дня (было 41% в среднем)', () => {
+    const pcts = DAYS.map((d) => {
+      const target = d.plan.isTrainingDay ? Math.max(3000, Math.round(3000 + (d.plan.weightKg || 0) * 5)) : 2300;
+      return Math.round((naOf(d) / target) * 100);
+    });
+    const avg = Math.round(pcts.reduce((s, v) => s + v, 0) / pcts.length);
+    expect(avg, `Na: ${avg}% цели (было 41%)`).toBeGreaterThanOrEqual(65);
+    expect(avg).toBeLessThanOrEqual(125);
+    const out = pcts.filter((v) => v > 125).length;
+    expect(out, 'дней с Na >125% цели').toBe(0);
+  });
+
+  it('соль стоит в плане минимум в 20 днях из 30 (было 0)', () => {
+    const withSalt = DAYS.filter((d) => items(d).some(({ x }) => x.id === 'himalayan_salt')).length;
+    expect(withSalt).toBeGreaterThanOrEqual(20);
+  });
+
+  it('нет ноты «добавьте соли» — соль уже в днях', () => {
+    const bad = DAYS.flatMap((d) => (d.plan.notes as string[]).filter((n) => typeof n === 'string' && /Добавьте ~[\d.,]+г соли/i.test(n)));
+    expect(bad.slice(0, 3).join(' | ')).toBe('');
+  });
+
+  it('соль не ломает макросы дня: 0 ккал и целые граммы', () => {
+    for (const d of DAYS) {
+      for (const { x } of items(d)) {
+        if (x.id !== 'himalayan_salt') continue;
+        expect(x.kcal).toBe(0);
+        expect(Math.abs((x.amount || 0) - Math.round(x.amount || 0))).toBeLessThan(1e-9);
+      }
+    }
   });
 });
 

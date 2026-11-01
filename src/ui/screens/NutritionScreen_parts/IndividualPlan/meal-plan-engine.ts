@@ -11505,6 +11505,79 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
       _qgTouched = false;
     }
 
+    // ── QG8: соль — в тарелке, а не в совете ─────────────────────────────
+    // Замер: Na 43% RDA в среднем (41 день из 50 ниже 50%), а движок печатал
+    // «🧂 Натрий низкий: добавьте ~4 г соли». Соль — такая же часть плана, как
+    // гарнир: 0 ккал и 0 макросов, поэтому она не может испортить сходимость.
+    // Идёт ПОСЛЕ откатов: правка макронейтральна по построению.
+    {
+      const _saltManual = !!(input as any).manualTargetsLocked
+        || String((input as any).kbjuMode || '') === 'manual'
+        || !!input.portableMode;
+      const _saltFd: any = !_saltManual && (input as any).sodiumTargetOverride === undefined
+        ? FOOD_DB.find((f: any) => f.id === 'himalayan_salt')
+        : null;
+      const _hasSalt = (meals as any[]).some((m) => (m.items || []).some((x: any) => x.id === 'himalayan_salt'));
+      const _naTarget = input.isTrainingDay
+        ? Math.max(3000, Math.round(3000 + (input.weightKg || 0) * 5))
+        : 2300;
+      const _naSnapshot = () => Number((sumMicros(
+        (meals as any[]).flatMap((m) => (m.items || []).map((it: any) => ({ id: it.id, amount: it.amount }))),
+        FOOD_DB as any,
+      ) as any)?.Na || 0);
+      const _naNow = _naSnapshot();
+      const _niNa = notes.findIndex((n) => typeof n === 'string' && n.startsWith('🧂 Натрий низкий'));
+      if (_saltFd && !_hasSalt && _naNow < _naTarget * 0.7) {
+        // 1 г соли ≈ 390 мг Na. Делим на два основных приёма (обед/ужин), иначе
+        // «соль только в обед» — это уже не вкус блюда, а досол.
+        const _gapMg = _naTarget - _naNow;
+        // Граммы соли — ЦЕЛЫЕ: инвариант «нет дробных граммовок» (planner-portion-grid).
+        const _totalSaltG = Math.min(5, Math.max(2, Math.round(_gapMg / 390)));
+        const _saltHosts = (meals as any[]).filter((m) => ['lunch', 'dinner'].includes(String(m.type)));
+        const _hosts = _saltHosts.length >= 2
+          ? _saltHosts
+          : [...(meals as any[])]
+            .filter((m) => !['preworkout', 'postworkout', 'intra'].includes(String(m.type)))
+            .sort((a, b) => ((b.totals?.kcal || 0) - (a.totals?.kcal || 0)))
+            .slice(0, 2);
+        if (_hosts.length > 0) {
+          const _mkSalt = (g: number) => ({
+            id: _saltFd.id, name: _saltFd.name, amount: g, role: 'supplement' as const,
+            kcal: 0, p: 0, f: 0, c: 0, fiber: 0, leucine_mg: 0, _fixedGrams: true,
+          });
+          const _parts = _hosts.length >= 2
+            ? [Math.round(_totalSaltG * 0.6), _totalSaltG - Math.round(_totalSaltG * 0.6)]
+            : [_totalSaltG];
+          let _leftG = _totalSaltG;
+          const _placed: string[] = [];
+          for (let i = 0; i < _hosts.length && i < _parts.length; i++) {
+            const g = Math.max(1, Math.round(_parts[i]));
+            if (_leftG < 1) break;
+            const gg = Math.min(g, _leftG);
+            (_hosts[i].items as any[]).push(_mkSalt(gg));
+            _hosts[i].totals = mealTotalsOf(_hosts[i].items);
+            _placed.push(`${gg} г в ${String(_hosts[i].label || _hosts[i].type).toLowerCase()}`);
+            _leftG = _leftG - gg;
+          }
+          if (_placed.length > 0) {
+            usedTodayIds.add(_saltFd.id);
+            allFoodsUsed.push(_saltFd.id);
+            recalcDayTotals(meals, totals);
+            const _naAfter = Math.round(_naNow + (_totalSaltG - _leftG) * 390);
+            // Старая нота «добавьте соли» теперь врёт — заменяем фактом.
+            const _txt = `🧂 Натрий: соль в плане (${_placed.join(', ')}) → ~${_naAfter} мг Na / цель ${_naTarget} мг`;
+            if (_niNa >= 0) notes[_niNa] = _txt;
+            else notes.push(_txt);
+            _qgTouched = true;
+          }
+        }
+      } else if (_niNa >= 0 && _naNow >= _naTarget * 0.7) {
+        // Соль не понадобилась (натрий уже набран едой) — но старая нота «Натрий
+        // низкий» врала: она писалась до поздних проходов, которые подняли Na.
+        notes[_niNa] = `🧂 Натрий: ~${Math.round(_naNow)} мг Na / цель ${_naTarget} мг — в норме`;
+      }
+    }
+
     // Витрина MPS должна совпадать с ФИНАЛЬНЫМ планом (санитайзеры E17/E18 меняют items).
     if (typeof _refreshMpsFromMeals === 'function') _refreshMpsFromMeals();
     // Честная строка «белок по приёмам». Раньше она печаталась ДО сборки тарелок, по
