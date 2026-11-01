@@ -76,6 +76,31 @@ describe('buildTrajectorySvg — экспорт траектории штанг�
     expect(svg).toContain('качество: ok');
   });
 
+  it('строка ракурса идёт отдельной строкой и не налезает на дату', () => {
+    const svg = buildTrajectorySvg({
+      liftRu: 'Жим лёжа',
+      series: REP,
+      overlayText: 'Повторы: 3 · vmax 0.52→0.44 м/с',
+      sessionText: 'vmax ниже прошлой сессии: 0.44 против 0.52',
+      angleText: '⚠ ход 37.5% · масштаб по высоте 31% — либо техника, либо камера не под 90°',
+      createdAt: '2026-11-01',
+    });
+    expect(svg).toContain('ход 37.5%');
+    // Три строки подписи + дата — четыре разных y, иначе текст накладывается.
+    const ys = [...svg.matchAll(/<text[^>]*y="(\d+)"/g)].map((m) => Number(m[1]));
+    const footerYs = ys.slice(-4);
+    expect(new Set(footerYs).size, `разные y для подписей: ${footerYs.join(',')}`).toBe(4);
+    expect(footerYs[3]).toBeGreaterThan(footerYs[2]);
+    // Картинка выросла под текст, дата не уехала за край.
+    const height = Number(/height="(\d+)"/.exec(svg)![1]);
+    expect(footerYs[3]).toBeLessThan(height);
+  });
+
+  it('без лишних строк высота картинки остаётся 320 (раскладка не разъехалась)', () => {
+    const svg = buildTrajectorySvg({ liftRu: 'Тяга', series: REP, createdAt: '2026-11-01' });
+    expect(/height="320"/.test(svg)).toBe(true);
+  });
+
   it('heatmap: с временем серия рисуется цветными отрезками и легендой скоростей', () => {
     // t растёт: медленный старт, быстрая середина, медленный финиш
     const withT = [

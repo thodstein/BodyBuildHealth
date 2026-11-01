@@ -44,7 +44,7 @@ import { getPLWeakGroupExerciseCandidates, diagnosticProtocolFromCycle } from '.
 import type { SRCycleTemplate } from '../../../data/lms-cycles/lms-types';
 import { applyToPlanner } from './planner-bridge';
 import { getExerciseById } from '../../../core/exercise-catalog';
-import { parseKinoveaCSV, analyzeBarTracking, segmentBarReps, barRepOverlay, videoQualityForCapture, cameraAngleCheck, barSpeedHeat, BAR_HEAT_COLORS, snapshotBarRep, compareBarSessions, barSetStats, barSetOverlay, heatSummary, scaleBarPoints, repSetIndex, type BarTrackingResult, type BarRepSegment, type BarRepSnapshot, type VideoCaptureMeta } from '../../../engines/strength-sport/strength-sport-video.engine';
+import { parseKinoveaCSV, analyzeBarTracking, segmentBarReps, barRepOverlay, videoQualityForCapture, cameraAngleCheck, cameraAngleShortLine, barSpeedHeat, BAR_HEAT_COLORS, snapshotBarRep, compareBarSessions, barSetStats, barSetOverlay, heatSummary, scaleBarPoints, repSetIndex, type BarTrackingResult, type BarRepSegment, type BarRepSnapshot, type VideoCaptureMeta } from '../../../engines/strength-sport/strength-sport-video.engine';
 import { barLoopFlag } from '../../../engines/pro/bar-path-core.engine';
 import { diagnoseAsymmetry } from '../../../engines/pro/pl-asymmetry.engine';
 import { RULE_CHECKS, checkLiftRules } from '../../../engines/pro/pl-competition-rules.engine';
@@ -2796,6 +2796,7 @@ export const LiftMasterCard: React.FC<{
                   vmax: kinoveaResult ? kinoveaResult.vmax : null,
                   overlayText: kinoveaOverlay ? kinoveaOverlay.text : '',
                   sessionText: sessionCompare ? sessionCompare.text : '',
+                  angleText: cameraAngleShortLine(angleCheck) ?? '',
                   captureQuality: captureQuality.flag === 'unknown' ? '' : `${captureQuality.flag === 'ok' ? 'в норме' : 'грубо'} — ${captureQuality.reason}`,
                 });
                 const o = await saveTextFileApk(movementDiagnosticsFilename(lift, 'svg'), svg, 'image/svg+xml;charset=utf-8');

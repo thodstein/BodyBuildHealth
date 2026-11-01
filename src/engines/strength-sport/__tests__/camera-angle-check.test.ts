@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { cameraAngleCheck } from '../strength-sport-video.engine';
+import { cameraAngleCheck, cameraAngleShortLine } from '../strength-sport-video.engine';
 
 /**
  * Траектория штанги: вертикальный ход `dyCm` и горизонтальный уход `dxCm` за серию.
@@ -149,5 +149,42 @@ describe('cameraAngleCheck — ракурс по замеру, без догад
     const r = cameraAngleCheck(big)!;
     expect(r).not.toBeNull();
     expect(r.driftPct).toBe(5);
+  });
+});
+
+describe('cameraAngleShortLine — короткая строка для картинки', () => {
+  it('нет замера — нет строки (картинку нечем подписывать)', () => {
+    expect(cameraAngleShortLine(null)).toBeNull();
+  });
+
+  it('в норме — без восклицательного знака и без приговора', () => {
+    const line = cameraAngleShortLine(cameraAngleCheck(path({ dxCm: 0 }), { skewPct: 1.2 }))!;
+    expect(line).toBe('ракурс: ход 0% · масштаб по высоте 1.2% — в норме');
+    expect(line).not.toContain('⚠');
+  });
+
+  it('уход — предупреждение с двумя версиями, как и в отчёте', () => {
+    const line = cameraAngleShortLine(cameraAngleCheck(path({ dxCm: 10, dyCm: 40 }), { side: 'left' }))!;
+    expect(line).toContain('⚠');
+    expect(line).toContain('ход 25%');
+    expect(line).toContain('либо техника, либо камера не под 90°');
+  });
+
+  it('вид спереди подписывает цифру как боковой уход', () => {
+    const line = cameraAngleShortLine(cameraAngleCheck(path({ dxCm: 10, dyCm: 40 }), { side: 'front' }))!;
+    expect(line).toContain('уход вбок 25%');
+    expect(line).not.toContain('не под 90°');
+  });
+
+  it('косая камера — рецепт, а не диагноз техники', () => {
+    const line = cameraAngleShortLine(cameraAngleCheck(path({ dxCm: 0 }), { skewPct: 8 }))!;
+    expect(line).toContain('масштаб по высоте 8%');
+    expect(line).toContain('нужна перспектива');
+    expect(line).not.toContain('техника');
+  });
+
+  it('нехватка хода — прямо сказано, что замер не сделан', () => {
+    const line = cameraAngleShortLine(cameraAngleCheck(path({ dyCm: 1 })))!;
+    expect(line).toBe('ракурс не проверен: ход по вертикали < 2 см');
   });
 });

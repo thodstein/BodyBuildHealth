@@ -306,6 +306,8 @@ export interface TrajectoryExportInput {
   overlayText?: string;
   /** Готовая строка сравнения сессий («vmax ниже прошлой сессии: …»). */
   sessionText?: string;
+  /** Короткая строка ракурса для картинки («⚠ ход 37.5% — либо техника, либо камера не под 90°»). */
+  angleText?: string;
   captureQuality?: string;
   /** Раскраска по скорости (heatmapping). По умолчанию включена, если в точках есть t. */
   heat?: boolean;
@@ -326,10 +328,16 @@ function heatSegments(pts: ReadonlyArray<{ x: number; y: number; t?: number }>):
  */
 export function buildTrajectorySvg(inp: TrajectoryExportInput): string {
   const W = 480;
-  const H = 320;
+  // Строки подписи идут столбиком: раньше текст сравнения сессий и дата рисовались
+  // на одной высоте (y=308) и накладывались друг на друга. Дополнительные строки
+  // увеличивают высоту картинки, а не налезают на график.
+  const infoLines = [inp.overlayText, inp.sessionText, inp.angleText]
+    .filter((t): t is string => typeof t === 'string' && t.trim().length > 0);
+  const extraLines = Math.max(0, infoLines.length - 1);
+  const H = 320 + extraLines * 14;
   const PAD_X = 44;
   const PAD_TOP = 40;
-  const PAD_BOTTOM = 62;
+  const PAD_BOTTOM = 62 + extraLines * 14;
   const overlay = !!(inp.firstRep?.length && inp.lastRep?.length);
   const all = [...(inp.series ?? []), ...(inp.firstRep ?? []), ...(inp.lastRep ?? []), ...(inp.prevRep ?? [])];
   const minX = all.length ? Math.min(...all.map((p) => p.x)) : 0;
@@ -390,14 +398,13 @@ export function buildTrajectorySvg(inp: TrajectoryExportInput): string {
   if (inp.xLoopCm != null) footer.push(`xLoop ${fmt(inp.xLoopCm, 1)} см`);
   if (inp.vmax != null) footer.push(`vmax ${fmt(inp.vmax, 2)} м/с`);
   if (inp.captureQuality) footer.push(`качество: ${inp.captureQuality}`);
-  parts.push(`<text x="${PAD_X}" y="${H - PAD_BOTTOM + 20}" fill="#d1d5db" font-family="sans-serif" font-size="10">${esc(footer.join(' · ') || '—')}</text>`);
-  let textY = H - PAD_BOTTOM + 36;
-  if (inp.overlayText) {
-    parts.push(`<text x="${PAD_X}" y="${textY}" fill="#e5e7eb" font-family="sans-serif" font-size="10">${esc(inp.overlayText)}</text>`);
+  const footerY = H - PAD_BOTTOM + 20;
+  parts.push(`<text x="${PAD_X}" y="${footerY}" fill="#d1d5db" font-family="sans-serif" font-size="10">${esc(footer.join(' · ') || '—')}</text>`);
+  let textY = footerY + 16;
+  const infoFill = ['#e5e7eb', '#cbd5e1', '#fbbf24'];
+  for (let i = 0; i < infoLines.length; i++) {
+    parts.push(`<text x="${PAD_X}" y="${textY}" fill="${infoFill[i] ?? '#cbd5e1'}" font-family="sans-serif" font-size="10">${esc(infoLines[i])}</text>`);
     textY += 14;
-  }
-  if (inp.sessionText) {
-    parts.push(`<text x="${PAD_X}" y="${textY}" fill="#cbd5e1" font-family="sans-serif" font-size="10">${esc(inp.sessionText)}</text>`);
   }
   parts.push(`<text x="${PAD_X}" y="${H - 12}" fill="#6b7280" font-family="sans-serif" font-size="9">${esc(inp.createdAt || new Date().toISOString().slice(0, 10))} · скорость из видео — оценка (не LPT)</text>`);
 

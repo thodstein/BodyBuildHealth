@@ -7,13 +7,16 @@ import React from 'react';
  * перехватываем сохранение и смотрим сам CSV. Так проверяется, что отчёт
  * объясняет, чем нанесена линия на видео (без этого его не воспроизвести).
  */
-const { savedCsv } = vi.hoisted(() => ({ savedCsv: [] as string[] }));
+const { savedCsv, savedText } = vi.hoisted(() => ({
+  savedCsv: [] as string[],
+  savedText: [] as Array<{ name: string; text: string }>,
+}));
 
 vi.mock('../../../../core/apk-share', () => ({
   copyOrShareText: async () => 'saved',
   saveCsvApk: async (_name: string, csv: string) => { savedCsv.push(csv); return 'saved'; },
   printHtmlApk: async () => 'saved',
-  saveTextFileApk: async () => 'saved',
+  saveTextFileApk: async (name: string, text: string) => { savedText.push({ name, text }); return 'saved'; },
   saveBlobApk: async () => 'saved',
   shareOutcomeLabel: () => 'сохранено',
 }));
@@ -34,6 +37,7 @@ beforeEach(() => {
   localStorage.clear();
   localStorage.setItem('he_lift_master_collapsed_v1', '{}');
   savedCsv.length = 0;
+  savedText.length = 0;
 });
 
 afterEach(() => {
@@ -168,5 +172,42 @@ describe('хаб → CSV: как нанесена линия на видео', (
     // Старой подписи быть не должно: иначе цифру прочтут как путь вглубь кадра.
     expect(csv).not.toContain('"Горизонтальный ход штанги, % хода"');
     expect(rowValue(csv, 'Проверка ракурса')).toContain('сигнал техники');
+  });
+
+  it('SVG-картинка несёт строку ракурса: её пересылают отдельно от отчёта', async () => {
+    const rows = ['time,x,y'];
+    for (let i = 0; i < 20; i++) rows.push(`${(i * 0.05).toFixed(2)},${100 + i * 1.5},${50 + i * 4}`);
+    localStorage.setItem(MASTER_KEY, JSON.stringify({ lift: 'bench', capture: { side: 'left' } }));
+    const { container } = render(<LiftMasterCard sessions={[]} />);
+    act(() => {
+      fireEvent.change(container.querySelector('[data-lift="kinovea-text"]')!, { target: { value: rows.join('\n') } });
+    });
+    act(() => { fireEvent.click(container.querySelector('[data-lift="parse-kinovea"]')!); });
+    await act(async () => { fireEvent.click(container.querySelector('[data-lift="export-svg"]')!); });
+
+    expect(savedText.length).toBe(1);
+    const svg = savedText[0].text;
+    expect(savedText[0].name).toMatch(/\.svg$/);
+    expect(svg).toContain('ход 37.5%');
+    // Та же оговорка, что в отчёте: цифра без неё читается как приговор технике.
+    expect(svg).toContain('либо техника, либо камера не под 90°');
+    // Кириллица в SVG не экранируется в мусор.
+    expect(svg).not.toContain('&amp;amp;');
+  });
+
+  it('SVG при виде спереди: боковой ход как техника, без подсказки про камеру', async () => {
+    const rows = ['time,x,y'];
+    for (let i = 0; i < 20; i++) rows.push(`${(i * 0.05).toFixed(2)},${100 + i * 1.5},${50 + i * 4}`);
+    localStorage.setItem(MASTER_KEY, JSON.stringify({ lift: 'bench', capture: { side: 'front' } }));
+    const { container } = render(<LiftMasterCard sessions={[]} />);
+    act(() => {
+      fireEvent.change(container.querySelector('[data-lift="kinovea-text"]')!, { target: { value: rows.join('\n') } });
+    });
+    act(() => { fireEvent.click(container.querySelector('[data-lift="parse-kinovea"]')!); });
+    await act(async () => { fireEvent.click(container.querySelector('[data-lift="export-svg"]')!); });
+
+    const svg = savedText[0].text;
+    expect(svg).toContain('боковой ход штанги (техника)');
+    expect(svg).not.toContain('не под 90°');
   });
 });
