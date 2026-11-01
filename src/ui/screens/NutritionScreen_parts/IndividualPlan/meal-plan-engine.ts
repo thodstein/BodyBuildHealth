@@ -11801,6 +11801,32 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     // после откатов и обязана день не ухудшить. Ручной КБЖУ и портативный режим
     // не трогаются.
     {
+      // Снимок/откат дня — ЕДИНЫЙ источник для QG12…QG16. Раньше каждая стадия
+      // копировала свою пару, и все копии восстанавливали только «обрезку»
+      // добавленного: пункт, УДАЛЁННЫЙ за пасс, обратно не возвращался, хотя
+      // totals дня его продолжали считать. Замер: 2 дня из 30 показывали завтрак
+      // на 14–15 г жира и 126–135 ккал жирнее своей же тарелки (завтрак «47%»
+      // вместо фактических 29–36%) — планировщик отчитывался не о том, что лежит
+      // в плане. Возвращаем состав и порядок тарелки по ссылкам.
+      const _snapDayAll = () => ({
+        tots: { ...totals },
+        meals: (meals as any[]).map((m: any) => ({
+          m, mt: { ...(m.totals || {}) },
+          refs: ((m.items || []) as any[]).slice(),
+          snap: ((m.items || []) as any[]).map((it: any) => ({ it, s: { ...it } })),
+        })),
+      });
+      const _restoreDayAll = (sd: any) => {
+        for (const e of sd.meals) {
+          e.m.items = e.refs.slice();
+          for (const it of e.snap) {
+            for (const k of Object.keys(it.it)) if (!(k in it.s)) delete it.it[k];
+            Object.assign(it.it, it.s);
+          }
+          e.m.totals = { ...e.mt };
+        }
+        Object.assign(totals, sd.tots);
+      };
       const _vegFree = !(!!(input as any).manualTargetsLocked
         || String((input as any).kbjuMode || '') === 'manual'
         || !!input.portableMode);
@@ -12301,24 +12327,8 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
         // маслом. Итоги дня тоже восстанавливаем как есть: пересчёт из тарелок
         // давал другое число, чем книжка движка (замер: отказ стадии менял
         // контрольный день 2937/178.6 → 2944/182.2, хотя ни один пункт не менялся).
-        const _snapDay12 = () => ({
-          tots: { ...totals },
-          meals: (meals as any[]).map((m: any) => ({
-            m, mt: { ...(m.totals || {}) },
-            snap: ((m.items || []) as any[]).map((it: any) => ({ it, s: { ...it } })),
-          })),
-        });
-        const _restoreDay12 = (sd: any) => {
-          for (const e of sd.meals) {
-            if ((e.m.items || []).length > e.snap.length) (e.m.items as any[]).length = e.snap.length;
-            for (const it of e.snap) {
-              for (const k of Object.keys(it.it)) if (!(k in it.s)) delete it.it[k];
-              Object.assign(it.it, it.s);
-            }
-            e.m.totals = { ...e.mt };
-          }
-          Object.assign(totals, sd.tots);
-        };
+        const _snapDay12 = () => _snapDayAll();
+        const _restoreDay12 = (sd: any) => _restoreDayAll(sd);
         // Жир желтка снимаем ТОЛЬКО с чистого масла того же приёма (масла/ги/
         // сливочное): у «жировых» пунктов вроде сыра 25 г белка на 100 г, и срез
         // 10 г увозил 2.5 г белка (замер: белок дня −2.7 г, «белок по приёмам» −9,
@@ -12511,24 +12521,8 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
         };
         // Снимок ДНЯ (тарелки + итоги): баланс углеводов правит гарнир, срез
         // белка — белковый пункт; откат одного приёма оставил бы день половинчатым.
-        const _snapDay13 = () => ({
-          tots: { ...totals },
-          meals: (meals as any[]).map((m: any) => ({
-            m, mt: { ...(m.totals || {}) },
-            snap: ((m.items || []) as any[]).map((it: any) => ({ it, s: { ...it } })),
-          })),
-        });
-        const _restoreDay13 = (sd: any) => {
-          for (const e of sd.meals) {
-            if ((e.m.items || []).length > e.snap.length) (e.m.items as any[]).length = e.snap.length;
-            for (const it of e.snap) {
-              for (const k of Object.keys(it.it)) if (!(k in it.s)) delete it.it[k];
-              Object.assign(it.it, it.s);
-            }
-            e.m.totals = { ...e.mt };
-          }
-          Object.assign(totals, sd.tots);
-        };
+        const _snapDay13 = () => _snapDayAll();
+        const _restoreDay13 = (sd: any) => _restoreDayAll(sd);
         // Порог «это порция цельного белка» — тот же, что у QG12 и у гарантии
         // реалистичности тарелки (≥80 кг: пункт 75 г, иначе 40 г).
         const _protFloor13 = (Number(input.weightKg) || 0) >= 80 ? 75 : 40;
@@ -12766,24 +12760,8 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
           const _withItems14 = () => (meals as any[]).filter((mm: any) => ((mm.items || []) as any[]).length > 0);
           // Снимок дня: перекладка правит ДВА приёма, откат одного оставил бы
           // день половинчатым (та же ловушка, что в QG12/QG13).
-          const _snapDay14 = () => ({
-            tots: { ...totals },
-            meals: (meals as any[]).map((m: any) => ({
-              m, mt: { ...(m.totals || {}) },
-              snap: ((m.items || []) as any[]).map((it: any) => ({ it, s: { ...it } })),
-            })),
-          });
-          const _restoreDay14 = (sd: any) => {
-            for (const e of sd.meals) {
-              if ((e.m.items || []).length > e.snap.length) (e.m.items as any[]).length = e.snap.length;
-              for (const it of e.snap) {
-                for (const k of Object.keys(it.it)) if (!(k in it.s)) delete it.it[k];
-                Object.assign(it.it, it.s);
-              }
-              e.m.totals = { ...e.mt };
-            }
-            Object.assign(totals, sd.tots);
-          };
+          const _snapDay14 = () => _snapDayAll();
+          const _restoreDay14 = (sd: any) => _restoreDayAll(sd);
           const moves14: string[] = [];
           // Кальций дня ДО стадии: молочный/порошковый донор не имеет права
           // увести его больше чем на 40 мг (иначе стадия съедает завоевание QG13).
@@ -12890,7 +12868,6 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
           }
         }
       }
-
       // ── QG15: жир по приёмам — ни один основной приём выше 35% жира дня ──────
       // Замер (30 дней): ось «жир в одном приёме» 81.4, и в 9 днях из 30 есть
       // основной приём выше 35% жира дня. Виновник в каждом дне один и тот же —
@@ -12927,24 +12904,8 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
           const _withItems15 = () => (meals as any[]).filter((mm: any) => ((mm.items || []) as any[]).length > 0);
           // Снимок дня: перенос правит две тарелки — откат одной оставил бы день
           // половинчатым (та же ловушка, что в QG12/QG13/QG14).
-          const _snapDay15 = () => ({
-            tots: { ...totals },
-            meals: (meals as any[]).map((m: any) => ({
-              m, mt: { ...(m.totals || {}) },
-              snap: ((m.items || []) as any[]).map((it: any) => ({ it, s: { ...it } })),
-            })),
-          });
-          const _restoreDay15 = (sd: any) => {
-            for (const e of sd.meals) {
-              if ((e.m.items || []).length > e.snap.length) (e.m.items as any[]).length = e.snap.length;
-              for (const it of e.snap) {
-                for (const k of Object.keys(it.it)) if (!(k in it.s)) delete it.it[k];
-                Object.assign(it.it, it.s);
-              }
-              e.m.totals = { ...e.mt };
-            }
-            Object.assign(totals, sd.tots);
-          };
+          const _snapDay15 = () => _snapDayAll();
+          const _restoreDay15 = (sd: any) => _restoreDayAll(sd);
           const _t0_15 = {
             kcal: Number(totals.kcal) || 0, p: Number(totals.p) || 0,
             f: Number(totals.f) || 0, c: Number(totals.c) || 0,
@@ -13007,39 +12968,49 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
             let left = over;
             let moved = 0;
             for (const it of srcItems) {
-              if (left < 1) break;
+              // «Почти на цели» — тоже повод: недобор 0.9 г жира не повод бросать
+              // перенос (раньше `left < 1` обрывал стадию на 0.8–0.95 г, и дни
+              // S2/5/рест и S2/6/тр оставались на 36%).
+              if (left <= 0) break;
               const amt = Number(it.amount) || 0;
               const perG = (Number(it.f) || 0) / Math.max(1, amt);
               if (!(perG > 0)) continue;
               const proto = { ...it };
-              // Сначала ДОГОВАРИВАЕМСЯ, куда уедет жир, и только потом режем
-              // источник: рез «на сколько просит день» терял жир в воздухе, когда
-              // приёмник места не давал.
-              // Новый пункт масла не создаём меньше «это еда» (7 г, правило QG1):
-              // «гхи 3 г» в чужой тарелке — не порция, а мусор в счёте пунктов
-              // (ось «порции» проседала ровно на таких добавках). Слияние в уже
-              // существующий пункт того же продукта — любой объём.
-              const plan15: Array<{ dn: any; take: number }> = [];
-              let rest = Math.min(Math.floor(left / perG), Math.floor(amt));
+              // Сколько уносим: столько, сколько просит день, но БЕЗ «огрызка»:
+              // если после среза в источнике осталось бы меньше порции (7 г),
+              // уносим пункт целиком. Иначе остаётся «гхи 6 г» — не еда, и день
+              // терял жир (замер: 14–15 г в двух днях из 30).
+              let want = Math.min(Math.floor(left / perG), Math.floor(amt));
+              if (want < 7 && amt >= 7) want = 7;              // день просит 1–6 г — уносим порцию
+              if (amt - want > 0 && amt - want < 7) want = Math.floor(amt);
+              const plan15: Array<{ dn: any; take: number; host: any }> = [];
+              let rest = want;
               for (const dn of dests) {
                 if (rest < 1) break;
                 const room = Math.floor(_lim15 * dayF - _fatOf15(dn));
                 if (room < 1) continue;
                 const same = ((dn.items || []) as any[]).filter((x: any) => String(x.id) === String(proto.id))[0];
-                // Если день просит меньше «порции» (бывает 1–6 г), едем порцией
-                // 7 г: лишний грамм жира уходит из перегруженного приёма в пустой,
-                // то есть работает туда же, куда и всё остальное.
-                const take = same ? Math.min(rest, room) : Math.min(Math.max(rest, 7), room);
-                if (!same && take < 7) continue;
-                plan15.push({ dn, take });
+                const take = Math.min(rest, room);
+                if (take < 1) continue;
+                // Новый пункт — только порцией ≥7 г: «гхи 5 г» в чужой тарелке не
+                // еда, а мусор в счёте пунктов (ось «порции»). Меньший остаток
+                // доливаем в УЖЕ существующее масло приёмника: подмена продукта
+                // здесь — цена за отсутствие огрызка, поэтому только когда без неё
+                // пункт пришлось бы бросить (иначе продукт сохраняем: гхи остаётся
+                // гхи и пунктом дня — ось «разнообразие» не платит за перенос).
+                const pf15 = ((dn.items || []) as any[]).filter(_pureFat15)[0] || null;
+                if (!same && take < 7 && !pf15) continue;
+                const host = same || (take < 7 ? pf15 : null);
+                plan15.push({ dn, take, host });
                 rest -= take;
               }
-              if (!plan15.length) continue;
               const realCut = plan15.reduce((s, p) => s + p.take, 0);
-              if (realCut < 1) continue;
+              const remain = Math.round((amt - realCut) * 10) / 10;
+              // Огрызка не оставляем: пункт либо уехал целиком, либо остался
+              // порцией ≥7 г. Иначе — не трогаем день вовсе.
+              if (realCut < 1 || (remain > 0 && remain < 7)) continue;
               for (const p of plan15) {
-                const had = ((p.dn.items || []) as any[]).filter((x: any) => String(x.id) === String(proto.id))[0];
-                if (had) Object.assign(had, _scale10(had, (Number(had.amount) || 0) + p.take));
+                if (p.host) Object.assign(p.host, _scale10(p.host, (Number(p.host.amount) || 0) + p.take));
                 else (p.dn.items as any[]).push({ ..._scale10(proto, p.take) });
               }
               Object.assign(it, _scale10(it, amt - realCut));
@@ -13053,7 +13024,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
               recalcDayTotals(meals, totals);
               left -= realCut * perG;
               moved += realCut;
-              moves15.push(`«${String(src.type)}» ${String(proto.name || proto.id)} −${realCut} г → ${plan15.map((p) => `«${String(p.dn.type)}» +${p.take} г`).join(', ')}`);
+              moves15.push(`«${String(src.type)}» ${String(proto.name || proto.id)} −${realCut} г → ${plan15.map((p) => `«${String(p.dn.type)}» ${p.host && String(p.host.id) !== String(proto.id) ? `${String(p.host.name || p.host.id)} ` : ''}+${p.take} г`).join(', ')}`);
             }
             recalcMealTotals(meals as any[]);
             recalcDayTotals(meals, totals);

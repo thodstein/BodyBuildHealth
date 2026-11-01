@@ -32,6 +32,10 @@
  *   ось «жир в одном приёме»       81.4         93.7 (QG15)
  *   дней с приёмом ≥36% жира дня   9/30         5/30 (QG15)
  *   макс. доля жира (среднее)      34.9%        32.6% (QG15)
+ *   ось «жир в одном приёме» (QG16) 93.7        99.6
+ *   дней с приёмом ≥36% жира (QG16) 5/30        1/30
+ *   приёмов, где итоги ≠ пункты     2            0    (QG16)
+ *   средняя оценка дня (QG16)      89.2         90.4
  */
 import { describe, it, expect } from 'vitest';
 import { buildDayPlan, type MealPlanInput } from '../meal-plan-engine';
@@ -647,6 +651,152 @@ describe('жир не сваливается в один основной при
     } as unknown as MealPlanInput);
     const notes = ((manual.notes || []) as string[]).filter((n) => n.startsWith('🧈 Жир по приёмам:'));
     expect(notes.join(' | ')).toBe('');
+  });
+});
+
+describe('перенос жира не теряет граммы и возвращает тарелку целиком (QG16)', () => {
+  // Найдено при попытке «убрать второй жировой якорь из завтрака»: два дня из 30
+  // отчитывались о завтраке на 14–15 г жира жирнее собственной тарелки (47% дня
+  // вместо фактических 28–29%). Причина не в завтраке, а в откате стадий QG12…QG15:
+  // снимок дня восстанавливал ПУНКТЫ, но не МАССИВ тарелки, поэтому пункт,
+  // снятый за неудачный пасс, обратно не возвращался, а итоги дня его продолжали
+  // считать. Вторая половина той же ошибки — «огрызок»: QG15 резал масло «на
+  // сколько просит день», и если остаток был 1–6 г (< порога «это еда»), пункт
+  // удалялся вместе с граммами — день терял жир, пасс откатывался, и ровно самые
+  // тяжёлые дни (47%) оставались нетронутыми.
+  // Замер QG16 (те же 30 дней):
+  //   ось «жир в одном приёме»        93.7 → 99.6
+  //   дней с приёмом ≥36% жира дня     5/30 → 1/30
+  //   макс. доля жира (среднее)       32.5% → 31.2%
+  //   приёмов, где итоги ≠ сумма пунктов  2 → 0
+  //   средняя оценка дня (с микро)     89.2 → 90.4
+  const MAIN5 = ['breakfast', 'lunch', 'dinner', 'snack', 'snack2'];
+  const mains = (d: Day) => d.meals.filter((m: any) => MAIN5.includes(String(m.type)));
+  const plateF = (m: any) => (m.items || []).reduce((s: number, x: any) => s + (Number(x.f) || 0), 0);
+  const dayPlateF = (d: Day) => d.meals.reduce((s: number, m: any) => s + plateF(m), 0);
+  const maxShare = (d: Day) => Math.max(...mains(d).map((m: any) => (Number(m.totals?.f) || 0) / Math.max(1, d.totF)));
+  const axis = (d: Day) => Math.max(0, Math.min(100, 100 - Math.max(0, maxShare(d) - 0.35) * (100 / 0.15)));
+  const goalF = (d: Day) => Number(buildDayTargets({
+    weightKg: d.w, presetGPerKg: 2.0, fatFloorGPerKg: 0.8, kbjuMode: 'auto',
+    goal: 'maintenance', dietStyle: 'classic',
+  } as any).fats);
+  const moveNotes = (d: Day) => (d.plan.notes as string[])
+    .filter((n) => typeof n === 'string' && n.startsWith('🧈 Жир по приёмам:'));
+
+  it('итоги приёма = сумма его пунктов (раньше 2 приёма из 30 «считали» снятую еду)', () => {
+    // 14–15 г жира и 126–135 ккал расхождения — это ровно тарелка гхи, которую
+    // откат стадии забыл вернуть: план обещал жир, которого на тарелке не было.
+    const bad: string[] = [];
+    for (const d of DAYS) {
+      for (const m of d.meals) {
+        const dF = (Number(m.totals?.f) || 0) - plateF(m);
+        const sK = (m.items || []).reduce((s: number, x: any) => s + (Number(x.kcal) || 0), 0);
+        const dK = (Number(m.totals?.kcal) || 0) - sK;
+        if (Math.abs(dF) > 0.6 || Math.abs(dK) > 6) {
+          bad.push(`${d.id}/${m.type}: Δжир ${Math.round(dF * 10) / 10} г, Δккал ${Math.round(dK)}`);
+        }
+      }
+    }
+    expect(bad.slice(0, 5).join(' | ')).toBe('');
+  });
+
+  it('жир в тарелке = жир дня по отчёту (расхождений 0 из 30)', () => {
+    const bad = DAYS
+      .map((d) => ({ id: d.id, d: Math.abs(dayPlateF(d) - d.totF) }))
+      .filter((x) => x.d > 0.6);
+    expect(bad.map((x) => `${x.id}:${Math.round(x.d * 10) / 10}`).join(', ')).toBe('');
+  });
+
+  it('жир в тарелках = цель дня ±3%, кроме ≤3 дней best-effort (было 5)', () => {
+    // Дни с упором в капы (мало жирового «места» в дне) остаются честным
+    // best-effort — их не «догоняем» мусором, но и не прибавляем к ним новых.
+    const bad = DAYS.filter((d) => Math.abs(dayPlateF(d) - goalF(d)) / goalF(d) > 0.03).map((d) => d.id);
+    expect(bad.length, `вне ±3% от цели: ${bad.join(', ')}`).toBeLessThanOrEqual(3);
+  });
+
+  it('ось «жир в одном приёме» в среднем ≥ 97 (было 93.7)', () => {
+    const avg = DAYS.reduce((s, d) => s + axis(d), 0) / DAYS.length;
+    expect(Math.round(avg)).toBeGreaterThanOrEqual(97);
+  });
+
+  it('дней с перевесом жира в одном приёме (≥36% дня): ≤ 2 из 30 (было 5)', () => {
+    const bad = DAYS.filter((d) => maxShare(d) > 0.355).map((d) => `${d.id}:${Math.round(maxShare(d) * 100)}%`);
+    expect(bad.length, `выше порога: ${bad.join(', ')}`).toBeLessThanOrEqual(2);
+  });
+
+  it('самая жирная тарелка дня в среднем ≤ 32% жира (было 32.5%)', () => {
+    const avg = (DAYS.reduce((s, d) => s + maxShare(d), 0) / DAYS.length) * 100;
+    expect(Math.round(avg * 10) / 10).toBeLessThanOrEqual(32);
+  });
+
+  it('ни один день не остался с приёмом > 40% жира дня (было 2 дня по 47%)', () => {
+    const bad = DAYS.filter((d) => maxShare(d) > 0.40).map((d) => `${d.id}:${Math.round(maxShare(d) * 100)}%`);
+    expect(bad.join(', ')).toBe('');
+  });
+
+  it('перенос не оставляет «огрызка» в приёме-источнике (масло 1–6 г)', () => {
+    // QG15 режет масло по 1 г на «комнату до 35%» — остаток 1–6 г это уже не еда,
+    // а лишний пункт в счёте (ось «порции»). Малый хвост доливается в масло,
+    // которое в приёме уже есть, либо пункт не режется вовсе.
+    const bad: string[] = [];
+    for (const d of DAYS) {
+      for (const n of moveNotes(d)) {
+        for (const m of String(n).matchAll(/«([a-z0-9]+)» [^−]*−(\d+) г/g)) {
+          const src = d.meals.find((x: any) => String(x.type) === String(m[1]));
+          for (const it of (src?.items || []) as any[]) {
+            if (!/(oil|ghee|mct)/.test(String(it.id))) continue;
+            if ((Number(it.amount) || 0) > 0 && (Number(it.amount) || 0) < 7) {
+              bad.push(`${d.id}/${m[1]}: ${it.id} ${Math.round(it.amount)} г после среза −${m[2]} г`);
+            }
+          }
+        }
+      }
+    }
+    expect(bad.slice(0, 5).join(' | ')).toBe('');
+  });
+
+  it('долг сборки зафиксирован: масляных пунктов 1–6 г не больше 10 (замер QG16: 10)', () => {
+    // Не перенос, а сама сборка: 5 г масла в тарелке — ниже пола «это еда» (7 г
+    // для жира, QG1). Замер 30 дней: 10 пунктов в 9 днях, в том числе в днях без
+    // нот о переносе. Это отдельная стадия (порог масла в ГОТОВОЙ тарелке), здесь
+    // фиксируем только «не стало хуже»: тест ловит рост, а не лечит долг.
+    const bad: string[] = [];
+    for (const d of DAYS) {
+      for (const { m, x } of items(d)) {
+        if (!/(oil|ghee|mct)/.test(String(x.id))) continue;
+        if ((Number(x.amount) || 0) > 0 && (Number(x.amount) || 0) < 7) bad.push(`${d.id}/${m.type}: ${x.id} ${Math.round(x.amount)} г`);
+      }
+    }
+    expect(bad.length, `мелкие масляные пункты: ${bad.join(', ')}`).toBeLessThanOrEqual(10);
+  });
+
+  it('нота переноса сходится: сколько обещала снять, столько и доложила', () => {
+    const bad: string[] = [];
+    for (const d of DAYS) {
+      for (const n of moveNotes(d)) {
+        const minus = [...n.matchAll(/−(\d+(?:[.,]\d+)?) г/g)].reduce((s, m) => s + Number(String(m[1]).replace(',', '.')), 0);
+        const plus = [...n.matchAll(/\+(\d+(?:[.,]\d+)?) г/g)].reduce((s, m) => s + Number(String(m[1]).replace(',', '.')), 0);
+        if (Math.abs(minus - plus) > 0.01) bad.push(`${d.id}: −${minus} ≠ +${plus}`);
+      }
+    }
+    expect(bad.slice(0, 5).join(' | ')).toBe('');
+  });
+
+  it('канон не хуже: дней в допуске 3% ≥ 25 из 30', () => {
+    const canon = DAYS.filter((d) => {
+      const t: any = buildDayTargets({
+        weightKg: d.w, presetGPerKg: 2.0, fatFloorGPerKg: 0.8, kbjuMode: 'auto',
+        goal: 'maintenance', dietStyle: 'classic',
+      } as any);
+      const dev = Math.max(
+        Math.abs((d.plan.totals?.kcal || 0) - t.kcal) / t.kcal,
+        Math.abs((d.plan.totals?.p || 0) - t.protein) / t.protein,
+        Math.abs((d.plan.totals?.f || 0) - t.fats) / t.fats,
+        Math.abs((d.plan.totals?.c || 0) - t.carbs) / Math.max(1, t.carbs),
+      );
+      return dev <= 0.03;
+    });
+    expect(canon.length).toBeGreaterThanOrEqual(25);
   });
 });
 
