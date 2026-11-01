@@ -638,6 +638,18 @@ describe('LiftMasterCard — поведение (не только смоук)',
     expect(btn.textContent).toContain('нет сетов');
   });
 
+  it('экспорт динамики heat доступен и тап-таргет ≥44 px', () => {
+    localStorage.setItem('he_lift_master_history_v1', JSON.stringify([
+      { ts: new Date('2026-10-06T12:00:00.000Z').getTime(), lift: 'bench', phase: '', issues: [], weakCount: 0, slowPct: 40, xLoopCm: 3.2, vmaxMS: 0.42 },
+      { ts: new Date('2026-10-13T12:00:00.000Z').getTime(), lift: 'bench', phase: '', issues: [], weakCount: 0, slowPct: 34, xLoopCm: 2.9, vmaxMS: 0.45 },
+    ]));
+    const { container } = render(<LiftMasterCard sessions={[]} />);
+    const btn = container.querySelector('[data-lift="export-heat-trend"]') as HTMLElement;
+    expect(btn).toBeTruthy();
+    expect(btn.getAttribute('aria-label')).toContain('динамику heat');
+    expect(parseFloat(btn.style.minHeight || '0')).toBeGreaterThanOrEqual(44);
+  });
+
   it('смещение трека сохраняется и переживает перезапуск', () => {
     const { container, unmount } = render(<LiftMasterCard sessions={[]} />);
     const input = container.querySelector('[data-lift="video-offset"]') as HTMLInputElement;

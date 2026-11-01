@@ -49,7 +49,7 @@ import { barLoopFlag } from '../../../engines/pro/bar-path-core.engine';
 import { diagnoseAsymmetry } from '../../../engines/pro/pl-asymmetry.engine';
 import { RULE_CHECKS, checkLiftRules } from '../../../engines/pro/pl-competition-rules.engine';
 import { RED_FLAGS, checkRedFlags, type RedFlagId } from '../../../engines/pro/pl-red-flags.engine';
-import { buildMovementDiagnosticsHtml, buildMovementDiagnosticsCsv, buildTrajectorySvg, movementDiagnosticsFilename, type MovementDiagnosticsExportInput } from '../../../engines/pro/movement-diagnostics-export.engine';
+import { buildMovementDiagnosticsHtml, buildMovementDiagnosticsCsv, buildTrajectorySvg, movementDiagnosticsFilename, buildHeatTrendCsv, type MovementDiagnosticsExportInput } from '../../../engines/pro/movement-diagnostics-export.engine';
 import { renderTrajectoryPng, recordTrajectoryWebm, recordVideoWithOverlay, canRecordTrajectory, dataUrlToBlob, grabVideoFrame, calibrationFromTaps, preferredVideoMime, isCalibrationSane, calibrationFrameFit, mapTrackToVideo, type VideoCalibration } from '../../../engines/pro/trajectory-overlay.engine';
 import { copyOrShareText, saveCsvApk, printHtmlApk, saveTextFileApk, saveBlobApk, shareOutcomeLabel } from '../../../core/apk-share';
 import { VideoCaptureCard } from './VideoCaptureCard';
@@ -1673,6 +1673,16 @@ export const LiftMasterCard: React.FC<{
               {!verdict && (
                 <div style={{ marginTop:4, fontSize:9, color:DIM }}>Одна неделя с разбором — динамика появится со вторым CSV.</div>
               )}
+              <button
+                data-lift="export-heat-trend"
+                aria-label="Сохранить динамику heat по неделям в CSV"
+                onClick={async()=>{
+                  const csv = buildHeatTrendCsv(rows, LIFT_RU[lift]);
+                  const o = await saveCsvApk(movementDiagnosticsFilename(lift, 'csv').replace(/\.csv$/, '-trend.csv'), csv);
+                  setShareMsg(shareOutcomeLabel(o)); setTimeout(()=>setShareMsg(null), 2500);
+                }}
+                style={{ minHeight:44, marginTop:6, padding:'10px 12px', borderRadius:8, cursor:'pointer', background:'rgba(251,191,36,0.1)', color:'#fbbf24', border:'1px solid rgba(251,191,36,0.28)', fontWeight:700, fontSize:11 }}
+              >📈 Динамика в CSV</button>
             </div>
           );
         })()}

@@ -67,8 +67,22 @@ function fmt(n: number | null, digits = 2): string {
 function csvCell(v: string | number | null | undefined): string {
   const s = v == null ? '' : String(v);
   // защита от формульной инъекции Excel: префикс ' для = + - @
-  const safe = /^[=+\-@]/.test(s) ? `'${s}` : s;
+  // Чистые числа (в т.ч. отрицательные дельты) не экранируем — иначе Excel
+  // превращает их в текст и формулы в файле ломаются.
+  const plainNumber = /^-?\d+(?:[.,]\d+)?$/.test(s);
+  const safe = !plainNumber && /^[=+\-@]/.test(s) ? `'${s}` : s;
   return `"${safe.replace(/"/g, '""')}"`;
+}
+
+/** ISO-неделя как «W42/2026» — без импорта тяжёлого workout-logger (движок должен быть чистым). */
+function isoWeekLabel(iso: string): string {
+  const d = new Date(`${iso}T00:00:00.000Z`);
+  if (!Number.isFinite(d.getTime())) return '—';
+  const day = d.getUTCDay() || 7;
+  d.setUTCDate(d.getUTCDate() + 4 - day);
+  const yearStart = Date.UTC(d.getUTCFullYear(), 0, 1);
+  const week = Math.ceil(((d.getTime() - yearStart) / 86400000 + 1) / 7);
+  return `W${String(week).padStart(2, '0')}/${d.getUTCFullYear()}`;
 }
 
 /** Человекочитаемые подписи VBT-метрики: в отчёте не должно быть id вида «mcv». */
@@ -80,6 +94,47 @@ const VBT_METRIC_RU: Record<string, string> = {
 export function vbtMetricRu(metric?: string | null): string {
   if (!metric) return '—';
   return VBT_METRIC_RU[metric] ?? metric;
+}
+
+/** Одна неделя динамики heat (совпадает с тем, что видно в хабе). */
+export interface HeatTrendExportRow {
+  ts: number;
+  slowPct: number;
+  xLoopCm: number | null;
+  vmaxMS: number | null;
+}
+
+/**
+ * CSV недельной динамики heat: дата, неделя, доля медленных отрезков, xLoop, vmax
+ * и изменение доли медленных относительно предыдущего среза (п.п.).
+ * Строки сортируются по времени, пустые/битые срезы отбрасываются.
+ */
+export function buildHeatTrendCsv(rows: HeatTrendExportRow[], liftRu: string): string {
+  const clean = (Array.isArray(rows) ? rows : [])
+    .filter((r) => r && Number.isFinite(r.ts) && Number.isFinite(r.slowPct))
+    .slice()
+    .sort((a, b) => a.ts - b.ts);
+  const out: string[][] = [
+    ['Движение', liftRu],
+    ['Дата', 'Неделя', 'Доля медленных отрезков, %', 'xLoop, см', 'vmax, м/с', 'Изменение доли, п.п.'],
+  ];
+  let prev: number | null = null;
+  for (const r of clean) {
+    const d = new Date(r.ts);
+    const iso = d.toISOString().slice(0, 10);
+    const delta = prev == null ? null : Math.round(r.slowPct - prev);
+    out.push([
+      d.toLocaleDateString('ru-RU'),
+      isoWeekLabel(iso),
+      String(Math.round(r.slowPct)),
+      fmt(r.xLoopCm, 1),
+      fmt(r.vmaxMS, 2),
+      delta == null ? '—' : `${delta > 0 ? '+' : ''}${delta}`,
+    ]);
+    prev = r.slowPct;
+  }
+  if (!clean.length) out.push(['—', '—', '—', '—', '—', '—']);
+  return out.map((r) => r.map(csvCell).join(',')).join('\n');
 }
 
 export function movementDiagnosticsFilename(lift: Lift, ext: 'html' | 'csv' | 'svg' | 'png' | 'webm' | 'mp4'): string {

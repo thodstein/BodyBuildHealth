@@ -3,6 +3,7 @@ import {
   buildMovementDiagnosticsHtml,
   buildMovementDiagnosticsCsv,
   movementDiagnosticsFilename,
+  buildHeatTrendCsv,
 } from '../movement-diagnostics-export.engine';
 import { parseKinoveaCSV, analyzeBarTracking } from '../../strength-sport/strength-sport-video.engine';
 import { diagnoseVelocity } from '../vbt.engine';
@@ -73,5 +74,37 @@ describe('movement-diagnostics-export', () => {
     expect(d.lossPct).toBeCloseTo(25, 0);
     expect(d.exceeded).toBe(true);
     expect(d.suggestedPhase).toBeTruthy();
+  });
+});
+
+describe('buildHeatTrendCsv — недельная динамика heat', () => {
+  const day = (iso: string) => new Date(`${iso}T12:00:00.000Z`).getTime();
+
+  it('сортирует недели, считает изменение доли и честно пишет «—»', () => {
+    const csv = buildHeatTrendCsv([
+      { ts: day('2026-10-20'), slowPct: 27, xLoopCm: 2.4, vmaxMS: 0.48 },
+      { ts: day('2026-10-06'), slowPct: 40, xLoopCm: null, vmaxMS: 0.42 },
+      { ts: day('2026-10-13'), slowPct: 34, xLoopCm: 2.9, vmaxMS: 0.45 },
+    ], 'Жим лёжа');
+    const lines = csv.split('\n');
+    expect(lines[0]).toBe('"Движение","Жим лёжа"');
+    expect(lines[1]).toContain('"Доля медленных отрезков, %"');
+    expect(lines[2]).toContain('"40"');
+    expect(lines[2]).toContain('"W41/2026"');
+    expect(lines[2]).toContain('"—"'); // xLoop в первом срезе не было
+    expect(lines[4]).toContain('"-7"'); // изменение относительно предыдущей недели (27 − 34), текст не ломается
+    expect(lines[4]).toContain('"W43/2026"');
+    expect(lines[4]).toContain('"2.4"');
+    expect(lines.length).toBe(5);
+  });
+
+  it('мусор и пустая история не дают пустого файла', () => {
+    const csv = buildHeatTrendCsv([], 'Присед');
+    const lines = csv.split('\n');
+    expect(lines[1]).toContain('"Дата"');
+    expect(lines[2]).toContain('"—"');
+
+    const bad = buildHeatTrendCsv([{ ts: Number.NaN, slowPct: 10, xLoopCm: null, vmaxMS: null }] as any, 'Присед');
+    expect(bad.split('\n').length).toBe(3); // заголовок + строки + заглушка
   });
 });

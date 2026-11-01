@@ -208,6 +208,7 @@ for (const hook of [
   'data-lift="video-calib"', 'data-lift="video-calib-file"', 'data-lift="video-calib-frame"',
   'data-lift="video-calib-save"', 'data-lift="video-calib-state"', 'data-lift="video-calib-clear"',
   'data-lift="video-calib-fit"', 'data-lift="heat-trend"', 'data-lift="heat-trend-row"', 'data-lift="heat-trend-verdict"',
+  'data-lift="export-heat-trend"',
   'data-lift="video-offset"', 'data-lift="vbt-weight"', 'data-lift="vbt-weight-from-diary"',
   'data-lift-nav=',
 ]) mustContain(LIFT_HUB, hook, `lift hub hook ${hook}`);
@@ -240,6 +241,7 @@ mustContain(LIFT_HUB, "'13 Старт'", 'lift hub nav 13 label');
 mustContain('src/engines/pro/trajectory-overlay.engine.ts', 'export function mapTrackToVideo', 'video calibration map');
 mustContain('src/engines/pro/trajectory-overlay.engine.ts', 'export function preferredVideoMime', 'video mp4 preference');
 mustContain('src/engines/pro/trajectory-overlay.engine.ts', 'export function calibrationFrameFit', 'video calibration fit');
+mustContain('src/engines/pro/movement-diagnostics-export.engine.ts', 'export function buildHeatTrendCsv', 'heat trend csv export');
 
 // 7d. Mojibake-бан: битые символы (U+FFFD) в файлах хаба — признак порванной кодировки.
 // В LiftMasterCard их было 11 (тексты VBT/LVP/Kinovea), и это попадало в UI АПК.
