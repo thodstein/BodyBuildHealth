@@ -1,5 +1,5 @@
 /**
- * Регрессия «пакета качества» (QG1–QG13) планировщика.
+ * Регрессия «пакета качества» (QG1–QG14) планировщика.
  *
  * Зачем: сходимость дня ≤3% ловит только КБЖУ. Жалобы шли на «съедобность»:
  * «19 г малины», «жир всего дня в одном приёме», «овощей 190 г», «в обед 12 г белка»,
@@ -27,6 +27,8 @@
  *   дней с Ca < 70% RDA           16/30        3/30 (QG13)
  *   Ca, среднее от RDA            73%          88%  (QG13)
  *   B12, среднее от RDA (после QG13) 57%       198% (QG13)
+ *   ось «белок осн. приёма»        80.4         82.4 (QG14)
+ *   дней с приёмом <0.30 г/кг      24/30        18/30 (QG14)
  */
 import { describe, it, expect } from 'vitest';
 import { buildDayPlan, type MealPlanInput } from '../meal-plan-engine';
@@ -493,6 +495,73 @@ describe('кальций из рыбы, а не из ноты (QG13)', () => {
       manualTargetsLocked: true, kbjuMode: 'manual',
     } as unknown as MealPlanInput);
     const notes = ((manual.notes || []) as string[]).filter((n) => n.startsWith('🐟 Кальций:'));
+    expect(notes.join(' | ')).toBe('');
+  });
+});
+
+describe('белок в каждом основном приёме (QG14)', () => {
+  // Замер: ось «белок основного приёма» 80.4 — рядом с жиром самая слабая, и в
+  // 24 днях из 30 минимальный основной приём ниже порога 0.30 г/кг (S2 58 кг:
+  // завтрак 11.6 г = 0.20 г/кг). Ось меряет МИНИМУМ по основным приёмам, поэтому
+  // перекладка имеет смысл только как «закрыть все дефицитные приёмы»: иначе
+  // получается тасовка (на контрольном дне 90 кг первая версия увела 10 г whey
+  // из пост-воркаута в перекус, а минимум остался 20 г).
+  const MAIN = ['breakfast', 'lunch', 'dinner', 'snack', 'snack2'];
+  const mains = (d: Day) => d.meals.filter((m: any) => MAIN.includes(String(m.type)));
+  const pOf = (m: any) => Number(m?.totals?.p) || 0;
+  const minMain = (d: Day) => Math.min(...mains(d).map(pOf));
+  const axis = (d: Day) => Math.max(0, Math.min(100, (minMain(d) / d.w / 0.3) * 100));
+  const moveNotes = (d: Day) => (d.plan.notes as string[])
+    .filter((n) => typeof n === 'string' && n.startsWith('🥩 Белок по приёмам:'));
+
+  it('ось «белок основного приёма» в среднем ≥ 82 (было 80.4)', () => {
+    const avg = DAYS.reduce((s, d) => s + axis(d), 0) / DAYS.length;
+    expect(Math.round(avg)).toBeGreaterThanOrEqual(82);
+  });
+
+  it('дней с основным приёмом ниже 0.30 г/кг: ≤ 18 из 30 (было 24)', () => {
+    const bad = DAYS.filter((d) => axis(d) < 100).map((d) => d.id);
+    expect(bad.length, `ниже порога: ${bad.join(', ')}`).toBeLessThanOrEqual(18);
+  });
+
+  it('перекладка не берёт белок из окон тренировки', () => {
+    // Тайминг окна (pre/post-workout, intra) — не «свободные граммы»: замер
+    // первой версии резал пост-воркаутный whey 30 → 20 г ради перекуса.
+    const bad: string[] = [];
+    for (const d of DAYS) {
+      for (const n of moveNotes(d)) {
+        if (/«(preworkout|postworkout|intra)»/.test(n)) bad.push(`${d.id}: ${n.slice(0, 60)}`);
+      }
+    }
+    expect(bad.slice(0, 3).join(' | ')).toBe('');
+  });
+
+  it('нота про перекладку не врёт: «минимум по основным приёмам N г» = факт', () => {
+    const bad: string[] = [];
+    for (const d of DAYS) {
+      const notes = moveNotes(d);
+      if (!notes.length) continue;
+      const claimed = Number((notes[0].match(/минимум по основным приёмам (\d+) г/) || [])[1]);
+      const fact = Math.round(minMain(d));
+      if (!Number.isFinite(claimed) || claimed !== fact) bad.push(`${d.id}: нота ${claimed}, факт ${fact}`);
+    }
+    expect(bad.slice(0, 5).join(' | ')).toBe('');
+  });
+
+  it('ручной режим не трогаем: в ручном дне перекладки нет', () => {
+    const tgt: any = buildDayTargets({
+      weightKg: 90, presetGPerKg: 2.0, fatFloorGPerKg: 0.8, kbjuMode: 'manual',
+      goal: 'maintenance', dietStyle: 'classic',
+    } as any);
+    const manual = buildDayPlan({
+      weightKg: 90, lbmKg: 73, bodyFatPct: 19, sex: 'male',
+      goalKcal: tgt.kcal, goalProteinG: tgt.protein, goalFatG: tgt.fats, goalCarbsG: tgt.carbs,
+      mealsCount: 4, isTrainingDay: true, trainStartMin: 18 * 60, trainDurationMin: 75,
+      allowIntraWorkout: true, budget: 'medium', dayOffset: 0, cyclePhase: 'none',
+      variety: 'medium', eveningLowCarb: false, goal: 'maintenance',
+      manualTargetsLocked: true, kbjuMode: 'manual',
+    } as unknown as MealPlanInput);
+    const notes = ((manual.notes || []) as string[]).filter((n) => n.startsWith('🥩 Белок по приёмам:'));
     expect(notes.join(' | ')).toBe('');
   });
 });

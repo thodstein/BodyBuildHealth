@@ -12680,6 +12680,216 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
           }
         }
       }
+      // ── QG14: белок в каждом основном приёме ≥ 0.30 г/кг ─────────────────────
+      // Замер (30 дней): ось «белок основного приёма» 80.4 — рядом с жиром самая
+      // слабая, и в 24 днях из 30 минимальный основной приём ниже порога MPS
+      // 0.30 г/кг: S2 58 кг — завтрак 11.6 г (0.20 г/кг), M1 80 кг — snack2
+      // 11.2 г (0.14), L1 110 кг — завтрак 16.4 г (0.15). Белка в дне при этом
+      // хватает (2.0 г/кг): он просто уехал в обед, ужин и предсонный творог.
+      // Это ровно то, на что жалуются спортсмены — «на завтрак 12 г белка», —
+      // и ровно то, что ось меряет.
+      // Стадия перекладывает белок ВНУТРИ дня: получатель — самый слабый
+      // основной приём, донор — приём с максимальным запасом над порогом.
+      // Белок дня сохраняется (перекладка, а не добавка), поэтому сходимость,
+      // недельные квоты и калории не двигаются. Приём-донор не опускается ниже
+      // порога, если он основной; пункт — ниже минимальной порции.
+      {
+        const _w14 = Number(input.weightKg) || 0;
+        const _need14 = _w14 > 0 ? 0.30 * _w14 : 0;
+        const _skip14 = !_vegFree
+          || _need14 <= 0
+          || !!((input as any).injections && (input as any).injections.length);
+        if (!_skip14) {
+          const _isMain14 = (mm: any) => !['preworkout', 'postworkout', 'intra', 'presleep'].includes(String(mm.type));
+          const _pOf14 = (mm: any) => Number(mm.totals?.p) || 0;
+          // Чем можно двигать белок: цельный/порошковый белок с низкой жирностью.
+          // Жирный белок (сардины, сыр) при добавке тянет жир, натрий и ось жира.
+          const _prot14 = (x: any) => {
+            const id = String(x.id || '');
+            if (x._fixedGrams || _fav10(id)) return false;
+            if (!['protein', 'fast_protein', 'slow_protein'].includes(String(x.role))) return false;
+            const amt = Number(x.amount) || 0;
+            if (!(amt > 0)) return false;
+            const per100 = (v: any) => ((Number(v) || 0) / amt) * 100;
+            return per100(x.p) >= 8 && per100(x.f) <= 10;
+          };
+          // Минимальная порция пункта — та же, что у оси «порции» (QG1) и у
+          // гарантии реалистичности тарелки: ниже неё пункт перестаёт быть едой
+          // (замер без этого пола: обед 75 г → 67 г у атлета 90 кг падал в тесте
+          // «масса 90кг/5пр/трен»).
+          const _realFloor14 = (Number(input.weightKg) || 0) >= 80 ? 75 : 40;
+          const _minG14 = (x: any) => (['fast_protein', 'slow_protein'].includes(String(x.role)) ? 20 : _realFloor14);
+          const _perG14 = (x: any) => (Number(x.p) || 0) / Math.max(1, Number(x.amount) || 0);
+          // Донор белка — постное мясо/рыба: у творога 120 мг кальция на 100 г,
+          // у whey/casein — 890, у яиц — B12 и витамин D. Замер первой версии
+          // (донор — «самый богатый приём»): средний Ca 88% → 87%, ось «микро»
+          // 69 → 67.6 — стадия отбирала кальций у QG13 и витамины у QG12.
+          const _leanMeat14 = (x: any) => /^(chicken_breast|chicken_thigh|turkey_breast|beef_lean|beef_minced|pollock|cod|white_fish|tuna_canned|hake|tilapia|pike_perch|zander)/.test(String(x.id || ''));
+          // Кальций дня: у творога 120 мг/100 г, у whey/casein 890. Молочный
+          // донор допустим только там, где день и после среза держит 80% RDA —
+          // иначе QG14 отбирает ровно то, за что боролась QG13.
+          const _caGoal14 = Number((RDA_BASE as any)?.Ca?.[input.sex === 'female' ? 'female' : 'male'] || 1000);
+          // Натрий: рыба/курица и творог несут соль, и день не имеет права
+          // выехать из коридора QG8 (65–125% базовой цели) из-за перекладки.
+          const _naTarget14 = Number((input as any).sodiumTargetOverride) > 0
+            ? Number((input as any).sodiumTargetOverride)
+            : (input.isTrainingDay ? 3000 : 2300);
+          const _na14 = () => Number((sumMicros(
+            (meals as any[]).flatMap((m: any) => (m.items || []).map((it: any) => ({ id: it.id, amount: it.amount }))),
+            FOOD_DB as any,
+          ) as any)?.Na || 0);
+          const _ca14 = () => Number((sumMicros(
+            (meals as any[]).flatMap((m: any) => (m.items || []).map((it: any) => ({ id: it.id, amount: it.amount }))),
+            FOOD_DB as any,
+          ) as any)?.Ca || 0);
+          const _devStart14 = _dev10();
+          const _worse14 = () => {
+            const canon = PLANNER_CONVERGENCE_PCT / 100;
+            const now = _dev10();
+            if (_devStart14 <= canon) return now > Math.min(canon, _devStart14 + 0.005);
+            return now > _devStart14 + 0.0005;
+          };
+          const _q14 = () => {
+            const cov = _pickCtx.qualityMode === 'full'
+              ? analyzeMicroCoverage(
+                sumMicros((meals as any[]).flatMap((m: any) => (m.items || []).map((it: any) => ({ id: it.id, amount: it.amount }))), FOOD_DB as any),
+                (input.sex || 'male') as any, input.weightKg, input.cyclePhase as any, !!input.isTrainingDay,
+                input.calciumTargetOverride, input.sodiumTargetOverride,
+              ).coverage
+              : [];
+            const lowN = cov.filter((c: any) => (c.pct || 0) < 70).length;
+            return scoreDayQuality(meals as any[], {
+              weightKg: Number(input.weightKg) || 0,
+              microCoverage: cov.length > 0 ? { lowCount: lowN, total: cov.length } : undefined,
+            });
+          };
+          const _withItems14 = () => (meals as any[]).filter((mm: any) => ((mm.items || []) as any[]).length > 0);
+          // Снимок дня: перекладка правит ДВА приёма, откат одного оставил бы
+          // день половинчатым (та же ловушка, что в QG12/QG13).
+          const _snapDay14 = () => ({
+            tots: { ...totals },
+            meals: (meals as any[]).map((m: any) => ({
+              m, mt: { ...(m.totals || {}) },
+              snap: ((m.items || []) as any[]).map((it: any) => ({ it, s: { ...it } })),
+            })),
+          });
+          const _restoreDay14 = (sd: any) => {
+            for (const e of sd.meals) {
+              if ((e.m.items || []).length > e.snap.length) (e.m.items as any[]).length = e.snap.length;
+              for (const it of e.snap) {
+                for (const k of Object.keys(it.it)) if (!(k in it.s)) delete it.it[k];
+                Object.assign(it.it, it.s);
+              }
+              e.m.totals = { ...e.mt };
+            }
+            Object.assign(totals, sd.tots);
+          };
+          const moves14: string[] = [];
+          // Кальций дня ДО стадии: молочный/порошковый донор не имеет права
+          // увести его больше чем на 40 мг (иначе стадия съедает завоевание QG13).
+          const _caInit14 = _ca14();
+          // Ось меряет МИНИМУМ по основным приёмам, поэтому перекладка имеет
+          // смысл, только если закрывает ВСЕ дефицитные приёмы дня. Иначе это
+          // бессмысленная тасовка (замер: на контрольном дне 90 кг стадия увела
+          // 10 г whey из пост-воркаута в перекус, а минимум остался 20 г — ось
+          // не сдвинулась, а тренировочное окно пострадало).
+          const _minMain14 = () => Math.min(..._withItems14().filter((mm: any) => _isMain14(mm)).map((mm: any) => _pOf14(mm)));
+          const _dayStart14 = _snapDay14();
+          const _minMainInit14 = _minMain14();
+          // До трёх приёмов за день: 4-приёмному дню хватает одного-двух,
+          // 6-приёмному — до трёх (завтрак, snack2, snack). Приём, у которого не
+          // нашлось донора, помечается и не блокирует остальные.
+          const tried14 = new Set<any>();
+          for (let pass = 0; pass < 3; pass++) {
+            const recv = _withItems14()
+              .filter((mm: any) => _isMain14(mm) && _pOf14(mm) < _need14 - 0.15 && !tried14.has(mm))
+              .sort((a: any, b: any) => _pOf14(a) - _pOf14(b))[0];
+            if (!recv) break;
+            tried14.add(recv);
+            const gap = _need14 - _pOf14(recv);
+            const rIt = ((recv.items || []) as any[]).filter(_prot14)
+              .sort((a: any, b: any) => _perG14(b) - _perG14(a))[0];
+            if (!rIt) continue;
+            const rPerG = _perG14(rIt);
+            if (!(rPerG > 0)) continue;
+            const rAmt = Number(rIt.amount) || 0;
+            const rCap = Math.min(Number(edibilityCapFor(String(rIt.id), 400)) || 400, 400);
+            // Шаг 1 г: белок день-в-день сохраняется, значит округление съедает
+            // не больше 1 г белка на приём — гард держит его в 0.5 г.
+            const addG = Math.max(0, Math.min(Math.ceil(gap / rPerG), rCap - rAmt));
+            if (addG < 1) continue;
+            let done = false;
+            // Донор — основной приём с запасом над порогом либо предсонный
+            // приём (творог/казеин — это длинный белок, его излишек можно
+            // переложить). Белок окон тренировки (pre/post-workout) не трогаем:
+            // это тайминг, а не «свободные граммы».
+            const donors = _withItems14()
+              .filter((mm: any) => mm !== recv && !['preworkout', 'postworkout', 'intra'].includes(String(mm.type)))
+              .sort((a: any, b: any) => _pOf14(b) - _pOf14(a));
+            for (const dn of donors) {
+              if (done) break;
+              const dIt = ((dn.items || []) as any[]).filter(_prot14)
+                .sort((a: any, b: any) => (Number(_leanMeat14(b)) - Number(_leanMeat14(a)))
+                  || (Number(b.p) || 0) - (Number(a.p) || 0))[0];
+              if (!dIt) continue;
+              const dPerG = _perG14(dIt);
+              if (!(dPerG > 0)) continue;
+              const dAmt = Number(dIt.amount) || 0;
+              const wantP = addG * rPerG;
+              // Донор-основной приём не опускается ниже порога; прочие приёмы
+              // (предсон, окна) — только до минимальной порции пункта.
+              const keepP = _isMain14(dn) ? _need14 : 0;
+              const slackP = Math.max(0, _pOf14(dn) - keepP);
+              if (slackP < wantP - 0.2) continue;
+              const cutG = Math.min(
+                Math.round(wantP / dPerG),
+                Math.floor(dAmt - _minG14(dIt)),
+                Math.floor(slackP / dPerG),
+              );
+              if (cutG < 1) continue;
+              const sd = _snapDay14();
+              const q0 = _q14();
+              const p0 = Number(totals.p) || 0;
+              const ca0 = _ca14();
+              Object.assign(rIt, _scale10(rIt, rAmt + addG));
+              Object.assign(dIt, _scale10(dIt, dAmt - cutG));
+              recalcMealTotals(meals as any[]);
+              recalcDayTotals(meals, totals);
+              const pShift = Math.abs((Number(totals.p) || 0) - p0);
+              // Гард: день не потерял белок, не вышел из канона, клетчатка по
+              // капу, кальций не ушёл ниже 70% RDA, ни одна ось не просела
+              // больше 2 п.п., оценка дня не ниже.
+              const q1 = _q14();
+              const caOk = _leanMeat14(dIt) || (_ca14() >= _caGoal14 * 0.7 && _ca14() >= _caInit14 - 40);
+              const naOk = _naTarget14 <= 0 || _na14() <= _naTarget14 * 1.25;
+              if (pShift > 0.5 || _worse14() || (Number(totals.fiber) || 0) > _qgFiberCap || !caOk || !naOk
+                || q1.total < q0.total || q1.fatSpread < q0.fatSpread - 2 || q1.micro < q0.micro - 2) {
+                _restoreDay14(sd);
+                continue;
+              }
+              const rName = String(rIt.name || rIt.id);
+              const dName = String(dIt.name || dIt.id);
+              moves14.push(`«${String(recv.type)}» ${rName} ${Math.round(rAmt)}→${Math.round(rAmt + addG)} г, «${String(dn.type)}» ${dName} ${Math.round(dAmt)}→${Math.round(dAmt - cutG)} г`);
+              done = true;
+              break;
+            }
+            if (!done) continue;
+          }
+          // Принимаем день только если минимум по основным приёмам реально вырос:
+          // иначе вся перекладка — тасовка ради тасовки.
+          if (moves14.length > 0 && _minMain14() <= _minMainInit14 + 0.2) {
+            _restoreDay14(_dayStart14);
+            moves14.length = 0;
+          }
+          if (moves14.length > 0) {
+            // Нота говорит ФАКТ, а не обещание: на днях, где запас белка в
+            // прочих приёмах кончился (окна тренировки держат whey), порог
+            // берётся не везде — и это видно в тексте.
+            const _minMain14 = Math.min(..._withItems14().filter((mm: any) => _isMain14(mm)).map((mm: any) => _pOf14(mm)));
+            notes.push(`🥩 Белок по приёмам: ${moves14.join('; ')} — те же граммы белка на день; минимум по основным приёмам ${Math.round(_minMain14)} г при пороге 0.30 г/кг (${Math.round(_need14)} г)`);
+          }
+        }
+      }
     }
 
     // Витрина MPS должна совпадать с ФИНАЛЬНЫМ планом (санитайзеры E17/E18 меняют items).
