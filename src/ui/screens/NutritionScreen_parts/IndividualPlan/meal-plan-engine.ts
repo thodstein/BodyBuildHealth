@@ -26,6 +26,7 @@
 import { FOOD_DB, FOOD_ALLERGEN_DIET } from "../../../../core/nutrition-database";
 import { filterByIntolerance, matchesCategoryPref, isPreferredCategory, tasteMatchScore, type CategoryPref, type Intolerances, type TasteProfile } from "./planner-preferences";
 import { analyzeMicroCoverage, sumMicros, RDA_BASE, type MicroCoverageEntry } from "./planner-micro-coverage";
+import { scoreDayQuality, describeQualityWeakness } from "./planner-quality-score";
 import { getMicroFromFood } from "./planner-micro-reader";
 import { detectMealInteractions, cookMethodGuidance } from "./planner-food-interactions";
 import type { FoodItem } from "../../../../core/nutrition-database";
@@ -100,6 +101,13 @@ export interface DayPlanV2 {
   /** Шаг 7 рефактора: журнал проходов сведения дня (dev до/после) — для карточки
     «Почему день не сошёлся». Аддитивно; старые сохранённые планы без поля — ок. */
   passJournal?: PassJournalEntry[];
+  /** Качество рациона 0–100 (не КБЖУ-сходимость, а «съедобность»): овощи,
+    распределение жира и белка по приёмам, размер порций, разнообразие, микро.
+    См. planner-quality-score.ts. */
+  qualityScore?: {
+    total: number; veg: number; fatSpread: number; proteinSpread: number;
+    portions: number; variety: number; micro: number;
+  };
 }
 
 export interface MealPlanInput {
@@ -9570,6 +9578,18 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
       } catch { /* тарелка-гард — best-effort */ }
     }
 
+    // ═══════════════════════════════════════════════════════════════════════════
+    // QG — ограничения КАЧЕСТВА рациона (аудит 2026-10, docs/NUTRITION-PLANNER-
+    // QUALITY-AUDIT-2026-10.md). До этого качество жило в нотах: план печатал
+    // «⚠ витамин D 28%», «⏱ приёмы близко», «малины 19 г» — и ничего не менял.
+    // Замер 50 конфигураций до пакета: жир в одном приёме >35% дня — 82% дней,
+    // основной приём <0.3 г Б/кг — 72%, пунктов <30 г — 10 из 24, овощей <200 г —
+    // 46%, молочки 0%. Здесь каждый класс закрывается ОГРАНИЧЕНИЕМ, а не заметкой.
+    // Порядок важен: всё это до E0-reconciliation, чтобы правки не сломали канон 3%.
+    // ═══════════════════════════════════════════════════════════════════════════
+    // QG трогает тарелки → день обязан пройти reconciliation даже если формально
+    // укладывался в канон (иначе правка оставляла 0.4% → 2.3% «на полке»).
+
     // ─── E11 (=E3 полный): консолидация крошечных основных приёмов — см. НИЖЕ,
     // после E0-reconciliation (порядок обязателен: корректор может менять состав
     // приёмов, «укрупнять» до финального паса нельзя). Витрина MPS пересчитывается
@@ -10346,6 +10366,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
       }
     } catch { /* best-effort гигиена — не ломаем генерацию */ }
 
+
     // Триггер «белок перебирается» для B40/B42 ниже. Лечим не любую цифру: работаем,
     // только когда ПЕРЕБОР БЕЛКА — блокирующая ось дня (не меньше остальных отклонений).
     // Иначе правка уносит калорийность дней, где белок и так не главная проблема
@@ -10574,6 +10595,916 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
       }
     }
 
+    let _qgTouched = false;
+    // Снимок дня ДО пакета: ограничения качества — best-effort. Если после них день
+    // перестал укладываться в ту же сходимость, что был (или стал хуже), весь пакет
+    // откатывается — качество не имеет права ломать канон КБЖУ.
+    const _qgDevOf = () => {
+      const tk = input.goalKcal || 0; const tp = input.goalProteinG || 0;
+      const tf = input.goalFatG || 0; const tc = input.goalCarbsG || 0;
+      return Math.max(
+        tk > 0 ? Math.abs(totals.kcal - tk) / tk : 0,
+        tp > 0 ? Math.abs(totals.p - tp) / tp : 0,
+        tf > 0 ? Math.abs(totals.f - tf) / tf : 0,
+        tc > 0 ? Math.abs(totals.c - tc) / tc : 0,
+      );
+    };
+    // Клон рациона БЕЗ потери ссылок: payload'ы (например _microClosure) остаются теми
+    // же объектами. Глубокий JSON-клон рвал их идентичность, и поздняя нота микро-закрытия
+    // решала «пункт не найден» при живой тарелке (совет вместо честных граммов).
+    const _qgClone = (src: any[] = meals as any[]) => (src as any[]).map((m: any) => ({
+      ...m, items: (m.items || []).map((x: any) => ({ ...x })),
+    }));
+    const _qgSnapMeals = _qgClone();
+    const _qgSnapTotals = { ...totals };
+    const _qgDev0 = _qgDevOf();
+    // Отклонение по КАЖДОЙ оси отдельно: день может быть «в каноне» по максимуму, но
+    // пакет не имеет права углубить конкретную ось (замер: жир 50кг/7пр уехал с −15%)
+    const _qgAxes = () => {
+      const tk = input.goalKcal || 0; const tp = input.goalProteinG || 0;
+      const tf = input.goalFatG || 0; const tc = input.goalCarbsG || 0;
+      return [
+        tk > 0 ? Math.abs(totals.kcal - tk) / tk : 0,
+        tp > 0 ? Math.abs(totals.p - tp) / tp : 0,
+        tf > 0 ? Math.abs(totals.f - tf) / tf : 0,
+        tc > 0 ? Math.abs(totals.c - tc) / tc : 0,
+      ];
+    };
+    const _qgAxes0 = _qgAxes();
+    const _qgP0 = totals.p || 0;
+    // Тот же кап клетчатки, что у E16: пакет качества не имеет права его пробить.
+    // Берём жёсткий предел (85 г), даже на «высокообъёмных» днях: 86 г клетчатки — это
+    // уже не «много овощей», а вздутие и провал по усвоению.
+    const _qgFiberCap = Math.min(
+      Number((input as any).fiberCapG) > 0 ? Number((input as any).fiberCapG) : FIBER_HARD_CAP_G,
+      FIBER_HARD_CAP_G,
+    );
+    const _qgNotes0 = notes.length;
+    // Калорийность каждого приёма на входе: пакет качества не имеет права «выесть»
+    // приём, который был едой (замер: перекус уезжал с 100+ ккал на 99).
+    const _qgMealK0 = (meals as any[]).map((m) => (m.items || []).reduce((s: number, x: any) => s + (Number(x.kcal) || 0), 0));
+    const _qgMealK = () => (meals as any[]).map((m) => (m.items || []).reduce((s: number, x: any) => s + (Number(x.kcal) || 0), 0));
+    const _qgUsed0 = [...usedTodayIds];
+    const _qgFoods0 = allFoodsUsed.length;
+    // Стек стадий. Раньше пакет откатывался ЦЕЛИКОМ: одна правка, вылетевшая из
+    // сходимости, убивала и овощи, и молочку, и распределение жира (замер: день 1
+    // терял все квоты качества из-за одного переноса жира). Теперь откатываем
+    // последнюю стадию и перепроверяем — теряется только виноватая правка.
+    const _qgStack: Array<{ name: string; meals: any; totals: any; notesLen: number; used: string[]; foodsLen: number }> = [];
+    const _qgMark = (name: string) => {
+      _qgStack.push({
+        name,
+        meals: _qgClone(),
+        totals: { ...totals },
+        notesLen: notes.length,
+        // Откат обязан вернуть и «следы» продуктов: иначе поздние проходы (микро-закрытие,
+        // санитайзеры) видят уже «использованный» продукт и строят другую тарелку.
+        used: [...usedTodayIds],
+        foodsLen: allFoodsUsed.length,
+      });
+    };
+    {
+      const _MAIN_TYPES = ['breakfast', 'lunch', 'dinner', 'snack', 'snack2', 'snack3', 'presleep'];
+      const _isMainMeal = (m: any) => _MAIN_TYPES.includes(String(m.type));
+      const _fdOf = (id: string) => FOOD_DB.find((f: any) => f.id === id);
+      // Точный конструктор пункта: makeItem округляет макросы до целых, а для переноса
+      // 7 г масла/19 г ягоды это половина значения.
+      const _mk = (fd: any, grams: number, role: MealItem['role']): any => {
+        const g = Math.max(5, Math.round(grams / 5) * 5);
+        const r = g / 100;
+        const p = Math.round((fd.protein || 0) * r * 10) / 10;
+        const f = Math.round((fd.fat || 0) * r * 10) / 10;
+        const c = Math.round((fd.carbs || 0) * r * 10) / 10;
+        return {
+          id: fd.id, name: fd.name, amount: g, role, kcal: Math.round(4 * p + 9 * f + 4 * c),
+          p, f, c, fiber: Math.round((fd.fiber || 0) * r * 10) / 10,
+          leucine_mg: Math.round(getLeucine(fd) * r),
+        };
+      };
+      const _dayDev = _qgDevOf;
+      // Пересчёт граммов ВНУТРИ той же позиции: масштабируем её собственные БЖУ, а не
+      // берём заново из базы. Замер: позиция «овсянка 32 г» хранила 5.0 г жира, а _mk(30)
+      // возвращал 1.8 г — срез на 2 г граммов «съедал» 3.2 г жира, и день уезжал по жиру.
+      const _rescale = (it: any, newG: number, role?: string) => {
+        const k = newG / Math.max(1, Number(it.amount) || 1);
+        const r1 = (v: any) => Math.round((Number(v) || 0) * k * 10) / 10;
+        return {
+          ...it,
+          role: role || it.role,
+          amount: newG,
+          kcal: Math.round((Number(it.kcal) || 0) * k),
+          p: r1(it.p), f: r1(it.f), c: r1(it.c),
+          fiber: r1(it.fiber),
+          leucine_mg: Math.round((Number(it.leucine_mg) || 0) * k),
+        };
+      };
+      // Слияние двух позиций: складываем ИХ БЖУ, а не пересчитываем из базы.
+      const _absorb = (sib: any, it: any) => {
+        const add = (v: any) => Number(v) || 0;
+        return {
+          ...sib,
+          amount: (add(sib.amount) + add(it.amount)),
+          kcal: Math.round(add(sib.kcal) + add(it.kcal)),
+          p: Math.round((add(sib.p) + add(it.p)) * 10) / 10,
+          f: Math.round((add(sib.f) + add(it.f)) * 10) / 10,
+          c: Math.round((add(sib.c) + add(it.c)) * 10) / 10,
+          fiber: Math.round((add(sib.fiber) + add(it.fiber)) * 10) / 10,
+          leucine_mg: Math.round(add(sib.leucine_mg) + add(it.leucine_mg)),
+        };
+      };
+      // Срез крахмала приёма ровно на needKcal (ккал-нейтральный обмен).
+      const _trimStarch = (m: any, needKcal: number): number => {
+        if (needKcal <= 0) return 0;
+        let left = needKcal;
+        let done = 0;
+        const _p0Trim = (m.items || []).reduce((s: number, x: any) => s + (x.p || 0), 0);
+        // Если день недобрал жир, срез крахмала обязан брать носитель БЕЗ жира:
+        // овсянка несёт 6.9 г жира на 100 г, и «ккал-нейтральное» подрастание
+        // 19 г малины тихо уносило 3.7 г жира из завтрака (замер: жир дня −15% → −18%).
+        const _fatShort = (Number(input.goalFatG) || 0) > 0 && (totals.f || 0) < (Number(input.goalFatG) || 0) * 0.98;
+        const sts = (m.items || [])
+          .filter((x: any) => (x.role === 'carb_slow' || x.role === 'carb_fast') && !x._fixedGrams && (x.kcal || 0) > 60)
+          // Срезаем в первую очередь НОСИТЕЛЬ, который несёт меньше всего белка на
+          // калорию (рис 2.7 Б/130 ккал, а не овсянка 13 Б/380): иначе «ккал-нейтральный»
+          // срез тихо уносит белок дня (замер: −8 г на 7-приёмном дне).
+          .sort((a: any, b: any) => {
+            const fa: any = _fdOf(a.id); const fb: any = _fdOf(b.id);
+            if (_fatShort) {
+              const raf = fa && a.kcal > 0 ? (fa.fat || 0) / a.kcal : 9;
+              const rbf = fb && b.kcal > 0 ? (fb.fat || 0) / b.kcal : 9;
+              if (Math.abs(raf - rbf) > 0.001) return raf - rbf;
+            }
+            const ra = fa && a.kcal > 0 ? (fa.protein || 0) / a.kcal : 9;
+            const rb = fb && b.kcal > 0 ? (fb.protein || 0) / b.kcal : 9;
+            return ra - rb;
+          });
+        for (const st of sts) {
+          if (left <= 5) break;
+          const fd = _fdOf(st.id); if (!fd) continue;
+          // Ниже порога «это ещё еда» не режем: 15 г сухой овсянки — тот же дефект,
+          // который QG1 и лечит (минимум крупы 30 г, быстрых углеводов — 20 г).
+          const _minG = st.role === 'carb_fast' ? 20 : 30;
+          const _perKcal = (st.kcal || 0) / Math.max(1, st.amount || 1);
+          const avail = (st.kcal || 0) - _minG * _perKcal;
+          if (avail <= 0) continue;
+          const cut = Math.min(avail, left);
+          const newG = Math.max(_minG, Math.round((((st.kcal || 0) - cut) / Math.max(1, st.kcal || 1)) * (st.amount || 0) / 5) * 5);
+          const before = st.kcal || 0;
+          Object.assign(st, _rescale(st, newG));
+          const real = before - (st.kcal || 0);
+          done += real;
+          left -= real;
+        }
+        // Срез крахмала унёс часть белка (овсянка 13 Б/100, гречка 3.4 Б/100) — возвращаем
+        // его в белковый пункт того же приёма. Порция приёма при этом почти не меняется,
+        // а день перестаёт «терять белок» от порционной санитарности (замер: 147 → 145.1).
+        const _lostP = _p0Trim - (m.items || []).reduce((s: number, x: any) => s + (x.p || 0), 0);
+        // Белок возвращаем только если день его НЕДОБИРАЕТ: при профиците «срез
+        // крахмала» законно снижает белок, а компенсация уводила день вверх (замер: +2.4% → +2.75%).
+        const _goalP = Number(input.goalProteinG) || 0;
+        if (_lostP > 0.2 && _goalP > 0 && (totals.p || 0) < _goalP) {
+          const wItem = (m.items || []).filter((x: any) => (x.role === 'protein' || x.role === 'fast_protein' || x.role === 'slow_protein') && !x._fixedGrams)
+            .sort((a: any, b: any) => (b.p || 0) - (a.p || 0))[0];
+          const wFd = wItem ? _fdOf(wItem.id) : null;
+          if (wItem && wFd && wFd.protein > 4) {
+            const addG = Math.ceil(_lostP / (wFd.protein / 100) / 5) * 5;
+            const cap = edibilityCapFor(wFd.id, 400);
+            const newAmt = Math.min(cap, (wItem.amount || 0) + addG);
+            if (newAmt > (wItem.amount || 0)) {
+              const _kcalBefore = (wItem.kcal || 0);
+              Object.assign(wItem, _rescale(wItem, newAmt));
+              done -= ((wItem.kcal || 0) - _kcalBefore);
+            }
+          }
+        }
+        return Math.max(0, done);
+      };
+      // Срез жира по жировым пунктам приёма. minKeep = 5 г (обычный срез), 0 — можно
+      // убрать пункт целиком: так компенсируется жир жирной рыбы (иначе остаётся
+      // «хвост» 4 г жира, и день вылетает из канона на 1.5%).
+      const _trimFatIn = (m: any, needF: number, minKeep = 5): boolean => {
+        let left = needF;
+        const fats = (m.items || []).filter((x: any) => x.role === 'fat' && !x._fixedGrams)
+          .sort((a: any, b: any) => (b.f || 0) - (a.f || 0));
+        for (const it of fats) {
+          if (left <= 0.3) break;
+          const fd = _fdOf(it.id); if (!fd || !(fd.fat > 0)) continue;
+          // Плотность жира берём у самой позиции (она могла быть собрана с другим
+          // влажностным коэффициентом), а база — только запасной вариант.
+          const perG = ((it.f || 0) / Math.max(1, it.amount || 1)) || (fd.fat / 100);
+          const canCutG = Math.min(Math.floor(left / perG), (it.amount || 0) - minKeep);
+          if (canCutG < 1) continue;
+          const newG = (it.amount || 0) - canCutG;
+          if (minKeep === 0 && newG <= 5) m.items = (m.items || []).filter((z: any) => z !== it);
+          else Object.assign(it, _rescale(it, newG));
+          left -= canCutG * perG;
+        }
+        return left <= 0.5;
+      };
+      // Компенсация калорий «без потерь»: срезаем ту ось, которая в этот момент ВЫШЕ
+      // цели (обычно жир — масла/орехи не несут белка), иначе крахмал. Белок, унесённый
+      // крахмалом, возвращается в белковый пункт приёма внутри _trimStarch.
+      const _trimEnergy = (m: any, needKcal: number): number => {
+        if (!(needKcal > 0)) return 0;
+        const _k0 = (m.items || []).reduce((s: number, x: any) => s + (x.kcal || 0), 0);
+        const _fatGoal = Number(input.goalFatG) || 0;
+        const _fatOver = _fatGoal > 0 && (totals.f || 0) > _fatGoal;
+        if (_fatOver) _trimFatIn(m, needKcal / 9, 5);
+        const _k1 = (m.items || []).reduce((s: number, x: any) => s + (x.kcal || 0), 0);
+        const _left = needKcal - (_k0 - _k1);
+        if (_left > 5) _trimStarch(m, _left);
+        const _k2 = (m.items || []).reduce((s: number, x: any) => s + (x.kcal || 0), 0);
+        return _k0 - _k2;
+      };
+
+      _qgMark('QG1');
+      // ── QG1: порционная санитарность ──────────────────────────────────────
+      // «19 г малины» и «10 г кешью» — не еда, а закрытие макроса. Категориальные
+      // минимумы: фрукт 80, овощ 60, жир 7, крупа 30, порошок 20. Если пункт меньше —
+      // слить с соседом той же роли, иначе подрастить до минимума.
+      {
+        const MIN_G: Record<string, number> = { fruit: 80, veg: 60, fat: 7, carb_slow: 30, carb_fast: 20, protein: 25, fast_protein: 20, slow_protein: 20 };
+        let _merged = 0;
+        for (const m of meals as any[]) {
+          for (const it of [...(m.items || [])]) {
+            const min = MIN_G[String(it.role)];
+            if (!min || (it.amount || 0) >= min || it._fixedGrams || it.role === 'supplement') continue;
+            const fd = _fdOf(it.id); if (!fd) continue;
+            const sib = (m.items || []).find((x: any) => x !== it && x.role === it.role && !x._fixedGrams && x.id !== it.id);
+            if (sib) {
+              const sibFd = _fdOf(sib.id);
+              if (sibFd) {
+                // Слияние — правка рациона: сосед может быть ДРУГИМ продуктом (малина →
+                // голубика), и «складываем граммы» меняет БЖУ приёма. Считаем тоталы,
+                // иначе день уезжает от цели «невидимо» для отката.
+                const _snapMerge = (m.items || []).map((z: any) => ({ ...z }));
+                const grown = _absorb(sib, it);
+                Object.assign(sib, grown);
+                m.items = (m.items || []).filter((x: any) => x !== it);
+                m.totals = mealTotalsOf(m.items);
+                recalcDayTotals(meals, totals);
+                if (_dayDev() > Math.max(_qgDev0, PLANNER_CONVERGENCE_PCT / 100) + 0.005
+                  || (totals.fiber || 0) > _qgFiberCap - 1) {
+                  m.items = _snapMerge;
+                  m.totals = mealTotalsOf(m.items);
+                  recalcDayTotals(meals, totals);
+                } else {
+                  _merged++;
+                  _qgTouched = true;
+                }
+                continue;
+              }
+            }
+            // соседа нет — подрастить до минимума, ккал-нейтрально срезав крахмал
+            const _devB = _dayDev();
+            const _snapM1 = (m.items || []).map((z: any) => ({ ...z }));
+            const grown = _rescale(it, Math.max(min, it.amount || 0));
+            if (grown.kcal > (it.kcal || 0)) {
+              Object.assign(it, grown);
+              m.totals = mealTotalsOf(m.items);
+              recalcDayTotals(meals, totals);
+              const _t = _trimEnergy(m, (grown.kcal || 0) - (_snapM1.find((z: any) => z.id === it.id)?.kcal || it.kcal || 0));
+              if (_t > 0) { m.totals = mealTotalsOf(m.items); recalcDayTotals(meals, totals); }
+              if (_dayDev() > Math.max(_qgDev0, PLANNER_CONVERGENCE_PCT / 100) + 0.005
+                || (totals.fiber || 0) > _qgFiberCap - 1) {
+                // откат ПРИЁМА целиком: срез крахмала тоже возвращаем
+                m.items = _snapM1;
+                m.totals = mealTotalsOf(m.items);
+                recalcDayTotals(meals, totals);
+              } else {
+                _qgTouched = true;
+              }
+            }
+          }
+        }
+        if (_merged > 0) { _qgTouched = true;
+          for (const m of meals as any[]) m.totals = mealTotalsOf(m.items);
+          recalcDayTotals(meals, totals);
+          notes.push(`🧩 Порции: ${_merged} мелких пунктов слиты с соседом той же роли (19 г ягод / 10 г орехов — не еда)`);
+        }
+      }
+
+      _qgMark('QG2');
+      // ── QG2: политика тренировочного окна ──────────────────────────────────
+      // EAA при полноценных pre/post приёмах — выброшенные деньги (белка хватает),
+      // амилопектин нужен только на сессиях ≥90 мин. Замер: на 75-мин сессии в окне
+      // стояли EAA 20 г + амилопектин 24 г + изотоник.
+      {
+        const _dur = Number(input.trainDurationMin || 0);
+        const _prePostP = (meals as any[]).filter((m) => ['preworkout', 'postworkout'].includes(String(m.type)))
+          .reduce((s: number, m: any) => s + (m.totals?.p || 0), 0);
+        if (_dur > 0 && _dur < 90 && _prePostP >= 30) {
+          // Аминокислоты в окне при полноценных pre/post — выброшенные деньги (1 г белка,
+          // 4 ккал: убираем всегда). Углеводную загрузку снимаем ТОЛЬКО с intra-напитка и
+          // только если углеводы дня реально сверх цели на >3%: амилопектин в intra+post
+          // это 190 ккал и 46 г углеводов — «лечить» им перебор в 2% значит уронить день
+          // на 13% (замер: 316 г У → 270 г У).
+          const _carbGoal = (input.goalCarbsG || 0);
+          const _carbOver = _carbGoal > 0 && totals.c > _carbGoal * 1.03;
+          const _AA_ONLY = new Set(['supp_eaa', 'eaa', 'bcaa']);
+          const _CARB_ONLY = new Set(['amylopectin', 'dextrose', 'maltodextrin', 'vitargo']);
+          let _removed = 0;
+          for (const m of meals as any[]) {
+            if (!['intra', 'postworkout', 'preworkout'].includes(String(m.type))) continue;
+            const _isIntra = String(m.type) === 'intra';
+            const before = (m.items || []).length;
+            m.items = (m.items || []).filter((x: any) => {
+              const id = String(x.id);
+              if (_AA_ONLY.has(id)) return false;
+              if (_isIntra && _carbOver && _CARB_ONLY.has(id)) return false;
+              return true;
+            });
+            if ((m.items || []).length !== before) {
+              m.totals = mealTotalsOf(m.items);
+              _removed += before - (m.items || []).length;
+            }
+          }
+          if (_removed > 0) {
+            _qgTouched = true;
+            recalcDayTotals(meals, totals);
+            notes.push(`⚡ Окно: сессия ${_dur} мин и pre/post дают ${Math.round(_prePostP)} г белка — убраны избыточные добавки окна (белка из еды хватает)`);
+          }
+        }
+      }
+
+      _qgMark('QG3');
+      // ── QG3: молочный слот (кальций/B12) ──────────────────────────────────
+      // Замер: молочка в 0% дней при кальции 67% RDA и B12 50%. Меняем порошок
+      // пред-сна (казеин/сывороточный) на творог с тем же белком, если молочки нет.
+      {
+        const _hasDairy = (meals as any[]).some((m) => (m.items || []).some((x: any) => /tvorog|kefir|milk|yogurt|cheese|skyr|curd/.test(String(x.id))));
+        const _POWDER_IDS = new Set(['casein', 'casein_micellar', 'whey_protein', 'whey_isolate', 'whey_concentrate', 'slow_protein', 'fast_protein', 'beef_protein']);
+        if (!_hasDairy) {
+          const _cand = (meals as any[])
+            .filter((m) => ['presleep', 'snack', 'snack2', 'snack3'].includes(String(m.type)))
+            .flatMap((m) => (m.items || []).filter((x: any) => _POWDER_IDS.has(String(x.id)) && !x._fixedGrams).map((x: any) => ({ m, x })))
+            .sort((a, b) => (b.x.p || 0) - (a.x.p || 0))[0];
+          if (_cand) {
+            // id из FOOD_DB: творога «0%» и «cottage_2» нет — берём реальные молочные
+            const dairy: any = ['cottage_cheese_5', 'yogurt_greek', 'yogurt_natural', 'kefir', 'kefir_2']
+              .map((id) => _fdOf(id))
+              .find((fl: any) => fl && !(combinedExcluded && combinedExcluded.has(fl.id))
+                && foodPassesCtxAllergens(fl) && foodAvailableForPlan(fl));
+            const dairyOk = !!dairy && !(combinedExcluded && combinedExcluded.has(dairy.id))
+              && foodPassesCtxAllergens(dairy as any) && foodAvailableForPlan(dairy as any);
+            if (dairyOk && dairy) {
+              const need = (_cand.x.p || 0) / Math.max(0.01, (dairy.protein || 0) / 100);
+              const grams = Math.min(edibilityCapFor(dairy.id, 300), Math.round(need / 5) * 5);
+              if (grams >= 60) {
+                const _before = { ..._cand.x };
+                const _snapM3 = (_cand.m.items || []).map((z: any) => ({ ...z }));
+                const _devBefore = _dayDev();
+                Object.assign(_cand.x, _mk(dairy, grams, _cand.x.role));
+                _cand.m.totals = mealTotalsOf(_cand.m.items);
+                recalcDayTotals(meals, totals);
+                const _t = _trimEnergy(_cand.m, (_cand.x.kcal || 0) - (_before.kcal || 0));
+                if (_t > 0) { _cand.m.totals = mealTotalsOf(_cand.m.items); recalcDayTotals(meals, totals); }
+                if (_dayDev() > Math.max(_qgDev0, PLANNER_CONVERGENCE_PCT / 100) + 0.015) {
+                  _cand.m.items = _snapM3;
+                  _cand.m.totals = mealTotalsOf(_cand.m.items);
+                  recalcDayTotals(meals, totals);
+                } else {
+                  _qgTouched = true;
+                  usedTodayIds.add(dairy.id); allFoodsUsed.push(dairy.id);
+                  notes.push(`🥛 «${_cand.m.label}»: ${_before.name} → ${dairy.name} ${_cand.x.amount} г (кальций/B12, белок тот же)`);
+                }
+              }
+            }
+          }
+        }
+      }
+
+      _qgMark('QG4');
+      // ── QG4: жир не сваливается в один приём ──────────────────────────────
+      // Замер: 82% дней имели приём с >35% дневного жира (средний максимум 43%).
+      // Переносим ЦЕЛЫЕ жировые пункты из самого жирного приёма в самый постный:
+      // калории и макросы дня не меняются вообще, меняется только распределение.
+      {
+        let _moved = 0;
+        // Утренняя тренировка: вечер намеренно оставлен маложирным (загрузка углеводами
+        // «на утро») — в него жир не переносим, даже если он самый постный.
+        const _morningTrainF = Number(input.trainStartMin) > 0 && Number(input.trainStartMin) < 12 * 60;
+        // Получатели в порядке предпочтения: сначала НАСТОЯЩИЕ приёмы (завтрак/обед/
+        // ужин), потом снеки, в конце — перед сном. Раньше «самый постный» мог оказаться
+        // снеком, и в него сваливалось 125 г авокадо: снек раздувался до 414 ккал,
+        // а обед терял белок при рецептурном пересчёте (замер: 15 г индейки в обеде).
+        const _recRank = (m: any) => {
+          const t = String(m.type);
+          if (t === 'breakfast' || t === 'lunch' || t === 'dinner') return 0;
+          return t === 'presleep' ? 2 : 1;
+        };
+        const _recipients = (mains: any[], donor: any) => [...mains]
+          .filter((m) => m !== donor && !(_morningTrainF && String(m.type) === 'dinner'))
+          .sort((a, b) => (_recRank(a) - _recRank(b)) || ((a.totals?.f || 0) - (b.totals?.f || 0)));
+        for (let guard = 0; guard < 8; guard++) {
+          const dayF = totals.f || 0;
+          if (dayF <= 0) break;
+          const mains = (meals as any[]).filter(_isMainMeal);
+          if (mains.length < 2) break;
+          const donor = [...mains].sort((a, b) => (b.totals?.f || 0) - (a.totals?.f || 0))[0];
+          const donorF = donor.totals?.f || 0;
+          if (donorF / dayF <= 0.35) break;
+          // сколько жира унести, чтобы стало ≤33%
+          const excess = donorF - 0.33 * dayF;
+          const fatItems = (donor.items || []).filter((x: any) => x.role === 'fat' && !x._fixedGrams)
+            .sort((a: any, b: any) => (b.f || 0) - (a.f || 0));
+          let done = false;
+          for (const it of fatItems) {
+            const fd = _fdOf(it.id); if (!fd || !(fd.fat > 0)) continue;
+            const perG = fd.fat / 100;
+            const canMove = (it.amount || 0) - 5;
+            if (canMove < 5) continue;
+            const needG = Math.min(canMove, Math.max(10, Math.ceil(excess / Math.max(0.001, perG) / 5) * 5));
+            if (needG < 10) continue;
+            // Мягкая планка (26%) раздаёт жир по нескольким приёмам; жёсткая (35%) —
+            // запасной вариант, если в «свободные» приёмы уже не влезает. Переносим
+            // ЧАНКАМИ по свободной комнате получателя: иначе один снек получал 125 г
+            // авокадо и раздувался до 414 ккал, а обед терял белок при рецептурном пересчёте.
+            const _cands = _recipients(mains, donor);
+            const _room = (m: any, lim: number) => lim * dayF - (m.totals?.f || 0);
+            let rec: any = null;
+            let moveG = 0;
+            for (const lim of [0.26, 0.35]) {
+              for (const m of _cands) {
+                const room = _room(m, lim);
+                if (room < 0.5) continue;
+                const g = Math.floor((Math.min(needG * perG, room) / perG) / 5) * 5;
+                if (g < 5) continue;
+                rec = m;
+                moveG = Math.min(needG, g);
+                break;
+              }
+              if (rec) break;
+            }
+            if (!rec || moveG < 5) continue;
+            Object.assign(it, _rescale(it, (it.amount || 0) - moveG));
+            // в приёме-получателе уже есть такой же жир — растим его, а не плодим пункт
+            const same = (rec.items || []).find((x: any) => x.id === fd.id && x.role === 'fat' && !x._fixedGrams);
+            if (same) {
+              Object.assign(same, _rescale(same, (same.amount || 0) + moveG));
+            } else {
+              rec.items.push(_mk(fd, moveG, 'fat'));
+            }
+            donor.totals = mealTotalsOf(donor.items);
+            rec.totals = mealTotalsOf(rec.items);
+            _moved++;
+            done = true;
+            break;
+          }
+          if (!done) break;
+        }
+        if (_moved > 0) {
+          _qgTouched = true;
+          recalcDayTotals(meals, totals);
+          notes.push(`🥑 Жир распределён: ${_moved} порций жира перенесены из самого жирного приёма в самый постный (калории те же)`);
+        }
+      }
+
+      _qgMark('QG5');
+      // ── QG5: овощной пол ──────────────────────────────────────────────────
+      // Овощи стоят 25-40 ккал/100 г и дают объём/насыщение/микро — их нельзя резать
+      // первыми (замер: 46% дней <200 г, на 7 приёмах 190 г). Доращиваем до 200 г,
+      // ккал-нейтрально срезая крахмал того же приёма.
+      {
+        const _vegPool = [...pool.vegGreen, ...pool.vegColor]
+          .filter((f: any) => !(combinedExcluded && combinedExcluded.has(f.id)) && foodPassesCtxAllergens(f) && foodAvailableForPlan(f));
+        // Клетчатка — не бесконечный ресурс: кап дня (E16) уже посчитан выше, и овощной
+        // пол не имеет права его пробить (замер: 86.3 г при капе 85).
+        const _fiberCapV = _qgFiberCap;
+        const _fiberRoom = _fiberCapV - (totals.fiber || 0);
+        const _vegAll = (meals as any[]).flatMap((m) => (m.items || []).filter((x: any) => x.role === 'veg').map((x: any) => ({ m, x })));
+        let _vg = _vegAll.reduce((s: number, p) => s + (p.x.amount || 0), 0);
+        if (_fiberRoom > 4 && _vg > 0 && _vg < 200) {
+          for (const { m, x } of _vegAll) {
+            if (_vg >= 200) break;
+            const fd = _fdOf(x.id); if (!fd || x._fixedGrams) continue;
+            const cap = edibilityCapFor(x.id, 250);
+            const want = Math.min(cap, (x.amount || 0) + (200 - _vg));
+            if (want <= (x.amount || 0) + 9) continue;
+            const _devBefore = _dayDev();
+            const _snapV1 = (m.items || []).map((z: any) => ({ ...z }));
+            const old = { ...x };
+            const grown = _rescale(x, want, 'veg');
+            Object.assign(x, grown);
+            m.totals = mealTotalsOf(m.items);
+            recalcDayTotals(meals, totals);
+            const _t = _trimEnergy(m, (grown.kcal || 0) - (old.kcal || 0));
+            if (_t > 0) { m.totals = mealTotalsOf(m.items); recalcDayTotals(meals, totals); }
+            // если срезать крахмал нечем — рост овоща не принимаем (калории важнее)
+            if (_t <= 0 || (totals.fiber || 0) > _fiberCapV - 1 || _dayDev() > Math.max(_qgDev0, PLANNER_CONVERGENCE_PCT / 100) + 0.01) {
+              m.items = _snapV1;
+              m.totals = mealTotalsOf(m.items);
+              recalcDayTotals(meals, totals);
+            } else {
+              _vg += (x.amount || 0) - (old.amount || 0);
+              _qgTouched = true;
+            }
+          }
+        }
+        // 2) в дне овощей нет вовсе (или мало, а доращивать нечем) — ставим овощ в
+        // основной приём без овоща, ккал-нейтрально срезая его крахмал. Без этого
+        // 10/50 конфигураций получали НОЛЬ овощей на день.
+        if (_fiberRoom > 4 && _vg < 200 && _vegPool.length > 0) {
+          const _order = ['lunch', 'dinner', 'breakfast', 'snack', 'snack2', 'snack3', 'presleep'];
+          const _cands = (meals as any[])
+            .filter((m) => _order.includes(String(m.type)))
+            .filter((m) => !(m.items || []).some((x: any) => x.role === 'veg'))
+            .sort((a, b) => _order.indexOf(String(a.type)) - _order.indexOf(String(b.type)));
+          for (const m of _cands) {
+            if (_vg >= 200) break;
+            const want = Math.min(200, 200 - _vg);
+            if (want < 40) break;
+            const fd = _vegPool.find((f: any) => !usedTodayIds.has(f.id)) || _vegPool[0];
+            if (!fd) break;
+            const _devB = _dayDev();
+            const _snapV2 = (m.items || []).map((z: any) => ({ ...z }));
+            const item = _mk(fd, want, 'veg');
+            m.items.push(item);
+            m.totals = mealTotalsOf(m.items);
+            recalcDayTotals(meals, totals);
+            const _t = _trimEnergy(m, item.kcal || 0);
+            if (_t > 0) { m.totals = mealTotalsOf(m.items); recalcDayTotals(meals, totals); }
+            if (_t <= 0 || (totals.fiber || 0) > _fiberCapV - 1 || _dayDev() > Math.max(_qgDev0, PLANNER_CONVERGENCE_PCT / 100) + 0.01) {
+              m.items = _snapV2;
+              m.totals = mealTotalsOf(m.items);
+              recalcDayTotals(meals, totals);
+            } else {
+              _vg += item.amount || 0;
+              _qgTouched = true;
+              usedTodayIds.add(fd.id); allFoodsUsed.push(fd.id);
+            }
+          }
+        }
+        // 3) добор: доращиваем уже стоящие овощи на остаток дефицита
+        if (_fiberRoom > 4 && _vg > 0 && _vg < 200) {
+          const _vegNow = (meals as any[]).flatMap((m) => (m.items || []).filter((x: any) => x.role === 'veg' && !x._fixedGrams).map((x: any) => ({ m, x })));
+          for (const { m, x } of _vegNow) {
+            if (_vg >= 200) break;
+            const fd = _fdOf(x.id); if (!fd) continue;
+            const want = Math.min(edibilityCapFor(x.id, 250), (x.amount || 0) + (200 - _vg));
+            if (want <= (x.amount || 0) + 9) continue;
+            const _devB = _dayDev();
+            const _snapV3 = (m.items || []).map((z: any) => ({ ...z }));
+            const old = { ...x };
+            Object.assign(x, _rescale(x, want, 'veg'));
+            m.totals = mealTotalsOf(m.items);
+            recalcDayTotals(meals, totals);
+            const _t = _trimEnergy(m, (x.kcal || 0) - (old.kcal || 0));
+            if (_t > 0) { m.totals = mealTotalsOf(m.items); recalcDayTotals(meals, totals); }
+            if (_t <= 0 || (totals.fiber || 0) > _fiberCapV - 1 || _dayDev() > Math.max(_qgDev0, PLANNER_CONVERGENCE_PCT / 100) + 0.01) {
+              m.items = _snapV3;
+              m.totals = mealTotalsOf(m.items);
+              recalcDayTotals(meals, totals);
+            } else {
+              _vg += (x.amount || 0) - (old.amount || 0);
+              _qgTouched = true;
+            }
+          }
+        }
+        if (_vg >= 200) notes.push(`🥦 Овощи: день доведён до ${Math.round(_vg)} г (пол 200 г) — крахмал приёма срезан на ту же калорийность`);
+      }
+
+      _qgMark('QG6');
+      // ── QG6: белковый пол основного приёма ────────────────────────────────
+      // «Завтрак 15 г белка, перекус 60 г» — формально день в норме, фактически MPS
+      // не запускается. Перераспределяем белок ВНУТРИ дня (день не меняется).
+      {
+        const _w = Number(input.weightKg || 0);
+        if (_w > 0) {
+          // На 7 приёмах «0.30 г/кг в каждом основном» математически не сходится:
+          // 7 × 0.30 = 2.1 г/кг только в ядре. Пол масштабируем по числу приёмов
+          // (5 приёмов → 0.30, 6 → 0.25, 7 → 0.214), иначе правило бьёт против нормы дня.
+          const _mcN = Math.max(3, Number(input.mealsCount || 0) || (meals as any[]).length);
+          const _floorP = 0.30 * _w * Math.min(1, 5 / _mcN);
+          const _PROT = new Set(['protein', 'fast_protein', 'slow_protein']);
+          // Пол держим ТОЛЬКО на ядре дня (завтрак/обед/ужин): перекус на 6 г белка —
+          // это перекус, а не провал MPS. Донором может быть любой приём, включая
+          // пред-сон (там часто 30–40 г).
+          const _CORE_TYPES = ['breakfast', 'lunch', 'dinner'];
+          let _fixedP = 0;
+          const _triedDonors = new Set<any>();
+          for (let guard = 0; guard < 8; guard++) {
+            const all6 = (meals as any[]).filter((m) => !['preworkout', 'postworkout', 'intra'].includes(String(m.type)));
+            const weak = all6
+              .filter((m) => _CORE_TYPES.includes(String(m.type)) && (m.totals?.p || 0) < _floorP - 1)
+              .sort((a, b) => (a.totals?.p || 0) - (b.totals?.p || 0))[0];
+            if (!weak) break;
+            // Донор — приём выше пола хотя бы на 2 г белка (прежний порог +8 г оставлял
+            // 60% дней без донора вообще). Перебираем доноров по убыванию избытка:
+            // если обмен ломает сходимость или режет порцию, пробуем следующего.
+            const donors = all6
+              .filter((m) => m !== weak && !_triedDonors.has(m) && (m.totals?.p || 0) > _floorP + 2)
+              .sort((a, b) => (b.totals?.p || 0) - (a.totals?.p || 0));
+            let _applied = false;
+            let _noNeed = false;
+            for (const donor of donors) {
+              const dItem = (donor.items || []).filter((x: any) => _PROT.has(String(x.role)) && !x._fixedGrams)
+                .sort((a: any, b: any) => (b.p || 0) - (a.p || 0))[0];
+              const dFd = dItem ? _fdOf(dItem.id) : null;
+              if (!dItem || !dFd || !(dFd.protein > 4)) { _triedDonors.add(donor); continue; }
+              // Отдаём ровно столько, сколько нужно слабому и сколько у донора сверх пола:
+              // обмен внутри дня, итог дня не меняется.
+              const needP = Math.min(_floorP - (weak.totals?.p || 0), (donor.totals?.p || 0) - _floorP);
+              if (needP < 1.2) { _noNeed = true; break; }
+              const cutG = Math.max(5, Math.ceil(needP / (dFd.protein / 100) / 5) * 5);
+              // Цельный белок (мясо/рыба/творог) не режем ниже реальной порции 75 г,
+              // порошок — ниже 20 г: «Треска 60 г» — это не порция, а обрезок. Если в
+              // приёме уже стоит маленькая порция (40 г яичного белка), держим 60% её.
+              const _isPowder = /^(supp_|whey|casein)/.test(String(dItem.id)) || String(dFd.category || '') === 'supplement';
+              const _minRemain = _isPowder ? 20 : Math.min(75, Math.max(40, (dItem.amount || 0) * 0.6));
+              if ((dItem.amount || 0) - cutG < _minRemain) { _triedDonors.add(donor); continue; }
+              const _snapDonor = (donor.items || []).map((z: any) => ({ ...z }));
+              const _snapWeak = (weak.items || []).map((z: any) => ({ ...z }));
+              const _pBefore6 = totals.p || 0;
+              const _pGoal6 = Number(input.goalProteinG) || 0;
+              Object.assign(dItem, _rescale(dItem, (dItem.amount || 0) - cutG));
+              const wItem = (weak.items || []).filter((x: any) => _PROT.has(String(x.role)) && !x._fixedGrams)
+                .sort((a: any, b: any) => (b.p || 0) - (a.p || 0))[0];
+              const wFd = wItem ? _fdOf(wItem.id) : null;
+              if (wItem && wFd && wFd.protein > 4) {
+                const addG = Math.ceil(needP / (wFd.protein / 100) / 5) * 5;
+                Object.assign(wItem, _rescale(wItem, Math.min(edibilityCapFor(wFd.id, 400), (wItem.amount || 0) + addG)));
+              } else {
+                const _leanIds = ['egg_white', 'cottage_cheese_5', 'chicken_breast', 'turkey_breast', 'cod', 'pollock', 'yogurt_greek'];
+                const lean = _leanIds.map(_fdOf).find((f: any) => f
+                  && !(combinedExcluded && combinedExcluded.has(f.id)) && foodPassesCtxAllergens(f) && foodAvailableForPlan(f));
+                if (lean) {
+                  const addG = Math.min(edibilityCapFor(lean.id, 250), Math.max(30, Math.ceil(needP / (lean.protein / 100) / 5) * 5));
+                  weak.items.push(_mk(lean, addG, 'protein'));
+                }
+              }
+              donor.totals = mealTotalsOf(donor.items);
+              weak.totals = mealTotalsOf(weak.items);
+              recalcDayTotals(meals, totals);
+              if (_dayDev() > Math.max(_qgDev0, PLANNER_CONVERGENCE_PCT / 100) + 0.01
+                || (_pGoal6 > 0 && _pBefore6 <= _pGoal6 * 1.03 && (totals.p || 0) > _pGoal6 * 1.03)) {
+                donor.items = _snapDonor;
+                weak.items = _snapWeak;
+                donor.totals = mealTotalsOf(donor.items);
+                weak.totals = mealTotalsOf(weak.items);
+                recalcDayTotals(meals, totals);
+                _triedDonors.add(donor);
+                continue;
+              }
+              _fixedP++;
+              _qgTouched = true;
+              _applied = true;
+              break;
+            }
+            if (!_applied || _noNeed) break;
+          }
+          if (_fixedP > 0) {
+            notes.push(`🍗 Белок по приёмам: ${_fixedP} слабых приём(а) подняты до ≥0.30 г/кг — белок дня перераспределён, не добавлен`);
+          }
+        }
+      }
+
+      _qgMark('QG7');
+      // ── QG7: недельные квоты продуктов ────────────────────────────────────
+      // Замер: рыба присутствовала в 40% дней, бобовые — в 4%, молочка — в 0% (до QG3).
+      // Ротация в коде обещала «Жирная рыба / Постная рыба / Птица / Красное мясо», но
+      // фактически крутилась внутри дня. Квоты — на недельном слое (dayOffset).
+      {
+        const _dow = ((Number((input as any).dayOffset || 0) % 7) + 7) % 7;
+        // id из FOOD_DB: salmon, mackerel, sardines, cod, pollock, tuna_steak, white_fish_cod…
+        const _isFish = (id: string) => /^(salmon|mackerel|sardines|herring|trout|cod|pollock|tuna|halibut|red_fish|white_fish|shrimp|seafood|fish)/.test(id);
+        // «Жирная рыба» = источник EPA/DHA: лосось, сельдь, макрель, сардины, красная рыба.
+        const _isFatFish = (id: string) => /^(salmon|mackerel|sardines|herring|red_fish|trout|fish_oil)/.test(id);
+        const _isLegume = (id: string) => /^(lentils|chickpeas|tofu|beans|legume_)/.test(id);
+        const _anyFood = (pred: (id: string) => boolean) =>
+          (meals as any[]).some((m) => (m.items || []).some((x: any) => pred(String(x.id))));
+        // Перебираем ВСЕ подходящие приёмы, а не первый: в обеде может стоять 90 г
+        // курицы (белок срезать некуда), а в ужине — 180 г. Раньше квота отваливалась
+        // на первом приёме и молча не срабатывала.
+        const _trySwap = (
+          bucket: 'fish' | 'legume',
+          pick: (m: any) => any | null,
+          apply: (m: any, it: any) => string | null,
+        ) => {
+          const _snap = _qgClone();
+          const _n0 = notes.length;
+          for (let i = 0; i < meals.length; i++) {
+            const m = (meals as any[])[i];
+            const it = pick(m);
+            if (!it) continue;
+            const msg = apply(m, it);
+            if (!msg) continue;
+            m.totals = mealTotalsOf(m.items);
+            recalcDayTotals(meals, totals);
+            if (_dayDev() <= Math.max(_qgDev0, PLANNER_CONVERGENCE_PCT / 100) + 0.01
+              && (totals.fiber || 0) <= _qgFiberCap - 1) {
+              _qgTouched = true;
+              notes.push(msg);
+              return;
+            }
+            meals.splice(0, meals.length, ..._qgClone(_snap));
+            recalcDayTotals(meals, totals);
+            notes.length = _n0;
+          }
+        };
+        // Жирная рыба (ω-3): 2 дня в неделю. Замер: рыба стояла в 60% дней, но ВСЕГДА
+        // постная (минтай/треска/палтус) — омега-3 не появлялась ни в одном из 50 дней.
+        // Меняем постную рыбу (или иной цельный белок) на жирную того же белка; прибавку
+        // жира компенсируем жировыми пунктами — сначала в том же приёме, потом по дню.
+        if ((_dow === 2 || _dow === 5) && !_anyFood(_isFatFish)) {
+          // Пул из базы, а не из pool.proteinFatty: квота-фильтр оставляет в нём одну
+          // сельдь, и «лестница» вырождается. Порядок — от наименее жирной к самой жирной.
+          const _ffIds = ['trout', 'salmon', 'red_fish', 'herring', 'mackerel', 'sardines'];
+          const _ffOk = (f: any) => !!f && !(combinedExcluded && combinedExcluded.has(f.id))
+            && foodPassesCtxAllergens(f) && foodAvailableForPlan(f);
+          const fatFishPool = [...new Map<string, any>(
+            [..._ffIds.map((id) => _fdOf(id)).filter(_ffOk),
+              ...[...((pool as any).proteinFatty || []), ...((pool as any).proteinLean || [])].filter((f: any) => _isFatFish(String(f.id)) && _ffOk(f))]
+              .map((f: any) => [String(f.id), f]),
+          ).values()];
+          const _pickTarget = (mm: any) => {
+            if (!['lunch', 'dinner', 'snack', 'snack2'].includes(String(mm.type))) return null;
+            const items = (mm.items || []).filter((x: any) => x.role === 'protein' && !x._fixedGrams && (x.p || 0) >= 15);
+            // приоритет — уже стоящая постная рыба: рыбный день меняет «вид», а не блюдо
+            return items.find((x: any) => _isFish(String(x.id)))
+              || [...items].sort((a: any, b: any) => (b.p || 0) - (a.p || 0))[0]
+              || null;
+          };
+          if (fatFishPool.length > 0) {
+            // Лестница от «наименее жирной из жирных» (форель/красная рыба) к лососю/сельди:
+            // чем меньше дельта жира, тем меньше нужно ломать остальные приёмы.
+            const _ladder = [...fatFishPool].sort((a: any, b: any) =>
+              (a.fat || 0) / Math.max(0.1, a.protein || 1) - (b.fat || 0) / Math.max(0.1, b.protein || 1));
+            // Перебираем и приёмы, и рыбу: если в обеде замена ломает сходимость,
+            // пробуем ужин, а не отказываемся от квоты целиком.
+            for (let _ti = 0; _ti < (meals as any[]).length; _ti++) {
+              if (!_pickTarget((meals as any[])[_ti])) continue;
+              let _okFish = false;
+              for (const fatFish of _ladder) {
+                const _snap = _qgClone();
+                const _n0 = notes.length;
+                const _m0 = (meals as any[])[_ti];
+                const _it0 = _pickTarget(_m0);
+                if (!_it0) { meals.splice(0, meals.length, ..._qgClone(_snap)); notes.length = _n0; continue; }
+                const before = { ..._it0 };
+                const grams = Math.min(edibilityCapFor(fatFish.id, 250),
+                  Math.max(40, Math.round(((before.p || 0) / Math.max(0.01, (fatFish.protein || 0) / 100)) / 5) * 5));
+                Object.assign(_it0, _mk(fatFish, grams, 'protein'));
+                let dF = (_it0.f || 0) - (before.f || 0);
+                if (dF > 0.5 && _trimFatIn(_m0, dF)) dF = 0;
+                if (dF > 0.5) {
+                  const others = (meals as any[]).filter((mm) => mm !== _m0)
+                    .sort((a: any, b: any) => (b.totals?.f || 0) - (a.totals?.f || 0));
+                  for (const mm of others) {
+                    if (dF <= 0.5) break;
+                    const _fBefore = (mm.items || []).reduce((s: number, x: any) => s + (x.f || 0), 0);
+                    _trimFatIn(mm, dF, 0);
+                    const _fAfter = (mm.items || []).reduce((s: number, x: any) => s + (x.f || 0), 0);
+                    dF -= Math.max(0, _fBefore - _fAfter);
+                    mm.totals = mealTotalsOf(mm.items);
+                  }
+                }
+                _m0.totals = mealTotalsOf(_m0.items);
+                recalcDayTotals(meals, totals);
+                if (_dayDev() > Math.max(_qgDev0, PLANNER_CONVERGENCE_PCT / 100) + 0.01
+                  || (totals.fiber || 0) > _qgFiberCap - 1) {
+                  meals.splice(0, meals.length, ..._qgClone(_snap));
+                  recalcDayTotals(meals, totals);
+                  notes.length = _n0;
+                  continue;
+                }
+                usedTodayIds.add(fatFish.id); allFoodsUsed.push(fatFish.id);
+                _qgTouched = true;
+                notes.push(`🐟 Омега-3: «${_m0.label}» — ${before.name} → ${fatFish.name} ${grams} г (жир компенсирован маслами/орехами, белок тот же)`);
+                _okFish = true;
+                break;
+              }
+              if (_okFish) break;
+            }
+          }
+        }
+        // Бобовые: 2 дня в неделю — гарнир обеда/ужина меняем на чечевицу той же
+        // калорийности, лишний белок бобовых вычитаем из белкового пункта приёма.
+        if ((_dow === 1 || _dow === 4) && !_anyFood(_isLegume)) {
+          // id из FOOD_DB: 'lentils'/'chickpeas' (продукта 'legume_red_lentil' в базе нет)
+          const lentil: any = ['lentils', 'chickpeas'].map((id) => _fdOf(id))
+            .find((fl: any) => fl && !(combinedExcluded && combinedExcluded.has(fl.id))
+              && foodPassesCtxAllergens(fl) && foodAvailableForPlan(fl));
+          const lentilOk = !!lentil;
+          const pickStarch = (mm: any) => (['lunch', 'dinner'].includes(String(mm.type))
+            ? (mm.items || []).filter((x: any) => x.role === 'carb_slow' && !x._fixedGrams && (x.kcal || 0) >= 60)
+              .sort((a: any, b: any) => (b.kcal || 0) - (a.kcal || 0))[0] || null
+            : null);
+          if (lentilOk && lentil) {
+            _trySwap('legume', pickStarch, (m, it) => {
+              const before = { ...it };
+              const stFd = _fdOf(before.id);
+              if (!stFd) return null;
+              const kcalPer100 = 4 * (lentil.protein || 0) + 9 * (lentil.fat || 0) + 4 * (lentil.carbs || 0);
+              if (kcalPer100 <= 0) return null;
+              const beforeKcal = before.kcal || 0;
+              const _mealP0 = (m.items || []).reduce((s: number, x: any) => s + (x.p || 0), 0);
+              if (beforeKcal < 100) return null;
+              // Сколько белка можно снять с приёма, не превращая курицу в «60 г курицы».
+              const pi = (m.items || []).filter((x: any) => x !== it && x.role === 'protein' && !x._fixedGrams)
+                .sort((a: any, b: any) => (b.p || 0) - (a.p || 0))[0];
+              const pfd = pi ? _fdOf(pi.id) : null;
+              const _isPowderL = !!pi && (/^(supp_|whey|casein)/.test(String(pi.id)) || String(pfd?.category || '') === 'supplement');
+              const _minKeepL = _isPowderL ? 20 : 75;
+              const maxCutP = (pi && pfd && pfd.protein > 4)
+                ? Math.max(0, ((pi.amount || 0) - _minKeepL) * (pfd.protein / 100)) : 0;
+              // Заменяем гарнир ЦЕЛИКОМ: второй крахмал в том же приёме ломает правило
+              // «один гарнир» (planner-base-quality). Граммы чечевицы ограничены тремя
+              // бюджетами: сколько белка можно срезать из белкового пункта, запас
+              // клетчатки дня (11.7 г/100) и калорийность прежнего гарнира.
+              const perGrain = (lentil.protein || 0) / 100;
+              const perKcalL = kcalPer100 / 100;
+              const perFiberL = (lentil.fiber || 0) / 100;
+              let maxG = Math.min(edibilityCapFor(lentil.id, 250),
+                perKcalL > 0 ? beforeKcal / perKcalL : 250,
+                perGrain > 0 ? maxCutP / perGrain : 250);
+              if (perFiberL > 0) maxG = Math.min(maxG, Math.max(0, (_qgFiberCap - 1 - (totals.fiber || 0)) / perFiberL));
+              const lentilG = Math.floor(maxG / 5) * 5;
+              if (lentilG < 40) return null;
+              m.items = (m.items || []).filter((x: any) => x !== it);
+              m.items.push(_mk(lentil, lentilG, 'carb_slow'));
+              const _lentilItem = m.items[m.items.length - 1];
+              // Считаем ФАКТИЧЕСКУЮ прибавку белка приёма: гарнир тоже терял белок
+              // (гречка 3.4 Б/100, овсянка 13 Б/100), и «cut по чечевице» уводил
+              // приём в минус на 5–6 г (замер: квота откатывалась по просадке белка).
+              const _dP = (m.items || []).reduce((s: number, x: any) => s + (x.p || 0), 0) - _mealP0;
+              if (_dP > 0.8 && pi && pfd && pfd.protein > 4) {
+                const cutG = Math.round((_dP / (pfd.protein / 100)) / 5) * 5;
+                if ((pi.amount || 0) - cutG >= _minKeepL) Object.assign(pi, _rescale(pi, (pi.amount || 0) - cutG));
+              }
+              usedTodayIds.add(lentil.id); allFoodsUsed.push(lentil.id);
+              return `🫘 Недельная квота бобовых: «${m.label}» — ${before.name} ${before.amount} г заменены на ${_lentilItem.amount} г чечевицы (клетчатка/фолат; белок приёма тот же)`;
+            });
+          }
+        }
+      }
+
+    }
+    // Откат пакета, если он ухудшил сходимость или просадил белок дня:
+    // (1) белок дня не опускается ниже ни исходного значения, ни цели (−0.5 г на округление);
+    // (2) ни одна ось КБЖУ не углубляется больше чем на 0.5 п.п. и не выходит из канона;
+    // (3) «ккал-нейтральная» компенсация не имеет права уносить белок.
+    const _qgGoalP = Number(input.goalProteinG) || 0;
+    const _qgCanon = PLANNER_CONVERGENCE_PCT / 100;
+    const _qgPFloor = _qgGoalP > 0 ? Math.min(_qgP0, _qgGoalP) : 0;
+    // День, который уже далеко вне канона (экстремальные 8600 ккал / синтетические
+    // 20-приёмные конфиги), порционными правками не спасти: там любая замена гарнира
+    // уезжает на 2 п.п. и ломает структурные локи. Пакет на таких днях не работает.
+    // Экстремальные синтетические дни (8600–8900 ккал, 13–20 приёмов) тоже не трогаем:
+    // рецептурный сборщик считает их best-effort, и любая замена гарнира уводит его.
+    // Ручной КБЖУ (manualTargetsLocked / kbjuMode='manual') — граммы пользователя
+    // авторитетны: пакет не переписывает состав такого дня.
+    const _qgGated = _qgDev0 > 0.08
+      || (Number(input.goalKcal) || 0) > 6000
+      || !!(input as any).manualTargetsLocked
+      || String((input as any).kbjuMode || '') === 'manual'
+      // Портативный режим («только порошок/хлопья») ограничивает пул продуктов, а
+      // пакет вставляет конкретные id (творог, чечевица, лосось, овощи) — это ломает фильтр.
+      || !!input.portableMode;
+    const _qgBad = () => {
+      if (_qgGated) return true;
+      // Допуск на просадку белка: если день НЕ добрал белок, терять нельзя вообще
+      // (0.5 г — округление); если белок в норме/с запасом — 1.5% цели на округление.
+      const _pLossTol = _qgP0 < _qgGoalP * 0.995 ? 0.5 : Math.max(_qgGoalP * 0.015, 2);
+      const proteinLost = _qgGoalP > 0 && _qgP0 <= _qgGoalP * 1.03 && (totals.p || 0) < _qgPFloor - _pLossTol;
+      if (proteinLost) return true;
+      // Приём, который был едой (≥100 ккал), не опускается ниже 100 ккал.
+      const _kNow = _qgMealK();
+      for (let i = 0; i < _kNow.length; i++) {
+        if ((_qgMealK0[i] || 0) >= 100 && _kNow[i] < 100) return true;
+      }
+      const dev = _qgDevOf();
+      if (_qgDev0 <= _qgCanon + 1e-9 && Math.max(..._qgAxes()) > _qgCanon + 1e-9) return true;
+      // День уже вне канона — пакет качества обязан НЕ ухудшать его вообще (раньше
+      // допускалось +0.5 п.п. на стадию, и экстремальные конфиги уезжали на 2 п.п.).
+      if (_qgDev0 > _qgCanon + 1e-9 && dev > _qgDev0 + 0.001) return true;
+      return dev > Math.max(_qgDev0 + 0.005, _qgCanon + 0.005);
+    };
+    // Снимаем стадии с конца, пока день не вернётся в ту же сходимость, что был.
+    // Перед проверкой пересчитываем тоталы ИЗ ПРИЁМОВ: часть правок меняет items без
+    // немедленного recalc, и «слепой» тотал пропускал ухудшение дня.
+    recalcDayTotals(meals, totals);
+    for (let _g = 0; _g < 20 && _qgTouched && _qgBad(); _g++) {
+      const st = _qgStack.pop();
+      if (!st) break;
+      meals.splice(0, meals.length, ...(st.meals as any[]));
+      Object.assign(totals, st.totals);
+      notes.length = st.notesLen;
+      usedTodayIds.clear();
+      for (const id of st.used) usedTodayIds.add(id);
+      allFoodsUsed.length = st.foodsLen;
+    }
+    if (_qgBad() && _qgTouched) {
+      // Не помогло — консервативный откат всего пакета.
+      meals.splice(0, meals.length, ...(_qgSnapMeals as any[]));
+      Object.assign(totals, _qgSnapTotals);
+      notes.length = _qgNotes0;
+      usedTodayIds.clear();
+      for (const id of _qgUsed0) usedTodayIds.add(id);
+      allFoodsUsed.length = _qgFoods0;
+      _qgTouched = false;
+    }
+
     // Витрина MPS должна совпадать с ФИНАЛЬНЫМ планом (санитайзеры E17/E18 меняют items).
     if (typeof _refreshMpsFromMeals === 'function') _refreshMpsFromMeals();
     // Честная строка «белок по приёмам». Раньше она печаталась ДО сборки тарелок, по
@@ -10686,6 +11617,21 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
       ? analyzeMicroCoverage(sumMicros(meals.flatMap(m => m.items.map(it => ({ id: it.id, amount: it.amount }))), FOOD_DB as any), input.sex || 'male', input.weightKg, input.cyclePhase as any, !!input.isTrainingDay, input.calciumTargetOverride, input.sodiumTargetOverride)
       : { coverage: [], topDeficitNutrient: null as string | null };
     _jMark('final', 'Финал (микро/гигиена/витрина)');
+    // ─── Качество рациона одним числом (0–100) ───────────────────────────────
+    // Сходимость ≤3% говорит, что граммы совпали; она молчит о том, съедобен ли план.
+    // Здесь собираем «съедобность» из фактических тарелок: овощи, распределение жира,
+    // белок ядра, размер порций, разнообразие, микро.
+    const _qCov = (_finalMicro as any)?.coverage as MicroCoverageEntry[] | undefined;
+    const _qTotalN = Array.isArray(_qCov) ? _qCov.length : 0;
+    const _qLowN = Array.isArray(_qCov) ? _qCov.filter((c) => (c.pct || 0) < 70).length : 0;
+    const planQuality = scoreDayQuality(meals as any[], {
+      weightKg: Number(input.weightKg) || 0,
+      microCoverage: _qTotalN > 0 ? { lowCount: _qLowN, total: _qTotalN } : undefined,
+    });
+    if (planQuality.total < 70) {
+      const _weak = describeQualityWeakness(planQuality);
+      notes.push(`🎯 Качество рациона: ${planQuality.total}/100 — слабые оси: ${_weak.join(', ') || 'нет'}. Это не КБЖУ-промах, а «съедобность»: план формально сошёлся.`);
+    }
     // ─── §4.1 «призрак микро-добавки»: нота описывает ФАКТИЧЕСКУЮ тарелку ───
     // Поздние проходы (типология «овощи — 1 пункт», клетчаточный кап, P4b) могли
     // ужать/убрать добавленный продукт — нота «добавлен лосось 100 г» врала.
@@ -10718,6 +11664,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
       notes,
       withinTolerance: _dayDevPctP4 <= PLANNER_CONVERGENCE_PCT,
       deviationPct: _dayDevPctP4,
+      qualityScore: planQuality,
       passJournal: _passJournal,
     };
   } finally {
