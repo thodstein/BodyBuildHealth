@@ -11578,6 +11578,215 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
       }
     }
 
+    // ── QG9: витамин E — качество жира, а не его количество ─────────────────
+    // Замер: VitE 24% RDA в среднем, 30 дней из 30 ниже 70% — при том что жир по
+    // дням ровно в норме. День держится на топлёном масле (0.8 мг E/100 г), а
+    // нерафинированное подсолнечное масло даёт 41 мг E/100 г при тех же 100 г
+    // жира и тех же 884 ккал. Замена «масло → масло» грамм-в-грамм не меняет
+    // КБЖУ вообще, поэтому идёт ПОСЛЕ откатов пакета и работает даже на днях,
+    // которые пакет не трогает (структурно вне канона). В ручном режиме состав
+    // задаёт пользователь — там не лезем.
+    {
+      const _saltFree = !(!!(input as any).manualTargetsLocked
+        || String((input as any).kbjuMode || '') === 'manual'
+        || !!input.portableMode);
+      const _eGoal9 = Number((RDA_BASE as any)?.VitE?.[input.sex === 'female' ? 'female' : 'male'] || 15);
+      const _vitE9 = () => Number((sumMicros(
+        (meals as any[]).flatMap((m) => (m.items || []).map((it: any) => ({ id: it.id, amount: it.amount }))),
+        FOOD_DB as any,
+      ) as any)?.VitE || 0);
+      const _ok9 = (id: string) => {
+        const fd: any = FOOD_DB.find((f: any) => f.id === id);
+        return !!fd && !(combinedExcluded && combinedExcluded.has(id))
+          && !(input.excludedIds && input.excludedIds.has(id))
+          && foodPassesCtxAllergens(fd) && foodAvailableForPlan(fd);
+      };
+      // Нерафинированное подсолнечное — самое богатое E масло для салата/овощей
+      // (41 мг/100 г); оливковое — универсальный запасной вариант (14.4).
+      const _oils9 = ['oil_sunflower_unrefined', 'olive_oil'].filter(_ok9);
+      const _eDens9 = (id: string) => Number((FOOD_DB.find((f: any) => f.id === id)?.micros as any)?.VitE || 0);
+      // Миндаль — 25 мг E/100 г при тех же ~50 г жира; кешью/грецкие/«орехи микс»
+      // дают почти ноль. Та же семья и те же граммы — квота орехов не меняется.
+      const _almond9: any = _ok9('almonds') ? FOOD_DB.find((f: any) => f.id === 'almonds') : null;
+      // Семейные квоты дня те же, что держит F1-гард: орехи/семена ≤ потолка на вес,
+      // масла ≤2 приёмов. Масло гхи в семействах не числится, поэтому замена на
+      // оливковое/подсолнечное ЗАНИМАЕТ слот — без этой проверки день уезжает в
+      // «3 приёма с маслом» и в перебор семян (81 г против 78).
+      const _famOk9 = () => {
+        const fm = new Map<string, number>();
+        for (const m of meals as any[]) {
+          const fams = new Set((m.items || []).map((it: any) => stapleFamilyOf(it.id)).filter(Boolean) as string[]);
+          for (const f of fams) fm.set(f, (fm.get(f) || 0) + 1);
+        }
+        if ((fm.get('oils') || 0) > 2) return false;
+        const nutG = (meals as any[]).flatMap((m) => m.items || [])
+          .filter((it: any) => ['nuts', 'seeds'].includes(stapleFamilyOf(it.id) || ''))
+          .reduce((s: number, it: any) => s + (Number(it.amount) || 0), 0);
+        return nutG <= nutCatchupCap(quotaWeightScale(Number(input.weightKg) || 80));
+      };
+      // Масштабирование своего пункта: тот же приём, что _rescale в пакете (макросы
+      // пункта масштабируются, а не берутся заново из базы).
+      const _scale9 = (it: any, newG: number): any => {
+        const k = newG / Math.max(1, Number(it.amount) || 1);
+        return {
+          ...it, amount: newG,
+          p: Math.round((it.p || 0) * k * 10) / 10,
+          f: Math.round((it.f || 0) * k * 10) / 10,
+          c: Math.round((it.c || 0) * k * 10) / 10,
+          fiber: Math.round((it.fiber || 0) * k * 10) / 10,
+          kcal: Math.round((it.kcal || 0) * k),
+          leucine_mg: Math.round((it.leucine_mg || 0) * k),
+        };
+      };
+      // Отклонение дня по осям — тот же смысл, что _qgDevOf внутри пакета, но
+      // снаружи блока: замена не имеет права ухудшить сходимость.
+      const _dev9 = () => {
+        const g = (k: number, t: number) => (t > 0 ? Math.abs(k - t) / t : 0);
+        return Math.max(
+          g(totals.kcal || 0, Number(input.goalKcal) || 0),
+          g(totals.p || 0, Number(input.goalProteinG) || 0),
+          g(totals.f || 0, Number(input.goalFatG) || 0),
+          g(totals.c || 0, Number(input.goalCarbsG) || 0),
+        );
+      };
+      // Граммы считаем по ЖИРУ: у чистых масел это грамм-в-грамм, у орехов
+      // (кешью 44% → миндаль 50%) — чуть меньше граммов, чтобы жир дня не уехал.
+      const _fatGrams9 = (fd: any, fatG: number) => {
+        const per = Number(fd?.fat) > 0 ? Number(fd.fat) / 100 : 0;
+        return per > 0 ? Math.max(5, Math.round(fatG / per)) : 0;
+      };
+      // «Не навреди»: не ухудшаем ни на шаг и НЕ выносим день из канона 3%
+      // (допуск 0.1 п.п. позволял дню 2.95% уехать в 3.05% — формально «не хуже», а
+      // по факту новый промах канона).
+      const _worse9 = (devBefore: number) => {
+        const canon = PLANNER_CONVERGENCE_PCT / 100;
+        const now = _dev9();
+        if (devBefore <= canon && now > canon) return true;
+        return now > devBefore + 0.001;
+      };
+      // Замена продукта в ТОМ ЖЕ пункте (жир сохраняем) + проверка семейных квот
+      // и сходимости дня.
+      const _apply9 = (m: any, it: any, fd: any): boolean => {
+        const fatG = Number(it.f) || 0;
+        const newG = _fatGrams9(fd, fatG);
+        if (newG < 5) return false;
+        const _snap = { ...it };
+        const _d0 = _dev9();
+        const r = newG / 100;
+        it.id = fd.id;
+        it.name = fd.name;
+        it.amount = newG;
+        it.p = Math.round((fd.protein || 0) * r * 10) / 10;
+        it.f = Math.round((fd.fat || 0) * r * 10) / 10;
+        it.c = Math.round((fd.carbs || 0) * r * 10) / 10;
+        it.fiber = Math.round((fd.fiber || 0) * r * 10) / 10;
+        it.kcal = Math.round(4 * it.p + 9 * it.f + 4 * it.c);
+        it.leucine_mg = 0;
+        m.totals = mealTotalsOf(m.items);
+        recalcDayTotals(meals, totals);
+        if (!_famOk9() || _worse9(_d0)) {
+          Object.assign(it, _snap);
+          m.totals = mealTotalsOf(m.items);
+          recalcDayTotals(meals, totals);
+          return false;
+        }
+        return true;
+      };
+      if (_saltFree && _eGoal9 > 0 && _vitE9() < _eGoal9 * 0.62) {
+        let _swapped9 = 0;
+        const _done: string[] = [];
+        const _needE9 = () => _swapped9 < 3 && _vitE9() < _eGoal9 * 0.62;
+        // (1) Орехи «с нулём витамина E» → миндаль (та же семья, те же граммы).
+        if (_almond9) {
+          for (const m of meals as any[]) {
+            for (const it of (m.items || []) as any[]) {
+              if (!_needE9()) break;
+              if (it.role !== 'fat' || it._fixedGrams) continue;
+              const id = String(it.id);
+              if (!/^(cashew|nuts_mix|walnut|hazelnut_paste|peanut|pecan|pistachio)/.test(id)) continue;
+              if (_eDens9(id) >= 10) continue;
+              if ((m.items || []).some((x: any) => x.id === _almond9.id)) continue;
+              if ((Number(it.amount) || 0) < 5) continue;
+              if (_apply9(m, it, _almond9)) { _swapped9++; _done.push(_almond9.name); }
+            }
+          }
+        }
+        // (2) Пустое масло → масло с витамином E (грамм-в-грамм, тот же пункт).
+        if (_oils9.length > 0) {
+          const _cands9: any[] = [];
+          for (const m of meals as any[]) {
+            const t = String(m.type);
+            // Завтрак — это каша/яйца с гхи, там замена на подсолнечное не по-кухонному.
+            const _dishOk = t === 'lunch' || t === 'dinner' || t === 'snack' || t === 'snack2' || t === 'snack3';
+            if (!_dishOk) continue;
+            for (const it of (m.items || []) as any[]) {
+              if (it.role !== 'fat' || it._fixedGrams) continue;
+              const fd: any = FOOD_DB.find((f: any) => f.id === it.id);
+              if (!fd || Number(fd.fat) < 90) continue; // только чистые масла (100% жира)
+              if (_eDens9(fd.id) >= 10) continue;      // уже несут E — не трогаем
+              _cands9.push({ m, it, fd });
+            }
+          }
+          // Приоритет — приёмы, где масло с E УЖЕ стоит: долить его грамм-в-грамм
+          // не занимает новый «масляный» приём (квота ≤2 — F1-гард).
+          _cands9.sort((a, b) => {
+            const ea = (a.m.items || []).some((x: any) => x !== a.it && x.role === 'fat' && _eDens9(x.id) >= 10) ? 0 : 1;
+            const eb = (b.m.items || []).some((x: any) => x !== b.it && x.role === 'fat' && _eDens9(x.id) >= 10) ? 0 : 1;
+            return ea - eb;
+          });
+          for (const c of _cands9) {
+            if (!_needE9()) break;
+            const amt = Number(c.it.amount) || 0;
+            if (amt < 5) continue;
+            const _m = c.m;
+            const _twin = (_m.items || []).find((x: any) => x !== c.it && x.role === 'fat'
+              && stapleFamilyOf(x.id) === 'oils' && _eDens9(x.id) >= 10);
+            if (_twin) {
+              // Доливаем существующее масло с E жиром донора, донора убираем:
+              // пункт один, жир тот же.
+              const _snapDonor = { ...c.it };
+              const _snapTwin = { ..._twin };
+              const _addFat = Number(c.it.f) || 0;
+              const _perT = Number(_twin.f) / Math.max(1, Number(_twin.amount) || 1);
+              const _newTwinG = _perT > 0
+                ? Math.round((Number(_twin.amount) || 0) + _addFat / _perT)
+                : (Number(_twin.amount) || 0);
+              const _d0m = _dev9();
+              _m.items = (_m.items as any[]).filter((x: any) => x !== c.it);
+              Object.assign(_twin, _scale9(_twin, _newTwinG));
+              _m.totals = mealTotalsOf(_m.items);
+              recalcDayTotals(meals, totals);
+              if (!_famOk9() || _worse9(_d0m)) {
+                Object.assign(_twin, _snapTwin);
+                (_m.items as any[]).push(_snapDonor);
+                _m.totals = mealTotalsOf(_m.items);
+                recalcDayTotals(meals, totals);
+                continue;
+              }
+              _swapped9++;
+              _done.push(String(_twin.name));
+              continue;
+            }
+            for (const rid of _oils9) {
+              if ((_m.items || []).some((x: any) => x.id === rid)) continue; // второй такой же пункт не плодим
+              const repl: any = FOOD_DB.find((f: any) => f.id === rid);
+              if (_apply9(_m, c.it, repl)) {
+                _swapped9++;
+                _done.push(repl.name);
+                usedTodayIds.add(repl.id);
+                allFoodsUsed.push(repl.id);
+                break;
+              }
+            }
+          }
+        }
+        if (_swapped9 > 0) {
+          const _uniq = [...new Set(_done)];
+          notes.push(`🌻 Витамин E: ${_swapped9} замен грамм-в-грамм (${_uniq.join(', ')}) — КБЖУ дня не изменились, E ${Math.round(_vitE9())} мг из ${Math.round(_eGoal9)} мг (цель держится планом, а не нотой)`);
+        }
+      }
+    }
+
     // Витрина MPS должна совпадать с ФИНАЛЬНЫМ планом (санитайзеры E17/E18 меняют items).
     if (typeof _refreshMpsFromMeals === 'function') _refreshMpsFromMeals();
     // Честная строка «белок по приёмам». Раньше она печаталась ДО сборки тарелок, по

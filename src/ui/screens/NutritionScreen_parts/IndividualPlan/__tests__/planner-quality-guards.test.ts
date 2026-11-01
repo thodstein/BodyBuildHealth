@@ -1,10 +1,11 @@
 /**
- * Регрессия «пакета качества» (QG1–QG7) планировщика.
+ * Регрессия «пакета качества» (QG1–QG9) планировщика.
  *
  * Зачем: сходимость дня ≤3% ловит только КБЖУ. Жалобы шли на «съедобность»:
- * «19 г малины», «жир всего дня в одном приёме», «овощей 190 г», «в обед 12 г белка».
- * Пакет QG правит именно это — и эти тесты фиксируют результат, чтобы следующая
- * правка движка не откатила его молча.
+ * «19 г малины», «жир всего дня в одном приёме», «овощей 190 г», «в обед 12 г белка»,
+ * «натрий 43% цели, а в совете — добавьте соли», «витамин E 24% RDA». Пакет QG правит
+ * именно это — и эти тесты фиксируют результат, чтобы следующая правка движка не
+ * откатила его молча.
  *
  * Пороги подобраны по замеру на одном и том же наборе профилей:
  *   метрика                        без пакета   с пакетом
@@ -14,12 +15,15 @@
  *   основных приёмов с белком <20г 14           11
  *   пунктов ниже порога «это еда»  155          101
  *   дней с молочкой               15/30        18/30
+ *   Na, среднее от цели дня        41%          88%
+ *   VitE, среднее от RDA           24%          63%
  */
 import { describe, it, expect } from 'vitest';
 import { buildDayPlan, type MealPlanInput } from '../meal-plan-engine';
 import { buildDayTargets } from '../planner-day-targets';
 import { scoreDayQuality } from '../planner-quality-score';
 import { sumMicros } from '../planner-micro-coverage';
+import { stapleFamilyOf, nutCatchupCap, quotaWeightScale } from '../food-availability';
 import { FOOD_DB } from '../../../../../core/nutrition-database';
 
 type Profile = { id: string; w: number; lbm: number; bf: number; sex: 'male' | 'female' };
@@ -35,7 +39,7 @@ const MAIN = ['breakfast', 'lunch', 'dinner'];
 const MIN_G: Record<string, number> = { fruit: 80, veg: 60, fat: 7, carb_slow: 30, carb_fast: 20, protein: 25 };
 const DAIRY_RE = /tvorog|kefir|milk|yogurt|cheese|skyr|curd/;
 
-type Day = { id: string; plan: any; meals: any[]; totF: number; totP: number };
+type Day = { id: string; w: number; plan: any; meals: any[]; totF: number; totP: number };
 
 function buildOne(pr: Profile, mealsCount: number, isTrainingDay: boolean, dayOffset = 0): Day | null {
   const tgt: any = buildDayTargets({
@@ -55,7 +59,7 @@ function buildOne(pr: Profile, mealsCount: number, isTrainingDay: boolean, dayOf
   if (!meals.length) return null;
   const totF = meals.reduce((s, m) => s + (m.totals?.f || 0), 0);
   const totP = meals.reduce((s, m) => s + (m.totals?.p || 0), 0);
-  return { id: `${pr.id}/${mealsCount}/${isTrainingDay ? 'тр' : 'отд'}`, plan, meals, totF, totP };
+  return { id: `${pr.id}/${mealsCount}/${isTrainingDay ? 'тр' : 'отд'}`, w: pr.w, plan, meals, totF, totP };
 }
 
 /** 30 дней: 5 профилей × 3 режима приёмов × тренировка/отдых. */
@@ -196,6 +200,67 @@ describe('пакет качества: соль в тарелке, а не в н
         expect(Math.abs((x.amount || 0) - Math.round(x.amount || 0))).toBeLessThan(1e-9);
       }
     }
+  });
+});
+
+describe('пакет качества: витамин E и семейные квоты (QG9)', () => {
+  const E_RDA = 15; // мг, RDA_BASE.VitE
+  const eMgOf = (d: Day) => Number((sumMicros(
+    items(d).map(({ x }) => ({ id: x.id, amount: x.amount })),
+    FOOD_DB as any,
+  ) as any)?.VitE || 0);
+
+  it('витамин E: среднее ≥ 60% RDA, дней ниже 70% ≤ 16 (было 100%)', () => {
+    const pcts = DAYS.map((d) => Math.round((eMgOf(d) / E_RDA) * 100));
+    const avg = Math.round(pcts.reduce((s, v) => s + v, 0) / pcts.length);
+    expect(avg, `VitE: ${avg}% RDA (было 24%)`).toBeGreaterThanOrEqual(60);
+    const below70 = pcts.filter((v) => v < 70).length;
+    expect(below70, `дней с VitE < 70% RDA: ${below70}/${pcts.length}`).toBeLessThanOrEqual(16);
+    const below50 = pcts.filter((v) => v < 50).length;
+    expect(below50, `дней с VitE < 50% RDA: ${below50}/${pcts.length}`).toBeLessThanOrEqual(10);
+  });
+
+  it('замена масла не нарушает квоты: орехи/семена ≤ потолка, в приёме одно масло', () => {
+    const caps: string[] = [];
+    for (const d of DAYS) {
+      const nutG = items(d)
+        .filter(({ x }) => ['nuts', 'seeds'].includes(stapleFamilyOf(x.id) || ''))
+        .reduce((s, { x }) => s + (x.amount || 0), 0);
+      const nutCap = nutCatchupCap(quotaWeightScale(d.w));
+      if (nutG > nutCap) caps.push(`${d.id}: орехов/семян ${nutG} г > ${nutCap}`);
+      // QG9 доливает существующее масло или меняет его тем же пунктом — второй
+      // масляный пункт в одном приёме означал бы «овсянка с двумя маслами».
+      for (const m of d.meals) {
+        const oils = (m.items || []).filter((x: any) => stapleFamilyOf(x.id) === 'oils');
+        if (oils.length > 1) caps.push(`${d.id}/${m.type}: ${oils.length} масла в приёме`);
+      }
+    }
+    expect(caps.slice(0, 4).join(' | ')).toBe('');
+  });
+
+  it('нота про витамин E не врёт: «E X мг из Y мг» совпадает с фактом по тарелке', () => {
+    const bad: string[] = [];
+    for (const d of DAYS) {
+      const note = (d.plan.notes as string[]).find((n) => typeof n === 'string' && n.includes('Витамин E'));
+      if (!note) continue;
+      const m = /E (\d+) мг из (\d+) мг/.exec(note);
+      if (!m) { bad.push(`${d.id}: нота без цифр`); continue; }
+      const claimed = Number(m[1]);
+      const actual = eMgOf(d);
+      if (Math.abs(claimed - actual) > 2.5) bad.push(`${d.id}: нота ${claimed} мг, факт ${Math.round(actual)} мг`);
+    }
+    expect(bad.slice(0, 4).join(' | ')).toBe('');
+  });
+
+  it('замены грамм-в-грамм: нет приёма с двумя одинаковыми продуктами', () => {
+    const dup: string[] = [];
+    for (const d of DAYS) {
+      for (const m of d.meals) {
+        const ids = (m.items || []).map((x: any) => x.id);
+        if (new Set(ids).size !== ids.length) dup.push(`${d.id}/${m.type}`);
+      }
+    }
+    expect(dup.slice(0, 4).join(' | ')).toBe('');
   });
 });
 
