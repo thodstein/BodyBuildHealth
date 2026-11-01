@@ -11875,7 +11875,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
       // гард сходимости отбивал замену на дне, стоящем ровно на каноне. Работает в
       // ОБЕ стороны: если новый овощ углеводов отдаёт меньше старого, гарнир
       // добирается — иначе день теряет углеводы и уезжает по оси C.
-      const _balanceCarb10 = (m: any, deltaC: number): number => {
+      const _balanceCarb10 = (m: any, deltaC: number, floorSlow = 40, floorFast = 40): number => {
         if (Math.abs(deltaC) < 0.5) return 0;
         const carbs = ((m.items || []) as any[])
           .filter((x: any) => (x.role === 'carb_slow' || x.role === 'carb_fast') && !x._fixedGrams)
@@ -11888,7 +11888,9 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
             const perG = (Number(it.c) || 0) / Math.max(1, amt);
             if (!(perG > 0)) continue;
             // Гарнир не опускается ниже 40 г: «30 г риса» — это уже не гарнир.
-            const canG = Math.min(Math.floor(left / perG), amt - 40);
+            // QG11 (фрукт/орехи) передаёт свой порог: там «30 г овсянки» — норма.
+            const fl = it.role === 'carb_fast' ? floorFast : floorSlow;
+            const canG = Math.min(Math.floor(left / perG), amt - fl);
             if (canG < 5) continue;
             Object.assign(it, _scale10(it, amt - canG));
             left -= canG * perG;
@@ -12121,6 +12123,125 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
         if (_changed.length > 0) {
           const _uniq = [...new Set(_changed)];
           notes.push(`🥕 Овощи и витамин A: ${_uniq.join('; ')} — ${Math.round(_vegG10())} г овощей в дне, A ${Math.round((_vita10() / Math.max(1, _vitaGoal10)) * 100)}% цели (КБЖУ дня те же: овощ вместо части гарнира)`);
+        }
+      }
+      // ── QG11: фрукт и орехи — порция, а не украшение ──────────────────────
+      // Замер (30 дней): 53 пункта фрукта/ягод меньше 80 г (15–26 г: «завтрак с
+      // 19 г малины», «перекус с 15 г яблока») и 19 пунктов орехов/семян меньше
+      // 15 г (5 г кешью/миндаля). Причина та же, что у овощей в QG10: порционная
+      // санитарность QG1 живёт ВНУТРИ пакета качества, а на днях с отклонением
+      // >8% пакет откатывается целиком — и «19 г малины» возвращается. Здесь —
+      // тот же безопасный приём: растим пункт до порции и меняем его на часть
+      // гарнира/масла того же приёма; день не имеет права стать хуже.
+      //
+      // Стадия не трогает дни с инсулиновыми окнами: там приёмные бюджеты
+      // разложены по дозам болюсов, и «порционный пол» фрукта либо бессмыслен,
+      // либо сдвигает выверенный перебор белка окон (`planner-meal-target-scale`).
+      if (_vegFree && !((input as any).injections && (input as any).injections.length)) {
+        const _devStart11 = _dev10();
+        const _worse11 = () => {
+          const canon = PLANNER_CONVERGENCE_PCT / 100;
+          const now = _dev10();
+          if (_devStart11 <= canon && now > canon) return true;
+          // Допуска нет: фрукт — не основная еда, ради украшения порции день не
+          // должен уезжать. Замер: допуск 0.5 п.п. выбивал рецепт-день R-1500 за
+          // ±0.8 п.п. базлайна (`planner-recipe-portion-drift`). Рост принимается,
+          // только если сходимость не испортилась.
+          return now > _devStart11 + 0.0005;
+        };
+        const _fiberOk11 = () => (Number(totals.fiber) || 0) <= _qgFiberCap;
+        // Углеводная ось не должна ухудшаться: «просто добавить фрукт» можно
+        // только если день по углеводам не перебирает — иначе фрукт меняет часть
+        // гарнира (иначе на дне, уже стоящем +3% по У, рост фрукта уводил У к +5%).
+        const _cStart11 = Number(totals.c) || 0;
+        const _cGoal11 = Number(input.goalCarbsG) || 0;
+        const _cOkFree11 = () => _cGoal11 <= 0
+          || Math.abs((Number(totals.c) || 0) - _cGoal11) <= Math.abs(_cStart11 - _cGoal11) + 0.05;
+        // Тарелка не должна «потяжелеть» сверх капа порции (700 г, на ёмких днях —
+        // больше): рост фрукта в обеде на 250-граммовой горе крупы давал 748 г
+        // (`planner-big-day-budget`).
+        const _capSolid11 = (_pickCtx as any)?.capacity?.active ? Math.min(900, Math.round(700 * (_pickCtx as any).capacity.plateMult)) : 700;
+        const _solid11 = (m: any) => ((m.items || []) as any[]).filter((x: any) => x.role !== 'liquid').reduce((s, x: any) => s + (Number(x.amount) || 0), 0);
+        // Орехи/семена — «жировой» пункт, который кормит, а не украшает: 5 г
+        // миндаля в день — это 30 ккал, то есть закрытие макроса, не еда.
+        const _isNut11 = (id: string) => /^(cashew|almonds?|walnuts?|hazelnuts?|peanuts?|pistachios?|pecan|macadamia|brazil_nut|seed_|sunflower_seeds|pumpkin_seeds|sesame_seeds)/i.test(id);
+        // Срез жира маслом/ги: орехи заменяют часть масла приёма, а не «ложатся
+        // сверху». Орехи и пасты не трогаем — их сами растим.
+        const _trimFat11 = (m: any, grams: number, keep: any) => {
+          let left = grams;
+          const fats = ((m.items || []) as any[])
+            .filter((x: any) => x.role === 'fat' && x !== keep && !x._fixedGrams && !_isNut11(String(x.id)) && !/paste|butter/i.test(String(x.id)))
+            .sort((a: any, b: any) => (Number(b.f) || 0) - (Number(a.f) || 0));
+          for (const it of fats) {
+            if (left <= 0.3) break;
+            const amt = Number(it.amount) || 0;
+            const perG = (Number(it.f) || 0) / Math.max(1, amt);
+            if (!(perG > 0)) continue;
+            // Масло меньше 5 г — уже не порция: срезаем до 5 г и идём дальше.
+            const canG = Math.min(Math.floor(left / perG), amt - 5);
+            if (canG < 1) continue;
+            Object.assign(it, _scale10(it, amt - canG));
+            left -= canG * perG;
+          }
+          return left;
+        };
+        const _fit11 = (m: any, it: any, target: number, kind: 'fruit' | 'nut'): boolean => {
+          const cur = Number(it.amount) || 0;
+          const cap = Math.min(edibilityCapFor(String(it.id), kind === 'fruit' ? 250 : 40), kind === 'fruit' ? 250 : 40);
+          const tgt = Math.min(cap, Math.round(target / 5) * 5);
+          if (tgt <= cur) return false;
+          const _snapM = _snapMeal10(m);
+          const f0 = Number(it.f) || 0, c0 = Number(it.c) || 0;
+          Object.assign(it, _scale10(it, tgt));
+          const dF = (Number(it.f) || 0) - f0;
+          const dC = (Number(it.c) || 0) - c0;
+          const _recalc = () => { m.totals = mealTotalsOf(m.items); recalcDayTotals(meals, totals); };
+          const _okFit = () => !_worse11() && _fiberOk11() && _solid11(m) <= _capSolid11 && _cOkFree11();
+          _recalc();
+          // Компенсация идёт ПО ФАКТУ, а не «на всякий случай»: на дне, где
+          // углеводов недобор (8–13% промаха почти всегда = белок выше, углеводы
+          // ниже), фрукт лечит день, и срезать гарнир как раз вредно.
+          if (_okFit()) return true;
+          // (1) приём сбалансировать углеводами: фрукт вместо части гарнира
+          //     (порог 30 г — это QG1-минимум крупы, ниже уже не еда)
+          if (Math.abs(dC) > 0.5) { _balanceCarb10(m, dC, 30, 20); _recalc(); }
+          if (_okFit()) return true;
+          // (2) остаток — жиром масла того же приёма (орехи заменяют масло,
+          //     фрукт, если гарнир уже на пороге «это еда», — тоже)
+          const rest = ((Number(it.f) || 0) - f0) * 9 + Math.max(0, (Number(it.c) || 0) - c0) * 4;
+          if (rest > 5 && dF >= 0) { _trimFat11(m, rest / 9, it); _recalc(); }
+          if (_okFit()) return true;
+          _restoreMeal10(m, _snapM);
+          return false;
+        };
+        const _changed11: string[] = [];
+        let _fixed11 = 0;
+        // Порядок приёмов — как в плане (детерминизм): где «19 г малины» стоит
+        // первым приёмом дня, там он и правится.
+        for (const m of (meals as any[])) {
+          if (_fixed11 >= 4) break;
+          if (!_hostOrder10.includes(String(m.type))) continue;
+          const items = ((m.items || []) as any[]).filter((x: any) => !x._fixedGrams);
+          // (1) Фрукт меньше порции (80 г). Ягода/фрукт по 15–26 г не дают ни
+          //     витаминов, ни сытости — только «галочку» в составе.
+          const fruit = items
+            .filter((x: any) => x.role === 'fruit' && (Number(x.amount) || 0) < 80)
+            .sort((a: any, b: any) => (Number(a.amount) || 0) - (Number(b.amount) || 0))[0];
+          if (fruit && _fit11(m, fruit, 80, 'fruit')) {
+            _changed11.push(`${String(fruit.name).toLowerCase()} до ${Number(fruit.amount)} г`);
+            _fixed11++;
+          }
+          // (2) Орехи/семена меньше 15 г — ровно та же история.
+          const nut = items
+            .filter((x: any) => x.role === 'fat' && _isNut11(String(x.id)) && (Number(x.amount) || 0) < 15)
+            .sort((a: any, b: any) => (Number(a.amount) || 0) - (Number(b.amount) || 0))[0];
+          if (nut && _fit11(m, nut, 15, 'nut')) {
+            _changed11.push(`${String(nut.name).toLowerCase()} до ${Number(nut.amount)} г`);
+            _fixed11++;
+          }
+        }
+        if (_changed11.length > 0) {
+          notes.push(`🍒 Порции: ${[...new Set(_changed11)].join('; ')} — фрукт/орехи доведены до еды (день не хуже: фрукт меняется на часть гарнира, орехи — на часть масла)`);
         }
       }
     }

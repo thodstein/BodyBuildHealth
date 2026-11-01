@@ -1,5 +1,5 @@
 /**
- * Регрессия «пакета качества» (QG1–QG10) планировщика.
+ * Регрессия «пакета качества» (QG1–QG11) планировщика.
  *
  * Зачем: сходимость дня ≤3% ловит только КБЖУ. Жалобы шли на «съедобность»:
  * «19 г малины», «жир всего дня в одном приёме», «овощей 190 г», «в обед 12 г белка»,
@@ -19,6 +19,9 @@
  *   VitE, среднее от RDA           24%          63%
  *   VitA < 70% RDA                14/30        1/30 (QG10)
  *   дней совсем без овощей         6/30        0/30 (QG10)
+ *   пунктов фрукта < 80 г          53           22   (QG11)
+ *   пунктов орехов < 15 г          19           17   (QG11)
+ *   ось «порции» (0-100)           85.7         90.1 (QG11)
  */
 import { describe, it, expect } from 'vitest';
 import { buildDayPlan, type MealPlanInput } from '../meal-plan-engine';
@@ -328,6 +331,38 @@ describe('овощи и витамин A в тарелке (QG10)', () => {
       if (a > 2000) bad.push(`${d.id}:${x.id} ${a}мкг/100г`);
     }
     expect(bad.slice(0, 5).join(' | ')).toBe('');
+  });
+});
+
+describe('порции: фрукт и орехи — еда, а не украшение (QG11)', () => {
+  // Замер на этих же 30 днях: 53 пункта фрукта/ягод меньше 80 г («завтрак с
+  // 19 г малины», «перекус с 15 г яблока») и 19 пунктов орехов/семян меньше 15 г
+  // («5 г миндаля»). Причина — та же, что у овощей в QG10: порционная
+  // санитарность QG1 живёт внутри пакета, а на днях вне канона пакет
+  // откатывается целиком, и «19 г малины» возвращается.
+  const fruits = (d: Day) => items(d).filter(({ x }) => x.role === 'fruit' && !x._fixedGrams);
+  const nuts = (d: Day) => items(d).filter(({ x }) => x.role === 'fat' && !x._fixedGrams
+    && /^(cashew|almonds?|walnuts?|hazelnuts?|peanuts?|pistachios?|pecan|macadamia|brazil_nut|seed_|sunflower_seeds|pumpkin_seeds|sesame_seeds)/i.test(String(x.id)));
+
+  it('фрукт меньше порции (80 г): пунктов ≤ 26 на 30 дней (было 53)', () => {
+    const bad = DAYS.flatMap((d) => fruits(d).filter(({ x }) => (x.amount || 0) < 80).map(({ x }) => `${d.id}:${x.id} ${x.amount}г`));
+    expect(bad.length, `фрукт мельче 80 г: ${bad.slice(0, 5).join(', ')}`).toBeLessThanOrEqual(26);
+  });
+
+  it('орехи/семена меньше 15 г: пунктов ≤ 18 на 30 дней (было 19)', () => {
+    const bad = DAYS.flatMap((d) => nuts(d).filter(({ x }) => (x.amount || 0) < 15).map(({ x }) => `${d.id}:${x.id} ${x.amount}г`));
+    expect(bad.length, `орехов мельче 15 г: ${bad.slice(0, 5).join(', ')}`).toBeLessThanOrEqual(18);
+  });
+
+  it('ось «порции» в оценке качества: среднее ≥ 89 (было 85.7)', () => {
+    const vals = DAYS.map((d) => scoreDayQuality(d.meals as any, { weightKg: d.w, microCoverage: { lowCount: 0, total: 16 } }).portions);
+    const avg = vals.reduce((s, v) => s + v, 0) / vals.length;
+    expect(avg, `средняя ось «порции»: ${avg.toFixed(1)}`).toBeGreaterThanOrEqual(89);
+  });
+
+  it('QG11 не выводит день из канона: дней вне 3% ≤ 8 из 30 (было 5)', () => {
+    const out = DAYS.filter((d) => d.plan.withinTolerance === false);
+    expect(out.length, `вне канона: ${out.map((d) => d.id).join(', ')}`).toBeLessThanOrEqual(8);
   });
 });
 
