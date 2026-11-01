@@ -13051,6 +13051,164 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
           }
         }
       }
+
+      // ── QG17: масло — порцией, а не «5 г в тарелке» ─────────────────────────
+      // Замер (30 дней, после QG16): 10 масляных пунктов по 5 г в 9 днях — ниже
+      // пола «это еда» (7 г для жира, правило QG1), причём это СБОРКА, а не
+      // перенос: половина таких дней вообще без нот о переносе жира. Механизм
+      // очевиден по составу тарелок — «добор жира дня» ставится пятиграммовкой
+      // в приём, где жира больше нечем набрать (`whey + овсянка + 5 г оливкового
+      // масла` в перекусе). В тарелке это «5 г масла в перекус», а в осях —
+      // лишний пункт-мусор в знаменателе «порций».
+      // Продукт стадия не меняет и жир дня не трогает:
+      //   A) малый пункт уезжает грамм-в-грамм в ТОТ ЖЕ продукт другого приёма
+      //      (чаще всего в обед, где это масло уже есть порцией);
+      //   B) если такого продукта в дне больше нет — долить пункт до 7 г и снять
+      //      ровно те же граммы жира с другого масла дня (оно остаётся ≥7 г).
+      // Гарды: жир дня ±0.2 г, энергия дня ±6 ккал, сходимость не хуже, оценка
+      // дня не ниже, максимальная доля жира в приёме не выросла, ни один приём,
+      // который был едой (≥100 ккал), не опустился ниже 100 ккал, и мелких
+      // масляных пунктов в дне стало строго меньше.
+      if (_vegFree && !((input as any).injections && (input as any).injections.length)) {
+        const _MAIN17 = ['breakfast', 'lunch', 'dinner', 'snack', 'snack2'];
+        // «Чистое масло» — то же определение, что у QG15: масла и гхи (≥85%
+        // жира, ≤2 г белка/углеводов на 100 г), но не семена и не паста.
+        const _oil17 = (x: any) => {
+          if (!x || x._fixedGrams) return false;
+          const amt = Number(x.amount) || 0;
+          if (!(amt > 0)) return false;
+          const per100 = (v: any) => ((Number(v) || 0) / amt) * 100;
+          return x.role === 'fat' && /(oil|ghee|mct)/.test(String(x.id))
+            && per100(x.f) >= 85 && per100(x.p) <= 2 && per100(x.c) <= 2;
+        };
+        const _smallOils17 = () => {
+          const out: Array<{ m: any; it: any }> = [];
+          for (const m of meals as any[]) {
+            for (const it of ((m.items || []) as any[])) {
+              const a = Number(it.amount) || 0;
+              if (a > 0 && a < 7 && _oil17(it)) out.push({ m, it });
+            }
+          }
+          return out;
+        };
+        const _startSmall17 = _smallOils17();
+        if (_startSmall17.length > 0) {
+          const _dayF17 = () => (meals as any[]).reduce((s: number, m: any) => s + (Number(m.totals?.f) || 0), 0);
+          const _maxShare17 = () => {
+            const df = _dayF17();
+            if (!(df > 0)) return 0;
+            const ms = (meals as any[]).filter((m: any) => _MAIN17.includes(String(m.type)) && ((m.items || []) as any[]).length > 0);
+            return ms.length ? Math.max(...ms.map((m: any) => (Number(m.totals?.f) || 0) / df)) : 0;
+          };
+          const _q17 = () => {
+            const cov = _pickCtx.qualityMode === 'full'
+              ? analyzeMicroCoverage(
+                sumMicros((meals as any[]).flatMap((m: any) => (m.items || []).map((it: any) => ({ id: it.id, amount: it.amount }))), FOOD_DB as any),
+                (input.sex || 'male') as any, input.weightKg, input.cyclePhase as any, !!input.isTrainingDay,
+                input.calciumTargetOverride, input.sodiumTargetOverride,
+              ).coverage
+              : [];
+            const lowN = cov.filter((c: any) => (c.pct || 0) < 70).length;
+            return scoreDayQuality(meals as any[], {
+              weightKg: Number(input.weightKg) || 0,
+              microCoverage: cov.length > 0 ? { lowCount: lowN, total: cov.length } : undefined,
+            });
+          };
+          const _f017 = Number(totals.f) || 0;
+          const _k017 = Number(totals.kcal) || 0;
+          const _q017 = _q17();
+          const _share017 = _maxShare17();
+          // Ось жира (та же формула, что в planner-quality-score): штраф идёт
+          // только за перевес ВЫШЕ 35%. Сырая доля расти может — «завтрак 26% →
+          // 29%» ось не трогает, а вот 34% → 37% это уже перевес.
+          const _fatAxis17 = () => Math.max(0, Math.min(100, 100 - Math.max(0, _maxShare17() - 0.35) * (100 / 0.15)));
+          const _fatAxis017 = Math.max(0, Math.min(100, 100 - Math.max(0, _share017 - 0.35) * (100 / 0.15)));
+          const _dev017 = _dev10();
+          const _kcal017 = new Map<any, number>((meals as any[]).map((m: any) => [m, Number(m.totals?.kcal) || 0]));
+          const moves17: string[] = [];
+          for (const { m, it } of _startSmall17) {
+            const amt = Math.round(Number(it.amount) || 0);
+            if (!(amt > 0) || !_oil17(it)) continue;
+            // A: тот же продукт в другом приёме (граммы и продукт сохраняются).
+            const sameHosts: Array<{ m2: any; x: any; where: string }> = [];
+            for (const m2 of meals as any[]) {
+              if (m2 === m) continue;
+              for (const x of ((m2.items || []) as any[])) {
+                if (String(x.id) === String(it.id) && _oil17(x) && (Number(x.amount) || 0) >= 7) {
+                  sameHosts.push({ m2, x, where: String(m2.type) });
+                }
+              }
+            }
+            for (const x of ((m.items || []) as any[])) {
+              if (x === it) continue;
+              if (String(x.id) === String(it.id) && _oil17(x) && (Number(x.amount) || 0) >= 7) {
+                sameHosts.push({ m2: m, x, where: String(m.type) });
+              }
+            }
+            // B: долив до 7 г + срез тех же граммов жира с другого масла дня.
+            const cut = 7 - amt;
+            const donors: Array<{ m2: any; x: any }> = [];
+            for (const m2 of meals as any[]) {
+              for (const x of ((m2.items || []) as any[])) {
+                if (x === it) continue;
+                if (_oil17(x) && (Number(x.amount) || 0) >= 7 + cut) donors.push({ m2, x });
+              }
+            }
+            donors.sort((a, b) => (Number(b.x.amount) || 0) - (Number(a.x.amount) || 0));
+            const runs: Array<{ label: string; apply: () => void }> = [];
+            for (const h of sameHosts) {
+              runs.push({
+                label: `«${String(m.type)}» ${String(it.name || it.id)} ${amt} г → «${h.where}» +${amt} г`,
+                apply: () => {
+                  Object.assign(h.x, _scale10(h.x, (Number(h.x.amount) || 0) + amt));
+                  m.items = ((m.items || []) as any[]).filter((x: any) => x !== it);
+                },
+              });
+            }
+            for (const d of donors) {
+              runs.push({
+                label: `«${String(m.type)}» ${String(it.name || it.id)} ${amt} → 7 г, «${String(d.m2.type)}» ${String(d.x.name || d.x.id)} −${cut} г`,
+                apply: () => {
+                  Object.assign(it, _scale10(it, 7));
+                  Object.assign(d.x, _scale10(d.x, (Number(d.x.amount) || 0) - cut));
+                },
+              });
+            }
+            for (const run of runs) {
+              const s1 = _snapDayAll();
+              run.apply();
+              recalcMealTotals(meals as any[]);
+              recalcDayTotals(meals, totals);
+              const ok = Math.abs((Number(totals.f) || 0) - _f017) <= 0.2
+                && Math.abs((Number(totals.kcal) || 0) - _k017) <= 6
+                && _dev10() <= _dev017 + 0.0005
+                && _fatAxis17() >= _fatAxis017 - 1e-6
+                && _q17().total >= _q017.total
+                && (meals as any[]).every((mm: any) => {
+                  if (((mm.items || []) as any[]).length === 0) return true;
+                  const was = _kcal017.get(mm) || 0;
+                  return was < 100 || (Number(mm.totals?.kcal) || 0) >= 100;
+                })
+                && _smallOils17().length < _startSmall17.length;
+              if (ok) { moves17.push(run.label); break; }
+              _restoreDayAll(s1);
+            }
+          }
+          if (moves17.length > 0) {
+            // Нота QG15 называет максимум доли жира в приёме, а QG17 правит жир
+            // уже ПОСЛЕ неё — число могло сдвинуться. Пересчитываем факт, иначе
+            // нота врёт (в регрессе есть проверка «названный максимум = факт»).
+            const _idx15 = notes.findIndex((n) => typeof n === 'string' && n.startsWith('🧈 Жир по приёмам:'));
+            if (_idx15 >= 0) {
+              const _now15 = Math.round(_maxShare17() * 100);
+              notes[_idx15] = String(notes[_idx15])
+                .replace(/максимум жира в основном приёме \d+%/, `максимум жира в основном приёме ${_now15}%`)
+                .replace(/(доля жира в самом жирном приёме снижена с \d+% до )\d+%/, `$1${_now15}%`);
+            }
+            notes.push(`🧴 Масло порцией: ${moves17.join('; ')} — те же КБЖУ дня, мелких масляных пунктов ${_startSmall17.length} → ${_smallOils17().length}`);
+          }
+        }
+      }
     }
 
     // Витрина MPS должна совпадать с ФИНАЛЬНЫМ планом (санитайзеры E17/E18 меняют items).

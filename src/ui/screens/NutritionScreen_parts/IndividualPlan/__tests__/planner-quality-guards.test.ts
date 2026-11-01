@@ -1,5 +1,5 @@
 /**
- * Регрессия «пакета качества» (QG1–QG15) планировщика.
+ * Регрессия «пакета качества» (QG1–QG17) планировщика.
  *
  * Зачем: сходимость дня ≤3% ловит только КБЖУ. Жалобы шли на «съедобность»:
  * «19 г малины», «жир всего дня в одном приёме», «овощей 190 г», «в обед 12 г белка»,
@@ -36,6 +36,9 @@
  *   дней с приёмом ≥36% жира (QG16) 5/30        1/30
  *   приёмов, где итоги ≠ пункты     2            0    (QG16)
  *   средняя оценка дня (QG16)      89.2         90.4
+ *   масляных пунктов 1-6 г (QG17)  10           0
+ *   ось «порции» (QG17)            90.2         90.9
+ *   средняя оценка дня (QG17)      90.4         90.6
  */
 import { describe, it, expect } from 'vitest';
 import { buildDayPlan, type MealPlanInput } from '../meal-plan-engine';
@@ -755,21 +758,6 @@ describe('перенос жира не теряет граммы и возвра
     expect(bad.slice(0, 5).join(' | ')).toBe('');
   });
 
-  it('долг сборки зафиксирован: масляных пунктов 1–6 г не больше 10 (замер QG16: 10)', () => {
-    // Не перенос, а сама сборка: 5 г масла в тарелке — ниже пола «это еда» (7 г
-    // для жира, QG1). Замер 30 дней: 10 пунктов в 9 днях, в том числе в днях без
-    // нот о переносе. Это отдельная стадия (порог масла в ГОТОВОЙ тарелке), здесь
-    // фиксируем только «не стало хуже»: тест ловит рост, а не лечит долг.
-    const bad: string[] = [];
-    for (const d of DAYS) {
-      for (const { m, x } of items(d)) {
-        if (!/(oil|ghee|mct)/.test(String(x.id))) continue;
-        if ((Number(x.amount) || 0) > 0 && (Number(x.amount) || 0) < 7) bad.push(`${d.id}/${m.type}: ${x.id} ${Math.round(x.amount)} г`);
-      }
-    }
-    expect(bad.length, `мелкие масляные пункты: ${bad.join(', ')}`).toBeLessThanOrEqual(10);
-  });
-
   it('нота переноса сходится: сколько обещала снять, столько и доложила', () => {
     const bad: string[] = [];
     for (const d of DAYS) {
@@ -797,6 +785,112 @@ describe('перенос жира не теряет граммы и возвра
       return dev <= 0.03;
     });
     expect(canon.length).toBeGreaterThanOrEqual(25);
+  });
+});
+
+describe('масло — порцией, а не «5 г в тарелке» (QG17)', () => {
+  // Замер (30 дней, после QG16): 10 масляных пунктов по 5 г в 9 днях — ниже пола
+  // «это еда» (7 г для жира). Это сборка, а не перенос: половина таких дней вообще
+  // без нот о переносе жира. Механизм — «добор жира дня» пятиграммовкой в приём,
+  // где жира больше нечем набрать (`whey + овсянка + 5 г оливкового масла`).
+  // Стадия не меняет продукт и не трогает жир дня: малый пункт уезжает в ТОТ ЖЕ
+  // продукт другого приёма, а если такого в дне нет — доливается до 7 г со срезом
+  // тех же граммов с другого масла дня.
+  // Замер QG17: ось «порции» 90.2 → 90.9, мелких масляных пунктов 10 → 0,
+  // жир в тарелках по 30 дням — 0.00 г разницы, дней хуже 0 (5 дней выросли).
+  const OIL_RE = /(oil|ghee|mct)/;
+  const smallOils = (d: Day) => items(d)
+    .filter(({ x }) => OIL_RE.test(String((x as any).id)) && (Number((x as any).amount) || 0) > 0 && (Number((x as any).amount) || 0) < 7)
+    .map(({ m, x }) => `${d.id}/${String(m.type)}: ${String((x as any).id)} ${Math.round(Number((x as any).amount))} г`);
+  const oilNotes = (d: Day) => (d.plan.notes as string[])
+    .filter((n) => typeof n === 'string' && n.startsWith('🧴 Масло порцией:'));
+  const noteDays = DAYS.filter((d) => oilNotes(d).length > 0);
+
+  it('ни одного масляного пункта 1–6 г в тарелках (было 10 в 9 днях)', () => {
+    const bad = DAYS.flatMap(smallOils);
+    expect(bad.slice(0, 6).join(' | ')).toBe('');
+  });
+
+  it('ось «порции» в среднем ≥ 90.5 (было 90.2)', () => {
+    const vals = DAYS.map((d) => scoreDayQuality(d.meals as any, { weightKg: d.w, microCoverage: { lowCount: 0, total: 16 } }).portions);
+    const avg = vals.reduce((s, v) => s + v, 0) / vals.length;
+    expect(Math.round(avg * 10) / 10).toBeGreaterThanOrEqual(90.5);
+  });
+
+  it('приёмы, которые стадия тронула, остались едой (≥100 ккал)', () => {
+    // Стадия снимает 45 ккал масла из приёма-источника: перекус из 240 ккал это
+    // переживает, а «снэк на 100 ккал» превратился бы в не-еду. Проверяем ровно
+    // те приёмы, которые названы в ноте (источник и приёмник), — не весь день:
+    // внутри-тренировочные приёмы и малые перекусы малы по замыслу.
+    const bad: string[] = [];
+    for (const d of noteDays) {
+      const named = new Set<string>();
+      for (const piece of String(oilNotes(d)[0]).split(/;\s*/)) {
+        for (const q of piece.matchAll(/«([a-z0-9_]+)»/g)) named.add(q[1]);
+      }
+      for (const type of named) {
+        const m: any = d.meals.find((x: any) => String(x.type) === type);
+        if (!m) continue;
+        const k = Math.round(Number(m.totals?.kcal) || 0);
+        if (k < 100) bad.push(`${d.id}/${type}: ${k} ккал`);
+      }
+    }
+    expect(bad.slice(0, 5).join(' | ')).toBe('');
+  });
+
+  it('жир в тарелках = жир дня по отчёту и после QG17 (расхождений 0)', () => {
+    const bad = DAYS.map((d) => {
+      const plate = d.meals.reduce((s, m) => s + (m.items || []).reduce((a: number, x: any) => a + (Number(x.f) || 0), 0), 0);
+      return { id: d.id, d: Math.abs(plate - d.totF) };
+    }).filter((x) => x.d > 0.6);
+    expect(bad.map((x) => `${x.id}:${Math.round(x.d * 10) / 10}`).join(', ')).toBe('');
+  });
+
+  it('нота честна: «мелких масляных пунктов N → M» = факт (M = 0)', () => {
+    const bad: string[] = [];
+    for (const d of noteDays) {
+      const n = oilNotes(d)[0];
+      const m = n.match(/мелких масляных пунктов (\d+) → (\d+)/);
+      const claimed = Number(m ? m[2] : NaN);
+      const fact = smallOils(d).length;
+      if (!Number.isFinite(claimed) || claimed !== fact) bad.push(`${d.id}: нота «→ ${claimed}», факт ${fact}`);
+    }
+    expect(bad.slice(0, 5).join(' | ')).toBe('');
+  });
+
+  it('нота не переписывает долю жира в приёме: заявленный максимум = факт', () => {
+    // QG17 идёт после QG15 и правит жир уже после её ноты — число в ноте QG15
+    // пересчитывается по финальным тарелкам, иначе нота врёт.
+    const MAIN5 = ['breakfast', 'lunch', 'dinner', 'snack', 'snack2'];
+    const bad: string[] = [];
+    for (const d of noteDays) {
+      const qg15 = (d.plan.notes as string[]).find((n) => typeof n === 'string' && n.startsWith('🧈 Жир по приёмам:'));
+      if (!qg15) continue;
+      const mm = qg15.match(/максимум жира в основном приёме (\d+)%/) || qg15.match(/снижена с (\d+)% до (\d+)%/);
+      const claimed = Number(mm ? (mm.length > 2 ? mm[2] : mm[1]) : NaN);
+      const fact = Math.round(Math.max(...d.meals
+        .filter((m: any) => MAIN5.includes(String(m.type)))
+        .map((m: any) => (Number(m.totals?.f) || 0) / Math.max(1, d.totF))) * 100);
+      if (!Number.isFinite(claimed) || Math.abs(claimed - fact) > 1) bad.push(`${d.id}: нота ${claimed}%, факт ${fact}%`);
+    }
+    expect(bad.slice(0, 5).join(' | ')).toBe('');
+  });
+
+  it('ручной режим не трогаем: в ручном дне правок масла нет', () => {
+    const tgt: any = buildDayTargets({
+      weightKg: 90, presetGPerKg: 2.0, fatFloorGPerKg: 0.8, kbjuMode: 'manual',
+      goal: 'maintenance', dietStyle: 'classic',
+    } as any);
+    const manual = buildDayPlan({
+      weightKg: 90, lbmKg: 73, bodyFatPct: 19, sex: 'male',
+      goalKcal: tgt.kcal, goalProteinG: tgt.protein, goalFatG: tgt.fats, goalCarbsG: tgt.carbs,
+      mealsCount: 4, isTrainingDay: true, trainStartMin: 18 * 60, trainDurationMin: 75,
+      allowIntraWorkout: true, budget: 'medium', dayOffset: 0, cyclePhase: 'none',
+      variety: 'medium', eveningLowCarb: false, goal: 'maintenance',
+      manualTargetsLocked: true, kbjuMode: 'manual',
+    } as unknown as MealPlanInput);
+    const notes = ((manual.notes || []) as string[]).filter((n) => n.startsWith('🧴 Масло порцией:'));
+    expect(notes.join(' | ')).toBe('');
   });
 });
 
