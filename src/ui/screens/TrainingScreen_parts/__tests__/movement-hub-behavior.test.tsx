@@ -737,6 +737,44 @@ describe('LiftMasterCard — поведение (не только смоук)',
     expect(bench[0].xLoopCm).toBe(2.7);
   });
 
+  it('перспектива: статус, сохранение в персисте и удаление', () => {
+    const anchors = [
+      { timeSec: 0.1, trackX: 0, trackY: 0, videoX: 100, videoY: 520 },
+      { timeSec: 0.4, trackX: 0.5, trackY: 16.7, videoX: 104, videoY: 370 },
+      { timeSec: 0.7, trackX: 1, trackY: 33.3, videoX: 108, videoY: 235 },
+      { timeSec: 1.0, trackX: 1.5, trackY: 50, videoX: 112, videoY: 100 },
+    ];
+    const persp = { anchors, vA: -8, vB: 520, vC: 0.004, fitPx: 0.1 };
+    localStorage.setItem(MASTER_KEY, JSON.stringify({ lift: 'bench', videoPersp: { bench: persp } }));
+    const { container } = render(<LiftMasterCard sessions={[]} />);
+
+    const state = container.querySelector('[data-lift="video-persp-state"]')!;
+    expect(state.textContent).toContain('перспектива');
+    expect(state.textContent).toContain('31%');
+
+    click(container.querySelector('[data-lift="persp-clear"]'));
+    const saved = JSON.parse(localStorage.getItem(MASTER_KEY) || '{}');
+    expect(saved.videoPersp?.bench).toBeUndefined();
+    expect(container.querySelector('[data-lift="video-persp-state"]')!.textContent).toContain('не настроена');
+  });
+
+  it('перспектива: мусор в персисте не применяется, без CSV точек нет', () => {
+    localStorage.setItem(MASTER_KEY, JSON.stringify({
+      lift: 'bench',
+      videoPersp: {
+        bench: { anchors: [{ timeSec: 0, trackY: 0, videoY: 1 }], vA: -8, vB: 520, vC: 0.004, fitPx: 0 },
+        squat: { anchors: 'nope', vA: 1, vB: 2, vC: 3, fitPx: 0 },
+      },
+    }));
+    const { container } = render(<LiftMasterCard sessions={[]} />);
+    expect(container.querySelector('[data-lift="video-persp-state"]')!.textContent).toContain('не настроена');
+
+    // Четыре точки времени на месте, но без разбора CSV модель честно недоступна.
+    expect(container.querySelectorAll('[data-lift^="persp-time-"]').length).toBe(4);
+    expect(container.textContent).toContain('Нужны точки трека');
+    expect(container.querySelector('[data-lift="persp-save"]')).toBeNull();
+  });
+
   it('интерактивные элементы хаба не меньше 44 px', () => {
     const { container } = render(<LiftMasterCard sessions={[]} />);
     // «Быстрый старт» исчезает после первых данных — проверяем до заполнения.
@@ -756,6 +794,7 @@ describe('LiftMasterCard — поведение (не только смоук)',
       'capture-device-phone', 'export-csv', 'export-overlay-video', 'video-overlay-file',
       'video-calib-ref-cm', 'video-calib-mirror', 'video-calib-taps-reset',
       'video-offset', 'vbt-weight-from-diary',
+      'persp-mirror', 'persp-reset', 'persp-grab-0', 'persp-time-0',
     ];
     for (const sel of selectors) {
       const el = container.querySelector(`[data-lift="${sel}"]`);

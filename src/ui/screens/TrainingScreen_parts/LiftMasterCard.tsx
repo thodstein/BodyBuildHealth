@@ -50,7 +50,7 @@ import { diagnoseAsymmetry } from '../../../engines/pro/pl-asymmetry.engine';
 import { RULE_CHECKS, checkLiftRules } from '../../../engines/pro/pl-competition-rules.engine';
 import { RED_FLAGS, checkRedFlags, type RedFlagId } from '../../../engines/pro/pl-red-flags.engine';
 import { buildMovementDiagnosticsHtml, buildMovementDiagnosticsCsv, buildTrajectorySvg, movementDiagnosticsFilename, buildHeatTrendCsv, type MovementDiagnosticsExportInput } from '../../../engines/pro/movement-diagnostics-export.engine';
-import { renderTrajectoryPng, recordTrajectoryWebm, recordVideoWithOverlay, canRecordTrajectory, dataUrlToBlob, grabVideoFrame, calibrationFromTaps, preferredVideoMime, isCalibrationSane, calibrationFrameFit, mapTrackToVideo, type VideoCalibration } from '../../../engines/pro/trajectory-overlay.engine';
+import { renderTrajectoryPng, recordTrajectoryWebm, recordVideoWithOverlay, canRecordTrajectory, dataUrlToBlob, grabVideoFrame, calibrationFromTaps, preferredVideoMime, isCalibrationSane, calibrationFrameFit, mapTrackToVideo, perspectiveFromAnchors, isPerspectiveSane, perspectiveSkewPct, perspectiveLocalScale, type VideoCalibration, type PerspectiveCalibration } from '../../../engines/pro/trajectory-overlay.engine';
 import { copyOrShareText, saveCsvApk, printHtmlApk, saveTextFileApk, saveBlobApk, shareOutcomeLabel } from '../../../core/apk-share';
 import { VideoCaptureCard } from './VideoCaptureCard';
 import StickingPointAnalysisCard from './StickingPointAnalysisCard';
@@ -342,6 +342,8 @@ interface MasterState {
   videoCalib?: Record<string, VideoCalibration>;
   /** Смещение начала трека относительно начала видео, с (per-lift). */
   videoOffsetSec?: Record<string, number>;
+  /** Перспективная калибровка по 3 кадрам (камера под углом); приоритетнее единого масштаба. */
+  videoPersp?: Record<string, PerspectiveCalibration>;
 }
 
 function isRecord(v: unknown): v is Record<string, unknown> { return !!v && typeof v === 'object' && !Array.isArray(v); }
@@ -406,8 +408,9 @@ function loadMaster(): MasterState {
       series: cleanSeries(raw.series),
       videoCalib: cleanVideoCalib(raw.videoCalib),
       videoOffsetSec: cleanVideoOffset(raw.videoOffsetSec),
+      videoPersp: cleanVideoPersp(raw.videoPersp),
     };
-  } catch { return { lift:'bench', phase:'' as WeakPoint|'', issues:[], selectedGeom:{}, daysGeom:{}, selectedDiag:{}, daysDiag:{}, weakMuscleGroups:[], weakMuscleSubs:[], asymSide:null, asymL:'', asymR:'', vbtBest:'', vbtLast:'', vbtWeight:'', vbtGoal:'strength', vbtUpdatedAt:null, vbtPauseMs:'', asymPhase:{ startL:'', startR:'', midL:'', midR:'', lockL:'', lockR:'' }, dualSensor:{ left:'', right:'' }, perLift:{}, redFlags:[], ruleChecks:{}, meetDate:'', meetStrategy:'balanced' as MeetStrategy, meetMaxS:'', meetMaxB:'', meetMaxD:'', lvp:{}, capture:{ heightM:'', distM:'', side:'', device:'' }, series:{}, videoCalib:{}, videoOffsetSec:{} }; }
+  } catch { return { lift:'bench', phase:'' as WeakPoint|'', issues:[], selectedGeom:{}, daysGeom:{}, selectedDiag:{}, daysDiag:{}, weakMuscleGroups:[], weakMuscleSubs:[], asymSide:null, asymL:'', asymR:'', vbtBest:'', vbtLast:'', vbtWeight:'', vbtGoal:'strength', vbtUpdatedAt:null, vbtPauseMs:'', asymPhase:{ startL:'', startR:'', midL:'', midR:'', lockL:'', lockR:'' }, dualSensor:{ left:'', right:'' }, perLift:{}, redFlags:[], ruleChecks:{}, meetDate:'', meetStrategy:'balanced' as MeetStrategy, meetMaxS:'', meetMaxB:'', meetMaxD:'', lvp:{}, capture:{ heightM:'', distM:'', side:'', device:'' }, series:{}, videoCalib:{}, videoOffsetSec:{}, videoPersp:{} }; }
 }
 function saveMaster(s: MasterState) { try{ localStorage.setItem(MASTER_KEY, JSON.stringify(s)); }catch{} }
 function cleanRuleChecks(raw: unknown): Record<string, boolean> {
@@ -425,6 +428,26 @@ function cleanCapture(raw: unknown): MasterState['capture'] {  const o = isRecor
   const side = o.side === 'left' || o.side === 'right' || o.side === 'front' ? o.side : '';
   const device = o.device === 'kinovea' || o.device === 'enode' || o.device === 'phone' ? o.device : '';
   return { heightM: str(o.heightM), distM: str(o.distM), side, device };
+}
+
+/** Перспективные калибровки: только те, что проходят проверку движка (иначе линия наврала бы). */
+function cleanVideoPersp(raw: unknown): Record<string, PerspectiveCalibration> {
+  if (!isRecord(raw)) return {};
+  const out: Record<string, PerspectiveCalibration> = {};
+  for (const [k, v] of Object.entries(raw)) {
+    if (k.length > 20 || !isRecord(v) || !Array.isArray(v.anchors)) continue;
+    const anchors = v.anchors.slice(0, 8).map((a: any) => ({
+      timeSec: Number(a?.timeSec), trackX: Number(a?.trackX), trackY: Number(a?.trackY),
+      videoX: Number(a?.videoX), videoY: Number(a?.videoY),
+    }));
+    const c: PerspectiveCalibration = {
+      anchors,
+      vA: Number(v.vA), vB: Number(v.vB), vC: Number(v.vC), fitPx: Number(v.fitPx),
+      ...(v.mirrorX === true ? { mirrorX: true } : {}),
+    };
+    if (isPerspectiveSane(c)) out[k] = c;
+  }
+  return out;
 }
 
 /** Смещения трека: только конечные неотрицательные секунды в разумных пределах. */
@@ -523,7 +546,7 @@ export const HUB_SECTIONS: Array<{ id: string; label: string; key: string; words
   { id: 'sec-5', label: '5 Траектория', key: 'sec4', words: 'bar path траектория xloop отклонения' },
   { id: 'sec-6', label: '6 Геометрия', key: 'sec5', words: 'углы геометрия техника' },
   { id: 'sec-7', label: '7 VBT', key: 'sec6', words: 'скорость vbt м/с lvp 1пм порог vl вес дневник подстановка' },
-  { id: 'sec-8', label: '8 Видео', key: 'secVideo', words: 'видео csv kinovea серия повторов heatmap экспорт png webm калибровка кадра пиксель px см смещение трека mp4 динамика тренд недели heat' },
+  { id: 'sec-8', label: '8 Видео', key: 'secVideo', words: 'видео csv kinovea серия повторов heatmap экспорт png webm калибровка кадра пиксель px см смещение трека mp4 динамика тренд недели heat перспектива проектив угол камера' },
   { id: 'sec-9', label: '9 Срывы', key: 'sec7', words: 'срывы дневник rpe тяжёлые подходы' },
   { id: 'sec-10', label: '10 RIR', key: 'sec8', words: 'rir калибровка bias' },
   { id: 'sec-11', label: '11 Мезо', key: 'sec9', words: 'мезо объём подходы коррекция' },
@@ -700,6 +723,19 @@ export const LiftMasterCard: React.FC<{
   const [videoCalib, setVideoCalib] = useState<NonNullable<MasterState['videoCalib']>>(initial.videoCalib ?? {});
   /** Смещение начала трека относительно начала видео, с (per-lift). */
   const [videoOffset, setVideoOffset] = useState<NonNullable<MasterState['videoOffsetSec']>>(initial.videoOffsetSec ?? {});
+  /** Перспективные калибровки per-lift (камера под углом). */
+  const [videoPersp, setVideoPersp] = useState<NonNullable<MasterState['videoPersp']>>(initial.videoPersp ?? {});
+  /** Четыре кадра перспективы: время, картинка и тап по штанге. */
+  const [perspRows, setPerspRows] = useState<Array<{ timeSec: string; frame: { dataUrl: string; width: number; height: number } | null; tap: { videoX: number; videoY: number } | null }>>([
+    { timeSec: '', frame: null, tap: null },
+    { timeSec: '', frame: null, tap: null },
+    { timeSec: '', frame: null, tap: null },
+    { timeSec: '', frame: null, tap: null },
+  ]);
+  /** Видео для нарезки трёх кадров: в памяти, файл не персистится. */
+  const [perspFile, setPerspFile] = useState<File | null>(null);
+  const [perspMirror, setPerspMirror] = useState(false);
+  const [perspMsg, setPerspMsg] = useState<string | null>(null);
   /** Превью кадра и тапы: якорь (штанга на 0 с) → два конца известного отрезка. */
   const [calibFrame, setCalibFrame] = useState<{ dataUrl: string; width: number; height: number } | null>(null);
   const [calibAnchor, setCalibAnchor] = useState<{ videoX: number; videoY: number } | null>(null);
@@ -744,7 +780,7 @@ export const LiftMasterCard: React.FC<{
     }catch{}
   }, []);
 
-  useEffect(()=>{ saveMaster({ lift, phase, issues, selectedGeom, daysGeom, selectedDiag, daysDiag, weakMuscleGroups, weakMuscleSubs, asymSide, asymL, asymR, vbtBest, vbtLast, vbtWeight, vbtGoal, vbtUpdatedAt, vbtPauseMs, asymPhase: { startL: asymStartL, startR: asymStartR, midL: asymMidL, midR: asymMidR, lockL: asymLockL, lockR: asymLockR }, dualSensor: { left: dualLeft, right: dualRight }, perLift, redFlags, ruleChecks, meetDate, meetStrategy, meetMaxS, meetMaxB, meetMaxD, lvp: lvpSaved, capture, series: seriesStore, videoCalib, videoOffsetSec: videoOffset }); }, [lift, phase, issues, selectedGeom, daysGeom, selectedDiag, daysDiag, weakMuscleGroups, weakMuscleSubs, asymSide, asymL, asymR, vbtBest, vbtLast, vbtWeight, vbtGoal, vbtUpdatedAt, vbtPauseMs, asymStartL, asymStartR, asymMidL, asymMidR, asymLockL, asymLockR, dualLeft, dualRight, perLift, redFlags, ruleChecks, meetDate, meetStrategy, meetMaxS, meetMaxB, meetMaxD, lvpSaved, capture, seriesStore, videoCalib, videoOffset]);
+  useEffect(()=>{ saveMaster({ lift, phase, issues, selectedGeom, daysGeom, selectedDiag, daysDiag, weakMuscleGroups, weakMuscleSubs, asymSide, asymL, asymR, vbtBest, vbtLast, vbtWeight, vbtGoal, vbtUpdatedAt, vbtPauseMs, asymPhase: { startL: asymStartL, startR: asymStartR, midL: asymMidL, midR: asymMidR, lockL: asymLockL, lockR: asymLockR }, dualSensor: { left: dualLeft, right: dualRight }, perLift, redFlags, ruleChecks, meetDate, meetStrategy, meetMaxS, meetMaxB, meetMaxD, lvp: lvpSaved, capture, series: seriesStore, videoCalib, videoOffsetSec: videoOffset, videoPersp }); }, [lift, phase, issues, selectedGeom, daysGeom, selectedDiag, daysDiag, weakMuscleGroups, weakMuscleSubs, asymSide, asymL, asymR, vbtBest, vbtLast, vbtWeight, vbtGoal, vbtUpdatedAt, vbtPauseMs, asymStartL, asymStartR, asymMidL, asymMidR, asymLockL, asymLockR, dualLeft, dualRight, perLift, redFlags, ruleChecks, meetDate, meetStrategy, meetMaxS, meetMaxB, meetMaxD, lvpSaved, capture, seriesStore, videoCalib, videoOffset, videoPersp]);
 
   /** Переключение лифта: сохраняем фазу/отклонения текущего и восстанавливаем выбор целевого.
    *  Раньше общий state обнулялся — пользователь терял выбранную фазу после каждого щелчка. */
@@ -847,6 +883,49 @@ export const LiftMasterCard: React.FC<{
     if (!mapped.length) return null;
     return Math.round(calibrationFrameFit(mapped, calibFrame.width, calibFrame.height) * 100);
   }, [curCalib, calibFrame, kinoveaResult]);
+
+  /** Сохранённая перспектива для движения. */
+  const curPersp = videoPersp[lift] ?? null;
+  /** Подсказка времён для четырёх кадров: 5%, 35%, 65%, 95% длительности трека. */
+  const perspSuggestedTimes = useMemo(() => {
+    const pts = kinoveaResult?.points;
+    if (!pts || pts.length < 2) return null;
+    const last = pts[pts.length - 1];
+    const dur = last?.t ?? (pts.length - 1) / 30;
+    if (!(dur > 0)) return null;
+    const at = (f: number) => (Math.round((dur * f + curOffset) * 100) / 100).toFixed(2);
+    return [at(0.05), at(0.35), at(0.65), at(0.95)];
+  }, [kinoveaResult, curOffset]);
+  /** Кандидат перспективы: три кадра с тапами и точки трека на эти моменты.
+   *  Время в поле — по видео, поэтому переводим его в время трека через смещение. */
+  const perspCandidate = useMemo(() => {
+    const pts = kinoveaResult?.points;
+    if (!pts?.length) return null;
+    const filled = perspRows
+      .map((r) => ({ t: parseFloat(r.timeSec) - curOffset, tap: r.tap }))
+      .filter((r) => r.tap && Number.isFinite(r.t));
+    if (filled.length < 4) return null;
+    return perspectiveFromAnchors(
+      filled.map((r) => ({ timeSec: r.t, videoX: r.tap!.videoX, videoY: r.tap!.videoY })),
+      pts,
+      { mirrorX: perspMirror },
+    );
+  }, [kinoveaResult, perspRows, perspMirror, curOffset]);
+  /** Тап по кадру N: пиксели исходного видео, не превью. */
+  const onPerspTap = useCallback((i: number, e: React.MouseEvent<HTMLDivElement>) => {
+    setPerspRows((rows) => {
+      const row = rows[i];
+      if (!row?.frame) return rows;
+      const rect = e.currentTarget.getBoundingClientRect();
+      const relX = (e.clientX - rect.left) / Math.max(1, rect.width);
+      const relY = (e.clientY - rect.top) / Math.max(1, rect.height);
+      const tap = { videoX: Math.round(relX * row.frame.width), videoY: Math.round(relY * row.frame.height) };
+      const next = rows.slice();
+      next[i] = { ...row, tap };
+      return next;
+    });
+    setPerspMsg(`Точка ${i + 1}: штанга отмечена. Нужны все четыре точки на разных высотах.`);
+  }, []);
   /** Сохранённая серия прошлого раза для текущего движения. */
   const savedSeries = seriesStore[lift] ?? null;
   const curFirstSnapshot = useMemo(()=> kinoveaReps.length ? snapshotBarRep(kinoveaReps[0]) : null, [kinoveaReps]);
@@ -2251,6 +2330,134 @@ export const LiftMasterCard: React.FC<{
               </div>
             )}
           </div>
+          {/* Перспектива: камера под углом → масштаб сверху и снизу разный, единый px/см врёт. */}
+          <div data-lift="video-persp" style={{ marginTop:8, padding:8, borderRadius:8, background:'rgba(168,85,247,0.05)', border:'1px solid rgba(168,85,247,0.2)' }}>
+            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:6, flexWrap:'wrap' }}>
+              <div style={{ fontSize:10, fontWeight:800, color:'#a855f7' }}>📐 Перспектива по 4 кадрам</div>
+              <span data-lift="video-persp-state" role="status" style={{ fontSize:9, color: curPersp ? '#4ade80' : '#fbbf24' }}>
+                {curPersp
+                  ? `✓ перспектива · разброс масштаба ${perspectiveSkewPct(curPersp) ?? 0}% (приоритет над единым масштабом)`
+                  : 'не настроена — работает единый масштаб'}
+              </span>
+            </div>
+            <div style={{ marginTop:4, fontSize:9, color:'#fff', opacity:0.7, lineHeight:1.45 }}>
+              Если камера стоит сбоку под углом, сверху и снизу кадра сантиметры выглядят по-разному.
+              Возьмите четыре кадра на разных высотах штанги и ткните в штангу на каждом: три точки
+              дали бы точное, но непроверяемое решение, а четвёртая показывает, сходятся ли тапы.
+            </div>
+            <div style={{ display:'flex', gap:6, flexWrap:'wrap', alignItems:'center', marginTop:6 }}>
+              <label data-lift="persp-file" aria-label="Видео для трёх кадров перспективы" style={{ display:'inline-flex', alignItems:'center', minHeight:44, padding:'10px 14px', borderRadius:10, border:'1px solid rgba(168,85,247,0.28)', background:'rgba(168,85,247,0.1)', color:'#a855f7', fontSize:12, fontWeight:700, cursor:'pointer' }}>
+                🎞 {perspFile ? 'Видео выбрано' : 'Выбрать видео'}
+                <input type="file" accept="video/*" aria-label="Видео подхода для перспективы" style={{ display:'none' }} onChange={(e)=>{
+                  const f = e.target.files?.[0];
+                  e.target.value = '';
+                  if (!f) return;
+                  setPerspFile(f);
+                  setPerspRows((rows) => rows.map((r, i) => ({
+                    ...r,
+                    timeSec: perspSuggestedTimes?.[i] ?? r.timeSec,
+                    frame: null, tap: null,
+                  })));
+                  setPerspMsg('Видео выбрано. Время подставлено (5/35/65/95% трека) — можно менять.');
+                }} />
+              </label>
+              <button data-lift="persp-mirror" aria-pressed={perspMirror} aria-label="Съёмка с зеркалом по горизонтали (перспектива)" onClick={()=>setPerspMirror(v => !v)} style={{ minHeight:44, padding:'8px 12px', borderRadius:8, cursor:'pointer', border: perspMirror ? '1px solid #a855f7' : '1px solid rgba(255,255,255,0.12)', background: perspMirror ? 'rgba(168,85,247,0.18)' : 'transparent', color: perspMirror ? '#a855f7' : DIM, fontSize:11 }}>⇄ зеркало X</button>
+              <button data-lift="persp-reset" aria-label="Сбросить кадры и точки перспективы" onClick={()=>{
+                setPerspRows([
+                  { timeSec: '', frame: null, tap: null },
+                  { timeSec: '', frame: null, tap: null },
+                  { timeSec: '', frame: null, tap: null },
+                  { timeSec: '', frame: null, tap: null },
+                ]);
+                setPerspMsg('Кадры и точки сброшены.');
+              }} style={{ minHeight:44, padding:'8px 12px', borderRadius:8, cursor:'pointer', background:'transparent', color:'#fff', border:'1px solid rgba(255,255,255,0.12)', fontSize:11 }}>↺ Сбросить</button>
+              {curPersp && (
+                <button data-lift="persp-clear" aria-label="Удалить перспективную калибровку" onClick={()=>{
+                  setVideoPersp((s) => { const next = { ...s }; delete next[lift]; return next; });
+                  setPerspMsg('Перспектива удалена — снова работает единый масштаб.');
+                }} style={{ minHeight:44, padding:'8px 12px', borderRadius:8, cursor:'pointer', background:'transparent', color:'#f87171', border:'1px solid rgba(248,113,113,0.3)', fontSize:11 }}>🗑 Удалить</button>
+              )}
+            </div>
+            {perspRows.map((row, i) => (
+              <div key={i} style={{ marginTop:6, padding:6, borderRadius:8, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(168,85,247,0.16)' }}>
+                <div style={{ display:'flex', gap:6, alignItems:'center', flexWrap:'wrap' }}>
+                  <span style={{ fontSize:10, fontWeight:700, color:'#a855f7' }}>Точка {i + 1}</span>
+                  <label style={{ fontSize:10, color:DIM }}>время в видео, с
+                    <input
+                      data-lift={`persp-time-${i}`}
+                      aria-label={`Время кадра ${i + 1} в видео, секунды`}
+                      type="number" step="0.05" min="0" max="600"
+                      value={row.timeSec}
+                      placeholder={perspSuggestedTimes?.[i] ?? '0.30'}
+                      onChange={(e)=>{
+                        const v = e.target.value;
+                        setPerspRows((rows) => rows.map((r, j) => (j === i ? { ...r, timeSec: v, tap: null } : r)));
+                      }}
+                      style={{ width:82, minHeight:44, marginLeft:4, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.15)', color:'#fff', borderRadius:8, padding:'10px 8px', fontSize:12 }}
+                    />
+                  </label>
+                  <button
+                    data-lift={`persp-grab-${i}`}
+                    aria-label={`Взять кадр ${i + 1} на указанном времени`}
+                    aria-disabled={!perspFile || !Number.isFinite(parseFloat(row.timeSec))}
+                    onClick={async ()=>{
+                      const t = parseFloat(row.timeSec);
+                      if (!perspFile) { setPerspMsg('Сначала выберите видео.'); return; }
+                      if (!Number.isFinite(t) || t < 0) { setPerspMsg('Укажите время кадра в секундах.'); return; }
+                      setPerspMsg(`⏳ Достаю кадр ${i + 1}…`);
+                      const frame = await grabVideoFrame(perspFile, { timeSec: t });
+                      if (!frame) { setPerspMsg('Кадр не получился: видео не декодировалось в этом WebView.'); return; }
+                      setPerspRows((rows) => rows.map((r, j) => (j === i ? { ...r, frame, tap: null } : r)));
+                      setPerspMsg(`Кадр ${i + 1} готов — ткните в штангу.`);
+                    }}
+                    style={{ minHeight:44, padding:'8px 12px', borderRadius:8, cursor:(perspFile && Number.isFinite(parseFloat(row.timeSec))) ? 'pointer' : 'default', background:'rgba(168,85,247,0.14)', color:'#a855f7', border:'1px solid rgba(168,85,247,0.3)', fontSize:11, fontWeight:700, opacity:(perspFile && Number.isFinite(parseFloat(row.timeSec))) ? 1 : 0.55 }}
+                  >📷 Кадр</button>
+                  {row.tap && <span style={{ fontSize:9, color:'#4ade80', fontWeight:700 }}>✓ отмечено</span>}
+                </div>
+                {row.frame && (
+                  <div
+                    data-lift={`persp-frame-${i}`}
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`Кадр ${i + 1}: ткните в штангу`}
+                    onClick={(e)=>onPerspTap(i, e)}
+                    style={{ position:'relative', marginTop:6, borderRadius:8, overflow:'hidden', border:'1px solid rgba(168,85,247,0.25)', cursor:'crosshair', lineHeight:0 }}
+                  >
+                    <img src={row.frame.dataUrl} alt={`Кадр ${i + 1} для перспективы`} style={{ width:'100%', display:'block' }} draggable={false} />
+                    {row.tap && (
+                      <span style={{ position:'absolute', left:`${((row.tap.videoX / Math.max(1, row.frame.width)) * 100).toFixed(2)}%`, top:`${((row.tap.videoY / Math.max(1, row.frame.height)) * 100).toFixed(2)}%`, transform:'translate(-50%,-50%)', width:14, height:14, borderRadius:7, background:'#a855f7', border:'2px solid #0b0f14', boxShadow:'0 0 0 1px rgba(255,255,255,0.35)' }} />
+                    )}
+                  </div>
+                )}
+              </div>
+            ))}
+            {perspCandidate && (() => {
+              const ys = perspCandidate.anchors.map((a) => a.trackY);
+              const lo = perspectiveLocalScale(perspCandidate, Math.min(...ys));
+              const hi = perspectiveLocalScale(perspCandidate, Math.max(...ys));
+              const skew = perspectiveSkewPct(perspCandidate) ?? 0;
+              return (
+                <div style={{ marginTop:6, display:'flex', gap:8, flexWrap:'wrap', alignItems:'center' }}>
+                  <span role="status" style={{ fontSize:10, color:'#e5e7eb' }}>
+                    Масштаб снизу {lo.toFixed(2)} px/см → сверху {hi.toFixed(2)} px/см (разброс {skew}%) · невязка {perspCandidate.fitPx} px
+                  </span>
+                  {skew > 60 && <span style={{ fontSize:9, color:'#fbbf24' }}>⚠ разброс слишком большой — проверьте, что точки взяты на разных высотах</span>}
+                  <button data-lift="persp-save" aria-label="Сохранить перспективную калибровку" onClick={()=>{
+                    setVideoPersp((s) => ({ ...s, [lift]: perspCandidate }));
+                    setPerspMsg(`Перспектива сохранена: разброс масштаба ${skew}%, невязка ${perspCandidate.fitPx} px. «Видео с траекторией» нарисует линию с учётом перспективы.`);
+                  }} style={{ minHeight:44, padding:'8px 12px', borderRadius:8, cursor:'pointer', background:'rgba(74,222,128,0.14)', color:'#4ade80', border:'1px solid rgba(74,222,128,0.3)', fontSize:11, fontWeight:700 }}>💾 Сохранить перспективу</button>
+                </div>
+              );
+            })()}
+            {!perspCandidate && (
+              <div style={{ marginTop:5, fontSize:9, color:DIM, lineHeight:1.4 }}>
+                {!kinoveaResult
+                  ? 'Нужны точки трека: сначала разберите CSV.'
+                  : `Заполнено ${perspRows.filter((r) => r.tap && Number.isFinite(parseFloat(r.timeSec))).length} из 4 точек${perspRows.some((r) => r.tap) ? ' — кадры должны быть на разных высотах штанги, иначе проектив не проверить' : ''}.`}
+              </div>
+            )}
+            {perspMsg && <div data-lift="persp-msg" role="status" style={{ marginTop:5, fontSize:10, color:'#a855f7', lineHeight:1.45 }}>{perspMsg}</div>}
+          </div>
           {/* Качество съёмки: без метаданных vmax/xLoop нельзя сравнивать между сессиями. */}
           <div data-lift="capture-quality" style={{ marginTop:8, padding:8, borderRadius:8, background:'rgba(148,163,184,0.05)', border:'1px solid rgba(148,163,184,0.18)' }}>
             <div style={{ fontSize:10, fontWeight:800, color:'#cbd5e1' }}>🎥 Качество съёмки</div>
@@ -2350,9 +2557,11 @@ export const LiftMasterCard: React.FC<{
                   if (pts.length < 2) { setShareMsg('Сначала разберите CSV — без точек накладывать нечего.'); setTimeout(()=>setShareMsg(null), 3500); return; }
                   if (!canRecordTrajectory()) { setShareMsg('Запись видео не поддерживается этим браузером.'); setTimeout(()=>setShareMsg(null), 3500); return; }
                   const ext = preferredVideoMime().ext;
-                  setShareMsg(curCalib
-                    ? '⏺ Пишу видео с линией по калибровке…'
-                    : '⏺ Пишу видео с панелью траектории (без калибровки кадра)…');
+                  setShareMsg(curPersp
+                    ? '⏺ Пишу видео с линией по перспективе…'
+                    : curCalib
+                      ? '⏺ Пишу видео с линией по калибровке…'
+                      : '⏺ Пишу видео с панелью траектории (без калибровки кадра)…');
                   const blob = await recordVideoWithOverlay({
                     file: f,
                     liftRu: LIFT_RU[lift],
@@ -2360,6 +2569,7 @@ export const LiftMasterCard: React.FC<{
                     xLoopCm: kinoveaResult ? kinoveaResult.xLoop : null,
                     vmax: kinoveaResult ? kinoveaResult.vmax : null,
                     calibration: curCalib,
+                    perspective: curPersp,
                     offsetSec: curOffset,
                   });
                   if (!blob) { setShareMsg('Не удалось: видео не декодировалось или запись недоступна (PNG остаётся).'); setTimeout(()=>setShareMsg(null), 4000); return; }

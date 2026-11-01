@@ -365,6 +365,209 @@ export function calibrationFrameFit(
   return isCalibrationSane(calib) ? calib : null;
 }
 
+/**
+ * Калибровка с перспективой: камера стоит не строго напротив плоскости движения,
+ * поэтому один масштаб px/см не подходит — снизу и сверху кадра он разный.
+ *
+ * Физика: pinhole-камера с наклоном даёт по вертикали дробно-линейную (проективную)
+ * связь `Y = (vA*y + vB) / (vC*y + 1)`, а масштаб меняется как её производная.
+ * Три привязки «штанга в кадре на момент времени трека» задают ровно три неизвестных,
+ * а горизонталь масштабируется локально (изотропно) — без выдуманных коэффициентов.
+ *
+ * Важно: 4-точечная гомография по точкам штанги НЕ решается — эти точки почти
+ * коллинеарны (движение вертикальное). Поэтому модель именно осевая, 1D-проективная.
+ */
+export interface PerspectiveCalibration {
+  /** Привязки, по которым считалась перспектива: время трека → точка трека (см) ↔ пиксель кадра. */
+  anchors: Array<{ timeSec: number; trackX: number; trackY: number; videoX: number; videoY: number }>;
+  /** Вертикальная связь: Y = (vA*y + vB) / (vC*y + 1). */
+  vA: number;
+  vB: number;
+  vC: number;
+  /** Максимальная невязка привязок по вертикали, px — честная оценка попадания. */
+  fitPx: number;
+  /** Съёмка с противоположной стороны / зеркало: инвертировать горизонталь. */
+  mirrorX?: boolean;
+}
+
+/** Одна привязка перспективы: время трека и пиксель штанги в кадре на этот момент. */
+export interface PerspectiveAnchor { timeSec: number; videoX: number; videoY: number }
+
+/** Локальный масштаб «пикселей на 1 см» на высоте трека y (производная проектива). */
+export function perspectiveLocalScale(c: PerspectiveCalibration, yTrack: number): number {
+  if (!c || !Number.isFinite(yTrack)) return 0;
+  const den = c.vC * yTrack + 1;
+  if (!Number.isFinite(den) || Math.abs(den) < 1e-6) return 0;
+  const k = Math.abs(c.vA - c.vC * c.vB);
+  return k / (den * den);
+}
+
+/** Правдоподобность перспективной калибровки: 4+ привязки, конечные числа, живой масштаб. */
+export function isPerspectiveSane(c: PerspectiveCalibration | null | undefined): boolean {
+  if (!c || !Array.isArray(c.anchors) || c.anchors.length < 4) return false;
+  if (![c.vA, c.vB, c.vC, c.fitPx].every((n) => Number.isFinite(n)) || c.fitPx < 0) return false;
+  for (const a of c.anchors) {
+    if (![a.timeSec, a.trackX, a.trackY, a.videoX, a.videoY].every((n) => Number.isFinite(n))) return false;
+    const s = perspectiveLocalScale(c, a.trackY);
+    if (!(s > 0.05 && s < 200)) return false;
+  }
+  return true;
+}
+
+/** Разброс масштаба по высоте привязок, %: 0 — перспективы нет, 15 — верх в 1.15 раза мельче. */
+export function perspectiveSkewPct(c: PerspectiveCalibration): number | null {
+  if (!isPerspectiveSane(c)) return null;
+  const ys = c.anchors.map((a) => a.trackY);
+  const lo = perspectiveLocalScale(c, Math.min(...ys));
+  const hi = perspectiveLocalScale(c, Math.max(...ys));
+  if (!(lo > 0) || !(hi > 0)) return null;
+  return Math.round(Math.abs(1 - hi / lo) * 100);
+}
+
+/** Решение 3×3 методом Крамера (без зависимостей). */
+function solve3(m: number[][], v: number[]): [number, number, number] | null {
+  const det = (a: number[][]) =>
+    a[0][0] * (a[1][1] * a[2][2] - a[1][2] * a[2][1])
+    - a[0][1] * (a[1][0] * a[2][2] - a[1][2] * a[2][0])
+    + a[0][2] * (a[1][0] * a[2][1] - a[1][1] * a[2][0]);
+  const d = det(m);
+  const norm = Math.max(1, ...m.flat().map((x) => Math.abs(x)));
+  if (!Number.isFinite(d) || Math.abs(d) < 1e-9 * norm ** 3) return null;
+  const rep = (col: number) => m.map((row, i) => row.map((x, j) => (j === col ? v[i] : x)));
+  const out: [number, number, number] = [det(rep(0)) / d, det(rep(1)) / d, det(rep(2)) / d];
+  return out.every((n) => Number.isFinite(n)) ? out : null;
+}
+
+/** Подгонка проектива по привязкам (нормальные уравнения в нормированных координатах). */
+function fitProjective(rows: ReadonlyArray<{ trackY: number; videoY: number }>): [number, number, number] | null {
+  if (rows.length < 3) return null;
+  // Нормировка: без неё матрица плохо обусловлена (y*Y ~ 1e4 при y ~ 50),
+  // и точное решение отбрасывалось как «вырожденное».
+  const sy = Math.max(...rows.map((r) => Math.abs(r.trackY)));
+  const sY = Math.max(...rows.map((r) => Math.abs(r.videoY)));
+  if (!(sy > 1e-6) || !(sY > 1e-6)) return null;
+  const ATA = [[0, 0, 0], [0, 0, 0], [0, 0, 0]];
+  const ATb = [0, 0, 0];
+  for (const r of rows) {
+    const u = r.trackY / sy;
+    const W = r.videoY / sY;
+    const row = [u, 1, -u * W];
+    for (let i = 0; i < 3; i++) {
+      for (let j = 0; j < 3; j++) ATA[i][j] += row[i] * row[j];
+      ATb[i] += row[i] * W;
+    }
+  }
+  const sol = solve3(ATA, ATb);
+  if (!sol) return null;
+  const [aN, bN, cN] = sol;
+  // Обратный переход к исходным единицам: Y = (sY/sy·a·y + sY·b) / ((c/sy)·y + 1).
+  return [(sY / sy) * aN, sY * bN, cN / sy];
+}
+
+/** Значение проектива в исходных пикселях (null при полюсе). */
+function projectiveY(v: readonly [number, number, number], y: number): number | null {
+  const [vA, vB, vC] = v;
+  const den = vC * y + 1;
+  if (!(Math.abs(den) > 1e-3)) return null;
+  const out = (vA * y + vB) / den;
+  return Number.isFinite(out) ? out : null;
+}
+
+/**
+ * Перспектива по 4+ привязкам: для каждой берётся точка трека на это время и пиксель
+ * кадра, куда ткнул пользователь.
+ *
+ * Минимум именно 4, а не 3: три точки дают точное решение (3 неизвестных, 3 уравнения),
+ * поэтому ошибку в тапе невозможно обнаружить. Четвёртая точка делает проверку возможной,
+ * причём двойной: остаток подгонки + leave-one-out (точка предсказывается по остальным).
+ * Возвращает null, если привязки вырождены (одинаковые высоты, слишком близко) или не сходятся.
+ */
+export function perspectiveFromAnchors(
+  anchors: ReadonlyArray<PerspectiveAnchor>,
+  points: ReadonlyArray<OverlayPoint>,
+  opts?: { mirrorX?: boolean },
+): PerspectiveCalibration | null {
+  if (!Array.isArray(anchors) || anchors.length < 4) return null;
+  if (!Array.isArray(points) || points.length < 2) return null;
+  const clean = anchors.filter((a) => a && [a.timeSec, a.videoX, a.videoY].every((n) => Number.isFinite(n)));
+  if (clean.length < 4) return null;
+
+  const times = points.map((p, i) => ({ t: p.t ?? i / 30 }));
+  const rows: Array<{ timeSec: number; trackX: number; trackY: number; videoX: number; videoY: number }> = [];
+  for (const a of clean) {
+    const idx = pointIndexAtTime(times, a.timeSec);
+    const p = idx >= 0 ? points[idx] : null;
+    if (!p || !Number.isFinite(p.x) || !Number.isFinite(p.y)) return null;
+    rows.push({ timeSec: a.timeSec, trackX: p.x, trackY: p.y, videoX: a.videoX, videoY: a.videoY });
+  }
+
+  // Высоты должны реально различаться, иначе проектив не определить.
+  const ys = rows.map((r) => r.trackY).sort((a, b) => a - b);
+  // Привязки обязаны покрывать ход штанги: экстраполяция перспективы с 5 см на 50 см — выдумка.
+  const trackYs = points.map((p) => p.y).filter((y) => Number.isFinite(y));
+  const trackRange = trackYs.length ? Math.max(...trackYs) - Math.min(...trackYs) : 0;
+  const needSpan = Math.max(10, trackRange * 0.5);
+  if (!(ys[ys.length - 1] - ys[0] >= needSpan)) return null;
+  for (let i = 1; i < ys.length; i++) if (ys[i] - ys[i - 1] < 0.5) return null;
+
+  const fit = fitProjective(rows);
+  if (!fit) return null;
+  const [vA, vB, vC] = fit;
+
+  const calib: PerspectiveCalibration = {
+    anchors: rows,
+    vA, vB, vC,
+    fitPx: 0,
+    ...(opts?.mirrorX ? { mirrorX: true } : {}),
+  };
+  for (const r of rows) {
+    const pred = projectiveY(fit, r.trackY);
+    if (pred == null) return null;
+    calib.fitPx = Math.max(calib.fitPx, Math.abs(pred - r.videoY));
+  }
+  calib.fitPx = Math.round(calib.fitPx * 10) / 10;
+  if (!isPerspectiveSane(calib)) return null;
+
+  // Невязка в сантиметрах хода: тап дальше 3 см от модели — ошибка в кадре, а не «перспектива».
+  const scales = rows.map((r) => perspectiveLocalScale(calib, r.trackY)).sort((a, b) => a - b);
+  const scaleMed = scales[Math.floor(scales.length / 2)] || 0;
+  if (!(scaleMed > 0)) return null;
+  const tolerancePx = Math.max(2, scaleMed * 3);
+  if (calib.fitPx > tolerancePx) return null;
+
+  // Leave-one-out: проектив с 4 точками легко «изгибается» под один промах, поэтому каждая
+  // точка предсказывается по остальным. Промах в тапе виден здесь при любом его положении.
+  for (let i = 0; i < rows.length; i++) {
+    const rest = rows.filter((_, j) => j !== i);
+    const holdout = fitProjective(rest);
+    if (!holdout) return null;
+    const pred = projectiveY(holdout, rows[i].trackY);
+    if (pred == null || Math.abs(pred - rows[i].videoY) > tolerancePx) return null;
+  }
+  return calib;
+}
+
+/** Пиксели видео для точек трека с учётом перспективы (y трека вверх, в кадре — вниз). */
+export function mapTrackToVideoPerspective(
+  points: ReadonlyArray<{ x: number; y: number }>,
+  calib: PerspectiveCalibration,
+): Array<[number, number]> {
+  if (!Array.isArray(points) || !points.length || !isPerspectiveSane(calib)) return [];
+  const origin = calib.anchors[0];
+  const mx = calib.mirrorX ? -1 : 1;
+  const out: Array<[number, number]> = [];
+  for (const p of points) {
+    if (!Number.isFinite(p.x) || !Number.isFinite(p.y)) return [];
+    const den = calib.vC * p.y + 1;
+    if (!(Math.abs(den) > 1e-3)) return [];
+    const yv = (calib.vA * p.y + calib.vB) / den;
+    const s = perspectiveLocalScale(calib, p.y);
+    if (!Number.isFinite(yv) || !(s > 0)) return [];
+    out.push([origin.videoX + (p.x - origin.trackX) * s * mx, yv]);
+  }
+  return out;
+}
+
 /** Контейнер записи: mp4, если WebView умеет (Chrome 126+), иначе webm. */
 export function preferredVideoMime(): { mime: string; ext: 'mp4' | 'webm' } {
   try {
@@ -439,8 +642,9 @@ export async function grabVideoFrame(
  * Видео подхода с наложенной траекторией.
  *
  * Два режима:
- * - с калибровкой (`calibration`) — траектория рисуется прямо по кадру, по грифу;
- * - без неё — честная панель траектории в углу (позиция штанги в кадре неизвестна).
+ * - с калибровкой (`calibration`) или перспективой (`perspective`) — траектория рисуется
+ *   прямо по кадру, по грифу;
+ * - без них — честная панель траектории в углу (позиция штанги в кадре неизвестна).
  *
  * Контейнер — mp4, если WebView его пишет, иначе webm; картинка видео
  * перекодируется, то есть это не оригинальный файл.
@@ -449,7 +653,7 @@ export async function grabVideoFrame(
  * не декодируется.
  */
 export async function recordVideoWithOverlay(
-  inp: TrajectoryRenderInput & { file: Blob; offsetSec?: number; calibration?: VideoCalibration | null },
+  inp: TrajectoryRenderInput & { file: Blob; offsetSec?: number; calibration?: VideoCalibration | null; perspective?: PerspectiveCalibration | null },
   opts?: { w?: number; h?: number },
 ): Promise<Blob | null> {
   if (!canRecordTrajectory()) return null;
@@ -507,10 +711,14 @@ export async function recordVideoWithOverlay(
       rec.onerror = () => resolve(null);
     });
 
-    const calib = isCalibrationSane(inp.calibration) ? inp.calibration! : null;
-    const mapped = calib ? mapTrackToVideo(pts, calib) : null;
+    // Перспектива точнее единого масштаба, поэтому у неё приоритет.
+    const persp = isPerspectiveSane(inp.perspective) ? inp.perspective! : null;
+    const calib = !persp && isCalibrationSane(inp.calibration) ? inp.calibration! : null;
+    const mapped = persp
+      ? mapTrackToVideoPerspective(pts, persp)
+      : calib ? mapTrackToVideo(pts, calib) : null;
     // В кадре ли линия: иначе честно пишем, что калибровка не сходится.
-    const fit = mapped ? calibrationFrameFit(mapped, video.videoWidth, video.videoHeight) : 0;
+    const fit = mapped && mapped.length ? calibrationFrameFit(mapped, video.videoWidth, video.videoHeight) : 0;
     const panel = overlayPanelRect(w, h);
     const xs = pts.map((p) => p.x), ys = pts.map((p) => p.y);
     const minX = Math.min(...xs), maxX = Math.max(...xs);
@@ -520,26 +728,28 @@ export async function recordVideoWithOverlay(
 
     const times = pts.map((p, i) => ({ t: p.t ?? i / 30 }));
 
+    const drawn = mapped && mapped.length ? mapped : null;
+
     const drawFrame = () => {
       ctx.clearRect(0, 0, w, h);
       try { ctx.drawImage(video, 0, 0, w, h); } catch { /* кадр ещё не готов */ }
       const idx = pointIndexAtTime(times, Math.max(0, video.currentTime - (inp.offsetSec ?? 0)));
-      if (mapped) {
+      if (drawn) {
         // Калиброванный режим: линия по грифу, без панели.
         if (idx > 0) {
           ctx.beginPath();
           for (let i = 0; i <= idx; i++) {
-            const bx = mapped[i][0] * scale, by = mapped[i][1] * scale;
+            const bx = drawn[i][0] * scale, by = drawn[i][1] * scale;
             if (i === 0) ctx.moveTo(bx, by); else ctx.lineTo(bx, by);
           }
           ctx.strokeStyle = BAR_HEAT_COLORS.fast;
           ctx.lineWidth = 3;
           ctx.stroke();
         }
-        if (idx >= 0 && mapped[idx]) {
+        if (idx >= 0 && drawn[idx]) {
           ctx.fillStyle = BAR_HEAT_COLORS.slow;
           ctx.beginPath();
-          ctx.arc(mapped[idx][0] * scale, mapped[idx][1] * scale, 5, 0, Math.PI * 2);
+          ctx.arc(drawn[idx][0] * scale, drawn[idx][1] * scale, 5, 0, Math.PI * 2);
           ctx.fill();
         }
       } else {
@@ -579,8 +789,10 @@ export async function recordVideoWithOverlay(
       ctx.fillText(footer, 12, h - 28);
       ctx.fillStyle = '#9ca3af';
       ctx.font = '500 12px sans-serif';
-      ctx.fillText(mapped
-        ? (fit >= 0.6 ? 'линия по калибровке кадра · скорость — оценка (не LPT)' : `линия вне кадра (${Math.round(fit * 100)}% точек) — проверьте калибровку · скорость — оценка (не LPT)`)
+      ctx.fillText(drawn
+        ? (fit >= 0.6
+          ? `${persp ? 'линия по перспективе (3 точки)' : 'линия по калибровке кадра'} · скорость — оценка (не LPT)`
+          : `линия вне кадра (${Math.round(fit * 100)}% точек) — проверьте калибровку · скорость — оценка (не LPT)`)
         : 'скорость из видео — оценка (не LPT)', 12, h - 10);
     };
 
