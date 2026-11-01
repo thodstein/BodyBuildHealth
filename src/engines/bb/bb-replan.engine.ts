@@ -19,6 +19,7 @@
 
 import type { BBPlan, BBBuilderInput } from './bb-builder.engine';
 import { buildBBPlan } from './bb-builder.engine';
+import { SPLIT_PATTERNS } from './bb-split-patterns';
 import type { WorkoutSession } from '../workout-logger.engine';
 
 export interface ReplanBBResult {
@@ -71,6 +72,10 @@ export function replanBBMesoFromFact(
 
   const patternId = String((plan as any).pattern?.id || (plan as any).patternId || snap.patternId || '');
   if (!patternId) return null;
+  // Аудит 2026-11: план из «ПРОФ-программы/цикла» несёт pattern.id = program.id —
+  // это НЕ id сплита. `buildBBPlan` на неизвестном id молча падает в SPLIT_PATTERNS[0],
+  // поэтому пересборка остатка программы выдавала бы ЧУЖОЙ сплит. Честный null.
+  if (!SPLIT_PATTERNS.some(p => p.id === patternId)) return null;
 
   const frozen = plan.weeks.slice(0, current - 1);
   const previousPlan: BBPlan = { ...plan, weeks: frozen };

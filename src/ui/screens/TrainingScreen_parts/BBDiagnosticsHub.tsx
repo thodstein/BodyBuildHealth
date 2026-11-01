@@ -934,6 +934,12 @@ export const BBDiagnosticsHub: React.FC = () => {
         // MMC-строка: приёмник ББ-авто её уже читает (typeof string) — шлём тот же текст, что в карточке
         mmc: mmcLine,
         sleepHours: Number.isFinite(profileSleep as number) ? profileSleep : null,
+        // G5: структурированный вердикт монитора боли (уровень + локация) — приёмник
+        // ББ-авто передаёт это в движок (срез объёма/RIR по зоне), а не только текст.
+        painLevel: (painMon.verdict.level === 'red' || painMon.verdict.level === 'yellow' || painMon.verdict.level === 'green')
+          ? painMon.verdict.level : null,
+        painLocation: state.pmLoc || null,
+        soreness010: null,
         // Симметрия L/R — движения, с флип-гейтом (сторона плавает — без добивки); направление — из истории
         lrVerdicts,
         lrDirection,

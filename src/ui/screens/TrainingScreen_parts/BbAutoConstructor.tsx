@@ -46,7 +46,9 @@ import { autoRegulate } from '../../../engines/pro/autoregulation-pro.engine';
 import { riskyOpenChainIds, decideBbOrthoIntake, subtractTracked } from '../../../engines/pro/ortho-screen.engine';
 import { resolveBbDiagIntakeExtras } from '../../../engines/bb/bb-diag-intake.engine';
 import { buildBbMovementPrintBlock } from '../../../engines/bb/bb-diagnostics-export.engine';
+import { replanBBMesoFromFact, replanSummary } from '../../../engines/bb/bb-replan.engine';
 import { loadTrainingProfile, saveTrainingProfile, type TrainingProfile } from './training-profile';
+import { canonicalMuscleOf, exerciseKeyOf, makeWorkSets, estimatedWeightFor, loadRatioBetween, findCatalogExercise } from './bb-auto-injections';
 import { subscribePlannerApply, applyToPlanner, getPlannerApply, clearPlannerApply, type PlannerApply, type WeakpointsPayload } from './planner-bridge';
 import { loadAnnualTrainingPlan } from '../../../engines/annual-training/annual-training-storage';
 import { CARD, SMALL, BTN, BTN_GHOST, H, STEP_PILL, PlannerStepNav, usePlannerStepScroll, PLANNER_HEAD_BAR, PLANNER_HEAD_TITLE, PLANNER_FLASH, PLANNER_STEP_NAV_WRAP } from './training-ui';
@@ -380,6 +382,19 @@ const [bbVolumeRamp, setBbVolumeRamp] = useState<'standard' | 'preloaded' | 'fla
       }
       return out;
     } catch { return {}; }
+  });
+  // G5: боль/крепатура из монитора боли хаба. Раньше хаб присылал только
+  // текстовую строку, и движок (applyRecoveryRelief) не получал ни уровня,
+  // ни локации — срез объёма при красном вердикте не применялся.
+  const [bbPain, setBbPain] = useState<{ level: 'green' | 'yellow' | 'red' | null; location: string | null; soreness010: number | null }>(() => {
+    try {
+      const raw = localStorage.getItem('he_bb_last_pain');
+      const j = raw ? JSON.parse(raw) : null;
+      const lvl = j?.level === 'red' || j?.level === 'yellow' || j?.level === 'green' ? j.level : null;
+      const loc = typeof j?.location === 'string' && j.location ? j.location : null;
+      const sore = Number.isFinite(Number(j?.soreness010)) ? Math.max(0, Math.min(10, Number(j.soreness010))) : null;
+      return { level: lvl, location: loc, soreness010: sore };
+    } catch { return { level: null, location: null, soreness010: null }; }
   });
   // PRO-4 S3: активная ступень возврата — влияет на вставку и автосборку (0% на ступени 1)
   const [returnAction, setReturnAction] = useState<{ volumeMult: number; rirShift: number; bannedPatterns: string[] } | null>(() => {
@@ -1352,6 +1367,22 @@ const [bbVolumeRamp, setBbVolumeRamp] = useState<'standard' | 'preloaded' | 'fla
           // PRO-CORR: детали коррекций библиотеки → бит «коррекция:» + персист movementExtra
           correctiveDetail: bbDiag.correctiveDetail,
         });
+        // G5: структурированный вердикт боли → состояние сборки + стор.
+        // Раньше в движок уходила только строка painMon (текст для отчёта).
+        {
+          const lvl = bbDiag.painLevel;
+          if (lvl === 'green' || lvl === 'yellow' || lvl === 'red') {
+            const loc = typeof bbDiag.painLocation === 'string' && bbDiag.painLocation ? bbDiag.painLocation : null;
+            const soreRaw = bbDiag.soreness010;
+            const sore = Number.isFinite(Number(soreRaw)) ? Math.max(0, Math.min(10, Number(soreRaw))) : null;
+            setBbPain({ level: lvl, location: loc, soreness010: sore });
+            try { localStorage.setItem('he_bb_last_pain', JSON.stringify({ level: lvl, location: loc, soreness010: sore })); } catch {}
+            setBridgeMsg((prev: string) => prev
+              ? `${prev} · боль: ${lvl}`
+              : `🔗 Боль из хаба: ${lvl}${loc ? ` (${loc})` : ''}${sore != null ? ` · крепатура ${sore}/10` : ''}`);
+            setTimeout(() => setBridgeMsg(''), 5000);
+          }
+        }
         // 3.9: гранулярные зоны приоритетны, но канонические/общие группы — честный fallback.
         const groups = (bbDiag.weakZonesGranular ?? bbDiag.weakMusclesCanonical ?? bbDiag.weakPoints ?? bbDiag.groups) as string[];
         const normalized = normalizeSpecializationTargets(groups.slice(0, 2));
@@ -1931,7 +1962,7 @@ const [bbVolumeRamp, setBbVolumeRamp] = useState<'standard' | 'preloaded' | 'fla
   }, [builtPlan, qualityWeek]);
 
   useEffect(() => {
-    try { saveTrainingProfile({ ...loadTrainingProfile(), workMax: bbWorkMax, weakPoints, injuries, mobilityRestrictions, onCourse: peds.length > 0, bbPeds: peds, courseIntensity, loadStrategy, planMode, bbCycleId: selectedCycleId }); } catch {}
+    try { saveTrainingProfile({ ...loadTrainingProfile(), workMax: bbWorkMax, weakPoints, injuries, mobilityRestrictions, onCourse: peds.length > 0, bbPeds: peds, courseIntensity, loadStrategy, planMode, bbCycleId: selectedCycleId, trainingFocus: bbTrainingFocus }); } catch {}
   }, [bbWorkMax, weakPoints, peds, courseIntensity, loadStrategy, planMode, selectedCycleId]);
 
   // FIX-19: Авто-загрузка сохранённого плана при монтировании
@@ -2074,15 +2105,28 @@ const [bbVolumeRamp, setBbVolumeRamp] = useState<'standard' | 'preloaded' | 'fla
     if (!builtPlan) return;
     const w2 = structuredClone(builtPlan.weeks);
     for (const w of w2) for (const s of w.sessions) for (const e of s.exercises) {
-      e.sets = Math.max(1, Math.round(e.sets * mult));
+      const next = Math.max(1, Math.round(e.sets * mult));
+      // Аудит 2026-11: sets менялся, workSets — нет → sets_mismatch в валидации
+      // и «пропавшие/лишние» подходы в плеере.
+      if (Array.isArray(e.workSets)) {
+        const tpl = e.workSets[e.workSets.length - 1] || { reps: e.repsRange?.[0] || 10, rir: e.rir, weight: 0 };
+        if (next < e.workSets.length) e.workSets = e.workSets.slice(0, next);
+        while (e.workSets.length < next) e.workSets.push({ ...tpl });
+      }
+      e.sets = next;
     }
     setBuiltPlan(revalidateEditedPlan({ ...builtPlan, weeks: w2 }));
   };
   const adjustWeight = (mult: number) => {
     if (!builtPlan) return;
     const w2 = structuredClone(builtPlan.weeks);
-    for (const w of w2) for (const s of w.sessions) for (const e of s.exercises) for (const ws of e.workSets) {
-      ws.weight = Math.round(ws.weight * mult * 10) / 10;
+    for (const w of w2) for (const s of w.sessions) for (const e of s.exercises) {
+      // Аудит 2026-11: у упражнений, добавленных лабораторией, workSets отсутствовал
+      // → TypeError и падение всей сборки при «вес ×0.9».
+      if (!Array.isArray(e.workSets)) continue;
+      for (const ws of e.workSets) {
+        ws.weight = Math.round((Number(ws.weight) || 0) * mult * 10) / 10;
+      }
     }
     setBuiltPlan(revalidateEditedPlan({ ...builtPlan, weeks: w2 }));
   };
@@ -2125,7 +2169,7 @@ const [bbVolumeRamp, setBbVolumeRamp] = useState<'standard' | 'preloaded' | 'fla
 
   const applyBbSubstitution = useCallback((newId: string) => {
     if (!subTarget || !builtPlan) return;
-    const rep = getExerciseById(newId); if (!rep) { setSubTarget(null); return; }
+    const rep = findCatalogExercise(newId) || getExerciseById(newId); if (!rep) { setSubTarget(null); return; }
     const { dayIdx: si, exIdx: ei } = subTarget;
     const wk = builtPlan.weeks[bbWeekSel - 1];
     if (!wk) { setSubTarget(null); return; }
@@ -2133,15 +2177,28 @@ const [bbVolumeRamp, setBbVolumeRamp] = useState<'standard' | 'preloaded' | 'fla
     if (!ses) { setSubTarget(null); return; }
     const oldEx = ses.exercises[ei];
     if (!oldEx) { setSubTarget(null); return; }
-    const wm = bbWorkMax[(rep as any).group || oldEx.muscle || 'chest'] || 80;
-    const pct = PCT_FOR_RIR[Math.max(0, Math.min(5, oldEx.rir))] ?? 0.9;
-    const weight = Math.round(wm * pct);
+    // Аудит 2026-11: вес считался от КОМПОЗИТНОЙ группы каталога (arms/legs/
+    // shoulders), которой нет в workMax → fallback 80 кг. Плюс muscle получал
+    // композитный ключ, ломая пер-мышечную атрибуцию.
+    const muscle = canonicalMuscleOf(rep, oldEx.muscle);
+    const rir = Math.max(0, Math.min(5, Number(oldEx.rir ?? 2)));
+    const weight = estimatedWeightFor(rep, bbWorkMax, rir) || Math.round(Number(oldEx.workSets?.[0]?.weight) || 0);
+    const reps = Number(oldEx.workSets?.[0]?.reps) || Number(oldEx.repsRange?.[0]) || 10;
     const w2 = structuredClone(builtPlan.weeks);
     const targetSession = w2[bbWeekSel - 1].sessions[si];
-    // 26.09.2026 (аудит): exerciseName — это id каталога (ключ весов/экспорта/SessionPlayer).
-    // Раньше поле сохраняло id СТАРОГО упражнения после свопа → вес/техника/экспорт
-    // ссылались на прежнее упражнение.
-    targetSession.exercises[ei] = { ...oldEx, name: rep.name, exerciseName: (rep as any).id || rep.name, muscle: (rep as any).group || oldEx.muscle || 'chest', workSets: [{ ...oldEx.workSets[0], weight }] };
+    // exerciseName — display-name (канон движка, bb-builder:2996); id давал второй
+    // ключ для того же движения в весах/калибровке/экспорте.
+    targetSession.exercises[ei] = {
+      ...oldEx,
+      name: rep.name,
+      exerciseName: exerciseKeyOf(rep),
+      muscle,
+      workSets: makeWorkSets(Number(oldEx.sets) || 3, {
+        reps, rir, weight,
+        tempo: oldEx.workSets?.[0]?.tempo || (oldEx as any).tempo,
+        restSeconds: oldEx.workSets?.[0]?.restSeconds || oldEx.restSeconds,
+      }),
+    };
     setBuiltPlan(revalidateEditedPlan({ ...builtPlan, weeks: w2 }));
     setSubTarget(null);
   }, [subTarget, builtPlan, bbWeekSel, bbWorkMax]);
@@ -2252,6 +2309,11 @@ const [bbVolumeRamp, setBbVolumeRamp] = useState<'standard' | 'preloaded' | 'fla
             availablePlates: platePreset === 'machine' ? undefined : (PLATE_SET_PRESETS.find(p => p.id === platePreset)?.plates ?? undefined),
             rehabMuscles: rehabMuscles.length ? rehabMuscles : undefined,
             dcMode,
+            // Аудит 2026-11: паритет с generic — возраст/боль/крепатура в program-путь.
+            age: Number(linked.profile?.settings?.personal?.age) || undefined,
+            painLevel: bbPain.level ?? undefined,
+            painLocation: bbPain.location ?? undefined,
+            soreness010: bbPain.soreness010 ?? undefined,
            });
           if (bbDays !== effectiveProgram.daysPerWeek) setBbDays(effectiveProgram.daysPerWeek);
          if (bbWeeks !== effectiveProgram.durationWeeks) {
@@ -2332,6 +2394,12 @@ const [bbVolumeRamp, setBbVolumeRamp] = useState<'standard' | 'preloaded' | 'fla
           cycleDay,
           wearable: wearableData,
           targetBodyFat,
+          // Аудит 2026-11: возраст и боль/крепатура объявлены в BBBuilderInput,
+          // но UI их не передавал — masters-MRV и G5-срез не работали.
+          age: Number(linked.profile?.settings?.personal?.age) || undefined,
+          painLevel: bbPain.level ?? undefined,
+          painLocation: bbPain.location ?? undefined,
+          soreness010: bbPain.soreness010 ?? undefined,
         }, pedAdapt);
     }
 
@@ -2366,7 +2434,11 @@ const [bbVolumeRamp, setBbVolumeRamp] = useState<'standard' | 'preloaded' | 'fla
     }
     // Лаборатория ББ-диагностики: замены + предпочитаемые + PROF-коррекции выполнения (темп/ROM/техника) — поверх плана
     // PRO-3 R2: L/R-добивка слабой стороны — поверх плана (унилатерально, слабая первой, ≤3 сетов, делод скип, сессия <10 упр)
+    // Аудит 2026-11 (BB-01): признак «поверх плана что-то вставили». Пере-финализация
+    // нужна ТОЛЬКО тогда — иначе чистовая сборка программ (faithful) не должна меняться.
+    let postPhaseInjected = false;
     if (exerciseSwaps.length > 0 || preferredExerciseIds.length > 0 || executionCorrections.length > 0 || Object.keys(lrTopUp).length > 0) {
+      postPhaseInjected = true;
       const swaps = exerciseSwaps.slice();
       // Лимит упражнений сессии — из движка (уровень/стаж/курс/объёмный режим), не хардкод 10
       // (движок даёт 15-20 для advanced/enhanced — добивки больше не глохнут).
@@ -2375,51 +2447,101 @@ const [bbVolumeRamp, setBbVolumeRamp] = useState<'standard' | 'preloaded' | 'fla
           return sessionLimitsFor({ level: bbLevel as any, trainingYears: bbTrainingYears, onCourse: peds.length > 0, trainingVolumeMode: trainingVolumeMode as any } as any).maxExercises;
         } catch { return 10; }
       })();
+      // Инвентарь плана: предпочтения/свопы обязаны его уважать, иначе финализация
+      // выдаст equipment_restriction_violation и предложит упражнение, которого нет.
+      const planEq: string[] = Array.isArray((plan as any).safetyConstraints?.equipment)
+        ? (plan as any).safetyConstraints!.equipment as string[]
+        : [];
+      const eqOk = (cat: any): boolean => {
+        if (!planEq.length) return true;
+        const eq = Array.isArray(cat?.equipment) ? cat.equipment : [String(cat?.equipment || '')];
+        if (!eq.length || !eq[0]) return true;
+        return eq.includes('bodyweight') || eq.some((x: string) => planEq.includes(x));
+      };
       // preferred как swap если упражнения нет в плане — добавим в первую неделю
       for (const pid of preferredExerciseIds) {
-        const low = String(pid).toLowerCase();
-        const already = (plan.weeks || []).some((w: any) => (w.sessions || []).some((s: any) => (s.exercises || []).some((e: any) => String(e.exerciseName || e.id || '').toLowerCase() === low)));
-        if (!already) {
-          const cat = getExerciseById(pid) || EXERCISE_CATALOG.find(c => c.id.toLowerCase() === low);
-          if (cat) {
-            const targetMuscle = (cat.group || 'chest').toLowerCase();
-            // найдём сессию где эта мышца primary — иначе первая
-            let targetSession: any = null;
-            for (const w of (plan.weeks || [])) {
-              for (const s of (w.sessions || [])) {
-                const has = (s.exercises || []).some((e: any) => String(e.muscle || '').toLowerCase() === targetMuscle);
-                if (has) { targetSession = s; break; }
-              }
-              if (targetSession) break;
-            }
-            if (!targetSession) targetSession = (plan.weeks?.[0] as any)?.sessions?.[0];
-            if (targetSession && Array.isArray(targetSession.exercises)) {
-              // заменим последний accessory чтобы не ломать объём, или добавим если ≤ лимита
-              const canAdd = targetSession.exercises.length < maxExForInsert;
-              if (canAdd) {
-                targetSession.exercises.push({ muscle: targetMuscle, name: cat.name, exerciseName: cat.id, role: 'accessory' as const, sets: 3, repsRange: [10, 12] as any, rir: 2, tempo: '3-1-1-0', comment: `🧬 Лаб: предпочтено ${cat.name} (SFR)` } as any);
-              } else {
-                const idx = targetSession.exercises.length - 1;
-                if (idx >= 1) targetSession.exercises[idx] = { muscle: targetMuscle, name: cat.name, exerciseName: cat.id, role: 'accessory' as const, sets: 3, repsRange: [10, 12] as any, rir: 2, tempo: '3-1-1-0', comment: `🧬 Лаб: замена на ${cat.name}` } as any;
-              }
-            }
+        const cat = findCatalogExercise(pid);
+        if (!cat || !eqOk(cat)) continue;
+        // Сравниваем и id, и display-name: движок пишет exerciseName=name,
+        // а лаборатория присылает id — раньше это давало дубль упражнения.
+        const ids = [String(cat.id || '').toLowerCase(), String(cat.name || '').toLowerCase()].filter(Boolean);
+        const already = (plan.weeks || []).some((w: any) => (w.sessions || []).some((s: any) => (s.exercises || []).some((e: any) =>
+          ids.includes(String(e.exerciseName || e.id || '').toLowerCase()) || ids.includes(String(e.name || '').toLowerCase()))));
+        if (already) continue;
+        const targetMuscle = canonicalMuscleOf(cat);
+        const weight = estimatedWeightFor(cat, bbWorkMax, 2);
+        // найдём сессию где эта мышца primary — иначе первая
+        let targetSession: any = null;
+        for (const w of (plan.weeks || [])) {
+          for (const s of (w.sessions || [])) {
+            const has = (s.exercises || []).some((e: any) => String(e.muscle || '').toLowerCase() === targetMuscle);
+            if (has) { targetSession = s; break; }
           }
+          if (targetSession) break;
+        }
+        if (!targetSession) targetSession = (plan.weeks?.[0] as any)?.sessions?.[0];
+        if (!targetSession || !Array.isArray(targetSession.exercises)) continue;
+        // Аудит 2026-11: push без workSets → пустые подходы в плеере и TypeError
+        // в авто-регуляции/замене. muscle — канон (arms/legs/shoulders не годятся).
+        const injected: any = {
+          muscle: targetMuscle,
+          name: cat.name,
+          exerciseName: exerciseKeyOf(cat),
+          role: 'accessory' as const,
+          sets: 3,
+          repsRange: [10, 12] as any,
+          rir: 2,
+          tempo: '3-1-1-0',
+          restSeconds: 90,
+          warmupSets: [],
+          workSets: makeWorkSets(3, { reps: 10, rir: 2, weight, tempo: '3-1-1-0', restSeconds: 90 }),
+        };
+        // заменим последний accessory чтобы не ломать объём, или добавим если ≤ лимита
+        const canAdd = targetSession.exercises.length < maxExForInsert;
+        if (canAdd) {
+          targetSession.exercises.push({ ...injected, comment: `🧬 Лаб: предпочтено ${cat.name} (SFR)` });
+        } else {
+          const idx = targetSession.exercises.length - 1;
+          if (idx >= 1) targetSession.exercises[idx] = { ...injected, comment: `🧬 Лаб: замена на ${cat.name}` };
         }
       }
       for (const sw of swaps) {
         const oldLow = String(sw.oldId).toLowerCase();
-        const newLow = String(sw.newId).toLowerCase();
-        const newCat = getExerciseById(sw.newId) || EXERCISE_CATALOG.find(c => c.id.toLowerCase() === newLow);
-        if (!newCat) continue;
+        const newCat = findCatalogExercise(sw.newId);
+        if (!newCat || !eqOk(newCat)) continue;
+        // Снаряд заменяемого упражнения — для пересчёта веса (штанга→гантели и т.п.).
+        const oldCat = findCatalogExercise(sw.oldId);
+        const ratio = oldCat
+          ? loadRatioBetween(String((oldCat as any).equipment || ''), String((newCat as any).equipment || ''))
+          : 1;
+        const newMuscle = canonicalMuscleOf(newCat);
         for (const w of (plan.weeks || [])) {
           for (const s of (w.sessions || [])) {
             for (let ei = 0; ei < (s.exercises || []).length; ei++) {
               const ex: any = s.exercises[ei];
               const cur = String(ex.exerciseName || ex.id || '').toLowerCase();
-              if (cur === oldLow) {
-                const keeps = { muscle: ex.muscle || newCat.group, sets: ex.sets, repsRange: ex.repsRange, rir: ex.rir, tempo: newCat.stretchPhase ? '3-1-1-0' : ex.tempo, comment: `🧬 Лаб: ${ex.name || oldLow} → ${newCat.name} (коррекция)` } as any;
-                s.exercises[ei] = { ...ex, name: newCat.name, exerciseName: newCat.id, ...keeps };
-              }
+              const curName = String(ex.name || '').toLowerCase();
+              if (cur !== oldLow && curName !== oldLow) continue;
+              const sets = Math.max(1, Number(ex.sets) || 3);
+              const reps = Number(ex.workSets?.[0]?.reps) || Number(ex.repsRange?.[0]) || 10;
+              const rir = Math.max(0, Math.min(5, Number(ex.rir ?? 2)));
+              const baseWeight = Number(ex.workSets?.[0]?.weight) || estimatedWeightFor(newCat, bbWorkMax, rir);
+              const weight = Math.round(baseWeight * ratio * 10) / 10;
+              s.exercises[ei] = {
+                ...ex,
+                muscle: newMuscle,
+                name: newCat.name,
+                exerciseName: exerciseKeyOf(newCat),
+                sets,
+                // Синхронизируем workSets с новым числом сетов (раньше их число
+                // оставалось от старого упражнения → sets_mismatch).
+                workSets: makeWorkSets(sets, {
+                  reps, rir, weight,
+                  tempo: newCat.stretchPhase ? '3-1-1-0' : (ex.workSets?.[0]?.tempo || ex.tempo),
+                  restSeconds: ex.workSets?.[0]?.restSeconds || ex.restSeconds,
+                }),
+                comment: `🧬 Лаб: ${ex.name || oldLow} → ${newCat.name} (коррекция)`,
+              };
             }
           }
         }
@@ -2479,9 +2601,22 @@ const [bbVolumeRamp, setBbVolumeRamp] = useState<'standard' | 'preloaded' | 'fla
             if (!target || !Array.isArray(target.exercises) || target.exercises.length >= maxExForInsert) continue;
             const src = (target.exercises as any[]).find((e: any) => String(e.muscle || '').toLowerCase() === gl);
             if (!src) continue;
+            // Аудит 2026-11: копия src несла sets/workSets исходного упражнения —
+            // получался рассинхрон (sets=1, workSets=4) и одинаковый exerciseName,
+            // из-за чего веса/калибровка двух записей сливались в одну.
+            const srcSets = Array.isArray(src.workSets) ? src.workSets : [];
+            const tpl = srcSets[srcSets.length - 1] || { reps: Number(src.repsRange?.[0]) || 10, rir: Number(src.rir ?? 2), weight: 0 };
             target.exercises.push({
               ...src,
+              exerciseName: `${exerciseKeyOf(src) || src.name || gl} · L/R-${side}`,
               sets: addSets,
+              workSets: makeWorkSets(addSets, {
+                reps: Number(tpl.reps) || 10,
+                rir: Number(tpl.rir ?? src.rir ?? 2),
+                weight: Number(tpl.weight) || 0,
+                tempo: (tpl as any).tempo || src.tempo,
+                restSeconds: (tpl as any).restSeconds || src.restSeconds,
+              }),
               role: 'accessory' as const,
               side: side,
               unilateral: true,
@@ -2533,6 +2668,16 @@ const [bbVolumeRamp, setBbVolumeRamp] = useState<'standard' | 'preloaded' | 'fla
         plan = { ...calib.plan, rationale: [...calib.plan.rationale, `⚖️ Применены сохранённые реальные веса (${calib.applied} вхождений упражнений).`] };
       }
     } catch { /* ignore */ }
+
+    // Аудит 2026-11 (BB-01): пост-обработка (свопы/предпочтения/L/R/возврат)
+    // меняла уже финализированный план без повторной финализации — sets/workSets,
+    // объём, инвентарь и капы проверялись по состоянию ДО правок, а валидация
+    // оставалась старой. Один проход revalidate = единый инвариант.
+    if (postPhaseInjected) {
+      try {
+        plan = revalidateEditedPlan(plan);
+      } catch { /* не роняем сборку: план остаётся как есть */ }
+    }
 
     setBuiltPlan({
       ...plan,
@@ -2979,14 +3124,25 @@ const [bbVolumeRamp, setBbVolumeRamp] = useState<'standard' | 'preloaded' | 'fla
     if (!target) return;
     const oldEquipment = String((EXERCISE_CATALOG.find(x => x.name === target.name)?.equipment) || '');
     const newEquipment = String(found.equipment || '');
-    const ratio: Record<string, number> = { barbell: 1, smith: 0.9, machine: 0.85, dumbbell: 0.8, cable: 0.8, bodyweight: 0.7 };
-    const loadRatio = (ratio[newEquipment] || 1) / (ratio[oldEquipment] || 1);
+    // Аудит 2026-11: свой словарь → общий хелпер (единый коэффициент свопа).
+    const loadRatio = loadRatioBetween(oldEquipment, newEquipment);
+    const targetMuscle = canonicalMuscleOf(found, target.muscle);
+    const sets = Math.max(1, Number(target.sets) || 3);
+    const srcSets = Array.isArray(target.workSets) ? target.workSets : [];
+    const tpl = srcSets[srcSets.length - 1] || { reps: Number(target.repsRange?.[0]) || 10, rir: Number(target.rir ?? 2), weight: 0 };
+    const weight = Math.round((Number(tpl.weight) || estimatedWeightFor(found, bbWorkMax, Number(target.rir ?? 2))) * loadRatio * 10) / 10;
     target.name = found.name;
-    // 26.09.2026 (аудит): exerciseName = id каталога (а не display-имя) — иначе ключ
-    // весов/экспорта/SessionPlayer указывал на неверное упражнение.
-    target.exerciseName = (found as any).id || found.name;
-    target.muscle = found.group || target.muscle;
-    target.workSets = target.workSets.map(ws => ({ ...ws, weight: Math.round(ws.weight * loadRatio * 10) / 10 }));
+    // exerciseName — display-name, как пишет движок (bb-builder:2996).
+    target.exerciseName = exerciseKeyOf(found);
+    target.muscle = targetMuscle;
+    // workSets мог отсутствовать (инъекции лаборатории) → раньше здесь был TypeError.
+    target.workSets = makeWorkSets(sets, {
+      reps: Number(tpl.reps) || 10,
+      rir: Number(tpl.rir ?? target.rir ?? 2),
+      weight,
+      tempo: (tpl as any).tempo || (target as any).tempo,
+      restSeconds: (tpl as any).restSeconds || target.restSeconds,
+    });
     target.comment = `${target.comment || ''} | Ручная замена: ${oldEquipment || 'unknown'} → ${newEquipment || 'unknown'}, вес ×${loadRatio.toFixed(2)}`;
     target.rationale = `${target.rationale || ''} | Manual replacement: ${found.name}`;
     const editedPlan = { ...builtPlan, weeks: w3 };
@@ -3027,7 +3183,7 @@ const [bbVolumeRamp, setBbVolumeRamp] = useState<'standard' | 'preloaded' | 'fla
             rir: ws.rir ?? e.rir ?? 2,
             technique: ws.technique,
           }));
-          return { name: e.name, muscleGroup: e.muscle, notes: e.comment || e.rationale || '', targetSets, restSec: e.restSeconds || 90 };
+          return { name: e.name, muscleGroup: muscleLabel(e.muscle) || e.muscle, notes: e.comment || e.rationale || '', targetSets, restSec: e.restSeconds || 90 };
         }),
       })));
        localStorage.setItem('he_pl_runtime', JSON.stringify({ days: playerDays, focus: executionPlan.pattern?.name || 'ББ-сплит', week: 1, track: 'bb' }));
@@ -3191,6 +3347,41 @@ const [bbVolumeRamp, setBbVolumeRamp] = useState<'standard' | 'preloaded' | 'fla
     catch { return null; }
   }, [builtPlan, startDateInput, exerciseEdits]);
   const currentWeek = weekDateInfo?.find(w => w.isCurrent);
+
+  /**
+   * BB-11 (аудит 2026-11): движок `replanBBMesoFromFact` существовал и был покрыт
+   * тестами, но не имел точки входа в UI — пересборка остатка мезоцикла по факту
+   * была мёртвой функцией. Кнопка доступна в плане, начиная со 2-й недели.
+   */
+  const handleReplanRemainder = () => {
+    if (!builtPlan) { flash('Сначала соберите план'); return; }
+    const plan = applyEditsToPlan(builtPlan);
+    // Пересборка остатка работает только для плана, собранного из сплита:
+    // у программ/циклов pattern.id = id программы, и движок вернёт null (честно).
+    const pid = String((plan as any).pattern?.id || '');
+    if (!SPLIT_PATTERNS.some(p => p.id === pid)) {
+      flash('Пересборка остатка доступна для планов из сплита (не для ПРОФ-программ/циклов)');
+      return;
+    }
+    const wk = Number(currentWeek?.week) || 0;
+    if (wk < 2) { flash('Пересборка остатка доступна со 2-й недели мезоцикла (сейчас неделя 1)'); return; }
+    let sessions: any[] = [];
+    try { sessions = loadSessions() as any[]; } catch { sessions = []; }
+    const result = replanBBMesoFromFact(plan as any, sessions as any, {
+      currentWeek: wk,
+      planStartWeek: startDateInput || (plan as any).planStartWeek,
+    });
+    if (!result) {
+      flash('Недостаточно данных для пересборки (нет снапшота входов или неделя вне диапазона)');
+      return;
+    }
+    const notes = [`🔄 ${replanSummary(result)}`, ...result.changes.slice(0, 8).map(c => ` • ${c}`)];
+    setBuiltPlan(revalidateEditedPlan({
+      ...result.plan,
+      rationale: [...((result.plan as any).rationale || []), ...notes],
+    } as any));
+    flash(`🔄 ${replanSummary(result)}`);
+  };
 
   /** PRO: CSV export — все сеты плана в CSV для Excel/Google Sheets. */
   const handleExportCSV = () => {
@@ -3618,6 +3809,35 @@ const [bbVolumeRamp, setBbVolumeRamp] = useState<'standard' | 'preloaded' | 'fla
       setStep={setStep}
       actionRow={renderActionRow(false)}
     />
+    {builtPlan && (() => {
+      // Кнопка имеет смысл только для плана из сплита (у программ/циклов
+      // pattern.id = id программы — движок вернёт null, чтобы не подменить сплит).
+      const splitId = String((builtPlan as any).pattern?.id || '');
+      const isSplitPlan = SPLIT_PATTERNS.some(p => p.id === splitId);
+      const wkNow = Number(currentWeek?.week) || 0;
+      const disabled = !isSplitPlan || wkNow < 2;
+      const hint = !isSplitPlan
+        ? 'Доступно для планов из сплита (ПРОФ-программы/циклы пересобираются в своём конструкторе).'
+        : wkNow < 2
+          ? 'Доступно со 2-й недели мезоцикла.'
+          : `Прожитые недели остаются как есть; оставшиеся пересобираются от фактического объёма/весов. Текущая неделя: ${wkNow} из ${builtPlan.weeks.length}.`;
+      return (
+        <div data-bb="replan-remainder" style={{ marginTop: 10, padding: '10px 12px', borderRadius: 12, background: 'rgba(16,185,129,0.06)', border: '1px solid rgba(16,185,129,0.2)' }}>
+          <div style={{ fontSize: 12, fontWeight: 800, color: '#34d399', marginBottom: 6 }}>🔄 Пересборка остатка мезоцикла по факту</div>
+          <div style={{ fontSize: 11, color: '#fff', opacity: 0.85, marginBottom: 8 }}>{hint}</div>
+          <button
+            type="button"
+            data-bb="replan-remainder-btn"
+            disabled={disabled}
+            aria-disabled={disabled}
+            onClick={handleReplanRemainder}
+            style={{ padding: '7px 12px', borderRadius: 10, border: '1px solid rgba(16,185,129,0.45)', background: 'rgba(16,185,129,0.16)', color: '#fff', fontSize: 12, fontWeight: 700, cursor: disabled ? 'not-allowed' : 'pointer', opacity: disabled ? 0.5 : 1 }}
+          >
+            Пересобрать остаток
+          </button>
+        </div>
+      );
+    })()}
     {freqOptResult && (
       <div data-bb="freq-opt" style={{ marginTop: 10, padding: '10px 12px', borderRadius: 12, background: 'rgba(96,165,250,0.06)', border: '1px solid rgba(96,165,250,0.2)' }}>
         <div style={{ fontSize: 12, fontWeight: 800, color: '#60a5fa', marginBottom: 6 }}>🔧 Оптимизация частоты по мышцам (по дневнику)</div>

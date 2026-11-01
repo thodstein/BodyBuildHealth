@@ -1057,6 +1057,7 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
       pedDoses, courseIntensity,
       // Profile parameters
       sex: profData?.sex,
+      age: Number(profData?.age) || undefined,
       proteinPerKg: nutrData?.proteinPerKg,
       calorieSurplus: nutrData?.calorieSurplus ?? 0,
     }, pedAdapt);
@@ -1100,6 +1101,7 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
       pedDoses, courseIntensity,
       // Profile parameters
       sex: profData?.sex,
+      age: Number(profData?.age) || undefined,
       proteinPerKg: nutrData?.proteinPerKg,
       calorieSurplus: nutrData?.calorieSurplus ?? 0,
     }, pedAdapt);

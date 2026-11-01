@@ -2009,7 +2009,7 @@ function ensurePPLCalves(session: any, week: any, options: BBFinalizeOptions) {
   }
   const working = session.exercises.filter((e: any) => !e.warmupActivator && e.muscle === 'calves');
   const w = (options.workMax && options.workMax.calves) || 60;
-  // hardcoded fallback ensures spec even if catalog filtered (equipment/mobility)
+  // Каталог обязан уважать инвентарь: хардкод-фолбэк убран (аудит 2026-11).
   let standing = working.find((e: any) => isStanding(e));
   let seated = working.find((e: any) => isSeated(e));
   if (!standing) {
@@ -2017,17 +2017,25 @@ function ensurePPLCalves(session: any, week: any, options: BBFinalizeOptions) {
     if (countWorking() < maxEx) {
       // Каталог первым (имя «Подъёмы на носки стоя»), хардкод — фолбэк.
       const cat = findCatalogCandidate('calves', /носк.*стоя|calf.*raise|standing/i, options, new Set(working.map((e: any) => e.name)));
-      const nm = cat?.name || 'Подъём на носки стоя';
-      session.exercises.push({
-        muscle: 'calves', name: nm, exerciseName: nm, role: 'accessory', character: 'памп',
-        sets: 5, repsRange: [12, 20], rir: 3, restSeconds: 60, warmupSets: [],
-        workSets: Array.from({ length: 5 }, () => ({ reps: 15, rir: 3, weight: Math.round(w * 0.35 * 10) / 10, restSeconds: 60 })),
-        rationale: 'PPL Legs: икры стоя/жим ногами 5×12-20',
-      });
+      // Аудит 2026-11: хардкод-фолбэк («Подъём на носки стоя») ставился даже когда
+      // каталог отфильтрован оборудованием/mobility → machine-упражнение в
+      // dumbbell-плане и ошибка equipment_restriction_violation. Нет кандидата — не добавляем.
+      if (cat) {
+        const nm = cat.name;
+        session.exercises.push({
+          muscle: 'calves', name: nm, exerciseName: nm, role: 'accessory', character: 'памп',
+          sets: 5, repsRange: [12, 20], rir: 3, restSeconds: 60, warmupSets: [],
+          workSets: Array.from({ length: 5 }, () => ({ reps: 15, rir: 3, weight: Math.round(w * 0.35 * 10) / 10, restSeconds: 60 })),
+          rationale: 'PPL Legs: икры стоя/жим ногами 5×12-20',
+        });
+      }
     }
   } else if (standing.sets !== 5) {
-    standing.sets = 5; standing.workSets = standing.workSets.slice(0,5);
-    while(standing.workSets.length<5) standing.workSets.push({...standing.workSets[0]});
+    standing.sets = 5;
+    // Аудит 2026-11: у упражнений из UI-инъекций мог отсутствовать workSets.
+    const sw = Array.isArray(standing.workSets) ? standing.workSets : [];
+    standing.workSets = sw.slice(0, 5);
+    while (standing.workSets.length < 5) standing.workSets.push({ ...(sw[0] || { reps: 15, rir: 3, weight: 0 }) });
   }
   if (!seated) {
     freeUp();
@@ -2037,17 +2045,23 @@ function ensurePPLCalves(session: any, week: any, options: BBFinalizeOptions) {
       // поиск в других проходах). Хардкод-фолбэк резолвится в каталоге точным
       // именем «Подъём на носки сидя».
       const cat = findCatalogCandidate('calves', /носк.*сидя|носков.*сидя|seated.*calf|сидя/i, options, new Set(working.map((e: any) => e.name)));
-      const nm = cat?.name || 'Подъём на носки сидя';
-      session.exercises.push({
-        muscle: 'calves', name: nm, exerciseName: nm, role: 'accessory', character: 'памп',
-        sets: 4, repsRange: [15, 25], rir: 3, restSeconds: 45, warmupSets: [],
-        workSets: Array.from({ length: 4 }, () => ({ reps: 20, rir: 3, weight: Math.round(w * 0.3 * 10) / 10, restSeconds: 45 })),
-        rationale: 'PPL Legs: икры сидя 4×15-25',
-      });
+      // Аудит 2026-11: см. standing-ветку — без каталожного кандидата хардкод
+      // (machine) нарушал инвентарь. Пропускаем.
+      if (cat) {
+        const nm = cat.name;
+        session.exercises.push({
+          muscle: 'calves', name: nm, exerciseName: nm, role: 'accessory', character: 'памп',
+          sets: 4, repsRange: [15, 25], rir: 3, restSeconds: 45, warmupSets: [],
+          workSets: Array.from({ length: 4 }, () => ({ reps: 20, rir: 3, weight: Math.round(w * 0.3 * 10) / 10, restSeconds: 45 })),
+          rationale: 'PPL Legs: икры сидя 4×15-25',
+        });
+      }
     }
   } else if (seated.sets !== 4) {
-    seated.sets = 4; seated.workSets = seated.workSets.slice(0,4);
-    while(seated.workSets.length<4) seated.workSets.push({...seated.workSets[0]});
+    seated.sets = 4;
+    const sw = Array.isArray(seated.workSets) ? seated.workSets : [];
+    seated.workSets = sw.slice(0, 4);
+    while (seated.workSets.length < 4) seated.workSets.push({ ...(sw[0] || { reps: 20, rir: 3, weight: 0 }) });
   }
 }
 function ensurePPLChest(session: any, week: any, options: BBFinalizeOptions) {
@@ -2125,7 +2139,7 @@ function ensurePPLBack(session: any, week: any, options: BBFinalizeOptions) {
   // только паттерн; иначе переполненная сессия пропускает rename и тест
   // wide/parallel падает при полном дне).
   const workingPullovers = session.exercises.filter((e: any) => !e.warmupActivator && e.muscle === 'back' && /пулловер|pullover|прям.*рук/i.test(e.name || ''));
-  if (workingPullovers.length > 0) {
+  if (workingPullovers.length > 0 && pplPushAllowed(options, 'Тяга верхнего блока широким хватом')) {
     for (const ex of workingPullovers) {
       ex.name = 'Тяга верхнего блока широким хватом'; ex.exerciseName = 'Тяга верхнего блока широким хватом';
       ex.rationale = 'PPL Pull: пулловер только разминка, заменён на тягу';
@@ -2146,7 +2160,7 @@ function ensurePPLBack(session: any, week: any, options: BBFinalizeOptions) {
   const hasWideOrParallel = session.exercises.filter((e: any) => e.muscle === 'back' && !e.warmupActivator).some((e: any) => /широк|wide|параллел|parallel|v.?bar/i.test(e.name || ''));
   if (!hasWideOrParallel) {
     const target = session.exercises.find((e: any) => e.muscle === 'back' && !e.warmupActivator);
-    if (target) {
+    if (target && pplPushAllowed(options, 'Тяга верхнего блока широким хватом')) {
       target.name = 'Тяга верхнего блока широким хватом'; target.exerciseName = 'Тяга верхнего блока широким хватом'; target.rationale = 'PPL Pull: широкий/параллельный хват обязателен';
     } else if (session.exercises.filter((e: any) => !(e as any).warmupActivator).length < maxEx
       && pplPushAllowed(options, 'Тяга верхнего блока широким хватом')) {
@@ -2172,7 +2186,9 @@ function ensurePPLLegs(session: any, week: any, options: BBFinalizeOptions, heav
   const hasDead = session.exercises.some((e: any) => /мёртв|мертв/i.test(e.name || '') && !/румын|rdl/i.test(e.name || ''));
   if (hasRomanian && hasDead) {
     const deadEx = session.exercises.find((e: any) => /мёртв|мертв|deadlift/i.test(e.name || '') && !/румын|rdl/i.test(e.name || ''));
-    if (deadEx) { deadEx.name = 'Сгибания ног в тренажёре лёжа'; deadEx.exerciseName = 'Сгибания ног в тренажёре лёжа'; deadEx.muscle = 'hamstrings'; }
+    // Аудит 2026-11: переименование в тренажёрное движение без проверки инвентаря
+    // давало machine-упражнение в плане с гантелями.
+    if (deadEx && pplPushAllowed(options, 'Сгибания ног в тренажёре лёжа')) { deadEx.name = 'Сгибания ног в тренажёре лёжа'; deadEx.exerciseName = 'Сгибания ног в тренажёре лёжа'; deadEx.muscle = 'hamstrings'; }
   }
   if (heavyQuads) {
     const wHam = (options.workMax && options.workMax.hamstrings) || 60;
@@ -2185,7 +2201,8 @@ function ensurePPLLegs(session: any, week: any, options: BBFinalizeOptions, heav
         rationale: 'PPL Legs (квадр-день): румынская тяга лёгкая 3×12-18',
       });
     }
-    if (!session.exercises.some((e: any) => e.muscle==='hamstrings' && /сгибан.*ног|leg.?curl/i.test(e.name||'')) && !excluded.has('hamstrings') && !donors.has('hamstrings') && session.exercises.filter((e: any) => !(e as any).warmupActivator).length < maxEx) {
+    if (!session.exercises.some((e: any) => e.muscle==='hamstrings' && /сгибан.*ног|leg.?curl/i.test(e.name||'')) && !excluded.has('hamstrings') && !donors.has('hamstrings') && session.exercises.filter((e: any) => !(e as any).warmupActivator).length < maxEx
+      && pplPushAllowed(options, 'Сгибания ног в тренажёре лёжа')) {
       session.exercises.push({
         muscle: 'hamstrings', name: 'Сгибания ног в тренажёре лёжа', exerciseName: 'Сгибания ног в тренажёре лёжа', role: 'accessory', character: 'памп',
         sets: 3, repsRange: [12, 18], rir: 3, restSeconds: 60, warmupSets: [],
@@ -2193,7 +2210,8 @@ function ensurePPLLegs(session: any, week: any, options: BBFinalizeOptions, heav
         rationale: 'PPL Legs (квадр-день): сгибания ног обязательны 3×12-18',
       });
     }
-    if (session.exercises.filter((e: any) => e.muscle === 'hamstrings' && !e.warmupActivator).length < 3 && !excluded.has('hamstrings') && !donors.has('hamstrings') && session.exercises.filter((e: any) => !(e as any).warmupActivator).length < maxEx) {
+    if (session.exercises.filter((e: any) => e.muscle === 'hamstrings' && !e.warmupActivator).length < 3 && !excluded.has('hamstrings') && !donors.has('hamstrings') && session.exercises.filter((e: any) => !(e as any).warmupActivator).length < maxEx
+      && pplPushAllowed(options, 'Гиперэкстензия (45°)')) {
       session.exercises.push({
         muscle: 'hamstrings', name: 'Гиперэкстензия (45°)', exerciseName: 'Гиперэкстензия (45°)', role: 'accessory', character: 'памп',
         sets: 3, repsRange: [12, 18], rir: 3, restSeconds: 60, warmupSets: [],
@@ -2206,7 +2224,8 @@ function ensurePPLLegs(session: any, week: any, options: BBFinalizeOptions, heav
     }
   } else {
     const wQuad = (options.workMax && options.workMax.quads) || 80;
-    if (!session.exercises.some((e: any) => e.muscle==='quads' && /жим.*ног|leg.?press/i.test(e.name||'')) && !excluded.has('quads') && !donors.has('quads') && session.exercises.filter((e: any) => !(e as any).warmupActivator).length < maxEx) {
+    if (!session.exercises.some((e: any) => e.muscle==='quads' && /жим.*ног|leg.?press/i.test(e.name||'')) && !excluded.has('quads') && !donors.has('quads') && session.exercises.filter((e: any) => !(e as any).warmupActivator).length < maxEx
+      && pplPushAllowed(options, 'Жим ногами (45°)')) {
       session.exercises.push({
         muscle: 'quads', name: 'Жим ногами (45°)', exerciseName: 'Жим ногами (45°)', role: 'accessory', character: 'памп',
         sets: 3, repsRange: [12, 20], rir: 3, restSeconds: 75, warmupSets: [],
@@ -2214,7 +2233,8 @@ function ensurePPLLegs(session: any, week: any, options: BBFinalizeOptions, heav
         rationale: 'PPL Legs (хам-день): квадры жим ногами лёгкий памп',
       });
     }
-    if (!session.exercises.some((e: any) => e.muscle==='quads' && /разгибан.*ног|leg.?extension/i.test(e.name||'')) && !excluded.has('quads') && !donors.has('quads') && session.exercises.filter((e: any) => !(e as any).warmupActivator).length < maxEx) {
+    if (!session.exercises.some((e: any) => e.muscle==='quads' && /разгибан.*ног|leg.?extension/i.test(e.name||'')) && !excluded.has('quads') && !donors.has('quads') && session.exercises.filter((e: any) => !(e as any).warmupActivator).length < maxEx
+      && pplPushAllowed(options, 'Разгибания ног в тренажёре')) {
       session.exercises.push({
         muscle: 'quads', name: 'Разгибания ног в тренажёре', exerciseName: 'Разгибания ног в тренажёре', role: 'accessory', character: 'памп',
         sets: 3, repsRange: [12, 20], rir: 3, restSeconds: 60, warmupSets: [],

@@ -552,6 +552,8 @@ export function suggestFeeders(weakPoints: string[], equipment: string[]): Feede
         ]));
         break;
       case 'delt_rear':
+      case 'rear_delts':
+      case 'rear_delt':
         add(pick([
           { needs: ['dumbbell'], set: { muscle: 'shoulders', exercise: 'Махи гантелями в наклоне', sets: 3, reps: 15, notes: 'Ежедневно 3×15, RIR 3. Акцент на заднюю дельту, не широчайшие.' } },
           { needs: ['cable'], set: { muscle: 'shoulders', exercise: 'Разведения на блоке в наклоне', sets: 3, reps: 15, notes: 'Ежедневно 3×15, RIR 3.' } },
@@ -560,6 +562,8 @@ export function suggestFeeders(weakPoints: string[], equipment: string[]): Feede
         break;
       case 'upper_chest':
       case 'chest_upper':
+      case 'chest_mid':
+      case 'mid_chest':
       case 'chest':
         add(pick([
           { needs: ['dumbbell'], set: { muscle: 'chest', exercise: 'Разводка гантелями на наклонной', sets: 3, reps: 12, notes: 'Ежедневно 3×12, RIR 3. Акцент на растянутую позицию.' } },
@@ -582,6 +586,8 @@ export function suggestFeeders(weakPoints: string[], equipment: string[]): Feede
         ]));
         break;
       case 'back_thickness':
+      case 'upper_back':
+      case 'lats_thickness':
         add(pick([
           { needs: ['band', 'cable'], set: { muscle: 'back', exercise: 'Тяга резины к поясу сидя', sets: 3, reps: 15, notes: 'Ежедневно 3×15, RIR 3. Для толщины спины (горизонтальная тяга).' } },
           { needs: ['bodyweight'], set: { muscle: 'back', exercise: 'Австралийские подтягивания (низкая перекладина)', sets: 3, reps: 10, notes: 'Ежедневно 3×10, RIR 3 — толщина спины.' } },
@@ -617,6 +623,14 @@ export function suggestFeeders(weakPoints: string[], equipment: string[]): Feede
           { needs: ['machine'], set: { muscle: 'hamstrings', exercise: 'Сгибания ног на тренажёре (лёгкий)', sets: 3, reps: 15, notes: 'Ежедневно 3×15, RIR 3. Контроль негатива.' } },
           { needs: ['dumbbell', 'barbell'], set: { muscle: 'hamstrings', exercise: 'Румынская тяга (лёгкая)', sets: 3, reps: 12, notes: 'Ежедневно 3×12, RIR 3. Контроль негатива.' } },
         ]));
+        break;
+      // BB-18: эти зоны сознательно БЕЗ ежедневного фидера (не «забыты»):
+      //  - lower_back — ежедневная экстензия поясницы = риск, работаем объёмом в плане;
+      //  - neck — нет безопасного ежедневного изолирующего движения (шлем/петля — не для всех);
+      //  - adductors — и так грузятся приседом/выпадами, отдельный фидер избыточен.
+      case 'lower_back':
+      case 'neck':
+      case 'adductors':
         break;
     }
   }
@@ -951,52 +965,11 @@ export function applyPostPhaseProcessing(input: PostPhaseInput): BBPlan {
     }
   }
 
-  // P8: auto-feeder — для слабых групп добавляем «ежедневные добивки» в подходящую сессию недели.
-  // Feeder = изоляция 15-20 reps, ~30% workMax, в конце основной тренировки (grease-the-groove).
-  const weakPoints = (input as any).weakPoints as string[] | undefined;
-  if (weakPoints && weakPoints.length > 0) {
-    const feeders = suggestFeeders(weakPoints, []);
-    for (const f of feeders) {
-      // Найти хотя бы одну неделю/сессию, где тренируется эта мышца
-      for (const w of weeks) {
-        let added = false;
-        for (const s of w.sessions) {
-          if (added) break;
-          // Сессия содержит нужную мышцу?
-          const hasMuscle = s.exercises.some(e => {
-            const m = (e.muscle || '').toLowerCase();
-            const fm = f.muscle.toLowerCase();
-            return m === fm || m.includes(fm) || fm.includes(m);
-          });
-          if (!hasMuscle) continue;
-          // Добавить feeder как отдельное упражнение
-          // BUG-B12: magic 30 → defaultWorkMax(f.muscle) — раньше forearms давали 9кг
-          // (fallback 30×0.3), хотя DEFAULT_WORKMAX.forearms=45 → правильно 13.5кг.
-          const fWeight = Math.max(5, Math.round((workMax[f.muscle] || defaultWorkMax(f.muscle)) * 0.3 * 10) / 10);
-          s.exercises.push({
-            muscle: f.muscle,
-            name: f.exercise,
-            role: 'accessory',
-            character: 'памп' as any,
-            sets: f.sets,
-            repsRange: [Math.max(8, f.reps - 3), f.reps + 2] as [number, number],
-            rir: 3,
-            workSets: Array.from({ length: f.sets }, () => ({
-              reps: f.reps, rir: 3, weight: fWeight, tempo: '2-0-1-0', restSeconds: 30,
-            })),
-            exerciseName: f.exercise,
-            tempoSpec: '2-0-1-0',
-            restSeconds: 30,
-            comment: `🎯 Auto-feeder (${f.notes})`,
-            warmupSets: [],
-            rationale: 'P8: автоматическая ежедневная добивка для отстающей группы.',
-          } as any);
-          added = true;
-        }
-        if (added) break; // только в первую подходящую неделю
-      }
-    }
-  }
+  // P8 auto-feeder удалён (аудит 2026-11): он игнорировал инвентарь
+  // (`suggestFeeders(weakPoints, [])`), вставлял упражнения вне каталога
+  // (валидатор → equipment_unknown_exercise) и работал только в первой неделе,
+  // дублируя фидер-сеты билдера (bb-builder:3910-3982: оборудование, все недели,
+  // дедуп по имени). Единственный пайплайн фидеров — в билдере.
 
   // Авто-регуляция (последний слой — поверх всего)
   if (autoRegResult) {
@@ -1006,10 +979,13 @@ export function applyPostPhaseProcessing(input: PostPhaseInput): BBPlan {
         for (const s of w.sessions) {
           for (const e of s.exercises) {
             e.sets = Math.max(1, Math.round(e.sets * autoRegResult.volumeMultiplier));
-            const template = e.workSets[e.workSets.length - 1] || {
+            // Аудит 2026-11: у упражнений из UI-инъекций (свопы/добивки) мог
+            // отсутствовать workSets — раньше здесь был TypeError при сборке.
+            const prevSets = Array.isArray(e.workSets) ? e.workSets : [];
+            const template = prevSets[prevSets.length - 1] || {
               reps: e.repsRange[0], rir: e.rir, weight: 0,
             };
-            e.workSets = e.workSets.slice(0, e.sets);
+            e.workSets = prevSets.slice(0, e.sets);
             while (e.workSets.length < e.sets) e.workSets.push({ ...template });
             for (const ws of e.workSets) {
             ws.weight = Math.round(ws.weight * autoRegResult.topSetPctMultiplier * 10) / 10;

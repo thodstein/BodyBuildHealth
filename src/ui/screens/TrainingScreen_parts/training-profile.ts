@@ -89,6 +89,10 @@ export const DEFAULT_PROFILE: TrainingProfile = {
 };
 
 export function loadTrainingProfile(): TrainingProfile {
+  // Legacy-снапшот читаем ДО веток: в нём лежат поля, которых нет в UnifiedSettings
+  // (bbPeds/onCourse/planMode/injuries — их писал только saveTrainingProfile).
+  let legacy: any = null;
+  try { legacy = JSON.parse(localStorage.getItem(KEY) || 'null'); } catch { /* ignore */ }
   // Сначала пытаемся прочитать из UnifiedSettings (новый путь)
   try {
     const prof = getProfile();
@@ -121,15 +125,92 @@ export function loadTrainingProfile(): TrainingProfile {
         pharmaCoursesCount: s.pharma?.totalCycles ?? DEFAULT_PROFILE.pharmaCoursesCount,
         monthsSinceLastCourse: s.pharma?.monthsSinceLastCourse ?? DEFAULT_PROFILE.monthsSinceLastCourse,
         totalYearsOnPharma: s.pharma?.yearsOnGear ?? DEFAULT_PROFILE.totalYearsOnPharma,
+        // Аудит 2026-11: эти поля объявлены в интерфейсе, но НЕ маппились —
+        // после перезагрузки режим/программа/фарма/фокус сбрасывались, а MRV
+        // терял курс-множитель (onCourse) примерно вдвое.
+        planMode: (s.training as any).planMode ?? legacy?.planMode ?? DEFAULT_PROFILE.planMode,
+        bbCycleId: (s.training as any).bbCycleId ?? legacy?.bbCycleId ?? DEFAULT_PROFILE.bbCycleId,
+        onCourse: (s.training as any).onCourse ?? legacy?.onCourse ?? DEFAULT_PROFILE.onCourse,
+        courseIntensity: (s.training as any).courseIntensity ?? legacy?.courseIntensity ?? DEFAULT_PROFILE.courseIntensity,
+        trainingFocus: (s.training as any).trainingFocus ?? legacy?.trainingFocus,
+        bbPeds: Array.isArray((s.training as any).bbPeds) ? (s.training as any).bbPeds : (legacy?.bbPeds ?? DEFAULT_PROFILE.bbPeds),
+        // Травмы: явные записи BB-Auto (UnifiedSettings + legacy-ключ) приоритетнее
+        // выведенных из профиля «Здоровье». Раньше health.injuries игнорировался,
+        // и травма из профиля не влияла на план.
+        injuries: mergeInjuries(
+          Array.isArray((s.training as any).injuries) ? (s.training as any).injuries : [],
+          Array.isArray(legacy?.injuries) ? legacy.injuries : [],
+          healthInjuriesToTraining(s.health?.injuries),
+        ),
       };
     }
   } catch { /* fallback к legacy */ }
   // Fallback — старый путь через localStorage
-  try {
-    const v = JSON.parse(localStorage.getItem(KEY) || 'null');
-    if (v) return { ...DEFAULT_PROFILE, ...v, workMax: { ...DEFAULT_PROFILE.workMax, ...(v.workMax || {}) } };
-  } catch { /* ignore */ }
+  if (legacy) return { ...DEFAULT_PROFILE, ...legacy, workMax: { ...DEFAULT_PROFILE.workMax, ...(legacy.workMax || {}) } };
   return { ...DEFAULT_PROFILE };
+}
+
+/** Локация травмы из профиля → каноническая мышца плана.
+ *  Ключи: англ. (payload'ы других движков) И русские подписи из
+ *  `core/constants.INJURY_LOCATIONS` — реальный источник формы «Здоровье».
+ *  Без русских ключей конверсия молча возвращала [] (BB-07 не работал). */
+const HEALTH_LOCATION_TO_MUSCLE: Record<string, string> = {
+  // англ.
+  knee: 'quads', knees: 'quads', quad: 'quads', quads: 'quads',
+  hamstring: 'hamstrings', hamstrings: 'hamstrings',
+  hip: 'glutes', glutes: 'glutes', ankle: 'calves', calf: 'calves', calves: 'calves',
+  shoulder: 'shoulders', shoulders: 'shoulders', elbow: 'triceps', wrist: 'forearms',
+  lower_back: 'lower_back', lowerback: 'lower_back', back: 'lower_back',
+  neck: 'traps', traps: 'traps', chest: 'chest', pec: 'chest',
+  biceps: 'biceps', triceps: 'triceps', adductor: 'adductors', groin: 'adductors',
+  abs: 'abs', core: 'abs',
+  // рус. (INJURY_LOCATIONS, после нормализации: lowercase + '_')
+  'плечо': 'shoulders', 'локоть': 'triceps', 'запястье': 'forearms', 'кисть': 'forearms',
+  'грудной_отдел': 'chest', 'поясница': 'lower_back', 'тазобедренный': 'glutes',
+  'колено': 'quads', 'голеностоп': 'calves', 'стопа': 'calves',
+  'шея': 'traps', 'предплечье': 'forearms', 'бицепс': 'biceps', 'трицепс': 'triceps',
+  'дельта': 'shoulders', 'трапеция': 'traps', 'широчайшие': 'back', 'пресс': 'abs',
+  'квадрицепс': 'quads', 'бицепс_бедра': 'hamstrings',
+};
+
+/** Травмы профиля «Здоровье» → Injury-формат BB (мягкая разгрузка, тяжёлые — исключение). */
+function healthInjuriesToTraining(list: unknown): TrainingProfile['injuries'] {
+  if (!Array.isArray(list)) return [];
+  const out: TrainingProfile['injuries'] = [];
+  for (const raw of list) {
+    if (!raw || typeof raw !== 'object') continue;
+    const r = raw as any;
+    const locRaw = String(r.location || r.muscle || '').toLowerCase().trim();
+    const loc = locRaw.replace(/\s+/g, '_');
+    const muscle = HEALTH_LOCATION_TO_MUSCLE[loc];
+    if (!muscle) continue;
+    const pain = Number(r.painLevel);
+    const limit = String(r.movementLimit || '').toLowerCase();
+    const severe = limit === 'severe' || limit === 'full_restriction' || (Number.isFinite(pain) && pain >= 8);
+    out.push({
+      muscle,
+      from: String(r.date || new Date().toISOString().slice(0, 10)),
+      exclude: severe ? true : undefined,
+      weightPct: severe ? 0 : 0.7,
+      volumePct: severe ? 0 : 0.6,
+    });
+  }
+  return out;
+}
+
+/** Слияние источников травм: первая запись по мышце побеждает (явные — раньше производных). */
+function mergeInjuries(...lists: TrainingProfile['injuries'][]): TrainingProfile['injuries'] {
+  const out: TrainingProfile['injuries'] = [];
+  const seen = new Set<string>();
+  for (const list of lists) {
+    for (const inj of list || []) {
+      const key = String((inj as any)?.muscle || '').toLowerCase();
+      if (!key || seen.has(key)) continue;
+      seen.add(key);
+      out.push(inj);
+    }
+  }
+  return out;
 }
 
 export function saveTrainingProfile(p: TrainingProfile): void {
@@ -153,11 +234,19 @@ export function saveTrainingProfile(p: TrainingProfile): void {
     if (p.fatigue !== undefined) next.lifestyle.fatigueLevel = p.fatigue;
     if (p.sleepHours) next.lifestyle.sleepHours = p.sleepHours;
     if (p.stressLevel) next.lifestyle.stressLevel = p.stressLevel;
-    if (p.weakPoints?.length) next.training.weakPoints = p.weakPoints;
+    if (p.weakPoints) next.training.weakPoints = p.weakPoints;
     (next.training as any).favoriteExercises = p.favoriteExercises ?? [];
     (next.training as any).excludedExercises = p.excludedExercises ?? [];
     if (p.avoidAxialLoad !== undefined) (next.training as any).avoidAxialLoad = p.avoidAxialLoad;
-    if (p.equipment?.length) next.training.equipment = p.equipment;
+    if (p.equipment) next.training.equipment = p.equipment;
+    // Аудит 2026-11: persist полей BB-режима (раньше жили только в legacy-ключе
+    // и терялись при чтении UnifiedSettings после F5).
+    if (p.planMode) (next.training as any).planMode = p.planMode;
+    if (p.bbCycleId !== undefined) (next.training as any).bbCycleId = p.bbCycleId;
+    (next.training as any).onCourse = !!p.onCourse;
+    (next.training as any).bbPeds = p.bbPeds ?? [];
+    if (p.courseIntensity) (next.training as any).courseIntensity = p.courseIntensity;
+    if (p.injuries) (next.training as any).injuries = p.injuries;
     if (p.loadStrategy) (next.training as any).loadStrategy = p.loadStrategy;
     if (p.bodyweightCapability) (next.training as any).bodyweightCapability = p.bodyweightCapability;
     (next.training as any).mobilityRestrictions = p.mobilityRestrictions ?? [];

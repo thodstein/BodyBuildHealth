@@ -74,6 +74,11 @@ export interface WeakpointsPayload { groups?: string[]; lift?: string; orthopedi
    *  шарнир под весом/ER:IR/скрининг-приоритет — всё опционально, приёмник только сохраняет/показывает. */
   bench?: { level: string; text: string } | null;
   painMon?: string | null;
+  /** G5: структурированный вердикт монитора боли (хаб) — уровень + локация + крепатура.
+   *  Без него `applyRecoveryRelief` в движке не срабатывал (только текстовая строка). */
+  painLevel?: 'green' | 'yellow' | 'red' | null;
+  painLocation?: string | null;
+  soreness010?: number | null;
   posterior?: { nhe?: string | null; adductor?: string | null } | null;
   loadedHinge?: { text: string } | null;
   erir?: { text: string } | null;

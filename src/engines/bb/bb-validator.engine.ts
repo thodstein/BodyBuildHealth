@@ -200,7 +200,15 @@ function validateSession(session: BBSession, week: number, sessionIndex: number,
     if (sets > 0 && sets < 2) {
       issues.push({ level: 'warning', code: 'single_work_set', message: `${exercise.name}: только ${sets} рабочий сет.`, week, session: sessionIndex, exercise: exercise.name });
     }
-    const canonical = trueMuscleOf({ name: exercise.name, muscle: exercise.muscle } as any);
+    // Аудит 2026-11: атрибуция должна идти по ПОЛНОЙ каталожной записи (group/
+    // movementPattern/targetMuscle). Раньше передавался только {name, muscle} —
+    // без group `derivePattern` ловил общий regex «жим» и отдавал chest для
+    // Арнольд-жима (плечи), JM-жима и отжиманий от скамьи (трицепс) →
+    // ложные muscle_attribution в каждом плане.
+    const attributionCat: any = resolveExerciseCatalogEntry(exercise.name, exercise.exerciseName);
+    const canonical = attributionCat
+      ? trueMuscleOf(attributionCat)
+      : trueMuscleOf({ name: exercise.name, muscle: exercise.muscle } as any);
     // Каталог определяет «основную» мышцу compound-движения; для изоляций
     // (французский жим, махи, разгибания на блоке) target-мышца из плана
     // точнее. Не выдаём false-positive предупреждения для изоляций.

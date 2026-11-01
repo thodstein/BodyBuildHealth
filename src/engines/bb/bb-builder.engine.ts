@@ -169,6 +169,10 @@ export interface BBBuilderInput {
    * G1-полный (opt-in): Israetel-волна объёма внутри фазы поверх плоского
    * рампа (1.0 → 1.15 → 0.75 → 1.05 + 2.5% за 4 недели). Дефолт выкл —
    * недельные множители остаются прежними.
+   *
+   * @unwired (аудит 2026-11, BB-10) — контрола волны в UI нет ни в одном экране
+   * (`volumeWave` не встречается в `TrainingScreen_parts`), поле никем не
+   * передаётся. Мёртвый вход движка.
    */
   volumeWave?: boolean;
   specialization?: boolean;      // true = слабые на MAV+10%, остальные на MEV
@@ -273,10 +277,17 @@ export interface BBBuilderInput {
    *  Если передан, buildBBPlan извлекает из него: peak-week веса → стартовые веса +2.5-5кг,
    *  список упражнений → ротация (избегаем повторов), per-muscle volume → +1-2 сета. */
   previousPlan?: BBPlan;
-  /** Фаза 2.7: cooldown-история упражнений (имена + паттерны), недавно
-   *  использованных в прошлых планах/дневнике. Подаётся в buildSession как
-   *  ротационное «понижение приоритета» (мягкое избегание повторов в течение
-   *  cooldown-окна), совместимо с cross-meso rotation. */
+  /**
+   * Фаза 2.7: cooldown-история упражнений (имена + паттерны), недавно
+   * использованных в прошлых планах/дневнике. Подаётся в buildSession как
+   * ротационное «понижение приоритета» (мягкое избегание повторов в течение
+   * cooldown-окна), совместимо с cross-meso rotation.
+   *
+   * @unwired (аудит 2026-11, BB-10) — контракт есть и покрыт тестами, но НИ ОДИН
+   * экран приложения не передаёт поле: ротация по «cooldown» фактически не
+   * работает в UI. Чтобы включить — собрать историю из дневника и прокинуть сюда;
+   * до этого поле не считается рабочей функцией.
+   */
   cooldownHistory?: Array<{ exerciseName: string; pattern?: string }>;
   /**
    * Волна-3.12: VBT-вход из дневника/хаба — потеря скорости лучший→последний
@@ -289,6 +300,9 @@ export interface BBBuilderInput {
    * Волна-3.13: readiness до/после последней разгрузки (из дневника/хаба).
    * Если overreachingCheck не «очищен» — после первой разгрузки плана ставится
    * вторая микро-разгрузка (−20% объём, RIR+2) с rationale.
+   *
+   * @unwired (аудит 2026-11, BB-10) — UI не передаёт поле: в приложении этот проход
+   * не срабатывает. Включать только вместе с источником before/after (дневник).
    */
   deloadReadiness?: { before: number; after: number; soreness?: number };
   /** Суперсеты-антагонисты (грудь↔спина, бицепс↔трицепс, квадры↔хамсы). */
@@ -3361,6 +3375,8 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
       // передавалась — HRV-сигнал брался только из store, игнорируя hrvBaseline).
       hrvBaseline: input.hrvBaseline,
       sleepHours: input.sleepHours, stressLevel: input.stressLevel,
+      // Аудит 2026-11: возраст объявлен и учитывается (−8 при 45+), но не передавался.
+      age: input.age,
     });
   // Фаза 4.28: ручной оверрайд множителя восстановления из визарда.
   const recoveryMultOverride = Number.isFinite(input.recoveryMultOverride) ? Math.max(0.6, Math.min(1.5, input.recoveryMultOverride as number)) : 1;

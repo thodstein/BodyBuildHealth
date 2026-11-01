@@ -7,7 +7,7 @@
 import type { SRCycleTemplate, SRDaySpec, SRExerciseSpec, SRSetSpec, SRDirection, SRLevel, SRPeriod } from '../../data/lms-cycles/lms-types';
 import type { BBPlan, BBWeek, BBSession, BBExercise, BBSet } from './bb-builder.engine';
 import type { BBPhase } from './bb-types';
-import { femalePosteriorBoost } from './bb-demographics';
+import { femalePosteriorBoost, mastersAdjust } from './bb-demographics';
 import { getBBVolumeLandmarks, isWeak, abDominantPattern, normalizeWeekMrv } from './bb-builder.engine';
 import { syncBBPlanSetShape } from './bb-validator.engine';
 import { aggregateBBVolume, perExerciseCap, exerciseVolumeContributions, BB_MRV_TOLERANCE } from './bb-volume.engine';
@@ -21,6 +21,7 @@ import { sessionLimitsFor as centralizedSessionLimits } from './bb-volume.engine
 import { adaptForPEDs, computeAASEquivDose, type PED, type CourseIntensity } from './bb-ped-adaptation.engine';
 import { recommendPEDMethodology } from './bb-ped-methodology.engine';
 import { applyRehabToPlan, rehabNotes } from './bb-recovery.engine';
+import { applyRecoveryRelief } from './bb-recovery-relief.engine';
 import { applyPlateRoundingToPlan } from './bb-plates.engine';
 import { applyBfrPattern } from './bb-rep-schemes.engine';
 import { mergeWearableIntoRecovery, type WearableDaily } from './bb-wearable.engine';
@@ -2071,6 +2072,13 @@ export interface ProgramToBBPlanOpts {
   cycleLength?: number;
   /** Ручной оверрайд множителя восстановления (0.6-1.5) — паритет с generic-оверрайдами. */
   recoveryMultOverride?: number;
+  /** Возраст (полных лет). Opt-in: 40+ → MRV×0.95/0.88/0.80 (паритет с generic). */
+  age?: number;
+  /** G5: боль-мониторинг (green/yellow/red) — срез объёма по локации (паритет с generic). */
+  painLevel?: 'green' | 'yellow' | 'red';
+  painLocation?: string | null;
+  /** Крепатура/усталость 0-10 (wellness-чек). >=7 → объём ×0.9. */
+  soreness010?: number | null;
   /** P0-5: текстовые предупреждения лаборатории (пробрасываются в rationale плана). */
   labWarnings?: string[];
   /** P0-5: рекомендация по интенсивности из лаборатории (пробрасывается в rationale). */
@@ -2330,7 +2338,12 @@ export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts)
   const dcGateProgram = !!opts.dcMode && (level === 'advanced' || level === 'enhanced') && dcDoseProgram >= 750;
   const nutritionMult = computeBBNutritionMultiplier(opts);
   const _labMultProgram = opts.labMrvMultiplier ?? 1;
-  const effectiveMrvMult = mrvMult * recoveryMult * nutritionMult * _labMultProgram;
+  // Аудит 2026-11: возраст учитывался только в generic-пути. 45-летний на
+  // программе получал MRV как 25-летний.
+  const ageMultProgram = Number.isFinite(opts.age) && (opts.age as number) >= 40
+    ? mastersAdjust(opts.age as number).mrvMultiplier
+    : 1;
+  const effectiveMrvMult = mrvMult * recoveryMult * nutritionMult * _labMultProgram * ageMultProgram;
   const pedMrvMult = effectiveMrvMult;
   const _labWarningsProgram: string[] = (opts as any).labWarnings || [];
   const _labIntensityNoteProgram: string | undefined = (opts as any).labIntensityNote;
@@ -2338,6 +2351,8 @@ export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts)
   const rationale: string[] = [];
   rationale.push(`📚 Программа: ${program.name} (${program.author})`);
   rationale.push(`📅 ${totalWeeks} нед, ${daysPerWeek}×/нед, уровень ${program.level}`);
+  // Аудит 2026-11: прозрачная пометка, что возраст применил masters-множитель.
+  if (ageMultProgram < 1) rationale.push(`👤 Возраст ${opts.age}: MRV ×${ageMultProgram} (masters-коррекция).`);
   rationale.push(`🎯 Цель: ${program.goal}${program.direction && program.direction !== program.goal ? ` (${program.direction})` : ''}`);
   if (program.progressionModel) rationale.push(`📈 Прогрессия: ${program.progressionModel}`);
   if (program.deloadProtocol) rationale.push(`🔋 Разгрузка: ${program.deloadProtocol}`);
@@ -3254,6 +3269,23 @@ export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts)
     dcMode: opts.dcMode,
     wearable: opts.wearable ? true : undefined,
   };
+  // G5: боль/крепатура — паритет с generic-путём. Раньше painLevel/soreness010
+  // существовали только в BBBuilderInput, и «программный» путь (циклы/программы)
+  // игнорировал монитор боли хаба (срез объёма не применялся).
+  if (opts.painLevel || (opts.soreness010 != null && Number.isFinite(opts.soreness010))) {
+    try {
+      const relief = applyRecoveryRelief(finalized, {
+        painLevel: opts.painLevel,
+        painLocation: opts.painLocation ?? null,
+        soreness010: opts.soreness010 ?? null,
+      });
+      if (relief.changes.length > 0) {
+        finalized.weeks = relief.plan.weeks;
+        for (const ch of relief.changes) if (!finalized.rationale.includes(ch)) finalized.rationale.push(ch);
+        syncBBPlanSetShape(finalized);
+      }
+    } catch { /* срез восстановления — best-effort, сборку не роняем */ }
+  }
   finalized.report = buildBBPlanReport(finalized);
   return finalized;
 }
