@@ -22,6 +22,7 @@ const createWorker = vi.fn();
 vi.mock('tesseract.js', () => ({ createWorker: (...args: any[]) => createWorker(...args) }));
 
 import { processUploadedFile } from '../ocr-engine';
+import { resetOcrLangProbeCache } from '../../engines/ocr-assets';
 
 const okWorker = () => ({
   setParameters: async () => {},
@@ -66,5 +67,34 @@ describe('АПК: запасные механизмы запуска ворке�
     expect(paths[0]).toMatch(/tesseract\/worker\.min\.js$/);
     expect(paths[paths.length - 1]).toMatch(/^https:\/\/cdn\./);
     expect(result.labs.length).toBeGreaterThan(0);
+  });
+
+  it('в APK модели лежат без .gz (AAPT распаковывает) — воркер стартует с gzip:false', async () => {
+    // Ровно картина с устройства: worker и core отдаются 200, а *.gz — 404,
+    // зато несжатые *.traineddata на месте.
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = vi.fn(async (input: any) => {
+      const url = String(input);
+      const ok = /tesseract\/lang\/(rus|eng)\.traineddata$/.test(url);
+      return {
+        status: ok ? 200 : 404,
+        headers: { get: () => (ok ? 'application/octet-stream' : 'text/plain') },
+        body: { cancel: async () => {} },
+      } as any;
+    }) as any;
+    try {
+      resetOcrLangProbeCache();
+      createWorker.mockImplementation(async () => okWorker());
+
+      const file = new File(['x'.repeat(64)], 'lab-photo.jpg', { type: 'image/jpeg' });
+      const result = await processUploadedFile(file, { purpose: 'labs' });
+
+      expect(createWorker.mock.calls[0][2]).toMatchObject({ gzip: false });
+      expect(String(createWorker.mock.calls[0][2]?.langPath)).toMatch(/tesseract\/lang$/);
+      expect(result.labs.map((l) => l.code)).toEqual(expect.arrayContaining(['ALT', 'CREATININE', 'GLU']));
+    } finally {
+      globalThis.fetch = originalFetch;
+      resetOcrLangProbeCache();
+    }
   });
 });

@@ -11,11 +11,46 @@ import {
   resolvePdfjsWorkerSrc,
   configurePdfjsWorker,
   localAssetAvailable,
+  resetOcrLangProbeCache,
 } from '../ocr-assets';
+
+/**
+ * URL-осведомлённая подмена fetch: порядок запросов больше не важен, потому что
+ * резолвер сначала определяет ФОРМАТ языковых моделей (в APK они лежат без
+ * `.gz`), а уже потом проверяет воркер и ядро.
+ */
+function stubAssets(opts: {
+  plainLang?: boolean;
+  gzLang?: boolean;
+  worker?: boolean;
+  core?: boolean;
+} = {}) {
+  const { plainLang = true, gzLang = false, worker = true, core = true } = opts;
+  fetchMock.mockImplementation(async (input: any) => {
+    const url = String(input);
+    const present = /\.traineddata\.gz$/.test(url)
+      ? gzLang
+      : /\.traineddata$/.test(url)
+        ? plainLang
+        : /worker\.min\.js$/.test(url)
+          ? worker
+          : /tesseract-core-lstm\.wasm\.js$/.test(url)
+            ? core
+            : false;
+    return {
+      ok: present,
+      status: present ? 200 : 404,
+      headers: { get: () => (present ? 'application/octet-stream' : 'text/plain') },
+      body: { cancel: async () => {} },
+    };
+  });
+}
 
 describe('ocr-assets: local path configuration', () => {
   beforeEach(() => {
     fetchMock.mockReset();
+    // Результат проверки моделей кэшируется на сессию — между тестами сбрасываем.
+    resetOcrLangProbeCache();
   });
 
   afterEach(() => {
@@ -79,52 +114,49 @@ describe('ocr-assets: local path configuration', () => {
   });
 
   it('resolveTesseractOptions prefers local when assets are reachable', async () => {
-    // worker + lstm-core + rus-lang probes (АПК-фикс Sep 2026: 3 пробы).
-    fetchMock
-      .mockResolvedValueOnce({ ok: true, status: 200 })
-      .mockResolvedValueOnce({ ok: true, status: 200 })
-      .mockResolvedValueOnce({ ok: true, status: 200 });
+    // Модели в APK лежат распакованными (AAPT снимает .gz) — gzip:false.
+    stubAssets({ plainLang: true });
     const opts = await resolveTesseractOptions();
     expect(opts.source).toBe('local');
     expect(opts.workerPath).toMatch(/(?:^|\/)tesseract\/worker\.min\.js$/);
     expect(opts.corePath).toMatch(/(?:^|\/)tesseract\/core$/);
     expect(opts.langPath).toMatch(/(?:^|\/)tesseract\/lang$/);
+    expect(opts.gzip).toBe(false);
+  });
+
+  it('resolveTesseractOptions prefers local with gzip:true for the dist/OTA layout', async () => {
+    // В dist/ и OTA-бандле модели сжатые.
+    stubAssets({ plainLang: false, gzLang: true });
+    const opts = await resolveTesseractOptions();
+    expect(opts.source).toBe('local');
+    expect(opts.gzip).toBe(true);
   });
 
   it('resolveTesseractOptions falls back to CDN when lstm core is missing (stale APK build)', async () => {
-    // localAssetAvailable делает HEAD, при 404 — ещё и GET Range. Итого:
-    // worker HEAD 200, core HEAD 404 + core GET 404 (false), lang HEAD 200.
-    fetchMock
-      .mockResolvedValueOnce({ ok: true, status: 200 })
-      .mockResolvedValueOnce({ ok: false, status: 404 })
-      .mockResolvedValueOnce({ ok: false, status: 404 })
-      .mockResolvedValueOnce({ ok: true, status: 200 });
+    stubAssets({ plainLang: true, core: false });
     const opts = await resolveTesseractOptions();
     expect(opts.source).toBe('cdn');
     expect(opts.workerPath).toContain('cdn.jsdelivr.net');
   });
 
   it('resolveTesseractOptions falls back to CDN when rus traineddata is missing', async () => {
-    // worker HEAD 200, core HEAD 200, lang HEAD 404 + lang GET 404 (false).
-    fetchMock
-      .mockResolvedValueOnce({ ok: true, status: 200 })
-      .mockResolvedValueOnce({ ok: true, status: 200 })
-      .mockResolvedValueOnce({ ok: false, status: 404 })
-      .mockResolvedValueOnce({ ok: false, status: 404 });
+    // Ни `rus.traineddata`, ни `rus.traineddata.gz` — воркер заведомо не стартует.
+    stubAssets({ plainLang: false, gzLang: false });
     const opts = await resolveTesseractOptions();
     expect(opts.source).toBe('cdn');
+    expect(opts.gzip).toBe(true);
   });
 
   it('resolveTesseractOptions falls back to CDN when local assets are unreachable', async () => {
-    fetchMock.mockResolvedValueOnce({ ok: false, status: 404 });
+    fetchMock.mockRejectedValue(new Error('network error'));
     const opts = await resolveTesseractOptions();
     expect(opts.source).toBe('cdn');
     expect(opts.workerPath).toContain('cdn.jsdelivr.net');
     expect(opts.corePath).toContain('cdn.jsdelivr.net');
   });
 
-  it('resolveTesseractOptions falls back to CDN on network error', async () => {
-    fetchMock.mockRejectedValueOnce(new Error('network error'));
+  it('resolveTesseractOptions falls back to CDN when worker script is missing', async () => {
+    stubAssets({ worker: false });
     const opts = await resolveTesseractOptions();
     expect(opts.source).toBe('cdn');
   });

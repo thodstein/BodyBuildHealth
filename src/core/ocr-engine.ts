@@ -556,10 +556,23 @@ export async function describeOcrFailure(error?: unknown): Promise<string> {
 async function openOcrWorker(
   Tesseract: any,
   cfg: { nativeApp: boolean; budgetMs: number; logger: (m: any) => void },
-): Promise<{ worker: any; used: { workerPath: string; corePath: string; langPath?: string; blobWorker: boolean } }> {
+): Promise<{
+  worker: any;
+  used: { workerPath: string; corePath: string; langPath?: string; gzip: boolean; blobWorker: boolean };
+}> {
   const { tesseractWorkerAttempts } = await import('../engines/ocr-assets');
   const online = typeof navigator === 'undefined' ? true : navigator.onLine !== false;
-  const attempts = tesseractWorkerAttempts({ nativeLike: cfg.nativeApp, online });
+  const attempts = await tesseractWorkerAttempts({ nativeLike: cfg.nativeApp, online });
+  if (attempts.length === 0) {
+    // Встроенных моделей нет, а сети тоже — поднимать воркер бессмысленно.
+    // Раньше это стоило 80с ожидания и сообщало «движок не запустился» без
+    // причины; теперь говорим прямо, что случилось.
+    throw new Error(
+      !online
+        ? 'в сборке нет языковых моделей OCR (traineddata), а сети нет — переустановите APK'
+        : 'не найдены доступные файлы OCR (ни встроенные, ни CDN)',
+    );
+  }
   const deadline = Date.now() + cfg.budgetMs;
   const errors: string[] = [];
   const withTimeout = <T>(p: Promise<T>, ms: number, label: string): Promise<T> => Promise.race([
@@ -573,9 +586,12 @@ async function openOcrWorker(
     if (left < 15_000) { errors.push(`${a.label}: пропущено (бюджет времени)`); break; }
     // Первая попытка забирает почти всё окно: именно она платит за компиляцию.
     const perAttempt = i === 0 ? left : Math.min(left, 45_000);
-    // Двуязычная модель — основная; одиночная русская — только если первая
-    // упала БЫСТРО (битый/недоступный traineddata), а не по таймауту.
-    const langs = ['rus+eng', 'rus'];
+    // Грузим только те модели, которые реально нашлись (если eng нет —
+    // обходимся русской). Одиночный русский — быстрый повтор, если
+    // двуязычная пачка упала до таймаута.
+    const langs = a.langs.length > 1
+      ? [a.langs.join('+'), a.langs[0]]
+      : a.langs.length === 1 ? [a.langs[0]] : ['rus+eng', 'rus'];
     let mechanismDead = false;
     for (let li = 0; li < langs.length; li++) {
       const leftForLang = deadline - Date.now();
@@ -588,13 +604,22 @@ async function openOcrWorker(
             workerPath: a.workerPath,
             corePath: a.corePath,
             ...(a.langPath ? { langPath: a.langPath } : {}),
+            // Формат моделей зависит от сборки: в APK AAPT распаковывает
+            // `*.gz`, поэтому там модели лежат без суффикса и требуют gzip:false.
+            gzip: a.gzip,
             workerBlobURL: a.blobWorker,
             logger: cfg.logger,
           }),
           timeout,
           `${a.label}/${langs[li]}`,
         );
-        const used = { workerPath: a.workerPath, corePath: a.corePath, langPath: a.langPath, blobWorker: a.blobWorker };
+        const used = {
+          workerPath: a.workerPath,
+          corePath: a.corePath,
+          langPath: a.langPath,
+          gzip: a.gzip,
+          blobWorker: a.blobWorker,
+        };
         return { worker, used };
       } catch (e) {
         const took = Date.now() - startedAt;
@@ -677,7 +702,7 @@ export async function recognizeImageTextOffline(
       },
     });
     worker = boot.worker;
-    lastOcrWorkerSource = `${boot.used.blobWorker ? 'blob' : 'direct'} ${boot.used.workerPath}`;
+    lastOcrWorkerSource = `${boot.used.blobWorker ? 'blob' : 'direct'} ${boot.used.workerPath} (gzip:${boot.used.gzip ? 'on' : 'off'})`;
   } catch (e) {
     lastOcrBootError = (e as Error)?.message || String(e);
     throw new Error(`движок OCR не запустился (worker/core/lang): ${lastOcrBootError}`);

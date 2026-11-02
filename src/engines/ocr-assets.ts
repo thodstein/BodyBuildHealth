@@ -112,12 +112,14 @@ export function tesseractWorkerOptions(src: {
   workerPath: string;
   corePath: string;
   langPath?: string;
-}): { workerPath: string; corePath: string; langPath?: string } {
-  const opts: { workerPath: string; corePath: string; langPath?: string } = {
+  gzip?: boolean;
+}): { workerPath: string; corePath: string; langPath?: string; gzip?: boolean } {
+  const opts: { workerPath: string; corePath: string; langPath?: string; gzip?: boolean } = {
     workerPath: src.workerPath,
     corePath: src.corePath,
   };
   if (src.langPath) opts.langPath = src.langPath;
+  if (typeof src.gzip === 'boolean') opts.gzip = src.gzip;
   return opts;
 }
 
@@ -137,8 +139,11 @@ export async function resolveTesseractOptions(): Promise<{
   corePath: string;
   langPath: string | undefined;
   source: 'local' | 'cdn';
+  /** true — модели берутся как `*.traineddata.gz`, false — как `*.traineddata`. */
+  gzip: boolean;
 }> {
   const local = getOcrAssetPaths('local');
+  const cdn = getOcrAssetPaths('cdn');
   // Capacitor bundles these files into the APK. Some Android WebViews reject
   // HEAD/Range probes even though the bundled assets are readable by Tesseract;
   // probing here would incorrectly switch to an unavailable CDN.
@@ -147,29 +152,128 @@ export async function resolveTesseractOptions(): Promise<{
   // пробовать сеть (CDN) в таком случае бессмысленно и ломает оффлайн-OCR.
   const isNativeLike = isCapacitorNative()
     || (typeof window !== 'undefined' && /^file:|^capacitor:|^ionic:/i.test(window.location?.protocol || ''));
-  if (isNativeLike) return { ...local, source: 'local', langPath: local.langPath };
+  // Языковые модели. Важно: AAPT при упаковке APK РАСПАКОВЫВАЕТ `*.gz`,
+  // поэтому внутри APK файл называется `rus.traineddata` без суффикса —
+  // запрос `rus.traineddata.gz` даёт 404, воркер висит до таймаута и всё
+  // распознавание падает с «движок OCR не запустился». Проверяем оба имени.
+  const langProbe = await detectLocalLangAssets(local.langPath, ['rus', 'eng']);
+  if (langProbe.kind === 'missing') {
+    console.warn('[ocr-assets] local traineddata не найдены, используем CDN.');
+    return { workerPath: cdn.workerPath, corePath: cdn.corePath, langPath: cdn.langPath, source: 'cdn', gzip: true };
+  }
+  if (isNativeLike) {
+    return {
+      workerPath: local.workerPath,
+      corePath: local.corePath,
+      langPath: local.langPath,
+      source: 'local',
+      gzip: langProbe.gzip,
+    };
+  }
   const workerOk = await localAssetAvailable(local.workerPath);
   if (workerOk) {
     // Ядро, которое getCore запросит первым на большинстве современных
-    // телефонов (relaxed-SIMD + LSTM). Плюс русская модель — без неё
-    // русскоязычные бланки не разбираются даже при живом воркере.
+    // телефонов (relaxed-SIMD + LSTM). Без него воркер падает уже внутри
+    // с "Failed to load TesseractCore".
     const coreProbe = `${local.corePath.replace(/\/$/, '')}/tesseract-core-lstm.wasm.js`;
-    // Локальный langPath задан всегда — пробуем именно русскую модель.
-    const langBase = local.langPath as string;
-    const langProbe = `${langBase.replace(/\/$/, '')}/rus.traineddata.gz`;
-    const [coreOk, langOk] = await Promise.all([
-      localAssetAvailable(coreProbe),
-      localAssetAvailable(langProbe),
-    ]);
-    if (coreOk && langOk) {
-      return { workerPath: local.workerPath, corePath: local.corePath, langPath: local.langPath, source: 'local' };
+    const coreOk = await localAssetAvailable(coreProbe);
+    if (coreOk) {
+      return {
+        workerPath: local.workerPath,
+        corePath: local.corePath,
+        langPath: local.langPath,
+        source: 'local',
+        gzip: langProbe.gzip,
+      };
     }
-    console.warn('[ocr-assets] local tesseract core/lang incomplete, falling back to CDN.');
+    console.warn('[ocr-assets] local tesseract core incomplete, falling back to CDN.');
   } else {
     console.warn('[ocr-assets] local tesseract worker not reachable, falling back to CDN.');
   }
-  const cdn = getOcrAssetPaths('cdn');
-  return { workerPath: cdn.workerPath, corePath: cdn.corePath, langPath: cdn.langPath, source: 'cdn' };
+  return { workerPath: cdn.workerPath, corePath: cdn.corePath, langPath: cdn.langPath, source: 'cdn', gzip: true };
+}
+
+/** Статус одного URL ассета: HTTP-код либо «запрос не дошёл». */
+interface AssetStatus {
+  status: number | null;
+  unreachable: boolean;
+  contentType: string;
+}
+
+/**
+ * Дешёвая проверка существования ассета: GET + сразу отменяем тело.
+ * HEAD/Range в Capacitor WebView отвечают ошибкой даже на существующие
+ * файлы, поэтому используем обычный GET (для локальных ассетов он бесплатный).
+ */
+async function probeAssetStatus(url: string): Promise<AssetStatus> {
+  try {
+    const res = await fetch(url, { method: 'GET', cache: 'no-store' });
+    const contentType = res.headers?.get?.('content-type') || '';
+    try { await res.body?.cancel(); } catch { /* ignore */ }
+    return { status: res.status, unreachable: false, contentType };
+  } catch {
+    return { status: null, unreachable: true, contentType: '' };
+  }
+}
+
+/** Ассет реально существует (SPA-фолбэк с index.html не считается). */
+function assetPresent(s: AssetStatus): boolean {
+  if (s.unreachable || s.status === null) return false;
+  if (s.status < 200 || s.status >= 300) return false;
+  return !/text\/html/i.test(s.contentType);
+}
+
+export interface OcrLangProbe {
+  /** found — файлы есть; missing — сервер явно ответил 404; unknown — проверить нельзя. */
+  kind: 'found' | 'missing' | 'unknown';
+  /** true — модели лежат как `*.traineddata.gz`. */
+  gzip: boolean;
+  /** Языки, которые реально нашлись (могут быть не все). */
+  langs: string[];
+}
+
+let cachedLangProbe: { key: string; value: OcrLangProbe } | null = null;
+
+/** Сброс кэша проверки моделей (тесты, диагностика, повторная попытка). */
+export function resetOcrLangProbeCache(): void {
+  cachedLangProbe = null;
+}
+
+/**
+ * Определить, в каком виде лежат языковые модели и какие языки доступны.
+ *
+ * Порядок важен: сначала ищем несжатые `*.traineddata` (так они лежат внутри
+ * APK), затем `*.traineddata.gz` (так они лежат в dist/ и в OTA-бандле).
+ * Если ни один запрос не дошёл (нет fetch / политика WebView), возвращаем
+ * `unknown` — вызывающий код должен попробовать локальные ассеты как раньше,
+ * а не объявлять их отсутствующими.
+ */
+export async function detectLocalLangAssets(
+  langPath: string | undefined,
+  want: string[],
+): Promise<OcrLangProbe> {
+  const base = (langPath || '').replace(/\/$/, '');
+  if (!base || typeof fetch !== 'function') {
+    return { kind: 'unknown', gzip: true, langs: want };
+  }
+  const key = `${base}|${want.join(',')}`;
+  if (cachedLangProbe?.key === key) return cachedLangProbe.value;
+  const remember = (value: OcrLangProbe): OcrLangProbe => {
+    cachedLangProbe = { key, value };
+    return value;
+  };
+  for (const gzip of [false, true]) {
+    // Параллельно: иначе на медленном WebView проверка съедает лишние секунды.
+    const statuses = await Promise.all(
+      want.map((lang) => probeAssetStatus(`${base}/${lang}.traineddata${gzip ? '.gz' : ''}`)),
+    );
+    const found = want.filter((_lang, i) => assetPresent(statuses[i]));
+    const unreachable = statuses.filter((s) => s.unreachable).length;
+    if (found.length > 0) return remember({ kind: 'found', gzip, langs: found });
+    // Ни один запрос не дошёл — это не «файла нет», а «не проверить».
+    if (unreachable >= want.length) return remember({ kind: 'unknown', gzip: true, langs: want });
+  }
+  return remember({ kind: 'missing', gzip: true, langs: want });
 }
 
 /** Одна попытка поднять воркер tesseract. */
@@ -179,6 +283,10 @@ export interface OcrWorkerAttempt {
   workerPath: string;
   corePath: string;
   langPath?: string;
+  /** true — модели запрашиваются как `*.traineddata.gz`, false — без сжатия. */
+  gzip: boolean;
+  /** Языки, реально доступные в этой попытке (rus+eng или только rus). */
+  langs: string[];
   source: 'local' | 'cdn';
   /** true — воркер создаётся из Blob (importScripts), false — напрямую по URL. */
   blobWorker: boolean;
@@ -188,56 +296,57 @@ export interface OcrWorkerAttempt {
  * Упорядоченный список попыток запуска воркера.
  *
  * Порядок важен: локальные ассеты лежат в APK/dist и не требуют сети, поэтому
- * пробуем их ПЕРВЫМИ и без предварительного HEAD-проба (WebView умеет отвечать
- * ошибкой на HEAD, хотя сам файл читается). CDN — только последняя попытка и
- * только когда устройство в сети: в офлайне он гарантированно даёт
- * «Failed to fetch», который пользователь видит как «нет соединения».
+ * пробуем их ПЕРВЫМИ. CDN — только последняя попытка и только когда устройство
+ * в сети: в офлайне он гарантированно даёт «Failed to fetch», который
+ * пользователь видит как «нет соединения».
  *
- * В АПК дополнительно перебираем два механизма создания воркера: прямой URL
- * (работает в Capacitor WebView) и Blob-обёртка (обходной путь, если WebView
- * отказывается грузить скрипт воркера из перехваченного `https://localhost`).
+ * Формат моделей определяется на месте (см. detectLocalLangAssets): в APK
+ * AAPT распаковывает `*.gz`, поэтому там файлы лежат без суффикса и запрос
+ * `rus.traineddata.gz` отдаёт 404 — именно это вешало OCR на 83с таймаута.
+ *
+ * В АПК перебираем два механизма создания воркера: Blob (штатный для
+ * tesseract.js и не зависящий от того, как WebView отдаёт скрипт воркера по
+ * абсолютному URL) и прямой URL.
  */
-export function tesseractWorkerAttempts(opts?: {
+export async function tesseractWorkerAttempts(opts?: {
   nativeLike?: boolean;
   online?: boolean;
-}): OcrWorkerAttempt[] {
+  langs?: string[];
+}): Promise<OcrWorkerAttempt[]> {
   const nativeLike = opts?.nativeLike === true;
   const online = opts?.online !== false;
+  const want = opts?.langs ?? ['rus', 'eng'];
   const local = getOcrAssetPaths('local');
   const cdn = getOcrAssetPaths('cdn');
   // В APK ядро выбираем явно (-lstm): SIMD-проба на старых WebView даёт
   // ложное срабатывание, после которого падает компиляция wasm.
   const nativeCore = (corePath: string) => `${corePath.replace(/\/$/, '')}/tesseract-core-lstm.wasm.js`;
+  const langProbe = await detectLocalLangAssets(local.langPath, want);
   const list: OcrWorkerAttempt[] = [];
-  if (nativeLike) {
-    // Blob-воркер первым: это штатный механизм tesseract.js (он же работает в
-    // десктопном Chromium), и он не зависит от того, как WebView отдаёт скрипт
-    // воркера по абсолютному `https://localhost`-URL.
-    list.push({
-      label: 'local-blob',
-      workerPath: local.workerPath,
-      corePath: nativeCore(local.corePath),
+  // Если сервер ЯВНО ответил 404 на все варианты — локальных моделей нет,
+  // тратить 80с на заведомо провальный запуск воркера незачем.
+  if (langProbe.kind !== 'missing') {
+    const shared = {
       langPath: local.langPath,
-      source: 'local',
-      blobWorker: true,
-    });
-    list.push({
-      label: 'local-direct',
-      workerPath: local.workerPath,
-      corePath: nativeCore(local.corePath),
-      langPath: local.langPath,
-      source: 'local',
-      blobWorker: false,
-    });
-  } else {
-    list.push({
-      label: 'local-blob',
-      workerPath: local.workerPath,
-      corePath: local.corePath,
-      langPath: local.langPath,
-      source: 'local',
-      blobWorker: true,
-    });
+      gzip: langProbe.gzip,
+      langs: langProbe.langs.length > 0 ? langProbe.langs : want,
+      source: 'local' as const,
+    };
+    const pushLocal = (label: string, blobWorker: boolean) => {
+      list.push({
+        label,
+        workerPath: local.workerPath,
+        corePath: nativeLike ? nativeCore(local.corePath) : local.corePath,
+        ...shared,
+        blobWorker,
+      });
+    };
+    if (nativeLike) {
+      pushLocal('local-blob', true);
+      pushLocal('local-direct', false);
+    } else {
+      pushLocal('local-blob', true);
+    }
   }
   if (online) {
     list.push({
@@ -245,6 +354,9 @@ export function tesseractWorkerAttempts(opts?: {
       workerPath: cdn.workerPath,
       corePath: cdn.corePath,
       langPath: cdn.langPath,
+      // jsdelivr отдаёт модели сжатыми.
+      gzip: true,
+      langs: want,
       source: 'cdn',
       blobWorker: true,
     });
@@ -269,18 +381,19 @@ export async function probeOcrAssets(): Promise<OcrAssetProbe[]> {
     local.workerPath,
     `${base}/tesseract-core-lstm.wasm.js`,
     `${base}/tesseract-core-lstm.wasm`,
+    // Оба имени: в APK модели распакованы (без .gz), в dist/OTA — сжатые.
+    lang ? `${lang}/rus.traineddata` : '',
     lang ? `${lang}/rus.traineddata.gz` : '',
+    lang ? `${lang}/eng.traineddata` : '',
     lang ? `${lang}/eng.traineddata.gz` : '',
   ].filter(Boolean);
   const out: OcrAssetProbe[] = [];
   for (const url of urls) {
-    try {
-      const res = await fetch(url, { method: 'GET', cache: 'no-store' });
-      // Тело не читаем: достаточно статуса и того, что запрос не заблокирован.
-      out.push({ url, ok: res.ok, status: res.status });
-      try { await res.body?.cancel(); } catch { /* ignore */ }
-    } catch (e) {
-      out.push({ url, ok: false, status: null, error: (e as Error)?.message || String(e) });
+    const st = await probeAssetStatus(url);
+    if (st.unreachable) {
+      out.push({ url, ok: false, status: null, error: 'запрос не дошёл' });
+    } else {
+      out.push({ url, ok: assetPresent(st), status: st.status });
     }
   }
   return out;
