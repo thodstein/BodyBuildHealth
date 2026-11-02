@@ -226,6 +226,13 @@ export interface BarRepSegment {
   yMin: number;
   xLoop: number;
   vmax: number;
+  /**
+   * Средняя скорость **концентрической фазы** (низ → верх), м/с: вертикальное
+   * смещение / время. Это другая величина, чем vmax: MVT и LVP считаются по
+   * средней, а пик всегда выше неё. Поле необязательное, потому что старые
+   * сохранённые серии его не содержат — и выдумывать его задним числом нельзя.
+   */
+  vMean?: number;
   xBias: number;
   durationMs: number;
   /** Номер подхода внутри тренировки (1-based). Не задан → считается первый подход. */
@@ -314,6 +321,10 @@ export function segmentBarReps(
     const slice = points.slice(a, b + 1);
     const m = analyzeBarTracking(slice);
     if (!m) continue;
+    // Средняя скорость концентрической фазы: амплитуда (см) / время (с) → м/с.
+    // Это измеренные точки, без модели: поворот камеры вокруг вертикали вертикаль
+    // не искажает, поэтому величина так же устойчива к ракурсу, как vmax.
+    const vMean = Math.round((amplitude / 100) / (durationMs / 1000) * 100) / 100;
     reps.push({
       index: reps.length + 1,
       points: m.points,
@@ -324,6 +335,7 @@ export function segmentBarReps(
       yMin: Math.round(Math.min(...ys.slice(a, b + 1))),
       xLoop: m.xLoop,
       vmax: m.vmax,
+      ...(vMean > 0 ? { vMean } : {}),
       xBias: m.xBias,
       durationMs,
     });
@@ -881,6 +893,11 @@ export interface BarRepSnapshot {
   cosPhi?: number;
   /** Измеренное отклонение камеры, град (для подписи в сравнении). */
   angleDeg?: number;
+  /**
+   * Средняя скорость концентрической фазы, м/с — то, с чем сравнивают MVT/LVP.
+   * Без неё сравнение сессий идёт по пиковой, и это должно быть видно.
+   */
+  vMean?: number;
 }
 
 /** Ракурс, под которым снят повтор: переносится в снимок, чтобы пережить перезагрузку. */
@@ -909,6 +926,10 @@ export function snapshotBarRep(rep: BarRepSegment, maxPoints = 24, camera?: BarR
     : null;
   const azRaw = camera?.azimuthDeg;
   const angleDeg = azRaw != null && Number.isFinite(azRaw) && azRaw >= 0 && azRaw <= 90 ? Math.round(azRaw) : null;
+  const vMeanRaw = (rep as { vMean?: unknown }).vMean;
+  const vMean = typeof vMeanRaw === 'number' && Number.isFinite(vMeanRaw) && vMeanRaw > 0 && vMeanRaw < 20
+    ? Math.round(vMeanRaw * 100) / 100
+    : null;
   return {
     index: rep.index,
     vmax: Math.round(rep.vmax * 100) / 100,
@@ -918,6 +939,7 @@ export function snapshotBarRep(rep: BarRepSegment, maxPoints = 24, camera?: BarR
     ...(rep.setIndex && rep.setIndex > 0 ? { setIndex: Math.round(rep.setIndex) } : {}),
     ...(cosPhi != null ? { cosPhi } : {}),
     ...(angleDeg != null ? { angleDeg } : {}),
+    ...(vMean != null ? { vMean } : {}),
   };
 }
 
@@ -982,6 +1004,15 @@ export interface BarSessionCompare {
   deltaPct: number;
   deltaXLoopCm: number;
   deltaAmplitudeCm: number;
+  /**
+   * Средняя скорость концентрической фазы: прошлая и текущая, м/с (undefined —
+   * не записана). Сравнение идёт по vmax, а средняя едет рядом, чтобы пик не
+   * выдавался за величину, по которой считают MVT.
+   */
+  prevVMean?: number;
+  curVMean?: number;
+  /** Δ средней скорости, %: считается только когда обе сессии её знают. */
+  deltaVMeanPct?: number;
   verdict: 'better' | 'same' | 'worse';
   text: string;
 }
@@ -994,9 +1025,18 @@ export function compareBarSessions(prev: BarRepSnapshot | null | undefined, cur:
   const deltaAmplitudeCm = Math.round((cur.amplitude - prev.amplitude) * 10) / 10;
   const verdict: BarSessionCompare['verdict'] = deltaPct <= -5 ? 'worse' : deltaPct >= 5 ? 'better' : 'same';
   const head = verdict === 'worse' ? 'vmax ниже прошлой сессии' : verdict === 'better' ? 'vmax выше прошлой сессии' : 'vmax на уровне прошлой сессии';
+  const pvm = typeof prev.vMean === 'number' && Number.isFinite(prev.vMean) && prev.vMean > 0 ? prev.vMean : null;
+  const cvm = typeof cur.vMean === 'number' && Number.isFinite(cur.vMean) && cur.vMean > 0 ? cur.vMean : null;
+  const deltaVMeanPct = pvm != null && cvm != null ? Math.round(((cvm - pvm) / pvm) * 100) : null;
+  const meanTail = deltaVMeanPct != null
+    ? ` · средняя (концентрическая) ${pvm!.toFixed(2)} → ${cvm!.toFixed(2)} м/с (${deltaVMeanPct > 0 ? '+' : ''}${deltaVMeanPct}%)`
+    : '';
   return {
     prevVmax: prev.vmax, curVmax: cur.vmax, deltaPct, deltaXLoopCm, deltaAmplitudeCm, verdict,
-    text: `${head}: ${prev.vmax.toFixed(2)} → ${cur.vmax.toFixed(2)} м/с (${deltaPct > 0 ? '+' : ''}${deltaPct}%) · xLoop ${deltaXLoopCm > 0 ? '+' : ''}${deltaXLoopCm} см`,
+    ...(pvm != null ? { prevVMean: pvm } : {}),
+    ...(cvm != null ? { curVMean: cvm } : {}),
+    ...(deltaVMeanPct != null ? { deltaVMeanPct } : {}),
+    text: `${head}: ${prev.vmax.toFixed(2)} → ${cur.vmax.toFixed(2)} м/с (${deltaPct > 0 ? '+' : ''}${deltaPct}%) · xLoop ${deltaXLoopCm > 0 ? '+' : ''}${deltaXLoopCm} см${meanTail}`,
   };
 }
 
@@ -1045,6 +1085,8 @@ export interface BarSetStat {
   /** Минимальный vmax подхода (худший повтор), м/с. */
   vmaxMin: number;
   xLoopMean: number;
+  /** Средняя по повторам vMean (концентрическая фаза), м/с — только если она измерена. */
+  vMeanMean?: number;
 }
 
 export function barSetStats(reps: BarRepSegment[]): BarSetStat[] {
@@ -1058,13 +1100,59 @@ export function barSetStats(reps: BarRepSegment[]): BarSetStat[] {
   const mean = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : 0);
   return [...bySet.entries()]
     .sort((a, b) => a[0] - b[0])
-    .map(([setIndex, list]) => ({
-      setIndex,
-      reps: list.length,
-      vmaxMean: Math.round(mean(list.map((r) => r.vmax)) * 100) / 100,
-      vmaxMin: Math.round(Math.min(...list.map((r) => r.vmax)) * 100) / 100,
-      xLoopMean: Math.round(mean(list.map((r) => r.xLoop)) * 10) / 10,
-    }));
+    .map(([setIndex, list]) => {
+      const means = list.map((r) => r.vMean).filter((v): v is number => typeof v === 'number' && Number.isFinite(v) && v > 0);
+      return {
+        setIndex,
+        reps: list.length,
+        vmaxMean: Math.round(mean(list.map((r) => r.vmax)) * 100) / 100,
+        vmaxMin: Math.round(Math.min(...list.map((r) => r.vmax)) * 100) / 100,
+        xLoopMean: Math.round(mean(list.map((r) => r.xLoop)) * 10) / 10,
+        ...(means.length ? { vMeanMean: Math.round(mean(means) * 100) / 100 } : {}),
+      };
+    });
+}
+
+/** Сводка по средней скорости концентрической фазы (то, с чем сравнивают MVT/LVP). */
+export interface MeanVelocitySummary {
+  /** Средняя по повторам vMean, м/с. */
+  mean: number;
+  /** Пиковая vmax по тем же повторам, м/с (0 — пик не записан). */
+  peak: number;
+  /** Сколько повторов дали vMean. */
+  reps: number;
+  /** Во сколько раз пик выше средней (0 — неизвестно). */
+  peakToMean: number;
+  text: string;
+}
+
+/**
+ * Средняя скорость концентрической фазы словами и числами.
+ *
+ * Зачем отдельная сводка: у нас есть только vmax (пик), а MVT и нагрузочно-скоростной
+ * профиль в литературе считаются по **средней** скорости концентрической фазы. Пик
+ * всегда выше средней, поэтому подстановка одного вместо другого систематически
+ * завышает результат — и молчать об этом нельзя. Считается только по замерам
+ * (`vMean`), никакой модели: нет данных — `null`.
+ */
+export function meanVelocitySummary(
+  reps: Array<{ vmax?: number; vMean?: number }> | null | undefined,
+): MeanVelocitySummary | null {
+  if (!Array.isArray(reps) || !reps.length) return null;
+  const means = reps
+    .map((r) => r.vMean)
+    .filter((v): v is number => typeof v === 'number' && Number.isFinite(v) && v > 0 && v < 20);
+  if (!means.length) return null;
+  const mean = Math.round((means.reduce((a, b) => a + b, 0) / means.length) * 100) / 100;
+  const peaks = reps
+    .map((r) => r.vmax)
+    .filter((v): v is number => typeof v === 'number' && Number.isFinite(v) && v > 0);
+  const peak = peaks.length ? Math.round(Math.max(...peaks) * 100) / 100 : 0;
+  const peakToMean = peak > 0 && mean > 0 ? Math.round((peak / mean) * 10) / 10 : 0;
+  const text = `Средняя скорость концентрической фазы: ${mean} м/с (${means.length} повт.`
+    + (peak > 0 ? `, пиковая ${peak} м/с — в ${peakToMean} раза выше` : '')
+    + '). MVT и LVP считаются по средней скорости, а не по пиковой: не подставляйте одно вместо другого.';
+  return { mean, peak, reps: means.length, peakToMean, text };
 }
 
 /** Сравнение «первый подход vs последний подход» по одноимённым повторам. */

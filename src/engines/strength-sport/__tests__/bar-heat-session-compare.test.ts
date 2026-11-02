@@ -4,6 +4,7 @@ import {
   BAR_HEAT_COLORS,
   snapshotBarRep,
   compareBarSessions,
+  meanVelocitySummary,
   segmentBarReps,
   type BarPoint,
   type BarRepSnapshot,
@@ -74,6 +75,14 @@ describe('snapshotBarRep — компактное представление п�
     const empty = { index: 1, vmax: 0, xLoop: 0, amplitude: 0, points: [] } as unknown as Parameters<typeof snapshotBarRep>[0];
     expect(snapshotBarRep(empty).points).toEqual([]);
   });
+
+  it('средняя скорость переживает снимок, а старые снимки остаются без неё', () => {
+    const snap = snapshotBarRep(rep);
+    expect(snap.vMean).toBeCloseTo(Math.round(rep.vMean! * 100) / 100, 5);
+    // Серия, сохранённая до этой волны, не получает поле задним числом.
+    expect('vMean' in snapshotBarRep({ ...rep, vMean: undefined })).toBe(false);
+    expect('vMean' in snapshotBarRep({ ...rep, vMean: 0 })).toBe(false);
+  });
 });
 
 describe('compareBarSessions — «прошлая сессия vs текущая»', () => {
@@ -102,5 +111,51 @@ describe('compareBarSessions — «прошлая сессия vs текущая
     expect(compareBarSessions(null, base)).toBeNull();
     expect(compareBarSessions(base, null)).toBeNull();
     expect(compareBarSessions({ ...base, vmax: 0 }, base)).toBeNull();
+  });
+
+  it('средняя скорость едет рядом с пиковой и не подменяет её', () => {
+    const cmp = compareBarSessions(
+      { ...base, vMean: 0.4 },
+      { ...base, vmax: 0.5, vMean: 0.44 },
+    );
+    expect(cmp?.prevVMean).toBe(0.4);
+    expect(cmp?.curVMean).toBe(0.44);
+    expect(cmp?.deltaVMeanPct).toBe(10);
+    expect(cmp?.text).toContain('средняя (концентрическая)');
+    // Вердикт по-прежнему по vmax: средняя его не перебивает.
+    expect(cmp?.verdict).toBe('same');
+  });
+
+  it('без средней скорости дельты нет — текста про неё тоже', () => {
+    const cmp = compareBarSessions(base, { ...base, vmax: 0.55 });
+    expect(cmp?.deltaVMeanPct).toBeUndefined();
+    expect(cmp?.text).not.toContain('средняя');
+  });
+});
+
+describe('meanVelocitySummary — средняя скорость, а не пиковая', () => {
+  it('считает среднее по повторам и отношение к пику', () => {
+    const s = meanVelocitySummary([{ vmax: 0.8, vMean: 0.4 }, { vmax: 0.7, vMean: 0.5 }]);
+    expect(s?.mean).toBe(0.45);
+    expect(s?.peak).toBe(0.8);
+    expect(s?.reps).toBe(2);
+    expect(s?.peakToMean).toBe(1.8);
+    expect(s?.text).toContain('концентрической');
+    expect(s?.text).toContain('MVT');
+  });
+
+  it('пик не записан — средняя всё равно есть, без выдуманного отношения', () => {
+    const s = meanVelocitySummary([{ vMean: 0.42 }]);
+    expect(s?.mean).toBe(0.42);
+    expect(s?.peak).toBe(0);
+    expect(s?.peakToMean).toBe(0);
+    expect(s?.text).toContain('0.42 м/с');
+  });
+
+  it('нет замеров средней — null, а не средняя из пиковой', () => {
+    expect(meanVelocitySummary([])).toBeNull();
+    expect(meanVelocitySummary(null)).toBeNull();
+    expect(meanVelocitySummary([{ vmax: 0.7 }])).toBeNull();
+    expect(meanVelocitySummary([{ vMean: NaN }, { vMean: -1 }])).toBeNull();
   });
 });

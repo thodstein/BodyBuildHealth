@@ -346,6 +346,12 @@ mustContain('src/ui/screens/TrainingScreen_parts/LiftMasterCard.tsx', 'reference
 mustContain('src/ui/screens/TrainingScreen_parts/LiftMasterCard.tsx', 'data-lift="ref-head-first"', 'which end is the head');
 mustContain('src/ui/screens/TrainingScreen_parts/LiftMasterCard.tsx', 'data-lift="ref-mirror"', 'mirrored frame bit');
 mustContain('src/ui/screens/TrainingScreen_parts/LiftMasterCard.tsx', 'data-lift="ref-side"', 'measured side line in hub');
+// Средняя скорость концентрической фазы: MVT/LVP считаются по ней, а пиковая всегда
+// выше — значит это два разных числа, и путать их в отчёте нельзя.
+mustContain('src/engines/strength-sport/strength-sport-video.engine.ts', 'export function meanVelocitySummary', 'mean concentric velocity');
+mustContain('src/engines/pro/movement-diagnostics-export.engine.ts', 'Средняя скорость (концентрическая), м/с', 'mean velocity in report');
+mustContain('src/engines/pro/movement-diagnostics-export.engine.ts', 'Средняя или пиковая', 'mean vs peak caveat');
+mustContain('src/ui/screens/TrainingScreen_parts/LiftMasterCard.tsx', 'data-lift="kinovea-vmean"', 'mean velocity line in hub');
 
 // 7d. Mojibake-бан: битые символы (U+FFFD) в файлах хаба — признак порванной кодировки.
 // В LiftMasterCard их было 11 (тексты VBT/LVP/Kinovea), и это попадало в UI АПК.

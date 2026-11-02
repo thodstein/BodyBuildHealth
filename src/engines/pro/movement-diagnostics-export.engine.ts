@@ -46,6 +46,13 @@ export interface MovementDiagnosticsExportInput {
   kinoveaTurnoverMs?: number | null;
   /** Сколько повторов нарезано из Kinovea-серии (overlay первый vs последний). */
   kinoveaReps?: number | null;
+  /**
+   * Средняя скорость концентрической фазы по видео, м/с. Другая величина, чем vmax:
+   * MVT и нагрузочно-скоростной профиль считаются по средней, а пик всегда выше.
+   */
+  videoVMeanMS?: number | null;
+  /** Оговорка «средняя, а не пиковая» — числа иначе не сопоставить с MVT/LVP. */
+  videoVMeanNote?: string | null;
   /** Overlay: изменение vmax первого→последнего повтора, % (отрицательное = потеря). */
   overlayVelocityLossPct?: number | null;
   /** Heatmap: доля «медленных» отрезков траектории, %. */
@@ -253,6 +260,8 @@ export function buildMovementDiagnosticsCsv(inp: MovementDiagnosticsExportInput)
     ['Kinovea смещение, см', inp.kinoveaXBias != null ? String(inp.kinoveaXBias) : '—'],
     ['Kinovea turnover, мс', inp.kinoveaTurnoverMs != null ? String(inp.kinoveaTurnoverMs) : '—'],
     ['Kinovea повторов, шт', inp.kinoveaReps != null ? String(inp.kinoveaReps) : '—'],
+    ['Средняя скорость (концентрическая), м/с', inp.videoVMeanMS != null ? String(inp.videoVMeanMS) : '—'],
+    ['Средняя или пиковая', inp.videoVMeanNote || '—'],
     ['Overlay потеря vmax, %', inp.overlayVelocityLossPct != null ? String(inp.overlayVelocityLossPct) : '—'],
     ['Heatmap медленных отрезков, %', inp.heatSlowPct != null ? String(inp.heatSlowPct) : '—'],
     ['Точка срыва, см', inp.heatStickingHeightCm != null ? String(inp.heatStickingHeightCm) : '—'],
@@ -346,6 +355,8 @@ export function buildMovementDiagnosticsHtml(inp: MovementDiagnosticsExportInput
     + (inp.kinoveaXBias != null ? li('Kinovea смещение', `${fmt(inp.kinoveaXBias, 1)} см`) : '')
     + (inp.kinoveaTurnoverMs != null ? li('Kinovea turnover', `${inp.kinoveaTurnoverMs} мс`) : '')
     + (inp.kinoveaReps != null ? li('Kinovea повторов', `${inp.kinoveaReps} шт`) : '')
+    + (inp.videoVMeanMS != null ? li('Средняя скорость (концентрическая)', `${fmt(inp.videoVMeanMS, 2)} м/с`) : '')
+    + (inp.videoVMeanNote ? li('Средняя или пиковая', inp.videoVMeanNote) : '')
     + (inp.overlayVelocityLossPct != null ? li('Overlay: потеря vmax', `${fmt(inp.overlayVelocityLossPct, 0)}% от первого повтора к последнему`) : '')
     + (inp.heatSlowPct != null
       ? li(

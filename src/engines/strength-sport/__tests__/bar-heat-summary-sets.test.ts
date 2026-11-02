@@ -78,6 +78,16 @@ describe('barSetStats / barSetOverlay — подход vs подход', () => {
     expect(stats[1].vmaxMean).toBe(0.45);
   });
 
+  it('средняя скорость подхода считается только по измеренным повторам', () => {
+    const withMean = { ...rep(1, 0.6, 1), vMean: 0.4 };
+    const also = { ...rep(2, 0.55, 1), vMean: 0.5 };
+    const stats = barSetStats([withMean, also, rep(3, 0.45, 1)]);
+    // Третий повтор средней не знает — он не тянет среднее к нулю.
+    expect(stats[0].vMeanMean).toBe(0.45);
+    // Нет ни одного измерения — поля просто нет, а не «0 м/с».
+    expect('vMeanMean' in barSetStats([rep(1, 0.6, 1)])[0]).toBe(false);
+  });
+
   it('overlay сравнивает первый и последний подход, падение — отрицательный Δ', () => {
     const o = barSetOverlay([rep(1, 0.6, 1), rep(2, 0.58, 1), rep(3, 0.45, 2)]);
     expect(o).toBeTruthy();

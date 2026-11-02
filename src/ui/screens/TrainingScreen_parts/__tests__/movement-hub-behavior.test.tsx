@@ -1324,6 +1324,30 @@ describe('LiftMasterCard — поведение (не только смоук)',
     expect(fix.textContent).toContain('поправка +15.5%');
   });
 
+  it('средняя скорость концентрической фазы — рядом с пиковой, а не вместо неё', () => {
+    const csv = ['time,x,y'];
+    for (let i = 0; i < 20; i++) csv.push(`${(i * 0.05).toFixed(2)},${100 + i * 1.5},${50 + i * 4}`);
+    const { container } = render(<LiftMasterCard sessions={[]} />);
+    act(() => { fireEvent.change(container.querySelector('[data-lift="kinovea-text"]')!, { target: { value: csv.join('\n') } }); });
+    click(container.querySelector('[data-lift="parse-kinovea"]'));
+    const line = container.querySelector('[data-lift="kinovea-vmean"]')!;
+    expect(line.textContent).toContain('Средняя скорость концентрической фазы');
+    // Оговорка — часть строки: без неё число подставят в MVT вместо средней.
+    expect(line.textContent).toContain('MVT');
+    // Пиковая осталась своим числом в сообщении разбора.
+    expect(container.querySelector('[data-lift="kinovea-msg"]')!.textContent).toContain('vmax');
+    // Средняя видна и по подходу: она не теряется среди повторов.
+    expect(container.querySelector('[data-lift="rep-series"]')!.textContent).toContain('ср. vMean');
+  });
+
+  it('средняя не выдумана, если серия не дала полного повтора', () => {
+    const { container } = render(<LiftMasterCard sessions={[]} />);
+    act(() => { fireEvent.change(container.querySelector('[data-lift="kinovea-text"]')!, { target: { value: 'time,x,y\n0,0,0\n0.1,1,10\n0.2,2,20\n0.3,3,30' } }); });
+    click(container.querySelector('[data-lift="parse-kinovea"]'));
+    // 4 точки — не повтор: строки средней нет вовсе, а не «0 м/с».
+    expect(container.querySelector('[data-lift="kinovea-vmean"]')).toBeNull();
+  });
+
   it('интерактивные элементы хаба не меньше 44 px', () => {
     const { container } = render(<LiftMasterCard sessions={[]} />);
     // «Быстрый старт» исчезает после первых данных — проверяем до заполнения.

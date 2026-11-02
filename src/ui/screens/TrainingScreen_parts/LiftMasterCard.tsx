@@ -44,7 +44,7 @@ import { getPLWeakGroupExerciseCandidates, diagnosticProtocolFromCycle } from '.
 import type { SRCycleTemplate } from '../../../data/lms-cycles/lms-types';
 import { applyToPlanner } from './planner-bridge';
 import { getExerciseById } from '../../../core/exercise-catalog';
-import { parseKinoveaCSV, analyzeBarTracking, segmentBarReps, barRepOverlay, videoQualityForCapture, cameraAngleCheck, cameraAngleShortLine, sideConflictCheck, sessionAngleMismatch, barDriftDirection, barSpeedHeat, BAR_HEAT_COLORS, snapshotBarRep, compareBarSessions, barSetStats, barSetOverlay, heatSummary, scaleBarPoints, repSetIndex, type BarRepCamera, type BarTrackingResult, type BarRepSegment, type BarRepSnapshot, type VideoCaptureMeta, type VideoSide } from '../../../engines/strength-sport/strength-sport-video.engine';
+import { parseKinoveaCSV, analyzeBarTracking, segmentBarReps, barRepOverlay, videoQualityForCapture, cameraAngleCheck, cameraAngleShortLine, sideConflictCheck, sessionAngleMismatch, barDriftDirection, meanVelocitySummary, barSpeedHeat, BAR_HEAT_COLORS, snapshotBarRep, compareBarSessions, barSetStats, barSetOverlay, heatSummary, scaleBarPoints, repSetIndex, type BarRepCamera, type BarTrackingResult, type BarRepSegment, type BarRepSnapshot, type VideoCaptureMeta, type VideoSide } from '../../../engines/strength-sport/strength-sport-video.engine';
 import { barLoopFlag } from '../../../engines/pro/bar-path-core.engine';
 import { diagnoseAsymmetry } from '../../../engines/pro/pl-asymmetry.engine';
 import { RULE_CHECKS, checkLiftRules } from '../../../engines/pro/pl-competition-rules.engine';
@@ -586,7 +586,10 @@ function cleanSeries(raw: unknown): NonNullable<MasterState['series']> {
       const camera = Number.isFinite(cosRaw2) && cosRaw2 > 0 && cosRaw2 <= 1.12
         ? { cosPhi: cosRaw2, angleDeg: Number.isFinite(azRaw) && azRaw >= 0 && azRaw <= 90 ? Math.round(azRaw) : null }
         : undefined;
-      reps.push({ index: Number.isFinite(index) ? index : reps.length + 1, vmax, xLoop, amplitude, points: pts, setIndex: (() => { const s = Number(r.setIndex); return Number.isFinite(s) && s > 0 ? Math.round(s) : undefined; })(), ...(camera ? { cosPhi: camera.cosPhi, ...(camera.angleDeg != null ? { angleDeg: camera.angleDeg } : {}) } : {}) });
+      // Средняя скорость: только правдоподобное значение, иначе поля просто нет.
+      const vmRaw = Number(r.vMean);
+      const vMean = Number.isFinite(vmRaw) && vmRaw > 0 && vmRaw < 20 ? Math.round(vmRaw * 100) / 100 : null;
+      reps.push({ index: Number.isFinite(index) ? index : reps.length + 1, vmax, xLoop, amplitude, points: pts, setIndex: (() => { const s = Number(r.setIndex); return Number.isFinite(s) && s > 0 ? Math.round(s) : undefined; })(), ...(camera ? { cosPhi: camera.cosPhi, ...(camera.angleDeg != null ? { angleDeg: camera.angleDeg } : {}) } : {}), ...(vMean != null ? { vMean } : {}) });
     }
     if (reps.length) {
       const w = Number(val.weightKg);
@@ -1060,6 +1063,12 @@ export const LiftMasterCard: React.FC<{
   /** Подходы: средний vmax по подходу и сравнение «первый подход vs последний». */
   const kinoveaSetStats = useMemo(()=> barSetStats(kinoveaReps), [kinoveaReps]);
   const kinoveaSetOverlay = useMemo(()=> barSetOverlay(kinoveaReps), [kinoveaReps]);
+  /**
+   * Средняя скорость концентрической фазы — то, с чем сравнивают MVT/LVP. Пиковая
+   * (vmax) всегда выше, поэтому в отчёт они едут двумя разными числами, а не одним
+   * «v». Нет замеров — `null`, а не подставленное значение.
+   */
+  const kinoveaVMean = useMemo(()=> meanVelocitySummary(kinoveaReps), [kinoveaReps]);
   /** Текущий вес: если он отличается от сохранённого, сравнение сессий нечестно. */
   const curWeightKg = useMemo(()=> { const w = parseFloat(vbtWeight); return Number.isFinite(w) && w > 0 ? Math.round(w * 10) / 10 : null; }, [vbtWeight]);
   /** Разбор CSV с масштабом: если файл в пикселях, «см на единицу» делает метрики осмысленными. */
@@ -1829,6 +1838,16 @@ export const LiftMasterCard: React.FC<{
       kinoveaXBias: kinoveaResult ? kinoveaResult.xBias : null,
       kinoveaTurnoverMs: kinoveaResult && kinoveaResult.turnoverMs != null ? kinoveaResult.turnoverMs : null,
       kinoveaReps: kinoveaReps.length > 0 ? kinoveaReps.length : null,
+      // Средняя и пиковая — разные величины: средняя едет числом, а оговорка рядом
+      // говорит, что MVT/LVP считаются по ней, а не по vmax.
+      videoVMeanMS: kinoveaVMean ? kinoveaVMean.mean : null,
+      videoVMeanNote: kinoveaVMean
+        ? `средняя по ${kinoveaVMean.reps} повт.`
+          + (kinoveaVMean.peak > 0 ? `, пиковая ${kinoveaVMean.peak} м/с (в ${kinoveaVMean.peakToMean} раза выше)` : '')
+          + '; MVT и LVP считаются по средней скорости, а не по пиковой'
+        : (kinoveaResult
+          ? 'в видео есть только пиковая скорость (vmax) — это не средняя; с MVT/LVP её не сравнивайте'
+          : null),
       overlayVelocityLossPct: kinoveaOverlay ? kinoveaOverlay.velocityLossPct : null,
       heatSlowPct: kinoveaHeatSummary ? kinoveaHeatSummary.slowPct : null,
       heatStickingHeightCm: kinoveaHeatSummary ? kinoveaHeatSummary.stickingHeightCm : null,
@@ -2778,9 +2797,12 @@ export const LiftMasterCard: React.FC<{
                 const turn = (r.turnoverMs != null) ? (' · разворот ' + r.turnoverMs + ' мс') : '';
                 const reps = segmentBarReps(pts);
                 const overlay = barRepOverlay(reps);
+                // Средняя скорость концентрической фазы — то, с чем сравнивают MVT:
+                // рядом с пиковой, чтобы «vmax» не читалось как «скорость для MVT».
+                const meanV = reps.length && reps[0].vMean != null ? ` · средняя ${reps[0].vMean} м/с` : '';
                 setKinoveaResult(r);
                 setKinoveaReps(reps.map(s => ({ ...s, setIndex: curSet })));
-                setKinoveaMsg('xLoop ' + r.xLoop + ' см (' + badge + ') · наклон ' + tilt + ' · yMax ' + r.yMax + ' см · vmax ' + r.vmax + ' м/с (оценка)' + turn + ' · точек ' + r.points.length + (overlay ? ' · повторов ' + overlay.reps : ''));
+                setKinoveaMsg('xLoop ' + r.xLoop + ' см (' + badge + ') · наклон ' + tilt + ' · yMax ' + r.yMax + ' см · vmax ' + r.vmax + ' м/с (оценка)' + meanV + turn + ' · точек ' + r.points.length + (overlay ? ' · повторов ' + overlay.reps : ''));
               }} style={{ minHeight:44, padding:'10px 14px', borderRadius:10, cursor:'pointer', background:'rgba(14,165,233,0.15)', color:'#0ea5e9', border:'1px solid rgba(14,165,233,0.3)', fontWeight:700, fontSize:12 }}>📊 Разобрать CSV</button>
               <button data-lift="rep-series-add" aria-label="Добавить это видео в серию повторов" onClick={()=>{
                 const pts = parseScaledPoints(kinoveaText);
@@ -2816,6 +2838,7 @@ export const LiftMasterCard: React.FC<{
                   <div key={set.setIndex} style={{ marginTop:6 }}>
                     <div style={{ fontSize:9, fontWeight:800, color:'#fbbf24', opacity:0.9 }}>
                       Подход {set.setIndex} · {set.reps} повт. · ср. vmax {set.vmaxMean.toFixed(2)} м/с · худший {set.vmaxMin.toFixed(2)} · xLoop {set.xLoopMean.toFixed(1)} см
+                      {set.vMeanMean != null ? ` · ср. vMean ${set.vMeanMean.toFixed(2)} м/с` : ''}
                     </div>
                     <div style={{ display:'flex', gap:4, flexWrap:'wrap', marginTop:4 }}>
                       {kinoveaReps.map((s, i) => ({ s, i })).filter(({ s }) => repSetIndex(s) === set.setIndex).map(({ s, i })=>(
@@ -2827,6 +2850,13 @@ export const LiftMasterCard: React.FC<{
                     </div>
                   </div>
                 ))}
+                {/* Средняя vs пиковая: два разных числа, и путать их нельзя —
+                    MVT и LVP считаются по средней скорости концентрической фазы. */}
+                {kinoveaVMean && (
+                  <div data-lift="kinovea-vmean" role="status" style={{ marginTop:6, fontSize:10, lineHeight:1.45, color:'#38bdf8' }}>
+                    {kinoveaVMean.text}
+                  </div>
+                )}
                 {/* Подход vs подход: падение среднего vmax — ранний признак перебора объёма. */}
                 {kinoveaSetOverlay && (
                   <div role="status" data-lift="set-compare" style={{ marginTop:6, fontSize:10, lineHeight:1.45, color: kinoveaSetOverlay.deltaPct <= -5 ? '#f87171' : '#fbbf24' }}>

@@ -80,6 +80,18 @@ describe('segmentBarReps — нарезка серии на повторы', () 
     expect(reps[0].xLoop).toBeGreaterThan(1.5);
     expect(reps[0].xLoop).toBeLessThanOrEqual(3.1);
   });
+
+  it('средняя скорость концентрической фазы = амплитуда / время и она ниже пиковой', () => {
+    const reps = segmentBarReps(buildSeries({ amps: [40, 40], upDur: [0.8, 1.2] }));
+    const [fast, slow] = reps;
+    expect(fast.vMean).toBeGreaterThan(0);
+    // Ровно арифметика измеренных точек: см → м, мс → с.
+    expect(fast.vMean!).toBeCloseTo(fast.amplitude / 100 / (fast.durationMs / 1000), 1);
+    // Тот же путь медленнее — средняя ниже: величина чувствительна к темпу, а не к амплитуде.
+    expect(slow.vMean!).toBeLessThan(fast.vMean!);
+    // Пик и средняя — разные числа: пик не может быть заметно ниже средней.
+    expect(fast.vmax).toBeGreaterThanOrEqual(fast.vMean! * 0.95);
+  });
 });
 
 describe('barRepOverlay — первый vs последний повтор', () => {
