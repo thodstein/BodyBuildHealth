@@ -60,7 +60,12 @@ export function ybtLqVerdict(s: YbtLqInput): YbtLqVerdict {
   const limb = fin(s.limbCm);
   const full = l != null && r != null && pmL != null && pmR != null && plL != null && plR != null && limb != null;
   const compositePct = full && limb != null
-    ? Math.round((((l as number) + (pmL as number) + (plL as number)) / (3 * (limb as number))) * 1000) / 10
+    // AUDIT 2026-11 (BB-D-25): раньше в числитель шла ТОЛЬКО левая сторона
+    // (antL+pmL+plL)/(3·limb) — композит смещался в сторону левой ноги и при
+    // асимметрии L=60/R=40 показывал 60 вместо среднего обеих сторон.
+    // Протокол: композит = (сумма 3 направлений ОБЕИХ сторон) / (6 · длина).
+    ? Math.round((((l as number) + (pmL as number) + (plL as number)
+      + (r as number) + (pmR as number) + (plR as number)) / (6 * (limb as number))) * 1000) / 10
     : null;
   const asymWarn = asymCm != null && asymCm > YBT_ANT_ASYM_CM;
   const compWarn = compositePct != null && compositePct < YBT_COMPOSITE_CUT;

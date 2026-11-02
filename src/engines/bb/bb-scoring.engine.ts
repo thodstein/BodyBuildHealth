@@ -28,9 +28,19 @@ export interface BBScoreResult {
   level: BBScoreLevel;
   floors: string[];
   verification: number; // 0-1
+  /** Каналы доказательств, которых не хватает до 100% (diary / circumf / vbt). */
+  verificationMissing: BBVerificationChannel[];
   penalties: Record<string, number>;
   raw: number;
 }
+
+export type BBVerificationChannel = 'diary' | 'circumf' | 'vbt';
+
+export const BB_VERIFICATION_LABEL_RU: Record<BBVerificationChannel, string> = {
+  diary: 'дневник тренировок',
+  circumf: 'замеры обхватов',
+  vbt: 'скорость (VBT/LVP)',
+};
 
 export function scoreBB(input: BBScoreInput): BBScoreResult {
   const penWeak = input.weakCount >= 2 ? 28 : input.weakCount === 1 ? 14 : 0;
@@ -84,9 +94,17 @@ export function scoreBB(input: BBScoreInput): BBScoreResult {
   if (score < 50) level = 'critical';
   else if (score < 75) level = 'warn';
 
+  // AUDIT 2026-11: веса 0.35/0.35/0.30 — доля подтверждённых каналов. Число честное,
+  // но раньше хаб всегда отдавал hasVbt=false, и 100% были недостижимы «навсегда».
+  // Теперь канал VBT считается по реальным данным (LVP/VBT), а недостающие каналы
+  // возвращаются наружу — UI пишет «пров. 70% (нет скорости)» вместо загадочного 70%.
+  const verificationMissing: BBVerificationChannel[] = [];
+  if (!input.hasDiary) verificationMissing.push('diary');
+  if (!input.hasCircumf) verificationMissing.push('circumf');
+  if (!input.hasVbt) verificationMissing.push('vbt');
   const verification = Math.min(1, Math.round((0.35 * (input.hasDiary ? 1 : 0) + 0.35 * (input.hasCircumf ? 1 : 0) + 0.30 * (input.hasVbt ? 1 : 0)) * 100) / 100);
 
-  return { score, level, floors, verification, penalties, raw: Math.round(raw * 10) / 10 };
+  return { score, level, floors, verification, verificationMissing, penalties, raw: Math.round(raw * 10) / 10 };
 }
 
 export function scoreColor(level: BBScoreLevel): string {

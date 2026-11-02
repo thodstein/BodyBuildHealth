@@ -46,7 +46,9 @@ export function bbLvpLiftFor(name: string): VBTLift | null {
 export function parseBbLvpText(text: string): BbLvpPoint[] {
   const out: BbLvpPoint[] = [];
   for (const line of String(text || '').split(/\r?\n/)) {
-    const m = line.trim().replace(',', '.').split(/[\s×x;\/]+/).filter(Boolean);
+    // AUDIT 2026-11 (BB-D-37): replace(',', '.') менял только ПЕРВУЮ запятую —
+    // строка «80,5 0,62» превращалась в NaN по скорости.
+    const m = line.trim().replace(/,/g, '.').split(/[\s×x;\/]+/).filter(Boolean);
     if (m.length < 2) continue;
     const w = parseFloat(m[0]);
     const v = parseFloat(m[1]);

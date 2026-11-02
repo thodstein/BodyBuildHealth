@@ -24,6 +24,14 @@ export interface BBSymmetryResult {
   ratios: Record<string, number>;
   issues: string[];
   score: number; // 0-100 (чем выше, тем симметричнее)
+  /**
+   * AUDIT 2026-11: без единого замера движок раньше возвращал score=100 и issues=[] —
+   * хаб рисовал «Симметрия 100 · пропорции в норме» на пустом профиле.
+   * tested=false означает «не измерено»: score в этом случае не показывается как оценка.
+   */
+  tested: boolean;
+  /** Сколько собственных замеров участвовало (обхваты/рост/вес+жир). */
+  measureCount: number;
 }
 
 function asymPct(l: number | null | undefined, r: number | null | undefined): number | null {
@@ -150,7 +158,19 @@ export function scoreBBSymmetry(
   }
 
   const score = Math.max(0, Math.min(100, Math.round(100 - Math.min(60, penalty))));
-  return { ratios, issues, score };
+  // «Измерено» = есть хотя бы один собственный замер тела (не только план/объём).
+  const own = [
+    meas.chest, meas.waist, meas.hips, meas.neck, meas.shoulderWidth,
+    meas.bicepL, meas.bicepR, meas.thighL, meas.thighR, meas.calfL, meas.calfR,
+    meas.forearmL, meas.forearmR,
+  ].filter((v) => Number.isFinite(v as number) && Number(v) > 0).length
+    + (Number.isFinite(meas.heightCm as number) && Number(meas.heightCm) > 0 ? 1 : 0)
+    + (Number.isFinite(meas.weightKg as number) && Number(meas.weightKg) > 0 ? 1 : 0);
+  const tested = own > 0;
+  // ВАЖНО: при отсутствии замеров issues остаётся пустым — иначе штраф RSS
+  // («симметрия 4») наказывал бы за неизмеренное, а не за плохое. Честный текст
+  // рисует UI по флагу tested.
+  return { ratios, issues, score, tested, measureCount: own };
 }
 
 /**

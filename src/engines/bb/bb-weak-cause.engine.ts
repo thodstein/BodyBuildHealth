@@ -182,6 +182,8 @@ export interface WeakCauseAuditFlags {
   singleAngle: boolean;
   missingStrict: boolean;
   avgSfr: number | null;
+  /** AUDIT 2026-11 (BB-D-28): в зоне есть объём, но темп не задан нигде. */
+  tempoMissing?: boolean;
 }
 
 export interface WeakCauseAssembleDeps {
@@ -205,7 +207,10 @@ function factSetsOf(factVolume: WeakCauseAssembleDeps['factVolume'], zone: strin
     const v: any = (factVolume as any)[k];
     if (v == null) return null;
     if (typeof v === 'number') return Number.isFinite(v) ? v : null;
-    const n = v.effectiveSets ?? v.directSets ?? null;
+    // AUDIT 2026-11 (BB-D-28): тот же приоритет, что у детектора слабости
+    // (directSets первым — MEV/MAV заданы для прямых сетов). Раньше причина
+    // брала effectiveSets и «слабая по объёму» мышца выглядела в причине нормальной.
+    const n = v.directSets ?? v.effectiveSets ?? null;
     return n == null || !Number.isFinite(n) ? null : n;
   };
   return pick(zone) ?? (canon && canon !== zone ? pick(canon) : null);
@@ -251,7 +256,8 @@ export function assembleWeakCauseInput(zone: string, deps: WeakCauseAssembleDeps
     hasLengthened: aud ? aud.lengthened : undefined,
     singleAngle: aud ? aud.singleAngle : false,
     missingStrict: aud ? aud.missingStrict : false,
-    tempoMismatch: false,
+    // BB-D-28: причина «темп» больше не захардкожена — берём факт из аудита плана.
+    tempoMismatch: !!aud?.tempoMissing,
     avgSfr: aud?.avgSfr ?? null,
     idealDeltaPct: idealDeltaForZone(z, (deps.meas || {}) as any, deps.heightCm ?? null, deps.wristCm ?? null),
     weeksAtMavClean: techClean ? weeksAtMav(hist, mavN) : 0,

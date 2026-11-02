@@ -23,6 +23,8 @@ export interface RankCtx {
   missingShort?: boolean;
   inPlanIds?: string[];
   sex?: string;
+  /** Ограничения подвижности профиля (shoulder/ankle/…) — фильтр опасных коррекций. */
+  mobilityRestrictions?: string[];
 }
 
 export interface RankedCorrection {
@@ -104,7 +106,15 @@ export function rankCorrectionsForWeak(weakZone: string, plan: unknown, ctx: Ran
     // с библиотекой/инъекцией/подбором; дефолт helper (machineAlways) сохранён для ручных вызывающих.
     if (!equipmentAllows((c as any).equipment, ctx.equipment, { machineAlways: false })) return false;
     try {
-      if (isMobilityRestricted(muscle) && String(c.jointStress || '').toLowerCase() === 'high' && /присед|squat|жим.*стоя|overhead/i.test(String(c.name))) return false;
+      // AUDIT 2026-11 (BB-D-29): isMobilityRestricted(ex, restrictions) ждёт объект
+      // упражнения и список ограничений, а передавалась строка мышцы и ничего —
+      // функция всегда возвращала false, и фильтр «не предлагать при ограничении
+      // подвижности» не работал.
+      if (
+        isMobilityRestricted({ name: String(c.name), id: String(c.id) } as any, ctx.mobilityRestrictions)
+        && String(c.jointStress || '').toLowerCase() === 'high'
+        && /присед|squat|жим.*стоя|overhead/i.test(String(c.name))
+      ) return false;
     } catch { /* noop */ }
     return true;
   });

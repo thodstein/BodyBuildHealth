@@ -20,6 +20,7 @@ import type { WorkoutSession, WorkoutExercise } from '../workout-logger.engine';
 import { prescribeLoad, type LoadStrategy } from './bb-autocoach.engine';
 import { EXERCISE_CATALOG } from '../../core/exercise-catalog';
 import { trueMuscleOf } from '../movement-pattern';
+import { canonicalMuscle } from './bb-specialization.engine';
 import { bbExerciseTier } from './bb-exercise-tier.engine';
 import { localIsoDate } from '../../core/local-date';
 
@@ -736,10 +737,17 @@ export function computePerMuscleACWR(
   for (const s of sessions) {
     const wk = weekKey(s.date);
     for (const ex of s.exercises || []) {
-      const muscle = ex.muscleGroup || '';
+      // AUDIT 2026-11 (BB-D-31): `ex.sets?.length` считал только массив сетов;
+      // при `sets: 3` (число) объём выходил 0 и мышца считалась «нетренированной».
+      // Канонизируем группу — иначе 'chest'/'грудь'/'CHEST' жили раздельно.
+      const rawMuscle = String(ex.muscleGroup || (ex as any).muscle || '');
+      const muscle = (() => { try { return canonicalMuscle(rawMuscle); } catch { return rawMuscle; } })();
       if (!muscle) continue;
+      const setsCount = Array.isArray(ex.sets)
+        ? ex.sets.length
+        : (Number.isFinite(Number(ex.sets)) ? Math.max(0, Number(ex.sets)) : 0);
       if (!muscleWeekSets[muscle]) muscleWeekSets[muscle] = {};
-      muscleWeekSets[muscle][wk] = (muscleWeekSets[muscle][wk] || 0) + (ex.sets?.length || 0);
+      muscleWeekSets[muscle][wk] = (muscleWeekSets[muscle][wk] || 0) + setsCount;
     }
   }
 

@@ -154,11 +154,20 @@ describe('AUDIT: YBT композит считается по протоколу
     expect(v.compositeFull).toBe(false);
     expect(v.text).toMatch(/PM\/PL/);
   });
-  it('полный ввод — композит (ANT+PM+PL)/(3×конечность)', () => {
+  it('полный ввод — композит = среднее ОБЕИХ сторон (сумма 6 значений)/(6×конечность)', () => {
     const v = ybtLqVerdict({ antL: 55, antR: 56, pmL: 50, pmR: 51, plL: 50, plR: 51, limbCm: 80 });
     expect(v.compositeFull).toBe(true);
-    expect(v.compositePct).toBeCloseTo(64.7, 0);
+    // AUDIT 2026-11 (BB-D-25): раньше числитель был только по левой ноге →
+    // 155/(3×80)=64.6. Протокол — обе стороны: 313/(6×80)=65.2.
+    expect(v.compositePct).toBeCloseTo(65.2, 1);
     expect(v.warn).toBe(true); // <94
+  });
+  it('асимметрия не даёт композит только по одной стороне', () => {
+    // L сильно слабее R: композит обязан учитывать обе, а не левую
+    const left = ybtLqVerdict({ antL: 34, antR: 60, pmL: 30, pmR: 55, plL: 30, plR: 55, limbCm: 80 });
+    const both = ybtLqVerdict({ antL: 60, antR: 60, pmL: 55, pmR: 55, plL: 55, plR: 55, limbCm: 80 });
+    expect(left.compositePct).toBeGreaterThan((34 + 30 + 30) / (3 * 80) * 100 - 0.2);
+    expect(left.compositePct).toBeLessThan(both.compositePct as number);
   });
   it('асимметрия anterior >4 см — предупреждение', () => {
     const v = ybtLqVerdict({ antL: 58, antR: 64, shinCm: 48 });

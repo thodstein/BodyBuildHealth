@@ -116,6 +116,15 @@ const TrainingHeroStats: React.FC = () => {
   );
 };
 
+/**
+ * BB-G-02: цели deep-link из ББ-диагностики (`training-open-tab`).
+ * Только белый список — иначе любое событие из консоли/расширения открывало бы
+ * произвольную вкладку тренировочного блока.
+ */
+const BB_DIAG_DEEP_LINKS: ReadonlySet<string> = new Set([
+  'volume_hub', 'joints_ortho', 'calc_vbt', 'strength_analysis', 'diary', 'progress',
+]);
+
 export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab }) => {
   const linked = useDataLink();
   const readiness = linked.readiness;
@@ -157,6 +166,10 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSu
       // Deep-link из homescreen-виджета «Тренировка»: сразу вкладка проведения.
       if (t === 'runtime' || t === 'timers') goTab(t as TrainingTab);
       else if (t === 'bb_diagnostics_hub' || t === 'bb_diagnostics') goTab('bb_diagnostics_hub' as TrainingTab);
+      // BB-G-02: deep-links из ББ-диагностики в профильные экраны (объём, орто,
+      // VBT/анализ силы, дневник). Только белый список — иначе событие из
+      // localStorage-мусора могло открыть любую «вкладку».
+      else if (BB_DIAG_DEEP_LINKS.has(String(t))) goTab(t as TrainingTab);
     };
     window.addEventListener('training-open-tab', h);
     return () => window.removeEventListener('training-open-tab', h);

@@ -9,7 +9,7 @@ import React from 'react';
 import { localIsoDate } from '../../../core/local-date';
 import { OHS_NORMS } from '../../../engines/strength-sport/strength-sport-ohs.engine';
 import { PAIN_LOCATIONS, provocationFor, PAIN_MONITOR_DISCLAIMER } from '../../../engines/bb/bb-pain-monitor.engine';
-import { ERIR_DISCLAIMER } from '../../../engines/bb/bb-shoulder-screen.engine';
+import { ERIR_DISCLAIMER, THORACIC_ROT_NORM } from '../../../engines/bb/bb-shoulder-screen.engine';
 import { YBT_DISCLAIMER } from '../../../engines/bb/bb-ybt-lq.engine';
 import { benchCorrections, BENCH_DISCLAIMER } from '../../../engines/bb/bb-bench-screen.engine';
 import { NHE_DISCLAIMER, ADDUCTOR_HONESTY } from '../../../engines/bb/bb-posterior-readiness.engine';
@@ -57,9 +57,25 @@ export const BbScreeningTab: React.FC<BbScreeningTabProps> = (props) => {
   painJointTendon, nheV, adductorV, erIrV, screenPriority, screenHist, setScreenHist,
     screenCodes, screenDelta, teenGate, applyMobilityToProfile, trackedRu,
   } = props;
+
+  /**
+   * «Скрининг пройден» ставим только по реальному взаимодействию с контролом.
+   * Раньше onClick висел на всём контейнере таба: тап по пустому месту/скролл
+   * помечал скрининг пройденным, и вердикты «чисто» появлялись без замеров.
+   */
+  const markTouched = (e: React.SyntheticEvent) => {
+    const el = e.target as HTMLElement | null;
+    if (!el || typeof el.closest !== 'function') return;
+    if (el.closest('button,input,select,textarea,[role="button"],[role="switch"],[role="checkbox"]')) {
+      if (!state.screenTouched) touchScreen();
+    }
+  };
+  /** Таймер тоста — чистим при размонтировании, иначе setState после unmount. */
+  const toastTimer = React.useRef<number | null>(null);
+  React.useEffect(() => () => { if (toastTimer.current) window.clearTimeout(toastTimer.current); }, []);
   return (
-            <div data-bb="mobility-tab" onClick={touchScreen}>
-              <div style={{ fontSize: 12, fontWeight: 800, color: '#fff', marginBottom: 6 }}>Скрининг — присед с руками вверх (6 признаков) + одна нога + драйвер
+            <div data-bb="mobility-tab" onClickCapture={markTouched} onChangeCapture={markTouched}>
+              <div style={{ fontSize: 12, fontWeight: 800, color: '#fff', marginBottom: 6 }}>Скрининг — присед с руками вверх (6 критериев + подворот таза как драйвер) + одна нога + драйвер
                 {!state.screenTouched && <span style={{ color: '#f59e0b' }}> · не пройден: отметь признаки или введи замеры</span>}
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 6 }} data-bb="ohs-grid">
@@ -75,7 +91,7 @@ export const BbScreeningTab: React.FC<BbScreeningTabProps> = (props) => {
                 <div style={{ fontSize: 12, fontWeight: 800, color: '#fff' }} data-bb="ohs-verdict">
                   {state.screenTouched
                     ? `Присед-тест ${ohs.totalScore}/6 · ${ohs.level === 'ok' ? 'хорошо' : ohs.level === 'warn' ? 'есть замечания' : 'нужна работа'} · несдано ${ohs.failed}${ohs.primaryDriver ? ` · ${ohs.primaryDriver}` : ''}`
-                    : 'Присед-тест: не пройден — отметь 7 признаков (или введи КТС), иначе результат не считается'}
+                    : 'Присед-тест: не пройден — отметь 6 критериев (7-я карточка «таз без подворота» — драйвер, в счёт не входит), иначе результат не считается'}
                 </div>
                 {state.screenTouched && <div style={{ fontSize: 11, color: '#fff', marginTop: 4 }}>{ohs.recommendation}</div>}
               </div>
@@ -94,7 +110,7 @@ export const BbScreeningTab: React.FC<BbScreeningTabProps> = (props) => {
                   <BbSheetSelect label="RDL на ноге Л" value={state.rdlL} onChange={(v) => setState((s) => ({ ...s, rdlL: v as any }))} options={[{ id: '', label: 'Не проверял' }, { id: 'pass', label: 'Чисто' }, { id: 'fail', label: 'Гуляет' }]} testId="bb-rdl-l" />
                   <BbSheetSelect label="RDL на ноге П" value={state.rdlR} onChange={(v) => setState((s) => ({ ...s, rdlR: v as any }))} options={[{ id: '', label: 'Не проверял' }, { id: 'pass', label: 'Чисто' }, { id: 'fail', label: 'Гуляет' }]} testId="bb-rdl-r" />
                 </div>
-                <div style={{ fontSize: 11, color: singleLeg.weakSide ? '#f59e0b' : '#22c55e' }} data-bb="single-leg-verdict">{singleLeg.text}</div>
+                <div style={{ fontSize: 11, color: singleLeg.tested === false ? '#94a3b8' : singleLeg.weakSide ? '#f59e0b' : '#22c55e' }} data-bb="single-leg-verdict">{singleLeg.text}</div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginTop: 6 }}>
                   <BbNum label="Угломер FPPA Л, ° (необязательно)" value={state.fppaL} onChange={(v) => setState(s => ({ ...s, fppaL: v }))} placeholder="—" step={1} testId="bb-fppa-l" />
                   <BbNum label="Угломер FPPA П, ° (необязательно)" value={state.fppaR} onChange={(v) => setState(s => ({ ...s, fppaR: v }))} placeholder="—" step={1} testId="bb-fppa-r" />
@@ -110,10 +126,10 @@ export const BbScreeningTab: React.FC<BbScreeningTabProps> = (props) => {
                   <BbCheckCard active={state.shRibsDown} title="Рёбра вниз" desc="поясница не прогибается" onToggle={() => setState((s) => ({ ...s, shRibsDown: !s.shRibsDown }))} />
                   <BbCheckCard active={state.shNoShrug} title="Без шрагов" desc="плечи не к ушам" onToggle={() => setState((s) => ({ ...s, shNoShrug: !s.shNoShrug }))} />
                 </div>
-                <div style={{ fontSize: 11, color: shoulderV.pass ? '#22c55e' : '#f59e0b' }} data-bb="shoulder-verdict">{shoulderV.text}</div>
+                <div style={{ fontSize: 11, color: shoulderV.tested === false ? '#94a3b8' : shoulderV.pass ? '#22c55e' : '#f59e0b' }} data-bb="shoulder-verdict">{shoulderV.text}</div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginTop: 6 }}>
-                  <BbNum label="Ротация грудного Л, °" value={state.rotL} onChange={(v) => setState(s => ({ ...s, rotL: v }))} placeholder="50" step={1} testId="bb-rot-l" />
-                  <BbNum label="Ротация грудного П, °" value={state.rotR} onChange={(v) => setState(s => ({ ...s, rotR: v }))} placeholder="50" step={1} testId="bb-rot-r" />
+                  <BbNum label="Ротация грудного Л, °" value={state.rotL} onChange={(v) => setState(s => ({ ...s, rotL: v }))} placeholder={String(THORACIC_ROT_NORM)} step={1} testId="bb-rot-l" />
+                  <BbNum label="Ротация грудного П, °" value={state.rotR} onChange={(v) => setState(s => ({ ...s, rotR: v }))} placeholder={String(THORACIC_ROT_NORM)} step={1} testId="bb-rot-r" />
                 </div>
                 <div style={{ fontSize: 11, color: '#fff', marginTop: 4 }} data-bb="rot-verdict">{rotV.text}</div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginTop: 6 }}>
@@ -122,7 +138,7 @@ export const BbScreeningTab: React.FC<BbScreeningTabProps> = (props) => {
                 </div>
                 <div style={{ fontSize: 11, color: erIrV.warn ? '#f59e0b' : '#fff', marginTop: 4 }} data-bb="erir-verdict">{erIrV.text}</div>
                 {!teenGate.blocked && <div style={{ fontSize: 10, color: '#fff', opacity: 0.85, marginTop: 4 }} data-bb="erir-disclaimer">{ERIR_DISCLAIMER}</div>}
-                <div style={{ fontSize: 10, color: '#fff', opacity: 0.85, marginTop: 4 }}>Норма ротации ≥50°/сторона, разрыв ≥10° — чинить слабую. Тест стоя у стены, руки вверх, 3 повтора.</div>
+                <div style={{ fontSize: 10, color: '#fff', opacity: 0.85, marginTop: 4 }}>Норма ротации ≥{THORACIC_ROT_NORM}°/сторона, разрыв ≥10° — чинить слабую. Тест стоя у стены, руки вверх, 3 повтора.</div>
               </div>
               <div style={{ padding: '8px 10px', borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', marginBottom: 6 }} data-bb="hinge-screen">
                 <div style={{ fontSize: 12, fontWeight: 800, color: '#fff', marginBottom: 6 }}>Шарнир (палка) + присед под нагрузкой</div>
@@ -247,14 +263,24 @@ export const BbScreeningTab: React.FC<BbScreeningTabProps> = (props) => {
                   <b style={{ fontSize: 11, color: '#fff' }}>📸 Снимки скрининга ({screenHist.length})</b>
                   <button onClick={() => {
                     // П1/R7: снимок v:3 — OHS + D1–D5 + R1–R6 коды (legacy без v / v:2 мигрируют в дельте, не регрессом)
-                    const entry = { date: localIsoDate(), fails: screenCodes, v: 3 };
+                    const today = localIsoDate();
+                    const entry = { date: today, fails: screenCodes, v: 3 };
                     setScreenHist((prev) => {
-                      const next = [...prev, entry].slice(-10);
+                      // Один снимок в день: повторное нажатие ОБНОВЛЯЕТ сегодняшний, а не
+                      // плодит дубли (дельта между двумя «сегодня» всегда была нулевой).
+                      const others = prev.filter((e: any) => e?.date !== today);
+                      const next = [...others, entry]
+                        .sort((a: any, b: any) => String(a?.date).localeCompare(String(b?.date)))
+                        .slice(-10);
                       try { localStorage.setItem('he_bb_screen_history', JSON.stringify(next)); } catch { /* noop */ }
                       return next;
                     });
-                    setToast(`✓ Снимок скрининга ${entry.date} сохранён`);
-                    setTimeout(() => setToast(''), 2000);
+                    // Снимок сделан по текущему скринингу → он пройден сегодня
+                    // (напоминание о re-screen считается от screenDoneAt).
+                    setState((s) => ({ ...s, screenTouched: true, screenDoneAt: today }));
+                    setToast(`✓ Снимок скрининга ${today} сохранён`);
+                    if (toastTimer.current) window.clearTimeout(toastTimer.current);
+                    toastTimer.current = window.setTimeout(() => setToast(''), 2000);
                   }} data-bb="screen-snapshot" style={{ minHeight: 44, padding: '8px 12px', borderRadius: 10, background: 'rgba(0,230,138,0.12)', border: '1px solid rgba(0,230,138,0.22)', color: '#00e68a', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>Снимок сегодня</button>
                 </div>
                 <div style={{ fontSize: 11, color: '#fff' }} data-bb="screen-delta">{screenDelta.text}</div>

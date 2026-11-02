@@ -6,6 +6,7 @@ import type { BBDiagnosticsReport } from './bb-diagnostics-hub.engine';
 import { auditPlanExercises } from './bb-plan-exercise-audit.engine';
 import { exerciseEffectScore } from './bb-exercise-effect.engine';
 import { auditHeadCoverage } from './bb-stimulus-target.engine';
+import { BB_VERIFICATION_LABEL_RU } from './bb-scoring.engine';
 
 function esc(s: string): string {
   return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -51,12 +52,22 @@ export interface BBDiagnosticsPro2Meta {
   }> | null;
   /** ROUND-10: строки блока коррекции (волна 4–8 нед) — опционально, без — байт-в-байт. */
   correctionBlock?: string[] | null;
+  /**
+   * BB-G-01/04: сводка «Объём · Recovery · Mobility» (чипы каналов, ограничитель,
+   * действия) и строка эффекта коррекции. Опционально: без панели секций нет.
+   */
+  volumeRecovery?: {
+    chips: Array<{ label: string; value: string; detail: string }>;
+    limiter: { label: string; detail: string } | null;
+    advice: string[];
+    effect: string | null;
+  } | null;
 }
 
 export function buildBBDiagnosticsHtml(report: BBDiagnosticsReport, meta?: { date?: string; level?: string; plan?: any; weakHeads?: string[]; weakCauses?: Record<string, { cause: string; confidence: number; evidence: string[]; fix: string }>; specBlock?: { lengthWeeks: number; donors: string[]; rationale: string[]; weeks: Array<{ week: number; targetSets: Record<string, number>; frequency: Record<string, number>; note: string }> } | null } & BBDiagnosticsPro2Meta): string {
   const date = meta?.date || new Date().toISOString().slice(0, 10);
   const level = meta?.level || '';
-  const rowsWeak = report.weakCandidates.map(c => `<tr><td>${esc(c.muscle)}</td><td>${esc(c.granular || '')}</td><td>${esc(c.source)}</td><td>${c.deltaPct}%</td><td>${esc(c.reason)}</td></tr>`).join('') || '<tr><td colspan="5">— баланс</td></tr>';
+  const rowsWeak = report.weakCandidates.map(c => `<tr><td>${esc(c.muscle)}</td><td>${esc(c.granular || '')}</td><td>${esc(c.source)}</td><td>${c.deltaPct == null ? 'вручную' : `${c.deltaPct}%`}</td><td>${esc(c.reason)}</td></tr>`).join('') || '<tr><td colspan="5">— баланс</td></tr>';
   const rowsSym = Object.entries(report.symmetry.ratios).map(([k, v]) => `<tr><td>${esc(k)}</td><td>${v}</td></tr>`).join('') || '<tr><td colspan="2">—</td></tr>';
   const issuesSym = report.symmetry.issues.map(s => `<li>${esc(s)}</li>`).join('') || '<li>—</li>';
   const issuesStim = report.stimulus.issues.map(s => `<li>${esc(s)}</li>`).join('') || '<li>—</li>';
@@ -103,7 +114,7 @@ export function buildBBDiagnosticsHtml(report: BBDiagnosticsReport, meta?: { dat
 <style>body{font-family:system-ui,Arial,sans-serif;padding:18px;color:#111}h1{font-size:18px}h2{font-size:14px;margin:14px 0 6px}table{border-collapse:collapse;width:100%;margin:6px 0}th,td{border:1px solid #ddd;padding:6px 8px;font-size:12px;text-align:left}th{background:#f5f5f5}.badge{padding:2px 8px;border-radius:999px;font-size:11px;font-weight:700;color:#fff}</style>
 </head><body>
 <h1>ББ-диагностика — отчёт ${esc(date)} ${level ? `· ${esc(level)}` : ''}</h1>
-<div>Score <span class="badge" style="background:${report.score.level === 'critical' ? '#ef4444' : report.score.level === 'warn' ? '#f59e0b' : '#22c55e'}">${report.score.score}/100 ${esc(report.score.level)}</span> · verification ${report.score.verification} · weak ${report.weakMusclesCanonical.join(', ') || '—'}</div>
+<div>Score <span class="badge" style="background:${report.score.level === 'critical' ? '#ef4444' : report.score.level === 'warn' ? '#f59e0b' : '#22c55e'}">${report.score.score}/100 ${esc(report.score.level)}</span> · проверка данных ${Math.round(report.score.verification * 100)}%${(report.score.verificationMissing || []).length ? ` (не подтверждено: ${(report.score.verificationMissing || []).map(c => esc(BB_VERIFICATION_LABEL_RU[c])).join(', ')})` : ''} · weak ${report.weakMusclesCanonical.join(', ') || '—'}</div>
 ${floors ? `<div style="margin-top:8px;color:#ef4444;font-size:11px"><b>Floors:</b><ul>${floors}</ul></div>` : ''}
 <h2>Слабые (топ-2 → в ББ-авто)</h2><table><tr><th>Мышца</th><th>Зона</th><th>Источник</th><th>Δ%</th><th>Причина</th></tr>${rowsWeak}</table>
 ${(meta as any)?.weakCauses ? `<h2>Причины отставания (MAX PRO)</h2><table><tr><th>Зона</th><th>Причина</th><th>Уверенность</th><th>Доказательства</th><th>Чинить</th></tr>${Object.entries((meta as any).weakCauses as Record<string, { cause: string; confidence: number; evidence: string[]; fix: string }>).map(([z, c]) => `<tr><td>${esc(z)}</td><td>${esc(c.cause)}</td><td>${Math.round(c.confidence * 100)}%</td><td>${esc(c.evidence.join(' · '))}</td><td>${esc(c.fix)}</td></tr>`).join('')}</table>` : ''}
@@ -170,6 +181,17 @@ ${(() => {
     if (m.mmc) parts.push(`<h2>Фокус внимания</h2><div style="font-size:12px">${esc(m.mmc)}</div>`);
     if (m.returnTo) parts.push(`<h2>Возврат после флагов</h2><div style="font-size:12px">${esc(m.returnTo.text)}</div><ul>${m.returnTo.stages.map((s) => `<li>${esc(s.title)}: ${esc(s.volume)}, ${esc(s.rir)} — ${esc(s.note)}</li>`).join('')}</ul>`);
     if (m.lrDirection?.length) parts.push(`<h2>Направление перекоса</h2><ul>${m.lrDirection.map((d) => `<li>${esc(d.text)}</li>`).join('')}</ul>`);
+    // BB-G-01/04: сводка объёма/восстановления и эффект коррекции (шестой экран хаба).
+    const vr = (m as any).volumeRecovery;
+    if (vr && (vr.limiter?.label || (Array.isArray(vr.chips) && vr.chips.length))) {
+      const chips = Array.isArray(vr.chips) ? vr.chips : [];
+      if (chips.length) {
+        parts.push(`<h2>Объём · Recovery · Mobility</h2><table><tr><th>Канал</th><th>Значение</th><th>Детали</th></tr>${chips.map((c: any) => `<tr><td>${esc(String(c?.label ?? ''))}</td><td>${esc(String(c?.value ?? ''))}</td><td>${esc(String(c?.detail ?? ''))}</td></tr>`).join('')}</table>`);
+      }
+      if (vr.limiter?.label) parts.push(`<div style="font-size:12px"><b>Ограничитель:</b> ${esc(String(vr.limiter.label))}${vr.limiter.detail ? ` — ${esc(String(vr.limiter.detail))}` : ''}</div>`);
+      if (Array.isArray(vr.advice) && vr.advice.length) parts.push(`<div style="font-size:12px"><b>Действия:</b></div><ul>${vr.advice.map((a: unknown) => `<li>${esc(String(a))}</li>`).join('')}</ul>`);
+      if (typeof vr.effect === 'string' && vr.effect) parts.push(`<div style="font-size:12px"><b>Эффект коррекции:</b> ${esc(vr.effect)}</div>`);
+    }
     if (m.workingRange) parts.push(`<h2>Рабочий вес (ориентир)</h2><div style="font-size:12px">${esc(m.workingRange)}</div>`);
     return parts.join('');
   })()}
@@ -196,7 +218,7 @@ export function buildBBDiagnosticsCsv(
   const VERIFICATION_PCT = `${Math.round(report.score.verification * 100)}%`;
   const lines: string[] = [];
   lines.push(['muscle', 'granular', 'source', 'deltaPct', 'reason'].map(escCsv).join(','));
-  for (const c of report.weakCandidates) lines.push([c.muscle, c.granular || '', c.source, c.deltaPct, c.reason].map(escCsv).join(','));
+  for (const c of report.weakCandidates) lines.push([c.muscle, c.granular || '', c.source, c.deltaPct == null ? '' : String(c.deltaPct), c.reason].map(escCsv).join(','));
   lines.push('');
   lines.push(['metric', 'value'].map(escCsv).join(','));
   lines.push(['score', report.score.score].map(escCsv).join(','));
@@ -286,6 +308,14 @@ export function buildBBDiagnosticsCsv(
   if (meta?.returnTo) lines.push(['return_to', meta.returnTo.text].map(escCsv).join(','));
   if (meta?.lrDirection?.length) lines.push(['lr_direction', meta.lrDirection.map((d) => d.text).join(' · ')].map(escCsv).join(','));
   if (meta?.workingRange) lines.push(['working_range', meta.workingRange].map(escCsv).join(','));
+  // BB-G-01/04: сводка объёма/восстановления + эффект коррекции (паритет с HTML).
+  if (meta?.volumeRecovery) {
+    const vr = meta.volumeRecovery;
+    for (const c of vr.chips || []) lines.push([`vr_${String(c.label).toLowerCase().replace(/\s+/g, '_')}`, `${c.value} — ${c.detail}`].map(escCsv).join(','));
+    if (vr.limiter?.label) lines.push(['vr_limiter', `${vr.limiter.label} — ${vr.limiter.detail}`].map(escCsv).join(','));
+    if (vr.advice?.length) lines.push(['vr_advice', vr.advice.join(' · ')].map(escCsv).join(','));
+    if (vr.effect) lines.push(['correction_effect', vr.effect].map(escCsv).join(','));
+  }
   // упражнения → эффект (максимально)
   try {
     const p = plan || (() => { try { const raw = typeof localStorage !== 'undefined' ? localStorage.getItem('he_bb_plan_saved') : null; if (!raw) return null; const j = JSON.parse(raw); return j?.plan?.weeks ? j.plan : j?.weeks ? j : null; } catch { return null; } })();

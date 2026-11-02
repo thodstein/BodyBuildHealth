@@ -30,7 +30,12 @@ export interface BbReadiness {
 export function assessBbReadiness(input: BbReadinessInput): BbReadiness {
   const reasons: string[] = [];
   let score = 0; // 0 green → выше хуже
+  // AUDIT 2026-11: Number(null) === 0 и Number('') === 0 — из-за этого «нет данных»
+  // превращалось в измеренный ноль (боль 0 / потеря 0) и день становился зелёным.
+  // Пустое значение обязано остаться пустым.
   const num = (v: unknown): number | null => {
+    if (v == null || v === '') return null;
+    if (typeof v === 'string' && !v.trim()) return null;
     const n = Number(v);
     return Number.isFinite(n) ? n : null;
   };
@@ -38,7 +43,9 @@ export function assessBbReadiness(input: BbReadinessInput): BbReadiness {
   const pain = num(input.pain010);
   const loss = num(input.vbtLossPct);
   const danger = num(input.dangerMuscles);
-  // Что из этого реально измерено: null/undefined ≠ 0.
+  // Что из этого реально измерено: null/undefined ≠ 0, но явный 0 — это данные.
+  // `dangerMuscles` — исключение: 0 перегруженных без замеров нагрузки неотличим от
+  // «замеров нет», поэтому данным считается только >0 (контракт bb-diagnostics-honesty).
   const tested = (sleep != null && sleep > 0)
     || (pain != null && pain >= 0)
     || (loss != null)

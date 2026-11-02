@@ -11,17 +11,24 @@ export interface BBStimulusResult {
   issues: string[];
   bfrEligible: string[]; // мышцы где применим BFR (памп-изо, RIR при ~≥3)
   scorePenalty: number; // 0-30 для RSS
+  /**
+   * AUDIT 2026-11: без плана движок возвращал issues=[] и penalty=0 —
+   * UI читал это как «стимул сбалансирован». noPlan=true = «анализировать нечего».
+   */
+  noPlan?: boolean;
 }
+
+const EMPTY_GLOBAL = { lengthened: 0, midRange: 0, shortened: 0, compound: 0, isolation: 0, patterns: {} };
 
 export function analyzeBBStimulus(plan: BBPlan | null | undefined): BBStimulusResult {
   if (!plan || !Array.isArray((plan as any).weeks) || (plan as any).weeks.length === 0) {
-    return { byMuscle: {}, global: { lengthened: 0, midRange: 0, shortened: 0, compound: 0, isolation: 0, patterns: {} }, issues: [], bfrEligible: [], scorePenalty: 0 };
+    return { byMuscle: {}, global: { ...EMPTY_GLOBAL, patterns: {} }, issues: [], bfrEligible: [], scorePenalty: 0, noPlan: true };
   }
   let balance: BBBalanceReport;
   try {
     balance = analyzeBBBalance(plan as any, { specTargets: (plan as any).priorityMuscles });
   } catch {
-    return { byMuscle: {}, global: { lengthened: 0, midRange: 0, shortened: 0, compound: 0, isolation: 0, patterns: {} }, issues: [], bfrEligible: [], scorePenalty: 0 };
+    return { byMuscle: {}, global: { ...EMPTY_GLOBAL, patterns: {} }, issues: [], bfrEligible: [], scorePenalty: 0, noPlan: true };
   }
   const issues: string[] = [];
   let penalty = 0;

@@ -1323,8 +1323,17 @@ const [bbVolumeRamp, setBbVolumeRamp] = useState<'standard' | 'preloaded' | 'fla
       } else if (payload.kind === 'weakpoints' && (() => {
         const d = payload.data as WeakpointsPayload;
         // 3.9: принимаем любой из источников групп (гранулярные → канонические → общие).
-        return Array.isArray(d.weakZonesGranular) || Array.isArray(d.weakMusclesCanonical)
+        const hasGroups = Array.isArray(d.weakZonesGranular) || Array.isArray(d.weakMusclesCanonical)
           || Array.isArray(d.weakPoints) || Array.isArray(d.groups);
+        // AUDIT 2026-11: орто-скрининг (OrthoScreenCard) шлёт ТОЛЬКО orthoGuards/teenNote.
+        // Раньше гейт требовал группы → payload молча отбрасывался, а блок ниже снимал
+        // ранее применённые орто-гарды — защита исчезала именно после орто-отправки.
+        const hasBbOnlyInfo = !!(
+          d.orthoGuards || d.orthoFlags || d.teenNote || d.painLevel || d.painMon
+          || d.bench || d.posterior || d.erir || d.scapPain || d.ybt || d.shoulder
+          || d.hinge || d.movementDriver || d.singleLeg || d.diagStatus || d.correctiveDetail
+        );
+        return hasGroups || hasBbOnlyInfo;
       })()) {
         const bbDiag = payload.data as WeakpointsPayload;
         // D1 (§9 плана BB-AUTO-EXHAUSTIVE-PRO): движения диагностики (driver/singleLeg) — чистое
@@ -1376,8 +1385,12 @@ const [bbVolumeRamp, setBbVolumeRamp] = useState<'standard' | 'preloaded' | 'fla
           }
         }
         // 3.9: гранулярные зоны приоритетны, но канонические/общие группы — честный fallback.
-        const groups = (bbDiag.weakZonesGranular ?? bbDiag.weakMusclesCanonical ?? bbDiag.weakPoints ?? bbDiag.groups) as string[];
-        const normalized = normalizeSpecializationTargets(groups.slice(0, 2));
+        // AUDIT 2026-11: payload может не нести групп вообще (орто/боль/скрининг) — раньше
+        // здесь был non-null assert и `.slice` падал на undefined.
+        const groups = (
+          bbDiag.weakZonesGranular ?? bbDiag.weakMusclesCanonical ?? bbDiag.weakPoints ?? bbDiag.groups ?? []
+        ) as string[];
+        const normalized = normalizeSpecializationTargets((Array.isArray(groups) ? groups : []).slice(0, 2));
         if (normalized.length > 0) {
           setSpecBlocks([{ id: 'spec-block-1', weeks: 5, targets: normalized, tradeoffMode: 'none' as const, donors: [] }]);
           setBridgeMsg(`🔗 Слабые группы → ББ-авто: ${normalized.join(', ')}`);
@@ -1435,12 +1448,19 @@ const [bbVolumeRamp, setBbVolumeRamp] = useState<'standard' | 'preloaded' | 'fla
         }
         // MAX PRO: спец-блок из диагностики (недели/доноры/dayMap) + причины.
         // Форма свободная (unknown) — валидируем перед применением.
-        const specRaw = bbDiag.specBlock as { lengthWeeks?: unknown; donors?: unknown } | null | undefined;
+        const specRaw = bbDiag.specBlock as { lengthWeeks?: unknown; donors?: unknown; rationale?: unknown } | null | undefined;
         if (specRaw && typeof specRaw === 'object' && normalized.length > 0) {
-          const wks = Math.max(3, Math.min(6, Math.round(typeof specRaw.lengthWeeks === 'number' ? specRaw.lengthWeeks : 5)));
+          const requested = Math.round(Number(specRaw.lengthWeeks) || 5);
+          const wks = Math.max(3, Math.min(6, requested));
           const donors = Array.isArray(specRaw.donors) ? specRaw.donors.map((d) => String(d)).slice(0, 2) : [];
           setSpecBlocks([{ id: 'spec-block-1', weeks: wks, targets: normalized, tradeoffMode: donors.length ? 'reduce_direct_to_floor' as const : 'none' as const, donors }]);
-          setBridgeMsg((prev: string) => prev ? `${prev} · спец-блок ${wks} нед` : `🔗 Спец-блок → ББ-авто: ${wks} нед`);
+          // BB-D-24: конструктор держит один блок 3–6 нед. Хаб уже просит 4–6, но
+          // если пришёл старый payload на 8+ нед — говорим об усечении честно, а не молчим.
+          const truncated = requested > wks;
+          const why = Array.isArray(specRaw.rationale) ? specRaw.rationale.slice(0, 1).map(String).join('') : '';
+          setBridgeMsg((prev: string) => prev
+            ? `${prev} · спец-блок ${wks} нед${truncated ? ` (просили ${requested})` : ''}`
+            : `🔗 Спец-блок → ББ-авто: ${wks} нед${truncated ? ` — конструктор держит 3–6, обрезано с ${requested}` : ''}${why ? ` · ${why}` : ''}`);
           setTimeout(() => setBridgeMsg(''), 5000);
         }
         // Слабые головки стимула — persist для будущих сборок и смены углов
@@ -1502,7 +1522,16 @@ const [bbVolumeRamp, setBbVolumeRamp] = useState<'standard' | 'preloaded' | 'fla
           if (typeof bbDiag.orthoSummary === 'string' && bbDiag.orthoSummary) pro2parts.push(`🦴 ${bbDiag.orthoSummary.slice(0, 80)}`);
         }
         // Э3: мост без орто-полей снимает ранее отслеженные гарды (только свои id — чужое/своё юзера цело).
-        if (!dec.active) {
+        // BB-D-19: снимаем ТОЛЬКО когда payload явно принёс орто-секцию. Иначе обычная
+        // ББ-диагностика/интеллект (они орто-полей не шлют) молча стирали ограничения,
+        // выставленные на орто-экране, — пользователь узнавал об этом постфактум.
+        const orthoPayloadPresent = !!bbDiag && (
+          (bbDiag as any).orthoGuards !== undefined
+          || (bbDiag as any).orthoFlags !== undefined
+          || (bbDiag as any).orthoSummary !== undefined
+          || (bbDiag as any).teenNote !== undefined
+        );
+        if (!dec.active && orthoPayloadPresent) {
           let cleaned = 0;
           try {
             const tm: unknown = JSON.parse(localStorage.getItem('he_bb_ortho_mobility') || '[]');
@@ -1999,12 +2028,34 @@ const [bbVolumeRamp, setBbVolumeRamp] = useState<'standard' | 'preloaded' | 'fla
   }, []);
 
   // ⚙️ Живой приём плана из «Сборки цикла» Годового планировщика (he-bb-plan-saved)
+  /** Актуальная сборка для внешних событий (замыкание эффекта не видит свежий state). */
+  const builtPlanRef = useRef<BBPlan | null>(builtPlan);
+  useEffect(() => { builtPlanRef.current = builtPlan; }, [builtPlan]);
+
   useEffect(() => {
-    const onExternalPlan = () => {
+    const onExternalPlan = (e: Event) => {
       try {
+        const detail = (e as CustomEvent).detail as { source?: string } | undefined;
+        const fromDiag = !!detail?.source && String(detail.source).startsWith('bb-diag');
         const saved = localStorage.getItem('he_bb_plan_saved');
         if (!saved) return;
         const parsed = JSON.parse(saved);
+        // AUDIT 2026-11: диагностика вставляет коррекции в СОХРАНЁННЫЙ план. Если в
+        // конструкторе есть несохранённая сборка, прежний код молча затирал её и
+        // переключал на план из хранилища. Теперь — предупреждение и никакой подмены.
+        if (fromDiag && builtPlanRef.current) {
+          const cur = JSON.stringify(builtPlanRef.current);
+          let prevPlan = '';
+          try {
+            const p = JSON.parse(localStorage.getItem('he_bb_plan_saved_prev') || 'null');
+            prevPlan = p?.plan ? JSON.stringify(p.plan) : '';
+          } catch { /* noop */ }
+          if (prevPlan && cur !== prevPlan) {
+            setBridgeMsg('⚠ Диагностика вставила коррекции в сохранённый план; несохранённая сборка в конструкторе не тронута. Сохрани/пересобери — и посмотри план из хранилища.');
+            setTimeout(() => setBridgeMsg(''), 7000);
+            return;
+          }
+        }
         if (parsed.plan) {
           setBuiltPlan(revalidateEditedPlan(parsed.plan as BBPlan));
           setBbWeekSel(1);
@@ -2451,10 +2502,21 @@ const [bbVolumeRamp, setBbVolumeRamp] = useState<'standard' | 'preloaded' | 'fla
         if (!eq.length || !eq[0]) return true;
         return eq.includes('bodyweight') || eq.some((x: string) => planEq.includes(x));
       };
+      // AUDIT 2026-11 (BB-D-23): bannedPatterns (ступень возврата) хранились, но в
+      // сборку не попадали — предпочтение/своп мог вернуть запрещённый шаблон.
+      // profParts объявлен ниже — копим ранние пометки отдельно.
+      const earlyProfNotes: string[] = [];
+      const bannedRe = (Array.isArray(returnAction?.bannedPatterns) ? returnAction!.bannedPatterns : [])
+        .map((b: any) => String(b).toLowerCase().trim()).filter(Boolean);
+      const isBannedName = (n: string): boolean => bannedRe.length > 0 && bannedRe.some((b: string) => n.toLowerCase().includes(b));
       // preferred как swap если упражнения нет в плане — добавим в первую неделю
       for (const pid of preferredExerciseIds) {
         const cat = findCatalogExercise(pid);
         if (!cat || !eqOk(cat)) continue;
+        if (isBannedName(`${(cat as any).id || ''} ${(cat as any).name || ''}`)) {
+          earlyProfNotes.push(`↩ ${(cat as any).name}: запрещён ступенью возврата — не добавлен`);
+          continue;
+        }
         // Сравниваем и id, и display-name: движок пишет exerciseName=name,
         // а лаборатория присылает id — раньше это давало дубль упражнения.
         const ids = [String(cat.id || '').toLowerCase(), String(cat.name || '').toLowerCase()].filter(Boolean);
@@ -2502,6 +2564,10 @@ const [bbVolumeRamp, setBbVolumeRamp] = useState<'standard' | 'preloaded' | 'fla
         const oldLow = String(sw.oldId).toLowerCase();
         const newCat = findCatalogExercise(sw.newId);
         if (!newCat || !eqOk(newCat)) continue;
+        if (isBannedName(`${sw.newId} ${(newCat as any).name || ''}`)) {
+          earlyProfNotes.push(`↩ ${(newCat as any).name}: запрещён ступенью возврата — замена не сделана`);
+          continue;
+        }
         // Снаряд заменяемого упражнения — для пересчёта веса (штанга→гантели и т.п.).
         const oldCat = findCatalogExercise(sw.oldId);
         const ratio = oldCat
@@ -2542,7 +2608,7 @@ const [bbVolumeRamp, setBbVolumeRamp] = useState<'standard' | 'preloaded' | 'fla
       // PROF-коррекции выполнения (темп/ROM/техника) — 3.10: гейт по targetId/targetName,
       // иначе правка выбранного упражнения меняла ВСЕ упражнения всех недель.
       applyExecutionCorrections(plan, executionCorrections as ExecutionCorrection[]);
-      const profParts: string[] = [];
+      const profParts: string[] = [...earlyProfNotes];
       // S3: возврат — главный план тоже режется (ступень 2 ×0.5, ступень 1 = только техника)
       if (returnAction && Number.isFinite(returnAction.volumeMult) && returnAction.volumeMult < 1) {
         const mult = Math.max(0, Math.min(1, returnAction.volumeMult));
@@ -2552,10 +2618,11 @@ const [bbVolumeRamp, setBbVolumeRamp] = useState<'standard' | 'preloaded' | 'fla
           for (const s of w.sessions as any[]) {
             for (const ex of s.exercises as any[]) {
               if (mult === 0) {
+                // Ступень 1: 1 подход = техника, НЕ силовой объём (так и подписано).
                 ex.sets = 1;
                 if (Array.isArray(ex.workSets) && ex.workSets.length > 1) ex.workSets = ex.workSets.slice(0, 1);
                 ex.rir = Math.min(5, (ex.rir || 2) + rirAdd + 2);
-                ex.comment = `${ex.comment ? ex.comment + ' · ' : ''}↩ возврат: техника`;
+                ex.comment = `${ex.comment ? ex.comment + ' · ' : ''}↩ возврат: техника (1 подход, не силовой объём)`;
               } else {
                 const ns = Math.max(1, Math.round(ex.sets * mult));
                 if (ns !== ex.sets) {

@@ -60,8 +60,10 @@ export function buildBBDiagnosticsReport(input: BBDiagnosticsHubInput): BBDiagno
       muscle: canonicalMuscle(m),
       granular: m,
       reason: 'Ручной выбор',
-      deltaPct: -15,
-      source: 'volume' as const,
+      // AUDIT 2026-11: раньше здесь стояло -15 и source:'volume' — хаб печатал
+      // «Авто-кандидаты: грудь −15%», хотя никакого дефицита не измеряли.
+      deltaPct: null,
+      source: 'manual' as const,
     }));
     const map = new Map<string, BBWeakCandidate>();
     for (const c of [...manual, ...merged]) {
@@ -156,7 +158,7 @@ export function buildBBDiagnosticsReport(input: BBDiagnosticsHubInput): BBDiagno
   });
 
   const findings: string[] = [];
-  if (candidates.length) findings.push(`Слабые: ${candidates.map(c => `${c.muscle}${c.granular ? `(${c.granular})` : ''} ${c.deltaPct}% [${c.source}]`).join(', ')}`);
+  if (candidates.length) findings.push(`Слабые: ${candidates.map(c => `${c.muscle}${c.granular ? `(${c.granular})` : ''} ${c.deltaPct == null ? 'вручную' : `${c.deltaPct}%`} [${c.source}]`).join(', ')}`);
   if (symmetry.issues.length) findings.push(...symmetry.issues.slice(0, 2));
   if (stimulus.issues.length) findings.push(...stimulus.issues.slice(0, 2));
   if (score.floors.length) findings.push(...score.floors.map(f => `Floor: ${f}`));

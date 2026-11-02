@@ -10,6 +10,7 @@ import { derivePattern } from '../movement-pattern';
 import { EXERCISE_CATALOG } from '../../core/exercise-catalog';
 import { getExerciseBio } from '../../data/exercise-biomechanics-db';
 import { diagnoseStimulusTarget, type StimulusDiagnosis, type StimulusFlag } from './bb-stimulus-target.engine';
+import { parseTempo } from '../rep-tempo.engine';
 
 export type DiagnosisFlag =
   | 'lowSFRHighFatigue'
@@ -248,7 +249,15 @@ export function diagnoseExercise(
   // 14 «стимул в цель» — доля нагрузки в целевую головку (пилот руки+дельты; остальные — silent neutral)
   let stimulus: StimulusDiagnosis | null = null;
   try {
-    const hasPause = Number(ex.pauseSeconds ?? ctx.planPauseSeconds ?? 0) > 0;
+    // AUDIT 2026-11 (BB-D-27): темп разбираем по 4 фазам, а «паузы нет» говорим
+    // только когда темп реально известен. Раньше `hasPause || undefined` превращал
+    // false в undefined (проверка `=== false` не срабатывала), а при заданном темпе
+    // пауза искалась по подстроке и ловила любую «1» в диапазоне повторений.
+    const tempoStr = String(actualTempo ?? (ex as any).tempo ?? '').trim();
+    const parsedTempo = tempoStr ? parseTempo(tempoStr) : null;
+    const pauseField = Number(ex.pauseSeconds ?? ctx.planPauseSeconds ?? 0);
+    const tempoKnown = !!parsedTempo || ex.pauseSeconds != null || ctx.planPauseSeconds != null;
+    const hasPause = pauseField > 0 || (parsedTempo ? parsedTempo.bottomPause > 0 || parsedTempo.topPause > 0 : false);
     stimulus = diagnoseStimulusTarget(
       { id: effect.id || (ex as any).id, name: effect.name, muscle: muscle || undefined },
       {
@@ -257,7 +266,7 @@ export function diagnoseExercise(
         cheating: ctx.cheating,
         rirActual: ex.rir ?? ctx.planRir ?? null,
         rangeFull: ctx.rangeFull,
-        tempoHasPause: hasPause || undefined,
+        tempoHasPause: tempoKnown ? hasPause : undefined,
       },
     );
     if (stimulus && stimulus.flags.length > 0) {

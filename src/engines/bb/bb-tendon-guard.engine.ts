@@ -25,6 +25,10 @@ export interface BbTendonGuard {
 
 // Тяга/бицепс грузят дистальный бицепс и локоть; жимы над головой/брусья — плечо.
 const ELBOW_RE = /станов|тяга|подтягиван|deadlift|row|pull-?up|pulldown|сгибание|бицепс|молот|curl|hammer/i;
+// AUDIT 2026-11 (BB-D-30): /curl|сгибание/ ловило «Сгибание ног лёжа (leg curl)» —
+// локоть получал stop/warn от упражнений на бицепс бедра. Ноги исключаем.
+const LEG_EXCLUDE_RE = /ног[аиу]?\b|ноги|бедр|голен|икр|leg|hamstring|lunge|присед|squat|calf|выпад|румынск/i;
+const isElbowPattern = (name: string): boolean => ELBOW_RE.test(name) && !LEG_EXCLUDE_RE.test(name);
 // ВАЖНО: 'наклон' убран — он матчил «Тяга штанги В НАКЛОНЕ» и «Гудморнинг (под наклоном)»,
 // относя спино-день к жимовым парам и раздувая shoulderSets до ложного stop.
 const SHOULDER_RE = /жим стоя|армейск|overhead|ohp|брусья|dips|жим л[ёе]жа|bench|incline (press|db|bar)|наклонн.*(жим|пресс)|махи|lateral/i;
@@ -70,7 +74,7 @@ function setEquiv(ex: any, set: any): number {
   return base;
 }
 
-function countFor(sessions: any[], re: RegExp): number {
+function countFor(sessions: any[], re: RegExp, extraFilter?: (name: string) => boolean): number {
   let n = 0;
   if (!Array.isArray(sessions)) return 0;
   for (const s of sessions) {
@@ -78,6 +82,7 @@ function countFor(sessions: any[], re: RegExp): number {
     for (const ex of list) {
       const name = `${ex?.exerciseName || ''} ${ex?.name || ''}`;
       if (!re.test(name)) continue;
+      if (extraFilter && !extraFilter(name)) continue;
       if (Array.isArray(ex?.sets)) {
         for (const st of ex.sets) n += setEquiv(ex, st);
       } else {
@@ -111,7 +116,7 @@ export function assessBbTendonGuard(
   opts: { elbowPain?: boolean; shoulderOhsFail?: boolean; level?: string; painRedJoint?: 'elbow' | 'shoulder' | null } = {},
 ): BbTendonGuard {
   const caps = LEVEL_CAPS[String(opts.level || 'intermediate').toLowerCase()] || LEVEL_CAPS.intermediate;
-  const elbowSets = countFor(sessions, ELBOW_RE);
+  const elbowSets = countFor(sessions, ELBOW_RE, isElbowPattern);
   const shoulderSets = countFor(sessions, SHOULDER_RE);
   // R2: боль-мониторинг красный по суставу — стоп независимо от объёма (PMM, не диагноз).
   const elbowForced = opts.painRedJoint === 'elbow';

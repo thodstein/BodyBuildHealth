@@ -260,11 +260,20 @@ export function injectBBWeakPoints(plan: BBPlan, weakZones: string[], opts: BBIn
     const retRir = Number.isFinite(opts.returnAction?.rirShift as number) ? Math.max(0, Math.min(3, Math.round(opts.returnAction!.rirShift))) : 0;
     // Недели: явные weekIdxs > все не-делоадные при allWeeks > только weeks[0]
     const all = (copy.weeks as any[]);
+    // AUDIT 2026-11 (BB-D-32): делод бывает не только `deload: true`, но и
+    // `phase: 'deload' | 'taper'` (годовой план) — раньше коррекции вставлялись
+    // в разгрузочную/подводящую неделю и ломали её смысл.
+    const isDeloadWeek = (w: any): boolean => {
+      if (!w) return true;
+      if (w.deload === true) return true;
+      const phase = String(w.phase || w.blockPhase || '').toLowerCase();
+      return phase === 'deload' || phase === 'taper' || phase === 'разгрузка' || phase === 'подводка';
+    };
     const weekIdxs = Array.isArray(opts.weekIdxs) && opts.weekIdxs.length
-      ? opts.weekIdxs.filter((i) => Number.isInteger(i) && all[i] && !all[i].deload)
+      ? opts.weekIdxs.filter((i) => Number.isInteger(i) && all[i] && !isDeloadWeek(all[i]))
       : opts.allWeeks
-        ? all.map((w, i) => ({ w, i })).filter(({ w }) => w && !w.deload).map(({ i }) => i)
-        : [0].filter((i) => all[i] && !all[i].deload);
+        ? all.map((w, i) => ({ w, i })).filter(({ w }) => !isDeloadWeek(w)).map(({ i }) => i)
+        : [0].filter((i) => all[i] && !isDeloadWeek(all[i]));
     if (weekIdxs.length === 0) { notes.push(`⚠ ${wp} — делод`); continue; }
     // K4: доза — у выбранного кандидата (замена не врёт дозой первого); legacy — из opts.corrective.
     const corr = picked

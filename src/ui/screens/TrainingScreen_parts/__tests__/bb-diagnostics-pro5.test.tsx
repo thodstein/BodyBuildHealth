@@ -63,7 +63,9 @@ describe('PRO-5 Э2 свежесть данных', () => {
     // Э5-доводка: план читается один раз (savedPlan), report/balance зависят от него
     expect(SRC).toMatch(/const savedPlan = useMemo\([\s\S]{0,300}?\}, \[planNonce, diarySessions\]\);/);
     expect(SRC).toMatch(/const balance = useMemo\([\s\S]{0,300}?\}, \[savedPlan\]\);/);
-    expect(SRC).toMatch(/state\.weakManual, savedPlan\]\);/);
+    // AUDIT 2026-11: в депсах report появились ACWR и LVP-профиль — без них
+    // perMuscleAcwr/hasVbt оставались замороженными (пол ACWR и 100% проверки мертвы).
+    expect(SRC).toMatch(/state\.weakManual, savedPlan, perMuscleAcwr, lvpSaved\]\);/);
     expect((SRC.match(/\[profileNonce\]/g) || []).length).toBeGreaterThanOrEqual(5);
   });
 });

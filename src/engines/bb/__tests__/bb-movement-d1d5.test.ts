@@ -92,10 +92,11 @@ describe('bb-movement D3 YBT-LQ', () => {
     expect(v.text).toMatch(/PM\/PL/);
     const full = ybtLqVerdict({ antL: 55, antR: 56, pmL: 50, pmR: 51, plL: 50, plR: 51, limbCm: 80 });
     expect(full.compositeFull).toBe(true);
-    expect(full.compositePct).toBeCloseTo(64.7, 0);
+    // AUDIT 2026-11 (BB-D-25): композит — по обеим сторонам: 313/(6×80)=65.2
+    expect(full.compositePct).toBeCloseTo(65.2, 1);
     const low = ybtLqVerdict({ antL: 40, antR: 41, pmL: 35, pmR: 36, plL: 35, plR: 36, limbCm: 80 });
     expect(low.warn).toBe(true);
-    expect(low.text).toMatch(/композит 45\.8/);
+    expect(low.text).toMatch(/композит 46\.5/);
   });
   it('одна сторона anterior — не «норма», а неполный скрининг', () => {
     const v = ybtLqVerdict({ antL: 60, antR: null, shinCm: 48 });

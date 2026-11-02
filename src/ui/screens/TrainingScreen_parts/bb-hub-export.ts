@@ -33,6 +33,30 @@ export interface BbHubPro2Input {
   /** ROUND-10: строки блока коррекции (волна) — тот же источник, что карточка хаба. */
   correctionBlock: string[] | null;
   lrDirection: Array<{ group: string; text: string }>;
+  /**
+   * AUDIT 2026-11 (BB-D-33): поля, которые HTML умеет рисовать, а сборщик их не
+   * отдавал — секции «Готовность/Флаги/Возврат/LVP/Сухожилия/Подросток/Женские/
+   * Рабочий вес» в экспорте оставались пустыми при живых данных хаба.
+   */
+  readiness?: { level: string; advice: string; reasons: string[] } | null;
+  redFlags?: { active: boolean; blocked: boolean; items: string[]; text: string } | null;
+  returnTo?: { text: string; stages: Array<{ stage: number; title: string; volume: string; rir: string; note: string; action?: { volumeMult: number; rirShift: number } }> } | null;
+  lvp?: { lift: string; r2: number; e1rm: number | null; text: string; valid?: boolean } | null;
+  tendon?: { elbow: string; shoulder: string } | null;
+  teen?: string | null;
+  femaleNotes?: string[] | null;
+  workingRange?: string | null;
+  /**
+   * BB-G-01/04: сводка «Объём · Recovery · Mobility» (чипы, ограничитель, действия)
+   * и строка эффекта коррекции. Раньше шестого экрана не было вовсе — экспорт ему
+   * не соответствовал; теперь «показано = выгружено».
+   */
+  volumeRecovery?: {
+    chips: Array<{ label: string; value: string; detail: string }>;
+    limiter: { label: string; detail: string } | null;
+    advice: string[];
+    effect: string | null;
+  } | null;
 }
 
 /** Единая мета для `buildBBDiagnosticsHtml` и `buildBBDiagnosticsCsv` (пусто — тихо). */
@@ -60,5 +84,14 @@ export function buildPro2Meta(i: BbHubPro2Input): Record<string, unknown> {
     correctiveDetail: i.correctiveDetail,
     correctionBlock: i.correctionBlock,
     lrDirection: i.lrDirection,
+    readiness: i.readiness ?? undefined,
+    redFlags: i.redFlags ?? undefined,
+    returnTo: i.returnTo ?? undefined,
+    lvp: i.lvp ?? undefined,
+    tendon: i.tendon ?? undefined,
+    teen: i.teen ?? undefined,
+    femaleNotes: i.femaleNotes?.length ? i.femaleNotes : undefined,
+    workingRange: i.workingRange ?? undefined,
+    volumeRecovery: i.volumeRecovery ?? undefined,
   };
 }

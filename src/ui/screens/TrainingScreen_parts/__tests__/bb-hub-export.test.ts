@@ -100,6 +100,68 @@ describe('bb-hub-export (PRO-5 Э5)', () => {
     expect(html).toContain('Подпятка');
   });
 
+  it('BB-D-33: готовность/флаги/возврат/LVP/сухожилия/возраст-пол доезжают до HTML', () => {
+    const meta = buildPro2Meta(baseInput({
+      readiness: { level: 'yellow', advice: 'снизь объём', reasons: ['сон 5 ч'] },
+      redFlags: { active: true, blocked: true, items: ['острая боль'], text: 'стоп-флаги: острая боль' },
+      returnTo: { text: 'поэтапный возврат', stages: [{ stage: 1, title: 'техника', volume: '0%', rir: '+4', note: 'лёгкое' }] },
+      lvp: { lift: 'squat', r2: 0.42, e1rm: 140, text: 'LVP: R² 0.42, e1RM 140', valid: true },
+      tendon: { elbow: 'локоть: warn', shoulder: 'плечо: ok' },
+      teen: '14-15 лет: объём ниже',
+      femaleNotes: ['талия/бёдра: ориентир 0.7'],
+    }));
+    expect(meta.readiness).toMatchObject({ level: 'yellow' });
+    expect(meta.redFlags).toMatchObject({ blocked: true });
+    expect(meta.returnTo?.stages).toHaveLength(1);
+    expect(meta.lvp).toMatchObject({ lift: 'squat' });
+    expect(meta.tendon).toMatchObject({ elbow: 'локоть: warn' });
+    expect(meta.teen).toContain('14-15');
+    expect(meta.femaleNotes).toHaveLength(1);
+
+    const report = { weakCandidates: [], weakMusclesCanonical: [], weakZonesGranular: [], symmetry: { ratios: {}, score: 0, issues: [] }, stimulus: { issues: [], scorePenalty: 0, global: {} }, score: { score: 100, level: 'ok', verification: 0, floors: [], verificationMissing: [] }, findings: [], priorities: [] } as any;
+    const html = buildBBDiagnosticsHtml(report, { date: '2026-09-22', ...meta } as any);
+    // Каждая секция реально отрисована (а не просто лежит в объекте)
+    for (const needle of ['Готовность', 'Флаги', 'возврат', 'LVP', 'Сухожилия', 'Подросток', 'Женские ориентиры']) {
+      expect(html).toContain(needle);
+    }
+  });
+
+  it('BB-D-38: пустые ориентиры по полу/возрасту — секции нет (не выдумываем)', () => {
+    const meta = buildPro2Meta(baseInput({ teen: null, femaleNotes: null }));
+    expect(meta.teen ?? null).toBeNull();
+    expect(meta.femaleNotes ?? null).toBeNull();
+    // источник: хаб считает ноты движками, а не литералами
+    expect(SRC).toContain('teenTrainingNote(');
+    expect(SRC).toContain('femaleSymmetryNotes(');
+  });
+
+  it('BB-G-01/04: сводка объёма/recovery и эффект коррекции доезжают до HTML', () => {
+    const meta = buildPro2Meta(baseInput({
+      volumeRecovery: {
+        chips: [{ label: 'MRV', value: 'Грудь 24/20', detail: 'сверх MRV: Грудь' }],
+        limiter: { label: 'Сон 5 ч', detail: 'объём приоритетов ×0.8' },
+        advice: ['Снять 4 подх. с Грудь (факт 24 > MRV 20)'],
+        effect: 'Эффект коррекции за 4 нед: 1 улучшилось · 0 хуже · 0 без изменений',
+      },
+    }));
+    expect(meta.volumeRecovery).toMatchObject({ limiter: { label: 'Сон 5 ч' } });
+    const report = { weakCandidates: [], weakMusclesCanonical: [], weakZonesGranular: [], symmetry: { ratios: {}, score: 0, issues: [] }, stimulus: { issues: [], scorePenalty: 0, global: {} }, score: { score: 100, level: 'ok', verification: 0, floors: [], verificationMissing: [] }, findings: [], priorities: [] } as any;
+    const html = buildBBDiagnosticsHtml(report, { date: '2026-11-03', ...meta } as any);
+    expect(html).toContain('Объём · Recovery · Mobility');
+    expect(html).toContain('Грудь 24/20');
+    expect(html).toContain('Ограничитель');
+    expect(html).toContain('Снять 4 подх.');
+    expect(html).toContain('Эффект коррекции');
+    // CSV-паритет: те же строки, что видны в хабе
+    const csv = buildBBDiagnosticsCsv(report, null, { ...meta, weakCauses: {}, weakHeads: [], specBlock: null } as any);
+    expect(csv).toContain('vr_limiter');
+    expect(csv).toContain('vr_advice');
+    expect(csv).toContain('correction_effect');
+    // без панели — секции нет (не выдумываем пустой блок)
+    const empty = buildBBDiagnosticsHtml(report, { date: '2026-11-03', ...buildPro2Meta(baseInput()) } as any);
+    expect(empty).not.toContain('Объём · Recovery · Mobility');
+  });
+
   it('source-guard: хаб собирает мету ровно одним вызовом, копий литералов нет', () => {
     expect((SRC.match(/buildPro2Meta\(/g) || []).length).toBe(1);
     expect(SRC).not.toContain('pro2csv');

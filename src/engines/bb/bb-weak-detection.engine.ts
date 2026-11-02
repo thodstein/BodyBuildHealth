@@ -12,8 +12,9 @@ export interface BBWeakCandidate {
   muscle: string; // канонический EN-ключ
   granular?: string; // гранулярная зона если есть (delt_mid и т.д.)
   reason: string;
-  deltaPct: number; // отрицат = отставание
-  source: 'volume' | 'e1rm' | 'circumf';
+  /** Дельта к ориентиру; null = выбрано вручную (дефицит не измерялся). */
+  deltaPct: number | null;
+  source: 'volume' | 'e1rm' | 'circumf' | 'manual';
 }
 
 /**
@@ -74,6 +75,10 @@ export function detectBBWeakByVolume(
     const vals = Object.values(mavValues);
     return vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : 0;
   })();
+  // AUDIT 2026-11 (BB-D-28): «почему слабая» и «кандидат в слабые» должны видеть
+  // ОДИН объём. Кандидат (bb-weak-detection) по контракту round-5 считает прямые
+  // сеты (MEV/MAV заданы для direct), а причина брала effectiveSets — вердикты
+  // расходились (4 сета vs 10). Приводим причину к тому же приоритету.
   const facts = muscles.map(m => fact[m]?.directSets ?? fact[m]?.effectiveSets ?? 0);
   const factAvg = facts.length ? facts.reduce((a, b) => a + b, 0) / facts.length : 0;
   const othersStrong = factAvg >= othersMavAvg * 0.85; // эвристика: средняя группа около MAV
@@ -105,7 +110,7 @@ export function detectBBWeakByVolume(
     seen.add(k);
     dedup.push(c);
   }
-  return dedup.sort((a, b) => a.deltaPct - b.deltaPct);
+  return dedup.sort((a, b) => (a.deltaPct ?? 0) - (b.deltaPct ?? 0));
 }
 
 /** e1RM-тренд per-muscle: old (21–42д назад, max) vs recent (7д, max) + число recent-замеров. */
@@ -208,7 +213,7 @@ export function detectBBWeakByE1rm(
       out.push({ muscle: m, reason: `e1RM плато ${deltaPct}% за 28д (≥2 сесс)`, deltaPct, source: 'e1rm' });
     }
   }
-  return out.sort((a, b) => a.deltaPct - b.deltaPct);
+  return out.sort((a, b) => (a.deltaPct ?? 0) - (b.deltaPct ?? 0));
 }
 
 /** 3) Окружности vs идеал Reeves: факт < идеал на ≥10% → weak */
@@ -261,7 +266,7 @@ export function detectBBWeakByCircumf(
     seen.add(c.muscle);
     dedup.push(c);
   }
-  return dedup.sort((a, b) => a.deltaPct - b.deltaPct);
+  return dedup.sort((a, b) => (a.deltaPct ?? 0) - (b.deltaPct ?? 0));
 }
 
 /**
@@ -275,16 +280,16 @@ export function mergeBBWeakCandidates(
   b: BBWeakCandidate[],
   c: BBWeakCandidate[],
 ): BBWeakCandidate[] {
-  const weight: Record<BBWeakCandidate['source'], number> = { volume: 3, e1rm: 2, circumf: 1 };
+  const weight: Record<BBWeakCandidate['source'], number> = { volume: 3, e1rm: 2, circumf: 1, manual: 0 };
   const byMuscle = new Map<string, BBWeakCandidate>();
   for (const cand of [...a, ...b, ...c]) {
     const prev = byMuscle.get(cand.muscle);
     if (!prev) { byMuscle.set(cand.muscle, cand); continue; }
     // надёжнее по источнику; при равном источнике — более отрицательная дельта
     if (weight[cand.source] > weight[prev.source]) byMuscle.set(cand.muscle, cand);
-    else if (weight[cand.source] === weight[prev.source] && cand.deltaPct < prev.deltaPct) byMuscle.set(cand.muscle, cand);
+    else if (weight[cand.source] === weight[prev.source] && (cand.deltaPct ?? 0) < (prev.deltaPct ?? 0)) byMuscle.set(cand.muscle, cand);
   }
-  return Array.from(byMuscle.values()).sort((x, y) => x.deltaPct - y.deltaPct);
+  return Array.from(byMuscle.values()).sort((x, y) => (x.deltaPct ?? 0) - (y.deltaPct ?? 0));
 }
 
 /**
@@ -342,5 +347,5 @@ export function detectBBWeakByVolumeStable(
       out.push({ muscle: normMuscleKey(m), reason: `28д стабильно ниже MAV (${hist.join('/')}) vs MAV ${lm.mav}`, deltaPct: delta, source: 'volume' });
     }
   }
-  return out.sort((a, b) => a.deltaPct - b.deltaPct);
+  return out.sort((a, b) => (a.deltaPct ?? 0) - (b.deltaPct ?? 0));
 }

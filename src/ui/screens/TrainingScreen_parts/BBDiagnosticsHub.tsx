@@ -4,7 +4,7 @@
  * Нагрузка/восстановление/объём/VBT/LVP/видео/ортопедия — НЕ дублируются, только ссылки на свои хабы.
  * Хедер RSS 0-100 (движения: слабые/симметрия/стимул/скрининг/SFR/углы/длина) + verification. Мост weakpoints → BbAutoConstructor.
  */
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect, useCallback, useRef } from 'react';
 import { CARD, ACCENT } from './training-ui';
 import { BbScreeningTab } from './bb-hub-screening-tab';
 import { BbCheckCard, BbNum, BbSheetSelect, bbNum } from './bb-hub-controls';
@@ -12,7 +12,7 @@ import { applyToPlanner } from './planner-bridge';
 import { buildPro2Meta } from './bb-hub-export';
 import { localIsoDate } from './diary-shared';
 import { localIsoDateOffset } from '../../../core/local-date';
-import { scoreColor as bbScoreColor } from '../../../engines/bb/bb-scoring.engine';
+import { scoreColor as bbScoreColor, BB_VERIFICATION_LABEL_RU } from '../../../engines/bb/bb-scoring.engine';
 import { buildBBDiagnosticsReport } from '../../../engines/bb/bb-diagnostics-hub.engine';
 import { buildBBDiagnosticsHtml, buildBBDiagnosticsCsv, downloadHtml, downloadCsv } from '../../../engines/bb/bb-diagnostics-export.engine';
 import { MUSCLE_LABEL_RU } from '../../../engines/volume-landmarks.engine';
@@ -31,6 +31,7 @@ import { bbSpecToAnnualPatch } from '../../../engines/bb/bb-spec-annual.engine';
 import { loadAnnualTrainingPlan, saveAnnualTrainingPlan } from '../../../engines/annual-training/annual-training-storage';
 import { setAnnualBlockConfig } from '../../../engines/annual-training/block-builders.engine';
 import { isSpecializationTargetConflict, canonicalMuscle } from '../../../engines/bb/bb-specialization.engine';
+import { isGranularZone, granularZoneOf } from '../../../engines/bb/bb-granular-zone.engine';
 import { calcExerciseEffect, exerciseEffectScore } from '../../../engines/bb/bb-exercise-effect.engine';
 import { auditPlanExercises } from '../../../engines/bb/bb-plan-exercise-audit.engine';
 import { diagnoseExercise } from '../../../engines/bb/bb-exercise-diagnosis.engine';
@@ -48,7 +49,10 @@ import { rankCorrectives, correctiveDose, correctiveLoadFactor } from '../../../
 import { correctiveBlockForBB, correctiveBlockExportLines } from '../../../engines/bb/bb-corrective-block.engine';
 import { buildSpecBlock } from '../../../engines/bb/bb-spec-block.engine';
 import { injectBBWeakPoints, correctiveWeightHint, pushPlanSnapshot, readPlanHistory, type PlanSnapshot } from '../../../engines/bb/bb-diagnostics-injection.engine';
-import { idealMcCallumMap, symmetryTriadDeviation, appendMeasureSnapshot, measureDeltas, type MeasureSnapshot } from '../../../engines/bb/bb-symmetry.engine';
+import { calculatePlanSafetyScore } from '../../../engines/bb/bb-safety-score.engine';
+import { bbPlanSaveBlockReason } from './bb-plan-save-guard';
+import { readDiagHistory, appendDiagHistory, diagHistoryTrend, type DiagHistoryEntry } from '../../../engines/bb/bb-diag-history.engine';
+import { idealMcCallumMap, symmetryTriadDeviation, appendMeasureSnapshot, measureDeltas, femaleSymmetryNotes, teenTrainingNote, type MeasureSnapshot } from '../../../engines/bb/bb-symmetry.engine';
 import { weakHeadForZone, HEAD_FUNCTIONS, auditHeadCoverage, headsHitOf } from '../../../engines/bb/bb-stimulus-target.engine';
 import { resolveMovementDriver, singleLegVerdict, ohsFailCodes, d1d5FailCodes, v3FailCodes, movementDelta, screenPriorityList, teenLoadedGate, type MovementSnapshot } from '../../../engines/bb/bb-movement-screen.engine';
 // Аудит 2026-11 (BB-24): экран скрининга вынесен в `bb-hub-screening-tab.tsx`,
@@ -63,9 +67,11 @@ import { painMonitorVerdict, painMonitorLine, type PainLocation } from '../../..
 import { nheVerdict, adductorVerdict, type CphLevel } from '../../../engines/bb/bb-posterior-readiness.engine';
 import { assessBbTendonGuard } from '../../../engines/bb/bb-tendon-guard.engine';
 import { calibrateBbLvp, parseBbLvpText, loadBbLvpProfiles, saveBbLvpProfile, clearBbLvpProfiles, type BbLvpProfile } from '../../../engines/bb/bb-lvp.engine';
+import { buildVolumeRecoveryPanel, vrMuscleLabel } from '../../../engines/bb/bb-volume-recovery.engine';
+import { buildCorrectionEffect, logDiagInjection, readDiagInjections, type DiagInjection } from '../../../engines/bb/bb-diag-effect.engine';
 
 const STORAGE_KEY = 'he_bb_diagnostics_hub_v1';
-type BBTab = 'weak' | 'screening' | 'exercise' | 'stimulus' | 'symmetry';
+type BBTab = 'weak' | 'screening' | 'exercise' | 'stimulus' | 'symmetry' | 'volume';
 
 export type BBState = {
   weakManual: string[];
@@ -158,7 +164,7 @@ const DEFAULT_STATE: BBState = {
   exerciseFilterUnilateral: false,
   wristCm: '',
   sex: '',
-  specWeeks: '8',
+  specWeeks: '6',
   showSpecBlock: false,
   stimCheating: false,
   stimShortRom: false,
@@ -192,10 +198,14 @@ const TAB_DEFS: Array<{ id: BBTab; label: string; icon: string; desc: string }> 
   { id: 'exercise', label: 'Разбор', icon: '🏋️', desc: 'упражнение + техника + замена' },
   { id: 'stimulus', label: 'Стимул-карта', icon: '🎯', desc: 'SFR + длина + углы + читинг' },
   { id: 'symmetry', label: 'Пропорции', icon: '⚖️', desc: 'замеры + лево/право + дельты' },
+  { id: 'volume', label: 'Объём · Recovery', icon: '📐', desc: 'ACWR + MRV + ограничитель' },
 ];
 
-const GRANULAR_OPTS: Array<{ id: string; label: string }> = [
-  { id: 'delt_mid', label: 'Средняя дельта' },
+/** Цвета панели «Объём · Recovery» (BB-G-01): «нет данных» — серый, а не зелёный. */
+const vrZoneColor = (z: string): string => z === 'red' ? '#ef4444' : z === 'yellow' ? '#f59e0b' : z === 'green' ? '#22c55e' : '#9ca3af';
+const vrZoneBg = (z: string): string => z === 'red' ? 'rgba(239,68,68,0.10)' : z === 'yellow' ? 'rgba(245,158,11,0.10)' : z === 'green' ? 'rgba(34,197,94,0.08)' : 'rgba(148,163,184,0.08)';
+
+const GRANULAR_OPTS: Array<{ id: string; label: string }> = [  { id: 'delt_mid', label: 'Средняя дельта' },
   { id: 'delt_rear', label: 'Задняя дельта' },
   { id: 'delt_front', label: 'Передняя дельта' },
   { id: 'chest_upper', label: 'Верх груди' },
@@ -324,13 +334,25 @@ export const BBDiagnosticsHub: React.FC = () => {
     };
   }, []);
 
+  /**
+   * AUDIT 2026-11: 40+ мест делали `setTimeout(() => setToast(''), N)` без очистки.
+   * Таймеры жили после размонтирования (тост-апдейт по мёртвому дереву), а быстрые
+   * подряд тосты гасили друг друга раньше времени. Один таймер + очистка по unmount.
+   */
+  const toastTimer = useRef<number | null>(null);
+  const scheduleToastClear = useCallback((ms = 2200) => {
+    if (toastTimer.current) window.clearTimeout(toastTimer.current);
+    toastTimer.current = window.setTimeout(() => setToast(''), ms);
+  }, []);
+  useEffect(() => () => { if (toastTimer.current) window.clearTimeout(toastTimer.current); }, []);
+
   useEffect(() => {
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch {
       // Тихий отказ терял настройки хаба (замеры/скрининг) без единого сигнала.
       setToast('⚠ Настройки хаба не сохранились — переполнено хранилище (очисти старые планы/замеры)');
-      setTimeout(() => setToast(''), 3000);
+      scheduleToastClear(3000);
     }
-  }, [state]);
+  }, [state, scheduleToastClear]);
   // Э4 PRO-5: поиск упражнения в «Разборе» (план — первыми, каталог без произвольного среза)
   const [exQuery, setExQuery] = useState('');
   // Э6 PRO-5: LVP-калибровка (движок был без UI-потребителя) — аккордеон в «Разборе»
@@ -411,10 +433,32 @@ export const BBDiagnosticsHub: React.FC = () => {
   // state.sex — замороженный легаси-фолбэк (UI-селекта больше нет); профиль приоритетнее
   const effSex = ((profileSex || state.sex || '') as '' | 'male' | 'female');
 
+  /**
+   * AUDIT 2026-11: дневник читался ОДИН раз при монтировании (deps=[]), поэтому
+   * тренировка, записанная в другой вкладке/экране, не попадала в диагностику до
+   * перезагрузки. Обновляем при возврате к приложению и при storage-событии.
+   */
+  const [diaryNonce, setDiaryNonce] = useState(0);
+  useEffect(() => {
+    const bump = () => setDiaryNonce(n => n + 1);
+    const onStorage = (e: StorageEvent) => {
+      if (!e.key || /he_workout_log|he_bb_diagnostics_hub/.test(e.key)) bump();
+    };
+    const onVisible = () => { if (document.visibilityState === 'visible') bump(); };
+    window.addEventListener('storage', onStorage);
+    window.addEventListener('focus', bump);
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      window.removeEventListener('storage', onStorage);
+      window.removeEventListener('focus', bump);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, []);
+
   const diarySessions: any[] = useMemo(() => {
     // ROUND-10: единый адаптер (живой he_workout_log_v2; цепочка `||` с `'[]'` глушила v2)
     try { return loadHubDiarySessions(); } catch { return []; }
-  }, []);
+  }, [diaryNonce]);
 
   const factVolume = useMemo(() => {
     try {
@@ -464,7 +508,7 @@ export const BBDiagnosticsHub: React.FC = () => {
     ankleDorsiflexDeg: bbNum(state.ankleDeg),
     shoulderFlexionDeg: bbNum(state.shoulderFlexDeg),
     heelRaiseRetest: state.heelRetest === 'better' ? true : state.heelRetest === 'same' ? false : null,
-  }), [state.ohsHeelsFlat, state.ohsKneeValgus, state.ohsHipBelowParallel, state.ohsTrunkUpright, state.ohsArmsOverMidfoot, state.ohsLumbarNeutral, state.ktwL, state.ktwR, state.kneeToWallCm, state.ankleDeg, state.heelRetest]);
+  }), [state.ohsHeelsFlat, state.ohsKneeValgus, state.ohsHipBelowParallel, state.ohsTrunkUpright, state.ohsArmsOverMidfoot, state.ohsLumbarNeutral, state.ktwL, state.ktwR, state.kneeToWallCm, state.ankleDeg, state.heelRetest, state.shoulderFlexDeg]);
 
   // P1: L/R-объём из дневника + флип-гейт по истории (D2: сторона плавает — шум измерения,
   // добивку не фиксируем; стабильная сторона ≥3 замеров — добивка оправдана).
@@ -497,20 +541,25 @@ export const BBDiagnosticsHub: React.FC = () => {
   }, [state.acutePain, state.swelling, state.numbness, state.jointClickPain]);
   const readiness = useMemo(() => {
     try {
-      // Сон — из профиля; боль сегодня в хабе не спрашиваем (её место — суставы/ортопедия),
-      // VBT живёт в Анализе силы. Важно: без дневника ACWR не «0 перегруженных», а «нет
-      // данных» — иначе пустой стор выглядел бы измеренным «зелёным».
+      // Сон — из профиля; боль — из pain-monitoring (pmDuring/pmMorning), если её
+      // вводили; ACWR — из дневника. Важно: без данных это «нет данных», а не
+      // измеренный ноль — раньше Number(null)=0 давал зелёный «можно включая добивки».
       const sl = profileSleep;
       const hasAcwr = Object.keys(perMuscleAcwr as any).length > 0;
       const danger = Object.values(perMuscleAcwr as any).filter((v: any) => v?.zone === 'dangerous').length;
+      // Боль 0–10: берём худшую из «во время» и «на след. утро» — восстановление
+      // определяется не лучшим показателем. (painMon объявлен ниже — читаем поля напрямую.)
+      const p1 = bbNum(state.pmDuring);
+      const p2 = bbNum(state.pmMorning);
+      const pain = (p1 != null || p2 != null) ? Math.max(p1 ?? 0, p2 ?? 0) : null;
       return assessBbReadiness({
         sleepHours: Number.isFinite(sl as number) ? (sl as number) : null,
-        pain010: null,
+        pain010: pain,
         vbtLossPct: null,
         dangerMuscles: hasAcwr ? danger : null,
       });
     } catch { return { level: 'yellow', reasons: [], advice: '', tested: false, noData: true } as any; }
-  }, [profileSleep, perMuscleAcwr]);
+  }, [profileSleep, perMuscleAcwr, state.pmDuring, state.pmMorning]);
   // PRO-3 R2 + PRO-4 S3: return-to после стоп-флагов (ступень выбирается вручную) — гейт вставки
   const returnToPlan = useMemo(() => {
     try { return buildReturnToPlan(redFlags as any); } catch { return null; }
@@ -566,16 +615,89 @@ export const BBDiagnosticsHub: React.FC = () => {
     heightCm: measNum.heightCm ?? null,
     plan: savedPlan as any,
     balance,
-    // Движения, не нагрузка: ACWR/VBT в скоринг не входят (их хабы — Интеллект/Анализ силы).
-    // perMuscleAcwr остаётся тихим входом причин (weakCauses), но не штрафа баллов.
-    perMuscleAcwr: null,
+    // AUDIT 2026-11: ACWR считается строкой выше и уже стоит в чипах — он обязан
+    // доходить и до балла (пол «ACWR danger → ≤59»), иначе чип красный, а цифра целая.
+    perMuscleAcwr: (perMuscleAcwr as any) || null,
     mobilityFails: state.screenTouched ? ohs.failed : 0,
     vbtLossPct: null,
     hasDiary: diarySessions.length > 0,
     hasCircumf: Object.keys(measNum).some(k => ['chest','waist','bicepL','bicepR','thighL','thighR'].includes(k)),
-    hasVbt: false,
+    // Канал «скорость» подтверждён, если есть калиброванный LVP-профиль (реальные
+    // замеры скорость-вес). Раньше здесь стояло false — 100% проверки были недостижимы.
+    hasVbt: lvpSaved > 0,
     manualWeak: state.weakManual,
-  }), [level, factVolume, diarySessions, measNum, balance, ohs.failed, state.screenTouched, state.weakManual, savedPlan]);
+  }), [level, factVolume, diarySessions, measNum, balance, ohs.failed, state.screenTouched, state.weakManual, savedPlan, perMuscleAcwr, lvpSaved]);
+
+  /**
+   * BB-D-39: append-only история балла. Раньше хаб не сохранял результат — сравнить
+   * «до/после блока» было нечем. Дедуп по дате: повторный заход за день перезаписывает
+   * сегодняшнюю запись (балл мог измениться после ввода данных).
+   */
+  const [diagHistory, setDiagHistory] = useState<DiagHistoryEntry[]>(() => readDiagHistory());
+  useEffect(() => {
+    try {
+      const list = appendDiagHistory({
+        date: localIsoDate(),
+        score: report.score.score,
+        level: report.score.level,
+        floors: report.score.floors,
+        weakZones: report.weakZonesGranular,
+      });
+      setDiagHistory((prev) => (prev.length === list.length && prev.every((e, i) => e.date === list[i].date && e.score === list[i].score) ? prev : list));
+    } catch { /* история не критична — отчёт важнее */ }
+  }, [report.score.score, report.score.level, report.score.floors.join('|'), report.weakZonesGranular.join('|')]);
+  const diagTrend = useMemo(() => diagHistoryTrend(diagHistory), [diagHistory]);
+
+  /**
+   * BB-G-01: панель «Объём · Recovery · Mobility». ACWR, ориентиры MEV/MAV/MRV и
+   * провалы мобилити считались по отдельности (строка подсказок), но нигде не
+   * сходились в ответ «что ограничивает рост». Панель собирает три канала и
+   * выбирает один ограничитель по приоритету (боль → сон → ACWR → MRV → мобилити).
+   */
+  const painWorst = useMemo(() => {
+    const p1 = bbNum(state.pmDuring);
+    const p2 = bbNum(state.pmMorning);
+    return (p1 != null || p2 != null) ? Math.max(p1 ?? 0, p2 ?? 0) : null;
+  }, [state.pmDuring, state.pmMorning]);
+
+  /** BB-G-04: журнал вставок коррекций (до/после по зоне через 4–6 нед). */
+  const [injections, setInjections] = useState<DiagInjection[]>(() => readDiagInjections());
+
+  const vrPanel = useMemo(() => {
+    try {
+      return buildVolumeRecoveryPanel({
+        level,
+        factVolume: factVolume as any,
+        perMuscleAcwr: perMuscleAcwr as any,
+        weakZones: report.weakZonesGranular,
+        readiness: readiness as any,
+        sleepHours: profileSleep,
+        pain010: painWorst,
+        mobilityFails: state.screenTouched ? (ohs.failed as any) : 0,
+        mobilityChecked: !!state.screenTouched,
+      });
+    } catch {
+      // Ошибка расчёта — честная панель «нет данных», а не падение хаба.
+      return buildVolumeRecoveryPanel({ level, factVolume: null });
+    }
+  }, [level, factVolume, perMuscleAcwr, report.weakZonesGranular, readiness, profileSleep, painWorst, ohs.failed, state.screenTouched]);
+
+  const corrEffect = useMemo(() => {
+    try {
+      return buildCorrectionEffect({ injections, sessions: diarySessions as any, today: localIsoDate() });
+    } catch {
+      return buildCorrectionEffect({ injections: [], sessions: [], today: localIsoDate() });
+    }
+  }, [injections, diarySessions]);
+
+  /**
+   * BB-G-02: deep-link в профильный экран. Хабу не нужен onNavigate из App —
+   * TrainingScreen уже слушает `training-open-tab` (этим же путём открывается
+   * сам хаб из виджета), достаточно расширить белый список целей.
+   */
+  const goToScreen = useCallback((target: string) => {
+    try { window.dispatchEvent(new CustomEvent('training-open-tab', { detail: target })); } catch { /* нет window — тест */ }
+  }, []);
 
   // Э5-доводка (R3): макс перекос L/R — один мемо (было 5 копий расчёта в карточках/выдаче/мосте)
   const asymMax = useMemo(() => {
@@ -614,12 +736,14 @@ export const BBDiagnosticsHub: React.FC = () => {
         rdlL: (state.rdlL || null) as any, rdlR: (state.rdlR || null) as any,
         fppaL: num(state.fppaL), fppaR: num(state.fppaR),
       });
-    } catch { return { weakSide: null, text: '' } as any; }
+    } catch { return { weakSide: null, text: 'Односторонний: ошибка расчёта — данные не учтены', tested: false } as any; }
   }, [state.splitL, state.splitR, state.rdlL, state.rdlR, state.fppaL, state.fppaR]);
   // D1–D5: плечо/шарнир/YBT/асимметрии/замены (чистые мемы, без TDZ — выше экспорта/моста)
   const shoulderV = useMemo(() => {
     try {
-      if (!state.screenTouched) return { pass: true, fails: [], locus: 'ok', text: 'Плечо у стены: не проверялся', tested: false };
+      // Не проверялся → pass=false + tested=false: иначе UI красил «непройденный»
+      // скрининг зелёным («всё чисто»), хотя замеров не было.
+      if (!state.screenTouched) return { pass: false, fails: [], locus: 'ok', text: 'Плечо у стены: не проверялся', tested: false } as any;
       return shoulderWallVerdict({
         backOnWall: state.shBackOnWall, headOnWall: state.shHeadOnWall, bicepsAtEars: state.shBicepsAtEars,
         ribsDown: state.shRibsDown, noShrug: state.shNoShrug,
@@ -855,7 +979,7 @@ export const BBDiagnosticsHub: React.FC = () => {
         // проверка конфликта parent+zone
         if (s.weakManual.some(ex => isSpecializationTargetConflict(ex, id))) {
           setToast('Конфликт: плечи+зона нельзя, две зоны можно');
-          setTimeout(() => setToast(''), 2000);
+          scheduleToastClear(2000);
           return s;
         }
         next = [...s.weakManual, id].slice(0, 2);
@@ -867,7 +991,7 @@ export const BBDiagnosticsHub: React.FC = () => {
   const applyToConstructor = () => {
     if (report.weakMusclesCanonical.length === 0) {
       setToast('Слабые зоны не выбраны — выберите 1-2 (или заполните дневник/замеры для авто)');
-      setTimeout(() => setToast(''), 2500);
+      scheduleToastClear(2500);
       return;
     }
     // MAX PRO payload: причины + топ-3 + спец-блок (лениво, без TDZ — считается внутри хендлера)
@@ -979,10 +1103,17 @@ export const BBDiagnosticsHub: React.FC = () => {
           ybtCompositeFull: !!(ybtV as any)?.compositeFull,
         },
       },
-      source: 'intellectual',
+      // AUDIT 2026-11: раньше здесь стоял source:'intellectual', и planner-bridge
+      // подставлял targetCycleId из ПЛ-сессии (window.__intellectual_cycle_id /
+      // he_pl_session.selectedCycleId). Если последний цикл был силовым, приёмник
+      // ББ-авто отбрасывал payload как «не ББ», а хаб уже показывал «✓ Применено».
+      // Диагностика — это ББ-канал: source 'bb-auto' маршрутизируется только в ББ.
+      source: 'bb-auto',
     });
-    setToast(`✓ Применено в ББ-авто: ${report.weakZonesGranular.map(weakRu).join(', ')} (оценка ${score})`);
-    setTimeout(() => setToast(''), 3000);
+    // «Отправлено», а не «Применено»: приёмник живёт в конструкторе и подтверждает
+    // применение своим сообщением («Слабые группы → ББ-авто: …»).
+    setToast(`→ Отправлено в ББ-авто: ${report.weakZonesGranular.map(weakRu).join(', ')} (оценка ${score})`);
+    scheduleToastClear(3000);
     try {
       window.dispatchEvent(new CustomEvent('planning-track-open', { detail: 'bb' } as any));
       localStorage.setItem('he_training_planning_track', 'bb');
@@ -1016,7 +1147,7 @@ export const BBDiagnosticsHub: React.FC = () => {
       try { window.dispatchEvent(new CustomEvent('profile-updated')); } catch {}
       const restrRu: Record<string, string> = { ankle: 'голеностоп', hip: 'таз', shoulder: 'плечо', lower_back: 'поясница' };
       setToast(`✓ Подвижность ${uniq.map((r) => restrRu[r] || r).join(', ') || 'в порядке'} → профиль (ББ-авто учтёт)`);
-      setTimeout(() => setToast(''), 2500);
+      scheduleToastClear(2500);
     } catch {}
   };
 
@@ -1070,7 +1201,7 @@ export const BBDiagnosticsHub: React.FC = () => {
       } else {
         setToast(p ? `LVP: r² ${p.r2} — мало/шумно, профиль не сохранён` : 'LVP: нужно 3+ точки с разбросом (формат «вес скорость»)');
       }
-      setTimeout(() => setToast(''), 3000);
+      scheduleToastClear(3000);
     } catch { /* noop */ }
   };
   const clearLvp = () => {
@@ -1079,7 +1210,7 @@ export const BBDiagnosticsHub: React.FC = () => {
       setLvpSaved(0);
       setLvpProfile(null);
       setToast('LVP-профили очищены');
-      setTimeout(() => setToast(''), 2000);
+      scheduleToastClear(2000);
     } catch { /* noop */ }
   };
 
@@ -1087,15 +1218,42 @@ export const BBDiagnosticsHub: React.FC = () => {
     // Э5 PRO-5: причины — мемо weakCauses (с auditFor: «показано = экспортировано»), PRO-мета — общий сборщик
     const html = buildBBDiagnosticsHtml(report, { date: localIsoDate(), level, plan: bbPlan, weakHeads: exportHeads, weakCauses: weakCauses as any, specBlock: specBlock as any, ...pro2Meta } as any);
     downloadHtml(html, `bb-diagnostics-${localIsoDate()}.html`);
-    setToast('✓ HTML экспорт (движения: причины + спец-блок + разбор + скрининг)');
-    setTimeout(() => setToast(''), 2000);
+    setToast('✓ HTML-файл сохранён (движения: причины + спец-блок + разбор + скрининг)');
+    scheduleToastClear(2000);
+  };
+  /**
+   * AUDIT 2026-11 (BB-D-34): кнопка «Печать» скачивала .html — печать не открывалась.
+   * Теперь печатаем отчёт в отдельном окне; если окно заблокировано — честно
+   * сообщаем и сохраняем файл (пользователь печатает его сам).
+   */
+  const handleExportPrint = () => {
+    const html = buildBBDiagnosticsHtml(report, { date: localIsoDate(), level, plan: bbPlan, weakHeads: exportHeads, weakCauses: weakCauses as any, specBlock: specBlock as any, ...pro2Meta } as any);
+    try {
+      const w = window.open('', '_blank');
+      if (!w) {
+        downloadHtml(html, `bb-diagnostics-${localIsoDate()}.html`);
+        setToast('⚠ Окно печати заблокировано — сохранил HTML-файл, печать из него');
+        scheduleToastClear(3000);
+        return;
+      }
+      w.document.write(html);
+      w.document.close();
+      w.focus();
+      w.print();
+      setToast('🖨 Печать открыта в новом окне');
+      scheduleToastClear(2000);
+    } catch {
+      downloadHtml(html, `bb-diagnostics-${localIsoDate()}.html`);
+      setToast('⚠ Печать не открылась — сохранил HTML-файл');
+      scheduleToastClear(3000);
+    }
   };
   const handleExportCsv = () => {
     // Э5 PRO-5: тот же объект меты, что HTML (CSV больше не теряет driver_subs)
     const csv = buildBBDiagnosticsCsv(report, bbPlan as any, { weakCauses: weakCauses as any, weakHeads: exportHeads, specBlock: specBlock as any, ...pro2Meta });
     downloadCsv(csv, `bb-diagnostics-${localIsoDate()}.csv`);
     setToast('✓ CSV экспорт (движения: причины + спец-блок + разбор + скрининг)');
-    setTimeout(() => setToast(''), 2000);
+    scheduleToastClear(2000);
   };
 
   // PRO-3 R7: спец-блок → конфиг BB-блока годового плана (официальный setAnnualBlockConfig)
@@ -1103,19 +1261,19 @@ export const BBDiagnosticsHub: React.FC = () => {
     try {
       if (!report.weakZonesGranular.length) {
         setToast('Выбери 1-2 слабые зоны — нечего класть в год');
-        setTimeout(() => setToast(''), 2000);
+        scheduleToastClear(2000);
         return;
       }
       const plan = loadAnnualTrainingPlan();
       if (!plan || !plan.blocks.length) {
         setToast('Годового плана нет — собери разметку в «Годовой план»');
-        setTimeout(() => setToast(''), 2500);
+        scheduleToastClear(2500);
         return;
       }
       const bbBlocks = plan.blocks.filter((b) => b?.ref?.kind === 'BB');
       if (!bbBlocks.length) {
         setToast('В году нет ББ-блоков — спец-блок класть некуда');
-        setTimeout(() => setToast(''), 2500);
+        scheduleToastClear(2500);
         return;
       }
       // Блок года выбирает годовой план сам (первый ББ-блок) — селекта в диагностике нет, без дублей
@@ -1123,22 +1281,22 @@ export const BBDiagnosticsHub: React.FC = () => {
       const sb = specBlock;
       if (!sb) {
         setToast('Не удалось собрать спец-блок');
-        setTimeout(() => setToast(''), 2000);
+        scheduleToastClear(2000);
         return;
       }
       const patch = bbSpecToAnnualPatch(sb, report.weakZonesGranular);
       if (!patch) {
         setToast('Не удалось собрать патч спец-блока');
-        setTimeout(() => setToast(''), 2000);
+        scheduleToastClear(2000);
         return;
       }
       const next = setAnnualBlockConfig(plan, key, patch as any);
       saveAnnualTrainingPlan(next);
       setToast(`✓ Спец-блок → годовой план (${key}): слабые + специализация, блок помечен stale`);
-      setTimeout(() => setToast(''), 3000);
+      scheduleToastClear(3000);
     } catch {
       setToast('⚠ Не удалось применить в годовой план');
-      setTimeout(() => setToast(''), 2000);
+      scheduleToastClear(2000);
     }
   };
 
@@ -1147,13 +1305,13 @@ export const BBDiagnosticsHub: React.FC = () => {
     try {
       if (!report.weakZonesGranular.length) {
         setToast('Выбери 1-2 слабые зоны — нечего класть в календарь');
-        setTimeout(() => setToast(''), 2000);
+        scheduleToastClear(2000);
         return;
       }
       const sb = specBlock;
       if (!sb) {
         setToast('Не удалось собрать календарь');
-        setTimeout(() => setToast(''), 2000);
+        scheduleToastClear(2000);
         return;
       }
       const ics = buildBBSpecIcs(
@@ -1162,15 +1320,15 @@ export const BBDiagnosticsHub: React.FC = () => {
       );
       if (!ics) {
         setToast('Не удалось собрать календарь');
-        setTimeout(() => setToast(''), 2000);
+        scheduleToastClear(2000);
         return;
       }
       downloadBBSpecIcs(ics, `bb-spec-${localIsoDate()}.ics`);
       setToast('📅 Календарь спец-блока скачан');
-      setTimeout(() => setToast(''), 2000);
+      scheduleToastClear(2000);
     } catch {
       setToast('⚠ Не удалось собрать календарь');
-      setTimeout(() => setToast(''), 2000);
+      scheduleToastClear(2000);
     }
   };
 
@@ -1182,6 +1340,20 @@ export const BBDiagnosticsHub: React.FC = () => {
   const planAudit = useMemo(() => {
     try { return bbPlan ? auditPlanExercises(bbPlan) : null; } catch { return null; }
   }, [bbPlan]);
+
+  /**
+   * AUDIT 2026-11: бакет аудита для приоритетной зоны.
+   * Головка (chest_upper / back_width / delt_mid) ищется в `byZone`: отсутствие ключа —
+   * это ДИАГНОЗ «в плане нет сетов на эту головку», а не повод показать данные всей
+   * мышцы. Канонические мышцы (quads, biceps…) — из `byMuscle` (с фолбэком на сырой ключ).
+   */
+  const zoneBucket = useCallback((z: string) => {
+    try {
+      if (!planAudit) return null;
+      if (isGranularZone(z)) return planAudit.byZone?.[z] ?? null;
+      return planAudit.byMuscle?.[canonicalMuscle(z)] ?? planAudit.byMuscle?.[z] ?? null;
+    } catch { return null; }
+  }, [planAudit]);
 
   // ── MAX PRO: причины + спец-блок + топ-3 (после planAudit/bbPlan — порядок важен) ──
   const hist28 = useMemo(() => {
@@ -1205,13 +1377,15 @@ export const BBDiagnosticsHub: React.FC = () => {
         wristCm: bbNum(state.wristCm),
         canonicalOf: canonicalMuscle,
         auditFor: (z) => {
-          const aud = (() => { try { return planAudit?.byMuscle?.[z]; } catch { return null; } })();
+          const aud = zoneBucket(z);
           if (!aud) return null;
           return {
             lengthened: aud.lengthened > 0,
             singleAngle: aud.angleCoverage.total > 1 && aud.angleCoverage.covered === 1 && aud.totalSets >= 6,
             missingStrict: aud.strictCoverage.missing.length > 0,
             avgSfr: aud.avgSfr ?? null,
+            // BB-D-28: объём есть, но темп не задан — реальная причина отставания.
+            tempoMissing: aud.totalSets >= 6 && (aud.tempoSets ?? 0) === 0,
           };
         },
       });
@@ -1222,7 +1396,10 @@ export const BBDiagnosticsHub: React.FC = () => {
       if (!report.weakZonesGranular.length) return null;
       const f: Record<string, number> = {};
       for (const [k, v] of Object.entries((factVolume as any) || {})) f[k] = (v as any)?.effectiveSets ?? (v as any)?.directSets ?? 0;
-      return buildSpecBlock({ weakZones: report.weakZonesGranular, factSets: f, level, weeks: parseInt(state.specWeeks) || 8, sex: effSex || undefined });
+      // План ББ-авто держит один спец-блок 3–6 нед: просим 4–6, чтобы движок не
+    // выдал 8 и приёмник не обрезал длину молча (BB-D-24).
+    const weeksReq = (() => { const n = parseInt(state.specWeeks) || 6; return Math.max(4, Math.min(6, n)); })();
+    return buildSpecBlock({ weakZones: report.weakZonesGranular, factSets: f, level, weeks: weeksReq, sex: effSex || undefined });
     } catch { return null; }
   }, [report.weakZonesGranular, factVolume, level, state.specWeeks, effSex]);
   const inPlanExerciseIds = useMemo(() => {
@@ -1236,7 +1413,7 @@ export const BBDiagnosticsHub: React.FC = () => {
     const out: Record<string, ReturnType<typeof rankCorrectionsForWeak>> = {};
     for (const z of report.weakZonesGranular.slice(0, 2)) {
       try {
-        const aud = (() => { try { return planAudit?.byMuscle?.[z]; } catch { return null; } })();
+        const aud = zoneBucket(z);
         out[z] = rankCorrectionsForWeak(z, null, {
           cause: weakCauses[z]?.cause,
           weakHead: weakHeadForZone(z),
@@ -1358,6 +1535,29 @@ export const BBDiagnosticsHub: React.FC = () => {
       return det.length ? det : null;
     } catch { return null; }
   }, [report.weakZonesGranular, correctiveTopByZone, weakCauses, readiness, painMon, profileWorkMax]);
+  // BB-D-38/33: ориентиры по полу и возрасту + сухожильный скрининг считались в
+  // движках, но в хаб/экспорт не попадали (пользователь их не видел вообще).
+  const teenNoteText = useMemo(() => {
+    try { return teenTrainingNote(profileAge); } catch { return null; }
+  }, [profileAge]);
+  const femaleNotesShort = useMemo(() => {
+    try {
+      if (effSex !== 'female') return null;
+      const notes = femaleSymmetryNotes(
+        { waist: measNum.waist ?? null, hips: measNum.hips ?? null, thigh: measNum.thighL ?? measNum.thigh ?? null },
+        // Фаза цикла в хабе не вводится (ввод убран) — ориентиры без фазовой поправки.
+        {},
+      );
+      return notes.length ? notes : null;
+    } catch { return null; }
+  }, [effSex, measNum]);
+  const tendonTexts = useMemo(() => {
+    try {
+      const g = assessBbTendonGuard(diarySessions as any, { level });
+      return { elbow: g.elbow.text, shoulder: g.shoulder.text };
+    } catch { return null; }
+  }, [diarySessions, level]);
+
   const pro2Meta = useMemo(() => buildPro2Meta({
     lrVerdicts: lrVerdicts as any,
     moveDriver,
@@ -1378,7 +1578,35 @@ export const BBDiagnosticsHub: React.FC = () => {
     correctiveDetail: correctiveDetailForExport,
     correctionBlock: corrBlockLines?.lines ?? null,
     lrDirection,
-  }), [lrVerdicts, moveDriver, singleLeg, ohs, mmcLine, shoulderV, hingeV, loadedV, ybtV, asymText, driverSubs, benchV, painMon, nheV, adductorV, loadedHingeV, erIrV, teenGate, screenPriority, correctiveDetailForExport, corrBlockLines, lrDirection]);
+    // BB-D-33: секции HTML, которые хаб уже считает, но не отдавал в экспорт.
+    readiness: readiness?.tested ? { level: readiness.level, advice: readiness.advice, reasons: readiness.reasons } : null,
+    redFlags: redFlags?.active ? { active: redFlags.active, blocked: redFlags.blocked, items: redFlags.items ?? [], text: redFlags.text } : null,
+    returnTo: (() => {
+      try {
+        const plan = returnToPlan as any;
+        if (!plan || !plan.stages?.length) return null;
+        return {
+          text: String(plan.text || 'поэтапный возврат после стоп-флагов'),
+          stages: plan.stages.map((s: any) => ({
+            stage: Number(s.stage), title: String(s.title || ''), volume: String(s.volume || ''),
+            rir: String(s.rir || ''), note: String(s.note || ''), action: s.action,
+          })),
+        };
+      } catch { return null; }
+    })(),
+    lvp: lvpProfile ? { lift: String(lvpProfile.lift), r2: Number(lvpProfile.r2), e1rm: lvpProfile.e1rm ?? null, text: String(lvpProfile.text), valid: !!lvpProfile.valid } : null,
+    tendon: tendonTexts,
+    teen: teenNoteText,
+    femaleNotes: femaleNotesShort,
+    workingRange: null,
+    // BB-G-01/04: панель объёма/восстановления и эффект коррекции — «показано = выгружено».
+    volumeRecovery: {
+      chips: vrPanel.chips.map((c) => ({ label: c.label, value: c.value, detail: c.detail })),
+      limiter: vrPanel.limiter ? { label: vrPanel.limiter.label, detail: vrPanel.limiter.detail } : null,
+      advice: vrPanel.advice,
+      effect: corrEffect.status === 'no_injection' ? null : corrEffect.text,
+    },
+  }), [lrVerdicts, moveDriver, singleLeg, ohs, mmcLine, shoulderV, hingeV, loadedV, ybtV, asymText, driverSubs, benchV, painMon, nheV, adductorV, loadedHingeV, erIrV, teenGate, screenPriority, correctiveDetailForExport, corrBlockLines, lrDirection, readiness, redFlags, returnToPlan, lvpProfile, tendonTexts, teenNoteText, femaleNotesShort, vrPanel, corrEffect]);
 
   // Покрытие слабых головок текущим планом (есть ли хоть одно упражнение в головку)
   const headCoverage = useMemo(() => {
@@ -1419,8 +1647,24 @@ export const BBDiagnosticsHub: React.FC = () => {
     }
     const cat = EXERCISE_CATALOG.find(c => c.id === id);
     if (cat) return { id: cat.id, name: cat.name, muscle: cat.group, sets: 3, rir: 2 };
-    return { id, name: id, muscle: 'chest' };
+    // Неизвестное упражнение: мышцу НЕ выдумываем (раньше подставлялся 'chest'
+    // и диагноз считался по чужой груди).
+    return { id, name: id, muscle: '' };
   }, [state.exerciseSelectedId, bbPlan]);
+
+  /** Головка выбранного упражнения (для точного аудита плана по головке). */
+  const selectedZone = useMemo(() => {
+    if (!selectedExRaw?.id) return null;
+    const cat = EXERCISE_CATALOG.find((c: any) => c.id === selectedExRaw.id);
+    if (!cat) return null;
+    return granularZoneOf({
+      id: (cat as any).id,
+      name: (cat as any).name,
+      targetMuscle: (cat as any).targetMuscle,
+      substitutionGroup: (cat as any).substitutionGroup,
+      muscle: (cat as any).group,
+    }, (cat as any).group);
+  }, [selectedExRaw]);
 
   // Э4 PRO-5: «Разбор» больше не режет каталог с начала — упражнения плана первыми + живой поиск
   const plannedCatalogIds = useMemo(() => {
@@ -1444,10 +1688,13 @@ export const BBDiagnosticsHub: React.FC = () => {
 
   const selectedDiagnosis = useMemo(() => {
     if (!selectedExRaw) return null;
+    // Упражнение не найдено ни в плане, ни в каталоге — мышца неизвестна: диагноз не врём.
+    if (!selectedExRaw.muscle) return null;
     try {
+      const selAud = (selectedZone && zoneBucket(selectedZone)) || zoneBucket(selectedExRaw.muscle);
       const singleAngleMuscle = planAudit ? Object.entries(planAudit.byMuscle).find(([, bm]) => bm.angleCoverage.total > 1 && bm.angleCoverage.covered === 1 && bm.totalSets >= 6)?.[0] || null : null;
-      const uncovered = planAudit?.byMuscle[selectedExRaw.muscle || '']?.regionalCoverage.missing || [];
-      const strictMissing = planAudit?.byMuscle[selectedExRaw.muscle || '']?.strictCoverage.missing || [];
+      const uncovered = selAud?.regionalCoverage.missing || [];
+      const strictMissing = selAud?.strictCoverage.missing || [];
       // слабая головка под выбранную мышцу (для wrongHead): первая зона, чья головка из той же семьи
       const weakHead = (() => {
         try {
@@ -1471,12 +1718,12 @@ export const BBDiagnosticsHub: React.FC = () => {
         setupIssues: state.stimSetupNote.trim() ? [state.stimSetupNote.trim()] : undefined,
       } as any);
     } catch { return null; }
-  }, [selectedExRaw, report.weakZonesGranular, report.weakMusclesCanonical, asymMax, ohs.failed, level, planAudit, state.stimCheating, state.stimShortRom, state.stimSetupNote]);
+  }, [selectedExRaw, selectedZone, report.weakZonesGranular, report.weakMusclesCanonical, asymMax, ohs.failed, level, planAudit, zoneBucket, state.stimCheating, state.stimShortRom, state.stimSetupNote]);
 
   const selectedCorrections = useMemo(() => {
     if (!selectedDiagnosis || !selectedExRaw) return [];
     try {
-      const aud = (() => { try { return planAudit?.byMuscle?.[selectedExRaw.muscle || '']; } catch { return null; } })();
+      const aud = (selectedZone && zoneBucket(selectedZone)) || zoneBucket(selectedExRaw.muscle);
       // слабая головка под мышцу — замены целятся в неё
       let weakHead: string | null = null;
       try {
@@ -1491,7 +1738,7 @@ export const BBDiagnosticsHub: React.FC = () => {
       } catch { /* noop */ }
       return prescribeCorrections(selectedDiagnosis, selectedExRaw as any, { goal: 'hypertrophy', level, muscle: selectedExRaw.muscle, weakHead, asymPct: asymMax, equipment: profileEquipment, mobilityRestrictions: profileMobility, missingAngles: aud?.angleCoverage.missing || [], missingStrict: aud?.strictCoverage.missing || [], sex: effSex || undefined });
     } catch { return []; }
-  }, [selectedDiagnosis, selectedExRaw, level, asymMax, report.weakZonesGranular, planAudit, effSex, profileEquipment, profileMobility]);
+  }, [selectedDiagnosis, selectedExRaw, selectedZone, level, asymMax, report.weakZonesGranular, planAudit, zoneBucket, effSex, profileEquipment, profileMobility]);
 
   const selectedProf = useMemo(() => {
     if (!selectedExRaw) return null;
@@ -1517,7 +1764,7 @@ export const BBDiagnosticsHub: React.FC = () => {
     const weak = report.weakZonesGranular;
     if (!weak.length && !action.targetId && action.type !== 'modifyExecution' && action.type !== 'modifyTempo' && action.type !== 'modifyROM') {
       setToast('Выбери слабую зону или упражнение — нечего применять');
-      setTimeout(() => setToast(''), 2500);
+      scheduleToastClear(2500);
       return;
     }
     const delta = (() => { try { return bbPlan && action ? simulateCorrection(bbPlan, action, targetExId || selectedExRaw?.id || null) : null; } catch { return null; } })();
@@ -1536,10 +1783,12 @@ export const BBDiagnosticsHub: React.FC = () => {
         labDelta: delta,
         bbDiagScore: score, bbDiagLevel: sLevel, verification: report.score.verification,
       },
-      source: 'intellectual',
+      // AUDIT 2026-11: см. applyToConstructor — это ББ-канал, а не «intellectual»
+      // (иначе targetCycleId из ПЛ-сессии уводил payload мимо ББ-авто).
+      source: 'bb-auto',
     });
-    setToast(`✓ Коррекция ${action.type} → в ББ-авто${delta?.summary ? ` (${delta.summary})` : ''}`);
-    setTimeout(() => setToast(''), 3000);
+    setToast(`→ Коррекция ${action.type} отправлена в ББ-авто${delta?.summary ? ` (${delta.summary})` : ''}`);
+    scheduleToastClear(3000);
     try { window.dispatchEvent(new CustomEvent('planning-track-open', { detail: 'bb' } as any)); localStorage.setItem('he_training_planning_track', 'bb'); } catch {}
   };
 
@@ -1547,7 +1796,7 @@ export const BBDiagnosticsHub: React.FC = () => {
   const selectWorstExercise = () => {
     if (!bbPlan) {
       setToast('Нет плана ББ — собери в ББ-авто');
-      setTimeout(() => setToast(''), 2000);
+      scheduleToastClear(2000);
       return;
     }
     let worst: { id: string; name: string; score: number } | null = null;
@@ -1584,12 +1833,12 @@ export const BBDiagnosticsHub: React.FC = () => {
     } catch { /* noop */ }
     if (!worst) {
       setToast('В плане нет упражнений');
-      setTimeout(() => setToast(''), 2000);
+      scheduleToastClear(2000);
       return;
     }
     setState((st) => ({ ...st, exerciseSelectedId: worst!.id, stimCheating: false, stimShortRom: false, stimSetupNote: '' }));
     setToast(`🎯 Худшее в плане: ${worst.name} (${worst.score}/100) — разбираем`);
-    setTimeout(() => setToast(''), 3000);
+    scheduleToastClear(3000);
   };
 
   const takeMeasureSnapshot = () => {
@@ -1602,7 +1851,7 @@ export const BBDiagnosticsHub: React.FC = () => {
     } catch { /* noop */ }
     if (!Object.keys(meas).length) {
       setToast('Введи хотя бы один замер — снимать нечего');
-      setTimeout(() => setToast(''), 2000);
+      scheduleToastClear(2000);
       return;
     }
     const entry = { date: localIsoDate(), meas };
@@ -1612,7 +1861,7 @@ export const BBDiagnosticsHub: React.FC = () => {
       return next;
     });
     setToast(`✓ Снимок замеров ${entry.date} сохранён`);
-    setTimeout(() => setToast(''), 2500);
+    scheduleToastClear(2500);
   };
 
   // 💉 Инъекция коррекций в сохранённый план (лениво — мемы ниже недоступны из-за TDZ).
@@ -1622,37 +1871,43 @@ export const BBDiagnosticsHub: React.FC = () => {
       const gate = assessBbRedFlags({ acutePain: state.acutePain, swelling: state.swelling, numbness: state.numbness, jointClickPain: state.jointClickPain });
       if (gate.blocked) {
         setToast(`⛔ ${gate.text}`);
-        setTimeout(() => setToast(''), 3000);
+        scheduleToastClear(3000);
         return;
       }
       if (gate.active) {
         setToast(`⚠ ${gate.text} — вставляем только технику, без объёма`);
-        setTimeout(() => setToast(''), 3000);
+        scheduleToastClear(3000);
       }
     } catch { /* noop */ }
     const zones = report.weakZonesGranular.slice(0, 2);
     if (!zones.length) {
       setToast('Выбери 1-2 слабые зоны — нечего вставлять');
-      setTimeout(() => setToast(''), 2000);
+      scheduleToastClear(2000);
       return;
     }
     let raw: string | null = null;
+    let rawKey: 'saved' | 'plans' = 'saved';
     try { raw = localStorage.getItem('he_bb_plan_saved'); } catch { /* noop */ }
     if (!raw) {
+      // AUDIT 2026-11: план может жить только в he_bb_plans (вариантах) — раньше
+      // хаб говорил «Нет плана ББ», хотя конструктор показывал собранный план.
+      try { const alt = localStorage.getItem('he_bb_plans'); if (alt) { raw = alt; rawKey = 'plans'; } } catch { /* noop */ }
+    }
+    if (!raw) {
       setToast('Нет плана ББ — собери в ББ-авто, потом вставляй коррекции');
-      setTimeout(() => setToast(''), 2500);
+      scheduleToastClear(2500);
       return;
     }
     let parsed: any = null;
     try { parsed = JSON.parse(raw); } catch {
       setToast('План в хранилище битый — пересобери в ББ-авто');
-      setTimeout(() => setToast(''), 2500);
+      scheduleToastClear(2500);
       return;
     }
     const plan = pickPlanFromSaved(parsed);
     if (!plan) {
       setToast('План не распознан — пересобери в ББ-авто');
-      setTimeout(() => setToast(''), 2500);
+      scheduleToastClear(2500);
       return;
     }
     // dayMap/targetSets из спец-блока, темп из PROF, упражнения из топ-3
@@ -1763,12 +2018,41 @@ export const BBDiagnosticsHub: React.FC = () => {
       setToast(onlyTechSkip
         ? '↩ Ступень 1 — вставка без силового объёма (только техника). Выбери ступень 2–3, когда боли нет'
         : `⊘ Не вставлено (${skipNote || 'нечего вставлять'})`);
-      setTimeout(() => setToast(''), 3000);
+      scheduleToastClear(3000);
       return;
     }
+    // Аудит 2026-11: инъекция писала план в обход bb-plan-save-guard — план с
+    // критическим SafetyScore (<60) доезжал до хранилища и мог быть исполнен.
+    // Валидацию проверяем, только если она есть у плана (у сохранённого её может не быть).
+    try {
+      const safety = calculatePlanSafetyScore(working as any, {
+        mobilityRestrictions: (profileMobility || []) as string[],
+        currentPain: state.acutePain ? [String(state.pmLoc || 'acute')] : [],
+      });
+      const hasValidation = !!(working as any).validation;
+      const block = hasValidation
+        ? bbPlanSaveBlockReason(working as any, safety)
+        : (safety.riskLevel === 'dangerous'
+          ? `⛔ План не записан: SafetyScore ${safety.score}/100 (<60 — критические риски). ${safety.recommendations?.[0] || ''}`.trim()
+          : null);
+      if (block) {
+        setToast(block);
+        scheduleToastClear(4000);
+        return;
+      }
+    } catch { /* noop */ }
     // Снапшот — только при реальном изменении + журнал последних (для отката на N шагов)
     try {
-      localStorage.setItem('he_bb_plan_saved_prev', raw as string);
+      // _prev хранит ровно то, что было в каноническом ключе. Если канонического
+      // плана не было (план пришёл из he_bb_plans), ставим маркер «не было» —
+      // иначе откат записал бы в he_bb_plan_saved массив вариантов.
+      let prevRaw: string;
+      if (rawKey === 'saved') prevRaw = raw as string;
+      else {
+        const existed = (() => { try { return localStorage.getItem('he_bb_plan_saved'); } catch { return null; } })();
+        prevRaw = existed || JSON.stringify({ __bbDiagNone: true });
+      }
+      localStorage.setItem('he_bb_plan_saved_prev', prevRaw);
       const next = pushPlanSnapshot(planHistory, {
         date: localIsoDate(),
         label: `до вставки: ${zones.map(weakRu).join(', ')}`,
@@ -1781,14 +2065,19 @@ export const BBDiagnosticsHub: React.FC = () => {
       localStorage.setItem('he_bb_plan_saved', JSON.stringify({ plan: working, date: new Date().toISOString() }));
     } catch {
       setToast('Не влезло в хранилище — очисти старые планы');
-      setTimeout(() => setToast(''), 2500);
+      scheduleToastClear(2500);
       return;
     }
     setHasInjectPrev(true);
+    // BB-G-04: журнал вставок — единственный способ потом честно сравнить
+    // «сеты/нед по зоне до и после» (план перезаписан, исходных цифр больше нет).
+    try { setInjections(logDiagInjection({ date: localIsoDate(), zones })); } catch { /* журнал не критичен */ }
     setPlanNonce((n) => n + 1);
-    try { window.dispatchEvent(new Event('he-bb-plan-saved')); } catch { /* noop */ }
+    // detail обязателен: конструктор по нему отличает «вставку диагностики» от
+    // «план из годового планировщика» и не затирает несохранённую сборку молча.
+    try { window.dispatchEvent(new CustomEvent('he-bb-plan-saved', { detail: { source: 'bb-diag-injection', injected, zones, date: localIsoDate() } })); } catch { /* noop */ }
     setToast(`✓ Вставлено коррекций: ${injected} (нед: ${nWeeks})${skipNote ? ` · пропущено (${skipNote})` : ''} · открыт ББ-авто`);
-    setTimeout(() => setToast(''), 3000);
+    scheduleToastClear(3000);
     try {
       window.dispatchEvent(new CustomEvent('planning-track-open', { detail: 'bb' } as any));
       localStorage.setItem('he_training_planning_track', 'bb');
@@ -1796,17 +2085,28 @@ export const BBDiagnosticsHub: React.FC = () => {
   };
 
   const handleRollbackInject = () => {
+    let prev: string | null = null;
+    try { prev = localStorage.getItem('he_bb_plan_saved_prev'); } catch { /* noop */ }
+    if (!prev) {
+      // Раньше молчаливый return: кнопка нажималась, ничего не происходило.
+      setHasInjectPrev(false);
+      setToast('↩ Откатывать нечего: снимка до вставки нет');
+      scheduleToastClear(2500);
+      return;
+    }
     try {
-      const prev = localStorage.getItem('he_bb_plan_saved_prev');
-      if (!prev) return;
-      localStorage.setItem('he_bb_plan_saved', prev);
+      // Маркер «канонического плана не было» — откат = удалить ключ, а не записать маркер.
+      let isNone = false;
+      try { isNone = !!JSON.parse(prev)?.__bbDiagNone; } catch { /* noop */ }
+      if (isNone) localStorage.removeItem('he_bb_plan_saved');
+      else localStorage.setItem('he_bb_plan_saved', prev);
       localStorage.removeItem('he_bb_plan_saved_prev');
     } catch { /* noop */ }
     setHasInjectPrev(false);
     setPlanNonce((n) => n + 1);
-    try { window.dispatchEvent(new Event('he-bb-plan-saved')); } catch { /* noop */ }
+    try { window.dispatchEvent(new CustomEvent('he-bb-plan-saved', { detail: { source: 'bb-diag-rollback' } })); } catch { /* noop */ }
     setToast('↩ План восстановлен до инъекции');
-    setTimeout(() => setToast(''), 2500);
+    scheduleToastClear(2500);
   };
 
   // Э5-доводка (R6): журнал плана — одно чтение на рендер (инъекция/откат бампят planNonce)
@@ -1825,13 +2125,13 @@ export const BBDiagnosticsHub: React.FC = () => {
       localStorage.setItem('he_bb_plan_saved', JSON.stringify({ plan: snap.plan, date: new Date().toISOString() }));
     } catch {
       setToast('Не влезло в хранилище — очисти старые планы');
-      setTimeout(() => setToast(''), 2500);
+      scheduleToastClear(2500);
       return;
     }
     setPlanNonce((n) => n + 1);
-    try { window.dispatchEvent(new Event('he-bb-plan-saved')); } catch { /* noop */ }
+    try { window.dispatchEvent(new CustomEvent('he-bb-plan-saved', { detail: { source: 'bb-diag-snapshot' } })); } catch { /* noop */ }
     setToast(`↩ Восстановлен снимок ${snap.date} (${snap.label || 'без метки'})`);
-    setTimeout(() => setToast(''), 2500);
+    scheduleToastClear(2500);
   };
 
   return (
@@ -1846,14 +2146,19 @@ export const BBDiagnosticsHub: React.FC = () => {
           </div>
           <div style={{ textAlign: 'center' }}>
             <div data-bb="score" style={{ width: 52, height: 52, borderRadius: 26, background: `conic-gradient(${sColor} ${score}%, rgba(255,255,255,0.06) 0)`, display: 'flex', alignItems: 'center', justifyContent: 'center', border: `2px solid ${sColor}`, fontWeight: 900, color: '#fff', fontSize: 14 }}>{score}</div>
-            <div style={{ fontSize: 9, color: sColor, fontWeight: 700, marginTop: 2 }}>{sLevel === 'ok' ? 'ОК' : sLevel === 'warn' ? 'ВНИМАНИЕ' : 'КРИТИЧНО'} · пров. {Math.round(report.score.verification * 100)}%</div>
+            <div
+              style={{ fontSize: 9, color: sColor, fontWeight: 700, marginTop: 2 }}
+              title={report.score.verificationMissing.length
+                ? `Не подтверждено: ${report.score.verificationMissing.map(c => BB_VERIFICATION_LABEL_RU[c]).join(', ')}`
+                : 'Все каналы данных подтверждены'}
+            >{sLevel === 'ok' ? 'ОК' : sLevel === 'warn' ? 'ВНИМАНИЕ' : 'КРИТИЧНО'} · пров. {report.score.verification > 0 ? `${Math.round(report.score.verification * 100)}%` : '—'}</div>
           </div>
         </div>
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', fontSize: 10, marginBottom: 8 }}>
           <span style={{ padding: '2px 8px', borderRadius: 20, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', color: '#fff' }}>Драйвер: {moveDriver.driver === 'none' ? '—' : moveDriver.label}</span>
           <span style={{ padding: '2px 8px', borderRadius: 20, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', color: '#fff' }}>{report.weakMusclesCanonical.length ? `${report.weakMusclesCanonical.length} слабые` : 'баланс'}</span>
-          <span style={{ padding: '2px 8px', borderRadius: 20, background: report.symmetry.score < 70 ? 'rgba(239,68,68,0.12)' : 'rgba(34,197,94,0.08)', border: '1px solid rgba(255,255,255,0.06)', color: report.symmetry.score < 70 ? '#ef4444' : '#22c55e' }}>Симметрия {report.symmetry.score}</span>
-          <span style={{ padding: '2px 8px', borderRadius: 20, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', color: '#fff' }}>Стимул {report.stimulus.scorePenalty ? `−${report.stimulus.scorePenalty}` : 'порядок'}</span>
+          <span style={{ padding: '2px 8px', borderRadius: 20, background: !report.symmetry.tested ? 'rgba(255,255,255,0.04)' : report.symmetry.score < 70 ? 'rgba(239,68,68,0.12)' : 'rgba(34,197,94,0.08)', border: '1px solid rgba(255,255,255,0.06)', color: !report.symmetry.tested ? '#94a3b8' : report.symmetry.score < 70 ? '#ef4444' : '#22c55e' }}>{report.symmetry.tested ? `Симметрия ${report.symmetry.score}` : 'Симметрия — нет замеров'}</span>
+          <span style={{ padding: '2px 8px', borderRadius: 20, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', color: report.stimulus.noPlan ? '#94a3b8' : '#fff' }}>{report.stimulus.noPlan ? 'Стимул — нет плана' : report.stimulus.scorePenalty ? `Стимул −${report.stimulus.scorePenalty}` : 'Стимул: порядок'}</span>
           {planAudit && <span style={{ padding: '2px 8px', borderRadius: 20, background: planAudit.avgSfr != null && planAudit.avgSfr < 3.5 ? 'rgba(239,68,68,0.12)' : 'rgba(34,197,94,0.08)', border: '1px solid rgba(255,255,255,0.06)', color: planAudit.avgSfr != null && planAudit.avgSfr < 3.5 ? '#ef4444' : '#22c55e' }}>SFR {planAudit.avgSfr ?? '—'}</span>}
           {planAudit && <span style={{ padding: '2px 8px', borderRadius: 20, background: planAudit.lengthenedRatio < 0.3 ? 'rgba(239,68,68,0.12)' : 'rgba(34,197,94,0.08)', border: '1px solid rgba(255,255,255,0.06)', color: planAudit.lengthenedRatio < 0.3 ? '#ef4444' : '#22c55e' }}>раст. {(planAudit.lengthenedRatio * 100).toFixed(0)}%</span>}
           {report.score.floors.length > 0 && <span style={{ padding: '2px 8px', borderRadius: 20, background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.22)', color: '#ef4444' }}>порог: {report.score.floors[0]}</span>}
@@ -1887,7 +2192,7 @@ export const BBDiagnosticsHub: React.FC = () => {
                 <button key={o.id} onClick={() => toggleWeak(o.id)} aria-pressed={state.weakManual.includes(o.id)} data-bb="weak-zone" data-active={state.weakManual.includes(o.id) ? '1' : '0'} style={{ minHeight: 44, padding: '8px 12px', borderRadius: 999, border: '1px solid', borderColor: state.weakManual.includes(o.id) ? '#00e68a' : 'rgba(255,255,255,0.12)', background: state.weakManual.includes(o.id) ? 'rgba(0,230,138,0.14)' : 'rgba(255,255,255,0.04)', color: state.weakManual.includes(o.id) ? '#00e68a' : '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>{o.label}</button>
               ))}
             </div>
-            <div style={{ fontSize: 10, color: '#fff', marginBottom: 6 }}>Авто-кандидаты: {report.weakCandidates.length ? report.weakCandidates.map(c => `${MUSCLE_LABEL_RU[c.muscle] || c.muscle}${c.granular ? ` (${c.granular})` : ''} ${c.deltaPct}%`).join(' · ') : '— баланс (дневник/объём/замеры не выдали)'}</div>
+            <div style={{ fontSize: 10, color: '#fff', marginBottom: 6 }}>Авто-кандидаты: {report.weakCandidates.length ? report.weakCandidates.map(c => `${MUSCLE_LABEL_RU[c.muscle] || c.muscle}${c.granular ? ` (${c.granular})` : ''} ${c.deltaPct == null ? 'выбрано вручную' : `${c.deltaPct}%`}`).join(' · ') : '— баланс (дневник/объём/замеры не выдали)'}</div>
             <div style={{ fontSize: 10, color: '#fff', background: '#0a1629', border: '1px solid #1f3a5f', borderRadius: 8, padding: '8px 10px' }}>
               Выбрано: {report.weakZonesGranular.join(', ') || '—'} → канонические: {report.weakMusclesCanonical.join(', ') || '—'} (×1.15 объём + бонус упражнения в ББ-авто)
             </div>
@@ -2240,10 +2545,10 @@ export const BBDiagnosticsHub: React.FC = () => {
               <span style={{ alignSelf: 'end' }}>{mcCallum && <span style={{ fontSize: 10, color: '#60a5fa' }}>Маккаллум: грудь {mcCallum.chest} · биц {mcCallum.bicep} · икры {mcCallum.calf} · талия {mcCallum.waist}</span>}</span>
               {triadDev != null && <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 20, background: triadDev >= 12 ? 'rgba(239,68,68,0.12)' : 'rgba(34,197,94,0.08)', border: '1px solid rgba(255,255,255,0.06)', color: triadDev >= 12 ? '#ef4444' : '#22c55e', alignSelf: 'end' }}>Триада шея=биц=икры Δ {triadDev}%</span>}
             </div>
-            <div style={{ padding: '8px 10px', borderRadius: 8, background: report.symmetry.score < 70 ? 'rgba(239,68,68,0.08)' : 'rgba(34,197,94,0.08)', border: `1px solid ${report.symmetry.score < 70 ? 'rgba(239,68,68,0.18)' : 'rgba(34,197,94,0.18)'}`, marginBottom: 8 }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: report.symmetry.score < 70 ? '#ef4444' : '#22c55e' }}>Симметрия {report.symmetry.score}/100</div>
+            <div style={{ padding: '8px 10px', borderRadius: 8, background: !report.symmetry.tested ? 'rgba(148,163,184,0.08)' : report.symmetry.score < 70 ? 'rgba(239,68,68,0.08)' : 'rgba(34,197,94,0.08)', border: `1px solid ${!report.symmetry.tested ? 'rgba(148,163,184,0.22)' : report.symmetry.score < 70 ? 'rgba(239,68,68,0.18)' : 'rgba(34,197,94,0.18)'}`, marginBottom: 8 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: !report.symmetry.tested ? '#94a3b8' : report.symmetry.score < 70 ? '#ef4444' : '#22c55e' }}>{report.symmetry.tested ? `Симметрия ${report.symmetry.score}/100` : 'Симметрия: нет замеров'}</div>
               <div style={{ fontSize: 10, color: '#fff' }}>{Object.entries(report.symmetry.ratios).map(([k, v]) => `${circRu(k)} ${typeof v === 'number' ? v.toFixed(2) : v}`).join(' · ') || '— замеры не введены'}</div>
-              <div style={{ fontSize: 10, color: report.symmetry.score < 70 ? '#ef4444' : '#fff', marginTop: 4 }}>{report.symmetry.issues.join(' · ') || 'Пропорции в норме'}</div>
+              <div style={{ fontSize: 10, color: !report.symmetry.tested ? '#94a3b8' : report.symmetry.score < 70 ? '#ef4444' : '#fff', marginTop: 4 }}>{report.symmetry.issues.join(' · ') || (report.symmetry.tested ? 'Пропорции в норме' : 'Введи ≥2 обхвата — оценка пропорций появится после этого (сейчас 0 замеров, это не «норма»)')}</div>
             </div>
             <div style={{ padding: '8px 10px', borderRadius: 8, background: '#0a1629', border: '1px solid #1f3a5f', marginBottom: 8 }}>
               <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 6, flexWrap: 'wrap' }}>
@@ -2322,9 +2627,9 @@ export const BBDiagnosticsHub: React.FC = () => {
                           const sc = exerciseEffectScore(eff);
                           const col = sc >= 70 ? '#22c55e' : sc >= 50 ? '#f59e0b' : '#ef4444';
                           return (
-                            <span key={i} title={`${eff.name}: SFR ${eff.sfr ?? '—'} · ${eff.profile ?? '—'} · ${eff.angleClass ?? '—'} · ${eff.strictGroup?.key ?? '—'} · ${eff.jointStress ?? '—'} · tempo ${eff.note || '—'}`} style={{ padding: '3px 7px', borderRadius: 20, background: `${col}14`, border: `1px solid ${col}33`, color: col, fontSize: 10, fontWeight: 600, cursor: 'pointer' }} onClick={() => setState(s => ({ ...s, exerciseSelectedId: eff.id || eff.name, stimCheating: false, stimShortRom: false, stimSetupNote: '' }))}>
+                            <button key={i} type="button" title={`${eff.name}: SFR ${eff.sfr ?? '—'} · ${eff.profile ?? '—'} · ${eff.angleClass ?? '—'} · ${eff.strictGroup?.key ?? '—'} · ${eff.jointStress ?? '—'} · tempo ${eff.note || '—'}`} aria-label={`Разобрать ${eff.name}`} style={{ padding: '3px 7px', borderRadius: 20, background: `${col}14`, border: `1px solid ${col}33`, color: col, fontSize: 10, fontWeight: 600, cursor: 'pointer' }} onClick={() => setState(s => ({ ...s, exerciseSelectedId: eff.id || eff.name, stimCheating: false, stimShortRom: false, stimSetupNote: '' }))}>
                               {eff.name} · СФР {eff.sfr ?? '—'} {eff.profile === 'lengthened' ? '📐' : eff.profile === 'short' ? '🔹' : '▪'} {eff.unilateral ? '↔' : ''} {eff.angleClass ? `·${eff.angleClass}` : ''} {eff.strictGroup ? `·${eff.strictGroup.key}` : ''} ·{sc}
-                            </span>
+                            </button>
                           );
                         })}
                       </div>
@@ -2511,9 +2816,9 @@ export const BBDiagnosticsHub: React.FC = () => {
                   const hitsWeak = heads.some((h) => libWeakHeads.includes(h));
                   const bcol = hitsWeak ? '#00e68a' : col;
                   return (
-                    <span key={c.id} title={`${c.name}: SFR ${eff?.sfr ?? '—'} · ${eff?.profile ?? '—'} · ${eff?.angleClass ?? '—'} · ${eff?.strictGroup?.key ?? '—'} · ${eff?.jointStress ?? '—'} · бьёт: ${heads.join(', ') || '—'}`} style={{ padding: '3px 7px', borderRadius: 20, background: hitsWeak ? 'rgba(0,230,138,0.12)' : `${col}12`, border: `1px solid ${bcol}${hitsWeak ? '' : '22'}`, color: hitsWeak ? '#00e68a' : col, fontSize: 10, fontWeight: hitsWeak ? 800 : 600, cursor: 'pointer' }} onClick={() => setState(s => ({ ...s, exerciseSelectedId: c.id, stimCheating: false, stimShortRom: false, stimSetupNote: '' }))}>
+                    <button key={c.id} type="button" title={`${c.name}: SFR ${eff?.sfr ?? '—'} · ${eff?.profile ?? '—'} · ${eff?.angleClass ?? '—'} · ${eff?.strictGroup?.key ?? '—'} · ${eff?.jointStress ?? '—'} · бьёт: ${heads.join(', ') || '—'}`} aria-label={`Разобрать ${c.name}`} style={{ padding: '3px 7px', borderRadius: 20, background: hitsWeak ? 'rgba(0,230,138,0.12)' : `${col}12`, border: `1px solid ${bcol}${hitsWeak ? '' : '22'}`, color: hitsWeak ? '#00e68a' : col, fontSize: 10, fontWeight: hitsWeak ? 800 : 600, cursor: 'pointer' }} onClick={() => setState(s => ({ ...s, exerciseSelectedId: c.id, stimCheating: false, stimShortRom: false, stimSetupNote: '' }))}>
                       {hitsWeak ? '🎯 ' : ''}{c.name} · СФР {eff?.sfr ?? '—'} {eff?.profile === 'lengthened' ? '📐' : eff?.profile === 'short' ? '🔹' : '▪'} {eff?.unilateral ? '↔' : ''} ·{sc}
-                    </span>
+                    </button>
                   );
                 })}
               </div>
@@ -2548,7 +2853,7 @@ export const BBDiagnosticsHub: React.FC = () => {
             <div style={{ fontSize: 12, fontWeight: 800, color: '#fff', marginBottom: 6 }}>Стимул-карта — где теряется рост (из плана, без объёмов)</div>
             <div style={{ padding: '8px 10px', borderRadius: 8, background: '#0a1629', border: '1px solid #1f3a5f', marginBottom: 8 }}>
               <div style={{ fontSize: 10, color: '#fff' }}>Всего: растянутых {report.stimulus.global.lengthened} · средних {report.stimulus.global.midRange} · пиковых {report.stimulus.global.shortened} · база {report.stimulus.global.compound} / изоляция {report.stimulus.global.isolation}</div>
-              <div style={{ fontSize: 10, color: report.stimulus.issues.length ? '#f59e0b' : '#22c55e', marginTop: 4 }}>{report.stimulus.issues.join(' · ') || 'Стимул сбалансирован'}</div>
+              <div style={{ fontSize: 10, color: report.stimulus.noPlan ? '#94a3b8' : report.stimulus.issues.length ? '#f59e0b' : '#22c55e', marginTop: 4 }}>{report.stimulus.noPlan ? 'Нет плана — анализировать нечего. Собери план в ББ-авто, вернись сюда: карта покажет перекос растянутых/пиковых.' : report.stimulus.issues.join(' · ') || 'Стимул сбалансирован'}</div>
               {report.stimulus.bfrEligible.length > 0 && <div style={{ fontSize: 10, color: '#a78bfa', marginTop: 4 }}>Жгуты подходят: {report.stimulus.bfrEligible.join(', ')} (20–30%, схема 30-15-15-15, пауза 30 с)</div>}
               <div style={{ fontSize: 10, color: '#fff', marginTop: 6 }} data-bb="stimulus-chip">Разбор каждого упражнения — во вкладке <b>🏋️ Разбор → Аудит портфеля</b> (здесь карта, без дублей).</div>
             </div>
@@ -2579,6 +2884,83 @@ export const BBDiagnosticsHub: React.FC = () => {
             )}
             <div style={{ fontSize: 10, color: '#fff', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 8, padding: '8px 10px', marginTop: 8 }}>
               План-баланс: {balance ? balance.issues.slice(0, 2).join(' · ') : '— нет плана (собери в ББ-авто)'} · Объёмы MEV/MRV — <b>📐 Объём-хаб</b> · Качество плана — <b>→ Качество</b>
+            </div>
+          </div>
+        )}
+
+        {tab === 'volume' && (
+          <div data-bb="vr-panel">
+            {/* BB-G-01: единый ответ «что ограничивает рост» — объём, острая нагрузка, восстановление. */}
+            <div style={{ fontSize: 12, fontWeight: 800, color: '#fff', marginBottom: 4 }}>Объём · Recovery · Mobility — что ограничивает рост сейчас</div>
+            <div style={{ fontSize: 10, color: '#fff', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 8, padding: '6px 8px', marginBottom: 6 }}>
+              Факт — <b>прямые</b> сеты за 7 дней из дневника (косвенная нагрузка не завышает картину). Ориентиры MEV/MAV/MRV — по уровню <b>{level}</b>.
+            </div>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }} data-bb="vr-chips">
+              {vrPanel.chips.map((c) => (
+                <span key={c.id} data-bb={`vr-chip-${c.id}`} data-zone={c.zone} style={{ padding: '6px 10px', borderRadius: 10, background: vrZoneBg(c.zone), border: `1px solid ${vrZoneColor(c.zone)}44`, color: vrZoneColor(c.zone), fontSize: 11, lineHeight: 1.35, maxWidth: '100%' }}>
+                  <b>{c.label}: {c.value}</b>
+                  <span style={{ display: 'block', color: '#fff', fontSize: 10, opacity: 0.85 }}>{c.detail}</span>
+                </span>
+              ))}
+            </div>
+            <div data-bb="vr-limiter" data-zone={vrPanel.limiter?.zone ?? 'green'} style={{ padding: '8px 10px', borderRadius: 10, background: vrZoneBg(vrPanel.limiter?.zone ?? 'green'), border: `1px solid ${vrZoneColor(vrPanel.limiter?.zone ?? 'green')}33`, marginBottom: 8, fontSize: 11, lineHeight: 1.5 }}>
+              <b style={{ color: vrZoneColor(vrPanel.limiter?.zone ?? 'green') }}>Ограничитель: {vrPanel.limiter ? vrPanel.limiter.label : 'нет'}</b>
+              <div style={{ color: '#fff' }}>{vrPanel.limiter ? vrPanel.limiter.detail : 'Ни один канал не ограничивает объём — можно держать MAV по приоритетам.'}</div>
+            </div>
+            {vrPanel.advice.length > 0 && (
+              <div data-bb="vr-advice" style={{ padding: '8px 10px', borderRadius: 10, background: 'rgba(0,230,138,0.07)', border: '1px solid rgba(0,230,138,0.16)', marginBottom: 8, fontSize: 11, lineHeight: 1.55 }}>
+                {vrPanel.advice.map((a, i) => <div key={i} style={{ color: '#fff' }}>• {a}</div>)}
+              </div>
+            )}
+            {vrPanel.hasVolume ? (
+              <div data-bb="vr-rows" style={{ display: 'grid', gap: 4, marginBottom: 8 }}>
+                {vrPanel.rows.map((r) => {
+                  const statusRu = r.status === 'exceeding_mrv' ? 'сверх MRV'
+                    : r.status === 'approaching_mrv' ? 'к MRV'
+                      : r.status === 'below_mev' ? 'ниже MEV' : 'оптимум';
+                  const col = r.status === 'exceeding_mrv' ? '#ef4444' : r.status === 'approaching_mrv' ? '#f59e0b' : r.status === 'below_mev' ? '#60a5fa' : '#22c55e';
+                  return (
+                    <div key={r.group} data-bb="vr-row" data-muscle={r.group} data-status={r.status} style={{ padding: '7px 9px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: `1px solid ${col}33`, fontSize: 10, lineHeight: 1.5 }}>
+                      <b style={{ fontSize: 11, color: '#fff' }}>{r.label}</b>
+                      <span style={{ color: col, marginLeft: 6 }}>{r.sets} сет/нед · MEV {r.mev} · MAV {r.mav} · MRV {r.mrv} · {statusRu}</span>
+                      <div style={{ color: '#fff' }}>
+                        {r.headroom >= 0 ? `запас до MRV: ${r.headroom}` : `сверх MRV: ${-r.headroom}`}
+                        {r.acwrRatio != null ? ` · ACWR ×${r.acwrRatio} (${r.acwrZone === 'dangerous' ? 'опасно' : r.acwrZone === 'caution' ? 'осторожно' : r.acwrZone === 'undertrained' ? 'мало' : 'норма'})` : ''}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div data-bb="vr-nodata" style={{ padding: '8px 10px', borderRadius: 8, background: '#0a1629', border: '1px solid #1f3a5f', fontSize: 10, color: '#fff', marginBottom: 8 }}>
+                Нет тренировок за 7 дней — сравнивать факт с MEV/MAV/MRV нечем (это «нет данных», а не нули).
+              </div>
+            )}
+            {/* BB-G-04: эффект вставки коррекций — до/после по зоне, честное «не срок». */}
+            <div data-bb="diag-effect" data-status={corrEffect.status} style={{ padding: '8px 10px', borderRadius: 10, background: 'rgba(168,85,247,0.06)', border: '1px solid rgba(168,85,247,0.16)', marginBottom: 8, fontSize: 10, lineHeight: 1.5 }}>
+              <b style={{ fontSize: 11, color: '#fff' }}>⏱ Эффект коррекции (окно 4–6 нед)</b>
+              <div style={{ color: corrEffect.status === 'no_injection' ? '#9ca3af' : corrEffect.status === 'too_early' ? '#f59e0b' : '#fff', marginTop: 2 }}>{corrEffect.text}</div>
+              {corrEffect.rows.map((r) => {
+                const vCol = r.verdict === 'improved' ? '#22c55e' : r.verdict === 'worse' ? '#ef4444' : r.verdict === 'flat' ? '#9ca3af' : '#f59e0b';
+                const vRu = r.verdict === 'improved' ? 'рост объёма' : r.verdict === 'worse' ? 'объём упал' : r.verdict === 'flat' ? 'без изменений' : 'ждём окно оценки';
+                return (
+                  <div key={r.zone} data-bb="diag-effect-row" data-verdict={r.verdict} style={{ color: '#fff', marginTop: 2 }}>
+                    <b>{weakRu(r.zone)}</b>: {r.setsBeforeWeekly ?? '—'} → {r.setsAfterWeekly ?? '—'} сет/нед
+                    {r.deltaPct != null ? ` (${r.deltaPct > 0 ? '+' : ''}${r.deltaPct}%)` : ''} · <span style={{ color: vCol }}>{vRu}</span>
+                  </div>
+                );
+              })}
+            </div>
+            {/* BB-G-02: deep-links — из вердикта можно дойти до замера/профильного экрана. */}
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }} data-bb="vr-links">
+              {([
+                ['volume_hub', '📐 Объём-хаб'],
+                ['joints_ortho', '🦴 Ортопедия'],
+                ['calc_vbt', '🎯 VBT · Анализ силы'],
+                ['diary', '📝 Дневник'],
+              ] as const).map(([target, label]) => (
+                <button key={target} type="button" data-bb="vr-link" data-target={target} onClick={() => goToScreen(target)} style={{ minHeight: 44, padding: '8px 12px', borderRadius: 10, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.14)', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>{label}</button>
+              ))}
             </div>
           </div>
         )}
@@ -2621,12 +3003,24 @@ export const BBDiagnosticsHub: React.FC = () => {
       <div style={{ ...CARD, padding: 10, margin: 0, background: 'rgba(0,230,138,0.08)', border: '1px solid rgba(0,230,138,0.16)' }} data-bb="footer">
         <div style={{ fontSize: 11, color: '#fff', marginBottom: 6 }}>Выбрано: {weakListRu(report.weakZonesGranular) || '— баланс'} · оценка {score} · пров. {Math.round(report.score.verification * 100)}% {report.score.floors.join(' · ')}</div>
         <div style={{ fontSize: 11, color: '#fff', marginBottom: 6 }}>{report.findings.slice(0, 3).join(' · ') || '—'}</div>
+        {/* BB-D-39: тренд балла к предыдущему замеру (честно: без второго замера — «мало данных»). */}
+        <div data-bb="diag-history" style={{ fontSize: 10, color: diagTrend.delta == null ? '#9ca3af' : diagTrend.delta > 0 ? '#22c55e' : diagTrend.delta < 0 ? '#f87171' : '#9ca3af', lineHeight: 1.5, marginBottom: 6 }}>
+          {diagTrend.text}
+        </div>
+        {/* AUDIT 2026-11 (BB-D-38): ориентиры по возрасту/полу считались, но не показывались. */}
+        {(teenNoteText || (femaleNotesShort && femaleNotesShort.length > 0)) && (
+          <div data-bb="sex-age-notes" style={{ fontSize: 10, color: '#a78bfa', lineHeight: 1.5, marginBottom: 6 }}>
+            {teenNoteText ? `🧒 ${teenNoteText}` : ''}
+            {teenNoteText && femaleNotesShort && femaleNotesShort.length ? ' · ' : ''}
+            {femaleNotesShort && femaleNotesShort.length ? `♀ ${femaleNotesShort.join(' · ')}` : ''}
+          </div>
+        )}
         {sLevel === 'critical' && <div style={{ fontSize: 11, color: '#ef4444', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.18)', borderRadius: 8, padding: '8px 10px', marginBottom: 6 }}>⚠️ Критично — урезание предельного объёма и коррекция до пика. Проверь присед-тест + объём.</div>}
         {specBlock && (
           <div style={{ marginBottom: 6, padding: '8px 10px', borderRadius: 10, background: 'rgba(168,85,247,0.06)', border: '1px solid rgba(168,85,247,0.16)', fontSize: 11, lineHeight: 1.5 }} data-bb="spec-block">
             <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 4, flexWrap: 'wrap' }}>
               <b style={{ color: '#fff' }}>Спец-блок {specBlock.lengthWeeks} нед: {report.weakZonesGranular.map(weakRu).join(', ')}</b>
-              <span style={{ marginLeft: 'auto', minWidth: 120, flex: '0 1 140px' }}><BbNum label="Длина, нед" value={state.specWeeks} onChange={(v) => setState(s => ({ ...s, specWeeks: v }))} placeholder="8" step={1} /></span>
+              <span style={{ marginLeft: 'auto', minWidth: 120, flex: '0 1 140px' }}><BbNum label="Длина блока, нед (4–6)" value={state.specWeeks} onChange={(v) => setState(s => ({ ...s, specWeeks: v }))} placeholder="6" step={1} /></span>
               <button onClick={() => setState(s => ({ ...s, showSpecBlock: !s.showSpecBlock }))} data-bb="spec-toggle" style={{ minHeight: 44, padding: '8px 12px', borderRadius: 10, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>{state.showSpecBlock ? 'Скрыть' : 'Недели'}</button>
             </div>
             <div style={{ color: '#fff' }}>{specBlock.rationale.join(' · ')}</div>
@@ -2663,7 +3057,8 @@ export const BBDiagnosticsHub: React.FC = () => {
         </div>
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }} data-bb="export-row">
           <button onClick={applyToConstructor} data-bb="apply-bottom" style={{ flex: '2 1 200px', minHeight: 52, padding: '12px 14px', borderRadius: 12, background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#06281c', border: 'none', fontWeight: 800, fontSize: 14, cursor: 'pointer' }}>→ Применить в ББ-авто ({report.weakZonesGranular.map(weakRu).join(', ') || 'баланс'})</button>
-          <button onClick={handleExport} data-bb="export-html" style={{ flex: '1 1 120px', minHeight: 52, padding: '12px 14px', borderRadius: 12, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: '#fff', fontSize: 13, fontWeight: 800, cursor: 'pointer' }}>🖨 Печать</button>
+          <button onClick={handleExport} data-bb="export-html" style={{ flex: '1 1 120px', minHeight: 52, padding: '12px 14px', borderRadius: 12, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: '#fff', fontSize: 13, fontWeight: 800, cursor: 'pointer' }}>⤓ HTML</button>
+          <button onClick={handleExportPrint} data-bb="export-print" style={{ flex: '1 1 120px', minHeight: 52, padding: '12px 14px', borderRadius: 12, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: '#fff', fontSize: 13, fontWeight: 800, cursor: 'pointer' }}>🖨 Печать</button>
           <button onClick={handleExportCsv} data-bb="export-csv" style={{ flex: '1 1 120px', minHeight: 52, padding: '12px 14px', borderRadius: 12, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: '#fff', fontSize: 13, fontWeight: 800, cursor: 'pointer' }}>📊 Таблица</button>
         </div>
         <div style={{ fontSize: 11, color: '#fff', marginTop: 6 }}>Объём: <b>📐 Объём-хаб</b> · Нагрузка: <b>⚡ Интеллект</b> · Суставы: <b>🦴 Суставы и ортопедия</b> · Сила: <b>🏋️ Анализ силы</b> — без дублей, только чтение.</div>

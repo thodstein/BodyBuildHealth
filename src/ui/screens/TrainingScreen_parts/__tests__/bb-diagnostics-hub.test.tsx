@@ -27,13 +27,29 @@ describe('BBDiagnosticsHub', () => {
     expect(screen.getAllByText(/Скрининг/)[0]).toBeInTheDocument();
     expect(screen.getAllByText(/Стимул-карта/)[0]).toBeInTheDocument();
   });
-  it('нагрузка/объём не дублируются: табов восстановления и объёма нет, только ссылки', () => {
+  it('объём/recovery — сводка со ссылками, а не дубль Объём-хаба (BB-G-01)', () => {
     render(<BBDiagnosticsHub />);
+    // Восстановление/подвижность отдельными табами не дублируются.
     expect(screen.queryByRole('button', { name: /Восстановление/ })).toBeNull();
-    expect(screen.queryByRole('button', { name: /Объём/ })).toBeNull();
     expect(screen.queryByRole('button', { name: /Подвижность/ })).toBeNull();
     expect(screen.getAllByText(/Смежные хабы/)[0]).toBeInTheDocument();
     expect(document.querySelector('[data-bb="recovery-tab"]')).toBeNull();
+
+    // Шестой таб — сводка: только чипы/строки и deep-links, без своих калькуляторов.
+    const tabBtns = Array.from(document.querySelectorAll('[data-bb="tab"]'));
+    expect(tabBtns).toHaveLength(6);
+    const volumeTab = tabBtns.find((b) => /Объём · Recovery/.test(b.textContent || ''));
+    expect(volumeTab).toBeTruthy();
+    fireEvent.click(volumeTab as Element);
+
+    const panel = document.querySelector('[data-bb="vr-panel"]');
+    expect(panel).not.toBeNull();
+    expect(panel!.querySelectorAll('input').length).toBe(0);
+    const links = Array.from(panel!.querySelectorAll('[data-bb="vr-link"]'))
+      .map((b) => b.getAttribute('data-target'));
+    expect(links).toEqual(['volume_hub', 'joints_ortho', 'calc_vbt', 'diary']);
+    // ограничитель показан всегда — «нет» тоже ответ
+    expect(panel!.querySelector('[data-bb="vr-limiter"]')).not.toBeNull();
   });
   it('toggles weak manual 1-2 and conflict shoulders+delt_mid', () => {
     render(<BBDiagnosticsHub />);
@@ -197,6 +213,27 @@ describe('BBDiagnosticsHub', () => {
     expect(localStorage.getItem('he_bb_plan_saved')).toBe(saved);
     expect(localStorage.getItem('he_bb_plan_saved_prev')).toBeNull();
   });
+  it('план только в he_bb_plans: инъекция работает, откат не пишет массив в канонический ключ', () => {
+    // AUDIT 2026-11: раньше хаб читал только he_bb_plan_saved и говорил «Нет плана ББ»,
+    // хотя конструктор показывал план из вариантов he_bb_plans.
+    const variants = JSON.stringify([{ plan: { weeks: [
+      { sessions: [{ day: 1, exercises: [{ exerciseName: 'bench_bar', name: 'Жим штанги лёжа', muscle: 'chest', sets: 4, rir: 2, role: 'primary' }] }] },
+      { sessions: [{ day: 1, exercises: [{ exerciseName: 'bench_bar', name: 'Жим штанги лёжа', muscle: 'chest', sets: 4, rir: 2, role: 'primary' }] }] },
+    ] } }]);
+    localStorage.setItem('he_bb_plans', variants);
+    render(<BBDiagnosticsHub />);
+    fireEvent.click(screen.getAllByText('Верх груди')[0]);
+    fireEvent.click(screen.getByRole('button', { name: /Вставить коррекции в план/ }));
+    const after = JSON.parse(localStorage.getItem('he_bb_plan_saved') || '{}');
+    const injected = (after.plan?.weeks || []).flatMap((w: any) => w.sessions || []).flatMap((s: any) => s.exercises || [])
+      .filter((e: any) => String(e.comment || '').includes('ББ-диагностика'));
+    expect(injected.length).toBeGreaterThan(0);
+    // снимок помечает «канонического плана не было» — иначе откат записал бы массив вариантов
+    expect(JSON.parse(localStorage.getItem('he_bb_plan_saved_prev') || '{}').__bbDiagNone).toBe(true);
+    fireEvent.click(screen.getByRole('button', { name: /Откатить вставку/ }));
+    expect(localStorage.getItem('he_bb_plan_saved')).toBeNull();
+    expect(localStorage.getItem('he_bb_plans')).toBe(variants);
+  });
   it('inject writes plan history and snapshot restore works', () => {
     const saved = JSON.stringify({ plan: { weeks: [
       { sessions: [{ day: 1, exercises: [{ exerciseName: 'bench_bar', name: 'Жим штанги лёжа', muscle: 'chest', sets: 4, rir: 2, role: 'primary' }] }] },
@@ -276,8 +313,11 @@ describe('BBDiagnosticsHub', () => {
     try {
       render(<BBDiagnosticsHub />);
       fireEvent.click(screen.getAllByText('Верх груди')[0]);
-      fireEvent.click(screen.getByRole('button', { name: /Печать/ }));
-      expect(screen.getAllByText(/HTML экспорт/)[0]).toBeInTheDocument();
+      // AUDIT 2026-11 (BB-D-34): «Печать» теперь печатает (window.open/print), а
+      // скачивание — отдельная кнопка ⤓ HTML. Проверяем именно скачивание файла.
+      expect(document.querySelector('[data-bb="export-print"]')).not.toBeNull();
+      fireEvent.click(document.querySelector('[data-bb="export-html"]') as HTMLElement);
+      expect(screen.getAllByText(/HTML-файл сохранён/)[0]).toBeInTheDocument();
     } finally {
       (document as any).createElement = origCreate;
     }

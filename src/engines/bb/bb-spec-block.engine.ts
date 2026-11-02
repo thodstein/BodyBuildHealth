@@ -55,7 +55,11 @@ export function splitSetsBySessions(weeklySets: number, frequency: number): numb
 export function buildSpecBlock(input: SpecBlockInput): SpecBlock {
   const zones = [...new Set((input.weakZones || []).map((s) => String(s).toLowerCase().trim()).filter(Boolean))].slice(0, 2);
   const level = input.level || 'intermediate';
-  const lengthWeeks = Math.max(4, Math.min(12, Math.round(input.weeks ?? 8)));
+  // AUDIT 2026-11: движок умеет 4–12 нед (контракт bb-diagnostics-max-pro), но план
+  // ББ-авто держит ОДИН блок 3–6 нед и раньше молча резал 8 → 6. Хаб просит
+  // максимум 6 (см. specWeeks в BBDiagnosticsHub) — здесь оставляем 4–12.
+  const requested = Math.round(input.weeks ?? 8);
+  const lengthWeeks = Math.max(4, Math.min(12, requested));
   const fact = input.factSets || {};
   const rationale: string[] = [];
   const weeks: SpecWeekPlan[] = [];
@@ -78,10 +82,17 @@ export function buildSpecBlock(input: SpecBlockInput): SpecBlock {
     const targetSets: Record<string, number> = {};
     const frequency: Record<string, number> = {};
     for (const z of zones) {
-      const start = Math.max(mvFloor[z], Math.round((fact[z] ?? fact[canonicalMuscle(z)] ?? 8) + 4));
+      const factNow = Math.round(fact[z] ?? fact[canonicalMuscle(z)] ?? 8);
+      const start = Math.max(mvFloor[z], factNow + 4);
       const ramp = start + (w - 1) * 2;
-      targetSets[z] = Math.max(start, Math.min(mavTop[z], Math.min(mrvCap[z], ramp)));
+      // AUDIT 2026-11: раньше стояло Math.max(start, …) — это возвращало старт,
+      // даже когда он ВЫШЕ MRV, и кап MRV не работал. Теперь потолок — mavTop/MRV:
+      // если факт уже выше, блок начинается с разгрузки до MAV-верха.
+      targetSets[z] = Math.max(mvFloor[z], Math.min(mavTop[z], mrvCap[z], ramp));
       frequency[z] = freqFor(z);
+      if (w === 1 && factNow + 4 > mrvCap[z]) {
+        rationale.push(`${z}: факт ${factNow} сет уже выше MRV ${mrvCap[z]} — блок начинаем с ${targetSets[z]} (разгрузка), а не с ${factNow + 4}`);
+      }
     }
     weeks.push({
       week: w,

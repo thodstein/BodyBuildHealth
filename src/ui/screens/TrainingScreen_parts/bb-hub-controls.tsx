@@ -43,7 +43,10 @@ const posNum = (v: string | number | null | undefined): number | null => {
 
 /** Красивое числовое поле: подпись + инпут 44px/16px + степпер. */
 export const BbNum: React.FC<{ label: string; value: string; onChange: (v: string) => void; placeholder?: string; width?: number | string; step?: number; testId?: string }> = ({ label, value, onChange, placeholder, width = '100%', step, testId }) => (
-  <label data-bb="num-field" style={{ fontSize: 11, color: '#fff', display: 'block', minWidth: 0 }}>
+  // <span>, а не <label>: внутри есть кнопки −/+, а <button> внутри <label> —
+  // невалидная вложенность и двойной клик (тап по «+» фокусировал инпут и поднимал
+  // клавиатуру). Имя поля для скринридера задано через aria-label у input.
+  <span data-bb="num-field" style={{ fontSize: 11, color: '#fff', display: 'block', minWidth: 0 }}>
     <span style={{ display: 'block', marginBottom: 3, lineHeight: 1.2 }}>{label}</span>
     <span style={{ display: 'flex', gap: 4, alignItems: 'stretch' }}>
       {step ? (
@@ -63,7 +66,7 @@ export const BbNum: React.FC<{ label: string; value: string; onChange: (v: strin
         <button type="button" data-bb="num-plus" aria-label={`Увеличить ${label}`} onClick={() => { const n = bbNum(value); onChange(n != null ? String(Math.round((n + step) * 10) / 10) : String(step)); }} style={{ minWidth: 44, minHeight: 44, borderRadius: 10, border: '1px solid rgba(0,230,138,0.30)', background: 'rgba(0,230,138,0.12)', color: '#fff', fontSize: 16, fontWeight: 800, cursor: 'pointer' }}>+</button>
       ) : null}
     </span>
-  </label>
+  </span>
 );
 
 /** Красивый попап-выбор вместо нативного селекта (кнопка 44px + шит). */

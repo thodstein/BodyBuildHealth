@@ -49,7 +49,17 @@ export function buildBBSpecIcs(
     if (Number.isFinite(cand.getTime())) ref = cand;
   }
   const title = opts.title || 'ББ спец-блок';
-  const stamp = toDateStr(new Date());
+  // AUDIT 2026-11 (BB-D-36): DTSTAMP — по UTC с суффиксом Z (раньше локальные
+  // числа без Z: календари читали их как UTC и сдвигали событие на часы);
+  // UID — стабильный от содержимого блока, а не от времени генерации. Иначе
+  // повторный импорт плодил дубли вместо обновления тех же событий.
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const now = new Date();
+  const stamp = `${now.getUTCFullYear()}${pad(now.getUTCMonth() + 1)}${pad(now.getUTCDate())}T${pad(now.getUTCHours())}${pad(now.getUTCMinutes())}${pad(now.getUTCSeconds())}Z`;
+  const uidSeed = `${title}|${(spec.weakZones || []).join(',')}|${opts.startDate || ''}`;
+  let uidHash = 0;
+  for (let i = 0; i < uidSeed.length; i++) uidHash = (uidHash * 31 + uidSeed.charCodeAt(i)) | 0;
+  const uidKey = Math.abs(uidHash).toString(36);
   const events = spec.weeks.map((w) => {
     const dt = toDateStr(mondayOfWeek(ref, w.week - 1));
     const sets = Object.entries(w.targetSets || {})
@@ -57,7 +67,7 @@ export function buildBBSpecIcs(
       .join(', ');
     const summary = escIcs(`${title}: нед ${w.week} — ${sets || 'баланс'}`);
     const desc = escIcs(`${w.note || ''}\nЦели: ${(spec.weakZones || []).join(', ') || '—'}`);
-    return ['BEGIN:VEVENT', `UID:bb-spec-w${w.week}-${stamp}@bodybuildhealth`, `DTSTAMP:${stamp}T000000`, `DTSTART;VALUE=DATE:${dt}`, `SUMMARY:${summary}`, `DESCRIPTION:${desc}`, 'END:VEVENT'].join('\r\n');
+    return ['BEGIN:VEVENT', `UID:bb-spec-${uidKey}-w${w.week}@bodybuildhealth`, `DTSTAMP:${stamp}`, `DTSTART;VALUE=DATE:${dt}`, `SUMMARY:${summary}`, `DESCRIPTION:${desc}`, 'END:VEVENT'].join('\r\n');
   });
   return ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//BodyBuildHealth//BB Spec//RU', ...events, 'END:VCALENDAR'].join('\r\n');
 }
