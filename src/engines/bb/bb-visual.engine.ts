@@ -142,7 +142,7 @@ export interface MesocycleRow {
   phase: string;
   day: number;
   character: string;
-  exercises: Array<{ name: string; muscle: string; sets: number; reps: number; weight: number; rir: number; rest: number }>;
+  exercises: Array<{ name: string; muscle: string; sets: number; reps: number; weight: number; rir: number; rest: number; technique?: string; progression?: string; superset?: string }>;
 }
 
 /** Фаза 4.22: вся таблица мезоцикла неделя×день×упр×вес/повт/сеты. */
@@ -158,6 +158,10 @@ export function buildBBMesocycleTable(plan: BBPlan): MesocycleRow[] {
         character: s.character || '',
         exercises: (s.exercises || []).map((e: BBExercise) => {
           const ws = (e.workSets || [])[0] || ({} as any);
+          // D-2 (итерация C): техника последнего подхода и правило прогрессии —
+          // чтобы распечатка работала как бумажный лог, а не только как список.
+          const lastSet = (e.workSets || [])[(e.workSets || []).length - 1] as any;
+          const technique = String(lastSet?.technique || (e as any).technique || '').trim();
           return {
             name: e.exerciseName || e.name || '',
             muscle: e.muscle || '',
@@ -166,6 +170,9 @@ export function buildBBMesocycleTable(plan: BBPlan): MesocycleRow[] {
             weight: ws.weight ?? 0,
             rir: ws.rir ?? e.rir ?? 0,
             rest: ws.restSeconds ?? e.restSeconds ?? 0,
+            technique: technique || undefined,
+            progression: (e as any).progressionRule || undefined,
+            superset: (e as any).supersetGroup != null ? `${(e as any).supersetSlot === 1 ? 'B' : 'A'}${(e as any).supersetGroup}` : undefined,
           };
         }),
       });
@@ -224,10 +231,10 @@ export function buildBBPlanPrintHtml(plan: BBPlan, opts?: { heatmap?: boolean })
   const phaseLegend = [...phases].map(p => `<span style="margin-right:10px"><i style="display:inline-block;width:10px;height:10px;background:${BB_PHASE_COLOR[p] || '#888'};border-radius:2px"></i> ${esc(BB_PHASE_LABEL_RU[p] || p)}</span>`).join('');
   const weeksHtml = rows.map(r => {
     const pc = BB_PHASE_COLOR[r.phase] || '#888';
-    const exercises = r.exercises.map(ex => `<tr><td>${esc(ex.name)}</td><td>${esc(ex.muscle)}</td><td>${ex.sets}</td><td>${ex.reps}</td><td>${ex.weight}</td><td>${ex.rir}</td><td>${ex.rest}</td></tr>`).join('');
+    const exercises = r.exercises.map(ex => `<tr><td>${esc(ex.name)}${ex.superset ? ` <b style="color:#a855f7">🔗${esc(ex.superset)}</b>` : ''}</td><td>${esc(ex.muscle)}</td><td>${ex.sets}</td><td>${ex.reps}</td><td>${ex.weight}</td><td>${ex.rir}</td><td>${ex.rest}</td><td style="font-size:9px">${esc(ex.technique || '')}</td><td style="font-size:9px">${esc(ex.progression || '')}</td><td style="border-left:1px solid #999;min-width:70px">&nbsp;</td></tr>`).join('');
     return `<h3 style="margin:14px 0 4px;color:${pc}">Неделя ${r.week} · ${esc(r.phase)} · День ${r.day} (${esc(r.character)})</h3>
       <table border="1" cellspacing="0" cellpadding="4" style="border-collapse:collapse;width:100%;font-size:11px">
-        <thead><tr style="background:#f4f4f5"><th>Упражнение</th><th>Мышца</th><th>Сеты</th><th>Повт</th><th>Вес</th><th>RIR</th><th>Отдых</th></tr></thead>
+        <thead><tr style="background:#f4f4f5"><th>Упражнение</th><th>Мышца</th><th>Сеты</th><th>Повт</th><th>Вес</th><th>RIR</th><th>Отдых</th><th>Техника</th><th>Прогрессия</th><th>Факт (вес×повт)</th></tr></thead>
         <tbody>${exercises}</tbody></table>`;
   }).join('');
   const heatmapHtml = heatmap.length ? (() => {

@@ -31,6 +31,13 @@ describe('Фаза 4.22: таблица мезоцикла', () => {
     expect(rows[0].exercises.length).toBeGreaterThan(0);
     expect(rows[0].exercises[0]).toHaveProperty('weight');
   });
+
+  it('итерация C: в строке есть правило прогрессии (бумажный лог, а не список)', () => {
+    const plan = buildBBPlan({ patternId: 'upper_lower_4', level: 'intermediate', goal: 'mass', weeks: 2 } as any);
+    const exercises = buildBBMesocycleTable(plan).flatMap(r => r.exercises);
+    expect(exercises.length).toBeGreaterThan(5);
+    expect(exercises.every(e => typeof e.progression === 'string' && e.progression!.length > 20)).toBe(true);
+  });
 });
 
 describe('Фаза 4.23: календарные диапазоны недель', () => {
@@ -56,6 +63,16 @@ describe('Фаза 4.24: print HTML + ics', () => {
     expect(html).toMatch(/<html/i);
     expect(html).toMatch(/Таблица мезоцикла/);
     expect(html).toMatch(/Нед/i); // heatmap секция
+  });
+
+  it('итерация E: печать содержит технику, прогрессию и поле «факт»', () => {
+    const plan = buildBBPlan({ patternId: 'upper_lower_4', level: 'intermediate', goal: 'mass', weeks: 2 } as any);
+    const html = buildBBPlanPrintHtml(plan);
+    expect(html).toMatch(/<th>Техника<\/th>/);
+    expect(html).toMatch(/<th>Прогрессия<\/th>/);
+    expect(html).toMatch(/<th>Факт/);
+    // Правило прогрессии реально доехало в печать, а не только в заголовок.
+    expect(html).toMatch(/Двойная прогрессия/);
   });
   it('buildBBPlanIcs — валидный VCALENDAR', () => {
     const plan = buildBBPlan({ patternId: 'upper_lower_4', level: 'intermediate', goal: 'mass', weeks: 2 } as any);

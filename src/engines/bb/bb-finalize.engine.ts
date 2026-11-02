@@ -21,6 +21,7 @@ function indirectToMuscle(ex: any, muscle: string): number {
 }
 import { estimateBBSessionCost, fitBBSessionToBudget } from './bb-fatigue.engine';
 import { REP_SCHEMES, isWidowmakerExercise } from './bb-rep-schemes.engine';
+import { buildProgressionRule } from './bb-progression-rule';
 import { analyzeBBRotation } from './bb-rotation.engine';
 import { EXERCISE_CATALOG } from '../../core/exercise-catalog';
 import { trueMuscleOf, derivePattern } from '../movement-pattern';
@@ -3212,12 +3213,44 @@ function assignSchemeSets(ex: any, sets: number, cfg: { reps: [number, number]; 
     ex.sets = sets;
     ex.repsRange = cfg.reps;
     ex.restSeconds = cfg.rest;
+    // D-1b: фиксируем, сколько сетов назначила схема. Бюджетные проходы ниже
+    // могут урезать финишер — тогда комментарий обязан перестать обещать
+    // «7×», иначе пользователь видит противоречие в одном и том же упражнении.
+    (ex as any).schemeAssignedSets = sets;
     if (Array.isArray(ex.workSets) && ex.workSets.length > 0) {
       const sample = ex.workSets[ex.workSets.length - 1];
       ex.workSets = Array.from({ length: sets }, () => ({ ...sample, reps: cfg.reps[1], restSeconds: cfg.rest }));
     }
     ex.comment = (ex.comment || '') + (ex.comment ? ' · ' : '') + `${cfg.label} (${sets}×${cfg.reps[0]}-${cfg.reps[1]}, отдых ${cfg.rest}с)`;
   }
+}
+
+/**
+ * D-1b: комментарий схемы не должен обещать больше, чем осталось сетов.
+ *
+ * FST-7 назначает финишеру 7 сетов, но бюджет недели и MRV-проходы в билдере
+ * могут его урезать. Раньше комментарий продолжал писать «FST-7 (7×8-12…)», а в
+ * плане стояло 4 сета — пользователь видел противоречие в одном упражнении.
+ *
+ * Вызывать ПОСЛЕ всех урезающих проходов (конец buildBBPlan / revalidate).
+ * Возвращает число исправленных упражнений — вызывающий пишет причину в rationale.
+ */
+export function reconcileSchemeComments(plan: BBPlan): number {
+  const fst7Label = REP_SCHEMES.fst7.nameRu;
+  let fixed = 0;
+  for (const week of plan.weeks) for (const session of week.sessions) for (const ex of session.exercises as any[]) {
+    const assigned = Number(ex.schemeAssignedSets);
+    if (!Number.isFinite(assigned) || assigned <= 0) continue;
+    const actual = Number(ex.sets) || 0;
+    if (actual <= 0 || actual >= assigned) continue;
+    const comment = String(ex.comment || '');
+    const oldSeg = `${fst7Label} (${assigned}×`;
+    if (!comment.includes(oldSeg)) continue;
+    ex.comment = comment.replace(oldSeg, `${fst7Label} (${actual}×`)
+      + ` · финишер урезан бюджетом недели: ${actual} из ${assigned} сетов`;
+    fixed += 1;
+  }
+  return fixed;
 }
 
 export function applyVolumeScheme(plan: BBPlan, scheme: string, opts?: { fst7Seven?: boolean }): void {
@@ -3273,7 +3306,33 @@ export function applyVolumeScheme(plan: BBPlan, scheme: string, opts?: { fst7Sev
         // Финишер = последняя памп-изоляция сессии (порядок: финишер последний).
         if (scheme === 'fst7' && opts?.fst7Seven) {
           const fin = [...exs].reverse().find(e => (e as any).role === 'accessory') || exs[exs.length - 1];
+          const before = Number((fin as any).sets) || 0;
           assignSchemeSets(fin, 7, cfg);
+          // Финишер не должен ДОБАВЛЯТЬ недельный объём: FST-7 — это
+          // перераспределение сетов мышцы на одно упражнение, а не +3 сверху.
+          // Иначе недельный бюджет-проход в финализаторе честно видел overflow и
+          // срезал финишер обратно до 2-4 сетов — обещанные 7 не доживали до
+          // плана (замер: 17/17 финишеров урезаны, схема = NO-OP). Дельту
+          // снимаем с ДРУГИХ упражнений этой мышцы в той же неделе, соблюдая пол
+          // (3 у базы / 2 у изоляции), — недельный объём мышцы остаётся прежним.
+          let need = 7 - before;
+          if (need > 0) {
+            const donors = week.sessions
+              .flatMap(s => s.exercises)
+              .filter((e: any) => e !== fin && !(e as any).warmupActivator
+                && e.muscle === muscle && !/FST-7/.test(String(e.comment || '')))
+              .sort((a: any, b: any) => (b.sets || 0) - (a.sets || 0));
+            for (const d of donors as any[]) {
+              if (need <= 0) break;
+              const floor = d.role === 'primary' ? 3 : 2;
+              const cut = Math.min(need, Math.max(0, (Number(d.sets) || 0) - floor));
+              if (cut > 0) {
+                d.sets = (Number(d.sets) || 0) - cut;
+                if (Array.isArray(d.workSets) && d.workSets.length > d.sets) d.workSets = d.workSets.slice(0, d.sets);
+                need -= cut;
+              }
+            }
+          }
           continue;
         }
         let remaining = cfg.target;
@@ -5872,6 +5931,34 @@ for (const week of next.weeks) {
         try { return tidySessionExercises(rest as any, undefined, (session as any).sessionTag, options.priorityMuscles, options.methodology, options.level === 'enhanced' && (options.trainingYears ?? 0) >= 6 ? 6 : 4) as any; } catch { return rest; }
       })();
       (session as any).exercises = [...warmups, ...orderedRest];
+    }
+  }
+  // ── Итерация C (D-1): правило прогрессии на каждое упражнение ──
+  // Делается в финализаторе — единственном месте, через которое проходят все
+  // пути сборки (сплит / цикл / программа / повторная финализация после правок).
+  // Правило выводится из фактических данных (фаза/неделя/спец-мышца), а не из
+  // комментария, поэтому не расходится с тем, что реально делает движок.
+  {
+    const specMusclesForRules = new Set<string>([
+      ...((options.priorityMuscles as string[]) || []),
+      ...((((next as any).priorityMuscles) as string[]) || []),
+    ]);
+    const focusForRules = String((next as any).trainingFocus || '');
+    for (const week of next.weeks) {
+      const phaseForRules = String((week as any).phase || 'accumulation');
+      const deloadForRules = !!(week as any).isDeloadLike || !!(week as any).deload || phaseForRules === 'deload';
+      for (const session of week.sessions) {
+        for (const ex of session.exercises) {
+          try {
+            ex.progressionRule = buildProgressionRule(ex as any, {
+              phase: phaseForRules,
+              isDeload: deloadForRules,
+              isSpecMuscle: specMusclesForRules.has(ex.muscle),
+              trainingFocus: focusForRules,
+            });
+          } catch { /* правило не критично для плана — финализацию не роняем */ }
+        }
+      }
     }
   }
   syncBBPlanSetShape(next);

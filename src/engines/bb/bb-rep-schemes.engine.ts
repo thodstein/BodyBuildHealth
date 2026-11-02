@@ -387,6 +387,12 @@ export function applySchemeToPlan(
     for (const sess of week.sessions || []) {
       for (const ex of sess.exercises || []) {
         if (!ex || ex.warmupActivator) continue;
+        // Объёмная схема (FST-7 7-in-1 / GVT / 8×8) уже назначила упражнению
+        // сеты/reps/отдых через assignSchemeSets. Накладывать поверх неё
+        // rep-схему (BFR/DC/мио) нельзя: BFR переписывал 7-сетовый финишер FST-7
+        // на 4-5 окклюзионных сетов, и методика становилась NO-OP (замер:
+        // 17/17 финишеров урезаны). Схема объёма приоритетнее rep-оверлея.
+        if (Number((ex as any).schemeAssignedSets) > 0) continue;
         // Widowmaker (DC) не трогаем: добивочный 20-повторный сет переживает
         // только если loading его не переписывает (схема дала бы фазовые повторы).
         // Волна 5.3: структурный тег первичен, комментарий — legacy-фолбэк.

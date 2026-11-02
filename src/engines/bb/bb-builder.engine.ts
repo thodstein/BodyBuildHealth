@@ -64,6 +64,7 @@ function mastersMrvMult(age?: number): number {
 // реализация, которую использует и ручной конструктор (phase-periodization).
 import { distributePhases, PHASE_CONFIGS, PHASE_LABELS, getPhaseConfig, getPhaseVolumeMult, getVolumeWaveFactor, type BBPhase } from '../periodization';
 import { orderSessionExercises, type SessionMethodology } from './bb-session-order.engine';
+import { methodologySpecFor, applyMethodologyRest } from './bb-methodology-spec';
 import { type BBTrainingFocus, FOCUS_RIR_TABLE } from './bb-goal-types';
 import { clampRir } from './bb-utils';
 import { isInappropriateBB, bbExerciseTier } from './bb-exercise-tier.engine';
@@ -73,7 +74,7 @@ import { loadSRPESessions } from '../../engines/pro/srpe-store';
 import { acuteChronicRatio, toDailyLoads } from '../../engines/pro/training-load.engine';
 import type { Macrocycle, MacroPhase, BBMacrocycle } from '../lms/macrocycle.engine';
 import { syncBBPlanSetShape, validateBBPlan } from './bb-validator.engine';
-import { finalizeBBPlan, prioritizeBackSessions, reconcileVolumeTargets, pplWeeklyFloorFor } from './bb-finalize.engine';
+import { finalizeBBPlan, prioritizeBackSessions, reconcileVolumeTargets, pplWeeklyFloorFor, reconcileSchemeComments } from './bb-finalize.engine';
 import { buildBBVolumeTarget, type BBVolumeTarget, computeMrvMult, regimeMrvMultFor, computeBBRecoveryScore, computeBBWeeklyBudget, sessionLimitsFor, computeBBRecoveryMultiplier, computeBBNutritionMultiplier, perExerciseCap, perSessionMuscleCap, sessionMrvRotCap, sessionMuscleRealismCap, sessionMuscleExerciseCap, sessionDensityExerciseCap, resolveMrvCap, weeklyCapFor, distributeSetsByRole, BB_MRV_TOLERANCE } from './bb-volume.engine';
 import { buildBBExpandedSummary } from './bb-summary.engine';
 import { jointGuardScorePenalty, jointGuardActive } from './bb-joint-guard.engine';
@@ -443,6 +444,10 @@ export interface BBExercise {
    *  в финализаторе. Комментарий остаётся для UI/печати; потребители читают тег
    *  с legacy-фолбэком на комментарий (`isWidowmakerExercise` в bb-rep-schemes). */
   techniqueTag?: 'widowmaker';
+  /** D-1 (итерация C): правило прогрессии для этого упражнения — «что делать,
+   *  когда верх диапазона достигнут». Заполняется финализатором для ВСЕХ путей
+   *  сборки (сплит/цикл/программа), поэтому не зависит от парсинга комментария. */
+  progressionRule?: string;
 }
 
 export interface BBSession {
@@ -2025,6 +2030,9 @@ function buildSession(
     FullBody: '', // FullBody — особый случай: primary определяется по musclePrimaryAssigned
   };
   const sessionLeadMuscle = LEAD_MUSCLE[sched.sessionTag || ''] || ((musclePlans[0] as any)?.group || '');
+  // O-4 (итерация D): тай-брейк по аксиальной стоимости включаем только в
+  // нижних/FB-днях — на верхних днях порядок остаётся байт-в-байт прежним.
+  const isLowerAxialDay = /Legs|Lower|Glute|FullBody/i.test(sched.sessionTag || '');
   // FB primary distribution — ВНУТРИ buildSession (надёжнее, чем в buildBBPlan).
   // Day 1: chest+back primary, Day 2: legs primary, Day 3: shoulders+arms primary.
   // Блокируем не-fbPrimary мышцы ДО цикла, чтобы они не получили role='primary'.
@@ -2980,7 +2988,11 @@ function buildSession(
         ? Math.min(180, baseRest + 30)
         : Math.max(60, (pl.role === 'accessory' ? Math.max(45, baseRest - 30) : baseRest) - restProgression);
       // Интенсивность тренинга: light → больше отдыха, high → меньше (плотность).
-      const exRest = Math.round(exRestBase * intensityRestMult);
+      const exRestCore = Math.round(exRestBase * intensityRestMult);
+      // Итерация A (M-1): методика меняет отдых только там, где это её протокол
+      // (сейчас — hyperemia у аксессуаров). Логика и пол паузы — в спеке,
+      // чтобы UI-подпись и поведение не разъезжались.
+      const exRest = applyMethodologyRest(exRestCore, pl.role, methodology);
       if (remainingBudget < cost) {
         const reduced = Math.max(2, Math.floor(remainingBudget / ((exData as any)?.fatigueCost || 5)));
         const adjustedSets = Math.min(exSets, reduced);
@@ -3061,6 +3073,13 @@ function buildSession(
     methodology,
     primaryMuscle: sessionLeadMuscle || undefined,
     priorityMuscles: [...weakPoints, ...(focusGroup ? [focusGroup] : [])],
+    // O-1 (итерация B): слабая/фокус-мышца со своим compound — впереди изоляций
+    // других мышц, но после мышцы дня.
+    leadMuscles: [...weakPoints, ...(focusGroup ? [focusGroup] : [])],
+    // O-2 (итерация D): FullBody — «круги» по мышцам вместо группировки.
+    interleave: sched.sessionTag === 'FullBody',
+    // O-4: аксиальная стоимость как тай-брейк — только в дни с осевыми движениями.
+    axialAware: isLowerAxialDay,
   });
   exercises.length = 0; exercises.push(..._ordered);
   // После финальной сортировки обновляем порядок в тренерской инструкции.
@@ -3152,6 +3171,9 @@ function buildSession(
     methodology,
     primaryMuscle: sessionLeadMuscle || undefined,
     priorityMuscles: [...weakPoints, ...(focusGroup ? [focusGroup] : [])],
+    leadMuscles: [...weakPoints, ...(focusGroup ? [focusGroup] : [])],
+    interleave: sched.sessionTag === 'FullBody',
+    axialAware: isLowerAxialDay,
   });
   exercises.length = 0;
   exercises.push(...finalOrdered);
@@ -4071,6 +4093,9 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
         sessionTag: s.sessionTag,
         methodology: input.methodology as any,
         priorityMuscles: [...weakPoints, ...(focusGroup ? [focusGroup] : [])],
+        leadMuscles: [...weakPoints, ...(focusGroup ? [focusGroup] : [])],
+        interleave: (s.sessionTag || '') === 'FullBody',
+        axialAware: /Legs|Lower|Glute|FullBody/i.test(s.sessionTag || ''),
       });
       sess.exercises.length = 0; sess.exercises.push(...reordered);
       weekSessions.push(sess);
@@ -4306,13 +4331,25 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
   // actual (UI показывает selected vs actual), inputSnapshot — выбор юзера.
   let effVolumeScheme = input.volumeScheme;
   const schemeDowngradeNotes: string[] = [];
-  if (input.volumeScheme === 'fst7') {
+  // Итерация A (M-1): «FST-7» в селекторе методики — это протокол, а не только
+  // порядок. Раньше 7-сетовый финишер включался лишь при явном выборе схемы
+  // объёма, т.е. методика обещала больше, чем делала. Теперь методика включает
+  // схему fst7, если пользователь не выбрал другую (gvt/gironda остаются его
+  // явным выбором). Все гейты (enhanced/joint-guard/соло-инсулин) ниже сохраняются.
+  const methSpecForScheme = methodologySpecFor(input.methodology);
+  if (methSpecForScheme.impliedVolumeScheme === 'fst7' && (!input.volumeScheme || input.volumeScheme === 'standard')) {
+    effVolumeScheme = 'fst7';
+  }
+  if (effVolumeScheme === 'fst7') {
     if (soloInsulinGate) {
       effVolumeScheme = 'standard';
       schemeDowngradeNotes.push('⛔ FST-7 запрещён: соло-инсулин без AAS/GH — 7 сетов до отказа без анаболической базы (травма + жир вместо мышц). Схема: standard.');
     } else if (level !== 'enhanced' || methForGates?.jointGuard) {
       effVolumeScheme = 'standard';
       schemeDowngradeNotes.push(`⛔ FST-7 7-in-1: только enhanced без joint-guard (уровень ${level}${methForGates?.jointGuard ? ', joint-guard активен' : ''}). Схема: standard (legacy 5+2).`);
+    } else if (methSpecForScheme.impliedVolumeScheme === 'fst7' && input.volumeScheme !== 'fst7') {
+      // Честно фиксируем, что схема пришла из методики, а не из отдельного выбора.
+      schemeDowngradeNotes.push('🎛 Методика FST-7 включает схему объёма FST-7: основная мышца дня получает 7-сетовый финишер (RIR 2, отдых 40 с).');
     }
   }
   // DC rest-pause при соло-инсулине: явный выбор техники снимается (нет базы
@@ -4490,6 +4527,9 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
         sessionTag: s.sessionTag || '',
         methodology: input.methodology,
         priorityMuscles: [...weakPoints, ...(focusGroup ? [focusGroup] : [])],
+        leadMuscles: [...weakPoints, ...(focusGroup ? [focusGroup] : [])],
+        interleave: (s.sessionTag || '') === 'FullBody',
+        axialAware: /Legs|Lower|Glute|FullBody/i.test(s.sessionTag || ''),
       });
       s.exercises.length = 0; s.exercises.push(...reordered);
       // P0-1: итоговый кап — профессиональный предел 6-10 упражнений на сессию.
@@ -5295,6 +5335,9 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
         for (const ex of sess.exercises) {
           if ((ex as any).warmupActivator) continue;
           if (ex.role !== 'accessory') continue;
+          // Объёмная схема (FST-7 7-in-1 и др.) уже владеет сетами/отдыхом этого
+          // упражнения — BFR-протокол поверх неё сделал бы методику NO-OP.
+          if (Number((ex as any).schemeAssignedSets) > 0) continue;
           const isIso = (ex as any).exerciseType === 'isolation' || (ex as any).type === 'isolation' || /разгибан|сгибан|curl|raise|fly|мах|развод|шраг|pushdown|скручив|отведен|сведен|face.?pull|тяга.*лиц/i.test(ex.name || '');
           if (!isIso) continue;
           // Волна-3.5: единый BFR-протокол (30-15-15-15 @25% workMax) из
@@ -5392,6 +5435,9 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
         sessionTag: sess.sessionTag,
         methodology: input.methodology,
         priorityMuscles: [...weakPoints, ...(focusGroup ? [focusGroup] : [])],
+        leadMuscles: [...weakPoints, ...(focusGroup ? [focusGroup] : [])],
+        interleave: (sess.sessionTag || '') === 'FullBody',
+        axialAware: /Legs|Lower|Glute|FullBody/i.test(sess.sessionTag || ''),
       });
       sess.exercises.length = 0;
       sess.exercises.push(...ordered);
@@ -5467,6 +5513,16 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
     // (замер: fullbody_3 chest peak 21 при цели 24 — инвариант «peak ≥ 90% цели»).
     // Повторный прогон опускает цель к реальному пику ramp-плана.
     reconcileVolumeTargets(finalized, { maxWorkingSets: sessLimits.maxWorkingSets });
+  }
+  // D-1b: комментарий схемы синхронизируется с фактическим числом сетов после
+  // ВСЕХ урезающих проходов (рампа, MRV, реализм). Иначе «FST-7 (7×8-12)» в
+  // комментарии и 4 сета в плане расходятся прямо в одном упражнении.
+  {
+    const trimmedScheme = reconcileSchemeComments(finalized);
+    if (trimmedScheme > 0) {
+      const note = `🎛 FST-7: финишер урезан бюджетом недели у ${trimmedScheme} упр. (вместо 7 сетов — меньше). Схема не применяется поверх MRV: для полных 7 нужен памп-день или меньше объёма в других мышцах.`;
+      if (!finalized.rationale.includes(note)) finalized.rationale.push(note);
+    }
   }
   syncBBPlanSetShape(finalized);
   return finalized;

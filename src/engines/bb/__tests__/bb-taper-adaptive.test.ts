@@ -16,6 +16,19 @@ import {
 } from '../bb-taper-adaptive.engine';
 import type { BBContestPrepConfig } from '../bb-contest-prep.engine';
 
+/**
+ * Дата шоу «через N недель от сегодня». Раньше здесь стояла жёсткая '2026-11-01':
+ * как только календарь её прошёл, `validateBBContestPrepConfig` отклоняла конфиг
+ * (шоу в прошлом) → тапер пустой, и 7 тестов падали от смены даты, а не от кода.
+ */
+const showDateInWeeks = (weeks: number): string => {
+  const d = new Date();
+  d.setDate(d.getDate() + Math.round(weeks * 7));
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${d.getFullYear()}-${m}-${day}`;
+};
+
 // ═══════════════════════════════════════════════════════════════════════════
 // estimateTrainingExperience
 // ═══════════════════════════════════════════════════════════════════════════
@@ -97,7 +110,7 @@ describe('buildTaperModifiers', () => {
     experienceLevel: 'intermediate',
     enhanced: false,
     prepCount: 0,
-    showDate: '2026-11-01',
+    showDate: showDateInWeeks(4),
     weeksOut: 4,
     trainingProtocol: 'bb',
     carbLoadStrategy: 'moderate',
@@ -189,7 +202,7 @@ describe('buildAdaptiveTaper', () => {
     experienceLevel: 'intermediate',
     enhanced: false,
     prepCount: 0,
-    showDate: '2026-11-01',
+    showDate: showDateInWeeks(4),
     weeksOut: 4,
     trainingProtocol: 'bb',
     carbLoadStrategy: 'moderate',
