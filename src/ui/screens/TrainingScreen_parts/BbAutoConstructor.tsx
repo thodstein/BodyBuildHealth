@@ -52,12 +52,11 @@ import { loadTrainingProfile, saveTrainingProfile, type TrainingProfile } from '
 import { canonicalMuscleOf, exerciseKeyOf, makeWorkSets, estimatedWeightFor, loadRatioBetween, findCatalogExercise } from './bb-auto-injections';
 import { subscribePlannerApply, applyToPlanner, getPlannerApply, clearPlannerApply, type PlannerApply, type WeakpointsPayload } from './planner-bridge';
 import { loadAnnualTrainingPlan } from '../../../engines/annual-training/annual-training-storage';
-import { CARD, SMALL, BTN, BTN_GHOST, H, STEP_PILL, PlannerStepNav, usePlannerStepScroll, PLANNER_HEAD_BAR, PLANNER_HEAD_TITLE, PLANNER_FLASH, PLANNER_STEP_NAV_WRAP } from './training-ui';
+import { CARD, SMALL, BTN, BTN_GHOST, H, PlannerStepNav, usePlannerStepScroll, PLANNER_HEAD_BAR, PLANNER_HEAD_TITLE, PLANNER_FLASH, PLANNER_STEP_NAV_WRAP } from './training-ui';
 import { PopupNumber } from '../SRCBBScreen_parts/TrainingPopups';
 import type { InjurySelectEntry } from './InjurySelectCard';
 import { DELOAD_PROTOCOLS, type LoadStrategy, type DeloadType, type IntensityTechnique } from '../../../engines/bb/bb-autocoach.engine';
 import type { SessionMethodology } from '../../../engines/bb/bb-session-order.engine';
-import { PCT_FOR_RIR } from '../../../engines/rir-table';
 import { labTrainingAdjust } from './lab-training-adjust';
 import { getCycleById, normalizeCycleDirection, getCyclesByDirection } from '../../../data/lms-cycles/lms-cycle-index';
 import { programToBBPlan, cycleTemplateToFullProgram } from '../../../engines/bb/cycle-to-plan';
@@ -436,8 +435,12 @@ const [bbVolumeRamp, setBbVolumeRamp] = useState<'standard' | 'preloaded' | 'fla
   // R1: мышцы для реабилитации (прогрессивная рампа возврата). По умолчанию — щадящие травмы.
   const [rehabMuscles, setRehabMuscles] = useState<string[]>([]);
   // P1: набор пластин зала для реалистичного округления весов.
-  const [platePreset, setPlatePreset] = useState<string>('standard');
+  // Аудит 2026-11 (BB-22): значение сохраняется в профиль — иначе выбор зала
+  // сбрасывался на 'standard' после каждой перезагрузки приложения.
+  const [platePreset, setPlatePreset] = useState<string>(() => prof.platePreset || 'standard');
   // P1: женский цикл — день цикла для лютеиновой модуляции объёма.
+  // Осознанно НЕ персистится: это параметр «на сегодня», сохранённый вчерашний
+  // день цикла дал бы неверную модуляцию объёма.
   const [cycleDay, setCycleDay] = useState<number | undefined>(undefined);
   // P1: целевой % жира (уточняет cut/recomp) — дефолт из defaultTargetBodyFat.
   const [targetBodyFat, setTargetBodyFat] = useState<number | undefined>(() => {
@@ -448,9 +451,20 @@ const [bbVolumeRamp, setBbVolumeRamp] = useState<'standard' | 'preloaded' | 'fla
     const fallback = defaultTargetBodyFat(String(sex || ''), bbGoal);
     try {
       const g = (linked?.profile?.settings?.goals as any)?.targetBodyFat;
-      return Number.isFinite(g) ? Number(g) : fallback;
+      if (Number.isFinite(g)) return Number(g);
+      // BB-22: ввод из шага «Параметры» переживает перезагрузку (раньше — нет).
+      return Number.isFinite(prof.targetBodyFat) ? Number(prof.targetBodyFat) : fallback;
     } catch { return fallback; }
   });
+  // BB-22: пишем оба параметра в профиль при изменении. Профиль недоступен —
+  // молча оставляем состояние (сборка от него не зависит).
+  useEffect(() => {
+    try {
+      const cur = loadTrainingProfile();
+      if (cur.platePreset === platePreset && cur.targetBodyFat === targetBodyFat) return;
+      saveTrainingProfile({ ...cur, platePreset, targetBodyFat });
+    } catch { /* профиль недоступен — не роняем шаг */ }
+  }, [platePreset, targetBodyFat]);
   // P2 D: дневные данные носимого (he_wearable_daily) — учитываются в recovery.
   // P0-13 (аудит 2026-09): tick — ручной ввод ниже пишет в localStorage, но без
   // ре-рендера сборка видела СТАРЫЕ данные. Tick форсит пересчёт.

@@ -461,6 +461,8 @@
 | BB-19 | DONE | Целевой % жира: в инициализаторе `targetBodyFat` считался `def` (18/10) и выбрасывался → `cut/recomp` без явной цели молча теряли поправку объёма (`bodyCompVolumeFactor` = 1.0). Теперь fallback = `defaultTargetBodyFat(sex, goal)` |
 | BB-20 | DONE | Удалён неиспользуемый `buildPeakConfig` (дубль живого `buildContestPrepConfig`; оверлей пик-недели снят — кнопка ведёт на шаг Contest Prep) + мёртвый импорт `legacyConfigFromProfile` |
 | BB-21 | DONE | Удалён мёртвый `regimeMrvMult` (`computeRegimeMrvMult` считался, но нигде не применялся): единственный источник множителя — `plan.mrvMultiplier` / `pedAdapt.combinedMrvMultiplier` |
+| BB-22 | DONE | `platePreset` (набор пластин зала) и `targetBodyFat` (% жира) не сохранялись: жили только в состоянии компонента и сбрасывались после перезагрузки (для % жира это ещё и меняло объём — канон пола вместо цели). Теперь персистятся в `settings.training` через `training-profile` и читаются в инициализаторах; `cycleDay` **осознанно** не сохраняется (это параметр «на сегодня») |
+| BB-23 | DONE | Удалены мёртвые импорты `STEP_PILL` и `PCT_FOR_RIR` в конструкторе |
 
 ### Новые файлы/замки
 
@@ -477,6 +479,9 @@
   `workSets`, единый `makeWorkSets`, BB-03/BB-14 расчёт веса, BB-08/BB-09 `age`+боль в обоих
   payload, BB-11 защита пересборки остатка, BB-12 подпись мышцы в плеере, BB-19 канон
   `defaultTargetBodyFat`, BB-20/BB-21 отсутствие вернувшегося мёртвого кода.
+- `src/ui/screens/TrainingScreen_parts/__tests__/training-profile-params.test.ts` —
+  2 проверки BB-22: round-trip `platePreset`/`targetBodyFat` и «очистка % жира не
+  залипает на старом значении».
 
 ### Верификация
 

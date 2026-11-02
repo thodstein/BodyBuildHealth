@@ -42,6 +42,14 @@ export interface TrainingProfile {
   /** Ограничения мобильности (биомеханика): shoulder/hip/ankle/lower_back/wrist.
    *  Упражнения с ограниченным движением заменяются на безопасные альтернативы. */
   mobilityRestrictions?: string[];
+  /** Набор пластин зала (шаг «Параметры»): округление рабочих весов под реальный
+   *  инвентарь. Аудит 2026-11 (BB-22): жил только в состоянии компонента и
+   *  сбрасывался на 'standard' после перезагрузки. */
+  platePreset?: string;
+  /** Целевой % жира для cut/recomp (шаг «Параметры»). Аудит 2026-11 (BB-22):
+   *  ввод не сохранялся — после F5 поправка объёма считалась по канону пола,
+   *  а не по цели пользователя. */
+  targetBodyFat?: number;
   /** Способность к bodyweight-упражнениям: если не подтверждена — подтягивания
    *  не ставятся как primary (заменяются pulldown/машиной). */
   bodyweightCapability?: {
@@ -118,6 +126,11 @@ export function loadTrainingProfile(): TrainingProfile {
         loadStrategy: (s.training as any).loadStrategy ?? DEFAULT_PROFILE.loadStrategy,
         bodyweightCapability: (s.training as any).bodyweightCapability ?? DEFAULT_PROFILE.bodyweightCapability,
         mobilityRestrictions: (s.training as any).mobilityRestrictions ?? DEFAULT_PROFILE.mobilityRestrictions,
+        // Аудит 2026-11 (BB-22): параметры шага «Параметры», влияющие на план.
+        platePreset: (s.training as any).platePreset ?? DEFAULT_PROFILE.platePreset,
+        targetBodyFat: Number.isFinite((s.training as any).targetBodyFat)
+          ? Number((s.training as any).targetBodyFat)
+          : DEFAULT_PROFILE.targetBodyFat,
         pmSquat: s.training?.pmSquat ?? DEFAULT_PROFILE.pmSquat,
         pmBench: s.training?.pmBench ?? DEFAULT_PROFILE.pmBench,
         pmDead: s.training?.pmDeadlift ?? DEFAULT_PROFILE.pmDead,
@@ -250,6 +263,10 @@ export function saveTrainingProfile(p: TrainingProfile): void {
     if (p.loadStrategy) (next.training as any).loadStrategy = p.loadStrategy;
     if (p.bodyweightCapability) (next.training as any).bodyweightCapability = p.bodyweightCapability;
     (next.training as any).mobilityRestrictions = p.mobilityRestrictions ?? [];
+    // Аудит 2026-11 (BB-22): параметры шага «Параметры» пишем явно — иначе
+    // очистка поля (% жира) оставляла старое значение в профиле навсегда.
+    (next.training as any).platePreset = p.platePreset ?? 'standard';
+    (next.training as any).targetBodyFat = Number.isFinite(p.targetBodyFat) ? p.targetBodyFat : undefined;
     if (p.pmSquat) next.training.pmSquat = p.pmSquat;
     if (p.pmBench) next.training.pmBench = p.pmBench;
     if (p.pmDead) next.training.pmDeadlift = p.pmDead;
