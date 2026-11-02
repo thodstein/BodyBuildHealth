@@ -44,7 +44,7 @@ import { getPLWeakGroupExerciseCandidates, diagnosticProtocolFromCycle } from '.
 import type { SRCycleTemplate } from '../../../data/lms-cycles/lms-types';
 import { applyToPlanner } from './planner-bridge';
 import { getExerciseById } from '../../../core/exercise-catalog';
-import { parseKinoveaCSV, analyzeBarTracking, segmentBarReps, barRepOverlay, videoQualityForCapture, cameraAngleCheck, cameraAngleShortLine, sideConflictCheck, sessionAngleMismatch, barDriftDirection, meanVelocitySummary, barSpeedHeat, BAR_HEAT_COLORS, snapshotBarRep, compareBarSessions, barSetStats, barSetOverlay, heatSummary, scaleBarPoints, repSetIndex, type BarRepCamera, type BarTrackingResult, type BarRepSegment, type BarRepSnapshot, type VideoCaptureMeta, type VideoSide } from '../../../engines/strength-sport/strength-sport-video.engine';
+import { parseKinoveaCSV, analyzeBarTracking, segmentBarReps, barRepOverlay, videoQualityForCapture, cameraAngleCheck, cameraAngleShortLine, sideConflictCheck, sideFrameConflict as sideFrameConflictOf, sessionAngleMismatch, barDriftDirection, meanVelocitySummary, barSpeedHeat, BAR_HEAT_COLORS, snapshotBarRep, compareBarSessions, barSetStats, barSetOverlay, heatSummary, scaleBarPoints, repSetIndex, type BarRepCamera, type BarTrackingResult, type BarRepSegment, type BarRepSnapshot, type VideoCaptureMeta, type VideoSide } from '../../../engines/strength-sport/strength-sport-video.engine';
 import { barLoopFlag } from '../../../engines/pro/bar-path-core.engine';
 import { diagnoseAsymmetry } from '../../../engines/pro/pl-asymmetry.engine';
 import { RULE_CHECKS, checkLiftRules } from '../../../engines/pro/pl-competition-rules.engine';
@@ -1292,11 +1292,13 @@ export const LiftMasterCard: React.FC<{
     }
     return { side: (captureMeta.side ?? '') as VideoSide | '', source: 'meta' as const, mirrored: refMirror };
   }, [measuredSide, curRefAngle, captureMeta.side, refMirror]);
-  /** Измеренная по кадру сторона спорит с параметрами — чинится одной кнопкой. */
+  /**
+   * Измеренная по кадру сторона спорит с параметрами — чинится одной кнопкой.
+   * Спор с «видом спереди» тоже спор: кадр доказывает, что съёмка боковая, а
+   * спереди направление ухода не читается вовсе (см. `sideFrameConflict`).
+   */
   const sideFrameConflict = useMemo(
-    () => (measuredSide && captureMeta.side && captureMeta.side !== 'front' && captureMeta.side !== measuredSide
-      ? { measured: measuredSide, meta: captureMeta.side }
-      : null),
+    () => sideFrameConflictOf(measuredSide, captureMeta.side),
     [measuredSide, captureMeta.side],
   );
   /**
@@ -3440,13 +3442,13 @@ export const LiftMasterCard: React.FC<{
                   <div data-lift="ref-side-conflict" role="alert" style={{ marginTop:6, padding:'6px 8px', borderRadius:8, background:'rgba(251,191,36,0.08)', border:'1px solid rgba(251,191,36,0.28)', fontSize:9, lineHeight:1.45, color:'#fbbf24' }}>
                     <div style={{ fontWeight:700 }}>⚠ Параметры съёмки спорят с кадром</div>
                     <div style={{ marginTop:3, color:'#e2e8f0' }}>
-                      В параметрах камера {sideFrameConflict.meta === 'left' ? 'слева' : 'справа'}, а по порядку концов эталона — {sideFrameConflict.measured === 'left' ? 'слева' : 'справа'}.
-                      Направление ухода считается по кадру: у стороны из параметров нет ничего, кроме вашего слова.
+                      {sideFrameConflict.text}
+                      {' '}Направление ухода считается по кадру: у стороны из параметров нет ничего, кроме вашего слова.
                     </div>
                     <button
                       data-lift="ref-side-apply"
                       aria-label="Поставить сторону камеры по кадру в параметры"
-                      onClick={()=> { setCapture((c)=> ({ ...c, side: sideFrameConflict.measured })); setRefMsg(`Сторона в параметрах выставлена по кадру: ${sideFrameConflict.measured === 'left' ? 'слева' : 'справа'}.`); }}
+                      onClick={()=> { setCapture((c)=> ({ ...c, side: sideFrameConflict.measuredSide })); setRefMsg(`Сторона в параметрах выставлена по кадру: ${sideFrameConflict.measuredSide === 'left' ? 'слева' : 'справа'}.`); }}
                       style={{ marginTop:6, minHeight:44, padding:'6px 12px', borderRadius:8, cursor:'pointer', background:'rgba(251,191,36,0.14)', color:'#fbbf24', border:'1px solid rgba(251,191,36,0.35)', fontWeight:700, fontSize:11 }}
                     >⇦ поставить по кадру</button>
                   </div>

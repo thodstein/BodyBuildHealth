@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { cameraAngleCheck, cameraAngleShortLine, sideConflictCheck, sessionAngleMismatch, snapshotBarRep, barDriftDirection } from '../strength-sport-video.engine';
+import { cameraAngleCheck, cameraAngleShortLine, sideConflictCheck, sideFrameConflict, sessionAngleMismatch, snapshotBarRep, barDriftDirection } from '../strength-sport-video.engine';
 
 /**
  * Траектория штанги: вертикальный ход `dyCm` и горизонтальный уход `dxCm` за серию.
@@ -263,6 +263,37 @@ describe('sideConflictCheck — параметры съёмки против з�
   });
 });
 
+describe('sideFrameConflict — сторона по кадру против параметров', () => {
+  it('параметры «спереди», а кадр даёт сторону — спор: спереди направление не читается', () => {
+    const c = sideFrameConflict('left', 'front')!;
+    expect(c.kind).toBe('meta-front-measured-side');
+    expect(c.metaSide).toBe('front');
+    expect(c.measuredSide).toBe('left');
+    expect(c.text).toContain('«вид спереди»');
+    expect(c.text).toContain('сбоку (слева)');
+    expect(c.text).toContain('говорили об одном и том же');
+  });
+
+  it('стороны разошлись — спор с прямым указанием, что опирается на параметры', () => {
+    const c = sideFrameConflict('right', 'left')!;
+    expect(c.kind).toBe('meta-side-other-side');
+    expect(c.measuredSide).toBe('right');
+    expect(c.metaSide).toBe('left');
+    expect(c.text).toContain('камера слева');
+    expect(c.text).toContain('эталона — справа');
+    expect(c.text).toContain('опираются на параметры');
+  });
+
+  it('согласие, отсутствие замера или параметров — спора нет', () => {
+    expect(sideFrameConflict('left', 'left')).toBeNull();
+    expect(sideFrameConflict('right', 'right')).toBeNull();
+    expect(sideFrameConflict(null, 'left')).toBeNull();
+    expect(sideFrameConflict(undefined, 'front')).toBeNull();
+    expect(sideFrameConflict('left', '')).toBeNull();
+    expect(sideFrameConflict('left', null)).toBeNull();
+  });
+});
+
 describe('sessionAngleMismatch — разные ракурсы двух сессий', () => {
   const snap = (o: { vmax?: number; xLoop?: number; cosPhi?: number; angleDeg?: number }) => ({
     index: 1,
@@ -390,6 +421,8 @@ describe('barDriftDirection — знак смещения словами, а н�
     const d = barDriftDirection(1.5, 'front', 'bench');
     expect(d.dir).toBe('unknown');
     expect(d.text).toContain('спереди');
+    // Отказ не тупик: сказано, что сторону можно взять по эталону, если кадр боковой.
+    expect(d.text).toContain('по эталону');
     expect(barDriftDirection(1.5, 'front', 'squat').dir).toBe('unknown');
   });
 
