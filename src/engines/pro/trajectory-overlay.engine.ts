@@ -834,6 +834,87 @@ export function referenceAngleCrossCheck(
 }
 
 /**
+ * Сторона камеры по кадру — по **порядку** концов поперечного эталона.
+ *
+ * Длина отрезка сторону не даёт (укорочение — это |φ|), но направление отрезка даёт:
+ * поперечный эталон лежит в плоскости движения, то есть вдоль оси «голова ↔ ноги»
+ * (жим) или «вперёд ↔ назад» (стоя), а камера с левого и с правого бока видит эту ось
+ * направленной в противоположные стороны кадра. Проверяется физикой, а не памятью:
+ * лежащий головой на север, камера на его левом боку смотрит на восток, её «право»
+ * указывает на юг — значит голова на изображении слева.
+ *
+ * Поэтому для замера нужен ровно один пользовательский бит — какой конец эталона
+ * у головы (уже есть бит «ось», это второй и последний). И один честный бит про
+ * запись: зеркальный кадр (селфи-камера) переворачивает порядок.
+ *
+ * Точность ограничена геометрией, а не разметкой: если отрезок в кадре почти
+ * вертикален (камера почти спереди), порядок концов не читается — тогда `unknown`,
+ * а не подброшенная монетка.
+ */
+export interface ReferenceSideResult {
+  side: 'left' | 'right' | 'unknown';
+  /** Сдвиг по горизонтали кадра от конца «у головы/вперёд» к концу «у ног/назад», px. */
+  dxPx: number;
+  /** Сила сигнала: |dx| / длина отрезка в кадре (1 — отрезок строго по горизонтали кадра). */
+  signal: number;
+  text: string;
+}
+
+export function referenceSideCheck(
+  inp: {
+    /** Конец эталона со стороны головы (жим) или «вперёд» (стоя). */
+    head: { x: number; y: number };
+    /** Противоположный конец: к ногам / назад. */
+    feet: { x: number; y: number };
+    /** Ось эталона: поперёк движения читается, вдоль штанги — нет. */
+    axis?: ReferenceAxis;
+    /** Кадр зеркальный (селфи): порядок концов обратный. */
+    mirrored?: boolean;
+  } | null | undefined,
+  opts?: { minPx?: number; minSignal?: number },
+): ReferenceSideResult {
+  const unknown = (text: string, dxPx = 0, signal = 0): ReferenceSideResult =>
+    ({ side: 'unknown', dxPx, signal, text });
+  const none = unknown('Эталон не размечен — сторону камеры определить не по чему.');
+  if (!inp) return none;
+  const finite = (p: { x: number; y: number } | undefined) =>
+    !!p && Number.isFinite(p.x) && Number.isFinite(p.y);
+  if (!finite(inp.head) || !finite(inp.feet)) return none;
+  if ((inp.axis ?? 'across') === 'along') {
+    return unknown('Эталон вдоль штанги сторону не даёт: при камере сбоку оба его конца проецируются в одну точку по горизонтали кадра. '
+      + 'Для стороны нужен отрезок поперёк движения — длина скамьи, глубина стойки.');
+  }
+  const dx = inp.feet.x - inp.head.x;
+  const dy = inp.feet.y - inp.head.y;
+  const span = Math.hypot(dx, dy);
+  const minPx = opts?.minPx != null && opts.minPx > 0 ? opts.minPx : 8;
+  const minSignal = opts?.minSignal != null && opts.minSignal > 0 ? opts.minSignal : 0.06;
+  if (!(span >= minPx)) {
+    return unknown(`Эталон слишком короткий в кадре (${Math.round(span)} px) — порядок концов не читается.`);
+  }
+  const signal = Math.abs(dx) / span;
+  if (signal < minSignal) {
+    return unknown(`Эталон в кадре почти вертикален (сдвиг ${Math.round(Math.abs(dx))} px из ${Math.round(span)} px) — `
+      + 'это значит, что камера смотрит почти спереди, и сторона по порядку концов не читается. '
+      + 'Снимите сбоку — сторона станет измеримой.', dx, Math.round(signal * 1000) / 1000);
+  }
+  // Голова левее ног в кадре ⟺ камера с левого бока (см. геометрию выше).
+  const leftByFrame = dx > 0;
+  const side = (inp.mirrored ? !leftByFrame : leftByFrame) ? 'left' : 'right';
+  const pct = Math.round(signal * 100);
+  const sideRu = side === 'left' ? 'слева' : 'справа';
+  return {
+    side,
+    dxPx: Math.round(dx),
+    signal: Math.round(signal * 1000) / 1000,
+    text: `По кадру камера ${sideRu}: конец у головы ${dx > 0 ? 'левее' : 'правее'} конца у ног `
+      + `(сдвиг ${Math.round(Math.abs(dx))} px, ${pct}% длины отрезка). `
+      + (inp.mirrored ? 'Кадр зеркальный — порядок пересчитан на реальный. ' : '')
+      + 'Это измерение по кадру, а не параметры съёмки.',
+  };
+}
+
+/**
  * Вход поправки горизонтали: достаточно результата замера эталона или его
  * сохранённой копии.
  *

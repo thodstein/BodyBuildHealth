@@ -116,6 +116,12 @@ export interface MovementDiagnosticsExportInput {
    */
   modelNote?: string | null;
   /**
+   * Сторона камеры по кадру: порядок концов поперечного эталона. Это **измерение**,
+   * а не параметры съёмки; строка нужна, чтобы отчёт не выдавал слово пользователя
+   * за факт. Отсутствие стороны — тоже факт («не читается по кадру»).
+   */
+  refSideNote?: string | null;
+  /**
    * Чем нанесена линия на видео: panel — панель без калибровки, calibration — единый
    * масштаб (px/см), perspective — по 4 привязкам. Отчёт без этого не воспроизводим.
    */
@@ -262,6 +268,7 @@ export function buildMovementDiagnosticsCsv(inp: MovementDiagnosticsExportInput)
     ['xLoop с поправкой на ракурс, см', inp.xLoopRefCorrectedCm != null ? String(inp.xLoopRefCorrectedCm) : '—'],
     ['Поправка xLoop на ракурс, %', inp.xLoopRefCorrectionPct != null ? String(inp.xLoopRefCorrectionPct) : '—'],
     ['Ракурс: параметры и замер', inp.angleMetaConflict || '—'],
+    ['Сторона камеры по кадру', inp.refSideNote || '—'],
     ['Δvmax к прошлой сессии, %', inp.sessionDeltaVmaxPct != null ? String(inp.sessionDeltaVmaxPct) : '—'],
     ['ΔxLoop к прошлой сессии, см', inp.sessionDeltaXLoopCm != null ? String(inp.sessionDeltaXLoopCm) : '—'],
     ['ΔxLoop к прошлой сессии с поправкой на ракурс, см', inp.sessionDeltaXLoopCorrectedCm != null ? String(inp.sessionDeltaXLoopCorrectedCm) : '—'],
@@ -368,6 +375,7 @@ export function buildMovementDiagnosticsHtml(inp: MovementDiagnosticsExportInput
         + '; оценка — не замена съёмке в плоскости движения)')
       : '')
     + (inp.angleMetaConflict ? li('Ракурс: параметры и замер', inp.angleMetaConflict) : '')
+    + (inp.refSideNote ? li('Сторона камеры по кадру', inp.refSideNote) : '')
     + (inp.refCrossNote ? li('Эталоны: сверка', inp.refCrossNote) : '')
     + (inp.driftDirection ? li('Направление ухода', inp.driftDirection) : '')
     + (inp.modelNote ? li('Модель поворота', inp.modelNote) : '')

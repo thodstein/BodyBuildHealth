@@ -44,13 +44,13 @@ import { getPLWeakGroupExerciseCandidates, diagnosticProtocolFromCycle } from '.
 import type { SRCycleTemplate } from '../../../data/lms-cycles/lms-types';
 import { applyToPlanner } from './planner-bridge';
 import { getExerciseById } from '../../../core/exercise-catalog';
-import { parseKinoveaCSV, analyzeBarTracking, segmentBarReps, barRepOverlay, videoQualityForCapture, cameraAngleCheck, cameraAngleShortLine, sideConflictCheck, sessionAngleMismatch, barDriftDirection, barSpeedHeat, BAR_HEAT_COLORS, snapshotBarRep, compareBarSessions, barSetStats, barSetOverlay, heatSummary, scaleBarPoints, repSetIndex, type BarRepCamera, type BarTrackingResult, type BarRepSegment, type BarRepSnapshot, type VideoCaptureMeta } from '../../../engines/strength-sport/strength-sport-video.engine';
+import { parseKinoveaCSV, analyzeBarTracking, segmentBarReps, barRepOverlay, videoQualityForCapture, cameraAngleCheck, cameraAngleShortLine, sideConflictCheck, sessionAngleMismatch, barDriftDirection, barSpeedHeat, BAR_HEAT_COLORS, snapshotBarRep, compareBarSessions, barSetStats, barSetOverlay, heatSummary, scaleBarPoints, repSetIndex, type BarRepCamera, type BarTrackingResult, type BarRepSegment, type BarRepSnapshot, type VideoCaptureMeta, type VideoSide } from '../../../engines/strength-sport/strength-sport-video.engine';
 import { barLoopFlag } from '../../../engines/pro/bar-path-core.engine';
 import { diagnoseAsymmetry } from '../../../engines/pro/pl-asymmetry.engine';
 import { RULE_CHECKS, checkLiftRules } from '../../../engines/pro/pl-competition-rules.engine';
 import { RED_FLAGS, checkRedFlags, type RedFlagId } from '../../../engines/pro/pl-red-flags.engine';
 import { buildMovementDiagnosticsHtml, buildMovementDiagnosticsCsv, buildTrajectorySvg, movementDiagnosticsFilename, buildHeatTrendCsv, type MovementDiagnosticsExportInput } from '../../../engines/pro/movement-diagnostics-export.engine';
-import { renderTrajectoryPng, recordTrajectoryWebm, recordVideoWithOverlay, canRecordTrajectory, dataUrlToBlob, grabVideoFrame, openVideoFramesFrom, calibrationFromTaps, isCalibrationSane, calibrationFrameFit, calibrationFrameFitOf, mapTrackToVideo, referenceAngleCheck, referenceAngleCrossCheck, referenceHorizontalCorrection, referencePrecisionNote, referenceMeasurementDrift, perspectiveTrackYForVideoY, perspectiveFromAnchors, isPerspectiveSane, perspectiveSkewPct, perspectiveLocalScale, perspectiveFrameFit, renderFrameWithMapping, mapTrackToVideoPerspective, type ReferenceAxis, type VideoCalibration, type PerspectiveCalibration, type VideoFrameSession } from '../../../engines/pro/trajectory-overlay.engine';
+import { renderTrajectoryPng, recordTrajectoryWebm, recordVideoWithOverlay, canRecordTrajectory, dataUrlToBlob, grabVideoFrame, openVideoFramesFrom, calibrationFromTaps, isCalibrationSane, calibrationFrameFit, calibrationFrameFitOf, mapTrackToVideo, referenceAngleCheck, referenceAngleCrossCheck, referenceSideCheck, referenceHorizontalCorrection, referencePrecisionNote, referenceMeasurementDrift, perspectiveTrackYForVideoY, perspectiveFromAnchors, isPerspectiveSane, perspectiveSkewPct, perspectiveLocalScale, perspectiveFrameFit, renderFrameWithMapping, mapTrackToVideoPerspective, type ReferenceAxis, type VideoCalibration, type PerspectiveCalibration, type VideoFrameSession } from '../../../engines/pro/trajectory-overlay.engine';
 import { copyOrShareText, saveCsvApk, printHtmlApk, saveTextFileApk, saveBlobApk, shareOutcomeLabel } from '../../../core/apk-share';
 import { VideoCaptureCard } from './VideoCaptureCard';
 import StickingPointAnalysisCard from './StickingPointAnalysisCard';
@@ -370,11 +370,26 @@ interface MasterState {
     checked?: 'both';
     /** Расхождение осей, %: cos² φ + sin² φ − 1 в процентах (0 — идеально). */
     crossDevPct?: number;
+    /**
+     * Сторона камеры, **измеренная по кадру** (порядок концов поперечного эталона).
+     * Поле есть только у замера: «сторона из параметров» — это отсутствие поля, чтобы
+     * отчёт не выдал заявленное за измеренное.
+     */
+    side?: 'left' | 'right';
+    /** Замер стороны шёл по зеркальному кадру: без этого бита знак в отчёте не пересчитать. */
+    sideMirrored?: boolean;
   }>;
   /** Длина эталона в кадре, см: скамья (поперёк движения) или гриф между насечками (вдоль штанги). */
   refLengthCm?: string;
   /** Ось эталона, выбранная пользователем: 'across' по умолчанию. */
   refAxis?: 'across' | 'along';
+  /**
+   * Какой конец эталона отмечен первым: у головы (жим) / вперёд (стоя). Один этот бит
+   * превращает порядок тапов в **измеренную** сторону камеры, поэтому он хранится.
+   */
+  refHeadFirst?: boolean;
+  /** Зеркальная запись (селфи-камера): кадр перевёрнут, порядок концов обратный. */
+  refMirror?: boolean;
 }
 
 function isRecord(v: unknown): v is Record<string, unknown> { return !!v && typeof v === 'object' && !Array.isArray(v); }
@@ -443,8 +458,10 @@ function loadMaster(): MasterState {
       refAngle: cleanRefAngle(raw.refAngle),
       refLengthCm: typeof raw.refLengthCm === 'string' ? raw.refLengthCm.slice(0, 6) : '',
       refAxis: raw.refAxis === 'along' ? 'along' : 'across',
+      refHeadFirst: raw.refHeadFirst !== false,
+      refMirror: raw.refMirror === true,
     };
-  } catch { return { lift:'bench', phase:'' as WeakPoint|'', issues:[], selectedGeom:{}, daysGeom:{}, selectedDiag:{}, daysDiag:{}, weakMuscleGroups:[], weakMuscleSubs:[], asymSide:null, asymL:'', asymR:'', vbtBest:'', vbtLast:'', vbtWeight:'', vbtGoal:'strength', vbtUpdatedAt:null, vbtPauseMs:'', asymPhase:{ startL:'', startR:'', midL:'', midR:'', lockL:'', lockR:'' }, dualSensor:{ left:'', right:'' }, perLift:{}, redFlags:[], ruleChecks:{}, meetDate:'', meetStrategy:'balanced' as MeetStrategy, meetMaxS:'', meetMaxB:'', meetMaxD:'', lvp:{}, capture:{ heightM:'', distM:'', side:'', device:'' }, series:{}, videoCalib:{}, videoOffsetSec:{}, videoPersp:{}, refAngle:{}, refLengthCm:'', refAxis:'across' as const }; }
+  } catch { return { lift:'bench', phase:'' as WeakPoint|'', issues:[], selectedGeom:{}, daysGeom:{}, selectedDiag:{}, daysDiag:{}, weakMuscleGroups:[], weakMuscleSubs:[], asymSide:null, asymL:'', asymR:'', vbtBest:'', vbtLast:'', vbtWeight:'', vbtGoal:'strength', vbtUpdatedAt:null, vbtPauseMs:'', asymPhase:{ startL:'', startR:'', midL:'', midR:'', lockL:'', lockR:'' }, dualSensor:{ left:'', right:'' }, perLift:{}, redFlags:[], ruleChecks:{}, meetDate:'', meetStrategy:'balanced' as MeetStrategy, meetMaxS:'', meetMaxB:'', meetMaxD:'', lvp:{}, capture:{ heightM:'', distM:'', side:'', device:'' }, series:{}, videoCalib:{}, videoOffsetSec:{}, videoPersp:{}, refAngle:{}, refLengthCm:'', refAxis:'across' as const, refHeadFirst:true, refMirror:false }; }
 }
 function saveMaster(s: MasterState) { try{ localStorage.setItem(MASTER_KEY, JSON.stringify(s)); }catch{} }
 function cleanRuleChecks(raw: unknown): Record<string, boolean> {
@@ -519,9 +536,13 @@ function cleanRefAngle(raw: unknown): NonNullable<MasterState['refAngle']> {
     const devRaw = Number(v.crossDevPct);
     const crossDevPct = Number.isFinite(devRaw) && Math.abs(devRaw) <= 50 ? devRaw : null;
     const checked: 'both' | undefined = v.checked === 'both' && crossDevPct != null ? 'both' : undefined;
+    // Сторона по кадру: только известные значения; «front» сюда не попадает — впереди
+    // порядок концов не читается, и признавать такой замер стороной нельзя.
+    const side: 'left' | 'right' | undefined = v.side === 'left' || v.side === 'right' ? v.side : undefined;
     out[k] = {
       azimuthDeg: Math.round(deg), ratio, lengthCm, atSec, spanPx, axis, cosPhi, cosPhiRelErrPct,
       ...(checked ? { checked, crossDevPct: crossDevPct as number } : {}),
+      ...(side ? { side, ...(v.sideMirrored === true ? { sideMirrored: true } : {}) } : {}),
     };
   }
   return out;
@@ -840,6 +861,15 @@ export const LiftMasterCard: React.FC<{
   const [refAltTaps, setRefAltTaps] = useState<Array<{ videoX: number; videoY: number }>>([]);
   const [refAltLength, setRefAltLength] = useState('');
   /**
+   * Какой конец эталона отмечен первым: у головы (жим) / вперёд (стоя) или наоборот.
+   * Это последний пользовательский бит, который нужен, чтобы **измерить** сторону
+   * камеры, а не спрашивать её отдельно: длина отрезка сторону не даёт, а порядок
+   * концов — даёт.
+   */
+  const [refHeadFirst, setRefHeadFirst] = useState(initial.refHeadFirst !== false);
+  /** Зеркальная запись (селфи-камера) переворачивает кадр — тогда порядок обратный. */
+  const [refMirror, setRefMirror] = useState(initial.refMirror === true);
+  /**
    * Модель поворота в выгрузках: тот же измеренный путь, но растянутый по
    * горизонтали до камеры «в плоскости движения». Включается явно и подписывается
    * как модель — иначе пунктир прочитают как второй, «правильный» замер.
@@ -968,7 +998,7 @@ export const LiftMasterCard: React.FC<{
     }catch{}
   }, []);
 
-  useEffect(()=>{ saveMaster({ lift, phase, issues, selectedGeom, daysGeom, selectedDiag, daysDiag, weakMuscleGroups, weakMuscleSubs, asymSide, asymL, asymR, vbtBest, vbtLast, vbtWeight, vbtGoal, vbtUpdatedAt, vbtPauseMs, asymPhase: { startL: asymStartL, startR: asymStartR, midL: asymMidL, midR: asymMidR, lockL: asymLockL, lockR: asymLockR }, dualSensor: { left: dualLeft, right: dualRight }, perLift, redFlags, ruleChecks, meetDate, meetStrategy, meetMaxS, meetMaxB, meetMaxD, lvp: lvpSaved, capture, series: seriesStore, videoCalib, videoOffsetSec: videoOffset, videoPersp, refAngle, refLengthCm: refLength, refAxis }); }, [lift, phase, issues, selectedGeom, daysGeom, selectedDiag, daysDiag, weakMuscleGroups, weakMuscleSubs, asymSide, asymL, asymR, vbtBest, vbtLast, vbtWeight, vbtGoal, vbtUpdatedAt, vbtPauseMs, asymStartL, asymStartR, asymMidL, asymMidR, asymLockL, asymLockR, dualLeft, dualRight, perLift, redFlags, ruleChecks, meetDate, meetStrategy, meetMaxS, meetMaxB, meetMaxD, lvpSaved, capture, seriesStore, videoCalib, videoOffset, videoPersp, refAngle, refLength, refAxis]);
+  useEffect(()=>{ saveMaster({ lift, phase, issues, selectedGeom, daysGeom, selectedDiag, daysDiag, weakMuscleGroups, weakMuscleSubs, asymSide, asymL, asymR, vbtBest, vbtLast, vbtWeight, vbtGoal, vbtUpdatedAt, vbtPauseMs, asymPhase: { startL: asymStartL, startR: asymStartR, midL: asymMidL, midR: asymMidR, lockL: asymLockL, lockR: asymLockR }, dualSensor: { left: dualLeft, right: dualRight }, perLift, redFlags, ruleChecks, meetDate, meetStrategy, meetMaxS, meetMaxB, meetMaxD, lvp: lvpSaved, capture, series: seriesStore, videoCalib, videoOffsetSec: videoOffset, videoPersp, refAngle, refLengthCm: refLength, refAxis, refHeadFirst, refMirror }); }, [lift, phase, issues, selectedGeom, daysGeom, selectedDiag, daysDiag, weakMuscleGroups, weakMuscleSubs, asymSide, asymL, asymR, vbtBest, vbtLast, vbtWeight, vbtGoal, vbtUpdatedAt, vbtPauseMs, asymStartL, asymStartR, asymMidL, asymMidR, asymLockL, asymLockR, dualLeft, dualRight, perLift, redFlags, ruleChecks, meetDate, meetStrategy, meetMaxS, meetMaxB, meetMaxD, lvpSaved, capture, seriesStore, videoCalib, videoOffset, videoPersp, refAngle, refLength, refAxis, refHeadFirst, refMirror]);
 
   /** Переключение лифта: сохраняем фазу/отклонения текущего и восстанавливаем выбор целевого.
    *  Раньше общий state обнулялся — пользователь терял выбранную фазу после каждого щелчка. */
@@ -1215,13 +1245,53 @@ export const LiftMasterCard: React.FC<{
     [curRefAngle, refCandidate],
   );
   /**
+   * Сторона камеры **по кадру**: порядок концов поперечного эталона вдоль оси
+   * «голова ↔ ноги». Это уже замер, а не параметры — но только если пользователь
+   * сказал, какой конец у головы, и если кадр не зеркальный.
+   */
+  const refSide = useMemo(() => {
+    if (refTaps.length < 2) return null;
+    const a = { x: refTaps[0].videoX, y: refTaps[0].videoY };
+    const b = { x: refTaps[1].videoX, y: refTaps[1].videoY };
+    return referenceSideCheck({
+      head: refHeadFirst ? a : b,
+      feet: refHeadFirst ? b : a,
+      axis: refAxis,
+      mirrored: refMirror,
+    });
+  }, [refTaps, refHeadFirst, refAxis, refMirror]);
+  /** Измеренная сторона, если она вообще читается по кадру. */
+  const measuredSide = refSide && refSide.side !== 'unknown' ? refSide.side : null;
+  /**
+   * Какая сторона идёт в слова о направлении: живой замер по кадру → сохранённый
+   * замер того же кадра → параметры съёмки. Источник едет в подпись: «измерено» и
+   * «заявлено» — разные утверждения, и в отчёте они не должны сливаться.
+   */
+  const effectiveSide = useMemo<{ side: VideoSide | ''; source: 'frame' | 'meta'; mirrored: boolean }>(() => {
+    if (measuredSide) return { side: measuredSide as VideoSide, source: 'frame' as const, mirrored: refMirror };
+    if (curRefAngle?.side) {
+      return { side: curRefAngle.side as VideoSide, source: 'frame' as const, mirrored: curRefAngle.sideMirrored === true };
+    }
+    return { side: (captureMeta.side ?? '') as VideoSide | '', source: 'meta' as const, mirrored: refMirror };
+  }, [measuredSide, curRefAngle, captureMeta.side, refMirror]);
+  /** Измеренная по кадру сторона спорит с параметрами — чинится одной кнопкой. */
+  const sideFrameConflict = useMemo(
+    () => (measuredSide && captureMeta.side && captureMeta.side !== 'front' && captureMeta.side !== measuredSide
+      ? { measured: measuredSide, meta: captureMeta.side }
+      : null),
+    [measuredSide, captureMeta.side],
+  );
+  /**
    * Направление ухода штанги словами: знак `x` в кадре — это «вправо», и только
-   * параметры съёмки превращают его в «к голове»/«вперёд». Без стороны съёмки —
-   * `unknown` с причиной, а не догадка: по одному кадру сторона не измеряется.
+   * сторона камеры превращает его в «к голове»/«вперёд». Сторона берётся из замера,
+   * если он есть; иначе — из параметров, и подпись говорит, откуда она.
    */
   const driftDir = useMemo(
-    () => barDriftDirection(kinoveaResult ? kinoveaResult.xBias : null, captureMeta.side, lift),
-    [kinoveaResult, captureMeta.side, lift],
+    () => barDriftDirection(kinoveaResult ? kinoveaResult.xBias : null, effectiveSide.side, lift, {
+      sideSource: effectiveSide.source,
+      mirrored: effectiveSide.mirrored,
+    }),
+    [kinoveaResult, effectiveSide, lift],
   );
   /**
    * Модель поворота: во сколько раз горизонталь выросла бы при камере в плоскости
@@ -1417,12 +1487,18 @@ export const LiftMasterCard: React.FC<{
         // это разные утверждения, и разница должна быть видна, а не сглажена.
         checked: crossOk ? ('both' as const) : undefined,
         crossDevPct: crossOk && refCross.dev != null ? Math.round(refCross.dev * 1000) / 10 : undefined,
+        // Сторона по кадру сохраняется вместе с углом: это замер того же кадра, и в
+        // отчёте «сторона измерена» — другое утверждение, чем «пользователь сказал».
+        ...(measuredSide ? { side: measuredSide, ...(refMirror ? { sideMirrored: true } : {}) } : {}),
       },
     }));
-    setRefMsg(crossOk
+    const sideNote = measuredSide
+      ? ` Сторона по кадру: ${measuredSide === 'left' ? 'слева' : 'справа'}${refMirror ? ' (кадр зеркальный)' : ''}.`
+      : '';
+    setRefMsg((crossOk
       ? `Ракурс применён: камера ${appliedDeg}° от плоскости движения — угол подтверждён вторым эталоном (расхождение ${Math.round((refCross.dev ?? 0) * 1000) / 10}%).`
-      : `Ракурс применён: камера ${appliedDeg}° от плоскости движения. Горизонталь теперь трактуется по замеру, а не по догадке.`);
-  }, [refCandidate, refCross, refLength, refFrame, lift, refAxis]);
+      : `Ракурс применён: камера ${appliedDeg}° от плоскости движения. Горизонталь теперь трактуется по замеру, а не по догадке.`) + sideNote);
+  }, [refCandidate, refCross, refLength, refFrame, lift, refAxis, measuredSide, refMirror]);
 
   /** Убрать сохранённый замер: ракурс снова будет только по метаданным. */
   const clearRefAngle = useCallback(() => {
@@ -1777,6 +1853,15 @@ export const LiftMasterCard: React.FC<{
       xLoopRefCorrectionPct: xLoopFix.flag === 'ok' ? xLoopFix.pct : null,
       // Неразрешённый спор параметров и замера не должен прятаться в отчёте.
       angleMetaConflict: sideConflict ? sideConflict.text : null,
+      // Сторона камеры: живой замер по кадру важнее сохранённого, а отсутствие
+      // замера — тоже факт, который в отчёте называется словами.
+      refSideNote: refSide && refSide.side !== 'unknown'
+        ? refSide.text
+        : curRefAngle?.side
+          ? `замер по кадру: камера ${curRefAngle.side === 'left' ? 'слева' : 'справа'}${curRefAngle.sideMirrored ? ' (зеркальный кадр)' : ''}`
+          : refSide && refTaps.length >= 2
+            ? refSide.text
+            : null,
       // Чем подтверждён угол: проверенный вторым эталоном и одиночный — разные утверждения.
       refCrossNote: curRefAngle
         ? (curRefAngle.checked === 'both'
@@ -3265,11 +3350,61 @@ export const LiftMasterCard: React.FC<{
                     : 'Вдоль штанги: гриф между насечками ≈ 131 см, ширина стойки. Сбоку такой отрезок смотрит в объектив и почти не виден — он растёт как sin φ: годится как контроль ракурса, но не как основной эталон.'}
                 </div>
                 {/*
-                  Контроль вторым эталоном. Один замер нельзя проверить: любая ошибка
-                  разметки (не та ось, отрезок не в плоскости) выглядит как правдоподобный
-                  угол. Второй отрезок на другой оси даёт sin φ там, где первый дал cos φ,
-                  и вместе они обязаны дать единицу — это и есть проверка.
+                  Сторона камеры по кадру. Длина отрезка сторону не даёт, а порядок
+                  концов — даёт, поэтому нужен ровно один пользовательский бит
+                  «какой конец у головы» и честный бит «кадр зеркальный». Оба
+                  хранятся: без них порядок тапов ничего не доказывает.
                 */}
+                <div style={{ display:'flex', gap:6, flexWrap:'wrap', alignItems:'center', marginTop:6 }}>
+                  <button
+                    data-lift="ref-head-first"
+                    aria-pressed={refHeadFirst}
+                    aria-label={lift === 'bench' ? 'Первый тап — конец эталона у головы' : 'Первый тап — передний конец эталона'}
+                    onClick={()=> { setRefHeadFirst((v)=> !v); setRefMsg(null); }}
+                    style={{ minHeight:44, padding:'6px 12px', borderRadius:8, cursor:'pointer', background: refHeadFirst ? 'rgba(56,189,248,0.14)' : 'transparent', color: refHeadFirst ? '#38bdf8' : DIM, border:`1px solid ${refHeadFirst ? 'rgba(56,189,248,0.4)' : 'rgba(255,255,255,0.12)'}`, fontWeight:700, fontSize:11 }}
+                  >{refHeadFirst
+                    ? (lift === 'bench' ? '1-й тап — у головы' : '1-й тап — вперёд')
+                    : (lift === 'bench' ? '1-й тап — у ног' : '1-й тап — назад')}</button>
+                  <button
+                    data-lift="ref-mirror"
+                    aria-pressed={refMirror}
+                    aria-label="Кадр записан зеркально (селфи-камера)"
+                    onClick={()=> { setRefMirror((v)=> !v); setRefMsg(null); }}
+                    style={{ minHeight:44, padding:'6px 12px', borderRadius:8, cursor:'pointer', background: refMirror ? 'rgba(244,114,182,0.16)' : 'transparent', color: refMirror ? '#f472b6' : DIM, border:`1px solid ${refMirror ? 'rgba(244,114,182,0.42)' : 'rgba(255,255,255,0.12)'}`, fontSize:11 }}
+                  >🪞 зеркальный кадр</button>
+                  <span style={{ fontSize:9, color:DIM, flex:'1 1 180px', lineHeight:1.45 }}>
+                    Порядок концов поперёк движения — это и есть замер стороны камеры. Два бита, а не догадка.
+                  </span>
+                </div>
+                {refSide && refTaps.length >= 2 && (
+                  <div
+                    data-lift="ref-side"
+                    role="status"
+                    style={{ marginTop:6, fontSize:10, lineHeight:1.45, color: refSide.side === 'unknown' ? DIM : '#4ade80' }}
+                  >
+                    <b>{refSide.side === 'unknown' ? 'Сторона не читается по кадру' : `Сторона по кадру: ${refSide.side === 'left' ? 'слева' : 'справа'}`}</b>
+                    {' — '}{refSide.text}
+                  </div>
+                )}
+                {sideFrameConflict && (
+                  <div data-lift="ref-side-conflict" role="alert" style={{ marginTop:6, padding:'6px 8px', borderRadius:8, background:'rgba(251,191,36,0.08)', border:'1px solid rgba(251,191,36,0.28)', fontSize:9, lineHeight:1.45, color:'#fbbf24' }}>
+                    <div style={{ fontWeight:700 }}>⚠ Параметры съёмки спорят с кадром</div>
+                    <div style={{ marginTop:3, color:'#e2e8f0' }}>
+                      В параметрах камера {sideFrameConflict.meta === 'left' ? 'слева' : 'справа'}, а по порядку концов эталона — {sideFrameConflict.measured === 'left' ? 'слева' : 'справа'}.
+                      Направление ухода считается по кадру: у стороны из параметров нет ничего, кроме вашего слова.
+                    </div>
+                    <button
+                      data-lift="ref-side-apply"
+                      aria-label="Поставить сторону камеры по кадру в параметры"
+                      onClick={()=> { setCapture((c)=> ({ ...c, side: sideFrameConflict.measured })); setRefMsg(`Сторона в параметрах выставлена по кадру: ${sideFrameConflict.measured === 'left' ? 'слева' : 'справа'}.`); }}
+                      style={{ marginTop:6, minHeight:44, padding:'6px 12px', borderRadius:8, cursor:'pointer', background:'rgba(251,191,36,0.14)', color:'#fbbf24', border:'1px solid rgba(251,191,36,0.35)', fontWeight:700, fontSize:11 }}
+                    >⇦ поставить по кадру</button>
+                  </div>
+                )}
+                {/* Контроль вторым эталоном. Один замер нельзя проверить: любая ошибка
+                    разметки (не та ось, отрезок не в плоскости) выглядит как правдоподобный
+                    угол. Второй отрезок на другой оси даёт sin φ там, где первый дал cos φ,
+                    и вместе они обязаны дать единицу — это и есть проверка. */}
                 <div style={{ display:'flex', gap:6, flexWrap:'wrap', alignItems:'center', marginTop:6 }}>
                   <button
                     data-lift="ref-cross-toggle"
@@ -3405,6 +3540,9 @@ export const LiftMasterCard: React.FC<{
                     {curRefAngle.checked === 'both'
                       ? ` · ✅ подтверждён вторым эталоном (расхождение осей ${curRefAngle.crossDevPct ?? 0}%)`
                       : ' · ось не проверена вторым эталоном'}
+                    {curRefAngle.side
+                      ? ` · сторона по кадру: ${curRefAngle.side === 'left' ? 'слева' : 'справа'}${curRefAngle.sideMirrored ? ' (зеркальный кадр)' : ''}`
+                      : ' · сторона съёмки — только из параметров'}
                     {' '}— угол идёт в вердикт ракурса и в выгрузки.
                   </div>
                 )}

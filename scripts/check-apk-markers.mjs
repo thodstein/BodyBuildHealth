@@ -336,6 +336,16 @@ mustContain('src/ui/screens/TrainingScreen_parts/LiftMasterCard.tsx', 'data-lift
 // а контейнер называется тем, что реально записан (mp4 есть не во всех WebView).
 mustContain('src/engines/pro/trajectory-overlay.engine.ts', 'export function sourceAudioTrack', 'source audio into composite');
 mustContain('src/engines/pro/trajectory-overlay.engine.ts', 'audio: audioTrack != null', 'composite reports audio');
+// Сторона камеры по кадру: длина эталона даёт только |φ|, а порядок концов — знак.
+// Один бит «какой конец у головы» + один «кадр зеркальный» — и слово о направлении
+// опирается на замер, а не на память пользователя.
+mustContain('src/engines/pro/trajectory-overlay.engine.ts', 'export function referenceSideCheck', 'camera side measured from frame');
+mustContain('src/engines/strength-sport/strength-sport-video.engine.ts', 'sideSource', 'drift direction says where the side came from');
+mustContain('src/engines/pro/movement-diagnostics-export.engine.ts', 'Сторона камеры по кадру', 'measured side in report');
+mustContain('src/ui/screens/TrainingScreen_parts/LiftMasterCard.tsx', 'referenceSideCheck(', 'hub measures the side');
+mustContain('src/ui/screens/TrainingScreen_parts/LiftMasterCard.tsx', 'data-lift="ref-head-first"', 'which end is the head');
+mustContain('src/ui/screens/TrainingScreen_parts/LiftMasterCard.tsx', 'data-lift="ref-mirror"', 'mirrored frame bit');
+mustContain('src/ui/screens/TrainingScreen_parts/LiftMasterCard.tsx', 'data-lift="ref-side"', 'measured side line in hub');
 
 // 7d. Mojibake-бан: битые символы (U+FFFD) в файлах хаба — признак порванной кодировки.
 // В LiftMasterCard их было 11 (тексты VBT/LVP/Kinovea), и это попадало в UI АПК.

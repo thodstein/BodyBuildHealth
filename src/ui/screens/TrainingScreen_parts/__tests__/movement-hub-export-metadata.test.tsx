@@ -429,21 +429,39 @@ describe('хаб → отчёт: направление ухода, сверка
     return rows.join('\n');
   };
 
-  it('направление ухода: знак x переводится в «к голове» по стороне съёмки', async () => {
+  it('направление ухода: знак x переводится в «к ногам» по стороне съёмки', async () => {
+    // Камера слева: её «право» смотрит к ногам — значит +x в кадре это «к ногам».
     const csv = await exportCsv({ capture: { side: 'left' } }, rows20(), '1');
-    expect(rowValue(csv, 'Направление ухода')).toContain('к голове');
+    expect(rowValue(csv, 'Направление ухода')).toContain('к ногам');
     // Это вывод из параметров, а не измерение: оговорка едет вместе со словом.
-    expect(rowValue(csv, 'Направление ухода')).toContain('по параметрам съёмки');
+    expect(rowValue(csv, 'Направление ухода')).toContain('из параметров');
   });
 
   it('жим с камерой справа: тот же кадр читается наоборот', async () => {
     const csv = await exportCsv({ capture: { side: 'right' } }, rows20(), '1');
-    expect(rowValue(csv, 'Направление ухода')).toContain('к ногам');
+    expect(rowValue(csv, 'Направление ухода')).toContain('к голове');
   });
 
   it('вид спереди: направление не названо, а не выдумано', async () => {
     const csv = await exportCsv({ capture: { side: 'front' } }, rows20(), '1');
     expect(rowValue(csv, 'Направление ухода')).toBe('"—"');
+  });
+
+  it('сторона по кадру: сохранённый замер едет отдельной строкой и ведёт направление', async () => {
+    const csv = await exportCsv({
+      capture: { side: 'left' },
+      refAngle: { bench: { azimuthDeg: 25, ratio: 0.906, cosPhi: 0.906, lengthCm: 120, atSec: null, spanPx: 300, side: 'right' } },
+    }, rows20(), '1');
+    // Строка отчёта говорит «замер по кадру», а не пересказывает параметры.
+    expect(rowValue(csv, 'Сторона камеры по кадру')).toContain('замер по кадру');
+    expect(rowValue(csv, 'Сторона камеры по кадру')).toContain('справа');
+    // Направление считается по измеренной стороне (справа), а не по параметрам (слева).
+    expect(rowValue(csv, 'Направление ухода')).toContain('измерена по кадру');
+    expect(rowValue(csv, 'Направление ухода')).toContain('к голове');
+
+    savedCsv.length = 0;
+    const none = await exportCsv({ capture: { side: 'left' } }, rows20(), '1');
+    expect(rowValue(none, 'Сторона камеры по кадру')).toBe('"—"');
   });
 
   it('сверка вторым эталоном: подтверждённый угол отличается от одиночного', async () => {

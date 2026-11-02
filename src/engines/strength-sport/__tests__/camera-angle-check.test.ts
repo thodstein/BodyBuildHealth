@@ -334,33 +334,49 @@ describe('snapshotBarRep — ракурс едет в снимок серии', 
 });
 
 describe('barDriftDirection — знак смещения словами, а не «+0.5 см»', () => {
-  it('жим: камера слева → +x это к голове (спортсмен в кадре головой вправо)', () => {
+  /**
+   * Геометрия перевода проверяется физикой, а не памятью: лежащий головой на север,
+   * камера на его левом боку смотрит на восток, её собственное «право» указывает на юг —
+   * значит при камере слева изображение +x это «к ногам».
+   */
+  it('жим: камера слева → +x это к ногам (право камеры смотрит к ногам)', () => {
     const d = barDriftDirection(0.5, 'left', 'bench');
-    expect(d.dir).toBe('toward-head');
-    expect(d.text).toContain('к голове');
+    expect(d.dir).toBe('toward-feet');
+    expect(d.text).toContain('к ногам');
     expect(d.text).toContain('камера слева');
-    // Оговорка про зеркальную запись — часть ответа, а не сноска.
-    expect(d.text).toContain('зеркальной');
-    expect(barDriftDirection(-0.5, 'left', 'bench').dir).toBe('toward-feet');
+    expect(barDriftDirection(-0.5, 'left', 'bench').dir).toBe('toward-head');
   });
 
-  it('жим: камера справа — картинка зеркальная, знак меняется', () => {
-    expect(barDriftDirection(0.5, 'right', 'bench').dir).toBe('toward-feet');
-    expect(barDriftDirection(-0.5, 'right', 'bench').dir).toBe('toward-head');
+  it('жим: камера справа — картинка перевёрнута относительно левой, знак меняется', () => {
+    expect(barDriftDirection(0.5, 'right', 'bench').dir).toBe('toward-head');
+    expect(barDriftDirection(-0.5, 'right', 'bench').dir).toBe('toward-feet');
   });
 
   it('стоя: вперёд/назад вместо головы/ног', () => {
-    expect(barDriftDirection(1.2, 'left', 'squat').dir).toBe('forward');
-    expect(barDriftDirection(1.2, 'left', 'squat').text).toContain('вперёд');
-    expect(barDriftDirection(-1.2, 'right', 'deadlift').dir).toBe('forward');
-    expect(barDriftDirection(-1.2, 'left', 'deadlift').dir).toBe('backward');
+    expect(barDriftDirection(1.2, 'right', 'squat').dir).toBe('forward');
+    expect(barDriftDirection(1.2, 'right', 'squat').text).toContain('вперёд');
+    expect(barDriftDirection(1.2, 'left', 'squat').dir).toBe('backward');
+    expect(barDriftDirection(-1.2, 'right', 'deadlift').dir).toBe('backward');
+  });
+
+  it('зеркальный кадр переворачивает направление, и это сказано в тексте', () => {
+    const d = barDriftDirection(0.5, 'left', 'bench', { mirrored: true });
+    expect(d.dir).toBe('toward-head');
+    expect(d.text).toContain('зеркальн');
+    expect(barDriftDirection(0.5, 'right', 'bench', { mirrored: true }).dir).toBe('toward-feet');
+  });
+
+  it('источник стороны едет в подпись: замер и слово пользователя — разные утверждения', () => {
+    expect(barDriftDirection(0.5, 'left', 'bench', { sideSource: 'frame' }).text).toContain('измерена по кадру');
+    expect(barDriftDirection(0.5, 'left', 'bench').text).toContain('из параметров');
   });
 
   it('меньше 0.3 см — шум трекинга, а не направление', () => {
     expect(barDriftDirection(0.2, 'left', 'bench').dir).toBe('level');
     expect(barDriftDirection(-0.2, 'left', 'bench').text).toContain('по вертикали');
     // Порог настраиваемый: 0.25 см при пороге 0.1 — уже направление.
-    expect(barDriftDirection(0.25, 'left', 'bench', 0.1).dir).toBe('toward-head');
+    expect(barDriftDirection(0.25, 'right', 'bench', { thresholdCm: 0.1 }).dir).toBe('toward-head');
+    expect(barDriftDirection(0.25, 'right', 'bench').dir).toBe('level');
   });
 
   it('нет стороны съёмки — нет и слова, только причина', () => {

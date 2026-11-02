@@ -524,15 +524,17 @@ export function sideConflictCheck(
  *
  * Зачем: в отчёте стояла голая цифра `xLoop +0.5 см`, а знак `x` — это «вправо в
  * кадре», что само по себе не значит ничего. Тренеру нужно «куда»: к голове или к
- * ногам (жим), вперёд или назад (стоя). Направление берётся из параметров съёмки,
- * потому что по одному кадру сторона не измеряется: укорочение эталона даёт только
- * |φ|, знак из него не следует (см. referenceAngleCheck).
+ * ногам (жим), вперёд или назад (стоя). Сама по себе длина эталона сторону не даёт
+ * (укорочение — это только |φ|), но **порядок концов** поперечного эталона даёт:
+ * см. `referenceSideCheck`. Здесь только перевод знака `x` в слова, поэтому вход —
+ * готовая сторона камеры (из кадра или из параметров).
  *
- * Геометрия перевода «кадр → тело» (камера без зеркалирования, обычная запись):
- * стоящий спортсмен смотрит в кадре вправо, если камера стоит слева от него;
- * лежащий на скамье лежит головой вправо. Значит `x > 0` при `side: 'left'` — это
- * «вперёд»/«к голове», а при `side: 'right'` — наоборот. Зеркальная запись (селфи)
- * меняет это на обратное, поэтому в тексте это сказано, а не подразумевается.
+ * Геометрия перевода «кадр → тело» — считается, а не подразумевается. Лежащий на
+ * скамье головой на север, камера на его **левом** (западном) боку, смотрит на восток:
+ * собственное «право» камеры указывает на юг, то есть **к ногам**. Значит при камере
+ * слева изображение `+x` — это «к ногам»/«назад», а при камере справа — «к голове»/
+ * «вперёд». Зеркальная запись (селфи-камера) переворачивает кадр: `mirrored` меняет
+ * ответ на обратный, и об этом сказано в тексте, а не подразумевается.
  *
  * Нет стороны съёмки — нет и слова: `unknown` с причиной, а не выдуманное «вперёд».
  */
@@ -555,13 +557,23 @@ export interface BarDriftDirection {
 /** Меньше 0.3 см по горизонтали — шум трекинга, называть направление нечестно. */
 const DRIFT_LEVEL_CM = 0.3;
 
+export interface BarDriftOptions {
+  /** Порог «ухода нет», см. */
+  thresholdCm?: number;
+  /** Кадр зеркальный (селфи): лево/право в кадре меняются местами. */
+  mirrored?: boolean;
+  /** Откуда взята сторона камеры: из кадра (замер) или из параметров. Меняет формулировку. */
+  sideSource?: 'frame' | 'meta';
+}
+
 export function barDriftDirection(
   xBiasCm: number | null | undefined,
   side: VideoSide | '' | null | undefined,
   lift: 'bench' | 'squat' | 'deadlift' | string,
-  thresholdCm = DRIFT_LEVEL_CM,
+  opts: BarDriftOptions = {},
 ): BarDriftDirection {
-  const threshold = thresholdCm > 0 ? thresholdCm : DRIFT_LEVEL_CM;
+  const threshold = opts.thresholdCm != null && opts.thresholdCm > 0 ? opts.thresholdCm : DRIFT_LEVEL_CM;
+  const mirrored = opts.mirrored === true;
   if (xBiasCm == null || !Number.isFinite(xBiasCm)) {
     return { dir: 'unknown', text: 'Смещения нет в данных — направление ухода не назвать.', thresholdCm: threshold };
   }
@@ -575,7 +587,8 @@ export function barDriftDirection(
   if (!side) {
     return {
       dir: 'unknown',
-      text: 'Сторона съёмки не указана — направление ухода не назвать: по одному кадру «слева/справа» не измеряется.',
+      text: 'Сторона съёмки не указана — направление ухода не назвать. Её можно измерить по кадру: '
+        + 'отметьте поперечный эталон и укажите, какой конец у головы (см. эталон в кадре).',
       thresholdCm: threshold,
     };
   }
@@ -587,17 +600,19 @@ export function barDriftDirection(
       thresholdCm: threshold,
     };
   }
-  // side === 'left' | 'right': камера слева → изображение +x = «вперёд/к голове».
-  const sign = side === 'left' ? 1 : -1;
-  const forward = xBiasCm * sign > 0;
+  // Камера справа → изображение +x это «к голове/вперёд» (см. геометрию выше).
+  const rightSide = side === 'right';
+  const posInBody = mirrored ? xBiasCm < 0 : xBiasCm > 0;
+  const forward = posInBody === rightSide;
   const isBench = lift === 'bench';
   const dir: BarDriftDir = isBench ? (forward ? 'toward-head' : 'toward-feet') : (forward ? 'forward' : 'backward');
   const word = isBench ? (forward ? 'к голове' : 'к ногам') : (forward ? 'вперёд' : 'назад');
   const sideRu = side === 'left' ? 'слева' : 'справа';
+  const from = opts.sideSource === 'frame' ? 'сторона измерена по кадру' : 'сторона из параметров съёмки';
   return {
     dir,
-    text: `Уход ${word} (${fmtDrift(Math.abs(xBiasCm))} см; камера ${sideRu} — по параметрам съёмки). `
-      + 'При зеркальной записи (селфи-камера) направление в кадре обратное.',
+    text: `Уход ${word} (${fmtDrift(Math.abs(xBiasCm))} см; камера ${sideRu} — ${from}).`
+      + (mirrored ? ' Кадр зеркальный: направление пересчитано на реальное.' : ''),
     thresholdCm: threshold,
   };
 }

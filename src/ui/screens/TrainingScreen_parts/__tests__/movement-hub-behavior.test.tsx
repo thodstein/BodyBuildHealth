@@ -1252,12 +1252,21 @@ describe('LiftMasterCard — поведение (не только смоук)',
   it('направление ухода подписано словами; без стороны съёмки — причина, а не догадка', () => {
     const csv = ['time,x,y'];
     for (let i = 0; i < 20; i++) csv.push(`${(i * 0.05).toFixed(2)},${100 + i * 1.5},${50 + i * 4}`);
-    localStorage.setItem(MASTER_KEY, JSON.stringify({ lift: 'bench', capture: { side: 'left' } }));
+    // Камера справа: её «право» смотрит к голове — значит +x в кадре это «к голове».
+    localStorage.setItem(MASTER_KEY, JSON.stringify({ lift: 'bench', capture: { side: 'right' } }));
     const { container, unmount } = render(<LiftMasterCard sessions={[]} />);
     act(() => { fireEvent.change(container.querySelector('[data-lift="kinovea-text"]')!, { target: { value: csv.join('\n') } }); });
     click(container.querySelector('[data-lift="parse-kinovea"]'));
     expect(container.querySelector('[data-lift="drift-dir"]')!.textContent).toContain('к голове');
     unmount();
+
+    // Та же картинка, камера слева — тот же знак читается наоборот.
+    localStorage.setItem(MASTER_KEY, JSON.stringify({ lift: 'bench', capture: { side: 'left' } }));
+    const flipped = render(<LiftMasterCard sessions={[]} />);
+    act(() => { fireEvent.change(flipped.container.querySelector('[data-lift="kinovea-text"]')!, { target: { value: csv.join('\n') } }); });
+    click(flipped.container.querySelector('[data-lift="parse-kinovea"]'));
+    expect(flipped.container.querySelector('[data-lift="drift-dir"]')!.textContent).toContain('к ногам');
+    flipped.unmount();
 
     localStorage.setItem(MASTER_KEY, JSON.stringify({ lift: 'bench' }));
     const second = render(<LiftMasterCard sessions={[]} />);
@@ -1266,6 +1275,32 @@ describe('LiftMasterCard — поведение (не только смоук)',
     const dir = second.container.querySelector('[data-lift="drift-dir"]')!.textContent!;
     expect(dir).toContain('не указана');
     expect(dir).not.toContain('к голове');
+  });
+
+  it('два бита стороны камеры: «какой конец у головы» и «зеркальный кадр» — и оба хранятся', () => {
+    const { container } = render(<LiftMasterCard sessions={[]} />);
+    const headFirst = container.querySelector('[data-lift="ref-head-first"]') as HTMLButtonElement;
+    const mirror = container.querySelector('[data-lift="ref-mirror"]') as HTMLButtonElement;
+    expect(headFirst).toBeTruthy();
+    expect(mirror).toBeTruthy();
+    // Тап-таргеты в APK.
+    expect(parseFloat(headFirst.style.minHeight)).toBeGreaterThanOrEqual(44);
+    expect(parseFloat(mirror.style.minHeight)).toBeGreaterThanOrEqual(44);
+    // По умолчанию первый тап — у головы, кадр не зеркальный: оба бита названы в подписи.
+    expect(headFirst.getAttribute('aria-pressed')).toBe('true');
+    expect(headFirst.textContent).toContain('у головы');
+    expect(mirror.getAttribute('aria-pressed')).toBe('false');
+    expect(mirror.textContent).toContain('зеркальный');
+
+    click(headFirst);
+    click(mirror);
+    expect(headFirst.getAttribute('aria-pressed')).toBe('false');
+    expect(headFirst.textContent).toContain('у ног');
+    expect(mirror.getAttribute('aria-pressed')).toBe('true');
+    // Без хранения биты пропадали бы после перезагрузки — и сторона молча меняла знак.
+    const saved = JSON.parse(localStorage.getItem(MASTER_KEY) || '{}');
+    expect(saved.refHeadFirst).toBe(false);
+    expect(saved.refMirror).toBe(true);
   });
 
   it('сохранённый замер вдоль штанги: ось в подписи и поправка по cos φ', () => {
