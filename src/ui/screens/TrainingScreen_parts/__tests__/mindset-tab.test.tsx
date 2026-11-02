@@ -4,6 +4,7 @@
  */
 import React from 'react';
 import { describe, expect, it, beforeEach } from 'vitest';
+import { localIsoDate, localIsoDateOffset } from '../../../../core/local-date';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { render, fireEvent, screen, waitFor } from '@testing-library/react';
 import { MindsetTab } from '../MindsetTab';
@@ -60,7 +61,7 @@ describe('MindsetTab (SSR-смок)', () => {
     const p = buildPresetProtocol('bb');
     upsertProtocol(p);
     setActiveProtocol(p.id);
-    const date = new Date().toISOString().slice(0, 10);
+    const date = localIsoDate();
     localStorage.setItem('he_mindset_checks', JSON.stringify([
       { id: 'c1', date, confidence: 4, arousal: 3, focus: 5, protocolFollowed: true },
       { id: 'c2', date: '2026-08-01', confidence: 2, arousal: 2, focus: 3, protocolFollowed: false },
@@ -94,7 +95,7 @@ describe('MindsetTab (SSR-смок)', () => {
     const p = buildPresetMobility('pl');
     upsertMobilityProtocol(p);
     setActiveMobility(p.id);
-    saveAssessment({ date: new Date().toISOString().slice(0, 10), scores: { deep_squat: 0, shoulder_flexion: 2 } });
+    saveAssessment({ date: localIsoDate(), scores: { deep_squat: 0, shoulder_flexion: 2 } });
     const html = renderToStaticMarkup(<MobilityTab hub={mkHub()} />);
     expect(html).toContain('Оценка мобильности (тесты)');
     expect(html).toContain('Слабые зоны');
@@ -229,7 +230,7 @@ describe('MindsetCheckinInline (формы записи)', () => {
 describe('Напоминание о психо-чек-ине в блоке «Сегодня»', () => {
   beforeEach(() => localStorage.clear());
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localIsoDate();
   const mkWorkoutToday = (): WorkoutLog => ({
     id: 'w_today', date: today, duration: 60, overallRPE: 7, recoveryBefore: 5, split: 'fullbody',
     exercises: [{
@@ -278,7 +279,7 @@ describe('Напоминание о психо-чек-ине в блоке «С�
 describe('Разминка в блоке «Сегодня»', () => {
   beforeEach(() => localStorage.clear());
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localIsoDate();
   const mkWorkoutToday = (): WorkoutLog => ({
     id: 'w_today2', date: today, duration: 60, overallRPE: 7, recoveryBefore: 5, split: 'fullbody',
     exercises: [{ id: `${today}_squat`, date: today, exerciseId: 'squat', exerciseName: 'Присед', isCompound: true, weekNumber: 1, sets: [{ weight: 100, reps: 5, rir: 2, rpe: 7 }], totalVolume: 500, estimated1RM: 115 } as any],
@@ -333,7 +334,7 @@ describe('Разминка в блоке «Сегодня»', () => {
 describe('Заминка (чек-ин, бейджи, вкладка)', () => {
   beforeEach(() => localStorage.clear());
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localIsoDate();
 
   it('CooldownCheckinInline: «✓ да» + сохранить → запись в дневнике заминки', () => {
     render(<CooldownCheckinInline date="2026-08-14" sessionId="w1" />);
@@ -486,7 +487,7 @@ describe('Панели мобильности SessionPlayer (SSR-смок)', () 
 describe('Напоминание о мобильности в блоке «Сегодня»', () => {
   beforeEach(() => localStorage.clear());
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localIsoDate();
   const mkWorkoutToday = (): WorkoutLog => ({
     id: 'w_today', date: today, duration: 60, overallRPE: 7, recoveryBefore: 5, split: 'fullbody',
     exercises: [{
@@ -574,7 +575,7 @@ describe('Прогресс протоколов в блоке «Сегодня»
   });
 
   it('полностью выполненный прогресс → чипы 100%', () => {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = localIsoDate();
     const mp = buildPresetProtocol('both');
     upsertProtocol(mp);
     setActiveProtocol(mp.id);
@@ -599,7 +600,7 @@ describe('Прогресс протоколов в блоке «Сегодня»
   });
 
   it('тренировка сегодня + rest_day блоки → сессии мобильности нет', () => {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = localIsoDate();
     const mob = buildPresetMobility('pl');
     upsertMobilityProtocol(mob);
     setActiveMobility(mob.id);
@@ -626,7 +627,7 @@ describe('Прогресс протоколов в блоке «Сегодня»
     render(<TrainingDiaryHub {...baseProps} initialMode="record" />);
     fireEvent.click(screen.getByRole('button', { name: /Рутина выполнена/ }));
     const saved = JSON.parse(localStorage.getItem('he_mobility_day_progress') || 'null');
-    expect(saved.date).toBe(new Date().toISOString().slice(0, 10));
+    expect(saved.date).toBe(localIsoDate());
     expect(saved.doneItems.sort()).toEqual([...dailyIds].sort());
   });
 });
@@ -634,10 +635,10 @@ describe('Прогресс протоколов в блоке «Сегодня»
 describe('Сводка недели с психо/мобильностью', () => {
   beforeEach(() => localStorage.clear());
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localIsoDate();
   const weekAgo = new Date(); weekAgo.setDate(weekAgo.getDate() - 7);
   // Дата гарантированно ВНЕ окна последних 7 дней (на сутки раньше)
-  const oldDate = new Date(weekAgo.getTime() - 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  const oldDate = localIsoDateOffset(-1, weekAgo);
 
   const baseProps = {
     diary: {} as any,
@@ -706,7 +707,7 @@ describe('Кнопки экспорта протокола JSON', () => {
 describe('Бейджи психо/мобильности в карточках истории', () => {
   beforeEach(() => localStorage.clear());
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localIsoDate();
   const workout = {
     id: 'w_badge', date: today, duration: 60, overallRPE: 7, recoveryBefore: 5, split: 'fullbody',
     exercises: [{ id: 'e1', date: today, exerciseId: 'bench_press', exerciseName: 'Жим штанги лёжа', isCompound: true, weekNumber: 1, sets: [{ weight: 80, reps: 8, rir: 2, rpe: 7 }], totalVolume: 640, estimated1RM: 101 } as any],
@@ -744,7 +745,7 @@ describe('Бейджи психо/мобильности в карточках �
 describe('Разминка (чек-ин, бейджи, рампа)', () => {
   beforeEach(() => localStorage.clear());
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localIsoDate();
 
   it('WarmupCheckinInline: «✓ да» + сохранить → запись в дневнике разминки', () => {
     render(<WarmupCheckinInline date="2026-08-14" sessionId="w1" />);
@@ -884,7 +885,7 @@ describe('Визуальные улучшения (степпер, кольца,
   });
 
   it('WorkoutWeekCard рендерит спарклайн e1RM при переданной серии', () => {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = localIsoDate();
     const w = { id: 'w1', date: today, duration: 60, overallRPE: 7, recoveryBefore: 5, split: 'fullbody', exercises: [] } as WorkoutLog;
     const html = renderToStaticMarkup(<WorkoutWeekCard weekLabel="Неделя 1" workouts={[w]} e1rmSeries={[80, 85, 90, 95]} expanded onToggle={() => {}} />);
     expect(html).toContain('svg');
@@ -931,8 +932,8 @@ describe('Визуальные улучшения (степпер, кольца,
   });
 
   it('WarmupDiaryView (SSR): с записями показывает приверженность и причины', () => {
-    upsertWarmupLog({ date: new Date().toISOString().slice(0, 10), done: true, quality: 4 });
-    upsertWarmupLog({ date: new Date().toISOString().slice(0, 10), done: false, quality: null, skippedReason: 'устал' });
+    upsertWarmupLog({ date: localIsoDate(), done: true, quality: 4 });
+    upsertWarmupLog({ date: localIsoDate(), done: false, quality: null, skippedReason: 'устал' });
     const html = renderToStaticMarkup(<WarmupDiaryView />);
     expect(html).toContain('Приверженность');
     expect(html).toContain('устал · 1×');
@@ -940,7 +941,7 @@ describe('Визуальные улучшения (степпер, кольца,
   });
 
   it('TrainingCalendarTab (CSR) показывает бейджи чек-инов на ячейках', async () => {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = localIsoDate();
     localStorage.setItem(MINDSET_CHECKS_KEY, JSON.stringify([{ id: 'c1', date: today, confidence: 4, arousal: 3, focus: 5, protocolFollowed: true }]));
     localStorage.setItem('he_mobility_checks', JSON.stringify([{ id: 'm1', date: today, done: true, romScore: 4 }]));
     render(<TrainingCalendarTab />);

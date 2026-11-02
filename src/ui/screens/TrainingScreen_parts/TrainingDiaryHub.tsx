@@ -272,7 +272,11 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
   const [mChest, setMChest] = useState(100);
   const [mArm, setMArm] = useState(38);
   const [mThigh, setMThigh] = useState(60);
-  const [mDate, setMDate] = useState(new Date().toISOString().split('T')[0]);
+  // Канон даты (core/local-date): список замеров по умолчанию должен открываться
+  // на ЛОКАЛЬНОЕ сегодня. Здесь был `toISOString().split('T')[0]` (UTC), и в
+  // UTC+3…+12 в первые часы суток форма замеров предлагала ВЧЕРАШНЮЮ дату —
+  // замер уезжал на день назад, хотя всё остальное окно считает через localIsoDate().
+  const [mDate, setMDate] = useState(() => localIsoDate());
 
   // Reports state
   const [trainingReportGenerated, setTrainingReportGenerated] = useState(false);

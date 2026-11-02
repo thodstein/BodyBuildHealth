@@ -1286,9 +1286,14 @@ export const BBDiagnosticsHub: React.FC = () => {
         // Тот же corrSignalsFor, только без плана — так «скрытые» считаются честно.
         // Объект собирается отдельно: инлайн-литерал сигналов тут запрещён (паритет-гард).
         const sigNoPlan = { ...sig, inPlanIds: [] } as any;
-        const withPlan = rankCorrectives(sig).length;
-        const noPlan = rankCorrectives(sigNoPlan).length;
-        out[z] = Math.max(0, noPlan - withPlan);
+        // Ранжир режется до 6 записей (rankCorrectives → slice(0, 6)) и ПОСЛЕ отсечения
+        // «уже в плане» добирается следующими вариантами, поэтому разница ДЛИН всегда 0:
+        // пометка «скрыто N: упражнение уже есть в плане» была мёртвой (не показывалась
+        // никогда). Считаем не длину, а идентичности: какие записи выдачи без плана
+        // отсутствуют в выдаче с планом.
+        const withPlanIds = new Set(rankCorrectives(sig).map((r) => r.corr.id));
+        const dropped = rankCorrectives(sigNoPlan).filter((r) => !withPlanIds.has(r.corr.id)).length;
+        out[z] = Math.max(0, dropped);
       } catch { out[z] = 0; }
     }
     return out;
