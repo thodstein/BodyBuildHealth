@@ -771,10 +771,26 @@ export interface BarRepSnapshot {
   points: Array<[number, number]>;
   /** Номер подхода внутри тренировки (1-based), если размечен. */
   setIndex?: number;
+  /**
+   * cos φ съёмки этой сессии (1 — камера в плоскости движения), если ракурс
+   * измерен по эталону. Без него ΔxLoop между сессиями может быть разницей
+   * ракурсов, а не техники — и отличить одно от другого нечем.
+   */
+  cosPhi?: number;
+  /** Измеренное отклонение камеры, град (для подписи в сравнении). */
+  angleDeg?: number;
+}
+
+/** Ракурс, под которым снят повтор: переносится в снимок, чтобы пережить перезагрузку. */
+export interface BarRepCamera {
+  /** cos φ из замера эталона. */
+  cosPhi?: number | null;
+  /** Отклонение камеры от плоскости движения, град. */
+  azimuthDeg?: number | null;
 }
 
 /** Прореживает повтор до maxPoints так, чтобы сохранить форму траектории (равномерно по индексу). */
-export function snapshotBarRep(rep: BarRepSegment, maxPoints = 24): BarRepSnapshot {
+export function snapshotBarRep(rep: BarRepSegment, maxPoints = 24, camera?: BarRepCamera | null): BarRepSnapshot {
   const src = rep.points ?? [];
   const n = Math.max(0, Math.min(maxPoints, src.length));
   const points: Array<[number, number]> = [];
@@ -785,6 +801,12 @@ export function snapshotBarRep(rep: BarRepSegment, maxPoints = 24): BarRepSnapsh
       points.push([Math.round(p.x * 10) / 10, Math.round(p.y * 10) / 10]);
     }
   }
+  const cosRaw = camera?.cosPhi;
+  const cosPhi = cosRaw != null && Number.isFinite(cosRaw) && cosRaw > 0 && cosRaw <= 1.12
+    ? Math.round(cosRaw * 1000) / 1000
+    : null;
+  const azRaw = camera?.azimuthDeg;
+  const angleDeg = azRaw != null && Number.isFinite(azRaw) && azRaw >= 0 && azRaw <= 90 ? Math.round(azRaw) : null;
   return {
     index: rep.index,
     vmax: Math.round(rep.vmax * 100) / 100,
@@ -792,7 +814,60 @@ export function snapshotBarRep(rep: BarRepSegment, maxPoints = 24): BarRepSnapsh
     amplitude: Math.round(rep.amplitude * 10) / 10,
     points,
     ...(rep.setIndex && rep.setIndex > 0 ? { setIndex: Math.round(rep.setIndex) } : {}),
+    ...(cosPhi != null ? { cosPhi } : {}),
+    ...(angleDeg != null ? { angleDeg } : {}),
   };
+}
+
+/** Дальше 40° от плоскости движения поправка горизонтали недопустима (как и в хабе). */
+const SESSION_FIX_MAX_COS = 0.766;
+
+export interface SessionAngleMismatch {
+  /** Угол прошлой сессии, град (null — не записан). */
+  prevDeg: number | null;
+  /** Угол текущей сессии, град (null — не записан). */
+  curDeg: number | null;
+  /** Расхождение по cos φ, %. */
+  pct: number;
+  /** ΔxLoop с поправкой на ракурс, см; null — поправка недопустима (дальше 40°). */
+  correctedDeltaCm: number | null;
+  text: string;
+}
+
+/**
+ * Разные ракурсы двух сессий — это разная шкала горизонтали, а не разная техника.
+ *
+ * vmax от ракурса не зависит (вертикаль при повороте камеры вокруг вертикали не
+ * искажается), поэтому скорость сравнивать можно и при разных углах. xLoop —
+ * нельзя: при 8° и 25° он занижен на 0% и 9%, и ΔxLoop покажет «технику», которой
+ * нет. `null` — либо ракурсы не записаны, либо они совпадают в пределах шума.
+ */
+export function sessionAngleMismatch(
+  prev: BarRepSnapshot | null | undefined,
+  cur: BarRepSnapshot | null | undefined,
+  minRelPct = 6,
+): SessionAngleMismatch | null {
+  if (!prev || !cur) return null;
+  const pc = prev.cosPhi;
+  const cc = cur.cosPhi;
+  if (pc == null || cc == null) return null;
+  if (!Number.isFinite(pc) || !Number.isFinite(cc) || !(pc > 0) || !(cc > 0)) return null;
+  if (!Number.isFinite(prev.xLoop) || !Number.isFinite(cur.xLoop)) return null;
+  const rel = Math.abs(cc - pc) / pc;
+  if (rel * 100 <= minRelPct) return null;
+  const pct = Math.round(rel * 1000) / 10;
+  const prevDeg = prev.angleDeg != null ? Math.round(prev.angleDeg) : null;
+  const curDeg = cur.angleDeg != null ? Math.round(cur.angleDeg) : null;
+  const minCos = Math.min(pc, cc);
+  const correctedDeltaCm = minCos >= SESSION_FIX_MAX_COS
+    ? Math.round((cur.xLoop / cc - prev.xLoop / pc) * 10) / 10
+    : null;
+  const head = `Сессии под разными углами (${prevDeg ?? '?'}° и ${curDeg ?? '?'}°, разница ${pct}% по горизонтальному масштабу): `
+    + 'ΔxLoop здесь — разница ракурсов, а не техники. vmax сравнивать можно: поворот камеры вокруг вертикали его не искажает.';
+  const tail = correctedDeltaCm != null
+    ? ` С поправкой на ракурс ΔxLoop ≈ ${correctedDeltaCm > 0 ? '+' : ''}${correctedDeltaCm} см (оценка).`
+    : ' Поправка недопустима: ракурс дальше 40° от плоскости движения — сравнивайте только vmax.';
+  return { prevDeg, curDeg, pct, correctedDeltaCm, text: head + tail };
 }
 
 /** Сравнение «прошлая сессия vs текущая» по одноимённым повторам (обычно первый vs первый). */

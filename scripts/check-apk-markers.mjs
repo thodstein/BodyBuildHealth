@@ -210,6 +210,8 @@ for (const hook of [
   'data-lift="ref-axis-across"', 'data-lift="ref-axis-along"', 'data-lift="ref-axis-hint"',
   // Точность замера и расхождение с сохранённым: число без этого читается как точное.
   'data-lift="ref-precision"', 'data-lift="ref-vs-saved"',
+  // Сравнение сессий: разные углы — это разная шкала горизонтали, а не техника.
+  'data-lift="angle-mismatch"',
   'data-lift="export-svg"', 'data-lift="export-overlay-png"', 'data-lift="export-overlay-video"',
   'data-lift="series-save"', 'data-lift="session-compare"', 'data-lift="bar-heat"',
   'data-lift="quick-start"', 'data-lift="quick-start-hide"',
@@ -301,6 +303,11 @@ mustContain('src/ui/screens/TrainingScreen_parts/LiftMasterCard.tsx', 'axis: ref
 mustContain('src/engines/pro/trajectory-overlay.engine.ts', 'export function referencePrecisionNote', 'precision stated in words');
 mustContain('src/engines/pro/trajectory-overlay.engine.ts', 'export function referenceMeasurementDrift', 'saved vs fresh measurement');
 mustContain('src/ui/screens/TrainingScreen_parts/LiftMasterCard.tsx', 'referenceMeasurementDrift(', 'hub warns on drift');
+// Сравнение сессий: ракурс хранится в снимке повтора и не даёт спутать его с техникой.
+mustContain('src/engines/strength-sport/strength-sport-video.engine.ts', 'export function sessionAngleMismatch', 'session camera mismatch');
+mustContain('src/engines/strength-sport/strength-sport-video.engine.ts', 'export interface BarRepCamera', 'camera travels with the snapshot');
+mustContain('src/ui/screens/TrainingScreen_parts/LiftMasterCard.tsx', 'snapshotBarRep(r, 24, cameraRef)', 'hub snapshots camera');
+mustContain('src/ui/screens/TrainingScreen_parts/LiftMasterCard.tsx', 'sessionAngleMismatch(', 'hub names angle mismatch');
 
 // 7d. Mojibake-бан: битые символы (U+FFFD) в файлах хаба — признак порванной кодировки.
 // В LiftMasterCard их было 11 (тексты VBT/LVP/Kinovea), и это попадало в UI АПК.

@@ -410,6 +410,61 @@ describe('LiftMasterCard — поведение (не только смоук)',
     expect(cmp!.textContent).toContain('1 повт.');
   });
 
+  it('сессии под разными углами: ΔxLoop назван разницей ракурсов, а не техники', () => {
+    const csv = ['time,x,y'];
+    for (let i = 0; i < 20; i++) csv.push(`${(i * 0.05).toFixed(2)},${100 + i * 1.5},${50 + i * 4}`);
+    const snapshot = {
+      savedAt: Date.now() - 86_400_000,
+      reps: [{
+        index: 1, vmax: 0.6, xLoop: 2, amplitude: 40,
+        points: [[0, 0], [0, 20], [0.5, 40], [6, 20], [0, 0]],
+        // Прошлая сессия снята почти в плоскости движения, текущая — под 25°.
+        cosPhi: 0.99, angleDeg: 8,
+      }],
+    };
+    localStorage.setItem(MASTER_KEY, JSON.stringify({
+      lift: 'bench',
+      series: { bench: snapshot },
+      refAngle: { bench: { azimuthDeg: 25, ratio: 0.906, cosPhi: 0.906, axis: 'across', lengthCm: 120, atSec: null, spanPx: 300 } },
+    }));
+    const { container } = render(<LiftMasterCard sessions={[]} />);
+    act(() => { fireEvent.change(container.querySelector('[data-lift="kinovea-text"]')!, { target: { value: csv.join('\n') } }); });
+    click(container.querySelector('[data-lift="parse-kinovea"]'));
+
+    const warn = container.querySelector('[data-lift="angle-mismatch"]')!;
+    expect(warn).toBeTruthy();
+    expect(warn.textContent).toContain('разными углами');
+    expect(warn.textContent).toContain('8° и 25°');
+    expect(warn.textContent).toContain('разница ракурсов, а не техники');
+    // Скорость от поворота камеры не страдает — это сказано, чтобы не бросали сравнение целиком.
+    expect(warn.textContent).toContain('vmax сравнивать можно');
+    expect(warn.textContent).toContain('С поправкой на ракурс');
+  });
+
+  it('одинаковые углы — предупреждения нет', () => {
+    const csv = ['time,x,y'];
+    for (let i = 0; i < 20; i++) csv.push(`${(i * 0.05).toFixed(2)},${100 + i * 1.5},${50 + i * 4}`);
+    const snapshot = {
+      savedAt: Date.now() - 86_400_000,
+      reps: [{
+        index: 1, vmax: 0.6, xLoop: 2, amplitude: 40,
+        points: [[0, 0], [0, 20], [0.5, 40], [6, 20], [0, 0]],
+        cosPhi: 0.906, angleDeg: 25,
+      }],
+    };
+    localStorage.setItem(MASTER_KEY, JSON.stringify({
+      lift: 'bench',
+      series: { bench: snapshot },
+      refAngle: { bench: { azimuthDeg: 25, ratio: 0.906, cosPhi: 0.906, axis: 'across', lengthCm: 120, atSec: null, spanPx: 300 } },
+    }));
+    const { container } = render(<LiftMasterCard sessions={[]} />);
+    act(() => { fireEvent.change(container.querySelector('[data-lift="kinovea-text"]')!, { target: { value: csv.join('\n') } }); });
+    click(container.querySelector('[data-lift="parse-kinovea"]'));
+
+    expect(container.querySelector('[data-lift="session-compare"]')).toBeTruthy();
+    expect(container.querySelector('[data-lift="angle-mismatch"]')).toBeNull();
+  });
+
   it('битый персист серии не ломает хаб (мусор отбрасывается)', () => {
     localStorage.setItem(MASTER_KEY, JSON.stringify({
       lift: 'bench',

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { cameraAngleCheck, cameraAngleShortLine, sideConflictCheck } from '../strength-sport-video.engine';
+import { cameraAngleCheck, cameraAngleShortLine, sideConflictCheck, sessionAngleMismatch, snapshotBarRep } from '../strength-sport-video.engine';
 
 /**
  * Траектория штанги: вертикальный ход `dyCm` и горизонтальный уход `dxCm` за серию.
@@ -260,5 +260,75 @@ describe('sideConflictCheck — параметры съёмки против з�
     expect(sideConflictCheck('front', NaN)).toBeNull();
     expect(sideConflictCheck('front', -5)).toBeNull();
     expect(sideConflictCheck('front', 120)).toBeNull();
+  });
+});
+
+describe('sessionAngleMismatch — разные ракурсы двух сессий', () => {
+  const snap = (o: { vmax?: number; xLoop?: number; cosPhi?: number; angleDeg?: number }) => ({
+    index: 1,
+    vmax: o.vmax ?? 0.4,
+    xLoop: o.xLoop ?? 2,
+    amplitude: 40,
+    points: [[0, 0], [1, 1]] as Array<[number, number]>,
+    ...(o.cosPhi != null ? { cosPhi: o.cosPhi } : {}),
+    ...(o.angleDeg != null ? { angleDeg: o.angleDeg } : {}),
+  });
+
+  it('одинаковый ракурс — молчим (это шум тапа, а не разница съёмки)', () => {
+    expect(sessionAngleMismatch(snap({ cosPhi: 0.99, angleDeg: 8 }), snap({ cosPhi: 0.98, angleDeg: 11 }))).toBeNull();
+  });
+
+  it('8° против 25°: ΔxLoop назван разницей ракурсов и дан с поправкой', () => {
+    const m = sessionAngleMismatch(snap({ cosPhi: 0.99, angleDeg: 8 }), snap({ cosPhi: 0.906, angleDeg: 25 }))!;
+    expect(m.pct).toBe(8.5);
+    expect(m.prevDeg).toBe(8);
+    expect(m.curDeg).toBe(25);
+    expect(m.text).toContain('разница ракурсов, а не техники');
+    // Скорость от поворота камеры вокруг вертикали не портится — это важно сказать.
+    expect(m.text).toContain('vmax сравнивать можно');
+    expect(m.correctedDeltaCm).toBe(0.2);
+    expect(m.text).toContain('С поправкой на ракурс ΔxLoop ≈ +0.2 см');
+    expect(m.text).toContain('оценка');
+  });
+
+  it('дальше 40° поправка не предлагается — только vmax', () => {
+    const m = sessionAngleMismatch(snap({ cosPhi: 0.99, angleDeg: 8 }), snap({ cosPhi: 0.5, angleDeg: 60 }))!;
+    expect(m.correctedDeltaCm).toBeNull();
+    expect(m.text).toContain('Поправка недопустима');
+    expect(m.text).toContain('сравнивайте только vmax');
+  });
+
+  it('ракурс не записан — не выдумываем ни предупреждения, ни поправки', () => {
+    expect(sessionAngleMismatch(snap({ xLoop: 2 }), snap({ cosPhi: 0.5, angleDeg: 60 }))).toBeNull();
+    expect(sessionAngleMismatch(snap({ cosPhi: 0.99 }), snap({ xLoop: 2 }))).toBeNull();
+    expect(sessionAngleMismatch(null, snap({ cosPhi: 0.5 }))).toBeNull();
+    expect(sessionAngleMismatch(snap({ cosPhi: 0 }), snap({ cosPhi: 0.5 }))).toBeNull();
+  });
+});
+
+describe('snapshotBarRep — ракурс едет в снимок серии', () => {
+  const rep = {
+    index: 1, vmax: 0.42, xLoop: 2.4, amplitude: 41,
+    points: [{ t: 0, x: 0, y: 0 }, { t: 0.1, x: 1, y: 9 }, { t: 0.2, x: 0, y: 0 }],
+  } as unknown as Parameters<typeof snapshotBarRep>[0];
+
+  it('ракурс сохраняется вместе с повтором — иначе сравнение сессий слепо', () => {
+    const s = snapshotBarRep(rep, 24, { cosPhi: 0.9056, azimuthDeg: 25.4 });
+    expect(s.cosPhi).toBe(0.906);
+    expect(s.angleDeg).toBe(25);
+  });
+
+  it('без ракурса полей нет вовсе (а не 0 и не 1)', () => {
+    const s = snapshotBarRep(rep);
+    expect('cosPhi' in s).toBe(false);
+    expect('angleDeg' in s).toBe(false);
+  });
+
+  it('мусорный ракурс отбрасывается: неправдоподобный cos φ и угол вне 0…90', () => {
+    expect('cosPhi' in snapshotBarRep(rep, 24, { cosPhi: 0 })).toBe(false);
+    expect('cosPhi' in snapshotBarRep(rep, 24, { cosPhi: 1.5 })).toBe(false);
+    expect('cosPhi' in snapshotBarRep(rep, 24, { cosPhi: NaN })).toBe(false);
+    expect('angleDeg' in snapshotBarRep(rep, 24, { cosPhi: 0.9, azimuthDeg: 120 })).toBe(false);
+    expect('angleDeg' in snapshotBarRep(rep, 24, { cosPhi: 0.9, azimuthDeg: -5 })).toBe(false);
   });
 });

@@ -44,7 +44,7 @@ import { getPLWeakGroupExerciseCandidates, diagnosticProtocolFromCycle } from '.
 import type { SRCycleTemplate } from '../../../data/lms-cycles/lms-types';
 import { applyToPlanner } from './planner-bridge';
 import { getExerciseById } from '../../../core/exercise-catalog';
-import { parseKinoveaCSV, analyzeBarTracking, segmentBarReps, barRepOverlay, videoQualityForCapture, cameraAngleCheck, cameraAngleShortLine, sideConflictCheck, barSpeedHeat, BAR_HEAT_COLORS, snapshotBarRep, compareBarSessions, barSetStats, barSetOverlay, heatSummary, scaleBarPoints, repSetIndex, type BarTrackingResult, type BarRepSegment, type BarRepSnapshot, type VideoCaptureMeta } from '../../../engines/strength-sport/strength-sport-video.engine';
+import { parseKinoveaCSV, analyzeBarTracking, segmentBarReps, barRepOverlay, videoQualityForCapture, cameraAngleCheck, cameraAngleShortLine, sideConflictCheck, sessionAngleMismatch, barSpeedHeat, BAR_HEAT_COLORS, snapshotBarRep, compareBarSessions, barSetStats, barSetOverlay, heatSummary, scaleBarPoints, repSetIndex, type BarRepCamera, type BarTrackingResult, type BarRepSegment, type BarRepSnapshot, type VideoCaptureMeta } from '../../../engines/strength-sport/strength-sport-video.engine';
 import { barLoopFlag } from '../../../engines/pro/bar-path-core.engine';
 import { diagnoseAsymmetry } from '../../../engines/pro/pl-asymmetry.engine';
 import { RULE_CHECKS, checkLiftRules } from '../../../engines/pro/pl-competition-rules.engine';
@@ -544,7 +544,12 @@ function cleanSeries(raw: unknown): NonNullable<MasterState['series']> {
         const x = Number(p[0]), y = Number(p[1]);
         if (Number.isFinite(x) && Number.isFinite(y)) pts.push([x, y]);
       }
-      reps.push({ index: Number.isFinite(index) ? index : reps.length + 1, vmax, xLoop, amplitude, points: pts, setIndex: (() => { const s = Number(r.setIndex); return Number.isFinite(s) && s > 0 ? Math.round(s) : undefined; })() });
+      const azRaw = Number(r.angleDeg);
+      const cosRaw2 = Number(r.cosPhi);
+      const camera = Number.isFinite(cosRaw2) && cosRaw2 > 0 && cosRaw2 <= 1.12
+        ? { cosPhi: cosRaw2, angleDeg: Number.isFinite(azRaw) && azRaw >= 0 && azRaw <= 90 ? Math.round(azRaw) : null }
+        : undefined;
+      reps.push({ index: Number.isFinite(index) ? index : reps.length + 1, vmax, xLoop, amplitude, points: pts, setIndex: (() => { const s = Number(r.setIndex); return Number.isFinite(s) && s > 0 ? Math.round(s) : undefined; })(), ...(camera ? { cosPhi: camera.cosPhi, ...(camera.angleDeg != null ? { angleDeg: camera.angleDeg } : {}) } : {}) });
     }
     if (reps.length) {
       const w = Number(val.weightKg);
@@ -1328,8 +1333,20 @@ export const LiftMasterCard: React.FC<{
   }, [calibFrame, curOffset]);
   /** Сохранённая серия прошлого раза для текущего движения. */
   const savedSeries = seriesStore[lift] ?? null;
-  const curFirstSnapshot = useMemo(()=> kinoveaReps.length ? snapshotBarRep(kinoveaReps[0]) : null, [kinoveaReps]);
+  /** Ракурс текущей съёмки — едет в снимок серии, иначе ΔxLoop между сессиями неоднозначен. */
+  const cameraRef = useMemo<BarRepCamera | null>(() => (curRefAngle
+    ? { cosPhi: curRefAngle.cosPhi ?? curRefAngle.ratio, azimuthDeg: curRefAngle.azimuthDeg }
+    : null), [curRefAngle]);
+  const curFirstSnapshot = useMemo(
+    () => (kinoveaReps.length ? snapshotBarRep(kinoveaReps[0], 24, cameraRef) : null),
+    [kinoveaReps, cameraRef],
+  );
   const sessionCompare = useMemo(()=> compareBarSessions(savedSeries?.reps?.[0], curFirstSnapshot), [savedSeries, curFirstSnapshot]);
+  /** Прошлая и текущая сессии сняты под разными углами: ΔxLoop — про камеру, а не про технику. */
+  const angleMismatch = useMemo(
+    () => sessionAngleMismatch(savedSeries?.reps?.[0], curFirstSnapshot),
+    [savedSeries, curFirstSnapshot],
+  );
   /** Прошлая сессия в виде {x,y} — для SVG/PNG/видео-оверлея (в персисте точки компактные). */
   const savedRepPoints = useMemo(()=> (savedSeries?.reps?.[0]?.points ?? []).map(([x, y]) => ({ x, y })), [savedSeries]);
   /** Вес прошлой записи vs текущий: при разнице >2.5% сравнение vmax нечестно. */
@@ -2562,7 +2579,7 @@ export const LiftMasterCard: React.FC<{
                 {kinoveaReps.length < 2 && <div style={{ marginTop:4, fontSize:9, color:'#fff', opacity:0.7 }}>Добавьте ещё один файл кнопкой «＋ В серию» — overlay заработает с 2 повторов.</div>}
                 <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginTop:6 }}>
                   <button data-lift="series-save" aria-label="Запомнить серию для сравнения со следующей сессией" onClick={()=>{
-                    setSeriesStore(s => ({ ...s, [lift]: { savedAt: Date.now(), weightKg: curWeightKg, reps: kinoveaReps.map(r => snapshotBarRep(r)) } }));
+                    setSeriesStore(s => ({ ...s, [lift]: { savedAt: Date.now(), weightKg: curWeightKg, reps: kinoveaReps.map(r => snapshotBarRep(r, 24, cameraRef)) } }));
                     setKinoveaMsg(`💾 Серия сохранена (${kinoveaReps.length} повт.${curWeightKg ? ` · ${curWeightKg} кг` : ''}) — на следующей тренировке будет сравнение.`);
                   }} style={{ minHeight:44, padding:'8px 12px', borderRadius:8, cursor:'pointer', background:'rgba(14,165,233,0.12)', color:'#0ea5e9', border:'1px solid rgba(14,165,233,0.25)', fontSize:11, fontWeight:700 }}>💾 Запомнить серию</button>
                   {savedSeries && (
@@ -2579,7 +2596,7 @@ export const LiftMasterCard: React.FC<{
                   <div style={{ display:'flex', gap:4, flexWrap:'wrap' }}>
                     {ALL_LIFTS.filter(l => l !== lift).map(l => (
                       <button key={l} data-lift={`series-copy-${l}`} aria-label={`Сохранить серию как эталон для ${LIFT_RU[l]}`} onClick={()=>{
-                        const reps = kinoveaReps.map(r => snapshotBarRep(r));
+                        const reps = kinoveaReps.map(r => snapshotBarRep(r, 24, cameraRef));
                         setSeriesStore(s => ({ ...s, [l]: { savedAt: Date.now(), weightKg: curWeightKg, reps } }));
                         setKinoveaMsg(`Серия скопирована как эталон для «${LIFT_RU[l]}» (${reps.length} повт.).`);
                       }} style={{ minHeight:44, padding:'8px 12px', borderRadius:8, cursor:'pointer', background:'rgba(148,163,184,0.1)', color:'#cbd5e1', border:'1px solid rgba(148,163,184,0.28)', fontSize:11 }}>→ {LIFT_RU[l]}</button>
@@ -2596,6 +2613,16 @@ export const LiftMasterCard: React.FC<{
                       <div data-lift="weight-mismatch" role="status" style={{ marginTop:3, fontSize:9, color:'#fbbf24', lineHeight:1.4 }}>
                         ⚠ Вес изменился: {weightMismatch.prev} → {weightMismatch.cur} кг ({weightMismatch.diffKg > 0 ? `±${weightMismatch.diffKg}` : '0'} кг).
                         Сравнение скорости честно только при равном весе.
+                      </div>
+                    )}
+                    {/*
+                      Разные ракурсы — разная шкала горизонтали. Вес уже проверяется
+                      выше; угол проверяется тем же способом, иначе ΔxLoop из
+                      сравнения читается как изменение техники.
+                    */}
+                    {angleMismatch && (
+                      <div data-lift="angle-mismatch" role="status" style={{ marginTop:3, fontSize:9, color:'#fbbf24', lineHeight:1.45 }}>
+                        ⚠ {angleMismatch.text}
                       </div>
                     )}
                     {sessionCompare ? (
