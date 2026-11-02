@@ -1,5 +1,5 @@
 /**
- * Регрессия «пакета качества» (QG1–QG18) планировщика.
+ * Регрессия «пакета качества» (QG1–QG19) планировщика.
  *
  * Зачем: сходимость дня ≤3% ловит только КБЖУ. Жалобы шли на «съедобность»:
  * «19 г малины», «жир всего дня в одном приёме», «овощей 190 г», «в обед 12 г белка»,
@@ -43,12 +43,16 @@
  *   дней с молочкой (QG18)         18/30        20/30
  *   микро ниже 70% в дне (QG18)    3.57         3.50
  *   средняя оценка дня (QG18)      90.6         90.7
+ *   дней с витамином D <70% (QG19) 29/30        20/30
+ *   витамин D, среднее от RDA      39%          59%
+ *   микро ниже 70% в дне (QG19)    3.50         3.07
+ *   средняя оценка дня (QG19)      90.7         91.1
  */
 import { describe, it, expect } from 'vitest';
 import { buildDayPlan, type MealPlanInput } from '../meal-plan-engine';
 import { buildDayTargets } from '../planner-day-targets';
 import { scoreDayQuality } from '../planner-quality-score';
-import { sumMicros } from '../planner-micro-coverage';
+import { sumMicros, analyzeMicroCoverage } from '../planner-micro-coverage';
 import { stapleFamilyOf, nutCatchupCap, quotaWeightScale } from '../food-availability';
 import { FOOD_DB } from '../../../../../core/nutrition-database';
 
@@ -1034,6 +1038,170 @@ describe('кальций молочкой, а не «просто так» (QG18
       manualTargetsLocked: true, kbjuMode: 'manual',
     } as unknown as MealPlanInput);
     const notes = ((manual.notes || []) as string[]).filter((n) => n.startsWith('🥛 Кальций молочкой:'));
+    expect(notes.join(' | ')).toBe('');
+  });
+});
+
+describe('витамин D рыбой вместо постного мяса (QG19)', () => {
+  // Замер после QG18 на тех же 30 днях: витамин D ниже 70% RDA в 29 днях из 30 при
+  // среднем 39% (5–15 мкг при цели 15) — самая частая и самая глубокая дыра дня
+  // (следующая — B6: 17 дней, витамин E: 16, омега-3: 11). Рыба в днях ЕСТЬ — QG13
+  // поставила сардины (5 мкг D/100 г), но 45–70 г дают 2–3.5 мкг, а рыбу с 12–13 мкг
+  // сборка не ставит вовсе: недельная ротация считает рыбу одной группой.
+  // Стадия меняет ПОСТНОЕ мясо на постную D-рыбу белок-в-белок: люциан красный
+  // (21 г белка / 1.8 г жира / 13 мкг D на 100 г) и форель (24 / 7 / 12) вместо
+  // курицы/индейки/поллока. Курица 70 г → люциан 105 г: белок дня меняется на
+  // ≤0.8 г, жир только падает (масло режется лишь у форели), D получает +5–20 мкг.
+  // Замер: дней с D < 70% 29 → 20, среднее 39% → 59%, микро-ось 69.6 → 73.4,
+  // микро-дыр в дне 3.50 → 3.07, средняя оценка дня 90.7 → 91.1, дней лучше 9,
+  // хуже 0, канон 3% 25/30 и макс. отклонение 12.9% не изменились.
+  const D_GOAL = 15;
+  const FISH19 = /^(fish_snapper_red|trout)$/;
+  const WINDOWS19 = ['preworkout', 'postworkout', 'intra', 'presleep'];
+  const sexOf = (d: Day) => PROFILES.find((p) => d.id.startsWith(p.id))?.sex || 'male';
+  const microsOf = (d: Day) => sumMicros(
+    items(d).map(({ x }) => ({ id: x.id, amount: x.amount })), FOOD_DB as any,
+  ) as any;
+  const covOf = (d: Day) => analyzeMicroCoverage(
+    microsOf(d), sexOf(d) as any, d.w, 'none' as any, !!d.plan.isTrainingDay,
+  ).coverage as any[];
+  const pctOf = (d: Day, nutrient: string) => Number(covOf(d).find((c) => c.nutrient === nutrient)?.pct || 0);
+  const lowCountOf = (d: Day) => covOf(d).filter((c) => (c.pct || 0) < 70).length;
+  const dNotes = (d: Day) => ((d.plan.notes || []) as string[])
+    .filter((n) => typeof n === 'string' && n.startsWith('🐠 Витамин D:'));
+  const noted = DAYS.filter((d) => dNotes(d).length > 0);
+  const fishIn = (d: Day) => items(d).filter(({ x }) => FISH19.test(String(x.id)));
+  const devOf = (d: Day) => {
+    const t: any = buildDayTargets({
+      weightKg: d.w, presetGPerKg: 2.0, fatFloorGPerKg: 0.8, kbjuMode: 'auto',
+      goal: 'maintenance', dietStyle: 'classic',
+    } as any);
+    const tot = (d.plan.totals || {}) as any;
+    return Math.max(
+      Math.abs((tot.kcal || 0) - t.kcal) / t.kcal,
+      Math.abs((tot.p || 0) - t.protein) / t.protein,
+      Math.abs((tot.f || 0) - t.fats) / t.fats,
+      Math.abs((tot.c || 0) - t.carbs) / t.carbs,
+    );
+  };
+
+  it('дней с витамином D < 70% RDA ≤ 20 из 30 (было 29)', () => {
+    const low = DAYS.filter((d) => pctOf(d, 'VitD') < 70)
+      .map((d) => `${d.id}:${Math.round(pctOf(d, 'VitD'))}%`);
+    expect(low.length, `ниже 70%: ${low.join(', ')}`).toBeLessThanOrEqual(20);
+  });
+
+  it('средний витамин D ≥ 55% RDA (было 39%)', () => {
+    const avg = DAYS.reduce((s, d) => s + pctOf(d, 'VitD'), 0) / DAYS.length;
+    expect(Math.round(avg), 'среднее D, % RDA').toBeGreaterThanOrEqual(55);
+  });
+
+  it('стадия реально срабатывает: обмен есть в ≥8 днях и назван в ноте', () => {
+    expect(noted.length, `дней с нотой: ${noted.map((d) => d.id).join(', ')}`).toBeGreaterThanOrEqual(8);
+  });
+
+  it('обмен только белок-в-белок: порция рыбы 40–200 г, шаг 5 г, граммы целые', () => {
+    const bad: string[] = [];
+    for (const d of DAYS) for (const { m, x } of fishIn(d)) {
+      if (!noted.includes(d)) continue;
+      const g = Number(x.amount) || 0;
+      const floor = d.w >= 80 ? 75 : 40;
+      if (!Number.isInteger(g) || g % 5 !== 0) bad.push(`${d.id}/${m.type}: ${g} г`);
+      if (g < floor || g > 200) bad.push(`${d.id}/${m.type}: ${g} г вне ${floor}–200`);
+    }
+    expect(bad.slice(0, 5).join(' | ')).toBe('');
+  });
+
+  it('рыба не встаёт в завтрак и в окна тренировки/предсон', () => {
+    // Завтрак — «завтрашний белок» (D1: яйца/творог/сыворотка), окна — тайминг,
+    // их жир и состав двигать нельзя.
+    const bad: string[] = [];
+    for (const d of noted) for (const { m, x } of fishIn(d)) {
+      const t = String(m.type);
+      if (t === 'breakfast') bad.push(`${d.id}: рыба в завтрак (${x.id})`);
+      if (WINDOWS19.includes(t)) bad.push(`${d.id}/${t}: ${x.id}`);
+    }
+    expect(bad.slice(0, 5).join(' | ')).toBe('');
+  });
+
+  it('микро не проседает: B6 ≤ 17 дней < 70%, E ≤ 16, омега-3 ≤ 9 (было 11), Ca 0', () => {
+    const low = (n: string) => DAYS.filter((d) => pctOf(d, n) < 70).length;
+    expect(low('VitB6'), 'дней с B6 < 70%').toBeLessThanOrEqual(17);
+    expect(low('VitE'), 'дней с E < 70%').toBeLessThanOrEqual(16);
+    expect(low('Omega3'), 'дней с омега-3 < 70%').toBeLessThanOrEqual(9);
+    expect(low('Ca'), 'дней с Ca < 70%').toBeLessThanOrEqual(0);
+  });
+
+  it('микро-дыр в дне 3.50 → ≤ 3.10 (D закрывает минус B6/E/омегу)', () => {
+    const avg = DAYS.reduce((s, d) => s + lowCountOf(d), 0) / DAYS.length;
+    expect(Math.round(avg * 100) / 100, 'микро ниже 70% в дне').toBeLessThanOrEqual(3.1);
+  });
+
+  it('оценка дня не падает: среднее ≥ 91.0 (было 90.7)', () => {
+    const q = (d: Day) => scoreDayQuality(d.meals, {
+      weightKg: d.w, microCoverage: { lowCount: lowCountOf(d), total: covOf(d).length },
+    }).total;
+    const avg = DAYS.reduce((s, d) => s + q(d), 0) / DAYS.length;
+    expect(Math.round(avg * 10) / 10, 'средняя оценка дня').toBeGreaterThanOrEqual(91);
+  });
+
+  it('КБЖУ дня не уезжает: макс. отклонение ≤ 13.0% (было 12.9%)', () => {
+    // Гард канона у стадии свой (внутри канона +0.5 п.п., вне — +0.05), поэтому
+    // обмен не двигает ни один день в «худшую» сторону канона.
+    const bad = DAYS.filter((d) => devOf(d) > 0.13).map((d) => `${d.id}:${(devOf(d) * 100).toFixed(1)}%`);
+    expect(bad.join(', ')).toBe('');
+  });
+
+  it('приём с обменом не становится фрагментом: основные приёмы ≥ 180 ккал', () => {
+    const bad: string[] = [];
+    for (const d of noted) for (const m of d.meals) {
+      if (!MAIN.includes(String(m.type))) continue;
+      const k = Number(m.totals?.kcal) || 0;
+      if (k < 180) bad.push(`${d.id}/${m.type}: ${Math.round(k)} ккал`);
+    }
+    expect(bad.slice(0, 5).join(' | ')).toBe('');
+  });
+
+  it('нота не врёт: D, % цели и омега-3 в ноте = факт по тарелке', () => {
+    const bad: string[] = [];
+    for (const d of noted) for (const n of dNotes(d)) {
+      const mm = n.match(/D ([\d.,]+) → ([\d.,]+) мкг \((\d+)% цели\), омега-3 (\d+) мг/);
+      if (!mm) { bad.push(`${d.id}: формат ноты`); continue; }
+      const dFact = Number((microsOf(d) as any)?.VitD || 0);
+      const o3Fact = Number((microsOf(d) as any)?.Omega3 || 0);
+      const dNote = Number(mm[2].replace(',', '.'));
+      const pctNote = Number(mm[3]);
+      const o3Note = Number(mm[4]);
+      const pctFact = Math.round((dNote / D_GOAL) * 100);
+      if (Math.abs(dNote - dFact) > 0.15) bad.push(`${d.id}: D нота ${dNote}, факт ${dFact.toFixed(1)}`);
+      if (Math.abs(pctNote - pctFact) > 1) bad.push(`${d.id}: ${pctNote}% vs ${pctFact}%`);
+      if (Math.abs(o3Note - o3Fact) > 1) bad.push(`${d.id}: омега-3 нота ${o3Note}, факт ${Math.round(o3Fact)}`);
+      // Названные граммы должны стоять в дне рыбой, а не «в воздухе».
+      const swapsPart = n.replace(/^🐠 Витамин D: /, '').split(' — белок тот же')[0];
+      for (const seg of swapsPart.split('; ')) {
+        const gm = seg.match(/→ .+? (\d+) г/);
+        if (!gm) { bad.push(`${d.id}: сегмент без граммов (${seg.slice(0, 40)})`); continue; }
+        const g = Number(gm[1]);
+        if (!fishIn(d).some(({ x }) => Number(x.amount) === g)) bad.push(`${d.id}: в ноте ${g} г рыбы, в дне нет`);
+      }
+    }
+    expect(bad.slice(0, 5).join(' | ')).toBe('');
+  });
+
+  it('ручной режим не трогаем: в ручном дне рыбы от стадии нет', () => {
+    const tgt: any = buildDayTargets({
+      weightKg: 90, presetGPerKg: 2.0, fatFloorGPerKg: 0.8, kbjuMode: 'manual',
+      goal: 'maintenance', dietStyle: 'classic',
+    } as any);
+    const manual = buildDayPlan({
+      weightKg: 90, lbmKg: 73, bodyFatPct: 19, sex: 'male',
+      goalKcal: tgt.kcal, goalProteinG: tgt.protein, goalFatG: tgt.fats, goalCarbsG: tgt.carbs,
+      mealsCount: 4, isTrainingDay: true, trainStartMin: 18 * 60, trainDurationMin: 75,
+      allowIntraWorkout: true, budget: 'medium', dayOffset: 0, cyclePhase: 'none',
+      variety: 'medium', eveningLowCarb: false, goal: 'maintenance',
+      manualTargetsLocked: true, kbjuMode: 'manual',
+    } as unknown as MealPlanInput);
+    const notes = ((manual.notes || []) as string[]).filter((n) => n.startsWith('🐠 Витамин D:'));
     expect(notes.join(' | ')).toBe('');
   });
 });

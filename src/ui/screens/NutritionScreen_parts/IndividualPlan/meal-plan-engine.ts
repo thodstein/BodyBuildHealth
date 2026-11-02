@@ -25,7 +25,7 @@
 
 import { FOOD_DB, FOOD_ALLERGEN_DIET } from "../../../../core/nutrition-database";
 import { filterByIntolerance, matchesCategoryPref, isPreferredCategory, tasteMatchScore, type CategoryPref, type Intolerances, type TasteProfile } from "./planner-preferences";
-import { analyzeMicroCoverage, sumMicros, RDA_BASE, type MicroCoverageEntry } from "./planner-micro-coverage";
+import { analyzeMicroCoverage, sumMicros, RDA_BASE, getMicroTargets, type MicroCoverageEntry } from "./planner-micro-coverage";
 import { scoreDayQuality, describeQualityWeakness } from "./planner-quality-score";
 import { getMicroFromFood } from "./planner-micro-reader";
 import { detectMealInteractions, cookMethodGuidance } from "./planner-food-interactions";
@@ -13480,6 +13480,290 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
               notes[_iA18] = String(notes[_iA18]).replace(/A \d+% цели/, `A ${Math.round((_micro18('VitA') / _aGoal18) * 100)}% цели`);
             }
             notes.push(`🥛 Кальций молочкой: ${swaps18.join('; ')} — излишек над целями дня снят с белкового пункта, масла и гарнира (КБЖУ дня в цели); Ca ${Math.round(_ca018)} → ${_caNow18} мг (${_caPct18}% цели)`);
+          }
+        }
+      }
+      // ── QG19: витамин D — рыба вместо постного мяса ──────────────────────────
+      // Замер после QG18 (те же 30 дней): витамин D ниже 70% RDA в 29 днях из 30
+      // при среднем 39% (5–15 мкг при цели 15) — самая частая дыра дня и самая
+      // глубокая (следующая — B6: 17 дней, витамин E: 16). Причина не в том, что
+      // «рыбы нет»: рыба в днях ЕСТЬ — QG13 поставила сардины (5 мкг D/100 г), но
+      // 45–70 г дают 2–3.5 мкг, а порог 70% требует ~10.5 мкг, то есть ~200 г
+      // сардин в одном приёме (с них уже не снять ни белка, ни жира). Рыбу с
+      // 12–17 мкг D/100 г сборка не ставит вовсе: её недельная ротация считает
+      // «рыбу» одной группой и держит жирную рыбу 2 раза в неделю.
+      // Что делает стадия: меняет ПОСТНЫЙ белок (16+ г белка и ≤11 г жира на 100 г:
+      // курица, индейка, поллок, тунец, сардины) на постную D-рыбу белок-в-белок.
+      // Люциан несёт 21 г белка и 1.8 г жира на 100 г против 31 и 3.6 у курицы,
+      // поэтому граммы растут в 1.5 раза (курица 70 г → рыба 105 г), белок дня
+      // меняется на ≤0.8 г, жир только ПАДАЕТ (масло режется лишь у форели — 7 г
+      // жира на 100 г). Ккал и канон 3% от такой замены почти не двигаются, а
+      // витамин D получает +5–20 мкг — ровно то, чего не хватало дню.
+      // Порядок рыб чередуется от дня к дню (люциан/форель): неделя не должна
+      // читаться «одна и та же рыба каждый день». Меч-рыба (17 мкг) сознательно
+      // не используется — тяжёлые металлы.
+      // Ручной/портативный режим, дни с инсулиновыми окнами, аллергия на рыбу
+      // (фильтрует `_ok10`), рецептурные приёмы (их состав — это рецепт) и уже
+      // стоящая в дне такая рыба не трогаются.
+      if (_vegFree && !((input as any).injections && (input as any).injections.length)) {
+        const _sex19 = input.sex === 'female' ? 'female' : 'male';
+        // Цели — ТЕМ ЖЕ расчётом, что и отчёт покрытия (`getMicroTargets`): у него
+        // фаза курса (омега-3 ×1.3) и округление до целых (B6 1.7 → 2 мг, B12 2.4 → 2).
+        // Иначе гард «B6 не ниже 70%» мерил бы по 1.7 при пороге отчёта 2.0 и
+        // пропускал день в НОВЫЙ дефицит (замер-ловушка: M1/4/тр 80% → 65%).
+        const _tg19 = new Map<string, number>(
+          getMicroTargets(_sex19 as any, input.weightKg, input.cyclePhase as any, !!input.isTrainingDay)
+            .map((t) => [t.nutrient, t.target] as [string, number]),
+        );
+        const _goal19 = (k: string, dflt: number) => Number(_tg19.get(k) || dflt);
+        const _dGoal19 = _goal19('VitD', 15);
+        const _caGoal19 = _goal19('Ca', 1000);
+        const _eGoal19 = _goal19('VitE', 15);
+        const _o3Goal19 = _goal19('Omega3', 1600);
+        // Натриевый коридор дня — по базовой цели (3000 трен / 2300 отдых), как у QG8.
+        const _naTarget19 = Number((input as any).sodiumTargetOverride) > 0
+          ? Number((input as any).sodiumTargetOverride)
+          : (input.isTrainingDay ? 3000 : 2300);
+        const _micro19 = (key: string) => Number((sumMicros(
+          (meals as any[]).flatMap((m: any) => (m.items || []).map((it: any) => ({ id: it.id, amount: it.amount }))),
+          FOOD_DB as any,
+        ) as any)?.[key] || 0);
+        const _d19 = () => _micro19('VitD');
+        const _hasItem19 = (id: string) => (meals as any[]).some((m: any) => ((m.items || []) as any[]).some((x: any) => String(x.id) === id));
+        // Рыба-носитель витамина D. Люциан — основной (13 мкг/100 г при 1.8 г жира),
+        // форель — второй (12 мкг при 7 г жира; пришедший жир снимается с масла дня).
+        const _dFish19: string[] = [];
+        const _rot19 = Math.abs(Math.round(Number((input as any).dayOffset) || 0)) % 2;
+        for (const id of (_rot19 === 1 ? ['trout', 'fish_snapper_red'] : ['fish_snapper_red', 'trout'])) {
+          if (_hasItem19(id) || _fav10(id)) continue;
+          if (_ok10(id)) _dFish19.push(id);
+        }
+        if (_dFish19.length > 0 && _d19() < _dGoal19 * 0.7) {
+          const _isWindow19 = (mm: any) => ['preworkout', 'postworkout', 'intra', 'presleep'].includes(String(mm.type));
+          // «Чистое масло» — то же определение, что у QG15/QG17/QG18: срез жира идёт
+          // с масла (пол 7 г), а не с орехов/пасты (их растит QG11).
+          const _pureFat19 = (x: any) => {
+            const amt = Number(x.amount) || 0;
+            if (!(amt > 0) || x._fixedGrams || _fav10(String(x.id))) return false;
+            const per100 = (v: any) => ((Number(v) || 0) / amt) * 100;
+            return x.role === 'fat' && per100(x.f) >= 85 && per100(x.p) <= 2 && per100(x.c) <= 2;
+          };
+          // Срез жира: сначала масло ТОГО ЖЕ приёма (иначе доля жира приёма растёт),
+          // затем масло дня; окна тренировки и предсон — не доноры (их жир — тайминг).
+          const _trimOil19 = (host: any, need: number): number => {
+            let left = need;
+            const order = [host, ...(meals as any[]).filter((mm: any) => mm !== host && !_isWindow19(mm) && ((mm.items || []) as any[]).length > 0)];
+            for (const mm of order) {
+              if (left <= 0.6) break;
+              const fats = ((mm.items || []) as any[]).filter(_pureFat19)
+                .sort((a: any, b: any) => (Number(b.amount) || 0) - (Number(a.amount) || 0));
+              for (const it of fats) {
+                if (left <= 0.6) break;
+                const amt = Number(it.amount) || 0;
+                const perG = (Number(it.f) || 0) / Math.max(1, amt);
+                if (!(perG > 0)) continue;
+                const cut = Math.min(Math.round(left / perG), amt - 7);
+                if (cut < 1) continue;
+                Object.assign(it, _scale10(it, amt - cut));
+                left -= cut * perG;
+              }
+            }
+            return left;
+          };
+          // Обратный срез: люциан ПОСТНЕЕ курицы (1.8 г жира против 3.6), поэтому обмен
+          // «белок-в-белок» снимает 1–3 г жира, и день, стоявший ровно в цели, уезжает
+          // по оси F на 1.5 п.п. (замер: S2/4/отд dev 0.16% → 1.71% — гард канона
+          // справедливо отбраковывал). Возвращаем жир в МАСЛО того же приёма — это и
+          // есть законный источник жира, и порция там уже ≥7 г (правило QG17).
+          const _addOil19 = (host: any, need: number): number => {
+            const order = [host, ...(meals as any[]).filter((mm: any) => mm !== host && !_isWindow19(mm) && ((mm.items || []) as any[]).length > 0)];
+            for (const mm of order) {
+              const fats = ((mm.items || []) as any[]).filter(_pureFat19)
+                .sort((a: any, b: any) => (Number(b.amount) || 0) - (Number(a.amount) || 0));
+              const it = fats[0];
+              if (!it) continue;
+              const amt = Number(it.amount) || 0;
+              const perG = (Number(it.f) || 0) / Math.max(1, amt);
+              if (!(perG > 0)) continue;
+              Object.assign(it, _scale10(it, amt + Math.max(1, Math.round(need / perG))));
+              return 0;
+            }
+            return need;
+          };
+          // Донор — постный белок: ≥16 г белка и ≤11 г жира на 100 г, порция ≥40 г,
+          // не порошок (порошок — это добавка, а не тарелка) и не сама D-рыба.
+          const _lean19 = (x: any) => {
+            const id = String(x.id || '');
+            if (x._fixedGrams || _fav10(id)) return false;
+            if (!(x.role === 'protein' || x.role === 'fast_protein')) return false;
+            if (/whey|casein|isolate|protein_powder|supp_/.test(id)) return false;
+            if (_dFish19.includes(id)) return false;
+            const amt = Number(x.amount) || 0;
+            if (amt < 40) return false;
+            const p100 = ((Number(x.p) || 0) / amt) * 100;
+            const f100 = ((Number(x.f) || 0) / amt) * 100;
+            return p100 >= 16 && f100 <= 11;
+          };
+          const _q19 = () => {
+            const cov = _pickCtx.qualityMode === 'full'
+              ? analyzeMicroCoverage(
+                sumMicros((meals as any[]).flatMap((m: any) => (m.items || []).map((it: any) => ({ id: it.id, amount: it.amount }))), FOOD_DB as any),
+                (input.sex || 'male') as any, input.weightKg, input.cyclePhase as any, !!input.isTrainingDay,
+                input.calciumTargetOverride, input.sodiumTargetOverride,
+              ).coverage
+              : [];
+            const lowN = cov.filter((c: any) => (c.pct || 0) < 70).length;
+            return scoreDayQuality(meals as any[], {
+              weightKg: Number(input.weightKg) || 0,
+              microCoverage: cov.length > 0 ? { lowCount: lowN, total: cov.length } : undefined,
+            });
+          };
+          const _d019 = _d19();
+          const _e019 = _micro19('VitE');
+          const _o3019 = _micro19('Omega3');
+          const _b6019 = _micro19('VitB6');
+          const _b6Goal19 = _goal19('VitB6', input.sex === 'female' ? 1.5 : 1.7);
+          // Порог QG14 «основной приём ≥0.30 г белка/кг» — его же и держим.
+          const _protThr19 = 0.30 * (Number(input.weightKg) || 0);
+          // «Это еда»: цельный белок основных приёмов ≥75 г у атлетов ≥80 кг (F1),
+          // у мелких профилей пол 40 г — рыба 55 г в обед не порция.
+          const _fishFloor19 = (Number(input.weightKg) || 0) >= 80 ? 75 : 40;
+          const _q019 = _q19();
+          const _dev019 = _dev10();
+          const _canon19 = PLANNER_CONVERGENCE_PCT / 100;
+          // Политика канона — как у QG13: внутри канона 0.5 п.п., вне канона — 0.05.
+          const _devOk19 = () => {
+            const now = _dev10();
+            if (_dev019 <= _canon19) return now <= Math.min(_canon19, _dev019 + 0.005);
+            return now <= _dev019 + 0.0005;
+          };
+          const swaps19: string[] = [];
+          // Не больше двух обменов в день: первый обычно закрывает порог, второй —
+          // для дней, где порция белка была маленькой (40–50 г).
+          for (let pass = 0; pass < 2 && _d19() < _dGoal19 * 0.7; pass++) {
+            const dBefore = _d19();
+            let best: any = null;
+            const pairs19 = (meals as any[])
+              .filter((mm: any) => ((mm.items || []) as any[]).length > 0 && !_isWindow19(mm) && !(mm as any).recipeApplied)
+              // Завтрак не трогаем (D1): его белок — яйца/творог/сыворотка, а не
+              // «рыба из ротации дня». Обмен идёт в обед/ужин/перекус.
+              .filter((mm: any) => String(mm.type) !== 'breakfast')
+              .flatMap((mm: any) => ((mm.items || []) as any[]).filter(_lean19).map((x: any) => ({ m: mm, x })));
+            for (const { m, x } of pairs19) {
+              const P0 = Number(x.p) || 0;
+              const F0 = Number(x.f) || 0;
+              const role0 = String(x.role) === 'fast_protein' ? 'fast_protein' : 'protein';
+              for (const fid of _dFish19) {
+                const fd: any = FOOD_DB.find((f: any) => f.id === fid);
+                if (!fd) continue;
+                // Граммы — из равенства белка (сардины 25 г/100 г → 70 г курицы это
+                // 105 г люциана), шаг 5 г, порция 40–200 г: «рыба 35 г» — не порция.
+                const cap = Math.min(200, Number(edibilityCapFor(fid, 200)) || 200);
+                const g = Math.round(((P0 / Math.max(1, Number(fd.protein) || 1)) * 100) / 5) * 5;
+                if (g < _fishFloor19 || g > cap) continue;
+                const Pnew = ((Number(fd.protein) || 0) * g) / 100;
+                if (Math.abs(Pnew - P0) > 0.8) continue;
+                const dF = ((Number(fd.fat) || 0) * g) / 100 - F0;
+                const sd = _snapDayAll();
+                const di = ((m.items || []) as any[]).indexOf(x);
+                if (di < 0) continue;
+                const _isMain19 = ['breakfast', 'lunch', 'dinner'].includes(String(m.type));
+                const _isMainQ14 = ['breakfast', 'lunch', 'dinner', 'snack', 'snack2'].includes(String(m.type));
+                const _kcalM0 = Number(m.totals?.kcal) || 0;
+                const _protM0 = Number(m.totals?.p) || 0;
+                (m.items as any[])[di] = _mk10(fd, g, role0 as any);
+                if (dF > 0.6) _trimOil19(m, dF);
+                if (dF < -0.6) _addOil19(m, -dF);
+                recalcMealTotals(meals as any[]);
+                recalcDayTotals(meals, totals);
+                const dNow = _d19();
+                const qNow = _q19();
+                // Кальций: сардины — кальциевая опора дня (QG13/QG18), их обмен
+                // допустим только при явном запасе (≥85% цели), остальных — ≥70%.
+                const _isCaFish = /^(sardines|sprat|preserved_)/.test(String(x.id));
+                const caFloor = _isCaFish ? 0.85 : 0.7;
+                const ok19 = (dNow - dBefore >= 1.0)
+                  && (_naTarget19 <= 0 || _micro19('Na') <= _naTarget19 * 1.25)
+                  && _micro19('Ca') >= _caGoal19 * caFloor
+                  // Омега-3: обмен не имеет права уронить нутриент, который был в норме
+                  // (сардины несут 2.4 г омега-3 на 100 г, люциан — почти ноль).
+                  && (_o3019 < _o3Goal19 * 0.7 || _micro19('Omega3') >= _o3Goal19 * 0.7)
+                  // Витамин E: масло режется только у форели, и тогда E не имеет права
+                  // просесть вовсе (масло — главный источник E в дне, норма QG9: среднее
+                  // ≥60%): допуск 2 п.п. на округление среза.
+                  && _micro19('VitE') >= _e019 - _eGoal19 * 0.02
+                  // B6: вся рыба в БД его не несёт (0 мг/100 г), а курица/индейка —
+                  // главный источник дня (0.5–0.6). Правило двух уровней: обмен
+                  // разрешён, если день остаётся в норме B6 (≥70%), и лишь при
+                  // УЖЕ низком B6 — не глубже 15 п.п. (0.3 мг: в дне «20% → 5%»
+                  // мясо уходит последним, а D-дыра всё равно не закрыта).
+                  && (_micro19('VitB6') >= _b6Goal19 * 0.7
+                    || (_b6019 < _b6Goal19 * 0.7 && _micro19('VitB6') >= _b6019 - _b6Goal19 * 0.15))
+                  && _devOk19()
+                  && (Number(totals.fiber) || 0) <= _qgFiberCap
+                  // Приём не должен стать «фрагментом» (E11: основной приём <180 ккал).
+                  // Замер: на F50-1200 обед стоял ровно на 181 ккал после консолидации,
+                  // обмен мяса на рыбу снимал 12 ккал — и E11-пасс уже не переигрывал.
+                  && (!_isMain19 || (Number(m.totals?.kcal) || 0) >= Math.min(180, _kcalM0))
+                  // …и не отдаёт белковый порог QG14 (0.30 г/кг): уход на 0.5 г из-за
+                  // шага 5 г превращал приём 24.0 г в 23.5 и день попадал в «ниже порога».
+                  && (!_isMainQ14 || _protM0 < _protThr19 || (Number(m.totals?.p) || 0) >= _protThr19)
+                  && qNow.total >= _q019.total
+                  && qNow.proteinSpread >= _q019.proteinSpread - 1e-6
+                  && qNow.fatSpread >= _q019.fatSpread - 1e-6;
+                if (ok19) {
+                  // Из прошедших проб берём ту, что перекрывает порог с НАИМЕНЬШИМ
+                  // перелётом: «D 40% → 250%» — уже не правка, а перекос.
+                  const want = _dGoal19 * 0.7;
+                  const score = dNow >= want ? (dNow - want) : 1000 - dNow;
+                  if (!best || score < best.score) {
+                    best = { m, x, fid, g, role0, dF, score, meal: String(m.type), oldName: String(x.name || x.id), oldId: String(x.id) };
+                  }
+                }
+                _restoreDayAll(sd);
+              }
+            }
+            if (!best) break;
+            const di2 = ((best.m.items || []) as any[]).indexOf(best.x);
+            if (di2 < 0) break;
+            const fd: any = FOOD_DB.find((f: any) => f.id === best.fid);
+            (best.m.items as any[])[di2] = _mk10(fd, best.g, best.role0);
+            if (best.dF > 0.6) _trimOil19(best.m, best.dF);
+            if (best.dF < -0.6) _addOil19(best.m, -best.dF);
+            recalcMealTotals(meals as any[]);
+            recalcDayTotals(meals, totals);
+            usedTodayIds.add(best.fid);
+            allFoodsUsed.push(best.fid);
+            swaps19.push(`«${best.meal}» ${best.oldName} → ${String(fd.name)} ${best.g} г`);
+          }
+          if (swaps19.length > 0) {
+            const _dNow19 = Math.round(_d19() * 10) / 10;
+            const _dPct19 = Math.round((_dNow19 / Math.max(0.1, _dGoal19)) * 100);
+            const _o3Now19 = Math.round(_micro19('Omega3'));
+            // Числа в чужих нотах пересчитываем по факту: QG13 и QG12 называют
+            // витамин D («витамин D 4.5 мкг»), QG13/QG18 — кальций, QG8 — натрий.
+            // Нота не имеет права врать после обмена мяса на рыбу.
+            const _caNow19 = Math.round(_micro19('Ca'));
+            const _caPct19 = Math.round((_caNow19 / Math.max(1, _caGoal19)) * 100);
+            const _iCa19 = notes.findIndex((n) => typeof n === 'string' && n.startsWith('🐟 Кальций:'));
+            if (_iCa19 >= 0) {
+              notes[_iCa19] = String(notes[_iCa19])
+                .replace(/Ca \d+ мг \(\d+% цели\)/, `Ca ${_caNow19} мг (${_caPct19}% цели)`)
+                .replace(/витамин D [\d.,]+ мкг/, `витамин D ${_dNow19} мкг`);
+            }
+            const _iY19 = notes.findIndex((n) => typeof n === 'string' && n.startsWith('🍳 Желток в тарелке:'));
+            if (_iY19 >= 0) {
+              notes[_iY19] = String(notes[_iY19]).replace(/витамин D [\d.,]+ мкг/, `витамин D ${_dNow19} мкг`);
+            }
+            const _iM19 = notes.findIndex((n) => typeof n === 'string' && n.startsWith('🥛 Кальций молочкой:'));
+            if (_iM19 >= 0) {
+              notes[_iM19] = String(notes[_iM19]).replace(/→ \d+ мг \(\d+% цели\)/, `→ ${_caNow19} мг (${_caPct19}% цели)`);
+            }
+            const _iNa19 = notes.findIndex((n) => typeof n === 'string' && n.startsWith('🧂 Натрий'));
+            if (_iNa19 >= 0) {
+              notes[_iNa19] = String(notes[_iNa19]).replace(/~?\d+ мг Na/, `${Math.round(_micro19('Na'))} мг Na`);
+            }
+            notes.push(`🐠 Витамин D: ${swaps19.join('; ')} — белок тот же, лишний жир рыбы снят с масла дня (КБЖУ дня в цели); D ${Math.round(_d019 * 10) / 10} → ${_dNow19} мкг (${_dPct19}% цели), омега-3 ${_o3Now19} мг`);
           }
         }
       }
