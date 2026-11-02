@@ -1157,13 +1157,16 @@ describe('LiftMasterCard — поведение (не только смоук)',
     localStorage.setItem(MASTER_KEY, JSON.stringify({
       lift: 'bench',
       // 30° от плоскости, эталон вдоль штанги: ratio 0.5 = sin φ, cos φ = 0.866.
-      refAngle: { bench: { azimuthDeg: 30, ratio: 0.5, cosPhi: 0.866, axis: 'along', lengthCm: 131, atSec: null, spanPx: 300 } },
+      refAngle: { bench: { azimuthDeg: 30, ratio: 0.5, cosPhi: 0.866, cosPhiRelErrPct: 1.4, axis: 'along', lengthCm: 131, atSec: null, spanPx: 300 } },
     }));
     const { container } = render(<LiftMasterCard sessions={[]} />);
     act(() => { fireEvent.change(container.querySelector('[data-lift="kinovea-text"]')!, { target: { value: csv.join('\n') } }); });
     click(container.querySelector('[data-lift="parse-kinovea"]'));
 
-    expect(container.querySelector('[data-lift="ref-saved"]')!.textContent).toContain('вдоль штанги');
+    const saved = container.querySelector('[data-lift="ref-saved"]')!.textContent!;
+    expect(saved).toContain('вдоль штанги');
+    // Точность едет вместе с замером: после перезагрузки она не теряется.
+    expect(saved).toContain('±1.4%');
     const fix = container.querySelector('[data-lift="ref-xloop-fix"]')!;
     // Поправка +15.5%, а не +100%: в поправку идёт cos φ, а не ratio этой оси.
     expect(fix.textContent).toContain('поправка +15.5%');

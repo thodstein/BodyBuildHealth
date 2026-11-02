@@ -50,7 +50,7 @@ import { diagnoseAsymmetry } from '../../../engines/pro/pl-asymmetry.engine';
 import { RULE_CHECKS, checkLiftRules } from '../../../engines/pro/pl-competition-rules.engine';
 import { RED_FLAGS, checkRedFlags, type RedFlagId } from '../../../engines/pro/pl-red-flags.engine';
 import { buildMovementDiagnosticsHtml, buildMovementDiagnosticsCsv, buildTrajectorySvg, movementDiagnosticsFilename, buildHeatTrendCsv, type MovementDiagnosticsExportInput } from '../../../engines/pro/movement-diagnostics-export.engine';
-import { renderTrajectoryPng, recordTrajectoryWebm, recordVideoWithOverlay, canRecordTrajectory, dataUrlToBlob, grabVideoFrame, openVideoFramesFrom, calibrationFromTaps, preferredVideoMime, isCalibrationSane, calibrationFrameFit, calibrationFrameFitOf, mapTrackToVideo, referenceAngleCheck, referenceHorizontalCorrection, perspectiveTrackYForVideoY, perspectiveFromAnchors, isPerspectiveSane, perspectiveSkewPct, perspectiveLocalScale, perspectiveFrameFit, renderFrameWithMapping, mapTrackToVideoPerspective, type ReferenceAxis, type VideoCalibration, type PerspectiveCalibration, type VideoFrameSession } from '../../../engines/pro/trajectory-overlay.engine';
+import { renderTrajectoryPng, recordTrajectoryWebm, recordVideoWithOverlay, canRecordTrajectory, dataUrlToBlob, grabVideoFrame, openVideoFramesFrom, calibrationFromTaps, preferredVideoMime, isCalibrationSane, calibrationFrameFit, calibrationFrameFitOf, mapTrackToVideo, referenceAngleCheck, referenceHorizontalCorrection, referencePrecisionNote, referenceMeasurementDrift, perspectiveTrackYForVideoY, perspectiveFromAnchors, isPerspectiveSane, perspectiveSkewPct, perspectiveLocalScale, perspectiveFrameFit, renderFrameWithMapping, mapTrackToVideoPerspective, type ReferenceAxis, type VideoCalibration, type PerspectiveCalibration, type VideoFrameSession } from '../../../engines/pro/trajectory-overlay.engine';
 import { copyOrShareText, saveCsvApk, printHtmlApk, saveTextFileApk, saveBlobApk, shareOutcomeLabel } from '../../../core/apk-share';
 import { VideoCaptureCard } from './VideoCaptureCard';
 import StickingPointAnalysisCard from './StickingPointAnalysisCard';
@@ -1093,20 +1093,24 @@ export const LiftMasterCard: React.FC<{
   /**
    * Масштаб кадра для эталона. У перспективы он локальный (зависит от высоты),
    * поэтому берём высоту самого эталона, а не среднюю по видео: иначе угол
-   * считался бы по чужому масштабу.
+   * считался бы по чужому масштабу. Источник запоминается, чтобы в UI было
+   * видно, по какому масштабу посчитан угол.
    */
-  const refScalePxPerCm = useMemo(() => {
-    if (refTaps.length < 2) return null;
+  const refScale = useMemo<{ pxPerCm: number | null; source: 'persp' | 'calib' | null }>(() => {
+    if (refTaps.length < 2) return { pxPerCm: null, source: null };
     const midY = (refTaps[0].videoY + refTaps[1].videoY) / 2;
     if (curPersp) {
       const yTrack = perspectiveTrackYForVideoY(curPersp, midY);
       if (yTrack != null) {
         const s = perspectiveLocalScale(curPersp, yTrack);
-        if (s > 0) return s;
+        if (s > 0) return { pxPerCm: s, source: 'persp' };
       }
     }
-    return isCalibrationSane(curCalib) ? curCalib.pxPerCm : null;
+    return isCalibrationSane(curCalib)
+      ? { pxPerCm: curCalib.pxPerCm, source: 'calib' }
+      : { pxPerCm: null, source: null };
   }, [refTaps, curPersp, curCalib]);
+  const refScalePxPerCm = refScale.pxPerCm;
   /** Черновой замер по двум тапам: показывается сразу, к ракурсу применяется кнопкой. */
   const refCandidate = useMemo(() => {
     const lenCm = Number.parseFloat(refLength);
@@ -1121,6 +1125,19 @@ export const LiftMasterCard: React.FC<{
       { pxPerCm: refScalePxPerCm },
     );
   }, [refTaps, refLength, refScalePxPerCm, refAxis]);
+  /** Точность замера словами: ±% по cos φ и предупреждение, если тап слишком грубый. */
+  const refPrecision = useMemo(
+    () => referencePrecisionNote(refCandidate ? refCandidate.cosPhiRelErrPct : null),
+    [refCandidate],
+  );
+  /** Свежий замер против сохранённого: молча перекрыть сохранённый нельзя. */
+  const refDrift = useMemo(
+    () => referenceMeasurementDrift(
+      { cosPhi: curRefAngle ? (curRefAngle.cosPhi ?? curRefAngle.ratio) : null, azimuthDeg: curRefAngle ? curRefAngle.azimuthDeg : null },
+      { cosPhi: refCandidate ? refCandidate.cosPhi : null, azimuthDeg: refCandidate ? refCandidate.azimuthDeg : null },
+    ),
+    [curRefAngle, refCandidate],
+  );
   const angleCheck = useMemo(
     () => (kinoveaResult
       ? cameraAngleCheck(kinoveaResult.points, {
@@ -3092,7 +3109,26 @@ export const LiftMasterCard: React.FC<{
                       {refCandidate.flag === 'ok' ? `камера ${refCandidate.azimuthDeg}° от плоскости движения` : 'угол не измерен'}
                       {` · видно ${refCandidate.observedCm} см из ${refCandidate.expectedCm} см`}
                     </div>
+                    {/*
+                      Точность — часть числа, а не сноска: при коротком эталоне
+                      угол гуляет, и лучше сказать это здесь, чем в отчёте.
+                      Показываем точность cos φ, а не «±N°»: у нуля угол обусловлен
+                      плохо, а горизонталь при этом верна в пределах процентов.
+                    */}
+                    {(refPrecision || refScale.source) && (
+                      <div data-lift="ref-precision" style={{ marginTop:2, fontSize:9, color: refPrecision?.coarse ? '#fbbf24' : DIM }}>
+                        {refPrecision ? refPrecision.text : 'точность тапа не оценена.'}
+                        {refScale.source && (
+                          <span style={{ marginLeft:4 }}>
+                            · масштаб: {refScale.source === 'persp' ? 'перспектива по высоте кадра' : 'калибровка кадра'}
+                          </span>
+                        )}
+                      </div>
+                    )}
                     <div style={{ marginTop:2, color:'#cbd5e1' }}>{refCandidate.reason}</div>
+                    {refDrift && (
+                      <div data-lift="ref-vs-saved" style={{ marginTop:4, color:'#fbbf24' }}>⚠ {refDrift.text}</div>
+                    )}
                     {refCandidate.flag === 'ok' && (
                       <button data-lift="ref-save" aria-label="Применить измеренный ракурс к вердикту" onClick={applyRefAngle} style={{ marginTop:6, minHeight:44, padding:'6px 12px', borderRadius:8, cursor:'pointer', background:'rgba(74,222,128,0.12)', color:'#4ade80', border:'1px solid rgba(74,222,128,0.3)', fontWeight:700, fontSize:11 }}>💾 Применить к ракурсу</button>
                     )}
@@ -3102,6 +3138,7 @@ export const LiftMasterCard: React.FC<{
                   <div data-lift="ref-saved" style={{ marginTop:6, fontSize:9, color:DIM, lineHeight:1.45 }}>
                     Применён замер: камера {curRefAngle.azimuthDeg}° · эталон {curRefAngle.lengthCm} см
                     {` (${curRefAngle.axis === 'along' ? 'вдоль штанги' : 'поперёк движения'})`}
+                    {curRefAngle.cosPhiRelErrPct != null ? ` · ±${curRefAngle.cosPhiRelErrPct >= 10 ? Math.round(curRefAngle.cosPhiRelErrPct) : Math.round(curRefAngle.cosPhiRelErrPct * 10) / 10}%` : ''}
                     {curRefAngle.atSec != null ? ` · кадр ${curRefAngle.atSec.toFixed(2)} с` : ''}
                     {' '}— угол идёт в вердикт ракурса и в выгрузки.
                   </div>

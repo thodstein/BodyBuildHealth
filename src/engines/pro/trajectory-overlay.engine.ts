@@ -811,6 +811,57 @@ export function referenceHorizontalCorrection(
   };
 }
 
+/** Определение масштаба кадра для эталона: откуда он взялся, чтобы это было видно в UI. */
+export interface ReferencePrecisionNote {
+  /** Готовая строка для UI. */
+  text: string;
+  /** Точность хуже 5% — тап слишком грубый, угол из такого замера гуляет. */
+  coarse: boolean;
+}
+
+/**
+ * Точность cos φ словами. Показывать именно cos φ, а не «±N°», — потому что
+ * угол у нуля обусловлен плохо: cos φ = 1 ± 1% даёт угол 0…8°, хотя горизонталь
+ * при этом верна в пределах процента. Для сравнения сессий важно второе.
+ */
+export function referencePrecisionNote(cosPhiRelErrPct: number | null | undefined): ReferencePrecisionNote | null {
+  if (cosPhiRelErrPct == null || !Number.isFinite(cosPhiRelErrPct) || cosPhiRelErrPct < 0) return null;
+  const pct = cosPhiRelErrPct >= 10 ? Math.round(cosPhiRelErrPct) : Math.round(cosPhiRelErrPct * 10) / 10;
+  if (pct > 5) {
+    return {
+      coarse: true,
+      text: `Точность тапа ±${pct}% — при таком эталоне угол гуляет: ткните точнее или возьмите отрезок длиннее. Горизонталь верна только в пределах ±${pct}%.`,
+    };
+  }
+  return { coarse: false, text: `Точность тапа: горизонталь верна в пределах ±${pct}%.` };
+}
+
+/**
+ * Свежий замер против сохранённого. Молча перекрыть сохранённый замер нельзя:
+ * если камера не двигалась, расхождение означает другую ось, длину или кадр —
+ * и тогда новый замер хуже старого, а вердикт и отчёт уже на нём держатся.
+ */
+export function referenceMeasurementDrift(
+  saved: { cosPhi: number | null | undefined; azimuthDeg: number | null | undefined },
+  fresh: { cosPhi: number | null | undefined; azimuthDeg: number | null | undefined },
+  minRelPct = 6,
+): { pct: number; text: string } | null {
+  const s = saved.cosPhi;
+  const f = fresh.cosPhi;
+  if (s == null || f == null || !Number.isFinite(s) || !Number.isFinite(f) || !(s > 0)) return null;
+  const rel = Math.abs(f - s) / s;
+  const pct = Math.round(rel * 1000) / 10;
+  if (rel * 100 <= minRelPct) return null;
+  const sd = saved.azimuthDeg != null ? `${Math.round(saved.azimuthDeg)}°` : '—';
+  const fd = fresh.azimuthDeg != null ? `${Math.round(fresh.azimuthDeg)}°` : '—';
+  return {
+    pct,
+    text: `Новый замер расходится с сохранённым на ${pct}% по горизонтальному масштабу (${sd} против ${fd}). `
+      + 'Если это та же съёмка — проверьте ось эталона, длину и кадр: вердикт и отчёт построены по прежнему числу. '
+      + 'Применяйте новый, только если камера действительно стояла иначе.',
+  };
+}
+
 /** Решение 3×3 методом Крамера (без зависимостей). */
 function solve3(m: number[][], v: number[]): [number, number, number] | null {
   const det = (a: number[][]) =>

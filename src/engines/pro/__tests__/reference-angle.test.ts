@@ -2,6 +2,8 @@ import { describe, it, expect } from 'vitest';
 import {
   referenceAngleCheck,
   referenceHorizontalCorrection,
+  referencePrecisionNote,
+  referenceMeasurementDrift,
   perspectiveTrackYForVideoY,
   perspectiveLocalScale,
   type PerspectiveCalibration,
@@ -262,6 +264,56 @@ describe('referenceHorizontalCorrection — поправка горизонта�
     const legacy = referenceHorizontalCorrection(10, { ratio: 0.906, azimuthDeg: 25, spanPx: 300 })!;
     expect(legacy.flag).toBe('ok');
     expect(legacy.correctedCm).toBe(11.04);
+  });
+});
+
+describe('referencePrecisionNote — точность замера словами', () => {
+  it('нет оценки — нет строки (а не «±0%»)', () => {
+    expect(referencePrecisionNote(null)).toBeNull();
+    expect(referencePrecisionNote(undefined)).toBeNull();
+    expect(referencePrecisionNote(NaN)).toBeNull();
+    expect(referencePrecisionNote(-1)).toBeNull();
+  });
+
+  it('точность называется по cos φ, а не в градусах', () => {
+    const n = referencePrecisionNote(1.4)!;
+    expect(n.coarse).toBe(false);
+    expect(n.text).toBe('Точность тапа: горизонталь верна в пределах ±1.4%.');
+    // Угол у нуля обусловлен плохо, поэтому «±N°» здесь было бы неправдой.
+    expect(n.text).not.toContain('°');
+  });
+
+  it('короткий эталон — предупреждение, а не спокойное «±7%»', () => {
+    const n = referencePrecisionNote(7.2)!;
+    expect(n.coarse).toBe(true);
+    expect(n.text).toContain('ткните точнее');
+    expect(n.text).toContain('±7.2%');
+  });
+});
+
+describe('referenceMeasurementDrift — новый замер против сохранённого', () => {
+  it('то же самое — молчим: шума тапа хватает', () => {
+    expect(referenceMeasurementDrift({ cosPhi: 0.906, azimuthDeg: 25 }, { cosPhi: 0.9, azimuthDeg: 26 })).toBeNull();
+    expect(referenceMeasurementDrift({ cosPhi: 0.906, azimuthDeg: 25 }, { cosPhi: 0.88, azimuthDeg: 28 })).toBeNull();
+    // Ниже общего порога, но при явно меньшем допуске расхождение уже называется.
+    expect(referenceMeasurementDrift({ cosPhi: 0.906, azimuthDeg: 25 }, { cosPhi: 0.88, azimuthDeg: 28 }, 2)!.pct).toBe(2.9);
+  });
+
+  it('расхождение названо числом и с двумя углами', () => {
+    const d = referenceMeasurementDrift({ cosPhi: 0.906, azimuthDeg: 25 }, { cosPhi: 0.5, azimuthDeg: 60 })!;
+    expect(d.pct).toBe(44.8);
+    expect(d.text).toContain('25° против 60°');
+    expect(d.text).toContain('проверьте ось эталона');
+    // Сказано главное: сохранённый вердикт и отчёт уже построены по прежнему числу.
+    expect(d.text).toContain('построены по прежнему числу');
+    expect(d.text).toContain('только если камера действительно стояла иначе');
+  });
+
+  it('порог настраивается, мусор не сравнивается', () => {
+    expect(referenceMeasurementDrift({ cosPhi: 0.906, azimuthDeg: 25 }, { cosPhi: 0.86, azimuthDeg: 31 }, 2)!.pct).toBe(5.1);
+    expect(referenceMeasurementDrift({ cosPhi: null, azimuthDeg: 25 }, { cosPhi: 0.5, azimuthDeg: 60 })).toBeNull();
+    expect(referenceMeasurementDrift({ cosPhi: 0, azimuthDeg: 0 }, { cosPhi: 0.5, azimuthDeg: 60 })).toBeNull();
+    expect(referenceMeasurementDrift({ cosPhi: NaN, azimuthDeg: 0 }, { cosPhi: 0.5, azimuthDeg: 60 })).toBeNull();
   });
 });
 

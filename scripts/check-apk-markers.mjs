@@ -208,6 +208,8 @@ for (const hook of [
   'data-lift="ref-vs-meta-fix-right"', 'data-lift="ref-vs-meta-fix-front"',
   // Ось эталона — половина формулы угла (cos φ против sin φ), а не подпись.
   'data-lift="ref-axis-across"', 'data-lift="ref-axis-along"', 'data-lift="ref-axis-hint"',
+  // Точность замера и расхождение с сохранённым: число без этого читается как точное.
+  'data-lift="ref-precision"', 'data-lift="ref-vs-saved"',
   'data-lift="export-svg"', 'data-lift="export-overlay-png"', 'data-lift="export-overlay-video"',
   'data-lift="series-save"', 'data-lift="session-compare"', 'data-lift="bar-heat"',
   'data-lift="quick-start"', 'data-lift="quick-start-hide"',
@@ -295,6 +297,10 @@ mustContain('src/engines/pro/trajectory-overlay.engine.ts', 'export type Referen
 mustContain('src/engines/pro/trajectory-overlay.engine.ts', 'Math.sqrt(Math.max(0, 1 - Math.min(1, ratio * ratio)))', 'sin-mode uses cos phi');
 mustContain('src/engines/pro/movement-diagnostics-export.engine.ts', 'Эталон: ось', 'axis in report');
 mustContain('src/ui/screens/TrainingScreen_parts/LiftMasterCard.tsx', 'axis: refAxis', 'hub passes axis to the check');
+// Точность замера и защита сохранённого замера от молчаливого перекрытия.
+mustContain('src/engines/pro/trajectory-overlay.engine.ts', 'export function referencePrecisionNote', 'precision stated in words');
+mustContain('src/engines/pro/trajectory-overlay.engine.ts', 'export function referenceMeasurementDrift', 'saved vs fresh measurement');
+mustContain('src/ui/screens/TrainingScreen_parts/LiftMasterCard.tsx', 'referenceMeasurementDrift(', 'hub warns on drift');
 
 // 7d. Mojibake-бан: битые символы (U+FFFD) в файлах хаба — признак порванной кодировки.
 // В LiftMasterCard их было 11 (тексты VBT/LVP/Kinovea), и это попадало в UI АПК.
