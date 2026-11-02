@@ -1,5 +1,5 @@
 /**
- * Регрессия «пакета качества» (QG1–QG19) планировщика.
+ * Регрессия «пакета качества» (QG1–QG20) планировщика.
  *
  * Зачем: сходимость дня ≤3% ловит только КБЖУ. Жалобы шли на «съедобность»:
  * «19 г малины», «жир всего дня в одном приёме», «овощей 190 г», «в обед 12 г белка»,
@@ -47,6 +47,9 @@
  *   витамин D, среднее от RDA      39%          59%
  *   микро ниже 70% в дне (QG19)    3.50         3.07
  *   средняя оценка дня (QG19)      90.7         91.1
+ *   дней с завтраком <0.30 г/кг    16/30        11/30 (QG20)
+ *   ось «белок осн. приёма» (QG20) 82.4         84.0
+ *   средняя оценка дня (QG20)      91.13        91.50
  */
 import { describe, it, expect } from 'vitest';
 import { buildDayPlan, type MealPlanInput } from '../meal-plan-engine';
@@ -1202,6 +1205,176 @@ describe('витамин D рыбой вместо постного мяса (QG
       manualTargetsLocked: true, kbjuMode: 'manual',
     } as unknown as MealPlanInput);
     const notes = ((manual.notes || []) as string[]).filter((n) => n.startsWith('🐠 Витамин D:'));
+    expect(notes.join(' | ')).toBe('');
+  });
+});
+
+describe('белок завтрака из приёмов с запасом (QG20)', () => {
+  // Замер после QG19 на тех же 30 днях: в 16 днях завтрак несёт меньше 0.30 г/кг
+  // белка (11.6–23.7 г при пороге 15–33), а обед/ужин/предсон держат вдвое больше
+  // порога (M2/4/тр: завтрак 22.5 г при обеде 42.8; L1/6/тр: 16.4 при предсне 48.8).
+  // При этом движок честно печатал ««Завтрак» недобирает (12 г) — добавьте 20–25 г
+  // белка»: совет вместо тарелки, тот же дефект, что «добавьте соли» до QG8.
+  // Стадия переносит ПОСТНЫЙ белок из приёма с запасом в завтрак белок-в-белок:
+  // яичный белок +Δг (омлет), мясо/рыба/творог −Δг, шаг 5 г, допуск 0.8 г по белку.
+  // Донор обязан остаться ≥0.30 г/кг и ≥ пола порции (75 г у ≥80 кг, 40 г), его
+  // приём — не фрагмент (≥180 ккал основной, ≥100 ккал перекус). Жир мяса
+  // возвращается в масло приёма, поэтому КБЖУ дня стоят.
+  // Замер: дней с завтраком < 0.30 г/кг 16 → 11, перенос в 6 днях (5 доходят до
+  // порога), ось белка 82.4 → 84.0, средняя оценка дня 91.13 → 91.50, дней лучше 4,
+  // хуже 0. D/B6/E/Ca-дни не изменились (20/17/16/0), микро-ось 73.37 та же.
+  const NOTES20 = '🍳 Белок завтрака:';
+  const bfOf = (d: Day) => d.meals.find((m) => String(m.type) === 'breakfast');
+  const bfP = (d: Day) => Number(bfOf(d)?.totals?.p) || 0;
+  const gpk = (d: Day) => bfP(d) / Math.max(1, d.w);
+  const noted20 = (d: Day) => ((d.plan.notes || []) as string[])
+    .filter((n) => typeof n === 'string' && n.startsWith(NOTES20));
+  const withNote = DAYS.filter((d) => noted20(d).length > 0);
+  const belowThr = DAYS.filter((d) => gpk(d) < 0.3 - 1e-6);
+  const sexOf20 = (d: Day) => PROFILES.find((p) => d.id.startsWith(p.id))?.sex || 'male';
+  const covOf20 = (d: Day) => analyzeMicroCoverage(
+    sumMicros(items(d).map(({ x }) => ({ id: x.id, amount: x.amount })), FOOD_DB as any),
+    sexOf20(d) as any, d.w, 'none' as any, !!d.plan.isTrainingDay,
+  ).coverage as any[];
+  const pctOf20 = (d: Day, n: string) => Number(covOf20(d).find((c) => c.nutrient === n)?.pct || 0);
+  const lowCount20 = (d: Day) => covOf20(d).filter((c) => (c.pct || 0) < 70).length;
+  const devOf20 = (d: Day) => {
+    const t: any = buildDayTargets({
+      weightKg: d.w, presetGPerKg: 2.0, fatFloorGPerKg: 0.8, kbjuMode: 'auto',
+      goal: 'maintenance', dietStyle: 'classic',
+    } as any);
+    const tot = (d.plan.totals || {}) as any;
+    return Math.max(
+      Math.abs((tot.kcal || 0) - t.kcal) / t.kcal,
+      Math.abs((tot.p || 0) - t.protein) / t.protein,
+      Math.abs((tot.f || 0) - t.fats) / t.fats,
+      Math.abs((tot.c || 0) - t.carbs) / t.carbs,
+    );
+  };
+
+  it('дней с завтраком < 0.30 г/кг ≤ 12 из 30 (было 16)', () => {
+    const list = belowThr.map((d) => `${d.id}:${(gpk(d) * 100).toFixed(0)}%`);
+    expect(belowThr.length, `завтрак ниже порога: ${list.join(', ')}`).toBeLessThanOrEqual(12);
+  });
+
+  it('стадия реально срабатывает: перенос в ≥5 днях, завтрак дотянут до порога', () => {
+    const reached = withNote.filter((d) => gpk(d) >= 0.3 - 1e-6);
+    expect(withNote.length, `дней с переносом: ${withNote.map((d) => d.id).join(', ')}`).toBeGreaterThanOrEqual(5);
+    expect(reached.length, `дошли до порога: ${reached.map((d) => d.id).join(', ')}`).toBeGreaterThanOrEqual(5);
+  });
+
+  it('завтрак растим цельным продуктом: шаг 5 г, без порошка', () => {
+    const bad: string[] = [];
+    for (const d of withNote) for (const n of noted20(d)) {
+      const segs = n.replace(`${NOTES20} `, '').split(' — завтрак')[0].split('; ');
+      for (const seg of segs) {
+        const head = seg.split(' (взят у')[0];
+        if (/whey|isolate|casein|сыворот|порош/i.test(head)) bad.push(`${d.id}: порошок в завтраке (${head.slice(0, 30)})`);
+        const nums = [...head.matchAll(/(\d+) г/g)].map((x) => Number(x[1]));
+        if (nums.length === 0) bad.push(`${d.id}: сегмент без граммов (${head.slice(0, 30)})`);
+        for (const g of nums) if (g % 5 !== 0) bad.push(`${d.id}: ${head} — не шаг 5 г`);
+      }
+    }
+    expect(bad.slice(0, 5).join(' | ')).toBe('');
+  });
+
+  it('донор не отдаёт порог QG14 и пол порции: приём ≥0.30 г/кг, пункт ≥ пола', () => {
+    const bad: string[] = [];
+    for (const d of withNote) {
+      const floor = d.w >= 80 ? 75 : 40;
+      const thr = 0.3 * d.w;
+      for (const n of noted20(d)) {
+        const segs = n.replace(`${NOTES20} `, '').split(' — завтрак')[0].split('; ');
+        for (const seg of segs) {
+          const mm = seg.match(/взят у «(.+?)»: (.+?) −(\d+) г/);
+          if (!mm) { bad.push(`${d.id}: сегмент без донора (${seg.slice(0, 40)})`); continue; }
+          const label = mm[1], name = mm[2], cutG = Number(mm[3]);
+          const meal = d.meals.find((m) => String(m.label) === label);
+          if (!meal) { bad.push(`${d.id}: в ноте «${label}», в дне нет такого приёма`); continue; }
+          const p = Number(meal.totals?.p) || 0;
+          if (p < thr - 1e-6) bad.push(`${d.id}/${label}: ${p.toFixed(1)} г < порога ${thr.toFixed(1)}`);
+          const donor = ((meal.items || []) as any[]).find((x) => String(x.name) === name);
+          if (!donor) { bad.push(`${d.id}/${label}: «${name}» в тарелке нет`); continue; }
+          const g = Number(donor.amount) || 0;
+          if (g < floor) bad.push(`${d.id}/${label}/${name}: ${g} г < пола ${floor}`);
+          if (!Number.isInteger(g)) bad.push(`${d.id}/${label}/${name}: дробные граммы ${g}`);
+          if (cutG < 5 || cutG % 5 !== 0) bad.push(`${d.id}/${label}/${name}: срез ${cutG} г`);
+        }
+      }
+    }
+    expect(bad.slice(0, 5).join(' | ')).toBe('');
+  });
+
+  it('торговля белок-в-белок: КБЖУ дня в каноне (≤13%), белок дня не уехал из цели', () => {
+    const bad = withNote.filter((d) => devOf20(d) > 0.13)
+      .map((d) => `${d.id}:${(devOf20(d) * 100).toFixed(1)}%`);
+    expect(bad.join(', ')).toBe('');
+    // Перенос не создаёт «белковый» день из ниоткуда: порции обоих пунктов — шаг 5 г,
+    // а сумма белка дня остаётся в пределах допуска стадии (0.6 г) от плановой.
+    const drift: string[] = [];
+    for (const d of withNote) {
+      const t: any = buildDayTargets({
+        weightKg: d.w, presetGPerKg: 2.0, fatFloorGPerKg: 0.8, kbjuMode: 'auto',
+        goal: 'maintenance', dietStyle: 'classic',
+      } as any);
+      const totP = Number((d.plan.totals || {}).p) || 0;
+      if (Math.abs(totP - t.protein) > 0.25 * t.protein) drift.push(`${d.id}: ${totP.toFixed(1)} vs ${t.protein}`);
+    }
+    expect(drift.join(', ')).toBe('');
+  });
+
+  it('микро не проседает: D ≤ 20 дней <70%, B6 ≤ 17, E ≤ 16, омега-3 ≤ 9, Ca 0', () => {
+    const low = (n: string) => DAYS.filter((d) => pctOf20(d, n) < 70).length;
+    expect(low('VitD'), 'дней с D < 70%').toBeLessThanOrEqual(20);
+    expect(low('VitB6'), 'дней с B6 < 70%').toBeLessThanOrEqual(17);
+    expect(low('VitE'), 'дней с E < 70%').toBeLessThanOrEqual(16);
+    expect(low('Omega3'), 'дней с омега-3 < 70%').toBeLessThanOrEqual(9);
+    expect(low('Ca'), 'дней с Ca < 70%').toBeLessThanOrEqual(0);
+  });
+
+  it('оценка дня не падает: среднее ≥ 91.4 (было 91.13) и ни один день не ниже 83', () => {
+    const q = (d: Day) => scoreDayQuality(d.meals, {
+      weightKg: d.w, microCoverage: { lowCount: lowCount20(d), total: covOf20(d).length },
+    }).total;
+    const avg = DAYS.reduce((s, d) => s + q(d), 0) / DAYS.length;
+    expect(Math.round(avg * 100) / 100, 'средняя оценка дня').toBeGreaterThanOrEqual(91.4);
+    const worst = DAYS.map((d) => `${d.id}:${q(d)}`).sort((a, b) => Number(a.split(':')[1]) - Number(b.split(':')[1]))[0];
+    expect(q(DAYS.find((d) => d.id === worst.split(':')[0])!), 'худший день').toBeGreaterThanOrEqual(73);
+  });
+
+  it('нота не врёт: кальций/D в нотах QG13 = факт по тарелке после переноса', () => {
+    const bad: string[] = [];
+    for (const d of withNote) {
+      const caFact = Number((sumMicros(items(d).map(({ x }) => ({ id: x.id, amount: x.amount })), FOOD_DB as any) as any)?.Ca || 0);
+      for (const n of (d.plan.notes || []) as string[]) {
+        const m = typeof n === 'string' ? n.match(/^🐟 Кальций: .*Ca (\d+) мг \((\d+)% цели\)/) : null;
+        if (!m) continue;
+        if (Math.abs(Number(m[1]) - caFact) > 1) bad.push(`${d.id}: Ca нота ${m[1]}, факт ${Math.round(caFact)}`);
+      }
+    }
+    expect(bad.slice(0, 5).join(' | ')).toBe('');
+  });
+
+  it('тонкий день без запаса не трогаем: L1/6/тр (177 г белка на 6 приёмов) без переноса', () => {
+    const thin = DAYS.find((d) => d.id === 'L1/6/тр');
+    expect(!!thin).toBe(true);
+    expect(noted20(thin!).length, 'нота переноса в тонком дне').toBe(0);
+  });
+
+  it('ручной режим не трогаем: в ручном дне переноса нет', () => {
+    const tgt: any = buildDayTargets({
+      weightKg: 90, presetGPerKg: 2.0, fatFloorGPerKg: 0.8, kbjuMode: 'manual',
+      goal: 'maintenance', dietStyle: 'classic',
+    } as any);
+    const manual = buildDayPlan({
+      weightKg: 90, lbmKg: 73, bodyFatPct: 19, sex: 'male',
+      goalKcal: tgt.kcal, goalProteinG: tgt.protein, goalFatG: tgt.fats, goalCarbsG: tgt.carbs,
+      mealsCount: 5, isTrainingDay: true, trainStartMin: 18 * 60, trainDurationMin: 75,
+      allowIntraWorkout: true, budget: 'medium', dayOffset: 0, cyclePhase: 'none',
+      variety: 'medium', eveningLowCarb: false, goal: 'maintenance',
+      manualTargetsLocked: true, kbjuMode: 'manual',
+    } as unknown as MealPlanInput);
+    const notes = ((manual.notes || []) as string[]).filter((n) => n.startsWith(NOTES20));
     expect(notes.join(' | ')).toBe('');
   });
 });

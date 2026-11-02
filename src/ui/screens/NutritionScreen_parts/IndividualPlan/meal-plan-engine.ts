@@ -13767,6 +13767,328 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
           }
         }
       }
+
+      // ── QG20: белок завтрака — перенос из приёмов с запасом ──────────────────
+      // Замер после QG19 (те же 30 дней): в 16 днях завтрак несёт меньше 0.30 г/кг
+      // белка (11.6–23.7 г при пороге 15–33 г), а обед/ужин/предсон держат вдвое
+      // больше порога (M2/4/тр: завтрак 22.5 при обеде 42.8; L1/6/тр: 16.4 при
+      // предсне 48.8). Движок в этих днях печатал ноту ««Завтрак» недобирает
+      // (12 г) — добавьте 20–25 г белка или объедините приём»: совет вместо
+      // тарелки, тот же дефект, что «добавьте соли» до QG8.
+      // Что делает стадия: переносит ПОСТНЫЙ белок из приёма с запасом в завтрак
+      // белок-в-белок — яичный белок +Δг (омлет), мясо/рыба −Δг. Шаг 5 г, допуск
+      // 0.8 г по белку; донор обязан остаться ≥0.30 г/кг и ≥ пола порции (75 г у
+      // ≥80 кг, 40 г), а его приём — не фрагментом (≥180 ккал в основном,
+      // ≥100 ккал в перекусе). Жир мяса (курица 3.6 г/100 г — рыба меньше)
+      // возвращается в масло того же приёма, поэтому КБЖУ дня стоят.
+      // Завтрак растим только цельным продуктом: яйцо целиком не увеличиваем (у
+      // него потолок в дне, `eggCatchupCap`), порошок не ставим — завтрак это
+      // тарелка, а не шейкер. Окна тренировки не донор (тайминг QG14/QG15).
+      if (_vegFree && !((input as any).injections && (input as any).injections.length)) {
+        const _w20 = Number(input.weightKg) || 0;
+        const _thr20 = 0.30 * _w20;
+        const _bf20 = (meals as any[]).find((mm: any) => String(mm.type) === 'breakfast');
+        const _p20 = (m: any) => Number(m.totals?.p) || 0;
+        if (_bf20 && _w20 > 0 && _thr20 > 0 && _p20(_bf20) < _thr20 - 1e-6) {
+          const _isWin20 = (mm: any) => ['preworkout', 'postworkout', 'intra'].includes(String(mm.type));
+          const _sex20 = input.sex === 'female' ? 'female' : 'male';
+          // Цели — тем же расчётом, что отчёт покрытия (см. QG19: `getMicroTargets`,
+          // а не RDA_BASE — там округление до целых и множители фазы).
+          const _tg20 = new Map<string, number>(
+            getMicroTargets(_sex20 as any, input.weightKg, input.cyclePhase as any, !!input.isTrainingDay)
+              .map((t) => [t.nutrient, t.target] as [string, number]),
+          );
+          const _goal20 = (k: string, dflt: number) => Number(_tg20.get(k) || dflt);
+          const _micro20 = (key: string) => Number((sumMicros(
+            (meals as any[]).flatMap((m: any) => (m.items || []).map((it: any) => ({ id: it.id, amount: it.amount }))),
+            FOOD_DB as any,
+          ) as any)?.[key] || 0);
+          const _q20 = () => {
+            const cov = _pickCtx.qualityMode === 'full'
+              ? analyzeMicroCoverage(
+                sumMicros((meals as any[]).flatMap((m: any) => (m.items || []).map((it: any) => ({ id: it.id, amount: it.amount }))), FOOD_DB as any),
+                (input.sex || 'male') as any, input.weightKg, input.cyclePhase as any, !!input.isTrainingDay,
+                input.calciumTargetOverride, input.sodiumTargetOverride,
+              ).coverage
+              : [];
+            const lowN = cov.filter((c: any) => (c.pct || 0) < 70).length;
+            return scoreDayQuality(meals as any[], {
+              weightKg: Number(input.weightKg) || 0,
+              microCoverage: cov.length > 0 ? { lowCount: lowN, total: cov.length } : undefined,
+            });
+          };
+          const _q020 = _q20();
+          const _dev020 = _dev10();
+          const _canon20 = PLANNER_CONVERGENCE_PCT / 100;
+          const _devOk20 = () => {
+            const now = _dev10();
+            if (_dev020 <= _canon20) return now <= Math.min(_canon20, _dev020 + 0.005);
+            return now <= _dev020 + 0.0005;
+          };
+          const _d020 = _micro20('VitD');
+          const _ca020 = _micro20('Ca');
+          const _e020 = _micro20('VitE');
+          const _o3020 = _micro20('Omega3');
+          const _b6020 = _micro20('VitB6');
+          const _dGoal20 = _goal20('VitD', 15);
+          const _caGoal20 = _goal20('Ca', 1000);
+          const _eGoal20 = _goal20('VitE', 15);
+          const _o3Goal20 = _goal20('Omega3', 1600);
+          const _b6Goal20 = _goal20('VitB6', input.sex === 'female' ? 1.5 : 1.7);
+          // Потолок натрия — от БАЗОВОЙ цели QG8 (3000 трен / 2300 отдых), как в
+          // QG13: весовая надбавка «+5 мг/кг» в гарде не участвует, и считать от
+          // «тяжёлой» цели значило бы разрешить дню выехать из коридора.
+          const _naTarget20 = Number((input as any).sodiumTargetOverride) > 0
+            ? Number((input as any).sodiumTargetOverride)
+            : (input.isTrainingDay ? 3000 : 2300);
+          const _na020 = _micro20('Na');
+          const _floor20 = _w20 >= 80 ? 75 : 40;
+          const _isDish20 = (id: string) => /whey|isolate|casein|powder|supp_|creatine/.test(id);
+          // «Чистое масло» — то же определение, что у QG15/QG17/QG19: срез и
+          // долив жира идут с масла (пол 7 г), а не с орехов/семян.
+          const _pureFat20 = (x: any) => {
+            const amt = Number(x.amount) || 0;
+            if (!(amt > 0) || x._fixedGrams || _fav10(String(x.id))) return false;
+            const per100 = (v: any) => ((Number(v) || 0) / amt) * 100;
+            return x.role === 'fat' && per100(x.f) >= 85 && per100(x.p) <= 2 && per100(x.c) <= 2;
+          };
+          // Жир дня: банк масла живёт в приёмах-донорах и в завтраке (окна — нет).
+          const _oil20 = (host: any, need: number, dir: 1 | -1): number => {
+            let left = need;
+            const order = [host, ...(meals as any[]).filter((mm: any) => mm !== host && !_isWin20(mm) && ((mm.items || []) as any[]).length > 0)];
+            for (const mm of order) {
+              if (left <= 0.3) break;
+              const fats = ((mm.items || []) as any[]).filter(_pureFat20)
+                .sort((a: any, b: any) => (Number(b.amount) || 0) - (Number(a.amount) || 0));
+              for (const it of fats) {
+                if (left <= 0.3) break;
+                const amt = Number(it.amount) || 0;
+                const perG = (Number(it.f) || 0) / Math.max(1, amt);
+                if (!(perG > 0)) continue;
+                if (dir < 0) {
+                  const cut = Math.min(Math.round(left / perG), amt - 7);
+                  if (cut < 1) continue;
+                  Object.assign(it, _scale10(it, amt - cut));
+                  left -= cut * perG;
+                } else {
+                  Object.assign(it, _scale10(it, amt + Math.max(1, Math.round(left / perG))));
+                  left = 0;
+                }
+              }
+            }
+            return left;
+          };
+          // Приёмник: уже стоящий в завтраке цельный белок — яичный белок (омлет),
+          // молочка. Цельное яйцо и порошок — нет; яйцо даёт жир желтка, а порошок
+          // не тарелка. Крупнейший по граммам — первым.
+          const _grow20 = (x: any) => {
+            const id = String(x.id || '');
+            if (x._fixedGrams || _fav10(id) || _isDish20(id) || id === 'egg_whole') return false;
+            if (!(x.role === 'protein' || x.role === 'fast_protein' || x.role === 'slow_protein')) return false;
+            return (Number(x.amount) || 0) > 0 && (Number(x.p) || 0) > 0;
+          };
+          const _recv20 = ((_bf20.items || []) as any[])
+            .filter((x: any) => _grow20(x))
+            .sort((a: any, b: any) => (Number(b.amount) || 0) - (Number(a.amount) || 0));
+          const _eggFD20: any = FOOD_DB.find((f: any) => f.id === 'egg_white');
+          // Если растить нечего (в завтраке только цельное яйцо) — добавляем яичный
+          // белок порцией: «1 яйцо + 2 белка» — обычный завтрак бодибилдера.
+          const _addEgg20 = !((_bf20.items || []) as any[]).some((x: any) => String(x.id) === 'egg_white')
+            && !!_eggFD20 && _ok10('egg_white');
+          // Донор — приём с запасом над порогом QG14 (включая предсон: 48.8 г
+          // казеина на ночь при 16 г завтрака — это не тайминг, а перекос).
+          const _isProt20 = (r: any) => ['protein', 'fast_protein', 'slow_protein'].includes(String(r));
+          const _donorsFor20 = () => (meals as any[])
+            .filter((mm: any) => mm !== _bf20 && !_isWin20(mm) && !(mm as any).recipeApplied
+              && ((mm.items || []) as any[]).length > 0 && _p20(mm) > _thr20 + 0.4)
+            .flatMap((mm: any) => ((mm.items || []) as any[])
+              .filter((x: any) => {
+                const id = String(x.id || '');
+                if (x._fixedGrams || _fav10(id) || _isDish20(id)) return false;
+                if (!_isProt20(x.role)) return false;
+                const amt = Number(x.amount) || 0;
+                if (amt <= _floor20) return false;
+                const p100 = ((Number(x.p) || 0) / Math.max(1, amt)) * 100;
+                return p100 >= 14;
+              })
+              .map((x: any) => ({ m: mm, x })));
+          const swaps20: string[] = [];
+          // Базовые итоги дня — ОДИН раз на стадию: проходов до четырёх, и если
+          // сравнивать с итогами прохода, дрейф копится (M2/5/тр: жир +0.9 г за два
+          // прохода при допуске 0.6). Инвариант стадии — «день тот же».
+          const _base20 = {
+            p: Number(totals.p) || 0,
+            k: Number(totals.kcal) || 0,
+            f: Number(totals.f) || 0,
+            c: Number(totals.c) || 0,
+          };
+          for (let pass20 = 0; pass20 < 4 && _p20(_bf20) < _thr20 - 1e-6; pass20++) {
+            let best20: any = null;
+            for (const { m: dm, x: dx } of _donorsFor20()) {
+              // Приёмник пересчитываем каждый проход: после первого переноса в
+              // завтраке может стоять уже выросший пункт (или добавленный белок).
+              const recv = ((_bf20.items || []) as any[]).find((x: any) => _grow20(x)) || null;
+              if (!recv && !_addEgg20) break;
+              const recvPpG = recv
+                ? (Number(recv.p) || 0) / Math.max(1, Number(recv.amount) || 1)
+                : (Number(_eggFD20?.protein) || 11) / 100;
+              const donPpG = (Number(dx.p) || 0) / Math.max(1, Number(dx.amount) || 1);
+              if (!(recvPpG > 0) || !(donPpG > 0)) continue;
+              const need = _thr20 - _p20(_bf20);
+              const bfBefore = _p20(_bf20);
+              // Граммы приёмника — шагом 5 г. Проход берёт максимум, который донор
+              // реально может отдать (не уводя себя ниже порога и пола порции), а не
+              // только «всё или ничего»: в S1/6/отд нужно 2.8 г, а один сосед отдаёт
+              // 2.5 — два соседа закрывают порог, один улучшает завтрак.
+              const donRoom = (Number(dx.amount) || 0) - _floor20;
+              if (donRoom < 5) continue;
+              const growCapG = edibilityCapFor(String(recv ? recv.id : 'egg_white'), 300)
+                - (recv ? Number(recv.amount) || 0 : 0);
+              const topAdd = Math.floor(Math.min(400, growCapG, (need + 1.2) / recvPpG) / 5) * 5;
+              let chosen: any = null;
+              for (let addG = topAdd; addG >= 5; addG -= 5) {
+                if (!recv && addG < 25) continue;
+                const cutP = addG * recvPpG;
+                const cutG = Math.round(cutP / donPpG / 5) * 5;
+                if (cutG < 5 || cutG > donRoom) continue;
+                if (Math.abs(cutG * donPpG - cutP) > 0.8) continue;
+                chosen = { addG, cutG };
+                break;
+              }
+              if (!chosen) continue;
+              const sd = _snapDayAll();
+              const f0 = Number(totals.f) || 0;
+              // Граммы «до» снимаем ДО правки: `recv` — ссылка, после _scale10 в ней
+              // уже новые граммы (нота «140 → 140 г» была ровно из этого).
+              const recvAmt0 = recv ? Number(recv.amount) || 0 : 0;
+              const donMealLabel = String(dm.label || dm.type);
+              if (recv) Object.assign(recv, _scale10(recv, (Number(recv.amount) || 0) + chosen.addG));
+              else (_bf20.items as any[]).push(_mk10(_eggFD20, chosen.addG, 'protein'));
+              Object.assign(dx, _scale10(dx, (Number(dx.amount) || 0) - chosen.cutG));
+              recalcMealTotals(meals as any[]);
+              recalcDayTotals(meals, totals);
+              // Жир: мясо жирнее яичного белка — пришедшая разница возвращается в
+              // масло донора (или снимается, если донором была рыба/индейка).
+              const dF20 = (Number(totals.f) || 0) - f0;
+              if (dF20 < -0.2) _oil20(dm, -dF20, 1);
+              if (dF20 > 0.6) _oil20(dm, dF20, -1);
+              recalcMealTotals(meals as any[]);
+              recalcDayTotals(meals, totals);
+              // Приём-донор не становится фрагментом: основной ≥180 ккал (E11),
+              // перекус ≥100 ккал, если был едой.
+              const _donorMain = ['breakfast', 'lunch', 'dinner'].includes(String(dm.type));
+              const _donorKcalOk = _donorMain
+                ? (Number(dm.totals?.kcal) || 0) >= 180
+                : (Number(dm.totals?.kcal) || 0) >= 100;
+              const qNow = _q20();
+              const g20 = {
+                progress: _p20(_bf20) > bfBefore + 0.3,
+                donorKeep: _p20(dm) >= _thr20 - 1e-6,
+                pSame: Math.abs((Number(totals.p) || 0) - _base20.p) <= 0.6,
+                kSame: Math.abs((Number(totals.kcal) || 0) - _base20.k) <= 12,
+                cSame: Math.abs((Number(totals.c) || 0) - _base20.c) <= 0.5,
+                fSame: Math.abs((Number(totals.f) || 0) - _base20.f) <= 0.6,
+                dev: _devOk20(),
+                fiber: (Number(totals.fiber) || 0) <= _qgFiberCap,
+                kcal: _donorKcalOk,
+                d: _micro20('VitD') >= Math.min(_d020, _dGoal20 * 0.7) - _dGoal20 * 0.02,
+                ca: _micro20('Ca') >= Math.min(_ca020, _caGoal20 * 0.7) - _caGoal20 * 0.02,
+                o3: _micro20('Omega3') >= Math.min(_o3020, _o3Goal20 * 0.7) - _o3Goal20 * 0.02,
+                e: _micro20('VitE') >= _e020 - _eGoal20 * 0.02,
+                b6: _micro20('VitB6') >= _b6Goal20 * 0.7
+                  || (_b6020 < _b6Goal20 * 0.7 && _micro20('VitB6') >= _b6020 - _b6Goal20 * 0.15),
+                // Натрий: белок яйца несёт 166 мг/100 г — коридор QG8 (65–125% цели)
+                // не имеем права пробить, а если день уже выше — не ухудшаем.
+                na: _micro20('Na') <= Math.max(_na020, _naTarget20 * 1.25),
+                score: qNow.total >= _q020.total,
+                spread: qNow.proteinSpread >= _q020.proteinSpread - 1e-6,
+                // «Съедобный» потолок пункта: омлет/творог за один приём не растут
+                // до бесконечности (EDIBILITY_CAPS: творог 250 г, яйцо 275 г).
+                growCap: (recv ? (Number(recv.amount) || 0) + chosen.addG : chosen.addG)
+                  <= edibilityCapFor(String(recv ? recv.id : 'egg_white'), 300),
+              };
+              const ok20 = Object.values(g20).every(Boolean);
+              if (ok20) {
+                const score20 = _p20(_bf20) - _thr20; // минимальный перелёт над порогом
+                if (!best20 || score20 < best20.score) {
+                  best20 = {
+                    recvId: recv ? String(recv.id) : '+egg_white',
+                    recvName: recv ? String(recv.name || recv.id) : String(_eggFD20?.name || 'Яичный белок'),
+                    recvAmt0,
+                    addG: chosen.addG, donId: String(dx.id), donName: String(dx.name || dx.id),
+                    cutG: chosen.cutG, donMeal: donMealLabel, donType: String(dm.type), score: score20,
+                  };
+                }
+              }
+              _restoreDayAll(sd);
+            }
+            if (!best20) break;
+            // Применяем лучшую пробу прохода теми же граммами, что прошли гарды.
+            const bfItems = (_bf20.items || []) as any[];
+            const recvNow = bfItems.find((x: any) => String(x.id) === best20.recvId) || null;
+            const donEntry = (meals as any[])
+              .flatMap((mm: any) => ((mm.items || []) as any[]).map((x: any) => ({ m: mm, x })))
+              .find((e: any) => String(e.x.id) === best20.donId && String(e.m.type) === best20.donType);
+            const f0 = Number(totals.f) || 0;
+            if (recvNow) Object.assign(recvNow, _scale10(recvNow, (Number(recvNow.amount) || 0) + best20.addG));
+            else if (best20.recvId === '+egg_white') bfItems.push(_mk10(_eggFD20, best20.addG, 'protein'));
+            if (donEntry) Object.assign(donEntry.x, _scale10(donEntry.x, (Number(donEntry.x.amount) || 0) - best20.cutG));
+            recalcMealTotals(meals as any[]);
+            recalcDayTotals(meals, totals);
+            const dF20 = (Number(totals.f) || 0) - f0;
+            if (dF20 < -0.2) _oil20(donEntry ? donEntry.m : _bf20, -dF20, 1);
+            if (dF20 > 0.6) _oil20(donEntry ? donEntry.m : _bf20, dF20, -1);
+            recalcMealTotals(meals as any[]);
+            recalcDayTotals(meals, totals);
+            swaps20.push(
+              `${best20.recvName} ${recvNow ? `${Math.round(best20.recvAmt0)} → ${Math.round(Number(recvNow.amount) || 0)}` : `добавлен ${Math.round(best20.addG)}`} г `
+              + `(взят у «${best20.donMeal}»: ${best20.donName} −${Math.round(best20.cutG)} г)`,
+            );
+          }
+          if (swaps20.length > 0) {
+            // Числа в чужих нотах — по факту: перенос белка срезает рыбу/молочку, а их
+            // ноты называют старые значения (QG19 — D и омега-3, QG13 — Ca/B12/D,
+            // QG12 — B12/D/A, QG18 — Ca, QG8 — натрий, QG9 — витамин E). Та же
+            // дисциплина, что у QG18/QG19: нота не имеет права врать после правки.
+            const _microNow20 = (k: string) => Math.round(_micro20(k) * 10) / 10;
+            const _dN20 = _microNow20('VitD');
+            const _dPctN20 = Math.round((_dN20 / Math.max(0.1, _dGoal20)) * 100);
+            const _caN20 = Math.round(_micro20('Ca'));
+            const _caPctN20 = Math.round((_caN20 / Math.max(1, _caGoal20)) * 100);
+            const _b12N20 = _microNow20('VitB12');
+            const _b12GoalN20 = Math.max(0.1, _goal20('VitB12', 2.4));
+            const _aN20 = Math.round(_micro20('VitA'));
+            const _eN20 = Math.round(_micro20('VitE'));
+            const _o3N20 = Math.round(_micro20('Omega3'));
+            const _naN20 = Math.round(_micro20('Na'));
+            const _set20 = (prefix: string, fn: (s: string) => string) => {
+              const i = notes.findIndex((n) => typeof n === 'string' && String(n).startsWith(prefix));
+              if (i >= 0) notes[i] = fn(String(notes[i]));
+            };
+            _set20('🐟 Кальций:', (s) => s
+              .replace(/Ca \d+ мг \(\d+% цели\)/, `Ca ${_caN20} мг (${_caPctN20}% цели)`)
+              .replace(/B12 [\d.,]+ мкг/, `B12 ${_b12N20} мкг`)
+              .replace(/витамин D [\d.,]+ мкг/, `витамин D ${_dN20} мкг`));
+            _set20('🍳 Желток в тарелке:', (s) => s
+              .replace(/B12 [\d.,]+ мкг \(\d+% цели\)/, `B12 ${_b12N20} мкг (${Math.round((_b12N20 / _b12GoalN20) * 100)}% цели)`)
+              .replace(/витамин D [\d.,]+ мкг/, `витамин D ${_dN20} мкг`)
+              .replace(/A \d+ мкг/, `A ${_aN20} мкг`));
+            _set20('🥛 Кальций молочкой:', (s) => s
+              .replace(/→ \d+ мг \(\d+% цели\)/, `→ ${_caN20} мг (${_caPctN20}% цели)`));
+            _set20('🐠 Витамин D:', (s) => s
+              .replace(/(D [\d.,]+ → )[\d.,]+ мкг/, `$1${_dN20} мкг`)
+              .replace(/\(\d+% цели\), омега-3/, `(${_dPctN20}% цели), омега-3`)
+              .replace(/омега-3 \d+ мг/, `омега-3 ${_o3N20} мг`));
+            _set20('🧂 Натрий', (s) => s.replace(/~?\d+ мг Na/, `${_naN20} мг Na`));
+            _set20('🌻 Витамин E:', (s) => s.replace(/E \d+ мг из/, `E ${_eN20} мг из`));
+            const bfP20 = Math.round(_p20(_bf20) * 10) / 10;
+            notes.push(
+              `🍳 Белок завтрака: ${swaps20.join('; ')} — завтрак `
+              + `${bfP20} г (${(bfP20 / Math.max(1, _w20)).toFixed(2)} г/кг при пороге 0.30), белок дня тот же`,
+            );
+          }
+        }
+      }
     }
 
     // Витрина MPS должна совпадать с ФИНАЛЬНЫМ планом (санитайзеры E17/E18 меняют items).
