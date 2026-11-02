@@ -204,6 +204,8 @@ for (const hook of [
   'data-lift="ref-grab"', 'data-lift="ref-grab-calib"', 'data-lift="ref-no-video"', 'data-lift="ref-frame"',
   'data-lift="ref-result"', 'data-lift="ref-save"', 'data-lift="ref-saved"',
   'data-lift="ref-clear"', 'data-lift="ref-msg"', 'data-lift="ref-xloop-fix"',
+  'data-lift="ref-vs-meta"', 'data-lift="ref-vs-meta-fix-left"',
+  'data-lift="ref-vs-meta-fix-right"', 'data-lift="ref-vs-meta-fix-front"',
   'data-lift="export-svg"', 'data-lift="export-overlay-png"', 'data-lift="export-overlay-video"',
   'data-lift="series-save"', 'data-lift="session-compare"', 'data-lift="bar-heat"',
   'data-lift="quick-start"', 'data-lift="quick-start-hide"',
@@ -282,6 +284,10 @@ mustContain('src/ui/screens/TrainingScreen_parts/LiftMasterCard.tsx', 'azimuthDe
 mustContain('src/engines/pro/trajectory-overlay.engine.ts', 'export function referenceHorizontalCorrection', 'horizontal metric fix by measured angle');
 mustContain('src/engines/pro/movement-diagnostics-export.engine.ts', 'xLoop с поправкой на ракурс', 'corrected horizontal in report');
 mustContain('src/ui/screens/TrainingScreen_parts/LiftMasterCard.tsx', 'referenceHorizontalCorrection(', 'hub applies horizontal fix');
+// Параметры съёмки и замер спорят о ракурсе — спор обязан быть назван, а не спрятан.
+mustContain('src/engines/strength-sport/strength-sport-video.engine.ts', 'export function sideConflictCheck', 'metadata vs measured view conflict');
+mustContain('src/engines/pro/movement-diagnostics-export.engine.ts', 'Ракурс: параметры и замер', 'conflict in report');
+mustContain('src/ui/screens/TrainingScreen_parts/LiftMasterCard.tsx', 'sideConflictCheck(', 'hub names the conflict');
 
 // 7d. Mojibake-бан: битые символы (U+FFFD) в файлах хаба — признак порванной кодировки.
 // В LiftMasterCard их было 11 (тексты VBT/LVP/Kinovea), и это попадало в UI АПК.

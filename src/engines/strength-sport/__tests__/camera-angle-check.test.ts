@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { cameraAngleCheck, cameraAngleShortLine } from '../strength-sport-video.engine';
+import { cameraAngleCheck, cameraAngleShortLine, sideConflictCheck } from '../strength-sport-video.engine';
 
 /**
  * Траектория штанги: вертикальный ход `dyCm` и горизонтальный уход `dxCm` за серию.
@@ -219,5 +219,46 @@ describe('cameraAngleShortLine — короткая строка для карт
   it('нехватка хода — прямо сказано, что замер не сделан', () => {
     const line = cameraAngleShortLine(cameraAngleCheck(path({ dyCm: 1 })))!;
     expect(line).toBe('ракурс не проверен: ход по вертикали < 2 см');
+  });
+});
+
+describe('sideConflictCheck — параметры съёмки против замера', () => {
+  it('параметры «спереди», замер 8° — спор: метрику бракуют зря', () => {
+    const c = sideConflictCheck('front', 8)!;
+    expect(c.kind).toBe('meta-front-measured-side');
+    expect(c.azimuthDeg).toBe(8);
+    expect(c.text).toContain('камера в плоскости движения (8°)');
+    expect(c.text).toContain('бракует xLoop');
+    // Никакого выбора стороны за пользователя: сказано только направление правки.
+    expect(c.text).toContain('Укажите сторону съёмки');
+    expect(c.text).not.toContain('слева');
+  });
+
+  it('параметры «сбоку», замер 61° — спор: сравнимость обещана зря', () => {
+    for (const side of ['left', 'right'] as const) {
+      const c = sideConflictCheck(side, 61)!;
+      expect(c.kind).toBe('meta-side-measured-front');
+      expect(c.metaSide).toBe(side);
+      expect(c.text).toContain('почти спереди (61°)');
+      expect(c.text).toContain('перестанет обещать сравнимость');
+    }
+  });
+
+  it('согласие сторон — спора нет (порог тот же, что у вердикта: 60°)', () => {
+    expect(sideConflictCheck('front', 61)).toBeNull();
+    expect(sideConflictCheck('left', 60)).toBeNull();
+    expect(sideConflictCheck('right', 8)).toBeNull();
+    expect(sideConflictCheck('left', 0)).toBeNull();
+  });
+
+  it('нет данных или мусор — спорить не о чем', () => {
+    expect(sideConflictCheck('', 8)).toBeNull();
+    expect(sideConflictCheck(null, 8)).toBeNull();
+    expect(sideConflictCheck(undefined, 61)).toBeNull();
+    expect(sideConflictCheck('front', null)).toBeNull();
+    expect(sideConflictCheck('left', undefined)).toBeNull();
+    expect(sideConflictCheck('front', NaN)).toBeNull();
+    expect(sideConflictCheck('front', -5)).toBeNull();
+    expect(sideConflictCheck('front', 120)).toBeNull();
   });
 });

@@ -1079,6 +1079,59 @@ describe('LiftMasterCard — поведение (не только смоук)',
     expect(fix.textContent).not.toContain('xLoop с поправкой');
   });
 
+  it('ракурс в параметрах спорит с замером — спор назван и чинится одним тапом', () => {
+    const csv = ['time,x,y'];
+    for (let i = 0; i < 20; i++) csv.push(`${(i * 0.05).toFixed(2)},${100 + i * 1.5},${50 + i * 4}`);
+    localStorage.setItem(MASTER_KEY, JSON.stringify({
+      lift: 'bench',
+      capture: { side: 'front' },
+      refAngle: { bench: { azimuthDeg: 8, ratio: 0.99, lengthCm: 131, atSec: null, spanPx: 300 } },
+    }));
+    const { container } = render(<LiftMasterCard sessions={[]} />);
+    act(() => { fireEvent.change(container.querySelector('[data-lift="kinovea-text"]')!, { target: { value: csv.join('\n') } }); });
+    click(container.querySelector('[data-lift="parse-kinovea"]'));
+
+    // Противоречие реальное: бейдж качества бракует метрику из-за параметров.
+    expect(container.querySelector('[data-lift="capture-quality"]')!.textContent).toContain('Вид спереди');
+    const conflict = container.querySelector('[data-lift="ref-vs-meta"]')!;
+    expect(conflict.textContent).toContain('не совпадает с замером');
+    expect(conflict.textContent).toContain('камера в плоскости движения (8°)');
+    expect(conflict.textContent).toContain('бракует xLoop');
+    // Сторону за пользователя не выбираем — предлагаем два честных варианта.
+    expect(container.querySelector('[data-lift="ref-vs-meta-fix-left"]')).toBeTruthy();
+    expect(container.querySelector('[data-lift="ref-vs-meta-fix-right"]')).toBeTruthy();
+    expect(container.querySelector('[data-lift="ref-vs-meta-fix-front"]')).toBeNull();
+
+    click(container.querySelector('[data-lift="ref-vs-meta-fix-left"]'));
+    expect(container.querySelector('[data-lift="ref-vs-meta"]')).toBeNull();
+    expect(JSON.parse(localStorage.getItem(MASTER_KEY) || '{}').capture.side).toBe('left');
+    expect(container.querySelector('[data-lift="capture-quality"]')!.textContent).not.toContain('Вид спереди');
+  });
+
+  it('обратный спор: параметры «сбоку», а замер почти спереди', () => {
+    const csv = ['time,x,y'];
+    for (let i = 0; i < 20; i++) csv.push(`${(i * 0.05).toFixed(2)},${100 + i * 1.5},${50 + i * 4}`);
+    localStorage.setItem(MASTER_KEY, JSON.stringify({
+      lift: 'bench',
+      capture: { side: 'left' },
+      refAngle: { bench: { azimuthDeg: 61, ratio: 0.48, lengthCm: 131, atSec: null, spanPx: 300 } },
+    }));
+    const { container } = render(<LiftMasterCard sessions={[]} />);
+    act(() => { fireEvent.change(container.querySelector('[data-lift="kinovea-text"]')!, { target: { value: csv.join('\n') } }); });
+    click(container.querySelector('[data-lift="parse-kinovea"]'));
+
+    const conflict = container.querySelector('[data-lift="ref-vs-meta"]')!;
+    expect(conflict.textContent).toContain('почти спереди (61°)');
+    expect(conflict.textContent).toContain('перестанет обещать сравнимость');
+    // Здесь сторона однозначна: спорить не о чем, чинится одной кнопкой.
+    expect(container.querySelector('[data-lift="ref-vs-meta-fix-front"]')).toBeTruthy();
+    expect(container.querySelector('[data-lift="ref-vs-meta-fix-left"]')).toBeNull();
+
+    click(container.querySelector('[data-lift="ref-vs-meta-fix-front"]'));
+    expect(container.querySelector('[data-lift="ref-vs-meta"]')).toBeNull();
+    expect(JSON.parse(localStorage.getItem(MASTER_KEY) || '{}').capture.side).toBe('front');
+  });
+
   it('интерактивные элементы хаба не меньше 44 px', () => {
     const { container } = render(<LiftMasterCard sessions={[]} />);
     // «Быстрый старт» исчезает после первых данных — проверяем до заполнения.

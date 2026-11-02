@@ -253,6 +253,28 @@ describe('хаб → отчёт: ракурс, измеренный по эта�
     expect(rowValue(csv, 'Kinovea xLoop, см')).not.toBe('"—"');
   });
 
+  it('спор «параметры ↔ замер» в отчёте не прячется', async () => {
+    const rows = ['time,x,y'];
+    for (let i = 0; i < 20; i++) rows.push(`${(i * 0.05).toFixed(2)},${100 + i * 1.5},${50 + i * 4}`);
+    // Параметры говорят «спереди», замер — 8°: в отчёте иначе стоит и «грубо», и «сравнимо».
+    const csv = await exportCsv({
+      capture: { side: 'front' },
+      refAngle: { bench: { azimuthDeg: 8, ratio: 0.99, lengthCm: 131, atSec: null, spanPx: 300 } },
+    }, rows.join('\n'), '1');
+    const row = rowValue(csv, 'Ракурс: параметры и замер');
+    expect(row).toContain('противоречит параметрам');
+    expect(row).toContain('камера в плоскости движения (8°)');
+    expect(row).toContain('бракует xLoop');
+
+    // Стороны согласны — строки нет, чтобы отчёт не пугал зря.
+    savedCsv.length = 0;
+    const clean = await exportCsv({
+      capture: { side: 'left' },
+      refAngle: { bench: { azimuthDeg: 8, ratio: 0.99, lengthCm: 131, atSec: null, spanPx: 300 } },
+    }, rows.join('\n'), '1');
+    expect(rowValue(clean, 'Ракурс: параметры и замер')).toBe('"—"');
+  });
+
   it('поправка меньше точности тапа — в отчёт не идёт как число', async () => {
     const rows = ['time,x,y'];
     for (let i = 0; i < 20; i++) rows.push(`${(i * 0.05).toFixed(2)},${100 + i * 1.5},${50 + i * 4}`);

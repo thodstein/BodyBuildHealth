@@ -82,6 +82,11 @@ export interface MovementDiagnosticsExportInput {
   /** На сколько процентов подняли xLoop этой поправкой. */
   xLoopRefCorrectionPct?: number | null;
   /**
+   * Спор «ракурс в параметрах» ↔ «ракурс по замеру» текстом. Пока он не разрешён,
+   * отчёт обязан его показать: иначе в нём рядом стоят два противоположных вывода.
+   */
+  angleMetaConflict?: string | null;
+  /**
    * Чем нанесена линия на видео: panel — панель без калибровки, calibration — единый
    * масштаб (px/см), perspective — по 4 привязкам. Отчёт без этого не воспроизводим.
    */
@@ -226,6 +231,7 @@ export function buildMovementDiagnosticsCsv(inp: MovementDiagnosticsExportInput)
     ['Эталон в кадре, см', inp.refLengthCm != null ? String(inp.refLengthCm) : '—'],
     ['xLoop с поправкой на ракурс, см', inp.xLoopRefCorrectedCm != null ? String(inp.xLoopRefCorrectedCm) : '—'],
     ['Поправка xLoop на ракурс, %', inp.xLoopRefCorrectionPct != null ? String(inp.xLoopRefCorrectionPct) : '—'],
+    ['Ракурс: параметры и замер', inp.angleMetaConflict || '—'],
     ['Наложение линии на видео', videoOverlayModeRu(inp.videoOverlayMode)],
     ['Масштаб калибровки кадра, px/см', inp.videoScalePxPerCm != null ? String(inp.videoScalePxPerCm) : '—'],
     ['Разброс масштаба по высоте, %', inp.videoPerspSkewPct != null ? String(inp.videoPerspSkewPct) : '—'],
@@ -309,6 +315,7 @@ export function buildMovementDiagnosticsHtml(inp: MovementDiagnosticsExportInput
         + (inp.xLoopRefCorrectionPct != null ? `, поправка +${fmt(inp.xLoopRefCorrectionPct, 1)}%` : '')
         + '; оценка — не замена съёмке в плоскости движения)')
       : '')
+    + (inp.angleMetaConflict ? li('Ракурс: параметры и замер', inp.angleMetaConflict) : '')
     + ((inp.videoOverlayMode || inp.videoScalePxPerCm != null || inp.videoPerspSkewPct != null || inp.videoOffsetSec != null)
       ? li('Наложение линии на видео', videoOverlayRuLine(inp)) : '')
     + (inp.asymmetryPct != null ? li('Асимметрия', `${fmt(inp.asymmetryPct, 1)}% ${inp.asymmetryVerdict || ''}`) : '')

@@ -168,7 +168,8 @@ describe('referenceHorizontalCorrection — поправка горизонта�
   });
 });
 
-describe('perspectiveTrackYForVideoY — обратная связь перспективы', () => {  const calib: PerspectiveCalibration = {
+describe('perspectiveTrackYForVideoY — обратная связь перспективы', () => {
+  const calib: PerspectiveCalibration = {
     anchors: [
       { timeSec: 0.1, trackX: 0, trackY: 0, videoX: 100, videoY: 520 },
       { timeSec: 0.4, trackX: 0.5, trackY: 16.7, videoX: 104, videoY: 362.2 },

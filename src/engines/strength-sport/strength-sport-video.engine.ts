@@ -465,6 +465,61 @@ export function videoQualityForCapture(meta: VideoCaptureMeta): VideoQuality {
 }
 
 /**
+ * Расхождение «ракурс в параметрах» ↔ «ракурс по замеру».
+ *
+ * Бейдж качества съёмки и вердикт ракурса отвечают на разные вопросы, но оба
+ * говорят про одно: можно ли сравнивать xLoop. Если параметры и замер спорят,
+ * экран показывает две противоположные фразы, и пользователь верит зелёной.
+ * Обе стороны расхождения опасны:
+ * - в параметрах «спереди», а замер 8° — бракуется метрика, которая на самом
+ *   деле сравнима (человек зря переснимает);
+ * - в параметрах «сбоку», а замер 61° — метрика считается сравнимой, хотя она
+ *   занижена (человек сравнивает разные ракурсы как разную технику).
+ */
+export interface SideConflict {
+  kind: 'meta-front-measured-side' | 'meta-side-measured-front';
+  /** Ракурс из параметров съёмки. */
+  metaSide: 'front' | 'left' | 'right';
+  /** Измеренный угол к плоскости движения. */
+  azimuthDeg: number;
+  text: string;
+}
+
+/**
+ * Спор параметров и замера; null — спорить не о чем (нет данных или они согласны).
+ * Порог тот же, что у вердикта: за ним камера уже не в плоскости движения.
+ */
+export function sideConflictCheck(
+  metaSide: VideoSide | '' | null | undefined,
+  azimuthDeg: number | null | undefined,
+): SideConflict | null {
+  if (!metaSide) return null;
+  if (azimuthDeg == null || !Number.isFinite(azimuthDeg) || azimuthDeg < 0 || azimuthDeg > 90) return null;
+  const deg = Math.round(azimuthDeg);
+  if (metaSide === 'front' && deg <= FRONT_AZIMUTH_DEG) {
+    return {
+      kind: 'meta-front-measured-side',
+      metaSide: 'front',
+      azimuthDeg: deg,
+      text: `Замер противоречит параметрам: по эталону камера в плоскости движения (${deg}°), а в параметрах указан вид спереди. `
+        + 'Качество съёмки из-за этого бракует xLoop, который замер считает сравнимым. '
+        + 'Укажите сторону съёмки — параметры, вердикт и отчёт станут об одном и том же.',
+    };
+  }
+  if ((metaSide === 'left' || metaSide === 'right') && deg > FRONT_AZIMUTH_DEG) {
+    return {
+      kind: 'meta-side-measured-front',
+      metaSide,
+      azimuthDeg: deg,
+      text: `Замер противоречит параметрам: по эталону камера почти спереди (${deg}°), а в параметрах указан вид сбоку. `
+        + 'Качество съёмки из-за этого считает xLoop пригодным, хотя замер говорит, что он несравним со съёмкой в плоскости движения. '
+        + 'Поставьте «спереди» — отчёт перестанет обещать сравнимость, которой нет.',
+    };
+  }
+  return null;
+}
+
+/**
  * Вердикт «ракурс по замеру»: что реально видно по самой траектории.
  *
  * Видно два измеримых сигнала:

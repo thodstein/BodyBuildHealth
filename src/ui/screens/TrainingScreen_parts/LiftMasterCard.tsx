@@ -44,7 +44,7 @@ import { getPLWeakGroupExerciseCandidates, diagnosticProtocolFromCycle } from '.
 import type { SRCycleTemplate } from '../../../data/lms-cycles/lms-types';
 import { applyToPlanner } from './planner-bridge';
 import { getExerciseById } from '../../../core/exercise-catalog';
-import { parseKinoveaCSV, analyzeBarTracking, segmentBarReps, barRepOverlay, videoQualityForCapture, cameraAngleCheck, cameraAngleShortLine, barSpeedHeat, BAR_HEAT_COLORS, snapshotBarRep, compareBarSessions, barSetStats, barSetOverlay, heatSummary, scaleBarPoints, repSetIndex, type BarTrackingResult, type BarRepSegment, type BarRepSnapshot, type VideoCaptureMeta } from '../../../engines/strength-sport/strength-sport-video.engine';
+import { parseKinoveaCSV, analyzeBarTracking, segmentBarReps, barRepOverlay, videoQualityForCapture, cameraAngleCheck, cameraAngleShortLine, sideConflictCheck, barSpeedHeat, BAR_HEAT_COLORS, snapshotBarRep, compareBarSessions, barSetStats, barSetOverlay, heatSummary, scaleBarPoints, repSetIndex, type BarTrackingResult, type BarRepSegment, type BarRepSnapshot, type VideoCaptureMeta } from '../../../engines/strength-sport/strength-sport-video.engine';
 import { barLoopFlag } from '../../../engines/pro/bar-path-core.engine';
 import { diagnoseAsymmetry } from '../../../engines/pro/pl-asymmetry.engine';
 import { RULE_CHECKS, checkLiftRules } from '../../../engines/pro/pl-competition-rules.engine';
@@ -1122,6 +1122,14 @@ export const LiftMasterCard: React.FC<{
     () => referenceHorizontalCorrection(kinoveaResult ? kinoveaResult.xLoop : null, curRefAngle),
     [kinoveaResult, curRefAngle],
   );
+  /**
+   * Параметры съёмки и замер могут спорить о ракурсе — тогда экран показывает
+   * две противоположные фразы. Спор называется, и чинится он одним тапом.
+   */
+  const sideConflict = useMemo(
+    () => sideConflictCheck(captureMeta.side, curRefAngle?.azimuthDeg),
+    [captureMeta, curRefAngle],
+  );
   /** Подсказка времён для четырёх кадров: 5%, 35%, 65%, 95% длительности трека. */
   const perspSuggestedTimes = useMemo(() => {
     const pts = kinoveaResult?.points;
@@ -1569,6 +1577,8 @@ export const LiftMasterCard: React.FC<{
       // Только когда поправка реально применена: «поправка меньше точности» в отчёт не идёт как число.
       xLoopRefCorrectedCm: xLoopFix.flag === 'ok' ? xLoopFix.correctedCm : null,
       xLoopRefCorrectionPct: xLoopFix.flag === 'ok' ? xLoopFix.pct : null,
+      // Неразрешённый спор параметров и замера не должен прятаться в отчёте.
+      angleMetaConflict: sideConflict ? sideConflict.text : null,
       videoOverlayMode: kinoveaResult ? (curPersp ? 'perspective' : curCalib ? 'calibration' : 'panel') : '',
       videoScalePxPerCm: curCalib ? Math.round(curCalib.pxPerCm * 100) / 100 : null,
       videoPerspSkewPct: curPersp ? perspectiveSkewPct(curPersp) : null,
@@ -2963,6 +2973,28 @@ export const LiftMasterCard: React.FC<{
                 <div data-lift="angle-vs-meta" style={{ marginTop:4, fontSize:9, lineHeight:1.4, color:DIM }}>
                   ℹ Параметры съёмки в допуске, но по самому замеру есть отклонение — смотрите строку выше:
                   это либо техника, либо камера стоит не так, как указано в параметрах.
+                </div>
+              )}
+              {/*
+                Параметры съёмки и замер — разные проверки, и они могут спорить
+                о ракурсе: бейдж качества судит по параметрам, вердикт ракурса —
+                по замеру. Тогда экран показывает противоположные фразы, и
+                пользователь верит зелёной. Спор называется и чинится одним тапом.
+              */}
+              {sideConflict && (
+                <div data-lift="ref-vs-meta" role="alert" style={{ marginTop:6, padding:'6px 8px', borderRadius:8, background:'rgba(251,191,36,0.08)', border:'1px solid rgba(251,191,36,0.28)', fontSize:9, lineHeight:1.45, color:'#fbbf24' }}>
+                  <div style={{ fontWeight:700 }}>⚠ Ракурс в параметрах не совпадает с замером</div>
+                  <div style={{ marginTop:3, color:'#e2e8f0' }}>{sideConflict.text}</div>
+                  <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginTop:6 }}>
+                    {sideConflict.kind === 'meta-front-measured-side' ? (
+                      <>
+                        <button data-lift="ref-vs-meta-fix-left" aria-label="Указать в параметрах съёмку слева" onClick={()=> setCapture(c=>({ ...c, side:'left' }))} style={{ minHeight:44, padding:'6px 12px', borderRadius:8, cursor:'pointer', background:'rgba(251,191,36,0.14)', color:'#fbbf24', border:'1px solid rgba(251,191,36,0.35)', fontWeight:700, fontSize:11 }}>⇦ снимал слева</button>
+                        <button data-lift="ref-vs-meta-fix-right" aria-label="Указать в параметрах съёмку справа" onClick={()=> setCapture(c=>({ ...c, side:'right' }))} style={{ minHeight:44, padding:'6px 12px', borderRadius:8, cursor:'pointer', background:'rgba(251,191,36,0.14)', color:'#fbbf24', border:'1px solid rgba(251,191,36,0.35)', fontWeight:700, fontSize:11 }}>⇨ снимал справа</button>
+                      </>
+                    ) : (
+                      <button data-lift="ref-vs-meta-fix-front" aria-label="Поставить в параметрах вид спереди" onClick={()=> setCapture(c=>({ ...c, side:'front' }))} style={{ minHeight:44, padding:'6px 12px', borderRadius:8, cursor:'pointer', background:'rgba(251,191,36,0.14)', color:'#fbbf24', border:'1px solid rgba(251,191,36,0.35)', fontWeight:700, fontSize:11 }}>⇩ снимал спереди</button>
+                    )}
+                  </div>
                 </div>
               )}
               {/*
