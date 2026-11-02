@@ -207,6 +207,21 @@ describe('LiftMasterCard — поведение (не только смоук)',
     expect(container.querySelector('[data-lift="vbt-metric-note"]')).toBeNull();
   });
 
+  it('метрика скорости и VL-порог — настройки, а не ввод сессии: переживают перезагрузку', () => {
+    localStorage.setItem('he_lift_master_collapsed_v1', '{}');
+    const metricBtn = (c: HTMLElement, label: string) => Array.from(c.querySelectorAll('[data-lift="vbt-metric"]'))
+      .find(b => (b.textContent || '').startsWith(label)) ?? null;
+    const first = render(<LiftMasterCard sessions={[]} />);
+    click(metricBtn(first.container, 'Пиковая'));
+    act(() => { fireEvent.change(first.container.querySelector('[data-lift="vbt-threshold"]')!, { target: { value: '25' } }); });
+    first.unmount();
+    const second = render(<LiftMasterCard sessions={[]} />);
+    // Метрика — та же: сброс «Пиковая → Средняя» молча менял бы шкалу зоны MVT и e1RM.
+    expect(metricBtn(second.container, 'Пиковая')!.getAttribute('aria-pressed')).toBe('true');
+    // Порог — тоже настройка: вердикт по нему, и сброс к 20 % переписывал бы вывод.
+    expect((second.container.querySelector('[data-lift="vbt-threshold"]') as HTMLInputElement).value).toBe('25');
+  });
+
   it('подсказка из дневника работает для НЕ-жимовых движений (регрессия B3)', () => {
     const sessions = [{
       sessionId: 's1', date: '2026-08-10', exercises: [{

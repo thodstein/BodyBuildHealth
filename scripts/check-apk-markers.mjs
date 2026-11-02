@@ -358,6 +358,10 @@ mustContain('src/engines/strength-sport/strength-sport-video.engine.ts', 'export
 mustContain('src/engines/pro/vbt.engine.ts', 'export function metricConversion', 'peak→mean conversion with basis');
 mustContain('src/engines/pro/movement-diagnostics-export.engine.ts', 'Пересчёт пиковой в среднюю', 'conversion basis in report');
 mustContain('src/ui/screens/TrainingScreen_parts/LiftMasterCard.tsx', 'data-lift="vbt-metric-note"', 'conversion basis line in hub');
+// Настройки VBT, от которых зависит шкала и вердикт, не должны сбрасываться при
+// перезагрузке: иначе зона MVT/e1RM и вывод о потере скорости считаются иначе.
+mustContain('src/ui/screens/TrainingScreen_parts/LiftMasterCard.tsx', 'vbtThreshold: cleanVbtThreshold', 'VL threshold persisted');
+mustContain('src/ui/screens/TrainingScreen_parts/LiftMasterCard.tsx', 'data-lift="vbt-threshold"', 'VL threshold control');
 
 // 7d. Mojibake-бан: битые символы (U+FFFD) в файлах хаба — признак порванной кодировки.
 // В LiftMasterCard их было 11 (тексты VBT/LVP/Kinovea), и это попадало в UI АПК.

@@ -320,6 +320,13 @@ interface MasterState {
   vbtGoal: string; vbtUpdatedAt: number | null;
   /** Пауза в нижней точке, мс (ввод + персист + экспорт). */
   vbtPauseMs: string;
+  /**
+   * Метрика скорости датчика. Персистится, потому что от неё зависит шкала: сброс
+   * «Пиковая → Средняя» при перезагрузке молча менял бы зону MVT и e1RM.
+   */
+  vbtMetric?: 'mcv' | 'mpv' | 'peak';
+  /** Порог потери скорости, % — по нему выносится вердикт, поэтому он тоже настройка, а не ввод сессии. */
+  vbtThreshold?: VelocityLossThreshold;
   /** Фазовая асимметрия L/R (старт/середина/дожим) — персистится, идёт в диагноз/экспорт. */
   asymPhase: { startL: string; startR: string; midL: string; midR: string; lockL: string; lockR: string };
   /** Двойной сенсор (скорости втулок L/R) — персистится. */
@@ -439,6 +446,8 @@ function loadMaster(): MasterState {
       vbtGoal: typeof raw.vbtGoal==='string'?raw.vbtGoal.slice(0,20):'strength',
       vbtUpdatedAt: typeof raw.vbtUpdatedAt==='number' && Number.isFinite(raw.vbtUpdatedAt) ? raw.vbtUpdatedAt : null,
       vbtPauseMs: typeof raw.vbtPauseMs==='string'?raw.vbtPauseMs.slice(0,10):'',
+      vbtMetric: raw.vbtMetric === 'peak' ? 'peak' : raw.vbtMetric === 'mpv' ? 'mpv' : 'mcv',
+      vbtThreshold: cleanVbtThreshold(raw.vbtThreshold),
       asymPhase: cleanAsymPhase(raw.asymPhase),
       dualSensor: cleanDualSensor(raw.dualSensor),
       perLift: cleanPerLift(raw.perLift),
@@ -464,6 +473,11 @@ function loadMaster(): MasterState {
   } catch { return { lift:'bench', phase:'' as WeakPoint|'', issues:[], selectedGeom:{}, daysGeom:{}, selectedDiag:{}, daysDiag:{}, weakMuscleGroups:[], weakMuscleSubs:[], asymSide:null, asymL:'', asymR:'', vbtBest:'', vbtLast:'', vbtWeight:'', vbtGoal:'strength', vbtUpdatedAt:null, vbtPauseMs:'', asymPhase:{ startL:'', startR:'', midL:'', midR:'', lockL:'', lockR:'' }, dualSensor:{ left:'', right:'' }, perLift:{}, redFlags:[], ruleChecks:{}, meetDate:'', meetStrategy:'balanced' as MeetStrategy, meetMaxS:'', meetMaxB:'', meetMaxD:'', lvp:{}, capture:{ heightM:'', distM:'', side:'', device:'' }, series:{}, videoCalib:{}, videoOffsetSec:{}, videoPersp:{}, refAngle:{}, refLengthCm:'', refAxis:'across' as const, refHeadFirst:true, refMirror:false }; }
 }
 function saveMaster(s: MasterState) { try{ localStorage.setItem(MASTER_KEY, JSON.stringify(s)); }catch{} }
+/** VL-порог: настройка вердикта, а не замер. Мусор и выход за 5–60 % → 20 % (значение по умолчанию). */
+function cleanVbtThreshold(raw: unknown): VelocityLossThreshold {
+  const n = Number(raw);
+  return Number.isFinite(n) && n >= 5 && n <= 60 ? (Math.round(n) as VelocityLossThreshold) : 20;
+}
 function cleanRuleChecks(raw: unknown): Record<string, boolean> {
   if (!isRecord(raw)) return {};
   const out: Record<string, boolean> = {};
@@ -773,8 +787,8 @@ export const LiftMasterCard: React.FC<{
   const [vbtWeight, setVbtWeight] = useState(initial.vbtWeight);
   const [vbtGoal, setVbtGoal] = useState(initial.vbtGoal || 'strength');
   const [vbtUpdatedAt, setVbtUpdatedAt] = useState<number | null>(initial.vbtUpdatedAt);
-  const [vbtThreshold, setVbtThreshold] = useState<VelocityLossThreshold>(20);
-  const [vbtMetric, setVbtMetric] = useState<'mcv' | 'mpv' | 'peak'>('mcv');
+  const [vbtThreshold, setVbtThreshold] = useState<VelocityLossThreshold>(initial.vbtThreshold ?? 20);
+  const [vbtMetric, setVbtMetric] = useState<'mcv' | 'mpv' | 'peak'>(initial.vbtMetric ?? 'mcv');
   const [vbtPauseMs, setVbtPauseMs] = useState(initial.vbtPauseMs);
   const [lvpPoints, setLvpPoints] = useState<Array<{ pct: number; velocity: number }>>([]);
   const [lvpPctInput, setLvpPctInput] = useState('');
@@ -1001,7 +1015,7 @@ export const LiftMasterCard: React.FC<{
     }catch{}
   }, []);
 
-  useEffect(()=>{ saveMaster({ lift, phase, issues, selectedGeom, daysGeom, selectedDiag, daysDiag, weakMuscleGroups, weakMuscleSubs, asymSide, asymL, asymR, vbtBest, vbtLast, vbtWeight, vbtGoal, vbtUpdatedAt, vbtPauseMs, asymPhase: { startL: asymStartL, startR: asymStartR, midL: asymMidL, midR: asymMidR, lockL: asymLockL, lockR: asymLockR }, dualSensor: { left: dualLeft, right: dualRight }, perLift, redFlags, ruleChecks, meetDate, meetStrategy, meetMaxS, meetMaxB, meetMaxD, lvp: lvpSaved, capture, series: seriesStore, videoCalib, videoOffsetSec: videoOffset, videoPersp, refAngle, refLengthCm: refLength, refAxis, refHeadFirst, refMirror }); }, [lift, phase, issues, selectedGeom, daysGeom, selectedDiag, daysDiag, weakMuscleGroups, weakMuscleSubs, asymSide, asymL, asymR, vbtBest, vbtLast, vbtWeight, vbtGoal, vbtUpdatedAt, vbtPauseMs, asymStartL, asymStartR, asymMidL, asymMidR, asymLockL, asymLockR, dualLeft, dualRight, perLift, redFlags, ruleChecks, meetDate, meetStrategy, meetMaxS, meetMaxB, meetMaxD, lvpSaved, capture, seriesStore, videoCalib, videoOffset, videoPersp, refAngle, refLength, refAxis, refHeadFirst, refMirror]);
+  useEffect(()=>{ saveMaster({ lift, phase, issues, selectedGeom, daysGeom, selectedDiag, daysDiag, weakMuscleGroups, weakMuscleSubs, asymSide, asymL, asymR, vbtBest, vbtLast, vbtWeight, vbtGoal, vbtUpdatedAt, vbtPauseMs, vbtThreshold, vbtMetric, asymPhase: { startL: asymStartL, startR: asymStartR, midL: asymMidL, midR: asymMidR, lockL: asymLockL, lockR: asymLockR }, dualSensor: { left: dualLeft, right: dualRight }, perLift, redFlags, ruleChecks, meetDate, meetStrategy, meetMaxS, meetMaxB, meetMaxD, lvp: lvpSaved, capture, series: seriesStore, videoCalib, videoOffsetSec: videoOffset, videoPersp, refAngle, refLengthCm: refLength, refAxis, refHeadFirst, refMirror }); }, [lift, phase, issues, selectedGeom, daysGeom, selectedDiag, daysDiag, weakMuscleGroups, weakMuscleSubs, asymSide, asymL, asymR, vbtBest, vbtLast, vbtWeight, vbtGoal, vbtUpdatedAt, vbtPauseMs, vbtThreshold, vbtMetric, asymStartL, asymStartR, asymMidL, asymMidR, asymLockL, asymLockR, dualLeft, dualRight, perLift, redFlags, ruleChecks, meetDate, meetStrategy, meetMaxS, meetMaxB, meetMaxD, lvpSaved, capture, seriesStore, videoCalib, videoOffset, videoPersp, refAngle, refLength, refAxis, refHeadFirst, refMirror]);
 
   /** Переключение лифта: сохраняем фазу/отклонения текущего и восстанавливаем выбор целевого.
    *  Раньше общий state обнулялся — пользователь терял выбранную фазу после каждого щелчка. */
@@ -2625,7 +2639,7 @@ export const LiftMasterCard: React.FC<{
         <div style={{ display:'flex', gap:5, flexWrap:'wrap', marginTop:6, alignItems:'center' }}>
           <span style={{ fontSize:10, color:'#ffffff' }}>Метрика:</span>
           {(['mcv','mpv','peak'] as const).map(m=>{ const on=vbtMetric===m; const label = m==='mcv'?'Средняя':m==='mpv'?'MPV':'Пиковая'; return <button key={m} data-lift="vbt-metric" title={m==='mcv'?'Средняя скорость концентрической фазы':m==='mpv'?'Средняя скорость по всему подъёму':'Пиковая скорость'} onClick={()=>setVbtMetric(m)} aria-pressed={on} style={{ minHeight:44, padding:'10px 10px', borderRadius:8, cursor:'pointer', border: on?'1px solid #f472b6':'1px solid rgba(255,255,255,0.1)', background: on?'rgba(244,114,182,0.15)':'transparent', color: on?'#f472b6':'#ffffff', fontSize:10, fontWeight:700 }}>{label}{on?' ✓':''}</button>; })}
-          <label style={{ fontSize:10, color:'#ffffff' }}>VL-порог %: <input type="number" min="5" max="60" step="5" value={vbtThreshold} onChange={e=>{ const v=parseFloat(e.target.value); if(Number.isFinite(v)&&v>0) setVbtThreshold(v as VelocityLossThreshold); touchVbt(); }} style={{ width:60, marginLeft:4, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.15)', color:'#fff', borderRadius:6, padding:'4px 6px', fontSize:11 }} /></label>
+          <label style={{ fontSize:10, color:'#ffffff' }}>VL-порог %: <input data-lift="vbt-threshold" aria-label="Порог потери скорости, %" type="number" min="5" max="60" step="5" value={vbtThreshold} onChange={e=>{ const v=parseFloat(e.target.value); if(Number.isFinite(v)&&v>0) setVbtThreshold(v as VelocityLossThreshold); touchVbt(); }} style={{ width:60, marginLeft:4, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.15)', color:'#fff', borderRadius:6, padding:'4px 6px', fontSize:11 }} /></label>
           <label style={{ fontSize:10, color:'#ffffff' }}>Пауза (мс): <input type="number" min="0" step="50" value={vbtPauseMs} onChange={e=>setVbtPauseMs(e.target.value)} placeholder="напр: 1000-2000" style={{ width:80, marginLeft:4, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.15)', color:'#fff', borderRadius:6, padding:'4px 6px', fontSize:11 }} /></label>
         </div>
         {/* Пиковая скорость не равна средней, а MVT/LVP считаются по средней. Если
