@@ -14199,8 +14199,9 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     for (const m of meals) for (const it of (m.items || [])) _finalFoodIds.add(it.id);
     const _finalCategories: Record<string, number> = {};
     _finalFoodIds.forEach(id => { const f = FOOD_DB.find(x => x.id === id); const cat = f?.category || 'other'; _finalCategories[cat] = (_finalCategories[cat] || 0) + 1; });
+    const _finalMicroTotals = sumMicros(meals.flatMap(m => m.items.map(it => ({ id: it.id, amount: it.amount }))), FOOD_DB as any);
     const _finalMicro = _pickCtx.qualityMode === 'full'
-      ? analyzeMicroCoverage(sumMicros(meals.flatMap(m => m.items.map(it => ({ id: it.id, amount: it.amount }))), FOOD_DB as any), input.sex || 'male', input.weightKg, input.cyclePhase as any, !!input.isTrainingDay, input.calciumTargetOverride, input.sodiumTargetOverride)
+      ? analyzeMicroCoverage(_finalMicroTotals, input.sex || 'male', input.weightKg, input.cyclePhase as any, !!input.isTrainingDay, input.calciumTargetOverride, input.sodiumTargetOverride)
       : { coverage: [], topDeficitNutrient: null as string | null };
     _jMark('final', 'Финал (микро/гигиена/витрина)');
     // ─── Качество рациона одним числом (0–100) ───────────────────────────────
@@ -14237,6 +14238,49 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
           : `🧬 ${_mb.foodName} ${_actualG}г (из ${_mb.grams} г — ужат поздними проходами) → дефицит ${_mb.key}: +${_addedNow} ${_mb.unit} (${_mb.before}→${_mb.before + _addedNow}/${_mb.rda} ${_mb.unit})`;
       } else {
         notes[microBoostNoteIdx] = `⚠ Дефицит ${_mb.key}: ${_mb.foodName} ${_mb.grams} г не влез в калорийность дня (поздние проходы его сократили) — добавьте вручную или поднимите ккал`;
+      }
+    }
+    // ─── QG21: микро-ноты по факту (только текст, тарелки не трогаются) ───
+    // Поздние стадии (соль QG8, рыба QG13/QG19, молочка QG18, желток QG12, белок
+    // завтрака QG20) меняют тарелки ПОСЛЕ того, как ноты покрытия уже напечатаны.
+    // Замер: 144 устаревшие строки в 30 днях из 30 и 28 «призраков» («лосось не влез» при
+    // D 160%). Пересобираем семейства по финальным граммам, а не правим числа точечно:
+    // иначе статус (дефицит/близко/норма) остаётся старым.
+    if (Array.isArray(_finalMicro.coverage) && _finalMicro.coverage.length > 0) {
+      const _hasSalt21 = notes.some((n) => typeof n === 'string' && n.startsWith('🧂 Натрий'));
+      const _fresh21 = rebuildMicroFactNotes(meals as any[], _finalMicroTotals as any, {
+        sex: (input.sex === 'female' ? 'female' : 'male'),
+        isVegetarian: !!input.isVegetarian,
+        coverage: _finalMicro.coverage as MicroCoverageEntry[],
+        surpluses: ((_finalMicro as any).surpluses || []) as string[],
+        hasSaltNote: _hasSalt21,
+      });
+      // Соль: старая нота «🧂 Натрий низкий/высокий» считалась до QG8 и после соли врёт.
+      // Если состояние ушло — ноту снимаем; если осталось — переписываем числа по факту.
+      const _naFact21 = Math.round(Number(_finalMicroTotals?.['Na'] || 0));
+      const _naGoal21 = input.isTrainingDay ? Math.max(3000, Math.round(3000 + (input.weightKg || 0) * 5)) : 2300;
+      for (let i = notes.length - 1; i >= 0; i--) {
+        const s = notes[i];
+        if (typeof s !== 'string') continue;
+        if (s.startsWith('🧂 Натрий низкий')) {
+          if (_naFact21 >= 1500) notes.splice(i, 1);
+          else notes[i] = `🧂 Натрий низкий: ${_naFact21}мг / цель ${_naGoal21}мг. На тренировочном дне риск гипонатриемии (потеря с потом). Добавьте ~${Math.round((_naGoal21 - _naFact21) / 400 * 10) / 10}г соли в приёмы`;
+        } else if (s.startsWith('🧂 Натрий высокий') && _naFact21 <= 5000) {
+          notes.splice(i, 1);
+        }
+      }
+      // Место свежих нот — там, где стояла первая устаревшая: порядок чтения не уезжает.
+      let _firstIdx21 = -1;
+      for (let i = notes.length - 1; i >= 0; i--) {
+        const s = notes[i];
+        if (typeof s === 'string' && _FACT_MICRO_STALE.some((re) => re.test(s))) {
+          if (_firstIdx21 < 0 || i < _firstIdx21) _firstIdx21 = i;
+          notes.splice(i, 1);
+        }
+      }
+      if (_fresh21.length > 0) {
+        if (_firstIdx21 >= 0) notes.splice(Math.min(_firstIdx21, notes.length), 0, ..._fresh21);
+        else notes.push(..._fresh21);
       }
     }
     return {
@@ -14416,6 +14460,75 @@ function closeFoodDeficiencies(meals: Meal[], isVegetarian = false, sex: 'male'|
     }
   });
   return notes;
+}
+
+// ─── QG21: микро-ноты по факту ──────────────────────────────────────────────
+// Ноты покрытия (`⚠/🟡 <ключ>: a/b (p%)`), «⚠ Дефицит <ключ>: …» и «избыток» пишутся
+// в СЕРЕДИНЕ сборки — до соли QG8, рыбы QG13/QG19, молочки QG18, желтка QG12 и переноса
+// белка QG20. Замер на 30 днях: 144 устаревшие строки в 30 днях из 30 — 116 нот с чужими
+// числами (M2/4/тр: «⚠ Na 749 мг (22%) — дефицит» при факте 2510 мг; S1/4/тр: «⚠ VitD
+// 58% RDA» при факте 13 мкг) и 28 «призраков» («⚠ Дефицит VitD: Лосось 100 г не влез в
+// калорийность дня» — при D 160%, потому что D закрыла рыба QG19, а лосось к тому моменту
+// уже убрали поздние проходы).
+// Тарелки стадия не трогает вообще: пересобираются ТОЛЬКО тексты по финальным граммам.
+// Совет «добавьте N г» считается от фактического остатка до нормы (было — фиксированная
+// порция `foodG`, поэтому «дефицит 3%» и «добавьте 100 г» жили в одной строке).
+const _FACT_MICRO_STALE: RegExp[] = [
+  /^[🟡⚠] [A-Za-z0-9]+: [\d.,]+ ?\S*\/[\d.,]+ ?\S* \(\d+%\)/u,
+  /^⚠ [^:]+: [\d.,]+ ?\S* > верхнего предела/u,
+  /^⚠ Дефицит [A-Za-z0-9]+:/u,
+];
+
+function rebuildMicroFactNotes(
+  meals: Meal[],
+  fact: Record<string, number>,
+  opts: {
+    sex: 'male' | 'female' | 'other';
+    isVegetarian: boolean;
+    coverage: MicroCoverageEntry[];
+    surpluses: string[];
+    hasSaltNote: boolean;
+  },
+): string[] {
+  const out: string[] = [];
+  const usedIds = new Set<string>();
+  for (const m of meals) for (const it of (m.items || [])) usedIds.add(String(it.id));
+  // 1) «⚠ Дефицит <ключ>» — только там, где норма не добрана на 40% (граница
+  //    closeFoodDeficiencies), и с граммами, которые реально закрывают остаток.
+  //    Норма — RDA_BASE sex-aware (rdaFor), как и у движка: §4.5-инвариант паритета
+  //    держит planner-micro-rda-canon (нота Fe у женщины — 18, а не 12 фазовой витрины).
+  for (const [key, cfg] of Object.entries(RDA_TARGETS)) {
+    const effRda = rdaFor(key, opts.sex) || cfg.rda;
+    const val = Number(fact[key] || 0);
+    if (!(effRda > 0) || val >= effRda * 0.6) continue;
+    const sourceId = opts.isVegetarian ? (cfg.vegFoodId || cfg.foodId) : cfg.foodId;
+    const sourceIds = [sourceId, ...cfg.alternatives].filter((id) => !usedIds.has(id));
+    const food = sourceIds.map((id) => FOOD_DB.find((f) => f.id === id)).find(Boolean)
+      || FOOD_DB.find((f) => f.id === sourceId) || FOOD_DB.find((f) => f.id === cfg.foodId);
+    if (!food) continue;
+    const per100 = getMicroFromFood(food, key);
+    const gap = effRda - val;
+    const addG = per100 > 0
+      ? Math.min(300, Math.max(5, Math.ceil((gap / per100) * 100 / 5) * 5))
+      : cfg.foodG;
+    const addUnits = Math.round(getMicroFromFood(food, key) * addG / 100);
+    // floor, а не round: нота существует только при < 60% нормы, а округление вверх
+    // давало «⚠ Дефицит K: 60% RDA» — число, которое спорит с собственным порогом.
+    const pct = Math.floor((val / effRda) * 100);
+    const alreadyUsed = usedIds.has(food.id);
+    out.push(`⚠ Дефицит ${key}: ${pct}% RDA (${Math.round(val)}/${effRda} ${cfg.unit}). ${alreadyUsed ? `Увеличьте уже используемый продукт ${food.name}` : `Добавьте ${food.name}`} ${addG} г (ещё ${addUnits} ${cfg.unit})`);
+  }
+  // 2) Остальные нутриенты — по статусу ФИНАЛЬНОГО покрытия. Na уходит из этого списка,
+  //    если в плане есть соль: две разные цифры Na в одном плане — это не честность.
+  for (const c of opts.coverage) {
+    if (c.nutrient in RDA_TARGETS) continue;
+    if (c.nutrient === 'Na' && opts.hasSaltNote) continue;
+    if (c.status === 'low') out.push(`🟡 ${c.nutrient}: ${c.actual}${c.unit}/${c.target}${c.unit} (${c.pct}%) — близко к дефициту`);
+    else if (c.status === 'deficit') out.push(`⚠ ${c.nutrient}: ${c.actual}${c.unit}/${c.target}${c.unit} (${c.pct}%) — дефицит`);
+  }
+  // 3) Избытки — тоже по финальным тарелкам (раньше считались до поздних правок).
+  out.push(...opts.surpluses);
+  return out;
 }
 
 // D-23: активное закрытие дефицита — добавляет целевой продукт для самого критичного

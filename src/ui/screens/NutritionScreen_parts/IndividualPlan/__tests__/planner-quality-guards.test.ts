@@ -1,5 +1,5 @@
 /**
- * Регрессия «пакета качества» (QG1–QG20) планировщика.
+ * Регрессия «пакета качества» (QG1–QG21) планировщика.
  *
  * Зачем: сходимость дня ≤3% ловит только КБЖУ. Жалобы шли на «съедобность»:
  * «19 г малины», «жир всего дня в одном приёме», «овощей 190 г», «в обед 12 г белка»,
@@ -50,6 +50,9 @@
  *   дней с завтраком <0.30 г/кг    16/30        11/30 (QG20)
  *   ось «белок осн. приёма» (QG20) 82.4         84.0
  *   средняя оценка дня (QG20)      91.13        91.50
+ *   устаревших микро-нот (QG21)    144          0    (116 чисел + 28 призраков)
+ *   «⚠ Дефицит» с пустой порцией   12           0    (QG21)
+ *   дней с двумя цифрами Na (QG21) 25           0
  */
 import { describe, it, expect } from 'vitest';
 import { buildDayPlan, type MealPlanInput } from '../meal-plan-engine';
@@ -1376,6 +1379,102 @@ describe('белок завтрака из приёмов с запасом (QG2
     } as unknown as MealPlanInput);
     const notes = ((manual.notes || []) as string[]).filter((n) => n.startsWith(NOTES20));
     expect(notes.join(' | ')).toBe('');
+  });
+});
+
+describe('микро-ноты по факту (QG21)', () => {
+  // Замер после QG20 на тех же 30 днях: 144 устаревшие строки в 30 днях из 30 — 116 нот с
+  // чужими числами (M2/4/тр: «⚠ Na 749 мг/3450 мг (22%) — дефицит» при факте 2510 мг;
+  // S1/4/тр: «⚠ VitD 58% RDA (9/15 мкг)» при факте 13 мкг; «⚠ VitE 1 мг (4%)» при 9 мг) и
+  // 28 «призраков» («⚠ Дефицит VitD: Лосось 100 г не влез в калорийность дня» — при
+  // D 160%, потому что D закрыла рыба QG19). Причина системная: ноты покрытия и
+  // «⚠ Дефицит» пишутся В СЕРЕДИНЕ сборки, а соль QG8, рыба QG13/QG19, молочка QG18,
+  // желток QG12 и белок завтрака QG20 меняют тарелки ПОСЛЕ них.
+  // QG21 пересобирает оба семейства по финальным граммам и по одному канону норм
+  // (RDA_BASE sex-aware): тарелки не трогает вообще, только текст.
+  // Замер: устаревших 144 → 0, призраков 28 → 0, неверных порций 12 → 0, двух цифр Na в
+  // одном плане 25 дней → 0; нот покрытия 130 → 69, «Дефицит» 21 → 35.
+  const NOTES21 = /^[🟡⚠] ([A-Za-z0-9]+): ([\d.,]+) ?(\S*)\/([\d.,]+) ?(\S*) \((\d+)%\)/u;
+  const DEF21 = /^⚠ Дефицит ([A-Za-z0-9]+): (\d+)% RDA \(([\d.,]+)\/([\d.,]+) (\S+)\)/u;
+  const notesOf21 = (d: Day) => ((d.plan.notes || []) as string[]).filter((n) => typeof n === 'string');
+  const microsOf21 = (d: Day) => sumMicros(
+    items(d).map(({ x }) => ({ id: x.id, amount: x.amount })), FOOD_DB as any,
+  ) as any;
+
+  it('ноты покрытия называют тарелку: ни одной строки «≠ факт»', () => {
+    const bad: string[] = [];
+    for (const d of DAYS) {
+      const micros = microsOf21(d);
+      for (const n of notesOf21(d)) {
+        const m = n.match(NOTES21);
+        if (!m) continue;
+        const fact = Number(micros[m[1]] || 0);
+        const said = Number(m[2]);
+        if (Math.abs(said - fact) > 1 && Math.abs(said - fact) / Math.max(1, fact) > 0.05) {
+          bad.push(`${d.id}: ${m[1]} нота ${said} / факт ${fact.toFixed(1)}`);
+        }
+      }
+    }
+    expect(bad.slice(0, 5).join(' | ')).toBe('');
+  });
+
+  it('нет «призраков»: закрытый дефицит не советует продукт, который уже убрали', () => {
+    const ghosts = DAYS.flatMap((d) => notesOf21(d)
+      .filter((n) => /не влез в калорийность/.test(n))
+      .map((n) => `${d.id}: ${n.slice(0, 60)}`));
+    expect(ghosts.slice(0, 3).join(' | ')).toBe('');
+  });
+
+  it('«⚠ Дефицит» называет факт и порцию, которая закрывает остаток', () => {
+    const bad: string[] = [];
+    let total = 0;
+    for (const d of DAYS) {
+      const micros = microsOf21(d);
+      for (const n of notesOf21(d)) {
+        const m = n.match(DEF21);
+        if (!m) continue;
+        total++;
+        const key = m[1];
+        const fact = Number(micros[key] || 0);
+        if (Math.abs(Number(m[3]) - fact) > 1) bad.push(`${d.id}/${key}: ${m[3]} при факте ${fact.toFixed(1)}`);
+        if (Math.abs(Number(m[2]) - Math.floor((fact / Number(m[4])) * 100)) > 1) {
+          bad.push(`${d.id}/${key}: ${m[2]}% ≠ ${fact.toFixed(1)}/${m[4]}`);
+        }
+        const portion = n.match(/(?:Добавьте|Увеличьте уже используемый продукт) (.+?) (\d+) г \(ещё (\d+)/);
+        if (!portion) { bad.push(`${d.id}/${key}: нет порции (${n.slice(0, 50)})`); continue; }
+        const g = Number(portion[2]);
+        const add = Number(portion[3]);
+        // Порция закрывает остаток до нормы (кроме случая упора в «еду, не ванну» 300 г).
+        if (g < 300 && fact + add < Number(m[4]) * 0.95) {
+          bad.push(`${d.id}/${key}: ${m[3]}+${add} при норме ${m[4]} (${g} г)`);
+        }
+      }
+    }
+    expect(total, 'нот «Дефицит» на 30 дней').toBeGreaterThanOrEqual(20);
+    expect(bad.slice(0, 5).join(' | ')).toBe('');
+  });
+
+  it('одна цифра натрия: если соль в плане, отдельной Na-ноты нет', () => {
+    const bad: string[] = [];
+    for (const d of DAYS) {
+      const hasSalt = notesOf21(d).some((n) => n.startsWith('🧂 Натрий'));
+      if (!hasSalt) continue;
+      const naNote = notesOf21(d).find((n) => /^[🟡⚠] Na:/.test(n));
+      if (naNote) bad.push(`${d.id}: ${naNote.slice(0, 70)}`);
+    }
+    expect(bad.slice(0, 3).join(' | ')).toBe('');
+  });
+
+  it('ноты не исчезают молча: микро-нот в дне по-прежнему достаточно', () => {
+    let total = 0;
+    let empty = 0;
+    for (const d of DAYS) {
+      const n = notesOf21(d).filter((s) => NOTES21.test(s) || DEF21.test(s)).length;
+      total += n;
+      if (n === 0) empty++;
+    }
+    expect(total, `микро-нот на 30 дней`).toBeGreaterThanOrEqual(90);
+    expect(empty, 'дней без микро-нот').toBeLessThanOrEqual(1);
   });
 });
 
