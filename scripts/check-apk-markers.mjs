@@ -308,6 +308,14 @@ mustContain('src/engines/strength-sport/strength-sport-video.engine.ts', 'export
 mustContain('src/engines/strength-sport/strength-sport-video.engine.ts', 'export interface BarRepCamera', 'camera travels with the snapshot');
 mustContain('src/ui/screens/TrainingScreen_parts/LiftMasterCard.tsx', 'snapshotBarRep(r, 24, cameraRef)', 'hub snapshots camera');
 mustContain('src/ui/screens/TrainingScreen_parts/LiftMasterCard.tsx', 'sessionAngleMismatch(', 'hub names angle mismatch');
+// Сравнение с прошлой сессией: дельта едет в отчёт вместе с оговорками (другой вес/ракурс),
+// иначе отчёт пересылают как «прогресс техники», хотя это разница условий съёмки.
+mustContain('src/engines/pro/movement-diagnostics-export.engine.ts', 'Δvmax к прошлой сессии, %', 'session delta in report');
+mustContain('src/engines/pro/movement-diagnostics-export.engine.ts', 'Сравнение сессий', 'session caveats in report');
+mustContain('src/ui/screens/TrainingScreen_parts/LiftMasterCard.tsx', 'sessionNote: sessionCompare', 'hub fills session comparison');
+mustContain('src/ui/screens/TrainingScreen_parts/LiftMasterCard.tsx', 'sessionCaveat,', 'caveats reach the picture');
+mustContain('src/engines/pro/trajectory-overlay.engine.ts', 'export function wrapCaptionLines', 'long captions wrapped, not cut');
+mustContain('src/engines/pro/movement-diagnostics-export.engine.ts', 'wrapCaptionLines(', 'svg captions wrapped too');
 
 // 7d. Mojibake-бан: битые символы (U+FFFD) в файлах хаба — признак порванной кодировки.
 // В LiftMasterCard их было 11 (тексты VBT/LVP/Kinovea), и это попадало в UI АПК.

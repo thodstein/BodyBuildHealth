@@ -96,6 +96,30 @@ describe('buildTrajectorySvg — экспорт траектории штанг�
     expect(footerYs[3]).toBeLessThan(height);
   });
 
+  it('длинная оговорка к сравнению переносится и остаётся внутри картинки', () => {
+    const caveat = '⚠ ракурс 8° → 25°: ΔxLoop — разница ракурсов, а не техники · ΔxLoop с поправкой +0.6 см (оценка)';
+    const svg = buildTrajectorySvg({
+      liftRu: 'Жим лёжа',
+      series: REP,
+      sessionText: 'vmax ниже прошлой сессии',
+      sessionCaveat: caveat,
+      createdAt: '2026-11-01',
+    });
+    // Слова не разрезаны и не потеряны, но ни одна строка не длиннее бюджета подписи.
+    const infoLines = [...svg.matchAll(/<text[^<>]*fill="(#[0-9a-f]+)"[^<>]*font-size="10">([^<]*)<\/text>/g)]
+      .map((m) => ({ color: m[1], text: m[2] }));
+    const caveatLines = infoLines.filter((l) => l.color === '#fbbf24').map((l) => l.text);
+    expect(caveatLines.length).toBeGreaterThan(1);
+    expect(caveatLines.join(' ')).toBe(caveat);
+    for (const line of caveatLines) expect(line.length).toBeLessThanOrEqual(78);
+    // Оговорка — вниманием, а не будничным серым.
+    expect(svg).toContain('fill="#fbbf24"');
+    // Каждая подпись выше нижнего края, иначе её обрежет вьюпорт.
+    const height = Number(/height="(\d+)"/.exec(svg)![1]);
+    const ys = [...svg.matchAll(/<text[^>]*y="(\d+)"/g)].map((m) => Number(m[1]));
+    for (const y of ys) expect(y).toBeLessThan(height);
+  });
+
   it('без лишних строк высота картинки остаётся 320 (раскладка не разъехалась)', () => {
     const svg = buildTrajectorySvg({ liftRu: 'Тяга', series: REP, createdAt: '2026-11-01' });
     expect(/height="320"/.test(svg)).toBe(true);

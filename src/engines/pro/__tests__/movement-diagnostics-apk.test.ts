@@ -45,8 +45,8 @@ describe('movement-diagnostics-export', () => {
     // качество и параметры съёмки, ракурс по замеру, угол камеры по эталону, ось
     // эталона и поправка горизонтали, спор параметров и замера, чем нанесена линия
     // на видео, асимметрия, метрика/порог/пауза VBT, LVP r²).
-    expect(lines.length).toBe(42);
-    for (const field of ['Kinovea turnover', 'Kinovea повторов', 'Overlay потеря vmax', 'Heatmap медленных отрезков', 'Точка срыва', 'Скорость в точке срыва', 'Вес штанги на записи', 'Качество съёмки', 'Съёмка: параметры', 'Горизонтальный ход штанги', 'Проверка ракурса', 'Угол камеры по эталону', 'Эталон в кадре', 'Эталон: ось', 'xLoop с поправкой на ракурс', 'Поправка xLoop на ракурс', 'Ракурс: параметры и замер', 'Наложение линии на видео', 'Масштаб калибровки кадра', 'Разброс масштаба по высоте', 'Привязок перспективы', 'Смещение трека от начала видео', 'Масштаб CSV', 'Асимметрия', 'VBT метрика', 'VBT VL-порог', 'VBT пауза', 'LVP r²']) {
+    expect(lines.length).toBe(46);
+    for (const field of ['Kinovea turnover', 'Kinovea повторов', 'Overlay потеря vmax', 'Heatmap медленных отрезков', 'Точка срыва', 'Скорость в точке срыва', 'Вес штанги на записи', 'Качество съёмки', 'Съёмка: параметры', 'Горизонтальный ход штанги', 'Проверка ракурса', 'Угол камеры по эталону', 'Эталон в кадре', 'Эталон: ось', 'xLoop с поправкой на ракурс', 'Поправка xLoop на ракурс', 'Ракурс: параметры и замер', 'Δvmax к прошлой сессии, %', 'ΔxLoop к прошлой сессии, см', 'ΔxLoop к прошлой сессии с поправкой на ракурс, см', 'Сравнение сессий', 'Наложение линии на видео', 'Масштаб калибровки кадра', 'Разброс масштаба по высоте', 'Привязок перспективы', 'Смещение трека от начала видео', 'Масштаб CSV', 'Асимметрия', 'VBT метрика', 'VBT VL-порог', 'VBT пауза', 'LVP r²']) {
       expect(csv).toContain(field);
     }
     expect(csv).toContain("'=cmd|evil");
@@ -155,6 +155,33 @@ describe('movement-diagnostics-export', () => {
     expect(html).toContain('оценка — не замена съёмке в плоскости движения');
     // Без поправки строки нет вовсе, а не «0 см».
     expect(buildMovementDiagnosticsHtml({ ...BASE, kinoveaXLoop: 2.85 })).not.toContain('с поправкой на ракурс');
+  });
+  it('сравнение с прошлой сессией — дельта числами, оговорки к ней рядом, а не вместо', () => {
+    const inp = {
+      ...BASE,
+      kinoveaXLoop: 2.85,
+      sessionDeltaVmaxPct: -8,
+      sessionDeltaXLoopCm: 0.4,
+      sessionDeltaXLoopCorrectedCm: 0.6,
+      sessionNote: 'прошлая сессия 28.10.2026 · vmax упал · ⚠ вес 100 → 95 кг: скорость сравнивайте при равном весе',
+    };
+    const csv = buildMovementDiagnosticsCsv(inp);
+    const val = (field: string) => csv.split('\n').find((l) => l.startsWith(`"${field}","`))!;
+    expect(val('Δvmax к прошлой сессии, %')).toBe('"Δvmax к прошлой сессии, %","-8"');
+    expect(val('ΔxLoop к прошлой сессии, см')).toBe('"ΔxLoop к прошлой сессии, см","0.4"');
+    expect(val('ΔxLoop к прошлой сессии с поправкой на ракурс, см')).toBe('"ΔxLoop к прошлой сессии с поправкой на ракурс, см","0.6"');
+    expect(val('Сравнение сессий')).toContain('вес 100 → 95');
+
+    const html = buildMovementDiagnosticsHtml(inp);
+    expect(html).toContain('Сравнение с прошлой сессией');
+    expect(html).toContain('Δvmax -8%');
+    expect(html).toContain('ΔxLoop +0.4 см');
+    expect(html).toContain('(оценка)');
+    expect(html).toContain('вес 100 → 95');
+
+    // Без прошлой сессии — прочерк в таблице и ни строки в отчёте (а не «0 %»).
+    expect(buildMovementDiagnosticsCsv({ ...BASE })).toContain('"Δvmax к прошлой сессии, %","—"');
+    expect(buildMovementDiagnosticsHtml({ ...BASE })).not.toContain('Сравнение с прошлой сессией');
   });
   it('VBT-метрика в отчёте — по-русски, без id «mcv»', () => {
     const csv = buildMovementDiagnosticsCsv({ ...BASE, vbtMetric: 'mcv' });

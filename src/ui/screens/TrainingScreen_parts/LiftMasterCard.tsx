@@ -1356,6 +1356,22 @@ export const LiftMasterCard: React.FC<{
     const diff = Math.abs(curWeightKg - prev);
     return diff / prev > 0.025 ? { prev, cur: curWeightKg, diffKg: Math.round(diff * 10) / 10 } : null;
   }, [savedSeries, curWeightKg]);
+  /**
+   * Оговорки к сравнению сессий одной строкой: другой вес / другой ракурс. Одна на все
+   * выходы (хаб → отчёт → SVG/PNG): дельта без оговорки читается как прогресс техники,
+   * даже когда это разница съёмки.
+   */
+  const sessionCaveat = useMemo(() => {
+    const parts: string[] = [];
+    if (weightMismatch) parts.push(`⚠ вес ${weightMismatch.prev} → ${weightMismatch.cur} кг: скорость сравнивайте при равном весе`);
+    if (angleMismatch) {
+      parts.push(`⚠ ракурс ${angleMismatch.prevDeg ?? '?'}° → ${angleMismatch.curDeg ?? '?'}°: ΔxLoop — разница ракурсов, а не техники`);
+      if (angleMismatch.correctedDeltaCm != null) {
+        parts.push(`ΔxLoop с поправкой ${angleMismatch.correctedDeltaCm > 0 ? '+' : ''}${angleMismatch.correctedDeltaCm} см (оценка)`);
+      }
+    }
+    return parts.join(' · ');
+  }, [weightMismatch, angleMismatch]);
 
   // diary hint (каноника phaseForReps)
   const diaryHint = useMemo(()=>{
@@ -1597,6 +1613,7 @@ export const LiftMasterCard: React.FC<{
     const pauseMs = parseFloat(vbtPauseMs);
     const SIDE_RU: Record<string, string> = { left: 'слева', right: 'справа', front: 'фронт' };
     const DEVICE_RU: Record<string, string> = { phone: 'телефон', kinovea: 'Kinovea', enode: 'Enode' };
+    const VERDICT_RU: Record<string, string> = { worse: 'vmax упал', better: 'vmax вырос', same: 'vmax без изменений' };
     const csvK = parseFloat(kinoveaScale);
     return {
       lift, liftRu: LIFT_RU[lift],
@@ -1637,6 +1654,18 @@ export const LiftMasterCard: React.FC<{
       xLoopRefCorrectionPct: xLoopFix.flag === 'ok' ? xLoopFix.pct : null,
       // Неразрешённый спор параметров и замера не должен прятаться в отчёте.
       angleMetaConflict: sideConflict ? sideConflict.text : null,
+      // Прошлая сессия: дельта едет в отчёт вместе со своими оговорками. Без них отчёт
+      // молча повторял бы две ошибки, которые в хабе уже помечены — другой вес и другой ракурс.
+      sessionDeltaVmaxPct: sessionCompare ? sessionCompare.deltaPct : null,
+      sessionDeltaXLoopCm: sessionCompare ? sessionCompare.deltaXLoopCm : null,
+      sessionDeltaXLoopCorrectedCm: angleMismatch ? angleMismatch.correctedDeltaCm : null,
+      sessionNote: sessionCompare
+        ? [
+            savedSeries ? `прошлая сессия ${new Date(savedSeries.savedAt).toLocaleDateString('ru-RU')}` : '',
+            VERDICT_RU[sessionCompare.verdict] ?? '',
+            sessionCaveat,
+          ].filter(Boolean).join(' · ')
+        : null,
       refAxis: curRefAngle ? (curRefAngle.axis === 'along' ? 'along' : 'across') : null,
       videoOverlayMode: kinoveaResult ? (curPersp ? 'perspective' : curCalib ? 'calibration' : 'panel') : '',
       videoScalePxPerCm: curCalib ? Math.round(curCalib.pxPerCm * 100) / 100 : null,
@@ -3221,6 +3250,7 @@ export const LiftMasterCard: React.FC<{
                   vmax: kinoveaResult ? kinoveaResult.vmax : null,
                   overlayText: kinoveaOverlay ? kinoveaOverlay.text : '',
                   sessionText: sessionCompare ? sessionCompare.text : '',
+                  sessionCaveat,
                   angleText: angleShortText ?? '',
                   captureQuality: captureQualityText,
                 });
@@ -3239,6 +3269,7 @@ export const LiftMasterCard: React.FC<{
                   // Тот же набор подписей, что в SVG: PNG пересылают отдельно от отчёта.
                   overlayText: kinoveaOverlay ? kinoveaOverlay.text : '',
                   sessionText: sessionCompare ? sessionCompare.text : '',
+                  sessionCaveat,
                   angleText: angleShortText ?? '',
                   captureQuality: captureQualityText,
                 });

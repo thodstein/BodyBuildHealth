@@ -9,6 +9,8 @@ import {
   recordVideoWithOverlay,
   trajectoryPngLines,
   trajectoryPngLayout,
+  wrapCaptionLines,
+  CAPTION_MAX_CHARS,
 } from '../trajectory-overlay.engine';
 
 describe('mapTrajectoryPoints — проекция см → пиксели канвы', () => {
@@ -149,6 +151,27 @@ describe('trajectoryPngLines / trajectoryPngLayout — подписи PNG как
     const lines = trajectoryPngLines({ liftRu: 'Присед', overlayText: '   ', sessionText: '', captureQuality: ' ', angleText: undefined });
     expect(lines).toEqual([]);
     expect(trajectoryPngLayout({ liftRu: 'Присед', angleText: '' }).h).toBe(640);
+  });
+
+  it('оговорки к сравнению — отдельной строкой, а не хвостом длинного сравнения', () => {
+    const caveat = '⚠ вес 100 → 95 кг: скорость сравнивайте при равном весе';
+    const lines = trajectoryPngLines({ liftRu: 'Присед', sessionText: 'сравнение', sessionCaveat: caveat, angleText: 'ракурс' });
+    expect(lines.map((l) => l.text)).toEqual(['сравнение', caveat, 'ракурс']);
+    // Оговорка — предупреждение: тот же цвет внимания, что у ракурса.
+    expect(lines[1].color).toBe('#fbbf24');
+  });
+
+  it('длинная подпись переносится по словам: хвост оговорки не обрезается', () => {
+    const long = '⚠ ракурс 8° → 25°: ΔxLoop — разница ракурсов, а не техники · ΔxLoop с поправкой +0.6 см (оценка)';
+    const lines = wrapCaptionLines(long);
+    expect(lines.length).toBeGreaterThan(1);
+    // Ни одно слово не потеряно и не разрезано, и каждая строка в бюджете.
+    expect(lines.join(' ')).toBe(long);
+    for (const line of lines) expect(line.length).toBeLessThanOrEqual(CAPTION_MAX_CHARS);
+    // Раскладка считает каждую перенесённую строку — картинка растёт, а не налезает.
+    const layout = trajectoryPngLayout({ liftRu: 'Присед', sessionCaveat: long });
+    expect(layout.lines.length).toBe(lines.length);
+    expect(layout.h).toBe(640 + lines.length * 20);
   });
 
   it('свой размер канвы сохраняется, рост идёт поверх него', () => {

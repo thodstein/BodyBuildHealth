@@ -11,6 +11,8 @@ import type { Lift, WeakPoint } from '../lms/weakpoint-pl';
 import type { BarPathIssue } from './lift-diagnostics.engine';
 import { barLoopFlag } from './bar-path-core.engine';
 import { barSpeedHeat, BAR_HEAT_COLORS } from '../strength-sport/strength-sport-video.engine';
+// Перенос длинных подписей — один на SVG и PNG, иначе картинки расходятся в трактовке.
+import { wrapCaptionLines } from './trajectory-overlay.engine';
 
 export type VideoOverlayMode = 'panel' | 'calibration' | 'perspective';
 
@@ -88,6 +90,17 @@ export interface MovementDiagnosticsExportInput {
    * отчёт обязан его показать: иначе в нём рядом стоят два противоположных вывода.
    */
   angleMetaConflict?: string | null;
+  /** Δvmax к прошлой сессии, %: отрицательное — скорость упала. */
+  sessionDeltaVmaxPct?: number | null;
+  /** ΔxLoop к прошлой сессии, см (как измерено, без поправки на ракурс). */
+  sessionDeltaXLoopCm?: number | null;
+  /** ΔxLoop с поправкой на ракурс, см: только если углы обоих сессий известны и ≤ 40°. */
+  sessionDeltaXLoopCorrectedCm?: number | null;
+  /**
+   * Сравнение с прошлой сессией словами: дата, вердикт и оговорки (другой вес, другой
+   * ракурс). Отчёт не должен показывать дельту без них — в UI эти оговорки уже есть.
+   */
+  sessionNote?: string | null;
   /**
    * Чем нанесена линия на видео: panel — панель без калибровки, calibration — единый
    * масштаб (px/см), perspective — по 4 привязкам. Отчёт без этого не воспроизводим.
@@ -235,6 +248,10 @@ export function buildMovementDiagnosticsCsv(inp: MovementDiagnosticsExportInput)
     ['xLoop с поправкой на ракурс, см', inp.xLoopRefCorrectedCm != null ? String(inp.xLoopRefCorrectedCm) : '—'],
     ['Поправка xLoop на ракурс, %', inp.xLoopRefCorrectionPct != null ? String(inp.xLoopRefCorrectionPct) : '—'],
     ['Ракурс: параметры и замер', inp.angleMetaConflict || '—'],
+    ['Δvmax к прошлой сессии, %', inp.sessionDeltaVmaxPct != null ? String(inp.sessionDeltaVmaxPct) : '—'],
+    ['ΔxLoop к прошлой сессии, см', inp.sessionDeltaXLoopCm != null ? String(inp.sessionDeltaXLoopCm) : '—'],
+    ['ΔxLoop к прошлой сессии с поправкой на ракурс, см', inp.sessionDeltaXLoopCorrectedCm != null ? String(inp.sessionDeltaXLoopCorrectedCm) : '—'],
+    ['Сравнение сессий', inp.sessionNote || '—'],
     ['Наложение линии на видео', videoOverlayModeRu(inp.videoOverlayMode)],
     ['Масштаб калибровки кадра, px/см', inp.videoScalePxPerCm != null ? String(inp.videoScalePxPerCm) : '—'],
     ['Разброс масштаба по высоте, %', inp.videoPerspSkewPct != null ? String(inp.videoPerspSkewPct) : '—'],
@@ -269,6 +286,19 @@ export function angleDriftLabel(basis?: 'side' | 'front' | 'unknown'): string {
   if (inp.videoPerspAnchors != null) parts.push(`привязок ${inp.videoPerspAnchors}`);
   if (inp.videoOffsetSec != null) parts.push(`трек с ${fmt(inp.videoOffsetSec, 2)} с`);
   if (inp.csvScaleCmPerUnit != null && inp.csvScaleCmPerUnit !== 1) parts.push(`CSV ${fmt(inp.csvScaleCmPerUnit, 2)} см/ед`);
+  return parts.join(' · ');
+}
+
+/** Строка сравнения с прошлой сессией для HTML: дельты числами + оговорки словами. */
+function sessionCompareRuLine(inp: MovementDiagnosticsExportInput): string {
+  const sign = (n: number) => (n > 0 ? '+' : '');
+  const parts: string[] = [];
+  if (inp.sessionDeltaVmaxPct != null) parts.push(`Δvmax ${sign(inp.sessionDeltaVmaxPct)}${fmt(inp.sessionDeltaVmaxPct, 0)}%`);
+  if (inp.sessionDeltaXLoopCm != null) parts.push(`ΔxLoop ${sign(inp.sessionDeltaXLoopCm)}${fmt(inp.sessionDeltaXLoopCm, 1)} см`);
+  if (inp.sessionDeltaXLoopCorrectedCm != null) {
+    parts.push(`ΔxLoop с поправкой на ракурс ${sign(inp.sessionDeltaXLoopCorrectedCm)}${fmt(inp.sessionDeltaXLoopCorrectedCm, 1)} см (оценка)`);
+  }
+  if (inp.sessionNote) parts.push(inp.sessionNote);
   return parts.join(' · ');
 }
 
@@ -321,6 +351,8 @@ export function buildMovementDiagnosticsHtml(inp: MovementDiagnosticsExportInput
         + '; оценка — не замена съёмке в плоскости движения)')
       : '')
     + (inp.angleMetaConflict ? li('Ракурс: параметры и замер', inp.angleMetaConflict) : '')
+    + ((inp.sessionNote || inp.sessionDeltaVmaxPct != null || inp.sessionDeltaXLoopCm != null)
+      ? li('Сравнение с прошлой сессией', sessionCompareRuLine(inp)) : '')
     + ((inp.videoOverlayMode || inp.videoScalePxPerCm != null || inp.videoPerspSkewPct != null || inp.videoOffsetSec != null)
       ? li('Наложение линии на видео', videoOverlayRuLine(inp)) : '')
     + (inp.asymmetryPct != null ? li('Асимметрия', `${fmt(inp.asymmetryPct, 1)}% ${inp.asymmetryVerdict || ''}`) : '')
@@ -347,6 +379,8 @@ export interface TrajectoryExportInput {
   overlayText?: string;
   /** Готовая строка сравнения сессий («vmax ниже прошлой сессии: …»). */
   sessionText?: string;
+  /** Оговорки к сравнению (другой вес/ракурс) — отдельной строкой, чтобы не терялись в хвосте. */
+  sessionCaveat?: string;
   /** Короткая строка ракурса для картинки («⚠ ход 37.5% — либо техника, либо камера не под 90°»). */
   angleText?: string;
   captureQuality?: string;
@@ -372,8 +406,12 @@ export function buildTrajectorySvg(inp: TrajectoryExportInput): string {
   // Строки подписи идут столбиком: раньше текст сравнения сессий и дата рисовались
   // на одной высоте (y=308) и накладывались друг на друга. Дополнительные строки
   // увеличивают высоту картинки, а не налезают на график.
-  const infoLines = [inp.overlayText, inp.sessionText, inp.angleText]
-    .filter((t): t is string => typeof t === 'string' && t.trim().length > 0);
+  const infoLines = [
+    [inp.overlayText, '#e5e7eb'] as const,
+    [inp.sessionText, '#cbd5e1'] as const,
+    [inp.sessionCaveat, '#fbbf24'] as const,
+    [inp.angleText, '#fbbf24'] as const,
+  ].flatMap(([text, color]) => wrapCaptionLines(text).map((line) => ({ text: line, color })));
   const extraLines = Math.max(0, infoLines.length - 1);
   const H = 320 + extraLines * 14;
   const PAD_X = 44;
@@ -442,9 +480,8 @@ export function buildTrajectorySvg(inp: TrajectoryExportInput): string {
   const footerY = H - PAD_BOTTOM + 20;
   parts.push(`<text x="${PAD_X}" y="${footerY}" fill="#d1d5db" font-family="sans-serif" font-size="10">${esc(footer.join(' · ') || '—')}</text>`);
   let textY = footerY + 16;
-  const infoFill = ['#e5e7eb', '#cbd5e1', '#fbbf24'];
-  for (let i = 0; i < infoLines.length; i++) {
-    parts.push(`<text x="${PAD_X}" y="${textY}" fill="${infoFill[i] ?? '#cbd5e1'}" font-family="sans-serif" font-size="10">${esc(infoLines[i])}</text>`);
+  for (const line of infoLines) {
+    parts.push(`<text x="${PAD_X}" y="${textY}" fill="${line.color}" font-family="sans-serif" font-size="10">${esc(line.text)}</text>`);
     textY += 14;
   }
   parts.push(`<text x="${PAD_X}" y="${H - 12}" fill="#6b7280" font-family="sans-serif" font-size="9">${esc(inp.createdAt || new Date().toISOString().slice(0, 10))} · скорость из видео — оценка (не LPT)</text>`);

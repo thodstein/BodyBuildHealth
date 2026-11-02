@@ -214,6 +214,96 @@ describe('хаб → CSV: как нанесена линия на видео', (
   });
 });
 
+describe('хаб → отчёт: сравнение с прошлой сессией', () => {
+  /** CSV с достаточным числом точек: из четырёх строк повтор не сегментируется. */
+  const rows = (() => {
+    const out = ['time,x,y'];
+    for (let i = 0; i < 20; i++) out.push(`${(i * 0.05).toFixed(2)},${100 + i * 1.5},${50 + i * 4}`);
+    return out.join('\n');
+  })();
+  /** Прошлая сессия снята под 8°, текущая — под 25°: xLoop сравнивать нельзя, vmax можно. */
+  const past = {
+    series: {
+      bench: {
+        savedAt: Date.UTC(2026, 9, 28),
+        weightKg: 100,
+        reps: [{ index: 1, vmax: 0.52, xLoop: 2.1, amplitude: 40, points: [[0, 0], [0.5, 10], [1, 20]], cosPhi: 0.99, angleDeg: 8 }],
+      },
+    },
+  };
+  const now = {
+    vbtWeight: '95',
+    refAngle: { bench: { azimuthDeg: 25, ratio: 0.906, cosPhi: 0.906, lengthCm: 131, atSec: null, spanPx: 300 } },
+  };
+
+  it('дельта vmax и xLoop — числами, оговорки про вес и ракурс — рядом с ними', async () => {
+    const csv = await exportCsv({ ...past, ...now }, rows, '1');
+    expect(rowValue(csv, 'Δvmax к прошлой сессии, %')).toMatch(/^"-?\d+"$/);
+    expect(rowValue(csv, 'ΔxLoop к прошлой сессии, см')).toMatch(/^"-?\d+(\.\d)?"$/);
+    // Поправка на ракурс — отдельной строкой: измеренное не подменяется оценкой.
+    expect(rowValue(csv, 'ΔxLoop к прошлой сессии с поправкой на ракурс, см')).toMatch(/^"-?\d+(\.\d)?"$/);
+    const note = rowValue(csv, 'Сравнение сессий');
+    expect(note).toContain('прошлая сессия 28.10.2026');
+    expect(note).toContain('вес 100 → 95');
+    expect(note).toContain('ракурс 8° → 25°');
+  });
+
+  it('равный вес и один ракурс — без ложных оговорок', async () => {
+    savedCsv.length = 0;
+    const same = await exportCsv({
+      series: { bench: { ...past.series.bench, weightKg: 95, reps: [{ ...past.series.bench.reps[0], cosPhi: 0.906, angleDeg: 25 }] } },
+      ...now,
+    }, rows, '1');
+    expect(rowValue(same, 'Δvmax к прошлой сессии, %')).toMatch(/^"-?\d+"$/);
+    const note = rowValue(same, 'Сравнение сессий');
+    expect(note).not.toContain('вес');
+    expect(note).not.toContain('ракурс');
+  });
+
+  it('SVG-картинка несёт оговорку: её пересылают отдельно от отчёта', async () => {
+    localStorage.setItem(MASTER_KEY, JSON.stringify({ lift: 'bench', ...past, ...now }));
+    const { container } = render(<LiftMasterCard sessions={[]} />);
+    act(() => {
+      fireEvent.change(container.querySelector('[data-lift="kinovea-text"]')!, { target: { value: rows } });
+      fireEvent.change(container.querySelector('[data-lift="kinovea-scale"]')!, { target: { value: '1' } });
+    });
+    act(() => { fireEvent.click(container.querySelector('[data-lift="parse-kinovea"]')!); });
+    await act(async () => { fireEvent.click(container.querySelector('[data-lift="export-svg"]')!); });
+
+    expect(savedText.length).toBe(1);
+    expect(savedText[0].name).toMatch(/\.svg$/);
+    // Подписи разбиты на строки по ширине картинки — сверяем текст без разметки.
+    const flat = savedText[0].text.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ');
+    expect(flat).toContain('вес 100 → 95');
+    expect(flat).toMatch(/ракурс 8°\s+→\s+25°/);
+    expect(flat).toContain('с поправкой');
+  });
+
+  it('без прошлой сессии — прочерки, а не нулевая дельта', async () => {
+    const csv = await exportCsv({}, rows, '1');
+    expect(rowValue(csv, 'Δvmax к прошлой сессии, %')).toBe('"—"');
+    expect(rowValue(csv, 'ΔxLoop к прошлой сессии, см')).toBe('"—"');
+    expect(rowValue(csv, 'Сравнение сессий')).toBe('"—"');
+  });
+
+  it('HTML несёт ту же оговорку, что и CSV: дельта без неё читается как прогресс техники', async () => {
+    localStorage.setItem(MASTER_KEY, JSON.stringify({ lift: 'bench', ...past, ...now }));
+    const { container } = render(<LiftMasterCard sessions={[]} />);
+    act(() => {
+      fireEvent.change(container.querySelector('[data-lift="kinovea-text"]')!, { target: { value: rows } });
+      fireEvent.change(container.querySelector('[data-lift="kinovea-scale"]')!, { target: { value: '1' } });
+    });
+    act(() => { fireEvent.click(container.querySelector('[data-lift="parse-kinovea"]')!); });
+    await act(async () => { fireEvent.click(container.querySelector('[data-lift="export-html"]')!); });
+
+    expect(savedHtml.length).toBe(1);
+    expect(savedHtml[0]).toContain('Сравнение с прошлой сессией');
+    expect(savedHtml[0]).toContain('вес 100 → 95');
+    expect(savedHtml[0]).toContain('ракурс 8° → 25°');
+    expect(savedHtml[0]).toContain('(оценка)');
+  });
+});
+
 describe('хаб → отчёт: ракурс, измеренный по эталону в кадре', () => {
   const refSeed = {
     refAngle: { bench: { azimuthDeg: 12, ratio: 0.978, lengthCm: 131, atSec: 2.5 } },

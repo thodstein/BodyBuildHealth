@@ -34,6 +34,11 @@ export interface TrajectoryRenderInput {
   overlayText?: string;
   /** Готовая строка сравнения сессий («vmax ниже прошлой сессии: …»). */
   sessionText?: string;
+  /**
+   * Оговорки к сравнению одной короткой строкой («⚠ вес 100 → 95 кг…», «⚠ ракурс 8°→25°…»).
+   * Идёт отдельной строкой: в длинном сравнении хвост обрезался, а он и есть главный.
+   */
+  sessionCaveat?: string;
   /** Без префикса: «в норме — Геометрия съёмки в допуске» (префикс добавляет рендер). */
   captureQuality?: string;
   /** Короткая строка ракурса («⚠ ход 37.5% — либо техника, либо камера не под 90°»). */
@@ -133,16 +138,45 @@ function paintBase(ctx: CanvasRenderingContext2D, w: number, h: number, title: s
 export interface TrajectoryPngLine { text: string; color: string }
 
 /**
+ * Сколько символов подписи влезает в одну строку. Подписи под графиком не переносятся
+ * сами: SVG рисует `text` без wrap, PNG обрезает по ширине канвы. Длинная оговорка
+ * («сессии под разными углами…») либо вылезала за край, либо теряла хвост — то есть
+ * ровно то, что важнее всего прочитать.
+ */
+export const CAPTION_MAX_CHARS = 78;
+
+/** Разбить длинную подпись на строки по словам. Пустая строка → пустой массив. */
+export function wrapCaptionLines(text: string | null | undefined, maxChars = CAPTION_MAX_CHARS): string[] {
+  const t = (text ?? '').trim();
+  if (!t) return [];
+  const out: string[] = [];
+  let cur = '';
+  for (const word of t.split(/\s+/)) {
+    if (!cur) { cur = word; continue; }
+    if (cur.length + 1 + word.length <= maxChars) cur += ` ${word}`;
+    else { out.push(cur); cur = word; }
+  }
+  if (cur) out.push(cur);
+  return out;
+}
+
+/**
  * Подписи под графиком PNG — тот же набор, что в SVG-выгрузке. Раньше PNG нёс
  * только xLoop/vmax, и картинка, пересланная отдельно от отчёта, шла без оговорок
  * о качестве съёмки и ракурсе, хотя её читают как самостоятельный вывод.
  */
 export function trajectoryPngLines(inp: TrajectoryRenderInput): TrajectoryPngLine[] {
   const out: TrajectoryPngLine[] = [];
-  if (inp.overlayText?.trim()) out.push({ text: inp.overlayText, color: '#e5e7eb' });
-  if (inp.sessionText?.trim()) out.push({ text: inp.sessionText, color: '#cbd5e1' });
-  if (inp.captureQuality?.trim()) out.push({ text: `качество: ${inp.captureQuality}`, color: '#d1d5db' });
-  if (inp.angleText?.trim()) out.push({ text: inp.angleText, color: '#fbbf24' });
+  const push = (text: string | null | undefined, color: string) => {
+    for (const line of wrapCaptionLines(text)) out.push({ text: line, color });
+  };
+  push(inp.overlayText, '#e5e7eb');
+  push(inp.sessionText, '#cbd5e1');
+  // Оговорки к сравнению (другой вес, другой ракурс) — отдельной строкой: без них
+  // дельта читается как прогресс/регресс техники.
+  push(inp.sessionCaveat, '#fbbf24');
+  if (inp.captureQuality?.trim()) push(`качество: ${inp.captureQuality}`, '#d1d5db');
+  push(inp.angleText, '#fbbf24');
   return out;
 }
 
