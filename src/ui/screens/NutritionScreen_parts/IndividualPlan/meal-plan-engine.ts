@@ -14195,6 +14195,27 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     // P2-фикс: microSummary.coverage и diversity пересчитываем на ФИНАЛЬНЫХ meals —
     // поздние проходы (E18/E17/E12, гигиена) добавляли/удаляли позиции, и витрина
     // расходилась с реальной тарелкой.
+    // ─── QG24: источник жира по витамину E (до пересчёта микро/витрины) ───
+    if (_pickCtx.qualityMode === 'full'
+      && !(input as any).manualTargetsLocked
+      && (input as any).kbjuMode !== 'manual') {
+      const _eGoal24 = Number((RDA_BASE as any)?.VitE?.[(input.sex === 'female' ? 'female' : 'male')] || 15);
+      const _eAdd24 = liftVitaminEByFatAddress(
+        meals as any[], totals, _eGoal24,
+        nutCatchupCap(quotaWeightScale(Number(input.weightKg) || 80)),
+      );
+      // Нота QG9 «E X мг из Y мг» написана до этой стадии — переписываем факт.
+      if (_eAdd24 > 0) {
+        const _i24 = notes.findIndex((n) => typeof n === 'string' && n.includes('Витамин E:'));
+        if (_i24 >= 0) {
+          const _eN24 = Math.round(Number((sumMicros(
+            (meals as any[]).flatMap((m: any) => (m.items || []).map((it: any) => ({ id: it.id, amount: it.amount }))),
+            FOOD_DB as any,
+          ) as any)?.VitE || 0));
+          notes[_i24] = String(notes[_i24]).replace(/E \d+ мг из/, `E ${_eN24} мг из`);
+        }
+      }
+    }
     const _finalFoodIds = new Set<string>();
     for (const m of meals) for (const it of (m.items || [])) _finalFoodIds.add(it.id);
     const _finalCategories: Record<string, number> = {};
@@ -14474,6 +14495,93 @@ function closeFoodDeficiencies(meals: Meal[], isVegetarian = false, sex: 'male'|
     }
   });
   return notes;
+}
+
+// ─── QG24: витамин E берётся из E-богатого жира (адрес жира, не граммы дня) ───
+// Замер 30 дней: витамин E ниже 70% RDA в 16 днях (минимум 26%), и это ровно те дни,
+// где «чистый жир» дня стоит из ги (0.8 мг E/100 г) и оливкового (14.4) — в днях с
+// подсолнечным нерафинированным (41 мг/100 г) E сразу 71–93%. При этом E в рационе —
+// это НЕ граммы: 1 г жира из подсолнечного масла несёт в 50 раз больше E, чем грамм
+// ги, при одинаковых 9 ккал. Стадия меняет только источник: пункт «чистый жир»
+// переезжает в подсолнечное масло с тем же жиром (граммы по жиру, ккал ±1), граммы
+// дня не растут и цели КБЖУ не двигаются.
+const _QG24_E_POOR = 10;    // мг/100 г — ниже «бедный» источник (ги 0.8, олив. 14.4 → 14.4 богаче
+//                             порога, поэтому оливковое НЕ трогаем: это MUFA-основа рациона)
+const _QG24_E_RICH_ID = 'oil_sunflower_unrefined';
+function liftVitaminEByFatAddress(
+  meals: any[], totals: any, eGoal: number, seedsCap: number,
+): number {
+  const rich: any = FOOD_DB.find((f: any) => String(f.id) === _QG24_E_RICH_ID);
+  if (!rich || !(eGoal > 0)) return 0;
+  const eOf = () => Number((sumMicros(
+    meals.flatMap((m: any) => (m.items || []).map((x: any) => ({ id: x.id, amount: x.amount }))),
+    FOOD_DB as any,
+  ) as any)?.VitE || 0);
+  const want = eGoal * 0.9;
+  const e0 = eOf();
+  if (e0 >= want) return 0;
+  const idsOf = () => new Set(meals.flatMap((m: any) => (m.items || []).map((x: any) => String(x.id))));
+  const pure = (x: any) => {
+    const amt = Number(x.amount) || 0;
+    if (!(amt >= 7) || x._fixedGrams) return false;
+    const p100 = (v: any) => ((Number(v) || 0) / amt) * 100;
+    return String(x.role) === 'fat' && p100(x.f) >= 85 && p100(x.p) <= 2 && p100(x.c) <= 2;
+  };
+  const rows: Array<{ m: any; idx: number; it: any; e: number }> = [];
+  for (const m of meals) {
+    const mine = new Set((m.items || []).map((x: any) => String(x.id)));
+    if (mine.has(_QG24_E_RICH_ID)) continue;   // второй такой пункт в приёме — дубль
+    for (let i = 0; i < (m.items || []).length; i++) {
+      const it: any = (m.items as any[])[i];
+      if (!pure(it)) continue;
+      const fd: any = FOOD_DB.find((f: any) => String(f.id) === String(it.id));
+      const e = Number(fd?.micros?.VitE ?? fd?.vitamins_100g?.vitamin_e_mg ?? 0);
+      if (e >= _QG24_E_POOR) continue;         // источник уже E-богатый
+      rows.push({ m, idx: i, it, e });
+    }
+  }
+  if (rows.length === 0) return 0;
+  rows.sort((a, b) => a.e - b.e);               // сначала самый бедный по E
+  const k0 = Number(totals?.kcal) || 0;
+  const f0 = Number(totals?.f) || 0;
+  const ids0 = idsOf();
+  const saved: Array<{ m: any; idx: number; it: any }> = [];
+  let swapped = 0;
+  for (const r of rows) {
+    if (eOf() >= want) break;
+    const g = Math.max(7, Math.round(((Number(r.it.f) || 0) / Math.max(1, Number(rich.fat) || 100)) * 100));
+    // Подсолнечное масло живёт в семействе «семена» (`stapleFamilyOf`), поэтому
+    // потолок орехов/семян дня (QG11) — жёсткая граница: заменяем только то, что
+    // влезает в остаток квоты.
+    const seedsNow = meals.reduce((s: number, mm: any) => s + ((mm.items || []) as any[])
+      .filter((x: any) => stapleFamilyOf(String(x.id)) === 'seeds')
+      .reduce((a: number, x: any) => a + (Number(x.amount) || 0), 0), 0);
+    if (seedsNow + g > seedsCap) continue;
+    const f = Math.round((Number(rich.fat) || 100) * g / 100);
+    const p = Math.round((Number(rich.protein) || 0) * g / 100);
+    const c = Math.round((Number(rich.carbs) || 0) * g / 100);
+    saved.push(r);
+    (r.m.items as any[])[r.idx] = {
+      id: rich.id, name: rich.name, amount: g, role: 'fat',
+      kcal: Math.round(4 * p + 9 * f + 4 * c), p, f, c, fiber: 0, leucine_mg: 0,
+    };
+    recalcMealTotals(meals as any[]);
+    recalcDayTotals(meals, totals);
+    swapped++;
+  }
+  const dk = Math.abs((Number(totals?.kcal) || 0) - k0);
+  const df = Math.abs((Number(totals?.f) || 0) - f0);
+  const idsNow = idsOf();
+  const varietyOk = idsNow.size >= ids0.size;
+  const ok = swapped > 0 && dk <= Math.max(6, k0 * 0.005) && df <= 0.6
+    && eOf() > e0 + 0.05 && varietyOk;
+  if (!ok) {
+    for (const s of saved) (s.m.items as any[])[s.idx] = s.it;
+    recalcMealTotals(meals as any[]);
+    recalcDayTotals(meals, totals);
+    return 0;
+  }
+  return Math.round((eOf() - e0) * 10) / 10;
 }
 
 // ─── QG22: нота обмена называет граммы, которые стоят в тарелке ─────────────
