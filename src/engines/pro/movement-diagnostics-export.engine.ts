@@ -72,8 +72,10 @@ export interface MovementDiagnosticsExportInput {
    * Отдельно от текста вердикта: отчёт должен нести и саму цифру замера.
    */
   refAzimuthDeg?: number | null;
-  /** Реальная длина эталона в кадре, см (гриф между насечками, ширина стойки). */
+  /** Реальная длина эталона в кадре, см (скамья между камера и стеной или гриф между насечками). */
   refLengthCm?: number | null;
+  /** Ось эталона: от неё зависит формула угла (cos φ против sin φ). */
+  refAxis?: 'across' | 'along' | null;
   /**
    * xLoop, перенесённый в плоскость движения по измеренному ракурсу (`измеренный / cos φ`).
    * Это оценка: она выравнивает сравнение сессий, но не заменяет съёмку сбоку.
@@ -229,6 +231,7 @@ export function buildMovementDiagnosticsCsv(inp: MovementDiagnosticsExportInput)
     ['Проверка ракурса', inp.angleCheck || '—'],
     ['Угол камеры по эталону, °', inp.refAzimuthDeg != null ? String(inp.refAzimuthDeg) : '—'],
     ['Эталон в кадре, см', inp.refLengthCm != null ? String(inp.refLengthCm) : '—'],
+    ['Эталон: ось', inp.refAxis ? (inp.refAxis === 'along' ? 'вдоль штанги' : 'поперёк движения') : '—'],
     ['xLoop с поправкой на ракурс, см', inp.xLoopRefCorrectedCm != null ? String(inp.xLoopRefCorrectedCm) : '—'],
     ['Поправка xLoop на ракурс, %', inp.xLoopRefCorrectionPct != null ? String(inp.xLoopRefCorrectionPct) : '—'],
     ['Ракурс: параметры и замер', inp.angleMetaConflict || '—'],
@@ -306,7 +309,9 @@ export function buildMovementDiagnosticsHtml(inp: MovementDiagnosticsExportInput
     + (inp.angleCheck ? li('Ракурс по замеру', inp.angleCheck) : '')
     + (inp.refAzimuthDeg != null
       ? li('Угол камеры по эталону', `${fmt(inp.refAzimuthDeg, 0)}° от плоскости движения`
-        + (inp.refLengthCm != null ? ` (эталон ${fmt(inp.refLengthCm, 0)} см)` : ''))
+        + (inp.refLengthCm != null
+          ? ` (эталон ${fmt(inp.refLengthCm, 0)} см${inp.refAxis ? `, ${inp.refAxis === 'along' ? 'вдоль штанги' : 'поперёк движения'}` : ''})`
+          : ''))
       : '')
     + (inp.xLoopRefCorrectedCm != null
       ? li('xLoop с поправкой на ракурс',

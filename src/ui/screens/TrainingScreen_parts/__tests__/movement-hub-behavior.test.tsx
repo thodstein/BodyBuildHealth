@@ -1132,6 +1132,43 @@ describe('LiftMasterCard — поведение (не только смоук)',
     expect(JSON.parse(localStorage.getItem(MASTER_KEY) || '{}').capture.side).toBe('front');
   });
 
+  it('ось эталона выбирается явно: формула угла зависит от неё', () => {
+    localStorage.setItem(MASTER_KEY, JSON.stringify({ lift: 'bench' }));
+    const { container } = render(<LiftMasterCard sessions={[]} />);
+    const across = container.querySelector('[data-lift="ref-axis-across"]')!;
+    const along = container.querySelector('[data-lift="ref-axis-along"]')!;
+    // По умолчанию — ось, которая прямо даёт cos φ.
+    expect(across.getAttribute('aria-pressed')).toBe('true');
+    expect(along.getAttribute('aria-pressed')).toBe('false');
+    expect(container.querySelector('[data-lift="ref-axis-hint"]')!.textContent).toContain('длина скамьи');
+
+    click(along);
+    expect(along.getAttribute('aria-pressed')).toBe('true');
+    expect(across.getAttribute('aria-pressed')).toBe('false');
+    const hint = container.querySelector('[data-lift="ref-axis-hint"]')!.textContent!;
+    expect(hint).toContain('растёт как sin φ');
+    // Выбор оси — часть замера, а не разовая подсказка: он переживает перезагрузку.
+    expect(JSON.parse(localStorage.getItem(MASTER_KEY) || '{}').refAxis).toBe('along');
+  });
+
+  it('сохранённый замер вдоль штанги: ось в подписи и поправка по cos φ', () => {
+    const csv = ['time,x,y'];
+    for (let i = 0; i < 20; i++) csv.push(`${(i * 0.05).toFixed(2)},${100 + i * 1.5},${50 + i * 4}`);
+    localStorage.setItem(MASTER_KEY, JSON.stringify({
+      lift: 'bench',
+      // 30° от плоскости, эталон вдоль штанги: ratio 0.5 = sin φ, cos φ = 0.866.
+      refAngle: { bench: { azimuthDeg: 30, ratio: 0.5, cosPhi: 0.866, axis: 'along', lengthCm: 131, atSec: null, spanPx: 300 } },
+    }));
+    const { container } = render(<LiftMasterCard sessions={[]} />);
+    act(() => { fireEvent.change(container.querySelector('[data-lift="kinovea-text"]')!, { target: { value: csv.join('\n') } }); });
+    click(container.querySelector('[data-lift="parse-kinovea"]'));
+
+    expect(container.querySelector('[data-lift="ref-saved"]')!.textContent).toContain('вдоль штанги');
+    const fix = container.querySelector('[data-lift="ref-xloop-fix"]')!;
+    // Поправка +15.5%, а не +100%: в поправку идёт cos φ, а не ratio этой оси.
+    expect(fix.textContent).toContain('поправка +15.5%');
+  });
+
   it('интерактивные элементы хаба не меньше 44 px', () => {
     const { container } = render(<LiftMasterCard sessions={[]} />);
     // «Быстрый старт» исчезает после первых данных — проверяем до заполнения.

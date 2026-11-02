@@ -563,17 +563,36 @@ export interface ReferenceSpan {
   b: { x: number; y: number };
   /** Реальная длина отрезка, см. */
   lengthCm: number;
+  /**
+   * Ось эталона — от неё зависит сама формула, и перепутать их нельзя:
+   * - `across` («поперёк движения», в плоскости движения, горизонтально: длина
+   *   скамьи, глубина стойки, метки на полу) виден полностью при камере в
+   *   плоскости и сжимается как **cos φ**;
+   * - `along` («вдоль штанги»: гриф между насечками, ширина стойки) при камере в
+   *   плоскости направлен в объектив и почти не виден — он растёт как **sin φ**.
+   * По умолчанию `across`.
+   */
+  axis?: ReferenceAxis;
 }
+
+/** Ось эталона: как он лежит относительно плоскости движения. */
+export type ReferenceAxis = 'across' | 'along';
 
 export interface ReferenceAngleResult {
   /** Наблюдаемая длина отрезка в кадре, см (по масштабу кадра). */
   observedCm: number;
   /** Ожидаемая длина при камере в плоскости движения, см. */
   expectedCm: number;
-  /** observed / expected: 1 — камера в плоскости, 0 — отрезок вдоль луча зрения. */
+  /** observed / expected: при `across` это cos φ, при `along` — sin φ. */
   ratio: number;
+  /** Ось, по которой считался угол (входит в формулу, а не в подпись). */
+  axis: ReferenceAxis;
   /** Отклонение камеры от плоскости движения, град; null — измерить нельзя. */
   azimuthDeg: number | null;
+  /** cos φ — насколько сжата горизонталь кадра; 1 — камера в плоскости. null — не измерено. */
+  cosPhi: number | null;
+  /** Относительная точность cos φ, % (± из точности тапа); null — не оценить. */
+  cosPhiRelErrPct: number | null;
   flag: 'ok' | 'unknown';
   /** Пикселей на сантиметр, по которым считалось (для отчёта). */
   pxPerCm: number;
@@ -593,80 +612,110 @@ const REF_MAX_CM = 500;
  * `pxPerCm` берётся из калибровки кадра или перспективы: без масштаба кадра
  * «длина в кадре» — просто пиксели, и угол из них не следует. Поэтому без
  * масштаба результат честно `unknown`, а не «0°».
+ *
+ * Главное про геометрию (частая ошибка): формулы разные для двух осей.
+ * Отрезок в плоскости движения поперёк луча зрения виден полностью при камере
+ * в плоскости и сжимается как cos φ. Отрезок вдоль штанги при камере в
+ * плоскости направлен в объектив, виден почти в ноль и растёт как sin φ. Если
+ * взять «гриф между насечками» и посчитать по cos, на 30° от плоскости выйдет
+ * 60° — то есть опасная ерунда в сторону «камера сбоку, всё сравнимо».
  */
 export function referenceAngleCheck(
   span: ReferenceSpan | null | undefined,
-  opts?: { pxPerCm?: number | null },
+  opts?: { pxPerCm?: number | null; tapPx?: number },
 ): ReferenceAngleResult | null {
   if (!span || !span.a || !span.b) return null;
   const { a, b, lengthCm } = span;
   if (![a.x, a.y, b.x, b.y].every((n) => Number.isFinite(n))) return null;
   if (!(lengthCm > 0) || lengthCm > REF_MAX_CM) return null;
+  const axis: ReferenceAxis = span.axis === 'along' ? 'along' : 'across';
   const pxPerCm = opts?.pxPerCm;
+  const tapPx = opts?.tapPx ?? REF_TAP_PX;
   const dPx = Math.hypot(b.x - a.x, b.y - a.y);
-  const base: Omit<ReferenceAngleResult, 'reason' | 'flag' | 'azimuthDeg'> = {
+  const base: Omit<ReferenceAngleResult, 'reason' | 'flag' | 'azimuthDeg' | 'cosPhi' | 'cosPhiRelErrPct'> = {
     observedCm: 0,
     expectedCm: lengthCm,
     ratio: 0,
+    axis,
     pxPerCm: Number.isFinite(pxPerCm) ? (pxPerCm as number) : 0,
     spanPx: Number.isFinite(dPx) ? Math.round(dPx * 10) / 10 : 0,
   };
+  const unknown = (reason: string): ReferenceAngleResult => ({
+    ...base,
+    flag: 'unknown',
+    azimuthDeg: null,
+    cosPhi: null,
+    cosPhiRelErrPct: null,
+    reason,
+  });
   if (!Number.isFinite(pxPerCm) || !((pxPerCm as number) > 0.05 && (pxPerCm as number) < 200)) {
-    return {
-      ...base,
-      flag: 'unknown',
-      azimuthDeg: null,
-      reason: 'Без масштаба кадра угол не измерить: сначала калибровка кадра (два тапа по отрезку) или перспектива по четырём точкам.',
-    };
+    return unknown('Без масштаба кадра угол не измерить: сначала калибровка кадра (два тапа по отрезку) или перспектива по четырём точкам.');
   }
   if (!(dPx >= REF_MIN_PX)) {
-    return {
-      ...base,
-      flag: 'unknown',
-      azimuthDeg: null,
-      reason: `Эталон в кадре всего ${Math.round(dPx)} px: ошибка тапа в 1 px съедает больше 4° — ткните точнее или возьмите отрезок длиннее.`,
-    };
+    return unknown(`Эталон в кадре всего ${Math.round(dPx)} px: ошибка тапа в 1 px съедает больше 4° — ткните точнее или возьмите отрезок длиннее.`);
   }
   const observedCm = dPx / (pxPerCm as number);
   const ratio = observedCm / lengthCm;
   base.observedCm = Math.round(observedCm * 10) / 10;
   base.ratio = Math.round(ratio * 1000) / 1000;
   if (ratio > 1.12) {
-    return {
-      ...base,
-      flag: 'unknown',
-      azimuthDeg: null,
-      reason: `Эталон виден на ${Math.round((ratio - 1) * 100)}% длиннее, чем должен: он ближе к камере, чем калибровочная плоскость, `
-        + 'или указана не та длина. Поставьте эталон в плоскости движения штанги (например, ширина стойки на уровне грифа) либо уточните калибровку — угол не выдаю.',
-    };
+    return unknown(`Эталон виден на ${Math.round((ratio - 1) * 100)}% длиннее, чем должен: он ближе к камере, чем калибровочная плоскость, `
+      + 'или указана не та длина. '
+      + (axis === 'across'
+        ? 'Поставьте эталон в плоскости движения штанги (длина скамьи, глубина стойки, метки на полу) либо уточните калибровку — угол не выдаю.'
+        : 'Для эталона вдоль штанги это значит, что концы ткнуты не по грифу (или длина не та). Уточните — угол не выдаю.'));
   }
-  const deg = Math.round((Math.acos(Math.min(1, Math.max(0, ratio))) * 180) / Math.PI);
-  const lost = Math.round((1 - Math.cos((deg * Math.PI) / 180)) * 100);
-  const reason = deg <= 15
+  // cos φ и угол считаются по-разному для двух осей — это и есть суть замера.
+  const cosPhi = axis === 'across'
+    ? Math.min(1, Math.max(0, ratio))
+    : Math.sqrt(Math.max(0, 1 - Math.min(1, ratio * ratio)));
+  const deg = Math.round((Math.acos(Math.min(1, Math.max(0, cosPhi))) * 180) / Math.PI);
+  // Точность cos φ: через тап по эталону. Для `along` ошибка усиливается у фронта.
+  const sigmaRatio = (Math.SQRT2 * tapPx) / dPx; // относительная ошибка observed/expected
+  const relErr = axis === 'across'
+    ? sigmaRatio
+    : (ratio * sigmaRatio) / Math.max(1e-6, 1 - ratio * ratio);
+  const cosPhiRelErrPct = Math.round(relErr * 1000) / 10;
+  const lost = Math.round((1 - cosPhi) * 100);
+  const verdict = deg <= 15
     ? `Камера в плоскости движения (отклонение ${deg}°): горизонталь кадра несёт путь штанги, xLoop сравним между сессиями.`
     : deg <= 40
       ? `Камера отклонена от плоскости движения на ${deg}°: горизонталь укорочена примерно на ${lost}%, xLoop и боковые метрики занижены. `
         + 'Сравнимо внутри одной сессии, но не с боковой съёмкой.'
       : `Камера почти спереди (отклонение ${deg}°): горизонталь кадра — не путь штанги, xLoop и скорости по пути несравнимы с боковым видом.`;
+  const how = axis === 'across'
+    ? 'Эталон поперёк движения: видимая длина = реальная × cos φ.'
+    : 'Эталон вдоль штанги: видимая длина = реальная × sin φ (сбоку такой отрезок почти не виден, поэтому он годится как контроль, а не как основной).';
   return {
     ...base,
     flag: 'ok',
     azimuthDeg: deg,
-    reason: `${reason} Направление «слева/справа» по одному кадру не определяется — эталон даёт только угол к плоскости.`,
+    cosPhi: Math.round(cosPhi * 10000) / 10000,
+    cosPhiRelErrPct,
+    reason: `${verdict} ${how} Направление «слева/справа» по одному кадру не определяется — эталон даёт только угол к плоскости.`,
   };
 }
 
 /**
  * Вход поправки горизонтали: достаточно результата замера эталона или его
- * сохранённой копии (`ratio` — это и есть cos φ).
+ * сохранённой копии.
+ *
+ * Важно: сжимает горизонталь именно **cos φ**, а он равен `ratio` только для
+ * эталона поперёк движения. Для эталона вдоль штанги `ratio` — это sin φ, и
+ * брать его напрямую значило бы поправить наоборот. Поэтому главный вход —
+ * `cosPhi`; `ratio` остаётся запасным для старых сохранённых замеров.
  */
 export interface HorizontalFixInput {
-  /** observed / expected из замера эталона (cos φ). */
-  ratio: number;
+  /** cos φ из замера (1 — камера в плоскости движения). Основной вход. */
+  cosPhi?: number | null;
+  /** observed / expected; запасной вход, если `cosPhi` нет (тогда ось — поперёк движения). */
+  ratio?: number | null;
   /** Отклонение камеры от плоскости движения, град. */
   azimuthDeg: number | null;
   /** Наблюдаемая длина эталона в кадре, px: от неё зависит точность поправки. */
   spanPx?: number | null;
+  /** Готовая относительная точность cos φ, % (у режима «вдоль штанги» она иная). */
+  cosPhiRelErrPct?: number | null;
 }
 
 export interface ReferenceHCorrection {
@@ -690,8 +739,8 @@ const REF_TAP_PX = 1.5;
  *
  * Физика: при повороте камеры вокруг вертикали на φ горизонтальные расстояния в
  * кадре сжимаются в cos φ раз, вертикальные — нет. Значит истинная горизонталь
- * = измеренная / cos φ = измеренная / ratio. Это ровно то же число, что «потеря
- * горизонтали» в вердикте, только в обратную сторону.
+ * = измеренная / cos φ. Это ровно то же число, что «потеря горизонтали» в
+ * вердикте, только в обратную сторону.
  *
  * Что важно про честность: поправка **не** делает плохую съёмку хорошей. Она
  * переносит измерение в плоскость движения с погрешностью из точности тапа и с
@@ -710,22 +759,33 @@ export function referenceHorizontalCorrection(
       reason: 'Горизонтальной метрики нет — поправлять нечего.',
     };
   }
-  const ratio = ref?.ratio;
-  if (ref == null || !Number.isFinite(ratio) || !((ratio as number) > 0) || (ratio as number) > 1.12) {
+  const rawCos = ref == null
+    ? null
+    : (ref.cosPhi != null && Number.isFinite(ref.cosPhi) ? ref.cosPhi : (ref.ratio ?? null));
+  if (ref == null || rawCos == null || !Number.isFinite(rawCos) || rawCos > 1.12) {
     return {
       correctedCm: null, pct: null, errPct: null, flag: 'unknown',
       reason: 'Ракурс не измерен — поправка не считается (метрика остаётся как есть).',
     };
   }
-  const r = ratio as number;
-  const spanPx = ref.spanPx;
-  const tapPx = opts?.tapPx ?? REF_TAP_PX;
-  const errPct = spanPx != null && Number.isFinite(spanPx) && spanPx > 0
-    ? Math.round((Math.SQRT2 * tapPx / spanPx) * 1000) / 10
-    : null;
-  const pct = Math.round((1 / r - 1) * 1000) / 10;
+  const c = rawCos as number;
   const maxAz = opts?.maxAzimuthDeg ?? REF_FIX_MAX_AZ;
   const az = ref.azimuthDeg;
+  if (!(c > 0)) {
+    return {
+      correctedCm: null, pct: null, errPct: null, flag: 'refused',
+      reason: 'Камера почти под прямым углом к плоскости движения — горизонталь в кадре не наблюдается вовсе. '
+        + 'Такой ракурс не исправляется: снимайте ближе к плоскости движения.',
+    };
+  }
+  const spanPx = ref.spanPx;
+  const tapPx = opts?.tapPx ?? REF_TAP_PX;
+  const errPct = ref.cosPhiRelErrPct != null && Number.isFinite(ref.cosPhiRelErrPct)
+    ? ref.cosPhiRelErrPct
+    : spanPx != null && Number.isFinite(spanPx) && spanPx > 0
+      ? Math.round((Math.SQRT2 * tapPx / spanPx) * 1000) / 10
+      : null;
+  const pct = Math.round((1 / c - 1) * 1000) / 10;
   if (az != null && Number.isFinite(az) && az > maxAz) {
     return {
       correctedCm: null, pct, errPct, flag: 'refused',
@@ -741,11 +801,11 @@ export function referenceHorizontalCorrection(
     };
   }
   return {
-    correctedCm: round2(valueCm / r),
+    correctedCm: round2(valueCm / c),
     pct,
     errPct,
     flag: 'ok',
-    reason: `Горизонталь умножена на 1/cos φ = ${round2(1 / r)} (поправка +${pct}%)`
+    reason: `Горизонталь умножена на 1/cos φ = ${round2(1 / c)} (поправка +${pct}%)`
       + (errPct != null ? `, точность ±${errPct}% — по точности тапа эталона.` : '; точность поправки не оценена (нет длины эталона в пикселях).')
       + ' Это оценка: она выравнивает сравнение между сессиями, но не заменяет съёмку в плоскости движения.',
   };

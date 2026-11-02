@@ -14,9 +14,9 @@ import {
  */
 
 /** Отрезок по горизонтали, видимая длина dPx при масштабе pxPerCm — обёртка для читаемости тестов. */
-function check(dPx: number, lengthCm: number, pxPerCm: number) {
+function check(dPx: number, lengthCm: number, pxPerCm: number, axis?: 'across' | 'along') {
   return referenceAngleCheck(
-    { a: { x: 100, y: 300 }, b: { x: 100 + dPx, y: 300 }, lengthCm },
+    { a: { x: 100, y: 300 }, b: { x: 100 + dPx, y: 300 }, lengthCm, axis },
     { pxPerCm },
   );
 }
@@ -102,6 +102,72 @@ describe('referenceAngleCheck — угол камеры по эталону в �
   });
 });
 
+/**
+ * Ось эталона — половина формулы, а не подпись. Отрезок в плоскости движения
+ * сжимается как cos φ, отрезок вдоль штанги при камере в плоскости смотрит в
+ * объектив и растёт как sin φ. Перепутанная ось даёт дополнительный угол:
+ * 30° прочитаются как 60°.
+ */
+describe('referenceAngleCheck — ось эталона меняет формулу (cos φ против sin φ)', () => {
+  it('один и тот же отрезок: поперёк движения 60°, вдоль штанги 30°', () => {
+    // ratio 0.5 при любой оси — но смысл противоположный.
+    const across = check(100, 100, 2)!;
+    const along = check(100, 100, 2, 'along')!;
+    expect(across.ratio).toBe(0.5);
+    expect(along.ratio).toBe(0.5);
+    expect(across.azimuthDeg).toBe(60);
+    expect(along.azimuthDeg).toBe(30);
+    // Это и есть проверка от «опасной» ошибки: перепутанная ось занизила бы угол вдвое.
+    expect(across.cosPhi).toBe(0.5);
+    expect(along.cosPhi).toBe(0.866);
+    expect(across.axis).toBe('across');
+    expect(along.axis).toBe('along');
+  });
+
+  it('ось по умолчанию — поперёк движения (та, что прямо даёт cos φ)', () => {
+    const r = check(200, 100, 2)!;
+    expect(r.axis).toBe('across');
+    expect(r.cosPhi).toBe(1);
+  });
+
+  it('эталон вдоль штанги: сбоку он почти не виден — это отказ, а не 0°', () => {
+    // Гриф 131 см при масштабе 2 px/см = 262 px ожидаемо; сбоку видно 10 px.
+    const r = check(10, 131, 2, 'along')!;
+    expect(r.flag).toBe('unknown');
+    expect(r.azimuthDeg).toBeNull();
+    expect(r.cosPhi).toBeNull();
+    expect(r.reason).toContain('ткните точнее');
+  });
+
+  it('эталон вдоль штанги: виден в полную длину — камера спереди', () => {
+    const r = check(262, 131, 2, 'along')!;
+    expect(r.flag).toBe('ok');
+    expect(r.azimuthDeg).toBe(90);
+    expect(r.cosPhi).toBe(0);
+    expect(r.reason).toContain('Камера почти спереди');
+    expect(r.reason).toContain('видимая длина = реальная × sin φ');
+  });
+
+  it('формула названа в вердикте — иначе число не воспроизвести', () => {
+    expect(check(200, 100, 2)!.reason).toContain('видимая длина = реальная × cos φ');
+    expect(check(100, 100, 2, 'along')!.reason).toContain('видимая длина = реальная × sin φ');
+  });
+
+  it('точность cos φ у оси «вдоль штанги» усиливается у фронта, и это сказано числом', () => {
+    // ratio 0.9 при оси along — 64° от плоскости: cos φ = 0.436, ошибка тапа растёт.
+    const along = check(0.9 * 262, 131, 2, 'along')!;
+    const across = check(0.9 * 262, 131, 2)!;
+    expect(along.cosPhiRelErrPct!).toBeGreaterThan(across.cosPhiRelErrPct!);
+    expect(along.cosPhiRelErrPct!).toBeLessThan(100);
+  });
+
+  it('эталон вдоль штанги виден длиннее реального — концы ткнуты не по грифу', () => {
+    const r = check(300, 131, 2, 'along')!;
+    expect(r.flag).toBe('unknown');
+    expect(r.reason).toContain('концы ткнуты не по грифу');
+  });
+});
+
 describe('referenceHorizontalCorrection — поправка горизонтали на ракурс', () => {
   /** ratio = cos φ: 0.906 — камера отклонена на 25°, 0.5 — на 60°. */
   const ok25 = { ratio: 0.906, azimuthDeg: 25, spanPx: 300 };
@@ -113,7 +179,10 @@ describe('referenceHorizontalCorrection — поправка горизонта�
     expect(referenceHorizontalCorrection(10, null).flag).toBe('unknown');
     // ratio > 1.12 — это не угол, а сломанный замер: поправку по нему не считаем.
     expect(referenceHorizontalCorrection(10, { ratio: 1.3, azimuthDeg: 0, spanPx: 300 }).flag).toBe('unknown');
-    expect(referenceHorizontalCorrection(10, { ratio: 0, azimuthDeg: 25, spanPx: 300 }).flag).toBe('unknown');
+    // cos φ = 0 — измеримый, но бесполезный ракурс: это «refused», а не «нет данных».
+    const perp = referenceHorizontalCorrection(10, { ratio: 0, azimuthDeg: 90, spanPx: 300 })!;
+    expect(perp.flag).toBe('refused');
+    expect(perp.reason).toContain('под прямым углом');
   });
 
   it('25°: измеренное делится на cos φ, поправка названа числом', () => {
@@ -165,6 +234,34 @@ describe('referenceHorizontalCorrection — поправка горизонта�
     )!;
     expect(r.spanPx).toBe(500);
     expect(r.ratio).toBe(1);
+  });
+
+  it('поправка берётся по cos φ, а не по ratio: ось «вдоль штанги» иначе дала бы обратный знак', () => {
+    // 30° от плоскости при оси along: ratio 0.5 (это sin φ), cos φ = 0.866.
+    const r = referenceHorizontalCorrection(10, {
+      ratio: 0.5, cosPhi: 0.866, azimuthDeg: 30, cosPhiRelErrPct: 2,
+    })!;
+    expect(r.flag).toBe('ok');
+    expect(r.pct).toBe(15.5);
+    expect(r.correctedCm).toBe(11.55);
+    // Если бы взяли ratio как cos φ, вышло бы +100% — вдвое, и это была бы уже не оценка.
+    expect(r.pct).not.toBe(100);
+    expect(r.errPct).toBe(2);
+  });
+
+  it('готовый cosPhiRelErrPct приоритетнее оценки из длины в пикселях', () => {
+    const r = referenceHorizontalCorrection(10, {
+      ratio: 0.906, cosPhi: 0.906, azimuthDeg: 25, spanPx: 300, cosPhiRelErrPct: 12,
+    })!;
+    expect(r.errPct).toBe(12);
+    // 12% больше поправки +10.4% — значит поправка в пределах шума и не применяется.
+    expect(r.flag).toBe('negligible');
+  });
+
+  it('старый сохранённый замер без cosPhi продолжает считаться по ratio', () => {
+    const legacy = referenceHorizontalCorrection(10, { ratio: 0.906, azimuthDeg: 25, spanPx: 300 })!;
+    expect(legacy.flag).toBe('ok');
+    expect(legacy.correctedCm).toBe(11.04);
   });
 });
 

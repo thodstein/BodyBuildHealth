@@ -40,13 +40,13 @@ describe('movement-diagnostics-export', () => {
     const csv = buildMovementDiagnosticsCsv({ ...BASE, issuesRu: ['=cmd|evil'] });
     const lines = csv.split('\n');
     expect(lines[0]).toContain('Поле');
-    // Шапка + 40 метрик: хаб-мастер передаёт все поддерживаемые поля
+    // Шапка + 41 метрика: хаб-мастер передаёт все поддерживаемые поля
     // (Kinovea-наклон/turnover/повторы, overlay-потеря vmax, heat-сводка и вес,
-    // качество и параметры съёмки, ракурс по замеру, угол камеры по эталону и
-    // поправка горизонтали, спор параметров и замера, чем нанесена линия на видео,
-    // асимметрия, метрика/порог/пауза VBT, LVP r²).
-    expect(lines.length).toBe(41);
-    for (const field of ['Kinovea turnover', 'Kinovea повторов', 'Overlay потеря vmax', 'Heatmap медленных отрезков', 'Точка срыва', 'Скорость в точке срыва', 'Вес штанги на записи', 'Качество съёмки', 'Съёмка: параметры', 'Горизонтальный ход штанги', 'Проверка ракурса', 'Угол камеры по эталону', 'Эталон в кадре', 'xLoop с поправкой на ракурс', 'Поправка xLoop на ракурс', 'Ракурс: параметры и замер', 'Наложение линии на видео', 'Масштаб калибровки кадра', 'Разброс масштаба по высоте', 'Привязок перспективы', 'Смещение трека от начала видео', 'Масштаб CSV', 'Асимметрия', 'VBT метрика', 'VBT VL-порог', 'VBT пауза', 'LVP r²']) {
+    // качество и параметры съёмки, ракурс по замеру, угол камеры по эталону, ось
+    // эталона и поправка горизонтали, спор параметров и замера, чем нанесена линия
+    // на видео, асимметрия, метрика/порог/пауза VBT, LVP r²).
+    expect(lines.length).toBe(42);
+    for (const field of ['Kinovea turnover', 'Kinovea повторов', 'Overlay потеря vmax', 'Heatmap медленных отрезков', 'Точка срыва', 'Скорость в точке срыва', 'Вес штанги на записи', 'Качество съёмки', 'Съёмка: параметры', 'Горизонтальный ход штанги', 'Проверка ракурса', 'Угол камеры по эталону', 'Эталон в кадре', 'Эталон: ось', 'xLoop с поправкой на ракурс', 'Поправка xLoop на ракурс', 'Ракурс: параметры и замер', 'Наложение линии на видео', 'Масштаб калибровки кадра', 'Разброс масштаба по высоте', 'Привязок перспективы', 'Смещение трека от начала видео', 'Масштаб CSV', 'Асимметрия', 'VBT метрика', 'VBT VL-порог', 'VBT пауза', 'LVP r²']) {
       expect(csv).toContain(field);
     }
     expect(csv).toContain("'=cmd|evil");
@@ -109,6 +109,14 @@ describe('movement-diagnostics-export', () => {
     expect(html).toContain('12° от плоскости движения');
     expect(html).toContain('эталон 131 см');
     expect(buildMovementDiagnosticsHtml({ ...BASE })).not.toContain('Угол камеры по эталону');
+    // Ось эталона — часть метода, а не украшение: без неё угол не пересчитать.
+    const alongHtml = buildMovementDiagnosticsHtml({ ...BASE, refAzimuthDeg: 30, refLengthCm: 131, refAxis: 'along' });
+    expect(alongHtml).toContain('эталон 131 см, вдоль штанги');
+    const alongCsv = buildMovementDiagnosticsCsv({ ...BASE, refAzimuthDeg: 30, refLengthCm: 131, refAxis: 'along' });
+    expect(alongCsv.split('\n').find((l) => l.startsWith('"Эталон: ось","'))).toBe('"Эталон: ось","вдоль штанги"');
+    // Без замера оси нет — «—», а не выдуманная «поперёк движения».
+    const emptyCsv = buildMovementDiagnosticsCsv({ ...BASE });
+    expect(emptyCsv.split('\n').find((l) => l.startsWith('"Эталон: ось","'))).toBe('"Эталон: ось","—"');
   });
   it('спор «параметры ↔ замер» — строка отчёта, а не тишина', () => {
     const csv = buildMovementDiagnosticsCsv({

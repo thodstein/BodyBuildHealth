@@ -253,6 +253,26 @@ describe('хаб → отчёт: ракурс, измеренный по эта�
     expect(rowValue(csv, 'Kinovea xLoop, см')).not.toBe('"—"');
   });
 
+  it('ось эталона уходит в отчёт — без неё угол не воспроизвести', async () => {
+    const rows = ['time,x,y'];
+    for (let i = 0; i < 20; i++) rows.push(`${(i * 0.05).toFixed(2)},${100 + i * 1.5},${50 + i * 4}`);
+    const along = await exportCsv({
+      refAngle: { bench: { azimuthDeg: 30, ratio: 0.5, cosPhi: 0.866, axis: 'along', lengthCm: 131, atSec: null, spanPx: 300 } },
+      refLengthCm: '131',
+    }, rows.join('\n'), '1');
+    expect(rowValue(along, 'Эталон: ось')).toBe('"вдоль штанги"');
+    // Поправка на ракурс считается по cos φ, поэтому +15.5%, а не +100% по ratio.
+    expect(rowValue(along, 'Поправка xLoop на ракурс, %')).toBe('"15.5"');
+
+    savedCsv.length = 0;
+    const across = await exportCsv({
+      refAngle: { bench: { azimuthDeg: 30, ratio: 0.866, cosPhi: 0.866, axis: 'across', lengthCm: 120, atSec: null, spanPx: 300 } },
+      refLengthCm: '120',
+    }, rows.join('\n'), '1');
+    expect(rowValue(across, 'Эталон: ось')).toBe('"поперёк движения"');
+    expect(rowValue(across, 'Поправка xLoop на ракурс, %')).toBe('"15.5"');
+  });
+
   it('спор «параметры ↔ замер» в отчёте не прячется', async () => {
     const rows = ['time,x,y'];
     for (let i = 0; i < 20; i++) rows.push(`${(i * 0.05).toFixed(2)},${100 + i * 1.5},${50 + i * 4}`);

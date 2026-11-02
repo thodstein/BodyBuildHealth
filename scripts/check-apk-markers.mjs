@@ -206,6 +206,8 @@ for (const hook of [
   'data-lift="ref-clear"', 'data-lift="ref-msg"', 'data-lift="ref-xloop-fix"',
   'data-lift="ref-vs-meta"', 'data-lift="ref-vs-meta-fix-left"',
   'data-lift="ref-vs-meta-fix-right"', 'data-lift="ref-vs-meta-fix-front"',
+  // Ось эталона — половина формулы угла (cos φ против sin φ), а не подпись.
+  'data-lift="ref-axis-across"', 'data-lift="ref-axis-along"', 'data-lift="ref-axis-hint"',
   'data-lift="export-svg"', 'data-lift="export-overlay-png"', 'data-lift="export-overlay-video"',
   'data-lift="series-save"', 'data-lift="session-compare"', 'data-lift="bar-heat"',
   'data-lift="quick-start"', 'data-lift="quick-start-hide"',
@@ -288,6 +290,11 @@ mustContain('src/ui/screens/TrainingScreen_parts/LiftMasterCard.tsx', 'reference
 mustContain('src/engines/strength-sport/strength-sport-video.engine.ts', 'export function sideConflictCheck', 'metadata vs measured view conflict');
 mustContain('src/engines/pro/movement-diagnostics-export.engine.ts', 'Ракурс: параметры и замер', 'conflict in report');
 mustContain('src/ui/screens/TrainingScreen_parts/LiftMasterCard.tsx', 'sideConflictCheck(', 'hub names the conflict');
+// Ось эталона: поперёк движения — cos φ, вдоль штанги — sin φ. Перепутать нельзя.
+mustContain('src/engines/pro/trajectory-overlay.engine.ts', 'export type ReferenceAxis', 'reference axis in the formula');
+mustContain('src/engines/pro/trajectory-overlay.engine.ts', 'Math.sqrt(Math.max(0, 1 - Math.min(1, ratio * ratio)))', 'sin-mode uses cos phi');
+mustContain('src/engines/pro/movement-diagnostics-export.engine.ts', 'Эталон: ось', 'axis in report');
+mustContain('src/ui/screens/TrainingScreen_parts/LiftMasterCard.tsx', 'axis: refAxis', 'hub passes axis to the check');
 
 // 7d. Mojibake-бан: битые символы (U+FFFD) в файлах хаба — признак порванной кодировки.
 // В LiftMasterCard их было 11 (тексты VBT/LVP/Kinovea), и это попадало в UI АПК.

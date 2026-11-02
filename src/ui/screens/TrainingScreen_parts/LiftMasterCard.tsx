@@ -50,7 +50,7 @@ import { diagnoseAsymmetry } from '../../../engines/pro/pl-asymmetry.engine';
 import { RULE_CHECKS, checkLiftRules } from '../../../engines/pro/pl-competition-rules.engine';
 import { RED_FLAGS, checkRedFlags, type RedFlagId } from '../../../engines/pro/pl-red-flags.engine';
 import { buildMovementDiagnosticsHtml, buildMovementDiagnosticsCsv, buildTrajectorySvg, movementDiagnosticsFilename, buildHeatTrendCsv, type MovementDiagnosticsExportInput } from '../../../engines/pro/movement-diagnostics-export.engine';
-import { renderTrajectoryPng, recordTrajectoryWebm, recordVideoWithOverlay, canRecordTrajectory, dataUrlToBlob, grabVideoFrame, openVideoFramesFrom, calibrationFromTaps, preferredVideoMime, isCalibrationSane, calibrationFrameFit, calibrationFrameFitOf, mapTrackToVideo, referenceAngleCheck, referenceHorizontalCorrection, perspectiveTrackYForVideoY, perspectiveFromAnchors, isPerspectiveSane, perspectiveSkewPct, perspectiveLocalScale, perspectiveFrameFit, renderFrameWithMapping, mapTrackToVideoPerspective, type VideoCalibration, type PerspectiveCalibration, type VideoFrameSession } from '../../../engines/pro/trajectory-overlay.engine';
+import { renderTrajectoryPng, recordTrajectoryWebm, recordVideoWithOverlay, canRecordTrajectory, dataUrlToBlob, grabVideoFrame, openVideoFramesFrom, calibrationFromTaps, preferredVideoMime, isCalibrationSane, calibrationFrameFit, calibrationFrameFitOf, mapTrackToVideo, referenceAngleCheck, referenceHorizontalCorrection, perspectiveTrackYForVideoY, perspectiveFromAnchors, isPerspectiveSane, perspectiveSkewPct, perspectiveLocalScale, perspectiveFrameFit, renderFrameWithMapping, mapTrackToVideoPerspective, type ReferenceAxis, type VideoCalibration, type PerspectiveCalibration, type VideoFrameSession } from '../../../engines/pro/trajectory-overlay.engine';
 import { copyOrShareText, saveCsvApk, printHtmlApk, saveTextFileApk, saveBlobApk, shareOutcomeLabel } from '../../../core/apk-share';
 import { VideoCaptureCard } from './VideoCaptureCard';
 import StickingPointAnalysisCard from './StickingPointAnalysisCard';
@@ -350,15 +350,23 @@ interface MasterState {
    */
   refAngle?: Record<string, {
     azimuthDeg: number;
-    /** observed / expected = cos φ; из него же считается поправка горизонтали. */
+    /** observed / expected: при эталоне поперёк движения это cos φ, вдоль штанги — sin φ. */
     ratio: number;
+    /** cos φ из замера: именно он сжимает горизонталь кадра (1 — камера в плоскости). */
+    cosPhi?: number | null;
+    /** Относительная точность cos φ, %: у оси «вдоль штанги» она усиливается у фронта. */
+    cosPhiRelErrPct?: number | null;
+    /** По какой оси мерили: формула угла зависит от неё, поэтому она хранится. */
+    axis?: 'across' | 'along';
     lengthCm: number;
     atSec: number | null;
     /** Длина эталона в пикселях кадра — задаёт точность поправки (±тап/длина). */
     spanPx?: number | null;
   }>;
-  /** Длина эталона в кадре, см: гриф между насечками, ширина стойки/скамьи. */
+  /** Длина эталона в кадре, см: скамья (поперёк движения) или гриф между насечками (вдоль штанги). */
   refLengthCm?: string;
+  /** Ось эталона, выбранная пользователем: 'across' по умолчанию. */
+  refAxis?: 'across' | 'along';
 }
 
 function isRecord(v: unknown): v is Record<string, unknown> { return !!v && typeof v === 'object' && !Array.isArray(v); }
@@ -426,8 +434,9 @@ function loadMaster(): MasterState {
       videoPersp: cleanVideoPersp(raw.videoPersp),
       refAngle: cleanRefAngle(raw.refAngle),
       refLengthCm: typeof raw.refLengthCm === 'string' ? raw.refLengthCm.slice(0, 6) : '',
+      refAxis: raw.refAxis === 'along' ? 'along' : 'across',
     };
-  } catch { return { lift:'bench', phase:'' as WeakPoint|'', issues:[], selectedGeom:{}, daysGeom:{}, selectedDiag:{}, daysDiag:{}, weakMuscleGroups:[], weakMuscleSubs:[], asymSide:null, asymL:'', asymR:'', vbtBest:'', vbtLast:'', vbtWeight:'', vbtGoal:'strength', vbtUpdatedAt:null, vbtPauseMs:'', asymPhase:{ startL:'', startR:'', midL:'', midR:'', lockL:'', lockR:'' }, dualSensor:{ left:'', right:'' }, perLift:{}, redFlags:[], ruleChecks:{}, meetDate:'', meetStrategy:'balanced' as MeetStrategy, meetMaxS:'', meetMaxB:'', meetMaxD:'', lvp:{}, capture:{ heightM:'', distM:'', side:'', device:'' }, series:{}, videoCalib:{}, videoOffsetSec:{}, videoPersp:{}, refAngle:{}, refLengthCm:'' }; }
+  } catch { return { lift:'bench', phase:'' as WeakPoint|'', issues:[], selectedGeom:{}, daysGeom:{}, selectedDiag:{}, daysDiag:{}, weakMuscleGroups:[], weakMuscleSubs:[], asymSide:null, asymL:'', asymR:'', vbtBest:'', vbtLast:'', vbtWeight:'', vbtGoal:'strength', vbtUpdatedAt:null, vbtPauseMs:'', asymPhase:{ startL:'', startR:'', midL:'', midR:'', lockL:'', lockR:'' }, dualSensor:{ left:'', right:'' }, perLift:{}, redFlags:[], ruleChecks:{}, meetDate:'', meetStrategy:'balanced' as MeetStrategy, meetMaxS:'', meetMaxB:'', meetMaxD:'', lvp:{}, capture:{ heightM:'', distM:'', side:'', device:'' }, series:{}, videoCalib:{}, videoOffsetSec:{}, videoPersp:{}, refAngle:{}, refLengthCm:'', refAxis:'across' as const }; }
 }
 function saveMaster(s: MasterState) { try{ localStorage.setItem(MASTER_KEY, JSON.stringify(s)); }catch{} }
 function cleanRuleChecks(raw: unknown): Record<string, boolean> {
@@ -491,7 +500,13 @@ function cleanRefAngle(raw: unknown): NonNullable<MasterState['refAngle']> {
     const atSec = typeof v.atSec === 'number' && Number.isFinite(v.atSec) && v.atSec >= 0 ? v.atSec : null;
     const spanRaw = Number(v.spanPx);
     const spanPx = Number.isFinite(spanRaw) && spanRaw > 0 ? spanRaw : null;
-    out[k] = { azimuthDeg: Math.round(deg), ratio, lengthCm, atSec, spanPx };
+    const axis: 'across' | 'along' = v.axis === 'along' ? 'along' : 'across';
+    // cos φ ∈ (0, 1.12]: за 1 он быть не может, а 0 — камера под прямым углом (замер бесполезен).
+    const cosRaw = Number(v.cosPhi);
+    const cosPhi = Number.isFinite(cosRaw) && cosRaw > 0 && cosRaw <= 1.12 ? cosRaw : null;
+    const errRaw = Number(v.cosPhiRelErrPct);
+    const cosPhiRelErrPct = Number.isFinite(errRaw) && errRaw >= 0 ? errRaw : null;
+    out[k] = { azimuthDeg: Math.round(deg), ratio, lengthCm, atSec, spanPx, axis, cosPhi, cosPhiRelErrPct };
   }
   return out;
 }
@@ -783,11 +798,15 @@ export const LiftMasterCard: React.FC<{
     { timeSec: '', frame: null, tap: null },
   ]);
   /**
-   * Эталон в кадре — отрезок известной длины поперёк движения (гриф между насечками,
-   * ширина стойки). Два тапа по нему дают угол камеры к плоскости движения:
-   * без эталона «спереди/сбоку» по одной траектории не восстановить.
+   * Эталон в кадре — отрезок известной длины, и его **ось** входит в формулу:
+   * отрезок в плоскости движения (длина скамьи, глубина стойки) сжимается как
+   * cos φ, а отрезок вдоль штанги (гриф между насечками, ширина стойки) при
+   * камере в плоскости направлен в объектив и растёт как sin φ. Перепутать их —
+   * значит получить угол, обратный правде, поэтому ось выбирается явно.
    */
   const [refLength, setRefLength] = useState(initial.refLengthCm ?? '');
+  /** Ось эталона: по умолчанию «поперёк движения» — она прямо даёт cos φ. */
+  const [refAxis, setRefAxis] = useState<ReferenceAxis>(initial.refAxis === 'along' ? 'along' : 'across');
   const [refFrame, setRefFrame] = useState<{ dataUrl: string; width: number; height: number; timeSec: number | null } | null>(null);
   const [refTaps, setRefTaps] = useState<Array<{ videoX: number; videoY: number }>>([]);
   const [refMsg, setRefMsg] = useState<string | null>(null);
@@ -913,7 +932,7 @@ export const LiftMasterCard: React.FC<{
     }catch{}
   }, []);
 
-  useEffect(()=>{ saveMaster({ lift, phase, issues, selectedGeom, daysGeom, selectedDiag, daysDiag, weakMuscleGroups, weakMuscleSubs, asymSide, asymL, asymR, vbtBest, vbtLast, vbtWeight, vbtGoal, vbtUpdatedAt, vbtPauseMs, asymPhase: { startL: asymStartL, startR: asymStartR, midL: asymMidL, midR: asymMidR, lockL: asymLockL, lockR: asymLockR }, dualSensor: { left: dualLeft, right: dualRight }, perLift, redFlags, ruleChecks, meetDate, meetStrategy, meetMaxS, meetMaxB, meetMaxD, lvp: lvpSaved, capture, series: seriesStore, videoCalib, videoOffsetSec: videoOffset, videoPersp, refAngle, refLengthCm: refLength }); }, [lift, phase, issues, selectedGeom, daysGeom, selectedDiag, daysDiag, weakMuscleGroups, weakMuscleSubs, asymSide, asymL, asymR, vbtBest, vbtLast, vbtWeight, vbtGoal, vbtUpdatedAt, vbtPauseMs, asymStartL, asymStartR, asymMidL, asymMidR, asymLockL, asymLockR, dualLeft, dualRight, perLift, redFlags, ruleChecks, meetDate, meetStrategy, meetMaxS, meetMaxB, meetMaxD, lvpSaved, capture, seriesStore, videoCalib, videoOffset, videoPersp, refAngle, refLength]);
+  useEffect(()=>{ saveMaster({ lift, phase, issues, selectedGeom, daysGeom, selectedDiag, daysDiag, weakMuscleGroups, weakMuscleSubs, asymSide, asymL, asymR, vbtBest, vbtLast, vbtWeight, vbtGoal, vbtUpdatedAt, vbtPauseMs, asymPhase: { startL: asymStartL, startR: asymStartR, midL: asymMidL, midR: asymMidR, lockL: asymLockL, lockR: asymLockR }, dualSensor: { left: dualLeft, right: dualRight }, perLift, redFlags, ruleChecks, meetDate, meetStrategy, meetMaxS, meetMaxB, meetMaxD, lvp: lvpSaved, capture, series: seriesStore, videoCalib, videoOffsetSec: videoOffset, videoPersp, refAngle, refLengthCm: refLength, refAxis }); }, [lift, phase, issues, selectedGeom, daysGeom, selectedDiag, daysDiag, weakMuscleGroups, weakMuscleSubs, asymSide, asymL, asymR, vbtBest, vbtLast, vbtWeight, vbtGoal, vbtUpdatedAt, vbtPauseMs, asymStartL, asymStartR, asymMidL, asymMidR, asymLockL, asymLockR, dualLeft, dualRight, perLift, redFlags, ruleChecks, meetDate, meetStrategy, meetMaxS, meetMaxB, meetMaxD, lvpSaved, capture, seriesStore, videoCalib, videoOffset, videoPersp, refAngle, refLength, refAxis]);
 
   /** Переключение лифта: сохраняем фазу/отклонения текущего и восстанавливаем выбор целевого.
    *  Раньше общий state обнулялся — пользователь терял выбранную фазу после каждого щелчка. */
@@ -1097,10 +1116,11 @@ export const LiftMasterCard: React.FC<{
         a: { x: refTaps[0].videoX, y: refTaps[0].videoY },
         b: { x: refTaps[1].videoX, y: refTaps[1].videoY },
         lengthCm: lenCm,
+        axis: refAxis,
       },
       { pxPerCm: refScalePxPerCm },
     );
-  }, [refTaps, refLength, refScalePxPerCm]);
+  }, [refTaps, refLength, refScalePxPerCm, refAxis]);
   const angleCheck = useMemo(
     () => (kinoveaResult
       ? cameraAngleCheck(kinoveaResult.points, {
@@ -1249,6 +1269,10 @@ export const LiftMasterCard: React.FC<{
       [lift]: {
         azimuthDeg: refCandidate.azimuthDeg as number,
         ratio: refCandidate.ratio,
+        // cos φ — то, что нужно поправке горизонтали: для оси «вдоль штанги» ratio тут не годится.
+        cosPhi: refCandidate.cosPhi,
+        cosPhiRelErrPct: refCandidate.cosPhiRelErrPct,
+        axis: refCandidate.axis,
         lengthCm,
         atSec: refFrame?.timeSec ?? null,
         spanPx: refCandidate.spanPx,
@@ -1579,6 +1603,7 @@ export const LiftMasterCard: React.FC<{
       xLoopRefCorrectionPct: xLoopFix.flag === 'ok' ? xLoopFix.pct : null,
       // Неразрешённый спор параметров и замера не должен прятаться в отчёте.
       angleMetaConflict: sideConflict ? sideConflict.text : null,
+      refAxis: curRefAngle ? (curRefAngle.axis === 'along' ? 'along' : 'across') : null,
       videoOverlayMode: kinoveaResult ? (curPersp ? 'perspective' : curCalib ? 'calibration' : 'panel') : '',
       videoScalePxPerCm: curCalib ? Math.round(curCalib.pxPerCm * 100) / 100 : null,
       videoPerspSkewPct: curPersp ? perspectiveSkewPct(curPersp) : null,
@@ -3005,9 +3030,23 @@ export const LiftMasterCard: React.FC<{
               <div data-lift="ref-block" style={{ marginTop:8, paddingTop:6, borderTop:'1px dashed rgba(148,163,184,0.2)' }}>
                 <div style={{ fontSize:10, fontWeight:800, color:'#cbd5e1' }}>📏 Эталон в кадре — ракурс по замеру</div>
                 <div style={{ marginTop:4, fontSize:9, color:DIM, lineHeight:1.45 }}>
-                  Отрезок известной длины <b>поперёк движения</b>: гриф между насечками ≈ 131 см, ширина стойки или скамьи.
-                  Ткните его концы на кадре — угол считается по укорочению, а не угадывается.
+                  Отрезок известной длины, видимый <b>целиком</b>. Сначала выберите, как он лежит — от этого зависит формула,
+                  и перепутать нельзя: не та ось даёт угол, обратный правде (30° прочитаются как 60° и наоборот).
                   Диск не подходит: он круглый и с любого ракурса виден одинаково.
+                </div>
+                {/*
+                  Ось эталона — не подпись, а половина формулы: «поперёк движения»
+                  даёт cos φ, «вдоль штанги» — sin φ. Значение по умолчанию —
+                  та ось, которая прямо даёт cos φ.
+                */}
+                <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginTop:6 }}>
+                  <button data-lift="ref-axis-across" aria-pressed={refAxis === 'across'} aria-label="Эталон поперёк движения: в плоскости движения, виден сбоку целиком" onClick={()=> setRefAxis('across')} style={{ minHeight:44, padding:'6px 12px', borderRadius:8, cursor:'pointer', background: refAxis === 'across' ? 'rgba(56,189,248,0.18)' : 'transparent', color: refAxis === 'across' ? '#38bdf8' : DIM, border:`1px solid ${refAxis === 'across' ? 'rgba(56,189,248,0.45)' : 'rgba(255,255,255,0.12)'}`, fontWeight:700, fontSize:11 }}>⇱ поперёк движения</button>
+                  <button data-lift="ref-axis-along" aria-pressed={refAxis === 'along'} aria-label="Эталон вдоль штанги: гриф между насечками, ширина стойки" onClick={()=> setRefAxis('along')} style={{ minHeight:44, padding:'6px 12px', borderRadius:8, cursor:'pointer', background: refAxis === 'along' ? 'rgba(244,114,182,0.16)' : 'transparent', color: refAxis === 'along' ? '#f472b6' : DIM, border:`1px solid ${refAxis === 'along' ? 'rgba(244,114,182,0.42)' : 'rgba(255,255,255,0.12)'}`, fontSize:11 }}>⇲ вдоль штанги</button>
+                </div>
+                <div data-lift="ref-axis-hint" style={{ marginTop:4, fontSize:9, color:DIM, lineHeight:1.45 }}>
+                  {refAxis === 'across'
+                    ? 'Поперёк движения (в плоскости пути штанги): длина скамьи, глубина стойки, расстояние между метками на полу. Видно полностью при камере сбоку и сжимается как cos φ — основная ось.'
+                    : 'Вдоль штанги: гриф между насечками ≈ 131 см, ширина стойки. Сбоку такой отрезок смотрит в объектив и почти не виден — он растёт как sin φ: годится как контроль ракурса, но не как основной эталон.'}
                 </div>
                 <div style={{ display:'flex', gap:6, flexWrap:'wrap', alignItems:'flex-end', marginTop:6 }}>
                   <label style={{ fontSize:9, color:DIM, display:'flex', flexDirection:'column', gap:2 }}>длина эталона, см
@@ -3017,7 +3056,7 @@ export const LiftMasterCard: React.FC<{
                       inputMode="decimal"
                       min={1}
                       max={500}
-                      placeholder="131"
+                      placeholder={refAxis === 'along' ? '131' : '120'}
                       value={refLength}
                       onChange={(e)=> setRefLength(e.target.value.replace(/[^0-9.,]/g, '').slice(0, 6))}
                       style={{ width:84, minHeight:32, padding:'6px 8px', borderRadius:8, background:'rgba(0,0,0,0.35)', border:'1px solid rgba(255,255,255,0.14)', color:'#fff', fontSize:11 }}
@@ -3062,6 +3101,7 @@ export const LiftMasterCard: React.FC<{
                 {curRefAngle && (
                   <div data-lift="ref-saved" style={{ marginTop:6, fontSize:9, color:DIM, lineHeight:1.45 }}>
                     Применён замер: камера {curRefAngle.azimuthDeg}° · эталон {curRefAngle.lengthCm} см
+                    {` (${curRefAngle.axis === 'along' ? 'вдоль штанги' : 'поперёк движения'})`}
                     {curRefAngle.atSec != null ? ` · кадр ${curRefAngle.atSec.toFixed(2)} с` : ''}
                     {' '}— угол идёт в вердикт ракурса и в выгрузки.
                   </div>
