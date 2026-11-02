@@ -23,6 +23,7 @@ import { BTN, BTN_GHOST, H, IN } from './training-ui';
 import { PLATE_SET_PRESETS } from '../../../engines/bb/bb-plates.engine';
 import { DELOAD_PROTOCOLS, INTENSITY_TECHNIQUES, type LoadStrategy, type DeloadType, type IntensityTechnique } from '../../../engines/bb/bb-autocoach.engine';
 import type { SessionMethodology } from '../../../engines/bb/bb-session-order.engine';
+import { methodologyOptions, methodologySpecFor } from '../../../engines/bb/bb-methodology-spec';
 import type { DUPMode } from '../../../engines/bb/bb-dup.engine';
 import type { PED } from '../../../engines/bb/bb-ped-adaptation.engine';
 import { computeAASEquivDose } from '../../../engines/bb/bb-ped-adaptation.engine';
@@ -461,14 +462,7 @@ export const BbParamsStep: React.FC<BbParamsStepProps> = ({
             { id: 'hypertrophy', label: 'Гипертрофия: RIR 2-3', desc: 'Умеренные веса 8-12 повт, контроль темпа 3-1-1-0, объём для роста.' },
             { id: 'endurance', label: 'Выносливость: RIR 3-4', desc: 'Лёгкие веса 15-20 повт, короткая пауза, метаболический стресс.' },
           ]} />
-          <PopupSelect label="🧩 Методика порядка" value={bbMethodology} onChange={v => setBbMethodology(v as SessionMethodology)} hint="Порядок упражнений в дне — влияет на силу и утомление. В коде: compound_first / pre_exhaust / post_exhaust / mountain_dog / fst7 / hyperemia" options={[
-            { id: 'compound_first', label: 'Базовые → изоляция (по умолчанию)', desc: 'Сначала тяжёлые многосуставные на свежие мышцы — максимум веса и безопасная техника, затем изоляция.' },
-            { id: 'pre_exhaust', label: 'Pre-exhaust: изоляция первой', desc: 'Изоляция целевой мышцы до базы — утомляет заранее, база добивает. Вес в базе −10-15%.' },
-            { id: 'post_exhaust', label: 'Post-exhaust: база → изоляция', desc: 'База в полную силу, сразу изоляция без отдыха — «пробить» мышцу двойным стимулом.' },
-            { id: 'mountain_dog', label: 'Mountain Dog: активация → база → памп → стретч', desc: 'Лёгкая активация (RIR≥3), тяжёлая база, памп и loaded stretch 30-60с. Для MGF-фаз и суставов.' },
-            { id: 'fst7', label: 'FST-7 порядок: праймер → финишер', desc: 'Памп-праймер первым, тяжёлая работа в середине, 7-сетовый финишер и стретч в конце. Под GH+инсулин окно.' },
-            { id: 'hyperemia', label: 'Hyperemia: памп раньше тяжестей', desc: 'У аксессуаров кровь первее веса — памп-изоляция перед тяжёлой, короткие паузы 30-60с. Под intra-углеводы (Sarcev).' },
-          ]} />
+          <PopupSelect label="🧩 Методика порядка" value={bbMethodology} onChange={v => setBbMethodology(v as SessionMethodology)} hint={`Что методика реально меняет: порядок, отдых, схема объёма и финишер — подписи берутся из спека (${methodologySpecFor(bbMethodology).honestNote})`} options={methodologyOptions().map(o => ({ id: o.id, label: o.label, desc: o.desc }))} />
           {isGeneric
             ? <PopupSelectSmart label="🎯 Интенсив-техника" value={intensityTech} onChange={onUserIntensityTech} suggestedIds={bbSuggest.intensityTechnique} suggestionReason="По цели и уровню (цепочка)" options={[
                 { id: 'none', label: 'Авто по фазе', desc: 'Accumulation → пауза-репс, intensification/peaking → rest-pause/dropset по профилю мышцы.' },

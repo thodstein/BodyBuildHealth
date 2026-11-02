@@ -10,7 +10,8 @@ import { EXERCISE_CATALOG } from '../../../core/exercise-catalog';
 import type { BBPlan } from '../../../engines/bb/bb-builder.engine';
 import { buildWarmup } from '../../../engines/bb/bb-builder.engine';
 import type { BBPlanMetrics } from '../../../engines/bb/bb-metrics.engine';
-import { isCompoundEx } from '../../../engines/bb/bb-session-order.engine';
+import { isCompoundEx, explainSessionOrder } from '../../../engines/bb/bb-session-order.engine';
+import { methodologySpecFor } from '../../../engines/bb/bb-methodology-spec';
 import type { DUPMode } from '../../../engines/bb/bb-dup.engine';
 import { loadSRPESessions } from '../../../engines/pro/srpe-store';
 import { acuteChronicRatio, toDailyLoads } from '../../../engines/pro/training-load.engine';
@@ -59,6 +60,10 @@ export interface BbPlanStepProps {
   setWeightEntries: React.Dispatch<React.SetStateAction<PlanWeightEntry[]>>;
   setWeightsApplied: React.Dispatch<React.SetStateAction<number>>;
   setStep: React.Dispatch<React.SetStateAction<Step>>;
+  /** D-4 (итерация E): дата старта мезоцикла — для сдвига «пропустил день/неделю».
+   *  Не передана (unit-рендер) — блок сдвига просто не показывается. */
+  startDateInput?: string;
+  setStartDateInput?: React.Dispatch<React.SetStateAction<string>>;
   /** `renderActionRow(false)` — низ шага (кнопки действий). */
   actionRow: React.ReactNode;
 }
@@ -68,7 +73,7 @@ export const BbPlanStep: React.FC<BbPlanStepProps> = ({
   exerciseEdits, setExerciseEdits, editMode, setEditMode,
   collapsedDays, setCollapsedDays, collapsedExercises, setCollapsedExercises,
   bbTrainingFocus, bbLevel, bbTrainingYears, onCourse, trainingVolumeMode, setSubTarget, handleSendToExecution,
-  setWeightEntries, setWeightsApplied, setStep, actionRow,
+  setWeightEntries, setWeightsApplied, setStep, actionRow, startDateInput, setStartDateInput,
 }) => {
   if (!builtPlan || !metrics) return null;
   const W = builtPlan.weeks;
@@ -263,6 +268,46 @@ export const BbPlanStep: React.FC<BbPlanStepProps> = ({
         </div>
       </div>
 
+      {/* Как прогрессирует план + правило пропуска (итерации C/E) */}
+      <CollapsibleCard
+        title="📈 Как прогрессирует этот план"
+        defaultOpen={false}
+        headerStyle={{ background: 'linear-gradient(135deg, rgba(34,197,94,0.10), rgba(34,197,94,0.03))', color: '#22c55e' }}
+        badge={methodologySpecFor(builtPlan.methodology).labelRu}
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 5, fontSize: 10, color: '#fff', lineHeight: 1.5 }}>
+          <div>🔁 <b>Двойная прогрессия:</b> сначала доведите все подходы до верхней границы повторов на целевом RIR, затем минимальный шаг веса вверх и возврат к нижней границе диапазона.</div>
+          <div>📦 <b>Объём:</b> MEV → MAV → MRV по неделям (×0.85 → ×1.0 → ×1.10), делод ≈ ×0.6 с возвратом к рабочему весу.</div>
+          {weakPoints.length > 0 && (
+            <div>🎯 <b>Спец-мышца ({weakPoints.map(m => muscleLabel(m)).join(', ')}):</b> +2 % веса в неделю внутри фазы (кап +6 %), дальше — обычная двойная прогрессия.</div>
+          )}
+          <div>🧩 <b>Методика «{methodologySpecFor(builtPlan.methodology).labelRu}»:</b> {methodologySpecFor(builtPlan.methodology).orderNote}</div>
+          <div style={{ opacity: 0.8 }}>ℹ️ {methodologySpecFor(builtPlan.methodology).honestNote}</div>
+        </div>
+        {setStartDateInput && startDateInput && (() => {
+          const shift = (days: number) => {
+            setStartDateInput(prev => {
+              const m = String(prev || startDateInput).match(/^(\d{4})-(\d{2})-(\d{2})/);
+              const dt = m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])) : new Date();
+              if (Number.isNaN(dt.getTime())) return prev;
+              dt.setDate(dt.getDate() + days);
+              const y = dt.getFullYear();
+              const mo = String(dt.getMonth() + 1).padStart(2, '0');
+              const da = String(dt.getDate()).padStart(2, '0');
+              return `${y}-${mo}-${da}`;
+            });
+          };
+          return (
+            <div style={{ marginTop: 8, paddingTop: 6, borderTop: '1px solid rgba(255,255,255,0.07)', display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', fontSize: 10, color: '#fff' }}>
+              <span>🗓 Пропустили день или неделю? Сдвиньте даты плана:</span>
+              <button onClick={() => shift(1)} style={{ ...BTN_GHOST, fontSize: 10, padding: '2px 8px' }}>+1 день</button>
+              <button onClick={() => shift(7)} style={{ ...BTN_GHOST, fontSize: 10, padding: '2px 8px' }}>+1 неделя</button>
+              <span style={{ opacity: 0.65 }}>меняются только даты, упражнения и веса остаются; старт: {startDateInput}</span>
+            </div>
+          );
+        })()}
+      </CollapsibleCard>
+
       {/* Calendar with phase colors */}
       <CollapsibleCard title="📅 Календарь мезоцикла (цвет = фаза)" defaultOpen={true} headerStyle={{ background: 'linear-gradient(135deg, rgba(168,85,247,0.12), rgba(168,85,247,0.04))', color: '#a78bfa' }} badge={`${W.length} нед`}>
         <div style={{ display:'flex', flexDirection:'column', gap:3 }}>
@@ -404,6 +449,40 @@ export const BbPlanStep: React.FC<BbPlanStepProps> = ({
         );
       })()}
 
+      {/* M-4 (итерация E): почему упражнение сменилось относительно прошлой недели */}
+      {(() => {
+        const prev = bbWeekSel >= 2 ? W[bbWeekSel - 2] : null;
+        if (!prev || prev.week === wk.week) return null;
+        const rows: string[] = [];
+        const dayN = Math.min(prev.sessions.length, wk.sessions.length);
+        for (let di = 0; di < dayN; di++) {
+          const a = prev.sessions[di]?.exercises || [];
+          const b = wk.sessions[di]?.exercises || [];
+          for (let ei2 = 0; ei2 < Math.min(a.length, b.length); ei2++) {
+            const an = (a[ei2] as any)?.exerciseName || a[ei2]?.name || '';
+            const bn = (b[ei2] as any)?.exerciseName || b[ei2]?.name || '';
+            if (an && bn && an !== bn) rows.push(`Д${di + 1} · №${ei2 + 1}: ${an} → ${bn}`);
+          }
+        }
+        if (!rows.length) return null;
+        return (
+          <CollapsibleCard
+            title={`🔄 Что сменилось с недели ${prev.week}`}
+            defaultOpen={false}
+            headerStyle={{ background: 'linear-gradient(135deg, rgba(168,85,247,0.10), rgba(168,85,247,0.03))', color: '#a78bfa' }}
+            badge={`${rows.length} замен`}
+          >
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 3, fontSize: 10, color: '#fff', lineHeight: 1.5 }}>
+              {rows.slice(0, 12).map((r, ri) => <div key={ri}>• {r}</div>)}
+              {rows.length > 12 && <div style={{ opacity: 0.7 }}>… и ещё {rows.length - 12}</div>}
+              <div style={{ marginTop: 4, opacity: 0.85 }}>
+                Причина — правило ротации: упражнение не повторяется раньше 4 недель и не более 3 раз за мезоцикл (смена режима «Запрет» отключает ротацию).
+              </div>
+            </div>
+          </CollapsibleCard>
+        );
+      })()}
+
       {/* Daily session cards — красивые раскрывающиеся карточки дней */}
       <div style={{ marginTop:10, display:'flex', flexDirection:'column', gap:12 }}>
         {wk.sessions.map((s, si) => {
@@ -464,6 +543,29 @@ export const BbPlanStep: React.FC<BbPlanStepProps> = ({
               </button>
               {!isDayCollapsed && (
                 <div style={{ padding:'8px 10px', borderTop:`1px solid ${dayColor}15` }}>
+
+              {/* O-5 (итерация B): почему порядок такой — из движка, не из комментария */}
+              {(() => {
+                const tag = s.sessionTag || '';
+                const notes = explainSessionOrder(s.exercises, {
+                  sessionTag: tag,
+                  methodology: builtPlan.methodology as any,
+                  leadMuscles: weakPoints,
+                  interleave: tag === 'FullBody',
+                  axialAware: /Legs|Lower|Glute|FullBody/i.test(tag),
+                });
+                if (!notes.length) return null;
+                return (
+                  <details style={{ marginBottom: 8 }}>
+                    <summary style={{ fontSize: 10, fontWeight: 700, color: 'rgba(96,165,250,0.85)', cursor: 'pointer', padding: '4px 6px', borderRadius: 6, background: 'rgba(96,165,250,0.06)' }}>
+                      🧭 Почему упражнения идут именно в таком порядке
+                    </summary>
+                    <div style={{ marginTop: 4, display: 'flex', flexDirection: 'column', gap: 3, fontSize: 10, color: '#fff', lineHeight: 1.5 }}>
+                      {notes.map((n, ni) => <div key={ni}>{n}</div>)}
+                    </div>
+                  </details>
+                );
+              })()}
 
               {/* Упражнения */}
               <div style={{ padding:'4px 0' }}>
@@ -528,6 +630,11 @@ export const BbPlanStep: React.FC<BbPlanStepProps> = ({
                             <span style={{ fontSize:11, fontWeight:700, padding:'2px 7px', borderRadius:5, background: charColor + '20', color: charColor, border: '0.5px solid ' + charColor + '30' }}>
                               {e.character === 'тяж' ? '💪 Тяж' : e.character === 'памп' ? '🩸 Памп' : '🌿 Лёг'}
                             </span>
+                            {e.supersetGroup != null && (
+                              <span style={{ fontSize:11, fontWeight:800, padding:'2px 7px', borderRadius:5, background:'rgba(168,85,247,0.18)', color:'#c084fc', border:'0.5px solid rgba(168,85,247,0.35)' }}>
+                                🔗 {(e.supersetSlot === 1 ? 'B' : 'A')}{e.supersetGroup}
+                              </span>
+                            )}
                             {(e as any).warmupActivator && (
                               <span style={{ fontSize:11, fontWeight:700, padding:'2px 7px', borderRadius:5, background:'rgba(148,163,184,0.15)', color:'#94a3b8', border:'0.5px solid rgba(148,163,184,0.3)' }}>
                                 🔥 Разминка
@@ -604,6 +711,13 @@ export const BbPlanStep: React.FC<BbPlanStepProps> = ({
                               </span>
                             )}
                           </div>
+                        </div>
+                      )}
+
+                      {/* D-1 (итерация C): правило прогрессии — что делать на следующей неделе */}
+                      {e.progressionRule && (
+                        <div style={{ marginTop:6, padding:'6px 9px', borderRadius:8, background:'rgba(34,197,94,0.06)', border:'0.5px solid rgba(34,197,94,0.18)', fontSize:10, color:'#fff', lineHeight:1.45 }}>
+                          <b style={{ color:'#22c55e' }}>📈 Как прогрессировать:</b> {e.progressionRule}
                         </div>
                       )}
 

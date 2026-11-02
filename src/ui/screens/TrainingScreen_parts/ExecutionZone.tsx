@@ -40,6 +40,8 @@ const playerDayFromMicro = (day: any): PlayerDay => {
       muscleGroup: String(ex?.muscleGroup || ex?.group || 'other'),
       targetSets,
       restSec: Math.max(20, Math.round(Number(ex?.restSec)) || 90),
+      // D-3: суперсет-пара из плана, если данные дошли до микроцикла.
+      ...(ex?.supersetGroup != null ? { supersetGroup: Number(ex.supersetGroup), supersetSlot: (Number(ex.supersetSlot) === 1 ? 1 : 0) as 0 | 1 } : {}),
     };
   });
   return { label: String(day?.day || day?.label || 'День'), exercises };

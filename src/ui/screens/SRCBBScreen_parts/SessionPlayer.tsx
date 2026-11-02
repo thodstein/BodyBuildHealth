@@ -137,6 +137,11 @@ export interface PlayerExercise {
   coef?: number;     // Коэф. тяжести (1.2 / 1.0 / 0.3)
   mnosz?: number;    // Множ (множитель нагрузки)
   group?: string;    // группа (ЖМ/ПР/ТГ/Ср)
+  /** D-3 (итерация E): номер суперсет-группы из плана — бейдж A1/B1 в плеере.
+   *  Не передано (микроцикл PL) — бейдж не показывается. */
+  supersetGroup?: number;
+  /** Позиция в паре: 0 = A, 1 = B. */
+  supersetSlot?: 0 | 1;
 }
 export interface PlayerDay { label: string; exercises: PlayerExercise[] }
 
@@ -1252,6 +1257,11 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
                           <div style={{ flex: 1, minWidth: 0 }}>
                             <div style={{ fontSize: 12, color: '#fff', fontWeight: 600 }}>
                               {ex.name}
+                              {ex.supersetGroup != null && (
+                                <span style={{ fontSize: 9, marginLeft: 6, padding: '1px 5px', borderRadius: 4, background: 'rgba(168,85,247,0.18)', color: '#c084fc', fontWeight: 800 }} title="Суперсет: упражнения пары выполняются без отдыха между ними">
+                                  🔗 {(ex.supersetSlot === 1 ? 'B' : 'A')}{ex.supersetGroup}
+                                </span>
+                              )}
                               {(() => {
                                 const t = ex.targetSets[ex.targetSets.length - 1]?.technique;
                                 const lbl = techniqueLabel(t);

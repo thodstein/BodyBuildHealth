@@ -3800,6 +3800,8 @@ const [bbVolumeRamp, setBbVolumeRamp] = useState<'standard' | 'preloaded' | 'fla
       setWeightEntries={setWeightEntries}
       setWeightsApplied={setWeightsApplied}
       setStep={setStep}
+      startDateInput={startDateInput}
+      setStartDateInput={setStartDateInput}
       actionRow={renderActionRow(false)}
     />
     {builtPlan && (() => {
