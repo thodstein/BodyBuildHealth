@@ -21,6 +21,7 @@ function indirectToMuscle(ex: any, muscle: string): number {
 }
 import { estimateBBSessionCost, fitBBSessionToBudget } from './bb-fatigue.engine';
 import { REP_SCHEMES, isWidowmakerExercise } from './bb-rep-schemes.engine';
+import { INTENSITY_TECHNIQUES, techniquesFor } from './bb-intensity-techniques';
 import { buildProgressionRule } from './bb-progression-rule';
 import { analyzeBBRotation } from './bb-rotation.engine';
 import { EXERCISE_CATALOG } from '../../core/exercise-catalog';
@@ -6015,6 +6016,20 @@ for (const week of next.weeks) {
  */
 export function autoAssignIntensityTechniques(plan: BBPlan, level: string, priorityMuscles?: string[], schedule?: SpecializationSchedule, allowFailureTechniques = true): void {
   if (level === 'beginner') return; // новички не используют intensity techniques
+  // M-3: уровень решают ДАННЫЕ (`INTENSITY_TECHNIQUES[].level`), а не эта функция.
+  // Раньше здесь была одна проверка `beginner → return`, и intermediate мог получить
+  // rest-pause/myo-rep, которые в данных помечены как advanced+ — две правды в репо.
+  const allowedTechs = new Set<string>(techniquesFor('памп', level).map(t => t.technique));
+  /** Честная замена, если уровень не разрешает выбранную по имени технику. */
+  const levelFallback: Record<string, string[]> = {
+    rest_pause: ['dropset', 'mechanical_drop', 'slow_eccentric'],
+    myo_rep: ['dropset', 'mechanical_drop', 'slow_eccentric'],
+    twenty_ones: ['dropset'],
+  };
+  const whyOf = (t: string): string => {
+    if (t === 'twenty_ones') return 'специализация бицепса: плотность и памп без роста осевой усталости';
+    return INTENSITY_TECHNIQUES.find(x => x.technique === t)?.whyRu || '';
+  };
   for (const week of plan.weeks) {
     if (week.phase === 'deload') continue; // deload — без intensity techniques
     // P2 (качество): пик/тейпер — без отказных техник. Реализация силы идёт
@@ -6070,15 +6085,24 @@ export function autoAssignIntensityTechniques(plan: BBPlan, level: string, prior
           technique = 'dropset';
         }
         if (technique && ex.workSets && ex.workSets.length > 0) {
+          // M-3: сверка с данными. twenty_ones — техника специализации бицепса из
+          // другого файла, поэтому она разрешена по смыслу (не в INTENSITY_TECHNIQUES).
+          let finalTech = technique;
+          if (finalTech !== 'twenty_ones' && !allowedTechs.has(finalTech)) {
+            finalTech = (levelFallback[finalTech] || []).find(t => allowedTechs.has(t)) || '';
+            if (!finalTech) continue; // уровень не разрешает ни технику, ни замену — честно пропускаем
+          }
           // Назначить технику на последний сет
           const lastSet = ex.workSets[ex.workSets.length - 1];
-          lastSet.technique = technique;
+          lastSet.technique = finalTech;
           techniquesInSession++;
-          // Добавить комментарий
+          // Добавить комментарий — с причиной, а не только названием (M-3).
           const techNames: Record<string, string> = {
             dropset: 'Дроп-сет', rest_pause: 'Rest-pause', myo_rep: 'Myo-reps', twenty_ones: '21s (7-7-7)',
+            mechanical_drop: 'Механический дроп', slow_eccentric: 'Медленный эксцентрик',
           };
-          ex.comment = (ex.comment || '') + ` | 💥 ${techNames[technique] || technique} на последнем подходе.`;
+          const why = whyOf(finalTech);
+          ex.comment = (ex.comment || '') + ` | 💥 ${techNames[finalTech] || finalTech} на последнем подходе${why ? ` (почему: ${why})` : ''}.`;
         }
       }
     }

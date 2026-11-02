@@ -88,8 +88,15 @@ describe('BB zero-state snapshots (baseline Этапа 10)', () => {
     // задокументировано замером (back 60→54 на ppl_6, ≤10%) — в рамках
     // допустимых ~15%. Потолок не режет ниже PPL-контракта сплита (бицепс/
     // трицепс/икры) — см. pplWeeklyFloorFor.
+    // Re-baseline 11 (итерация F, O-3: каталог старше эвристик по имени):
+    // «Гакк-присед на бицепс бедра (стопы высоко)» содержит слово «бицепс», из-за
+    // чего регексом считался ИЗОЛЯЦИЕЙ, хотя движение многосуставное (каталог:
+    // compound). Класс исправлен → упражнение получило бюджет базы (пол 3 сета
+    // вместо 2), а недельный zero-sum перераспределил разницу:
+    // glutes 9→10, hamstrings 22→24, quads 20→18 (-10%, в рамках ~15%).
+    // Валидатор зелёный, инварианты целы.
     expect(directVolume(plan)).toEqual({
-      abs: 10, back: 34, biceps: 4, calves: 10, chest: 17, delt_mid: 4, delt_rear: 2, forearms: 6, glutes: 9, hamstrings: 22, quads: 20, shoulders: 0, traps: 7, triceps: 4,
+      abs: 10, back: 34, biceps: 4, calves: 10, chest: 17, delt_mid: 4, delt_rear: 2, forearms: 6, glutes: 10, hamstrings: 24, quads: 18, shoulders: 0, traps: 7, triceps: 4,
     });
   });
 

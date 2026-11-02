@@ -37,7 +37,10 @@ function musclePriority(muscle: string): number {
 /* ───────────────────────── Классификаторы по имени ───────────────────────── */
 
 /** Базовое (compound) упражнение по имени или роли. */
-const ISOLATION_RE = /мах|raise|fly|разв(од|ед)|сгибан|разгибан|curl|extension|kickback|crunch|пресс|скручив|француз|шраг|кроссовер|из-за головы|в стороны|перед собой|на носки|подъём|подъем|бицепс|трицепс|молотк|сведен|отведение|приведение|cable.*lateral/i;
+// O-3: без голого `подъём` — «Подъём на грудь» (clean) и «Подъём ног в висе» это
+// не изоляция. Подъёмы-изоляции узнаются по своей сути (на носки / бицепс /
+// перед собой / на скамье Скотта / через стороны), а не по слову «подъём».
+const ISOLATION_RE = /мах|raise|fly|разв(од|ед)|сгибан|разгибан|curl|extension|kickback|crunch|пресс|скручив|француз|шраг|кроссовер|из-за головы|в стороны|сторон|перед собой|на носки|на носок|на нос|бицепс|трицепс|молотк|сведен|отведение|приведение|скотт|концентрирован|тибиалис|scaption|cable.*lateral/i;
 /** True for isolation movements by name (french press, curl, lateral/front raise, shrug, pushdown,
  *  fly, calf raise, crunch, etc.) — used to keep heavy/primary isolations out of the compound tier. */
 export function isIsolationByName(name: string): boolean {
@@ -46,9 +49,13 @@ export function isIsolationByName(name: string): boolean {
 
 export function isCompoundEx(ex: BBExercise): boolean {
   const n = (ex.name || '').toLowerCase();
-  if (ISOLATION_RE.test(n)) return false; // isolation never treated as compound, even if role=primary
+  // O-3: структурные данные каталога СТАРШЕ догадок по имени. Раньше regex
+  // проверялся первым, и `подъём` в нём переводил в «изоляцию» многосуставные
+  // движения («Подъём на грудь» = clean, «Подъём ног в висе», «Турецкий подъём»,
+  // «Махи гирей» = swing). Regex остаётся fallback'ом — для имён вне каталога.
   const catalog = EXERCISE_CATALOG.find(item => item.name === ex.name || item.id === ex.exerciseName);
   if (catalog) return catalog.type === 'compound';
+  if (ISOLATION_RE.test(n)) return false; // isolation never treated as compound, even if role=primary
   if (ex.role === 'primary') return true;
   return (
     /жим|присед|становая|тяга|выпад|пулловер|pull-?up|подтяг|отжимание|dip|bench|press|squat|deadlift|row|lunge|hip.?thrust|rdl|good.?morning/i.test(n)
