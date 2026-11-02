@@ -14240,6 +14240,20 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
         notes[microBoostNoteIdx] = `⚠ Дефицит ${_mb.key}: ${_mb.foodName} ${_mb.grams} г не влез в калорийность дня (поздние проходы его сократили) — добавьте вручную или поднимите ккал`;
       }
     }
+    // ─── QG22: граммы обмена в ноте = граммы финальной тарелки ───
+    // QG20/санитайзеры/микро-буст меняют количество рыбы ПОСЛЕ того, как QG13/QG19
+    // написали «→ <рыба> N г». Пересчитываем граммы и хвост с фактами по финальным
+    // продуктам дня; сегмент, чьей рыбы в тарелке уже нет, снимается.
+    if (_pickCtx.qualityMode === 'full') {
+      const _tg22 = new Map<string, number>(
+        getMicroTargets((input.sex === 'female' ? 'female' : 'male') as any, input.weightKg, input.cyclePhase as any, !!input.isTrainingDay)
+          .map((t) => [t.nutrient, t.target] as [string, number]),
+      );
+      reconcileFishSwapNotes(notes, meals as any[], _finalMicroTotals as any, {
+        d: Number(_tg22.get('VitD') || 15),
+        ca: Number(_tg22.get('Ca') || 1000),
+      });
+    }
     // ─── QG21: микро-ноты по факту (только текст, тарелки не трогаются) ───
     // Поздние стадии (соль QG8, рыба QG13/QG19, молочка QG18, желток QG12, белок
     // завтрака QG20) меняют тарелки ПОСЛЕ того, как ноты покрытия уже напечатаны.
@@ -14429,7 +14443,7 @@ export function preSleepProteinBudget(weightKg?: number): number {
 // реализация на движок и отчёт покрытия (раньше два сумматора расходились).
 export { getMicroFromFood as _getMicroFromFoodForTest };
 // §4.5: единый RDA-канон на экспорт для тестов паритета с отчётом покрытия.
-export { rdaFor as _rdaForForTest };
+export { rdaFor as _rdaForForTest, RDA_TARGETS as _rdaTargetsForTest };
 // Д-6: veg-aware. In vegetarian mode, deficiency recommendations use plant/dairy sources,
 // never suggesting meat/fish (salmon/oysters/beef_liver) which the user does not eat.
 function closeFoodDeficiencies(meals: Meal[], isVegetarian = false, sex: 'male'|'female'|'other' = 'male'): string[] {
@@ -14460,6 +14474,93 @@ function closeFoodDeficiencies(meals: Meal[], isVegetarian = false, sex: 'male'|
     }
   });
   return notes;
+}
+
+// ─── QG22: нота обмена называет граммы, которые стоят в тарелке ─────────────
+// Ноты QG13 (`🐟 Кальций:`) и QG19 (`🐠 Витамин D:`) пишутся в момент обмена
+// («Обед: индейка 75 г → люциан 105 г»), а ПОЗЖЕ их граммы меняют перенос белка
+// QG20 (рыба — тоже белок-донор), санитайзеры и микро-буст. Итог: в ноте 105 г
+// рыбы, в тарелке 85 г (замер после QG22: M1/6/отд). Пользователь читает план,
+// в котором нота описывает другое блюдо, — тот же дефект, что QG21 вылечил для
+// микро-нот, только здесь правятся граммы обмена и хвост с фактами.
+// Тарелки стадия не трогает: переписывается текст по финальным продуктам дня.
+const _FISH_SWAP_NOTE_PREFIXES = ['🐠 Витамин D:', '🐟 Кальций:'];
+
+function reconcileFishSwapNotes(
+  notes: string[],
+  meals: any[],
+  fact: Record<string, number>,
+  goals: { d: number; ca: number },
+): void {
+  const factD = Math.round(Number(fact?.['VitD'] || 0) * 10) / 10;
+  const factO3 = Math.round(Number(fact?.['Omega3'] || 0));
+  const factCa = Math.round(Number(fact?.['Ca'] || 0));
+  const factB12 = Math.round(Number(fact?.['VitB12'] || 0) * 10) / 10;
+  const dGoal = Number(goals?.d) > 0 ? Number(goals.d) : 15;
+  const caGoal = Number(goals?.ca) > 0 ? Number(goals.ca) : 1000;
+  const dPct = Math.round((factD / dGoal) * 100);
+  const caPct = Math.round((factCa / caGoal) * 100);
+  const fishLeft = meals.some((m: any) => (m.items || []).some((x: any) => /^(trout|fish_snapper_red|sardines|salmon|mackerel|herring|pollock|cod|tuna|sprat|hake|perch)/.test(String(x.id))));
+  for (let i = 0; i < notes.length; i++) {
+    const s = notes[i];
+    if (typeof s !== 'string') continue;
+    const prefix = _FISH_SWAP_NOTE_PREFIXES.find((p) => s.startsWith(p));
+    if (!prefix) continue;
+    // Обмен состоялся, но поздние проходы сняли рыбу из дня целиком — нота про
+    // D-рыбу описывает блюдо, которого нет.
+    if (!fishLeft) { notes.splice(i, 1); i--; continue; }
+    let out = s;
+    // 1) Хвост с фактами: «D 2.1 → 9.4 мкг (63% цели), омега-3 1410 мг».
+    const dBefore = (s.match(/D ([\d.,]+) →/u) || [])[1] || '0';
+    out = out.replace(
+      /D [\d.,]+ → [\d.,]+ мкг \([\d.,]+% цели\), омега-3 \d+ мг/u,
+      `D ${dBefore} → ${factD} мкг (${dPct}% цели), омега-3 ${factO3} мг`,
+    );
+    // 2) Кальциевая нота называет Ca/B12/D в хвосте — тоже по факту.
+    out = out.replace(/Ca \d+ мг \([\d.,]+% цели\)/u, `Ca ${factCa} мг (${caPct}% цели)`);
+    out = out.replace(/B12 [\d.,]+ мкг/u, `B12 ${factB12} мкг`);
+    out = out.replace(/витамин D [\d.,]+ мкг/u, `витамин D ${factD} мкг`);
+    // 3) Граммы обмена: ««<приём>» X г → <рыба> N г» — сверяем с финальной тарелкой.
+    const cut = out.indexOf(' — белок тот же');
+    const head = cut >= 0 ? out.slice(0, cut) : out;
+    const tail = cut >= 0 ? out.slice(cut) : '';
+    const segs = head.slice(prefix.length).trim().split('; ');
+    const kept: string[] = [];
+    let changed = false;
+    for (const seg of segs) {
+      const m = seg.match(/^(.*?→ )(.+?) (\d+) г$/u);
+      if (!m) { kept.push(seg); continue; }
+      const fishName = m[2];
+      const claimed = Number(m[3]);
+      const cand = FOOD_DB
+        .filter((f: any) => f.name && fishName.includes(String(f.name)))
+        .sort((a: any, b: any) => String(b.name).length - String(a.name).length)[0];
+      const fid = cand ? String(cand.id) : null;
+      if (!fid) {
+        // Имя в ноте не сверилось с БД (у QG13 короткие имена: «сардины»): решаем по
+        // граммам — если такой порции рыбы в дне нет, обмен отменён поздними проходами.
+        const amts = meals.flatMap((mm: any) => (mm.items || []).map((x: any) => Math.round(Number(x.amount) || 0)));
+        if (!amts.includes(claimed)) { changed = true; continue; }
+        kept.push(seg);
+        continue;
+      }
+      const mealTok = seg.match(/^«([^»]+)»/u);
+      const meal = mealTok ? meals.find((mm: any) => String(mm.type) === mealTok[1]) : undefined;
+      const take = (ms: any[]) => ms.flatMap((mm: any) => (mm.items || []).filter((x: any) => String(x.id) === fid));
+      const inMeal = meal ? take([meal]) : [];
+      const hit = inMeal.length > 0 ? inMeal : take(meals);
+      // Рыбы в тарелке нет — обмен отменён поздними проходами, сегмент снимаем.
+      if (hit.length === 0) { changed = true; continue; }
+      const actual = Math.round(Number(hit[hit.length - 1].amount) || 0);
+      if (actual !== claimed) changed = true;
+      kept.push(`${m[1]}${fishName} ${actual} г`);
+    }
+    if (changed) {
+      if (kept.length === 0) { notes.splice(i, 1); i--; continue; }
+      out = `${prefix} ${kept.join('; ')}${tail}`;
+    }
+    notes[i] = out;
+  }
 }
 
 // ─── QG21: микро-ноты по факту ──────────────────────────────────────────────

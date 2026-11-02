@@ -30,6 +30,7 @@ export function getMicroFromFood(food: FoodItem, field: string): number {
     Fe: ['iron_total_mg'], Mg: ['magnesium_mg'], Zn: ['zinc_mg'], K: ['potassium_mg'],
     Ca: ['calcium_mg'], Se: ['selenium_mcg'],
     VitC: ['vitamin_c_mg'], VitD: ['vitamin_d_mcg'], VitB12: ['vitamin_b12_mcg'], VitB9: ['vitamin_b9_mcg'],
+    VitB6: ['vitamin_b6_mg'],
     Omega3: ['omega_3_mg'],
   };
   const altKeys = fieldMap[field];

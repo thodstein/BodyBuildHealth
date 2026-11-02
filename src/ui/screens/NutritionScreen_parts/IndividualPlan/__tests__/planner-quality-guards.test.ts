@@ -53,14 +53,21 @@
  *   устаревших микро-нот (QG21)    144          0    (116 чисел + 28 призраков)
  *   «⚠ Дефицит» с пустой порцией   12           0    (QG21)
  *   дней с двумя цифрами Na (QG21) 25           0
+ *   читатель микро знает норм      12 из 16     16 из 16 (QG22)
+ *   дней с B6 < 70% RDA (QG22)     17/30        0/30
+ *   дней с витамином D <70% (QG22) 20/30        8/30
+ *   нота обмена с граммами,        1 день       0    (QG22)
+ *     которых нет в тарелке
+ *   средняя оценка дня (QG22)      91.50        93.00
  */
 import { describe, it, expect } from 'vitest';
-import { buildDayPlan, type MealPlanInput } from '../meal-plan-engine';
+import { buildDayPlan, type MealPlanInput, _rdaForForTest, _rdaTargetsForTest } from '../meal-plan-engine';
 import { buildDayTargets } from '../planner-day-targets';
 import { scoreDayQuality } from '../planner-quality-score';
 import { sumMicros, analyzeMicroCoverage } from '../planner-micro-coverage';
 import { stapleFamilyOf, nutCatchupCap, quotaWeightScale } from '../food-availability';
 import { FOOD_DB } from '../../../../../core/nutrition-database';
+import { getMicroFromFood } from '../planner-micro-reader';
 
 type Profile = { id: string; w: number; lbm: number; bf: number; sex: 'male' | 'female' };
 const PROFILES: Profile[] = [
@@ -1450,7 +1457,26 @@ describe('микро-ноты по факту (QG21)', () => {
         }
       }
     }
-    expect(total, 'нот «Дефицит» на 30 дней').toBeGreaterThanOrEqual(20);
+    // QG22: магический порог «≥20» снят — он был замерен, когда B6 рыбы считался
+    // нулём (фантом: «B6 5% RDA» в дне с сардинами и яйцами). Вместо числа — проверка
+    // по факту: каждый нутриент канона «Дефицит», который в дне ниже 60% нормы, назван
+    // строкой, и лишних строк нет.
+    const missing: string[] = [];
+    let expected = 0;
+    for (const d of DAYS) {
+      const micros = microsOf21(d);
+      const sex = d.id.startsWith('S') ? 'female' : 'male';
+      const said = new Set(notesOf21(d).map((n) => (n.match(DEF21) || [])[1]).filter(Boolean) as string[]);
+      for (const key of Object.keys(_rdaTargetsForTest)) {
+        const effRda = _rdaForForTest(key, sex as any) || (Number(_rdaTargetsForTest[key]?.rda) || 0);
+        if (!(effRda > 0)) continue;
+        if (Number(micros[key] || 0) >= effRda * 0.6) continue;
+        expected++;
+        if (!said.has(key)) missing.push(`${d.id}/${key}`);
+      }
+    }
+    expect(missing.slice(0, 5).join(' | '), 'дефицит канона без строки').toBe('');
+    expect(total, `нот «Дефицит» = фактических дефицитов (${expected})`).toBe(expected);
     expect(bad.slice(0, 5).join(' | ')).toBe('');
   });
 
@@ -1465,16 +1491,94 @@ describe('микро-ноты по факту (QG21)', () => {
     expect(bad.slice(0, 3).join(' | ')).toBe('');
   });
 
-  it('ноты не исчезают молча: микро-нот в дне по-прежнему достаточно', () => {
+  it('ноты не исчезают молча: у каждого фактического дефицита есть строка', () => {
     let total = 0;
     let empty = 0;
+    const silent: string[] = [];
     for (const d of DAYS) {
       const n = notesOf21(d).filter((s) => NOTES21.test(s) || DEF21.test(s)).length;
       total += n;
       if (n === 0) empty++;
+      // QG22: вместо магических «≥90 нот» — смысл проверки: если в дне по факту есть
+      // нутриент ниже 90% нормы, в плане обязана быть строка именно про него.
+      const sex = d.id.startsWith('S') ? 'female' : 'male';
+      const cov = analyzeMicroCoverage(
+        microsOf21(d), sex as any, d.w, 'none' as any, d.id.endsWith('тр'),
+      ).coverage as any[];
+      const said = new Set(notesOf21(d).map((s) => (s.match(NOTES21) || s.match(DEF21) || [])[1]).filter(Boolean) as string[]);
+      for (const c of cov) {
+        if (Number(c.pct || 0) >= 90) continue;
+        // Канон «Дефицит» (11 ключей) помечает только <60% — это стережёт тест
+        // «„⚠ Дефицит“ называет факт и порцию»; середина 60–90% у них молчит осознанно
+        // (QG21 §8.19 п.2: не дублировать строку «Дефицит» второй записью).
+        if (String(c.nutrient) in _rdaTargetsForTest) continue;
+        // Na: если в плане есть соль, отдельной Na-ноты нет осознанно (одна цифра на
+        // план — тест «одна цифра натрия»), поэтому «молчание» здесь не дефект.
+        if (c.nutrient === 'Na' && notesOf21(d).some((s) => s.startsWith('🧂 Натрий'))) continue;
+        if (!said.has(String(c.nutrient))) silent.push(`${d.id}/${c.nutrient} ${c.pct}%`);
+      }
     }
-    expect(total, `микро-нот на 30 дней`).toBeGreaterThanOrEqual(90);
+    expect(silent.slice(0, 5).join(' | '), 'дефицит без строки').toBe('');
+    expect(total, `микро-нот на 30 дней`).toBeGreaterThan(0);
     expect(empty, 'дней без микро-нот').toBeLessThanOrEqual(1);
+  });
+});
+
+describe('читатель микро видит B6 из БД (QG22)', () => {
+  const FISH_RE = /^(trout|fish_snapper_red|sardines|salmon|mackerel|herring|pollock|cod|tuna|sprat|hake|perch)/;
+  const sexOf = (d: Day) => (d.id.startsWith('S') ? 'female' : 'male') as 'male' | 'female';
+  const covOf = (d: Day) => analyzeMicroCoverage(
+    sumMicros(items(d).map(({ x }) => ({ id: x.id, amount: x.amount })), FOOD_DB as any),
+    sexOf(d) as any, d.w, 'none' as any, d.id.endsWith('тр'),
+  ).coverage as any[];
+  const pctOf = (d: Day, key: string) => {
+    const c = covOf(d).find((x: any) => x.nutrient === key);
+    return c ? Number(c.pct) : 0;
+  };
+
+  // Замер до правки: 17 дней из 30 с B6 < 70% RDA (минимум 5%) — при том, что в этих
+  // днях стоят сардины, яйца и творог. Причина не в тарелке: `planner-micro-reader`
+  // не мапил `vitamins_100g.vitamin_b6_mg`, где у ВСЕЙ рыбы лежит 0.5 мг/100 г.
+  it('B6 рыбы доезжает до покрытия: дней ниже 70% не больше 6 (было 17, минимум 5%)', () => {
+    const low = DAYS.filter((d) => pctOf(d, 'VitB6') < 70).map((d) => `${d.id} ${pctOf(d, 'VitB6')}%`);
+    expect(low.slice(0, 6).join(', '), `дней с B6 < 70%: ${low.length}/30`).toBe('');
+  });
+
+  it('B6 виден у рыбы, круп и овощей — читатель смотрит в витаминный контейнер', () => {
+    const b6 = (id: string) => getMicroFromFood(FOOD_DB.find((f: any) => f.id === id) as any, 'VitB6');
+    expect(b6('sardines'), 'сардины 0.5 мг/100 г').toBeGreaterThanOrEqual(0.4);
+    expect(b6('trout'), 'форель 0.5 мг/100 г').toBeGreaterThanOrEqual(0.4);
+    expect(b6('potato_boiled'), 'картофель').toBeGreaterThan(0);
+  });
+
+  it('нота обмена называет граммы рыбы, которые действительно стоят в тарелке', () => {
+    const bad: string[] = [];
+    for (const d of DAYS) {
+      const fish = items(d).filter(({ x }) => FISH_RE.test(String(x.id)));
+      const fishAmts = fish.map(({ x }) => Math.round(Number(x.amount) || 0));
+      const fishIds = new Set(fish.map(({ x }) => String(x.id)));
+      for (const n of ((d.plan.notes || []) as string[]).filter((s) => typeof s === 'string')) {
+        if (!(n.startsWith('🐠 Витамин D:') || n.startsWith('🐟 Кальций:'))) continue;
+        const cut = n.indexOf(' — белок тот же');
+        for (const seg of (cut >= 0 ? n.slice(0, cut) : n).split('; ')) {
+          const m = seg.match(/→ (.+?) (\d+) г$/u);
+          if (!m) continue;
+          const g = Number(m[2]);
+          const named = FOOD_DB
+            .filter((f: any) => f.name && fishIds.has(String(f.id))
+              && (m[1].toLowerCase().includes(String(f.name).toLowerCase())
+                || String(f.name).toLowerCase().includes(m[1].toLowerCase())))
+            .sort((a: any, b: any) => String(b.name).length - String(a.name).length)[0];
+          // Главное: названные граммы стоят в дне рыбой (имя сверяем, только если оно
+          // вообще находится в БД — у QG13 короткие имена вроде «сардины»).
+          if (!fishAmts.includes(g)) bad.push(`${d.id}: в ноте «${m[1]} ${g} г», в тарелке ${fishAmts.join('/') || 'нет рыбы'} г`);
+          else if (m[1] && FOOD_DB.some((f: any) => f.name && String(f.name).toLowerCase() === m[1].toLowerCase()) && !named) {
+            bad.push(`${d.id}: в ноте «${m[1]}», этой рыбы в дне нет`);
+          }
+        }
+      }
+    }
+    expect(bad.slice(0, 4).join(' | ')).toBe('');
   });
 });
 
