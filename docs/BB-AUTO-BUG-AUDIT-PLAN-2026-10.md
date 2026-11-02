@@ -458,6 +458,9 @@
 | BB-16 | DONE | UI пишет display-name (`exerciseKeyOf`) |
 | BB-17 | DONE | `zzattr.test.ts` — 4 инвариант-проверки вместо `expect(true)` |
 | BB-18 | DONE | `suggestFeeders` — алиасы `rear_delts`/`upper_back`/`chest_mid` |
+| BB-19 | DONE | Целевой % жира: в инициализаторе `targetBodyFat` считался `def` (18/10) и выбрасывался → `cut/recomp` без явной цели молча теряли поправку объёма (`bodyCompVolumeFactor` = 1.0). Теперь fallback = `defaultTargetBodyFat(sex, goal)` |
+| BB-20 | DONE | Удалён неиспользуемый `buildPeakConfig` (дубль живого `buildContestPrepConfig`; оверлей пик-недели снят — кнопка ведёт на шаг Contest Prep) + мёртвый импорт `legacyConfigFromProfile` |
+| BB-21 | DONE | Удалён мёртвый `regimeMrvMult` (`computeRegimeMrvMult` считался, но нигде не применялся): единственный источник множителя — `plan.mrvMultiplier` / `pedAdapt.combinedMrvMultiplier` |
 
 ### Новые файлы/замки
 
@@ -469,10 +472,11 @@
 - `src/ui/screens/TrainingScreen_parts/__tests__/training-profile-health-injuries.test.ts` —
   3 проверки BB-07: русские локации профиля «Здоровье» → канон мышц, тяжёлая травма
   = исключение, явная запись BB-Auto приоритетнее производной.
-- `src/ui/screens/TrainingScreen_parts/__tests__/bb-auto-wiring.test.ts` — 11 source-guard
+- `src/ui/screens/TrainingScreen_parts/__tests__/bb-auto-wiring.test.ts` — 13 source-guard
   проверок **проводки** (не хелперов): BB-01 пере-финализация пост-фазы, BB-02/BB-13 синхрон
   `workSets`, единый `makeWorkSets`, BB-03/BB-14 расчёт веса, BB-08/BB-09 `age`+боль в обоих
-  payload, BB-11 защита пересборки остатка, BB-12 подпись мышцы в плеере.
+  payload, BB-11 защита пересборки остатка, BB-12 подпись мышцы в плеере, BB-19 канон
+  `defaultTargetBodyFat`, BB-20/BB-21 отсутствие вернувшегося мёртвого кода.
 
 ### Верификация
 

@@ -117,3 +117,23 @@ describe('BB-12/BB-16: канон подписей', () => {
     expect(SRC).toContain('muscleLabel(e.muscle)');
   });
 });
+
+describe('BB-19/BB-20/BB-21: дефолт целевого % жира и мёртвый код', () => {
+  it('BB-19: targetBodyFat получает канон defaultTargetBodyFat, а не undefined', () => {
+    const init = between('const [targetBodyFat, setTargetBodyFat] = useState', 'const [wearableTick');
+    // Раньше здесь жил `const def = sex === 'female' ? 18 : 10`, который
+    // вычислялся и выбрасывался → cut/recomp теряли поправку объёма.
+    expect(init).toContain('defaultTargetBodyFat(');
+    expect(init).not.toContain('const def =');
+  });
+
+  it('BB-20/BB-21: мёртвые расчёты удалены, а не оставлены «на будущее»', () => {
+    // buildPeakConfig дублировал buildContestPrepConfig; regimeMrvMult нигде не
+    // применялся (множитель берётся из плана/pedAdapt). Оба удалены.
+    expect(SRC).not.toContain('buildPeakConfig');
+    expect(SRC).not.toContain('regimeMrvMult');
+    // В комментарии хелпер упомянут как объяснение — проверяем, что он не остался
+    // в импортах (иначе мёртвая зависимость вернётся).
+    expect(SRC).not.toMatch(/import[^\n]*computeRegimeMrvMult/);
+  });
+});

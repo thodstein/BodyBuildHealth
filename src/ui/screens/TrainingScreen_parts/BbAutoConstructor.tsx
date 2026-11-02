@@ -32,7 +32,8 @@ import { exerciseFeatureBadges, techniqueChainParts, canonTechniqueId } from './
 import { calcBBPlanMetrics } from '../../../engines/bb/bb-metrics.engine';
 import { buildBBPlanReportText } from '../../../engines/bb/bb-report.engine';
 import { averageWeeklyScores, scoreVolumeWeek, scoreProWeek, gradeFor } from '../../../engines/bb/bb-quality-weekly.engine';
-import { computeRegimeMrvMult, sessionLimitsFor } from '../../../engines/bb/bb-volume.engine';
+import { sessionLimitsFor } from '../../../engines/bb/bb-volume.engine';
+import { defaultTargetBodyFat } from '../../../engines/bb/bb-bodycomp.engine';
 import { bbExerciseExplanation } from '../../../engines/bb/bb-summary.engine';
 import { buildMEVCalibration, recordMEVCalibrationWeek, isMEVCalibrationComplete, saveMEVCalibration, loadMEVCalibration, clearMEVCalibration, type MEVCalibration, type MEVSignal } from '../../../engines/bb/bb-mev-calibration.engine';
 import { adaptForPEDs, type PED } from '../../../engines/bb/bb-ped-adaptation.engine';
@@ -70,7 +71,7 @@ import { useOriginalPrograms } from './useOriginalPrograms';
 import { PlanExportCard } from './PlanExportCard';
 import { loadSavedBBPlans, saveBBPlanVariant, deleteBBPlanVariant, type SavedBBPlan } from './bb-plans-store';
 import { bbPlanSaveBlockReason } from './bb-plan-save-guard';
-import { deserializeBBPrepConfig, legacyConfigFromProfile, isoAddDays, isoToday, CATEGORY_PROFILES, buildBBContestPrepPlan, applyContestPrepToBBPlan, extendBBPlanPreparation, addPrepWeeks, shiftBBContestPrepShowDate, prepPhaseForDate, configFromPlan, computeReadiness, spillRiskScore, isShortCycle, saveTestPeakWeekResult, latestTestPeakWeek, planFromStored, prepWeightAdvice, syncPrepDietBreaksWithPlan, recommendBBTaperConfig, sRPEAdjustment, loadShowChecklist, type BBTaperRecommendation, buildContestPrepPrintHtml, recordPrepAdjustment, buildPrepIcs, buildPrepCoachJson, prepTrainingCompliance, buildPrepWeeklyReportHtml, buildPrepCheckinsCsv, trialCarbDoseGPerKg, type BBContestPrepConfig, type BBContestCategory, type ContestSpecialization, type BBContestPrepPlan, type BBPlanWithPrep, type ContestEventEntry, type WaterStrategy, type SodiumStrategy, type CarbLoadStrategy } from '../../../engines/bb/bb-contest-prep.engine';
+import { deserializeBBPrepConfig, isoAddDays, isoToday, CATEGORY_PROFILES, buildBBContestPrepPlan, applyContestPrepToBBPlan, extendBBPlanPreparation, addPrepWeeks, shiftBBContestPrepShowDate, prepPhaseForDate, configFromPlan, computeReadiness, spillRiskScore, isShortCycle, saveTestPeakWeekResult, latestTestPeakWeek, planFromStored, prepWeightAdvice, syncPrepDietBreaksWithPlan, recommendBBTaperConfig, sRPEAdjustment, loadShowChecklist, type BBTaperRecommendation, buildContestPrepPrintHtml, recordPrepAdjustment, buildPrepIcs, buildPrepCoachJson, prepTrainingCompliance, buildPrepWeeklyReportHtml, buildPrepCheckinsCsv, trialCarbDoseGPerKg, type BBContestPrepConfig, type BBContestCategory, type ContestSpecialization, type BBContestPrepPlan, type BBPlanWithPrep, type ContestEventEntry, type WaterStrategy, type SodiumStrategy, type CarbLoadStrategy } from '../../../engines/bb/bb-contest-prep.engine';
 import { CONTEST_PREP_UPDATED_EVENT, migrateLegacyContestPrepIfNeeded, storeContestPrepPlan } from '../../../engines/bb/bb-contest-prep-sync';
 import { loadPeakWeekLog, peakWeekAdherence, peakWeekTrendAdvice, emergencyLines } from '../../../engines/bb/bb-peak-pro.engine';
 import type { PeakingProtocol } from '../../../engines/peaking-protocols.engine';
@@ -441,11 +442,14 @@ const [bbVolumeRamp, setBbVolumeRamp] = useState<'standard' | 'preloaded' | 'fla
   // P1: целевой % жира (уточняет cut/recomp) — дефолт из defaultTargetBodyFat.
   const [targetBodyFat, setTargetBodyFat] = useState<number | undefined>(() => {
     const sex = linked?.profile?.settings?.personal?.sex;
-    const def = sex === 'female' ? 18 : 10;
+    // Аудит 2026-11 (BB-19): здесь вычислялся `def` (18/10) и выбрасывался —
+    // «дефолт из defaultTargetBodyFat» не применялся, поэтому у cut/recomp без
+    // явной цели bodyCompVolumeFactor тихо возвращал 1.0 (объём не корректировался).
+    const fallback = defaultTargetBodyFat(String(sex || ''), bbGoal);
     try {
       const g = (linked?.profile?.settings?.goals as any)?.targetBodyFat;
-      return Number.isFinite(g) ? Number(g) : undefined;
-    } catch { return undefined; }
+      return Number.isFinite(g) ? Number(g) : fallback;
+    } catch { return fallback; }
   });
   // P2 D: дневные данные носимого (he_wearable_daily) — учитываются в recovery.
   // P0-13 (аудит 2026-09): tick — ручной ввод ниже пишет в localStorage, но без
@@ -1226,32 +1230,6 @@ const [bbVolumeRamp, setBbVolumeRamp] = useState<'standard' | 'preloaded' | 'fla
   }, []);
   /** Конфиг тапера для кнопки «🎭 Peak week»: профиль (goals.bbPeakConfig/legacy)
    *  с переопределением категории и специализации выбранными в UI. */
-  const buildPeakConfig = (): BBContestPrepConfig => {
-    const prof = (linked.profile?.settings ?? {}) as any;
-    const catProfile = CATEGORY_PROFILES[peakWeekCategory] ?? CATEGORY_PROFILES.mens_physique;
-    const sex: 'male' | 'female' = catProfile.sex;
-    const stored = prof?.goals?.bbPeakConfig ? deserializeBBPrepConfig(prof.goals.bbPeakConfig) : null;
-    const legacy = stored ? null : legacyConfigFromProfile(prof?.goals, prof?.personal);
-    const base = stored ?? legacy;
-    if (base) return { ...base, category: peakWeekCategory, sex, specialization: peakSpec };
-    return {
-      sex,
-      category: peakWeekCategory,
-      weightKg: Math.max(40, Math.min(200, Number(prof?.personal?.weight) || 80)),
-      bodyFatPct: Number(prof?.personal?.bodyFat) > 0 ? Number(prof?.personal?.bodyFat) : undefined,
-      experienceLevel: 'intermediate',
-      enhanced: false,
-      prepCount: 0,
-      showDate: isoAddDays(isoToday(), 7),
-      weeksOut: 3,
-      trainingProtocol: 'bb',
-      carbLoadStrategy: 'moderate',
-      waterStrategy: 'stable',
-      sodiumStrategy: 'stable',
-      specialization: peakSpec,
-    };
-  };
-
   const applyPeakWeekToCurrentPlan = (category: BBContestCategory, spec: ContestSpecialization = peakSpec) => {
     setPeakWeekCategory(category);
     setPeakSpec(spec);
@@ -1824,9 +1802,10 @@ const [bbVolumeRamp, setBbVolumeRamp] = useState<'standard' | 'preloaded' | 'fla
   const specChipDisabled = (targets: string[], id: string, on: boolean) =>
     !!on ? false : targets.length >= 2 || targets.some(t => isRegionConflict(t, id));
   const pedAdapt = useMemo(() => adaptForPEDs(peds, Object.fromEntries(Object.entries(allLandmarks).map(([m, v]) => [m, v.mrv])), pedDoses, courseIntensity), [peds, allLandmarks, pedDoses, courseIntensity]);
-  // Режим-множитель (×2 на курсе) — масштабирует MRV-капы в карточке muscle volume
-  // под реальный режим (а не натуральный), чтобы карточка совпадала с планом.
-  const regimeMrvMult = computeRegimeMrvMult({ onCourse: peds.length > 0, courseIntensity });
+  // Аудит 2026-11 (BB-21): здесь считался «режим-множитель» (computeRegimeMrvMult),
+  // но ни в карточке, ни в сборке он не использовался — мёртвый расчёт. Единственный
+  // источник множителя: сам план (`mrvMultiplier`) либо `pedAdapt.combinedMrvMultiplier`
+  // (он уже учитывает курс и его интенсивность), см. `metrics` ниже и сохранение варианта.
   // ACWR — единый расчёт для всего качества (пороги 1.3/1.5)
   const acwrData = useMemo(() => {
     try {
