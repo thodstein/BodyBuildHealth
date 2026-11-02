@@ -372,12 +372,23 @@
   ```
 - изолированный прогон: `npx vitest run <file> --pool=forks --reporter=dot`.
 
-Задачи:
+Задачи и их статус (2026-11):
 
-1. Добавить npm-скрипты `test:bb` / `test:ui` / `test:core` (сегментация полного прогона).
-2. Зафиксировать в `package.json`/доке безопасный флаг памяти для `vitest`.
-3. Разобраться с `tsc`: `skipLibCheck`/project references/инкрементальный `tsbuildinfo`.
-4. После BB-01 — добавить тест-паритет: «UI-инъекции → revalidate → `sets_mismatch = 0`».
+| # | Задача | Статус |
+|---|---|---|
+| 1 | npm-скрипты `test:bb` / `test:ui` / `test:core` (сегментация полного прогона) | **DONE** — добавлены в `package.json` с безопасными флагами |
+| 2 | Безопасный флаг памяти для `vitest` | **DONE** — в тех же скриптах: `--max-old-space-size=8192` + `--pool=forks --poolOptions.forks.maxForks=1 --poolOptions.forks.minForks=1` |
+| 3 | `tsc`: `skipLibCheck` / project references / инкрементальный `tsbuildinfo` | **НЕ НУЖНО** — `npm run type-check` (4096 МБ) на текущем размере кода завершается с `EXIT=0` за приемлемое время. OOM в прошлых сессиях воспроизводился только при **параллельном** прогоне тестов; если повторится — поднять до `--max-old-space-size=12288` вручную, менять скрипт не требуется |
+| 4 | Тест-паритет «UI-инъекции → revalidate → `sets_mismatch = 0`» | **DONE** — `TrainingScreen_parts/__tests__/bb-auto-wiring.test.ts` (11 проверок): пере-финализация пост-фазы, синхрон `workSets` в `adjustVolume`/`adjustWeight`, единый `makeWorkSets`, `estimatedWeightFor`/`loadRatioBetween`, `age`+`painLevel` в обоих payload, защита пересборки остатка, `muscleLabel` в плеере |
+
+Побочный вывод по п.3: «параллельные прогоны vitest в одном проекте» — единственный
+воспроизводимый источник OOM и «фантомного» `exit 1`. Прогоны запускать по одному.
+
+Попутно (нашлось при проверке новых скриптов): `src/core/__tests__/widget-bridge.test.ts`
+падал по утрам — тест брал дату `new Date().toISOString().slice(0,10)` (UTC), а
+`addWater()` пишет через канон `localIsoDate()` (локальный календарь). В UTC+10 при
+локальном времени до 10:00 UTC-дата = «вчера» → строки за сегодня нет. Заменено на
+`localIsoDate()` из `src/core/local-date.ts`; файл 11/11.
 
 ---
 
@@ -458,6 +469,10 @@
 - `src/ui/screens/TrainingScreen_parts/__tests__/training-profile-health-injuries.test.ts` —
   3 проверки BB-07: русские локации профиля «Здоровье» → канон мышц, тяжёлая травма
   = исключение, явная запись BB-Auto приоритетнее производной.
+- `src/ui/screens/TrainingScreen_parts/__tests__/bb-auto-wiring.test.ts` — 11 source-guard
+  проверок **проводки** (не хелперов): BB-01 пере-финализация пост-фазы, BB-02/BB-13 синхрон
+  `workSets`, единый `makeWorkSets`, BB-03/BB-14 расчёт веса, BB-08/BB-09 `age`+боль в обоих
+  payload, BB-11 защита пересборки остатка, BB-12 подпись мышцы в плеере.
 
 ### Верификация
 

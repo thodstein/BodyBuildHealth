@@ -26,6 +26,7 @@ import {
   resetWidgetBridgeCache,
 } from '../widget-bridge';
 import { applyWidgetQueue } from '../../ui/native/widget-sync';
+import { localIsoDate } from '../local-date';
 
 beforeEach(async () => {
   vi.unstubAllEnvs();
@@ -149,7 +150,9 @@ describe('очередь -> дневники', () => {
     const applied = applyWidgetQueue(await drainWidgetQueue());
     expect(applied).toEqual({ waterMl: 750, foods: 0 });
     const log = JSON.parse(localStorage.getItem('he_water_log') || '[]');
-    const today = new Date().toISOString().slice(0, 10);
+    // Канон даты — локальный календарь (`local-date`), а не UTC: `toISOString()`
+    // в UTC+10 до 10:00 утра отдаёт «вчера», и тест падал только по утрам.
+    const today = localIsoDate();
     const row = log.find((e: { date: string }) => e.date === today);
     expect(row.amountMl).toBe(750);
   });
