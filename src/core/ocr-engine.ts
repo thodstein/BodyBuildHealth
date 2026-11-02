@@ -516,6 +516,13 @@ async function serverOcrImage(file: File): Promise<{ text: string; meals?: Parse
 let lastOcrBootError = '';
 /** Механизм, на котором воркер поднялся (диагностика). */
 let lastOcrWorkerSource = '';
+/**
+ * Последняя стадия, до которой дошёл старт движка (tesseract присылает их в
+ * logger: `loading tesseract core` → `loading language traineddata` →
+ * `initializing api`). Без неё «таймаут 83с» не говорит ничего: зависание в
+ * загрузке воркера, ядра и языковой модели выглядит одинаково.
+ */
+let lastOcrBootStage = '';
 
 /** Диагностика офлайн-OCR: что именно не читается в текущей сборке. */
 export async function describeOcrFailure(error?: unknown): Promise<string> {
@@ -540,6 +547,7 @@ export async function describeOcrFailure(error?: unknown): Promise<string> {
   const msg = error instanceof Error ? error.message : error ? String(error) : '';
   if (msg) lines.push(`error: ${msg}`);
   if (lastOcrWorkerSource) lines.push(`worker: ${lastOcrWorkerSource}`);
+  if (lastOcrBootStage) lines.push(`стадия: ${lastOcrBootStage}`);
   if (lastOcrBootError && lastOcrBootError !== msg) lines.push(`boot: ${lastOcrBootError}`);
   return lines.join('\n');
 }
@@ -573,17 +581,52 @@ async function openOcrWorker(
         : 'не найдены доступные файлы OCR (ни встроенные, ни CDN)',
     );
   }
-  const deadline = Date.now() + cfg.budgetMs;
+  let deadline = Date.now() + cfg.budgetMs;
   const errors: string[] = [];
-  const withTimeout = <T>(p: Promise<T>, ms: number, label: string): Promise<T> => Promise.race([
+  // Резерв: если воркер не отработал НИ ОДНОЙ стадии, сломан механизм его
+  // создания, а не устройство. Даём одному другому механизму отдельное окно,
+  // иначе первый таймаут съедает весь бюджет и запасные механизмы не пробуются
+  // вообще (именно это и было видно на устройстве: «таймаут» и всё).
+  const RESCUE_MS = 25_000;
+  let rescueUsed = false;
+  let lastAttemptBootedNothing = false;
+  // Логгер tesseract: заодно запоминаем стадию старта движка — по ней видно,
+  // где именно зависает (воркер / ядро / языковая модель).
+  const trackStage = (m: any) => {
+    try {
+      const status = m && typeof m.status === 'string' ? m.status : '';
+      if (status) {
+        const pct = typeof m.progress === 'number' && Number.isFinite(m.progress)
+          ? ` ${Math.round(m.progress * 100)}%`
+          : '';
+        lastOcrBootStage = `${status}${pct}`;
+      }
+    } catch { /* диагностика не должна ломать OCR */ }
+    cfg.logger(m);
+  };
+  const withTimeout = <T>(p: Promise<T>, ms: number): Promise<T> => Promise.race([
     p,
-    new Promise<T>((_, reject) => setTimeout(() => reject(new Error(`${label}: таймаут ${Math.round(ms / 1000)}с`)), ms)),
+    new Promise<T>((_, reject) => setTimeout(() => reject(new Error(`таймаут ${Math.round(ms / 1000)}с`)), ms)),
   ]);
   for (let i = 0; i < attempts.length; i++) {
     const a = attempts[i];
-    const left = deadline - Date.now();
+    let left = deadline - Date.now();
     // На повторный механизм нужно хотя бы 15с, иначе это только задержка.
-    if (left < 15_000) { errors.push(`${a.label}: пропущено (бюджет времени)`); break; }
+    if (left < 15_000) {
+      if (!rescueUsed && lastAttemptBootedNothing) {
+        // Воркер вообще не поднялся — пробуем другой механизм в отдельном окне.
+        rescueUsed = true;
+        left = RESCUE_MS;
+        deadline = Date.now() + left;
+        errors.push(`${a.label}: запасная попытка (${Math.round(left / 1000)}с)`);
+      } else {
+        errors.push(`${a.label}: пропущено (бюджет времени)`);
+        break;
+      }
+    }
+    // Стадии относятся к текущей попытке.
+    lastOcrBootStage = '';
+    lastAttemptBootedNothing = false;
     // Первая попытка забирает почти всё окно: именно она платит за компиляцию.
     const perAttempt = i === 0 ? left : Math.min(left, 45_000);
     // Грузим только те модели, которые реально нашлись (если eng нет —
@@ -608,10 +651,9 @@ async function openOcrWorker(
             // `*.gz`, поэтому там модели лежат без суффикса и требуют gzip:false.
             gzip: a.gzip,
             workerBlobURL: a.blobWorker,
-            logger: cfg.logger,
+            logger: trackStage,
           }),
           timeout,
-          `${a.label}/${langs[li]}`,
         );
         const used = {
           workerPath: a.workerPath,
@@ -624,10 +666,21 @@ async function openOcrWorker(
       } catch (e) {
         const took = Date.now() - startedAt;
         const msg = (e as Error)?.message || String(e);
-        errors.push(`${a.label}/${langs[li]}: ${msg}`);
-        // Долгий отказ = медленное устройство/большая модель. Менять механизм
-        // бессмысленно: следующая попытка снова начнёт с нуля и снова не успеет.
-        if (took > 20_000) { mechanismDead = true; break; }
+        const stage = lastOcrBootStage;
+        // Стадия в тексте ошибки: иначе «таймаут» не отличает зависание на
+        // воркере от зависания на ядре или на языковой модели.
+        errors.push(`${a.label}/${langs[li]}: ${msg}${stage ? ` [стадия: ${stage}]` : ' [воркер не стартовал]'}`);
+        // Долгий отказ ПОСЛЕ старта движка = медленное устройство/большая
+        // модель. Менять механизм бессмысленно: следующая попытка снова
+        // начнёт с нуля и снова не успеет.
+        if (took > 20_000 && stage) { mechanismDead = true; break; }
+        // А если движок не отработал ни одной стадии, сломан именно механизм
+        // создания воркера (например, WebView не поднял Blob-воркер) — тогда
+        // следующий механизм получает отдельное окно (см. RESCUE_MS выше).
+        if (took > 20_000) {
+          lastAttemptBootedNothing = !stage;
+          break;
+        }
         // Ошибка загрузки самого воркера/ядра — повтор с другим языком заведомо
         // даст тот же результат: сразу переходим к следующему механизму.
         if (/worker|importScripts|failed to fetch|network|404|not found|script/i.test(msg)) break;

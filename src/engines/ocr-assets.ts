@@ -392,6 +392,9 @@ export async function probeOcrAssets(): Promise<OcrAssetProbe[]> {
     const st = await probeAssetStatus(url);
     if (st.unreachable) {
       out.push({ url, ok: false, status: null, error: 'запрос не дошёл' });
+    } else if (!assetPresent(st) && st.status !== null && st.status >= 200 && st.status < 300) {
+      // 200 с text/html — это SPA-фолбэк dev-сервера, а не файл модели.
+      out.push({ url, ok: false, status: st.status, error: 'отдан index.html вместо файла' });
     } else {
       out.push({ url, ok: assetPresent(st), status: st.status });
     }
