@@ -19,7 +19,7 @@ import { MUSCLE_LABEL_RU } from '../../../engines/volume-landmarks.engine';
 import { aggregateBBVolume } from '../../../engines/bb/bb-volume.engine';
 import { analyzeBBBalance } from '../../../engines/bb/bb-balance.engine';
 import { computePerMuscleACWR } from '../../../engines/bb/bb-progression-feedback.engine';
-import { assessOHS, OHS_NORMS } from '../../../engines/strength-sport/strength-sport-ohs.engine';
+import { assessOHS } from '../../../engines/strength-sport/strength-sport-ohs.engine';
 import { lrVerdictsFromSessions, LR_PHASE_ASYM_NOTE } from '../../../engines/bb/bb-lr-volume.engine';
 import { assessBbReadiness } from '../../../engines/bb/bb-readiness.engine';
 import { assessBbRedFlags } from '../../../engines/bb/bb-red-flags.engine';
@@ -51,13 +51,16 @@ import { injectBBWeakPoints, correctiveWeightHint, pushPlanSnapshot, readPlanHis
 import { idealMcCallumMap, symmetryTriadDeviation, appendMeasureSnapshot, measureDeltas, type MeasureSnapshot } from '../../../engines/bb/bb-symmetry.engine';
 import { weakHeadForZone, HEAD_FUNCTIONS, auditHeadCoverage, headsHitOf } from '../../../engines/bb/bb-stimulus-target.engine';
 import { resolveMovementDriver, singleLegVerdict, ohsFailCodes, d1d5FailCodes, v3FailCodes, movementDelta, screenPriorityList, teenLoadedGate, type MovementSnapshot } from '../../../engines/bb/bb-movement-screen.engine';
-import { shoulderWallVerdict, thoracicRotationVerdict, erIrVerdict, ERIR_DISCLAIMER } from '../../../engines/bb/bb-shoulder-screen.engine';
-import { hingeVerdict, loadedSquatVerdict, loadedHingeVerdict, HINGE_LOAD_NOTE } from '../../../engines/bb/bb-hinge-screen.engine';
-import { ybtLqVerdict, YBT_DISCLAIMER } from '../../../engines/bb/bb-ybt-lq.engine';
-import { substitutesForDriver, asymPriorityText, SCREENING_DISCLAIMER, VIDEO_GUIDE } from '../../../engines/bb/bb-movement-to-plan.engine';
-import { benchScreenVerdict, benchCorrections, BENCH_DISCLAIMER } from '../../../engines/bb/bb-bench-screen.engine';
-import { painMonitorVerdict, painMonitorLine, provocationFor, PAIN_LOCATIONS, PAIN_MONITOR_DISCLAIMER, type PainLocation } from '../../../engines/bb/bb-pain-monitor.engine';
-import { nheVerdict, adductorVerdict, NHE_DISCLAIMER, ADDUCTOR_HONESTY, type CphLevel } from '../../../engines/bb/bb-posterior-readiness.engine';
+// Аудит 2026-11 (BB-24): экран скрининга вынесен в `bb-hub-screening-tab.tsx`,
+// поэтому оговорки/справочники рисуются ТАМ. Раньше хаб держал их импорты
+// «на память» — 13 имён ни разу не использовались в этом файле.
+import { shoulderWallVerdict, thoracicRotationVerdict, erIrVerdict } from '../../../engines/bb/bb-shoulder-screen.engine';
+import { hingeVerdict, loadedSquatVerdict, loadedHingeVerdict } from '../../../engines/bb/bb-hinge-screen.engine';
+import { ybtLqVerdict } from '../../../engines/bb/bb-ybt-lq.engine';
+import { substitutesForDriver, asymPriorityText } from '../../../engines/bb/bb-movement-to-plan.engine';
+import { benchScreenVerdict } from '../../../engines/bb/bb-bench-screen.engine';
+import { painMonitorVerdict, painMonitorLine, type PainLocation } from '../../../engines/bb/bb-pain-monitor.engine';
+import { nheVerdict, adductorVerdict, type CphLevel } from '../../../engines/bb/bb-posterior-readiness.engine';
 import { assessBbTendonGuard } from '../../../engines/bb/bb-tendon-guard.engine';
 import { calibrateBbLvp, parseBbLvpText, loadBbLvpProfiles, saveBbLvpProfile, clearBbLvpProfiles, type BbLvpProfile } from '../../../engines/bb/bb-lvp.engine';
 

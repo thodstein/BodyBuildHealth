@@ -463,6 +463,7 @@
 | BB-21 | DONE | Удалён мёртвый `regimeMrvMult` (`computeRegimeMrvMult` считался, но нигде не применялся): единственный источник множителя — `plan.mrvMultiplier` / `pedAdapt.combinedMrvMultiplier` |
 | BB-22 | DONE | `platePreset` (набор пластин зала) и `targetBodyFat` (% жира) не сохранялись: жили только в состоянии компонента и сбрасывались после перезагрузки (для % жира это ещё и меняло объём — канон пола вместо цели). Теперь персистятся в `settings.training` через `training-profile` и читаются в инициализаторах; `cycleDay` **осознанно** не сохраняется (это параметр «на сегодня») |
 | BB-23 | DONE | Удалены мёртвые импорты `STEP_PILL` и `PCT_FOR_RIR` в конструкторе |
+| BB-24 | DONE | Мёртвый код в соседних экранах BB: в `SRCBBScreen` — `isCompound`, `cardBg`, `SEL`, `LABEL`, `CAT_GROUPS`, `GRP_RU`, `addAccessory`, `toggleDayInMap`, `toggleExerciseInMap` + 3 неиспользуемые карточки (`TaperCoachCard`, `DeloadProtocolCard`, `LimiterCalculatorCard`); в `BBDiagnosticsHub` — 13 импортов оговорок/справочников (реально рисуются в `bb-hub-screening-tab.tsx`, в хабе были пустыми) |
 
 ### Новые файлы/замки
 

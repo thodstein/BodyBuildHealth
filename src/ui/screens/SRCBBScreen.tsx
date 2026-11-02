@@ -26,7 +26,6 @@ import {
 import { PedInputPanel, PedAdaptationCard } from './TrainingScreen_parts/PedCoursePanel';
 
 
-import { TaperCoachCard } from './SRCBBScreen_parts/TaperCoachCard';
 import { PLCompetitionTab } from './SRCBBScreen_parts/PLCompetitionTab';
 import { PLPlanView } from './SRCBBScreen_parts/PLPlanView';
 import { PLTaperProvider, usePLTaper, TAPER_PLAN_PERSIST_MAX_CHARS, validateSavedMacroTaperMode, validateSavedMacroWeightGoal, validateSavedMacroBool } from './SRCBBScreen_parts/taper-state';
@@ -40,7 +39,6 @@ import type { WorkoutLog } from '../../core/types';
 
 import { PopupNumber, PopupSelect, PopupMultiSelect, ExpandableCard } from './SRCBBScreen_parts/TrainingPopups';
 import { generateRepTempo, type RepTempoOutput } from '../../engines/rep-tempo-engine';
-import { DeloadProtocolCard } from './TrainingScreen_parts/DeloadProtocolCard';
 import { MacrocyclePanel } from './SRCBBScreen_parts/MacrocyclePanel';
 import { CardioLinkCard } from './TrainingScreen_parts/CardioLinkCard';
 import { deserializeMacro, deserializeBbMacro, serializeMacro, serializeBbMacro, rebalanceMacrocycle, rebalanceBbMacrocycle, type Macrocycle, type BBMacrocycle } from '../../engines/lms/macrocycle.engine';
@@ -52,7 +50,6 @@ import { getProfile } from '../../core/profile-manager';
 import { PlannerToolsPanel } from './TrainingScreen_parts/PlannerToolsPanel';
 import { PlDeadpointsBarPathCard } from './TrainingScreen_parts/PlDeadpointsBarPathCard';
 import { LiftMasterCard } from './TrainingScreen_parts/LiftMasterCard';
-import { LimiterCalculatorCard } from './TrainingScreen_parts/LimiterCalculatorCard';
 import { PLSeasonBuilder, type SeasonBuildInfo } from './SRCBBScreen_parts/PLSeasonBuilder';
 import { BlockView } from './SRCBBScreen_parts/BlockView';
 import { PLToolsCard } from './SRCBBScreen_parts/PLToolsCard';
@@ -61,10 +58,6 @@ import { periodLabelRu, directionLabelRu } from '../../data/lms-cycles/period-la
 import { loadSessions } from '../../engines/workout-logger.engine';
 
 const getTempo = (exerciseName: string, goal: string, isMainLift: boolean): RepTempoOutput => {
-  const isCompound = !exerciseName.toLowerCase().includes('сгибан') &&
-    !exerciseName.toLowerCase().includes('разгибан') &&
-    !exerciseName.toLowerCase().includes('подъём') &&
-    !exerciseName.toLowerCase().includes('махи');
   return generateRepTempo({
     goal: goal === 'strength' ? 'strength' : goal === 'mass' || goal === 'bulk' ? 'hypertrophy' : 'hypertrophy',
     riskLevel: 'low',
@@ -87,14 +80,11 @@ type Mode = 'pl' | 'bb' | 'manual';
 // Фаза 3: карточки/кнопки — из единого кита training-ui (без локальных копий токенов).
 const CARD = TRAIN_CARD;
 const SMALL = TRAIN_SMALL;
-const cardBg = CARD;
 const ACCENT = 'var(--accent)';
 const BTN = TRAIN_BTN;
 const BTN_GHOST = TRAIN_BTN_GHOST;
 const PILL = (active: boolean) => ({ padding:'8px 14px', borderRadius:20, fontSize:11, fontWeight: active ? 800 : 500, cursor:'pointer', border: active ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.08)', background: active ? 'linear-gradient(135deg,var(--accent) 0%, #00c8a0 100%)' : 'rgba(255,255,255,0.04)', color: active ? '#000' : '#fff', flexShrink:0, boxShadow: active ? '0 2px 10px rgba(0,230,138,0.25), inset 0 1px 0 rgba(255,255,255,0.2)' : 'none', backdropFilter: 'blur(8px)', transition: 'all 0.2s ease', transform: active ? 'translateY(-1px)' : 'none' } as React.CSSProperties);
-const SEL: React.CSSProperties = { background: '#18181b', color: '#fff', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: '8px', minHeight: 40, width: '100%', outline: 'none', boxSizing: 'border-box' };
 const IN = TRAIN_IN;
-const LABEL: React.CSSProperties = { color: '#fff', fontSize: 11, margin: '6px 0 3px' };
 const H: React.CSSProperties = { fontSize: 14, fontWeight: 700, color: 'var(--accent)', marginBottom: 8 };
 
 /** 6 групп Frequency Planner ← канонические мышцы volume-landmarks (без выдуманных цифр). */
@@ -495,39 +485,11 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
   const [pickerGroup, setPickerGroup] = useState<string>('chest');
   const [pickerExName, setPickerExName] = useState<string>('');
   const [pickerScheme, setPickerScheme] = useState<{ sets: number; reps: number; weight: number }>({ sets: 3, reps: 8, weight: 40 });
-  // Additions are an overlay and never modify source cycle exercises.
-  const CAT_GROUPS = ['chest','back','legs','shoulders','arms','core'];
-  const GRP_RU: Record<string,string> = { chest:'Грудь', back:'Спина', legs:'Ноги', shoulders:'Плечи', arms:'Руки', core:'Кор' };
   const dayKey = (w: number, di: number) => `${w}_${di}`;
   const addExToDay = (dk: string) => {
     if (!pickerExName) return;
     setSrcAdditions(prev => ({ ...prev, [dk]: [...(prev[dk]||[]), { uid: 'add_'+Date.now()+'_'+Math.random().toString(36).slice(2,6), name: pickerExName, group: pickerGroup, sets: pickerScheme.sets, reps: pickerScheme.reps, weight: pickerScheme.weight }] }));
     setPickerExName(''); setPickerDay(null);
-  };
-  const addAccessory = (dayKeys: string[], name: string, group: string, phase?: string) => {
-    const PHASE_SCHEMES: Record<string,{reps:number;pct:number}> = { base:{reps:10,pct:0.67}, build:{reps:8,pct:0.73}, peak:{reps:5,pct:0.80}, deload:{reps:12,pct:0.50} };
-    const totalW = builtSrc?.weeks.length || 12;
-    // расчёт фазы из контекста вызова (сейчас глобальная переменная недоступна в момент вызова)
-    const wkNum = Number(dayKeys[0]?.split('_')[0]) || 1;
-    const ph = mesocyclePhaseForWeek(wkNum, totalW);
-    const sc = PHASE_SCHEMES[ph] || PHASE_SCHEMES.base;
-    const profile = loadTrainingProfile();
-    setSrcAdditions(prev => {
-      const next = { ...prev };
-      for (const dk of [...new Set(dayKeys)]) {
-        const entries = next[dk] || [];
-        if (entries.some(entry => entry.name === name)) continue;
-        next[dk] = [...entries, {
-          uid: 'acc_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
-          name,
-          group,
-          sets: 3,
-          reps: sc.reps,
-          weight: Math.round((profile.workMax[group] || 80) * sc.pct),
-        }];
-      }
-      return next;
-    });
   };
 
 
@@ -914,24 +876,6 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
     setWeakGroupExerciseMap({});
     setPlWeakPointExerciseMap({});
   }, [selectedCycleId]);
-  const toggleDayInMap = (mapKey: string, day: number, which: 'wg' | 'pw') => {
-    const upd = (prev: Record<string, number[]>) => {
-      const s = new Set(prev[mapKey] || []);
-      if (s.has(day)) s.delete(day); else s.add(day);
-      return { ...prev, [mapKey]: [...s].sort((a, b) => a - b) };
-    };
-    if (which === 'wg') setWeakGroupDayMap(upd);
-    else setPlWeakPointDayMap(upd);
-  };
-  const toggleExerciseInMap = (mapKey: string, name: string, kind: 'wg' | 'pw') => {
-    const update = (prev: Record<string, string[]>) => {
-      const selected = new Set(prev[mapKey] || []);
-      if (selected.has(name)) selected.delete(name); else selected.add(name);
-      return { ...prev, [mapKey]: [...selected] };
-    };
-    if (kind === 'wg') setWeakGroupExerciseMap(update);
-    else setPlWeakPointExerciseMap(update);
-  };
   // V7 расширение: тренд 1ПМ по выбранному упражнению
   const [selectedTrendEx, setSelectedTrendEx] = useState<string | null>(null);
   // 🔗 planner-bridge: приём корректировок от калькуляторов (ПМ/слабые точки/PRI/сплит)
