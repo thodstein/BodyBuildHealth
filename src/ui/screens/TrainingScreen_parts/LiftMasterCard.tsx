@@ -33,7 +33,7 @@ import { barPathIssuesForLift, phaseForReps, type BarPathIssue } from '../../../
 import { analyzePhaseAssistance, analyzeStickingCorrections, analyzeBarPathAssistance, protocolFromCycle } from '../../../engines/pro/lift-assistance.engine';
 import { WEAK_POINTS_BY_LIFT, diagnoseWeakPoint, type Lift, type WeakPoint } from '../../../engines/lms/weakpoint-pl';
 import { detectWeakMusclesByE1rm, snapshotWeakE1rm, diffWeakE1rm, type E1rmSnapshot } from '../../../engines/pro/weak-muscle-detection.engine';
-import { diagnoseVelocity, thresholdForGoal, mvtForPLLift, lvrStale, adjustVelocityForMetric, calibrateLVP, dailyReadinessCheck, expectedVelocityFromCalib, rpeVbtDiscrepancy, trainingMax, velocityForPct, type VelocityLossThreshold, type VBTLift } from '../../../engines/pro/vbt.engine';
+import { diagnoseVelocity, thresholdForGoal, mvtForPLLift, lvrStale, adjustVelocityForMetric, metricConversion, calibrateLVP, dailyReadinessCheck, expectedVelocityFromCalib, rpeVbtDiscrepancy, trainingMax, velocityForPct, type VelocityLossThreshold, type VBTLift } from '../../../engines/pro/vbt.engine';
 import { estimate1RMConsensus } from '../../../engines/pro/estimate1rm.engine';
 import { epley1RM } from '../../../engines/e1rm';
 import { meetAttemptsFor, warmupToOpener, MEET_STRATEGY_PCT_LABEL, type MeetStrategy } from '../../../engines/lms/competition-attempts';
@@ -1069,6 +1069,15 @@ export const LiftMasterCard: React.FC<{
    * «v». Нет замеров — `null`, а не подставленное значение.
    */
   const kinoveaVMean = useMemo(()=> meanVelocitySummary(kinoveaReps), [kinoveaReps]);
+  /**
+   * Чем пересчитана введённая скорость: если пользователь выбрал «Пиковая», раньше
+   * она молча умножалось на 0.9. Теперь множитель либо из его же видео (пик/средняя),
+   * либо названная оценкой константа — и подпись рядом говорит, что именно.
+   */
+  const vbtConversion = useMemo(
+    ()=> metricConversion(vbtMetric, kinoveaVMean?.peakToMean ?? null),
+    [vbtMetric, kinoveaVMean],
+  );
   /** Текущий вес: если он отличается от сохранённого, сравнение сессий нечестно. */
   const curWeightKg = useMemo(()=> { const w = parseFloat(vbtWeight); return Number.isFinite(w) && w > 0 ? Math.round(w * 10) / 10 : null; }, [vbtWeight]);
   /** Разбор CSV с масштабом: если файл в пикселях, «см на единицу» делает метрики осмысленными. */
@@ -1914,6 +1923,9 @@ export const LiftMasterCard: React.FC<{
       asymmetryPct: asymDiag ? asymDiag.pct : null,
       asymmetryVerdict: asymDiag ? asymDiag.text : '',
       vbtMetric,
+      vbtMetricNote: vbtConversion.text
+        ? `${vbtConversion.basis === 'measured' ? 'по своим видео' : 'оценка'}: ${vbtConversion.text} На потерю скорости не влияет (она — отношение), на зону MVT и e1RM влияет.`
+        : null,
       vbtThreshold,
       vbtPauseMs: Number.isFinite(pauseMs) ? pauseMs : null,
       lvpR2: lvp ? lvp.r2 : null,
@@ -2614,6 +2626,14 @@ export const LiftMasterCard: React.FC<{
           <label style={{ fontSize:10, color:'#ffffff' }}>VL-порог %: <input type="number" min="5" max="60" step="5" value={vbtThreshold} onChange={e=>{ const v=parseFloat(e.target.value); if(Number.isFinite(v)&&v>0) setVbtThreshold(v as VelocityLossThreshold); touchVbt(); }} style={{ width:60, marginLeft:4, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.15)', color:'#fff', borderRadius:6, padding:'4px 6px', fontSize:11 }} /></label>
           <label style={{ fontSize:10, color:'#ffffff' }}>Пауза (мс): <input type="number" min="0" step="50" value={vbtPauseMs} onChange={e=>setVbtPauseMs(e.target.value)} placeholder="напр: 1000-2000" style={{ width:80, marginLeft:4, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.15)', color:'#fff', borderRadius:6, padding:'4px 6px', fontSize:11 }} /></label>
         </div>
+        {/* Пиковая скорость не равна средней, а MVT/LVP считаются по средней. Если
+            пересчёт есть, он назван: либо по своему замеру по видео, либо как оценка. */}
+        {vbtConversion.text && (
+          <div data-lift="vbt-metric-note" role="status" style={{ marginTop:5, fontSize:10, lineHeight:1.45, color: vbtConversion.basis === 'measured' ? '#34d399' : '#fbbf24' }}>
+            {vbtConversion.basis === 'measured' ? '✓ ' : 'ℹ '}{vbtConversion.text}
+            {' '}На потерю скорости это не влияет (она считается как отношение), а на зону MVT и e1RM — влияет.
+          </div>
+        )}
         <div style={{ marginTop:8, padding:8, borderRadius:8, background:'rgba(244,114,182,0.05)', border:'1px solid rgba(244,114,182,0.18)' }}>
           <div style={{ fontSize:10, fontWeight:800, color:'#f472b6', marginBottom:4 }}>LVP-калибровка (3+ точки: %1RM / скорость)</div>
           <div style={{ display:'flex', gap:6, flexWrap:'wrap', alignItems:'center', marginBottom:6 }}>
@@ -2659,8 +2679,8 @@ export const LiftMasterCard: React.FC<{
           const best=parseFloat(vbtBest), last=parseFloat(vbtLast);
           if (!Number.isFinite(best)||!Number.isFinite(last)||best<=0||last<=0||last>best) return <div style={{ marginTop:6, fontSize:10, color:'#ffffff' }}>Введите скорости (последний не может быть быстрее лучшего).</div>;
           const weight=parseFloat(vbtWeight);
-           const bestAdj = adjustVelocityForMetric(best, vbtMetric);
-           const lastAdj = adjustVelocityForMetric(last, vbtMetric);
+           const bestAdj = adjustVelocityForMetric(best, vbtMetric, kinoveaVMean?.peakToMean ?? null);
+           const lastAdj = adjustVelocityForMetric(last, vbtMetric, kinoveaVMean?.peakToMean ?? null);
            const d=diagnoseVelocity(lift, bestAdj, lastAdj, Number.isFinite(weight)&&weight>0?weight:undefined, vbtThreshold);
            const vbtPhase=(d.suggestedPhase ?? effectivePhase) as WeakPoint|null;
           const vbtSticking = vbtPhase ? analyzeStickingCorrections(lift, vbtPhase, template ?? undefined) : null;

@@ -47,7 +47,7 @@ afterEach(() => {
   localStorage.clear();
 });
 
-async function exportCsv(seed: Record<string, unknown>, csvText = CSV_POINTS, scale = '0.01'): Promise<string> {
+async function exportCsv(seed: Record<string, unknown>, csvText = CSV_POINTS, scale = '0.01', beforeExport?: (container: HTMLElement) => void): Promise<string> {
   localStorage.setItem(MASTER_KEY, JSON.stringify({ lift: 'bench', ...seed }));
   const { container } = render(<LiftMasterCard sessions={[]} />);
   act(() => {
@@ -59,6 +59,7 @@ async function exportCsv(seed: Record<string, unknown>, csvText = CSV_POINTS, sc
   act(() => {
     fireEvent.click(container.querySelector('[data-lift="parse-kinovea"]')!);
   });
+  if (beforeExport) act(() => { beforeExport(container); });
   await act(async () => {
     fireEvent.click(container.querySelector('[data-lift="export-csv"]')!);
   });
@@ -422,10 +423,13 @@ describe('хаб → отчёт: ракурс, измеренный по эта�
  * ракурс». Три вопроса, на которые отчёт раньше отвечал цифрой без слов.
  */
 describe('хаб → отчёт: средняя скорость — отдельное число, а не «v»', () => {
-  /** Монотонный подъём: 20 точек дают один полный повтор (низ → верх). */
+  /** Монотонный подъём с разгоном: 20 точек дают один полный повтор (низ → верх),
+   *  а пиковая скорость заметно выше средней — иначе отношение пик/средняя = 1 и
+   *  пересчёт справедливо отказывается его применять. Числа в «пикселях»: парсер
+   *  переводит их в см (÷10), поэтому амплитуда должна быть крупной. */
   const rows20 = () => {
     const rows = ['time,x,y'];
-    for (let i = 0; i < 20; i++) rows.push(`${(i * 0.05).toFixed(2)},${100 + i * 1.5},${50 + i * 4}`);
+    for (let i = 0; i < 20; i++) rows.push(`${(i * 0.05).toFixed(2)},${(1000 + i * 15).toFixed(1)},${(500 + i * i * 1.8).toFixed(2)}`);
     return rows.join('\n');
   };
 
@@ -442,6 +446,19 @@ describe('хаб → отчёт: средняя скорость — отдел�
     const csv = await exportCsv({}, CSV_POINTS, '1');
     expect(rowValue(csv, 'Средняя скорость (концентрическая), м/с')).toBe('"—"');
     expect(rowValue(csv, 'Средняя или пиковая')).toContain('только пиковая');
+  });
+
+  it('пиковая: пересчёт в среднюю уходит в отчёт с подписью, чем он сделан', async () => {
+    const csv = await exportCsv({}, rows20(), '1', (container) => {
+      const peak = Array.from(container.querySelectorAll('[data-lift="vbt-metric"]'))
+        .find(b => (b.textContent || '').startsWith('Пиковая'));
+      expect(peak, 'кнопка «Пиковая»').toBeTruthy();
+      fireEvent.click(peak!);
+    });
+    const note = rowValue(csv, 'Пересчёт пиковой в среднюю');
+    // Есть свой замер по видео — пересчёт идёт по нему, а не по константе 0.9.
+    expect(note).toContain('по своим видео');
+    expect(note).toContain('На потерю скорости');
   });
 });
 

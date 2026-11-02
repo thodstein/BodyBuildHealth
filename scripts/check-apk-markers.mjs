@@ -352,6 +352,11 @@ mustContain('src/engines/strength-sport/strength-sport-video.engine.ts', 'export
 mustContain('src/engines/pro/movement-diagnostics-export.engine.ts', 'Средняя скорость (концентрическая), м/с', 'mean velocity in report');
 mustContain('src/engines/pro/movement-diagnostics-export.engine.ts', 'Средняя или пиковая', 'mean vs peak caveat');
 mustContain('src/ui/screens/TrainingScreen_parts/LiftMasterCard.tsx', 'data-lift="kinovea-vmean"', 'mean velocity line in hub');
+// Пересчёт «пиковая → средняя» раньше был молчаливым ×0.9: число менялось без
+// объяснения. Теперь рядом обязана быть подпись, чем именно пересчитано.
+mustContain('src/engines/pro/vbt.engine.ts', 'export function metricConversion', 'peak→mean conversion with basis');
+mustContain('src/engines/pro/movement-diagnostics-export.engine.ts', 'Пересчёт пиковой в среднюю', 'conversion basis in report');
+mustContain('src/ui/screens/TrainingScreen_parts/LiftMasterCard.tsx', 'data-lift="vbt-metric-note"', 'conversion basis line in hub');
 
 // 7d. Mojibake-бан: битые символы (U+FFFD) в файлах хаба — признак порванной кодировки.
 // В LiftMasterCard их было 11 (тексты VBT/LVP/Kinovea), и это попадало в UI АПК.

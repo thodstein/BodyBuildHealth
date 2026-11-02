@@ -146,6 +146,8 @@ export interface MovementDiagnosticsExportInput {
   asymmetryPct?: number | null;
   asymmetryVerdict?: string;
   vbtMetric?: string;
+  /** Чем пересчитана пиковая скорость в среднюю (своё отношение из видео или оценка ×0.9). */
+  vbtMetricNote?: string | null;
   vbtThreshold?: number | null;
   vbtPauseMs?: number | null;
   lvpR2?: number | null;
@@ -294,6 +296,7 @@ export function buildMovementDiagnosticsCsv(inp: MovementDiagnosticsExportInput)
     ['Асимметрия, %', inp.asymmetryPct != null ? String(inp.asymmetryPct) : '—'],
     ['Вердикт асимметрии', inp.asymmetryVerdict || '—'],
     ['VBT метрика', vbtMetricRu(inp.vbtMetric)],
+    ['Пересчёт пиковой в среднюю', inp.vbtMetricNote || '—'],
     ['VBT VL-порог, %', inp.vbtThreshold != null ? String(inp.vbtThreshold) : '—'],
     ['VBT пауза, мс', inp.vbtPauseMs != null ? String(inp.vbtPauseMs) : '—'],
     ['LVP r²', inp.lvpR2 != null ? String(inp.lvpR2) : '—'],
@@ -396,6 +399,7 @@ export function buildMovementDiagnosticsHtml(inp: MovementDiagnosticsExportInput
       ? li('Наложение линии на видео', videoOverlayRuLine(inp)) : '')
     + (inp.asymmetryPct != null ? li('Асимметрия', `${fmt(inp.asymmetryPct, 1)}% ${inp.asymmetryVerdict || ''}`) : '')
     + (inp.vbtMetric ? li('VBT метрика', vbtMetricRu(inp.vbtMetric)) : '')
+    + (inp.vbtMetricNote ? li('Пересчёт пиковой в среднюю', inp.vbtMetricNote) : '')
     + (inp.vbtThreshold != null ? li('VBT VL-порог', `${inp.vbtThreshold}%`) : '')
     + (inp.vbtPauseMs != null ? li('VBT пауза', `${inp.vbtPauseMs} мс`) : '')
     + (inp.lvpR2 != null ? li('LVP r²', fmt(inp.lvpR2, 3)) : '')

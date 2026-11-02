@@ -108,11 +108,65 @@ export function calibrateLVP(points: Array<{ pct: number; velocity: number }>): 
 /** Training Max 90-92% как у Шейко (буфер для скорости) */
 export function trainingMax(compMax: number, pct: number = 0.90): number { return Math.round(compMax * pct * 10)/10; }
 
-/** Метрика скорости датчика: MCV/MPV — прямое использование, peak — завышает на ~10–20% (поправка ×0.9, ориентир). */
+/**
+ * Метрика скорости датчика: MCV/MPV — прямое использование, peak — завышает на ~10–20%
+ * (поправка ×0.9, **ориентир**).
+ */
 export type VelocityMetric = 'mcv' | 'mpv' | 'peak';
-export function adjustVelocityForMetric(velocity: number, metric: VelocityMetric): number {
+
+/**
+ * Грубая поправка «пик → средняя». Не замер: пик выше средней на 10–20 %, и это
+ * отношение зависит от движения, веса и техники. Константа вынесена сюда, чтобы
+ * её нельзя было применить молча — и чтобы подпись рядом всегда называла её оценкой.
+ */
+export const PEAK_TO_MEAN_ESTIMATE = 0.9;
+
+/** На чём основан пересчёт введённой скорости. */
+export type MetricBasis =
+  /** Введена средняя — пересчитывать нечего. */
+  | 'direct'
+  /** Пиковая → средняя по **своему** отношению пик/средняя (замер по видео). */
+  | 'measured'
+  /** Пиковая → средняя по грубой константе ×0.9. */
+  | 'estimate';
+
+export interface MetricConversion {
+  /** Множитель к введённой скорости (1 — без пересчёта). */
+  factor: number;
+  basis: MetricBasis;
+  /** Подпись для UI/отчёта: чем именно пересчитано. null — пересчёта нет. */
+  text: string | null;
+}
+
+/**
+ * Пересчёт введённой скорости в шкалу MVT/LVP (средняя концентрическая).
+ *
+ * Зачем объект, а не просто число: раньше пиковая молча умножалось на 0.9, и в
+ * интерфейсе об этом не было ни слова — число менялось «само». Теперь рядом всегда
+ * есть подпись, а если у пользователя есть замер по видео (пик/средняя), пересчёт
+ * идёт по его собственному отношению, а не по константе.
+ */
+export function metricConversion(metric: VelocityMetric, measuredPeakToMean?: number | null): MetricConversion {
+  if (metric !== 'peak') return { factor: 1, basis: 'direct', text: null };
+  const ratio = measuredPeakToMean;
+  if (typeof ratio === 'number' && Number.isFinite(ratio) && ratio > 1.02 && ratio <= 5) {
+    return {
+      factor: 1 / ratio,
+      basis: 'measured',
+      text: `Пиковая пересчитана в среднюю по вашим видео: пик выше средней в ${Math.round(ratio * 10) / 10} раза. Это пересчёт замера, а не второе измерение.`,
+    };
+  }
+  return {
+    factor: PEAK_TO_MEAN_ESTIMATE,
+    basis: 'estimate',
+    text: `Пиковая пересчитана в среднюю оценкой ×${PEAK_TO_MEAN_ESTIMATE} (пик обычно на 10–20 % выше средней). Для своего отношения разберите видео с эталоном — тогда пересчёт пойдёт по вашему замеру.`,
+  };
+}
+
+export function adjustVelocityForMetric(velocity: number, metric: VelocityMetric, measuredPeakToMean?: number | null): number {
   if (!Number.isFinite(velocity) || velocity <= 0) return 0;
-  return metric === 'peak' ? round2(velocity * 0.9) : round2(velocity);
+  const { factor } = metricConversion(metric, measuredPeakToMean);
+  return factor === 1 ? round2(velocity) : Math.round(velocity * factor * 100) / 100;
 }
 
 export interface CalibratedLVP { slope: number; intercept: number; r2: number; lift: VBTLift; calibratedAt: number }

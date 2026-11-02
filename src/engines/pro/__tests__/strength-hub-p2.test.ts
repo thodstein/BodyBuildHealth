@@ -5,6 +5,8 @@ import {
   dailyReadinessCheck,
   velocityLoss,
   adjustVelocityForMetric,
+  metricConversion,
+  PEAK_TO_MEAN_ESTIMATE,
   pctFromCalibrated,
   e1RMFromCalibrated,
   expectedVelocityFromCalib,
@@ -68,6 +70,25 @@ describe('P2 метрика и readiness', () => {
     expect(adjustVelocityForMetric(1.0, 'mcv')).toBe(1.0);
     expect(adjustVelocityForMetric(1.0, 'mpv')).toBe(1.0);
     expect(adjustVelocityForMetric(-1, 'peak')).toBe(0);
+  });
+  it('пересчёт пиковой в среднюю назван: оценка или свой замер по видео', () => {
+    const est = metricConversion('peak');
+    expect(est.basis).toBe('estimate');
+    expect(est.factor).toBe(PEAK_TO_MEAN_ESTIMATE);
+    expect(est.text).toContain('оценкой');
+    // Своё отношение из видео главнее константы — и множитель реально меняется.
+    const own = metricConversion('peak', 1.5);
+    expect(own.basis).toBe('measured');
+    expect(own.factor).toBeCloseTo(1 / 1.5, 5);
+    expect(own.text).toContain('1.5');
+    expect(adjustVelocityForMetric(1.0, 'peak', 1.5)).toBeCloseTo(0.67, 2);
+    // Средняя введена напрямую — пересчитывать нечего, и подписи нет.
+    expect(metricConversion('mcv', 1.5)).toEqual({ factor: 1, basis: 'direct', text: null });
+    // Неправдоподобное отношение (пик ниже средней, мусор) не используется.
+    for (const bad of [1, 0.9, -2, NaN, 7]) {
+      expect(metricConversion('peak', bad).basis).toBe('estimate');
+    }
+    expect(metricConversion('peak', null).basis).toBe('estimate');
   });
   it('readiness-пороги: норма / −20% / делод', () => {
     expect(dailyReadinessCheck(0.6, 0.6).action).toBe('as-planned');

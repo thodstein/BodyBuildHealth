@@ -186,6 +186,27 @@ describe('LiftMasterCard — поведение (не только смоук)',
     expect(container.querySelector('[data-lift="vbt-metric"]'), 'тело VBT раскрыто').toBeTruthy();
   });
 
+  it('пересчёт пиковой в среднюю не делается молча: есть подпись, чем пересчитано', () => {
+    localStorage.setItem('he_lift_master_collapsed_v1', JSON.stringify({ secAnthro: true, sec6: true }));
+    const { container } = render(<LiftMasterCard sessions={[]} />);
+    const navVbt = Array.from(container.querySelectorAll('[data-lift="nav-jump"]'))
+      .find(b => (b.textContent || '').startsWith('7 '));
+    click(navVbt ?? null);
+    const metricBtn = (label: string) => Array.from(container.querySelectorAll('[data-lift="vbt-metric"]'))
+      .find(b => (b.textContent || '').startsWith(label)) ?? null;
+    // Средняя введена напрямую — пересчёта нет, подписи тоже.
+    expect(container.querySelector('[data-lift="vbt-metric-note"]')).toBeNull();
+    click(metricBtn('Пиковая'));
+    const note = container.querySelector('[data-lift="vbt-metric-note"]')!;
+    expect(note, 'подпись пересчёта').toBeTruthy();
+    // Оценка названа оценкой — вместе с тем, на что она влияет.
+    expect(note.textContent).toContain('×0.9');
+    expect(note.textContent).toContain('оценк');
+    expect(note.textContent).toContain('e1RM');
+    click(metricBtn('Средняя'));
+    expect(container.querySelector('[data-lift="vbt-metric-note"]')).toBeNull();
+  });
+
   it('подсказка из дневника работает для НЕ-жимовых движений (регрессия B3)', () => {
     const sessions = [{
       sessionId: 's1', date: '2026-08-10', exercises: [{
