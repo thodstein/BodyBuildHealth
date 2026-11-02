@@ -1206,6 +1206,68 @@ describe('LiftMasterCard — поведение (не только смоук)',
     expect(JSON.parse(localStorage.getItem(MASTER_KEY) || '{}').refAxis).toBe('along');
   });
 
+  it('контроль вторым эталоном: тумблер, ось наоборот и честное «ось не проверена»', () => {
+    const csv = ['time,x,y'];
+    for (let i = 0; i < 20; i++) csv.push(`${(i * 0.05).toFixed(2)},${100 + i * 1.5},${50 + i * 4}`);
+    localStorage.setItem(MASTER_KEY, JSON.stringify({
+      lift: 'bench',
+      // Угол есть, но вторым отрезком он не подтверждён — в подписи это сказано.
+      refAngle: { bench: { azimuthDeg: 25, ratio: 0.906, cosPhi: 0.906, lengthCm: 120, atSec: null, spanPx: 300 } },
+    }));
+    const { container } = render(<LiftMasterCard sessions={[]} />);
+    act(() => { fireEvent.change(container.querySelector('[data-lift="kinovea-text"]')!, { target: { value: csv.join('\n') } }); });
+    click(container.querySelector('[data-lift="parse-kinovea"]'));
+    expect(container.querySelector('[data-lift="ref-saved"]')!.textContent).toContain('ось не проверена вторым эталоном');
+
+    const toggle = container.querySelector('[data-lift="ref-cross-toggle"]')!;
+    expect(toggle.getAttribute('aria-pressed')).toBe('false');
+    // Тап-таргет в APK: кнопка не меньше 44 px.
+    expect(Number((toggle as HTMLElement).style.minHeight.replace('px', ''))).toBeGreaterThanOrEqual(44);
+    expect(container.querySelector('[data-lift="ref-cross-help"]')).toBeNull();
+
+    click(toggle);
+    expect(toggle.getAttribute('aria-pressed')).toBe('true');
+    // Второй отрезок — всегда на другой оси: той же осью ничего не проверить.
+    const help = container.querySelector('[data-lift="ref-cross-help"]')!.textContent!;
+    expect(help).toContain('вдоль штанги');
+    expect(help).toContain('cos² + sin² = 1');
+    // Без второго отрезка сверка не «ок», а честно неполная — с объяснением.
+    const cross = container.querySelector('[data-lift="ref-cross"]')!.textContent!;
+    expect(cross).toContain('Сверка неполная');
+    expect(cross).toContain('два эталона');
+    expect(cross).not.toContain('✅');
+  });
+
+  it('сохранённый замер с подтверждением: «подтверждён», а не просто угол', () => {
+    localStorage.setItem(MASTER_KEY, JSON.stringify({
+      lift: 'bench',
+      refAngle: { bench: { azimuthDeg: 25, ratio: 0.906, cosPhi: 0.906, lengthCm: 120, atSec: null, spanPx: 300, checked: 'both', crossDevPct: 0.4 } },
+    }));
+    const { container } = render(<LiftMasterCard sessions={[]} />);
+    const saved = container.querySelector('[data-lift="ref-saved"]')!.textContent!;
+    expect(saved).toContain('подтверждён вторым эталоном');
+    expect(saved).toContain('0.4%');
+  });
+
+  it('направление ухода подписано словами; без стороны съёмки — причина, а не догадка', () => {
+    const csv = ['time,x,y'];
+    for (let i = 0; i < 20; i++) csv.push(`${(i * 0.05).toFixed(2)},${100 + i * 1.5},${50 + i * 4}`);
+    localStorage.setItem(MASTER_KEY, JSON.stringify({ lift: 'bench', capture: { side: 'left' } }));
+    const { container, unmount } = render(<LiftMasterCard sessions={[]} />);
+    act(() => { fireEvent.change(container.querySelector('[data-lift="kinovea-text"]')!, { target: { value: csv.join('\n') } }); });
+    click(container.querySelector('[data-lift="parse-kinovea"]'));
+    expect(container.querySelector('[data-lift="drift-dir"]')!.textContent).toContain('к голове');
+    unmount();
+
+    localStorage.setItem(MASTER_KEY, JSON.stringify({ lift: 'bench' }));
+    const second = render(<LiftMasterCard sessions={[]} />);
+    act(() => { fireEvent.change(second.container.querySelector('[data-lift="kinovea-text"]')!, { target: { value: csv.join('\n') } }); });
+    click(second.container.querySelector('[data-lift="parse-kinovea"]'));
+    const dir = second.container.querySelector('[data-lift="drift-dir"]')!.textContent!;
+    expect(dir).toContain('не указана');
+    expect(dir).not.toContain('к голове');
+  });
+
   it('сохранённый замер вдоль штанги: ось в подписи и поправка по cos φ', () => {
     const csv = ['time,x,y'];
     for (let i = 0; i < 20; i++) csv.push(`${(i * 0.05).toFixed(2)},${100 + i * 1.5},${50 + i * 4}`);

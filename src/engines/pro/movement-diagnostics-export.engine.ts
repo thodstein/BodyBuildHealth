@@ -96,11 +96,25 @@ export interface MovementDiagnosticsExportInput {
   sessionDeltaXLoopCm?: number | null;
   /** ΔxLoop с поправкой на ракурс, см: только если углы обоих сессий известны и ≤ 40°. */
   sessionDeltaXLoopCorrectedCm?: number | null;
-  /**
-   * Сравнение с прошлой сессией словами: дата, вердикт и оговорки (другой вес, другой
-   * ракурс). Отчёт не должен показывать дельту без них — в UI эти оговорки уже есть.
-   */
+  /** Сравнение с прошлой сессией словами: дата, вердикт и оговорки (другой вес, другой
+   *  ракурс). Отчёт не должен показывать дельту без них — в UI эти оговорки уже есть. */
   sessionNote?: string | null;
+  /**
+   * Направление ухода штанги словами («к голове», «вперёд»). Знак `x` в отчёте без
+   * этого не значит ничего: +x — это «вправо в кадре», а не «в сторону головы».
+   */
+  driftDirection?: string | null;
+  /**
+   * Сверка ракурса вторым эталоном: подтверждён/один эталон/не сошлось. Одно и то же
+   * число 25° стоит разной уверенности в зависимости от того, проверено оно или нет.
+   */
+  refCrossNote?: string | null;
+  /**
+   * Модель поворота словами: «xLoop ≈ 3.2 вместо 2.8 см при камере в плоскости».
+   * В отчёте это отдельная строка, а не замена измеренного значения: пересчёт и
+   * замер не должны стоять в одной графе.
+   */
+  modelNote?: string | null;
   /**
    * Чем нанесена линия на видео: panel — панель без калибровки, calibration — единый
    * масштаб (px/см), perspective — по 4 привязкам. Отчёт без этого не воспроизводим.
@@ -252,6 +266,9 @@ export function buildMovementDiagnosticsCsv(inp: MovementDiagnosticsExportInput)
     ['ΔxLoop к прошлой сессии, см', inp.sessionDeltaXLoopCm != null ? String(inp.sessionDeltaXLoopCm) : '—'],
     ['ΔxLoop к прошлой сессии с поправкой на ракурс, см', inp.sessionDeltaXLoopCorrectedCm != null ? String(inp.sessionDeltaXLoopCorrectedCm) : '—'],
     ['Сравнение сессий', inp.sessionNote || '—'],
+    ['Направление ухода', inp.driftDirection || '—'],
+    ['Эталоны: сверка', inp.refCrossNote || '—'],
+    ['Модель поворота', inp.modelNote || '—'],
     ['Наложение линии на видео', videoOverlayModeRu(inp.videoOverlayMode)],
     ['Масштаб калибровки кадра, px/см', inp.videoScalePxPerCm != null ? String(inp.videoScalePxPerCm) : '—'],
     ['Разброс масштаба по высоте, %', inp.videoPerspSkewPct != null ? String(inp.videoPerspSkewPct) : '—'],
@@ -351,6 +368,9 @@ export function buildMovementDiagnosticsHtml(inp: MovementDiagnosticsExportInput
         + '; оценка — не замена съёмке в плоскости движения)')
       : '')
     + (inp.angleMetaConflict ? li('Ракурс: параметры и замер', inp.angleMetaConflict) : '')
+    + (inp.refCrossNote ? li('Эталоны: сверка', inp.refCrossNote) : '')
+    + (inp.driftDirection ? li('Направление ухода', inp.driftDirection) : '')
+    + (inp.modelNote ? li('Модель поворота', inp.modelNote) : '')
     + ((inp.sessionNote || inp.sessionDeltaVmaxPct != null || inp.sessionDeltaXLoopCm != null)
       ? li('Сравнение с прошлой сессией', sessionCompareRuLine(inp)) : '')
     + ((inp.videoOverlayMode || inp.videoScalePxPerCm != null || inp.videoPerspSkewPct != null || inp.videoOffsetSec != null)
@@ -387,6 +407,16 @@ export interface TrajectoryExportInput {
   /** Раскраска по скорости (heatmapping). По умолчанию включена, если в точках есть t. */
   heat?: boolean;
   createdAt?: string;
+  /**
+   * Модель поворота: во сколько раз горизонталь выросла бы при камере в плоскости
+   * движения (1/cos φ). Третьего измерения в данных нет — есть только измеренный
+   * путь, у которого ракурс сжал горизонталь. Поэтому это **пересчёт**, а не второй
+   * замер: вертикаль и форма не трогаются, растягивается одна ось, и подпись говорит
+   * это прямо.
+   */
+  modelXScale?: number | null;
+  /** Готовая строка модели («Модель поворота: … ×1.15 — пересчёт, не второй замер»). */
+  modelNote?: string | null;
 }
 
 /** Точки с валидным временем → отрезки heatmap. Без времени возвращает пусто. */
@@ -411,6 +441,7 @@ export function buildTrajectorySvg(inp: TrajectoryExportInput): string {
     [inp.sessionText, '#cbd5e1'] as const,
     [inp.sessionCaveat, '#fbbf24'] as const,
     [inp.angleText, '#fbbf24'] as const,
+    [inp.modelNote, '#4ade80'] as const,
   ].flatMap(([text, color]) => wrapCaptionLines(text).map((line) => ({ text: line, color })));
   const extraLines = Math.max(0, infoLines.length - 1);
   const H = 320 + extraLines * 14;
@@ -418,7 +449,16 @@ export function buildTrajectorySvg(inp: TrajectoryExportInput): string {
   const PAD_TOP = 40;
   const PAD_BOTTOM = 62 + extraLines * 14;
   const overlay = !!(inp.firstRep?.length && inp.lastRep?.length);
-  const all = [...(inp.series ?? []), ...(inp.firstRep ?? []), ...(inp.lastRep ?? []), ...(inp.prevRep ?? [])];
+  // Модель поворота: та же измеренная кривая, растянутая по горизонтали в 1/cos φ.
+  // Диапазон осей считается вместе с ней, иначе модель уезжает за рамку и читается
+  // как «путь вылез из кадра», то есть как ошибка замера.
+  const modelScaleRaw = Number(inp.modelXScale);
+  const modelScale = Number.isFinite(modelScaleRaw) && modelScaleRaw > 0.05 && modelScaleRaw < 20 ? modelScaleRaw : null;
+  const modelSrc = inp.lastRep?.length ? inp.lastRep : (inp.series?.length ? inp.series : null);
+  const modelPts = modelScale != null && modelSrc
+    ? modelSrc.map((p) => ({ x: p.x * (modelScale as number), y: p.y }))
+    : [];
+  const all = [...(inp.series ?? []), ...(inp.firstRep ?? []), ...(inp.lastRep ?? []), ...(inp.prevRep ?? []), ...modelPts];
   const minX = all.length ? Math.min(...all.map((p) => p.x)) : 0;
   const maxX = all.length ? Math.max(...all.map((p) => p.x)) : 1;
   const minY = all.length ? Math.min(...all.map((p) => p.y)) : 0;
@@ -446,6 +486,13 @@ export function buildTrajectorySvg(inp: TrajectoryExportInput): string {
   if (inp.prevRep?.length) {
     parts.push(`<path d="${path(inp.prevRep)}" fill="none" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="2 3"/>`);
     legend('#94a3b8', '· · прошлая сессия');
+  }
+
+  // Модель поворота — отдельным пунктиром: это не второй замер и не «исправленная»
+  // кривая, а ответ на вопрос «сколько горизонтали съел ракурс».
+  if (modelPts.length >= 2) {
+    parts.push(`<path d="${path(modelPts)}" fill="none" stroke="#4ade80" stroke-width="1.6" stroke-dasharray="3 3" opacity="0.95"/>`);
+    legend('#4ade80', '- - модель: камера в плоскости');
   }
 
   const heatOn = inp.heat !== false;

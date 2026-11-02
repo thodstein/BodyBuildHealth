@@ -520,6 +520,93 @@ export function sideConflictCheck(
 }
 
 /**
+ * Направление ухода штанги словами: «к голове» / «вперёд».
+ *
+ * Зачем: в отчёте стояла голая цифра `xLoop +0.5 см`, а знак `x` — это «вправо в
+ * кадре», что само по себе не значит ничего. Тренеру нужно «куда»: к голове или к
+ * ногам (жим), вперёд или назад (стоя). Направление берётся из параметров съёмки,
+ * потому что по одному кадру сторона не измеряется: укорочение эталона даёт только
+ * |φ|, знак из него не следует (см. referenceAngleCheck).
+ *
+ * Геометрия перевода «кадр → тело» (камера без зеркалирования, обычная запись):
+ * стоящий спортсмен смотрит в кадре вправо, если камера стоит слева от него;
+ * лежащий на скамье лежит головой вправо. Значит `x > 0` при `side: 'left'` — это
+ * «вперёд»/«к голове», а при `side: 'right'` — наоборот. Зеркальная запись (селфи)
+ * меняет это на обратное, поэтому в тексте это сказано, а не подразумевается.
+ *
+ * Нет стороны съёмки — нет и слова: `unknown` с причиной, а не выдуманное «вперёд».
+ */
+export type BarDriftDir =
+  | 'toward-head'
+  | 'toward-feet'
+  | 'forward'
+  | 'backward'
+  | 'level'
+  | 'unknown';
+
+export interface BarDriftDirection {
+  dir: BarDriftDir;
+  /** Готовая подпись («Уход к голове (камера слева)»). */
+  text: string;
+  /** Порог «ухода нет», см: меньше него — это шум трекинга, а не направление. */
+  thresholdCm: number;
+}
+
+/** Меньше 0.3 см по горизонтали — шум трекинга, называть направление нечестно. */
+const DRIFT_LEVEL_CM = 0.3;
+
+export function barDriftDirection(
+  xBiasCm: number | null | undefined,
+  side: VideoSide | '' | null | undefined,
+  lift: 'bench' | 'squat' | 'deadlift' | string,
+  thresholdCm = DRIFT_LEVEL_CM,
+): BarDriftDirection {
+  const threshold = thresholdCm > 0 ? thresholdCm : DRIFT_LEVEL_CM;
+  if (xBiasCm == null || !Number.isFinite(xBiasCm)) {
+    return { dir: 'unknown', text: 'Смещения нет в данных — направление ухода не назвать.', thresholdCm: threshold };
+  }
+  if (Math.abs(xBiasCm) < threshold) {
+    return {
+      dir: 'level',
+      text: `Ухода в сторону нет (|${fmtDrift(xBiasCm)}| < ${fmtDrift(threshold)} см) — штанга идёт по вертикали.`,
+      thresholdCm: threshold,
+    };
+  }
+  if (!side) {
+    return {
+      dir: 'unknown',
+      text: 'Сторона съёмки не указана — направление ухода не назвать: по одному кадру «слева/справа» не измеряется.',
+      thresholdCm: threshold,
+    };
+  }
+  if (side === 'front') {
+    return {
+      dir: 'unknown',
+      text: 'Вид спереди: в кадре не видно, где голова, а где ноги (или где перед, а где зад), '
+        + 'поэтому «влево/вправо» по кадру не переводится в «к голове/вперёд». Снимите сбоку — направление станет однозначным.',
+      thresholdCm: threshold,
+    };
+  }
+  // side === 'left' | 'right': камера слева → изображение +x = «вперёд/к голове».
+  const sign = side === 'left' ? 1 : -1;
+  const forward = xBiasCm * sign > 0;
+  const isBench = lift === 'bench';
+  const dir: BarDriftDir = isBench ? (forward ? 'toward-head' : 'toward-feet') : (forward ? 'forward' : 'backward');
+  const word = isBench ? (forward ? 'к голове' : 'к ногам') : (forward ? 'вперёд' : 'назад');
+  const sideRu = side === 'left' ? 'слева' : 'справа';
+  return {
+    dir,
+    text: `Уход ${word} (${fmtDrift(Math.abs(xBiasCm))} см; камера ${sideRu} — по параметрам съёмки). `
+      + 'При зеркальной записи (селфи-камера) направление в кадре обратное.',
+    thresholdCm: threshold,
+  };
+}
+
+function fmtDrift(v: number): string {
+  return String(Math.round(v * 10) / 10);
+}
+
+/**
  * Вердикт «ракурс по замеру»: что реально видно по самой траектории.
  *
  * Видно два измеримых сигнала:

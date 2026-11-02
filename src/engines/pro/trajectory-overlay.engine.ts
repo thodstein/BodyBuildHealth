@@ -43,6 +43,13 @@ export interface TrajectoryRenderInput {
   captureQuality?: string;
   /** Короткая строка ракурса («⚠ ход 37.5% — либо техника, либо камера не под 90°»). */
   angleText?: string;
+  /**
+   * Модель поворота словами («при камере в плоскости движения xLoop ≈ 3.2 вместо
+   * 2.8 см — пересчёт, не второй замер»). В PNG рисуется подписью, без второй кривой:
+   * картинка нормализует точки по своим границам, и растянутая кривая легла бы в тот
+   * же прямоугольник — то есть показала бы ровно противоположное правде.
+   */
+  modelNote?: string;
 }
 
 const PAD = { x: 70, top: 70, bottom: 110 };
@@ -177,6 +184,8 @@ export function trajectoryPngLines(inp: TrajectoryRenderInput): TrajectoryPngLin
   push(inp.sessionCaveat, '#fbbf24');
   if (inp.captureQuality?.trim()) push(`качество: ${inp.captureQuality}`, '#d1d5db');
   push(inp.angleText, '#fbbf24');
+  // Модель поворота — зелёной, как и пунктир в SVG: это пересчёт, а не измерение.
+  push(inp.modelNote, '#4ade80');
   return out;
 }
 
@@ -727,6 +736,100 @@ export function referenceAngleCheck(
     cosPhi: Math.round(cosPhi * 10000) / 10000,
     cosPhiRelErrPct,
     reason: `${verdict} ${how} Направление «слева/справа» по одному кадру не определяется — эталон даёт только угол к плоскости.`,
+  };
+}
+
+/**
+ * Сверка ракурса по двум эталонам на разных осях.
+ *
+ * Почему это вообще работает: поперечный эталон даёт cos φ, продольный — sin φ, а
+ * вместе они обязаны удовлетворять cos² φ + sin² φ = 1. Если сумма уходит от
+ * единицы, значит одно из трёх: отрезок лежит не в плоскости движения, ось
+ * размечена неверно (ровно та ошибка, из-за которой в волне 24 получалось 60°
+ * вместо 30°), или указана не та длина. Ни то, ни другое не видно по одному замеру —
+ * а по двум видно сразу, и вместо «доверьтесь» появляется проверка.
+ *
+ * Направление «слева/справа» сверка не даёт: длина отрезка знак φ не несёт, только
+ * |cos φ|. Поэтому сторона остаётся параметром пользователя.
+ */
+export interface ReferenceCrossCheck {
+  flag: 'ok' | 'inconsistent' | 'unknown';
+  /** Угол, подтверждённый обеими осями, град; null — не подтверждён. */
+  azimuthDeg: number | null;
+  /** cos φ подтверждённого угла; null — не подтверждён. */
+  cosPhi: number | null;
+  /** cos² φ + sin² φ − 1; 0 — эталоны согласны. null — не посчитать. */
+  dev: number | null;
+  /** Допуск на расхождение (из точности тапов по двум эталонам). */
+  tol: number | null;
+  text: string;
+}
+
+export function referenceAngleCrossCheck(
+  across: ReferenceAngleResult | null | undefined,
+  along: ReferenceAngleResult | null | undefined,
+  opts?: { tapPx?: number },
+): ReferenceCrossCheck {
+  const unknown = (text: string): ReferenceCrossCheck => ({
+    flag: 'unknown', azimuthDeg: null, cosPhi: null, dev: null, tol: null, text,
+  });
+  if (!across || !along) {
+    return unknown('Сверка ракурса нужна два эталона: один поперёк движения и один вдоль штанги. Пока отмечен один — угол не проверен.');
+  }
+  if (across.flag !== 'ok' || along.flag !== 'ok') {
+    return unknown('Один из эталонов не измерен — сверять нечего. Сначала доведите оба замера до угла.');
+  }
+  if (across.axis !== 'across' || along.axis !== 'along') {
+    return unknown('Сверка требует разных осей: поперечный эталон (cos φ) и продольный (sin φ). Оба по одной оси ничего не докажут.');
+  }
+  const c = across.cosPhi;
+  const s = along.ratio;
+  if (c == null || !Number.isFinite(c) || !(c > 0) || !(c <= 1)) {
+    return unknown('Поперечный эталон не дал cos φ в допустимых пределах — сверять нечем.');
+  }
+  if (!Number.isFinite(s) || !(s >= 0) || !(s <= 1)) {
+    return unknown('Продольный эталон не дал sin φ в допустимых пределах — сверять нечем.');
+  }
+  const tapPx = opts?.tapPx ?? REF_TAP_PX;
+  const sigma = (r: ReferenceAngleResult) =>
+    r.spanPx > 0 && Number.isFinite(r.spanPx) ? (Math.SQRT2 * tapPx) / r.spanPx : null;
+  const sigmaC = sigma(across);
+  const sigmaS = sigma(along);
+  if (sigmaC == null || sigmaS == null) {
+    return unknown('У эталонов не записана длина в пикселях — допуск на расхождение не оценить, поэтому и подтверждать нечего.');
+  }
+  const dev = Math.round((c * c + s * s - 1) * 1000) / 1000;
+  // Допуск: неопределённость суммы квадратов (2·c²·σc + 2·s²·σs) + 4% на то, что
+  // «в плоскости движения» — допущение пользователя, а не факт съёмки.
+  const tol = Math.round((0.04 + 2 * (c * c * sigmaC + s * s * sigmaS)) * 1000) / 1000;
+  const degOf = (cosPhi: number) => Math.round((Math.acos(Math.min(1, Math.max(0, cosPhi))) * 180) / Math.PI);
+  const angC = degOf(c);
+  const angS = Math.round((Math.asin(Math.min(1, Math.max(0, s))) * 180) / Math.PI);
+  if (Math.abs(dev) > tol) {
+    return {
+      flag: 'inconsistent',
+      azimuthDeg: null,
+      cosPhi: null,
+      dev,
+      tol,
+      text: `Эталоны не сходятся: cos² φ + sin² φ = ${(1 + dev).toFixed(2)} при допуске ±${tol.toFixed(2)}. `
+        + `Поперечный эталон даёт ${angC}°, продольный — ${angS}°. Так не бывает, если оба отрезка лежат в плоскости движения `
+        + 'и размечены по своим осям — значит один из них взят не в плоскости (ближе к камере) или ось указана неверно. '
+        + 'Угол не применяю: лучше перемерить, чем поправить горизонталь по неверной оси.',
+    };
+  }
+  const norm = Math.hypot(c, s);
+  const cosPhi = Math.round((c / norm) * 10000) / 10000;
+  const azimuthDeg = degOf(cosPhi);
+  return {
+    flag: 'ok',
+    azimuthDeg,
+    cosPhi,
+    dev,
+    tol,
+    text: `Два эталона согласны: cos² φ + sin² φ = ${(1 + dev).toFixed(2)} при допуске ±${tol.toFixed(2)}. `
+      + `Угол ${azimuthDeg}° подтверждён обеими осями (поперечный ${angC}°, продольный ${angS}°) — `
+      + 'это уже не доверие к разметке, а проверка.',
   };
 }
 
@@ -1347,6 +1450,48 @@ export async function grabVideoFrame(
 }
 
 /**
+ * Аудиодорожка исходного файла для композита.
+ *
+ * Перекодирование через canvas звук теряло, и «видео с траекторией» уходило немым:
+ * по звуку слышно усилие и ритм подхода, поэтому терять его без причины нельзя.
+ * Отдельный muxer для этого не нужен: дорожка берётся прямо из исходного элемента
+ * и кладётся рядом с видеодорожкой канвы — запись идёт один раз.
+ *
+ * `captureStream` у видео есть не в каждом Android WebView, поэтому отсутствие
+ * звука — не ошибка, а известное ограничение, которое вызывающая сторона называет
+ * пользователю (`audio: false` в результате).
+ */
+export function sourceAudioTrack(video: HTMLVideoElement | null | undefined): MediaStreamTrack | null {
+  if (!video) return null;
+  const holder = video as unknown as {
+    captureStream?: () => MediaStream;
+    mozCaptureStream?: () => MediaStream;
+  };
+  const cap = typeof holder.captureStream === 'function'
+    ? holder.captureStream.bind(video)
+    : typeof holder.mozCaptureStream === 'function'
+      ? holder.mozCaptureStream.bind(video)
+      : null;
+  if (!cap) return null;
+  try {
+    const s = cap();
+    const track = s.getAudioTracks?.()[0] ?? null;
+    return track ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/** Что получилось из видео с наложением: файл, контейнер и попал ли звук. */
+export interface CompositeVideoResult {
+  blob: Blob;
+  /** Контейнер, который реально записал WebView (`video/mp4` пишется не везде). */
+  mime: string;
+  /** Звук исходного подхода попал в композит. false — WebView не отдал дорожку. */
+  audio: boolean;
+}
+
+/**
  * Видео подхода с наложенной траекторией.
  *
  * Два режима:
@@ -1355,7 +1500,8 @@ export async function grabVideoFrame(
  * - без них — честная панель траектории в углу (позиция штанги в кадре неизвестна).
  *
  * Контейнер — mp4, если WebView его пишет, иначе webm; картинка видео
- * перекодируется, то есть это не оригинальный файл.
+ * перекодируется, то есть это не оригинальный файл. Звук при этом переносится
+ * из исходника, а не теряется.
  *
  * Возвращает null, если MediaRecorder/captureStream/video недоступны или файл
  * не декодируется.
@@ -1363,7 +1509,7 @@ export async function grabVideoFrame(
 export async function recordVideoWithOverlay(
   inp: TrajectoryRenderInput & { file: Blob; offsetSec?: number; calibration?: VideoCalibration | null; perspective?: PerspectiveCalibration | null },
   opts?: { w?: number; h?: number },
-): Promise<Blob | null> {
+): Promise<CompositeVideoResult | null> {
   if (!canRecordTrajectory()) return null;
   if (!inp.file || typeof inp.file.size !== 'number') return null;
   const pts = inp.points?.length ? inp.points : (inp.firstRep ?? []);
@@ -1403,7 +1549,15 @@ export async function recordVideoWithOverlay(
     const ctx = canvas.getContext('2d');
     if (!ctx) return null;
 
-    const stream = (canvas as unknown as { captureStream: (fps?: number) => MediaStream }).captureStream(30);
+    const canvasStream = (canvas as unknown as { captureStream: (fps?: number) => MediaStream }).captureStream(30);
+    // Звук подхода — из исходного файла, рядом с видеодорожкой канвы. Muxer не нужен:
+    // MediaRecorder пишет оба трека за один проход.
+    const audioTrack = sourceAudioTrack(video);
+    let stream: MediaStream = canvasStream;
+    if (audioTrack) {
+      try { stream = new MediaStream([...canvasStream.getVideoTracks(), audioTrack]); }
+      catch { stream = canvasStream; }
+    }
     const MR = (window as unknown as { MediaRecorder?: new (s: MediaStream, o?: { mimeType?: string }) => MediaRecorder }).MediaRecorder;
     if (typeof MR !== 'function') return null;
     let rec: MediaRecorder;
@@ -1526,8 +1680,12 @@ export async function recordVideoWithOverlay(
       tick();
     });
     rec.stop();
+    const blob = await done;
     try { stream.getTracks().forEach((t) => t.stop()); } catch {}
-    return await done;
+    if (!blob) return null;
+    // Контейнер — тот, что реально записан: mp4 есть не во всех WebView, и
+    // сообщать пользователю «mp4» по умолчанию было бы враньём.
+    return { blob, mime: blob.type || container.mime, audio: audioTrack != null };
   } catch {
     return null;
   } finally {

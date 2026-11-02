@@ -147,6 +147,17 @@ describe('trajectoryPngLines / trajectoryPngLayout — подписи PNG как
     expect(lines[3].color).toBe('#fbbf24');
   });
 
+  it('модель поворота — последней строкой и другим цветом, чем ракурс', () => {
+    const lines = trajectoryPngLines({
+      liftRu: 'Присед',
+      angleText: 'ракурс',
+      modelNote: 'Модель поворота: горизонталь ×1.25 — пересчёт, не второй замер',
+    });
+    expect(lines.map((l) => l.text)).toEqual(['ракурс', 'Модель поворота: горизонталь ×1.25 — пересчёт, не второй замер']);
+    // Зелёный, а не жёлтый: это пересчёт, а не предупреждение о качестве съёмки.
+    expect(lines[1].color).toBe('#4ade80');
+  });
+
   it('пустые и пробельные строки не занимают места', () => {
     const lines = trajectoryPngLines({ liftRu: 'Присед', overlayText: '   ', sessionText: '', captureQuality: ' ', angleText: undefined });
     expect(lines).toEqual([]);

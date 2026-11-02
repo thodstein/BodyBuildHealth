@@ -316,6 +316,26 @@ mustContain('src/ui/screens/TrainingScreen_parts/LiftMasterCard.tsx', 'sessionNo
 mustContain('src/ui/screens/TrainingScreen_parts/LiftMasterCard.tsx', 'sessionCaveat,', 'caveats reach the picture');
 mustContain('src/engines/pro/trajectory-overlay.engine.ts', 'export function wrapCaptionLines', 'long captions wrapped, not cut');
 mustContain('src/engines/pro/movement-diagnostics-export.engine.ts', 'wrapCaptionLines(', 'svg captions wrapped too');
+// Направление ухода: «+0.5 см» в отчёте — это «вправо в кадре», а не «к голове».
+// Перевод в тело словами, и с оговоркой, что он взят из параметров, а не измерен.
+mustContain('src/engines/strength-sport/strength-sport-video.engine.ts', 'export function barDriftDirection', 'drift direction in words');
+mustContain('src/engines/pro/movement-diagnostics-export.engine.ts', 'Направление ухода', 'drift direction in report');
+mustContain('src/ui/screens/TrainingScreen_parts/LiftMasterCard.tsx', 'barDriftDirection(', 'hub names drift direction');
+mustContain('src/ui/screens/TrainingScreen_parts/LiftMasterCard.tsx', 'data-lift="drift-dir"', 'drift direction line in hub');
+// Второй эталон: cos² + sin² = 1 — проверка разметки, а не доверие пользователю.
+mustContain('src/engines/pro/trajectory-overlay.engine.ts', 'export function referenceAngleCrossCheck', 'two references cross-check');
+mustContain('src/engines/pro/movement-diagnostics-export.engine.ts', 'Эталоны: сверка', 'cross-check in report');
+mustContain('src/ui/screens/TrainingScreen_parts/LiftMasterCard.tsx', 'referenceAngleCrossCheck(', 'hub cross-checks the axis');
+mustContain('src/ui/screens/TrainingScreen_parts/LiftMasterCard.tsx', 'data-lift="ref-cross-toggle"', 'second reference toggle');
+mustContain('src/ui/screens/TrainingScreen_parts/LiftMasterCard.tsx', 'data-lift="ref-alt-length"', 'second reference length');
+// Модель поворота: пересчёт по cos φ, названный моделью (третьего измерения в данных нет).
+mustContain('src/engines/pro/movement-diagnostics-export.engine.ts', 'Модель поворота', 'rotation model in report');
+mustContain('src/engines/pro/movement-diagnostics-export.engine.ts', 'modelXScale', 'rotation model in svg');
+mustContain('src/ui/screens/TrainingScreen_parts/LiftMasterCard.tsx', 'data-lift="export-model"', 'rotation model toggle in hub');
+// Звук подхода не теряется при перекодировании: дорожка берётся из исходного файла,
+// а контейнер называется тем, что реально записан (mp4 есть не во всех WebView).
+mustContain('src/engines/pro/trajectory-overlay.engine.ts', 'export function sourceAudioTrack', 'source audio into composite');
+mustContain('src/engines/pro/trajectory-overlay.engine.ts', 'audio: audioTrack != null', 'composite reports audio');
 
 // 7d. Mojibake-бан: битые символы (U+FFFD) в файлах хаба — признак порванной кодировки.
 // В LiftMasterCard их было 11 (тексты VBT/LVP/Kinovea), и это попадало в UI АПК.

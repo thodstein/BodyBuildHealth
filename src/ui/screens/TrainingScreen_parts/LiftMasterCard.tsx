@@ -44,13 +44,13 @@ import { getPLWeakGroupExerciseCandidates, diagnosticProtocolFromCycle } from '.
 import type { SRCycleTemplate } from '../../../data/lms-cycles/lms-types';
 import { applyToPlanner } from './planner-bridge';
 import { getExerciseById } from '../../../core/exercise-catalog';
-import { parseKinoveaCSV, analyzeBarTracking, segmentBarReps, barRepOverlay, videoQualityForCapture, cameraAngleCheck, cameraAngleShortLine, sideConflictCheck, sessionAngleMismatch, barSpeedHeat, BAR_HEAT_COLORS, snapshotBarRep, compareBarSessions, barSetStats, barSetOverlay, heatSummary, scaleBarPoints, repSetIndex, type BarRepCamera, type BarTrackingResult, type BarRepSegment, type BarRepSnapshot, type VideoCaptureMeta } from '../../../engines/strength-sport/strength-sport-video.engine';
+import { parseKinoveaCSV, analyzeBarTracking, segmentBarReps, barRepOverlay, videoQualityForCapture, cameraAngleCheck, cameraAngleShortLine, sideConflictCheck, sessionAngleMismatch, barDriftDirection, barSpeedHeat, BAR_HEAT_COLORS, snapshotBarRep, compareBarSessions, barSetStats, barSetOverlay, heatSummary, scaleBarPoints, repSetIndex, type BarRepCamera, type BarTrackingResult, type BarRepSegment, type BarRepSnapshot, type VideoCaptureMeta } from '../../../engines/strength-sport/strength-sport-video.engine';
 import { barLoopFlag } from '../../../engines/pro/bar-path-core.engine';
 import { diagnoseAsymmetry } from '../../../engines/pro/pl-asymmetry.engine';
 import { RULE_CHECKS, checkLiftRules } from '../../../engines/pro/pl-competition-rules.engine';
 import { RED_FLAGS, checkRedFlags, type RedFlagId } from '../../../engines/pro/pl-red-flags.engine';
 import { buildMovementDiagnosticsHtml, buildMovementDiagnosticsCsv, buildTrajectorySvg, movementDiagnosticsFilename, buildHeatTrendCsv, type MovementDiagnosticsExportInput } from '../../../engines/pro/movement-diagnostics-export.engine';
-import { renderTrajectoryPng, recordTrajectoryWebm, recordVideoWithOverlay, canRecordTrajectory, dataUrlToBlob, grabVideoFrame, openVideoFramesFrom, calibrationFromTaps, preferredVideoMime, isCalibrationSane, calibrationFrameFit, calibrationFrameFitOf, mapTrackToVideo, referenceAngleCheck, referenceHorizontalCorrection, referencePrecisionNote, referenceMeasurementDrift, perspectiveTrackYForVideoY, perspectiveFromAnchors, isPerspectiveSane, perspectiveSkewPct, perspectiveLocalScale, perspectiveFrameFit, renderFrameWithMapping, mapTrackToVideoPerspective, type ReferenceAxis, type VideoCalibration, type PerspectiveCalibration, type VideoFrameSession } from '../../../engines/pro/trajectory-overlay.engine';
+import { renderTrajectoryPng, recordTrajectoryWebm, recordVideoWithOverlay, canRecordTrajectory, dataUrlToBlob, grabVideoFrame, openVideoFramesFrom, calibrationFromTaps, isCalibrationSane, calibrationFrameFit, calibrationFrameFitOf, mapTrackToVideo, referenceAngleCheck, referenceAngleCrossCheck, referenceHorizontalCorrection, referencePrecisionNote, referenceMeasurementDrift, perspectiveTrackYForVideoY, perspectiveFromAnchors, isPerspectiveSane, perspectiveSkewPct, perspectiveLocalScale, perspectiveFrameFit, renderFrameWithMapping, mapTrackToVideoPerspective, type ReferenceAxis, type VideoCalibration, type PerspectiveCalibration, type VideoFrameSession } from '../../../engines/pro/trajectory-overlay.engine';
 import { copyOrShareText, saveCsvApk, printHtmlApk, saveTextFileApk, saveBlobApk, shareOutcomeLabel } from '../../../core/apk-share';
 import { VideoCaptureCard } from './VideoCaptureCard';
 import StickingPointAnalysisCard from './StickingPointAnalysisCard';
@@ -362,6 +362,14 @@ interface MasterState {
     atSec: number | null;
     /** Длина эталона в пикселях кадра — задаёт точность поправки (±тап/длина). */
     spanPx?: number | null;
+    /**
+     * Чем подтверждён угол: `'both'` — вторым эталоном на другой оси (cos²+sin²≈1).
+     * Поле есть только у подтверждённого замера: «не проверено» — это отсутствие поля,
+     * а не отдельное значение, которое можно перепутать с «проверено и не сошлось».
+     */
+    checked?: 'both';
+    /** Расхождение осей, %: cos² φ + sin² φ − 1 в процентах (0 — идеально). */
+    crossDevPct?: number;
   }>;
   /** Длина эталона в кадре, см: скамья (поперёк движения) или гриф между насечками (вдоль штанги). */
   refLengthCm?: string;
@@ -506,7 +514,15 @@ function cleanRefAngle(raw: unknown): NonNullable<MasterState['refAngle']> {
     const cosPhi = Number.isFinite(cosRaw) && cosRaw > 0 && cosRaw <= 1.12 ? cosRaw : null;
     const errRaw = Number(v.cosPhiRelErrPct);
     const cosPhiRelErrPct = Number.isFinite(errRaw) && errRaw >= 0 ? errRaw : null;
-    out[k] = { azimuthDeg: Math.round(deg), ratio, lengthCm, atSec, spanPx, axis, cosPhi, cosPhiRelErrPct };
+    // Сверка вторым эталоном: сохраняется только как факт «проверено», вместе с
+    // расхождением. Без числа расхождения флаг ничего не доказывает — не храним.
+    const devRaw = Number(v.crossDevPct);
+    const crossDevPct = Number.isFinite(devRaw) && Math.abs(devRaw) <= 50 ? devRaw : null;
+    const checked: 'both' | undefined = v.checked === 'both' && crossDevPct != null ? 'both' : undefined;
+    out[k] = {
+      azimuthDeg: Math.round(deg), ratio, lengthCm, atSec, spanPx, axis, cosPhi, cosPhiRelErrPct,
+      ...(checked ? { checked, crossDevPct: crossDevPct as number } : {}),
+    };
   }
   return out;
 }
@@ -814,6 +830,21 @@ export const LiftMasterCard: React.FC<{
   const [refAxis, setRefAxis] = useState<ReferenceAxis>(initial.refAxis === 'along' ? 'along' : 'across');
   const [refFrame, setRefFrame] = useState<{ dataUrl: string; width: number; height: number; timeSec: number | null } | null>(null);
   const [refTaps, setRefTaps] = useState<Array<{ videoX: number; videoY: number }>>([]);
+  /**
+   * Второй эталон — контроль, а не второй угол: он лежит на **другой** оси, поэтому
+   * обязан дать sin φ там, где первый дал cos φ. Вместе они проверяют сами себя
+   * (cos² + sin² = 1) — единственный способ увидеть, что отрезок взят не в плоскости
+   * движения или ось указана неверно.
+   */
+  const [refCrossOn, setRefCrossOn] = useState(false);
+  const [refAltTaps, setRefAltTaps] = useState<Array<{ videoX: number; videoY: number }>>([]);
+  const [refAltLength, setRefAltLength] = useState('');
+  /**
+   * Модель поворота в выгрузках: тот же измеренный путь, но растянутый по
+   * горизонтали до камеры «в плоскости движения». Включается явно и подписывается
+   * как модель — иначе пунктир прочитают как второй, «правильный» замер.
+   */
+  const [exportModel, setExportModel] = useState(false);
   const [refMsg, setRefMsg] = useState<string | null>(null);
   /** Сохранённые замеры ракурса per-lift (в master, чтобы не терять между сессиями). */
   const [refAngle, setRefAngle] = useState<NonNullable<MasterState['refAngle']>>(initial.refAngle ?? {});
@@ -1116,6 +1147,21 @@ export const LiftMasterCard: React.FC<{
       : { pxPerCm: null, source: null };
   }, [refTaps, curPersp, curCalib]);
   const refScalePxPerCm = refScale.pxPerCm;
+  /** Тот же расчёт масштаба для второго эталона: его высота в кадре своя. */
+  const refAltScale = useMemo<{ pxPerCm: number | null; source: 'persp' | 'calib' | null }>(() => {
+    if (refAltTaps.length < 2) return { pxPerCm: null, source: null };
+    const midY = (refAltTaps[0].videoY + refAltTaps[1].videoY) / 2;
+    if (curPersp) {
+      const yTrack = perspectiveTrackYForVideoY(curPersp, midY);
+      if (yTrack != null) {
+        const s = perspectiveLocalScale(curPersp, yTrack);
+        if (s > 0) return { pxPerCm: s, source: 'persp' };
+      }
+    }
+    return isCalibrationSane(curCalib)
+      ? { pxPerCm: curCalib.pxPerCm, source: 'calib' }
+      : { pxPerCm: null, source: null };
+  }, [refAltTaps, curPersp, curCalib]);
   /** Черновой замер по двум тапам: показывается сразу, к ракурсу применяется кнопкой. */
   const refCandidate = useMemo(() => {
     const lenCm = Number.parseFloat(refLength);
@@ -1135,6 +1181,31 @@ export const LiftMasterCard: React.FC<{
     () => referencePrecisionNote(refCandidate ? refCandidate.cosPhiRelErrPct : null),
     [refCandidate],
   );
+  /** Ось второго эталона всегда противоположная — иначе сверка ничего не докажет. */
+  const refAltAxis: ReferenceAxis = refAxis === 'across' ? 'along' : 'across';
+  const refAltCandidate = useMemo(() => {
+    const lenCm = Number.parseFloat(refAltLength);
+    if (refAltTaps.length < 2 || !Number.isFinite(lenCm) || lenCm <= 0) return null;
+    return referenceAngleCheck(
+      {
+        a: { x: refAltTaps[0].videoX, y: refAltTaps[0].videoY },
+        b: { x: refAltTaps[1].videoX, y: refAltTaps[1].videoY },
+        lengthCm: lenCm,
+        axis: refAltAxis,
+      },
+      { pxPerCm: refAltScale.pxPerCm },
+    );
+  }, [refAltTaps, refAltLength, refAltScale, refAltAxis]);
+  /** Сверка осей: cos² φ + sin² φ обязано быть единицей, иначе разметка врёт. */
+  const refCross = useMemo(
+    () => (refCrossOn
+      ? referenceAngleCrossCheck(
+        refAxis === 'across' ? refCandidate : refAltCandidate,
+        refAxis === 'across' ? refAltCandidate : refCandidate,
+      )
+      : null),
+    [refCrossOn, refAxis, refCandidate, refAltCandidate],
+  );
   /** Свежий замер против сохранённого: молча перекрыть сохранённый нельзя. */
   const refDrift = useMemo(
     () => referenceMeasurementDrift(
@@ -1143,6 +1214,33 @@ export const LiftMasterCard: React.FC<{
     ),
     [curRefAngle, refCandidate],
   );
+  /**
+   * Направление ухода штанги словами: знак `x` в кадре — это «вправо», и только
+   * параметры съёмки превращают его в «к голове»/«вперёд». Без стороны съёмки —
+   * `unknown` с причиной, а не догадка: по одному кадру сторона не измеряется.
+   */
+  const driftDir = useMemo(
+    () => barDriftDirection(kinoveaResult ? kinoveaResult.xBias : null, captureMeta.side, lift),
+    [kinoveaResult, captureMeta.side, lift],
+  );
+  /**
+   * Модель поворота: во сколько раз горизонталь выросла бы при камере в плоскости
+   * движения (1/cos φ). Третьего измерения в данных нет — это пересчёт одной оси
+   * измеренного пути, поэтому и в подписи сказано «модель», а не «уточнённый xLoop».
+   */
+  const modelScaleBase = useMemo<number | null>(() => {
+    const cos = curRefAngle ? curRefAngle.cosPhi : null;
+    return cos != null && cos > 0.1 && cos <= 1 ? 1 / cos : null;
+  }, [curRefAngle]);
+  const modelXScale = exportModel ? modelScaleBase : null;
+  const modelNote = useMemo(() => {
+    if (!exportModel || modelScaleBase == null) return null;
+    const az = curRefAngle ? curRefAngle.azimuthDeg : null;
+    const head = `Модель поворота: при камере в плоскости движения (${az}° → 0°) горизонталь была бы ×${modelScaleBase.toFixed(2)}`;
+    const xl = kinoveaResult ? kinoveaResult.xLoop : null;
+    const tail = xl != null ? ` — xLoop ≈ ${(xl * modelScaleBase).toFixed(1)} см вместо ${xl.toFixed(1)}` : '';
+    return `${head}${tail}. Это пересчёт измеренного пути, а не второй замер: вертикаль и форма те же.`;
+  }, [exportModel, modelScaleBase, curRefAngle, kinoveaResult]);
   const angleCheck = useMemo(
     () => (kinoveaResult
       ? cameraAngleCheck(kinoveaResult.points, {
@@ -1266,22 +1364,39 @@ export const LiftMasterCard: React.FC<{
     if (!frame) { setRefMsg('Кадр не получился: видео не декодировалось в этом WebView.'); return; }
     setRefFrame({ dataUrl: frame.dataUrl, width: frame.width, height: frame.height, timeSec: t ?? null });
     setRefTaps([]);
+    setRefAltTaps([]);
     setRefMsg('Ткните один конец эталона, затем второй — по прямой линии в реальности.');
   }, [perspFile, grabPerspFrame]);
 
-  /** Тап по кадру эталона: ровно две точки; третий тап начинает заново, а не копит мусор. */
+  /**
+   * Тап по кадру эталона: ровно две точки на отрезок. Третий тап начинает заново,
+   * а не копит мусор. Когда включён контроль вторым эталоном и первый отрезок уже
+   * отмечен, тапы идут во второй — иначе второй разметить нечем.
+   */
   const onRefTap = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
     if (!refFrame) return;
     const rect = e.currentTarget.getBoundingClientRect();
     const relX = (e.clientX - rect.left) / Math.max(1, rect.width);
     const relY = (e.clientY - rect.top) / Math.max(1, rect.height);
     const tap = { videoX: Math.round(relX * refFrame.width), videoY: Math.round(relY * refFrame.height) };
+    if (refCrossOn && refTaps.length >= 2) {
+      setRefAltTaps((prev) => (prev.length >= 2 ? [tap] : [...prev, tap]));
+      return;
+    }
     setRefTaps((prev) => (prev.length >= 2 ? [tap] : [...prev, tap]));
-  }, [refFrame]);
+  }, [refFrame, refCrossOn, refTaps.length]);
 
   /** Применить замер к ракурсу: с этого момента горизонталь трактуется однозначно. */
   const applyRefAngle = useCallback(() => {
-    if (!refCandidate || refCandidate.flag !== 'ok' || refCandidate.azimuthDeg == null) {
+    // Сверка двух осей — не украшение: если cos²+sin² не сходится с единицей,
+    // сохранять угол нельзя, иначе поправка посчитается по неверной оси.
+    if (refCross && refCross.flag === 'inconsistent') {
+      setRefMsg(`Угол не применён: ${refCross.text}`);
+      return;
+    }
+    const crossOk = refCross != null && refCross.flag === 'ok';
+    const appliedDeg = crossOk ? refCross.azimuthDeg : (refCandidate && refCandidate.flag === 'ok' ? refCandidate.azimuthDeg : null);
+    if (appliedDeg == null) {
       setRefMsg('Угол не измерен — применять нечего.');
       return;
     }
@@ -1289,19 +1404,25 @@ export const LiftMasterCard: React.FC<{
     setRefAngle((s) => ({
       ...s,
       [lift]: {
-        azimuthDeg: refCandidate.azimuthDeg as number,
-        ratio: refCandidate.ratio,
+        azimuthDeg: appliedDeg as number,
+        ratio: refCandidate ? refCandidate.ratio : 0,
         // cos φ — то, что нужно поправке горизонтали: для оси «вдоль штанги» ratio тут не годится.
-        cosPhi: refCandidate.cosPhi,
-        cosPhiRelErrPct: refCandidate.cosPhiRelErrPct,
-        axis: refCandidate.axis,
+        cosPhi: crossOk ? refCross.cosPhi : (refCandidate ? refCandidate.cosPhi : null),
+        cosPhiRelErrPct: refCandidate ? refCandidate.cosPhiRelErrPct : null,
+        axis: refCandidate ? refCandidate.axis : (refAxis === 'along' ? 'along' : 'across'),
         lengthCm,
         atSec: refFrame?.timeSec ?? null,
-        spanPx: refCandidate.spanPx,
+        spanPx: refCandidate ? refCandidate.spanPx : null,
+        // Как получен угол: по одному эталону или подтверждён вторым. В отчёте
+        // это разные утверждения, и разница должна быть видна, а не сглажена.
+        checked: crossOk ? ('both' as const) : undefined,
+        crossDevPct: crossOk && refCross.dev != null ? Math.round(refCross.dev * 1000) / 10 : undefined,
       },
     }));
-    setRefMsg(`Ракурс применён: камера ${refCandidate.azimuthDeg}° от плоскости движения. Горизонталь теперь трактуется по замеру, а не по догадке.`);
-  }, [refCandidate, refLength, refFrame, lift]);
+    setRefMsg(crossOk
+      ? `Ракурс применён: камера ${appliedDeg}° от плоскости движения — угол подтверждён вторым эталоном (расхождение ${Math.round((refCross.dev ?? 0) * 1000) / 10}%).`
+      : `Ракурс применён: камера ${appliedDeg}° от плоскости движения. Горизонталь теперь трактуется по замеру, а не по догадке.`);
+  }, [refCandidate, refCross, refLength, refFrame, lift, refAxis]);
 
   /** Убрать сохранённый замер: ракурс снова будет только по метаданным. */
   const clearRefAngle = useCallback(() => {
@@ -1311,6 +1432,7 @@ export const LiftMasterCard: React.FC<{
       return next;
     });
     setRefTaps([]);
+    setRefAltTaps([]);
     setRefFrame(null);
     setRefMsg('Замер ракурса убран — вернулись к метаданным съёмки.');
   }, [lift]);
@@ -1329,6 +1451,7 @@ export const LiftMasterCard: React.FC<{
       timeSec: curOffset > 0 ? curOffset : null,
     });
     setRefTaps([]);
+    setRefAltTaps([]);
     setRefMsg('Кадр калибровки взят за основу: ткните два конца эталона.');
   }, [calibFrame, curOffset]);
   /** Сохранённая серия прошлого раза для текущего движения. */
@@ -1654,6 +1777,17 @@ export const LiftMasterCard: React.FC<{
       xLoopRefCorrectionPct: xLoopFix.flag === 'ok' ? xLoopFix.pct : null,
       // Неразрешённый спор параметров и замера не должен прятаться в отчёте.
       angleMetaConflict: sideConflict ? sideConflict.text : null,
+      // Чем подтверждён угол: проверенный вторым эталоном и одиночный — разные утверждения.
+      refCrossNote: curRefAngle
+        ? (curRefAngle.checked === 'both'
+          ? `угол подтверждён вторым эталоном на другой оси (расхождение ${curRefAngle.crossDevPct ?? 0}%, cos²+sin²≈1)`
+          : 'проверен один эталон: ось размечена по выбору пользователя и вторым отрезком не подтверждена')
+        : null,
+      // Направление ухода: без него «+0.5 см» в отчёте не читается вовсе.
+      driftDirection: driftDir.dir === 'unknown' ? null : driftDir.text,
+      // Модель поворота — только вместе с подписью «это пересчёт»: цифра без неё
+      // читается как второй замер.
+      modelNote,
       // Прошлая сессия: дельта едет в отчёт вместе со своими оговорками. Без них отчёт
       // молча повторял бы две ошибки, которые в хабе уже помечены — другой вес и другой ракурс.
       sessionDeltaVmaxPct: sessionCompare ? sessionCompare.deltaPct : null,
@@ -2293,6 +2427,15 @@ export const LiftMasterCard: React.FC<{
         {kinoveaResult && (
           <div role="status" data-lift="kinovea-tilt" style={{ marginTop:6, fontSize:10, color:'#38bdf8', lineHeight:1.4 }}>
             Наклон штанги из Kinovea: {kinoveaResult.xBias > 0 ? '+' : ''}{kinoveaResult.xBias} см · xLoop {kinoveaResult.xLoop} см · разворот {kinoveaResult.turnoverMs != null ? `${kinoveaResult.turnoverMs} мс` : '—'}
+          </div>
+        )}
+        {/*
+          Знак смещения без слов бесполезен: «+0.5 см» — это «вправо в кадре», а куда
+          это по телу, знает только сторона съёмки. Нет стороны — честно не называем.
+        */}
+        {kinoveaResult && (
+          <div data-lift="drift-dir" role="status" style={{ marginTop:4, fontSize:10, lineHeight:1.4, color: driftDir.dir === 'unknown' ? DIM : '#38bdf8' }}>
+            {driftDir.text}
           </div>
         )}
         {diag.barPath.analysis && diag.barPath.analysis.diagnoses.map((d:any)=>(
@@ -3121,6 +3264,27 @@ export const LiftMasterCard: React.FC<{
                     ? 'Поперёк движения (в плоскости пути штанги): длина скамьи, глубина стойки, расстояние между метками на полу. Видно полностью при камере сбоку и сжимается как cos φ — основная ось.'
                     : 'Вдоль штанги: гриф между насечками ≈ 131 см, ширина стойки. Сбоку такой отрезок смотрит в объектив и почти не виден — он растёт как sin φ: годится как контроль ракурса, но не как основной эталон.'}
                 </div>
+                {/*
+                  Контроль вторым эталоном. Один замер нельзя проверить: любая ошибка
+                  разметки (не та ось, отрезок не в плоскости) выглядит как правдоподобный
+                  угол. Второй отрезок на другой оси даёт sin φ там, где первый дал cos φ,
+                  и вместе они обязаны дать единицу — это и есть проверка.
+                */}
+                <div style={{ display:'flex', gap:6, flexWrap:'wrap', alignItems:'center', marginTop:6 }}>
+                  <button
+                    data-lift="ref-cross-toggle"
+                    aria-pressed={refCrossOn}
+                    aria-label="Сверить ракурс вторым эталоном на другой оси"
+                    onClick={()=> { setRefCrossOn((v)=> !v); setRefAltTaps([]); }}
+                    style={{ minHeight:44, padding:'6px 12px', borderRadius:8, cursor:'pointer', background: refCrossOn ? 'rgba(250,204,21,0.14)' : 'transparent', color: refCrossOn ? '#facc15' : DIM, border:`1px solid ${refCrossOn ? 'rgba(250,204,21,0.4)' : 'rgba(255,255,255,0.12)'}`, fontWeight:700, fontSize:11 }}
+                  >⇄ Контроль вторым эталоном</button>
+                  {refCrossOn && (
+                    <span data-lift="ref-cross-help" style={{ fontSize:9, color:DIM, flex:'1 1 160px', lineHeight:1.45 }}>
+                      Второй отрезок — на <b>другой</b> оси ({refAltAxis === 'along' ? 'вдоль штанги: гриф между насечками ≈ 131 см' : 'поперёк движения: длина скамьи'}).
+                      Один даёт cos φ, другой sin φ: если оба размечены верно, cos² + sin² = 1.
+                    </span>
+                  )}
+                </div>
                 <div style={{ display:'flex', gap:6, flexWrap:'wrap', alignItems:'flex-end', marginTop:6 }}>
                   <label style={{ fontSize:9, color:DIM, display:'flex', flexDirection:'column', gap:2 }}>длина эталона, см
                     <input
@@ -3152,11 +3316,53 @@ export const LiftMasterCard: React.FC<{
                     {refTaps.map((t, i) => (
                       <span key={i} data-lift={`ref-tap-${i}`} style={{ position:'absolute', left:`${((t.videoX / Math.max(1, refFrame.width)) * 100).toFixed(2)}%`, top:`${((t.videoY / Math.max(1, refFrame.height)) * 100).toFixed(2)}%`, transform:'translate(-50%,-50%)', width:14, height:14, borderRadius:7, background: i === 0 ? '#38bdf8' : '#f472b6', border:'2px solid #0b0f14', boxShadow:'0 0 0 1px rgba(255,255,255,0.35)' }} />
                     ))}
+                    {/* Второй эталон другим цветом: видно, что это отдельный отрезок, а не те же тапы. */}
+                    {refCrossOn && refAltTaps.map((t, i) => (
+                      <span key={`alt-${i}`} data-lift={`ref-alt-tap-${i}`} style={{ position:'absolute', left:`${((t.videoX / Math.max(1, refFrame.width)) * 100).toFixed(2)}%`, top:`${((t.videoY / Math.max(1, refFrame.height)) * 100).toFixed(2)}%`, transform:'translate(-50%,-50%)', width:12, height:12, borderRadius:6, background: '#facc15', border:'2px solid #0b0f14' }} />
+                    ))}
                   </div>
                 )}
                 {refFrame && refTaps.length < 2 && (
                   <div style={{ marginTop:4, fontSize:9, color:DIM }}>
                     Ткните {refTaps.length === 0 ? 'первый' : 'второй'} конец эталона.
+                  </div>
+                )}
+                {refCrossOn && refFrame && refTaps.length >= 2 && (
+                  <div style={{ marginTop:4, fontSize:9, color: refAltTaps.length >= 2 ? DIM : '#facc15', lineHeight:1.45 }}>
+                    {refAltTaps.length >= 2
+                      ? 'Второй отрезок отмечен — сверка ниже. Следующий тап начнёт его заново; чтобы перемерить первый, выключите контроль.'
+                      : `Ткните ${refAltTaps.length === 0 ? 'первый' : 'второй'} конец второго эталона (${refAltAxis === 'along' ? 'вдоль штанги' : 'поперёк движения'}).`}
+                  </div>
+                )}
+                {refCrossOn && refFrame && refTaps.length >= 2 && (
+                  <div style={{ display:'flex', gap:6, flexWrap:'wrap', alignItems:'flex-end', marginTop:6 }}>
+                    <label style={{ fontSize:9, color:DIM, display:'flex', flexDirection:'column', gap:2 }}>длина 2-го эталона, см
+                      <input
+                        data-lift="ref-alt-length"
+                        type="number"
+                        inputMode="decimal"
+                        min={1}
+                        max={500}
+                        placeholder={refAltAxis === 'along' ? '131' : '120'}
+                        value={refAltLength}
+                        onChange={(e)=> setRefAltLength(e.target.value.replace(/[^0-9.,]/g, '').slice(0, 6))}
+                        style={{ width:84, minHeight:32, padding:'6px 8px', borderRadius:8, background:'rgba(0,0,0,0.35)', border:'1px solid rgba(255,255,255,0.14)', color:'#fff', fontSize:11 }}
+                      />
+                    </label>
+                    <span data-lift="ref-alt-state" style={{ fontSize:9, color:DIM }}>отмечено {refAltTaps.length} из 2</span>
+                    {refAltTaps.length > 0 && (
+                      <button data-lift="ref-alt-clear" aria-label="Сбросить второй эталон" onClick={()=> { setRefAltTaps([]); setRefMsg(null); }} style={{ minHeight:44, padding:'6px 12px', borderRadius:8, cursor:'pointer', background:'transparent', color:DIM, border:'1px solid rgba(255,255,255,0.12)', fontSize:11 }}>Сброс 2-го</button>
+                    )}
+                  </div>
+                )}
+                {refCross && (
+                  <div
+                    data-lift="ref-cross"
+                    role="status"
+                    style={{ marginTop:6, fontSize:10, lineHeight:1.45, color: refCross.flag === 'ok' ? '#4ade80' : refCross.flag === 'inconsistent' ? '#f87171' : DIM }}
+                  >
+                    <b>{refCross.flag === 'ok' ? '✅ Сверка осей пройдена' : refCross.flag === 'inconsistent' ? '⛔ Сверка не сошлась' : 'Сверка неполная'}</b>
+                    {' — '}{refCross.text}
                   </div>
                 )}
                 {refCandidate && (
@@ -3196,6 +3402,9 @@ export const LiftMasterCard: React.FC<{
                     {` (${curRefAngle.axis === 'along' ? 'вдоль штанги' : 'поперёк движения'})`}
                     {curRefAngle.cosPhiRelErrPct != null ? ` · ±${curRefAngle.cosPhiRelErrPct >= 10 ? Math.round(curRefAngle.cosPhiRelErrPct) : Math.round(curRefAngle.cosPhiRelErrPct * 10) / 10}%` : ''}
                     {curRefAngle.atSec != null ? ` · кадр ${curRefAngle.atSec.toFixed(2)} с` : ''}
+                    {curRefAngle.checked === 'both'
+                      ? ` · ✅ подтверждён вторым эталоном (расхождение осей ${curRefAngle.crossDevPct ?? 0}%)`
+                      : ' · ось не проверена вторым эталоном'}
                     {' '}— угол идёт в вердикт ракурса и в выгрузки.
                   </div>
                 )}
@@ -3229,6 +3438,30 @@ export const LiftMasterCard: React.FC<{
           <div style={{ marginTop:8, padding:8, borderRadius:8, background:'rgba(0,230,138,0.05)', border:'1px solid rgba(0,230,138,0.15)' }}>
             <div style={{ fontSize:10, fontWeight:800, color:'#00e68a' }}>📤 Выдача диагностики</div>
             <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginTop:6 }}>
+              {/*
+                Модель поворота: показать, сколько горизонтали съел ракурс. Без
+                измеренного угла её не построить — тогда кнопка честно отказывает,
+                а не рисует растяжку «на глаз».
+              */}
+              <button
+                data-lift="export-model"
+                aria-pressed={exportModel}
+                aria-label="Показать модель поворота: путь при камере в плоскости движения"
+                onClick={()=>{
+                  if (!exportModel && modelScaleBase == null) {
+                    setShareMsg(curRefAngle
+                      ? 'Модель не построить: угол по эталону вне рабочего диапазона (cos φ ≤ 0.1).'
+                      : 'Модель не построить: сначала измерьте ракурс эталоном в кадре — без угла растягивать нечего.');
+                    setTimeout(()=>setShareMsg(null), 4000);
+                    return;
+                  }
+                  setExportModel(v => !v);
+                }}
+                style={{ minHeight:44, padding:'10px 14px', borderRadius:10, cursor:'pointer', background: exportModel ? 'rgba(74,222,128,0.16)' : 'rgba(255,255,255,0.04)', color: exportModel ? '#4ade80' : DIM, border:`1px solid ${exportModel ? 'rgba(74,222,128,0.35)' : 'rgba(255,255,255,0.12)'}`, fontWeight:700, fontSize:12 }}
+              >⟲ Модель поворота</button>
+              {exportModel && modelNote && (
+                <span data-lift="export-model-note" style={{ flex:'1 1 200px', fontSize:9, color:'#4ade80', lineHeight:1.45 }}>{modelNote}</span>
+              )}
               <button data-lift="export-html" aria-label="Печать отчёта диагностики" onClick={async ()=>{
                 const html = buildMovementDiagnosticsHtml(diagExportInput());
                 const o = await printHtmlApk(html, movementDiagnosticsFilename(lift, 'html'));
@@ -3253,6 +3486,8 @@ export const LiftMasterCard: React.FC<{
                   sessionCaveat,
                   angleText: angleShortText ?? '',
                   captureQuality: captureQualityText,
+                  modelXScale,
+                  modelNote,
                 });
                 const o = await saveTextFileApk(movementDiagnosticsFilename(lift, 'svg'), svg, 'image/svg+xml;charset=utf-8');
                 setShareMsg(shareOutcomeLabel(o)); setTimeout(()=>setShareMsg(null), 2500);
@@ -3272,6 +3507,7 @@ export const LiftMasterCard: React.FC<{
                   sessionCaveat,
                   angleText: angleShortText ?? '',
                   captureQuality: captureQualityText,
+                  modelNote: modelNote ?? undefined,
                 });
                 if (!png) { setShareMsg('PNG недоступен: нет данных траектории или canvas не поддерживается.'); setTimeout(()=>setShareMsg(null), 3000); return; }
                 const blob = dataUrlToBlob(png);
@@ -3303,13 +3539,12 @@ export const LiftMasterCard: React.FC<{
                   const pts = kinoveaResult ? kinoveaResult.points : [];
                   if (pts.length < 2) { setShareMsg('Сначала разберите CSV — без точек накладывать нечего.'); setTimeout(()=>setShareMsg(null), 3500); return; }
                   if (!canRecordTrajectory()) { setShareMsg('Запись видео не поддерживается этим браузером.'); setTimeout(()=>setShareMsg(null), 3500); return; }
-                  const ext = preferredVideoMime().ext;
                   setShareMsg(curPersp
                     ? '⏺ Пишу видео с линией по перспективе…'
                     : curCalib
                       ? '⏺ Пишу видео с линией по калибровке…'
                       : '⏺ Пишу видео с панелью траектории (без калибровки кадра)…');
-                  const blob = await recordVideoWithOverlay({
+                  const res = await recordVideoWithOverlay({
                     file: f,
                     liftRu: LIFT_RU[lift],
                     points: pts,
@@ -3320,9 +3555,13 @@ export const LiftMasterCard: React.FC<{
                     offsetSec: curOffset,
                     angleText: angleShortText ?? '',
                   });
-                  if (!blob) { setShareMsg('Не удалось: видео не декодировалось или запись недоступна (PNG остаётся).'); setTimeout(()=>setShareMsg(null), 4000); return; }
-                  const o = await saveBlobApk(movementDiagnosticsFilename(lift, ext), blob);
-                  setShareMsg(shareOutcomeLabel(o)); setTimeout(()=>setShareMsg(null), 2500);
+                  if (!res) { setShareMsg('Не удалось: видео не декодировалось или запись недоступна (PNG остаётся).'); setTimeout(()=>setShareMsg(null), 4000); return; }
+                  // Контейнер и звук называются теми, что реально получились: mp4
+                  // пишется не во всех WebView, а аудиодорожку отдаёт не каждый.
+                  const container = res.mime.includes('mp4') ? 'mp4' : 'webm';
+                  const o = await saveBlobApk(movementDiagnosticsFilename(lift, container), res.blob);
+                  setShareMsg(`${shareOutcomeLabel(o)} · ${container}${res.audio ? ', со звуком' : ', без звука (WebView не отдал аудиодорожку)'}`);
+                  setTimeout(()=>setShareMsg(null), 3000);
                 }} />
               </label>
               <button data-lift="share" aria-label="Поделиться диагностикой" onClick={async ()=>{

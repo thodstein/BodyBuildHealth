@@ -416,3 +416,112 @@ describe('хаб → отчёт: ракурс, измеренный по эта�
     expect(savedHtml[0]).toContain('не замена съёмке в плоскости движения');
   });
 });
+
+/**
+ * Волна 28: «куда ушла штанга», «проверен ли угол» и «сколько горизонтали съел
+ * ракурс». Три вопроса, на которые отчёт раньше отвечал цифрой без слов.
+ */
+describe('хаб → отчёт: направление ухода, сверка эталонов, модель поворота', () => {
+  /** 20 точек с уходом вбок: из четырёх строк повтор не сегментируется. */
+  const rows20 = () => {
+    const rows = ['time,x,y'];
+    for (let i = 0; i < 20; i++) rows.push(`${(i * 0.05).toFixed(2)},${100 + i * 1.5},${50 + i * 4}`);
+    return rows.join('\n');
+  };
+
+  it('направление ухода: знак x переводится в «к голове» по стороне съёмки', async () => {
+    const csv = await exportCsv({ capture: { side: 'left' } }, rows20(), '1');
+    expect(rowValue(csv, 'Направление ухода')).toContain('к голове');
+    // Это вывод из параметров, а не измерение: оговорка едет вместе со словом.
+    expect(rowValue(csv, 'Направление ухода')).toContain('по параметрам съёмки');
+  });
+
+  it('жим с камерой справа: тот же кадр читается наоборот', async () => {
+    const csv = await exportCsv({ capture: { side: 'right' } }, rows20(), '1');
+    expect(rowValue(csv, 'Направление ухода')).toContain('к ногам');
+  });
+
+  it('вид спереди: направление не названо, а не выдумано', async () => {
+    const csv = await exportCsv({ capture: { side: 'front' } }, rows20(), '1');
+    expect(rowValue(csv, 'Направление ухода')).toBe('"—"');
+  });
+
+  it('сверка вторым эталоном: подтверждённый угол отличается от одиночного', async () => {
+    const checked = await exportCsv({
+      refAngle: { bench: { azimuthDeg: 25, ratio: 0.906, cosPhi: 0.906, lengthCm: 131, atSec: null, spanPx: 300, checked: 'both', crossDevPct: 1.2 } },
+      refLengthCm: '131',
+    }, rows20(), '1');
+    expect(rowValue(checked, 'Эталоны: сверка')).toContain('подтверждён вторым эталоном');
+    expect(rowValue(checked, 'Эталоны: сверка')).toContain('1.2');
+
+    savedCsv.length = 0;
+    const single = await exportCsv({
+      refAngle: { bench: { azimuthDeg: 25, ratio: 0.906, cosPhi: 0.906, lengthCm: 131, atSec: null, spanPx: 300 } },
+      refLengthCm: '131',
+    }, rows20(), '1');
+    expect(rowValue(single, 'Эталоны: сверка')).toContain('проверен один эталон');
+  });
+
+  it('модель поворота: включается кнопкой и растягивает горизонталь, а не измерение', async () => {
+    localStorage.setItem(MASTER_KEY, JSON.stringify({
+      lift: 'bench',
+      refAngle: { bench: { azimuthDeg: 25, ratio: 0.906, cosPhi: 0.906, lengthCm: 131, atSec: null, spanPx: 300 } },
+    }));
+    const { container } = render(<LiftMasterCard sessions={[]} />);
+    act(() => {
+      fireEvent.change(container.querySelector('[data-lift="kinovea-text"]')!, { target: { value: rows20() } });
+    });
+    act(() => { fireEvent.change(container.querySelector('[data-lift="kinovea-scale"]')!, { target: { value: '1' } }); });
+    act(() => { fireEvent.click(container.querySelector('[data-lift="parse-kinovea"]')!); });
+    // Без включённой модели строка честно пустая.
+    await act(async () => { fireEvent.click(container.querySelector('[data-lift="export-csv"]')!); });
+    expect(rowValue(savedCsv[0], 'Модель поворота')).toBe('"—"');
+
+    act(() => { fireEvent.click(container.querySelector('[data-lift="export-model"]')!); });
+    savedCsv.length = 0;
+    await act(async () => { fireEvent.click(container.querySelector('[data-lift="export-csv"]')!); });
+    const note = rowValue(savedCsv[0], 'Модель поворота');
+    // 1 / cos 25° = 1.10 — модель названа моделью, а не «уточнённым xLoop».
+    expect(note).toContain('×1.10');
+    expect(note).toContain('не второй замер');
+    // Измеренный xLoop остаётся измеренным.
+    expect(rowValue(savedCsv[0], 'Kinovea xLoop, см')).not.toContain('Модель');
+  });
+
+  it('SVG: модель — пунктиром, подпись говорит «пересчёт»', async () => {
+    localStorage.setItem(MASTER_KEY, JSON.stringify({
+      lift: 'bench',
+      refAngle: { bench: { azimuthDeg: 25, ratio: 0.906, cosPhi: 0.906, lengthCm: 131, atSec: null, spanPx: 300 } },
+    }));
+    const { container } = render(<LiftMasterCard sessions={[]} />);
+    act(() => {
+      fireEvent.change(container.querySelector('[data-lift="kinovea-text"]')!, { target: { value: rows20() } });
+    });
+    act(() => { fireEvent.change(container.querySelector('[data-lift="kinovea-scale"]')!, { target: { value: '1' } }); });
+    act(() => { fireEvent.click(container.querySelector('[data-lift="parse-kinovea"]')!); });
+    act(() => { fireEvent.click(container.querySelector('[data-lift="export-model"]')!); });
+    await act(async () => { fireEvent.click(container.querySelector('[data-lift="export-svg"]')!); });
+
+    const svg = savedText[0].text;
+    expect(svg).toContain('stroke="#4ade80"');
+    expect(svg).toContain('модель: камера в плоскости');
+    expect(svg).toContain('Модель поворота');
+    // Подпись переносится по словам, поэтому проверяем смысл, а не всю фразу целиком.
+    expect(svg).toContain('пересчёт измеренного пути');
+  });
+
+  it('без измеренного угла модель не включается: растягивать нечего', async () => {
+    localStorage.setItem(MASTER_KEY, JSON.stringify({ lift: 'bench' }));
+    const { container } = render(<LiftMasterCard sessions={[]} />);
+    act(() => {
+      fireEvent.change(container.querySelector('[data-lift="kinovea-text"]')!, { target: { value: rows20() } });
+    });
+    act(() => { fireEvent.click(container.querySelector('[data-lift="parse-kinovea"]')!); });
+    act(() => { fireEvent.click(container.querySelector('[data-lift="export-model"]')!); });
+    const btn = container.querySelector('[data-lift="export-model"]')!;
+    expect(btn.getAttribute('aria-pressed')).toBe('false');
+    await act(async () => { fireEvent.click(container.querySelector('[data-lift="export-csv"]')!); });
+    expect(rowValue(savedCsv[0], 'Модель поворота')).toBe('"—"');
+  });
+});
+

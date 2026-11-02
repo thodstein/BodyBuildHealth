@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { cameraAngleCheck, cameraAngleShortLine, sideConflictCheck, sessionAngleMismatch, snapshotBarRep } from '../strength-sport-video.engine';
+import { cameraAngleCheck, cameraAngleShortLine, sideConflictCheck, sessionAngleMismatch, snapshotBarRep, barDriftDirection } from '../strength-sport-video.engine';
 
 /**
  * Траектория штанги: вертикальный ход `dyCm` и горизонтальный уход `dxCm` за серию.
@@ -330,5 +330,55 @@ describe('snapshotBarRep — ракурс едет в снимок серии', 
     expect('cosPhi' in snapshotBarRep(rep, 24, { cosPhi: NaN })).toBe(false);
     expect('angleDeg' in snapshotBarRep(rep, 24, { cosPhi: 0.9, azimuthDeg: 120 })).toBe(false);
     expect('angleDeg' in snapshotBarRep(rep, 24, { cosPhi: 0.9, azimuthDeg: -5 })).toBe(false);
+  });
+});
+
+describe('barDriftDirection — знак смещения словами, а не «+0.5 см»', () => {
+  it('жим: камера слева → +x это к голове (спортсмен в кадре головой вправо)', () => {
+    const d = barDriftDirection(0.5, 'left', 'bench');
+    expect(d.dir).toBe('toward-head');
+    expect(d.text).toContain('к голове');
+    expect(d.text).toContain('камера слева');
+    // Оговорка про зеркальную запись — часть ответа, а не сноска.
+    expect(d.text).toContain('зеркальной');
+    expect(barDriftDirection(-0.5, 'left', 'bench').dir).toBe('toward-feet');
+  });
+
+  it('жим: камера справа — картинка зеркальная, знак меняется', () => {
+    expect(barDriftDirection(0.5, 'right', 'bench').dir).toBe('toward-feet');
+    expect(barDriftDirection(-0.5, 'right', 'bench').dir).toBe('toward-head');
+  });
+
+  it('стоя: вперёд/назад вместо головы/ног', () => {
+    expect(barDriftDirection(1.2, 'left', 'squat').dir).toBe('forward');
+    expect(barDriftDirection(1.2, 'left', 'squat').text).toContain('вперёд');
+    expect(barDriftDirection(-1.2, 'right', 'deadlift').dir).toBe('forward');
+    expect(barDriftDirection(-1.2, 'left', 'deadlift').dir).toBe('backward');
+  });
+
+  it('меньше 0.3 см — шум трекинга, а не направление', () => {
+    expect(barDriftDirection(0.2, 'left', 'bench').dir).toBe('level');
+    expect(barDriftDirection(-0.2, 'left', 'bench').text).toContain('по вертикали');
+    // Порог настраиваемый: 0.25 см при пороге 0.1 — уже направление.
+    expect(barDriftDirection(0.25, 'left', 'bench', 0.1).dir).toBe('toward-head');
+  });
+
+  it('нет стороны съёмки — нет и слова, только причина', () => {
+    const d = barDriftDirection(1.5, '', 'bench');
+    expect(d.dir).toBe('unknown');
+    expect(d.text).toContain('не указана');
+    expect(d.text).not.toContain('к голове');
+  });
+
+  it('вид спереди: «влево/вправо» в кадре не переводится в тело', () => {
+    const d = barDriftDirection(1.5, 'front', 'bench');
+    expect(d.dir).toBe('unknown');
+    expect(d.text).toContain('спереди');
+    expect(barDriftDirection(1.5, 'front', 'squat').dir).toBe('unknown');
+  });
+
+  it('мусор вместо смещения — unknown, а не ноль', () => {
+    expect(barDriftDirection(NaN, 'left', 'bench').dir).toBe('unknown');
+    expect(barDriftDirection(null, 'left', 'bench').dir).toBe('unknown');
   });
 });

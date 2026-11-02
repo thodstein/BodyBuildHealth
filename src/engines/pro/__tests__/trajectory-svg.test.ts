@@ -41,6 +41,35 @@ describe('buildTrajectorySvg — экспорт траектории штанг�
     expect(svg).toContain('stroke-dasharray="6 4"');
   });
 
+  it('модель поворота: пунктир с камерой в плоскости и это названо моделью', () => {
+    const svg = buildTrajectorySvg({
+      liftRu: 'Жим лёжа',
+      series: REP,
+      lastRep: REP,
+      firstRep: REP,
+      modelXScale: 1.25,
+      modelNote: 'Модель поворота: при камере в плоскости движения горизонталь была бы ×1.25',
+    });
+    // Измеренный путь + модель, а не «исправленная» кривая вместо измерения.
+    expect(svg.match(/<path /g)?.length).toBe(3);
+    expect(svg).toContain('stroke="#4ade80"');
+    expect(svg).toContain('модель: камера в плоскости');
+    expect(svg).toContain('Модель поворота');
+  });
+
+  it('без угла модели нет: пустой пунктир не рисуется', () => {
+    const svg = buildTrajectorySvg({ liftRu: 'Жим лёжа', series: REP });
+    expect(svg).not.toContain('#4ade80');
+    expect(svg).not.toContain('модель: камера в плоскости');
+  });
+
+  it('мусорный множитель модели отбрасывается, а не растягивает график в ноль', () => {
+    for (const bad of [0, -2, NaN, Infinity, 1e6]) {
+      const svg = buildTrajectorySvg({ liftRu: 'Жим лёжа', series: REP, modelXScale: bad });
+      expect(svg).not.toContain('модель: камера в плоскости');
+    }
+  });
+
   it('экранирует пользовательский текст (без инъекции тегов)', () => {
     const svg = buildTrajectorySvg({
       liftRu: '<script>alert(1)</script>',

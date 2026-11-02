@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   referenceAngleCheck,
+  referenceAngleCrossCheck,
   referenceHorizontalCorrection,
   referencePrecisionNote,
   referenceMeasurementDrift,
@@ -350,5 +351,60 @@ describe('perspectiveTrackYForVideoY — обратная связь персп�
   it('невалидная перспектива → null', () => {
     expect(perspectiveTrackYForVideoY({ ...calib, anchors: [] }, 300)).toBeNull();
     expect(perspectiveTrackYForVideoY(calib, NaN)).toBeNull();
+  });
+});
+
+/**
+ * Второй эталон: поперечный даёт cos φ, продольный — sin φ, вместе они обязаны
+ * дать единицу. Это единственный способ увидеть ошибку разметки (не та ось,
+ * отрезок не в плоскости), не полагаясь на слово пользователя.
+ */
+describe('referenceAngleCrossCheck — второй эталон проверяет первый', () => {
+  // 30°: cos = 0.866, sin = 0.5. Длины и масштаб подобраны так, чтобы отрезки были «живыми».
+  const across30 = check(120 * 0.8660254 * 2, 120, 2, 'across')!;
+  const along30 = check(131 * 0.5 * 2, 131, 2, 'along')!;
+  const along60 = check(131 * 0.8660254 * 2, 131, 2, 'along')!;
+
+  it('обе оси дают один угол — угол подтверждён, а не «наверное, верный»', () => {
+    expect(across30.azimuthDeg).toBe(30);
+    expect(along30.azimuthDeg).toBe(30);
+    const cc = referenceAngleCrossCheck(across30, along30);
+    expect(cc.flag).toBe('ok');
+    expect(cc.azimuthDeg).toBe(30);
+    expect(Math.abs(cc.dev ?? 1)).toBeLessThan(0.02);
+    expect(cc.text).toContain('подтверждён обеими осями');
+    expect(cc.text).toContain('cos² φ + sin² φ = 1.00');
+  });
+
+  it('cos²+sin² ушло от единицы — угол НЕ применяется', () => {
+    const cc = referenceAngleCrossCheck(across30, along60);
+    expect(cc.flag).toBe('inconsistent');
+    expect(cc.azimuthDeg).toBeNull();
+    expect(cc.cosPhi).toBeNull();
+    expect(cc.dev).toBeGreaterThan(0.4);
+    expect(cc.text).toContain('не сходятся');
+    expect(cc.text).toContain('30°');
+    expect(cc.text).toContain('60°');
+    expect(cc.text).toContain('Угол не применяю');
+  });
+
+  it('аргументы — это оси, а не «первый/второй»: перепутать нельзя', () => {
+    expect(referenceAngleCrossCheck(along30, across30).flag).toBe('unknown');
+    // Один и тот же отрезок под видом двух осей ничего не доказывает.
+    expect(referenceAngleCrossCheck(across30, across30).flag).toBe('unknown');
+  });
+
+  it('нет второго замера или он не измерен — сверка неполная, а не «ок»', () => {
+    expect(referenceAngleCrossCheck(across30, null).flag).toBe('unknown');
+    expect(referenceAngleCrossCheck(null, along30).flag).toBe('unknown');
+    const broken = referenceAngleCheck({ a: { x: 0, y: 0 }, b: { x: 200, y: 0 }, lengthCm: 100 })!;
+    expect(referenceAngleCrossCheck(across30, broken).flag).toBe('unknown');
+  });
+
+  it('без длины в пикселях допуск не оценить — честный отказ', () => {
+    const noSpan = { ...across30, spanPx: 0 };
+    const cc = referenceAngleCrossCheck(noSpan, along30);
+    expect(cc.flag).toBe('unknown');
+    expect(cc.text).toContain('пикселях');
   });
 });
