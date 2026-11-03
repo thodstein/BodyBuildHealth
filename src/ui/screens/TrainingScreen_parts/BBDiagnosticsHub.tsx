@@ -8,6 +8,11 @@ import React, { useMemo, useState, useEffect, useCallback, useRef } from 'react'
 import { CARD, ACCENT } from './training-ui';
 import { BbScreeningTab } from './bb-hub-screening-tab';
 import { BbCheckCard, BbNum, BbSheetSelect, bbNum } from './bb-hub-controls';
+// Декомпозиция (волна 3 плана хабов): секции хаба живут отдельными файлами,
+// разметка и data-bb-контракты при переезде не меняются.
+import { BbNextActionsCard } from './bb-hub-next-actions-card';
+import { BbVolumeTab } from './bb-hub-volume-tab';
+import { vrZoneBg, vrZoneColor } from './bb-hub-zones';
 import { applyToPlanner } from './planner-bridge';
 import { buildPro2Meta } from './bb-hub-export';
 import { localIsoDate } from './diary-shared';
@@ -203,9 +208,8 @@ const TAB_DEFS: Array<{ id: BBTab; label: string; icon: string; desc: string }> 
   { id: 'volume', label: 'Объём · Recovery', icon: '📐', desc: 'ACWR + MRV + ограничитель' },
 ];
 
-/** Цвета панели «Объём · Recovery» (BB-G-01): «нет данных» — серый, а не зелёный. */
-const vrZoneColor = (z: string): string => z === 'red' ? '#ef4444' : z === 'yellow' ? '#f59e0b' : z === 'green' ? '#22c55e' : '#9ca3af';
-const vrZoneBg = (z: string): string => z === 'red' ? 'rgba(239,68,68,0.10)' : z === 'yellow' ? 'rgba(245,158,11,0.10)' : z === 'green' ? 'rgba(34,197,94,0.08)' : 'rgba(148,163,184,0.08)';
+// Цвета зон (BB-G-01: «нет данных» — серый, а не зелёный) — в `bb-hub-zones.ts`,
+// потому что их красят и панель объёма, и карточка «что делать дальше».
 
 const GRANULAR_OPTS: Array<{ id: string; label: string }> = [  { id: 'delt_mid', label: 'Средняя дельта' },
   { id: 'delt_rear', label: 'Задняя дельта' },
@@ -2228,52 +2232,12 @@ export const BBDiagnosticsHub: React.FC = () => {
         {toast && <div style={{ marginTop: 8, padding: '6px 10px', borderRadius: 8, background: 'rgba(34,197,94,0.12)', border: '1px solid rgba(34,197,94,0.2)', color: '#22c55e', fontSize: 11 }}>{toast}</div>}
       </div>
 
-      {(nextActions.actions.length > 0 || nextActions.note) && (
-        <div data-bb="next-actions" style={{ ...CARD, padding: '10px 10px 8px', margin: 0 }}>
-          <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8, marginBottom: 6 }}>
-            <div style={{ fontSize: 12, fontWeight: 800, color: '#fff' }}>Что делать дальше</div>
-            <div style={{ fontSize: 9, color: '#94a3b8' }}>из данных, не из шаблона</div>
-          </div>
-          {nextActions.actions.map((a, i) => {
-            const rowStyle: React.CSSProperties = {
-              display: 'flex', gap: 8, alignItems: 'flex-start', padding: '6px 8px', borderRadius: 8,
-              background: vrZoneBg(a.zone), border: `1px solid ${vrZoneColor(a.zone)}33`, marginBottom: 6,
-              width: '100%', textAlign: 'left', minHeight: 44, font: 'inherit', color: '#fff',
-            };
-            const inner = (
-              <>
-                <span style={{ width: 18, height: 18, borderRadius: 9, flex: '0 0 auto', background: vrZoneColor(a.zone), color: '#06281c', fontSize: 11, fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{i + 1}</span>
-                <span style={{ flex: 1, minWidth: 0 }}>
-                  <span style={{ display: 'block', fontSize: 11, fontWeight: 700, color: '#fff', lineHeight: 1.3 }}>{a.title}</span>
-                  <span style={{ display: 'block', fontSize: 10, color: '#cbd5e1', lineHeight: 1.45 }}>{a.why}</span>
-                </span>
-                {/* Место шага — визуальный чип; имя кнопки = сам шаг (а не название раздела). */}
-                {a.target && <span aria-hidden="true" style={{ flex: '0 0 auto', padding: '3px 8px', borderRadius: 999, background: 'rgba(0,230,138,0.12)', border: '1px solid rgba(0,230,138,0.25)', color: '#00e68a', fontSize: 10, fontWeight: 700, lineHeight: 1.6 }}>{a.target.label} →</span>}
-              </>
-            );
-            return a.target ? (
-              <button
-                key={a.id}
-                type="button"
-                data-bb="next-action"
-                data-action={a.id}
-                data-zone={a.zone}
-                data-target={a.target.id}
-                data-target-type={a.target.type}
-                title={`Перейти: ${a.target.label}`}
-                aria-label={a.title}
-                onClick={() => { if (a.target!.type === 'screen') goToScreen(a.target!.id); else setTab(a.target!.id as any); }}
-                style={{ ...rowStyle, cursor: 'pointer' }}
-              >{inner}</button>
-            ) : (
-              <div key={a.id} data-bb="next-action" data-action={a.id} data-zone={a.zone} style={rowStyle}>{inner}</div>
-            );
-          })}
-          {nextActions.actions.length === 0 && nextActions.note && (
-            <div style={{ fontSize: 10, color: '#94a3b8', lineHeight: 1.5 }}>{nextActions.note}</div>
-          )}
-        </div>
-      )}
+      <BbNextActionsCard
+        actions={nextActions.actions}
+        note={nextActions.note}
+        onGoScreen={goToScreen}
+        onGoTab={(id) => setTab(id as BBTab)}
+      />
 
       <div style={{ ...CARD, padding: 10, margin: 0 }} data-bb="tabs-card">
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }} data-bb="tabs-row">
@@ -2990,80 +2954,7 @@ export const BBDiagnosticsHub: React.FC = () => {
         )}
 
         {tab === 'volume' && (
-          <div data-bb="vr-panel">
-            {/* BB-G-01: единый ответ «что ограничивает рост» — объём, острая нагрузка, восстановление. */}
-            <div style={{ fontSize: 12, fontWeight: 800, color: '#fff', marginBottom: 4 }}>Объём · Recovery · Mobility — что ограничивает рост сейчас</div>
-            <div style={{ fontSize: 10, color: '#fff', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 8, padding: '6px 8px', marginBottom: 6 }}>
-              Факт — <b>прямые</b> сеты за 7 дней из дневника (косвенная нагрузка не завышает картину). Ориентиры MEV/MAV/MRV — по уровню <b>{level}</b>.
-            </div>
-            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }} data-bb="vr-chips">
-              {vrPanel.chips.map((c) => (
-                <span key={c.id} data-bb={`vr-chip-${c.id}`} data-zone={c.zone} style={{ padding: '6px 10px', borderRadius: 10, background: vrZoneBg(c.zone), border: `1px solid ${vrZoneColor(c.zone)}44`, color: vrZoneColor(c.zone), fontSize: 11, lineHeight: 1.35, maxWidth: '100%' }}>
-                  <b>{c.label}: {c.value}</b>
-                  <span style={{ display: 'block', color: '#fff', fontSize: 10, opacity: 0.85 }}>{c.detail}</span>
-                </span>
-              ))}
-            </div>
-            <div data-bb="vr-limiter" data-zone={vrPanel.limiter?.zone ?? 'green'} style={{ padding: '8px 10px', borderRadius: 10, background: vrZoneBg(vrPanel.limiter?.zone ?? 'green'), border: `1px solid ${vrZoneColor(vrPanel.limiter?.zone ?? 'green')}33`, marginBottom: 8, fontSize: 11, lineHeight: 1.5 }}>
-              <b style={{ color: vrZoneColor(vrPanel.limiter?.zone ?? 'green') }}>Ограничитель: {vrPanel.limiter ? vrPanel.limiter.label : 'нет'}</b>
-              <div style={{ color: '#fff' }}>{vrPanel.limiter ? vrPanel.limiter.detail : 'Ни один канал не ограничивает объём — можно держать MAV по приоритетам.'}</div>
-            </div>
-            {vrPanel.advice.length > 0 && (
-              <div data-bb="vr-advice" style={{ padding: '8px 10px', borderRadius: 10, background: 'rgba(0,230,138,0.07)', border: '1px solid rgba(0,230,138,0.16)', marginBottom: 8, fontSize: 11, lineHeight: 1.55 }}>
-                {vrPanel.advice.map((a, i) => <div key={i} style={{ color: '#fff' }}>• {a}</div>)}
-              </div>
-            )}
-            {vrPanel.hasVolume ? (
-              <div data-bb="vr-rows" style={{ display: 'grid', gap: 4, marginBottom: 8 }}>
-                {vrPanel.rows.map((r) => {
-                  const statusRu = r.status === 'exceeding_mrv' ? 'сверх MRV'
-                    : r.status === 'approaching_mrv' ? 'к MRV'
-                      : r.status === 'below_mev' ? 'ниже MEV' : 'оптимум';
-                  const col = r.status === 'exceeding_mrv' ? '#ef4444' : r.status === 'approaching_mrv' ? '#f59e0b' : r.status === 'below_mev' ? '#60a5fa' : '#22c55e';
-                  return (
-                    <div key={r.group} data-bb="vr-row" data-muscle={r.group} data-status={r.status} style={{ padding: '7px 9px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: `1px solid ${col}33`, fontSize: 10, lineHeight: 1.5 }}>
-                      <b style={{ fontSize: 11, color: '#fff' }}>{r.label}</b>
-                      <span style={{ color: col, marginLeft: 6 }}>{r.sets} сет/нед · MEV {r.mev} · MAV {r.mav} · MRV {r.mrv} · {statusRu}</span>
-                      <div style={{ color: '#fff' }}>
-                        {r.headroom >= 0 ? `запас до MRV: ${r.headroom}` : `сверх MRV: ${-r.headroom}`}
-                        {r.acwrRatio != null ? ` · ACWR ×${r.acwrRatio} (${r.acwrZone === 'dangerous' ? 'опасно' : r.acwrZone === 'caution' ? 'осторожно' : r.acwrZone === 'undertrained' ? 'мало' : 'норма'})` : ''}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            ) : (
-              <div data-bb="vr-nodata" style={{ padding: '8px 10px', borderRadius: 8, background: '#0a1629', border: '1px solid #1f3a5f', fontSize: 10, color: '#fff', marginBottom: 8 }}>
-                Нет тренировок за 7 дней — сравнивать факт с MEV/MAV/MRV нечем (это «нет данных», а не нули).
-              </div>
-            )}
-            {/* BB-G-04: эффект вставки коррекций — до/после по зоне, честное «не срок». */}
-            <div data-bb="diag-effect" data-status={corrEffect.status} style={{ padding: '8px 10px', borderRadius: 10, background: 'rgba(168,85,247,0.06)', border: '1px solid rgba(168,85,247,0.16)', marginBottom: 8, fontSize: 10, lineHeight: 1.5 }}>
-              <b style={{ fontSize: 11, color: '#fff' }}>⏱ Эффект коррекции (окно 4–6 нед)</b>
-              <div style={{ color: corrEffect.status === 'no_injection' ? '#9ca3af' : corrEffect.status === 'too_early' ? '#f59e0b' : '#fff', marginTop: 2 }}>{corrEffect.text}</div>
-              {corrEffect.rows.map((r) => {
-                const vCol = r.verdict === 'improved' ? '#22c55e' : r.verdict === 'worse' ? '#ef4444' : r.verdict === 'flat' ? '#9ca3af' : '#f59e0b';
-                const vRu = r.verdict === 'improved' ? 'рост объёма' : r.verdict === 'worse' ? 'объём упал' : r.verdict === 'flat' ? 'без изменений' : 'ждём окно оценки';
-                return (
-                  <div key={r.zone} data-bb="diag-effect-row" data-verdict={r.verdict} style={{ color: '#fff', marginTop: 2 }}>
-                    <b>{weakRu(r.zone)}</b>: {r.setsBeforeWeekly ?? '—'} → {r.setsAfterWeekly ?? '—'} сет/нед
-                    {r.deltaPct != null ? ` (${r.deltaPct > 0 ? '+' : ''}${r.deltaPct}%)` : ''} · <span style={{ color: vCol }}>{vRu}</span>
-                  </div>
-                );
-              })}
-            </div>
-            {/* BB-G-02: deep-links — из вердикта можно дойти до замера/профильного экрана. */}
-            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }} data-bb="vr-links">
-              {([
-                ['volume_hub', '📐 Объём-хаб'],
-                ['joints_ortho', '🦴 Ортопедия'],
-                ['calc_vbt', '🎯 VBT · Анализ силы'],
-                ['diary', '📝 Дневник'],
-              ] as const).map(([target, label]) => (
-                <button key={target} type="button" data-bb="vr-link" data-target={target} onClick={() => goToScreen(target)} style={{ minHeight: 44, padding: '8px 12px', borderRadius: 10, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.14)', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>{label}</button>
-              ))}
-            </div>
-          </div>
+          <BbVolumeTab panel={vrPanel} effect={corrEffect} level={level} zoneLabel={weakRu} onGoScreen={goToScreen} />
         )}
 
         {tab === 'screening' && (

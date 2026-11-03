@@ -13,6 +13,10 @@ const HUB = read('BBDiagnosticsHub.tsx');
 const AUTO = read('BbAutoConstructor.tsx');
 const TAB = read('bb-hub-screening-tab.tsx');
 const CONTROLS = read('bb-hub-controls.tsx');
+// Волна 3 (декомпозиция): 6-й таб и карточка «что делать дальше» — отдельные файлы,
+// поэтому source-guard'ы смотрят туда, где разметка реально живёт.
+const VOL = read('bb-hub-volume-tab.tsx');
+const NEXT = read('bb-hub-next-actions-card.tsx');
 
 describe('W1 честность UI скрининга', () => {
   it('клик по пустому месту не помечает скрининг пройденным', () => {
@@ -135,21 +139,21 @@ describe('W5 (BB-G-01/02/04) объём-recovery, deep-links, эффект ко�
 
   it('панель строится движком, а не считается инлайном в JSX', () => {
     expect(HUB).toContain('buildVolumeRecoveryPanel(');
-    expect(HUB).toContain('data-bb="vr-chips"');
-    expect(HUB).toMatch(/data-bb=\{`vr-chip-\$\{c\.id\}`\}/);
-    expect(HUB).toContain('data-bb="vr-limiter"');
+    expect(VOL).toContain('data-bb="vr-chips"');
+    expect(VOL).toMatch(/data-bb=\{`vr-chip-\$\{c\.id\}`\}/);
+    expect(VOL).toContain('data-bb="vr-limiter"');
   });
 
   it('«нет данных» отделено от нулей: есть ветка vr-nodata и data-zone=nodata', () => {
-    expect(HUB).toContain('data-bb="vr-nodata"');
-    expect(HUB).toContain('data-zone={c.zone}');
+    expect(VOL).toContain('data-bb="vr-nodata"');
+    expect(VOL).toContain('data-zone={c.zone}');
   });
 
   it('deep-links шлют training-open-tab с белым списком целей', () => {
     expect(HUB).toContain("new CustomEvent('training-open-tab'");
-    expect(HUB).toContain('data-bb="vr-link"');
+    expect(VOL).toContain('data-bb="vr-link"');
     for (const target of ['volume_hub', 'joints_ortho', 'calc_vbt', 'diary']) {
-      expect(HUB).toContain(`['${target}',`);
+      expect(VOL).toContain(`['${target}',`);
     }
     // TrainingScreen принимает цель только из списка
     expect(TRAIN).toContain('BB_DIAG_DEEP_LINKS');
@@ -163,8 +167,20 @@ describe('W5 (BB-G-01/02/04) объём-recovery, deep-links, эффект ко�
     expect(HUB).toContain('logDiagInjection(');
     expect(HUB).toContain('readDiagInjections');
     expect(HUB).toContain('buildCorrectionEffect(');
-    expect(HUB).toContain('data-bb="diag-effect"');
-    expect(HUB).toContain('data-bb="diag-effect-row"');
+    expect(VOL).toContain('data-bb="diag-effect"');
+    expect(VOL).toContain('data-bb="diag-effect-row"');
+  });
+
+  it('декомпозиция: разметка таба живёт в одном месте, а не копией в хабе', () => {
+    // иначе правка «в одном из двух мест» тихо вернёт старый баг
+    expect(HUB).not.toContain('data-bb="vr-panel"');
+    expect(HUB).not.toContain('data-bb="vr-chips"');
+    expect(HUB).not.toContain('data-bb="next-actions"');
+    expect(NEXT).toContain('data-bb="next-actions"');
+    expect(NEXT).toContain('data-bb="next-action"');
+    // хаб только передаёт данные и колбэки — логики шагов в разметке нет
+    expect(HUB).toContain('<BbVolumeTab panel={vrPanel}');
+    expect(HUB).toContain('<BbNextActionsCard');
   });
 });
 
