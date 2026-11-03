@@ -47,7 +47,7 @@ describe('E17: чистая выдача рациона', () => {
   });
 
   it('E18: дешёвые/экзотические масла-«мусор» не стоят «жиром приёма»', () => {
-    const JUNK = /^sauce_|^oil_(soybean|corn|palm|rice_bran|camelina|cedar|black_cumin|chili|truffle|mustard)|^seed_(poppy|fennel|anise|celery|nigella|cumin|coriander|cardamom|mustard_yellow)|^nut_(kukui|pili|baru)|basil_seeds|hazelnut_paste|pesto|fat_cocoa_butter/;
+    const JUNK = /^sauce_|^oil_(soybean|corn|palm|rice_bran|camelina|cedar|black_cumin|chili|truffle|mustard)|^seed_(poppy|fennel|anise|celery|nigella|cumin|coriander|cardamom|mustard_yellow)|^nut_(kukui|pili|baru)|basil_seeds|pesto|fat_cocoa_butter/;
     for (const salt of [1, 2, 3, 4, 5]) {
       const p = buildDayPlan(mk({ goalKcal: 2720, goalProteinG: 170, goalFatG: 80, goalCarbsG: 330, mealsCount: 5, randomSalt: salt } as any));
       for (const m of p.meals) for (const it of (m.items || [])) {

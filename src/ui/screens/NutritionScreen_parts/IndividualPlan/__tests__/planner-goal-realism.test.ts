@@ -8,7 +8,7 @@ import { describe, it, expect } from 'vitest';
 import { buildDayPlan, type MealPlanInput } from '../meal-plan-engine';
 import { afAllows } from '../planner-meal-affinity';
 
-const JUNK = /^sauce_|^oil_(soybean|corn|palm|rice_bran|camelina|cedar|black_cumin|chili|truffle|mustard)|^seed_(poppy|fennel|anise|celery|nigella|cumin|coriander|cardamom|mustard_yellow)|^nut_(kukui|pili|baru)|basil_seeds|hazelnut_paste|pesto|fat_cocoa_butter|^root_(taro|cassava|yam)|plantain|breadfruit|^(lemon|lime)(_|$)/;
+const JUNK = /^sauce_|^oil_(soybean|corn|palm|rice_bran|camelina|cedar|black_cumin|chili|truffle|mustard)|^seed_(poppy|fennel|anise|celery|nigella|cumin|coriander|cardamom|mustard_yellow)|^nut_(kukui|pili|baru)|basil_seeds|pesto|fat_cocoa_butter|^root_(taro|cassava|yam)|plantain|breadfruit|^(lemon|lime)(_|$)/;
 const DRY_CARB = /oats_dry|corn_flakes|grain_rice_flakes|rice_cream|rice_semolina|cream_of_rice|muesli|granola/;
 
 const mk = (over: Partial<MealPlanInput>): MealPlanInput => ({

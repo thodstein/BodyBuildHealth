@@ -246,6 +246,27 @@ describe('пакет качества: соль в тарелке, а не в н
   });
 });
 
+describe('QG33: «мусорный» жир не доезжает до финальной тарелки', () => {
+  // Настоящие мусорные жиры: соусы, «кухонные» масла (соевое/кукурузное/пальмовое и т.п.),
+  // пряные семена-специи, экзотические орехи-заменители. Урбеч (hazelnut_paste) здесь
+  // СОЗНАТЕЛЬНО отсутствует: это молотый фундук (60 г жира, 17 углеводов, 9 клетчатки),
+  // а не спред — раньше он попадал в список по слову «паста».
+  const JUNK_OIL = /^sauce_|^oil_(soybean|corn|palm|rice_bran|camelina|cedar|black_cumin|chili|truffle|mustard)|^seed_(poppy|fennel|anise|celery|nigella|cumin|coriander|cardamom|mustard_yellow)|^nut_(kukui|pili|baru)|basil_seeds|pesto|fat_cocoa_butter/;
+
+  it('в 30 днях нет ни одного «мусорного» жира (было 3 дня)', () => {
+    const hits: string[] = [];
+    for (const d of DAYS) for (const { x } of items(d)) {
+      if (JUNK_OIL.test(String(x.id))) hits.push(`${String(x.id)}`);
+    }
+    expect(hits, `мусорный жир в тарелке: ${hits.join(', ')}`).toHaveLength(0);
+  });
+
+  it('урбеч не считается мусором, а соевое масло — считается', () => {
+    expect(JUNK_OIL.test('hazelnut_paste')).toBe(false);
+    expect(JUNK_OIL.test('oil_soybean')).toBe(true);
+  });
+});
+
 describe('пакет качества: витамин E и семейные квоты (QG9)', () => {
   const E_RDA = 15; // мг, RDA_BASE.VitE
   const eMgOf = (d: Day) => Number((sumMicros(

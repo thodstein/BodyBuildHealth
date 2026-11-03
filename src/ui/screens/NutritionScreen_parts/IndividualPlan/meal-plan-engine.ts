@@ -10183,7 +10183,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     // «семена аниса») → оливковое/авокадо/орехи; экзотические корнеплоды (таро/кассава/ям)
     // → рис/картофель; лимон/лайм (приправа, не фрукт) → обычный фрукт. Guard: +2%.
     try {
-      const JUNK_FAT = /^sauce_|^oil_(soybean|corn|palm|rice_bran|camelina|cedar|black_cumin|chili|truffle|mustard)|^seed_(poppy|fennel|anise|celery|nigella|cumin|coriander|cardamom|mustard_yellow)|^nut_(kukui|pili|baru)|basil_seeds|hazelnut_paste|pesto|fat_cocoa_butter/;
+      const JUNK_FAT = _JUNK_FAT_RE;
       const JUNK_CARB = /^root_(taro|cassava|yam)|plantain|breadfruit/;
       const FLAVOR_FRUIT = /^(lemon|lime)(_|$)/;
       // Чистые масла первыми — замена «мусорного» масла макро-нейтральна (100 г жира → 100 г).
@@ -14261,6 +14261,13 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
       }
     }
 
+    // ─── QG33: «мусорный» жир — финальная зачистка перед подсчётом микро/витриной ───
+    if (_pickCtx.qualityMode === 'full'
+      && !(input as any).manualTargetsLocked
+      && (input as any).kbjuMode !== 'manual') {
+      purgeJunkFatFinal(meals as any[], totals);
+    }
+
     // ─── QG24: источник жира по витамину E (до пересчёта микро/витрины) ───
     if (_pickCtx.qualityMode === 'full'
       && !(input as any).manualTargetsLocked
@@ -14581,6 +14588,89 @@ const _QG24_E_POOR = 10;    // мг/100 г — ниже «бедный» ист�
 // и не больше одного пункта (оливковое остаётся MUFA-основой дня).
 const _QG24_E_MID = 20;     // мг/100 г — «средний» источник: трогаем только при дефиците
 const _QG24_E_RICH_ID = 'oil_sunflower_unrefined';
+// ─── QG33: «мусорный» жир не должен доезжать до тарелки ────────────────────
+// Единый регэксп мусорных жиров: ранняя гигиена FAT_REPL (`:10186`) и финальная зачистка
+// QG33 обязаны видеть одно и то же множество, иначе «мусор» просачивается между ними.
+const _JUNK_FAT_RE = /^sauce_|^oil_(soybean|corn|palm|rice_bran|camelina|cedar|black_cumin|chili|truffle|mustard)|^seed_(poppy|fennel|anise|celery|nigella|cumin|coriander|cardamom|mustard_yellow)|^nut_(kukui|pili|baru)|basil_seeds|pesto|fat_cocoa_butter/;
+// `hazelnut_paste` из списка убран: это урбеч (молотый фундук) — 60 г жира, 15 белка, 17 углеводов,
+// 9 клетчатки, VitE 15 мг/100 г, а не шоколадный спред (у спреда углеводов 50+). В «мусор» он
+// попадал по слову «паста». Замер: 22 из 32 «мусорных» пунктов в 540 сборках — он.
+// Замер: в 32 сборках из 540 (hazelnut_paste 22 пункта, oil_soybean 10) «мусорный» жир доживал
+// до финала — ранняя гигиена отрабатывает ДО поздних доборов жира (ореховый добор, распределение
+// масел), и они приносят его обратно. Поздняя зачистка — финальный инвариант: сначала пробуем
+// свободный чистый жир того же приёма, иначе (все кандидаты уже в приёме) сливаем граммы жира
+// в уже стоящий чистый жир приёма и пункт убираем.
+const _QG33_FAT_REPL = ['olive_oil', 'oil_coconut', 'oil_mct', 'fat_ghee', 'oil_ghee', 'butter', 'avocado', 'almonds', 'walnuts', 'nuts_mix'];
+function purgeJunkFatFinal(meals: any[], totals: any): number {
+  let fixed = 0;
+  const fatOf = (x: any) => Number(x?.f) || 0;
+  const amtOf = (x: any) => Number(x?.amount) || 0;
+  const densFat = (id: string) => Number(FOOD_DB.find((f: any) => String(f.id) === id)?.fat) || 0;
+  const isPureFat = (x: any) => {
+    const a = amtOf(x);
+    if (!(a > 0)) return false;
+    const f100 = (fatOf(x) / a) * 100;
+    return String(x.role) === 'fat' && f100 >= 85 && ((Number(x.p) || 0) / a) * 100 <= 2 && ((Number(x.c) || 0) / a) * 100 <= 2;
+  };
+  for (const m of meals as any[]) {
+    for (let i = 0; i < ((m.items || []) as any[]).length; i++) {
+      const it: any = (m.items as any[])[i];
+      if (!it || !_JUNK_FAT_RE.test(String(it.id))) continue;
+      if (it._fixedGrams) continue;
+      // Только «чистые» масла: у них замена по жиру макро-нейтральна, поэтому день не портится.
+      const amt = amtOf(it);
+      if (!(amt > 0) || (fatOf(it) / amt) * 100 < 90) continue;
+      const targetF = fatOf(it);
+      const snapItems = (m.items as any[]).map((x: any) => ({ ...x }));
+      const day0 = { p: Number(totals?.p) || 0, f: Number(totals?.f) || 0, c: Number(totals?.c) || 0, kcal: Number(totals?.kcal) || 0 };
+      // (1) свободный чистый жир того же приёма — граммы по жиру, один пункт на месте.
+      const inMeal = new Set(((m.items || []) as any[]).map((x: any) => String(x.id)));
+      const free = _QG33_FAT_REPL.find((rid) => !inMeal.has(rid) && densFat(rid) > 0);
+      if (free && targetF > 0) {
+        const fd: any = FOOD_DB.find((f: any) => String(f.id) === free);
+        const g = Math.max(1, Math.round((targetF / Math.max(1, Number(fd.fat))) * 100));
+        const r = g / 100;
+        const np = Math.round((Number(fd.protein) || 0) * r * 10) / 10;
+        const nf = Math.round((Number(fd.fat) || 0) * r * 10) / 10;
+        const nc = Math.round((Number(fd.carbs) || 0) * r * 10) / 10;
+        (m.items as any[])[i] = {
+          id: fd.id, name: fd.name, amount: g, role: 'fat',
+          kcal: Math.round(4 * np + 9 * nf + 4 * nc), p: np, f: nf, c: nc,
+          fiber: 0, leucine_mg: 0,
+        };
+      } else {
+        // (2) свободных нет — сливаем жир в чистый жир приёма и убираем пункт.
+        const twin = ((m.items || []) as any[]).find((x: any) => x !== it && isPureFat(x));
+        if (!twin || targetF <= 0) continue;
+        const dens = densFat(String(twin.id));
+        if (dens <= 0) continue;
+        const addG = Math.max(1, Math.round((targetF / dens) * 100));
+        twin.amount = amtOf(twin) + addG;
+        const rr = addG / 100;
+        // Чистый жир (≥85% из жира) добавляет только жир — белок/углеводы не двигаются.
+        twin.f = Math.round((fatOf(twin) + dens * rr) * 10) / 10;
+        twin.kcal = Math.round(4 * (Number(twin.p) || 0) + 9 * (Number(twin.f) || 0) + 4 * (Number(twin.c) || 0));
+        (m.items as any[]).splice(i, 1);
+        i--;
+      }
+      recalcMealTotals(meals as any[]);
+      recalcDayTotals(meals, totals);
+      // «Не навреди»: белок/углеводы не двигаем больше 1 г и 2 г, жир — не больше 0.6 г.
+      const dp = Math.abs((Number(totals?.p) || 0) - day0.p);
+      const df = Math.abs((Number(totals?.f) || 0) - day0.f);
+      const dc = Math.abs((Number(totals?.c) || 0) - day0.c);
+      if (dp > 1.01 || df > 0.61 || dc > 2.01) {
+        m.items = snapItems;
+        recalcMealTotals(meals as any[]);
+        recalcDayTotals(meals, totals);
+        continue;
+      }
+      fixed++;
+    }
+  }
+  return fixed;
+}
+
 function liftVitaminEByFatAddress(
   meals: any[], totals: any, eGoal: number, seedsCap: number,
 ): number {
