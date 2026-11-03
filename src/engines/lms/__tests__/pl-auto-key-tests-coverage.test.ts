@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { autoRegulate } from '../../pro/autoregulation-pro.engine';
 import { buildDiaryAutoreg } from '../../pro/diary-autoreg.engine';
-import { buildLMSPlan, getPLVolumeLandmarks, getPLWeakPointRecommendations, diagnosticProtocolFromCycle } from '../lms-builder.engine';
+import { buildLMSPlan, getPLVolumeLandmarks, getPLVolumeBreakdown, getPLVolumeLandmarksByMuscle, getPLWeakPointRecommendations, diagnosticProtocolFromCycle } from '../lms-builder.engine';
 import { calcTonnage } from '../lms-metrics.engine';
-import { computePLPlanFeedback } from '../lms-progression-feedback.engine';
+import { findLastFact } from '../../pro/diary-autoreg.engine';
 import { rankCycles } from '../lms-selector.engine';
 import { CYCLE_01 } from '../../../data/lms-cycles/cycle-01';
 import { getExercisesByGroup } from '../../../core/exercise-catalog';
@@ -11,6 +11,15 @@ import { getVolumeLandmarks } from '../../volume-landmarks.engine';
 import { diagnoseWeakPoint } from '../weakpoint-pl';
 import type { WorkoutSession } from '../workout-logger.engine';
 import type { WorkoutLog } from '../../../core/types';
+import { localIsoDateOffset } from '../../../core/local-date';
+
+// Даты «внутри 90-дневного окна findLastFact/findAllFacts»: хардкод календарных дат
+// «протухает» — через 3 месяца окно отсекает записи и тест падает без регресса.
+const D14 = localIsoDateOffset(-14);
+const D13 = localIsoDateOffset(-13);
+const D3 = localIsoDateOffset(-3);
+const D2 = localIsoDateOffset(-2);
+const D1 = localIsoDateOffset(-1);
 
 const pmMap = { 'Присед': 150, 'Жим лежа': 110, 'Становая тяга': 180 };
 const autoBase = {
@@ -34,6 +43,19 @@ function workout(date: string, name: string, sets: { weightKg: number; reps: num
     }],
     totalVolume: 0, totalSets: sets.length, totalReps: sets.reduce((n, s) => n + s.reps, 0),
     avgIntensity: 8, prCount: 0, notes: '', weekNumber: 1, mesocycleWeek: 1,
+  };
+}
+
+/** Канон дневника (core/types.WorkoutLog): сеты с `weight`, а не `weightKg`. */
+function log(date: string, name: string, sets: { weight: number; reps: number; rir: number }[]): WorkoutLog {
+  return {
+    id: `w_${name}_${date}`, date, duration: 60, overallRPE: 8, recoveryBefore: 70, split: 'PL',
+    exercises: [{
+      id: `e_${name}_${date}`, date, exerciseId: name, exerciseName: name,
+      sets: sets.map(s => ({ weight: s.weight, reps: s.reps, rir: s.rir, rpe: 10 - s.rir })),
+      totalVolume: sets.reduce((n, s) => n + s.weight * s.reps, 0),
+      estimated1RM: 0, isCompound: true,
+    }],
   };
 }
 
@@ -73,14 +95,14 @@ describe('PL-auto key coverage 4.1-4.15', () => {
 
   it('4.5 diary delta > 2 increases RIR by one', () => {
     const result = buildDiaryAutoreg({
-      historyWorkouts: [{ id: 'w', date: '2026-08-01', duration: 60, exercises: [{ id: 'e', date: '2026-08-01', exerciseId: 'bench', exerciseName: 'Жим лёжа', sets: [{ weight: 100, reps: 5, rir: 0, rpe: 10 }], totalVolume: 500, estimated1RM: 120, isCompound: true }], overallRPE: 10, recoveryBefore: 50, split: 'PL' } as WorkoutLog],
+      historyWorkouts: [{ id: 'w', date: D2, duration: 60, exercises: [{ id: 'e', date: D2, exerciseId: 'bench', exerciseName: 'Жим лёжа', sets: [{ weight: 100, reps: 5, rir: 0, rpe: 10 }], totalVolume: 500, estimated1RM: 120, isCompound: true }], overallRPE: 10, recoveryBefore: 50, split: 'PL' } as WorkoutLog],
       plannedExercises: [{ name: 'Жим лёжа', plannedWeight: 90, plannedReps: 5, plannedSets: 3, plannedRir: 3, isMain: true }],
     });
     expect(result.perExercise.get('Жим лёжа')!.adjustedRir).toBe(4);
   });
 
   it('4.6 non-main diary exercise does not receive plateau warning', () => {
-    const history = [1, 2, 3].map((n) => ({ id: `w${n}`, date: `2026-07-${String(n).padStart(2, '0')}`, duration: 60, exercises: [{ id: 'e', date: `2026-07-${String(n).padStart(2, '0')}`, exerciseId: 'curl', exerciseName: 'Сгибание рук', sets: [{ weight: 20, reps: 10, rir: 2, rpe: 8 }], totalVolume: 200, estimated1RM: 26.7, isCompound: false }], overallRPE: 8, recoveryBefore: 80, split: 'PL' })) as WorkoutLog[];
+    const history = [D3, D2, D1].map((d, i) => ({ id: `w${i}`, date: d, duration: 60, exercises: [{ id: 'e', date: d, exerciseId: 'curl', exerciseName: 'Сгибание рук', sets: [{ weight: 20, reps: 10, rir: 2, rpe: 8 }], totalVolume: 200, estimated1RM: 26.7, isCompound: false }], overallRPE: 8, recoveryBefore: 80, split: 'PL' })) as WorkoutLog[];
     const result = buildDiaryAutoreg({ historyWorkouts: history, plannedExercises: [{ name: 'Сгибание рук', plannedWeight: 20, plannedReps: 10, plannedSets: 3, plannedRir: 2, isMain: false }] });
     expect(result.plateauWarnings).toEqual([]);
   });
@@ -92,12 +114,13 @@ describe('PL-auto key coverage 4.1-4.15', () => {
     expect(out.topSetPctMultiplier).toBe(0.92);
   });
 
-  it('4.8 excludes sessions older than 90 days', () => {
-    const p = plan();
-    const ex = p.weeks.at(-1)!.days[0].exercises[0].name;
-    const old = workout('2020-01-01', ex, [{ weightKg: 300, reps: 5, rir: 0 }]);
-    const feedback = computePLPlanFeedback(p, [old]);
-    expect(feedback.find(x => x.planExerciseName === ex)!.last).toBeNull();
+  it('4.8 excludes sessions older than 90 days (инвариант окна — на прод-функции findLastFact)', () => {
+    // Раньше проверялось через удалённый lms-progression-feedback; инвариант
+    // тот же и живёт в diary-autoreg.findLastFact (90-дневное окно).
+    const old = log('2020-01-01', 'Жим лёжа', [{ weight: 300, reps: 5, rir: 0 }]);
+    expect(findLastFact([old], 'Жим лёжа')).toBeNull();
+    const fresh = log(localIsoDateOffset(-10), 'Жим лёжа', [{ weight: 100, reps: 5, rir: 2 }]);
+    expect(findLastFact([fresh], 'Жим лёжа')).not.toBeNull();
   });
 
   it('4.9 applies mode mismatch penalties for natural+peak, pct+peak, on_course+endurance', () => {
@@ -110,18 +133,82 @@ describe('PL-auto key coverage 4.1-4.15', () => {
     expect(peakNatural.score).toBeLessThan(peakPct.score + 6);
   });
 
-  it('4.10 keeps the highest e1RM across repeated sessions', () => {
-    const p = plan();
-    const ex = p.weeks.at(-1)!.days[0].exercises[0].name;
-    const feedback = computePLPlanFeedback(p, [
-      workout('2026-07-20', ex, [{ weightKg: 80, reps: 5, rir: 2 }]),
-      workout('2026-07-21', ex, [{ weightKg: 82, reps: 1, rir: 1 }]),
-    ]);
-    expect(feedback.find(x => x.planExerciseName === ex)!.last!.e1rm).toBe(93);
+  it('4.10 keeps the highest e1RM across repeated sessions (прод-функция findLastFact)', () => {
+    const ex = 'Жим лёжа';
+    const fact = findLastFact([
+      log(D14, ex, [{ weight: 80, reps: 5, rir: 2 }]),
+      log(D13, ex, [{ weight: 82, reps: 1, rir: 1 }]),
+    ], ex);
+    expect(fact).not.toBeNull();
+    // 80×5 (≈93.3) выше 82×1 (≈84.7) — берётся лучший e1RM, а не последний по дате.
+    expect(Math.round(fact!.e1RM)).toBe(93);
   });
 
   it('4.11 calculates tonnage as Σ(weight × reps × sets) × mnosz', async () => {
     expect(calcTonnage({ name: 'x', group: 'ЖМ', coef: 1, mnosz: 1.5, pm: 100, sets: [{ weight: 80, reps: 5, sets: 3 }, { weight: 60, reps: 10, sets: 2 }] })).toBe(3600);
+  });
+
+  // P2-2: вклад упражнений в группу объёма (причина перебора), без мелких порогов.
+  it('4.12b вклад упражнений сходится с объёмом группы на пиковой неделе', () => {
+    const p = plan();
+    const lms = getPLVolumeLandmarks(p.weeks, 'intermediate');
+    const bd = getPLVolumeBreakdown(p.weeks);
+    expect(bd.peakWeek).toBe(lms[0].peakWeek);
+    expect(bd.rows.length).toBeGreaterThan(0);
+    for (const row of lms) {
+      const sum = bd.rows.filter(r => r.group === row.group).reduce((n, r) => n + r.sets, 0);
+      expect(sum).toBe(row.sets);
+    }
+    // Внутри группы строки идут по убыванию подходов, доли в сумме ≈ 100 %.
+    const byGroup = new Map<string, number>();
+    for (const r of bd.rows) byGroup.set(r.group, (byGroup.get(r.group) || 0) + r.sharePct);
+    for (const [, share] of byGroup) expect(Math.abs(share - 100)).toBeLessThanOrEqual(2);
+    for (const g of new Set(bd.rows.map(r => r.group))) {
+      const sets = bd.rows.filter(r => r.group === g).map(r => r.sets);
+      expect([...sets].sort((a, b) => b - a)).toEqual(sets);
+    }
+  });
+
+  // P2-2 (вариант «а», согласован): композиты раскладываются по МЫШЦАМ пропорционально.
+  it('4.12c по мышцам: сумма сходится с группами, композитных ключей нет', () => {
+    const p = plan();
+    const byMuscle = getPLVolumeLandmarksByMuscle(p.weeks, 'intermediate');
+    const byGroup = getPLVolumeLandmarks(p.weeks, 'intermediate');
+    expect(byMuscle.length).toBeGreaterThan(0);
+    // Композитные ключи (legs/arms/shoulders) в разбивке запрещены: их порог —
+    // сумма подгрупп, вместе с подгруппами это дало бы двойной счёт.
+    expect(byMuscle.every(r => !['legs', 'arms', 'shoulders'].includes(r.group))).toBe(true);
+    const sumMuscle = byMuscle.reduce((n, r) => n + r.sets, 0);
+    const sumGroup = byGroup.reduce((n, r) => n + r.sets, 0);
+    // Пропорции сохраняют объём: расхождение — только округление до 0.1 сета.
+    expect(Math.abs(sumMuscle - sumGroup)).toBeLessThanOrEqual(0.6);
+  });
+
+  it('4.12d присед: 10 сетов → квадрицепс 6 / бицепс бедра 4 (разбивка 60/40)', () => {
+    const wk = {
+      week: 1, pmRow: {}, days: [{ exercises: [
+        { name: 'Присед', group: 'Ноги', workSets: [{ pct: 0.8, reps: 5, sets: 10, weight: 100, rir: 2 }] },
+      ] }],
+    } as never;
+    const rows = getPLVolumeLandmarksByMuscle([wk], 'intermediate');
+    const sets = (g: string) => rows.find(r => r.group === g)?.sets ?? 0;
+    expect(sets('quads')).toBeCloseTo(6, 5);
+    expect(sets('hamstrings')).toBeCloseTo(4, 5);
+    expect(rows.length).toBe(2);
+  });
+
+  it('4.12e румынская тяга (hinge): бицепс бедра 45 % / ягодицы 30 % / спина 25 %, без квадрицепса', () => {
+    const wk = {
+      week: 1, pmRow: {}, days: [{ exercises: [
+        { name: 'Румынская тяга', group: 'Ноги', workSets: [{ pct: 0.7, reps: 8, sets: 4, weight: 100, rir: 2 }] },
+      ] }],
+    } as never;
+    const rows = getPLVolumeLandmarksByMuscle([wk], 'intermediate');
+    const sets = (g: string) => rows.find(r => r.group === g)?.sets ?? 0;
+    expect(sets('hamstrings')).toBeCloseTo(1.8, 5);
+    expect(sets('glutes')).toBeCloseTo(1.2, 5);
+    expect(sets('back')).toBeCloseTo(1.0, 5);
+    expect(sets('quads')).toBe(0);
   });
 
   it('4.12 returns ordered landmarks with correct status', () => {

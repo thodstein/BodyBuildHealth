@@ -145,6 +145,28 @@ export interface PlayerExercise {
 }
 export interface PlayerDay { label: string; exercises: PlayerExercise[] }
 
+/**
+ * Убрать из сессии подход с указанным `setNumber` (перед повторной записью того же сета).
+ *
+ * `logSet` всегда добавляет подход в конец, а кнопка «✓» в плеере в залогированном
+ * состоянии означает ПРАВКУ (вес/повторы поменяли → записать заново). Без этой чистки
+ * повторное нажатие удваивало подход: объём, e1RM и PR считались по двум записям.
+ */
+export function withoutSetNumber(session: WorkoutSession, exerciseIndex: number, setNumber: number): WorkoutSession {
+  if (!session || !Array.isArray(session.exercises)) return session;
+  const exercises = session.exercises.map((e, i) => {
+    if (i !== exerciseIndex) return e;
+    const sets = (e.sets || []).filter(st => st.setNumber !== setNumber);
+    // Производные поля упражнения пересчитываем по остатку — иначе после правки
+    // веса вниз «лучший 1ПМ сессии» и объём оставались завышенными.
+    const best1RM = sets.reduce((m, st) => Math.max(m, st.weightKg * (1 + st.reps / 30)), 0);
+    const totalVolume = sets.reduce((s, st) => s + st.weightKg * st.reps, 0);
+    const avgRPE = sets.length ? Math.round(sets.reduce((s, st) => s + st.rpe, 0) / sets.length * 10) / 10 : 0;
+    return { ...e, sets, best1RM: Math.round(best1RM * 10) / 10, totalVolume, avgRPE };
+  });
+  return { ...session, exercises };
+}
+
 export interface SessionPlayerProps {
   days: PlayerDay[];
   weekNumber: number;
@@ -161,6 +183,9 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
   // Экран не гаснет mid-set. Внутри хука — гейт на APK; в TG/web no-op.
   useNativeWakeLock(phase === 'warmup' || phase === 'main' || phase === 'cooldown');
   const [session, setSession] = useState<WorkoutSession | null>(null);
+  // Последняя ошибка логирования подхода (вес 0 / сверх лимита) — показываем,
+  // когда движок отказал: раньше отказ проглатывался и подход «терялся» тихо.
+  const [logError, setLogError] = useState<{ key: string; msg: string } | null>(null);
   const [done, setDone] = useState<WorkoutSession | null>(null);
   // Незавершённая сессия из автосейва — живёт между закрытиями приложения.
   const [resumeFrom, setResumeFrom] = useState<ActiveSession | null>(() => {
@@ -796,7 +821,12 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
       const plannedTempo = tempoText(t.tempo);
       const a0 = actual[keyFor(ei, si)] || { weight: t.weight, reps: t.reps, rpe: 0 };
       const a = { ...a0, rir: a0.rir ?? (a0.rpe > 0 ? Math.max(0, 10 - a0.rpe) : t.rir) };
-      let s = logSet(session, ei, {
+      // Повторное «✓» по тому же сету = ПРАВКА подхода, а не второй подход:
+      // сначала убираем прежнюю запись с этим setNumber, потом пишем новую.
+      // (logSet всегда append — без этого двойной тап удваивал подход и объём.)
+      const alreadyLogged = !!actual[keyFor(ei, si)];
+      const base = alreadyLogged ? withoutSetNumber(session, ei, si + 1) : session;
+      const res = logSet(base, ei, {
         setNumber: si + 1,
         weightKg: a.weight,
         reps: a.reps,
@@ -811,15 +841,24 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
         plannedRir: t.rir,
          plannedTempo,
          actualTempo: a.tempo?.trim() || undefined,
-      }).session;
-     setSession(s);
-     setActual(prev => ({ ...prev, [keyFor(ei, si)]: a }));
-     // обновляем прогресс упражнения
-      setExerciseProgress(prev => {
-        const total = ex.targetSets.length;
-        const completed = Object.keys(prev).filter(k => k.startsWith(`${ei}_`) && prev[k]).length;
-        return { ...prev, [String(ei)]: { completed: Math.min(completed + 1, total), total } };
       });
+      // Валидация движка (вес 0, вес/повторы сверх лимитов) больше не глотается:
+      // иначе подход выглядел записанным, а в сессию не попадал.
+      if (!res.success) {
+        setLogError({ key: keyFor(ei, si), msg: res.reason || 'Подход не записан' });
+        return;
+      }
+      setLogError(null);
+      setSession(res.session);
+      setActual(prev => ({ ...prev, [keyFor(ei, si)]: a }));
+      // обновляем прогресс упражнения (только для ПЕРВОЙ записи сета)
+      if (!alreadyLogged) {
+        setExerciseProgress(prev => {
+          const total = ex.targetSets.length;
+          const completed = Object.keys(prev).filter(k => k.startsWith(`${ei}_`) && prev[k]).length;
+          return { ...prev, [String(ei)]: { completed: Math.min(completed + 1, total), total } };
+        });
+      }
       // авто-старт таймера отдыха после подхода
       if (autoStartRest) {
         startRestTimer(ei);
@@ -893,7 +932,9 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
      ex.targetSets.forEach((t, si) => {
        const plannedTempo = tempoText(t.tempo);
        const a = { weight: t.weight, reps: t.reps, rpe: Math.max(1, 10 - t.rir), rir: t.rir, tempo: plannedTempo };
-      s = logSet(s, ei, {
+      // Массовый пропуск тоже уважает валидацию движка: сет, который он отверг
+      // (вес 0 / сверх лимита), не помечается выполненным.
+      const r = logSet(s, ei, {
         setNumber: si + 1,
         weightKg: a.weight,
         reps: a.reps,
@@ -905,7 +946,9 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
         plannedRir: t.rir,
          plannedTempo,
          actualTempo: plannedTempo,
-      }).session;
+      });
+      if (!r.success) return;
+      s = r.session;
       newActual[keyFor(ei, si)] = a;
     });
     setSession(s);
@@ -1907,6 +1950,11 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
                                setActual(p => ({ ...p, [k]: { weight: t.weight, reps: t.reps, rpe: Math.max(1, 10 - t.rir), rir: t.rir, tempo: plannedTempo } }));
                               setTimeout(() => logOne(ei, si), 30);
                             }}>⚡ Быстро</button>
+                          )}
+                          {logError?.key === k && (
+                            <div role="alert" data-pl="log-error" style={{ width: '100%', fontSize: 10, fontWeight: 700, color: '#f87171', background: 'rgba(248,113,113,0.10)', border: '1px solid rgba(248,113,113,0.25)', borderRadius: 8, padding: '5px 8px' }}>
+                              ⚠ {logError.msg}
+                            </div>
                           )}
                         </div>
                       </div>

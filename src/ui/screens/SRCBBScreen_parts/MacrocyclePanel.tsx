@@ -17,6 +17,7 @@ import type { BBTrainingFocus } from '../../../engines/bb/bb-goal-types';
 import { buildPLTaperCurve, TAPER_MODE_LABELS, TAPER_WEIGHT_GOAL_LABELS, type TaperMode, type TaperWeightGoal } from '../../../engines/lms/lms-taper.engine';
 import { getCycleById, LMS_CYCLES, normalizeCycleDirection } from '../../../data/lms-cycles/lms-cycle-index';
 import { originalCycleWeeks } from '../../../engines/lms/lms-builder.engine';
+import { reanchorCompetitionWeeks } from '../../../engines/lms/pl-meet-registry.engine';
 import { periodLabelRu } from '../../../data/lms-cycles/period-labels';
 import { CARD, SMALL, H, IN, BTN, BTN_GHOST, BbCard } from '../TrainingScreen_parts/training-ui';
 import { PL_PHASE_VISUAL, BB_PHASE_VISUAL, COMPETITION_PRIORITY_VISUAL } from '../TrainingScreen_parts/phase-visual-tokens';
@@ -706,15 +707,21 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
       return;
     }
     try {
+      // Недели стартов хранятся как АБСОЛЮТНЫЕ недели прошлой сборки. План строится
+      // от «сегодня = неделя 1», поэтому перед сборкой пере-привязываем week к датам,
+      // иначе старый старт уедет в прошлое и buildMacrocycleMulti упадёт.
+      const anchored = competitions.length > 0
+        ? reanchorCompetitionWeeks(competitions, isoToday())
+        : competitions;
       if (isBB) {
         const m = buildBbMacrocycle({
           level: effLevel, totalWeeks,
-          competitions: competitions.length > 0 ? competitions : undefined,
+          competitions: anchored.length > 0 ? anchored : undefined,
           trainingFocus,
         });
         setBbMacro(m);
-      } else if (competitions.length > 0) {
-        const m = buildMacrocycleMulti(competitions, { level: effLevel, goal: effGoal, totalWeeks });
+      } else if (anchored.length > 0) {
+        const m = buildMacrocycleMulti(anchored, { level: effLevel, goal: effGoal, totalWeeks });
         setMacro(m);
       } else {
         const input: MacroInput = { level: effLevel, goal: effGoal, competitionWeek: compWeek, totalWeeks };
@@ -722,6 +729,9 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
         setMacro(m);
       }
       setBuildError(null);
+      // Если недели стартов пере-привязались — фиксируем их в состоянии, чтобы
+      // сохранённый he_pl_macro/bb-макро нёс те же значения, что и собранный план.
+      if (anchored.some((c, i) => c.week !== competitions[i]?.week)) setCompetitions(anchored);
       setSelectedBlockIdx(-1);
       setEditWeeks({});
       setCurrentWeekIdx(1);

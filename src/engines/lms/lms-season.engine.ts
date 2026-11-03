@@ -15,7 +15,7 @@
  */
 import { LMS_CYCLES, getCycleById, normalizeCycleDirection } from '../../data/lms-cycles/lms-cycle-index';
 import { cloneCycleTemplate, cloneCycleDay } from '../../data/lms-cycles/lms-cycle-clone';
-import { rankCycles, type LMSRankedCycle, type LMSSelectorInput } from './lms-selector.engine';
+import { rankCycles, plLevelRank, type LMSRankedCycle, type LMSSelectorInput } from './lms-selector.engine';
 import type { SRCycleTemplate, SRDaySpec } from '../../data/lms-cycles/lms-types';
 import { originalCycleWeeks, buildLMSPlan, getPLVolumeLandmarks, type LMSBuildInput, type LMSBuildOutput, type LMSPlanWeek, type LMSSeasonProvenance } from './lms-builder.engine';
 import { calcCycleMetrics, type SRExercise } from './lms-metrics.engine';
@@ -106,6 +106,14 @@ function sampleIndices(n: number, target: number): number[] {
   return arr;
 }
 
+/**
+ * Минимальная длительность цикла, при которой сжатие вообще имеет смысл.
+ * Единый канон для сезона и для планировщика «пролётов» между стартами
+ * (аудит 2026-11: там стояло 4 и 1 — одно и то же окно 2–3 нед
+ * обрабатывалось по-разному).
+ */
+export const PL_MIN_CYCLE_WEEKS = 4;
+
 export function fitCycleToWeeks(
   cycle: SRCycleTemplate,
   targetWeeks: number,
@@ -184,11 +192,9 @@ export function applyFitConsent(result: FitResult, consent: boolean): FitResult 
 
 // ─── Кандидаты под слот ─────────────────────────────────────────────────────────
 
-const LEVEL_ORDER = ['novice', 'II-KMS', 'II-MS', 'KMS-MS', 'intermediate', 'KMS-MSMK', 'MS-MSMK'];
-
+// Канон уровней — общий с селектором (см. PL_LEVEL_ORDER в lms-selector.engine).
 function levelRankOf(level: string): number {
-  const i = LEVEL_ORDER.indexOf(level);
-  return i < 0 ? 3 : i;
+  return plLevelRank(level);
 }
 
 /** Уровень близости направления: совпадение / совместимо / различие. */
@@ -325,7 +331,10 @@ export function planSeason(input: PLSeasonInput): PLSeasonPlan {
       notes.push(`⚠ слот ${i + 1} («${slot.label}»): нет подходящих циклов в базе — слот пропущен`);
       return;
     }
-    let fit = fitCycleToWeeks(chosen.cycle, slot.weeks, { minCycleFloor: 4 });
+    // Пол сегмента: не меньше канона цикла, но и не больше самого окна —
+    // иначе короткое окно (1–3 нед) молча выпадало из сезона (strict_skip без
+    // предложения), хотя согласование сжатия предусмотрено.
+    let fit = fitCycleToWeeks(chosen.cycle, slot.weeks, { minCycleFloor: Math.min(PL_MIN_CYCLE_WEEKS, Math.max(1, slot.weeks)) });
     // Любое изменение требует согласия
     if (fit.needsConsent) {
       const consent = input.consents?.[i] === true;

@@ -15,7 +15,7 @@
  */
 import { buildLMSPlan, originalCycleWeeks, type LMSBuildInput, type LMSPlanWeek } from './lms-builder.engine';
 import { buildPLSeasonPeaks, type MacroTaperOpts, type PLSeasonMeet } from './lms-macro-taper.engine';
-import { candidateCyclesForSlot, fitCycleToWeeks, applyFitConsent, type PLSeasonPeriod, type PLSeasonSlot } from './lms-season.engine';
+import { candidateCyclesForSlot, fitCycleToWeeks, applyFitConsent, PL_MIN_CYCLE_WEEKS, type PLSeasonPeriod, type PLSeasonSlot } from './lms-season.engine';
 import type { LMSRankedCycle, LMSSelectorInput } from './lms-selector.engine';
 import type { SRCycleTemplate } from '../../data/lms-cycles/lms-types';
 import type { PED } from '../bb/bb-ped-adaptation.engine';
@@ -62,6 +62,10 @@ export interface CompGapBuildResult {
   totalPlanWeeks: number;
   weeks: LMSPlanWeek[];   // финальные недели сезона (с пик-блоками buildPLSeasonPeaks)
   notes: string[];
+  /** Недели без тренировочного блока (позиции в календаре сохранены) — P2-6. */
+  emptyWeeks?: number[];
+  /** Сколько недель реально имеют тренировки (`totalPlanWeeks - emptyWeeks.length`). */
+  trainingWeeks?: number;
 }
 
 export interface CompGapBuildOptions extends CompGapOptions {
@@ -163,7 +167,7 @@ export function planBetweenCompetitions(
     if (!chosen) chosen = candidates[0];
 
     if (!chosen) {
-      notes.push(`⚠ Пролёт к «${meet.name}» (нед ${meet.weeksToStart}): нет подходящих циклов в базе — только поддерживающий объём`);
+      notes.push(`⚠ Пролёт к «${meet.name}» (нед ${meet.weeksToStart}): нет подходящих циклов в базе — недели до старта останутся БЕЗ тренировочного блока (выберите цикл вручную или сдвиньте старт)`);
       segments.push({
         meetId: meet.id, meetName: meet.name, meetWeek: meet.weeksToStart,
         startWeek, endWeek, availableWeeks: available,
@@ -173,7 +177,7 @@ export function planBetweenCompetitions(
       return;
     }
 
-    const rawFit = fitCycleToWeeks(chosen.cycle, Math.max(1, available), { minCycleFloor: 1 });
+    const rawFit = fitCycleToWeeks(chosen.cycle, Math.max(1, available), { minCycleFloor: Math.min(PL_MIN_CYCLE_WEEKS, Math.max(1, available)) });
     // Окна нет вовсе (до старта 0 недель). Раньше цикл здесь молча сжимался до
     // 1 недели — обход контракта «любое изменение раскладки только по согласию».
     // Теперь noWindow идёт ТЕМ ЖЕ согласованием, что и обычное сжатие.
@@ -246,7 +250,18 @@ export function planBetweenCompetitions(
 
   // 2) Собираем базовые недели сезона: каждый пролёт заполняется своим циклом
   //    (циклически), meet/post/тапер-недели будут перекрыты пик-блоком.
-  const placeholder = (week: number): LMSPlanWeek => ({ week, pmRow: {}, days: [], macroPhase: 'endurance' });
+  // P2-6: если у пролёта нет цикла, неделя не «притворяется» планом — она помечается
+  // `emptyBlock` с причиной (позиции стартов абсолютные, выбросить неделю нельзя).
+  const segReasonOf = (seg: GapSegment | undefined): string => {
+    if (!seg) return 'неделя вне сегментов сезона — цикл не определён';
+    if (seg.fitMode === 'strict_skip') {
+      return `сегмент к «${seg.meetName}» пропущен: окно ${seg.availableWeeks} нед не позволяет цикл (нужно согласие на изменение раскладки)`;
+    }
+    return `к «${seg.meetName}» не подобран цикл (окно ${seg.availableWeeks} нед)`;
+  };
+  const placeholder = (week: number, reason: string): LMSPlanWeek => ({
+    week, pmRow: {}, days: [], macroPhase: 'endurance', emptyBlock: true, blockNote: reason,
+  });
 
   // Предварительная сборка плана каждого пролёта ОДИН раз (детерминизм, без повторов).
   const segOutputs = new Map<number, LMSPlanWeek[]>();
@@ -289,7 +304,7 @@ export function planBetweenCompetitions(
       periodization: opts.periodization,
       ...(opts.recovery ?? {}),
     });
-    segOutputs.set(j, out.weeks.length > 0 ? out.weeks : [placeholder(1)]);
+    segOutputs.set(j, out.weeks.length > 0 ? out.weeks : [placeholder(1, segReasonOf(seg))]);
   });
 
   const baseWeeks: LMSPlanWeek[] = [];
@@ -297,10 +312,10 @@ export function planBetweenCompetitions(
     const segIdx = segments.findIndex((s) => w >= s.startWeek && w <= s.endWeek);
     const seg = segIdx >= 0 ? segments[segIdx] : segments[segments.length - 1];
     if (!seg || seg.fitWeeks == null || seg.fitWeeks < 1) {
-      baseWeeks.push(placeholder(w));
+      baseWeeks.push(placeholder(w, segReasonOf(seg)));
       continue;
     }
-    const fitCycleWeeks = segOutputs.get(segIdx >= 0 ? segIdx : segments.length - 1) ?? [placeholder(1)];
+    const fitCycleWeeks = segOutputs.get(segIdx >= 0 ? segIdx : segments.length - 1) ?? [placeholder(1, segReasonOf(seg))];
     const rel = (w - seg.startWeek) % fitCycleWeeks.length;
     const src = fitCycleWeeks[rel] ?? fitCycleWeeks[fitCycleWeeks.length - 1];
     baseWeeks.push({ ...src, week: w, macroPhase: 'endurance' });
@@ -320,7 +335,35 @@ export function planBetweenCompetitions(
     notes.push(`⛔ ${blocked.length} пролёт(ов) требуют согласия на изменение раскладки — сборка заблокирована до решения`);
   }
 
-  return { segments, totalPlanWeeks: weeks.length, weeks, notes };
+  // P2-6: честный учёт недель без тренировочного блока (иначе «итого N нед» врёт).
+  const emptyWeeks = weeks.filter(w => w.emptyBlock || w.days.length === 0).map(w => w.week);
+  if (emptyWeeks.length > 0) {
+    notes.push(`⚠ Без тренировочного блока: нед ${formatWeekRanges(emptyWeeks)} — выберите цикл для пролёта или сдвиньте старт.`);
+  }
+
+  return {
+    segments,
+    totalPlanWeeks: weeks.length,
+    weeks,
+    notes,
+    emptyWeeks,
+    trainingWeeks: weeks.length - emptyWeeks.length,
+  };
+}
+
+/** Сжать список недель в диапазоны: [2,3,4,7] → «2–4, 7». */
+function formatWeekRanges(weeks: number[]): string {
+  const sorted = [...weeks].sort((a, b) => a - b);
+  const parts: string[] = [];
+  let start = sorted[0];
+  let prev = sorted[0];
+  for (const w of sorted.slice(1)) {
+    if (w === prev + 1) { prev = w; continue; }
+    parts.push(start === prev ? `${start}` : `${start}–${prev}`);
+    start = w; prev = w;
+  }
+  if (start != null) parts.push(start === prev ? `${start}` : `${start}–${prev}`);
+  return parts.join(', ');
 }
 
 /** Обёртка для UI: сгенерировать сезон между стартами с авто/ручным выбором циклов. */

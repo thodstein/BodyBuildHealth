@@ -220,10 +220,19 @@ export function buildPLTaperCurve(opts: TaperCurveOptions): TaperCurvePoint[] {
 
   if (mode === 'pl') {
     const proto = getPeakingProtocol('pl');
-    const offset = Math.max(0, proto.weeks.length - n);
-    // Последние N недель протокола (финал всегда в списке). При n > 3 —
-    // крайняя (соревновательная) неделя повторяется (кламп, как в legacy).
-    const sel = Array.from({ length: n }, (_, i) => proto.weeks[Math.min(offset + i, proto.weeks.length - 1)]);
+    // Последние min(n, 3) недель протокола (финал всегда в списке). Если недель
+    // больше, чем в протоколе, первую (входную) неделю повторяем В НАЧАЛЕ:
+    // раньше повторялась финальная — две соревновательные недели подряд
+    // (объём/интенсивность дублировались, warmupOnly был только у последней).
+    const sel: typeof proto.weeks = [];
+    if (n <= proto.weeks.length) {
+      const offset = proto.weeks.length - n;
+      for (let i = 0; i < n; i++) sel.push(proto.weeks[offset + i]);
+    } else {
+      const extra = n - proto.weeks.length;
+      for (let i = 0; i < extra; i++) sel.push(proto.weeks[0]);
+      for (const w of proto.weeks) sel.push(w);
+    }
     return sel.map((pw, i) => ({
       week: i + 1,
       volumePct: r2(pw.volumePct * wGoalMult),

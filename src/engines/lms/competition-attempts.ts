@@ -1,12 +1,3 @@
-export interface CompetitionAttempts {
-  opener: number;
-  second: number;
-  third: number;
-  openerRange: [number, number];
-  secondRange: [number, number];
-  thirdRange: [number, number];
-}
-
 export type MeetStrategy = 'conservative' | 'balanced' | 'aggressive';
 
 export interface MeetAttemptSet {
@@ -38,20 +29,6 @@ export const MEET_STRATEGY_PCT_LABEL: Record<MeetStrategy, string> = {
 
 /** Проценты прикидов от опенера для разминочной последовательности (40→90%). */
 export const MEET_WARMUP_STEPS = [0.40, 0.55, 0.70, 0.80, 0.90];
-
-/** Suggested attempts from a tested max, rounded to the nearest 2.5 kg. */
-export function competitionAttempts(pm: number): CompetitionAttempts {
-  const round = (value: number) => Math.round(value / 2.5) * 2.5;
-  const range = (low: number, high: number): [number, number] => [round(pm * low), round(pm * high)];
-  return {
-    opener: round(pm * 0.875),
-    second: round(pm * 0.925),
-    third: round(pm * 1.0),
-    openerRange: range(0.85, 0.9),
-    secondRange: range(0.9, 0.95),
-    thirdRange: range(0.95, 1.05),
-  };
-}
 
 /**
  * Прикиды соревновательного дня по стратегии (как в тапер-калькуляторе):
@@ -127,4 +104,153 @@ export function warmupToOpener(opener: number, round = (v: number) => Math.round
     weight: round(opener * p),
     reps: p < 0.7 ? 5 : p < 0.85 ? 3 : 1,
   }));
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Фаза 6, п.1: адаптивные попытки соревновательного дня.
+//
+// Задача: опенер уже сделан/провален, а 2-ю и 3-ю надо выбрать с учётом факта,
+// не нарушая ПРАВИЛ соревнований. Правила (IPF и большинство федераций):
+//   • вес последующей попытки НЕ МОЖЕТ быть меньше веса предыдущей — только
+//     равен или больше (поэтому повтор проваленного веса разрешён, «сброс» — нет);
+//   • попыток ровно три; провал всех трёх — «баранка» (в этом движении нет
+//     зачётного результата, итог (тотал) не идёт).
+//
+// Доли ниже — ПРОЗРАЧНАЯ ЭВРИСТИКА (не физиология, не гарантия): после тяжёлой
+// («grind») попытки шаг вверх ограничивается 3 %, после лёгкой — 3 % вверх,
+// между попытками — стандартный шаг 2.5 кг (блины).
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Как попытка далась спортсмену (субъективно, только для ЗАЧЁТНОЙ попытки). */
+export type MeetAttemptEffort = 'easy' | 'normal' | 'grind';
+
+export interface MeetAttemptResult {
+  /** Номер попытки в подходе (1..3). */
+  attempt: 1 | 2 | 3;
+  /** Вес, который был на штанге. */
+  weight: number;
+  /** Зачёт (true) / баранка (false). */
+  made: boolean;
+  /** Субъективная тяжесть зачётной попытки. */
+  effort?: MeetAttemptEffort;
+}
+
+export interface MeetAdaptiveAdvice {
+  /** Рекомендация на 2-ю попытку (null — уже сделана/невозможна). */
+  second: number | null;
+  /** Рекомендация на 3-ю попытку (null — уже сделана/невозможна). */
+  third: number | null;
+  /** Человекочитаемые обоснования (в UI — построчно). */
+  notes: string[];
+  /** Попытки в движении исчерпаны без зачёта — итог (тотал) без этого движения. */
+  bombed: boolean;
+}
+
+const PLATE_STEP = 2.5;
+const roundPlate = (v: number): number => Math.round(v / PLATE_STEP) * PLATE_STEP;
+const stepUp = (base: number, pct: number): number => roundPlate(base * (1 + pct));
+
+/** Шаг вверх после тяжёлой попытки (grind) — 3 % от сделанного веса. */
+export const MEET_GRIND_STEP_PCT = 0.03;
+/** Шаг вверх после лёгкой попытки — 3 % от сделанного веса. */
+export const MEET_EASY_STEP_PCT = 0.03;
+
+/**
+ * Пересчёт 2-й/3-й попытки по факту предыдущих (стек: можно вызывать после
+ * каждой попытки — рекомендация для ещё не выполненных).
+ *
+ * `planned` — то, что собирались делать по стратегии (meetAttemptsFor).
+ * Уже выполненные попытки берутся из `results`; их веса — источник истины
+ * (в зачёт идёт фактический вес со штанги, а не план).
+ */
+export function adaptMeetAttempts(planned: MeetAttemptSet, results: MeetAttemptResult[]): MeetAdaptiveAdvice {
+  const notes: string[] = [];
+  const sorted = [...results]
+    .filter(r => r.attempt >= 1 && r.attempt <= 3 && Number.isFinite(r.weight) && r.weight > 0)
+    .sort((a, b) => a.attempt - b.attempt);
+  const first = sorted.find(r => r.attempt === 1);
+  const second = sorted.find(r => r.attempt === 2);
+  const third = sorted.find(r => r.attempt === 3);
+
+  // 3-я уже выполнена — рекомендаций больше нет.
+  if (third) {
+    return {
+      second: null,
+      third: null,
+      notes: [third.made
+        ? `3-я попытка зачтена: ${third.weight} кг — подход закрыт.`
+        : `3-я попытка не зачтена (${third.weight} кг) — в этом движении «баранка», итог (тотал) не идёт.`],
+      bombed: !third.made,
+    };
+  }
+
+  let secondPlan = planned.second > 0 ? planned.second : null;
+  let thirdPlan = planned.third > 0 ? planned.third : null;
+
+  if (!first) {
+    notes.push('Факта 1-й попытки нет — рекомендации по стратегии.');
+  } else if (!first.made) {
+    // Правило: вес нельзя уменьшать → повторяем тот же вес.
+    secondPlan = first.weight;
+    notes.push(`1-я попытка не зачтена (${first.weight} кг) — повторяем тот же вес: уменьшать по правилам нельзя.`);
+  } else if (first.effort === 'grind') {
+    const cap = stepUp(first.weight, MEET_GRIND_STEP_PCT);
+    const capped = Math.min(planned.second, cap);
+    secondPlan = capped;
+    notes.push(capped < planned.second
+      ? `Опенер дался тяжело — 2-я снижена до ${capped} кг (по стратегии было ${planned.second} кг).`
+      : `Опенер дался тяжело — 2-я без изменений (${capped} кг).`);
+    thirdPlan = Math.min(planned.third, stepUp(capped, MEET_EASY_STEP_PCT));
+  } else if (first.effort === 'easy') {
+    secondPlan = planned.second;
+    notes.push('Опенер лёгкий — 2-я по стратегии; при такой же лёгкости 3-ю можно добавить.');
+  } else {
+    secondPlan = planned.second;
+    notes.push('Опенер нормальный — 2-я по стратегии.');
+  }
+
+  if (second) {
+    if (!second.made) {
+      thirdPlan = second.weight;
+      notes.push(`2-я попытка не зачтена (${second.weight} кг) — 3-я на том же весе.`);
+    } else if (second.effort === 'grind') {
+      const capped = Math.min(planned.third, stepUp(second.weight, MEET_GRIND_STEP_PCT));
+      thirdPlan = capped;
+      notes.push(capped < planned.third
+        ? `2-я далась тяжело — 3-я снижена до ${capped} кг (по стратегии было ${planned.third} кг).`
+        : `2-я далась тяжело — 3-я без изменений (${capped} кг).`);
+    } else if (second.effort === 'easy' && planned.third <= second.weight) {
+      const up = stepUp(second.weight, MEET_EASY_STEP_PCT);
+      thirdPlan = up;
+      notes.push(`2-я легла легко — 3-я ${up} кг.`);
+    }
+  } else if (first?.made && !secondPlan) {
+    // Нет 2-й в плане (странный оверрайд) — предлагаем шаг от опенера.
+    secondPlan = stepUp(first.weight, MEET_EASY_STEP_PCT);
+    notes.push(`2-я в плане не задана — от опенера ${secondPlan} кг.`);
+  }
+
+  // Инвариант правил: вес не уменьшается относительно предыдущей попытки.
+  const monotonic = (value: number | null, prev: number, label: string): number | null => {
+    if (value === null) return null;
+    if (prev > 0 && value < prev) {
+      notes.push(`${label} приведена к весу предыдущей попытки (${prev} кг): уменьшать нельзя.`);
+      return prev;
+    }
+    return value;
+  };
+  if (second) {
+    secondPlan = null; // уже сделана
+    thirdPlan = monotonic(thirdPlan, second.weight, '3-я попытка');
+  } else {
+    secondPlan = monotonic(secondPlan, first?.weight ?? 0, '2-я попытка');
+  }
+  // Подсказка: 3-я не должна быть ниже 2-й (иначе бессмысленный повтор плана).
+  if (secondPlan !== null && thirdPlan !== null && thirdPlan < secondPlan) {
+    thirdPlan = secondPlan;
+    notes.push(`3-я поднята до веса 2-й (${secondPlan} кг).`);
+  }
+
+  const bombed = !!(second && !second.made && thirdPlan === null);
+  return { second: secondPlan, third: thirdPlan, notes, bombed };
 }

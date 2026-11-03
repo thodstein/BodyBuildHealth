@@ -4,7 +4,7 @@ import { rankCycles, explainSelection } from '../../engines/lms/lms-selector.eng
 import { buildLMSPlan, extractExercises, originalCycleWeeks, appendPLTaperWeeks, type LMSBuildOutput, type LMSBuildInput } from '../../engines/lms/lms-builder.engine';
 import { applyPLEffectiveOverlay } from '../../engines/lms/lms-effective-plan';
 import { applyMacroTaperToPLWeeks } from '../../engines/lms/lms-macro-taper.engine';
-import { mergeMeetRegistry, syncCompetitionsFromMeets } from '../../engines/lms/pl-meet-registry.engine';
+import { mergeMeetRegistry, syncCompetitionsFromMeets, dateFromWeeksToStart } from '../../engines/lms/pl-meet-registry.engine';
 import { recommendTaperConfig, type TaperCoachCtx } from '../../engines/lms/lms-taper-coach.engine';
 import { TAPER_MODE_LABELS, TAPER_WEIGHT_GOAL_LABELS, type TaperMode, type TaperWeightGoal } from '../../engines/lms/lms-taper.engine';
 import { type Lift, type WeakPoint } from '../../engines/lms/weakpoint-pl';
@@ -221,7 +221,7 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
     bw, setBw, targetBw, weeksToMeet,
     taperWeeksToAdd, setTaperWeeksToAdd, attemptStrategy, setAttemptStrategy,
     peakMode, setPeakMode, peakLayout, taperWeightGoal, setTaperWeightGoal,
-    taperFed, taperActualPm, taperPlannedPm,
+    taperFed, taperGear, taperActualPm, taperPlannedPm,
     taperAttemptOverride,
     mockMeetOn, setMockMeetOn, meetWeekOn, postMeetOn, setPostMeetOn,
     taperNote, taperPlan, setTaperPlan,
@@ -342,6 +342,17 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
     const saved = _plSaved?.autoRegMode;
     return saved === 'auto' || saved === 'diary' ? saved : 'off';
   });
+  // Авторегуляция ПРОГРЕССИИ ПМ (только ПМ) — независимая ось от авторегуляции весов/объёма/RIR.
+  // Персистится вместе с остальной ПЛ-сессией (аудит 2026-11, P1-3): раньше режим
+  // сбрасывался в 'off' после перезагрузки, и план собирался по-другому.
+  const [pmAutoRegMode, setPmAutoRegMode] = useState<PMAutoRegMode>(() => {
+    const saved = _plSaved?.plPmAutoRegMode;
+    return saved === 'auto' || saved === 'diary' ? saved : 'off';
+  });
+  // Режим периодизации: linear (линейная прогрессия) или dup (ежедневное варьирование зон).
+  const [periodizationMode, setPeriodizationMode] = useState<'linear' | 'dup'>(() => {
+    return _plSaved?.plPeriodizationMode === 'dup' ? 'dup' : 'linear';
+  });
   useEffect(() => {
     if (!builtSrc) return;
     setSrcWeek(current => Math.max(1, Math.min(builtSrc.weeks.length, current)));
@@ -363,11 +374,12 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
     localStorage.setItem('he_pl_session', JSON.stringify({
       ...base,
       ...taperDraft,
-             selectedCycleId, cycleWeeks, srcWeek, builtSrc, srcEdits, srcAdditions, autoRegMode, plLevel: level, plGoal: goal, plDir: dir, plBw: bw, plDays: days, pmSquat, pmBench, pmDead, exercisePMs, plTargetBw: targetBw, plWeeksToMeet: weeksToMeet, plTaperWeeksToAdd: taperWeeksToAdd, plTaperNote: taperNote, plAttemptStrategy: attemptStrategy, plMockMeet: mockMeetOn, plMeetWeek: meetWeekOn, plPostMeetOn: postMeetOn, plTaperFed: taperFed, plTaperActualPm: taperActualPm, plTaperPlannedPm: taperPlannedPm, plPeakMode: peakMode, plTaperWeightGoal: taperWeightGoal, plPeakLayout: peakLayout, plMeetList: meetList, plMainMeetId: mainMeetId, plPeakCycleId: peakCycleId,
+             selectedCycleId, cycleWeeks, srcWeek, builtSrc, srcEdits, srcAdditions, autoRegMode, plLevel: level, plGoal: goal, plDir: dir, plBw: bw, plDays: days, pmSquat, pmBench, pmDead, exercisePMs, plTargetBw: targetBw, plWeeksToMeet: weeksToMeet, plTaperWeeksToAdd: taperWeeksToAdd, plTaperNote: taperNote, plAttemptStrategy: attemptStrategy, plMockMeet: mockMeetOn, plMeetWeek: meetWeekOn, plPostMeetOn: postMeetOn, plTaperFed: taperFed, plTaperGear: taperGear, plTaperActualPm: taperActualPm, plTaperPlannedPm: taperPlannedPm, plPeakMode: peakMode, plTaperWeightGoal: taperWeightGoal, plPeakLayout: peakLayout, plMeetList: meetList, plMainMeetId: mainMeetId, plPeakCycleId: peakCycleId,
       plDeloadCfg, plDiagnosticWeakSide: diagnosticWeakSide,
       plMacroTaperMode: macroTaperMode, plMacroWeightGoal: macroWeightGoal, plMacroMockMeet: macroMockMeet, plMacroPostMeet: macroPostMeet,
+      plPmAutoRegMode: pmAutoRegMode, plPeriodizationMode: periodizationMode,
     }));
-  } catch { /* ignore */ } }, [selectedCycleId, cycleWeeks, srcWeek, builtSrc, srcEdits, srcAdditions, autoRegMode, level, goal, dir, bw, days, pmSquat, pmBench, pmDead, exercisePMs, targetBw, weeksToMeet, taperWeeksToAdd, taperNote, attemptStrategy, mockMeetOn, meetWeekOn, postMeetOn, taperFed, taperActualPm, taperPlannedPm, peakMode, taperWeightGoal, peakLayout, meetList, mainMeetId, peakCycleId, plDeloadCfg, diagnosticWeakSide, taperPlan, taperAttemptOverride, macroTaperMode, macroWeightGoal, macroMockMeet, macroPostMeet]);
+  } catch { /* ignore */ } }, [selectedCycleId, cycleWeeks, srcWeek, builtSrc, srcEdits, srcAdditions, autoRegMode, level, goal, dir, bw, days, pmSquat, pmBench, pmDead, exercisePMs, targetBw, weeksToMeet, taperWeeksToAdd, taperNote, attemptStrategy, mockMeetOn, meetWeekOn, postMeetOn, taperFed, taperGear, taperActualPm, taperPlannedPm, peakMode, taperWeightGoal, peakLayout, meetList, mainMeetId, peakCycleId, plDeloadCfg, diagnosticWeakSide, taperPlan, taperAttemptOverride, macroTaperMode, macroWeightGoal, macroMockMeet, macroPostMeet, pmAutoRegMode, periodizationMode]);
   // 🏁 Единый реестр стартов (слияние Фазы 2): канон — he_pl_macro.competitions,
   // plMeetList — надстройка ПЛ (федерация/ПМ/стратегия). Гидрация при монтировании
   // и по событию годового плана; обратная запись — при правках стартов в ПЛ.
@@ -464,8 +476,11 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
   const effSet = (w: number, di: number, ei: number, si: number, ws: { sets: number; reps: number; weight: number; pct: number; rir?: number }, exerciseName?: string) => {
     const ed = srcEdits[setKey(w, di, ei, si)];
     const pct = ed?.pct != null && ed.pct > 0 ? ed.pct : ws.pct;
+    // База пересчёта %→кг: сам подход, иначе ПМ упражнения. Деление на ws.pct=0
+    // давало Infinity/NaN и «вес 0» в карточке (аудит 2026-11).
+    const pmBase = ws.pct > 0 ? ws.weight / ws.pct : (exerciseName ? (exercisePMs[exerciseName] ?? 0) : 0);
     const editedWeight = ed?.pct != null && ed.pct > 0
-      ? Math.round((ws.weight / ws.pct) * ed.pct * 10) / 10
+      ? (pmBase > 0 ? Math.round(pmBase * ed.pct * 10) / 10 : ws.weight)
       : ed?.weight ?? ws.weight;
     const diaryAdj = exerciseName && autoRegMode === 'diary' ? diaryAutoreg?.perExercise.get(exerciseName) : undefined;
     const autoVol = autoRegMode === 'auto' ? finiteAuto(autoRegResult.volumeMultiplier, 1) : 1;
@@ -477,7 +492,8 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
     const rir = Math.max(0, Math.min(6, peakAdjust ? peakAdjust.rirTarget : baseRir + bridgeRir + autoRir + diaryRir));
     const hasManualWeight = ed?.pct != null || ed?.weight != null;
     const outputWeight = hasManualWeight ? editedWeight : diaryAdj?.adjustedWeight ?? editedWeight;
-    return { sets, reps: ed?.reps ?? ws.reps, weight: outputWeight * autoWeight, pct, rir };
+    // Ручной вес — последнее слово: авторегуляция его не перемасштабирует.
+    return { sets, reps: ed?.reps ?? ws.reps, weight: hasManualWeight ? outputWeight : outputWeight * autoWeight, pct, rir };
   };
 
   // U5: добавление упражнений из каталога (536) в день плана
@@ -793,12 +809,16 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
       fatigue: linked.readiness?.fatigue ?? 30,
       acwr: acwrData,
       recentSessions: loadSRPESessions(),
-      meetDate: isoAddDays(isoToday(), Math.max(0, weeksToMeet * 7)),
+      // Канон недель: старт в неделе N = начало недели N (today + (N−1)×7).
+      meetDate: dateFromWeeksToStart(Math.max(1, Math.round(weeksToMeet || 1)), isoToday()),
       currentWeight: bw,
       targetWeight: targetBw,
       actualPm: Object.fromEntries(Object.entries(taperActualPm).filter(([, v]) => v > 0)),
       plannedPm: Object.fromEntries(Object.entries(taperPlannedPm).filter(([, v]) => v > 0)),
-      forecastPm: lastWk?.pmRow ?? undefined,
+      // База прогноза — ПМ НАЧАЛА блока (текущий), а не последней недели:
+      // последняя неделя уже спрогнозирована, и движок продлевает базу темпом
+      // до старта → двойной счёт «план достижим» при отставании (аудит 2026-11).
+      forecastPm: (builtSrc?.weeks[0]?.pmRow ?? lastWk?.pmRow) ?? undefined,
       weeksToMeet,
       weeklyK: builtSrc?.template?.meta?.correctionPct ?? 0.005,
     };
@@ -917,10 +937,6 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
   const diarySessions = useMemo(() => loadSessions(), []);
   // P12-wire #2: проф-авторегуляция плана — 3 режима (off/auto/diary)
   const autoRegOn = autoRegMode !== 'off';
-  // Авторегуляция ПРОГРЕССИИ ПМ (только ПМ) — независимый переключатель от авторегуляции весов/объёма/RIR.
-  const [pmAutoRegMode, setPmAutoRegMode] = useState<PMAutoRegMode>('off');
-  // Режим периодизации: linear (линейная прогрессия) или dup (ежедневное варьирование зон).
-  const [periodizationMode, setPeriodizationMode] = useState<'linear' | 'dup'>('linear');
   const acwrData = useMemo(() => {
     const srpe = loadSRPESessions();
     if (srpe.length < 2) return { ratio: 1.0, zone: 'optimal' as const };

@@ -67,6 +67,19 @@ export function isoToIcsDate(iso: string): string | null {
   return `${m[1]}${m[2]}${m[3]}`;
 }
 
+/** DTSTAMP ICS из даты события (детерминированно, без «сегодняшней» даты в файле). */
+function icsStamp(dateIcs: string): string {
+  return `${dateIcs}T000000Z`;
+}
+
+/** Стабильный UID события: повторный экспорт не дублирует события в календаре. */
+function icsUid(dateIcs: string, summary: string): string {
+  const s = `${dateIcs}|${summary}`;
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+  return `plseason-${dateIcs}-${h.toString(36)}@bodybuildhealth`;
+}
+
 /** ICS-дата + 1 день (DTEND эксклюзивен по стандарту). */
 function icsDatePlusOne(ics: string): string | null {
   if (!/^\d{8}$/.test(ics)) return null;
@@ -120,6 +133,10 @@ export function buildPLSeasonIcs(
     if (!ds || !de) return;
     lines.push(
       'BEGIN:VEVENT',
+      // UID/DTSTAMP обязательны по RFC 5545: без них Outlook отклоняет или
+      // схлопывает события при повторном импорте (аудит 2026-11, P2-3).
+      `UID:${icsUid(ds, icsEscape(summary))}`,
+      `DTSTAMP:${icsStamp(ds)}`,
       `SUMMARY:${icsEscape(summary)}`,
       `DTSTART;VALUE=DATE:${ds}`,
       `DTEND;VALUE=DATE:${de}`,

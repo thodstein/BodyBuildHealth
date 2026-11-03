@@ -118,7 +118,15 @@ export function mergeMeetRegistry(input: MergeMeetRegistryInput): MergeMeetRegis
       usedEventIds.add(ev.id);
       // Гармонизация канона со стартом ПЛ (имя/дата/приоритет).
       const date = dateForCompetition(ev, todayIso) ?? dateFromWeeksToStart(legacy.weeksToStart, todayIso);
-      const week = macroWeekForDateIso(date, todayIso);
+      // `week` — АБСОЛЮТНАЯ неделя годового плана: фиксируется при создании/правке старта
+      // и НЕ пересчитывается от «сегодня». Раньше здесь стоял macroWeekForDateIso(date, todayIso),
+      // из-за чего каждые сутки старт «переезжал» на неделю раньше относительно сохранённого
+      // годового плана (buildMacrocycleMulti трактует week как неделю макроцикла).
+      // Пере-привязка к новой неделе 1 делается только при ПЕРЕСБОРКЕ плана
+      // (reanchorCompetitionWeeks в MacrocyclePanel.build).
+      const week = Number.isFinite(ev.week) && ev.week >= 1
+        ? Math.max(1, Math.round(ev.week))
+        : macroWeekForDateIso(date, todayIso);
       const priority: CompetitionEvent['priority'] = legacy.id === input.mainMeetId || ev.id === input.mainMeetId ? 'A' : (ev.priority ?? 'B');
       const nextName = legacy.name || ev.name;
       if (ev.name !== nextName || ev.date !== date || ev.week !== week || ev.priority !== priority) {
@@ -153,6 +161,12 @@ export function mergeMeetRegistry(input: MergeMeetRegistryInput): MergeMeetRegis
   for (const ev of competitions) {
     if (usedEventIds.has(ev.id)) continue;
     const date = dateForCompetition(ev, todayIso);
+    // Событие без валидной недели (0/NaN — следы ранних версий) получает её один раз
+    // от своей даты: buildMacrocycleMulti отвергает week < 1 целиком.
+    if (date && !(Number.isFinite(ev.week) && ev.week >= 1)) {
+      const week = macroWeekForDateIso(date, todayIso);
+      if (ev.week !== week) { ev.week = week; changed = true; notes.push(`📅 «${ev.name}»: неделя старта рассчитана по дате`); }
+    }
     // Контракт недель: старт в неделе ev.week ⇔ ev.week недель до старта.
     const weeksToStart = date ? weeksToStartFromDate(date, todayIso) : (Number.isFinite(ev.week) ? Math.max(1, Math.round(ev.week)) : 1);
     meets.push({ id: ev.id, name: ev.name, weeksToStart, ...DEFAULT_EXTRAS, plannedPm: {}, strategy: 'balanced' });
@@ -198,4 +212,27 @@ export function syncCompetitionsFromMeets(
     });
   }
   return result;
+}
+
+/**
+ * Пере-привязка недель событий к новой точке отсчёта (неделя 1 = `todayIso`).
+ *
+ * Нужна ровно в момент ПЕРЕСБОРКИ годового плана: `buildMacrocycleMulti` трактует
+ * `week` как неделю макроцикла от недели 1, а сохранённые недели зафиксированы на
+ * дату прошлой сборки. Без пере-привязки старт «уезжает» в прошлое и сборка падает
+ * («Невозможно уместить...»). Гидрация реестра (mergeMeetRegistry) этого НЕ делает —
+ * иначе недели дрейфовали бы каждые сутки.
+ *
+ * События без валидной даты возвращаются как есть.
+ */
+export function reanchorCompetitionWeeks(
+  competitions: CompetitionEvent[],
+  todayIso: string,
+): CompetitionEvent[] {
+  return (Array.isArray(competitions) ? competitions : []).map(c => {
+    const date = c && c.date && toLocalNoonUtc(c.date) != null ? c.date.slice(0, 10) : null;
+    if (!date) return c;
+    const week = macroWeekForDateIso(date, todayIso);
+    return week === c.week ? c : { ...c, week };
+  });
 }

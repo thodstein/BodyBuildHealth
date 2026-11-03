@@ -16,10 +16,13 @@ const LIFT_RU: Record<string, string> = { squat: 'присед', bench: 'жим'
 export const PLToolsCard: React.FC<{ level: string; days: number; totalSets: Record<string, number>; e1RM: Record<string, number>; hrvRatio?: number; acwr?: number; rpeDelta?: number; bodyWeight?: number; sex?: string; onApplyFrequency?: (plans: ReturnType<typeof planFrequency>[]) => void; plan?: { weeks: Array<{ week: number; days: Array<{ exercises: Array<{ workSets: Array<{ weight: number; reps: number; sets: number; pct: number }> }> }> }> } | null }> = ({ level, days, totalSets, e1RM, hrvRatio, acwr, rpeDelta, bodyWeight, sex, onApplyFrequency, plan }) => {
   const freqs = useMemo(() => Object.keys(totalSets).map(m => planFrequency(m, totalSets[m], days, level)), [totalSets, days, level]);
   const [lift, setLift] = useState<VBTLift>('squat');
+  const e1rmForLift = e1RM[lift];
+  const hasE1rm = typeof e1rmForLift === 'number' && Number.isFinite(e1rmForLift) && e1rmForLift > 0;
   const attempts = useMemo(() => {
-    const e = e1RM[lift] ?? 180;
-    return velocityAttempts(e, lift, 'balanced');
-  }, [e1RM, lift]);
+    // Без фактического 1ПМ НЕ подставляем «180 кг»: это выдуманные прикиды.
+    // velocityAttempts с 0 вернёт нули — UI ниже прямо говорит «нет данных».
+    return velocityAttempts(hasE1rm ? e1rmForLift : 0, lift, 'balanced');
+  }, [hasE1rm, e1rmForLift, lift]);
   const light = useMemo(() => trafficLight(hrvRatio ?? null, acwr ?? 1.0, rpeDelta ?? 0), [hrvRatio, acwr, rpeDelta]);
   // P2-3/§10.3: имя атлета персистится (he_opl_name читается при монтировании);
   // история — больше не write-only: сохранённые старты читаются и рисуются DOTS.
@@ -51,7 +54,7 @@ export const PLToolsCard: React.FC<{ level: string; days: number; totalSets: Rec
       <BbFoldCard icon="🏋️" accent="#a78bfa" title="OpenPowerlifting импорт" className="pl-tools-opl">
         <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
           <input value={oplName} onChange={e=>setOplName(e.target.value)} placeholder="Имя атлета" style={{ flex: 1, minWidth: 120, background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 6, color: '#fff', padding: '4px 8px', fontSize: 10 }} />
-          <button onClick={async()=>{ const r=await fetchOPLHistory(oplName); if(r.length){ setOplMeets(r); try{ localStorage.setItem('he_opl_history', JSON.stringify(r)); localStorage.setItem('he_opl_name', oplName); }catch{} setOplRes(`Найдено ${r.length} стартов — история DOTS ниже (локально в этом браузере)`); } else setOplRes(`Нет данных / не найдено`); }} style={{ padding: '4px 10px', borderRadius: 6, fontSize: 10, fontWeight: 700, background: '#a78bfa', color: '#000', border: 'none', cursor: 'pointer' }}>Найти</button>
+          <button onClick={async()=>{ try { const r=await fetchOPLHistory(oplName); if(r.length){ setOplMeets(r); try{ localStorage.setItem('he_opl_history', JSON.stringify(r)); localStorage.setItem('he_opl_name', oplName); }catch{} setOplRes(`Найдено ${r.length} стартов — история DOTS ниже (локально в этом браузере)`); } else setOplRes(`Нет данных / не найдено`); } catch (err) { setOplRes(`⚠ Не удалось загрузить: ${(err as Error)?.message || 'сеть недоступна'}`); } }} style={{ padding: '4px 10px', borderRadius: 6, fontSize: 10, fontWeight: 700, background: '#a78bfa', color: '#000', border: 'none', cursor: 'pointer' }}>Найти</button>
           {oplRes && <span style={{ fontSize: 10, color: '#fff' }}>{oplRes}</span>}
         </div>
         {oplMeets.length > 0 && (() => {
@@ -101,9 +104,15 @@ export const PLToolsCard: React.FC<{ level: string; days: number; totalSets: Rec
           ))}
         </div>
         <div style={{ fontSize: 10, lineHeight: 1.5 }}>
-          <div>Opener: <b>{attempts.opener.weight}кг</b> {attempts.opener.pct}% @ {attempts.opener.velocity} м/с — {attempts.opener.note}</div>
-          <div>Second: <b>{attempts.second.weight}кг</b> {attempts.second.pct}% @ {attempts.second.velocity} м/с</div>
-          <div>Third: <b>{attempts.third.weight}кг</b> {attempts.third.pct}% @ {attempts.third.velocity} м/с</div>
+          {hasE1rm ? (
+            <>
+              <div>Opener: <b>{attempts.opener.weight}кг</b> {attempts.opener.pct}% @ {attempts.opener.velocity} м/с — {attempts.opener.note}</div>
+              <div>Second: <b>{attempts.second.weight}кг</b> {attempts.second.pct}% @ {attempts.second.velocity} м/с</div>
+              <div>Third: <b>{attempts.third.weight}кг</b> {attempts.third.pct}% @ {attempts.third.velocity} м/с</div>
+            </>
+          ) : (
+            <div style={{ color: '#fbbf24' }}>Нет 1ПМ по «{LIFT_RU[lift]}» — прикиды не рассчитаны. Внесите ПМ или запишите подходы в дневник.</div>
+          )}
         </div>
       </BbCard>
       <BbCard icon="🚦" accent={light === 'red' ? '#ef4444' : light === 'yellow' ? '#f59e0b' : '#22c55e'}

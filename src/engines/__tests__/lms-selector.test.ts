@@ -1,7 +1,20 @@
 import { describe, it, expect } from 'vitest';
-import { rankCycles, selectBestCycle, explainSelection, type LMSSelectorInput } from '../lms/lms-selector.engine';
+import { rankCycles, explainSelection, plLevelRank, type LMSSelectorInput } from '../lms/lms-selector.engine';
 
 describe('rankCycles', () => {
+  it('канон уровней: intermediate ниже II-KMS, KMS-MS выше II-MS (аудит 2026-11)', () => {
+    // Раньше «intermediate» стоял между KMS-MS и KMS-MSMK: цикл среднего уровня
+    // выглядел «сложнее» цикла KMS и отбраковывался у сильных атлетов.
+    expect(plLevelRank('novice')).toBeLessThan(plLevelRank('intermediate'));
+    expect(plLevelRank('intermediate')).toBeLessThan(plLevelRank('II-KMS'));
+    expect(plLevelRank('II-KMS')).toBeLessThan(plLevelRank('II-MS'));
+    expect(plLevelRank('II-MS')).toBeLessThan(plLevelRank('KMS-MS'));
+    expect(plLevelRank('KMS-MSMK')).toBeLessThan(plLevelRank('MS-MSMK'));
+  });
+
+  it('неизвестный уровень не считается почти максимальным', () => {
+    expect(plLevelRank('нечто-своё')).toBeLessThan(plLevelRank('MS-MSMK'));
+  });
   it('возвращает непустой список для валидного input', () => {
     const ranked = rankCycles({ goal: 'strength', level: 'II-KMS', bodyWeight: 85, daysPerWeek: 3, direction: 'powerlifting', mode: 'natural' });
     expect(ranked.length).toBeGreaterThan(0);
@@ -62,23 +75,12 @@ describe('rankCycles', () => {
   });
 });
 
-describe('selectBestCycle', () => {
-  it('возвращает топ-1 цикл', () => {
-    const best = selectBestCycle({ goal: 'strength', level: 'II-KMS', direction: 'powerlifting' });
-    expect(best).not.toBeNull();
-    expect(best!.score).toBeGreaterThan(0);
-  });
-
-  it('возвращает null только если нет циклов (невозможно — LMS_CYCLES непустой)', () => {
-    const best = selectBestCycle({ goal: 'mixed', level: 'MS-MSMK' });
-    expect(best).not.toBeNull();
-  });
-});
-
 describe('explainSelection', () => {
   it('возвращает человекочитаемую сводку', () => {
-    const best = selectBestCycle({ goal: 'strength', level: 'II-KMS', direction: 'powerlifting' });
-    const text = explainSelection(best!);
+    const ranked = rankCycles({ goal: 'strength', level: 'II-KMS', direction: 'powerlifting' });
+    const best = ranked[0];
+    expect(best).toBeTruthy();
+    const text = explainSelection(best);
     expect(text).toContain('скоринг');
     expect(text.length).toBeGreaterThan(20);
   });

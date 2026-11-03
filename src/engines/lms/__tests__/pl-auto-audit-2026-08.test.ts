@@ -9,6 +9,7 @@ import { CYCLE_04 } from '../../../data/lms-cycles/cycle-04';
 import { CYCLE_09K } from '../../../data/lms-cycles/cycle-09k';
 import { expandCycleWeeks } from '../lms-to-pl';
 import type { WorkoutLog } from '../../../core/types';
+import { localIsoDateOffset } from '../../../core/local-date';
 import type { SRCycleTemplate } from '../../../data/lms-cycles/lms-types';
 
 const pmMap = { 'Присед': 150, 'Жим лежа': 110, 'Становая тяга': 180 };
@@ -138,6 +139,8 @@ describe('P1-2: injectPLWeakPoints light-day = min volume', () => {
 
 // ── P1-3: diary-autoreg nameMatch lift-aware ──
 describe('P1-3: diary-autoreg nameMatch excludes false positives', () => {
+  // Дата внутри 90-дневного окна findLastFact (иначе тест «протухает» по календарю).
+  const RECENT = localIsoDateOffset(-14);
   function makeWorkout(date: string, name: string, weight: number, reps: number, rpe: number): WorkoutLog {
     return {
       id: `w_${date}`, date, duration: 60,
@@ -151,7 +154,7 @@ describe('P1-3: diary-autoreg nameMatch excludes false positives', () => {
   }
 
   it('Жим лёжа does NOT match Жим стоя', () => {
-    const history = [makeWorkout('2026-08-01', 'Жим стоя', 60, 5, 8)];
+    const history = [makeWorkout(RECENT, 'Жим стоя', 60, 5, 8)];
     const result = buildDiaryAutoreg({
       historyWorkouts: history,
       plannedExercises: [{ name: 'Жим лёжа', plannedWeight: 80, plannedReps: 5, plannedSets: 3, plannedRir: 2, isMain: true }],
@@ -160,7 +163,7 @@ describe('P1-3: diary-autoreg nameMatch excludes false positives', () => {
   });
 
   it('Жим лёжа does NOT match Жим ногами', () => {
-    const history = [makeWorkout('2026-08-01', 'Жим ногами', 200, 10, 7)];
+    const history = [makeWorkout(RECENT, 'Жим ногами', 200, 10, 7)];
     const result = buildDiaryAutoreg({
       historyWorkouts: history,
       plannedExercises: [{ name: 'Жим лёжа', plannedWeight: 80, plannedReps: 5, plannedSets: 3, plannedRir: 2, isMain: true }],
@@ -169,7 +172,7 @@ describe('P1-3: diary-autoreg nameMatch excludes false positives', () => {
   });
 
   it('Становая тяга does NOT match Тяга штанги в наклоне', () => {
-    const history = [makeWorkout('2026-08-01', 'Тяга штанги в наклоне', 80, 8, 7)];
+    const history = [makeWorkout(RECENT, 'Тяга штанги в наклоне', 80, 8, 7)];
     const result = buildDiaryAutoreg({
       historyWorkouts: history,
       plannedExercises: [{ name: 'Становая тяга', plannedWeight: 140, plannedReps: 5, plannedSets: 3, plannedRir: 2, isMain: true }],
@@ -178,7 +181,7 @@ describe('P1-3: diary-autoreg nameMatch excludes false positives', () => {
   });
 
   it('Жим лёжа DOES match Жим лёжа (exact)', () => {
-    const history = [makeWorkout('2026-08-01', 'Жим лёжа', 90, 5, 8)];
+    const history = [makeWorkout(RECENT, 'Жим лёжа', 90, 5, 8)];
     const result = buildDiaryAutoreg({
       historyWorkouts: history,
       plannedExercises: [{ name: 'Жим лёжа', plannedWeight: 80, plannedReps: 5, plannedSets: 3, plannedRir: 2, isMain: true }],

@@ -8,8 +8,7 @@
 import { describe, it, expect } from 'vitest';
 import { pmForWeek, pmProgression, progressionRationale, type PMProgressionInput } from '../lms-progression.engine';
 import { detectLift, expandCycleWeeks } from '../lms-to-pl';
-import { computePLPlanFeedback, summarizePLFeedback } from '../lms-progression-feedback.engine';
-import { buildDiaryAutoreg, type DiaryAutoregInput } from '../../pro/diary-autoreg.engine';
+import { buildDiaryAutoreg, findLastFact, type DiaryAutoregInput } from '../../pro/diary-autoreg.engine';
 import { computePerMuscleACWR } from '../../bb/bb-progression-feedback.engine';
 import { buildMacrocycle, rebalanceMacrocycle, type Macrocycle } from '../macrocycle.engine';
 import { buildLMSPlan } from '../lms-builder.engine';
@@ -121,6 +120,19 @@ describe('P1-2: detectLift excludes OHP from bench', () => {
     expect(detectLift('Тяга гантели в наклоне', 'Спина')).not.toBe('dead');
   });
 
+  // Аудит 2026-11, P1-12: «тяги к себе» без слов-исключений получали ПМ становой.
+  it('«тяги к себе» (подбородок/узкий хват/Т-гриф) — не становая', () => {
+    expect(detectLift('Тяга к подбородку', 'Плечи')).not.toBe('dead');
+    expect(detectLift('Тяга узким хватом', 'Спина')).not.toBe('dead');
+    expect(detectLift('Тяга Т-грифа', 'Спина')).not.toBe('dead');
+    expect(detectLift('Тяга к лицу', 'Плечи')).not.toBe('dead');
+  });
+
+  it('«Тяга классическая/до колен» остаются становой (движение — тяга с пола)', () => {
+    expect(detectLift('Тяга классическая', 'Спина')).toBe('dead');
+    expect(detectLift('Тяга до колен', 'Спина')).toBe('dead');
+  });
+
   it('classifies squat correctly', () => {
     expect(detectLift('Присед со штангой', '')).toBe('squat');
   });
@@ -164,73 +176,34 @@ describe('P1-4: expandCycleWeeks preserves weeks[0]', () => {
   });
 });
 
-// ── P1-3: fuzzy match fix ──
-describe('P1-3: fuzzy match logic', () => {
-  function makeSession(exerciseName: string, date: string, sets: { weight: number; reps: number; rir: number }[]): WorkoutSession {
-    return {
-      sessionId: `s_${date}`, date, startTime: '10:00', endTime: '11:00', durationMin: 60, focus: 'test',
+// ── P1-3: fuzzy match жима в «план vs факт» ──
+// Проверки удалены вместе с lms-progression-feedback.engine.ts (мёртвый модуль
+// без прод-вызовов). Прод-путь сопоставления «план ↔ факт» — diary-autoreg/findLastFact,
+// его окно и матчинг покрыты pm-autoreg.test.ts и pl-auto-key-tests-coverage.test.ts.
+
+
+// ── P1-5: top set выбирается по e1RM, не по весу ──
+describe('P1-5: top set by e1RM not weight', () => {
+  it('выбирает сет с наибольшим e1RM, а не с наибольшим весом', () => {
+    // Инвариант живёт в прод-функции findLastFact: 80×5 (e1RM≈93) тяжелее по
+    // e1RM, чем 82×1 (e1RM≈84.7), хотя вес меньше.
+    const exName = 'Присед';
+    const session: WorkoutLog = {
+      id: 'w1', date: daysAgo(10), duration: 60, overallRPE: 8, recoveryBefore: 70, split: 'PL',
       exercises: [{
-        exerciseId: exerciseName.toLowerCase(), exerciseName, pattern: 'squat', muscleGroup: 'legs', order: 1,
-        sets: sets.map((s, i) => ({ setNumber: i + 1, weightKg: s.weight, reps: s.reps, rpe: 10 - s.rir, rir: s.rir, isPR: false, notes: '' })),
-        totalVolume: sets.reduce((sum, s) => sum + s.weight * s.reps, 0),
-        best1RM: 0, avgRPE: 8,
-      }],
-      totalVolume: 0, totalSets: sets.length, totalReps: sets.reduce((s, x) => s + x.reps, 0), avgIntensity: 8, prCount: 0, notes: '', weekNumber: 1, mesocycleWeek: 1,
-    };
-  }
-
-  it('matches «Жим лёжа» with «Жим штанги лёжа» (was false negative)', () => {
-    const plan = buildLMSPlan({ template: CYCLE_01, pmMap, fallbackPm: 80, mode: 'natural', weeksOverride: 12 });
-    // The fuzzy match should now work: "жим лёжа" ↔ "жим штанги лёжа" share 2 tokens (жим, лёжа)
-    const sessions = [makeSession('Жим штанги лёжа', daysAgo(10), [{ weight: 90, reps: 5, rir: 2 }])];
-    const feedback = computePLPlanFeedback(plan, sessions);
-    const benchFeedback = feedback.find(f => /жим.*лёж/i.test(f.planExerciseName));
-    if (benchFeedback) {
-      expect(benchFeedback.last).not.toBeNull();
-      expect(benchFeedback.recommendation.source).toBe('fact');
-    }
-  });
-
-  it('does NOT match generic «жим» with «Жим гантелей стоя» (was false positive)', () => {
-    const plan = buildLMSPlan({ template: CYCLE_01, pmMap, fallbackPm: 80, mode: 'natural', weeksOverride: 12 });
-    // "жим" alone (1 token, length <= 2 when filtered) should NOT match "жим гантелей стоя"
-    const sessions = [makeSession('Жим гантелей стоя', daysAgo(10), [{ weight: 40, reps: 8, rir: 2 }])];
-    const feedback = computePLPlanFeedback(plan, sessions);
-    // No exercise in the plan should incorrectly match the OHP session
-    const matchedFact = feedback.find(f => f.last != null && f.last.topWeight === 40);
-    // Either no match at all, or if matched, it should be a proper OHP exercise (not bench)
-    if (matchedFact) {
-      expect(matchedFact.group.toLowerCase()).not.toBe('chest');
-    }
-  });
-});
-
-// ── P1-5: topSetOf selects by e1RM ──
-describe('P1-5: topSetOf by e1RM not weight', () => {
-  it('selects set with highest e1RM, not highest weight', () => {
-    // This is tested indirectly via computePLPlanFeedback: a session with 80kg×5 (e1RM=88.3)
-    // and 82kg×1 (e1RM=82) should use the 80kg set as the "top set".
-    const plan = buildLMSPlan({ template: CYCLE_01, pmMap, fallbackPm: 80, mode: 'natural', weeksOverride: 12 });
-    const lastDay = plan.weeks[plan.weeks.length - 1].days[0];
-    const exName = lastDay.exercises[0].name;
-    const session: WorkoutSession = {
-      sessionId: 's1', date: daysAgo(10), startTime: '10:00', endTime: '11:00', durationMin: 60, focus: 'test',
-      exercises: [{
-        exerciseId: exName.toLowerCase(), exerciseName: exName, pattern: 'squat', muscleGroup: 'legs', order: 1,
+        id: 'e1', date: daysAgo(10), exerciseId: exName, exerciseName: exName,
         sets: [
-          { setNumber: 1, weightKg: 80, reps: 5, rpe: 7, rir: 3, isPR: false, notes: '' },  // e1RM = 88.3
-          { setNumber: 2, weightKg: 82, reps: 1, rpe: 9, rir: 1, isPR: false, notes: '' },  // e1RM = 82
+          { weight: 80, reps: 5, rir: 3, rpe: 7 },  // e1RM ≈ 93.3
+          { weight: 82, reps: 1, rir: 1, rpe: 9 },  // e1RM ≈ 84.7
         ],
-        totalVolume: 482, best1RM: 0, avgRPE: 8,
+        totalVolume: 482, estimated1RM: 0, isCompound: true,
       }],
-      totalVolume: 482, totalSets: 2, totalReps: 6, avgIntensity: 8, prCount: 0, notes: '', weekNumber: 1, mesocycleWeek: 1,
     };
-    const feedback = computePLPlanFeedback(plan, [session]);
-    const f = feedback.find(fb => fb.planExerciseName === exName);
-    expect(f).toBeDefined();
-    expect(f!.last).not.toBeNull();
-    // e1RM should be based on 80kg×5 (e1RM≈88.3), not 82kg×1 (e1RM=82)
-    expect(f!.last!.e1rm).toBeGreaterThan(85);
+    const fact = findLastFact([session], exName);
+    expect(fact).not.toBeNull();
+    expect(fact!.lastSet.weight).toBe(80);
+    expect(fact!.lastSet.reps).toBe(5);
+    expect(fact!.e1RM).toBeGreaterThan(90);
   });
 });
 

@@ -66,6 +66,27 @@ describe('MyTrainingTab (перенесён в дневник)', () => {
     expect(saved[0].exercises.length).toBe(1);
   });
 
+  it('многонедельный план: чипы недель и переключение недели (P0-4)', () => {
+    const plan = {
+      id: 'p_multi', name: 'PL Тестовый цикл', date: new Date().toISOString(),
+      exercises: [{ name: 'Присед', sets: 3, reps: 5, rir: 2 }],
+      weeksPlan: [
+        { week: 1, exercises: [{ name: 'Присед', sets: 3, reps: 5, rir: 2 }] },
+        { week: 2, exercises: [{ name: 'Жим лёжа', sets: 4, reps: 3, rir: 1 }] },
+      ],
+      weekCount: 2,
+    };
+    localStorage.setItem('myTrainingPlans', JSON.stringify([plan]));
+    render(<MyTrainingTab customExercises={[]} setCustomExercises={() => {}} />);
+    fireEvent.click(screen.getByText(/Планы/));
+    // В метаданных честное число недель (раньше показывалось только «1 упр.»)
+    expect(screen.getByText(/2 нед/)).toBeTruthy();
+    expect(screen.getAllByText(/Присед 3×5/).length).toBeGreaterThan(0);
+    fireEvent.click(screen.getByText('нед 2'));
+    expect(screen.getAllByText(/Жим лёжа 4×3/).length).toBeGreaterThan(0);
+    expect(screen.queryByText(/Присед 3×5/)).toBeNull();
+  });
+
   it('пустой список: кнопка сохранения скрыта (guard), ничего не пишется', () => {
     render(<MyTrainingTab customExercises={[]} setCustomExercises={() => {}} />);
     expect(screen.queryByRole('button', { name: /Сохранить план/ })).toBeNull();

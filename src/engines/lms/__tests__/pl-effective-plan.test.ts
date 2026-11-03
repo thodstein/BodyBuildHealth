@@ -97,4 +97,48 @@ describe('effective PL plan', () => {
     const plan = basePlan();
     expect(applyPLEffectiveOverlay(plan)).toBe(plan);
   });
+
+  // ── Аудит 2026-11, P1: ручной вес и pct ──
+  it('ручной вес НЕ перемножается на autoReg.topSetPctMultiplier (правка = последнее слово)', () => {
+    const plan = basePlan();
+    const out = applyPLEffectiveOverlay(plan, {
+      edits: { '1_0_0_0': { weight: 100 } },
+      autoReg: { topSetPctMultiplier: 0.9, volumeMultiplier: 1, rirShift: 0 },
+    }).weeks[0].days[0].exercises[0].workSets[0];
+    expect(out.weight).toBe(100);
+  });
+
+  it('ручной вес без autoReg тоже ровно тот, что ввели', () => {
+    const plan = basePlan();
+    const out = applyPLEffectiveOverlay(plan, { edits: { '1_0_0_0': { weight: 101.5 } } })
+      .weeks[0].days[0].exercises[0].workSets[0];
+    expect(out.weight).toBe(101.5);
+  });
+
+  it('правка pct при ws.pct = 0 не даёт NaN/Infinity (вес считается от ПМ упражнения)', () => {
+    const plan = JSON.parse(JSON.stringify(basePlan()));
+    const ex = plan.weeks[0].days[0].exercises[0];
+    ex.workSets[0].pct = 0;
+    const out = applyPLEffectiveOverlay(plan, { edits: { '1_0_0_0': { pct: 0.8 } } })
+      .weeks[0].days[0].exercises[0].workSets[0];
+    expect(Number.isFinite(out.weight)).toBe(true);
+    expect(out.weight).toBeGreaterThan(0);
+    expect(out.pct).toBe(0.8);
+  });
+
+  it('plVolumeLandmarks пересчитывается после оверлея (не остаётся от исходного плана)', () => {
+    const plan = basePlan();
+    // Резко урезаем объём всех подходов → статус по мышцам должен измениться.
+    const edits: Record<string, { sets: number }> = {};
+    plan.weeks.forEach((wk, wi) => wk.days.forEach((day, di) => {
+      let flat = 0;
+      day.exercises.forEach((ex, ei) => {
+        ex.workSets.forEach(() => { edits[`${wk.week}_${di}_${ei}_${flat}`] = { sets: 1 }; flat += 1; });
+      });
+      void wi;
+    }));
+    const out = applyPLEffectiveOverlay(plan, { edits });
+    expect(out.plVolumeLandmarks).toBeTruthy();
+    expect(out.plVolumeLandmarks!.some(l => l.status === 'under')).toBe(true);
+  });
 });

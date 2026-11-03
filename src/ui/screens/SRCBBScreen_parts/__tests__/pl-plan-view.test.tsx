@@ -92,6 +92,24 @@ describe('PLPlanView', () => {
     expect(document.querySelectorAll('[data-pl="test-attempt"]').length).toBeGreaterThan(0);
   });
 
+  it('«💾 Сохранить программу» пишет ВСЕ недели в weeksPlan (P0-4), а exercises остаётся неделей 1', () => {
+    try { localStorage.removeItem('myTrainingPlans'); } catch { /* ignore */ }
+    render(<PLPlanView api={api()} />);
+    fireEvent.click(screen.getByText('💾 Сохранить программу'));
+    const saved = JSON.parse(localStorage.getItem('myTrainingPlans') || '[]');
+    expect(saved.length).toBe(1);
+    const p = saved[0];
+    // Полный цикл, а не только первая неделя (раньше weekCount врал: «8 нед», а в плане 1 неделя).
+    expect(Array.isArray(p.weeksPlan)).toBe(true);
+    expect(p.weeksPlan.length).toBe(4);
+    expect(p.weeksPlan.map((w: any) => w.week)).toEqual([1, 2, 7, 8]);
+    expect(p.weekCount).toBe(4);
+    // Обратная совместимость: плоский exercises = неделя 1.
+    expect(p.exercises.length).toBeGreaterThan(0);
+    expect(p.weeksPlan[0].exercises.length).toBe(p.exercises.length);
+    try { localStorage.removeItem('myTrainingPlans'); } catch { /* ignore */ }
+  });
+
   it('карточка прикидов: переключение «🤖 Авто» меняет веса на лету (база из pmRow, множитель в отображении)', () => {
     const a = api();
     a.srcWeek = 8;
@@ -306,6 +324,45 @@ describe('PLPlanView', () => {
     render(<PLPlanView api={a} />);
     expect(screen.getByText(/факту дневника: 50/)).toBeTruthy();
     expect(document.querySelector('[data-pl="vl-source"]')?.textContent).toContain('по факту дневника');
+  });
+
+  // P2-2 (аудит 2026-11): карточка объёма показывает ВКЛАД УПРАЖНЕНИЙ в группу —
+  // видно, ИЗ-ЗА ЧЕГО перебор, без введения мелких мышечных групп и новых порогов.
+  it('карточка объёма: под группой видны упражнения-вкладчики (P2-2)', () => {
+    const a = api();
+    (a.builtSrc as unknown as Record<string, unknown>).plVolumeLandmarks = [
+      { group: 'chest', muscle: 'Грудь', peakWeek: 1, sets: 10, mev: 8, mav: 14, mrv: 24, status: 'optimal' },
+    ];
+    render(<PLPlanView api={a} />);
+    const rows = [...document.querySelectorAll('[data-pl="volume-share"]')];
+    expect(rows.length).toBeGreaterThan(0);
+    // Порядок — по убыванию подходов на пиковой неделе (Тяга к поясу 4 → Присед/Жим по 3).
+    expect(rows[0].textContent).toContain('Тяга к поясу');
+    expect(rows.map(r => r.textContent).join(' ')).toContain('Присед');
+    // Сумма подходов строк = подходы группы (сетка сходится с «10 сет · MRV 24»).
+    const sum = rows.reduce((n, r) => n + Number((r.textContent || '').match(/— (\d+) сет/)?.[1] || 0), 0);
+    expect(sum).toBe(10);
+  });
+
+  it('карточка объёма: переключатель «По мышцам» (P2-2 вариант а) — композиты разложены', () => {
+    const a = api();
+    (a.builtSrc as unknown as Record<string, unknown>).plVolumeLandmarks = [
+      { group: 'chest', muscle: 'Грудь', peakWeek: 1, sets: 10, mev: 8, mav: 14, mrv: 24, status: 'optimal' },
+    ];
+    render(<PLPlanView api={a} />);
+    // По умолчанию — режим групп (канон), вклад упражнений виден.
+    expect(screen.getAllByText(/Грудь/).length).toBeGreaterThan(0);
+    fireEvent.click(document.querySelector('[data-pl="vol-mode-muscle"]') as HTMLElement);
+    const rows = [...document.querySelectorAll('[data-pl="volume-row"]')];
+    expect(rows.length).toBeGreaterThan(0);
+    const text = rows.map(r => r.textContent).join(' ');
+    // Присед → квадрицепс/бицепс бедра (60/40), жим → грудь/трицепс, тяга → грудь (фикстура).
+    expect(text).toMatch(/Квадрицепс/);
+    expect(text).toMatch(/Бицепс бедра/);
+    expect(text).toMatch(/Трицепс/);
+    // Композитных строк нет — иначе двойной счёт с порогами подгрупп.
+    expect(text).not.toMatch(/Ноги \(квадрицепсы/);
+    expect(text).not.toMatch(/Руки \(бицепс/);
   });
 
   it('экспорт отчёта «план vs факт»: CSV/HTML через общий APK-мост (§5-quat)', async () => {

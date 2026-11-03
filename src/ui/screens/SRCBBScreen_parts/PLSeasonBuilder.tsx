@@ -342,6 +342,15 @@ export const PLSeasonBuilder: React.FC<PLSeasonBuilderProps> = ({ selector, meet
           onBuilt(null, [`⛔ Сборка заблокирована: ${blockedGaps.length} пролёт(ов) требуют согласия на изменение раскладки — подтвердите или выберите другой цикл.`], []);
           return;
         }
+        // P2-6: план с «дырами» не собираем — иначе пустые недели выглядят как тренировки.
+        const emptyWeeks = compGap!.emptyWeeks ?? [];
+        if (emptyWeeks.length > 0) {
+          onBuilt(null, [
+            `⛔ План не собран: ${emptyWeeks.length} нед без тренировочного блока (нед ${emptyWeeks.join(', ')}).`,
+            ...compGap!.notes.filter(n => n.includes('Без тренировочного блока') || n.includes('нет подходящих циклов')),
+          ], []);
+          return;
+        }
         // compGap.weeks уже включает пик-блоки (buildPLSeasonPeaks) — используем напрямую.
         notes.push(...compGap!.notes);
         const firstCycle = compGap!.segments[0]?.fittedCycle ?? compGap!.segments[0]?.candidates[0]?.cycle;
@@ -655,6 +664,11 @@ export const PLSeasonBuilder: React.FC<PLSeasonBuilderProps> = ({ selector, meet
           </div>
         );})}
         <div style={{ fontSize: 10, color: '#fff' }}>Итого: {compGap.totalPlanWeeks} нед плана, у каждого старта пик-блок (вход в пик + mock + тапер + старт{taper.postMeet ? ' + пост' : ''}).</div>
+        {(compGap.emptyWeeks?.length ?? 0) > 0 && (
+          <div data-pl="season-empty-weeks" style={{ fontSize: 10, color: '#f87171', marginTop: 4 }}>
+            ⚠ Без тренировочного блока: нед {compGap.emptyWeeks!.join(', ')} · тренировочных недель {compGap.trainingWeeks} из {compGap.totalPlanWeeks} — сборка плана заблокирована, выберите цикл или сдвиньте старт.
+          </div>
+        )}
       </BbFoldCard>
     );
   };

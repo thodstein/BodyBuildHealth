@@ -77,6 +77,20 @@ describe('buildPLTaperCurve: pl (ПЛ-пик-протокол Библиотек
     expect(curve[1].intensityPct).toBe(1.0);
     expect(curve[1].singles).toBeFalsy();
   });
+
+  it('taperWeeks=4 (больше протокола): финал уникален, дублируется ВХОДНАЯ неделя', () => {
+    const curve = buildPLTaperCurve({ taperWeeks: 4, mode: 'pl' });
+    expect(curve).toHaveLength(4);
+    // Раньше протокол растягивался повтором ПОСЛЕДНЕЙ недели: две
+    // соревновательные недели с одинаковой интенсивностью 100 %.
+    expect(curve[2].intensityPct).toBeLessThan(curve[3].intensityPct);
+    expect(curve.filter(c => c.intensityPct >= 1.0)).toHaveLength(1);
+    // Вход в пик повторяется дважды (объём одинаковый).
+    expect(curve[0].volumePct).toBeCloseTo(curve[1].volumePct, 5);
+    expect(curve[0].intensityPct).toBeCloseTo(curve[1].intensityPct, 5);
+    expect(curve[3].warmupOnly).toBe(true);
+    expect(curve.filter(c => c.warmupOnly)).toHaveLength(1);
+  });
 });
 
 describe('buildPLTaperCurve: pro (усталость-зависимая)', () => {

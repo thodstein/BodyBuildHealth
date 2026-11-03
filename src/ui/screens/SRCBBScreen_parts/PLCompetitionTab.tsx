@@ -12,7 +12,7 @@ import { appendPLTaperWeeks, refreshMeetAttempts, computeMeetAttemptsFromPmRow, 
 import { buildPLPeakBlockLayout } from '../../../engines/lms/lms-peak-block.engine';
 import { buildPLSeasonPeaks } from '../../../engines/lms/lms-macro-taper.engine';
 import { calcCycleMetrics, type SRExercise } from '../../../engines/lms/lms-metrics.engine';
-import { MEET_STRATEGY_LABEL, MEET_STRATEGY_PCT_LABEL, MEET_WARMUP_STEPS, resolveCompetitionLiftPm, type MeetStrategy } from '../../../engines/lms/competition-attempts';
+import { MEET_STRATEGY_LABEL, MEET_STRATEGY_PCT_LABEL, MEET_WARMUP_STEPS, resolveCompetitionLiftPm, adaptMeetAttempts, type MeetStrategy, type MeetAttemptResult, type MeetAttemptEffort } from '../../../engines/lms/competition-attempts';
 import { LAST_HEAVY_DAYS } from '../../../engines/pro/taper.engine';
 import type { PED } from '../../../engines/bb/bb-ped-adaptation.engine';
 import type { AutoRegMode } from '../../../engines/pro/diary-autoreg.engine';
@@ -28,7 +28,12 @@ import { AutoRegModeSwitch } from './AutoRegModeSwitch';
 import { TaperCoachCard } from './TaperCoachCard';
 import { usePLTaper } from './taper-state';
 import { getPeakCycles } from '../../../engines/lms/pl-peak-cycle-taper.engine';
+import { plNormsSnapshot, PL_GEAR_LABEL } from '../../../engines/lms/pl-norms-bridge.engine';
+import { parseMeetProtocol } from '../../../engines/lms/pl-protocol-import.engine';
+import { collectPLBackup, parsePLBackup, restorePLBackup, PL_BACKUP_KEY_LABEL } from '../../../engines/lms/pl-backup.engine';
+import { getProfile } from '../../../core/profile-manager';
 import { localIsoDateOffset } from '../../../core/local-date';
+import { dateFromWeeksToStart } from '../../../engines/lms/pl-meet-registry.engine';
 import { saveTextFileApk, shareOutcomeLabel } from '../../../core/apk-share';
 
 // Фаза 3: кнопки — из единого кита training-ui.
@@ -81,7 +86,7 @@ export const PLCompetitionTab: React.FC<{ api: PLCompetitionTabApi }> = ({ api }
     bw, setBw, targetBw, setTargetBw, weeksToMeet, setWeeksToMeet,
     taperWeeksToAdd, setTaperWeeksToAdd, attemptStrategy, setAttemptStrategy,
     peakMode, setPeakMode, peakLayout, setPeakLayout, taperWeightGoal, setTaperWeightGoal,
-    taperFed, setTaperFed, taperActualPm, setTaperActualPm, taperPlannedPm, setTaperPlannedPm,
+    taperFed, setTaperFed, taperGear, setTaperGear, taperActualPm, setTaperActualPm, taperPlannedPm, setTaperPlannedPm,
     taperAttemptOverride, setTaperAttemptOverride,
     mockMeetOn, setMockMeetOn, meetWeekOn, setMeetWeekOn, postMeetOn, setPostMeetOn,
     taperNote, setTaperNote, taperPlan, setTaperPlan,
@@ -145,7 +150,10 @@ export const PLCompetitionTab: React.FC<{ api: PLCompetitionTabApi }> = ({ api }
   // Aудит P1: было `new Date(Date.now()+...).toISOString()` — в UTC+X утром дата
   // уезжала на сутки назад; канон проекта — локальная дата (core/local-date).
   const derivedMeetDate = (() => {
-    try { return localIsoDateOffset(Math.max(0, weeksToMeet) * 7); }
+    // Канон недель проекта: старт в неделе N ⇔ её начало = today + (N−1)×7
+    // (см. dateFromWeeksToStart / buildPLSeasonPeaks). Было weeksToMeet*7 —
+    // дата старта уезжала на неделю позже, чем неделя соревнований в плане.
+    try { return dateFromWeeksToStart(Math.max(1, Math.round(weeksToMeet || 1)), localIsoDateOffset(0)); }
     catch { return undefined; }
   })();
   const [meetDateInput, setMeetDateInput] = React.useState<string>(derivedMeetDate ?? '');
@@ -154,8 +162,62 @@ export const PLCompetitionTab: React.FC<{ api: PLCompetitionTabApi }> = ({ api }
   // (раунд 3, §5-bis п.4). Дни цикла раскладываются позиционно от weekStart:
   // СРЦ-цикл не хранит weekday, поэтому при другом расписании события сдвигаются.
   const [seasonIcsWithSessions, setSeasonIcsWithSessions] = React.useState(false);
+  // 🏁 Фаза 6, п.1: ФАКТ попыток старта (зачёт/баранка/тяжело + вес) → пересчёт 2-й/3-й
+  // по правилам федерации (вес не уменьшается). Переживает F5: старт идёт часами,
+  // и потерять опенер из-за перезагрузки экрана — дорогая ошибка.
+  const [meetLog, setMeetLog] = React.useState<Record<string, MeetAttemptResult[]>>(() => {
+    try {
+      const raw = localStorage.getItem('he_pl_meet_log');
+      const parsed = raw ? JSON.parse(raw) : null;
+      return parsed && typeof parsed === 'object' ? parsed as Record<string, MeetAttemptResult[]> : {};
+    } catch { return {}; }
+  });
+  // 📥 Фаза 6, п.4: импорт протокола соревнования → факты попыток.
+  const [protocolOpen, setProtocolOpen] = React.useState(false);
+  const [protocolText, setProtocolText] = React.useState('');
+  const [protocolLog, setProtocolLog] = React.useState<string[]>([]);
+  // 💾 Фаза 6, п.8: бэкап/восстановление PL-сессии (всё живёт в localStorage).
+  const [backupText, setBackupText] = React.useState('');
+  const [backupLog, setBackupLog] = React.useState<string[]>([]);
+  React.useEffect(() => {
+    try { localStorage.setItem('he_pl_meet_log', JSON.stringify(meetLog)); } catch { /* ignore */ }
+  }, [meetLog]);
+  const meetLogKey = (week: number, lift: string) => `${week}:${lift}`;
+  const meetResults = (week: number, lift: string) =>
+    (meetLog[meetLogKey(week, lift)] || []).filter(r => Number.isFinite(r.weight) && r.weight > 0);
+  const setMeetResult = (
+    week: number,
+    lift: string,
+    attempt: 1 | 2 | 3,
+    value: { weight: number; made: boolean; effort?: MeetAttemptEffort } | null,
+  ) => {
+    setMeetLog(cur => {
+      const key = meetLogKey(week, lift);
+      const list = (cur[key] || []).filter(r => r.attempt !== attempt);
+      if (value) list.push({ attempt, weight: value.weight, made: value.made, ...(value.effort ? { effort: value.effort } : {}) });
+      list.sort((a, b) => a.attempt - b.attempt);
+      const next = { ...cur };
+      if (list.length === 0) delete next[key]; else next[key] = list;
+      return next;
+    });
+  };
   // P2-5: протокол сгонки к категории на пик-неделю (вода/натрий/карбы).
-  const peakCut = React.useMemo(() => buildPLPeakWeekCutProtocol(bw, targetBw), [bw, targetBw]);
+  // Фаза 6, п.5: окно «взвешивание → подход» определяет план регидратации.
+  const [weighInHours, setWeighInHours] = React.useState<number>(2);
+  const peakCut = React.useMemo(
+    () => buildPLPeakWeekCutProtocol(bw, targetBw, { weighInHoursBeforeLift: weighInHours }),
+    [bw, targetBw, weighInHours],
+  );
+  // 🏅 Фаза 6, п.2: разряд/тотал/очки. Проектный тотал — от целевых ПМ сезона
+  // (если они не заполнены — от фактических). Вес категории — целевой (взвешивание).
+  const normsSnap = React.useMemo(() => {
+    const sex: 'male' | 'female' = (() => {
+      try { return (getProfile().settings as { personal?: { sex?: string } } | undefined)?.personal?.sex === 'female' ? 'female' : 'male'; }
+      catch { return 'male'; }
+    })();
+    const planned = Object.values(taperPlannedPm).some(v => v > 0) ? taperPlannedPm : taperActualPm;
+    return plNormsSnapshot({ fed: taperFed, sex, bodyWeight: targetBw > 0 ? targetBw : bw, plannedPm: planned, gear: taperGear });
+  }, [taperFed, taperGear, taperPlannedPm, taperActualPm, targetBw, bw]);
   const fedRu: Record<string, string> = { ipf: 'IPF', fpr: 'FPR', wpc: 'WPC', other: 'Другая' };
   // C4: печать тапер-плана (PDF через window.print) — единый контур печати
   // (карточка тапер-плана и кнопка у прикидов используют этот же обработчик).
@@ -405,6 +467,12 @@ export const PLCompetitionTab: React.FC<{ api: PLCompetitionTabApi }> = ({ api }
         <PopupSelect label="Федерация" value={taperFed} onChange={v => setTaperFed(v)} options={[
           { id: 'ipf', label: 'IPF' }, { id: 'fpr', label: 'FPR' }, { id: 'wpc', label: 'WPC' }, { id: 'other', label: 'Другая' },
         ]} />
+        {/* Фаза 6, п.3: экипировка меняет таблицу нормативов (у ФПР своя) и коэффициенты IPF GL. */}
+        <PopupSelect label="Экипировка" value={taperGear} onChange={v => setTaperGear(v as typeof taperGear)} options={[
+          { id: 'classic', label: PL_GEAR_LABEL.classic },
+          { id: 'single-ply', label: PL_GEAR_LABEL['single-ply'] },
+          { id: 'multi-ply', label: PL_GEAR_LABEL['multi-ply'] },
+        ] as { id: 'classic' | 'single-ply' | 'multi-ply'; label: string }[]} />
         <div style={{ gridColumn: '1/-1', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 6 }}>
           {(['Присед', 'Жим лежа', 'Становая тяга'] as const).map(name => (
             <PopupNumber key={name + '_act'} label={`Факт. ПМ после цикла · ${name === 'Присед' ? 'присед' : name === 'Жим лежа' ? 'жим' : 'тяга'}`} value={taperActualPm[name] || 0} min={0} max={500} suffix=" кг" hint="Реально поднятый ПМ — от него строятся тренировочные веса тапера" onChange={v => setTaperActualPm(p => ({ ...p, [name]: v }))} />
@@ -460,6 +528,9 @@ export const PLCompetitionTab: React.FC<{ api: PLCompetitionTabApi }> = ({ api }
           title="Печать тапер-плана (PDF) — таблицы недель блока с датами, объёмом, интенсивностью, RIR и прикидами"
         >🖨 Тапер-план (PDF)</button>
         <button
+          onClick={() => setMockMeetOn(v => !v)}
+          aria-pressed={mockMeetOn}
+          data-pl="mock-meet-toggle"
           style={{ alignSelf: 'flex-end', minHeight: 44, borderRadius: 8, border: mockMeetOn ? '1px solid #a78bfa' : '1px solid rgba(255,255,255,0.08)', background: mockMeetOn ? 'rgba(139,92,246,0.15)' : 'rgba(255,255,255,0.02)', color: mockMeetOn ? '#a78bfa' : '#fff', fontSize: 11, fontWeight: 700, cursor: 'pointer', padding: '8px 12px' }}
           title="Имитация соревнований за 10-14 дней до старта: неделя перед тапером с прикидами-синглами (опенер RIR2 → вторая RIR1 → третья RIR0)"
         >🎯 Имитация соревнований (mock meet){mockMeetOn ? ' ✓' : ''}</button>
@@ -471,7 +542,7 @@ export const PLCompetitionTab: React.FC<{ api: PLCompetitionTabApi }> = ({ api }
         <button
           onClick={() => setPostMeetOn(v => !v)}
           style={{ alignSelf: 'flex-end', minHeight: 44, borderRadius: 8, border: postMeetOn ? '1px solid #34d399' : '1px solid rgba(255,255,255,0.08)', background: postMeetOn ? 'rgba(52,211,153,0.12)' : 'rgba(255,255,255,0.02)', color: postMeetOn ? '#34d399' : '#fff', fontSize: 11, fontWeight: 700, cursor: 'pointer', padding: '8px 12px' }}
-          title="Восстановительная неделя ПОСЛЕ соревнований: объём ×0.5, RIR +3 — полная разгрузка после прикидок"
+          title="Восстановительная неделя ПОСЛЕ соревнований: объём ×0.5, вес 65 % ПМ, RIR 4 — плавный старт от последней рабочей недели (без соревновательных весов)"
         >🔄 Пост-старт неделя{postMeetOn ? ' ✓' : ''}</button>
         <button
           disabled={!builtSrc || !taperNote}
@@ -516,12 +587,58 @@ export const PLCompetitionTab: React.FC<{ api: PLCompetitionTabApi }> = ({ api }
           </div>
         );
       })()}
+      {/* 🏅 Фаза 6, п.2: разряд и зачётный тотал по нормативам федерации */}
+      <div data-pl="norms-bridge">
+        <ExpandableCard
+          icon="🏅"
+          title={normsSnap.classification
+            ? `🏅 Разряд · ${normsSnap.classification.achievedLabel} → ${normsSnap.classification.nextLabel} · проект ${normsSnap.total} кг`
+            : `🏅 Разряд и тотал · проект ${normsSnap.total} кг`}
+          short={`${taperGear === 'classic' ? '' : `Экипировка · ${PL_GEAR_LABEL[taperGear]} · `}${normsSnap.classification
+            ? `${normsSnap.classification.category.label} · до следующего разряда ${normsSnap.classification.nextLabel}: ${normsSnap.classification.kgToNext > 0 ? `${normsSnap.classification.kgToNext} кг` : 'выполнен'} · IPF GL ${normsSnap.glPoints} · прогресс ${normsSnap.progressPct}% · ⚠ Сверяйте с официальной таблицей сезона`
+            : `${normsSnap.note}${normsSnap.glPoints > 0 ? ` · IPF GL ${normsSnap.glPoints}` : ''}`}`}
+          full={
+            <div>
+              <div style={{ fontSize: 10, color: '#fff', lineHeight: 1.45, marginBottom: 6 }}>
+                Проектный тотал: <b>{normsSnap.total} кг</b> (вес категории {normsSnap.bodyWeight} кг) · очки IPF GL: <b>{normsSnap.glPoints}</b>
+              </div>
+              {normsSnap.classification && (
+                <>
+                  <div style={{ height: 6, background: 'rgba(255,255,255,0.1)', borderRadius: 3, marginBottom: 6, overflow: 'hidden' }}>
+                    <div style={{ width: `${Math.max(0, Math.min(100, normsSnap.progressPct))}%`, height: '100%', background: '#00e68a' }} />
+                  </div>
+                  <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap', marginBottom: 6 }}>
+                    {normsSnap.classification.allRanks.map(rn => (
+                      <span
+                        key={rn.key}
+                        title={rn.achieved ? 'выполнено проектом тотала' : 'не дотягиваем'}
+                        style={{
+                          padding: '3px 6px', borderRadius: 6, fontSize: 9, fontWeight: 700,
+                          background: rn.achieved ? 'rgba(0,230,138,0.14)' : 'rgba(255,255,255,0.05)',
+                          border: `1px solid ${rn.achieved ? 'rgba(0,230,138,0.4)' : 'rgba(255,255,255,0.08)'}`,
+                          color: rn.achieved ? '#4ade80' : '#fff',
+                        }}
+                      >
+                        {rn.label} {rn.threshold}
+                      </span>
+                    ))}
+                  </div>
+                </>
+              )}
+              <div style={{ fontSize: 9, color: '#fff', opacity: 0.8, lineHeight: 1.45 }}>{normsSnap.note}</div>
+              <div style={{ fontSize: 9, color: '#fff', opacity: 0.6, lineHeight: 1.45, marginTop: 4 }}>
+                Тотал считается из целевых ПМ (поля «План ПМ в федерации»). Нормативы — из справочника приложения; перед заявкой сверяйте с официальной таблицей сезона.
+              </div>
+            </div>
+          }
+        />
+      </div>
       {/* P2-5: сгонка к категории на пик-неделе (вода/натрий/карбы по дням) */}
       {peakCut.needed && (
         <ExpandableCard
           icon="💧"
           title={`💧 Сгонка на пик-неделе · ${peakCut.toCutKg.toFixed(1)} кг (вода/натрий/карбы)`}
-          short={`Вода 6→2 л · Натрий 4→0.5 г · Карбы 4→1 г/кг · взвешивание утром старта${peakCut.warnings.length ? ' · ⚠ см. детали' : ''}`}
+          short={`Вода 6→2 л · Натрий 4→0.5 г · Карбы 4→1 г/кг · взвешивание утром старта${peakCut.recovery ? ` · ♻️ восстановление: ${peakCut.recovery.hoursToLift} ч до подхода` : ''}${peakCut.warnings.length ? ' · ⚠ см. детали' : ''}`}
           full={
             <div>
               {peakCut.warnings.map((w, i) => (
@@ -548,6 +665,57 @@ export const PLCompetitionTab: React.FC<{ api: PLCompetitionTabApi }> = ({ api }
                   ))}
                 </tbody>
               </table>
+              {/* Фаза 6, п.5: план восстановления ПОСЛЕ взвешивания (без него сгонка бессмысленна) */}
+              <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginTop: 8, flexWrap: 'wrap' }}>
+                <span style={{ fontSize: 10, color: '#fff', fontWeight: 700 }}>Взвешивание:</span>
+                {[{ h: 2, label: 'за 2 ч (IPF)' }, { h: 24, label: 'за 24 ч' }].map(o => (
+                  <button
+                    key={o.h}
+                    type="button"
+                    data-pl="weighin-window"
+                    aria-pressed={weighInHours === o.h}
+                    onClick={() => setWeighInHours(o.h)}
+                    style={{
+                      minHeight: 30, padding: '4px 10px', borderRadius: 8, fontSize: 10, fontWeight: 700, cursor: 'pointer',
+                      border: `1px solid ${weighInHours === o.h ? '#38bdf8' : 'rgba(255,255,255,0.15)'}`,
+                      background: weighInHours === o.h ? '#38bdf8' : 'rgba(255,255,255,0.05)',
+                      color: weighInHours === o.h ? '#000' : '#fff',
+                    }}
+                  >{o.label}</button>
+                ))}
+              </div>
+              {peakCut.recovery && (
+                <div data-pl="weighin-recovery" style={{ marginTop: 8 }}>
+                  <div style={{ fontSize: 11, fontWeight: 800, color: '#38bdf8', marginBottom: 4 }}>♻️ Восстановление после взвешивания</div>
+                  <div style={{ fontSize: 10, color: '#fff', lineHeight: 1.45, marginBottom: 6 }}>{peakCut.recovery.summary}</div>
+                  {peakCut.recovery.warnings.map((w, i) => (
+                    <div key={i} style={{ fontSize: 10, color: '#fbbf24', lineHeight: 1.4, marginBottom: 4 }}>⚠ {w}</div>
+                  ))}
+                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <thead>
+                      <tr style={{ fontSize: 9, color: '#fff' }}>
+                        <th style={{ textAlign: 'left', padding: '4px 6px' }}>Окно</th>
+                        <th style={{ textAlign: 'left', padding: '4px 6px' }}>Жидкость</th>
+                        <th style={{ textAlign: 'left', padding: '4px 6px' }}>Натрий</th>
+                        <th style={{ textAlign: 'left', padding: '4px 6px' }}>Углеводы</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {peakCut.recovery.steps.map((s, i) => (
+                        <tr key={i} style={{ fontSize: 10, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+                          <td style={{ padding: '4px 6px', fontWeight: 700, color: '#fff' }}>{s.window}</td>
+                          <td style={{ padding: '4px 6px', color: '#fff' }}>{s.fluids}</td>
+                          <td style={{ padding: '4px 6px', color: '#fff' }}>{s.sodium}</td>
+                          <td style={{ padding: '4px 6px', color: '#fff' }}>{s.carbs}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  {peakCut.recovery.steps.map((s, i) => (
+                    <div key={i} style={{ fontSize: 9, color: '#fff', opacity: 0.75, marginTop: 2 }}>· {s.window}: {s.note}</div>
+                  ))}
+                </div>
+              )}
             </div>
           }
         />
@@ -584,7 +752,7 @@ export const PLCompetitionTab: React.FC<{ api: PLCompetitionTabApi }> = ({ api }
             const addCount = Math.max(0, next.weeks.length - builtSrc.weeks.length);
             const cycNote2 = peakCycleId ? ` · 🏆 из цикла «${peakCycleId}»` : '';
             setTaperNote(`+${addCount} нед${mockMeetOn ? ' · 🎯 mock meet' : ''}${meetWeekOn ? ' · 🏁 соревнования' : ''}${postMeetOn ? ' · 🔄 пост-старт' : ''}${pedAuto && peds.length > 0 ? ' · 💉 PED-адаптация как в цикле' : ''}${cycNote2}${taperWeightGoal === 'lose' ? ' · ⬇ сгонка' : taperWeightGoal === 'gain' ? ' · ⬆ набор' : ''} · 🏁 пик ${MEET_STRATEGY_PCT_LABEL[attemptStrategy]}`);
-            onNote(`📉 Пик-блок применён к активному циклу по окну ${weeksToMeet} нед: ${peakPreview.summary}${peakPreview.warnings.length ? ' ⚠ ' + peakPreview.warnings.join(' ⚠ ') : ''} — ${peakCycleId ? `пиковый цикл «${peakCycleId}» — кривая тапера из цикла (соответствует ПЛ-авто).` : peakMode === 'pl' ? 'ПЛ-пик-протокол (объём 85/75/60%, инт. 90/95/100%)' : peakMode === 'pro' ? 'про-тапер (усталость-зависимый)' : 'объём ×0.65/×0.45, RIR +1/+2 (Bosquet 2005)'}.${taperWeightGoal === 'lose' ? ' Весовая цель: сгонка — объём ×0.9.' : taperWeightGoal === 'gain' ? ' Весовая цель: набор — полный объём.' : ''}${mockMeetOn ? ' 🎯 Имитация соревнований (mock meet) добавлена перед тапером — прикиды-синглы.' : ''}${meetWeekOn ? ' 🏁 Неделя соревнований добавлена в конец — прикиды как подходы дня старта.' : ''}${postMeetOn ? ' 🔄 Пост-соревновательная неделя: объём ×0.5, RIR +3.' : ''} 🏁 Выход на пик: прикиды дня соревнований (${MEET_STRATEGY_LABEL[attemptStrategy]}, ${MEET_STRATEGY_PCT_LABEL[attemptStrategy]}) на финальной тапер-неделе.${pedAuto && peds.length > 0 ? ' 💉 PED-адаптация та же, что в цикле: прогрессия ПМ продолжена по курсу, adaptForPEDs (MRV/восст).' : ''} → откройте «📋 План цикла», чтобы увидеть результат.`);
+            onNote(`📉 Пик-блок применён к активному циклу по окну ${weeksToMeet} нед: ${peakPreview.summary}${peakPreview.warnings.length ? ' ⚠ ' + peakPreview.warnings.join(' ⚠ ') : ''} — ${peakCycleId ? `пиковый цикл «${peakCycleId}» — кривая тапера из цикла (соответствует ПЛ-авто).` : peakMode === 'pl' ? 'ПЛ-пик-протокол (объём 85/75/60%, инт. 90/95/100%)' : peakMode === 'pro' ? 'про-тапер (усталость-зависимый)' : 'объём ×0.65/×0.45, RIR +1/+2 (Bosquet 2005)'}.${taperWeightGoal === 'lose' ? ' Весовая цель: сгонка — объём ×0.9.' : taperWeightGoal === 'gain' ? ' Весовая цель: набор — полный объём.' : ''}${mockMeetOn ? ' 🎯 Имитация соревнований (mock meet) добавлена перед тапером — прикиды-синглы.' : ''}${meetWeekOn ? ' 🏁 Неделя соревнований добавлена в конец — прикиды как подходы дня старта.' : ''}${postMeetOn ? ' 🔄 Пост-соревновательная неделя: объём ×0.5, вес 65 % ПМ, RIR 4 — от последней рабочей недели, без соревновательных весов.' : ''} 🏁 Выход на пик: прикиды дня соревнований (${MEET_STRATEGY_LABEL[attemptStrategy]}, ${MEET_STRATEGY_PCT_LABEL[attemptStrategy]}) на финальной тапер-неделе.${pedAuto && peds.length > 0 ? ' 💉 PED-адаптация та же, что в цикле: прогрессия ПМ продолжена по курсу, adaptForPEDs (MRV/восст).' : ''} → откройте «📋 План цикла», чтобы увидеть результат.`);
           }}
           style={{ ...BTN_GHOST, flex: 1, minHeight: 44, border: builtSrc ? '1px solid rgba(245,158,11,0.4)' : '1px solid rgba(255,255,255,0.08)', color: builtSrc ? '#f59e0b' : 'rgba(255,255,255,0.3)', fontSize: 11, fontWeight: 700, background: builtSrc ? 'rgba(245,158,11,0.1)' : 'transparent' }}
           title={builtSrc ? `Построить пик-блок на окно ${weeksToMeet} нед до старта: вход в пик + mock + глубокий тапер (${taperWeeksToAdd} нед) + соревнования${postMeetOn ? ' + пост-старт' : ''}${pedAuto && peds.length > 0 ? ' (с учётом PED-курса)' : ''}` : 'Сначала сгенерируйте план'}
@@ -861,13 +1029,71 @@ export const PLCompetitionTab: React.FC<{ api: PLCompetitionTabApi }> = ({ api }
                     {arMult !== 1 ? ` · 🤖 авторегуляция ×${arMult.toFixed(2)}` : ''}
                   </div>
                   {wk.taperNote && <div style={{ fontSize: 9, color: '#fbbf24', marginBottom: 4 }}>⚠ {wk.taperNote}</div>}
+                  {/* 📥 Фаза 6, п.4: импорт протокола — заполняет факты попыток из вставленного текста. */}
+                  {(wk.meetWeek || wk.mockMeet) && (
+                    <div data-pl="protocol-import" style={{ marginBottom: 6 }}>
+                      <button
+                        type="button"
+                        data-pl="protocol-import-toggle"
+                        aria-expanded={protocolOpen}
+                        onClick={() => setProtocolOpen(o => !o)}
+                        style={{ ...BTN_GHOST, minHeight: 28, fontSize: 9, padding: '3px 8px', background: 'rgba(96,165,250,0.1)', color: '#93c5fd', border: '1px solid rgba(96,165,250,0.3)' }}
+                      >📥 {protocolOpen ? 'Скрыть импорт протокола' : 'Импорт протокола'}</button>
+                      {protocolOpen && (
+                        <div style={{ marginTop: 4 }}>
+                          <textarea
+                            value={protocolText}
+                            onChange={e => setProtocolText(e.target.value)}
+                            aria-label="Текст протокола соревнования"
+                            placeholder={'Присед 1 185 ✅\nПрисед 2 192.5 ✅\nЖим 1 140 ❌'}
+                            style={{ width: '100%', minHeight: 68, padding: 6, borderRadius: 8, background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.12)', color: '#fff', fontSize: 10, fontFamily: 'monospace', boxSizing: 'border-box' }}
+                          />
+                          <button
+                            type="button"
+                            data-pl="protocol-import-apply"
+                            onClick={() => {
+                              const parsed = parseMeetProtocol(protocolText);
+                              const applied: string[] = [];
+                              for (const row of parsed.rows) {
+                                if (row.made === null) continue; // не выдумываем результат
+                                const lift = att?.lifts.find(li =>
+                                  row.lift === 'squat' ? /присед/i.test(li.name)
+                                    : row.lift === 'bench' ? /жим/i.test(li.name)
+                                      : /станов|тяга/i.test(li.name));
+                                if (!lift) continue;
+                                setMeetResult(wk.week, lift.name, row.attempt, { weight: row.weight, made: row.made, effort: 'normal' });
+                                applied.push(`${lift.name} ${row.attempt}-я ${row.weight} кг ${row.made ? '✅' : '❌'}`);
+                              }
+                              const log = [...parsed.warnings, applied.length > 0 ? `Внесено: ${applied.join('; ')}` : 'Ничего не внесено.'];
+                              setProtocolLog(log);
+                              onNote(`📥 Протокол: внесено попыток — ${applied.length}. Проверьте чипы факта ниже.`);
+                            }}
+                            style={{ ...BTN_GHOST, minHeight: 28, fontSize: 9, padding: '3px 8px', marginTop: 4, background: 'rgba(0,230,138,0.12)', color: '#00e68a', border: '1px solid rgba(0,230,138,0.35)' }}
+                          >Заполнить факты</button>
+                          {protocolLog.length > 0 && (
+                            <div data-pl="protocol-import-log" style={{ marginTop: 4, fontSize: 9, color: '#fff', opacity: 0.85, lineHeight: 1.45 }}>
+                              {protocolLog.map((l, i) => <div key={i}>{/Внесено|Ничего/.test(l) ? `✔ ${l}` : `⚠ ${l}`}</div>)}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
                   {att?.lifts.map(l => {
                     const ov = taperAttemptOverride[l.name];
                     const opener = ov ? ov[0] : scale(l.opener);
                     const second = ov ? ov[1] : scale(l.second);
                     const third = ov ? ov[2] : scale(l.third);
+                    // Разминка — на КАЖДЫЙ лифт: раньше выводилась только для первого
+                    // (присед), а жим/тяга оставались без разминочной лестницы.
+                    const baseWarmup = l.warmup ?? [];
+                    const ratio = l.opener > 0 ? opener / scale(l.opener) : 1;
+                    const steps = baseWarmup.length > 0
+                      ? baseWarmup.map(s => ({ pct: s.pct, weight: Math.round(s.weight * ratio * 2) / 2, reps: s.reps }))
+                      : MEET_WARMUP_STEPS.map(p => ({ pct: p, weight: Math.round(opener * p * 2) / 2, reps: p < 0.7 ? 5 : p < 0.85 ? 3 : 1 }));
                     return (
-                      <div key={l.name} style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 10, marginTop: 3, flexWrap: 'wrap' }}>
+                      <div key={l.name} style={{ marginTop: 3 }}>
+                      <div style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 10, flexWrap: 'wrap' }}>
                         <b style={{ width: 70, flexShrink: 0 }}>{l.name}</b>
                         {ov ? (
                           <>
@@ -885,43 +1111,118 @@ export const PLCompetitionTab: React.FC<{ api: PLCompetitionTabApi }> = ({ api }
                           </>
                         )}
                       </div>
-                    );
-                  })}
-                  {att?.lifts[0] && taperAttemptOverride[att.lifts[0].name] && (() => {
-                    const ov = taperAttemptOverride[att.lifts[0].name];
-                    return (
-                      <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 4 }}>
-                        {['опенер', 'вторая', 'третья'].map((label, i) => (
-                          <span key={label} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 9 }}>
-                            {label}:
-                            <input type="number" value={ov[i] || 0} min={0} max={500} step={2.5}
-                              onChange={e => {
-                                const v = Number(e.target.value);
-                                setTaperAttemptOverride(cur => {
-                                  const next = [...(cur[att.lifts[0].name] || [0, 0, 0])];
-                                  next[i] = Number.isFinite(v) && v >= 0 ? Math.min(v, 500) : 0;
-                                  return { ...cur, [att.lifts[0].name]: next };
-                                });
-                              }}
-                              style={{ width: 60, padding: '3px 5px', borderRadius: 6, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)', color: '#fff', fontSize: 10, fontWeight: 700, minHeight: 26, boxSizing: 'border-box' }} />
-                          </span>
-                        ))}
+                      {ov && (
+                        <div data-pl="attempt-override" style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 4 }}>
+                          {['опенер', 'вторая', 'третья'].map((label, i) => (
+                            <span key={label} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 9 }}>
+                              {label}:
+                              <input type="number" value={ov[i] || 0} min={0} max={500} step={2.5}
+                                aria-label={`${l.name} ${label}`}
+                                onChange={e => {
+                                  const v = Number(e.target.value);
+                                  setTaperAttemptOverride(cur => {
+                                    const next = [...(cur[l.name] || [0, 0, 0])];
+                                    next[i] = Number.isFinite(v) && v >= 0 ? Math.min(v, 500) : 0;
+                                    return { ...cur, [l.name]: next };
+                                  });
+                                }}
+                                style={{ width: 60, padding: '3px 5px', borderRadius: 6, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)', color: '#fff', fontSize: 10, fontWeight: 700, minHeight: 26, boxSizing: 'border-box' }} />
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                      {opener > 0 && (
+                        <div style={{ marginTop: 4, fontSize: 9, color: '#fff' }}>🔥 Разминка: {steps.map(s => `${Math.round(s.pct * 100)}%×${s.reps}`).join(' → ')} ({steps.map(s => s.weight).join('/')} кг)</div>
+                      )}
+                      {(wk.meetWeek || wk.mockMeet) && (() => {
+                        const results = meetResults(wk.week, l.name);
+                        const adv = adaptMeetAttempts({ opener, second, third, target: third }, results);
+                        const chipStyle = (active: boolean, tone: string) => ({
+                          minHeight: 26, minWidth: 30, padding: '2px 6px', borderRadius: 6, fontSize: 10, cursor: 'pointer',
+                          border: `1px solid ${active ? tone : 'rgba(255,255,255,0.15)'}`,
+                          background: active ? tone : 'rgba(255,255,255,0.05)',
+                          color: active ? '#000' : '#fff',
+                        });
+                        const plannedWeight = (n: 1 | 2 | 3) => (n === 1 ? opener : n === 2 ? second : third);
+                        return (
+                          <div data-pl="meet-adaptive" style={{ marginTop: 6, paddingTop: 5, borderTop: '1px dashed rgba(255,255,255,0.12)' }}>
+                            <div style={{ fontSize: 9, color: '#fff', opacity: 0.75 }}>🏁 Факт попыток → пересчёт 2-й/3-й (вес можно только поднимать или повторить)</div>
+                            {([1, 2, 3] as const).map(n => {
+                              const r = results.find(x => x.attempt === n);
+                              const w = r ? r.weight : plannedWeight(n);
+                              return (
+                                <div key={n} style={{ display: 'flex', gap: 4, alignItems: 'center', marginTop: 3, fontSize: 9 }}>
+                                  <span style={{ width: 26, color: '#fff' }}>{n}-я</span>
+                                  <input
+                                    type="number" min={0} max={500} step={2.5} value={w}
+                                    aria-label={`${l.name} факт ${n}-й попытки`}
+                                    onChange={e => {
+                                      const v = Number(e.target.value);
+                                      if (!Number.isFinite(v) || v <= 0) { setMeetResult(wk.week, l.name, n, null); return; }
+                                      setMeetResult(wk.week, l.name, n, { weight: Math.min(v, 500), made: r ? r.made : true, effort: r?.effort });
+                                    }}
+                                    style={{ width: 60, padding: '3px 5px', borderRadius: 6, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)', color: '#fff', fontSize: 10, fontWeight: 700, minHeight: 26, boxSizing: 'border-box' }}
+                                  />
+                                  <button
+                                    type="button" data-pl="meet-made" aria-pressed={!!r && r.made && r.effort !== 'grind'}
+                                    onClick={() => {
+                                      const active = !!r && r.made && r.effort !== 'grind';
+                                      setMeetResult(wk.week, l.name, n, active ? null : { weight: w, made: true, effort: 'normal' });
+                                    }}
+                                    style={chipStyle(!!r && r.made && r.effort !== 'grind', '#4ade80')}
+                                  >✅</button>
+                                  <button
+                                    type="button" data-pl="meet-grind" aria-pressed={!!r && r.made && r.effort === 'grind'}
+                                    onClick={() => {
+                                      const active = !!r && r.made && r.effort === 'grind';
+                                      setMeetResult(wk.week, l.name, n, active ? null : { weight: w, made: true, effort: 'grind' });
+                                    }}
+                                    style={chipStyle(!!r && r.made && r.effort === 'grind', '#fbbf24')}
+                                  >😤</button>
+                                  <button
+                                    type="button" data-pl="meet-miss" aria-pressed={!!r && !r.made}
+                                    onClick={() => {
+                                      const active = !!r && !r.made;
+                                      setMeetResult(wk.week, l.name, n, active ? null : { weight: w, made: false });
+                                    }}
+                                    style={chipStyle(!!r && !r.made, '#f87171')}
+                                  >✗</button>
+                                </div>
+                              );
+                            })}
+                            {results.length > 0 && (
+                              <div data-pl="meet-advice" style={{ marginTop: 4, fontSize: 9, color: adv.bombed ? '#f87171' : '#fbbf24' }}>
+                                {adv.notes.map((note, ni) => <div key={ni}>· {note}</div>)}
+                                {(adv.second !== null || adv.third !== null) && (
+                                  <div style={{ color: '#fff' }}>
+                                    → Рекомендация: {adv.second !== null ? `2-я ${adv.second} кг` : ''}
+                                    {adv.second !== null && adv.third !== null ? ' · ' : ''}
+                                    {adv.third !== null ? `3-я ${adv.third} кг` : ''}
+                                  </div>
+                                )}
+                                {adv.second !== null && adv.third !== null && (adv.second !== second || adv.third !== third) && (
+                                  <button
+                                    type="button" data-pl="meet-apply"
+                                    onClick={() => {
+                                      const o = Math.round(opener);
+                                      const s2 = Math.round(adv.second!);
+                                      const t2 = Math.round(adv.third!);
+                                      setTaperAttemptOverride(cur => ({ ...cur, [l.name]: [o, s2, t2] }));
+                                      onNote(`📌 ${l.name}: рекомендация ${o}/${s2}/${t2} кг внесена в план (печать/экспорт увидят её).`);
+                                    }}
+                                    style={{ ...BTN_GHOST, minHeight: 26, fontSize: 9, padding: '3px 8px', marginTop: 3, background: 'rgba(251,191,36,0.12)', color: '#fbbf24', border: '1px solid rgba(251,191,36,0.35)' }}
+                                  >📌 Принять в план</button>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })()}
                       </div>
                     );
-                  })()}
-                  {att?.lifts[0] && (() => {
-                    const ov = taperAttemptOverride[att.lifts[0].name];
-                    // Разминка считается от ЭФФЕКТИВНОГО опенера (свои веса тоже
-                    // должны вести разминку; раньше база была только расчётной).
-                    const opener = ov ? scale(ov[0]) : scale(att.lifts[0].opener);
-                    const baseWarmup = att.lifts[0].warmup ?? [];
-                    const ratio = att.lifts[0].opener > 0 ? opener / scale(att.lifts[0].opener) : 1;
-                    const steps = baseWarmup.length > 0
-                      ? baseWarmup.map(s => ({ pct: s.pct, weight: Math.round(s.weight * ratio * 2) / 2, reps: s.reps }))
-                      : MEET_WARMUP_STEPS.map(p => ({ pct: p, weight: Math.round(opener * p * 2) / 2, reps: p < 0.7 ? 5 : p < 0.85 ? 3 : 1 }));
-                    if (!opener) return null;
-                    return <div style={{ marginTop: 4, fontSize: 9, color: '#fff' }}>🔥 Разминка: {steps.map(s => `${Math.round(s.pct * 100)}%×${s.reps}`).join(' → ')} ({steps.map(s => s.weight).join('/')} кг)</div>;
-                  })()}
+                  })}
+                  {/* Свои прикиды и разминка — теперь внутри карточки КАЖДОГО лифта (выше). */}
+
                 </div>
                 );
               })())}
@@ -1039,6 +1340,64 @@ export const PLCompetitionTab: React.FC<{ api: PLCompetitionTabApi }> = ({ api }
             </div>
           );
         })()}
+      />
+      {/* 💾 Фаза 6, п.8: бэкап/восстановление PL-сессии (всё живёт в localStorage) */}
+      <ExpandableCard
+        icon="💾"
+        title="💾 Бэкап PL-сессии"
+        short="Сессия, макро-цикл, тапер, факты попыток и сохранённые планы живут только в localStorage. Скачайте бэкап перед чисткой данных или переносом на другое устройство."
+        full={
+          <div data-pl="pl-backup">
+            <button
+              type="button"
+              data-pl="pl-backup-download"
+              onClick={() => {
+                const backup = collectPLBackup(localStorage);
+                if (!backup) { setBackupLog(['⚠ Нет PL-данных для бэкапа — сначала соберите план/сезон.']); return; }
+                const keysCount = Object.keys(backup.keys).length;
+                void saveTextFileApk(`pl-backup-${localIsoDateOffset(0)}.json`, JSON.stringify(backup, null, 2), 'application/json;charset=utf-8')
+                  .then(out => setBackupLog(out === 'failed'
+                    ? ['⚠ Не удалось сохранить файл бэкапа.']
+                    : [`✔ Бэкап: ${keysCount} ключ(ей) — ${Object.keys(backup.keys).map(k => PL_BACKUP_KEY_LABEL[k as keyof typeof PL_BACKUP_KEY_LABEL] ?? k).join(', ')}`]))
+                  .catch(e => setBackupLog([`⚠ Ошибка бэкапа: ${(e as Error).message}`]));
+              }}
+              style={{ ...BTN_GHOST, minHeight: 34, fontSize: 10, padding: '5px 10px', background: 'rgba(0,230,138,0.1)', color: '#00e68a', border: '1px solid rgba(0,230,138,0.35)' }}
+            >⬇ Скачать бэкап</button>
+            <div style={{ fontSize: 9, color: '#fff', opacity: 0.75, margin: '8px 0 4px', lineHeight: 1.45 }}>
+              Восстановление: вставьте JSON файла бэкапа ниже. Пишутся только ключи PL-сессии — чужие ключи игнорируются.
+            </div>
+            <textarea
+              value={backupText}
+              onChange={e => setBackupText(e.target.value)}
+              aria-label="JSON бэкапа PL"
+              placeholder='{"app":"bodybuildhealth","kind":"pl-backup",...}'
+              style={{ width: '100%', minHeight: 72, padding: 6, borderRadius: 8, background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.12)', color: '#fff', fontSize: 10, fontFamily: 'monospace', boxSizing: 'border-box' }}
+            />
+            <button
+              type="button"
+              data-pl="pl-backup-restore"
+              onClick={() => {
+                const parsed = parsePLBackup(backupText);
+                if (parsed.error || !parsed.backup) { setBackupLog([`⛔ ${parsed.error ?? 'не удалось разобрать бэкап'}`]); return; }
+                const res = restorePLBackup(parsed.backup, localStorage);
+                const lines = [
+                  ...res.restored.map(k => `✔ ${PL_BACKUP_KEY_LABEL[k as keyof typeof PL_BACKUP_KEY_LABEL] ?? k}`),
+                  ...res.skipped.map(k => `⚠ пропущено: ${k}`),
+                  ...(res.error ? [`⚠ ${res.error}`] : []),
+                  '♻️ Перезагрузите экран, чтобы приложение подхватило восстановленные данные.',
+                ];
+                setBackupLog(lines);
+                onNote(`♻️ Восстановлено ключей: ${res.restored.length}${res.skipped.length ? `, пропущено: ${res.skipped.length}` : ''}.`);
+              }}
+              style={{ ...BTN_GHOST, minHeight: 34, fontSize: 10, padding: '5px 10px', marginTop: 6, background: 'rgba(251,191,36,0.1)', color: '#fbbf24', border: '1px solid rgba(251,191,36,0.3)' }}
+            >♻️ Восстановить</button>
+            {backupLog.length > 0 && (
+              <div data-pl="pl-backup-log" style={{ marginTop: 6, fontSize: 9, color: '#fff', opacity: 0.9, lineHeight: 1.45 }}>
+                {backupLog.map((l, i) => <div key={i}>{l}</div>)}
+              </div>
+            )}
+          </div>
+        }
       />
     </BbCard>
   );

@@ -68,16 +68,22 @@ const GOAL_TO_PERIOD: Record<UserGoal, string[]> = {
   speed: ['strength', 'mixed', 'endurance'],
 };
 
-const LEVEL_ORDER = ['novice', 'II-KMS', 'II-MS', 'KMS-MS', 'intermediate', 'KMS-MSMK', 'MS-MSMK'];
+/**
+ * Канон уровней ПЛ (от слабого к сильному). Один список на селектор и сезон:
+ * раньше он был скопирован в двух файлах, и «intermediate» стоял МЕЖДУ
+ * KMS-MS и KMS-MSMK — цикл среднего уровня считался «сложнее» цикла KMS.
+ */
+export const PL_LEVEL_ORDER = ['novice', 'intermediate', 'II-KMS', 'II-MS', 'KMS-MS', 'KMS-MSMK', 'MS-MSMK'];
 
-function levelRank(lvl: string): number {
-  const i = LEVEL_ORDER.indexOf(lvl);
-  return i < 0 ? 3 : i;
+export function plLevelRank(lvl: string): number {
+  const i = PL_LEVEL_ORDER.indexOf(String(lvl));
+  // Неизвестный уровень — середина шкалы, а не «почти максимум».
+  return i < 0 ? 1 : i;
 }
 
 export function rankCycles(input: LMSSelectorInput): LMSRankedCycle[] {
   const out: LMSRankedCycle[] = [];
-  const userLevelRank = levelRank(input.level);
+  const userLevelRank = plLevelRank(input.level);
   const acceptablePeriods = GOAL_TO_PERIOD[input.goal] || [input.goal];
 
   for (const cycle of LMS_CYCLES) {
@@ -112,7 +118,7 @@ export function rankCycles(input: LMSSelectorInput): LMSRankedCycle[] {
     }
 
     // уровень (близость)
-    const cycleLevelRank = levelRank(m.level);
+    const cycleLevelRank = plLevelRank(m.level);
     const levelDelta = Math.abs(cycleLevelRank - userLevelRank);
     if (levelDelta === 0) { score += 30; rationale.push(`уровень «${m.level}» точное совпадение`); }
     else if (levelDelta === 1) { score += 15; rationale.push(`уровень «${m.level}» близок`); }
@@ -148,11 +154,6 @@ export function rankCycles(input: LMSSelectorInput): LMSRankedCycle[] {
     out.push({ cycle, score, rationale, warnings });
   }
   return out.sort((a, b) => b.score - a.score);
-}
-
-export function selectBestCycle(input: LMSSelectorInput): LMSRankedCycle | null {
-  const ranked = rankCycles(input);
-  return ranked[0] ?? null;
 }
 
 /** Человекочитаемая сводка выбора. */

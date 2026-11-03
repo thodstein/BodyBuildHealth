@@ -36,6 +36,16 @@ export function validateSavedTaperPlan(plan: unknown): LMSBuildOutput | null {
 }
 
 /**
+ * Фаза 6, п.3: экипировка сезона (классика/однослой/многослой). Влияет на
+ * таблицу нормативов ФПР и коэффициенты IPF GL — не на раскладку циклов.
+ */
+export type PLGearMode = 'classic' | 'single-ply' | 'multi-ply';
+
+export function validateSavedGear(v: unknown): PLGearMode {
+  return v === 'single-ply' || v === 'multi-ply' ? v : 'classic';
+}
+
+/**
  * P1-§4: валидация персиста macro-настроек тапера (`plMacroTaperMode`/`plMacroWeightGoal`/
  * `plMacroMockMeet`/`plMacroPostMeet`) — раньше сбрасывались на дефолт после F5.
  * Контекст отдельный от циклового тапера (peakMode/taperWeightGoal): у макроцикла
@@ -75,6 +85,8 @@ export interface PLTaperState {
   peakLayout: PeakWeekLayout; setPeakLayout: React.Dispatch<React.SetStateAction<PeakWeekLayout>>;
   taperWeightGoal: TaperWeightGoal; setTaperWeightGoal: React.Dispatch<React.SetStateAction<TaperWeightGoal>>;
   taperFed: string; setTaperFed: React.Dispatch<React.SetStateAction<string>>;
+  /** Фаза 6, п.3: экипировка сезона (таблица нормативов + очки IPF GL). */
+  taperGear: PLGearMode; setTaperGear: React.Dispatch<React.SetStateAction<PLGearMode>>;
   taperActualPm: Record<string, number>;
   setTaperActualPm: React.Dispatch<React.SetStateAction<Record<string, number>>>;
   taperPlannedPm: Record<string, number>;
@@ -111,6 +123,7 @@ export function usePLTaperState(saved: any, profBodyWeight?: number): PLTaperSta
   const [taperActualPm, setTaperActualPm] = useState<Record<string, number>>(saved?.plTaperActualPm ?? { 'Присед': 0, 'Жим лежа': 0, 'Становая тяга': 0 });
   const [taperPlannedPm, setTaperPlannedPm] = useState<Record<string, number>>(saved?.plTaperPlannedPm ?? { 'Присед': 0, 'Жим лежа': 0, 'Становая тяга': 0 });
   const [taperFed, setTaperFed] = useState<string>(saved?.plTaperFed ?? 'fpr');
+  const [taperGear, setTaperGear] = useState<PLGearMode>(() => validateSavedGear(saved?.plTaperGear));
   const [taperAttemptOverride, setTaperAttemptOverride] = useState<Record<string, number[]>>(() => validateSavedTaperAttemptOverride(saved?.plTaperAttemptOverride));
   const [meetList, setMeetList] = useState<PLMeetListItem[]>(() => {
     const savedList = saved?.plMeetList as PLMeetListItem[] | undefined;
@@ -160,7 +173,8 @@ export function usePLTaperState(saved: any, profBodyWeight?: number): PLTaperSta
     bw, setBw, targetBw, setTargetBw, weeksToMeet, setWeeksToMeet,
     taperWeeksToAdd, setTaperWeeksToAdd, attemptStrategy, setAttemptStrategy,
     peakMode, setPeakMode, peakLayout, setPeakLayout, taperWeightGoal, setTaperWeightGoal,
-    taperFed, setTaperFed, taperActualPm, setTaperActualPm, taperPlannedPm, setTaperPlannedPm,
+    taperFed, setTaperFed, taperGear, setTaperGear,
+    taperActualPm, setTaperActualPm, taperPlannedPm, setTaperPlannedPm,
     taperAttemptOverride, setTaperAttemptOverride,
     mockMeetOn, setMockMeetOn, meetWeekOn, setMeetWeekOn, postMeetOn, setPostMeetOn,
     taperNote, setTaperNote, taperPlan, setTaperPlan,

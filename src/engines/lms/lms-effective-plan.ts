@@ -1,4 +1,5 @@
 import type { LMSBuildOutput, LMSPlanDay, LMSPlanExercise, LMSPlanWeek, LMSWorkSet } from './lms-builder.engine';
+import { getPLVolumeLandmarks } from './lms-builder.engine';
 import { calcCycleMetrics, calcSessionMetrics, type SRExercise } from './lms-metrics.engine';
 
 export interface PLEffectiveEdit {
@@ -38,9 +39,14 @@ function finite(value: unknown, fallback: number): number {
   return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
 }
 
-function normalizeWorkSet(ws: LMSWorkSet, autoReg: PLEffectiveOptions['autoReg'], volumeMultiplier: number, rirShift: number, rirTarget: number | undefined): LMSWorkSet {
-  const sets = Math.max(1, Math.round(ws.sets * volumeMultiplier * finite(autoReg?.volumeMultiplier, 1)));
-  const weight = Math.round(ws.weight * finite(autoReg?.topSetPctMultiplier, 1) * 10) / 10;
+function normalizeWorkSet(ws: LMSWorkSet, autoReg: PLEffectiveOptions['autoReg'], volumeMultiplier: number, rirShift: number, rirTarget: number | undefined, manual?: { weight?: boolean; sets?: boolean }): LMSWorkSet {
+  // Ручная правка веса/подходов приоритетнее авторегуляции: раньше ручной вес
+  // умножался на autoReg.topSetPctMultiplier (например −8 % «дважды»), и
+  // пользователь видел не то, что ввёл.
+  const autoVol = manual?.sets ? 1 : finite(autoReg?.volumeMultiplier, 1);
+  const autoTop = manual?.weight ? 1 : finite(autoReg?.topSetPctMultiplier, 1);
+  const sets = Math.max(1, Math.round(ws.sets * volumeMultiplier * autoVol));
+  const weight = Math.round(ws.weight * autoTop * 10) / 10;
   const rir = Math.max(0, Math.min(6, rirTarget != null ? rirTarget : ws.rir + rirShift + finite(autoReg?.rirShift, 0)));
   return {
     ...ws,
@@ -77,14 +83,24 @@ function applyDay(day: LMSPlanDay, week: number, dayIndex: number, opts: PLEffec
       }
       if (edit?.pct != null && edit.pct > 0) {
         edited.pct = edit.pct;
-        edited.weight = Math.round((edited.weight / ws.pct) * edit.pct * 10) / 10;
+        // База пересчёта — ПМ упражнения. Старый код делил вес на ws.pct
+        // (при pct=0/undefined → Infinity/NaN и «вес 0» в плане).
+        const pmBase = exercise.pm && exercise.pm > 0
+          ? exercise.pm
+          : (ws.pct > 0 ? ws.weight / ws.pct : 0);
+        if (pmBase > 0) edited.weight = Math.round(pmBase * edit.pct * 10) / 10;
       } else if (edit?.weight != null) {
         edited.weight = edit.weight;
+        if (exercise.pm && exercise.pm > 0) edited.pct = Math.round((edit.weight / exercise.pm) * 1000) / 1000;
       }
       if (edit?.reps != null) edited.reps = edit.reps;
       if (edit?.sets != null) edited.sets = Math.max(1, Math.round(edit.sets));
       if (edit?.rir != null) edited.rir = Math.max(0, Math.min(6, edit.rir));
-      return normalizeWorkSet(edited, opts.autoReg, finite(opts.volumeMultiplier, 1), finite(opts.rirShift, 0), opts.rirTarget);
+      // Авторегуляция не должна перемасштабировать то, что человек ввёл руками
+      // (edit.weight/edit.pct). Дневниковая авторегуляция остаётся отдельной осью —
+      // её множители по готовности применяются как раньше.
+      const manual = { weight: edit?.weight != null || (edit?.pct != null && edit.pct > 0), sets: false };
+      return normalizeWorkSet(edited, opts.autoReg, finite(opts.volumeMultiplier, 1), finite(opts.rirShift, 0), opts.rirTarget, manual);
     });
     return { ...exercise, rir: workSets[0]?.rir ?? exercise.rir, workSets };
   });
@@ -106,6 +122,26 @@ function applyDay(day: LMSPlanDay, week: number, dayIndex: number, opts: PLEffec
   return { ...day, exercises, metrics: calcSessionMetrics(exercises.map(toMetricExercise)) };
 }
 
+/**
+ * Восстановить PED-множитель MRV по уже посчитанным порогам плана.
+ *
+ * `getPLVolumeLandmarks` получает множитель из PED-адаптации при сборке, но в
+ * LMSBuildOutput он не сохраняется. Пороги (mrv) = base(level) × множитель,
+ * поэтому коэффициент однозначно восстанавливается сравнением с пробой mult=1.
+ */
+function deriveLandmarkMult(plan: LMSBuildOutput, level: string): number {
+  const stored = plan.plVolumeLandmarks;
+  if (!stored || stored.length === 0) return 1;
+  const probe = getPLVolumeLandmarks(plan.weeks, level, 1);
+  for (const row of stored) {
+    const base = probe.find(p => p.group === row.group);
+    if (base && base.mrv > 0 && row.mrv > 0) {
+      return Math.min(2, Math.max(1, Math.round((row.mrv / base.mrv) * 100) / 100));
+    }
+  }
+  return 1;
+}
+
 export function applyPLEffectiveOverlay(plan: LMSBuildOutput, opts: PLEffectiveOptions = {}): LMSBuildOutput {
   const hasEdits = Object.keys(opts.edits ?? {}).length > 0;
   const hasAdditions = Object.values(opts.additions ?? {}).some(list => list.length > 0);
@@ -117,5 +153,11 @@ export function applyPLEffectiveOverlay(plan: LMSBuildOutput, opts: PLEffectiveO
     ...week,
     days: week.days.map((day, dayIndex) => applyDay(day, week.week, dayIndex, opts)),
   }));
-  return { ...plan, weeks, cycleMetrics: calcCycleMetrics(weeks.flatMap(week => week.days.map(day => day.exercises.map(toMetricExercise)))) };
+  // Отчёт «объём vs MRV» пересчитываем по фактическим неделям оверлея: раньше
+  // plVolumeLandmarks оставался от исходного плана (правки объёма/тапера не видел).
+  const level = plan.template?.meta?.level as string | undefined;
+  const plVolumeLandmarks = level
+    ? getPLVolumeLandmarks(weeks, level, deriveLandmarkMult(plan, level))
+    : plan.plVolumeLandmarks;
+  return { ...plan, weeks, plVolumeLandmarks, cycleMetrics: calcCycleMetrics(weeks.flatMap(week => week.days.map(day => day.exercises.map(toMetricExercise)))) };
 }

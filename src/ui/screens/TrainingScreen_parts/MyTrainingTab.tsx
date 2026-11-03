@@ -68,7 +68,17 @@ export const MyTrainingTab: React.FC<{ customExercises: { name: string; sets: nu
   const [newExSets, setNewExSets] = useState(3);
   const [newExReps, setNewExReps] = useState(10);
   const [newExRir, setNewExRir] = useState(2);
-  const [savedPlans, setSavedPlans] = useState<{ id: string; name: string; date: string; exercises: { name: string; sets: number; reps: number; rir: number }[] }[]>(() => { try { const v = JSON.parse(localStorage.getItem('myTrainingPlans') || '[]'); return (Array.isArray(v) ? v : []).filter((p: any) => p && typeof p === 'object' && typeof p.id === 'string' && Array.isArray(p.exercises)); } catch { return []; } });
+  const [savedPlans, setSavedPlans] = useState<{ id: string; name: string; date: string; exercises: { name: string; sets: number; reps: number; rir: number }[]; weekCount?: number; weeksPlan?: { week: number; exercises: { name: string; sets: number; reps: number; rir: number }[] }[] }[]>(() => { try { const v = JSON.parse(localStorage.getItem('myTrainingPlans') || '[]'); return (Array.isArray(v) ? v : []).filter((p: any) => p && typeof p === 'object' && typeof p.id === 'string' && Array.isArray(p.exercises)); } catch { return []; } });
+  // Многонедельные PL-программы: какую неделю показываем/загружаем (по умолчанию первая).
+  const [planWeek, setPlanWeek] = useState<Record<string, number>>({});
+  /** Недели сохранённого плана (для старых записей — единственная «неделя» из exercises). */
+  const weeksOfPlan = (plan: { exercises: { name: string; sets: number; reps: number; rir: number }[]; weeksPlan?: { week: number; exercises: { name: string; sets: number; reps: number; rir: number }[] }[] }) =>
+    Array.isArray(plan.weeksPlan) && plan.weeksPlan.length > 0 ? plan.weeksPlan : [{ week: 1, exercises: plan.exercises }];
+  const exercisesOfPlan = (plan: { id: string; exercises: { name: string; sets: number; reps: number; rir: number }[]; weeksPlan?: { week: number; exercises: { name: string; sets: number; reps: number; rir: number }[] }[] }) => {
+    const ws = weeksOfPlan(plan);
+    const idx = Math.min(Math.max(0, (planWeek[plan.id] ?? 1) - 1), ws.length - 1);
+    return ws[idx]?.exercises ?? plan.exercises;
+  };
   const [planName, setPlanName] = useState('');
   const [savedCycles, setSavedCycles] = useState<{ id: string; name: string; date: string; weeks: number; goal: string; level: string; days: number }[]>(() => { try { const v = JSON.parse(localStorage.getItem('myTrainingCycles') || '[]'); return Array.isArray(v) ? v.filter((p: unknown) => p && typeof p === 'object' && typeof (p as { id?: unknown }).id === 'string') : []; } catch { return []; } });
   const [cycleName, setCycleName] = useState('');
@@ -236,13 +246,14 @@ export const MyTrainingTab: React.FC<{ customExercises: { name: string; sets: nu
               <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:4}}>
                 <div>
                   <div style={{fontSize:11,fontWeight:700,color:'#fff'}}>{plan.name}</div>
-                  <div style={{fontSize:11,color:'#fff'}}>{new Date(plan.date).toLocaleDateString('ru')} · {plan.exercises.length} упр.</div>
+                  <div style={{fontSize:11,color:'#fff'}}>{new Date(plan.date).toLocaleDateString('ru')} · {exercisesOfPlan(plan).length} упр.{weeksOfPlan(plan).length > 1 ? ` · ${weeksOfPlan(plan).length} нед` : ''}</div>
                 </div>
                 <div style={{display:'flex',gap:4,flexWrap:'wrap'}}>
-                  <button onClick={()=>loadPlan(plan)} style={{padding:'3px 8px',borderRadius:8,border:'1px solid rgba(0,230,138,0.2)',background:'rgba(0,230,138,0.08)',color:'#00e68a',fontSize:11,cursor:'pointer'}}>Загрузить</button>
-                  <button onClick={()=>{ setCustomExercises(prev=>[...prev, ...plan.exercises]); showToast('Добавлено ' + plan.exercises.length + ' упр. к текущему списку', 'ok'); }} style={{padding:'3px 8px',borderRadius:8,border:'1px solid rgba(139,92,246,0.2)',background:'rgba(139,92,246,0.08)',color:'#8b5cf6',fontSize:11,cursor:'pointer'}}>➕ В мою</button>
+                  <button onClick={()=>loadPlan({ ...plan, exercises: exercisesOfPlan(plan) })} style={{padding:'3px 8px',borderRadius:8,border:'1px solid rgba(0,230,138,0.2)',background:'rgba(0,230,138,0.08)',color:'#00e68a',fontSize:11,cursor:'pointer'}}>Загрузить</button>
+                  <button onClick={()=>{ const exs = exercisesOfPlan(plan); setCustomExercises(prev=>[...prev, ...exs]); showToast('Добавлено ' + exs.length + ' упр. к текущему списку', 'ok'); }} style={{padding:'3px 8px',borderRadius:8,border:'1px solid rgba(139,92,246,0.2)',background:'rgba(139,92,246,0.08)',color:'#8b5cf6',fontSize:11,cursor:'pointer'}}>➕ В мою</button>
                   <button onClick={() => {
-                    const exs = Array.isArray((plan as any).exercises) ? (plan as any).exercises : (Array.isArray((plan as any).days) ? (plan as any).days.flatMap((d:any)=>d.exercises||[]) : []);
+                    const selected = exercisesOfPlan(plan);
+                    const exs = Array.isArray(selected) && selected.length > 0 ? selected : (Array.isArray((plan as any).exercises) ? (plan as any).exercises : (Array.isArray((plan as any).days) ? (plan as any).days.flatMap((d:any)=>d.exercises||[]) : []));
                     const data = exs.map((e:any) => ({ name: e.name, sets: e.sets || e.sets || 3, reps: e.reps || 10, rir: e.rir ?? 2 }));
                     applyToPlanner({ kind: 'split', label: plan.name, data });
                     if (onLoadToConstructor) { onLoadToConstructor({ name: plan.name, exercises: exs }); showToast('План «' + plan.name + '» (' + exs.length + ' упр.) загружен в конструктор', 'ok'); }
@@ -251,8 +262,18 @@ export const MyTrainingTab: React.FC<{ customExercises: { name: string; sets: nu
                   <button onClick={()=>deletePlan(plan.id)} style={{padding:'3px 8px',borderRadius:8,border:'1px solid rgba(239,68,68,0.2)',background:'rgba(239,68,68,0.08)',color:'#f87171',fontSize:11,cursor:'pointer'}}>Удалить</button>
                 </div>
               </div>
+              {weeksOfPlan(plan).length > 1 && (
+                <div style={{display:'flex',gap:3,flexWrap:'wrap',marginBottom:4}}>
+                  {weeksOfPlan(plan).map(w => {
+                    const active = (planWeek[plan.id] ?? 1) === w.week;
+                    return (
+                      <button key={w.week} onClick={() => setPlanWeek(p => ({ ...p, [plan.id]: w.week }))} style={{padding:'2px 8px',borderRadius:8,fontSize:10,fontWeight:700,cursor:'pointer',minHeight:26,border:active?'1px solid rgba(0,230,138,0.35)':'1px solid rgba(255,255,255,0.10)',background:active?'rgba(0,230,138,0.14)':'rgba(255,255,255,0.04)',color:active?'#00e68a':'#fff'}}>нед {w.week}</button>
+                    );
+                  })}
+                </div>
+              )}
               <div style={{display:'flex',flexWrap:'wrap',gap:3}}>
-                {plan.exercises.map((ex,i) => (
+                {exercisesOfPlan(plan).map((ex,i) => (
                   <span key={i} style={{fontSize:11,padding:'2px 6px',borderRadius:8,background:'rgba(0,230,138,0.06)',border:'1px solid rgba(0,230,138,0.12)',color:'#fff'}}>{ex.name} {ex.sets}×{ex.reps}</span>
                 ))}
               </div>

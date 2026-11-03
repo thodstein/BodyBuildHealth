@@ -225,12 +225,15 @@ export function applyMacroTaperToPLWeeks(weeks: LMSPlanWeek[], opts?: MacroTaper
     const peakIdx: number[] = [];
     for (let p = ci - 1; p >= 0 && out[p].macroPhase === 'peak'; p--) peakIdx.unshift(p);
     // Применяем ВСЮ кривую (ramp + taper) к доступным peak-неделям; если peak-недель
-    // меньше — берём последние applyCount точек (финал всегда самый глубокий).
+    // меньше — берём ПОСЛЕДНИЕ applyCount точек (финал всегда самый глубокий).
+    // Раньше брали curve[0..applyCount-1] — начало кривой, и финальная неделя
+    // получала неглубокий тапер (аудит 2026-11).
     const applyCount = Math.min(curve.length, peakIdx.length);
+    const curveOffset = Math.max(0, curve.length - applyCount);
     for (let t = 0; t < applyCount; t++) {
       const idx = peakIdx[peakIdx.length - applyCount + t];
       if (alreadyMarked(out[idx])) continue;
-      out[idx] = applyCurvePoint(out[idx], curve[t], strategy, t === applyCount - 1);
+      out[idx] = applyCurvePoint(out[idx], curve[curveOffset + t], strategy, t === applyCount - 1);
     }
     if (applyCount > 0) notes.push(`📉 Тапер (${mode}): нед ${peakIdx.slice(-applyCount).map(i => out[i].week).join(', ')} — объём ↓, RIR ↑.`);
 

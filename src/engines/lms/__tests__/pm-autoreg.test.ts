@@ -3,6 +3,7 @@ import type { WorkoutLog } from '../../core/types';
 import { autoWeeklyPercent, pmDiaryMultiplier, type PMAutoRegMode } from '../pm-autoreg.engine';
 import { buildLMSPlan, type LMSBuildOutput } from '../lms-builder.engine';
 import { CYCLE_01 } from '../../../data/lms-cycles/cycle-01';
+import { localIsoDateOffset } from '../../../core/local-date';
 
 const tpl = CYCLE_01;
 const basePm = { 'Присед': 120, 'Жим лежа': 100, 'Становая тяга': 140 };
@@ -20,8 +21,11 @@ function lastWeekPm(out: LMSBuildOutput, exName: string): number {
   return wk.days[0].exercises.find(e => e.name === exName)?.pm ?? 0;
 }
 
+// Дата внутри 90-дневного окна findLastFact (иначе тест «протухает»: окно отсекает запись).
+const RECENT = localIsoDateOffset(-14);
+
 const makeLog = (name: string, weight: number, reps: number, e1?: number): WorkoutLog => ({
-  date: '2026-08-01',
+  date: RECENT,
   exercises: [{ exerciseName: name, weight, reps, sets: [{ weight, reps }], ...(e1 != null ? { estimated1RM: e1 } : {}) }],
 });
 

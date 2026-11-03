@@ -9,7 +9,7 @@
 import React, { useState } from 'react';
 import { getCycleById, LMS_CYCLES } from '../../../data/lms-cycles/lms-cycle-index';
 import { detectLift } from '../../../engines/lms/lms-to-pl';
-import { originalCycleWeeks, getPLWeakPointRecommendations, computeMeetAttemptsFromPmRow, type LMSBuildOutput } from '../../../engines/lms/lms-builder.engine';
+import { originalCycleWeeks, getPLWeakPointRecommendations, computeMeetAttemptsFromPmRow, getPLVolumeBreakdown, getPLVolumeLandmarksByMuscle, type LMSBuildOutput } from '../../../engines/lms/lms-builder.engine';
 import { mesocyclePhaseForWeek, type MesocyclePhase } from '../../../engines/rir-matrix.engine';
 import { macroPhaseToLmsPhase } from '../../../engines/periodization/phase-bridge';
 import { shouldTrainToday, type AutoRegOutput } from '../../../engines/pro/autoregulation-pro.engine';
@@ -182,6 +182,8 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
   const [expWeek, setExpWeek] = useState<number | null>(null);
   // 📈 «План vs факт»: раскрытие разбивки по дням (раунд 3, §5-bis п.3).
   const [factDaysOpen, setFactDaysOpen] = useState(false);
+  // 📊 P2-2: объём «по группам» (канон) ↔ «по мышцам» (композиты разложены пропорционально).
+  const [volByMuscle, setVolByMuscle] = useState(false);
 
   const displayPhaseForWeek = (week: LMSBuildOutput['weeks'][number], totalWeeks: number): string => {
     return week.macroPhase
@@ -931,19 +933,23 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
                      const cycle = LMS_CYCLES.find(c => c.meta.id === selectedCycleId);
                      const saveSrc = effectiveSrc ?? builtSrc;
                      // Полный формат «Моих тренировок»: id + exercises (иначе вкладка «Планы» крашится на plan.exercises.length).
-                     const week1 = saveSrc.weeks[0];
-                    const exercises = week1 ? week1.days.flatMap(d => d.exercises.map(e => ({
-                      name: e.name,
-                      sets: e.workSets.reduce((s, ws) => s + ws.sets, 0),
-                      reps: e.workSets[0]?.reps ?? 5,
-                      rir: e.workSets[0]?.rir ?? e.rir ?? 2,
-                    }))) : [];
-                    const plan = { id: 'plplan_' + Date.now(), name: `PL ${cycle?.meta.title || selectedCycleId || 'цикл'}`, date: new Date().toISOString(), exercises, weekCount: totalW, cycleWeeks };
+                     // `exercises` остаётся плоским списком ПЕРВОЙ недели (обратная совместимость с
+                     // MyTrainingTab/ProgramsTab/BbAutoConstructor), а полный цикл пишем в `weeksPlan`,
+                     // чтобы «сохранённая программа» не теряла недели 2..N.
+                     const weekToExercises = (w: typeof saveSrc.weeks[number] | undefined) => w ? w.days.flatMap(d => d.exercises.map(e => ({
+                       name: e.name,
+                       sets: e.workSets.reduce((s, ws) => s + ws.sets, 0),
+                       reps: e.workSets[0]?.reps ?? 5,
+                       rir: e.workSets[0]?.rir ?? e.rir ?? 2,
+                     }))) : [];
+                    const exercises = weekToExercises(saveSrc.weeks[0]);
+                    const weeksPlan = saveSrc.weeks.map(w => ({ week: w.week, exercises: weekToExercises(w) }));
+                    const plan = { id: 'plplan_' + Date.now(), name: `PL ${cycle?.meta.title || selectedCycleId || 'цикл'}`, date: new Date().toISOString(), exercises, weeksPlan, weekCount: weeksPlan.length, cycleWeeks };
                     const existing = JSON.parse(localStorage.getItem('myTrainingPlans') || '[]');
                     // Отбрасываем битые записи старых версий (без exercises) — они ломали рендер «Планы».
                     const updated = [...(Array.isArray(existing) ? existing : []).filter((p: any) => p && typeof p === 'object' && Array.isArray(p.exercises)), plan].slice(-30);
                     localStorage.setItem('myTrainingPlans', JSON.stringify(updated));
-                    onNote(`✓ Программа сохранена в «Мои тренировки»: ${plan.name} — ${exercises.length} упр. · ${totalW} нед`);
+                    onNote(`✓ Программа сохранена в «Мои тренировки»: ${plan.name} — ${exercises.length} упр. · ${weeksPlan.length} нед`);
                   } catch (e) { onNote(`⚠ Ошибка сохранения: ${(e as Error).message}`); }
                 }} />
                 <button
@@ -1107,16 +1113,22 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
                                  {tempo && <span style={{ fontSize:10, color:'#fff', padding:'3px 6px', borderRadius:6, background:'rgba(168,85,247,0.1)', border:'0.5px solid rgba(168,85,247,0.2)', display:'flex', justifyContent:'space-between' }}><span style={{ color:'rgba(168,85,247,0.8)' }}>Темп</span><b style={{color:'#fff'}}>{tempo}</b></span>}
                                 <span style={{ fontSize:10, color:'#fff', padding:'3px 6px', borderRadius:6, background:'rgba(255,255,255,0.05)', border:'0.5px solid rgba(255,255,255,0.1)', display:'flex', justifyContent:'space-between' }}><span style={{ color:'#fff' }}>Группа</span><b style={{color:'#fff'}}>{e.group}</b></span>
                               </div>
-                              <div style={{ marginTop:5, display:'flex', flexDirection:'column', gap:3 }}>
+                              <div data-pl="set-list-body" style={{ marginTop:5, display:'flex', flexDirection:'column', gap:3 }}>
                                 {(() => {
-                                  const allSets: { ws: typeof e.workSets[number]; si: number; blockIdx: number; repIdx: number }[] = [];
-                                  e.workSets.forEach((ws, blockIdx) => {
+                                  // Ключ правки — НАЧАЛЬНЫЙ индекс work-set блока (контракт
+                                  // applyPLEffectiveOverlay: одна правка на блок). Для строк
+                                  // 2..N внутри блока берём тот же ключ.
+                                  const allSets: { ws: typeof e.workSets[number]; si: number; blockStart: number; repIdx: number }[] = [];
+                                  let flat = 0;
+                                  e.workSets.forEach((ws) => {
+                                    const blockStart = flat;
                                     for (let r = 0; r < ws.sets; r++) {
-                                      allSets.push({ ws, si: allSets.length, blockIdx, repIdx: r });
+                                      allSets.push({ ws, si: allSets.length, blockStart, repIdx: r });
                                     }
+                                    flat += ws.sets;
                                   });
-                                  return allSets.map(({ ws, si, blockIdx }) => {
-                                    const es = adjustDisplaySet(ws, blockIdx);
+                                  return allSets.map(({ ws, si, blockStart }) => {
+                                    const es = adjustDisplaySet(ws, blockStart);
                                     return (
                                       <div key={si} style={{ fontSize:11, color:'#fff', padding:'4px 8px', borderRadius:6, background:'rgba(255,255,255,0.03)', border:'0.5px solid rgba(255,255,255,0.06)', display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' }}>
                                         <span style={{ fontSize:9, fontWeight:700, color:'rgba(0,230,138,0.7)', minWidth:40 }}>Сет {si+1}</span>
@@ -1159,16 +1171,49 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
                    <div style={{ ...SMALL, background:'var(--accent-dim)', padding:'6px 8px', borderRadius:8 }}>УОИ: <b style={{color:'#fff'}}>{displaySrc.cycleMetrics.uoi.toFixed(3)}</b></div>
                 </div>
               </MetricCard>
-               {displaySrc && displaySrc.plVolumeLandmarks && displaySrc.plVolumeLandmarks.length > 0 && (
+               {displaySrc && displaySrc.plVolumeLandmarks && displaySrc.plVolumeLandmarks.length > 0 && (() => {
+                // P2-2: вклад упражнений в группу — видно, ИЗ-ЗА ЧЕГО перебор,
+                // без введения мелких мышечных групп и новых порогов.
+                const breakdown = getPLVolumeBreakdown(displaySrc.weeks);
+                // PED-множитель MRV — один расчёт на оба режима (заголовок и строки).
+                const pedFactor = (() => {
+                  if (!(pedAuto && peds.length > 0)) return 1;
+                  try {
+                    const lm = Object.fromEntries(Object.entries(getAllVolumeLandmarks(level)).map(([k, v]) => [k, v.mrv]));
+                    return adaptForPEDs(peds, lm, pedDoses, courseIntensity).combinedMrvMultiplier;
+                  } catch { return 1; }
+                })();
+                // «По мышцам» — те же пороги, но объём композитов разложен пропорционально.
+                const volRows = volByMuscle
+                  ? getPLVolumeLandmarksByMuscle(displaySrc.weeks, level, pedFactor)
+                  : displaySrc.plVolumeLandmarks;
+                return (
                 <MetricCard title={'Объём vs MRV (volume-landmarks)'} icon="📊">
-                  <div style={{ color:'#fff', fontSize:11, marginBottom:8 }}>
-                     Пиковая неделя: {displaySrc.plVolumeLandmarks[0].peakWeek}{W.some(w => w.macroPhase === 'competition') ? ` · 📉 +${W.filter(w => w.macroPhase === 'competition').length} тапер-нед` : ''}{pedAuto && peds.length > 0 ? ` · 💉 MRV ×${Math.max(1, (() => { try { const lm = Object.fromEntries(Object.entries(getAllVolumeLandmarks(level)).map(([k, v]) => [k, v.mrv])); return adaptForPEDs(peds, lm, pedDoses, courseIntensity).combinedMrvMultiplier; } catch { return 1; } })()).toFixed(2)} (PED)` : ''}
+                  <div style={{ display: 'flex', gap: 4, marginBottom: 8 }}>
+                    <button
+                      data-pl="vol-mode-group"
+                      onClick={() => setVolByMuscle(false)}
+                      style={{ padding: '4px 8px', borderRadius: 6, border: 'none', fontSize: 10, fontWeight: 700, cursor: 'pointer', color: '#fff', background: volByMuscle ? 'rgba(255,255,255,0.12)' : '#00e68a' }}
+                    >Группы</button>
+                    <button
+                      data-pl="vol-mode-muscle"
+                      onClick={() => setVolByMuscle(true)}
+                      style={{ padding: '4px 8px', borderRadius: 6, border: 'none', fontSize: 10, fontWeight: 700, cursor: 'pointer', color: '#fff', background: volByMuscle ? '#00e68a' : 'rgba(255,255,255,0.12)' }}
+                    >По мышцам</button>
                   </div>
-                   {displaySrc.plVolumeLandmarks.map((lm) => {
+                  {volByMuscle && (
+                    <div style={{ color:'#fff', fontSize:9, opacity:0.7, marginBottom:6 }}>
+                      Композиты разложены пропорционально: присед/выпады 60 % квадрицепс · 40 % бицепс бедра; жим 65/25/10 грудь/трицепс/передняя дельта; становая 45/30/25 бицепс бедра/ягодицы/спина. Суммарный объём плана не меняется.
+                    </div>
+                  )}
+                  <div style={{ color:'#fff', fontSize:11, marginBottom:8 }}>
+                     Пиковая неделя: {volRows[0].peakWeek}{W.some(w => w.macroPhase === 'competition') ? ` · 📉 +${W.filter(w => w.macroPhase === 'competition').length} тапер-нед` : ''}{pedAuto && peds.length > 0 ? ` · 💉 MRV ×${Math.max(1, pedFactor).toFixed(2)} (PED)` : ''}
+                  </div>
+                   {volRows.map((lm) => {
                     const c = lm.status === 'over' ? '#ff5252' : lm.status === 'high' ? '#ffb74d' : lm.status === 'optimal' ? '#4caf50' : '#90caf9';
                     const lbl = lm.status === 'over' ? 'ПЕРЕБОР' : lm.status === 'high' ? 'высоко' : lm.status === 'optimal' ? 'оптимум' : 'низко';
                     return (
-                      <div key={lm.group} style={{ marginBottom: 6, minWidth: 0 }}>
+                      <div key={lm.group} data-pl="volume-row" style={{ marginBottom: 6, minWidth: 0 }}>
                         <div style={{ display:'flex', justifyContent:'space-between', gap: 6, flexWrap: 'wrap' }}>
                           <span style={{ color:'#fff', fontSize:12, minWidth: 0, overflowWrap: 'break-word' }}>{lm.muscle}</span>
                           <span style={{ color: c, fontSize:11, fontWeight:700, whiteSpace: 'nowrap' }}>{lm.sets} сет · MRV {lm.mrv} · {lbl}</span>
@@ -1177,14 +1222,20 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
                         <div style={{ height:6, background:'rgba(255,255,255,0.1)', borderRadius:3, marginTop:3, overflow:'hidden' }}>
                           <div style={{ width: `${Math.min(100, (lm.sets / lm.mrv) * 100)}%`, height:'100%', background:c, borderRadius:3 }} />
                         </div>
+                        {!volByMuscle && breakdown.rows.filter(r => r.group === lm.group).slice(0, 3).map(r => (
+                          <div key={r.exercise} data-pl="volume-share" style={{ fontSize: 9, color: '#fff', opacity: 0.85, marginTop: 2 }}>
+                            · {r.exercise} — {r.sets} сет{r.sharePct >= 1 ? ` (${r.sharePct}%)` : ''}
+                          </div>
+                        ))}
                       </div>
                     );
                   })}
-                   {displaySrc.plVolumeLandmarks.some(l => l.status === 'over') && (
+                   {volRows.some(l => l.status === 'over') && (
                     <div style={{ color:'#ff5252', fontSize:11, marginTop:4 }}>⚠ Объём выше верхней границы MRV. Важно: MRV — это верх РАБОЧЕГО ДИАПАЗОНА ориентировочной модели, а не потолок организма. В РКИ (Camargo 2026, +120 % объёма за 8 недель) ухудшения адаптации не нашли, поэтому решение ваше: снизить объём, если восстановление вас не устраивает, или оставить как есть.</div>
                   )}
                 </MetricCard>
-              )}
+                );
+              })()}
               {/* Календарь цикла: оригинальный / с учётом тапера */}
               <div style={{ marginTop: 4, display: 'flex', justifyContent: 'flex-end' }}>
                 <CalendarViewSwitch

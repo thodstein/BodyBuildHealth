@@ -109,6 +109,23 @@ describe('planBetweenCompetitions', () => {
     expect(Object.keys(meetWeek!.pmRow).length).toBeGreaterThan(0);
   });
 
+  // P2-6: неделя без тренировочного блока должна быть ПОМЕЧЕНА, а не выглядеть планом.
+  it('P2-6: без цикла недели помечаются emptyBlock + причина, счётчики честные', () => {
+    // Старт через 2 недели при тапере mock+старт+пост: тренировочного окна нет →
+    // сегмент пропущен, недели остаются в календаре, но помечены.
+    const res = planBetweenCompetitions(
+      [{ id: 'm1', name: 'Старт', weeksToStart: 2 }],
+      { ...opts, mode: 'auto' } as never,
+    );
+    const empties = res.weeks.filter(w => w.emptyBlock);
+    expect(empties.length).toBeGreaterThan(0);
+    expect(empties.every(w => w.days.length === 0)).toBe(true);
+    expect(empties.every(w => typeof w.blockNote === 'string' && w.blockNote.length > 0)).toBe(true);
+    expect(res.emptyWeeks).toEqual(empties.map(w => w.week));
+    expect(res.trainingWeeks).toBe(res.totalPlanWeeks - empties.length);
+    expect(res.notes.some(n => n.includes('Без тренировочного блока'))).toBe(true);
+  });
+
   it('несколько стартов подряд: окна не накладываются, у каждого старта пик-блок (с согласием)', () => {
     const res = planBetweenCompetitions(
       [

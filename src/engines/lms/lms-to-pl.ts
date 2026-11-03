@@ -51,8 +51,11 @@ export function detectLift(name: string, group: string): 'squat' | 'bench' | 'de
   // с весом от ПМ становой) — требуем тяговый контекст рядом.
   if (/станов|румын|сумо|прямых ног|плинт/i.test(haystack)) return 'dead';
   if (/из ямы|с ямы/i.test(haystack) && /тяг|станов|deadlift/i.test(haystack)) return 'dead';
-  // Deadlift: "тяг" but NOT row/pulldown variants.
-  if (/тяг/i.test(haystack) && !/верхнего|нижнего|горизонтального|блока|в наклон|к поясу|гантел|штанг|к груди/i.test(haystack)) return 'dead';
+  // Deadlift: «тяг» без маркеров ТЯГОВОГО движения. Список исключений —
+  // это варианты ТЯГИ К СЕБЕ (горизонтальные/вертикальные тяги, тяга к
+  // подбородку, Т-гриф, узким хватом): раньше они получали ПМ становой
+  // (аудит 2026-11, P1-12).
+  if (/тяг/i.test(haystack) && !/верхнего|нижнего|горизонтального|блока|в наклон|к поясу|гантел|штанг|к груди|подбородк|узким|т-?гриф|к лицу|сидя|одной рукой|рывков|протяжк|шраги/i.test(haystack)) return 'dead';
   if (/прис|скв/i.test(haystack)) return 'squat';
   return null;
 }

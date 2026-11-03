@@ -333,6 +333,18 @@ describe('раунд 3: сезонный ICS с тренировочными с�
     expect(ics).toMatch(/DESCRIPTION:.*\d+×\d+ @\d+кг/);
   });
 
+  it('каждый VEVENT несёт UID и DTSTAMP (RFC 5545, аудит 2026-11 P2-3)', () => {
+    const plan = appendPLTaperWeeks(base(), 2, { windowWeeks: 4, reference: '2026-12-20', mockMeet: { strategy: 'balanced' }, meetWeek: { strategy: 'balanced' } });
+    const ics = buildPLSeasonIcs(plan.weeks, [{ id: 'm1', name: 'Старт', weeksToStart: 8 }], { todayIso: TODAY, seasonStart: '2026-09-07', withTrainingSessions: true });
+    const events = (ics.match(/BEGIN:VEVENT/g) || []).length;
+    expect(events).toBeGreaterThan(0);
+    expect((ics.match(/^UID:/gm) || []).length).toBe(events);
+    expect((ics.match(/^DTSTAMP:/gm) || []).length).toBe(events);
+    // UID стабилен между экспортами — повторный импорт не даёт дублей.
+    const again = buildPLSeasonIcs(plan.weeks, [{ id: 'm1', name: 'Старт', weeksToStart: 8 }], { todayIso: TODAY, seasonStart: '2026-09-07', withTrainingSessions: true });
+    expect((again.match(/^UID:.*$/gm) || [])).toEqual((ics.match(/^UID:.*$/gm) || []));
+  });
+
   it('без дат и seasonStart сессии честно пропускаются', () => {
     const ics = buildPLSeasonIcs(base().weeks, [], { todayIso: TODAY, withTrainingSessions: true });
     expect(ics).not.toContain('VEVENT');

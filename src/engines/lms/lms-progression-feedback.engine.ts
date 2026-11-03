@@ -1,12 +1,6 @@
 /**
  * lms-progression-feedback.engine.ts — замыкание цикла «дневник → план» для ПЛ-авто.
  *
- * @deprecated Фаза 1 аудита ПЛ-авто (docs/PL-AUTO-TOP-TOOL-PLAN.md): движок не
- * подключён ни к UI, ни к buildLMSPlan — единственные потребители в тестах.
- * Живая обратная связь дневника для ПЛ идёт через diary-autoreg + pm-autoreg.
- * Подключение этой петли изменило бы математику весов плана — отложено до
- * отдельного решения пользователя; удаление — в фазе очистки (P2).
- *
  * Аналог bb-progression-feedback.engine.ts, адаптированный под LMSBuildOutput:
  * для каждого упражнения последней недели плана находим последнюю запись в дневнике,
  * считаем e1RM, фактический RIR vs целевого → рекомендация на следующую неделю
@@ -21,7 +15,6 @@ import { epley1RM } from '../e1rm';
 import { mesocyclePhaseForWeek } from '../rir-matrix.engine';
 import { macroPhaseToLmsPhase } from '../periodization/phase-bridge';
 import type { MacroPhase } from './macrocycle.engine';
-import { toLocalIso } from './cardio-date-utils.engine';
 
 export interface PLExerciseLastResult {
   exerciseName: string;
@@ -91,7 +84,7 @@ function buildLastResultIndex(sessions: WorkoutSession[]): Map<string, PLExercis
   const ninetyDaysAgo = (() => {
     const d = new Date();
     d.setDate(d.getDate() - 90);
-    return toLocalIso(d);
+    return d.toISOString().slice(0, 10);
   })();
   for (const s of sorted) {
     // Only consider sessions within the last 90 days for the "best e1RM" selection.

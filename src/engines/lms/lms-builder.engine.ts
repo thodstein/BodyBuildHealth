@@ -19,7 +19,7 @@ import { diagnoseLift } from '../pro/lift-diagnostics.engine';
 import type { LimiterProtocol } from '../pro/limiter-calculator.engine';
 import { LMS_EXERCISES } from '../../data/lms-cycles/lms-exercises';
 
-import { computeVolumeLandmarks, getVolumeLandmarks, getAllVolumeLandmarks } from '../volume-landmarks.engine';
+import { computeVolumeLandmarks, getVolumeLandmarks, getAllVolumeLandmarks, normMuscle, checkVolumeStatus, MUSCLE_LABEL_RU } from '../volume-landmarks.engine';
 import { adaptForPEDs, type PED } from '../bb/bb-ped-adaptation.engine';
 import { derivePattern, trueMuscleOf } from '../movement-pattern';
 import { norm } from '../norm';
@@ -172,6 +172,12 @@ export interface LMSPlanWeek {
   /** Неделя «входа в пик» (ramp) — плавное снижение объёма ПЕРЕД mock/тапером
    *  (часть пик-блока по окну, но НЕ глубокий тапер). */
   rampWeek?: boolean;
+  /** Неделя БЕЗ тренировочного блока: календарь сохраняет позицию, но тренировать
+   *  нечего (цикл не подобран / окно не позволяет). Честная метка вместо пустой
+   *  недели, выглядящей как готовый план (аудит 2026-11, P2-6). */
+  emptyBlock?: boolean;
+  /** Причина, почему у недели нет тренировочного блока (показывается в UI). */
+  blockNote?: string;
 }
 
 export interface LMSSeasonProvenance {
@@ -987,7 +993,17 @@ function injectDiagnosticExercises(
       if (day.exercises.some(ex => norm(ex.name) === norm(name))) continue;
       // Day cap (паритет со слабыми группами): упражнений ≤ 10 на сессию.
       if (day.exercises.length >= 10) continue;
-      const pm = pmRow[name] ?? fallbackPm;
+      // ПМ диагностического упражнения: точное имя → fuzzy (в т.ч. основной лифт)
+      // → ПМ основного лифта, если упражнение из его же семьи → общий fallback.
+      // Раньше «Жим узким хватом» получал 80 кг при жиме 140 только потому, что
+      // имени не было в pmRow (аудит 2026-11, P2-4).
+      const liftKey = key.split('|')[0] as 'squat' | 'bench' | 'deadlift';
+      const mainName = mainNameMap[liftKey] ?? '';
+      const pmFuzzy = pmForInjected(name, mainName, pmRow, 0);
+      const mainPm = mainName ? (pmRow[mainName] ?? 0) : 0;
+      const pm = pmFuzzy > 0
+        ? pmFuzzy
+        : (matchesFocusLift(name, liftKey) && mainPm > 0 ? mainPm : fallbackPm);
       const protocol = diagnosticProtocolFromCycle(template, name);
       const group = diagnosticGroupForExercise(name);
       // P2: слабая сторона получает +1 сет на унилатеральных (в пределах MRV).
@@ -2261,7 +2277,12 @@ export function appendPLTaperWeeks(
     const wk = buildAttemptsWeek(cur, 'mock');
     if (wk) { extra.push(wk); cur++; }
   };
-  if (mockMeetOn && !layout) pushMock();
+  // Раскладка решает, ВЛЕЗАЕТ ли mock в окно: при `mockWeeks = 0` (окно
+  // 1–2 нед под mock+старт) она его исключила и предупредила. Раньше билдер всё
+  // равно вставлял mock → недель в блоке больше, чем в окне, и даты уезжали.
+  const mockAllowed = layout ? (layout.mockWeeks ?? 0) > 0 : true;
+  const pushMockIfAllowed = () => { if (mockMeetOn && mockAllowed) pushMock(); };
+  if (!layout) pushMockIfAllowed();
   // Раскладка пика — канон (lms-taper.engine): 'classic' — разгрузка Bosquet;
   // 'pl' — 3-нед протокол Библиотеки (при taperWeeks < 3 — последние N недель
   // протокола, финал всегда соревновательный 100% с прикидами);
@@ -2270,10 +2291,10 @@ export function appendPLTaperWeeks(
   // вставляется между ними (за 10-14 дней до старта), а не в начало блока.
   // Aудит P1: окно ровно = mock + meet → кривая пуста, и mock молча терялся
   // (pushMock жил внутри цикла). Превью и заметка обещают mock — публикуем его.
-  if (mockMeetOn && layout && taperCurvePoints.length === 0) pushMock();
+  if (layout && taperCurvePoints.length === 0) pushMockIfAllowed();
   const taperMode: TaperMode = opts?.peakMode ?? 'classic';
   for (let i = 0; i < taperCurvePoints.length; i++) {
-    if (layout && mockMeetOn && i === rampLen) pushMock();
+    if (layout && i === rampLen) pushMockIfAllowed();
     const isRamp = layout && i < rampLen;
     const week = buildTaperWeek(cur, taperCurvePoints[i], i === taperCurvePoints.length - 1);
     if (isRamp) week.rampWeek = true;
@@ -2287,15 +2308,33 @@ export function appendPLTaperWeeks(
   // Пост-соревновательная неделя (post-meet): лёгкий объём, высокий RIR —
   // возврат к тренировкам после прикидок без перегруза.
   if (opts?.postMeet) {
-    const baseWk = extra[extra.length - 1] ?? baseWeek;
-    const pmRow: Record<string, number> = { ...baseWk.pmRow };
+    // База пост-старта — последняя РАБОЧАЯ неделя блока (baseWeek, уже без deload).
+    // Копировать `extra[extra.length - 1]` нельзя: это неделя прикидов, и её синглы
+    // 102 % ПМ уезжали в «восстановительную» неделю (травмоопасно и бессмысленно).
+    const postPmRow: Record<string, number> = { ...baseWeek.pmRow };
     const volMult = Math.max(0.3, Math.min(1, opts.postMeet.volumeMult ?? 0.5));
-    const days = baseWk.days.map(d => {
-      const exercises = d.exercises.map(e => ({
-        ...e,
-        rir: e.rir + 3,
-        workSets: e.workSets.map(ws => ({ ...ws, sets: Math.max(1, Math.round(ws.sets * volMult)), rir: ws.rir + 3 })),
-      }));
+    const postPct = 0.65;
+    const days = baseWeek.days.map(d => {
+      const exercises = d.exercises.map(e => {
+        const pm = Math.max(1, postPmRow[e.name] ?? e.pm ?? 1);
+        // 60–70 % ПМ (берём середину), объём × volMult, RIR 4: старт восстановления
+        // без соревновательных весов и без синглов. Подходы урезаем «вниз» —
+        // упражнение, у которого не остаётся подходов, уходит из недели целиком
+        // (иначе минимум 1 подход на каждое упражнение съедал всю разгрузку).
+        const scaled = e.workSets
+          .map(ws => ({ ...ws, sets: Math.floor((ws.sets ?? 0) * volMult) }))
+          .filter(ws => ws.sets >= 1);
+        const chosen = scaled.length > 0
+          ? scaled
+          : (e.workSets[0] ? [{ ...e.workSets[0], sets: 1 }] : []);
+        const workSets = chosen.map(ws => ({
+          ...ws,
+          weight: Math.round(workWeight(pm, postPct) * 10) / 10,
+          pct: postPct,
+          rir: 4,
+        }));
+        return { ...e, rir: 4, workSets };
+      });
       const metricsEx: SRExercise[] = exercises.map(pe => ({
         name: pe.name, group: pe.group, coef: pe.coef, mnosz: pe.mnosz, pm: pe.pm,
         sets: pe.workSets.map(ws => ({ weight: ws.weight, reps: ws.reps, sets: ws.sets })),
@@ -2304,13 +2343,13 @@ export function appendPLTaperWeeks(
     });
     extra.push({
       week: nextWeekNum + cur,
-      pmRow,
+      pmRow: postPmRow,
       days,
       sourcePhase: 'deload' as MesocyclePhase,
       sourcePhaseOrigin: 'inferred' as const,
       macroPhase: 'transition' as const,
       postMeet: true,
-      taperNote: `Восстановление после соревнований: объём ×${volMult}, RIR +3 — полная разгрузка, возврат к базовому объёму со следующей недели.`,
+      taperNote: `Восстановление после соревнований: объём ×${volMult}, вес ${Math.round(postPct * 100)} % ПМ, RIR 4 — плавный старт без соревновательных весов.`,
     });
     cur++;
   }
@@ -2465,24 +2504,47 @@ export function refreshMeetAttempts(plan: LMSBuildOutput, strategy: MeetStrategy
 }
 
 /**
+ * Снимок ПИКОВОЙ по суммарному объёму недели: объём по группам И по упражнениям
+ * внутри группы. Общий расчёт для `getPLVolumeLandmarks` и `getPLVolumeBreakdown`,
+ * чтобы «сет в группе» и «вклад упражнений» всегда сходились.
+ */
+function volumeWeekSnapshot(weeks: LMSPlanWeek[]): {
+  idx: number;
+  groups: Record<string, number>;
+  byExercise: Record<string, Record<string, number>>;
+} {
+  let peakTotal = -1;
+  let best: { idx: number; groups: Record<string, number>; byExercise: Record<string, Record<string, number>> } = {
+    idx: 0, groups: {}, byExercise: {},
+  };
+  weeks.forEach((wk, i) => {
+    const g: Record<string, number> = {};
+    const per: Record<string, Record<string, number>> = {};
+    for (const day of wk.days) for (const ex of day.exercises) {
+      const rawGroup = exEnGroup(ex.group); if (!rawGroup) continue;
+      // Канонический ключ — тот же, что вернёт computeVolumeLandmarks ('core' → 'abs',
+      // 'ПР' → 'legs'): иначе группа пика и разбивка по упражнениям разъезжаются.
+      const eg = normMuscle(rawGroup);
+      const sets = ex.workSets.reduce((s, ws) => s + ws.sets, 0);
+      if (sets <= 0) continue;
+      g[eg] = (g[eg] || 0) + sets;
+      per[eg] = per[eg] || {};
+      per[eg][ex.name] = (per[eg][ex.name] || 0) + sets;
+    }
+    const total = Object.values(g).reduce((a, b) => a + b, 0);
+    if (total > peakTotal) { peakTotal = total; best = { idx: i, groups: g, byExercise: per }; }
+  });
+  return best;
+}
+
+/**
  * Агрегация объёма PL-плана по группам мышц и сравнение с volume-landmarks (MEV/MAV/MRV).
  * Берётся пиковая по суммарному объёму неделя (наиболее нагруженная) — «худший случай».
  */
 export function getPLVolumeLandmarks(weeks: LMSPlanWeek[], level: string, pedMrvMult = 1): PLVolumeLandmark[] {
-  let peakIdx = 0, peakTotal = -1;
-  const weekGroups: Record<number, Record<string, number>> = {};
-  weeks.forEach((wk, i) => {
-    const g: Record<string, number> = {};
-    for (const day of wk.days) for (const ex of day.exercises) {
-      const eg = exEnGroup(ex.group); if (!eg) continue;
-      const sets = ex.workSets.reduce((s, ws) => s + ws.sets, 0);
-      g[eg] = (g[eg] || 0) + sets;
-    }
-    weekGroups[i] = g;
-    const total = Object.values(g).reduce((a, b) => a + b, 0);
-    if (total > peakTotal) { peakTotal = total; peakIdx = i; }
-  });
-  const peak = weekGroups[peakIdx] || {};
+  const snap = volumeWeekSnapshot(weeks);
+  const peakIdx = snap.idx;
+  const peak = snap.groups;
   // Делегируем в канонический движок (единый источник MEV/MAV/MRV по EN-мышцам).
   const rows = computeVolumeLandmarks(peak, level, { labMult: pedMrvMult, peakWeek: peakIdx + 1 });
   return rows.map(r => {
@@ -2493,4 +2555,147 @@ export function getPLVolumeLandmarks(weeks: LMSPlanWeek[], level: string, pedMrv
     return { group: r.group, muscle: r.label, peakWeek: r.peakWeek ?? (peakIdx + 1), sets: r.sets, mev: r.mev, mav: r.mav, mrv: r.mrv, status };
   });
 }
-  // OHP варианты ('Жим стоя', 'Жим штанги стоя', 'Жим гантелей стоя') ловятся через norm('Жим') вхождением в любое 'Жим ... стоя'.
+
+export interface PLVolumeExerciseRow {
+  group: string;      // EN-группа (совпадает с `PLVolumeLandmark.group`)
+  exercise: string;
+  sets: number;       // подходов на пиковой неделе
+  sharePct: number;   // доля внутри группы, %
+}
+
+/**
+ * P2-2: разбивка объёма группы ПО УПРАЖНЕНИЯМ на пиковой неделе.
+ * Отвечает на вопрос «из-за чего перебор в группе» без введения мелких мышечных
+ * групп и новых порогов: сумма строк группы = `sets` строки из `getPLVolumeLandmarks`.
+ */
+export function getPLVolumeBreakdown(weeks: LMSPlanWeek[]): { peakWeek: number; rows: PLVolumeExerciseRow[] } {
+  const snap = volumeWeekSnapshot(weeks);
+  const rows: PLVolumeExerciseRow[] = [];
+  for (const [group, perExercise] of Object.entries(snap.byExercise)) {
+    const total = snap.groups[group] || 0;
+    Object.entries(perExercise)
+      .sort((a, b) => b[1] - a[1])
+      .forEach(([exercise, sets]) => {
+        rows.push({
+          group,
+          exercise,
+          sets,
+          sharePct: total > 0 ? Math.round((sets / total) * 100) : 0,
+        });
+      });
+  }
+  return { peakWeek: snap.idx + 1, rows };
+}
+/**
+ * P2-2 (вариант «а», согласован с пользователем): распределение объёма КОМПОЗИТНЫХ
+ * движений по мышцам. Доли — эвристика распределения стимула (не измерение и не
+ * методический норматив): соглашение «присед → 60 % квадрицепс / 40 % бицепс бедра»
+ * и аналогичные разбивки для жимов/тяг. Сумма долей паттерна всегда = 1, поэтому
+ * суммарный объём плана НЕ меняется — меняется только нарезка по мышцам.
+ */
+const MUSCLE_SPLIT_BY_PATTERN: Record<string, Record<string, number>> = {
+  // Присед-семейство: согласованная разбивка 60/40 (квадрицепс / бицепс бедра).
+  squat: { quads: 0.6, hamstrings: 0.4 },
+  lunge: { quads: 0.6, hamstrings: 0.4 },
+  isolation_legs_quad: { quads: 1 },
+  isolation_legs_ham: { hamstrings: 1 },
+  glute_squat: { glutes: 1 },
+  isolation_glutes: { glutes: 1 },
+  isolation_calves: { calves: 1 },
+  // Тяговое (hinge): становая/РДЛ/гудморнинг/гиперэкстензия — задняя цепь.
+  hinge: { hamstrings: 0.45, glutes: 0.3, back: 0.25 },
+  // Жимы.
+  horizontal_push: { chest: 0.65, triceps: 0.25, delt_front: 0.1 },
+  incline_push: { chest: 0.55, delt_front: 0.2, triceps: 0.25 },
+  dip_push: { chest: 0.6, triceps: 0.3, delt_front: 0.1 },
+  decline_push: { chest: 0.75, triceps: 0.2, delt_front: 0.05 },
+  vertical_push: { delt_front: 0.55, triceps: 0.3, delt_mid: 0.15 },
+  isolation_chest: { chest: 1 },
+  // Тяги.
+  horizontal_pull: { back: 0.65, biceps: 0.2, delt_rear: 0.15 },
+  vertical_pull: { back: 0.7, biceps: 0.3 },
+  isolation_back: { back: 0.7, traps: 0.3 },
+  isolation_shoulders: { delt_mid: 0.5, delt_rear: 0.5 },
+  isolation_arms: { biceps: 0.5, triceps: 0.5 },
+  core: { abs: 1 },
+  anti_rotation: { abs: 1 },
+  rotation: { abs: 1 },
+  carry: { traps: 0.4, forearms: 0.3, back: 0.3 },
+};
+
+/** Коарс-фолбэк по группе плана (когда паттерн/мышца не определены). */
+const MUSCLE_SPLIT_BY_GROUP: Record<string, Record<string, number>> = {
+  chest: { chest: 0.65, triceps: 0.25, delt_front: 0.1 },
+  back: { back: 0.7, biceps: 0.3 },
+  legs: { quads: 0.6, hamstrings: 0.4 },
+  shoulders: { delt_front: 0.4, delt_mid: 0.35, delt_rear: 0.25 },
+  arms: { biceps: 0.5, triceps: 0.5 },
+  core: { abs: 1 },
+};
+
+/**
+ * Доли стимула упражнения по МЫШЦАМ (сумма = 1).
+ * Порядок: паттерн (пропорции композитов) → точная мышца (`trueMuscleOf`) → коарс-группа.
+ */
+function muscleSharesFor(ex: { name: string; group?: string; movementPattern?: string; targetMuscle?: string; type?: string }): Record<string, number> {
+  const pattern = ex.movementPattern || derivePattern(ex);
+  const byPattern = MUSCLE_SPLIT_BY_PATTERN[pattern];
+  if (byPattern) return byPattern;
+  const m = trueMuscleOf(ex);
+  if (m) return { [m]: 1 };
+  const coarse = exEnGroup(ex.group);
+  if (coarse) {
+    const fb = MUSCLE_SPLIT_BY_GROUP[coarse];
+    if (fb) return fb;
+  }
+  return {};
+}
+
+const VOL_STATUS_ORDER: Record<PLVolumeLandmark['status'], number> = {
+  over: 0, high: 1, optimal: 2, under: 3,
+};
+
+/**
+ * P2-2: объём пиковой недели в разрезе МЫШЦ (quads/hamstrings/glutes/calves/triceps/
+ * delt_front/mid/rear/biceps/back/chest/traps/forearms/abs) с MEV/MAV/MRV по мышце.
+ *
+ * Композиты раскладываются пропорционально (`MUSCLE_SPLIT_BY_PATTERN`), поэтому
+ * Σ по мышцам ≈ объём плана: локальный перебор (например, бицепс бедра) виден,
+ * а общая нагрузка не «размножается». Дроби округляются до 0.1 сета.
+ */
+export function getPLVolumeLandmarksByMuscle(weeks: LMSPlanWeek[], level: string, pedMrvMult = 1): PLVolumeLandmark[] {
+  const snap = volumeWeekSnapshot(weeks);
+  const peak = weeks[snap.idx];
+  const byMuscle: Record<string, number> = {};
+  if (peak) {
+    for (const day of peak.days) for (const ex of day.exercises) {
+      const sets = ex.workSets.reduce((s, ws) => s + ws.sets, 0);
+      if (sets <= 0) continue;
+      for (const [muscle, share] of Object.entries(muscleSharesFor(ex))) {
+        byMuscle[muscle] = (byMuscle[muscle] || 0) + sets * share;
+      }
+    }
+  }
+  const rows: PLVolumeLandmark[] = [];
+  for (const [muscle, raw] of Object.entries(byMuscle)) {
+    const sets = Math.round(raw * 10) / 10;
+    if (sets <= 0) continue;
+    const lm = getVolumeLandmarks(level, muscle);
+    if (!lm) continue;   // мышца без порогов в базе — не выдумываем
+    const mrv = pedMrvMult ? Math.round(lm.mrv * pedMrvMult) : lm.mrv;
+    const st = checkVolumeStatus(sets, { ...lm, mrv });
+    const status: PLVolumeLandmark['status'] =
+      st === 'below_mev' ? 'under' :
+      st === 'optimal' ? 'optimal' :
+      st === 'approaching_mrv' ? 'high' : 'over';
+    rows.push({
+      group: muscle,
+      muscle: MUSCLE_LABEL_RU[muscle] || muscle,
+      peakWeek: snap.idx + 1,
+      sets, mev: lm.mev, mav: lm.mav, mrv, status,
+    });
+  }
+  rows.sort((a, b) => (VOL_STATUS_ORDER[a.status] - VOL_STATUS_ORDER[b.status]) || (b.sets - a.sets));
+  return rows;
+}
+

@@ -82,6 +82,8 @@ export function pmFeasibility(ctx: TaperCoachCtx): PmFeasibility {
     const plan = planned[name];
     if (!(plan > 0)) return { name, forecast: 0, planned: 0, gapKg: 0, weeksNeeded: 0, feasible: true };
     // База прогноза: фактический ПМ (реально поднятый) или прогноз цикла.
+    // ВАЖНО: `forecastPm` — это БАЗА (текущий/цикловой ПМ), темп k продлевает её
+    // до старта. Передавать сюда ПМ последней недели плана нельзя — он уже спрогнозирован.
     const base = (actual[name] > 0 ? actual[name] : forecastBase[name]) || 0;
     const forecast = base > 0 ? base * Math.pow(1 + k, weeks) : 0;
     const gapKg = forecast > 0 ? plan - forecast : plan - base;
@@ -693,6 +695,25 @@ export interface PLPeakWeekCutProtocol {
   days: PLPeakDayCut[];
   summary: string;
   warnings: string[];
+  /** Фаза 6, п.5: что делать ПОСЛЕ взвешивания (регидрация/гликоген), если сгонка нужна. */
+  recovery: PLWeighInRecovery | null;
+}
+
+export interface PLRecoveryStep {
+  /** Окно времени от взвешивания. */
+  window: string;
+  fluids: string;
+  sodium: string;
+  carbs: string;
+  note: string;
+}
+
+export interface PLWeighInRecovery {
+  /** Сколько часов между взвешиванием и подходом (2 у IPF, 24 у части коммерческих). */
+  hoursToLift: number;
+  steps: PLRecoveryStep[];
+  summary: string;
+  warnings: string[];
 }
 
 const PW = (label: string, waterMl: string, sodiumMg: string, carbsG: string, note: string): PLPeakDayCut =>
@@ -702,10 +723,16 @@ const PW = (label: string, waterMl: string, sodiumMg: string, carbsG: string, no
  * Консервативный 7-дневный протокол сгонки к категории (вода/натрий/карбы).
  * Пик-неделя даёт ~1-2% массы (вода+гликоген). Если нужно согнать больше —
  * предупреждение: нужна более ранняя сгонка (питание/вода за 2-4 недели).
+ *
+ * Фаза 6, п.5: вместе с деплецией отдаём план ВОССТАНОВЛЕНИЯ после взвешивания
+ * (регидрация + гликоген) — без него сгонка бессмысленна: атлет выходит на
+ * помост обезвоженным. Окно до подхода — параметр (по умолчанию 2 ч, как у IPF;
+ * для 24-часового взвешивания передайте 24).
  */
 export function buildPLPeakWeekCutProtocol(
   currentWeight: number,
   targetWeight: number,
+  opts: { weighInHoursBeforeLift?: number } = {},
 ): PLPeakWeekCutProtocol {
   const toCutKg = Math.max(0, (currentWeight || 0) - (targetWeight || 0));
   const capPct = 0.02; // пик-неделя = до 2% массы (вода+гликоген)
@@ -733,11 +760,56 @@ export function buildPLPeakWeekCutProtocol(
     ? `Сгонка ${toCutKg.toFixed(1)} кг к категории (пик-неделя ≈${capKg.toFixed(1)} кг вода+гликоген): вода ↓ 6→2 л, натрий ↓ 4→0.5 г, карбы ↓ 4→1 г/кг, взвешивание утром старта.`
     : 'Вес уже в категории — манипуляция водой/натрием не требуется (опционально лёгкий протокол).';
 
+  const hoursToLift = (() => {
+    const raw = opts.weighInHoursBeforeLift;
+    if (!Number.isFinite(raw as number) || (raw as number) <= 0) return 2;
+    return Math.min(24, Math.max(1, Math.round(raw as number)));
+  })();
+  const recovery = needed ? buildWeighInRecovery(hoursToLift, toCutKg) : null;
+
   // A1-fix: при needed=false (вес уже в категории) НЕ отдаём агрессивный протокол деплеции
   // (вода 6→2 л, натрий 4→0.5 г) — показывать манипуляцию, когда она не нужна, вводит
   // в заблуждение и опасно (риск дегидратации без необходимости). Дни протокола пусты;
   // UI и так скрывает карточку сгонки при !needed.
-  return { needed, toCutKg, peakWeekCapKg: capKg, days: needed ? base : [], summary, warnings };
+  return { needed, toCutKg, peakWeekCapKg: capKg, days: needed ? base : [], summary, warnings, recovery };
+}
+
+/**
+ * Восстановление после взвешивания. Правила — практика пауэрлифтинга/борьбы,
+ * НЕ медицинская рекомендация:
+ *  • возвращаем регидратацию с электролитами (вода без солей при дефиците
+ *    натрия не удерживается);
+ *  • гликоген — быстрые углеводы дробно, не «один большой приём»;
+ *  • окно 2 ч — только жидкое/мягкое, ничего нового и тяжёлого;
+ *  • ориентир объёма жидкости для 24-часового окна — ~1.5× согнанной массы.
+ */
+export function buildWeighInRecovery(hoursToLift: number, toCutKg: number): PLWeighInRecovery {
+  const hours = Math.min(24, Math.max(1, Math.round(hoursToLift || 2)));
+  const deficitMl = Math.round(Math.max(0, toCutKg) * 1500); // 1.5 л на 1 кг
+  const warnings: string[] = [];
+  if (hours <= 3) {
+    warnings.push('Окно до подхода ≤3 ч: только жидкости с электролитами и быстрые углеводы; тяжёлую еду не добавлять — иначе тяжесть в животе на помосте.');
+  }
+  if (toCutKg > 2) {
+    warnings.push(`Согнано ${toCutKg.toFixed(1)} кг: восстановление >2 кг за короткое окно — риск для самочувствия. Такие сгонки — только с врачом/тренером, не по приложению.`);
+  }
+  const steps: PLRecoveryStep[] = hours <= 3
+    ? [
+        { window: 'Сразу после взвешивания', fluids: '500–750 мл с электролитами', sodium: '1–1.5 г соли на 500 мл', carbs: '30–40 г быстрых (гель/рисовая бумага)', note: 'Пить дробно, не залпом; следить за самочувствием.' },
+        { window: `За ${Math.max(1, hours - 1)} ч до подхода`, fluids: '250–500 мл', sodium: '0.5–1 г', carbs: '40–60 г', note: 'Основной приём углеводов — здесь, чтобы успело усвоиться.' },
+        { window: 'За 30–45 мин до подхода', fluids: '150–250 мл', sodium: 'по жажде', carbs: '15–25 г (гель)', note: 'Ничего нового: только то, что уже проверено на тренировках.' },
+      ]
+    : [
+        { window: 'Первые 2 ч после взвешивания', fluids: `700–1000 мл с электролитами (всего за сутки ≈${(deficitMl / 1000).toFixed(1)} л)`, sodium: '2–3 г соли за день, дробно', carbs: '1–1.5 г/кг fast', note: 'Сначала жидкость и электролиты — потом еда.' },
+        { window: '3–8 ч после взвешивания', fluids: 'по жажде до нормы', sodium: 'до 4–5 г за день', carbs: '4–6 г/кг за день, обычные приёмы', note: 'Нормальные приёмы пищи; следите за отеками/самочувствием.' },
+        { window: 'Вечер и утро старта', fluids: 'нормальная вода', sodium: 'обычный рацион', carbs: 'завтрак 1–1.5 г/кг + перекус', note: 'Ничего экзотического в день старта.' },
+      ];
+  return {
+    hoursToLift: hours,
+    steps,
+    summary: `Регидрация + гликоген после взвешивания (окно ${hours} ч): жидкости с электролитами ≈${(deficitMl / 1000).toFixed(1)} л за сутки, углеводы дробно, ничего нового в день старта.`,
+    warnings,
+  };
 }
 
 export { buildPLTaperCurve };

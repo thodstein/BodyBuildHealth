@@ -82,7 +82,7 @@ const DIAGNOSIS: Record<Lift, Partial<Record<WeakPoint, Omit<WeakPointDiagnosis,
   },
   ohp: {
     ohp_start: { weakPoint: 'ohp_start', label: 'Старт с плеч', description: 'Не хватает стартовой силы — слабые передние дельты в нижней точке.', assistanceFromCatalog: ['Жим гантелей сидя', 'Жимовой швунг'], intensityPct: 0.65, rationale: 'Жим гантелей сидя + швунг — сила дельт в старте без дубля основного движения.' },
-    ohp_mid: { weakPoint: 'ohp_mid', label: 'Середина (переход)', description: 'Зависание по ходу — переход дельты→трицепс.', assistanceFromCatalog: ['Жим гантелей сидя', 'Жимовой швунг'], intensityPct: 0.7, rationale: 'Швунг (взрыв) и жим гантелей — мощность и контроль в переходе.' },
+    ohp_mid: { weakPoint: 'ohp_mid', label: 'Середина (переход)', description: 'Зависание по ходу — переход дельты→трицепс.', assistanceFromCatalog: ['Скоростной жим', 'Жим с остановками', 'Жим гантелей сидя'], intensityPct: 0.7, rationale: 'Скоростной жим и остановки в амплитуде — мощность и удержание позиции в переходе дельта→трицепс.' },
     ohp_lockout: { weakPoint: 'ohp_lockout', label: 'Дожим вверх', description: 'Не дожимает вверху — слабый трицепс/трапеции.', assistanceFromCatalog: ['Французский жим лёжа (EZ-гриф)', 'Жим лежа узким хватом', 'Разгибания на трицепс в верхнем блоке'], intensityPct: 0.75, rationale: 'Французский жим и узкий хват изолируют трицепс в локдауне.' },
   },
   row: {
