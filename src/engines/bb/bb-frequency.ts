@@ -25,6 +25,9 @@ import { aggregateBBVolume } from './bb-volume.engine';
 /** Префикс строки в `plan.rationale`. Один и тот же при записи и сверке. */
 export const FREQUENCY_LINE_PREFIX = 'Частота на группу/нед';
 
+/** Префикс заметки «факт ниже расписания сплита». */
+export const FREQUENCY_DRIFT_PREFIX = '📉 Частота по факту';
+
 const DELT_BUNDLES = ['delt_front', 'delt_mid', 'delt_rear'] as const;
 
 /** Канонизация алиасов (`chest_upper` -> `chest`). Инжектится вызывающим:
@@ -161,4 +164,27 @@ export function reconcileFrequencyClaim(
     .map(([muscle, p]) => ({ muscle, planned: Number(p) || 0, factMax: facts[muscle]?.max ?? 0 }))
     .filter((x) => x.planned > x.factMax);
   return { changed, factLine: line, facts, lowerThanPlanned };
+}
+
+/** Текст заметки «факт ниже расписания сплита» ('' — заметка не нужна). */
+export function frequencyDriftNote(res: {
+  facts: Record<string, MuscleFrequencyFact>;
+  lowerThanPlanned: Array<{ muscle: string; planned: number; factMax: number }>;
+}): string {
+  if (!res.lowerThanPlanned.length) return '';
+  const fmt = (f?: MuscleFrequencyFact) => (!f ? '0×' : f.min === f.max ? `${f.max}×` : `${f.min}-${f.max}×`);
+  const shown = res.lowerThanPlanned.slice(0, 8)
+    .map((x) => `${x.muscle} ${fmt(res.facts[x.muscle])} при плане ${x.planned}×`);
+  const rest = res.lowerThanPlanned.length - shown.length;
+  return `${FREQUENCY_DRIFT_PREFIX} ниже расписания сплита: ${shown.join(', ')}${rest > 0 ? ` и ещё ${rest}` : ''}. `
+    + 'Считаны сессии с ПРЯМОЙ работой на мышцу — косвенная нагрузка компаундов не в счёт.';
+}
+
+/** Записывает заметку о расхождении (или убирает её, если note пуст).
+ *  Идемпотентно: прежние заметки с этим префиксом вычищаются. */
+export function applyFrequencyDriftNote(plan: any, note: string): void {
+  const rationale: string[] = Array.isArray(plan?.rationale) ? plan.rationale : [];
+  const cleaned = rationale.filter((r) => !String(r).startsWith(FREQUENCY_DRIFT_PREFIX));
+  if (note) cleaned.push(note);
+  plan.rationale = cleaned;
 }

@@ -137,3 +137,33 @@ describe('BB-19/BB-20/BB-21: дефолт целевого % жира и мёр�
     expect(SRC).not.toMatch(/import[^\n]*computeRegimeMrvMult/);
   });
 });
+
+/**
+ * Итерации M/P: снимки факта пересчитываются ПОСЛЕ последних изменений плана —
+ * в том числе на пути ручных правок, где после `finalizeBBPlan` идут ещё
+ * `prioritizeBackSessions` и финальная рампа (замер: expandedSummary расходился
+ * в 9 из 12 планов, т.е. «Итого: N рабочих сетов/нед» и карточки качества
+ * показывали цифры прежней версии плана).
+ */
+describe('BB-снимки: правки пересчитывают факт последним', () => {
+  it('revalidateEditedPlan заканчивается refreshBBPlanSnapshots', () => {
+    const body = between('const revalidateEditedPlan = (plan: BBPlan): BBPlan => {', 'const adjustVolume =');
+    const refreshIdx = body.indexOf('refreshBBPlanSnapshots(out,');
+    expect(refreshIdx).toBeGreaterThan(-1);
+    // Порядок: после пере-финализации, топ-апа спины и рампа.
+    expect(refreshIdx).toBeGreaterThan(body.indexOf('finalizeBBPlan('));
+    expect(refreshIdx).toBeGreaterThan(body.indexOf('prioritizeBackSessions(out,'));
+    expect(refreshIdx).toBeGreaterThan(body.indexOf('enforceRampWeeklyCap(week.sessions, caps)'));
+    // И частота сверяется с фактом, иначе после правок обещание «N×/нед» врёт.
+    expect(body.slice(refreshIdx)).toContain('refreshFrequency: true');
+  });
+
+  it('плитка «сетов/нед» не суммирует все недели мезоцикла', () => {
+    const body = between('const handleSendToNutrition = () => {', 'const handleExportIcs =');
+    // Раньше: reduce по всем неделям → 6-недельный план обещал в 6 раз больше,
+    // а подпись была «сетов/нед».
+    expect(body).toContain('totalWorkingSets');
+    expect(body).toContain('weeksCount');
+    expect(body).not.toMatch(/const weeklySets = \(plan\.weeks \|\| \[\]\)\.reduce/);
+  });
+});

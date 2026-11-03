@@ -12,7 +12,11 @@
  * `validation` хранил ошибки, которых в итоговом плане уже нет — UI показывал
  * «план невалиден» там, где всё исправлено.
  */
-import { buildBBPlan } from '../bb-builder.engine';
+import { buildBBPlan, WEAK_TO_MUSCLE } from '../bb-builder.engine';
+import { finalizeBBPlan, prioritizeBackSessions } from '../bb-finalize.engine';
+import { refreshBBPlanSnapshots } from '../bb-plan-snapshot.engine';
+import { validateBBPlan } from '../bb-validator.engine';
+import { FREQUENCY_DRIFT_PREFIX, FREQUENCY_LINE_PREFIX } from '../bb-frequency';
 import { SPLIT_PATTERNS } from '../bb-split-patterns';
 import { aggregateBBVolume } from '../bb-volume.engine';
 import { analyzeBBBalance } from '../bb-balance.engine';
@@ -96,4 +100,129 @@ describe('bb: снимки плана = факт итогового плана',
       expect(errs.map((e: any) => e.code), `${where}: ошибки валидации в готовом плане`).toEqual([]);
     }
   });
+});
+
+/**
+ * Тот же инвариант на ПУТИ РЕДАКТИРОВАНИЯ (UI: `revalidateEditedPlan`).
+ *
+ * Там последовательность другая: `finalizeBBPlan` (снимает снимки у себя) →
+ * `prioritizeBackSessions` (добавляет сеты спине) → финальная рампа (режет
+ * сеты). То есть после снимков план снова меняется — и «Итого: N рабочих
+ * сетов/нед» показывает цифры прежней версии. Замер до правки: на 12 планах
+ * expandedSummary расходился в 9 (1-7 сетов). Правка — единая точка
+ * `refreshBBPlanSnapshots`, которую обязан звать любой, кто меняет план.
+ */
+describe('bb: снимки после правок (revalidate-путь)', () => {
+  const CANON = (m: string) => WEAK_TO_MUSCLE[m] || m;
+  /** Те же опции, что передаёт UI в `revalidateEditedPlan`. */
+  const uiValidationOptions = (plan: any) => ({
+    level: 'advanced',
+    trainingYears: 3,
+    excludedMuscles: [],
+    checkOrder: true,
+    specializationTargets: plan.priorityMuscles,
+    maxWorkingSets: plan.maxWorkingSets,
+    maxExercises: plan.maxExercises,
+  });
+
+  function editLikeUi(basePlan: any): any {
+    const edited: any = structuredClone(basePlan);
+    const first = edited.weeks[0].sessions[0].exercises[0];
+    first.sets = Math.max(2, (first.sets || 3) - 1);
+    const out: any = finalizeBBPlan(edited, {
+      reorder: false,
+      phaseSafety: true,
+      level: 'advanced',
+      volumeGoal: 'mass',
+      priorityMuscles: edited.priorityMuscles,
+      trainingYears: 3,
+      mrvMultiplier: edited.mrvMultiplier,
+      ensureMinimumVolume: true,
+      controlledRotation: false,
+      maxWorkingSets: edited.maxWorkingSets,
+      maxExercises: edited.maxExercises,
+    } as any);
+    prioritizeBackSessions(out, { level: 'advanced' as any, trainingYears: 3, onCourse: false, maxWorkingSets: edited.maxWorkingSets } as any);
+    refreshBBPlanSnapshots(out, {
+      validationOptions: uiValidationOptions(out),
+      specTargets: out.priorityMuscles,
+      canonicalMuscle: CANON,
+      refreshFrequency: true,
+      refreshValidationRationale: true,
+    });
+    return out;
+  }
+
+  const splits = SPLIT_PATTERNS.filter((s) => ['fullbody_3', 'upper_lower_4', 'rolling_4_1'].includes(s.id));
+  const plans = splits.flatMap((split) => (['intermediate', 'advanced'] as const).map((level) => ({
+    where: `${split.id}/${level}`,
+    plan: editLikeUi(buildBBPlan({ patternId: split.id, level, goal: 'mass', weeks: 2, workMax: WM })),
+  })));
+
+  it('после правки все снимки описывают отредактированный план', () => {
+    for (const { where, plan } of plans) {
+      for (const week of plan.weeks) {
+        const fresh = aggregateBBVolume(week.sessions) as any;
+        for (const m of new Set([...Object.keys(fresh), ...Object.keys(plan.weeklyVolume[week.week] || {})])) {
+          const a = Math.round((plan.weeklyVolume[week.week]?.[m]?.effectiveSets || 0) * 100) / 100;
+          const b = Math.round((fresh[m]?.effectiveSets || 0) * 100) / 100;
+          expect(a, `${where}: weeklyVolume недели ${week.week}, ${m}`).toBe(b);
+        }
+      }
+      expect(plan.expandedSummary.totalWorkingSets, `${where}: expandedSummary`).toBe(buildBBExpandedSummary(plan).totalWorkingSets);
+      const freshFatigue = plan.weeks.map((w: any) => ({ week: w.week, sessions: w.sessions.map((s: any) => estimateBBSessionCost(s)) }));
+      expect(JSON.parse(JSON.stringify(plan.fatigueReport)), `${where}: fatigueReport`).toEqual(JSON.parse(JSON.stringify(freshFatigue)));
+      expect(JSON.parse(JSON.stringify(plan.report)), `${where}: report`).toEqual(JSON.parse(JSON.stringify(buildBBPlanReport(plan))));
+      expect(plan.report.expandedSummary, `${where}: отчёт копирует expandedSummary`).toBe(plan.expandedSummary);
+      const freshValidation = validateBBPlan(plan, uiValidationOptions(plan) as any);
+      const countErrors = (issues: any[]) => issues.filter((i: any) => i.level === 'error').length;
+      expect(
+        countErrors(plan.validation?.issues || []),
+        `${where}: ошибки валидации`,
+      ).toBe(countErrors(freshValidation.issues));
+    }
+  }, 900000);
+
+  it('пересчёт идемпотентен (повторный вызов не сдвигает цифры)', () => {
+    for (const { where, plan } of plans) {
+      const before = JSON.stringify([plan.weeklyVolume, plan.expandedSummary, plan.fatigueReport, plan.balanceReport, plan.report]);
+      refreshBBPlanSnapshots(plan, {
+        validationOptions: { level: 'advanced', trainingYears: 3, excludedMuscles: [], checkOrder: true },
+        specTargets: plan.priorityMuscles,
+        canonicalMuscle: CANON,
+        refreshFrequency: true,
+        refreshValidationRationale: true,
+      });
+      const after = JSON.stringify([plan.weeklyVolume, plan.expandedSummary, plan.fatigueReport, plan.balanceReport, plan.report]);
+      expect(after, `${where}: второй пересчёт изменил снимки`).toBe(before);
+      // и строки-обещания не размножились
+      const freqLines = (plan.rationale || []).filter((r: string) => String(r).startsWith(FREQUENCY_LINE_PREFIX));
+      expect(freqLines.length, `${where}: строка частоты`).toBe(1);
+      const driftNotes = (plan.rationale || []).filter((r: string) => String(r).startsWith(FREQUENCY_DRIFT_PREFIX));
+      expect(driftNotes.length, `${where}: заметка о расхождении частоты`).toBeLessThanOrEqual(1);
+    }
+  });
+
+  it('удаление работы на мышцу снимает прежнее обещание частоты', () => {
+    const plan: any = buildBBPlan({ patternId: 'ppl_6', level: 'intermediate', goal: 'mass', weeks: 2, workMax: WM });
+    const before = (plan.rationale || []).find((r: string) => String(r).startsWith(FREQUENCY_LINE_PREFIX));
+    expect(before, 'строка частоты должна быть в плане').toBeDefined();
+    // Пользователь убрал все упражнения на бицепс — обещание «2×/нед» больше не факт.
+    for (const week of plan.weeks) {
+      for (const session of week.sessions) {
+        session.exercises = session.exercises.filter((e: any) => CANON(e.muscle || '') !== 'biceps');
+      }
+    }
+    refreshBBPlanSnapshots(plan, {
+      validationOptions: { level: 'intermediate', trainingYears: 3, excludedMuscles: [], checkOrder: true },
+      specTargets: plan.priorityMuscles,
+      canonicalMuscle: CANON,
+      refreshFrequency: true,
+      refreshValidationRationale: true,
+    });
+    const after = String((plan.rationale || []).find((r: string) => String(r).startsWith(FREQUENCY_LINE_PREFIX)) || '');
+    expect(after).not.toBe(before);
+    expect(after).toMatch(/biceps=0×/);
+    expect((plan.rationale || []).some((r: string) => String(r).startsWith(FREQUENCY_DRIFT_PREFIX))).toBe(true);
+  }, 300000);
 });

@@ -27,6 +27,7 @@ import { applyExecutionCorrections, type ExecutionCorrection } from '../../../en
 import { validateBBPlan, generateActionableRecommendations } from '../../../engines/bb/bb-validator.engine';
 import { finalizeBBPlan } from '../../../engines/bb/bb-finalize.engine';
 import { prioritizeBackSessions } from '../../../engines/bb/bb-finalize.engine';
+import { refreshBBPlanSnapshots } from '../../../engines/bb/bb-plan-snapshot.engine';
 import { enforceRampWeeklyCap } from '../../../engines/bb/bb-builder.engine';
 import { exerciseFeatureBadges, techniqueChainParts, canonTechniqueId } from './bb-technique-display';
 import { calcBBPlanMetrics } from '../../../engines/bb/bb-metrics.engine';
@@ -2142,6 +2143,33 @@ const [bbVolumeRamp, setBbVolumeRamp] = useState<'standard' | 'preloaded' | 'fla
         || wAny.contestPhase || (typeof wAny.prepProtocol === 'string' && wAny.prepProtocol)) continue;
       enforceRampWeeklyCap(week.sessions, caps);
     }
+    // Паритет с buildBBPlan (часть 3): снимки факта. Финализатор снимает
+    // weeklyVolume/validation/balanceReport/expandedSummary в конце СВОЕГО
+    // прохода, а два прохода выше (топ-ап спины, рампа) идут ПОСЛЕ него — и
+    // правка пользователя меняет сеты уже после всех снимков. Замер: на 12
+    // планах «Итого: N рабочих сетов/нед» и карточки качества расходились в
+    // 9 случаях (1-7 сетов), т.е. UI показывал цифры прежней версии плана.
+    // Пересчитываем последними — тем же движком, что и сборка.
+    refreshBBPlanSnapshots(out, {
+      validationOptions: {
+        level: bbLevel,
+        trainingYears: bbTrainingYears,
+        equipment: out.safetyConstraints?.equipment,
+        excludedExercises: out.safetyConstraints?.excludedExercises,
+        excludedMuscles: out.safetyConstraints?.excludedMuscles,
+        avoidAxialLoad: out.safetyConstraints?.avoidAxialLoad,
+        checkOrder: true,
+        methodology: bbMethodology,
+        specializationTargets: out.priorityMuscles,
+        onCourse: peds.length > 0,
+        maxWorkingSets: out.maxWorkingSets,
+        maxExercises: out.maxExercises,
+      },
+      specTargets: out.priorityMuscles,
+      canonicalMuscle,
+      refreshFrequency: true,
+      refreshValidationRationale: true,
+    });
     return out;
   };
 
@@ -3307,7 +3335,12 @@ const [bbVolumeRamp, setBbVolumeRamp] = useState<'standard' | 'preloaded' | 'fla
     if (!builtPlan) return;
     const plan = applyEditsToPlan(builtPlan);
     try {
-      const weeklySets = (plan.weeks || []).reduce((s, w) => s + (w.sessions || []).reduce((a, ses) => a + ses.exercises.filter((e: any) => !(e as any).warmupActivator).reduce((b, e) => b + (e.sets || 0), 0), 0), 0);
+      // «Сетов/нед» — а мезоцикл содержит несколько недель: раньше суммировались
+      // ВСЕ недели плана, и 6-недельный план обещал в 6 раз больше (а плашка и
+      // заметка питания писали «сетов/нед»). Теперь — среднее за неделю.
+      const weeksCount = Math.max(1, (plan.weeks || []).length);
+      const totalWorkingSets = (plan.weeks || []).reduce((s, w) => s + (w.sessions || []).reduce((a, ses) => a + ses.exercises.filter((e: any) => !(e as any).warmupActivator).reduce((b, e) => b + (e.sets || 0), 0), 0), 0);
+      const weeklySets = Math.round(totalWorkingSets / weeksCount);
       // Трен-дни недели: индексы сессий с упражнениями (не отдых).
       const w0 = plan.weeks[0];
       const trainDays = (w0?.sessions || []).map((s, i) => ((s.exercises || []).some((e: any) => !(e as any).warmupActivator) ? i + 1 : 0)).filter(d => d > 0);
@@ -3324,7 +3357,7 @@ const [bbVolumeRamp, setBbVolumeRamp] = useState<'standard' | 'preloaded' | 'fla
         : (weeklySets > 0 ? 180 : 160);
       applyToPlanner({
         kind: 'bb_nutrition',
-        label: `ББ-план → питание (${trainDays.length} трен-дня, ~${weeklySets} сетов/нед)`,
+        label: `ББ-план → питание (${trainDays.length} трен-дня, ~${weeklySets} сетов/нед в среднем)`,
         data: { kcal, proteinG, trainDays, weeklySets, splitId: plan.pattern?.id, weightKg: pw > 0 ? pw : undefined, sex: linked.profile?.settings?.personal?.sex, goal: bbGoal },
       });
     } catch (e) {

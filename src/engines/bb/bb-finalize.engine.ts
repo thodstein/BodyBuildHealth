@@ -31,8 +31,7 @@ import { isHardAdvanced, isPoolAllowed, swapExerciseForLevel } from './bb-exerci
 import { isAxialLoadExercise } from '../exercise-selector.engine';
 import { computeVolumeLandmarks, getVolumeLandmarks } from '../volume-landmarks.engine';
 import { calibratedLandmarksFor, type MEVCalibration } from './bb-mev-calibration.engine';
-import { buildBBPlanReport } from './bb-report.engine';
-import { analyzeBBBalance } from './bb-balance.engine';
+import { refreshBBPlanSnapshots } from './bb-plan-snapshot.engine';
 import { buildExerciseInstructions } from './bb-exercise-instructions.engine';
 import { applyTaperToFinalWeeks, isDeloadLikeWeek } from './bb-autocoach.engine';
 import { analyzePlanStress } from './bb-injury-prevention.engine';
@@ -5976,13 +5975,18 @@ for (const week of next.weeks) {
   // plan.weeklyVolume описывали версию плана, которой уже не существует.
   // Ранний снимок (выше) намеренно сохранён: из него собираются
   // rationale-строки о том, что финализатор починил.
-  next.weeklyVolume = Object.fromEntries(next.weeks.map(week => [
-    week.week,
-    aggregateBBVolume(week.sessions),
-  ]));
-  next.validation = validateBBPlan(next, validationOptions);
-  next.balanceReport = analyzeBBBalance(next, { specTargets: (options as any).priorityMuscles });
-  next.report = buildBBPlanReport(next);
+  //
+  // Здесь же закрыты два остатка того же класса: `fatigueReport` снимался на
+  // 5690 (до рампа/доводки PPL — замер: расходился), а `expandedSummary`
+  // финализатор не пересчитывал вовсе (его собирал только билдер, поэтому после
+  // UI-правок «Итого: N рабочих сетов/нед» описывал до-правочную версию; замер
+  // revalidate-пути: 9/12 планов). Единая точка — bb-plan-snapshot.engine.
+  refreshBBPlanSnapshots(next, {
+    validationOptions,
+    specTargets: (options as any).priorityMuscles,
+    canonicalMuscle: (m: string) => (WEAK_TO_MUSCLE as Record<string, string>)[m] || m,
+    refreshFrequency: true,
+  });
   return next;
 }
 

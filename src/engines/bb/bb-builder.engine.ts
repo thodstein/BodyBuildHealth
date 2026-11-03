@@ -74,11 +74,9 @@ import { loadSRPESessions } from '../../engines/pro/srpe-store';
 import { acuteChronicRatio, toDailyLoads } from '../../engines/pro/training-load.engine';
 import type { Macrocycle, MacroPhase, BBMacrocycle } from '../lms/macrocycle.engine';
 import { syncBBPlanSetShape, validateBBPlan } from './bb-validator.engine';
-import { analyzeBBBalance } from './bb-balance.engine';
-import { buildBBPlanReport } from './bb-report.engine';
 import { finalizeBBPlan, prioritizeBackSessions, reconcileVolumeTargets, pplWeeklyFloorFor, reconcileSchemeComments } from './bb-finalize.engine';
-import { reconcileFrequencyClaim, type MuscleFrequencyFact } from './bb-frequency';
 import { normalizeEquipmentIds, equipmentAllows } from './bb-equipment';
+import { refreshBBPlanSnapshots } from './bb-plan-snapshot.engine';
 import { buildBBVolumeTarget, type BBVolumeTarget, computeMrvMult, regimeMrvMultFor, computeBBRecoveryScore, computeBBWeeklyBudget, sessionLimitsFor, computeBBRecoveryMultiplier, computeBBNutritionMultiplier, perExerciseCap, perSessionMuscleCap, sessionMrvRotCap, sessionMuscleRealismCap, sessionMuscleExerciseCap, sessionDensityExerciseCap, resolveMrvCap, weeklyCapFor, distributeSetsByRole, BB_MRV_TOLERANCE } from './bb-volume.engine';
 import { buildBBExpandedSummary } from './bb-summary.engine';
 import { jointGuardScorePenalty, jointGuardActive } from './bb-joint-guard.engine';
@@ -88,7 +86,6 @@ import { REP_SCHEMES, schemeFor, applySchemeToPlan, applyBfrPattern } from './bb
 import { bbVbtRecommendation } from './bb-vbt.engine';
 import type { BBRotationReport } from './bb-rotation.engine';
 import type { BBSessionCost } from './bb-fatigue.engine';
-import { estimateBBSessionCost } from './bb-fatigue.engine';
 import type { BBPlanReport } from './bb-report.engine';
 
 import type { BBPlanValidationResult } from './bb-validator.engine';
@@ -5542,26 +5539,20 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
     }
   }
   syncBBPlanSetShape(finalized);
-  // M: финальный снимок ФАКТА. `finalizeBBPlan` снимает
-  // weeklyVolume/validation/balanceReport/report в конце СВОЕГО прохода
-  // (bb-finalize:5972-5985), но билдер после финализатора ещё меняет план:
-  // rehab-возврат, дневниковая коррекция, VBT, RIR-волна, вторая разгрузка,
-  // схемы интенсивности (reps/rest/tempo/вес), BFR, blast/cruise, рампа,
-  // сверка комментариев схемы. Замер на матрице (192 плана):
-  //  - `weeklyVolume` расходился в 191/192 (back W1: 12.5 эффективных сетов
-  //    против фактических 11.5);
-  //  - `validation` в 20 планах хранил ОШИБКИ, которых в итоговом плане нет
-  //    (свежий прогон на 192 планах даёт 0 error) — UI показывал «план
-  //    невалиден» там, где всё уже исправлено;
-  //  - `balanceReport`/`report` собирались из тех же устаревших снимков.
+  // M/L/K: финальный снимок ФАКТА — одной точкой (bb-plan-snapshot.engine).
+  // `finalizeBBPlan` снимает weeklyVolume/validation/balanceReport/report в конце
+  // СВОЕГО прохода, но билдер после финализатора ещё меняет план: rehab-возврат,
+  // дневниковая коррекция, VBT, RIR-волна, вторая разгрузка, схемы интенсивности,
+  // BFR, blast/cruise, рампа, сверка комментариев схемы. Замер на матрице
+  // (192 плана): `weeklyVolume` расходился в 191/192 (back W1: 12.5 эффективных
+  // сетов против фактических 11.5), `validation` в 20 планах хранил ОШИБКИ,
+  // которых в итоговом плане нет; `expandedSummary` («Итого: N рабочих сетов/нед»)
+  // расходился в 508/512 планов (до 82 сетов); строка «Частота на группу/нед»
+  // считалась по расписанию сплита и расходилась в 902 случаях на 512 планах.
   // Пересчитываем ровно те же объекты теми же функциями — тогда отчёт, печать,
   // CSV и карточки качества описывают план, который пользователь реально получит.
-  {
-    const priorityClean = [...new Set([...weakPoints, ...allSpecTargets, ...(focusGroup ? [focusGroup] : [])])];
-    finalized.weeklyVolume = Object.fromEntries(
-      (finalized.weeks || []).map((week) => [week.week, aggregateBBVolume(week.sessions)]),
-    ) as any;
-    finalized.validation = validateBBPlan(finalized, {
+  refreshBBPlanSnapshots(finalized, {
+    validationOptions: {
       level,
       trainingYears: input.trainingYears,
       equipment: eqList,
@@ -5570,62 +5561,16 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
       avoidAxialLoad: avAxial,
       checkOrder: true,
       methodology: input.methodology,
-      specializationTargets: priorityClean,
+      specializationTargets: [...new Set([...weakPoints, ...allSpecTargets, ...(focusGroup ? [focusGroup] : [])])],
       onCourse,
       maxWorkingSets: sessLimits.maxWorkingSets,
       maxExercises: sessLimits.maxExercises,
-    } as any);
-    (finalized as any).balanceReport = analyzeBBBalance(finalized, { specTargets: priorityClean });
-    (finalized as any).fatigueReport = (finalized.weeks || []).map((week) => ({
-      week: week.week,
-      sessions: week.sessions.map((session) => estimateBBSessionCost(session)),
-    }));
-    // Текст «⚠ Валидация: …» в rationale писался на 5086 по ДОфинализационному
-    // плану. Пересобираем из свежего прогона тем же фильтром (дефицит объёма и
-    // effective-MRV на той стадии ожидаемы — их снимает финализатор).
-    const freshWarn = (finalized.validation.issues || [])
-      .filter((i) => i.level === 'warning')
-      .filter((i) => i.code !== 'target_volume_deficit' && i.code !== 'effective_mrv_overflow')
-      .slice(0, 20)
-      .map((i) => `⚠ Валидация: ${i.message}`);
-    const ratClean = (finalized.rationale || []).filter((r) => !String(r).startsWith('⚠ Валидация:'));
-    for (const w of freshWarn) if (!ratClean.includes(w)) ratClean.push(w);
-    finalized.rationale = ratClean;
-  }
-  // L: `expandedSummary` собирался на 5002 — ДО финализации (MRV-трим,
-  // сессионные капы, поздняя доводка PPL, топ-апы). А из него печатается
-  // «Итого: N рабочих сетов/нед» и сеты по мышцам в отчёте/CSV/quality-report,
-  // то есть цифры описывали версию плана, которой уже нет. Замер на матрице
-  // (512 планов): 508 расхождений, до 82 сетов (fullbody_3/новичок/слабая
-  // грудь: «70», по факту 93). Тот же приём, что уже применён к
-  // weeklyVolume/validation в bb-finalize (финальный снимок).
-  (finalized as any).expandedSummary = buildBBExpandedSummary(finalized);
-  // K: «Частота на группу/нед» писалась ВЫШЕ по РАСПИСАНИЮ сплита
-  // (`musclesForTag`: «в каждом FullBody-дне есть бицепс»), а после подбора
-  // упражнений и всех урезающих проходов факт другой. Замер на матрице
-  // (512 планов): 902 расхождения — `fullbody_3`/новичок обещал `biceps=3×`,
-  // прямой работы 1-2 сессии из 3. Переписываем строку по факту.
-  {
-    const canonicalFn = (m: string) => (WEAK_TO_MUSCLE as Record<string, string>)[m] || m;
-    const freq = reconcileFrequencyClaim(finalized, { canonical: canonicalFn });
-    if (freq.lowerThanPlanned.length) {
-      const fmtFact = (f?: MuscleFrequencyFact) => (!f ? '0×' : f.min === f.max ? `${f.max}×` : `${f.min}-${f.max}×`);
-      const shown = freq.lowerThanPlanned.slice(0, 8)
-        .map((x) => `${x.muscle} ${fmtFact(freq.facts[x.muscle])} при плане ${x.planned}×`);
-      const rest = freq.lowerThanPlanned.length - shown.length;
-      const note = `📉 Частота по факту ниже расписания сплита: ${shown.join(', ')}${rest > 0 ? ` и ещё ${rest}` : ''}. `
-        + 'Считаны сессии с ПРЯМОЙ работой на мышцу — косвенная нагрузка компаундов не в счёт.';
-      const rat: string[] = finalized.rationale || [];
-      const i = rat.findIndex((r) => String(r).startsWith('📉 Частота по факту'));
-      if (i === -1) rat.push(note); else rat[i] = note;
-      finalized.rationale = rat;
-    }
-  }
-  // Отчёт собирается ПОСЛЕДНИМ: он копирует в себя weeklyVolume, validation,
-  // balanceReport, expandedSummary и текст rationale — если собрать его раньше,
-  // в нём останутся цифры предыдущей версии плана (это же случилось в
-  // финализаторе: там отчёт снимался последним, но билдер потом менял план).
-  (finalized as any).report = buildBBPlanReport(finalized);
+    },
+    specTargets: [...new Set([...weakPoints, ...allSpecTargets, ...(focusGroup ? [focusGroup] : [])])],
+    canonicalMuscle: (m: string) => (WEAK_TO_MUSCLE as Record<string, string>)[m] || m,
+    refreshFrequency: true,
+    refreshValidationRationale: true,
+  });
   return finalized;
 }
 
