@@ -93,6 +93,10 @@ import { buildNextActions } from '../../../engines/bb/bb-diag-next-actions.engin
 import { buildCorrectionEffect, logDiagInjection, readDiagInjections, type DiagInjection } from '../../../engines/bb/bb-diag-effect.engine';
 // BB-G-05: типы результата видео-разбора позы (метрики считает отдельный чистый движок).
 import { bbPoseLines, type BbPoseSummary, type BbPoseView } from '../../../engines/bb/bb-pose-metrics.engine';
+// BB-D-19 (хвост): орто-скрининг из хаба «Суставы и ортопедия» — читаем флаги и считаем
+// прехаб-строки. Слабые зоны НЕ создаём: специализация на больном суставе = +объём туда.
+import { loadOrthoFlags } from '../../../engines/pro/ortho-screen.engine';
+import { bbOrthoPrehabRows, bbOrthoFlagsSummary } from '../../../engines/bb/bb-ortho-prehab.engine';
 
 const STORAGE_KEY = 'he_bb_diagnostics_hub_v1';
 type BBTab = 'weak' | 'screening' | 'exercise' | 'stimulus' | 'symmetry' | 'volume';
@@ -726,6 +730,28 @@ export const BBDiagnosticsHub: React.FC = () => {
   /** BB-G-04: журнал вставок коррекций (до/после по зоне через 4–6 нед). */
   const [injections, setInjections] = useState<DiagInjection[]>(() => readDiagInjections());
 
+  /**
+   * BB-D-19 (хвост): орто-скрининг живёт в общем хабе «Суставы и ортопедия»
+   * (`he_ortho_screen_v1`). Хаб диагностики его не дублирует, а читает — и перечитывает,
+   * когда окно возвращается из ортопедии (focus/visibility), иначе карточка показывала бы
+   * старый скрининг после заполнения.
+   */
+  const [orthoNonce, setOrthoNonce] = useState(0);
+  useEffect(() => {
+    const bump = () => setOrthoNonce((n) => n + 1);
+    const onVis = () => { if (typeof document !== 'undefined' && document.visibilityState === 'visible') bump(); };
+    window.addEventListener('focus', bump);
+    document.addEventListener?.('visibilitychange', onVis);
+    return () => { window.removeEventListener('focus', bump); document.removeEventListener?.('visibilitychange', onVis); };
+  }, []);
+  const orthoFlags = useMemo(() => {
+    try { return loadOrthoFlags(); } catch { return []; }
+  }, [orthoNonce]);
+  const orthoPrehab = useMemo(() => {
+    try { return bbOrthoPrehabRows(orthoFlags); } catch { return []; }
+  }, [orthoFlags]);
+  const orthoSummary = useMemo(() => bbOrthoFlagsSummary(orthoFlags), [orthoFlags]);
+
   const vrPanel = useMemo(() => {
     try {
       return buildVolumeRecoveryPanel({
@@ -1133,8 +1159,17 @@ export const BBDiagnosticsHub: React.FC = () => {
         vbtLossPct: null,
         weakCauses: weakCausesPayload,
         preferredExerciseIds: topIds,
-        // Э5 PRO-5: единая деталь коррекций библиотеки (карточка = экспорт = мост)
-        correctiveDetail: correctiveDetailForExport,
+        // Э5 PRO-5: единая деталь коррекций библиотеки (карточка = экспорт = мост).
+        // BB-D-19: плюс прехаб из орто-скрининга — зона подписана «сустав: … (прехаб)»,
+        // поэтому приёмник не примет её за слабую мышцу (группы/weakPoints не трогаем).
+        correctiveDetail: (() => {
+          const base = Array.isArray(correctiveDetailForExport) ? correctiveDetailForExport : [];
+          const ortho = Array.isArray(orthoPrehab) ? orthoPrehab.map((r) => ({
+            id: r.id, zone: r.zone, exerciseId: r.exerciseId, protocol: r.protocol,
+            cues: r.cues, source: r.source, phase: r.phase,
+          })) : [];
+          return [...base, ...ortho].slice(0, 6);
+        })(),
         weakHeads,
         specBlock: specPayload,
         // MMC-строка: приёмник ББ-авто её уже читает (typeof string) — шлём тот же текст, что в карточке
@@ -1769,6 +1804,13 @@ export const BBDiagnosticsHub: React.FC = () => {
         };
       })
       .filter(Boolean) as any,
+    // BB-D-19 (хвост): орто-скрининг из общего хаба — флаги + прехаб. Нет флагов → поля нет.
+    ortho: orthoFlags.length
+      ? {
+        flags: orthoFlags.slice(0, 6).map((f) => ({ id: String(f.id || ''), joint: String(f.joint || ''), level: String(f.level || ''), label: String(f.label || '') })),
+        prehab: orthoPrehab.map((r) => ({ id: r.id, joint: r.joint, zone: r.zone, title: r.title, exerciseId: r.exerciseId, protocol: r.protocol, why: r.why, doctorFirst: r.doctorFirst })),
+      }
+      : null,
     // BB-G-01/04: панель объёма/восстановления и эффект коррекции — «показано = выгружено».
     volumeRecovery: {
       chips: vrPanel.chips.map((c) => ({ label: c.label, value: c.value, detail: c.detail })),
@@ -1784,7 +1826,7 @@ export const BBDiagnosticsHub: React.FC = () => {
       zone: a.zone,
       where: a.target ? { type: a.target.type, id: a.target.id, label: a.target.label } : null,
     })),
-  }), [lrVerdicts, moveDriver, singleLeg, ohs, mmcLine, shoulderV, hingeV, loadedV, ybtV, asymText, driverSubs, benchV, painMon, nheV, adductorV, loadedHingeV, erIrV, teenGate, screenPriority, correctiveDetailForExport, corrBlockLines, lrDirection, readiness, redFlags, returnToPlan, lvpProfile, tendonTexts, teenNoteText, femaleNotesShort, vrPanel, corrEffect, nextActions, lvpWorkingRange, noDataAtAll, state.poseResults, state.poseApplied]);
+  }), [lrVerdicts, moveDriver, singleLeg, ohs, mmcLine, shoulderV, hingeV, loadedV, ybtV, asymText, driverSubs, benchV, painMon, nheV, adductorV, loadedHingeV, erIrV, teenGate, screenPriority, correctiveDetailForExport, corrBlockLines, lrDirection, readiness, redFlags, returnToPlan, lvpProfile, tendonTexts, teenNoteText, femaleNotesShort, vrPanel, corrEffect, nextActions, lvpWorkingRange, noDataAtAll, state.poseResults, state.poseApplied, orthoFlags, orthoPrehab]);
 
   // Покрытие слабых головок текущим планом (есть ли хоть одно упражнение в головку)
   const headCoverage = useMemo(() => {
@@ -2530,6 +2572,9 @@ export const BBDiagnosticsHub: React.FC = () => {
             teenGate={teenGate}
             applyMobilityToProfile={applyMobilityToProfile}
             trackedRu={trackedRu}
+            orthoSummary={orthoSummary}
+            orthoPrehab={orthoPrehab}
+            onGoOrtho={() => goToScreen('joints_ortho')}
           />
         )}
       </div>

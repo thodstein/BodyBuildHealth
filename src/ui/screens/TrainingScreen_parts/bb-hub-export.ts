@@ -89,6 +89,17 @@ export interface BbHubPro2Input {
     applied: boolean;
     lines: string[];
   }> | null;
+  /**
+   * BB-D-19 (хвост): орто-скрининг из хаба «Суставы и ортопедия».
+   * Флаги ограничений + прехаб-строки (не слабые мышцы — спец-блок они не включают).
+   */
+  ortho?: {
+    flags: Array<{ id: string; joint: string; level: string; label?: string }>;
+    prehab: Array<{
+      id: string; joint: string; zone: string; title: string; exerciseId: string;
+      protocol: string; why: string; doctorFirst?: boolean;
+    }>;
+  } | null;
 }
 
 /** Единая мета для `buildBBDiagnosticsHtml` и `buildBBDiagnosticsCsv` (пусто — тихо). */
@@ -128,5 +139,7 @@ export function buildPro2Meta(i: BbHubPro2Input): Record<string, unknown> {
     volumeRecovery: i.volumeRecovery ?? undefined,
     nextActions: i.nextActions?.length ? i.nextActions : undefined,
     poseVideos: i.poseVideos?.length ? i.poseVideos : undefined,
+    // BB-D-19 (хвост): орто-скрининг — пусто (нет флагов) не создаёт секцию в отчёте.
+    ortho: i.ortho && i.ortho.flags.length ? i.ortho : undefined,
   };
 }

@@ -206,6 +206,28 @@ describe('bb-hub-export (PRO-5 Э5)', () => {
     expect(html).toContain('Глубина: колено 96°');
   });
 
+  it('BB-D-19: орто-скрининг в мете — флаги + прехаб в HTML/CSV, пусто не создаёт секцию', () => {
+    const report = { weakCandidates: [], weakMusclesCanonical: [], weakZonesGranular: [], symmetry: { ratios: {}, score: 0, issues: [] }, stimulus: { issues: [], scorePenalty: 0, global: {} }, score: { score: 60, level: 'warn', verification: 0.5, floors: [] }, findings: [], priorities: [] } as any;
+    const ortho = {
+      flags: [{ id: 'knee_valgus_pos', joint: 'knee', level: 'watch', label: 'Вальгус колена' }],
+      prehab: [{ id: 'ortho-knee-g-clam-complex', joint: 'knee', zone: 'сустав: колено (прехаб)', title: 'Комплекс ТБС', exerciseId: 'clamshell', protocol: '2×10–12 RIR2 3-1-1-0', why: 'щадить вальгус' }],
+    };
+    const meta = buildPro2Meta(baseInput({ ortho }));
+    expect((meta as any).ortho).toEqual(ortho);
+    const html = buildBBDiagnosticsHtml(report, { date: '2026-11-04', ...meta } as any);
+    expect(html).toContain('Орто-скрининг (хаб Ортопедия)');
+    expect(html).toContain('Вальгус колена');
+    expect(html).toContain('сустав: колено (прехаб)');
+    const csv = buildBBDiagnosticsCsv(report, null, { date: '2026-11-04', ...meta } as any);
+    expect(csv).toContain('"ortho_flag","watch","knee","Вальгус колена"');
+    expect(csv).toContain('"ortho_prehab","сустав: колено (прехаб)","clamshell"');
+    // нет флагов → секции нет (вывод прежних вызовов не меняется)
+    const empty = buildPro2Meta(baseInput({ ortho: { flags: [], prehab: [] } }));
+    expect((empty as any).ortho).toBeUndefined();
+    const htmlEmpty = buildBBDiagnosticsHtml(report, { date: '2026-11-04', ...empty } as any);
+    expect(htmlEmpty).not.toContain('Орто-скрининг');
+  });
+
   it('source-guard: хаб собирает мету ровно одним вызовом, копий литералов нет', () => {
     expect((SRC.match(/buildPro2Meta\(/g) || []).length).toBe(1);
     expect(SRC).not.toContain('pro2csv');

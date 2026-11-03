@@ -39,6 +39,16 @@ function poseVideoEntries(meta: any): BbPoseVideoEntry[] {
 const POSE_VIEW_RU: Record<string, string> = { front: 'фронтально', side: 'сбоку' };
 const POSE_QUALITY_RU: Record<string, string> = { ok: 'ок', low: 'черновой', none: 'поза не найдена' };
 
+/** BB-D-19 (хвост): то, что ББ-хаб реально читает из орто-скрининга. */
+export interface BbOrthoMeta {
+  flags: Array<{ id: string; joint: string; level: string; label?: string }>;
+  prehab: Array<{
+    id: string; joint: string; zone: string; title: string; exerciseId: string;
+    protocol: string; why: string; doctorFirst?: boolean;
+  }>;
+}
+const ORTHO_LEVEL_RU: Record<string, string> = { watch: '⚪ наблюдение', doctor: '🟡 врач', urgent: '🔴 стоп' };
+
 export interface BBDiagnosticsPro2Meta {
   lr?: Array<{ group: string; left: number; right: number; asymPct: number | null; weakSide: string | null; verdict: string; topUpSets: number; text: string }>;
   readiness?: { level: string; advice: string; reasons: string[] };
@@ -55,6 +65,11 @@ export interface BBDiagnosticsPro2Meta {
    * отчёт печатает обе секции; одиночный `poseVideo` поддерживается для старых данных.
    */
   poseVideos?: BbPoseVideoEntry[] | null;
+  /**
+   * BB-D-19 (хвост): орто-скрининг из хаба «Суставы и ортопедия». Флаги — ограничения
+   * (они уже едут гардами в ББ-авто), прехаб — щадящие строки, НЕ слабые мышцы.
+   */
+  ortho?: BbOrthoMeta | null;
   teen?: string | null;
   femaleNotes?: string[];
   /** PRO-3: LVP-профиль, сухожилия, MMC, return-to, направление перекоса, рабочие веса (legacy-чтение старых файлов). */
@@ -239,6 +254,21 @@ ${(() => {
       // ROUND-10: блок коррекции — те же строки, что карточка хаба («показано = выгружено»).
       parts.push(`<h2>Блок коррекции (волна)</h2><ul>${(m as any).correctionBlock.map((l: unknown) => `<li>${esc(String(l))}</li>`).join('')}</ul>`);
     }
+    // BB-D-19 (хвост): орто-скрининг читается из общего хаба «Суставы и ортопедия».
+    // Флаги печатаем с уровнем (urgent нельзя потерять), прехаб — с явной пометкой,
+    // что это щадящие упражнения, а не «слабая мышца» (иначе отчёт противоречил бы плану).
+    {
+      const ortho = (m as any).ortho as BbOrthoMeta | null | undefined;
+      if (ortho && Array.isArray(ortho.flags) && ortho.flags.length) {
+        const flagRows = ortho.flags.slice(0, 6).map((f) => (
+          `<tr><td>${esc(ORTHO_LEVEL_RU[String(f.level)] || String(f.level || ''))}</td><td>${esc(String(f.joint || ''))}</td><td>${esc(String(f.label || f.id || ''))}</td></tr>`
+        )).join('');
+        const pre = Array.isArray(ortho.prehab) && ortho.prehab.length
+          ? `<h3>Прехаб (щадяще, не спец-блок)</h3><table><tr><th>Зона</th><th>Упражнение</th><th>Доза</th><th>Основание</th></tr>${ortho.prehab.slice(0, 4).map((r) => `<tr><td>${esc(r.zone)}</td><td>${esc(r.title)}</td><td>${esc(r.protocol)}</td><td>${esc(r.doctorFirst ? `после допуска врача · ${r.why}` : r.why)}</td></tr>`).join('')}</table>`
+          : '<div style="font-size:12px">Прехаба нет: флаги уровня «стоп»/режимные — сначала врач, тренировка на паузе.</div>';
+        parts.push(`<h2>Орто-скрининг (хаб Ортопедия)</h2><table><tr><th>Уровень</th><th>Сустав</th><th>Флаг</th></tr>${flagRows}</table>${pre}<div style="font-size:11px">Скрининг, не диагноз. Ограничения применяются гардами ББ-авто; прехаб не делает мышцу «слабой» и не включает спец-блок.</div>`);
+      }
+    }
     if (m.readiness?.level) parts.push(`<h2>Готовность — ${esc(m.readiness.level)}</h2><div style="font-size:12px">${esc(m.readiness.advice)}</div><ul>${m.readiness.reasons.map((r) => `<li>${esc(r)}</li>`).join('') || '<li>—</li>'}</ul>`);
     if (m.redFlags?.active) parts.push(`<h2>Флаги — ${m.redFlags.blocked ? 'стоп' : 'осторожно'}</h2><div style="font-size:12px">${esc(m.redFlags.text)} (скрининг, не диагноз)</div>`);
     if (m.bar) parts.push(`<h2>Штанга (видео)</h2><div style="font-size:12px">Петля ${m.bar.xLoop} см · ${esc(m.bar.type)} — ${esc(m.bar.text)} (порог 4/6 см)</div>`);
@@ -387,6 +417,18 @@ export function buildBBDiagnosticsCsv(
   }
   if (Array.isArray((meta as any)?.correctionBlock) && (meta as any).correctionBlock.length) {
     lines.push(['correction_block', (meta as any).correctionBlock.join(' | ')].map(escCsv).join(','));
+  }
+  // BB-D-19 (хвост): орто-флаги + прехаб — паритет с HTML (уровень флага не теряется).
+  {
+    const ortho = (meta as any)?.ortho as BbOrthoMeta | null | undefined;
+    if (ortho && Array.isArray(ortho.flags) && ortho.flags.length) {
+      lines.push(['ortho_flag', 'level', 'joint', 'label'].map(escCsv).join(','));
+      for (const f of ortho.flags.slice(0, 6)) lines.push(['ortho_flag', String(f.level || ''), String(f.joint || ''), String(f.label || f.id || '')].map(escCsv).join(','));
+      if (Array.isArray(ortho.prehab) && ortho.prehab.length) {
+        lines.push(['ortho_prehab', 'zone', 'exercise', 'protocol', 'why'].map(escCsv).join(','));
+        for (const r of ortho.prehab.slice(0, 4)) lines.push(['ortho_prehab', r.zone, r.exerciseId, r.protocol, r.doctorFirst ? `после допуска врача · ${r.why}` : r.why].map(escCsv).join(','));
+      }
+    }
   }
   if (meta?.returnTo) lines.push(['return_to', meta.returnTo.text].map(escCsv).join(','));
   if (meta?.lrDirection?.length) lines.push(['lr_direction', meta.lrDirection.map((d) => d.text).join(' · ')].map(escCsv).join(','));

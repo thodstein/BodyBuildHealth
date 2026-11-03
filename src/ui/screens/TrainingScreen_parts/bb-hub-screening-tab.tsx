@@ -16,6 +16,7 @@ import { NHE_DISCLAIMER, ADDUCTOR_HONESTY } from '../../../engines/bb/bb-posteri
 import { HINGE_LOAD_NOTE } from '../../../engines/bb/bb-hinge-screen.engine';
 import { SCREENING_DISCLAIMER, VIDEO_GUIDE, MOTION_CAPTURE_NOTE } from '../../../engines/bb/bb-movement-to-plan.engine';
 import { bbPoseScreeningPatch } from '../../../engines/bb/bb-pose-metrics.engine';
+import { BB_ORTHO_PREHAB_NOTE, type BbOrthoPrehabRow } from '../../../engines/bb/bb-ortho-prehab.engine';
 import { BbCheckCard, BbNum, BbSheetSelect } from './bb-hub-controls';
 import { BbPoseCard } from './bb-hub-pose-card';
 import type { BBState } from './BBDiagnosticsHub';
@@ -50,6 +51,11 @@ export interface BbScreeningTabProps {
   teenGate: { blocked: boolean; note: string };
   applyMobilityToProfile: () => void;
   trackedRu: (codes: string[]) => string;
+  /** BB-D-19 (хвост): сводка орто-флагов из общего хаба «Суставы и ортопедия». */
+  orthoSummary: { total: number; urgent: number; doctor: number; watch: number; text: string };
+  /** Прехаб по орто-флагам (щадящие строки; это НЕ слабые мышцы и не спец-блок). */
+  orthoPrehab: BbOrthoPrehabRow[];
+  onGoOrtho: () => void;
 }
 
 export const BbScreeningTab: React.FC<BbScreeningTabProps> = (props) => {
@@ -58,6 +64,7 @@ export const BbScreeningTab: React.FC<BbScreeningTabProps> = (props) => {
     hingeV, loadedV, loadedHingeV, ybtV, asymText, driverSubs, benchV, painMon,
   painJointTendon, nheV, adductorV, erIrV, screenPriority, screenHist, setScreenHist,
     screenCodes, screenDelta, teenGate, applyMobilityToProfile, trackedRu,
+    orthoSummary, orthoPrehab, onGoOrtho,
   } = props;
 
   /**
@@ -282,6 +289,38 @@ export const BbScreeningTab: React.FC<BbScreeningTabProps> = (props) => {
                   {driverSubs.avoid.length ? ` (убрать: ${driverSubs.avoid.join(' · ')})` : ''} — {driverSubs.note}
                 </div>
                 <div style={{ fontSize: 10, color: '#fff', opacity: 0.85, marginTop: 4 }} data-bb="screening-disclaimer">{SCREENING_DISCLAIMER}</div>
+              </div>
+              {/* BB-D-19 (хвост): орто-скрининг живёт в хабе «Суставы и ортопедия».
+                  Здесь он только читается — без дубля ввода. Слабые зоны НЕ создаём:
+                  специализация на проблемном суставе увеличила бы нагрузку на него. */}
+              <div style={{ padding: '8px 10px', borderRadius: 10, background: 'rgba(244,63,94,0.07)', border: '1px solid rgba(244,63,94,0.18)', marginBottom: 6 }} data-bb="ortho-screen">
+                <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+                  <b style={{ fontSize: 11, color: '#fff' }}>🦴 Орто-скрининг (хаб Ортопедия)</b>
+                  <span style={{ fontSize: 10, color: '#fff', opacity: 0.85 }} data-bb="ortho-summary">{orthoSummary.text}</span>
+                  <button
+                    type="button"
+                    onClick={onGoOrtho}
+                    data-bb="ortho-open"
+                    style={{ minHeight: 36, padding: '6px 10px', borderRadius: 8, background: 'rgba(244,63,94,0.14)', border: '1px solid rgba(244,63,94,0.28)', color: '#fff', fontSize: 10, fontWeight: 800, cursor: 'pointer' }}
+                  >Открыть ортопедию</button>
+                </div>
+                {orthoSummary.urgent > 0 && (
+                  <div data-bb="ortho-urgent" style={{ fontSize: 10, color: '#fca5a5', marginTop: 4, lineHeight: 1.45 }}>
+                    ⛔ Есть флаг «стоп»: тренировка на паузе до врача — прехаб не предлагаем.
+                  </div>
+                )}
+                {orthoPrehab.length > 0 && (
+                  <ul data-bb="ortho-prehab" style={{ margin: '4px 0 0', paddingLeft: 16, fontSize: 10, color: '#fff', lineHeight: 1.5 }}>
+                    {orthoPrehab.map((r) => (
+                      <li key={r.id}>
+                        {r.zone} → {r.title}: {r.protocol}{r.doctorFirst ? ' · после допуска врача' : ''}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 4, lineHeight: 1.45 }} data-bb="ortho-note">
+                  {orthoSummary.total === 0 ? 'Скрининг суставов не заполнен — орто-ограничения в план не попадут.' : BB_ORTHO_PREHAB_NOTE}
+                </div>
               </div>
               <div style={{ padding: '8px 10px', borderRadius: 10, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.16)', marginBottom: 6 }} data-bb="screen-priority">
                 <div style={{ fontSize: 12, fontWeight: 800, color: '#00e68a', marginBottom: 4 }}>🧭 Что чинить первым (горизонт 4–6 нед)</div>
