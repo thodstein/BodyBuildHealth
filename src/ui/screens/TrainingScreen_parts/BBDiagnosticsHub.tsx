@@ -68,6 +68,8 @@ import { nheVerdict, adductorVerdict, type CphLevel } from '../../../engines/bb/
 import { assessBbTendonGuard } from '../../../engines/bb/bb-tendon-guard.engine';
 import { calibrateBbLvp, parseBbLvpText, loadBbLvpProfiles, saveBbLvpProfile, clearBbLvpProfiles, type BbLvpProfile } from '../../../engines/bb/bb-lvp.engine';
 import { buildVolumeRecoveryPanel, vrMuscleLabel } from '../../../engines/bb/bb-volume-recovery.engine';
+// BB-G-08: «что делать дальше» — 1–2 шага из данных + белый список deep-link'ов.
+import { buildNextActions } from '../../../engines/bb/bb-diag-next-actions.engine';
 import { buildCorrectionEffect, logDiagInjection, readDiagInjections, type DiagInjection } from '../../../engines/bb/bb-diag-effect.engine';
 
 const STORAGE_KEY = 'he_bb_diagnostics_hub_v1';
@@ -1558,6 +1560,50 @@ export const BBDiagnosticsHub: React.FC = () => {
     } catch { return null; }
   }, [diarySessions, level]);
 
+  /**
+   * BB-G-08: «что делать дальше». Правила и приоритет — в движке (там же белый
+   * список целей deep-link'а), здесь только вход из уже посчитанных мемов.
+   * Действия не дублируют экран: два шага ведут в два разных места.
+   */
+  const nextActions = useMemo(() => {
+    try {
+      return buildNextActions({
+        score: {
+          score: report.score.score,
+          level: report.score.level,
+          verification: report.score.verification,
+          verificationMissing: report.score.verificationMissing,
+        },
+        redFlags: redFlags?.active
+          ? { active: true, blocked: !!redFlags.blocked, items: (redFlags.items ?? []) as string[], text: redFlags.text }
+          : null,
+        volume: {
+          limiter: vrPanel.limiter
+            ? { id: vrPanel.limiter.id, label: vrPanel.limiter.label, zone: vrPanel.limiter.zone, detail: vrPanel.limiter.detail }
+            : null,
+          hasVolume: vrPanel.hasVolume,
+          hasAcwr: vrPanel.hasAcwr,
+          hasMobility: vrPanel.hasMobility,
+          rows: vrPanel.rows.map((r) => ({ group: r.group, label: r.label, over: r.over, sets: r.sets, mrv: r.mrv })),
+        },
+        weakZones: report.weakZonesGranular,
+        weakCauses: weakCauses as any,
+        // `false` только когда план точно отсутствует: «нет плана» — совет, а не догадка.
+        planPresent: !!savedPlan,
+        diaryCount: diarySessions.length,
+        measuresCount: Object.keys(measNum).length,
+        screenTouched: !!state.screenTouched,
+        effect: corrEffect.status === 'no_injection' ? null : { status: corrEffect.status, text: corrEffect.text },
+      });
+    } catch {
+      // Ошибка расчёта — честное «не посчитано», а не пустой блок без объяснений.
+      return { actions: [], considered: [], note: 'Действия не посчитаны — ошибка расчёта' };
+    }
+  }, [
+    report.score.score, report.score.level, report.score.verification, report.score.verificationMissing.join('|'),
+    redFlags, vrPanel, report.weakZonesGranular, weakCauses, savedPlan, diarySessions.length, measNum, state.screenTouched, corrEffect,
+  ]);
+
   const pro2Meta = useMemo(() => buildPro2Meta({
     lrVerdicts: lrVerdicts as any,
     moveDriver,
@@ -1606,7 +1652,15 @@ export const BBDiagnosticsHub: React.FC = () => {
       advice: vrPanel.advice,
       effect: corrEffect.status === 'no_injection' ? null : corrEffect.text,
     },
-  }), [lrVerdicts, moveDriver, singleLeg, ohs, mmcLine, shoulderV, hingeV, loadedV, ybtV, asymText, driverSubs, benchV, painMon, nheV, adductorV, loadedHingeV, erIrV, teenGate, screenPriority, correctiveDetailForExport, corrBlockLines, lrDirection, readiness, redFlags, returnToPlan, lvpProfile, tendonTexts, teenNoteText, femaleNotesShort, vrPanel, corrEffect]);
+    // BB-G-08: те же 1–2 действия, что в шапке хаба («показано = выгружено»).
+    nextActions: nextActions.actions.map((a) => ({
+      title: a.title,
+      why: a.why,
+      kind: a.kind,
+      zone: a.zone,
+      where: a.target ? { type: a.target.type, id: a.target.id, label: a.target.label } : null,
+    })),
+  }), [lrVerdicts, moveDriver, singleLeg, ohs, mmcLine, shoulderV, hingeV, loadedV, ybtV, asymText, driverSubs, benchV, painMon, nheV, adductorV, loadedHingeV, erIrV, teenGate, screenPriority, correctiveDetailForExport, corrBlockLines, lrDirection, readiness, redFlags, returnToPlan, lvpProfile, tendonTexts, teenNoteText, femaleNotesShort, vrPanel, corrEffect, nextActions]);
 
   // Покрытие слабых головок текущим планом (есть ли хоть одно упражнение в головку)
   const headCoverage = useMemo(() => {
@@ -2173,6 +2227,53 @@ export const BBDiagnosticsHub: React.FC = () => {
         </div>
         {toast && <div style={{ marginTop: 8, padding: '6px 10px', borderRadius: 8, background: 'rgba(34,197,94,0.12)', border: '1px solid rgba(34,197,94,0.2)', color: '#22c55e', fontSize: 11 }}>{toast}</div>}
       </div>
+
+      {(nextActions.actions.length > 0 || nextActions.note) && (
+        <div data-bb="next-actions" style={{ ...CARD, padding: '10px 10px 8px', margin: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8, marginBottom: 6 }}>
+            <div style={{ fontSize: 12, fontWeight: 800, color: '#fff' }}>Что делать дальше</div>
+            <div style={{ fontSize: 9, color: '#94a3b8' }}>из данных, не из шаблона</div>
+          </div>
+          {nextActions.actions.map((a, i) => {
+            const rowStyle: React.CSSProperties = {
+              display: 'flex', gap: 8, alignItems: 'flex-start', padding: '6px 8px', borderRadius: 8,
+              background: vrZoneBg(a.zone), border: `1px solid ${vrZoneColor(a.zone)}33`, marginBottom: 6,
+              width: '100%', textAlign: 'left', minHeight: 44, font: 'inherit', color: '#fff',
+            };
+            const inner = (
+              <>
+                <span style={{ width: 18, height: 18, borderRadius: 9, flex: '0 0 auto', background: vrZoneColor(a.zone), color: '#06281c', fontSize: 11, fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{i + 1}</span>
+                <span style={{ flex: 1, minWidth: 0 }}>
+                  <span style={{ display: 'block', fontSize: 11, fontWeight: 700, color: '#fff', lineHeight: 1.3 }}>{a.title}</span>
+                  <span style={{ display: 'block', fontSize: 10, color: '#cbd5e1', lineHeight: 1.45 }}>{a.why}</span>
+                </span>
+                {/* Место шага — визуальный чип; имя кнопки = сам шаг (а не название раздела). */}
+                {a.target && <span aria-hidden="true" style={{ flex: '0 0 auto', padding: '3px 8px', borderRadius: 999, background: 'rgba(0,230,138,0.12)', border: '1px solid rgba(0,230,138,0.25)', color: '#00e68a', fontSize: 10, fontWeight: 700, lineHeight: 1.6 }}>{a.target.label} →</span>}
+              </>
+            );
+            return a.target ? (
+              <button
+                key={a.id}
+                type="button"
+                data-bb="next-action"
+                data-action={a.id}
+                data-zone={a.zone}
+                data-target={a.target.id}
+                data-target-type={a.target.type}
+                title={`Перейти: ${a.target.label}`}
+                aria-label={a.title}
+                onClick={() => { if (a.target!.type === 'screen') goToScreen(a.target!.id); else setTab(a.target!.id as any); }}
+                style={{ ...rowStyle, cursor: 'pointer' }}
+              >{inner}</button>
+            ) : (
+              <div key={a.id} data-bb="next-action" data-action={a.id} data-zone={a.zone} style={rowStyle}>{inner}</div>
+            );
+          })}
+          {nextActions.actions.length === 0 && nextActions.note && (
+            <div style={{ fontSize: 10, color: '#94a3b8', lineHeight: 1.5 }}>{nextActions.note}</div>
+          )}
+        </div>
+      )}
 
       <div style={{ ...CARD, padding: 10, margin: 0 }} data-bb="tabs-card">
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }} data-bb="tabs-row">

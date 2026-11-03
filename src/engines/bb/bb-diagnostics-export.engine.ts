@@ -62,6 +62,18 @@ export interface BBDiagnosticsPro2Meta {
     advice: string[];
     effect: string | null;
   } | null;
+  /**
+   * BB-G-08: 1–2 действия «что делать дальше» — те же строки, что в шапке хаба.
+   * `where` — куда ведёт шаг (экран/deep-link или вкладка хаба), `null` — кнопка
+   * самого хаба (например, «→ В ББ-авто»).
+   */
+  nextActions?: Array<{
+    title: string;
+    why: string;
+    kind: string;
+    zone: string;
+    where: { type: string; id: string; label: string } | null;
+  }> | null;
 }
 
 export function buildBBDiagnosticsHtml(report: BBDiagnosticsReport, meta?: { date?: string; level?: string; plan?: any; weakHeads?: string[]; weakCauses?: Record<string, { cause: string; confidence: number; evidence: string[]; fix: string }>; specBlock?: { lengthWeeks: number; donors: string[]; rationale: string[]; weeks: Array<{ week: number; targetSets: Record<string, number>; frequency: Record<string, number>; note: string }> } | null } & BBDiagnosticsPro2Meta): string {
@@ -116,6 +128,15 @@ export function buildBBDiagnosticsHtml(report: BBDiagnosticsReport, meta?: { dat
 <h1>ББ-диагностика — отчёт ${esc(date)} ${level ? `· ${esc(level)}` : ''}</h1>
 <div>Score <span class="badge" style="background:${report.score.level === 'critical' ? '#ef4444' : report.score.level === 'warn' ? '#f59e0b' : '#22c55e'}">${report.score.score}/100 ${esc(report.score.level)}</span> · проверка данных ${Math.round(report.score.verification * 100)}%${(report.score.verificationMissing || []).length ? ` (не подтверждено: ${(report.score.verificationMissing || []).map(c => esc(BB_VERIFICATION_LABEL_RU[c])).join(', ')})` : ''} · weak ${report.weakMusclesCanonical.join(', ') || '—'}</div>
 ${floors ? `<div style="margin-top:8px;color:#ef4444;font-size:11px"><b>Floors:</b><ul>${floors}</ul></div>` : ''}
+${(() => {
+    // BB-G-08: «что делать дальше» — первое, что нужно увидеть в отчёте, поэтому
+    // блок идёт до разборов. Пункты те же, что в шапке хаба (1–2, из данных).
+    const list = Array.isArray((meta as any)?.nextActions)
+      ? ((meta as any).nextActions as Array<{ title?: string; why?: string; where?: { label?: string } | null }>).filter((a) => a && a.title)
+      : [];
+    if (!list.length) return '';
+    return `<h2>Что делать дальше</h2><ol>${list.map((a) => `<li><b>${esc(String(a.title))}</b> — ${esc(String(a.why ?? ''))}${a.where?.label ? ` <i>(${esc(String(a.where.label))})</i>` : ''}</li>`).join('')}</ol>`;
+  })()}
 <h2>Слабые (топ-2 → в ББ-авто)</h2><table><tr><th>Мышца</th><th>Зона</th><th>Источник</th><th>Δ%</th><th>Причина</th></tr>${rowsWeak}</table>
 ${(meta as any)?.weakCauses ? `<h2>Причины отставания (MAX PRO)</h2><table><tr><th>Зона</th><th>Причина</th><th>Уверенность</th><th>Доказательства</th><th>Чинить</th></tr>${Object.entries((meta as any).weakCauses as Record<string, { cause: string; confidence: number; evidence: string[]; fix: string }>).map(([z, c]) => `<tr><td>${esc(z)}</td><td>${esc(c.cause)}</td><td>${Math.round(c.confidence * 100)}%</td><td>${esc(c.evidence.join(' · '))}</td><td>${esc(c.fix)}</td></tr>`).join('')}</table>` : ''}
   ${(meta as any)?.specBlock ? `<h2>Спец-блок ${(meta as any).specBlock.lengthWeeks} нед</h2><div style="font-size:11px;color:#666">${esc(((meta as any).specBlock.rationale || []).join(' · '))} · доноры: ${esc((((meta as any).specBlock as any).donors || []).join(', ') || '—')}</div><table><tr><th>Нед</th><th>Цели (сеты)</th><th>Частота</th><th>Заметка</th></tr>${((meta as any).specBlock.weeks || []).map((w: { week: number; targetSets: Record<string, number>; frequency: Record<string, number>; note: string }) => `<tr><td>${w.week}</td><td>${esc(Object.entries(w.targetSets).map(([k, v]) => `${k} ${v}`).join(', '))}</td><td>${esc(Object.entries(w.frequency).map(([k, v]) => `${k} ×${v}`).join(', '))}</td><td>${esc(w.note)}</td></tr>`).join('')}</table>` : ''}
@@ -315,6 +336,14 @@ export function buildBBDiagnosticsCsv(
     if (vr.limiter?.label) lines.push(['vr_limiter', `${vr.limiter.label} — ${vr.limiter.detail}`].map(escCsv).join(','));
     if (vr.advice?.length) lines.push(['vr_advice', vr.advice.join(' · ')].map(escCsv).join(','));
     if (vr.effect) lines.push(['correction_effect', vr.effect].map(escCsv).join(','));
+  }
+  // BB-G-08: действия «что делать дальше» — паритет с HTML-блоком (и с шапкой хаба).
+  if (Array.isArray(meta?.nextActions) && meta.nextActions.length) {
+    lines.push('');
+    lines.push(['next_action', 'why', 'where', 'kind', 'zone'].map(escCsv).join(','));
+    for (const a of meta.nextActions) {
+      lines.push([a.title, a.why, a.where?.label ?? '', a.kind, a.zone].map(escCsv).join(','));
+    }
   }
   // упражнения → эффект (максимально)
   try {

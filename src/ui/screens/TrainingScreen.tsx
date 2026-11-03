@@ -77,6 +77,8 @@ import { saveTrainingProfile, loadTrainingProfile } from './TrainingScreen_parts
 import { loadSRPESessions } from '../../engines/pro/srpe-store';
 import { acuteChronicRatio, toDailyLoads, weeklyMonotony } from '../../engines/pro/training-load.engine';
 import { epley1RM } from '../../engines/e1rm';
+// BB-G-02/08: белый список целей deep-link'а из ББ-диагностики (один источник с движком советов).
+import { BB_DIAG_DEEP_LINKS } from '../../engines/bb/bb-diag-next-actions.engine';
 
 /** TrainingHeroStats — полоска статистики hero, ТОЛЬКО APK (isNativeApp гейт в hero).
  *  Telegram её не рендерит вообще. Все источники в try/catch. */
@@ -117,13 +119,14 @@ const TrainingHeroStats: React.FC = () => {
 };
 
 /**
- * BB-G-02: цели deep-link из ББ-диагностики (`training-open-tab`).
+ * BB-G-02 + BB-G-08: цели deep-link из ББ-диагностики (`training-open-tab`).
  * Только белый список — иначе любое событие из консоли/расширения открывало бы
  * произвольную вкладку тренировочного блока.
+ *
+ * Сам список живёт в `bb-diag-next-actions.engine` рядом с правилами «что делать
+ * дальше»: иначе движок молча советовал бы экран, которого шелл не знает (два
+ * списка разъехались бы при первой же правке). Здесь — только импорт.
  */
-const BB_DIAG_DEEP_LINKS: ReadonlySet<string> = new Set([
-  'volume_hub', 'joints_ortho', 'calc_vbt', 'strength_analysis', 'diary', 'progress',
-]);
 
 export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab }) => {
   const linked = useDataLink();

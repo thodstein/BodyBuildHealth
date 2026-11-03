@@ -162,6 +162,34 @@ describe('bb-hub-export (PRO-5 Э5)', () => {
     expect(empty).not.toContain('Объём · Recovery · Mobility');
   });
 
+  it('BB-G-08: «что делать дальше» доезжает до HTML и CSV (1–2 действия, без пустого блока)', () => {
+    const meta = buildPro2Meta(baseInput({
+      nextActions: [
+        { title: 'Снять 4 подх. с Грудь', why: 'факт 26 против MRV 22', kind: 'training', zone: 'yellow', where: { type: 'screen', id: 'volume_hub', label: 'Объём-хаб' } },
+        { title: 'Собрать план в конструкторе', why: 'Без плана не считаются покрытие головок', kind: 'plan', zone: 'yellow', where: null },
+      ],
+    }));
+    expect(meta.nextActions).toHaveLength(2);
+    const report = { weakCandidates: [], weakMusclesCanonical: [], weakZonesGranular: [], symmetry: { ratios: {}, score: 0, issues: [] }, stimulus: { issues: [], scorePenalty: 0, global: {} }, score: { score: 60, level: 'warn', verification: 0.5, floors: [], verificationMissing: [] }, findings: [], priorities: [] } as any;
+    const html = buildBBDiagnosticsHtml(report, { date: '2026-11-03', ...meta } as any);
+    expect(html).toContain('Что делать дальше');
+    expect(html).toContain('Снять 4 подх. с Грудь');
+    // место шага видно в отчёте, а не только в приложении
+    expect(html).toContain('Объём-хаб');
+    const csv = buildBBDiagnosticsCsv(report, null, { ...meta, weakCauses: {}, weakHeads: [], specBlock: null } as any);
+    expect(csv).toContain('next_action');
+    expect(csv).toContain('Снять 4 подх. с Грудь');
+    // порядок сохраняется (первый шаг — первый в файле)
+    expect(csv.indexOf('next_action')).toBeLessThan(csv.indexOf('Снять 4 подх.'));
+    // без действий — секций нет (не рисуем пустую инструкцию)
+    const emptyMeta = buildPro2Meta(baseInput({ nextActions: [] }));
+    expect(emptyMeta.nextActions).toBeUndefined();
+    const emptyHtml = buildBBDiagnosticsHtml(report, { date: '2026-11-03', ...emptyMeta } as any);
+    expect(emptyHtml).not.toContain('Что делать дальше');
+    const emptyCsv = buildBBDiagnosticsCsv(report, null, { ...emptyMeta, weakCauses: {}, weakHeads: [], specBlock: null } as any);
+    expect(emptyCsv).not.toContain('next_action');
+  });
+
   it('source-guard: хаб собирает мету ровно одним вызовом, копий литералов нет', () => {
     expect((SRC.match(/buildPro2Meta\(/g) || []).length).toBe(1);
     expect(SRC).not.toContain('pro2csv');

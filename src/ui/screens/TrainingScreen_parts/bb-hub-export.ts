@@ -57,6 +57,17 @@ export interface BbHubPro2Input {
     advice: string[];
     effect: string | null;
   } | null;
+  /**
+   * BB-G-08: 1–2 действия «что делать дальше» из шапки хаба. Без поля секции в
+   * отчёте нет — старые вызовы сборщика остаются байт-в-байт.
+   */
+  nextActions?: Array<{
+    title: string;
+    why: string;
+    kind: string;
+    zone: string;
+    where: { type: string; id: string; label: string } | null;
+  }> | null;
 }
 
 /** Единая мета для `buildBBDiagnosticsHtml` и `buildBBDiagnosticsCsv` (пусто — тихо). */
@@ -93,5 +104,6 @@ export function buildPro2Meta(i: BbHubPro2Input): Record<string, unknown> {
     femaleNotes: i.femaleNotes?.length ? i.femaleNotes : undefined,
     workingRange: i.workingRange ?? undefined,
     volumeRecovery: i.volumeRecovery ?? undefined,
+    nextActions: i.nextActions?.length ? i.nextActions : undefined,
   };
 }
