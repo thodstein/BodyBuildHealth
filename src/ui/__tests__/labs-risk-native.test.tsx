@@ -130,6 +130,22 @@ describe('волна 12: липкая внутренняя навигация', 
     }
   });
 
+  it('9. риск-лента липнет к верху .risk-body (top: 0), без двойного topnav/safe-отступа', async () => {
+    const fs = await import('fs');
+    const path = await import('path');
+    const css = fs.readFileSync(path.join(process.cwd(), 'src', 'styles-native.css'), 'utf-8');
+    // .risk-body — собственный скролл-контейнер ПОД топнавом: sticky-top
+    // считается от него, поэтому calc(safe + 64px) давал пустую полосу и
+    // накрывал дисклеймер. Проверяем итоговое (последнее) правило каскада.
+    const rules = [...css.matchAll(/html\.app-native \.risk-subtabs\s*\{([^}]*)\}/g)];
+    expect(rules.length).toBeGreaterThan(0);
+    const last = rules[rules.length - 1][1];
+    expect(last).toContain('top: 0 !important');
+    for (const r of rules) {
+      expect(r[1]).not.toContain('env(safe-area-inset-top');
+    }
+  });
+
   it('8. labs: верхняя панель убрана, навигация только нижней labs-bottomtabs (док к дашборду)', async () => {
     setCapacitorNative();
     await resetPlatform();

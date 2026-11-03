@@ -4620,6 +4620,10 @@ html.app-native .pharma-subtabs {
   position: sticky !important;
   top: calc(max(env(safe-area-inset-top, 0px), 24px) + 46px) !important;
   z-index: 15 !important;
+  /* ВАЖНО: offset считается от скроллпорта ближайшего скролл-контейнера.
+   * Для .risk-subtabs это не экран, а .risk-body (собственный overflow-y:auto
+   * ПОД топнавом), поэтому риск-лента переопределяется ниже на top: 0 —
+   * иначе +64px отсчитывались дважды и над подвкладками висела пустая полоса. */
   background: rgba(9, 18, 34, 0.82) !important;
   -webkit-backdrop-filter: blur(16px) !important;
   backdrop-filter: blur(16px) !important;
@@ -4632,6 +4636,13 @@ html.app-native .labs-subtabs::-webkit-scrollbar,
 html.app-native .risk-subtabs::-webkit-scrollbar,
 html.app-native .pharma-subtabs::-webkit-scrollbar {
   display: none !important;
+}
+
+/* Риск-лента живёт в .risk-body (свой скролл-контейнер сразу под топнавом):
+ * липнет к ЕГО верху, без повторного safe-area/topnav-отступа — 0 даёт
+ * «подвкладки ровно под шапкой», без пустой полосы и без наезда на дисклеймер. */
+html.app-native .risk-subtabs {
+  top: 0 !important;
 }
 
 html.app-native .labs-subtab:active,
@@ -5220,8 +5231,10 @@ html.app-native .risk-topnav button:focus-visible {
 }
 
 html.app-native .risk-subtabs {
-  /* topnav 56px + 8px зазор + safe-area: лента липнет под шапкой без наезда */
-  top: calc(env(safe-area-inset-top, 0px) + 64px) !important;
+  /* .risk-body — собственный скролл-контейнер под топнавом: липнем к его
+   * верху (top: 0). Прежний calc(safe + 64px) отсчитывался дважды и оставлял
+   * ~64px пустой полосы над подвкладками (плюс накрывал дисклеймер). */
+  top: 0 !important;
   background: linear-gradient(180deg, rgba(5, 11, 22, 0.92), rgba(5, 11, 22, 0.75)) !important;
   padding: 12px 12px 10px !important;
   scroll-snap-type: x proximity !important;
