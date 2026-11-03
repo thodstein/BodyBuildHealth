@@ -1796,13 +1796,22 @@ export const BBDiagnosticsHub: React.FC = () => {
     } catch { /* noop */ }
     return set;
   }, [bbPlan]);
-  const exPickerOptions = useMemo(() => {
+  // Э4 PRO-5 + волна 4 (каталог): поиск фильтрует ВЕСЬ каталог, но в шторку кладём
+  // первые 80 совпадений (иначе 562 кнопки в одном sheet). Показываем честно
+  // «80 из N» — раньше кап молчал, и выглядело, будто упражнений всего 80.
+  const exPicker = useMemo(() => {
     const q = exQuery.trim().toLowerCase();
     let list = EXERCISE_CATALOG;
     if (q) list = list.filter((c) => String(c.name).toLowerCase().includes(q) || String(c.id).toLowerCase().includes(q));
     const planFirst = list.filter((c) => plannedCatalogIds.has(c.id));
     const rest = list.filter((c) => !plannedCatalogIds.has(c.id));
-    return [{ id: '', label: 'Не выбрано' }, ...[...planFirst, ...rest].slice(0, 80).map((c) => ({ id: c.id, label: `${c.name}`, hint: `${MUSCLE_LABEL_RU[(c as any).group] || (c as any).group} · СФР ${sfrOf(c as any) ?? '—'}` }))];
+    const ordered = [...planFirst, ...rest];
+    const CAP = 80;
+    return {
+      options: [{ id: '', label: 'Не выбрано' }, ...ordered.slice(0, CAP).map((c) => ({ id: c.id, label: `${c.name}`, hint: `${MUSCLE_LABEL_RU[(c as any).group] || (c as any).group} · СФР ${sfrOf(c as any) ?? '—'}` }))],
+      shown: Math.min(CAP, ordered.length),
+      total: ordered.length,
+    };
   }, [exQuery, plannedCatalogIds]);
 
   const selectedDiagnosis = useMemo(() => {
@@ -1864,8 +1873,12 @@ export const BBDiagnosticsHub: React.FC = () => {
     try { return getProfExecutionProfile(selectedExRaw.muscle || ''); } catch { return null; }
   }, [selectedExRaw]);
 
-  const exerciseLibraryFiltered = useMemo(() => {
+  // Библиотека (секция 5 «Разбора») — те же фильтры + тот же поиск: без поиска
+  // кап 40 из 562 оставлял 522 упражнения недостижимыми МОЛЧА (жалоба из аудита хабов).
+  const exerciseLibrary = useMemo(() => {
+    const q = exQuery.trim().toLowerCase();
     let list = EXERCISE_CATALOG;
+    if (q) list = list.filter((e) => String(e.name).toLowerCase().includes(q) || String(e.id).toLowerCase().includes(q));
     if (state.exerciseFilterSfr >= 4) list = list.filter(e => (sfrOf(e as any) ?? 0) >= 4);
     if (state.exerciseFilterProfile !== 'all') list = list.filter(e => {
       try {
@@ -1876,8 +1889,9 @@ export const BBDiagnosticsHub: React.FC = () => {
     if (state.exerciseFilterUnilateral) list = list.filter(e => {
       try { const eff = calcExerciseEffect(e as any, {}); return eff.unilateral; } catch { return false; }
     });
-    return list.slice(0, 40);
-  }, [state.exerciseFilterSfr, state.exerciseFilterProfile, state.exerciseFilterUnilateral]);
+    const CAP = 40;
+    return { list: list.slice(0, CAP), shown: Math.min(CAP, list.length), total: list.length };
+  }, [state.exerciseFilterSfr, state.exerciseFilterProfile, state.exerciseFilterUnilateral, exQuery]);
 
   const handleApplyExerciseCorrection = (action: any, targetExId?: string | null) => {
     const weak = report.weakZonesGranular;
@@ -2388,10 +2402,10 @@ export const BBDiagnosticsHub: React.FC = () => {
             buildExerciseInstructions={buildExerciseInstructions}
             calcExerciseEffect={calcExerciseEffect}
             clearLvp={clearLvp}
-            exPickerOptions={exPickerOptions}
+            exPicker={exPicker}
             exQuery={exQuery}
             exerciseEffectScore={exerciseEffectScore}
-            exerciseLibraryFiltered={exerciseLibraryFiltered}
+            exerciseLibrary={exerciseLibrary}
             flagRu={flagRu}
             handleApplyExerciseCorrection={handleApplyExerciseCorrection}
             headsHitOf={headsHitOf}

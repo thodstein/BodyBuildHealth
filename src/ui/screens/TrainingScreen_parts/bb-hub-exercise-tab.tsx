@@ -14,6 +14,18 @@ import { BbCheckCard, BbSheetSelect } from './bb-hub-controls';
 import { ACCENT } from './training-ui';
 import type { BBState } from './BBDiagnosticsHub';
 
+/**
+ * Честная подпись капа каталога: «Разбор» показывает первые N (шторка 80 / библиотека 40)
+ * из всего списка. Раньше кап молчал — выглядело, будто упражнений всего 40–80.
+ * Возвращает null, когда ничего не обрезано (подпись не нужна).
+ */
+export const catalogLimitNote = (shown: number, total: number, where: 'picker' | 'library'): string | null => {
+  if (!Number.isFinite(shown) || !Number.isFinite(total) || total <= shown) return null;
+  return where === 'picker'
+    ? `Показаны первые ${shown} из ${total} — поиск ищет по всему каталогу: уточни запрос, чтобы дойти до остальных`
+    : `Показаны ${shown} из ${total} — сузь поиск или фильтры, остальные в списке не показаны`;
+};
+
 export interface BbExerciseTabProps {
   state: BBState;
   setState: React.Dispatch<React.SetStateAction<BBState>>;
@@ -25,10 +37,10 @@ export interface BbExerciseTabProps {
   buildExerciseInstructions: any;
   calcExerciseEffect: any;
   clearLvp: any;
-  exPickerOptions: any;
+  exPicker: { options: Array<{ id: string; label: string; hint?: string }>; shown: number; total: number };
   exQuery: any;
   exerciseEffectScore: any;
-  exerciseLibraryFiltered: any;
+  exerciseLibrary: { list: any[]; shown: number; total: number };
   flagRu: any;
   handleApplyExerciseCorrection: any;
   headsHitOf: any;
@@ -56,8 +68,10 @@ export interface BbExerciseTabProps {
 
 export const BbExerciseTab: React.FC<BbExerciseTabProps> = (props) => {
   const {
-    state, setState, weakRu, LVP_LIFTS, MUSCLE_LABEL_RU, asymMax, bbPlan, buildExerciseInstructions, calcExerciseEffect, clearLvp, exPickerOptions, exQuery, exerciseEffectScore, exerciseLibraryFiltered, flagRu, handleApplyExerciseCorrection, headsHitOf, libWeakHeads, lvpLift, lvpProfile, lvpSaved, lvpText, lvpWorkingRange, planAudit, profileRu, report, runLvp, selectWorstExercise, selectedCorrections, selectedDiagnosis, selectedExRaw, selectedProf, setExQuery, setLvpLift, setLvpText, simulateCorrection, weakListRu,
+    state, setState, weakRu, LVP_LIFTS, MUSCLE_LABEL_RU, asymMax, bbPlan, buildExerciseInstructions, calcExerciseEffect, clearLvp, exPicker, exQuery, exerciseEffectScore, exerciseLibrary, flagRu, handleApplyExerciseCorrection, headsHitOf, libWeakHeads, lvpLift, lvpProfile, lvpSaved, lvpText, lvpWorkingRange, planAudit, profileRu, report, runLvp, selectWorstExercise, selectedCorrections, selectedDiagnosis, selectedExRaw, selectedProf, setExQuery, setLvpLift, setLvpText, simulateCorrection, weakListRu,
   } = props;
+  const pickerNote = catalogLimitNote(exPicker.shown, exPicker.total, 'picker');
+  const libraryNote = catalogLimitNote(exerciseLibrary.shown, exerciseLibrary.total, 'library');
   return (
           <div>
             <div style={{ fontSize: 12, fontWeight: 800, color: '#fff', marginBottom: 6 }}>Разбор — упражнение + техника → стимул в плане (подробно)</div>
@@ -135,9 +149,12 @@ export const BbExerciseTab: React.FC<BbExerciseTabProps> = (props) => {
                 <button onClick={() => setExQuery('')} data-bb="ex-search-clear" aria-label="Очистить поиск" style={{ minHeight: 44, minWidth: 48, padding: '8px 12px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.05)', color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>✕</button>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 6, marginBottom: 6 }} data-bb="ex-picker">
-                <BbSheetSelect label="Упражнение" value={state.exerciseSelectedId || ''} onChange={(v) => setState(s => ({ ...s, exerciseSelectedId: v || null, stimCheating: false, stimShortRom: false, stimSetupNote: '' }))} testId="bb-exercise" options={exPickerOptions} />
+                <BbSheetSelect label="Упражнение" value={state.exerciseSelectedId || ''} onChange={(v) => setState(s => ({ ...s, exerciseSelectedId: v || null, stimCheating: false, stimShortRom: false, stimSetupNote: '' }))} testId="bb-exercise" options={exPicker.options} />
                 <button onClick={() => setState(s => ({ ...s, exerciseSelectedId: null, stimCheating: false, stimShortRom: false, stimSetupNote: '' }))} data-bb="ex-reset" style={{ minHeight: 44, minWidth: 64, padding: '8px 12px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.05)', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>Сброс</button>
               </div>
+              {pickerNote && (
+                <div data-bb="catalog-limit-picker" style={{ fontSize: 10, color: '#94a3b8', marginBottom: 6, lineHeight: 1.45 }}>{pickerNote}</div>
+              )}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 6 }} data-bb="exec-cards">
                 <BbCheckCard active={state.stimCheating} title="Читинг / раскачка" desc="включаю рывок корпусом" onToggle={() => setState(s => ({ ...s, stimCheating: !s.stimCheating }))} accent="#f59e0b" />
                 <BbCheckCard active={state.stimShortRom} title="Амплитуда укорочена" desc="не довожу до конца" onToggle={() => setState(s => ({ ...s, stimShortRom: !s.stimShortRom }))} accent="#f59e0b" />
@@ -284,8 +301,11 @@ export const BbExerciseTab: React.FC<BbExerciseTabProps> = (props) => {
                 <BbSheetSelect label="Профиль" value={state.exerciseFilterProfile} onChange={(v) => setState(s => ({ ...s, exerciseFilterProfile: v }))} options={[{ id: 'all', label: 'Все' }, { id: 'lengthened', label: 'Растянутая' }, { id: 'mid', label: 'Средняя' }, { id: 'short', label: 'Пиковая' }]} />
               </div>
               <div style={{ marginBottom: 6 }}><BbCheckCard active={state.exerciseFilterUnilateral} title="Только односторонние" desc="гантели, по одной стороне" onToggle={() => setState(s => ({ ...s, exerciseFilterUnilateral: !s.exerciseFilterUnilateral }))} /></div>
+              {libraryNote && (
+                <div data-bb="catalog-limit-library" style={{ fontSize: 10, color: '#94a3b8', marginBottom: 6, lineHeight: 1.45 }}>{libraryNote}</div>
+              )}
               <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', maxHeight: 160, overflowY: 'auto' }}>
-                {exerciseLibraryFiltered.map((c: any) => {
+                {exerciseLibrary.list.map((c: any) => {
                   const eff = (() => { try { return calcExerciseEffect(c as any, {}); } catch { return null; } })();
                   const sc = eff ? exerciseEffectScore(eff) : 50;
                   const col = sc >= 70 ? '#22c55e' : sc >= 50 ? '#f59e0b' : '#ef4444';
