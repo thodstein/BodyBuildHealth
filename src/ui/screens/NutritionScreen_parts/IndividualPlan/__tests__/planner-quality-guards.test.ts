@@ -1613,6 +1613,34 @@ describe('витамин E из E-богатого жира (QG24)', () => {
   });
 });
 
+describe('в дне минимум два овоща (QG28)', () => {
+  const sexOf28 = (d: Day) => (d.id.startsWith('S') ? 'female' : 'male') as 'male' | 'female';
+  const kPct28 = (d: Day) => {
+    const cov = analyzeMicroCoverage(
+      sumMicros(items(d).map(({ x }) => ({ id: x.id, amount: x.amount })), FOOD_DB as any),
+      sexOf28(d) as any, d.w, 'none' as any, d.id.endsWith('тр'),
+    ).coverage as any[];
+    const c = cov.find((x: any) => x.nutrient === 'VitK');
+    return c ? Number(c.pct) : 0;
+  };
+
+  // Замер до правки: витамин K < 70% RDA ровно в 8 днях из 30 (8–61%), и во всех восьми
+  // овощ дня один и это сладкий перец. Дни отдыха (два овоща) — 243–342%. Сборка дня
+  // зелень ставила (`veg_leek` в ужине и на тренировочном дне), но ранние санитайзеры
+  // (предел съедобности приёма) её снимали, и день оставался с одним перцем.
+  it('дней с витамином K < 70% RDA не больше 5 из 30 и среднее ≥ 280% (было 8 дней, 260%)', () => {
+    const low = DAYS.filter((d) => kPct28(d) < 70).map((d) => `${d.id} ${kPct28(d)}%`);
+    const avg = Math.round(DAYS.reduce((s, d) => s + kPct28(d), 0) / DAYS.length);
+    expect(low.length, `дней с K < 70%: ${low.length}/30 (${low.slice(0, 5).join(', ')})`).toBeLessThanOrEqual(5);
+    expect(avg, 'среднее витамина K по 30 дням').toBeGreaterThanOrEqual(280);
+  });
+
+  it('дней с одним овощом не больше 5 из 30 (было 8)', () => {
+    const one = DAYS.filter((d) => items(d).filter(({ x }) => String(x.role) === 'veg').length < 2).map((d) => d.id);
+    expect(one.length, `дней с <2 овощами: ${one.slice(0, 6).join(', ')}`).toBeLessThanOrEqual(5);
+  });
+});
+
 describe('оценка качества дня (planner-quality-score)', () => {
   const food = (id: string, amount: number, role: string) => {
     const fd: any = FOOD_DB.find((f: any) => f.id === id)!;

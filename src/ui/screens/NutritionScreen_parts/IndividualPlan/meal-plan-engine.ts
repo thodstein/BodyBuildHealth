@@ -11578,6 +11578,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
       }
     }
 
+
     // ── QG9: витамин E — качество жира, а не его количество ─────────────────
     // Замер: VitE 24% RDA в среднем, 30 дней из 30 ниже 70% — при том что жир по
     // дням ровно в норме. День держится на топлёном масле (0.8 мг E/100 г), а
@@ -14195,6 +14196,68 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     // P2-фикс: microSummary.coverage и diversity пересчитываем на ФИНАЛЬНЫХ meals —
     // поздние проходы (E18/E17/E12, гигиена) добавляли/удаляли позиции, и витрина
     // расходилась с реальной тарелкой.
+    // ─── QG28: в дне минимум два овоща ───
+    // Ранние санитайзеры (предел съедобности приёма) снимают зелень ужина, и
+    // тренировочный день остаётся с одним перцем: витамин K 8–61% RDA в 8 днях из 30
+    // (дни отдыха с двумя овощами — 243–342%). Стадия возвращает второй овощ ПОСЛЕ
+    // микро-стадий (QG9–QG20), чтобы не переигрывать их решения по рыбе и молочке.
+    if (_pickCtx.qualityMode === 'full'
+      && !(input as any).manualTargetsLocked
+      && (input as any).kbjuMode !== 'manual') {
+      const _q28 = () => {
+        const cov = analyzeMicroCoverage(
+          sumMicros((meals as any[]).flatMap((m: any) => (m.items || []).map((it: any) => ({ id: it.id, amount: it.amount }))), FOOD_DB as any),
+          (input.sex || 'male') as any, input.weightKg, input.cyclePhase as any, !!input.isTrainingDay,
+          input.calciumTargetOverride, input.sodiumTargetOverride,
+        ).coverage;
+        const lowN = cov.filter((c: any) => (c.pct || 0) < 70).length;
+        return scoreDayQuality(meals as any[], {
+          weightKg: Number(input.weightKg) || 0,
+          microCoverage: cov.length > 0 ? { lowCount: lowN, total: cov.length } : undefined,
+        }).total;
+      };
+      const _veg28 = ensureSecondVeg(meals as any[], totals, {
+        k: Number(input.goalKcal) || 0,
+        p: Number(input.goalProteinG) || 0,
+        f: Number(input.goalFatG) || 0,
+        c: Number(input.goalCarbsG) || 0,
+      }, _q28);
+      // Зелень добавила Ca/Na/A — числа в чужих нотах (QG13 «Ca N мг (P% цели)»,
+      // QG8 натрий, QG10 витамин A) пересчитываем по факту тарелки.
+      if (_veg28 > 0) {
+        const _m28 = (key: string) => Number((sumMicros(
+          (meals as any[]).flatMap((m: any) => (m.items || []).map((it: any) => ({ id: it.id, amount: it.amount }))),
+          FOOD_DB as any,
+        ) as any)?.[key] || 0);
+        const _sex28 = input.sex === 'female' ? 'female' : 'male';
+        const _tg28 = new Map<string, number>(
+          getMicroTargets(_sex28 as any, input.weightKg, input.cyclePhase as any, !!input.isTrainingDay)
+            .map((t) => [t.nutrient, t.target] as [string, number]),
+        );
+        const _caG28 = Number(_tg28.get('Ca') || 1000);
+        const _aG28 = Number((RDA_BASE as any)?.VitA?.[_sex28] || 900);
+        const _iCa28 = notes.findIndex((n) => typeof n === 'string' && n.startsWith('🐟 Кальций:'));
+        if (_iCa28 >= 0) {
+          const _ca28 = Math.round(_m28('Ca'));
+          notes[_iCa28] = String(notes[_iCa28]).replace(/Ca \d+ мг \(\d+% цели\)/, `Ca ${_ca28} мг (${Math.round((_ca28 / Math.max(1, _caG28)) * 100)}% цели)`);
+        }
+        const _iNa28 = notes.findIndex((n) => typeof n === 'string' && n.startsWith('🧂 Натрий'));
+        const _iCaM28 = notes.findIndex((n) => typeof n === 'string' && n.startsWith('🥛 Кальций молочкой:'));
+        if (_iCaM28 >= 0) {
+          const _ca28F = Math.round(_m28('Ca'));
+          const _caPct28F = Math.round((_ca28F / Math.max(1, _caG28)) * 100);
+          notes[_iCaM28] = String(notes[_iCaM28]).replace(/Ca (\d+) → \d+ мг \(\d+% цели\)/, (_mm, _pre) => `Ca ${_pre} → ${_ca28F} мг (${_caPct28F}% цели)`);
+        }
+        if (_iNa28 >= 0) {
+          notes[_iNa28] = String(notes[_iNa28]).replace(/~?\d+ мг Na/, `${Math.round(_m28('Na'))} мг Na`);
+        }
+        const _iA28 = notes.findIndex((n) => typeof n === 'string' && n.startsWith('🥕 Овощи и витамин A:'));
+        if (_iA28 >= 0 && _aG28 > 0) {
+          notes[_iA28] = String(notes[_iA28]).replace(/A \d+% цели/, `A ${Math.round((_m28('VitA') / _aG28) * 100)}% цели`);
+        }
+      }
+    }
+
     // ─── QG24: источник жира по витамину E (до пересчёта микро/витрины) ───
     if (_pickCtx.qualityMode === 'full'
       && !(input as any).manualTargetsLocked
@@ -14584,8 +14647,63 @@ function liftVitaminEByFatAddress(
   return Math.round((eOf() - e0) * 10) / 10;
 }
 
-// ─── QG22: нота обмена называет граммы, которые стоят в тарелке ─────────────
-// Ноты QG13 (`🐟 Кальций:`) и QG19 (`🐠 Витамин D:`) пишутся в момент обмена
+// ─── QG28: в дне минимум два овоща (второй слот не должен «испаряться») ─────
+// Замер: на тренировочных днях овощ один (сладкий перец от QG10), и витамин K там
+// 8–61% RDA — 8 дней из 30; в дни отдыха овощей два (сельдерей + эндивий) и K
+// 243–342%. Причина не в сборке: `buildWholeMeal` для ужина выбирает зелень и на
+// тренировочном дне тоже (лог: `veg_leek`), но ранние санитайзеры (предел
+// съедобности приёма → «мелочь <30 г») её снимают, и день остаётся с одним овощем.
+// Стадия возвращает второй овощ ДО поздних финишёров, чтобы их балансировка
+// (не моя пост-правка) разложила граммы.
+const _QG28_GREENS: string[] = ['greens_endive', 'spinach', 'veg_collard_greens', 'veg_kale'];
+function ensureSecondVeg(
+  meals: any[], totals: any, goals: { k: number; p: number; f: number; c: number }, scoreFn: () => number,
+): number {
+  const vegItems = () => (meals || []).flatMap((m: any) => (m.items || [])
+    .filter((x: any) => String(x.role) === 'veg').map((x: any) => ({ m, x })));
+  if (vegItems().length >= 2) return 0;
+  const used = new Set((meals || []).flatMap((m: any) => (m.items || []).map((x: any) => String(x.id))));
+  const cand = _QG28_GREENS
+    .map((id) => FOOD_DB.find((f: any) => String(f.id) === id))
+    .filter((f: any) => !!f && !used.has(String(f.id)) && foodAvailableForPlan(f) && foodPassesCtxAllergens(f));
+  if (!cand.length) return 0;
+  const devOf = () => {
+    const t: any = totals || {};
+    const pairs: Array<[number, number]> = [
+      [Number(t.kcal) || 0, goals.k], [Number(t.p) || 0, goals.p],
+      [Number(t.f) || 0, goals.f], [Number(t.c) || 0, goals.c],
+    ];
+    const vals = pairs.filter(([, g]) => g > 0).map(([v, g]) => Math.abs(v - g) / g);
+    return vals.length ? Math.max(...vals) : 0;
+  };
+  const dev0 = devOf();
+  const q0 = scoreFn();
+  // Приём-получатель: сначала тот, где меньше всего белка (второй овощ не должен
+  // двигать «разброс белка» по приёмам), из ужина/обеда, иначе любой основной приём.
+  const order = ['dinner', 'lunch'].map((t) => (meals || []).find((m: any) => String(m.type) === t && (m.items || []).length > 0))
+    .filter(Boolean) as any[];
+  const poolAll = (order.length > 0 ? order : (meals || []).filter((m: any) => (m.items || []).length > 0
+    && String(m.type) !== 'intra' && String(m.type) !== 'preworkout' && String(m.type) !== 'postworkout'));
+  const pool = [...poolAll].sort((a: any, b: any) => (Number(a.totals?.p) || 0) - (Number(b.totals?.p) || 0));
+  if (!pool.length) return 0;
+  for (const m of pool) {
+    for (const f of cand) {
+      const it = makeItem(f as any, 100, 'veg');
+      (m.items as any[]).push(it);
+      recalcMealTotals(meals as any[]);
+      recalcDayTotals(meals, totals);
+      const ok = devOf() <= Math.max(dev0, 0.03) + 1e-9 && scoreFn() >= q0 - 1e-6;
+      if (ok) return 1;
+      const i = (m.items as any[]).indexOf(it);
+      if (i >= 0) (m.items as any[]).splice(i, 1);
+      recalcMealTotals(meals as any[]);
+      recalcDayTotals(meals, totals);
+    }
+  }
+  return 0;
+}
+
+// ─── QG22: нота обмена называет граммы, которые стоят в тарелке ─────────────// Ноты QG13 (`🐟 Кальций:`) и QG19 (`🐠 Витамин D:`) пишутся в момент обмена
 // («Обед: индейка 75 г → люциан 105 г»), а ПОЗЖЕ их граммы меняют перенос белка
 // QG20 (рыба — тоже белок-донор), санитайзеры и микро-буст. Итог: в ноте 105 г
 // рыбы, в тарелке 85 г (замер после QG22: M1/6/отд). Пользователь читает план,
