@@ -24,6 +24,7 @@ import { QUALITY_GRADE_THRESHOLDS } from '../quality-score-v2.engine';
 import { getVolumeLandmarks, MUSCLE_LABEL_RU } from '../volume-landmarks.engine';
 import { aggregateBBVolume, computeMuscleBalance, sessionLimitsFor } from './bb-volume.engine';
 import { canonicalMuscle, specResForWeekSchedule, tradeoffForWeek, expandDonorMuscles, isSpecializationWeak, isSpecializationFocus } from './bb-specialization.engine';
+import { sessionsWithMuscleInWeek } from './bb-frequency';
 import { EXERCISE_CATALOG } from '../../core/exercise-catalog';
 import { derivePattern } from '../movement-pattern';
 import { resolveCatalogId } from '../../data/lms-cycles/exercise-alias-map';
@@ -248,28 +249,12 @@ function isGraded(m: string, sets: { excluded: Set<string>; graded: Set<string> 
   return sets.graded.has(m) || sets.graded.has(canonicalMuscle(m));
 }
 
-/** Сколько сессий недели дают мышце ПРЯМЫЕ сеты — той же моделью, что и объём
- *  (aggregateBBVolume: 'shoulders' по имени reklассифицируется в пучки delt_*).
- *  Сырые ключи тегов врут: одна и та же работа в разных сессиях тегируется то
- *  'delt_rear', то 'shoulders' — подсчёт по ключам давал ложную частоту 1×.
- *  Плюс фолбэк: пучку засчитывается неклассифицированный остаток 'shoulders'. */
-function sessionsWithMuscle(week: any, muscle: string): number {
-  let n = 0;
-  for (const s of week?.sessions || []) {
-    try {
-      const agg = aggregateBBVolume([s]);
-      if ((agg[muscle]?.directSets || 0) > 0) { n++; continue; }
-      if ((muscle === 'delt_front' || muscle === 'delt_mid' || muscle === 'delt_rear') && (agg['shoulders']?.directSets || 0) > 0) { n++; continue; }
-    } catch { /* нет данных — сессия не считается */ }
-    const keys = new Set<string>((s.exercises || []).map((e: any) => String(e.muscle || '')));
-    if (keys.has(muscle)) { n++; continue; }
-    const cm = canonicalMuscle(muscle);
-    if (cm === muscle) {
-      for (const k of keys) { if (canonicalMuscle(k) === cm) { n++; break; } }
-    }
-  }
-  return n;
-}
+/** Сколько сессий недели дают мышце ПРЯМЫЕ сеты — единая модель из
+ *  `bb-frequency` (была локальная копия; расходилась с планом на ключе
+ *  'shoulders': агрегат раскладывает плечи на пучки, копия видела 1× там,
+ *  где фактически работали 2-3 сессии). */
+const sessionsWithMuscle = (week: any, muscle: string): number =>
+  sessionsWithMuscleInWeek(week, muscle, canonicalMuscle);
 
 /** PPL-лифт лимита сессии — паритет с финализатором (bb-finalize: тяжёлый Pull
  *  41 сет задуман, кап 42/46). Без лифта карточка штрафовала то, что

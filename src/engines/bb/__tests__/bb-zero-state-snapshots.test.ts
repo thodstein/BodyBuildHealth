@@ -95,8 +95,18 @@ describe('BB zero-state snapshots (baseline Этапа 10)', () => {
     // вместо 2), а недельный zero-sum перераспределил разницу:
     // glutes 9→10, hamstrings 22→24, quads 20→18 (-10%, в рамках ~15%).
     // Валидатор зелёный, инварианты целы.
+    // Re-baseline 12 (итерация M, «финальный снимок факта»): этот снапшот читает
+    // `plan.weeklyVolume`, а он снимался финализатором ДО финального применения
+    // рампа-потолка («Вход в мезоцикл», bb-builder:5510-5515) — то есть показывал
+    // объём, которого в плане нет. Теперь weeklyVolume пересчитывается в самом
+    // конце сборки (тот же `aggregateBBVolume`, что и в финализаторе) и совпадает
+    // с фактом; план НЕ менялся, менялся только снимок. W1 (0.85-0.89×якорь):
+    // back 34→31, chest 17→15, hamstrings 24→22, quads 18→16, calves 10→9,
+    // traps 7→6 (-7…-11%, в рамках документированных ≤15%). Валидатор зелёный,
+    // новых дефицитов нет (единственные предупреждения — delt_mid/delt_rear
+    // ниже MEV, они были и в прежнем снимке).
     expect(directVolume(plan)).toEqual({
-      abs: 10, back: 34, biceps: 4, calves: 10, chest: 17, delt_mid: 4, delt_rear: 2, forearms: 6, glutes: 10, hamstrings: 24, quads: 18, shoulders: 0, traps: 7, triceps: 4,
+      abs: 10, back: 31, biceps: 4, calves: 9, chest: 15, delt_mid: 4, delt_rear: 2, forearms: 6, glutes: 10, hamstrings: 22, quads: 16, shoulders: 0, traps: 6, triceps: 4,
     });
   });
 
@@ -137,8 +147,12 @@ describe('BB zero-state snapshots (baseline Этапа 10)', () => {
     // зелёный, сессии в лимитах).
     // Re-baseline 8 (аудит 2026-10, финишер ног): памп-мышца Legs-дня держится
     // финишером (сумма ≤ target), из-за перераспределения квадры 19→18.
+    // Re-baseline 9 (итерация M, «финальный снимок факта»): как и в предыдущем
+    // снапшоте — weeklyVolume теперь снят ПОСЛЕ рампа и всех проходов билдера
+    // (был снят до них): back 19→18, delt_front 7→6 (Push-день под рампой
+    // 0.85-0.89×якорь). План не менялся, валидатор зелёный.
     expect(directVolume(plan)).toEqual({
-      abs: 8, back: 19, biceps: 16, calves: 18, chest: 18, delt_front: 7, delt_mid: 3, delt_rear: 12, forearms: 7, glutes: 11, hamstrings: 12, quads: 18, shoulders: 3, traps: 10, triceps: 16,
+      abs: 8, back: 18, biceps: 16, calves: 18, chest: 18, delt_front: 6, delt_mid: 3, delt_rear: 12, forearms: 7, glutes: 11, hamstrings: 12, quads: 18, shoulders: 3, traps: 10, triceps: 16,
     });
   });
 

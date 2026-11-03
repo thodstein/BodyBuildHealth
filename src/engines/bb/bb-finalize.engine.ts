@@ -1928,7 +1928,7 @@ function ensurePPLTriceps(session: any, week: any, options: BBFinalizeOptions) {
   const w = (options.workMax && options.workMax.triceps) || 50;
   if (working.length === 0) {
     // bb-safety: EZ-штанга/трос — не добавляем при ограничениях.
-    if (!pplPushAllowed(options, 'Французский жим лёжа (EZ-гриф)', 'Разгибание рук на блоке (канат)')) return;
+    if (!pplPushAllowed(options, 'Французский жим лёжа (EZ-гриф)', 'Разгибания трицепса канатной рукояткой')) return;
     if (session.exercises.filter((e: any) => !(e as any).warmupActivator).length < maxEx) {
       session.exercises.push({
         muscle: 'triceps', name: 'Французский жим лёжа (EZ-гриф)', exerciseName: 'Французский жим лёжа (EZ-гриф)', role: 'accessory', character: 'тяж',
@@ -1939,7 +1939,7 @@ function ensurePPLTriceps(session: any, week: any, options: BBFinalizeOptions) {
     }
     if (session.exercises.filter((e: any) => !(e as any).warmupActivator).length < maxEx) {
       session.exercises.push({
-        muscle: 'triceps', name: 'Разгибание рук на блоке (канат)', exerciseName: 'Разгибание рук на блоке (канат)', role: 'accessory', character: 'памп',
+        muscle: 'triceps', name: 'Разгибания трицепса канатной рукояткой', exerciseName: 'Разгибания трицепса канатной рукояткой', role: 'accessory', character: 'памп',
         sets: 4, repsRange: [12, 18], rir: 3, restSeconds: 60, warmupSets: [],
         workSets: Array.from({ length: 4 }, () => ({ reps: 15, rir: 3, weight: Math.round(w * 0.35 * 10) / 10, restSeconds: 60 })),
         rationale: 'PPL Push: трицепс памп 4×12-18',
@@ -1959,9 +1959,9 @@ function ensurePPLTriceps(session: any, week: any, options: BBFinalizeOptions) {
   }
   const hasPump = working.some((e: any) => /блок|pushdown|канат/i.test(e.name || ''));
   if (!hasPump && working.length < 3 && session.exercises.filter((e: any) => !(e as any).warmupActivator).length < maxEx
-    && pplPushAllowed(options, 'Разгибание рук на блоке (канат)')) {
+    && pplPushAllowed(options, 'Разгибания трицепса канатной рукояткой')) {
     session.exercises.push({
-      muscle: 'triceps', name: 'Разгибание рук на блоке (канат)', exerciseName: 'Разгибание рук на блоке (канат)', role: 'accessory', character: 'памп',
+      muscle: 'triceps', name: 'Разгибания трицепса канатной рукояткой', exerciseName: 'Разгибания трицепса канатной рукояткой', role: 'accessory', character: 'памп',
       sets: 4, repsRange: [12, 18], rir: 3, restSeconds: 60, warmupSets: [],
       workSets: Array.from({ length: 4 }, () => ({ reps: 15, rir: 3, weight: Math.round(w * 0.35 * 10) / 10, restSeconds: 60 })),
       rationale: 'PPL Push: памп добавлен',
