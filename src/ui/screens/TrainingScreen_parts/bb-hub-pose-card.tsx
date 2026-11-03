@@ -51,8 +51,13 @@ export interface BbPoseCardProps {
   onView: (v: BbPoseView) => void;
   /** Сохранённый результат (живёт в состоянии хаба → переживает переключение табов и попадает в отчёт). */
   saved: BbPoseSummary | null;
-  /** Результат уже перенесён в скрининг. */
+  /** Результат уже перенесён в скрининг (для текущего ракурса). */
   applied: boolean;
+  /**
+   * Второй ракурс: его разбор живёт отдельно (фронт и бок меряют разное), поэтому
+   * карточка показывает итог второго видео, а не теряет его при переключении.
+   */
+  other?: { view: BbPoseView; summary: BbPoseSummary | null; applied: boolean };
   onResult: (s: BbPoseSummary) => void;
   onApply: () => void;
   setToast?: (v: string) => void;
@@ -66,7 +71,7 @@ type Stage = 'file' | 'live' | null;
 
 export const BbPoseCard: React.FC<BbPoseCardProps> = (props) => {
   const {
-    view, onView, saved, applied, onResult, onApply, setToast,
+    view, onView, saved, applied, other, onResult, onApply, setToast,
     analyzeVideo = analyzeBbPoseVideo,
     makeDetector = createBbPoseDetector,
   } = props;
@@ -263,6 +268,22 @@ export const BbPoseCard: React.FC<BbPoseCardProps> = (props) => {
       <div style={{ fontSize: 10, color: '#94a3b8', lineHeight: 1.45, marginBottom: 6 }} data-bb="pose-view-note">
         {BB_POSE_VIEW_NOTE[view]} {BB_POSE_2D_NOTE}
       </div>
+
+      {/* Второй ракурс не теряется: его итог виден и открывается одной кнопкой. */}
+      {other?.summary && (
+        <div data-bb="pose-other-view" style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', fontSize: 10, color: '#94a3b8', marginBottom: 6 }}>
+          <span>
+            {other.view === 'front' ? 'Спереди' : 'Сбоку'}: разобрано · {other.summary.framesPosed} из {other.summary.framesTotal} кадров · качество: {BB_POSE_QUALITY_RU[other.summary.quality]}
+            {other.applied ? ' · перенесено в скрининг' : ''}
+          </span>
+          <button
+            type="button"
+            data-bb="pose-other-open"
+            onClick={() => onView(other.view)}
+            style={{ ...btn('rgba(255,255,255,0.06)', 'rgba(255,255,255,0.14)', '#fff'), minHeight: 36, padding: '6px 8px', fontSize: 10 }}
+          >Открыть</button>
+        </div>
+      )}
 
       <div style={{ fontSize: 10, color: '#fff', lineHeight: 1.45, marginBottom: 6 }}>
         <b>{guide.title}.</b> {guide.cam} · {guide.dist} · {guide.height}

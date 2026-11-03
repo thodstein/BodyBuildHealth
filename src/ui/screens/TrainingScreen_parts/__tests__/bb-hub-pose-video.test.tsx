@@ -38,6 +38,23 @@ const sideDeep = (): BbPoseLandmark => lm33({
 
 const sideSummary = (): BbPoseSummary => summarizeBbPose(Array.from({ length: 6 }, sideDeep), 'side');
 
+/** Фронтальная поза: стойка 0.20, колени на линии таз–стопа (вальгус 0). */
+const frontSummary = (): BbPoseSummary => {
+  const frame = (): BbPoseLandmark => lm33({
+    11: { x: 0.40, y: 0.30 }, 12: { x: 0.60, y: 0.30 },
+    15: { x: 0.46, y: 0.14 }, 16: { x: 0.54, y: 0.14 },
+    23: { x: 0.42, y: 0.55 }, 24: { x: 0.58, y: 0.55 },
+    25: { x: 0.41, y: 0.735 }, 26: { x: 0.59, y: 0.735 },
+    27: { x: 0.40, y: 0.92 }, 28: { x: 0.60, y: 0.92 },
+    29: { x: 0.40, y: 0.95 }, 30: { x: 0.60, y: 0.95 },
+    31: { x: 0.40, y: 0.985 }, 32: { x: 0.60, y: 0.985 },
+  }) as BbPoseLandmark;
+  return summarizeBbPose(Array.from({ length: 6 }, frame), 'front');
+};
+
+const HUB_KEY = 'he_bb_diagnostics_hub_v1';
+const seedHub = (patch: Record<string, unknown>) => localStorage.setItem(HUB_KEY, JSON.stringify(patch));
+
 /** Харнесс: результат хранится как в хабе (saved), применено — по клику. */
 const Harness: React.FC<{ analyze: any; onApply?: () => void }> = ({ analyze, onApply }) => {
   const [saved, setSaved] = useState<BbPoseSummary | null>(null);
@@ -93,6 +110,42 @@ describe('карточка в хабе (АПК)', () => {
     expect(note).toMatch(/2D-проекция/);
     expect(note).toMatch(/поясницы/);
     expect(note).toMatch(/гониометр/);
+  });
+
+  it('оба ракурса хранятся: второй разбор не затирает первый', () => {
+    seedHub({
+      poseView: 'front',
+      poseResults: { front: frontSummary(), side: sideSummary() },
+      poseApplied: { front: true, side: false },
+      screenTouched: true,
+    });
+    goScreening();
+    // текущий ракурс — фронт: его метрики и его статус переноса
+    const res = document.querySelector('[data-bb="pose-result"]')?.textContent || '';
+    expect(res).toMatch(/Вальгус/);
+    expect(document.querySelector('[data-bb="pose-apply"]')?.textContent).toMatch(/Перенесено в скрининг/);
+    // второй ракурс не потерян: итог виден и открывается одной кнопкой
+    expect(document.querySelector('[data-bb="pose-other-view"]')?.textContent).toMatch(/Сбоку: разобрано/);
+    fireEvent.click(document.querySelector('[data-bb="pose-other-open"]') as HTMLElement);
+    expect(document.querySelector('[data-bb="pose-result"]')?.textContent).toMatch(/Глубина/);
+    expect(document.querySelector('[data-bb="pose-other-view"]')?.textContent).toMatch(/Спереди: разобрано/);
+    // у бока свой патч, значит своя кнопка «→ В скрининг» (ещё не применено)
+    expect(document.querySelector('[data-bb="pose-apply"]')?.textContent).toMatch(/В скрининг/);
+  });
+
+  it('миграция: одиночный poseResult старого снимка не теряется', () => {
+    seedHub({ poseView: 'side', poseResult: sideSummary(), poseApplied: true, screenTouched: true });
+    goScreening();
+    expect(document.querySelector('[data-bb="pose-result"]')?.textContent).toMatch(/Глубина/);
+    expect(document.querySelector('[data-bb="pose-apply"]')?.textContent).toMatch(/Перенесено в скрининг/);
+  });
+
+  it('разбор видео — это данные: балл не «нет данных» без остального скрининга', () => {
+    seedHub({ poseResults: { front: frontSummary(), side: null }, poseApplied: { front: false, side: false } });
+    goScreening();
+    const score = document.querySelector('[data-bb="score"]');
+    expect(score).not.toBeNull();
+    expect(score!.getAttribute('data-state')).not.toBe('nodata');
   });
 });
 

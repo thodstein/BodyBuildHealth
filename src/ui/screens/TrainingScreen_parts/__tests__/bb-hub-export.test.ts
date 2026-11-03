@@ -190,6 +190,22 @@ describe('bb-hub-export (PRO-5 Э5)', () => {
     expect(emptyCsv).not.toContain('next_action');
   });
 
+  it('BB-G-05: мета видео-разбора — по записи на ракурс, пустое не создаёт поле', () => {
+    const entry = {
+      view: 'side' as const, quality: 'ok' as const, framesPosed: 18, framesTotal: 24,
+      depthKneeDeg: 96, applied: true, lines: ['Глубина: колено 96°'],
+    };
+    const meta = buildPro2Meta(baseInput({ poseVideos: [entry] }));
+    expect(meta.poseVideos).toEqual([entry]);
+    // пусто — поля нет (отчёт не рисует пустую секцию и не печатает pose_video)
+    const empty = buildPro2Meta(baseInput({ poseVideos: [] }));
+    expect(empty.poseVideos).toBeUndefined();
+    const report = { weakCandidates: [], weakMusclesCanonical: [], weakZonesGranular: [], symmetry: { ratios: {}, score: 0, issues: [] }, stimulus: { issues: [], scorePenalty: 0, global: {} }, score: { score: 60, level: 'warn', verification: 0.5, floors: [] }, findings: [], priorities: [] } as any;
+    const html = buildBBDiagnosticsHtml(report, { date: '2026-11-04', ...meta } as any);
+    expect(html).toContain('Видео-разбор позы (сбоку)');
+    expect(html).toContain('Глубина: колено 96°');
+  });
+
   it('source-guard: хаб собирает мету ровно одним вызовом, копий литералов нет', () => {
     expect((SRC.match(/buildPro2Meta\(/g) || []).length).toBe(1);
     expect(SRC).not.toContain('pro2csv');

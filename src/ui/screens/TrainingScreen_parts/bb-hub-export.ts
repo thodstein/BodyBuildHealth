@@ -71,10 +71,10 @@ export interface BbHubPro2Input {
     where: { type: string; id: string; label: string } | null;
   }> | null;
   /**
-   * BB-G-05: видео-разбор позы (ракурс, метрики, качество, применено ли в скрининг).
+   * BB-G-05: видео-разбор позы — по записи на ракурс (фронт и бок меряют разное).
    * `lines` — ровно те строки, что в карточке хаба, поэтому HTML/CSV не разойдутся.
    */
-  poseVideo?: {
+  poseVideos?: Array<{
     view: 'front' | 'side';
     quality: 'ok' | 'low' | 'none';
     framesPosed: number;
@@ -88,7 +88,7 @@ export interface BbHubPro2Input {
     armsOverMidfootPct?: number;
     applied: boolean;
     lines: string[];
-  } | null;
+  }> | null;
 }
 
 /** Единая мета для `buildBBDiagnosticsHtml` и `buildBBDiagnosticsCsv` (пусто — тихо). */
@@ -127,6 +127,6 @@ export function buildPro2Meta(i: BbHubPro2Input): Record<string, unknown> {
     scoreState: i.scoreState ?? undefined,
     volumeRecovery: i.volumeRecovery ?? undefined,
     nextActions: i.nextActions?.length ? i.nextActions : undefined,
-    poseVideo: i.poseVideo ?? undefined,
+    poseVideos: i.poseVideos?.length ? i.poseVideos : undefined,
   };
 }

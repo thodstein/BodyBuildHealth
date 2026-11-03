@@ -169,12 +169,14 @@ export type BBState = {
   /** Скрининг вообще затронут (иначе все «чисто» — это дефолт, а не результат). */
   screenTouched: boolean;
   /**
-   * BB-G-05: видео-разбор позы. Ракурс + последний результат живут в состоянии хаба,
-   * чтобы переключение табов не терял замер, а отчёт печатал ровно то, что видел экран.
+   * BB-G-05: видео-разбор позы — результаты ДЕРЖИМ ПО РАКУРСАМ.
+   * Фронт и бок меряют разные признаки, поэтому второй замер не должен затирать
+   * первый: иначе «снято с 2 ракурсов» в отчёте противоречит единственной секции.
    */
   poseView: BbPoseView;
-  poseResult: BbPoseSummary | null;
-  poseApplied: boolean;
+  poseResults: { front: BbPoseSummary | null; side: BbPoseSummary | null };
+  /** Перенос в OHS — отдельно по ракурсу: у каждого свой патч и своя кнопка. */
+  poseApplied: { front: boolean; side: boolean };
   /** Выбранное пользователем упражнение коррекции по зоне (⭐ = id записи библиотеки коррекций).
    *  Единственный источник выбора: карточка/экспорт/вставка/мост читают тот же мемо. */
   prefCorr: Record<string, string>;
@@ -221,8 +223,8 @@ const DEFAULT_STATE: BBState = {
   nheL: '', nheR: '', nheAngle: '', addL: '', addR: '', cphLevel: '',
   screenTouched: false,
   poseView: 'front',
-  poseResult: null,
-  poseApplied: false,
+  poseResults: { front: null, side: null },
+  poseApplied: { front: false, side: false },
   prefCorr: {},
 };
 
@@ -336,6 +338,21 @@ export const BBDiagnosticsHub: React.FC = () => {
         // Миграция BB-G-05: старый снимок без `poseView` не должен ломать выбор ракурса
         // (движок читает BB_POSE_VIDEO_GUIDE[view] — undefined уронил бы карточку).
         if (merged.poseView !== 'front' && merged.poseView !== 'side') merged.poseView = 'front';
+        // Миграция BB-G-05 (2): до разделения по ракурсам был один `poseResult: BbPoseSummary`.
+        // Не теряем замер: кладём его в тот ракурс, который в нём записан.
+        const legacyPose = (parsed as any)?.poseResult as BbPoseSummary | null | undefined;
+        merged.poseResults = {
+          front: merged.poseResults?.front ?? null,
+          side: merged.poseResults?.side ?? null,
+        };
+        merged.poseApplied = {
+          front: !!merged.poseApplied?.front,
+          side: !!merged.poseApplied?.side,
+        };
+        if (legacyPose && typeof legacyPose === 'object' && (legacyPose.view === 'front' || legacyPose.view === 'side')) {
+          if (!merged.poseResults[legacyPose.view]) merged.poseResults[legacyPose.view] = legacyPose;
+          if ((parsed as any)?.poseApplied === true) merged.poseApplied[legacyPose.view] = true;
+        }
         return merged;
       }
     } catch {}
@@ -999,7 +1016,7 @@ export const BBDiagnosticsHub: React.FC = () => {
     && !state.exerciseSelectedId
     && state.weakManual.length === 0
     // Разбор видео (BB-G-05) — это измерение: с ним балл уже посчитан по данным.
-    && !state.poseResult
+    && !state.poseResults.front && !state.poseResults.side
     // Сохранённый план — это уже данные: хаб его аудирует (баланс/стимул/объём).
     && !savedPlan;
   const sColor = noDataAtAll ? '#94a3b8' : bbScoreColor(sLevel);
@@ -1729,22 +1746,29 @@ export const BBDiagnosticsHub: React.FC = () => {
     // BB-D-05 (хвост): «нет данных» — состояние, а не 100. Отчёт обязан говорить то же.
     scoreState: noDataAtAll ? 'no_data' : undefined,
     // BB-G-05: видео-разбор позы — те же строки, что карточка («показано = выгружено»),
-    // плюс числа для машинного чтения. Нет разбора — секции в отчёте нет.
-    poseVideo: state.poseResult ? {
-      view: state.poseResult.view,
-      quality: state.poseResult.quality,
-      framesPosed: state.poseResult.framesPosed,
-      framesTotal: state.poseResult.framesTotal,
-      depthKneeDeg: state.poseResult.depthKneeDeg ?? undefined,
-      trunkLeanDeg: state.poseResult.trunkLeanDeg ?? undefined,
-      heelRisePct: state.poseResult.heelRisePct ?? undefined,
-      valgusDeg: state.poseResult.valgusDeg ?? undefined,
-      hipShiftPct: state.poseResult.hipShiftPct ?? undefined,
-      pelvicDropPct: state.poseResult.pelvicDropPct ?? undefined,
-      armsOverMidfootPct: state.poseResult.armsOverMidfootPct ?? undefined,
-      applied: state.poseApplied,
-      lines: bbPoseLines(state.poseResult),
-    } : null,
+    // плюс числа для машинного чтения. Ракурсы независимы: фронт и бок идут отдельными
+    // секциями, иначе второй разбор затирал бы первый в отчёте.
+    poseVideos: (['front', 'side'] as const)
+      .map((v) => {
+        const r = state.poseResults[v];
+        if (!r) return null;
+        return {
+          view: v,
+          quality: r.quality,
+          framesPosed: r.framesPosed,
+          framesTotal: r.framesTotal,
+          depthKneeDeg: r.depthKneeDeg ?? undefined,
+          trunkLeanDeg: r.trunkLeanDeg ?? undefined,
+          heelRisePct: r.heelRisePct ?? undefined,
+          valgusDeg: r.valgusDeg ?? undefined,
+          hipShiftPct: r.hipShiftPct ?? undefined,
+          pelvicDropPct: r.pelvicDropPct ?? undefined,
+          armsOverMidfootPct: r.armsOverMidfootPct ?? undefined,
+          applied: state.poseApplied[v],
+          lines: bbPoseLines(r),
+        };
+      })
+      .filter(Boolean) as any,
     // BB-G-01/04: панель объёма/восстановления и эффект коррекции — «показано = выгружено».
     volumeRecovery: {
       chips: vrPanel.chips.map((c) => ({ label: c.label, value: c.value, detail: c.detail })),
@@ -1760,7 +1784,7 @@ export const BBDiagnosticsHub: React.FC = () => {
       zone: a.zone,
       where: a.target ? { type: a.target.type, id: a.target.id, label: a.target.label } : null,
     })),
-  }), [lrVerdicts, moveDriver, singleLeg, ohs, mmcLine, shoulderV, hingeV, loadedV, ybtV, asymText, driverSubs, benchV, painMon, nheV, adductorV, loadedHingeV, erIrV, teenGate, screenPriority, correctiveDetailForExport, corrBlockLines, lrDirection, readiness, redFlags, returnToPlan, lvpProfile, tendonTexts, teenNoteText, femaleNotesShort, vrPanel, corrEffect, nextActions, lvpWorkingRange, noDataAtAll, state.poseResult, state.poseApplied]);
+  }), [lrVerdicts, moveDriver, singleLeg, ohs, mmcLine, shoulderV, hingeV, loadedV, ybtV, asymText, driverSubs, benchV, painMon, nheV, adductorV, loadedHingeV, erIrV, teenGate, screenPriority, correctiveDetailForExport, corrBlockLines, lrDirection, readiness, redFlags, returnToPlan, lvpProfile, tendonTexts, teenNoteText, femaleNotesShort, vrPanel, corrEffect, nextActions, lvpWorkingRange, noDataAtAll, state.poseResults, state.poseApplied]);
 
   // Покрытие слабых головок текущим планом (есть ли хоть одно упражнение в головку)
   const headCoverage = useMemo(() => {

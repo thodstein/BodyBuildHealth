@@ -249,18 +249,26 @@ export const BbScreeningTab: React.FC<BbScreeningTabProps> = (props) => {
                 {/* BB-G-05: реальный видео-разбор — системная камера АПК → BlazePose → метрики ракурса. */}
                 <BbPoseCard
                   view={state.poseView}
-                  onView={(v) => setState((s) => ({ ...s, poseView: v, poseApplied: false }))}
-                  saved={state.poseResult}
-                  applied={state.poseApplied}
+                  onView={(v) => setState((s) => ({ ...s, poseView: v }))}
+                  saved={state.poseResults[state.poseView]}
+                  applied={state.poseApplied[state.poseView]}
+                  other={(() => {
+                    const ov = state.poseView === 'front' ? 'side' : 'front';
+                    return { view: ov, summary: state.poseResults[ov], applied: state.poseApplied[ov] };
+                  })()}
                   onResult={(r) => setState((s) => ({
-                    ...s, poseResult: r, poseApplied: false,
+                    ...s,
+                    poseResults: { ...s.poseResults, [s.poseView]: r },
+                    // новый разбор этого ракурса — старый перенос в скрининг больше не актуален
+                    poseApplied: { ...s.poseApplied, [s.poseView]: false },
                     screenTouched: true, screenDoneAt: s.screenDoneAt || localIsoDate(),
                   }))}
                   onApply={() => {
-                    const patch = bbPoseScreeningPatch(state.poseResult);
+                    const patch = bbPoseScreeningPatch(state.poseResults[state.poseView]);
                     if (!Object.keys(patch).length) return;
                     setState((s) => ({
-                      ...s, ...patch, poseApplied: true,
+                      ...s, ...patch,
+                      poseApplied: { ...s.poseApplied, [s.poseView]: true },
                       screenTouched: true, screenDoneAt: s.screenDoneAt || localIsoDate(),
                     }));
                     setToast('✓ Перенесено в скрининг: только измеренные признаки');

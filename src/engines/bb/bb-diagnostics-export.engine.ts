@@ -12,6 +12,33 @@ function esc(s: string): string {
   return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
+export interface BbPoseVideoEntry {
+  view: 'front' | 'side';
+  quality: 'ok' | 'low' | 'none';
+  framesPosed: number;
+  framesTotal: number;
+  depthKneeDeg?: number;
+  trunkLeanDeg?: number;
+  heelRisePct?: number;
+  valgusDeg?: number;
+  hipShiftPct?: number;
+  pelvicDropPct?: number;
+  armsOverMidfootPct?: number;
+  applied: boolean;
+  lines: string[];
+}
+
+/** Единый список секций видео-разбора: новый массив приоритетнее legacy-одиночки. */
+function poseVideoEntries(meta: any): BbPoseVideoEntry[] {
+  const arr = meta?.poseVideos;
+  if (Array.isArray(arr)) return arr.filter((x: any) => x && Array.isArray(x.lines) && x.lines.length) as BbPoseVideoEntry[];
+  const single = meta?.poseVideo;
+  return single && Array.isArray(single.lines) && single.lines.length ? [single as BbPoseVideoEntry] : [];
+}
+
+const POSE_VIEW_RU: Record<string, string> = { front: 'фронтально', side: 'сбоку' };
+const POSE_QUALITY_RU: Record<string, string> = { ok: 'ок', low: 'черновой', none: 'поза не найдена' };
+
 export interface BBDiagnosticsPro2Meta {
   lr?: Array<{ group: string; left: number; right: number; asymPct: number | null; weakSide: string | null; verdict: string; topUpSets: number; text: string }>;
   readiness?: { level: string; advice: string; reasons: string[] };
@@ -22,21 +49,12 @@ export interface BBDiagnosticsPro2Meta {
    * BB-G-05: видео-разбор позы (BlazePose). Отдельно от legacy `pose` — тот про ручные
    * углы «таблицы», здесь измеренная поза с ракурсом и качеством.
    */
-  poseVideo?: {
-    view: 'front' | 'side';
-    quality: 'ok' | 'low' | 'none';
-    framesPosed: number;
-    framesTotal: number;
-    depthKneeDeg?: number;
-    trunkLeanDeg?: number;
-    heelRisePct?: number;
-    valgusDeg?: number;
-    hipShiftPct?: number;
-    pelvicDropPct?: number;
-    armsOverMidfootPct?: number;
-    applied: boolean;
-    lines: string[];
-  } | null;
+  poseVideo?: BbPoseVideoEntry | null;
+  /**
+   * BB-G-05 (2): по записи на ракурс. Фронт и бок меряют разные признаки, поэтому
+   * отчёт печатает обе секции; одиночный `poseVideo` поддерживается для старых данных.
+   */
+  poseVideos?: BbPoseVideoEntry[] | null;
   teen?: string | null;
   femaleNotes?: string[];
   /** PRO-3: LVP-профиль, сухожилия, MMC, return-to, направление перекоса, рабочие веса (legacy-чтение старых файлов). */
@@ -225,11 +243,11 @@ ${(() => {
     if (m.redFlags?.active) parts.push(`<h2>Флаги — ${m.redFlags.blocked ? 'стоп' : 'осторожно'}</h2><div style="font-size:12px">${esc(m.redFlags.text)} (скрининг, не диагноз)</div>`);
     if (m.bar) parts.push(`<h2>Штанга (видео)</h2><div style="font-size:12px">Петля ${m.bar.xLoop} см · ${esc(m.bar.type)} — ${esc(m.bar.text)} (порог 4/6 см)</div>`);
     if (m.pose) parts.push(`<h2>Углы (таблица)</h2><div style="font-size:12px">Таз ${m.pose.hip ?? '—'}° · колено ${m.pose.knee ?? '—'}° · голеностоп ${m.pose.ankle ?? '—'}° · плечо ${m.pose.shoulder ?? '—'}° (кадров: ${m.pose.n})${m.pose.faults.length ? ` — ${esc(m.pose.faults.join(' · '))}` : ''}</div>`);
-    // BB-G-05: видео-разбор позы — те же строки, что в карточке хаба.
-    const pv: any = (m as any).poseVideo;
-    if (pv && Array.isArray(pv.lines) && pv.lines.length) {
-      const viewRu = pv.view === 'front' ? 'фронтально' : 'сбоку';
-      const q = pv.quality === 'ok' ? 'ок' : pv.quality === 'low' ? 'черновой' : 'поза не найдена';
+    // BB-G-05: видео-разбор позы — те же строки, что в карточке хаба. Секция на ракурс:
+    // фронт и бок измеряют разное, поэтому оба попадают в отчёт (раньше оставался один).
+    for (const pv of poseVideoEntries(m)) {
+      const viewRu = POSE_VIEW_RU[String(pv.view)] || String(pv.view);
+      const q = POSE_QUALITY_RU[String(pv.quality)] || String(pv.quality);
       parts.push(`<h2>Видео-разбор позы (${esc(viewRu)})</h2><div style="font-size:12px">Качество: ${esc(q)} · кадров с позой ${Number(pv.framesPosed)} из ${Number(pv.framesTotal)}${pv.applied ? ' · перенесено в скрининг' : ''}</div><ul>${pv.lines.map((l: unknown) => `<li>${esc(String(l))}</li>`).join('')}</ul>`);
     }
     if (m.teen) parts.push(`<h2>Подросток</h2><div style="font-size:12px">${esc(m.teen)}</div>`);
@@ -331,10 +349,9 @@ export function buildBBDiagnosticsCsv(
     lines.push(['pose', `hip ${meta.pose.hip ?? '—'} knee ${meta.pose.knee ?? '—'} ankle ${meta.pose.ankle ?? '—'} shoulder ${meta.pose.shoulder ?? '—'} n ${meta.pose.n}`].map(escCsv).join(','));
   }
   // BB-G-05: видео-разбор позы — сводка + по строке на каждый показатель (паритет с HTML).
-  const pvCsv: any = (meta as any)?.poseVideo;
-  if (pvCsv && Array.isArray(pvCsv.lines) && pvCsv.lines.length) {
+  for (const pvCsv of poseVideoEntries(meta)) {
     lines.push(['pose_video', pvCsv.view, pvCsv.quality, `${pvCsv.framesPosed}/${pvCsv.framesTotal}`, pvCsv.applied ? 'applied' : 'not_applied'].map(escCsv).join(','));
-    for (const l of pvCsv.lines) lines.push(['pose_video_line', l].map(escCsv).join(','));
+    for (const l of pvCsv.lines) lines.push(['pose_video_line', pvCsv.view, l].map(escCsv).join(','));
   }
   if (meta?.teen) lines.push(['teen', meta.teen].map(escCsv).join(','));
   if (meta?.femaleNotes?.length) lines.push(['female_notes', meta.femaleNotes.join(' · ')].map(escCsv).join(','));
