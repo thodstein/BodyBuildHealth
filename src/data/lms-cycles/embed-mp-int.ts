@@ -22,73 +22,73 @@ export const EMBED_MP_INT: SRCycleTemplate = {
   },
   week1: [
     { exercises: [
-      { name: 'Жим стоя', group: '', coef: 1, mnosz: 1, sets: [{pct:0.4,reps:6,sets:4},{pct:0.45,reps:5,sets:4}] },
-      { name: 'Жим средним хватом', group: '', coef: 1, mnosz: 1, sets: [{pct:0.55,reps:5,sets:5}] },
+      { name: 'Жим стоя', group: 'Плечи', coef: 1, mnosz: 1, sets: [{pct:0.4,reps:6,sets:4},{pct:0.45,reps:5,sets:4}] },
+      { name: 'Жим средним хватом', group: 'Грудь', coef: 1, mnosz: 1, sets: [{pct:0.55,reps:5,sets:5}] },
     ] },
     { exercises: [
-      { name: 'Жим стоя', group: '', coef: 1, mnosz: 1, sets: [{pct:0.55,reps:4,sets:4}] },
-      { name: 'Жим средним хватом', group: '', coef: 1, mnosz: 1, sets: [{pct:0.5,reps:5,sets:1},{pct:0.6,reps:4,sets:1},{pct:0.7,reps:4,sets:4}] },
+      { name: 'Жим стоя', group: 'Плечи', coef: 1, mnosz: 1, sets: [{pct:0.55,reps:4,sets:4}] },
+      { name: 'Жим средним хватом', group: 'Грудь', coef: 1, mnosz: 1, sets: [{pct:0.5,reps:5,sets:1},{pct:0.6,reps:4,sets:1},{pct:0.7,reps:4,sets:4}] },
     ] },
     { exercises: [
-      { name: 'Жим стоя', group: '', coef: 1, mnosz: 1, sets: [{pct:0.55,reps:5,sets:1},{pct:0.65,reps:4,sets:4}] },
-      { name: 'Жим средним хватом', group: '', coef: 1, mnosz: 1, sets: [{pct:0.55,reps:5,sets:1},{pct:0.65,reps:4,sets:4}] },
+      { name: 'Жим стоя', group: 'Плечи', coef: 1, mnosz: 1, sets: [{pct:0.55,reps:5,sets:1},{pct:0.65,reps:4,sets:4}] },
+      { name: 'Жим средним хватом', group: 'Грудь', coef: 1, mnosz: 1, sets: [{pct:0.55,reps:5,sets:1},{pct:0.65,reps:4,sets:4}] },
     ] },
   ],
   weeks: [
     [
     { exercises: [
-      { name: 'Жим стоя', group: '', coef: 1, mnosz: 1, sets: [{pct:0.4,reps:6,sets:4},{pct:0.45,reps:5,sets:4}] },
-      { name: 'Жим средним хватом', group: '', coef: 1, mnosz: 1, sets: [{pct:0.55,reps:5,sets:5}] },
+      { name: 'Жим стоя', group: 'Плечи', coef: 1, mnosz: 1, sets: [{pct:0.4,reps:6,sets:4},{pct:0.45,reps:5,sets:4}] },
+      { name: 'Жим средним хватом', group: 'Грудь', coef: 1, mnosz: 1, sets: [{pct:0.55,reps:5,sets:5}] },
     ] },
     { exercises: [
-      { name: 'Жим стоя', group: '', coef: 1, mnosz: 1, sets: [{pct:0.55,reps:4,sets:4}] },
-      { name: 'Жим средним хватом', group: '', coef: 1, mnosz: 1, sets: [{pct:0.5,reps:5,sets:1},{pct:0.6,reps:4,sets:1},{pct:0.7,reps:4,sets:4}] },
+      { name: 'Жим стоя', group: 'Плечи', coef: 1, mnosz: 1, sets: [{pct:0.55,reps:4,sets:4}] },
+      { name: 'Жим средним хватом', group: 'Грудь', coef: 1, mnosz: 1, sets: [{pct:0.5,reps:5,sets:1},{pct:0.6,reps:4,sets:1},{pct:0.7,reps:4,sets:4}] },
     ] },
     { exercises: [
-      { name: 'Жим стоя', group: '', coef: 1, mnosz: 1, sets: [{pct:0.55,reps:5,sets:1},{pct:0.65,reps:4,sets:4}] },
-      { name: 'Жим средним хватом', group: '', coef: 1, mnosz: 1, sets: [{pct:0.55,reps:5,sets:1},{pct:0.65,reps:4,sets:4}] },
-    ] },
-    ],
-    [
-    { exercises: [
-      { name: 'Жим стоя', group: '', coef: 1, mnosz: 1, sets: [{pct:0.35,reps:6,sets:4},{pct:0.4,reps:5,sets:4}] },
-      { name: 'Жим средним хватом', group: '', coef: 1, mnosz: 1, sets: [{pct:0.5,reps:5,sets:5}] },
-    ] },
-    { exercises: [
-      { name: 'Жим стоя', group: '', coef: 1, mnosz: 1, sets: [{pct:0.5,reps:6,sets:1},{pct:0.6,reps:5,sets:5}] },
-      { name: 'Жим средним хватом', group: '', coef: 1, mnosz: 1, sets: [{pct:0.55,reps:5,sets:5}] },
-    ] },
-    { exercises: [
-      { name: 'Жим стоя', group: '', coef: 1, mnosz: 1, sets: [{pct:0.4,reps:6,sets:5}] },
-      { name: 'Жим средним хватом', group: '', coef: 1, mnosz: 1, sets: [{pct:0.55,reps:5,sets:1},{pct:0.65,reps:5,sets:1}] },
+      { name: 'Жим стоя', group: 'Плечи', coef: 1, mnosz: 1, sets: [{pct:0.55,reps:5,sets:1},{pct:0.65,reps:4,sets:4}] },
+      { name: 'Жим средним хватом', group: 'Грудь', coef: 1, mnosz: 1, sets: [{pct:0.55,reps:5,sets:1},{pct:0.65,reps:4,sets:4}] },
     ] },
     ],
     [
     { exercises: [
-      { name: 'Жим стоя', group: '', coef: 1, mnosz: 1, sets: [{pct:0.4,reps:6,sets:4},{pct:0.45,reps:5,sets:4}] },
-      { name: 'Жим средним хватом', group: '', coef: 1, mnosz: 1, sets: [{pct:0.55,reps:5,sets:1},{pct:0.65,reps:4,sets:4}] },
+      { name: 'Жим стоя', group: 'Плечи', coef: 1, mnosz: 1, sets: [{pct:0.35,reps:6,sets:4},{pct:0.4,reps:5,sets:4}] },
+      { name: 'Жим средним хватом', group: 'Грудь', coef: 1, mnosz: 1, sets: [{pct:0.5,reps:5,sets:5}] },
     ] },
     { exercises: [
-      { name: 'Жим стоя', group: '', coef: 1, mnosz: 1, sets: [{pct:0.55,reps:5,sets:1},{pct:0.65,reps:4,sets:1},{pct:0.72,reps:4,sets:1},{pct:0.8,reps:4,sets:1}] },
-      { name: 'Жим средним хватом', group: '', coef: 1, mnosz: 1, sets: [{pct:0.55,reps:5,sets:5}] },
+      { name: 'Жим стоя', group: 'Плечи', coef: 1, mnosz: 1, sets: [{pct:0.5,reps:6,sets:1},{pct:0.6,reps:5,sets:5}] },
+      { name: 'Жим средним хватом', group: 'Грудь', coef: 1, mnosz: 1, sets: [{pct:0.55,reps:5,sets:5}] },
     ] },
     { exercises: [
-      { name: 'Жим стоя', group: '', coef: 1, mnosz: 1, sets: [{pct:0.45,reps:6,sets:4},{pct:0.5,reps:5,sets:4}] },
-      { name: 'Жим средним хватом', group: '', coef: 1, mnosz: 1, sets: [{pct:0.55,reps:5,sets:5}] },
+      { name: 'Жим стоя', group: 'Плечи', coef: 1, mnosz: 1, sets: [{pct:0.4,reps:6,sets:5}] },
+      { name: 'Жим средним хватом', group: 'Грудь', coef: 1, mnosz: 1, sets: [{pct:0.55,reps:5,sets:1},{pct:0.65,reps:5,sets:1}] },
     ] },
     ],
     [
     { exercises: [
-      { name: 'Жим стоя', group: '', coef: 1, mnosz: 1, sets: [{pct:0.5,reps:6,sets:1},{pct:0.6,reps:5,sets:5}] },
-      { name: 'Жим средним хватом', group: '', coef: 1, mnosz: 1, sets: [{pct:0.55,reps:4,sets:1},{pct:0.66,reps:4,sets:4}] },
+      { name: 'Жим стоя', group: 'Плечи', coef: 1, mnosz: 1, sets: [{pct:0.4,reps:6,sets:4},{pct:0.45,reps:5,sets:4}] },
+      { name: 'Жим средним хватом', group: 'Грудь', coef: 1, mnosz: 1, sets: [{pct:0.55,reps:5,sets:1},{pct:0.65,reps:4,sets:4}] },
     ] },
     { exercises: [
-      { name: 'Жим стоя', group: '', coef: 1, mnosz: 1, sets: [{pct:0.5,reps:5,sets:1},{pct:0.57,reps:4,sets:1},{pct:0.67,reps:4,sets:4}] },
-      { name: 'Жим средним хватом', group: '', coef: 1, mnosz: 1, sets: [{pct:0.55,reps:5,sets:1},{pct:0.65,reps:4,sets:1},{pct:0.72,reps:4,sets:4}] },
+      { name: 'Жим стоя', group: 'Плечи', coef: 1, mnosz: 1, sets: [{pct:0.55,reps:5,sets:1},{pct:0.65,reps:4,sets:1},{pct:0.72,reps:4,sets:1},{pct:0.8,reps:4,sets:1}] },
+      { name: 'Жим средним хватом', group: 'Грудь', coef: 1, mnosz: 1, sets: [{pct:0.55,reps:5,sets:5}] },
     ] },
     { exercises: [
-      { name: 'Жим стоя', group: '', coef: 1, mnosz: 1, sets: [{pct:0.55,reps:4,sets:1},{pct:0.65,reps:4,sets:4}] },
-      { name: 'Жим средним хватом', group: '', coef: 1, mnosz: 1, sets: [{pct:0.45,reps:6,sets:4},{pct:0.5,reps:5,sets:4}] },
+      { name: 'Жим стоя', group: 'Плечи', coef: 1, mnosz: 1, sets: [{pct:0.45,reps:6,sets:4},{pct:0.5,reps:5,sets:4}] },
+      { name: 'Жим средним хватом', group: 'Грудь', coef: 1, mnosz: 1, sets: [{pct:0.55,reps:5,sets:5}] },
+    ] },
+    ],
+    [
+    { exercises: [
+      { name: 'Жим стоя', group: 'Плечи', coef: 1, mnosz: 1, sets: [{pct:0.5,reps:6,sets:1},{pct:0.6,reps:5,sets:5}] },
+      { name: 'Жим средним хватом', group: 'Грудь', coef: 1, mnosz: 1, sets: [{pct:0.55,reps:4,sets:1},{pct:0.66,reps:4,sets:4}] },
+    ] },
+    { exercises: [
+      { name: 'Жим стоя', group: 'Плечи', coef: 1, mnosz: 1, sets: [{pct:0.5,reps:5,sets:1},{pct:0.57,reps:4,sets:1},{pct:0.67,reps:4,sets:4}] },
+      { name: 'Жим средним хватом', group: 'Грудь', coef: 1, mnosz: 1, sets: [{pct:0.55,reps:5,sets:1},{pct:0.65,reps:4,sets:1},{pct:0.72,reps:4,sets:4}] },
+    ] },
+    { exercises: [
+      { name: 'Жим стоя', group: 'Плечи', coef: 1, mnosz: 1, sets: [{pct:0.55,reps:4,sets:1},{pct:0.65,reps:4,sets:4}] },
+      { name: 'Жим средним хватом', group: 'Грудь', coef: 1, mnosz: 1, sets: [{pct:0.45,reps:6,sets:4},{pct:0.5,reps:5,sets:4}] },
     ] },
     ],
   ],
