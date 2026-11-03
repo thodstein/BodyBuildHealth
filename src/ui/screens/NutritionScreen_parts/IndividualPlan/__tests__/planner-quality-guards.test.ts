@@ -253,14 +253,35 @@ describe('пакет качества: витамин E и семейные кв
     FOOD_DB as any,
   ) as any)?.VitE || 0);
 
-  it('витамин E: среднее ≥ 60% RDA, дней ниже 70% ≤ 16 (было 100%)', () => {
+  it('витамин E: среднее ≥ 79% RDA, дней ниже 70% ≤ 6 (QG31; было 78% / 9 дней)', () => {
     const pcts = DAYS.map((d) => Math.round((eMgOf(d) / E_RDA) * 100));
     const avg = Math.round(pcts.reduce((s, v) => s + v, 0) / pcts.length);
-    expect(avg, `VitE: ${avg}% RDA (было 24%)`).toBeGreaterThanOrEqual(60);
+    expect(avg, `VitE: ${avg}% RDA (было 24%)`).toBeGreaterThanOrEqual(79);
     const below70 = pcts.filter((v) => v < 70).length;
-    expect(below70, `дней с VitE < 70% RDA: ${below70}/${pcts.length}`).toBeLessThanOrEqual(16);
+    expect(below70, `дней с VitE < 70% RDA: ${below70}/${pcts.length}`).toBeLessThanOrEqual(6);
     const below50 = pcts.filter((v) => v < 50).length;
-    expect(below50, `дней с VitE < 50% RDA: ${below50}/${pcts.length}`).toBeLessThanOrEqual(10);
+    expect(below50, `дней с VitE < 50% RDA: ${below50}/${pcts.length}`).toBeLessThanOrEqual(2);
+  });
+
+  // QG31: дефицит E адресуется и через «средний» источник. На этом дне в тарелке нет
+  // ги/сливочного — только оливковое (два пункта), поэтому первый ярус QG24 не находил
+  // ни одного кандидата и день стоял на 32% RDA. Второй ярус меняет ОДИН оливковый пункт
+  // на подсолнечное (41 мг/100) с теми же граммами жира: цель 70%, но MUFA-основа дня
+  // сохраняется (оливковое в дне остаётся), поэтому фактический потолок — 55%.
+  it('дефицитный день без ги добирает E (было 32%): M1/6/тр', () => {
+    const d = buildOne(PROFILES[2], 6, true);
+    expect(d).toBeTruthy();
+    const pct = Math.round((eMgOf(d as Day) / E_RDA) * 100);
+    expect(pct, `VitE на M1/6/тр: ${pct}% RDA`).toBeGreaterThanOrEqual(55);
+    // MUFA-основа дня не вытеснена полностью: в дне остаётся оливковое масло.
+    const hasOlive = items(d as Day).some(({ x }) => String(x.id) === 'olive_oil');
+    expect(hasOlive, 'оливковое масло вытеснено целиком').toBe(true);
+    const t: any = buildDayTargets({
+      weightKg: 80, presetGPerKg: 2.0, fatFloorGPerKg: 0.8, kbjuMode: 'auto',
+      goal: 'maintenance', dietStyle: 'classic',
+    } as any);
+    const fat = Number((d as Day).plan.totals?.f) || 0;
+    expect(Math.abs(fat - t.fats) / t.fats, `жир ${fat.toFixed(1)} при цели ${t.fats}`).toBeLessThanOrEqual(0.03);
   });
 
   it('замена масла не нарушает квоты: орехи/семена ≤ потолка, в приёме одно масло', () => {

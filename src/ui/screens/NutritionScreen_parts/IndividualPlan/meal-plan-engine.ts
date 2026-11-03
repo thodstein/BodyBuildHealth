@@ -14573,6 +14573,13 @@ function closeFoodDeficiencies(meals: Meal[], isVegetarian = false, sex: 'male'|
 // дня не растут и цели КБЖУ не двигаются.
 const _QG24_E_POOR = 10;    // мг/100 г — ниже «бедный» источник (ги 0.8, олив. 14.4 → 14.4 богаче
 //                             порога, поэтому оливковое НЕ трогаем: это MUFA-основа рациона)
+// QG31: второй ярус. Замер: на 30 днях E < 70% RDA в 9 днях, и в 6 из них в тарелке НЕТ
+// ги/сливочного — только оливковое (14.4 мг/100) и подсолнечное. Первый ярус там не находит
+// ни одного кандидата, поэтому дефицит E ничем не адресован (M1/6/тр — 32%, S1/4/отд — 52%).
+// Правило: если день В ДЕФИЦИТЕ (E < 70% RDA), оливковое можно заменить на подсолнечное
+// нерафинированное (41 мг/100) с теми же граммами жира — но только до порога 70%, а не до 90%,
+// и не больше одного пункта (оливковое остаётся MUFA-основой дня).
+const _QG24_E_MID = 20;     // мг/100 г — «средний» источник: трогаем только при дефиците
 const _QG24_E_RICH_ID = 'oil_sunflower_unrefined';
 function liftVitaminEByFatAddress(
   meals: any[], totals: any, eGoal: number, seedsCap: number,
@@ -14586,6 +14593,10 @@ function liftVitaminEByFatAddress(
   const want = eGoal * 0.9;
   const e0 = eOf();
   if (e0 >= want) return 0;
+  // QG31: дефицит (< 70% RDA) открывает второй ярус адресов (оливковое) и цель 70%,
+  // иначе «вылечить» дефицит нечем — первый ярус требует ги/сливочного в тарелке.
+  const deficient = e0 < eGoal * 0.7;
+  const wantNow = deficient ? eGoal * 0.7 : want;
   const idsOf = () => new Set(meals.flatMap((m: any) => (m.items || []).map((x: any) => String(x.id))));
   const pure = (x: any) => {
     const amt = Number(x.amount) || 0;
@@ -14602,7 +14613,9 @@ function liftVitaminEByFatAddress(
       if (!pure(it)) continue;
       const fd: any = FOOD_DB.find((f: any) => String(f.id) === String(it.id));
       const e = Number(fd?.micros?.VitE ?? fd?.vitamins_100g?.vitamin_e_mg ?? 0);
-      if (e >= _QG24_E_POOR) continue;         // источник уже E-богатый
+      // QG31: при дефиците E адресуем и «средний» источник (оливковое), но не богатый.
+      const eLimit = deficient ? _QG24_E_MID : _QG24_E_POOR;
+      if (e >= eLimit) continue;         // источник уже E-богатый
       rows.push({ m, idx: i, it, e });
     }
   }
@@ -14613,8 +14626,14 @@ function liftVitaminEByFatAddress(
   const ids0 = idsOf();
   const saved: Array<{ m: any; idx: number; it: any }> = [];
   let swapped = 0;
+  // QG31: «средний» источник (оливковое) меняем не больше одного пункта в день и только если
+  // оливковых пунктов в дне ≥2 — иначе MUFA-основа дня исчезает целиком.
+  let midSwapped = 0;
+  const midTotal = rows.filter((r) => r.e >= _QG24_E_POOR).length;
   for (const r of rows) {
-    if (eOf() >= want) break;
+    if (eOf() >= wantNow) break;
+    const isMid = r.e >= _QG24_E_POOR;
+    if (isMid && (midTotal < 2 || midSwapped >= 1)) continue;
     const g = Math.max(7, Math.round(((Number(r.it.f) || 0) / Math.max(1, Number(rich.fat) || 100)) * 100));
     // Подсолнечное масло живёт в семействе «семена» (`stapleFamilyOf`), поэтому
     // потолок орехов/семян дня (QG11) — жёсткая граница: заменяем только то, что
@@ -14634,6 +14653,7 @@ function liftVitaminEByFatAddress(
     recalcMealTotals(meals as any[]);
     recalcDayTotals(meals, totals);
     swapped++;
+    if (isMid) midSwapped++;
   }
   const dk = Math.abs((Number(totals?.kcal) || 0) - k0);
   const df = Math.abs((Number(totals?.f) || 0) - f0);
