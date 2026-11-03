@@ -3218,6 +3218,9 @@ function assignSchemeSets(ex: any, sets: number, cfg: { reps: [number, number]; 
     // могут урезать финишер — тогда комментарий обязан перестать обещать
     // «7×», иначе пользователь видит противоречие в одном и том же упражнении.
     (ex as any).schemeAssignedSets = sets;
+    // Итерация G: запоминаем и метку схемы. Раньше reconcile умел чинить только
+    // FST-7 (метка была захардкожена), а GVT/8×8 так и обещали 5 сетов при 4 в плане.
+    (ex as any).schemeLabel = cfg.label;
     if (Array.isArray(ex.workSets) && ex.workSets.length > 0) {
       const sample = ex.workSets[ex.workSets.length - 1];
       ex.workSets = Array.from({ length: sets }, () => ({ ...sample, reps: cfg.reps[1], restSeconds: cfg.rest }));
@@ -3227,31 +3230,43 @@ function assignSchemeSets(ex: any, sets: number, cfg: { reps: [number, number]; 
 }
 
 /**
- * D-1b: комментарий схемы не должен обещать больше, чем осталось сетов.
+ * D-1b + G: комментарий схемы не должен обещать больше, чем осталось сетов.
  *
- * FST-7 назначает финишеру 7 сетов, но бюджет недели и MRV-проходы в билдере
- * могут его урезать. Раньше комментарий продолжал писать «FST-7 (7×8-12…)», а в
- * плане стояло 4 сета — пользователь видел противоречие в одном упражнении.
+ * Схемы объёма назначают фиксированное число сетов (FST-7 = 7, GVT = 5+5,
+ * 8×8 = 5+5), но недельный бюджет и MRV-проходы режут их (GVT/Gironda держат
+ * форму ≥4 — это осознанный инвариант). Раньше комментарий продолжал писать
+ * «FST-7 (7×…)» / «GVT 10×10 (5×10…)», а в плане стояло 3-4 сета — пользователь
+ * видел противоречие в одном упражнении. Для FST-7 это чинилось, для GVT/8×8 —
+ * НЕТ: метка схемы была захардкожена «FST-7», и замер показал десятки таких
+ * упражнений на обычных 8-недельных планах.
+ *
+ * Метка берётся из `schemeLabel`, которую пишет `assignSchemeSets`; для старых
+ * планов без поля — прежний FST-7-фолбэк.
  *
  * Вызывать ПОСЛЕ всех урезающих проходов (конец buildBBPlan / revalidate).
- * Возвращает число исправленных упражнений — вызывающий пишет причину в rationale.
+ * Возвращает число исправленных упражнений по меткам — вызывающий пишет причину
+ * в rationale.
  */
-export function reconcileSchemeComments(plan: BBPlan): number {
+export function reconcileSchemeComments(plan: BBPlan): { fixed: number; byLabel: Record<string, number> } {
   const fst7Label = REP_SCHEMES.fst7.nameRu;
+  const byLabel: Record<string, number> = {};
   let fixed = 0;
   for (const week of plan.weeks) for (const session of week.sessions) for (const ex of session.exercises as any[]) {
     const assigned = Number(ex.schemeAssignedSets);
     if (!Number.isFinite(assigned) || assigned <= 0) continue;
     const actual = Number(ex.sets) || 0;
     if (actual <= 0 || actual >= assigned) continue;
+    const label = String(ex.schemeLabel || fst7Label);
     const comment = String(ex.comment || '');
-    const oldSeg = `${fst7Label} (${assigned}×`;
+    const oldSeg = `${label} (${assigned}×`;
     if (!comment.includes(oldSeg)) continue;
-    ex.comment = comment.replace(oldSeg, `${fst7Label} (${actual}×`)
-      + ` · финишер урезан бюджетом недели: ${actual} из ${assigned} сетов`;
+    const where = label === fst7Label ? 'финишер урезан бюджетом недели' : 'схема урезана бюджетом недели';
+    ex.comment = comment.replace(oldSeg, `${label} (${actual}×`)
+      + ` · ${where}: ${actual} из ${assigned} сетов`;
+    byLabel[label] = (byLabel[label] || 0) + 1;
     fixed += 1;
   }
-  return fixed;
+  return { fixed, byLabel };
 }
 
 export function applyVolumeScheme(plan: BBPlan, scheme: string, opts?: { fst7Seven?: boolean }): void {

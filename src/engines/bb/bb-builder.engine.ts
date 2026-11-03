@@ -4349,7 +4349,7 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
       schemeDowngradeNotes.push(`⛔ FST-7 7-in-1: только enhanced без joint-guard (уровень ${level}${methForGates?.jointGuard ? ', joint-guard активен' : ''}). Схема: standard (legacy 5+2).`);
     } else if (methSpecForScheme.impliedVolumeScheme === 'fst7' && input.volumeScheme !== 'fst7') {
       // Честно фиксируем, что схема пришла из методики, а не из отдельного выбора.
-      schemeDowngradeNotes.push('🎛 Методика FST-7 включает схему объёма FST-7: основная мышца дня получает 7-сетовый финишер (RIR 2, отдых 40 с).');
+      schemeDowngradeNotes.push('🎛 Методика FST-7 включает схему объёма FST-7: основная мышца дня получает 7-сетовый финишер (RIR 2, отдых 40 с). Сеты финишера не добавляются сверху — они перераспределяются с других упражнений этой мышцы в той же неделе (пол 3 у базы / 2 у изоляции), поэтому недельный объём мышцы не растёт.');
     }
   }
   // DC rest-pause при соло-инсулине: явный выбор техники снимается (нет базы
@@ -5518,10 +5518,18 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
   // ВСЕХ урезающих проходов (рампа, MRV, реализм). Иначе «FST-7 (7×8-12)» в
   // комментарии и 4 сета в плане расходятся прямо в одном упражнении.
   {
-    const trimmedScheme = reconcileSchemeComments(finalized);
-    if (trimmedScheme > 0) {
-      const note = `🎛 FST-7: финишер урезан бюджетом недели у ${trimmedScheme} упр. (вместо 7 сетов — меньше). Схема не применяется поверх MRV: для полных 7 нужен памп-день или меньше объёма в других мышцах.`;
-      if (!finalized.rationale.includes(note)) finalized.rationale.push(note);
+    const trimmed = reconcileSchemeComments(finalized);
+    if (trimmed.fixed > 0) {
+      const notes: string[] = [];
+      const fst7n = trimmed.byLabel[REP_SCHEMES.fst7.nameRu] || 0;
+      if (fst7n > 0) {
+        notes.push(`🎛 FST-7: финишер урезан бюджетом недели у ${fst7n} упр. (вместо 7 сетов — меньше). Схема не применяется поверх MRV: для полных 7 нужен памп-день или меньше объёма в других мышцах.`);
+      }
+      for (const [label, n] of Object.entries(trimmed.byLabel)) {
+        if (label === REP_SCHEMES.fst7.nameRu) continue;
+        notes.push(`🎛 ${label}: у ${n} упр. сетов меньше, чем обещает схема (бюджет недели/MRV) — цифра в комментарии исправлена на фактическую.`);
+      }
+      for (const note of notes) if (!finalized.rationale.includes(note)) finalized.rationale.push(note);
     }
   }
   syncBBPlanSetShape(finalized);
