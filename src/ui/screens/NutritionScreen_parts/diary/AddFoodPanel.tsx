@@ -9,6 +9,9 @@ import { processUploadedFile } from '../../../../core/ocr-engine';
 import { isCapacitorNative } from '../../../../core/app-platform';
 import { parseNutritionText, findFood } from '../../../../engines/nutrition-ocr-parser';
 import { readDiaryV2 } from '../diary-storage-v2';
+import { LabelNutritionPanel, type LabelDraftView } from './LabelNutritionPanel';
+import { customFoodToFoodItem } from '../../../../engines/meal-custom-food';
+import { useCustomFoods } from './hooks/useCustomFoods';
 
 interface AddFoodPanelProps {
   foodSearch: string;
@@ -27,6 +30,22 @@ interface AddFoodPanelProps {
   onCloseBarcode: () => void;
   showBarcode: boolean;
   onBarcodeProduct: (product: OFFProduct) => void;
+  labelOpen: boolean;
+  labelLoading: boolean;
+  labelProgress: number;
+  labelHint: string;
+  labelError: string;
+  labelDraft: LabelDraftView | null;
+  labelRawText: string;
+  labelBarcodeLoading: boolean;
+  onOpenLabelScan: () => void;
+  onCloseLabelScan: () => void;
+  onLabelCamera: () => void;
+  onLabelGallery: () => void;
+  onLabelFieldChange: (field: 'name' | 'kcal' | 'p' | 'f' | 'c' | 'fiber' | 'barcode', value: string) => void;
+  onLabelSaveToBase: () => void;
+  onLabelAddToDiary: () => void;
+  onLabelBarcodeScan: () => void;
   onOcrFile: (file: File) => void;
   ocrFileLoading: boolean;
   onShowOCR: () => void;
@@ -63,7 +82,10 @@ interface AddFoodPanelProps {
 
 export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
   foodSearch, onFoodSearchChange, debouncedSearch, usdaFoods, mealType, onMealTypeChange,
-  allMealTypes, onAddFoodFromDB, onDirectAdd, customMealInput, onCustomMealInputChange, onAddCustomMeal, onShowBarcode, onCloseBarcode, showBarcode, onBarcodeProduct, onOcrFile,
+  allMealTypes, onAddFoodFromDB, onDirectAdd, customMealInput, onCustomMealInputChange, onAddCustomMeal, onShowBarcode, onCloseBarcode, showBarcode, onBarcodeProduct,
+  labelOpen, labelLoading, labelProgress, labelHint, labelError, labelDraft, labelRawText, labelBarcodeLoading,
+  onOpenLabelScan, onCloseLabelScan, onLabelCamera, onLabelGallery, onLabelFieldChange, onLabelSaveToBase, onLabelAddToDiary, onLabelBarcodeScan,
+  onOcrFile,
   ocrFileLoading, onShowOCR, showOCR, ocrText, onOcrTextChange, onOcrSubmit, ocrError, ocrHint, onOcrClose,
   parsedItems, onRemoveParsedItem, onUpdateParsedItemQty, onFillMicros, onSaveItems, onEditParsedItem,
   onFixAllLowConfidence,
@@ -73,6 +95,9 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
 }) => {
   // АПК: системная камера/галерея вместо сырого file-input (в WebView он
   // открывается через раз). Перехват клика по плитке «Фото».
+  // Свои продукты (в т.ч. распознанные с упаковки) ищем в той же строке, что
+  // и FOOD_DB: иначе сохранённый продукт есть в базе, но найти его нельзя.
+  const customFoods = useCustomFoods();
   const handlePhotoTile = async (e: React.MouseEvent) => {
     if (!isCapacitorNative()) return;
     e.preventDefault();
@@ -102,10 +127,13 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
       const t = (text || '').toLowerCase().replace(/ё/g,'е');
       return tokens.every(tok => t.includes(tok));
     };
+    const custom = customFoods
+      .map(customFoodToFoodItem)
+      .filter((f: any) => match(f.name) || match(f.description || ''));
     const internal = FOOD_DB.filter((f: any) => match(f.name) || match(f.description || ''));
     const usda = usdaFoods.filter((f: any) => match(f.name) || match(f.description || ''));
-    return [...internal.slice(0, 5), ...usda.slice(0, 10)].slice(0, 15);
-  }, [debouncedSearch, usdaFoods]);
+    return [...custom.slice(0, 5), ...internal.slice(0, 5), ...usda.slice(0, 10)].slice(0, 15);
+  }, [debouncedSearch, usdaFoods, customFoods]);
 
   const [history, setHistory] = useState<string[]>(() => { try { const v = JSON.parse(localStorage.getItem('he_search_history') || '[]'); return Array.isArray(v) ? v.filter((x:any)=>typeof x==='string').slice(0,5) : []; } catch { return []; } });
   const [showQuickAdd, setShowQuickAdd] = useState(false);
@@ -398,6 +426,31 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
             <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.45)', marginTop: -2 }}>вставить</span>
           </button>
          </div>
+        {/* Фото упаковки → КБЖУ на 100 г → своя база + очередь дневника */}
+        <button type="button" onClick={labelOpen ? onCloseLabelScan : onOpenLabelScan} aria-label="КБЖУ с упаковки камерой"
+          aria-expanded={labelOpen} className="nd-label-open"
+          style={{ width: '100%', marginTop: 8, padding: '13px 14px', borderRadius: 14, cursor: 'pointer', minHeight: 52,
+            display: 'flex', alignItems: 'center', gap: 10, textAlign: 'left', position: 'relative', overflow: 'hidden',
+            background: labelOpen ? 'linear-gradient(135deg, rgba(0,230,138,0.18), rgba(0,200,160,0.07))' : 'linear-gradient(135deg, rgba(0,230,138,0.10), rgba(59,130,246,0.05))',
+            border: `1px solid ${labelOpen ? 'rgba(0,230,138,0.35)' : 'rgba(0,230,138,0.18)'}`,
+            color: labelOpen ? '#00e68a' : 'rgba(255,255,255,0.9)', fontWeight: 700,
+            boxShadow: labelOpen ? '0 4px 18px rgba(0,230,138,0.16)' : '0 2px 10px rgba(0,0,0,0.12)' }}>
+          <span style={{ width: 34, height: 34, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', background: labelOpen ? 'rgba(0,230,138,0.20)' : 'rgba(0,230,138,0.12)', fontSize: 17, flexShrink: 0 }}>🏷</span>
+          <span style={{ flex: 1, minWidth: 0 }}>
+            <span style={{ display: 'block', fontSize: 12, fontWeight: 800 }}>КБЖУ с упаковки</span>
+            <span style={{ display: 'block', fontSize: 9, color: labelOpen ? 'rgba(0,230,138,0.75)' : 'rgba(255,255,255,0.48)', fontWeight: 500, marginTop: 1 }}>камера · распознать текст · сохранить в базу</span>
+          </span>
+          <span style={{ fontSize: 11, opacity: 0.7 }}>{labelOpen ? '▲' : '▼'}</span>
+        </button>
+
+        <LabelNutritionPanel
+          open={labelOpen} loading={labelLoading} progress={labelProgress} hint={labelHint}
+          error={labelError} draft={labelDraft} rawText={labelRawText} barcodeLoading={labelBarcodeLoading}
+          onCamera={onLabelCamera} onGallery={onLabelGallery} onClose={onCloseLabelScan}
+          onFieldChange={onLabelFieldChange} onSaveToBase={onLabelSaveToBase}
+          onAddToDiary={onLabelAddToDiary} onScanBarcode={onLabelBarcodeScan}
+        />
+
         {/* Быстрое добавление — отдельной красивой кнопкой */}
         <button onClick={() => setShowQuickAdd(v => !v)} style={{ width: '100%', marginTop: 10, padding: '12px 14px', borderRadius: 14, border: `1px solid ${showQuickAdd ? 'rgba(0,230,138,0.25)' : 'rgba(255,255,255,0.06)'}`, background: showQuickAdd ? 'linear-gradient(135deg, rgba(0,230,138,0.12), rgba(0,200,160,0.06))' : 'linear-gradient(135deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01))', color: showQuickAdd ? '#00e68a' : 'rgba(255,255,255,0.85)', fontWeight: 700, fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, backdropFilter: 'blur(12px)', transition: 'all 0.2s', boxShadow: showQuickAdd ? '0 4px 16px rgba(0,230,138,0.12)' : 'none' }}>
           <span style={{ fontSize: 16 }}>⚡</span>
@@ -538,7 +591,11 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
       </div>
 
       {showBarcode && (
-        <BarcodeScanner onProductFound={onBarcodeProduct} onClose={onCloseBarcode} />
+        <BarcodeScanner
+          onProductFound={onBarcodeProduct}
+          onClose={onCloseBarcode}
+          onLabelScan={() => { onCloseBarcode(); onOpenLabelScan(); }}
+        />
       )}
 
       {/* OCR Panel */}

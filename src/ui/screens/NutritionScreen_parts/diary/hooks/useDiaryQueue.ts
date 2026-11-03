@@ -7,6 +7,8 @@ import { FOOD_DB } from '../../../../../core/nutrition-database';
 import { type DiaryItem, type FoodItemLike } from '../../types';
 import { readJSONArr } from '../../diary-storage-v2';
 import { readProgramRestrictions, summarizeImportChecks } from '../diary-import-guards';
+import { useLabelScan } from './useLabelScan';
+import type { CustomFoodEntry } from '../../../../../engines/meal-custom-food';
 
 export function useDiaryQueue({ diaryData, selectedDate, mealType, usdaFoods, saveDiary, showToast, bumpRefresh, setShowBarcode, setFoodSearch }: {
   diaryData: Record<string, any>;
@@ -41,6 +43,39 @@ export function useDiaryQueue({ diaryData, selectedDate, mealType, usdaFoods, sa
       bumpRefresh();
     } catch {}
   }, [setFoodSearch, bumpRefresh]);
+
+  /** Продукт, распознанный с упаковки, — в очередь дневника (100 г). */
+  const addCustomEntryToQueue = useCallback((entry: CustomFoodEntry) => {
+    const micros: Record<string, number> = {};
+    const microMap: Array<[string, number | undefined]> = [
+      ['sodium_mg', entry.sodium_mg], ['potassium_mg', entry.potassium_mg],
+      ['magnesium_mg', entry.magnesium_mg], ['calcium_mg', entry.calcium_mg],
+      ['phosphorus_mg', entry.phosphorus_mg], ['zinc_mg', entry.zinc_mg],
+      ['iron_mg', entry.iron_mg], ['selenium_mcg', entry.selenium_mcg],
+      ['vitamin_a_mcg', entry.vitamin_a_mcg], ['vitamin_c_mg', entry.vitamin_c_mg],
+      ['vitamin_d_mcg', entry.vitamin_d_mcg], ['vitamin_e_mg', entry.vitamin_e_mg],
+      ['vitamin_k_mcg', entry.vitamin_k_mcg], ['vitamin_b12_mcg', entry.vitamin_b12_mcg],
+    ];
+    for (const [key, value] of microMap) {
+      if (typeof value === 'number' && Number.isFinite(value) && value > 0) micros[key] = value;
+    }
+    setParsedItems(prev => [...prev, {
+      name: entry.name,
+      kcal: entry.kcal,
+      p: entry.protein,
+      f: entry.fat,
+      c: entry.carbs,
+      qty: 100,
+      category: entry.category,
+      foodId: entry.id,
+      barcode: entry.barcode,
+      micros: Object.keys(micros).length > 0 ? micros : undefined,
+      confidence: 0.95,
+    }]);
+    bumpRefresh();
+  }, [bumpRefresh]);
+
+  const labelScan = useLabelScan({ showToast, onAddToQueue: addCustomEntryToQueue });
 
   const handleDirectAdd = useCallback((food: FoodItemLike) => {
     const data = { ...diaryData };
@@ -270,5 +305,6 @@ export function useDiaryQueue({ diaryData, selectedDate, mealType, usdaFoods, sa
     addFoodFromDB, handleDirectAdd, handleBarcodeProduct,
     fillQueuedMicros, handleOcrFileUpload, handleOCR, saveItemsToDiary,
     addCustomFood, updateParsedItemQty, extractQty, addPresetItems,
+    ...labelScan,
   };
 }

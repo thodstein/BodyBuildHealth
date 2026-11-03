@@ -3,11 +3,31 @@ import { Html5Qrcode } from 'html5-qrcode';
 import { searchByBarcode, searchByName, saveToCache, type OFFProduct } from '../../engines/openfoodfacts.engine';
 import { guessRetailCategory, searchRetailProductByBarcode } from '../../engines/retail-search.engine';
 import { searchSharedBarcode, saveSharedBarcode } from '../../engines/food-barcode-catalog.engine';
+import { findCustomFoodByBarcode, type CustomFoodEntry } from '../../engines/meal-custom-food';
 import { isCapacitorNative } from '../../core/app-platform';
 
 interface Props {
   onProductFound: (product: OFFProduct) => void;
   onClose: () => void;
+  /** Не нашли товар — открыть распознавание КБЖУ с фото упаковки. */
+  onLabelScan?: () => void;
+}
+
+function customFoodToOFFProduct(entry: CustomFoodEntry): OFFProduct {
+  return {
+    id: entry.barcode || entry.id,
+    barcode: entry.barcode || '',
+    name: entry.name,
+    brand: entry.brand,
+    category: entry.category,
+    kcal: entry.kcal,
+    protein: entry.protein,
+    fat: entry.fat,
+    carbs: entry.carbs,
+    fiber: entry.fiber,
+    servingSize: entry.servingSize || '100 г',
+    cachedAt: Date.now(),
+  };
 }
 
 const SCANNER_ID = 'barcode-scanner-region';
@@ -46,7 +66,7 @@ function pushRecent(barcode: string, name: string, kcal: number): RecentScan[] {
   }
 }
 
-const ModernCreateFood: React.FC<{ error: string; barcode: string; onProductFound: (p: OFFProduct)=>void; btnStyle: React.CSSProperties }> = ({ error, barcode, onProductFound }) => {
+const ModernCreateFood: React.FC<{ error: string; barcode: string; onProductFound: (p: OFFProduct)=>void; btnStyle: React.CSSProperties; onLabelScan?: () => void }> = ({ error, barcode, onProductFound, onLabelScan }) => {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState('');
   const [kcal, setKcal] = useState('100');
@@ -70,6 +90,12 @@ const ModernCreateFood: React.FC<{ error: string; barcode: string; onProductFoun
       <div style={{ marginTop:12, padding:12, borderRadius:14, background:'linear-gradient(135deg, rgba(239,68,68,0.08), rgba(239,68,68,0.03))', border:'1px solid rgba(239,68,68,0.18)', backdropFilter:'blur(8px)' }}>
         <div style={{ color: '#fca5a5', fontSize: 12, marginBottom:10, lineHeight:1.4 }}>{error}</div>
         <button type="button" onClick={()=>setOpen(true)} className="nd-scancreate" style={{ width:'100%', padding:'11px', borderRadius:12, border:'none', background:'linear-gradient(135deg,#00e68a,#00c8a0)', color:'#000', fontWeight:700, fontSize:12, cursor:'pointer', minHeight:48, boxShadow:'0 4px 12px rgba(0,230,138,0.2)' }}>➕ Создать свою еду (оффлайн)</button>
+        {onLabelScan && (
+          <button type="button" onClick={onLabelScan} className="nd-scanlabel" aria-label="Распознать КБЖУ с фото упаковки"
+            style={{ width:'100%', marginTop:8, padding:'11px', borderRadius:12, border:'1px solid rgba(0,230,138,0.22)', background:'rgba(0,230,138,0.08)', color:'#00e68a', fontWeight:700, fontSize:12, cursor:'pointer', minHeight:48 }}>
+            🏷 Снять КБЖУ с упаковки
+          </button>
+        )}
         <div style={{ fontSize:9, color:'rgba(255,255,255,0.45)', textAlign:'center', marginTop:6 }}>Без сети — сохранится в кэш и найдётся при след. сканировании</div>
       </div>
     );
@@ -105,7 +131,7 @@ const ModernCreateFood: React.FC<{ error: string; barcode: string; onProductFoun
   );
 };
 
-export const BarcodeScanner: React.FC<Props> = ({ onProductFound, onClose }) => {
+export const BarcodeScanner: React.FC<Props> = ({ onProductFound, onClose, onLabelScan }) => {
   const [mode, setMode] = useState<'scan' | 'manual' | 'search'>(() => (isCapacitorNative() ? 'scan' : 'manual'));
   const [barcode, setBarcode] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
@@ -147,6 +173,16 @@ export const BarcodeScanner: React.FC<Props> = ({ onProductFound, onClose }) => 
     setError('');
     setShowSettings(false);
     try {
+      // Свои продукты (в т.ч. распознанные с упаковки) — до сети: одинаковый
+      // штрихкод должен находить ровно ту запись, которую сохранил пользователь.
+      setLookupStep('Проверяем свои продукты…');
+      const local = findCustomFoodByBarcode(bc);
+      if (local) {
+        const product = customFoodToOFFProduct(local);
+        try { await saveToCache(product); } catch {}
+        deliverProduct(product, bc);
+        return;
+      }
       // Показываем пользователю, где ищется товар, пока ждём сетевые каталоги.
       setLookupStep('Проверяем локальный кэш и Open Food Facts…');
       const product = await searchByBarcode(bc);
@@ -507,7 +543,13 @@ export const BarcodeScanner: React.FC<Props> = ({ onProductFound, onClose }) => 
 
       {scanNotice && <div role="status" className="nd-scannotice" style={{ marginTop: 10, padding: 10, borderRadius: 10, background: 'rgba(245,158,11,0.08)', color: '#fff', fontSize: 12 }}>{scanNotice}</div>}
       {error && (
-        <ModernCreateFood error={error} barcode={barcode} onProductFound={onProductFound} btnStyle={btnStyle} />
+        <ModernCreateFood
+          error={error}
+          barcode={barcode}
+          onProductFound={onProductFound}
+          btnStyle={btnStyle}
+          onLabelScan={onLabelScan ? () => { onCloseRef.current(); onLabelScan(); } : undefined}
+        />
       )}
     </div>
   );

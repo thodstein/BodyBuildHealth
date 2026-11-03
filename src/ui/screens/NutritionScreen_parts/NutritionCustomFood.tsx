@@ -198,7 +198,11 @@ export const NutritionCustomFood: React.FC = () => {
               <div key={f.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-secondary)', padding: '8px 12px', borderRadius: 8 }}>
                 <div>
                   <div style={{ fontSize: 12, fontWeight: 600 }}>{f.name}</div>
-                  <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>{f.kcal} ккал | Б:{f.protein}г Ж:{f.fat}г У:{f.carbs}г</div>
+                  <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>
+                    {f.kcal} ккал | Б:{f.protein}г Ж:{f.fat}г У:{f.carbs}г
+                    {f.source === 'label_photo' ? ' · 🏷 с упаковки' : ''}
+                    {f.barcode ? ` · ${f.barcode}` : ''}
+                  </div>
                 </div>
                 <button onClick={() => handleDeleteFood(f.id)} style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 6, padding: '4px 8px', cursor: 'pointer', color: '#ef4444', fontSize: 10 }}>Удалить</button>
               </div>

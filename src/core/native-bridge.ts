@@ -346,6 +346,50 @@ export async function pickPhoto(): Promise<PickedPhoto | null> {
   }
 }
 
+/**
+ * Фото сразу с камеры (без системного выбора «камера/галерея»).
+ * Для сценария «сфотографировать упаковку и распознать КБЖУ»: лишний
+ * промежуточный диалог только замедляет путь на телефоне.
+ * В web тот же путь доступен через `<input capture="environment">`.
+ */
+export async function pickCameraPhoto(): Promise<PickedPhoto | null> {
+  if (isCapacitorNative()) {
+    try {
+      const { Camera, CameraSource, CameraResultType } = await import('@capacitor/camera');
+      const photo = await Camera.getPhoto({
+        source: CameraSource.Camera,
+        resultType: CameraResultType.DataUrl,
+        quality: 88,
+      });
+      if (photo.dataUrl) return { uri: photo.dataUrl, format: photo.format ?? 'jpeg' };
+      if (photo.webPath) return { uri: photo.webPath, format: photo.format ?? 'jpeg' };
+      return null;
+    } catch {
+      return null;
+    }
+  }
+  try {
+    return await new Promise<PickedPhoto | null>((resolve) => {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = 'image/*';
+      input.setAttribute('capture', 'environment');
+      input.onchange = () => {
+        const file = input.files?.[0];
+        if (!file) { resolve(null); return; }
+        const reader = new FileReader();
+        reader.onload = () => resolve({ uri: String(reader.result ?? ''), format: file.type.split('/')[1] ?? 'jpeg' });
+        reader.onerror = () => resolve(null);
+        reader.readAsDataURL(file);
+      };
+      input.oncancel = () => resolve(null);
+      input.click();
+    });
+  } catch {
+    return null;
+  }
+}
+
 /** Photo-picker variant optimized for native barcode image decoding. */
 export async function pickBarcodePhoto(): Promise<PickedPhoto | null> {
   if (!isCapacitorNative()) return pickPhoto();

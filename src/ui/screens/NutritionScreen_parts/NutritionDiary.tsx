@@ -51,6 +51,9 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
     addFoodFromDB, handleDirectAdd, handleBarcodeProduct,
     fillQueuedMicros, handleOcrFileUpload, handleOCR, saveItemsToDiary,
     addCustomFood, updateParsedItemQty, extractQty, addPresetItems,
+    labelOpen, labelLoading, labelProgress, labelHint, labelError, labelDraft, labelRawText, labelBarcodeLoading,
+    openLabelScan, closeLabelScan, handleLabelCamera, handleLabelGallery,
+    handleLabelFieldChange, handleLabelSaveToBase, handleLabelAddToDiary, handleLabelBarcodeScan,
   } = useDiaryQueue({ diaryData, selectedDate, mealType, usdaFoods, saveDiary, showToast, bumpRefresh, setShowBarcode, setFoodSearch });
   const {
     editItem, setEditItem, editQty, setEditQty, copySource, setCopySource, copiedDay,
@@ -178,6 +181,13 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
           allMealTypes={allMealTypes} onAddFoodFromDB={addFoodFromDB} onDirectAdd={handleDirectAdd}
           customMealInput={customMealInput} onCustomMealInputChange={setCustomMealInput} onAddCustomMeal={addCustomMeal}
            onShowBarcode={() => setShowBarcode(true)} onCloseBarcode={() => setShowBarcode(false)} showBarcode={showBarcode} onBarcodeProduct={handleBarcodeProduct}
+          labelOpen={labelOpen} labelLoading={labelLoading} labelProgress={labelProgress}
+          labelHint={labelHint} labelError={labelError} labelDraft={labelDraft} labelRawText={labelRawText}
+          labelBarcodeLoading={labelBarcodeLoading}
+          onOpenLabelScan={openLabelScan} onCloseLabelScan={closeLabelScan}
+          onLabelCamera={handleLabelCamera} onLabelGallery={handleLabelGallery}
+          onLabelFieldChange={handleLabelFieldChange} onLabelSaveToBase={handleLabelSaveToBase}
+          onLabelAddToDiary={handleLabelAddToDiary} onLabelBarcodeScan={handleLabelBarcodeScan}
           onOcrFile={handleOcrFileUpload} ocrFileLoading={ocrFileLoading}
           onShowOCR={() => setShowOCR(!showOCR)} showOCR={showOCR}
           ocrText={ocrText} onOcrTextChange={setOcrText} onOcrSubmit={handleOCR}
