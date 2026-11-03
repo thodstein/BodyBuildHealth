@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { localIsoDate, localIsoDateOffset } from '../../core/local-date';
 import { buildHistoryContext, generateInsights, createSession, createSet } from '../diary-insights.engine';
 import type { DiarySession, DiarySet } from '../diary-insights.engine';
 
@@ -30,8 +31,8 @@ describe('buildHistoryContext', () => {
   });
 
   it('computes weekly volume from last 7 days', () => {
-    const today = new Date().toISOString().slice(0, 10);
-    const weekAgo = new Date(Date.now() - 3 * 86400000).toISOString().slice(0, 10);
+    const today = localIsoDate();
+    const weekAgo = localIsoDateOffset(-3);
     const s1 = makeSession('s1', weekAgo);
     const s2 = makeSession('s2', today);
     const sets = [
@@ -43,9 +44,9 @@ describe('buildHistoryContext', () => {
   });
 
   it('computes streak correctly with date gaps', () => {
-    const today = new Date().toISOString().slice(0, 10);
-    const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
-    const dayBefore = new Date(Date.now() - 2 * 86400000).toISOString().slice(0, 10);
+    const today = localIsoDate();
+    const yesterday = localIsoDateOffset(-1);
+    const dayBefore = localIsoDateOffset(-2);
     const s1 = makeSession('s1', dayBefore);
     const s2 = makeSession('s2', yesterday);
     const s3 = makeSession('s3', today);
@@ -56,8 +57,8 @@ describe('buildHistoryContext', () => {
   });
 
   it('resets streak when gap > 1.5 days', () => {
-    const today = new Date().toISOString().slice(0, 10);
-    const threeDaysAgo = new Date(Date.now() - 3 * 86400000).toISOString().slice(0, 10);
+    const today = localIsoDate();
+    const threeDaysAgo = localIsoDateOffset(-3);
     const s1 = makeSession('s1', threeDaysAgo);
     const s2 = makeSession('s2', today);
     const sets = [makeSet('s1', 'squat', 100, 5), makeSet('s2', 'squat', 100, 5)];
@@ -91,7 +92,7 @@ describe('generateInsights', () => {
 describe('createSession and createSet', () => {
   it('createSession fills defaults', () => {
     const s = createSession({});
-    expect(s.date).toBe(new Date().toISOString().slice(0, 10));
+    expect(s.date).toBe(localIsoDate());
     expect(s.focus).toBe('fullbody');
     expect(s.completed).toBe(true);
   });
@@ -114,7 +115,7 @@ describe('buildHistoryContext edge cases', () => {
   });
 
   it('handles session with no exercises', () => {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = localIsoDate();
     const s = makeSession('s1', today);
     const ctx = buildHistoryContext([], [s]);
     expect(ctx.totalSessions).toBe(1);

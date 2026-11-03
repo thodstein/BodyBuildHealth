@@ -3,6 +3,7 @@
  * тренд качества, инсайты, CSV, санитайзер.
  */
 import { describe, expect, it, beforeEach } from 'vitest';
+import { localIsoDate, localIsoDateOffset } from '../../core/local-date';
 import {
   WARMUP_DIARY_KEY, WARMUP_DIARY_CAP, WARMUP_SKIP_REASONS, WARMUP_LABELS, warmupLabel,
   sanitizeWarmupLog, loadWarmupLog, upsertWarmupLog, latestWarmupLog,
@@ -10,8 +11,8 @@ import {
   warmupStreak, correlateWarmupWithPerformance, warmupWeeklyAdherence, warmupWeeklyTrendInsight,
 } from '../warmup.engine';
 
-const iso = (d: Date) => d.toISOString().slice(0, 10);
-const daysAgo = (n: number) => { const d = new Date(); d.setDate(d.getDate() - n); return iso(d); };
+const iso = (d: Date) => localIsoDate(d);
+const daysAgo = (n: number) => localIsoDateOffset(-n);
 
 describe('Хранилище дневника разминки', () => {
   beforeEach(() => localStorage.clear());
