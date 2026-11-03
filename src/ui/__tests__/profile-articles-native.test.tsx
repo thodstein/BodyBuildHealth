@@ -38,7 +38,12 @@ afterEach(async () => {
 });
 
 describe('ProfileHero', () => {
-  it('1. native → hero + имя + прогресс + 4 раздела', async () => {
+  // 7 карточек: 4 базовых (Пользователь/Дневники/Отчёты/Настройки) + инструменты
+  // тренера (Тренер, Заметки, Планер). Число держим явным, чтобы случайное
+  // «добавлю ещё одну карточку» не проходило молча, и одинаковым на обеих платформах.
+  const HERO_CARDS = 7;
+
+  it('1. native → hero + имя + прогресс + 7 разделов', async () => {
     setCapacitorNative();
     await resetPlatform();
     const { container } = render(<ProfileHero onSelectTab={() => {}} />);
@@ -54,14 +59,20 @@ describe('ProfileHero', () => {
         '.profile-hero-progress[role="progressbar"], .profile-hero-progress [role="progressbar"]',
       ),
     ).not.toBeNull();
-    expect(container.querySelectorAll('.profile-hero-card').length).toBe(4);
+    expect(container.querySelectorAll('.profile-hero-card').length).toBe(HERO_CARDS);
+    expect(container.querySelector('.profile-hero-card[data-id="coach"]')).not.toBeNull();
+    expect(container.querySelector('.profile-hero-card[data-id="notes"]')).not.toBeNull();
+    expect(container.querySelector('.profile-hero-card[data-id="planner"]')).not.toBeNull();
   });
 
-  it('2. web → та же классика (hero, 4 раздела)', async () => {
+  it('2. web → та же классика (hero, 7 разделов)', async () => {
     await resetPlatform();
     const { container } = render(<ProfileHero onSelectTab={() => {}} />);
     expect(container.querySelector('.profile-hero')).not.toBeNull();
-    expect(container.querySelectorAll('.profile-hero-card').length).toBe(4);
+    expect(container.querySelectorAll('.profile-hero-card').length).toBe(HERO_CARDS);
+    // Одинаковый набор карточек на обеих платформах — без «web-урезанной» версии.
+    const ids = Array.from(container.querySelectorAll('.profile-hero-card')).map(el => el.getAttribute('data-id'));
+    expect(ids).toEqual(['user', 'diaries', 'reports', 'coach', 'notes', 'planner', 'settings']);
   });
 
   it('3. клик по разделу открывает вкладку', async () => {

@@ -9,6 +9,9 @@ import { ProfileUserTab } from './ProfileUserTab';
 import { ProfileDiariesTab } from './ProfileDiariesTab';
 import { ProfileReportsTab } from './ProfileReportsTab';
 import { ProfileSettingsTab } from './ProfileSettingsTab';
+import { ProfileCoachTab } from './ProfileCoachTab';
+import { ProfileNotesTab } from './ProfileNotesTab';
+import { ProfilePlannerTab } from './ProfilePlannerTab';
 import { useProfileRefresh, getSnapshotsCount, undoLastSnapshot } from '../../../core/profile-manager';
 import { onAnyProfileChange } from '../../../core/profile-events';
 import { colors } from './ui';
@@ -46,13 +49,16 @@ class ProfileErrorBoundary extends React.Component<
   }
 }
 
-type Tab = 'user' | 'diaries' | 'settings' | 'reports';
+type Tab = 'user' | 'diaries' | 'settings' | 'reports' | 'coach' | 'notes' | 'planner';
 
 const TAB_META: Record<Tab, { icon: NativeIconName; title: string; color: string }> = {
   user: { icon: 'user', title: 'Пользователь', color: colors.primary },
   diaries: { icon: 'notebook', title: 'Дневники', color: colors.orange },
-  settings: { icon: 'sliders', title: 'Настройки', color: colors.purple },
   reports: { icon: 'chart', title: 'Отчёты', color: colors.blue },
+  coach: { icon: 'award', title: 'Тренер', color: '#22d3ee' },
+  notes: { icon: 'file', title: 'Заметки', color: '#f59e0b' },
+  planner: { icon: 'clock', title: 'Планер', color: '#60a5fa' },
+  settings: { icon: 'sliders', title: 'Настройки', color: colors.purple },
 };
 
 export const ProfileScreen_v2: React.FC<{ onNavigate?: (screen: string) => void; initialSubTab?: string }> = ({ onNavigate, initialSubTab }) => {
@@ -64,6 +70,8 @@ export const ProfileScreen_v2: React.FC<{ onNavigate?: (screen: string) => void;
   useEffect(() => {
     if (initialSubTab === 'reports' || initialSubTab === 'custom-report' || initialSubTab === 'archive') {
       setTab('reports');
+    } else if (initialSubTab === 'coach' || initialSubTab === 'notes' || initialSubTab === 'planner') {
+      setTab(initialSubTab);
     } else if (
       initialSubTab &&
       (['diaries', 'sleep', 'bp', 'weight', 'injection', 'measurements', 'cardio'].includes(initialSubTab) ||
@@ -187,6 +195,9 @@ export const ProfileScreen_v2: React.FC<{ onNavigate?: (screen: string) => void;
         background: 'radial-gradient(120% 40% at 50% 0%, rgba(52,211,153,0.06), transparent 70%)',
       }}>
          {tab === 'user' && <ProfileErrorBoundary tabName="Пользователь"><ProfileUserTab /></ProfileErrorBoundary>}
+          {tab === 'coach' && <ProfileErrorBoundary tabName="Тренер"><ProfileCoachTab onNavigate={onNavigate} /></ProfileErrorBoundary>}
+          {tab === 'notes' && <ProfileErrorBoundary tabName="Заметки"><ProfileNotesTab /></ProfileErrorBoundary>}
+          {tab === 'planner' && <ProfileErrorBoundary tabName="Планер"><ProfilePlannerTab /></ProfileErrorBoundary>}
           {tab === 'diaries' && <ProfileErrorBoundary tabName="Дневники"><ProfileDiariesTab
             onNavigate={onNavigate}
             initialView={initialSubTab === 'sleep' || initialSubTab === 'bp' || initialSubTab === 'weight' || initialSubTab === 'measurements' ? (initialSubTab as 'sleep' | 'bp' | 'weight' | 'measurements') : 'diary'}

@@ -10,9 +10,22 @@ import { onAnyProfileChange } from '../../../core/profile-events';
 import { isNativeApp } from '../../../core/app-platform';
 import { NativeIcon, type NativeIconName } from '../../native/NativeIcons';
 import { colors, withAlpha } from './ui';
+import { coachSummary, readCoachState } from '../../../engines/coach/coach-mode.engine';
+
+const COACH_COLOR = '#22d3ee';
+const NOTES_COLOR = '#f59e0b';
+const PLANNER_COLOR = '#60a5fa';
+
+const coachDescForHero = (): string => {
+  try {
+    return coachSummary(readCoachState(typeof localStorage !== 'undefined' ? localStorage : null));
+  } catch {
+    return 'До 20 атлетов, разделы, активный атлет';
+  }
+};
 
 interface TabDef {
-  id: 'user' | 'diaries' | 'settings' | 'reports';
+  id: 'user' | 'diaries' | 'reports' | 'settings' | 'coach' | 'notes' | 'planner';
   icon: NativeIconName;
   label: string;
   desc: string;
@@ -23,6 +36,9 @@ const TABS: TabDef[] = [
   { id: 'user', icon: 'user', label: 'Пользователь', desc: 'Имя, параметры, образ жизни, курс, цели', color: colors.primary },
   { id: 'diaries', icon: 'notebook', label: 'Дневники', desc: 'Сон, давление, вес, замеры', color: colors.orange },
   { id: 'reports', icon: 'chart', label: 'Отчёты', desc: 'Комплексный отчёт для врача/тренера', color: colors.blue },
+  { id: 'coach', icon: 'award', label: 'Тренер', desc: 'До 20 атлетов, разделы, активный атлет', color: COACH_COLOR },
+  { id: 'notes', icon: 'file', label: 'Заметки', desc: 'Контекст, ограничения, договорённости', color: NOTES_COLOR },
+  { id: 'planner', icon: 'clock', label: 'Планер', desc: 'Календарь задач по дням', color: PLANNER_COLOR },
   { id: 'settings', icon: 'sliders', label: 'Настройки', desc: 'Единицы, уведомления, экспорт данных', color: colors.purple },
 ];
 
@@ -82,6 +98,7 @@ export const ProfileHero: React.FC<{ onSelectTab: (id: TabDef['id']) => void }> 
   const bmi = p.weight && p.height && p.height > 0
     ? (p.weight / Math.pow(p.height / 100, 2)).toFixed(1) : null;
   const barColor = completeness < 50 ? colors.danger : completeness < 80 ? colors.warning : 'var(--profile-accent, #34d399)';
+  const tabs: TabDef[] = TABS.map(t => (t.id === 'coach' ? { ...t, desc: coachDescForHero() } : t));
 
   return (
     <div className="profile-hero pf-hero" data-complete={filled} style={{ position:'fixed', inset:0, zIndex:100, display:'flex', flexDirection:'column' }}>
@@ -185,7 +202,7 @@ export const ProfileHero: React.FC<{ onSelectTab: (id: TabDef['id']) => void }> 
         </div>
 
         <div role="navigation" aria-label="Разделы профиля" className="profile-hero-nav pf-hero-nav" style={{ display:'flex', flexDirection:'column', gap:10 }}>
-          {TABS.map(t => (
+          {tabs.map(t => (
             <div
               key={t.id}
               role="button"

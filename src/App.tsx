@@ -137,6 +137,11 @@ export const NAV_TARGETS: Record<string, NavTarget> = {
   'support-reports': { tab: 'support', subTab: 'reports' },
   'custom-report': { tab: 'profile', subTab: 'custom-report' },
   'profile-reports': { tab: 'profile', subTab: 'reports' },
+  // Режим тренера и его инструменты (общий слой профиля)
+  'coach': { tab: 'profile', subTab: 'coach' },
+  'coach-mode': { tab: 'profile', subTab: 'coach' },
+  'notes': { tab: 'profile', subTab: 'notes' },
+  'planner': { tab: 'profile', subTab: 'planner' },
 
   // Встроенные дневники — открываем профильный дневник
   'profile-diary-sleep': { tab: 'profile', subTab: 'sleep' },
