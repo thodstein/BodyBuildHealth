@@ -24,6 +24,7 @@ import { applyRehabToPlan, rehabNotes } from './bb-recovery.engine';
 import { applyRecoveryRelief } from './bb-recovery-relief.engine';
 import { applyPlateRoundingToPlan } from './bb-plates.engine';
 import { applyBfrPattern } from './bb-rep-schemes.engine';
+import { reconcileSchemeComments } from './bb-scheme-comment-reconcile';
 import { mergeWearableIntoRecovery, type WearableDaily } from './bb-wearable.engine';
 import { getExcludedMuscles, getGradedInjuries, type Injury } from '../manual-plan-builder';
 import { applyPostPhaseProcessing, applyDeloadToWeek, resolveDeloadProtocol, type LoadStrategy, type IntensityTechnique, type DeloadType } from './bb-autocoach.engine';
@@ -3285,6 +3286,25 @@ export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts)
         syncBBPlanSetShape(finalized);
       }
     } catch { /* срез восстановления — best-effort, сборку не роняем */ }
+  }
+  // J: программа-путь правит план ПОСЛЕ назначения схемы объёма (внутри
+  // finalizeBBPlan): rehab режет сеты травмированных мышц, недельный MRV-трим и
+  // сессионный кап — объём, множитель отдыха по уровню интенсивности — отдых,
+  // expandPlanToTargets — сеты до целей. Обещание схемы в комментарии приводим
+  // к факту одним проходом в самом конце.
+  {
+    const schemeFix = reconcileSchemeComments(finalized as any, {
+      reason: (a, m) => `после сборки программы: ${a} из ${m} сетов`,
+    });
+    if (schemeFix.fixed > 0) {
+      const parts: string[] = [];
+      if (schemeFix.aspects.sets) parts.push(`${schemeFix.aspects.sets} — сеты`);
+      if (schemeFix.aspects.reps) parts.push(`${schemeFix.aspects.reps} — повторы`);
+      if (schemeFix.aspects.rest) parts.push(`${schemeFix.aspects.rest} — отдых`);
+      finalized.rationale.push(
+        `🎛 Схема объёма: у ${schemeFix.fixed} упр. комментарий приведён к факту после пост-проходов (${parts.join(', ')}).`,
+      );
+    }
   }
   finalized.report = buildBBPlanReport(finalized);
   return finalized;
