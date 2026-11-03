@@ -9,6 +9,7 @@ import { defaultWorkMax } from './bb-builder.engine';
 import { EXERCISE_CATALOG } from '../../core/exercise-catalog';
 import { PHASE_CONFIGS } from '../periodization';
 import { classifyBackExercise } from './bb-back-quality.engine';
+import { reconcileSchemeComments, reconcileSchemeCommentsIn } from './bb-scheme-comment-reconcile';
 
 /* ──────────── BB phase ──────────── */
 export type BBPhase = 'accumulation' | 'intensification' | 'deload' | 'peaking';
@@ -1001,6 +1002,23 @@ export function applyPostPhaseProcessing(input: PostPhaseInput): BBPlan {
     }
   }
 
+  // H: авто-регуляция по готовности множит сеты ВСЕХ упражнений недели — в том
+  // числе тех, кому схема объёма уже назначила фиксированное число. Без сверки
+  // комментарий продолжал обещать «GVT 10×10 (5×10)» при 4 сетах после ×0.7
+  // (замер: 509 расхождений на 24 сборках, включая рост при ×1.1).
+  {
+    const schemeFix = reconcileSchemeComments({ weeks } as any, {
+      reason: (a, m) => `объём по готовности: ${a} из ${m} сетов`,
+    });
+    if (schemeFix.fixed > 0) {
+      const rationale = [...((plan as any).rationale || [])];
+      for (const [label, n] of Object.entries(schemeFix.byLabel)) {
+        rationale.push(`🎛 ${label}: авто-регуляция изменила число сетов у ${n} упр. — цифра в комментарии приведена к факту.`);
+      }
+      return { ...plan, weeks, rationale };
+    }
+  }
+
   return { ...plan, weeks };
 }
 
@@ -1136,6 +1154,10 @@ export function applyTaperToFinalWeeks(plan: BBPlan, _totalWeeks: number): BBPla
     }));
     return { ...w, sessions: newSessions, taper: true, taperApplied: true, taperVolumeMult: volumeMult };
   });
+
+  // H: тапер режет объём ПОСЛЕ билдера — комментарий схемы обязан отражать факт,
+  // иначе на тапер-неделе висит «GVT 10×10 (5×10)» при 3 сетах.
+  reconcileSchemeCommentsIn(newWeeks, { reason: (a, m) => `тапер: ${a} из ${m} сетов` });
 
   return { ...plan, weeks: newWeeks };
 }

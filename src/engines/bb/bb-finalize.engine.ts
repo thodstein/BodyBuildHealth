@@ -3226,48 +3226,19 @@ function assignSchemeSets(ex: any, sets: number, cfg: { reps: [number, number]; 
       ex.workSets = Array.from({ length: sets }, () => ({ ...sample, reps: cfg.reps[1], restSeconds: cfg.rest }));
     }
     ex.comment = (ex.comment || '') + (ex.comment ? ' · ' : '') + `${cfg.label} (${sets}×${cfg.reps[0]}-${cfg.reps[1]}, отдых ${cfg.rest}с)`;
+    // H: база для идемпотентного reconcile — комментарий без нашей причины.
+    (ex as any).schemeBaseComment = ex.comment;
   }
 }
 
 /**
- * D-1b + G: комментарий схемы не должен обещать больше, чем осталось сетов.
- *
- * Схемы объёма назначают фиксированное число сетов (FST-7 = 7, GVT = 5+5,
- * 8×8 = 5+5), но недельный бюджет и MRV-проходы режут их (GVT/Gironda держат
- * форму ≥4 — это осознанный инвариант). Раньше комментарий продолжал писать
- * «FST-7 (7×…)» / «GVT 10×10 (5×10…)», а в плане стояло 3-4 сета — пользователь
- * видел противоречие в одном упражнении. Для FST-7 это чинилось, для GVT/8×8 —
- * НЕТ: метка схемы была захардкожена «FST-7», и замер показал десятки таких
- * упражнений на обычных 8-недельных планах.
- *
- * Метка берётся из `schemeLabel`, которую пишет `assignSchemeSets`; для старых
- * планов без поля — прежний FST-7-фолбэк.
- *
- * Вызывать ПОСЛЕ всех урезающих проходов (конец buildBBPlan / revalidate).
- * Возвращает число исправленных упражнений по меткам — вызывающий пишет причину
- * в rationale.
+ * D-1b + G + H: комментарий схемы не должен обещать больше (или меньше), чем
+ * осталось сетов. Реализация вынесена в `bb-scheme-comment-reconcile` — иначе
+ * bb-autocoach (авто-регуляция объёма) и bb-finalize дают цикл импортов.
+ * Здесь остаётся ре-экспорт: публичный API `bb-finalize` не менялся.
  */
-export function reconcileSchemeComments(plan: BBPlan): { fixed: number; byLabel: Record<string, number> } {
-  const fst7Label = REP_SCHEMES.fst7.nameRu;
-  const byLabel: Record<string, number> = {};
-  let fixed = 0;
-  for (const week of plan.weeks) for (const session of week.sessions) for (const ex of session.exercises as any[]) {
-    const assigned = Number(ex.schemeAssignedSets);
-    if (!Number.isFinite(assigned) || assigned <= 0) continue;
-    const actual = Number(ex.sets) || 0;
-    if (actual <= 0 || actual >= assigned) continue;
-    const label = String(ex.schemeLabel || fst7Label);
-    const comment = String(ex.comment || '');
-    const oldSeg = `${label} (${assigned}×`;
-    if (!comment.includes(oldSeg)) continue;
-    const where = label === fst7Label ? 'финишер урезан бюджетом недели' : 'схема урезана бюджетом недели';
-    ex.comment = comment.replace(oldSeg, `${label} (${actual}×`)
-      + ` · ${where}: ${actual} из ${assigned} сетов`;
-    byLabel[label] = (byLabel[label] || 0) + 1;
-    fixed += 1;
-  }
-  return { fixed, byLabel };
-}
+export { reconcileSchemeComments } from './bb-scheme-comment-reconcile';
+
 
 export function applyVolumeScheme(plan: BBPlan, scheme: string, opts?: { fst7Seven?: boolean }): void {
   const cfg = VOLUME_SCHEMES[scheme];

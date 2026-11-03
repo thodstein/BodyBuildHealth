@@ -21,6 +21,7 @@ import { buildSpecializationSchedule, normalizeSpecializationTargets, expandDono
 import type { Injury } from '../manual-plan-builder';
 import { computeBBNutritionMultiplier } from './bb-volume.engine';
 import { autoAssignIntensityTechniques } from './bb-finalize.engine';
+import { reconcileSchemeCommentsIn } from './bb-scheme-comment-reconcile';
 import type { BBTrainingFocus } from './bb-goal-types';
 import { applyDUPOverlay, type DUPMode } from './bb-dup.engine';
 import { buildBBContestPrepPlan, applyContestPrepToBBPlan, CATEGORY_PROFILES, isoToday, isoDiffDays, isoAddDays, prepPhaseForWeek, buildPeakWeek, configFromPlan, isMonotonicTaper, prepDietBreaks, isPrepRefeedDay, syncPrepDietBreaksWithPlan, type BBContestCategory, type BBContestPrepConfig, type BBContestPrepPlan, type BBPlanWithPrep, type CarbLoadStrategy, type ContestEventEntry, type ContestSpecialization, type ExperienceLevel, type SodiumStrategy, type WaterStrategy } from './bb-contest-prep.engine';
@@ -1011,6 +1012,9 @@ export function applyPrepVolumeCascade(
     }
   }
 
+  // H: prep-кривая масштабирует сеты недель — комментарий схемы приводится к факту.
+  reconcileSchemeCommentsIn(weeks, { reason: (a, m) => `prep-кривая: ${a} из ${m} сетов` });
+
   return { ...plan, weeks } as BBPlanWithPrep;
 }
 
@@ -1044,6 +1048,8 @@ export function applyPrepDeloads(
       prepProtocol: `Prep-делод (нед ${wk1}): объём ×70%, RIR +2 — сброс усталости, мышцы сохраняются.`,
     };
   });
+  // H: разгрузка подготовки урезает объём — цифра в комментарии схемы = факт.
+  reconcileSchemeCommentsIn(weeks, { reason: (a, m) => `prep-делод: ${a} из ${m} сетов` });
   return { ...plan, weeks } as BBPlanWithPrep;
 }
 
@@ -1076,6 +1082,8 @@ export function applyPrepTaperSparing(plan: BBPlanWithPrep, cfg: PrepCycleConfig
     const cur = totalSetsOfWeek(weeks[taperIdx[k]]);
     if (cur > prev) weeks[taperIdx[k]] = scaleWeekToTarget(weeks[taperIdx[k]], prev);
   }
+  // H: тапер подготовки режет сеты после билдера — сверяем обещание схемы с фактом.
+  reconcileSchemeCommentsIn(weeks, { reason: (a, m) => `тапер подготовки: ${a} из ${m} сетов` });
   return { ...plan, weeks } as BBPlanWithPrep;
 }
 
@@ -1108,6 +1116,8 @@ export function applyPrepPeakReduction(plan: BBPlanWithPrep): BBPlanWithPrep {
     if (total > 18) sessions = scaleWeekToTarget({ sessions }, 18).sessions;
     return { ...wk, sessions, prepProtocol: `${wk.prepProtocol || ''} 🎭 Пик-неделя: лёгкий памп ~18 сетов, без отказа.` };
   });
+  // H: пик-неделя принудительно ставит 2 сета — обещание схемы приводится к факту.
+  reconcileSchemeCommentsIn(weeks, { reason: (a, m) => `пик-неделя: ${a} из ${m} сетов` });
   return { ...plan, weeks } as BBPlanWithPrep;
 }
 
