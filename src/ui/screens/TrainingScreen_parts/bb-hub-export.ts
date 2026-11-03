@@ -70,6 +70,25 @@ export interface BbHubPro2Input {
     zone: string;
     where: { type: string; id: string; label: string } | null;
   }> | null;
+  /**
+   * BB-G-05: видео-разбор позы (ракурс, метрики, качество, применено ли в скрининг).
+   * `lines` — ровно те строки, что в карточке хаба, поэтому HTML/CSV не разойдутся.
+   */
+  poseVideo?: {
+    view: 'front' | 'side';
+    quality: 'ok' | 'low' | 'none';
+    framesPosed: number;
+    framesTotal: number;
+    depthKneeDeg?: number;
+    trunkLeanDeg?: number;
+    heelRisePct?: number;
+    valgusDeg?: number;
+    hipShiftPct?: number;
+    pelvicDropPct?: number;
+    armsOverMidfootPct?: number;
+    applied: boolean;
+    lines: string[];
+  } | null;
 }
 
 /** Единая мета для `buildBBDiagnosticsHtml` и `buildBBDiagnosticsCsv` (пусто — тихо). */
@@ -108,5 +127,6 @@ export function buildPro2Meta(i: BbHubPro2Input): Record<string, unknown> {
     scoreState: i.scoreState ?? undefined,
     volumeRecovery: i.volumeRecovery ?? undefined,
     nextActions: i.nextActions?.length ? i.nextActions : undefined,
+    poseVideo: i.poseVideo ?? undefined,
   };
 }

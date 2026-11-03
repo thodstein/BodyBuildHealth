@@ -74,7 +74,12 @@ export interface PoseMetrics {
 
 let landmarkerPromise: Promise<any> | null = null;
 
-async function getLandmarker(): Promise<any | null> {
+/**
+ * Один экземпляр PoseLandmarker на приложение (модель ~5.5 МБ + WASM грузятся один раз).
+ * Экспортируется для ББ-диагностики (BB-G-05): свой пайплайн кадров, тот же загрузчик —
+ * иначе вторая копия модели тянула бы память и время старта.
+ */
+export async function getPoseLandmarker(): Promise<any | null> {
   if (landmarkerPromise) return landmarkerPromise;
   landmarkerPromise = (async () => {
     try {
@@ -202,7 +207,7 @@ function refinedBarY(imageData: ImageData, lWr: {x:number;y:number}, rWr: {x:num
  * Возвращает PoseMetrics или null если поза не найдена.
  */
 export async function analyzeVideoElement(video: HTMLVideoElement, lift: Lift, opts?: { shoulderWidthCm?: number }): Promise<PoseMetrics | null> {
-  const lm = await getLandmarker();
+  const lm = await getPoseLandmarker();
   if (!lm) return null;
   const duration = video.duration;
   if (!duration || !isFinite(duration) || duration <= 0) return null;

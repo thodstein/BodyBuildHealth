@@ -91,6 +91,8 @@ import { buildVolumeRecoveryPanel } from '../../../engines/bb/bb-volume-recovery
 // BB-G-08: «что делать дальше» — 1–2 шага из данных + белый список deep-link'ов.
 import { buildNextActions } from '../../../engines/bb/bb-diag-next-actions.engine';
 import { buildCorrectionEffect, logDiagInjection, readDiagInjections, type DiagInjection } from '../../../engines/bb/bb-diag-effect.engine';
+// BB-G-05: типы результата видео-разбора позы (метрики считает отдельный чистый движок).
+import { bbPoseLines, type BbPoseSummary, type BbPoseView } from '../../../engines/bb/bb-pose-metrics.engine';
 
 const STORAGE_KEY = 'he_bb_diagnostics_hub_v1';
 type BBTab = 'weak' | 'screening' | 'exercise' | 'stimulus' | 'symmetry' | 'volume';
@@ -166,6 +168,13 @@ export type BBState = {
   ybtPmL: string; ybtPmR: string; ybtPlL: string; ybtPlR: string; limbCm: string;
   /** Скрининг вообще затронут (иначе все «чисто» — это дефолт, а не результат). */
   screenTouched: boolean;
+  /**
+   * BB-G-05: видео-разбор позы. Ракурс + последний результат живут в состоянии хаба,
+   * чтобы переключение табов не терял замер, а отчёт печатал ровно то, что видел экран.
+   */
+  poseView: BbPoseView;
+  poseResult: BbPoseSummary | null;
+  poseApplied: boolean;
   /** Выбранное пользователем упражнение коррекции по зоне (⭐ = id записи библиотеки коррекций).
    *  Единственный источник выбора: карточка/экспорт/вставка/мост читают тот же мемо. */
   prefCorr: Record<string, string>;
@@ -211,6 +220,9 @@ const DEFAULT_STATE: BBState = {
   pmLoc: '', pmDuring: '', pmMorning: '', pmRising: false, pmNight: false, pmSharp: false,
   nheL: '', nheR: '', nheAngle: '', addL: '', addR: '', cphLevel: '',
   screenTouched: false,
+  poseView: 'front',
+  poseResult: null,
+  poseApplied: false,
   prefCorr: {},
 };
 
@@ -320,7 +332,11 @@ export const BBDiagnosticsHub: React.FC = () => {
         if ((parsed.ktwL == null || parsed.ktwL === '') && (parsed.ktwR == null || parsed.ktwR === '') && parsed.kneeToWallCm) {
           parsed.ktwL = parsed.ktwR = parsed.kneeToWallCm;
         }
-        return { ...DEFAULT_STATE, ...parsed, circ: { ...DEFAULT_STATE.circ, ...(parsed.circ || {}) } };
+        const merged: BBState = { ...DEFAULT_STATE, ...parsed, circ: { ...DEFAULT_STATE.circ, ...(parsed.circ || {}) } };
+        // Миграция BB-G-05: старый снимок без `poseView` не должен ломать выбор ракурса
+        // (движок читает BB_POSE_VIDEO_GUIDE[view] — undefined уронил бы карточку).
+        if (merged.poseView !== 'front' && merged.poseView !== 'side') merged.poseView = 'front';
+        return merged;
       }
     } catch {}
     return DEFAULT_STATE;
@@ -982,6 +998,8 @@ export const BBDiagnosticsHub: React.FC = () => {
     && enteredMeasures.length === 0
     && !state.exerciseSelectedId
     && state.weakManual.length === 0
+    // Разбор видео (BB-G-05) — это измерение: с ним балл уже посчитан по данным.
+    && !state.poseResult
     // Сохранённый план — это уже данные: хаб его аудирует (баланс/стимул/объём).
     && !savedPlan;
   const sColor = noDataAtAll ? '#94a3b8' : bbScoreColor(sLevel);
@@ -1710,6 +1728,23 @@ export const BBDiagnosticsHub: React.FC = () => {
     workingRange: lvpWorkingRange,
     // BB-D-05 (хвост): «нет данных» — состояние, а не 100. Отчёт обязан говорить то же.
     scoreState: noDataAtAll ? 'no_data' : undefined,
+    // BB-G-05: видео-разбор позы — те же строки, что карточка («показано = выгружено»),
+    // плюс числа для машинного чтения. Нет разбора — секции в отчёте нет.
+    poseVideo: state.poseResult ? {
+      view: state.poseResult.view,
+      quality: state.poseResult.quality,
+      framesPosed: state.poseResult.framesPosed,
+      framesTotal: state.poseResult.framesTotal,
+      depthKneeDeg: state.poseResult.depthKneeDeg ?? undefined,
+      trunkLeanDeg: state.poseResult.trunkLeanDeg ?? undefined,
+      heelRisePct: state.poseResult.heelRisePct ?? undefined,
+      valgusDeg: state.poseResult.valgusDeg ?? undefined,
+      hipShiftPct: state.poseResult.hipShiftPct ?? undefined,
+      pelvicDropPct: state.poseResult.pelvicDropPct ?? undefined,
+      armsOverMidfootPct: state.poseResult.armsOverMidfootPct ?? undefined,
+      applied: state.poseApplied,
+      lines: bbPoseLines(state.poseResult),
+    } : null,
     // BB-G-01/04: панель объёма/восстановления и эффект коррекции — «показано = выгружено».
     volumeRecovery: {
       chips: vrPanel.chips.map((c) => ({ label: c.label, value: c.value, detail: c.detail })),
@@ -1725,7 +1760,7 @@ export const BBDiagnosticsHub: React.FC = () => {
       zone: a.zone,
       where: a.target ? { type: a.target.type, id: a.target.id, label: a.target.label } : null,
     })),
-  }), [lrVerdicts, moveDriver, singleLeg, ohs, mmcLine, shoulderV, hingeV, loadedV, ybtV, asymText, driverSubs, benchV, painMon, nheV, adductorV, loadedHingeV, erIrV, teenGate, screenPriority, correctiveDetailForExport, corrBlockLines, lrDirection, readiness, redFlags, returnToPlan, lvpProfile, tendonTexts, teenNoteText, femaleNotesShort, vrPanel, corrEffect, nextActions, lvpWorkingRange, noDataAtAll]);
+  }), [lrVerdicts, moveDriver, singleLeg, ohs, mmcLine, shoulderV, hingeV, loadedV, ybtV, asymText, driverSubs, benchV, painMon, nheV, adductorV, loadedHingeV, erIrV, teenGate, screenPriority, correctiveDetailForExport, corrBlockLines, lrDirection, readiness, redFlags, returnToPlan, lvpProfile, tendonTexts, teenNoteText, femaleNotesShort, vrPanel, corrEffect, nextActions, lvpWorkingRange, noDataAtAll, state.poseResult, state.poseApplied]);
 
   // Покрытие слабых головок текущим планом (есть ли хоть одно упражнение в головку)
   const headCoverage = useMemo(() => {

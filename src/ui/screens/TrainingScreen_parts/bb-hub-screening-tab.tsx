@@ -15,7 +15,9 @@ import { benchCorrections, BENCH_DISCLAIMER } from '../../../engines/bb/bb-bench
 import { NHE_DISCLAIMER, ADDUCTOR_HONESTY } from '../../../engines/bb/bb-posterior-readiness.engine';
 import { HINGE_LOAD_NOTE } from '../../../engines/bb/bb-hinge-screen.engine';
 import { SCREENING_DISCLAIMER, VIDEO_GUIDE, MOTION_CAPTURE_NOTE } from '../../../engines/bb/bb-movement-to-plan.engine';
+import { bbPoseScreeningPatch } from '../../../engines/bb/bb-pose-metrics.engine';
 import { BbCheckCard, BbNum, BbSheetSelect } from './bb-hub-controls';
+import { BbPoseCard } from './bb-hub-pose-card';
 import type { BBState } from './BBDiagnosticsHub';
 
 export interface BbScreeningTabProps {
@@ -244,7 +246,27 @@ export const BbScreeningTab: React.FC<BbScreeningTabProps> = (props) => {
                   </div>
                 )}
                 <BbCheckCard active={state.videoTwoAngles} title="Видео с 2 ракурсов" desc="5 повторов, босиком, спереди + сбоку" onToggle={() => setState((s) => ({ ...s, videoTwoAngles: !s.videoTwoAngles }))} accent="#a855f7" />
-                {/* BB-G-05: честная граница возможностей — не «видео-разбор», а ручная запись. */}
+                {/* BB-G-05: реальный видео-разбор — системная камера АПК → BlazePose → метрики ракурса. */}
+                <BbPoseCard
+                  view={state.poseView}
+                  onView={(v) => setState((s) => ({ ...s, poseView: v, poseApplied: false }))}
+                  saved={state.poseResult}
+                  applied={state.poseApplied}
+                  onResult={(r) => setState((s) => ({
+                    ...s, poseResult: r, poseApplied: false,
+                    screenTouched: true, screenDoneAt: s.screenDoneAt || localIsoDate(),
+                  }))}
+                  onApply={() => {
+                    const patch = bbPoseScreeningPatch(state.poseResult);
+                    if (!Object.keys(patch).length) return;
+                    setState((s) => ({
+                      ...s, ...patch, poseApplied: true,
+                      screenTouched: true, screenDoneAt: s.screenDoneAt || localIsoDate(),
+                    }));
+                    setToast('✓ Перенесено в скрининг: только измеренные признаки');
+                  }}
+                  setToast={setToast}
+                />
                 <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 4, lineHeight: 1.45 }} data-bb="motion-capture">{MOTION_CAPTURE_NOTE}</div>
                 <div style={{ fontSize: 10, color: '#fff', opacity: 0.85, marginTop: 4 }} data-bb="video-guide">{VIDEO_GUIDE}</div>
                 <div style={{ fontSize: 11, color: '#fff', marginTop: 6 }} data-bb="driver-subs">

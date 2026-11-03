@@ -81,14 +81,16 @@ describe('bb-hub D3 YBT + D4/D5', () => {
     expect(document.querySelector('[data-bb="video-guide"]')?.textContent).toMatch(/штативе/);
   });
 
-  it('BB-G-05: live-поза/видео честно «не поддерживается», без обещаний анализа кадров', () => {
+  it('BB-G-05: видео-разбор работает (АПК: системная камера), границы модели названы', () => {
     goScreening();
+    expect(document.querySelector('[data-bb="pose-capture"]')).not.toBeNull();
+    const cam = document.querySelector('[data-bb="pose-camera"] input[type="file"]') as HTMLInputElement | null;
+    expect(cam).not.toBeNull();
+    expect(cam!.getAttribute('capture')).toBe('environment');
     const note = document.querySelector('[data-bb="motion-capture"]')?.textContent || '';
-    expect(note).toMatch(/не поддерживаются/);
-    expect(note).toMatch(/не разбирает кадры/);
-    // чем заменяется автоматика — названо, а не «скоро»
-    expect(note).toMatch(/OHS-скрининг/);
-    expect(note).toMatch(/LVP/);
+    // честная граница: 2D-проекция и невидимое по видео названы
+    expect(note).toMatch(/2D-проекция/);
+    expect(note).toMatch(/поясницы/);
     // флаг «2 ракурса» остаётся ручной отметкой (в мету уходит как videoStandard)
     fireEvent.click(screen.getByRole('switch', { name: /Видео с 2 ракурсов/ }));
     expect(document.querySelector('[data-bb="motion-capture"]')).not.toBeNull();
