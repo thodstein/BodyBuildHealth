@@ -13087,7 +13087,10 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
           for (const m of meals as any[]) {
             for (const it of ((m.items || []) as any[])) {
               const a = Number(it.amount) || 0;
-              if (a > 0 && a < 7 && _oil17(it)) out.push({ m, it });
+              // §8.28 (решение владельца): 5 г масла — легальная остаточная порция (45 ккал,
+              // поднять до 7 г = +2 г жира = 2.9% при цели 70 г, то есть весь канон 3%).
+              // Мелким считается 1–4 г — там масло уже след округления, а не порция.
+              if (a > 0 && a < 5 && _oil17(it)) out.push({ m, it });
             }
           }
           return out;

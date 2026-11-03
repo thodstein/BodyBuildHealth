@@ -84,7 +84,7 @@ const DAIRY_RE = /tvorog|kefir|milk|yogurt|cheese|skyr|curd/;
 
 type Day = { id: string; w: number; plan: any; meals: any[]; totF: number; totP: number };
 
-function buildOne(pr: Profile, mealsCount: number, isTrainingDay: boolean, dayOffset = 0): Day | null {
+function buildOne(pr: Profile, mealsCount: number, isTrainingDay: boolean, dayOffset = 0, budget: 'low' | 'medium' | 'high' = 'medium'): Day | null {
   const tgt: any = buildDayTargets({
     weightKg: pr.w, presetGPerKg: 2.0, fatFloorGPerKg: 0.8, kbjuMode: 'auto',
     goal: 'maintenance', dietStyle: 'classic',
@@ -93,7 +93,7 @@ function buildOne(pr: Profile, mealsCount: number, isTrainingDay: boolean, dayOf
     weightKg: pr.w, lbmKg: pr.lbm, bodyFatPct: pr.bf, sex: pr.sex,
     goalKcal: tgt.kcal, goalProteinG: tgt.protein, goalFatG: tgt.fats, goalCarbsG: tgt.carbs,
     mealsCount, isTrainingDay, trainStartMin: 18 * 60, trainDurationMin: 75,
-    allowIntraWorkout: true, budget: 'medium', dayOffset, cyclePhase: 'none',
+    allowIntraWorkout: true, budget, dayOffset, cyclePhase: 'none',
     variety: 'medium', eveningLowCarb: false, goal: 'maintenance',
   } as unknown as MealPlanInput;
   let plan: any;
@@ -820,16 +820,49 @@ describe('масло — порцией, а не «5 г в тарелке» (QG1
   // Замер QG17: ось «порции» 90.2 → 90.9, мелких масляных пунктов 10 → 0,
   // жир в тарелках по 30 дням — 0.00 г разницы, дней хуже 0 (5 дней выросли).
   const OIL_RE = /(oil|ghee|mct)/;
-  const smallOils = (d: Day) => items(d)
-    .filter(({ x }) => OIL_RE.test(String((x as any).id)) && (Number((x as any).amount) || 0) > 0 && (Number((x as any).amount) || 0) < 7)
-    .map(({ m, x }) => `${d.id}/${String(m.type)}: ${String((x as any).id)} ${Math.round(Number((x as any).amount))} г`);
+  const oilGrams = (d: Day) => items(d)
+    .filter(({ x }) => OIL_RE.test(String((x as any).id)) && (Number((x as any).amount) || 0) > 0)
+    .map(({ m, x }) => ({ label: `${d.id}/${String(m.type)}: ${String((x as any).id)} ${Math.round(Number((x as any).amount))} г`, g: Math.round(Number((x as any).amount)) }));
+  // Контракт §8.28 (решение владельца): 5 г масла — легальная ОСТАТОЧНАЯ порция.
+  // Порог «это еда» 7 г требует +2 г жира (2.9% при цели 70 г) — ровно канон 3%, поэтому
+  // 5 г, закрывающие ровно жировой остаток дня (45 ккал), поднимать некуда: любая замена
+  // цельным продуктом тащит его белок и углеводы (замер: чиа 30 → 45 г даёт +2.5% белка).
+  // Мелким считается 1–4 г: там масло уже не «порция», а след округления.
+  const tinyOils = (d: Day) => oilGrams(d).filter((o) => o.g < 5).map((o) => o.label);
+  const residualOils = (d: Day) => oilGrams(d).filter((o) => o.g === 5).map((o) => o.label);
   const oilNotes = (d: Day) => (d.plan.notes as string[])
     .filter((n) => typeof n === 'string' && n.startsWith('🧴 Масло порцией:'));
   const noteDays = DAYS.filter((d) => oilNotes(d).length > 0);
 
-  it('ни одного масляного пункта 1–6 г в тарелках (было 10 в 9 днях)', () => {
-    const bad = DAYS.flatMap(smallOils);
+  it('ни одного масляного пункта 1–4 г в тарелках (5 г — остаток дня, легален)', () => {
+    const bad = DAYS.flatMap(tinyOils);
     expect(bad.slice(0, 6).join(' | ')).toBe('');
+  });
+
+  // Дни вне гард-матрицы (9 в 540 сборках) дают ровно 5 г. Контракт требует, чтобы это
+  // была именно остаточная порция: жир дня в каноне 3%, иначе 5 г — уже не остаток, а дефект.
+  it('5-граммовое масло стоит только в дне, где жир сошёлся (≤3%)', () => {
+    const cfg: Array<[Profile, number, boolean, number, 'low' | 'medium' | 'high']> = [
+      [PROFILES[1], 4, false, 1, 'medium'], // S2/4/отд/medium/d1
+      [PROFILES[2], 3, false, 0, 'low'],    // M1/3/отд/low/d0
+      [PROFILES[2], 5, false, 1, 'low'],    // M1/5/отд/low/d1
+    ];
+    const rows = cfg.map(([pr, mc, tr, off, budget]) => buildOne(pr, mc, tr, off, budget)).filter(Boolean) as Day[];
+    const tiny = rows.flatMap(tinyOils);
+    expect(tiny.slice(0, 6).join(' | ')).toBe('');
+    const tinyDays = rows.filter((d) => residualOils(d).length > 0);
+    expect(tinyDays.length, 'дней с 5-граммовкой в контрольной тройке').toBeGreaterThan(0);
+    const bad = rows.map((d) => {
+      const t: any = buildDayTargets({
+        weightKg: d.w, presetGPerKg: 2.0, fatFloorGPerKg: 0.8, kbjuMode: 'auto',
+        goal: 'maintenance', dietStyle: 'classic',
+      } as any);
+      const fat = Number(d.plan.totals?.f) || 0;
+      const dev = Math.abs(fat - t.fats) / Math.max(1, t.fats);
+      return { id: d.id, fat: +fat.toFixed(1), goal: +Number(t.fats).toFixed(1), dev: +dev.toFixed(4), oils: residualOils(d) };
+    });
+    const off = bad.filter((r) => r.oils.length > 0 && r.dev > 0.03);
+    expect(off.map((r) => `${r.id}: жир ${r.fat}/${r.goal} (${(r.dev * 100).toFixed(1)}%)`).join(' | ')).toBe('');
   });
 
   it('ось «порции» в среднем ≥ 90.5 (было 90.2)', () => {

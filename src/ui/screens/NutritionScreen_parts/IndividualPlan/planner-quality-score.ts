@@ -43,9 +43,12 @@ export interface QualityBreakdown {
 /** Пункты, которые не являются «порцией еды»: добавки, масла, приправы. */
 const NON_PORTION_ROLES = new Set(['supplement', 'liquid']);
 const FAT_ROLES = new Set(['fat']);
+// §8.28 (решение владельца): 5 г масла — легальная ОСТАТОЧНАЯ порция дня (45 ккал), а не
+// недопорция. Поднять её до 7 г = +2 г жира = 2.9% при цели 70 г, то есть весь канон 3%,
+// поэтому ось «порции» не вправе штрафовать 5 г: штраф начинается с 1–4 г (след округления).
 const MIN_MEANINGFUL_G: Record<string, number> = {
   protein: 40, fast_protein: 20, slow_protein: 20,
-  carb_slow: 30, carb_fast: 20, fruit: 80, veg: 60, fat: 7,
+  carb_slow: 30, carb_fast: 20, fruit: 80, veg: 60, fat: 5,
 };
 
 const clamp = (v: number, lo = 0, hi = 100) => Math.max(lo, Math.min(hi, v));
