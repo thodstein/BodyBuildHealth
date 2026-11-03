@@ -31,7 +31,7 @@ import { assessBbRedFlags } from '../../../engines/bb/bb-red-flags.engine';
 import { buildReturnToPlan, activeReturnToStage, evaluateReturnToCriteria } from '../../../engines/bb/bb-return-to.engine';
 import { mmcAdviceFor } from '../../../engines/bb/bb-mmc-gate.engine';
 import { pushLrSnapshot, summarizeLrDirection, type BbLrSnapshot } from '../../../engines/bb/bb-lr-history.engine';
-import { buildBBSpecIcs, downloadBBSpecIcs } from '../../../engines/bb/bb-spec-ics.engine';
+import { buildBBSpecIcs, downloadBBSpecIcs, bbWorkingRange, bbWorkingRangeNote } from '../../../engines/bb/bb-spec-ics.engine';
 import { bbSpecToAnnualPatch } from '../../../engines/bb/bb-spec-annual.engine';
 import { loadAnnualTrainingPlan, saveAnnualTrainingPlan } from '../../../engines/annual-training/annual-training-storage';
 import { setAnnualBlockConfig } from '../../../engines/annual-training/block-builders.engine';
@@ -206,6 +206,15 @@ const TAB_DEFS: Array<{ id: BBTab; label: string; icon: string; desc: string }> 
   { id: 'stimulus', label: 'Стимул-карта', icon: '🎯', desc: 'SFR + длина + углы + читинг' },
   { id: 'symmetry', label: 'Пропорции', icon: '⚖️', desc: 'замеры + лево/право + дельты' },
   { id: 'volume', label: 'Объём · Recovery', icon: '📐', desc: 'ACWR + MRV + ограничитель' },
+];
+
+/** Движения LVP-калибровки: один источник для селекта и для подписи рабочего коридора. */
+const LVP_LIFTS: Array<{ id: string; label: string }> = [
+  { id: 'squat', label: 'Присед' },
+  { id: 'bench', label: 'Жим лёжа' },
+  { id: 'deadlift', label: 'Тяга' },
+  { id: 'ohp', label: 'Жим стоя' },
+  { id: 'row', label: 'Тяга в наклоне' },
 ];
 
 // Цвета зон (BB-G-01: «нет данных» — серый, а не зелёный) — в `bb-hub-zones.ts`,
@@ -1220,6 +1229,27 @@ export const BBDiagnosticsHub: React.FC = () => {
     } catch { /* noop */ }
   };
 
+  // BB-D-33 (хвост): сохранённый профиль поднимаем из хранилища — иначе после
+  // перезагрузки «сохранено профилей: N» показывало профили, которых не видно,
+  // а рабочий вес не доезжал до отчёта (мета слала null).
+  useEffect(() => {
+    try { setLvpProfile(loadBbLvpProfiles()[String(lvpLift).toLowerCase()] || null); }
+    catch { setLvpProfile(null); }
+  }, [lvpLift]);
+
+  // Рабочий вес (BB-D-33): единственный честный источник — индивидуальный e1RM из LVP.
+  // Нет профиля или e1RM — коридора нет (секция в отчёте не рисуется), а не «примерно».
+  const lvpWorkingRange = useMemo(() => {
+    const e = Number(lvpProfile?.e1rm);
+    if (!Number.isFinite(e) || e <= 0) return null;
+    const range = bbWorkingRange(e, 'mass');
+    if (!range) return null;
+    return bbWorkingRangeNote(range, e, {
+      liftRu: LVP_LIFTS.find((l) => l.id === String(lvpProfile?.lift))?.label,
+      source: lvpProfile?.valid ? 'individual' : 'population',
+    });
+  }, [lvpProfile]);
+
   const handleExport = () => {
     // Э5 PRO-5: причины — мемо weakCauses (с auditFor: «показано = экспортировано»), PRO-мета — общий сборщик
     const html = buildBBDiagnosticsHtml(report, { date: localIsoDate(), level, plan: bbPlan, weakHeads: exportHeads, weakCauses: weakCauses as any, specBlock: specBlock as any, ...pro2Meta } as any);
@@ -1648,7 +1678,7 @@ export const BBDiagnosticsHub: React.FC = () => {
     tendon: tendonTexts,
     teen: teenNoteText,
     femaleNotes: femaleNotesShort,
-    workingRange: null,
+    workingRange: lvpWorkingRange,
     // BB-G-01/04: панель объёма/восстановления и эффект коррекции — «показано = выгружено».
     volumeRecovery: {
       chips: vrPanel.chips.map((c) => ({ label: c.label, value: c.value, detail: c.detail })),
@@ -1664,7 +1694,7 @@ export const BBDiagnosticsHub: React.FC = () => {
       zone: a.zone,
       where: a.target ? { type: a.target.type, id: a.target.id, label: a.target.label } : null,
     })),
-  }), [lrVerdicts, moveDriver, singleLeg, ohs, mmcLine, shoulderV, hingeV, loadedV, ybtV, asymText, driverSubs, benchV, painMon, nheV, adductorV, loadedHingeV, erIrV, teenGate, screenPriority, correctiveDetailForExport, corrBlockLines, lrDirection, readiness, redFlags, returnToPlan, lvpProfile, tendonTexts, teenNoteText, femaleNotesShort, vrPanel, corrEffect, nextActions]);
+  }), [lrVerdicts, moveDriver, singleLeg, ohs, mmcLine, shoulderV, hingeV, loadedV, ybtV, asymText, driverSubs, benchV, painMon, nheV, adductorV, loadedHingeV, erIrV, teenGate, screenPriority, correctiveDetailForExport, corrBlockLines, lrDirection, readiness, redFlags, returnToPlan, lvpProfile, tendonTexts, teenNoteText, femaleNotesShort, vrPanel, corrEffect, nextActions, lvpWorkingRange]);
 
   // Покрытие слабых головок текущим планом (есть ли хоть одно упражнение в головку)
   const headCoverage = useMemo(() => {
@@ -2894,10 +2924,10 @@ export const BBDiagnosticsHub: React.FC = () => {
               <summary style={{ cursor: 'pointer', minHeight: 44, display: 'flex', alignItems: 'center', fontSize: 11, fontWeight: 700, color: ACCENT }}>6 · ⚡ LVP-калибровка (индивидуальный профиль нагрузка–скорость)</summary>
               <div style={{ fontSize: 10, color: '#fff', marginTop: 6, lineHeight: 1.5 }}>
                 3+ точки «вес скорость лучшего повтора», по одной в строке: «80 0.62» (кг, м/с). Профиль даёт индивидуальный e1RM при MVT движения (канон VBT).
-                В мост/план не уходит — ориентир; сохранено профилей: {lvpSaved}.
+                В мост/план не идёт — ориентир; в отчёт уходит рабочий коридор. Сохранено профилей: {lvpSaved}.
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 6, marginTop: 6 }}>
-                <BbSheetSelect label="Движение" value={lvpLift} onChange={setLvpLift} testId="bb-lvp-lift" options={[{ id: 'squat', label: 'Присед' }, { id: 'bench', label: 'Жим лёжа' }, { id: 'deadlift', label: 'Тяга' }, { id: 'ohp', label: 'Жим стоя' }, { id: 'row', label: 'Тяга в наклоне' }]} />
+                <BbSheetSelect label="Движение" value={lvpLift} onChange={setLvpLift} testId="bb-lvp-lift" options={LVP_LIFTS} />
                 <textarea value={lvpText} onChange={(e) => setLvpText(e.target.value)} placeholder={'80 0.62\n100 0.5\n120 0.4'} aria-label="Точки вес скорость" data-bb="lvp-text" data-testid="bb-lvp-text" style={{ minHeight: 72, padding: '10px 12px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.04)', color: '#fff', fontSize: 16, resize: 'vertical' }} />
               </div>
               <div style={{ display: 'flex', gap: 6, marginTop: 6, flexWrap: 'wrap' }}>
@@ -2907,6 +2937,12 @@ export const BBDiagnosticsHub: React.FC = () => {
               {lvpProfile && (
                 <div data-bb="lvp-result" style={{ marginTop: 6, fontSize: 10, color: lvpProfile.valid ? '#22c55e' : '#f59e0b', lineHeight: 1.5 }}>
                   {lvpProfile.text}
+                </div>
+              )}
+              {/* BB-D-33: рабочий коридор виден в хабе и уезжает в отчёт одним и тем же текстом. */}
+              {lvpWorkingRange && (
+                <div data-bb="working-range" style={{ marginTop: 4, fontSize: 10, color: '#fff', lineHeight: 1.5 }}>
+                  🏋️ Рабочий вес (ориентир): {lvpWorkingRange}
                 </div>
               )}
             </details>

@@ -109,3 +109,25 @@ export function bbWorkingRange(e1rm: number, goal: 'mass' | 'strength' = 'mass')
       : `Ориентир массы: ${low}–${high} кг (65–80% от e1RM ${e} кг) — последние повторы тяжёлые, но с запасом`,
   };
 }
+
+/**
+ * Короткая подпись коридора для хаба и отчёта:
+ * «Присед: 65–80 кг (65–80% от e1RM 100 кг) · индивид. LVP».
+ *
+ * Проценты считаются от e1RM, а не пишутся числом: иначе правка `bbWorkingRange`
+ * разошлась бы с подписью в отчёте (та же болезнь, что BB-D-33).
+ */
+export function bbWorkingRangeNote(
+  range: BbWorkingRange,
+  e1rm: number,
+  opts: { liftRu?: string; source?: 'individual' | 'population' } = {},
+): string {
+  const e = Number(e1rm);
+  const pct = (v: number) => (Number.isFinite(e) && e > 0 ? Math.round((v / e) * 100) : null);
+  const lo = pct(range.low);
+  const hi = pct(range.high);
+  const pctText = lo != null && hi != null ? ` (${lo}–${hi}% от e1RM ${e} кг)` : '';
+  const head = opts.liftRu ? `${opts.liftRu}: ` : '';
+  const src = opts.source === 'individual' ? ' · индивид. LVP' : opts.source === 'population' ? ' · популяц. LVP' : '';
+  return `${head}${range.low}–${range.high} кг${pctText}${src}`;
+}
