@@ -5,6 +5,10 @@ import { resolve } from 'node:path';
 import { BBDiagnosticsHub } from '../BBDiagnosticsHub';
 
 const HUB_SRC = readFileSync(resolve(__dirname, '..', 'BBDiagnosticsHub.tsx'), 'utf8');
+// Декомпозиция (волна 3 плана хабов): карточка коррекции переехала в таб «Слабые»,
+// экспорт остался в хабе. Паритет проверяем по сумме двух файлов.
+const WEAK_TAB_SRC = readFileSync(resolve(__dirname, '..', 'bb-hub-weak-tab.tsx'), 'utf8');
+const CARD_SRC = HUB_SRC + '\n' + WEAK_TAB_SRC;
 
 describe('bb-corrective-ui', () => {
   beforeEach(() => { localStorage.clear(); });
@@ -118,7 +122,10 @@ describe('bb-corrective-ui', () => {
     expect(document.querySelector('[data-bb="corrective-coverage"]')!.textContent).toMatch(/вариантов/);
   });
   it('K7: паритет карточка=экспорт — обе точки считают вес одним helper', () => {
-    expect((HUB_SRC.match(/correctiveWeightHint\(/g) || []).length).toBeGreaterThanOrEqual(2); // карточка + correctiveDetailForExport
-    expect((HUB_SRC.match(/loadFactor: correctiveLoadFactor\(/g) || []).length).toBeGreaterThanOrEqual(2);
+    // карточка — в табе «Слабые», export-деталь — в хабе
+    expect((WEAK_TAB_SRC.match(/correctiveWeightHint\(/g) || []).length).toBeGreaterThanOrEqual(1);
+    expect((CARD_SRC.match(/correctiveWeightHint\(/g) || []).length).toBeGreaterThanOrEqual(2);
+    expect((WEAK_TAB_SRC.match(/loadFactor: correctiveLoadFactor\(/g) || []).length).toBeGreaterThanOrEqual(1);
+    expect((CARD_SRC.match(/loadFactor: correctiveLoadFactor\(/g) || []).length).toBeGreaterThanOrEqual(2);
   });
 });

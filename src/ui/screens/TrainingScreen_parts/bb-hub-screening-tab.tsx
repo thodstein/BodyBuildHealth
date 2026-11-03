@@ -14,7 +14,7 @@ import { YBT_DISCLAIMER } from '../../../engines/bb/bb-ybt-lq.engine';
 import { benchCorrections, BENCH_DISCLAIMER } from '../../../engines/bb/bb-bench-screen.engine';
 import { NHE_DISCLAIMER, ADDUCTOR_HONESTY } from '../../../engines/bb/bb-posterior-readiness.engine';
 import { HINGE_LOAD_NOTE } from '../../../engines/bb/bb-hinge-screen.engine';
-import { SCREENING_DISCLAIMER, VIDEO_GUIDE } from '../../../engines/bb/bb-movement-to-plan.engine';
+import { SCREENING_DISCLAIMER, VIDEO_GUIDE, MOTION_CAPTURE_NOTE } from '../../../engines/bb/bb-movement-to-plan.engine';
 import { BbCheckCard, BbNum, BbSheetSelect } from './bb-hub-controls';
 import type { BBState } from './BBDiagnosticsHub';
 
@@ -244,6 +244,8 @@ export const BbScreeningTab: React.FC<BbScreeningTabProps> = (props) => {
                   </div>
                 )}
                 <BbCheckCard active={state.videoTwoAngles} title="Видео с 2 ракурсов" desc="5 повторов, босиком, спереди + сбоку" onToggle={() => setState((s) => ({ ...s, videoTwoAngles: !s.videoTwoAngles }))} accent="#a855f7" />
+                {/* BB-G-05: честная граница возможностей — не «видео-разбор», а ручная запись. */}
+                <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 4, lineHeight: 1.45 }} data-bb="motion-capture">{MOTION_CAPTURE_NOTE}</div>
                 <div style={{ fontSize: 10, color: '#fff', opacity: 0.85, marginTop: 4 }} data-bb="video-guide">{VIDEO_GUIDE}</div>
                 <div style={{ fontSize: 11, color: '#fff', marginTop: 6 }} data-bb="driver-subs">
                   Замены под драйвер: {driverSubs.prefer.length ? driverSubs.prefer.join(' · ') : '—'}

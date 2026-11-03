@@ -27,6 +27,11 @@ export interface BBDiagnosticsPro2Meta {
   returnTo?: { text: string; stages: Array<{ stage: number; title: string; volume: string; rir: string; note: string; action?: { volumeMult: number; rirShift: number } }> } | null;
   lrDirection?: Array<{ group: string; text: string }>;
   workingRange?: string | null;
+  /**
+   * BB-D-05 (хвост): «данных нет вовсе» — балл 100 в этом состоянии был арифметикой,
+   * а не результатом. Хаб решает один раз и отдаёт сюда же, чтобы отчёт не врал.
+   */
+  scoreState?: 'no_data' | null;
   /** Движения v2: драйвер скрининга + односторонний вердикт (хаб шлёт, приёмник/экспорт читают). */
   movementDriver?: { driver: string; label: string; fix: string; confidence: number } | null;
   singleLeg?: { weakSide: 'left' | 'right' | null; text: string } | null;
@@ -126,7 +131,13 @@ export function buildBBDiagnosticsHtml(report: BBDiagnosticsReport, meta?: { dat
 <style>body{font-family:system-ui,Arial,sans-serif;padding:18px;color:#111}h1{font-size:18px}h2{font-size:14px;margin:14px 0 6px}table{border-collapse:collapse;width:100%;margin:6px 0}th,td{border:1px solid #ddd;padding:6px 8px;font-size:12px;text-align:left}th{background:#f5f5f5}.badge{padding:2px 8px;border-radius:999px;font-size:11px;font-weight:700;color:#fff}</style>
 </head><body>
 <h1>ББ-диагностика — отчёт ${esc(date)} ${level ? `· ${esc(level)}` : ''}</h1>
-<div>Score <span class="badge" style="background:${report.score.level === 'critical' ? '#ef4444' : report.score.level === 'warn' ? '#f59e0b' : '#22c55e'}">${report.score.score}/100 ${esc(report.score.level)}</span> · проверка данных ${Math.round(report.score.verification * 100)}%${(report.score.verificationMissing || []).length ? ` (не подтверждено: ${(report.score.verificationMissing || []).map(c => esc(BB_VERIFICATION_LABEL_RU[c])).join(', ')})` : ''} · weak ${report.weakMusclesCanonical.join(', ') || '—'}</div>
+${(() => {
+    // BB-D-05 (хвост): «нет данных» — состояние, а не 100/100. Печатаем прямо.
+    if ((meta as any)?.scoreState === 'no_data') {
+      return `<div><b>Оценка: нет данных</b> <span class="badge" style="background:#94a3b8">нет данных</span> · проверка данных — (не заполнены скрининг/замеры/дневник) · weak ${report.weakMusclesCanonical.join(', ') || '—'}</div>`;
+    }
+    return `<div>Score <span class="badge" style="background:${report.score.level === 'critical' ? '#ef4444' : report.score.level === 'warn' ? '#f59e0b' : '#22c55e'}">${report.score.score}/100 ${esc(report.score.level)}</span> · проверка данных ${Math.round(report.score.verification * 100)}%${(report.score.verificationMissing || []).length ? ` (не подтверждено: ${(report.score.verificationMissing || []).map(c => esc(BB_VERIFICATION_LABEL_RU[c])).join(', ')})` : ''} · weak ${report.weakMusclesCanonical.join(', ') || '—'}</div>`;
+  })()}
 ${floors ? `<div style="margin-top:8px;color:#ef4444;font-size:11px"><b>Floors:</b><ul>${floors}</ul></div>` : ''}
 ${(() => {
     // BB-G-08: «что делать дальше» — первое, что нужно увидеть в отчёте, поэтому
@@ -237,14 +248,16 @@ export function buildBBDiagnosticsCsv(
     return `"${guarded.replace(/"/g, '""')}"`;
   };
   const VERIFICATION_PCT = `${Math.round(report.score.verification * 100)}%`;
+  // BB-D-05 (хвост): то же состояние, что в хабе — «нет данных», а не 100.
+  const NO_DATA = (meta as any)?.scoreState === 'no_data';
   const lines: string[] = [];
   lines.push(['muscle', 'granular', 'source', 'deltaPct', 'reason'].map(escCsv).join(','));
   for (const c of report.weakCandidates) lines.push([c.muscle, c.granular || '', c.source, c.deltaPct == null ? '' : String(c.deltaPct), c.reason].map(escCsv).join(','));
   lines.push('');
   lines.push(['metric', 'value'].map(escCsv).join(','));
-  lines.push(['score', report.score.score].map(escCsv).join(','));
-  lines.push(['level', report.score.level].map(escCsv).join(','));
-  lines.push(['verification', VERIFICATION_PCT].map(escCsv).join(','));
+  lines.push(['score', NO_DATA ? 'нет данных' : report.score.score].map(escCsv).join(','));
+  lines.push(['level', NO_DATA ? 'нет данных' : report.score.level].map(escCsv).join(','));
+  lines.push(['verification', NO_DATA ? '—' : VERIFICATION_PCT].map(escCsv).join(','));
   lines.push(['weakCanonical', report.weakMusclesCanonical.join('|')].map(escCsv).join(','));
   lines.push(['weakGranular', report.weakZonesGranular.join('|')].map(escCsv).join(','));
   if (meta?.weakHeads?.length) lines.push(['weakHeads', meta.weakHeads.join('|')].map(escCsv).join(','));

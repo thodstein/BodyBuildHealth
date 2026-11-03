@@ -80,4 +80,17 @@ describe('bb-hub D3 YBT + D4/D5', () => {
     expect(document.querySelector('[data-bb="screening-disclaimer"]')?.textContent).toMatch(/не прогноз/);
     expect(document.querySelector('[data-bb="video-guide"]')?.textContent).toMatch(/штативе/);
   });
+
+  it('BB-G-05: live-поза/видео честно «не поддерживается», без обещаний анализа кадров', () => {
+    goScreening();
+    const note = document.querySelector('[data-bb="motion-capture"]')?.textContent || '';
+    expect(note).toMatch(/не поддерживаются/);
+    expect(note).toMatch(/не разбирает кадры/);
+    // чем заменяется автоматика — названо, а не «скоро»
+    expect(note).toMatch(/OHS-скрининг/);
+    expect(note).toMatch(/LVP/);
+    // флаг «2 ракурса» остаётся ручной отметкой (в мету уходит как videoStandard)
+    fireEvent.click(screen.getByRole('switch', { name: /Видео с 2 ракурсов/ }));
+    expect(document.querySelector('[data-bb="motion-capture"]')).not.toBeNull();
+  });
 });

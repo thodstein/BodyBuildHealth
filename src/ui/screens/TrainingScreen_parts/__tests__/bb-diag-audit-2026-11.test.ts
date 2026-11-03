@@ -17,6 +17,10 @@ const CONTROLS = read('bb-hub-controls.tsx');
 // поэтому source-guard'ы смотрят туда, где разметка реально живёт.
 const VOL = read('bb-hub-volume-tab.tsx');
 const NEXT = read('bb-hub-next-actions-card.tsx');
+const WEAK = read('bb-hub-weak-tab.tsx');
+const EXERCISE = read('bb-hub-exercise-tab.tsx');
+const STIMULUS = read('bb-hub-stimulus-tab.tsx');
+const SYMMETRY = read('bb-hub-symmetry-tab.tsx');
 
 describe('W1 честность UI скрининга', () => {
   it('клик по пустому месту не помечает скрининг пройденным', () => {
@@ -181,6 +185,35 @@ describe('W5 (BB-G-01/02/04) объём-recovery, deep-links, эффект ко�
     // хаб только передаёт данные и колбэки — логики шагов в разметке нет
     expect(HUB).toContain('<BbVolumeTab panel={vrPanel}');
     expect(HUB).toContain('<BbNextActionsCard');
+  });
+
+  it('декомпозиция 2: табы «Слабые/Разбор/Стимул/Пропорции» живут отдельными файлами', () => {
+    // разметка перенесена 1:1 — в хабе её быть не должно (иначе две копии разойдутся)
+    for (const marker of ['data-bb="weak-zone"', 'data-bb="corrective-card"', 'data-bb="corr-block"']) {
+      expect(WEAK).toContain(marker);
+      expect(HUB).not.toContain(marker);
+    }
+    for (const marker of ['data-bb="ex-reset"', 'data-bb="working-range"']) {
+      expect(EXERCISE).toContain(marker);
+      expect(HUB).not.toContain(marker);
+    }
+    for (const marker of ['data-bb="stimulus-map"', 'data-bb="stimulus-chip"']) {
+      expect(STIMULUS).toContain(marker);
+      expect(HUB).not.toContain(marker);
+    }
+    for (const marker of ['data-bb="circ-main"', 'data-bb="circ-lr"', 'data-bb="snapshot"']) {
+      expect(SYMMETRY).toContain(marker);
+      expect(HUB).not.toContain(marker);
+    }
+    // хаб остаётся контейнером: состояние/мемо/хендлеры, а не разметка секций
+    for (const comp of ['<BbWeakTab', '<BbExerciseTab', '<BbStimulusTab', '<BbSymmetryTab', '<BbVolumeTab', '<BbScreeningTab', '<BbNextActionsCard']) {
+      expect(HUB).toContain(comp);
+    }
+    // секции без своего состояния: useState/localStorage только в хабе
+    for (const src of [WEAK, EXERCISE, STIMULUS, SYMMETRY, VOL, NEXT]) {
+      expect(src).not.toContain('useState');
+      expect(src).not.toContain('localStorage');
+    }
   });
 });
 

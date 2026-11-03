@@ -46,6 +46,8 @@ export interface BbHubPro2Input {
   teen?: string | null;
   femaleNotes?: string[] | null;
   workingRange?: string | null;
+  /** BB-D-05 (хвост): «данных нет вовсе» — отчёт не печатает 100 вместо результата. */
+  scoreState?: 'no_data' | null;
   /**
    * BB-G-01/04: сводка «Объём · Recovery · Mobility» (чипы, ограничитель, действия)
    * и строка эффекта коррекции. Раньше шестого экрана не было вовсе — экспорт ему
@@ -103,6 +105,7 @@ export function buildPro2Meta(i: BbHubPro2Input): Record<string, unknown> {
     teen: i.teen ?? undefined,
     femaleNotes: i.femaleNotes?.length ? i.femaleNotes : undefined,
     workingRange: i.workingRange ?? undefined,
+    scoreState: i.scoreState ?? undefined,
     volumeRecovery: i.volumeRecovery ?? undefined,
     nextActions: i.nextActions?.length ? i.nextActions : undefined,
   };
