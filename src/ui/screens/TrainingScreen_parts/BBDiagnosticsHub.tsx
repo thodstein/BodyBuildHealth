@@ -1,8 +1,15 @@
 /**
  * BBDiagnosticsHub.tsx — диагностика ДВИЖЕНИЙ под бодибилдинг (мышца + упражнение → стимул → коррекция).
- * 4 таба: screening (OHS-скрининг + односторонний + драйвер)/exercise (разбор+PROF-техника+Δ)/stimulus (стимул-карта)/symmetry (пропорции).
+ * 6 табов: weak (слабые зоны + причина + топ-3)/screening (OHS-скрининг + односторонний + драйвер)/
+ * exercise (разбор + PROF-техника + Δ + LVP)/stimulus (стимул-карта)/symmetry (пропорции)/volume (объём·recovery·mobility).
  * Нагрузка/восстановление/объём/VBT/LVP/видео/ортопедия — НЕ дублируются, только ссылки на свои хабы.
  * Хедер RSS 0-100 (движения: слабые/симметрия/стимул/скрининг/SFR/углы/длина) + verification. Мост weakpoints → BbAutoConstructor.
+ *
+ * Декомпозиция (волна 3 плана хабов) — секции живут отдельными файлами, здесь данные и переходы:
+ *   `bb-hub-screening-tab.tsx` — таб «Скрининг»; `bb-hub-volume-tab.tsx` — 6-й таб «Объём · Recovery»;
+ *   `bb-hub-next-actions-card.tsx` — карточка «Что делать дальше» (BB-G-08);
+ *   `bb-hub-controls.tsx` — общие контролы (BbNum/BbCheckCard/BbSheetSelect);
+ *   `bb-hub-zones.ts` — цвета зон; `bb-hub-export.ts` — единая PRO-мета для HTML/CSV/печати.
  */
 import React, { useMemo, useState, useEffect, useCallback, useRef } from 'react';
 import { CARD, ACCENT } from './training-ui';
