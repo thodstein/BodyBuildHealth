@@ -20,6 +20,7 @@
 
 import { getPeakingProtocol, type PeakingProtocol } from '../peaking-protocols.engine';
 import type { BBPlan } from './bb-builder.engine';
+import { reconcileSchemeCommentsIn } from './bb-scheme-comment-reconcile';
 import {
   buildAdaptiveTaper,
   buildTaperModifiers,
@@ -1496,6 +1497,9 @@ export function planTwoShowSequence(
     }
     return w;
   });
+  // H/I: overreach УВЕЛИЧИВАЕТ сеты (×1.12) уже после билдера — обещание схемы
+  // объёма в комментарии приводится к факту (это как раз случай роста).
+  reconcileSchemeCommentsIn(weeks, { reason: (a, m) => `overreach перед тапером: ${a} из ${m} сетов` });
   if (applied.length) notes.push(`Overreach-недели перед тапером: ${applied.join(', ')} (объём ×${overreachMult.toFixed(2)})`);
   return { plan: { ...plan, weeks }, applied: applied.length, notes };
 }
@@ -1850,6 +1854,9 @@ export function applyTrainingTaperToBBPlan(
     }
   }
 
+  // I: тапер ББ режет объём после билдера — цифра схемы в комментарии = факт.
+  reconcileSchemeCommentsIn(weeks, { reason: (a, m) => `тапер ББ: ${a} из ${m} сетов` });
+
   const applied = appliedWeeks.length > 0;
   const result = {
     ...plan,
@@ -2108,6 +2115,10 @@ export function applyContestPrepToBBPlan(
   if (usedPrep < prepWeeks) {
     warnings.push(`⚠ План (${total} нед) короче полной подготовки ${prepWeeks}+${taperWeeks}+пик: подготовка усечена до ${usedPrep} нед. Добавьте недели подготовки (➕) или увеличьте длительность плана — весь цикл не переделывается автоматически.`);
   }
+
+  // I: режим подготовки (prepVolumeMult ×0.75…1) и финальная ×0.9 меняют сеты
+  // после билдера — цифра схемы в комментарии приводится к факту.
+  reconcileSchemeCommentsIn(weeks, { reason: (a, m) => `режим подготовки: ${a} из ${m} сетов` });
 
   const result = {
     ...tapered,
