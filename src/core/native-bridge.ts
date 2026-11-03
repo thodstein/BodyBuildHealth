@@ -361,6 +361,82 @@ export async function pickBarcodePhoto(): Promise<PickedPhoto | null> {
 }
 
 /* ------------------------------------------------------------------ */
+/* Video к подходу (Фаза 6, п.10)                                      */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Доступна ли запись видео. В вебе `Camera.recordVideo` не поддерживается —
+ * UI обязан сказать это прямо, а не показывать кнопку, которая «ничего не делает».
+ */
+export function isVideoCaptureSupported(): boolean {
+  return isCapacitorNative();
+}
+
+export interface PickedVideo {
+  /** Постоянный URI в памяти приложения (native) или blob-URL (web, до перезагрузки). */
+  uri: string;
+}
+
+/**
+ * Записать видео подхода камерой устройства. Только APK.
+ * `isPersistent: true` — ссылку сохраняем между запусками приложения;
+ * `saveToGallery: false` — ролик техники не обязан валяться в галерее.
+ */
+export async function recordSetVideo(): Promise<PickedVideo | null> {
+  if (!isCapacitorNative()) return null;
+  try {
+    const { Camera } = await import('@capacitor/camera') as unknown as {
+      Camera: { recordVideo?: (o: Record<string, unknown>) => Promise<{ uri?: string }> };
+    };
+    if (!Camera?.recordVideo) return null;
+    const res = await Camera.recordVideo({ saveToGallery: false, isPersistent: true, includeMetadata: true });
+    const uri = String(res?.uri ?? '');
+    return uri ? { uri } : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Воспроизвести видео подхода: native — системный плеер, web — новая вкладка.
+ * Возвращает false, если URI пустой/недоступен (ссылка протухла — файл удалён).
+ */
+export async function playSetVideo(uri: string): Promise<boolean> {
+  const clean = String(uri ?? '').trim();
+  if (!clean) return false;
+  try {
+    if (isCapacitorNative()) {
+      const { Camera } = await import('@capacitor/camera') as unknown as {
+        Camera: { playVideo?: (o: { uri: string }) => Promise<void> };
+      };
+      if (!Camera?.playVideo) return false;
+      await Camera.playVideo({ uri: clean });
+      return true;
+    }
+    window.open(clean, '_blank', 'noopener');
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Лучшая попытка удалить файл видео подхода (только APK). Не бросает:
+ * ссылку мы убираем в любом случае, а «файл остался» — не повод ронять плеер.
+ */
+export async function deleteSetVideoFile(uri: string): Promise<boolean> {
+  if (!isCapacitorNative() || !uri) return false;
+  try {
+    const { Filesystem, Directory } = await import('@capacitor/filesystem');
+    const path = uri.replace(/^file:\/\//i, '');
+    await Filesystem.deleteFile({ path, directory: Directory.Data });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/* ------------------------------------------------------------------ */
 /* Barcode (MLKit, только APK)                                         */
 /* ------------------------------------------------------------------ */
 

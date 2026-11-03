@@ -18,7 +18,7 @@ import { type WarmupBlock, type CooldownBlock } from '../../../core/types';
 import { computeSessionMetrics } from './sessionMetrics';
 import { hapticImpact, hapticNotify } from '../../../core/telegram';
 import { useNativeWakeLock } from '../../native/useWakeLock';
-import { velocityLoss, velocityLossZone, thresholdForIntent, type VBTIntent } from '../../../engines/pro/vbt.engine';
+import { velocityLoss, velocityLossZone, type VBTIntent } from '../../../engines/pro/vbt.engine';
 import { calculatePlates } from '../../../engines/gym-competition.engine';
 import { widgetTimerCommand } from '../../../core/widget-bridge';
 import { saveSRPESession } from '../../../engines/pro/srpe-store';
@@ -35,6 +35,9 @@ import { EXERCISE_CATALOG } from '../../../core/exercise-catalog';
 import {
   CARD as TRAIN_CARD, SMALL as TRAIN_SMALL, BTN as TRAIN_BTN, BTN_GHOST as TRAIN_BTN_GHOST, IN as TRAIN_IN,
 } from '../TrainingScreen_parts/training-ui';
+import { readPLCheckin, applyReadinessToDay } from '../../../engines/lms/pl-readiness-adjust.engine';
+import { adviseVBTNextSet, type VBTSetSample } from '../../../engines/lms/pl-vbt-loop.engine';
+import { PLSetVideoButton } from './PLSetVideoButton';
 
 // Фаза 3: карточки/кнопки/поля — из единого кита training-ui.
 const CARD = TRAIN_CARD;
@@ -281,9 +284,14 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
 
     // P11: VBT-ввод скорости штанги (м/с) на сет + авторегуляция по потере скорости
   const [vel, setVel] = useState<Record<string, number>>({});
+  /** Фаза 6, п.10: сообщение по видео подхода (показывается только у своего сета). */
+  const [videoNote, setVideoNote] = useState<{ key: string; msg: string } | null>(null);
   const [mmco, setMMCOpen] = useState<string>('');
   const [mmcVals, setMMCVals] = useState<Record<string, number>>({});
   const [vbtIntent, setVbtIntent] = useState<VBTIntent>('strength');
+  /** Фаза 6, п.7: вес, который VBT-пересчёт применил к сету (ключ `${ei}_${si}`).
+   *  Хранится ОТДЕЛЬНО от `actual`: иначе сет выглядел бы уже записанным. */
+  const [vbtOverride, setVbtOverride] = useState<Record<string, number>>({});
   const [sessionRPE, setSessionRPE] = useState<number>(7);
   const [sessionDur, setSessionDur] = useState<number>(60);
   // авто-таймер отдыха
@@ -310,7 +318,18 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
      } catch {}
    }, [timerPreset, customRestSec, autoStartRest]);
  
-   const day = days[dayIdx] || days[0];
+   const plannedDay = days[dayIdx] || days[0];
+  // 🌅 Фаза 6, п.6: утренний чек-ин меняет ТОЛЬКО сегодняшнюю сессию
+  // (объём/RIR, в красной зоне — вес). Нет чек-ина на сегодня → план как есть.
+  const readinessToday = useMemo(
+    () => (typeof localStorage === 'undefined' ? null : readPLCheckin(localStorage)),
+    [],
+  );
+  const day = useMemo(() => {
+    if (!plannedDay) return plannedDay;
+    if (!readinessToday || readinessToday.verdict.level === 'green') return plannedDay;
+    return { ...plannedDay, exercises: applyReadinessToDay(plannedDay.exercises ?? [], readinessToday.verdict) };
+  }, [plannedDay, readinessToday]);
   const [last, setLast] = useState<WorkoutSession | null>(() => getLastSession());
   const prs = useMemo(() => getRecentPRs(3), [done]);
 
@@ -819,7 +838,7 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
      const ts = Array.isArray(ex.targetSets) ? ex.targetSets[si] : null;
       const t = ts || { weight: weightFor(ex) || 60, reps: repsFor(ex) || 10, rir: rirFor(ex) ?? 2, tempo: undefined as string | undefined };
       const plannedTempo = tempoText(t.tempo);
-      const a0 = actual[keyFor(ei, si)] || { weight: t.weight, reps: t.reps, rpe: 0 };
+      const a0 = actual[keyFor(ei, si)] || { weight: vbtOverride[keyFor(ei, si)] ?? t.weight, reps: t.reps, rpe: 0 };
       const a = { ...a0, rir: a0.rir ?? (a0.rpe > 0 ? Math.max(0, 10 - a0.rpe) : t.rir) };
       // Повторное «✓» по тому же сету = ПРАВКА подхода, а не второй подход:
       // сначала убираем прежнюю запись с этим setNumber, потом пишем новую.
@@ -1185,6 +1204,18 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
 
       {phase === 'ready' && (
         <div style={{ marginTop: 8 }}>
+          {/* 🌅 Фаза 6, п.6: видимый след утреннего чек-ина — веса/объёмы ниже скорректированы */}
+          {readinessToday && readinessToday.verdict.level !== 'green' && (
+            <div data-session="readiness" style={{ marginBottom: 8, padding: 10, borderRadius: 12, background: readinessToday.verdict.level === 'red' ? 'rgba(255,82,82,0.10)' : 'rgba(251,191,36,0.10)', border: `1px solid ${readinessToday.verdict.level === 'red' ? 'rgba(255,82,82,0.35)' : 'rgba(251,191,36,0.35)'}` }}>
+              <div style={{ color: readinessToday.verdict.level === 'red' ? '#ff5252' : '#fbbf24', fontSize: 11, fontWeight: 800 }}>
+                🌅 Чек-ин: готовность {readinessToday.verdict.score}/100
+              </div>
+              <div style={{ color: '#fff', fontSize: 10, marginTop: 2, lineHeight: 1.45 }}>
+                {readinessToday.verdict.summary} Изменения касаются только этой тренировки; план недели не изменён.
+                {readinessToday.verdict.noFailure ? ' Работаем без отказа (RIR ≥ 1).' : ''}
+              </div>
+            </div>
+          )}
           <button onClick={() => { hapticImpact('medium'); begin(); }} style={{
             width: '100%', padding: '14px 16px', borderRadius: 14, border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12,
             background: 'linear-gradient(135deg, #00e68a, #00c853)', color: '#000', fontWeight: 800, fontSize: 14, boxShadow: '0 6px 20px rgba(0,230,138,0.28)', transition: 'transform 0.15s, boxShadow 0.15s',
@@ -1873,7 +1904,7 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
                     )}
                   {ex.targetSets.map((t, si) => {
                  const k = keyFor(ei, si);
-                   const a = actual[k] || { weight: t.weight, reps: t.reps, rpe: 0, rir: undefined, tempo: undefined };
+                   const a = actual[k] || { weight: vbtOverride[k] ?? t.weight, reps: t.reps, rpe: 0, rir: undefined, tempo: undefined };
                    const plannedTempo = tempoText(t.tempo);
                    const logged = !!actual[k];
                  const targetRPE = 10 - t.rir;
@@ -1943,6 +1974,7 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
                              <input style={{ ...IN, width: 74, textAlign: 'center', padding: '6px 4px', fontSize: 11 }} type="text" placeholder={plannedTempo ? `темп ${plannedTempo}` : 'темп факт'} value={a.tempo ?? ''} onChange={e => setActual(p => ({ ...p, [k]: { ...a, tempo: e.target.value } }))} aria-label="темп факт" />
                            </div>
                            <input style={{ ...IN, width: 56, textAlign: 'center', padding: '6px 4px', fontSize: 11 }} type="number" step="0.01" placeholder="v м/с" value={vel[k] ?? ""} onChange={e => setVel(p => ({ ...p, [k]: +e.target.value }))} aria-label="скорость м/с" />
+                           <PLSetVideoButton date={localIsoDate()} exercise={ex.name} setNumber={si + 1} onNote={msg => setVideoNote({ key: k, msg })} />
                            <button style={{ ...(logged ? BTN_GHOST : { ...BTN, background: 'linear-gradient(135deg,#00e68a,#00c853)', boxShadow: '0 4px 14px rgba(0,230,138,0.28)', minHeight: 44, padding: '10px 14px', borderRadius: 12, fontSize: 14 }), flexShrink: 0, minWidth: 68 }} onClick={() => logOne(ei, si)}>{logged ? '✓' : 'OK'}</button>
                            {!logged && (
                              <button style={{ ...BTN_GHOST, fontSize: 11, padding: '10px 10px', borderRadius: 12, minHeight: 44 }} onClick={() => {
@@ -1954,6 +1986,11 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
                           {logError?.key === k && (
                             <div role="alert" data-pl="log-error" style={{ width: '100%', fontSize: 10, fontWeight: 700, color: '#f87171', background: 'rgba(248,113,113,0.10)', border: '1px solid rgba(248,113,113,0.25)', borderRadius: 8, padding: '5px 8px' }}>
                               ⚠ {logError.msg}
+                            </div>
+                          )}
+                          {videoNote?.key === k && (
+                            <div data-pl="set-video-note" style={{ width: '100%', fontSize: 10, fontWeight: 700, color: '#60a5fa', background: 'rgba(96,165,250,0.08)', border: '1px solid rgba(96,165,250,0.22)', borderRadius: 8, padding: '5px 8px' }}>
+                              {videoNote.msg}
                             </div>
                           )}
                         </div>
@@ -2018,18 +2055,67 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
                           </div>
                         );
                 })}
-              {/* P11: VBT-авторегуляция по потере скорости (если введены скорости) */}
+              {/* P11 + Фаза 6, п.7: VBT-замкнутый контур — скорость уже сделанных подходов
+                  пересчитывает СЛЕДУЮЩИЙ подход. Рекомендация не применяется молча:
+                  пользователь видит причину и нажимает «Применить». */}
               {(() => {
-                const vels = ex.targetSets.map((t, si) => vel[keyFor(ei, si)]).filter(v => v && v > 0);
-                if (vels.length < 2) return null;
-                const thr = thresholdForIntent(vbtIntent);
-                const vl = velocityLoss(vels, thr);
-                if (!vl) return null;
-                const zone = velocityLossZone(vl.lossPct);
-                return <div style={{ marginTop: 6, padding: '6px 10px', borderRadius: 8, background: vl.exceeded ? 'rgba(239,68,68,0.1)' : 'rgba(0,230,138,0.08)', border: '1px solid ' + (vl.exceeded ? 'rgba(239,68,68,0.3)' : 'rgba(0,230,138,0.2)') }}>
-                  <div style={{ fontSize: 10, fontWeight: 700, color: vl.exceeded ? '#ef4444' : ACCENT }}>⚡ VBT: потеря скорости {vl.lossPct}% ({vl.bestVelocity}→{vl.lastVelocity} м/с, порог {thr}%)</div>
-                  <div style={{ fontSize: 10, color: '#fff' }}>{vl.exceeded ? '🔴 СТОП — порог превышен, заканчивайте сет' : '🟢 ещё ~' + vl.remainingReps + ' повторов до порога'} · {zone}</div>
-                </div>;
+                const samples: VBTSetSample[] = [];
+                ex.targetSets.forEach((t, si) => {
+                  const v = vel[keyFor(ei, si)];
+                  if (!v || v <= 0) return;
+                  const av = actual[keyFor(ei, si)];
+                  samples.push({ weight: av?.weight ?? t.weight, reps: av?.reps ?? t.reps, velocity: v });
+                });
+                if (samples.length === 0) return null;
+                const nextIdx = ex.targetSets.findIndex((_, si) => !actual[keyFor(ei, si)] && !(vel[keyFor(ei, si)] > 0));
+                const plannedNext = nextIdx >= 0 ? ex.targetSets[nextIdx].weight : 0;
+                const advice = adviseVBTNextSet({ samples, plannedNextWeight: plannedNext, intent: vbtIntent });
+                const thr = advice.thresholdPct;
+                const vl = velocityLoss(samples.map(v2 => v2.velocity), thr);
+                const over = !!vl?.exceeded;
+                const k2 = nextIdx >= 0 ? keyFor(ei, nextIdx) : '';
+                const applied = k2 ? vbtOverride[k2] : undefined;
+                const canApply = nextIdx >= 0 && advice.nextWeight != null && advice.deltaKg !== 0 && applied === undefined;
+                return (
+                  <div data-pl="vbt-loop" style={{ marginTop: 6, padding: '6px 10px', borderRadius: 8, background: over ? 'rgba(239,68,68,0.1)' : 'rgba(0,230,138,0.08)', border: '1px solid ' + (over ? 'rgba(239,68,68,0.3)' : 'rgba(0,230,138,0.2)') }}>
+                    {vl && (
+                      <div style={{ fontSize: 10, fontWeight: 700, color: over ? '#ef4444' : ACCENT }}>
+                        ⚡ VBT: потеря скорости {vl.lossPct}% ({vl.bestVelocity}→{vl.lastVelocity} м/с, порог {thr}%)
+                      </div>
+                    )}
+                    {vl && (
+                      <div style={{ fontSize: 10, color: '#fff' }}>
+                        {over ? '🔴 СТОП — порог превышен, заканчивайте подход' : '🟢 ещё ~' + vl.remainingReps + ' повторов до порога'} · {velocityLossZone(vl.lossPct)}
+                      </div>
+                    )}
+                    <div data-pl="vbt-advice" style={{ fontSize: 10, color: '#fff', marginTop: 3, fontWeight: 700 }}>
+                      {advice.action === 'decrease' ? '⬇ ' : advice.action === 'increase' ? '⬆ ' : advice.action === 'hold' ? '➡ ' : '⚪ '}
+                      {advice.reason}
+                    </div>
+                    {applied !== undefined && (
+                      <div data-pl="vbt-applied" style={{ fontSize: 10, color: ACCENT, marginTop: 2 }}>
+                        ✓ применено к сету {nextIdx + 1}: {applied} кг (план {plannedNext} кг)
+                      </div>
+                    )}
+                    {canApply && (
+                      <button
+                        type="button"
+                        data-pl="vbt-apply"
+                        onClick={() => {
+                          hapticImpact('light');
+                          const w = advice.nextWeight as number;
+                          setVbtOverride(p => ({ ...p, [k2]: w }));
+                        }}
+                        style={{ marginTop: 4, minHeight: 34, padding: '6px 10px', borderRadius: 8, border: '1px solid rgba(0,230,138,0.3)', background: 'rgba(0,230,138,0.10)', color: ACCENT, fontSize: 10, fontWeight: 800, cursor: 'pointer' }}
+                      >
+                        Применить к сету {nextIdx + 1}: {advice.nextWeight} кг (план {plannedNext})
+                      </button>
+                    )}
+                    <div style={{ fontSize: 9, color: '#fff', opacity: 0.6, marginTop: 3, lineHeight: 1.4 }}>
+                      {advice.notes[0]}
+                    </div>
+                  </div>
+                );
               })()}
               <div style={{ display: 'flex', gap: 5, marginTop: 8, flexWrap: 'wrap', alignItems: 'center', padding: '6px 8px', borderRadius: 12, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
                 <span style={{ fontSize: 8, fontWeight: 800, color: '#fff', letterSpacing: 0.3, textTransform: 'uppercase' }}>VBT</span>

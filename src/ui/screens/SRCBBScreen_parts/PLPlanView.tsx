@@ -35,6 +35,7 @@ import { useInlineDialogA11y } from '../TrainingScreen_parts/bb-auto-constructor
 import { MetricCard, SaveButton } from './TrainingPopups';
 import { AutoRegModeSwitch } from './AutoRegModeSwitch';
 import { CalendarViewSwitch } from './CalendarViewSwitch';
+import { PLReadinessCard } from './PLReadinessCard';
 import type { PlayerDay } from './SessionPlayer';
 import { DayCard, type PhaseKey } from '../TrainingScreen_parts/PlanOutput';
 import { usePLTaper } from './taper-state';
@@ -1236,6 +1237,11 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
                 </MetricCard>
                 );
               })()}
+              {/* 🌅 Фаза 6, п.6: утренний чек-ин → сегодняшняя тренировка (плеер применит) */}
+              <PLReadinessCard
+                onNote={onNote}
+                previewDay={playerDays?.[0]?.exercises?.map(ex => ({ name: ex.name, targetSets: ex.targetSets })) ?? null}
+              />
               {/* Календарь цикла: оригинальный / с учётом тапера */}
               <div style={{ marginTop: 4, display: 'flex', justifyContent: 'flex-end' }}>
                 <CalendarViewSwitch

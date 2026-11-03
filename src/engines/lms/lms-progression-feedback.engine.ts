@@ -12,6 +12,7 @@ import type { LMSBuildOutput, LMSPlanExercise } from './lms-builder.engine';
 import type { WorkoutSession, WorkoutExercise } from '../workout-logger.engine';
 import { prescribeLoad, type LoadStrategy } from '../bb/bb-autocoach.engine';
 import { epley1RM } from '../e1rm';
+import { localIsoDateOffset } from '../../core/local-date';
 import { mesocyclePhaseForWeek } from '../rir-matrix.engine';
 import { macroPhaseToLmsPhase } from '../periodization/phase-bridge';
 import type { MacroPhase } from './macrocycle.engine';
@@ -81,11 +82,10 @@ function topSetOf(ex: WorkoutExercise): { weight: number; reps: number; rir: num
 function buildLastResultIndex(sessions: WorkoutSession[]): Map<string, PLExerciseLastResult> {
   const sorted = [...sessions].sort((a, b) => (b.date || '').localeCompare(a.date || ''));
   const idx = new Map<string, PLExerciseLastResult>();
-  const ninetyDaysAgo = (() => {
-    const d = new Date();
-    d.setDate(d.getDate() - 90);
-    return d.toISOString().slice(0, 10);
-  })();
+  // Окно «последние 90 дней» — по КАЛЕНДАРНОЙ дате пользователя, а не по UTC:
+  // `new Date().toISOString()` после полуночи в UTC+3 даёт вчерашнюю дату и
+  // молча сдвигает окно на день (см. pl-date-census).
+  const ninetyDaysAgo = localIsoDateOffset(-90);
   for (const s of sorted) {
     // Only consider sessions within the last 90 days for the "best e1RM" selection.
     if ((s.date || '') < ninetyDaysAgo) continue;
