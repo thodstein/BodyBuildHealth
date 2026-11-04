@@ -17,6 +17,8 @@ import { CardioVolumeChart } from './CardioVolumeChart';
 import { CardioProgressCard } from './CardioProgressCard';
 import { CARD, ROW, LABEL, BTN, BTN_PRIMARY, BTN_CTA, BTN_DANGER, PHASE_COLOR, TYPE_COLOR, Badge, ProgressBar, Stepper, Tabs, CARD_HERO, HINT_SM, EmptyState } from './CardioUI';
 import { CardioCalendar } from './CardioCalendar';
+import { copyOrShareText } from '../../../core/apk-share';
+import { useAndroidBackHandler } from '../../../core/use-android-back';
 
 const VARIANT_CARD: React.CSSProperties = {
   flex: '1 1 168px', padding: '12px 14px', borderRadius: 13, cursor: 'pointer', textAlign: 'left',
@@ -57,6 +59,8 @@ export const CardioPreviewStep: React.FC<{
   const [weekNo, setWeekNo] = useState(1);
   const [improve, setImprove] = useState<{ changes: CardioTuneChange[]; cycle: CardioCycle } | null>(null);
   const [selectedSession, setSelectedSession] = useState<{ week: number; dayOfWeek: number } | null>(null);
+  // АПК: «назад» закрывает карточку протокола сессии.
+  useAndroidBackHandler(!!selectedSession, () => setSelectedSession(null));
   const [kcalFlash, setKcalFlash] = useState(false);
 
   const summary = useMemo(() => (cycle ? cardioCycleSummary(cycle) : null), [cycle]);
@@ -100,7 +104,7 @@ export const CardioPreviewStep: React.FC<{
     if (!cycle) return [];
     const clamped = Math.max(1, Math.min(cycle.totalWeeks, weekNo));
     const w = cycle.weeks.find(x => x.week === clamped);
-    return w ? spreadSessionsAcrossDays(w) : [];
+    return w ? spreadSessionsAcrossDays(w, cycle.startDate, { legDays: cycle.config?.legDays }) : [];
   }, [cycle, weekNo]);
 
   const legDays = useMemo(() => new Set((cycle?.config?.legDays ?? []).filter(d => d >= 0 && d <= 6)), [cycle]);
@@ -117,11 +121,14 @@ export const CardioPreviewStep: React.FC<{
   const copyKcal = () => {
     if (!cycle || !summary) return;
     const text = `Кардио «${cycle.name}»: ${summary.avgKcalPerWeek} ккал/нед (в среднем)`;
-    try {
-      navigator.clipboard.writeText(text).then(() => setKcalFlash(true)).catch(() => fallbackCopy(text));
-    } catch { fallbackCopy(text); }
-    if (!navigator.clipboard) fallbackCopy(text);
+    // АПК: единый канал выдачи (на native — системный Share, иначе буфер).
+    // Метка переключается сразу (оптимистично): открытие Share-листа занимает
+    // секунды, и подтверждение не должно отставать от тапа.
+    setKcalFlash(true);
     window.setTimeout(() => setKcalFlash(false), 2000);
+    void copyOrShareText(text, 'Расход кардио').then(res => {
+      if (res === 'failed') fallbackCopy(text);
+    });
   };
 
   const fallbackCopy = (text: string) => {
@@ -272,7 +279,7 @@ export const CardioPreviewStep: React.FC<{
                 <span style={LABEL}>📊 Качество цикла</span>
                 <Badge bg={quality.score >= 85 ? 'rgba(34,197,94,0.14)' : quality.score >= 60 ? 'rgba(245,158,11,0.14)' : 'rgba(239,68,68,0.14)'} border={quality.score >= 85 ? 'rgba(34,197,94,0.28)' : quality.score >= 60 ? 'rgba(245,158,11,0.28)' : 'rgba(239,68,68,0.28)'} color={quality.score >= 85 ? '#22c55e' : quality.score >= 60 ? '#f59e0b' : '#ef4444'}>{quality.score}/100</Badge>
                 <span style={{ flex: 1 }} />
-                <button style={{ ...BTN, minHeight: 36, padding: '6px 14px' }} onClick={previewImprove}>✨ Улучшить</button>
+                <button style={{ ...BTN, minHeight: 44, padding: '6px 14px' }} onClick={previewImprove}>✨ Улучшить</button>
               </div>
               <ProgressBar value={quality.score} color={quality.score >= 85 ? '#22c55e' : quality.score >= 60 ? '#f59e0b' : '#ef4444'} height={8} />
               {quality.findings.map((f, i) => (
@@ -449,7 +456,7 @@ export const CardioPreviewStep: React.FC<{
                       <b style={{ color: '#fff' }}>{p.name}</b> {p.minutes} мин — {p.note}{p.hrZone?.max ? ` · ЧСС ${p.hrZone.min}-${p.hrZone.max}` : ''}
                     </div>
                   ))}
-                  <button style={{ ...BTN, minHeight: 32, padding: '6px 10px', alignSelf: 'flex-start' }} onClick={() => setSelectedSession(null)}>✕ Закрыть</button>
+                  <button style={{ ...BTN, minHeight: 44, padding: '6px 10px', alignSelf: 'flex-start' }} onClick={() => setSelectedSession(null)}>✕ Закрыть</button>
                 </div>
               );
             })()}
@@ -571,7 +578,7 @@ export const CardioPreviewStep: React.FC<{
                   );
                 })}
                 {!showAllWeeks && (cycle.totalWeeks ?? 0) > 16 && (
-                  <button style={{ ...BTN, minHeight: 36, padding: '8px 12px', alignSelf: 'flex-start' }} onClick={() => setShowAllWeeks(true)} aria-label="Показать все недели">
+                  <button style={{ ...BTN, minHeight: 44, padding: '8px 12px', alignSelf: 'flex-start' }} onClick={() => setShowAllWeeks(true)} aria-label="Показать все недели">
                     Показать все ({cycle.totalWeeks})
                   </button>
                 )}

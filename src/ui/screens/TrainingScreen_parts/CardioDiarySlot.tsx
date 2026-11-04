@@ -6,12 +6,12 @@
  * План на сегодня — cardioSessionsForDate, факт — loadCardioLog за дату,
  * итог недели — cardioWeekFact.
  */
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   loadActiveCardioCycle, cardioSessionsForDate, cardioWeekForDate,
   cardioEquipmentLabel, CARDIO_PHASE_LABELS,
 } from '../../../engines/lms/cardio.engine';
-import { loadCardioLog } from '../../../engines/lms/cardio-diary.engine';
+import { loadCardioLog, CARDIO_LOG_EVENT } from '../../../engines/lms/cardio-diary.engine';
 import { CARD, ROW, LABEL, Badge, HINT_SM, EmptyState } from './CardioUI';
 
 const TYPE_LABEL: Record<string, string> = { zone2: 'Zone 2', miss: 'MISS', hiit: 'HIIT', recovery: 'Rec' };
@@ -22,6 +22,18 @@ function localToday(): string {
 }
 
 export const CardioDiarySlot: React.FC = () => {
+  // Журнал живёт вне этого компонента: подписываемся на изменения, иначе
+  // «факт» оставался из первого рендера до перемонтирования.
+  const [revision, setRevision] = useState(0);
+  useEffect(() => {
+    const bump = () => setRevision(v => v + 1);
+    window.addEventListener(CARDIO_LOG_EVENT, bump);
+    window.addEventListener('storage', bump);
+    return () => {
+      window.removeEventListener(CARDIO_LOG_EVENT, bump);
+      window.removeEventListener('storage', bump);
+    };
+  }, []);
   const data = useMemo(() => {
     try {
       const cycle = loadActiveCardioCycle();
@@ -34,7 +46,7 @@ export const CardioDiarySlot: React.FC = () => {
       const factKcal = log.reduce((s, e) => s + (e.calories || 0), 0);
       return { cycle, day, week, log, factMin, factKcal };
     } catch { return null; }
-  }, []);
+  }, [revision]);
   if (!data) {
     return (
       <div style={CARD}>
@@ -44,7 +56,9 @@ export const CardioDiarySlot: React.FC = () => {
     );
   }
   const { cycle, day, week, log, factMin, factKcal } = data;
-  const planMin = day ? day.sessions.reduce((s, x) => s + x.durationMin * x.weeklyFrequency, 0) : 0;
+  // План дня — ровно те занятия, что попали на эту дату (раскладка уже
+  // развернула weeklyFrequency в отдельные дни), без повторного ×frequency.
+  const planMin = day ? day.sessions.reduce((s, x) => s + x.durationMin, 0) : 0;
   return (
     <div style={CARD} data-testid="cardio-diary-slot">
       <div style={ROW}>

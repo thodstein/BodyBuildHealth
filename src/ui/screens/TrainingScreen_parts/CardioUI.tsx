@@ -6,6 +6,7 @@
  */
 import React from 'react';
 import { createPortal } from 'react-dom';
+import { useAndroidBackHandler } from '../../../core/use-android-back';
 
 // ─── Токены дизайна v4 TOP (уровень флагманов: стекло + кромки + glow) ───
 export const ACCENT = '#00e68a';
@@ -83,8 +84,9 @@ export const BTN_CTA: React.CSSProperties = {
 };
 export const BTN_GHOST: React.CSSProperties = { ...BTN, background: 'transparent', border: '1px solid rgba(255,255,255,0.09)', color: TEXT_1 };
 export const BTN_DANGER: React.CSSProperties = { ...BTN, background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.34)', color: '#f87171' };
-export const BTN_SMALL: React.CSSProperties = { ...BTN, minHeight: 40, padding: '8px 13px', fontSize: 11.5, borderRadius: 10 };
-export const BTN_XS: React.CSSProperties = { ...BTN, minHeight: 36, padding: '6px 10px', fontSize: 11, borderRadius: 8 };
+export const BTN_SMALL: React.CSSProperties = { ...BTN, minHeight: 44, padding: '8px 13px', fontSize: 11.5, borderRadius: 10 };
+/** Компактная кнопка для плотных строк: 40px — осознанное исключение из 44px-нормы. */
+export const BTN_XS: React.CSSProperties = { ...BTN, minHeight: 40, padding: '6px 10px', fontSize: 11, borderRadius: 8 };
 export const INPUT: React.CSSProperties = {
   background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.13)',
   borderRadius: 10, padding: '11px 12px', color: TEXT_1, fontSize: 16,
@@ -318,6 +320,8 @@ export const CardioSelectSheet: React.FC<SelectInputProps> = ({
 }) => {
   const [open, setOpen] = React.useState(false);
   const current = options.find(o => o.value === value);
+  // АПК: системная «назад» закрывает лист выбора, а не уводит с экрана.
+  useAndroidBackHandler(open, () => setOpen(false));
   React.useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); };

@@ -11,6 +11,7 @@ import {
 } from '../../../engines/lms/cardio.engine';
 import { saveCardioLogEntry, loadCardioLog, estimateCardioEntryKcal, cardioExpectedDistanceHint, validateCardioLogFields, CARDIO_SPORT_RU, type CardioSport, type CardioLogFieldWarnings } from '../../../engines/lms/cardio-diary.engine';
 import { getWeightLog } from '../../../engines/profile-store';
+import { getProfile } from '../../../core/profile-manager';
 import { CARD, ROW, LABEL, HINT_SM, BTN, BTN_PRIMARY, BTN_CTA, BTN_DANGER, ProgressBar, TYPE_COLOR } from './CardioUI';
 
 const INPUT: React.CSSProperties = {
@@ -55,6 +56,18 @@ interface ActiveSession {
   remainingSec: number;
   paused: boolean;
   targetHr?: { min?: number; max?: number };
+  equipment?: CardioEquipment;
+}
+
+interface FinishedSession {
+  type: CardioType;
+  /** Плановая длительность (что было в плане). */
+  plannedMin: number;
+  /** Фактически отработано (остановка таймера/досрочное завершение). */
+  actualMin: number;
+  /** true — завершено досрочно (факт < план). */
+  partial: boolean;
+  equipment?: CardioEquipment;
 }
 
 interface TodaySession {
@@ -71,7 +84,7 @@ export const CardioSessionTimer: React.FC<{ cycle: CardioCycle | null; onSaved?:
     return t ? t.sessions.map(s => ({ type: s.type, durationMin: s.durationMin, targetHr: s.targetHr, equipment: s.equipment })) : [];
   });
   const [active, setActive] = useState<ActiveSession | null>(null);
-  const [finished, setFinished] = useState<{ type: CardioType; durationMin: number } | null>(null);
+  const [finished, setFinished] = useState<FinishedSession | null>(null);
   // PRO (аудит Oct 2026): мощность имеет смысл только на вело-сессии — поле
   // появляется, когда оборудование сессии/цикла = cycling (не шумим на беге).
   const isPowerRelevant = useMemo(() => {
@@ -135,34 +148,70 @@ const [power, setPower] = useState('');
     };
   }, [active?.paused, active?.type, active?.durationMin, active]);
 
+  // 3-2-1: один бип на каждое значение (раньше на 00:01 срабатывали и бип
+  // завершения, и бип обратного отсчёта, а таймер замирал на 00:01).
+  const lastBeepSecRef = useRef<number | null>(null);
   useEffect(() => {
-    if (!active) return;
+    if (!active) { lastBeepSecRef.current = null; return; }
     if (active.remainingSec <= 0) {
       if (timerRef.current != null) window.clearInterval(timerRef.current);
       deadlineRef.current = null;
       pausedRemainingRef.current = null;
+      lastBeepSecRef.current = null;
       beep(880, 300);
       vibrate([120, 80, 120]);
-      setFinished({ type: active.type, durationMin: active.durationMin });
+      // Факт = план: таймер дошёл до нуля сам.
+      setFinished({
+        type: active.type, plannedMin: active.durationMin, actualMin: active.durationMin,
+        partial: false, equipment: active.equipment,
+      });
       setActive(null);
-    } else if (active.remainingSec <= 1) {
-      if (timerRef.current != null) window.clearInterval(timerRef.current);
-      deadlineRef.current = null;
-      beep(880, 300);
-      vibrate([120, 80, 120]);
-      setFinished({ type: active.type, durationMin: active.durationMin });
-    } else if (active.remainingSec <= 3 && active.remainingSec > 0 && !active.paused) {
+      return;
+    }
+    if (active.paused) return;
+    if (active.remainingSec <= 3 && lastBeepSecRef.current !== active.remainingSec) {
+      lastBeepSecRef.current = active.remainingSec;
       beep(660, 120);
       if (active.remainingSec === 1) vibrate(120);
     }
   }, [active]);
 
+  // Wake lock: экран гаснет → setInterval душится и «прошло» врёт. Держим
+  // экран включённым, пока идёт активная (не на паузе) сессия.
+  // АПК-важный нюанс: Android снимает wake lock при уходе приложения в фон
+  // и НЕ возвращает его сам — экран гас уже через минуту после возврата.
+  // Поэтому перезапрашиваем лок на каждый visibilitychange → visible.
+  useEffect(() => {
+    if (!active || active.paused) return;
+    type WakeSentinel = { release?: () => Promise<void> | void };
+    const nav = navigator as unknown as { wakeLock?: { request: (t: string) => Promise<WakeSentinel> } };
+    if (!nav.wakeLock?.request) return;
+    let sentinel: WakeSentinel | null = null;
+    let cancelled = false;
+    const acquire = () => {
+      if (cancelled || document.visibilityState !== 'visible') return;
+      nav.wakeLock!.request('screen').then(s => {
+        if (cancelled) { void s.release?.(); } else { sentinel = s; }
+      }).catch(() => { /* политика браузера — не критично */ });
+    };
+    acquire();
+    const onVis = () => {
+      if (document.visibilityState === 'visible') acquire();
+    };
+    document.addEventListener('visibilitychange', onVis);
+    return () => {
+      cancelled = true;
+      document.removeEventListener('visibilitychange', onVis);
+      try { void sentinel?.release?.(); } catch { /* ignore */ }
+    };
+  }, [active?.paused, !!active]);
+
   const flashMsg = (m: string) => { setFlash(m); window.setTimeout(() => setFlash(null), 3000); };
 
-  const start = (type: CardioType, durationMin: number, targetHr?: { min?: number; max?: number }) => {
+  const start = (type: CardioType, durationMin: number, targetHr?: { min?: number; max?: number }, equipment?: CardioEquipment) => {
     deadlineRef.current = null;
     pausedRemainingRef.current = null;
-    setActive({ type, durationMin, remainingSec: durationMin * 60, paused: false, targetHr });
+    setActive({ type, durationMin, remainingSec: durationMin * 60, paused: false, targetHr, equipment });
     setFinished(null);
   };
 
@@ -173,7 +222,17 @@ const [power, setPower] = useState('');
     pausedRemainingRef.current = null;
     beep(880, 220);
     vibrate(140);
-    setFinished({ type: active.type, durationMin: active.durationMin });
+    // Аудит 2026-11: досрочное завершение записывалось как ПОЛНЫЙ план —
+    // журнал «подтверждал» минуты, которых не было. Теперь факт = отработанное.
+    const elapsedSec = Math.max(0, active.durationMin * 60 - active.remainingSec);
+    const actualMin = Math.max(0, Math.round(elapsedSec / 60));
+    setFinished({
+      type: active.type,
+      plannedMin: active.durationMin,
+      actualMin,
+      partial: actualMin < active.durationMin,
+      equipment: active.equipment,
+    });
     setActive(null);
   };
 
@@ -192,17 +251,30 @@ const [power, setPower] = useState('');
       const sorted = Array.isArray(weights) ? [...weights].filter(e => Number.isFinite(e.weight)).sort((a, b) => (a.date < b.date ? 1 : -1)) : [];
       if (sorted.length > 0) weight = sorted[0].weight;
     } catch { /* ignore */ }
+    // Ккал факта: пол и тощая масса (жир почти не тратит) + оборудование.
+    // Раньше формула знала только вес и тип: 45 мин гребли = 45 мин бега.
+    let sex: 'male' | 'female' = 'male';
+    let ffmKg: number | undefined;
+    try {
+      const personal = getProfile()?.settings?.personal as { sex?: string; bodyFat?: number } | undefined;
+      if (personal?.sex === 'female') sex = 'female';
+      const bf = Number(personal?.bodyFat);
+      if (weight && Number.isFinite(bf) && bf >= 3 && bf <= 70) {
+        ffmKg = Math.round(weight * (1 - bf / 100) * 10) / 10;
+      }
+    } catch { /* ignore */ }
     saveCardioLogEntry({
       id: 'c-' + Date.now() + '-' + Math.floor(Math.random() * 1e6),
       date: todayIso(),
       type: finished.type,
-      durationMin: finished.durationMin,
+      durationMin: Math.max(1, finished.actualMin),
       completed: true,
       sport,
       rpe: Number(rpe) > 0 ? Number(rpe) : undefined,
       avgHr: Number(hr) > 0 ? Number(hr) : undefined,
-      calories: estimateCardioEntryKcal(finished.type, finished.durationMin, weight ?? undefined),
+      calories: estimateCardioEntryKcal(finished.type, Math.max(1, finished.actualMin), weight ?? undefined, { equipment: finished.equipment, sex, ffmKg }),
       distanceKm: Number(km) > 0 ? Math.round(Number(km) * 10) / 10 : undefined,
+      notes: finished.partial ? `досрочно: ${finished.actualMin} из ${finished.plannedMin} мин` : undefined,
       // PRO (аудит Oct 2026): средняя мощность вело-сессии — TSS по мощности
       // в PMC (точнее пульсовой оценки на ровной работе).
       avgPowerWatts: isPowerRelevant && Number(power) > 0 ? Math.round(Number(power)) : undefined,
@@ -305,7 +377,9 @@ const [power, setPower] = useState('');
       {finished && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, background: 'rgba(59,130,246,0.07)', border: '1px solid rgba(59,130,246,0.25)', borderRadius: 10, padding: 10 }}>
           <div style={{ fontSize: 11, color: '#fff' }}>
-            ✅ {TYPE_LABEL[finished.type]} {finished.durationMin} мин завершена — оцените сессию:
+            {finished.partial ? '⏹' : '✅'} {TYPE_LABEL[finished.type]} {finished.partial
+              ? `${finished.actualMin} из ${finished.plannedMin} мин (досрочно)`
+              : `${finished.actualMin} мин`} завершена — оцените сессию:
           </div>
           {/* Дисциплина: без неё запись ляжет в <другое> и не попадёт в разбивку TID. */}
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
@@ -344,7 +418,7 @@ const [power, setPower] = useState('');
             </div>
           )}
           {(() => {
-            const hint = cardioExpectedDistanceHint(finished.type, finished.durationMin);
+            const hint = cardioExpectedDistanceHint(finished.type, Math.max(1, finished.actualMin));
             return hint ? (
               <div style={{ fontSize: 10, color: 'rgba(96,165,250,0.85)', lineHeight: 1.4 }}>💡 Ориентир: {hint} — темп покажется в журнале после сохранения.</div>
             ) : null;
@@ -363,7 +437,7 @@ const [power, setPower] = useState('');
                   <span style={{ fontSize: 10.5, color: 'rgba(96,165,250,0.9)' }}>🎯 ЧСС {s.targetHr.min}-{s.targetHr.max} уд/мин</span>
                 )}
               </span>
-              <button style={{ ...BTN_CTA, flexShrink: 0 }} onClick={() => start(s.type, s.durationMin, s.targetHr)} aria-label={`Старт ${TYPE_LABEL[s.type]}`}>▶️ Старт</button>
+              <button style={{ ...BTN_CTA, flexShrink: 0 }} onClick={() => start(s.type, s.durationMin, s.targetHr, s.equipment)} aria-label={`Старт ${TYPE_LABEL[s.type]}`}>▶️ Старт</button>
               <button style={{ ...BTN, flexShrink: 0, minWidth: 44 }} onClick={reschedule} aria-label="Перенести на другой день">↗</button>
               <button style={{ ...BTN, flexShrink: 0, minWidth: 44 }} onClick={() => skip(s.type, s.durationMin)} aria-label={`Пропустить ${TYPE_LABEL[s.type]}`}>⏭</button>
             </div>

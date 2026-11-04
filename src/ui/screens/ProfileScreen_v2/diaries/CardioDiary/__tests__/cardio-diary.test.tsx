@@ -5,7 +5,7 @@
 import React from 'react';
 import { describe, expect, it, beforeEach } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { CardioDiary } from '../CardioDiary';
 import { buildCardioCycle, saveCardioCycle, setActiveCardioCycle } from '../../../../../../engines/lms/cardio.engine';
 import { saveCardioLogEntry, loadCardioLog } from '../../../../../../engines/lms/cardio-diary.engine';
@@ -98,6 +98,31 @@ describe('CardioDiary — CSR', () => {
     fireEvent.click(screen.getByRole('button', { name: /Отменить запись/ }));
     expect(loadCardioLog().length).toBe(1);
     expect(loadCardioLog()[0].id).toBe('x8');
+  });
+
+  it('«Очистить дневник»: app-диалог (не window.confirm) → одна транзакция + отмена', async () => {
+    saveCardioLogEntry({ id: 'cl1', date: '2026-08-17', type: 'zone2', durationMin: 30, completed: true });
+    saveCardioLogEntry({ id: 'cl2', date: '2026-08-18', type: 'hiit', durationMin: 20, completed: true });
+    render(<CardioDiary open onClose={() => {}} diaryKey="cardio" goals={GOALS} />);
+    fireEvent.click(screen.getByRole('button', { name: /••• Ещё/ }));
+    fireEvent.click(screen.getByRole('menuitem', { name: /Очистить дневник/ }));
+    // АПК: диалог приложения, а не системный confirm().
+    expect(screen.getByText(/Очистить кардио-дневник\?/)).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Очистить' }));
+    await waitFor(() => expect(loadCardioLog().length).toBe(0));
+    // Всё удалено одной записью, но откат возвращает обе сессии.
+    fireEvent.click(screen.getByRole('button', { name: /Отменить запись/ }));
+    expect(loadCardioLog().length).toBe(2);
+  });
+
+  it('«Очистить дневник»: отмена в диалоге ничего не удаляет', async () => {
+    saveCardioLogEntry({ id: 'cl3', date: '2026-08-19', type: 'zone2', durationMin: 25, completed: true });
+    render(<CardioDiary open onClose={() => {}} diaryKey="cardio" goals={GOALS} />);
+    fireEvent.click(screen.getByRole('button', { name: /••• Ещё/ }));
+    fireEvent.click(screen.getByRole('menuitem', { name: /Очистить дневник/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Отмена' }));
+    await waitFor(() => expect(screen.queryByText(/Очистить кардио-дневник\?/)).toBeNull());
+    expect(loadCardioLog().length).toBe(1);
   });
 
   it('активный цикл: блок «план vs факт» показывает выполнение текущей недели', () => {

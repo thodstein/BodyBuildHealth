@@ -108,7 +108,7 @@ export const CardioRecordsSection: React.FC = () => {
                 <span style={{ fontSize: 13, fontWeight: 800, fontVariantNumeric: 'tabular-nums' }}>{fmtVal(r.kind, r.value)}</span>
                 <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)' }}>{r.date}</span>
                 <span style={{ flex: 1 }} />
-                <button style={{ ...BTN_DANGER, minHeight: 36, padding: '4px 10px' }} onClick={() => { removeCardioRecord(r.id); refresh(); }} aria-label={`Удалить рекорд ${CARDIO_RECORD_LABELS[r.kind]}`}>✕</button>
+                <button style={{ ...BTN_DANGER, minHeight: 44, minWidth: 44, padding: '4px 10px' }} onClick={() => { removeCardioRecord(r.id); refresh(); }} aria-label={`Удалить рекорд ${CARDIO_RECORD_LABELS[r.kind]}`}>✕</button>
               </div>
             ))}
           </div>

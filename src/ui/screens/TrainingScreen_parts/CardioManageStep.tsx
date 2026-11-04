@@ -6,12 +6,11 @@
 import React, { useState } from 'react';
 import {
   cardioCycleSummary, buildCardioSummaryText, cardioCycleToUserProgram, CARDIO_GOAL_LABELS,
-  cardioToNutritionPayload, buildCardioTcx, buildCardioZwo, cardioCtlSeries,
+  buildCardioTcx, buildCardioZwo, cardioCtlSeries,
   loadCardioCycles, cardioYearPlan, buildCardioYearText,
   type CardioCycle, type CardioScenario,
 } from '../../../engines/lms/cardio.engine';
-import { CARDIO_KCAL_NOTE_KEY } from './planner-bridge-handlers';
-import { loadCardioLog } from '../../../engines/lms/cardio-diary.engine';
+import { publishCardioKcalContract } from '../../../engines/lms/cardio-nutrition-contract.engine';
 import { SPORT_LABELS, type CardioLink, type CardioLinkSport } from '../../../engines/lms/cardio-bridge';
 import { applyToPlanner } from './planner-bridge';
 import { CardioWeekEditor } from './CardioWeekEditor';
@@ -20,6 +19,8 @@ import { CardioCatalogSection } from './CardioCatalogSection';
 import { CardioRecordsSection } from './CardioRecordsSection';
 import { forecastYearCtl } from '../../../engines/lms/cardio-year-forecast.engine';
 import { SectionCard, ROW, LABEL, BTN, BTN_PRIMARY, BTN_CTA, BTN_DANGER, BTN_SMALL, InfoBanner, Tabs, Badge, EmptyState } from './CardioUI';
+import { saveTextFileApk, copyOrShareText, shareOutcomeLabel } from '../../../core/apk-share';
+import type { ApkShareOutcome } from '../../../core/apk-share';
 
 const GOAL_COLOR: Record<string, string> = {
   health: '#22c55e', mass: '#3b82f6', cut: '#f59e0b', recomp: '#a78bfa',
@@ -90,62 +91,38 @@ export const CardioManageStep: React.FC<{
       ? loadCardioCycles().filter(c => mappedIds.includes(c.id)).sort((a, b) => String(a.startDate ?? '').localeCompare(String(b.startDate ?? '')))
       : loadCardioCycles().slice(0, 4);
     const plan = cardioYearPlan(cycles);
-    if (!plan) { setYearFlash(true); window.setTimeout(() => setYearFlash(false), 2500); return; }
+    // АПК: единый канал выдачи. Раньше при пустых данных и при отказе буфера
+    // кнопка всё равно показывала «✅ в буфере» — ложный успех.
+    if (!plan) { say('⚠️ Нет циклов для годовой сводки — соберите хотя бы один', 4000); return; }
     const text = buildCardioYearText(plan);
-    try {
-      navigator.clipboard.writeText(text).then(() => setYearFlash(true)).catch(() => { setYearFlash(true); });
-    } catch { setYearFlash(true); }
-    if (!navigator.clipboard) setYearFlash(true);
-    window.setTimeout(() => setYearFlash(false), 2500);
+    void copyOrShareText(text, 'Год кардио').then((res) => {
+      if (res === 'failed') { say('⚠️ Год не выдан — используйте экспорт в файл', 4500); return; }
+      setYearFlash(true);
+      window.setTimeout(() => setYearFlash(false), 2500);
+    });
   };
 
   const copySummary = () => {
     if (!cycle) return;
     const text = buildCardioSummaryText(cycle);
-    if (navigator.clipboard?.writeText) {
-      navigator.clipboard.writeText(text)
-        .then(() => say('✅ Сводка скопирована'))
-        .catch(() => copyFallback(text, '⚠️ Буфер не сработал — скопируйте сводку вручную'));
-    } else {
-      copyFallback(text, '⚠️ Буфер обмена недоступен — скопируйте сводку вручную');
-    }
-  };
-
-  const copyFallback = (text: string, failMsg: string): boolean => {
-    try {
-      const ta = document.createElement('textarea');
-      ta.value = text;
-      document.body.appendChild(ta);
-      ta.select();
-      const ok = document.execCommand('copy');
-      document.body.removeChild(ta);
-      if (ok) say('✅ Скопировано');
-      else say(failMsg, 4500);
-      return !!ok;
-    } catch (err) {
-      console.warn('[cardio] clipboard fallback failed', err);
-      say(failMsg, 4500);
-      return false;
-    }
+    void copyOrShareText(text, 'Сводка кардио').then((res) => {
+      if (res === 'failed') say('⚠️ Сводка не выдана — используйте экспорт в файл', 4500);
+      else say(`${shareOutcomeLabel(res)} Сводка кардио`);
+    });
   };
 
   const sendToNutrition = () => {
     if (!cycle) return;
-    const p = cardioToNutritionPayload(cycle, loadCardioLog());
-    try {
-      localStorage.setItem(CARDIO_KCAL_NOTE_KEY, JSON.stringify({ cycleId: cycle.id, avgKcalPerWeek: p.avgKcalPerWeek, avgMinutesPerWeek: p.avgMinutesPerWeek, updatedAt: new Date().toISOString() }));
-    } catch (err) {
-      // Раньше here был тихий ignore: расход записывался «в никуда».
-      console.warn('[cardio] kcal note persist failed', err);
-    }
-    const ok = navigator.clipboard?.writeText
-      ? navigator.clipboard.writeText(p.text).then(() => true).catch(() => false)
-      : Promise.resolve(false);
-    ok.then((done) => {
-      if (done) { setNutriFlash(true); window.setTimeout(() => setNutriFlash(false), 2500); }
-      else if (!copyFallback(p.text, '⚠️ Не удалось скопировать расход — вставьте текст в питание вручную')) {
-        say('⚠️ Заметка о расходе сохранена, но текст не скопирован', 4500);
+    // Единый контракт «кардио → питание»: weeklyKcal + todayKcal + confidence + include.
+    // Раньше писались только два числа, и заметку никто не читал.
+    const contract = publishCardioKcalContract(cycle);
+    void copyOrShareText(contract.text, 'Расход кардио').then((res) => {
+      if (res === 'failed') {
+        say('⚠️ Заметка о расходе сохранена, но текст не выдан (экспорт в файл доступен)', 4500);
+        return;
       }
+      setNutriFlash(true);
+      window.setTimeout(() => setNutriFlash(false), 2500);
     });
   };
 
@@ -165,25 +142,24 @@ export const CardioManageStep: React.FC<{
     }
   };
 
-  const downloadFile = (build: () => string, ext: string, label: string) => {
+  const downloadFile = async (build: () => string, ext: string, label: string) => {
     if (!cycle) return;
-    let url: string | null = null;
+    const mime = ext === 'ics'
+      ? 'text/calendar;charset=utf-8'
+      : ext === 'json'
+        ? 'application/json;charset=utf-8'
+        : ext === 'csv'
+          ? 'text/csv;charset=utf-8'
+          : 'application/xml;charset=utf-8';
+    let res: ApkShareOutcome = 'failed';
     try {
-      const blob = new Blob([build()], { type: 'application/xml;charset=utf-8' });
-      url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${cycle.id}.${ext}`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      say(`✅ ${label} сохранён`);
+      // АПК: `<a download>` в Capacitor WebView не сохраняет файл — раньше
+      // кнопка всё равно рапортовала «✅ сохранён». Теперь результат реальный.
+      res = await saveTextFileApk(`${cycle.id}.${ext}`, build(), mime);
     } catch (err) {
       console.warn(`[cardio] download .${ext} failed`, err);
-      say(`⚠️ Не удалось сохранить ${label}`, 4500);
-    } finally {
-      if (url) { try { URL.revokeObjectURL(url); } catch { /* revoke не критичен */ } }
     }
+    say(res === 'saved' ? `✅ ${label} сохранён` : `⚠️ Не удалось сохранить ${label}`, res === 'saved' ? 3000 : 4500);
   };
 
   const downloadTcx = () => downloadFile(() => buildCardioTcx(cycle!), 'tcx', 'файл .tcx');

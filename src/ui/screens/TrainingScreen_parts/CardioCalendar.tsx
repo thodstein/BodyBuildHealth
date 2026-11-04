@@ -34,7 +34,7 @@ export const CardioCalendar: React.FC<{ cycle: CardioCycle | null; defaultOpen?:
     const legDays = new Set((cycle.config?.legDays ?? []).filter(d => d >= 0 && d <= 6));
     const map = new Map<string, { phase: string; sessions: { type: CardioType; durationMin: number; dayOfWeek: number }[]; isLegDay: boolean; weekNo: number | null }>();
     for (const w of cycle.weeks) {
-      const laid = spreadSessionsAcrossDays(w);
+      const laid = spreadSessionsAcrossDays(w, cycle.startDate, { legDays: cycle.config?.legDays });
       // week start date
       const weekStartIso = addDaysIso(cycle.startDate!, (w.week - 1) * 7);
       for (let d = 0; d < 7; d++) {

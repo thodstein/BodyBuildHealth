@@ -50,7 +50,7 @@ export const CardioWeekEditor: React.FC<{ cycle: CardioCycle | null; onChanged?:
     return cycle.weeks.find(w => w.week === clamped) ?? null;
   }, [cycle, weekNo]);
 
-  const days = useMemo(() => (week ? spreadSessionsAcrossDays(week) : []), [week]);
+  const days = useMemo(() => (week ? spreadSessionsAcrossDays(week, cycle?.startDate, { legDays: cycle?.config?.legDays }) : []), [week, cycle]);
 
   const flashMsg = (m: string) => { setFlash(m); window.setTimeout(() => setFlash(null), 2500); };
 
@@ -234,7 +234,7 @@ export const CardioWeekEditor: React.FC<{ cycle: CardioCycle | null; onChanged?:
 
       <div style={ROW}>
         <button style={BTN_SMALL} onClick={() => scaleMinutes(0.9)} title="−10% минут на неделе">−10% мин</button>
-        <button style={{ ...BTN_PRIMARY, minHeight: 32, padding: '6px 12px', fontSize: 11 } as never} onClick={() => scaleMinutes(1.1)} title="+10% минут на неделе">+10% мин</button>
+        <button style={{ ...BTN_PRIMARY, minHeight: 44, padding: '6px 12px', fontSize: 11 } as never} onClick={() => scaleMinutes(1.1)} title="+10% минут на неделе">+10% мин</button>
         <button style={BTN_SMALL} onClick={() => setEditSessions(v => !v)}>{editSessions ? '▾ Скрыть сессии' : '✏️ Редактировать сессии'}</button>
         {week.week < cycle.totalWeeks && <button style={BTN_SMALL} onClick={copyToNext} title="Скопировать сессии недели в следующую">⧉ В след. неделю</button>}
         {hasVersion && <button style={BTN_SMALL} onClick={undoVersion} title="Отменить последнюю правку">↩ Вернуть</button>}
@@ -261,9 +261,9 @@ export const CardioWeekEditor: React.FC<{ cycle: CardioCycle | null; onChanged?:
               )}
               <input type="number" value={s.durationMin} onChange={e => updateSession(idx, { durationMin: Math.max(5, Math.min(180, Number(e.target.value) || 30)) })} inputMode="numeric" style={NUM} aria-label={`Минуты сессии ${idx + 1}`} />
               <span style={{ fontSize: 10, color: '#fff' }}>мин ×</span>
-              <button style={{ ...BTN, minHeight: 30, padding: '4px 8px' }} onClick={() => updateSession(idx, { weeklyFrequency: Math.max(1, s.weeklyFrequency - 1) })} aria-label="Меньше частоты">−</button>
+              <button style={{ ...BTN, minHeight: 44, minWidth: 44, padding: '4px 8px' }} onClick={() => updateSession(idx, { weeklyFrequency: Math.max(1, s.weeklyFrequency - 1) })} aria-label="Меньше частоты">−</button>
               <span style={{ fontSize: 12, fontWeight: 800, minWidth: 16, textAlign: 'center' }}>{s.weeklyFrequency}</span>
-              <button style={{ ...BTN, minHeight: 30, padding: '4px 8px' }} onClick={() => updateSession(idx, { weeklyFrequency: Math.min(7, s.weeklyFrequency + 1) })} aria-label="Больше частоты">+</button>
+              <button style={{ ...BTN, minHeight: 44, minWidth: 44, padding: '4px 8px' }} onClick={() => updateSession(idx, { weeklyFrequency: Math.min(7, s.weeklyFrequency + 1) })} aria-label="Больше частоты">+</button>
               <span style={{ fontSize: 10, color: '#fff' }}>в нед</span>
               <button style={BTN_DANGER} onClick={() => removeSession(idx)} aria-label={`Удалить сессию ${idx + 1}`}>✕</button>
             </div>

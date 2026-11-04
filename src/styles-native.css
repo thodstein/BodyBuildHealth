@@ -14179,6 +14179,20 @@ html.app-native [data-cardio="select-option"] { font-variant-numeric: tabular-nu
   html.app-native [data-cardio="select-option"],
   html.app-native [data-cardio="select-done"] { transition: none !important; }
 }
+/* Тап-отклик кардио в АПК: без 300мс-задержки и double-tap-zoom. Критично для
+   «+/−» частоты и повторных нажатий в сессии: иначе часть тапов «съедается». */
+html.app-native [data-cardio="select-trigger"],
+html.app-native [data-cardio="select-option"],
+html.app-native [data-cardio="select-done"],
+html.app-native .train-cardiotimer button,
+html.app-native .train-cardiodiary button,
+html.app-native .train-cardioparams button,
+html.app-native .train-cardiopreview button,
+html.app-native .train-cardiomanage button {
+  touch-action: manipulation;
+}
+/* Шит выбора: инерционный скролл списка не «протекает» на страницу под ним. */
+html.app-native [data-cardio="select-backdrop"] { overscroll-behavior: contain; }
 /* === §119. UNIFIED-INTELLIGENCE HUB: 44px/шрифты/сетки/focus/tabular === */
 html.app-native .hub-intel button,
 html.app-native .hub-intel input,

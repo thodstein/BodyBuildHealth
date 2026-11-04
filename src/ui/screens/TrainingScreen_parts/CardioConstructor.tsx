@@ -11,7 +11,7 @@ import {
   buildCardioCycle, buildCardioCycleFromPrep, cardioPlanToCycle, buildCardioPlan,
   loadCardioCycles, saveCardioCycle, removeCardioCycle,
   loadActiveCardioCycle, setActiveCardioCycle,
-  buildCardioIcs, buildCardioPrintHtml, compareCardioCycles, formatCardioComparison,
+  buildCardioIcs, buildCardioPrintHtml, buildCardioSummaryText, compareCardioCycles, formatCardioComparison,
   cardioSessionsForDate, cardioWeekForDate, cardioEquipmentLabel, cardioCycleSummary,
   cardioPlanVariants, explainCardioChoice, saveCardioCycleVersion, restoreCardioCycleVersion, clearCardioCycleHistory,
   loadCardioScenarios, saveCardioScenario, removeCardioScenario,
@@ -21,7 +21,8 @@ import {
   type CardioCycle, type CardioCycleInput, type CardioGoal, type CardioCompetitionRef, type CardioLevel, type CardioEquipment, type CardioVariant, type CardioScenario, type CardioSession,
 } from '../../../engines/lms/cardio.engine';
 import { getCardioCycleTemplateById } from '../../../data/cardio-cycles/cardio-cycle-index';
-import { buildCardioCycleFromTemplate, finishCardioCycle } from '../../../engines/lms/cardio-templates.engine';
+import { saveTextFileApk, printHtmlApk } from '../../../core/apk-share';
+import { buildCardioCycleFromTemplate, finishCardioCycle, rebuildCardioCycleFromConfig } from '../../../engines/lms/cardio-templates.engine';
 import { consumeCardioTemplatePending, subscribeCardioTemplatePending } from '../../../engines/lms/cardio-cycle-bridge';
 import { parsePaceText, formatPace } from '../../../engines/lms/cardio-personal-zones.engine';
 import { hrvRecoveryMult, hrvSignalFromStore } from '../../../engines/pro/hrv-baseline.engine';
@@ -56,6 +57,8 @@ import { CardioPreviewStep } from './CardioPreviewStep';
 import { CardioManageStep } from './CardioManageStep';
 import { CardioDiaryStep } from './CardioDiaryStep';
 import { CardioValidationCard, CardioMesoRow } from './CardioPlanExtras';
+import { ConfirmDialogProvider, useConfirmDialog } from './ConfirmDialog';
+import { useAndroidBackHandler } from '../../../core/use-android-back';
 import { CardioHiitSection } from './CardioHiitSection';
 
 /**
@@ -212,29 +215,22 @@ function variantFromConfig(cfg: { level?: CardioLevel; recoveryLow?: boolean }):
   return 'base';
 }
 
-function downloadIcs(cycle: CardioCycle): void {
-  try {
-    const blob = new Blob([buildCardioIcs(cycle)], { type: 'text/calendar;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${cycle.id}.ics`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  } catch { /* ignore */ }
+function downloadIcs(cycle: CardioCycle, onDone?: (msg: string) => void): void {
+  // АПК: `<a download>` в Capacitor WebView файл никуда не кладёт — канон
+  // saveTextFileApk (Documents + Share на native, обычный download на web).
+  void saveTextFileApk(`${cycle.id}.ics`, buildCardioIcs(cycle), 'text/calendar;charset=utf-8')
+    .then(r => onDone?.(r === 'saved' ? '📅 Календарь .ics сохранён' : '⚠ Не удалось сохранить .ics'))
+    .catch(() => onDone?.('⚠ Не удалось сохранить .ics'));
 }
 
-function printCycle(cycle: CardioCycle): void {
-  const w = window.open('', '_blank');
-  if (!w) return;
-  w.document.write(buildCardioPrintHtml(cycle));
-  w.document.close();
-  w.print();
+function printCycle(cycle: CardioCycle, onDone?: (msg: string) => void): void {
+  // АПК: window.open().print() в Capacitor WebView не работает — printHtmlApk.
+  void printHtmlApk(buildCardioPrintHtml(cycle), `${cycle.id}-plan.html`, buildCardioSummaryText(cycle))
+    .then(r => onDone?.(r === 'failed' ? '⚠ Печать недоступна — отчёт не сохранён' : '🖨 Отчёт готов'))
+    .catch(() => onDone?.('⚠ Печать недоступна'));
 }
 
-export const CardioConstructor: React.FC = () => {
+const CardioConstructorInner: React.FC = () => {
   // Шаг 1-2: параметры (восстанавливаются из последней сессии)
   const wizard = useMemo(loadWizard, []);
   const [step, setStep] = useState<CardioStep>('params');
@@ -451,6 +447,11 @@ export const CardioConstructor: React.FC = () => {
       age: Math.max(12, Math.min(90, Number(age) || 30)),
       restingHr: Number(restingHr) > 0 ? Number(restingHr) : undefined,
       sex, level, daysAvailable, equipment, lowImpact, legDays,
+      // Эталоны пульса: без них авторский план собирался без targetHr, и
+      // факт-ЧСС автокоррекция для него была мертва.
+      lthr: Number(lthr) >= 80 && Number(lthr) <= 220 ? Math.round(Number(lthr)) : undefined,
+      talkZone2Hr: Number(talkHr) >= 80 && Number(talkHr) <= 200 ? Math.round(Number(talkHr)) : undefined,
+      maxHrFormula,
       redFlags: redFlags.length > 0 ? [...redFlags] : undefined,
       ...previewFactors,
     }));
@@ -524,7 +525,13 @@ export const CardioConstructor: React.FC = () => {
     flashMsg(`⚡ «${preset.title}» — в неделю ${targetWeek} (отмена — «↩ Вернуть версию»)`);
   };
 
-  const build = () => {
+  /**
+   * Единый сборщик входных параметров: вариант нагрузки запекается в config.
+   * Аудит 2026-11 (P2): `build` и `selectVariant` были двумя копиями одного
+   * блока и уже успели разойтись (`recoveryLow` жил в base только одной ветки),
+   * поэтому правка одной не доходила до другой. Теперь один источник.
+   */
+  const assembleInput = (v: CardioVariant): CardioCycleInput => {
     const bf = Number(bodyFatPct) > 0 ? Math.max(3, Math.min(70, Number(bodyFatPct))) : undefined;
     const lthrNum = Number(lthr) >= 80 && Number(lthr) <= 220 ? Math.round(Number(lthr)) : undefined;
     const ftpNum = Number(ftpWatts) >= 30 && Number(ftpWatts) <= 800 ? Math.round(Number(ftpWatts)) : undefined;
@@ -533,8 +540,15 @@ export const CardioConstructor: React.FC = () => {
     const altNum = altitudeM !== '' && Number.isFinite(Number(altitudeM)) ? Math.round(Number(altitudeM)) : undefined;
     const humNum = humidityPct !== '' && Number.isFinite(Number(humidityPct)) ? Math.max(0, Math.min(100, Math.round(Number(humidityPct)))) : undefined;
     // Один канон диапазона на превью и на реальную сборку.
-    const lthrBySportNum = lthrBySportFromInput(lthrBySport);
-    const base: CardioCycleInput = {
+    const vOpts: Pick<CardioCycleInput, 'level' | 'recoveryLow'> = v === 'gentle'
+      ? { level: 'beginner' as CardioLevel, recoveryLow: true }
+      : v === 'intense'
+        ? { level: 'advanced' as CardioLevel, recoveryLow: false }
+        : { level, recoveryLow };
+    // config = фактические применённые опции (вариант запекается в конфиг),
+    // иначе «⚙️ Изменить параметры» восстановит другой уровень и пересборка
+    // даст иной цикл, чем показанный пользователю.
+    return {
       goal,
       totalWeeks,
       daysAvailable,
@@ -545,7 +559,8 @@ export const CardioConstructor: React.FC = () => {
       taperModel,
       taper: taperEnabled,
       peakWeek,
-      level,
+      level: vOpts.level,
+      recoveryLow: vOpts.recoveryLow,
       equipment,
       lowImpact,
       age: Math.max(12, Math.min(90, Number(age) || 30)),
@@ -557,7 +572,7 @@ export const CardioConstructor: React.FC = () => {
       periodizationModel,
       maxHrFormula,
       lthr: lthrNum,
-      lthrBySport: lthrBySportNum,
+      lthrBySport: lthrBySportFromInput(lthrBySport),
       ftpWatts: ftpNum,
       talkZone2Hr: talkNum,
       tempC: tempNum,
@@ -567,80 +582,31 @@ export const CardioConstructor: React.FC = () => {
       tidSwitchWeek: tidSwitch ? Math.max(2, Math.ceil(totalWeeks / 2)) : undefined,
       durabilitySession: durabilityOn || undefined,
     };
-    const vOpts = variant === 'gentle'
-      ? { level: 'beginner' as CardioLevel, recoveryLow: true }
-      : variant === 'intense'
-        ? { level: 'advanced' as CardioLevel, recoveryLow: false }
-        : { level, recoveryLow };
-    // config = фактические применённые опции (вариант запекается в конфиг),
-    // иначе «⚙️ Изменить параметры» восстановит другой уровень и пересборка
-    // даст иной цикл, чем показанный пользователю.
-    const applied = { ...base, ...vOpts };
-    const c = finishCycle(buildCardioCycle({ ...applied, config: applied }));
+  };
+
+  /** Собрать цикл по параметрам и сохранить (общий хвост build/selectVariant). */
+  const commitCycle = (applied: CardioCycleInput, msg: string) => {
+    // Авторский шаблон пересобираем ЧЕРЕЗ шаблон, а не генератором: иначе
+    // «Собрать» после «Изменить параметры» молча уничтожал план источника
+    // (C25K/Хигдон/Concept2 превращались в сгенерированный цикл).
+    const c = cycle?.config?.templateId
+      ? finishCycle(rebuildCardioCycleFromConfig({ ...cycle, config: applied }))
+      : finishCycle(buildCardioCycle({ ...applied, config: applied }));
     saveCardioCycle(c);
     setActiveCardioCycle(c);
     setCycle(c);
     reload();
-    flashMsg('✅ Кардио-цикл собран и сохранён в библиотеку');
+    flashMsg(msg);
+  };
+
+  const build = () => {
+    commitCycle(assembleInput(variant), '✅ Кардио-цикл собран и сохранён в библиотеку');
   };
 
   /** Живой пересчёт при выборе варианта нагрузки: вариант применяется сразу. */
   const selectVariant = (v: CardioVariant) => {
     setVariant(v);
-    const bf2 = Number(bodyFatPct) > 0 ? Math.max(3, Math.min(70, Number(bodyFatPct))) : undefined;
-    const lthrNum2 = Number(lthr) >= 80 && Number(lthr) <= 220 ? Math.round(Number(lthr)) : undefined;
-    const ftpNum2 = Number(ftpWatts) >= 30 && Number(ftpWatts) <= 800 ? Math.round(Number(ftpWatts)) : undefined;
-    const talkNum2 = Number(talkHr) >= 80 && Number(talkHr) <= 200 ? Math.round(Number(talkHr)) : undefined;
-    const tempNum2 = tempC !== '' && Number.isFinite(Number(tempC)) ? Number(tempC) : undefined;
-    const altNum2 = altitudeM !== '' && Number.isFinite(Number(altitudeM)) ? Math.round(Number(altitudeM)) : undefined;
-    const humNum2 = humidityPct !== '' && Number.isFinite(Number(humidityPct)) ? Math.max(0, Math.min(100, Math.round(Number(humidityPct)))) : undefined;
-    const lthrBySportNum2 = lthrBySportFromInput(lthrBySport);
-    const base: CardioCycleInput = {
-      goal,
-      totalWeeks,
-      daysAvailable,
-      bodyWeight,
-      bodyFatPct: bf2,
-      competitions: comps,
-      taperWeeks,
-      taperModel,
-      taper: taperEnabled,
-      peakWeek,
-      level,
-      recoveryLow,
-      equipment,
-      lowImpact,
-      age: Math.max(12, Math.min(90, Number(age) || 30)),
-      restingHr: Number(restingHr) > 0 ? Number(restingHr) : undefined,
-      sex,
-      legDays,
-      ...previewFactors,
-      phaseSplit: phaseSplit.auto ? undefined : { base: phaseSplit.base, build: phaseSplit.build, maintenance: phaseSplit.maintenance },
-      periodizationModel,
-      maxHrFormula,
-      lthr: lthrNum2,
-      lthrBySport: lthrBySportNum2,
-      ftpWatts: ftpNum2,
-      talkZone2Hr: talkNum2,
-      tempC: tempNum2,
-      altitudeM: altNum2,
-      humidityPct: humNum2,
-      redFlags: redFlags.length > 0 ? [...redFlags] : undefined,
-      tidSwitchWeek: tidSwitch ? Math.max(2, Math.ceil(totalWeeks / 2)) : undefined,
-      durabilitySession: durabilityOn || undefined,
-    };
-    const vOpts = v === 'gentle'
-      ? { level: 'beginner' as CardioLevel, recoveryLow: true }
-      : v === 'intense'
-        ? { level: 'advanced' as CardioLevel, recoveryLow: false }
-        : { level, recoveryLow };
-    const applied = { ...base, ...vOpts };
-    const c = finishCycle(buildCardioCycle({ ...applied, config: applied }));
-    saveCardioCycle(c);
-    setActiveCardioCycle(c);
-    setCycle(c);
-    reload();
-    flashMsg(`⇄ Вариант «${CARDIO_VARIANT_LABELS[v]}» применён — цикл пересобран`);
+    commitCycle(assembleInput(v), `⇄ Вариант «${CARDIO_VARIANT_LABELS[v]}» применён — цикл пересобран`);
   };
 
   const editConfig = () => {
@@ -775,8 +741,18 @@ export const CardioConstructor: React.FC = () => {
     } catch { flashMsg('⚠ Не удалось отвязать кардио'); }
   };
 
-  const removeCycle = (c: CardioCycle) => {
-    if (!window.confirm(`Удалить кардио-цикл «${c.name || 'без названия'}» (${c.totalWeeks} нед)? Это также очистит его историю версий.`)) return;
+  const { confirm } = useConfirmDialog();
+
+  const removeCycle = async (c: CardioCycle) => {
+    // АПК: app-style диалог вместо window.confirm (в WebView он блокирующий и
+    // после «не показывать снова» молча возвращает false — удаление «не работает»).
+    const ok = await confirm({
+      title: 'Удалить кардио-цикл?',
+      message: `«${c.name || 'без названия'}» (${c.totalWeeks} нед). Это также очистит его историю версий.`,
+      confirmLabel: 'Удалить',
+      danger: true,
+    });
+    if (!ok) return;
     removeCardioCycle(c.id);
     clearCardioCycleHistory(c.id);
     if (cycle?.id === c.id) { setActiveCardioCycle(null); setCycle(null); }
@@ -1238,6 +1214,9 @@ export const CardioConstructor: React.FC = () => {
     if (stepIdx < STEPS.length - 1) setStep(STEPS[stepIdx + 1].id);
   };
   const goPrev = () => { buzzStep(); if (stepIdx > 0) setStep(STEPS[stepIdx - 1].id); };
+  // АПК: системная «назад» на шаге мастера — предыдущий шаг (на первом —
+  // штатное поведение App: возврат на главную вкладку).
+  useAndroidBackHandler(stepIdx > 0, goPrev);
   const goStep = (id: CardioStep) => { buzzStep(); setStep(id); };
 
   /** Живой итог параметров для hero на шагах 1-3 (тот же предпросмотр движка). */
@@ -1565,7 +1544,7 @@ export const CardioConstructor: React.FC = () => {
           annualCardioMap={annualCardioMap}
           onBuildAnnualCardio={buildAnnualCardio} onClearAnnualCardio={clearAnnualCardio}
           onLinkTo={linkTo} onUnlink={unlink} onAttachMacro={attachMacro} onDetachMacro={detachMacro}
-          onExport={downloadIcs} onPrint={printCycle} onDuplicate={duplicate} onActivate={activate}
+          onExport={(c) => downloadIcs(c, flashMsg)} onPrint={(c) => printCycle(c, flashMsg)} onDuplicate={duplicate} onActivate={activate}
           onCompare={compareWith} onRemove={removeCycle} onChanged={refreshActive}
           onSaveScenario={saveScenario} onLoadScenario={loadScenario} onRemoveScenario={deleteScenario}
           onApplyTaper={applyTaper}
@@ -1590,3 +1569,10 @@ export const CardioConstructor: React.FC = () => {
     </div>
   );
 };
+
+/** Кардио-конструктор с app-style подтверждениями (АПК: не window.confirm). */
+export const CardioConstructor: React.FC = () => (
+  <ConfirmDialogProvider>
+    <CardioConstructorInner />
+  </ConfirmDialogProvider>
+);

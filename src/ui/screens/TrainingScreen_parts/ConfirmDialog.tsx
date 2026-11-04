@@ -8,6 +8,7 @@
  */
 import React, { useState, useCallback, useRef, createContext, useContext, type ReactNode } from 'react';
 import { ACCENT, BTN, BTN_GHOST } from './training-ui';
+import { useAndroidBackHandler } from '../../../core/use-android-back';
 
 interface ConfirmOptions {
   title?: string;
@@ -39,6 +40,9 @@ export const ConfirmDialogProvider: React.FC<{ children: ReactNode }> = ({ child
     state.resolve?.(ok);
     setState({ open: false, options: { message: '' }, resolve: null });
   };
+
+  // АПК: системная «назад» = «Отмена» в диалоге.
+  useAndroidBackHandler(state.open, () => handleClose(false));
 
   const danger = state.options.danger;
   const confirmColor = danger ? '#ef4444' : ACCENT;

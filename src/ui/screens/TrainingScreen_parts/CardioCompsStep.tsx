@@ -74,7 +74,7 @@ export const CardioCompsStep: React.FC<{
                   <span style={{ fontSize: 11, color: '#fff' }}>
                     {taperEnabled ? `taper с нед ${Math.max(1, c.week - taperWeeks)}` : peakWeek ? 'пик-неделя' : 'без пика'}
                   </span>
-                  <button style={{ ...BTN_DANGER, minHeight: 28, padding: '4px 8px' }} onClick={() => setComps(comps.filter(x => x.id !== c.id))} aria-label={`Удалить ${c.name}`}>✕</button>
+                  <button style={{ ...BTN_DANGER, minHeight: 44, minWidth: 44, padding: '4px 8px' }} onClick={() => setComps(comps.filter(x => x.id !== c.id))} aria-label={`Удалить ${c.name}`}>✕</button>
                 </div>
               ))}
             </div>

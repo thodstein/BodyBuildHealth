@@ -293,7 +293,7 @@ export const CardioAutoTunePanel: React.FC<{
           {ble.error && <span style={{ fontSize: 11, color: '#f87171' }}>{ble.error}</span>}
           {bleHr && !ble.connected && <Badge bg="rgba(0,230,138,0.12)" border="rgba(0,230,138,0.24)" color="#4ade80">{bleHr} уд/мин live</Badge>}
         </div>
-        <div style={HINT_SM}>Polar H10 / Garmin HRM — live HR в таймере + подсветка зоны (Web Bluetooth, Chrome/Edge).</div>
+        <div style={HINT_SM}>Polar H10 / Garmin HRM — живой пульс и подсветка зоны в браузере (Web Bluetooth, Chrome/Edge). В APK-Bluetooth недоступен: пульс вводится вручную или импортом из часов.</div>
       </div>
 
       <Accordion title={`Пульс-зоны ${lthr ? '(LTHR)' : '(Karvonen)'}`} icon="🎯" defaultOpen>

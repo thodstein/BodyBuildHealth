@@ -10,9 +10,11 @@ import { colors, glassCard, inputStyle, labelStyle, selectStyle } from '../../ui
 import { NativeIcon } from '../../../../native/NativeIcons';
 import { btnBase, btnPrimary, chip, chipActive, diaryShell, header as diaryHeaderStyle, glassSection, heroCard, main as pageMain, sectionTitle, statCard, tableTh, tableTd } from '../diary-page-styles';
 import { DiaryHeader } from '../DiaryHeader';
-import { saveCsvApk, printHtmlApk } from '../../../../../core/apk-share';
+import { saveCsvApk, printHtmlApk, shareOutcomeLabel } from '../../../../../core/apk-share';
+import { ConfirmDialogProvider, useConfirmDialog } from '../../../TrainingScreen_parts/ConfirmDialog';
+import { useAndroidBackHandler } from '../../../../../core/use-android-back';
 import {
-  loadCardioLog, saveCardioLogEntry, removeCardioLogEntry, replaceCardioLog,
+  loadCardioLog, saveCardioLogEntry, removeCardioLogEntry, replaceCardioLog, importCardioEntries,
   cardioLogStats, cardioWeekAdherence, estimateCardioEntryKcal, cardioPaceMinPerKm,
   validateCardioLogFields, cardioHrCompliance,
   sanitizeCardioSport, CARDIO_SPORTS, CARDIO_SPORT_RU, type CardioSport,
@@ -45,7 +47,8 @@ function newId(): string {
   return 'c-' + Date.now() + '-' + Math.floor(Math.random() * 1e6);
 }
 
-export const CardioDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDataChange }) => {
+const CardioDiaryInner: React.FC<DiaryWindowProps> = ({ open, onClose, onDataChange }) => {
+  const { confirm } = useConfirmDialog();
   const [log, setLog] = useState<CardioLogEntry[]>(() => loadCardioLog());
   const [date, setDate] = useState(todayIso());
   const [type, setType] = useState<CardioType>('zone2');
@@ -68,6 +71,11 @@ export const CardioDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDataC
   const [importBusy, setImportBusy] = useState(false);
   const [showImportHelp, setShowImportHelp] = useState(false);
   const importInputRef = useRef<HTMLInputElement>(null);
+  // АПК: «назад» закрывает превью импорта/справку, а не уводит из дневника.
+  useAndroidBackHandler(!!importPreview || showImportHelp, () => {
+    if (importPreview) setImportPreview(null);
+    else setShowImportHelp(false);
+  });
 
   const flashMsg = (m: string) => { setFlash(m); window.setTimeout(() => setFlash(null), 3000); };
 
@@ -104,12 +112,15 @@ export const CardioDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDataC
     if (!importPreview || importPreview.entries.length === 0) return;
     const prev = loadCardioLog();
     setUndo(prev);
-    // P2-аудит: раньше N записей импорта каждая перечитывала и перезаписывала
-    // ВЕСЬ журнал (O(n²) сериализаций localStorage). Один атомарный вызов.
+    // P2-аудит: один атомарный вызов + ДЕДУП. Раньше импорт просто склеивал
+    // массивы: повторный импорт того же .fit/.tcx удваивал журнал.
     const incoming = importPreview.entries;
-    replaceCardioLog([...incoming, ...prev]);
+    const merged = importCardioEntries(incoming);
+    const added = merged.length - prev.length;
     reload();
-    flashMsg(`✅ Импортировано ${incoming.length} тренировок`);
+    flashMsg(added > 0
+      ? `✅ Импортировано ${added} тренировок`
+      : `ℹ️ Новых записей нет — дубликаты пропущены (${incoming.length})`);
     setImportPreview(null);
   };
 
@@ -226,17 +237,27 @@ export const CardioDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDataC
       const sorted = Array.isArray(weights) ? [...weights].filter(e => Number.isFinite(e.weight)).sort((a, b) => (a.date < b.date ? 1 : -1)) : [];
       if (sorted.length > 0) weight = sorted[0].weight;
     } catch { /* ignore */ }
+    // Правка существующей записи: сохраняем поля, которых нет в форме
+    // (мощность, decoupling из FIT, source/updatedAt). Раньше редактирование
+    // пересоздавало запись с нуля и теряло импортированные метрики.
+    const prev = editingId ? log.find(e => e.id === editingId) : undefined;
     const entry: CardioLogEntry = {
-      id: editingId ?? newId(), date, type, durationMin: dur, completed: true,
+      ...(prev ?? {}),
+      id: editingId ?? newId(), date, type, durationMin: dur,
+      completed: prev?.completed ?? true,
       rpe: Number(String(rpe).replace(',', '.')) > 0 ? Math.max(1, Math.min(10, Math.round(Number(String(rpe).replace(',', '.'))))) : undefined,
       avgHr: Number(String(hr).replace(',', '.')) > 0 ? Math.max(20, Math.min(260, Math.round(Number(String(hr).replace(',', '.'))))) : undefined,
-      calories: estimateCardioEntryKcal(type, dur, weight ?? undefined),
+      // Ккал: если правится только заметка/RPE (тип и минуты те же) — импортированное
+      // значение не пересчитываем, иначе правка текста меняет расход и TSS.
+      calories: prev && prev.type === type && prev.durationMin === dur && prev.calories != null
+        ? prev.calories
+        : estimateCardioEntryKcal(type, dur, weight ?? undefined),
       distanceKm: Number(String(km).replace(',', '.')) > 0 ? Math.max(0, Math.min(200, Math.round(Number(String(km).replace(',', '.')) * 10) / 10)) : undefined,
       notes: notes.trim() ? notes.trim().slice(0, 300) : undefined,
       // Спринт 5.2/5.3: дисциплина + provenance. Раньше форма профиля не писала
       // ни то, ни другое — запись была анонимной для разбивки TID.
       sport: sanitizeCardioSport(sport),
-      source: 'manual',
+      source: prev?.source ?? 'manual',
     };
     setUndo(log);
     saveCardioLogEntry(entry);
@@ -278,8 +299,10 @@ export const CardioDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDataC
         e.distanceKm ?? '', cardioPaceMinPerKm(e.distanceKm, e.durationMin) ?? '', e.calories ?? '', e.avgHr ?? '', e.rpe ?? '',
         legDayDates.has(e.date) ? 'да' : '', e.notes ?? '', e.completed ? 'да' : 'нет'].map(csvCell).join(','),
     ).join('\n');
-    // АПК: <a download> в WebView не сохраняет — Documents + Share.
-    void saveCsvApk(`cardio-${todayIso()}.csv`, head + body);
+    // АПК: `&lt;a download&gt;` в WebView не сохраняет — Documents + Share.
+    void saveCsvApk(`cardio-${todayIso()}.csv`, head + body)
+      .then(r => flashMsg(r === 'failed' ? '⚠ CSV не сохранён' : `${shareOutcomeLabel(r)} CSV`))
+      .catch(() => flashMsg('⚠ CSV не сохранён'));
   };
 
   const printPdf = () => {
@@ -313,7 +336,9 @@ export const CardioDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDataC
   ${rows}
 </table>`;
     // АПК: window.open().print() заблокирован в WebView — html в файл + Share.
-    void printHtmlApk(html, `cardio-${todayIso()}.html`);
+    void printHtmlApk(html, `cardio-${todayIso()}.html`)
+      .then(r => flashMsg(r === 'failed' ? '⚠ Печать недоступна' : '🖨 Отчёт открыт для печати'))
+      .catch(() => flashMsg('⚠ Печать недоступна'));
   };
 
   const totalMinutes = log.reduce((s, e) => s + e.durationMin, 0);
@@ -345,7 +370,23 @@ export const CardioDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDataC
         exportActions={[
           { label: '📥 CSV-файл', onClick: exportCsv },
           { label: '🖨 Печать / PDF', onClick: printPdf },
-          { label: '🗑 Очистить дневник', onClick: () => { if (log.length && window.confirm('Очистить весь кардио-дневник?')) { log.forEach(e => removeCardioLogEntry(e.id)); reload(); } }, danger: true },
+          { label: '🗑 Очистить дневник', danger: true, onClick: () => {
+            if (!log.length) { flashMsg('⚠️ Дневник уже пуст'); return; }
+            // АПК: app-style диалог. Действие транзакционное (одна запись в storage)
+            // и отменяемое — раньше удаляли по одной записи в цикле.
+            void confirm({
+              title: 'Очистить кардио-дневник?',
+              message: `Будет удалено ${log.length} ${log.length === 1 ? 'запись' : 'записей'}. Действие можно отменить кнопкой «↩».`,
+              confirmLabel: 'Очистить',
+              danger: true,
+            }).then(ok => {
+              if (!ok) return;
+              setUndo(log);
+              replaceCardioLog([]);
+              reload();
+              flashMsg('🗑 Дневник очищен (можно отменить)');
+            });
+          } },
         ]}
         badge={adherence ? (
           <span style={{ fontSize: 11, fontWeight: 700, color: ACCENT, background: `${ACCENT}14`, border: `1px solid ${ACCENT}30`, borderRadius: 999, padding: '3px 10px', letterSpacing: '0.2px' }}>
@@ -528,7 +569,7 @@ export const CardioDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDataC
           <span style={{ marginLeft: 'auto', fontSize: 11, color: 'rgba(255,255,255,0.45)', fontVariantNumeric: 'tabular-nums' }}>CSV · TCX · GPX · Apple export.xml · JSON · FIT</span>
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-          <input ref={importInputRef} type="file" accept=".csv,.tcx,.gpx,.xml,.json,.fit,.zip" style={{ display: 'none' }} onChange={e => { const f = e.target.files?.[0]; if (f) handleImportFile(f); }} />
+          <input ref={importInputRef} type="file" accept=".csv,.tcx,.gpx,.xml,.json,.fit,.zip,text/csv,application/json,application/xml,text/xml,application/gpx+xml,application/zip,application/octet-stream" style={{ display: 'none' }} onChange={e => { const f = e.target.files?.[0]; if (f) handleImportFile(f); }} />
           <button style={btnPrimary(ACCENT)} disabled={importBusy} onClick={() => importInputRef.current?.click()}>
             {importBusy ? '⏳ Чтение…' : '📥 Выбрать файл'}
           </button>
@@ -597,7 +638,7 @@ export const CardioDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDataC
         <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
           <input style={{ ...inputStyle, width: 180, fontSize: 16, minHeight: 44, paddingRight: query ? 38 : undefined }} placeholder="🔍 Поиск" value={query} onChange={e => { setQuery(e.target.value); setPage(1); }} />
           {query && (
-            <button onClick={() => { setQuery(''); setPage(1); }} aria-label="Очистить поиск" style={{ position: 'absolute', right: 7, background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, color: colors.textMuted, cursor: 'pointer', width: 30, height: 30, minWidth: 30, minHeight: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12 }}>✕</button>
+            <button onClick={() => { setQuery(''); setPage(1); }} aria-label="Очистить поиск" style={{ position: 'absolute', right: 0, top: '50%', transform: 'translateY(-50%)', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, color: colors.textMuted, cursor: 'pointer', width: 44, height: 44, minWidth: 44, minHeight: 44, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13 }}>✕</button>
           )}
         </div>
       </div>
@@ -654,3 +695,10 @@ export const CardioDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDataC
     </div>
   );
 };
+
+/** Кардио-дневник с app-style подтверждениями (АПК: не window.confirm). */
+export const CardioDiary: React.FC<DiaryWindowProps> = props => (
+  <ConfirmDialogProvider>
+    <CardioDiaryInner {...props} />
+  </ConfirmDialogProvider>
+);

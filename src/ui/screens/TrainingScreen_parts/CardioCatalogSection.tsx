@@ -61,7 +61,7 @@ export const CardioCatalogSection: React.FC<{
         </button>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 8 }}>
-        {ranked.map(({ template: t, score, reasons }) => {
+        {ranked.map(({ template: t, score, reasons, warnings, conditions }) => {
           const m = t.meta;
           const isTop = t.meta.id === topId;
           return (
@@ -75,6 +75,16 @@ export const CardioCatalogSection: React.FC<{
                 {m.kind === 'explicit' && <Badge>📜 дословно</Badge>}
               </div>
               <div style={{ fontSize: 11.5, color: '#fff', lineHeight: 1.5 }}>{m.description}</div>
+              {conditions && conditions.length > 0 && (
+                <div style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.62)', lineHeight: 1.45 }}>
+                  ✅ Нужно: {conditions.join(' · ')}
+                </div>
+              )}
+              {warnings && warnings.length > 0 && (
+                <div role="note" style={{ fontSize: 10.5, color: '#fbbf24', background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.28)', borderRadius: 9, padding: '6px 8px', lineHeight: 1.45 }}>
+                  ⚠ {warnings.join(' ')}
+                </div>
+              )}
               <div style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.55)' }}>📖 {m.sourceLabel} · счёт {score} ({reasons.slice(0, 3).join(', ')})</div>
               <div style={ROW}>
                 <button style={{ ...BTN_PRIMARY, minHeight: 44, flex: 1 }} onClick={() => onApplyTemplate(m.id)}>🛠 Собрать цикл</button>

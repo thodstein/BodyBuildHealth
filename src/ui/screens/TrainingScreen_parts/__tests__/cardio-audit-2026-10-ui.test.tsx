@@ -125,11 +125,11 @@ describe('P0-3 wellness реально влияет на авто-подстро
     const view = render(<CardioAutoTunePanel cycle={c} acwr={1.0} />);
     // Панель показывает вход сигнала (текст разбит узлами — сверяем textContent).
     expect(view.container.textContent).toContain('Готовность сегодня:');
-    expect(view.container.textContent).toContain('2/10'); // readiness = (1+1+1+1)/20*10
+    expect(view.container.textContent).toContain('1/10'); // 4..20 → 1..10 (край = 1)
     expect(view.container.textContent).toContain('низкая');
     fireEvent.click(screen.getByRole('button', { name: /Подстроить сейчас/ }));
     expect(screen.getByText(/Предпросмотр изменений/)).toBeTruthy();
-    expect(view.container.textContent).toContain('Готовность 2/10');
+    expect(view.container.textContent).toContain('Готовность 1/10');
     fireEvent.click(screen.getByRole('button', { name: /Применить/ }));
     expect(screen.getByText(/Подстройка применена/)).toBeTruthy();
     const saved = loadCycles().find(x => x.id === 'well-1')!;

@@ -15,6 +15,8 @@ import { cardioWeekAdherence } from '../../../engines/lms/cardio-diary.engine';
 import { cardioWeightAdvice, cardioWeekForDate, cardioCoachHints, type CardioCycle, type CardioType, type CardioCoachHint } from '../../../engines/lms/cardio.engine';
 import { getWeightLog } from '../../../engines/profile-store';
 import { CARD, ROW, LABEL, HINT_SM, BTN, BTN_CTA, BTN_SMALL, INPUT, CHIP, CHIP_ACTIVE, Badge, TYPE_COLOR, EmptyState } from './CardioUI';
+import { saveTextFileApk, saveCsvApk, copyOrShareText, shareOutcomeLabel } from '../../../core/apk-share';
+import { loadCardioKcalContract, setCardioKcalInclude, publishCardioKcalContract, type CardioKcalContract } from '../../../engines/lms/cardio-nutrition-contract.engine';
 
 const TYPES: CardioType[] = ['zone2', 'miss', 'hiit', 'recovery'];
 const TYPE_LABEL: Record<CardioType, string> = { zone2: 'Zone 2', hiit: 'HIIT', miss: 'MISS', recovery: 'Recovery' };
@@ -109,7 +111,11 @@ export const CardioDiaryPanel: React.FC<{ cycle: CardioCycle | null; acwr?: numb
   }, [log]);
   const shareWeek = () => {
     const txt = `Кардио 7д: ${stats7.sessions} сесс · ${stats7.minutes} мин${stats7.km > 0 ? ` · ${stats7.km} км` : ''}${stats7.avgPace ? ` · ${stats7.avgPace}` : ''} · стрик ${streak.current}д (лучший ${streak.best}д)`;
-    try { navigator.clipboard.writeText(txt).then(() => flashMsg('📋 Недельный отчет скопирован')).catch(() => flashMsg(txt)); } catch { flashMsg(txt); }
+    // АПК: нативный Share вместо «буфер или покажи текст на экране».
+    void copyOrShareText(txt, 'Недельный отчёт кардио').then(res => {
+      if (res === 'failed') flashMsg(txt);
+      else flashMsg(`${shareOutcomeLabel(res)} Недельный отчёт`);
+    });
   };
   const adherence = useMemo(() => {
     if (!cycle) return null;
@@ -183,22 +189,17 @@ export const CardioDiaryPanel: React.FC<{ cycle: CardioCycle | null; acwr?: numb
     const body = log.map(e =>
       [e.date, TYPE_LABEL[e.type], e.durationMin, e.distanceKm ?? '', cardioPaceMinPerKm(e.distanceKm, e.durationMin) ?? '', e.calories ?? '', e.avgHr ?? '', e.rpe ?? '', e.completed ? 'да' : 'нет'].map(csvEscape).join(','),
     ).join('\n');
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(new Blob(['\ufeff' + head + body], { type: 'text/csv' }));
-    a.download = `cardio-log-${todayIso()}.csv`;
-    a.click();
-    URL.revokeObjectURL(a.href);
-    flashMsg('📥 CSV экспортирован');
+    // АПК: <a download> файл не сохраняет — канон saveCsvApk (BOM внутри).
+    void saveCsvApk(`cardio-log-${todayIso()}.csv`, head + body)
+      .then(r => flashMsg(r === 'saved' ? '📥 CSV экспортирован' : '⚠ CSV не сохранён'))
+      .catch(() => flashMsg('⚠ CSV не сохранён'));
   };
 
   const exportJson = () => {
     const data = JSON.stringify(log, null, 2);
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(new Blob([data], { type: 'application/json' }));
-    a.download = `cardio-log-${todayIso()}.json`;
-    a.click();
-    URL.revokeObjectURL(a.href);
-    flashMsg('📥 JSON экспортирован');
+    void saveTextFileApk(`cardio-log-${todayIso()}.json`, data, 'application/json;charset=utf-8')
+      .then(r => flashMsg(r === 'saved' ? '📥 JSON экспортирован' : '⚠ JSON не сохранён'))
+      .catch(() => flashMsg('⚠ JSON не сохранён'));
   };
 
   return (
@@ -282,7 +283,7 @@ export const CardioDiaryPanel: React.FC<{ cycle: CardioCycle | null; acwr?: numb
             <div style={{ fontSize: 11, color: '#fbbf24', background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.25)', borderRadius: 8, padding: '6px 8px', display: 'flex', flexDirection: 'column', gap: 6 }} role="status">
               <div>⚖️ {wa.reason}</div>
               {onApplyWeightAdjust && (
-                <button style={{ ...BTN, minHeight: 32, padding: '5px 10px', alignSelf: 'flex-start' }} onClick={onApplyWeightAdjust} aria-label="Применить +15 мин Zone 2">
+                <button style={{ ...BTN, minHeight: 44, padding: '5px 10px', alignSelf: 'flex-start' }} onClick={onApplyWeightAdjust} aria-label="Применить +15 мин Zone 2">
                   ⚖️ Применить (+15 мин Zone 2)
                 </button>
               )}
@@ -290,6 +291,7 @@ export const CardioDiaryPanel: React.FC<{ cycle: CardioCycle | null; acwr?: numb
           );
         } catch { return null; }
       })()}
+      <KcalContractCard cycle={cycle} />
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8, background: 'linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.015))', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 13, padding: 12 }}>
         <div style={{ ...LABEL, fontSize: 11.5 }}>🧘 Wellness (POMS) — готовность {wellnessReadiness(wellness)}/10</div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px,1fr))', gap: 7 }}>
@@ -358,12 +360,61 @@ export const CardioDiaryPanel: React.FC<{ cycle: CardioCycle | null; acwr?: numb
             </div>
           ))}
           {log.length > 6 && (
-            <button style={{ ...BTN, minHeight: 30, padding: '5px 10px', alignSelf: 'flex-start' }} onClick={() => setShowAll(v => !v)} aria-label={showAll ? 'Скрыть записи' : `Показать все записи (${log.length})`}>
+            <button style={{ ...BTN, minHeight: 44, padding: '5px 10px', alignSelf: 'flex-start' }} onClick={() => setShowAll(v => !v)} aria-label={showAll ? 'Скрыть записи' : `Показать все записи (${log.length})`}>
               {showAll ? '▴ Скрыть' : `▾ Показать все (${log.length})`}
             </button>
           )}
         </div>
       )}
+    </div>
+  );
+};
+
+/**
+ * Карточка контракта «кардио → питание»: показывает, что реально видит
+ * питание (ккал/нед, сегодняшний факт, уверенность) и позволяет выключить
+ * учёт. Раньше ключ `he_cardio_kcal_note` писался и нигде не читался.
+ */
+const KcalContractCard: React.FC<{ cycle: CardioCycle | null }> = ({ cycle }) => {
+  const [c, setC] = useState<CardioKcalContract | null>(() => loadCardioKcalContract());
+  const [msg, setMsg] = useState<string | null>(null);
+  const flash = (m: string) => { setMsg(m); window.setTimeout(() => setMsg(null), 3000); };
+  if (!c) return null;
+  const pct = Math.round(c.confidence * 100);
+  return (
+    <div
+      data-cardio="kcal-contract"
+      style={{ display: 'flex', flexDirection: 'column', gap: 7, background: 'linear-gradient(180deg, rgba(96,165,250,0.08), rgba(96,165,250,0.02))', border: '1px solid rgba(96,165,250,0.26)', borderRadius: 13, padding: 12 }}
+    >
+      <div style={{ ...LABEL, fontSize: 11.5 }}>🍽 Питание видит кардио: {c.weeklyKcal} ккал/нед · уверенность {pct}%</div>
+      <div style={HINT_SM}>
+        Сегодня: {c.todayMinutes} мин · {c.todayKcal} ккал · основа: {c.basis === 'log' ? 'журнал' : 'план'} · учитывается: {c.include ? 'да' : 'нет'}
+      </div>
+      <div style={ROW}>
+        <button
+          style={BTN_SMALL}
+          onClick={() => {
+            if (!cycle) { flash('⚠ Нет активного цикла'); return; }
+            const next = publishCardioKcalContract(cycle);
+            setC(next);
+            flash('✅ Пересчитано из журнала');
+          }}
+        >
+          🔄 Пересчитать
+        </button>
+        <button
+          style={BTN_SMALL}
+          aria-pressed={c.include}
+          onClick={() => {
+            const next = setCardioKcalInclude(!c.include);
+            setC(next);
+            flash(next?.include ? '✅ Кардио учитывается в питании' : '⏸ Кардио НЕ учитывается в питании');
+          }}
+        >
+          {c.include ? '⏸ Не учитывать в питании' : '▶ Учитывать в питании'}
+        </button>
+      </div>
+      {msg && <div style={{ fontSize: 10.5, color: '#4ade80' }} role="status" aria-live="polite">{msg}</div>}
     </div>
   );
 };

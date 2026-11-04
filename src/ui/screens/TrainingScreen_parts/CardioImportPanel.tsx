@@ -22,7 +22,9 @@ import type { CardioType } from '../../../engines/lms/cardio.engine';
 /** Текстовые форматы: 5 МБ (защита от подвисания). ZIP (Apple export) — 60 МБ. */
 const TEXT_MAX = 5 * 1024 * 1024;
 const ZIP_MAX = 60 * 1024 * 1024;
-const ACCEPT = '.gpx,.tcx,.xml,.csv,.json,.fit,.zip';
+// АПК: Android-пикер не всегда понимает расширения .fit/.zip — дублируем MIME,
+// иначе файл с часа бывает недоступен для выбора (поиск «серый»).
+const ACCEPT = '.gpx,.tcx,.xml,.csv,.json,.fit,.zip,application/gpx+xml,application/xml,text/xml,text/csv,application/json,application/zip,application/octet-stream';
 
 /** Подписи форматов — единый источник в движке импорта (раньше копия в UI
  *  разошлась с движком: парсер отдавал 'apple_health_xml', ключа не было —
