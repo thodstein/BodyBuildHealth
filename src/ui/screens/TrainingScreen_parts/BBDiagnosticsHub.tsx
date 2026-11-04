@@ -31,14 +31,10 @@ import { BbSymmetryTab } from './bb-hub-symmetry-tab';
 import { applyToPlanner } from './planner-bridge';
 import { buildPro2Meta } from './bb-hub-export';
 import { localIsoDate } from './diary-shared';
-import { localIsoDateOffset } from '../../../core/local-date';
 import { scoreColor as bbScoreColor, BB_VERIFICATION_LABEL_RU } from '../../../engines/bb/bb-scoring.engine';
 import { buildBBDiagnosticsReport } from '../../../engines/bb/bb-diagnostics-hub.engine';
 import { buildBBDiagnosticsHtml, buildBBDiagnosticsCsv, downloadHtml, downloadCsv } from '../../../engines/bb/bb-diagnostics-export.engine';
 import { MUSCLE_LABEL_RU } from '../../../engines/volume-landmarks.engine';
-import { aggregateBBVolume } from '../../../engines/bb/bb-volume.engine';
-import { analyzeBBBalance } from '../../../engines/bb/bb-balance.engine';
-import { computePerMuscleACWR } from '../../../engines/bb/bb-progression-feedback.engine';
 import { assessOHS } from '../../../engines/strength-sport/strength-sport-ohs.engine';
 import { lrVerdictsFromSessions, LR_PHASE_ASYM_NOTE } from '../../../engines/bb/bb-lr-volume.engine';
 import { assessBbReadiness } from '../../../engines/bb/bb-readiness.engine';
@@ -64,7 +60,6 @@ import { sfrOf } from '../../../engines/bb/bb-sfr-db';
 import { diagnoseWeakCausesBatch } from '../../../engines/bb/bb-weak-cause.engine';
 import { volumeHistory28d, e1rmTrend28d } from '../../../engines/bb/bb-weak-detection.engine';
 import { rankCorrectionsForWeak } from '../../../engines/bb/bb-correction-rank.engine';
-import { loadHubDiarySessions } from '../../../engines/hub-diary.engine';
 import { rankCorrectives, correctiveDose, correctiveLoadFactor } from '../../../engines/bb/bb-corrective.engine';
 import { correctiveBlockForBB, correctiveBlockExportLines } from '../../../engines/bb/bb-corrective-block.engine';
 import { buildSpecBlock } from '../../../engines/bb/bb-spec-block.engine';
@@ -74,7 +69,7 @@ import { bbPlanSaveBlockReason } from './bb-plan-save-guard';
 import { readDiagHistory, appendDiagHistory, diagHistoryTrend, type DiagHistoryEntry } from '../../../engines/bb/bb-diag-history.engine';
 import { idealMcCallumMap, symmetryTriadDeviation, appendMeasureSnapshot, femaleSymmetryNotes, teenTrainingNote, type MeasureSnapshot } from '../../../engines/bb/bb-symmetry.engine';
 import { weakHeadForZone, HEAD_FUNCTIONS, auditHeadCoverage, headsHitOf } from '../../../engines/bb/bb-stimulus-target.engine';
-import { resolveMovementDriver, singleLegVerdict, ohsFailCodes, d1d5FailCodes, v3FailCodes, movementDelta, screenPriorityList, teenLoadedGate, type MovementSnapshot } from '../../../engines/bb/bb-movement-screen.engine';
+import { resolveMovementDriver, singleLegVerdict, ohsFailCodes, d1d5FailCodes, v3FailCodes, movementDelta, screenPriorityList, type MovementSnapshot } from '../../../engines/bb/bb-movement-screen.engine';
 // Аудит 2026-11 (BB-24): экран скрининга вынесен в `bb-hub-screening-tab.tsx`,
 // поэтому оговорки/справочники рисуются ТАМ. Раньше хаб держал их импорты
 // «на память» — 13 имён ни разу не использовались в этом файле.
@@ -91,277 +86,44 @@ import { buildVolumeRecoveryPanel } from '../../../engines/bb/bb-volume-recovery
 // BB-G-08: «что делать дальше» — 1–2 шага из данных + белый список deep-link'ов.
 import { buildNextActions } from '../../../engines/bb/bb-diag-next-actions.engine';
 import { buildCorrectionEffect, logDiagInjection, readDiagInjections, type DiagInjection } from '../../../engines/bb/bb-diag-effect.engine';
-// BB-G-05: типы результата видео-разбора позы (метрики считает отдельный чистый движок).
-import { bbPoseLines, type BbPoseSummary, type BbPoseView } from '../../../engines/bb/bb-pose-metrics.engine';
+// BB-G-05: строки отчёта по метрикам позы (метрики/типы считает отдельный чистый движок).
+import { bbPoseLines } from '../../../engines/bb/bb-pose-metrics.engine';
 // BB-D-19 (хвост): орто-скрининг из хаба «Суставы и ортопедия» — читаем флаги и считаем
 // прехаб-строки. Слабые зоны НЕ создаём: специализация на больном суставе = +объём туда.
 import { loadOrthoFlags } from '../../../engines/pro/ortho-screen.engine';
 import { bbOrthoPrehabRows, bbOrthoFlagsSummary } from '../../../engines/bb/bb-ortho-prehab.engine';
+// Волна 3 декомпозиции: состояние/дефолты/миграции/словари — в `bb-hub-state.ts`.
+// Импорт тянет ровно то, что хаб использует; поведение не меняется.
+import {
+  STORAGE_KEY,
+  DEFAULT_STATE,
+  loadBbHubState,
+  ktwOf,
+  pickPlanFromSaved,
+  TAB_DEFS,
+  LVP_LIFTS,
+  GRANULAR_OPTS,
+  weakRu,
+  weakListRu,
+  profileRu,
+  flagRu,
+  circRu,
+  trackedRu,
+} from './bb-hub-state';
+// Волна 3 декомпозиции: под-хуки хаба (профиль, дневник/план, скрининг).
+import { useBbHubProfile } from './hooks/use-bb-hub-profile';
+import { useBbHubLive } from './hooks/use-bb-hub-live';
 
-const STORAGE_KEY = 'he_bb_diagnostics_hub_v1';
-type BBTab = 'weak' | 'screening' | 'exercise' | 'stimulus' | 'symmetry' | 'volume';
-
-export type BBState = {
-  weakManual: string[];
-  circ: Record<string, string>;
-  ohsHeelsFlat: boolean; ohsKneeValgus: boolean; ohsHipBelowParallel: boolean; ohsTrunkUpright: boolean; ohsArmsOverMidfoot: boolean; ohsLumbarNeutral: boolean;
-  kneeToWallCm: string; ankleDeg: string; heelRetest: '' | 'better' | 'same';
-  /** Сгибание плеча по гониометру (градусы; норма 180°). */
-  shoulderFlexDeg: string;
-  /** Когда скрининг пройден в последний раз (ISO-дата) — для авто-напоминания о re-screen. */
-  screenDoneAt: string;
-  /** КТС левая/правая (см). kneeToWallCm — legacy (мигрирует в обе при загрузке). */
-  ktwL: string; ktwR: string;
-  /** Скрининг v2: руки на бёдрах чистят поясницу (тест на широчайшие) + односторонний + снимок. */
-  handsOnHipsBetter: boolean;
-  splitL: '' | 'pass' | 'fail';
-  splitR: '' | 'pass' | 'fail';
-  rdlL: '' | 'pass' | 'fail';
-  rdlR: '' | 'pass' | 'fail';
-  /** Опциональный угломер FPPA (градусы, замер с фото). Только tiebreak при чистой качественной оценке. */
-  fppaL: string;
-  fppaR: string;
-  exerciseSelectedId: string | null;
-  exerciseFilterSfr: number;
-  exerciseFilterProfile: string;
-  exerciseFilterUnilateral: boolean;
-  wristCm: string;
-  sex: '' | 'male' | 'female';
-  specWeeks: string;
-  showSpecBlock: boolean;
-  stimCheating: boolean;
-  stimShortRom: boolean;
-  stimSetupNote: string;
-  acutePain: boolean;
-  swelling: boolean;
-  numbness: boolean;
-  jointClickPain: boolean;
-  /** PRO-4 S3: подтверждённая ступень возврата ('' — авто: ступень 1). */
-  returnStage: '' | '1' | '2' | '3';
-  /** П2: измеримые критерии выхода из return-to (pain-monitoring, Silbernagel 2007).
-   *  null/undefined = не введено → «нет данных», а не «всё хорошо». */
-  retPainLoad?: number | null;
-  retPainMorning?: number | null;
-  retStiffness?: 'better' | 'same' | 'worse' | null;
-  retPlyo?: boolean | null;
-  /** D1 плечо у стены (true = чисто; фолс — провал признака). */
-  shBackOnWall: boolean; shHeadOnWall: boolean; shBicepsAtEars: boolean; shRibsDown: boolean; shNoShrug: boolean;
-  /** D1 ротация грудного, градусы. */
-  rotL: string; rotR: string;
-  /** D2 шарнир (палка) + нагруженный присед. */
-  hingeDowel: '' | 'full' | 'lumbar_loss' | 'neck_loss' | 'both';
-  sqBody: '' | 'pass' | 'fail'; sqBar: '' | 'pass' | 'fail'; sqWork: '' | 'pass' | 'fail';
-  /** D3 YBT-LQ anterior + длина голени. */
-  ybtL: string; ybtR: string; shinCm: string;
-  /** D4 скапула/болевая дуга + видео-стандарт. */
-  painArc: boolean; scapWinging: boolean; videoTwoAngles: boolean;
-  /** R4: таз/голеностоп — КТС прямым коленом (гастрокнемиус), сгибание бедра, «подворот» таза. */
-  ktwStraightL: string; ktwStraightR: string; hipFlexDeg: string; ppTilt: boolean;
-  /** R5: шарнир под весом (RDL / тяга с пола). */
-  rdlLoaded: '' | 'pass' | 'fail'; floorLoaded: '' | 'pass' | 'fail';
-  /** R6: ER/IR-ratio (кг, ручной замер). */
-  erKg: string; irKg: string;
-  /** R1: жим — хват/касание/лопатки/отведение/локти/боль. */
-  benchGripCm: string; benchTouch: '' | 'nipple' | 'upper_abs' | 'neck'; benchScapula: '' | 'retracted' | 'neutral' | 'released';
-  benchAbduction: string; benchElbowsBelow: boolean; benchPain: boolean;
-  /** R2: боль-мониторинг (0–10 днём/утром + флаги). */
-  pmLoc: '' | PainLocation; pmDuring: string; pmMorning: string; pmRising: boolean; pmNight: boolean; pmSharp: boolean;
-  /** R3: задняя цепь — NHE (повторы/угол) + аддукторы (сжатие/уровень Copenhagen). */
-  nheL: string; nheR: string; nheAngle: string; addL: string; addR: string; cphLevel: '' | CphLevel;
-  /** YBT-LQ: posteromedial / posterolateral / длина конечности (полный композит по протоколу). */
-  ybtPmL: string; ybtPmR: string; ybtPlL: string; ybtPlR: string; limbCm: string;
-  /** Скрининг вообще затронут (иначе все «чисто» — это дефолт, а не результат). */
-  screenTouched: boolean;
-  /**
-   * BB-G-05: видео-разбор позы — результаты ДЕРЖИМ ПО РАКУРСАМ.
-   * Фронт и бок меряют разные признаки, поэтому второй замер не должен затирать
-   * первый: иначе «снято с 2 ракурсов» в отчёте противоречит единственной секции.
-   */
-  poseView: BbPoseView;
-  poseResults: { front: BbPoseSummary | null; side: BbPoseSummary | null };
-  /** Перенос в OHS — отдельно по ракурсу: у каждого свой патч и своя кнопка. */
-  poseApplied: { front: boolean; side: boolean };
-  /** Выбранное пользователем упражнение коррекции по зоне (⭐ = id записи библиотеки коррекций).
-   *  Единственный источник выбора: карточка/экспорт/вставка/мост читают тот же мемо. */
-  prefCorr: Record<string, string>;
-};
-
-const DEFAULT_STATE: BBState = {
-  weakManual: [],
-  circ: { heightCm: '175', weightKg: '80', neck: '', chest: '', waist: '', hips: '', bicepL: '', bicepR: '', thighL: '', thighR: '', calfL: '', calfR: '', shoulderWidth: '', forearmL: '', forearmR: '' },
-  ohsHeelsFlat: true, ohsKneeValgus: false, ohsHipBelowParallel: true, ohsTrunkUpright: true, ohsArmsOverMidfoot: true, ohsLumbarNeutral: true,
-  kneeToWallCm: '', ankleDeg: '', heelRetest: '', shoulderFlexDeg: '', screenDoneAt: '',
-  ktwL: '', ktwR: '',
-  handsOnHipsBetter: false,
-  splitL: '', splitR: '', rdlL: '', rdlR: '',
-  fppaL: '', fppaR: '',
-  exerciseSelectedId: null,
-  exerciseFilterSfr: 0,
-  exerciseFilterProfile: 'all',
-  exerciseFilterUnilateral: false,
-  wristCm: '',
-  sex: '',
-  specWeeks: '6',
-  showSpecBlock: false,
-  stimCheating: false,
-  stimShortRom: false,
-  stimSetupNote: '',
-  acutePain: false,
-  swelling: false,
-  numbness: false,
-  jointClickPain: false,
-  returnStage: '',
-  retPainLoad: null, retPainMorning: null, retStiffness: null, retPlyo: null,
-  shBackOnWall: true, shHeadOnWall: true, shBicepsAtEars: true, shRibsDown: true, shNoShrug: true,
-  rotL: '', rotR: '',
-  hingeDowel: '',
-  sqBody: '', sqBar: '', sqWork: '',
-  ybtL: '', ybtR: '', shinCm: '',
-  ybtPmL: '', ybtPmR: '', ybtPlL: '', ybtPlR: '', limbCm: '',
-  painArc: false, scapWinging: false, videoTwoAngles: false,
-  ktwStraightL: '', ktwStraightR: '', hipFlexDeg: '', ppTilt: false,
-  rdlLoaded: '', floorLoaded: '',
-  erKg: '', irKg: '',
-  benchGripCm: '', benchTouch: '', benchScapula: '', benchAbduction: '', benchElbowsBelow: false, benchPain: false,
-  pmLoc: '', pmDuring: '', pmMorning: '', pmRising: false, pmNight: false, pmSharp: false,
-  nheL: '', nheR: '', nheAngle: '', addL: '', addR: '', cphLevel: '',
-  screenTouched: false,
-  poseView: 'front',
-  poseResults: { front: null, side: null },
-  poseApplied: { front: false, side: false },
-  prefCorr: {},
-};
-
-const TAB_DEFS: Array<{ id: BBTab; label: string; icon: string; desc: string }> = [
-  { id: 'weak', label: 'Слабые', icon: '🎯', desc: 'зоны 1–2 + причина + топ-3' },
-  { id: 'screening', label: 'Скрининг', icon: '🦿', desc: 'присед-тест + драйвер + 1 нога' },
-  { id: 'exercise', label: 'Разбор', icon: '🏋️', desc: 'упражнение + техника + замена' },
-  { id: 'stimulus', label: 'Стимул-карта', icon: '🎯', desc: 'SFR + длина + углы + читинг' },
-  { id: 'symmetry', label: 'Пропорции', icon: '⚖️', desc: 'замеры + лево/право + дельты' },
-  { id: 'volume', label: 'Объём · Recovery', icon: '📐', desc: 'ACWR + MRV + ограничитель' },
-];
-
-/** Движения LVP-калибровки: один источник для селекта и для подписи рабочего коридора. */
-const LVP_LIFTS: Array<{ id: string; label: string }> = [
-  { id: 'squat', label: 'Присед' },
-  { id: 'bench', label: 'Жим лёжа' },
-  { id: 'deadlift', label: 'Тяга' },
-  { id: 'ohp', label: 'Жим стоя' },
-  { id: 'row', label: 'Тяга в наклоне' },
-];
-
-// Цвета зон (BB-G-01: «нет данных» — серый, а не зелёный) — в `bb-hub-zones.ts`,
-// потому что их красят и панель объёма, и карточка «что делать дальше».
-
-const GRANULAR_OPTS: Array<{ id: string; label: string }> = [  { id: 'delt_mid', label: 'Средняя дельта' },
-  { id: 'delt_rear', label: 'Задняя дельта' },
-  { id: 'delt_front', label: 'Передняя дельта' },
-  { id: 'chest_upper', label: 'Верх груди' },
-  { id: 'chest_lower', label: 'Низ груди' },
-  { id: 'back_width', label: 'Ширина спины' },
-  { id: 'back_thickness', label: 'Толщина спины' },
-  { id: 'quads', label: 'Квадрицепс' },
-  { id: 'hamstrings', label: 'Бицепс бедра' },
-  { id: 'glutes', label: 'Ягодицы' },
-  { id: 'biceps', label: 'Бицепс' },
-  { id: 'triceps', label: 'Трицепс' },
-  { id: 'calves', label: 'Икры' },
-  { id: 'traps', label: 'Трапеции' },
-  { id: 'forearms', label: 'Предплечья' },
-];
-
-/** Русские подписи профилей/мышц для вывода (движковые id не меняются). */
-const PROFILE_RU: Record<string, string> = { lengthened: 'растянутая', mid: 'средняя', short: 'пиковая', all: 'все' };
-
-/** PRO-5 Э3: RU-расшифровка кодов трекинга снимков (D1–D5/R1–R8; неизвестный код — как есть). */
-const TRACKED_CODE_RU: Record<string, string> = {
-  heels: 'пятки', valgus: 'вальгус', depth: 'глубина', trunk: 'корпус', arms: 'руки', lumbar: 'поясница', ppt: 'наклон таза',
-  'sh-flexion': 'плечо: сгибание', 'sh-thoracic': 'плечо: грудной', 'sh-lats': 'плечо: широчайшие', 'sh-control': 'плечо: контроль', 'sh-position': 'плечо: позиция', 'sh-fail': 'плечо: провал',
-  'rot-gap': 'ротация: разрыв', 'rot-low': 'ротация: мало',
-  'hinge-lumbar': 'шарнир: поясница', 'hinge-neck': 'шарнир: шея', 'hinge-both': 'шарнир: поясница+шея',
-  'sq-degraded': 'присед под весом', 'ybt-asym': 'YBT: асимметрия', 'ybt-comp': 'YBT: композит',
-  'bench-fix': 'жим: правка', 'bench-watch': 'жим: наблюдать', 'nhe-asym': 'NHE: асимметрия', 'add-asym': 'аддукторы: асимметрия',
-  'pm-red': 'боль: красная', 'pm-yellow': 'боль: жёлтая', 'hip-flex': 'сгибание бедра', 'hng-degraded': 'шарнир под весом', 'erir-low': 'ER/IR низко',
-};
-const trackedRu = (codes: string[]): string => codes.map((c) => TRACKED_CODE_RU[c] || c).join(' · ');
-const profileRu = (p: string | null | undefined): string => (p && PROFILE_RU[p]) || String(p || '—');
-const FLAG_RU: Record<string, string> = {
-  synergistTakeover: 'нагрузку забирают соседи', stabilityGap: 'не хватает стабильности', wrongHead: 'бьёт мимо слабой головки',
-  singleAngle: 'один угол — нужен второй', shortOnly: 'только короткая позиция', missingLengthened: 'нет растянутой позиции',
-  jointOverload: 'перегруз сустава', mobilityBlock: 'мешает подвижность', asymRisk: 'риск перекоса',
-  tempoOff: 'темп не тот', romShort: 'амплитуда укорочена', cheating: 'читинг',
-};
-const flagRu = (f: string): string => FLAG_RU[f] || f;
-const CIRC_RU: Record<string, string> = {
-  heightCm: 'рост', weightKg: 'вес', chest: 'грудь', waist: 'талия', hips: 'бёдра', neck: 'шея',
-  shoulderWidth: 'плечи', bicepL: 'бицепс Л', bicepR: 'бицепс П', bicep: 'бицепс',
-  thighL: 'бедро Л', thighR: 'бедро П', calfL: 'голень Л', calfR: 'голень П',
-  forearmL: 'предплечье Л', forearmR: 'предплечье П', wristCm: 'запястье',
-};
-const circRu = (k: string): string => CIRC_RU[k] || k;
-const weakRu = (z: string): string => GRANULAR_OPTS.find((o) => o.id === z)?.label || MUSCLE_LABEL_RU[z] || z;
-const weakListRu = (zs: string[]): string => zs.map(weakRu).join(' · ');
-
-
-/* 3.11: единый парсинг плана ББ из localStorage (было 4 копии). */
-export function pickPlanFromSaved(parsed: unknown): any | null {
-  const j: any = parsed;
-  if (Array.isArray(j) && j[0]?.plan?.weeks) return j[0].plan;
-  if (j?.plan?.weeks) return j.plan;
-  if (j?.weeks) return j;
-  return null;
-}
-function readSavedBbPlanRaw(): string | null {
-  try { return localStorage.getItem('he_bb_plan_saved') || localStorage.getItem('he_bb_plans'); } catch { return null; }
-}
-function readSavedBbPlan(): any | null {
-  const raw = readSavedBbPlanRaw();
-  if (!raw) return null;
-  try { return pickPlanFromSaved(JSON.parse(raw)); } catch { return null; }
-}
-
-/** КТС: L/R приоритетнее legacy-одиночки; eff — худшая сторона (разница ≥2 см — см. драйвер). */
-function ktwOf(s: { ktwL?: string; ktwR?: string; kneeToWallCm?: string }): { l: number | null; r: number | null; eff: number | null } {
-  const num = (v: unknown): number | null => { const n = bbNum(v as any); return n != null && n >= 0 ? n : null; };
-  const l = num(s.ktwL) ?? num(s.kneeToWallCm);
-  const r = num(s.ktwR) ?? num(s.kneeToWallCm);
-  return { l, r, eff: l != null && r != null ? Math.min(l, r) : (l ?? r) };
-}
+// Состояние/словари/хранилище — в `bb-hub-state.ts` (волна 3 плана хабов):
+// тип состояния, дефолты, миграции localStorage и RU-подписи движковых id.
+// Реэкспорт держит прежние точки входа (табы и локи читают `BBState`/парсер плана отсюда).
+import type { BBState, BBTab } from './bb-hub-state';
+export type { BBState, BBTab } from './bb-hub-state';
+export { pickPlanFromSaved } from './bb-hub-state';
 
 export const BBDiagnosticsHub: React.FC = () => {
-  const [state, setState] = useState<BBState>(() => {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        // Миграция legacy: одно значение КТС → обе стороны (дальше живут раздельно)
-        if ((parsed.ktwL == null || parsed.ktwL === '') && (parsed.ktwR == null || parsed.ktwR === '') && parsed.kneeToWallCm) {
-          parsed.ktwL = parsed.ktwR = parsed.kneeToWallCm;
-        }
-        const merged: BBState = { ...DEFAULT_STATE, ...parsed, circ: { ...DEFAULT_STATE.circ, ...(parsed.circ || {}) } };
-        // Миграция BB-G-05: старый снимок без `poseView` не должен ломать выбор ракурса
-        // (движок читает BB_POSE_VIDEO_GUIDE[view] — undefined уронил бы карточку).
-        if (merged.poseView !== 'front' && merged.poseView !== 'side') merged.poseView = 'front';
-        // Миграция BB-G-05 (2): до разделения по ракурсам был один `poseResult: BbPoseSummary`.
-        // Не теряем замер: кладём его в тот ракурс, который в нём записан.
-        const legacyPose = (parsed as any)?.poseResult as BbPoseSummary | null | undefined;
-        merged.poseResults = {
-          front: merged.poseResults?.front ?? null,
-          side: merged.poseResults?.side ?? null,
-        };
-        merged.poseApplied = {
-          front: !!merged.poseApplied?.front,
-          side: !!merged.poseApplied?.side,
-        };
-        if (legacyPose && typeof legacyPose === 'object' && (legacyPose.view === 'front' || legacyPose.view === 'side')) {
-          if (!merged.poseResults[legacyPose.view]) merged.poseResults[legacyPose.view] = legacyPose;
-          if ((parsed as any)?.poseApplied === true) merged.poseApplied[legacyPose.view] = true;
-        }
-        return merged;
-      }
-    } catch {}
-    return DEFAULT_STATE;
-  });
+  // Чтение + миграции хранилища — в `bb-hub-state.ts` (loadBbHubState), правила 1:1.
+  const [state, setState] = useState<BBState>(loadBbHubState);
   const [tab, setTab] = useState<BBTab>('weak');
   const [toast, setToast] = useState<string>('');
   /**
@@ -382,24 +144,9 @@ export const BBDiagnosticsHub: React.FC = () => {
   });
   // Нонс перечитывания плана из хранилища (инъекция/откат меняют его мимо мемов)
   const [planNonce, setPlanNonce] = useState(0);
-  // PRO-5 Э2: профиль читают мемы — бампим тик по profile-updated/storage (правка профиля без ремаунта)
-  const [profileNonce, setProfileNonce] = useState(0);
   // PRO-CORR: после записи he_bb_lr_history (applyToConstructor) флип-гейт и lrDirection
   // считались по СТАРОМУ срезу — текст и мост уезжали на один клик назад.
   const [lrHistNonce, setLrHistNonce] = useState(0);
-  useEffect(() => {
-    const bump = () => setProfileNonce((t) => t + 1);
-    try {
-      window.addEventListener('profile-updated', bump as EventListener);
-      window.addEventListener('storage', bump as EventListener);
-    } catch { /* noop */ }
-    return () => {
-      try {
-        window.removeEventListener('profile-updated', bump as EventListener);
-        window.removeEventListener('storage', bump as EventListener);
-      } catch { /* noop */ }
-    };
-  }, []);
 
   /**
    * AUDIT 2026-11: 40+ мест делали `setTimeout(() => setToast(''), N)` без очистки.
@@ -428,145 +175,13 @@ export const BBDiagnosticsHub: React.FC = () => {
   const [lvpProfile, setLvpProfile] = useState<BbLvpProfile | null>(null);
   const [lvpSaved, setLvpSaved] = useState<number>(() => { try { return Object.keys(loadBbLvpProfiles()).length; } catch { return 0; } });
 
-  const level = useMemo(() => {
-    try { const p = JSON.parse(localStorage.getItem('he_profile_v2') || '{}'); return p?.settings?.training?.level || p?.training?.level || 'intermediate'; } catch { return 'intermediate'; }
-  }, [profileNonce]);
+  // Профильные источники (уровень/оборудование/workMax/мобильность/пол/сон/возраст) —
+  // в `hooks/use-bb-hub-profile.ts`: тик по profile-updated/storage и teen-гейт там же.
+  const { level, profileEquipment, profileWorkMax, profileMobility, profileSex, profileSleep, profileAge, teenGate, effSex } = useBbHubProfile(state.sex);
 
-  // Оборудование зала из профиля — фильтр кандидатов (без него — весь каталог)
-  const profileEquipment = useMemo(() => {
-    try {
-      const p = JSON.parse(localStorage.getItem('he_profile_v2') || '{}');
-      const eq = p?.settings?.training?.equipment ?? p?.training?.equipment;
-      if (Array.isArray(eq)) {
-        const clean = eq.map((s) => String(s)).filter(Boolean);
-        return clean.length ? clean : undefined;
-      }
-      return undefined;
-    } catch { return undefined; }
-  }, [profileNonce]);
-
-  // K3: рабочие максимумы профиля для веса коррекций (точный id упражнения → мышца).
-  // Единый вход карточки и вставки («показано = вставится»); нет данных — движок честно без кг.
-  const profileWorkMax = useMemo(() => {
-    try {
-      const p = JSON.parse(localStorage.getItem('he_profile_v2') || '{}');
-      const t = p?.settings?.training ?? p?.training;
-      const byMuscle = (t?.workMax || {}) as Record<string, number>;
-      const byEx = (t?.workMaxByExercise || {}) as Record<string, number>;
-      const out: Record<string, number> = {};
-      for (const [k, v] of Object.entries(byEx)) { const n = Number(v); if (Number.isFinite(n) && n > 0) out[k] = n; }
-      for (const [k, v] of Object.entries(byMuscle)) { const n = Number(v); if (Number.isFinite(n) && n > 0) out[k] = n; }
-      return Object.keys(out).length ? out : undefined;
-    } catch { return undefined; }
-  }, [profileNonce]);
-
-  // K4: ограничения мобильности профиля — гейт кандидатов инъекции (те же каноны, что у билдера).
-  const profileMobility = useMemo(() => {
-    try {
-      const p = JSON.parse(localStorage.getItem('he_profile_v2') || '{}');
-      const m = p?.settings?.training?.mobilityRestrictions ?? p?.training?.mobilityRestrictions;
-      if (Array.isArray(m)) {
-        const clean = m.map((s) => String(s)).filter(Boolean);
-        return clean.length ? clean : undefined;
-      }
-      return undefined;
-    } catch { return undefined; }
-  }, [profileNonce]);
-
-  // Пол и сон — из профиля (единый источник; в хабе своих селектов нет, без дублей)
-  const profileSex = useMemo(() => {
-    try {
-      const p = JSON.parse(localStorage.getItem('he_profile_v2') || '{}');
-      const s = p?.settings?.personal?.sex ?? p?.personal?.sex;
-      return s === 'female' || s === 'male' ? (s as 'male' | 'female') : '';
-    } catch { return ''; }
-  }, [profileNonce]);
-  const profileSleep = useMemo(() => {
-    try {
-      const p = JSON.parse(localStorage.getItem('he_profile_v2') || '{}');
-      const n = Number(p?.settings?.lifestyle?.sleepHours ?? p?.lifestyle?.sleepHours);
-      return Number.isFinite(n) && n > 0 ? n : null;
-    } catch { return null; }
-  }, [profileNonce]);
-  // R6: возраст из профиля — гейт нагруженных проб для 14–15 (прецедент teenNotes ББ-авто)
-  const profileAge = useMemo(() => {
-    try {
-      const p = JSON.parse(localStorage.getItem('he_profile_v2') || '{}');
-      const a = Number(p?.settings?.personal?.age ?? p?.personal?.age);
-      return Number.isFinite(a) && a > 0 ? a : null;
-    } catch { return null; }
-  }, [profileNonce]);
-  const teenGate = useMemo(() => teenLoadedGate(profileAge), [profileAge]);
-  // state.sex — замороженный легаси-фолбэк (UI-селекта больше нет); профиль приоритетнее
-  const effSex = ((profileSex || state.sex || '') as '' | 'male' | 'female');
-
-  /**
-   * AUDIT 2026-11: дневник читался ОДИН раз при монтировании (deps=[]), поэтому
-   * тренировка, записанная в другой вкладке/экране, не попадала в диагностику до
-   * перезагрузки. Обновляем при возврате к приложению и при storage-событии.
-   */
-  const [diaryNonce, setDiaryNonce] = useState(0);
-  useEffect(() => {
-    const bump = () => setDiaryNonce(n => n + 1);
-    const onStorage = (e: StorageEvent) => {
-      if (!e.key || /he_workout_log|he_bb_diagnostics_hub/.test(e.key)) bump();
-    };
-    const onVisible = () => { if (document.visibilityState === 'visible') bump(); };
-    window.addEventListener('storage', onStorage);
-    window.addEventListener('focus', bump);
-    document.addEventListener('visibilitychange', onVisible);
-    return () => {
-      window.removeEventListener('storage', onStorage);
-      window.removeEventListener('focus', bump);
-      document.removeEventListener('visibilitychange', onVisible);
-    };
-  }, []);
-
-  const diarySessions: any[] = useMemo(() => {
-    // ROUND-10: единый адаптер (живой he_workout_log_v2; цепочка `||` с `'[]'` глушила v2)
-    try { return loadHubDiarySessions(); } catch { return []; }
-  }, [diaryNonce]);
-
-  const factVolume = useMemo(() => {
-    try {
-      // последние 7 дней факт (effective). Окно — КАЛЕНДАРНОЕ (localIsoDateOffset):
-      // `new Date('YYYY-MM-DD')` — полночь UTC, и в зонах UTC− окно съезжало на сутки
-      // (сессия 6-дневной давности выпадала/заезжала).
-      const from = localIsoDateOffset(-7);
-      const recent = diarySessions.filter((s: any) => {
-        const d = String(s.date || '').slice(0, 10);
-        return d && d >= from;
-      });
-      if (recent.length === 0) return null;
-      // 3.11: факт-объём через канонический aggregateBBVolume (direct + EMG-indirect),
-      // а не своя сумма «direct = effective» без косвенной нагрузки.
-      const exercises = recent.flatMap((s: any) => ((s.exercises || []) as any[]).map((ex) => ({
-        name: String(ex.exerciseName || ex.name || ''),
-        muscle: String(ex.muscleGroup || ex.muscle || '').toLowerCase(),
-        sets: Array.isArray(ex.sets) ? ex.sets.length : Math.max(0, Number(ex.sets) || 0),
-        rir: Number(ex.rir) || 2,
-        role: 'accessory' as const,
-      })).filter((e) => e.muscle && e.sets > 0));
-      if (exercises.length === 0) return null;
-      return aggregateBBVolume([{ exercises }]);
-    } catch { return null; }
-  }, [diarySessions]);
-
-  const perMuscleAcwr = useMemo(() => {
-    try { return computePerMuscleACWR(diarySessions as any); } catch { return {}; }
-  }, [diarySessions]);
-
-  // Э5-доводка (R6): сохранённый план читается ОДИН раз на рендер (было 3 точки readSavedBbPlan)
-  const savedPlan = useMemo(() => {
-    try { return readSavedBbPlan(); } catch { return null; }
-  }, [planNonce, diarySessions]);
-
-  const balance = useMemo(() => {
-    try {
-      if (savedPlan?.weeks) return analyzeBBBalance(savedPlan);
-      return null;
-    } catch { return null; }
-  }, [savedPlan]);
+  // Дневник + план из хранилища — в `hooks/use-bb-hub-live.ts`: перечитывание по
+  // storage/focus/visibility (дневник), канонический факт-объём и ACWR, один read плана.
+  const { diarySessions, factVolume, perMuscleAcwr, savedPlan, balance } = useBbHubLive(planNonce);
 
   const ohs = useMemo(() => assessOHS({
     heelsFlat: state.ohsHeelsFlat, kneeValgus: state.ohsKneeValgus, hipBelowParallel: state.ohsHipBelowParallel,

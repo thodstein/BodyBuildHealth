@@ -7,9 +7,13 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { pickPlanFromSaved } from '../BBDiagnosticsHub';
+import { pickPlanFromSaved } from '../bb-hub-state';
 
-const SRC = readFileSync(resolve(__dirname, '..', 'BBDiagnosticsHub.tsx'), 'utf8');
+const SRC = [
+  readFileSync(resolve(__dirname, '..', 'BBDiagnosticsHub.tsx'), 'utf8'),
+  readFileSync(resolve(__dirname, '..', 'bb-hub-state.ts'), 'utf8'),
+  readFileSync(resolve(__dirname, '..', 'hooks', 'use-bb-hub-live.ts'), 'utf8'),
+].join('\n');
 
 describe('3.11 pickPlanFromSaved — единый парсинг storage', () => {
   const plan = { weeks: [{ week: 1, sessions: [] }] };

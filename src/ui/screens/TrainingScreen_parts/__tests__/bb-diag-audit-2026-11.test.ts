@@ -10,6 +10,14 @@ import { resolve } from 'node:path';
 
 const read = (f: string) => readFileSync(resolve(__dirname, '..', f), 'utf8');
 const HUB = read('BBDiagnosticsHub.tsx');
+// Волна 3: состояние/дефолты/табы уехали в `bb-hub-state.ts`, дневник/план — в под-хук,
+// поэтому локи «где живёт код» читают всю поверхность хаба, а не один файл.
+const HUB_SURFACE = [
+  HUB,
+  read('bb-hub-state.ts'),
+  read('hooks/use-bb-hub-live.ts'),
+  read('hooks/use-bb-hub-profile.ts'),
+].join('\n');
 const AUTO = read('BbAutoConstructor.tsx');
 const TAB = read('bb-hub-screening-tab.tsx');
 const CONTROLS = read('bb-hub-controls.tsx');
@@ -90,7 +98,7 @@ describe('W2b спец-блок и возврат', () => {
   });
   it('хаб просит 4–6 нед — приёмник не режет длину молча (BB-D-24)', () => {
     expect(HUB).toMatch(/Math\.max\(4, Math\.min\(6, n\)\)/);
-    expect(HUB).toMatch(/specWeeks: '6'/);
+    expect(HUB_SURFACE).toMatch(/specWeeks: '6'/);
   });
 
   it('орто-гарды не снимаются чужой диагностикой (BB-D-19)', () => {
@@ -136,8 +144,8 @@ describe('W5 (BB-G-01/02/04) объём-recovery, deep-links, эффект ко�
   const TRAIN = readFileSync(resolve(__dirname, '..', '..', 'TrainingScreen.tsx'), 'utf8');
 
   it('6-й таб «Объём · Recovery» есть в навигации хаба и рендерится', () => {
-    expect(HUB).toMatch(/\{ id: 'volume', label: 'Объём · Recovery'/);
-    expect(HUB).toMatch(/type BBTab = .*'volume'/);
+    expect(HUB_SURFACE).toMatch(/\{ id: 'volume', label: 'Объём · Recovery'/);
+    expect(HUB_SURFACE).toMatch(/type BBTab = .*'volume'/);
     expect(HUB).toContain("{tab === 'volume' && (");
   });
 
@@ -219,8 +227,8 @@ describe('W5 (BB-G-01/02/04) объём-recovery, deep-links, эффект ко�
 
 describe('W1 дневник хаба обновляется', () => {
   it('diarySessions не заморожен на монтировании', () => {
-    expect(HUB).not.toMatch(/loadHubDiarySessions\(\); \} catch \{ return \[\]; \}\s*\}, \[\]\);/);
-    expect(HUB).toContain('diaryNonce');
+    expect(HUB_SURFACE).not.toMatch(/loadHubDiarySessions\(\); \} catch \{ return \[\]; \}\s*\}, \[\]\);/);
+    expect(HUB_SURFACE).toContain('diaryNonce');
   });
 
   it('таймеры тостов чистятся (нет голого setTimeout(() => setToast(\'\'))', () => {

@@ -14,7 +14,14 @@ import { aggregateBBVolume } from '../../../../engines/bb/bb-volume.engine';
 import { buildSpecBlock } from '../../../../engines/bb/bb-spec-block.engine';
 import { EXERCISE_CATALOG } from '../../../../core/exercise-catalog';
 
-const SRC = readFileSync(resolve(__dirname, '..', 'BBDiagnosticsHub.tsx'), 'utf8');
+// Source-guard: поверхность хаба — контейнер + под-хуки волны 3 (`use-bb-hub-live.ts`
+// держит единственное чтение плана, `bb-hub-state.ts` — состояние/дефолты).
+const SRC = [
+  readFileSync(resolve(__dirname, '..', 'BBDiagnosticsHub.tsx'), 'utf8'),
+  readFileSync(resolve(__dirname, '..', 'bb-hub-state.ts'), 'utf8'),
+  readFileSync(resolve(__dirname, '..', 'hooks', 'use-bb-hub-live.ts'), 'utf8'),
+  readFileSync(resolve(__dirname, '..', 'hooks', 'use-bb-hub-profile.ts'), 'utf8'),
+].join('\n');
 
 const planWith = (ex: Array<Record<string, unknown>>) => ({ weeks: [{ sessions: [{ exercises: ex }] }] });
 

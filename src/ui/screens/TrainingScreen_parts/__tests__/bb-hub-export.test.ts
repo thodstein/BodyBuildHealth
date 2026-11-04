@@ -9,7 +9,13 @@ import { resolve } from 'node:path';
 import { buildPro2Meta, type BbHubPro2Input } from '../bb-hub-export';
 import { buildBBDiagnosticsHtml, buildBBDiagnosticsCsv } from '../../../../engines/bb/bb-diagnostics-export.engine';
 
-const SRC = readFileSync(resolve(__dirname, '..', 'BBDiagnosticsHub.tsx'), 'utf8');
+// Source-guard: поверхность хаба — сам контейнер + под-хуки волны 3
+// (`hooks/use-bb-hub-live.ts` держит единственное чтение плана, `bb-hub-state.ts` — парсер).
+const SRC = [
+  readFileSync(resolve(__dirname, '..', 'BBDiagnosticsHub.tsx'), 'utf8'),
+  readFileSync(resolve(__dirname, '..', 'bb-hub-state.ts'), 'utf8'),
+  readFileSync(resolve(__dirname, '..', 'hooks', 'use-bb-hub-live.ts'), 'utf8'),
+].join('\n');
 
 const baseInput = (over?: Partial<BbHubPro2Input>): BbHubPro2Input => ({
   lrVerdicts: [{ group: 'chest', left: 10, right: 12, asymPct: 18, weakSide: 'left', verdict: 'topup', topUpSets: 2, text: 'слабее левая' }],
