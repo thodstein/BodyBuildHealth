@@ -988,11 +988,21 @@ describe('metabolic-hub PRO v4 — Adaptive v3, CAT2, Sweat V2, MetS-добив�
     expect(calcVAIWrap({ waistCm:102, bmi:30, tgMgDl:180, hdlMgDl:35, sex:'male' })).toBeGreaterThan(1.5);
     expect(calcFMIWrap(80,20,180)).toBeCloseTo(4.94, 0.2);
   });
-  it('Алко-хроника: 14+ units high (WHO)', async () => {
+  it('Алко-хроника: 14+ units high (UK CMO)', async () => {
     const { calcAlcoholChronic } = await import('../metabolic-hub.engine');
     expect(calcAlcoholChronic(40,3).unitsPerWeek).toBe(15);
     expect(calcAlcoholChronic(40,3).risk).toBe('high');
+    expect(calcAlcoholChronic(40,3).note).toContain('120г');
     expect(calcAlcoholChronic(20,2).risk).toBe('low');
+  });
+  it('Алко-хроника: без дней — «нет данных», а не «низкая»', async () => {
+    const { calcAlcoholChronic } = await import('../metabolic-hub.engine');
+    const unknown = calcAlcoholChronic(80, 0);
+    expect(unknown.note).toContain('Укажи');
+    expect(unknown.note).not.toContain('низкая');
+    // без дней, но и без дозы — это честный ноль
+    expect(calcAlcoholChronic(0, 0).unitsPerWeek).toBe(0);
+    expect(calcAlcoholChronic(0, 0).note).toContain('низкая');
   });
   it('DIAAS PRO: whey leuc > pea, 60+ ceiling 0.60, pre-sleep 40 при 90кг', async () => {
     const { calcProteinTimingPro } = await import('../metabolic-hub.engine');

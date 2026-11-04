@@ -155,6 +155,19 @@ describe('MetabolicHub: ввод меняет расчёт (проводка п�
     expect(blood).toMatch(/мл/);
   });
 
+  it('хроника алкоголя не врёт «низкая», когда дни не указаны', () => {
+    render(<MetabolicHub />);
+    setNumber('Алкоголь, г/сут', 80);
+    let txt = openMode('Алко');
+    expect(txt).toContain('Укажи');
+    expect(txt).not.toContain('Алко-хроника низкая');
+    setNumber('Дней/нед с алко', 3);
+    txt = openMode('Алко');
+    expect(txt).toContain('30 units/нед');
+    expect(txt).toContain('240г за неделю');
+    expect(txt).toContain('UK CMO 2016');
+  });
+
   it('алкоголь подписан как приём сверх плана, а не «уже в TDEE»', () => {
     render(<MetabolicHub />);
     const txt0 = openMode('Алко');

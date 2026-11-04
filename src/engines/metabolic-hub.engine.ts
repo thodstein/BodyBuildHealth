@@ -1392,10 +1392,22 @@ export function calcFMIWrap(weight: number, bodyFat: number, height: number): nu
 }
 /** Алко-хроника: units/нед → FLI/EA/HOMA-связка (WHO порог 14 units/нед) */
 export function calcAlcoholChronic(alcoholGPerDay?: number, daysPerWeek?: number): { unitsPerWeek: number; risk: 'low' | 'moderate' | 'high'; note: string } {
-  const g = Math.max(0, alcoholGPerDay ?? 0); const d = Math.max(0, Math.min(7, daysPerWeek ?? (g > 0 ? 2 : 0)));
-  const units = Math.round(((g * d) / 8) * 10) / 10; // UK unit 8г
+  const g = Math.max(0, alcoholGPerDay ?? 0);
+  // Аудит 2026-11: при g>0 и днях=0 движок печатал «0 units/нед — хроника низкая», хотя
+  // человек только что ввёл дозу. Теперь «дни не указаны» — это отсутствие данных, а не «низко».
+  const daysKnown = typeof daysPerWeek === 'number' && daysPerWeek > 0;
+  const d = Math.max(0, Math.min(7, daysKnown ? (daysPerWeek as number) : (g > 0 ? 0 : 0)));
+  const gramsPerWeek = Math.round(g * d);
+  const units = Math.round((gramsPerWeek / 8) * 10) / 10; // UK unit 8г
+  if (g > 0 && !daysKnown) {
+    return { unitsPerWeek: 0, risk: 'low', note: `Укажи «Дней/нед с алко» — без них хроника не считается (units = г × дни / 8)` };
+  }
   const risk = units >= 14 ? 'high' : units >= 7 ? 'moderate' : 'low';
-  const note = risk === 'high' ? `Алко-хроника ${units} units/нед ≥14 WHO — FLI↑, MPS↓, сон↓, EA↓ (Suter + Bedogni)` : risk === 'moderate' ? `Алко ${units} units/нед — граница, ≤1б/нед без трени` : 'Алко-хроника низкая';
+  const note = risk === 'high'
+    ? `Алко-хроника ${units} units/нед (${gramsPerWeek}г этанола) ≥14 units — UK CMO 2016: FLI↑, MPS↓, сон↓, EA↓ (Suter + Bedogni)`
+    : risk === 'moderate'
+      ? `Алко ${units} units/нед (${gramsPerWeek}г) — граница (UK CMO ≤14/нед), ≤1б/нед без трени`
+      : `Алко-хроника низкая: ${units} units/нед (${gramsPerWeek}г)`;
   return { unitsPerWeek: units, risk, note };
 }
 

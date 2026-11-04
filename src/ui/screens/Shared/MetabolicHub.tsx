@@ -1099,7 +1099,7 @@ const kbju = useMemo(()=> calcKBJU(input), [input]);
           : <div style={{ fontSize:9, color:'rgba(255,255,255,0.55)' }}>TDEE по формуле — adaptive v3 включится после 7 взвешиваний и дневника (сейчас {weightHistory.length}/{diaryDays}).</div>}
         {adaptiveV3?.plateau && <div style={{ fontSize:9, color:'#fbbf24' }}>⏸ Плато: тренд {adaptiveV3.trend}кг/нед · AT {adaptiveV3.atKcal}ккал — проверь дефицит и шаги</div>}
         {cat2.light !== 'green' && <div style={{ fontSize:9, color: cat2.color }}>CAT2 {cat2.light.toUpperCase()}: {cat2.note}</div>}
-        {alcoholChronic.risk !== 'low' && <div style={{ fontSize:9, color: alcoholChronic.risk==='high'?'#ef4444':'#f59e0b' }}>{alcoholChronic.note}</div>}
+        {alcoholG > 0 && <div style={{ fontSize:9, color: alcoholChronic.risk==='high'?'#ef4444': alcoholChronic.risk==='moderate'?'#f59e0b':'#facc15' }}>{alcoholChronic.note}</div>}
         <div style={{ fontSize:8, color:'rgba(255,255,255,0.45)' }}>TG/HDL {tgHdl ?? '—'}{tgHdl && tgHdl>=3.5?' ⚠ IR':''} · LAP {lapV ?? '—'} · VAI {vaiV ?? '—'} · FMI {fmiV ?? '—'} · NEAT {neatPro.total} · AT {atRange.low}–{atRange.high} · DIAAS {proteinPro.diaas}{pregAdd ? ` · 🤰 +${pregAdd}ккал` : ''}</div>
       </div>
 
@@ -1445,7 +1445,7 @@ const kbju = useMemo(()=> calcKBJU(input), [input]);
             <div style={{ fontSize:9, color:'rgba(255,255,255,0.45)' }}>из sRPE · {cortisol.caffeineAdj? `коф +${cortisol.caffeineAdj}`:''} {cortisol.alcoholAdj? `алк +${cortisol.alcoholAdj}`:''}</div>
           </div>
         </MhGrid>
-        <div style={{ fontSize:8, color:'rgba(255,255,255,0.45)', background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', borderRadius:10, padding:'8px 10px', marginTop:6 }}>{alcohol.kcal>0? `${alcohol.kcal}ккал алко · блок жира ${alcohol.fatOxidationBlockedPct}%`:'Без алкоголя'} · хроника: {alcoholChronic.unitsPerWeek} units/нед {alcoholChronic.risk !== 'low' ? `· ${alcoholChronic.note}` : ''} · {caffeineCurve.note} · сон cut-off {caffeineCurve.sleepCutoffH}ч</div>
+        <div style={{ fontSize:8, color:'rgba(255,255,255,0.45)', background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', borderRadius:10, padding:'8px 10px', marginTop:6 }}>{alcohol.kcal>0? `${alcohol.kcal}ккал алко · блок жира ${alcohol.fatOxidationBlockedPct}%`:'Без алкоголя'} · хроника: {alcoholChronic.unitsPerWeek} units/нед{alcoholG > 0 ? ` · ${alcoholChronic.note}` : ''} · {caffeineCurve.note} · сон cut-off {caffeineCurve.sleepCutoffH}ч</div>
       </MhSection>
       </div>
       <div style={{ ...CARD, border:'1px solid rgba(6,182,214,0.12)', padding:10, background:'rgba(6,182,214,0.04)', display: wizardStep===3 ? 'block' : 'none' }}>
@@ -2045,6 +2045,12 @@ const kbju = useMemo(()=> calcKBJU(input), [input]);
                 </div>
               </div>
               {alcohol.kcal>0 && <div style={{ marginTop:8, padding:'8px 10px', borderRadius:8, background:'rgba(249,115,22,0.08)', border:'1px solid rgba(249,115,22,0.18)', fontSize:10, color:'#fff' }}>🥃 {alcohol.kcal} ккал спирта — это <b>приём сверх плана</b>, а не расход: в КБЖУ дневная цель их не содержит (в TEF учтён только расход на переваривание ~{alcohol.tef} ккал). Пьёшь — добавь {alcohol.kcal} ккал к дню или убери ~{Math.round(alcohol.kcal/4)}г углеводов. Жир блок {alcohol.fatOxidationBlockedPct}% ~3ч — не планируй тренировку сразу после.</div>}
+              {alcoholG > 0 && (
+                <div style={{ marginTop:8, padding:'8px 10px', borderRadius:8, fontSize:10, lineHeight:1.45, background: alcoholChronic.risk==='high'?'rgba(239,68,68,0.08)':'rgba(245,158,11,0.06)', border:`1px solid ${alcoholChronic.risk==='high'?'rgba(239,68,68,0.18)':'rgba(245,158,11,0.16)'}`, color: alcoholChronic.risk==='high'?'#f87171':'#fbbf24' }}>
+                  📅 Хроника: {alcoholChronic.unitsPerWeek} units/нед ({alcoholG * alcoholDays}г за неделю) · {alcoholChronic.note}
+                  {alcoholDays <= 0 && <div style={{ marginTop:4, color:'#fff' }}>Укажи «Дней/нед с алко» в HPA-блоке — иначе недельная доза и риск не считаются.</div>}
+                </div>
+              )}
             </div>
           )}
           {mode==='protein' && (
