@@ -12,7 +12,7 @@
  * Этап 21: подгруппы для ВСЕХ мышц (display-only, вне капа) + пояснения.
  */
 import type { BBPlan } from './bb-builder.engine';
-import { exerciseVolumeContributions } from './bb-volume.engine';
+import { aggregateBBVolume } from './bb-volume.engine';
 import { derivePattern } from '../movement-pattern';
 
 export interface BBMuscleSummary {
@@ -238,13 +238,6 @@ export function buildBBExpandedSummary(plan: BBPlan): BBExpandedSummary {
           m.warmupSets += ex.sets || 0;
           continue;
         }
-        const contributions = exerciseVolumeContributions(ex as any);
-        let hasDirect = false;
-        for (const c of contributions) {
-          if (c.muscle === muscle) { if (c.source === 'direct') { m.directSets += c.directSets; hasDirect = true; } else m.indirectSets += c.effectiveSets; }
-          else if (c.source === 'indirect' && c.muscle === muscle) m.indirectSets += c.effectiveSets;
-        }
-        if (!hasDirect && contributions.every(c => c.muscle !== muscle)) m.directSets += ex.sets || 0;
         m.workingSets += ex.sets || 0;
         totalWorkingSets += ex.sets || 0;
         const pattern = getPatternForExercise(ex);
@@ -264,6 +257,34 @@ export function buildBBExpandedSummary(plan: BBPlan): BBExpandedSummary {
         if (!seenMuscles.has(muscle)) { seenMuscles.add(muscle); m.sessionsPerWeek += 1; }
       }
     }
+  }
+
+  // direct/indirect — по КАНОНУ объёма (`aggregateBBVolume`), а не по метке
+  // мышцы упражнения. Замер (96 планов): 139 расхождений по direct и 446 по
+  // indirect. Примеры: `biceps` — «косв. 0» при 4-5 фактических эффективных сетах
+  // (косвенная от тяг не считалась вовсе), `shoulders` — «direct 3» при каноне 1
+  // (метка `shoulders` уходит в пучок delt_*). Строка отчёта
+  // «direct N · косв. M» описывала не тот объём, по которому работает валидатор
+  // (он сверяет с MEV/MAV/MRV ЭФФЕКТИВНЫЕ сеты). Теперь обе цифры — из той же
+  // модели, что и `weeklyVolume`; мышца, живущая только на косвенной нагрузке,
+  // попадает в сводку (раньше её там не было, и «косв. 0» было буквально пустым).
+  const canonDirect: Record<string, number> = {};
+  const canonIndirect: Record<string, number> = {};
+  for (const week of plan.weeks) {
+    const agg = aggregateBBVolume(week.sessions || []) as Record<string, any>;
+    for (const [m, v] of Object.entries(agg)) {
+      const direct = Number(v?.directSets || 0);
+      const effective = Number(v?.effectiveSets ?? direct);
+      canonDirect[m] = (canonDirect[m] || 0) + direct;
+      canonIndirect[m] = (canonIndirect[m] || 0) + Math.max(0, effective - direct);
+    }
+  }
+  for (const m of new Set([...Object.keys(canonDirect), ...Object.keys(byMuscle)])) {
+    if (!byMuscle[m]) {
+      byMuscle[m] = { muscle: m, sessionsPerWeek: 0, workingSets: 0, warmupSets: 0, directSets: 0, indirectSets: 0, byPattern: {}, bySession: [], byExercise: {}, subGroups: {} };
+    }
+    byMuscle[m].directSets = canonDirect[m] || 0;
+    byMuscle[m].indirectSets = canonIndirect[m] || 0;
   }
 
   // Нормализуем на неделю (среднее) — только целые подходы, без дробных 16.5.

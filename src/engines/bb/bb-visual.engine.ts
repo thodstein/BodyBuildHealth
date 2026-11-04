@@ -45,15 +45,33 @@ export function buildBBMuscleHeatmap(plan: BBPlan, opts?: { mevByMuscle?: Record
   const mrv = opts?.mrvByMuscle || {};
   const landmarks = (plan as any).volumeLandmarks as Array<{ muscle: string; mev: number; mav: number; mrv: number }> | undefined;
   const lmFor = (m: string) => landmarks?.find(l => l.muscle === m);
+  // Источник цифры — снимок факта плана (`weeklyVolume`, пересчитывается
+  // последним, см. bb-plan-snapshot.engine). Раньше здесь считались СЫРЫЕ сеты
+  // по полю `e.muscle`, и это расходилось с планом: замер на ppl_6 — 4/28 ячеек
+  // врали (`shoulders` 12 против факта 3 прямых / 9.8 эффективных, `delt_rear`
+  // 6 против 12). Причина — паритет пулов: упражнение с меткой `shoulders` может
+  // быть задней дельтой, и `aggregateBBVolume` раскладывает его по пучкам.
+  // Теперь берём ту же величину, что валидатор/качество: ЭФФЕКТИВНЫЕ сеты
+  // (прямые + дробные косвенные) — именно к ним относятся MEV/MAV/MRV.
+  const snapshot = (plan as any).weeklyVolume as Record<string, Record<string, any>> | undefined;
   const out: HeatmapCell[] = [];
   for (const w of plan.weeks) {
     const byMuscle: Record<string, number> = {};
-    for (const s of w.sessions) {
-      for (const e of s.exercises) {
-        if ((e as any).warmupActivator) continue;
-        const m = e.muscle || '';
-        if (!m) continue;
-        byMuscle[m] = (byMuscle[m] || 0) + (e.sets || 0);
+    const weekSnap = snapshot?.[w.week];
+    if (weekSnap && Object.keys(weekSnap).length > 0) {
+      for (const [m, v] of Object.entries(weekSnap)) {
+        const sets = Math.round(Number((v as any)?.effectiveSets ?? (v as any)?.directSets ?? 0));
+        if (sets > 0) byMuscle[m] = sets;
+      }
+    } else {
+      // Планы без снимка (ручные/импортированные) — прямой счёт по мышце упражнения.
+      for (const s of w.sessions) {
+        for (const e of s.exercises) {
+          if ((e as any).warmupActivator) continue;
+          const m = e.muscle || '';
+          if (!m) continue;
+          byMuscle[m] = (byMuscle[m] || 0) + (e.sets || 0);
+        }
       }
     }
     for (const [muscle, sets] of Object.entries(byMuscle)) {
@@ -197,23 +215,10 @@ export function bbWeekDateRanges(plan: BBPlan, opts?: { startDate?: string; refe
     // Без даты — только пометка фазы (диапазоны не вычислимы).
     return plan.weeks.map(w => ({ week: w.week, start: '', end: '', isCurrent: false }));
   }
-  const parse = (iso: string): Date => {
-    const m = String(iso).match(/^(\d{4})-(\d{2})-(\d{2})/);
-    return m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])) : new Date(NaN);
-  };
-  const addDays = (iso: string, d: number): string => {
-    const dt = parse(iso);
-    if (Number.isNaN(dt.getTime())) return '';
-    dt.setDate(dt.getDate() + d);
-    const y = dt.getFullYear();
-    const mo = String(dt.getMonth() + 1).padStart(2, '0');
-    const da = String(dt.getDate()).padStart(2, '0');
-    return `${y}-${mo}-${da}`;
-  };
   const refStr = ref || new Date().toISOString().slice(0, 10);
   return plan.weeks.map(w => {
-    const s = addDays(start, (w.week - 1) * 7);
-    const e = addDays(start, (w.week - 1) * 7 + 6);
+    const s = addDaysIso(start, (w.week - 1) * 7);
+    const e = addDaysIso(start, (w.week - 1) * 7 + 6);
     return { week: w.week, start: s, end: e, isCurrent: refStr >= s && refStr <= e };
   });
 }
@@ -261,7 +266,28 @@ h1{font-size:18px}h2{font-size:14px;border-bottom:1px solid #ddd;padding-bottom:
 <h2>📋 Таблица мезоцикла</h2>${weeksHtml}${heatmapHtml}</body></html>`;
 }
 
-/** Фаза 4.24: обычный план → .ics (события по неделям/дням). */
+/** Сдвиг ISO-даты (`YYYY-MM-DD`) на N дней. Один календарный канон на модуль. */
+function addDaysIso(iso: string, days: number): string {
+  const m = String(iso).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!m) return '';
+  const dt = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  if (Number.isNaN(dt.getTime())) return '';
+  dt.setDate(dt.getDate() + days);
+  const y = dt.getFullYear();
+  const mo = String(dt.getMonth() + 1).padStart(2, '0');
+  const da = String(dt.getDate()).padStart(2, '0');
+  return `${y}-${mo}-${da}`;
+}
+
+/** Фаза 4.24: обычный план → .ics (события по неделям/дням).
+ *
+ * Каждая СЕССИЯ — отдельное событие в свой день недели. Раньше все сессии
+ * недели получали один и тот же `DTSTART` (дата начала недели, 10:00Z), то есть
+ * 6-дневный сплит на 2 недели давал 12 событий в 2 датах внахлёст, и обещание
+ * «календарь по неделям/дням» было неправдой. День берём из `session.day`
+ * (1..7 внутри недели, его же использует плеер), с фолбэком на порядковый номер.
+ * `DTEND` = +1 час: событие нулевой длины календарь показывает как «весь день»/
+ * пустую запись. */
 export function buildBBPlanIcs(plan: BBPlan, opts?: { startDate?: string }): string {
   if (!plan?.weeks?.length) return '';
   const ranges = bbWeekDateRanges(plan, { startDate: opts?.startDate });
@@ -271,17 +297,24 @@ export function buildBBPlanIcs(plan: BBPlan, opts?: { startDate?: string }): str
   const uid = (n: string) => String(n).replace(/[^A-Za-z0-9_-]/g, '_');
   plan.weeks.forEach((w, i) => {
     const r = ranges[i];
-    if (!r) return;
-    for (const s of w.sessions || []) {
-      const title = `${w.week} нед · ${uid(s.character || 'тренировка')}`;
-      const dtstart = `${(r.start || '').replace(/-/g, '')}T100000Z`;
+    if (!r || !r.start) return;
+    (w.sessions || []).forEach((s, si) => {
+      // Пустой день («😴 Полный отдых») в календарь не пишем: событие
+      // «тренировка» на день отдыха — ложное напоминание.
+      if (!((s as any).exercises || []).length) return;
+      // 1..7 — внутри недели, чтобы событие не уехало в следующую неделю плана.
+      const dayIdx = Math.min(7, Math.max(1, Number((s as any).day) || si + 1));
+      const date = addDaysIso(r.start, dayIdx - 1);
+      if (!date) return;
+      const stamp = date.replace(/-/g, '');
+      const title = `${w.week} нед · ${uid((s as any).character || 'тренировка')}${(s as any).sessionTag ? ' · ' + uid((s as any).sessionTag) : ''}`;
       lines.push('BEGIN:VEVENT');
       lines.push(`SUMMARY:${title}`);
-      lines.push(`DTSTART:${dtstart}`);
-      lines.push(`DTEND:${dtstart}`);
-      lines.push(`UID:bb-${w.week}-${s.weekOffset ?? s.day ?? 0}@bb-auto`);
+      lines.push(`DTSTART:${stamp}T100000Z`);
+      lines.push(`DTEND:${stamp}T110000Z`);
+      lines.push(`UID:bb-${w.week}-${(s as any).weekOffset ?? dayIdx}@bb-auto`);
       lines.push('END:VEVENT');
-    }
+    });
   });
   lines.push('END:VCALENDAR');
   return lines.join('\r\n');

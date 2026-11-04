@@ -9,6 +9,7 @@
 import { buildBBPlan } from '../bb-builder.engine';
 import { buildBBExpandedSummary } from '../bb-summary.engine';
 import { buildBBPlanReportText } from '../bb-report.engine';
+import { aggregateBBVolume } from '../bb-volume.engine';
 import { SPLIT_PATTERNS } from '../bb-split-patterns';
 
 const WM = { chest: 100, back: 120, shoulders: 60, biceps: 50, triceps: 60, quads: 140, hamstrings: 100, glutes: 140, calves: 80, abs: 60, traps: 80, forearms: 40 };
@@ -65,4 +66,39 @@ describe('bb-expanded-summary = факт плана', () => {
     plan.expandedSummary = buildBBExpandedSummary(plan);
     expect(plan.expandedSummary.totalWorkingSets).toBe(first);
   });
+
+  it('direct/indirect по мышце = канон объёма (включая чисто косвенную нагрузку)', () => {
+    // Замер до правки (96 планов): 139 расхождений по direct и 446 по indirect.
+    // `biceps` показывал «косв. 0» при 4-5 фактических эффективных сетах (косвенная
+    // от тяг не считалась), `shoulders` — «direct 3» при каноне 1 (метка плеч уходит
+    // в пучок через aggregateBBVolume). Теперь обе цифры берутся из канона.
+    for (const patternId of ['fullbody_3', 'upper_lower_4', 'ppl_6']) {
+      for (const weeks of [1, 2]) {
+        const plan: any = buildBBPlan({ patternId, level: 'intermediate', goal: 'mass', weeks, workMax: WM });
+        const sum = buildBBExpandedSummary(plan);
+        // канон: среднее по неделям
+        const canon: Record<string, { direct: number; indirect: number }> = {};
+        for (const w of plan.weeks) {
+          const agg = aggregateBBVolume(w.sessions) as Record<string, any>;
+          for (const [m, v] of Object.entries(agg)) {
+            const direct = Number(v?.directSets || 0);
+            const effective = Number(v?.effectiveSets ?? direct);
+            if (!canon[m]) canon[m] = { direct: 0, indirect: 0 };
+            canon[m].direct += direct;
+            canon[m].indirect += Math.max(0, effective - direct);
+          }
+        }
+        const weeksCount = Math.max(1, plan.weeks.length);
+        for (const [m, c] of Object.entries(canon)) {
+          const row = sum.byMuscle[m];
+          expect(row, `${patternId}/${weeks}н: ${m} отсутствует в сводке`).toBeDefined();
+          expect(row.directSets, `${patternId}/${weeks}н: ${m} direct`).toBe(Math.round(c.direct / weeksCount));
+          expect(row.indirectSets, `${patternId}/${weeks}н: ${m} indirect`).toBe(Math.round(c.indirect / weeksCount));
+        }
+        // Мышца с одной косвенной нагрузкой реально видна в отчёте (было «косв. 0»).
+        const anyIndirect = Object.entries(sum.byMuscle).some(([, r]: [string, any]) => (r.indirectSets || 0) > 0);
+        expect(anyIndirect, `${patternId}/${weeks}н: ни у одной мышцы нет косвенных сетов`).toBe(true);
+      }
+    }
+  }, 600000);
 });

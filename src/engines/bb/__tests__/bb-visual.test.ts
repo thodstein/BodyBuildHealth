@@ -14,6 +14,24 @@ describe('Фаза 4.19: heatmap мышца×неделя', () => {
     expect(hm[0]).toHaveProperty('muscle');
     expect(hm[0]).toHaveProperty('sets');
   });
+
+  it('цифра клетки = факт плана (weeklyVolume), а не сырые сеты по метке мышцы', () => {
+    // Замер до правки (ppl_6): 4 из 28 клеток врали — `shoulders` 12 против
+    // 3 прямых / 9.8 эффективных, `delt_rear` 6 против 12: упражнение с меткой
+    // `shoulders` может быть задней дельтой, и aggregateBBVolume раскладывает его
+    // по пучкам, а heatmap считал сырые сеты по полю `e.muscle`.
+    for (const patternId of ['ppl_6', 'upper_lower_4', 'fullbody_3']) {
+      const plan: any = buildBBPlan({ patternId, level: 'intermediate', goal: 'mass', weeks: 2 } as any);
+      const hm = buildBBMuscleHeatmap(plan);
+      expect(hm.length, `${patternId}: пустой heatmap`).toBeGreaterThan(0);
+      for (const cell of hm) {
+        const snap = plan.weeklyVolume?.[cell.week]?.[cell.muscle];
+        expect(snap, `${patternId}: клетка ${cell.week}/${cell.muscle} без снимка факта`).toBeDefined();
+        const expected = Math.round(Number(snap.effectiveSets ?? snap.directSets ?? 0));
+        expect(cell.sets, `${patternId}: ${cell.week}/${cell.muscle}`).toBe(expected);
+      }
+    }
+  });
 });
 
 describe('Фаза 4.21: кривая тапера', () => {
@@ -80,6 +98,45 @@ describe('Фаза 4.24: print HTML + ics', () => {
     expect(ics.startsWith('BEGIN:VCALENDAR')).toBe(true);
     expect(ics).toContain('BEGIN:VEVENT');
     expect(ics).toContain('END:VCALENDAR');
+  });
+
+  it('каждая сессия — событие в свой день; ничего нулевой длины', () => {
+    // Замер до правки (ppl_6, 2 недели, старт 2026-11-04): 12 событий в ДВУХ
+    // датах (все сессии недели получали дату начала недели), у всех
+    // DTEND == DTSTART; сессии несут `day` (1..7) и `weekOffset`, т.е. данные
+    // для раскладки по дням были и игнорировались.
+    const plan: any = buildBBPlan({ patternId: 'ppl_6', level: 'intermediate', goal: 'mass', weeks: 2 } as any);
+    const start = '2026-11-04';
+    const ics = buildBBPlanIcs(plan, { startDate: start });
+    const events = ics.split('BEGIN:VEVENT').length - 1;
+    const sessions = plan.weeks.reduce((n: number, w: any) => n + (w.sessions || []).filter((s: any) => (s.exercises || []).length > 0).length, 0);
+    expect(events).toBe(sessions);
+
+    const pairs = [...ics.matchAll(/DTSTART:(\d{8})T(\d{6})Z\r\nDTEND:(\d{8})T(\d{6})Z\r\nUID:bb-(\d+)-/g)];
+    expect(pairs.length).toBe(events);
+    for (const p of pairs) {
+      expect(p[3] > p[1] || (p[3] === p[1] && p[4] > p[2]), 'нулевая длительность события').toBe(true);
+    }
+    // Внутри недели даты разные (1..7 день недели), недели не наезжают друг на друга.
+    const perWeekDates = new Map<number, string[]>();
+    for (const p of pairs) {
+      const weekNo = Number(p[5]);
+      const list = perWeekDates.get(weekNo) || [];
+      list.push(p[1]);
+      perWeekDates.set(weekNo, list);
+    }
+    for (const [weekNo, dates] of perWeekDates) {
+      expect(new Set(dates).size, `неделя ${weekNo}: события слиплись в один день`).toBe(dates.length);
+    }
+    // Первый день первой недели — ровно дата старта (day=1 → старт).
+    expect(pairs[0][1]).toBe(start.replace(/-/g, ''));
+    // Ни одно событие не уехало за пределы своей недели.
+    const weekKeys = [...perWeekDates.keys()].sort((a, b) => a - b);
+    for (let wi = 1; wi < weekKeys.length; wi++) {
+      const prevMax = [...perWeekDates.get(weekKeys[wi - 1])!].sort().pop()!;
+      const curMin = [...perWeekDates.get(weekKeys[wi])!].sort()[0];
+      expect(curMin > prevMax, 'недели перекрываются').toBe(true);
+    }
   });
 });
 
