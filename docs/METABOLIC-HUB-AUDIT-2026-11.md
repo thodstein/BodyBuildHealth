@@ -326,6 +326,18 @@ TDEE, `cut`/`bulk`-цели и One-answer считались по оценке �
 **Регрессия.** `metabolic-hub-wiring.test.tsx` → «прогноз после донации не считается измерением в
 истории HCT» (ждёт `2 измерений + 1 прогноз`, `Δ +4%`, `title*="прогноз"`).
 
+### 1.31 Поиск нормы считал TDEE по собственному плану
+**Причина.** `calcMaintenanceFinder(weightHistory, diaryAvgKcal ?? kbju.nat.kcal)` — при пустом
+дневнике вместо факта еды в движок уходила **цель** КБЖУ, и карточка печатала
+`тренд … → TDEE ~3012ккал (+AT 0) intake 2640` — то есть выдавала план за измерение. Вес знает,
+сколько съедено, только из дневника; без него «finder» считал TDEE от собственной рекомендации.
+**Исправление.** В finder идёт только `diaryAvgKcal`; без дневника число не считается (`—`), а под
+карточкой стоит жёлтый блок «Finder = вес + **факт** еды. Дневник пуст…». Reverse-auto тоже честно
+подписывает старт: `старт 2640ккал (цель плана)` / `(дневник)`.
+**Регрессия.** `metabolic-hub-wiring.test.tsx` → «finder TDEE не подставляет цель плана вместо факта
+еды» (14 взвешиваний, 0 дней дневника → «Дневник пуст», нет `intake`) и «finder TDEE считает по факту
+дневника, когда он есть» (12 дней → `intake 2600`).
+
 ---
 
 ## 2. Чего не хватало (добавлено)
@@ -375,7 +387,7 @@ TDEE, `cut`/`bulk`-цели и One-answer считались по оценке �
   параллельные `tsc`/`vitest` из других сессий → heap OOM / `Zone Allocation failed`.
   Прогонять на свободной машине.
 - `npx vitest run src/ui/screens/Shared/__tests__ src/engines/__tests__/metabolic-hub.test.ts`
-  — **209 passed** (6 файлов: structure / toggles / honesty / modes / wiring / engine).
+  — **211 passed** (6 файлов: structure / toggles / honesty / modes / wiring / engine).
 - `npx vitest run src/ui/__tests__/rest-hooks-native.test.tsx
   src/engines/__tests__/risk-info-honesty-e07-e08.test.ts` — **89 passed**
   (в stderr шумит jsdom-canvas chart.js — это фон, не падения).

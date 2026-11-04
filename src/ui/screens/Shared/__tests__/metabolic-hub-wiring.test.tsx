@@ -169,6 +169,22 @@ describe('MetabolicHub: ввод меняет расчёт (проводка п�
     expect(txt).toContain(localDate(ready));
   });
 
+  it('finder TDEE не подставляет цель плана вместо факта еды', () => {
+    seedWeightAndDiary(14, 0);
+    render(<MetabolicHub />);
+    const txt = openMode('Поиск нормы');
+    expect(txt).toContain('Дневник пуст');
+    expect(txt).not.toContain('intake ');
+  });
+
+  it('finder TDEE считает по факту дневника, когда он есть', () => {
+    seedWeightAndDiary(14, 12);
+    render(<MetabolicHub />);
+    const txt = openMode('Поиск нормы');
+    expect(txt).toContain('intake 2600');
+    expect(txt).not.toContain('Дневник пуст');
+  });
+
   it('прогноз после донации не считается измерением в истории HCT', () => {
     localStorage.setItem('he_hct_history_v1', JSON.stringify([
       { date: '2026-10-01', hct: 50 },

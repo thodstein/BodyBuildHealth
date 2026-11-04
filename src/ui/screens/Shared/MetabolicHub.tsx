@@ -768,9 +768,11 @@ const kbju = useMemo(()=> calcKBJU(input), [input]);
   const alcohol = useMemo(()=> calcAlcohol(alcoholG, weight), [alcoholG, weight]);
   // белок — единая точка PRO: proteinPro (DIAAS + 60+), v1 calcProteinTiming удалён из UI
   const maintenance = useMemo(()=>{
-    const avgKcal = diaryAvgKcal ?? kbju.nat.kcal;
-    return calcMaintenanceFinder(weightHistory, avgKcal, bodyFat);
-  }, [weightHistory, kbju, diaryAvgKcal, bodyFat]);
+    // Аудит 2026-11: раньше при пустом дневнике сюда подставлялась цель КБЖУ (`kbju.nat.kcal`)
+    // и finder печатал «intake 2450» как измеренный факт. Вес знает, сколько съедено, только из
+    // дневника — без него карточка должна просить данные, а не считать TDEE по собственному плану.
+    return calcMaintenanceFinder(weightHistory, diaryAvgKcal, bodyFat);
+  }, [weightHistory, diaryAvgKcal, bodyFat]);
   // цель — единая точка PRO: goalV2 (Helms caps + diet-break), v1 calcGoalTimeline удалён из UI
   const leafCalc = useMemo(()=> calcLeafScore(leafAnswers), [leafAnswers]);
   // адаптив — единая точка PRO: adaptiveV3 (EMA-28д), v1 calcAdaptiveTDEE удалён из UI
@@ -2029,7 +2031,7 @@ const kbju = useMemo(()=> calcKBJU(input), [input]);
                 <div style={{ padding:14, borderRadius:12, background: maintenance?.confidence==='high'?'rgba(34,197,94,0.08)': maintenance?.confidence==='medium'?'rgba(234,179,8,0.08)':'rgba(255,255,255,0.03)', border:`1px solid ${maintenance?.confidence==='high'?'rgba(34,197,94,0.18)': maintenance?.confidence==='medium'?'rgba(234,179,8,0.18)':'rgba(255,255,255,0.06)'}`, textAlign:'center' }}>
                   <div style={{ fontSize:10, color:'rgba(255,255,255,0.55)' }}>TDEE finder 14д · R2 {maintenance?.r2 ?? '—'} · {maintenance?.confidence ?? 'нет данных'}</div>
                   <div style={{ fontSize:22, fontWeight:900, color: maintenance?.tdee ? '#eab308' : '#fff' }}>{maintenance?.tdee || '—'}<span style={{ fontSize:10 }}>ккал</span></div>
-                  <div style={{ fontSize:9, color:'#fff' }}>{maintenance?.note ?? 'Нужно ≥7 взвешиваний + факт ккал'}</div>
+                  <div style={{ fontSize:9, color:'#fff' }}>{maintenance?.note ?? (diaryAvgKcal ? 'Нужно ≥7 взвешиваний' : 'Нужен дневник питания: без факта ккал TDEE из веса не выводится')}</div>
                 </div>
                 <div style={{ padding:10, borderRadius:10, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', fontSize:10, color:'#fff', lineHeight:1.5 }}>
                   <b style={{ color:'#eab308' }}>Цель Hall 2011 density + AT + Helms caps:</b> {goalV2?.note ?? 'Введи цель вес в антропометрии'}<br/>
@@ -2040,6 +2042,13 @@ const kbju = useMemo(()=> calcKBJU(input), [input]);
                   </div>
                 </div>
               </div>
+              {!diaryAvgKcal && (
+                <div style={{ marginTop:8, padding:'8px 10px', borderRadius:8, background:'rgba(234,179,8,0.06)', border:'1px solid rgba(234,179,8,0.16)', fontSize:10, color:'#eab308', lineHeight:1.45 }}>
+                  📓 Finder = вес + <b>факт</b> еды. Дневник пуст (0 дней), поэтому число не считается: цель из плана
+                  — это не «сколько вы ели», и подставлять её значило бы выдать план за измерение.
+                  Заполни ≥7 дней в «Дневнике питания» — и TDEE посчитается от реального тренда веса.
+                </div>
+              )}
               {emaChartModel ? (
                 <div style={{ marginTop:8, padding:'8px 10px', borderRadius:8, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)' }}>
                   <div style={{ fontSize:9, fontWeight:700, color:'rgba(255,255,255,0.55)', textTransform:'uppercase', marginBottom:6 }}>📈 Динамика 28д · вес + EMA + ккал vs TDEE</div>
@@ -2094,7 +2103,7 @@ const kbju = useMemo(()=> calcKBJU(input), [input]);
                   <div style={{ fontSize:9, color:'#fff' }}>RMR pred {at.rmrPred} → meas ~{at.rmrMeasEst} · {at.note}</div>
                 </div>
                 <div style={{ padding:10, borderRadius:10, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', fontSize:10, color:'#fff', lineHeight:1.5 }}>
-                  <b style={{ color:'#f97316' }}>Reverse-auto — MATADOR Byrne 2017</b><br/>шаг по trend ({adaptiveV3 ? `тренд ${adaptiveV3.trend}кг/нед` : 'нет trend'}) до {reverseAuto[reverseAuto.length-1]?.kcal ?? stepsCalc.tdeeNat}ккал<br/>
+                  <b style={{ color:'#f97316' }}>Reverse-auto — MATADOR Byrne 2017</b><br/>старт {diaryAvgKcal ?? kbju.nat.kcal}ккал ({diaryAvgKcal ? 'дневник' : 'цель плана'}) · шаг по trend ({adaptiveV3 ? `тренд ${adaptiveV3.trend}кг/нед` : 'нет trend'}) до {reverseAuto[reverseAuto.length-1]?.kcal ?? stepsCalc.tdeeNat}ккал<br/>
                   <span style={{ fontSize:9, color:'rgba(255,255,255,0.55)' }}>После дефицита TDEE подавлен 10-15% 4-8нед. Резкий +500 = откат жира.</span>
                   <div style={{ marginTop:6, display:'flex', gap:4, flexWrap:'wrap' }}>
                     {reverseAuto.slice(0,6).map(s=>(
