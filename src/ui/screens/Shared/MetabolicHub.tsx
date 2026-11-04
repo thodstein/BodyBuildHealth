@@ -1256,26 +1256,26 @@ const kbju = useMemo(()=> calcKBJU(input), [input]);
         <div style={{ marginTop:8, display:'flex', gap:4, flexWrap:'wrap', alignItems:'center' }}>
           <span style={{ fontSize:8, color:'rgba(255,255,255,0.55)' }}>Профили (нажми — применить):</span>
           {(['cool','warm','hot'] as const).map(k=>(
-            <button key={k} type="button" disabled={!sweatProfiles[k]} onClick={()=>{
+            <button key={k} type="button" disabled={!sweatProfiles[k]} aria-label={`Применить профиль пота ${k}${sweatProfiles[k] ? `: ${sweatProfiles[k].rate.toFixed(2)} л/ч, Na ${Math.round(sweatProfiles[k].sodium)}` : ' — не сохранён'}`} onClick={()=>{
               const prof = sweatProfiles[k]; if(!prof) return;
               setSweatRate(Math.round(prof.rate*1000));
               setSweatSodium(Math.round(prof.sodium));
               setUseMeasuredSweat(false);
               showToast(`Профиль ${k} применён: ${prof.rate.toFixed(2)} л/ч, Na ${Math.round(prof.sodium)} → режим «Оценка»`);
-            }} style={{ padding:'4px 8px', borderRadius:8, border:'1px solid rgba(6,182,214,0.18)', background: sweatProfiles[k] ? 'rgba(6,182,214,0.14)':'rgba(255,255,255,0.03)', color: sweatProfiles[k] ? '#06b6d4':'rgba(255,255,255,0.35)', fontSize:8, cursor: sweatProfiles[k] ? 'pointer':'not-allowed' }}>{k} {sweatProfiles[k] ? `${sweatProfiles[k].rate.toFixed(2)}л/ч` : '—'}</button>
+            }} style={{ padding:'6px 10px', minHeight:44, borderRadius:8, border:'1px solid rgba(6,182,214,0.18)', background: sweatProfiles[k] ? 'rgba(6,182,214,0.14)':'rgba(255,255,255,0.03)', color: sweatProfiles[k] ? '#06b6d4':'rgba(255,255,255,0.35)', fontSize:9, cursor: sweatProfiles[k] ? 'pointer':'not-allowed' }}>{k} {sweatProfiles[k] ? `${sweatProfiles[k].rate.toFixed(2)}л/ч` : '—'}</button>
           ))}
         </div>
         <div style={{ marginTop:4, display:'flex', gap:4, flexWrap:'wrap', alignItems:'center' }}>
           <span style={{ fontSize:8, color:'rgba(255,255,255,0.45)' }}>Сохранить текущий как:</span>
           {(['cool','warm','hot'] as const).map(k=>(
-            <button key={k} type="button" disabled={!sweatV2} onClick={()=>{
+            <button key={k} type="button" disabled={!sweatV2} aria-label={`Сохранить текущий пот как профиль ${k}`} onClick={()=>{
               if(!sweatV2) return;
               const prof={ rate: sweatV2.rateLPerH, sodium: sweatSodium };
               const next={...sweatProfiles, [k]: prof};
               setSweatProfiles(next);
               try{ localStorage.setItem('he_sweat_profiles_v1', JSON.stringify(next)); }catch{}
               showToast(`Профиль ${k} сохранён: ${prof.rate.toFixed(2)}л/ч Na ${prof.sodium}`);
-            }} style={{ padding:'4px 8px', borderRadius:8, border:'1px solid rgba(255,255,255,0.10)', background:'rgba(255,255,255,0.03)', color: sweatV2 ? '#fff':'rgba(255,255,255,0.35)', fontSize:8, cursor: sweatV2 ? 'pointer':'not-allowed' }}>💾 {k}</button>
+            }} style={{ padding:'6px 10px', minHeight:44, borderRadius:8, border:'1px solid rgba(255,255,255,0.10)', background:'rgba(255,255,255,0.03)', color: sweatV2 ? '#fff':'rgba(255,255,255,0.35)', fontSize:9, cursor: sweatV2 ? 'pointer':'not-allowed' }}>💾 {k}</button>
           ))}
         </div>
         <div style={{ marginTop:8 }}>
