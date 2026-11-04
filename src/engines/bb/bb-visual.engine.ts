@@ -11,6 +11,7 @@
  */
 import type { BBPlan, BBExercise } from './bb-builder.engine';
 import { MUSCLE_LABEL_RU } from '../volume-landmarks.engine';
+import { bbSessionTagLabel } from './bb-session-tags';
 
 /** Русская подпись мышцы для печати (сырые ключи в печати — дефект: замер
  *  2507/2946 ячеек были ключами `delt_mid`/`back`). Неизвестный ключ не теряем. */
@@ -300,12 +301,51 @@ function addDaysIso(iso: string, days: number): string {
  * (1..7 внутри недели, его же использует плеер), с фолбэком на порядковый номер.
  * `DTEND` = +1 час: событие нулевой длины календарь показывает как «весь день»/
  * пустую запись. */
+/**
+ * Текст значения свойства ICS (RFC 5545 §3.3.11): экранируются `\`, `;`, `,`
+ * и переводы строк. Раньше заголовок прогонялся через `uid()` (замена всего
+ * не-ASCII на `_`), из-за чего «тяж» превращался в `___` — замер: 12 из 12
+ * событий календаря содержали искалеченный текст.
+ */
+function icsText(value: string): string {
+  return String(value ?? '')
+    .replace(/\\/g, '\\\\')
+    .replace(/;/g, '\\;')
+    .replace(/,/g, '\\,')
+    .replace(/\r?\n/g, '\\n');
+}
+
+/** Складывание строки в 75 октетов UTF-8 с продолжением `CRLF + пробел`
+ *  (RFC 5545 §3.1). Русский заголовок длиннее лимита — без складывания
+ *  некоторые клиенты обрезают событие. */
+function foldIcsLine(line: string): string {
+  const enc = new TextEncoder();
+  const parts: string[] = [];
+  let current = '';
+  let bytes = 0;
+  for (const ch of line) {
+    const size = enc.encode(ch).length;
+    // Первая строка — 75 октетов, продолжения начинаются с пробела (74).
+    const limit = parts.length ? 74 : 75;
+    if (bytes + size > limit) {
+      parts.push(current);
+      current = '';
+      bytes = 0;
+    }
+    current += ch;
+    bytes += size;
+  }
+  parts.push(current);
+  return parts.join('\r\n ');
+}
+
 export function buildBBPlanIcs(plan: BBPlan, opts?: { startDate?: string }): string {
   if (!plan?.weeks?.length) return '';
   const ranges = bbWeekDateRanges(plan, { startDate: opts?.startDate });
   const lines = [
     'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//BB-auto//RU//EN', 'CALSCALE:GREGORIAN',
   ];
+  // uid() — только для UID (там ASCII обязателен), НЕ для текста события.
   const uid = (n: string) => String(n).replace(/[^A-Za-z0-9_-]/g, '_');
   plan.weeks.forEach((w, i) => {
     const r = ranges[i];
@@ -319,9 +359,17 @@ export function buildBBPlanIcs(plan: BBPlan, opts?: { startDate?: string }): str
       const date = addDaysIso(r.start, dayIdx - 1);
       if (!date) return;
       const stamp = date.replace(/-/g, '');
-      const title = `${w.week} нед · ${uid((s as any).character || 'тренировка')}${(s as any).sessionTag ? ' · ' + uid((s as any).sessionTag) : ''}`;
+      const tag = bbSessionTagLabel((s as any).sessionTag);
+      const character = String((s as any).character || '').trim();
+      // Человеческий заголовок: неделя · день · характер. Английский тег
+      // («Push») и заменённые на `_` кириллические символы — дефект.
+      const title = [
+        `Неделя ${w.week}`,
+        tag || character || 'Тренировка',
+        character && tag ? character : '',
+      ].filter(Boolean).join(' · ');
       lines.push('BEGIN:VEVENT');
-      lines.push(`SUMMARY:${title}`);
+      lines.push(foldIcsLine(`SUMMARY:${icsText(title)}`));
       lines.push(`DTSTART:${stamp}T100000Z`);
       lines.push(`DTEND:${stamp}T110000Z`);
       lines.push(`UID:bb-${w.week}-${(s as any).weekOffset ?? dayIdx}@bb-auto`);

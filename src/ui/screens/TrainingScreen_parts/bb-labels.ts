@@ -3,36 +3,15 @@
  * Единый слой локализации, применяемый во всех рендерах плана (UI/PDF/CSV).
  */
 import { MUSCLE_LABEL_RU } from '../../../engines/volume-landmarks.engine';
+import { SESSION_TAG_RU, bbSessionTagLabel } from '../../../engines/bb/bb-session-tags';
 
-/** sessionTag (EN) → русская подпись дня. */
-export const SESSION_TAG_RU: Record<string, string> = {
-  Push: 'Грудь/Плечи/Трицепс',
-  Pull: 'Спина/Бицепс',
-  Legs: 'Ноги',
-  Upper: 'Верх',
-  Lower: 'Низ',
-  FullBody: 'Всё тело',
-  Chest: 'Грудь',
-  Back: 'Спина',
-  Shoulders: 'Плечи',
-  Arms: 'Руки',
-  ChestBack: 'Грудь/Спина',
-  ShouldersArms: 'Плечи/Руки',
-  Torso: 'Торс',
-  Limbs: 'Конечности',
-  UpperPower: 'Верх (сила)',
-  LowerPower: 'Низ (сила)',
-  UpperHyp: 'Верх (гипертрофия)',
-  LowerHyp: 'Низ (гипертрофия)',
-  LegsBiceps: 'Ноги/Бицепс',
-  Glutes: 'Ягодицы',
-  GlutesHams: 'Ягодицы/Бицепс бедра',
-};
+/** sessionTag (EN) → русская подпись дня (словарь в движке: его же использует
+ *  экспорт календаря, чтобы `.ics` и UI говорили одно и то же). */
+export { SESSION_TAG_RU };
 
 /** Подпись дня: sessionTag → RU (fallback на исходный тег). */
 export function sessionTagLabel(tag?: string): string {
-  if (!tag) return '';
-  return SESSION_TAG_RU[tag] || tag;
+  return bbSessionTagLabel(tag);
 }
 
 /** Подпись мышцы: canonical EN-ключ → RU. */

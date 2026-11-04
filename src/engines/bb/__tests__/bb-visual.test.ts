@@ -4,6 +4,7 @@
 import { describe, it, expect } from 'vitest';
 import { buildBBMuscleHeatmap, buildBBTaperCurve, buildBBMesocycleTable, bbWeekDateRanges, buildBBPlanPrintHtml, buildBBPlanIcs, compareBBVariants, buildBBFitnessFatigue } from '../bb-visual.engine';
 import { buildBBPlan } from '../bb-builder.engine';
+import { bbSessionTagLabel } from '../bb-session-tags';
 
 describe('Фаза 4.19: heatmap мышца×неделя', () => {
   it('строит клетки по мышцам/неделям', () => {
@@ -155,6 +156,54 @@ describe('Фаза 4.24: print HTML + ics', () => {
       const curMin = [...perWeekDates.get(weekKeys[wi])!].sort()[0];
       expect(curMin > prevMax, 'недели перекрываются').toBe(true);
     }
+  });
+
+  it('.ics: заголовок события читается человеком (RU день, без заглушек)', () => {
+    // Замер до правки: SUMMARY прогонялся через uid() (замена всего не-ASCII на
+    // `_`) — 12 из 12 событий имели искалеченный текст вида «1 нед · ___ · Push».
+    const plan: any = buildBBPlan({ patternId: 'ppl_6', level: 'intermediate', goal: 'mass', weeks: 2 } as any);
+    const ics = buildBBPlanIcs(plan, { startDate: '2026-11-04' });
+    const summaries = [...ics.matchAll(/SUMMARY:(.*)/g)].map((m) => m[1]);
+    expect(summaries.length).toBeGreaterThan(0);
+    for (const s of summaries) {
+      expect(s, `заглушки вместо текста: ${s}`).not.toMatch(/_{2,}/);
+      expect(s, `английский тег дня: ${s}`).not.toMatch(/\b(Push|Pull|Legs|Upper|Lower|FullBody)\b/);
+      expect(s, `нет русской подписи дня: ${s}`).toMatch(/Неделя \d+/);
+    }
+    // День недели из словаря движка (тот же, что в UI): Pull → Спина/Бицепс.
+    expect(summaries.join('\n')).toMatch(/Спина\/Бицепс|Грудь\/Плечи\/Трицепс|Ноги/);
+  });
+
+  it('.ics: строки не длиннее 75 октетов (RFC 5545) и складываются пробелом', () => {
+    const plan: any = buildBBPlan({ patternId: 'ppl_6', level: 'intermediate', goal: 'mass', weeks: 2 } as any);
+    // Самый длинный русский тег дня: «Ягодицы/Бицепс бедра» — заголовок выходит
+    // за 75 октетов, и без складывания клиенты его обрезают.
+    const session = plan.weeks[0].sessions.find((s: any) => (s.exercises || []).length > 0);
+    expect(session, 'в первой неделе нет тренировочной сессии').toBeTruthy();
+    session.sessionTag = 'GlutesHams';
+    session.character = 'памп';
+    const ics = buildBBPlanIcs(plan, { startDate: '2026-11-04' });
+    const enc = new TextEncoder();
+    const physical = ics.split('\r\n');
+    for (const line of physical) {
+      expect(enc.encode(line).length, `строка длиннее 75 октетов: ${line}`).toBeLessThanOrEqual(75);
+    }
+    // Складывание действительно произошло: продолжение — строка с ведущим пробелом.
+    const folded = physical.some((l, i) => l.startsWith('SUMMARY:') && physical[i + 1]?.startsWith(' '));
+    expect(folded, 'длинный заголовок не сложен').toBe(true);
+    // И после разворота складывания заголовок читается целиком.
+    const unfolded = ics.replace(/\r\n /g, '');
+    expect(unfolded).toMatch(/SUMMARY:Неделя 1 · Ягодицы\/Бицепс бедра/);
+  });
+});
+
+describe('bb-session-tags: единый словарь дней', () => {
+  it('переводит теги и не теряет неизвестный', () => {
+    expect(bbSessionTagLabel('Pull')).toBe('Спина/Бицепс');
+    expect(bbSessionTagLabel('ChestBack')).toBe('Грудь/Спина');
+    expect(bbSessionTagLabel('Legs')).toBe('Ноги');
+    expect(bbSessionTagLabel('Unknown')).toBe('Unknown');
+    expect(bbSessionTagLabel('')).toBe('');
   });
 });
 
