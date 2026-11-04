@@ -459,6 +459,11 @@ export function deviceRawOrFallback(storage: RawStorageLike): RawStorageLike {
   return installedRaw ?? storage;
 }
 
+/** Установлен ли шов (нужно тем, кто оборачивает методы `localStorage`). */
+export function isDataSpaceInstalled(): boolean {
+  return installedRaw !== null;
+}
+
 export interface SpaceUsage {
   keys: number;
   bytes: number;

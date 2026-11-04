@@ -143,6 +143,19 @@ const origSetItem = typeof localStorage !== 'undefined' ? localStorage.setItem.b
 const origRemoveItem = typeof localStorage !== 'undefined' ? localStorage.removeItem.bind(localStorage) : null;
 const origGetItem = typeof localStorage !== 'undefined' ? localStorage.getItem.bind(localStorage) : null;
 
+/**
+ * Методы, которые оборачивает хук. Снимаем их В МОМЕНТ установки хука, а не при
+ * импорте модуля: к этому времени шов пространств данных уже стоит (он ставится
+ * первым импортом приложения), поэтому цепочка получается
+ * «хук синка → шов пространств → сырое хранилище». Если снять методы при импорте,
+ * хук мог бы писать в домашнее пространство даже под атлетом.
+ */
+let hookOrig: {
+  set: ((k: string, v: string) => void) | null;
+  remove: ((k: string) => void) | null;
+  get: ((k: string) => string | null) | null;
+} = { set: origSetItem, remove: origRemoveItem, get: origGetItem };
+
 /** Признак «пишем сами из pull()» — такие записи не считаются локальной правкой. */
 let applyingRemote = false;
 
@@ -330,13 +343,15 @@ export function _resetKvForTests(): void {
   if (flushTimer != null) { clearTimeout(flushTimer); flushTimer = null; }
   if (metaTimer != null) { clearTimeout(metaTimer); metaTimer = null; }
   if (pullInterval != null) { clearInterval(pullInterval); pullInterval = null; }
-  if (installed && origSetItem && origRemoveItem && typeof localStorage !== 'undefined') {
+  if (installed && typeof localStorage !== 'undefined') {
     try {
-      localStorage.setItem = origSetItem;
-      localStorage.removeItem = origRemoveItem;
+      // Возвращаем ровно те методы, которые обернули (под швом — методы шва).
+      localStorage.setItem = hookOrig.set ?? origSetItem ?? localStorage.setItem;
+      localStorage.removeItem = hookOrig.remove ?? origRemoveItem ?? localStorage.removeItem;
     } catch { /* no-op */ }
     installed = false;
   }
+  hookOrig = { set: origSetItem, remove: origRemoveItem, get: origGetItem };
   state = { status: 'off' };
   listeners.clear();
 }
@@ -459,17 +474,31 @@ function markRemoved(k: string): void {
 }
 
 function installHook(): void {
-  if (installed || typeof localStorage === 'undefined' || !origSetItem || !origRemoveItem || !origGetItem) return;
+  if (installed || typeof localStorage === 'undefined') return;
+  // Снимаем методы сейчас: под швом это методы шва (иначе писали бы в home).
+  try {
+    hookOrig = {
+      set: localStorage.setItem.bind(localStorage),
+      remove: localStorage.removeItem.bind(localStorage),
+      get: localStorage.getItem.bind(localStorage),
+    };
+  } catch {
+    return;
+  }
+  const origSet = hookOrig.set;
+  const origRemove = hookOrig.remove;
+  const origGet = hookOrig.get;
+  if (!origSet || !origRemove || !origGet) return;
   installed = true;
   localStorage.setItem = (k, v) => {
     if (applyingRemote) {
       // запись из pull() — не локальная правка
-      origSetItem(k, v);
+      origSet(k, v);
       return;
     }
     let prev: string | null = null;
-    try { prev = origGetItem(k); } catch { /* no-op */ }
-    origSetItem(k, v);
+    try { prev = origGet(k); } catch { /* no-op */ }
+    origSet(k, v);
     // значение не изменилось (перезапись теми же данными) — не считаем правкой,
     // иначе пустой flush с «свежим» временем затирал бы правки другого устройства
     if (prev === v) return;
@@ -478,7 +507,7 @@ function installHook(): void {
     if (pulling) dirtyDuringPull.add(syncKey(k));
   };
   localStorage.removeItem = (k) => {
-    origRemoveItem(k);
+    origRemove(k);
     markRemoved(k);
     if (pulling) dirtyDuringPull.add(syncKey(k));
   };
