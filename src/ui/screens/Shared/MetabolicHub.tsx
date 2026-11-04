@@ -2044,7 +2044,7 @@ const kbju = useMemo(()=> calcKBJU(input), [input]);
                   </div>
                 </div>
               </div>
-              {alcohol.kcal>0 && <div style={{ marginTop:8, padding:'8px 10px', borderRadius:8, background:'rgba(249,115,22,0.08)', border:'1px solid rgba(249,115,22,0.18)', fontSize:10, color:'#fff' }}>Учет в КБЖУ: {alcohol.kcal}ккал уже включены в TDEE TEF, но жир блок {alcohol.fatOxidationBlockedPct}% ~3ч — не планируй тренировку сразу после.</div>}
+              {alcohol.kcal>0 && <div style={{ marginTop:8, padding:'8px 10px', borderRadius:8, background:'rgba(249,115,22,0.08)', border:'1px solid rgba(249,115,22,0.18)', fontSize:10, color:'#fff' }}>🥃 {alcohol.kcal} ккал спирта — это <b>приём сверх плана</b>, а не расход: в КБЖУ дневная цель их не содержит (в TEF учтён только расход на переваривание ~{alcohol.tef} ккал). Пьёшь — добавь {alcohol.kcal} ккал к дню или убери ~{Math.round(alcohol.kcal/4)}г углеводов. Жир блок {alcohol.fatOxidationBlockedPct}% ~3ч — не планируй тренировку сразу после.</div>}
             </div>
           )}
           {mode==='protein' && (

@@ -155,6 +155,18 @@ describe('MetabolicHub: ввод меняет расчёт (проводка п�
     expect(blood).toMatch(/мл/);
   });
 
+  it('алкоголь подписан как приём сверх плана, а не «уже в TDEE»', () => {
+    render(<MetabolicHub />);
+    const txt0 = openMode('Алко');
+    expect(txt0).not.toContain('уже включены');
+    setNumber('Алкоголь, г/сут', 40);
+    const txt = openMode('Алко');
+    expect(txt).toContain('приём сверх плана');
+    expect(txt).toContain('284 ккал спирта');
+    expect(txt).toContain('убери ~71г углеводов');
+    expect(txt).not.toContain('уже включены');
+  });
+
   it('вода «факт» подписана источником, а не выдана за измерение', () => {
     render(<MetabolicHub />);
     setNumber('HCT, %', 52);

@@ -384,6 +384,17 @@ RDA)»; `metabolic-hub-wiring.test.tsx` → «поле „Железо, мг/с�
 **Регрессия.** `metabolic-hub.test.ts` → «без данных о воде флаг вязкости не выдумывается»;
 `metabolic-hub-wiring.test.tsx` → «вода „факт“ подписана источником, а не выдана за измерение».
 
+### 1.36 Алкоголь обещал «ккал уже учтены в TDEE», но в плане их нет
+**Причина.** Режим «Алко» печатал «{X} ккал уже включены в TDEE TEF». В `calcKBJU` из алкоголя
+учитывается только TEF (расход ~15 %, `calcTEF`), а сами 7.1 ккал/г — это **приём**, который в
+дневную цель не добавлен. Человек с 40 г этанола (284 ккал) считал, что пиво уже посчитано, и
+ел по плану — реальный дефицит/профицит уезжал на ~280 ккал.
+**Исправление.** Подпись говорит правду: «284 ккал спирта — это приём сверх плана, а не расход: в
+КБЖУ дневная цель их не содержит (в TEF учтён только расход ~{tef})», плюс конкретика — «добавь
+284 ккал к дню или убери ~71 г углеводов».
+**Регрессия.** `metabolic-hub-wiring.test.tsx` → «алкоголь подписан как приём сверх плана, а не
+„уже в TDEE“» (40 г → 284 ккал, 71 г У; строка «уже включены» не встречается).
+
 ---
 
 ## 2. Чего не хватало (добавлено)
@@ -433,7 +444,7 @@ RDA)»; `metabolic-hub-wiring.test.tsx` → «поле „Железо, мг/с�
   параллельные `tsc`/`vitest` из других сессий → heap OOM / `Zone Allocation failed`.
   Прогонять на свободной машине.
 - `npx vitest run src/ui/screens/Shared/__tests__ src/engines/__tests__/metabolic-hub.test.ts`
-  — **217 passed** (6 файлов: structure / toggles / honesty / modes / wiring / engine).
+  — **218 passed** (6 файлов: structure / toggles / honesty / modes / wiring / engine).
 - `npx vitest run src/ui/__tests__/rest-hooks-native.test.tsx
   src/engines/__tests__/risk-info-honesty-e07-e08.test.ts` — **89 passed**
   (в stderr шумит jsdom-canvas chart.js — это фон, не падения).
