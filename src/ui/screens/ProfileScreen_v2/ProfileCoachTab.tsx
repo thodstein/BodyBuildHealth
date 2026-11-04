@@ -45,6 +45,7 @@ import {
   activateHomeSpace,
   activeSpaceRecord,
   athleteSpaceId,
+  clearSessionSpaceData,
   clearSpaceData,
   deviceRawOrFallback,
   readRegistryFromStorage,
@@ -323,6 +324,9 @@ export const ProfileCoachTab: React.FC<{
     // ключи (атлет входил, но реестр уже переписывали) тоже должны уйти.
     const storage = ls();
     if (storage) clearSpaceData(deviceRawOrFallback(storage), sid);
+    // Черновики в sessionStorage (дневник, копия блока программы) тоже его данные:
+    // иначе в следующем входе всплыл бы старый недописанный черновик.
+    clearSessionSpaceData(sid);
     writeRegistryToStorage(removeSpace(readRegistryFromStorage(), sid));
     // База IndexedDB грузится лениво: движок нужен только здесь, а статический
     // импорт тянул его в граф экрана профиля и замедлял холодный старт.

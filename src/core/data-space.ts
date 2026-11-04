@@ -491,6 +491,53 @@ export function deviceRaw(): RawStorageLike | null {
 }
 
 /**
+ * «Сырой» sessionStorage, если его удалось обернуть. Черновики атлетов лежат под
+ * префиксом пространства, поэтому при удалении данных атлета их нужно снимать
+ * по префиксу, а при полном сбросе — целиком.
+ */
+let installedSessionRaw: RawStorageLike | null = null;
+
+export function deviceSessionRaw(): RawStorageLike | null {
+  return installedSessionRaw;
+}
+
+/** Снести сессионные данные (черновики) одного пространства. */
+export function clearSessionSpaceData(spaceId: string): number {
+  const raw = installedSessionRaw;
+  if (!raw || !spaceId || spaceId === HOME_SPACE_ID) return 0;
+  const prefix = spaceKeyPrefix(spaceId);
+  let removed = 0;
+  for (const k of rawKeys(raw)) {
+    if (!k.startsWith(prefix)) continue;
+    try {
+      raw.removeItem(k);
+      removed++;
+    } catch {
+      /* ignore */
+    }
+  }
+  return removed;
+}
+
+/** Снести сессионные данные ВСЕХ пространств (полный сброс устройства). */
+export function clearAllSessionStorage(): number {
+  const raw =
+    installedSessionRaw ??
+    (typeof sessionStorage !== 'undefined' ? (sessionStorage as unknown as RawStorageLike) : null);
+  if (!raw) return 0;
+  let removed = 0;
+  for (const k of rawKeys(raw)) {
+    try {
+      raw.removeItem(k);
+      removed++;
+    } catch {
+      /* ignore */
+    }
+  }
+  return removed;
+}
+
+/**
  * Полная зачистка хранилища устройства: ВСЕ пространства, все ключи.
  * Нужна аварийным сбросам (`location.reload()` после неё) — иначе `clear()`
  * под швом почистил бы только открытое пространство, а базы IndexedDB всех
@@ -510,6 +557,13 @@ export function clearAllDeviceStorage(storage?: Storage | null): number {
     } catch {
       /* один ключ не должен блокировать сброс */
     }
+  }
+  // Черновики в sessionStorage (дневники, копия блока программы, снапшоты) —
+  // тоже данные человека: после «удалили всё» они не должны всплыть заново.
+  try {
+    clearAllSessionStorage();
+  } catch {
+    /* ignore */
   }
   cachedActive = null;
   return removed;
@@ -628,6 +682,76 @@ export function currentSpaceId(): string {
 }
 
 /**
+ * Снять «сырые» методы хранилища ДО подмены. После подмены читать их через сам
+ * объект нельзя — получится рекурсия.
+ */
+function snapshotStorage(target: Storage): RawStorageLike | null {
+  try {
+    const get = target.getItem.bind(target);
+    const set = target.setItem.bind(target);
+    const remove = target.removeItem.bind(target);
+    const key = target.key.bind(target);
+
+    // `length` — аксессор на прототипе Storage: после подмены читать его напрямую
+    // нельзя (бесконечная рекурсия: наш getter зовёт raw.length). Берём оригинал.
+    let len: () => number;
+    const proto = Object.getPrototypeOf(target) as object | null;
+    const descriptor = proto ? Object.getOwnPropertyDescriptor(proto, 'length') : undefined;
+    const protoGetter = descriptor?.get as (() => number) | undefined;
+    if (typeof protoGetter === 'function') {
+      len = () => protoGetter.call(target);
+    } else {
+      len = () => {
+        let n = 0;
+        // Считаем по исходному `key()`: он уже снят до подмены.
+        while (n < 100000) {
+          let k: string | null = null;
+          try {
+            k = key(n);
+          } catch {
+            break;
+          }
+          if (k == null) break;
+          n++;
+        }
+        return n;
+      };
+    }
+
+    return {
+      get length() { return len(); },
+      key: (i: number) => key(i),
+      getItem: (k: string) => get(k),
+      setItem: (k: string, v: string) => set(k, v),
+      removeItem: (k: string) => remove(k),
+    };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Подменить методы хранилища НА МЕСТЕ на пространство данных: ссылки, взятые
+ * другими модулями раньше, продолжают работать. `false` — среда не дала.
+ */
+function patchStorage(target: Storage, space: Storage): boolean {
+  try {
+    target.getItem = (k: string) => space.getItem(k);
+    target.setItem = (k: string, v: string) => space.setItem(k, v);
+    target.removeItem = (k: string) => space.removeItem(k);
+    target.key = (i: number) => space.key(i);
+    target.clear = () => space.clear();
+    Object.defineProperty(target, 'length', {
+      configurable: true,
+      get: () => space.length,
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Поставить шов. Вызывать РОВНО ОДИН РАЗ на старте приложения, до первого
  * чтения данных. Идемпотентно: повторный вызов возвращает уже установленный шов.
  */
@@ -645,44 +769,8 @@ export function installDataSpaceStorage(win: Window | null | undefined): Install
   if (!ls) return null;
 
   // Снимаем «сырые» методы ДО подмены, иначе получим рекурсию.
-  const rawGet = ls.getItem.bind(ls);
-  const rawSet = ls.setItem.bind(ls);
-  const rawRemove = ls.removeItem.bind(ls);
-  const rawKey = ls.key.bind(ls);
-
-  // `length` — аксессор на прототипе Storage: после подмены читать его напрямую
-  // нельзя (бесконечная рекурсия: наш getter зовёт raw.length). Берём оригинал.
-  let rawLength: () => number;
-  const proto = Object.getPrototypeOf(ls) as object | null;
-  const descriptor = proto ? Object.getOwnPropertyDescriptor(proto, 'length') : undefined;
-  const protoGetter = descriptor?.get as (() => number) | undefined;
-  if (typeof protoGetter === 'function') {
-    rawLength = () => protoGetter.call(ls);
-  } else {
-    rawLength = () => {
-      let n = 0;
-      // Считаем по исходному `key()`: он уже снят до подмены.
-      while (n < 100000) {
-        let k: string | null = null;
-        try {
-          k = rawKey(n);
-        } catch {
-          break;
-        }
-        if (k == null) break;
-        n++;
-      }
-      return n;
-    };
-  }
-
-  const raw: RawStorageLike = {
-    get length() { return rawLength(); },
-    key: (i: number) => rawKey(i),
-    getItem: (k: string) => rawGet(k),
-    setItem: (k: string, v: string) => rawSet(k, v),
-    removeItem: (k: string) => rawRemove(k),
-  };
+  const raw = snapshotStorage(ls);
+  if (!raw) return null;
 
   const readRegistry = (): DataSpaceRegistry => {
     try {
@@ -711,17 +799,7 @@ export function installDataSpaceStorage(win: Window | null | undefined): Install
 
   // Подмена методов на месте: ссылки, взятые другими модулями раньше, продолжают
   // работать, а порядок вызовов остаётся «приложение → (синк-хук) → пространство → сырое».
-  try {
-    ls.getItem = (k: string) => storage.getItem(k);
-    ls.setItem = (k: string, v: string) => storage.setItem(k, v);
-    ls.removeItem = (k: string) => storage.removeItem(k);
-    ls.key = (i: number) => storage.key(i);
-    ls.clear = () => storage.clear();
-    Object.defineProperty(ls, 'length', {
-      configurable: true,
-      get: () => storage.length,
-    });
-  } catch {
+  if (!patchStorage(ls, storage)) {
     // Среда не даёт подменить хранилище: изоляция невозможна. Возвращаем активное
     // пространство в home, иначе приложение читало бы данные устройства, а базу
     // IndexedDB открывало бы от атлета — то есть смешало бы данные.
@@ -735,6 +813,25 @@ export function installDataSpaceStorage(win: Window | null | undefined): Install
     }
     cachedActive = null;
     return null; // работаем как раньше, без изоляции
+  }
+
+  // sessionStorage: та же вкладка, НЕ чистится при перезагрузке — а переключение
+  // пространства как раз перезагружает страницу. Черновик дневника, скопированный
+  // блок программы, снапшот «откатить внедрение», шаг редактора — это данные
+  // КОНКРЕТНОГО атлета. Без префикса новый атлет увидел бы чужой черновик, а
+  // «восстановить» вписал бы чужой план в его данные. Префиксуем тем же швом:
+  // черновик не теряется (вернулся к атлету — он на месте), но и чужому не виден.
+  try {
+    const ss = w.sessionStorage as Storage | undefined;
+    if (ss && ss !== (ls as unknown)) {
+      const ssRaw = snapshotStorage(ss);
+      if (ssRaw) {
+        const ssStorage = createSpaceStorage(ssRaw, activeSpaceId);
+        if (patchStorage(ss, ssStorage)) installedSessionRaw = ssRaw;
+      }
+    }
+  } catch {
+    // Среда без sessionStorage (SSR, приватный режим) — работаем как раньше.
   }
 
   const installedApi: InstalledDataSpace = { storage, raw, readRegistry, writeRegistry, activeSpaceId };

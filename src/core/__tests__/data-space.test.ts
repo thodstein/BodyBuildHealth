@@ -20,6 +20,8 @@ import {
   athleteSpaceId,
   athleteSpacesByRecent,
   clearAllDeviceStorage,
+  clearAllSessionStorage,
+  clearSessionSpaceData,
   clearSpaceData,
   createSpaceStorage,
   emptyRegistry,
@@ -422,21 +424,27 @@ describe('сырой доступ и удаление данных атлета'
 });
 
 describe('установка шва (как в приложении)', () => {
+  const makeStorage = (raw: ReturnType<typeof makeRaw>) => ({
+    get length() {
+      return raw.length;
+    },
+    key: (i: number) => raw.key(i),
+    getItem: (k: string) => raw.getItem(k),
+    setItem: (k: string, v: string) => raw.setItem(k, v),
+    removeItem: (k: string) => raw.removeItem(k),
+    clear: () => {
+      for (const k of rawKeys(raw)) raw.removeItem(k);
+    },
+  });
+
   const makeWin = () => {
     const raw = makeRaw();
-    const ls = {
-      get length() {
-        return raw.length;
-      },
-      key: (i: number) => raw.key(i),
-      getItem: (k: string) => raw.getItem(k),
-      setItem: (k: string, v: string) => raw.setItem(k, v),
-      removeItem: (k: string) => raw.removeItem(k),
-      clear: () => {
-        for (const k of rawKeys(raw)) raw.removeItem(k);
-      },
+    const sraw = makeRaw();
+    return {
+      window: { localStorage: makeStorage(raw), sessionStorage: makeStorage(sraw) } as unknown as Window,
+      raw,
+      sraw,
     };
-    return { window: { localStorage: ls } as unknown as Window, raw };
   };
 
   beforeEach(() => {
@@ -521,5 +529,57 @@ describe('установка шва (как в приложении)', () => {
     const namesAfter = Array.from({ length: win.localStorage.length }, (_, i) => win.localStorage.key(i));
     expect(namesAfter.sort()).toEqual([DATA_SPACE_KEY, 'he_profile_v2', 'he_theme']);
     expect(win.localStorage.getItem('he_profile_v2')).toBe('a1');
+  });
+
+  it('черновики в sessionStorage не переходят к другому атлету', () => {
+    const { window: win, sraw } = makeWin();
+    const api = installDataSpaceStorage(win)!;
+    // Тренер начал вводить вес у себя (home).
+    win.sessionStorage.setItem('he_draft_weight', '{"kg":82}');
+
+    const sid = athleteSpaceId('a1');
+    api.writeRegistry(
+      setActiveSpace(upsertSpace(emptyRegistry(), { id: sid, athleteId: 'a1' }).registry, sid),
+    );
+
+    // У атлета чужого черновика не видно — иначе его цифры попали бы в его дневник.
+    expect(win.sessionStorage.getItem('he_draft_weight')).toBeNull();
+    expect(win.sessionStorage.length).toBe(0);
+
+    win.sessionStorage.setItem('he_draft_weight', '{"kg":75}');
+    expect(sraw.getItem(toPhysicalKey(sid, 'he_draft_weight'))).toBe('{"kg":75}');
+    expect(sraw.getItem('he_draft_weight')).toBe('{"kg":82}');
+
+    // Вернулись к своим данным — свой черновик на месте, а не потерян.
+    api.writeRegistry(setActiveSpace(api.readRegistry(), HOME_SPACE_ID));
+    expect(win.sessionStorage.getItem('he_draft_weight')).toBe('{"kg":82}');
+  });
+
+  it('удаление данных атлета снимает и его черновики в sessionStorage', () => {
+    const { window: win, sraw } = makeWin();
+    const api = installDataSpaceStorage(win)!;
+    const sid = athleteSpaceId('a1');
+    const other = athleteSpaceId('a2');
+    api.writeRegistry(
+      setActiveSpace(
+        upsertSpace(
+          upsertSpace(emptyRegistry(), { id: sid, athleteId: 'a1' }).registry,
+          { id: other, athleteId: 'a2' },
+        ).registry,
+        sid,
+      ),
+    );
+    win.sessionStorage.setItem('he_draft_weight', '{"kg":75}');
+    sraw.setItem(toPhysicalKey(other, 'he_draft_weight'), '{"kg":90}');
+
+    expect(clearSessionSpaceData(sid)).toBe(1);
+    expect(sraw.getItem(toPhysicalKey(sid, 'he_draft_weight'))).toBeNull();
+    // чужой атлет не задет
+    expect(sraw.getItem(toPhysicalKey(other, 'he_draft_weight'))).toBe('{"kg":90}');
+    // home-черновики удалять «пространством» нельзя
+    expect(clearSessionSpaceData(HOME_SPACE_ID)).toBe(0);
+
+    expect(clearAllSessionStorage()).toBe(1);
+    expect(rawKeys(sraw)).toEqual([]);
   });
 });

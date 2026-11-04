@@ -4,6 +4,7 @@ import {
   DEVICE_SALT_KEY,
   HOME_SPACE_ID,
   _resetDataSpaceCache,
+  clearAllSessionStorage,
   deviceRawOrFallback,
   parseRegistry,
   rawKeys,
@@ -118,6 +119,14 @@ export async function importBackup(b: AppBackup): Promise<void> {
   for (const k of Object.keys(b.localStorage || {})) {
     localStorage.setItem(k, b.localStorage[k]);
   }
+  // Черновики в sessionStorage принадлежат тому, кто работал здесь до восстановления.
+  // После восстановления бэкапа они не «его» — снимаем, чтобы не подставить чужие
+  // цифры в открытую форму.
+  try {
+    clearAllSessionStorage();
+  } catch {
+    /* среда без sessionStorage */
+  }
 }
 
 // Soft clear: wipe everything EXCEPT he_profile_v2 + he_session_v2
@@ -151,5 +160,12 @@ export async function softClear(): Promise<void> {
     }
   }
   _resetDataSpaceCache();
+  // Черновики атлетов в sessionStorage относятся к «всем данным» так же, как
+  // их ключи в localStorage: после сброса они не должны всплыть заново.
+  try {
+    clearAllSessionStorage();
+  } catch {
+    /* среда без sessionStorage */
+  }
   await deleteSpaceDatabases(athleteSpaces);
 }
