@@ -88,6 +88,21 @@ export interface DataSpaceRecord {
   athleteId: string | null;
   label: string;
   createdAt: string;
+  /**
+   * Данные из карточки тренера, из которых создаётся ПУСТОЙ профиль при первом
+   * входе в пространство. Нужны, чтобы тренер не вводил имя/пол/возраст/рост/вес
+   * второй раз. Это не «нормативы»: переносятся только те числа, что тренер ввёл.
+   */
+  seed?: AthleteProfileSeed;
+}
+
+/** Поля карточки, которые переносятся в профиль атлета. */
+export interface AthleteProfileSeed {
+  name?: string;
+  sex?: 'male' | 'female';
+  age?: number;
+  height?: number;
+  weight?: number;
 }
 
 export interface DataSpaceRegistry {
@@ -189,6 +204,29 @@ export function emptyRegistry(): DataSpaceRegistry {
 
 const clean = (v: unknown, max: number): string => String(v ?? '').trim().slice(0, max);
 
+/** Положительное число из ввода; мусор, минус и абсурд → undefined (не «норматив»). */
+function cleanPositive(v: unknown, max: number): number | undefined {
+  const n = typeof v === 'number' ? v : Number(String(v ?? '').replace(',', '.'));
+  if (!Number.isFinite(n) || n <= 0 || n > max) return undefined;
+  return Math.round(n * 10) / 10;
+}
+
+const cleanSeed = (raw: unknown): AthleteProfileSeed | undefined => {
+  if (!raw || typeof raw !== 'object') return undefined;
+  const r = raw as Partial<AthleteProfileSeed>;
+  const seed: AthleteProfileSeed = {};
+  const name = clean(r.name, 60);
+  if (name) seed.name = name;
+  if (r.sex === 'male' || r.sex === 'female') seed.sex = r.sex;
+  const age = cleanPositive(r.age, 120);
+  if (age !== undefined) seed.age = age;
+  const height = cleanPositive(r.height, 260);
+  if (height !== undefined) seed.height = height;
+  const weight = cleanPositive(r.weight, 400);
+  if (weight !== undefined) seed.weight = weight;
+  return Object.keys(seed).length ? seed : undefined;
+};
+
 function normalizeSpace(raw: unknown): DataSpaceRecord | null {
   if (!raw || typeof raw !== 'object') return null;
   const r = raw as Partial<DataSpaceRecord>;
@@ -199,11 +237,13 @@ function normalizeSpace(raw: unknown): DataSpaceRecord | null {
   }
   // id пространства вклеивается в составной ключ — разделитель и пробелы ломают разбор.
   if (id.includes(SPACE_INFIX) || /\s/.test(id)) return null;
+  const seed = cleanSeed(r.seed);
   return {
     id,
     athleteId: r.athleteId == null ? null : clean(r.athleteId, 80),
     label: clean(r.label, 80) || 'Атлет',
     createdAt: clean(r.createdAt, 40),
+    ...(seed ? { seed } : {}),
   };
 }
 
@@ -244,17 +284,33 @@ export function serializeRegistry(reg: DataSpaceRegistry): string {
 /** Добавить/обновить пространство (лимит — на атлетов, `home` не считается). */
 export function upsertSpace(
   reg: DataSpaceRegistry,
-  rec: { id: string; athleteId?: string | null; label?: string; createdAt?: string },
+  rec: {
+    id: string;
+    athleteId?: string | null;
+    label?: string;
+    createdAt?: string;
+    seed?: AthleteProfileSeed;
+  },
 ): { registry: DataSpaceRegistry; error: 'limit' | 'invalid' | null } {
   const id = clean(rec.id, 80);
   if (!id || id === HOME_SPACE_ID || id.includes(SPACE_INFIX)) {
     return { registry: reg, error: 'invalid' };
   }
+  const incomingSeed = cleanSeed(rec.seed);
   const existing = reg.spaces.find(s => s.id === id);
   if (existing) {
+    const merged: AthleteProfileSeed | undefined =
+      incomingSeed || existing.seed
+        ? cleanSeed({ ...(existing.seed ?? {}), ...(incomingSeed ?? {}) })
+        : undefined;
     const spaces = reg.spaces.map(s =>
       s.id === id
-        ? { ...s, athleteId: rec.athleteId === undefined ? s.athleteId : rec.athleteId, label: clean(rec.label, 80) || s.label }
+        ? {
+            ...s,
+            athleteId: rec.athleteId === undefined ? s.athleteId : rec.athleteId,
+            label: clean(rec.label, 80) || s.label,
+            ...(merged ? { seed: merged } : {}),
+          }
         : s,
     );
     return { registry: { ...reg, spaces }, error: null };
@@ -266,6 +322,7 @@ export function upsertSpace(
     athleteId: rec.athleteId ?? null,
     label: clean(rec.label, 80) || 'Атлет',
     createdAt: clean(rec.createdAt, 40) || new Date().toISOString(),
+    ...(incomingSeed ? { seed: incomingSeed } : {}),
   };
   return { registry: { ...reg, spaces: [...reg.spaces, space] }, error: null };
 }
@@ -706,13 +763,27 @@ export function isAthleteDataActive(): boolean {
 export function activateAthleteSpace(
   athleteId: string,
   label: string,
+  seed?: AthleteProfileSeed,
 ): { id: string | null; error: 'limit' | 'invalid' | null } {
   const reg = readRegistryFromStorage();
   const id = athleteSpaceId(athleteId);
-  const up = upsertSpace(reg, { id, athleteId, label });
+  const up = upsertSpace(reg, { id, athleteId, label, seed });
   if (up.error) return { id: null, error: up.error };
   writeRegistryToStorage(setActiveSpace(up.registry, id));
   return { id, error: null };
+}
+
+/**
+ * Данные карточки тренера для активного пространства (или null).
+ * Читается профилем как «из чего создать пустой профиль атлета при первом входе».
+ */
+export function activeSpaceSeed(): AthleteProfileSeed | null {
+  try {
+    const rec = findSpace(readRegistryFromStorage(), currentSpaceId());
+    return rec?.seed ?? null;
+  } catch {
+    return null;
+  }
 }
 
 export function activateHomeSpace(): void {

@@ -18,7 +18,10 @@ import {
   DEVICE_SALT_KEY,
   HOME_SPACE_ID,
   _resetDataSpaceCache,
+  activateAthleteSpace,
+  activateHomeSpace,
   athleteSpaceId,
+  currentSpaceId,
   emptyRegistry,
   installDataSpaceStorage,
   rawKeys,
@@ -207,6 +210,42 @@ describe('приложение видит профиль того, кто отк
 
     switchTo(HOME_SPACE_ID);
     expect(getProfile().name).toBe('Тренер');
+  });
+
+  it('пустой профиль атлета создаётся из данных карточки, но не перетирает уже заполненный', async () => {
+    const { getProfile } = await import('../profile-manager');
+
+    // Тренер ввёл в карточку: имя, пол, возраст, рост, вес — второй раз не спрашиваем.
+    const res = activateAthleteSpace('a1', 'Иван', {
+      name: 'Иван',
+      sex: 'male',
+      age: 27,
+      height: 181,
+      weight: 84.5,
+    });
+    expect(res.error).toBeNull();
+    expect(currentSpaceId()).toBe(athleteSpaceId('a1'));
+
+    const p = getProfile();
+    expect(p.name).toBe('Иван');
+    expect(p.settings.personal.sex).toBe('male');
+    expect(p.settings.personal.age).toBe(27);
+    expect(p.settings.personal.height).toBe(181);
+    expect(p.settings.personal.weight).toBe(84.5);
+
+    // Как только профиль реально сохранён, он главнее карточки: тренер мог
+    // исправить данные в самом приложении.
+    localStorage.setItem('he_profile_v2', JSON.stringify({ ...p, name: 'Иван П.', settings: { ...p.settings, personal: { ...p.settings.personal, weight: 82 } } }));
+    const saved = getProfile();
+    expect(saved.name).toBe('Иван П.');
+    expect(saved.settings.personal.weight).toBe(82);
+  });
+
+  it('в домашнем пространстве подстановки из карточки нет', async () => {
+    const { getProfile } = await import('../profile-manager');
+    activateAthleteSpace('a1', 'Иван', { name: 'Иван', age: 27 });
+    activateHomeSpace();
+    expect(getProfile().name).toBe('');
   });
 });
 

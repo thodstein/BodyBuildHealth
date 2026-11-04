@@ -246,7 +246,10 @@ describe('атлеты', () => {
 
     const reg = JSON.parse(localStorage.getItem(DATA_SPACE_KEY) as string);
     expect(reg.active).toBe(athleteSpaceId('a1'));
-    expect(reg.spaces.some((s: { athleteId: string }) => s.athleteId === 'a1')).toBe(true);
+    const space = reg.spaces.find((s: { athleteId: string }) => s.athleteId === 'a1');
+    expect(space).toBeTruthy();
+    // Имя из карточки уходит в пространство: профиль атлета не будет пустым.
+    expect(space.seed.name).toBe('Атлет 1');
     expect(reload).toHaveBeenCalled();
 
     Object.defineProperty(window, 'location', {

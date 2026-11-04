@@ -1,6 +1,7 @@
 import { UserRole, UserProfile, UnifiedSettings, getDefaultSettings } from "./types";
 import { useState, useEffect, useCallback, useRef, useSyncExternalStore } from "react";
 import { broadcastProfileChange } from './profile-events';
+import { activeSpaceSeed } from './data-space';
 
 const STORAGE_KEY = "he_profile_v2";
 const MIGRATED_FLAG = 'he_profile_migrated_v2';
@@ -178,11 +179,34 @@ export function getProfile(): UserProfile {
   try {
     ensureBioStackCleanup();
     const saved = localStorage.getItem(STORAGE_KEY);
-    const p: UserProfile = saved ? JSON.parse(saved) : getDefaultProfile();
+    const p: UserProfile = saved ? JSON.parse(saved) : seededDefaultProfile();
     p.settings = makeSettingsProxy(p.settings);
     normalizeArrayFields(p.settings);
     return p;
-  } catch { return getDefaultProfile(); }
+  } catch { return seededDefaultProfile(); }
+}
+
+/**
+ * Пустой профиль для пространства данных. В домашнем пространстве это ровно
+ * дефолт приложения (поведение не менялось). В пространстве атлета в пустой
+ * профиль переносятся поля карточки тренера (имя, пол, возраст, рост, вес) —
+ * тренер уже вводил их один раз, заставлять вводить снова глупо.
+ * Переносятся ТОЛЬКО введённые значения: никаких «норм» и подстановок.
+ */
+function seededDefaultProfile(): UserProfile {
+  const base = getDefaultProfile();
+  const seed = activeSpaceSeed();
+  if (!seed) return base;
+  const personal = { ...base.settings.personal };
+  if (seed.sex) personal.sex = seed.sex;
+  if (seed.age !== undefined) personal.age = seed.age;
+  if (seed.height !== undefined) personal.height = seed.height;
+  if (seed.weight !== undefined) personal.weight = seed.weight;
+  return {
+    ...base,
+    name: seed.name || base.name,
+    settings: { ...base.settings, personal },
+  } as UserProfile;
 }
 
 /* ── Кэш парсинга профиля: один JSON.parse на все подписки за один notify ── */

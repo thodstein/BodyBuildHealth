@@ -1,3 +1,12 @@
+// ШОВ ПРОСТРАНСТВ ДАННЫХ ставится дважды и это осознанно:
+//  • импортом ниже — чтобы шов стоял даже для модулей, читающих localStorage
+//    на этапе импорта (это редкий случай; сейчас так делает только cloud-kv);
+//  • первым оператором тела — потому что порядок вычисления импортов зависит от
+//    бандлера, а «шов не встал» означает не «ошибка», а молчаливую утечку
+//    данных между тренером и атлетом. Функция идемпотентна.
+import { installDataSpaceStorage } from './core/data-space';
+installDataSpaceStorage(typeof window !== 'undefined' ? window : null);
+
 // Unregister stale service workers in development
 if ('serviceWorker' in navigator && import.meta.env.DEV) {
   navigator.serviceWorker.getRegistrations().then(regs => regs.forEach(r => { console.log('Unregistering stale SW:', r.scope); r.unregister(); }));

@@ -306,7 +306,16 @@ export const ProfileCoachTab: React.FC<{
 
   /** Войти в данные атлета: своё пространство профиля/дневников/планов. */
   const enterAthleteData = (a: CoachAthlete) => {
-    const res = activateAthleteSpace(a.id, a.name);
+    // Переносим введённое в карточку в пустой профиль атлета: имя, пол, возраст,
+    // рост и вес тренер уже заполнял здесь — второй раз спрашивать незачем.
+    const seed = {
+      name: a.name,
+      ...(a.sex === 'male' || a.sex === 'female' ? { sex: a.sex } : {}),
+      ...(a.age != null ? { age: a.age } : {}),
+      ...(a.heightCm != null ? { height: a.heightCm } : {}),
+      ...(a.weightKg != null ? { weight: a.weightKg } : {}),
+    };
+    const res = activateAthleteSpace(a.id, a.name, seed);
     if (res.error === 'limit') {
       setFormError(`Лимит ${MAX_DATA_SPACES} пространств данных. Удалите данные неактуального атлета.`);
       return;
