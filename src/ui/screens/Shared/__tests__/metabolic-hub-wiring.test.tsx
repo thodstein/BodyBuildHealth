@@ -349,6 +349,23 @@ describe('MetabolicHub: ввод меняет расчёт (проводка п�
     expect(t1).toBeLessThan(t0);
   });
 
+  it('пресет задаёт % жира и не отдаёт его старому калиперу/BIA', () => {
+    render(<MetabolicHub />);
+    setNumber('JP3 сумма, мм', 100);
+    expect(tileText('Жир')).toContain('замер');
+    const preset = Array.from(document.querySelectorAll('.mh-preset'))
+      .find(b => (b.textContent || '').includes('Бикини')) as HTMLElement;
+    expect(preset).toBeTruthy();
+    fireEvent.click(preset);
+    expect(tileValue('Жир')).toBe(18);
+    expect(tileText('Жир')).toContain('пресет');
+    expect(tileText('Жир')).not.toContain('замер');
+    // ручной ввод снова главнее пресета и честно подписан
+    setNumber('Жир, % (если измерен)', 26);
+    expect(tileValue('Жир')).toBe(26);
+    expect(tileText('Жир')).toContain('ручной ввод');
+  });
+
   it('adaptive TDEE не подменяет плитку, пока данных мало (2 дня дневника)', () => {
     seedWeightAndDiary(10, 2);
     render(<MetabolicHub />);

@@ -662,6 +662,17 @@ describe('metabolic-hub PRO v2 — новые Pro-исправления', () =>
     const obese = calcBodyFat({ weight:100, height:170, age:30, sex:'male', waist:100, neck:40 });
     expect(obese.deurenbergWarn).toContain('BMI');
   });
+  it('ручной % жира перебивает калипер только по явному флагу', () => {
+    const measured = calcBodyFat({ ...base, skinfoldSum3:100, bodyFat: 26 });
+    // без флага приоритет прежний: замер (JP3) > профильный/ручной bodyFat
+    expect(measured.current).toBeGreaterThan(26);
+    expect(measured.measured).not.toBeNull();
+    // с флагом плитка и BMR считают одно и то же число
+    const manual = calcBodyFat({ ...base, skinfoldSum3:100, bodyFat: 26, bodyFatAuthoritative: true });
+    expect(manual.current).toBe(26);
+    // кросс-чек всё равно печатает замер — числа не прячем
+    expect(manual.crossCheck).toContain('JP3');
+  });
   it('Stress Load Index alias + дисклеймер E', () => {
     const s = calcStressLoad({ ...base, stress:5, sleepHours:7, acwr:1 });
     const c = calcCortisol({ ...base, stress:5, sleepHours:7, acwr:1 });

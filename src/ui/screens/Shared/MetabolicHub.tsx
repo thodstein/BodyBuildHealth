@@ -136,6 +136,20 @@ const SNAP_BOOL: Record<string, [string, string]> = {
 /** Все лабы, которые хаб умеет подтягивать/помечать как ручные (ключи valuesRef и apply). */
 const LAB_KEYS = ['hct', 'hgb', 'ferritin', 'gfr', 'hdlMgDl', 'ast', 'alt', 'plt', 'tgMgDl2', 'glucoseMgDl', 'insulinMuMl', 'tsh', 'ft4'] as const;
 
+/**
+ * Типовые профили для быстрого старта. Только данные — применение в `applyPreset`,
+ * чтобы пресет мог помечать `% жира` как введённый (иначе калипер/BIA его перебивал).
+ */
+const MH_PRESETS: Array<{
+  label: string; weight: number; height: number; age: number; activityLevel: 'low'|'medium'|'high';
+  trainingDays: number; cardioMin?: number; bodyFat?: number; sex?: 'male'|'female';
+}> = [
+  { label: 'Офис 70кг', weight: 70, height: 175, age: 30, activityLevel: 'low', trainingDays: 3, cardioMin: 60 },
+  { label: 'Атлет 90кг', weight: 90, height: 185, age: 28, activityLevel: 'medium', trainingDays: 5, cardioMin: 120, bodyFat: 12 },
+  { label: 'Тяж 110кг', weight: 110, height: 190, age: 32, activityLevel: 'high', trainingDays: 6, cardioMin: 150, bodyFat: 18 },
+  { label: 'Бикини 55кг', weight: 55, height: 165, age: 26, activityLevel: 'medium', trainingDays: 4, bodyFat: 18, sex: 'female' },
+];
+
 /** Значение поля снапшота для показа в diff. */
 function snapValue(key: string, v: unknown): string {
   if (v == null || v === '') return '—';
@@ -317,6 +331,8 @@ export const MetabolicHub: React.FC = () => {
   const sweatTouchedRef = useRef(false);
   /** `% жира` введён вручную в этом хабе — он главнее калипера; иначе главнее замер. */
   const bodyFatTouchedRef = useRef(false);
+  /** `% жира` пришёл из пресета (не замер) — подпись источника иначе врёт «профиль». */
+  const bfPresetRef = useRef(false);
   /** Откуда взялась «вода факт»: профиль (там дефолт 2 л) или ручной ввод в хабе. */
   const waterOriginRef = useRef<'profile'|'user'|null>(null);
 
@@ -715,13 +731,13 @@ export const MetabolicHub: React.FC = () => {
     ? (bodyFat ?? measuredBf.direct ?? measuredBf.navy)
     : (measuredBf.direct ?? bodyFat ?? measuredBf.navy);
   const bfSource = bodyFatTouchedRef.current && bodyFat != null
-    ? 'ручной ввод'
+    ? (bfPresetRef.current ? 'пресет' : 'ручной ввод')
     : measuredBf.direct != null ? `замер ${Number(measuredBf.direct.toFixed(1))}%`
     : bodyFat != null ? 'профиль'
     : measuredBf.navy != null ? `Navy ${Number(measuredBf.navy.toFixed(1))}%`
     : 'Deurenberg';
 
-  const input: MetabolicInput = useMemo(()=> ({ weight,height,age,sex,bodyFat: bfForCalc,neck,waist,hip,steps,cardioMin,trainingDays,trainingHours: trainingDays*1.15, activityLevel: activityLevel as any, profession, goal, onAAS, aasDose, stress, sleepHours, sleepQuality, acwr, climate, humidity, standingHours, fidgetLevel, sweatRate: effectiveSweatMlPerH, sweatSodiumMgPerL: effectiveSweatNaMgPerL, weightHistory: weightHistory.length>=3 ? weightHistory : undefined, hct, hgb, ferritin, gfr, waterL, ironIntakeMg: undefined, alcoholG, alcoholDaysPerWeek: alcoholDays, caffeineMg, tsh, ft4, creatineUse, weeklyVolumeTons, menstrualPhase, targetWeight, fiberG, omega3G, skinfoldSum3, skinfoldSum4, biaResistanceOhm: biaResistance, glucoseMgDl, insulinMuMl, deficitKcal, weeksInDeficit, metHoursPerWeek, measuredRMR, leafScore, boneFlag, menstrualFlag, hdlMgDl, systolic, diastolic, ast, alt, plt, caffeineHoursSince, trimester: trimester || undefined, lactating: lactating === 'none' ? undefined : lactating, ethnicity, postBariatric, untreatedHypothyroid: untreatedHypo || undefined, acclimated, proteinSource } as any), [weight,height,age,sex,bfForCalc,neck,waist,hip,steps,cardioMin,trainingDays,activityLevel,profession,goal,onAAS,aasDose,stress,sleepHours,sleepQuality,acwr,climate,humidity,standingHours,fidgetLevel,effectiveSweatMlPerH,effectiveSweatNaMgPerL,weightHistory,hct,hgb,ferritin,gfr,waterL,alcoholG,alcoholDays,caffeineMg,tsh,ft4,glucoseMgDl,insulinMuMl,skinfoldSum3,skinfoldSum4,biaResistance,deficitKcal,weeksInDeficit,creatineUse,weeklyVolumeTons,menstrualPhase,targetWeight,fiberG,omega3G,metHoursPerWeek,measuredRMR,leafScore,boneFlag,menstrualFlag,hdlMgDl,systolic,diastolic,ast,alt,plt,caffeineHoursSince,trimester,lactating,ethnicity,postBariatric,untreatedHypo,acclimated,proteinSource]);
+  const input: MetabolicInput = useMemo(()=> ({ weight,height,age,sex,bodyFat: bfForCalc, bodyFatAuthoritative: bodyFatTouchedRef.current,neck,waist,hip,steps,cardioMin,trainingDays,trainingHours: trainingDays*1.15, activityLevel: activityLevel as any, profession, goal, onAAS, aasDose, stress, sleepHours, sleepQuality, acwr, climate, humidity, standingHours, fidgetLevel, sweatRate: effectiveSweatMlPerH, sweatSodiumMgPerL: effectiveSweatNaMgPerL, weightHistory: weightHistory.length>=3 ? weightHistory : undefined, hct, hgb, ferritin, gfr, waterL, ironIntakeMg: undefined, alcoholG, alcoholDaysPerWeek: alcoholDays, caffeineMg, tsh, ft4, creatineUse, weeklyVolumeTons, menstrualPhase, targetWeight, fiberG, omega3G, skinfoldSum3, skinfoldSum4, biaResistanceOhm: biaResistance, glucoseMgDl, insulinMuMl, deficitKcal, weeksInDeficit, metHoursPerWeek, measuredRMR, leafScore, boneFlag, menstrualFlag, hdlMgDl, systolic, diastolic, ast, alt, plt, caffeineHoursSince, trimester: trimester || undefined, lactating: lactating === 'none' ? undefined : lactating, ethnicity, postBariatric, untreatedHypothyroid: untreatedHypo || undefined, acclimated, proteinSource } as any), [weight,height,age,sex,bfForCalc,neck,waist,hip,steps,cardioMin,trainingDays,activityLevel,profession,goal,onAAS,aasDose,stress,sleepHours,sleepQuality,acwr,climate,humidity,standingHours,fidgetLevel,effectiveSweatMlPerH,effectiveSweatNaMgPerL,weightHistory,hct,hgb,ferritin,gfr,waterL,alcoholG,alcoholDays,caffeineMg,tsh,ft4,glucoseMgDl,insulinMuMl,skinfoldSum3,skinfoldSum4,biaResistance,deficitKcal,weeksInDeficit,creatineUse,weeklyVolumeTons,menstrualPhase,targetWeight,fiberG,omega3G,metHoursPerWeek,measuredRMR,leafScore,boneFlag,menstrualFlag,hdlMgDl,systolic,diastolic,ast,alt,plt,caffeineHoursSince,trimester,lactating,ethnicity,postBariatric,untreatedHypo,acclimated,proteinSource]);
 
   const water = useMemo(()=> calcWater(input), [input]);
 const stepsCalc = useMemo(()=> calcSteps(input), [input]);
@@ -951,6 +967,7 @@ const kbju = useMemo(()=> calcKBJU(input), [input]);
     manualLabsRef.current = {};
     sweatTouchedRef.current = false;
     bodyFatTouchedRef.current = false;
+    bfPresetRef.current = false;
     // Лабы и замеры
     setBodyFat(undefined);
     setHct(undefined); setHgb(undefined); setFerritin(undefined); setGfr(undefined);
@@ -988,6 +1005,24 @@ const kbju = useMemo(()=> calcKBJU(input), [input]);
     setWizardStep(1);
     showToast('Ввод сброшен: лабы, замеры, пот, климат, сон, цель — пусто. Вес/рост/активность из профиля не тронуты');
   }, [showToast, weight]);
+
+  /**
+   * Пресет — это «пример профиля», а не замер. `% жира` из пресета обязан победить
+   * старый калипер/BIA (иначе «Бикини 55кг» давала TDEE от прошлых обхватов),
+   * поэтому ставим `bodyFatTouchedRef` и запоминаем источник «пресет».
+   */
+  const applyPreset = useCallback((p: typeof MH_PRESETS[number]) => {
+    setWeight(p.weight); setHeight(p.height); setAge(p.age);
+    if (p.sex) setSex(p.sex);
+    setActivityLevel(p.activityLevel); setTrainingDays(p.trainingDays);
+    if (p.cardioMin != null) setCardioMin(p.cardioMin);
+    if (p.bodyFat != null) {
+      bodyFatTouchedRef.current = true;
+      bfPresetRef.current = true;
+      setBodyFat(p.bodyFat);
+    }
+    showToast(`Пресет «${p.label}»: вес ${p.weight}кг, рост ${p.height}см${p.bodyFat != null ? `, жир ${p.bodyFat}%` : ''} — замеры и лабы не тронуты`);
+  }, [showToast]);
 
   const active = MODE_DEFS.find(d=> d.m===mode)!;
   const waistErr = waist && neck && waist <= neck ? 'Талия ≤ шеи — Navy невалиден' : null;
@@ -1172,7 +1207,7 @@ const kbju = useMemo(()=> calcKBJU(input), [input]);
           <PopupSelect label="Пол" value={sex} options={[{id:'male',label:'♂ Мужчина'},{id:'female',label:'♀ Женщина'}]} onChange={v=> setSex(v as any)} />
           <MhNum label="Жир, % (если измерен)" value={bodyFat} min={3} max={55} suffix=" %" optional
             hint="Введённое вручную главнее замеров (DEXA). Пусто — берётся калипер/Navy/BIA, иначе Deurenberg (подписано)."
-            onChange={(v)=>{ bodyFatTouchedRef.current = true; setBodyFat(v); }} />
+            onChange={(v)=>{ bodyFatTouchedRef.current = true; bfPresetRef.current = false; setBodyFat(v); }} />
           <PopupSelect label="Белок DIAAS" value={proteinSource} options={[{id:'mixed',label:'Смешанный 0.95'},{id:'whey',label:'Whey 1.09'},{id:'milk',label:'Молоко 1.14'},{id:'egg',label:'Яйцо 1.13'},{id:'beef',label:'Говядина 1.10'},{id:'chicken',label:'Курица 1.08'},{id:'fish',label:'Рыба 1.05'},{id:'casein',label:'Казеин 1.12'},{id:'soy',label:'Соя 0.90'},{id:'pea',label:'Горох 0.58'},{id:'rice',label:'Рис 0.59'},{id:'blend_plant',label:'Бленд 0.75'}]} onChange={setProteinSource} />
           <MhNum label="Цель вес, кг" value={targetWeight} min={35} max={200} suffix=" кг" optional
             hint="Нужен для срока цели, diet-break и проекции. Без него эти блоки честно пустые."
@@ -1198,12 +1233,7 @@ const kbju = useMemo(()=> calcKBJU(input), [input]);
         <div style={{ marginTop:10, paddingTop:8, borderTop:'1px solid rgba(255,255,255,0.07)' }}>
           <div style={{ display:'flex', gap:6, flexWrap:'wrap', alignItems:'center' }}>
             <span style={{ fontSize:9, fontWeight:800, color:'rgba(255,255,255,0.55)', textTransform:'uppercase' }}>⚡ Пресеты</span>
-            {[
-              { label:'Офис 70кг', act:()=>{ setWeight(70); setHeight(175); setAge(30); setActivityLevel('low' as any); setTrainingDays(3); setCardioMin(60); } },
-              { label:'Атлет 90кг', act:()=>{ setWeight(90); setHeight(185); setAge(28); setActivityLevel('medium' as any); setTrainingDays(5); setCardioMin(120); setBodyFat(12); } },
-              { label:'Тяж 110кг', act:()=>{ setWeight(110); setHeight(190); setAge(32); setActivityLevel('high' as any); setTrainingDays(6); setCardioMin(150); setBodyFat(18); } },
-              { label:'Бикини 55кг', act:()=>{ setWeight(55); setHeight(165); setAge(26); setSex('female' as any); setActivityLevel('medium' as any); setTrainingDays(4); setBodyFat(18); } },
-            ].map(p=> <button key={p.label} onClick={p.act} className="mh-preset" style={{ padding:'6px 10px', minHeight:44, borderRadius:20, border:'1px solid rgba(255,255,255,0.08)', background:'rgba(255,255,255,0.04)', color:'#fff', fontSize:10, fontWeight:700, cursor:'pointer' }}>{p.label}</button>)}
+            {MH_PRESETS.map(p=> <button key={p.label} onClick={()=> applyPreset(p)} className="mh-preset" style={{ padding:'6px 10px', minHeight:44, borderRadius:20, border:'1px solid rgba(255,255,255,0.08)', background:'rgba(255,255,255,0.04)', color:'#fff', fontSize:10, fontWeight:700, cursor:'pointer' }}>{p.label}</button>)}
           </div>
         </div>
       </div>

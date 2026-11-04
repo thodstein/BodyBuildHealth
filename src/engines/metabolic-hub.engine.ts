@@ -77,6 +77,11 @@ export type KBJUInput = Pick<MetabolicInput,'weight'|'height'|'age'|'sex'|'bodyF
 export interface MetabolicInput {
   weight: number; height: number; age: number; sex: 'male'|'female';
   bodyFat?: number; neck?: number; waist?: number; hip?: number;
+  /**
+   * `bodyFat` — уже РЕШЁННОЕ значение (пользователь ввёл руками/пресет), а не профильный
+   * дефолт: тогда `calcBodyFat` не перебивает его калипером/BIA и плитка совпадает с BMR.
+   */
+  bodyFatAuthoritative?: boolean;
   steps?: number; cardioMin?: number; trainingDays?: number; trainingHours?: number;
   activityLevel?: 'low'|'medium'|'high'|'very_high'; // бытовая NEAT — very_high для 2×/д
   goal?: 'cut'|'maintain'|'bulk'|'health';
@@ -557,7 +562,10 @@ export function calcBodyFat(input: MetabolicInput) {
   // Приоритет: JP/Durnin/BIA (если есть) > Navy > ручной bodyFat > Deurenberg > дефолт
   // JP ±3% best field при обученном калипере, Durnin ±4%, BIA ±3.5% Kyle
   const measured = jp ?? durnin ?? bia;
-  const currRaw = measured ?? navy ?? (typeof input.bodyFat==='number' && input.bodyFat>3 ? input.bodyFat : null) ?? deurenbergRaw ?? (input.sex==='female'?22:15);
+  // Аудит 2026-11: если `bodyFat` — уже решённый ручной/пресет-ввод, калипер его не перебивает:
+  // иначе плитка показывала замер (35.5%), а BMR/TDEE считались от введённых 26% — два разных жира.
+  const authBf = input.bodyFatAuthoritative && typeof input.bodyFat === 'number' && input.bodyFat > 3 ? input.bodyFat : null;
+  const currRaw = authBf ?? measured ?? navy ?? (typeof input.bodyFat==='number' && input.bodyFat>3 ? input.bodyFat : null) ?? deurenbergRaw ?? (input.sex==='female'?22:15);
   const curr = clamp(Math.round(currRaw*10)/10, 3, 65);
   const ffm = input.weight * (1 - curr/100);
   const hM = (input.height||180)/100;
