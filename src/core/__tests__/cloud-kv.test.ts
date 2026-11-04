@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { DATA_SPACE_KEY } from '../data-space';
 import {
   CHUNK_SIZE,
   META_KEY,
@@ -122,6 +123,15 @@ describe('isKvExcludedKey', () => {
     expect(isKvExcludedKey('he_weight_log')).toBe(false);
     expect(isKvExcludedKey('he_bb_plan')).toBe(false);
     expect(isKvExcludedKey('he_workout_log_v2')).toBe(false);
+  });
+
+  it('реестр пространств данных не уезжает в облако (это свойство устройства)', () => {
+    // Иначе переключение на атлета уехало бы на другое устройство, и там
+    // приложение открылось бы «в пространстве атлета» без его данных.
+    expect(isKvExcludedKey(DATA_SPACE_KEY)).toBe(true);
+    expect(isKvExcludedKey('he_data_space_v1')).toBe(true);
+    // профили атлетов при этом синхронизируются как обычные ключи
+    expect(isKvExcludedKey(`he_ath_asp_a1_x__he_profile_v2`)).toBe(false);
   });
 });
 

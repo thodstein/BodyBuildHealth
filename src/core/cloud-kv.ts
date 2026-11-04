@@ -24,6 +24,7 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { db } from './db';
 import {
+  DATA_SPACE_KEY,
   HOME_SPACE_ID,
   currentSpaceId,
   spaceIdOfKey,
@@ -49,8 +50,19 @@ const IDB_KV_PREFIX = 'idb:';
 export const LINKED_TG_TOKEN_KEY = 'he_sync_tg_token_v1';
 
 /** Ключи, которые НЕ синхронизируются (сессия/ключи шифрования/синк-внутренности). */
-export const EXCLUDED_KEYS = new Set(['he_session_v2', 'he_crypto_key', 'he_last_active', META_KEY, IDB_META_KEY, LINKED_TG_TOKEN_KEY]);
-export const EXCLUDED_PREFIXES = ['he_sync_ts_', 'he_draft_', 'he_nav_', 'he_admin_'];
+export const EXCLUDED_KEYS = new Set([
+  'he_session_v2',
+  'he_crypto_key',
+  'he_last_active',
+  // Реестр пространств — свойство УСТРОЙСТВА. Если его синкать, переключение на
+  // атлета уедет в облако и на другом устройстве приложение откроется «в
+  // пространстве атлета», которого там нет: пустой профиль вместо своих данных.
+  DATA_SPACE_KEY,
+  META_KEY,
+  IDB_META_KEY,
+  LINKED_TG_TOKEN_KEY,
+]);
+export const EXCLUDED_PREFIXES = ['he_sync_ts_', 'he_draft_', 'he_nav_', 'he_admin_', 'he_data_space_'];
 
 export interface KvRow {
   id: string;
