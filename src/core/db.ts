@@ -322,10 +322,93 @@ export async function deleteSpaceDatabases(spaceIds: readonly string[]): Promise
 }
 
 /**
+ * Сколько записей лежит в базе пространства (дневники тренировок, анализы,
+ * фото). Нужно, чтобы «удалить данные атлета» показывало НАСТОЯЩИЙ объём:
+ * `localStorage` этого атлета может быть почти пуст, а база — на тысячи записей.
+ *
+ * Возвращает `0`, если базы нет (открытие создало бы пустую — прерываем
+ * апгрейд, поэтому база не появляется), и `null`, если посчитать не удалось.
+ * Никогда не бросает: это вспомогательная цифра, а не рабочий путь записи.
+ */
+export function spaceDbRecordCount(spaceId: string): Promise<number | null> {
+  return new Promise<number | null>(resolve => {
+    let settled = false;
+    const done = (v: number | null) => {
+      if (settled) return;
+      settled = true;
+      resolve(v);
+    };
+    try {
+      const req = indexedDB.open(dbNameFor(spaceId));
+      req.onupgradeneeded = () => {
+        // Базы ещё нет. Открытие без версии создало бы пустую — прерываем.
+        try {
+          req.transaction?.abort();
+        } catch {
+          /* ignore */
+        }
+        done(0);
+      };
+      req.onerror = () => done(0);
+      req.onblocked = () => done(null);
+      req.onsuccess = () => {
+        const database = req.result;
+        const close = () => {
+          try {
+            database.close();
+          } catch {
+            /* ignore */
+          }
+        };
+        try {
+          const stores = Array.from(database.objectStoreNames ?? []);
+          if (!stores.length) {
+            close();
+            return done(0);
+          }
+          const tx = database.transaction(stores, 'readonly');
+          let sum = 0;
+          let failed = false;
+          for (const name of stores) {
+            try {
+              const r = tx.objectStore(name).count();
+              r.onsuccess = () => {
+                if (typeof r.result === 'number') sum += r.result;
+              };
+              r.onerror = () => {
+                failed = true;
+              };
+            } catch {
+              failed = true;
+            }
+          }
+          tx.oncomplete = () => {
+            close();
+            done(failed ? null : sum);
+          };
+          tx.onerror = () => {
+            close();
+            done(null);
+          };
+          tx.onabort = () => {
+            close();
+            done(null);
+          };
+        } catch {
+          close();
+          done(null);
+        }
+      };
+    } catch {
+      done(null);
+    }
+  });
+}
+
+/**
  * Удалить базы ВСЕХ пространств (аварийный сброс). Синхронная: вызывается из
  * обработчиков кнопок, где ждать нечего.
- */
-export function deleteAllDatabasesSync(): void {
+ */export function deleteAllDatabasesSync(): void {
   let spaces: string[] = [];
   try {
     spaces = parseRegistry(localStorage.getItem(DATA_SPACE_KEY)).spaces.map(s => s.id);

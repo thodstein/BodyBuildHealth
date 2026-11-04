@@ -8,7 +8,7 @@
  *  • удаление — через подтверждение, а не «одним тапом навсегда».
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { render, fireEvent, cleanup } from '@testing-library/react';
+import { render, fireEvent, cleanup, waitFor } from '@testing-library/react';
 import { ProfileCoachTab } from '../ProfileCoachTab';
 import {
   COACH_MAX_ATHLETES,
@@ -203,12 +203,28 @@ describe('атлеты', () => {
     expect(hint).toContain('Удалить и его данные');
   });
 
-  it('кнопка «Удалить и его данные» есть, только если у атлета уже есть свои данные', () => {
+  it('подтверждение показывает измеренный объём, а не выдуманный', () => {
+    seed(1);
+    const sid = athleteSpaceId('a1');
+    localStorage.setItem(`${ATHLETE_SPACE_PREFIX}${sid}__he_profile_v2`, 'x'.repeat(2048));
+    const { container } = render(<ProfileCoachTab />);
+    fireEvent.click(container.querySelector('[data-coach="delete"]') as HTMLElement);
+    const hint = container.querySelector('[data-coach="delete-hint"]')?.textContent ?? '';
+    // 2048 символов профиля — это ровно 2,0 КБ текста; размер берём из хранилища
+    expect(hint).toContain('2,0 КБ');
+    expect(hint).toContain('настроек и планов');
+  });
+
+  it('кнопка «Удалить и его данные» есть, только если у атлета есть свои данные (в памяти или в базе)', async () => {
     seed(1);
     const first = render(<ProfileCoachTab />);
     fireEvent.click(first.container.querySelector('[data-coach="delete"]') as HTMLElement);
-    // пока атлет ни разу не входил в приложение — данных нет, кнопки нет
-    expect(first.container.querySelector('[data-coach="delete-with-data"]')).toBeNull();
+    // Пока объём неизвестен, кнопка видна: у атлета могут быть записи ТОЛЬКО
+    // в базе IndexedDB (дневники тренировок, анализы), и спрятать кнопку значит
+    // сделать эти данные неудаляемыми. Как только выяснили, что пусто — убираем.
+    await waitFor(() =>
+      expect(first.container.querySelector('[data-coach="delete-with-data"]')).toBeNull(),
+    );
     cleanup();
 
     // имитируем «атлет вошёл»: его пространство содержит собственный профиль
@@ -219,7 +235,8 @@ describe('атлеты', () => {
     fireEvent.click(second.container.querySelector('[data-coach="delete"]') as HTMLElement);
     const btn = second.container.querySelector('[data-coach="delete-with-data"]');
     expect(btn).not.toBeNull();
-    expect(btn?.textContent).toContain('1');
+    // в самой кнопке цифры нет: объём пишем в подсказке, где он посчитан честно
+    expect(btn?.textContent).toBe('Удалить и его данные');
   });
 
   it('«Удалить и его данные» стирает данные атлета, но не трогает профиль тренера', () => {
@@ -260,7 +277,7 @@ describe('атлеты', () => {
     expect(localStorage.getItem(`${ATHLETE_SPACE_PREFIX}${sid}__he_profile_v2`)).toBe('{"name":"Иван"}');
   });
 
-  it('в карточке видно факты о данных атлета: объём и когда открывали', () => {
+  it('в карточке видно факты о данных атлета: есть ли данные и когда открывали', () => {
     seed(1);
     const sid = athleteSpaceId('a1');
     let reg = upsertSpace(emptyRegistry(), { id: sid, athleteId: 'a1', label: 'Атлет 1' }).registry;
@@ -270,13 +287,16 @@ describe('атлеты', () => {
 
     const { container } = render(<ProfileCoachTab />);
     const facts = container.querySelector('[data-coach="space-facts"]')?.textContent ?? '';
-    expect(facts).toContain('свои данные: 2,0 КБ');
+    expect(facts).toContain('свои данные: есть');
     expect(facts).toContain('открывался 03.11.26');
-    // никаких оценок «мало/пора заниматься» — только факты
+    // Объём не показываем: дневники и анализы лежат в IndexedDB, и размер только
+    // по localStorage был бы занижен в разы — это было бы враньём о масштабе.
+    expect(facts).not.toMatch(/КБ|МБ|записей/);
+    // и никаких оценок «мало/пора заниматься» — только факты
     expect(facts).not.toMatch(/мало|пора|отстаёт|норма/i);
   });
 
-  it('о пустом пространстве карточка говорит прямо: данных пока нет', () => {
+  it('о пустом пространстве карточка не выдумывает данных: только «открывался»', () => {
     seed(1);
     const sid = athleteSpaceId('a1');
     let reg = upsertSpace(emptyRegistry(), { id: sid, athleteId: 'a1', label: 'Атлет 1' }).registry;
@@ -285,8 +305,8 @@ describe('атлеты', () => {
 
     const { container } = render(<ProfileCoachTab />);
     const facts = container.querySelector('[data-coach="space-facts"]')?.textContent ?? '';
-    expect(facts).toContain('пока пусто');
-    expect(facts).toContain('открывался 03.11.26');
+    expect(facts).toBe('открывался 03.11.26');
+    expect(facts).not.toContain('свои данные');
   });
 
   it('«Войти в его данные» записывает пространство атлета и перезагружает приложение', () => {

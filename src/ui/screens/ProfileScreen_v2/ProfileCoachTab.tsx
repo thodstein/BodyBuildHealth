@@ -82,6 +82,16 @@ const fmtBytes = (bytes: number): string => {
   return `${(kb / 1024).toFixed(1).replace('.', ',')} МБ`;
 };
 
+/** 1 запись / 2 записи / 5 записей — иначе «2 записей» выглядит небрежно. */
+const plural = (n: number, one: string, few: string, many: string): string => {
+  const a = Math.abs(n) % 100;
+  const b = a % 10;
+  if (a > 10 && a < 20) return many;
+  if (b === 1) return one;
+  if (b >= 2 && b <= 4) return few;
+  return many;
+};
+
 interface AthleteForm {
   name: string;
   sex: CoachSex;
@@ -174,6 +184,11 @@ export const ProfileCoachTab: React.FC<{
   const [form, setForm] = useState<AthleteForm>(EMPTY_FORM);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
+  /**
+   * Сколько записей в базе IndexedDB каждого атлета. `undefined` — ещё не
+   * спрашивали, `null` — спросить не удалось (тогда цифру не показываем вовсе).
+   */
+  const [spaceDbRecords, setSpaceDbRecords] = useState<Record<string, number | null>>({});
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [query, setQuery] = useState('');
 
@@ -315,6 +330,13 @@ export const ProfileCoachTab: React.FC<{
       return;
     }
     setConfirmDeleteId(id);
+    // Настоящий объём данных атлета спрашиваем лениво и только когда тренер уже
+    // собрался удалять: дневники тренировок и анализы живут в его базе IndexedDB,
+    // а не в localStorage — без этого «сколько удалится» было бы занижено в разы.
+    void import('../../../core/db')
+      .then(({ spaceDbRecordCount }) => spaceDbRecordCount(athleteSpaceId(id)))
+      .then(records => setSpaceDbRecords(prev => ({ ...prev, [id]: records })))
+      .catch(() => setSpaceDbRecords(prev => ({ ...prev, [id]: null })));
   };
 
   /** Удаление карточки вместе с данными атлета (профиль/дневники/анализы). */
@@ -813,17 +835,20 @@ export const ProfileCoachTab: React.FC<{
                     {(() => {
                       const u = usageOf(a.id);
                       const opened = lastOpenedOf(a.id);
-                      // Только факты: сколько занимает и когда открывали. Ключи
-                      // хранилища — техническая единица, поэтому объём показываем
-                      // размером, а не «записями» (иначе это было бы враньё).
-                      if (u.keys === 0 && !opened) return null;
+                      // Только то, что знаем наверняка и без лишней работы: есть ли
+                      // ключи и когда открывали. Объём в карточке не показываем —
+                      // дневники тренировок и анализы лежат в IndexedDB, и число по
+                      // localStorage было бы на порядки меньше настоящего.
+                      const parts: string[] = [];
+                      if (u.keys > 0) parts.push('свои данные: есть');
+                      if (opened) parts.push(`открывался ${fmtShort(opened.slice(0, 10))}`);
+                      if (!parts.length) return null;
                       return (
                         <div
                           data-coach="space-facts"
                           style={{ marginTop: 6, fontSize: 10.5, color: colors.textMuted, lineHeight: 1.45 }}
                         >
-                          {u.keys > 0 ? `свои данные: ${fmtBytes(u.bytes)}` : 'свои данные: пока пусто'}
-                          {opened && ` · открывался ${fmtShort(opened.slice(0, 10))}`}
+                          {parts.join(' · ')}
                         </div>
                       );
                     })()}
@@ -918,16 +943,22 @@ export const ProfileCoachTab: React.FC<{
                           Оставить
                         </button>
                       )}
-                      {confirmDeleteId === a.id && usageOf(a.id).keys > 0 && (
-                        <button
-                          type="button"
-                          data-coach="delete-with-data"
-                          onClick={() => deleteWithData(a)}
-                          style={{ ...btn('danger'), fontSize: 12 }}
-                        >
-                          Удалить и его данные ({fmtBytes(usageOf(a.id).bytes)})
-                        </button>
-                      )}
+                      {confirmDeleteId === a.id && (() => {
+                        // Показываем кнопку, пока не доказано, что данных нет:
+                        // у атлета могут быть записи только в базе IndexedDB.
+                        const knownEmpty = usageOf(a.id).keys === 0 && spaceDbRecords[a.id] === 0;
+                        if (knownEmpty) return null;
+                        return (
+                          <button
+                            type="button"
+                            data-coach="delete-with-data"
+                            onClick={() => deleteWithData(a)}
+                            style={{ ...btn('danger'), fontSize: 12 }}
+                          >
+                            Удалить и его данные
+                          </button>
+                        );
+                      })()}
                     </div>
                     {confirmDeleteId === a.id && (
                       <div
@@ -936,7 +967,18 @@ export const ProfileCoachTab: React.FC<{
                       >
                         «Точно удалить» убирает только карточку: заметки, задачи и записи журнала этого
                         атлета останутся. Если атлет уже входил в приложение, у него есть собственные
-                        профиль, дневники и планы — их удаляет отдельная кнопка «Удалить и его данные».
+                        профиль, дневники и планы — их удаляет отдельная кнопка «Удалить и его данные»
+                        {(() => {
+                          const u = usageOf(a.id);
+                          const rec = spaceDbRecords[a.id];
+                          const parts: string[] = [];
+                          if (typeof rec === 'number' && rec > 0) {
+                            parts.push(`${rec} ${plural(rec, 'запись', 'записи', 'записей')} в базе`);
+                          }
+                          if (u.bytes > 0) parts.push(`${fmtBytes(u.bytes)} настроек и планов`);
+                          return parts.length ? ` (${parts.join(' + ')})` : '';
+                        })()}
+                        .
                       </div>
                     )}
                   </div>

@@ -129,7 +129,21 @@ export const DataSpaceBanner: React.FC = () => {
       </div>
 
       {open && (
-        <div data-space="switch-list" style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+        <div
+          data-space="switch-list"
+          role="group"
+          aria-label="Перейти к другому атлету"
+          style={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: 6,
+            // До 19 других атлетов: без ограничения высоты список в четыре ряда
+            // сдвинул бы весь экран вниз. Лучше прокрутка внутри полосы.
+            maxHeight: 168,
+            overflowY: 'auto',
+            WebkitOverflowScrolling: 'touch',
+          }}
+        >
           {others.map(s => (
             <button
               key={s.id}
@@ -137,8 +151,10 @@ export const DataSpaceBanner: React.FC = () => {
               data-space="switch-to"
               data-space-id={s.id}
               onClick={() => go(s.id)}
+              aria-label={`Открыть данные атлета: ${s.label}`}
               style={{
                 padding: '6px 10px',
+                minHeight: 32,
                 borderRadius: 999,
                 fontSize: 11.5,
                 fontWeight: 700,

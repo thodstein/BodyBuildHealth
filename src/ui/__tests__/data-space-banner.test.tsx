@@ -155,4 +155,27 @@ describe('полоса пространства данных', () => {
     expect(Number.parseInt(textCol.style.paddingRight || '0', 10)).toBeGreaterThanOrEqual(80);
     expect(firstRow.querySelector('[data-space="return"]')).toBeNull();
   });
+
+  it('список атлетов прокручивается внутри полосы, а не растягивает экран', () => {
+    // Лимит — 20 атлетов: 19 пилюль в четыре ряда сдвинули бы весь экран вниз,
+    // и на телефоне кнопка «К своим данным» уехала бы из виду.
+    let reg = emptyRegistry();
+    for (let i = 1; i <= 19; i++) {
+      reg = upsertSpace(reg, { id: athleteSpaceId(`a${i}`), athleteId: `a${i}`, label: `Атлет ${i}` }).registry;
+    }
+    writeRegistryToStorage(reg);
+    _resetDataSpaceCache();
+    activateAthleteSpace('a1', 'Атлет 1');
+    _resetDataSpaceCache();
+
+    const { container } = render(<DataSpaceBanner />);
+    fireEvent.click(container.querySelector('[data-space="switch"]') as HTMLElement);
+    const list = container.querySelector('[data-space="switch-list"]') as HTMLElement;
+    expect(Number.parseInt(list.style.maxHeight || '0', 10)).toBeGreaterThan(0);
+    expect(list.style.overflowY).toBe('auto');
+    expect(container.querySelectorAll('[data-space="switch-to"]').length).toBe(18);
+    // пилюля — не меньше 32 px по высоте: иначе по ней тяжело попасть пальцем
+    const pill = container.querySelector('[data-space="switch-to"]') as HTMLElement;
+    expect(Number.parseInt(pill.style.minHeight || '0', 10)).toBeGreaterThanOrEqual(32);
+  });
 });
