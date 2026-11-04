@@ -12,7 +12,7 @@
  *  Канон — Питание, алиас — Тренировки/Интеллект.
  */
 import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
-import { calcWater, calcSteps, calcKBJU, calcBodyFat, calcCortisol, calcStressLoad, calcHematology, calcEnergyAvailability, calcAlcohol, calcMaintenanceFinder, calcAdaptiveThermogenesis, calcThyroidImpact, calcHomaIRWrap, IR_MARKERS_SHARED_INPUT_NOTE, calcLipid, calcFLIWrap, checkPSMFWrap, calcMenstrualWater, calcFiberSplit, calcLBMPreservation, calcTyG, calcMetSWrapper, calcFIB4, calcAPRI, calcQUICKI, calcWHtR, calcABSI, calcBAI, calcCaffeineCurve, buildDietBreakPlan, calcRefeedNeed, calcCarbLoading, calcSodiumLoading, calcBodyCompProjection, calcLeafScore, calcAdaptiveTDEEv3, calcLeamScore, calcRedsCAT2, calcSweatTestV2, calcBeverageRankV2, calcTGHDLWrap, calcLAPWrap, calcVAIWrap, calcFMIWrap, calcAlcoholChronic, calcProteinTimingPro, calcNEATPro, calcATRange, calcReverseDietAuto, calcGoalTimelineV2, calcDeadlineFeasibility, buildOneAnswerPro, diffMetabolicSnapshots, parseWeeklyScheduleTextPro, buildMetHoursPro, pregnancyAdd, calcPALPro, AAS_EXPERIMENTAL_NOTE, type MetabolicInput } from '../../../engines/metabolic-hub.engine';
+import { calcWater, calcSteps, calcKBJU, calcBodyFat, calcCortisol, calcStressLoad, calcHematology, calcEnergyAvailability, calcAlcohol, calcMaintenanceFinder, calcAdaptiveThermogenesis, calcThyroidImpact, calcHomaIRWrap, IR_MARKERS_SHARED_INPUT_NOTE, calcLipid, calcFLIWrap, checkPSMFWrap, calcMenstrualWater, calcFiberSplit, calcLBMPreservation, calcTyG, calcMetSWrapper, calcFIB4, calcAPRI, calcQUICKI, calcWHtR, calcABSI, calcBAI, calcCaffeineCurve, buildDietBreakPlan, calcRefeedNeed, calcCarbLoading, calcSodiumLoading, calcBodyCompProjection, calcLeafScore, calcAdaptiveTDEEv3, calcLeamScore, calcRedsCAT2, calcSweatTestV2, calcBeverageRankV2, calcTGHDLWrap, calcLAPWrap, calcVAIWrap, calcFMIWrap, calcAlcoholChronic, calcProteinTimingPro, calcNEATPro, calcATRange, calcReverseDietAuto, calcGoalTimelineV2, calcDeadlineFeasibility, weeklyExerciseEnergy, buildOneAnswerPro, diffMetabolicSnapshots, parseWeeklyScheduleTextPro, buildMetHoursPro, pregnancyAdd, calcPALPro, AAS_EXPERIMENTAL_NOTE, type MetabolicInput } from '../../../engines/metabolic-hub.engine';
 import { boerLeanBodyMass, bmrMethodLabel } from '../../../core/metabolic-constants';
 import { ACTIVITY_CATALOG_60, PROFESSION_PAL } from '../../../core/activity-catalog';
 import { getProfile, updateProfile } from '../../../core/profile-manager';
@@ -570,6 +570,8 @@ export const MetabolicHub: React.FC = () => {
   const effectiveSweatMlPerH = measuredSweatMlPerH ?? sweatRate;
   /** Periard: акклиматизация снижает [Na] пота на ~40% — считаем одинаково в воде и в пот-тесте. */
   const effectiveSweatNaMgPerL = Math.round(sweatSodium * (acclimated ? 0.6 : 1));
+  /** Единая точка EEE (тоннаж ИЛИ сессии+кардио) — в EA уходит суточная доля. */
+  const weeklyEee = useMemo(()=> weeklyExerciseEnergy({ weeklyVolumeTons, trainingDays, cardioMin }), [weeklyVolumeTons, trainingDays, cardioMin]);
 
   const input: MetabolicInput = useMemo(()=> ({ weight,height,age,sex,bodyFat,neck,waist,hip,steps,cardioMin,trainingDays,trainingHours: trainingDays*1.15, activityLevel: activityLevel as any, profession, goal, onAAS, aasDose, stress, sleepHours, sleepQuality, acwr, climate, humidity, standingHours, fidgetLevel, sweatRate: effectiveSweatMlPerH, sweatSodiumMgPerL: effectiveSweatNaMgPerL, weightHistory: weightHistory.length>=3 ? weightHistory : undefined, hct, hgb, ferritin, gfr, waterL, ironIntakeMg: undefined, alcoholG, alcoholDaysPerWeek: alcoholDays, caffeineMg, tsh, ft4, creatineUse, weeklyVolumeTons, menstrualPhase, targetWeight, fiberG, omega3G, skinfoldSum3, skinfoldSum4, biaResistanceOhm: biaResistance, glucoseMgDl, insulinMuMl, deficitKcal, weeksInDeficit, metHoursPerWeek, measuredRMR, leafScore, boneFlag, menstrualFlag, hdlMgDl, systolic, diastolic, ast, alt, plt, caffeineHoursSince, trimester: trimester || undefined, lactating: lactating === 'none' ? undefined : lactating, ethnicity, postBariatric, untreatedHypothyroid: untreatedHypo || undefined, acclimated, proteinSource } as any), [weight,height,age,sex,bodyFat,neck,waist,hip,steps,cardioMin,trainingDays,activityLevel,profession,goal,onAAS,aasDose,stress,sleepHours,sleepQuality,acwr,climate,humidity,standingHours,fidgetLevel,effectiveSweatMlPerH,effectiveSweatNaMgPerL,weightHistory,hct,hgb,ferritin,gfr,waterL,alcoholG,alcoholDays,caffeineMg,tsh,ft4,glucoseMgDl,insulinMuMl,skinfoldSum3,skinfoldSum4,biaResistance,deficitKcal,weeksInDeficit,creatineUse,weeklyVolumeTons,menstrualPhase,targetWeight,fiberG,omega3G,metHoursPerWeek,measuredRMR,leafScore,boneFlag,menstrualFlag,hdlMgDl,systolic,diastolic,ast,alt,plt,caffeineHoursSince,trimester,lactating,ethnicity,postBariatric,untreatedHypo,acclimated,proteinSource]);
 
@@ -611,12 +613,11 @@ const kbju = useMemo(()=> calcKBJU(input), [input]);
   const ea = useMemo(()=>{
     const intake = diaryAvgKcal ?? kbju.nat.kcal;
     // EEE — энергия упражнений В СУТКИ (движок сам делает ×0.85 net, Loucks).
-    // Было: недельный EEE (тоннаж/кардио за неделю) подставлялся как суточный —
-    // EA падала до «LEA red» почти у всех. Теперь недельный объём делится на 7.
-    const weeklyEee = weeklyVolumeTons ? Math.round(weeklyVolumeTons * 380) : Math.round(trainingDays * 380 + cardioMin * 7);
-    const eeeDaily = Math.max(0, Math.round(weeklyEee / 7));
+    // Недельный объём (тоннаж ИЛИ сессии+кардио) считается одной функцией и делится на 7.
+    const eeeDaily = Math.max(0, Math.round(weeklyEee.kcalPerWeek / 7));
     return calcEnergyAvailability({ weight, bodyFat, height: height||180, heightCm: height, lean: kbju.nat.lean, intakeKcal: intake, eeeKcal: eeeDaily, trainingDays, sex } as any);
-  }, [weight,bodyFat,height,kbju,trainingDays,weeklyVolumeTons,cardioMin, diaryAvgKcal, sex]);
+  }, [weight,bodyFat,height,kbju,trainingDays,weeklyVolumeTons,cardioMin, diaryAvgKcal, sex, weeklyEee]);
+  const eeeDailyKcal = useMemo(()=> Math.max(0, Math.round(weeklyEee.kcalPerWeek / 7)), [weeklyEee]);
   const lbmPres = useMemo(()=> calcLBMPreservation({ proteinGPerKg: kbju.nat.protPerKg, deficitKcal: effectiveDeficit, trainingDays, ea: ea?.ea }), [kbju, trainingDays, ea, effectiveDeficit]);
   const psmf = useMemo(()=> checkPSMFWrap(ea.ea), [ea.ea]);
   const menstrual = useMemo(()=> calcMenstrualWater(menstrualPhase), [menstrualPhase]);
@@ -1782,7 +1783,7 @@ const kbju = useMemo(()=> calcKBJU(input), [input]);
                 </div>
                 <div style={{ padding:10, borderRadius:10, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', fontSize:10, color:'#fff', lineHeight:1.5 }}>
                   <b style={{ color: ea.color }}>{ea.zone==='low'?'🔴 LEA — риск RED-S': ea.zone==='reduced'?'🟡 Граница': ea.zone==='optimal'?'🟢 Оптимально':'—'}</b><br/>{ea.note}<br/>
-                  <span style={{ fontSize:9, color:'rgba(255,255,255,0.55)' }}>Формула: (EI − EEE)/FFM. EI из дневника/КБЖУ {Math.round(kbju.nat.kcal)}ккал, EEE=train+cardio. Женщинам &lt;30 — аменорея/кость, &lt;45 — внимание.</span>
+                  <span style={{ fontSize:9, color:'rgba(255,255,255,0.55)' }}>Формула: (EI − EEE)/FFM. EI из дневника/КБЖУ {Math.round(kbju.nat.kcal)}ккал, EEE = {weeklyEee.note} → {eeeDailyKcal}ккал/сут × 0.85 net (Loucks). Женщинам &lt;30 — аменорея/кость, &lt;45 — внимание.</span>
                 </div>
               </div>
               <div style={{ marginTop:8, height:10, borderRadius:20, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.06)', overflow:'hidden', display:'flex' }}>

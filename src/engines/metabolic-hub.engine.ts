@@ -796,6 +796,32 @@ export interface EAResult {
   eee: number; // exercise energy expenditure
   note: string;
 }
+/**
+ * Энергия упражнений (EEE) за неделю — одна точка правды для EA.
+ *
+ * Было: `weeklyVolumeTons * 380`, где 380 — стоимость ОДНОЙ тренировки, а не тонны.
+ * При 20 т/нед это давало 7600 ккал/нед (1086 ккал/сут) вместо реальных ~1600 ккал/нед,
+ * и EA уходила в «LEA red» почти у всех, кто вводил тоннаж.
+ * Физика: 1 кг на ~0.5 м ≈ 0.05 ккал механической работы, КПД ~25% → ~0.1 ккал/кг,
+ * то есть 5-тонная тренировка ≈ 60 мин силовой ≈ 400 ккал (ACSM 6-7 ккал/мин) ≈ 80 ккал/т.
+ */
+export function weeklyExerciseEnergy(input: { weeklyVolumeTons?: number; trainingDays?: number; cardioMin?: number }): {
+  kcalPerWeek: number; source: 'tonnage' | 'sessions' | 'none'; note: string;
+} {
+  const tons = Math.max(0, input.weeklyVolumeTons ?? 0);
+  const days = Math.max(0, input.trainingDays ?? 0);
+  const cardio = Math.max(0, input.cardioMin ?? 0);
+  if (tons > 0) {
+    const kcalPerWeek = Math.round(tons * 80);
+    return { kcalPerWeek, source: 'tonnage', note: `тоннаж ${tons} т × 80 ккал/т (5-тонная тренировка ≈ 400 ккал)` };
+  }
+  const kcalPerWeek = Math.round(days * 380 + cardio * 7);
+  return {
+    kcalPerWeek,
+    source: days || cardio ? 'sessions' : 'none',
+    note: days || cardio ? `${days} тренировок × 380 ккал + ${cardio} мин кардио × 7 ккал/мин` : 'EEE не задан',
+  };
+}
 export function calcEnergyAvailability(input: { weight:number; bodyFat?:number; height:number; lean?:number; intakeKcal?:number; eeeKcal?: number; trainingDays?:number; heightCm?:number; sex?: 'male'|'female' }): EAResult {
   const bf = input.bodyFat ?? 15;
   const lean = input.lean ?? input.weight * (1 - bf/100);

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { calcWater, calcSteps, calcKBJU, calcBodyFat, calcCortisol, calcStressLoad, calcHematology, calcTrendFromHistory, calcAdaptiveAdjustment, calcEnergyAvailability, calcAlcohol, calcProteinTiming, calcMaintenanceFinder, calcGoalTimeline, calcAdaptiveThermogenesis, calcReverseDiet, calcNEAT, calcThyroidImpact, calcHomaIRWrap, calcATRange, buildOneAnswerPro, balanceCarbsAndFat, getEffectivePal, calcPALPro, calcDeadlineFeasibility, PONTZER_FORMULA_NOTE, TDEE_ALREADY_ADAPTED_NOTE, IR_MARKERS_SHARED_INPUT_NOTE } from '../metabolic-hub.engine';
+import { calcWater, calcSteps, calcKBJU, calcBodyFat, calcCortisol, calcStressLoad, calcHematology, calcTrendFromHistory, calcAdaptiveAdjustment, calcEnergyAvailability, calcAlcohol, calcProteinTiming, calcMaintenanceFinder, calcGoalTimeline, calcAdaptiveThermogenesis, calcReverseDiet, calcNEAT, calcThyroidImpact, calcHomaIRWrap, calcATRange, buildOneAnswerPro, balanceCarbsAndFat, getEffectivePal, calcPALPro, calcDeadlineFeasibility, weeklyExerciseEnergy, PONTZER_FORMULA_NOTE, TDEE_ALREADY_ADAPTED_NOTE, IR_MARKERS_SHARED_INPUT_NOTE } from '../metabolic-hub.engine';
 import { bmrCunningham, bmrOwen, bmrTenHaaf, bmrHarrisRevised, bmrHenry, bmrLivingston, bmrMethodLabel, bmrMethodSpread, calcHomaIR, calcTyG, calcTEF as calcTEFConst, calcTrendWithConfidence as calcTrendConf2, energyDensityPerKg, hallAdaptationFactor, calcSweatElectrolytes, calcJPBodyFat, calcDurninBodyFat, computeBMR } from '../../core/metabolic-constants';
 
 const base = { weight: 80, height: 180, age: 30, sex: 'male' as const };
@@ -1083,6 +1083,21 @@ describe('metabolic-hub PRO v4-3 — дедуп поколений: PAL-пари
     expect(Math.abs(calcPALPro(input) - calcSteps(input).pal)).toBeLessThanOrEqual(0.01);
     const met = calcPALPro({ ...base, activityLevel:'medium', metHoursPerWeek:18 } as any);
     expect(met).toBeCloseTo(1.55 + 18 * 0.0067, 0.02);
+  });
+  it('EEE из тоннажа: 80 ккал/т (было 380 на тонну — завышение ~5x и ложная «LEA red»)', () => {
+    const tons20 = weeklyExerciseEnergy({ weeklyVolumeTons: 20, trainingDays: 4, cardioMin: 90 });
+    expect(tons20.source).toBe('tonnage');
+    expect(tons20.kcalPerWeek).toBe(1600); // 20 т × 80, а не 7600
+    const sessions = weeklyExerciseEnergy({ trainingDays: 4, cardioMin: 90 });
+    expect(sessions.source).toBe('sessions');
+    expect(sessions.kcalPerWeek).toBe(4 * 380 + 90 * 7);
+    const none = weeklyExerciseEnergy({});
+    expect(none).toEqual({ kcalPerWeek: 0, source: 'none', note: 'EEE не задан' });
+    // 5-тонная тренировка ≈ одна силовая сессия по 380 ккал — калибровка согласована
+    expect(Math.abs(weeklyExerciseEnergy({ weeklyVolumeTons: 5 }).kcalPerWeek - 380)).toBeLessThanOrEqual(20);
+    // и тренд EA: при 20 т/нед и 2600 ккал средний человек не «в красной зоне» от одного объёма
+    const eaTons = calcEnergyAvailability({ weight: 80, bodyFat: 15, height: 180, intakeKcal: 2600, eeeKcal: Math.round(tons20.kcalPerWeek / 7), trainingDays: 4 });
+    expect(eaTons.ea).toBeGreaterThan(30);
   });
   it('DIAAS в целях: mixed без изменений, горох +надбавка с пометкой', async () => {
     const { calcKBJU } = await import('../metabolic-hub.engine');
