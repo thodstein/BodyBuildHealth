@@ -35,7 +35,7 @@ describe('MetabolicHub: 16 калькуляторов выдают резуль�
   it('каждый режим показывает непустой результат без NaN/undefined', () => {
     const { container } = render(<MetabolicHub />);
     const pills = Array.from(container.querySelectorAll('.mh-mode')) as HTMLElement[];
-    const results = container.querySelector('#mh-results') as HTMLElement;
+    const results = container.querySelector('#mh-mode-body') as HTMLElement;
     expect(results).toBeTruthy();
 
     for (const pill of pills) {
@@ -81,7 +81,7 @@ describe('MetabolicHub: 16 калькуляторов выдают резуль�
     expect(container.textContent || '').toMatch(/HCT 41%/);
 
     const pills = Array.from(container.querySelectorAll('.mh-mode')) as HTMLElement[];
-    const results = container.querySelector('#mh-results') as HTMLElement;
+    const results = container.querySelector('#mh-mode-body') as HTMLElement;
     for (const pill of pills) {
       fireEvent.click(pill);
       const text = (results.textContent || '').replace(/\s+/g, ' ');

@@ -714,6 +714,25 @@ const kbju = useMemo(()=> calcKBJU(input), [input]);
     if(fiberGV==null) fiberGV = kbju?.fiber?.nat;
     return calcHematology({ weight, hct, hgb, ferritin, gfr, waterL, sodiumG, potassiumG, proteinPerKg, fiberG: fiberGV, omega3G: omega3GV, ironIntakeMg: undefined, onAAS, aasDose, sex });
   }, [weight,hct,hgb,ferritin,gfr,waterL,sodiumG,potassiumG,onAAS,aasDose,sex, kbju, fiberG, omega3G]);
+  // Аудит 2026-11: журнал донаций был только «мёртвой» историей — совет «флеботомия» печатался
+  // и через 3 дня после сдачи. Интервал между сдачами цельной крови ≥8 недель (ASA 2023,
+  // донорские правила), поэтому свежая дата блокирует повтор и называется дата «не раньше».
+  const donationGuard = useMemo(()=>{
+    if(!hematology.donation.needed) return null;
+    const dates = donationLog.map(d=>d?.date).filter((d): d is string=> typeof d==='string' && /^\d{4}-\d{2}-\d{2}$/.test(d)).sort();
+    if(!dates.length) return null;
+    const lastDate = dates[dates.length-1];
+    const lastT = Date.parse(`${lastDate}T00:00:00`);
+    if(!isFinite(lastT)) return null;
+    const today = new Date(); today.setHours(0,0,0,0);
+    const days = Math.round((today.getTime()-lastT)/86400000);
+    if(days < 0) return null; // дата из будущего — не считаем
+    const MIN_DAYS = 56;
+    // local-дата: toISOString() в зонах восточнее UTC даёт вчерашний день
+    const ready = new Date(lastT); ready.setDate(ready.getDate() + MIN_DAYS);
+    const readyOn = `${ready.getFullYear()}-${String(ready.getMonth()+1).padStart(2,'0')}-${String(ready.getDate()).padStart(2,'0')}`;
+    return { lastDate, days, minDays: MIN_DAYS, readyOn, blocked: days < MIN_DAYS };
+  }, [hematology, donationLog]);
   const ea = useMemo(()=>{
     const intake = diaryAvgKcal ?? kbju.nat.kcal;
     // EEE — энергия упражнений В СУТКИ (движок сам делает ×0.85 net, Loucks).
@@ -1633,7 +1652,7 @@ const kbju = useMemo(()=> calcKBJU(input), [input]);
             <div style={{ fontSize:10, color:'#fff' }}>{active.hint}</div>
           </div>
         </div>
-        <div style={{ padding:12 }}>
+        <div id="mh-mode-body" style={{ padding:12 }}>
           {mode==='water' && (
             <div>
               <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
@@ -1866,6 +1885,14 @@ const kbju = useMemo(()=> calcKBJU(input), [input]);
                 <div style={{ padding:8, borderRadius:8, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', textAlign:'center', fontSize:10, color:'#fff' }}>{hematology.ironRecLabel}</div>
                 <div style={{ padding:8, borderRadius:8, background: hematology.donation.needed ? 'rgba(239,68,68,0.08)' : 'rgba(34,197,94,0.08)', border:`1px solid ${hematology.donation.needed ? 'rgba(239,68,68,0.18)' : 'rgba(34,197,94,0.18)'}`, textAlign:'center', fontSize:10, color: hematology.donation.needed ? '#f87171' : '#22c55e' }}>{hematology.donation.text}{hematology.donation.needed ? ` k=${hematology.donation.k}` : ''}</div>
               </div>
+              {donationGuard && (
+                <div style={{ marginTop:6, padding:'8px 10px', borderRadius:8, fontSize:10, lineHeight:1.4, background: donationGuard.blocked ? 'rgba(239,68,68,0.10)' : 'rgba(34,197,94,0.06)', border:`1px solid ${donationGuard.blocked ? 'rgba(239,68,68,0.20)' : 'rgba(34,197,94,0.14)'}`, color: donationGuard.blocked ? '#f87171' : '#22c55e' }}>
+                  🩸 Последняя донация {donationGuard.lastDate} — прошло {donationGuard.days} дн.{' '}
+                  {donationGuard.blocked
+                    ? <>Повторная флеботомия <b>не раньше {donationGuard.readyOn}</b> (интервал {donationGuard.minDays} дн ≈ 8 нед). Сейчас — только гидратация и контроль HCT.</>
+                    : <>Интервал {donationGuard.minDays} дн выдержан — повторная сдача допустима с {donationGuard.readyOn} (решение — с гематологом).</>}
+                </div>
+              )}
               <div style={{ marginTop:6, display:'flex', gap:6, flexWrap:'wrap' }}>
                 <span style={{ fontSize:9, padding:'5px 8px', borderRadius:8, background: hematology.ferritinFlag ? 'rgba(245,158,11,0.10)' : 'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', color: hematology.ferritinFlag ? '#fbbf24' : '#fff' }}>ферритин {ferritin ?? '—'} {hematology.ferritinFlag ? '⚠ &lt;30' : 'OK'}</span>
                 <span style={{ fontSize:9, padding:'5px 8px', borderRadius:8, background: hematology.gfrFlag ? 'rgba(239,68,68,0.10)' : 'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', color: hematology.gfrFlag ? '#f87171' : '#fff' }}>GFR {gfr ?? '—'} {hematology.gfrFlag ? '⚠ &lt;60' : ''}</span>
@@ -1877,9 +1904,9 @@ const kbju = useMemo(()=> calcKBJU(input), [input]);
                 {hematology.recommendations.map((r,i)=>(<span key={i}>• {r}<br/></span>))}
               </div>
               <div style={{ marginTop:6, display:'flex', gap:6 }}>
-                <button onClick={()=> { const txt=`HCT ${hematology.hct}% — ${hematology.zoneLabel}. Вода ${hematology.waterTargetMl}мл (${hematology.mlPerKg}мл/кг), ${hematology.ironRecLabel}, ${hematology.donation.text}`; void shareOrCopyText('HCT-сводка', txt).then(ok => showToast(ok ? 'Скопировано: '+txt : txt)); }} className="mh-act" style={{ flex:1, padding:'10px', minHeight:44, borderRadius:10, border:'1px solid rgba(255,255,255,0.08)', background:'rgba(255,255,255,0.04)', color:'#fff', fontWeight:700, fontSize:11, cursor:'pointer' }}>⎘ Копировать сводку</button>
+                <button onClick={()=> { const txt=`HCT ${hematology.hct}% — ${hematology.zoneLabel}. Вода ${hematology.waterTargetMl}мл (${hematology.mlPerKg}мл/кг), ${hematology.ironRecLabel}, ${hematology.donation.text}${donationGuard?.blocked ? ` — повторная сдача не раньше ${donationGuard.readyOn} (прошло ${donationGuard.days} из ${donationGuard.minDays} дн)` : ''}`; void shareOrCopyText('HCT-сводка', txt).then(ok => showToast(ok ? 'Скопировано: '+txt : txt)); }} className="mh-act" style={{ flex:1, padding:'10px', minHeight:44, borderRadius:10, border:'1px solid rgba(255,255,255,0.08)', background:'rgba(255,255,255,0.04)', color:'#fff', fontWeight:700, fontSize:11, cursor:'pointer' }}>⎘ Копировать сводку</button>
                 <button onClick={()=> {
-                  const payload={ hct: hematology.hct, waterTargetMl: hematology.waterTargetMl, ironRec: hematology.ironRec, donation: hematology.donation, ts: Date.now(), source:'metabolic-hub-hematology' };
+                  const payload={ hct: hematology.hct, waterTargetMl: hematology.waterTargetMl, ironRec: hematology.ironRec, donation: hematology.donation, donationReadyOn: donationGuard?.blocked ? donationGuard.readyOn : null, ts: Date.now(), source:'metabolic-hub-hematology' };
                   try{ localStorage.setItem('he_hematology_advice', JSON.stringify(payload)); window.dispatchEvent(new CustomEvent('he-hematology-advice', {detail: payload})); showToast(`Сохранено he_hematology_advice: HCT ${hematology.hct}% → ${hematology.zoneLabel}`); }catch{ showToast('Сохранено'); }
                 }} style={{ flex:1, padding:'8px 10px', borderRadius:8, border:'none', background:'linear-gradient(135deg,#ef4444,#dc2626)', color:'#fff', fontWeight:800, fontSize:10, cursor:'pointer' }}>💾 В планировщик (he_hematology_advice)</button>
               </div>

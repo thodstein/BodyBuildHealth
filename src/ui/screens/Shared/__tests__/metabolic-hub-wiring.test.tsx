@@ -101,6 +101,33 @@ function seedWeightAndDiary(days: number, logDays: number) {
   localStorage.setItem('nutrition_diary_v2', JSON.stringify({ ...diary, __version: 2 }));
 }
 
+/** Локальная дата YYYY-MM-DD (без сдвига часового пояса, в отличие от toISOString). */
+function localDate(d: Date): string {
+  const p = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+}
+
+/** Записать донацию `daysAgo` дней назад в журнал (he_donation_log_v1), вернуть её дату. */
+function seedDonation(daysAgo: number): string {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  d.setDate(d.getDate() - daysAgo);
+  const date = localDate(d);
+  localStorage.setItem('he_donation_log_v1', JSON.stringify([{ date, hct: 56 }]));
+  return date;
+}
+
+/** Открыть режим калькулятора (пилюля `.mh-mode`) и вернуть текст его результата. */
+function openMode(label: string): string {
+  const pill = Array.from(document.querySelectorAll('.mh-mode'))
+    .find(p => (p.textContent || '').replace(/^[^\p{L}]+/u, '').trim().startsWith(label)) as HTMLElement | undefined;
+  if (!pill) throw new Error(`нет режима «${label}»`);
+  fireEvent.click(pill);
+  const body = document.querySelector('#mh-mode-body') as HTMLElement | null;
+  if (!body) throw new Error('нет #mh-mode-body');
+  return (body.textContent || '').replace(/\s+/g, ' ');
+}
+
 describe('MetabolicHub: ввод меняет расчёт (проводка полей)', () => {
   it('вес 83 → 110 поднимает TDEE и воду', () => {
     render(<MetabolicHub />);
@@ -126,6 +153,28 @@ describe('MetabolicHub: ввод меняет расчёт (проводка п�
     expect(blood).toContain('56%');
     expect(blood).not.toContain('введи HCT');
     expect(blood).toMatch(/мл/);
+  });
+
+  it('свежая донация в журнале блокирует повторную флеботомию', () => {
+    const last = seedDonation(10);
+    render(<MetabolicHub />);
+    setNumber('HCT, %', 52);
+    const txt = openMode('Кровь');
+    expect(txt).toContain('Последняя донация');
+    expect(txt).toContain(last);
+    expect(txt).toContain('прошло 10 дн');
+    expect(txt).toContain('не раньше');
+    // дата «не раньше» = последняя донация + 56 дней
+    const ready = new Date(Date.parse(`${last}T00:00:00`) + 56 * 86400000);
+    expect(txt).toContain(localDate(ready));
+  });
+
+  it('донация 10 недель назад уже не блокирует совет', () => {
+    seedDonation(70);
+    render(<MetabolicHub />);
+    setNumber('HCT, %', 52);
+    const txt = openMode('Кровь');
+    expect(txt).toMatch(/интервал 56 дн выдержан/i);
   });
 
   it('цель: сушка < поддержание < масса по ккал КБЖУ', () => {
