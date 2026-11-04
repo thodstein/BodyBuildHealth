@@ -48,6 +48,8 @@ interface AddFoodPanelProps {
   onLabelBarcodeScan: () => void;
   onOcrFile: (file: File) => void;
   ocrFileLoading: boolean;
+  /** 0..1 — прогресс распознавания скриншота (проценты как у анализов). */
+  ocrProgress?: number;
   onShowOCR: () => void;
   showOCR: boolean;
   ocrText: string;
@@ -86,7 +88,7 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
   labelOpen, labelLoading, labelProgress, labelHint, labelError, labelDraft, labelRawText, labelBarcodeLoading,
   onOpenLabelScan, onCloseLabelScan, onLabelCamera, onLabelGallery, onLabelFieldChange, onLabelSaveToBase, onLabelAddToDiary, onLabelBarcodeScan,
   onOcrFile,
-  ocrFileLoading, onShowOCR, showOCR, ocrText, onOcrTextChange, onOcrSubmit, ocrError, ocrHint, onOcrClose,
+  ocrFileLoading, ocrProgress = 0, onShowOCR, showOCR, ocrText, onOcrTextChange, onOcrSubmit, ocrError, ocrHint, onOcrClose,
   parsedItems, onRemoveParsedItem, onUpdateParsedItemQty, onFillMicros, onSaveItems, onEditParsedItem,
   onFixAllLowConfidence,
   favoriteFoods, mealPresets, onAddPreset, showCustomFood, onToggleCustomFood,
@@ -137,6 +139,12 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
 
   const [history, setHistory] = useState<string[]>(() => { try { const v = JSON.parse(localStorage.getItem('he_search_history') || '[]'); return Array.isArray(v) ? v.filter((x:any)=>typeof x==='string').slice(0,5) : []; } catch { return []; } });
   const [showQuickAdd, setShowQuickAdd] = useState(false);
+  /**
+   * Карточка сырого текста: раскрыта, когда распознавать больше нечего
+   * (позиций нет) — там же кнопки «Разобрать» и «Добавить».
+   * null = пользователь ещё не трогал, берём значение по умолчанию.
+   */
+  const [rawTextOpen, setRawTextOpen] = useState<boolean | null>(null);
   const [quickTab, setQuickTab] = useState<'fav'|'recent'|'last'|'presets'>('fav');
   const [lastAdded, setLastAdded] = useState<any[]>(() => {
     try {
@@ -572,21 +580,17 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
         {/* Hidden camera input kept for compat — not rendered as button */}
         <input ref={ocrCameraRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={() => {}} />
 
-          {ocrError && (
+          {/* Обратная связь вне OCR-панели: показываем только когда панель
+              закрыта, иначе сообщения дублируются и «прыгают» по экрану. */}
+          {!showOCR && ocrError && (
             <div role="alert" className="nd-ocr-err" style={{ padding: '10px 12px', borderRadius: 10, background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', color: '#fca5a5', fontSize: 12, lineHeight: 1.35 }}>
               {ocrError}
             </div>
           )}
-          {ocrHint && !ocrError && (
+          {!showOCR && ocrHint && !ocrError && (
             <div className="nd-ocr-hint" style={{ padding: '10px 12px', borderRadius: 10, background: 'rgba(0,230,138,0.08)', border: '1px solid rgba(0,230,138,0.15)', color: '#86efac', fontSize: 12, lineHeight: 1.35 }}>
               {ocrHint}
             </div>
-          )}
-          {ocrText && !ocrError && ocrHint && (
-            <details className="nd-ocr-raw" style={{ padding: '8px 10px', borderRadius: 10, background: '#202023', border: '1px solid rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.6)', fontSize: 12 }}>
-              <summary style={{ cursor: 'pointer', color: 'rgba(255,255,255,0.8)' }}>Сырой текст OCR (для отладки)</summary>
-              <pre style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word', marginTop: 6, maxHeight: 120, overflowY: 'auto' }}>{ocrText.slice(0, 1500)}</pre>
-            </details>
           )}
       </div>
 
@@ -598,11 +602,13 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
         />
       )}
 
-      {/* OCR Panel */}
+      {/* OCR / очередь / сырой текст — одна панель с закреплённой строкой добавления */}
+      {(showOCR || parsedItems.length > 0) && (
+      <div className="nd-ocr-wrap" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
       {showOCR && (
-        <div style={{ padding: 14, borderRadius: 16, background: '#18181b', border: '1px solid rgba(255,255,255,0.06)' }}>
+        <div className="nd-ocr" style={{ padding: 14, borderRadius: 16, background: '#18181b', border: '1px solid rgba(255,255,255,0.06)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-            <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.85)', fontWeight: 600 }}>Вставьте текст из приложения калорий:</span>
+            <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.85)', fontWeight: 600 }}>Скриншот из приложения калорий</span>
             <button onClick={onOcrClose} aria-label="Закрыть OCR"
               style={{ padding: '4px 10px', borderRadius: 8, border: 'none', cursor: 'pointer',
                 background: 'rgba(239,68,68,0.1)', color: '#ef4444', fontSize: 10, minHeight: 32 }}>
@@ -620,7 +626,34 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
               fontSize: 12, cursor: 'pointer', minHeight: 44 }}>
             ✨ Распознать
           </button>
-          {ocrError && <div style={{ color: '#ef4444', fontSize: 10, marginTop: 6 }}>{ocrError}</div>}
+
+          {/* Прогресс как в анализах: проценты + полоса + подпись этапа */}
+          {ocrFileLoading && (
+            <div role="status" aria-live="polite" className="nd-ocr-progress"
+              style={{ marginTop: 10, padding: '10px 12px', borderRadius: 12, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.18)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, fontSize: 11, fontWeight: 700, color: '#86efac' }}>
+                <span>Распознаю скриншот…</span>
+                <span aria-label="Прогресс распознавания" style={{ fontVariantNumeric: 'tabular-nums', color: '#00e68a' }}>{ocrProgress > 0 ? `${Math.round(ocrProgress * 100)}%` : '—'}</span>
+              </div>
+              <div style={{ marginTop: 8, height: 6, borderRadius: 999, background: 'rgba(255,255,255,0.10)', overflow: 'hidden' }}>
+                <div style={{ width: `${Math.max(4, Math.min(100, Math.round(ocrProgress * 100)))}%`, height: '100%', borderRadius: 999, background: 'linear-gradient(90deg,#00e68a,#00c8a0)', transition: 'width 0.3s ease' }} />
+              </div>
+              <div style={{ marginTop: 8, fontSize: 10, color: 'rgba(255,255,255,0.55)' }}>
+                {ocrProgress > 0 ? 'Распознавание на устройстве…' : 'Отправляю скриншот… (первый запуск дольше обычного)'}
+              </div>
+            </div>
+          )}
+
+          {ocrError && (
+            <div role="alert" className="nd-ocr-err" style={{ marginTop: 8, padding: '10px 12px', borderRadius: 12, background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', color: '#fca5a5', fontSize: 11, lineHeight: 1.35 }}>
+              {ocrError}
+            </div>
+          )}
+          {ocrHint && !ocrError && !ocrFileLoading && (
+            <div className="nd-ocr-hint" style={{ marginTop: 8, padding: '10px 12px', borderRadius: 12, background: 'rgba(0,230,138,0.08)', border: '1px solid rgba(0,230,138,0.15)', color: '#86efac', fontSize: 11, lineHeight: 1.35 }}>
+              {ocrHint}
+            </div>
+          )}
         </div>
       )}
 
@@ -746,14 +779,51 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
                 background: 'rgba(34,197,94,0.06)', color: '#86efac', cursor: 'pointer', fontSize: 12, fontWeight: 700, minHeight: 44 }}>
               ✨ Микронутриенты
             </button>
-            <button onClick={onSaveItems} aria-label="Сохранить"
-              style={{ flex: 2, padding: '10px', borderRadius: 10, border: 'none', cursor: 'pointer',
-                background: 'linear-gradient(135deg,#00e68a,#00c8a0)', color: '#000', fontWeight: 700, 
-                fontSize: 12, minHeight: 48, boxShadow: '0 4px 16px rgba(0,230,138,0.2)' }}>
-              💾 Сохранить {parsedItems.length} поз.
-            </button>
           </div>
         </div>
+      )}
+
+      {/* Сырой текст — отдельная карточка, действие добавления прямо в ней */}
+      {ocrText && (
+        <details className="nd-ocr-raw"
+          open={rawTextOpen ?? parsedItems.length === 0}
+          onToggle={(e) => setRawTextOpen((e.currentTarget as HTMLDetailsElement).open)}
+          style={{ padding: '10px 12px', borderRadius: 14, background: 'linear-gradient(135deg, rgba(59,130,246,0.06), rgba(24,24,27,0.9))', border: '1px solid rgba(59,130,246,0.16)', fontSize: 12 }}>
+          <summary style={{ cursor: 'pointer', color: 'rgba(255,255,255,0.85)', fontSize: 11, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}>
+            🧾 Текст со скриншота
+            <span style={{ fontSize: 9, fontWeight: 700, padding: '2px 7px', borderRadius: 999, background: 'rgba(59,130,246,0.14)', color: '#93c5fd' }}>
+              {ocrText.split(/\r?\n/).filter(l => l.trim()).length} стр. · {ocrText.length} симв.
+            </span>
+          </summary>
+          <pre style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word', marginTop: 8, marginBottom: 8, padding: 10, borderRadius: 10, background: '#141417', color: 'rgba(255,255,255,0.72)', fontSize: 11, lineHeight: 1.45, maxHeight: 160, overflowY: 'auto', border: '1px solid rgba(255,255,255,0.05)' }}>{ocrText.slice(0, 1500)}</pre>
+          <div style={{ display: 'flex', gap: 6 }}>
+            <button onClick={() => { try { void navigator.clipboard?.writeText(ocrText); } catch { /* нет буфера */ } }} aria-label="Копировать текст"
+              style={{ flex: 1, padding: '10px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.75)', fontSize: 11, fontWeight: 700, cursor: 'pointer', minHeight: 44 }}>
+              📋 Копировать
+            </button>
+            <button onClick={onOcrSubmit} aria-label="Разобрать заново"
+              style={{ flex: 1, padding: '10px', borderRadius: 10, border: '1px solid rgba(59,130,246,0.22)', background: 'rgba(59,130,246,0.08)', color: '#93c5fd', fontSize: 11, fontWeight: 700, cursor: 'pointer', minHeight: 44 }}>
+              🔁 Разобрать
+            </button>
+            <button onClick={onSaveItems} disabled={parsedItems.length === 0} aria-label="Добавить в дневник"
+              style={{ flex: 1.4, padding: '10px', borderRadius: 10, border: 'none', background: parsedItems.length ? 'linear-gradient(135deg,#00e68a,#00c8a0)' : 'rgba(255,255,255,0.06)', color: parsedItems.length ? '#000' : 'rgba(255,255,255,0.4)', fontSize: 11, fontWeight: 800, cursor: parsedItems.length ? 'pointer' : 'not-allowed', minHeight: 44 }}>
+              ➕ Добавить
+            </button>
+          </div>
+        </details>
+      )}
+
+      {/* Закреплённая строка добавления: всегда на одном месте, не «бегает» */}
+      <div className="nd-ocr-actions" style={{ position: 'sticky', bottom: 'calc(var(--nav-height, 0px) + 8px)', zIndex: 3, display: 'flex', gap: 8, padding: 8, borderRadius: 14, background: 'linear-gradient(180deg, rgba(24,24,27,0.88), #18181b)', border: '1px solid rgba(0,230,138,0.18)', backdropFilter: 'blur(12px)', boxShadow: '0 -6px 20px rgba(0,0,0,0.35)' }}>
+        <button onClick={onSaveItems} aria-label="Сохранить" disabled={parsedItems.length === 0} className="nd-ocr-add"
+          style={{ width: '100%', padding: '12px', borderRadius: 10, border: 'none', cursor: parsedItems.length ? 'pointer' : 'not-allowed',
+            background: parsedItems.length ? 'linear-gradient(135deg,#00e68a,#00c8a0)' : 'rgba(255,255,255,0.07)',
+            color: parsedItems.length ? '#000' : 'rgba(255,255,255,0.4)', fontWeight: 800, fontSize: 12, minHeight: 48,
+            boxShadow: parsedItems.length ? '0 4px 16px rgba(0,230,138,0.22)' : 'none' }}>
+          💾 Добавить {parsedItems.length} поз. в дневник
+        </button>
+      </div>
+      </div>
       )}
 
 

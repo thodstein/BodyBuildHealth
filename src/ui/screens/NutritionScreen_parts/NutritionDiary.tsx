@@ -44,7 +44,7 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
   const { mealType, setMealType, allMealTypes, customMealInput, setCustomMealInput, addCustomMeal } = useDiaryMealTypes({ tab, safeSet, showToast });
   const { selectedDate, setSelectedDate, weekDays, dayMeals, dayTotals, dayMicros, mealQuality, dayQuality, favoriteFoods, recentFoods } = useDiaryDay({ diaryData, refreshKey });
   const {
-    ocrText, setOcrText, parsedItems, setParsedItems, ocrError, ocrHint, ocrFileLoading,
+    ocrText, setOcrText, parsedItems, setParsedItems, ocrError, ocrHint, ocrFileLoading, ocrProgress,
     showCustomFood, setShowCustomFood,
     customFoodName, setCustomFoodName, customFoodKcal, setCustomFoodKcal, customFoodP, setCustomFoodP,
     customFoodF, setCustomFoodF, customFoodC, setCustomFoodC,
@@ -166,11 +166,17 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
         </div>
         <MacroSummary dayTotals={dayTotals} targets={targets} />
       </div>
-      
-      
-      
-      
-      
+
+      {/* Переход к добавлению — обычная кнопка в потоке, на одном и том же месте.
+          Плавающих/FAB-кнопок в дневнике нет: только закреплённые в раскладке. */}
+      {tab !== 'add' && (
+        <button onClick={() => setTab('add')} aria-label="Быстро добавить" className="nd-addfood-pin"
+          style={{ width: '100%', minHeight: 52, borderRadius: 14, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+            border: '1px solid rgba(0,230,138,0.25)', background: 'rgba(0,230,138,0.08)', color: '#00e68a', fontSize: 13, fontWeight: 800 }}>
+          <span style={{ fontSize: 16, lineHeight: 1 }}>＋</span> Добавить еду
+        </button>
+      )}
+
       {/* Tab content */}
       {tab === 'add' && (
         <>
@@ -188,13 +194,20 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
           onLabelCamera={handleLabelCamera} onLabelGallery={handleLabelGallery}
           onLabelFieldChange={handleLabelFieldChange} onLabelSaveToBase={handleLabelSaveToBase}
           onLabelAddToDiary={handleLabelAddToDiary} onLabelBarcodeScan={handleLabelBarcodeScan}
-          onOcrFile={handleOcrFileUpload} ocrFileLoading={ocrFileLoading}
+          onOcrFile={handleOcrFileUpload} ocrFileLoading={ocrFileLoading} ocrProgress={ocrProgress}
           onShowOCR={() => setShowOCR(!showOCR)} showOCR={showOCR}
           ocrText={ocrText} onOcrTextChange={setOcrText} onOcrSubmit={handleOCR}
           ocrError={ocrError} ocrHint={ocrHint} onOcrClose={() => { setShowOCR(false); setOcrText(''); }}
           parsedItems={parsedItems} onRemoveParsedItem={(i) => setParsedItems(prev => prev.filter((_, j) => j !== i))}
           onUpdateParsedItemQty={updateParsedItemQty} onFillMicros={fillQueuedMicros}
-          onSaveItems={() => saveItemsToDiary(parsedItems)}
+          onSaveItems={() => {
+            if (parsedItems.length === 0) return;
+            saveItemsToDiary(parsedItems);
+            // Распознанное должно быть ВИДНО: уводим на «День», иначе кажется,
+            // что кнопка ничего не добавила (очередь просто исчезла).
+            setShowOCR(false);
+            setTab('day');
+          }}
           onEditParsedItem={(idx, updated) => setParsedItems(prev => prev.map((item, i) => i === idx ? { ...item, ...updated } : item))}
           onFixAllLowConfidence={() => setParsedItems(prev => prev.map(item => {
             if (typeof item.confidence === 'number' && item.confidence < 0.5) {
@@ -476,14 +489,6 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
           )}
         </div>
       </DiarySection>
-      {tab !== 'add' && (
-        <div className="nut-diary-fabbar" style={{ position: 'static', maxWidth: 560, margin: '4px auto 0', pointerEvents: 'none' }}>
-          <button onClick={() => setTab('add')} aria-label="Быстро добавить" className="nut-diary-fab" style={{ width: '100%', minHeight: 52, borderRadius: 14, background: 'linear-gradient(135deg,#00e68a,#00c8a0)', border: 'none', boxShadow: '0 6px 20px rgba(0,230,138,0.35)', fontSize: 14, fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, color: '#000', pointerEvents: 'auto' }}>
-            <span style={{ fontSize: 20, lineHeight: 1 }}>＋</span> Добавить еду
-          </button>
-        </div>
-      )}
-
       {/* Modern popups */}
       {presetDialog && (
         <div role="dialog" aria-modal="true" aria-label="Сохранить набор" className="nd-pdlg" onClick={e => { if (e.target===e.currentTarget) setPresetDialog(null); }} style={{ position:'fixed', inset:0, zIndex:1000, background:'rgba(0,0,0,0.75)', backdropFilter:'blur(8px)', display:'flex', alignItems:'center', justifyContent:'center', padding:16 }}>

@@ -26,6 +26,8 @@ export function useDiaryQueue({ diaryData, selectedDate, mealType, usdaFoods, sa
   const [ocrError, setOcrError] = useState('');
   const [ocrHint, setOcrHint] = useState('');
   const [ocrFileLoading, setOcrFileLoading] = useState(false);
+  /** 0..1 — прогресс распознавания скриншота (как у анализов), не «бегущий» текст. */
+  const [ocrProgress, setOcrProgress] = useState(0);
   const [showCustomFood, setShowCustomFood] = useState(false);
   const [customFoodName, setCustomFoodName] = useState('');
   const [customFoodKcal, setCustomFoodKcal] = useState('100');
@@ -140,7 +142,7 @@ export function useDiaryQueue({ diaryData, selectedDate, mealType, usdaFoods, sa
 
   const handleOcrFileUpload = useCallback(async (file: File) => {
     if (!file) { setOcrError('Файл не выбран. Попробуйте ещё раз.'); setOcrFileLoading(false); return; }
-    setOcrFileLoading(true); setOcrError(''); setOcrHint(`⏳ Файл выбран: ${((file as any)?.size ? ((file.size/1024/1024).toFixed(2)+' МБ') : '…')} — загружаем…`);
+    setOcrFileLoading(true); setOcrError(''); setOcrProgress(0); setOcrHint(`⏳ Файл выбран: ${((file as any)?.size ? ((file.size/1024/1024).toFixed(2)+' МБ') : '…')} — загружаем…`);
     if ((file as any)?.size > 15 * 1024 * 1024) {
       setOcrFileLoading(false);
       setOcrError('Фото больше 15 МБ. Сделайте скриншот экрана или уменьшите изображение и повторите.');
@@ -165,7 +167,9 @@ export function useDiaryQueue({ diaryData, selectedDate, mealType, usdaFoods, sa
     let sawProgress = false;
     const onOcrProgress = (fraction: number) => {
       sawProgress = true;
-      const pct = Math.round(fraction * 100);
+      const safe = Number.isFinite(fraction) ? Math.min(1, Math.max(0, fraction)) : 0;
+      setOcrProgress(safe);
+      const pct = Math.round(safe * 100);
       if (pct >= lastPct + 10 || pct >= 100) {
         lastPct = pct;
         setOcrHint(`⏳ Распознаём скриншот… ${pct}% (текст+цифры КБЖУ)`);
@@ -185,6 +189,7 @@ export function useDiaryQueue({ diaryData, selectedDate, mealType, usdaFoods, sa
         backupPromise,
       ]);
       setOcrText(result.text || '');
+      setOcrProgress(1);
       if (result.meals.length > 0) {
         const converted = convertOCRItems(result.meals, usdaFoods);
         if (converted.length > 0) {
@@ -298,7 +303,7 @@ export function useDiaryQueue({ diaryData, selectedDate, mealType, usdaFoods, sa
   }, [showToast]);
 
   return {
-    ocrText, setOcrText, parsedItems, setParsedItems, ocrError, ocrHint, ocrFileLoading,
+    ocrText, setOcrText, parsedItems, setParsedItems, ocrError, ocrHint, ocrFileLoading, ocrProgress,
     showCustomFood, setShowCustomFood,
     customFoodName, setCustomFoodName, customFoodKcal, setCustomFoodKcal, customFoodP, setCustomFoodP,
     customFoodF, setCustomFoodF, customFoodC, setCustomFoodC,
