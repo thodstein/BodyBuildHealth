@@ -96,4 +96,16 @@ describe('хаб «Метаболизм» — честность подписе�
     expect(src).toMatch(/calcTyG[\s\S]{0,400}?Math\.log\(\(tgMgDl\*glucoseMgDl\)\/2\)/);
     expect(src).toMatch(/calcHomaIR[\s\S]{0,400}?glucoseMmol \* insulinMuMl \/ 22\.5/);
   });
+
+  it('waterfall TDEE: сумма BMR+NEAT+EAT не выдаёт себя за расход с TEF и целью', () => {
+    const src = hub();
+    // Было: «TDEE {kbju.nat.tdee}= BMR+NEAT+EAT+TEF», хотя kbju.nat.tdee уже содержит
+    // дельту цели, а TEF сидит внутри PAL — равенство было ложным.
+    expect(src).not.toMatch(/TDEE \{kbju\.nat\.tdee\}= BMR/);
+    expect(src).toContain('Waterfall TDEE · BMR + NEAT + EAT (TEF внутри PAL)');
+    // шкала строится от расхода БЕЗ дельты цели
+    expect(src).toMatch(/<MhBar v=\{kbju\.bmr\} max=\{stepsCalc\.tdeeNat\}/);
+    // и явно сказано, что TEF в сумму не входит
+    expect(src).toMatch(/в сумму выше не входит/);
+  });
 });

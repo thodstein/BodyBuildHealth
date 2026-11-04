@@ -1569,16 +1569,18 @@ const kbju = useMemo(()=> calcKBJU(input), [input]);
                 </div>
               )}
               <div style={{ marginTop:8, padding:'8px 10px', borderRadius:10, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)' }}>
-                <div style={{ fontSize:9, fontWeight:800, color:'rgba(255,255,255,0.6)', textTransform:'uppercase', letterSpacing:0.3, marginBottom:6 }}>Waterfall TDEE · BMR + NEAT + EAT + TEF 10%</div>
+                <div style={{ fontSize:9, fontWeight:800, color:'rgba(255,255,255,0.6)', textTransform:'uppercase', letterSpacing:0.3, marginBottom:6 }}>Waterfall TDEE · BMR + NEAT + EAT (TEF внутри PAL)</div>
                 <div style={{ display:'flex', gap:6, alignItems:'end' }}>
-                  <MhBar v={kbju.bmr} max={kbju.nat.tdee} color="#60a5fa" label={`BMR ${kbju.bmr}`} />
-                  <MhBar v={kbju.neat} max={kbju.nat.tdee} color="#22c55e" label={`NEAT ${kbju.neat}`} />
-                  <MhBar v={kbju.eat} max={kbju.nat.tdee} color="#f59e0b" label={`EAT ${kbju.eat}`} />
-                  <MhBar v={kbju.tefNat} max={kbju.nat.tdee} color="#a78bfa" label={`TEF ${kbju.tefNat}`} />
-                  {caffeineCurve.tefBoostKcal>0 && <MhBar v={caffeineCurve.tefBoostKcal} max={kbju.nat.tdee} color="#f43f5e" label={`Caf ${caffeineCurve.tefBoostKcal}`} />}
+                  <MhBar v={kbju.bmr} max={stepsCalc.tdeeNat} color="#60a5fa" label={`BMR ${kbju.bmr}`} />
+                  <MhBar v={kbju.neat} max={stepsCalc.tdeeNat} color="#22c55e" label={`NEAT ${kbju.neat}`} />
+                  <MhBar v={kbju.eat} max={stepsCalc.tdeeNat} color="#f59e0b" label={`EAT ${kbju.eat}`} />
+                  <MhBar v={kbju.tefNat} max={stepsCalc.tdeeNat} color="#a78bfa" label={`TEF ${kbju.tefNat}`} />
+                  {caffeineCurve.tefBoostKcal>0 && <MhBar v={caffeineCurve.tefBoostKcal} max={stepsCalc.tdeeNat} color="#f43f5e" label={`Caf ${caffeineCurve.tefBoostKcal}`} />}
                 </div>
-                <div style={{ fontSize:8, color:'rgba(255,255,255,0.45)', marginTop:4 }}>TDEE {kbju.nat.tdee}= BMR{kbju.bmr}+NEAT{kbju.neat}+EAT{kbju.eat}+TEF{kbju.tefNat} (TEF ~10% внутри PAL, показан для наглядности)</div>
-                <div style={{ fontSize:8, color:'rgba(255,255,255,0.35)', marginTop:3 }}>FAO 2004: BEE=BMR×1.10 (TEF), TEE=BEE×PAL. У нас TDEE=BMR×PAL — PAL FAO уже включает TEF; TEF отдельно информативен, BEE≈{kbju.bmr + kbju.tefNat}ккал</div>
+                {/* Шкала — расход БЕЗ цели: kbju.nat.tdee уже содержит дельту цели,
+                    и сумма BMR+NEAT+EAT не могла её дать (сушка выглядела «недобором»). */}
+                <div style={{ fontSize:8, color:'rgba(255,255,255,0.45)', marginTop:4 }}>TDEE {stepsCalc.tdeeNat} = BMR {kbju.bmr} + NEAT {kbju.neat} + EAT {kbju.eat} · план на цель {kbju.nat.kcal} ккал ({kbju.nat.kcal < stepsCalc.tdeeNat ? '−' : '+'}{Math.abs(stepsCalc.tdeeNat - kbju.nat.kcal)})</div>
+                <div style={{ fontSize:8, color:'rgba(255,255,255,0.35)', marginTop:3 }}>FAO 2004: BEE=BMR×1.10 (TEF), TEE=BEE×PAL. У нас TDEE=BMR×PAL — PAL FAO уже включает TEF; TEF {kbju.tefNat}ккал показан отдельно и в сумму выше не входит, BEE≈{kbju.bmr + kbju.tefNat}ккал</div>
               </div>
               {adaptiveV3 ? (
                 <div style={{ marginTop:8, padding:'8px 10px', borderRadius:8, background:'rgba(34,197,94,0.08)', border:'1px solid rgba(34,197,94,0.18)', fontSize:10, color:'#fff', lineHeight:1.4 }}>
@@ -1872,7 +1874,7 @@ const kbju = useMemo(()=> calcKBJU(input), [input]);
                   <div style={{ fontSize:9, color:'#fff' }}>RMR pred {at.rmrPred} → meas ~{at.rmrMeasEst} · {at.note}</div>
                 </div>
                 <div style={{ padding:10, borderRadius:10, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', fontSize:10, color:'#fff', lineHeight:1.5 }}>
-                  <b style={{ color:'#f97316' }}>Reverse-auto — MATADOR Byrne 2017</b><br/>шаг по trend ({adaptiveV3 ? `тренд ${adaptiveV3.trend}кг/нед` : 'нет trend'}) до {reverseAuto[reverseAuto.length-1]?.kcal ?? kbju.nat.tdee}ккал<br/>
+                  <b style={{ color:'#f97316' }}>Reverse-auto — MATADOR Byrne 2017</b><br/>шаг по trend ({adaptiveV3 ? `тренд ${adaptiveV3.trend}кг/нед` : 'нет trend'}) до {reverseAuto[reverseAuto.length-1]?.kcal ?? stepsCalc.tdeeNat}ккал<br/>
                   <span style={{ fontSize:9, color:'rgba(255,255,255,0.55)' }}>После дефицита TDEE подавлен 10-15% 4-8нед. Резкий +500 = откат жира.</span>
                   <div style={{ marginTop:6, display:'flex', gap:4, flexWrap:'wrap' }}>
                     {reverseAuto.slice(0,6).map(s=>(
