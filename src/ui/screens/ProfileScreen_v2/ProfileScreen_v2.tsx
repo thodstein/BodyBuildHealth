@@ -12,6 +12,7 @@ import { ProfileSettingsTab } from './ProfileSettingsTab';
 import { ProfileCoachTab } from './ProfileCoachTab';
 import { ProfileNotesTab } from './ProfileNotesTab';
 import { ProfilePlannerTab } from './ProfilePlannerTab';
+import { ProfileAthleteLogTab } from './ProfileAthleteLogTab';
 import { useProfileRefresh, getSnapshotsCount, undoLastSnapshot } from '../../../core/profile-manager';
 import { onAnyProfileChange } from '../../../core/profile-events';
 import { colors } from './ui';
@@ -49,13 +50,14 @@ class ProfileErrorBoundary extends React.Component<
   }
 }
 
-type Tab = 'user' | 'diaries' | 'settings' | 'reports' | 'coach' | 'notes' | 'planner';
+type Tab = 'user' | 'diaries' | 'settings' | 'reports' | 'coach' | 'notes' | 'planner' | 'log';
 
 const TAB_META: Record<Tab, { icon: NativeIconName; title: string; color: string }> = {
   user: { icon: 'user', title: 'Пользователь', color: colors.primary },
   diaries: { icon: 'notebook', title: 'Дневники', color: colors.orange },
   reports: { icon: 'chart', title: 'Отчёты', color: colors.blue },
   coach: { icon: 'award', title: 'Тренер', color: '#22d3ee' },
+  log: { icon: 'activity', title: 'Журнал', color: '#a78bfa' },
   notes: { icon: 'file', title: 'Заметки', color: '#f59e0b' },
   planner: { icon: 'clock', title: 'Планер', color: '#60a5fa' },
   settings: { icon: 'sliders', title: 'Настройки', color: colors.purple },
@@ -65,10 +67,10 @@ export const ProfileScreen_v2: React.FC<{ onNavigate?: (screen: string) => void;
   useProfileRefresh();
   const [tab, setTab] = useState<Tab | null>(null);
   const [undoAvailable, setUndoAvailable] = useState(false);
-  // Переход «атлет → его заметки/задачи»: вкладка открывается с фильтром по атлету.
-  const [athleteFocus, setAthleteFocus] = useState<{ id: string; target: 'notes' | 'planner' } | null>(null);
+  // Переход «атлет → его заметки/задачи/журнал»: вкладка открывается с фильтром по атлету.
+  const [athleteFocus, setAthleteFocus] = useState<{ id: string; target: 'notes' | 'planner' | 'log' } | null>(null);
 
-  const openAthleteSection = (id: string, target: 'notes' | 'planner') => {
+  const openAthleteSection = (id: string, target: 'notes' | 'planner' | 'log') => {
     setAthleteFocus({ id, target });
     setTab(target);
   };
@@ -77,7 +79,7 @@ export const ProfileScreen_v2: React.FC<{ onNavigate?: (screen: string) => void;
   useEffect(() => {
     if (initialSubTab === 'reports' || initialSubTab === 'custom-report' || initialSubTab === 'archive') {
       setTab('reports');
-    } else if (initialSubTab === 'coach' || initialSubTab === 'notes' || initialSubTab === 'planner') {
+    } else if (initialSubTab === 'coach' || initialSubTab === 'notes' || initialSubTab === 'planner' || initialSubTab === 'log') {
       setTab(initialSubTab);
     } else if (
       initialSubTab &&
@@ -203,6 +205,7 @@ export const ProfileScreen_v2: React.FC<{ onNavigate?: (screen: string) => void;
       }}>
          {tab === 'user' && <ProfileErrorBoundary tabName="Пользователь"><ProfileUserTab /></ProfileErrorBoundary>}
           {tab === 'coach' && <ProfileErrorBoundary tabName="Тренер"><ProfileCoachTab onNavigate={onNavigate} onOpenAthlete={openAthleteSection} /></ProfileErrorBoundary>}
+          {tab === 'log' && <ProfileErrorBoundary tabName="Журнал"><ProfileAthleteLogTab initialAthleteId={athleteFocus?.target === 'log' ? athleteFocus.id : undefined} /></ProfileErrorBoundary>}
           {tab === 'notes' && <ProfileErrorBoundary tabName="Заметки"><ProfileNotesTab initialAthleteId={athleteFocus?.target === 'notes' ? athleteFocus.id : undefined} /></ProfileErrorBoundary>}
           {tab === 'planner' && <ProfileErrorBoundary tabName="Планер"><ProfilePlannerTab initialAthleteId={athleteFocus?.target === 'planner' ? athleteFocus.id : undefined} /></ProfileErrorBoundary>}
           {tab === 'diaries' && <ProfileErrorBoundary tabName="Дневники"><ProfileDiariesTab

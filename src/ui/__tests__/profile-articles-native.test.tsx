@@ -38,12 +38,12 @@ afterEach(async () => {
 });
 
 describe('ProfileHero', () => {
-  // 7 карточек: 4 базовых (Пользователь/Дневники/Отчёты/Настройки) + инструменты
-  // тренера (Тренер, Заметки, Планер). Число держим явным, чтобы случайное
+  // 8 карточек: 4 базовых (Пользователь/Дневники/Отчёты/Настройки) + инструменты
+  // тренера (Тренер, Журнал, Заметки, Планер). Число держим явным, чтобы случайное
   // «добавлю ещё одну карточку» не проходило молча, и одинаковым на обеих платформах.
-  const HERO_CARDS = 7;
+  const HERO_CARDS = 8;
 
-  it('1. native → hero + имя + прогресс + 7 разделов', async () => {
+  it('1. native → hero + имя + прогресс + 8 разделов', async () => {
     setCapacitorNative();
     await resetPlatform();
     const { container } = render(<ProfileHero onSelectTab={() => {}} />);
@@ -61,18 +61,19 @@ describe('ProfileHero', () => {
     ).not.toBeNull();
     expect(container.querySelectorAll('.profile-hero-card').length).toBe(HERO_CARDS);
     expect(container.querySelector('.profile-hero-card[data-id="coach"]')).not.toBeNull();
+    expect(container.querySelector('.profile-hero-card[data-id="log"]')).not.toBeNull();
     expect(container.querySelector('.profile-hero-card[data-id="notes"]')).not.toBeNull();
     expect(container.querySelector('.profile-hero-card[data-id="planner"]')).not.toBeNull();
   });
 
-  it('2. web → та же классика (hero, 7 разделов)', async () => {
+  it('2. web → та же классика (hero, 8 разделов)', async () => {
     await resetPlatform();
     const { container } = render(<ProfileHero onSelectTab={() => {}} />);
     expect(container.querySelector('.profile-hero')).not.toBeNull();
     expect(container.querySelectorAll('.profile-hero-card').length).toBe(HERO_CARDS);
     // Одинаковый набор карточек на обеих платформах — без «web-урезанной» версии.
     const ids = Array.from(container.querySelectorAll('.profile-hero-card')).map(el => el.getAttribute('data-id'));
-    expect(ids).toEqual(['user', 'diaries', 'reports', 'coach', 'notes', 'planner', 'settings']);
+    expect(ids).toEqual(['user', 'diaries', 'reports', 'coach', 'log', 'notes', 'planner', 'settings']);
   });
 
   it('3. клик по разделу открывает вкладку', async () => {

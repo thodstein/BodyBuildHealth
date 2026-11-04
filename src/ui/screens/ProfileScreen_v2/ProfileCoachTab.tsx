@@ -137,7 +137,7 @@ const btn = (tone: 'primary' | 'ghost' | 'danger'): React.CSSProperties => ({
 export const ProfileCoachTab: React.FC<{
   onNavigate?: (screen: string) => void;
   /** Открыть заметки/задачи конкретного атлета (переход на вкладку с фильтром). */
-  onOpenAthlete?: (athleteId: string, target: 'notes' | 'planner') => void;
+  onOpenAthlete?: (athleteId: string, target: 'notes' | 'planner' | 'log') => void;
 }> = ({ onNavigate, onOpenAthlete }) => {
   const [state, setState] = useState<CoachState>(() => readCoachState(ls()));
   const [form, setForm] = useState<AthleteForm>(EMPTY_FORM);
@@ -679,6 +679,14 @@ export const ProfileCoachTab: React.FC<{
                     <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
                       {onOpenAthlete && (
                         <>
+                          <button
+                            type="button"
+                            data-coach="open-log"
+                            onClick={() => onOpenAthlete(a.id, 'log')}
+                            style={{ ...btn('ghost'), fontSize: 12 }}
+                          >
+                            Журнал атлета
+                          </button>
                           <button
                             type="button"
                             data-coach="open-notes"

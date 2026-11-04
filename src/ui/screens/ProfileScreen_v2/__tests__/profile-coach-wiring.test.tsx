@@ -21,6 +21,7 @@ import {
   writeCoachNotes,
 } from '../../../../engines/coach/coach-notes.engine';
 import { readCoachPlanner } from '../../../../engines/coach/coach-planner.engine';
+import { readCoachLog } from '../../../../engines/coach/coach-athlete-log.engine';
 
 beforeEach(() => {
   try { localStorage.clear(); } catch { /* ignore */ }
@@ -64,6 +65,8 @@ describe('проводка вкладок профиля', () => {
     expect(NAV_TARGETS['coach-mode']).toMatchObject({ tab: 'profile', subTab: 'coach' });
     expect(NAV_TARGETS['notes']).toMatchObject({ tab: 'profile', subTab: 'notes' });
     expect(NAV_TARGETS['planner']).toMatchObject({ tab: 'profile', subTab: 'planner' });
+    expect(NAV_TARGETS['athlete-log']).toMatchObject({ tab: 'profile', subTab: 'log' });
+    expect(NAV_TARGETS['coach-log']).toMatchObject({ tab: 'profile', subTab: 'log' });
   });
 });
 
@@ -106,5 +109,23 @@ describe('атлет → его заметки и задачи', () => {
     fireEvent.change(container.querySelector('[data-planner="title"]') as HTMLInputElement, { target: { value: 'Созвон' } });
     fireEvent.click(container.querySelector('[data-planner="add"]') as HTMLElement);
     expect(readCoachPlanner(localStorage).items[0].athleteId).toBe('a2');
+  });
+
+  it('кнопка «Журнал атлета» открывает журнал с этим атлетом и пишет запись на него', () => {
+    seedCoach();
+    const { container } = render(<ProfileScreen_v2 initialSubTab="coach" />);
+    const card = container.querySelector('[data-coach="athlete"][data-athlete-id="a1"]') as HTMLElement;
+    fireEvent.click(card.querySelector('[data-coach="open-log"]') as HTMLElement);
+
+    expect(container.querySelector('[data-log="root"]')).not.toBeNull();
+    expect((container.querySelector('[data-log="athlete"]') as HTMLSelectElement).value).toBe('a1');
+
+    fireEvent.change(container.querySelector('[data-log="exercise"]') as HTMLInputElement, { target: { value: 'Присед' } });
+    fireEvent.change(container.querySelector('[data-log="sets"]') as HTMLInputElement, { target: { value: '3' } });
+    fireEvent.change(container.querySelector('[data-log="reps"]') as HTMLInputElement, { target: { value: '5' } });
+    fireEvent.change(container.querySelector('[data-log="weight"]') as HTMLInputElement, { target: { value: '100' } });
+    fireEvent.click(container.querySelector('[data-log="save"]') as HTMLElement);
+
+    expect(readCoachLog(localStorage).items[0]).toMatchObject({ athleteId: 'a1', exercise: 'Присед', weightKg: 100 });
   });
 });

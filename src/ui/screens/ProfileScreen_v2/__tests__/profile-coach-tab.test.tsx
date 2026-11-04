@@ -197,6 +197,8 @@ describe('атлеты', () => {
     expect(onOpenAthlete).toHaveBeenLastCalledWith('a1', 'notes');
     fireEvent.click(container.querySelector('[data-coach="open-planner"]') as HTMLElement);
     expect(onOpenAthlete).toHaveBeenLastCalledWith('a1', 'planner');
+    fireEvent.click(container.querySelector('[data-coach="open-log"]') as HTMLElement);
+    expect(onOpenAthlete).toHaveBeenLastCalledWith('a1', 'log');
   });
 
   it('без обработчика переходов кнопки не показываются (не мёртвые кнопки)', () => {
@@ -204,5 +206,6 @@ describe('атлеты', () => {
     const { container } = render(<ProfileCoachTab />);
     expect(container.querySelector('[data-coach="open-notes"]')).toBeNull();
     expect(container.querySelector('[data-coach="open-planner"]')).toBeNull();
+    expect(container.querySelector('[data-coach="open-log"]')).toBeNull();
   });
 });

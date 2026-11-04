@@ -15,6 +15,7 @@ import { coachSummary, readCoachState } from '../../../engines/coach/coach-mode.
 const COACH_COLOR = '#22d3ee';
 const NOTES_COLOR = '#f59e0b';
 const PLANNER_COLOR = '#60a5fa';
+const LOG_COLOR = '#a78bfa';
 
 const coachDescForHero = (): string => {
   try {
@@ -25,7 +26,7 @@ const coachDescForHero = (): string => {
 };
 
 interface TabDef {
-  id: 'user' | 'diaries' | 'reports' | 'settings' | 'coach' | 'notes' | 'planner';
+  id: 'user' | 'diaries' | 'reports' | 'settings' | 'coach' | 'notes' | 'planner' | 'log';
   icon: NativeIconName;
   label: string;
   desc: string;
@@ -37,6 +38,7 @@ const TABS: TabDef[] = [
   { id: 'diaries', icon: 'notebook', label: 'Дневники', desc: 'Сон, давление, вес, замеры', color: colors.orange },
   { id: 'reports', icon: 'chart', label: 'Отчёты', desc: 'Комплексный отчёт для врача/тренера', color: colors.blue },
   { id: 'coach', icon: 'award', label: 'Тренер', desc: 'До 20 атлетов, разделы, активный атлет', color: COACH_COLOR },
+  { id: 'log', icon: 'activity', label: 'Журнал', desc: 'Подходы и вес тела по атлетам', color: LOG_COLOR },
   { id: 'notes', icon: 'file', label: 'Заметки', desc: 'Контекст, ограничения, договорённости', color: NOTES_COLOR },
   { id: 'planner', icon: 'clock', label: 'Планер', desc: 'Календарь задач по дням', color: PLANNER_COLOR },
   { id: 'settings', icon: 'sliders', label: 'Настройки', desc: 'Единицы, уведомления, экспорт данных', color: colors.purple },

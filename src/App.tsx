@@ -142,6 +142,8 @@ export const NAV_TARGETS: Record<string, NavTarget> = {
   'coach-mode': { tab: 'profile', subTab: 'coach' },
   'notes': { tab: 'profile', subTab: 'notes' },
   'planner': { tab: 'profile', subTab: 'planner' },
+  'athlete-log': { tab: 'profile', subTab: 'log' },
+  'coach-log': { tab: 'profile', subTab: 'log' },
 
   // Встроенные дневники — открываем профильный дневник
   'profile-diary-sleep': { tab: 'profile', subTab: 'sleep' },
