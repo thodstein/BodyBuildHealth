@@ -2,7 +2,7 @@
 // Ловит молчаливые откаты в shared-worktree (чужой checkout/revert):
 // HeroImg-использования, CSS-изоляция, монтаж native-узлов, манифест.
 // Запуск: `npm run verify:apk-design`. Падает (exit 1) со списком проблем.
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
@@ -148,6 +148,60 @@ for (const f of ['CardioUI', 'CardioWeekEditor', 'CardioCatalogSection', 'Cardio
     .filter(l => /<select[\s>]/.test(l) && !/^\s*(\*|\/\/)/.test(l));
   if (native.length) mustContain(p, 'NO_NATIVE_SELECT', `native <select> в ${f}: ${native[0].trim().slice(0, 60)}`);
 }
+
+// 7b-2. Кардио-UI: АПК-каналы выдачи, тач-норма и app-style диалоги.
+// Молчаливый откат этого блока уже случался (shared-worktree): «копировать»
+// снова уходило в navigator.clipboard без фолбэка, экспорт — в <a download>,
+// удаление цикла — в window.confirm. Гейдим ВСЕ кардио-файлы, не список.
+const CARDIO_UI_DIR = 'src/ui/screens/TrainingScreen_parts';
+const CARDIO_DIARY_UI = 'src/ui/screens/ProfileScreen_v2/diaries/CardioDiary/CardioDiary.tsx';
+const cardioUiFiles = readdirSync(join(root, CARDIO_UI_DIR))
+  .filter(f => f.endsWith('.tsx') && /^cardio/i.test(f))
+  .map(f => `${CARDIO_UI_DIR}/${f}`)
+  .concat([CARDIO_DIARY_UI]);
+
+const CARDIO_HOSTILE = [
+  [/a\.download\s*=/, '<a download> (в WebView файл не сохраняется)'],
+  [/window\.open\s*\(/, 'window.open (заблокирован в WebView)'],
+  [/window\.print\s*\(/, 'window.print (заблокирован в WebView)'],
+  [/<select[\s>]/, 'нативный <select>'],
+  [/type=\{?["']checkbox["']/, 'нативный checkbox'],
+  [/navigator\.clipboard\.writeText/, 'clipboard без АПК-фолбэка (copyOrShareText)'],
+  [/window\.confirm\s*\(/, 'window.confirm вместо useConfirmDialog'],
+];
+const isCommentLine = l => /^\s*(\*|\/\/|\/\*)/.test(l);
+for (const f of cardioUiFiles) {
+  const lines = readFileSync(join(root, f), 'utf8').split(/\r?\n/);
+  for (const [re, label] of CARDIO_HOSTILE) {
+    const i = lines.findIndex(l => re.test(l) && !isCommentLine(l));
+    if (i >= 0) fails.push(`HOSTILE ${label} → ${f}:${i + 1}: ${lines[i].trim().slice(0, 70)}`);
+  }
+  // Тач-норма 44px: minHeight 1x/2x/3x у button/input режет тап в АПК.
+  const small = lines.findIndex((l, i) => {
+    if (!/minHeight:\s*(1\d|2\d|3\d)\b/.test(l)) return false;
+    return lines.slice(Math.max(0, i - 5), i + 1).some(w => /<(button|input)\b/.test(w));
+  });
+  if (small >= 0) fails.push(`TAP<44 → ${f}:${small + 1}: ${lines[small].trim().slice(0, 70)}`);
+}
+
+// АПК-пути кардио, которые нельзя терять молча.
+const CARDIO_APK_MARKERS = [
+  [`${CARDIO_UI_DIR}/CardioManageStep.tsx`, 'saveTextFileApk', 'экспорт файлов через Documents+Share'],
+  [`${CARDIO_UI_DIR}/CardioManageStep.tsx`, 'publishCardioKcalContract', 'контракт «кардио → питание»'],
+  [`${CARDIO_UI_DIR}/CardioManageStep.tsx`, 'copyOrShareText', 'выдача текста через Share'],
+  [`${CARDIO_UI_DIR}/CardioDiaryPanel.tsx`, 'saveCsvApk', 'CSV через Share'],
+  [`${CARDIO_UI_DIR}/CardioDiaryPanel.tsx`, 'KcalContractCard', 'карточка «питание видит кардио»'],
+  [`${CARDIO_UI_DIR}/CardioSessionTimer.tsx`, 'plannedMin', 'факт-минуты сессии'],
+  [`${CARDIO_UI_DIR}/CardioSessionTimer.tsx`, 'wakeLock', 'экран не гаснет на сессии'],
+  [`${CARDIO_UI_DIR}/CardioSessionTimer.tsx`, 'ffmKg', 'ккал по тощей массе'],
+  [`${CARDIO_UI_DIR}/CardioConstructor.tsx`, 'assembleInput', 'единая сборка цикла'],
+  [`${CARDIO_UI_DIR}/CardioConstructor.tsx`, 'printHtmlApk', 'печать через файл+Share'],
+  [`${CARDIO_UI_DIR}/CardioConstructor.tsx`, 'useConfirmDialog', 'app-style подтверждение'],
+  [CARDIO_DIARY_UI, 'importCardioEntries', 'импорт с дедупом'],
+  [CARDIO_DIARY_UI, 'replaceCardioLog([])', 'очистка одной транзакцией'],
+  [CARDIO_DIARY_UI, 'useConfirmDialog', 'app-style подтверждение'],
+];
+for (const [file, needle, label] of CARDIO_APK_MARKERS) mustContain(file, needle, `cardio apk ${label}`);
 
 // 7b. Единоборства: APK-хуки боёв, 44px на тапах, никаких нативных <select>/checkbox.
 const COMBAT_SRC = 'src/ui/screens/combat/';
