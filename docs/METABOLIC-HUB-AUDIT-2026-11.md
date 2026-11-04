@@ -283,6 +283,17 @@ EA при 2600 ккал не в красной зоне, `none` при пуст�
 выставляют флаг корректно.
 **Регрессия.** `metabolic-hub-wiring.test.tsx` → «пот-тест подставляет текущий вес…».
 
+### 1.27 Adaptive TDEE подменял главное число при 2 днях дневника
+**Причина.** Движок `calcAdaptiveTDEEv3` возвращает `adherence.sufficient=false`, когда в дневнике
+меньше 10 дней (или меньше 10 взвешиваний) — это «ориентир». Но хаб брал `adaptiveV3.tdee` всякий
+раз, когда объект не null, и подменял им формульный TDEE: при 7–9 взвешиваниях и 2 днях еды плитка
+TDEE, `cut`/`bulk`-цели и One-answer считались по оценке с точностью «плюс-минус всё».
+**Исправление.** В TDEE уходит только «достаточный» adaptive (`adherence.sufficient`), иначе —
+формула; сама оценка остаётся в строке `Adaptive v3` с пометкой «ориентир, в TDEE — формула».
+Подпись плитки честно печатает `формула (адаптив 2/10 — мало)`.
+**Регрессия.** `metabolic-hub-wiring.test.tsx` → «adaptive TDEE не подменяет плитку, пока данных
+мало» и «…встаёт в плитку, когда данных достаточно».
+
 ---
 
 ## 2. Чего не хватало (добавлено)
@@ -332,7 +343,7 @@ EA при 2600 ккал не в красной зоне, `none` при пуст�
   параллельные `tsc`/`vitest` из других сессий → heap OOM / `Zone Allocation failed`.
   Прогонять на свободной машине.
 - `npx vitest run src/ui/screens/Shared/__tests__ src/engines/__tests__/metabolic-hub.test.ts`
-  — **204 passed** (6 файлов: structure / toggles / honesty / modes / wiring / engine).
+  — **206 passed** (6 файлов: structure / toggles / honesty / modes / wiring / engine).
 - `npx vitest run src/ui/__tests__/rest-hooks-native.test.tsx
   src/engines/__tests__/risk-info-honesty-e07-e08.test.ts` — **89 passed**
   (в stderr шумит jsdom-canvas chart.js — это фон, не падения).

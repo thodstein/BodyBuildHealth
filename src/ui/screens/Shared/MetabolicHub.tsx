@@ -794,8 +794,12 @@ const kbju = useMemo(()=> calcKBJU(input), [input]);
     // поэтому в `buildOneAnswerPro` уходит база БЕЗ неё — иначе +340/+452 считались
     // дважды (плитка TDEE и её cut/bulk-цели были завышены на 340–452 ккал).
     const baseTdee = stepsCalc.tdeeNat - pregAdd;
-    const pro = buildOneAnswerPro({ formulaTDEE: baseTdee, adaptiveV3, waterMl: onAAS ? water.aas : water.nat, ea: ea?.ea ?? null, pregnancyAddKcal: pregAdd });
-    return { ...pro, eaZone: ea?.zone, metsScore: mets.score };
+    // Аудит 2026-11: adaptive-v3 с 2 днями дневника и 7 взвешиваниями — это «ориентир», а не
+    // TDEE (движок сам помечает adherence.sufficient=false). Такой оценкой нельзя подменять
+    // главное число и все цели: она остаётся в блоке AT как ориентир, а плитка считает по формуле.
+    const adaptiveTrusted = adaptiveV3 && adaptiveV3.adherence?.sufficient ? adaptiveV3 : null;
+    const pro = buildOneAnswerPro({ formulaTDEE: baseTdee, adaptiveV3: adaptiveTrusted, waterMl: onAAS ? water.aas : water.nat, ea: ea?.ea ?? null, pregnancyAddKcal: pregAdd });
+    return { ...pro, eaZone: ea?.zone, metsScore: mets.score, tdeeFromAdaptive: !!adaptiveTrusted };
   }, [adaptiveV3, stepsCalc, water, onAAS, ea, mets, pregAdd]);
   // модель графика v3: сырой вес (тот же фильтр, что в движке) + EMA + intake по датам
   const emaChartModel = useMemo(()=>{
@@ -980,7 +984,7 @@ const kbju = useMemo(()=> calcKBJU(input), [input]);
       <div style={{ display:'grid', gridTemplateColumns:'repeat(2, minmax(0,1fr))', gap:6, marginBottom:6 }}>
         <MhTile label="TDEE · DLW ±12%" accent="#22c55e"
           value={<>{oneAnswer.tdee} <span style={{ fontSize:10 }}>ккал</span></>}
-          sub={<>{oneAnswer.low}–{oneAnswer.high} · {adaptiveV3 ? `адаптив R²${adaptiveV3.r2} ${adaptiveV3.confidence}` : 'по формуле'} · cut {oneAnswer.targets.cut}</>}
+          sub={<>{oneAnswer.low}–{oneAnswer.high} · {oneAnswer.tdeeFromAdaptive && adaptiveV3 ? `адаптив R²${adaptiveV3.r2} ${adaptiveV3.confidence}` : adaptiveV3 ? `формула (адаптив ${adaptiveV3.adherence.logDays}/${adaptiveV3.adherence.weighIns} — мало)` : 'по формуле'} · cut {oneAnswer.targets.cut}</>}
           active={mode==='maintenance'} onClick={()=> go('maintenance')} />
         <MhTile label="Вода" accent="#38bdf8"
           value={<>{onAAS ? water.aas : water.nat} <span style={{ fontSize:10 }}>мл</span></>}
@@ -1005,7 +1009,7 @@ const kbju = useMemo(()=> calcKBJU(input), [input]);
       </div>
       <div style={{ ...CARD, padding:'10px 12px', display:'flex', flexDirection:'column', gap:6 }}>
         {adaptiveV3
-          ? <div style={{ fontSize:9, color: adaptiveV3.confidence==='high'?'#22c55e': adaptiveV3.confidence==='medium'?'#f59e0b':'#f87171' }}>Adaptive v3 (28д EMA): {adaptiveV3.tdee}ккал [{adaptiveV3.low}–{adaptiveV3.high}] · {adaptiveV3.adherence.note} · PALpro {palPro.toFixed(2)}</div>
+          ? <div style={{ fontSize:9, color: adaptiveV3.confidence==='high'?'#22c55e': adaptiveV3.confidence==='medium'?'#f59e0b':'#f87171' }}>Adaptive v3 (28д EMA): {adaptiveV3.tdee}ккал [{adaptiveV3.low}–{adaptiveV3.high}] · {oneAnswer.tdeeFromAdaptive ? 'в TDEE' : 'ориентир, в TDEE — формула'} · {adaptiveV3.adherence.note} · PALpro {palPro.toFixed(2)}</div>
           : <div style={{ fontSize:9, color:'rgba(255,255,255,0.55)' }}>TDEE по формуле — adaptive v3 включится после 7 взвешиваний и дневника (сейчас {weightHistory.length}/{diaryDays}).</div>}
         {adaptiveV3?.plateau && <div style={{ fontSize:9, color:'#fbbf24' }}>⏸ Плато: тренд {adaptiveV3.trend}кг/нед · AT {adaptiveV3.atKcal}ккал — проверь дефицит и шаги</div>}
         {cat2.light !== 'green' && <div style={{ fontSize:9, color: cat2.color }}>CAT2 {cat2.light.toUpperCase()}: {cat2.note}</div>}

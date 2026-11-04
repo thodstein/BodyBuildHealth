@@ -31,6 +31,11 @@ function tileValue(prefix: string): number {
   return Number(m[0].replace(',', '.'));
 }
 
+/** Весь текст плитки (label / value / sub) — для проверки оговорок. */
+function tileText(prefix: string): string {
+  return (tile(prefix).textContent || '').replace(/\s+/g, ' ');
+}
+
 /** Ввести число в поле хаба (MhNum или PopupNumber) так, как это делает пользователь. */
 function setNumber(label: string, value: number) {
   const btn = Array.from(document.querySelectorAll('button')).find(b => {
@@ -79,6 +84,21 @@ function popupValue(label: string): string {
     .find(b => (b.textContent || '').trim().startsWith(label));
   if (!btn) throw new Error(`нет popup-поля «${label}»`);
   return (btn.children[1]?.textContent || '').trim();
+}
+
+/** Подготовить историю веса и дневник: `days` взвешиваний (ровный тренд −0.05 кг/д) и `logDays` дней еды. */
+function seedWeightAndDiary(days: number, logDays: number) {
+  const today = Date.parse('2026-11-04T00:00:00Z');
+  const day = (i: number) => new Date(today - i * 86400000).toISOString().slice(0, 10);
+  const weightHistory: Array<{ date: string; kg: number }> = [];
+  for (let i = days - 1; i >= 0; i--) weightHistory.push({ date: day(i), kg: Math.round((83 - (days - 1 - i) * 0.05) * 100) / 100 });
+  localStorage.setItem('he_nutrition_v2', JSON.stringify({ weightHistory }));
+  const diary: Record<string, any> = {};
+  for (let i = logDays - 1; i >= 0; i--) {
+    diary[day(i)] = { meals: { breakfast: [{ name: 'тест', kcal: 2600, p: 150, f: 70, c: 300, qty: 1, micros: {} }] } };
+  }
+  // формат diary-storage-v2: плоский объект по датам + __version
+  localStorage.setItem('nutrition_diary_v2', JSON.stringify({ ...diary, __version: 2 }));
 }
 
 describe('MetabolicHub: ввод меняет расчёт (проводка полей)', () => {
@@ -176,6 +196,22 @@ describe('MetabolicHub: ввод меняет расчёт (проводка п�
     const loose = document.body.textContent || '';
     expect(loose).toMatch(/план быстрее срока/);
     expect(loose).not.toMatch(/в срок не успеть/);
+  });
+
+  it('adaptive TDEE не подменяет плитку, пока данных мало (2 дня дневника)', () => {
+    seedWeightAndDiary(10, 2);
+    render(<MetabolicHub />);
+    expect(tileText('TDEE')).toMatch(/формула \(адаптив 2\/10 — мало\)/);
+    expect(tileText('TDEE')).not.toMatch(/адаптив R²/);
+    // сама оценка не исчезает — остаётся ориентиром в строке adaptive v3
+    expect(document.body.textContent || '').toMatch(/Adaptive v3.*ориентир, в TDEE — формула/);
+  });
+
+  it('adaptive TDEE встаёт в плитку, когда данных достаточно (12 дней дневника)', () => {
+    seedWeightAndDiary(14, 12);
+    render(<MetabolicHub />);
+    expect(tileText('TDEE')).toMatch(/адаптив R²/);
+    expect(document.body.textContent || '').toMatch(/Adaptive v3.*в TDEE/);
   });
 
   it('«Применить к плану питания» пишет manualTargets + ручной режим в профиль', () => {
