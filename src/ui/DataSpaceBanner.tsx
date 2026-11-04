@@ -20,6 +20,7 @@ import {
   HOME_SPACE_ID,
   activateSpaceById,
   activeSpaceRecord,
+  athleteSpacesByRecent,
   isAthleteDataActive,
   readRegistryFromStorage,
   reloadToApplySpace,
@@ -31,7 +32,7 @@ export const DataSpaceBanner: React.FC = () => {
   const active = useMemo(() => activeSpaceRecord(), []);
   // Список пространств тоже читаем на монтировании: баннер живёт до перезагрузки,
   // а переключение всегда перезагружает приложение.
-  const spaces = useMemo(() => readRegistryFromStorage().spaces, []);
+  const spaces = useMemo(() => readRegistryFromStorage(), []);
   const [open, setOpen] = useState(false);
   if (!isAthleteDataActive()) return null;
 
@@ -41,10 +42,10 @@ export const DataSpaceBanner: React.FC = () => {
     reloadToApplySpace();
   };
 
-  // В списке «Сменить» — только атлеты: возврат к своим данным уже есть отдельной
-  // кнопкой, дублировать его плиткой «Мои данные» значит делать выбор из двух
-  // одинаковых по смыслу пунктов.
-  const others = spaces.filter(s => s.id !== active.id && s.id !== HOME_SPACE_ID);
+  // В списке «Сменить» — только атлеты, последние открытые первыми: рабочий день
+  // тренера почти всегда «тот же, что и вчера». Возврат к своим данным уже есть
+  // отдельной кнопкой, дублировать его плиткой «Мои данные» незачем.
+  const others = athleteSpacesByRecent(spaces).filter(s => s.id !== active.id);
 
   return (
     <div

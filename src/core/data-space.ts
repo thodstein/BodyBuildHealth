@@ -94,6 +94,12 @@ export interface DataSpaceRecord {
    * второй раз. Это не «нормативы»: переносятся только те числа, что тренер ввёл.
    */
   seed?: AthleteProfileSeed;
+  /**
+   * Когда это пространство открывали последний раз (ISO). Только факт: нужен,
+   * чтобы список переключения шёл «последние сверху», а карточка могла честно
+   * сказать «открывался 03.11.26». Никаких оценок из этого не выводится.
+   */
+  lastOpenedAt?: string;
 }
 
 /** Поля карточки, которые переносятся в профиль атлета. */
@@ -238,12 +244,14 @@ function normalizeSpace(raw: unknown): DataSpaceRecord | null {
   // id пространства вклеивается в составной ключ — разделитель и пробелы ломают разбор.
   if (id.includes(SPACE_INFIX) || /\s/.test(id)) return null;
   const seed = cleanSeed(r.seed);
+  const lastOpenedAt = clean(r.lastOpenedAt, 40);
   return {
     id,
     athleteId: r.athleteId == null ? null : clean(r.athleteId, 80),
     label: clean(r.label, 80) || 'Атлет',
     createdAt: clean(r.createdAt, 40),
     ...(seed ? { seed } : {}),
+    ...(lastOpenedAt ? { lastOpenedAt } : {}),
   };
 }
 
@@ -314,8 +322,7 @@ export function upsertSpace(
         : s,
     );
     return { registry: { ...reg, spaces }, error: null };
-  }
-  const athleteSpaces = reg.spaces.filter(s => s.id !== HOME_SPACE_ID).length;
+  }  const athleteSpaces = reg.spaces.filter(s => s.id !== HOME_SPACE_ID).length;
   if (athleteSpaces >= MAX_DATA_SPACES) return { registry: reg, error: 'limit' };
   const space: DataSpaceRecord = {
     id,
@@ -541,6 +548,31 @@ export function spaceUsage(raw: RawStorageLike, spaceId: string): SpaceUsage {
     }
   }
   return { keys, bytes };
+}
+
+/**
+ * Объём ВСЕХ пространств за один проход. Нужен списку атлетов: считать
+ * `spaceUsage` для каждого (20 × полное перечисление ключей) значит делать
+ * квадратичную работу на каждый рендер экрана.
+ */
+export function spaceUsageMap(raw: RawStorageLike): Map<string, SpaceUsage> {
+  const out = new Map<string, SpaceUsage>();
+  for (const k of rawKeys(raw)) {
+    const parsed = spaceIdOfKey(k);
+    if (!parsed) continue;
+    let acc = out.get(parsed.spaceId);
+    if (!acc) {
+      acc = { keys: 0, bytes: 0 };
+      out.set(parsed.spaceId, acc);
+    }
+    acc.keys++;
+    try {
+      acc.bytes += (raw.getItem(k) || '').length;
+    } catch {
+      /* ignore */
+    }
+  }
+  return out;
 }
 
 /** Удалить ВСЕ физические ключи пространства. Возвращает число удалённых ключей. */
@@ -769,8 +801,22 @@ export function activateAthleteSpace(
   const id = athleteSpaceId(athleteId);
   const up = upsertSpace(reg, { id, athleteId, label, seed });
   if (up.error) return { id: null, error: up.error };
-  writeRegistryToStorage(setActiveSpace(up.registry, id));
+  writeRegistryToStorage(setActiveSpace(touchSpaceOpened(up.registry, id), id));
   return { id, error: null };
+}
+
+/** Отметить, что пространство открыли сейчас (факт времени, без оценок). */
+export function touchSpaceOpened(
+  reg: DataSpaceRegistry,
+  spaceId: string,
+  now: string = new Date().toISOString(),
+): DataSpaceRegistry {
+  if (!spaceId || spaceId === HOME_SPACE_ID) return reg;
+  if (!reg.spaces.some(s => s.id === spaceId)) return reg;
+  return {
+    ...reg,
+    spaces: reg.spaces.map(s => (s.id === spaceId ? { ...s, lastOpenedAt: now } : s)),
+  };
 }
 
 /**
@@ -803,8 +849,22 @@ export function activateSpaceById(spaceId: string): { id: string | null; error: 
   }
   const known = reg.spaces.some(s => s.id === spaceId);
   if (!known) return { id: null, error: 'unknown' };
-  writeRegistryToStorage(setActiveSpace(reg, spaceId));
+  writeRegistryToStorage(setActiveSpace(touchSpaceOpened(reg, spaceId), spaceId));
   return { id: spaceId, error: null };
+}
+
+/**
+ * Пространства атлетов, «последние открытые — первыми». Без `lastOpenedAt`
+ * (старые записи) — в конце, в порядке добавления.
+ */
+export function athleteSpacesByRecent(reg: DataSpaceRegistry): DataSpaceRecord[] {
+  const list = reg.spaces.filter(s => s.id !== HOME_SPACE_ID);
+  return list.slice().sort((a, b) => {
+    const at = a.lastOpenedAt ?? '';
+    const bt = b.lastOpenedAt ?? '';
+    if (at === bt) return 0;
+    return at < bt ? 1 : -1;
+  });
 }
 
 /** Единственное место, где мы перезагружаем приложение после смены пространства. */

@@ -27,6 +27,7 @@ import {
   athleteSpaceId,
   emptyRegistry,
   readRegistryFromStorage,
+  touchSpaceOpened,
   upsertSpace,
   writeRegistryToStorage,
 } from '../../../../core/data-space';
@@ -247,8 +248,7 @@ describe('атлеты', () => {
     expect(readRegistryFromStorage().spaces.some(s => s.id === sid)).toBe(false);
   });
 
-  it('обычное удаление НЕ выбрасывает запись пространства, в котором есть данные', () => {
-    seed(1);
+  it('обычное удаление НЕ выбрасывает запись пространства, в котором есть данные', () => {    seed(1);
     const sid = athleteSpaceId('a1');
     writeRegistryToStorage(upsertSpace(emptyRegistry(), { id: sid, athleteId: 'a1', label: 'Атлет 1' }).registry);
     localStorage.setItem(`${ATHLETE_SPACE_PREFIX}${sid}__he_profile_v2`, '{"name":"Иван"}');
@@ -258,6 +258,35 @@ describe('атлеты', () => {
     // данные остались — значит запись должна остаться, иначе до них не добраться
     expect(readRegistryFromStorage().spaces.some(s => s.id === sid)).toBe(true);
     expect(localStorage.getItem(`${ATHLETE_SPACE_PREFIX}${sid}__he_profile_v2`)).toBe('{"name":"Иван"}');
+  });
+
+  it('в карточке видно факты о данных атлета: объём и когда открывали', () => {
+    seed(1);
+    const sid = athleteSpaceId('a1');
+    let reg = upsertSpace(emptyRegistry(), { id: sid, athleteId: 'a1', label: 'Атлет 1' }).registry;
+    reg = touchSpaceOpened(reg, sid, '2026-11-03T09:00:00.000Z');
+    writeRegistryToStorage(reg);
+    localStorage.setItem(`${ATHLETE_SPACE_PREFIX}${sid}__he_profile_v2`, 'x'.repeat(2048));
+
+    const { container } = render(<ProfileCoachTab />);
+    const facts = container.querySelector('[data-coach="space-facts"]')?.textContent ?? '';
+    expect(facts).toContain('свои данные: 2,0 КБ');
+    expect(facts).toContain('открывался 03.11.26');
+    // никаких оценок «мало/пора заниматься» — только факты
+    expect(facts).not.toMatch(/мало|пора|отстаёт|норма/i);
+  });
+
+  it('о пустом пространстве карточка говорит прямо: данных пока нет', () => {
+    seed(1);
+    const sid = athleteSpaceId('a1');
+    let reg = upsertSpace(emptyRegistry(), { id: sid, athleteId: 'a1', label: 'Атлет 1' }).registry;
+    reg = touchSpaceOpened(reg, sid, '2026-11-03T09:00:00.000Z');
+    writeRegistryToStorage(reg);
+
+    const { container } = render(<ProfileCoachTab />);
+    const facts = container.querySelector('[data-coach="space-facts"]')?.textContent ?? '';
+    expect(facts).toContain('пока пусто');
+    expect(facts).toContain('открывался 03.11.26');
   });
 
   it('«Войти в его данные» записывает пространство атлета и перезагружает приложение', () => {

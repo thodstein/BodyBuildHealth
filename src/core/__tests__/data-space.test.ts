@@ -18,6 +18,7 @@ import {
   MAX_DATA_SPACES,
   _resetDataSpaceCache,
   athleteSpaceId,
+  athleteSpacesByRecent,
   clearAllDeviceStorage,
   clearSpaceData,
   createSpaceStorage,
@@ -35,8 +36,10 @@ import {
   spaceIdOfKey,
   spaceKeyPrefix,
   spaceUsage,
+  spaceUsageMap,
   toLogicalKey,
   toPhysicalKey,
+  touchSpaceOpened,
   upsertSpace,
   type RawStorageLike,
 } from '../data-space';
@@ -364,8 +367,50 @@ describe('сырой доступ и удаление данных атлета'
     expect(clearSpaceData(raw, HOME_SPACE_ID)).toBe(0);
   });
 
-  it('clearAllDeviceStorage чистит ВСЕ пространства (аварийный сброс)', () => {
+  it('spaceUsageMap считает объём всех пространств за один проход', () => {
     const a1 = athleteSpaceId('a1');
+    const a2 = athleteSpaceId('a2');
+    const raw = makeRaw({
+      he_profile_v2: 'home-key',
+      he_coach_mode: 'coach',
+      [toPhysicalKey(a1, 'he_profile_v2')]: '12345',
+      [toPhysicalKey(a1, 'he_x')]: 'ab',
+      [toPhysicalKey(a2, 'he_x')]: 'abcd',
+    });
+    const map = spaceUsageMap(raw);
+    expect(map.get(a1)).toEqual({ keys: 2, bytes: 7 });
+    expect(map.get(a2)).toEqual({ keys: 1, bytes: 4 });
+    // ключи домашнего пространства и данные устройства не приписываются атлетам
+    expect(map.has(HOME_SPACE_ID)).toBe(false);
+    expect(map.size).toBe(2);
+  });
+
+  it('touchSpaceOpened отмечает время, но не выдумывает записи и не трогает home', () => {
+    const a1 = athleteSpaceId('a1');
+    const reg = upsertSpace(emptyRegistry(), { id: a1, athleteId: 'a1', label: 'Иван' }).registry;
+    const touched = touchSpaceOpened(reg, a1, '2026-11-04T10:00:00.000Z');
+    expect(touched.spaces.find(s => s.id === a1)?.lastOpenedAt).toBe('2026-11-04T10:00:00.000Z');
+    // неизвестное пространство и home — без изменений (не создаём записей на ходу)
+    expect(touchSpaceOpened(reg, athleteSpaceId('zzz'), '2026-11-04T10:00:00.000Z')).toBe(reg);
+    expect(touchSpaceOpened(reg, HOME_SPACE_ID, '2026-11-04T10:00:00.000Z')).toBe(reg);
+  });
+
+  it('athleteSpacesByRecent ставит последние открытые первыми, без даты — в конце', () => {
+    const a1 = athleteSpaceId('a1');
+    const a2 = athleteSpaceId('a2');
+    const a3 = athleteSpaceId('a3');
+    let reg = emptyRegistry();
+    reg = upsertSpace(reg, { id: a1, athleteId: 'a1' }).registry;
+    reg = upsertSpace(reg, { id: a2, athleteId: 'a2' }).registry;
+    reg = upsertSpace(reg, { id: a3, athleteId: 'a3' }).registry;
+    reg = touchSpaceOpened(reg, a1, '2026-11-01T10:00:00.000Z');
+    reg = touchSpaceOpened(reg, a2, '2026-11-04T10:00:00.000Z');
+    expect(athleteSpacesByRecent(reg).map(s => s.id)).toEqual([a2, a1, a3]);
+    // home в списке атлетов не появляется
+    expect(athleteSpacesByRecent(reg).some(s => s.id === HOME_SPACE_ID)).toBe(false);
+  });
+
+  it('clearAllDeviceStorage чистит ВСЕ пространства (аварийный сброс)', () => {    const a1 = athleteSpaceId('a1');
     const raw = makeRaw({
       he_profile_v2: 'home',
       he_coach_mode: 'x',

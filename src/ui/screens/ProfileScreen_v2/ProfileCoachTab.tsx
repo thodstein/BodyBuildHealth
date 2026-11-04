@@ -50,7 +50,7 @@ import {
   readRegistryFromStorage,
   reloadToApplySpace,
   removeSpace,
-  spaceUsage,
+  spaceUsageMap,
   writeRegistryToStorage,
 } from '../../../core/data-space';
 
@@ -70,6 +70,15 @@ const SEX_LABEL: Record<CoachSex, string> = { male: 'муж', female: 'жен', 
 const fmtShort = (iso: string): string => {
   const [y, m, d] = iso.split('-');
   return `${d}.${m}.${y.slice(2)}`;
+};
+
+/** Размер данных человека. Десятичный разделитель — запятая, как в интерфейсе. */
+const fmtBytes = (bytes: number): string => {
+  if (!Number.isFinite(bytes) || bytes <= 0) return '0 Б';
+  if (bytes < 1024) return `${Math.round(bytes)} Б`;
+  const kb = bytes / 1024;
+  if (kb < 1024) return `${kb.toFixed(1).replace('.', ',')} КБ`;
+  return `${(kb / 1024).toFixed(1).replace('.', ',')} МБ`;
 };
 
 interface AthleteForm {
@@ -197,13 +206,20 @@ export const ProfileCoachTab: React.FC<{
   };
 
   // Пространство данных читаем один раз на рендер экрана (переключение всё равно
-  // перезагружает приложение), а объём данных атлета — только для подтверждения удаления.
+  // перезагружает приложение).
   const spaceActiveId = useMemo(() => activeSpaceRecord().id, []);
-  const usageOf = (athleteId: string) => {
+  // Реестр перечитываем и после изменений в списке: удаление атлета меняет его.
+  const spaceRegistry = useMemo(() => readRegistryFromStorage(), [state]);
+  // Объём всех пространств — ОДНИМ проходом по ключам. Считать `spaceUsage` на
+  // каждого атлета значит 20 полных перечислений хранилища на каждый рендер.
+  const usage = useMemo(() => {
     const storage = ls();
-    if (!storage) return { keys: 0, bytes: 0 };
-    return spaceUsage(deviceRawOrFallback(storage), athleteSpaceId(athleteId));
-  };
+    if (!storage) return new Map<string, { keys: number; bytes: number }>();
+    return spaceUsageMap(deviceRawOrFallback(storage));
+  }, [state, spaceActiveId]);
+  const usageOf = (athleteId: string) => usage.get(athleteSpaceId(athleteId)) ?? { keys: 0, bytes: 0 };
+  const lastOpenedOf = (athleteId: string) =>
+    spaceRegistry.spaces.find(s => s.id === athleteSpaceId(athleteId))?.lastOpenedAt ?? null;
 
   const limits = coachLimits(state);
   const active = coachActiveAthlete(state);
@@ -790,6 +806,23 @@ export const ProfileCoachTab: React.FC<{
                         </span>
                       )}
                     </div>
+                    {(() => {
+                      const u = usageOf(a.id);
+                      const opened = lastOpenedOf(a.id);
+                      // Только факты: сколько занимает и когда открывали. Ключи
+                      // хранилища — техническая единица, поэтому объём показываем
+                      // размером, а не «записями» (иначе это было бы враньё).
+                      if (u.keys === 0 && !opened) return null;
+                      return (
+                        <div
+                          data-coach="space-facts"
+                          style={{ marginTop: 6, fontSize: 10.5, color: colors.textMuted, lineHeight: 1.45 }}
+                        >
+                          {u.keys > 0 ? `свои данные: ${fmtBytes(u.bytes)}` : 'свои данные: пока пусто'}
+                          {opened && ` · открывался ${fmtShort(opened.slice(0, 10))}`}
+                        </div>
+                      );
+                    })()}
                     <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
                       {onOpenAthlete && (
                         <>
@@ -888,7 +921,7 @@ export const ProfileCoachTab: React.FC<{
                           onClick={() => deleteWithData(a)}
                           style={{ ...btn('danger'), fontSize: 12 }}
                         >
-                          Удалить и его данные ({usageOf(a.id).keys})
+                          Удалить и его данные ({fmtBytes(usageOf(a.id).bytes)})
                         </button>
                       )}
                     </div>

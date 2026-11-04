@@ -18,6 +18,9 @@ import {
   athleteSpaceId,
   emptyRegistry,
   readRegistryFromStorage,
+  setActiveSpace,
+  touchSpaceOpened,
+  upsertSpace,
   writeRegistryToStorage,
 } from '../../core/data-space';
 
@@ -116,6 +119,28 @@ describe('полоса пространства данных', () => {
     _resetDataSpaceCache();
     const { container } = render(<DataSpaceBanner />);
     expect(container.querySelector('[data-space="switch"]')).toBeNull();
+  });
+
+  it('в списке «Сменить» последние открытые идут первыми', () => {
+    // Порядок задаём явными отметками времени: три подряд activation могли бы
+    // попасть в одну миллисекунду, и тест стал бы флейком.
+    let reg = emptyRegistry();
+    reg = upsertSpace(reg, { id: athleteSpaceId('a1'), athleteId: 'a1', label: 'Иван' }).registry;
+    reg = upsertSpace(reg, { id: athleteSpaceId('a2'), athleteId: 'a2', label: 'Пётр' }).registry;
+    reg = upsertSpace(reg, { id: athleteSpaceId('a3'), athleteId: 'a3', label: 'Олег' }).registry;
+    reg = touchSpaceOpened(reg, athleteSpaceId('a1'), '2026-11-01T09:00:00.000Z');
+    reg = touchSpaceOpened(reg, athleteSpaceId('a3'), '2026-11-03T09:00:00.000Z');
+    reg = touchSpaceOpened(reg, athleteSpaceId('a2'), '2026-11-04T09:00:00.000Z');
+    writeRegistryToStorage(setActiveSpace(reg, athleteSpaceId('a2')));
+    _resetDataSpaceCache();
+
+    const { container } = render(<DataSpaceBanner />);
+    fireEvent.click(container.querySelector('[data-space="switch"]') as HTMLElement);
+    const ids = Array.from(container.querySelectorAll('[data-space="switch-to"]')).map(
+      el => el.getAttribute('data-space-id'),
+    );
+    // активный (a2) в списке не дублируется; остальные — от свежих к старым
+    expect(ids).toEqual([athleteSpaceId('a3'), athleteSpaceId('a1')]);
   });
 
   it('текст не уезжает под плавающие кнопки синка/языка, а кнопки — отдельной строкой', () => {
