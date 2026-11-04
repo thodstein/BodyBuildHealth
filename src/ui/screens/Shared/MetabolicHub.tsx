@@ -12,7 +12,7 @@
  *  Канон — Питание, алиас — Тренировки/Интеллект.
  */
 import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
-import { calcWater, calcSteps, calcKBJU, calcBodyFat, calcCortisol, calcStressLoad, calcHematology, calcEnergyAvailability, calcAlcohol, calcMaintenanceFinder, calcAdaptiveThermogenesis, calcThyroidImpact, calcHomaIRWrap, IR_MARKERS_SHARED_INPUT_NOTE, calcLipid, calcFLIWrap, checkPSMFWrap, calcMenstrualWater, calcFiberSplit, calcLBMPreservation, calcTyG, calcMetSWrapper, calcFIB4, calcAPRI, calcQUICKI, calcWHtR, calcABSI, calcBAI, calcCaffeineCurve, buildDietBreakPlan, calcRefeedNeed, calcCarbLoading, calcSodiumLoading, calcBodyCompProjection, calcLeafScore, calcAdaptiveTDEEv3, calcLeamScore, calcRedsCAT2, calcSweatTestV2, calcBeverageRankV2, calcTGHDLWrap, calcLAPWrap, calcVAIWrap, calcFMIWrap, calcAlcoholChronic, calcProteinTimingPro, calcNEATPro, calcATRange, calcReverseDietAuto, calcGoalTimelineV2, buildOneAnswerPro, diffMetabolicSnapshots, parseWeeklyScheduleTextPro, buildMetHoursPro, pregnancyAdd, calcPALPro, AAS_EXPERIMENTAL_NOTE, type MetabolicInput } from '../../../engines/metabolic-hub.engine';
+import { calcWater, calcSteps, calcKBJU, calcBodyFat, calcCortisol, calcStressLoad, calcHematology, calcEnergyAvailability, calcAlcohol, calcMaintenanceFinder, calcAdaptiveThermogenesis, calcThyroidImpact, calcHomaIRWrap, IR_MARKERS_SHARED_INPUT_NOTE, calcLipid, calcFLIWrap, checkPSMFWrap, calcMenstrualWater, calcFiberSplit, calcLBMPreservation, calcTyG, calcMetSWrapper, calcFIB4, calcAPRI, calcQUICKI, calcWHtR, calcABSI, calcBAI, calcCaffeineCurve, buildDietBreakPlan, calcRefeedNeed, calcCarbLoading, calcSodiumLoading, calcBodyCompProjection, calcLeafScore, calcAdaptiveTDEEv3, calcLeamScore, calcRedsCAT2, calcSweatTestV2, calcBeverageRankV2, calcTGHDLWrap, calcLAPWrap, calcVAIWrap, calcFMIWrap, calcAlcoholChronic, calcProteinTimingPro, calcNEATPro, calcATRange, calcReverseDietAuto, calcGoalTimelineV2, calcDeadlineFeasibility, buildOneAnswerPro, diffMetabolicSnapshots, parseWeeklyScheduleTextPro, buildMetHoursPro, pregnancyAdd, calcPALPro, AAS_EXPERIMENTAL_NOTE, type MetabolicInput } from '../../../engines/metabolic-hub.engine';
 import { boerLeanBodyMass, bmrMethodLabel } from '../../../core/metabolic-constants';
 import { ACTIVITY_CATALOG_60, PROFESSION_PAL } from '../../../core/activity-catalog';
 import { getProfile, updateProfile } from '../../../core/profile-manager';
@@ -690,6 +690,15 @@ const kbju = useMemo(()=> calcKBJU(input), [input]);
     return { ema: adaptiveV3.emaSeries, raw, byDate, tdee: adaptiveV3.tdee };
   }, [adaptiveV3, weightHistory, intakeSeries]);
 
+  // Срок до цели: поле «Целевых недель» раньше ни на что не влияло.
+  const deadline = useMemo(()=> {
+    if (!targetWeight || !weeksToGoal) return null;
+    return calcDeadlineFeasibility({
+      weight, targetWeight, weeks: weeksToGoal,
+      tdee: stepsCalc.tdeeNat, plannedKcal: onAAS ? kbju.aas.kcal : kbju.nat.kcal, bodyFat,
+    });
+  }, [targetWeight, weeksToGoal, weight, stepsCalc, onAAS, kbju, bodyFat]);
+
   // сценарии
   const [scenarios, setScenarios] = useState<Array<{id:string; name:string; snapshot:any}>>(()=>{
     try{ const raw=localStorage.getItem(SCENARIOS_KEY); return raw? JSON.parse(raw):[] }catch{ return [] }
@@ -1332,6 +1341,16 @@ const kbju = useMemo(()=> calcKBJU(input), [input]);
           <PopupSelect label="Этничность (FFMI/жир)" value={ethnicity} options={[{id:'european',label:'Европейская'},{id:'african',label:'Африканская'},{id:'east_asian',label:'Восточноазиатская'}]} onChange={v=> setEthnicity(v as any)} />
           <MhToggle checked={postBariatric} onChange={setPostBariatric} icon="🩺" title="После бариатрии" desc="белок и усвоение — консервативнее" accent="#f59e0b" />
         </MhGrid>
+        {deadline && (
+          <div style={{
+            marginTop:6, padding:'8px 10px', borderRadius:10, fontSize:9, lineHeight:1.45,
+            background: deadline.verdict==='on-track'||deadline.verdict==='met' ? 'rgba(34,197,94,0.08)' : deadline.verdict==='too-fast' ? 'rgba(245,158,11,0.08)' : 'rgba(239,68,68,0.08)',
+            border: `1px solid ${deadline.verdict==='on-track'||deadline.verdict==='met' ? 'rgba(34,197,94,0.18)' : deadline.verdict==='too-fast' ? 'rgba(245,158,11,0.18)' : 'rgba(239,68,68,0.18)'}`,
+            color: deadline.verdict==='on-track'||deadline.verdict==='met' ? '#22c55e' : deadline.verdict==='too-fast' ? '#f59e0b' : '#f87171',
+          }}>
+            🗓 {deadline.verdict==='met' ? 'цель достигнута' : deadline.verdict==='on-track' ? 'срок выполним' : deadline.verdict==='too-fast' ? 'план быстрее срока' : deadline.verdict==='too-slow' ? 'в срок не успеть' : 'цель и план в разные стороны'} · {deadline.note}
+          </div>
+        )}
         <div style={{ fontSize:9, color:'rgba(255,255,255,0.5)', marginTop:6, lineHeight:1.4 }}>
           {at.note} · RMR pred {at.rmrPred} · Телосложение: {fat.current}% жира, FFMI {onAAS ? fat.ffmiNormAdj : fat.ffmiNorm} {goalV2 ? `· цель ${goalV2.days}д (${goalV2.weeks}нед) при ${goalV2.kcalDiff>0?'+':''}${goalV2.kcalDiff}ккал/сут` : '· целевой вес не задан'}
         </div>

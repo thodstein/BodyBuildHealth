@@ -146,4 +146,19 @@ describe('MetabolicHub: ввод меняет расчёт (проводка п�
     expect(tileValue('TDEE')).toBe(tdeePhysical);
     expect(tdeePhysical).toBeGreaterThan(tdee0);
   });
+
+  it('«Целевых недель» реально проверяет срок (раньше поле не считалось)', () => {
+    render(<MetabolicHub />);
+    setNumber('Цель вес, кг', 60);
+    setNumber('Целевых недель', 3);
+    // без цели «сушка» план = поддержание, и срок справедливо назван встречным
+    expect(document.body.textContent || '').toMatch(/Переключи цель/);
+    fireEvent.click(Array.from(document.querySelectorAll('button'))
+      .find(b => (b.textContent || '').trim() === 'Сушка' && b.className.includes('mh-goal')) as HTMLElement);
+    expect(document.body.textContent || '').toMatch(/в срок не успеть/);
+    setNumber('Целевых недель', 80);
+    const loose = document.body.textContent || '';
+    expect(loose).toMatch(/план быстрее срока/);
+    expect(loose).not.toMatch(/в срок не успеть/);
+  });
 });

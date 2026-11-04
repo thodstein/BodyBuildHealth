@@ -1445,6 +1445,64 @@ export function calcGoalTimelineV2(input: { weight: number; targetWeight: number
 }
 
 // ——— One-answer PRO + diff сценариев + беременность ———
+/**
+ * Срок до цели — это ВВОД, а не украшение.
+ *
+ * Было: поле «Недель до цели» сохранялось в снапшот и не участвовало ни в одном расчёте.
+ * Теперь срок сравнивается с темпом, который даёт план ккал: пользователь видит, реально ли
+ * успеть, сколько ккал не хватает и какой срок соответствует плану.
+ */
+export function calcDeadlineFeasibility(input: {
+  weight: number; targetWeight: number; weeks: number; tdee: number; plannedKcal: number; bodyFat?: number;
+}): {
+  diffKg: number; needRate: number; needDeficitKcal: number; plannedRate: number; plannedDeficitKcal: number;
+  verdict: 'met' | 'on-track' | 'too-slow' | 'too-fast' | 'wrong-direction'; note: string;
+} | null {
+  const weeks = Math.round(input.weeks);
+  if (!Number.isFinite(weeks) || weeks <= 0) return null;
+  if (!Number.isFinite(input.targetWeight) || input.targetWeight <= 0) return null;
+  const diffKg = Math.round((input.weight - input.targetWeight) * 10) / 10; // + = худеть
+  const density = energyDensityPerKg(input.bodyFat, input.weight);
+  const needRate = diffKg / weeks;                                          // кг/нед, + = похудение
+  const needDeficitKcal = Math.round((needRate * density) / 7);             // ккал/сут, + = дефицит
+  const plannedDeficitKcal = Math.round(input.tdee - input.plannedKcal);    // + = дефицит
+  const plannedRate = Math.round(((plannedDeficitKcal * 7) / density) * 100) / 100;
+  const fmtKcal = (v: number) => `${v >= 0 ? '−' : '+'}${Math.abs(v)} ккал/сут`;
+  const r2 = (v: number) => Math.abs(v).toFixed(2);
+  const base = { diffKg, needRate, needDeficitKcal, plannedRate, plannedDeficitKcal };
+  if (Math.abs(diffKg) < 0.5) {
+    return { ...base, verdict: 'met', note: `Вес уже на цели (±0.5 кг): срок не нужен, держи поддержание ${input.tdee} ккал.` };
+  }
+  const pctPerWeek = (Math.abs(needRate) / input.weight) * 100;
+  const capNote = pctPerWeek > (diffKg > 0 ? 1 : 0.5)
+    ? ` ⚠️ ${pctPerWeek.toFixed(2)}%/нед выше нормы (${diffKg > 0 ? '0.5–1' : '0.25–0.5'}%/нед, Helms) — так теряется мышца/набирается жир.`
+    : '';
+  if (diffKg * plannedDeficitKcal <= 0) {
+    return {
+      ...base, verdict: 'wrong-direction',
+      note: `Цель — ${diffKg > 0 ? 'похудеть' : 'набрать'} ${r2(Math.abs(diffKg))} кг, а план ${plannedDeficitKcal > 0 ? 'в дефиците' : 'в профиците'} ${Math.abs(plannedDeficitKcal)} ккал/сут: срок так не выполнить. Переключи цель.`,
+    };
+  }
+  const ratio = Math.abs(needRate) / Math.max(1e-6, Math.abs(plannedRate));
+  if (ratio > 1.15) {
+    const suggestWeeks = Math.max(1, Math.ceil(Math.abs(diffKg) / Math.max(0.05, Math.abs(plannedRate))));
+    return {
+      ...base, verdict: 'too-slow',
+      note: `До ${diffKg > 0 ? '−' : '+'}${r2(diffKg)} кг за ${weeks} нед нужно ${fmtKcal(needDeficitKcal)} (${r2(needRate)} кг/нед), а план даёт ${fmtKcal(plannedDeficitKcal)} (${r2(plannedRate)} кг/нед). Не успеешь: сдвинь срок до ~${suggestWeeks} нед или добавь ~${Math.abs(needDeficitKcal - plannedDeficitKcal)} ккал к ${plannedDeficitKcal > 0 ? 'дефициту' : 'профициту'}.${capNote}`,
+    };
+  }
+  if (ratio < 0.85) {
+    return {
+      ...base, verdict: 'too-fast',
+      note: `План быстрее срока: ${fmtKcal(plannedDeficitKcal)} (${r2(plannedRate)} кг/нед) дойдёшь за ~${Math.max(1, Math.ceil(Math.abs(diffKg) / Math.max(0.05, Math.abs(plannedRate))))} нед, а не за ${weeks}. Если срок жёсткий — ослабь план до ${fmtKcal(needDeficitKcal)}.${capNote}`,
+    };
+  }
+  return {
+    ...base, verdict: 'on-track',
+    note: `Срок реальный: план ${fmtKcal(plannedDeficitKcal)} (${r2(plannedRate)} кг/нед) ≈ нужные ${fmtKcal(needDeficitKcal)} (${r2(needRate)} кг/нед).${capNote}`,
+  };
+}
+
 export function pregnancyAdd(input: MetabolicInput): number {
   return pregnancyTDEEAdd({ trimester: (input as any).trimester, lactating: (input as any).lactating ?? null });
 }

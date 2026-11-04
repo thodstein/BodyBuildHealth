@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { calcWater, calcSteps, calcKBJU, calcBodyFat, calcCortisol, calcStressLoad, calcHematology, calcTrendFromHistory, calcAdaptiveAdjustment, calcEnergyAvailability, calcAlcohol, calcProteinTiming, calcMaintenanceFinder, calcGoalTimeline, calcAdaptiveThermogenesis, calcReverseDiet, calcNEAT, calcThyroidImpact, calcHomaIRWrap, calcATRange, buildOneAnswerPro, balanceCarbsAndFat, getEffectivePal, calcPALPro, PONTZER_FORMULA_NOTE, TDEE_ALREADY_ADAPTED_NOTE, IR_MARKERS_SHARED_INPUT_NOTE } from '../metabolic-hub.engine';
+import { calcWater, calcSteps, calcKBJU, calcBodyFat, calcCortisol, calcStressLoad, calcHematology, calcTrendFromHistory, calcAdaptiveAdjustment, calcEnergyAvailability, calcAlcohol, calcProteinTiming, calcMaintenanceFinder, calcGoalTimeline, calcAdaptiveThermogenesis, calcReverseDiet, calcNEAT, calcThyroidImpact, calcHomaIRWrap, calcATRange, buildOneAnswerPro, balanceCarbsAndFat, getEffectivePal, calcPALPro, calcDeadlineFeasibility, PONTZER_FORMULA_NOTE, TDEE_ALREADY_ADAPTED_NOTE, IR_MARKERS_SHARED_INPUT_NOTE } from '../metabolic-hub.engine';
 import { bmrCunningham, bmrOwen, bmrTenHaaf, bmrHarrisRevised, bmrHenry, bmrLivingston, bmrMethodLabel, bmrMethodSpread, calcHomaIR, calcTyG, calcTEF as calcTEFConst, calcTrendWithConfidence as calcTrendConf2, energyDensityPerKg, hallAdaptationFactor, calcSweatElectrolytes, calcJPBodyFat, calcDurninBodyFat, computeBMR } from '../../core/metabolic-constants';
 
 const base = { weight: 80, height: 180, age: 30, sex: 'male' as const };
@@ -264,6 +264,28 @@ describe('metabolic-hub — calcKBJU', () => {
     expect(impossible.fatG).toBe(120);
     expect(impossible.gapKcal).toBeGreaterThan(0);
     expect(impossible.note).toMatch(/недостижима/);
+  });
+  it('срок до цели реально проверяется: медленный план, быстрый, встречный', () => {
+    // плотность при BF20% ≈ 4.2 Мкал/кг (energyDensityPerKg), поэтому −0.5 кг/нед ≈ −300 ккал/сут
+    const base = { weight: 90, targetWeight: 83, tdee: 2900, bodyFat: 20 };
+    const slow = calcDeadlineFeasibility({ ...base, weeks: 14, plannedKcal: 2750 });
+    expect(slow?.verdict).toBe('too-slow');
+    expect(slow?.note).toMatch(/Не успеешь/);
+    expect(slow?.needDeficitKcal).toBeGreaterThan(Math.abs(slow!.plannedDeficitKcal));
+    const ok = calcDeadlineFeasibility({ ...base, weeks: 14, plannedKcal: 2600 });
+    expect(ok?.verdict).toBe('on-track');
+    const fast = calcDeadlineFeasibility({ ...base, weeks: 40, plannedKcal: 2350 });
+    expect(fast?.verdict).toBe('too-fast');
+    expect(fast?.note).toMatch(/быстрее срока/);
+    // цель похудеть, а план в профиците — встречное направление, срок не выполнить
+    const wrong = calcDeadlineFeasibility({ ...base, weeks: 14, plannedKcal: 3200 });
+    expect(wrong?.verdict).toBe('wrong-direction');
+    // вес на цели
+    const met = calcDeadlineFeasibility({ ...base, targetWeight: 89.8, weeks: 14, plannedKcal: 2900 });
+    expect(met?.verdict).toBe('met');
+    // без срока или без цели — null, а не выдуманное число
+    expect(calcDeadlineFeasibility({ ...base, weeks: 0, plannedKcal: 2350 })).toBeNull();
+    expect(calcDeadlineFeasibility({ ...base, targetWeight: 0, weeks: 14, plannedKcal: 2350 })).toBeNull();
   });
   it('PAL влияет на tdee', () => {
     const low = calcKBJU({ ...base, activityLevel:'low' });

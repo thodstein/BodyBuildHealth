@@ -154,6 +154,19 @@ TDEE, ни на КБЖУ). Пользователь менял «Низкая/С
 профессия не указана» (TDEE растёт/падает) и «профессия перекрывает бытовую — и это сказано
 текстом»; `metabolic-hub.test.ts` → `getEffectivePal` с `profession:'auto'`.
 
+### 1.16 «Целевых недель» ничего не считало
+
+**Причина.** `weeksToGoal` сохранялся в снапшот/сценарии, показывался в шаге 4 — и не входил ни
+в один расчёт. Пользователь ставил «12 недель» и не получал ни проверки, ни дефицита.
+**Исправление.** Новая функция `calcDeadlineFeasibility` сравнивает требуемый темп
+(`(вес − цель)/срок`) с темпом плана (`дефицит × 7 / плотность кг`, `energyDensityPerKg`):
+вердикты `met` / `on-track` / `too-slow` / `too-fast` / `wrong-direction`, плюс сколько ккал не
+хватает, в какой срок реально уложится план и предупреждение, если темп выше 1%/нед (похудение)
+или 0.5%/нед (набор). Вердикт печатается в шаге 4 цветной строкой.
+**Регрессия.** `metabolic-hub.test.ts` → «срок до цели реально проверяется: медленный план,
+быстрый, встречный» (плюс `null` без срока/цели); `metabolic-hub-wiring.test.tsx` →
+«„Целевых недель“ реально проверяет срок».
+
 ---
 
 ## 2. Чего не хватало (добавлено)
@@ -203,7 +216,7 @@ TDEE, ни на КБЖУ). Пользователь менял «Низкая/С
   параллельные `tsc`/`vitest` из других сессий → heap OOM / `Zone Allocation failed`.
   Прогонять на свободной машине.
 - `npx vitest run src/ui/screens/Shared/__tests__ src/engines/__tests__/metabolic-hub.test.ts`
-  — **189 passed** (6 файлов: structure / toggles / honesty / modes / wiring / engine).
+  — **191 passed** (6 файлов: structure / toggles / honesty / modes / wiring / engine).
 - `npx vitest run src/ui/__tests__/rest-hooks-native.test.tsx
   src/engines/__tests__/risk-info-honesty-e07-e08.test.ts` — **89 passed**
   (в stderr шумит jsdom-canvas chart.js — это фон, не падения).
