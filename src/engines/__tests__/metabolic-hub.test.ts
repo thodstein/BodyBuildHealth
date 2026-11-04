@@ -475,6 +475,23 @@ describe('metabolic-hub — calcHematology (ESC/ASA)', () => {
     const withHgb = calcHematology({ weight:80, hct:50, hgb:180 });
     expect(withHgb.hgbEstimated).toBe(180);
   });
+  it('факт железа в еде сверяется с советом (ZERO / кап 15 / RDA)', () => {
+    // HCT>51 → ZERO; приём 20 мг обязан быть назван «отменить»
+    const zero = calcHematology({ weight:80, hct:52, ironIntakeMg:20 });
+    expect(zero.ironRecLabel).toContain('отменить');
+    expect(zero.recommendations.join(' ')).toContain('отменить');
+    // HCT 49 → кап 15; 20 мг выше капа
+    expect(calcHematology({ weight:80, hct:49, ironIntakeMg:20 }).ironRecLabel).toContain('выше капа 15');
+    expect(calcHematology({ weight:80, hct:49, ironIntakeMg:12 }).ironRecLabel).not.toContain('выше капа');
+    // норма + много железа без дефицита → пользы нет
+    expect(calcHematology({ weight:80, hct:45, ferritin:120, ironIntakeMg:25 }).ironRecLabel).toContain('больше RDA');
+    // норма + ферритин <30 + мало железа → ниже RDA
+    expect(calcHematology({ weight:80, hct:45, ferritin:20, ironIntakeMg:8 }).ironRecLabel).toContain('ниже RDA');
+    // пусто → подпись не меняется, NaN/undefined не появляются
+    const none = calcHematology({ weight:80, hct:45 });
+    expect(none.ironRecLabel).toBe('Железо — норма (15-18мг/сут)');
+    expect(none.ironRecLabel).not.toMatch(/undefined|NaN/);
+  });
   it('health цель: 1.8г/кг в КБЖУ, maintain ~2.1', () => {
     const health = calcKBJU({ ...base, goal:'health' });
     const maintain = calcKBJU({ ...base, goal:'maintain' });

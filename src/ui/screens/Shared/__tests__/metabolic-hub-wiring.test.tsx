@@ -155,6 +155,16 @@ describe('MetabolicHub: ввод меняет расчёт (проводка п�
     expect(blood).toMatch(/мл/);
   });
 
+  it('поле «Железо, мг/сут» доходит до совета по крови', () => {
+    render(<MetabolicHub />);
+    setNumber('HCT, %', 52);
+    expect(openMode('Кровь')).not.toContain('сейчас 20мг/сут');
+    setNumber('Железо, мг/сут', 20);
+    const txt = openMode('Кровь');
+    expect(txt).toContain('сейчас 20мг/сут — отменить');
+    expect(txt).toContain('добавка поддерживает эритроцитоз');
+  });
+
   it('свежая донация в журнале блокирует повторную флеботомию', () => {
     const last = seedDonation(10);
     render(<MetabolicHub />);

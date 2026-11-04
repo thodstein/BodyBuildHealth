@@ -346,6 +346,19 @@ TDEE, `cut`/`bulk`-цели и One-answer считались по оценке �
 источник и объём: `EI — дневник 2600ккал (7 дн)` или `EI — план 2640ккал (дневника нет)`.
 **Регрессия.** `metabolic-hub-wiring.test.tsx` → «EA подписывает источник приёма: дневник или план».
 
+### 1.33 Приём железа был «мёртвым» параметром гематологии
+**Причина.** `HematologyInput.ironIntakeMg` объявлен в движке, но внутрь `calcHematology` не
+передавался (`ironIntakeMg: undefined` из хаба) и в теле функции не читался ни разу. То есть
+«сколько железа реально принимаю» (добавки!) не влияло ни на совет «ZERO железо», ни на кап 15,
+ни на рекомендации — при HCT 52% человек на 30 мг бисглицината видел то же, что и без добавок.
+**Исправление.** Движок сверяет факт с порогом: `HCT>51` и приём >0 → «сейчас 20мг/сут — отменить»
+(+строка в рекомендациях «добавка поддерживает эритроцитоз»); `48–51` и >15 → «выше капа 15»;
+норма и >18 без дефицита → «больше RDA, пользы нет»; ферритин <30 и <15 → «ниже RDA 15-18».
+В шаге ③ появилось поле «Железо, мг/сут» (0-60), оно в снапшоте (`SNAP_LABEL`), сбросе лаб и
+JSON-экспорте гематологии.
+**Регрессия.** `metabolic-hub.test.ts` → «факт железа в еде сверяется с советом (ZERO / кап 15 /
+RDA)»; `metabolic-hub-wiring.test.tsx` → «поле „Железо, мг/сут“ доходит до совета по крови».
+
 ---
 
 ## 2. Чего не хватало (добавлено)
@@ -395,7 +408,7 @@ TDEE, `cut`/`bulk`-цели и One-answer считались по оценке �
   параллельные `tsc`/`vitest` из других сессий → heap OOM / `Zone Allocation failed`.
   Прогонять на свободной машине.
 - `npx vitest run src/ui/screens/Shared/__tests__ src/engines/__tests__/metabolic-hub.test.ts`
-  — **212 passed** (6 файлов: structure / toggles / honesty / modes / wiring / engine).
+  — **214 passed** (6 файлов: structure / toggles / honesty / modes / wiring / engine).
 - `npx vitest run src/ui/__tests__/rest-hooks-native.test.tsx
   src/engines/__tests__/risk-info-honesty-e07-e08.test.ts` — **89 passed**
   (в stderr шумит jsdom-canvas chart.js — это фон, не падения).

@@ -739,6 +739,18 @@ export function calcHematology(input: HematologyInput): HematologyResult {
   if (ferritin != null && ferritin < 30 && ironRec === 'zero') {
     ironRecLabel += ' · ферритин <30 — дефицит, но HCT приоритет (консультация гематолога)';
   }
+  // Аудит 2026-11: `ironIntakeMg` был объявлен в HematologyInput, но нигде не читался —
+  // поле «сколько железа реально принимаю» не влияло ни на что. Теперь это факт, с которым
+  // сверяется совет (ZERO/кап/RDA), а не только порог HCT.
+  const ironMg = typeof input.ironIntakeMg === 'number' && isFinite(input.ironIntakeMg) && input.ironIntakeMg >= 0
+    ? Math.round(input.ironIntakeMg * 10) / 10
+    : null;
+  if (ironMg != null) {
+    if (ironRec === 'zero' && ironMg > 0) ironRecLabel += ` · сейчас ${ironMg}мг/сут — отменить (HCT>51)`;
+    else if (ironRec === 'cap_15' && ironMg > 15) ironRecLabel += ` · сейчас ${ironMg}мг/сут — выше капа 15`;
+    else if (ironRec === 'normal' && ironMg > 18 && !(ferritin != null && ferritin < 30)) ironRecLabel += ` · сейчас ${ironMg}мг/сут — больше RDA 15-18, пользы нет без дефицита`;
+    else if (ironRec === 'normal' && ferritin != null && ferritin < 30 && ironMg < 15) ironRecLabel += ` · сейчас ${ironMg}мг/сут — ниже RDA 15-18 при ферритине <30`;
+  }
   // donation
   let donation: HematologyResult['donation'] = { needed: false, urgency: 'none', text: 'Донация не требуется', k: 0 };
   if (hct != null) {
@@ -777,6 +789,7 @@ export function calcHematology(input: HematologyInput): HematologyResult {
     if (viscosityFlag) recommendations.push('Гипервязкость: увеличьте воду до ' + waterTargetMl + 'мл (' + mlPerKg + 'мл/кг)');
     if (gfrFlag) recommendations.push('GFR <60 — белок и PRAL под контролем (почки)');
     if (ferritinFlag && ironRec !== 'zero') recommendations.push('Ферритин <30 — гемовое железо (говядина/печень) + vit C');
+    if (ironMg != null && ironRec === 'zero' && ironMg > 0) recommendations.push(`Железо ${ironMg}мг/сут при HCT ${hct}% — отменить: добавка поддерживает эритроцитоз`);
   }
   if (input.onAAS) recommendations.push('ААС гонит HCT (болденон ×5, тест ×3) — контроль каждые 4 нед');
   const pralNote = ironRec === 'zero' ? 'PRAL цель −5..+5 · защелачивание (овощи/фрукты 400г)' : 'PRAL <100 mEq/сут';

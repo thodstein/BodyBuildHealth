@@ -82,7 +82,7 @@ const SNAP_LABEL: Record<string, string> = {
   weightLostKg: 'потеряно кг', creatineUse: 'креатин', weeklyVolumeTons: 'тоннаж, т/нед',
   targetWeight: 'цель вес', weeksToGoal: 'срок, нед', menstrualPhase: 'фаза цикла',
   sfaG: 'насыщ. жиры, г', tgMgDl2: 'ТГ, мг/дл', ggt: 'ГГТ', hct: 'гематокрит, %',
-  hgb: 'гемоглобин, г/л', ferritin: 'ферритин, нг/мл', gfr: 'СКФ, мл/мин',
+  hgb: 'гемоглобин, г/л', ferritin: 'ферритин, нг/мл', ironIntakeMg: 'железо в еде, мг/сут', gfr: 'СКФ, мл/мин',
   waterL: 'вода, л/сут', sodiumG: 'натрий, г', potassiumG: 'калий, г',
   metHoursPerWeek: 'MET-ч/нед', leafScore: 'LEAF (0–3)', leafAnswers: 'ответы LEAF',
   leamAnswers: 'ответы LEAM', measuredRMR: 'измеренный RMR, ккал', boneFlag: 'стресс-перелом',
@@ -233,6 +233,8 @@ export const MetabolicHub: React.FC = () => {
   const [hct, setHct] = useState<number|undefined>(undefined);
   const [hgb, setHgb] = useState<number|undefined>(undefined);
   const [ferritin, setFerritin] = useState<number|undefined>(undefined);
+  // железо из еды/добавок, мг/сут — единственный вход hematology, который раньше был «мёртвым»
+  const [ironIntakeMg, setIronIntakeMg] = useState<number|undefined>(undefined);
   const [gfr, setGfr] = useState<number|undefined>(undefined);
   const [waterL, setWaterL] = useState(2.5);
   const [sodiumG, setSodiumG] = useState(3.5);
@@ -484,7 +486,7 @@ export const MetabolicHub: React.FC = () => {
     setHct(undefined); setHgb(undefined); setFerritin(undefined); setGfr(undefined);
     setHdlMgDl(undefined); setAst(undefined); setAlt(undefined); setPlt(undefined);
     setTgMgDl2(undefined); setGlucoseMgDl(undefined); setInsulinMuMl(undefined);
-    setTsh(undefined); setFt4(undefined);
+    setTsh(undefined); setFt4(undefined); setIronIntakeMg(undefined);
     showToast('Лабы сброшены — подтянутся из Профиля → Лабы');
   }, [showToast]);
 
@@ -567,6 +569,7 @@ export const MetabolicHub: React.FC = () => {
     if(typeof s.alt==='number') setAlt(s.alt);
     if(typeof s.plt==='number') setPlt(s.plt);
     if(typeof s.caffeineHoursSince==='number') setCaffeineHoursSince(s.caffeineHoursSince);
+    if(typeof s.ironIntakeMg==='number') setIronIntakeMg(s.ironIntakeMg);
     if(s.profession) setProfession(s.profession);
     if(typeof s.trimester==='number') setTrimester(s.trimester as any);
     if(s.lactating) setLactating(s.lactating);
@@ -664,7 +667,7 @@ export const MetabolicHub: React.FC = () => {
       }
     }catch{}
   },[]);
-  const snapshot = useMemo(()=>({weight,height,age,sex,bodyFat,neck,waist,hip,steps,cardioMin,trainingDays,activityLevel,profession,goal,stress,sleepHours,sleepQuality,onAAS,aasDose,climate,humidity,standingHours,fidgetLevel,sweatRate,sweatSodium,alcoholG,alcoholDays,caffeineMg,tsh,ft4,glucoseMgDl,insulinMuMl,skinfoldSum3,skinfoldSum4,biaResistance,deficitKcal,weeksInDeficit,weightLostKg,creatineUse,weeklyVolumeTons,targetWeight,weeksToGoal,menstrualPhase,sfaG,tgMgDl2,ggt,hct,hgb,ferritin,gfr,waterL,sodiumG,potassiumG,metHoursPerWeek,leafScore,leafAnswers,leamAnswers,measuredRMR,boneFlag,menstrualFlag,preKg,postKg,fluidL,sweatHours,hdlMgDl,systolic,diastolic,ast,alt,plt,caffeineHoursSince,trimester,lactating,ethnicity,postBariatric,untreatedHypo,acclimated,proteinSource,proteinMeals,edeScore,lowT,lowBMD,t3Low,sweatIntensity,sweatEnv,compareIds,fiberG,omega3G,scheduleText,carbLoadDays,carbGPerKg,sodiumLoadDays,sodiumGPerDay,projectionYears,projectionMode,useMeasuredSweat,manualLabs: Object.keys(manualLabsRef.current)}), [weight,height,age,sex,bodyFat,neck,waist,hip,steps,cardioMin,trainingDays,activityLevel,profession,goal,stress,sleepHours,sleepQuality,onAAS,aasDose,climate,humidity,standingHours,fidgetLevel,sweatRate,sweatSodium,alcoholG,alcoholDays,caffeineMg,tsh,ft4,glucoseMgDl,insulinMuMl,skinfoldSum3,skinfoldSum4,biaResistance,deficitKcal,weeksInDeficit,weightLostKg,creatineUse,weeklyVolumeTons,targetWeight,weeksToGoal,menstrualPhase,sfaG,tgMgDl2,ggt,hct,hgb,ferritin,gfr,waterL,sodiumG,potassiumG,metHoursPerWeek,leafScore,leafAnswers,leamAnswers,measuredRMR,boneFlag,menstrualFlag,preKg,postKg,fluidL,sweatHours,hdlMgDl,systolic,diastolic,ast,alt,plt,caffeineHoursSince,trimester,lactating,ethnicity,postBariatric,untreatedHypo,acclimated,proteinSource,proteinMeals,edeScore,lowT,lowBMD,t3Low,sweatIntensity,sweatEnv,compareIds,fiberG,omega3G,scheduleText,carbLoadDays,carbGPerKg,sodiumLoadDays,sodiumGPerDay,projectionYears,projectionMode,useMeasuredSweat]);
+  const snapshot = useMemo(()=>({weight,height,age,sex,bodyFat,neck,waist,hip,steps,cardioMin,trainingDays,activityLevel,profession,goal,stress,sleepHours,sleepQuality,onAAS,aasDose,climate,humidity,standingHours,fidgetLevel,sweatRate,sweatSodium,alcoholG,alcoholDays,caffeineMg,tsh,ft4,glucoseMgDl,insulinMuMl,skinfoldSum3,skinfoldSum4,biaResistance,deficitKcal,weeksInDeficit,weightLostKg,creatineUse,weeklyVolumeTons,targetWeight,weeksToGoal,menstrualPhase,sfaG,tgMgDl2,ggt,hct,hgb,ferritin,gfr,waterL,sodiumG,potassiumG,metHoursPerWeek,leafScore,leafAnswers,leamAnswers,measuredRMR,boneFlag,menstrualFlag,preKg,postKg,fluidL,sweatHours,hdlMgDl,systolic,diastolic,ast,alt,plt,caffeineHoursSince,ironIntakeMg,trimester,lactating,ethnicity,postBariatric,untreatedHypo,acclimated,proteinSource,proteinMeals,edeScore,lowT,lowBMD,t3Low,sweatIntensity,sweatEnv,compareIds,fiberG,omega3G,scheduleText,carbLoadDays,carbGPerKg,sodiumLoadDays,sodiumGPerDay,projectionYears,projectionMode,useMeasuredSweat,manualLabs: Object.keys(manualLabsRef.current)}), [weight,height,age,sex,bodyFat,neck,waist,hip,steps,cardioMin,trainingDays,activityLevel,profession,goal,stress,sleepHours,sleepQuality,onAAS,aasDose,climate,humidity,standingHours,fidgetLevel,sweatRate,sweatSodium,alcoholG,alcoholDays,caffeineMg,tsh,ft4,glucoseMgDl,insulinMuMl,skinfoldSum3,skinfoldSum4,biaResistance,deficitKcal,weeksInDeficit,weightLostKg,creatineUse,weeklyVolumeTons,targetWeight,weeksToGoal,menstrualPhase,sfaG,tgMgDl2,ggt,hct,hgb,ferritin,gfr,waterL,sodiumG,potassiumG,metHoursPerWeek,leafScore,leafAnswers,leamAnswers,measuredRMR,boneFlag,menstrualFlag,preKg,postKg,fluidL,sweatHours,hdlMgDl,systolic,diastolic,ast,alt,plt,caffeineHoursSince,ironIntakeMg,trimester,lactating,ethnicity,postBariatric,untreatedHypo,acclimated,proteinSource,proteinMeals,edeScore,lowT,lowBMD,t3Low,sweatIntensity,sweatEnv,compareIds,fiberG,omega3G,scheduleText,carbLoadDays,carbGPerKg,sodiumLoadDays,sodiumGPerDay,projectionYears,projectionMode,useMeasuredSweat]);
   useEffect(()=>{
     try{ localStorage.setItem(SNAP_KEY, JSON.stringify(snapshot)); }catch{}
   }, [snapshot]);
@@ -721,8 +724,8 @@ const kbju = useMemo(()=> calcKBJU(input), [input]);
     }catch{}
     if(proteinPerKg==null) proteinPerKg = kbju?.nat?.protPerKg;
     if(fiberGV==null) fiberGV = kbju?.fiber?.nat;
-    return calcHematology({ weight, hct, hgb, ferritin, gfr, waterL, sodiumG, potassiumG, proteinPerKg, fiberG: fiberGV, omega3G: omega3GV, ironIntakeMg: undefined, onAAS, aasDose, sex });
-  }, [weight,hct,hgb,ferritin,gfr,waterL,sodiumG,potassiumG,onAAS,aasDose,sex, kbju, fiberG, omega3G]);
+    return calcHematology({ weight, hct, hgb, ferritin, gfr, waterL, sodiumG, potassiumG, proteinPerKg, fiberG: fiberGV, omega3G: omega3GV, ironIntakeMg, onAAS, aasDose, sex });
+  }, [weight,hct,hgb,ferritin,gfr,waterL,sodiumG,potassiumG,onAAS,aasDose,sex, kbju, fiberG, omega3G, ironIntakeMg]);
   // Аудит 2026-11: журнал донаций был только «мёртвой» историей — совет «флеботомия» печатался
   // и через 3 дня после сдачи. Интервал между сдачами цельной крови ≥8 недель (ASA 2023,
   // донорские правила), поэтому свежая дата блокирует повтор и называется дата «не раньше».
@@ -1468,6 +1471,9 @@ const kbju = useMemo(()=> calcKBJU(input), [input]);
           <MhNum label="Ферритин, нг/мл" value={ferritin} min={5} max={800} suffix=" нг/мл" optional
             hint="<30 — дефицит запасов железа; на ААС железо не назначают при HCT>51."
             onChange={markManualLab('ferritin', setFerritin)} />
+          <MhNum label="Железо, мг/сут" value={ironIntakeMg} min={0} max={60} suffix=" мг" optional
+            hint="Из еды + добавок. Сверяется с советом: ZERO при HCT>51, кап 15 при 48-51, RDA 15-18."
+            onChange={setIronIntakeMg} />
           <MhNum label="GFR, мл/мин" value={gfr} min={15} max={130} suffix=" мл/мин" optional
             hint="<60 — вода и белок считаются консервативнее."
             onChange={markManualLab('gfr', setGfr)} />
@@ -1952,7 +1958,7 @@ const kbju = useMemo(()=> calcKBJU(input), [input]);
                 }} className="mh-act" style={{ flex:1, padding:'10px', minHeight:44, borderRadius:10, border:'1px solid rgba(255,255,255,0.08)', background:'rgba(255,255,255,0.03)', color:'#fff', fontWeight:700, fontSize:11, cursor:'pointer' }}>🖨 Печать / PDF</button>
                 <button onClick={()=>{
                   try{
-                    const data={ date: localISODate(), weight, sex, onAAS, aasDose, hct: hematology.hct, hgb: hematology.hgbEstimated, gfr, ferritin, waterTargetMl: hematology.waterTargetMl, ironRec: hematology.ironRec, donation: hematology.donation, zone: hematology.zone, recommendations: hematology.recommendations, nutritionMult: hematology.nutritionMult };
+                    const data={ date: localISODate(), weight, sex, onAAS, aasDose, hct: hematology.hct, hgb: hematology.hgbEstimated, gfr, ferritin, ironIntakeMg, waterTargetMl: hematology.waterTargetMl, ironRec: hematology.ironRec, donation: hematology.donation, zone: hematology.zone, recommendations: hematology.recommendations, nutritionMult: hematology.nutritionMult };
                     void downloadCoachFile(JSON.stringify(data,null,2), `hematology-${data.date}.json`).then(ok => showToast(ok ? 'JSON экспортирован' : 'Экспорт'));
                   }catch{ showToast('Экспорт'); }
                 }} className="mh-act" style={{ padding:'10px', minHeight:44, borderRadius:10, border:'1px solid rgba(255,255,255,0.08)', background:'rgba(255,255,255,0.03)', color:'#fff', fontWeight:700, fontSize:11, cursor:'pointer' }}>⬇ JSON</button>
