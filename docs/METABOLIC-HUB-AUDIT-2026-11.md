@@ -237,6 +237,17 @@ EA при 2600 ккал не в красной зоне, `none` при пуст�
 **Регрессия.** `metabolic-hub-wiring.test.tsx` → «по умолчанию пот-тест не выдаёт выдуманное
 „измерение“».
 
+### 1.23 Профили пота сохранялись, но никуда не применялись
+**Причина.** Кнопки `cool/warm/hot` писали `{rate, sodium}` в `he_sweat_profiles_v1` и показывали
+сохранённое значение — прочитать профиль обратно было нельзя. Список был мёртвым: ни вода, ни
+электролиты от него не менялись. Вдобавок блок профилей жил внутри карточки результата и исчезал,
+когда замера нет.
+**Исправление.** Профили вынесены из карточки (видны всегда). Клик по профилю применяет его:
+`rate → «Пот, мл/ч»`, `Na → «Na пота»`, режим переключается на «Оценка» (профиль — ручное
+значение), с тостом. Сохранение текущего — отдельный ряд «💾 cool/warm/hot», неактивный без
+расчёта.
+**Регрессия.** `metabolic-hub-wiring.test.tsx` → «сохранённый профиль пота применяется к расчёту».
+
 ---
 
 ## 2. Чего не хватало (добавлено)
@@ -286,7 +297,7 @@ EA при 2600 ккал не в красной зоне, `none` при пуст�
   параллельные `tsc`/`vitest` из других сессий → heap OOM / `Zone Allocation failed`.
   Прогонять на свободной машине.
 - `npx vitest run src/ui/screens/Shared/__tests__ src/engines/__tests__/metabolic-hub.test.ts`
-  — **198 passed** (6 файлов: structure / toggles / honesty / modes / wiring / engine).
+  — **199 passed** (6 файлов: structure / toggles / honesty / modes / wiring / engine).
 - `npx vitest run src/ui/__tests__/rest-hooks-native.test.tsx
   src/engines/__tests__/risk-info-honesty-e07-e08.test.ts` — **89 passed**
   (в stderr шумит jsdom-canvas chart.js — это фон, не падения).

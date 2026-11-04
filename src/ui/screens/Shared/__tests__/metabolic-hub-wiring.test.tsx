@@ -208,6 +208,25 @@ describe('MetabolicHub: ввод меняет расчёт (проводка п�
     expect(climate.textContent || '').toMatch(/Умеренный/);
   });
 
+  it('сохранённый профиль пота применяется к расчёту (раньше только копился)', () => {
+    render(<MetabolicHub />);
+    setNumber('Вес до, кг', 83);
+    setNumber('Вес после, кг', 82.2);
+    setNumber('Выпито, л', 0.5);
+    fireEvent.click(Array.from(document.querySelectorAll('button'))
+      .find(b => (b.textContent || '').trim().startsWith('💾 warm')) as HTMLElement);
+    // в режиме «Взвешивание» ручное поле не работает — переключаемся на «Оценку»
+    fireEvent.click(Array.from(document.querySelectorAll('button'))
+      .find(b => (b.textContent || '').includes('Оценка')) as HTMLElement);
+    setNumber('Пот, мл/ч', 500);
+    expect(fieldValue('Пот, мл/ч')).toBe('500 мл/ч');
+    const water500 = tileValue('Вода');
+    fireEvent.click(Array.from(document.querySelectorAll('button'))
+      .find(b => (b.textContent || '').trim().startsWith('warm ')) as HTMLElement);
+    expect(fieldValue('Пот, мл/ч')).toBe('1300 мл/ч');
+    expect(tileValue('Вода')).toBeGreaterThan(water500);
+  });
+
   it('измеренный пот-тест попадает в воду, а не живёт только в карточке', () => {
     render(<MetabolicHub />);
     // без измерений «измеренный» не выдумывается: в воду идёт ручное 600 мл/ч

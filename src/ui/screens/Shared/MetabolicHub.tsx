@@ -1242,22 +1242,38 @@ const kbju = useMemo(()=> calcKBJU(input), [input]);
             <b style={{color:'#06b6d4'}}>Пот {sweatV2.rateLPerH.toFixed(2)}л/ч{sweatV2.measured ? '' : ' (оценка)'} · потеря {sweatV2.totalLossMl}мл за {sweatHours}ч · Na {Math.round(sweatV2.elect.sodiumMg)}мг Cl {sweatV2.elect.chlorideMg} · {sweatV2.plan.note}</b>
             {sweatV2.plan.hyponatremiaRisk && <span style={{ display:'block', color:'#ef4444', marginTop:4 }}>⚠ Гипонатриемия риск (Hew-Butler) — не пей &gt;1л/ч plain water на 4ч+ без Na</span>}
             <span style={{ display:'block', fontSize:8, color:'rgba(255,255,255,0.55)', marginTop:4 }}>Pre {sweatV2.plan.preMl}мл + During {sweatV2.plan.duringMlPerH}мл/ч + Post {sweatV2.plan.postMl}мл · бутылок 0.5л: {sweatV2.plan.bottles05} · {sweatV2.rangeNote}</span>
-            <div style={{ marginTop:6, display:'flex', gap:4, flexWrap:'wrap' }}>
-              <span style={{ fontSize:8, color:'rgba(255,255,255,0.55)' }}>Профили:</span>
-              {['cool','warm','hot'].map(k=>(
-                <button key={k} onClick={()=>{
-                  const prof={ rate: sweatV2.rateLPerH, sodium: sweatSodium };
-                  const next={...sweatProfiles, [k]: prof};
-                  setSweatProfiles(next);
-                  try{ localStorage.setItem('he_sweat_profiles_v1', JSON.stringify(next)); }catch{}
-                  showToast(`Профиль ${k} сохранён: ${prof.rate.toFixed(2)}л/ч Na ${prof.sodium}`);
-                }} style={{ padding:'4px 8px', borderRadius:8, border:'1px solid rgba(6,182,214,0.18)', background: sweatProfiles[k] ? 'rgba(6,182,214,0.14)':'rgba(255,255,255,0.03)', color: sweatProfiles[k] ? '#06b6d4':'#fff', fontSize:8, cursor:'pointer' }}>{k} {sweatProfiles[k] ? `${sweatProfiles[k].rate.toFixed(2)}л/ч` : '—'}</button>
-              ))}
-            </div>
             <div style={{ marginTop:6, fontSize:8, color:'rgba(255,255,255,0.45)' }}>BHI-рейтинг: {beverageV2.slice(0,3).map(b=>`${b.name} ×${b.score}`).join(' · ')}</div>
             {sweatV2 && <div style={{ marginTop:6, fontSize:8, color:'#06b6d4', background:'rgba(6,182,214,0.06)', border:'1px solid rgba(6,182,214,0.12)', borderRadius:8, padding:'6px 8px' }}>PRO v2 {sweatV2.measured ? 'измеренный' : 'оценка ACSM'}: {sweatV2.rateLPerH.toFixed(2)} л/ч · {sweatV2.rangeNote} · BHI-топ: {beverageV2.slice(0,3).map(b=>`${b.name} BHI${b.bhi}`).join(' · ')}</div>}
           </div>
         ) : <div style={{ marginTop:8, fontSize:9, color:'rgba(255,255,255,0.45)', background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', borderRadius:8, padding:'7px 10px' }}>Формула: (до − после + выпито)/часы. 1кг =1л пота. Тестируй в условиях гонки. Пока измерения нет, в воду идёт {effectiveSweatMlPerH} мл/ч (ручное значение из шага ②).</div>}
+        {/* Профили пота — вне карточки результата: без замера их тоже надо видеть/применять.
+            Аудит 2026-11: профиль только сохранялся и никуда не применялся («cool 1.10 л/ч»
+            в списке не влиял ни на воду, ни на электролиты). */}
+        <div style={{ marginTop:8, display:'flex', gap:4, flexWrap:'wrap', alignItems:'center' }}>
+          <span style={{ fontSize:8, color:'rgba(255,255,255,0.55)' }}>Профили (нажми — применить):</span>
+          {(['cool','warm','hot'] as const).map(k=>(
+            <button key={k} type="button" disabled={!sweatProfiles[k]} onClick={()=>{
+              const prof = sweatProfiles[k]; if(!prof) return;
+              setSweatRate(Math.round(prof.rate*1000));
+              setSweatSodium(Math.round(prof.sodium));
+              setUseMeasuredSweat(false);
+              showToast(`Профиль ${k} применён: ${prof.rate.toFixed(2)} л/ч, Na ${Math.round(prof.sodium)} → режим «Оценка»`);
+            }} style={{ padding:'4px 8px', borderRadius:8, border:'1px solid rgba(6,182,214,0.18)', background: sweatProfiles[k] ? 'rgba(6,182,214,0.14)':'rgba(255,255,255,0.03)', color: sweatProfiles[k] ? '#06b6d4':'rgba(255,255,255,0.35)', fontSize:8, cursor: sweatProfiles[k] ? 'pointer':'not-allowed' }}>{k} {sweatProfiles[k] ? `${sweatProfiles[k].rate.toFixed(2)}л/ч` : '—'}</button>
+          ))}
+        </div>
+        <div style={{ marginTop:4, display:'flex', gap:4, flexWrap:'wrap', alignItems:'center' }}>
+          <span style={{ fontSize:8, color:'rgba(255,255,255,0.45)' }}>Сохранить текущий как:</span>
+          {(['cool','warm','hot'] as const).map(k=>(
+            <button key={k} type="button" disabled={!sweatV2} onClick={()=>{
+              if(!sweatV2) return;
+              const prof={ rate: sweatV2.rateLPerH, sodium: sweatSodium };
+              const next={...sweatProfiles, [k]: prof};
+              setSweatProfiles(next);
+              try{ localStorage.setItem('he_sweat_profiles_v1', JSON.stringify(next)); }catch{}
+              showToast(`Профиль ${k} сохранён: ${prof.rate.toFixed(2)}л/ч Na ${prof.sodium}`);
+            }} style={{ padding:'4px 8px', borderRadius:8, border:'1px solid rgba(255,255,255,0.10)', background:'rgba(255,255,255,0.03)', color: sweatV2 ? '#fff':'rgba(255,255,255,0.35)', fontSize:8, cursor: sweatV2 ? 'pointer':'not-allowed' }}>💾 {k}</button>
+          ))}
+        </div>
         <div style={{ marginTop:8 }}>
           <MhToggle checked={acclimated} onChange={setAcclimated} icon="🌡" title="Акклиматизация 10–14 дней" desc="объём +10–20%, Na −40% (Periard)" accent="#06b6d4" />
         </div>
