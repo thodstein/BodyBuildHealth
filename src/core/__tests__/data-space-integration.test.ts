@@ -183,8 +183,34 @@ describe('бэкап: все пространства, восстановлен�
   });
 });
 
-describe('IndexedDB: своя база на пространство', () => {
-  it('home сохраняет историческое имя базы (нулевая миграция)', async () => {
+describe('приложение видит профиль того, кто открыт', () => {
+  it('getProfile() читает профиль активного пространства, а не подмешивает чужой', async () => {
+    const { getProfile } = await import('../profile-manager');
+
+    switchTo(HOME_SPACE_ID);
+    // Берём эталонную форму профиля у самого приложения — тест не должен
+    // придумывать схему, которую потом придётся чинить.
+    const base = getProfile();
+    const asJson = (name: string) => JSON.stringify({ ...base, name });
+
+    switchTo(HOME_SPACE_ID);
+    localStorage.setItem('he_profile_v2', asJson('Тренер'));
+    expect(getProfile().name).toBe('Тренер');
+
+    const sid = athleteSpaceId('a1');
+    switchTo(sid, 'a1');
+    // В пространстве атлета профиля ещё нет — приложение обязано отдать дефолт,
+    // а не профиль тренера.
+    expect(getProfile().name).not.toBe('Тренер');
+    localStorage.setItem('he_profile_v2', asJson('Иван'));
+    expect(getProfile().name).toBe('Иван');
+
+    switchTo(HOME_SPACE_ID);
+    expect(getProfile().name).toBe('Тренер');
+  });
+});
+
+describe('IndexedDB: своя база на пространство', () => {  it('home сохраняет историческое имя базы (нулевая миграция)', async () => {
     const { dbNameFor } = await import('../db');
     expect(dbNameFor(HOME_SPACE_ID)).toBe('HealthEngineDB_v3');
     expect(dbNameFor('')).toBe('HealthEngineDB_v3');
