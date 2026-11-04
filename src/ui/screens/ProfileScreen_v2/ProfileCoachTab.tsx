@@ -39,7 +39,6 @@ import {
 import { countNotesForAthlete, readCoachNotes, type CoachNotesStore } from '../../../engines/coach/coach-notes.engine';
 import { readCoachPlanner, type CoachPlannerStore } from '../../../engines/coach/coach-planner.engine';
 import { readCoachLog, type CoachLogStore } from '../../../engines/coach/coach-athlete-log.engine';
-import { deleteSpaceDatabases } from '../../../core/db';
 import {
   MAX_DATA_SPACES,
   activateAthleteSpace,
@@ -309,7 +308,11 @@ export const ProfileCoachTab: React.FC<{
     const storage = ls();
     if (storage) clearSpaceData(deviceRawOrFallback(storage), sid);
     writeRegistryToStorage(removeSpace(readRegistryFromStorage(), sid));
-    void deleteSpaceDatabases([sid]);
+    // База IndexedDB грузится лениво: движок нужен только здесь, а статический
+    // импорт тянул его в граф экрана профиля и замедлял холодный старт.
+    void import('../../../core/db')
+      .then(({ deleteSpaceDatabases }) => deleteSpaceDatabases([sid]))
+      .catch(() => { /* база останется — данные уже недостижимы, это не блокирует удаление */ });
     apply(removeCoachAthlete(state, a.id));
     setConfirmDeleteId(null);
     if (editingId === a.id) cancelEdit();
