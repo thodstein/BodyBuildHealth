@@ -446,9 +446,9 @@
 (`deviceRawOrFallback`), поэтому уносит все пространства и реестр, а не только открытое.
 
 Тесты: `coach-mode` 19, `coach-notes` 13, `coach-planner` 20, `coach-athlete-log` 22,
-`profile-coach-tab` 22, `profile-athlete-log-tab` 12, `profile-notes-tab` 10, `profile-planner-tab` 13,
+`profile-coach-tab` 24, `profile-athlete-log-tab` 12, `profile-notes-tab` 10, `profile-planner-tab` 13,
 `profile-coach-wiring` 7, `data-space` 39, `data-space-integration` 14, `data-space-banner` 9,
-`db-space-databases` 9 — **204 теста**, зелёные. Весь `ProfileScreen_v2/__tests__` — 33 файла /
+`db-space-databases` 9 — **206 тестов**, зелёные. Весь `ProfileScreen_v2/__tests__` — 33 файла /
 461 тест, зелёные (новые вкладки не сломали hero/deep-links/дневники); `profile-articles-native`
 обновлён осознанно: hero-контракт теперь **8 карточек** (4 базовых + Тренер/Журнал/Заметки/Планер)
 с явным списком id, одинаковым на web и APK — это уточнение контракта, а не ослабление: случайная

@@ -309,6 +309,17 @@ describe('атлеты', () => {
     expect(facts).not.toContain('свои данные');
   });
 
+  it('граница режима сказана честно: черновики раздельные, а вкладка видна тому, кто держит телефон', () => {
+    seed(1);
+    const { container } = render(<ProfileCoachTab />);
+    const text = container.querySelector('[data-coach="boundary"]')?.textContent ?? '';
+    // то, что режим НЕ обещает, должно быть написано, а не подразумеваться
+    expect(text).toContain('черновики');
+    expect(text).toContain('IndexedDB');
+    expect(text).toContain('кто держит телефон');
+    expect(text).toContain('аккаунтов');
+  });
+
   it('«Войти в его данные» записывает пространство атлета и перезагружает приложение', () => {
     seed(1);
     const reload = vi.fn();
