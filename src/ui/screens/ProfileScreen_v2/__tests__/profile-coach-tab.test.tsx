@@ -21,17 +21,20 @@ import {
   type CoachAthlete,
 } from '../../../../engines/coach/coach-mode.engine';
 import {
-  addCoachLogEntry,
-  emptyCoachLog,
-  writeCoachLog,
-} from '../../../../engines/coach/coach-athlete-log.engine';
+  ATHLETE_SPACE_PREFIX,
+  DATA_SPACE_KEY,
+  _resetDataSpaceCache,
+  athleteSpaceId,
+} from '../../../../core/data-space';
 
 beforeEach(() => {
   try { localStorage.clear(); } catch { /* ignore */ }
+  _resetDataSpaceCache();
 });
 afterEach(() => {
   cleanup();
   try { localStorage.clear(); } catch { /* ignore */ }
+  _resetDataSpaceCache();
 });
 
 const seed = (athletes: number) => {
@@ -185,34 +188,71 @@ describe('атлеты', () => {
     expect(container.textContent).toContain('Иван П.');
   });
 
-  it('в подтверждении удаления сказано, что заметки, задачи и журнал не удаляются', () => {
+  it('в подтверждении удаления сказано, что заметки/задачи/журнал остаются, а данные — отдельная кнопка', () => {
     seed(1);
     const { container } = render(<ProfileCoachTab />);
     fireEvent.click(container.querySelector('[data-coach="delete"]') as HTMLElement);
     const hint = container.querySelector('[data-coach="delete-hint"]')?.textContent ?? '';
-    expect(hint).toContain('карточка');
-    expect(hint).toContain('Заметки, задачи и записи журнала');
+    expect(hint).toContain('только карточку');
+    expect(hint).toContain('записи журнала');
+    expect(hint).toContain('Удалить и его данные');
   });
 
-  it('в карточке видно, сколько записей в журнале и когда последняя (без оценок)', () => {
+  it('кнопка «Удалить и его данные» есть, только если у атлета уже есть свои данные', () => {
     seed(1);
-    let log = emptyCoachLog();
-    log = addCoachLogEntry(log, { athleteId: 'a1', date: '2026-11-01', exercise: 'Присед', sets: 3, reps: 5, weightKg: 100 }, { id: 'l1' }).store;
-    log = addCoachLogEntry(log, { athleteId: 'a1', date: '2026-11-03', exercise: 'Жим', sets: 3, reps: 5, weightKg: 80 }, { id: 'l2' }).store;
-    writeCoachLog(localStorage, log);
+    const first = render(<ProfileCoachTab />);
+    fireEvent.click(first.container.querySelector('[data-coach="delete"]') as HTMLElement);
+    // пока атлет ни разу не входил в приложение — данных нет, кнопки нет
+    expect(first.container.querySelector('[data-coach="delete-with-data"]')).toBeNull();
+    cleanup();
 
-    const { container } = render(<ProfileCoachTab />);
-    const chip = container.querySelector('[data-coach="log-count"]')?.textContent ?? '';
-    expect(chip).toContain('записей: 2');
-    expect(chip).toContain('03.11.26');
-    // Никаких «норма/плохо/отстаёт» — карточка не оценивает атлета.
-    expect(chip).not.toMatch(/норм|плох|отста/i);
+    // имитируем «атлет вошёл»: его пространство содержит собственный профиль
+    const sid = athleteSpaceId('a1');
+    localStorage.setItem(`${ATHLETE_SPACE_PREFIX}${sid}__he_profile_v2`, '{"name":"Иван"}');
+
+    const second = render(<ProfileCoachTab />);
+    fireEvent.click(second.container.querySelector('[data-coach="delete"]') as HTMLElement);
+    const btn = second.container.querySelector('[data-coach="delete-with-data"]');
+    expect(btn).not.toBeNull();
+    expect(btn?.textContent).toContain('1');
   });
 
-  it('без записей журнала строки журнала в карточке нет', () => {
+  it('«Удалить и его данные» стирает данные атлета, но не трогает профиль тренера', () => {
     seed(1);
+    localStorage.setItem('he_profile_v2', '{"name":"Тренер"}');
+    const sid = athleteSpaceId('a1');
+    localStorage.setItem(`${ATHLETE_SPACE_PREFIX}${sid}__he_profile_v2`, '{"name":"Иван"}');
+
     const { container } = render(<ProfileCoachTab />);
-    expect(container.querySelector('[data-coach="log-count"]')).toBeNull();
+    fireEvent.click(container.querySelector('[data-coach="delete"]') as HTMLElement);
+    fireEvent.click(container.querySelector('[data-coach="delete-with-data"]') as HTMLElement);
+
+    expect(readCoachState(localStorage).athletes).toHaveLength(0);
+    expect(localStorage.getItem(`${ATHLETE_SPACE_PREFIX}${sid}__he_profile_v2`)).toBeNull();
+    expect(localStorage.getItem('he_profile_v2')).toBe('{"name":"Тренер"}');
+  });
+
+  it('«Войти в его данные» записывает пространство атлета и перезагружает приложение', () => {
+    seed(1);
+    const reload = vi.fn();
+    const originalReload = window.location.reload;
+    Object.defineProperty(window, 'location', {
+      configurable: true,
+      value: { ...window.location, reload },
+    });
+
+    const { container } = render(<ProfileCoachTab />);
+    fireEvent.click(container.querySelector('[data-coach="enter-space"]') as HTMLElement);
+
+    const reg = JSON.parse(localStorage.getItem(DATA_SPACE_KEY) as string);
+    expect(reg.active).toBe(athleteSpaceId('a1'));
+    expect(reg.spaces.some((s: { athleteId: string }) => s.athleteId === 'a1')).toBe(true);
+    expect(reload).toHaveBeenCalled();
+
+    Object.defineProperty(window, 'location', {
+      configurable: true,
+      value: { ...window.location, reload: originalReload },
+    });
   });
 
   it('переход к заметкам и задачам атлета передаёт id и цель', () => {

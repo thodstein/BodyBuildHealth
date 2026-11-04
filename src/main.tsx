@@ -3,8 +3,12 @@ if ('serviceWorker' in navigator && import.meta.env.DEV) {
   navigator.serviceWorker.getRegistrations().then(regs => regs.forEach(r => { console.log('Unregistering stale SW:', r.scope); r.unregister(); }));
 }
 
+// ПЕРВЫЙ импорт приложения: шов пространств данных («кто сейчас тренируется»)
+// должен встать до того, как любой модуль прочитает localStorage.
+import './core/data-space-install';
 import { renderAuthModule, emergencyProfile } from './ui/auth-module';
-import { db, dbInitDiagnostics } from './core/db';
+import { db, dbInitDiagnostics, deleteAllDatabasesSync } from './core/db';
+import { clearAllDeviceStorage } from './core/data-space';
 import { registry } from './core/data/registry';
 import { initPWA } from './core/pwa-manager';
 import { onViewportChanged, hapticImpact, onKeyboardClose } from './core/telegram';
@@ -237,8 +241,8 @@ function showBootstrapError(msg: string) {
     const wipe = document.getElementById('he-boot-wipe');
     if (wipe) {
       wipe.onclick = () => {
-        try { localStorage.clear(); } catch { /* ignore */ }
-        try { indexedDB.deleteDatabase('HealthEngineDB_v3'); } catch { /* ignore */ }
+        try { clearAllDeviceStorage(); } catch { /* ignore */ }
+        try { deleteAllDatabasesSync(); } catch { /* ignore */ }
         location.reload();
       };
     }

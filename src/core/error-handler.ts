@@ -1,3 +1,6 @@
+import { deleteAllDatabasesSync } from './db';
+import { clearAllDeviceStorage } from './data-space';
+
 interface CrashReport {
   timestamp: string;
   url: string;
@@ -65,8 +68,10 @@ export function initErrorHandler(appId: string = 'app') {
 
   document.getElementById('reload-btn')!.onclick = () => location.reload();
   document.getElementById('clear-btn')!.onclick = () => {
-    localStorage.clear();
-    indexedDB.deleteDatabase('HealthEngineDB_v3');
+    // Аварийный сброс: чистим ВСЕ пространства, иначе ключи атлетов остались бы
+    // при удалённых базах IndexedDB.
+    clearAllDeviceStorage();
+    deleteAllDatabasesSync();
     location.reload();
   };
 }

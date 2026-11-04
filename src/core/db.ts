@@ -1,3 +1,5 @@
+import { currentSpaceId, DATA_SPACE_KEY, HOME_SPACE_ID, parseRegistry } from './data-space';
+
 const DB_NAME = 'HealthEngineDB_v3';
 const DB_VERSION = 7;
 
@@ -76,6 +78,16 @@ const INDEXES: Record<string, { name: string; keyPath: string }[]> = {
   cardio_sessions: [{ name: 'date', keyPath: 'date' }],
 };
 
+/**
+ * Имя базы IndexedDB для пространства данных: home — как было (`HealthEngineDB_v3`,
+ * нулевая миграция), атлет — своя база. Без этого дневники и анализы всех атлетов
+ * лежали бы в одной базе и «изоляция» была бы только на словах.
+ */
+export function dbNameFor(spaceId: string): string {
+  if (!spaceId || spaceId === 'home') return DB_NAME;
+  return `${DB_NAME}__${spaceId}`;
+}
+
 class HealthDB {
   private db: IDBDatabase | null = null;
 
@@ -111,7 +123,7 @@ class HealthDB {
     return new Promise<void>((res, rej) => {
       let r: IDBOpenDBRequest;
       try {
-        r = indexedDB.open(DB_NAME, DB_VERSION);
+        r = indexedDB.open(dbNameFor(currentSpaceId()), DB_VERSION);
       } catch (e) {
         rej(e);
         return;
@@ -261,7 +273,73 @@ class HealthDB {
       tx.onerror = () => rej(tx.error);
     });
   }
+  /** Закрыть соединение (нужно перед удалением базы пространства). */
+  close(): void {
+    try {
+      this.db?.close();
+    } catch {
+      /* ignore */
+    }
+    this.db = null;
+    dbReady = false; // следующий доступ должен снова вызвать init()
+  }
 }
 
 export const db = new HealthDB();
+
+/**
+ * Удалить базы IndexedDB указанных пространств (их дневники/анализы/фото).
+ * Используется «удалить данные атлета» и полной очисткой: без этого данные
+ * остались бы на диске после «всё удалено».
+ */
+export async function deleteSpaceDatabases(spaceIds: readonly string[]): Promise<void> {
+  const ids = (spaceIds || []).filter(id => id && id !== 'home');
+  if (!ids.length) return;
+  // Закрываем соединение только если удаляем базу ТЕКУЩЕГО пространства:
+  // закрывать рабочую базу из-за чужого атлета незачем (и это ломало бы запись).
+  if (ids.includes(currentSpaceId())) {
+    try {
+      db.close();
+    } catch {
+      /* ignore */
+    }
+  }
+  await Promise.all(
+    ids.map(
+      id =>
+        new Promise<void>(resolve => {
+          try {
+            const req = indexedDB.deleteDatabase(dbNameFor(id));
+            req.onsuccess = () => resolve();
+            req.onerror = () => resolve();
+            req.onblocked = () => resolve(); // другое окно держит базу — не подвешиваем UI
+          } catch {
+            resolve();
+          }
+        }),
+    ),
+  );
+}
+
+/**
+ * Удалить базы ВСЕХ пространств (аварийный сброс). Синхронная: вызывается из
+ * обработчиков кнопок, где ждать нечего.
+ */
+export function deleteAllDatabasesSync(): void {
+  let spaces: string[] = [];
+  try {
+    spaces = parseRegistry(localStorage.getItem(DATA_SPACE_KEY)).spaces.map(s => s.id);
+  } catch {
+    spaces = []; // реестр недоступен — хотя бы домашнюю базу
+  }
+  const targets = new Set<string>([HOME_SPACE_ID, ...spaces]);
+  for (const id of targets) {
+    try {
+      indexedDB.deleteDatabase(dbNameFor(id));
+    } catch {
+      /* ignore */
+    }
+  }
+}
+
 export type { StoreNames };

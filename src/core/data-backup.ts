@@ -1,4 +1,18 @@
-import { db, STORES } from './db';
+import { db, STORES, deleteSpaceDatabases } from './db';
+import {
+  DATA_SPACE_KEY,
+  DEVICE_SALT_KEY,
+  HOME_SPACE_ID,
+  _resetDataSpaceCache,
+  deviceRawOrFallback,
+  parseRegistry,
+  rawKeys,
+} from './data-space';
+
+/** Сырое хранилище: бэкап и полная очистка обязаны видеть все пространства. */
+function rawLs() {
+  return deviceRawOrFallback(localStorage as unknown as Parameters<typeof deviceRawOrFallback>[0]);
+}
 
 export const BACKUP_VERSION = '1.0';
 
@@ -21,9 +35,19 @@ export async function collectBackup(): Promise<AppBackup> {
     }
   }
   const local: Record<string, string> = {};
-  for (let i = 0; i < localStorage.length; i++) {
-    const k = localStorage.key(i)!;
-    if (k.startsWith('he_')) local[k] = localStorage.getItem(k) || '';
+  // Перечисляем СЫРЫЕ ключи: бэкап должен унести все пространства (атлетов),
+  // а не только то, в котором сейчас открыто приложение. Ключи атлетов уже
+  // физические (`he_ath_…__…`), поэтому восстановление кладёт их на место.
+  const raw = rawLs();
+  for (const k of rawKeys(raw)) {
+    // Соль шифрования IndexedDB не начинается с `he_`, но без неё после
+    // восстановления часть записей не расшифруется (secureDB упадёт в plaintext).
+    if (!k.startsWith('he_') && k !== DEVICE_SALT_KEY) continue;
+    try {
+      local[k] = raw.getItem(k) || '';
+    } catch {
+      /* один сбойный ключ не должен срывать весь бэкап */
+    }
   }
   return {
     app: 'health-engine',
@@ -106,11 +130,26 @@ export async function softClear(): Promise<void> {
       /* ignore */
     }
   }
+  const raw = rawLs();
+  // Пространства атлетов помним ДО зачистки: их базы IndexedDB нужно удалить,
+  // иначе «удалил все данные» оставило бы дневники/анализы атлетов на диске.
+  const athleteSpaces = parseRegistry(raw.getItem(DATA_SPACE_KEY)).spaces
+    .filter(s => s.id !== HOME_SPACE_ID)
+    .map(s => s.id);
+
   const keep = new Set(['he_profile_v2', 'he_session_v2']);
   const toRemove: string[] = [];
-  for (let i = 0; i < localStorage.length; i++) {
-    const k = localStorage.key(i)!;
-    if (k.startsWith('he_') && !keep.has(k)) toRemove.push(k);
+  for (const k of rawKeys(raw)) {
+    if (!k.startsWith('he_') || keep.has(k)) continue;
+    toRemove.push(k);
   }
-  toRemove.forEach((k) => localStorage.removeItem(k));
+  for (const k of toRemove) {
+    try {
+      raw.removeItem(k);
+    } catch {
+      /* ignore */
+    }
+  }
+  _resetDataSpaceCache();
+  await deleteSpaceDatabases(athleteSpaces);
 }

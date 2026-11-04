@@ -23,6 +23,13 @@
 
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { db } from './db';
+import {
+  HOME_SPACE_ID,
+  currentSpaceId,
+  spaceIdOfKey,
+  toLogicalKey,
+  toPhysicalKey,
+} from './data-space';
 
 export const CHUNK_SIZE = 100_000;
 const PULL_PAGE = 1000;
@@ -270,8 +277,10 @@ export function touchKvKeys(keys: string[]): void {
   try {
     let touched = false;
     for (const k of keys || []) {
-      if (typeof k !== 'string' || !k || isKvExcludedKey(k)) continue;
-      dirty.add(k);
+      if (typeof k !== 'string' || !k) continue;
+      const sk = syncKey(k);
+      if (isKvExcludedKey(toLogicalKey(sk))) continue;
+      dirty.add(sk);
       touched = true;
     }
     if (touched) scheduleFlush();
@@ -337,9 +346,11 @@ export function _resetKvForTests(): void {
 /* ------------------------------------------------------------------ */
 
 export function isKvExcludedKey(k: string): boolean {
-  if (EXCLUDED_KEYS.has(k)) return true;
+  // Ключ может прийти физическим (из облака): исключения заданы логическими именами.
+  const key = toLogicalKey(k);
+  if (EXCLUDED_KEYS.has(key)) return true;
   for (const p of EXCLUDED_PREFIXES) {
-    if (k.startsWith(p)) return true;
+    if (key.startsWith(p)) return true;
   }
   return false;
 }
@@ -407,18 +418,42 @@ function serverNowMs(): number {
   return Date.now() + skewMs;
 }
 
+/**
+ * Ключ синхронизации: логический ключ → физический (с пространством).
+ * Без этого профиль атлета уезжал бы в облако под именем `he_profile_v2` и
+ * затирал профиль тренера. Ключи устройства (`he_coach_*`, `he_sync_*`) не
+ * меняются — они общие.
+ */
+function syncKey(k: string): string {
+  return toPhysicalKey(currentSpaceId(), k);
+}
+
+/** Принадлежит ли ключ текущему пространству (а не другому атлету). */
+export function _ownsKvKey(k: string): boolean {
+  const space = currentSpaceId();
+  if (k.startsWith(IDB_KV_PREFIX)) {
+    const parsed = parseIdbKvKey(k);
+    return !!parsed && parsed.space === space;
+  }
+  const physical = spaceIdOfKey(k);
+  if (physical) return physical.spaceId === space;
+  return space === HOME_SPACE_ID;
+}
+
 function markDirty(k: string): void {
-  if (!started || !token || isKvExcludedKey(k)) return;
-  mtimes.set(k, serverNowMs());
-  dirty.add(k);
+  const sk = syncKey(k);
+  if (!started || !token || isKvExcludedKey(toLogicalKey(sk))) return;
+  mtimes.set(sk, serverNowMs());
+  dirty.add(sk);
   persistMeta();
   scheduleFlush();
 }
 
 function markRemoved(k: string): void {
-  if (!started || !token || isKvExcludedKey(k)) return;
-  mtimes.delete(k);
-  dirty.add(k);
+  const sk = syncKey(k);
+  if (!started || !token || isKvExcludedKey(toLogicalKey(sk))) return;
+  mtimes.delete(sk);
+  dirty.add(sk);
   persistMeta();
   scheduleFlush();
 }
@@ -440,12 +475,12 @@ function installHook(): void {
     if (prev === v) return;
     markDirty(k);
     // правка сделана, пока шёл сетевой pull — её нет в снимке облака, нельзя затирать
-    if (pulling) dirtyDuringPull.add(k);
+    if (pulling) dirtyDuringPull.add(syncKey(k));
   };
   localStorage.removeItem = (k) => {
     origRemoveItem(k);
     markRemoved(k);
-    if (pulling) dirtyDuringPull.add(k);
+    if (pulling) dirtyDuringPull.add(syncKey(k));
   };
 }
 
@@ -498,15 +533,27 @@ function stableStringify(value: unknown): string {
 }
 
 function idbKvKey(store: string, id: string): string {
-  return IDB_KV_PREFIX + store + ':' + id;
+  const space = currentSpaceId();
+  // home — исторический формат (`idb:store:id`): старые записи в облаке остаются валидными.
+  return space === HOME_SPACE_ID
+    ? IDB_KV_PREFIX + store + ':' + id
+    : IDB_KV_PREFIX + space + ':' + store + ':' + id;
 }
 
-function parseIdbKvKey(k: string): { store: string; id: string } | null {
+function parseIdbKvKey(k: string): { store: string; id: string; space: string } | null {
   if (!k.startsWith(IDB_KV_PREFIX)) return null;
   const rest = k.slice(IDB_KV_PREFIX.length);
-  const i = rest.indexOf(':');
-  if (i <= 0 || i === rest.length - 1) return null;
-  return { store: rest.slice(0, i), id: rest.slice(i + 1) };
+  const parts = rest.split(':');
+  if (parts.length < 2) return null;
+  // Домашний формат узнаём по имени стора: id записи может содержать двоеточия.
+  const isStore = (name: string) => (IDB_STORES as readonly string[]).includes(name);
+  if (isStore(parts[0])) {
+    return { store: parts[0], id: parts.slice(1).join(':'), space: HOME_SPACE_ID };
+  }
+  if (parts.length >= 3 && isStore(parts[1])) {
+    return { store: parts[1], id: parts.slice(2).join(':'), space: parts[0] };
+  }
+  return null;
 }
 
 function loadIdbMeta(): void {
@@ -566,6 +613,8 @@ async function pushIdb(): Promise<void> {
       if (localKeys.has(kvKey)) continue;
       const parsed = parseIdbKvKey(kvKey);
       if (!parsed) { idbMeta.delete(kvKey); continue; }
+      // Чужие пространства не трогаем: их записи не наши — удалять их из облака нельзя.
+      if (parsed.space !== currentSpaceId()) continue;
       let localRec: any;
       try { localRec = await idbAdapter.get(parsed.store, parsed.id); } catch { localRec = undefined; }
       if (localRec) continue; // запись есть, просто цикл начался до неё — не трогаем
@@ -589,8 +638,12 @@ async function pullIdb(byKey: Map<string, KvRow[]>): Promise<number> {
   const remoteKeys = new Set<string>();
   for (const [k, keyRows] of byKey) {
     if (!k.startsWith(IDB_KV_PREFIX)) continue;
+    const parsed0 = parseIdbKvKey(k);
+    // Записи других пространств не применяем в текущую базу: они приедут, когда
+    // тренер откроет этого атлета. Иначе анализы атлета легли бы в чужие данные.
+    if (!parsed0 || parsed0.space !== currentSpaceId()) continue;
     remoteKeys.add(k);
-    const parsed = parseIdbKvKey(k);
+    const parsed = parsed0;
     if (!parsed || !IDB_STORES.includes(parsed.store as any)) continue;
     const count = keyRows.find(r => r.chunk_index === 0)?.chunk_count;
     if (!count || keyRows.filter(r => r.chunk_index < count).length !== count) continue;
@@ -635,6 +688,8 @@ async function pullIdb(byKey: Map<string, KvRow[]>): Promise<number> {
     if (remoteKeys.has(kvKey)) continue;
     const parsed = parseIdbKvKey(kvKey);
     if (!parsed) continue;
+    // Удаления чужого пространства к нашей базе не применяем.
+    if (parsed.space !== currentSpaceId()) continue;
     const localRec = await idbAdapter.get(parsed.store, parsed.id);
     if (!localRec) {
       idbMeta.delete(kvKey);
@@ -770,8 +825,11 @@ function reconcileLocalKeys(remoteByKey: Map<string, KvRow[]>): void {
   if (typeof localStorage === 'undefined') return;
   const remoteKeys = new Set(remoteByKey.keys());
   for (let i = 0; i < localStorage.length; i++) {
-    const k = localStorage.key(i);
-    if (!k || !k.startsWith('he_') || isKvExcludedKey(k)) continue;
+    const logical = localStorage.key(i);
+    if (!logical || !logical.startsWith('he_')) continue;
+    // В облаке ключи лежат физическими (с пространством) — сравниваем как физические.
+    const k = syncKey(logical);
+    if (isKvExcludedKey(logical)) continue;
     if (!mtimes.has(k) && !remoteKeys.has(k)) {
       mtimes.set(k, serverNowMs());
       dirty.add(k);

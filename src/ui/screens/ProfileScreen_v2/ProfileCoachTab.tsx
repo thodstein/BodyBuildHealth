@@ -9,10 +9,10 @@
  *    ПРИЧИНА написана текстом, а не «кнопка молча не работает»;
  *  • активный атлет — тот, с кем тренер работает сейчас; удаление активного
  *    корректно сбрасывает выбор (движок это гарантирует);
- *  • честная граница: этот экран ведёт карточки/заметки/планер, но НЕ делает
- *    отдельные профили данных (планы, дневники, анализы) для каждого атлета.
- *    Об этом написано прямо внизу, чтобы тренер не думал, что данные уже
- *    изолированы.
+ *  • «Войти в его данные» — переключение приложения в пространство данных атлета
+ *    (`core/data-space`): свои профиль/дневники/планы/анализы, своя база IndexedDB.
+ *    Переключение всегда через перезагрузку: половинчатая подмена оставила бы в
+ *    памяти чужие данные. Удаление карточки и удаление ЕГО данных — разные кнопки.
  */
 import React, { useMemo, useState } from 'react';
 import { NativeIcon } from '../../native/NativeIcons';
@@ -39,6 +39,21 @@ import {
 import { countNotesForAthlete, readCoachNotes, type CoachNotesStore } from '../../../engines/coach/coach-notes.engine';
 import { readCoachPlanner, type CoachPlannerStore } from '../../../engines/coach/coach-planner.engine';
 import { readCoachLog, type CoachLogStore } from '../../../engines/coach/coach-athlete-log.engine';
+import { deleteSpaceDatabases } from '../../../core/db';
+import {
+  MAX_DATA_SPACES,
+  activateAthleteSpace,
+  activateHomeSpace,
+  activeSpaceRecord,
+  athleteSpaceId,
+  clearSpaceData,
+  deviceRawOrFallback,
+  readRegistryFromStorage,
+  reloadToApplySpace,
+  removeSpace,
+  spaceUsage,
+  writeRegistryToStorage,
+} from '../../../core/data-space';
 
 const ACCENT = '#22d3ee';
 
@@ -182,6 +197,15 @@ export const ProfileCoachTab: React.FC<{
     setState(next);
   };
 
+  // Пространство данных читаем один раз на рендер экрана (переключение всё равно
+  // перезагружает приложение), а объём данных атлета — только для подтверждения удаления.
+  const spaceActiveId = useMemo(() => activeSpaceRecord().id, []);
+  const usageOf = (athleteId: string) => {
+    const storage = ls();
+    if (!storage) return { keys: 0, bytes: 0 };
+    return spaceUsage(deviceRawOrFallback(storage), athleteSpaceId(athleteId));
+  };
+
   const limits = coachLimits(state);
   const active = coachActiveAthlete(state);
 
@@ -260,6 +284,38 @@ export const ProfileCoachTab: React.FC<{
       return;
     }
     setConfirmDeleteId(id);
+  };
+
+  /** Удаление карточки вместе с данными атлета (профиль/дневники/анализы). */
+  const deleteWithData = (a: CoachAthlete) => {
+    const sid = athleteSpaceId(a.id);
+    // Чистим по префиксу пространства, а не по наличию записи в реестре: «осиротевшие»
+    // ключи (атлет входил, но реестр уже переписывали) тоже должны уйти.
+    const storage = ls();
+    if (storage) clearSpaceData(deviceRawOrFallback(storage), sid);
+    writeRegistryToStorage(removeSpace(readRegistryFromStorage(), sid));
+    void deleteSpaceDatabases([sid]);
+    apply(removeCoachAthlete(state, a.id));
+    setConfirmDeleteId(null);
+    if (editingId === a.id) cancelEdit();
+    if (spaceActiveId === sid) {
+      activateHomeSpace();
+      reloadToApplySpace();
+    }
+  };
+
+  /** Войти в данные атлета: своё пространство профиля/дневников/планов. */
+  const enterAthleteData = (a: CoachAthlete) => {
+    const res = activateAthleteSpace(a.id, a.name);
+    if (res.error === 'limit') {
+      setFormError(`Лимит ${MAX_DATA_SPACES} пространств данных. Удалите данные неактуального атлета.`);
+      return;
+    }
+    if (res.error) {
+      setFormError('Не удалось открыть данные атлета.');
+      return;
+    }
+    reloadToApplySpace();
   };
 
   const visibleAthletes = useMemo(() => {
@@ -746,6 +802,32 @@ export const ProfileCoachTab: React.FC<{
                           Сделать активным
                         </button>
                       )}
+                      {spaceActiveId === athleteSpaceId(a.id) ? (
+                        <span
+                          data-coach="space-active"
+                          style={{
+                            alignSelf: 'center',
+                            fontSize: 11,
+                            fontWeight: 800,
+                            padding: '4px 9px',
+                            borderRadius: 999,
+                            color: '#1b1033',
+                            background: '#a78bfa',
+                          }}
+                        >
+                          Открыты его данные
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          data-coach="enter-space"
+                          onClick={() => enterAthleteData(a)}
+                          style={{ ...btn('ghost'), fontSize: 12 }}
+                          title="Открыть профиль, дневники и планы этого атлета"
+                        >
+                          Войти в его данные
+                        </button>
+                      )}
                       <button
                         type="button"
                         data-coach="edit"
@@ -772,14 +854,25 @@ export const ProfileCoachTab: React.FC<{
                           Оставить
                         </button>
                       )}
+                      {confirmDeleteId === a.id && usageOf(a.id).keys > 0 && (
+                        <button
+                          type="button"
+                          data-coach="delete-with-data"
+                          onClick={() => deleteWithData(a)}
+                          style={{ ...btn('danger'), fontSize: 12 }}
+                        >
+                          Удалить и его данные ({usageOf(a.id).keys})
+                        </button>
+                      )}
                     </div>
                     {confirmDeleteId === a.id && (
                       <div
                         data-coach="delete-hint"
                         style={{ marginTop: 8, fontSize: 11.5, color: colors.textMuted, lineHeight: 1.45 }}
                       >
-                        Удаляется только карточка. Заметки, задачи и записи журнала этого атлета останутся
-                        на месте — их видно в общем списке заметок, в планёре и в журнале.
+                        «Точно удалить» убирает только карточку: заметки, задачи и записи журнала этого
+                        атлета останутся. Если атлет уже входил в приложение, у него есть собственные
+                        профиль, дневники и планы — их удаляет отдельная кнопка «Удалить и его данные».
                       </div>
                     )}
                   </div>
@@ -793,10 +886,12 @@ export const ProfileCoachTab: React.FC<{
             data-coach="boundary"
             style={{ fontSize: 11.5, color: colors.textSubtle, lineHeight: 1.55, padding: '0 4px' }}
           >
-            Сейчас режим тренера ведёт карточки атлетов, заметки и планер. Планы, дневники и
-            анализы в разделах приложения остаются данными этого устройства — отдельные
-            профили данных для каждого атлета появятся на следующем шаге, и мы не будем
-            делать вид, что они уже изолированы.
+            «Войти в его данные» переключает всё приложение в профиль этого атлета: у него свои
+            профиль, дневники, планы и анализы — отдельное хранилище и отдельная база IndexedDB.
+            Пока открыты данные атлета, сверху висит полоса с кнопкой возврата: это не украшение, а
+            защита от правки чужого профиля по ошибке. Заметки, задачи и журнал тренера остаются
+            общими для всех атлетов. Отдельных аккаунтов и доступа для самого атлета нет: данные
+            живут на этом устройстве и в вашей синхронизации.
           </div>
         </>
       )}

@@ -14,6 +14,7 @@ import { ArticlesScreen } from './ui/screens/ArticlesScreen';
 
 import { ToastContainer } from './ui/ToastContainer';
 import { KvUpdateBanner } from './ui/KvUpdateBanner';
+import { DataSpaceBanner } from './ui/DataSpaceBanner';
 import { KvSyncButton } from './ui/KvSyncButton';
 import { setLocale, getLocale } from './data/interactions-labels';
 import { isNativeApp } from './core/app-platform';
@@ -450,6 +451,8 @@ export default function App() {
               {getLocale() === 'ru' ? 'EN' : 'RU'}
             </button>
           </div>
+          {/* Пока открыто пространство атлета — полоса предупреждения сверху. */}
+          <DataSpaceBanner />
           {renderContent()}
         </div>
       </main>
