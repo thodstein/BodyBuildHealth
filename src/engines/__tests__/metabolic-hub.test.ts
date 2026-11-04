@@ -463,6 +463,18 @@ describe('metabolic-hub — calcHematology (ESC/ASA)', () => {
     expect(calcHematology({ weight:80, hct:45, gfr:55 }).gfrFlag).toBe(true);
     expect(calcHematology({ weight:80, hct:45, ferritin:20 }).ferritinFlag).toBe(true);
   });
+  it('без данных о воде флаг вязкости не выдумывается', () => {
+    // Движок раньше молча подставлял 2.5 л и печатал «вязкость OK» — теперь null.
+    const unknown = calcHematology({ weight:80, hct:52 });
+    expect(unknown.viscosityFlag).toBe(false);
+    expect(calcHematology({ weight:80, hct:52, waterL:1.2 }).viscosityFlag).toBe(true);
+    // nutritionMult: неизвестная вода не даёт штраф и не даёт «плюс за хорошую» —
+    // число совпадает с версией «вода 2.5 л», но ниже «вода 1.2 л».
+    const common = { weight:80, hct:45, sodiumG:3, potassiumG:3, proteinPerKg:2, fiberG:30, omega3G:2 } as const;
+    const noWater = calcHematology(common);
+    expect(noWater.nutritionMult).toBe(calcHematology({ ...common, waterL:2.5 }).nutritionMult);
+    expect(calcHematology({ ...common, waterL:1.2 }).nutritionMult).toBeGreaterThan(noWater.nutritionMult);
+  });
   it('nutritionMult растёт с дефицитами', () => {
     const good = calcHematology({ weight:80, hct:45, waterL:2.5, sodiumG:3, potassiumG:3, proteinPerKg:1.8, fiberG:30, omega3G:1.5 });
     const bad = calcHematology({ weight:80, hct:45, waterL:1.2, sodiumG:5, potassiumG:2, proteinPerKg:1.0, fiberG:10, omega3G:0.2 });

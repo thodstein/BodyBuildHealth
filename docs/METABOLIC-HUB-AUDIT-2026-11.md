@@ -372,6 +372,18 @@ RDA)»; `metabolic-hub-wiring.test.tsx` → «поле „Железо, мг/с�
 **Регрессия.** `metabolic-hub-wiring.test.tsx` → «калипер (JP3) меняет TDEE: измеренный % жира идёт
 в BMR, а не только в плитку» (JP3 100 мм → TDEE падает).
 
+### 1.35 «Вода факт» была выдумана, а «вязкость OK» — без данных о воде
+**Причина.** `waterL` в хабе стартовал с `2.5`, а движок при отсутствии значения сам подставлял
+`2.5` — плитка печатала «факт 2.5л», флаг вязкости (`HCT>51 && вода<1.8`) и `nutritionMult`
+считались по числу, которого пользователь не вводил. Плюс профиль подставлял дефолтные
+`dailyWaterLiters: 2` как «факт».
+**Исправление.** `waterL` больше не имеет выдуманного дефолта: в движке `null` = «не задано»
+(вязкость не флагается и +0.04 к `nutritionMult` не начисляется), в хабе «факт» печатается с
+источником (`факт 2л (профиль)` / `факт 1.2л` / `факт не задано`). При `HCT>51` и неизвестной воде
+подпись вязкости не врёт «OK», а просит воду («вязкость: введи воду»), и то же уходит в печать.
+**Регрессия.** `metabolic-hub.test.ts` → «без данных о воде флаг вязкости не выдумывается»;
+`metabolic-hub-wiring.test.tsx` → «вода „факт“ подписана источником, а не выдана за измерение».
+
 ---
 
 ## 2. Чего не хватало (добавлено)
@@ -421,7 +433,7 @@ RDA)»; `metabolic-hub-wiring.test.tsx` → «поле „Железо, мг/с�
   параллельные `tsc`/`vitest` из других сессий → heap OOM / `Zone Allocation failed`.
   Прогонять на свободной машине.
 - `npx vitest run src/ui/screens/Shared/__tests__ src/engines/__tests__/metabolic-hub.test.ts`
-  — **215 passed** (6 файлов: structure / toggles / honesty / modes / wiring / engine).
+  — **217 passed** (6 файлов: structure / toggles / honesty / modes / wiring / engine).
 - `npx vitest run src/ui/__tests__/rest-hooks-native.test.tsx
   src/engines/__tests__/risk-info-honesty-e07-e08.test.ts` — **89 passed**
   (в stderr шумит jsdom-canvas chart.js — это фон, не падения).

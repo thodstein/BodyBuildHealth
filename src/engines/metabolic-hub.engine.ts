@@ -701,7 +701,9 @@ export function calcHematology(input: HematologyInput): HematologyResult {
   const hct = typeof input.hct === 'number' && input.hct > 20 && input.hct < 70 ? input.hct : null;
   const hgb = typeof input.hgb === 'number' && input.hgb > 80 && input.hgb < 250 ? input.hgb : null;
   const weight = input.weight || 80;
-  const waterL = typeof input.waterL === 'number' ? input.waterL : 2.5;
+  // Аудит 2026-11: неизвестная вода была «фактом 2.5 л» — движок подставлял её молча,
+  // и вязкость/nutritionMult считались по выдуманному числу. Теперь null = «не задано».
+  const waterL = typeof input.waterL === 'number' && isFinite(input.waterL) ? input.waterL : null;
   const gfr = input.gfr;
   const ferritin = input.ferritin;
   // hgb estimate: HCT*3.4 (если нет лаба)
@@ -759,7 +761,7 @@ export function calcHematology(input: HematologyInput): HematologyResult {
     else if (hct > 51) donation = { needed: true, urgency: 'elective', text: 'Плановая донация 300-450мл', k: 0.30 };
   }
   // viscosity: HCT>51 && water<1.5 или HCT>54
-  const viscosityFlag = hct != null && ((hct > 51 && waterL < 1.8) || hct > 53);
+  const viscosityFlag = hct != null && ((hct > 51 && waterL != null && waterL < 1.8) || hct > 53);
   const gfrFlag = typeof gfr === 'number' && gfr < 60;
   const ferritinFlag = typeof ferritin === 'number' && ferritin < 30;
   // nutritionMult как в risk-engine:663-672 (1.0-1.25) — синхронизировано с TZ-spec
@@ -769,7 +771,7 @@ export function calcHematology(input: HematologyInput): HematologyResult {
   if (typeof input.omega3G === 'number' && input.omega3G < 1.0) nutritionMult += 0.05;
   if (typeof input.sodiumG === 'number' && input.sodiumG > 4) nutritionMult += 0.03;
   if (typeof input.potassiumG === 'number' && input.potassiumG < 2.5) nutritionMult += 0.03;
-  if (waterL < 1.5) nutritionMult += 0.04;
+  if (waterL != null && waterL < 1.5) nutritionMult += 0.04;
   nutritionMult = Math.min(1.25, Math.round(nutritionMult * 100) / 100);
   // якорные floors из риск-движка (единый источник порогов)
   const floors = hct != null ? clinicalFloorsForLabs({ HCT: hct, HGB: hgb ?? undefined } as any).filter(f=> f.organId==='hematologic') : [];

@@ -236,7 +236,7 @@ export const MetabolicHub: React.FC = () => {
   // железо из еды/добавок, мг/сут — единственный вход hematology, который раньше был «мёртвым»
   const [ironIntakeMg, setIronIntakeMg] = useState<number|undefined>(undefined);
   const [gfr, setGfr] = useState<number|undefined>(undefined);
-  const [waterL, setWaterL] = useState(2.5);
+  const [waterL, setWaterL] = useState<number|undefined>(undefined);
   const [sodiumG, setSodiumG] = useState(3.5);
   const [potassiumG, setPotassiumG] = useState(3.0);
   // P0-2 MET
@@ -317,6 +317,8 @@ export const MetabolicHub: React.FC = () => {
   const sweatTouchedRef = useRef(false);
   /** `% жира` введён вручную в этом хабе — он главнее калипера; иначе главнее замер. */
   const bodyFatTouchedRef = useRef(false);
+  /** Откуда взялась «вода факт»: профиль (там дефолт 2 л) или ручной ввод в хабе. */
+  const waterOriginRef = useRef<'profile'|'user'|null>(null);
 
   // ACWR live — слушаем srpe-store + polling
   const [acwr, setAcwr] = useState(1);
@@ -658,7 +660,7 @@ export const MetabolicHub: React.FC = () => {
       if(gfrLab?.value) setGfr(Number(gfrLab.value));
       const tshLab = labs['TSH'] || labs['tsh'];
       if(tshLab?.value) setTsh(Number(tshLab.value));
-      if(typeof life.dailyWaterLiters==='number') setWaterL(Number(life.dailyWaterLiters));
+      if(typeof life.dailyWaterLiters==='number'){ waterOriginRef.current = 'profile'; setWaterL(Number(life.dailyWaterLiters)); }
       if(typeof p.nutrition?.sodiumG==='number') setSodiumG(Number(p.nutrition.sodiumG));
       if(typeof p.nutrition?.potassiumG==='number') setPotassiumG(Number(p.nutrition.potassiumG));
       if(typeof p.goals?.targetWeight==='number') setTargetWeight(Number(p.goals.targetWeight));
@@ -775,6 +777,11 @@ const kbju = useMemo(()=> calcKBJU(input), [input]);
     const readyOn = localISODate(ready);
     return { lastDate, days, minDays: MIN_DAYS, readyOn, blocked: days < MIN_DAYS };
   }, [hematology, donationLog]);
+  // Аудит 2026-11: при HCT>51 флаг вязкости зависит от воды, а вода теперь может быть «не задано».
+  // Печатать «вязкость OK» без данных — неправда, поэтому честная подпись просит воду.
+  const viscosityNeedsWater = hct != null && hct > 51 && waterL == null && !hematology.viscosityFlag;
+  const viscosityShort = hematology.viscosityFlag ? '⚠ вязкость' : viscosityNeedsWater ? 'вязкость: вода?' : 'вязкость OK';
+  const viscosityLong = hematology.viscosityFlag ? '⚠ гипервязкость' : viscosityNeedsWater ? 'вязкость: введи воду' : 'вязкость OK';
   // Аудит 2026-11: точка «прогноз через 7 дней» (est:true после донации) рисовалась как измерение
   // и попадала в Δ за период. Считаем Δ/шаг только по лабораторным точкам, прогноз подписываем.
   const hctStats = useMemo(()=>{
@@ -970,7 +977,7 @@ const kbju = useMemo(()=> calcKBJU(input), [input]);
     setSweatRate(600); setSweatSodium(900); setSweatIntensity('moderate'); setSweatEnv('temperate');
     setUseMeasuredSweat(true); setPreKg(weight); setPostKg(weight); setFluidL(0); setSweatHours(1);
     setAlcoholG(0); setAlcoholDays(0); setCaffeineMg(150); setCaffeineHoursSince(2);
-    setWaterL(2.5); setSodiumG(3.5); setPotassiumG(3.0);
+    setWaterL(undefined); waterOriginRef.current = null; setSodiumG(3.5); setPotassiumG(3.0);
     setScheduleText('пн: силовая 1ч, вт: бег 0.5ч, чт: силовая 1ч');
     setCarbLoadDays(2); setCarbGPerKg(10); setSodiumLoadDays(2); setSodiumGPerDay(5);
     setProjectionYears(3); setProjectionMode('hold_bf'); setProteinMeals(4);
@@ -1508,11 +1515,11 @@ const kbju = useMemo(()=> calcKBJU(input), [input]);
           <MhNum label="GFR, мл/мин" value={gfr} min={15} max={130} suffix=" мл/мин" optional
             hint="<60 — вода и белок считаются консервативнее."
             onChange={markManualLab('gfr', setGfr)} />
-          <PopupNumber label="Вода факт, л/сут" value={waterL} min={1} max={6} step={0.1} onChange={setWaterL} />
+          <PopupNumber label="Вода факт, л/сут" value={waterL ?? 0} min={1} max={6} step={0.1} onChange={(v)=>{ waterOriginRef.current = 'user'; setWaterL(v); }} />
           <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
             <PopupNumber label="Na, г/сут" value={sodiumG} min={1} max={8} step={0.1} onChange={setSodiumG} />
             <div style={{ display:'flex', gap:4 }}>
-              <span style={{ flex:1, fontSize:8, color: hematology.viscosityFlag ? '#ef4444' : 'rgba(255,255,255,0.45)', background: hematology.viscosityFlag ? 'rgba(239,68,68,0.10)' : 'rgba(255,255,255,0.03)', border:`1px solid ${hematology.viscosityFlag?'rgba(239,68,68,0.18)':'rgba(255,255,255,0.06)'}`, borderRadius:8, padding:'5px 6px', textAlign:'center' }}>{hematology.viscosityFlag ? '⚠ вязкость' : 'вязкость OK'}</span>
+              <span style={{ flex:1, fontSize:8, color: hematology.viscosityFlag ? '#ef4444' : 'rgba(255,255,255,0.45)', background: hematology.viscosityFlag ? 'rgba(239,68,68,0.10)' : 'rgba(255,255,255,0.03)', border:`1px solid ${hematology.viscosityFlag?'rgba(239,68,68,0.18)':'rgba(255,255,255,0.06)'}`, borderRadius:8, padding:'5px 6px', textAlign:'center' }}>{viscosityShort}</span>
               <span style={{ flex:1, fontSize:8, color:'rgba(255,255,255,0.55)', background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', borderRadius:8, padding:'5px 6px', textAlign:'center' }}>K {potassiumG}г</span>
             </div>
           </div>
@@ -1917,12 +1924,12 @@ const kbju = useMemo(()=> calcKBJU(input), [input]);
                 <div style={{ padding:10, borderRadius:10, background: hematology.zone==='unknown' ? 'rgba(255,255,255,0.03)' : `${hematology.color}14`, border:`1px solid ${hematology.zone==='unknown' ? 'rgba(255,255,255,0.06)' : hematology.color+'33'}`, textAlign:'center' }}>
                   <div style={{ fontSize:10, color: hematology.zone==='unknown' ? 'rgba(255,255,255,0.55)' : hematology.color }}>HCT {hematology.hct ?? '—'}% — {hematology.zoneLabel}</div>
                   <div style={{ fontSize:22, fontWeight:900, color: hematology.zone==='unknown' ? '#fff' : hematology.color }}>{hematology.hct ?? '—'}<span style={{ fontSize:11, color:'#fff' }}>%</span></div>
-                  <div style={{ fontSize:9, color:'#fff' }}>{hematology.hgbEstimated ? `HGB ~${hematology.hgbEstimated} г/л` : 'введи HCT/HGB'} · {hematology.viscosityFlag ? '⚠ гипервязкость' : 'вязкость OK'} · GFR {gfr ?? '—'}</div>
+                  <div style={{ fontSize:9, color:'#fff' }}>{hematology.hgbEstimated ? `HGB ~${hematology.hgbEstimated} г/л` : 'введи HCT/HGB'} · {viscosityLong} · GFR {gfr ?? '—'}</div>
                 </div>
                 <div style={{ padding:10, borderRadius:10, background:'rgba(239,68,68,0.06)', border:'1px solid rgba(239,68,68,0.12)', textAlign:'center' }}>
                   <div style={{ fontSize:10, color:'#f87171' }}>Вода с HCT</div>
                   <div style={{ fontSize:18, fontWeight:900, color:'#38bdf8' }}>{hematology.waterTargetMl}<span style={{ fontSize:10, color:'#fff' }}>мл</span></div>
-                  <div style={{ fontSize:9, color:'#fff' }}>{hematology.mlPerKg}мл/кг · {hematology.waterAdjMl>0 ? `+${hematology.waterAdjMl} к базе` : 'база 35мл/кг'} · факт {waterL}л</div>
+                  <div style={{ fontSize:9, color:'#fff' }}>{hematology.mlPerKg}мл/кг · {hematology.waterAdjMl>0 ? `+${hematology.waterAdjMl} к базе` : 'база 35мл/кг'} · факт {waterL != null ? `${waterL}л${waterOriginRef.current === 'profile' ? ' (профиль)' : ''}` : 'не задано'}</div>
                 </div>
               </div>
               <div style={{ marginTop:8, height:10, borderRadius:20, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.06)', overflow:'hidden', position:'relative', display:'flex' }}>
@@ -1983,7 +1990,7 @@ const kbju = useMemo(()=> calcKBJU(input), [input]);
               <div style={{ marginTop:6, display:'flex', gap:6 }}>
                 <button onClick={()=>{
                   try{
-                    const html=`<!doctype html><html><head><meta charset="utf-8"><title>Гематология — ${hematology.hct ?? '—'}%</title><style>body{font-family:system-ui;padding:24px;color:#111}h1{font-size:18px}table{border-collapse:collapse;width:100%}td,th{border:1px solid #ddd;padding:6px 8px;font-size:12px}th{background:#f5f5f5;text-align:left}.badge{padding:2px 6px;border-radius:6px;color:#fff;font-weight:700;font-size:11px}</style></head><body><h1>🩸 Гематокрит — сводка PRO</h1><p>Дата: ${new Date().toLocaleString('ru-RU')} · Вес ${weight}кг · Пол ${sex} · ААС ${onAAS? aasDose+'мг': 'нет'}</p><table><tr><th>Показатель</th><th>Значение</th></tr><tr><td>HCT</td><td><span class="badge" style="background:${hematology.color}">${hematology.hct ?? '—'}% — ${hematology.zoneLabel}</span></td></tr><tr><td>HGB (оценка)</td><td>${hematology.hgbEstimated ?? '—'} г/л</td></tr><tr><td>Вода цель</td><td>${hematology.waterTargetMl} мл (${hematology.mlPerKg} мл/кг) ${hematology.waterAdjMl? `+${hematology.waterAdjMl} к базе`:''} · факт ${waterL}л</td></tr><tr><td>Железо</td><td>${hematology.ironRecLabel}</td></tr><tr><td>Донация</td><td>${hematology.donation.text} k=${hematology.donation.k}</td></tr><tr><td>Вязкость</td><td>${hematology.viscosityFlag? '⚠ гипервязкость':'OK'} · GFR ${gfr ?? '—'} ${hematology.gfrFlag? '⚠ &lt;60':''} · ферритин ${ferritin ?? '—'} ${hematology.ferritinFlag? '⚠ &lt;30':''}</td></tr><tr><td>Питание×гематология</td><td>×${hematology.nutritionMult} · PRAL ${hematology.pralNote}</td></tr></table><h3>Рекомендации</h3><ul>${hematology.recommendations.map(r=>`<li>${r}</li>`).join('')}</ul><p style="font-size:10px;color:#666">Источники: ESC 2023 эритроцитоз &gt;52% (м)/48% (ж), ASA флеботомия &gt;54%, lab-tier-recommendations, PROCEDURE_DB k0.30/0.45. Дисклеймер: не назначение — к гематологу + JAK2 при HCT&gt;52%.</p><script>window.print()</`+`script></body></html>`;
+                    const html=`<!doctype html><html><head><meta charset="utf-8"><title>Гематология — ${hematology.hct ?? '—'}%</title><style>body{font-family:system-ui;padding:24px;color:#111}h1{font-size:18px}table{border-collapse:collapse;width:100%}td,th{border:1px solid #ddd;padding:6px 8px;font-size:12px}th{background:#f5f5f5;text-align:left}.badge{padding:2px 6px;border-radius:6px;color:#fff;font-weight:700;font-size:11px}</style></head><body><h1>🩸 Гематокрит — сводка PRO</h1><p>Дата: ${new Date().toLocaleString('ru-RU')} · Вес ${weight}кг · Пол ${sex} · ААС ${onAAS? aasDose+'мг': 'нет'}</p><table><tr><th>Показатель</th><th>Значение</th></tr><tr><td>HCT</td><td><span class="badge" style="background:${hematology.color}">${hematology.hct ?? '—'}% — ${hematology.zoneLabel}</span></td></tr><tr><td>HGB (оценка)</td><td>${hematology.hgbEstimated ?? '—'} г/л</td></tr><tr><td>Вода цель</td><td>${hematology.waterTargetMl} мл (${hematology.mlPerKg} мл/кг) ${hematology.waterAdjMl? `+${hematology.waterAdjMl} к базе`:''} · факт ${waterL != null ? `${waterL}л${waterOriginRef.current === 'profile' ? ' (профиль)' : ''}` : 'не задано'}</td></tr><tr><td>Железо</td><td>${hematology.ironRecLabel}</td></tr><tr><td>Донация</td><td>${hematology.donation.text} k=${hematology.donation.k}</td></tr><tr><td>Вязкость</td><td>${hematology.viscosityFlag? '⚠ гипервязкость': viscosityNeedsWater ? 'нужна вода (HCT>51)' : 'OK'} · GFR ${gfr ?? '—'} ${hematology.gfrFlag? '⚠ &lt;60':''} · ферритин ${ferritin ?? '—'} ${hematology.ferritinFlag? '⚠ &lt;30':''}</td></tr><tr><td>Питание×гематология</td><td>×${hematology.nutritionMult} · PRAL ${hematology.pralNote}</td></tr></table><h3>Рекомендации</h3><ul>${hematology.recommendations.map(r=>`<li>${r}</li>`).join('')}</ul><p style="font-size:10px;color:#666">Источники: ESC 2023 эритроцитоз &gt;52% (м)/48% (ж), ASA флеботомия &gt;54%, lab-tier-recommendations, PROCEDURE_DB k0.30/0.45. Дисклеймер: не назначение — к гематологу + JAK2 при HCT&gt;52%.</p><script>window.print()</`+`script></body></html>`;
                     void printPlanHtml('Гематокрит — сводка PRO', html);
                   }catch{ showToast('Печать: открой HCT вкладку'); }
                 }} className="mh-act" style={{ flex:1, padding:'10px', minHeight:44, borderRadius:10, border:'1px solid rgba(255,255,255,0.08)', background:'rgba(255,255,255,0.03)', color:'#fff', fontWeight:700, fontSize:11, cursor:'pointer' }}>🖨 Печать / PDF</button>

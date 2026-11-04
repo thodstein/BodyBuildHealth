@@ -155,6 +155,21 @@ describe('MetabolicHub: ввод меняет расчёт (проводка п�
     expect(blood).toMatch(/мл/);
   });
 
+  it('вода «факт» подписана источником, а не выдана за измерение', () => {
+    render(<MetabolicHub />);
+    setNumber('HCT, %', 52);
+    // профиль отдаёт дефолтные 2 л — это не замер, поэтому подписано «(профиль)»
+    expect(openMode('Кровь')).toContain('факт 2л (профиль)');
+    setNumber('Вода факт, л/сут', 1.2);
+    let txt = openMode('Кровь');
+    expect(txt).toContain('факт 1.2л');
+    expect(txt).not.toContain('(профиль)');
+    expect(txt).toContain('⚠ гипервязкость');
+    setNumber('Вода факт, л/сут', 2.5);
+    txt = openMode('Кровь');
+    expect(txt).toContain('вязкость OK');
+  });
+
   it('поле «Железо, мг/сут» доходит до совета по крови', () => {
     render(<MetabolicHub />);
     setNumber('HCT, %', 52);
