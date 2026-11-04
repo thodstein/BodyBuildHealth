@@ -1138,3 +1138,57 @@ describe('E0.5 — calcATRange: точка внутри своей полосы'
     expect(calcATRange({ tdee: 3000, weeksInDeficit: 12 }).persistent).toBeGreaterThan(0);
   });
 });
+/**
+ * Аудит 2026-11 — регрессии на два реальных дефекта расчёта.
+ *
+ * 1) calcWater прибавлял НЕДЕЛЬНЫЙ пот к СУТОЧНОЙ норме: при 4 тренировках по
+ *    часу норма выходила ~6 л вместо ~3.4 л (83 кг). Теперь недельный объём
+ *    делится на 7, а электролиты считаются на одну сессию.
+ * 2) UI отдавал в calcEnergyAvailability недельный EEE как суточный — EA падала
+ *    до «LEA» почти у всех. Контракт движка (EEE в сутки) теперь зафиксирован.
+ */
+describe('metabolic-hub — аудит 2026-11: вода и EA', () => {
+  it('недельный пот делится на 7, а не прибавляется целиком', () => {
+    const r = calcWater({
+      weight: 83, height: 180, age: 30, sex: 'male',
+      trainingDays: 4, cardioMin: 90, sweatRate: 600, standingHours: 0,
+    });
+    const weekly = r.breakdown.weeklySweatMl;
+    expect(weekly).toBeGreaterThan(2000); // 4 силовые + 90 мин кардио в неделю
+    expect(r.breakdown.training).toBe(Math.round(weekly / 7));
+    // Ключевая регрессия: пот в суточной норме меньше недельного объёма
+    expect(r.breakdown.training).toBeLessThan(weekly);
+    // И норма не раздувается: 83 кг × 35 = 2905, пот ≤ ~500 мл/сут
+    expect(r.nat).toBeLessThan(r.breakdown.base + 700);
+  });
+
+  it('электролиты — на одну тренировку, а не на неделю', () => {
+    const r = calcWater({
+      weight: 83, height: 180, age: 30, sex: 'male',
+      trainingDays: 4, cardioMin: 90, sweatRate: 600, standingHours: 0,
+    });
+    expect(r.breakdown.sessionSweatMl).toBeLessThan(r.breakdown.weeklySweatMl);
+    // 1 сессия ≈ 1ч × 600 мл/ч + доля кардио/сут
+    expect(r.breakdown.sessionSweatMl).toBeGreaterThan(400);
+    expect(r.breakdown.sessionSweatMl).toBeLessThan(1200);
+  });
+
+  it('calcEnergyAvailability трактует eeeKcal как СУТОЧНЫЙ EEE', () => {
+    const daily = calcEnergyAvailability({ weight: 80, bodyFat: 15, height: 180, intakeKcal: 3200, eeeKcal: 300, sex: 'male' });
+    const weeklyAsDaily = calcEnergyAvailability({ weight: 80, bodyFat: 15, height: 180, intakeKcal: 3200, eeeKcal: 2100, sex: 'male' });
+    expect(daily.ea).not.toBeNull();
+    expect(weeklyAsDaily.ea).not.toBeNull();
+    expect(daily.ea!).toBeGreaterThan(weeklyAsDaily.ea!);
+    expect(daily.zone).toBe('optimal');
+    // недельный EEE, подставленный как суточный, ложно даёт LEA — это и был дефект
+    expect(weeklyAsDaily.zone).toBe('low');
+  });
+
+  it('вода реагирует на влажность только в жаре', () => {
+    const hotDry = calcWater({ weight: 83, height: 180, age: 30, sex: 'male', climate: 'hot', humidity: 40, trainingDays: 0, cardioMin: 0 });
+    const hotHumid = calcWater({ weight: 83, height: 180, age: 30, sex: 'male', climate: 'hot', humidity: 85, trainingDays: 0, cardioMin: 0 });
+    const cold = calcWater({ weight: 83, height: 180, age: 30, sex: 'male', climate: 'cold', humidity: 85, trainingDays: 0, cardioMin: 0 });
+    expect(hotHumid.nat).toBeGreaterThan(hotDry.nat);
+    expect(cold.nat).toBe(hotDry.nat - 600 - 150);
+  });
+});

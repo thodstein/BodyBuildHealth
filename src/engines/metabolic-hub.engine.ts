@@ -217,9 +217,16 @@ export function calcWater(input: MetabolicInput) {
   const base = baseIOM;
   // IOM вода: беременность +300мл, лактация +700мл (эксклюзив) / +400мл (смешанная)
   const pregWaterAdd = (input as any).trimester ? 300 : (input as any).lactating === 'exclusive' ? 700 : (input as any).lactating === 'mixed' ? 400 : 0;
-  const hours = input.trainingHours ?? (input.trainingDays ?? 3) * 1.1;
+  // Аудит 2026-11: trainingHours/cardioMin — это НЕДЕЛЬНЫЙ объём (UI передаёт
+  // trainingDays×1.15 и мин/нед). Раньше недельный пот прибавлялся к СУТОЧНОЙ
+  // норме воды — при 4 тренировках по часу норма раздувалась на ~2.3 л
+  // (83 кг: ~6.0 л вместо ~3.4 л). Теперь недельный пот делится на 7 дней,
+  // а электролиты считаются на ОДНУ тренировку (как и подписано в UI).
+  const weeklyTrainHours = Math.max(0, input.trainingHours ?? (input.trainingDays ?? 3) * 1.1);
+  const weeklyCardioMin = Math.max(0, input.cardioMin ?? 0);
   const sweat = input.sweatRate ?? 600;
-  const training = Math.round(hours * sweat * 0.85 + (input.cardioMin ?? 0) * 7);
+  const weeklySweatMl = weeklyTrainHours * sweat * 0.85 + weeklyCardioMin * 7;
+  const training = Math.round(weeklySweatMl / 7);
   // климат: Sawka WBGT нелинейно — упрощено +600 жара +8*(hum-60), холод −150
   let climateAdd = 0;
   if (input.climate==='hot') {
@@ -236,8 +243,13 @@ export function calcWater(input: MetabolicInput) {
   const perHour = Math.round(nat / 16);
   const perHourAAS = Math.round(aas / 16);
   // Электролиты по Baker 2017: Na 900мг/л средн., Cl 1.5×Na, K 180мг/л, Mg 12мг/л
-  const totalSweatMl = hours * sweat;
-  const electrolytes = calcSweatElectrolytes(totalSweatMl, input.sweatSodiumMgPerL ?? 900);
+  // — на ОДНУ тренировку (не на неделю): sessionHours = недельные часы / число тренировок
+  const sessionHours = (input.trainingDays ?? 0) > 0
+    ? weeklyTrainHours / Math.max(1, input.trainingDays ?? 1)
+    : weeklyTrainHours;
+  // кардио тоже потеет: его минуты/нед → часы/день → мл пота за день кардио
+  const sessionSweatMl = sessionHours * sweat + (weeklyCardioMin / 7 / 60) * sweat;
+  const electrolytes = calcSweatElectrolytes(sessionSweatMl, input.sweatSodiumMgPerL ?? 900);
   const sweatNaG = Math.round(electrolytes.sodiumMg / 100) / 10;
   const sweatClG = Math.round(electrolytes.chlorideMg / 100) / 10;
   const sweatKG = Math.round(electrolytes.potassiumMg / 1000 * 10) / 10;
@@ -252,7 +264,7 @@ export function calcWater(input: MetabolicInput) {
     note: input.onAAS
       ? `ААС EXP: +${Math.round(boost*100)}% (Na/H2O) ${AAS_EXPERIMENTAL_NOTE}. Na ~${sweatNaG}г/тр, K ${sweatKG}г`
       : `IOM ${iomPerKg}мл/кг → ${baseIOM}мл + пот ${sweat}мл/ч. Lean-модель ${baseLeanModel}мл (эксп.). Жара ${climateAdd}мл${standingAdd? `, стоя +${standingAdd}`:''}${creatineAdd? `, креатин +${creatineAdd}${creatineNote}`:''}${pregWaterAdd? `, беременность/лактация +${pregWaterAdd} (IOM)`:''}`,
-    breakdown: { base: Math.round(base), training: Math.round(training), climate: climateAdd, standing: standingAdd, creatine: creatineAdd, pregnancy: pregWaterAdd, lean: Math.round(lean), fatMass: Math.round(fatMass), sweatNaG, sweatClG, sweatKG, sweatMgMg, baseIOM, baseLeanModel }
+    breakdown: { base: Math.round(base), training: Math.round(training), climate: climateAdd, standing: standingAdd, creatine: creatineAdd, pregnancy: pregWaterAdd, lean: Math.round(lean), fatMass: Math.round(fatMass), sweatNaG, sweatClG, sweatKG, sweatMgMg, baseIOM, baseLeanModel, weeklySweatMl: Math.round(weeklySweatMl), sessionSweatMl: Math.round(sessionSweatMl) }
   };
 }
 
