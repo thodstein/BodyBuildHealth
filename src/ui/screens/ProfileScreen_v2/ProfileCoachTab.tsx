@@ -278,9 +278,24 @@ export const ProfileCoachTab: React.FC<{
 
   const askDelete = (id: string) => {
     if (confirmDeleteId === id) {
+      const sid = athleteSpaceId(id);
       apply(removeCoachAthlete(state, id));
       setConfirmDeleteId(null);
       if (editingId === id) cancelEdit();
+      // Пустое пространство (атлет входил, но данных не появилось) убираем из
+      // реестра: иначе оно навсегда висит в списке «Сменить» и занимает лимит
+      // пространств. Там, где данные ЕСТЬ, запись остаётся намеренно —
+      // иначе до них было бы не добраться, а «удалить данные» уже отдельная кнопка.
+      if (usageOf(id).keys === 0) {
+        const reg = readRegistryFromStorage();
+        if (reg.spaces.some(s => s.id === sid)) {
+          writeRegistryToStorage(removeSpace(reg, sid));
+          if (spaceActiveId === sid) {
+            activateHomeSpace();
+            reloadToApplySpace();
+          }
+        }
+      }
       return;
     }
     setConfirmDeleteId(id);

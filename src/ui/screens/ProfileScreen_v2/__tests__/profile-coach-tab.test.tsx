@@ -25,6 +25,10 @@ import {
   DATA_SPACE_KEY,
   _resetDataSpaceCache,
   athleteSpaceId,
+  emptyRegistry,
+  readRegistryFromStorage,
+  upsertSpace,
+  writeRegistryToStorage,
 } from '../../../../core/data-space';
 
 beforeEach(() => {
@@ -230,6 +234,30 @@ describe('атлеты', () => {
     expect(readCoachState(localStorage).athletes).toHaveLength(0);
     expect(localStorage.getItem(`${ATHLETE_SPACE_PREFIX}${sid}__he_profile_v2`)).toBeNull();
     expect(localStorage.getItem('he_profile_v2')).toBe('{"name":"Тренер"}');
+  });
+
+  it('обычное удаление убирает из реестра ПУСТОЕ пространство атлета', () => {
+    seed(1);
+    // Атлет заходил в приложение, но ничего не записал
+    const sid = athleteSpaceId('a1');
+    writeRegistryToStorage(upsertSpace(emptyRegistry(), { id: sid, athleteId: 'a1', label: 'Атлет 1' }).registry);
+    const { container } = render(<ProfileCoachTab />);
+    fireEvent.click(container.querySelector('[data-coach="delete"]') as HTMLElement);
+    fireEvent.click(container.querySelector('[data-coach="delete"]') as HTMLElement);
+    expect(readRegistryFromStorage().spaces.some(s => s.id === sid)).toBe(false);
+  });
+
+  it('обычное удаление НЕ выбрасывает запись пространства, в котором есть данные', () => {
+    seed(1);
+    const sid = athleteSpaceId('a1');
+    writeRegistryToStorage(upsertSpace(emptyRegistry(), { id: sid, athleteId: 'a1', label: 'Атлет 1' }).registry);
+    localStorage.setItem(`${ATHLETE_SPACE_PREFIX}${sid}__he_profile_v2`, '{"name":"Иван"}');
+    const { container } = render(<ProfileCoachTab />);
+    fireEvent.click(container.querySelector('[data-coach="delete"]') as HTMLElement);
+    fireEvent.click(container.querySelector('[data-coach="delete"]') as HTMLElement);
+    // данные остались — значит запись должна остаться, иначе до них не добраться
+    expect(readRegistryFromStorage().spaces.some(s => s.id === sid)).toBe(true);
+    expect(localStorage.getItem(`${ATHLETE_SPACE_PREFIX}${sid}__he_profile_v2`)).toBe('{"name":"Иван"}');
   });
 
   it('«Войти в его данные» записывает пространство атлета и перезагружает приложение', () => {
