@@ -10,6 +10,12 @@ import { render, fireEvent, cleanup } from '@testing-library/react';
 import { ProfilePlannerTab } from '../ProfilePlannerTab';
 import { localIsoDate, shiftIsoDate } from '../../../../core/local-date';
 import {
+  addCoachAthlete,
+  emptyCoachState,
+  setCoachEnabled,
+  writeCoachState,
+} from '../../../../engines/coach/coach-mode.engine';
+import {
   COACH_MONTH_LABELS,
   addCoachTask,
   emptyCoachPlanner,
@@ -152,5 +158,28 @@ describe('просроченное', () => {
     writeCoachPlanner(localStorage, s);
     const { container } = render(<ProfilePlannerTab />);
     expect(container.querySelector('[data-planner="overdue"]')).toBeNull();
+  });
+});
+
+describe('пришли из карточки атлета', () => {
+  const seedAthlete = () => {
+    let coach = setCoachEnabled(emptyCoachState(), true);
+    coach = addCoachAthlete(coach, { name: 'Иван' }, { id: 'a1' }).state;
+    writeCoachState(localStorage, coach);
+  };
+
+  it('атлет подставлен в форму новой задачи', () => {
+    seedAthlete();
+    const { container } = render(<ProfilePlannerTab initialAthleteId="a1" />);
+    expect((container.querySelector('[data-planner="athlete"]') as HTMLSelectElement).value).toBe('a1');
+    fireEvent.change(container.querySelector('[data-planner="title"]') as HTMLInputElement, { target: { value: 'Созвон' } });
+    fireEvent.click(container.querySelector('[data-planner="add"]') as HTMLElement);
+    expect(readCoachPlanner(localStorage).items[0]).toMatchObject({ title: 'Созвон', athleteId: 'a1' });
+  });
+
+  it('удалённого атлета не подставляем (без «фантомной» привязки)', () => {
+    seedAthlete();
+    const { container } = render(<ProfilePlannerTab initialAthleteId="ghost" />);
+    expect((container.querySelector('[data-planner="athlete"]') as HTMLSelectElement).value).toBe('');
   });
 });

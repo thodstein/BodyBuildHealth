@@ -65,6 +65,13 @@ export const ProfileScreen_v2: React.FC<{ onNavigate?: (screen: string) => void;
   useProfileRefresh();
   const [tab, setTab] = useState<Tab | null>(null);
   const [undoAvailable, setUndoAvailable] = useState(false);
+  // Переход «атлет → его заметки/задачи»: вкладка открывается с фильтром по атлету.
+  const [athleteFocus, setAthleteFocus] = useState<{ id: string; target: 'notes' | 'planner' } | null>(null);
+
+  const openAthleteSection = (id: string, target: 'notes' | 'planner') => {
+    setAthleteFocus({ id, target });
+    setTab(target);
+  };
 
   // P1-fix (Aug 5 2026): при переходе из App — открываем конкретную вкладку дневника
   useEffect(() => {
@@ -195,9 +202,9 @@ export const ProfileScreen_v2: React.FC<{ onNavigate?: (screen: string) => void;
         background: 'radial-gradient(120% 40% at 50% 0%, rgba(52,211,153,0.06), transparent 70%)',
       }}>
          {tab === 'user' && <ProfileErrorBoundary tabName="Пользователь"><ProfileUserTab /></ProfileErrorBoundary>}
-          {tab === 'coach' && <ProfileErrorBoundary tabName="Тренер"><ProfileCoachTab onNavigate={onNavigate} /></ProfileErrorBoundary>}
-          {tab === 'notes' && <ProfileErrorBoundary tabName="Заметки"><ProfileNotesTab /></ProfileErrorBoundary>}
-          {tab === 'planner' && <ProfileErrorBoundary tabName="Планер"><ProfilePlannerTab /></ProfileErrorBoundary>}
+          {tab === 'coach' && <ProfileErrorBoundary tabName="Тренер"><ProfileCoachTab onNavigate={onNavigate} onOpenAthlete={openAthleteSection} /></ProfileErrorBoundary>}
+          {tab === 'notes' && <ProfileErrorBoundary tabName="Заметки"><ProfileNotesTab initialAthleteId={athleteFocus?.target === 'notes' ? athleteFocus.id : undefined} /></ProfileErrorBoundary>}
+          {tab === 'planner' && <ProfileErrorBoundary tabName="Планер"><ProfilePlannerTab initialAthleteId={athleteFocus?.target === 'planner' ? athleteFocus.id : undefined} /></ProfileErrorBoundary>}
           {tab === 'diaries' && <ProfileErrorBoundary tabName="Дневники"><ProfileDiariesTab
             onNavigate={onNavigate}
             initialView={initialSubTab === 'sleep' || initialSubTab === 'bp' || initialSubTab === 'weight' || initialSubTab === 'measurements' ? (initialSubTab as 'sleep' | 'bp' | 'weight' | 'measurements') : 'diary'}

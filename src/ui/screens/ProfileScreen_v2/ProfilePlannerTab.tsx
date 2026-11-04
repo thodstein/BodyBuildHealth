@@ -92,10 +92,11 @@ const fmtHuman = (iso: string): string => {
   return d.toLocaleDateString('ru-RU', { weekday: 'short', day: 'numeric', month: 'long' });
 };
 
-export const ProfilePlannerTab: React.FC = () => {
+export const ProfilePlannerTab: React.FC<{ initialAthleteId?: string }> = ({ initialAthleteId }) => {
   // Не мемоизируем: приложение может жить открытым через полночь — «сегодня»
   // должно пересчитываться на следующем рендере, а не застывать на дате входа.
   const today = localIsoDate();
+  const athletes = useMemo(() => readCoachState(ls()).athletes, []);
   const [store, setStore] = useState<CoachPlannerStore>(() => readCoachPlanner(ls()));
   const [cursor, setCursor] = useState<{ year: number; month: number }>(() => {
     const d = new Date(`${today}T00:00:00`);
@@ -104,11 +105,14 @@ export const ProfilePlannerTab: React.FC = () => {
   const [selected, setSelected] = useState<string>(today);
   const [title, setTitle] = useState('');
   const [time, setTime] = useState('');
-  const [athleteId, setAthleteId] = useState('');
+  // Атлет, к которому пришли из карточки тренера; удалённая карточка — не подставляем.
+  const [athleteId, setAthleteId] = useState<string>(() => {
+    if (!initialAthleteId) return '';
+    return athletes.some(a => a.id === initialAthleteId) ? initialAthleteId : '';
+  });
   const [error, setError] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
-  const athletes = useMemo(() => readCoachState(ls()).athletes, []);
   const nameOf = (id: string | null): string =>
     id ? (athletes.find(a => a.id === id)?.name ?? 'атлет удалён') : '';
 

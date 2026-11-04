@@ -134,7 +134,11 @@ const btn = (tone: 'primary' | 'ghost' | 'danger'): React.CSSProperties => ({
         : 'rgba(255,255,255,0.05)',
 });
 
-export const ProfileCoachTab: React.FC<{ onNavigate?: (screen: string) => void }> = ({ onNavigate }) => {
+export const ProfileCoachTab: React.FC<{
+  onNavigate?: (screen: string) => void;
+  /** Открыть заметки/задачи конкретного атлета (переход на вкладку с фильтром). */
+  onOpenAthlete?: (athleteId: string, target: 'notes' | 'planner') => void;
+}> = ({ onNavigate, onOpenAthlete }) => {
   const [state, setState] = useState<CoachState>(() => readCoachState(ls()));
   const [form, setForm] = useState<AthleteForm>(EMPTY_FORM);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -595,7 +599,7 @@ export const ProfileCoachTab: React.FC<{ onNavigate?: (screen: string) => void }
               {visibleAthletes.map(a => {
                 const isActive = state.activeAthleteId === a.id;
                 const noteCount = countNotesForAthlete(notes, a.id);
-                const taskCount = planner.items.filter(t => t.athleteId === a.id && !t.done).length;
+                const openTaskCount = planner.items.filter(t => t.athleteId === a.id && !t.done).length;
                 const meta = [
                   SEX_LABEL[a.sex],
                   a.age !== null ? `${a.age} лет` : null,
@@ -666,13 +670,33 @@ export const ProfileCoachTab: React.FC<{ onNavigate?: (screen: string) => void }
                           заметок: {noteCount}
                         </span>
                       )}
-                      {taskCount > 0 && (
+                      {openTaskCount > 0 && (
                         <span style={{ fontSize: 10.5, color: colors.textMuted, alignSelf: 'center' }}>
-                          задач: {taskCount}
+                          незакрытых задач: {openTaskCount}
                         </span>
                       )}
                     </div>
                     <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
+                      {onOpenAthlete && (
+                        <>
+                          <button
+                            type="button"
+                            data-coach="open-notes"
+                            onClick={() => onOpenAthlete(a.id, 'notes')}
+                            style={{ ...btn('ghost'), fontSize: 12 }}
+                          >
+                            Заметки атлета
+                          </button>
+                          <button
+                            type="button"
+                            data-coach="open-planner"
+                            onClick={() => onOpenAthlete(a.id, 'planner')}
+                            style={{ ...btn('ghost'), fontSize: 12 }}
+                          >
+                            Задачи атлета
+                          </button>
+                        </>
+                      )}
                       {!isActive && (
                         <button
                           type="button"
@@ -710,6 +734,15 @@ export const ProfileCoachTab: React.FC<{ onNavigate?: (screen: string) => void }
                         </button>
                       )}
                     </div>
+                    {confirmDeleteId === a.id && (
+                      <div
+                        data-coach="delete-hint"
+                        style={{ marginTop: 8, fontSize: 11.5, color: colors.textMuted, lineHeight: 1.45 }}
+                      >
+                        Удаляется только карточка. Заметки и задачи этого атлета останутся на месте —
+                        их видно в общем списке заметок и в планёре.
+                      </div>
+                    )}
                   </div>
                 );
               })}

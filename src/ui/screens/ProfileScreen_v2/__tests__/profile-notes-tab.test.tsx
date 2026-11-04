@@ -127,4 +127,28 @@ describe('связь с атлетами', () => {
     const { container } = render(<ProfileNotesTab />);
     expect(container.querySelector('[data-notes="filter"]')).toBeNull();
   });
+
+  it('пришли из карточки атлета — фильтр уже стоит на нём', () => {
+    let coach = setCoachEnabled(emptyCoachState(), true);
+    coach = addCoachAthlete(coach, { name: 'Иван' }, { id: 'a1' }).state;
+    coach = addCoachAthlete(coach, { name: 'Пётр' }, { id: 'a2' }).state;
+    writeCoachState(localStorage, coach);
+    let notes = emptyCoachNotes();
+    notes = addCoachNote(notes, { title: 'Про Ивана', athleteId: 'a1' }, { id: 'n1' }).store;
+    notes = addCoachNote(notes, { title: 'Про Петра', athleteId: 'a2' }, { id: 'n2' }).store;
+    writeCoachNotes(localStorage, notes);
+
+    const { container } = render(<ProfileNotesTab initialAthleteId="a2" />);
+    expect((container.querySelector('[data-notes="filter"]') as HTMLSelectElement).value).toBe('a2');
+    expect(items(container)).toHaveLength(1);
+    expect(items(container)[0].getAttribute('data-note-id')).toBe('n2');
+  });
+
+  it('удалённого атлета в фильтре не подставляем (показываем всё)', () => {
+    let notes = emptyCoachNotes();
+    notes = addCoachNote(notes, { title: 'A' }, { id: 'n1' }).store;
+    writeCoachNotes(localStorage, notes);
+    const { container } = render(<ProfileNotesTab initialAthleteId="ghost" />);
+    expect(items(container)).toHaveLength(1);
+  });
 });

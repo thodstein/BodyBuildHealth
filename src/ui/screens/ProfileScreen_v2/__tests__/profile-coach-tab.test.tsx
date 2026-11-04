@@ -179,4 +179,30 @@ describe('атлеты', () => {
     expect((readCoachState(localStorage).athletes[0] as CoachAthlete).name).toBe('Иван П.');
     expect(container.textContent).toContain('Иван П.');
   });
+
+  it('в подтверждении удаления сказано, что заметки и задачи не удаляются', () => {
+    seed(1);
+    const { container } = render(<ProfileCoachTab />);
+    fireEvent.click(container.querySelector('[data-coach="delete"]') as HTMLElement);
+    const hint = container.querySelector('[data-coach="delete-hint"]')?.textContent ?? '';
+    expect(hint).toContain('карточка');
+    expect(hint).toContain('Заметки и задачи');
+  });
+
+  it('переход к заметкам и задачам атлета передаёт id и цель', () => {
+    seed(1);
+    const onOpenAthlete = vi.fn();
+    const { container } = render(<ProfileCoachTab onOpenAthlete={onOpenAthlete} />);
+    fireEvent.click(container.querySelector('[data-coach="open-notes"]') as HTMLElement);
+    expect(onOpenAthlete).toHaveBeenLastCalledWith('a1', 'notes');
+    fireEvent.click(container.querySelector('[data-coach="open-planner"]') as HTMLElement);
+    expect(onOpenAthlete).toHaveBeenLastCalledWith('a1', 'planner');
+  });
+
+  it('без обработчика переходов кнопки не показываются (не мёртвые кнопки)', () => {
+    seed(1);
+    const { container } = render(<ProfileCoachTab />);
+    expect(container.querySelector('[data-coach="open-notes"]')).toBeNull();
+    expect(container.querySelector('[data-coach="open-planner"]')).toBeNull();
+  });
 });

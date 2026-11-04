@@ -95,15 +95,20 @@ const fmtDate = (iso: string): string => {
   return d.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: '2-digit' });
 };
 
-export const ProfileNotesTab: React.FC = () => {
+export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initialAthleteId }) => {
+  const athletes = useMemo(() => readCoachState(ls()).athletes, []);
   const [store, setStore] = useState<CoachNotesStore>(() => readCoachNotes(ls()));
   const [query, setQuery] = useState('');
-  const [athleteFilter, setAthleteFilter] = useState<string>('all');
+  // Фильтр по атлету, к которому пришли из режима тренера. Если карточку уже
+  // удалили — не показываем пустой список «по несуществующему атлету».
+  const [athleteFilter, setAthleteFilter] = useState<string>(() => {
+    if (!initialAthleteId) return 'all';
+    return athletes.some(a => a.id === initialAthleteId) ? initialAthleteId : 'all';
+  });
   const [editor, setEditor] = useState<EditorState | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
-  const athletes = useMemo(() => readCoachState(ls()).athletes, []);
   const nameOf = (id: string | null): string =>
     id ? (athletes.find(a => a.id === id)?.name ?? 'атлет удалён') : '';
 
