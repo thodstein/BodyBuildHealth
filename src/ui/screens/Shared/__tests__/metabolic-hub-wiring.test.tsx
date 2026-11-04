@@ -186,15 +186,42 @@ describe('MetabolicHub: ввод меняет расчёт (проводка п�
     expect(fieldValue('Ферритин, нг/мл')).toBe('15 нг/мл');
   });
 
+  it('по умолчанию пот-тест не выдаёт выдуманное «измерение»', () => {
+    render(<MetabolicHub />);
+    // дефолты 83 → 82.2 кг + 0.5 л давали «измеренный 1.30 л/ч» без единого замера
+    expect(document.body.textContent || '').not.toMatch(/измерено пот-тестом/);
+    expect(document.body.textContent || '').toMatch(/Пока измерения нет/);
+    expect(document.body.textContent || '').toMatch(/пот-тест: вес до\/после/);
+  });
+
+  it('«Сбросить весь ввод» чистит климат и пот, а не только лабы', () => {
+    render(<MetabolicHub />);
+    setSelect('Климат', 'Жара');
+    setNumber('Пот, мл/ч', 1500);
+    setNumber('Стресс', 9);
+    expect(fieldValue('Пот, мл/ч')).toBe('1500 мл/ч');
+    fireEvent.click(Array.from(document.querySelectorAll('button'))
+      .find(b => (b.textContent || '').includes('Сбросить весь ввод')) as HTMLElement);
+    expect(fieldValue('Пот, мл/ч')).toBe('600 мл/ч');
+    const climate = Array.from(document.querySelectorAll('button.pl-popupselect'))
+      .find(b => (b.textContent || '').trim().startsWith('Климат'))!;
+    expect(climate.textContent || '').toMatch(/Умеренный/);
+  });
+
   it('измеренный пот-тест попадает в воду, а не живёт только в карточке', () => {
     render(<MetabolicHub />);
-    // по умолчанию режим «Взвешивание»: 83 → 82.2 кг + 0.5 л за 1 ч = 1.30 л/ч
+    // без измерений «измеренный» не выдумывается: в воду идёт ручное 600 мл/ч
+    expect(document.body.textContent || '').toMatch(/— ручное значение/);
+    const waterManual = tileValue('Вода');
+    setNumber('Вес до, кг', 83);
+    setNumber('Вес после, кг', 82.2);
+    setNumber('Выпито, л', 0.5);
     const waterMeasured = tileValue('Вода');
     expect(document.body.textContent || '').toMatch(/измерено пот-тестом/);
+    expect(waterMeasured).toBeGreaterThan(waterManual);
     fireEvent.click(Array.from(document.querySelectorAll('button'))
       .find(b => (b.textContent || '').includes('Оценка')) as HTMLElement);
-    const waterEstimated = tileValue('Вода');
     expect(document.body.textContent || '').toMatch(/— ручное значение/);
-    expect(waterMeasured).not.toBe(waterEstimated);
+    expect(tileValue('Вода')).toBe(waterManual);
   });
 });

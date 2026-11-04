@@ -236,9 +236,12 @@ export const MetabolicHub: React.FC = () => {
   const [boneFlag, setBoneFlag] = useState(false);
   const [menstrualFlag, setMenstrualFlag] = useState(false);
   // P1-1 sweat lab
+  // Аудит 2026-11: дефолты были 83 → 82.2 кг + 0.5 л, и карточка показывала «измеренный
+  // 1.30 л/ч», хотя пользователь ничего не измерял. Теперь измерения пустые (потери 0 →
+  // движок даёт оценку ACSM), а «измеренный» появляется только после реального ввода.
   const [preKg, setPreKg] = useState(83);
-  const [postKg, setPostKg] = useState(82.2);
-  const [fluidL, setFluidL] = useState(0.5);
+  const [postKg, setPostKg] = useState(83);
+  const [fluidL, setFluidL] = useState(0);
   const [sweatHours, setSweatHours] = useState(1);
   // P1-3 metabolic health extra
   const [hdlMgDl, setHdlMgDl] = useState<number|undefined>(undefined);
@@ -843,6 +846,7 @@ const kbju = useMemo(()=> calcKBJU(input), [input]);
   const resetAll = useCallback(()=>{
     try{ localStorage.removeItem(SNAP_KEY); }catch{}
     manualLabsRef.current = {};
+    // Лабы и замеры
     setBodyFat(undefined);
     setHct(undefined); setHgb(undefined); setFerritin(undefined); setGfr(undefined);
     setHdlMgDl(undefined); setAst(undefined); setAlt(undefined); setPlt(undefined);
@@ -850,17 +854,35 @@ const kbju = useMemo(()=> calcKBJU(input), [input]);
     setTsh(undefined); setFt4(undefined); setSfaG(undefined); setGgt(undefined);
     setFiberG(undefined); setOmega3G(undefined);
     setSkinfoldSum3(undefined); setSkinfoldSum4(undefined); setBiaResistance(undefined);
+    setSystolic(undefined); setDiastolic(undefined);
+    // Цель, дефицит, объём
     setDeficitKcal(undefined); setWeeksInDeficit(undefined); setWeightLostKg(undefined);
     setTargetWeight(undefined); setWeeksToGoal(undefined); setMetHoursPerWeek(undefined);
     setMeasuredRMR(undefined); setEdeScore(undefined); setWeeklyVolumeTons(undefined);
-    setAlcoholG(0); setAlcoholDays(0);
+    // Анкеты и флаги
     setLeafAnswers(Array(8).fill(false)); setLeafScore(undefined);
     setLeamAnswers(Array(6).fill(false));
     setBoneFlag(false); setMenstrualFlag(false); setLowT(false); setLowBMD(false); setT3Low(false);
     setPostBariatric(false); setAcclimated(false); setUntreatedHypo(false); setCreatineUse(false);
+    // Аудит 2026-11: «Сброс» обещал «поля снова пустые», но оставлял климат, пот, сон/стресс,
+    // тест пота, расписание, загрузки, горизонт прогноза, профессию и ААС — значения
+    // продолжали влиять на расчёт после сброса.
+    setStress(5); setSleepHours(7); setSleepQuality(3);
+    setClimate('temperate'); setHumidity(55); setStandingHours(2); setFidgetLevel(2);
+    setSweatRate(600); setSweatSodium(900); setSweatIntensity('moderate'); setSweatEnv('temperate');
+    setUseMeasuredSweat(true); setPreKg(weight); setPostKg(weight); setFluidL(0); setSweatHours(1);
+    setAlcoholG(0); setAlcoholDays(0); setCaffeineMg(150); setCaffeineHoursSince(2);
+    setWaterL(2.5); setSodiumG(3.5); setPotassiumG(3.0);
+    setScheduleText('пн: силовая 1ч, вт: бег 0.5ч, чт: силовая 1ч');
+    setCarbLoadDays(2); setCarbGPerKg(10); setSodiumLoadDays(2); setSodiumGPerDay(5);
+    setProjectionYears(3); setProjectionMode('hold_bf'); setProteinMeals(4);
+    setProfession('sedentary'); setTrimester(0); setLactating('none'); setEthnicity('european');
+    setMenstrualPhase('none'); setProteinSource('mixed');
+    setGoal('maintain'); setActivityLevel('medium'); setOnAAS(false); setAasDose(500);
+    setCompareIds([]);
     setWizardStep(1);
-    showToast('Ввод сброшен — поля снова пустые, профиль не тронут');
-  }, [showToast]);
+    showToast('Ввод сброшен: лабы, замеры, пот, климат, сон, цель — пусто. Вес/рост/активность из профиля не тронуты');
+  }, [showToast, weight]);
 
   const active = MODE_DEFS.find(d=> d.m===mode)!;
   const waistErr = waist && neck && waist <= neck ? 'Талия ≤ шеи — Navy невалиден' : null;
@@ -1235,7 +1257,7 @@ const kbju = useMemo(()=> calcKBJU(input), [input]);
             <div style={{ marginTop:6, fontSize:8, color:'rgba(255,255,255,0.45)' }}>BHI-рейтинг: {beverageV2.slice(0,3).map(b=>`${b.name} ×${b.score}`).join(' · ')}</div>
             {sweatV2 && <div style={{ marginTop:6, fontSize:8, color:'#06b6d4', background:'rgba(6,182,214,0.06)', border:'1px solid rgba(6,182,214,0.12)', borderRadius:8, padding:'6px 8px' }}>PRO v2 {sweatV2.measured ? 'измеренный' : 'оценка ACSM'}: {sweatV2.rateLPerH.toFixed(2)} л/ч · {sweatV2.rangeNote} · BHI-топ: {beverageV2.slice(0,3).map(b=>`${b.name} BHI${b.bhi}`).join(' · ')}</div>}
           </div>
-        ) : <div style={{ marginTop:8, fontSize:9, color:'rgba(255,255,255,0.45)', background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', borderRadius:8, padding:'7px 10px' }}>Формула: (до − после + выпито)/часы. 1кг =1л пота. Тестируй в условиях гонки.</div>}
+        ) : <div style={{ marginTop:8, fontSize:9, color:'rgba(255,255,255,0.45)', background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', borderRadius:8, padding:'7px 10px' }}>Формула: (до − после + выпито)/часы. 1кг =1л пота. Тестируй в условиях гонки. Пока измерения нет, в воду идёт {effectiveSweatMlPerH} мл/ч (ручное значение из шага ②).</div>}
         <div style={{ marginTop:8 }}>
           <MhToggle checked={acclimated} onChange={setAcclimated} icon="🌡" title="Акклиматизация 10–14 дней" desc="объём +10–20%, Na −40% (Periard)" accent="#06b6d4" />
         </div>
