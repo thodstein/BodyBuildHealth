@@ -96,6 +96,23 @@ glucose/insulin/tsh/ft4).
 **Исправление.** Единый `effectiveDeficit`, `stepsCalc.tdeeNat` как настоящий TDEE для
 `at`/`atRange`/`goalV2`/`reverseAuto`.
 
+### 1.11 `MhTile` смешивала `border` и `borderLeft`
+
+**Причина.** Активная плитка задавала шорткат `border` поверх базового `borderLeft`. React
+предупреждал «Updating a style property during rerender (border) when a conflicting property is
+set (borderLeft)», и рамка могла залипнуть при переключении active → не active.
+**Исправление.** Плитка задаёт только длинные свойства (`borderTopWidth/…Color`,
+`borderLeftWidth: 3`), без шортката.
+**Регрессия.** Предупреждение исчезло из прогона `metabolic-hub-modes.test.tsx` (консоль чистая).
+
+### 1.12 Режимы не проверялись на «реально показывает результат»
+
+**Причина.** Guard-тесты фиксировали структуру (16 пилюль в DOM), но не то, что КАЖДЫЙ режим
+реально показывает результат. Сломанный режим (потерянный вход, деление на 0) прошёл бы мимо.
+**Исправление.** Добавлен `metabolic-hub-modes.test.tsx`: кликает все 16 пилюль и требует
+непустой результат без `NaN`/`undefined`/`null`, плюс что переключение режима не сбрасывает шаг
+мастера.
+
 ---
 
 ## 2. Чего не хватало (добавлено)
@@ -144,10 +161,8 @@ glucose/insulin/tsh/ft4).
   Полный `npm run type-check` в этом окружении не укладывается в память: 7.9 ГБ RAM и
   параллельные `tsc`/`vitest` из других сессий → heap OOM / `Zone Allocation failed`.
   Прогонять на свободной машине.
-- `npx vitest run src/ui/screens/Shared/__tests__/metabolic-hub-structure.test.tsx
-  src/ui/screens/Shared/__tests__/metabolic-hub-toggles.test.tsx
-  src/ui/screens/Shared/__tests__/metabolic-hub-honesty.test.ts
-  src/engines/__tests__/metabolic-hub.test.ts` — **175 passed** (4 файла).
+- `npx vitest run src/ui/screens/Shared/__tests__ src/engines/__tests__/metabolic-hub.test.ts`
+  — **178 passed** (5 файлов: structure / toggles / honesty / modes / engine).
 - `npx vitest run src/ui/__tests__/rest-hooks-native.test.tsx
   src/engines/__tests__/risk-info-honesty-e07-e08.test.ts` — **89 passed**
   (в stderr шумит jsdom-canvas chart.js — это фон, не падения).
@@ -159,6 +174,7 @@ Guard-тесты, которые нельзя ломать при следующ
 | --- | --- |
 | `metabolic-hub-toggles.test.tsx` | 16 `.mh-mode` (все ≥44px), 4 `.mh-preset`, ≥20 `role=switch`, `.mh-mini`/`.mh-compare` ≥44px |
 | `metabolic-hub-honesty.test.ts` | `bmrMethodLabel(` ровно 2 раза, «неприменима», `IR_MARKERS_SHARED_INPUT_NOTE` рядом с TyG |
+| `metabolic-hub-modes.test.tsx` | 16 пилюль с ожидаемыми подписями; каждый режим даёт непустой результат без `NaN`/`undefined`/`null`; переключение режима не сбрасывает шаг мастера |
 | `metabolic-hub-structure.test.tsx` | 4 шага, 4 группы, sticky-селектор, честные «не задано», ключи `valuesRef` = ключи `apply(...)`, «Сброс лаб» → `resetLabs` |
 | `risk-info-honesty-e07-e08.test.ts` | `{MODE_DEFS.length} калькуляторов`, 16 записей `MODE_DEFS` |
 

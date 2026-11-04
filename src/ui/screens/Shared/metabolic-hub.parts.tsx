@@ -194,13 +194,21 @@ export const MhTile: React.FC<{
   onClick?: () => void; active?: boolean;
 }> = ({ label, value, sub, color = '#fff', accent = '#60a5fa', onClick, active }) => {
   const Tag: any = onClick ? 'button' : 'div';
+  // Только длинные свойства границ: смешивать `border`-шорткат с `borderLeft` нельзя —
+  // React предупреждает, и при ререндере (active → не active) рамка может залипнуть.
+  const edge = active ? `${accent}44` : 'rgba(255,255,255,0.07)';
   return (
     <Tag
       {...(onClick ? { type: 'button', onClick, 'aria-label': `${label}: ${typeof value === 'string' || typeof value === 'number' ? value : ''}` } : {})}
       style={{
-        ...MH_CARD, marginBottom: 0, padding: 10, borderLeft: `3px solid ${accent}`, minHeight: 72,
+        background: active ? `${accent}14` : MH_GLASS.background,
+        backdropFilter: MH_GLASS.backdropFilter,
+        transition: MH_GLASS.transition,
+        borderRadius: 14, padding: 10, marginBottom: 0, minHeight: 72,
+        borderTopWidth: 1, borderRightWidth: 1, borderBottomWidth: 1, borderLeftWidth: 3,
+        borderStyle: 'solid',
+        borderTopColor: edge, borderRightColor: edge, borderBottomColor: edge, borderLeftColor: accent,
         ...(onClick ? { width: '100%', textAlign: 'left', cursor: 'pointer' } : {}),
-        ...(active ? { background: `${accent}14`, border: `1px solid ${accent}44`, borderLeft: `3px solid ${accent}` } : {}),
       }}>
       <div style={{ fontSize: 9, fontWeight: 800, color: accent, letterSpacing: 0.4, textTransform: 'uppercase' }}>{label}</div>
       <div style={{ fontSize: 16, fontWeight: 900, color, lineHeight: 1.2 }}>{value}</div>
