@@ -167,3 +167,27 @@ describe('BB-снимки: правки пересчитывают факт по
     expect(body).not.toMatch(/const weeklySets = \(plan\.weeks \|\| \[\]\)\.reduce/);
   });
 });
+
+/**
+ * Итерация T: в артефактах для человека не должно быть сырых ключей мышц.
+ * Замер: 2507 из 2946 ячеек мышц в печати — ключи (`delt_mid`, `back`);
+ * экран heatmap выводил `m` как есть, хотя импортирует `muscleLabel`.
+ */
+describe('BB-подписи: печать/CSV/heatmap показывают мышцу по-русски', () => {
+  const ADJUST = readFileSync(resolve(__dirname, '..', 'bb-step-adjust.tsx'), 'utf8');
+
+  it('экран heatmap подписывает строку через muscleLabel', () => {
+    const row = ADJUST.split('\n').find((l) => l.includes('hmMuscles.map('));
+    expect(row, 'строка heatmap не найдена').toBeTruthy();
+    expect(row).toContain('muscleLabel(m)');
+  });
+
+  it('печать и CSV конструктора не печатают сырой ключ мышцы', () => {
+    // Печать «вся таблица» (ячейка мышцы) и CSV-колонка «Мышца».
+    expect(SRC).toMatch(/esc\(muscleLabel\(e\.muscle\)\)/);
+    expect(SRC).toMatch(/esc\(muscleLabel\(ex\.muscle\)\)/);
+    expect(SRC).toMatch(/esc\(muscleLabel\(m\)\)/);
+    expect(SRC).not.toMatch(/esc\(e\.muscle\)<\/td>/);
+    expect(SRC).not.toMatch(/esc\(ex\.muscle\)\s*,/);
+  });
+});

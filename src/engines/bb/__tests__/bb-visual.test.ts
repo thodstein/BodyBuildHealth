@@ -100,6 +100,24 @@ describe('Фаза 4.24: print HTML + ics', () => {
     expect(ics).toContain('END:VCALENDAR');
   });
 
+  it('печать: подписи мышц и уровня по-русски, без сырых ключей', () => {
+    // Замер до правки: 2507 из 2946 ячеек мышц в печати — сырые ключи
+    // (`delt_mid`, `back`), 16/16 планов печатали английское `Level: advanced`.
+    const RAW = ['chest', 'back', 'quads', 'hamstrings', 'glutes', 'calves', 'abs', 'traps', 'forearms', 'shoulders', 'biceps', 'triceps', 'delt_front', 'delt_mid', 'delt_rear'];
+    for (const patternId of ['ppl_6', 'upper_lower_4', 'fullbody_3']) {
+      const plan: any = buildBBPlan({ patternId, level: 'advanced', goal: 'mass', weeks: 2 } as any);
+      const html = buildBBPlanPrintHtml(plan);
+      expect(html, `${patternId}: английский уровень`).not.toMatch(/Level:\s*(beginner|intermediate|advanced|enhanced)/);
+      expect(html, `${patternId}: нет русского уровня`).toMatch(/Уровень:\s*Опытный/);
+      for (const k of RAW) {
+        expect(html, `${patternId}: сырой ключ мышцы '${k}' в печати`).not.toContain(`<td>${k}</td>`);
+        expect(html, `${patternId}: сырой ключ мышцы '${k}' в heatmap`).not.toContain(`<tr><td>${k}</td>`);
+      }
+      // Русские подписи реально присутствуют (а не «всё пусто»).
+      expect(html).toMatch(/Спина|Грудь|Квадрицепс|Квадры/);
+    }
+  });
+
   it('каждая сессия — событие в свой день; ничего нулевой длины', () => {
     // Замер до правки (ppl_6, 2 недели, старт 2026-11-04): 12 событий в ДВУХ
     // датах (все сессии недели получали дату начала недели), у всех

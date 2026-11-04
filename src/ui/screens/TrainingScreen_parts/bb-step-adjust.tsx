@@ -141,7 +141,7 @@ export const BbAdjustStep: React.FC<BbAdjustStepProps> = ({
             <div style={{ overflowX: 'auto', scrollbarWidth: 'none' }}>
               <table style={{ borderCollapse: 'collapse', fontSize: 10, minWidth: 300 }}>
                 <thead><tr><th style={{ border: '1px solid rgba(255,255,255,0.1)', padding: '3px 6px', textAlign: 'left' }}>Мышца</th>{hmWeeks.map(w => <th key={w} style={{ border: '1px solid rgba(255,255,255,0.1)', padding: '3px 6px' }}>Нед {w}</th>)}</tr></thead>
-                <tbody>{hmMuscles.map(m => <tr key={m}><td style={{ border: '1px solid rgba(255,255,255,0.1)', padding: '3px 6px' }}>{m}</td>{hmWeeks.map(w => { const c = hm.find(h => h.muscle === m && h.week === w); return <td key={w} style={{ border: '1px solid rgba(255,255,255,0.1)', textAlign: 'center', background: c ? (hmColor[c.status] + '22') : 'transparent', color: c ? hmColor[c.status] : 'rgba(255,255,255,0.4)' }}>{c ? c.sets : '·'}</td>; })}</tr>)}</tbody>
+                <tbody>{hmMuscles.map(m => <tr key={m}><td style={{ border: '1px solid rgba(255,255,255,0.1)', padding: '3px 6px' }}>{muscleLabel(m)}</td>{hmWeeks.map(w => { const c = hm.find(h => h.muscle === m && h.week === w); return <td key={w} style={{ border: '1px solid rgba(255,255,255,0.1)', textAlign: 'center', background: c ? (hmColor[c.status] + '22') : 'transparent', color: c ? hmColor[c.status] : 'rgba(255,255,255,0.4)' }}>{c ? c.sets : '·'}</td>; })}</tr>)}</tbody>
               </table>
             </div>
             <div style={{ display: 'flex', gap: 10, fontSize: 10, color: 'rgba(255,255,255,0.7)', flexWrap: 'wrap' }}>
