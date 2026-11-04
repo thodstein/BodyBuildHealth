@@ -562,7 +562,16 @@ export const MetabolicHub: React.FC = () => {
     try{ localStorage.setItem(SNAP_KEY, JSON.stringify(snapshot)); }catch{}
   }, [snapshot]);
 
-  const input: MetabolicInput = useMemo(()=> ({ weight,height,age,sex,bodyFat,neck,waist,hip,steps,cardioMin,trainingDays,trainingHours: trainingDays*1.15, activityLevel: activityLevel as any, profession, goal, onAAS, aasDose, stress, sleepHours, sleepQuality, acwr, climate, humidity, standingHours, fidgetLevel, sweatRate, sweatSodiumMgPerL: sweatSodium, weightHistory: weightHistory.length>=3 ? weightHistory : undefined, hct, hgb, ferritin, gfr, waterL, ironIntakeMg: undefined, alcoholG, alcoholDaysPerWeek: alcoholDays, caffeineMg, tsh, ft4, creatineUse, weeklyVolumeTons, menstrualPhase, targetWeight, fiberG, omega3G, skinfoldSum3, skinfoldSum4, biaResistanceOhm: biaResistance, glucoseMgDl, insulinMuMl, deficitKcal, weeksInDeficit, metHoursPerWeek, measuredRMR, leafScore, boneFlag, menstrualFlag, hdlMgDl, systolic, diastolic, ast, alt, plt, caffeineHoursSince, trimester: trimester || undefined, lactating: lactating === 'none' ? undefined : lactating, ethnicity, postBariatric, untreatedHypothyroid: untreatedHypo || undefined, acclimated, proteinSource } as any), [weight,height,age,sex,bodyFat,neck,waist,hip,steps,cardioMin,trainingDays,activityLevel,profession,goal,onAAS,aasDose,stress,sleepHours,sleepQuality,acwr,climate,humidity,standingHours,fidgetLevel,sweatRate,sweatSodium,weightHistory,hct,hgb,ferritin,gfr,waterL,alcoholG,alcoholDays,caffeineMg,tsh,ft4,glucoseMgDl,insulinMuMl,skinfoldSum3,skinfoldSum4,biaResistance,deficitKcal,weeksInDeficit,creatineUse,weeklyVolumeTons,menstrualPhase,targetWeight,fiberG,omega3G,metHoursPerWeek,measuredRMR,leafScore,boneFlag,menstrualFlag,hdlMgDl,systolic,diastolic,ast,alt,plt,caffeineHoursSince,trimester,lactating,ethnicity,postBariatric,untreatedHypo,acclimated,proteinSource]);
+  // Пот-тест считается ДО общего input: измеренный пот обязан попадать в воду, а не жить
+  // только в карточке «Пот-тест» (было: тест показал 1.30 л/ч, а вода считалась по 600).
+  const sweatV2 = useMemo(()=> calcSweatTestV2(useMeasuredSweat ? { preKg, postKg, fluidL, hours: sweatHours, sodiumMgPerL: sweatSodium, weightKg: weight, acclimated } : { hours: sweatHours, sodiumMgPerL: sweatSodium, weightKg: weight, intensity: sweatIntensity, environment: sweatEnv, acclimated }), [useMeasuredSweat, preKg, postKg, fluidL, sweatHours, sweatSodium, weight, acclimated, sweatIntensity, sweatEnv]);
+  /** Измеренный пот (мл/ч) или null, если режим «Оценка»/данных нет. */
+  const measuredSweatMlPerH = useMeasuredSweat && sweatV2?.measured ? Math.round(sweatV2.rateLPerH * 1000) : null;
+  const effectiveSweatMlPerH = measuredSweatMlPerH ?? sweatRate;
+  /** Periard: акклиматизация снижает [Na] пота на ~40% — считаем одинаково в воде и в пот-тесте. */
+  const effectiveSweatNaMgPerL = Math.round(sweatSodium * (acclimated ? 0.6 : 1));
+
+  const input: MetabolicInput = useMemo(()=> ({ weight,height,age,sex,bodyFat,neck,waist,hip,steps,cardioMin,trainingDays,trainingHours: trainingDays*1.15, activityLevel: activityLevel as any, profession, goal, onAAS, aasDose, stress, sleepHours, sleepQuality, acwr, climate, humidity, standingHours, fidgetLevel, sweatRate: effectiveSweatMlPerH, sweatSodiumMgPerL: effectiveSweatNaMgPerL, weightHistory: weightHistory.length>=3 ? weightHistory : undefined, hct, hgb, ferritin, gfr, waterL, ironIntakeMg: undefined, alcoholG, alcoholDaysPerWeek: alcoholDays, caffeineMg, tsh, ft4, creatineUse, weeklyVolumeTons, menstrualPhase, targetWeight, fiberG, omega3G, skinfoldSum3, skinfoldSum4, biaResistanceOhm: biaResistance, glucoseMgDl, insulinMuMl, deficitKcal, weeksInDeficit, metHoursPerWeek, measuredRMR, leafScore, boneFlag, menstrualFlag, hdlMgDl, systolic, diastolic, ast, alt, plt, caffeineHoursSince, trimester: trimester || undefined, lactating: lactating === 'none' ? undefined : lactating, ethnicity, postBariatric, untreatedHypothyroid: untreatedHypo || undefined, acclimated, proteinSource } as any), [weight,height,age,sex,bodyFat,neck,waist,hip,steps,cardioMin,trainingDays,activityLevel,profession,goal,onAAS,aasDose,stress,sleepHours,sleepQuality,acwr,climate,humidity,standingHours,fidgetLevel,effectiveSweatMlPerH,effectiveSweatNaMgPerL,weightHistory,hct,hgb,ferritin,gfr,waterL,alcoholG,alcoholDays,caffeineMg,tsh,ft4,glucoseMgDl,insulinMuMl,skinfoldSum3,skinfoldSum4,biaResistance,deficitKcal,weeksInDeficit,creatineUse,weeklyVolumeTons,menstrualPhase,targetWeight,fiberG,omega3G,metHoursPerWeek,measuredRMR,leafScore,boneFlag,menstrualFlag,hdlMgDl,systolic,diastolic,ast,alt,plt,caffeineHoursSince,trimester,lactating,ethnicity,postBariatric,untreatedHypo,acclimated,proteinSource]);
 
   const water = useMemo(()=> calcWater(input), [input]);
 const stepsCalc = useMemo(()=> calcSteps(input), [input]);
@@ -650,7 +659,6 @@ const kbju = useMemo(()=> calcKBJU(input), [input]);
     const ls = leafCalc ? leafCalc.score : leafScore;
     return calcRedsCAT2({ ea: ea?.ea ?? null, sex, leafScore: ls, leamScore: leamCalc.score, edeScore, rmrRatio, boneFlag, menstrualFlag, lowTestosterone: lowT, lowBMD: lowBMD, ferritinLow: (ferritin ?? 999) < 30, t3Low });
   }, [ea, sex, leafScore, leafCalc, leamCalc, edeScore, measuredRMR, kbju, boneFlag, menstrualFlag, lowT, lowBMD, ferritin, t3Low]);
-  const sweatV2 = useMemo(()=> calcSweatTestV2(useMeasuredSweat ? { preKg, postKg, fluidL, hours: sweatHours, sodiumMgPerL: sweatSodium, weightKg: weight, acclimated } : { hours: sweatHours, sodiumMgPerL: sweatSodium, weightKg: weight, intensity: sweatIntensity, environment: sweatEnv, acclimated }), [useMeasuredSweat, preKg, postKg, fluidL, sweatHours, sweatSodium, weight, acclimated, sweatIntensity, sweatEnv]);
   const beverageV2 = useMemo(()=> sweatV2 ? calcBeverageRankV2(sweatV2.totalLossMl, sweatV2.elect.sodiumMg, sweatHours) : [], [sweatV2, sweatHours]);
   const tgHdl = useMemo(()=> calcTGHDLWrap(tgMgDl2, hdlMgDl), [tgMgDl2, hdlMgDl]);
   const bmiNow = useMemo(()=> weight / (((height||180)/100)**2), [weight, height]);
@@ -1020,7 +1028,7 @@ const kbju = useMemo(()=> calcKBJU(input), [input]);
             hint="Честный PAL по Ainsworth: 3 силовые × 6 MET × 1ч = 18 MET·ч/нед → +0.12 PAL. Пусто = оценка по шагам/тренировкам."
             onChange={setMetHoursPerWeek} />
           <MhNum label="Пот, мл/ч" value={sweatRate} min={200} max={2000} suffix=" мл/ч"
-            hint="Baker 2017: 400–800 мл/ч в среднем, до 2000 в жару. Влияет на воду и электролиты."
+            hint="Baker 2017: 400–800 мл/ч в среднем, до 2000 в жару. Идёт в воду, когда пот-тест стоит в режиме «Оценка» — измеренный пот подставляется сам."
             onChange={v=> setSweatRate(v ?? 600)} />
           <MhNum label="Na пота, мг/л" value={sweatSodium} min={200} max={2000} suffix=" мг/л"
             hint="Индивидуально 200–1800 мг/л; 900 = среднее. Точное значение — полоской пота."
@@ -1030,6 +1038,13 @@ const kbju = useMemo(()=> calcKBJU(input), [input]);
             hint="Учитывается только в жаре: каждая точка выше 60% добавляет ~8 мл/сут испарением."
             onChange={setHumidity} />
         </MhGrid>
+        <div style={{ fontSize:8, color:'#06b6d4', marginTop:6, lineHeight:1.4 }}>
+          💧 В воду идёт {effectiveSweatMlPerH} мл/ч
+          {measuredSweatMlPerH != null
+            ? ` — измерено пот-тестом (${sweatV2?.rateLPerH.toFixed(2)} л/ч); ручное ${sweatRate} вернётся в режиме «Оценка»`
+            : ' — ручное значение (измеренный пот подставится после взвешивания до/после)'}
+          {' · '}Na {effectiveSweatNaMgPerL} мг/л{acclimated ? ' (акклиматизация −40%, Periard)' : ''}
+        </div>
         <div style={{ marginTop:6 }}>
           <div style={{ fontSize:9, fontWeight:700, color:'rgba(255,255,255,0.55)', marginBottom:4 }}>Расписание (plain-English):</div>
           <textarea value={scheduleText} onChange={e=> setScheduleText(e.target.value)} placeholder="пн: силовая 1ч, вт: бег 0.5ч, чт: силовая 1ч, сб: ходьба 1ч" style={{ width:'100%', minHeight:48, borderRadius:8, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.08)', color:'#fff', fontSize:9, padding:'8px 10px', resize:'vertical' }} />

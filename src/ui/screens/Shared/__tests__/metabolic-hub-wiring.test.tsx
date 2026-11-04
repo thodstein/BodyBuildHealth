@@ -161,4 +161,16 @@ describe('MetabolicHub: ввод меняет расчёт (проводка п�
     expect(loose).toMatch(/план быстрее срока/);
     expect(loose).not.toMatch(/в срок не успеть/);
   });
+
+  it('измеренный пот-тест попадает в воду, а не живёт только в карточке', () => {
+    render(<MetabolicHub />);
+    // по умолчанию режим «Взвешивание»: 83 → 82.2 кг + 0.5 л за 1 ч = 1.30 л/ч
+    const waterMeasured = tileValue('Вода');
+    expect(document.body.textContent || '').toMatch(/измерено пот-тестом/);
+    fireEvent.click(Array.from(document.querySelectorAll('button'))
+      .find(b => (b.textContent || '').includes('Оценка')) as HTMLElement);
+    const waterEstimated = tileValue('Вода');
+    expect(document.body.textContent || '').toMatch(/— ручное значение/);
+    expect(waterMeasured).not.toBe(waterEstimated);
+  });
 });
