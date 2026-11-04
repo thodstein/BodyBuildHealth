@@ -1543,11 +1543,15 @@ export function buildOneAnswerPro(params: { formulaTDEE: number; adaptiveV3?: Ad
 export function diffMetabolicSnapshots(a: Record<string, any>, b: Record<string, any>): Array<{ key: string; a: any; b: any; delta: number | null }> {
   const keys = Array.from(new Set([...Object.keys(a), ...Object.keys(b)]));
   const out: Array<{ key: string; a: any; b: any; delta: number | null }> = [];
+  const scalar = (v: unknown) => typeof v === 'number' || typeof v === 'string' || typeof v === 'boolean';
   for (const k of keys) {
     if (typeof a[k] === 'number' && typeof b[k] === 'number') {
       const d = Math.round((b[k] - a[k]) * 100) / 100;
       if (d !== 0) out.push({ key: k, a: a[k], b: b[k], delta: d });
-    } else if (JSON.stringify(a[k]) !== JSON.stringify(b[k]) && (typeof a[k] === 'number' || typeof b[k] === 'number' || typeof a[k] === 'string' || typeof b[k] === 'string')) {
+    } else if (JSON.stringify(a[k]) !== JSON.stringify(b[k]) && (scalar(a[k]) || scalar(b[k]))) {
+      // Аудит 2026-11: булевы переключатели (ААС, креатин, акклиматизация, пот-режим)
+      // раньше не попадали в diff вовсе — сравнение «до/после» их молча пропускало.
+      // Объекты (анкеты LEAF/LEAM, список сценариев) по-прежнему не мусорят diff.
       out.push({ key: k, a: a[k], b: b[k], delta: null });
     }
   }

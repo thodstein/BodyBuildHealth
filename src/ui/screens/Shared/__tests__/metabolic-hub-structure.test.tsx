@@ -124,4 +124,17 @@ describe('MetabolicHub: ручной ввод лаб переживает авт
     expect(src).toMatch(/onClick=\{resetLabs\}/);
     expect(src).toContain('manualLabsRef.current = {};');
   });
+
+  it('у каждого поля снапшота есть человеческая подпись в SNAP_LABEL', () => {
+    // регрессия: список покрывал 29 из ~90 ключей, и diff сценариев печатал
+    // сырые camelCase (glucoseMgDl, useMeasuredSweat, hct) вместо подписей
+    const snapBlock = src.match(/const snapshot = useMemo\(\(\)=>\(\{([^}]*)\}/);
+    expect(snapBlock, 'snapshot').toBeTruthy();
+    const snapKeys = snapBlock![1].split(',').map(s => s.trim().split(':')[0]!.trim()).filter(Boolean);
+    expect(snapKeys.length).toBeGreaterThan(80);
+    const labelBlock = src.match(/const SNAP_LABEL: Record<string, string> = \{([\s\S]*?)\n\};/);
+    expect(labelBlock, 'SNAP_LABEL').toBeTruthy();
+    const labels = new Set(Array.from(labelBlock![1].matchAll(/([A-Za-z0-9_]+)\s*:/g)).map(m => m[1]!));
+    expect(snapKeys.filter(k => !labels.has(k))).toEqual([]);
+  });
 });

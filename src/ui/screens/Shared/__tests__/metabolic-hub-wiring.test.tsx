@@ -65,6 +65,14 @@ function setSelect(label: string, option: string) {
   fireEvent.click(opt);
 }
 
+/** Значение поля по aria-label («HCT, %: 52 %» → «52 %»). */
+function fieldValue(label: string): string {
+  const el = Array.from(document.querySelectorAll('button'))
+    .find(b => (b.getAttribute('aria-label') || '').startsWith(`${label}:`));
+  if (!el) throw new Error(`нет поля «${label}»`);
+  return (el.getAttribute('aria-label') || '').slice(label.length + 2);
+}
+
 describe('MetabolicHub: ввод меняет расчёт (проводка полей)', () => {
   it('вес 83 → 110 поднимает TDEE и воду', () => {
     render(<MetabolicHub />);
@@ -160,6 +168,22 @@ describe('MetabolicHub: ввод меняет расчёт (проводка п�
     const loose = document.body.textContent || '';
     expect(loose).toMatch(/план быстрее срока/);
     expect(loose).not.toMatch(/в срок не успеть/);
+  });
+
+  it('сценарий хранит лабы и восстанавливает их (было 22 поля из ~90)', () => {
+    render(<MetabolicHub />);
+    setNumber('HCT, %', 52);
+    setNumber('Ферритин, нг/мл', 15);
+    fireEvent.click(Array.from(document.querySelectorAll('button'))
+      .find(b => (b.textContent || '').includes('Сохранить сценарий')) as HTMLElement);
+    setNumber('HCT, %', 44);
+    setNumber('Ферритин, нг/мл', 120);
+    expect(fieldValue('HCT, %')).toBe('44 %');
+    fireEvent.click(Array.from(document.querySelectorAll('button'))
+      .find(b => (b.textContent || '').includes('↺ Сценарий')) as HTMLElement);
+    // сценарий раньше нёс только вес/рост/цель — лабы после загрузки пропадали
+    expect(fieldValue('HCT, %')).toBe('52 %');
+    expect(fieldValue('Ферритин, нг/мл')).toBe('15 нг/мл');
   });
 
   it('измеренный пот-тест попадает в воду, а не живёт только в карточке', () => {

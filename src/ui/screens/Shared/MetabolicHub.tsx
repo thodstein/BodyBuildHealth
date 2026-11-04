@@ -61,17 +61,94 @@ const GROUP_OF: Record<Mode, string> = MODE_GROUPS.reduce((acc, g) => {
 const GOAL_LABEL: Record<'cut' | 'maintain' | 'bulk' | 'health', string> = {
   cut: 'Сушка', maintain: 'Поддержание', bulk: 'Масса', health: 'Здоровье',
 };
-/** Человеческие подписи для diff сценариев (раньше показывались camelCase-ключи). */
+/**
+ * Человеческие подписи для diff сценариев.
+ * Аудит 2026-11: список покрывал 29 из ~90 ключей снапшота, поэтому сравнение
+ * показывало сырые camelCase (`glucoseMgDl`, `useMeasuredSweat`, `hct`).
+ * Guard: `metabolic-hub-structure.test.tsx` проверяет, что подпись есть у КАЖДОГО
+ * ключа снапшота.
+ */
 const SNAP_LABEL: Record<string, string> = {
   weight: 'вес', height: 'рост', age: 'возраст', sex: 'пол', bodyFat: '% жира',
   neck: 'шея', waist: 'талия', hip: 'бёдра', steps: 'шаги', cardioMin: 'кардио мин/нед',
   trainingDays: 'трен/нед', activityLevel: 'бытовая активность', profession: 'профессия',
-  goal: 'цель', onAAS: 'ААС', aasDose: 'доза ААС', trimester: 'триместр', lactating: 'лактация',
-  ethnicity: 'этничность', postBariatric: 'бариатрия', acclimated: 'акклиматизация',
-  proteinSource: 'источник белка', targetWeight: 'цель вес', deficitKcal: 'дефицит',
-  weeksInDeficit: 'нед в дефиците', weightLostKg: 'потеряно кг', metHoursPerWeek: 'MET-ч/нед',
-  weeklyVolumeTons: 'тоннаж', creatineUse: 'креатин',
+  goal: 'цель', stress: 'стресс 1–10', sleepHours: 'сон, ч', sleepQuality: 'качество сна',
+  onAAS: 'ААС', aasDose: 'доза ААС', climate: 'климат', humidity: 'влажность, %',
+  standingHours: 'стоя, ч/сут', fidgetLevel: 'непоседливость', sweatRate: 'пот, мл/ч',
+  sweatSodium: 'Na пота, мг/л', alcoholG: 'алкоголь, г/нед', alcoholDays: 'дней с алкоголем',
+  caffeineMg: 'кофеин, мг', tsh: 'ТТГ', ft4: 'св. Т4', glucoseMgDl: 'глюкоза, мг/дл',
+  insulinMuMl: 'инсулин, мкЕд/мл', skinfoldSum3: 'сумма 3 складок', skinfoldSum4: 'сумма 4 складок',
+  biaResistance: 'BIA, Ом', deficitKcal: 'дефицит, ккал', weeksInDeficit: 'нед в дефиците',
+  weightLostKg: 'потеряно кг', creatineUse: 'креатин', weeklyVolumeTons: 'тоннаж, т/нед',
+  targetWeight: 'цель вес', weeksToGoal: 'срок, нед', menstrualPhase: 'фаза цикла',
+  sfaG: 'насыщ. жиры, г', tgMgDl2: 'ТГ, мг/дл', ggt: 'ГГТ', hct: 'гематокрит, %',
+  hgb: 'гемоглобин, г/л', ferritin: 'ферритин, нг/мл', gfr: 'СКФ, мл/мин',
+  waterL: 'вода, л/сут', sodiumG: 'натрий, г', potassiumG: 'калий, г',
+  metHoursPerWeek: 'MET-ч/нед', leafScore: 'LEAF (0–3)', leafAnswers: 'ответы LEAF',
+  leamAnswers: 'ответы LEAM', measuredRMR: 'измеренный RMR, ккал', boneFlag: 'стресс-перелом',
+  menstrualFlag: 'нарушение цикла', preKg: 'вес до, кг', postKg: 'вес после, кг',
+  fluidL: 'выпито, л', sweatHours: 'длит. теста, ч', hdlMgDl: 'ЛПВП, мг/дл',
+  systolic: 'САД', diastolic: 'ДАД', ast: 'АСТ', alt: 'АЛТ', plt: 'тромбоциты, тыс',
+  caffeineHoursSince: 'кофеин, ч назад', trimester: 'триместр', lactating: 'лактация',
+  ethnicity: 'этничность', postBariatric: 'бариатрия', untreatedHypo: 'нелеч. гипотиреоз',
+  acclimated: 'акклиматизация', proteinSource: 'источник белка', proteinMeals: 'приёмов белка',
+  edeScore: 'EDE-Q', lowT: 'низкий тестостерон', lowBMD: 'низкая МПК', t3Low: 'низкий Т3',
+  sweatIntensity: 'интенсивность пота', sweatEnv: 'среда для пота', compareIds: 'выбранные сценарии',
+  fiberG: 'клетчатка, г', omega3G: 'омега-3, г', scheduleText: 'расписание тренировок',
+  carbLoadDays: 'дней углеводной загрузки', carbGPerKg: 'угли, г/кг',
+  sodiumLoadDays: 'дней Na-загрузки', sodiumGPerDay: 'Na, г/сут',
+  projectionYears: 'горизонт, лет', projectionMode: 'режим прогноза',
+  useMeasuredSweat: 'пот-тест',
+  manualLabs: 'лабы введены руками',
 };
+
+/** Значения-перечисления → по-русски (иначе diff печатал `cut → bulk`). */
+const SNAP_ENUM: Record<string, Record<string, string>> = {
+  sex: { male: 'муж', female: 'жен' },
+  goal: GOAL_LABEL,
+  activityLevel: { low: 'низкая', medium: 'средняя', high: 'высокая' },
+  profession: { auto: 'по бытовой', sedentary: 'сидячая 1.40', standing: 'на ногах 1.55', physical: 'физическая' },
+  climate: { temperate: 'умеренный', hot: 'жара', cold: 'холод' },
+  sweatIntensity: { easy: 'лёгкая', moderate: 'средняя', hard: 'тяжёлая' },
+  sweatEnv: { cool: 'прохладно', temperate: 'умеренно', hot: 'жара', hot_humid: 'жара + влажно' },
+  menstrualPhase: { none: 'нет', follicular: 'фолликулярная', luteal: 'лютеиновая' },
+  lactating: { none: 'нет', exclusive: 'исключительная', mixed: 'смешанная' },
+  ethnicity: { european: 'европейская', african: 'африканская', east_asian: 'восточноазиатская' },
+  proteinSource: { mixed: 'смешанный', whey: 'whey', milk: 'молочный', egg: 'яйцо', beef: 'говядина', plant: 'растительный' },
+  projectionMode: { hold_bf: 'BF const', hold_weight: 'вес const', hold_ffmi: 'FFMI const' },
+};
+
+/** Булевы поля diff: «вкл/выкл» мало что говорит, даём смысл по ключу. */
+const SNAP_BOOL: Record<string, [string, string]> = {
+  useMeasuredSweat: ['взвешивание', 'оценка'],
+  onAAS: ['да', 'нет'],
+  creatineUse: ['да', 'нет'],
+  acclimated: ['да', 'нет'],
+  postBariatric: ['да', 'нет'],
+  untreatedHypo: ['да', 'нет'],
+  boneFlag: ['есть', 'нет'],
+  menstrualFlag: ['есть', 'нет'],
+  lowT: ['низкий', 'норма'],
+  lowBMD: ['низкая', 'норма'],
+  t3Low: ['низкий', 'норма'],
+};
+
+/** Все лабы, которые хаб умеет подтягивать/помечать как ручные (ключи valuesRef и apply). */
+const LAB_KEYS = ['hct', 'hgb', 'ferritin', 'gfr', 'hdlMgDl', 'ast', 'alt', 'plt', 'tgMgDl2', 'glucoseMgDl', 'insulinMuMl', 'tsh', 'ft4'] as const;
+
+/** Значение поля снапшота для показа в diff. */
+function snapValue(key: string, v: unknown): string {
+  if (v == null || v === '') return '—';
+  if (typeof v === 'boolean') {
+    const pair = SNAP_BOOL[key] ?? ['вкл', 'выкл'];
+    return v ? pair[0] : pair[1];
+  }
+  if (typeof v === 'string') {
+    const map = SNAP_ENUM[key];
+    if (map && map[v]) return map[v];
+  }
+  return String(v);
+}
 
 const SNAP_KEY = 'he_metabolic_snapshot_v6';
 const SNAP_LEGACY_KEYS = [
@@ -397,6 +474,115 @@ export const MetabolicHub: React.FC = () => {
     showToast('Лабы сброшены — подтянутся из Профиля → Лабы');
   }, [showToast]);
 
+  /**
+   * Применить снапшот: одно место правды и для автосохранения (v6), и для загрузки сценария.
+   * Аудит 2026-11: сценарий хранил 22 поля из ~90 и восстанавливал столько же, поэтому
+   * лабы/сон/стресс/пот/климат/клетчатка в сценарии терялись, а diff их не показывал.
+   */
+  const applySnapshot = useCallback((s: any, opts?: { markLabs?: boolean })=>{
+    if(!s || typeof s !== 'object') return;
+    if(typeof s.weight==='number') setWeight(s.weight);
+    if(typeof s.height==='number') setHeight(s.height);
+    if(typeof s.age==='number') setAge(s.age);
+    if(s.sex) setSex(s.sex);
+    if(typeof s.bodyFat==='number') setBodyFat(s.bodyFat);
+    if(typeof s.neck==='number') setNeck(s.neck);
+    if(typeof s.waist==='number') setWaist(s.waist);
+    if(typeof s.hip==='number') setHip(s.hip);
+    if(typeof s.steps==='number') setSteps(s.steps);
+    if(typeof s.cardioMin==='number') setCardioMin(s.cardioMin);
+    if(typeof s.trainingDays==='number') setTrainingDays(s.trainingDays);
+    if(s.activityLevel) setActivityLevel(s.activityLevel);
+    if(s.goal) setGoal(s.goal);
+    if(typeof s.stress==='number') setStress(s.stress);
+    if(typeof s.sleepHours==='number') setSleepHours(s.sleepHours);
+    if(typeof s.sleepQuality==='number') setSleepQuality(s.sleepQuality);
+    if(typeof s.onAAS==='boolean') setOnAAS(s.onAAS);
+    if(typeof s.aasDose==='number') setAasDose(s.aasDose);
+    if(s.climate) setClimate(s.climate);
+    if(typeof s.humidity==='number') setHumidity(s.humidity);
+    if(typeof s.standingHours==='number') setStandingHours(s.standingHours);
+    if(typeof s.fidgetLevel==='number') setFidgetLevel(s.fidgetLevel as any);
+    if(typeof s.sweatRate==='number') setSweatRate(s.sweatRate);
+    if(typeof s.sweatSodium==='number') setSweatSodium(s.sweatSodium);
+    if(typeof s.alcoholG==='number') setAlcoholG(s.alcoholG);
+    if(typeof s.caffeineMg==='number') setCaffeineMg(s.caffeineMg);
+    if(typeof s.tsh==='number') setTsh(s.tsh);
+    if(typeof s.ft4==='number') setFt4(s.ft4);
+    if(typeof s.glucoseMgDl==='number') setGlucoseMgDl(s.glucoseMgDl);
+    if(typeof s.insulinMuMl==='number') setInsulinMuMl(s.insulinMuMl);
+    if(typeof s.skinfoldSum3==='number') setSkinfoldSum3(s.skinfoldSum3);
+    if(typeof s.skinfoldSum4==='number') setSkinfoldSum4(s.skinfoldSum4);
+    if(typeof s.biaResistance==='number') setBiaResistance(s.biaResistance);
+    if(typeof s.t3Low==='boolean') setT3Low(s.t3Low);
+    if(typeof s.untreatedHypo==='boolean') setUntreatedHypo(s.untreatedHypo);
+    if(Array.isArray(s.leafAnswers) && s.leafAnswers.length===8) { setLeafAnswers(s.leafAnswers.map(Boolean)); setLeafScore(s.leafAnswers.filter(Boolean).length*2); }
+    if(Array.isArray(s.leamAnswers) && s.leamAnswers.length===6) setLeamAnswers(s.leamAnswers.map(Boolean));
+    if(Array.isArray(s.compareIds)) setCompareIds(s.compareIds.filter((x:any)=> typeof x==='string').slice(-2));
+    if(typeof s.deficitKcal==='number') setDeficitKcal(s.deficitKcal);
+    if(typeof s.weeksInDeficit==='number') setWeeksInDeficit(s.weeksInDeficit);
+    if(typeof s.weightLostKg==='number') setWeightLostKg(s.weightLostKg);
+    if(typeof s.creatineUse==='boolean') setCreatineUse(s.creatineUse);
+    if(typeof s.weeklyVolumeTons==='number') setWeeklyVolumeTons(s.weeklyVolumeTons);
+    if(typeof s.targetWeight==='number') setTargetWeight(s.targetWeight);
+    if(typeof s.weeksToGoal==='number') setWeeksToGoal(s.weeksToGoal);
+    if(s.menstrualPhase) setMenstrualPhase(s.menstrualPhase);
+    if(typeof s.sfaG==='number') setSfaG(s.sfaG);
+    if(typeof s.tgMgDl2==='number') setTgMgDl2(s.tgMgDl2);
+    if(typeof s.ggt==='number') setGgt(s.ggt);
+    if(typeof s.hct==='number') setHct(s.hct);
+    if(typeof s.hgb==='number') setHgb(s.hgb);
+    if(typeof s.ferritin==='number') setFerritin(s.ferritin);
+    if(typeof s.gfr==='number') setGfr(s.gfr);
+    if(typeof s.waterL==='number') setWaterL(s.waterL);
+    if(typeof s.sodiumG==='number') setSodiumG(s.sodiumG);
+    if(typeof s.potassiumG==='number') setPotassiumG(s.potassiumG);
+    if(typeof s.metHoursPerWeek==='number') setMetHoursPerWeek(s.metHoursPerWeek);
+    if(typeof s.leafScore==='number') setLeafScore(s.leafScore);
+    if(typeof s.measuredRMR==='number') setMeasuredRMR(s.measuredRMR);
+    if(typeof s.boneFlag==='boolean') setBoneFlag(s.boneFlag);
+    if(typeof s.menstrualFlag==='boolean') setMenstrualFlag(s.menstrualFlag);
+    if(typeof s.preKg==='number') setPreKg(s.preKg);
+    if(typeof s.postKg==='number') setPostKg(s.postKg);
+    if(typeof s.fluidL==='number') setFluidL(s.fluidL);
+    if(typeof s.sweatHours==='number') setSweatHours(s.sweatHours);
+    if(typeof s.hdlMgDl==='number') setHdlMgDl(s.hdlMgDl);
+    if(typeof s.systolic==='number') setSystolic(s.systolic);
+    if(typeof s.diastolic==='number') setDiastolic(s.diastolic);
+    if(typeof s.ast==='number') setAst(s.ast);
+    if(typeof s.alt==='number') setAlt(s.alt);
+    if(typeof s.plt==='number') setPlt(s.plt);
+    if(typeof s.caffeineHoursSince==='number') setCaffeineHoursSince(s.caffeineHoursSince);
+    if(s.profession) setProfession(s.profession);
+    if(typeof s.trimester==='number') setTrimester(s.trimester as any);
+    if(s.lactating) setLactating(s.lactating);
+    if(s.ethnicity) setEthnicity(s.ethnicity);
+    if(typeof s.postBariatric==='boolean') setPostBariatric(s.postBariatric);
+    if(typeof s.acclimated==='boolean') setAcclimated(s.acclimated);
+    if(typeof s.alcoholDays==='number') setAlcoholDays(s.alcoholDays);
+    if(typeof s.proteinSource==='string') setProteinSource(s.proteinSource);
+    if(s.proteinMeals===3 || s.proteinMeals===4 || s.proteinMeals===5 || s.proteinMeals===6) setProteinMeals(s.proteinMeals);
+    if(typeof s.edeScore==='number') setEdeScore(s.edeScore);
+    if(typeof s.lowT==='boolean') setLowT(s.lowT);
+    if(typeof s.lowBMD==='boolean') setLowBMD(s.lowBMD);
+    if(s.sweatIntensity) setSweatIntensity(s.sweatIntensity);
+    if(s.sweatEnv) setSweatEnv(s.sweatEnv);
+    if(typeof s.useMeasuredSweat==='boolean') setUseMeasuredSweat(s.useMeasuredSweat);
+    if(typeof s.fiberG==='number') setFiberG(s.fiberG);
+    if(typeof s.omega3G==='number') setOmega3G(s.omega3G);
+    if(typeof s.scheduleText==='string') setScheduleText(s.scheduleText);
+    if(typeof s.carbLoadDays==='number') setCarbLoadDays(s.carbLoadDays);
+    if(typeof s.carbGPerKg==='number') setCarbGPerKg(s.carbGPerKg);
+    if(typeof s.sodiumLoadDays==='number') setSodiumLoadDays(s.sodiumLoadDays);
+    if(typeof s.sodiumGPerDay==='number') setSodiumGPerDay(s.sodiumGPerDay);
+    if(typeof s.projectionYears==='number') setProjectionYears(s.projectionYears);
+    if(s.projectionMode) setProjectionMode(s.projectionMode);
+    if(opts?.markLabs) for(const k of LAB_KEYS) if(typeof s[k]==='number') manualLabsRef.current[k] = true;
+    // пометки «введено руками» сохраняются вместе со снапшотом — иначе таймер лаб
+    // (раз в 8 с) возвращал значение из профиля и затирал ручной ввод
+    if(Array.isArray(s.manualLabs)) for(const k of s.manualLabs) if(typeof k==='string') manualLabsRef.current[k] = true;
+  },[]);
+
   // init: актуальный снапшот v6 → legacy v5/v4/v3/v1 → профиль
   useEffect(()=>{
     let loaded=false;
@@ -408,102 +594,7 @@ export const MetabolicHub: React.FC = () => {
       }
       if(raw){
         const s=JSON.parse(raw);
-        if(typeof s.weight==='number') setWeight(s.weight);
-        if(typeof s.height==='number') setHeight(s.height);
-        if(typeof s.age==='number') setAge(s.age);
-        if(s.sex) setSex(s.sex);
-        if(typeof s.bodyFat==='number') setBodyFat(s.bodyFat);
-        if(typeof s.neck==='number') setNeck(s.neck);
-        if(typeof s.waist==='number') setWaist(s.waist);
-        if(typeof s.hip==='number') setHip(s.hip);
-        if(typeof s.steps==='number') setSteps(s.steps);
-        if(typeof s.cardioMin==='number') setCardioMin(s.cardioMin);
-        if(typeof s.trainingDays==='number') setTrainingDays(s.trainingDays);
-        if(s.activityLevel) setActivityLevel(s.activityLevel);
-        if(s.goal) setGoal(s.goal);
-        if(typeof s.stress==='number') setStress(s.stress);
-        if(typeof s.sleepHours==='number') setSleepHours(s.sleepHours);
-        if(typeof s.sleepQuality==='number') setSleepQuality(s.sleepQuality);
-        if(typeof s.onAAS==='boolean') setOnAAS(s.onAAS);
-        if(typeof s.aasDose==='number') setAasDose(s.aasDose);
-        if(s.climate) setClimate(s.climate);
-        if(typeof s.humidity==='number') setHumidity(s.humidity);
-        if(typeof s.standingHours==='number') setStandingHours(s.standingHours);
-        if(typeof s.fidgetLevel==='number') setFidgetLevel(s.fidgetLevel as any);
-        if(typeof s.sweatRate==='number') setSweatRate(s.sweatRate);
-        if(typeof s.sweatSodium==='number') setSweatSodium(s.sweatSodium);
-        if(typeof s.alcoholG==='number') setAlcoholG(s.alcoholG);
-        if(typeof s.caffeineMg==='number') setCaffeineMg(s.caffeineMg);
-        if(typeof s.tsh==='number') setTsh(s.tsh);
-        if(typeof s.ft4==='number') setFt4(s.ft4);
-        if(typeof s.glucoseMgDl==='number') setGlucoseMgDl(s.glucoseMgDl);
-        if(typeof s.insulinMuMl==='number') setInsulinMuMl(s.insulinMuMl);
-        if(typeof s.skinfoldSum3==='number') setSkinfoldSum3(s.skinfoldSum3);
-        if(typeof s.skinfoldSum4==='number') setSkinfoldSum4(s.skinfoldSum4);
-        if(typeof s.biaResistance==='number') setBiaResistance(s.biaResistance);
-        if(typeof s.t3Low==='boolean') setT3Low(s.t3Low);
-        if(typeof s.untreatedHypo==='boolean') setUntreatedHypo(s.untreatedHypo);
-        if(Array.isArray(s.leafAnswers) && s.leafAnswers.length===8) { setLeafAnswers(s.leafAnswers.map(Boolean)); setLeafScore(s.leafAnswers.filter(Boolean).length*2); }
-        if(Array.isArray(s.leamAnswers) && s.leamAnswers.length===6) setLeamAnswers(s.leamAnswers.map(Boolean));
-        if(Array.isArray(s.compareIds)) setCompareIds(s.compareIds.filter((x:any)=> typeof x==='string').slice(-2));
-        if(typeof s.deficitKcal==='number') setDeficitKcal(s.deficitKcal);
-        if(typeof s.weeksInDeficit==='number') setWeeksInDeficit(s.weeksInDeficit);
-        if(typeof s.weightLostKg==='number') setWeightLostKg(s.weightLostKg);
-        if(typeof s.creatineUse==='boolean') setCreatineUse(s.creatineUse);
-        if(typeof s.weeklyVolumeTons==='number') setWeeklyVolumeTons(s.weeklyVolumeTons);
-        if(typeof s.targetWeight==='number') setTargetWeight(s.targetWeight);
-        if(typeof s.weeksToGoal==='number') setWeeksToGoal(s.weeksToGoal);
-        if(s.menstrualPhase) setMenstrualPhase(s.menstrualPhase);
-        if(typeof s.sfaG==='number') setSfaG(s.sfaG);
-        if(typeof s.tgMgDl2==='number') setTgMgDl2(s.tgMgDl2);
-        if(typeof s.ggt==='number') setGgt(s.ggt);
-        if(typeof s.hct==='number') setHct(s.hct);
-        if(typeof s.hgb==='number') setHgb(s.hgb);
-        if(typeof s.ferritin==='number') setFerritin(s.ferritin);
-        if(typeof s.gfr==='number') setGfr(s.gfr);
-        if(typeof s.waterL==='number') setWaterL(s.waterL);
-        if(typeof s.sodiumG==='number') setSodiumG(s.sodiumG);
-        if(typeof s.potassiumG==='number') setPotassiumG(s.potassiumG);
-        if(typeof s.metHoursPerWeek==='number') setMetHoursPerWeek(s.metHoursPerWeek);
-        if(typeof s.leafScore==='number') setLeafScore(s.leafScore);
-        if(typeof s.measuredRMR==='number') setMeasuredRMR(s.measuredRMR);
-        if(typeof s.boneFlag==='boolean') setBoneFlag(s.boneFlag);
-        if(typeof s.menstrualFlag==='boolean') setMenstrualFlag(s.menstrualFlag);
-        if(typeof s.preKg==='number') setPreKg(s.preKg);
-        if(typeof s.postKg==='number') setPostKg(s.postKg);
-        if(typeof s.fluidL==='number') setFluidL(s.fluidL);
-        if(typeof s.sweatHours==='number') setSweatHours(s.sweatHours);
-        if(typeof s.hdlMgDl==='number') setHdlMgDl(s.hdlMgDl);
-        if(typeof s.systolic==='number') setSystolic(s.systolic);
-        if(typeof s.diastolic==='number') setDiastolic(s.diastolic);
-        if(typeof s.ast==='number') setAst(s.ast);
-        if(typeof s.alt==='number') setAlt(s.alt);
-        if(typeof s.plt==='number') setPlt(s.plt);
-        if(typeof s.caffeineHoursSince==='number') setCaffeineHoursSince(s.caffeineHoursSince);
-        if(s.profession) setProfession(s.profession);
-        if(typeof s.trimester==='number') setTrimester(s.trimester as any);
-        if(s.lactating) setLactating(s.lactating);
-        if(s.ethnicity) setEthnicity(s.ethnicity);
-        if(typeof s.postBariatric==='boolean') setPostBariatric(s.postBariatric);
-        if(typeof s.acclimated==='boolean') setAcclimated(s.acclimated);
-        if(typeof s.alcoholDays==='number') setAlcoholDays(s.alcoholDays);
-        if(typeof s.proteinSource==='string') setProteinSource(s.proteinSource);
-        if(s.proteinMeals===3 || s.proteinMeals===4 || s.proteinMeals===5 || s.proteinMeals===6) setProteinMeals(s.proteinMeals);
-        if(typeof s.edeScore==='number') setEdeScore(s.edeScore);
-        if(typeof s.lowT==='boolean') setLowT(s.lowT);
-        if(typeof s.lowBMD==='boolean') setLowBMD(s.lowBMD);
-        if(s.sweatIntensity) setSweatIntensity(s.sweatIntensity);
-        if(s.sweatEnv) setSweatEnv(s.sweatEnv);
-        if(typeof s.useMeasuredSweat==='boolean') setUseMeasuredSweat(s.useMeasuredSweat);
-        if(typeof s.fiberG==='number') setFiberG(s.fiberG);
-        if(typeof s.omega3G==='number') setOmega3G(s.omega3G);
-        if(typeof s.scheduleText==='string') setScheduleText(s.scheduleText);
-        if(typeof s.carbLoadDays==='number') setCarbLoadDays(s.carbLoadDays);
-        if(typeof s.carbGPerKg==='number') setCarbGPerKg(s.carbGPerKg);
-        if(typeof s.sodiumLoadDays==='number') setSodiumLoadDays(s.sodiumLoadDays);
-        if(typeof s.sodiumGPerDay==='number') setSodiumGPerDay(s.sodiumGPerDay);
-        if(typeof s.projectionYears==='number') setProjectionYears(s.projectionYears);
-        if(s.projectionMode) setProjectionMode(s.projectionMode);
+        applySnapshot(s);
         loaded=true;
       }
     }catch{}
@@ -557,7 +648,7 @@ export const MetabolicHub: React.FC = () => {
       }
     }catch{}
   },[]);
-  const snapshot = useMemo(()=>({weight,height,age,sex,bodyFat,neck,waist,hip,steps,cardioMin,trainingDays,activityLevel,profession,goal,stress,sleepHours,sleepQuality,onAAS,aasDose,climate,humidity,standingHours,fidgetLevel,sweatRate,sweatSodium,alcoholG,alcoholDays,caffeineMg,tsh,ft4,glucoseMgDl,insulinMuMl,skinfoldSum3,skinfoldSum4,biaResistance,deficitKcal,weeksInDeficit,weightLostKg,creatineUse,weeklyVolumeTons,targetWeight,weeksToGoal,menstrualPhase,sfaG,tgMgDl2,ggt,hct,hgb,ferritin,gfr,waterL,sodiumG,potassiumG,metHoursPerWeek,leafScore,leafAnswers,leamAnswers,measuredRMR,boneFlag,menstrualFlag,preKg,postKg,fluidL,sweatHours,hdlMgDl,systolic,diastolic,ast,alt,plt,caffeineHoursSince,trimester,lactating,ethnicity,postBariatric,untreatedHypo,acclimated,proteinSource,proteinMeals,edeScore,lowT,lowBMD,t3Low,sweatIntensity,sweatEnv,compareIds,fiberG,omega3G,scheduleText,carbLoadDays,carbGPerKg,sodiumLoadDays,sodiumGPerDay,projectionYears,projectionMode,useMeasuredSweat}), [weight,height,age,sex,bodyFat,neck,waist,hip,steps,cardioMin,trainingDays,activityLevel,profession,goal,stress,sleepHours,sleepQuality,onAAS,aasDose,climate,humidity,standingHours,fidgetLevel,sweatRate,sweatSodium,alcoholG,alcoholDays,caffeineMg,tsh,ft4,glucoseMgDl,insulinMuMl,skinfoldSum3,skinfoldSum4,biaResistance,deficitKcal,weeksInDeficit,weightLostKg,creatineUse,weeklyVolumeTons,targetWeight,weeksToGoal,menstrualPhase,sfaG,tgMgDl2,ggt,hct,hgb,ferritin,gfr,waterL,sodiumG,potassiumG,metHoursPerWeek,leafScore,leafAnswers,leamAnswers,measuredRMR,boneFlag,menstrualFlag,preKg,postKg,fluidL,sweatHours,hdlMgDl,systolic,diastolic,ast,alt,plt,caffeineHoursSince,trimester,lactating,ethnicity,postBariatric,untreatedHypo,acclimated,proteinSource,proteinMeals,edeScore,lowT,lowBMD,t3Low,sweatIntensity,sweatEnv,compareIds,fiberG,omega3G,scheduleText,carbLoadDays,carbGPerKg,sodiumLoadDays,sodiumGPerDay,projectionYears,projectionMode,useMeasuredSweat]);
+  const snapshot = useMemo(()=>({weight,height,age,sex,bodyFat,neck,waist,hip,steps,cardioMin,trainingDays,activityLevel,profession,goal,stress,sleepHours,sleepQuality,onAAS,aasDose,climate,humidity,standingHours,fidgetLevel,sweatRate,sweatSodium,alcoholG,alcoholDays,caffeineMg,tsh,ft4,glucoseMgDl,insulinMuMl,skinfoldSum3,skinfoldSum4,biaResistance,deficitKcal,weeksInDeficit,weightLostKg,creatineUse,weeklyVolumeTons,targetWeight,weeksToGoal,menstrualPhase,sfaG,tgMgDl2,ggt,hct,hgb,ferritin,gfr,waterL,sodiumG,potassiumG,metHoursPerWeek,leafScore,leafAnswers,leamAnswers,measuredRMR,boneFlag,menstrualFlag,preKg,postKg,fluidL,sweatHours,hdlMgDl,systolic,diastolic,ast,alt,plt,caffeineHoursSince,trimester,lactating,ethnicity,postBariatric,untreatedHypo,acclimated,proteinSource,proteinMeals,edeScore,lowT,lowBMD,t3Low,sweatIntensity,sweatEnv,compareIds,fiberG,omega3G,scheduleText,carbLoadDays,carbGPerKg,sodiumLoadDays,sodiumGPerDay,projectionYears,projectionMode,useMeasuredSweat,manualLabs: Object.keys(manualLabsRef.current)}), [weight,height,age,sex,bodyFat,neck,waist,hip,steps,cardioMin,trainingDays,activityLevel,profession,goal,stress,sleepHours,sleepQuality,onAAS,aasDose,climate,humidity,standingHours,fidgetLevel,sweatRate,sweatSodium,alcoholG,alcoholDays,caffeineMg,tsh,ft4,glucoseMgDl,insulinMuMl,skinfoldSum3,skinfoldSum4,biaResistance,deficitKcal,weeksInDeficit,weightLostKg,creatineUse,weeklyVolumeTons,targetWeight,weeksToGoal,menstrualPhase,sfaG,tgMgDl2,ggt,hct,hgb,ferritin,gfr,waterL,sodiumG,potassiumG,metHoursPerWeek,leafScore,leafAnswers,leamAnswers,measuredRMR,boneFlag,menstrualFlag,preKg,postKg,fluidL,sweatHours,hdlMgDl,systolic,diastolic,ast,alt,plt,caffeineHoursSince,trimester,lactating,ethnicity,postBariatric,untreatedHypo,acclimated,proteinSource,proteinMeals,edeScore,lowT,lowBMD,t3Low,sweatIntensity,sweatEnv,compareIds,fiberG,omega3G,scheduleText,carbLoadDays,carbGPerKg,sodiumLoadDays,sodiumGPerDay,projectionYears,projectionMode,useMeasuredSweat]);
   useEffect(()=>{
     try{ localStorage.setItem(SNAP_KEY, JSON.stringify(snapshot)); }catch{}
   }, [snapshot]);
@@ -714,38 +805,17 @@ const kbju = useMemo(()=> calcKBJU(input), [input]);
   });
   const saveScenario = useCallback(()=>{
     const name = `Сценарий ${scenarios.length+1} · ${new Date().toLocaleDateString('ru-RU')} · ${weight}кг ${GOAL_LABEL[goal]}`;
-    const snap = { weight,height,age,sex,bodyFat,neck,waist,hip,steps,cardioMin,trainingDays,activityLevel,profession,goal,onAAS,aasDose,trimester,lactating,proteinSource,targetWeight,deficitKcal,weeksInDeficit,weightLostKg };
-    const next=[...scenarios, {id: Date.now().toString(), name, snapshot: snap}].slice(-6);
+    // Полный снапшот, а не 22 поля: иначе сценарий терял лабы, сон/стресс, пот, климат,
+    // клетчатку/омега-3 — и сравнение сценариев физически не могло их показать.
+    const next=[...scenarios, {id: Date.now().toString(), name, snapshot}].slice(-6);
     setScenarios(next); try{ localStorage.setItem(SCENARIOS_KEY, JSON.stringify(next)); }catch{}; showToast(`Сценарий "${name}" сохранён`);
-  }, [scenarios, weight,height,age,sex,bodyFat,neck,waist,hip,steps,cardioMin,trainingDays,activityLevel,profession,goal,onAAS,aasDose,trimester,lactating,proteinSource,targetWeight,deficitKcal,weeksInDeficit,weightLostKg, showToast]);
+  }, [scenarios, snapshot, weight, goal, showToast]);
   const loadScenario = useCallback((id:string)=>{
     const sc=scenarios.find(s=>s.id===id); if(!sc) return;
-    const s=sc.snapshot;
-    if(typeof s.weight==='number') setWeight(s.weight);
-    if(typeof s.height==='number') setHeight(s.height);
-    if(s.sex) setSex(s.sex);
-    if(typeof s.bodyFat==='number') setBodyFat(s.bodyFat);
-    if(s.activityLevel) setActivityLevel(s.activityLevel);
-    if(s.profession) setProfession(s.profession);
-    if(typeof s.trainingDays==='number') setTrainingDays(s.trainingDays);
-    if(typeof s.cardioMin==='number') setCardioMin(s.cardioMin);
-    if(s.goal) setGoal(s.goal);
-    if(typeof s.onAAS==='boolean') setOnAAS(s.onAAS);
-    if(typeof s.aasDose==='number') setAasDose(s.aasDose);
-    if(typeof s.proteinSource==='string') setProteinSource(s.proteinSource);
-    // раньше сценарий молча терял беременность/лактацию — EA и вода считались как «нет»
-    if(typeof s.trimester==='number') setTrimester(s.trimester as any);
-    if(typeof s.lactating==='string') setLactating(s.lactating);
-    if(typeof s.neck==='number') setNeck(s.neck);
-    if(typeof s.waist==='number') setWaist(s.waist);
-    if(typeof s.hip==='number') setHip(s.hip);
-    if(typeof s.steps==='number') setSteps(s.steps);
-    if(typeof s.targetWeight==='number') setTargetWeight(s.targetWeight);
-    if(typeof s.deficitKcal==='number') setDeficitKcal(s.deficitKcal);
-    if(typeof s.weeksInDeficit==='number') setWeeksInDeficit(s.weeksInDeficit);
-    if(typeof s.weightLostKg==='number') setWeightLostKg(s.weightLostKg);
+    // Та же логика, что и для автосохранения v6: одно место правды, ничего не забыто.
+    applySnapshot(sc.snapshot, { markLabs: true });
     showToast(`Сценарий "${sc.name}" загружен`);
-  }, [scenarios, showToast]);
+  }, [scenarios, applySnapshot, showToast]);
   const scenarioDiff = useMemo(()=>{
     if(compareIds.length !== 2) return null;
     const a = scenarios.find(s=> s.id===compareIds[0])?.snapshot;
@@ -1461,7 +1531,7 @@ const kbju = useMemo(()=> calcKBJU(input), [input]);
                 {scenarioDiff.map(d=> (
                   <div key={d.key} style={{ display:'flex', justifyContent:'space-between', gap:8, fontSize:9, color:'#fff', lineHeight:1.5 }}>
                     <span style={{ color:'rgba(255,255,255,0.62)' }}>{SNAP_LABEL[d.key] ?? d.key}</span>
-                    <span>{String(d.a ?? '—')} → <b>{String(d.b ?? '—')}</b>{d.delta != null ? ` (${d.delta>0?'+':''}${d.delta})` : ''}</span>
+                    <span>{snapValue(d.key, d.a)} → <b>{snapValue(d.key, d.b)}</b>{d.delta != null ? ` (${d.delta>0?'+':''}${d.delta})` : ''}</span>
                   </div>
                 ))}
               </div>

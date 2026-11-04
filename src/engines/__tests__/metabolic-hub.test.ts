@@ -999,6 +999,18 @@ describe('metabolic-hub PRO v4 — Adaptive v3, CAT2, Sweat V2, MetS-добив�
     const d = diffMetabolicSnapshots({ weight:80, goal:'cut' }, { weight:82, goal:'bulk' });
     expect(d.some(x=> x.key==='weight' && x.delta===2)).toBe(true);
   });
+  it('diff сценариев видит переключатели (булевы), но не мусорит объектами', async () => {
+    const { diffMetabolicSnapshots } = await import('../metabolic-hub.engine');
+    // раньше typeof-фильтр отбрасывал boolean: «ААС вкл → выкл» в сравнении не появлялось
+    const d = diffMetabolicSnapshots({ weight: 80, onAAS: false }, { weight: 80, onAAS: true });
+    expect(d).toHaveLength(1);
+    expect(d[0]).toMatchObject({ key: 'onAAS', a: false, b: true, delta: null });
+    // анкеты — объекты, их в построчный diff не тащим
+    expect(diffMetabolicSnapshots({ leafAnswers: { a: 1 } }, { leafAnswers: { a: 2 } })).toHaveLength(0);
+    // снятое значение (undefined) vs число — тоже показываем
+    const cleared = diffMetabolicSnapshots({ hct: 44 }, { hct: undefined });
+    expect(cleared[0]).toMatchObject({ key: 'hct', delta: null });
+  });
   it('Парсер PRO: бег 10км -> 1ч, swim EN, 2× strength', async () => {
     const { parseWeeklyScheduleTextPro, buildMetHoursPro } = await import('../metabolic-hub.engine');
     const p = parseWeeklyScheduleTextPro('mon: run 10km, tue: swim 45min, 2× strength 1h');
