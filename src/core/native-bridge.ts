@@ -763,6 +763,23 @@ export async function initNativeChrome(
 }
 
 /**
+ * Стек перехватчиков аппаратной кнопки «назад» (АПК).
+ * Регистрируется из UI: открытый лист выбора, диалог подтверждения, шаг
+ * мастера. Обрабатывает последний зарегистрированный (LIFO). Без этого
+ * системная «назад» при открытом оверлее выбрасывала на главную вкладку.
+ */
+const backInterceptors: Array<() => boolean> = [];
+
+/** Возвращает unsubscribe. */
+export function registerBackInterceptor(fn: () => boolean): () => void {
+  backInterceptors.push(fn);
+  return () => {
+    const i = backInterceptors.indexOf(fn);
+    if (i >= 0) backInterceptors.splice(i, 1);
+  };
+}
+
+/**
  * Системная кнопка «назад» Android. Возвращает unsubscribe.
  * В Telegram/web — no-op (там свои BackButton/история).
  */
@@ -774,6 +791,12 @@ export async function setupNativeBackButton(
     const { App } = await import('@capacitor/app');
     const sub = await App.addListener('backButton', () => {
       try {
+        // 1) Открытые оверлеи кардио/еды/подтверждений закрываются первыми.
+        for (let i = backInterceptors.length - 1; i >= 0; i--) {
+          let handled = false;
+          try { handled = backInterceptors[i](); } catch { handled = false; }
+          if (handled) return;
+        }
         const handled = onBack();
         if (handled === false) {
           // Явно не перехвачено — сворачиваем приложение штатно.
