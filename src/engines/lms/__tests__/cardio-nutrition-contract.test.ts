@@ -7,7 +7,7 @@
  */
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
-  CARDIO_KCAL_NOTE_KEY, buildCardioKcalContract, loadCardioKcalContract,
+  CARDIO_KCAL_NOTE_KEY, buildCardioKcalContract, cardioKcalPlannerNote, loadCardioKcalContract,
   publishCardioKcalContract, setCardioKcalInclude,
 } from '../cardio-nutrition-contract.engine';
 import { buildCardioCycle, cardioToNutritionPayload, type CardioCycle } from '../cardio.engine';
@@ -95,5 +95,24 @@ describe('контракт кардио → питание', () => {
     const raw = JSON.parse(localStorage.getItem(CARDIO_KCAL_NOTE_KEY)!);
     expect(raw.avgKcalPerWeek).toBe(contract.weeklyKcal);
     expect(raw.avgMinutesPerWeek).toBe(contract.weeklyMinutes);
+  });
+
+  it('планировщик питания: справочная строка, без второго добавления ккал', () => {
+    const c = cycle();
+    const contract = publishCardioKcalContract(c, []);
+    const note = cardioKcalPlannerNote(contract)!;
+    expect(note.headline).toContain('ккал/нед');
+    expect(note.headline).toContain('уверенность');
+    expect(note.lines.join(' ')).toContain('второй раз не добавляется');
+    expect(note.tone).toBe('ok');
+    expect(cardioKcalPlannerNote(null)).toBeNull();
+  });
+
+  it('планировщик питания: выключенный учёт отражается в тоне и тексте', () => {
+    publishCardioKcalContract(cycle(), []);
+    const off = setCardioKcalInclude(false)!;
+    const note = cardioKcalPlannerNote(off)!;
+    expect(note.tone).toBe('muted');
+    expect(note.lines.join(' ')).toContain('выключен');
   });
 });

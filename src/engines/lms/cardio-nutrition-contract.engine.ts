@@ -153,3 +153,34 @@ export function setCardioKcalInclude(include: boolean): CardioKcalContract | nul
   saveCardioKcalContract(next);
   return next;
 }
+
+/**
+ * Текст для планировщика питания: что именно питание «видит» из кардио.
+ *
+ * Решение по модели (ноябрь 2026): цели КБЖУ НЕ меняются от кардио-расхода —
+ * PAL уже учитывает дни/минуты/тип тренировок, и прибавка «сверху» была бы
+ * двойным счётом. Поэтому кардио показывается справочно и явно об этом
+ * предупреждает: честная цифра без скрытой подмены калорий.
+ */
+export interface CardioPlannerNote {
+  headline: string;
+  lines: string[];
+  tone: 'ok' | 'muted';
+}
+
+export function cardioKcalPlannerNote(c: CardioKcalContract | null): CardioPlannerNote | null {
+  if (!c) return null;
+  const pct = Math.round(Math.max(0, Math.min(1, c.confidence)) * 100);
+  const basis = c.basis === 'log' ? 'по журналу сессий' : 'по плану — журнала мало';
+  return {
+    headline: `❤️ Кардио: ${c.weeklyKcal} ккал/нед · ${c.weeklyMinutes} мин/нед · уверенность ${pct}% (${basis})`,
+    lines: [
+      c.todayKcal > 0
+        ? `Сегодня: ${c.todayMinutes} мин · ${c.todayKcal} ккал (факт из дневника)`
+        : 'Сегодня кардио не записано',
+      c.include ? 'Учёт кардио включён (переключатель в кардио-дневнике).' : 'Учёт кардио выключен в кардио-дневнике.',
+      'Цели КБЖУ считаются через PAL (дни/минуты/тип тренировок) — расход кардио показан справочно и второй раз не добавляется.',
+    ],
+    tone: c.include ? 'ok' : 'muted',
+  };
+}

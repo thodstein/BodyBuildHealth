@@ -155,10 +155,13 @@ for (const f of ['CardioUI', 'CardioWeekEditor', 'CardioCatalogSection', 'Cardio
 // удаление цикла — в window.confirm. Гейдим ВСЕ кардио-файлы, не список.
 const CARDIO_UI_DIR = 'src/ui/screens/TrainingScreen_parts';
 const CARDIO_DIARY_UI = 'src/ui/screens/ProfileScreen_v2/diaries/CardioDiary/CardioDiary.tsx';
+// Читатель контракта на стороне питания — тот же АПК-слой (тап-норма, никаких
+// нативных браузерных путей), поэтому гейдим и его.
+const CARDIO_NUTRITION_UI = 'src/ui/screens/NutritionScreen_parts/IndividualPlan/CardioKcalNote.tsx';
 const cardioUiFiles = readdirSync(join(root, CARDIO_UI_DIR))
   .filter(f => f.endsWith('.tsx') && /^cardio/i.test(f))
   .map(f => `${CARDIO_UI_DIR}/${f}`)
-  .concat([CARDIO_DIARY_UI]);
+  .concat([CARDIO_DIARY_UI, CARDIO_NUTRITION_UI]);
 
 const CARDIO_HOSTILE = [
   [/a\.download\s*=/, '<a download> (в WebView файл не сохраняется)'],

@@ -63,6 +63,7 @@ import { autoCyclePhase, getCycleLog, saveCyclePeriod, clearCycleLog, CYCLE_PHAS
 import { computeEnergyAvailability } from './planner-female-cycle';
 import { checkTargetsConsistency, PLANNER_CONVERGENCE_PCT } from './day-target-corrector';
 import { getRecipes, type Recipe } from '../../../../engines/nutrition-periodization.engine';
+import { CardioKcalNote } from './CardioKcalNote';
 
 
 // P3.2: Collapsible section for compact settings
@@ -601,6 +602,8 @@ export const IndividualPlanSettings: React.FC = () => {
           <PopupSelect label="🏋️ Тип тренировок" value={trainType} options={[{id:'strength',label:'Силовые'},{id:'cardio',label:'Кардио'},{id:'mixed',label:'Смешанные'},{id:'hiit',label:'HIIT'}]} onChange={v => setTrainType(v as string)} />
           <PopupSelect label="📊 Интенсивность" value={trainIntensity} options={[{id:'low',label:'Низкая'},{id:'medium',label:'Средняя'},{id:'high',label:'Высокая'}]} onChange={v => setTrainIntensity(v as string)} />
         </div>
+        {/* Кардио-дневник → питание: справочно, цели КБЖУ не меняются (PAL уже их учёл). */}
+        <CardioKcalNote compact />
         <div style={{ marginBottom: 6 }}>
           <button onClick={() => setIntraWorkoutEnabled(!intraWorkoutEnabled)} style={{ width:'100%', padding:'6px 8px', borderRadius:8, cursor:'pointer', fontSize:9, fontWeight:600, textAlign:'left', background: intraWorkoutEnabled ? 'rgba(34,197,94,0.08)' : '#202023', border:`1px solid ${intraWorkoutEnabled ? 'rgba(34,197,94,0.3)' : 'rgba(255,255,255,0.1)'}`, color: intraWorkoutEnabled ? '#22c55e' : 'rgba(255,255,255,0.5)' }}>
             🏋️ Intra-workout (углеводы+изотоник во время тренировки): {intraWorkoutEnabled ? 'ВКЛ' : 'ВЫКЛ'}
