@@ -1018,13 +1018,24 @@ describe('кальций молочкой, а не «просто так» (QG18
     expect(low.join(', ')).toBe('');
   });
 
-  it('в дефицитных днях стоит молочка порцией и Ca дошёл до цели', () => {
+  it('в дефицитных днях стоит адрес кальция порцией и Ca дошёл до цели', () => {
+    // QG36/B′ (решение владельца 2026-11-04): инвариант — «день с дефицитом Ca получает
+    // настоящий адрес Ca порцией», а не «именно молочка». На S1/4/тр после B′ дефицит
+    // закрыт сардинами 50 г (Ca 71% ≥ 70%, плюс B12 и витамин D) — это законный адрес,
+    // и добавлять туда ещё и молочку значит двигать КБЖУ без причины. Сила гарда сохранена:
+    // адрес обязателен, порция обязательна, Ca ≥70% обязателен.
+    const CA_FISH = /sardine|sardines|salmon|mackerel|herring|sprat|tuna/i;
+    const fishCa = (d: Day) => items(d)
+      .filter(({ x }) => CA_FISH.test(String(x.id)) && (Number(x.amount) || 0) >= 40);
+    const fishCaNote = (d: Day) => (d.plan.notes as string[] || [])
+      .some((n) => typeof n === 'string' && n.startsWith('🐟 Кальций:'));
     const bad: string[] = [];
     for (const d of DAYS.filter((x) => TARGET_IDS.includes(x.id))) {
       const dairy = dairyItems(d);
       const g = dairy.reduce((s, { x }) => s + (Number(x.amount) || 0), 0);
-      if (!dairy.length) { bad.push(`${d.id}: молочки нет`); continue; }
-      if (g < 100) bad.push(`${d.id}: молочки всего ${g} г`);
+      const hasDairy = dairy.length > 0 && g >= 100;
+      const hasFish = fishCa(d).length > 0 && fishCaNote(d);
+      if (!hasDairy && !hasFish) { bad.push(`${d.id}: нет адреса Ca (ни молочки, ни рыбы)`); continue; }
       if (ca(d) < CA_RDA * 0.7) bad.push(`${d.id}: Ca ${Math.round((ca(d) / CA_RDA) * 100)}%`);
     }
     expect(bad.join(' | ')).toBe('');

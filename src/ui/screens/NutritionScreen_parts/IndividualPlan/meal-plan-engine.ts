@@ -3882,6 +3882,34 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   let _regular = [..._regularBuilt];
   for (const r of ['snack6','snack5','snack4','snack3','snack2','preSleep','snack']) { if (_regular.length <= input.mealsCount) break; _regular = _regular.filter(x => x !== r); }
   if (_regular.length > input.mealsCount) _regular = _regular.slice(0, Math.max(3, input.mealsCount));
+  // ─── QG36 (B′): пери-окна не создаются, если цель белка их не вмещает ───────
+  // Замер (§8.27/§8.34): на малых профилях полы регулярных приёмов (3×18 + 2×14 = 82 г
+  // белка), ночной бюджет и два осмысленных окна по 20 г вместе больше дневной цели —
+  // окна тогда отнимают белок у приёмов и день уходит за цель на +7…13% (§8.26).
+  // Резать полы и окна нельзя (MPS), поэтому окна просто НЕ создаются: окно остаётся
+  // в тайминге, белок уходит в 5–6 приёмов, полы 18/14 и P4b-минимумы не тронуты.
+  // День, чья цель вмещает всё, не меняется ни в грамме (бит-в-бит прежнее поведение).
+  let _periSuppressed36 = false;
+  let _periSuppressNote36 = '';
+  if (trainWindow && !(process.env as any).QG36_OFF) {
+    const _m36 = _regular.filter((r) => r === 'breakfast' || r === 'lunch' || r === 'dinner').length;
+    const _s36 = _regular.filter((r) => r !== 'breakfast' && r !== 'lunch' && r !== 'dinner' && r !== 'preSleep').length;
+    const _floors36 = _m36 * 18 + _s36 * 14;               // те же полы, что в §7.2-3
+    const _sleep36 = _regular.includes('preSleep') ? preSleepProteinBudget(input.weightKg) : 0;
+    const _dayPT36 = adjustedProteinG || input.goalProteinG;
+    // Снимаем окна только при РЕАЛЬНОМ переборе: если полы + ночь + два окна больше цели
+    // более чем на 5%. Иначе (8 приёмов, цель 160 г: полы 124 + 40 = 164, +2.5%) окна
+    // остаются — план их переваривает, а структурный инвариант «peri отдельно» цел.
+    if (_dayPT36 > 0 && _floors36 + _sleep36 + 40 > _dayPT36 * 1.05) {
+      const _i1 = _periBuilt.indexOf('prew');
+      if (_i1 >= 0) _periBuilt.splice(_i1, 1);
+      const _i2 = _periBuilt.indexOf('postw');
+      if (_i2 >= 0) _periBuilt.splice(_i2, 1);
+      _periSuppressed36 = true;
+      _periSuppressNote36 = `⚖️ Цель белка ${_dayPT36} г не вмещает полы приёмов (${_floors36} г) + ночь (${_sleep36} г) + два окна по 20 г: `
+        + `пери-приёмы не созданы, белок ушёл в ${_regular.length} основных — полы 18/14 и MPS-минимумы не тронуты.`;
+    }
+  }
   const _roles = [..._regular, ..._periBuilt];
   const _keep = new Set(_roles);
   // N3/E2-фикс: перекусы распределяем по САМЫМ БОЛЬШИМ разрывам между фикс-приёмами,
@@ -4171,6 +4199,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
       notes.push(`⚖️ Цель белка ${_dayPT} г ниже полов приёмов (${_regularFloorTotal} г) + окна: peri ужат до ${periProteinFixed} г, pre-sleep до ${_preSleepFixedP} г — иначе день уходил бы за цель на +20-30%.`);
     }
   }
+  if (_periSuppressed36 && _periSuppressNote36) notes.push(_periSuppressNote36);
   const roleP: Record<string, number> = {};
   for (const r of _regular) {
     if (r === 'preSleep') roleP[r] = _preSleepFixedP;
@@ -14399,6 +14428,14 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
         }
       }
     }
+    // ─── QG36а: дубли одного продукта в приёме сливаются (7+7 г масла = одна порция 14 г) ───
+    // Распределение жира/углеводов после QG36 (B′) может поставить два пункта одного масла
+    // в один приём. Дубль — дефект витрины («две порции одного продукта в тарелке»),
+    // слияние макро-нейтрально: граммы и Б/Ж/У складываются.
+    if (mergeDuplicateMealItems(meals as any[]) > 0) {
+      recalcMealTotals(meals as any[]);
+      recalcDayTotals(meals, totals);
+    }
     // ─── QG35: финальный адрес витамина E (точечно, по граммам жира) ───
     // QG24/QG31 меняют пункт только целиком и только от 7 г, а квота семян в дефицитных
     // днях уже занята — поэтому адрес не находится. Здесь меняем то, что влезает.
@@ -14409,6 +14446,8 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
       const _e35 = liftVitaminEFinal(
         meals as any[], totals, _eGoal35,
         nutCatchupCap(quotaWeightScale(Number(input.weightKg) || 80)),
+        { k: Number(input.goalKcal) || 0, p: Number(adjustedProteinG || input.goalProteinG) || 0, f: Number(input.goalFatG) || 0, c: Number(input.goalCarbsG) || 0 },
+        (id: string) => !combinedExcluded.has(id),
       );
       if (_e35.add > 0 && _e35.names.length > 0) {
         // Нота QG9 «N замен грамм-в-грамм (…) … E X мг из Y мг» написана раньше — переписываем
@@ -14430,6 +14469,13 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
         }
       }
     }
+    // ─── QG36б: жёсткий зажим квоты «орехи+семена» на финальной тарелке ───────
+    // Работает ВСЕГДА (в отличие от стадии E): квота — потолок дня, а не цель.
+    clampNutSeedsQuota(
+      meals as any[], totals,
+      nutCatchupCap(quotaWeightScale(Number(input.weightKg) || 80)),
+      { k: Number(input.goalKcal) || 0, p: Number(adjustedProteinG || input.goalProteinG) || 0, f: Number(input.goalFatG) || 0, c: Number(input.goalCarbsG) || 0 },
+    );
     const _finalFoodIds = new Set<string>();
     for (const m of meals) for (const it of (m.items || [])) _finalFoodIds.add(it.id);
     const _finalCategories: Record<string, number> = {};
@@ -15045,8 +15091,40 @@ function liftVitaminEByFatAddress(
 const _QG35_PURE_FAT_MIN_PCT = 80;   // «почти чистый жир»: ≥80% ккал-плотности из жира
 const _QG35_OLIVE_KEEP_G = 10;       // MUFA-основа: после правки оливкового ≥10 г
 const _QG35_NUT_SWAP: Array<[string, string]> = [['cashew', 'almonds']];
+/** Резерв квоты орехов/семян под поздние добивки (они добавляют до 5 г). */
+const _QG35_NUT_RESERVE_G = 5;
+/** Зародыши пшеницы: E 18 мг/100 г, семейство null — единственный адрес витамина E,
+ *  который не тратит квоту орехов/семян (масла-«мусор» запрещены QG33, chia/flax в БД
+ *  без витамина E, а чиа-дни занимают квоту целиком). */
+const _QG35_E_GERM_ID = 'grain_wheat_germ';
+/** Слить пункты одного продукта внутри приёма (дубль = одна порция, макросы те же).
+ *  Нужна как финальный инвариант: распределение жира может поставить два пункта одного
+ *  масла в приём (7 г + 7 г), а «две порции одного продукта в тарелке» — дефект витрины. */
+function mergeDuplicateMealItems(meals: any[]): number {
+  let merged = 0;
+  for (const m of meals as any[]) {
+    const items = (m.items || []) as any[];
+    if (items.length < 2) continue;
+    const keep: any[] = [];
+    for (const it of items) {
+      const twin = keep.find((x: any) => String(x.id) === String(it.id));
+      if (!twin) { keep.push(it); continue; }
+      twin.amount = Math.round(((Number(twin.amount) || 0) + (Number(it.amount) || 0)) * 10) / 10;
+      twin.p = Math.round((((Number(twin.p) || 0) + (Number(it.p) || 0))) * 10) / 10;
+      twin.f = Math.round((((Number(twin.f) || 0) + (Number(it.f) || 0))) * 10) / 10;
+      twin.c = Math.round((((Number(twin.c) || 0) + (Number(it.c) || 0))) * 10) / 10;
+      twin.fiber = Math.round((((Number(twin.fiber) || 0) + (Number(it.fiber) || 0))) * 10) / 10;
+      twin.kcal = Math.round(4 * (Number(twin.p) || 0) + 9 * (Number(twin.f) || 0) + 4 * (Number(twin.c) || 0));
+      merged++;
+    }
+    if (merged > 0) m.items = keep;
+  }
+  return merged;
+}
 function liftVitaminEFinal(
   meals: any[], totals: any, eGoal: number, seedsCap: number,
+  goals?: { k: number; p: number; f: number; c: number },
+  isAllowed?: (id: string) => boolean,
 ): { add: number; names: string[] } {
   const names: string[] = [];
   if (!(eGoal > 0)) return { add: 0, names };
@@ -15064,7 +15142,10 @@ function liftVitaminEFinal(
     return Number(fd?.micros?.VitE ?? fd?.vitamins_100g?.vitamin_e_mg ?? 0);
   };
   const seedsNow = () => meals.reduce((s: number, m: any) => s + ((m.items || []) as any[])
-    .filter((x: any) => stapleFamilyOf(String(x.id)) === 'seeds')
+    .filter((x: any) => {
+      const fam = stapleFamilyOf(String(x.id));
+      return fam === 'seeds' || fam === 'nuts';
+    })
     .reduce((a: number, x: any) => a + (Number(x.amount) || 0), 0), 0);
   const oliveNow = () => meals.reduce((s: number, m: any) => s + ((m.items || []) as any[])
     .filter((x: any) => /olive/.test(String(x.id)))
@@ -15083,14 +15164,45 @@ function liftVitaminEFinal(
     // Латеральная замена источника жира может убрать из палитры ОДИН пункт (гхи уходит,
     // подсолнечное уже стоит в дне) — это осознанный обмен на витамин E, не монотонность.
     // Больше одного пункта за стадию не теряем.
-    return dk <= Math.max(6, k0 * 0.005) && df <= 0.61 && dp <= 0.61 && dc <= 2.01
+    const kDevNow = Number(goals?.k) > 0 ? Math.abs((Number(totals?.kcal) || 0) - Number(goals!.k)) / Number(goals!.k) : 0;
+    const kDev0 = Number(goals?.k) > 0 ? Math.abs(k0 - Number(goals!.k)) / Number(goals!.k) : 0;
+    // Ккал: либо сдвиг в пределах шума, либо день становится БЛИЖЕ к цели (грязные макросы
+    // пункта-жира после пересборок не дают замене быть ккал-нейтральной до 1 ккал).
+    const kcalOk = dk <= Math.max(6, k0 * 0.005) || kDevNow <= kDev0 + 1e-9;
+    // «Канон не хуже»: день, стоявший в 3% по КБЖУ, не имеет права из них выпасть —
+    // иначе выигрыш в витамине E покупается потерей сходимости дня.
+    const _dv = (v: number, t?: number) => (Number(t) > 0 ? Math.abs(Number(v) - Number(t)) / Number(t) : 0);
+    const _dev0 = Math.max(_dv(k0, goals?.k), _dv(p0, goals?.p), _dv(f0, goals?.f), _dv(c0, goals?.c));
+    const _devNow = Math.max(
+      _dv(Number(totals?.kcal) || 0, goals?.k), _dv(Number(totals?.p) || 0, goals?.p),
+      _dv(Number(totals?.f) || 0, goals?.f), _dv(Number(totals?.c) || 0, goals?.c),
+    );
+    const canonOk = !(_dev0 > 0 && _dev0 <= 0.03) || (_devNow > 0 && _devNow <= 0.03);
+    return kcalOk && canonOk && df <= 0.61 && dp <= 0.61 && dc <= 2.01
       && ids >= ids0 - (names.length + 1);
   };
-  const restore = (m: any, snapshot: any[]) => {
-    m.items = snapshot;
+  // Откат обязан сохранять ИДЕНТИЧНОСТЬ пунктов: правка массива (splice/замена объекта)
+  // «протухает» индексы и ссылки, и следующий кандидат начинает править чужой пункт
+  // (урок §8.28). Поэтому снимаем состав приёмов + значения каждого пункта, а откат
+  // возвращает и состав, и значения в те же объекты.
+  const takeSnap = () => ({
+    arrs: meals.map((mm: any) => ((mm.items || []) as any[]).slice()),
+    vals: meals.flatMap((mm: any) => ((mm.items || []) as any[]).map((x: any) => [x, { ...x }] as const)),
+  });
+  const undoSnap = (s: { arrs: any[][]; vals: ReadonlyArray<readonly [any, any]> }) => {
+    for (const [obj, v] of s.vals) Object.assign(obj, v);
+    meals.forEach((mm: any, i: number) => { mm.items = s.arrs[i]; });
     recalcMealTotals(meals as any[]);
     recalcDayTotals(meals, totals);
   };
+  // Канон дня (±3% по КБЖУ) — единственное, что не имеет права пострадать от правок стадии.
+  const _dvG = (v: number, t?: number) => (Number(t) > 0 ? Math.abs(Number(v) - Number(t)) / Number(t) : 0);
+  const canonOkOnly = () => !goals || (
+    _dvG(Number(totals?.kcal) || 0, goals.k) <= 0.03
+    && _dvG(Number(totals?.p) || 0, goals.p) <= 0.03
+    && _dvG(Number(totals?.f) || 0, goals.f) <= 0.03
+    && _dvG(Number(totals?.c) || 0, goals.c) <= 0.03
+  );
 
   // (1) «Почти чистый жир» с бедным E → подсолнечное нерафинированное, по граммам ЖИРА.
   type Cand = { m: any; idx: number; it: any; e: number };
@@ -15121,60 +15233,90 @@ function liftVitaminEFinal(
     const amt = Number(it.amount) || 0;
     const fIt = Number(it.f) || 0;
     if (!(fIt > 0) || !(amt > 0)) continue;
-    const roomG = Math.max(0, Number(seedsCap) - seedsNow());
-    const fSwap = Math.min(fIt, roomG);
-    const gRich = Math.round((fSwap / Number(rich.fat)) * 100);
-    if (!(gRich >= 5)) continue;
-    const part = fSwap / fIt;
-    const full = part >= 0.999;
-    if (!full && Math.round(amt * (1 - part)) < 5) continue;   // огрызок < 5 г — не еда
-    // MUFA-основа: оливковое не вымывается целиком, в дне остаётся ≥10 г.
-    if (/olive/.test(String(it.id)) && oliveNow() - Math.round(amt * part) < _QG35_OLIVE_KEEP_G) continue;
-    const snapshot = ((cd.m.items as any[]) || []).map((x: any) => ({ ...x }));
-    const newItem = {
-      id: rich.id, name: rich.name, amount: gRich, role: 'fat',
-      kcal: Math.round(9 * fSwap), p: 0, f: Math.round(fSwap * 10) / 10, c: 0, fiber: 0, leucine_mg: 0,
-    };
-    const twin = ((cd.m.items as any[]) || []).find((x: any) => x !== it && String(x.id) === String(rich.id));
-    // В приёме уже стоит подсолнечное — не плодим второй пункт того же продукта
-    // (гард «нет двух одинаковых продуктов в приёме»), а сливаем жир в него.
-    if (twin && twin !== it) {
-      const twinF = Math.round(((Number(twin.f) || 0) + fSwap) * 10) / 10;
-      twin.amount = Math.round((Number(twin.amount) || 0) + gRich);
-      twin.f = twinF;
-      twin.kcal = Math.round(4 * (Number(twin.p) || 0) + 9 * twinF + 4 * (Number(twin.c) || 0));
-      if (full) {
-        (cd.m.items as any[]).splice(cd.idx, 1);
+    const roomHard = Math.max(0, Number(seedsCap) - seedsNow());
+    // Резерв: поздние добивки орехов добавляют до 5 г, и если отдать квоту под ноль,
+    // день выходит за потолок (S2/6/тр 60 г > 55). Сначала с резервом, потом — без.
+    const roomSoft = Math.max(0, roomHard - _QG35_NUT_RESERVE_G);
+    // Берём ровно столько граммов жира, сколько нужно до порога 70% (минимум 5 г — «это еда»):
+    // полная замена ради 2% витамина ломает тарелку, а минимальный срез — нет.
+    const needE = Math.max(0, want - eOf());
+    const ePerG = Math.max(0.02, (eDens(String(rich.id)) - eDens(String(it.id))) / 100);
+    const fWant = Math.ceil(needE / ePerG);
+    // Два плана замены: (1) минимальный — остаток пункта ≥5 г, Б/У остаются в пункте;
+    // (2) полный — только если минимальный невозможен/не прошёл гарды (тогда Б/У уходят).
+    const plans: number[] = [];
+    const seenPlan = new Set<number>();
+    for (const room of [roomSoft, roomHard]) {
+      if (!(room > 0)) continue;
+      const capF = Math.min(fIt, room);
+      const gTarget = Math.max(5, Math.min(capF, fWant));          // граммы богатого продукта
+      const fMinX = Math.min(fIt, Math.round(gTarget) * Number(rich.fat) / 100);  // их жир
+      if (fMinX > 0.5 && fMinX < fIt * 0.999 && Math.round(amt * (1 - fMinX / fIt)) >= 5
+        && !seenPlan.has(fMinX)) { seenPlan.add(fMinX); plans.push(fMinX); }
+      if (fIt <= room + 0.5 && !seenPlan.has(fIt)) { seenPlan.add(fIt); plans.push(fIt); }
+    }
+    for (const fSwap of plans) {
+      if ((Number(eOf()) || 0) >= want) break;
+      const gRich = Math.round((fSwap / Number(rich.fat)) * 100);
+      if (!(gRich >= 5)) continue;
+      const part = fSwap / fIt;
+      const full = part >= 0.999;
+      // MUFA-основа: оливковое целиком не вымывается, если оно одно в дне; при ≥2 пунктах
+      // (правило QG31 — «оливковое остаётся основой») один пункт может уйти полностью.
+      if (/olive/.test(String(it.id))) {
+        const oliveLeft = oliveNow() - Math.round(amt * part);
+        const oliveCount = meals.reduce((s: number, mm: any) => s + ((mm.items || []) as any[])
+          .filter((x: any) => /olive/.test(String(x.id))).length, 0);
+        if (oliveLeft < _QG35_OLIVE_KEEP_G && !(oliveCount >= 2 && oliveLeft >= 0)) continue;
+      }
+      const idxNow = ((cd.m.items as any[]) || []).indexOf(it);
+      if (idxNow < 0) break;   // пункт уже заменён/слит другой правкой — индекс протух
+      const snapshot = takeSnap();
+      const newItem = {
+        id: rich.id, name: rich.name, amount: gRich, role: 'fat',
+        kcal: Math.round(9 * fSwap), p: 0, f: Math.round(fSwap * 10) / 10, c: 0, fiber: 0, leucine_mg: 0,
+      };
+      const twin = ((cd.m.items as any[]) || []).find((x: any) => x !== it && String(x.id) === String(rich.id));
+      // В приёме уже стоит подсолнечное — не плодим второй пункт того же продукта
+      // (гард «нет двух одинаковых продуктов в приёме»), а сливаем жир в него.
+      if (twin && twin !== it) {
+        const twinF = Math.round(((Number(twin.f) || 0) + fSwap) * 10) / 10;
+        twin.amount = Math.round((Number(twin.amount) || 0) + gRich);
+        twin.f = twinF;
+        twin.kcal = Math.round(4 * (Number(twin.p) || 0) + 9 * twinF + 4 * (Number(twin.c) || 0));
+        if (full) {
+          (cd.m.items as any[]).splice(idxNow, 1);
+        } else {
+          const leftAmt = Math.round(amt * (1 - part));
+          const newF = Math.round((fIt - fSwap) * 10) / 10;
+          (cd.m.items as any[])[idxNow] = {
+            ...it, amount: leftAmt, f: newF,
+            kcal: Math.round(4 * (Number(it.p) || 0) + 9 * newF + 4 * (Number(it.c) || 0)),
+          };
+        }
+      } else if (full) {
+        (cd.m.items as any[])[idxNow] = newItem;
       } else {
         const leftAmt = Math.round(amt * (1 - part));
         const newF = Math.round((fIt - fSwap) * 10) / 10;
-        const ratio = fIt > 0 ? newF / fIt : 1;
-        (cd.m.items as any[])[cd.idx] = {
+        const leftItem = {
           ...it, amount: leftAmt, f: newF,
-          p: Math.round(((Number(it.p) || 0) * ratio) * 10) / 10,
-          c: Math.round(((Number(it.c) || 0) * ratio) * 10) / 10,
-          kcal: Math.round(4 * ((Number(it.p) || 0) * ratio) + 9 * newF + 4 * ((Number(it.c) || 0) * ratio)),
+          kcal: Math.round(4 * (Number(it.p) || 0) + 9 * newF + 4 * (Number(it.c) || 0)),
         };
+        (cd.m.items as any[])[idxNow] = leftItem;
+        (cd.m.items as any[]).splice(idxNow + 1, 0, newItem);
       }
-    } else if (full) {
-      (cd.m.items as any[])[cd.idx] = newItem;
-    } else {
-      const leftAmt = Math.round(amt * (1 - part));
-      const newF = Math.round((fIt - fSwap) * 10) / 10;
-      const ratio = Number(it.f) > 0 ? newF / fIt : 1;
-      const leftItem = {
-        ...it, amount: leftAmt, f: newF,
-        p: Math.round(((Number(it.p) || 0) * ratio) * 10) / 10,
-        c: Math.round(((Number(it.c) || 0) * ratio) * 10) / 10,
-        kcal: Math.round(4 * ((Number(it.p) || 0) * ratio) + 9 * newF + 4 * ((Number(it.c) || 0) * ratio)),
-      };
-      (cd.m.items as any[])[cd.idx] = leftItem;
-      (cd.m.items as any[]).splice(cd.idx + 1, 0, newItem);
+      recalcMealTotals(meals as any[]);
+      recalcDayTotals(meals, totals);
+      // Квота «орехи+семена» — суммарная по дню (так её мерит гард): после правки
+      // проверяем ФАКТ, а не арифметику до неё.
+      if (!fitsDay() || eOf() <= e0 + 0.05 || seedsNow() > Number(seedsCap) + 1e-9) {
+        undoSnap(snapshot);
+        continue;
+      }
+      names.push(String(rich.name));
+      break;
     }
-    recalcMealTotals(meals as any[]);
-    recalcDayTotals(meals, totals);
-    if (!fitsDay() || eOf() <= e0 + 0.05) { restore(cd.m, snapshot); continue; }
-    names.push(String(rich.name));
   }
 
   // (2) E-бедный орех → E-богатый в том же семействе (кешью 0.9 → миндаль 25).
@@ -15198,7 +15340,7 @@ function liftVitaminEFinal(
         const kNew = 9 * densTo * r + 4 * Number(to.protein) * r + 4 * Number(to.carbs) * r;
         const kOld = Number(it.kcal) || 0;
         if (kOld > 0 && Math.abs(kNew - kOld) > Math.max(25, kOld * 0.3)) continue;
-        const snapshot = ((m.items as any[]) || []).map((x: any) => ({ ...x }));
+        const snapshot = takeSnap();
         (m.items as any[])[i] = {
           id: to.id, name: to.name, amount: gTo, role: String(it.role) || 'fat',
           kcal: Math.round(kNew),
@@ -15224,12 +15366,121 @@ function liftVitaminEFinal(
           recalcMealTotals(meals as any[]);
           recalcDayTotals(meals, totals);
         }
-        if (!fitsDay() || eOf() <= e0 + 0.05) { restore(m, snapshot); continue; }
+        if (!fitsDay() || eOf() <= e0 + 0.05) { undoSnap(snapshot); continue; }
         names.push(String(to.name));
       }
     }
   }
+
+  // (3) Зерновая добавка: часть овсянки/риса → зародыши пшеницы (E 18 мг/100 г, семейство
+  //     null — квоту орехов/семян не тратит). Это последний адрес E для дней, где квота
+  //     семян занята чиа: 15 г зародышей дают ~2.7 мг E почти без сдвига ккал.
+  if (eOf() < want) {
+    const _wg: any = FOOD_DB.find((f: any) => String(f.id) === _QG35_E_GERM_ID
+      && foodPassesCtxAllergens(f) && foodAvailableForPlan(f)
+      && (!isAllowed || isAllowed(String(f.id))));
+    if (_wg && Number(_wg.kcal) > 0) {
+      const _wgE = eDens(_QG35_E_GERM_ID);
+      for (const m of meals) {
+        if (eOf() >= want) break;
+        const arr = (m.items || []) as any[];
+        for (let i = 0; i < arr.length; i++) {
+          if (eOf() >= want) break;
+          const it: any = arr[i];
+          if (it._fixedGrams || String(it.role) !== 'carb_slow') continue;
+          if (!/oats|rice_white|buckwheat|barley|quinoa/.test(String(it.id))) continue;
+          const amt = Number(it.amount) || 0;
+          if (!(amt >= 45)) continue;
+          const needE = Math.max(0, want - eOf());
+          const ePerG = Math.max(0.02, (_wgE - eDens(String(it.id))) / 100);
+          // Зародыш заменяет 1.33 своих грамма крупы: белок и клетчатка почти компенсируются,
+          // а ккал не съезжает (360 против 367 на 100 г).
+          const g = Math.min(Math.round((amt - 30) * 0.75), Math.max(15, Math.ceil(needE / ePerG)));
+          if (!(g >= 15)) continue;
+          const snapshot = takeSnap();
+          const _r = g / 100;
+          const _keep = (amt - Math.round(g / 0.75)) / amt;
+          if (!(_keep > 0.3)) continue;
+          const _p = Math.round((Number(_wg.protein) || 0) * _r * 10) / 10;
+          const _f = Math.round((Number(_wg.fat) || 0) * _r * 10) / 10;
+          const _c = Math.round((Number(_wg.carbs) || 0) * _r * 10) / 10;
+          arr[i] = {
+            ...it, amount: amt - Math.round(g / 0.75),
+            p: Math.round((Number(it.p) || 0) * _keep * 10) / 10,
+            f: Math.round((Number(it.f) || 0) * _keep * 10) / 10,
+            c: Math.round((Number(it.c) || 0) * _keep * 10) / 10,
+            kcal: Math.round(4 * ((Number(it.p) || 0) * _keep) + 9 * ((Number(it.f) || 0) * _keep) + 4 * ((Number(it.c) || 0) * _keep)),
+          };
+          arr.splice(i + 1, 0, {
+            id: _QG35_E_GERM_ID, name: _wg.name, amount: g, role: 'other',
+            kcal: Math.round(4 * _p + 9 * _f + 4 * _c), p: _p, f: _f, c: _c,
+            fiber: Math.round((Number(_wg.fiber) || 0) * _r * 10) / 10, leucine_mg: 0,
+          });
+          recalcMealTotals(meals as any[]);
+          recalcDayTotals(meals, totals);
+          if (!canonOkOnly() || eOf() <= e0 + 0.05) { undoSnap(snapshot); continue; }
+          names.push(String(_wg.name));
+          break;
+        }
+      }
+    }
+  }
   return { add: Math.round((eOf() - e0) * 10) / 10, names };
+}
+
+/** Жёсткий потолок «орехи+семена» на финальной тарелке (гард мерит СУММУ по дню).
+ *  B′ отдаёт освободившийся жир семенам, а поздние добивки орехов добавляют ещё 5 г —
+ *  день выходит за потолок (S2/6/тр 60 г > 55). Срезаем излишек с самого крупного
+ *  пункта-семени, оставляя порцию ≥15 г, и только если день остаётся в каноне (±3% КБЖУ). */
+function clampNutSeedsQuota(
+  meals: any[], totals: any, seedsCap: number, goals?: { k: number; p: number; f: number; c: number },
+): number {
+  if (!(seedsCap > 0)) return 0;
+  const seedsNow = () => meals.reduce((s: number, m: any) => s + ((m.items || []) as any[])
+    .filter((x: any) => {
+      const fam = stapleFamilyOf(String(x.id));
+      return fam === 'seeds' || fam === 'nuts';
+    })
+    .reduce((a: number, x: any) => a + (Number(x.amount) || 0), 0), 0);
+  const _dv = (v: number, t?: number) => (Number(t) > 0 ? Math.abs(Number(v) - Number(t)) / Number(t) : 0);
+  const canonOk = () => !goals || (
+    _dv(Number(totals?.kcal) || 0, goals.k) <= 0.03
+    && _dv(Number(totals?.p) || 0, goals.p) <= 0.03
+    && _dv(Number(totals?.f) || 0, goals.f) <= 0.03
+    && _dv(Number(totals?.c) || 0, goals.c) <= 0.03
+  );
+  let trimmed = 0;
+  let over = Math.round(seedsNow() - Number(seedsCap));
+  for (let guard = 8; over > 0 && guard-- > 0;) {
+    const plate = meals.flatMap((m: any) => (m.items || []) as any[])
+      .filter((x: any) => {
+        const fam = stapleFamilyOf(String(x.id));
+        return (fam === 'seeds' || fam === 'nuts') && !x._fixedGrams;
+      })
+      .sort((a: any, b: any) => (Number(b.amount) || 0) - (Number(a.amount) || 0));
+    const target = plate.find((x: any) => Math.floor((Number(x.amount) || 0) - 15) >= 1);
+    if (!target) break;
+    const cut = Math.min(over, Math.floor((Number(target.amount) || 0) - 15));
+    const amt0 = Number(target.amount) || 0;
+    const backup = { ...target };
+    const kRT = (amt0 - cut) / amt0;
+    target.amount = amt0 - cut;
+    target.p = Math.round((Number(target.p) || 0) * kRT * 10) / 10;
+    target.f = Math.round((Number(target.f) || 0) * kRT * 10) / 10;
+    target.c = Math.round((Number(target.c) || 0) * kRT * 10) / 10;
+    target.kcal = Math.round(4 * target.p + 9 * target.f + 4 * target.c);
+    recalcMealTotals(meals as any[]);
+    recalcDayTotals(meals, totals);
+    if (!canonOk()) {
+      Object.assign(target, backup);
+      recalcMealTotals(meals as any[]);
+      recalcDayTotals(meals, totals);
+      break;
+    }
+    trimmed += cut;
+    over = Math.round(seedsNow() - Number(seedsCap));
+  }
+  return trimmed;
 }
 
 // ─── QG28: в дне минимум два овоща (второй слот не должен «испаряться») ─────
