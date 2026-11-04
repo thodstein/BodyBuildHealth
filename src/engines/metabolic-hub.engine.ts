@@ -1535,10 +1535,13 @@ export function pregnancyAdd(input: MetabolicInput): number {
 export interface OneAnswerPro { tdee: number; low: number; high: number; water: number; ea: number | null; tdeeSource: 'adaptive-v3' | 'formula'; targets: { maintain: number; mildCut: number; cut: number; bulk: number }; note: string }
 export function buildOneAnswerPro(params: { formulaTDEE: number; adaptiveV3?: AdaptiveTDEEv3Result | null; waterMl: number; ea: number | null; pregnancyAddKcal?: number }): OneAnswerPro {
   const tdeeBase = params.adaptiveV3?.tdee ?? params.formulaTDEE;
-  const tdee = tdeeBase + (params.pregnancyAddKcal ?? 0);
+  // Беременность/лактация добавляются только к формуле: adaptive-v3 — это ИЗМЕРЕННЫЙ TDEE
+  // по весу и фактическому приёму, там добавка уже «внутри» (иначе +340 считались дважды).
+  const pregAdd = params.adaptiveV3 ? 0 : (params.pregnancyAddKcal ?? 0);
+  const tdee = tdeeBase + pregAdd;
   const low = Math.round(tdee * 0.88); const high = Math.round(tdee * 1.12);
   const targets = { maintain: tdee, mildCut: Math.round(tdee - 250), cut: Math.round(tdee - 500), bulk: Math.round(tdee + 300) };
-  return { tdee, low, high, water: params.waterMl, ea: params.ea, tdeeSource: params.adaptiveV3 ? 'adaptive-v3' : 'formula', targets, note: `TDEE ${tdee} [${low}–${high} DLW] via ${params.adaptiveV3 ? `adaptive-v3 R²${params.adaptiveV3.r2} ${params.adaptiveV3.confidence} · ${TDEE_ALREADY_ADAPTED_NOTE}` : `формула · ${PONTZER_FORMULA_NOTE}`} · cut ${targets.cut} / bulk ${targets.bulk}` };
+  return { tdee, low, high, water: params.waterMl, ea: params.ea, tdeeSource: params.adaptiveV3 ? 'adaptive-v3' : 'formula', targets, note: `TDEE ${tdee} [${low}–${high} DLW] via ${params.adaptiveV3 ? `adaptive-v3 R²${params.adaptiveV3.r2} ${params.adaptiveV3.confidence} · ${TDEE_ALREADY_ADAPTED_NOTE}` : `формула${pregAdd ? ` + ${pregAdd} ккал (беременность/лактация, IOM)` : ''} · ${PONTZER_FORMULA_NOTE}`} · cut ${targets.cut} / bulk ${targets.bulk}` };
 }
 export function diffMetabolicSnapshots(a: Record<string, any>, b: Record<string, any>): Array<{ key: string; a: any; b: any; delta: number | null }> {
   const keys = Array.from(new Set([...Object.keys(a), ...Object.keys(b)]));

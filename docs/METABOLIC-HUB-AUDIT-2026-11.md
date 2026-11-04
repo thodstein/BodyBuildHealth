@@ -248,6 +248,19 @@ EA при 2600 ккал не в красной зоне, `none` при пуст�
 расчёта.
 **Регрессия.** `metabolic-hub-wiring.test.tsx` → «сохранённый профиль пота применяется к расчёту».
 
+### 1.24 Беременность добавлялась к TDEE дважды (+680 вместо +340)
+**Причина.** `calcSteps` уже включает добавку беременности/лактации в `tdeeNat`
+(`tdeeNat = bmr×pal + pregAdd`), а хаб передавал этот же `tdeeNat` в `buildOneAnswerPro` вместе
+с `pregnancyAddKcal` — тот прибавлял добавку ещё раз. Плитка TDEE и её `cut`/`bulk`-цели были
+завышены на 340 ккал (2-й триместр) и 452 (3-й). Для adaptive-v3 добавка тоже шла поверх
+измеренного TDEE, то есть второй раз.
+**Исправление.** В хабе в `buildOneAnswerPro` уходит база без добавки (`tdeeNat − pregAdd`);
+в движке `buildOneAnswerPro` добавляет беременность только к формуле, не к adaptive-v3
+(измеренный TDEE уже содержит фактический приём). В подписи появилось «+ N ккал
+(беременность/лактация, IOM)».
+**Регрессия.** `metabolic-hub.test.ts` → «беременность добавляется один раз»;
+`metabolic-hub-wiring.test.tsx` → «беременность в UI поднимает TDEE ровно на 340».
+
 ---
 
 ## 2. Чего не хватало (добавлено)
@@ -297,7 +310,7 @@ EA при 2600 ккал не в красной зоне, `none` при пуст�
   параллельные `tsc`/`vitest` из других сессий → heap OOM / `Zone Allocation failed`.
   Прогонять на свободной машине.
 - `npx vitest run src/ui/screens/Shared/__tests__ src/engines/__tests__/metabolic-hub.test.ts`
-  — **199 passed** (6 файлов: structure / toggles / honesty / modes / wiring / engine).
+  — **202 passed** (6 файлов: structure / toggles / honesty / modes / wiring / engine).
 - `npx vitest run src/ui/__tests__/rest-hooks-native.test.tsx
   src/engines/__tests__/risk-info-honesty-e07-e08.test.ts` — **89 passed**
   (в stderr шумит jsdom-canvas chart.js — это фон, не падения).

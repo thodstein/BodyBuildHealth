@@ -1111,6 +1111,25 @@ describe('metabolic-hub PRO v4-3 — дедуп поколений: PAL-пари
     const eaTons = calcEnergyAvailability({ weight: 80, bodyFat: 15, height: 180, intakeKcal: 2600, eeeKcal: Math.round(tons20.kcalPerWeek / 7), trainingDays: 4 });
     expect(eaTons.ea).toBeGreaterThan(30);
   });
+  it('беременность добавляется один раз: +340, а не +680', async () => {
+    const { calcSteps, buildOneAnswerPro, pregnancyAdd } = await import('../metabolic-hub.engine');
+    const base = { weight: 70, height: 168, age: 29, sex: 'female' as const, activityLevel: 'high' as const };
+    const null3 = calcSteps({ ...base } as any);
+    const preg = calcSteps({ ...base, trimester: 2 } as any);
+    // calcSteps уже включает добавку беременности
+    expect(preg.tdeeNat - null3.tdeeNat).toBe(340);
+    // в хабе в buildOneAnswerPro уходит база БЕЗ добавки — итог должен остаться +340
+    const add = pregnancyAdd({ ...base, trimester: 2 } as any);
+    expect(add).toBe(340);
+    const one = buildOneAnswerPro({ formulaTDEE: preg.tdeeNat - add, waterMl: 3000, ea: null, pregnancyAddKcal: add });
+    expect(one.tdee).toBe(preg.tdeeNat);
+    // adaptive-v3 — уже измеренный TDEE, добавка беременности второй раз не идёт
+    const adaptive = buildOneAnswerPro({
+      formulaTDEE: 2000, waterMl: 3000, ea: null, pregnancyAddKcal: 340,
+      adaptiveV3: { tdee: 2600, r2: 0.8, confidence: 'high', emaSeries: [70, 70], trend: 0, adjustment: 0, days: 28, note: '' } as any,
+    });
+    expect(adaptive.tdee).toBe(2600);
+  });
   it('DIAAS в целях: mixed без изменений, горох +надбавка с пометкой', async () => {
     const { calcKBJU } = await import('../metabolic-hub.engine');
     const def = calcKBJU({ ...base });

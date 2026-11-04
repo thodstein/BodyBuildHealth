@@ -170,6 +170,16 @@ describe('MetabolicHub: ввод меняет расчёт (проводка п�
     expect(loose).not.toMatch(/в срок не успеть/);
   });
 
+  it('беременность в UI поднимает TDEE ровно на 340, а не на 680', () => {
+    render(<MetabolicHub />);
+    // блок беременности виден только для ♀
+    setSelect('Пол', '♀');
+    const tdeeF = tileValue('TDEE');
+    setSelect('Триместр', '2-й');
+    // было: calcSteps уже добавлял 340, а buildOneAnswerPro добавлял ещё раз → +680
+    expect(tileValue('TDEE') - tdeeF).toBe(340);
+  });
+
   it('сценарий хранит лабы и восстанавливает их (было 22 поля из ~90)', () => {
     render(<MetabolicHub />);
     setNumber('HCT, %', 52);

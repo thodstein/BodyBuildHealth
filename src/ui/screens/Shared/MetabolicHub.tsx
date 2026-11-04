@@ -780,7 +780,11 @@ const kbju = useMemo(()=> calcKBJU(input), [input]);
   const pregAdd = useMemo(()=> pregnancyAdd({ weight, height, age, sex, trimester: trimester || undefined, lactating: lactating === 'none' ? null : lactating } as any), [weight, height, age, sex, trimester, lactating]);
   const palPro = useMemo(()=> calcPALPro({ weight, height, age, sex, activityLevel: activityLevel as any, profession, metHoursPerWeek, standingHours, fidgetLevel, steps } as any), [weight, height, age, sex, activityLevel, profession, metHoursPerWeek, standingHours, fidgetLevel, steps]);
   const oneAnswer = useMemo(()=>{
-    const pro = buildOneAnswerPro({ formulaTDEE: stepsCalc.tdeeNat, adaptiveV3, waterMl: onAAS ? water.aas : water.nat, ea: ea?.ea ?? null, pregnancyAddKcal: pregAdd });
+    // Аудит 2026-11: `calcSteps.tdeeNat` УЖЕ содержит беременность/лактацию (pregAdd),
+    // поэтому в `buildOneAnswerPro` уходит база БЕЗ неё — иначе +340/+452 считались
+    // дважды (плитка TDEE и её cut/bulk-цели были завышены на 340–452 ккал).
+    const baseTdee = stepsCalc.tdeeNat - pregAdd;
+    const pro = buildOneAnswerPro({ formulaTDEE: baseTdee, adaptiveV3, waterMl: onAAS ? water.aas : water.nat, ea: ea?.ea ?? null, pregnancyAddKcal: pregAdd });
     return { ...pro, eaZone: ea?.zone, metsScore: mets.score };
   }, [adaptiveV3, stepsCalc, water, onAAS, ea, mets, pregAdd]);
   // модель графика v3: сырой вес (тот же фильтр, что в движке) + EMA + intake по датам
