@@ -26,7 +26,7 @@
 import { FOOD_DB, FOOD_ALLERGEN_DIET } from "../../../../core/nutrition-database";
 import { filterByIntolerance, matchesCategoryPref, isPreferredCategory, tasteMatchScore, type CategoryPref, type Intolerances, type TasteProfile } from "./planner-preferences";
 import { analyzeMicroCoverage, sumMicros, RDA_BASE, getMicroTargets, type MicroCoverageEntry } from "./planner-micro-coverage";
-import { scoreDayQuality, describeQualityWeakness } from "./planner-quality-score";
+import { scoreDayQuality, describeQualityWeakness, MIN_MEANINGFUL_G } from "./planner-quality-score";
 import { getMicroFromFood } from "./planner-micro-reader";
 import { detectMealInteractions, cookMethodGuidance } from "./planner-food-interactions";
 import type { FoodItem } from "../../../../core/nutrition-database";
@@ -14268,6 +14268,116 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
       purgeJunkFatFinal(meals as any[], totals);
     }
 
+    // ─── QG34: баланс белка до цели (все режимы — срез только ВНИЗ) ─────────────
+    // Замер: ручной день `M2 7 приёмов/отдых` (цель 160 г Б) отдавал 164.5 г (+2.81%)
+    // при каноне по остальным осям. B40/B42 молчат (их порог — перебор >3% И белок как
+    // блокирующая ось), хотя перебор собран не «лишним приёмом», а граммами порошка/
+    // творога сверх пола приёма. Лечим точечно: срез 5-граммовыми шагами у пункта с
+    // наибольшим ИЗБЫТКОМ над полом, не трогая сами полы (18/14 г, 0.30 г/кг у основных).
+    // Гард «день не хуже»: если срез роняет оценку дня или выводит его из канона 3%,
+    // правка откатывается целиком. Честность: срез меняет белок/ккал, поэтому «Точность
+    // рациона» и «Сводка MPS» пересобираются по ФАКТУ тарелки (C5-fix/B38).
+    {
+      const _p34 = Number((input as any).goalProteinG) || 0;
+      if (_p34 > 0 && (Number(totals.p) || 0) > _p34 * _QG34_BAND) {
+        const _q34 = () => {
+          const cov = _pickCtx.qualityMode === 'full'
+            ? analyzeMicroCoverage(
+              sumMicros((meals as any[]).flatMap((m: any) => (m.items || []).map((it: any) => ({ id: it.id, amount: it.amount }))), FOOD_DB as any),
+              (input.sex || 'male') as any, input.weightKg, input.cyclePhase as any, !!input.isTrainingDay,
+              input.calciumTargetOverride, input.sodiumTargetOverride,
+            ).coverage
+            : [];
+          const lowN = cov.filter((c: any) => (c.pct || 0) < 70).length;
+          return scoreDayQuality(meals as any[], {
+            weightKg: Number(input.weightKg) || 0,
+            microCoverage: cov.length > 0 ? { lowCount: lowN, total: cov.length } : undefined,
+          }).total;
+        };
+        const _snapItems34 = (meals as any[]).map((m: any) => (m.items || []).map((x: any) => ({ ...x })));
+        const _snapMealT34 = (meals as any[]).map((m: any) => ({ ...(m.totals || {}) }));
+        const _snapDay34 = { ...totals };
+        const _q34Before = _q34();
+        // Доноры, уже обещанные в ноте QG20 («взят у «Обед»: Сардины −15 г»), неприкосновенны:
+        // нота обещает, что приём держит ≥0.30 г/кг, а пункт — пол порции (75 г при ≥80 кг).
+        const _prot34 = new Set<string>();
+        for (const n of notes) {
+          const _s34 = String(n);
+          const _re34 = /взят у «[^»]*»: ([^−]+?) −\d+ г/g;
+          let _m34: RegExpExecArray | null;
+          while ((_m34 = _re34.exec(_s34))) _prot34.add(_m34[1].trim());
+        }
+        const _n34 = trimProteinToTarget(
+          meals as any[], totals, _p34,
+          Number((input as any).goalKcal) || 0,
+          Number((input as any).goalFatG) || 0,
+          Number((input as any).goalCarbsG) || 0,
+          Number(input.weightKg) || 0,
+          _prot34,
+          Number(input.weightKg) >= 80 && !(input as any).manualTargetsLocked ? 75 : 0,
+        );
+        if (_n34 > 0 && _q34() < _q34Before - 1e-9) {
+          (meals as any[]).forEach((m: any, i: number) => {
+            m.items = _snapItems34[i];
+            m.totals = _snapMealT34[i];
+          });
+          Object.assign(totals, _snapDay34);
+        } else if (_n34 > 0) {
+          // ── честность: «Точность рациона» по факту среза ──
+          const _gP34 = input.goalProteinG || adjustedProteinG;
+          const _gC34 = input.goalCarbsG || carbsTotal;
+          const _gF34 = input.goalFatG || fatTotal;
+          const _dP34 = Math.abs(totals.p - _gP34) / Math.max(1, _gP34);
+          const _dC34 = Math.abs(totals.c - _gC34) / Math.max(1, _gC34);
+          const _dF34 = Math.abs(totals.f - _gF34) / Math.max(1, _gF34);
+          const _mx34 = Math.max(_dP34, _dC34, _dF34);
+          const _iT34 = notes.findIndex((n) => typeof n === 'string' && /Точность рациона:/.test(String(n)));
+          if (_iT34 >= 0) {
+            notes[_iT34] = _mx34 <= 0.02
+              ? `🎯 Точность рациона: Б ${totals.p}/${_gP34}г, Ж ${totals.f}/${_gF34}г, У ${totals.c}/${_gC34}г (отклонение ≤2%)`
+              : _mx34 <= 0.05
+                ? `✓ Точность рациона: отклонение ≤5% (Б ${Math.round(_dP34 * 100)}%, Ж ${Math.round(_dF34 * 100)}%, У ${Math.round(_dC34 * 100)}%)`
+                : `⚠ Точность рациона: отклонение >5% (Б ${Math.round(_dP34 * 100)}%, Ж ${Math.round(_dF34 * 100)}%, У ${Math.round(_dC34 * 100)}%) — проверьте пулы продуктов`;
+          }
+          // ── честность: «Жир по приёмам» (QG15) — максимум доли жира по факту среза ──
+          {
+            const _iFat34 = notes.findIndex((n) => typeof n === 'string' && String(n).startsWith('🧈 Жир по приёмам:'));
+            if (_iFat34 >= 0) {
+              const _txt34 = String(notes[_iFat34]);
+              const _moves34 = _txt34.match(/^🧈 Жир по приёмам: (.*?) — /)?.[1] || '';
+              const _dayF34 = Number(totals.f) || 0;
+              const _mains34 = (meals as any[]).filter((m: any) => !['preworkout', 'postworkout', 'intra', 'presleep'].includes(String(m.type))
+                && ((m.items || []) as any[]).length > 0);
+              const _share34 = _dayF34 > 0 && _mains34.length
+                ? Math.round(Math.max(..._mains34.map((m: any) => (Number(m.totals?.f) || 0) / _dayF34)) * 100)
+                : 0;
+              notes[_iFat34] = `🧈 Жир по приёмам: ${_moves34} — максимум жира в основном приёме ${_share34}%`
+                + (_share34 <= 35 ? ' (норма ≤35%)' : ' (выше нормы 35% — переносить больше некуда)');
+            }
+          }
+          // ── честность: «Сводка MPS» и mpsSummary по финальным приёмам ──
+          {
+            const _mb34 = (meals as any[]).map((m: any) => {
+              const _p34m = (m.items || []).reduce((s: number, i: any) => s + (i.p || 0), 0);
+              const _leu34 = ((m.items || []).reduce((s: number, i: any) => s + (i.leucine_mg || 0), 0)) / 1000;
+              return {
+                label: m.label || m.type, proteinG: Math.round(_p34m), leucineG: Math.round(_leu34 * 10) / 10,
+                triggersMps: m.mpsCheck?.triggers_mTOR || (_p34m >= 25 && _leu34 >= 2.5),
+              };
+            });
+            (mpsSummary as any).meals = _mb34;
+            (mpsSummary as any).avg_protein_per_meal_g = Math.round(totals.p / Math.max(1, (meals as any[]).length));
+            const _feed34 = _mb34.filter((x: any) => (x.proteinG || 0) >= 25).length;
+            (mpsSummary as any).avg_leucine_g = Math.round((totals.leucine_mg || 0) / Math.max(1, _feed34)) / 1000;
+            const _iMps34 = notes.findIndex((n) => typeof n === 'string' && String(n).startsWith('Сводка MPS:'));
+            if (_iMps34 >= 0) {
+              notes[_iMps34] = `Сводка MPS: ${_feed34} feedings × ${(mpsSummary as any).avg_protein_per_meal_g} г/meal, ${(mpsSummary as any).avg_leucine_g} г лейцина (порог ${LEU_THRESHOLD_MG / 1000} г)`;
+            }
+          }
+        }
+      }
+    }
+
     // ─── QG24: источник жира по витамину E (до пересчёта микро/витрины) ───
     if (_pickCtx.qualityMode === 'full'
       && !(input as any).manualTargetsLocked
@@ -14669,6 +14779,133 @@ function purgeJunkFatFinal(meals: any[], totals: any): number {
     }
   }
   return fixed;
+}
+
+// ─── QG34: финальный баланс белка (±2.5% к цели) ────────────────────────────
+// Замер: ручной день `M2 7 приёмов/отдых` (цель 160 г Б) отдаёт 164.5 г (+2.81%), при этом
+// канон по остальным осям соблюдён (ккал −1.1%, жир −1.0%, углеводы −3.1%). B40/B42 молчат:
+// их порог — перебор >3% И белок как блокирующая ось. Перебор собран не «лишним приёмом», а
+// граммами порошка/творога сверх пола приёма, поэтому лечится не удалением приёма, а срезом
+// 5-граммовыми шагами у пункта с наибольшим ИЗБЫТКОМ над полом.
+// Жёсткие границы: приём не опускается ниже 8 г белка (контракт MPS — минимум 4 белковых
+// приёма), пункт не опускается ниже 5 г белка, день не опускается ниже цели, канон по ккал
+// не имеет права стать хуже 3%. Полы приёмов (18/14 г) не понижаются — срезается только то,
+// что выше пола.
+const _QG34_BAND = 1.025;    // порог старта: перебор больше 2.5% цели
+const _QG34_STOP = 1.02;     // цель среза: 2% (запас до порога)
+function trimProteinToTarget(
+  meals: any[], totals: any, pTarget: number, kcalTarget: number, fatTarget: number, carbTarget: number,
+  weightKg: number, protectedNames?: Set<string>, portionFloorG = 0,
+): number {
+  if (!(pTarget > 0)) return 0;
+  if (!(Number(totals?.p) > pTarget * _QG34_BAND)) return 0;   // ниже порога — не трогаем день вовсе
+  const _roles = new Set(['protein', 'fast_protein', 'slow_protein']);
+  const _W = Math.max(1, Number(weightKg) || 0);
+  // Пол приёма: 0.30 г белка/кг (инвариант QG14/QG20 — донор порога не отдаёт).
+  const _mainFloor = 0.3 * _W;
+  // Пол ПОРЦИИ цельного белка (F1 #8): у атлетов ≥80 кг в завтраке/обеде/ужине порция
+  // мяса/рыбы/яичного белка ≥75 г. Срез не имеет права ПРОБИТЬ этот пол сверху вниз
+  // (если порция уже меньше — её выбрал движок, и это не наша правка). Пол задаёт вызывающий:
+  // это контракт АВТО-режима, в ручном дне цели и порции задал пользователь.
+  const _portionFloor = Math.max(0, Number(portionFloorG) || 0);
+  const _kcalGoal = Number(kcalTarget) || 0;
+  const _fatGoal = Number(fatTarget) || 0;
+  const _carbGoal = Number(carbTarget) || 0;
+  const _kcalDev = (k: number) => (_kcalGoal > 0 ? Math.abs(k - _kcalGoal) / _kcalGoal : 0);
+  // «Канон не хуже»: срез белка уносит и его жир, поэтому день, стоящий в каноне, не имеет
+  // права из него выпасть (замер: M1/6/тр уходил по жиру на 3.14%).
+  const _devAll = () => Math.max(
+    _kcalDev(Number(totals?.kcal) || 0),
+    pTarget > 0 ? Math.abs((Number(totals?.p) || 0) - pTarget) / pTarget : 0,
+    _fatGoal > 0 ? Math.abs((Number(totals?.f) || 0) - _fatGoal) / _fatGoal : 0,
+    _carbGoal > 0 ? Math.abs((Number(totals?.c) || 0) - _carbGoal) / _carbGoal : 0,
+  );
+  const _fatSigned = () => (_fatGoal > 0 ? ((Number(totals?.f) || 0) - _fatGoal) / _fatGoal : 0);
+  let trimmed = 0;
+  for (let guard = 0; guard < 16; guard++) {
+    const p0 = Number(totals?.p) || 0;
+    if (p0 <= pTarget * _QG34_STOP) break;
+    // Кандидаты: приоритет — порошок (0), цельный белок (1), молочка/Ca (2); внутри —
+    // по «комнате». Порог «осмысленной порции» берём ИЗ ОЦЕНКИ (MIN_MEANINGFUL_G):
+    // срез порошка 20 → 15 г уводил пункт ниже порога fast_protein (20 г) и ронял ось «порции».
+    const cands: any[] = [];
+    for (const m of meals as any[]) {
+      const mp = Number(m.totals?.p) || 0;
+      for (const it of (m.items || []) as any[]) {
+        if (!_roles.has(String(it.role)) || (it as any)._fixedGrams) continue;
+        const amt = Number(it.amount) || 0;
+        const p = Number(it.p) || 0;
+        const minG = Number(MIN_MEANINGFUL_G[String(it.role)] || 0);
+        if (p < 5 || amt < Math.max(10, minG)) continue;
+        // «Комната»: приём не опускается ниже своего пола. Пол = max(8 г, 0.30 г/кг):
+        // QG20 требует, чтобы ЛЮБОЙ приём, ставший донором, держал 0.30 г/кг
+        // (в замере — pre-sleep 11.3 г при пороге 15 г), а presleep-молочка — ещё и свой пол.
+        const _mf = Math.max(8, _mainFloor);
+        const room = Math.min(p - 5, mp - _mf);
+        if (room < 1) continue;
+        const _id = String(it.id);
+        const tier = /whey|isolat|protein_powder/.test(_id) ? 0
+          : (_id.includes('casein') || _id.includes('cottage') || _id.includes('curd') || _id.includes('kefir') || _id.includes('milk') ? 2 : 1);
+        cands.push({ m, it, p, room, tier, minG, mp });
+      }
+    }
+    cands.sort((a, b) => (a.tier - b.tier) || (b.room - a.room));
+    const need = p0 - pTarget * _QG34_STOP;
+    let applied = false;
+    for (const c of cands) {
+      const fd: any = FOOD_DB.find((f: any) => String(f.id) === String(c.it.id));
+      if (!fd || !(Number(fd.protein) > 0)) continue;
+      const take = Math.min(c.room, Math.max(need, 1));
+      let step = Math.round(((take / Number(fd.protein)) * 100) / 5) * 5;
+      if (step < 5) step = 5;                      // шаг 5 г — «порция», а не дробь
+      const newAmt = Math.round((Number(c.it.amount) - step) / 5) * 5;
+      // Ниже «осмысленной порции» роли не опускаемся — иначе ось «порции» падает.
+      if (!(newAmt >= Math.max(10, c.minG)) || newAmt >= Number(c.it.amount)) continue;
+      // Донор, обещанный нотой QG20, неприкосновенен (нота обещает пол порции).
+      if (protectedNames && protectedNames.has(String(c.it.name))) continue;
+      // Пол порции цельного белка не пробиваем сверху вниз (F1 #8).
+      if (_portionFloor > 0 && String(c.it.role) === 'protein'
+        && ['breakfast', 'lunch', 'dinner'].includes(String(c.m.type))
+        && Number(c.it.amount) >= _portionFloor && newAmt < _portionFloor) continue;
+      // Точная проверка пола приёма: шаг 5 г снимает до 5×плотность белка, поэтому «комната»
+      // по округлённым totals могла соврать на десятые (pre-sleep 14.9 г при пороге 15 г).
+      // Запас 0.2 г покрывает округление пунктов до 0.1.
+      const _dropP = (Number(fd.protein) * (Number(c.it.amount) - newAmt)) / 100;
+      if (c.mp - _dropP < _mainFloor + 0.2) continue;
+      const snap = { ...c.it };
+      const dev0 = _devAll();
+      const fat0 = _fatSigned();
+      const _amtBefore = Number(c.it.amount) || 1;
+      const r = newAmt / 100;
+      c.it.amount = newAmt;
+      c.it.p = +(Number(fd.protein) * r).toFixed(1);
+      c.it.f = +(Number(fd.fat) * r).toFixed(1);
+      c.it.c = +(Number(fd.carbs) * r).toFixed(1);
+      c.it.kcal = Number(fd.kcal) > 0
+        ? Math.round((Number(fd.kcal) * newAmt) / 100)
+        : Math.round(4 * c.it.p + 9 * c.it.f + 4 * c.it.c);
+      c.it.fiber = +(Number(fd.fiber || 0) * r).toFixed(1);
+      // Лейцин масштабируем пропорционально граммам: иначе «Сводка MPS» и mpsSummary
+      // показывают лейцин нетронутого пункта.
+      c.it.leucine_mg = Math.round((Number(c.it.leucine_mg) || 0) * (newAmt / _amtBefore));
+      recalcMealTotals(meals as any[]);
+      recalcDayTotals(meals, totals);
+      // «Не навреди»: срез не имеет права сделать ХУДШУЮ ось дня хуже (он уносит и жир
+      // пункта: в днях с жиром −15% перебор белка — не та проблема, которую стоит лечить).
+      const dev1 = _devAll();
+      if (dev1 > dev0 + 1e-4 || (fat0 >= -0.15 && _fatSigned() < -0.15)) {
+        Object.assign(c.it, snap);
+        recalcMealTotals(meals as any[]);
+        recalcDayTotals(meals, totals);
+        break;
+      }
+      trimmed++;
+      applied = true;
+      break;
+    }
+    if (!applied) break;
+  }
+  return trimmed;
 }
 
 function liftVitaminEByFatAddress(

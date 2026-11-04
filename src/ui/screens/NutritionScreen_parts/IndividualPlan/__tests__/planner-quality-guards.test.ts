@@ -1761,3 +1761,69 @@ describe('оценка качества дня (planner-quality-score)', () => {
     expect(a.total).toBeLessThanOrEqual(100);
   });
 });
+
+describe('белок дня приводится к цели срезом, а не полами (QG34)', () => {
+  // Замер: ручной день `M2 / 7 приёмов / отдых` (цель 160 г Б) отдавал 164.5 г (+2.81%)
+  // при каноне по остальным осям (ккал −1.1%, жир −1.0%, углеводы −3.1%). B40/B42 молчат:
+  // их порог — перебор >3% И белок как блокирующая ось. Перебор собран не «лишним
+  // приёмом», а граммами порошка/мяса сверх пола приёма — значит лечится срезом 5-г
+  // шагами, а не удалением приёма и не понижением полов.
+  const kcalOf = (p: number, f: number, c: number) => p * 4 + f * 9 + c * 4;
+
+  const manualDay = () => buildDayPlan({
+    weightKg: 90, lbmKg: 73, bodyFatPct: 19, sex: 'male',
+    goalKcal: kcalOf(160, 80, 350), goalProteinG: 160, goalFatG: 80, goalCarbsG: 350,
+    mealsCount: 7, isTrainingDay: false, trainStartMin: 17 * 60 + 30, trainDurationMin: 90,
+    allowIntraWorkout: true, budget: 'medium', dayOffset: 0, cyclePhase: 'none',
+    variety: 'medium', eveningLowCarb: false, goal: 'maintenance',
+    manualTargetsLocked: true, carbCapGPerKg: 0,
+  } as unknown as MealPlanInput) as any;
+
+  it('ручной день 7 приёмов: белок у цели (<2.5%), но не ниже цели', () => {
+    const p = manualDay();
+    const dev = Math.abs(Number(p.totals.p) - 160) / 160;
+    expect(Number(p.totals.p), 'белок дня не опускается ниже цели').toBeGreaterThanOrEqual(160);
+    expect(dev * 100, `отклонение белка ${(dev * 100).toFixed(2)}%`).toBeLessThan(2.5);
+  });
+
+  it('«Точность рациона» считает проценты по ФАКТУ после среза', () => {
+    const p = manualDay();
+    const note = ((p.notes || []) as string[]).find((n) => typeof n === 'string' && /Точность рациона:/.test(n)) || '';
+    expect(note, 'нота точности есть').not.toBe('');
+    const factPct = Math.round((Math.abs(Number(p.totals.p) - 160) / 160) * 100);
+    const shownGrams = (note.match(/Б (\d+)\/\d+г/) || [])[1];
+    const shownPct = (note.match(/Б (\d+)%/) || [])[1];
+    if (shownGrams !== undefined) {
+      expect(Math.abs(Number(shownGrams) - Math.round(Number(p.totals.p))), 'граммы Б в ноте = факт').toBeLessThanOrEqual(1);
+    } else {
+      expect(Math.abs(Number(shownPct) - factPct), `процент Б в ноте ${shownPct} vs факт ${factPct}`).toBeLessThanOrEqual(1);
+    }
+  });
+
+  it('«Сводка MPS» не врёт после среза: feedings и средний белок = факт тарелки', () => {
+    const p = manualDay();
+    const note = ((p.notes || []) as string[]).find((n) => typeof n === 'string' && n.startsWith('Сводка MPS:')) || '';
+    expect(note, 'сводка есть').not.toBe('');
+    const m = note.match(/Сводка MPS: (\d+) feedings × (\d+) г\/meal/);
+    expect(m, 'формат сводки').not.toBeNull();
+    const meals = (p.meals || []) as any[];
+    const factFeed = meals.filter((mm: any) => Math.round((mm.items || []).reduce((s: number, i: any) => s + (i.p || 0), 0)) >= 25).length;
+    const factAvg = Math.round((Number(p.totals.p) || 0) / Math.max(1, meals.length));
+    expect(Number(m![1]), `feedings ${m![1]} vs ${factFeed}`).toBe(factFeed);
+    expect(Number(m![2]), `avg ${m![2]} vs ${factAvg}`).toBe(factAvg);
+  });
+
+  it('срез оставляет осмысленные порции: мясо/рыба ≥40 г, порошок ≥20 г', () => {
+    const p = manualDay();
+    const bad: string[] = [];
+    for (const m of (p.meals || []) as any[]) {
+      for (const x of (m.items || []) as any[]) {
+        if (!['protein', 'fast_protein', 'slow_protein'].includes(String(x.role))) continue;
+        const g = Number(x.amount) || 0;
+        const min = /whey|isolat|protein_powder|casein/.test(String(x.id)) ? 20 : 40;
+        if (g < min) bad.push(`${m.type}/${x.id}: ${g} г < ${min}`);
+      }
+    }
+    expect(bad.slice(0, 5).join(' | ')).toBe('');
+  });
+});
