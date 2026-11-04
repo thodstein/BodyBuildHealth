@@ -14399,6 +14399,37 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
         }
       }
     }
+    // ─── QG35: финальный адрес витамина E (точечно, по граммам жира) ───
+    // QG24/QG31 меняют пункт только целиком и только от 7 г, а квота семян в дефицитных
+    // днях уже занята — поэтому адрес не находится. Здесь меняем то, что влезает.
+    if (_pickCtx.qualityMode === 'full'
+      && !(input as any).manualTargetsLocked
+      && (input as any).kbjuMode !== 'manual') {
+      const _eGoal35 = Number((RDA_BASE as any)?.VitE?.[(input.sex === 'female' ? 'female' : 'male')] || 15);
+      const _e35 = liftVitaminEFinal(
+        meals as any[], totals, _eGoal35,
+        nutCatchupCap(quotaWeightScale(Number(input.weightKg) || 80)),
+      );
+      if (_e35.add > 0 && _e35.names.length > 0) {
+        // Нота QG9 «N замен грамм-в-грамм (…) … E X мг из Y мг» написана раньше — переписываем
+        // и счётчик замен, и список продуктов, и факт по витамину: нота не имеет права врать.
+        const _i35 = notes.findIndex((n) => typeof n === 'string' && String(n).includes('Витамин E:'));
+        const _eN35 = Math.round(Number((sumMicros(
+          (meals as any[]).flatMap((m: any) => (m.items || []).map((it: any) => ({ id: it.id, amount: it.amount }))),
+          FOOD_DB as any,
+        ) as any)?.VitE || 0));
+        if (_i35 >= 0) {
+          const _uniq35 = Array.from(new Set(_e35.names.map(String)));
+          notes[_i35] = String(notes[_i35])
+            .replace(/E \d+ мг из/, `E ${_eN35} мг из`)
+            .replace(/(\d+) замен грамм-в-грамм \(([^)]*)\)/, (_m: string, n: string, list: string) => {
+              const rest = list.split(',').map((s: string) => s.trim()).filter(Boolean);
+              const merged = Array.from(new Set([...rest, ..._uniq35]));
+              return `${Number(n) + _e35.names.length} замен грамм-в-грамм (${merged.join(', ')})`;
+            });
+        }
+      }
+    }
     const _finalFoodIds = new Set<string>();
     for (const m of meals) for (const it of (m.items || [])) _finalFoodIds.add(it.id);
     const _finalCategories: Record<string, number> = {};
@@ -14995,6 +15026,210 @@ function liftVitaminEByFatAddress(
     return 0;
   }
   return Math.round((eOf() - e0) * 10) / 10;
+}
+
+// ─── QG35: финальный адрес витамина E — точечно, по граммам жира ────────────
+// Замер после QG33/QG34 (30 дней): E < 70% RDA остаётся в 6 днях (55–69%). В каждом из
+// них в тарелке стоит «бедный» жир: ги (0.8 мг E/100 г) — 4 дня, кешью (E ≈ 1) — 2 дня.
+// QG24/QG31 не достают их по двум причинам: (а) меняют пункт только ЦЕЛИКОМ и только от
+// 7 г (гхи 5 г не видит); (б) подсолнечное масло живёт в семействе «семена»
+// (`stapleFamilyOf`), а квота семян в этих днях уже занята чиа/семечками — полная замена
+// в неё не влезает.
+// Здесь адрес точечный: меняем столько граммов ЖИРА, сколько в квоте осталось комнаты
+// (минимум 5 г — «это ещё еда»). Макро дня не двигаются: жир 100% меняется на жир 100%,
+// остаток пункта ужимается пропорционально. Два легальных адреса:
+//   1) «почти чистый жир» с бедным E (гхи 0.8, оливковое 14.4) → подсолнечное нерафинированное;
+//      оливковое — только если после правки в дне остаётся ≥10 г (MUFA-основа неприкосновенна);
+//   2) E-бедный орех → E-богатый внутри орехового семейства (кешью 0.9 → миндаль 25),
+//      по жиру, квота орехов при этом не растёт.
+const _QG35_PURE_FAT_MIN_PCT = 80;   // «почти чистый жир»: ≥80% ккал-плотности из жира
+const _QG35_OLIVE_KEEP_G = 10;       // MUFA-основа: после правки оливкового ≥10 г
+const _QG35_NUT_SWAP: Array<[string, string]> = [['cashew', 'almonds']];
+function liftVitaminEFinal(
+  meals: any[], totals: any, eGoal: number, seedsCap: number,
+): { add: number; names: string[] } {
+  const names: string[] = [];
+  if (!(eGoal > 0)) return { add: 0, names };
+  const want = eGoal * 0.7;
+  const eOf = () => Number((sumMicros(
+    meals.flatMap((m: any) => (m.items || []).map((x: any) => ({ id: x.id, amount: x.amount }))),
+    FOOD_DB as any,
+  ) as any)?.VitE || 0);
+  const e0 = eOf();
+  if (e0 >= want) return { add: 0, names };
+  const rich: any = FOOD_DB.find((f: any) => String(f.id) === _QG24_E_RICH_ID);
+  if (!rich || !(Number(rich.fat) > 0)) return { add: 0, names };
+  const eDens = (id: string) => {
+    const fd: any = FOOD_DB.find((f: any) => String(f.id) === id);
+    return Number(fd?.micros?.VitE ?? fd?.vitamins_100g?.vitamin_e_mg ?? 0);
+  };
+  const seedsNow = () => meals.reduce((s: number, m: any) => s + ((m.items || []) as any[])
+    .filter((x: any) => stapleFamilyOf(String(x.id)) === 'seeds')
+    .reduce((a: number, x: any) => a + (Number(x.amount) || 0), 0), 0);
+  const oliveNow = () => meals.reduce((s: number, m: any) => s + ((m.items || []) as any[])
+    .filter((x: any) => /olive/.test(String(x.id)))
+    .reduce((a: number, x: any) => a + (Number(x.amount) || 0), 0), 0);
+  const k0 = Number(totals?.kcal) || 0;
+  const f0 = Number(totals?.f) || 0;
+  const p0 = Number(totals?.p) || 0;
+  const c0 = Number(totals?.c) || 0;
+  const ids0 = new Set(meals.flatMap((m: any) => (m.items || []).map((x: any) => String(x.id)))).size;
+  const fitsDay = () => {
+    const dk = Math.abs((Number(totals?.kcal) || 0) - k0);
+    const df = Math.abs((Number(totals?.f) || 0) - f0);
+    const dp = Math.abs((Number(totals?.p) || 0) - p0);
+    const dc = Math.abs((Number(totals?.c) || 0) - c0);
+    const ids = new Set(meals.flatMap((m: any) => (m.items || []).map((x: any) => String(x.id)))).size;
+    // Латеральная замена источника жира может убрать из палитры ОДИН пункт (гхи уходит,
+    // подсолнечное уже стоит в дне) — это осознанный обмен на витамин E, не монотонность.
+    // Больше одного пункта за стадию не теряем.
+    return dk <= Math.max(6, k0 * 0.005) && df <= 0.61 && dp <= 0.61 && dc <= 2.01
+      && ids >= ids0 - (names.length + 1);
+  };
+  const restore = (m: any, snapshot: any[]) => {
+    m.items = snapshot;
+    recalcMealTotals(meals as any[]);
+    recalcDayTotals(meals, totals);
+  };
+
+  // (1) «Почти чистый жир» с бедным E → подсолнечное нерафинированное, по граммам ЖИРА.
+  type Cand = { m: any; idx: number; it: any; e: number };
+  const cands: Cand[] = [];
+  for (const m of meals) {
+    for (let i = 0; i < ((m.items || []) as any[]).length; i++) {
+      const it: any = (m.items as any[])[i];
+      const amt = Number(it.amount) || 0;
+      if (!(amt >= 5) || it._fixedGrams) continue;
+      if (String(it.role) !== 'fat') continue;
+      const fIt = Number(it.f) || 0;
+      if (!(fIt > 0) || (fIt / amt) * 100 < _QG35_PURE_FAT_MIN_PCT) continue;
+      // «Почти чистый жир» ≠ «чистый по макросам»: после поздних пересборок у пункта-жира
+      // бывают остаточные белок/углеводы (гхи 7 г: 0.2 Б + 0.7 У). Порог держим по жиру,
+      // а примесь ограничиваем так, чтобы урбеч (15/17 на 100 г) и орехи не проходили.
+      if (((Number(it.p) || 0) / amt) * 100 > 6) continue;
+      if (((Number(it.c) || 0) / amt) * 100 > 12) continue;
+      if (String(it.id) === _QG24_E_RICH_ID) continue;
+      const e = eDens(String(it.id));
+      if (e >= _QG24_E_MID) continue;   // оливковое (14.4) — ещё адрес, подсолнечное (41) — уже нет
+      cands.push({ m, idx: i, it, e });
+    }
+  }
+  cands.sort((a, b) => a.e - b.e || (Number(b.it.f) || 0) - (Number(a.it.f) || 0));
+  for (const cd of cands) {
+    if (eOf() >= want) break;
+    const it = cd.it;
+    const amt = Number(it.amount) || 0;
+    const fIt = Number(it.f) || 0;
+    if (!(fIt > 0) || !(amt > 0)) continue;
+    const roomG = Math.max(0, Number(seedsCap) - seedsNow());
+    const fSwap = Math.min(fIt, roomG);
+    const gRich = Math.round((fSwap / Number(rich.fat)) * 100);
+    if (!(gRich >= 5)) continue;
+    const part = fSwap / fIt;
+    const full = part >= 0.999;
+    if (!full && Math.round(amt * (1 - part)) < 5) continue;   // огрызок < 5 г — не еда
+    // MUFA-основа: оливковое не вымывается целиком, в дне остаётся ≥10 г.
+    if (/olive/.test(String(it.id)) && oliveNow() - Math.round(amt * part) < _QG35_OLIVE_KEEP_G) continue;
+    const snapshot = ((cd.m.items as any[]) || []).map((x: any) => ({ ...x }));
+    const newItem = {
+      id: rich.id, name: rich.name, amount: gRich, role: 'fat',
+      kcal: Math.round(9 * fSwap), p: 0, f: Math.round(fSwap * 10) / 10, c: 0, fiber: 0, leucine_mg: 0,
+    };
+    const twin = ((cd.m.items as any[]) || []).find((x: any) => x !== it && String(x.id) === String(rich.id));
+    // В приёме уже стоит подсолнечное — не плодим второй пункт того же продукта
+    // (гард «нет двух одинаковых продуктов в приёме»), а сливаем жир в него.
+    if (twin && twin !== it) {
+      const twinF = Math.round(((Number(twin.f) || 0) + fSwap) * 10) / 10;
+      twin.amount = Math.round((Number(twin.amount) || 0) + gRich);
+      twin.f = twinF;
+      twin.kcal = Math.round(4 * (Number(twin.p) || 0) + 9 * twinF + 4 * (Number(twin.c) || 0));
+      if (full) {
+        (cd.m.items as any[]).splice(cd.idx, 1);
+      } else {
+        const leftAmt = Math.round(amt * (1 - part));
+        const newF = Math.round((fIt - fSwap) * 10) / 10;
+        const ratio = fIt > 0 ? newF / fIt : 1;
+        (cd.m.items as any[])[cd.idx] = {
+          ...it, amount: leftAmt, f: newF,
+          p: Math.round(((Number(it.p) || 0) * ratio) * 10) / 10,
+          c: Math.round(((Number(it.c) || 0) * ratio) * 10) / 10,
+          kcal: Math.round(4 * ((Number(it.p) || 0) * ratio) + 9 * newF + 4 * ((Number(it.c) || 0) * ratio)),
+        };
+      }
+    } else if (full) {
+      (cd.m.items as any[])[cd.idx] = newItem;
+    } else {
+      const leftAmt = Math.round(amt * (1 - part));
+      const newF = Math.round((fIt - fSwap) * 10) / 10;
+      const ratio = Number(it.f) > 0 ? newF / fIt : 1;
+      const leftItem = {
+        ...it, amount: leftAmt, f: newF,
+        p: Math.round(((Number(it.p) || 0) * ratio) * 10) / 10,
+        c: Math.round(((Number(it.c) || 0) * ratio) * 10) / 10,
+        kcal: Math.round(4 * ((Number(it.p) || 0) * ratio) + 9 * newF + 4 * ((Number(it.c) || 0) * ratio)),
+      };
+      (cd.m.items as any[])[cd.idx] = leftItem;
+      (cd.m.items as any[]).splice(cd.idx + 1, 0, newItem);
+    }
+    recalcMealTotals(meals as any[]);
+    recalcDayTotals(meals, totals);
+    if (!fitsDay() || eOf() <= e0 + 0.05) { restore(cd.m, snapshot); continue; }
+    names.push(String(rich.name));
+  }
+
+  // (2) E-бедный орех → E-богатый в том же семействе (кешью 0.9 → миндаль 25).
+  //     Орех не превращаем в «украшение»: порция остаётся ≥15 г, поэтому меняем не по
+  //     граммам жира, а по порции, а лишний жир срезаем с чистого жира дня (не ниже 5 г).
+  for (const [fromId, toId] of _QG35_NUT_SWAP) {
+    if (eOf() >= want) break;
+    const to: any = FOOD_DB.find((f: any) => String(f.id) === toId);
+    if (!to || !(Number(to.fat) > 0)) continue;
+    const densTo = Number(to.fat);
+    for (const m of meals) {
+      if (eOf() >= want) break;
+      for (let i = 0; i < ((m.items || []) as any[]).length; i++) {
+        const it: any = (m.items as any[])[i];
+        if (String(it.id) !== fromId || it._fixedGrams) continue;
+        const amtIt = Number(it.amount) || 0;
+        const fIt = Number(it.f) || 0;
+        if (!(fIt > 0) || !(amtIt >= 5)) continue;
+        const gTo = Math.max(15, Math.round((fIt / densTo) * 100));
+        const r = gTo / 100;
+        const kNew = 9 * densTo * r + 4 * Number(to.protein) * r + 4 * Number(to.carbs) * r;
+        const kOld = Number(it.kcal) || 0;
+        if (kOld > 0 && Math.abs(kNew - kOld) > Math.max(25, kOld * 0.3)) continue;
+        const snapshot = ((m.items as any[]) || []).map((x: any) => ({ ...x }));
+        (m.items as any[])[i] = {
+          id: to.id, name: to.name, amount: gTo, role: String(it.role) || 'fat',
+          kcal: Math.round(kNew),
+          p: Math.round(Number(to.protein) * r * 10) / 10,
+          f: Math.round(densTo * r * 10) / 10,
+          c: Math.round(Number(to.carbs) * r * 10) / 10,
+          fiber: Math.round((Number(to.fiber) || 0) * r * 10) / 10,
+          leucine_mg: 0,
+        };
+        recalcMealTotals(meals as any[]);
+        recalcDayTotals(meals, totals);
+        // Компенсация лишнего жира: срезаем подсолнечное (оно 100% жира, 1 г = 1 г жира),
+        // оставляя не меньше 5 г. Оливковое не трогаем — MUFA-основа дня.
+        let dGuard = 4;
+        while ((Number(totals?.f) || 0) - f0 > 0.31 && dGuard-- > 0) {
+          const oils = meals.flatMap((mm: any) => ((mm.items || []) as any[])
+            .filter((x: any) => String(x.id) === _QG24_E_RICH_ID && !x._fixedGrams && (Number(x.amount) || 0) - 1 >= 5));
+          const target = oils[0];
+          if (!target) break;
+          target.amount = (Number(target.amount) || 0) - 1;
+          target.f = Math.round(((Number(target.f) || 0) - 1) * 10) / 10;
+          target.kcal = Math.round(4 * (Number(target.p) || 0) + 9 * (Number(target.f) || 0) + 4 * (Number(target.c) || 0));
+          recalcMealTotals(meals as any[]);
+          recalcDayTotals(meals, totals);
+        }
+        if (!fitsDay() || eOf() <= e0 + 0.05) { restore(m, snapshot); continue; }
+        names.push(String(to.name));
+      }
+    }
+  }
+  return { add: Math.round((eOf() - e0) * 10) / 10, names };
 }
 
 // ─── QG28: в дне минимум два овоща (второй слот не должен «испаряться») ─────

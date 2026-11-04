@@ -1688,8 +1688,60 @@ describe('витамин E из E-богатого жира (QG24)', () => {
   });
 });
 
-describe('в дне минимум два овоща (QG28)', () => {
-  const sexOf28 = (d: Day) => (d.id.startsWith('S') ? 'female' : 'male') as 'male' | 'female';
+describe('витамин E: финальный адрес жира по граммам (QG35)', () => {
+  // Замер до стадии: 6 дней из 30 ниже 70% RDA (55–69%), среднее 79%. В каждом из них
+  // стоял «бедный» жир — гхи (0.8 мг E/100 г) в 4 днях, кешью (E ≈ 1) в 2, — но QG24/QG31
+  // меняют пункт только целиком и только от 7 г, а квота семян (подсолнечное масло живёт
+  // в семействе «семена») в этих днях уже занята чиа/семечками. Стадия меняет ровно
+  // столько граммов жира, сколько в квоте осталось комнаты.
+  const ePct35 = (d: Day) => {
+    const sex = (d.id.startsWith('S') ? 'female' : 'male') as 'male' | 'female';
+    const cov = analyzeMicroCoverage(
+      sumMicros(items(d).map(({ x }) => ({ id: x.id, amount: x.amount })), FOOD_DB as any),
+      sex as any, d.w, 'none' as any, d.id.endsWith('тр'),
+    ).coverage as any[];
+    const c = cov.find((x: any) => x.nutrient === 'VitE');
+    return c ? Number(c.pct) : 0;
+  };
+
+  it('дней с витамином E < 70% RDA нет (было 6, минимум 55%), среднее ≥ 80%', () => {
+    const pcts = DAYS.map((d) => ({ id: d.id, pct: ePct35(d) }));
+    const low = pcts.filter((x) => x.pct < 70).map((x) => `${x.id} ${Math.round(x.pct)}%`);
+    const avg = pcts.reduce((s, x) => s + x.pct, 0) / pcts.length;
+    expect(low.slice(0, 5).join(', '), 'дни ниже 70% RDA').toBe('');
+    expect(Math.round(avg), `среднее E ${avg.toFixed(0)}%`).toBeGreaterThanOrEqual(80);
+  });
+
+  it('нота «Витамин E: X мг из Y мг» называет факт после правки', () => {
+    const bad: string[] = [];
+    for (const d of DAYS) {
+      const note = ((d.plan.notes || []) as string[])
+        .find((n) => typeof n === 'string' && String(n).includes('Витамин E:'));
+      if (!note) continue;
+      const m = String(note).match(/E (\d+) мг из (\d+) мг/);
+      if (!m) { bad.push(`${d.id}: формат «${String(note).slice(0, 40)}»`); continue; }
+      const fact = Number((sumMicros(
+        items(d).map(({ x }) => ({ id: x.id, amount: x.amount })), FOOD_DB as any,
+      ) as any)?.VitE || 0);
+      if (Math.abs(Number(m[1]) - fact) > 1) bad.push(`${d.id}: нота ${m[1]} мг, факт ${fact.toFixed(1)} мг`);
+    }
+    expect(bad.slice(0, 4).join(' | ')).toBe('');
+  });
+
+  it('правка не плодит «украшений»: порций жира мельче 5 г в дне нет', () => {
+    const bad: string[] = [];
+    for (const d of DAYS) {
+      for (const { m, x } of items(d)) {
+        if (String(x.role) !== 'fat') continue;
+        const amt = Number(x.amount) || 0;
+        if (amt > 0 && amt < 5) bad.push(`${d.id}/${m.type}:${x.id} ${amt}г`);
+      }
+    }
+    expect(bad.slice(0, 4).join(' | ')).toBe('');
+  });
+});
+
+describe('в дне минимум два овоща (QG28)', () => {  const sexOf28 = (d: Day) => (d.id.startsWith('S') ? 'female' : 'male') as 'male' | 'female';
   const kPct28 = (d: Day) => {
     const cov = analyzeMicroCoverage(
       sumMicros(items(d).map(({ x }) => ({ id: x.id, amount: x.amount })), FOOD_DB as any),
