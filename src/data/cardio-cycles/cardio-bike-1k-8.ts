@@ -6,10 +6,15 @@
  */
 import type { CardioCycleTemplate, CardioTemplateSession, CardioTemplateWeek } from './cardio-cycle-types';
 
-const bike = (d: number, p: string, workSec?: number, restSec?: number, reps?: number, dow?: number): CardioTemplateSession => ({
-  type: workSec ? 'hiit' : 'zone2', durationMin: d, equipment: 'cycling', purpose: p, dayOfWeek: dow,
-  structured: workSec && restSec && reps ? [{ workSec, restSec, reps, target: 'power', note: 'Мощность: средняя с прошлой такой тренировки, чуть выше' }] : undefined,
-});
+const bike = (d: number, p: string, workSec?: number, restSec?: number, reps?: number, dow?: number): CardioTemplateSession => {
+  // Аудит 2026-11: длительность не могла быть меньше суммы интервалов
+  // (5×4/2 = 30 мин при заявленных 28) — план обещал невыполнимое.
+  const structureMin = workSec && restSec && reps ? Math.ceil(((workSec + restSec) * reps) / 60) : 0;
+  return {
+    type: workSec ? 'hiit' : 'zone2', durationMin: Math.max(d, structureMin), equipment: 'cycling', purpose: p, dayOfWeek: dow,
+    structured: workSec && restSec && reps ? [{ workSec, restSec, reps, target: 'power', note: 'Мощность: средняя с прошлой такой тренировки, чуть выше' }] : undefined,
+  };
+};
 const steady = (d: number, p: string, dow?: number): CardioTemplateSession => ({ type: 'zone2', durationMin: d, equipment: 'cycling', purpose: p, dayOfWeek: dow });
 const rec = (d: number, p: string, dow?: number): CardioTemplateSession => ({ type: 'recovery', durationMin: d, equipment: 'cycling', purpose: p, dayOfWeek: dow });
 
@@ -21,7 +26,7 @@ const W: CardioTemplateWeek[] = [
   { sessions: [bike(22, 'Интервалы 12×1 мин / 1 мин.', 60, 60, 12, 0), bike(28, 'Интервалы 4×5 мин / 3 мин.', 300, 180, 4, 2), steady(40, 'Ровный заезд 40 мин.', 4)], phase: 'build', note: 'Скоростной блок.' },
   { sessions: [bike(24, 'Интервалы 10×2 мин / 1 мин.', 120, 60, 10, 0), bike(30, 'Интервалы 5×4 мин / 2 мин.', 240, 120, 5, 2), steady(45, 'Ровный заезд 45 мин — пик.', 4)], phase: 'build', note: 'Пик объёма.' },
   { sessions: [bike(20, 'Интервалы 8×2 мин / 1 мин.', 120, 60, 8, 0), bike(24, 'Интервалы 3×6 мин / 3 мин.', 360, 180, 3, 2), steady(30, 'Ровный заезд 30 мин.', 4)], phase: 'taper', taper: true, note: 'Подводка: объём −40%.' },
-  { sessions: [bike(15, 'Открывашка: 5×1 мин / 1 мин легко.', 60, 60, 5, 0), bike(10, 'ГОНКА 1000 м! Разминка 15 мин + старт.', undefined, undefined, undefined, 2), rec(20, 'Заминка 20 мин легко.', 4)], phase: 'peak', taper: true, note: 'Неделя гонки!' },
+  { sessions: [bike(15, 'Открывашка: 5×1 мин / 1 мин легко.', 60, 60, 5, 0), { type: 'miss', durationMin: 10, equipment: 'cycling', purpose: 'ГОНКА 1000 м! Разминка 15 мин + старт.', dayOfWeek: 2 }, rec(20, 'Заминка 20 мин легко.', 4)], phase: 'peak', taper: true, note: 'Неделя гонки!' },
 ];
 
 export const CARDIO_BIKE_1K_8: CardioCycleTemplate = {

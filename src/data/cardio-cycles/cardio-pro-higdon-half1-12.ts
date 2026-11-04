@@ -36,7 +36,7 @@ function buildWeek(w: number): CardioTemplateWeek {
   ];
   if (crossMin > 0) sessions.push(cross(crossMin, 5));
   if (race) {
-    sessions.push({ type: 'hiit', durationMin: w === 12 ? 130 : w === 9 ? 60 : 30, equipment: 'running', purpose: race, dayOfWeek: 6 });
+    sessions.push({ type: 'miss', durationMin: w === 12 ? 130 : w === 9 ? 60 : 30, equipment: 'running', purpose: race, dayOfWeek: 6 });
   } else {
     sessions.push(run(long, 'Long: каждую неделю +1 миля, отдых до и после.', 6));
   }

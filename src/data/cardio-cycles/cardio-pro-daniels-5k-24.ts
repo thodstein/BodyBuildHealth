@@ -64,7 +64,7 @@ function buildWeek(w: number): CardioTemplateWeek {
         [{ workSec: 420, restSec: 120, reps: 3, target: 'pace', note: 'T 3×1 миля' }]),
       E(5, 4),
       race
-        ? { type: 'hiit', durationMin: 40, equipment: 'running', purpose: 'Старт 5K/10K!', dayOfWeek: 6 }
+        ? { type: 'miss', durationMin: 40, equipment: 'running', purpose: 'Старт 5K/10K!', dayOfWeek: 6 }
         : longRun(10, '10 миль E'),
     ],
     phase: race ? 'peak' : 'taper', taper: true, note: 'Фаза IV: гонки по выходным.',

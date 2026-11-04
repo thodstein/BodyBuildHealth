@@ -22,6 +22,22 @@ export interface RankedCardioTemplate {
   template: CardioCycleTemplate;
   score: number;
   reasons: string[];
+  /** Честные гейты: план выше уровня на 2 ступени, объём >300 мин/нед новичку. */
+  warnings?: string[];
+  /** Чек-лист условий из meta.conditions — показать перед сборкой. */
+  conditions?: string[];
+}
+
+const LEVEL_RANK: Record<CardioLevel, number> = { beginner: 0, intermediate: 1, advanced: 2 };
+
+/** Оценка пикового недельного объёма шаблона (мин) — для гейта новичка. */
+export function cardioTemplateWeeklyMinutes(tpl: CardioCycleTemplate): number {
+  const w = tpl.weeks;
+  if (w && w.length > 0) {
+    return Math.max(...w.map(week => Math.round(week.sessions.reduce((s, x) => s + x.durationMin, 0))));
+  }
+  const days = tpl.meta.sessionsPerWeekMax ?? tpl.meta.sessionsPerWeek;
+  return days * 40;
 }
 
 /** Совместимость уровня фильтра с LMS-шкалой (для каталога). */
@@ -33,6 +49,7 @@ export function cardioLevelMatches(templateLevels: CardioLevel[], want?: CardioL
 export function scoreCardioTemplate(tpl: CardioCycleTemplate, q: CardioSelectorInput): RankedCardioTemplate {
   let score = 0;
   const reasons: string[] = [];
+  const warnings: string[] = [];
   const m = tpl.meta;
   if (q.goal) {
     if (m.goal === q.goal) { score += 30; reasons.push('точная цель'); }
@@ -40,8 +57,29 @@ export function scoreCardioTemplate(tpl: CardioCycleTemplate, q: CardioSelectorI
     else { score -= 12; reasons.push('другая цель'); }
   }
   if (q.level) {
-    if (m.level.includes(q.level)) { score += 20; reasons.push('свой уровень'); }
-    else { score -= 8; reasons.push('чужой уровень'); }
+    const mine = LEVEL_RANK[q.level];
+    const ranks = m.level.map(l => LEVEL_RANK[l]);
+    if (ranks.includes(mine)) { score += 20; reasons.push('свой уровень'); }
+    else {
+      const gap = Math.min(...ranks) - mine; // >0 — план выше уровня атлета
+      if (gap >= 2) {
+        // Гейт: новичку не показываем продвинутый план в топе вовсе.
+        score -= 60;
+        reasons.push('уровень выше на 2 ступени');
+        warnings.push(`План для ${m.level.join('/')} — на ${gap} ступени выше вашего уровня.`);
+      } else if (gap === 1) {
+        score -= 8; reasons.push('уровень выше'); warnings.push('План на ступень выше — темп снизится автоматически.');
+      } else {
+        score -= 4; reasons.push('уровень ниже');
+      }
+    }
+    if (q.level === 'beginner') {
+      const peak = cardioTemplateWeeklyMinutes(tpl);
+      if (peak > 300) {
+        score -= 15;
+        warnings.push(`Пиковый объём ~${peak} мин/нед — для новичка больше безопасных 300.`);
+      }
+    }
   }
   if (q.daysPerWeek != null) {
     const lo = m.sessionsPerWeek;
@@ -67,7 +105,13 @@ export function scoreCardioTemplate(tpl: CardioCycleTemplate, q: CardioSelectorI
     else if (m.sport === 'mixed') { score += 4; reasons.push('универсальный'); }
     else { score -= 6; reasons.push('другой вид'); }
   }
-  return { template: tpl, score, reasons };
+  return {
+    template: tpl,
+    score,
+    reasons,
+    warnings: warnings.length > 0 ? warnings : undefined,
+    conditions: m.conditions.length > 0 ? [...m.conditions] : undefined,
+  };
 }
 
 /** Ранжировать библиотеку (по умолчанию — вся). Топ-N через slice у вызывающего. */

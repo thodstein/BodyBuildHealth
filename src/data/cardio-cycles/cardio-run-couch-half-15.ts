@@ -7,7 +7,9 @@ import type { CardioCycleTemplate, CardioTemplateSession, CardioTemplateWeek } f
 
 const ez = (d: number, p: string, dow?: number): CardioTemplateSession => ({ type: 'zone2', durationMin: d, equipment: 'running', purpose: p, dayOfWeek: dow });
 const wr = (runMin: number, walkMin: number, reps: number, totalMin: number, dow?: number): CardioTemplateSession => ({
-  type: 'zone2', durationMin: totalMin, equipment: 'running', dayOfWeek: dow,
+  // Аудит 2026-11: заявленные 30-34 мин были меньше суммы интервалов
+  // (чередование 10/2 ×3 = 36 мин и т.п.) — берём максимум из двух.
+  type: 'zone2', durationMin: Math.max(totalMin, Math.ceil((runMin + walkMin) * reps)), equipment: 'running', dayOfWeek: dow,
   purpose: `Чередование: ${runMin} мин бег / ${walkMin} мин ходьба ×${reps}. RPE 3-4.`,
   structured: [{ workSec: runMin * 60, restSec: walkMin * 60, reps, target: 'rpe', note: 'Бег/ходьба' }],
 });
@@ -49,7 +51,8 @@ function buildWeek(w: number): CardioTemplateWeek {
       ez(Math.round(b * 6), `Тренировочный бег ${b} км. RPE 3-4.`, 3),
       ez(Math.round(c * 6), `Тренировочный бег ${c} км. RPE 3-4.`, 4),
       w === 8 ? ez(40, 'Силовая + тест 10 км. RPE 3-4.', 6) : w === 15
-        ? ez(30, 'Разминка + СТАРТ полумарафон 21.1 км!', 6)
+        // Старт = длинная умеренная работа на гоночном темпе, не «лёгкий бег 30 мин».
+        ? { type: 'miss' as const, durationMin: 130, equipment: 'running' as const, purpose: 'Разминка + СТАРТ полумарафон 21.1 км!', dayOfWeek: 6 }
         : ez(Math.round(l * 6), `Длинный ${l} км. RPE 2-3.`, 6),
     ],
     note: w === 15 ? 'День старта!' : deload ? 'Сброс объёма.' : w >= 9 ? 'Фаза Half.' : 'Фаза 10K.',

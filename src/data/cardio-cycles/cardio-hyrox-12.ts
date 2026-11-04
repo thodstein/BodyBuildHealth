@@ -27,10 +27,12 @@ const rec = (min: number, dow: number): CardioTemplateSession => ({
   type: 'recovery', durationMin: min, equipment: 'cycling', dayOfWeek: dow, purpose: 'Recovery: вело/ходьба, ноги разгрузить.',
 });
 const sim = (min: number, desc: string, dow: number): CardioTemplateSession => ({
-  type: 'hiit', durationMin: min, equipment: 'running', dayOfWeek: dow, purpose: desc,
+  // Симуляция дистанции HYROX (80-100 мин) — соревновательный темп, не HIIT:
+  // иначе TRIMP/ACWR считают её как интервальную тренировку.
+  type: 'miss', durationMin: min, equipment: 'running', dayOfWeek: dow, purpose: desc,
 });
 const race = (): CardioTemplateSession => ({
-  type: 'hiit', durationMin: 90, equipment: 'running', dayOfWeek: 6,
+  type: 'miss', durationMin: 90, equipment: 'running', dayOfWeek: 6,
   purpose: 'СТАРТ HYROX: 8×1 км + 8 станций! Раскладка: бег ровно, станции по плану, wall balls — терпеть.',
 });
 

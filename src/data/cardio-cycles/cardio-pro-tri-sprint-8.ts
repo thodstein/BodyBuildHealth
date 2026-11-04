@@ -105,7 +105,7 @@ const WEEKS: CardioTemplateWeek[] = [
       run(20, '12 мин Z1 + 3 мин Z3 + 5 мин Z1, ровно', 2),
       bike(30, '15 мин Z1 + 2×(2.5 мин Z3 + 2.5 мин Z2) + 5 мин Z1, 90-95 RPM', 3),
       bike(15, 'Раскатка Z1, 90-95 RPM', 5),
-      { type: 'hiit', durationMin: 90, equipment: 'running', dayOfWeek: 6, purpose: 'СТАРТ: спринт 750 м / 20 км / 5 км! Не тестируйте себя на неделе — сберегите на гонку.' },
+      { type: 'miss', durationMin: 90, equipment: 'running', dayOfWeek: 6, purpose: 'СТАРТ: спринт 750 м / 20 км / 5 км! Не тестируйте себя на неделе — сберегите на гонку.' },
     ],
     phase: 'peak', taper: true, note: 'Taper + старт. Разложите экипировку заранее.',
   },

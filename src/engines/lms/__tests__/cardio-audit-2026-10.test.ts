@@ -159,14 +159,17 @@ describe('P1-4 локальный парс дат: .ics и раскладка п
     const ics = buildCardioIcs(c);
     const dates = [...ics.matchAll(/DTSTART:(\d{8})T/g)].map(m => m[1]);
     expect(dates.length).toBeGreaterThan(0);
-    // Ожидание — из канона cardio-date-utils (тот же, что использует экспорт).
+    // Ожидание — из канона cardio-date-utils: `dayOfWeek` сессии — АБСОЛЮТНЫЙ
+    // день недели (Пн=0), окно недели начинается с даты старта. Раньше тест
+    // повторял ошибку экспорта (dow трактовался как смещение от startDate).
+    const startDow = (parseLocalIso(start).getDay() + 6) % 7;
     const expected: string[] = [];
     for (const w of c.weeks) {
       for (const s of w.sessions) {
         const freq = Math.max(1, Math.round(s.weeklyFrequency));
         for (let k = 0; k < freq; k++) {
           const iso = s.dayOfWeek != null
-            ? dayOfWeekIso(w.week, (s.dayOfWeek + k) % 7, start)
+            ? dayOfWeekIso(w.week, (s.dayOfWeek + k - startDow + 7) % 7, start)
             : addDaysIso(weekStartIso(w.week, start), k);
           expected.push(iso.replace(/-/g, ''));
         }

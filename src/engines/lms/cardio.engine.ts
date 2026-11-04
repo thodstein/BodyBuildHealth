@@ -34,7 +34,7 @@ import {
   maxHrByFormula,
 } from './cardio-physiology.engine';
 
-import { addDaysIso, todayLocalIso, toLocalIso, parseLocalIso, weekStartIso, dayOfWeekIso } from './cardio-date-utils.engine';
+import { addDaysIso, todayLocalIso, toLocalIso, parseLocalIso, weekStartIso } from './cardio-date-utils.engine';
 export { addDaysIso, todayLocalIso, toLocalIso } from './cardio-date-utils.engine';
 export type { HeartZone, VdotResult, CardioCtlPoint, CardioFactCtlPoint } from './cardio-physiology.engine';
 // PRO-уровень: новые движки (эпики A/B/D/E/F/G) — реэкспорт для UI, без циклов (только типы внутрь).
@@ -936,6 +936,8 @@ export interface CardioPrepBuildOptions {
   altitudeM?: number;
   /** №3 PRO-2-добивка: красные флаги — HIIT/MISS запрещены до врача. */
   redFlags?: string[];
+  /** Формула ЧССмакс (та же, что в buildCardioCycle). */
+  maxHrFormula?: 'classic' | 'tanaka' | 'gulati';
 }
 
 /** Шаги пик-недели prep по дням (зеркало STEPS_BY_DAY bb-contest-prep.engine). */
@@ -1070,7 +1072,7 @@ export function buildCardioCycleFromPrep(
     if (opts.talkZone2Hr != null && opts.talkZone2Hr >= 80 && opts.talkZone2Hr <= 200) {
       return talkZonesFromTest(opts.talkZone2Hr) ?? undefined;
     }
-    return opts.age != null ? cardioHeartZones(opts.age, opts.restingHr, undefined, sex) : undefined;
+    return opts.age != null ? cardioHeartZones(opts.age, opts.restingHr, undefined, sex, opts.maxHrFormula) : undefined;
   })();
   const zonesPrep = zones && heatAddPrep > 0 ? zones.map(z => ({ ...z, bpmMin: z.bpmMin + heatAddPrep, bpmMax: z.bpmMax + heatAddPrep })) : zones;
   const weeks: CardioWeek[] = [];
@@ -1165,6 +1167,10 @@ export function buildCardioCycleFromPrep(
       goal: 'bb_prep',
       totalWeeks,
       bodyWeight: bw,
+      // Аудит 2026-11: config был неполным — «Изменить параметры» и
+      // пересборка теряли % жира (→ FFM), возраст-формулу, красные флаги и дату.
+      bodyFatPct: opts.bodyFatPct,
+      startDate: opts.startDate ?? p.startDate,
       daysAvailable,
       level: opts.level,
       equipment: opts.equipment ? [...opts.equipment] : undefined,
@@ -1182,9 +1188,12 @@ export function buildCardioCycleFromPrep(
       taperWeeks,
       peakWeek: peakEnabled,
       lthr: opts.lthr,
+      lthrBySport: opts.lthrBySport ? { ...opts.lthrBySport } : undefined,
       talkZone2Hr: opts.talkZone2Hr,
       tempC: opts.tempC,
       altitudeM: opts.altitudeM,
+      redFlags: opts.redFlags ? [...opts.redFlags] : undefined,
+      maxHrFormula: opts.maxHrFormula,
     },
     rationale: [
       `Цель: подготовка ББ по prep-плану (${prep.category || 'категория не задана'}, ${sex === 'female' ? 'жен.' : 'муж.'}), ${totalWeeks} нед.`,
@@ -1397,6 +1406,9 @@ export function applyCardioCompetitionCascade(
       if (delta < 0 || w.taper || w.deload || w.phase === 'peak') return w;
       if (spec.taper) {
         if (spec.peakWeek && delta === 0) {
+          // Неделя старта A (шоу): кардио — только лёгкая привычная активность
+          // 20 мин. Это не «снос недели»: на неделе шоу тренировочный объём
+          // вреден, а в плане остаётся одна честная recovery-сессия.
           const sessions = [mkSession('recovery', 20, 1, 'День старта A: только лёгкая привычная активность', bw, undefined, sex)];
           return rebuildWeek({ ...w, phase: 'peak', taper: true }, sessions, ['ПЛ пик (A): только recovery 20 мин.']);
         }
@@ -1839,7 +1851,7 @@ export function cardioWeekLegConflicts(cycle: CardioCycle, weekNo: number): Card
   if (leg.size === 0) return [];
   const w = cycle.weeks.find(x => x.week === weekNo);
   if (!w) return [];
-  const laid = spreadSessionsAcrossDays(w);
+  const laid = spreadSessionsAcrossDays(w, undefined, { legDays: cycle.config?.legDays });
   const out: CardioLegDayConflict[] = [];
   for (let i = 0; i < 7; i++) {
     if (!leg.has(i)) continue;
@@ -2322,7 +2334,8 @@ function addMinutesToIcsDateTime(icsDateTime: string, minutes: number): string {
 // парсится как UTC-полночь, и в UTC−X события .ics и TCX уезжали на сутки
 // назад (стробая форма не ловилась стрocheчным guard'ом date-canon).
 
-/** Календарь .ics: кардио-события по дням недели (тип, минуты, фаза). Учитывает weeklyFrequency и dayOfWeek, DTEND = DTSTART + duration. */
+/** Календарь .ics: кардио-события по дням недели (тип, минуты, фаза). Учитывает weeklyFrequency и dayOfWeek, DTEND = DTSTART + duration.
+ *  Раскладка — единый канон `expandWeekSchedule` (те же даты, что в календаре и дневнике). */
 export function buildCardioIcs(cycle: CardioCycle, referenceIso?: string): string {
   const ref = referenceIso ?? cycle.startDate;
   const lines: string[] = [
@@ -2332,17 +2345,11 @@ export function buildCardioIcs(cycle: CardioCycle, referenceIso?: string): strin
     'CALSCALE:GREGORIAN',
   ];
   for (const w of cycle.weeks) {
-    const baseDay = weekStartIso(w.week, ref);
-    for (let si = 0; si < w.sessions.length; si++) {
-      const s = w.sessions[si];
+    const scheduled = expandWeekSchedule(w, ref, { legDays: cycle.config?.legDays, weekNo: w.week });
+    for (let si = 0; si < scheduled.length; si++) {
+      const { session: s, date: isoDate, occurrence } = scheduled[si];
       if (s.weeklyFrequency <= 0) continue;
-      const freq = Math.max(1, Math.round(s.weeklyFrequency));
-      for (let k = 0; k < freq; k++) {
-        const isoDate = s.dayOfWeek != null ? dayOfWeekIso(w.week, (s.dayOfWeek + k) % 7, ref) : (() => {
-          const base = parseLocalIso(baseDay);
-          base.setDate(base.getDate() + k);
-          return `${base.getFullYear()}-${String(base.getMonth() + 1).padStart(2, '0')}-${String(base.getDate()).padStart(2, '0')}`;
-        })();
+      {
         const dtStart = toIcsDateTime(isoDate, '06:00');
         const dtEnd = addMinutesToIcsDateTime(dtStart, s.durationMin);
         const summary = `Кардио ${s.type.toUpperCase()} ${s.durationMin} мин · нед ${w.week}`;
@@ -2350,7 +2357,7 @@ export function buildCardioIcs(cycle: CardioCycle, referenceIso?: string): strin
         const checklist = w.taper ? ' · Чек-лист гоночной недели: сон 8ч, без нового 48–72ч, привычное питание/гидратация, shakeout 15–20 мин.' : '';
         const desc = `Фаза: ${CARDIO_PHASE_LABELS[w.phase]} · ${s.purpose}${s.equipment ? ' · ' + cardioEquipmentLabel(s.equipment) : ''}${w.deload ? ' · делод' : ''}${w.taper ? ' · taper' : ''}${checklist}`;
         lines.push('BEGIN:VEVENT');
-        lines.push(`UID:${cycle.id}-w${w.week}-${s.type}-${si}-${k}@bbh`);
+        lines.push(`UID:${cycle.id}-w${w.week}-${s.type}-${si}-${occurrence}@bbh`);
         lines.push(`DTSTART:${dtStart}`);
         lines.push(`DTEND:${dtEnd}`);
         lines.push(`SUMMARY:${escIcs(summary)}`);
@@ -2424,9 +2431,9 @@ export function buildCardioTcx(cycle: CardioCycle, referenceIso?: string): strin
   ];
   let act = 0;
   for (const w of cycle.weeks) {
-    for (const s of w.sessions) {
+    const scheduled = expandWeekSchedule(w, referenceIso ?? cycle.startDate, { legDays: cycle.config?.legDays, weekNo: w.week });
+    for (const { session: s, date: dateIso } of scheduled) {
       if (s.weeklyFrequency <= 0) continue;
-      const dateIso = s.dayOfWeek != null ? dayOfWeekIso(w.week, s.dayOfWeek, referenceIso) : weekStartIso(w.week, referenceIso);
       const start = dateIso + 'T' + '06:00:00Z';
       act++;
       lines.push(`  <Activities><Activity Sport="${tcxSportForSession(s, cycle)}" ActivityType="Manual">`);
@@ -2544,15 +2551,15 @@ export function cardioNextSession(cycle: CardioCycle, dateIso: string, reference
   const parseLocal = parseLocalIso;
   const start = parseLocal(dateIso);
   if (!Number.isFinite(start.getTime())) return null;
+  const refIso = referenceIso ?? cycle.startDate;
   const maxDays = Math.min(cycle.totalWeeks * 7, 365);
   for (let i = 0; i < maxDays; i++) {
     const d = new Date(start.getFullYear(), start.getMonth(), start.getDate() + i);
     const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-    const week = cardioWeekForDate(cycle, iso, referenceIso);
-    if (!week) continue;
-    const dow = (d.getDay() + 6) % 7;
-    const s = week.sessions.find(x => x.dayOfWeek === dow);
-    if (s) return { date: iso, week: week.week, session: s };
+    const found = cardioSessionsForDate(cycle, iso, refIso);
+    if (found && found.sessions.length > 0) {
+      return { date: iso, week: found.week.week, session: found.sessions[0] };
+    }
   }
   return null;
 }
@@ -2566,28 +2573,28 @@ export interface CardioRescheduleResult {
 
 /**
  * Перенести плановую сессию с даты на ближайший свободный день её недели.
- * Плановая сессия на дату ищется по dayOfWeek; свободный день — следующий
- * (по кругу), на котором нет плановой сессии. Возвращает копию цикла;
- * без сессии на дату или без свободного дня — цикл не меняется.
+ * Плановая сессия на дату ищется по раскладке (weeklyFrequency учитывается);
+ * свободный день — следующий (по кругу), на котором нет ни одного занятия.
+ * Переносится вся сессия (все её повторы в неделе) — об этом говорит label.
+ * Возвращает копию цикла; без сессии на дату или без свободного дня — без изменений.
  */
 export function rescheduleCardioSession(cycle: CardioCycle, dateIso: string, opts: { referenceIso?: string } = {}): CardioRescheduleResult {
-  const parseLocal = parseLocalIso;
   const ref = opts.referenceIso ?? cycle.startDate;
   const week = cardioWeekForDate(cycle, dateIso, ref);
   if (!week) return { cycle, changes: [] };
-  const target = parseLocal(dateIso);
-  if (!Number.isFinite(target.getTime())) return { cycle, changes: [] };
-  const dow = (target.getDay() + 6) % 7;
-  const planned = week.sessions.find(s => (s.dayOfWeek ?? dow) === dow);
-  if (!planned) return { cycle, changes: [] };
+  const scheduled = expandWeekSchedule(week, ref, { legDays: cycle.config?.legDays, weekNo: week.week });
+  const hit = scheduled.find(x => x.date === dateIso);
+  if (!hit) return { cycle, changes: [] };
+  const dow = hit.dayOfWeek;
+  const busy = new Set(scheduled.map(x => x.dayOfWeek));
   let next = dow;
   let guard = 0;
   do {
     next = (next + 1) % 7;
     guard++;
-  } while (guard < 7 && week.sessions.some(s => s.dayOfWeek === next));
+  } while (guard < 7 && busy.has(next));
   if (guard >= 7 || next === dow) return { cycle, changes: [] };
-  const sessions = week.sessions.map(s => (s === planned ? { ...s, dayOfWeek: next } : s));
+  const sessions = week.sessions.map(s => (s === hit.session ? { ...s, dayOfWeek: next } : s));
   const week2 = rebuildWeek({ ...week, sessions }, sessions, []);
   const weeks = cycle.weeks.map(w => (w.week === week.week ? week2 : w));
   return {
@@ -2853,20 +2860,88 @@ export function formatCardioComparison(cmp: CardioCycleComparison): string {
 
 export const DAY_LABELS_RU = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
 
-/** Раскладка сессий недели по дням (равномерно от reference-дня; сессии получают dayOfWeek). */
-export function spreadSessionsAcrossDays(week: CardioWeek, referenceIso?: string): CardioSession[] {
-  // Канон cardio-date-utils: `new Date(iso)` парсит 10-символьную дату как
-  // UTC-полночь и в UTC−X сдвигает день недели — раскладка уезжала на сутки.
-  const ref = referenceIso ? parseLocalIso(referenceIso) : new Date();
+/** Одно запланированное занятие на конкретную дату (одно из weeklyFrequency повторов). */
+export interface CardioScheduledSession {
+  weekNo: number;
+  /** Пн=0 … Вс=6. */
+  dayOfWeek: number;
+  /** Локальная дата YYYY-MM-DD (неделя 1 = reference-день). */
+  date: string;
+  session: CardioSession;
+  /** 0-based номер повтора внутри недели (для weeklyFrequency > 1). */
+  occurrence: number;
+}
+
+/**
+ * Канон раскладки недели: сессия с `weeklyFrequency = N` занимает **N разных
+ * дней** недели. Явный `dayOfWeek` уважается для первого вхождения (конфликт
+ * с днём ног не скрывается — его показывает `cardioWeekLegConflicts`),
+ * повторы и сессии без дня идут на следующие свободные дни, обходя дни
+ * тяжёлых ног (кроме recovery).
+ *
+ * Раньше раскладка отдавала один день на сессию, и «Zone 2 4×40 мин»
+ * выглядела в календаре как одно занятие при недельном объёме 160 мин.
+ */
+export function expandWeekSchedule(
+  week: CardioWeek,
+  referenceIso?: string,
+  opts: { legDays?: number[]; weekNo?: number } = {},
+): CardioScheduledSession[] {
+  const refIso = referenceIso ?? toLocalIso(new Date());
+  const ref = parseLocalIso(refIso);
+  if (!Number.isFinite(ref.getTime())) return [];
   const startDow = (ref.getDay() + 6) % 7; // Пн=0
-  const sessions: CardioSession[] = [];
-  let dayIdx = startDow;
+  const weekNo = Math.max(1, Math.round(opts.weekNo ?? week.week ?? 1));
+  const weekStart = weekStartIso(weekNo, refIso);
+  // `dayOfWeek` — АБСОЛЮТНЫЙ день недели (Пн=0), а окно недели начинается с
+  // reference-дня; смещение внутри окна = (dow − dow(ref) + 7) % 7.
+  const dateOf = (dow: number): string => addDaysIso(weekStart, (dow - startDow + 7) % 7);
+  const blocked = new Set((opts.legDays ?? []).filter(d => d >= 0 && d <= 6));
+  const blockedActive = blocked.size > 0 && blocked.size < 7;
+  const occupied = new Set<number>();
+  const out: CardioScheduledSession[] = [];
+  let cursor = startDow;
+  const pick = (start: number, type: CardioType): number => {
+    const avoid = blockedActive && type !== 'recovery';
+    // Первый проход — только свободные дни, второй — с повторным использованием.
+    for (let pass = 0; pass < 2; pass++) {
+      for (let i = 0; i < 7; i++) {
+        const d = (start + i) % 7;
+        if (avoid && blocked.has(d)) continue;
+        if (pass === 0 && occupied.has(d)) continue;
+        return d;
+      }
+    }
+    return ((start % 7) + 7) % 7;
+  };
   for (const s of week.sessions) {
-    const sched: CardioSession = { ...s, dayOfWeek: s.dayOfWeek ?? dayIdx };
-    sessions.push(sched);
-    dayIdx = (dayIdx + 1) % 7;
+    const freq = Math.max(1, Math.min(7, Math.round(s.weeklyFrequency || 1)));
+    for (let occ = 0; occ < freq; occ++) {
+      const explicit = occ === 0 && s.dayOfWeek != null ? ((Math.round(s.dayOfWeek) % 7) + 7) % 7 : null;
+      const day = explicit != null ? explicit : pick(cursor, s.type);
+      occupied.add(day);
+      out.push({
+        weekNo,
+        dayOfWeek: day,
+        date: dateOf(day),
+        session: s,
+        occurrence: occ,
+      });
+      cursor = (day + 1) % 7;
+    }
   }
-  return sessions;
+  return out;
+}
+
+/** Раскладка сессий недели по дням: по одному элементу на каждый повтор
+ *  (`weeklyFrequency`), сессии получают вычисленный `dayOfWeek`. */
+export function spreadSessionsAcrossDays(
+  week: CardioWeek,
+  referenceIso?: string,
+  opts: { legDays?: number[] } = {},
+): CardioSession[] {
+  return expandWeekSchedule(week, referenceIso, { legDays: opts.legDays, weekNo: week.week })
+    .map(x => ({ ...x.session, dayOfWeek: x.dayOfWeek }));
 }
 
 /** Активная неделя цикла по локальной дате (неделя 1 = reference). */
@@ -2895,18 +2970,13 @@ export function cardioLegDayForDate(cycle: CardioCycle | null, dateIso: string):
   return { dayOfWeek, isLegDay: leg.has(dayOfWeek) };
 }
 
-/** Сессии на конкретную дату (раскладка по дням недели, без силового контекста). */
+/** Сессии на конкретную дату (раскладка по дням недели с учётом weeklyFrequency). */
 export function cardioSessionsForDate(cycle: CardioCycle, dateIso: string, referenceIso?: string): { week: CardioWeek; sessions: CardioSession[] } | null {
-  const week = cardioWeekForDate(cycle, dateIso, referenceIso);
+  const refIso = referenceIso ?? cycle.startDate;
+  const week = cardioWeekForDate(cycle, dateIso, refIso);
   if (!week) return null;
-  const parseLocal = parseLocalIso;
-  const ref = referenceIso ? parseLocal(referenceIso) : (() => { const n = new Date(); return new Date(n.getFullYear(), n.getMonth(), n.getDate()); })();
-  const target = parseLocal(dateIso);
-  const dow = (target.getDay() + 6) % 7;
-  const startDow = (ref.getDay() + 6) % 7;
-  const spread = spreadSessionsAcrossDays(week, referenceIso);
-  const weekdaySessions = spread.filter(s => (s.dayOfWeek ?? startDow) === dow);
-  return { week, sessions: weekdaySessions };
+  const scheduled = expandWeekSchedule(week, refIso, { legDays: cycle.config?.legDays, weekNo: week.week });
+  return { week, sessions: scheduled.filter(x => x.date === dateIso).map(x => ({ ...x.session })) };
 }
 
 /** Серии объёма по неделям для графика (мин/ккал/фаза). */

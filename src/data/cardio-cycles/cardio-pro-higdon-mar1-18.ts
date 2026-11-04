@@ -29,13 +29,18 @@ function buildWeek(w: number): CardioTemplateWeek {
   const [tu, we, th, sat] = PLAN[w - 1];
   const sessions: CardioTemplateSession[] = [run(tu, 1), run(we, 2, w >= 9 ? 'Sorta-long.' : ''), run(th, 3)];
   if (sat === 'M') {
-    sessions.push({ type: 'hiit', durationMin: 260, equipment: 'running', purpose: 'СТАРТ: марафон 26.2 мили! Первые мили — сдержанно.', dayOfWeek: 5 });
+    // P0-аудит 2026-11: забег был типизирован `hiit` — 260-минутный «HIIT»
+    // раздувал TRIMP/ACWR и в дневнике выглядел как интервальная тренировка.
+    // Марафон = длинная умеренная работа (race pace) → `miss`.
+    sessions.push({ type: 'miss', durationMin: 260, equipment: 'running', purpose: 'СТАРТ: марафон 26.2 мили! Первые мили — сдержанно.', dayOfWeek: 5 });
   } else if (sat === 'HM') {
-    sessions.push({ type: 'hiit', durationMin: 130, equipment: 'running', purpose: 'Старт Half Marathon вместо long — прикидка темпа марафона.', dayOfWeek: 5 });
+    sessions.push({ type: 'miss', durationMin: 130, equipment: 'running', purpose: 'Старт Half Marathon вместо long — прикидка темпа марафона.', dayOfWeek: 5 });
   } else {
     sessions.push(run(sat as number, 5, 'Long: не пропускать; каждые 3 нед — откат.'));
   }
-  sessions.push(cross(6));
+  // Кросс в воскресенье есть в плане каждую неделю, КРОМЕ недели марафона:
+  // 45 мин кросса на следующий день после 42 км — не план, а ошибка.
+  if (sat !== 'M') sessions.push(cross(6));
   const phase = sat === 'M' ? 'peak' : w >= 16 ? 'taper' : w <= 4 ? 'base' : 'build';
   const stepback = [3, 6, 12, 14].includes(w);
   return {

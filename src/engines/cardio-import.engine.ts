@@ -769,13 +769,20 @@ export function parseCardioFit(buffer: ArrayBuffer): CardioImportResult {
             else if (s.total_time !== undefined) dur = Math.round(Number(s.total_time) / 60);
             else if (s.duration !== undefined) dur = parseDurationFlexible(String(s.duration));
             if (!dur || dur < 1 || dur > 600) continue;
+            const typeRaw = String(s.sport ?? s.activity ?? s.sport_type ?? s.sub_sport ?? '');
             let dist: number | undefined;
             const dRaw = s.total_distance ?? s.distance ?? s.totalDistance;
             if (dRaw !== undefined) {
               const v = Number(dRaw);
-              if (Number.isFinite(v) && v > 0) dist = Math.round((v / 1000) * 10) / 10; // метры → км, если уже км — <200
-              if (dist !== undefined && dist > 1000) dist = Math.round((dist / 1000) * 10) / 10;
-              if (dist !== undefined && dist > 200) dist = 200;
+              if (Number.isFinite(v) && v > 0) {
+                // P0-аудит 2026-11: парсер вызывается с lengthUnit:'km', а код
+                // безусловно делил на 1000 → 10 км превращались в 0.0 км.
+                // Эвристика единиц: FIT-нативно дистанция в метрах, поэтому
+                // >=1000 — метры; для бега/ходьбы и >=100 — тоже метры.
+                const foot = /run|walk|hike|trail/i.test(typeRaw);
+                const km = (v >= 1000 || (foot && v >= 100)) ? v / 1000 : v;
+                dist = Math.round(Math.min(200, km) * 10) / 10;
+              }
             }
             let hr: number | undefined;
             const hrRaw = s.avg_heart_rate ?? s.average_heart_rate ?? s.avgHeartRate ?? s.heart_rate;
@@ -789,7 +796,6 @@ export function parseCardioFit(buffer: ArrayBuffer): CardioImportResult {
               const v = Number(calRaw);
               if (Number.isFinite(v) && v > 0) cal = Math.round(v);
             }
-            const typeRaw = String(s.sport ?? s.activity ?? s.sport_type ?? s.sub_sport ?? '');
             const type = mapActivityToCardioType(typeRaw);
             parsed.push({
               id: genId(),

@@ -39,13 +39,16 @@ function buildWeek(w: number): CardioTemplateWeek {
   const race = w === 16;
   const sessions: CardioTemplateSession[] = [
     {
-      type: 'hiit', durationMin: t.k1min, equipment: 'running', dayOfWeek: 1,
+      // 5×5 мин / 2 мин = 35 мин структуры; заявленного k1min не хватало на
+      // саму работу (плюс разминка/заминка не входят).
+      type: 'hiit', durationMin: Math.max(t.k1min, 35), equipment: 'running', dayOfWeek: 1,
       purpose: `K1 скорость: ${t.k1}. Разминка 10-20 мин + заминка 10 мин.`,
       structured: [{ workSec: 300, restSec: 120, reps: 5, target: 'pace', note: `Скорость: ${t.k1}` }],
     },
     { type: 'miss', durationMin: Math.round(t.k2mi * MIN_PER_MI_Q), equipment: 'running', dayOfWeek: 3, purpose: `K2 темп: ${t.k2}.` },
     race
-      ? { type: 'hiit', durationMin: 240, equipment: 'running', dayOfWeek: 5, purpose: `K3: ${t.k3}!` }
+      // Марафон — длинная умеренная работа, не HIIT (иначе TRIMP/ACWR врут).
+      ? { type: 'miss', durationMin: 240, equipment: 'running', dayOfWeek: 5, purpose: `K3: ${t.k3}!` }
       : { type: 'zone2', durationMin: Math.round(t.k3mi * MIN_PER_MI_EASY), equipment: 'running', dayOfWeek: 5, purpose: `K3 long: ${t.k3}.` },
   ];
   const phase = race ? 'peak' : w >= 14 ? 'taper' : 'build';

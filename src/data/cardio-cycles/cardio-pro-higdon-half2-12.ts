@@ -30,7 +30,7 @@ function buildWeek(w: number): CardioTemplateWeek {
     sessions.push(run(sat, false, 5));
   } else {
     const min = sat === 'HM' ? 135 : sat === '10K' ? 60 : 30;
-    sessions.push({ type: 'hiit', durationMin: min, equipment: 'running', purpose: sat === 'HM' ? 'СТАРТ: полумарафон 13.1 мили!' : `Старт ${sat} вместо long!`, dayOfWeek: 5 });
+    sessions.push({ type: 'miss', durationMin: min, equipment: 'running', purpose: sat === 'HM' ? 'СТАРТ: полумарафон 13.1 мили!' : `Старт ${sat} вместо long!`, dayOfWeek: 5 });
   }
   sessions.push(cross(6));
   const phase = sat === 'HM' ? 'peak' : w >= 10 ? 'taper' : w <= 3 ? 'base' : 'build';

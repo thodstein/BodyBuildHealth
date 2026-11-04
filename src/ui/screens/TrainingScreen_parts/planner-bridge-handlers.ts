@@ -30,6 +30,7 @@ import {
   loadCardioCycles, loadActiveCardioCycle, cardioToNutritionPayload,
 } from '../../../engines/lms/cardio.engine';
 import { loadCardioLog } from '../../../engines/lms/cardio-diary.engine';
+import { publishCardioKcalContract } from '../../../engines/lms/cardio-nutrition-contract.engine';
 import { parseTempoCanon } from '../../../engines/tempo-canon.engine';
 
 export interface BridgeCtx {
@@ -833,8 +834,11 @@ const annualBlockHandler: Handler = (payload, { onChange, showToast }) => {
   } catch (e) { showToast('⚠ Не удалось открыть блок: ' + (e as Error)?.message); }
 };
 
-/** Ключ заметки «кардио → питание» (читается планировщиком питания/другими UI). */
-export const CARDIO_KCAL_NOTE_KEY = 'he_cardio_kcal_note';
+/**
+ * Ключ заметки «кардио → питание». Единый источник — контрактный модуль
+ * `cardio-nutrition-contract.engine` (там же reader и переключатель «учитывать»).
+ */
+export { CARDIO_KCAL_NOTE_KEY } from '../../../engines/lms/cardio-nutrition-contract.engine';
 export const BB_NUTRITION_NOTE_KEY = 'he_bb_nutrition_note';
 
 /**
@@ -883,11 +887,11 @@ const cardioHandler: Handler = (payload, { showToast }) => {
       : loadActiveCardioCycle();
     if (!cycle) { showToast('⚠ Кардио-цикл не найден — соберите его в кардио-конструкторе'); return; }
     const p = cardioToNutritionPayload(cycle, loadCardioLog());
-    try {
-      localStorage.setItem(CARDIO_KCAL_NOTE_KEY, JSON.stringify({ cycleId: cycle.id, avgKcalPerWeek: p.avgKcalPerWeek, avgMinutesPerWeek: p.avgMinutesPerWeek, updatedAt: new Date().toISOString() }));
-    } catch { /* ignore */ }
-    try { navigator.clipboard?.writeText(p.text) } catch { /* ignore */ }
-    showToast(`🍽 Расход кардио передан в питание: ~${p.avgKcalPerWeek} ккал/нед · сегодня ${p.todayMinutes} мин${p.todayKcal > 0 ? ' · ' + p.todayKcal + ' ккал' : ''} (в буфер)`);
+    // Контракт (weeklyKcal/todayKcal/confidence/include) — единственная запись,
+    // которую читает питание. Раньше писались только два числа, и ключ был мёртв.
+    const contract = publishCardioKcalContract(cycle);
+    try { navigator.clipboard?.writeText(contract.text) } catch { /* ignore */ }
+    showToast(`🍽 Расход кардио передан в питание: ~${p.avgKcalPerWeek} ккал/нед · сегодня ${p.todayMinutes} мин${p.todayKcal > 0 ? ' · ' + p.todayKcal + ' ккал' : ''} · уверенность ${Math.round(contract.confidence * 100)}% (в буфер)`);
   } catch (e) {
     showToast('⚠ Ошибка передачи в питание: ' + (e as Error)?.message);
   }

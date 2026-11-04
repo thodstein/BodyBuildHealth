@@ -13,11 +13,17 @@ const dist = (m: number, note: string, dow: number): CardioTemplateSession => ({
   type: 'zone2', durationMin: Math.round(m / M_PER_MIN), equipment: 'rowing', dayOfWeek: dow,
   purpose: `${m} м ровно. ${note}`,
 });
-const ints = (desc: string, workSec: number, restSec: number, reps: number, totalM: number, dow: number): CardioTemplateSession => ({
-  type: 'hiit', durationMin: Math.round(totalM / M_PER_MIN), equipment: 'rowing', dayOfWeek: dow,
-  purpose: `${desc}. Пейсинг по дневнику: прошлая похожая ±1 с; последний отрезок — быстрее.`,
-  structured: [{ workSec, restSec, reps, target: 'pace', note: desc }],
-});
+const ints = (desc: string, workSec: number, restSec: number, reps: number, totalM: number, dow: number): CardioTemplateSession => {
+  // Аудит 2026-11: durationMin считался только по дистанции работы и игнорировал
+  // отдых между отрезками — план обещал 15 мин там, где по структуре 23.
+  const structureMin = Math.ceil(((workSec + restSec) * reps) / 60);
+  const distMin = Math.round(totalM / M_PER_MIN);
+  return {
+    type: workSec >= 300 ? 'miss' : 'hiit', durationMin: Math.max(structureMin, distMin) + 3, equipment: 'rowing', dayOfWeek: dow,
+    purpose: `${desc}. Пейсинг по дневнику: прошлая похожая ±1 с; последний отрезок — быстрее.`,
+    structured: [{ workSec, restSec, reps, target: 'pace', note: desc }],
+  };
+};
 const opt = (desc: string, min: number, dow: number): CardioTemplateSession => ({
   type: 'recovery', durationMin: min, equipment: 'rowing', dayOfWeek: dow,
   purpose: `[Доп] ${desc} — только если есть силы/время; темп ниже ядер.`,

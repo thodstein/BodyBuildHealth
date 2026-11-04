@@ -10,7 +10,7 @@
  * модулей дневника. Канон хранения один — localStorage; синк телефон↔ПК
  * и так делает `cloud-kv` (he_cardio_sessions не в EXCLUDED_KEYS).
  */
-import type { CardioCycle, CardioSession, CardioType } from './cardio.engine';
+import type { CardioCycle, CardioEquipment, CardioSession, CardioType } from './cardio.engine';
 import { cardioSessionsForDate, cardioWeekForDate, kcalForCardio } from './cardio.engine';
 import { todayLocalIso, addDaysIso, toLocalIso } from './cardio-date-utils.engine';
 import { cardioEntryLoad } from './cardio-physiology.engine';
@@ -81,22 +81,36 @@ export function loadCardioLog(): CardioLogEntry[] {
   } catch { return []; }
 }
 
+export const CARDIO_LOG_EVENT = 'cardio-log-updated';
+
+/** Сигнал «журнал изменился» для слоёв UI, которые живут вне формы
+ *  (кардио-слот дня, панель дневника, аналитика). Без него слот показывал
+ *  «факт» из первого рендера до перемонтирования. */
+function notifyLogChanged(): void {
+  try {
+    if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent(CARDIO_LOG_EVENT));
+  } catch { /* ignore */ }
+}
+
 export function saveCardioLogEntry(entry: CardioLogEntry): CardioLogEntry[] {
   const all = loadCardioLog().filter(e => e.id !== entry.id);
   all.unshift({ ...entry, updatedAt: toLocalIso(new Date()) });
   const list = all.slice(0, CARDIO_LOG_CAP);
   try { localStorage.setItem(CARDIO_LOG_KEY, JSON.stringify(list)); } catch { /* ignore */ }
+  notifyLogChanged();
   return list;
 }
 
 export function removeCardioLogEntry(id: string): CardioLogEntry[] {
   const all = loadCardioLog().filter(e => e.id !== id);
   try { localStorage.setItem(CARDIO_LOG_KEY, JSON.stringify(all)); } catch { /* ignore */ }
+  notifyLogChanged();
   return all;
 }
 
 export function clearCardioLog(): void {
   try { localStorage.removeItem(CARDIO_LOG_KEY); } catch { /* ignore */ }
+  notifyLogChanged();
 }
 
 /** Полная замена журнала (для undo/восстановления снимка). */
@@ -105,6 +119,7 @@ export function replaceCardioLog(entries: CardioLogEntry[]): CardioLogEntry[] {
     .filter((e): e is CardioLogEntry => !!e && typeof e === 'object' && typeof e.date === 'string' && typeof e.durationMin === 'number')
     .slice(0, CARDIO_LOG_CAP);
   try { localStorage.setItem(CARDIO_LOG_KEY, JSON.stringify(list)); } catch { /* ignore */ }
+  notifyLogChanged();
   return list;
 }
 
@@ -259,9 +274,33 @@ export interface CardioAdvice {
   reason: string;
 }
 
-/** Оценка ккал сессии журнала по MET-модели движка (вес по умолчанию 80 кг). */
-export function estimateCardioEntryKcal(type: CardioType, durationMin: number, weightKg?: number): number {
-  return kcalForCardio(type, durationMin, weightKg && weightKg > 0 ? weightKg : 80);
+export interface CardioEntryKcalOpts {
+  /** Оборудование факта (гребля/вело/бег) — MET различается на 10-25%. */
+  equipment?: CardioEquipment;
+  sex?: 'male' | 'female';
+  /** Тощая масса: точнее веса тела (жир почти не тратит). */
+  ffmKg?: number;
+}
+
+/**
+ * Оценка ккал сессии журнала по MET-модели движка (вес по умолчанию 80 кг).
+ * Раньше факт считался «по весу и типу», игнорируя оборудование: 45 мин
+ * гребли оценивались как 45 мин бега. Теперь — те же поправки, что у плана.
+ */
+export function estimateCardioEntryKcal(
+  type: CardioType,
+  durationMin: number,
+  weightKg?: number,
+  opts: CardioEntryKcalOpts = {},
+): number {
+  return kcalForCardio(
+    type,
+    durationMin,
+    weightKg && weightKg > 0 ? weightKg : 80,
+    opts.equipment,
+    opts.sex,
+    opts.ffmKg,
+  );
 }
 
 /** Темп сессии: мин/км в формате «м:сс/км» или null (нет дистанции/времени). */
@@ -539,10 +578,13 @@ export interface CardioWellness {
 }
 
 export function wellnessReadiness(w: Pick<CardioWellness, 'sleep' | 'stress' | 'soreness' | 'mood'>): number {
-  // stress инвертируем: 1=высокий стресс=1 балл, 5=низкий=5 баллов
+  // Единая шкала: сон/настроение — 5 = отлично; стресс/боль — 5 = максимум (хуже),
+  // поэтому они инвертируются.
   const stressInv = 6 - w.stress;
   const sum = w.sleep + stressInv + (6 - w.soreness) + w.mood; // 4-20
-  return Math.max(1, Math.min(10, Math.round((sum / 20) * 10)));
+  // 4..20 → 1..10. Раньше (sum/20)*10 давало 2 в худшем случае: нижняя
+  // половина шкалы готовности была недостижима, а автотюн сравнивал с 2-3.
+  return Math.max(1, Math.min(10, Math.round(1 + ((sum - 4) / 16) * 9)));
 }
 
 export function saveCardioWellness(entry: CardioWellness): void {
@@ -594,6 +636,7 @@ export function importCardioEntries(entries: CardioLogEntry[]): CardioLogEntry[]
   }
   const merged = [...toAdd, ...existing].slice(0, CARDIO_LOG_CAP).sort((a, b) => (a.date < b.date ? 1 : -1));
   try { localStorage.setItem(CARDIO_LOG_KEY, JSON.stringify(merged)); } catch { /* ignore */ }
+  notifyLogChanged();
   return merged;
 }
 
