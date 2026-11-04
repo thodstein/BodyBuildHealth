@@ -20,6 +20,11 @@ import {
   writeCoachState,
   type CoachAthlete,
 } from '../../../../engines/coach/coach-mode.engine';
+import {
+  addCoachLogEntry,
+  emptyCoachLog,
+  writeCoachLog,
+} from '../../../../engines/coach/coach-athlete-log.engine';
 
 beforeEach(() => {
   try { localStorage.clear(); } catch { /* ignore */ }
@@ -180,13 +185,34 @@ describe('атлеты', () => {
     expect(container.textContent).toContain('Иван П.');
   });
 
-  it('в подтверждении удаления сказано, что заметки и задачи не удаляются', () => {
+  it('в подтверждении удаления сказано, что заметки, задачи и журнал не удаляются', () => {
     seed(1);
     const { container } = render(<ProfileCoachTab />);
     fireEvent.click(container.querySelector('[data-coach="delete"]') as HTMLElement);
     const hint = container.querySelector('[data-coach="delete-hint"]')?.textContent ?? '';
     expect(hint).toContain('карточка');
-    expect(hint).toContain('Заметки и задачи');
+    expect(hint).toContain('Заметки, задачи и записи журнала');
+  });
+
+  it('в карточке видно, сколько записей в журнале и когда последняя (без оценок)', () => {
+    seed(1);
+    let log = emptyCoachLog();
+    log = addCoachLogEntry(log, { athleteId: 'a1', date: '2026-11-01', exercise: 'Присед', sets: 3, reps: 5, weightKg: 100 }, { id: 'l1' }).store;
+    log = addCoachLogEntry(log, { athleteId: 'a1', date: '2026-11-03', exercise: 'Жим', sets: 3, reps: 5, weightKg: 80 }, { id: 'l2' }).store;
+    writeCoachLog(localStorage, log);
+
+    const { container } = render(<ProfileCoachTab />);
+    const chip = container.querySelector('[data-coach="log-count"]')?.textContent ?? '';
+    expect(chip).toContain('записей: 2');
+    expect(chip).toContain('03.11.26');
+    // Никаких «норма/плохо/отстаёт» — карточка не оценивает атлета.
+    expect(chip).not.toMatch(/норм|плох|отста/i);
+  });
+
+  it('без записей журнала строки журнала в карточке нет', () => {
+    seed(1);
+    const { container } = render(<ProfileCoachTab />);
+    expect(container.querySelector('[data-coach="log-count"]')).toBeNull();
   });
 
   it('переход к заметкам и задачам атлета передаёт id и цель', () => {

@@ -38,6 +38,7 @@ import {
 } from '../../../engines/coach/coach-mode.engine';
 import { countNotesForAthlete, readCoachNotes, type CoachNotesStore } from '../../../engines/coach/coach-notes.engine';
 import { readCoachPlanner, type CoachPlannerStore } from '../../../engines/coach/coach-planner.engine';
+import { readCoachLog, type CoachLogStore } from '../../../engines/coach/coach-athlete-log.engine';
 
 const ACCENT = '#22d3ee';
 
@@ -50,6 +51,12 @@ const ls = (): Storage | null => {
 };
 
 const SEX_LABEL: Record<CoachSex, string> = { male: 'муж', female: 'жен', unspecified: 'пол не указан' };
+
+/** 2026-11-04 → 04.11.26 (компактно для строки карточки). */
+const fmtShort = (iso: string): string => {
+  const [y, m, d] = iso.split('-');
+  return `${d}.${m}.${y.slice(2)}`;
+};
 
 interface AthleteForm {
   name: string;
@@ -146,12 +153,29 @@ export const ProfileCoachTab: React.FC<{
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [query, setQuery] = useState('');
 
-  // Заметки/планер читаем один раз на состояние режима: сам экран их не меняет,
+  // Заметки/планер/журнал читаем один раз на состояние режима: сам экран их не меняет,
   // а пересчитывать JSON на каждый символ в форме атлета незачем.
-  const { notes, planner } = useMemo<{ notes: CoachNotesStore; planner: CoachPlannerStore }>(
-    () => ({ notes: readCoachNotes(ls()), planner: readCoachPlanner(ls()) }),
+  const { notes, planner, log } = useMemo<{
+    notes: CoachNotesStore;
+    planner: CoachPlannerStore;
+    log: CoachLogStore;
+  }>(
+    () => ({ notes: readCoachNotes(ls()), planner: readCoachPlanner(ls()), log: readCoachLog(ls()) }),
     [state],
   );
+
+  // Одна проходка по журналу вместо «на каждого атлета заново»: 20 карточек × 5000
+  // записей — это 100k итераций на рендер, если считать в лоб.
+  const logStats = useMemo(() => {
+    const map = new Map<string, { count: number; last: string | null }>();
+    for (const entry of log.items) {
+      const cur = map.get(entry.athleteId) ?? { count: 0, last: null };
+      cur.count += 1;
+      if (!cur.last || entry.date > cur.last) cur.last = entry.date;
+      map.set(entry.athleteId, cur);
+    }
+    return map;
+  }, [log.items]);
 
   const apply = (next: CoachState) => {
     writeCoachState(ls(), next);
@@ -600,6 +624,7 @@ export const ProfileCoachTab: React.FC<{
                 const isActive = state.activeAthleteId === a.id;
                 const noteCount = countNotesForAthlete(notes, a.id);
                 const openTaskCount = planner.items.filter(t => t.athleteId === a.id && !t.done).length;
+                const logStat = logStats.get(a.id);
                 const meta = [
                   SEX_LABEL[a.sex],
                   a.age !== null ? `${a.age} лет` : null,
@@ -675,6 +700,12 @@ export const ProfileCoachTab: React.FC<{
                           незакрытых задач: {openTaskCount}
                         </span>
                       )}
+                      {logStat && logStat.count > 0 && (
+                        <span data-coach="log-count" style={{ fontSize: 10.5, color: colors.textMuted, alignSelf: 'center' }}>
+                          записей: {logStat.count}
+                          {logStat.last && ` · последняя ${fmtShort(logStat.last)}`}
+                        </span>
+                      )}
                     </div>
                     <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
                       {onOpenAthlete && (
@@ -747,8 +778,8 @@ export const ProfileCoachTab: React.FC<{
                         data-coach="delete-hint"
                         style={{ marginTop: 8, fontSize: 11.5, color: colors.textMuted, lineHeight: 1.45 }}
                       >
-                        Удаляется только карточка. Заметки и задачи этого атлета останутся на месте —
-                        их видно в общем списке заметок и в планёре.
+                        Удаляется только карточка. Заметки, задачи и записи журнала этого атлета останутся
+                        на месте — их видно в общем списке заметок, в планёре и в журнале.
                       </div>
                     )}
                   </div>
