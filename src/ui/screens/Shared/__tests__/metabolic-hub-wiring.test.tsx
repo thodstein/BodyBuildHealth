@@ -73,6 +73,14 @@ function fieldValue(label: string): string {
   return (el.getAttribute('aria-label') || '').slice(label.length + 2);
 }
 
+/** Значение `.pl-popupnum` по подписи (у PopupNumber нет aria-label — берём второй div). */
+function popupValue(label: string): string {
+  const btn = Array.from(document.querySelectorAll('button.pl-popupnum'))
+    .find(b => (b.textContent || '').trim().startsWith(label));
+  if (!btn) throw new Error(`нет popup-поля «${label}»`);
+  return (btn.children[1]?.textContent || '').trim();
+}
+
 describe('MetabolicHub: ввод меняет расчёт (проводка полей)', () => {
   it('вес 83 → 110 поднимает TDEE и воду', () => {
     render(<MetabolicHub />);
@@ -197,6 +205,17 @@ describe('MetabolicHub: ввод меняет расчёт (проводка п�
     setSelect('Триместр', '2-й');
     // было: calcSteps уже добавлял 340, а buildOneAnswerPro добавлял ещё раз → +680
     expect(tileValue('TDEE') - tdeeF).toBe(340);
+  });
+
+  it('пот-тест подставляет текущий вес, пока его не трогали, и не перетирает введённый', () => {
+    render(<MetabolicHub />);
+    setNumber('Вес, кг', 95);
+    expect(popupValue('Вес до, кг')).toBe('95');
+    expect(popupValue('Вес после, кг')).toBe('95');
+    // пользователь ввёл свой замер — вес тела больше не должен его двигать
+    setNumber('Вес после, кг', 94.2);
+    setNumber('Вес, кг', 96);
+    expect(popupValue('Вес после, кг')).toBe('94.2');
   });
 
   it('сценарий хранит лабы и восстанавливает их (было 22 поля из ~90)', () => {

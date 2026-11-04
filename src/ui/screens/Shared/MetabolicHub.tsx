@@ -302,6 +302,8 @@ export const MetabolicHub: React.FC = () => {
   const valuesRef = useRef<Record<string, number | undefined>>({});
   /** Поля, которые пользователь ввёл руками: их 8-секундный авто-refresh из профиля не перезаписывает. */
   const manualLabsRef = useRef<Record<string, boolean>>({});
+  /** Пользователь уже трогал вес «до/после» в пот-тесте — тогда не подставляем текущий вес. */
+  const sweatTouchedRef = useRef(false);
 
   // ACWR live — слушаем srpe-store + polling
   const [acwr, setAcwr] = useState(1);
@@ -584,6 +586,8 @@ export const MetabolicHub: React.FC = () => {
     // пометки «введено руками» сохраняются вместе со снапшотом — иначе таймер лаб
     // (раз в 8 с) возвращал значение из профиля и затирал ручной ввод
     if(Array.isArray(s.manualLabs)) for(const k of s.manualLabs) if(typeof k==='string') manualLabsRef.current[k] = true;
+    // в снапшоте есть вес «до/после» — не перетираем его текущим весом из эффекта ниже
+    if(typeof s.preKg==='number') sweatTouchedRef.current = true;
   },[]);
 
   // init: актуальный снапшот v6 → legacy v5/v4/v3/v1 → профиль
@@ -658,6 +662,12 @@ export const MetabolicHub: React.FC = () => {
 
   // Пот-тест считается ДО общего input: измеренный пот обязан попадать в воду, а не жить
   // только в карточке «Пот-тест» (было: тест показал 1.30 л/ч, а вода считалась по 600).
+  // Пот-тест: пока вес «до/после» не вводили руками, держим их равными текущему весу.
+  // Иначе при весе 95 кг в полях висело бы 83 из дефолта и замер считался бы по чужой массе.
+  useEffect(()=>{
+    if(sweatTouchedRef.current) return;
+    setPreKg(weight); setPostKg(weight);
+  }, [weight]);
   const sweatV2 = useMemo(()=> calcSweatTestV2(useMeasuredSweat ? { preKg, postKg, fluidL, hours: sweatHours, sodiumMgPerL: sweatSodium, weightKg: weight, acclimated } : { hours: sweatHours, sodiumMgPerL: sweatSodium, weightKg: weight, intensity: sweatIntensity, environment: sweatEnv, acclimated }), [useMeasuredSweat, preKg, postKg, fluidL, sweatHours, sweatSodium, weight, acclimated, sweatIntensity, sweatEnv]);
   /** Измеренный пот (мл/ч) или null, если режим «Оценка»/данных нет. */
   const measuredSweatMlPerH = useMeasuredSweat && sweatV2?.measured ? Math.round(sweatV2.rateLPerH * 1000) : null;
@@ -850,6 +860,7 @@ const kbju = useMemo(()=> calcKBJU(input), [input]);
   const resetAll = useCallback(()=>{
     try{ localStorage.removeItem(SNAP_KEY); }catch{}
     manualLabsRef.current = {};
+    sweatTouchedRef.current = false;
     // Лабы и замеры
     setBodyFat(undefined);
     setHct(undefined); setHgb(undefined); setFerritin(undefined); setGfr(undefined);
@@ -1228,8 +1239,8 @@ const kbju = useMemo(()=> calcKBJU(input), [input]);
         </div>
         {useMeasuredSweat ? (
         <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
-          <PopupNumber label="Вес до, кг" value={preKg} min={40} max={150} step={0.1} onChange={setPreKg} />
-          <PopupNumber label="Вес после, кг" value={postKg} min={40} max={150} step={0.1} onChange={setPostKg} />
+          <PopupNumber label="Вес до, кг" value={preKg} min={40} max={150} step={0.1} onChange={(v)=>{ sweatTouchedRef.current = true; setPreKg(v); }} />
+          <PopupNumber label="Вес после, кг" value={postKg} min={40} max={150} step={0.1} onChange={(v)=>{ sweatTouchedRef.current = true; setPostKg(v); }} />
           <PopupNumber label="Выпито, л" value={fluidL} min={0} max={5} step={0.1} onChange={setFluidL} />
           <PopupNumber label="Длительность, ч" value={sweatHours} min={0.3} max={6} step={0.25} onChange={setSweatHours} />
         </div>

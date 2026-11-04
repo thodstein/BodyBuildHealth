@@ -274,6 +274,15 @@ EA при 2600 ккал не в красной зоне, `none` при пуст�
 ручной режим в профиль» (проверяет `he_profile_v2`: `kbjuMode='manual'`, `manualTargets.kcal` = плитка
 КБЖУ, Б/Ж/У > 0).
 
+### 1.26 Пот-тест считался по чужой массе (83 кг из дефолта)
+**Причина.** Поля «Вес до/после» жили с дефолтом 83 кг и не следовали за весом человека:
+при весе 95 кг тест предлагал 83 → разница весов означала «потерю» −12 кг (движок такое
+отбрасывал) или, наоборот, давала правдоподобные, но неверные числа после мелкой правки.
+**Исправление.** Пока пользователь сам не трогал эти поля, они следуют за текущим весом
+(`sweatTouchedRef`); первая же правка «до/после» отвязывает их от веса, и снапшот/сброс
+выставляют флаг корректно.
+**Регрессия.** `metabolic-hub-wiring.test.tsx` → «пот-тест подставляет текущий вес…».
+
 ---
 
 ## 2. Чего не хватало (добавлено)
@@ -323,7 +332,7 @@ EA при 2600 ккал не в красной зоне, `none` при пуст�
   параллельные `tsc`/`vitest` из других сессий → heap OOM / `Zone Allocation failed`.
   Прогонять на свободной машине.
 - `npx vitest run src/ui/screens/Shared/__tests__ src/engines/__tests__/metabolic-hub.test.ts`
-  — **203 passed** (6 файлов: structure / toggles / honesty / modes / wiring / engine).
+  — **204 passed** (6 файлов: structure / toggles / honesty / modes / wiring / engine).
 - `npx vitest run src/ui/__tests__/rest-hooks-native.test.tsx
   src/engines/__tests__/risk-info-honesty-e07-e08.test.ts` — **89 passed**
   (в stderr шумит jsdom-canvas chart.js — это фон, не падения).
