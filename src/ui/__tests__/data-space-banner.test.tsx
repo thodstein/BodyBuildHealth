@@ -117,4 +117,17 @@ describe('полоса пространства данных', () => {
     const { container } = render(<DataSpaceBanner />);
     expect(container.querySelector('[data-space="switch"]')).toBeNull();
   });
+
+  it('текст не уезжает под плавающие кнопки синка/языка, а кнопки — отдельной строкой', () => {
+    // В App.tsx кнопки синка и языка висят absolute top-8 right-8 поверх верха
+    // экрана. Если полоса займёт ту же строку, «К своим данным» окажется под ними.
+    activateAthleteSpace('a1', 'Иван');
+    _resetDataSpaceCache();
+    const { container } = render(<DataSpaceBanner />);
+    const banner = container.querySelector('[data-space="banner"]') as HTMLElement;
+    const firstRow = banner.firstElementChild as HTMLElement;
+    const textCol = firstRow.lastElementChild as HTMLElement;
+    expect(Number.parseInt(textCol.style.paddingRight || '0', 10)).toBeGreaterThanOrEqual(80);
+    expect(firstRow.querySelector('[data-space="return"]')).toBeNull();
+  });
 });

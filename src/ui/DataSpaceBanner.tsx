@@ -66,11 +66,14 @@ export const DataSpaceBanner: React.FC = () => {
         lineHeight: 1.35,
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-        <span aria-hidden="true" style={{ display: 'inline-flex', color: VIOLET, flexShrink: 0 }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+        <span aria-hidden="true" style={{ display: 'inline-flex', color: VIOLET, flexShrink: 0, marginTop: 2 }}>
           <NativeIcon name="user" size={15} />
         </span>
-        <div style={{ flex: 1, minWidth: 0 }}>
+        {/* Справа зарезервировано место под плавающие кнопки синка/языка
+            (`App.tsx`: absolute top-8 right-8). Без запаса они ложились бы
+            поверх текста полосы. */}
+        <div style={{ flex: 1, minWidth: 0, paddingRight: 84 }}>
           <div style={{ fontWeight: 800, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             Данные атлета: {active.label}
           </div>
@@ -78,6 +81,9 @@ export const DataSpaceBanner: React.FC = () => {
             Профиль, дневники и планы сейчас — этого атлета. Заметки и планер тренера общие.
           </div>
         </div>
+      </div>
+
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 6 }}>
         {others.length > 0 && (
           <button
             type="button"
@@ -85,9 +91,8 @@ export const DataSpaceBanner: React.FC = () => {
             onClick={() => setOpen(v => !v)}
             aria-expanded={open}
             style={{
-              flexShrink: 0,
-              minHeight: 36,
-              padding: '6px 10px',
+              minHeight: 32,
+              padding: '5px 10px',
               borderRadius: 10,
               fontSize: 11.5,
               fontWeight: 800,
@@ -106,9 +111,8 @@ export const DataSpaceBanner: React.FC = () => {
           data-space="return"
           onClick={() => go(HOME_SPACE_ID)}
           style={{
-            flexShrink: 0,
-            minHeight: 36,
-            padding: '6px 12px',
+            minHeight: 32,
+            padding: '5px 12px',
             borderRadius: 10,
             fontSize: 11.5,
             fontWeight: 800,
