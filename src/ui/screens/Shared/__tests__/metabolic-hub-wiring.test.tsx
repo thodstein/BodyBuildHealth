@@ -51,6 +51,20 @@ function setNumber(label: string, value: number) {
   fireEvent.click(ok as HTMLElement);
 }
 
+/** Выбрать значение в PopupSelect (клик по карточке → клик по варианту). */
+function setSelect(label: string, option: string) {
+  const trigger = Array.from(document.querySelectorAll('button.pl-popupselect'))
+    .find(b => (b.textContent || '').trim().startsWith(label));
+  if (!trigger) throw new Error(`нет селекта «${label}»`);
+  fireEvent.click(trigger);
+  const area = document.querySelector('.pl-popupoverlay');
+  if (!area) throw new Error(`попап «${label}» не открылся`);
+  const opt = Array.from(area.querySelectorAll('button'))
+    .find(b => (b.textContent || '').trim().startsWith(option));
+  if (!opt) throw new Error(`в селекте «${label}» нет варианта «${option}»`);
+  fireEvent.click(opt);
+}
+
 describe('MetabolicHub: ввод меняет расчёт (проводка полей)', () => {
   it('вес 83 → 110 поднимает TDEE и воду', () => {
     render(<MetabolicHub />);
@@ -80,7 +94,6 @@ describe('MetabolicHub: ввод меняет расчёт (проводка п�
 
   it('цель: сушка < поддержание < масса по ккал КБЖУ', () => {
     render(<MetabolicHub />);
-    fireEvent.click(document.querySelector('.mh-goal:nth-child(1)') as HTMLElement ?? tile('КБЖУ'));
     const pick = (name: string) => {
       const btn = Array.from(document.querySelectorAll('button'))
         .find(b => (b.textContent || '').trim() === name && b.className.includes('mh-goal'));
@@ -106,5 +119,31 @@ describe('MetabolicHub: ввод меняет расчёт (проводка п�
     expect(tileValue('Вода')).toBeGreaterThan(water0);
     expect(tileValue('КБЖУ')).toBeGreaterThan(kbju0);
     expect(tileValue('Жир')).toBe(weight0);
+  });
+
+  it('«бытовая активность» реально работает, когда профессия не указана', () => {
+    render(<MetabolicHub />);
+    // было: профессия по умолчанию 'sedentary' всегда перекрывала бытовую — поле-пустышка
+    setSelect('Профессия (FAO PAL)', 'Не указана');
+    const tdee0 = tileValue('TDEE');
+    setSelect('Бытовая', 'Высокая');
+    const tdeeHigh = tileValue('TDEE');
+    setSelect('Бытовая', 'Низкая');
+    const tdeeLow = tileValue('TDEE');
+    expect(tdeeHigh).toBeGreaterThan(tdee0);
+    expect(tdeeLow).toBeLessThan(tdee0);
+  });
+
+  it('профессия перекрывает бытовую — и это сказано текстом, а не молча', () => {
+    render(<MetabolicHub />);
+    expect(document.body.textContent).toMatch(/профессия перекрывает «бытовую»/);
+    const tdee0 = tileValue('TDEE');
+    setSelect('Профессия (FAO PAL)', 'Физическая');
+    const tdeePhysical = tileValue('TDEE');
+    setSelect('Бытовая', 'Низкая');
+    setSelect('Бытовая', 'Высокая');
+    // пока профессия задана, «бытовая» на расчёт не влияет (один день нельзя посчитать дважды)
+    expect(tileValue('TDEE')).toBe(tdeePhysical);
+    expect(tdeePhysical).toBeGreaterThan(tdee0);
   });
 });

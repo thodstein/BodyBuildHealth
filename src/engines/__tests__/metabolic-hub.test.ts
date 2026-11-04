@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { calcWater, calcSteps, calcKBJU, calcBodyFat, calcCortisol, calcStressLoad, calcHematology, calcTrendFromHistory, calcAdaptiveAdjustment, calcEnergyAvailability, calcAlcohol, calcProteinTiming, calcMaintenanceFinder, calcGoalTimeline, calcAdaptiveThermogenesis, calcReverseDiet, calcNEAT, calcThyroidImpact, calcHomaIRWrap, calcATRange, buildOneAnswerPro, balanceCarbsAndFat, PONTZER_FORMULA_NOTE, TDEE_ALREADY_ADAPTED_NOTE, IR_MARKERS_SHARED_INPUT_NOTE } from '../metabolic-hub.engine';
+import { calcWater, calcSteps, calcKBJU, calcBodyFat, calcCortisol, calcStressLoad, calcHematology, calcTrendFromHistory, calcAdaptiveAdjustment, calcEnergyAvailability, calcAlcohol, calcProteinTiming, calcMaintenanceFinder, calcGoalTimeline, calcAdaptiveThermogenesis, calcReverseDiet, calcNEAT, calcThyroidImpact, calcHomaIRWrap, calcATRange, buildOneAnswerPro, balanceCarbsAndFat, getEffectivePal, calcPALPro, PONTZER_FORMULA_NOTE, TDEE_ALREADY_ADAPTED_NOTE, IR_MARKERS_SHARED_INPUT_NOTE } from '../metabolic-hub.engine';
 import { bmrCunningham, bmrOwen, bmrTenHaaf, bmrHarrisRevised, bmrHenry, bmrLivingston, bmrMethodLabel, bmrMethodSpread, calcHomaIR, calcTyG, calcTEF as calcTEFConst, calcTrendWithConfidence as calcTrendConf2, energyDensityPerKg, hallAdaptationFactor, calcSweatElectrolytes, calcJPBodyFat, calcDurninBodyFat, computeBMR } from '../../core/metabolic-constants';
 
 const base = { weight: 80, height: 180, age: 30, sex: 'male' as const };
@@ -269,6 +269,22 @@ describe('metabolic-hub — calcKBJU', () => {
     const low = calcKBJU({ ...base, activityLevel:'low' });
     const high = calcKBJU({ ...base, activityLevel:'high' });
     expect(high.nat.tdee).toBeGreaterThan(low.nat.tdee);
+  });
+  it('профессия «авто» возвращает бытовую активность в работу (иначе поле мёртвое)', () => {
+    // Было: profession по умолчанию 'sedentary' всегда перекрывал activityLevel,
+    // и переключатель «Бытовая» ничего не менял.
+    const autoLow = getEffectivePal({ ...base, profession:'auto', activityLevel:'low' } as any);
+    const autoHigh = getEffectivePal({ ...base, profession:'auto', activityLevel:'high' } as any);
+    expect(autoLow.palBase).toBe(1.40);
+    expect(autoHigh.palBase).toBe(1.75);
+    expect(autoHigh.palEff).toBeGreaterThan(autoLow.palEff);
+    // заданная профессия по-прежнему перекрывает бытовую базу
+    const office = getEffectivePal({ ...base, profession:'sedentary', activityLevel:'high' } as any);
+    expect(office.palBase).toBe(1.40);
+    // и PRO-обёртка считает так же
+    const proAutoLow = calcPALPro({ ...base, profession:'auto', activityLevel:'low' } as any);
+    const proAutoHigh = calcPALPro({ ...base, profession:'auto', activityLevel:'high' } as any);
+    expect(proAutoHigh).toBeGreaterThan(proAutoLow);
   });
   it('ААС +0.4-0.8 белка и +10% TDEE дозозависимо', () => {
     const nat = calcKBJU({ ...base });

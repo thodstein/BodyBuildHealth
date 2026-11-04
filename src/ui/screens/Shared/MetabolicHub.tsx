@@ -190,7 +190,7 @@ export const MetabolicHub: React.FC = () => {
   const [intakeSeries, setIntakeSeries] = useState<Array<{date:string;kcal:number}>>([]);
   const [proteinMeals, setProteinMeals] = useState<3|4|5|6>(4);
   // PRO v4 — профессия/беременность/этника/бариатрия/акклиматизация/хроника/DIAAS/CAT2/пот-оценка
-  const [profession, setProfession] = useState<'sedentary'|'standing'|'physical'>('sedentary');
+  const [profession, setProfession] = useState<'sedentary'|'standing'|'physical'|'auto'>('sedentary');
   const [trimester, setTrimester] = useState<1|2|3|0>(0);
   const [lactating, setLactating] = useState<'none'|'exclusive'|'mixed'>('none');
   const [ethnicity, setEthnicity] = useState<'european'|'african'|'east_asian'>('european');
@@ -660,7 +660,7 @@ const kbju = useMemo(()=> calcKBJU(input), [input]);
   const boerLBM = useMemo(()=> boerLeanBodyMass(weight, height, sex), [weight, height, sex]);
   const alcoholChronic = useMemo(()=> calcAlcoholChronic(alcoholG, alcoholDays), [alcoholG, alcoholDays]);
   const proteinPro = useMemo(()=> calcProteinTimingPro(onAAS ? kbju.aas.p : kbju.nat.p, weight, proteinMeals, proteinSource, age), [kbju, weight, onAAS, proteinMeals, proteinSource, age]);
-  const neatPro = useMemo(()=> calcNEATPro({ weight, profession, standingHours, fidgetLevel, steps, height }), [weight, profession, standingHours, fidgetLevel, steps, height]);
+  const neatPro = useMemo(()=> calcNEATPro({ weight, profession: profession === 'auto' ? undefined : profession, standingHours, fidgetLevel, steps, height }), [weight, profession, standingHours, fidgetLevel, steps, height]);
   const atRange = useMemo(()=> calcATRange({ tdee: stepsCalc.tdeeNat, deficitKcal: effectiveDeficit, weeksInDeficit, weightLostKg }), [stepsCalc, effectiveDeficit, weeksInDeficit, weightLostKg]);
   const reverseAuto = useMemo(()=>{
     const curKcal = diaryAvgKcal ?? kbju.nat.kcal;
@@ -998,7 +998,7 @@ const kbju = useMemo(()=> calcKBJU(input), [input]);
       <MhSection icon="🏃" accent="#22c55e" title="2. Активность" hint="NEAT + EAT: шаги, тренировки и профессия двигают PAL и TDEE. Пот и климат — воду.">
         <MhGrid>
           <PopupSelect label="Бытовая" value={activityLevel} options={[{id:'low',label:'Низкая (офис)'},{id:'medium',label:'Средняя'},{id:'high',label:'Высокая (на ногах)'}]} onChange={v=> setActivityLevel(v as any)} />
-          <PopupSelect label="Профессия (FAO PAL)" value={profession} options={[{id:'sedentary',label:'Офис 1.40'},{id:'standing',label:'На ногах 1.55'},{id:'physical',label:'Физическая 1.75'}]} onChange={v=> setProfession(v as any)} />
+          <PopupSelect label="Профессия (FAO PAL)" value={profession} options={[{id:'auto',label:'Не указана → по бытовой'},{id:'sedentary',label:'Офис 1.40'},{id:'standing',label:'На ногах 1.55'},{id:'physical',label:'Физическая 1.75'}]} onChange={v=> setProfession(v as any)} />
           <PopupNumber label="Тренировок/нед" value={trainingDays} min={0} max={7} onChange={setTrainingDays} />
           <PopupNumber label="Кардио мин/нед" value={cardioMin} min={0} max={600} onChange={setCardioMin} />
           <PopupNumber label="Шаги/сут факт" value={steps} min={0} max={32000} onChange={setSteps} />
@@ -1027,7 +1027,10 @@ const kbju = useMemo(()=> calcKBJU(input), [input]);
           {parsedSchedule && <div style={{ fontSize:8, color:'#22c55e', marginTop:4 }}>Распознано: {parsedSchedule.map(s=>`${s.key} ${s.hours}ч`).join(', ')} → {scheduleMetHours} MET-ч/нед → PAL +{(scheduleMetHours*0.0067).toFixed(2)} <button onClick={()=> setMetHoursPerWeek(scheduleMetHours)} className="mh-mini" style={{ marginLeft:6, padding:'8px 10px', minHeight:44, borderRadius:8, border:'1px solid rgba(34,197,94,0.18)', background:'rgba(34,197,94,0.10)', color:'#22c55e', fontSize:10, fontWeight:700, cursor:'pointer' }}>→ Применить</button></div>}
         </div>
         <div style={{ fontSize:8, color:'rgba(255,255,255,0.45)', marginTop:6, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', borderRadius:8, padding:'6px 8px' }}>
-          {metHoursPerWeek ? `MET ${metHoursPerWeek}ч/нед → честный PAL ${stepsCalc.pal.toFixed(2)} (Ainsworth) · PALpro ${palPro.toFixed(2)} (профессия ${profession} ${PROFESSION_PAL[profession]})` : 'Подсказка: 3× силовая 6 MET ×1ч =18 MET-ч/нед → +0.12 PAL. Парсер v2 понимает км и 2×, EN+RU, 60 активностей.'}
+          {metHoursPerWeek ? `MET ${metHoursPerWeek}ч/нед → честный PAL ${stepsCalc.pal.toFixed(2)} (Ainsworth) · PALpro ${palPro.toFixed(2)} (${profession === 'auto' ? `база из бытовой «${activityLevel}»` : `профессия ${profession} ${PROFESSION_PAL[profession]}`})` : 'Подсказка: 3× силовая 6 MET ×1ч =18 MET-ч/нед → +0.12 PAL. Парсер v2 понимает км и 2×, EN+RU, 60 активностей.'}
+        </div>
+        <div style={{ fontSize:8, color:'rgba(255,255,255,0.35)', marginTop:4 }}>
+          База PAL: {profession === 'auto' ? `бытовая «${activityLevel}»` : `профессия ${PROFESSION_PAL[profession]}`} — профессия и «бытовая» описывают один и тот же день, поэтому считается только одна: профессия перекрывает «бытовую». Выбери «Не указана», чтобы работать по бытовой.
         </div>
         <div style={{ fontSize:9, color:'rgba(255,255,255,0.45)', marginTop:6 }}>TDEE {stepsCalc.tdeeNat} → цель {stepsCalc.targetNat}ккал · {stepsCalc.kcalPerStep}ккал/шаг · NEAT {stepsCalc.neat} (pro {neatPro.total}) · EAT {stepsCalc.eat} · ACWR {acwr.toFixed(2)}{pregAdd ? ` · 🤰 +${pregAdd}` : ''}</div>
         {adaptiveV3 && <div style={{ fontSize:8, color: adaptiveV3.confidence==='high'?'#22c55e':'#f59e0b', background:'rgba(34,197,94,0.06)', border:'1px solid rgba(34,197,94,0.14)', borderRadius:8, padding:'6px 8px', marginTop:4 }}>Adaptive v3 EMA-28д: {adaptiveV3.tdee} [{adaptiveV3.low}–{adaptiveV3.high}] R²{adaptiveV3.r2} {adaptiveV3.confidence} · {adaptiveV3.adherence.note} · reverse-auto шаг {reverseAuto[0]?.kcal ?? '—'}</div>}
@@ -1848,7 +1851,7 @@ const kbju = useMemo(()=> calcKBJU(input), [input]);
             <div>
               <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
                 <div style={{ padding:14, borderRadius:12, background:'rgba(20,184,166,0.08)', border:'1px solid rgba(20,184,166,0.18)', textAlign:'center' }}>
-                  <div style={{ fontSize:10, color:'#14b8a6' }}>NEATpro сегодня · Levine 2002 + профессия {profession} {PROFESSION_PAL[profession]}</div>
+                  <div style={{ fontSize:10, color:'#14b8a6' }}>NEATpro сегодня · Levine 2002 + {profession === 'auto' ? `база «бытовая ${activityLevel}»` : `профессия ${profession} ${PROFESSION_PAL[profession]}`}</div>
                   <div style={{ fontSize:22, fontWeight:900, color:'#14b8a6' }}>{neatPro.total}<span style={{ fontSize:10 }}>ккал</span></div>
                   <div style={{ fontSize:9, color:'#fff' }}>база {neatPro.profession} +{neatPro.standing} стоя +{neatPro.fidget>=0?'+':''}{neatPro.fidget} fidget +{neatPro.walking} ходьба</div>
                 </div>

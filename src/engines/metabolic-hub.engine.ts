@@ -161,8 +161,11 @@ function aasMult(input: MetabolicInput, maxBoost:number){
 }
 // ——— PAL дедуп — единая точка PRO (профессия + MET + шаги) ———
 export function getEffectivePal(input: MetabolicInput): { palEff:number; palBase:number; trainAdd:number; cardioAdd:number } {
-  // PRO: профессия — честная база (FAO sedentary 1.40 / standing 1.55 / physical 1.75)
-  const profBase = (input as any).profession ? PROFESSION_PAL[(input as any).profession as ProfessionKind] : undefined;
+  // PRO: профессия — честная база (FAO sedentary 1.40 / standing 1.55 / physical 1.75).
+  // `'auto'` = «профессию не знаю» → база берётся из бытовой активности (иначе это поле
+  // было мёртвым: профессия по умолчанию стояла 'sedentary' и всегда перекрывала выбор).
+  const profName = (input as any).profession as string | undefined;
+  const profBase = profName && profName !== 'auto' ? PROFESSION_PAL[profName as ProfessionKind] : undefined;
   const palKey = ((input.activityLevel as string) ?? 'medium') as 'low'|'medium'|'high'|'very_high';
   const palBase = profBase ?? (({ low: 1.40, medium: 1.55, high: 1.75, very_high: 1.95 } as const)[palKey] ?? 1.55);
   let trainAdd: number;
@@ -190,9 +193,10 @@ export function calcPALPro(input: MetabolicInput): number {
       ? clamp(input.weeklyVolumeTons * 0.018, 0.02, 0.24)
       : palTrainingAdd(input.trainingDays);
   // computePalFromActivity не знает тонны/кардио — добавляем train/cardio той же шкалой, что getEffectivePal
+  const profKnown = (input as any).profession && (input as any).profession !== 'auto';
   const base = computePalFromActivity({
-    profession: (input as any).profession,
-    basePal: (input as any).profession ? undefined : ({ low: 1.40, medium: 1.55, high: 1.75, very_high: 1.95 } as const)[((input.activityLevel as string) ?? 'medium') as 'low'|'medium'|'high'|'very_high'] ?? 1.55,
+    profession: profKnown ? (input as any).profession : undefined,
+    basePal: profKnown ? undefined : ({ low: 1.40, medium: 1.55, high: 1.75, very_high: 1.95 } as const)[((input.activityLevel as string) ?? 'medium') as 'low'|'medium'|'high'|'very_high'] ?? 1.55,
     metHoursPerWeek: (typeof input.metHoursPerWeek === 'number' && input.metHoursPerWeek > 0) ? input.metHoursPerWeek : undefined,
     standingHours: input.standingHours,
     fidgetLevel: input.fidgetLevel,
