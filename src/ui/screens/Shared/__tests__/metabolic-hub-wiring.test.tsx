@@ -169,6 +169,17 @@ describe('MetabolicHub: ввод меняет расчёт (проводка п�
     expect(txt).toContain(localDate(ready));
   });
 
+  it('EA подписывает источник приёма: дневник или план', () => {
+    render(<MetabolicHub />);
+    expect(openMode('EA')).toContain('— план');
+    cleanup();
+    seedWeightAndDiary(14, 12);
+    render(<MetabolicHub />);
+    const txt = openMode('EA');
+    expect(txt).toContain('— дневник 2600ккал (7 дн)');
+    expect(txt).not.toContain('— план');
+  });
+
   it('finder TDEE не подставляет цель плана вместо факта еды', () => {
     seedWeightAndDiary(14, 0);
     render(<MetabolicHub />);

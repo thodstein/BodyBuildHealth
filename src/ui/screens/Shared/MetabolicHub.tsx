@@ -754,13 +754,16 @@ const kbju = useMemo(()=> calcKBJU(input), [input]);
       lastStep: measured.length >= 3 ? round1(measured[measured.length-1].hct - measured[measured.length-2].hct) : null,
     };
   }, [hctHistory]);
+  // Аудит 2026-11: EA считалась от `diaryAvgKcal ?? kbju.nat.kcal`, но подпись всегда печатала
+  // план (`kbju.nat.kcal`) — при заполненном дневнике число EA было от дневника, а подпись от плана.
+  const eaIntakeKcal = useMemo(()=> diaryAvgKcal ?? kbju.nat.kcal, [diaryAvgKcal, kbju]);
   const ea = useMemo(()=>{
-    const intake = diaryAvgKcal ?? kbju.nat.kcal;
+    const intake = eaIntakeKcal;
     // EEE — энергия упражнений В СУТКИ (движок сам делает ×0.85 net, Loucks).
     // Недельный объём (тоннаж ИЛИ сессии+кардио) считается одной функцией и делится на 7.
     const eeeDaily = Math.max(0, Math.round(weeklyEee.kcalPerWeek / 7));
     return calcEnergyAvailability({ weight, bodyFat, height: height||180, heightCm: height, lean: kbju.nat.lean, intakeKcal: intake, eeeKcal: eeeDaily, trainingDays, sex } as any);
-  }, [weight,bodyFat,height,kbju,trainingDays,weeklyVolumeTons,cardioMin, diaryAvgKcal, sex, weeklyEee]);
+  }, [weight,bodyFat,height,kbju,trainingDays,weeklyVolumeTons,cardioMin, eaIntakeKcal, sex, weeklyEee]);
   const eeeDailyKcal = useMemo(()=> Math.max(0, Math.round(weeklyEee.kcalPerWeek / 7)), [weeklyEee]);
   const lbmPres = useMemo(()=> calcLBMPreservation({ proteinGPerKg: kbju.nat.protPerKg, deficitKcal: effectiveDeficit, trainingDays, ea: ea?.ea }), [kbju, trainingDays, ea, effectiveDeficit]);
   const psmf = useMemo(()=> checkPSMFWrap(ea.ea), [ea.ea]);
@@ -1967,7 +1970,7 @@ const kbju = useMemo(()=> calcKBJU(input), [input]);
                 </div>
                 <div style={{ padding:10, borderRadius:10, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', fontSize:10, color:'#fff', lineHeight:1.5 }}>
                   <b style={{ color: ea.color }}>{ea.zone==='low'?'🔴 LEA — риск RED-S': ea.zone==='reduced'?'🟡 Граница': ea.zone==='optimal'?'🟢 Оптимально':'—'}</b><br/>{ea.note}<br/>
-                  <span style={{ fontSize:9, color:'rgba(255,255,255,0.55)' }}>Формула: (EI − EEE)/FFM. EI из дневника/КБЖУ {Math.round(kbju.nat.kcal)}ккал, EEE = {weeklyEee.note} → {eeeDailyKcal}ккал/сут × 0.85 net (Loucks). Женщинам &lt;30 — аменорея/кость, &lt;45 — внимание.</span>
+                  <span style={{ fontSize:9, color:'rgba(255,255,255,0.55)' }}>Формула: (EI − EEE)/FFM. EI {diaryAvgKcal ? `— дневник ${eaIntakeKcal}ккал (${diaryDays} дн)` : `— план ${eaIntakeKcal}ккал (дневника нет)`}, EEE = {weeklyEee.note} → {eeeDailyKcal}ккал/сут × 0.85 net (Loucks). Женщинам &lt;30 — аменорея/кость, &lt;45 — внимание.</span>
                 </div>
               </div>
               <div style={{ marginTop:8, height:10, borderRadius:20, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.06)', overflow:'hidden', display:'flex' }}>

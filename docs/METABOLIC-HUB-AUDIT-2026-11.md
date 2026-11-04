@@ -338,6 +338,14 @@ TDEE, `cut`/`bulk`-цели и One-answer считались по оценке �
 еды» (14 взвешиваний, 0 дней дневника → «Дневник пуст», нет `intake`) и «finder TDEE считает по факту
 дневника, когда он есть» (12 дней → `intake 2600`).
 
+### 1.32 Подпись EA показывала план, даже когда EA считалась по дневнику
+**Причина.** `ea` брал `intake = diaryAvgKcal ?? kbju.nat.kcal`, а строка под блоком печатала
+`EI из дневника/КБЖУ {Math.round(kbju.nat.kcal)}` — всегда план. При заполненном дневнике EA 39.8
+считалась от 2600 ккал, а подпись рядом говорила «EI … 2640» (план): проверить число было нельзя.
+**Исправление.** `eaIntakeKcal` — одна точка выбора приёма (её же использует `ea`), подпись печатает
+источник и объём: `EI — дневник 2600ккал (7 дн)` или `EI — план 2640ккал (дневника нет)`.
+**Регрессия.** `metabolic-hub-wiring.test.tsx` → «EA подписывает источник приёма: дневник или план».
+
 ---
 
 ## 2. Чего не хватало (добавлено)
@@ -387,7 +395,7 @@ TDEE, `cut`/`bulk`-цели и One-answer считались по оценке �
   параллельные `tsc`/`vitest` из других сессий → heap OOM / `Zone Allocation failed`.
   Прогонять на свободной машине.
 - `npx vitest run src/ui/screens/Shared/__tests__ src/engines/__tests__/metabolic-hub.test.ts`
-  — **211 passed** (6 файлов: structure / toggles / honesty / modes / wiring / engine).
+  — **212 passed** (6 файлов: structure / toggles / honesty / modes / wiring / engine).
 - `npx vitest run src/ui/__tests__/rest-hooks-native.test.tsx
   src/engines/__tests__/risk-info-honesty-e07-e08.test.ts` — **89 passed**
   (в stderr шумит jsdom-canvas chart.js — это фон, не падения).
