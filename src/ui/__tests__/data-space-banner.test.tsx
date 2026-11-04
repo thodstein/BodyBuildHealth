@@ -15,6 +15,7 @@ import {
   _resetDataSpaceCache,
   activateAthleteSpace,
   activateHomeSpace,
+  athleteSpaceId,
   emptyRegistry,
   readRegistryFromStorage,
   writeRegistryToStorage,
@@ -86,5 +87,34 @@ describe('полоса пространства данных', () => {
     cleanup();
     const { container } = render(<DataSpaceBanner />);
     expect(container.querySelector('[data-space="banner"]')).toBeNull();
+  });
+
+  it('можно перейти сразу к другому атлету, не возвращаясь в home', () => {
+    activateAthleteSpace('a1', 'Иван');
+    activateAthleteSpace('a2', 'Пётр');
+    _resetDataSpaceCache();
+    const { reload, restore } = stubReload();
+    try {
+      const { container } = render(<DataSpaceBanner />);
+      // в полосе показан текущий, а в списке — остальные
+      expect(container.querySelector('[data-space="banner"]')?.textContent).toContain('Пётр');
+      fireEvent.click(container.querySelector('[data-space="switch"]') as HTMLElement);
+      const target = container.querySelector(
+        `[data-space="switch-to"][data-space-id="${athleteSpaceId('a1')}"]`,
+      ) as HTMLElement;
+      expect(target).toBeTruthy();
+      fireEvent.click(target);
+      expect(reload).toHaveBeenCalledTimes(1);
+      expect(readRegistryFromStorage().active).toBe(athleteSpaceId('a1'));
+    } finally {
+      restore();
+    }
+  });
+
+  it('если пространств только одно — предлагать «Сменить» нечего', () => {
+    activateAthleteSpace('a1', 'Иван');
+    _resetDataSpaceCache();
+    const { container } = render(<DataSpaceBanner />);
+    expect(container.querySelector('[data-space="switch"]')).toBeNull();
   });
 });

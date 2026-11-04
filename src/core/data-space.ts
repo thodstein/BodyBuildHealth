@@ -791,6 +791,22 @@ export function activateHomeSpace(): void {
   writeRegistryToStorage(setActiveSpace(reg, HOME_SPACE_ID));
 }
 
+/**
+ * Переключиться на ЛЮБОЕ известное пространство по id (в т.ч. с атлета на атлета).
+ * Неизвестный id — не ошибка приложения, а отказ: остаёмся где были.
+ */
+export function activateSpaceById(spaceId: string): { id: string | null; error: 'unknown' | null } {
+  const reg = readRegistryFromStorage();
+  if (spaceId === HOME_SPACE_ID) {
+    writeRegistryToStorage(setActiveSpace(reg, HOME_SPACE_ID));
+    return { id: HOME_SPACE_ID, error: null };
+  }
+  const known = reg.spaces.some(s => s.id === spaceId);
+  if (!known) return { id: null, error: 'unknown' };
+  writeRegistryToStorage(setActiveSpace(reg, spaceId));
+  return { id: spaceId, error: null };
+}
+
 /** Единственное место, где мы перезагружаем приложение после смены пространства. */
 export function reloadToApplySpace(): void {
   try {
