@@ -169,6 +169,21 @@ describe('MetabolicHub: ввод меняет расчёт (проводка п�
     expect(txt).toContain(localDate(ready));
   });
 
+  it('прогноз после донации не считается измерением в истории HCT', () => {
+    localStorage.setItem('he_hct_history_v1', JSON.stringify([
+      { date: '2026-10-01', hct: 50 },
+      { date: '2026-10-10', hct: 54 },
+      { date: '2026-10-17', hct: 50, est: true },
+    ]));
+    render(<MetabolicHub />);
+    const txt = openMode('Кровь');
+    expect(txt).toContain('2 измерений');
+    expect(txt).toContain('+ 1 прогноз');
+    // Δ считается по лабораторным точкам (50 → 54), а не по прогнозной 50%
+    expect(txt).toContain('Δ +4%');
+    expect(document.querySelectorAll('[title*="прогноз"]').length).toBeGreaterThan(0);
+  });
+
   it('донация 10 недель назад уже не блокирует совет', () => {
     seedDonation(70);
     render(<MetabolicHub />);

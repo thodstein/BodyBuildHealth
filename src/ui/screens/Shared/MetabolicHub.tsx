@@ -164,6 +164,15 @@ const SWEAT_PROFILES_KEY = 'he_sweat_profiles_v1';
 
 type HctPoint = { date: string; hct: number; est?: boolean };
 
+/**
+ * Локальная дата `YYYY-MM-DD`.
+ * `new Date().toISOString().slice(0,10)` — это UTC: в Москве (UTC+3) любое действие до 03:00
+ * записывалось «вчерашним» числом, вплоть до замеров HCT и донаций.
+ */
+function localISODate(d: Date = new Date()): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
 /** 4 шага мастера ввода: одно место для полей, результаты — под селектором. */
 const STEP_DEFS: Array<{ n: 1 | 2 | 3 | 4; title: string; icon: string; hint: string }> = [
   { n: 1, title: 'Тело', icon: '🧍', hint: 'вес · рост · % жира · замеры' },
@@ -393,13 +402,13 @@ export const MetabolicHub: React.FC = () => {
   },[setHctHistory]);
   const recordHct = useCallback(()=>{
     if(hct==null || hct<30 || hct>70) { showToast('HCT не задан'); return; }
-    const entry: HctPoint = { date: new Date().toISOString().slice(0,10), hct };
+    const entry: HctPoint = { date: localISODate(), hct };
     pushHct([entry]);
     showToast(`HCT ${hct}% записан на ${entry.date}`);
   }, [hct, showToast, pushHct]);
   const recordDonation = useCallback(()=>{
     if(hct==null) { showToast('Сначала укажи HCT'); return; }
-    const today = new Date().toISOString().slice(0,10);
+    const today = localISODate();
     const entry: HctPoint = { date: today, hct };
     try{
       const raw = localStorage.getItem(DONATION_LOG_KEY);
@@ -410,7 +419,7 @@ export const MetabolicHub: React.FC = () => {
       // Флеботомия 450 мл (ASA): HCT падает ~4 пп, восстанавливается 3-4 нед.
       // Пишем прогноз отдельной точкой с est:true — это не измерение.
       const d = new Date(); d.setDate(d.getDate() + 7);
-      const est: HctPoint = { date: d.toISOString().slice(0,10), hct: Math.max(30, Math.round((hct-4)*10)/10), est: true };
+      const est: HctPoint = { date: localISODate(d), hct: Math.max(30, Math.round((hct-4)*10)/10), est: true };
       pushHct([entry, est]);
       showToast(`Донация ${today} записана · HCT ${hct}% → прогноз ~${est.hct}% через 7д`);
     }catch{ showToast('Донация записана'); }
@@ -730,9 +739,21 @@ const kbju = useMemo(()=> calcKBJU(input), [input]);
     const MIN_DAYS = 56;
     // local-дата: toISOString() в зонах восточнее UTC даёт вчерашний день
     const ready = new Date(lastT); ready.setDate(ready.getDate() + MIN_DAYS);
-    const readyOn = `${ready.getFullYear()}-${String(ready.getMonth()+1).padStart(2,'0')}-${String(ready.getDate()).padStart(2,'0')}`;
+    const readyOn = localISODate(ready);
     return { lastDate, days, minDays: MIN_DAYS, readyOn, blocked: days < MIN_DAYS };
   }, [hematology, donationLog]);
+  // Аудит 2026-11: точка «прогноз через 7 дней» (est:true после донации) рисовалась как измерение
+  // и попадала в Δ за период. Считаем Δ/шаг только по лабораторным точкам, прогноз подписываем.
+  const hctStats = useMemo(()=>{
+    const measured = hctHistory.filter(p=>!p.est);
+    const round1 = (n: number) => Math.round(n*10)/10;
+    return {
+      measured: measured.length,
+      forecast: hctHistory.length - measured.length,
+      delta: measured.length >= 2 ? round1(measured[measured.length-1].hct - measured[0].hct) : null,
+      lastStep: measured.length >= 3 ? round1(measured[measured.length-1].hct - measured[measured.length-2].hct) : null,
+    };
+  }, [hctHistory]);
   const ea = useMemo(()=>{
     const intake = diaryAvgKcal ?? kbju.nat.kcal;
     // EEE — энергия упражнений В СУТКИ (движок сам делает ×0.85 net, Loucks).
@@ -1464,11 +1485,14 @@ const kbju = useMemo(()=> calcKBJU(input), [input]);
           <div style={{ marginTop:6, display:'flex', gap:4, alignItems:'end', flexWrap:'wrap' }}>
             {hctHistory.slice(-12).map((p,i)=>(
               <div key={i} style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:2 }}>
-                <div style={{ width:22, height: Math.max(6, Math.min(42, (p.hct-36)*1.6)), borderRadius:4, background: p.hct>54 ? '#ef4444' : p.hct>51 ? '#f59e0b' : p.hct>=48 ? '#eab308' : '#22c55e', border:'1px solid rgba(255,255,255,0.08)' }} title={`${p.date} ${p.hct}%`} />
-                <span style={{ fontSize:7, color:'rgba(255,255,255,0.35)' }}>{p.date.slice(5)}</span>
+                <div style={{ width:22, height: Math.max(6, Math.min(42, (p.hct-36)*1.6)), borderRadius:4, opacity: p.est ? 0.45 : 1, background: p.hct>54 ? '#ef4444' : p.hct>51 ? '#f59e0b' : p.hct>=48 ? '#eab308' : '#22c55e', border: p.est ? '1px dashed rgba(255,255,255,0.55)' : '1px solid rgba(255,255,255,0.08)', boxSizing:'border-box' }} title={`${p.date} ${p.hct}%${p.est ? ' — прогноз, не измерение' : ''}`} />
+                <span style={{ fontSize:7, color:'rgba(255,255,255,0.35)' }}>{p.est ? '~' : ''}{p.date.slice(5)}</span>
               </div>
             ))}
-            <span style={{ fontSize:8, color:'rgba(255,255,255,0.45)', marginLeft:4 }}>{hctHistory.length} записей · тренд {hctHistory.length>=2 ? `${(hctHistory[hctHistory.length-1].hct - hctHistory[0].hct).toFixed(1)}%` : ''}</span>
+            <span style={{ fontSize:8, color:'rgba(255,255,255,0.45)', marginLeft:4 }}>
+              {hctStats.measured} измерений{hctStats.forecast>0 ? ` + ${hctStats.forecast} прогноз` : ''}
+              {hctStats.delta!=null ? ` · Δ ${hctStats.delta>0?'+':''}${hctStats.delta}%` : ''}
+            </span>
             {donationLog.length>0 && <span style={{ fontSize:8, color:'#ef4444', background:'rgba(239,68,68,0.08)', border:'1px solid rgba(239,68,68,0.12)', borderRadius:6, padding:'2px 6px' }}>🩸 донаций {donationLog.length} · посл. {donationLog[donationLog.length-1].date}</span>}
           </div>
         )}
@@ -1869,12 +1893,16 @@ const kbju = useMemo(()=> calcKBJU(input), [input]);
               <div style={{ display:'flex', justifyContent:'space-between', fontSize:7, color:'rgba(255,255,255,0.45)', marginTop:2 }}><span>36</span><span>48 норма</span><span>51</span><span>54 стоп</span><span>62</span></div>
               {hctHistory.length>=2 && (
                 <div style={{ marginTop:8, padding:'8px 10px', borderRadius:8, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)' }}>
-                  <div style={{ fontSize:9, fontWeight:700, color:'rgba(255,255,255,0.55)', textTransform:'uppercase', letterSpacing:0.3, marginBottom:6 }}>История HCT · {hctHistory.length} точек · Δ {((hctHistory[hctHistory.length-1].hct - hctHistory[0].hct)).toFixed(1)}% {hctHistory.length>=3 ? `· тренд ${((hctHistory[hctHistory.length-1].hct - hctHistory[hctHistory.length-2].hct)).toFixed(1)}%/посл.` : ''}</div>
+                  <div style={{ fontSize:9, fontWeight:700, color:'rgba(255,255,255,0.55)', textTransform:'uppercase', letterSpacing:0.3, marginBottom:6 }}>
+                    История HCT · {hctStats.measured} измерений{hctStats.forecast>0 ? ` + ${hctStats.forecast} прогноз` : ''}
+                    {hctStats.delta!=null ? ` · Δ ${hctStats.delta>0?'+':''}${hctStats.delta}%` : ''}
+                    {hctStats.lastStep!=null ? ` · посл. шаг ${hctStats.lastStep>0?'+':''}${hctStats.lastStep}%` : ''}
+                  </div>
                   <div style={{ display:'flex', gap:3, alignItems:'end', height:36 }}>
                     {hctHistory.slice(-14).map((p,i)=>(
                       <div key={i} style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', gap:2 }}>
-                        <div style={{ width:'100%', height: Math.max(4, Math.min(32, (p.hct-36)*1.25)), borderRadius:3, background: p.hct>54 ? '#ef4444' : p.hct>51 ? '#f59e0b' : p.hct>=48 ? '#eab308' : '#22c55e' }} title={`${p.date} ${p.hct}%`} />
-                        <span style={{ fontSize:6, color:'rgba(255,255,255,0.35)' }}>{p.date.slice(5).replace('-','/')}</span>
+                        <div style={{ width:'100%', height: Math.max(4, Math.min(32, (p.hct-36)*1.25)), borderRadius:3, opacity: p.est ? 0.45 : 1, border: p.est ? '1px dashed rgba(255,255,255,0.55)' : 'none', boxSizing:'border-box', background: p.hct>54 ? '#ef4444' : p.hct>51 ? '#f59e0b' : p.hct>=48 ? '#eab308' : '#22c55e' }} title={`${p.date} ${p.hct}%${p.est ? ' — прогноз, не измерение' : ''}`} />
+                        <span style={{ fontSize:6, color:'rgba(255,255,255,0.35)' }}>{p.est ? '~' : ''}{p.date.slice(5).replace('-','/')}</span>
                       </div>
                     ))}
                   </div>
@@ -1919,7 +1947,7 @@ const kbju = useMemo(()=> calcKBJU(input), [input]);
                 }} className="mh-act" style={{ flex:1, padding:'10px', minHeight:44, borderRadius:10, border:'1px solid rgba(255,255,255,0.08)', background:'rgba(255,255,255,0.03)', color:'#fff', fontWeight:700, fontSize:11, cursor:'pointer' }}>🖨 Печать / PDF</button>
                 <button onClick={()=>{
                   try{
-                    const data={ date: new Date().toISOString().slice(0,10), weight, sex, onAAS, aasDose, hct: hematology.hct, hgb: hematology.hgbEstimated, gfr, ferritin, waterTargetMl: hematology.waterTargetMl, ironRec: hematology.ironRec, donation: hematology.donation, zone: hematology.zone, recommendations: hematology.recommendations, nutritionMult: hematology.nutritionMult };
+                    const data={ date: localISODate(), weight, sex, onAAS, aasDose, hct: hematology.hct, hgb: hematology.hgbEstimated, gfr, ferritin, waterTargetMl: hematology.waterTargetMl, ironRec: hematology.ironRec, donation: hematology.donation, zone: hematology.zone, recommendations: hematology.recommendations, nutritionMult: hematology.nutritionMult };
                     void downloadCoachFile(JSON.stringify(data,null,2), `hematology-${data.date}.json`).then(ok => showToast(ok ? 'JSON экспортирован' : 'Экспорт'));
                   }catch{ showToast('Экспорт'); }
                 }} className="mh-act" style={{ padding:'10px', minHeight:44, borderRadius:10, border:'1px solid rgba(255,255,255,0.08)', background:'rgba(255,255,255,0.03)', color:'#fff', fontWeight:700, fontSize:11, cursor:'pointer' }}>⬇ JSON</button>
