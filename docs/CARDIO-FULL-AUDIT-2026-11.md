@@ -357,9 +357,12 @@
 
 ### Проверка
 
-- `npm run type-check` — 0 ошибок.
-- `npx vitest run cardio` — 58 файлов, 1037 тестов, все зелёные; `src/core` — 507;
-  `TrainingScreen_parts` — 1915; `ProfileScreen_v2` — 463; `native-back-interceptors` — 3.
+- `npm run type-check` — 0 ошибок (в кардио-файлах и добавленном читателе питания;
+  единственная ошибка рабочего дерева на момент проверки — чужая незакоммиченная
+  правка `meal-plan-engine.ts`, к кардио не относится).
+- `npx vitest run cardio` — 59 файлов, 1046 тестов, все зелёные; `src/core` — 507;
+  `TrainingScreen_parts` — 1915; `ProfileScreen_v2` — 463; `native-back-interceptors` — 3;
+  `cardio-kcal-note` — 5.
 - `npm run verify:apk-design` — OK (гейт проверен «пробным» файлом: 3 нарушения ловятся).
 
 ## 10. АПК-доводка направления (ноябрь 2026, второй проход)
@@ -385,7 +388,8 @@
 
 ### Гейты, которые не дают откатиться
 
-`npm run verify:apk-design` теперь сканирует **все** `Cardio*.tsx` + `CardioDiary.tsx`:
+`npm run verify:apk-design` теперь сканирует **все** `Cardio*.tsx` + `CardioDiary.tsx`
++ читатель питания `CardioKcalNote.tsx`:
 
 - запрещено: `a.download`, `window.open(`, `window.print(`, `<select>`, `type="checkbox"`,
   `navigator.clipboard.writeText`, `window.confirm(`;
@@ -395,8 +399,10 @@
   `assembleInput`, `useConfirmDialog`, `importCardioEntries`, `replaceCardioLog([])`.
 
 Плюс unit-тесты: `src/core/__tests__/native-back-interceptors.test.ts` (порядок LIFO,
-перехват не доходит до глобального обработчика) и совместимость контракта
-«кардио → питание» со старой записью (`avgKcalPerWeek` → `weeklyKcal`).
+перехват не доходит до глобального обработчика), совместимость контракта
+«кардио → питание» со старой записью (`avgKcalPerWeek` → `weeklyKcal`) и блок
+`CardioKcalNote` (`cardio-kcal-note.test.tsx`): без контракта не рисуется, показывает
+уверенность, честно говорит про PAL и перечитывает данные по «↻».
 
 ### Что в APK всё ещё ограничено (честно)
 
