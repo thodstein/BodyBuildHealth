@@ -1520,7 +1520,7 @@ const kbju = useMemo(()=> calcKBJU(input), [input]);
                   <MhBar v={stepsCalc.eat} max={stepsCalc.tdeeNat} color="#f59e0b" label={`EAT ${stepsCalc.eat}`} />
                   <MhBar v={stepsCalc.tefNat} max={stepsCalc.tdeeNat} color="#a78bfa" label={`TEF ${stepsCalc.tefNat}`} />
                 </div>
-                <div style={{ fontSize:8, color:'rgba(255,255,255,0.45)', marginTop:4, lineHeight:1.3 }}>TDEE {stepsCalc.tdeeNat}= BMR{stepsCalc.bmr}+NEAT{stepsCalc.neat}+EAT{stepsCalc.eat}+TEF{stepsCalc.tefNat} (TEF ~10% уже внутри PAL, показан для наглядности · EAT = train+cardio)</div>
+                <div style={{ fontSize:8, color:'rgba(255,255,255,0.45)', marginTop:4, lineHeight:1.3 }}>TDEE {stepsCalc.tdeeNat} ≈ BMR {stepsCalc.bmr} + NEAT {stepsCalc.neat} + EAT {stepsCalc.eat} = {stepsCalc.bmr + stepsCalc.neat + stepsCalc.eat} (Δ{stepsCalc.bmr + stepsCalc.neat + stepsCalc.eat - stepsCalc.tdeeNat} — округление NEAT) · EAT = train+cardio · TEF {stepsCalc.tefNat} ~10% уже внутри PAL и в сумму не входит</div>
               </div>
               {adaptiveV3 ? (
                 <div style={{ marginTop:8, padding:'8px 10px', borderRadius:8, background:'rgba(34,197,94,0.08)', border:'1px solid rgba(34,197,94,0.18)', fontSize:10, color:'#fff', lineHeight:1.4 }}>

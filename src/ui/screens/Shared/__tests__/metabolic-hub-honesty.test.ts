@@ -107,5 +107,8 @@ describe('хаб «Метаболизм» — честность подписе�
     expect(src).toMatch(/<MhBar v=\{kbju\.bmr\} max=\{stepsCalc\.tdeeNat\}/);
     // и явно сказано, что TEF в сумму не входит
     expect(src).toMatch(/в сумму выше не входит/);
+    // тот же дефект был в режиме «Шаги»: сумма частей + TEF как равенство
+    expect(src).not.toMatch(/TDEE \{stepsCalc\.tdeeNat\}= BMR\{stepsCalc\.bmr\}\+NEAT/);
+    expect(src).toMatch(/TEF \{stepsCalc\.tefNat\} ~10% уже внутри PAL и в сумму не входит/);
   });
 });
