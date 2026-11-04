@@ -315,6 +315,8 @@ export const MetabolicHub: React.FC = () => {
   const manualLabsRef = useRef<Record<string, boolean>>({});
   /** Пользователь уже трогал вес «до/после» в пот-тесте — тогда не подставляем текущий вес. */
   const sweatTouchedRef = useRef(false);
+  /** `% жира` введён вручную в этом хабе — он главнее калипера; иначе главнее замер. */
+  const bodyFatTouchedRef = useRef(false);
 
   // ACWR live — слушаем srpe-store + polling
   const [acwr, setAcwr] = useState(1);
@@ -689,7 +691,35 @@ export const MetabolicHub: React.FC = () => {
   /** Единая точка EEE (тоннаж ИЛИ сессии+кардио) — в EA уходит суточная доля. */
   const weeklyEee = useMemo(()=> weeklyExerciseEnergy({ weeklyVolumeTons, trainingDays, cardioMin }), [weeklyVolumeTons, trainingDays, cardioMin]);
 
-  const input: MetabolicInput = useMemo(()=> ({ weight,height,age,sex,bodyFat,neck,waist,hip,steps,cardioMin,trainingDays,trainingHours: trainingDays*1.15, activityLevel: activityLevel as any, profession, goal, onAAS, aasDose, stress, sleepHours, sleepQuality, acwr, climate, humidity, standingHours, fidgetLevel, sweatRate: effectiveSweatMlPerH, sweatSodiumMgPerL: effectiveSweatNaMgPerL, weightHistory: weightHistory.length>=3 ? weightHistory : undefined, hct, hgb, ferritin, gfr, waterL, ironIntakeMg: undefined, alcoholG, alcoholDaysPerWeek: alcoholDays, caffeineMg, tsh, ft4, creatineUse, weeklyVolumeTons, menstrualPhase, targetWeight, fiberG, omega3G, skinfoldSum3, skinfoldSum4, biaResistanceOhm: biaResistance, glucoseMgDl, insulinMuMl, deficitKcal, weeksInDeficit, metHoursPerWeek, measuredRMR, leafScore, boneFlag, menstrualFlag, hdlMgDl, systolic, diastolic, ast, alt, plt, caffeineHoursSince, trimester: trimester || undefined, lactating: lactating === 'none' ? undefined : lactating, ethnicity, postBariatric, untreatedHypothyroid: untreatedHypo || undefined, acclimated, proteinSource } as any), [weight,height,age,sex,bodyFat,neck,waist,hip,steps,cardioMin,trainingDays,activityLevel,profession,goal,onAAS,aasDose,stress,sleepHours,sleepQuality,acwr,climate,humidity,standingHours,fidgetLevel,effectiveSweatMlPerH,effectiveSweatNaMgPerL,weightHistory,hct,hgb,ferritin,gfr,waterL,alcoholG,alcoholDays,caffeineMg,tsh,ft4,glucoseMgDl,insulinMuMl,skinfoldSum3,skinfoldSum4,biaResistance,deficitKcal,weeksInDeficit,creatineUse,weeklyVolumeTons,menstrualPhase,targetWeight,fiberG,omega3G,metHoursPerWeek,measuredRMR,leafScore,boneFlag,menstrualFlag,hdlMgDl,systolic,diastolic,ast,alt,plt,caffeineHoursSince,trimester,lactating,ethnicity,postBariatric,untreatedHypo,acclimated,proteinSource]);
+  /**
+   * Аудит 2026-11: замеры % жира (JP3/JP7/Durnin/BIA/Navy) считались и показывались в плитке,
+   * а в BMR/TDEE/EA уходил только РУЧНОЙ `% жира`. Без него движок оценивал LBM по Deurenberg —
+   * плитка говорила 18%, а Katch-McArdle считался от ~24%: расклад TDEE не соответствовал цифре
+   * на экране, и замер калипером «не работал».
+   * `measuredBf` считается ДО `input` (без цикла input → fat → input) и содержит только измерения.
+   */
+  const measuredBf = useMemo(()=>{
+    try{
+      const r = calcBodyFat({ weight, height, age, sex, neck, waist, hip, skinfoldSum3, skinfoldSum4, biaResistanceOhm: biaResistance } as any);
+      return { direct: r.measured ?? undefined, navy: r.navy ?? undefined };
+    }catch{ return { direct: undefined as number|undefined, navy: undefined as number|undefined }; }
+  }, [weight, height, age, sex, neck, waist, hip, skinfoldSum3, skinfoldSum4, biaResistance]);
+  /**
+   * Приоритет % жира: ручной ввод в хабе (DEXA — точнее калипера) → калипер/Durnin/BIA →
+   * значение из профиля → Navy (обхваты, оценка) → Deurenberg (в движке).
+   * Раньше дефолтные 15 % из профиля молча перебивали калипер, и Katch считался не от той цифры.
+   */
+  const bfForCalc = bodyFatTouchedRef.current
+    ? (bodyFat ?? measuredBf.direct ?? measuredBf.navy)
+    : (measuredBf.direct ?? bodyFat ?? measuredBf.navy);
+  const bfSource = bodyFatTouchedRef.current && bodyFat != null
+    ? 'ручной ввод'
+    : measuredBf.direct != null ? `замер ${Number(measuredBf.direct.toFixed(1))}%`
+    : bodyFat != null ? 'профиль'
+    : measuredBf.navy != null ? `Navy ${Number(measuredBf.navy.toFixed(1))}%`
+    : 'Deurenberg';
+
+  const input: MetabolicInput = useMemo(()=> ({ weight,height,age,sex,bodyFat: bfForCalc,neck,waist,hip,steps,cardioMin,trainingDays,trainingHours: trainingDays*1.15, activityLevel: activityLevel as any, profession, goal, onAAS, aasDose, stress, sleepHours, sleepQuality, acwr, climate, humidity, standingHours, fidgetLevel, sweatRate: effectiveSweatMlPerH, sweatSodiumMgPerL: effectiveSweatNaMgPerL, weightHistory: weightHistory.length>=3 ? weightHistory : undefined, hct, hgb, ferritin, gfr, waterL, ironIntakeMg: undefined, alcoholG, alcoholDaysPerWeek: alcoholDays, caffeineMg, tsh, ft4, creatineUse, weeklyVolumeTons, menstrualPhase, targetWeight, fiberG, omega3G, skinfoldSum3, skinfoldSum4, biaResistanceOhm: biaResistance, glucoseMgDl, insulinMuMl, deficitKcal, weeksInDeficit, metHoursPerWeek, measuredRMR, leafScore, boneFlag, menstrualFlag, hdlMgDl, systolic, diastolic, ast, alt, plt, caffeineHoursSince, trimester: trimester || undefined, lactating: lactating === 'none' ? undefined : lactating, ethnicity, postBariatric, untreatedHypothyroid: untreatedHypo || undefined, acclimated, proteinSource } as any), [weight,height,age,sex,bfForCalc,neck,waist,hip,steps,cardioMin,trainingDays,activityLevel,profession,goal,onAAS,aasDose,stress,sleepHours,sleepQuality,acwr,climate,humidity,standingHours,fidgetLevel,effectiveSweatMlPerH,effectiveSweatNaMgPerL,weightHistory,hct,hgb,ferritin,gfr,waterL,alcoholG,alcoholDays,caffeineMg,tsh,ft4,glucoseMgDl,insulinMuMl,skinfoldSum3,skinfoldSum4,biaResistance,deficitKcal,weeksInDeficit,creatineUse,weeklyVolumeTons,menstrualPhase,targetWeight,fiberG,omega3G,metHoursPerWeek,measuredRMR,leafScore,boneFlag,menstrualFlag,hdlMgDl,systolic,diastolic,ast,alt,plt,caffeineHoursSince,trimester,lactating,ethnicity,postBariatric,untreatedHypo,acclimated,proteinSource]);
 
   const water = useMemo(()=> calcWater(input), [input]);
 const stepsCalc = useMemo(()=> calcSteps(input), [input]);
@@ -704,7 +734,7 @@ const kbju = useMemo(()=> calcKBJU(input), [input]);
     [deficitKcal, stepsCalc, kbju],
   );
   // NEAT — единая точка PRO: neatPro (профессия), v1 calcNEAT удалён из UI
-  const at = useMemo(()=> calcAdaptiveThermogenesis({ weight, height, age, sex, bodyFat, deficitKcal: effectiveDeficit, weeksInDeficit, weightLostKg }), [weight,height,age,sex,bodyFat,effectiveDeficit,weeksInDeficit,weightLostKg]);
+  const at = useMemo(()=> calcAdaptiveThermogenesis({ weight, height, age, sex, bodyFat: bfForCalc, deficitKcal: effectiveDeficit, weeksInDeficit, weightLostKg }), [weight,height,age,sex,bfForCalc,effectiveDeficit,weeksInDeficit,weightLostKg]);
   // reverse — единая точка PRO: reverseAuto (шаг по trend), v1 calcReverseDiet удалён из UI (движок оставлен для совместимости)
   const thyroid = useMemo(()=> calcThyroidImpact(ft4, tsh), [ft4,tsh]);
   const homa = useMemo(()=> calcHomaIRWrap(glucoseMgDl, insulinMuMl), [glucoseMgDl, insulinMuMl]);
@@ -765,8 +795,8 @@ const kbju = useMemo(()=> calcKBJU(input), [input]);
     // EEE — энергия упражнений В СУТКИ (движок сам делает ×0.85 net, Loucks).
     // Недельный объём (тоннаж ИЛИ сессии+кардио) считается одной функцией и делится на 7.
     const eeeDaily = Math.max(0, Math.round(weeklyEee.kcalPerWeek / 7));
-    return calcEnergyAvailability({ weight, bodyFat, height: height||180, heightCm: height, lean: kbju.nat.lean, intakeKcal: intake, eeeKcal: eeeDaily, trainingDays, sex } as any);
-  }, [weight,bodyFat,height,kbju,trainingDays,weeklyVolumeTons,cardioMin, eaIntakeKcal, sex, weeklyEee]);
+    return calcEnergyAvailability({ weight, bodyFat: bfForCalc, height: height||180, heightCm: height, lean: kbju.nat.lean, intakeKcal: intake, eeeKcal: eeeDaily, trainingDays, sex } as any);
+  }, [weight,bfForCalc,height,kbju,trainingDays,weeklyVolumeTons,cardioMin, eaIntakeKcal, sex, weeklyEee]);
   const eeeDailyKcal = useMemo(()=> Math.max(0, Math.round(weeklyEee.kcalPerWeek / 7)), [weeklyEee]);
   const lbmPres = useMemo(()=> calcLBMPreservation({ proteinGPerKg: kbju.nat.protPerKg, deficitKcal: effectiveDeficit, trainingDays, ea: ea?.ea }), [kbju, trainingDays, ea, effectiveDeficit]);
   const psmf = useMemo(()=> checkPSMFWrap(ea.ea), [ea.ea]);
@@ -777,8 +807,8 @@ const kbju = useMemo(()=> calcKBJU(input), [input]);
     // Аудит 2026-11: раньше при пустом дневнике сюда подставлялась цель КБЖУ (`kbju.nat.kcal`)
     // и finder печатал «intake 2450» как измеренный факт. Вес знает, сколько съедено, только из
     // дневника — без него карточка должна просить данные, а не считать TDEE по собственному плану.
-    return calcMaintenanceFinder(weightHistory, diaryAvgKcal, bodyFat);
-  }, [weightHistory, diaryAvgKcal, bodyFat]);
+    return calcMaintenanceFinder(weightHistory, diaryAvgKcal, bfForCalc);
+  }, [weightHistory, diaryAvgKcal, bfForCalc]);
   // цель — единая точка PRO: goalV2 (Helms caps + diet-break), v1 calcGoalTimeline удалён из UI
   const leafCalc = useMemo(()=> calcLeafScore(leafAnswers), [leafAnswers]);
   // адаптив — единая точка PRO: adaptiveV3 (EMA-28д), v1 calcAdaptiveTDEE удалён из UI
@@ -793,7 +823,7 @@ const kbju = useMemo(()=> calcKBJU(input), [input]);
   const apri = useMemo(()=> calcAPRI(ast, plt), [ast, plt]);
   const quicki = useMemo(()=> calcQUICKI(glucoseMgDl, insulinMuMl), [glucoseMgDl, insulinMuMl]);
   const caffeineCurve = useMemo(()=> calcCaffeineCurve(caffeineMg, caffeineHoursSince, weight), [caffeineMg, caffeineHoursSince, weight]);
-  const refeedNeed = useMemo(()=> calcRefeedNeed(weeksInDeficit ?? 0, bodyFat, ea?.ea ?? null), [weeksInDeficit, bodyFat, ea]);
+  const refeedNeed = useMemo(()=> calcRefeedNeed(weeksInDeficit ?? 0, bfForCalc, ea?.ea ?? null), [weeksInDeficit, bfForCalc, ea]);
   const carbLoad = useMemo(()=> calcCarbLoading(weight, carbLoadDays, carbGPerKg), [weight, carbLoadDays, carbGPerKg]);
   const sodiumLoad = useMemo(()=> calcSodiumLoading(weight, sodiumLoadDays, sodiumGPerDay), [weight, sodiumLoadDays, sodiumGPerDay]);
   const bodyCompProj = useMemo(()=> calcBodyCompProjection({ weight, height, bodyFat: bodyFat ?? fat.current, years: projectionYears, mode: projectionMode }), [weight,height,bodyFat,fat,projectionYears,projectionMode]);
@@ -804,8 +834,8 @@ const kbju = useMemo(()=> calcKBJU(input), [input]);
   const adaptiveV3 = useMemo(()=>{
     if(!weightHistory || weightHistory.length<7 || !diaryAvgKcal) return null;
     // intakeHistory 28д — date-join внутри движка; гейт плотности по длине серии (окно v3), не по 7д
-    return calcAdaptiveTDEEv3({ weightHistory, avgIntakeKcal: diaryAvgKcal, bodyFatPct: bodyFat, goal, logDays: intakeSeries.length, intakeHistory: intakeSeries.length>=5 ? intakeSeries : undefined });
-  }, [weightHistory, diaryAvgKcal, bodyFat, goal, intakeSeries]);
+    return calcAdaptiveTDEEv3({ weightHistory, avgIntakeKcal: diaryAvgKcal, bodyFatPct: bfForCalc, goal, logDays: intakeSeries.length, intakeHistory: intakeSeries.length>=5 ? intakeSeries : undefined });
+  }, [weightHistory, diaryAvgKcal, bfForCalc, goal, intakeSeries]);
   const leamCalc = useMemo(()=> calcLeamScore(leamAnswers), [leamAnswers]);
   const cat2 = useMemo(()=>{
     const rmrRatio = measuredRMR && kbju.nat.bmr ? measuredRMR/kbju.nat.bmr : undefined;
@@ -829,7 +859,7 @@ const kbju = useMemo(()=> calcKBJU(input), [input]);
     const trend = adaptiveV3?.trend ?? 0;
     return calcReverseDietAuto(curKcal, targetKcal, trend);
   }, [diaryAvgKcal, kbju, adaptiveV3, stepsCalc]);
-  const goalV2 = useMemo(()=> targetWeight ? calcGoalTimelineV2({ weight, targetWeight, tdee: stepsCalc.tdeeNat, bodyFat, withDietBreaks: true }) : null, [weight, targetWeight, stepsCalc, bodyFat]);
+  const goalV2 = useMemo(()=> targetWeight ? calcGoalTimelineV2({ weight, targetWeight, tdee: stepsCalc.tdeeNat, bodyFat: bfForCalc, withDietBreaks: true }) : null, [weight, targetWeight, stepsCalc, bfForCalc]);
   const dietBreakPlan = useMemo(()=> {
     if(!targetWeight || !goalV2) return null;
     const weeksTotal = Math.max(4, goalV2.days/7);
@@ -864,9 +894,9 @@ const kbju = useMemo(()=> calcKBJU(input), [input]);
     if (!targetWeight || !weeksToGoal) return null;
     return calcDeadlineFeasibility({
       weight, targetWeight, weeks: weeksToGoal,
-      tdee: stepsCalc.tdeeNat, plannedKcal: onAAS ? kbju.aas.kcal : kbju.nat.kcal, bodyFat,
+      tdee: stepsCalc.tdeeNat, plannedKcal: onAAS ? kbju.aas.kcal : kbju.nat.kcal, bodyFat: bfForCalc,
     });
-  }, [targetWeight, weeksToGoal, weight, stepsCalc, onAAS, kbju, bodyFat]);
+  }, [targetWeight, weeksToGoal, weight, stepsCalc, onAAS, kbju, bfForCalc]);
 
   // сценарии
   const [scenarios, setScenarios] = useState<Array<{id:string; name:string; snapshot:any}>>(()=>{
@@ -913,6 +943,7 @@ const kbju = useMemo(()=> calcKBJU(input), [input]);
     try{ localStorage.removeItem(SNAP_KEY); }catch{}
     manualLabsRef.current = {};
     sweatTouchedRef.current = false;
+    bodyFatTouchedRef.current = false;
     // Лабы и замеры
     setBodyFat(undefined);
     setHct(undefined); setHgb(undefined); setFerritin(undefined); setGfr(undefined);
@@ -1052,7 +1083,7 @@ const kbju = useMemo(()=> calcKBJU(input), [input]);
           active={mode==='hematology'} onClick={()=> go('hematology')} />
         <MhTile label="Жир · FFMI" accent="#a78bfa"
           value={<>{fat.current}% <span style={{ fontSize:10 }}>FFMI {onAAS ? fat.ffmiNormAdj : fat.ffmiNorm}</span></>}
-          sub={<>{bodyFat == null ? 'оценка по замерам/Deurenberg · ' : ''}лимит 26.2 {(onAAS ? fat.isOverNatLimitAAS : fat.isOverNatLimit) ? '⚠' : '✓'}</>}
+          sub={<>{bfSource} · лимит 26.2 {(onAAS ? fat.isOverNatLimitAAS : fat.isOverNatLimit) ? '⚠' : '✓'}</>}
           active={mode==='fat'} onClick={()=> go('fat')} />
       </div>
       <div style={{ ...CARD, padding:'10px 12px', display:'flex', flexDirection:'column', gap:6 }}>
@@ -1133,8 +1164,8 @@ const kbju = useMemo(()=> calcKBJU(input), [input]);
           <PopupNumber label="Возраст" value={age} min={14} max={80} onChange={setAge} />
           <PopupSelect label="Пол" value={sex} options={[{id:'male',label:'♂ Мужчина'},{id:'female',label:'♀ Женщина'}]} onChange={v=> setSex(v as any)} />
           <MhNum label="Жир, % (если измерен)" value={bodyFat} min={3} max={55} suffix=" %" optional
-            hint="Если пусто — % жира оценивается по замерам (Navy/JP/BIA) или Deurenberg, и это будет подписано как оценка."
-            onChange={setBodyFat} />
+            hint="Введённое вручную главнее замеров (DEXA). Пусто — берётся калипер/Navy/BIA, иначе Deurenberg (подписано)."
+            onChange={(v)=>{ bodyFatTouchedRef.current = true; setBodyFat(v); }} />
           <PopupSelect label="Белок DIAAS" value={proteinSource} options={[{id:'mixed',label:'Смешанный 0.95'},{id:'whey',label:'Whey 1.09'},{id:'milk',label:'Молоко 1.14'},{id:'egg',label:'Яйцо 1.13'},{id:'beef',label:'Говядина 1.10'},{id:'chicken',label:'Курица 1.08'},{id:'fish',label:'Рыба 1.05'},{id:'casein',label:'Казеин 1.12'},{id:'soy',label:'Соя 0.90'},{id:'pea',label:'Горох 0.58'},{id:'rice',label:'Рис 0.59'},{id:'blend_plant',label:'Бленд 0.75'}]} onChange={setProteinSource} />
           <MhNum label="Цель вес, кг" value={targetWeight} min={35} max={200} suffix=" кг" optional
             hint="Нужен для срока цели, diet-break и проекции. Без него эти блоки честно пустые."

@@ -299,6 +299,16 @@ describe('MetabolicHub: ввод меняет расчёт (проводка п�
     expect(loose).not.toMatch(/в срок не успеть/);
   });
 
+  it('калипер (JP3) меняет TDEE: измеренный % жира идёт в BMR, а не только в плитку', () => {
+    render(<MetabolicHub />);
+    const t0 = tileValue('TDEE');
+    setNumber('JP3 сумма, мм', 100);
+    const t1 = tileValue('TDEE');
+    expect(t1).not.toBe(t0);
+    // весит «жирнее» — Katch/LBM ниже, значит TDEE падает
+    expect(t1).toBeLessThan(t0);
+  });
+
   it('adaptive TDEE не подменяет плитку, пока данных мало (2 дня дневника)', () => {
     seedWeightAndDiary(10, 2);
     render(<MetabolicHub />);

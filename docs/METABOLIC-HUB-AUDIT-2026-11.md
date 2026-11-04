@@ -359,6 +359,19 @@ JSON-экспорте гематологии.
 **Регрессия.** `metabolic-hub.test.ts` → «факт железа в еде сверяется с советом (ZERO / кап 15 /
 RDA)»; `metabolic-hub-wiring.test.tsx` → «поле „Железо, мг/сут“ доходит до совета по крови».
 
+### 1.34 Замеры % жира не доходили до BMR: дефолтные 15 % из профиля перебивали калипер
+**Причина.** `calcBodyFat` честно считал JP3/Durnin/BIA/Navy и показывал их в плитке, но в
+`MetabolicInput.bodyFat` уходил только `bodyFat` (поле «Жир, %»), а оно заполнялось из профиля —
+у нового профиля там дефолтные **15 %** (`core/types.ts`). Итог: человек вводил калипер (JP3 100 мм →
+28 %), плитка писала 28 %, а Katch-McArdle и весь TDEE считались от 15 % — замер «не работал»
+(TDEE 2581 при заявленных 28 %).
+**Исправление.** `measuredBf` (JP/Durnin/BIA и отдельно Navy) считается **до** `input`; порядок
+приоритета: ручной ввод в хабе (DEXA) → калипер/Durnin/BIA → значение профиля → Navy → Deurenberg.
+`bfForCalc` теперь идёт в BMR/TDEE, EA, AT, refeed, adaptive-v3, срок цели, finder. Подпись плитки
+«Жир · FFMI» называет источник (`замер 28.2%` / `профиль` / `Navy 15.3%` / `Deurenberg`).
+**Регрессия.** `metabolic-hub-wiring.test.tsx` → «калипер (JP3) меняет TDEE: измеренный % жира идёт
+в BMR, а не только в плитку» (JP3 100 мм → TDEE падает).
+
 ---
 
 ## 2. Чего не хватало (добавлено)
@@ -408,7 +421,7 @@ RDA)»; `metabolic-hub-wiring.test.tsx` → «поле „Железо, мг/с�
   параллельные `tsc`/`vitest` из других сессий → heap OOM / `Zone Allocation failed`.
   Прогонять на свободной машине.
 - `npx vitest run src/ui/screens/Shared/__tests__ src/engines/__tests__/metabolic-hub.test.ts`
-  — **214 passed** (6 файлов: structure / toggles / honesty / modes / wiring / engine).
+  — **215 passed** (6 файлов: structure / toggles / honesty / modes / wiring / engine).
 - `npx vitest run src/ui/__tests__/rest-hooks-native.test.tsx
   src/engines/__tests__/risk-info-honesty-e07-e08.test.ts` — **89 passed**
   (в stderr шумит jsdom-canvas chart.js — это фон, не падения).
