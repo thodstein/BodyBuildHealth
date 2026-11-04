@@ -350,6 +350,43 @@ export function calcSteps(input: MetabolicInput) {
 }
 
 // ——— КБЖУ ——— (Helms/ISSN + персональный TEF + train/rest periodization + thyroid)
+/**
+ * Потолок углеводов (5 г/кг нат / 6 ААС) не должен молча съедать цель по калориям.
+ *
+ * Было: `c = clamp(c, 90, weight*5)` и всё — при TDEE 3659 ккал угли упирались в 415 г,
+ * и «сушка 3000», «поддержание 3659» и «масса 4025» выдавали почти одинаковые ~3000 ккал.
+ * Теперь недобор закрывается жиром до потолка (1.5 г/кг), а остаток честно возвращается
+ * как `gapKcal` + подпись: цель недостижима на этих макросах, и почему.
+ */
+export function balanceCarbsAndFat(p: {
+  targetKcal: number; protG: number; carbG: number; fatG: number;
+  carbFloorG: number; carbCeilG: number; fatMinG: number; fatCeilG: number;
+}): { carbG: number; fatG: number; kcal: number; gapKcal: number; note: string | null } {
+  const protKcal = p.protG * 4;
+  const fatMinG = Math.max(1, Math.round(p.fatMinG));
+  const fatCeilG = Math.max(fatMinG, Math.round(p.fatCeilG));
+  let carbG = clamp(Math.round(p.carbG), p.carbFloorG, p.carbCeilG);
+  let fatG = clamp(Math.round(p.fatG), fatMinG, fatCeilG);
+  let kcal = protKcal + carbG * 4 + fatG * 9;
+  const gap0 = p.targetKcal - kcal;
+  if (Math.abs(gap0) >= 9) {
+    fatG = clamp(fatG + Math.trunc(gap0 / 9), fatMinG, fatCeilG);
+    kcal = protKcal + carbG * 4 + fatG * 9;
+  }
+  const gapKcal = p.targetKcal - kcal;
+  let note: string | null = null;
+  if (Math.abs(gapKcal) > 60) {
+    const carbCapped = carbG >= p.carbCeilG;
+    const where = carbCapped
+      ? `угли на потолке ${p.carbCeilG} г, жир на потолке ${fatCeilG} г`
+      : `угли ${carbG} г, жир ${fatG} г`;
+    note = gapKcal > 0
+      ? `Цель ${p.targetKcal} ккал недостижима на этих макросах: план ${kcal} ккал (−${gapKcal}), ${where}. Подними PAL/кардио или возьми меньшую цель.`
+      : `Макросы дают ${kcal} ккал — на ${-gapKcal} больше цели ${p.targetKcal} (${where}).`;
+  }
+  return { carbG, fatG, kcal, gapKcal, note };
+}
+
 // TEF информативный: PAL уже включает ~10% TEF (FAO) — не суммируем повторно к TDEE, показываем для breakdown
 export function calcKBJU(input: MetabolicInput) {
   // Thyroid-коррекция BMR: Kim 2014 — каждая 1 pmol FT4 ↑BMR ~8%, TSH>4.5 уже в HPA, здесь — FT4
@@ -413,22 +450,36 @@ export function calcKBJU(input: MetabolicInput) {
   // Жиры: с учетом пола и здоровья
   const isFemale = input.sex==='female';
   const fMinNat = input.goal==='cut' ? (isFemale?0.85:0.80) : (isFemale?0.95:0.90);
-  const fNat = Math.round(Math.max(isFemale?45:50, input.weight * fMinNat));
-  const fAAS = Math.round(Math.max(isFemale?50:55, input.weight * (isFemale?1.0:1.0)));
+  const fNatPlanned = Math.round(Math.max(isFemale?45:50, input.weight * fMinNat));
+  const fAASPlanned = Math.round(Math.max(isFemale?50:55, input.weight * (isFemale?1.0:1.0)));
   // Углеводы — остаток
-  const kcalProtNat = pNat * 4, kcalFatNat = fNat * 9;
-  let cNat = Math.max(80, Math.round((tdeeNat - kcalProtNat - kcalFatNat)/4));
-  const kcalProtAAS = pAAS * 4, kcalFatAAS = fAAS * 9;
-  let cAAS = Math.max(100, Math.round((tdeeAAS - kcalProtAAS - kcalFatAAS)/4));
-  // потолок У: 5г/кг нат, 6 AAS, 8 если high-volume (>20ч/нед) — атлет
+  const kcalProtNat = pNat * 4, kcalFatNat = fNatPlanned * 9;
+  const cNatRaw = Math.max(80, Math.round((tdeeNat - kcalProtNat - kcalFatNat)/4));
+  const kcalProtAAS = pAAS * 4, kcalFatAAS = fAASPlanned * 9;
+  const cAASRaw = Math.max(100, Math.round((tdeeAAS - kcalProtAAS - kcalFatAAS)/4));
+  // Потолок У — санитарный предел, а не способ урезать цель: 7г/кг нат, 8 AAS,
+  // 8/9 если high-volume (>20ч/нед). Раньше было 5/6 — цель на 44 ккал/кг была
+  // физически недостижима, и «сушка»/«масса» выдавали почти одинаковые ккал.
   const isHighVol = (input.trainingDays ?? 0) >=6 && (input.cardioMin ?? 0) > 120;
-  const carbCeilNat = Math.round(input.weight * (isHighVol?6.5:5));
-  const carbCeilAAS = Math.round(input.weight * (isHighVol?7.5:6));
+  const carbCeilNat = Math.round(input.weight * (isHighVol?8:7));
+  const carbCeilAAS = Math.round(input.weight * (isHighVol?9:8));
   const carbFloor = 90;
-  cNat = clamp(cNat, carbFloor, carbCeilNat);
-  cAAS = clamp(cAAS, 110, carbCeilAAS);
-  const kcalNatFinal = pNat*4 + fNat*9 + cNat*4;
-  const kcalAASFinal = pAAS*4 + fAAS*9 + cAAS*4;
+  // Потолок углей не съедает цель: недобор уходит в жир (до 1.5 г/кг), остаток — в подпись.
+  const fatCeilNat = Math.round(input.weight * 1.5);
+  const fatMinBalNat = Math.round(input.weight * 0.7);
+  const fatMinBalAAS = Math.round(input.weight * 0.8);
+  const balNat = balanceCarbsAndFat({
+    targetKcal: tdeeNat, protG: pNat, carbG: cNatRaw, fatG: fNatPlanned,
+    carbFloorG: carbFloor, carbCeilG: carbCeilNat, fatMinG: fatMinBalNat, fatCeilG: fatCeilNat,
+  });
+  const balAAS = balanceCarbsAndFat({
+    targetKcal: tdeeAAS, protG: pAAS, carbG: cAASRaw, fatG: fAASPlanned,
+    carbFloorG: 110, carbCeilG: carbCeilAAS, fatMinG: fatMinBalAAS, fatCeilG: fatCeilNat,
+  });
+  const cNat = balNat.carbG, fNat = balNat.fatG;
+  const cAAS = balAAS.carbG, fAAS = balAAS.fatG;
+  const kcalNatFinal = balNat.kcal;
+  const kcalAASFinal = balAAS.kcal;
   // TEF персональный
   const tefNat = calcTEF(pNat, cNat, fNat, input.alcoholG);
   const tefAAS = calcTEF(pAAS, cAAS, fAAS, input.alcoholG);
@@ -460,6 +511,12 @@ export function calcKBJU(input: MetabolicInput) {
     delta: { kcal: Math.round(kcalAASFinal - kcalNatFinal), p: pAAS - pNat, c: cAAS - cNat },
     carbTiming, fiber: { nat: fiberNat, aas: fiberAAS }, tefNat, tefAAS, neat, eat, bmr: Math.round(bmr),
     adaptive, periodization, lutealAdd, thyroidMult,
+    // Цель vs фактические макросы: угли/жир упираются в потолки — подпись обязательна,
+    // иначе «сушка» и «масса» показывают почти одинаковые ккал и это выглядит нормой.
+    macroGap: {
+      nat: { gapKcal: balNat.gapKcal, note: balNat.note, targetKcal: tdeeNat },
+      aas: { gapKcal: balAAS.gapKcal, note: balAAS.note, targetKcal: tdeeAAS },
+    },
     bmrSpread: bmrMethodSpread(bmrBase.allMethods),
     note: input.onAAS ? `ААС EXP +${Math.round((mult-1)*100)}% белок ${protAAS}г/кг (+${aasProtAdd.toFixed(1)} EXP)${AAS_EXPERIMENTAL_NOTE}${lutealAdd? `, лютеин +${lutealAdd}`:''}${thyroidNote}${diaasMult > 1 ? ` · DIAAS ×${diaasMult.toFixed(2)} (${diaasSrc.label})` : ''} · TEF ${tefNat}ккал (инфо, в PAL уже)` : `Натурал: белок ${protNat}г/кг (LBM ${Math.round(lbmForProt)}кг)${diaasMult > 1 ? ` · DIAAS ×${diaasMult.toFixed(2)} ${diaasSrc.label}` : ''}, TEF ${tefNat}ккал (инфо), PAL ${palEff.toFixed(2)}${lutealAdd? `, лютеин +${lutealAdd}`:''}${thyroidNote} · ${PONTZER_FORMULA_NOTE}`
   };

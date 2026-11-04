@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { calcWater, calcSteps, calcKBJU, calcBodyFat, calcCortisol, calcStressLoad, calcHematology, calcTrendFromHistory, calcAdaptiveAdjustment, calcEnergyAvailability, calcAlcohol, calcProteinTiming, calcMaintenanceFinder, calcGoalTimeline, calcAdaptiveThermogenesis, calcReverseDiet, calcNEAT, calcThyroidImpact, calcHomaIRWrap, calcATRange, buildOneAnswerPro, PONTZER_FORMULA_NOTE, TDEE_ALREADY_ADAPTED_NOTE, IR_MARKERS_SHARED_INPUT_NOTE } from '../metabolic-hub.engine';
+import { calcWater, calcSteps, calcKBJU, calcBodyFat, calcCortisol, calcStressLoad, calcHematology, calcTrendFromHistory, calcAdaptiveAdjustment, calcEnergyAvailability, calcAlcohol, calcProteinTiming, calcMaintenanceFinder, calcGoalTimeline, calcAdaptiveThermogenesis, calcReverseDiet, calcNEAT, calcThyroidImpact, calcHomaIRWrap, calcATRange, buildOneAnswerPro, balanceCarbsAndFat, PONTZER_FORMULA_NOTE, TDEE_ALREADY_ADAPTED_NOTE, IR_MARKERS_SHARED_INPUT_NOTE } from '../metabolic-hub.engine';
 import { bmrCunningham, bmrOwen, bmrTenHaaf, bmrHarrisRevised, bmrHenry, bmrLivingston, bmrMethodLabel, bmrMethodSpread, calcHomaIR, calcTyG, calcTEF as calcTEFConst, calcTrendWithConfidence as calcTrendConf2, energyDensityPerKg, hallAdaptationFactor, calcSweatElectrolytes, calcJPBodyFat, calcDurninBodyFat, computeBMR } from '../../core/metabolic-constants';
 
 const base = { weight: 80, height: 180, age: 30, sex: 'male' as const };
@@ -227,11 +227,43 @@ describe('metabolic-hub — calcKBJU', () => {
     const fatCut = calcKBJU({ ...base, bodyFat:24, goal:'cut' });
     expect(leanCut.nat.protPerKg).toBeGreaterThan(fatCut.nat.protPerKg);
   });
-  it('потолок углеводов 5г/кг (6 на ААС)', () => {
+  it('потолок углеводов 7г/кг (8 на ААС) — санитарный, а не «урезать цель»', () => {
     const r = calcKBJU({ weight: 110, height:190, age:25, sex:'male', activityLevel:'high', trainingDays:6, goal:'bulk' });
-    expect(r.nat.c).toBeLessThanOrEqual(110*5);
+    expect(r.nat.c).toBeLessThanOrEqual(110*7);
     const aas = calcKBJU({ weight:110, height:190, age:25, sex:'male', activityLevel:'high', trainingDays:6, goal:'bulk', onAAS:true, aasDose:800 });
-    expect(aas.aas.c).toBeLessThanOrEqual(110*6);
+    expect(aas.aas.c).toBeLessThanOrEqual(110*8);
+  });
+  it('цель по ккал достигается: сушка < поддержание < масса (кап углей не съедает цель)', () => {
+    // Было: c=clamp(...,90,weight*5) и всё — при TDEE 3659 ккал «сушка», «поддержание»
+    // и «масса» выдавали ~3000 ккал, то есть цель не влияла на итог.
+    const cut = calcKBJU({ ...base, goal:'cut' });
+    const maintain = calcKBJU({ ...base, goal:'maintain' });
+    const bulk = calcKBJU({ ...base, goal:'bulk' });
+    expect(cut.nat.kcal).toBeLessThan(maintain.nat.kcal);
+    expect(maintain.nat.kcal).toBeLessThan(bulk.nat.kcal);
+    // и каждый план сходится с собственной целью (+ протеиновая разница в пределах 60 ккал)
+    for (const r of [cut, maintain, bulk]) {
+      expect(Math.abs(r.nat.kcal - r.nat.tdee)).toBeLessThanOrEqual(60);
+      expect(r.macroGap.nat.gapKcal).toBeGreaterThanOrEqual(-60);
+    }
+  });
+  it('недобор цели подписан честно, если её нельзя набрать макросами', () => {
+    // 95 кг, очень высокий расход: угли и жир упираются в потолки — итог ниже цели,
+    // и это обязано быть в macroGap.note, а не молча.
+    const r = calcKBJU({ weight: 55, height: 150, age: 30, sex:'female', activityLevel:'high', trainingDays:6, cardioMin:180, goal:'bulk', weeklyVolumeTons: 40 } as any);
+    if (r.macroGap.nat.gapKcal > 60) {
+      expect(r.macroGap.nat.note).toBeTruthy();
+      expect(r.macroGap.nat.note).toContain('недостижима');
+    }
+    // прямой контракт функции балансировки
+    const impossible = balanceCarbsAndFat({
+      targetKcal: 6000, protG: 200, carbG: 9999, fatG: 300,
+      carbFloorG: 90, carbCeilG: 500, fatMinG: 50, fatCeilG: 120,
+    });
+    expect(impossible.carbG).toBe(500);
+    expect(impossible.fatG).toBe(120);
+    expect(impossible.gapKcal).toBeGreaterThan(0);
+    expect(impossible.note).toMatch(/недостижима/);
   });
   it('PAL влияет на tdee', () => {
     const low = calcKBJU({ ...base, activityLevel:'low' });

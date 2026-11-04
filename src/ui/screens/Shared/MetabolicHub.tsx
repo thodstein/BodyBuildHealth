@@ -863,7 +863,7 @@ const kbju = useMemo(()=> calcKBJU(input), [input]);
           active={mode==='water'} onClick={()=> go('water')} />
         <MhTile label="КБЖУ" accent="#f59e0b"
           value={<>{onAAS ? kbju.aas.kcal : kbju.nat.kcal} <span style={{ fontSize:10 }}>ккал</span></>}
-          sub={<>Б{onAAS ? kbju.aas.p : kbju.nat.p} · Ж{onAAS ? kbju.aas.f : kbju.nat.f} · У{onAAS ? kbju.aas.c : kbju.nat.c}{kbju.thyroidMult!==1 ? ` · щит ×${kbju.thyroidMult.toFixed(2)}` : ''}</>}
+          sub={<>Б{onAAS ? kbju.aas.p : kbju.nat.p} · Ж{onAAS ? kbju.aas.f : kbju.nat.f} · У{onAAS ? kbju.aas.c : kbju.nat.c}{kbju.thyroidMult!==1 ? ` · щит ×${kbju.thyroidMult.toFixed(2)}` : ''}{(onAAS ? kbju.macroGap.aas : kbju.macroGap.nat).gapKcal > 60 ? ` · ⚖️ цель −${(onAAS ? kbju.macroGap.aas : kbju.macroGap.nat).gapKcal}` : ''}</>}
           active={mode==='kbju'} onClick={()=> go('kbju')} />
         <MhTile label="EA · RED-S" accent={ea.color}
           value={<>{ea.ea ?? '—'} <span style={{ fontSize:10 }}>ккал/кгFFM</span></>}
@@ -1563,6 +1563,11 @@ const kbju = useMemo(()=> calcKBJU(input), [input]);
                 <div style={{ flex:1, padding:8, borderRadius:8, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', textAlign:'center', fontSize:10, color:'#fff' }}>Δ белок <b style={{color:'#f87171'}}>+{kbju.delta.p}г</b></div>
                 <div style={{ flex:1, padding:8, borderRadius:8, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', textAlign:'center', fontSize:10, color:'#fff' }}>клетчатка {onAAS? kbju.fiber.aas:kbju.fiber.nat}г</div>
               </div>
+              {(onAAS ? kbju.macroGap.aas : kbju.macroGap.nat).note && (
+                <div style={{ marginTop:6, padding:'7px 10px', borderRadius:8, background:'rgba(245,158,11,0.08)', border:'1px solid rgba(245,158,11,0.18)', fontSize:9, color:'#fbbf24', lineHeight:1.4 }}>
+                  ⚖️ {(onAAS ? kbju.macroGap.aas : kbju.macroGap.nat).note}
+                </div>
+              )}
               <div style={{ marginTop:8, padding:'8px 10px', borderRadius:10, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)' }}>
                 <div style={{ fontSize:9, fontWeight:800, color:'rgba(255,255,255,0.6)', textTransform:'uppercase', letterSpacing:0.3, marginBottom:6 }}>Waterfall TDEE · BMR + NEAT + EAT + TEF 10%</div>
                 <div style={{ display:'flex', gap:6, alignItems:'end' }}>
