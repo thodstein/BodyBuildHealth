@@ -261,6 +261,19 @@ EA при 2600 ккал не в красной зоне, `none` при пуст�
 **Регрессия.** `metabolic-hub.test.ts` → «беременность добавляется один раз»;
 `metabolic-hub-wiring.test.tsx` → «беременность в UI поднимает TDEE ровно на 340».
 
+### 1.25 Подпись под «Применить к плану питания» обещала чужой потолок углеводов
+**Причина.** Текст гласил «Потолок У — 5 г/кг (6 на ААС, ≤8 с инсулином) — из `planner-targets`»,
+но хаб режет углеводы по своим правилам: 7 г/кг (8 при высоком объёме), +1 г/кг на ААС. То есть
+подпись обещала 5, а блок КБЖУ спокойно показывает 7. Вторая ошибка: «Планировщик подхватит»
+читалось как «он пересчитает», хотя в режиме «КБЖУ — Ручной» он берёт `manualTargets` как есть
+(`carbCapGPerKg: 0`, `manualTargetsLocked`) и ничего не урезает.
+**Исправление.** Текст описывает реальный потолок хаба (7/8, +1 на ААС), прямо говорит, что в ручном
+режиме значения переносятся без пересчёта, и что недобор ккал при упёршемся потолке подписан в
+блоке КБЖУ.
+**Регрессия.** `metabolic-hub-wiring.test.tsx` → «„Применить к плану питания“ пишет manualTargets +
+ручной режим в профиль» (проверяет `he_profile_v2`: `kbjuMode='manual'`, `manualTargets.kcal` = плитка
+КБЖУ, Б/Ж/У > 0).
+
 ---
 
 ## 2. Чего не хватало (добавлено)
@@ -310,7 +323,7 @@ EA при 2600 ккал не в красной зоне, `none` при пуст�
   параллельные `tsc`/`vitest` из других сессий → heap OOM / `Zone Allocation failed`.
   Прогонять на свободной машине.
 - `npx vitest run src/ui/screens/Shared/__tests__ src/engines/__tests__/metabolic-hub.test.ts`
-  — **202 passed** (6 файлов: structure / toggles / honesty / modes / wiring / engine).
+  — **203 passed** (6 файлов: structure / toggles / honesty / modes / wiring / engine).
 - `npx vitest run src/ui/__tests__/rest-hooks-native.test.tsx
   src/engines/__tests__/risk-info-honesty-e07-e08.test.ts` — **89 passed**
   (в stderr шумит jsdom-canvas chart.js — это фон, не падения).

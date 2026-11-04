@@ -170,6 +170,25 @@ describe('MetabolicHub: ввод меняет расчёт (проводка п�
     expect(loose).not.toMatch(/в срок не успеть/);
   });
 
+  it('«Применить к плану питания» пишет manualTargets + ручной режим в профиль', () => {
+    render(<MetabolicHub />);
+    const kcal = tileValue('КБЖУ');
+    // кнопка живёт в блоке режима «КБЖУ»
+    fireEvent.click(Array.from(document.querySelectorAll('.mh-mode'))
+      .find(b => (b.textContent || '').includes('КБЖУ')) as HTMLElement);
+    fireEvent.click(Array.from(document.querySelectorAll('button'))
+      .find(b => (b.textContent || '').includes('Применить к плану питания')) as HTMLElement);
+    const prof = JSON.parse(localStorage.getItem('he_profile_v2') || '{}');
+    const nut = prof?.settings?.nutrition || {};
+    // мост в планировщик — только через профиль (он читает эти два поля)
+    expect(nut.kbjuMode).toBe('manual');
+    expect(nut.manualTargets?.kcal).toBe(kcal);
+    expect(nut.manualTargets?.protein).toBeGreaterThan(0);
+    expect(nut.manualTargets?.fat).toBeGreaterThan(0);
+    expect(nut.manualTargets?.carbs).toBeGreaterThan(0);
+    expect(document.body.textContent || '').toMatch(/записано в профиль/);
+  });
+
   it('беременность в UI поднимает TDEE ровно на 340, а не на 680', () => {
     render(<MetabolicHub />);
     // блок беременности виден только для ♀
