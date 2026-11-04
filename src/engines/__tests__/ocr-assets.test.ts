@@ -9,9 +9,10 @@ import {
   getOcrAssetPaths,
   resolveTesseractOptions,
   resolvePdfjsWorkerSrc,
-  configurePdfjsWorker,
+  preparePdfjsWorker,
   localAssetAvailable,
   resetOcrLangProbeCache,
+  resetPdfjsWorkerCache,
 } from '../ocr-assets';
 
 /**
@@ -51,6 +52,7 @@ describe('ocr-assets: local path configuration', () => {
     fetchMock.mockReset();
     // Результат проверки моделей кэшируется на сессию — между тестами сбрасываем.
     resetOcrLangProbeCache();
+    resetPdfjsWorkerCache();
   });
 
   afterEach(() => {
@@ -175,17 +177,35 @@ describe('ocr-assets: local path configuration', () => {
     expect(r.workerSrc).toContain('cdnjs.cloudflare.com');
   });
 
-  it('configurePdfjsWorker sets workerSrc on pdfjsLib', () => {
+  it('preparePdfjsWorker отдаёт воркер через Blob-URL (обход MIME .mjs в АПК)', async () => {
+    const workerSource = '// pdfjs worker\n' + 'x'.repeat(2000);
+    fetchMock.mockImplementation(async (input: any, init?: any) => {
+      const url = String(input);
+      if (url.endsWith('pdf.worker.min.mjs')) {
+        if (init?.method === 'HEAD') return { ok: true, status: 200 };
+        return { ok: true, status: 200, text: async () => workerSource };
+      }
+      return { ok: true, status: 200, headers: { get: () => 'application/octet-stream' }, body: { cancel: async () => {} } };
+    });
     const fakePdfjsLib = { GlobalWorkerOptions: {} };
-    const ok = configurePdfjsWorker(fakePdfjsLib, 'local');
-    expect(ok).toBe(true);
-    expect(fakePdfjsLib.GlobalWorkerOptions.workerSrc).toMatch(/(?:^|\/)pdfjs\/pdf\.worker\.min\.mjs$/);
+    const r = await preparePdfjsWorker(fakePdfjsLib);
+    expect(r.source).toBe('blob');
+    expect(r.workerSrc).toMatch(/^blob:/);
+    expect(fakePdfjsLib.GlobalWorkerOptions.workerSrc).toBe(r.workerSrc);
   });
 
-  it('configurePdfjsWorker with CDN preference sets CDN workerSrc', () => {
+  it('preparePdfjsWorker не берёт index.html вместо скрипта воркера', async () => {
+    fetchMock.mockImplementation(async (input: any, init?: any) => {
+      const url = String(input);
+      if (url.endsWith('pdf.worker.min.mjs')) {
+        if (init?.method === 'HEAD') return { ok: true, status: 200 };
+        return { ok: true, status: 200, text: async () => '<!DOCTYPE html><html><body>SPA</body></html>' };
+      }
+      return { ok: true, status: 200, headers: { get: () => 'application/octet-stream' }, body: { cancel: async () => {} } };
+    });
     const fakePdfjsLib = { GlobalWorkerOptions: {} };
-    const ok = configurePdfjsWorker(fakePdfjsLib, 'cdn');
-    expect(ok).toBe(false);
-    expect(fakePdfjsLib.GlobalWorkerOptions.workerSrc).toContain('cdnjs.cloudflare.com');
+    const r = await preparePdfjsWorker(fakePdfjsLib);
+    expect(r.source).toBe('local');
+    expect(r.workerSrc).toMatch(/(?:^|\/)pdfjs\/pdf\.worker\.min\.mjs$/);
   });
 });

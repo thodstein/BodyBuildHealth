@@ -1,5 +1,3 @@
-import { isNativeApp as isCapacitorNativeRuntime } from '../core/app-platform';
-
 export interface ParsedLabValue {
   code: string;
   name: string;
@@ -576,22 +574,15 @@ function installWebViewPolyfills(): void {
   }
 }
 
-async function openPdfDocument(pdfjsLib: any, data: ArrayBuffer, disableWorker = false): Promise<any> {
-  const pdfData = new Uint8Array(data);
-  // In SSR/Node test runners there is no browser Worker implementation. PDF.js
-  // otherwise tries to create a fake worker from the configured CDN URL, which
-  // fails before text extraction even starts (and made valid PDFs look empty).
-  if (disableWorker || typeof Worker === 'undefined') {
-    return pdfjsLib.getDocument({ data: pdfData, disableWorker: true }).promise;
-  }
-  try {
-    return await pdfjsLib.getDocument({ data: pdfData }).promise;
-  } catch (workerError) {
-    // Some WebViews and Telegram Mini App environments cannot load the CDN
-    // worker. PDF.js can still extract/render pages in its main thread.
-    console.warn('PDF.js worker failed, retrying without worker:', workerError);
-    return pdfjsLib.getDocument({ data: pdfData, disableWorker: true }).promise;
-  }
+async function openPdfDocument(pdfjsLib: any, data: ArrayBuffer): Promise<any> {
+  // Копия обязательна: pdfjs передаёт буфер воркеру (ArrayBuffer становится
+  // detached). Без копии следующий шаг — OCR страниц того же PDF — падал с
+  // «Cannot perform Construct on a detached ArrayBuffer».
+  const pdfData = new Uint8Array(data.slice(0));
+  // pdfjs 6 удалил опцию `disableWorker`: воркер обязателен, иначе движок
+  // падает с «No "GlobalWorkerOptions.workerSrc" specified» ещё до чтения
+  // файла. Воркер настраивается вызывающим кодом: preparePdfjsWorker().
+  return pdfjsLib.getDocument({ data: pdfData }).promise;
 }
 
 function enhanceOcrCanvas(source: HTMLCanvasElement): HTMLCanvasElement {
@@ -910,6 +901,24 @@ function parseLabLineGeneric(line: string, val: number): { unit: string; refLow?
   return { unit, refLow: ref.low, refHigh: ref.high };
 }
 
+/**
+ * «25-ОН витамин D» / «25(OH)D» — это название анализа, а не результат.
+ *
+ * Если скан потерял столбец значений, строка состоит только из названия, и без
+ * очистки 25 из названия становилось результатом (витамин D = 25 вместо 30.048).
+ */
+function stripAnalyteNameDigits(text: string): string {
+  return text
+    .replace(/\d+\s*[-–—]?\s*(?:он|oh)(?![а-яёa-z])/gi, ' ')
+    .replace(/\d+\s*\(\s*(?:oh|он)\s*\)\s*[a-zа-яё]?/gi, ' ');
+}
+
+/** Содержит ли строка название какого-либо анализа (даже без значения). */
+function lineHasLabName(line: string): boolean {
+  const lower = line.toLowerCase();
+  return LAB_PATTERNS.some(def => def.names.some(n => containsLabName(lower, n)));
+}
+
 function tryParseLabFromLine(line: string): { code: string; name: string; value: number; unit: string; refLow?: number; refHigh?: number; raw?: string; confidence?: number } | null {
   const lowerLine = line.toLowerCase();
 
@@ -940,9 +949,10 @@ function tryParseLabFromLine(line: string): { code: string; name: string; value:
     const searchTexts = /\d/.test(afterName) && afterName !== valueText ? [afterName, valueText] : [valueText];
     let val: number | null = null;
     for (const src of searchTexts) {
-      val = extractNumberBeforeUnit(src);
-      if (val === null) val = extractNumber(src.replace(/[^\d.,\s\-–]/g, ' '));
-      if (val === null) val = extractResultNumber(src);
+      const cleaned = stripAnalyteNameDigits(src);
+      val = extractNumberBeforeUnit(cleaned);
+      if (val === null) val = extractNumber(cleaned.replace(/[^\d.,\s\-–]/g, ' '));
+      if (val === null) val = extractResultNumber(cleaned);
       if (val !== null) break;
     }
     // When the marker name contains digits (e.g. "Витамин D 25-OH"), the
@@ -956,7 +966,7 @@ function tryParseLabFromLine(line: string): { code: string; name: string; value:
       let cellVal: number | null = null;
       for (const cell of cols) {
         if (labDef.names.some(n => containsLabName(cell, n))) continue;
-        const cellNum = extractResultNumber(cell);
+        const cellNum = extractResultNumber(stripAnalyteNameDigits(cell));
         if (cellNum !== null && cellNum > 0) { cellVal = cellNum; break; }
       }
       // Prefer cell-based value when the generic path picked a name-suffix number
@@ -1026,7 +1036,12 @@ export function parseLabText(rawText: string): ParsedLabResult {
     // extraction.
     for (let windowSize = 2; windowSize <= 3; windowSize++) {
       for (let i = 0; i <= lines.length - windowSize; i++) {
-        const combined = lines.slice(i, i + windowSize).join(' ');
+        const windowLines = lines.slice(i, i + windowSize);
+        // Не склеиваем строки, где названия анализов идут подряд: иначе
+        // значение следующего маркера приписывается предыдущему (строка
+        // «25-ОН витамин D» без значения брала 35 из следующей строки «АЛТ 35»).
+        if (windowLines.filter(lineHasLabName).length > 1) continue;
+        const combined = windowLines.join(' ');
         const result = tryParseLabFromLine(combined);
         if (!result) continue;
         if (values.some(v => v.code === result.code)) continue;
@@ -1094,14 +1109,17 @@ export async function parsePDF(fileOrBuffer: File | ArrayBuffer): Promise<Parsed
     // The legacy bundle keeps the same browser API and is compatible with
     // environments where those DOM globals are not exposed eagerly.
     const pdfjsLib = await import('pdfjs-dist/legacy/build/pdf.mjs');
-    if (typeof Worker !== 'undefined' && !isCapacitorNativeRuntime()) {
-      const { resolvePdfjsWorkerSrc } = await import('./ocr-assets');
-      pdfjsLib.GlobalWorkerOptions.workerSrc = (await resolvePdfjsWorkerSrc()).workerSrc;
+    // Воркер нужен ВСЕГДА (pdfjs 6 не умеет без него), в том числе в АПК —
+    // раньше в нативном режиме он намеренно не задавался, и любой PDF падал
+    // с «No "GlobalWorkerOptions.workerSrc" specified».
+    {
+      const { preparePdfjsWorker } = await import('./ocr-assets');
+      await preparePdfjsWorker(pdfjsLib);
     }
     const arrayBuffer = fileOrBuffer instanceof ArrayBuffer ? fileOrBuffer : await fileOrBuffer.arrayBuffer();
     // Scanned PDFs need page rendering. Telegram WebView often cannot load
     // the PDF.js worker URL, while the main-thread renderer works reliably.
-    const pdf = await openPdfDocument(pdfjsLib, arrayBuffer, isCapacitorNativeRuntime());
+    const pdf = await openPdfDocument(pdfjsLib, arrayBuffer);
     let fullText = '';
     let allItems: TextItem[] = [];
     for (let i = 1; i <= pdf.numPages; i++) {
@@ -1162,18 +1180,23 @@ export async function ocrScannedPdf(fileOrBuffer: File | ArrayBuffer): Promise<s
     throw new Error(`OCR сканированного PDF недоступен: ${initError?.message || String(initError)}`);
   }
   try {
-    if (typeof Worker !== 'undefined') {
-      const { resolvePdfjsWorkerSrc } = await import('./ocr-assets');
-      // Scanned pages are rendered on the main thread below, so no PDF.js
-      // worker URL is needed here. This avoids Telegram WebView worker errors.
+    {
+      // pdfjs 6: воркер обязателен (disableWorker удалён). В АПК настраиваем
+      // его через Blob, чтобы не зависеть от MIME `.mjs` в ассетах.
+      const { preparePdfjsWorker } = await import('./ocr-assets');
+      await preparePdfjsWorker(pdfjsLib);
     }
     const arrayBuffer = fileOrBuffer instanceof ArrayBuffer ? fileOrBuffer : await fileOrBuffer.arrayBuffer();
     if (arrayBuffer.byteLength > 12 * 1024 * 1024) {
       throw new Error('Сканированный PDF больше 12 МБ. Сожмите файл или загрузите страницы по одной.');
     }
-    const pdf = await openPdfDocument(pdfjsLib, arrayBuffer, true);
+    const pdf = await openPdfDocument(pdfjsLib, arrayBuffer);
     const mobile = isMobileWebView();
-    const MAX_PAGE_PX = mobile ? 1000000 : 4000000;
+    // Разрешение страницы определяет, прочитает ли OCR мелкие цифры в таблице.
+    // Раньше на телефоне итог был ~840×1190 px (≈100 dpi) — на таком размере
+    // терялись строки и путались значения. Держим паритет с фото-путём
+    // (сторона ~1800 px): A4 при 595×842 pt даёт ~2.2 Мпикс и ~144 dpi.
+    const MAX_PAGE_PX = mobile ? 2400000 : 4000000;
     const MAX_SCAN_PAGES = 8;
     if (pdf.numPages > MAX_SCAN_PAGES) {
       throw new Error(`В сканированном PDF ${pdf.numPages} страниц. Максимум для Telegram Mini App: ${MAX_SCAN_PAGES}.`);
@@ -1185,14 +1208,18 @@ export async function ocrScannedPdf(fileOrBuffer: File | ArrayBuffer): Promise<s
       for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber++) {
         const page = await pdf.getPage(pageNumber);
         const vp = page.getViewport({ scale: 1 });
-        const effectiveScale = Math.min(mobile ? 1.5 : 2.5, Math.sqrt(MAX_PAGE_PX / Math.max(1, vp.width * vp.height)));
+        const effectiveScale = Math.min(mobile ? 2.1 : 2.5, Math.sqrt(MAX_PAGE_PX / Math.max(1, vp.width * vp.height)));
         const viewport = page.getViewport({ scale: effectiveScale });
         const canvas = document.createElement('canvas');
         canvas.width = Math.ceil(viewport.width);
         canvas.height = Math.ceil(viewport.height);
         const context = canvas.getContext('2d');
         if (!context) continue;
-        await page.render({ canvas, canvasContext: context, viewport }).promise;
+        // intent: 'print' — у pdfjs это отключает планирование через
+        // requestAnimationFrame, то есть рендер страницы доходит до конца даже
+        // когда приложение свернули (иначе rAF в фоне замирает и промис
+        // page.render() не резолвится никогда). Для OCR картинка та же.
+        await page.render({ canvas, canvasContext: context, viewport, intent: 'print' }).promise;
         const enhanced = enhanceOcrCanvasInPlace(canvas);
         try {
           const { data } = await worker.recognize(enhanced);

@@ -72,21 +72,6 @@ function getPdfjsVersionForCdn(): string {
 }
 
 /**
- * Configure pdfjs-dist to use the local worker. Must be called after
- * `import('pdfjs-dist')` and before any `getDocument`/`render` call.
- * Returns true if the local worker URL was set; false if we fell back to CDN.
- */
-export function configurePdfjsWorker(pdfjsLib: any, prefer: 'local' | 'cdn' = 'local'): boolean {
-  const paths = getOcrAssetPaths(prefer);
-  try {
-    pdfjsLib.GlobalWorkerOptions.workerSrc = paths.pdfjsWorkerSrc;
-    return prefer === 'local';
-  } catch {
-    return false;
-  }
-}
-
-/**
  * Try a local HEAD fetch to verify the asset exists. Returns false on any
  * network/HTTP error so callers can fall back to CDN.
  */
@@ -407,8 +392,6 @@ export async function probeOcrAssets(): Promise<OcrAssetProbe[]> {
  */
 export async function resolvePdfjsWorkerSrc(): Promise<{ workerSrc: string; source: 'local' | 'cdn' }> {
   const local = getOcrAssetPaths('local');
-  // PDF parsing in the APK uses the main thread because Capacitor WebViews
-  // frequently reject module workers and external CDN URLs.
   const isNativeLike = isCapacitorNative()
     || (typeof window !== 'undefined' && /^file:|^capacitor:|^ionic:/i.test(window.location?.protocol || ''));
   if (isNativeLike) return { workerSrc: local.pdfjsWorkerSrc, source: 'local' };
@@ -419,4 +402,59 @@ export async function resolvePdfjsWorkerSrc(): Promise<{ workerSrc: string; sour
   console.warn('[ocr-assets] local pdfjs worker not reachable, falling back to CDN.');
   const cdn = getOcrAssetPaths('cdn');
   return { workerSrc: cdn.pdfjsWorkerSrc, source: 'cdn' };
+}
+
+/**
+ * Настроить воркер pdfjs перед разбором PDF.
+ *
+ * Почему это обязателен: pdfjs 6 **удалил** опцию `disableWorker` — без
+ * `GlobalWorkerOptions.workerSrc` он падает ещё до чтения файла:
+ * «No "GlobalWorkerOptions.workerSrc" specified». Именно это ломало импорт PDF
+ * в АПК, при том что фото уже распознавались.
+ *
+ * В Capacitor WebView модульный воркер по URL из APK может не подняться:
+ * `.mjs` из ассетов отдаётся с MIME вроде `application/octet-stream`, а Chrome
+ * такой скрипт как модуль не принимает. Поэтому скрипт воркера читается через
+ * fetch и подставляется Blob-URL с типом `text/javascript` — это обходит и
+ * MIME, и перехват запросов WebView. Если прочитать не удалось, остаётся
+ * прямой URL (локальный или CDN).
+ */
+/** url → blob-url скрипта воркера, чтобы не качать 1.2 МБ при каждом PDF. */
+const pdfjsWorkerBlobCache = new Map<string, string>();
+
+/** Сброс кэша Blob-URL (тесты и повторная инициализация окружения). */
+export function resetPdfjsWorkerCache(): void {
+  pdfjsWorkerBlobCache.clear();
+}
+
+export async function preparePdfjsWorker(
+  pdfjsLib: any,
+): Promise<{ workerSrc: string; source: 'blob' | 'local' | 'cdn' }> {
+  const resolved = await resolvePdfjsWorkerSrc();
+  let workerSrc = resolved.workerSrc;
+  let source: 'blob' | 'local' | 'cdn' = resolved.source;
+  const cachedBlob = pdfjsWorkerBlobCache.get(resolved.workerSrc);
+  if (cachedBlob) {
+    workerSrc = cachedBlob;
+    source = 'blob';
+  } else {
+    try {
+      if (typeof fetch === 'function' && typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function') {
+        const res = await fetch(resolved.workerSrc, { cache: 'no-store' });
+        if (res.ok) {
+          const text = await res.text();
+          // Страховка от SPA-фолбэка: index.html вместо скрипта воркера.
+          if (text.length > 1000 && !/^\s*<!doctype html/i.test(text)) {
+            workerSrc = URL.createObjectURL(new Blob([text], { type: 'text/javascript' }));
+            source = 'blob';
+            pdfjsWorkerBlobCache.set(resolved.workerSrc, workerSrc);
+          }
+        }
+      }
+    } catch { /* остаётся прямой URL */ }
+  }
+  try {
+    if (pdfjsLib?.GlobalWorkerOptions) pdfjsLib.GlobalWorkerOptions.workerSrc = workerSrc;
+  } catch { /* ignore */ }
+  return { workerSrc, source };
 }

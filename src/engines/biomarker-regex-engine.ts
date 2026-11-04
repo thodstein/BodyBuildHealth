@@ -366,6 +366,22 @@ function preprocessLine(line: string): string {
 }
 
 /**
+ * Убрать числа, которые принадлежат названию анализа, а не результату.
+ *
+ * Реальные бланки пишут анализ как «25-ОН витамин D» / «25(OH)D». Если OCR
+ * потерял столбец значений, парсер брал 25 из названия и записывал его как
+ * результат (витамин D = 25 при реальном 30.048) — то есть выдумывал значение.
+ * После очистки таких чисел в строке не остаётся, и строка честно пропускается.
+ */
+function stripAnalyteNameNumbers(text: string): string {
+  return text
+    .replace(/\d+\s*[-–—]?\s*(?:он|oh)(?![а-яёa-z])/gi, ' ')   // «25-ОН», «25-OH»
+    .replace(/\d+\s*\(\s*(?:oh|он)\s*\)\s*[a-zа-яё]?/gi, ' ')  // «25(OH)D»
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/**
  * Extract all floating-point numbers from a string.
  * Handles: "15.4", "0.5", "106", "15,4" (already normalized to dot).
  */
@@ -545,8 +561,9 @@ export function parseLabResults(
     if (seenCodes.has(match.code)) continue;
 
     // Extract numbers
-    const resultBeforeUnit = extractResultBeforeUnit(line);
-    const numbers = extractNumbers(line);
+    const numberLine = stripAnalyteNameNumbers(line);
+    const resultBeforeUnit = extractResultBeforeUnit(numberLine);
+    const numbers = extractNumbers(numberLine);
 
     // Полуколичественный fallback для качественных тестов ОАМ.
     // Если BIOMARKER_DICTIONARY маркер оканчивается на _QR и число не найдено,
@@ -572,7 +589,7 @@ export function parseLabResults(
     if (numbers.length === 0) continue;
 
     // Heuristics
-    const { value: heuristicValue, ec50, refText } = extractValueAndEc50(line, numbers);
+    const { value: heuristicValue, ec50, refText } = extractValueAndEc50(numberLine, numbers);
     const value = resultBeforeUnit ?? heuristicValue;
 
     // Zero is meaningful in urine reports: it denotes no cells/substance,

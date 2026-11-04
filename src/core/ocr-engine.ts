@@ -949,6 +949,10 @@ export async function processUploadedFile(
       // Russian/English OCR pipeline used for uploaded photos.
       if (shouldRetryPdfWithOcr(rawText, parsedAll.labs)) {
         try {
+          // Если текстового слоя не было, предупреждения разбора пустой строки
+          // («не найдено ни одного маркера») после успешного OCR только путают:
+          // показатели находятся ниже по распознанным страницам.
+          const textLayerWarnings = rawText.trim() ? parsedAll.warnings : [];
           const ocrText = await ocrScannedPdf(arrayBuffer);
           if (ocrText.trim()) {
             const ocrParsed = parseLabTextAllWays(ocrText, 'tesseract.js');
@@ -957,7 +961,7 @@ export async function processUploadedFile(
             parsedAll = {
               labs: finalizeLabCandidates([...parsedAll.labs, ...ocrParsed.labs]),
               provider: parsedAll.provider !== 'unknown' ? parsedAll.provider : ocrParsed.provider,
-              warnings: [...parsedAll.warnings, ...ocrParsed.warnings],
+              warnings: [...textLayerWarnings, ...ocrParsed.warnings],
               // OCR страниц тоже может увидеть «Дата …» — берём ту, что есть
               date: parsedAll.date || ocrParsed.date,
             };

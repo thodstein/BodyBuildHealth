@@ -656,6 +656,25 @@ describe('OCR-артефакты и краевые случаи', () => {
     expect(pdf.values.find(v => v.code === 'OH17P')?.value).toBe(4.5);
   });
 
+  it('название анализа без значения не даёт выдуманного витамина D', () => {
+    // Так выглядит скан-PDF, где OCR потерял столбец значений: осталась только
+    // строка названия. Раньше парсер брал 25 из «25-ОН» и записывал как результат.
+    const { pdf } = runAllParsers('25-ОН витамин D\t\tнг/мл\nАЛТ 35 Е/л 0-41');
+    expect(pdf.values.some(v => v.code === 'VITD')).toBe(false);
+    expect(pdf.values.find(v => v.code === 'ALT')?.value).toBe(35);
+  });
+
+  it('25-ОН витамин D берёт значение из столбца, а не число из названия', () => {
+    const { pdf } = runAllParsers('25-ОН витамин D\t30.048\t25-100\tнг/мл');
+    expect(pdf.values.find(v => v.code === 'VITD')?.value).toBe(30.048);
+  });
+
+  it('25-ОН витамин D с результатом 75 и референсом 75-250 даёт 75', () => {
+    // Именно так эту строку отдаёт реальный OCR бланка Хеликс.
+    const { pdf } = runAllParsers('25-ОН витамин D 75 75 - 250 нг/мл');
+    expect(pdf.values.find(v => v.code === 'VITD')?.value).toBe(75);
+  });
+
   it('watermark-строки не портят распознавание', () => {
     const text = 'ИНВИТРО\nСтраница 1 из 2\nАЛТ 35 Е/л 0-41\nСтраница 2 из 2\nГлюкоза 5.4 ммоль/л 3.9-5.5';
     const { pdf } = runAllParsers(text);
