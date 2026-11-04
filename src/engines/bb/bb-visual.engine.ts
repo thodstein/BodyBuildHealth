@@ -12,6 +12,7 @@
 import type { BBPlan, BBExercise } from './bb-builder.engine';
 import { MUSCLE_LABEL_RU } from '../volume-landmarks.engine';
 import { bbSessionTagLabel } from './bb-session-tags';
+import { icsProperty } from '../ics-format';
 
 /** Русская подпись мышцы для печати (сырые ключи в печати — дефект: замер
  *  2507/2946 ячеек были ключами `delt_mid`/`back`). Неизвестный ключ не теряем. */
@@ -302,42 +303,10 @@ function addDaysIso(iso: string, days: number): string {
  * `DTEND` = +1 час: событие нулевой длины календарь показывает как «весь день»/
  * пустую запись. */
 /**
- * Текст значения свойства ICS (RFC 5545 §3.3.11): экранируются `\`, `;`, `,`
- * и переводы строк. Раньше заголовок прогонялся через `uid()` (замена всего
- * не-ASCII на `_`), из-за чего «тяж» превращался в `___` — замер: 12 из 12
- * событий календаря содержали искалеченный текст.
+ * Текст значения свойства ICS (RFC 5545 §3.3.11) и складывание длинных строк
+ * теперь в общем модуле `src/engines/ics-format.ts` — здесь раньше жили две
+ * локальные копии, из-за чего правила расходились между экспортами.
  */
-function icsText(value: string): string {
-  return String(value ?? '')
-    .replace(/\\/g, '\\\\')
-    .replace(/;/g, '\\;')
-    .replace(/,/g, '\\,')
-    .replace(/\r?\n/g, '\\n');
-}
-
-/** Складывание строки в 75 октетов UTF-8 с продолжением `CRLF + пробел`
- *  (RFC 5545 §3.1). Русский заголовок длиннее лимита — без складывания
- *  некоторые клиенты обрезают событие. */
-function foldIcsLine(line: string): string {
-  const enc = new TextEncoder();
-  const parts: string[] = [];
-  let current = '';
-  let bytes = 0;
-  for (const ch of line) {
-    const size = enc.encode(ch).length;
-    // Первая строка — 75 октетов, продолжения начинаются с пробела (74).
-    const limit = parts.length ? 74 : 75;
-    if (bytes + size > limit) {
-      parts.push(current);
-      current = '';
-      bytes = 0;
-    }
-    current += ch;
-    bytes += size;
-  }
-  parts.push(current);
-  return parts.join('\r\n ');
-}
 
 export function buildBBPlanIcs(plan: BBPlan, opts?: { startDate?: string }): string {
   if (!plan?.weeks?.length) return '';
@@ -369,7 +338,7 @@ export function buildBBPlanIcs(plan: BBPlan, opts?: { startDate?: string }): str
         character && tag ? character : '',
       ].filter(Boolean).join(' · ');
       lines.push('BEGIN:VEVENT');
-      lines.push(foldIcsLine(`SUMMARY:${icsText(title)}`));
+      lines.push(icsProperty('SUMMARY', title));
       lines.push(`DTSTART:${stamp}T100000Z`);
       lines.push(`DTEND:${stamp}T110000Z`);
       lines.push(`UID:bb-${w.week}-${(s as any).weekOffset ?? dayIdx}@bb-auto`);

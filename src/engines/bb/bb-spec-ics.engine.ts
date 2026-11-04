@@ -7,6 +7,8 @@
  * Рабочие веса — ОРИЕНТИР, не назначение (у ББ нет помоста): e1RM (по скорости или
  * дневнику) × коридор цели. Коридоры — стандартные ACSM: масса 65–80%, сила 80–90%.
  */
+import { icsProperty } from '../ics-format';
+import { MUSCLE_LABEL_RU } from '../volume-landmarks.engine';
 
 export interface BbSpecWeekLite {
   week: number;
@@ -14,12 +16,10 @@ export interface BbSpecWeekLite {
   note: string;
 }
 
-function escIcs(s: string): string {
-  return String(s ?? '')
-    .replace(/\\/g, '\\\\')
-    .replace(/;/g, '\\;')
-    .replace(/,/g, '\\,')
-    .replace(/\r?\n/g, '\\n');
+/** Русская подпись мышцы для календаря: ключи модели (`delt_mid`, `biceps`) в
+ *  событии для человека — дефект (замер: 24 вхождения на один блок). */
+function ruMuscle(key: string): string {
+  return MUSCLE_LABEL_RU[key] || key;
 }
 
 function toDateStr(d: Date): string {
@@ -63,11 +63,11 @@ export function buildBBSpecIcs(
   const events = spec.weeks.map((w) => {
     const dt = toDateStr(mondayOfWeek(ref, w.week - 1));
     const sets = Object.entries(w.targetSets || {})
-      .map(([k, v]) => `${k} ${v}`)
+      .map(([k, v]) => `${ruMuscle(k)} ${v}`)
       .join(', ');
-    const summary = escIcs(`${title}: нед ${w.week} — ${sets || 'баланс'}`);
-    const desc = escIcs(`${w.note || ''}\nЦели: ${(spec.weakZones || []).join(', ') || '—'}`);
-    return ['BEGIN:VEVENT', `UID:bb-spec-${uidKey}-w${w.week}@bodybuildhealth`, `DTSTAMP:${stamp}`, `DTSTART;VALUE=DATE:${dt}`, `SUMMARY:${summary}`, `DESCRIPTION:${desc}`, 'END:VEVENT'].join('\r\n');
+    const summary = `${title}: нед ${w.week} — ${sets || 'баланс'}`;
+    const desc = `${w.note || ''}\nЦели: ${(spec.weakZones || []).map(ruMuscle).join(', ') || '—'}`;
+    return ['BEGIN:VEVENT', `UID:bb-spec-${uidKey}-w${w.week}@bodybuildhealth`, `DTSTAMP:${stamp}`, `DTSTART;VALUE=DATE:${dt}`, icsProperty('SUMMARY', summary), icsProperty('DESCRIPTION', desc), 'END:VEVENT'].join('\r\n');
   });
   return ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//BodyBuildHealth//BB Spec//RU', ...events, 'END:VCALENDAR'].join('\r\n');
 }
