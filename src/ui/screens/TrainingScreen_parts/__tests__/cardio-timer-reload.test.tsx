@@ -132,6 +132,18 @@ describe('CardioSessionTimer: сессия переживает перезагр
     expect(loadCardioLog().length).toBe(1);
   });
 
+  it('после сохранения сессия в списке помечена «уже записано сегодня»', () => {
+    const c = cycleToday();
+    render(<CardioSessionTimer cycle={c} />);
+    expect(screen.queryByText(/уже записано сегодня/)).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Старт Zone 2' }));
+    fireEvent.click(screen.getByRole('button', { name: /завершить/i }));
+    fireEvent.click(screen.getByRole('button', { name: /сохранить в дневник/i }));
+    expect(screen.getByText(/уже записано сегодня/)).toBeTruthy();
+    // aria-label не меняется (кнопка всё ещё «Старт Zone 2»), меняется подпись.
+    expect(screen.getByRole('button', { name: 'Старт Zone 2' }).textContent).toContain('Ещё раз');
+  });
+
   it('битый снимок не ломает экран', () => {
     localStorage.setItem(KEY, '{не json');
     const c = cycleToday();

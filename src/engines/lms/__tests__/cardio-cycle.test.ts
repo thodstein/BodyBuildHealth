@@ -1423,6 +1423,49 @@ describe('rescheduleCardioSession', () => {
     expect(r.changes).toEqual([]);
     expect(JSON.stringify(r.cycle)).toBe(before);
   });
+
+  /** Неделя с явными днями и заданными днями тяжёлых ног. */
+  const weekWithLegs = (dows: number[], legDays: number[], type: 'zone2' | 'recovery' = 'zone2'): CardioCycle => {
+    const c = buildCardioCycle({ goal: 'health', totalWeeks: 2, daysAvailable: dows.length, startDate: REF });
+    const w = c.weeks[0];
+    const template = w.sessions[0];
+    return {
+      ...c,
+      config: { ...c.config, legDays },
+      weeks: [{
+        ...w,
+        sessions: dows.map((d, i) => ({ ...template, id: `${template.id}-${i}`, type: i === 0 ? type : template.type, dayOfWeek: d, weeklyFrequency: 1 })),
+      }],
+    };
+  };
+
+  it('интенсивную сессию не переносит на день ног, если есть обычный свободный день', () => {
+    const c = weekWithLegs([0, 2, 4], [1, 3]);
+    const r = rescheduleCardioSession(c, weekDateIso(1, 0), { referenceIso: REF });
+    expect(r.changes).toHaveLength(1);
+    const dows = r.cycle.weeks[0].sessions.map(s => s.dayOfWeek);
+    expect(dows).not.toContain(1); // свободен, но день ног
+    expect(dows).not.toContain(3);
+    expect(new Set(dows).size).toBe(dows.length);
+    expect(r.changes[0].note).toBeUndefined();
+  });
+
+  it('свободны только дни ног — перенос с честной оговоркой', () => {
+    const c = weekWithLegs([0, 2, 4, 5, 6], [1, 3]);
+    const r = rescheduleCardioSession(c, weekDateIso(1, 0), { referenceIso: REF });
+    expect(r.changes).toHaveLength(1);
+    expect([1, 3]).toContain(r.cycle.weeks[0].sessions[0].dayOfWeek);
+    expect(r.changes[0].note).toBeTruthy();
+    expect(r.changes[0].label).toContain('день ног');
+  });
+
+  it('recovery можно перенести на день ног без оговорки', () => {
+    const c = weekWithLegs([0, 2, 4, 5, 6], [1, 3], 'recovery');
+    const r = rescheduleCardioSession(c, weekDateIso(1, 0), { referenceIso: REF });
+    expect(r.changes).toHaveLength(1);
+    expect([1, 3]).toContain(r.cycle.weeks[0].sessions[0].dayOfWeek);
+    expect(r.changes[0].note).toBeUndefined();
+  });
 });
 
 describe('assignSessionDays — стартовый день от startDate (баг №6)', () => {

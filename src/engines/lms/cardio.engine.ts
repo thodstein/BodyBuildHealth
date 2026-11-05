@@ -2610,30 +2610,46 @@ export interface CardioRescheduleResult {
  * Плановая сессия на дату ищется по раскладке (weeklyFrequency учитывается);
  * свободный день — следующий (по кругу), на котором нет ни одного занятия.
  * Переносится вся сессия (все её повторы в неделе) — об этом говорит label.
+ *
+ * Дни ног — такое же ограничение, как в раскладке (`expandWeekSchedule`):
+ * интенсивную сессию не ставим на день тяжёлых ног, если есть свободный обычный
+ * день. Если свободны только дни ног — переносим, но честно помечаем (`note`),
+ * вместо того чтобы молча создавать конфликт, о котором предупреждает превью.
+ *
  * Возвращает копию цикла; без сессии на дату или без свободного дня — без изменений.
  */
 export function rescheduleCardioSession(cycle: CardioCycle, dateIso: string, opts: { referenceIso?: string } = {}): CardioRescheduleResult {
   const ref = opts.referenceIso ?? cycle.startDate;
   const week = cardioWeekForDate(cycle, dateIso, ref);
   if (!week) return { cycle, changes: [] };
+  const legDays = new Set((cycle.config?.legDays ?? []).filter(d => d >= 0 && d <= 6));
   const scheduled = expandWeekSchedule(week, ref, { legDays: cycle.config?.legDays, weekNo: week.week });
   const hit = scheduled.find(x => x.date === dateIso);
   if (!hit) return { cycle, changes: [] };
   const dow = hit.dayOfWeek;
   const busy = new Set(scheduled.map(x => x.dayOfWeek));
-  let next = dow;
-  let guard = 0;
-  do {
-    next = (next + 1) % 7;
-    guard++;
-  } while (guard < 7 && busy.has(next));
-  if (guard >= 7 || next === dow) return { cycle, changes: [] };
+  const free: number[] = [];
+  for (let i = 1; i < 7; i++) {
+    const d = (dow + i) % 7;
+    if (!busy.has(d)) free.push(d);
+  }
+  if (free.length === 0) return { cycle, changes: [] };
+  const intense = hit.session.type !== 'recovery';
+  const usable = intense ? free.filter(d => !legDays.has(d)) : free;
+  const next = usable.length > 0 ? usable[0] : free[0];
+  const ontoLegDay = intense && legDays.has(next);
   const sessions = week.sessions.map(s => (s === hit.session ? { ...s, dayOfWeek: next } : s));
   const week2 = rebuildWeek({ ...week, sessions }, sessions, []);
   const weeks = cycle.weeks.map(w => (w.week === week.week ? week2 : w));
   return {
     cycle: rebuildCycle({ ...cycle, weeks }),
-    changes: [{ week: week.week, label: 'Сессия перенесена', from: DAY_LABELS_RU[dow], to: DAY_LABELS_RU[next] }],
+    changes: [{
+      week: week.week,
+      label: ontoLegDay ? 'Сессия перенесена на день ног' : 'Сессия перенесена',
+      from: DAY_LABELS_RU[dow],
+      to: DAY_LABELS_RU[next],
+      note: ontoLegDay ? 'свободного дня без тяжёлых ног нет — лучше заменить на recovery' : undefined,
+    }],
   };
 }
 
@@ -3023,6 +3039,8 @@ export interface CardioTuneChange {
   label: string;
   from: string;
   to: string;
+  /** Оговорка к изменению (например, «свободного дня без тяжёлых ног нет»). */
+  note?: string;
 }
 
 export interface CardioTuneResult {

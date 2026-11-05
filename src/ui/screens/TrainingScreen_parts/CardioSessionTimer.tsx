@@ -112,6 +112,13 @@ interface TodaySession {
 
 const elapsedOf = (s: Pick<ActiveSession, 'totalSec' | 'remainingSec'>) => Math.max(0, s.totalSec - s.remainingSec);
 
+/** Типы сессий, уже записанных сегодня (для пометки «уже записано»). */
+function todayLoggedTypes(): CardioType[] {
+  try {
+    return loadCardioLog().filter(e => e.date === todayIso() && e.completed).map(e => e.type);
+  } catch { return []; }
+}
+
 // ─── Снимок сессии (пережить перезагрузку WebView) ───
 //
 // На Android WebView может быть убит в фоне, а `location.reload()` (и
@@ -282,12 +289,16 @@ const [power, setPower] = useState(() => restored?.inputs.power ?? '');
   const [sport, setSport] = useState<CardioSport>(() => restored?.sport ?? 'other');
   const [flash, setFlash] = useState<string | null>(() => (restored ? (restored.finished ? RESTORED_FINISH_FLASH : RESTORED_FLASH) : null));
   const [warnings, setWarnings] = useState<CardioLogFieldWarnings | null>(null);
+  // Какие сессии уже записаны сегодня: после сохранения список выглядел
+  // ровно так же, и второй «Старт» молча создавал дубль в журнале.
+  const [loggedToday, setLoggedToday] = useState<CardioType[]>(() => todayLoggedTypes());
   const timerRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (!cycle) { setTodaySessions([]); return; }
     const t = cardioSessionsForDate(cycle, todayIso(), cycle.startDate);
     setTodaySessions(t ? t.sessions.map(s => ({ type: s.type, durationMin: s.durationMin, targetHr: s.targetHr, equipment: s.equipment, structured: s.structured })) : []);
+    setLoggedToday(todayLoggedTypes());
   }, [cycle]);
 
   const deadlineRef = useRef<number | null>(null);
@@ -584,6 +595,7 @@ const [power, setPower] = useState(() => restored?.inputs.power ?? '');
     setHr('');
     setKm('');
     setPower('');
+    setLoggedToday(todayLoggedTypes());
     flashMsg('💾 Сессия записана в дневник');
   };
 
@@ -621,7 +633,8 @@ const [power, setPower] = useState(() => restored?.inputs.power ?? '');
     const r = rescheduleCardioSession(cycle, todayIso(), { referenceIso: cycle.startDate });
     if (r.changes.length === 0) { flashMsg('⚠ Сессию некуда перенести (нет свободного дня недели)'); return; }
     onReschedule?.(r.cycle);
-    flashMsg(`↗ Сессия перенесена на ${r.changes[0].to} (нед ${r.changes[0].week})`);
+    const ch = r.changes[0];
+    flashMsg(`↗ Сессия перенесена на ${ch.to} (нед ${ch.week})${ch.note ? ` — ${ch.note}` : ''}`);
   };
 
   // Что показывать крупно: в интервальном режиме — остаток ШАГА, иначе — сессии.
@@ -821,10 +834,16 @@ const [power, setPower] = useState(() => restored?.inputs.power ?? '');
           {todaySessions.length === 0 && <div style={{ fontSize: 11, color: '#fff' }}>По плану на сегодня кардио нет.</div>}
           {todaySessions.map((s, i) => {
             const plan = buildCardioIntervalPlan({ type: s.type, durationMin: s.durationMin, structured: s.structured });
+            const doneToday = loggedToday.includes(s.type);
             return (
               <div key={i} style={{ ...ROW, flexWrap: 'nowrap', background: 'linear-gradient(180deg, rgba(255,255,255,0.045), rgba(255,255,255,0.015))', border: '1px solid rgba(255,255,255,0.08)', borderLeft: `3px solid ${TYPE_COLOR[s.type] ?? 'rgba(255,255,255,0.16)'}`, borderRadius: 12, padding: '9px 10px', fontVariantNumeric: 'tabular-nums' }}>
                 <span style={{ fontSize: 12.5, flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
                   <span style={{ fontWeight: 800 }}>{TYPE_LABEL[s.type]} · {s.durationMin} мин{s.equipment ? ` · ${cardioEquipmentLabel(s.equipment as CardioEquipment)}` : ''}</span>
+                  {doneToday && (
+                    <span data-cardio="logged-today" style={{ fontSize: 10.5, color: '#4ade80' }}>
+                      ✅ уже записано сегодня — второй «Старт» создаст ещё одну запись
+                    </span>
+                  )}
                   {plan && (
                     <span data-cardio="interval-hint" style={{ fontSize: 10.5, color: '#fbbf24' }}>
                       🔁 {plan.workSteps}×{fmt(plan.workSec)}{plan.restSec > 0 ? ` / ${fmt(plan.restSec)}` : ''} — таймер ведёт по подходам
@@ -834,7 +853,7 @@ const [power, setPower] = useState(() => restored?.inputs.power ?? '');
                     <span style={{ fontSize: 10.5, color: 'rgba(96,165,250,0.9)' }}>🎯 ЧСС {s.targetHr.min}-{s.targetHr.max} уд/мин</span>
                   )}
                 </span>
-                <button style={{ ...BTN_CTA, flexShrink: 0 }} onClick={() => start(s)} aria-label={`Старт ${TYPE_LABEL[s.type]}`}>▶️ Старт</button>
+                <button style={{ ...BTN_CTA, flexShrink: 0 }} onClick={() => start(s)} aria-label={`Старт ${TYPE_LABEL[s.type]}`}>{doneToday ? '▶️ Ещё раз' : '▶️ Старт'}</button>
                 <button style={{ ...BTN, flexShrink: 0, minWidth: 44 }} onClick={reschedule} aria-label="Перенести на другой день">↗</button>
                 <button style={{ ...BTN, flexShrink: 0, minWidth: 44 }} onClick={() => skip(s.type, s.durationMin)} aria-label={`Пропустить ${TYPE_LABEL[s.type]}`}>⏭</button>
               </div>
