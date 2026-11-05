@@ -6,6 +6,7 @@ import { aggregateBBVolume } from '../bb-volume.engine';
 import { validateBBPlan } from '../bb-validator.engine';
 import { estimateBBSessionCost } from '../bb-fatigue.engine';
 import { buildBBExpandedSummary } from '../bb-summary.engine';
+import { analyzeBBRotation } from '../bb-rotation.engine';
 
 /**
  * Аудит Y: цикл- и программа-пути меняют план ПОСЛЕ `finalizeBBPlan`
@@ -19,6 +20,8 @@ import { buildBBExpandedSummary } from '../bb-summary.engine';
  *  - `fatigueReport`: до 30/72 сессий;
  *  - `expandedSummary` и строки «⚠ Валидация» в rationale — расходились
  *    на всех 7 сборках.
+ *  - `rotationReport` (и счётчик «Ротация» в отчёте) считался до поздних
+ *    замен/удалений: расходился на 17/17 собранных планов.
  */
 
 const workMax = {
@@ -64,6 +67,14 @@ function expectSnapshotsMatchFacts(plan: any, label: string) {
   expect(norm(plan.validation?.issues || []), `${label}: validation`).toEqual(norm(fresh.issues));
 
   expect(plan.expandedSummary, `${label}: expandedSummary`).toEqual(buildBBExpandedSummary(plan));
+
+  const freshRotation = analyzeBBRotation(plan);
+  expect(plan.rotationReport, `${label}: rotationReport`).toEqual(freshRotation);
+  expect(plan.report.rotationWarnings, `${label}: счётчик ротации в отчёте`).toBe(freshRotation.issues.length);
+  const freshRotationLines = new Set(freshRotation.issues.map((i: any) => `⚠ Ротация: ${i.message}`));
+  const staleRotation = ((plan.rationale || []) as string[])
+    .filter(line => String(line).startsWith('⚠ Ротация:') && !freshRotationLines.has(line));
+  expect(staleRotation, `${label}: rationale описывает снятую ротацию`).toEqual([]);
 
   const warningSet = new Set(
     ((plan.validation?.issues || []) as any[])

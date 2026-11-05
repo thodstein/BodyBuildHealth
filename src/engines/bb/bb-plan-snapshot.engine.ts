@@ -33,6 +33,7 @@ import { analyzeBBBalance } from './bb-balance.engine';
 import { estimateBBSessionCost } from './bb-fatigue.engine';
 import { buildBBPlanReport } from './bb-report.engine';
 import { buildBBExpandedSummary } from './bb-summary.engine';
+import { analyzeBBRotation } from './bb-rotation.engine';
 import {
   applyFrequencyDriftNote,
   frequencyDriftNote,
@@ -50,9 +51,12 @@ export interface BBPlanSnapshotOptions {
   refreshFrequency?: boolean;
   /** Пересобрать строки «⚠ Валидация: …» в rationale (иначе они описывают старое состояние). */
   refreshValidationRationale?: boolean;
+  /** Пересобрать строки «⚠ Ротация: …» в rationale (иначе описывают до-финальный состав). */
+  refreshRotationRationale?: boolean;
 }
 
 const VALIDATION_LINE_PREFIX = '⚠ Валидация:';
+const ROTATION_LINE_PREFIX = '⚠ Ротация:';
 /** Коды, которые на промежуточной стадии ожидаемы и снимаются финализатором. */
 const TRANSIENT_VALIDATION_CODES = new Set(['target_volume_deficit', 'effective_mrv_overflow']);
 
@@ -77,6 +81,31 @@ export function refreshBBPlanSnapshots(plan: any, opts: BBPlanSnapshotOptions = 
     sessions: (week.sessions || []).map((session: any) => estimateBBSessionCost(session)),
   }));
   plan.expandedSummary = buildBBExpandedSummary(plan);
+
+  // Ротация: стабильность основных движений внутри фазы. В финализаторе она
+  // считалась в середине прохода — до поздних замен/удалений (реализм сессии,
+  // гарды дней, доводка головок рук). Замер 17 планов (generic/cycle/program):
+  // расходились все, например upper_lower_4 — 56 issue в плане против 65
+  // фактических; отчёт и карточка качества показывали до-финальное число.
+  plan.rotationReport = analyzeBBRotation(plan);
+  if (opts.refreshRotationRationale) {
+    const issues = ((plan.rotationReport.issues || []) as any[]);
+    const message = (issue: any) => `${ROTATION_LINE_PREFIX} ${issue.message}`;
+    const prev = (Array.isArray(plan.rationale) ? plan.rationale : [])
+      .filter((line: string) => String(line).startsWith(ROTATION_LINE_PREFIX));
+    // «primary_changed» сохраняем, только если финализатор уже решил его
+    // показать (reorder=false); остальные строки — по фактическому составу.
+    const keptPrimary = prev.filter((line: string) =>
+      issues.some((issue) => issue.code === 'primary_changed' && message(issue) === line));
+    const fresh = issues
+      .filter((issue) => issue.code !== 'primary_changed')
+      .slice(0, 20)
+      .map(message);
+    const lines = [...new Set([...keptPrimary, ...fresh])];
+    plan.rationale = (Array.isArray(plan.rationale) ? plan.rationale : [])
+      .filter((line: string) => !String(line).startsWith(ROTATION_LINE_PREFIX))
+      .concat(lines);
+  }
 
   if (opts.refreshFrequency && opts.canonicalMuscle) {
     const freq = reconcileFrequencyClaim(plan, { canonical: opts.canonicalMuscle });

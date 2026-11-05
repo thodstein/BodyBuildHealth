@@ -2010,6 +2010,7 @@ export function convertCycleToBBPlan(input: CycleToPlanInput): BBPlan {
       // Паритет с билдером: строки «⚠ Валидация» в rationale тоже к факту —
       // иначе после среза в тексте остаются предупреждения, которых уже нет.
       refreshValidationRationale: true,
+      refreshRotationRationale: true,
     });
   } else {
     finalized.report = buildBBPlanReport(finalized);
@@ -3360,6 +3361,7 @@ export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts)
     canonicalMuscle: (m: string) => WEAK_TO_MUSCLE[m] || m,
     refreshFrequency: true,
     refreshValidationRationale: true,
+    refreshRotationRationale: true,
   });
   return finalized;
 }

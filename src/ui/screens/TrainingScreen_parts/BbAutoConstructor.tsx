@@ -2170,6 +2170,7 @@ const [bbVolumeRamp, setBbVolumeRamp] = useState<'standard' | 'preloaded' | 'fla
       canonicalMuscle,
       refreshFrequency: true,
       refreshValidationRationale: true,
+      refreshRotationRationale: true,
     });
     return out;
   };

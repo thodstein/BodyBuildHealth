@@ -1641,5 +1641,57 @@ MAV-верха`, `Доноры на MV: back, quads`, `поставлен в с�
   факту сессий: 14 при капе 28 и 12 при капе 22, валидатор без ошибок — план не
   менялся, снапшот был неверным.
 
+---
+
+## 25. Итерация AA (2026-11-05): `rotationReport` — тоже снимок факта
+
+### Дефект
+
+`finalizeBBPlan` считал `rotationReport` (стабильность основных движений внутри
+фазы) в середине прохода — до поздних замен/удалений упражнений: реализм
+сессии, гарды дней (трапы/предплечья/икры), доводка головок рук, суперсеты.
+Итоговый план отличался, а `rotationReport` — нет. Потребители:
+`bb-report.engine` (`rotationWarnings` в отчёте), `bb-quality-report.engine`
+(карточка качества), UI-диагностика. Строки «⚠ Ротация: …» в `rationale` тоже
+описывали старый состав.
+
+### Замер (пробник: 12 generic + 4 цикла + программа; до правки)
+
+Расходились 17/17 планов:
+
+| план | issue в `rotationReport` / факт |
+|---|---|
+| upper_lower_4/intermediate | 56 / 65 |
+| ppl_6/intermediate | 69 / 81 |
+| push_pull_4/intermediate | 46 / 56 |
+| bro_5/intermediate | 49 / 52 |
+| cycle-08 | 46 / 47 |
+| program adapt | 9 / 7 |
+
+Stale-строк «⚠ Ротация» в `rationale`: 0–4 (ppl_6, bro_5, program).
+
+### Правка
+
+`refreshBBPlanSnapshots` теперь всегда пересобирает `rotationReport` по
+текущему составу и (по флагу `refreshRotationRationale`) переписывает строки
+«⚠ Ротация»; `primary_changed` сохраняется, только если финализатор уже решил
+его показать (`reorder === false`). Флаг включён везде, где план меняется после
+финализатора: финальный снимок финализатора, билдер, цикл- и программа-пути, UI
+(`BbAutoConstructor`).
+
+### Проверка AA
+
+- Пробник после правки: 17/17 `same = true`, `report.rotationWarnings` = факт,
+  stale-строк — 0.
+- `bb-plan-snapshot-fact` (generic + UI-правка) и
+  `bb-cycle-program-snapshot-facts` (цикл/программа) теперь сверяют
+  `rotationReport`, счётчик в отчёте и строки `rationale` с фактом.
+- Целевые: 11 bb-файлов / 133 теста — passed; 15 UI bb-файлов / 111 тестов —
+  passed.
+- `tsc --noEmit` — 0 ошибок.
+- Полный `src/engines/bb/__tests__` (301 файл, 7 чанков): 3412 passed,
+  20 skipped (авторские skip), 0 failed.
+
+
 
 

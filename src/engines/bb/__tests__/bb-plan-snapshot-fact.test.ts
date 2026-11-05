@@ -23,6 +23,7 @@ import { analyzeBBBalance } from '../bb-balance.engine';
 import { estimateBBSessionCost } from '../bb-fatigue.engine';
 import { buildBBPlanReport } from '../bb-report.engine';
 import { buildBBExpandedSummary } from '../bb-summary.engine';
+import { analyzeBBRotation } from '../bb-rotation.engine';
 
 const WM = { chest: 100, back: 120, shoulders: 60, biceps: 50, triceps: 60, quads: 140, hamstrings: 100, glutes: 140, calves: 80, abs: 60, traps: 80, forearms: 40 };
 
@@ -174,6 +175,14 @@ describe('bb: снимки после правок (revalidate-путь)', () =>
       expect(JSON.parse(JSON.stringify(plan.fatigueReport)), `${where}: fatigueReport`).toEqual(JSON.parse(JSON.stringify(freshFatigue)));
       expect(JSON.parse(JSON.stringify(plan.report)), `${where}: report`).toEqual(JSON.parse(JSON.stringify(buildBBPlanReport(plan))));
       expect(plan.report.expandedSummary, `${where}: отчёт копирует expandedSummary`).toBe(plan.expandedSummary);
+      const freshRotation = analyzeBBRotation(plan);
+      expect(plan.rotationReport, `${where}: rotationReport`).toEqual(freshRotation);
+      expect(plan.report.rotationWarnings, `${where}: счётчик ротации в отчёте`).toBe(freshRotation.issues.length);
+      const freshRotationLines = new Set(freshRotation.issues.map((i: any) => `⚠ Ротация: ${i.message}`));
+      const staleRotation = (plan.rationale || [])
+        .filter((line: string) => String(line).startsWith('⚠ Ротация:'))
+        .filter((line: string) => !freshRotationLines.has(String(line)));
+      expect(staleRotation, `${where}: rationale описывает снятую ротацию`).toEqual([]);
       const freshValidation = validateBBPlan(plan, uiValidationOptions(plan) as any);
       const countErrors = (issues: any[]) => issues.filter((i: any) => i.level === 'error').length;
       expect(

@@ -5988,6 +5988,7 @@ for (const week of next.weeks) {
     specTargets: (options as any).priorityMuscles,
     canonicalMuscle: (m: string) => (WEAK_TO_MUSCLE as Record<string, string>)[m] || m,
     refreshFrequency: true,
+    refreshRotationRationale: true,
   });
   return next;
 }

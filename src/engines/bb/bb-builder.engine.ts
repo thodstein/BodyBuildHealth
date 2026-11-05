@@ -5571,6 +5571,7 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
     canonicalMuscle: (m: string) => (WEAK_TO_MUSCLE as Record<string, string>)[m] || m,
     refreshFrequency: true,
     refreshValidationRationale: true,
+    refreshRotationRationale: true,
   });
   return finalized;
 }
