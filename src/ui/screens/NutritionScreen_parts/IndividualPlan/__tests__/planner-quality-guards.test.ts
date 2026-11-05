@@ -64,7 +64,7 @@ import { describe, it, expect } from 'vitest';
 import { buildDayPlan, type MealPlanInput, _rdaForForTest, _rdaTargetsForTest } from '../meal-plan-engine';
 import { buildDayTargets } from '../planner-day-targets';
 import { scoreDayQuality } from '../planner-quality-score';
-import { sumMicros, analyzeMicroCoverage, lowCountForScore } from '../planner-micro-coverage';
+import { sumMicros, analyzeMicroCoverage, lowCountForScore, SUPPLEMENT_ADDRESSED } from '../planner-micro-coverage';
 import { stapleFamilyOf, nutCatchupCap, quotaWeightScale } from '../food-availability';
 import { FOOD_DB } from '../../../../../core/nutrition-database';
 import { getMicroFromFood } from '../planner-micro-reader';
@@ -1542,6 +1542,10 @@ describe('микро-ноты по факту (QG21)', () => {
         if (Math.abs(Number(m[2]) - Math.floor((fact / Number(m[4])) * 100)) > 1) {
           bad.push(`${d.id}/${key}: ${m[2]}% ≠ ${fact.toFixed(1)}/${m[4]}`);
         }
+        // QG38 (§8.37): у нутриента с адресом-добавкой (витамин D) ноты «Добавьте
+        // продукт N г» больше нет — адрес капсула. Требуем только честное значение
+        // и % нормы (проверены выше), а не порцию еды.
+        if (SUPPLEMENT_ADDRESSED.has(key)) continue;
         const portion = n.match(/(?:Добавьте|Увеличьте уже используемый продукт) (.+?) (\d+) г \(ещё (\d+)/);
         if (!portion) { bad.push(`${d.id}/${key}: нет порции (${n.slice(0, 50)})`); continue; }
         const g = Number(portion[2]);
@@ -2033,5 +2037,24 @@ describe('QG37: витамин D — адрес-добавка вместо «д
     ];
     expect(lowCountForScore(cov as any), 'D исключён, Fe и E остались').toBe(2);
     expect(lowCountForScore(undefined)).toBe(0);
+  });
+
+  it('нота дефицита D называет адрес-добавку, а не «добавьте лосось» (QG38)', () => {
+    // Замер до QG38: 9 дней из 30 печатали «⚠ Дефицит VitD: 3% RDA … Добавьте
+    // Лосось 100 г» — рядом с нотой «D3 2000 IU/день». Два разных адреса одного
+    // дефицита: человек не понимает, что из этого делать. Теперь нота одна и
+    // она про капсулу; формат «⚠ Дефицит <key>:» сохранён (его читает QG21).
+    const bad: string[] = [];
+    let seen = 0;
+    for (const d of DAYS) {
+      for (const n of ((d.plan.notes || []) as string[])) {
+        if (typeof n !== 'string' || !/Дефицит VitD/.test(n)) continue;
+        seen++;
+        if (!/добавка D3 2000 IU/.test(n)) bad.push(`${d.id}: нет адреса (${n.slice(0, 50)})`);
+        if (/Добавьте|Увеличьте/.test(n)) bad.push(`${d.id}: совет едой (${n.slice(0, 50)})`);
+      }
+    }
+    expect(bad.slice(0, 4).join(' | '), 'нота D с двумя адресами').toBe('');
+    expect(seen, 'дней с нотой дефицита D').toBeGreaterThan(0);
   });
 });

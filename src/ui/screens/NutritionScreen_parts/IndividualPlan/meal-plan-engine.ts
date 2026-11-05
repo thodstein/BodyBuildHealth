@@ -25,7 +25,7 @@
 
 import { FOOD_DB, FOOD_ALLERGEN_DIET } from "../../../../core/nutrition-database";
 import { filterByIntolerance, matchesCategoryPref, isPreferredCategory, tasteMatchScore, type CategoryPref, type Intolerances, type TasteProfile } from "./planner-preferences";
-import { analyzeMicroCoverage, sumMicros, RDA_BASE, getMicroTargets, lowCountForScore, type MicroCoverageEntry } from "./planner-micro-coverage";
+import { analyzeMicroCoverage, sumMicros, RDA_BASE, getMicroTargets, lowCountForScore, SUPPLEMENT_ADDRESSED, type MicroCoverageEntry } from "./planner-micro-coverage";
 import { scoreDayQuality, describeQualityWeakness, MIN_MEANINGFUL_G } from "./planner-quality-score";
 import { getMicroFromFood } from "./planner-micro-reader";
 import { detectMealInteractions, cookMethodGuidance } from "./planner-food-interactions";
@@ -14029,7 +14029,11 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
                 dev: _devOk20(),
                 fiber: (Number(totals.fiber) || 0) <= _qgFiberCap,
                 kcal: _donorKcalOk,
-                d: _micro20('VitD') >= Math.min(_d020, _dGoal20 * 0.7) - _dGoal20 * 0.02,
+                // QG38 (§8.37): D не гейтит перенос белка завтрака — у него адрес-добавка,
+                // а донор-рыба может нести D, который стадия QG20 не обязана сохранять.
+                // Гард оставлен только для нутриентов БЕЗ адреса (Ca/омега-3/E/B6 ниже).
+                // QG38 (§8.37): D не гейтит перенос белка завтрака — у него адрес-добавка.
+                d: true,
                 ca: _micro20('Ca') >= Math.min(_ca020, _caGoal20 * 0.7) - _caGoal20 * 0.02,
                 o3: _micro20('Omega3') >= Math.min(_o3020, _o3Goal20 * 0.7) - _o3Goal20 * 0.02,
                 e: _micro20('VitE') >= _e020 - _eGoal20 * 0.02,
@@ -14792,6 +14796,9 @@ function closeFoodDeficiencies(meals: Meal[], isVegetarian = false, sex: 'male'|
   const notes: string[] = [];
   const usedIds = new Set(allItems.filter(x => x.food).map(x => x.food!.id));
   Object.entries(RDA_TARGETS).forEach(([key, cfg]) => {
+    // QG38 (§8.37): адресованные добавкой нутриенты не получают совет «добавьте
+    // продукт» — иначе в плане две ноты одного дефицита с разными адресами.
+    if (SUPPLEMENT_ADDRESSED.has(key)) return;
     const effRda = rdaFor(key, sex) || cfg.rda; // §4.5: единый sex-aware канон
     const val = totals[key] || 0;
     if (val < effRda * 0.6) {
@@ -15721,6 +15728,19 @@ function rebuildMicroFactNotes(
     const effRda = rdaFor(key, opts.sex) || cfg.rda;
     const val = Number(fact[key] || 0);
     if (!(effRda > 0) || val >= effRda * 0.6) continue;
+    // QG38 (§8.37): у витамина D адрес — добавка D3, а не продукт. Совет «добавьте
+    // лосось 100 г» рядом с нотой «D3 2000 IU» — два разных адреса одного дефицита;
+    // план обязан говорить то, что реально закрывает нутриент.
+    if (SUPPLEMENT_ADDRESSED.has(key)) {
+      // floor, как у остальных нот: 69.6% не должно выглядеть как 70%.
+      const pctD = Math.floor((val / effRda) * 100);
+      if (pctD < 70) {
+        // Формат «⚠ Дефицит <key>:» сохранён намеренно: QG21 требует строку на
+        // каждый нутриент <60% RDA. Меняется только АДРЕС — капсула, а не «ещё рыба».
+        out.push(`⚠ Дефицит ${key}: ${pctD}% RDA (${Math.round(val)}/${effRda} ${cfg.unit}). Адрес — добавка D3 2000 IU (стек добавок): пищевого D в тарелке физиологически мало у всех`);
+      }
+      continue;
+    }
     const sourceId = opts.isVegetarian ? (cfg.vegFoodId || cfg.foodId) : cfg.foodId;
     const sourceIds = [sourceId, ...cfg.alternatives].filter((id) => !usedIds.has(id));
     const food = sourceIds.map((id) => FOOD_DB.find((f) => f.id === id)).find(Boolean)
@@ -15777,6 +15797,11 @@ function activelyCloseTopDeficiency(meals: Meal[], isVegetarian: boolean, sex: '
   });
   let worstKey: string | null = null; let worstPct = 60;
   for (const [key, cfg] of Object.entries(RDA_TARGETS)) {
+    // QG38 (§8.37): слепое исключение адресованного нутриента (витамин D) из выбора
+    // «худшего» ЗАМЕРЕНО и отвергнуто: worstKey переезжает на Fe/K/Zn, стадия тянет
+    // печень/устрицы, и день теряет жир (50кг/4/отдых: 39.1 → 31.9 г, −20.2% при
+    // допуске −15%). Цена честных данных D — не эта стадия, а пере-базирование
+    // 7 тестовых файлов (долг QG39), см. docs §8.37.
     const effRda = rdaFor(key, sex) || cfg.rda; // §4.5: единый sex-aware канон
     const pct = (microTotals[key] || 0) / effRda * 100;
     if (pct < worstPct) { worstPct = pct; worstKey = key; }
