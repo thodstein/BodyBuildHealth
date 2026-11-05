@@ -41,6 +41,9 @@ beforeEach(() => {
     localStorage.removeItem(LOG_KEY);
     localStorage.removeItem(SRPE_KEY);
     localStorage.removeItem(CARDIO_AUTO_TUNE_KEY);
+    // Снимок активного таймера: иначе идущая сессия из соседнего теста
+    // восстанавливается и ломает сценарий «старт → завершить → сохранить».
+    localStorage.removeItem('he_cardio_timer_active');
   } catch { /* ignore */ }
 });
 

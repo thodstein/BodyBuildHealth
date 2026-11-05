@@ -3573,6 +3573,43 @@ export function cardioSessionProtocol(session: Pick<CardioSession, 'type' | 'dur
     }
     return { note: 'Интервалы в целевом диапазоне', zone: z(fallbackIdx) ? { min: z(fallbackIdx)!.bpmMin, max: z(fallbackIdx)!.bpmMax } : undefined };
   };
+  // Структурированная сессия: протокол = таймлайн таймера. Раньше превью
+  // обещало «Разминка 5 мин» на любой сессии, а таймер вёл 10-20 мин из остатка
+  // бюджета — атлет читал один план, а тренировался по другому.
+  const plan = session.structured && session.structured.length > 0 ? buildCardioIntervalPlan(session) : null;
+  if (plan) {
+    const steps = plan.steps;
+    const warm = steps[0]?.kind === 'warmup' ? steps[0].sec : 0;
+    const cool = steps[steps.length - 1]?.kind === 'cooldown' ? steps[steps.length - 1].sec : 0;
+    const mainSec = Math.max(0, plan.totalSec - warm - cool);
+    const iv = intervalNote(session.type === 'hiit' ? 3 : 2);
+    const structMin = Math.round(plan.totalSec / 60);
+    const planMin = Math.round(session.durationMin);
+    const shortNote = structMin < planMin ? ` · по структуре ${structMin} из ${planMin} мин, остаток — лёгкий темп` : '';
+    const phases: CardioSessionPhase[] = [];
+    const zone0 = z(0);
+    if (warm > 0) {
+      phases.push({
+        name: 'Разминка', minutes: Math.max(1, Math.round(warm / 60)),
+        note: 'Лёгкий темп, плавное повышение пульса',
+        hrZone: zone0 ? { min: zone0.bpmMin, max: zone0.bpmMax } : undefined,
+      });
+    }
+    phases.push({
+      name: session.type === 'hiit' ? 'Интервалы' : 'Темповые отрезки',
+      minutes: Math.max(1, Math.round(mainSec / 60)),
+      note: iv.note + shortNote,
+      hrZone: iv.zone,
+    });
+    if (cool > 0) {
+      phases.push({
+        name: 'Заминка', minutes: Math.max(1, Math.round(cool / 60)),
+        note: 'Лёгкий темп до восстановления пульса',
+        hrZone: zone0 ? { min: zone0.bpmMin, max: zone0.bpmMax } : undefined,
+      });
+    }
+    return phases;
+  }
   switch (session.type) {
     case 'hiit': {
       const work = Math.max(5, dur - 10);

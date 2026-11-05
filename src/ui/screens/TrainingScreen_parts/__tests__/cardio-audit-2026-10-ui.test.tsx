@@ -8,12 +8,14 @@
  */
 import React from 'react';
 import { describe, expect, it, beforeEach } from 'vitest';
-import { render, screen, fireEvent, within } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { CardioAnalyticsDashboard } from '../CardioAnalyticsDashboard';
 import { CardioWeekEditor } from '../CardioWeekEditor';
 import { CardioAutoTunePanel } from '../CardioAutoTunePanel';
 import { CardioValidationCard } from '../CardioPlanExtras';
-import { buildCardioCycle, loadCardioCycles, loadCardioCycles as loadCycles, cardioFactHrAdjustment } from '../../../../engines/lms/cardio.engine';
+import { CardioFieldTestLog } from '../CardioFieldTestLog';
+import { CardioDiaryStep } from '../CardioDiaryStep';
+import { buildCardioCycle, loadCardioCycles, loadCardioCycles as loadCycles, cardioFactHrAdjustment, saveFieldTestLogEntry } from '../../../../engines/lms/cardio.engine';
 import { loadCardioLog } from '../../../../engines/lms/cardio-diary.engine';
 import type { CardioCycle } from '../../../../engines/lms/cardio.engine';
 
@@ -25,8 +27,22 @@ beforeEach(() => {
     localStorage.removeItem('he_cardio_sessions');
     localStorage.removeItem('he_cardio_wellness');
     localStorage.removeItem('he_cardio_cycle_history');
+    // Снимок активного таймера: иначе сессия из предыдущего теста
+    // «восстанавливается» и подменяет ожидаемый экран.
+    localStorage.removeItem('he_cardio_timer_active');
   } catch { /* ignore */ }
 });
+
+/**
+ * Переключение таба кардио-дневника. `getByRole` строит accessibility-дерево
+ * всего CardioDiaryStep — на загруженной машине это секунды, и тяжёлые тесты
+ * падали по таймауту. Прямой обход кнопок по тексту быстрый и достаточный.
+ */
+const clickTab = (root: HTMLElement, label: string) => {
+  const btn = Array.from(root.querySelectorAll('button')).find(b => (b.textContent ?? '').includes(label));
+  if (!btn) throw new Error(`таб «${label}» не найден`);
+  fireEvent.click(btn);
+};
 
 /** Локальная дата N дней назад (журнал кардио — DESC). */
 function isoDaysAgo(n: number): string {
@@ -155,7 +171,6 @@ describe('P0-3 wellness реально влияет на авто-подстро
 
 describe('PRO: журнал полевых тестов — подсказка следующего теста', () => {
   it('пустой журнал + уровень → видно, какой тест делать', async () => {
-    const { CardioFieldTestLog } = await import('../CardioFieldTestLog');
     localStorage.removeItem('he_cardio_field_tests_v1');
     render(<CardioFieldTestLog level="intermediate" equipment={['running']} />);
     const el = document.querySelector('[data-fieldtest="recommend"]');
@@ -165,7 +180,6 @@ describe('PRO: журнал полевых тестов — подсказка �
   });
 
   it('без уровня подсказки нет (не выдумываем)', async () => {
-    const { CardioFieldTestLog } = await import('../CardioFieldTestLog');
     localStorage.removeItem('he_cardio_field_tests_v1');
     render(<CardioFieldTestLog />);
     expect(document.querySelector('[data-fieldtest="recommend"]')).toBeNull();
@@ -202,9 +216,7 @@ describe('PRO: мощность вело-сессии → TSS (powerTss)', () =>
 
 describe('PRO: персональные зоны из полевых тестов (personalZones)', () => {
   it('есть LTHR-замер → блок «Ваши зоны сейчас» с диапазонами', async () => {
-    const { CardioFieldTestLog } = await import('../CardioFieldTestLog');
     localStorage.removeItem('he_cardio_field_tests_v1');
-    const { saveFieldTestLogEntry } = await import('../../../../engines/lms/cardio.engine');
     saveFieldTestLogEntry({ date: isoDaysAgo(5), kind: 'lthr30', lthr: 170 });
     const c = buildCardioCycle({ goal: 'cut', totalWeeks: 4, id: 'pz-1', age: 30 });
     render(<CardioFieldTestLog level="intermediate" cycle={c} />);
@@ -218,7 +230,6 @@ describe('PRO: персональные зоны из полевых тесто�
   });
 
   it('замеров нет — блока зон нет (не выдумываем)', async () => {
-    const { CardioFieldTestLog } = await import('../CardioFieldTestLog');
     localStorage.removeItem('he_cardio_field_tests_v1');
     render(<CardioFieldTestLog level="intermediate" />);
     expect(document.querySelector('[data-fieldtest="zones"]')).toBeNull();
@@ -227,7 +238,6 @@ describe('PRO: персональные зоны из полевых тесто�
 
 describe('PRO: CTL по году кардио (cardioYearFactCtlSeries)', () => {
   it('есть annual-кардио + журнал → строка CTL за год', async () => {
-    const { CardioDiaryStep } = await import('../CardioDiaryStep');
     const c1 = buildCardioCycle({ goal: 'cut', totalWeeks: 6, id: 'yr-1', startDate: isoDaysAgo(30), age: 30, restingHr: 60 });
     const c2 = buildCardioCycle({ goal: 'health', totalWeeks: 6, id: 'yr-2', startDate: isoDaysAgo(4), age: 30, restingHr: 60 });
     localStorage.setItem('he_cardio_cycles', JSON.stringify([c1, c2]));
@@ -239,7 +249,7 @@ describe('PRO: CTL по году кардио (cardioYearFactCtlSeries)', () => 
     const view = render(<CardioDiaryStep cycle={c2} acwr={null} recoveryLow={false} onChanged={() => {}} />);
     // Переключаемся на таб «Аналитика» (строго в своём контейнере: под нагрузкой
     // в body могут остаться корни предыдущих тестов).
-    fireEvent.click(within(view.container).getByRole('button', { name: /Аналитика/ }));
+    clickTab(view.container, 'Аналитика');
     const el = document.querySelector('[data-autotune="year-ctl"]');
     expect(el).toBeTruthy();
     const text = el!.textContent ?? '';
@@ -248,11 +258,10 @@ describe('PRO: CTL по году кардио (cardioYearFactCtlSeries)', () => 
   });
 
   it('без annual-кардио строки нет', async () => {
-    const { CardioDiaryStep } = await import('../CardioDiaryStep');
     const c = buildCardioCycle({ goal: 'health', totalWeeks: 4, id: 'yr-3' });
     localStorage.setItem('he_cardio_cycles', JSON.stringify([c]));
     const view2 = render(<CardioDiaryStep cycle={c} acwr={null} recoveryLow={false} onChanged={() => {}} />);
-    fireEvent.click(within(view2.container).getByRole('button', { name: /Аналитика/ }));
+    clickTab(view2.container, 'Аналитика');
     expect(document.querySelector('[data-autotune="year-ctl"]')).toBeNull();
   });
 });
