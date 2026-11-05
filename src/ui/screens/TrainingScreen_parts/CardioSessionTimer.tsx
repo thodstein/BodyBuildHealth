@@ -821,9 +821,9 @@ const [power, setPower] = useState(() => restored?.inputs.power ?? '');
             </div>
           )}
           {(() => {
-            const hint = cardioExpectedDistanceHint(finished.type, Math.max(1, finished.actualMin));
+            const hint = cardioExpectedDistanceHint(finished.type, Math.max(1, finished.actualMin), sport);
             return hint ? (
-              <div style={{ fontSize: 10, color: 'rgba(96,165,250,0.85)', lineHeight: 1.4 }}>💡 Ориентир: {hint} — темп покажется в журнале после сохранения.</div>
+              <div data-cardio="distance-hint" style={{ fontSize: 10, color: 'rgba(96,165,250,0.85)', lineHeight: 1.4 }}>💡 Ориентир: {hint} — цифры покажутся в журнале после сохранения.</div>
             ) : null;
           })()}
         </div>

@@ -132,6 +132,18 @@ describe('CardioSessionTimer: сессия переживает перезагр
     expect(loadCardioLog().length).toBe(1);
   });
 
+  it('подсказка дистанции следует за дисциплиной: вело — не беговые км/ч', () => {
+    const c = cycleToday();
+    render(<CardioSessionTimer cycle={c} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Старт Zone 2' }));
+    fireEvent.click(screen.getByRole('button', { name: /завершить/i }));
+    expect((screen.getByText(/Ориентир/).textContent ?? '')).toContain('если бег/ходьба');
+    fireEvent.click(screen.getByRole('button', { name: 'Дисциплина: велосипед' }));
+    const bike = screen.getByText(/Ориентир/).textContent ?? '';
+    expect(bike).toContain('вело');
+    expect(bike).not.toContain('бег');
+  });
+
   it('после сохранения сессия в списке помечена «уже записано сегодня»', () => {
     const c = cycleToday();
     render(<CardioSessionTimer cycle={c} />);

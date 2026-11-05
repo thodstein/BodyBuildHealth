@@ -162,16 +162,39 @@ describe('cardioPaceMinPerKm / cardioAvgPaceMinPerKm (темп мин/км)', ()
 });
 
 describe('cardioExpectedDistanceHint', () => {
-  it('zone2 30 мин → ~4.5 км при 9 км/ч', () => {
-    expect(cardioExpectedDistanceHint('zone2', 30)).toContain('~4.5 км при 9 км/ч (Zone 2 (лёгкий бег)');
+  it('дисциплина не выбрана → условная подсказка (не выдумываем вид)', () => {
+    const hint = cardioExpectedDistanceHint('zone2', 30);
+    expect(hint).toContain('~4.5 км');
+    expect(hint).toContain('если бег/ходьба');
+    expect(hint).toContain('9 км/ч');
+    expect(hint).not.toContain('лёгкий бег');
   });
 
-  it('hiit 20 мин → ~2.7 км при 8 км/ч', () => {
-    expect(cardioExpectedDistanceHint('hiit', 20)).toContain('~2.7 км при 8 км/ч (HIIT (с учётом отдыха)');
+  it('бег: скорость и подпись дисциплины', () => {
+    const hint = cardioExpectedDistanceHint('zone2', 30, 'run');
+    expect(hint).toContain('~4.5 км при 9 км/ч');
+    expect(hint).toContain('Zone 2, бег');
   });
 
-  it('recovery 40 мин → ~3.3 км при 5 км/ч', () => {
-    expect(cardioExpectedDistanceHint('recovery', 40)).toContain('~3.3 км при 5 км/ч (Recovery (ходьба)');
+  it('вело: велосипедные км/ч, а не беговые', () => {
+    const hint = cardioExpectedDistanceHint('zone2', 60, 'bike');
+    expect(hint).toContain('~24 км при 24 км/ч');
+    expect(hint).toContain('вело');
+    expect(hint).not.toContain('бег');
+  });
+
+  it('гребля: 45 мин zone2 → ~8.3 км при 11 км/ч', () => {
+    const hint = cardioExpectedDistanceHint('zone2', 45, 'row');
+    expect(hint).toContain('~8.3 км при 11 км/ч');
+    expect(hint).toContain('гребля');
+  });
+
+  it('hiit 20 мин, бег → ~2.7 км при 8 км/ч', () => {
+    expect(cardioExpectedDistanceHint('hiit', 20, 'run')).toContain('~2.7 км при 8 км/ч (HIIT (с учётом отдыха)');
+  });
+
+  it('recovery 40 мин, бег → ~3.3 км при 5 км/ч', () => {
+    expect(cardioExpectedDistanceHint('recovery', 40, 'run')).toContain('~3.3 км при 5 км/ч (Recovery, бег');
   });
 
   it('null при нулевой/отрицательной длительности', () => {
@@ -180,8 +203,8 @@ describe('cardioExpectedDistanceHint', () => {
     expect(cardioExpectedDistanceHint('zone2', undefined as unknown as number)).toBeNull();
   });
 
-  it('miss: скорость 10 км/ч', () => {
-    expect(cardioExpectedDistanceHint('miss', 60)).toContain('~10 км при 10 км/ч (MISS (умеренно)');
+  it('miss 60 мин, бег → ~10 км при 10 км/ч', () => {
+    expect(cardioExpectedDistanceHint('miss', 60, 'run')).toContain('~10 км при 10 км/ч (MISS, бег');
   });
 });
 

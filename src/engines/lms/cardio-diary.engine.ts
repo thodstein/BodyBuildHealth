@@ -366,27 +366,45 @@ export function cardioAvgPaceMinPerKm(entries: { distanceKm?: number; durationMi
   return cardioPaceMinPerKm(totalKm, totalMin);
 }
 
-/** Типичная скорость по типу сессии (км/ч) — ориентир для подсказки дистанции. */
+/** Типичная скорость по типу сессии (км/ч) — ориентир для бега/ходьбы. */
 const CARDIO_TYPICAL_SPEED_KMH: Record<CardioType, number> = {
   zone2: 9, miss: 10, hiit: 8, recovery: 5,
 };
 
+/**
+ * Скорости для дисциплин, где беговые км/ч — враньё: вело на станке/улице
+ * идёт ~22-26 км/ч, гребля — ~8-12. Аудит 2026-11 (седьмой проход): подсказка
+ * дистанции была беговой для всех, и атлет на вело читал «Zone 2 (лёгкий бег),
+ * ~6.8 км при 9 км/ч».
+ */
+const CARDIO_SPORT_SPEED_KMH: Partial<Record<CardioSport, Record<CardioType, number>>> = {
+  bike: { zone2: 24, miss: 26, hiit: 22, recovery: 13 },
+  row: { zone2: 11, miss: 12, hiit: 10, recovery: 8 },
+};
+
+const CARDIO_SPORT_HINT_RU: Record<CardioSport, string> = {
+  run: 'бег', bike: 'вело', row: 'гребля', other: 'если бег/ходьба',
+};
+
 const CARDIO_TYPE_HINT_LABEL: Record<CardioType, string> = {
-  zone2: 'Zone 2 (лёгкий бег)', miss: 'MISS (умеренно)', hiit: 'HIIT (с учётом отдыха)', recovery: 'Recovery (ходьба)',
+  zone2: 'Zone 2', miss: 'MISS', hiit: 'HIIT (с учётом отдыха)', recovery: 'Recovery',
 };
 
 /**
- * Ожидаемая дистанция сессии по типу и длительности: «~N км при N км/ч (тип) — N±15%»
- * или null (нет/некорректная длительность). Диапазон учитывает рельеф/ветер.
+ * Ожидаемая дистанция сессии по типу, длительности и дисциплине:
+ * «~N км при N км/ч (тип, дисциплина, N±15%)». Для неизвестной дисциплины
+ * (`other`) подсказка условная — «если бег/ходьба», а не выдуманный вид.
+ * Возвращает null для некорректной длительности.
  */
-export function cardioExpectedDistanceHint(type: CardioType, durationMin: number): string | null {
-  const kmh = CARDIO_TYPICAL_SPEED_KMH[type];
+export function cardioExpectedDistanceHint(type: CardioType, durationMin: number, sport: CardioSport = 'other'): string | null {
+  const speeds = CARDIO_SPORT_SPEED_KMH[sport] ?? CARDIO_TYPICAL_SPEED_KMH;
+  const kmh = speeds[type];
   if (!kmh || !durationMin || durationMin <= 0) return null;
   const km = Math.round((kmh * durationMin / 60) * 10) / 10;
   const lo = Math.round(km * 0.85 * 10) / 10;
   const hi = Math.round(km * 1.15 * 10) / 10;
-  const label = CARDIO_TYPE_HINT_LABEL[type];
-  return `~${km} км при ${kmh} км/ч (${label}, ${lo}–${hi})`;
+  if (sport === 'other') return `~${km} км, если бег/ходьба (${kmh} км/ч) — ${lo}–${hi}`;
+  return `~${km} км при ${kmh} км/ч (${CARDIO_TYPE_HINT_LABEL[type]}, ${CARDIO_SPORT_HINT_RU[sport]}, ${lo}–${hi})`;
 }
 
 /**

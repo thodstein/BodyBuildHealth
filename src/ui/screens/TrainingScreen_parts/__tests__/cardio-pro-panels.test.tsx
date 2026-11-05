@@ -381,7 +381,9 @@ describe('CardioSessionTimer', () => {
     fireEvent.click(screen.getAllByRole('button', { name: /Старт/ })[0]);
     fireEvent.click(screen.getByRole('button', { name: /Завершить/ }));
     expect(screen.getByRole('textbox', { name: /Км/ })).toBeTruthy();
-    expect(screen.getByText(/Ориентир: ~.* км при .* км\/ч/)).toBeTruthy();
+    // Дисциплина не выбрана — подсказка условная, но с км/ч и ориентиром.
+    expect(screen.getByText(/Ориентир: ~.* км.*км\/ч/)).toBeTruthy();
+    expect(screen.getByText(/если бег\/ходьба/)).toBeTruthy();
     unmount();
   });
 });
