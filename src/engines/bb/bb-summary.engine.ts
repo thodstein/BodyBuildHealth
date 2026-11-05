@@ -14,6 +14,8 @@
 import type { BBPlan } from './bb-builder.engine';
 import { aggregateBBVolume } from './bb-volume.engine';
 import { derivePattern } from '../movement-pattern';
+import { MUSCLE_LABEL_RU } from '../volume-landmarks.engine';
+import { ruCount, ruForm, RU_APPROACHES, RU_SETS, RU_TRAININGS } from '../ru-plural';
 
 export interface BBMuscleSummary {
   muscle: string;
@@ -342,10 +344,13 @@ export function buildBBExpandedSummary(plan: BBPlan): BBExpandedSummary {
 export function formatBBExpandedSummary(plan: BBPlan): string {
   const s = buildBBExpandedSummary(plan);
   const lines: string[] = [];
+  // Частота может быть дробной (2.7 тренировки/нед) — для дробей форма
+  // родительного единственного, для целых — обычное согласование.
+  const freqLabel = (n: number) => (Number.isInteger(n) ? ruCount(n, RU_TRAININGS) : `${n} тренировки`);
   for (const [muscle, m] of Object.entries(s.byMuscle)) {
-    lines.push(`${muscle} — ${m.sessionsPerWeek} тренировок/нед, ${m.workingSets} рабочих, ${m.warmupSets} разминочных`);
+    lines.push(`${MUSCLE_LABEL_RU[muscle] || muscle} — ${freqLabel(m.sessionsPerWeek)}/нед, ${m.workingSets} рабочих ${ruForm(m.workingSets, RU_SETS)}, ${m.warmupSets} разминочных ${ruForm(m.warmupSets, RU_SETS)}`);
     for (const sess of m.bySession) {
-      lines.push(`  День ${sess.day}: ${sess.working} рабочих подходов, ${sess.warmup} разминочных`);
+      lines.push(`  День ${sess.day}: ${sess.working} ${ruForm(sess.working, RU_APPROACHES)} рабочих, ${sess.warmup} разминочных`);
     }
     const patterns = Object.entries(m.byPattern).map(([p, v]) => `${patternRu(p)}: ${v}`).join(', ');
     if (patterns) lines.push(`  Паттерны: ${patterns}`);
@@ -353,7 +358,7 @@ export function formatBBExpandedSummary(plan: BBPlan): string {
     if (m.subGroups && Object.keys(m.subGroups).length) {
       for (const [subId, sg] of Object.entries(m.subGroups)) {
         const expl = (sg as any).explanation;
-        lines.push(`  └ ${expl?.labelRu || subId}: ${sg.workingSets} сетов`);
+        lines.push(`  └ ${expl?.labelRu || subId}: ${ruCount(sg.workingSets, RU_SETS)}`);
         const subPat = Object.entries(sg.byPattern).map(([p, v]) => `${patternRu(p)}: ${v}`).join(', ');
         if (subPat) lines.push(`     Паттерн: ${subPat}`);
         if (expl?.why) lines.push(`     Чем хорошо: ${expl.why}`);

@@ -4,6 +4,8 @@
  */
 import type { BBPlan } from './bb-builder.engine';
 import { analyzeBBBalance, type BBBalanceReport } from './bb-balance.engine';
+import { MUSCLE_LABEL_RU } from '../volume-landmarks.engine';
+import { ruCount, RU_SETS } from '../ru-plural';
 
 export interface BBStimulusResult {
   byMuscle: Record<string, { lengthened: number; midRange: number; shortened: number; compound: number; isolation: number; patterns: Record<string, number> }>;
@@ -42,20 +44,20 @@ export function analyzeBBStimulus(plan: BBPlan | null | undefined): BBStimulusRe
   for (const [muscle, cov] of Object.entries(balance.byMuscle)) {
     const total = cov.compound + cov.isolation;
     if (total >= 6 && cov.lengthened === 0) {
-      issues.push(`${muscle}: нет растянутой позиции при ${total} сетов`);
+      issues.push(`${MUSCLE_LABEL_RU[muscle] || muscle}: нет растянутой позиции при ${ruCount(total, RU_SETS)}`);
       penalty += 6;
     }
     if (total >= 6 && Object.keys(cov.patterns).length === 1) {
       const pat = Object.keys(cov.patterns)[0];
       const cnt = Object.values(cov.patterns)[0] as number;
       if (cnt >= 4) {
-        issues.push(`${muscle}: один паттерн «${pat}» ${cnt} сетов — добавьте угол`);
+        issues.push(`${MUSCLE_LABEL_RU[muscle] || muscle}: один паттерн «${pat}» ${ruCount(cnt, RU_SETS)} — добавьте угол`);
         penalty += 6;
       }
     }
     const isolationDominant = new Set(['biceps', 'triceps', 'forearms', 'calves', 'abs', 'shoulders', 'delt_front', 'delt_mid', 'delt_rear', 'traps', 'glutes']).has(muscle);
     if (!isolationDominant && total >= 6 && cov.compound < total * 0.4) {
-      issues.push(`${muscle}: база ${cov.compound}/${total} <40%`);
+      issues.push(`${MUSCLE_LABEL_RU[muscle] || muscle}: база ${cov.compound} из ${total} (<40%)`);
       penalty += 8;
     }
   }

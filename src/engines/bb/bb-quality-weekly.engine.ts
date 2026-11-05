@@ -28,6 +28,7 @@ import { sessionsWithMuscleInWeek } from './bb-frequency';
 import { EXERCISE_CATALOG } from '../../core/exercise-catalog';
 import { derivePattern } from '../movement-pattern';
 import { resolveCatalogId } from '../../data/lms-cycles/exercise-alias-map';
+import { PATTERN_RU } from './bb-summary.engine';
 
 // ─── Типы ───
 
@@ -147,6 +148,18 @@ export function gradeFor(score: number): string {
 
 export function muscleRu(m: string): string {
   return MUSCLE_LABEL_RU[m] || m;
+}
+
+/** Короткая подпись группы для PRO-строк: `legs` → «Ноги», `arms` → «Руки»
+ *  (в центральном словаре они с расшифровкой в скобках — в строке карточки это
+ *  шум). Замер: `➕ back: добавьте horizontal_pull` — и ключ мышцы, и id паттерна
+ *  уезжали в текст для пользователя сырыми. */
+function groupRu(m: string): string {
+  return muscleRu(m).replace(/\s*\([^)]*\)\s*$/, '');
+}
+
+function patternRuSafe(p: string): string {
+  return PATTERN_RU[p] || p;
 }
 
 // ─── Внутренние хелперы ───
@@ -718,8 +731,8 @@ export function scoreProWeek(plan: PlanLike, weekNo: number | 'meso'): BBProWeek
     const ok = !substantial || distinct.length >= need || (mu === 'shoulders' && distinct.length >= 1);
     let issue: string | undefined;
     if (!ok && distinct.length > 0) {
-      issue = `${mu}: паттернов ${distinct.length} < ${need} (факт: ${distinct.join(', ')})`;
-      minus(4, `🔀 Паттерн ${mu}: ${distinct.length} < ${need} — факт недели`, `➕ ${mu}: добавьте ${expected.find(p => !distinct.includes(p)) || 'вариацию'}`);
+      issue = `${groupRu(mu)}: паттернов ${distinct.length} < ${need} (факт: ${distinct.map(patternRuSafe).join(', ')})`;
+      minus(4, `🔀 Паттерн ${groupRu(mu)}: ${distinct.length} < ${need} — факт недели`, `➕ ${groupRu(mu)}: добавьте ${patternRuSafe(expected.find(p => !distinct.includes(p)) || 'вариацию')}`);
     }
     patterns.push({ muscle: mu, patterns: distinct, expected, distinct: distinct.length, ok, issue });
   }
@@ -736,8 +749,8 @@ export function scoreProWeek(plan: PlanLike, weekNo: number | 'meso'): BBProWeek
     const ok = !substantial || coverage >= 0.5;
     let issue: string | undefined;
     if (!ok && distinctAngles.length > 0) {
-      issue = `${mu}: углов ${distinctAngles.length}/${expected.length} (факт)`;
-      minus(3, `📐 Углы ${mu}: ${distinctAngles.length}/${expected.length} — факт недели`, `➕ ${mu}: добавьте угол ${expected.find(a => !distinctAngles.includes(a))}`);
+      issue = `${groupRu(mu)}: углов ${distinctAngles.length}/${expected.length} (факт)`;
+      minus(3, `📐 Углы ${groupRu(mu)}: ${distinctAngles.length}/${expected.length} — факт недели`, `➕ ${groupRu(mu)}: добавьте угол ${expected.find(a => !distinctAngles.includes(a))}`);
     }
     angles.push({ muscle: mu, angles: distinctAngles, expected, coverage, ok, issue });
   }
@@ -766,7 +779,7 @@ export function scoreProWeek(plan: PlanLike, weekNo: number | 'meso'): BBProWeek
     const highVol = groupEx.length >= 2;
     const ok = hasStretch || !isTarget || !highVol || poolLimited;
     if (!ok) {
-      minus(3, `🧘 Растяжка ${mu}: нет stretch-фазы при высоком объёме цели — факт недели`, `➕ ${mu}: добавьте движение с растяжением`);
+      minus(3, `🧘 Растяжка ${groupRu(mu)}: нет stretch-фазы при высоком объёме цели — факт недели`, `➕ ${groupRu(mu)}: добавьте движение с растяжением`);
     }
     stretches.push({ muscle: mu, hasStretch, stretchExercises: stretchEx, ok });
   }

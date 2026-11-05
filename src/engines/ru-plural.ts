@@ -33,5 +33,6 @@ export function ruCount(n: number, forms: RuPluralForms): string {
 export const RU_WEEKS: RuPluralForms = ['неделя', 'недели', 'недель'];
 export const RU_TRAININGS: RuPluralForms = ['тренировка', 'тренировки', 'тренировок'];
 export const RU_SETS: RuPluralForms = ['сет', 'сета', 'сетов'];
+export const RU_APPROACHES: RuPluralForms = ['подход', 'подхода', 'подходов'];
 export const RU_EXERCISES: RuPluralForms = ['упражнение', 'упражнения', 'упражнений'];
 export const RU_DAYS: RuPluralForms = ['день', 'дня', 'дней'];

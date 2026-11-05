@@ -3,6 +3,7 @@ import type { BBBalanceReport } from './bb-balance.engine';
 import { trueMuscleOf } from '../movement-pattern';
 import { EXERCISE_CATALOG } from '../../core/exercise-catalog';
 import { ruCount, ruForm, RU_EXERCISES, RU_SETS, RU_TRAININGS, RU_WEEKS } from '../ru-plural';
+import { MUSCLE_LABEL_RU } from '../volume-landmarks.engine';
 
 export interface BBPlanReport {
   pattern: string;
@@ -62,6 +63,13 @@ export function buildBBPlanReport(plan: BBPlan): BBPlanReport {
 
 /** RU-подписи мышц (компактно). */
 const MUSCLE_RU: Record<string, string> = { chest: 'Грудь', back: 'Спина', shoulders: 'Плечи', quads: 'Квадрицепсы', hamstrings: 'Бицепс бедра', glutes: 'Ягодицы', calves: 'Икры', biceps: 'Бицепс', triceps: 'Трицепс', forearms: 'Предплечья', abs: 'Пресс', traps: 'Трапеции', arms: 'Руки', legs: 'Ноги', core: 'Кор' };
+
+/** Подпись мышцы: канонический словарь проекта первым (он знает пучки дельт и
+ *  верх/низ груди), локальная карта — только фолбэк. Замер: сырой `delt_front`
+ *  печатался в отчёте, потому что в локальной карте его не было. */
+function ruMuscle(muscle: string): string {
+  return MUSCLE_LABEL_RU[muscle] || MUSCLE_RU[muscle] || muscle;
+}
 
 const PHASE_RU: Record<string, string> = { accumulation: 'Накопление', intensification: 'Интенсификация', deload: 'Разгрузка', peaking: 'Пик' };
 
@@ -141,7 +149,7 @@ export function checkBBExerciseAppropriateness(plan: BBPlan): string[] {
       ? trueMuscleOf({ name: ex.name, muscle: ex.muscle, group: (catalogEx as any).group, type: (catalogEx as any).type, movementPattern: (catalogEx as any).movementPattern, targetMuscle: (catalogEx as any).targetMuscle } as any)
       : trueMuscleOf({ name: ex.name, muscle: ex.muscle } as any);
     if (tm && tm !== ex.muscle) {
-      issues.push(`«${n}» поставлен в слот «${ex.muscle}», но реально тренирует «${tm}» (проверьте соответствие).`);
+      issues.push(`«${n}» поставлен в слот «${ruMuscle(ex.muscle)}», но реально тренирует «${ruMuscle(tm)}» (проверьте соответствие).`);
     }
   }
   return issues;
@@ -337,7 +345,7 @@ export function buildBBPlanReportText(plan: BBPlan): string {
   lines.push('📋 Недельная сводка сетов:');
   if (plan.expandedSummary) {
     for (const [muscle, m] of Object.entries(plan.expandedSummary.byMuscle)) {
-      lines.push(`  ${MUSCLE_RU[muscle] || muscle} — ${m.sessionsPerWeek} тр/нед · ${m.workingSets} раб · direct ${m.directSets} · косв. ${Math.round(m.indirectSets)}`);
+      lines.push(`  ${ruMuscle(muscle)} — ${m.sessionsPerWeek} тр/нед · ${m.workingSets} раб · direct ${m.directSets} · косв. ${Math.round(m.indirectSets)}`);
       const sg = (m as any).subGroups as Record<string, any> | undefined;
       if (sg && Object.keys(sg).length) {
         for (const [subId, sub] of Object.entries(sg)) {
@@ -355,7 +363,7 @@ export function buildBBPlanReportText(plan: BBPlan): string {
   }
   lines.push('');
   const wps = plan.priorityMuscles?.filter(m => !['delt_front', 'delt_mid', 'delt_rear'].includes(m)) || [];
-  if (wps.length) lines.push(`🎯 Слабые группы: ${wps.map(m => MUSCLE_RU[m] || m).join(', ')} (+1 упражнение без капа)`);
+  if (wps.length) lines.push(`🎯 Слабые группы: ${wps.map(m => ruMuscle(m)).join(', ')} (+1 упражнение без капа)`);
   const optionalCount = plan.report?.optionalExercises ?? 0;
   if (optionalCount > 0) lines.push(`⚡ Упражнений «при наличии сил» (optional): ${optionalCount}`);
   lines.push('');
@@ -369,7 +377,7 @@ export function buildBBPlanReportText(plan: BBPlan): string {
         const key = `${ex.muscle}:${ex.name}`;
         if (seen.has(key)) continue;
         seen.add(key);
-        const muscle = MUSCLE_RU[ex.muscle] || ex.muscle;
+        const muscle = ruMuscle(ex.muscle);
         const w = ex.workSets?.[0]?.weight ?? 0;
         const r = ex.workSets?.[0]?.reps ?? ex.sets;
         const opt = (ex as any).optional ? ' ⚡' : '';

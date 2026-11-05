@@ -15,6 +15,7 @@ import { ruForm, ruCount, RU_EXERCISES, RU_SETS, RU_TRAININGS, RU_WEEKS } from '
 import { buildBBPlan } from '../bb/bb-builder.engine';
 import { buildBBPlanReportText } from '../bb/bb-report.engine';
 import { buildBBPlanPrintHtml } from '../bb/bb-visual.engine';
+import { formatBBExpandedSummary } from '../bb/bb-summary.engine';
 
 const WM = { chest: 100, back: 120, shoulders: 60, biceps: 50, triceps: 60, quads: 140, hamstrings: 100, glutes: 140, calves: 80, abs: 60, traps: 80, forearms: 40 };
 
@@ -36,10 +37,10 @@ describe('тексты плана: числительные согласован
   type Noun = { forms: readonly [string, string, string]; re: RegExp };
 
   const NOUNS: Noun[] = [
-    { forms: RU_WEEKS, re: /(\d+)\s+(неделя|недели|недель)(?![а-яё])/gi },
-    { forms: RU_TRAININGS, re: /(\d+)\s+(тренировка|тренировки|тренировок)(?![а-яё])/gi },
-    { forms: RU_SETS, re: /(\d+)\s+(сет|сета|сетов)(?![а-яё])/gi },
-    { forms: RU_EXERCISES, re: /(\d+)\s+(упражнение|упражнения|упражнений)(?![а-яё])/gi },
+    { forms: RU_WEEKS, re: /(?<![\d.,])(\d+)\s+(неделя|недели|недель)(?![а-яё])/gi },
+    { forms: RU_TRAININGS, re: /(?<![\d.,])(\d+)\s+(тренировка|тренировки|тренировок)(?![а-яё])/gi },
+    { forms: RU_SETS, re: /(?<![\d.,])(\d+)\s+(сет|сета|сетов)(?![а-яё])/gi },
+    { forms: RU_EXERCISES, re: /(?<![\d.,])(\d+)\s+(упражнение|упражнения|упражнений)(?![а-яё])/gi },
   ];
 
   function findBad(text: string): string[] {
@@ -62,6 +63,7 @@ describe('тексты плана: числительные согласован
           const texts: Array<[string, string]> = [
             ['отчёт', buildBBPlanReportText(plan)],
             ['печать', buildBBPlanPrintHtml(plan).replace(/<[^>]*>/g, ' ')],
+            ['сводка', formatBBExpandedSummary(plan)],
             ['rationale', (plan.rationale || []).join('\n')],
           ];
           for (const [kind, text] of texts) {

@@ -11,7 +11,7 @@ export interface CanonicalBBValidationIssue {
   muscle?: string;
 }
 
-const MUSCLE_KEYS = 'chest|back|quads|hamstrings|glutes|calves|biceps|triceps|forearms|abs|traps|shoulders|delt_front|delt_mid|delt_rear|lower_back';
+const MUSCLE_KEYS = 'chest_upper|chest_lower|chest|back|quads|hamstrings|glutes|calves|biceps|triceps|forearms|abs|traps|shoulders|delt_front|delt_mid|delt_rear|lower_back';
 
 export function canonicalBBIssueText(issue: CanonicalBBValidationIssue): string {
   return String(issue.message || issue.text || '')

@@ -5,6 +5,8 @@
  * целевая первой в сессии, делоад не трогаем. Без мутаций плана — чистый расчёт.
  */
 import { getVolumeLandmarks } from '../volume-landmarks.engine';
+import { MUSCLE_LABEL_RU } from '../volume-landmarks.engine';
+import { ruCount, RU_SETS } from '../ru-plural';
 import { canonicalMuscle } from './bb-specialization.engine';
 
 export interface SpecBlockInput {
@@ -91,7 +93,7 @@ export function buildSpecBlock(input: SpecBlockInput): SpecBlock {
       targetSets[z] = Math.max(mvFloor[z], Math.min(mavTop[z], mrvCap[z], ramp));
       frequency[z] = freqFor(z);
       if (w === 1 && factNow + 4 > mrvCap[z]) {
-        rationale.push(`${z}: факт ${factNow} сет уже выше MRV ${mrvCap[z]} — блок начинаем с ${targetSets[z]} (разгрузка), а не с ${factNow + 4}`);
+        rationale.push(`${MUSCLE_LABEL_RU[z] || z}: факт ${ruCount(factNow, RU_SETS)} уже выше MRV ${mrvCap[z]} — блок начинаем с ${targetSets[z]} (разгрузка), а не с ${factNow + 4}`);
       }
     }
     weeks.push({
@@ -105,9 +107,9 @@ export function buildSpecBlock(input: SpecBlockInput): SpecBlock {
 
   // Доноры: сильные крупные на MV (упрощённо — список кандидатов, конкретика в tradeoff)
   const donors = ['chest', 'back', 'quads'].filter((d) => !zones.includes(d) && !zones.map(canonicalMuscle).includes(d)).slice(0, 2);
-  rationale.push(`Цели: ${zones.join(', ') || '—'} — ${lengthWeeks} нед к MAV-верха (${Object.entries(mavTop).map(([k, v]) => `${k} ${v}`).join(', ') || '—'})`);
-  rationale.push(`Доноры на MV: ${donors.join(', ') || '—'} (освобождение 10-15 сетов/нед)`);
-  rationale.push('11-set rule: >10 сетов/мышца/сессия режем на доп. день; целевая — первой в сессии');
+  rationale.push(`Цели: ${zones.map((z) => MUSCLE_LABEL_RU[z] || z).join(', ') || '—'} — ${lengthWeeks} нед к MAV-верха (${Object.entries(mavTop).map(([k, v]) => `${MUSCLE_LABEL_RU[k] || k} ${v}`).join(', ') || '—'})`);
+  rationale.push(`Доноры на MV: ${donors.map((d) => MUSCLE_LABEL_RU[d] || d).join(', ') || '—'} (освобождение 10-15 сетов/нед)`);
+  rationale.push('Правило 11 сетов: >10 сетов/мышца/сессия режем на доп. день; целевая — первой в сессии');
 
   // dayMap: равномерное распределение частоты по дням недели 1..5
   const dayMap: Record<string, number[]> = {};

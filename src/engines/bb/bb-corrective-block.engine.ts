@@ -11,6 +11,7 @@
 import { EXERCISE_CATALOG } from '../../core/exercise-catalog';
 import type { BBCorrective, BBWeakCause, BBCorrPhase } from './bb-corrective.engine';
 import { correctiveDose } from './bb-corrective.engine';
+import { ruCount, RU_SETS } from '../ru-plural';
 
 export type BBCorrBlockFocus = 'Втягивание' | 'Прогрессия' | 'Пик' | 'Разгрузка';
 
@@ -160,7 +161,7 @@ export function correctiveBlockForBB(
       week: i + 1,
       focus,
       items,
-      note: `${FOCUS_RU[focus]} · ${wave[i]} сетов · ${items.length} упр.`,
+      note: `${FOCUS_RU[focus]} · ${ruCount(wave[i], RU_SETS)} · ${items.length} упр.`,
     });
   }
   const targets = Array.from(new Set(session.flatMap((s) => s.targets)));

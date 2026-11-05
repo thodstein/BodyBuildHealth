@@ -19,7 +19,8 @@ describe('BB расширенная недельная сводка', () => {
   it('форматирует текстовую сводку (для отчёта)', () => {
     const plan = buildBBPlan({ patternId: 'ppl_6', level: 'intermediate', trainingYears: 3, goal: 'mass', weeks: 1, workMax: WM });
     const text = formatBBExpandedSummary(plan);
-    expect(text).toContain('тренировок/нед');
+    // Частота в неделю: «3 тренировки/нед» (склонение по числу), а не «3 тренировок/нед».
+    expect(text).toMatch(/\d+ тренировк(а|и)/);
     expect(text).toContain('рабочих');
     expect(text).toContain('Итого рабочих сетов/нед');
   });

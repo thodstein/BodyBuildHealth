@@ -230,6 +230,9 @@ export function landmarksForRotation(level: string, muscle: string, rotationDays
 /** RU-подписи мышц для отображения в UI. */
 export const MUSCLE_LABEL_RU: Record<string, string> = {
   chest: 'Грудь', back: 'Спина', quads: 'Квадрицепсы', hamstrings: 'Бицепс бедра',
+  // Верх/низ груди — отдельные ключи специализации и диагностики: без подписи
+  // они уезжали в пользовательские тексты сырыми (`chest_upper`, `chest_lower`).
+  chest_upper: 'Верх груди', chest_lower: 'Низ груди',
   shoulders: 'Плечи', delt_front: 'Передняя дельта', delt_mid: 'Средняя дельта', delt_rear: 'Задняя дельта',
   biceps: 'Бицепс', triceps: 'Трицепс', calves: 'Икры', glutes: 'Ягодицы',
   abs: 'Пресс / Кор', traps: 'Трапеции', forearms: 'Предплечья',
