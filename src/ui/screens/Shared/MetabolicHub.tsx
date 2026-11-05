@@ -846,7 +846,7 @@ const kbju = useMemo(()=> calcKBJU(input), [input]);
   const apri = useMemo(()=> calcAPRI(ast, plt), [ast, plt]);
   const quicki = useMemo(()=> calcQUICKI(glucoseMgDl, insulinMuMl), [glucoseMgDl, insulinMuMl]);
   const caffeineCurve = useMemo(()=> calcCaffeineCurve(caffeineMg, caffeineHoursSince, weight), [caffeineMg, caffeineHoursSince, weight]);
-  const refeedNeed = useMemo(()=> calcRefeedNeed(weeksInDeficit ?? 0, bfForCalc, ea?.ea ?? null), [weeksInDeficit, bfForCalc, ea]);
+  const refeedNeed = useMemo(()=> calcRefeedNeed(weeksInDeficit, bfForCalc, ea?.ea ?? null, sex), [weeksInDeficit, bfForCalc, ea, sex]);
   const carbLoad = useMemo(()=> calcCarbLoading(weight, carbLoadDays, carbGPerKg), [weight, carbLoadDays, carbGPerKg]);
   const sodiumLoad = useMemo(()=> calcSodiumLoading(weight, sodiumLoadDays, sodiumGPerDay), [weight, sodiumLoadDays, sodiumGPerDay]);
   const bodyCompProj = useMemo(()=> calcBodyCompProjection({ weight, height, bodyFat: bodyFat ?? fat.current, years: projectionYears, mode: projectionMode }), [weight,height,bodyFat,fat,projectionYears,projectionMode]);
@@ -884,10 +884,16 @@ const kbju = useMemo(()=> calcKBJU(input), [input]);
   }, [diaryAvgKcal, kbju, adaptiveV3, stepsCalc]);
   const goalV2 = useMemo(()=> targetWeight ? calcGoalTimelineV2({ weight, targetWeight, tdee: stepsCalc.tdeeNat, bodyFat: bfForCalc, withDietBreaks: true }) : null, [weight, targetWeight, stepsCalc, bfForCalc]);
   const dietBreakPlan = useMemo(()=> {
-    if(!targetWeight || !goalV2) return null;
-    const weeksTotal = Math.max(4, goalV2.days/7);
-    return buildDietBreakPlan(Math.ceil(weeksTotal), Math.ceil(weeksTotal*0.75));
-  }, [targetWeight, goalV2]);
+    // Аудит 2026-11: план строился от «всех недель × 0.75» — догадка, из-за которой длина
+    // плана не совпадала со сроком цели. Теперь берём реальные недели дефицита из goalV2,
+    // и длина плана = недели дефицита + брейки, ровно как в сроке.
+    if(!goalV2 || goalV2.deficitWeeks <= 0) return null;
+    return buildDietBreakPlan(goalV2.deficitWeeks, {
+      breakEvery: 6,
+      breakWeeks: goalV2.breakWeeks,
+      deficitKcalDelta: Math.round(kbju.nat.kcal - stepsCalc.tdeeNat),
+    });
+  }, [goalV2, kbju, stepsCalc]);
   const pregAdd = useMemo(()=> pregnancyAdd({ weight, height, age, sex, trimester: trimester || undefined, lactating: lactating === 'none' ? null : lactating } as any), [weight, height, age, sex, trimester, lactating]);
   const palPro = useMemo(()=> calcPALPro({ weight, height, age, sex, activityLevel: activityLevel as any, profession, metHoursPerWeek, standingHours, fidgetLevel, steps } as any), [weight, height, age, sex, activityLevel, profession, metHoursPerWeek, standingHours, fidgetLevel, steps]);
   const oneAnswer = useMemo(()=>{
@@ -1517,7 +1523,7 @@ const kbju = useMemo(()=> calcKBJU(input), [input]);
           <span style={{ display:'block', fontSize:8, color:'rgba(255,255,255,0.55)', marginTop:4 }}>{cat2.returnToPlay} · LEAM {leamCalc.score}/12 {leamCalc.note} · EDE-Q {edeScore ?? '—'} (≥4 primary, 2–4 secondary)</span>
         </div>
         {refeedNeed.needed && <div style={{ marginTop:6, padding:'7px 10px', borderRadius:8, background:'rgba(245,158,11,0.10)', border:'1px solid rgba(245,158,11,0.18)', fontSize:9, color:'#fbbf24' }}>Refeed нужен: +{refeedNeed.carbBoostPct}% углей 1×/нед — лептин/T3 (Trexler). {refeedNeed.note}</div>}
-        {dietBreakPlan && <div style={{ marginTop:6, fontSize:8, color:'rgba(255,255,255,0.45)', background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', borderRadius:8, padding:'6px 8px' }}>MATADOR: {dietBreakPlan.slice(0,8).map(p=> p.phase==='deficit'?'−':'○').join('')} {dietBreakPlan.length}нед · break каждые 6нед ×2нед maintenance</div>}
+        {dietBreakPlan && <div style={{ marginTop:6, fontSize:8, color:'rgba(255,255,255,0.45)', background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', borderRadius:8, padding:'6px 8px' }}>Diet break: {dietBreakPlan.slice(0,8).map(p=> p.phase==='deficit'?'−':'○').join('')}{dietBreakPlan.length>8?'…':''} · {dietBreakPlan.length}нед = {goalV2?.deficitWeeks ?? '—'}нед дефицита + {goalV2?.breaks ?? 0}×{goalV2?.breakWeeks ?? 2}нед maintenance</div>}
       </div>
 
       <div style={{ ...CARD, border:'1px solid rgba(239,68,68,0.12)', padding:10, background:'rgba(239,68,68,0.04)', display: wizardStep===3 ? 'block' : 'none' }}>
@@ -2112,7 +2118,7 @@ const kbju = useMemo(()=> calcKBJU(input), [input]);
             <div>
               <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
                 <div style={{ padding:14, borderRadius:12, background: maintenance?.confidence==='high'?'rgba(34,197,94,0.08)': maintenance?.confidence==='medium'?'rgba(234,179,8,0.08)':'rgba(255,255,255,0.03)', border:`1px solid ${maintenance?.confidence==='high'?'rgba(34,197,94,0.18)': maintenance?.confidence==='medium'?'rgba(234,179,8,0.18)':'rgba(255,255,255,0.06)'}`, textAlign:'center' }}>
-                  <div style={{ fontSize:10, color:'rgba(255,255,255,0.55)' }}>TDEE finder 14д · R2 {maintenance?.r2 ?? '—'} · {maintenance?.confidence ?? 'нет данных'}</div>
+                  <div style={{ fontSize:10, color:'rgba(255,255,255,0.55)' }}>TDEE finder: окно {maintenance?.days ?? '—'}д · R2 {maintenance?.r2 ?? '—'} · {maintenance?.confidence ?? 'нет данных'}</div>
                   <div style={{ fontSize:22, fontWeight:900, color: maintenance?.tdee ? '#eab308' : '#fff' }}>{maintenance?.tdee || '—'}<span style={{ fontSize:10 }}>ккал</span></div>
                   <div style={{ fontSize:9, color:'#fff' }}>{maintenance?.note ?? (diaryAvgKcal ? 'Нужно ≥7 взвешиваний' : 'Нужен дневник питания: без факта ккал TDEE из веса не выводится')}</div>
                 </div>
@@ -2279,11 +2285,15 @@ const kbju = useMemo(()=> calcKBJU(input), [input]);
               <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
                 <div style={{ padding:14, borderRadius:12, background: refeedNeed.needed?'rgba(245,158,11,0.08)':'rgba(255,255,255,0.03)', border:`1px solid ${refeedNeed.needed?'rgba(245,158,11,0.18)':'rgba(255,255,255,0.06)'}`, textAlign:'center' }}>
                   <div style={{ fontSize:10, color: refeedNeed.needed?'#f59e0b':'rgba(255,255,255,0.55)' }}>Refeed — лептин/T3</div>
-                  <div style={{ fontSize:16, fontWeight:900, color: refeedNeed.needed?'#f59e0b':'#fff' }}>{refeedNeed.needed? `+${refeedNeed.carbBoostPct}% углей`:'Не нужен'}</div>
+                  <div style={{ fontSize:16, fontWeight:900, color: refeedNeed.needed?'#f59e0b':'#fff' }}>{refeedNeed.needed? `+${refeedNeed.carbBoostPct}% углей` : refeedNeed.known ? 'Не нужен' : 'Нужны данные'}</div>
                   <div style={{ fontSize:8, color:'#fff' }}>{refeedNeed.note}</div>
                 </div>
                 <div style={{ padding:10, borderRadius:10, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', fontSize:9, color:'#fff', lineHeight:1.4 }}>
-                  MATADOR (Byrne 2017): 2нед дефицит / 2нед maintenance чередование сохраняет RMR лучше continuous.<br/><span style={{ fontSize:8, color:'rgba(255,255,255,0.55)' }}>Diet break каждые 6нед ×2нед maintenance. Твоя цель {targetWeight? `${targetWeight}кг`:'—'} → {dietBreakPlan? `${dietBreakPlan.length}нед`:'—'}.</span>
+                  Diet break (Trexler/Helms): 2 нед на поддержании каждые 6 нед дефицита — лептин/T3 и соблюдение; MATADOR (Byrne 2018) показал, что брейки не мешают результату (RMR сохраняется лучше continuous).<br/><span style={{ fontSize:8, color:'rgba(255,255,255,0.55)' }}>{dietBreakPlan && goalV2
+                    ? `Цель ${targetWeight}кг → ${goalV2.deficitWeeks} нед дефицита + ${goalV2.breaks}×${goalV2.breakWeeks} нед брейка = ${dietBreakPlan.length} нед (срок цели ${goalV2.weeks} нед).`
+                    : goalV2 && goalV2.deficitWeeks > 0
+                      ? `Цель ${targetWeight}кг → ${goalV2.deficitWeeks} нед дефицита; срок короче 6 нед — брейк не нужен (${goalV2.weeks} нед).`
+                      : 'Введи цель вес в антропометрии — посчитаю календарь.'}</span>
                   {dietBreakPlan && <div style={{ marginTop:6, display:'flex', gap:4, flexWrap:'wrap' }}>{dietBreakPlan.slice(0,12).map((p,i)=><span key={i} style={{ padding:'3px 6px', borderRadius:6, background: p.phase==='deficit'?'rgba(239,68,68,0.10)':'rgba(34,197,94,0.10)', border:`1px solid ${p.phase==='deficit'?'rgba(239,68,68,0.18)':'rgba(34,197,94,0.18)'}`, fontSize:8, color: p.phase==='deficit'?'#f87171':'#22c55e' }}>{p.week}:{p.phase==='deficit'?'−':'○'}</span>)}</div>}
                 </div>
               </div>

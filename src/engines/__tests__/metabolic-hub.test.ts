@@ -850,14 +850,59 @@ describe('metabolic-hub v3 — Adaptive TDEE v2, MET, RED-S, Sweat, WHtR, MetS',
     expect(c5.remainingMg).toBeCloseTo(100,5);
     expect(c5.sleepCutoffH).toBe(6);
   });
-  it('Diet break MATADOR 12w', async () => {
-    const { buildDietBreakPlan, calcRefeedNeed } = await import('../metabolic-hub.engine');
-    const p=buildDietBreakPlan(12,9);
-    expect(p.length).toBe(12);
-    expect(p.filter(x=>x.phase==='maintenance').length).toBeGreaterThan(0);
-    const re=calcRefeedNeed(7,12,22);
+  it('Diet break: календарь = недели дефицита + брейки, без молчаливой обрезки', async () => {
+    const { buildDietBreakPlan, calcRefeedNeed, calcGoalTimelineV2 } = await import('../metabolic-hub.engine');
+    const p = buildDietBreakPlan(12, { breakEvery: 6, breakWeeks: 2 });
+    // 12 недель дефицита = блок 6 → брейк 2 → блок 6
+    expect(p.length).toBe(14);
+    expect(p.filter(x => x.phase === 'maintenance').length).toBe(2);
+    expect(p[5].phase).toBe('deficit');
+    expect(p[6].phase).toBe('maintenance');
+    expect(p[p.length - 1].phase).toBe('deficit');
+    // после ровно 6 недель брейк не нужен — дефицита больше нет
+    expect(buildDietBreakPlan(6).length).toBe(6);
+    expect(buildDietBreakPlan(6).some(x => x.phase === 'maintenance')).toBe(false);
+    // длина плана совпадает со сроком цели, который печатает хаб
+    const g = calcGoalTimelineV2({ weight: 85, targetWeight: 80, tdee: 2800, withDietBreaks: true })!;
+    expect(g.breaks).toBeGreaterThan(0);
+    expect(buildDietBreakPlan(g.deficitWeeks, { breakWeeks: g.breakWeeks }).length).toBe(g.weeks);
+    // и срок с брейками действительно длиннее срока без них на те же недели
+    const b = calcGoalTimelineV2({ weight: 85, targetWeight: 80, tdee: 2800 })!;
+    expect(g.weeks - b.weeks).toBe(g.breaks * g.breakWeeks);
+
+    const re = calcRefeedNeed(7, 12, 22);
     expect(re.needed).toBe(true);
-    expect(calcRefeedNeed(2,18,40).needed).toBe(false);
+    expect(calcRefeedNeed(2, 18, 40).needed).toBe(false);
+  });
+  it('Refeed: порог зависит от пола, неизвестные недели ≠ «не нужен»', async () => {
+    const { calcRefeedNeed } = await import('../metabolic-hub.engine');
+    // 22% жира — уже «низко» для женщины и ещё норма для мужчины (Trexler/Helms: м <15, ж <24)
+    expect(calcRefeedNeed(7, 22, 45, 'female').needed).toBe(true);
+    expect(calcRefeedNeed(7, 22, 45, 'male').needed).toBe(false);
+    expect(calcRefeedNeed(7, 12, 45, 'male').needed).toBe(true);
+    // мало недель — не нужен, и это правда, а не догадка
+    expect(calcRefeedNeed(3, 12, 45, 'male').known).toBe(true);
+    // недели не введены — «нужны данные», а не вердикт
+    const unknown = calcRefeedNeed(undefined, 12, 45);
+    expect(unknown.needed).toBe(false);
+    expect(unknown.known).toBe(false);
+    expect(unknown.note).toContain('не указаны');
+    expect(unknown.note).not.toContain('Refeed не нужен');
+    // низкая доступность энергии срабатывает и без недель
+    expect(calcRefeedNeed(undefined, 12, 25).needed).toBe(true);
+  });
+  it('finder: уверенность требует длинного окна, а не только R²', () => {
+    // 7 взвешиваний за 6 дней — идеальная прямая (R²≈1), но тренд шумный
+    const short = Array.from({ length: 7 }, (_, i) => ({ date: `2026-01-0${i + 1}`, kg: 83 - i * 0.1 }));
+    const ms = calcMaintenanceFinder(short, 2800);
+    expect(ms).not.toBeNull();
+    expect(ms!.confidence).toBe('low');
+    expect(ms!.note).toContain('окно 6д');
+    // три недели — уверенность может быть высокой
+    const long = Array.from({ length: 8 }, (_, i) => ({ date: `2026-01-${String(i * 3 + 1).padStart(2, '0')}`, kg: 83 - i * 0.3 }));
+    const ml = calcMaintenanceFinder(long, 2800);
+    expect(ml!.confidence).not.toBe('low');
+    expect(ml!.note).not.toContain('окно');
   });
   it('Sweat electrolytes still correct after refactor', async () => {
     const { calcSweatElectrolytes } = await import('../../core/metabolic-constants');

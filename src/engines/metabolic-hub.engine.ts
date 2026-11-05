@@ -935,10 +935,17 @@ export function calcMaintenanceFinder(weightHistory: WeightPoint[], avgIntakeKca
   const atKcal = trend < -0.2 ? estimateAdaptiveThermogenesis({ deficitKcal: Math.round(Math.abs(trend)*density/7), weeksInDeficit: Math.round(conf.days/7) }) : 0;
   let tdee = 0;
   let confidence: MaintenanceFinderResult['confidence']='low';
-  if (conf.r2>0.6) confidence='high'; else if (conf.r2>0.35) confidence='medium';
+  // Аудит 2026-11: R² считается по 7 точкам за 6 дней так же уверенно, как по 14 точкам за 3 недели,
+  // хотя тренд на коротком окне — шум воды/гликогена. Уверенность теперь требует и длины окна.
+  const spanDays = conf.days;
+  if (conf.r2 > 0.6 && spanDays >= 14) confidence = 'high';
+  else if (conf.r2 > 0.35 && spanDays >= 10) confidence = 'medium';
   if (intake>0) tdee = Math.round(intake - (trend*density/7) - atKcal*0.3);
   else tdee = 0;
-  const note = tdee ? `Тренд ${trend}кг/нед (R2 ${conf.r2}, плотность ${density} Hall) → TDEE ~${tdee}ккал (+AT ${atKcal}) intake ${intake}` : `Тренд ${trend}кг/нед — введи средний ккал из дневника для TDEE`;
+  const spanNote = spanDays < 14 ? ` · ⚠ окно ${spanDays}д <14 — тренд шумный (вода/гликоген)` : '';
+  const note = tdee
+    ? `Тренд ${trend}кг/нед (R2 ${conf.r2}, плотность ${density} Hall) → TDEE ~${tdee}ккал (+AT ${atKcal}) intake ${intake}${spanNote}`
+    : `Тренд ${trend}кг/нед — введи средний ккал из дневника для TDEE`;
   return { tdee, confidence, r2: conf.r2, days: conf.days, note, density, atKcal };
 }
 export interface GoalTimelineResult { days:number; kcalDiff:number; note:string; model: string }
@@ -1147,24 +1154,79 @@ export function calcSweatTest(input:SweatTestInput){
 }
 
 // ——— Diet break / MATADOR ———
-export function buildDietBreakPlan(totalWeeks:number, deficitWeeks:number, breakEvery?:number, breakDays?:number): Array<{ week:number; phase:'deficit'|'maintenance'; kcalDelta:number; note:string }> {
-  const every=breakEvery ?? 6; const bDays=breakDays ?? 14;
-  const breakWeeks=Math.round(bDays/7);
-  const plan: Array<{week:number;phase:'deficit'|'maintenance';kcalDelta:number;note:string}>=[]; let w=1;
-  while(w<=totalWeeks){
-    for(let i=0;i<every && w<=totalWeeks;i++){ plan.push({ week:w, phase:'deficit', kcalDelta:-500, note:'Дефицит -500' }); w++; }
-    for(let i=0;i<breakWeeks && w<=totalWeeks;i++){ plan.push({ week:w, phase:'maintenance', kcalDelta:0, note:'Diet break maintenance (Byrne MATADOR)' }); w++; }
-    if(totalWeeks - deficitWeeks <=0) break;
+/**
+ * Календарь диеты: `deficitWeeks` недель дефицита, между блоками — diet break.
+ *
+ * Было: `buildDietBreakPlan(totalWeeks, deficitWeeks, …)` молча обрезал план до `totalWeeks`, а
+ * параметр `deficitWeeks` работал только как «выйти из цикла, если он ≥ totalWeeks». В хабе это
+ * давало план, длина которого не совпадала с обещанным сроком цели, и брейки не удлиняли срок.
+ *
+ * Теперь аргумент один — сколько недель дефицита реально нужно. Брейки вставляются ПОСЛЕ каждых
+ * `breakEvery` недель дефицита (по умолчанию 6 нед → 2 нед maintenance, Trexler/Helms), поэтому
+ * длина плана = deficitWeeks + breaks × breakWeeks, и это ровно то, что печатает срок цели.
+ */
+export function buildDietBreakPlan(
+  deficitWeeks: number,
+  opts?: { breakEvery?: number; breakWeeks?: number; deficitKcalDelta?: number },
+): Array<{ week: number; phase: 'deficit'|'maintenance'; kcalDelta: number; note: string }> {
+  const every = Math.max(2, Math.round(opts?.breakEvery ?? 6));
+  const breakWeeks = Math.max(1, Math.round(opts?.breakWeeks ?? 2));
+  const delta = Math.round(opts?.deficitKcalDelta ?? -500);
+  const total = Math.max(0, Math.round(deficitWeeks));
+  const plan: Array<{ week:number; phase:'deficit'|'maintenance'; kcalDelta:number; note:string }> = [];
+  let placed = 0;
+  while (placed < total) {
+    const block = Math.min(every, total - placed);
+    for (let i = 0; i < block; i++) {
+      placed++;
+      plan.push({ week: plan.length + 1, phase: 'deficit', kcalDelta: delta, note: `Дефицит ${delta > 0 ? '+' : ''}${delta} ккал` });
+    }
+    // брейк нужен только если после него ещё остаётся дефицит
+    if (placed < total) {
+      for (let i = 0; i < breakWeeks; i++) {
+        plan.push({ week: plan.length + 1, phase: 'maintenance', kcalDelta: 0, note: 'Diet break: maintenance 2 нед (Trexler/Helms; MATADOR Byrne 2018)' });
+      }
+    }
   }
-  return plan.slice(0,totalWeeks);
+  return plan;
 }
-export function calcRefeedNeed(weeksInDeficit:number, bodyFat?:number, ea?:number|null): { needed:boolean; carbBoostPct:number; note:string } {
-  const bf=bodyFat ?? 15;
-  const longDeficit=weeksInDeficit>=6 && bf<15;
-  const lowEA=ea!=null && ea < 30;
-  const needed=longDeficit || lowEA;
-  const boost=needed? 25:0;
-  return { needed, carbBoostPct:boost, note: needed ? `Refeed 1×/нед +${boost}% углей (лептин/T3 Trexler)` : 'Refeed не нужен' };
+/** Сколько брейков попадёт в план (нужно сроку цели, чтобы совпасть с календарём). */
+export function countDietBreaks(deficitWeeks: number, breakEvery = 6): number {
+  const total = Math.max(0, Math.round(deficitWeeks));
+  return total > 1 ? Math.floor((total - 1) / Math.max(2, Math.round(breakEvery))) : 0;
+}
+/**
+ * Нужен ли refeed (1×/нед +25 % углей). Порог «низкого жира» разный для полов:
+ * мужчины ~15 %, женщины ~24 % (Trexler/Helms). Неизвестные недели дефицита — это НЕ «не нужен».
+ */
+export function calcRefeedNeed(
+  weeksInDeficit?: number,
+  bodyFat?: number,
+  ea?: number | null,
+  sex: 'male' | 'female' = 'male',
+): { needed: boolean; carbBoostPct: number; known: boolean; note: string } {
+  const lowEA = ea != null && Number.isFinite(ea) && ea < 30;
+  const known = typeof weeksInDeficit === 'number' && Number.isFinite(weeksInDeficit) && weeksInDeficit > 0;
+  const weeks = known ? Math.round(weeksInDeficit as number) : null;
+  const bf = typeof bodyFat === 'number' && Number.isFinite(bodyFat) ? bodyFat : null;
+  const leanCutoff = sex === 'female' ? 24 : 15;
+  const lean = bf != null && bf < leanCutoff;
+  const longDeficit = weeks != null && weeks >= 6 && lean;
+  const needed = longDeficit || lowEA;
+  const boost = needed ? 25 : 0;
+  let note: string;
+  if (needed && longDeficit) {
+    note = `Refeed 1×/нед +${boost}% углей: ${weeks} нед дефицита при жире ${bf}% <${leanCutoff}% (лептин/T3, Trexler)`;
+  } else if (needed && lowEA) {
+    note = `Refeed 1×/нед +${boost}% углей: EA ${ea} ккал/кг LBM <30 (низкая доступность энергии, RED-S)`;
+  } else if (!known) {
+    note = 'Недели в дефиците не указаны — refeed считается от ≥6 нед подряд при низком жире (м <15 %, ж <24 %)';
+  } else if (bf == null) {
+    note = 'Жир не известен — порог рефида не проверить (нужен % жира)';
+  } else {
+    note = `Refeed не нужен: ${weeks} нед дефицита, жир ${bf}% ≥${leanCutoff}%`;
+  }
+  return { needed, carbBoostPct: boost, known, note };
 }
 
 // ——— Carb / Sodium loading (Breno Melo / peak week) ———
@@ -1487,7 +1549,16 @@ export function calcReverseDietAuto(currentKcal: number, targetKcal: number, tre
 }
 
 // ——— Goal timeline V2: rate-caps Helms + diet-break вставка ———
-export function calcGoalTimelineV2(input: { weight: number; targetWeight: number; tdee: number; bodyFat?: number; withDietBreaks?: boolean }): { days: number; kcalDiff: number; weeks: number; rateNote: string; note: string; model: string } | null {
+/**
+ * Срок цели. С diet-break считается по той же схеме, что и календарь `buildDietBreakPlan`:
+ * 2 нед maintenance каждые 6 нед дефицита, и эти недели **полностью** добавляются к сроку.
+ * Было: `withDietBreaks` брал брейк каждые 8 нед и «стоил» 35 % своей длины — срок цели и
+ * напечатанный план диеты не сходились, и человек планировал недели, которых в плане нет.
+ */
+export function calcGoalTimelineV2(input: { weight: number; targetWeight: number; tdee: number; bodyFat?: number; withDietBreaks?: boolean }): {
+  days: number; kcalDiff: number; weeks: number; rateNote: string; note: string; model: string;
+  deficitWeeks: number; breakWeeks: number; breaks: number;
+} | null {
   const base = calcGoalTimeline(input as any);
   if (!base) return null;
   const diff = input.targetWeight - input.weight;
@@ -1495,14 +1566,19 @@ export function calcGoalTimelineV2(input: { weight: number; targetWeight: number
   const capNote = diff < 0
     ? (pctPerWeek > 1 ? '⚠ >1%/нед — агрессивно, LBM-риск (Helms: 0.5–1%)' : 'Темп 0.5–1%/нед ок (Helms)')
     : (pctPerWeek > 0.5 ? '⚠ >0.5%/нед — жир-набор (Helms: 0.25–0.5%)' : 'Темп 0.25–0.5%/нед ок (Helms)');
+  const deficitWeeks = Math.max(0, Math.round(base.days / 7));
+  const breakWeeks = 2;
   let days = base.days;
   let extra = '';
-  if (input.withDietBreaks && base.days > 42) {
-    const breaks = Math.floor(base.days / 56); // каждые 8нед ×2нед maintenance
-    days += breaks * 14 * 0.35; // break замедляет на ~35% своего времени
-    extra = ` · diet-break +${Math.round(breaks * 14 * 0.35)}д (${breaks}×2нед MATADOR)`;
+  let breaks = 0;
+  if (input.withDietBreaks) {
+    breaks = countDietBreaks(deficitWeeks, 6);
+    if (breaks > 0) {
+      days += breaks * breakWeeks * 7;
+      extra = ` · diet-break +${breaks * breakWeeks}нед (${breaks}×${breakWeeks}нед каждые 6нед дефицита)`;
+    }
   }
-  return { days: Math.round(days), kcalDiff: base.kcalDiff, weeks: Math.round(days / 7), rateNote: capNote, note: `${base.note}${extra} · ${capNote}`, model: `${(base as any).model} + Helms caps` };
+  return { days: Math.round(days), kcalDiff: base.kcalDiff, weeks: Math.round(days / 7), rateNote: capNote, note: `${base.note}${extra} · ${capNote}`, model: `${(base as any).model} + Helms caps`, deficitWeeks, breakWeeks, breaks };
 }
 
 // ——— One-answer PRO + diff сценариев + беременность ———

@@ -129,6 +129,32 @@ function openMode(label: string): string {
 }
 
 describe('MetabolicHub: ввод меняет расчёт (проводка полей)', () => {
+  it('refeed: «нужны данные» пока недели дефицита не введены, и пол меняет порог', () => {
+    render(<MetabolicHub />);
+    let txt = openMode('Diet break');
+    expect(txt).toContain('Нужны данные');
+    expect(txt).not.toContain('Не нужен');
+    setNumber('Жир, % (если измерен)', 12);
+    setNumber('Недель в дефиците', 8);
+    txt = openMode('Diet break');
+    expect(txt).toContain('+25% углей');
+    expect(txt).toContain('8 нед дефицита');
+    expect(txt).toContain('<15%');
+  });
+
+  it('календарь diet break совпадает со сроком цели (раньше план был короче)', () => {
+    render(<MetabolicHub />);
+    // 5 кг — примерно полгода: брейки точно попадают в календарь
+    setNumber('Цель вес, кг', 78);
+    const txt = openMode('Diet break');
+    const m = txt.match(/→ (\d+) нед дефицита \+ (\d+)×(\d+) нед брейка = (\d+) нед \(срок цели (\d+) нед\)/);
+    expect(m, `нет раскладки календаря: ${txt.slice(0, 300)}`).toBeTruthy();
+    const [defWeeks, breaks, breakWeeks, planWeeks, goalWeeks] = m!.slice(1).map(Number);
+    expect(breaks).toBeGreaterThan(0);
+    expect(planWeeks).toBe(defWeeks + breaks * breakWeeks);
+    expect(goalWeeks).toBe(planWeeks);
+  });
+
   it('вес 83 → 110 поднимает TDEE и воду', () => {
     render(<MetabolicHub />);
     const tdee0 = tileValue('TDEE');
