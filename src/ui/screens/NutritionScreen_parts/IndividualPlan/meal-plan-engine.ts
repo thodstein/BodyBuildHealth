@@ -426,6 +426,84 @@ function recalcDayTotals(meals: any[], totals: any): void {
   totals.leucine_mg = meals.reduce((s: number, m: any) => s + (m.totals.leucine_mg || 0), 0);
 }
 
+/**
+ * QG46: последняя миля честными граммами.
+ *
+ * До §8.44 день «добирал» остаток фантомными граммами — позиция 8 г несла макросы 160 г
+ * (замер: 110 кг / 8370 ккал / 1500 У / отдых: канон держался на «чиа 8 г»). После QG45
+ * фантом убран, и честный недобор вскрылся: жир −7.2 % (120.7 из 130 г) на экстремальном
+ * отдыхе, белок −4.9 % (190.2 из 200 г) на 80 кг / 2200 / 6 приёмов.
+ *
+ * Стадия возвращает канон **реальной едой**: остаток жира 6–12 г закрывается порцией масла
+ * 5–10 г, остаток белка 5–12 г при излишке углеводов ≥10 г — грамм-в-грамм по калориям
+ * (белок вверх, гарнир вниз), поэтому ккал дня не растёт. Работает только когда день уже
+ * собран (±3.5 % ккал), только в про-режиме и только в свободном режиме (не ручные цели,
+ * не портативный) — тот же контур, что у овощных/микро-стадий.
+ */
+function applyLastMilePortions(
+  meals: any[],
+  totals: any,
+  goal: { kcal: number; p: number; f: number; c: number },
+  isExcluded: (id: string) => boolean,
+  notes: string[],
+): boolean {
+  if (!(goal.kcal > 0) || !(goal.p > 0) || !(goal.f > 0) || !(goal.c > 0)) return false;
+  if (Math.abs((totals.kcal || 0) - goal.kcal) > goal.kcal * 0.035) return false;
+  const byId = fdDensityMap();
+  const mains = (meals || []).filter((m: any) => ['breakfast', 'lunch', 'dinner'].includes(String(m.type || '')));
+  const targets = mains.length > 0 ? mains : (meals || []);
+  const labelOf = (m: any) => String(m.label || m.type || 'приём');
+  let changed = false;
+
+  // ── 1. Жир: 6–12 г остатка → реальная порция масла 5–10 г ───────────────
+  const dF = goal.f - (totals.f || 0);
+  if (dF >= 6 && dF <= 12) {
+    const add = Math.min(10, Math.max(5, Math.round(dF / 5) * 5));
+    // сначала расширяем масло, которое уже стоит в приёме (≤10 г): меньше позиций в тарелке
+    let done = false;
+    let fatNote = '';
+    for (const m of targets) {
+      const it: any = (m.items || []).find((x: any) =>
+        x.role === 'fat' && /oil|ghee|butter/.test(String(x.id)) && (x.amount || 0) >= 5 && (x.amount || 0) <= 10);
+      if (!it) continue;
+      const fd: any = byId.get(String(it.id));
+      if (!fd) continue;
+      const grown = makeItem(fd, (it.amount || 0) + add, 'fat');
+      Object.assign(it, { amount: grown.amount, p: grown.p, f: grown.f, c: grown.c, kcal: grown.kcal, fiber: grown.fiber, leucine_mg: grown.leucine_mg });
+      fatNote = `🫒 Последняя миля: ${it.name} +${add} г — жир дня закрывается реальной порцией`;
+      done = true;
+      break;
+    }
+    if (!done) {
+      const oil: any = ['oil_olive', 'oil_sunflower_unrefined', 'fat_ghee']
+        .map((id) => byId.get(id)).find((fd: any) => fd && !isExcluded(String(fd.id)));
+      if (oil) {
+        const target = targets.slice().sort((a: any, b: any) => (a.totals?.f || 0) - (b.totals?.f || 0))[0];
+        if (target) {
+          const item = makeItem(oil, add, 'fat');
+          target.items = target.items || [];
+          target.items.push(item);
+          fatNote = `🫒 Последняя миля: ${item.name} ${add} г в «${labelOf(target)}» — жир дня закрывается реальной порцией`;
+          done = true;
+        }
+      }
+    }
+    if (done) {
+      changed = true;
+      // жир поднялся — пересчитываем, иначе следующий шаг будет считать по устаревшей сумме
+      recalcMealTotals(meals);
+      recalcDayTotals(meals, totals);
+      if (fatNote) notes.push(`${fatNote} (цель ${Math.round(goal.f)} г, факт ${Math.round(totals.f)} г)`);
+    }
+  }
+
+  // ── 2. Белок: НЕ здесь (реш. QG46). Недобор белка на 80 кг / 2200 / 6 приёмов
+  // (−4.9 %) вызван не «последней милей», а приёмом без белка: обед = картофель 199 г +
+  // спаржа 200 г. Пост-обработка тут дала бы крошку (35 г курицы) или изолят вместо еды —
+  // лечится в сборке приёма (каждый основной приём несёт белок), отдельная стадия QG47.
+  return changed;
+}
+
 // Максимально допустимые порции для добавок (г) — защита от абсурдных доз
 const SUPPLEMENT_MAX_G: Record<string, number> = {
   creatine: 10, whey_isolate: 60, whey_protein: 60, whey_concentrate: 60,
@@ -14544,9 +14622,26 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
       nutCatchupCap(quotaWeightScale(Number(input.weightKg) || 80)),
       { k: Number(input.goalKcal) || 0, p: Number(adjustedProteinG || input.goalProteinG) || 0, f: Number(input.goalFatG) || 0, c: Number(input.goalCarbsG) || 0 },
     );
+    // ─── QG46: последняя миля честными граммами (§8.44: фантом убран — добираем едой) ───
+    if (_pickCtx.qualityMode === 'full'
+      && !(input as any).manualTargetsLocked
+      && (input as any).kbjuMode !== 'manual'
+      && !(input as any).portableMode) {
+      applyLastMilePortions(
+        meals as any[],
+        totals,
+        {
+          kcal: Number(input.goalKcal) || 0,
+          p: Number(adjustedProteinG || input.goalProteinG) || 0,
+          f: Number(input.goalFatG) || 0,
+          c: Number(input.goalCarbsG) || 0,
+        },
+        (id: string) => !combinedExcluded.has(id),
+        notes as string[],
+      );
+    }
     const _finalFoodIds = new Set<string>();
-    for (const m of meals) for (const it of (m.items || [])) _finalFoodIds.add(it.id);
-    // QG45: финальная страховка целостности перед микро/оценкой/витриной. Основная работа —
+    for (const m of meals) for (const it of (m.items || [])) _finalFoodIds.add(it.id);    // QG45: финальная страховка целостности перед микро/оценкой/витриной. Основная работа —
     // в recalcDayTotals (каждая стадия видит честные totals), здесь — гарантия на выходе.
     if (sanitizeItemNutrients(meals as any[]) > 0) {
       recalcMealTotals(meals as any[]);
