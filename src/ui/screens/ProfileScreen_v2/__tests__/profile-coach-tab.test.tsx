@@ -184,14 +184,52 @@ describe('атлеты', () => {
     expect(athleteCards(container)).toHaveLength(0);
   });
 
-  it('правка имени сохраняется в карточке', () => {
+  it('правка имени сохраняется в карточке и в пространстве данных (полоса не врёт)', () => {
     seed(1);
+    // Пространство атлета уже существует: тренер входил в его данные.
+    const sid = athleteSpaceId('a1');
+    const reg = upsertSpace(emptyRegistry(), { id: sid, athleteId: 'a1', label: 'Атлет 1' }).registry;
+    writeRegistryToStorage(reg);
+    _resetDataSpaceCache();
+
     const { container } = render(<ProfileCoachTab />);
     fireEvent.click(container.querySelector('[data-coach="edit"]') as HTMLElement);
     fireEvent.change(container.querySelector('[data-coach="name"]') as HTMLInputElement, { target: { value: 'Иван П.' } });
     fireEvent.click(container.querySelector('[data-coach="save"]') as HTMLElement);
     expect((readCoachState(localStorage).athletes[0] as CoachAthlete).name).toBe('Иван П.');
     expect(container.textContent).toContain('Иван П.');
+    // иначе полоса «Данные атлета» и «Сменить» показывали бы старое имя
+    const space = readRegistryFromStorage().spaces.find(s => s.id === sid);
+    expect(space?.label).toBe('Иван П.');
+    _resetDataSpaceCache();
+  });
+
+  it('переименование АКТИВНОГО атлета сразу меняет строку «Открыты данные»', () => {
+    seed(1);
+    const sid = athleteSpaceId('a1');
+    const reg = upsertSpace(emptyRegistry(), { id: sid, athleteId: 'a1', label: 'Атлет 1' }).registry;
+    writeRegistryToStorage({ ...reg, active: sid });
+    _resetDataSpaceCache();
+
+    const { container } = render(<ProfileCoachTab />);
+    expect(container.querySelector('[data-coach="active"]')?.textContent).toContain('Атлет 1');
+    fireEvent.click(container.querySelector('[data-coach="edit"]') as HTMLElement);
+    fireEvent.change(container.querySelector('[data-coach="name"]') as HTMLInputElement, { target: { value: 'Иван П.' } });
+    fireEvent.click(container.querySelector('[data-coach="save"]') as HTMLElement);
+    const text = container.querySelector('[data-coach="active"]')?.textContent ?? '';
+    expect(text).toContain('Иван П.');
+    expect(text).not.toContain('Атлет 1');
+    _resetDataSpaceCache();
+  });
+
+  it('переименование не создаёт пространство атлета, который ни разу не входил', () => {
+    seed(1);
+    const { container } = render(<ProfileCoachTab />);
+    fireEvent.click(container.querySelector('[data-coach="edit"]') as HTMLElement);
+    fireEvent.change(container.querySelector('[data-coach="name"]') as HTMLInputElement, { target: { value: 'Пётр' } });
+    fireEvent.click(container.querySelector('[data-coach="save"]') as HTMLElement);
+    // запись пространства = «его данные существуют»: выдумывать её нельзя
+    expect(readRegistryFromStorage().spaces.filter(s => s.id !== HOME_SPACE_ID)).toHaveLength(0);
   });
 
   it('в подтверждении удаления сказано, что заметки/задачи/журнал остаются, а данные — отдельная кнопка', () => {
@@ -374,6 +412,29 @@ describe('атлеты', () => {
       configurable: true,
       value: { ...window.location, reload: originalReload },
     });
+    _resetDataSpaceCache();
+  });
+
+  it('строка статуса говорит, чьи данные ОТКРЫТЫ, а не кто выбран в списке', () => {
+    const at = '2026-01-01T00:00:00.000Z';
+    // дома: «Открыты ваши данные», и выбранный атлет подписан отдельно
+    seed(2);
+    const home = render(<ProfileCoachTab />);
+    const homeText = home.container.querySelector('[data-coach="active"]')?.textContent ?? '';
+    expect(homeText).toContain('Открыты ваши данные');
+    expect(homeText).toContain('выбран');
+    cleanup();
+
+    // в пространстве атлета: «Открыты данные: <имя>», без «выбран»
+    const sid = athleteSpaceId('a1');
+    const reg = upsertSpace(emptyRegistry(), { id: sid, athleteId: 'a1', label: 'Атлет 1' }).registry;
+    writeRegistryToStorage({ ...reg, active: sid });
+    _resetDataSpaceCache();
+    const inSpace = render(<ProfileCoachTab />);
+    const spaceText = inSpace.container.querySelector('[data-coach="active"]')?.textContent ?? '';
+    expect(spaceText).toContain('Открыты данные:');
+    expect(spaceText).toContain('Атлет 1');
+    expect(spaceText).not.toContain('выбран');
     _resetDataSpaceCache();
   });
 

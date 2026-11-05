@@ -53,6 +53,7 @@ import {
   reloadToApplySpace,
   removeSpace,
   spaceUsageMap,
+  upsertSpace,
   writeRegistryToStorage,
 } from '../../../core/data-space';
 
@@ -224,7 +225,10 @@ export const ProfileCoachTab: React.FC<{
 
   // Пространство данных читаем один раз на рендер экрана (переключение всё равно
   // перезагружает приложение).
-  const spaceActiveId = useMemo(() => activeSpaceRecord().id, []);
+  const [activeSpace, setActiveSpace] = useState(() => activeSpaceRecord());
+  const spaceActiveId = activeSpace.id;
+  /** Имя пространства, данные которого открыты (для честной строки статуса). */
+  const activeSpaceLabel = activeSpace.label;
   // Реестр перечитываем и после изменений в списке: удаление атлета меняет его.
   const spaceRegistry = useMemo(() => readRegistryFromStorage(), [state]);
   // Объём всех пространств — ОДНИМ проходом по ключам. Считать `spaceUsage` на
@@ -290,6 +294,10 @@ export const ProfileCoachTab: React.FC<{
           note: form.note,
         }),
       );
+      // Переименовали атлета — имя в его пространстве данных должно обновиться
+      // тоже: иначе полоса «Данные атлета: <старое имя>» и список «Сменить»
+      // показывали бы прежнее имя, пока тренер не войдёт в данные заново.
+      syncSpaceLabel(editingId, form.name);
       cancelEdit();
       return;
     }
@@ -314,6 +322,26 @@ export const ProfileCoachTab: React.FC<{
     apply(res.state);
     setForm(EMPTY_FORM);
     setFormError(null);
+  };
+
+  /**
+   * Имя атлета живёт в двух местах: карточка тренера (журнал/заметки) и запись
+   * пространства данных (полоса сверху, список «Сменить»). Переименование
+   * обновляет оба, иначе человек видит старое имя там, где принимает решение.
+   * Запись пространства может отсутствовать (атлет ещё не входил) — тогда нечего
+   * обновлять, и создавать её «на всякий случай» не нужно.
+   */
+  const syncSpaceLabel = (athleteId: string, label: string) => {
+    const sid = athleteSpaceId(athleteId);
+    const reg = readRegistryFromStorage();
+    if (!reg.spaces.some(s => s.id === sid)) return;
+    const next = upsertSpace(reg, { id: sid, athleteId, label });
+    if (!next.error) {
+      writeRegistryToStorage(next.registry);
+      // Строка «Открыты данные: …» должна обновиться сразу, а не после входа
+      // в данные заново: имя в ней — единственный признак, чей профиль открыт.
+      setActiveSpace(activeSpaceRecord());
+    }
   };
 
   const askDelete = (id: string) => {
@@ -460,7 +488,7 @@ export const ProfileCoachTab: React.FC<{
             />
           </button>
         </div>
-        {state.enabled && active && (
+        {state.enabled && (
           <div
             data-coach="active"
             style={{
@@ -479,7 +507,25 @@ export const ProfileCoachTab: React.FC<{
             <span aria-hidden="true" style={{ display: 'inline-flex', color: ACCENT }}>
               <NativeIcon name="target" size={13} />
             </span>
-            Активный атлет: <strong style={{ fontWeight: 800 }}>{active.name}</strong>
+            {/* Показываем ПРАВДУ о том, чьи данные открыты, а не «выбранного
+                атлета»: выбор в списке не значит, что его пространство открыто.
+                Иначе строка читалась бы как «сейчас правлю Ивана», когда на
+                экране свои данные. */}
+            {spaceActiveId !== HOME_SPACE_ID ? (
+              <>
+                Открыты данные: <strong style={{ fontWeight: 800 }}>{activeSpaceLabel}</strong>
+              </>
+            ) : (
+              <>
+                Открыты ваши данные
+                {active ? (
+                  <>
+                    {' · выбран: '}
+                    <strong style={{ fontWeight: 800 }}>{active.name}</strong>
+                  </>
+                ) : null}
+              </>
+            )}
           </div>
         )}
       </div>
