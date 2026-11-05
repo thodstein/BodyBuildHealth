@@ -39,8 +39,8 @@ UI в понятную структуру (мастер ввода → резу�
 **Исправление.** Новый примитив `MhNum` с честным состоянием «не задано» (opt-in `optional`)
 для всех опциональных лаб и замеров. Обязательные поля (вес/рост/возраст/шея/талия) остались
 на `PopupNumber`.
-**Регрессия.** `metabolic-hub-structure.test.tsx` → «HCT по умолчанию не задан», «опциональные
-лабы подписаны «не задано»».
+**Регрессия.** `metabolic-hub-structure.test.tsx` → «плитка крови без HCT показывает «—», а не
+45 %», «опциональные лабы в шаге 3 подписаны «не задано»».
 
 ### 1.4 Автообновление лаб из профиля откатывало ручной ввод
 
@@ -55,8 +55,9 @@ UI в понятную структуру (мастер ввода → резу�
 «не затираем уже показанное» для этих четырёх лаб не срабатывала. Ключи сведены к коротким,
 `markManualLab` теперь стоит на всех 13 лабах (hct/hgb/ferritin/gfr/hdl/ast/alt/plt/tg/
 glucose/insulin/tsh/ft4).
-**Регрессия.** `metabolic-hub-structure.test.tsx` → «ключи `valuesRef` совпадают с ключами
-`apply(...)`», «каждая лаба помечена `markManualLab`», «Сброс лаб вызывает `resetLabs`».
+**Регрессия.** `metabolic-hub-structure.test.tsx` → «ключи valuesRef совпадают с ключами
+apply(...) в refreshLabs», «каждая лаба из refreshLabs помечена markManualLab», ««Сброс лаб»
+вызывает resetLabs (снимает пометки), а не инлайн-сброс четырёх полей».
 
 ### 1.5 Кнопка «Донация сегодня» ничего не сохраняла
 
@@ -787,16 +788,29 @@ SRCBScreen (33 файла, 334 теста), TrainingScreen (196 файлов, 19
   `node --max-old-space-size=6144 ./node_modules/typescript/bin/tsc --noEmit`.
   Раньше в этом окружении падал по памяти (7.9 ГБ RAM + параллельные `tsc`/`vitest`
   из других сессий → heap OOM); на 6 ГБ heap проходит, если рядом никто не собирает.
-  ⚠️ На момент последнего прогона полный `tsc` ругается **в чужом WIP-файле**
-  `src/engines/bb/cycle-to-plan.ts:1999` (TS2367, сравнение `'adapt'`/`'faithful'`) —
-  это параллельная сессия, файл хаба к нему не относится; scoped-прогон по графу хаба
-  по-прежнему `EXIT=0`.
-- `npx vitest run src/ui/screens/Shared/__tests__ src/engines/__tests__/metabolic-hub.test.ts`
-  — **260 passed** (6 файлов: structure / toggles / honesty / modes / wiring / engine).
+  Раньше полный `tsc` падал ещё и в чужом WIP-файле `src/engines/bb/cycle-to-plan.ts:1999`
+  (TS2367, сравнение `'adapt'`/`'faithful'`) — параллельная сессия его поправила,
+  контрольный прогон 05.11.2026: **0 ошибок**.
+- `npx vitest run src/ui/screens/Shared/__tests__ src/engines/__tests__/metabolic-hub.test.ts
+  src/ui/screens/SRCBBScreen_parts/__tests__/popup-number-honesty.test.tsx` — **260 passed**
+  (7 файлов: structure / toggles / honesty / modes / wiring / engine / popup-number-honesty —
+  последний проверяет общий `PopupNumber`, которым пользуются ещё SRCBBScreen и TrainingScreen).
 - `npx vitest run src/ui/__tests__/rest-hooks-native.test.tsx
   src/engines/__tests__/risk-info-honesty-e07-e08.test.ts` — **89 passed**
   (в stderr шумит jsdom-canvas chart.js — это фон, не падения).
 - `npm run verify:apk-design` — OK.
+
+### Приёмка 05.11.2026 (контрольный прогон)
+
+- Дефектов в отчёте: **63** (§1.1–1.63), у каждого есть строка «Исправление» и регрессия
+  (у 1.63 — сам прогон экранов).
+- Связок «файл → тест» из отчёта: **71**, все подтверждены по исходникам тестов
+  (расхождений 0; две цитаты подтянуты к реальным заголовкам).
+- Guard-инварианты перепроверены кодом: 16 режимов, `#mh-mode-body`, `#mh-results`,
+  4 пресета, отсутствие нативных `<select>`/checkbox в JSX хаба, 13 лаб через `markManualLab`,
+  5 ключей localStorage, лимит сценариев 6, `diffMetabolicSnapshots` без обрезки.
+- Полный `tsc --noEmit` — **0 ошибок** (чужой WIP-файл поправлен параллельной сессией).
+- `verify:apk-design` — OK. Рабочее дерево по файлам хаба чистое (всё закоммичено локально).
 
 Guard-тесты, которые нельзя ломать при следующих правках:
 
