@@ -15,7 +15,7 @@ import { ConfirmDialogProvider, useConfirmDialog } from '../../../TrainingScreen
 import { useAndroidBackHandler } from '../../../../../core/use-android-back';
 import {
   loadCardioLog, saveCardioLogEntry, removeCardioLogEntry, replaceCardioLog, importCardioEntries,
-  cardioLogStats, cardioWeekAdherence, estimateCardioEntryKcal, cardioPaceMinPerKm,
+  cardioLogStats, cardioWeekAdherence, estimateCardioEntryKcal, cardioPaceOrSpeed,
   validateCardioLogFields, cardioHrCompliance,
   sanitizeCardioSport, CARDIO_SPORTS, CARDIO_SPORT_RU, type CardioSport,
   type CardioLogEntry,
@@ -293,10 +293,10 @@ const CardioDiaryInner: React.FC<DiaryWindowProps> = ({ open, onClose, onDataCha
   const exportCsv = () => {
     // Спринт 5.2: колонка «Дисциплина» — иначе данные уходят из приложения, а
     // круговой импорт теряет дисциплину (её больше некуда восстановить).
-    const head = 'Дата,Тип,Дисциплина,Минуты,Км,Темп,Ккал,ЧСС ср.,RPE,День ног,Заметка,Завершено\n';
+    const head = 'Дата,Тип,Дисциплина,Минуты,Км,Темп/скорость,Ккал,ЧСС ср.,RPE,День ног,Заметка,Завершено\n';
     const body = log.map(e =>
       [e.date, TYPES.find(t => t.id === e.type)?.label ?? e.type, CARDIO_SPORT_RU[sanitizeCardioSport(e.sport)], e.durationMin,
-        e.distanceKm ?? '', cardioPaceMinPerKm(e.distanceKm, e.durationMin) ?? '', e.calories ?? '', e.avgHr ?? '', e.rpe ?? '',
+        e.distanceKm ?? '', cardioPaceOrSpeed(e.sport, e.distanceKm, e.durationMin) ?? '', e.calories ?? '', e.avgHr ?? '', e.rpe ?? '',
         legDayDates.has(e.date) ? 'да' : '', e.notes ?? '', e.completed ? 'да' : 'нет'].map(csvCell).join(','),
     ).join('\n');
     // АПК: `&lt;a download&gt;` в WebView не сохраняет — Documents + Share.
@@ -309,7 +309,7 @@ const CardioDiaryInner: React.FC<DiaryWindowProps> = ({ open, onClose, onDataCha
     const typeLabel = (id: CardioType) => TYPES.find(t => t.id === id)?.label ?? id;
     const rows = log.map(e =>
       `<tr><td>${escapeHtml(e.date)}</td><td>${escapeHtml(typeLabel(e.type))}</td><td>${escapeHtml(CARDIO_SPORT_RU[sanitizeCardioSport(e.sport)])}</td><td>${e.durationMin}</td>` +
-      `<td>${e.distanceKm != null ? e.distanceKm : ''}</td><td>${cardioPaceMinPerKm(e.distanceKm, e.durationMin) ?? ''}</td><td>${e.calories != null ? e.calories : ''}</td>` +
+      `<td>${e.distanceKm != null ? e.distanceKm : ''}</td><td>${cardioPaceOrSpeed(e.sport, e.distanceKm, e.durationMin) ?? ''}</td><td>${e.calories != null ? e.calories : ''}</td>` +
       `<td>${e.avgHr ?? ''}</td><td>${e.rpe ?? ''}</td><td>${legDayDates.has(e.date) ? '🦵' : ''}</td><td>${escapeHtml(e.notes ?? '')}</td></tr>`,
     ).join('');
     const html = `<!doctype html>
@@ -332,7 +332,7 @@ const CardioDiaryInner: React.FC<DiaryWindowProps> = ({ open, onClose, onDataCha
   <div class="card"><b>Всего</b><br>${doneSessions} сесс · ${totalMinutes} мин</div>
 </div>
 <table>
-  <tr><th>Дата</th><th>Тип</th><th>Дисциплина</th><th>Минуты</th><th>Км</th><th>Темп</th><th>Ккал</th><th>ЧСС ср.</th><th>RPE</th><th>День ног</th><th>Заметка</th></tr>
+  <tr><th>Дата</th><th>Тип</th><th>Дисциплина</th><th>Минуты</th><th>Км</th><th>Темп/скорость</th><th>Ккал</th><th>ЧСС ср.</th><th>RPE</th><th>День ног</th><th>Заметка</th></tr>
   ${rows}
 </table>`;
     // АПК: window.open().print() заблокирован в WebView — html в файл + Share.
@@ -657,7 +657,7 @@ const CardioDiaryInner: React.FC<DiaryWindowProps> = ({ open, onClose, onDataCha
                 {e.distanceKm != null && e.distanceKm > 0 && (
                   <>
                     <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)', fontVariantNumeric: 'tabular-nums' }}>{e.distanceKm} км</span>
-                    <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)', fontVariantNumeric: 'tabular-nums' }}>{cardioPaceMinPerKm(e.distanceKm, e.durationMin)}</span>
+                    <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)', fontVariantNumeric: 'tabular-nums' }}>{cardioPaceOrSpeed(e.sport, e.distanceKm, e.durationMin)}</span>
                   </>
                 )}
                 {e.avgHr != null && <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)', fontVariantNumeric: 'tabular-nums' }}>{e.avgHr} уд</span>}

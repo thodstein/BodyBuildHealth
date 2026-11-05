@@ -5,7 +5,7 @@
  */
 import React, { useMemo } from 'react';
 import { cardioEquipmentLabel, loadActiveCardioCycle, cardioWeekForDate, cardioCoachHints, cardioLegDayForDate, type CardioCycle, type CardioType } from '../../../engines/lms/cardio.engine';
-import { cardioDayLoad, loadCardioLog, cardioPaceMinPerKm, type CardioLogEntry } from '../../../engines/lms/cardio-diary.engine';
+import { cardioDayLoad, loadCardioLog, cardioAvgPaceOrSpeed, type CardioLogEntry } from '../../../engines/lms/cardio-diary.engine';
 import { loadSRPESessions, type SRPESession } from '../../../engines/pro/srpe-store';
 import { CARD, ROW, LABEL, HINT_SM, BTN_PRIMARY, Badge, TYPE_COLOR, PHASE_COLOR } from './CardioUI';
 
@@ -37,6 +37,11 @@ export const CardioDayCard: React.FC<{ cycle?: CardioCycle | null; onOpen?: () =
   const totalLoad = load.totalLoad;
   const cardioPct = totalLoad > 0 ? Math.round((load.cardioLoad / totalLoad) * 100) : 0;
   const strengthPct = totalLoad > 0 ? 100 - cardioPct : 0;
+  // Единица интенсивности дня: темп по беговым записям, скорость — если в дне
+  // только вело/гребля. «2:30/км» велосипедисту не говорит ничего, а смешивать
+  // км бега и км вело в один темп нельзя (аудит 2026-11).
+  const doneKm = Math.round(load.done.reduce((s, e) => s + (e.distanceKm ?? 0), 0) * 10) / 10;
+  const intensity = cardioAvgPaceOrSpeed(load.done);
 
   return (
     <div className="train-cardioday" style={{ ...CARD, gap: 11 }}>
@@ -95,8 +100,8 @@ export const CardioDayCard: React.FC<{ cycle?: CardioCycle | null; onOpen?: () =
         ) : (
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
             <Badge bg="rgba(0,230,138,0.12)" border="rgba(0,230,138,0.24)" color="#4ade80">{load.done.length} сесс · {load.cardioMinutes}м</Badge>
-            {load.done.some(e => e.distanceKm) && <Badge>{load.done.reduce((s, e) => s + (e.distanceKm ?? 0), 0).toFixed(1)} км</Badge>}
-            {cardioPaceMinPerKm(load.done.reduce((s, e) => s + (e.distanceKm ?? 0), 0), load.cardioMinutes) && <Badge>{cardioPaceMinPerKm(load.done.reduce((s, e) => s + (e.distanceKm ?? 0), 0), load.cardioMinutes)}</Badge>}
+            {load.done.some(e => e.distanceKm) && <Badge>{doneKm.toFixed(1)} км</Badge>}
+            {intensity && <Badge>{intensity}</Badge>}
             {load.done.some(e => e.rpe != null) && <Badge>RPE {(load.done.filter(e => e.rpe != null).reduce((s, e) => s + (e.rpe ?? 0), 0) / load.done.filter(e => e.rpe != null).length).toFixed(1)}</Badge>}
           </div>
         )}

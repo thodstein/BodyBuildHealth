@@ -634,6 +634,27 @@ describe('CardioDayCard — кардио-слой дня', () => {
     expect(screen.getByText(/recovery — можно/)).toBeTruthy();
     expect(screen.queryByText(/лучше перенести/)).toBeNull();
   });
+
+  it('CSR: только вело в факте — интенсивность дня в км/ч, а не в мин/км', () => {
+    const c = buildCardioCycle({ goal: 'health', totalWeeks: 4, id: 'day-bike' });
+    const d = new Date();
+    const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    saveCardioLogEntry({ id: 'b1', date: iso, type: 'zone2', durationMin: 60, distanceKm: 24, sport: 'bike', completed: true, calories: 420 });
+    render(<CardioDayCard cycle={c} />);
+    expect(screen.getByText('24 км/ч')).toBeTruthy();
+    expect(screen.queryByText(/мин\/км|\d:\d\d\/км/)).toBeNull();
+  });
+
+  it('CSR: смешанный день (бег + вело) — темп считается только по бегу', () => {
+    const c = buildCardioCycle({ goal: 'health', totalWeeks: 4, id: 'day-mix' });
+    const d = new Date();
+    const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    saveCardioLogEntry({ id: 'm1', date: iso, type: 'zone2', durationMin: 30, distanceKm: 5, sport: 'run', completed: true });
+    saveCardioLogEntry({ id: 'm2', date: iso, type: 'recovery', durationMin: 30, distanceKm: 12, sport: 'bike', completed: true });
+    render(<CardioDayCard cycle={c} />);
+    // 5 км / 30 мин = 6:00/км; км вело в бейдж дистанции входят, в темп — нет.
+    expect(screen.getByText('6:00/км')).toBeTruthy();
+  });
 });
 
 describe('CardioDiaryStep — старт-контроль (5C)', () => {

@@ -213,7 +213,7 @@ export function cardioLogStats(log: CardioLogEntry[], days: number, referenceIso
     avgHr: hrs.length > 0 ? Math.round(hrs.reduce((s, e) => s + (e.avgHr ?? 0), 0) / hrs.length) : null,
     kcal: rows.reduce((s, e) => s + (e.calories ?? 0), 0),
     km: Math.round(rows.reduce((s, e) => s + (e.distanceKm ?? 0), 0) * 10) / 10,
-    avgPace: cardioAvgPaceMinPerKm(rows),
+    avgPace: cardioAvgPaceOrSpeed(rows),
   };
 }
 
@@ -364,6 +364,45 @@ export function cardioAvgPaceMinPerKm(entries: { distanceKm?: number; durationMi
   const totalMin = entries.reduce((s, e) => s + e.durationMin, 0);
   if (totalKm <= 0 || totalMin <= 0) return null;
   return cardioPaceMinPerKm(totalKm, totalMin);
+}
+
+/** Скорость сессии: «24.5 км/ч» или null (нет дистанции/времени). */
+export function cardioSpeedKmh(distanceKm?: number, minutes?: number): string | null {
+  if (!distanceKm || distanceKm <= 0 || !minutes || minutes <= 0) return null;
+  const kmh = (distanceKm * 60) / minutes;
+  if (!Number.isFinite(kmh) || kmh <= 0) return null;
+  return `${Math.round(kmh * 10) / 10} км/ч`;
+}
+
+/**
+ * В какой величине мерить интенсивность записи. У бегуна — темп (мин/км),
+ * у велосипедиста и гребца — скорость (км/ч): «2:30/км» на вело формально
+ * верно, но райдер думает в км/ч, а не в минутах на километр.
+ * Аудит 2026-11 (восьмой проход).
+ */
+export function cardioPaceOrSpeed(sport: CardioSport | undefined | null, distanceKm?: number, minutes?: number): string | null {
+  const s = sport ?? 'other';
+  if (s === 'bike' || s === 'row') return cardioSpeedKmh(distanceKm, minutes);
+  return cardioPaceMinPerKm(distanceKm, minutes);
+}
+
+/**
+ * Средняя интенсивность набора записей с учётом дисциплины: беговые записи
+ * складываются в средний темп, а если в окне только вело/гребля — в среднюю
+ * скорость. Смешивать 5 км бега и 24 км вело в один «темп» нельзя: цифра
+ * выходит правдоподобной и бессмысленной.
+ */
+export function cardioAvgPaceOrSpeed(entries: { sport?: CardioSport; distanceKm?: number; durationMin: number }[]): string | null {
+  // Только записи с реальной дистанцией: сессия на дорожке без км не должна
+  // разбавлять темп своими минутами.
+  const withKm = entries.filter(e => (e.distanceKm ?? 0) > 0);
+  const paceable = withKm.filter(e => { const s = e.sport ?? 'other'; return s !== 'bike' && s !== 'row'; });
+  const paceKm = paceable.reduce((s, e) => s + (e.distanceKm ?? 0), 0);
+  const paceMin = paceable.reduce((s, e) => s + e.durationMin, 0);
+  if (paceKm > 0 && paceMin > 0) return cardioPaceMinPerKm(paceKm, paceMin);
+  const speedKm = withKm.reduce((s, e) => s + (e.distanceKm ?? 0), 0);
+  const speedMin = withKm.reduce((s, e) => s + e.durationMin, 0);
+  return cardioSpeedKmh(speedKm, speedMin);
 }
 
 /** Типичная скорость по типу сессии (км/ч) — ориентир для бега/ходьбы. */

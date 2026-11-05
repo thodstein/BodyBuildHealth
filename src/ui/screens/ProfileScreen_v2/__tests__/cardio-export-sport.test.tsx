@@ -47,6 +47,20 @@ describe('Экспорт кардио-дневника везёт дисципл
     expect(csv[0].text).toContain('велосипед');   // подпись из канона, не сырой id
   });
 
+  it('CSV: «Темп/скорость» — вело уходит в км/ч', () => {
+    saveCardioLogEntry({
+      id: 'bk1', date: '2026-09-19', type: 'zone2', durationMin: 60,
+      distanceKm: 24, completed: true, avgHr: 130, sport: 'bike', source: 'manual',
+    });
+    render(<CardioDiary />);
+    openExportMenu();
+    fireEvent.click(screen.getByRole('menuitem', { name: /CSV/i }));
+    expect(csv).toHaveLength(1);
+    expect(csv[0].text).toContain('Темп/скорость');
+    expect(csv[0].text).toContain('24 км/ч');
+    expect(csv[0].text).not.toContain('2:30/км');
+  });
+
   it('печать: та же колонка', () => {
     saveCardioLogEntry({
       id: 'r1', date: '2026-09-19', type: 'zone2', durationMin: 30,

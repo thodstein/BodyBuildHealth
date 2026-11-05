@@ -8,7 +8,7 @@ import {
   cardioLogStats, computeCardioAdvice, cardioWeekFact, estimateCardioEntryKcal,
   cardioIntervalAdherence,
   sanitizeCardioSport, CARDIO_SPORTS, CARDIO_SPORT_RU, type CardioSport,
-  cardioPaceMinPerKm, validateCardioLogFields, clampCardioLogNumber,
+  cardioPaceOrSpeed, validateCardioLogFields, clampCardioLogNumber,
   saveCardioWellness, loadCardioWellness, wellnessReadiness,
   type CardioLogEntry, type CardioLogFieldWarnings,
 } from '../../../engines/lms/cardio-diary.engine';
@@ -196,9 +196,9 @@ export const CardioDiaryPanel: React.FC<{ cycle: CardioCycle | null; acwr?: numb
   };
 
   const exportCsv = () => {
-    const head = 'Дата,Тип,Минуты,Км,Темп,Ккал,ЧСС,RPE,Интервалы,Завершено\n';
+    const head = 'Дата,Тип,Минуты,Км,Темп/скорость,Ккал,ЧСС,RPE,Интервалы,Завершено\n';
     const body = log.map(e =>
-      [e.date, TYPE_LABEL[e.type], e.durationMin, e.distanceKm ?? '', cardioPaceMinPerKm(e.distanceKm, e.durationMin) ?? '', e.calories ?? '', e.avgHr ?? '', e.rpe ?? '', e.intervalsPlanned ? `${e.intervalsDone ?? 0}/${e.intervalsPlanned}` : '', e.completed ? 'да' : 'нет'].map(csvEscape).join(','),
+      [e.date, TYPE_LABEL[e.type], e.durationMin, e.distanceKm ?? '', cardioPaceOrSpeed(e.sport, e.distanceKm, e.durationMin) ?? '', e.calories ?? '', e.avgHr ?? '', e.rpe ?? '', e.intervalsPlanned ? `${e.intervalsDone ?? 0}/${e.intervalsPlanned}` : '', e.completed ? 'да' : 'нет'].map(csvEscape).join(','),
     ).join('\n');
     // АПК: <a download> файл не сохраняет — канон saveCsvApk (BOM внутри).
     void saveCsvApk(`cardio-log-${todayIso()}.csv`, head + body)
@@ -382,7 +382,7 @@ export const CardioDiaryPanel: React.FC<{ cycle: CardioCycle | null; acwr?: numb
                 {e.completed !== false && e.distanceKm != null && e.distanceKm > 0 && (
                   <>
                     <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.72)' }}>{e.distanceKm} км</span>
-                    <span style={{ fontSize: 11, color: '#4ade80', fontWeight: 800 }}>{cardioPaceMinPerKm(e.distanceKm, e.durationMin)}</span>
+                    <span style={{ fontSize: 11, color: '#4ade80', fontWeight: 800 }}>{cardioPaceOrSpeed(e.sport, e.distanceKm, e.durationMin)}</span>
                   </>
                 )}
               </span>

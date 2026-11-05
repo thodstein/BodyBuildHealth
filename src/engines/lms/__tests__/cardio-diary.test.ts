@@ -7,6 +7,7 @@ import {
   cardioWeekFact, cardioCycleCompliance,
   cardioDayFact, cardioDayLoad, cardioHrCompliance,
   estimateCardioEntryKcal, cardioPaceMinPerKm, cardioAvgPaceMinPerKm, cardioExpectedDistanceHint,
+  cardioSpeedKmh, cardioPaceOrSpeed, cardioAvgPaceOrSpeed,
   type CardioLogEntry,
 } from '../cardio-diary.engine';
 
@@ -158,6 +159,56 @@ describe('cardioPaceMinPerKm / cardioAvgPaceMinPerKm (темп мин/км)', ()
     saveCardioLogEntry(entry({ date: '2026-01-05', durationMin: 30 }));
     const stats = cardioLogStats(loadCardioLog(), 30, REF);
     expect(stats.avgPace).toBeNull();
+  });
+
+  it('cardioLogStats.avgPace: окно только с вело — средняя скорость', () => {
+    saveCardioLogEntry(entry({ date: '2026-01-05', durationMin: 60, distanceKm: 24, sport: 'bike' }));
+    const stats = cardioLogStats(loadCardioLog(), 30, REF);
+    expect(stats.avgPace).toBe('24 км/ч');
+  });
+});
+
+describe('cardioSpeedKmh / cardioPaceOrSpeed (км/ч для вело и гребли)', () => {
+  it('24 км за 60 мин → 24 км/ч', () => {
+    expect(cardioSpeedKmh(24, 60)).toBe('24 км/ч');
+  });
+
+  it('18 км за 45 мин и 8 км за 40 мин', () => {
+    expect(cardioSpeedKmh(18, 45)).toBe('24 км/ч');
+    expect(cardioSpeedKmh(8, 40)).toBe('12 км/ч');
+  });
+
+  it('null без дистанции/времени', () => {
+    expect(cardioSpeedKmh(undefined, 30)).toBeNull();
+    expect(cardioSpeedKmh(0, 30)).toBeNull();
+    expect(cardioSpeedKmh(5, 0)).toBeNull();
+  });
+
+  it('вело/гребля → км/ч; бег, «другое» и неизвестная дисциплина → мин/км', () => {
+    expect(cardioPaceOrSpeed('bike', 18, 45)).toBe('24 км/ч');
+    expect(cardioPaceOrSpeed('row', 8, 40)).toBe('12 км/ч');
+    expect(cardioPaceOrSpeed('run', 5, 30)).toBe('6:00/км');
+    expect(cardioPaceOrSpeed(undefined, 5, 30)).toBe('6:00/км');
+    expect(cardioPaceOrSpeed('other', 5, 30)).toBe('6:00/км');
+  });
+});
+
+describe('cardioAvgPaceOrSpeed (средняя интенсивность окна)', () => {
+  it('только вело → средняя скорость, а не мин/км', () => {
+    expect(cardioAvgPaceOrSpeed([{ sport: 'bike', distanceKm: 24, durationMin: 60 }])).toBe('24 км/ч');
+  });
+
+  it('смешанное окно → темп только по беговым записям', () => {
+    const rows = [
+      { sport: 'run' as const, distanceKm: 5, durationMin: 30 },
+      { sport: 'bike' as const, distanceKm: 24, durationMin: 60 },
+    ];
+    expect(cardioAvgPaceOrSpeed(rows)).toBe('6:00/км');
+  });
+
+  it('нет дистанции → null', () => {
+    expect(cardioAvgPaceOrSpeed([{ sport: 'bike', durationMin: 60 }])).toBeNull();
+    expect(cardioAvgPaceOrSpeed([])).toBeNull();
   });
 });
 
