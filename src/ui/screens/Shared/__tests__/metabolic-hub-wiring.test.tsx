@@ -403,6 +403,26 @@ describe('MetabolicHub: ввод меняет расчёт (проводка п�
     expect(txt).not.toContain('вес растёт вместе с сухой массой');
   });
 
+  it('автосейв переживает перезагрузку экрана: ввод восстанавливается из снапшота', () => {
+    render(<MetabolicHub />);
+    setNumber('Вес, кг', 95);
+    setNumber('Алкоголь, г/сут', 30);
+    setNumber('HCT, %', 52);
+    setNumber('Na, г/сут', 4.2);
+    const snap = JSON.parse(localStorage.getItem('he_metabolic_snapshot_v6') || '{}');
+    expect(snap.weight).toBe(95);
+    expect(snap.alcoholG).toBe(30);
+    expect(snap.hct).toBe(52);
+    expect(snap.sodiumG).toBe(4.2);
+    // «перезагрузка»: снимаем компонент, монтируем заново — значения должны вернуться
+    cleanup();
+    render(<MetabolicHub />);
+    expect(fieldValue('Вес, кг')).toBe('95');
+    expect(fieldValue('Алкоголь, г/сут')).toBe('30');
+    expect(fieldValue('HCT, %')).toBe('52 %');
+    expect(fieldValue('Na, г/сут')).toBe('4.2');
+  });
+
   it('сценарий можно переименовать (автоимя больше не приговор)', () => {
     localStorage.setItem('he_metabolic_scenarios_v1', JSON.stringify([
       { id: 's1', name: 'Сценарий 1 · 05.11.2026 · 80кг Сушка', snapshot: { weight: 80 } },
