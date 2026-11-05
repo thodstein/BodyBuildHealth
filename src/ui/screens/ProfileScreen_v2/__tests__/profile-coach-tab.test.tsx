@@ -23,6 +23,7 @@ import {
 import {
   ATHLETE_SPACE_PREFIX,
   DATA_SPACE_KEY,
+  HOME_SPACE_ID,
   _resetDataSpaceCache,
   athleteSpaceId,
   emptyRegistry,
@@ -344,6 +345,36 @@ describe('атлеты', () => {
       configurable: true,
       value: { ...window.location, reload: originalReload },
     });
+  });
+
+  it('выключение режима в данных атлета возвращает в свои данные, а не оставляет чужие', () => {
+    seed(1);
+    // Открыт профиль атлета: без возврата полоса «Данные атлета» исчезнет,
+    // и его дневники будут выглядеть как данные тренера.
+    const sid = athleteSpaceId('a1');
+    const reg = upsertSpace(emptyRegistry(), { id: sid, athleteId: 'a1', label: 'Атлет 1' }).registry;
+    writeRegistryToStorage({ ...reg, active: sid });
+    _resetDataSpaceCache();
+
+    const reload = vi.fn();
+    const originalReload = window.location.reload;
+    Object.defineProperty(window, 'location', {
+      configurable: true,
+      value: { ...window.location, reload },
+    });
+
+    const { container } = render(<ProfileCoachTab />);
+    fireEvent.click(container.querySelector('[data-coach="toggle"]') as HTMLElement);
+
+    const after = JSON.parse(localStorage.getItem(DATA_SPACE_KEY) as string);
+    expect(after.active).toBe(HOME_SPACE_ID);
+    expect(reload).toHaveBeenCalled();
+
+    Object.defineProperty(window, 'location', {
+      configurable: true,
+      value: { ...window.location, reload: originalReload },
+    });
+    _resetDataSpaceCache();
   });
 
   it('переход к заметкам и задачам атлета передаёт id и цель', () => {

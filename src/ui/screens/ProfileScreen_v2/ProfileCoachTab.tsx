@@ -40,6 +40,7 @@ import { countNotesForAthlete, readCoachNotes, type CoachNotesStore } from '../.
 import { readCoachPlanner, type CoachPlannerStore } from '../../../engines/coach/coach-planner.engine';
 import { readCoachLog, type CoachLogStore } from '../../../engines/coach/coach-athlete-log.engine';
 import {
+  HOME_SPACE_ID,
   MAX_DATA_SPACES,
   activateAthleteSpace,
   activateHomeSpace,
@@ -241,7 +242,15 @@ export const ProfileCoachTab: React.FC<{
   const active = coachActiveAthlete(state);
 
   const toggleEnabled = () => {
-    apply(setCoachEnabled(state, !state.enabled));
+    const next = setCoachEnabled(state, !state.enabled);
+    apply(next);
+    // Выключили режим, находясь в данных атлета — оставаться там нельзя: полоса
+    // «Данные атлета» пропадает, и чужие данные выглядят как свои. Возвращаем
+    // в домашнее пространство, как и любое другое переключение.
+    if (!next.enabled && spaceActiveId !== HOME_SPACE_ID) {
+      activateHomeSpace();
+      reloadToApplySpace();
+    }
   };
 
   const toggleSection = (id: CoachSectionId) => {
