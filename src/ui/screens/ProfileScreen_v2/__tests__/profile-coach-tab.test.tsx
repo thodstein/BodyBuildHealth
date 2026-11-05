@@ -29,6 +29,7 @@ import {
   emptyRegistry,
   readRegistryFromStorage,
   touchSpaceOpened,
+  toPhysicalKey,
   upsertSpace,
   writeRegistryToStorage,
 } from '../../../../core/data-space';
@@ -456,5 +457,93 @@ describe('атлеты', () => {
     expect(container.querySelector('[data-coach="open-notes"]')).toBeNull();
     expect(container.querySelector('[data-coach="open-planner"]')).toBeNull();
     expect(container.querySelector('[data-coach="open-log"]')).toBeNull();
+  });
+});
+
+describe('данные без карточки', () => {
+  /** Пространство атлета, карточки которого в списке тренера уже нет. */
+  const makeOrphan = (athleteId: string, label: string, opts: { active?: boolean } = {}) => {
+    const sid = athleteSpaceId(athleteId);
+    const reg = upsertSpace(emptyRegistry(), { id: sid, athleteId, label }).registry;
+    writeRegistryToStorage({ ...reg, active: opts.active ? sid : HOME_SPACE_ID });
+    _resetDataSpaceCache();
+    return sid;
+  };
+
+  it('висящие данные видны отдельным блоком, а не теряются после удаления карточки', () => {
+    seed(1);
+    makeOrphan('a9', 'Без карточки');
+    localStorage.setItem(toPhysicalKey(athleteSpaceId('a9'), 'he_profile_v2'), '{"name":"Пётр"}');
+
+    const { container } = render(<ProfileCoachTab />);
+    const box = container.querySelector('[data-coach="orphans"]');
+    expect(box).not.toBeNull();
+    const rows = container.querySelectorAll('[data-coach="orphan"]');
+    expect(rows).toHaveLength(1);
+    expect(rows[0].textContent).toContain('Без карточки');
+    // факты — только проверяемое: ключи есть, а не «сколько всего»
+    expect(rows[0].querySelector('[data-coach="orphan-facts"]')?.textContent).toContain('свои данные: есть');
+    // и прямо сказано, почему это важно: новая карточка = новое пространство
+    expect(container.querySelector('[data-coach="orphans-hint"]')?.textContent).toContain('новое');
+  });
+
+  it('пространство с живой карточкой в этот блок не попадает', () => {
+    seed(1);
+    const sid = athleteSpaceId('a1');
+    const reg = upsertSpace(emptyRegistry(), { id: sid, athleteId: 'a1', label: 'Атлет 1' }).registry;
+    writeRegistryToStorage(reg);
+    _resetDataSpaceCache();
+
+    const { container } = render(<ProfileCoachTab />);
+    expect(container.querySelector('[data-coach="orphans"]')).toBeNull();
+  });
+
+  it('«Открыть данные» переключает приложение в это пространство', () => {
+    seed(1);
+    const sid = makeOrphan('a9', 'Без карточки');
+    const reload = vi.fn();
+    const originalReload = window.location.reload;
+    Object.defineProperty(window, 'location', {
+      configurable: true,
+      value: { ...window.location, reload },
+    });
+
+    const { container } = render(<ProfileCoachTab />);
+    fireEvent.click(container.querySelector('[data-coach="orphan-open"]') as HTMLElement);
+    expect(readRegistryFromStorage().active).toBe(sid);
+    expect(reload).toHaveBeenCalled();
+
+    Object.defineProperty(window, 'location', {
+      configurable: true,
+      value: { ...window.location, reload: originalReload },
+    });
+  });
+
+  it('«Удалить данные» — два шага, и удаляет не только карточку реестра', () => {
+    seed(1);
+    const sid = makeOrphan('a9', 'Без карточки');
+    localStorage.setItem(toPhysicalKey(sid, 'he_profile_v2'), '{"name":"Пётр"}');
+
+    const { container } = render(<ProfileCoachTab />);
+    fireEvent.click(container.querySelector('[data-coach="orphan-delete"]') as HTMLElement);
+    // первый клик только спрашивает: данные атлета стереть случайно нельзя
+    expect(container.querySelector('[data-coach="orphan-delete-confirm"]')).not.toBeNull();
+    expect(readRegistryFromStorage().spaces.some(s => s.id === sid)).toBe(true);
+    expect(localStorage.getItem(toPhysicalKey(sid, 'he_profile_v2'))).not.toBeNull();
+
+    fireEvent.click(container.querySelector('[data-coach="orphan-delete-confirm"]') as HTMLElement);
+    expect(readRegistryFromStorage().spaces.some(s => s.id === sid)).toBe(false);
+    expect(localStorage.getItem(toPhysicalKey(sid, 'he_profile_v2'))).toBeNull();
+    expect(container.querySelector('[data-coach="orphans"]')).toBeNull();
+  });
+
+  it('«Оставить» возвращает блок в исходное состояние и ничего не удаляет', () => {
+    seed(1);
+    const sid = makeOrphan('a9', 'Без карточки');
+    const { container } = render(<ProfileCoachTab />);
+    fireEvent.click(container.querySelector('[data-coach="orphan-delete"]') as HTMLElement);
+    fireEvent.click(container.querySelector('[data-coach="orphan-delete-cancel"]') as HTMLElement);
+    expect(container.querySelector('[data-coach="orphan-delete-confirm"]')).toBeNull();
+    expect(readRegistryFromStorage().spaces.some(s => s.id === sid)).toBe(true);
   });
 });

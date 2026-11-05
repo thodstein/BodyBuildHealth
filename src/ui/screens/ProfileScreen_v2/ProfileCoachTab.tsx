@@ -44,6 +44,7 @@ import {
   MAX_DATA_SPACES,
   activateAthleteSpace,
   activateHomeSpace,
+  activateSpaceById,
   activeSpaceRecord,
   athleteSpaceId,
   clearSessionSpaceData,
@@ -230,7 +231,10 @@ export const ProfileCoachTab: React.FC<{
   /** Имя пространства, данные которого открыты (для честной строки статуса). */
   const activeSpaceLabel = activeSpace.label;
   // Реестр перечитываем и после изменений в списке: удаление атлета меняет его.
-  const spaceRegistry = useMemo(() => readRegistryFromStorage(), [state]);
+  // `registryRev` — для изменений, которые не трогают состояние режима (удаление
+  // данных без карточки): иначе список «висит» со старыми записями.
+  const [registryRev, setRegistryRev] = useState(0);
+  const spaceRegistry = useMemo(() => readRegistryFromStorage(), [state, registryRev]);
   // Объём всех пространств — ОДНИМ проходом по ключам. Считать `spaceUsage` на
   // каждого атлета значит 20 полных перечислений хранилища на каждый рендер.
   const usage = useMemo(() => {
@@ -244,6 +248,24 @@ export const ProfileCoachTab: React.FC<{
 
   const limits = coachLimits(state);
   const active = coachActiveAthlete(state);
+
+  /**
+   * Пространства, у которых нет карточки атлета.
+   *
+   * Появляются от «Точно удалить»: карточка уходит, а данные на устройстве
+   * остаются (так и задумано — их нельзя стереть случайно). Проблема в том, что
+   * после этого до них можно добраться только через «Сменить», а если тренер
+   * заново добавит атлета с тем же именем — создастся НОВОЕ пространство, и
+   * старые дневники останутся сиротами навсегда, занимая лимит и место.
+   * Поэтому сироты видны явно: открыть или удалить, но не «потерять».
+   */
+  const orphanSpaces = useMemo(() => {
+    const known = new Set(state.athletes.map(a => a.id));
+    return spaceRegistry.spaces.filter(
+      s => s.id !== HOME_SPACE_ID && !(s.athleteId && known.has(s.athleteId)),
+    );
+  }, [spaceRegistry, state.athletes]);
+  const [confirmOrphanId, setConfirmOrphanId] = useState<string | null>(null);
 
   const toggleEnabled = () => {
     const next = setCoachEnabled(state, !state.enabled);
@@ -399,6 +421,34 @@ export const ProfileCoachTab: React.FC<{
       activateHomeSpace();
       reloadToApplySpace();
     }
+  };
+
+  /**
+   * Удалить данные пространства, у которого уже нет карточки. Тот же путь, что и
+   * «Удалить и его данные»: ключи по префиксу (включая осиротевшие), черновики,
+   * запись реестра, база IndexedDB — иначе «удалено» значило бы «спрятано».
+   */
+  const deleteOrphanData = (spaceId: string) => {
+    const storage = ls();
+    if (storage) clearSpaceData(deviceRawOrFallback(storage), spaceId);
+    clearSessionSpaceData(spaceId);
+    writeRegistryToStorage(removeSpace(readRegistryFromStorage(), spaceId));
+    setRegistryRev(v => v + 1);
+    setConfirmOrphanId(null);
+    void import('../../../core/db')
+      .then(({ deleteSpaceDatabases }) => deleteSpaceDatabases([spaceId]))
+      .catch(() => { /* база останется — данные уже недостижимы, удаление не блокируем */ });
+    if (spaceActiveId === spaceId) {
+      activateHomeSpace();
+      reloadToApplySpace();
+    }
+  };
+
+  /** Войти в данные без карточки — тем же путём, что и обычное переключение. */
+  const openOrphanSpace = (spaceId: string) => {
+    const res = activateSpaceById(spaceId);
+    if (res.error) return;
+    reloadToApplySpace();
   };
 
   /** Войти в данные атлета: своё пространство профиля/дневников/планов. */
@@ -1041,6 +1091,97 @@ export const ProfileCoachTab: React.FC<{
               })}
             </div>
           </div>
+
+          {/* Данные, у которых больше нет карточки: не даём им потеряться */}
+          {orphanSpaces.length > 0 && (
+            <div
+              style={{ ...cardStyle, borderColor: 'rgba(251,191,36,0.35)' }}
+              data-coach="orphans"
+            >
+              <div style={{ fontSize: 13.5, fontWeight: 800, color: '#fff', display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span aria-hidden="true" style={{ display: 'inline-flex', color: '#fbbf24' }}>
+                  <NativeIcon name="alertTriangle" size={14} />
+                </span>
+                Данные без карточки
+              </div>
+              <div
+                data-coach="orphans-hint"
+                style={{ fontSize: 11.5, color: colors.textMuted, marginTop: 6, lineHeight: 1.5 }}
+              >
+                Карточку удалили, а данные остались на устройстве — так и задумано, стереть их
+                случайно нельзя. Но если добавить атлета с тем же именем заново, это будет{' '}
+                <strong>новое</strong> пространство: старые дневники и анализы останутся здесь.
+              </div>
+              {orphanSpaces.map(s => {
+                const u = usage.get(s.id) ?? { keys: 0, bytes: 0 };
+                return (
+                  <div
+                    key={s.id}
+                    data-coach="orphan"
+                    data-space-id={s.id}
+                    style={{
+                      marginTop: 10,
+                      padding: '10px 12px',
+                      borderRadius: 12,
+                      border: '1px solid rgba(255,255,255,0.10)',
+                      background: 'rgba(255,255,255,0.03)',
+                    }}
+                  >
+                    <div style={{ fontSize: 13, fontWeight: 700, color: '#fff', wordBreak: 'break-word' }}>
+                      {s.label}
+                    </div>
+                    <div
+                      data-coach="orphan-facts"
+                      style={{ fontSize: 10.5, color: colors.textMuted, marginTop: 4, lineHeight: 1.45 }}
+                    >
+                      {u.keys > 0
+                        ? 'свои данные: есть'
+                        : 'ключей в настройках нет — записи могли быть только в базе'}
+                      {s.lastOpenedAt ? ` · открывался ${fmtShort(s.lastOpenedAt.slice(0, 10))}` : ''}
+                    </div>
+                    <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
+                      <button
+                        type="button"
+                        data-coach="orphan-open"
+                        onClick={() => openOrphanSpace(s.id)}
+                        style={{ ...btn('ghost'), fontSize: 12 }}
+                      >
+                        Открыть данные
+                      </button>
+                      <button
+                        type="button"
+                        data-coach="orphan-delete"
+                        onClick={() => setConfirmOrphanId(confirmOrphanId === s.id ? null : s.id)}
+                        style={{ ...btn('danger'), fontSize: 12 }}
+                      >
+                        Удалить данные
+                      </button>
+                      {confirmOrphanId === s.id && (
+                        <>
+                          <button
+                            type="button"
+                            data-coach="orphan-delete-confirm"
+                            onClick={() => deleteOrphanData(s.id)}
+                            style={{ ...btn('danger'), fontSize: 12 }}
+                          >
+                            Удалить навсегда
+                          </button>
+                          <button
+                            type="button"
+                            data-coach="orphan-delete-cancel"
+                            onClick={() => setConfirmOrphanId(null)}
+                            style={{ ...btn('ghost'), fontSize: 12 }}
+                          >
+                            Оставить
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
 
           {/* Честная граница режима */}
           <div
