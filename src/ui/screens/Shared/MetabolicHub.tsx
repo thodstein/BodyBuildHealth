@@ -339,9 +339,15 @@ export const MetabolicHub: React.FC = () => {
   const waterOriginRef = useRef<'profile'|'user'|null>(null);
 
   // ACWR live — слушаем srpe-store + polling
-  const [acwr, setAcwr] = useState(1);
+  // Аудит 2026-11: `acwr` стартовал с 1 — в сводке печаталось «ACWR 1.00 · optimal», хотя журнала
+  // sRPE могло не быть вовсе. Теперь нет ≥2 сессий → undefined = «нет данных», а не «идеально».
+  const [acwr, setAcwr] = useState<number|undefined>(undefined);
   const refreshAcwr = useCallback(()=>{
-    try{ const s=loadSRPESessions(); const r = s.length>=2 ? acuteChronicRatio(toDailyLoads(s as any)).ratio : 1; setAcwr(r); }catch{ setAcwr(1); }
+    try{
+      const s=loadSRPESessions();
+      // <2 сессий — отношения острая/хроническая нагрузка не существует: «нет данных», не 1.0
+      setAcwr(s.length>=2 ? acuteChronicRatio(toDailyLoads(s as any)).ratio : undefined);
+    }catch{ setAcwr(undefined); }
   }, []);
   useEffect(()=>{
     refreshAcwr();
@@ -1100,7 +1106,7 @@ const kbju = useMemo(()=> calcKBJU(input), [input]);
                 подзаголовке имя модели веса приводило к устаревшей версии v2,
                 тогда как в коде реализована только v3 (см. `calcAdaptiveTDEEv3`). */}
             <div style={{ fontSize:15, fontWeight:900, color:'#fff', lineHeight:1 }}>Метаболика Pro — {MODE_DEFS.length} калькуляторов</div>
-            <div style={{ fontSize:10, color:'#fff', lineHeight:1.3 }}>IOM + Baker · FAO PAL MET-часы · 7 BMR · Navy/JP/BIA · FFMI 26.2 · SLI · Hall adaptive v3 · Levine · Trexler MATADOR · RED-S CAT2 · Пот-тест · TyG/FIB-4 · ACWR {acwr.toFixed(2)} · HCT {hematology.hct ?? '—'}% · WHtR {whtr? whtr.toFixed(2):'—'}</div>
+            <div style={{ fontSize:10, color:'#fff', lineHeight:1.3 }}>IOM + Baker · FAO PAL MET-часы · 7 BMR · Navy/JP/BIA · FFMI 26.2 · SLI · Hall adaptive v3 · Levine · Trexler MATADOR · RED-S CAT2 · Пот-тест · TyG/FIB-4 · ACWR {acwr != null ? acwr.toFixed(2) : '—'} · HCT {hematology.hct ?? '—'}% · WHtR {whtr? whtr.toFixed(2):'—'}</div>
           </div>
           <span style={{ fontSize:9, padding:'4px 8px', borderRadius:20, background: onAAS ? 'rgba(239,68,68,0.12)' : 'rgba(34,197,94,0.12)', border: `1px solid ${onAAS ? 'rgba(239,68,68,0.22)' : 'rgba(34,197,94,0.22)'}`, color: onAAS ? '#f87171' : '#22c55e', fontWeight:800, whiteSpace:'nowrap' }}>{onAAS ? `💉 ${aasDose}мг/нед EXP` : '🌿 Натурал'}</span>
         </div>
@@ -1292,7 +1298,7 @@ const kbju = useMemo(()=> calcKBJU(input), [input]);
         <div style={{ fontSize:8, color:'rgba(255,255,255,0.35)', marginTop:4 }}>
           База PAL: {profession === 'auto' ? `бытовая «${activityLevel}»` : `профессия ${PROFESSION_PAL[profession]}`} — профессия и «бытовая» описывают один и тот же день, поэтому считается только одна: профессия перекрывает «бытовую». Выбери «Не указана», чтобы работать по бытовой.
         </div>
-        <div style={{ fontSize:9, color:'rgba(255,255,255,0.45)', marginTop:6 }}>TDEE {stepsCalc.tdeeNat} → цель {stepsCalc.targetNat}ккал · {stepsCalc.kcalPerStep}ккал/шаг · NEAT {stepsCalc.neat} (pro {neatPro.total}) · EAT {stepsCalc.eat} · ACWR {acwr.toFixed(2)}{pregAdd ? ` · 🤰 +${pregAdd}` : ''}</div>
+        <div style={{ fontSize:9, color:'rgba(255,255,255,0.45)', marginTop:6 }}>TDEE {stepsCalc.tdeeNat} → цель {stepsCalc.targetNat}ккал · {stepsCalc.kcalPerStep}ккал/шаг · NEAT {stepsCalc.neat} (pro {neatPro.total}) · EAT {stepsCalc.eat} · ACWR {acwr != null ? acwr.toFixed(2) : '—'}{pregAdd ? ` · 🤰 +${pregAdd}` : ''}</div>
         {adaptiveV3 && <div style={{ fontSize:8, color: adaptiveV3.confidence==='high'?'#22c55e':'#f59e0b', background:'rgba(34,197,94,0.06)', border:'1px solid rgba(34,197,94,0.14)', borderRadius:8, padding:'6px 8px', marginTop:4 }}>Adaptive v3 EMA-28д: {adaptiveV3.tdee} [{adaptiveV3.low}–{adaptiveV3.high}] R²{adaptiveV3.r2} {adaptiveV3.confidence} · {adaptiveV3.adherence.note} · reverse-auto шаг {reverseAuto[0]?.kcal ?? '—'}</div>}
         {!adaptiveV3 && weightHistory.length>=1 && weightHistory.length<7 && <div style={{ marginTop:4, padding:'7px 10px', borderRadius:8, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', fontSize:9, color:'rgba(255,255,255,0.55)' }}>Адаптивный TDEE v3: нужно ≥7 взвешиваний + логи питания (сейчас {weightHistory.length}/{diaryDays}) — данные из he_nutrition_v2.</div>}
       </MhSection>
@@ -1479,8 +1485,8 @@ const kbju = useMemo(()=> calcKBJU(input), [input]);
           <PopupNumber label="Ч/после кофе, ч" value={caffeineHoursSince} min={0} max={24} step={0.5} onChange={setCaffeineHoursSince} />
           <div style={{ display:'flex', flexDirection:'column', justifyContent:'center', padding:'8px 10px', borderRadius:10, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)' }}>
             <div style={{ fontSize:9, color:'rgba(255,255,255,0.55)', textTransform:'uppercase', letterSpacing:0.3 }}>ACWR live</div>
-            <div style={{ fontSize:14, fontWeight:900, color: cortisol.acwrZone==='dangerous'?'#ef4444':cortisol.acwrZone==='caution'?'#f59e0b':'#22c55e' }}>{acwr.toFixed(2)} · {cortisol.acwrZone}</div>
-            <div style={{ fontSize:9, color:'rgba(255,255,255,0.45)' }}>из sRPE · {cortisol.caffeineAdj? `коф +${cortisol.caffeineAdj}`:''} {cortisol.alcoholAdj? `алк +${cortisol.alcoholAdj}`:''}</div>
+            <div style={{ fontSize:14, fontWeight:900, color: acwr == null ? '#fff' : cortisol.acwrZone==='dangerous'?'#ef4444':cortisol.acwrZone==='caution'?'#f59e0b':'#22c55e' }}>{acwr != null ? `${acwr.toFixed(2)} · ${cortisol.acwrZone}` : 'нет данных'}</div>
+            <div style={{ fontSize:9, color:'rgba(255,255,255,0.45)' }}>{acwr != null ? 'из sRPE' : 'нужны ≥2 сессии в журнале sRPE'} · {cortisol.caffeineAdj? `коф +${cortisol.caffeineAdj}`:''} {cortisol.alcoholAdj? `алк +${cortisol.alcoholAdj}`:''}</div>
           </div>
         </MhGrid>
         <div style={{ fontSize:8, color:'rgba(255,255,255,0.45)', background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', borderRadius:10, padding:'8px 10px', marginTop:6 }}>{alcohol.kcal>0? `${alcohol.kcal}ккал алко · блок жира ${alcohol.fatOxidationBlockedPct}%`:'Без алкоголя'} · хроника: {alcoholChronic.unitsPerWeek} units/нед{alcoholG > 0 ? ` · ${alcoholChronic.note}` : ''} · {caffeineCurve.note} · сон cut-off {caffeineCurve.sleepCutoffH}ч</div>
@@ -1658,7 +1664,7 @@ const kbju = useMemo(()=> calcKBJU(input), [input]);
           active={mode==='steps'} onClick={()=> go('steps')} />
         <MhTile label="Stress Load ⚠️ E" accent="#f43f5e"
           value={<>{onAAS ? cortisol.aas : cortisol.nat} <span style={{ fontSize:10 }}>/100 · {onAAS ? cortisol.zoneLabelAAS : cortisol.zoneLabelNat}</span></>}
-          sub={<>эвристика, не кортизол · ACWR {acwr.toFixed(2)}</>}
+          sub={<>эвристика, не кортизол · ACWR {acwr != null ? acwr.toFixed(2) : 'нет данных'}</>}
           active={mode==='cortisol'} onClick={()=> go('cortisol')} />
         <MhTile label="Алко · TEF" accent="#f97316"
           value={<>{alcohol.kcal} <span style={{ fontSize:10 }}>ккал</span></>}
@@ -1943,7 +1949,7 @@ const kbju = useMemo(()=> calcKBJU(input), [input]);
                 <div style={{ padding:10, borderRadius:10, background: onAAS?'rgba(239,68,68,0.08)':'rgba(255,255,255,0.03)', border: onAAS?'1px solid rgba(239,68,68,0.18)':'1px solid rgba(255,255,255,0.06)', textAlign:'center' }}>
                   <div style={{ fontSize:10, color: onAAS?'#f87171':'#fff' }}>С ААС — {cortisol.zoneLabelAAS}</div>
                   <div style={{ fontSize:18, fontWeight:900, color: cortisol.zoneAAS==='high'||cortisol.zoneAAS==='very_high'?'#ef4444': cortisol.zoneAAS==='low'?'#60a5fa':'#22c55e' }}>{cortisol.aas} <span style={{fontSize:10}}>/100</span></div>
-                  <div style={{ fontSize:9, color:'#fff' }}>Δ {cortisol.delta>0?'+':''}{cortisol.delta} · {cortisol.acwrZone}</div>
+                  <div style={{ fontSize:9, color:'#fff' }}>Δ {cortisol.delta>0?'+':''}{cortisol.delta} · {acwr != null ? cortisol.acwrZone : 'ACWR нет данных'}</div>
                 </div>
               </div>
               <div style={{ marginTop:8, height:10, borderRadius:20, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.06)', overflow:'hidden', display:'flex' }}>

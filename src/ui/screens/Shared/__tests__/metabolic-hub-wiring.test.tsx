@@ -170,6 +170,16 @@ describe('MetabolicHub: ввод меняет расчёт (проводка п�
     expect(def + br * bw).toBe(total);
   });
 
+  it('ACWR без журнала sRPE — «нет данных», а не 1.00 optimal', () => {
+    render(<MetabolicHub />);
+    const txt = openMode('Stress');
+    expect(txt).toContain('ACWR нет данных');
+    expect(txt).not.toContain('1.00 · optimal');
+    // в сводке тоже прочерк, а не выдуманная единица
+    const summary = (document.body.textContent || '').replace(/\s+/g, ' ');
+    expect(summary).toContain('ACWR —');
+  });
+
   it('вес 83 → 110 поднимает TDEE и воду', () => {
     render(<MetabolicHub />);
     const tdee0 = tileValue('TDEE');

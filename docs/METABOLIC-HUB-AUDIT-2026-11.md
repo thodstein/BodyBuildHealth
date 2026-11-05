@@ -489,6 +489,17 @@ deficitKcalDelta })` вставляет 2 нед maintenance после кажд
 **Регрессия.** `metabolic-hub-wiring.test.tsx` → «срок цели не спорит с брейками: показывает, что
 проверено без них» (раскладка сходится: дефицит + брейки = срок).
 
+### 1.44 ACWR показывал «1.00 · optimal», когда журнала sRPE нет
+**Причина.** `acwr` стартовал с `1`, `refreshAcwr` при <2 сессиях тоже отдавал `1` — и сводка,
+плитка «ACWR live» и Stress-режим печатали «ACWR 1.00 · optimal» (зелёный sweet spot), хотя данных
+для отношения острая/хроническая нагрузка не существует. Движок при `undefined` и так берёт 1 как
+нейтраль, поэтому «правило» было только в UI.
+**Исправление.** Нет ≥2 сессий в журнале sRPE → `acwr = undefined`; в UI «ACWR —», в плитке «нет
+данных» с подсказкой «нужны ≥2 сессии в журнале sRPE», в Stress-режиме — «ACWR нет данных» вместо
+зоны. Расчёт не изменился (нейтраль та же), изменилось только утверждение.
+**Регрессия.** `metabolic-hub-wiring.test.tsx` → «ACWR без журнала sRPE — „нет данных“, а не
+1.00 optimal».
+
 ---
 
 ## 2. Чего не хватало (добавлено)
@@ -538,7 +549,7 @@ deficitKcalDelta })` вставляет 2 нед maintenance после кажд
   параллельные `tsc`/`vitest` из других сессий → heap OOM / `Zone Allocation failed`.
   Прогонять на свободной машине.
 - `npx vitest run src/ui/screens/Shared/__tests__ src/engines/__tests__/metabolic-hub.test.ts`
-  — **229 passed** (6 файлов: structure / toggles / honesty / modes / wiring / engine).
+  — **230 passed** (6 файлов: structure / toggles / honesty / modes / wiring / engine).
 - `npx vitest run src/ui/__tests__/rest-hooks-native.test.tsx
   src/engines/__tests__/risk-info-honesty-e07-e08.test.ts` — **89 passed**
   (в stderr шумит jsdom-canvas chart.js — это фон, не падения).
