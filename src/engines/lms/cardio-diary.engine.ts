@@ -217,8 +217,47 @@ export function cardioLogStats(log: CardioLogEntry[], days: number, referenceIso
   };
 }
 
-/** Сопоставить неделю цикла с датой (неделя 1 = reference). */
-export function weekStartIso(week: number, referenceIso?: string): string {
+// ─── Интервалы: приверженность по подходам (аудит 2026-11, ч.3) ───
+//
+// Минуты не говорят, сделал ли атлет подходы: 40 минут «интервалов» с
+// половиной брошенных отрезков и 40 минут полной работы — одинаковые минуты,
+// но разная тренировка. Поэтому факт по подходам считается отдельно и влияет
+// на рекомендацию (объём интервалов режется, если атлет их не добирает).
+
+export interface CardioIntervalAdherence {
+  /** Записей с интервальной структурой в окне. */
+  sessions: number;
+  /** Σ подходов по плану. */
+  planned: number;
+  /** Σ сделанных подходов (не больше плана в записи). */
+  done: number;
+  /** Выполнение по подходам, %. */
+  pct: number;
+  /** Сессий, где сделано меньше плана. */
+  shortSessions: number;
+}
+
+export function cardioIntervalAdherence(
+  log: CardioLogEntry[],
+  days: number,
+  referenceIso?: string,
+): CardioIntervalAdherence {
+  const from = dateDaysAgo(days, referenceIso);
+  const rows = log.filter(e => e.completed && e.date >= from && (e.intervalsPlanned ?? 0) > 0);
+  const planned = rows.reduce((s, e) => s + (e.intervalsPlanned ?? 0), 0);
+  // Клампим факт по каждой записи: вручную введённые 9 из 8 не должны
+  // «компенсировать» брошенную сессию.
+  const done = rows.reduce((s, e) => s + Math.min(e.intervalsPlanned ?? 0, Math.max(0, e.intervalsDone ?? 0)), 0);
+  return {
+    sessions: rows.length,
+    planned,
+    done,
+    pct: planned > 0 ? Math.round((done / planned) * 100) : 0,
+    shortSessions: rows.filter(e => (e.intervalsDone ?? 0) < (e.intervalsPlanned ?? 0)).length,
+  };
+}
+
+/** Сопоставить неделю цикла с датой (неделя 1 = reference). */export function weekStartIso(week: number, referenceIso?: string): string {
   // P1-аудит: UTC-парс якоря → неделя уезжала на сутки при отрицательном смещении.
   return addDaysIso(referenceIso ?? todayLocalIso(), (week - 1) * 7);
 }
@@ -388,6 +427,15 @@ export function computeCardioAdvice(
   }
   if (stats.avgRpe != null && stats.avgRpe >= 8) {
     return { action: 'reduce', reason: `Средний RPE ${stats.avgRpe} — кардио перегружает: снизить интенсивность/минуты.` };
+  }
+  // Интервалы: если атлет систематически не добирает подходы, виноват не он, а
+  // объём в плане. 14 дней — достаточно, чтобы это был паттерн, а не разовый день.
+  const intervals = cardioIntervalAdherence(log, 14, opts.referenceIso);
+  if (intervals.sessions >= 2 && intervals.pct < 80) {
+    return {
+      action: 'reduce',
+      reason: `Интервалы: ${intervals.done} из ${intervals.planned} подходов (${intervals.pct}%) за 14 дней — сократить число подходов, качество важнее объёма.`,
+    };
   }
   return { action: 'keep', reason: 'Нагрузка соответствует плану — продолжайте.' };
 }

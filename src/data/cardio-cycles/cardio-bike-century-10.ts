@@ -7,12 +7,14 @@
  * на усталости, делоды каждые 3-4 нед, taper 2 нед):
  *   Ср — темп/SS, Чт — лёгкое Z2, Сб — длинная прогрессия, Вс — recovery.
  */
-import type { CardioCycleTemplate, CardioTemplateSession, CardioTemplateWeek } from './cardio-cycle-types';
+import type { CardioCycleTemplate, CardioStructuredBlock, CardioTemplateSession, CardioTemplateWeek } from './cardio-cycle-types';
 
 const RW = 'Разминка 10 мин + заминка 10 мин.';
-const ss = (min: number, desc: string, dow: number): CardioTemplateSession => ({
+/** Темповая сессия: `structured` = отрезки темпа + отдых (таймер ведёт по подходам). */
+const ss = (min: number, desc: string, dow: number, block: CardioStructuredBlock): CardioTemplateSession => ({
   type: 'miss', durationMin: min, equipment: 'cycling', dayOfWeek: dow,
   purpose: `${RW} ${desc} Темп 85-90% FTP / «на грани разговора», каденс 85-95.`,
+  structured: [{ ...block, target: 'power', note: 'Темп 85-90% FTP' }],
 });
 const z2 = (min: number, desc: string, dow: number): CardioTemplateSession => ({
   type: 'zone2', durationMin: min, equipment: 'cycling', dayOfWeek: dow, purpose: `Z2: ${desc} Разговорно, каденс 85-95.`,
@@ -30,13 +32,14 @@ const event = (): CardioTemplateSession => ({
 });
 
 const WEEKS: CardioTemplateWeek[] = [
-  { sessions: [ss(60, '2×15 мин темп / 5 мин.', 2), z2(60, 'ровно.', 3), long(100, 'первая сотня минут.', 5), rec(30, 6)], phase: 'base', note: 'База: длинная ×60%, темповые включения короткие.' },
-  { sessions: [ss(70, '3×15 мин темп / 5 мин.', 2), z2(60, 'ровно.', 3), long(110, '+10 мин.', 5), rec(30, 6)], phase: 'base' },
-  { sessions: [ss(75, '3×20 мин темп / 5 мин.', 2), z2(60, 'ровно.', 3), long(120, 'два часа.', 5), rec(30, 6)], phase: 'build', note: 'Пик первой волны — затем разгрузка.' },
+  // Длительность темпа = отрезки + 20 мин (разминка 10 + заминка 10 из текста).
+  { sessions: [ss(60, '2×15 мин темп / 5 мин.', 2, { workSec: 900, restSec: 300, reps: 2 }), z2(60, 'ровно.', 3), long(100, 'первая сотня минут.', 5), rec(30, 6)], phase: 'base', note: 'База: длинная ×60%, темповые включения короткие.' },
+  { sessions: [ss(80, '3×15 мин темп / 5 мин.', 2, { workSec: 900, restSec: 300, reps: 3 }), z2(60, 'ровно.', 3), long(110, '+10 мин.', 5), rec(30, 6)], phase: 'base' },
+  { sessions: [ss(95, '3×20 мин темп / 5 мин.', 2, { workSec: 1200, restSec: 300, reps: 3 }), z2(60, 'ровно.', 3), long(120, 'два часа.', 5), rec(30, 6)], phase: 'build', note: 'Пик первой волны — затем разгрузка.' },
   { sessions: [rec(45, 2), z2(60, 'легко.', 3), long(80, 'укороченная.', 5), rec(25, 6)], phase: 'base', deload: true, note: 'Делод −30%: темп не катаем.' },
-  { sessions: [ss(80, '3×20 мин / 5 мин.', 2), z2(60, 'ровно.', 3), long(150, '2.5 часа.', 5), rec(30, 6)], phase: 'build', note: 'Возврат: длинная растит время в седле.' },
-  { sessions: [ss(90, '2×30 мин / 5 мин.', 2), z2(60, 'ровно.', 3), long(165, '2 ч 45 мин.', 5), rec(30, 6)], phase: 'build' },
-  { sessions: [ss(90, '3×20 мин / 5 мин.', 2), z2(75, 'ровно.', 3), long(180, '3 часа — пик.', 5), rec(30, 6)], phase: 'build', note: 'Пик объёма: 3 часа в седле, отработайте питание.' },
+  { sessions: [ss(95, '3×20 мин / 5 мин.', 2, { workSec: 1200, restSec: 300, reps: 3 }), z2(60, 'ровно.', 3), long(150, '2.5 часа.', 5), rec(30, 6)], phase: 'build', note: 'Возврат: длинная растит время в седле.' },
+  { sessions: [ss(90, '2×30 мин / 5 мин.', 2, { workSec: 1800, restSec: 300, reps: 2 }), z2(60, 'ровно.', 3), long(165, '2 ч 45 мин.', 5), rec(30, 6)], phase: 'build' },
+  { sessions: [ss(95, '3×20 мин / 5 мин.', 2, { workSec: 1200, restSec: 300, reps: 3 }), z2(75, 'ровно.', 3), long(180, '3 часа — пик.', 5), rec(30, 6)], phase: 'build', note: 'Пик объёма: 3 часа в седле, отработайте питание.' },
   { sessions: [rec(45, 2), z2(60, 'легко.', 3), long(100, 'укороченная.', 5), rec(25, 6)], phase: 'base', deload: true, note: 'Делод перед taper: впитываем нагрузку.' },
   { sessions: [z2(50, 'лёгкое.', 2), rec(30, 3), rec(25, 5), long(120, 'подводка: 2 часа ровно.', 6)], phase: 'taper', taper: true, note: 'Taper: объём −35%, привычные ноги.' },
   { sessions: [rec(30, 2), rec(30, 3), rec(25, 5), event()], phase: 'peak', taper: true, note: 'Неделя события: отдых и 100 км!' },

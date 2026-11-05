@@ -93,8 +93,34 @@ describe('CardioSessionTimer: интервальный режим', () => {
     expect(screen.getByText(/по структуре 43 из 60 мин/)).toBeTruthy();
   });
 
-  it('без structure — один отсчёт, без кнопки «Дальше» и без выдуманных подходов', () => {
-    const base = buildCardioCycle({ goal: 'health', totalWeeks: 4, id: 'plain-timer' });
+  it('показывает подходы точками и следующий шаг загодя', () => {
+    const { container } = render(<CardioSessionTimer cycle={cycleWithIntervals()} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Старт HIIT' }));
+
+    // Разминка: ни один подход не закрыт, впереди «Работа 1/2».
+    const dots = container.querySelector('[data-cardio="interval-dots"]');
+    expect(dots?.getAttribute('aria-label')).toBe('Подходы: 0 из 2');
+    expect(dots!.querySelectorAll('span')).toHaveLength(2);
+    expect(container.querySelector('[data-cardio="interval-next"]')?.textContent).toMatch(/далее: Работа 1\/2/);
+
+    // Разминка → работа 1 → отдых 1: подход 1 закрыт, следующий — работа 2.
+    const next = screen.getByRole('button', { name: 'Следующий шаг' });
+    fireEvent.click(next);
+    fireEvent.click(next);
+    expect(container.querySelector('[data-cardio="interval-dots"]')?.getAttribute('aria-label')).toBe('Подходы: 1 из 2');
+    expect(container.querySelector('[data-cardio="interval-next"]')?.textContent).toMatch(/далее: Работа 2\/2/);
+  });
+
+  it('на последнем шаге не обещает несуществующий следующий', () => {
+    const { container } = render(<CardioSessionTimer cycle={cycleWithIntervals()} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Старт HIIT' }));
+    const next = screen.getByRole('button', { name: 'Следующий шаг' });
+    // разминка → 4 шага работы/отдыха → заминка (последний).
+    for (let i = 0; i < 5; i++) fireEvent.click(next);
+    expect(container.querySelector('[data-cardio="interval-next"]')?.textContent).toBe('последний шаг');
+  });
+
+  it('без structure — один отсчёт, без кнопки «Дальше» и без выдуманных подходов', () => {    const base = buildCardioCycle({ goal: 'health', totalWeeks: 4, id: 'plain-timer' });
     const dow = (new Date().getDay() + 6) % 7;
     const cycle: CardioCycle = {
       ...base,
@@ -125,5 +151,26 @@ describe('CardioDiaryPanel: факт по подходам виден в жур�
     expect(chip).toBeTruthy();
     expect(chip!.textContent).toContain('6/8');
     expect(chip!.getAttribute('title')).toMatch(/работа 1 мин/i);
+  });
+
+  it('сводка за 14 дней: подходы и недобор по сессиям', () => {
+    const log: CardioLogEntry[] = [
+      { id: 'iv-2', date: '2026-11-01', type: 'hiit', durationMin: 40, completed: true, intervalsPlanned: 8, intervalsDone: 8 },
+      { id: 'iv-3', date: '2026-11-03', type: 'hiit', durationMin: 40, completed: true, intervalsPlanned: 8, intervalsDone: 6 },
+    ];
+    const { container } = render(<CardioDiaryPanel cycle={null} log={log} />);
+    const block = container.querySelector('[data-cardio="interval-adherence"]');
+    expect(block).toBeTruthy();
+    expect(block!.textContent).toContain('14 из 16');
+    expect(block!.textContent).toContain('88%');
+    expect(block!.textContent).toContain('недобрано в 1 из 2');
+  });
+
+  it('без интервальных записей сводки нет (не показываем нули)', () => {
+    const log: CardioLogEntry[] = [
+      { id: 'z2-1', date: '2026-11-01', type: 'zone2', durationMin: 40, completed: true },
+    ];
+    const { container } = render(<CardioDiaryPanel cycle={null} log={log} />);
+    expect(container.querySelector('[data-cardio="interval-adherence"]')).toBeNull();
   });
 });

@@ -6,7 +6,7 @@
  * Опциональные кодированы как recovery-сессии с пометкой [доп].
  * Минуты — производные (гребля ~2:30/500 м новичка → м = метры/200).
  */
-import type { CardioCycleTemplate, CardioTemplateSession, CardioTemplateWeek } from './cardio-cycle-types';
+import type { CardioCycleTemplate, CardioStructuredBlock, CardioTemplateSession, CardioTemplateWeek } from './cardio-cycle-types';
 
 const M_PER_MIN = 200;
 const dist = (m: number, note: string, dow: number): CardioTemplateSession => ({
@@ -77,6 +77,26 @@ function parseOpt(desc: string): { min: number; label: string } {
   return { min: 25, label: desc };
 }
 
+/**
+ * «[3×10 мин/2:00]» → машиночитаемая структура.
+ *
+ * Аудит 2026-11, ч.3: такие сессии шли как `miss` с текстом «длинные отрезки»,
+ * но без `structured`, а `parseOpt` ставил им 30 мин на 36 мин работы с отдыхом —
+ * длительность была меньше, чем физически длится сессия. Здесь считаем точно и
+ * поднимаем `durationMin` до работы + отдых + 10 мин (разминка/заминка).
+ * Отрезки в МЕТРАХ структуру не получают: темп/сплит в тексте не задан, а
+ * выдумывать его мы не будем.
+ */
+function timedSet(desc: string): CardioStructuredBlock[] | undefined {
+  const m = desc.match(/(\d+)\s*×\s*(\d+)\s*(?:мин|min)\s*\/\s*(\d+):(\d{2})/);
+  if (!m) return undefined;
+  const reps = Number(m[1]);
+  const workSec = Number(m[2]) * 60;
+  const restSec = Number(m[3]) * 60 + Number(m[4]);
+  if (!(reps > 0 && reps <= 60) || !(workSec > 0)) return undefined;
+  return [{ workSec, restSec, reps, target: 'rpe', note: 'Длинные отрезки с коротким отдыхом (≤1/4 работы)' }];
+}
+
 function buildWeek(w: number): CardioTemplateWeek {
   const [d1, d2, d3, o4, o5] = PLAN[w - 1];
   const core = w <= 11 ? 'дистанция' : w <= 15 ? 'дистанция 10K, темп прогрессирует' : 'over-distance + скорость';
@@ -88,7 +108,17 @@ function buildWeek(w: number): CardioTemplateWeek {
     sessions.push(dist(d3, w === 1 ? 'Темп первой дистанции недели, не быстрее.' : 'Negative split: первую половину ровно, вторую быстрее.', 4));
   } else {
     const p4 = parseOpt(o4);
-    sessions.push({ type: 'miss', durationMin: p4.min, equipment: 'rowing', dayOfWeek: 4, purpose: `${p4.label} — длинные отрезки с коротким отдыхом (≤1/4 работы).` });
+    // Отрезки во времени → структура + честная длительность (было 25-30 мин
+    // на 34-36 мин работы с отдыхом).
+    const blocks = timedSet(p4.label);
+    const mainSec = blocks ? blocks.reduce((s, b) => s + (b.workSec + b.restSec) * b.reps, 0) : 0;
+    sessions.push({
+      type: 'miss',
+      durationMin: blocks ? Math.max(p4.min, Math.round(mainSec / 60) + 10) : p4.min,
+      equipment: 'rowing', dayOfWeek: 4,
+      purpose: `${p4.label} — длинные отрезки с коротким отдыхом (≤1/4 работы).`,
+      structured: blocks,
+    });
   }
   const p4 = parseOpt(o4);
   const p5 = parseOpt(o5);

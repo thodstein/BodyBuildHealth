@@ -6,6 +6,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   loadCardioLog, saveCardioLogEntry, removeCardioLogEntry, replaceCardioLog,
   cardioLogStats, computeCardioAdvice, cardioWeekFact, estimateCardioEntryKcal,
+  cardioIntervalAdherence,
   sanitizeCardioSport, CARDIO_SPORTS, CARDIO_SPORT_RU, type CardioSport,
   cardioPaceMinPerKm, validateCardioLogFields, clampCardioLogNumber,
   saveCardioWellness, loadCardioWellness, wellnessReadiness,
@@ -90,6 +91,7 @@ export const CardioDiaryPanel: React.FC<{ cycle: CardioCycle | null; acwr?: numb
 
   const stats7 = useMemo(() => cardioLogStats(log, 7), [log]);
   const stats28 = useMemo(() => cardioLogStats(log, 28), [log]);
+  const intervals14 = useMemo(() => cardioIntervalAdherence(log, 14), [log]);
   const advice = useMemo(() => computeCardioAdvice(cycle, log, { acwr, recoveryLow }), [log, cycle, acwr, recoveryLow]);
   // Серия дней подряд. Было три разных расчёта в одном memo (два из них —
   // мёртвые: их результат перезатирался). Один проход: best по всем дням,
@@ -269,6 +271,17 @@ export const CardioDiaryPanel: React.FC<{ cycle: CardioCycle | null; acwr?: numb
         {stats7.avgHr != null ? ` · ЧСС ${stats7.avgHr}` : ''}
         {' '}· 28д: {stats28.sessions} сессий · {stats28.minutes} мин{stats28.km > 0 ? ` · ${stats28.km} км` : ''}{stats28.avgPace ? ` · ${stats28.avgPace}` : ''}{stats28.kcal > 0 ? ` · ${stats28.kcal} ккал` : ''}
       </div>
+      {intervals14.sessions > 0 && (
+        <div
+          data-cardio="interval-adherence"
+          style={{ fontSize: 11.5, color: '#fff', background: 'rgba(245,158,11,0.07)', border: '1px solid rgba(245,158,11,0.22)', borderLeft: '3px solid #f59e0b', borderRadius: 10, padding: '8px 11px', fontVariantNumeric: 'tabular-nums', lineHeight: 1.5 }}
+        >
+          🔁 Интервалы 14д: {intervals14.done} из {intervals14.planned} подходов ({intervals14.pct}%)
+          {intervals14.shortSessions > 0
+            ? ` · недобрано в ${intervals14.shortSessions} из ${intervals14.sessions} сессий`
+            : ' · все подходы сделаны'}
+        </div>
+      )}
       <div style={{ fontSize: 13, fontWeight: 850, color: ADVICE_COLOR[advice.action], letterSpacing: -0.1 }}>
         {advice.action === 'reduce' ? '▼ Снизить' : advice.action === 'increase' ? '▲ Увеличить' : '▶ Продолжать'}: {advice.reason}
       </div>

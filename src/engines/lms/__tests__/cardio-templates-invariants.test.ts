@@ -137,8 +137,44 @@ describe('шаблоны: данные сессий', () => {
     expect(bad).toEqual([]);
   });
 
-  it('totalMinutes = Σ duration × weeklyFrequency (в сумме по неделе не врёт)', () => {
+  it('структура сама по себе влезает в длительность (не полагаемся на «сжатие» разминки)', () => {
+    // Класс ошибок, найденный в 2026-11: «3×20 мин темп / 5 мин» при durationMin 75
+    // (работа 70 мин + разминка/заминка 20 = 90). Таймер такое «спасал», но план
+    // врал о длительности, а атлет не получал разминку.
+    const bad: string[] = [];
     for (const t of explicit) {
+      t.weeks!.forEach((w, wi) => w.sessions.forEach((s, si) => {
+        if (!s.structured || s.structured.length === 0) return;
+        const mainSec = s.structured.reduce((sum, b) => sum + (b.workSec + Math.max(0, b.restSec)) * b.reps, 0);
+        if (mainSec > Math.round(s.durationMin * 60)) {
+          bad.push(`${t.meta.id} w${wi + 1} s${si + 1}: работа ${Math.round(mainSec / 60)} мин > сессия ${s.durationMin} мин`);
+        }
+      }));
+    }
+    expect(bad).toEqual([]);
+  });
+
+  it('структура не цепляется к добавочным отрезкам в непрерывной сессии', () => {
+    // 10 миль E + 6×100 м strides — это длинный бег, а не интервальная тренировка:
+    // таймлайн с разминкой/заминкой на 50 из 100 минут был бы враньём. Но в
+    // интервальной сессии (hiit/miss) «4×20 с ускорения» — часть разминки, а
+    // структура описывает основной набор: это законно.
+    const CONTINUOUS = new Set(['zone2', 'recovery', 'long']);
+    const bad: string[] = [];
+    for (const t of explicit) {
+      t.weeks!.forEach((w, wi) => w.sessions.forEach((s, si) => {
+        if (!s.structured || s.structured.length === 0) return;
+        const text = `${s.purpose ?? ''}`.toLowerCase();
+        const additive = /strides|ускорени|\[доп\]/.test(text);
+        if (additive && CONTINUOUS.has(s.type)) {
+          bad.push(`${t.meta.id} w${wi + 1} s${si + 1} [${s.type}]: добавочные отрезки получили structured — «${s.purpose}»`);
+        }
+      }));
+    }
+    expect(bad).toEqual([]);
+  });
+
+  it('totalMinutes = Σ duration × weeklyFrequency (в сумме по неделе не врёт)', () => {    for (const t of explicit) {
       const c = buildCardioCycleFromTemplate(t, { age: 30, bodyWeight: 80 });
       for (const w of c.weeks) {
         const sum = w.sessions.reduce((s, x) => s + x.durationMin * Math.max(1, Math.round(x.weeklyFrequency)), 0);

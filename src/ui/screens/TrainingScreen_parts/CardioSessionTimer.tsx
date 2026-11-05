@@ -471,6 +471,45 @@ const [power, setPower] = useState('');
                   <span>из {fmt(active.totalSec)}</span>
                 </div>
               </div>
+              {/* Подходы точками: видно на бегу, сколько сделано, сколько впереди. */}
+              {(() => {
+                const plan = active.plan!;
+                const works = plan.steps.filter(st => st.kind === 'work');
+                if (works.length === 0 || works.length > 24) return null;
+                // Считаем по индексу шага в таймлайне, а не по сумме секунд:
+                // разминка и отдых тоже идут в общий elapsed, и «накопление
+                // работы» засчитывало бы все подходы ещё на разминке.
+                const doneCount = works.filter(st => st.index < activeStep.index).length;
+                return (
+                  <div data-cardio="interval-dots" style={{ display: 'flex', gap: 5, flexWrap: 'wrap', justifyContent: 'center' }} aria-label={`Подходы: ${doneCount} из ${works.length}`}>
+                    {works.map((st, i) => {
+                      const isCurrent = activeStep.step.kind === 'work' && activeStep.step.index === st.index;
+                      const done = i < doneCount;
+                      return (
+                        <span
+                          key={st.index}
+                          aria-hidden="true"
+                          style={{
+                            width: 9, height: 9, borderRadius: 99,
+                            background: done ? '#22c55e' : isCurrent ? STEP_COLOR.work : 'rgba(255,255,255,0.16)',
+                            border: isCurrent ? '2px solid #fff' : 'none',
+                            boxShadow: isCurrent ? '0 0 8px rgba(245,158,11,0.8)' : 'none',
+                          }}
+                        />
+                      );
+                    })}
+                  </div>
+                );
+              })()}
+              {/* Что дальше: атлет готовится к следующему шагу заранее. */}
+              {(() => {
+                const next = active.plan!.steps[activeStep.index + 1];
+                return (
+                  <div data-cardio="interval-next" style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.7)', fontVariantNumeric: 'tabular-nums' }} aria-live="polite">
+                    {next ? `далее: ${next.label} · ${fmt(next.sec)}` : 'последний шаг'}
+                  </div>
+                );
+              })()}
             </>
           ) : (
             <>
