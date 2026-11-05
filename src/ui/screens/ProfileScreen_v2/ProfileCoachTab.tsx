@@ -74,6 +74,10 @@ import {
   inboxSummary,
 } from '../../../engines/coach/coach-inbox.engine';
 import {
+  buildCoachWeek,
+} from '../../../engines/coach/coach-week.engine';
+import { CoachWeekView } from './CoachWeekView';
+import {
   addCoachNote,
   countNotesForAthlete,
   emptyCoachNotes,
@@ -1038,26 +1042,43 @@ export const ProfileCoachTab: React.FC<{
     [state.athletes, snapshots, adherence],
   );
 
+  /** Недельный вид: задачи по дням + факты атлетов. Считается из уже загруженного. */
+  const week = useMemo(
+    () =>
+      buildCoachWeek({
+        today: coachToday(),
+        weekStart: weekStartOf(coachToday()),
+        tasks: planner.items,
+        athletes: state.athletes.map(a => ({
+          athlete: a,
+          snapshot: snapshots[a.id],
+          adherence: adherence[a.id],
+        })),
+        notes: notes.items,
+      }),
+    [planner.items, state.athletes, snapshots, adherence, notes],
+  );
+
   const openWeekComment = (a: CoachAthlete) => {
     if (weekCommentFor === a.id) {
       setWeekCommentFor(null);
       return;
     }
-    const week = weekStartOf(coachToday());
-    const existing = weekNoteFor(notes, a.id, week);
+    const weekStart = weekStartOf(coachToday());
+    const existing = weekNoteFor(notes, a.id, weekStart);
     setWeekDraft(existing?.body ?? '');
     setWeekError(null);
     setWeekCommentFor(a.id);
   };
 
   const saveWeekComment = (a: CoachAthlete) => {
-    const week = weekStartOf(coachToday());
+    const weekStart = weekStartOf(coachToday());
     const body = weekDraft.trim();
     if (!body) {
       setWeekError('Пустой комментарий не сохраняем.');
       return;
     }
-    const res = addCoachNote(notes, { athleteId: a.id, week, body });
+    const res = addCoachNote(notes, { athleteId: a.id, week: weekStart, body });
     if (res.error) {
       setWeekError(res.error === 'limit' ? 'Лимит заметок — удалите старые в разделе «Заметки».' : 'Не удалось сохранить.');
       return;
@@ -1265,6 +1286,17 @@ export const ProfileCoachTab: React.FC<{
               </>
             )}
           </div>
+
+          {/* Неделя: задачи по дням и обзор — до списка карточек. */}
+          <CoachWeekView
+            week={week}
+            tasks={planner.items}
+            onSelectAthlete={(_id, name) => {
+              setQuery(name);
+              setStatusFilter('all');
+              setAttentionOnly(false);
+            }}
+          />
 
           {/* Атлеты */}
           <div style={cardStyle} data-coach="athletes">

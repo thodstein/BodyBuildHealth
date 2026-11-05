@@ -789,3 +789,15 @@ describe('карточка v2: статусы, группа, метки, кон�
     expect(container.querySelector('[data-coach="athletes-empty"]')?.textContent).toContain('1 в архиве');
   });
 });
+describe('недельный вид в вкладке', () => {
+  it('«Неделя» показывается в режиме тренера и считает задачи', () => {
+    seed(1);
+    const { container } = render(<ProfileCoachTab />);
+    const week = container.querySelector('[data-coach="week"]');
+    expect(week).not.toBeNull();
+    expect(week?.querySelectorAll('[data-coach="week-day"]')).toHaveLength(7);
+    expect(week?.textContent).toContain('задач: 0');
+    // Напоминания по умолчанию выключены — никакого «мы уже включили».
+    expect(week?.querySelector('[data-coach="reminders-toggle"]')?.textContent).toContain('Напоминать о задачах');
+  });
+});
