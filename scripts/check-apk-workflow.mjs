@@ -21,7 +21,15 @@ if (gates !== 4) fails.push(`гейтов release по env: ${gates}, ждали
 const decl = (
   text.match(/ANDROID_KEYSTORE_BASE64:\s*\$\{\{\s*secrets\.ANDROID_KEYSTORE_BASE64\s*\}\}/g) || []
 ).length;
-if (decl !== 1) fails.push(`объявлений секрета в env: ${decl}, ждали 1`);
+if (decl !== 2) fails.push(`объявлений секрета в env: ${decl}, ждали 2 (build + release)`);
+
+// Обе сборки обязаны брать один и тот же стабильный ключ: debug-APK,
+// подписанный одноразовым keystore раннера, нельзя обновить поверх.
+{
+  const restores = (text.match(/name:\s*Restore keystore/g) || []).length;
+  if (restores !== 2) fails.push(`восстановлений keystore: ${restores}, ждали 2 (build + release)`);
+  if (!/Guard signing secrets/.test(text)) fails.push('в build нет проверки наличия секретов подписи');
+}
 
 // Контракт с android/app/build.gradle: workflow обязан класть keystore
 // ровно туда, откуда gradle читает (rootProject = android/):

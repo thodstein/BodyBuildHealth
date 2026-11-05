@@ -15,6 +15,14 @@ jobs:
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    # Тот же стабильный ключ, что и в release-джобе: иначе assembleDebug
+    # подписывается одноразовым debug-keystore раннера, и каждый APK получает
+    # новую подпись — Android такие обновления не ставит поверх.
+    env:
+      ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+      ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+      ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+      ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -73,6 +81,20 @@ jobs:
       - name: Install SDK packages
         run: |
           sdkmanager "platform-tools" "platforms;android-36" "platforms;android-35" "platforms;android-34" "build-tools;36.0.0" "build-tools;35.0.0" "build-tools;34.0.0"
+
+      - name: Guard signing secrets
+        # Без стабильного ключа собирать APK вредно: подпись одноразовая,
+        # обновиься поверх такой сборки нельзя. Лучше упасть с понятным текстом.
+        run: |
+          if [ -z "$ANDROID_KEYSTORE_BASE64" ]; then
+            echo "::error::Нет секрета ANDROID_KEYSTORE_BASE64. APK с одноразовой подписью нельзя обновить поверх. Добавьте 4 секрета (docs/NATIVE-APP.md §7)."
+            exit 1
+          fi
+
+      - name: Restore keystore
+        run: |
+          echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > android/app/he-release.keystore
+          printf 'storeFile=he-release.keystore\nstorePassword=%s\nkeyAlias=%s\nkeyPassword=%s\n' "$ANDROID_KEYSTORE_PASSWORD" "$ANDROID_KEY_ALIAS" "$ANDROID_KEY_PASSWORD" > android/keystore.properties
 
       - name: Assemble debug APK
         working-directory: android
@@ -203,6 +225,7 @@ jobs:
       - name: Publish GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
           TAG: ${{ github.ref_name }}
         run: |
           FILES=""
@@ -220,12 +243,13 @@ jobs:
             echo "::error::Красная сборка: ни одного APK нет — публиковать нечего, релиз не трогаем"
             exit 1
           fi
-          if gh release view "$TAG" >/dev/null 2>&1; then
+          if gh release view "$TAG" --repo "$GH_REPO" >/dev/null 2>&1; then
             # shellcheck disable=SC2086
-            gh release upload "$TAG" $FILES --clobber
+            gh release upload "$TAG" $FILES --clobber --repo "$GH_REPO"
           else
             # shellcheck disable=SC2086
             gh release create "$TAG" $FILES \
+              --repo "$GH_REPO" \
               --title "Health Engine $TAG" \
               --notes "APK + web-bundle для самообновления без сторов. Приложение само предложит: быстрое обновление (файлы внутрь, без переустановки) или полный APK поверх (данные сохраняются). Требуется та же подпись сборки — все CI-сборки подписываются единым ключом."
           fi
