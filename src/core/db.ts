@@ -88,6 +88,157 @@ export function dbNameFor(spaceId: string): string {
   return `${DB_NAME}__${spaceId}`;
 }
 
+/** Создать недостающие сторы/индексы. Одинаково для всех пространств. */
+function applySchema(d: IDBDatabase, e: IDBVersionChangeEvent): void {
+  STORES.forEach(s => {
+    let store: IDBObjectStore;
+    if (!d.objectStoreNames.contains(s)) {
+      store = d.createObjectStore(s, { keyPath: 'id' });
+    } else {
+      store = (e.target as IDBOpenDBRequest).transaction!.objectStore(s);
+    }
+    const indexes = INDEXES[s];
+    if (indexes) {
+      indexes.forEach(idx => {
+        if (!store.indexNames.contains(idx.name)) {
+          store.createIndex(idx.name, idx.keyPath);
+        }
+      });
+    }
+  });
+}
+
+/**
+ * Открыть базу КОНКРЕТНОГО пространства (а не открытого). Нужно бэкапу:
+ * дневники тренировок и анализы атлетов лежат в их базах, и без этого бэкап
+ * уносил бы только базу того пространства, в котором открыто приложение.
+ *
+ * `create=false` — если базы нет, вернуть `null` и не создавать пустую.
+ */
+export function openSpaceDb(spaceId: string, create: boolean): Promise<IDBDatabase | null> {
+  return new Promise<IDBDatabase | null>(resolve => {
+    let req: IDBOpenDBRequest;
+    try {
+      req = indexedDB.open(dbNameFor(spaceId), DB_VERSION);
+    } catch {
+      resolve(null);
+      return;
+    }
+    let settled = false;
+    const done = (v: IDBDatabase | null) => {
+      if (settled) return;
+      settled = true;
+      resolve(v);
+    };
+    req.onupgradeneeded = e => {
+      if (!create) {
+        // Базы не было. Открытие без версии создало бы пустую — прерываем.
+        try {
+          (e.target as IDBOpenDBRequest).transaction?.abort();
+        } catch {
+          /* ignore */
+        }
+        return;
+      }
+      try {
+        applySchema((e.target as IDBOpenDBRequest).result, e);
+      } catch {
+        /* среда не дала создать схему — ниже откроем как есть */
+      }
+    };
+    req.onsuccess = () => done(req.result);
+    req.onerror = () => done(null);
+    req.onblocked = () => done(null);
+  });
+}
+
+/** Прочитать всю базу пространства (для бэкапа). Пустая база — пустые списки. */
+export async function readSpaceStores(spaceId: string): Promise<Record<string, any[]>> {
+  const out: Record<string, any[]> = {};
+  const database = await openSpaceDb(spaceId, false);
+  if (!database) return out;
+  try {
+    const names = STORES.filter(s => database.objectStoreNames.contains(s));
+    if (!names.length) return out;
+    const tx = database.transaction(names, 'readonly');
+    await Promise.all(
+      names.map(
+        s =>
+          new Promise<void>(res => {
+            try {
+              const r = tx.objectStore(s).getAll();
+              r.onsuccess = () => {
+                out[s] = Array.isArray(r.result) ? r.result : [];
+                res();
+              };
+              r.onerror = () => {
+                out[s] = [];
+                res();
+              };
+            } catch {
+              out[s] = [];
+              res();
+            }
+          }),
+      ),
+    );
+  } catch {
+    /* среда не дала прочитать — считаем, что записей нет */
+  } finally {
+    try {
+      database.close();
+    } catch {
+      /* ignore */
+    }
+  }
+  return out;
+}
+
+/**
+ * Заменить содержимое базы пространства (восстановление бэкапа). Пишем именно
+ * в базу этого пространства: иначе данные атлета оказались бы в базе другого.
+ */
+export async function writeSpaceStores(
+  spaceId: string,
+  stores: Record<string, any[]>,
+): Promise<void> {
+  const database = await openSpaceDb(spaceId, true);
+  if (!database) return;
+  try {
+    const names = STORES.filter(s => database.objectStoreNames.contains(s));
+    if (!names.length) return;
+    const tx = database.transaction(names, 'readwrite');
+    for (const s of names) {
+      try {
+        const os = tx.objectStore(s);
+        os.clear();
+        for (const rec of stores[s] || []) {
+          try {
+            os.put(rec);
+          } catch {
+            /* сбойная запись не должна срывать восстановление остальных */
+          }
+        }
+      } catch {
+        /* ignore */
+      }
+    }
+    await new Promise<void>(res => {
+      tx.oncomplete = () => res();
+      tx.onerror = () => res();
+      tx.onabort = () => res();
+    });
+  } catch {
+    /* ignore */
+  } finally {
+    try {
+      database.close();
+    } catch {
+      /* ignore */
+    }
+  }
+}
+
 class HealthDB {
   private db: IDBDatabase | null = null;
 
@@ -144,23 +295,11 @@ class HealthDB {
         done(fn);
       };
       r.onupgradeneeded = e => {
-        const d = (e.target as IDBOpenDBRequest).result;
-        STORES.forEach(s => {
-          let store: IDBObjectStore;
-          if (!d.objectStoreNames.contains(s)) {
-            store = d.createObjectStore(s, { keyPath: 'id' });
-          } else {
-            store = (e.target as IDBOpenDBRequest).transaction!.objectStore(s);
-          }
-          const indexes = INDEXES[s];
-          if (indexes) {
-            indexes.forEach(idx => {
-              if (!store.indexNames.contains(idx.name)) {
-                store.createIndex(idx.name, idx.keyPath);
-              }
-            });
-          }
-        });
+        try {
+          applySchema((e.target as IDBOpenDBRequest).result, e);
+        } catch {
+          /* схема не создалась — init упадёт на следующем шаге и повторит попытку */
+        }
       };
       r.onsuccess = () => {
         this.db = r.result;

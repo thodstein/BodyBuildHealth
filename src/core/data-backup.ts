@@ -1,10 +1,11 @@
-import { db, STORES, deleteSpaceDatabases } from './db';
+import { db, STORES, deleteSpaceDatabases, readSpaceStores, writeSpaceStores } from './db';
 import {
   DATA_SPACE_KEY,
   DEVICE_SALT_KEY,
   HOME_SPACE_ID,
   _resetDataSpaceCache,
   clearAllSessionStorage,
+  currentSpaceId,
   deviceRawOrFallback,
   parseRegistry,
   rawKeys,
@@ -15,26 +16,60 @@ function rawLs() {
   return deviceRawOrFallback(localStorage as unknown as Parameters<typeof deviceRawOrFallback>[0]);
 }
 
-export const BACKUP_VERSION = '1.0';
+export const BACKUP_VERSION = '2.0';
 
 export interface AppBackup {
   app: 'health-engine';
   version: string;
   createdAt: string; // ISO timestamp
+  /**
+   * Легаси-поле (формат 1.0): база ТОГО пространства, в котором делали экспорт.
+   * Читается старыми версиями приложения и пишется в домашнюю базу при
+   * восстановлении файла, где нет `spaceStores`.
+   */
   stores: Record<string, any[]>;
+  /**
+   * База каждого пространства: `{ home: {…}, '<spaceId>': {…} }`. Без этого
+   * бэкап уносил бы тренировки и анализы только открытого атлета — а остальные
+   * после смены телефона терялись бы.
+   */
+  spaceStores?: Record<string, Record<string, any[]>>;
   localStorage: Record<string, string>;
+}
+
+const EMPTY_STORES = (): Record<string, any[]> => {
+  const out: Record<string, any[]> = {};
+  for (const s of STORES) out[s] = [];
+  return out;
+};
+
+/** Все пространства устройства: домашнее + атлеты из реестра. */
+function allSpaceIds(): string[] {
+  const ids = [HOME_SPACE_ID];
+  try {
+    for (const s of parseRegistry(rawLs().getItem(DATA_SPACE_KEY)).spaces) {
+      if (s.id && s.id !== HOME_SPACE_ID) ids.push(s.id);
+    }
+  } catch {
+    /* реестр недоступен — хотя бы домашнее пространство */
+  }
+  return Array.from(new Set(ids));
 }
 
 export async function collectBackup(): Promise<AppBackup> {
   await db.init();
-  const stores: Record<string, any[]> = {};
-  for (const s of STORES) {
-    try {
-      stores[s] = await db.getAll(s);
-    } catch {
-      stores[s] = [];
-    }
+  // База каждого пространства: атлеты живут в своих базах IndexedDB.
+  const spaceStores: Record<string, Record<string, any[]>> = {};
+  for (const spaceId of allSpaceIds()) {
+    const data = await readSpaceStores(spaceId);
+    const hasRecords = Object.values(data).some(records => records.length > 0);
+    if (hasRecords) spaceStores[spaceId] = data;
   }
+  // Легаси-поле — база открытого пространства (так его прочитают старые версии).
+  const current = currentSpaceId();
+  const stores = spaceStores[current] ??
+    (current !== HOME_SPACE_ID ? await readSpaceStores(current) : EMPTY_STORES());
+
   const local: Record<string, string> = {};
   // Перечисляем СЫРЫЕ ключи: бэкап должен унести все пространства (атлетов),
   // а не только то, в котором сейчас открыто приложение. Ключи атлетов уже
@@ -55,6 +90,7 @@ export async function collectBackup(): Promise<AppBackup> {
     version: BACKUP_VERSION,
     createdAt: new Date().toISOString(),
     stores,
+    spaceStores,
     localStorage: local,
   };
 }
@@ -100,25 +136,27 @@ export async function exportBackup(): Promise<void> {
 
 // Full replace (restore). Caller wraps parseBackup in try/catch.
 export async function importBackup(b: AppBackup): Promise<void> {
-  await db.init();
-  for (const s of STORES) {
-    try {
-      await db.clear(s);
-    } catch {
-      /* ignore */
-    }
-    const recs = b.stores?.[s] || [];
-    for (const r of recs) {
-      try {
-        await db.put(s, r);
-      } catch {
-        /* ignore bad record */
-      }
-    }
-  }
+  // Ключи восстанавливаем СЫРЫМИ: в файле они уже физические
+  // (`he_ath_<spaceId>__…`), и через шов домашний профиль попал бы в текущее
+  // пространство — то есть в данные атлета.
+  const raw = rawLs();
   for (const k of Object.keys(b.localStorage || {})) {
-    localStorage.setItem(k, b.localStorage[k]);
+    try {
+      raw.setItem(k, b.localStorage[k]);
+    } catch {
+      /* один ключ не должен срывать восстановление */
+    }
   }
+  // Базы: у каждого пространства своя. Файлы формата 1.0 содержат одну базу —
+  // это база домашнего пространства (изоляции тогда не было).
+  const perSpace: Record<string, Record<string, any[]>> =
+    b.spaceStores && Object.keys(b.spaceStores).length
+      ? b.spaceStores
+      : { [HOME_SPACE_ID]: b.stores || {} };
+  for (const [spaceId, stores] of Object.entries(perSpace)) {
+    await writeSpaceStores(spaceId, stores);
+  }
+  _resetDataSpaceCache();
   // Черновики в sessionStorage принадлежат тому, кто работал здесь до восстановления.
   // После восстановления бэкапа они не «его» — снимаем, чтобы не подставить чужие
   // цифры в открытую форму.
@@ -132,13 +170,6 @@ export async function importBackup(b: AppBackup): Promise<void> {
 // Soft clear: wipe everything EXCEPT he_profile_v2 + he_session_v2
 export async function softClear(): Promise<void> {
   await db.init();
-  for (const s of STORES) {
-    try {
-      await db.clear(s);
-    } catch {
-      /* ignore */
-    }
-  }
   const raw = rawLs();
   // Пространства атлетов помним ДО зачистки: их базы IndexedDB нужно удалить,
   // иначе «удалил все данные» оставило бы дневники/анализы атлетов на диске.
@@ -159,6 +190,10 @@ export async function softClear(): Promise<void> {
       /* ignore */
     }
   }
+  // Базы: домашнюю чистим по сторам, базы атлетов удаляем целиком. Чистить
+  // только открытое пространство нельзя: если сброс нажали, находясь в данных
+  // атлета, домашняя база осталась бы с дневниками и анализами.
+  await writeSpaceStores(HOME_SPACE_ID, {});
   _resetDataSpaceCache();
   // Черновики атлетов в sessionStorage относятся к «всем данным» так же, как
   // их ключи в localStorage: после сброса они не должны всплыть заново.

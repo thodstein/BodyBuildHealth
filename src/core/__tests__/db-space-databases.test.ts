@@ -11,7 +11,7 @@
  *    (закрыть рабочую базу из-за чужого атлета — значит сломать запись).
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { db, deleteSpaceDatabases, dbNameFor, spaceDbRecordCount } from '../db';
+import { db, deleteSpaceDatabases, dbNameFor, readSpaceStores, spaceDbRecordCount, writeSpaceStores } from '../db';
 import {
   _resetDataSpaceCache,
   athleteSpaceId,
@@ -167,5 +167,150 @@ describe('подсчёт записей в базе пространства', (
     const log = stubIdb({ exists: true, counts: {} });
     await spaceDbRecordCount(athleteSpaceId('a1'));
     expect(log).toContain(`open:${dbNameFor(athleteSpaceId('a1'))}`);
+  });
+});
+
+/**
+ * Чтение и запись базы КОНКРЕТНОГО пространства — то, на чём держится бэкап
+ * атлетов. Если бы бэкап читал только открытую базу, тренировки и анализы
+ * остальных атлетов после смены телефона терялись бы.
+ */
+describe('чтение и запись базы пространства', () => {
+  type DbMap = Record<string, Record<string, any[]>>;
+
+  /** Список имён как у DOMStringList: `contains` + перебор. */
+  const nameList = (names: string[]) => {
+    const list: any = {
+      length: names.length,
+      contains: (n: string) => names.includes(n),
+      item: (i: number) => names[i] ?? null,
+    };
+    list[Symbol.iterator] = () => names[Symbol.iterator]();
+    return list;
+  };
+
+  /** Поддельный IndexedDB с несколькими базами и сторами. */
+  const stubDb = (initial: DbMap) => {
+    const dbs = new Map<string, Record<string, any[]>>();
+    for (const [name, stores] of Object.entries(initial)) {
+      dbs.set(name, JSON.parse(JSON.stringify(stores)) as Record<string, any[]>);
+    }
+    const closed: string[] = [];
+    const created: string[] = [];
+
+    const facade = (data: Record<string, any[]>, name: string) => ({
+      get objectStoreNames() {
+        return nameList(Object.keys(data));
+      },
+      createObjectStore: (store: string) => {
+        data[store] = data[store] || [];
+        return { indexNames: nameList([]), createIndex: () => {} };
+      },
+      close: () => closed.push(name),
+      transaction: () => {
+        const tx: any = { oncomplete: null, onerror: null, onabort: null };
+        tx.objectStore = (store: string) => ({
+          getAll: () => {
+            const r: any = { result: data[store] ?? [], onsuccess: null, onerror: null };
+            setTimeout(() => r.onsuccess?.(), 0);
+            return r;
+          },
+          clear: () => {
+            data[store] = [];
+          },
+          put: (rec: any) => {
+            data[store] = data[store] || [];
+            data[store].push(rec);
+          },
+        });
+        setTimeout(() => tx.oncomplete?.(), 5);
+        return tx;
+      },
+    });
+
+    vi.stubGlobal('indexedDB', {
+      open(name: string) {
+        const req: any = {
+          result: null,
+          transaction: {
+            abort() {
+              req.aborted = true;
+            },
+          },
+          onupgradeneeded: null,
+          onsuccess: null,
+          onerror: null,
+          onblocked: null,
+        };
+        setTimeout(() => {
+          const existing = dbs.get(name);
+          if (!existing) {
+            const data: Record<string, any[]> = {};
+            req.result = facade(data, name);
+            req.onupgradeneeded?.({ target: req });
+            if (req.aborted) {
+              // как в настоящем IndexedDB: прерванный апгрейд не создаёт базу
+              req.onerror?.();
+              return;
+            }
+            dbs.set(name, data);
+            created.push(name);
+            req.onsuccess?.({ target: req });
+            return;
+          }
+          req.result = facade(existing, name);
+          req.onsuccess?.({ target: req });
+        }, 0);
+        return req;
+      },
+    });
+    return { dbs, closed, created };
+  };
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('читает записи из базы нужного пространства', async () => {
+    const { dbs } = stubDb({
+      [dbNameFor('home')]: { diary: [{ id: 'h1' }] },
+      [dbNameFor(athleteSpaceId('a1'))]: { training_log: [{ id: 't1' }, { id: 't2' }] },
+    });
+    await readSpaceStores(athleteSpaceId('a1'));
+    const read = await readSpaceStores(athleteSpaceId('a1'));
+    expect(read.training_log).toEqual([{ id: 't1' }, { id: 't2' }]);
+    // открытые базы закрываем — иначе чужой бэкап держал бы соединения
+    expect(dbs.size).toBe(2);
+  });
+
+  it('базы, которой нет, не создаёт при чтении', async () => {
+    const { created } = stubDb({ [dbNameFor('home')]: {} });
+    const read = await readSpaceStores(athleteSpaceId('nobody'));
+    expect(read).toEqual({});
+    expect(created).toEqual([]);
+  });
+
+  it('запись заменяет содержимое стора, а не дописывает', async () => {
+    const sid = athleteSpaceId('a1');
+    const { dbs } = stubDb({ [dbNameFor(sid)]: { diary: [{ id: 'old' }] } });
+    await writeSpaceStores(sid, { diary: [{ id: 'new' }, { id: 'new2' }] });
+    expect(dbs.get(dbNameFor(sid))!.diary).toEqual([{ id: 'new' }, { id: 'new2' }]);
+  });
+
+  it('запись создаёт базу, если её нет (восстановление на новом устройстве)', async () => {
+    const sid = athleteSpaceId('a1');
+    const { dbs } = stubDb({});
+    await writeSpaceStores(sid, { diary: [{ id: 'x' }] });
+    expect(dbs.get(dbNameFor(sid))!.diary).toEqual([{ id: 'x' }]);
+  });
+
+  it('сбой хранилища не роняет бэкап', async () => {
+    vi.stubGlobal('indexedDB', {
+      open() {
+        throw new Error('нет доступа');
+      },
+    });
+    await expect(readSpaceStores('home')).resolves.toEqual({});
+    await expect(writeSpaceStores('home', { diary: [] })).resolves.toBeUndefined();
   });
 });

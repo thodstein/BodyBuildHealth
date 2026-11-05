@@ -475,7 +475,7 @@ describe('установка шва (как в приложении)', () => {
     expect(win.localStorage.getItem('he_profile_v2')).toBe('home');
   });
 
-  it('если среда не даёт подменить хранилище — изоляция выключается, а активное возвращается в home', () => {
+  it('если среда не даёт ни подменить методы, ни подменить свойство окна — изоляция выключается, а активное возвращается в home', () => {
     const { window: win, raw } = makeWin();
     // готовим реестр с «активным» атлетом
     const sid = athleteSpaceId('a1');
@@ -483,12 +483,26 @@ describe('установка шва (как в приложении)', () => {
       DATA_SPACE_KEY,
       serializeRegistry(setActiveSpace(upsertSpace(emptyRegistry(), { id: sid, athleteId: 'a1' }).registry, sid)),
     );
+    // Оба пути закрыты: методы вморожены, а окно не даёт определить свойство.
     Object.freeze(win.localStorage);
+    Object.freeze(win);
 
     const api = installDataSpaceStorage(win);
     expect(api).toBeNull(); // шва нет
     // и приложение не должно остаться «в атлете» без шва: это смешало бы данные
     expect(parseRegistry(raw.getItem(DATA_SPACE_KEY)).active).toBe(HOME_SPACE_ID);
+  });
+
+  it('если методы вморожены, но окно подменяемо — шов всё равно работает через свойство окна', () => {
+    const { window: win, raw } = makeWin();
+    Object.freeze(win.localStorage);
+    const api = installDataSpaceStorage(win);
+    expect(api).not.toBeNull();
+
+    const sid = athleteSpaceId('a1');
+    api!.writeRegistry(setActiveSpace(upsertSpace(emptyRegistry(), { id: sid, athleteId: 'a1' }).registry, sid));
+    win.localStorage.setItem('he_profile_v2', 'a1');
+    expect(raw.getItem(toPhysicalKey(sid, 'he_profile_v2'))).toBe('a1');
   });
 
   it('реестр лежит в сыром хранилище и переживает переустановку шва', () => {

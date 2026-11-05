@@ -730,22 +730,87 @@ function snapshotStorage(target: Storage): RawStorageLike | null {
   }
 }
 
+/** Имена методов Storage, которые шов подменяет (нужны и для уборки мусора). */
+const PATCHED_METHODS = ['getItem', 'setItem', 'removeItem', 'key', 'clear'] as const;
+
 /**
  * Подменить методы хранилища НА МЕСТЕ на пространство данных: ссылки, взятые
- * другими модулями раньше, продолжают работать. `false` — среда не дала.
+ * другими модулями раньше, продолжают работать.
+ *
+ * Возвращает `false`, если среда подмену не приняла. Это не формальность:
+ * `localStorage`/`sessionStorage` — объекты с именованными свойствами (WebIDL),
+ * и присваивание метода может быть молча принято за ЗАПИСЬ ЭЛЕМЕНТА с именем
+ * «getItem». Тогда метод остаётся прежним, а изоляция не работает, хотя
+ * исключения не было. Поэтому после присваивания читаем свойства обратно.
  */
 function patchStorage(target: Storage, space: Storage): boolean {
+  const get = (k: string) => space.getItem(k);
+  const set = (k: string, v: string) => space.setItem(k, v);
+  const remove = (k: string) => space.removeItem(k);
+  const key = (i: number) => space.key(i);
+  const clear = () => space.clear();
   try {
-    target.getItem = (k: string) => space.getItem(k);
-    target.setItem = (k: string, v: string) => space.setItem(k, v);
-    target.removeItem = (k: string) => space.removeItem(k);
-    target.key = (i: number) => space.key(i);
-    target.clear = () => space.clear();
+    target.getItem = get;
+    target.setItem = set;
+    target.removeItem = remove;
+    target.key = key;
+    target.clear = clear;
+    const accepted =
+      target.getItem === get &&
+      target.setItem === set &&
+      target.removeItem === remove &&
+      target.key === key &&
+      target.clear === clear;
+    if (!accepted) return false;
     Object.defineProperty(target, 'length', {
       configurable: true,
       get: () => space.length,
     });
-    return true;
+    return target.length === space.length;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Поставить шов на одно хранилище окна.
+ *
+ * 1. Пробуем подменить методы на месте — тогда все, кто уже держит ссылку на
+ *    объект хранилища, тоже попадают под шов.
+ * 2. Если среда не дала (см. `patchStorage`), подменяем само свойство окна:
+ *    `window.localStorage` — accessor на прототипе окна, собственное свойство
+ *    его перекрывает. Тогда ссылки, взятые ДО установки, шов не видят, поэтому
+ *    шов обязан ставиться первым действием приложения (так и есть в `main.tsx`).
+ */
+function installOnWindow(
+  win: Window,
+  prop: 'localStorage' | 'sessionStorage',
+  space: Storage,
+  raw: RawStorageLike,
+): boolean {
+  let target: Storage | null = null;
+  try {
+    target = (win as unknown as Record<string, Storage | undefined>)[prop] ?? null;
+  } catch {
+    target = null;
+  }
+  if (target && patchStorage(target, space)) return true;
+  // Среда не дала тень на прототип. Тогда присваивание метода уже успело
+  // записать «элементы» с именами getItem/setItem/... — это мусор в данных
+  // человека, снимаем его.
+  for (const name of PATCHED_METHODS) {
+    try {
+      raw.removeItem(name);
+    } catch {
+      /* ignore */
+    }
+  }
+  try {
+    Object.defineProperty(win, prop, {
+      configurable: true,
+      get: () => space,
+    });
+    return (win as unknown as Record<string, Storage | undefined>)[prop] === space;
   } catch {
     return false;
   }
@@ -797,12 +862,11 @@ export function installDataSpaceStorage(win: Window | null | undefined): Install
     }
   };
 
-  // Подмена методов на месте: ссылки, взятые другими модулями раньше, продолжают
-  // работать, а порядок вызовов остаётся «приложение → (синк-хук) → пространство → сырое».
-  if (!patchStorage(ls, storage)) {
-    // Среда не даёт подменить хранилище: изоляция невозможна. Возвращаем активное
-    // пространство в home, иначе приложение читало бы данные устройства, а базу
-    // IndexedDB открывало бы от атлета — то есть смешало бы данные.
+  // Подмена хранилища окна. Если среда не дала ни одного из двух способов,
+  // изоляция невозможна: возвращаем активное пространство в home, иначе
+  // приложение читало бы данные устройства, а базу IndexedDB открывало бы от
+  // атлета — то есть смешало бы данные.
+  if (!installOnWindow(w, 'localStorage', storage, raw)) {
     try {
       const reg = parseRegistry(raw.getItem(DATA_SPACE_KEY));
       if (reg.active !== HOME_SPACE_ID) {
@@ -827,7 +891,7 @@ export function installDataSpaceStorage(win: Window | null | undefined): Install
       const ssRaw = snapshotStorage(ss);
       if (ssRaw) {
         const ssStorage = createSpaceStorage(ssRaw, activeSpaceId);
-        if (patchStorage(ss, ssStorage)) installedSessionRaw = ssRaw;
+        if (installOnWindow(w, 'sessionStorage', ssStorage, ssRaw)) installedSessionRaw = ssRaw;
       }
     }
   } catch {
