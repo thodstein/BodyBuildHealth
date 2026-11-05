@@ -238,3 +238,58 @@ describe('файл копии для пользователя', () => {
     expect(() => parseBackup('{"hello":"world"}')).toThrow('Неизвестный файл бэкапа');
   });
 });
+
+describe('забыть всех атлетов', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    try { sessionStorage.clear(); } catch { /* ignore */ }
+    readSpaceStores.mockClear();
+    writeSpaceStores.mockClear();
+    vi.clearAllMocks();
+  });
+
+  it('убирает данные и записи всех атлетов, но не трогает домашнее пространство', async () => {
+    const a1 = athleteSpaceId('a1');
+    const a2 = athleteSpaceId('a2');
+    let reg = upsertSpace(emptyRegistry(), { id: a1, athleteId: 'a1', label: 'Иван' }).registry;
+    reg = upsertSpace(reg, { id: a2, athleteId: 'a2', label: 'Пётр' }).registry;
+    localStorage.setItem(DATA_SPACE_KEY, serializeRegistry(setActiveSpace(reg, a2)));
+
+    localStorage.setItem('he_profile_v2', 'тренер');
+    localStorage.setItem(toPhysicalKey(a1, 'he_profile_v2'), 'иван');
+    localStorage.setItem(toPhysicalKey(a2, 'he_profile_v2'), 'пётр');
+    sessionStorage.setItem(`he_ath_${a1}__he_draft_diary`, 'черновик');
+
+    const { forgetAllAthletes } = await import('../data-backup');
+    const { deleteSpaceDatabases } = await import('../db');
+    const { installDataSpaceStorage } = await import('../data-space');
+    // Черновики чистятся через шов над sessionStorage — он ставится при старте
+    // приложения; в тесте ставим явно (окно настоящее, jsdom).
+    expect(installDataSpaceStorage(window)).not.toBeNull();
+    const res = await forgetAllAthletes();
+
+    expect(res.spaces).toBe(2);
+    // данные атлетов ушли вместе с их черновиками
+    expect(localStorage.getItem(toPhysicalKey(a1, 'he_profile_v2'))).toBeNull();
+    expect(localStorage.getItem(toPhysicalKey(a2, 'he_profile_v2'))).toBeNull();
+    expect(sessionStorage.getItem(`he_ath_${a1}__he_draft_diary`)).toBeNull();
+    // собственные данные и вход остаются: это не полный сброс приложения
+    expect(localStorage.getItem('he_profile_v2')).toBe('тренер');
+    // реестр: только домашнее пространство, и оно активно
+    const after = JSON.parse(localStorage.getItem(DATA_SPACE_KEY) as string);
+    expect(after.spaces.map((s: any) => s.id)).toEqual(['home']);
+    expect(after.active).toBe('home');
+    // базы атлетов удалены (обе — основная и фото, это делает deleteSpaceDatabases)
+    expect(vi.mocked(deleteSpaceDatabases).mock.calls.flat(2)).toEqual(expect.arrayContaining([a1, a2]));
+  });
+
+  it('когда атлетов нет — ничего не удаляет и возвращает 0', async () => {
+    localStorage.setItem('he_profile_v2', 'тренер');
+    const { forgetAllAthletes } = await import('../data-backup');
+    const { deleteSpaceDatabases } = await import('../db');
+    const res = await forgetAllAthletes();
+    expect(res.spaces).toBe(0);
+    expect(deleteSpaceDatabases).not.toHaveBeenCalled();
+    expect(localStorage.getItem('he_profile_v2')).toBe('тренер');
+  });
+});

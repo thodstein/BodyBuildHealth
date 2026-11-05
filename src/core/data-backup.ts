@@ -12,10 +12,14 @@ import {
   HOME_SPACE_ID,
   _resetDataSpaceCache,
   clearAllSessionStorage,
+  clearSessionSpaceData,
+  clearSpaceData,
   currentSpaceId,
   deviceRawOrFallback,
   parseRegistry,
   rawKeys,
+  readRegistryFromStorage,
+  writeRegistryToStorage,
 } from './data-space';
 
 /** Сырое хранилище: бэкап и полная очистка обязаны видеть все пространства. */
@@ -100,6 +104,38 @@ export async function collectBackup(): Promise<AppBackup> {
     spaceStores,
     localStorage: local,
   };
+}
+
+/**
+ * «Забыть всех атлетов»: удалить данные всех пространств атлетов, не трогая
+ * домашнее. Это НЕ `softClear` (он вычищает и собственные дневники тренера):
+ * здесь человек закончил работу с людьми или отдаёт телефон, но свои данные
+ * сохраняет.
+ *
+ * Возвращает число удалённых пространств — его показывают в подтверждении, а не
+ * пишут «все данные удалены» без цифры.
+ */
+export async function forgetAllAthletes(): Promise<{ spaces: number }> {
+  const reg = readRegistryFromStorage();
+  const ids = reg.spaces.filter(s => s.id !== HOME_SPACE_ID).map(s => s.id);
+  const raw = rawLs();
+  for (const id of ids) {
+    // Ключи чистим по префиксу, а не по наличию записи в реестре: осиротевшие
+    // ключи (реестр переписывали) относятся к тому же человеку.
+    clearSpaceData(raw, id);
+    // Черновики в sessionStorage — тоже его данные.
+    clearSessionSpaceData(id);
+  }
+  // Базы удаляем ДО записи реестра: пока кэш активного пространства прежний,
+  // `deleteSpaceDatabases` закроет соединение этого пространства. Иначе
+  // удаление упрётся в «блокировано» и база останется на диске.
+  if (ids.length) await deleteSpaceDatabases(ids);
+  writeRegistryToStorage({
+    ...reg,
+    active: HOME_SPACE_ID,
+    spaces: reg.spaces.filter(s => s.id === HOME_SPACE_ID),
+  });
+  return { spaces: ids.length };
 }
 
 export function exportToJSON(b: AppBackup): string {

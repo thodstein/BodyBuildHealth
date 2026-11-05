@@ -36,9 +36,25 @@ import {
   type CoachSex,
   type CoachState,
 } from '../../../engines/coach/coach-mode.engine';
-import { countNotesForAthlete, readCoachNotes, type CoachNotesStore } from '../../../engines/coach/coach-notes.engine';
-import { readCoachPlanner, type CoachPlannerStore } from '../../../engines/coach/coach-planner.engine';
-import { readCoachLog, type CoachLogStore } from '../../../engines/coach/coach-athlete-log.engine';
+import {
+  countNotesForAthlete,
+  emptyCoachNotes,
+  readCoachNotes,
+  writeCoachNotes,
+  type CoachNotesStore,
+} from '../../../engines/coach/coach-notes.engine';
+import {
+  emptyCoachPlanner,
+  readCoachPlanner,
+  writeCoachPlanner,
+  type CoachPlannerStore,
+} from '../../../engines/coach/coach-planner.engine';
+import {
+  emptyCoachLog,
+  readCoachLog,
+  writeCoachLog,
+  type CoachLogStore,
+} from '../../../engines/coach/coach-athlete-log.engine';
 import {
   HOME_SPACE_ID,
   MAX_DATA_SPACES,
@@ -265,7 +281,18 @@ export const ProfileCoachTab: React.FC<{
       s => s.id !== HOME_SPACE_ID && !(s.athleteId && known.has(s.athleteId)),
     );
   }, [spaceRegistry, state.athletes]);
+  const athleteSpaces = useMemo(
+    () => spaceRegistry.spaces.filter(s => s.id !== HOME_SPACE_ID),
+    [spaceRegistry],
+  );
   const [confirmOrphanId, setConfirmOrphanId] = useState<string | null>(null);
+  const [confirmForgetAll, setConfirmForgetAll] = useState(false);
+  const [forgetBusy, setForgetBusy] = useState(false);
+  const [forgetDone, setForgetDone] = useState(false);
+  const [forgetError, setForgetError] = useState<string | null>(null);
+  // Итог «забыли всех» показываем, только пока действительно никого не осталось:
+  // как только появился новый атлет, блок снова предлагает действие, а не итог.
+  const showForgetDone = forgetDone && state.athletes.length === 0 && athleteSpaces.length === 0;
 
   const toggleEnabled = () => {
     const next = setCoachEnabled(state, !state.enabled);
@@ -366,36 +393,63 @@ export const ProfileCoachTab: React.FC<{
     }
   };
 
+  /**
+   * Ленивый подсчёт записей в базе пространства. Возвращает то же значение,
+   * которое кладёт в состояние: `null` — посчитать не удалось.
+   */
+  const loadSpaceDbCount = (id: string): Promise<number | null> =>
+    import('../../../core/db')
+      .then(({ spaceDbRecordCount }) => spaceDbRecordCount(athleteSpaceId(id)))
+      .then(records => {
+        setSpaceDbRecords(prev => ({ ...prev, [id]: records }));
+        return records;
+      })
+      .catch(() => {
+        setSpaceDbRecords(prev => ({ ...prev, [id]: null }));
+        return null;
+      });
+
   const askDelete = (id: string) => {
     if (confirmDeleteId === id) {
-      const sid = athleteSpaceId(id);
-      apply(removeCoachAthlete(state, id));
-      setConfirmDeleteId(null);
-      if (editingId === id) cancelEdit();
-      // Пустое пространство (атлет входил, но данных не появилось) убираем из
-      // реестра: иначе оно навсегда висит в списке «Сменить» и занимает лимит
-      // пространств. Там, где данные ЕСТЬ, запись остаётся намеренно —
-      // иначе до них было бы не добраться, а «удалить данные» уже отдельная кнопка.
-      if (usageOf(id).keys === 0) {
-        const reg = readRegistryFromStorage();
-        if (reg.spaces.some(s => s.id === sid)) {
-          writeRegistryToStorage(removeSpace(reg, sid));
-          if (spaceActiveId === sid) {
-            activateHomeSpace();
-            reloadToApplySpace();
-          }
-        }
-      }
+      void confirmCardDelete(id);
       return;
     }
     setConfirmDeleteId(id);
     // Настоящий объём данных атлета спрашиваем лениво и только когда тренер уже
     // собрался удалять: дневники тренировок и анализы живут в его базе IndexedDB,
     // а не в localStorage — без этого «сколько удалится» было бы занижено в разы.
-    void import('../../../core/db')
-      .then(({ spaceDbRecordCount }) => spaceDbRecordCount(athleteSpaceId(id)))
-      .then(records => setSpaceDbRecords(prev => ({ ...prev, [id]: records })))
-      .catch(() => setSpaceDbRecords(prev => ({ ...prev, [id]: null })));
+    void loadSpaceDbCount(id);
+  };
+
+  /**
+   * «Точно удалить»: убираем карточку. Запись пространства — только если
+   * доказано, что данных нет НИГДЕ: ни ключей в localStorage, ни записей в его
+   * базе IndexedDB.
+   *
+   * Раньше смотрели только на ключи. Атлет, у которого в localStorage пусто, а
+   * тренировки и анализы лежат в его базе, терял запись реестра — и база
+   * оставалась на диске без единого способа до неё добраться: «Сменить» и блок
+   * висящих данных читают реестр. Неизвестный объём (не спросили / не смогли)
+   * считается «не пусто»: сохранить лишнюю запись безопасно, потерять данные —
+   * нет.
+   */
+  const confirmCardDelete = async (id: string) => {
+    const sid = athleteSpaceId(id);
+    apply(removeCoachAthlete(state, id));
+    setConfirmDeleteId(null);
+    if (editingId === id) cancelEdit();
+    if (usageOf(id).keys !== 0) return;
+    let records = spaceDbRecords[id];
+    if (records === undefined) records = await loadSpaceDbCount(id);
+    if (records !== 0) return;
+    const reg = readRegistryFromStorage();
+    if (!reg.spaces.some(s => s.id === sid)) return;
+    writeRegistryToStorage(removeSpace(reg, sid));
+    setRegistryRev(v => v + 1);
+    if (spaceActiveId === sid) {
+      activateHomeSpace();
+      reloadToApplySpace();
+    }
   };
 
   /** Удаление карточки вместе с данными атлета (профиль/дневники/анализы). */
@@ -449,6 +503,53 @@ export const ProfileCoachTab: React.FC<{
     const res = activateSpaceById(spaceId);
     if (res.error) return;
     reloadToApplySpace();
+  };
+
+  /**
+   * «Забыть всех атлетов». Два шага и цифра в подтверждении: это необратимо.
+   *
+   * Зачем отдельная кнопка: удалять по одному 20 раз — не путь для человека,
+   * который закончил работу с группой или отдаёт телефон. И это НЕ полный сброс
+   * приложения: собственные данные тренера остаются, уходят только те, что
+   * относятся к атлетам (включая карточки, заметки, задачи и журнал — иначе
+   * после «забыли людей» остались бы записи о людях, которых больше нет).
+   */
+  const forgetAll = () => {
+    if (!confirmForgetAll) {
+      setForgetError(null);
+      setForgetDone(false);
+      setConfirmForgetAll(true);
+      return;
+    }
+    setForgetBusy(true);
+    const wasInAthleteSpace = spaceActiveId !== HOME_SPACE_ID;
+    void import('../../../core/data-backup')
+      .then(({ forgetAllAthletes }) => forgetAllAthletes())
+      .then(() => {
+        const storage = ls();
+        writeCoachNotes(storage, emptyCoachNotes());
+        writeCoachPlanner(storage, emptyCoachPlanner());
+        writeCoachLog(storage, emptyCoachLog());
+        apply({ ...state, athletes: [], activeAthleteId: null });
+        setSpaceDbRecords({});
+        setConfirmOrphanId(null);
+        setConfirmForgetAll(false);
+        setForgetBusy(false);
+        // Блок остаётся на экране с итогом: иначе он просто исчезает вместе с
+        // последней карточкой, и человек не видит, что операция состоялась.
+        setForgetDone(true);
+        setRegistryRev(v => v + 1);
+        // Если открыты данные атлета — в памяти остались его дневники:
+        // возвращаемся домой, как при любом переключении.
+        if (wasInAthleteSpace) {
+          activateHomeSpace();
+          reloadToApplySpace();
+        }
+      })
+      .catch(() => {
+        setForgetBusy(false);
+        setForgetError('Не удалось удалить данные атлетов — попробуйте ещё раз.');
+      });
   };
 
   /** Войти в данные атлета: своё пространство профиля/дневников/планов. */
@@ -1180,6 +1281,72 @@ export const ProfileCoachTab: React.FC<{
                   </div>
                 );
               })}
+            </div>
+          )}
+
+          {/* Забыть всех: человек закончил с группой или отдаёт телефон */}
+          {(showForgetDone || state.athletes.length > 0 || athleteSpaces.length > 0) && (
+            <div
+              style={{ ...cardStyle, borderColor: 'rgba(239,68,68,0.32)' }}
+              data-coach="forget-all-card"
+            >
+              <div style={{ fontSize: 13.5, fontWeight: 800, color: '#fff', display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span aria-hidden="true" style={{ display: 'inline-flex', color: colors.danger }}>
+                  <NativeIcon name="alertTriangle" size={14} />
+                </span>
+                Забыть всех атлетов
+              </div>
+              {showForgetDone ? (
+                <div
+                  data-coach="forget-all-done"
+                  style={{ fontSize: 12, color: colors.textMuted, marginTop: 6, lineHeight: 1.5 }}
+                >
+                  Данные атлетов удалены: пространства, базы, карточки, заметки, задачи и журнал.
+                  Ваши собственные данные на месте.
+                </div>
+              ) : (
+                <>
+                  <div
+                    data-coach="forget-all-hint"
+                    style={{ fontSize: 11.5, color: colors.textMuted, marginTop: 6, lineHeight: 1.5 }}
+                  >
+                    Удалит данные атлетов ({athleteSpaces.length}{' '}
+                    {plural(athleteSpaces.length, 'пространство', 'пространства', 'пространств')}: профили,
+                    дневники, планы, анализы, фото веса) вместе с карточками, заметками, задачами и журналом.
+                    Ваши собственные данные останутся. Отменить это нельзя.
+                  </div>
+                  <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
+                    <button
+                      type="button"
+                      data-coach="forget-all"
+                      onClick={forgetAll}
+                      disabled={forgetBusy}
+                      style={{ ...btn('danger'), fontSize: 12, opacity: forgetBusy ? 0.6 : 1 }}
+                    >
+                      {forgetBusy
+                        ? 'Удаляем…'
+                        : confirmForgetAll
+                          ? 'Точно забыть всех'
+                          : 'Забыть всех атлетов'}
+                    </button>
+                    {confirmForgetAll && !forgetBusy && (
+                      <button
+                        type="button"
+                        data-coach="forget-all-cancel"
+                        onClick={() => setConfirmForgetAll(false)}
+                        style={{ ...btn('ghost'), fontSize: 12 }}
+                      >
+                        Оставить
+                      </button>
+                    )}
+                  </div>
+                  {forgetError && (
+                    <div role="alert" data-coach="forget-all-error" style={{ marginTop: 8, fontSize: 12, color: colors.danger }}>
+                      {forgetError}
+                    </div>
+                  )}
+                </>
+              )}
             </div>
           )}
 

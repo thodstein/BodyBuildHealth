@@ -9,6 +9,21 @@
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, fireEvent, cleanup, waitFor } from '@testing-library/react';
+
+/**
+ * База IndexedDB подменена: тесту нужно управлять числом записей в пространстве
+ * атлета, а глобальная заглушка делит хранилища между «базами» и не изолирует
+ * тесты друг от друга. Остальные функции `core/db` берём настоящие.
+ */
+const dbCounts = vi.hoisted(() => ({ counts: {} as Record<string, number | null> }));
+vi.mock('../../../../core/db', async importOriginal => {
+  const actual = await importOriginal<typeof import('../../../../core/db')>();
+  return {
+    ...actual,
+    spaceDbRecordCount: vi.fn(async (sid: string) => dbCounts.counts[sid] ?? 0),
+  };
+});
+
 import { ProfileCoachTab } from '../ProfileCoachTab';
 import {
   COACH_MAX_ATHLETES,
@@ -20,6 +35,10 @@ import {
   writeCoachState,
   type CoachAthlete,
 } from '../../../../engines/coach/coach-mode.engine';
+import {
+  COACH_NOTES_KEY,
+  readCoachNotes,
+} from '../../../../engines/coach/coach-notes.engine';
 import {
   ATHLETE_SPACE_PREFIX,
   DATA_SPACE_KEY,
@@ -294,7 +313,7 @@ describe('атлеты', () => {
     expect(localStorage.getItem('he_profile_v2')).toBe('{"name":"Тренер"}');
   });
 
-  it('обычное удаление убирает из реестра ПУСТОЕ пространство атлета', () => {
+  it('обычное удаление убирает из реестра ПУСТОЕ пространство атлета', async () => {
     seed(1);
     // Атлет заходил в приложение, но ничего не записал
     const sid = athleteSpaceId('a1');
@@ -302,7 +321,31 @@ describe('атлеты', () => {
     const { container } = render(<ProfileCoachTab />);
     fireEvent.click(container.querySelector('[data-coach="delete"]') as HTMLElement);
     fireEvent.click(container.querySelector('[data-coach="delete"]') as HTMLElement);
-    expect(readRegistryFromStorage().spaces.some(s => s.id === sid)).toBe(false);
+    // запись уходит только после того, как доказано, что пусто и в базе тоже
+    await waitFor(() => expect(readRegistryFromStorage().spaces.some(s => s.id === sid)).toBe(false));
+  });
+
+  it('атлет с записями ТОЛЬКО в базе сохраняет запись пространства и попадает в «Данные без карточки»', async () => {
+    seed(1);
+    const sid = athleteSpaceId('a1');
+    writeRegistryToStorage(upsertSpace(emptyRegistry(), { id: sid, athleteId: 'a1', label: 'Атлет 1' }).registry);
+    // в localStorage пусто, а в его базе — три записи (дневник/анализы)
+    dbCounts.counts[sid] = 3;
+
+    const { container } = render(<ProfileCoachTab />);
+    fireEvent.click(container.querySelector('[data-coach="delete"]') as HTMLElement);
+    // объём в базе — единственное доказательство, что данные есть
+    await waitFor(() =>
+      expect(container.querySelector('[data-coach="delete-hint"]')?.textContent).toContain('3 записи'),
+    );
+    fireEvent.click(container.querySelector('[data-coach="delete"]') as HTMLElement);
+    await waitFor(() => expect(readCoachState(localStorage).athletes).toHaveLength(0));
+
+    // карточки нет, но запись реестра обязана остаться: иначе база осиротеет
+    expect(readRegistryFromStorage().spaces.some(s => s.id === sid)).toBe(true);
+    // и данные видны как висящие, а не «потерялись»
+    await waitFor(() => expect(container.querySelector('[data-coach="orphan"]')).not.toBeNull());
+    delete dbCounts.counts[sid];
   });
 
   it('обычное удаление НЕ выбрасывает запись пространства, в котором есть данные', () => {    seed(1);
@@ -457,6 +500,63 @@ describe('атлеты', () => {
     expect(container.querySelector('[data-coach="open-notes"]')).toBeNull();
     expect(container.querySelector('[data-coach="open-planner"]')).toBeNull();
     expect(container.querySelector('[data-coach="open-log"]')).toBeNull();
+  });
+});
+
+describe('забыть всех атлетов', () => {
+  it('первый клик только спрашивает: данные на месте', () => {
+    seed(1);
+    const sid = athleteSpaceId('a1');
+    writeRegistryToStorage(upsertSpace(emptyRegistry(), { id: sid, athleteId: 'a1', label: 'Атлет 1' }).registry);
+    localStorage.setItem(toPhysicalKey(sid, 'he_profile_v2'), '{"name":"Иван"}');
+
+    const { container } = render(<ProfileCoachTab />);
+    fireEvent.click(container.querySelector('[data-coach="forget-all"]') as HTMLElement);
+
+    expect(container.querySelector('[data-coach="forget-all"]')?.textContent).toContain('Точно забыть');
+    expect(readCoachState(localStorage).athletes).toHaveLength(1);
+    expect(localStorage.getItem(toPhysicalKey(sid, 'he_profile_v2'))).toBe('{"name":"Иван"}');
+  });
+
+  it('подтверждение удаляет данные и карточки атлетов, свои данные и записи тренера — тоже его', async () => {
+    seed(1);
+    const sid = athleteSpaceId('a1');
+    writeRegistryToStorage(upsertSpace(emptyRegistry(), { id: sid, athleteId: 'a1', label: 'Атлет 1' }).registry);
+    localStorage.setItem('he_profile_v2', '{"name":"Тренер"}');
+    localStorage.setItem(toPhysicalKey(sid, 'he_profile_v2'), '{"name":"Иван"}');
+    localStorage.setItem(
+      COACH_NOTES_KEY,
+      JSON.stringify({ version: 1, items: [{ id: 'n1', title: 'Колено', athleteId: 'a1' }] }),
+    );
+    expect(readCoachNotes(localStorage).items).toHaveLength(1);
+
+    const { container } = render(<ProfileCoachTab />);
+    fireEvent.click(container.querySelector('[data-coach="forget-all"]') as HTMLElement);
+    fireEvent.click(container.querySelector('[data-coach="forget-all"]') as HTMLElement);
+
+    await waitFor(() => expect(readCoachState(localStorage).athletes).toHaveLength(0));
+    // данные атлета и запись его пространства ушли
+    expect(localStorage.getItem(toPhysicalKey(sid, 'he_profile_v2'))).toBeNull();
+    expect(readRegistryFromStorage().spaces.filter(s => s.id !== HOME_SPACE_ID)).toHaveLength(0);
+    // заметки и журнал относились к людям, которых больше нет
+    expect(readCoachNotes(localStorage).items).toHaveLength(0);
+    // собственные данные тренера остались: это не полный сброс приложения
+    expect(localStorage.getItem('he_profile_v2')).toBe('{"name":"Тренер"}');
+    // режим не выключился сам — тренер может продолжить работу
+    expect(readCoachState(localStorage).enabled).toBe(true);
+    // и человек видит, что операция состоялась, а не пустое место вместо блока
+    expect(container.querySelector('[data-coach="forget-all-done"]')).not.toBeNull();
+  });
+
+  it('«Оставить» после вопроса ничего не удаляет', () => {
+    seed(1);
+    const sid = athleteSpaceId('a1');
+    writeRegistryToStorage(upsertSpace(emptyRegistry(), { id: sid, athleteId: 'a1', label: 'Атлет 1' }).registry);
+    const { container } = render(<ProfileCoachTab />);
+    fireEvent.click(container.querySelector('[data-coach="forget-all"]') as HTMLElement);
+    fireEvent.click(container.querySelector('[data-coach="forget-all-cancel"]') as HTMLElement);
+    expect(readCoachState(localStorage).athletes).toHaveLength(1);
+    expect(readRegistryFromStorage().spaces.some(s => s.id === sid)).toBe(true);
   });
 });
 
