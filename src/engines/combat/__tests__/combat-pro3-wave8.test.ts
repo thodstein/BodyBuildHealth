@@ -134,6 +134,17 @@ describe('Э5.7 — LEA: тренировочный расход из дневн
     expect(r.note).toMatch(/вручную/);
   });
 
+  it('сохранённые ккал записи — источник правды (не пересчитываются)', () => {
+    const r = estimateTrainingKcalFromDiary(null, { cardioEntries: [cardio({ calories: 700 })] as any, days: 7, todayIso: '2026-10-03' });
+    expect(r.kcal).toBe(100); // 700 / 7, а не MET-оценка 315/7
+  });
+
+  it('без сохранённых ккал пересчёт идёт по дисциплине: вело дешевле бега', () => {
+    const run = estimateTrainingKcalFromDiary(null, { cardioEntries: [cardio({ sport: 'run' })] as any, days: 7, todayIso: '2026-10-03' });
+    const bike = estimateTrainingKcalFromDiary(null, { cardioEntries: [cardio({ sport: 'bike' })] as any, days: 7, todayIso: '2026-10-03' });
+    expect(bike.kcal!).toBeLessThan(run.kcal!);
+  });
+
   it('живой путь: запись в he_cardio_sessions подхватывается без явного журнала', () => {
     saveCardioLogEntry({ id: 'c1', date: localIsoDate(), type: 'hiit', durationMin: 15, completed: true } as any);
     const r = estimateTrainingKcalFromDiary([], { weightKg: 80 });

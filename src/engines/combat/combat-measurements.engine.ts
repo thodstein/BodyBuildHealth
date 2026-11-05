@@ -1045,8 +1045,13 @@ function isoShiftDays(iso: string, days: number): string {
 
 /**
  * Авто-тренировочный расход из дневника для скрининга LEA.
- * - кардио-дневник: `estimateCardioEntryKcal` по фактическим записям в окне;
+ * - кардио-дневник: ккал записи, а при их отсутствии `estimateCardioEntryKcal`
+ *   (с дисциплиной: вело/гребля дешевле бега) по фактическим записям в окне;
  * - sRPE-сессии: только считаются (в ккал не переводятся — формулы нет).
+ *
+ * Сохранённые ккал — источник правды: их поставил импорт из устройства
+ * (FIT/TCX отдают реальный расход) или сам атлет в журнале. Раньше функция
+ * молча пересчитывала всё по типу сессии, игнорируя и значение, и дисциплину.
  *
  * @param srpeSessions sRPE-сессии (`he_srpe_sessions`); нужны лишь для честной строки.
  * @param opts.cardioEntries явный журнал (тесты/повторное использование); иначе `loadCardioLog()`.
@@ -1068,12 +1073,15 @@ export function estimateTrainingKcalFromDiary(
   let cardioEntries = 0;
   let cardioSum = 0;
   for (const e of entries) {
-    if (!e || (e as any).completed === false) continue;
-    if (!inWindow((e as any).date)) continue;
-    const dur = Number((e as any).durationMin);
+    if (!e || e.completed === false) continue;
+    if (!inWindow(e.date)) continue;
+    const dur = Number(e.durationMin);
     if (!Number.isFinite(dur) || dur <= 0) continue;
     cardioEntries++;
-    cardioSum += estimateCardioEntryKcal((e as any).type, dur, opts?.weightKg ?? undefined);
+    const stored = Number(e.calories);
+    cardioSum += Number.isFinite(stored) && stored > 0
+      ? stored
+      : estimateCardioEntryKcal(e.type, dur, opts?.weightKg ?? undefined, { sport: e.sport });
   }
   const cardioKcalPerDay = cardioEntries > 0 ? Math.round(cardioSum / days) : null;
   const srpeCount = Array.isArray(srpeSessions)
@@ -1082,8 +1090,8 @@ export function estimateTrainingKcalFromDiary(
   const note = cardioKcalPerDay === null
     ? 'Кардио-дневник за окно пуст — тренировочный расход введите вручную.'
     : srpeCount > 0
-      ? 'Взята только кардио-часть (MET-оценки дневника): подписанной формулы sRPE→ккал нет — силовой вклад введите вручную.'
-      : 'Кардио-часть из дневника (MET-оценки); силовой вклад не входит — при необходимости введите вручную.';
+      ? 'Взята только кардио-часть (ккал записей дневника): подписанной формулы sRPE→ккал нет — силовой вклад введите вручную.'
+      : 'Кардио-часть из дневника (ккал записей; без ккал — MET-оценка по дисциплине); силовой вклад не входит — при необходимости введите вручную.';
   return {
     kcal: cardioKcalPerDay,
     cardioKcalPerDay,
