@@ -995,11 +995,16 @@ const kbju = useMemo(()=> calcKBJU(input), [input]);
     try{ const raw=localStorage.getItem(SCENARIOS_KEY); return raw? JSON.parse(raw):[] }catch{ return [] }
   });
   const saveScenario = useCallback(()=>{
+    // Аудит 2026-11: номер брался как length+1, а хранится максимум 6 — после шестого сценария
+    // все новые назывались «Сценарий 7», и вытеснение самого старого было молчаливым.
     const name = `Сценарий ${scenarios.length+1} · ${new Date().toLocaleDateString('ru-RU')} · ${weight}кг ${GOAL_LABEL[goal]}`;
     // Полный снапшот, а не 22 поля: иначе сценарий терял лабы, сон/стресс, пот, климат,
     // клетчатку/омега-3 — и сравнение сценариев физически не могло их показать.
     const next=[...scenarios, {id: Date.now().toString(), name, snapshot}].slice(-6);
-    setScenarios(next); try{ localStorage.setItem(SCENARIOS_KEY, JSON.stringify(next)); }catch{}; showToast(`Сценарий "${name}" сохранён`);
+    setScenarios(next); try{ localStorage.setItem(SCENARIOS_KEY, JSON.stringify(next)); }catch{};
+    showToast(scenarios.length >= 6
+      ? `Сценарий сохранён; хранится до 6 — самый старый вытеснен`
+      : `Сценарий "${name}" сохранён`);
   }, [scenarios, snapshot, weight, goal, showToast]);
   const loadScenario = useCallback((id:string)=>{
     const sc=scenarios.find(s=>s.id===id); if(!sc) return;
@@ -1016,6 +1021,9 @@ const kbju = useMemo(()=> calcKBJU(input), [input]);
   }, [compareIds, scenarios]);
   const deleteScenario = useCallback((id:string)=>{
     const next=scenarios.filter(s=>s.id!==id); setScenarios(next); try{ localStorage.setItem(SCENARIOS_KEY, JSON.stringify(next)); }catch{}
+    // Аудит 2026-11: удалённый сценарий оставался в compareIds — сравнение молча ломалось
+    // (diff = null), а следующая отметка давала пару [удалённый, новый].
+    setCompareIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : prev);
   }, [scenarios]);
 
   /** Перейти к калькулятору: режим + его группа + прокрутка к результатам. */

@@ -403,6 +403,22 @@ describe('MetabolicHub: ввод меняет расчёт (проводка п�
     expect(txt).not.toContain('вес растёт вместе с сухой массой');
   });
 
+  it('удаление выбранного сценария снимает его из сравнения (не оставляет битую пару)', () => {
+    localStorage.setItem('he_metabolic_scenarios_v1', JSON.stringify([
+      { id: 's1', name: 'A', snapshot: { weight: 80 } },
+      { id: 's2', name: 'B', snapshot: { weight: 90 } },
+    ]));
+    localStorage.setItem('he_metabolic_snapshot_v6', JSON.stringify({ compareIds: ['s1', 's2'] }));
+    render(<MetabolicHub />);
+    expect(document.body.textContent || '').toContain('Δ между сценариями (1 поле)');
+    fireEvent.click(document.querySelector('button[aria-label="Удалить сценарий: A"]') as HTMLElement);
+    const txt = document.body.textContent || '';
+    expect(txt).not.toContain('Δ между сценариями');
+    // compareIds потерял удалённый id (остался один) — вместо пустоты подсказка выбрать второй
+    expect(txt).toContain('Отметь второй сценарий');
+    expect(txt).toContain('Снять выбор');
+  });
+
   it('сравнение сценариев не выдаёт обрезанные 24 поля за полный список', () => {
     const a: Record<string, number> = {}; const b: Record<string, number> = {};
     for (let i = 0; i < 30; i++) { a['f' + i] = i; b['f' + i] = i + 1; }
