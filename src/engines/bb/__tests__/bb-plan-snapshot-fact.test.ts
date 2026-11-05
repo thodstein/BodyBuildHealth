@@ -24,6 +24,7 @@ import { estimateBBSessionCost } from '../bb-fatigue.engine';
 import { buildBBPlanReport } from '../bb-report.engine';
 import { buildBBExpandedSummary } from '../bb-summary.engine';
 import { analyzeBBRotation } from '../bb-rotation.engine';
+import { backQualityIssues, armQualityIssues } from '../bb-back-quality.engine';
 
 const WM = { chest: 100, back: 120, shoulders: 60, biceps: 50, triceps: 60, quads: 140, hamstrings: 100, glutes: 140, calves: 80, abs: 60, traps: 80, forearms: 40 };
 
@@ -183,6 +184,36 @@ describe('bb: снимки после правок (revalidate-путь)', () =>
         .filter((line: string) => String(line).startsWith('⚠ Ротация:'))
         .filter((line: string) => !freshRotationLines.has(String(line)));
       expect(staleRotation, `${where}: rationale описывает снятую ротацию`).toEqual([]);
+
+      // Паттерны спины/рук и их качество — факт финального состава, а не
+      // середина финализатора (замер до правки: спина 14/17, руки 9/17,
+      // «Качество рук» держало до 14 снятых предупреждений).
+      const patternSummaryOf = (muscles: string[]) => {
+        const acc: Record<string, number> = {};
+        for (const week of plan.weeks) for (const s of week.sessions) for (const e of s.exercises) {
+          if (!muscles.includes(e.muscle)) continue;
+          const p = e.movementPattern || 'other';
+          acc[p] = (acc[p] || 0) + e.sets;
+        }
+        return Object.entries(acc).map(([k, v]) => `${k}=${v}`).join(', ') || 'нет прямой работы';
+      };
+      const rationale = (plan.rationale || []).map(String);
+      expect(
+        rationale.find((line: string) => line.startsWith('🧩 Спина по паттернам:')),
+        `${where}: строка спины`,
+      ).toBe(`🧩 Спина по паттернам: ${patternSummaryOf(['back'])}`);
+      expect(
+        rationale.find((line: string) => line.startsWith('💪 Руки по паттернам:')),
+        `${where}: строка рук`,
+      ).toBe(`💪 Руки по паттернам: ${patternSummaryOf(['biceps', 'triceps', 'forearms'])}`);
+      expect(
+        rationale.filter((line: string) => line.startsWith('⚠ Качество спины:')),
+        `${where}: качество спины`,
+      ).toEqual(backQualityIssues(plan.weeks).map((i: string) => `⚠ Качество спины: ${i}`));
+      expect(
+        rationale.filter((line: string) => line.startsWith('⚠ Качество рук:')),
+        `${where}: качество рук`,
+      ).toEqual(armQualityIssues(plan.weeks).map((i: string) => `⚠ Качество рук: ${i}`));
       const freshValidation = validateBBPlan(plan, uiValidationOptions(plan) as any);
       const countErrors = (issues: any[]) => issues.filter((i: any) => i.level === 'error').length;
       expect(

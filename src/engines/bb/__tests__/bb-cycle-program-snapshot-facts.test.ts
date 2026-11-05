@@ -8,6 +8,7 @@ import { estimateBBSessionCost } from '../bb-fatigue.engine';
 import { buildBBExpandedSummary } from '../bb-summary.engine';
 import { analyzeBBRotation } from '../bb-rotation.engine';
 import { reconcileSchemeComments } from '../bb-scheme-comment-reconcile';
+import { backQualityIssues, armQualityIssues } from '../bb-back-quality.engine';
 
 /**
  * Аудит Y: цикл- и программа-пути меняют план ПОСЛЕ `finalizeBBPlan`
@@ -76,6 +77,33 @@ function expectSnapshotsMatchFacts(plan: any, label: string) {
   const staleRotation = ((plan.rationale || []) as string[])
     .filter(line => String(line).startsWith('⚠ Ротация:') && !freshRotationLines.has(line));
   expect(staleRotation, `${label}: rationale описывает снятую ротацию`).toEqual([]);
+
+  const rationale = ((plan.rationale || []) as string[]).map(String);
+  const patternSummaryOf = (muscles: string[]) => {
+    const acc: Record<string, number> = {};
+    for (const week of plan.weeks) for (const s of week.sessions) for (const e of s.exercises) {
+      if (!muscles.includes(e.muscle)) continue;
+      const p = e.movementPattern || 'other';
+      acc[p] = (acc[p] || 0) + e.sets;
+    }
+    return Object.entries(acc).map(([k, v]) => `${k}=${v}`).join(', ') || 'нет прямой работы';
+  };
+  expect(
+    rationale.find(line => line.startsWith('🧩 Спина по паттернам:')),
+    `${label}: строка спины`,
+  ).toBe(`🧩 Спина по паттернам: ${patternSummaryOf(['back'])}`);
+  expect(
+    rationale.find(line => line.startsWith('💪 Руки по паттернам:')),
+    `${label}: строка рук`,
+  ).toBe(`💪 Руки по паттернам: ${patternSummaryOf(['biceps', 'triceps', 'forearms'])}`);
+  expect(
+    rationale.filter(line => line.startsWith('⚠ Качество спины:')),
+    `${label}: качество спины`,
+  ).toEqual(backQualityIssues(plan.weeks).map((i: string) => `⚠ Качество спины: ${i}`));
+  expect(
+    rationale.filter(line => line.startsWith('⚠ Качество рук:')),
+    `${label}: качество рук`,
+  ).toEqual(armQualityIssues(plan.weeks).map((i: string) => `⚠ Качество рук: ${i}`));
 
   const warningSet = new Set(
     ((plan.validation?.issues || []) as any[])

@@ -37,7 +37,7 @@ import { refreshBBPlanSnapshots } from './bb-plan-snapshot.engine';
 import { buildExerciseInstructions } from './bb-exercise-instructions.engine';
 import { applyTaperToFinalWeeks, isDeloadLikeWeek } from './bb-autocoach.engine';
 import { analyzePlanStress } from './bb-injury-prevention.engine';
-import { annotateBackExercise, backQualityIssues, verticalPullProfile, classifyLegExercise, annotateArmExercise, armQualityIssues, classifyArmExercise, classifyBackExercise } from './bb-back-quality.engine';
+import { annotateBackExercise, verticalPullProfile, classifyLegExercise, annotateArmExercise, classifyArmExercise, classifyBackExercise } from './bb-back-quality.engine';
 import { WEAK_TO_MUSCLE, isBBJunk } from './bb-builder.engine';
 // G1-рампа: кап недельного потолка «Вход в мезоцикл» переустанавливается на
 // revalidate (см. финал finalizeBBPlan). Импорт из билдера — функция уровня
@@ -5740,22 +5740,9 @@ for (const week of next.weeks) {
       }
     }
   }
-  const backQuality = next.weeks.flatMap(w => w.sessions).flatMap(s => s.exercises.filter(e => e.muscle === 'back')).reduce((acc, e) => {
-    const pattern = e.movementPattern || 'other';
-    acc[pattern] = (acc[pattern] || 0) + e.sets;
-    return acc;
-  }, {} as Record<string, number>);
-  next.rationale.push(`🧩 Спина по паттернам: ${Object.entries(backQuality).map(([k, v]) => `${k}=${v}`).join(', ') || 'нет прямой работы'}`);
-  next.rationale.push(...backQualityIssues(next.weeks).map(issue => `⚠ Качество спины: ${issue}`));
-  // Руки по головкам (Этап 2/4): длинная/короткая/brachialis, overhead/pushdown.
-  const armQuality = next.weeks.flatMap(w => w.sessions).flatMap(s => s.exercises.filter(e => ['biceps', 'triceps', 'forearms'].includes(e.muscle))).reduce((acc, e) => {
-    const pattern = e.movementPattern || 'other';
-    acc[pattern] = (acc[pattern] || 0) + e.sets;
-    return acc;
-  }, {} as Record<string, number>);
-  const armSummary = Object.entries(armQuality).map(([k, v]) => `${k}=${v}`).join(', ') || 'нет прямой работы';
-  next.rationale.push(`💪 Руки по паттернам: ${armSummary}`);
-  next.rationale.push(...armQualityIssues(next.weeks).map(issue => `⚠ Качество рук: ${issue}`));
+  // Паттерны/качество спины и рук считаются в ЕДИНОЙ точке снимков
+  // (`refreshBBPlanSnapshots`) — здесь они были бы до поздних замен/удалений
+  // (гарантия головок, гейт уровней, реализм сессии) и врали бы в rationale.
   // Суставной стресс (объём × вес × RIR-проксимити + PED-интенсификация):
   // предупреждения по суставам попадают в rationale плана.
   const jointIssues = analyzePlanStress(next).issues;

@@ -34,6 +34,7 @@ import { estimateBBSessionCost } from './bb-fatigue.engine';
 import { buildBBPlanReport } from './bb-report.engine';
 import { buildBBExpandedSummary } from './bb-summary.engine';
 import { analyzeBBRotation } from './bb-rotation.engine';
+import { backQualityIssues, armQualityIssues } from './bb-back-quality.engine';
 import {
   applyFrequencyDriftNote,
   frequencyDriftNote,
@@ -57,6 +58,25 @@ export interface BBPlanSnapshotOptions {
 
 const VALIDATION_LINE_PREFIX = '⚠ Валидация:';
 const ROTATION_LINE_PREFIX = '⚠ Ротация:';
+const BACK_SUMMARY_PREFIX = '🧩 Спина по паттернам:';
+const ARM_SUMMARY_PREFIX = '💪 Руки по паттернам:';
+const BACK_ISSUE_PREFIX = '⚠ Качество спины:';
+const ARM_ISSUE_PREFIX = '⚠ Качество рук:';
+
+/** Сумма сетов по movement-паттернам для выбранных мышц (как в финализаторе). */
+function patternSummary(weeks: any[], muscles: string[]): string {
+  const acc: Record<string, number> = {};
+  for (const week of weeks) {
+    for (const session of week.sessions || []) {
+      for (const exercise of session.exercises || []) {
+        if (!muscles.includes(exercise.muscle)) continue;
+        const pattern = exercise.movementPattern || 'other';
+        acc[pattern] = (acc[pattern] || 0) + (exercise.sets || 0);
+      }
+    }
+  }
+  return Object.entries(acc).map(([key, value]) => `${key}=${value}`).join(', ') || 'нет прямой работы';
+}
 /** Коды, которые на промежуточной стадии ожидаемы и снимаются финализатором. */
 const TRANSIENT_VALIDATION_CODES = new Set(['target_volume_deficit', 'effective_mrv_overflow']);
 
@@ -105,6 +125,27 @@ export function refreshBBPlanSnapshots(plan: any, opts: BBPlanSnapshotOptions = 
     plan.rationale = (Array.isArray(plan.rationale) ? plan.rationale : [])
       .filter((line: string) => !String(line).startsWith(ROTATION_LINE_PREFIX))
       .concat(lines);
+  }
+
+  // Паттерны спины/рук и их качество — тоже факт состава: финализатор считал
+  // их до поздних замен/удалений (гарантия головок рук, гейт уровней, реализм
+  // сессии, пост-финальный MRV-трим цикл/программа-путей). Замер: строка спины
+  // расходилась в 14/17 планов, рук — в 9/17, «Качество рук» держало до 14
+  // снятых предупреждений.
+  {
+    const rationale = (Array.isArray(plan.rationale) ? plan.rationale : [])
+      .filter((line: string) => {
+        const text = String(line);
+        return !text.startsWith(BACK_SUMMARY_PREFIX)
+          && !text.startsWith(ARM_SUMMARY_PREFIX)
+          && !text.startsWith(BACK_ISSUE_PREFIX)
+          && !text.startsWith(ARM_ISSUE_PREFIX);
+      });
+    rationale.push(`${BACK_SUMMARY_PREFIX} ${patternSummary(plan.weeks, ['back'])}`);
+    for (const issue of backQualityIssues(plan.weeks)) rationale.push(`${BACK_ISSUE_PREFIX} ${issue}`);
+    rationale.push(`${ARM_SUMMARY_PREFIX} ${patternSummary(plan.weeks, ['biceps', 'triceps', 'forearms'])}`);
+    for (const issue of armQualityIssues(plan.weeks)) rationale.push(`${ARM_ISSUE_PREFIX} ${issue}`);
+    plan.rationale = rationale;
   }
 
   if (opts.refreshFrequency && opts.canonicalMuscle) {
