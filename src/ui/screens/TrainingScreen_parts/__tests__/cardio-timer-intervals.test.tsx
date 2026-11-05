@@ -21,7 +21,7 @@ const pad = (n: number) => String(n).padStart(2, '0');
 const todayIso = () => { const d = new Date(); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; };
 
 /** Цикл, у которого сегодняшняя сессия несёт структуру 2×(1 мин / 30 с). */
-function cycleWithIntervals(): CardioCycle {
+function cycleWithIntervals(durationMin = 20): CardioCycle {
   const base = buildCardioCycle({ goal: 'health', totalWeeks: 4, id: 'iv-timer' });
   const dow = (new Date().getDay() + 6) % 7;
   const template = base.weeks[0].sessions[0];
@@ -31,7 +31,7 @@ function cycleWithIntervals(): CardioCycle {
     weeks: base.weeks.map((w, i) => i === 0 ? {
       ...w,
       sessions: [{
-        ...template, type: 'hiit', durationMin: 20, dayOfWeek: dow, weeklyFrequency: 1,
+        ...template, type: 'hiit', durationMin, dayOfWeek: dow, weeklyFrequency: 1,
         structured: [{ workSec: 60, restSec: 30, reps: 2 }],
       }],
     } : w),
@@ -83,6 +83,14 @@ describe('CardioSessionTimer: интервальный режим', () => {
     expect(log[0].workSec).toBe(60);
     expect(log[0].restSec).toBe(30);
     expect(log[0].notes).toContain('интервалы: 1 из 2');
+  });
+
+  it('структура короче сессии — честно пишет «по структуре 43 из 60 мин»', () => {
+    render(<CardioSessionTimer cycle={cycleWithIntervals(60)} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Старт HIIT' }));
+    fireEvent.click(screen.getByRole('button', { name: /завершить/i }));
+    // 2×(1/0.5) = 3 мин работы, разминка/заминка по 20 мин → 43 мин таймлайна.
+    expect(screen.getByText(/по структуре 43 из 60 мин/)).toBeTruthy();
   });
 
   it('без structure — один отсчёт, без кнопки «Дальше» и без выдуманных подходов', () => {

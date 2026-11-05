@@ -43,9 +43,18 @@ function fmt(sec: number): string {
   const s = sec % 60;
   return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
 }
+/** Один общий AudioContext: в интервальном режиме сигналов много (смена шага),
+ *  а создание контекста на каждый бип — лишняя работа и лимит WebView. */
+let beepCtx: AudioContext | null = null;
 function beep(freq = 880, ms = 180) {
   try {
-    const ctx = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
+    if (!beepCtx) {
+      const Ctor = window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+      if (!Ctor) return;
+      beepCtx = new Ctor();
+    }
+    const ctx = beepCtx;
+    if (ctx.state === 'suspended') void ctx.resume();
     const o = ctx.createOscillator();
     const g = ctx.createGain();
     o.type = 'sine';
@@ -54,7 +63,7 @@ function beep(freq = 880, ms = 180) {
     g.connect(ctx.destination);
     g.gain.setValueAtTime(0.18, ctx.currentTime);
     o.start();
-    window.setTimeout(() => { try { o.stop(); ctx.close(); } catch { /* ignore */ } }, ms);
+    o.stop(ctx.currentTime + ms / 1000);
   } catch { /* ignore */ }
 }
 function vibrate(pattern: number | number[]) {
@@ -89,6 +98,8 @@ interface FinishedSession {
   restSec?: number;
   /** Длительность по структуре (может быть меньше durationMin, если структура короче). */
   structureMin?: number;
+  /** Длительность сессии по плану (для честного «по структуре 55 из 65 мин»). */
+  sessionMin?: number;
 }
 
 interface TodaySession {
@@ -199,6 +210,7 @@ const [power, setPower] = useState('');
         workSec: active.plan?.workSec,
         restSec: active.plan?.restSec,
         structureMin: active.plan ? structureMin : undefined,
+        sessionMin: active.plan ? active.durationMin : undefined,
       });
       setActive(null);
     };
@@ -297,6 +309,7 @@ const [power, setPower] = useState('');
       workSec: active.plan?.workSec,
       restSec: active.plan?.restSec,
       structureMin: active.plan ? plannedMin : undefined,
+      sessionMin: active.plan ? active.durationMin : undefined,
     });
     setActive(null);
   };
@@ -513,6 +526,11 @@ const [power, setPower] = useState('');
             <div data-cardio="intervals-result" style={{ fontSize: 10.5, color: finished.intervalsDone === finished.intervalsPlanned ? '#4ade80' : '#fbbf24', lineHeight: 1.45 }}>
               🔁 Интервалы: {finished.intervalsDone ?? 0} из {finished.intervalsPlanned} подходов
               {finished.workSec ? ` · ${fmt(finished.workSec)} работа` : ''}{finished.restSec ? ` / ${fmt(finished.restSec)} отдых` : ''}
+              {/* Структура короче плана — говорим прямо, а не молчим: остаток
+                  сессии идёт лёгким добеганием, и это видно атлету. */}
+              {finished.sessionMin && finished.structureMin && finished.sessionMin > finished.structureMin
+                ? ` · по структуре ${finished.structureMin} из ${finished.sessionMin} мин`
+                : ''}
             </div>
           )}
           {/* Дисциплина: без неё запись ляжет в <другое> и не попадёт в разбивку TID. */}
