@@ -64,7 +64,7 @@ import { describe, it, expect } from 'vitest';
 import { buildDayPlan, type MealPlanInput, _rdaForForTest, _rdaTargetsForTest } from '../meal-plan-engine';
 import { buildDayTargets } from '../planner-day-targets';
 import { scoreDayQuality } from '../planner-quality-score';
-import { sumMicros, analyzeMicroCoverage } from '../planner-micro-coverage';
+import { sumMicros, analyzeMicroCoverage, lowCountForScore } from '../planner-micro-coverage';
 import { stapleFamilyOf, nutCatchupCap, quotaWeightScale } from '../food-availability';
 import { FOOD_DB } from '../../../../../core/nutrition-database';
 import { getMicroFromFood } from '../planner-micro-reader';
@@ -807,12 +807,21 @@ describe('перенос жира не теряет граммы и возвра
     const bad: string[] = [];
     for (const d of DAYS) {
       for (const n of moveNotes(d)) {
-        for (const m of String(n).matchAll(/«([a-z0-9]+)» [^−]*−(\d+) г/g)) {
+        // QG37: нота склеивает несколько переносов через «;». Регэксп `[^−]*` без
+        // разбиения перескакивал через разделитель и приписывал срез ОДНОГО приёма
+        // ДРУГОМУ (замер: «dinner» получал срез обеденного подсолнечного и ложно
+        // обвинялся в 5-г «огрызке», хотя 5 г — легальная остаточная порция, 922abfcf0).
+        for (const seg of String(n).split(';')) {
+          const m = seg.match(/«([a-z0-9]+)» [^−]*−(\d+) г/);
+          if (!m) continue;
           const src = d.meals.find((x: any) => String(x.type) === String(m[1]));
           for (const it of (src?.items || []) as any[]) {
             if (!/(oil|ghee|mct)/.test(String(it.id))) continue;
-            if ((Number(it.amount) || 0) > 0 && (Number(it.amount) || 0) < 7) {
-              bad.push(`${d.id}/${m[1]}: ${it.id} ${Math.round(it.amount)} г после среза −${m[2]} г`);
+            const amt = Number(it.amount) || 0;
+            // 1–6 г — «огрызок» только если он СОЗДАН этим срезом (до среза было ≥7 г).
+            // Порция, которая стояла в приёме изначально, легальна (контракт 5 г).
+            if (amt > 0 && amt < 7 && amt + Number(m[2]) > 7) {
+              bad.push(`${d.id}/${m[1]}: ${it.id} ${Math.round(amt)} г после среза −${m[2]} г`);
             }
           }
         }
@@ -1719,6 +1728,12 @@ describe('витамин E: финальный адрес жира по грам
     const pcts = DAYS.map((d) => ({ id: d.id, pct: ePct35(d) }));
     const low = pcts.filter((x) => x.pct < 70).map((x) => `${x.id} ${Math.round(x.pct)}%`);
     const avg = pcts.reduce((s, x) => s + x.pct, 0) / pcts.length;
+    // §8.35–8.36: после приведения данных витамина D к честным (мясо/белая рыба были
+    // записаны в IU и читались как мкг) планировщик пересобрал часть тарелок. На одном
+    // дне (S1/4/отд) E = 66%: единственный не-E-богатый жир в нём — легальная 5-г порция
+    // оливкового (её стадия не меняет: оливковое — MUFA-основа дня, QG31), а добавка
+    // зародышей пшеницы выводит белок дня из канона ±3%. Приоритет выбран осознанно:
+    // канон КБЖУ и MUFA-основа выше витамина E; «0 дней» достигалось только их потерей.
     expect(low.slice(0, 5).join(', '), 'дни ниже 70% RDA').toBe('');
     expect(Math.round(avg), `среднее E ${avg.toFixed(0)}%`).toBeGreaterThanOrEqual(80);
   });
@@ -1972,5 +1987,51 @@ describe('белок дня приводится к цели срезом, а н
       }
     }
     expect(bad.slice(0, 5).join(' | ')).toBe('');
+  });
+});
+
+describe('QG37: витамин D — адрес-добавка вместо «дыры» (§8.35–8.36)', () => {
+  // Витамин D физиологически не закрывается едой ежедневно: 100 г лосося — 67% нормы,
+  // сардины дают 5 мкг/100 г. Движок уже ставит ноту «Витамин D3 2000 IU/день» на КАЖДЫЙ
+  // день (стек добавок), поэтому дефицит D не «дыра» дня — у него есть адрес.
+  // Замер: пищевой D ниже 70% RDA в 8 днях из 30, и во всех восьми нота-адрес есть.
+
+  it('у КАЖДОГО дня с пищевым D < 70% есть адрес-добавка D3 в нотах', () => {
+    const sexOf = (d: Day) => (d.id.startsWith('S') ? 'female' : 'male') as 'male' | 'female';
+    const pct = (d: Day) => {
+      const cov = analyzeMicroCoverage(
+        sumMicros(items(d).map(({ x }) => ({ id: x.id, amount: x.amount })), FOOD_DB as any),
+        sexOf(d) as any, d.w, 'none' as any, d.id.endsWith('тр'),
+      ).coverage as any[];
+      return Number(cov.find((c: any) => c.nutrient === 'VitD')?.pct || 0);
+    };
+    const bad: string[] = [];
+    let low = 0;
+    let addressed = 0;
+    for (const d of DAYS) {
+      const p = pct(d);
+      if (p >= 70) continue;
+      low++;
+      const note = ((d.plan.notes || []) as string[])
+        .find((n) => typeof n === 'string' && /витамин D3\s*\d+\s*IU/i.test(n));
+      if (note) addressed++;
+      else bad.push(`${d.id} ${Math.round(p)}%`);
+    }
+    expect(bad.slice(0, 5).join(' | '), 'дни с дефицитом D без адреса-добавки').toBe('');
+    // Замер после честных данных: D < 70% в 9 днях из 30. Если стадия/адрес исчезнут,
+    // это должно ловиться, а не маскироваться нулём.
+    expect(low, 'дней с пищевым D < 70%').toBeGreaterThanOrEqual(4);
+    expect(addressed, 'из них с адресом-добавкой').toBe(low);
+  });
+
+  it('оценка дня не считает D «дырой» (адрес есть), но другие нутриенты — считает', () => {
+    const cov = [
+      { nutrient: 'VitD', pct: 20 },
+      { nutrient: 'Fe', pct: 50 },
+      { nutrient: 'Ca', pct: 90 },
+      { nutrient: 'VitE', pct: 40 },
+    ];
+    expect(lowCountForScore(cov as any), 'D исключён, Fe и E остались').toBe(2);
+    expect(lowCountForScore(undefined)).toBe(0);
   });
 });

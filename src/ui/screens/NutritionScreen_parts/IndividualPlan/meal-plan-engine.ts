@@ -25,7 +25,7 @@
 
 import { FOOD_DB, FOOD_ALLERGEN_DIET } from "../../../../core/nutrition-database";
 import { filterByIntolerance, matchesCategoryPref, isPreferredCategory, tasteMatchScore, type CategoryPref, type Intolerances, type TasteProfile } from "./planner-preferences";
-import { analyzeMicroCoverage, sumMicros, RDA_BASE, getMicroTargets, type MicroCoverageEntry } from "./planner-micro-coverage";
+import { analyzeMicroCoverage, sumMicros, RDA_BASE, getMicroTargets, lowCountForScore, type MicroCoverageEntry } from "./planner-micro-coverage";
 import { scoreDayQuality, describeQualityWeakness, MIN_MEANINGFUL_G } from "./planner-quality-score";
 import { getMicroFromFood } from "./planner-micro-reader";
 import { detectMealInteractions, cookMethodGuidance } from "./planner-food-interactions";
@@ -14496,7 +14496,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     // белок ядра, размер порций, разнообразие, микро.
     const _qCov = (_finalMicro as any)?.coverage as MicroCoverageEntry[] | undefined;
     const _qTotalN = Array.isArray(_qCov) ? _qCov.length : 0;
-    const _qLowN = Array.isArray(_qCov) ? _qCov.filter((c) => (c.pct || 0) < 70).length : 0;
+    const _qLowN = Array.isArray(_qCov) ? lowCountForScore(_qCov as any) : 0;
     const planQuality = scoreDayQuality(meals as any[], {
       weightKg: Number(input.weightKg) || 0,
       microCoverage: _qTotalN > 0 ? { lowCount: _qLowN, total: _qTotalN } : undefined,
@@ -14581,6 +14581,53 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
       if (_fresh21.length > 0) {
         if (_firstIdx21 >= 0) notes.splice(Math.min(_firstIdx21, notes.length), 0, ..._fresh21);
         else notes.push(..._fresh21);
+      }
+    }
+    // ─── QG37: числа в СТАДИЙНЫХ нотах = финальная тарелка (страховка) ──────
+    // Ноты «🌻 Витамин E: … X мг», «🧈 Жир по приёмам: … максимум N%», «🐟 Кальций…»,
+    // «🐠 Витамин D…» печатают стадии, а ПОСЛЕ них работают QG34/QG35/срезы/переносы.
+    // В замере QG37 (честные данные D, §8.36) это дало две врущие строки из 30 дней
+    // (`M1/6/о` нота «33%» при факте 29%, `S1/5/о` нота «E 17 мг» при факте 19.1 мг).
+    // Данные D отложены до QG38, но страховка остаётся: числа в этих нотах сверяются
+    // с фактическими totals в самом конце — текст не меняется, меняются только числа.
+    {
+      const _tg37 = new Map<string, number>(
+        getMicroTargets((input.sex === 'female' ? 'female' : 'male') as any, input.weightKg, input.cyclePhase as any, !!input.isTrainingDay)
+          .map((t) => [t.nutrient, t.target] as [string, number]),
+      );
+      const _r1 = (v: number) => Math.round(v * 10) / 10;
+      const _pct = (v: number, goal: number) => Math.round((v / Math.max(1, goal)) * 100);
+      const _eMg37 = Number((_finalMicroTotals as any)?.['VitE'] || 0);
+      const _eGoal37 = Number(_tg37.get('VitE') || 15);
+      const _ca37 = Number((_finalMicroTotals as any)?.['Ca'] || 0);
+      const _caGoal37 = Number(_tg37.get('Ca') || 1000);
+      const _d37 = Number((_finalMicroTotals as any)?.['VitD'] || 0);
+      const _dGoal37 = Number(_tg37.get('VitD') || 15);
+      const _o337 = Number((_finalMicroTotals as any)?.['Omega3'] || 0);
+      const _b1237 = Number((_finalMicroTotals as any)?.['VitB12'] || 0);
+      const _mains37 = (meals as any[]).filter((m) => ['breakfast', 'lunch', 'dinner'].includes(String(m.type)));
+      const _maxF37 = Math.max(0, ..._mains37.map((m) => Number(m.totals?.f) || 0));
+      const _share37 = Math.round((_maxF37 / Math.max(1, Number(totals.f) || 1)) * 100);
+      for (let i = 0; i < notes.length; i++) {
+        const s = notes[i];
+        if (typeof s !== 'string') continue;
+        let t = s;
+        if (t.includes('🌻 Витамин E:')) {
+          t = t.replace(/E [\d.,]+ мг из [\d.,]+ мг/, `E ${Math.round(_eMg37)} мг из ${Math.round(_eGoal37)} мг`);
+        }
+        if (t.includes('🧈 Жир по приёмам:')) {
+          t = t.replace(/максимум жира в основном приёме \d+%/, `максимум жира в основном приёме ${_share37}%`);
+        }
+        if (t.includes('🐟 Кальций:')) {
+          t = t.replace(/Ca [\d.,]+ мг \(\d+% цели\)/, `Ca ${Math.round(_ca37)} мг (${_pct(_ca37, _caGoal37)}% цели)`);
+          t = t.replace(/B12 [\d.,]+ мкг/, `B12 ${_r1(_b1237)} мкг`);
+          t = t.replace(/витамин D [\d.,]+ мкг/, `витамин D ${_r1(_d37)} мкг`);
+        }
+        if (t.includes('🐠 Витамин D:')) {
+          t = t.replace(/D [\d.,]+ → [\d.,]+ мкг \(\d+% цели\)/, `D ${_r1(_d37)} → ${_r1(_d37)} мкг (${_pct(_d37, _dGoal37)}% цели)`);
+          t = t.replace(/омега-3 [\d.,]+ мг/, `омега-3 ${Math.round(_o337)} мг`);
+        }
+        if (t !== s) notes[i] = t;
       }
     }
     return {
