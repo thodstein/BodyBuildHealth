@@ -48,4 +48,38 @@ describe('CardioDiarySlot', () => {
       vi.useRealTimers();
     }
   });
+
+  it('цикл закончился — слот говорит «завершён», а не «не запланировано»', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 0, 5, 12, 0, 0));
+    try {
+      const c = buildCardioCycleFromTemplateId('cardio-run-c25k-9', {})!;
+      // Сдвигаем старт на 200 дней назад: все недели цикла позади.
+      const old = { ...c, startDate: '2025-06-02' };
+      saveCardioCycle(old);
+      setActiveCardioCycle(old);
+      const { container } = render(<CardioDiarySlot />);
+      expect(container.textContent).toContain('завершён');
+      expect(container.textContent).toContain('соберите новый блок');
+      expect(container.textContent).not.toContain('не запланировано');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('цикл ещё не начался — «начнётся», а не пустой план', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 0, 5, 12, 0, 0));
+    try {
+      const c = buildCardioCycleFromTemplateId('cardio-run-c25k-9', {})!;
+      const future = { ...c, startDate: '2026-02-02' };
+      saveCardioCycle(future);
+      setActiveCardioCycle(future);
+      const { container } = render(<CardioDiarySlot />);
+      expect(container.textContent).toContain('начнётся 2026-02-02');
+      expect(container.textContent).not.toContain('не запланировано');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });

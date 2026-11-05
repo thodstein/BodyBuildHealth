@@ -41,10 +41,14 @@ export const CardioDiarySlot: React.FC = () => {
       const today = localToday();
       const day = cardioSessionsForDate(cycle, today, cycle.startDate);
       const week = cardioWeekForDate(cycle, today, cycle.startDate);
+      const start = cycle.startDate ? String(cycle.startDate) : '';
+      // Три разных состояния — три разных текста: план закончился («не
+      // запланировано» тут врало), план ещё не начался, план идёт.
+      const lifecycle: 'active' | 'finished' | 'upcoming' = start && today < start ? 'upcoming' : week ? 'active' : 'finished';
       const log = loadCardioLog().filter(e => e.date === today);
       const factMin = log.reduce((s, e) => s + (e.durationMin || 0), 0);
       const factKcal = log.reduce((s, e) => s + (e.calories || 0), 0);
-      return { cycle, day, week, log, factMin, factKcal };
+      return { cycle, day, week, log, factMin, factKcal, lifecycle, start };
     } catch { return null; }
   }, [revision]);
   if (!data) {
@@ -55,7 +59,7 @@ export const CardioDiarySlot: React.FC = () => {
       </div>
     );
   }
-  const { cycle, day, week, log, factMin, factKcal } = data;
+  const { cycle, day, week, log, factMin, factKcal, lifecycle, start } = data;
   // План дня — ровно те занятия, что попали на эту дату (раскладка уже
   // развернула weeklyFrequency в отдельные дни), без повторного ×frequency.
   const planMin = day ? day.sessions.reduce((s, x) => s + x.durationMin, 0) : 0;
@@ -64,8 +68,16 @@ export const CardioDiarySlot: React.FC = () => {
       <div style={ROW}>
         <span style={LABEL}>🏃 Кардио сегодня</span>
         {week && <Badge>{CARDIO_PHASE_LABELS[week.phase] ?? week.phase} · нед {week.week}</Badge>}
+        {lifecycle === 'finished' && <Badge>завершён</Badge>}
       </div>
-      {day && day.sessions.length > 0 ? (
+      {lifecycle === 'finished' ? (
+        <div style={{ fontSize: 12, color: '#fbbf24' }}>
+          🏁 Цикл «{cycle.name}» завершён ({cycle.totalWeeks} нед) — соберите новый блок в кардио-конструкторе.
+          {log.length > 0 ? ` Сегодня внепланово записано ${factMin} мин${factKcal > 0 ? ` · ${factKcal} ккал` : ''}.` : ''}
+        </div>
+      ) : lifecycle === 'upcoming' ? (
+        <div style={{ fontSize: 12, color: '#93c5fd' }}>▶ Цикл начнётся {start} — до старта плана на сегодня нет.</div>
+      ) : day && day.sessions.length > 0 ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
           {day.sessions.map((s, i) => (
             <div key={i} style={{ fontSize: 12, color: '#fff' }}>
@@ -77,7 +89,7 @@ export const CardioDiarySlot: React.FC = () => {
       ) : (
         <div style={{ fontSize: 12, color: '#fff' }}>На сегодня кардио не запланировано{log.length > 0 ? `, но записано ${factMin} мин — внеплановая активность.` : '.'}</div>
       )}
-      {log.length === 0 && <div style={HINT_SM}>Отметьте выполнение в дневнике кардио (шаг «Дневник» конструктора).</div>}
+      {lifecycle === 'active' && log.length === 0 && <div style={HINT_SM}>Отметьте выполнение в дневнике кардио (шаг «Дневник» конструктора).</div>}
       <div style={HINT_SM}>{cycle.name}</div>
     </div>
   );

@@ -1210,6 +1210,17 @@ const CardioConstructorInner: React.FC = () => {
 
   const todayCardio = useMemo(() => (cycle ? cardioSessionsForDate(cycle, todayIso(), cycle.startDate) : null), [cycle]);
 
+  // Жизненный цикл активного цикла: идёт / ещё не начался / завершён. Без этого
+  // «▶ Сегодня» просто исчезал после последней недели, и было непонятно: план
+  // закончился или на сегодня просто нет сессии.
+  const cycleLifecycle = useMemo(() => {
+    if (!cycle) return null;
+    const today = todayIso();
+    const start = cycle.startDate ? String(cycle.startDate) : '';
+    if (start && today < start) return { state: 'upcoming' as const, start };
+    return { state: cardioWeekForDate(cycle, today, cycle.startDate) ? 'active' as const : 'finished' as const, start };
+  }, [cycle]);
+
   const nextStartInfo = useMemo(() => {
     if (!cycle) return null;
     const w = cardioWeekForDate(cycle, todayIso(), cycle.startDate);
@@ -1315,10 +1326,22 @@ const CardioConstructorInner: React.FC = () => {
           </div>
         </div>
         {/* Второй ряд — статусы, компактно */}
-        {(autoModeOn || nextStartInfo || todayCardio || prepPlan || peakWeekInfo) && (
+        {(autoModeOn || nextStartInfo || todayCardio || prepPlan || peakWeekInfo || (cycleLifecycle && cycleLifecycle.state !== 'active')) && (
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
             {autoModeOn && (
               <span style={{ fontSize: 11, fontWeight: 700, color: '#a78bfa', background: 'rgba(139,92,246,0.13)', border: '1px solid rgba(139,92,246,0.30)', borderRadius: 20, padding: '4px 10px' }}>🔄 авто-режим</span>
+            )}
+            {cycleLifecycle?.state === 'finished' && (
+              <button
+                onClick={() => setStep('preview')}
+                title="План закончился. На шаге «План» нажмите «🔄 Пересобрать цикл» — новый блок начнётся с сегодня, старый останется в библиотеке."
+                style={{ fontSize: 11, fontWeight: 750, color: '#fbbf24', background: 'rgba(245,158,11,0.10)', border: '1px solid rgba(245,158,11,0.30)', borderRadius: 20, padding: '5px 12px', cursor: 'pointer', whiteSpace: 'nowrap' }}
+              >
+                🏁 цикл завершён — собрать новый
+              </button>
+            )}
+            {cycleLifecycle?.state === 'upcoming' && (
+              <span style={{ fontSize: 11, fontWeight: 700, color: '#93c5fd', background: 'rgba(59,130,246,0.12)', border: '1px solid rgba(59,130,246,0.28)', borderRadius: 20, padding: '4px 10px' }}>▶ старт {cycleLifecycle.start}</span>
             )}
             {nextStartInfo && nextStartInfo.left > 0 && (
               <span style={{ fontSize: 11, fontWeight: 700, color: '#fbbf24', background: 'rgba(245,158,11,0.10)', border: '1px solid rgba(245,158,11,0.28)', borderRadius: 20, padding: '4px 10px' }}>🏁 до старта {nextStartInfo.left} нед</span>

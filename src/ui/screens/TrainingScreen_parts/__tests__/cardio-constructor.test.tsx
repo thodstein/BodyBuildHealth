@@ -449,6 +449,8 @@ describe('CardioConstructor — пересборка не откатывает �
     localStorage.setItem(CYCLES_KEY, JSON.stringify([old]));
     localStorage.setItem(ACTIVE_KEY, JSON.stringify(old));
     render(<CardioConstructor />);
+    // Шапка честно показывает, что план закончился, и ведёт к пересборке.
+    expect(screen.getByRole('button', { name: /цикл завершён — собрать новый/ })).toBeTruthy();
     toPreview();
     fireEvent.click(screen.getByRole('button', { name: /Пересобрать цикл/ }));
     const all = loadCardioCycles();
