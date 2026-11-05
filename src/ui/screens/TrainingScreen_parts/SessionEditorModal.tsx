@@ -11,6 +11,7 @@ import { MindsetCheckinInline } from '../SRCBBScreen_parts/MindsetSessionPanels'
 import { MobilityCheckinInline } from '../SRCBBScreen_parts/MobilitySessionPanel';
 import { WarmupCheckinInline } from '../SRCBBScreen_parts/WarmupSessionPanel';
 import { CooldownCheckinInline } from '../SRCBBScreen_parts/CooldownSessionPanel';
+import { ruCount, RU_APPROACHES } from '../../../engines/ru-plural';
 
 interface Props {
   workout: WorkoutLog;
@@ -178,7 +179,7 @@ export const SessionEditorModal: React.FC<Props> = ({ workout, onClose, onSave }
         })}
 
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 10, color: '#fff', marginBottom: 10 }}>
-          <span>{log.exercises.length} упр. · {totalSets} подходов · {totalVolume.toLocaleString()} кг</span>
+          <span>{log.exercises.length} упр. · {ruCount(totalSets, RU_APPROACHES)} · {totalVolume.toLocaleString()} кг</span>
         </div>
 
         {/* Психо-чек-ин (опционально): уверенность/активация/фокус сессии */}

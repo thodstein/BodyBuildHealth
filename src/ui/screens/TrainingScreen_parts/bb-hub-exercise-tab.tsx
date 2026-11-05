@@ -13,6 +13,7 @@ import { EXERCISE_CATALOG } from '../../../core/exercise-catalog';
 import { BbCheckCard, BbSheetSelect } from './bb-hub-controls';
 import { ACCENT } from './training-ui';
 import type { BBState } from './BBDiagnosticsHub';
+import { ruCount, RU_SETS } from '../../../engines/ru-plural';
 
 /**
  * Честная подпись капа каталога: «Разбор» показывает первые N (шторка 80 / библиотека 40)
@@ -83,7 +84,7 @@ export const BbExerciseTab: React.FC<BbExerciseTabProps> = (props) => {
                   <span style={{ padding: '2px 8px', borderRadius: 20, background: planAudit.lengthenedRatio < 0.3 ? 'rgba(239,68,68,0.12)' : 'rgba(34,197,94,0.08)', border: '1px solid rgba(255,255,255,0.06)', color: planAudit.lengthenedRatio < 0.3 ? '#ef4444' : '#22c55e', fontWeight: 700 }}>растяж. {(planAudit.lengthenedRatio * 100).toFixed(0)}% {planAudit.lengthenedRatio < 0.3 ? '⚠ мало' : 'порядок'}</span>
                   <span style={{ padding: '2px 8px', borderRadius: 20, background: planAudit.unilateralRatio < 0.08 ? 'rgba(245,158,11,0.12)' : 'rgba(34,197,94,0.08)', border: '1px solid rgba(255,255,255,0.06)', color: planAudit.unilateralRatio < 0.08 ? '#f59e0b' : '#22c55e' }}>одност. {(planAudit.unilateralRatio * 100).toFixed(0)}% {planAudit.unilateralRatio < 0.08 ? '→ добавь' : 'порядок'}</span>
                   <span style={{ padding: '2px 8px', borderRadius: 20, background: planAudit.fatigueDensity > 1.35 ? 'rgba(239,68,68,0.12)' : 'rgba(34,197,94,0.08)', border: '1px solid rgba(255,255,255,0.06)', color: planAudit.fatigueDensity > 1.35 ? '#ef4444' : '#fff' }}>усталость {planAudit.fatigueDensity.toFixed(2)} {planAudit.fatigueDensity > 1.35 ? '⚠ высоко' : ''}</span>
-                  <span style={{ padding: '2px 8px', borderRadius: 20, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', color: '#fff' }}>{planAudit.totalExercises} упр · {planAudit.totalSets} сетов</span>
+                  <span style={{ padding: '2px 8px', borderRadius: 20, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', color: '#fff' }}>{planAudit.totalExercises} упр · {ruCount(planAudit.totalSets, RU_SETS)}</span>
                 </div>
                 {planAudit.flags.length > 0 && <div style={{ color: '#f59e0b', fontSize: 10 }}>Замечания: {planAudit.flags.map((f: any) => {
                   const base = String(f).split(':')[0];

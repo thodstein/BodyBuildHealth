@@ -56,6 +56,7 @@ import { PLToolsCard } from './SRCBBScreen_parts/PLToolsCard';
 import { buildPLPrintHtml, printPLHtml, buildPLExcelWorkbook, downloadPLExcel, plExportRows } from './SRCBBScreen_parts/pl-export';
 import { periodLabelRu, directionLabelRu } from '../../data/lms-cycles/period-labels';
 import { loadSessions } from '../../engines/workout-logger.engine';
+import { ruCount, RU_EXERCISES, RU_SETS, RU_WEEKS } from '../../engines/ru-plural';
 
 const getTempo = (exerciseName: string, goal: string, isMainLift: boolean): RepTempoOutput => {
   return generateRepTempo({
@@ -713,7 +714,7 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
       template: first.template,
       weeks: finalWeeks,
       cycleMetrics: calcCycleMetrics(sessions),
-      progressionRationale: `Макроцикл: ${outputs.length} СРЦ-блок(ов), ${weeks.length} недель. ` + outputs.map(({ block, output }) => `${block.phase} ${block.weekOffset}-${block.weekOffset + block.weeks - 1}: ${output.template.meta.title}`).join('; ') + (reusedWeeks > 0 ? ` ⚠ ${reusedWeeks} нед без собственного цикла (соревновательные блоки) — использована ближайшая тренировочная раскладка.` : '') + (taperRes.notes.length > 0 ? ' 🏁 ' + taperRes.notes.join(' ') : ''),
+      progressionRationale: `Макроцикл: ${outputs.length} СРЦ-блок(ов), ${ruCount(weeks.length, RU_WEEKS)}. ` + outputs.map(({ block, output }) => `${block.phase} ${block.weekOffset}-${block.weekOffset + block.weeks - 1}: ${output.template.meta.title}`).join('; ') + (reusedWeeks > 0 ? ` ⚠ ${reusedWeeks} нед без собственного цикла (соревновательные блоки) — использована ближайшая тренировочная раскладка.` : '') + (taperRes.notes.length > 0 ? ' 🏁 ' + taperRes.notes.join(' ') : ''),
     };
     // 🔋 Делод по кнопке — и на макроцикловом пути (недели могут не совпасть:
     // pickDeloadWeeks сам честно пропустит отсутствующие/защищённые).
@@ -1620,7 +1621,7 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
             return (
               <>
                 <div style={{ fontSize: 11, color: '#fff', marginBottom: 6 }}>
-                  Цикл использует {exs.length} упражнений. Укажите ПМ для каждого:
+                  Цикл использует {ruCount(exs.length, RU_EXERCISES)}. Укажите ПМ для каждого:
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: 6, boxSizing: 'border-box' }}>
                   {exs.map(e => {
@@ -1866,7 +1867,7 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
                     const intensity = w.tonnage / maxT;
                     const bg = intensity > 0.85 ? '#ef4444' : intensity > 0.6 ? '#f59e0b' : intensity > 0.35 ? '#eab308' : intensity > 0.15 ? '#22c55e' : '#14532d';
                     return (
-                      <div key={w.week} title={`Неделя ${w.week}: ${w.sets} сетов · ${Math.round(w.tonnage).toLocaleString('ru-RU')} кг`} style={{ textAlign: 'center', padding: '6px 2px', borderRadius: 6, background: bg, color: intensity > 0.6 ? '#000' : '#fff', fontSize: 10, fontWeight: 800, cursor: 'default' }}>{w.week}</div>
+                      <div key={w.week} title={`Неделя ${w.week}: ${ruCount(w.sets, RU_SETS)} · ${Math.round(w.tonnage).toLocaleString('ru-RU')} кг`} style={{ textAlign: 'center', padding: '6px 2px', borderRadius: 6, background: bg, color: intensity > 0.6 ? '#000' : '#fff', fontSize: 10, fontWeight: 800, cursor: 'default' }}>{w.week}</div>
                     );
                   })}
                 </div>

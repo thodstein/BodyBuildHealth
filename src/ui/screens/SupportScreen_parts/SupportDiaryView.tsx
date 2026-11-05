@@ -5,6 +5,7 @@ import { getSubstanceName } from '../../../engines/stack-optimizer.engine';
 import { ComplaintsTab } from './ComplaintsTab';
 import { SupplementComplianceCard } from './SupplementComplianceCard';
 import { readDiaryMixes } from '../../../engines/training-plan-save.engine';
+import { ruCount, RU_DAYS } from '../../../engines/ru-plural';
 
 const DIARY_KEY = 'he_support_diary';
 
@@ -1654,7 +1655,7 @@ export const SupportDiaryView: React.FC<{ s: Record<string, any>; onOpenSolver?:
                </style></head><body>
                <h1>📋 Дневник приёма БАД</h1>
                <p>Период: ${escapeHtml(allEntries[0]?.date || '—')} — ${escapeHtml(allEntries[allEntries.length - 1]?.date || '—')}</p>
-               <p>Всего записей: ${allEntries.length} · Streak: ${streak} дней · Комплаентность 7д: ${weekCompliance}%</p>
+               <p>Всего записей: ${allEntries.length} · Streak: ${ruCount(streak, RU_DAYS)} · Комплаентность 7д: ${weekCompliance}%</p>
                ${allEntries.slice().reverse().map(e => {
                  const moodIcon = e.mood ? MOOD_OPTIONS.find(m => m.level === e.mood)?.icon || '' : '';
                  const effs = new Set<string>();

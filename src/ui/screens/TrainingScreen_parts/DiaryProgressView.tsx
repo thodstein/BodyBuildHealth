@@ -7,6 +7,7 @@ import { loadMeasurements } from '../../../engines/log-analytics-progression.eng
 import { Sparkline } from './Sparkline';
 import { ProgressChartsCard } from './diary-cards';
 import { useDiaryHub, type DiaryHubCtx } from './diary-hub-context';
+import { ruCount, RU_DAYS } from '../../../engines/ru-plural';
 
 export const DiaryProgressView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
   const {
@@ -202,7 +203,7 @@ export const DiaryProgressView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
             const dayLabels = ['Пн', '', 'Ср', '', 'Пт', '', 'Вс'];
             return (
               <div className="card pg-cal" style={{ padding: 10, marginTop: 8 }}>
-                <h4 style={{ margin: '0 0 6px', fontSize: 12 }}>🏆 Календарь PR ({prDays.size} дней за {weeks} нед)</h4>
+                <h4 style={{ margin: '0 0 6px', fontSize: 12 }}>🏆 Календарь PR ({ruCount(prDays.size, RU_DAYS)} за {weeks} нед)</h4>
                 <div style={{ display: 'flex', gap: 2 }}>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 1, marginRight: 2 }}>
                     {dayLabels.map((l, i) => <div key={i} style={{ height: 10, fontSize: 7, color: '#fff', display: 'flex', alignItems: 'center' }}>{l}</div>)}

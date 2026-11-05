@@ -43,6 +43,7 @@ import {
 } from '../../../engines/bb/bb-mev-calibration.engine';
 import type { TrainingProfile } from './training-profile';
 import type { SavedBBPlan } from './bb-plans-store';
+import { ruCount, RU_SETS } from '../../../engines/ru-plural';
 
 export interface BbParamsStepProps {
   planMode: PlanMode;
@@ -193,7 +194,7 @@ export const BbParamsStep: React.FC<BbParamsStepProps> = ({
   const isPrograms = planMode === 'programs';
   const isGeneric = planMode === 'generic_split';
   const limitText = (() => {
-    try { const l = sessionLimitsFor({ level: bbLevel, trainingYears: bbTrainingYears, onCourse: peds.length > 0 }); return `${l.maxWorkingSets} сетов / ${l.maxExercises} упр.`; }
+    try { const l = sessionLimitsFor({ level: bbLevel, trainingYears: bbTrainingYears, onCourse: peds.length > 0 }); return `${ruCount(l.maxWorkingSets, RU_SETS)} / ${l.maxExercises} упр.`; }
     catch { return '24/10'; }
   })();
   const aasEquiv = computeAASEquivDose(pedDoses);

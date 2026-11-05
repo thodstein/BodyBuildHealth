@@ -18,6 +18,7 @@ import { getWeightLog } from '../../../engines/profile-store';
 import { CARD, ROW, LABEL, HINT_SM, BTN, BTN_CTA, BTN_SMALL, INPUT, CHIP, CHIP_ACTIVE, Badge, TYPE_COLOR, EmptyState } from './CardioUI';
 import { saveTextFileApk, saveCsvApk, copyOrShareText, shareOutcomeLabel } from '../../../core/apk-share';
 import { loadCardioKcalContract, setCardioKcalInclude, publishCardioKcalContract, type CardioKcalContract } from '../../../engines/lms/cardio-nutrition-contract.engine';
+import { ruCount, RU_SESSIONS } from '../../../engines/ru-plural';
 
 const TYPES: CardioType[] = ['zone2', 'miss', 'hiit', 'recovery'];
 const TYPE_LABEL: Record<CardioType, string> = { zone2: 'Zone 2', hiit: 'HIIT', miss: 'MISS', recovery: 'Recovery' };
@@ -275,9 +276,9 @@ export const CardioDiaryPanel: React.FC<{ cycle: CardioCycle | null; acwr?: numb
         </div>
       )}
       <div style={{ fontSize: 11.5, color: '#fff', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 10, padding: '8px 11px', fontVariantNumeric: 'tabular-nums', lineHeight: 1.6 }}>
-        7д: {stats7.sessions} сессий · {stats7.minutes} мин{stats7.km > 0 ? ` · ${stats7.km} км` : ''}{stats7.avgPace ? ` · ${stats7.avgPace}` : ''}{stats7.kcal > 0 ? ` · ${stats7.kcal} ккал` : ''}{stats7.avgRpe != null ? ` · RPE ${stats7.avgRpe}` : ''}
+        7д: {ruCount(stats7.sessions, RU_SESSIONS)} · {stats7.minutes} мин{stats7.km > 0 ? ` · ${stats7.km} км` : ''}{stats7.avgPace ? ` · ${stats7.avgPace}` : ''}{stats7.kcal > 0 ? ` · ${stats7.kcal} ккал` : ''}{stats7.avgRpe != null ? ` · RPE ${stats7.avgRpe}` : ''}
         {stats7.avgHr != null ? ` · ЧСС ${stats7.avgHr}` : ''}
-        {' '}· 28д: {stats28.sessions} сессий · {stats28.minutes} мин{stats28.km > 0 ? ` · ${stats28.km} км` : ''}{stats28.avgPace ? ` · ${stats28.avgPace}` : ''}{stats28.kcal > 0 ? ` · ${stats28.kcal} ккал` : ''}
+        {' '}· 28д: {ruCount(stats28.sessions, RU_SESSIONS)} · {stats28.minutes} мин{stats28.km > 0 ? ` · ${stats28.km} км` : ''}{stats28.avgPace ? ` · ${stats28.avgPace}` : ''}{stats28.kcal > 0 ? ` · ${stats28.kcal} ккал` : ''}
       </div>
       {intervals14.sessions > 0 && (
         <div

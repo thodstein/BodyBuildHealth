@@ -29,6 +29,7 @@ import {
   drainWidgetQueue,
   type QueuedItem,
 } from '../../core/widget-bridge';
+import { ruCount, RU_APPROACHES } from '../../engines/ru-plural';
 
 export type WidgetNavTarget = 'training' | 'nutrition' | 'support' | 'home';
 
@@ -117,7 +118,7 @@ function collectTraining(): {
   const vol = last.totalVolume > 0 ? ` · ${(last.totalVolume / 1000).toFixed(1)} т` : '';
   return {
     title: last.focus || 'Тренировка',
-    subtitle: `${last.date} · ${last.totalSets} подходов${vol}`,
+    subtitle: `${last.date} · ${ruCount(last.totalSets, RU_APPROACHES)}${vol}`,
     meta: `на неделе ${week} · всего ${total}`,
     progress: 0,
     live: false,

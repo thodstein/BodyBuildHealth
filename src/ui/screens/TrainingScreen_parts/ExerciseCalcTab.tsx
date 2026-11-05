@@ -10,6 +10,7 @@ import { PopupSelect, PopupNumber, PopupText, ExpandableCard, MetricCard } from 
 import { useDataLink } from '../../../core/data-link';
 import { getTargetMuscleForExercise, getTargetMusclesByGroup } from '../../../data/target-muscle-db';
 import type { Exercise } from '../../../core/types';
+import { ruCount, RU_APPROACHES, RU_ENTRIES } from '../../../engines/ru-plural';
 
 const ACCENT = '#00e68a';
 const SMALL: React.CSSProperties = { color:'#fff', fontSize: 11, lineHeight: 1.4 };
@@ -557,11 +558,11 @@ export const ExerciseCalcTab: React.FC = () => {
     const pct = prescribedSets > 0 && mav > 0 ? Math.round(prescribedSets / mav * 100) : 0;
     let advice = '';
     let color = '#22c55e';
-    if (prescribedSets >= mrv + 2) { advice = `Объём ${prescribedSets} подходов > MRV (${mrv}). Высокий риск перетрена. Снизьте!`; color = '#ef4444'; }
-    else if (prescribedSets > mrv) { advice = `Объём ${prescribedSets} подходов на MRV (${mrv}). Рекомендуется не превышать.`; color = '#f59e0b'; }
-    else if (prescribedSets >= mav) { advice = `Объём ${prescribedSets} подходов: MEV ${mev} → MAV ${mav} ✓ Оптимальный диапазон.`; color = '#22c55e'; }
-    else if (prescribedSets >= mev) { advice = `Объём ${prescribedSets} подходов: MEV ${mev} достигнут, но ниже MAV (${mav}). Можно добавить.`; color = '#60a5fa'; }
-    else { advice = `Объём ${prescribedSets} подходов < MEV (${mev}). Добавьте до ${mev} подходов для роста.`; color = '#ef4444'; }
+    if (prescribedSets >= mrv + 2) { advice = `Объём ${ruCount(prescribedSets, RU_APPROACHES)} > MRV (${mrv}). Высокий риск перетрена. Снизьте!`; color = '#ef4444'; }
+    else if (prescribedSets > mrv) { advice = `Объём ${ruCount(prescribedSets, RU_APPROACHES)} на MRV (${mrv}). Рекомендуется не превышать.`; color = '#f59e0b'; }
+    else if (prescribedSets >= mav) { advice = `Объём ${ruCount(prescribedSets, RU_APPROACHES)}: MEV ${mev} → MAV ${mav} ✓ Оптимальный диапазон.`; color = '#22c55e'; }
+    else if (prescribedSets >= mev) { advice = `Объём ${ruCount(prescribedSets, RU_APPROACHES)}: MEV ${mev} достигнут, но ниже MAV (${mav}). Можно добавить.`; color = '#60a5fa'; }
+    else { advice = `Объём ${ruCount(prescribedSets, RU_APPROACHES)} < MEV (${mev}). Добавьте до ${mev} подходов для роста.`; color = '#ef4444'; }
     return { advice, color, mev, mav, mrv, prescribedSets, pct };
   }, [ex, presc, level]);
 
@@ -1565,7 +1566,7 @@ export const ExerciseCalcTab: React.FC = () => {
             <div style={{ marginTop: 14, padding: 12, background: 'rgba(34,197,94,0.06)', borderRadius: 8, border: '1px solid rgba(34,197,94,0.2)' }}>
               <div style={{ fontSize: 11, fontWeight: 700, color: '#22c55e', marginBottom: 6 }}>📈 Тренд 1ПМ — {ex?.name}</div>
               <div style={{ fontSize: 10, color: '#fff', marginBottom: 6 }}>
-                {oneRMHistory.length} записей · {oneRMHistory[0].date} → {oneRMHistory[oneRMHistory.length - 1].date}
+                {ruCount(oneRMHistory.length, RU_ENTRIES)} · {oneRMHistory[0].date} → {oneRMHistory[oneRMHistory.length - 1].date}
                 · {(() => { const d = oneRMHistory[oneRMHistory.length - 1].oneRM - oneRMHistory[0].oneRM; return `${d >= 0 ? '+' : ''}${d.toFixed(1)} кг`; })()}
               </div>
               {(() => {

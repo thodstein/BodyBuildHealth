@@ -71,6 +71,7 @@ import { ManualLibraryDrawer } from './ManualLibraryDrawer';
 import { MANUAL_STORAGE_KEYS } from '../../../engines/manual-constructor/manual-storage';
 
 import { GOAL_OPTS_BB as CENTRAL_GOAL_BB2, GOAL_OPTS_PL as CENTRAL_GOAL_PL2, GOAL_OPTS_HYBRID as CENTRAL_GOAL_HYBRID2, goalLabelOf as centralGoalLabelOf2 } from '../../../engines/goals';
+import { ruAdjCount, ruCount, RU_ADJ_TRAINING, RU_DAYS, RU_ENTRIES } from '../../../engines/ru-plural';
 export const GOAL_OPTS_BB = CENTRAL_GOAL_BB2;
 export const GOAL_OPTS_PL = CENTRAL_GOAL_PL2;
 export const GOAL_OPTS_HYBRID = CENTRAL_GOAL_HYBRID2;
@@ -1605,7 +1606,7 @@ return (
                 <ProPanelsGroup sections={[{ id: 'technique', title: '🦴 Техника и биомеханика', hint: 'Срывы, bar-path, блины, инфо об упражнениях', color: '#06b6d4', content: <><PlateAutoPanel program={program} dir={dir} /><ExerciseInfoPanel program={program} dir={dir} /><button className="propanels-more" onClick={() => setShowToolsAdv(v => !v)} style={{ ...BTN_GHOST, width: '100%', minHeight: 36, fontSize: 11, borderColor: showToolsAdv ? 'rgba(6,182,212,0.35)' : 'rgba(255,255,255,0.10)', color: showToolsAdv ? '#06b6d4' : DIM }}>{showToolsAdv ? '▲ Скрыть биомеханику' : '▼ Биомеханика: срывы / bar-path'}</button>{showToolsAdv && <><StickingPointPanel program={program} dir={dir} onChange={onChange} showToast={showToast} /><BiomechanicsPanel program={program} dir={dir} /></>}</> }, { id: 'tools', title: '🔧 Инструменты тренера', hint: 'Подбор сплита, замены упражнений, история ревизий', color: '#a78bfa', content: <><SplitConsultant program={program} dir={dir} onChange={onChange} showToast={showToast} labMrvMult={labAdjust.mrvMultiplier} /><SubstitutionPanel program={program} dir={dir} onChange={onChange} showToast={showToast} labMrvMult={labAdjust.mrvMultiplier} /><ProgramRevisionsDiff program={program} /></> }]} />
                 {revisions.length > 0 && (
                   <div style={{ ...CARD, padding: 10 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}><span style={{ fontSize: 11, fontWeight: 800, color: ACCENT }}>📜 История правок</span><span style={{ fontSize: 10, color: DIM }}>({revisions.length} записей)</span></div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}><span style={{ fontSize: 11, fontWeight: 800, color: ACCENT }}>📜 История правок</span><span style={{ fontSize: 10, color: DIM }}>({ruCount(revisions.length, RU_ENTRIES)})</span></div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 160, overflowY: 'auto' }}>
                       {revisions.slice().reverse().map((r, i) => {
                         const realIdx = revisions.length - 1 - i;
@@ -1655,7 +1656,7 @@ return (
                   if (v < program.meta.daysPerWeek && program.bb) {
                     const willDeleteContent = program.bb.weeks.some(w => w.sessions.slice(v).some(s => s.blocks.some(b => b.exerciseName && b.exerciseName.trim())));
                     if (willDeleteContent) {
-                      const ok = await confirm({ title: `Уменьшить до ${v} дн/нед?`, message: `Последние ${program.meta.daysPerWeek - v} тренировочных дней с упражнениями будут удалены во всех неделях. Продолжить?`, confirmLabel: 'Удалить', danger: true });
+                      const ok = await confirm({ title: `Уменьшить до ${v} дн/нед?`, message: `Последние ${ruAdjCount(program.meta.daysPerWeek - v, RU_ADJ_TRAINING, RU_DAYS)} с упражнениями будут удалены во всех неделях. Продолжить?`, confirmLabel: 'Удалить', danger: true });
                       if (!ok) { e.target.value = String(program.meta.daysPerWeek); return; }
                     }
                   }

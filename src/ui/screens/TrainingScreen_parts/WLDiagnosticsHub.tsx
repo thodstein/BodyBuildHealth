@@ -54,6 +54,7 @@ import { appendTAPullPower, taPullPowerTrend, loadTAPullPower, saveTAPullPower }
 import { ymaxNormForBodyweight } from '../../../engines/strength-sport/strength-sport-ta-norms.engine';
 import { printHtmlApk, shareOutcomeLabel, saveTextFileApk, saveCsvApk } from '../../../core/apk-share';
 import { localIsoDate } from '../../../core/local-date';
+import { ruCount, RU_SETS } from '../../../engines/ru-plural';
 
 const STORAGE_KEY = 'he_wl_diagnostics_hub_v1';
 
@@ -2250,7 +2251,7 @@ export const WLDiagnosticsHub: React.FC = () => {
                 const isWorst = planAudit.worstPhase === wp;
                 const short = ({ snatch_off_floor: 'рыв.отрыв', snatch_mid: 'рыв.серед', snatch_pull_under: 'рыв.уход', snatch_catch: 'рыв.сед', snatch_overhead: 'рыв.верх', clean_off_floor: 'вз.отрыв', clean_mid: 'вз.серед', clean_catch: 'вз.сед', jerk_dip: 'dip', jerk_drive: 'drive', jerk_lockout: 'замок' } as Record<string, string>)[wp] || wp;
                 return (
-                  <span key={wp} title={`${c.label}: ${c.sets} сетов`} style={{ fontSize: 10, padding: '4px 8px', borderRadius: 12, background: isWorst ? 'rgba(239,68,68,0.12)' : c.covered ? 'rgba(34,197,94,0.10)' : 'rgba(255,255,255,0.04)', border: `1px solid ${isWorst ? 'rgba(239,68,68,0.35)' : c.covered ? 'rgba(34,197,94,0.25)' : 'rgba(255,255,255,0.08)'}`, color: isWorst ? '#ef4444' : c.covered ? '#22c55e' : '#fff' }}>{short} {c.sets}</span>
+                  <span key={wp} title={`${c.label}: ${ruCount(c.sets, RU_SETS)}`} style={{ fontSize: 10, padding: '4px 8px', borderRadius: 12, background: isWorst ? 'rgba(239,68,68,0.12)' : c.covered ? 'rgba(34,197,94,0.10)' : 'rgba(255,255,255,0.04)', border: `1px solid ${isWorst ? 'rgba(239,68,68,0.35)' : c.covered ? 'rgba(34,197,94,0.25)' : 'rgba(255,255,255,0.08)'}`, color: isWorst ? '#ef4444' : c.covered ? '#22c55e' : '#fff' }}>{short} {c.sets}</span>
                 );
               })}
             </div>
@@ -2267,7 +2268,7 @@ export const WLDiagnosticsHub: React.FC = () => {
           )}
           {planAudit.hasPlan && planAudit.worstPhase && (
             <button data-wl="worst" onClick={selectWorstPhase} style={{ minHeight: 44, marginTop: 6, padding: '6px 12px', borderRadius: 8, background: 'rgba(59,130,246,0.14)', border: '1px solid #1f3a5f', color: '#60a5fa', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>
-              🎯 Худшая фаза: {WL_WEAKPOINT_LABELS[planAudit.worstPhase] || planAudit.worstPhase} ({planAudit.byPhase[planAudit.worstPhase].sets} сетов) → разобрать
+              🎯 Худшая фаза: {WL_WEAKPOINT_LABELS[planAudit.worstPhase] || planAudit.worstPhase} ({ruCount(planAudit.byPhase[planAudit.worstPhase].sets, RU_SETS)}) → разобрать
             </button>
           )}
         </div>

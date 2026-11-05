@@ -41,7 +41,7 @@ describe('Панель импорта: дисциплина и provenance дох
     await feed();
     // Кнопка «Импортировать всё» для нескольких сессий.
     const saveAll = Array.from(document.querySelectorAll('button'))
-      .find(b => /Импортировать \d+ записей/.test(b.textContent ?? ''));
+      .find(b => /Импортировать \d+ запис/.test(b.textContent ?? ''));
     expect(saveAll).toBeTruthy();
     fireEvent.click(saveAll!);
 
@@ -58,7 +58,7 @@ describe('Панель импорта: дисциплина и provenance дох
     render(<CardioImportPanel />);
     await feed();
     const saveAll = Array.from(document.querySelectorAll('button'))
-      .find(b => /Импортировать \d+ записей/.test(b.textContent ?? ''));
+      .find(b => /Импортировать \d+ запис/.test(b.textContent ?? ''));
     fireEvent.click(saveAll!);
     const writes = spy.mock.calls.filter(c => c[0] === 'he_cardio_sessions');
     expect(writes).toHaveLength(1);
@@ -72,7 +72,7 @@ describe('Панель импорта: дисциплина и provenance дох
     render(<CardioImportPanel />);
     await feed();
     const saveAll = Array.from(document.querySelectorAll('button'))
-      .find(b => /Импортировать \d+ записей/.test(b.textContent ?? ''));
+      .find(b => /Импортировать \d+ запис/.test(b.textContent ?? ''));
     fireEvent.click(saveAll!);
 
     const log = loadCardioLog();

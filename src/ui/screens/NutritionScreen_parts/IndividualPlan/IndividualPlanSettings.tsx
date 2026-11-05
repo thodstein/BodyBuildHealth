@@ -64,6 +64,7 @@ import { computeEnergyAvailability } from './planner-female-cycle';
 import { checkTargetsConsistency, PLANNER_CONVERGENCE_PCT } from './day-target-corrector';
 import { getRecipes, type Recipe } from '../../../../engines/nutrition-periodization.engine';
 import { CardioKcalNote } from './CardioKcalNote';
+import { ruAdjCount, RU_ADJ_TRAINING, RU_DAYS } from '../../../../engines/ru-plural';
 
 
 // P3.2: Collapsible section for compact settings
@@ -1157,7 +1158,7 @@ export const IndividualPlanSettings: React.FC = () => {
             <div style={{ fontSize: 9, color: '#22c55e', marginBottom: 6, padding: '5px 8px', borderRadius: 8, background: 'rgba(34,197,94,0.08)' }}>
               {trainScheduleType === 'eod' && '🔁 Через день (EOD): 3-4 тренировки в неделе'}
               {trainScheduleType === 'pattern' && `🔢 Цикл ${trainPattern.work}+${trainPattern.off}: ${trainPattern.work} тр / ${trainPattern.off} отдых`}
-              {trainScheduleType === 'weekly' && `📅 ${trainingDays.filter(Boolean).length} тренировочных дней: ${DAY_LABELS.filter((_, i) => trainingDays[i]).join(', ') || '—'}`}
+              {trainScheduleType === 'weekly' && `📅 ${ruAdjCount(trainingDays.filter(Boolean).length, RU_ADJ_TRAINING, RU_DAYS)}: ${DAY_LABELS.filter((_, i) => trainingDays[i]).join(', ') || '—'}`}
             </div>
             {/* Эпик 6: день тяжёлых ног/объёма — угли +25%, ккал +5% */}
             {trainScheduleType === 'weekly' && (

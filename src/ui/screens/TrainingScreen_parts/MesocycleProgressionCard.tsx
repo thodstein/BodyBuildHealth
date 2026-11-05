@@ -13,6 +13,7 @@ import { SOURCE_PHASE_LABEL, SOURCE_PHASE_ORIGIN_LABEL } from '../../../engines/
 export { SOURCE_PHASE_LABEL, SOURCE_PHASE_ORIGIN_LABEL, sourcePhaseForWeek, sourceWeekColor, summarizeSourceCycleWeeks } from '../../../engines/lms/source-phase.engine';
 export type { SourceWeekSnapshot } from '../../../engines/lms/source-phase.engine';
 import { applyToPlanner } from './planner-bridge';
+import { ruCount, RU_WEEKS } from '../../../engines/ru-plural';
 
 const ACCENT = '#00e68a';
 
@@ -84,7 +85,7 @@ export const MesocycleProgressionCard: React.FC<MesocycleProgressionCardProps> =
         {isSourceCalendar ? '📅' : '📈'} {title || 'Прогрессия мезоцикла'}
         <div style={{ marginLeft: 8, fontSize: 10, color: '#fff', fontWeight: 400, marginTop: 2 }}>
           {isSourceCalendar
-            ? `Источник: ${progression.length} недель, без типовой фазовой генерации`
+            ? `Источник: ${ruCount(progression.length, RU_WEEKS)}, без типовой фазовой генерации`
             : `Трек Мезо 1→2→3: ${interMeso.map((m, i) => `${m.mesoIndex}: ${m.startVolumeSets}с / ${Math.round(m.startIntensityPct * 100)}%`).join(' → ')}`}
         </div>
       </div>

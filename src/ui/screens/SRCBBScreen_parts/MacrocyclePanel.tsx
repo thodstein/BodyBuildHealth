@@ -51,6 +51,7 @@ import type { AnnualTrainingPlan, AnnualBlockConfig, AnnualBlockKind } from '../
 import { loadAnnualTrainingPlan, saveAnnualTrainingPlan } from '../../../engines/annual-training/annual-training-storage';
 import { ARM_CYCLE_LIBRARY } from '../../../engines/arm/arm-cycle-library.engine';
 import { annualBlockCycleSuggestion } from '../../../engines/arm/arm-annual';
+import { ruCount, RU_SESSIONS, RU_WEEKS } from '../../../engines/ru-plural';
 
 /** Единый канон недели для даты (P2-1): движок block-builders.engine, не дублируем. */
 export const macroWeekForDate = weekForDate;
@@ -1340,7 +1341,7 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
             <span>🎯 Направление</span><strong>{goalLabel}</strong><small>Изменить</small>
           </button>
           <button type="button" className="macrocycle-control-card" onClick={() => setActivePopup('duration')}>
-            <span>🗓 Горизонт</span><strong>{totalWeeks} недель</strong><small>Ввести значение</small>
+            <span>🗓 Горизонт</span><strong>{ruCount(totalWeeks, RU_WEEKS)}</strong><small>Ввести значение</small>
           </button>
           {isBB && <button type="button" className="macrocycle-control-card" onClick={() => setActivePopup('focus')}>
             <span>💪 Фокус ББ</span><strong>{focusLabel}</strong><small>Изменить</small>
@@ -2188,7 +2189,7 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
                 return (
                   <div style={{ marginTop: 6, padding: '6px 8px', borderRadius: 8, fontSize: 10, lineHeight: 1.5,
                     background: 'rgba(34,197,94,0.04)', border: '1px solid rgba(34,197,94,0.18)', color: '#fff' }}>
-                    📈 Дневник: {ds.sessions7} сессий (7д) · {ds.sessions28} (28д)
+                    📈 Дневник: {ruCount(ds.sessions7, RU_SESSIONS)} (7д) · {ds.sessions28} (28д)
                     {ds.acwr ? ` · ⚡ ACWR ${ds.acwr.ratio} — ${zone}` : ''}
                     {ds.lastSessionWeek != null && (
                       <button type="button" onClick={() => setCurrentWeekIdx(ds.lastSessionWeek!)}
@@ -2982,7 +2983,7 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
                   return (
                     <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 2, fontSize: 10, color: '#fff' }}>
                       <div>
-                        📈 Дневник: {d.sessions7} сессий (7д) · {d.sessions28} (28д){d.lastSessionDate ? ` · последняя ${d.lastSessionDate}` : ''}
+                        📈 Дневник: {ruCount(d.sessions7, RU_SESSIONS)} (7д) · {d.sessions28} (28д){d.lastSessionDate ? ` · последняя ${d.lastSessionDate}` : ''}
                       </div>
                       {d.acwr && (
                         <div style={{ color: zoneColor, fontWeight: 700 }}>

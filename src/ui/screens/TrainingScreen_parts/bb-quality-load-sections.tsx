@@ -25,6 +25,7 @@ import { VolumeByWeekChart, RirDriftChart, type WeekVolume, type RirRecord } fro
 import { MesocycleProgressionCard } from './MesocycleProgressionCard';
 import type { InjurySelectEntry } from './InjurySelectCard';
 import type { calcBBPlanMetrics } from '../../../engines/bb/bb-metrics.engine';
+import { ruCount, RU_SETS } from '../../../engines/ru-plural';
 
 /** Структурный срез quality-объекта конструктора (поля — как их читает train-load блок;
  *  «any» намеренно: форма внутри god-object, контекстная типизация картбека рекомендаций сохранена). */
@@ -158,7 +159,7 @@ export const BbQualityLoadOverview: React.FC<BbQualityLoadOverviewProps> = ({ ct
             </div>
           </div>
         </CollapsibleCard>
-        <CollapsibleCard title="📊 Общие сведения о нагрузке" defaultOpen={true} headerStyle={{ background: 'linear-gradient(135deg, rgba(0,230,138,0.12), rgba(0,230,138,0.04))', color: '#00e68a' }} badge={`${metrics.totalSets} сетов · тяж ${(metrics.тяжPct*100).toFixed(0)}% · памп ${(metrics.пампPct*100).toFixed(0)}%`}>
+        <CollapsibleCard title="📊 Общие сведения о нагрузке" defaultOpen={true} headerStyle={{ background: 'linear-gradient(135deg, rgba(0,230,138,0.12), rgba(0,230,138,0.04))', color: '#00e68a' }} badge={`${ruCount(metrics.totalSets, RU_SETS)} · тяж ${(metrics.тяжPct*100).toFixed(0)}% · памп ${(metrics.пампPct*100).toFixed(0)}%`}>
           <div style={{ display:'grid', gap:8, fontSize:11 }}>
             <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:6 }}>
               <div style={{ padding:'6px 8px', borderRadius:8, background:'rgba(255,255,255,0.04)', textAlign:'center' }}><div style={{ fontSize:9, color:'#fff', opacity:0.6 }}>Сетов пик</div><div style={{ fontSize:14, fontWeight:800, color:'#00e68a' }}>{metrics.totalSets}</div><div style={{ fontSize:9, color:'#fff', opacity:0.5 }}>средн. {Math.round(W.reduce((a,w)=>a+w.sessions.reduce((b,s)=>b+s.exercises.reduce((c,e)=>c+e.sets,0),0),0)/W.length)}/нед</div></div>
@@ -259,7 +260,7 @@ export const BbQualityLoadOverview: React.FC<BbQualityLoadOverviewProps> = ({ ct
                   const intW = W.filter((w:any) => ((w as any).phase || '') === 'intensification');
                   const avgRirFor = (ws: any[]) => { const exs = ws.flatMap((w:any) => w.sessions.flatMap((s:any) => s.exercises)); if (!exs.length) return '—'; return (exs.reduce((a:any,e:any) => a + (Number.isFinite(e.rir) ? e.rir : 2), 0) / exs.length).toFixed(1); };
                   return (<>
-                    <span style={{ fontSize:10, color:'#f59e0b' }}>📈 пик нед {peakW.wk} ({peakW.ts} сетов)</span>
+                    <span style={{ fontSize:10, color:'#f59e0b' }}>📈 пик нед {peakW.wk} ({ruCount(peakW.ts, RU_SETS)})</span>
                     <span style={{ fontSize:10, color: delW.length ? '#22c55e' : '#ef4444' }}>🔻 делод: {delW.length ? 'нед '+delW.join(',') : '⚠ не запланирована'}</span>
                     {accW.length ? <span style={{ fontSize:10, color:'#60a5fa' }}>⬆ накопл {accW.length} нед (RIR {avgRirFor(accW)})</span> : null}
                     {intW.length ? <span style={{ fontSize:10, color:'#ef4444' }}>⬇ интенсиф {intW.length} нед (RIR {avgRirFor(intW)})</span> : null}

@@ -9,6 +9,7 @@ import React from 'react';
 import { Highlight } from './CombatUI';
 import { ruLabel, PHASE_RU } from './CombatUI';
 import type { CombatPlan } from '../../../engines/combat/combat.types';
+import { ruCount, RU_SETS } from '../../../engines/ru-plural';
 
 const phaseColor = (w: any) => (w.deload ? '#f59e0b' : w.taper ? '#60a5fa' : '#a855f7');
 
@@ -40,7 +41,7 @@ export const CampStrip: React.FC<{
               data-active={active ? 'true' : 'false'}
               aria-current={active ? 'true' : undefined}
               onClick={() => onPickWeek(active ? null : i)}
-              aria-label={`Неделя ${w.week}, ${phase}, ${w.totalSets || 0} сетов`}
+              aria-label={`Неделя ${w.week}, ${phase}, ${ruCount(w.totalSets || 0, RU_SETS)}`}
               style={{
                 flex: '0 0 auto', scrollSnapAlign: 'start', minWidth: 62, minHeight: 44,
                 display: 'flex', flexDirection: 'column', gap: 3, alignItems: 'center',
@@ -66,7 +67,7 @@ export const CampStrip: React.FC<{
           <Highlight color="#f59e0b">🌡 Тепловая адаптация</Highlight>
           <span>
             пауза <Highlight>{heatSessions || '—'}</Highlight> из {plan.weeks} нед
-            {weeks.length > 1 && <> · нагрузка падает по неделям на {firstSets - lastSets} сетов</>}
+            {weeks.length > 1 && <> · нагрузка падает по неделям на {ruCount(firstSets - lastSets, RU_SETS)}</>}
           </span>
         </div>
       )}

@@ -53,6 +53,7 @@ interface ExerciseRecord {
  * единый источник для QuickEntry и DiaryRecordingForm.
  */
 import { getPreviousWorkoutData, getPersonalRecord, searchExerciseCatalog, seedForNewExercise } from './diary-shared';
+import { ruCount, RU_APPROACHES, RU_SETS } from '../../../engines/ru-plural';
 
 export const QuickEntry: React.FC<QuickEntryProps> = ({
   diary, historyWorkouts, selectedWeek, onSave,
@@ -349,7 +350,7 @@ export const QuickEntry: React.FC<QuickEntryProps> = ({
             <button onClick={redo} style={{ padding: '3px 8px', borderRadius: 5, border: '1px solid rgba(255,255,255,0.1)', background: 'transparent', color: '#fff', cursor: 'pointer', fontSize: 10 }}>↷</button>
           )}
           <div style={{ fontSize: 10, color: '#fff' }}>
-            {totalSets} сетов · {totalVolume.toLocaleString()} кг
+            {ruCount(totalSets, RU_SETS)} · {totalVolume.toLocaleString()} кг
           </div>
         </div>
       </div>
@@ -651,7 +652,7 @@ export const QuickEntry: React.FC<QuickEntryProps> = ({
             fontWeight: 700, fontSize: 14, minHeight: 48,
           }}
         >
-          {saved ? '✅ Сохранено!' : `💾 Сохранить (${totalSets} подходов)`}
+          {saved ? '✅ Сохранено!' : `💾 Сохранить (${ruCount(totalSets, RU_APPROACHES)})`}
         </button>
         {saveError && <div style={{ fontSize: 11, color: '#ef4444', textAlign: 'center', marginTop: 4 }}>{saveError}</div>}
         {/* Психо-чек-ин (опционально): уверенность/активация/фокус сессии */}

@@ -10,6 +10,7 @@ import type { UserProgram } from '../../../engines/user-program/user-program.typ
 import { GROUP_RU } from './program-types';
 import { getVolumeLandmarks } from '../../../engines/volume-landmarks.engine';
 import { CARD, DIM, DIM_STRONG, ACCENT } from './training-ui';
+import { ruCount, RU_SETS } from '../../../engines/ru-plural';
 
 const MUSCLES = ['chest', 'back', 'legs', 'shoulders', 'arms', 'core'] as const;
 
@@ -95,7 +96,7 @@ export const MesoHeatmap: React.FC<{ program: UserProgram; dir: string; onToast?
                         strokeWidth={isHover ? 1.5 : 0}
                         onMouseEnter={() => setHoverCell({ m, w: wi })}
                         onMouseLeave={() => setHoverCell(null)}
-                        onClick={() => onToast?.(`${GROUP_RU[m] ?? m}, нед ${wi + 1}: ${sets} сетов${lm ? ` (MRV ${lm.mrv})` : ''}`)}
+                        onClick={() => onToast?.(`${GROUP_RU[m] ?? m}, нед ${wi + 1}: ${ruCount(sets, RU_SETS)}${lm ? ` (MRV ${lm.mrv})` : ''}`)}
                         style={{ cursor: 'pointer' }}
                       />
                       <text
@@ -118,7 +119,7 @@ export const MesoHeatmap: React.FC<{ program: UserProgram; dir: string; onToast?
       </div>
       {hoverCell && (
         <div style={{ fontSize: 10, color: 'var(--text-light, #fff)', marginTop: 4, fontFamily: 'monospace' }}>
-          {GROUP_RU[hoverCell.m] ?? hoverCell.m} · нед {hoverCell.w + 1}: {grid[hoverCell.m]?.[hoverCell.w] ?? 0} сетов
+          {GROUP_RU[hoverCell.m] ?? hoverCell.m} · нед {hoverCell.w + 1}: {ruCount(grid[hoverCell.m]?.[hoverCell.w] ?? 0, RU_SETS)}
           {lmByMuscle[hoverCell.m] && ` (MRV ${lmByMuscle[hoverCell.m]!.mrv})`}
         </div>
       )}

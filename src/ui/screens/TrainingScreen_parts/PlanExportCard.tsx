@@ -15,6 +15,7 @@ import {
 import { averageWeeklyScores, gradeFor } from '../../../engines/bb/bb-quality-weekly.engine';
 import type { ManualResult, ManualDay } from './program-types';
 import { GROUP_RU, LEVELS, GOALS } from './program-types';
+import { ruCount, RU_SETS } from '../../../engines/ru-plural';
 
 const ACCENT = '#00e68a';
 const DIM = '#fff';
@@ -168,7 +169,7 @@ function generateExportText(
   for (const m of result.muscles.sort((a, b) => b.weeklySets - a.weeklySets)) {
     const statusIcon = m.status === 'exceeding_mrv' ? '🔴' : m.status === 'approaching_mrv' ? '🟡' : m.status === 'below_mev' ? '⚠' : '🟢';
     const weakMark = m.weakPoint ? ' ★' : '';
-    lines.push(`  ${statusIcon} ${GROUP_RU[m.muscle] || m.muscle}: ${m.weeklySets} сетов/нед (${m.pctOfMav}% MAV)${weakMark}`);
+    lines.push(`  ${statusIcon} ${GROUP_RU[m.muscle] || m.muscle}: ${ruCount(m.weeklySets, RU_SETS)}/нед (${m.pctOfMav}% MAV)${weakMark}`);
   }
   lines.push('');
   lines.push(`Толкай/Тянай: ${result.metadata.pushPullRatio}`);
@@ -349,7 +350,7 @@ export const PlanExportCard: React.FC<PlanExportCardProps> = ({
         {/* Quick stats */}
         <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
           <span style={{ fontSize: 10, color: DIM, padding: '2px 6px', borderRadius: 4, background: 'rgba(255,255,255,0.04)' }}>
-            {qualityResult.metadata.totalSets} сетов/нед
+            {ruCount(qualityResult.metadata.totalSets, RU_SETS)}/нед
           </span>
           <span style={{ fontSize: 10, color: DIM, padding: '2px 6px', borderRadius: 4, background: 'rgba(255,255,255,0.04)' }}>
             Т/Т: {qualityResult.metadata.pushPullRatio}

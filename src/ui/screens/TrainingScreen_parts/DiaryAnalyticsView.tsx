@@ -29,6 +29,7 @@ import { useDiaryHub, type DiaryHubCtx } from './diary-hub-context';
 import { localIsoDate, weekdayMon0 } from './diary-shared';
 import { PL_NORM_TABLES, classifyTotal, RANK_LABELS, getNormTable, type Discipline, type Sex } from '../../../engines/pl-norms.engine';
 import { getProfile } from '../../../core/profile-manager';
+import { ruCount, RU_APPROACHES, RU_MEASUREMENTS, RU_SESSIONS, RU_SETS, RU_TRAININGS, RU_WEEKS } from '../../../engines/ru-plural';
 
 export const DiaryAnalyticsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
   const {
@@ -211,7 +212,7 @@ export const DiaryAnalyticsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                   {barTooltip && (
                     <div style={{ position: 'fixed', left: barTooltip.x + 8, top: barTooltip.y - 30, background: '#18181b', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 6, padding: '4px 8px', fontSize: 10, color: '#fff', zIndex: 9999, pointerEvents: 'none', whiteSpace: 'nowrap' }}>
                       <span style={{ color: GROUP_COLORS[barTooltip.group] || '#888', fontWeight: 700 }}>{GRP_RU[barTooltip.group] || barTooltip.group}</span>
-                      <span style={{ marginLeft: 6, color:'#fff' }}>Н{barTooltip.week}: {barTooltip.sets} сетов</span>
+                      <span style={{ marginLeft: 6, color:'#fff' }}>Н{barTooltip.week}: {ruCount(barTooltip.sets, RU_SETS)}</span>
                     </div>
                   )}
                 </div>
@@ -550,7 +551,7 @@ export const DiaryAnalyticsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                       <span style={{ fontSize: 11, fontWeight: 700, color: '#60a5fa' }}>Рекомендация: разгрузочная неделя</span>
                     </div>
                     <div style={{ fontSize: 10, color:'#fff', lineHeight: 1.5 }}>
-                      {weeksSinceDeload} недель подряд без снижения объёма. Тренд объёма растёт ({Math.round(trend)} → {Math.round(avgVol)} сетов). Рекомендуется неделя объёмом ~50% ({Math.round(avgVol * 0.5)} сетов) с RIR 3-4.
+                      {ruCount(weeksSinceDeload, RU_WEEKS)} подряд без снижения объёма. Тренд объёма растёт ({Math.round(trend)} → {ruCount(Math.round(avgVol), RU_SETS)}). Рекомендуется неделя объёмом ~50% ({ruCount(Math.round(avgVol * 0.5), RU_SETS)}) с RIR 3-4.
                     </div>
                     <div style={{ marginTop: 6, padding: '4px 8px', borderRadius: 6, background: 'rgba(96,165,250,0.08)', fontSize: 9, color: '#60a5fa' }}>
                       Пример: снизить веса на 10-15%, увеличить RIR до 3-4, убрать изолирующие упражнения
@@ -612,7 +613,7 @@ export const DiaryAnalyticsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                       })}
                     </div>
                     <div style={{ fontSize: 9, color: '#fff', marginTop: 4, textAlign: 'center' }}>
-                      Всего {total} замеров RPE
+                      Всего {ruCount(total, RU_MEASUREMENTS)} RPE
                     </div>
                   </div>
                 );
@@ -700,7 +701,7 @@ export const DiaryAnalyticsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                       <div key={p.name} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '3px 0', borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
                         <div>
                           <span style={{ fontSize: 10, color: '#fff' }}>{p.name}</span>
-                          <span style={{ fontSize: 9, color: '#fff', marginLeft: 4 }}>{p.sessions} сессий</span>
+                          <span style={{ fontSize: 9, color: '#fff', marginLeft: 4 }}>{ruCount(p.sessions, RU_SESSIONS)}</span>
                         </div>
                         <span style={{ fontSize: 10, fontWeight: 700, color: '#f59e0b' }}>{p.best}кг</span>
                       </div>
@@ -851,7 +852,7 @@ export const DiaryAnalyticsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                         <React.Fragment key={group}>
                           <span style={{ fontSize: 9, color: '#fff', textAlign: 'right' }}>{GRP_RU[group] || group}</span>
                           {data.map((v, wi) => (
-                            <div key={wi} style={{ height: 12, borderRadius: 3, background: heat(v), display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'default' }} title={`${GRP_RU[group] || group}: ${v} подходов`}>
+                            <div key={wi} style={{ height: 12, borderRadius: 3, background: heat(v), display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'default' }} title={`${GRP_RU[group] || group}: ${ruCount(v, RU_APPROACHES)}`}>
                               {v > 0 && <span style={{ fontSize: 7, color: '#fff' }}>{v}</span>}
                             </div>
                           ))}
@@ -893,7 +894,7 @@ export const DiaryAnalyticsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                           <div key={i} style={{ textAlign: 'center', padding: '6px 2px', borderRadius: 6, background: bg }}>
                             <div style={{ fontSize: 10, fontWeight: 700, color: d.workouts > 0 ? '#00e68a' : 'rgba(255,255,255,0.2)' }}>{d.name}</div>
                             <div style={{ fontSize: 14, fontWeight: 800, color: '#fff', margin: '2px 0' }}>{d.workouts}</div>
-                            <div style={{ fontSize: 8, color: '#fff' }}>{d.sets} сетов</div>
+                            <div style={{ fontSize: 8, color: '#fff' }}>{ruCount(d.sets, RU_SETS)}</div>
                             {d.topGroup !== '—' && <div style={{ fontSize: 7, color: '#fff', marginTop: 1 }}>{d.topGroup}</div>}
                           </div>
                         );
@@ -1039,7 +1040,7 @@ export const DiaryAnalyticsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                       <Sparkline data={totals} width={60} height={20} color="#00e68a" />
                       <span style={{ fontSize: 10, color: totals[7] > totals[0] ? '#22c55e' : '#ef4444', fontWeight: 600 }}>
-                        {totals[7] > totals[0] ? '↑' : '↓'} {Math.abs(totals[7] - totals[0])} сетов
+                        {totals[7] > totals[0] ? '↑' : '↓'} {ruCount(Math.abs(totals[7] - totals[0]), RU_SETS)}
                       </span>
                     </div>
                   </div>
@@ -1435,7 +1436,7 @@ export const DiaryAnalyticsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                       return (
                         <div style={style.card}>
                           <div style={style.label}>⏱ Прогноз времени</div>
-                          <div style={{ fontSize: 9, color: '#fff', marginBottom: 4 }}>На основе последних {last10.length} тренировок (ср. {avgDuration} мин)</div>
+                          <div style={{ fontSize: 9, color: '#fff', marginBottom: 4 }}>На основе последних {ruCount(last10.length, RU_TRAININGS)} (ср. {avgDuration} мин)</div>
                           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 4, textAlign: 'center' }}>
                             {[4, 6, 8].map(n => (
                               <div key={n} style={{ padding: 6, borderRadius: 6, background: 'rgba(255,255,255,0.03)' }}>
@@ -1444,7 +1445,7 @@ export const DiaryAnalyticsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                               </div>
                             ))}
                           </div>
-                          <div style={{ fontSize: 9, color: '#fff', marginTop: 4, textAlign: 'center' }}>Ср. {avgSets} подходов / {avgExercises} упр. / {avgDuration} мин</div>
+                          <div style={{ fontSize: 9, color: '#fff', marginTop: 4, textAlign: 'center' }}>Ср. {ruCount(avgSets, RU_APPROACHES)} / {avgExercises} упр. / {avgDuration} мин</div>
                         </div>
                       );
                     })()}

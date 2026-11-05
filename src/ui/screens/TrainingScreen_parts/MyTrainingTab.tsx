@@ -27,6 +27,7 @@ import {
   type TrainingTab, type TrainingPage,
 } from './shared';
 import { applyToPlanner } from './planner-bridge';
+import { ruCount, RU_TRAININGS } from '../../../engines/ru-plural';
 
 
 /** Безопасный расчётный 1ПМ (Эпли): reps>=30 или мусор → null вместо Infinity/отрицательных. */
@@ -341,7 +342,7 @@ export const MyTrainingTab: React.FC<{ customExercises: { name: string; sets: nu
                         <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:4}}>
                           <div style={{fontSize:11,fontWeight:600,color:'#fff'}}>{i+1}. {ex.exercise}</div>
                           <div style={{fontSize:11,fontWeight:700,color:showChange>0?'#00e68a':'#fff'}}>
-                            {showChange > 0 ? '+':''}{showChange}% · лучший {ex.best}кг ({ex.count} тренировок)
+                            {showChange > 0 ? '+':''}{showChange}% · лучший {ex.best}кг ({ruCount(ex.count, RU_TRAININGS)})
                           </div>
                         </div>
                         <div style={{height:24,position:'relative',background:'rgba(255,255,255,0.03)',borderRadius:8,overflow:'hidden'}}>

@@ -4,6 +4,7 @@ import { diagnoseLift, phaseForReps } from '../../../engines/pro/lift-diagnostic
 import { epley1RM } from '../../../engines/e1rm';
 import { WEAK_POINTS_BY_LIFT, type Lift, type WeakPoint } from '../../../engines/lms/weakpoint-pl';
 import { applyToPlanner } from './planner-bridge';
+import { ruCount, RU_SETS } from '../../../engines/ru-plural';
 
 interface LiftFailureData {
   lift: Lift;
@@ -246,7 +247,7 @@ const StickingPointAnalysisCard: React.FC<{ sessions: WorkoutLog[] }> = ({ sessi
           {active.totalFailedSets > 0 && (
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6, fontSize: 10 }}>
               <span style={{ color: '#fff' }}>Тяжёлых подходов (RPE≥8):</span>
-              <span style={{ fontWeight: 600, color: '#ef4444' }}>{active.totalFailedSets} сетов ({active.failureRate}%)</span>
+              <span style={{ fontWeight: 600, color: '#ef4444' }}>{ruCount(active.totalFailedSets, RU_SETS)} ({active.failureRate}%)</span>
             </div>
           )}
           {active.sumoHardSets > 0 && (

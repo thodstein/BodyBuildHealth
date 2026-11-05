@@ -11,6 +11,7 @@ import { toDailyLoads, weeklyMonotony, acuteChronicRatio, type DayLoad } from '.
 import { loadReadinessHistory, type ReadinessHistoryPoint } from './readiness-history';
 import { PopupSelect, ExpandableCard, MetricCard } from '../SRCBBScreen_parts/TrainingPopups';
 import { applyToPlanner } from './planner-bridge';
+import { ruCount, RU_SETS } from '../../../engines/ru-plural';
 
 const ACCENT = '#00e68a';
 const DIM = '#fff';
@@ -140,7 +141,7 @@ export const MRVEstimatorTab: React.FC = () => {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginBottom: 12 }}>
           <MetricCard title="Индивидуальный MRV" icon="🎯" accent={ACCENT}>
             <div style={{ fontSize: 18, fontWeight: 800, color: ACCENT }}>{est.mrvVolume} AU</div>
-            <div style={SMALL}>{setsPerWeek} сетов/нед (прогноз)</div>
+            <div style={SMALL}>{ruCount(setsPerWeek, RU_SETS)}/нед (прогноз)</div>
           </MetricCard>
           <MetricCard title="Сетов на мышцу/нед" icon="💪" accent={ACCENT}>
             <div style={{ fontSize: 18, fontWeight: 800, color: ACCENT }}>≈{perMuscleSets}</div>

@@ -14,6 +14,7 @@ import { toDailyLoads, acuteChronicRatio } from '../../../engines/pro/training-l
 import { StrengthDiary } from '../../../engines/strength-diary.engine';
 import { epley1RM } from '../../../engines/e1rm';
 import { sinclairScore } from '../../../engines/pro/relative-strength.engine';
+import { ruCount, RU_DAYS } from '../../../engines/ru-plural';
 
 const ACCENT = '#00e68a';
 const DIM = '#fff';
@@ -238,7 +239,7 @@ export const StrengthAnalyticsCard: React.FC<Props> = ({ snapshot, onHubPatch })
 
       {diarySeries.length > 0 && (
         <div style={CARD}>
-          <div style={H}>📈 Динамика e1RM из дневника (последние {diarySeries.length} дней)</div>
+          <div style={H}>📈 Динамика e1RM из дневника (последние {ruCount(diarySeries.length, RU_DAYS)})</div>
           {/* мини-график приседа: факт + Holt-прогноз */}
           {(() => {
             const fact = diarySeries.map(d => d.squatE1RM).filter(v => v > 0);

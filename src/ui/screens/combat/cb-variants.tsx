@@ -12,6 +12,7 @@ import {
   type CombatVariant, COMBAT_VARIANTS_CAP,
 } from '../../../engines/combat/combat-variants';
 import type { CombatPlan } from '../../../engines/combat/combat.types';
+import { ruCount, RU_SETS } from '../../../engines/ru-plural';
 
 export const CbVariants: React.FC<{
   plan: CombatPlan;
@@ -54,7 +55,7 @@ export const CbVariants: React.FC<{
           <div key={v.id} style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', background: 'rgba(255,255,255,0.03)', padding: '8px 10px', borderRadius: 10, border: '0.5px solid rgba(255,255,255,0.06)' }}>
             <span style={{ fontSize: 11.5, color: '#fff', fontWeight: 700, flex: '1 1 120px' }}>{v.name}</span>
             <Badge>{v.inputs.weeks}нд</Badge>
-            <Badge>{v.totalSets} сетов</Badge>
+            <Badge>{ruCount(v.totalSets, RU_SETS)}</Badge>
             {v.hasFight && <Badge color="#ef4444">бой</Badge>}
             {v.hasWeightCut && <Badge color="#f59e0b">сгон</Badge>}
             <button

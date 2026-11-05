@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { importSessionsFromCSV } from '../../../engines/workout-logger.engine';
+import { ruCount, RU_SESSIONS, RU_SETS } from '../../../engines/ru-plural';
 
 const ACCENT = '#00e68a';
 const SMALL: React.CSSProperties = { color:'#fff', fontSize: 11, lineHeight: 1.4 };
@@ -190,7 +191,7 @@ export const CsvImportTab: React.FC<{ onDone?: () => void }> = ({ onDone }) => {
       {result && (
         <div className="ci-result" style={{ marginTop: 10, padding: 12, borderRadius: 10, background: result.importedSessions > 0 ? 'rgba(0,230,138,0.06)' : 'rgba(239,68,68,0.06)', border: '1px solid ' + (result.importedSessions > 0 ? 'rgba(0,230,138,0.25)' : 'rgba(239,68,68,0.25)') }}>
           <div style={{ fontSize: 12, fontWeight: 700, color: result.importedSessions > 0 ? ACCENT : '#ef4444' }}>
-            {result.importedSessions > 0 ? `✅ Импортировано: ${result.importedSessions} сессий, ${result.importedSets} сетов` : '⚠ Ничего не импортировано'}
+            {result.importedSessions > 0 ? `✅ Импортировано: ${ruCount(result.importedSessions, RU_SESSIONS)}, ${ruCount(result.importedSets, RU_SETS)}` : '⚠ Ничего не импортировано'}
           </div>
           {result.errors.length > 0 && (
             <div style={{ marginTop: 6 }}>

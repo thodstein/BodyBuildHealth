@@ -112,6 +112,7 @@ import { BbPlanStep } from './bb-step-plan';
 import { BbQualityUnifiedCard, BbQualityPlanLogicCard, BbQualitySafetySection } from './bb-quality-sections';
 import { BbQualityLoadOverview, BbQualityLoadVolume, BbQualityLoadChecks, type BbQualityLoadCtx } from './bb-quality-load-sections';
 import { BbContestPrepParams, BbContestPrepPreview, BbContestPrepTrialSafety, BbContestPrepPost, type BbContestPrepCtx } from './bb-contest-prep-sections';
+import { ruCount, RU_SETS } from '../../../engines/ru-plural';
 export {
   PHASE_TECHNIQUES, backSubgroupLabel, armHeadLabel, isAbRotationActive,
   annualBlockCtxToPrepPatch, annualActiveBlockLine,
@@ -3357,7 +3358,7 @@ const [bbVolumeRamp, setBbVolumeRamp] = useState<'standard' | 'preloaded' | 'fla
         : (weeklySets > 0 ? 180 : 160);
       applyToPlanner({
         kind: 'bb_nutrition',
-        label: `ББ-план → питание (${trainDays.length} трен-дня, ~${weeklySets} сетов/нед в среднем)`,
+        label: `ББ-план → питание (${trainDays.length} трен-дня, ~${ruCount(weeklySets, RU_SETS)}/нед в среднем)`,
         data: { kcal, proteinG, trainDays, weeklySets, splitId: plan.pattern?.id, weightKg: pw > 0 ? pw : undefined, sex: linked.profile?.settings?.personal?.sex, goal: bbGoal },
       });
     } catch (e) {

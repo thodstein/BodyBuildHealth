@@ -8,6 +8,7 @@ import {
   DELOAD_PROTOCOLS,
   selectDeloadProtocol,
 } from '../../../engines/deload-engine';
+import { ruCount, RU_DAYS } from '../../../engines/ru-plural';
 
 const CARD: React.CSSProperties = { background: 'var(--glass-bg)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 'var(--radius-sm)', padding: 12, margin: '6px 0' };
 const ACCENT = '#00e68a';
@@ -68,7 +69,7 @@ export const DeloadProtocolCard: React.FC<Props> = ({ ctx, overrideProtocol }) =
             📋 {protocol.protocolName}
           </div>
           <div style={{ fontSize: 10, color: '#fff' }}>
-            {protocol.days} дней · объём −{protocol.volumeReductionPct}% · RIR {protocol.rirTarget}
+            {ruCount(protocol.days, RU_DAYS)} · объём −{protocol.volumeReductionPct}% · RIR {protocol.rirTarget}
           </div>
         </div>
       </div>

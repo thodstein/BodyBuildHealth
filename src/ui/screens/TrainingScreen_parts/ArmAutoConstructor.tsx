@@ -76,6 +76,7 @@ import { buzzPlanner } from './planner-ui';
 import { AdSwitch, AdSheetSelect } from './arm-design-system';
 import { isNativeApp } from '../../../core/app-platform';
 import { ensureArmApkStyles } from './arm-apk-loader';
+import { ruCount, RU_SETS } from '../../../engines/ru-plural';
 
 /* ── Единый плотный каркас: Ad* — тонкие обёртки над китом training-ui
   * (BB-авто — эталон). DOM-контракты 1-в-1: классы .ad-* + data-arm хуки +
@@ -2749,7 +2750,7 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
                 {planAudit ? (
                   <>
                     <div className="ad-tip" data-arm="plan-audit-cover" style={{ fontVariantNumeric: 'tabular-nums' }}>
-                      Покрытие: {planAudit.covered.length}/12 точек ({planAudit.coveragePct}%) · стол {Math.round(planAudit.tableRatio * 100)}% / зал {100 - Math.round(planAudit.tableRatio * 100)}% · static {planAudit.staticSets} / dynamic {planAudit.dynamicSets} сетов.
+                      Покрытие: {planAudit.covered.length}/12 точек ({planAudit.coveragePct}%) · стол {Math.round(planAudit.tableRatio * 100)}% / зал {100 - Math.round(planAudit.tableRatio * 100)}% · static {planAudit.staticSets} / dynamic {ruCount(planAudit.dynamicSets, RU_SETS)}.
                     </div>
                     <div className="ad-chips" data-arm="plan-audit-points">
                       {ARM_WEAK_POINTS.map((wp) => (
@@ -2936,7 +2937,7 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
                      cycId ? `Цикл: ${cycId}` : 'Обычный план',
                      ...(Array.isArray(viewPlan.blocks) && viewPlan.blocks.length ? [`Блоки: ${viewPlan.blocks.map((b: any) => `${b.name} (${b.weekStart}–${b.weekEnd})`).join(' → ')}`] : []),
                      ...(Array.isArray(viewPlan.peakWindows) && viewPlan.peakWindows.length ? [`Старты: ${viewPlan.peakWindows.map((p: any) => `Н${p.week} (${p.priority})`).join(', ')}`] : []),
-                      `Всего: ${tot} сетов · стол-сессии ${planDash ? planDash.tablePct : '—'}% · объём ${planDash ? planDash.tableVolumePct : '—'}% · минуты ${planDash?.tableMinutesPct == null ? 'нет данных' : `${planDash.tableMinutesPct}%`}`,
+                      `Всего: ${ruCount(tot, RU_SETS)} · стол-сессии ${planDash ? planDash.tablePct : '—'}% · объём ${planDash ? planDash.tableVolumePct : '—'}% · минуты ${planDash?.tableMinutesPct == null ? 'нет данных' : `${planDash.tableMinutesPct}%`}`,
                      (viewPlan.weeks || []).map((w: any) => `Н${w.week} (${w.phase}): ${(w.sessions || []).reduce((x: number, s: any) => x + (s.exercises || []).reduce((y: number, e: any) => y + (e.sets || 0), 0), 0)}`).join(' · '),
                    ];
                    // Движение схватки из диагностики (тот же diag, что у печати)

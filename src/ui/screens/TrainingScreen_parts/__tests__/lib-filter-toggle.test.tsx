@@ -19,7 +19,7 @@ describe('lib-filter-toggle', () => {
     expect(filters.style.display).toBe('flex');
     expect(toggle).toHaveAttribute('aria-expanded', 'true');
     // Счётчик циклов виден на кнопке даже при скрытых фильтрах
-    expect(toggle.textContent).toMatch(/циклов/);
+    expect(toggle.textContent).toMatch(/цикл(ов|а)?/);
   });
 
   it('ManualLibraryGallery: фильтры скрыты по умолчанию и раскрываются', () => {

@@ -8,6 +8,7 @@ import { getArmLandmarks } from '../../../engines/arm/arm-volume-landmarks.engin
 import type { ArmPlan } from '../../../engines/arm/arm-types';
 import { ARM_MUSCLE_RU } from '../../../engines/arm/arm-types';
 import { AdCard } from './arm-design-system';
+import { ruCount, RU_SETS } from '../../../engines/ru-plural';
 
 const ARM_MUSCLES = ['wrist_flexors','pronators','supinators','brachialis','risers','grip_support','grip_pinch','grip_crush','thumb','side_pressure','back_pressure','shoulder_stab'] as const;
 
@@ -97,7 +98,7 @@ export const ArmHeatmap: React.FC<{ plan: ArmPlan; onToast?: (msg: string) => vo
                           strokeWidth={isHover ? 1.5 : 0}
                           onMouseEnter={() => setHoverCell({ m, w: wi })}
                           onMouseLeave={() => setHoverCell(null)}
-                          onClick={() => onToast?.(`${ARM_MUSCLE_RU[m] ?? m}, нед ${wi + 1}: ${sets} сетов${lm ? ` (MRV ${lm.mrv})` : ''}`)}
+                          onClick={() => onToast?.(`${ARM_MUSCLE_RU[m] ?? m}, нед ${wi + 1}: ${ruCount(sets, RU_SETS)}${lm ? ` (MRV ${lm.mrv})` : ''}`)}
                           style={{ cursor: 'pointer' }}
                         />
                         <text x={labelW + cellW * (wi + 0.5)} y={14 + cellH * mi + cellH * 0.65} fontSize="8" fill={sets > 0 ? '#fff' : 'rgba(255,255,255,0.25)'} textAnchor="middle" pointerEvents="none">
@@ -113,7 +114,7 @@ export const ArmHeatmap: React.FC<{ plan: ArmPlan; onToast?: (msg: string) => vo
         </div>
         {hoverCell && (
           <div className="ad-muted ad-code">
-            {ARM_MUSCLE_RU[hoverCell.m] ?? hoverCell.m} · нед {hoverCell.w + 1}: {grid[hoverCell.m]?.[hoverCell.w] ?? 0} сетов
+            {ARM_MUSCLE_RU[hoverCell.m] ?? hoverCell.m} · нед {hoverCell.w + 1}: {ruCount(grid[hoverCell.m]?.[hoverCell.w] ?? 0, RU_SETS)}
             {lmByMuscle[hoverCell.m] && ` (MEV ${lmByMuscle[hoverCell.m]!.mev} MAV ${lmByMuscle[hoverCell.m]!.mav} MRV ${lmByMuscle[hoverCell.m]!.mrv})`}
           </div>
         )}

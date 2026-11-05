@@ -17,6 +17,7 @@ import { WorkoutWeekCard, DiaryEmptyState, DiarySkeletonCard } from './diary-car
 import { diaryStyles as style, GRP_RU, GROUP_COLORS, ACCENT } from './diary-tokens';
 import { useDiaryHub, type DiaryHubCtx } from './diary-hub-context';
 import { mrvBaseForLevel, bestE1rmSeriesForWeek } from './diary-shared';
+import { ruCount, RU_SETS } from '../../../engines/ru-plural';
 
 export const DiaryHistoryView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
   const {
@@ -318,7 +319,7 @@ export const DiaryHistoryView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                 <div className="th-mrv" style={{ marginBottom: 8, padding: 10, borderRadius: 10, background: color + '12', border: '1px solid ' + color + '40' }}>
                   <div style={{ fontSize: 11, fontWeight: 800, color, marginBottom: 4 }}>{over2.length > 0 ? '🔴 Риск перетренированности' : '🟡 Превышение объёма'}</div>
                   <div style={{ fontSize: 10, color: '#fff', lineHeight: 1.5 }}>
-                    {over2.length > 0 ? `Группы выше MRV (${Math.round(mrvBase)} сетов) 2 недели подряд: ${over2.map(ru).join(', ')}. Снизьте объём на 10–15% в следующем микроцикле.` : `Группы выше MRV на прошлой/текущей неделе: ${over1.map(ru).join(', ')}. Следите за восстановлением.`}
+                    {over2.length > 0 ? `Группы выше MRV (${ruCount(Math.round(mrvBase), RU_SETS)}) 2 недели подряд: ${over2.map(ru).join(', ')}. Снизьте объём на 10–15% в следующем микроцикле.` : `Группы выше MRV на прошлой/текущей неделе: ${over1.map(ru).join(', ')}. Следите за восстановлением.`}
                   </div>
                 </div>
               );

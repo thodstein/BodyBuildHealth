@@ -27,6 +27,7 @@ import {
   PHASE_LABELS, PHASE_HINTS, TAB_LABELS,
   type TrainingTab, type TrainingPage,
 } from './shared';
+import { ruCount, RU_APPROACHES } from '../../../engines/ru-plural';
 
 
 export const MethodsTab: React.FC<{ linked: ReturnType<typeof useDataLink>; trainingOutput: TrainingOutput | null; diaryStats: StrengthStats[]; historyWorkouts: WorkoutLog[]; goal: string; level: string; daysPerWeek: number; recovery: number; fatigue: number; appliedMethods: Record<string, string>; onToggleMethod: (name: string, category: string) => void; onApplyComposition: () => void }> = ({ linked, trainingOutput, diaryStats, historyWorkouts, goal, level, daysPerWeek, recovery, fatigue, appliedMethods, onToggleMethod, onApplyComposition }) => {
@@ -302,7 +303,7 @@ export const MethodsTab: React.FC<{ linked: ReturnType<typeof useDataLink>; trai
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, marginBottom: 1 }}>
                     <span style={{ fontWeight: 600 }}>{groupLabelMap[group] || group}</span>
                     <span style={{ color: barColor }}>
-                      {v.weeklySets} подходов/нед (MEV:{mev} MAV:{mav} MRV:{mrv})
+                      {ruCount(v.weeklySets, RU_APPROACHES)}/нед (MEV:{mev} MAV:{mav} MRV:{mrv})
                     </span>
                   </div>
                   <div style={{ height: 6, borderRadius: 3, background: 'rgba(255,255,255,0.06)', overflow: 'hidden' }}>

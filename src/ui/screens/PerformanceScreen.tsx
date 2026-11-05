@@ -5,6 +5,7 @@ import { getPeriodizationModels, getBBContestPrep, getPCTProtocols, generateMeet
 import { predictStrength, computePRI, type PredictionInput } from '../../engines/prediction-models-engine';
 import { getProfile, updateSection } from '../../core/profile-manager';
 import { BBContestPrepCard } from './SRCBBScreen_parts/BBContestPrepCard';
+import { ruCount, RU_WEEKS } from '../../engines/ru-plural';
 
 export const PerformanceScreen: React.FC = () => {
   const linked = useDataLink();
@@ -187,7 +188,7 @@ export const PerformanceScreen: React.FC = () => {
       <h4 style={{ fontSize:12, marginBottom:8 }}>🔄 Протоколы ПКТ</h4>
       {pctProtocols.map((p,i)=><div key={i} className="card" style={{ marginBottom:6, padding:10 }}>
         <div style={{ fontWeight:600, fontSize:12 }}>{p.name} ({p.forCycle})</div>
-        <div style={{ fontSize:9, color:'var(--text-dim)', marginTop:2 }}>{p.totalWeeks} недель · Успех: {p.successRate}</div>
+        <div style={{ fontSize:9, color:'var(--text-dim)', marginTop:2 }}>{ruCount(p.totalWeeks, RU_WEEKS)} · Успех: {p.successRate}</div>
         <div style={{ fontSize:8, color:'var(--text-light)', marginTop:4 }}>{p.expectedRecovery}</div>
         {p.timeline?.slice(0,4).map((t,ti)=><div key={ti} style={{ fontSize:8, marginTop:2 }}>
           <b>Нед {t.week}:</b> {t.compounds.map(c=>`${c.name} ${c.dosage}`).join(', ')} — {t.notes}

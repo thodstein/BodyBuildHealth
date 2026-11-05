@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import type { WorkoutLog } from '../../../core/types';
 import { loadReadinessHistory } from './readiness-history';
 import { applyToPlanner } from './planner-bridge';
+import { ruCount, RU_POINTS } from '../../../engines/ru-plural';
 
 interface WeeklyPoint {
   weekStart: string;
@@ -100,7 +101,7 @@ const VolumeRecoveryCorrelationCard: React.FC<{ sessions: WorkoutLog[] }> = ({ s
         🔄 Корреляция объём ↔ восстановление
       </div>
       <div style={{ fontSize: 10, color: '#fff', marginBottom: 6 }}>
-        {points.length} точек (недель с данными) · r = {corr.r.toFixed(2)}
+        {ruCount(points.length, RU_POINTS)} (недель с данными) · r = {corr.r.toFixed(2)}
         {corr.r < -0.3 ? ' (умеренная обратная)' : corr.r < -0.1 ? ' (слабая обратная)' : Math.abs(corr.r) < 0.1 ? ' (нет корреляции)' : ' (положительная)'}
       </div>
       <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{ maxWidth: 320, margin: '0 auto', display: 'block' }}>

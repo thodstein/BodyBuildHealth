@@ -42,6 +42,7 @@ import { diagnosticCompleteness } from '../../../engines/arm/armlift-completenes
 import { applyToPlanner } from './planner-bridge';
 import { AdRoot, AdCard, AdSec, AdGrid, AdChip, AdBtn, AdBanner, AdCta, AdStat } from './arm-design-system';
 import { haptics } from '../../../core/native-bridge';
+import { ruCount, RU_SETS } from '../../../engines/ru-plural';
 
 /** PRO-визуал: уровень → цвет точки (строки/aria 1-в-1, только подача). */
 const LIFT_LEVEL_COLOR: Record<string, string> = {
@@ -965,7 +966,7 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
               {/* Паритет с ТА `data-wl="worst"`: связка закрыта, но слабейшая — разбираем её (не дубль «дыры») */}
               {liftWorst && (liftAudit.byLink[liftWorst]?.sets ?? 0) > 0 && (
                 <button data-arm="lift-worst" onClick={selectWorstLink} style={{ marginTop: 6, minHeight: 44, padding: '8px 12px', borderRadius: 10, background: 'rgba(59,130,246,0.14)', border: '1px solid #1f3a5f', color: '#60a5fa', fontSize: 12, fontWeight: 800, cursor: 'pointer' }}>
-                  🎯 Слабейшая связка: {ARMLIFT_WEAK_LINK_SHORT_RU[liftWorst]} ({liftAudit.byLink[liftWorst].sets} сетов) → разобрать
+                  🎯 Слабейшая связка: {ARMLIFT_WEAK_LINK_SHORT_RU[liftWorst]} ({ruCount(liftAudit.byLink[liftWorst].sets, RU_SETS)}) → разобрать
                 </button>
               )}
             </>

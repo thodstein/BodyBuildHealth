@@ -69,6 +69,7 @@ import { CARD, DIM, ACCENT } from './training-ui';
 import { loadSRPESessions } from '../../../engines/pro/srpe-store';
 import { toDailyLoads, acuteChronicRatio } from '../../../engines/pro/training-load.engine';
 import { printHtmlApk, shareOutcomeLabel, saveTextFileApk, saveCsvApk } from '../../../core/apk-share';
+import { ruCount, RU_SETS } from '../../../engines/ru-plural';
 
 const STORAGE_KEY = 'he_strongman_diagnostics_hub_v1';
 
@@ -2251,12 +2252,12 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
             {smAudit.hasPlan && (
               <div data-sm="sm-coverage" style={{ display:'flex', gap:4, flexWrap:'wrap', marginTop:6 }}>
                 {SM_ALL_PHASES.map(ph => { const c = smAudit.byPhase[ph]; const worst = smAudit.worstPhase === ph; return (
-                  <span key={ph} title={`${SM_WEAKPOINT_LABELS[ph]} — ${c.sets} сетов`} data-covered={c.covered?'true':'false'} data-worst={worst?'true':'false'} style={{ fontSize:10, padding:'4px 8px', borderRadius:12, background: worst?'rgba(239,68,68,0.12)': c.covered?'rgba(34,197,94,0.10)':'#0a1629', border:`1px solid ${worst?'rgba(239,68,68,0.35)': c.covered?'rgba(34,197,94,0.25)':'#1f3a5f'}`, color: worst?'#ef4444': c.covered?'#22c55e':'#fff' }}>{SM_PHASE_SHORT[ph] || ph} {c.sets}</span>
+                  <span key={ph} title={`${SM_WEAKPOINT_LABELS[ph]} — ${ruCount(c.sets, RU_SETS)}`} data-covered={c.covered?'true':'false'} data-worst={worst?'true':'false'} style={{ fontSize:10, padding:'4px 8px', borderRadius:12, background: worst?'rgba(239,68,68,0.12)': c.covered?'rgba(34,197,94,0.10)':'#0a1629', border:`1px solid ${worst?'rgba(239,68,68,0.35)': c.covered?'rgba(34,197,94,0.25)':'#1f3a5f'}`, color: worst?'#ef4444': c.covered?'#22c55e':'#fff' }}>{SM_PHASE_SHORT[ph] || ph} {c.sets}</span>
                 ); })}
               </div>
             )}
             {smAudit.hasPlan && smAudit.worstPhase && (
-              <button data-sm="sm-worst" onClick={selectSmWorstPhase} style={{ marginTop:6, minHeight:44, padding:'8px 12px', borderRadius:10, background:'rgba(59,130,246,0.14)', border:'1px solid #1f3a5f', color:'#60a5fa', fontSize:12, fontWeight:800, cursor:'pointer' }}>🎯 Худшая фаза: {SM_WEAKPOINT_LABELS[smAudit.worstPhase]} ({smAudit.byPhase[smAudit.worstPhase].sets} сетов) → разобрать</button>
+              <button data-sm="sm-worst" onClick={selectSmWorstPhase} style={{ marginTop:6, minHeight:44, padding:'8px 12px', borderRadius:10, background:'rgba(59,130,246,0.14)', border:'1px solid #1f3a5f', color:'#60a5fa', fontSize:12, fontWeight:800, cursor:'pointer' }}>🎯 Худшая фаза: {SM_WEAKPOINT_LABELS[smAudit.worstPhase]} ({ruCount(smAudit.byPhase[smAudit.worstPhase].sets, RU_SETS)}) → разобрать</button>
             )}
             <div style={{ display:'flex', gap:6, marginTop:6, flexWrap:'wrap' }}>
               <button data-sm="sm-inject" onClick={handleInjectSM} style={{ flex:'1 1 180px', minHeight:48, padding:'10px 14px', borderRadius:12, background:'linear-gradient(135deg,#3b82f6,#a855f7)', color:'#fff', border:'none', fontWeight:800, fontSize:13, cursor:'pointer' }}>💉 Вставить коррекции в план ({smWeakPoints.length})</button>

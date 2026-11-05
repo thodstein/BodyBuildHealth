@@ -10,6 +10,7 @@ import { newId } from '../../../../engines/user-program/user-program.types';
 import { computePlanQualityFor, muscleAwareSets, makeSetsFromTemplate, suggestExercisesForGroup } from '../../../../engines/manual-constructor';
 import { loadTrainingProfile } from '../training-profile';
 import type { PanelProps } from './shared';
+import { ruCount, RU_SETS } from '../../../../engines/ru-plural';
 
 export const PlanDiagnosticsPanel: React.FC<PanelProps> = ({ program, dir, onChange, showToast, labMrvMult }) => {
   if (!(dir === 'bb' && program.bb || dir === 'pl' && program.pl?.customWeeks)) return null;
@@ -58,7 +59,7 @@ export const PlanDiagnosticsPanel: React.FC<PanelProps> = ({ program, dir, onCha
             if (exs.length === 0) return null;
             return (
               <div key={w.muscle} style={{ marginBottom: 4 }}>
-                <span style={{ fontSize: 10, fontWeight: 700, color: DIM_STRONG }}>{GROUP_RU[w.muscle] ?? w.muscle}: +{w.mev - Math.max(0, w.peakSets)} сетов до MEV={w.mev}</span>
+                <span style={{ fontSize: 10, fontWeight: 700, color: DIM_STRONG }}>{GROUP_RU[w.muscle] ?? w.muscle}: +{ruCount(w.mev - Math.max(0, w.peakSets), RU_SETS)} до MEV={w.mev}</span>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 2 }}>
                   {exs.slice(0, 3).map((ex, i) => (
                     <button key={i} onClick={() => {
@@ -80,7 +81,7 @@ export const PlanDiagnosticsPanel: React.FC<PanelProps> = ({ program, dir, onCha
         <div style={{ marginBottom: 8, padding: 8, borderRadius: 8, background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.15)' }}>
           <div style={{ fontSize: 11, fontWeight: 700, color: '#ef4444', marginBottom: 4 }}>⚠ Превышение MRV — снизьте объём:</div>
           {overloaded.map(o => (
-            <div key={o.muscle} style={{ fontSize: 10, color: 'rgba(255,255,255,0.8)' }}>{GROUP_RU[o.muscle] ?? o.muscle}: {o.peakSets} сетов {'>'} MRV {o.mrv} (−{o.peakSets - o.mrv} сетов)</div>
+            <div key={o.muscle} style={{ fontSize: 10, color: 'rgba(255,255,255,0.8)' }}>{GROUP_RU[o.muscle] ?? o.muscle}: {ruCount(o.peakSets, RU_SETS)} {'>'} MRV {o.mrv} (−{ruCount(o.peakSets - o.mrv, RU_SETS)})</div>
           ))}
         </div>
       )}

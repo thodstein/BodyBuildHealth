@@ -30,9 +30,37 @@ export function ruCount(n: number, forms: RuPluralForms): string {
   return `${n} ${ruForm(n, forms)}`;
 }
 
+/**
+ * «N прилагательное существительное» с согласованием обоих:
+ * `ruAdjCount(3, RU_ADJ_WORKING, RU_SETS)` → «3 рабочих сета»,
+ * `ruAdjCount(1, RU_ADJ_WORKING, RU_SETS)` → «1 рабочий сет».
+ *
+ * Формы прилагательного задаёт вызывающий: для мужского рода при 2–4 это
+ * родительный мн. («рабочих»), для женского — именительный мн. («пустые»).
+ */
+export function ruAdjCount(n: number, adj: RuPluralForms, noun: RuPluralForms): string {
+  return `${n} ${ruForm(n, adj)} ${ruForm(n, noun)}`;
+}
+
+/** Прилагательные, которые встречаются в счёте (формы подобраны под род). */
+export const RU_ADJ_WORKING: RuPluralForms = ['рабочий', 'рабочих', 'рабочих'];
+export const RU_ADJ_TRAINING: RuPluralForms = ['тренировочный', 'тренировочных', 'тренировочных'];
+export const RU_ADJ_EMPTY_F: RuPluralForms = ['пустая', 'пустые', 'пустых'];
+
 export const RU_WEEKS: RuPluralForms = ['неделя', 'недели', 'недель'];
 export const RU_TRAININGS: RuPluralForms = ['тренировка', 'тренировки', 'тренировок'];
 export const RU_SETS: RuPluralForms = ['сет', 'сета', 'сетов'];
 export const RU_APPROACHES: RuPluralForms = ['подход', 'подхода', 'подходов'];
 export const RU_EXERCISES: RuPluralForms = ['упражнение', 'упражнения', 'упражнений'];
 export const RU_DAYS: RuPluralForms = ['день', 'дня', 'дней'];
+export const RU_SESSIONS: RuPluralForms = ['сессия', 'сессии', 'сессий'];
+export const RU_CYCLES: RuPluralForms = ['цикл', 'цикла', 'циклов'];
+export const RU_POINTS: RuPluralForms = ['точка', 'точки', 'точек'];
+export const RU_MEASUREMENTS: RuPluralForms = ['замер', 'замера', 'замеров'];
+export const RU_ENTRIES: RuPluralForms = ['запись', 'записи', 'записей'];
+export const RU_REPS: RuPluralForms = ['повторение', 'повторения', 'повторений'];
+export const RU_MONTHS: RuPluralForms = ['месяц', 'месяца', 'месяцев'];
+export const RU_HOURS: RuPluralForms = ['час', 'часа', 'часов'];
+export const RU_MINUTES: RuPluralForms = ['минута', 'минуты', 'минут'];
+export const RU_MUSCLES: RuPluralForms = ['мышца', 'мышцы', 'мышц'];
+export const RU_INJECTIONS: RuPluralForms = ['инъекция', 'инъекции', 'инъекций'];

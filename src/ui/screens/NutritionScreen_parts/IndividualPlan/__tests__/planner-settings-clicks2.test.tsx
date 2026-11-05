@@ -140,11 +140,11 @@ describe('Кнопки настроек: клик → состояние (бат
     clickToggleByLabel(/Привязать рацион к тренировке/);
     if (document.querySelectorAll('input[type="time"]').length === 0) clickToggleByLabel(/Привязать рацион к тренировке/);
     clickBtn(/Неделя/);
-    const before = (document.body.textContent || '').match(/(\d+) тренировочных дней/)?.[1];
+    const before = (document.body.textContent || '').match(/(\d+) тренировочных (дней|дня)/)?.[1];
     const circles = Array.from(document.querySelectorAll('button')).filter((b) => ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'].includes((b.textContent || '').trim()));
     expect(circles.length).toBeGreaterThan(0);
     fireEvent.click(circles[0]);
-    const after = (document.body.textContent || '').match(/(\d+) тренировочных дней/)?.[1];
+    const after = (document.body.textContent || '').match(/(\d+) тренировочных (дней|дня)/)?.[1];
     expect(after).not.toBe(before);
   });
 

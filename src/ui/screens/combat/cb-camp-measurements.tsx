@@ -21,6 +21,7 @@ import {
   type SparType, type GripHand,
 } from '../../../engines/combat/combat-measurements.engine';
 import { weightCycleVerdict } from '../../../engines/combat/combat-science';
+import { ruCount, RU_ENTRIES, RU_MEASUREMENTS } from '../../../engines/ru-plural';
 
 const IN = 16;
 const BTN: React.CSSProperties = { minHeight: 44, fontSize: IN, padding: '8px 12px' };
@@ -223,7 +224,7 @@ export const CbCampMeasurementsCard: React.FC<{
     <SectionCard title="Замеры, журналы и скрининги" accent>
       {/* 8.1 — журнал веса */}
       <div data-cb="measure-weigh" style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 8 }}>
-        <Highlight>⚖️ Журнал веса ({weighins.length} записей)</Highlight>
+        <Highlight>⚖️ Журнал веса ({ruCount(weighins.length, RU_ENTRIES)})</Highlight>
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
           <input aria-label="Дата взвешивания" data-cb="weigh-date" style={{ ...inp(wDate, 'ГГГГ-ММ-ДД'), flex: '1 1 130px' }}
             value={wDate} onChange={e => setWDate(e.target.value)} />
@@ -298,7 +299,7 @@ export const CbCampMeasurementsCard: React.FC<{
 
       {/* 8.3 — сила хвата (кистевой динамометр) */}
       <div data-cb="measure-grip" style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 8 }}>
-        <Highlight>✊ Сила хвата ({grip.length} замеров)</Highlight>
+        <Highlight>✊ Сила хвата ({ruCount(grip.length, RU_MEASUREMENTS)})</Highlight>
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
           <CombatPopupSelect
             label="Рука"
@@ -337,7 +338,7 @@ export const CbCampMeasurementsCard: React.FC<{
 
       {/* 8.6 — градуированный RTP после сотрясения */}
       <div data-cb="measure-rtp" style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 8 }}>
-        <Highlight>🧠 Возврат после сотрясения ({rtp.length} записей)</Highlight>
+        <Highlight>🧠 Возврат после сотрясения ({ruCount(rtp.length, RU_ENTRIES)})</Highlight>
         <div style={{ fontSize: 12, color: '#fff' }}>{RTP_EARLY_AEROBIC_NOTE}</div>
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
           <CombatPopupSelect

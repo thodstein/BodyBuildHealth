@@ -20,6 +20,7 @@ import {
 import { loadTempoPrevSnapshot } from './planner-bridge-handlers';
 import type { TempoApplyMode } from './planner-bridge';
 import { useDataLink } from '../../../core/data-link';
+import { ruCount, RU_SETS } from '../../../engines/ru-plural';
 
 const ACCENT = '#00e68a';
 const CARD: React.CSSProperties = { background: 'rgba(24,24,27,0.6)', borderRadius: 12, border: '1px solid rgba(255,255,255,0.04)', padding: '12px', margin: '6px 0' };
@@ -435,7 +436,7 @@ export const TempoTab: React.FC = () => {
         <button onClick={() => { applyToPlanner({ kind: 'tempo', label: 'Темп ' + formatTempo(customTempo), data: { ...customTempo, label: formatTempo(customTempo), mode: bridgeMode } }); setSnapInfo(loadTempoPrevSnapshot()); }} style={{ width: '100%', padding: 12, borderRadius: 10, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#000', fontWeight: 800, fontSize: 13, minHeight: 44 }}>🛠 Применить темп к планировщику</button>
         <div style={{ marginTop: 8, fontSize: 10, color: '#fff' }}>
           {snapInfo ? (
-            <span>📸 Снимок: {snapInfo.count} сетов · {new Date(snapInfo.ts).toLocaleString('ru-RU')} </span>
+            <span>📸 Снимок: {ruCount(snapInfo.count, RU_SETS)} · {new Date(snapInfo.ts).toLocaleString('ru-RU')} </span>
           ) : (
             <span>📸 Снимка пока нет — появится после применения темпа. </span>
           )}

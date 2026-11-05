@@ -19,6 +19,7 @@ import { rankCardioCycles, type CardioSelectorInput } from '../../../engines/lms
 import { rankCycles } from '../../../engines/lms/lms-selector.engine';
 import { ExpandableCard } from '../SRCBBScreen_parts/TrainingPopups';
 import { applyToPlanner } from './planner-bridge';
+import { ruCount, RU_CYCLES } from '../../../engines/ru-plural';
 
 type CatFilter = 'all' | 'strength' | 'bodybuilding' | 'arm' | 'strong' | 'cardio' | 'combat';
 type UserGoal = 'strength' | 'mass' | 'endurance' | 'peak' | 'mixed' | 'speed';
@@ -687,7 +688,7 @@ export const CycleCatalog: React.FC<Props> = (p) => {
             style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, width: '100%', padding: '10px 12px', borderRadius: 12, fontSize: 12, fontWeight: 800, cursor: 'pointer', minHeight: 44, border: '1px solid rgba(255,255,255,0.10)', background: 'rgba(255,255,255,0.04)', color: '#fff' }}
           >
             <span>{showFilters ? '▾' : '▸'} 🎛 Фильтры{activeFilters > 0 ? ` · ${activeFilters} акт.` : ''}</span>
-            <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--accent)' }}>{visibleCount} циклов</span>
+            <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--accent)' }}>{ruCount(visibleCount, RU_CYCLES)}</span>
           </button>
         );
       })()}

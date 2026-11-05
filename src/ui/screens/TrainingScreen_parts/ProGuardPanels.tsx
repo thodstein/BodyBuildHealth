@@ -27,6 +27,7 @@ import { runWhatIf, generateReadinessForecast, type ForecastResult } from '../..
 import { loadReadinessHistory } from './readiness-history';
 import { useDataLink } from '../../../core/data-link';
 import { PCT_FOR_RIR } from '../../../engines/rir-table';
+import { ruCount, RU_SETS } from '../../../engines/ru-plural';
 
 interface GuardPanelProps {
   program: UserProgram;
@@ -240,7 +241,7 @@ export const RIRCalibrationPanel: React.FC<GuardPanelProps> = ({ program, dir, o
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6, flexWrap: 'wrap' }}>
         <span style={{ fontSize: 13, fontWeight: 800, color: ACCENT }}>🎯 Калибровка RIR</span>
         <span style={{ fontSize: 11, fontWeight: 700, color: biasColor }}>{biasLabel}</span>
-        <span style={{ fontSize: 10, color: DIM, marginLeft: 'auto' }}>{stats.totalSets} сетов · консистенция {stats.consistency}%</span>
+        <span style={{ fontSize: 10, color: DIM, marginLeft: 'auto' }}>{ruCount(stats.totalSets, RU_SETS)} · консистенция {stats.consistency}%</span>
       </div>
 
       {/* Bias-бар */}

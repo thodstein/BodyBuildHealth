@@ -16,6 +16,7 @@ import { exportWarmupCheckinsCSV, loadWarmupLog, warmupAdherence, warmupQualityT
 import { exportCooldownCheckinsCSV, loadCooldownLog, cooldownAdherence, cooldownQualityTrend } from '../../../engines/cooldown.engine';
 import { loadStretchLog, stretchStats } from '../../../engines/stretch-session.engine';
 import { restoreDiaryExtras } from '../../../engines/diary-backup.engine';
+import { ruCount, RU_ENTRIES, RU_MEASUREMENTS, RU_SESSIONS, RU_SETS, RU_TRAININGS } from '../../../engines/ru-plural';
 
 export const DiaryToolsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
   const {
@@ -74,14 +75,14 @@ export const DiaryToolsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                 a.click();
                 URL.revokeObjectURL(url);
               }} style={{ width: '100%', padding: '8px 16px', borderRadius: 8, fontSize: 12, fontWeight: 600, background: 'var(--accent)', color: '#000', border: 'none', cursor: 'pointer' }}>
-                📥 Скачать CSV ({historyWorkouts.length} тренировок)
+                📥 Скачать CSV ({ruCount(historyWorkouts.length, RU_TRAININGS)})
               </button>
             )}
           </div>
           {/* Mindset check-ins CSV export */}
           <div style={style.card}>
             <div style={style.label}>🧠 Психо-чек-ины CSV</div>
-            <div style={{ fontSize: 10, color: '#fff', marginBottom: 6 }}>Экспорт чек-инов уверенности/активации/фокуса из вкладки «Психология» ({mindsetCount} записей)</div>
+            <div style={{ fontSize: 10, color: '#fff', marginBottom: 6 }}>Экспорт чек-инов уверенности/активации/фокуса из вкладки «Психология» ({ruCount(mindsetCount, RU_ENTRIES)})</div>
             <button onClick={() => {
               const csv = exportMindsetCheckinsCSV();
               const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
@@ -98,7 +99,7 @@ export const DiaryToolsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
           {/* Mobility check-ins CSV export */}
           <div style={style.card}>
             <div style={style.label}>🧘 Мобильность CSV</div>
-            <div style={{ fontSize: 10, color: '#fff', marginBottom: 6 }}>Экспорт чек-инов мобильности (выполнено + ROM) из вкладки «Мобильность» ({mobilityCount} записей)</div>
+            <div style={{ fontSize: 10, color: '#fff', marginBottom: 6 }}>Экспорт чек-инов мобильности (выполнено + ROM) из вкладки «Мобильность» ({ruCount(mobilityCount, RU_ENTRIES)})</div>
             <button onClick={() => {
               const csv = exportMobilityCheckinsCSV();
               const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
@@ -115,7 +116,7 @@ export const DiaryToolsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
           {/* Warmup diary CSV export */}
           <div style={style.card}>
             <div style={style.label}>🔥 Разминка CSV</div>
-            <div style={{ fontSize: 10, color: '#fff', marginBottom: 6 }}>Экспорт дневника разминки (выполнена/качество/причина пропуска) — {warmupCount} записей</div>
+            <div style={{ fontSize: 10, color: '#fff', marginBottom: 6 }}>Экспорт дневника разминки (выполнена/качество/причина пропуска) — {ruCount(warmupCount, RU_ENTRIES)}</div>
             <button onClick={() => {
               const csv = exportWarmupCheckinsCSV();
               const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
@@ -132,7 +133,7 @@ export const DiaryToolsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
           {/* Cooldown diary CSV export */}
           <div style={style.card}>
             <div style={style.label}>❄️ Заминка CSV</div>
-            <div style={{ fontSize: 10, color: '#fff', marginBottom: 6 }}>Экспорт дневника заминки (выполнена/качество/причина пропуска) — {cooldownCount} записей</div>
+            <div style={{ fontSize: 10, color: '#fff', marginBottom: 6 }}>Экспорт дневника заминки (выполнена/качество/причина пропуска) — {ruCount(cooldownCount, RU_ENTRIES)}</div>
             <button onClick={() => {
               const csv = exportCooldownCheckinsCSV();
               const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
@@ -155,7 +156,7 @@ export const DiaryToolsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                   <div key={i} style={{ padding: '6px 8px', borderRadius: 6, background: 'rgba(255,255,255,0.03)', marginBottom: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div>
                       <div style={{ fontSize: 10, fontWeight: 600, color: '#fff' }}>{t.exercises.slice(0, 3).join(', ')}{t.exercises.length > 3 ? ` +${t.exercises.length - 3}` : ''}</div>
-                      <div style={{ fontSize: 9, color: '#fff' }}>{t.sets} сетов · {t.date}</div>
+                      <div style={{ fontSize: 9, color: '#fff' }}>{ruCount(t.sets, RU_SETS)} · {t.date}</div>
                     </div>
                     <button onClick={() => {
                       const recent = historyWorkouts.slice(-5).reverse();
@@ -232,7 +233,7 @@ export const DiaryToolsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                     ${mob30.length > 0 ? `<span>Мобильность: <b>${mobDone30}/${mob30.length}</b> дней</span><span>Ср. ROM: <b>${romAvg !== null ? romAvg + '/5' : '—'}</b></span>` : ''}
                     ${warm30.length > 0 ? `<span>Разминка: <b>${warmDone30}/${warm30.length}</b> дней</span><span>Ср. качество: <b>${warmQ.count > 0 ? warmQ.avg.toFixed(1) + '/5' : '—'}</b></span>` : ''}
                     ${cool30.length > 0 ? `<span>Заминка: <b>${coolDone30}/${cool30.length}</b> дней</span><span>Ср. качество: <b>${coolQ.count > 0 ? coolQ.avg.toFixed(1) + '/5' : '—'}</b></span>` : ''}
-                    ${stretch30.length > 0 ? `<span>Растяжка: <b>${stretchMin30} мин</b> (${stretch30.length} сессий)</span>` : ''}
+                    ${stretch30.length > 0 ? `<span>Растяжка: <b>${stretchMin30} мин</b> (${ruCount(stretch30.length, RU_SESSIONS)})</span>` : ''}
                   </div>` : ''}
                 ${prs.length > 0 ? `<h2>🏆 PR за период</h2><ul>${prs.slice(0, 10).map(p => `<li>${esc(p.ex)} — ${esc(p.w)}</li>`).join('')}</ul>` : ''}
                 <h2>📋 Сессии</h2>
@@ -353,7 +354,7 @@ export const DiaryToolsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                       });
                       saveWeightLog([...byDate.values()]);
                       setMeasurements(loadMeasurements());
-                      alert(`Импортировано: ${entries.length} записей веса`);
+                      alert(`Импортировано: ${ruCount(entries.length, RU_ENTRIES)} веса`);
                       onRefresh();
                     } catch { alert('Ошибка чтения файла'); }
                   };
@@ -430,7 +431,7 @@ export const DiaryToolsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                         const extras = restoreDiaryExtras(data);
                         const totalAdded = newWorkouts.length + addedMeasurements + extras.warmup + extras.mind + extras.mob;
                         if (totalAdded === 0) { alert('Все данные уже есть в дневнике'); return; }
-                        alert(`Импортировано: ${newWorkouts.length} тренировок, ${addedMeasurements} замеров, ${extras.warmup} записей разминки, ${extras.cooldown} записей заминки, ${extras.stretch} сессий растяжки, ${extras.mind} психо-чек-инов, ${extras.mob} чек-инов мобильности`);
+                        alert(`Импортировано: ${ruCount(newWorkouts.length, RU_TRAININGS)}, ${ruCount(addedMeasurements, RU_MEASUREMENTS)}, ${ruCount(extras.warmup, RU_ENTRIES)} разминки, ${ruCount(extras.cooldown, RU_ENTRIES)} заминки, ${ruCount(extras.stretch, RU_SESSIONS)} растяжки, ${extras.mind} психо-чек-инов, ${extras.mob} чек-инов мобильности`);
                         onRefresh();
                       } catch { alert('Ошибка чтения файла'); }
                     })();

@@ -24,6 +24,7 @@ import { PeakWeekMonitorCard, ShowDayEmergencyCard, PrepLabsCard, ShowSeriesCard
 import { buildTaperModifiers, taperCurveSVG, compareTaperStrategies } from '../../../engines/bb/bb-taper-adaptive.engine';
 import { postShowRecoveryProgress } from '../../../engines/bb/bb-peak-pro.engine';
 import { getWeightLog } from '../../../engines/profile-store';
+import { ruCount, RU_DAYS, RU_WEEKS } from '../../../engines/ru-plural';
 
 export interface BbContestPrepCtx { [key: string]: any }
 
@@ -578,7 +579,7 @@ export const BbContestPrepPreview: React.FC<{ ctx: BbContestPrepCtx }> = ({ ctx 
                     </table>
                   </div>
                   <div style={{ fontSize:9, color:'#fff', marginTop:3 }}>
-                    {rest > 0 ? `и ещё ${rest} недель подготовки с тем же режимом. ` : ''}
+                    {rest > 0 ? `и ещё ${ruCount(rest, RU_WEEKS)} подготовки с тем же режимом. ` : ''}
                     Объём подготовки не переделывает цикл: меняются только RIR/техники (+объём при выборе ×0.85), веса сохраняются.
                   </div>
                   {/* PRO-2 P7: diet-break длинного препа */}
@@ -1262,7 +1263,7 @@ export const BbContestPrepPost: React.FC<{ ctx: BbContestPrepCtx }> = ({ ctx }) 
                 return (
                   <div style={{ background:'rgba(34,197,94,0.04)', border:'1px solid rgba(34,197,94,0.15)', borderRadius:8, padding:10, fontSize:10 }}>
                     <div style={{ color:'#fff', marginBottom:4 }}>
-                      <b>{post.kcal} ккал</b> (поддержание) · Б {post.proteinG} г · 💧 {post.waterLiters} л стабильно · {post.durationDays} дней
+                      <b>{post.kcal} ккал</b> (поддержание) · Б {post.proteinG} г · 💧 {post.waterLiters} л стабильно · {ruCount(post.durationDays, RU_DAYS)}
                     </div>
                     {/* PRO-2 P5: трек восстановления — recovery (дефолт) vs reverse (opt-in) */}
                     <div style={{ display:'flex', gap:6, marginBottom:6 }}>

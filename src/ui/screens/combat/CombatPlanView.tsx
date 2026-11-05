@@ -22,6 +22,7 @@ import { CB_STRICT_GROUPS, cbStrictGroupFor } from '../../../engines/combat/comb
 import { buildCombatPrintHtml, downloadCombatCsv, buildCombatPlanIcs } from '../../../engines/combat/combat-print.engine';
 import { downloadCombatXlsx } from '../../../engines/combat/combat-xlsx.engine';
 import { weightCutNutritionForWeek, combatWeightCutToMealInput } from '../../../engines/combat/combat-weight-cut.engine';
+import { ruCount, RU_SESSIONS } from '../../../engines/ru-plural';
 
 type Props = {
   plan: CombatPlan;
@@ -320,7 +321,7 @@ export const CombatPlanView: React.FC<Props> = ({
               }}>{wk.week}</span>
               <div className="cb-plan-weektitle" style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 13, fontWeight: 700, color: '#fff', lineHeight: 1.1, display:'flex', gap:6, flexWrap:'wrap', alignItems:'center' }}><Highlight color={wk.deload?'#f59e0b': (wk as any).taper?'#60a5fa':'#a855f7'}>{ruLabel(PHASE_RU, wk.phase)}</Highlight>{wk.deload ? <Highlight color="#f59e0b">разгрузка</Highlight> : (wk as any).taper ? <Highlight color="#60a5fa">тапер</Highlight> : null}<span style={{ fontWeight:400, color:TEXT_3 }}>· <Highlight>{wk.totalSets}</Highlight> сетов{(wk as any).totalTonnage ? <> · <Highlight>{((wk as any).totalTonnage / 1000).toFixed(1)}т</Highlight></> : ''}</span></div>
-                <div style={{ fontSize: 11, color: TEXT_3, marginTop: 1, fontVariantNumeric:'tabular-nums' }}>Неделя {wk.week} · {wk.sessions.length} сессий · {wk.sessions.reduce((a, s) => a + s.exercises.length, 0)} упр.</div>
+                <div style={{ fontSize: 11, color: TEXT_3, marginTop: 1, fontVariantNumeric:'tabular-nums' }}>Неделя {wk.week} · {ruCount(wk.sessions.length, RU_SESSIONS)} · {wk.sessions.reduce((a, s) => a + s.exercises.length, 0)} упр.</div>
               </div>
               <span className="cb-plan-weekchev" style={{ width: 36, height: 36, borderRadius: 12, background: isOpen ? 'rgba(168,85,247,0.14)' : 'rgba(255,255,255,0.06)', border: `1px solid ${isOpen ? 'rgba(168,85,247,0.22)' : 'rgba(255,255,255,0.08)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 13, transition: 'transform 0.18s', transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>▾</span>
             </button>

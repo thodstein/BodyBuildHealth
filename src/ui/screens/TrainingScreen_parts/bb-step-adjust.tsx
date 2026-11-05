@@ -27,6 +27,7 @@ import { CollapsibleCard, phaseForWeek, exerciseComment, backSubgroupLabel, armH
 import { exerciseFeatureBadges, planSetsBreakdown, canonTechniqueId } from './bb-technique-display';
 import { muscleLabel } from './bb-labels';
 import type { SavedBBPlan } from './bb-plans-store';
+import { ruCount, RU_SESSIONS } from '../../../engines/ru-plural';
 
 export interface BbAdjustStepProps {
   builtPlan: BBPlan | null;
@@ -220,7 +221,7 @@ export const BbAdjustStep: React.FC<BbAdjustStepProps> = ({
               )}
               {fact.unmatchedSessions.length > 0 && (
                 <div style={{ marginTop: 6, fontSize: 9, color: 'rgba(255,255,255,0.5)' }}>
-                  {fact.unmatchedSessions.length} сессий вне диапазона плана (даты не совпадают с неделями мезо).
+                  {ruCount(fact.unmatchedSessions.length, RU_SESSIONS)} вне диапазона плана (даты не совпадают с неделями мезо).
                 </div>
               )}
             </div>

@@ -35,6 +35,7 @@ import type { Lift } from '../../../engines/lms/weakpoint-pl';
 import { PopupNumber, PopupSelect, ExpandableCard, MetricCard } from '../SRCBBScreen_parts/TrainingPopups';
 import { applyToPlanner } from './planner-bridge';
 import type { HubSnapshot } from './StrengthAnalysisHub';
+import { ruCount, RU_POINTS } from '../../../engines/ru-plural';
 
 const ACCENT = '#00e68a';
 const DIM = '#fff';
@@ -53,7 +54,7 @@ const INTENT_RU: Record<VBTIntent, string> = {
   speed: 'Скорость (30-50%)',
 };
 
-const liftOpts: { id: VBTLift; label: string; desc: string }[] = (Object.keys(LOAD_VELOCITY_PROFILE) as VBTLift[]).map(k => ({ id: k, label: LIFT_RU[k], desc: `Профиль: ${LOAD_VELOCITY_PROFILE[k].length} точек %[1RM]→скорость (м/с)` }));
+const liftOpts: { id: VBTLift; label: string; desc: string }[] = (Object.keys(LOAD_VELOCITY_PROFILE) as VBTLift[]).map(k => ({ id: k, label: LIFT_RU[k], desc: `Профиль: ${ruCount(LOAD_VELOCITY_PROFILE[k].length, RU_POINTS)} %[1RM]→скорость (м/с)` }));
 const intentOpts: { id: VBTIntent; label: string; desc: string }[] = (Object.keys(INTENT_ZONES) as VBTIntent[]).map(k => ({ id: k, label: INTENT_RU[k], desc: `Целевые %1RM: ${(INTENT_ZONES[k].pct[0] * 100).toFixed(0)}–${(INTENT_ZONES[k].pct[1] * 100).toFixed(0)}%` }));
 
 interface Props {

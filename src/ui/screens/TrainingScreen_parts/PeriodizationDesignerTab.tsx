@@ -51,6 +51,7 @@ import { loadSRPESessions } from '../../../engines/pro/srpe-store';
 import { acuteChronicRatio, toDailyLoads, weeklyMonotony } from '../../../engines/pro/training-load.engine';
 import { generateMesocycleProgression, generateInterMesocycleProgression, phaseDistribution } from '../../../engines/pro/mesocycle-progression.engine';
 import { useDataLink } from '../../../core/data-link';
+import { ruCount, RU_WEEKS } from '../../../engines/ru-plural';
 
 const ACCENT = '#00e68a';
 const ACCENT_PL = '#3b82f6';
@@ -906,7 +907,7 @@ export const PeriodizationDesignerTab: React.FC<{ initialUnifiedMode?: 'micro' |
                         </div>
                       );
                     })}
-                    {current.totalWeeks > 24 && <div style={{ fontSize: 10, color: DIM, textAlign: 'center', padding: 6 }}>… ещё {current.totalWeeks - 24} недель — см. таймлайн/график</div>}
+                    {current.totalWeeks > 24 && <div style={{ fontSize: 10, color: DIM, textAlign: 'center', padding: 6 }}>… ещё {ruCount(current.totalWeeks - 24, RU_WEEKS)} — см. таймлайн/график</div>}
                     <div style={{ marginTop: 8, display: 'flex', gap: 6 }}>
                       <button onClick={() => {
                         const seq = current.blocks.map(b => (PHASE_LABELS_RU[b.phaseKey] || b.phaseKey) + ' ' + b.startWeek + '-' + b.endWeek).join(' → ');

@@ -43,6 +43,7 @@ import { suggestWeightFromVelocity } from '../../../engines/manual-constructor/m
 import { getVolumeLandmarks } from '../../../engines/volume-landmarks.engine';
 import { MesoHeatmap } from './MesoHeatmap';
 import { MANUAL_STORAGE_KEYS } from '../../../engines/manual-constructor/manual-storage';
+import { ruCount, RU_DAYS, RU_EXERCISES, RU_SESSIONS, RU_SETS, RU_WEEKS } from '../../../engines/ru-plural';
 
 export const TRAINING_DAY_NAMES = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'] as const;
 const DAY_COLORS = ['#f59e0b', '#3b82f6', '#22c55e', '#a78bfa', '#ef4444', '#06b6d4', '#ec4899'];
@@ -249,7 +250,7 @@ const BBEditor: React.FC<{ body: BBProgramBody; onChange: (b: BBProgramBody) => 
       const willDelete = week.sessions.slice(count);
       const hasContent = willDelete.some(s => s.blocks.some(b => b.exerciseName && b.exerciseName.trim()));
       if (hasContent) {
-        const ok = await confirm({ title: `Уменьшить до ${count} тренировок?`, message: `Последние ${week.sessions.length - count} дней с упражнениями будут удалены из недели ${week.week}. Продолжить?`, confirmLabel: 'Удалить', danger: true });
+        const ok = await confirm({ title: `Уменьшить до ${count} тренировок?`, message: `Последние ${ruCount(week.sessions.length - count, RU_DAYS)} с упражнениями будут удалены из недели ${week.week}. Продолжить?`, confirmLabel: 'Удалить', danger: true });
         if (!ok) return;
       }
     }
@@ -260,7 +261,7 @@ const BBEditor: React.FC<{ body: BBProgramBody; onChange: (b: BBProgramBody) => 
   const removeWeek = async (wi: number) => {
     const wk = bodyRef.current.weeks[wi];
     const sessCount = wk?.sessions?.length ?? 0;
-    const ok = await confirm({ title: `Удалить неделю ${wk?.week}?`, message: `Будет потеряно ${sessCount} сессий. Это нельзя отменить.`, confirmLabel: 'Удалить', danger: true });
+    const ok = await confirm({ title: `Удалить неделю ${wk?.week}?`, message: `Будет потеряно ${ruCount(sessCount, RU_SESSIONS)}. Это нельзя отменить.`, confirmLabel: 'Удалить', danger: true });
     if (!ok) return;
     const remaining = bodyRef.current.weeks.filter((_, i) => i !== wi).map((w, i) => ({ ...w, week: i + 1 }));
     setWeeks(remaining);
@@ -427,7 +428,7 @@ const BBEditor: React.FC<{ body: BBProgramBody; onChange: (b: BBProgramBody) => 
       {showHeatmap && body.weeks.length > 1 && (() => {
         try {
           const tmpProg = { meta: { id: 'tmp', title: 'tmp', author: '', goal: 'hypertrophy', level, daysPerWeek: body.weeks[0]?.sessions.length ?? 3, weeks: body.weeks.length, direction: 'bb' as const, createdAt: '', updatedAt: '', source: 'custom' as const }, bb: body } as any;
-          return <div role="img" aria-label={`Тепловая карта объёма: ${body.weeks.length} недель`}><MesoHeatmap program={tmpProg} dir="bb" /></div>;
+          return <div role="img" aria-label={`Тепловая карта объёма: ${ruCount(body.weeks.length, RU_WEEKS)}`}><MesoHeatmap program={tmpProg} dir="bb" /></div>;
         } catch { return null; }
       })()}
       {body.weeks.length > 1 && (
@@ -747,7 +748,7 @@ const SessionList: React.FC<{ sessions: UserSession[]; phase?: UserWeek['phase']
   // U4/F4: confirm-диалог при удалении сессии — ConfirmDialog
   const removeSession = async (si: number) => {
     const s = sessions[si];
-    const ok = await confirm({ title: `Удалить "${s.name}"?`, message: `Будет потеряно ${s.blocks.length} упражнений. Это нельзя отменить.`, confirmLabel: 'Удалить', danger: true });
+    const ok = await confirm({ title: `Удалить "${s.name}"?`, message: `Будет потеряно ${ruCount(s.blocks.length, RU_EXERCISES)}. Это нельзя отменить.`, confirmLabel: 'Удалить', danger: true });
     if (!ok) return;
     onChange(sessions.filter((_, i) => i !== si));
   };
@@ -920,7 +921,7 @@ const BlockList: React.FC<{ blocks: UserBlock[]; phase?: UserWeek['phase']; sess
   const bulkWeight = (delta: number) => onChange(blocks.map(b=> selected.has(b.id) ? { ...b, sets: b.sets.map(s=> ({...s, weight: Math.max(0, Math.round(((s.weight??0)+delta)/2.5)*2.5)})) } : b));
   const bulkDelete = async () => {
     if (selected.size===0) return;
-    const ok = await confirm({ title: `Удалить ${selected.size} упражнений?`, message: 'Будет потеряно выбранное.', confirmLabel: 'Удалить', danger: true });
+    const ok = await confirm({ title: `Удалить ${ruCount(selected.size, RU_EXERCISES)}?`, message: 'Будет потеряно выбранное.', confirmLabel: 'Удалить', danger: true });
     if (!ok) return;
     onChange(blocks.filter(b=> !selected.has(b.id))); clearSel();
   };
@@ -1008,7 +1009,7 @@ const BlockList: React.FC<{ blocks: UserBlock[]; phase?: UserWeek['phase']; sess
   // U4/F4: confirm-диалог при удалении блока — ConfirmDialog
   const removeBlock = async (bi: number) => {
     const b = blocks[bi];
-    const ok = await confirm({ title: `Удалить "${b.exerciseName || 'упражнение'}"?`, message: `Будет потеряно ${b.sets.length} сетов. Это нельзя отменить.`, confirmLabel: 'Удалить', danger: true });
+    const ok = await confirm({ title: `Удалить "${b.exerciseName || 'упражнение'}"?`, message: `Будет потеряно ${ruCount(b.sets.length, RU_SETS)}. Это нельзя отменить.`, confirmLabel: 'Удалить', danger: true });
     if (!ok) return;
     onChange(blocks.filter((_, i) => i !== bi));
   };

@@ -12,7 +12,6 @@ import { stackLimitVerdicts, type StackItem } from '../../../engines/support-lim
 import { isAASHonest } from '../../../engines/support-hub-aas.engine';
 import { LAB_TOP20, resolveLabMonitor } from '../../../engines/support-hub-labs.engine';
 
-
 /* ──────────────── DEPLETION DB ──────────────── */
 const DEPLETION_DB: Array<{ depleter: string; depleted: string; mechanism: string; severity: string; recommendation: string }> = [
   { depleter: 'ZINC', depleted: 'COPPER', mechanism: 'Индукция металлотионеина → связывание Cu в энтероцитах → ↓ всасывания Cu', severity: 'HIGH', recommendation: 'Соотношение Zn:Cu = 10:1. При 50 мг Zn + 5 мг Cu. Контроль Cu в крови каждые 3 мес.' },

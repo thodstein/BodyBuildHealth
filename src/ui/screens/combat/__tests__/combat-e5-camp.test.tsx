@@ -58,7 +58,7 @@ describe('E5.2 — траектория нагрузки лагеря', () => {
     const plan = mkPlan();
     const delta = (plan.weeksData[0].totalSets || 0) - (plan.weeksData[plan.weeksData.length - 1].totalSets || 0);
     render(<CampStrip plan={{ ...plan, inputSnapshot: { ...(plan.inputSnapshot as any), heatSessions: true, heatSessionsCount: 3 } } as any} expandedWeek={null} onPickWeek={() => {}} />);
-    expect(screen.getByText(new RegExp(`нагрузка падает по неделям на ${delta} сетов`))).toBeTruthy();
+    expect(screen.getByText(new RegExp(`нагрузка падает по неделям на ${delta} (сет|сета|сетов)(?![а-яё])`))).toBeTruthy();
   });
 
   it('без тепловой адаптации блока нет (не показываем пустую строку)', () => {

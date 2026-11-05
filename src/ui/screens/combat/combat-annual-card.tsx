@@ -9,6 +9,7 @@ import React from 'react';
 import { SectionCard, CardHeader, Badge, BTN_SMALL, INPUT, CombatPopupSelect, Highlight, PHASE_RU, ruLabel, TEXT_3 } from './CombatUI';
 import { annualCBPhaseForWeek, annualResidualNote } from '../../../engines/combat/combat-annual';
 import { localIsoDate } from '../../../core/local-date';
+import { ruCount, RU_SETS } from '../../../engines/ru-plural';
 
 export interface AnnualCardProps {
   annual: any;
@@ -173,7 +174,7 @@ export const AnnualCard: React.FC<AnnualCardProps> = (p) => {
               return (
                 <div key={b.id} data-cb="annual-block-plan" style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', background: 'rgba(255,255,255,0.03)', padding: '7px 9px', borderRadius: 10, border: '0.5px solid rgba(255,255,255,0.06)' }}>
                   <span style={{ fontSize: 11, color: '#fff', flex: 1, minWidth: 140, fontVariantNumeric: 'tabular-nums' }}>
-                    Нед {b.startWeek}-{b.startWeek + b.weeks - 1} · {ruLabel(PHASE_RU, b.phase)} · план: <Highlight color="#6ee7b7">{b.plan.weeks} нед</Highlight> · {Math.round(setsWeek / Math.max(1, b.plan.weeks))} сетов/нед
+                    Нед {b.startWeek}-{b.startWeek + b.weeks - 1} · {ruLabel(PHASE_RU, b.phase)} · план: <Highlight color="#6ee7b7">{b.plan.weeks} нед</Highlight> · {ruCount(Math.round(setsWeek / Math.max(1, b.plan.weeks)), RU_SETS)}/нед
                   </span>
                   {p.onPrintBlock && (
                     <button data-cb="annual-block-print" aria-label={`Печать блока ${b.startWeek}-${b.startWeek + b.weeks - 1}`} onClick={() => p.onPrintBlock!(b)} style={{ ...BTN_SMALL, minHeight: 40, padding: '6px 10px', background: 'rgba(255,255,255,0.06)', color: '#fff', border: '0.5px solid rgba(255,255,255,0.1)' }}>🖨</button>

@@ -8,6 +8,7 @@ import React, { useMemo } from 'react';
 import type { UserProgram } from '../../../engines/user-program/user-program.types';
 import { GROUP_RU } from './program-types';
 import { ACCENT, DIM, DIM_STRONG } from './training-ui';
+import { ruCount, RU_SETS } from '../../../engines/ru-plural';
 
 interface Props {
   program: UserProgram;
@@ -113,7 +114,7 @@ export const ProgramTimeline: React.FC<Props> = ({ program, selectedWeek, onSele
                   color: sets > 0 ? (sets / maxSets > 0.5 ? '#fff' : DIM_STRONG) : 'transparent',
                   transition: 'background 0.15s',
                 }}
-                title={`${GROUP_RU[m] ?? m}, нед ${weeks[wi].week}: ${sets} сетов`}
+                title={`${GROUP_RU[m] ?? m}, нед ${weeks[wi].week}: ${ruCount(sets, RU_SETS)}`}
               >
                 {sets > 0 ? sets : ''}
               </div>

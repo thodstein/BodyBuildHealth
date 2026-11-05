@@ -12,6 +12,7 @@ import { ACCENT, CARD, DIM, BTN_GHOST } from './training-ui';
 import { bulkProgressWeeks } from '../../../engines/manual-constructor/manual-progression.engine';
 import type { LoadStrategy } from '../../../engines/bb/bb-autocoach.engine';
 import { applyDUPToProgram, type DupPreset, DUP_PRESETS, applySpecializationToProgram, applyTaperToProgram, inheritWeekBlocks } from '../../../engines/manual-constructor/manual-periodization-pro.engine';
+import { ruAdjCount, RU_ADJ_EMPTY_F, RU_WEEKS } from '../../../engines/ru-plural';
 
 interface Props {
   program: UserProgram;
@@ -147,7 +148,7 @@ export const BulkApplyCard: React.FC<Props> = ({ program, onChange, showToast })
     }
     if (inherited===0) { showToast('ℹ Нет пустых недель в диапазоне'); return; }
     onChange({ ...program, bb: { ...program.bb!, weeks: nextWeeks } });
-    showToast(`🧬 Наследование: неделя 1 → ${inherited} пустых недель`);
+    showToast(`🧬 Наследование: неделя 1 → ${ruAdjCount(inherited, RU_ADJ_EMPTY_F, RU_WEEKS)}`);
   };
 
   return (

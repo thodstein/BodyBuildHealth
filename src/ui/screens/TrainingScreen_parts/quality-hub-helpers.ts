@@ -13,6 +13,7 @@ import { deriveLengthShare, deriveShoulderFromNames } from '../../../engines/pla
 import { detectLift } from '../../../engines/lms/lms-to-pl';
 import type { V2ComposerInput } from '../../../engines/quality-score-v2.engine';
 import { applyToPlanner } from './planner-bridge';
+import { ruCount, RU_SETS } from '../../../engines/ru-plural';
 
 // ─── Рабочие максимумы ───
 
@@ -462,7 +463,7 @@ export function buildSplitFixText(
 ): string {
   const lines = candidates.map(c => {
     const half = Math.round((c.weeklySets / 2) * 10) / 10;
-    return `${c.muscle}: ${c.weeklySets} сетов в ${c.frequency}×/нед → разбить на 2× по ~${half} (напр. Пн/Чт)`;
+    return `${c.muscle}: ${ruCount(c.weeklySets, RU_SETS)} в ${c.frequency}×/нед → разбить на 2× по ~${half} (напр. Пн/Чт)`;
   });
   return `Разбиение объёма на 2 сессии (session MAV ≤10):\n${lines.join('\n')}`;
 }

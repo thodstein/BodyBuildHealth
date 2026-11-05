@@ -14,6 +14,7 @@ import { acuteChronicRatio, toDailyLoads } from '../../../engines/pro/training-l
 import { loadReadinessHistory } from './readiness-history';
 import { useDataLink } from '../../../core/data-link';
 import { CARD, DIM, DIM_STRONG, ACCENT, BTN_GHOST, BTN } from './training-ui';
+import { ruCount, RU_SETS } from '../../../engines/ru-plural';
 
 // ═══════════ F2.5: Тренерские комментарии в PDF ═══════════
 export const ProgramNotes: React.FC<{
@@ -205,7 +206,7 @@ export const ProgramStrengthScore: React.FC<{ program: UserProgram; dir: string 
         <span style={{ fontSize: 18, fontWeight: 800, color, marginLeft: 'auto' }}>{score.overall}/100</span>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4, fontSize: 10 }}>
-        <FactorBar label="Объём" v={score.volumeScore} hint={`${score.totalSets} сетов`} />
+        <FactorBar label="Объём" v={score.volumeScore} hint={`${ruCount(score.totalSets, RU_SETS)}`} />
         <FactorBar label="Разнообразие" v={score.diversityScore} hint="6 групп" />
         <FactorBar label="Частота" v={score.sessionsScore} hint="4 сессии/нед" />
         <FactorBar label="Упражнения" v={score.exercisesScore} hint="4 упр/сессию" />

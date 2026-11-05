@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import type { WorkoutLog } from '../../../core/types';
 import { getAllExerciseProgressions, type ExerciseProgressionData } from '../../../engines/log-analytics-progression.engine';
+import { ruCount, RU_EXERCISES } from '../../../engines/ru-plural';
 
 const EXERCISE_KEYS: Record<string, string> = {
   bench: 'Жим лёжа', squat: 'Присед', deadlift: 'Становая тяга',
@@ -44,7 +45,7 @@ const AllExercisesTrendCard: React.FC<{ sessions: WorkoutLog[] }> = ({ sessions 
           </span>
         )}
       </div>
-      <div style={{ fontSize: 10, color: '#fff', marginBottom: 4 }}>{progressions.length} упражнений</div>
+      <div style={{ fontSize: 10, color: '#fff', marginBottom: 4 }}>{ruCount(progressions.length, RU_EXERCISES)}</div>
       <div style={{ maxHeight: 280, overflowY: 'auto' }}>
         <table style={{ width: '100%', fontSize: 10, borderCollapse: 'collapse' }}>
           <thead>
@@ -85,7 +86,7 @@ const AllExercisesTrendCard: React.FC<{ sessions: WorkoutLog[] }> = ({ sessions 
       </div>
       {progressions.filter(p => p.plateauWeeks >= 3).length > 0 && (
         <div style={{ marginTop: 4, fontSize: 10, color: '#f59e0b', background: 'rgba(245,158,11,0.1)', borderRadius: 4, padding: '4px 6px' }}>
-          ⚠ {progressions.filter(p => p.plateauWeeks >= 3).length} упражнений в плато ≥3 нед. Рекомендуется смена программы или делод.
+          ⚠ {ruCount(progressions.filter(p => p.plateauWeeks >= 3).length, RU_EXERCISES)} в плато ≥3 нед. Рекомендуется смена программы или делод.
         </div>
       )}
     </div>

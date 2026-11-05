@@ -10,6 +10,7 @@ import { WarmupCheckinInline } from '../SRCBBScreen_parts/WarmupSessionPanel';
 import { CooldownCheckinInline } from '../SRCBBScreen_parts/CooldownSessionPanel';
 import { getPreviousWorkoutData, searchExerciseCatalog, seedForNewExercise } from './diary-shared';
 import type { StrengthLogEntry, WorkoutLog } from '../../../core/types';
+import { ruCount, RU_APPROACHES, RU_SETS } from '../../../engines/ru-plural';
 
 const ACCENT = '#00e68a';
 
@@ -387,7 +388,7 @@ export const DiaryRecordingForm: React.FC<DiaryRecordingFormProps> = ({ diary, s
           {undoRef.current.length > 0 && (
             <button onClick={undo} style={{ padding: '3px 8px', borderRadius: 5, border: '1px solid rgba(255,255,255,0.1)', background: 'transparent', color: '#fff', cursor: 'pointer', fontSize: 10 }}>↩</button>
           )}
-          {totalSets > 0 && <span style={{ fontSize: 10, color: '#fff' }}>{totalSets} сетов · {totalVolume.toLocaleString()} кг</span>}
+          {totalSets > 0 && <span style={{ fontSize: 10, color: '#fff' }}>{ruCount(totalSets, RU_SETS)} · {totalVolume.toLocaleString()} кг</span>}
         </div>
       </div>
 
@@ -599,7 +600,7 @@ export const DiaryRecordingForm: React.FC<DiaryRecordingFormProps> = ({ diary, s
                   {cat?.name || ex.exerciseName}
                 </div>
                 <div style={{ fontSize: 10, color: '#fff' }}>
-                  {ex.sets.length} подходов
+                  {ruCount(ex.sets.length, RU_APPROACHES)}
                   {prev && <span style={{ marginLeft: 6, color: ACCENT }}>прошлый: {prev.weight}кг×{prev.reps}</span>}
                 </div>
               </div>
@@ -839,7 +840,7 @@ export const DiaryRecordingForm: React.FC<DiaryRecordingFormProps> = ({ diary, s
         </div>
       ) : (
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, fontSize: 10, color: '#fff' }}>
-          <span>Всего: {exercises.length} упр. · {totalSets} подходов · {totalVolume.toLocaleString()} кг</span>
+          <span>Всего: {exercises.length} упр. · {ruCount(totalSets, RU_APPROACHES)} · {totalVolume.toLocaleString()} кг</span>
           {saved && <span style={{ color: ACCENT, fontWeight: 700 }}>✅ Сохранено!</span>}
           {saveError && <span style={{ color: '#ef4444', fontWeight: 700 }}>{saveError}</span>}
         </div>

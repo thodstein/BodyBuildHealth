@@ -12,6 +12,7 @@ import { StrengthDiary } from '../../../engines/strength-diary.engine';
 import type { StrengthStats } from '../../../engines/strength-diary.engine';
 import { CARD, DIM, DIM_STRONG, ACCENT } from './training-ui';
 import { GROUP_RU } from './program-types';
+import { ruCount, RU_EXERCISES } from '../../../engines/ru-plural';
 
 export const StrengthDiaryPanel: React.FC<{ program: UserProgram; dir: string }> = ({ program, dir }) => {
   const [statsMap, setStatsMap] = useState<Record<string, StrengthStats | null>>({});
@@ -77,7 +78,7 @@ export const StrengthDiaryPanel: React.FC<{ program: UserProgram; dir: string }>
     <div className="train-strengthdiary" style={{ ...CARD, padding: 10, borderLeft: '3px solid #60a5fa' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6, flexWrap: 'wrap' }}>
         <span style={{ fontSize: 13, fontWeight: 800, color: ACCENT }}>📊 Дневник: реальный прогресс</span>
-        <span style={{ fontSize: 10, color: DIM, marginLeft: 'auto' }}>{sorted.length} упражнений · {plateauCount} возможный плато</span>
+        <span style={{ fontSize: 10, color: DIM, marginLeft: 'auto' }}>{ruCount(sorted.length, RU_EXERCISES)} · {plateauCount} возможный плато</span>
       </div>
       {loading && <div style={{ fontSize: 11, color: DIM }}>⏳ Загрузка...</div>}
       <div style={{ maxHeight: 220, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 3 }}>

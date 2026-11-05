@@ -19,6 +19,7 @@ import { selectProgressionRule, calcSuggestedWeight, estimate1RM, getDeloadRecom
 import type { TrainingInput, TrainingOutput, ReadinessInput, ReadinessScores, Exercise } from '../../core/types';
 
 import type { MacrocyclePlan, Microcycle } from '../../engines/training-periodization.engine';
+import { ruCount, RU_DAYS } from '../../engines/ru-plural';
 
 
 
@@ -106,13 +107,13 @@ function getSplitRationale(goal: string, level: string, daysPerWeek: number, rec
 
   const reasons: string[] = [];
 
-  if (daysPerWeek <= 3) reasons.push(`${daysPerWeek} дней/нед → фуллбоди или Верх/Низ сплит для частоты каждой группы ≥2×`);
+  if (daysPerWeek <= 3) reasons.push(`${ruCount(daysPerWeek, RU_DAYS)}/нед → фуллбоди или Верх/Низ сплит для частоты каждой группы ≥2×`);
 
   else if (daysPerWeek === 4) reasons.push(`${daysPerWeek} дня → оптимально Верх/Низ для гипертрофии (каждая группа 2×/нед)`);
 
-  else if (daysPerWeek === 5) reasons.push(`${daysPerWeek} дней → PPL + акцент или бро-сплит для специализации`);
+  else if (daysPerWeek === 5) reasons.push(`${ruCount(daysPerWeek, RU_DAYS)} → PPL + акцент или бро-сплит для специализации`);
 
-  else reasons.push(`${daysPerWeek} дней → PPL дважды для максимального объёма и частоты`);
+  else reasons.push(`${ruCount(daysPerWeek, RU_DAYS)} → PPL дважды для максимального объёма и частоты`);
 
 
 

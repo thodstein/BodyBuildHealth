@@ -29,6 +29,7 @@ import { PHASE_COLORS, PHASE_LABELS } from './PlanOutput';
 import { Chip, BTN, BTN_GHOST, H, SMALL, IN } from './training-ui';
 import { sessionTagLabel, muscleLabel, exerciseTargetNote } from './bb-labels';
 import { ExpandableCard } from '../SRCBBScreen_parts/TrainingPopups';
+import { ruCount, RU_SETS } from '../../../engines/ru-plural';
 
 export interface BbPlanStepProps {
   builtPlan: BBPlan | null;
@@ -114,8 +115,8 @@ export const BbPlanStep: React.FC<BbPlanStepProps> = ({
               badge={badge.label}
             >
               <div style={{ fontSize: 10, color: '#fff', opacity: 0.85, marginBottom: 6, lineHeight: 1.45 }}>
-                Учтены: уровень «{bbLevel}», {bbWeeks} нед, {bbTrainingFocus === 'strength' ? 'силовой' : bbTrainingFocus === 'endurance' ? 'выносливостный' : 'гипертрофийный'} фокус, лимиты сессии {(() => { try { const l = sessionLimitsFor({ level: bbLevel, trainingYears: bbTrainingYears, onCourse, trainingVolumeMode } as any, { id: builtPlan.pattern?.id } as any); return `${l.maxExercises} упр / ${l.maxWorkingSets} сетов`; } catch { return '—'; } })()}.
-                Максимум в плане: {stats.maxExercises} упр / {stats.maxSets} сетов за сессию.
+                Учтены: уровень «{bbLevel}», {bbWeeks} нед, {bbTrainingFocus === 'strength' ? 'силовой' : bbTrainingFocus === 'endurance' ? 'выносливостный' : 'гипертрофийный'} фокус, лимиты сессии {(() => { try { const l = sessionLimitsFor({ level: bbLevel, trainingYears: bbTrainingYears, onCourse, trainingVolumeMode } as any, { id: builtPlan.pattern?.id } as any); return `${l.maxExercises} упр / ${ruCount(l.maxWorkingSets, RU_SETS)}`; } catch { return '—'; } })()}.
+                Максимум в плане: {stats.maxExercises} упр / {ruCount(stats.maxSets, RU_SETS)} за сессию.
               </div>
               {view.accentNote && (
                 <div style={{ fontSize: 10, color: '#facc15', padding: '5px 8px', borderRadius: 8, background: 'rgba(250,204,21,0.07)', border: '1px solid rgba(250,204,21,0.2)', marginBottom: 6, lineHeight: 1.45 }}>
@@ -531,7 +532,7 @@ export const BbPlanStep: React.FC<BbPlanStepProps> = ({
                     <div style={{ fontSize:15, fontWeight:800, color:'#fff', lineHeight:1.2 }}>День {si+1} · {sessionTagLabel(s.sessionTag)}</div>
                     <div style={{ fontSize:11, color:'#fff', opacity:0.85, marginTop:2, display:'flex', gap:8, flexWrap:'wrap' }}>
                       <span style={{ padding:'2px 7px', borderRadius:6, background: dayColor+'22', color:dayColor, border:`1px solid ${dayColor}35`, fontWeight:700 }}>{PHASE_LABELS[currentPhase]}</span>
-                      <span>{s.character} · {dayExCount} упр · {daySets} сетов</span>
+                      <span>{s.character} · {dayExCount} упр · {ruCount(daySets, RU_SETS)}</span>
                     </div>
                   </div>
                 </div>

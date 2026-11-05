@@ -95,6 +95,7 @@ import { periodLabelRu } from '../../../data/lms-cycles/period-labels';
 import { MANUAL_STORAGE_KEYS } from '../../../engines/manual-constructor/manual-storage';
 
 import { GOAL_OPTS_BB as CENTRAL_GOAL_BB, GOAL_OPTS_PL as CENTRAL_GOAL_PL, GOAL_OPTS_HYBRID as CENTRAL_GOAL_HYBRID, goalLabelOf as centralGoalLabelOf } from '../../../engines/goals';
+import { ruCount, RU_CYCLES, RU_SESSIONS } from '../../../engines/ru-plural';
 // Центральный реестр целей — реэкспорт для совместимости
 export const GOAL_OPTS_BB = CENTRAL_GOAL_BB;
 export const GOAL_OPTS_PL = CENTRAL_GOAL_PL;
@@ -694,7 +695,7 @@ export const ProgramManagerPanel: React.FC = () => {
             }
             const cyc = p.pl!.sourceCycleId ? `Цикл ${p.pl!.sourceCycleId}` : 'Цикл не выбран';
             const wm = p.pl!.workMax;
-            return (<div style={{ fontSize: 10, color: DIM, marginTop: 8, lineHeight: 1.5 }}><b style={{ color: DIM_STRONG }}>🏆 {cyc}</b> · ПМ {wm.squat ?? '—'}/{wm.bench ?? '—'}/{wm.dead ?? '—'} кг · {p.pl!.schedule.length} сессий</div>);
+            return (<div style={{ fontSize: 10, color: DIM, marginTop: 8, lineHeight: 1.5 }}><b style={{ color: DIM_STRONG }}>🏆 {cyc}</b> · ПМ {wm.squat ?? '—'}/{wm.bench ?? '—'}/{wm.dead ?? '—'} кг · {ruCount(p.pl!.schedule.length, RU_SESSIONS)}</div>);
           })()}
           {dir === 'hybrid' && p.hybrid && (() => {
             const bb = p.hybrid!.bbWeeks?.[0];
@@ -938,7 +939,7 @@ export const ProgramManagerPanel: React.FC = () => {
           title="✋ Ручной конструктор программ"
           subtitle={`Соберите программу с нуля, клонируйте из библиотеки ${allLibraryPrograms.length} шаблонов или подключите LMS-цикл ${plCycles.length} — сеты, RIR, вес и отдых настраиваются вручную или в 1 клик из профиля.`}
           progress={{ current: 1, total: 3, label: 'Выбор' }}
-          chips={[{ label: `${allLibraryPrograms.length} шаблонов`, color: '#00e68a' }, { label: `${plCycles.length} циклов`, color: '#a78bfa' }]}
+          chips={[{ label: `${allLibraryPrograms.length} шаблонов`, color: '#00e68a' }, { label: `${ruCount(plCycles.length, RU_CYCLES)}`, color: '#a78bfa' }]}
         />
         {renderMstepNav()}
 
@@ -952,7 +953,7 @@ export const ProgramManagerPanel: React.FC = () => {
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 8 }}>
               {[
-                { n: '1', icon: '📚', title: 'Выбор', desc: `Библиотека ${allLibraryPrograms.length} + ${plCycles.length} циклов, фильтры, ⭐ рекомендовано, 1-клик` },
+                { n: '1', icon: '📚', title: 'Выбор', desc: `Библиотека ${allLibraryPrograms.length} + ${ruCount(plCycles.length, RU_CYCLES)}, фильтры, ⭐ рекомендовано, 1-клик` },
                 { n: '2', icon: '🛠️', title: 'Редактор', desc: 'Недели → дни → упражнения, доска, live качество, пикер с поиском' },
                 { n: '3', icon: '✅', title: 'Итог', desc: 'Score 0-100, проверка MRV, 📅 ICS / 📤 JSON / 🖨 PDF' },
               ].map(s => (
@@ -1084,7 +1085,7 @@ export const ProgramManagerPanel: React.FC = () => {
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 8 }}>
             {[
-              { n: '1', icon: '📚', title: 'Выбор', desc: `Библиотека ${allLibraryPrograms.length} + ${plCycles.length} циклов, ⭐ рекомендовано` },
+              { n: '1', icon: '📚', title: 'Выбор', desc: `Библиотека ${allLibraryPrograms.length} + ${ruCount(plCycles.length, RU_CYCLES)}, ⭐ рекомендовано` },
               { n: '2', icon: '🛠️', title: 'Редактор', desc: 'Недели → дни → упражнения, доска, live качество' },
               { n: '3', icon: '✅', title: 'Итог', desc: 'Score 0-100, ICS / JSON / PDF' },
             ].map(s => (

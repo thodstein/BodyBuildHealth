@@ -27,6 +27,7 @@ import {
   type MindsetProtocol, type ProtocolItem, type ProtocolItemKind, type MindsetDayType, type MindsetDirection,
   type MoodTag,
 } from '../../../engines/mindset-protocol.engine';
+import { ruCount, RU_SESSIONS } from '../../../engines/ru-plural';
 
 const CARD = diaryCard;
 const IN = diaryInput;
@@ -709,7 +710,7 @@ export const MindsetTab: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                     <div key={b.level} style={{ padding: '6px 8px', borderRadius: 8, background: 'rgba(255,255,255,0.04)', textAlign: 'center' }}>
                       <div style={{ fontSize: 9, color: DIM }}>{b.range}</div>
                       <div style={{ fontSize: 12, fontWeight: 700, color: b.n > 0 ? '#fff' : DIM }}>{b.n > 0 ? `${b.avgE1RM} кг` : '—'}</div>
-                      <div style={{ fontSize: 8, color: DIM }}>{b.n} сессий</div>
+                      <div style={{ fontSize: 8, color: DIM }}>{ruCount(b.n, RU_SESSIONS)}</div>
                     </div>
                   ))}
                 </div>

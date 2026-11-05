@@ -18,6 +18,7 @@ import { getWeightLog } from '../../../engines/profile-store';
 import { lthrZones, cardioHeartZones, type HeartZone, type CardioCycle } from '../../../engines/lms/cardio.engine';
 import { CARD, ROW, LABEL, HINT_SM, BTN, BTN_CTA, BTN_SMALL, CHIP, CHIP_ACTIVE } from './CardioUI';
 import type { CardioType } from '../../../engines/lms/cardio.engine';
+import { ruCount, RU_ENTRIES, RU_TRAININGS } from '../../../engines/ru-plural';
 
 /** Текстовые форматы: 5 МБ (защита от подвисания). ZIP (Apple export) — 60 МБ. */
 const TEXT_MAX = 5 * 1024 * 1024;
@@ -125,7 +126,7 @@ export const CardioImportPanel: React.FC<{ onImported?: () => void; cycle?: Card
       setFit(analyzeFitRecords(records, zoneBoundsFromCycle(cycle)));
       const km = result.entries.reduce((s, x) => s + (x.distanceKm ?? 0), 0);
       const fitTail = records.length >= 10 ? ' · PRO-разбор FIT готов' : '';
-      say(`📥 ${f.name}: ${result.entries.length} тренировр${result.entries.length === 1 ? 'а' : 'ок(и)'} · ${cardioImportFormatLabel(result.format)}${km > 0 ? ` · ${km.toFixed(1)} км` : ''}${fitTail} — проверьте превью`, 4000);
+      say(`📥 ${f.name}: ${ruCount(result.entries.length, RU_TRAININGS)} · ${cardioImportFormatLabel(result.format)}${km > 0 ? ` · ${km.toFixed(1)} км` : ''}${fitTail} — проверьте превью`, 4000);
     } catch (err) {
       say(`⚠ Ошибка чтения файла: ${(err as Error).message}`, 4000);
     } finally {
@@ -183,7 +184,7 @@ export const CardioImportPanel: React.FC<{ onImported?: () => void; cycle?: Card
         notes: `импорт ${preview.fileName}`,
       })),
     );
-    say(`✅ Импортировано ${n} тренировок`, 3000);
+    say(`✅ Импортировано ${ruCount(n, RU_TRAININGS)}`, 3000);
     setPreview(null);
     onImported?.();
   };
@@ -222,7 +223,7 @@ export const CardioImportPanel: React.FC<{ onImported?: () => void; cycle?: Card
           )}
           {fit && (
             <div style={{ background: 'rgba(167,139,250,0.08)', border: '1px solid rgba(167,139,250,0.26)', borderLeft: '3px solid #a78bfa', borderRadius: 10, padding: '9px 11px', display: 'flex', flexDirection: 'column', gap: 5 }} data-cardio="fit-analysis">
-              <div style={{ fontSize: 11.5, fontWeight: 800, color: '#c4b5fd' }}>🔬 PRO-разбор FIT · {fit.records.toLocaleString('ru-RU')} записей</div>
+              <div style={{ fontSize: 11.5, fontWeight: 800, color: '#c4b5fd' }}>🔬 PRO-разбор FIT · {ruCount(fit.records, RU_ENTRIES)}</div>
               {fit.hist && (() => {
                 const total = fit.hist!.counts.reduce((s, x) => s + x, 0);
                 if (total === 0) return null;
@@ -282,7 +283,7 @@ export const CardioImportPanel: React.FC<{ onImported?: () => void; cycle?: Card
                 {preview.entries.length > 30 && <div style={HINT_SM}>…и ещё {preview.entries.length - 30}</div>}
               </div>
               <div style={ROW}>
-                <button style={{ ...BTN_CTA, minHeight: 48 }} onClick={saveAll}>💾 Импортировать {preview.entries.length} записей</button>
+                <button style={{ ...BTN_CTA, minHeight: 48 }} onClick={saveAll}>💾 Импортировать {ruCount(preview.entries.length, RU_ENTRIES)}</button>
                 <button style={BTN} onClick={() => setPreview(null)}>✕ Отмена</button>
               </div>
             </>

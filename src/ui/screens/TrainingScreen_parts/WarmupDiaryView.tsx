@@ -23,6 +23,7 @@ import { warmupLabel } from '../../../engines/warmup.engine';
 import { WarmupRampCard } from './diary-cards';
 import type { WorkoutLog } from '../../../core/types';
 import { localIsoDate } from './diary-shared';
+import { ruCount, RU_SESSIONS } from '../../../engines/ru-plural';
 
 const CARD = diaryCard;
 const WARMUP_COLOR = '#f97316';
@@ -269,7 +270,7 @@ export const WarmupDiaryView: React.FC<{ historyWorkouts?: WorkoutLog[]; planDay
                     <div key={b.level} style={{ padding: '6px 8px', borderRadius: 8, background: 'rgba(255,255,255,0.04)', textAlign: 'center' }}>
                       <div style={{ fontSize: 8, color: DIM }}>{b.range}</div>
                       <div style={{ fontSize: 12, fontWeight: 700, color: b.n > 0 ? '#fff' : DIM }}>{b.n > 0 ? `${b.avgE1RM} кг` : '—'}</div>
-                      <div style={{ fontSize: 8, color: DIM }}>{b.n} сессий</div>
+                      <div style={{ fontSize: 8, color: DIM }}>{ruCount(b.n, RU_SESSIONS)}</div>
                     </div>
                   ))}
                 </div>

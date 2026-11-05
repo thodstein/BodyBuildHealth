@@ -32,6 +32,7 @@ import {
 import { loadCardioLog } from '../../../engines/lms/cardio-diary.engine';
 import { publishCardioKcalContract } from '../../../engines/lms/cardio-nutrition-contract.engine';
 import { parseTempoCanon } from '../../../engines/tempo-canon.engine';
+import { ruAdjCount, RU_ADJ_WORKING, RU_SETS } from '../../../engines/ru-plural';
 
 export interface BridgeCtx {
   program: UserProgram;
@@ -861,7 +862,7 @@ const bbNutritionHandler: Handler = (payload, { showToast }) => {
     : '';
   const kcalLabel = kcal ? `Целевой калораж: ~${kcal} ккал/день.` : '';
   const proteinLabel = proteinG ? `Белок: ~${proteinG} г/день.` : '';
-  const volumeLabel = weeklySets ? `Недельный объём: ${weeklySets} рабочих сетов.` : '';
+  const volumeLabel = weeklySets ? `Недельный объём: ${ruAdjCount(weeklySets, RU_ADJ_WORKING, RU_SETS)}.` : '';
   const text = ['🍽 Питание для ББ-плана:', kcalLabel, proteinLabel, volumeLabel, trainDaysLabel, basisLabel].filter(Boolean).join('\n');
   try {
     localStorage.setItem(BB_NUTRITION_NOTE_KEY, JSON.stringify({

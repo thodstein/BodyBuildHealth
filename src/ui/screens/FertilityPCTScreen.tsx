@@ -9,6 +9,7 @@ import { STRUCTURED_PCT_PROTOCOLS } from '../../engines/pct-timing.engine';
 import { AAS_MEDICAL_DISCLAIMER, matchProtocolsForStack } from '../../data/aas-support-protocols';
 import { PHARMA_DB } from '../../core/pharma-database';
 import { UnifiedLabPanel } from '../components/UnifiedLabPanel';
+import { ruCount, RU_WEEKS } from '../../engines/ru-plural';
 
 type FertTab = 'overview' | 'pct-plan' | 'hrt';
 const addToPlan = async (substanceId: string, doseValue: number, doseUnit: string, freq: string, startWeek: number, endWeek: number) => {
@@ -599,7 +600,7 @@ export const FertilityPCTScreen: React.FC<{ initialTab?: FertTab; restrictToMode
                 <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 8 }}>Рекомендации для восстановления после курса</div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                   {[
-                    { icon: '📅', label: 'Длительность', desc: `${pctPlan.pctProtocol.reduce((max: number, p: any) => Math.max(max, p.endWeek || 0), 0) - pctPlan.pctStartWeek + 1} недель` },
+                    { icon: '📅', label: 'Длительность', desc: `${ruCount(pctPlan.pctProtocol.reduce((max: number, p: any) => Math.max(max, p.endWeek || 0), 0) - pctPlan.pctStartWeek + 1, RU_WEEKS)}` },
                     { icon: '💊', label: 'Препараты', desc: `${pctPlan.pctProtocol.length} препаратов в протоколе` },
                     { icon: '📊', label: 'Мониторинг', desc: 'Контроль гормонов каждые 2-4 нед' },
                     { icon: '🧬', label: 'Цель', desc: 'LH/ФСГ > 5, тестостерон > 15 нмоль/л' },

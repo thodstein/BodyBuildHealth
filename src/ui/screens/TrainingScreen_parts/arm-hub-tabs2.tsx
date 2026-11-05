@@ -14,6 +14,7 @@ import { AdSec, AdGrid, AdField, AdChip, AdSwitch, AdSheetSelect, AdBtn, AdBanne
 import { WP_LABEL_SHORT } from './arm-hub-shared';
 import { ArmPickBlock } from './arm-hub-pick';
 import { ArmVideoTracker } from './arm-video-tracker';
+import { ruCount, RU_SETS } from '../../../engines/ru-plural';
 
 /** PRO-3 P8: позиционный чек-лист — локальный стейт ритуала (не персистится: проверка «сегодня»).
  * PRO-5 №5: провалы дублируются в he_arm_humerus_checks — мост в конструктор (ось/warmup). */
@@ -519,7 +520,7 @@ export function HubRecoveryTab({ H }: { H: any }) {
           <div className="ad-muted">{tendonAcwr? `Tendon — факт` : 'нет tendon-данных'}</div>
         </AdSec>
         <AdSec title={`Tendon Load · лимит ${tendonWeeklyLimit(state.level)}`}>
-          <div className="ad-muted">{report.tendonLoad != null ? `${report.tendonLoad} сетов/нед` : 'план не подключён — недельная нагрузка не оценена'} · Side MRV {H.landmarks.side.mrv} · TendonCap 1.2× vs Muscle 1.7×</div>
+          <div className="ad-muted">{report.tendonLoad != null ? `${ruCount(report.tendonLoad, RU_SETS)}/нед` : 'план не подключён — недельная нагрузка не оценена'} · Side MRV {H.landmarks.side.mrv} · TendonCap 1.2× vs Muscle 1.7×</div>
           <div className="ad-muted">Beginner 12 / Inter 16 / Adv 18 / Enh 22 — GripStrength F1 3с эксцентрик</div>
         </AdSec>
         <AdSec title="Дополнительно">

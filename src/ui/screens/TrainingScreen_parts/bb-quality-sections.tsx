@@ -30,6 +30,7 @@ import type { SessionMethodology } from '../../../engines/bb/bb-session-order.en
 import type { PED, PEDAdaptation } from '../../../engines/bb/bb-ped-adaptation.engine';
 import type { InjurySelectEntry } from './InjurySelectCard';
 import { CARD } from './training-ui';
+import { ruCount, RU_SETS } from '../../../engines/ru-plural';
 
 export interface BbQualityUnifiedCardProps {
   qualityReport: ReturnType<typeof buildBBQualityReport> | null;
@@ -240,7 +241,7 @@ export const BbQualityPlanLogicCard: React.FC<BbQualityPlanLogicProps> = ({
         <CollapsibleCard title="4 · Объём и восстановление — стратегия" defaultOpen={false} headerStyle={{ background: 'linear-gradient(135deg, rgba(245,158,11,0.10), rgba(245,158,11,0.03))', color: '#f59e0b' }}>
           <div style={{ display:'flex', flexWrap:'wrap', gap:5 }}>
             <span style={{ fontSize:10, color:'#fff', background: pedMult>1?'rgba(245,158,11,0.12)':'rgba(255,255,255,0.04)', border:`1px solid ${pedMult>1?'rgba(245,158,11,0.22)':'rgba(255,255,255,0.06)'}`, padding:'3px 7px', borderRadius:20 }}>{pedLabel}</span>
-            <span style={{ fontSize:10, color:'#fff', background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', padding:'3px 7px', borderRadius:20 }}>лимиты {builtPlan.maxWorkingSets} сетов / {builtPlan.maxExercises} упр. · режим {sessionLimitsFor({onCourse: pedMult>1, level: bbLevel, trainingYears: bbTrainingYears, trainingVolumeMode} as any).weeklyWorkingSets} в неделю</span>
+            <span style={{ fontSize:10, color:'#fff', background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', padding:'3px 7px', borderRadius:20 }}>лимиты {ruCount(builtPlan.maxWorkingSets ?? 0, RU_SETS)} / {builtPlan.maxExercises} упр. · режим {sessionLimitsFor({onCourse: pedMult>1, level: bbLevel, trainingYears: bbTrainingYears, trainingVolumeMode} as any).weeklyWorkingSets} в неделю</span>
           </div>
           <div style={{ fontSize:10, color:'#fff', opacity:0.7, lineHeight:1.35, marginTop:6 }}>Детализация по мышцам — в карточке «Тренировочный объём» ниже: там прямой/косвенный, недельный и общий, подмышцы и статус MEV/MAV/MRV.</div>
         </CollapsibleCard>

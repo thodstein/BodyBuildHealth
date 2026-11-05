@@ -21,6 +21,7 @@ import { hapticImpact, hapticNotify } from '../../../core/telegram';
 import { NativeIcon } from '../../native/NativeIcons';
 import { useNativeWakeLock } from '../../native/useWakeLock';
 import type { TrainingTab } from './shared';
+import { ruCount, RU_APPROACHES, RU_EXERCISES, RU_SESSIONS, RU_SETS } from '../../../engines/ru-plural';
 
 const isDumbbellEx = (n?: string) => !!(n && /гантел|dumbbell/i.test(n));
 
@@ -174,7 +175,7 @@ export const ExecutionZone: React.FC<Props> = (p) => {
                             <span style={{ width: 28, height: 28, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#000', fontSize: 12, fontWeight: 800 }}>#{selectedWeek}</span>
                             <div>
                               <div style={{ fontSize: 11, fontWeight: 800, color: '#00e68a', lineHeight: 1 }}>Неделя {selectedWeek} · {trainingDaysList.length} тренировки · {currentMicrocycle.mesocycleType || ''}</div>
-                              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.60)' }}>{totalSetsWeek} сетов · {totalVolWeek.toLocaleString()} кг недельный объём</div>
+                              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.60)' }}>{ruCount(totalSetsWeek, RU_SETS)} · {totalVolWeek.toLocaleString()} кг недельный объём</div>
                             </div>
                           </div>
                           <span style={{ fontSize: 10, fontWeight: 700, padding: '3px 7px', borderRadius: 20, background: 'rgba(0,230,138,0.12)', color: '#00e68a', border: '1px solid rgba(0,230,138,0.20)', whiteSpace: 'nowrap' }}>понедельно</span>
@@ -239,7 +240,7 @@ export const ExecutionZone: React.FC<Props> = (p) => {
                   </div>
             <div style={{ background: 'rgba(255,255,255,0.04)', borderRadius: 6, padding: 8, marginBottom: 8 }}>
               <div style={{ fontSize: 10, color: '#fff' }}>
-                {trainingDaysList[safeRuntimeDay]?.exercises?.length || 0} упражнений • {trainingDaysList[safeRuntimeDay]?.duration || 60} мин
+                {ruCount(trainingDaysList[safeRuntimeDay]?.exercises?.length || 0, RU_EXERCISES)} • {trainingDaysList[safeRuntimeDay]?.duration || 60} мин
               </div>
               <div style={{ fontSize: 10, color: '#fff', marginTop: 2 }}>
                 Интенсивность: {trainingDaysList[safeRuntimeDay]?.intensity || 'средняя'} | Схема: {currentMicrocycle.mesocycleType || ''}
@@ -264,7 +265,7 @@ export const ExecutionZone: React.FC<Props> = (p) => {
                           aria-label="Детали плана дня"
                         >
                           <span style={{ fontSize: 11, fontWeight: 700, color: '#fff' }}>
-                            📋 План дня — {dayExercises.length} упр. · {totalSets} подходов · ~{estMin} мин
+                            📋 План дня — {dayExercises.length} упр. · {ruCount(totalSets, RU_APPROACHES)} · ~{estMin} мин
                           </span>
                           <span style={{ fontSize: 10, color: '#fff' }}>{dayDetailsOpen ? '▲' : '▼'}</span>
                         </div>
@@ -303,7 +304,7 @@ export const ExecutionZone: React.FC<Props> = (p) => {
                       <div style={{ fontSize: 10, margin: '6px 0', padding: '6px 8px', borderRadius: 6, background: 'rgba(255,255,255,0.03)' }}>
                         <span style={{ color: '#fff' }}>Сложность: </span>
                         <span style={{ fontWeight: 600, color }}>{difficulty}</span>
-                        <span style={{ color: '#fff', marginLeft: 6 }}>· {totalSets} подходов · ~{avgIntensity.toFixed(0)}% ср.</span>
+                        <span style={{ color: '#fff', marginLeft: 6 }}>· {ruCount(totalSets, RU_APPROACHES)} · ~{avgIntensity.toFixed(0)}% ср.</span>
                         {totalSets > 25 && (
                           <div style={{ color: '#f97316', marginTop: 2 }}>⚠ Высокий объём — отдых ≥ 3 мин между подходами</div>
                         )}
@@ -502,7 +503,7 @@ export const ExecutionZone: React.FC<Props> = (p) => {
                                     <span>Объём {cached.totalVolume.toLocaleString()}</span>
                                     <span style={{ color: trendColor }}>{trendIcon} {cached.weightDelta > 0 ? '+' : ''}{cached.weightDelta}кг</span>
                                   </div>
-                                  <div style={{ fontSize: 10, color: '#fff', marginTop: 2 }}>{cached.sessions} сессий · {cached.lastDate}</div>
+                                  <div style={{ fontSize: 10, color: '#fff', marginTop: 2 }}>{ruCount(cached.sessions, RU_SESSIONS)} · {cached.lastDate}</div>
                                 </div>
                               );
                             })}

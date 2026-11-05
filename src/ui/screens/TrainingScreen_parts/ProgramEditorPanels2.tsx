@@ -16,6 +16,7 @@ import { cloneFromCycle } from '../../../engines/user-program/program-store';
 import { WOMENS_PROGRAMS, CUSTOM_PROGRAMS } from './programs-data';
 import { ACCENT, CARD, DIM, DIM_STRONG, IN, BTN, BTN_GHOST } from './training-ui';
 import type { TrainingProfile } from './training-profile';
+import { ruCount, RU_SETS } from '../../../engines/ru-plural';
 
 /* ─── RirWaveChart ─── */
 
@@ -150,7 +151,7 @@ export const QualityScorePanel: React.FC<QualityScorePanelProps> = ({ program, l
       )}
       {pro && (
         <div style={{ fontSize: 10, color: DIM, marginBottom: 6, lineHeight: 1.4 }}>
-          Бюджет {pro.weeklyBudget} сетов/нед · лимит сессии {pro.sessionLimits.maxWorkingSets} сетов / {pro.sessionLimits.maxExercises} упр
+          Бюджет {ruCount(pro.weeklyBudget, RU_SETS)}/нед · лимит сессии {ruCount(pro.sessionLimits.maxWorkingSets, RU_SETS)} / {pro.sessionLimits.maxExercises} упр
           {pro.weeklyIssues?.length ? <span style={{ color: '#f59e0b' }}> · {pro.weeklyIssues.slice(0, 2).join(' · ')}</span> : null}
         </div>
       )}

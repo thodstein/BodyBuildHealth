@@ -30,6 +30,7 @@ const HUB_HERO: React.CSSProperties = {
 };
 const HUB_SECTION_GAP: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: 6, marginTop: 6 };
 import { LEVEL_OPTS, TAB_DEFS, WP_LABEL_SHORT } from './arm-hub-shared';
+import { ruCount, RU_MUSCLES, RU_POINTS, RU_SETS } from '../../../engines/ru-plural';
 
 const TECHNIQUE_OPTS = [
   { id: 'balanced', label: 'Сбалансировано' },
@@ -249,8 +250,8 @@ export function HubP0Panel({ H }: { H: any }) {
                   key={wp}
                   role="button"
                   tabIndex={0}
-                  aria-label={`${(WP_LABEL_SHORT as any)[wp] || wp}: ${sets} сетов`}
-                  title={`${(WP_LABEL_SHORT as any)[wp] || wp} — ${sets} сетов${isSel ? ' · выбрана' : ''}`}
+                  aria-label={`${(WP_LABEL_SHORT as any)[wp] || wp}: ${ruCount(sets, RU_SETS)}`}
+                  title={`${(WP_LABEL_SHORT as any)[wp] || wp} — ${ruCount(sets, RU_SETS)}${isSel ? ' · выбрана' : ''}`}
                   onClick={() => toggleWeakPoint(wp)}
                   data-covered={sets > 0 ? 'true' : 'false'}
                   data-worst={worst ? 'true' : 'false'}
@@ -502,7 +503,7 @@ export function HubAction({ H }: { H: any }) {
   const days: string[] = Array.from(new Set(((report as any).corrections || []).map((c: any) => c.dayTags[0])));
   const hasPayload = pts.length > 0 || muscles.length > 0 || dynKeys.length > 0;
   const label = (pts.join(', ') || muscles.join(', ')) || (dynKeys.length ? 'динамика' : 'баланс');
-  const count = pts.length ? `${pts.length} точек` : `${muscles.length} мышц`;
+  const count = pts.length ? `${ruCount(pts.length, RU_POINTS)}` : `${ruCount(muscles.length, RU_MUSCLES)}`;
   return (
     <AdSec title="📦 Что уедет в конструктор" hook="hub-bridge-preview" collapsible defaultOpen={false} summary={hasPayload ? label : 'пока пусто'}>
       {hasPayload ? (

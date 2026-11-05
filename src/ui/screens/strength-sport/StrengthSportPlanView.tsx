@@ -18,6 +18,7 @@ import { activeSeasonBlockForDate } from '../../../engines/strength-sport/streng
 import { CARD, BTN, BTN_PRIMARY, BTN_SMALL, INPUT, TEXT_2, TEXT_3, ACCENT, ACCENT_STRONG, ACCENT_SOFT, STRONG_SOFT, ACCENT_BORDER, STRONG_BORDER, ACCENT_GRAD, SectionCard, StatTile, Badge, InfoBanner, GroupHeading, CardHeader, Highlight, HighlightStrong, ChipToggle, Divider } from './StrengthUI';
 import { StrengthGantt, StrengthHeatmap, EventCard } from './StrengthUI';
 import { MODE_RU, LEVEL_RU, PHASE_RU, ruLabel } from './StrengthUI';
+import { ruCount, RU_SESSIONS, RU_SETS } from '../../../engines/ru-plural';
 
 type Props = {
   plan: StrengthSportPlan;
@@ -233,8 +234,8 @@ export const StrengthSportPlanView: React.FC<Props> = ({
           <button onClick={()=> onToggleWeek(isOpen? null : wk.week-1)} style={{ width:'100%', display:'flex', alignItems:'center', gap:12, padding:'16px 18px', background: wk.deload? 'rgba(245,158,11,0.07)' : (wk as any).taper? 'rgba(59,130,246,0.07)':'transparent', border:'none', cursor:'pointer', textAlign:'left', minHeight:72 }}>
             <span style={{ width:46, height:46, borderRadius:14, background: wk.deload? 'linear-gradient(135deg,#f59e0b,#f97316)' : (wk as any).taper? 'linear-gradient(135deg,#3b82f6,#06b6d4)' : ACCENT_GRAD, display:'flex', alignItems:'center', justifyContent:'center', color:'#fff', fontWeight:800, fontSize:16, flexShrink:0, boxShadow:'0 6px 18px rgba(0,0,0,0.22), inset 0 1px 0 rgba(255,255,255,0.22)', fontFamily:'-apple-system, system-ui, sans-serif' }}>{wk.week}</span>
             <div style={{ flex:1, minWidth:0 }}>
-              <div style={{ fontSize:15, fontWeight:700, color:'#fff', lineHeight:1.2, display:'flex', gap:8, flexWrap:'wrap', alignItems:'center' }}><Highlight color={tone}>{ruLabel(PHASE_RU, wk.phase)}</Highlight>{wk.deload? <Highlight color="#f59e0b">разгрузка</Highlight> : (wk as any).taper? <Highlight color="#60a5fa">тапер</Highlight> : null}<span style={{ fontWeight:400, color:TEXT_3 }}>· {wk.totalSets} сетов · <Highlight color={tone}>{tonnage}т</Highlight></span></div>
-              <div style={{ fontSize:11, color:TEXT_3, marginTop:1, fontFamily:'-apple-system, system-ui, sans-serif' }}>Неделя {wk.week} · {wk.sessions.length} сессий · {wk.sessions.reduce((a,s)=>a+s.exercises.length,0)} упр.</div>
+              <div style={{ fontSize:15, fontWeight:700, color:'#fff', lineHeight:1.2, display:'flex', gap:8, flexWrap:'wrap', alignItems:'center' }}><Highlight color={tone}>{ruLabel(PHASE_RU, wk.phase)}</Highlight>{wk.deload? <Highlight color="#f59e0b">разгрузка</Highlight> : (wk as any).taper? <Highlight color="#60a5fa">тапер</Highlight> : null}<span style={{ fontWeight:400, color:TEXT_3 }}>· {ruCount(wk.totalSets ?? 0, RU_SETS)} · <Highlight color={tone}>{tonnage}т</Highlight></span></div>
+              <div style={{ fontSize:11, color:TEXT_3, marginTop:1, fontFamily:'-apple-system, system-ui, sans-serif' }}>Неделя {wk.week} · {ruCount(wk.sessions.length, RU_SESSIONS)} · {wk.sessions.reduce((a,s)=>a+s.exercises.length,0)} упр.</div>
             </div>
             <span style={{ width:38, height:38, borderRadius:12, background: isOpen? `${tone}14`:'rgba(255,255,255,0.06)', border:`0.5px solid ${isOpen? tone+'22':'rgba(255,255,255,0.08)'}`, display:'flex', alignItems:'center', justifyContent:'center', color: isOpen? tone:'#fff', fontSize:13, transition:'transform 0.18s', transform: isOpen? 'rotate(180deg)':'rotate(0deg)', flexShrink:0 }}>▾</span>
           </button>

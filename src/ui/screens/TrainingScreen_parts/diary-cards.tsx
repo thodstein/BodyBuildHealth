@@ -12,6 +12,7 @@ import { loadMobilityCheckins } from '../../../engines/mobility-protocol.engine'
 import { activeRampRows } from '../../../engines/warmup-ramp.engine';
 import { MiniLineChart, MiniBarChart } from './DiaryChart';
 import { diaryStyles as style, ACCENT, DIM } from './diary-tokens';
+import { ruCount, RU_APPROACHES } from '../../../engines/ru-plural';
 
 /* ─── WorkoutWeekCard — неделя с тренировками, дельты e1RM, edit/delete/copy ─── */
 
@@ -61,7 +62,7 @@ export const WorkoutWeekCard: React.FC<{
         </div>
         <div style={{ display: 'flex', gap: 8, fontSize: 10, color: '#fff', alignItems: 'center' }}>
           <span>{workouts.length} трен.</span>
-          <span>{totalSets} подходов</span>
+          <span>{ruCount(totalSets, RU_APPROACHES)}</span>
           <span>{(totalVol / 1000).toFixed(1)}т кг</span>
           {e1rmSeries && e1rmSeries.length >= 2 && (
             <span title="Тренд лучшего e1RM по последним сессиям" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>

@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { weeklySetsByGroup } from '../../../engines/training-recommendations.engine';
 import type { WorkoutLog } from '../../../core/types';
+import { ruCount, RU_SETS } from '../../../engines/ru-plural';
 
 const GROUP_COLORS: Record<string, string> = { chest: '#00e68a', back: '#60a5fa', legs: '#f59e0b', shoulders: '#a855f7', arms: '#ef4444', core: '#22c55e', hamstrings: '#3b82f6', glutes: '#ec4899', calves: '#eab308', triceps: '#fb923c', biceps: '#f472b6', quads: '#facc15' };
 const GRP_RU: Record<string, string> = { chest: 'Грудь', back: 'Спина', legs: 'Ноги', shoulders: 'Плечи', arms: 'Руки', core: 'Кор', hamstrings: 'Бицепс бедра', glutes: 'Ягодицы', calves: 'Икры', triceps: 'Трицепс', biceps: 'Бицепс', quads: 'Квадрицепсы' };
@@ -21,7 +22,7 @@ export const VolumeTrendCard: React.FC<{ sessions: WorkoutLog[]; weeks?: number 
       <div style={{ fontSize: 10, color: '#fff', marginBottom: 8 }}>Стек-бары по неделям — видно рост/снижение объёма и распределение по группам тела.</div>
       <div style={{ display: 'flex', alignItems: 'flex-end', gap: 4, height: 120, marginBottom: 6 }}>
         {totals.map((t, wi) => (
-          <div key={wi} style={{ flex: 1, display: 'flex', flexDirection: 'column-reverse', height: '100%', borderRadius: 4, overflow: 'hidden', background: t > 0 ? 'transparent' : 'rgba(255,255,255,0.03)' }} title={`Нед ${wi + 1}: ${t} сетов`}>
+          <div key={wi} style={{ flex: 1, display: 'flex', flexDirection: 'column-reverse', height: '100%', borderRadius: 4, overflow: 'hidden', background: t > 0 ? 'transparent' : 'rgba(255,255,255,0.03)' }} title={`Нед ${wi + 1}: ${ruCount(t, RU_SETS)}`}>
             {groups.map(g => {
               const v = wsg[g]?.[wi] || 0;
               if (v === 0) return null;

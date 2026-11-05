@@ -14,6 +14,7 @@ import {
   type DayLoad,
 } from '../../../engines/pro/training-load.engine';
 import { PopupSelect, ExpandableCard, MetricCard } from '../SRCBBScreen_parts/TrainingPopups';
+import { ruCount, RU_WEEKS } from '../../../engines/ru-plural';
 
 const ACCENT = '#00e68a';
 const DIM = '#fff';
@@ -199,7 +200,7 @@ export const FatigueIndexTab: React.FC = () => {
       </div>
 
       {/* Понедельная сводка за 6 недель */}
-      <ExpandableCard title="📅 Понедельная сводка (6 недель)" accent={ACCENT} short={weeks.length > 0 ? `${weeks.length} недель · последняя ${weeks[weeks.length - 1].load} AU` : 'Нет данных'}>
+      <ExpandableCard title="📅 Понедельная сводка (6 недель)" accent={ACCENT} short={weeks.length > 0 ? `${ruCount(weeks.length, RU_WEEKS)} · последняя ${weeks[weeks.length - 1].load} AU` : 'Нет данных'}>
         {weeks.length === 0 ? (
           <div style={SMALL}>Недостаточно данных (нужно ≥7 дней).</div>
         ) : (

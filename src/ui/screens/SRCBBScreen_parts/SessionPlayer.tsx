@@ -38,6 +38,7 @@ import {
 import { readPLCheckin, applyReadinessToDay } from '../../../engines/lms/pl-readiness-adjust.engine';
 import { adviseVBTNextSet, type VBTSetSample } from '../../../engines/lms/pl-vbt-loop.engine';
 import { PLSetVideoButton } from './PLSetVideoButton';
+import { ruCount, RU_APPROACHES, RU_EXERCISES, RU_SETS } from '../../../engines/ru-plural';
 
 // Фаза 3: карточки/кнопки/поля — из единого кита training-ui.
 const CARD = TRAIN_CARD;
@@ -1114,7 +1115,7 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
                 <span style={{ width: 30, height: 30, borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#000', fontSize: 13, fontWeight: 800 }}>#{weekNumber}</span>
                 <div>
                   <div style={{ fontSize: 12.5, fontWeight: 800, color: '#00e68a', lineHeight: 1 }}>Неделя {weekNumber} · {days.length} тренировки {focus ? `· ${focus}` : ''}</div>
-                  <div style={{ fontSize: 9, color: '#fff', lineHeight: 1.2 }}>{totalWeeklySets} сетов · {totalWeeklyVol.toLocaleString()} кг недельный объём · {days[dayIdx]?.label || ''}</div>
+                  <div style={{ fontSize: 9, color: '#fff', lineHeight: 1.2 }}>{ruCount(totalWeeklySets, RU_SETS)} · {totalWeeklyVol.toLocaleString()} кг недельный объём · {days[dayIdx]?.label || ''}</div>
                 </div>
               </div>
               <span style={{ fontSize: 9, fontWeight: 700, padding: '4px 8px', borderRadius: 20, background: 'rgba(0,230,138,0.12)', color: '#00e68a', border: '1px solid rgba(0,230,138,0.22)', whiteSpace: 'nowrap' }}>{phase === 'ready' || phase === 'done' ? 'выбор дня' : phase === 'warmup' ? 'разминка' : phase === 'main' ? 'тренировка' : 'заминка'}</span>
@@ -1171,7 +1172,7 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
               <div style={{ fontSize: 12, fontWeight: 800, color: '#fff', lineHeight: 1.15, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{d.label}</div>
               <div style={{ display: 'flex', gap: 5, marginTop: 7, flexWrap: 'wrap' }}>
                 <span style={{ fontSize: 9, fontWeight: 700, padding: '2px 6px', borderRadius: 20, background: active ? 'rgba(0,230,138,0.14)' : 'rgba(255,255,255,0.06)', color: active ? '#00e68a' : '#fff', border: `1px solid ${active ? 'rgba(0,230,138,0.22)' : 'rgba(255,255,255,0.08)'}` }}>{exCnt} упр.</span>
-                <span style={{ fontSize: 9, fontWeight: 600, padding: '2px 6px', borderRadius: 20, background: 'rgba(255,255,255,0.04)', color: '#fff', border: '1px solid rgba(255,255,255,0.06)' }}>{totalSets} сетов</span>
+                <span style={{ fontSize: 9, fontWeight: 600, padding: '2px 6px', borderRadius: 20, background: 'rgba(255,255,255,0.04)', color: '#fff', border: '1px solid rgba(255,255,255,0.06)' }}>{ruCount(totalSets, RU_SETS)}</span>
               </div>
               {active && <span style={{ position: 'absolute', top: 8, right: 8, width: 18, height: 18, borderRadius: 18, background: '#00e68a', color: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 800, boxShadow: '0 2px 8px rgba(0,230,138,0.35)' }}>✓</span>}
             </button>
@@ -1240,7 +1241,7 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
                   <span style={{ fontSize: 10, fontWeight: 800, color: '#00e68a', fontVariantNumeric: 'tabular-nums' }}>{sum.progressPct}%</span>
                 </div>
                 <div style={{ color: '#fff', fontSize: 11, marginTop: 4 }}>
-                  {sum.focus} · {sum.date} · {sum.setsDone} подходов · {sum.volumeKg.toLocaleString()} кг
+                  {sum.focus} · {sum.date} · {ruCount(sum.setsDone, RU_APPROACHES)} · {sum.volumeKg.toLocaleString()} кг
                 </div>
                 {sum.currentExercise && <div style={{ color: '#fff', fontSize: 10, marginTop: 2, opacity: 0.85 }}>Последнее: {sum.currentExercise}</div>}
                 {!sameDay && (
@@ -1261,7 +1262,7 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
             return (
               <div style={{ display: 'flex', gap: 8, marginTop: 6, flexWrap: 'wrap' }}>
                 <span style={{ fontSize: 10, color: '#fff' }}>
-                  📋 {day.exercises.length} упр. · {totalSets} сетов · ~{estMin} мин
+                  📋 {day.exercises.length} упр. · {ruCount(totalSets, RU_SETS)} · ~{estMin} мин
                 </span>
                 {last && last.durationMin > 0 && (
                   <span style={{ fontSize: 10, color: estMin > last.durationMin ? '#f59e0b' : '#22c55e' }}>
@@ -1291,7 +1292,7 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
               </div>
               {planned.volume > 0 && last.totalVolume > 0 && (
                 <div style={{ marginTop: 6, fontSize: 10, color: '#fff' }}>
-                  План сегодня: {planned.volume.toLocaleString()} кг · {planned.sets} сетов
+                  План сегодня: {planned.volume.toLocaleString()} кг · {ruCount(planned.sets, RU_SETS)}
                   {last.totalVolume > 0 && (
                     <span style={{ color: planned.volume > last.totalVolume ? '#f59e0b' : '#22c55e', marginLeft: 4 }}>
                       ({planned.volume > last.totalVolume ? '+' : ''}{Math.round((planned.volume - last.totalVolume) / last.totalVolume * 100)}% к прошлой)
@@ -1316,7 +1317,7 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
                   aria-expanded={dayDetailsOpen}
                   aria-label={`Детали дня ${day.label}`}
                 >
-                  <div style={LABEL}>📋 Детали дня — {day.exercises.length} упр. · {totalSets} сетов · {tonnage.toLocaleString()} кг · ~{avgRest}с отдых</div>
+                  <div style={LABEL}>📋 Детали дня — {day.exercises.length} упр. · {ruCount(totalSets, RU_SETS)} · {tonnage.toLocaleString()} кг · ~{avgRest}с отдых</div>
                   <span style={{ color: '#fff', fontSize: 11 }}>{dayDetailsOpen ? '▲' : '▼'}</span>
                 </div>
                 {dayDetailsOpen && (
@@ -1782,7 +1783,7 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
              ))}
            </div>
 
-           <div style={{ ...SMALL, marginBottom: 6 }}>План: {planned.sets} сетов / {planned.volume} кг·пов · Факт: {factVol.sets} сетов / {factVol.volume} кг·пов</div>
+           <div style={{ ...SMALL, marginBottom: 6 }}>План: {ruCount(planned.sets, RU_SETS)} / {planned.volume} кг·пов · Факт: {ruCount(factVol.sets, RU_SETS)} / {factVol.volume} кг·пов</div>
           {/* P12: sRPE для мониторинга нагрузки (сохранится при завершении) */}
            <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 8, flexWrap: 'wrap', padding: '6px 8px', borderRadius: 12, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
             <span style={{ fontSize: 9, fontWeight: 800, color: '#fff', letterSpacing: 0.3, textTransform: 'uppercase' }}>sRPE</span>
@@ -2201,7 +2202,7 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
                    background: supersetMode ? 'rgba(245,158,11,0.08)' : 'rgba(139,92,246,0.08)',
                    border: `1px solid ${supersetMode ? 'rgba(245,158,11,0.3)' : 'rgba(139,92,246,0.3)'}` }}>
                    <div style={{ fontSize: 11, fontWeight: 600, color: supersetMode ? '#f59e0b' : '#8b5cf6', marginBottom: 6 }}>
-                     {supersetMode ? '🔄 Суперсет:' : '⭕ Круг:'} {supersetExercises.length} упражнений
+                     {supersetMode ? '🔄 Суперсет:' : '⭕ Круг:'} {ruCount(supersetExercises.length, RU_EXERCISES)}
                    </div>
                    <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
                      {supersetExercises.map((exIdx, order) => (

@@ -25,6 +25,7 @@ import { loadReadinessHistory } from './readiness-history';
 import { collectGroupCooldown } from '../../../engines/cooldown-day.engine';
 import { groupsFromExercises, prepGroupLabels, canonicalizeGroups } from '../../../engines/warmup-day.engine';
 import { localIsoDate } from './diary-shared';
+import { ruCount, RU_DAYS, RU_SESSIONS } from '../../../engines/ru-plural';
 
 const CARD = diaryCard;
 const COOLDOWN_COLOR = '#38bdf8';
@@ -191,7 +192,7 @@ export const CooldownDiaryView: React.FC<{ planDay?: { name?: string; exercises?
           <div style={{ fontSize: 10, color: '#fff', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.3 }}>🧘 Сессия растяжки</div>
           {stretchStatsMemo.count > 0 && (
             <span style={{ fontSize: 9, color: DIM }}>
-              {stretchStatsMemo.count} сессий · {stretchStatsMemo.totalMin} мин · эта неделя: <b style={{ color: '#a78bfa' }}>{stretchStatsMemo.weekMin} мин</b>
+              {ruCount(stretchStatsMemo.count, RU_SESSIONS)} · {stretchStatsMemo.totalMin} мин · эта неделя: <b style={{ color: '#a78bfa' }}>{stretchStatsMemo.weekMin} мин</b>
             </span>
           )}
         </div>
@@ -343,7 +344,7 @@ export const CooldownDiaryView: React.FC<{ planDay?: { name?: string; exercises?
                     <div key={b.level} style={{ padding: '6px 8px', borderRadius: 8, background: 'rgba(255,255,255,0.04)', textAlign: 'center' }}>
                       <div style={{ fontSize: 8, color: DIM }}>{b.range}</div>
                       <div style={{ fontSize: 12, fontWeight: 700, color: b.n > 0 ? '#fff' : DIM }}>{b.n > 0 ? `${b.avgRecovery}%` : '—'}</div>
-                      <div style={{ fontSize: 8, color: DIM }}>{b.n} дней</div>
+                      <div style={{ fontSize: 8, color: DIM }}>{ruCount(b.n, RU_DAYS)}</div>
                     </div>
                   ))}
                 </div>

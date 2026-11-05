@@ -6,6 +6,7 @@ import { WOMENS_PROGRAMS, CUSTOM_PROGRAMS } from './programs-data';
 import { useOriginalPrograms } from './useOriginalPrograms';
 import { GROUP_RU } from './program-types';
 import { DAY_TEMPLATES } from './ProgramEditorComponents';
+import { ruCount, RU_CYCLES } from '../../../engines/ru-plural';
 
 type TabKey = 'bb' | 'pl' | 'templates' | 'fav';
 
@@ -83,7 +84,7 @@ export const ManualLibraryDrawer: React.FC<{
         )}
         {tab==='pl' && (
           <>
-            <div style={{ fontSize:10, color:'rgba(255,255,255,0.45)' }}>Найдено {filteredPL.length} циклов</div>
+            <div style={{ fontSize:10, color:'rgba(255,255,255,0.45)' }}>Найдено {ruCount(filteredPL.length, RU_CYCLES)}</div>
             {filteredPL.map(c=> (
               <button key={c.meta.id} className="lib-row" onClick={()=> onSelectPL(c.meta.id)} style={{ textAlign:'left', padding:'8px 10px', borderRadius:8, background:'rgba(167,139,250,0.08)', border:'1px solid rgba(167,139,250,0.15)', color:'#fff', cursor:'pointer' }}>
                 <div style={{ fontSize:11, fontWeight:800, color:'#a78bfa' }}>{c.meta.title} <span style={{ fontWeight:400, color:'rgba(255,255,255,0.55)' }}>· {c.meta.weeks}н · {c.meta.sessionsPerWeek}×</span></div>

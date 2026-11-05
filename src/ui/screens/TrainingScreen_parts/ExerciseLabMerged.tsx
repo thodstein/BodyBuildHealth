@@ -15,6 +15,7 @@ import { readLabAthleteCtx, readLabPlanAudit, useLabRefresh } from './lab-athlet
 import { buildLabExportHtml, buildLabExportCsv, collectLabExportDiagnoses } from '../../../engines/lab-exercise-export.engine';
 import { loadLabPlanFromStorage } from '../../../engines/lab-plan-exercise-audit.engine';
 import type { Exercise } from '../../../core/types';
+import { ruCount, RU_SETS } from '../../../engines/ru-plural';
 
 const LAB_STORE_KEY = 'he_exercise_lab_v1';
 
@@ -170,7 +171,7 @@ const ExerciseLabMerged: React.FC<{
       {labAudit ? (
         <div style={{ ...CARD, marginBottom: 10, border: '1px solid rgba(168,85,247,0.20)' }}>
           <div style={{ fontSize: 11, fontWeight: 800, color: '#c084fc', marginBottom: 4 }}>
-            🔍 Портфель плана: Lab {labAudit.labScore}/100 · {labAudit.totalExercises} упр · {labAudit.totalSets} сетов
+            🔍 Портфель плана: Lab {labAudit.labScore}/100 · {labAudit.totalExercises} упр · {ruCount(labAudit.totalSets, RU_SETS)}
           </div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, fontSize: 10, color: '#fff' }}>
             <span style={{ padding: '2px 8px', borderRadius: 12, background: 'rgba(255,255,255,0.05)' }}>

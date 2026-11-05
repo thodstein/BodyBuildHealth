@@ -45,6 +45,7 @@ import { applyToPlanner } from './planner-bridge';
 import { generateBBRecommendations, bbRecSummary } from '../../../engines/bb/bb-training-recommendations.engine';
 import { weeklySetsByGroup } from '../../../engines/training-recommendations.engine';
 import { MetricCard, ExpandableCard, PopupNumber, PopupSelect } from '../SRCBBScreen_parts/TrainingPopups';
+import { ruCount, RU_APPROACHES, RU_DAYS, RU_ENTRIES, RU_MEASUREMENTS, RU_POINTS } from '../../../engines/ru-plural';
 
 const ACCENT = '#00e68a';
 const DIM = '#fff';
@@ -1055,7 +1056,7 @@ export const UnifiedIntelligenceHub: React.FC = () => {
               )}
 
 
-              <ExpandableCard title={`Журнал sRPE · ${sessions.length}`} short={`${sessions.length} записей · ACWR ${acwr.ratio.toFixed(2)} · ${ZONE_META[acwr.zone].label}`} full={
+              <ExpandableCard title={`Журнал sRPE · ${sessions.length}`} short={`${ruCount(sessions.length, RU_ENTRIES)} · ACWR ${acwr.ratio.toFixed(2)} · ${ZONE_META[acwr.zone].label}`} full={
                 <div>
                   {sessions.slice().reverse().slice(0,30).map((s,i)=> {
                     const realIdx = sessions.length - 1 - i;
@@ -1121,7 +1122,7 @@ export const UnifiedIntelligenceHub: React.FC = () => {
                     <div style={{ fontSize:15, fontWeight:900, color:'#fff' }}>
                       {cmj.current?.deltaVsBaselinePct == null ? '—' : `${cmj.current.deltaVsBaselinePct>0?'+':''}${cmj.current.deltaVsBaselinePct}%`}
                     </div>
-                    <div style={SMALL}>{cmj.points.length} замеров</div>
+                    <div style={SMALL}>{ruCount(cmj.points.length, RU_MEASUREMENTS)}</div>
                   </div>
                   <div style={{ background:'rgba(255,255,255,0.03)', borderRadius:10, padding:'8px 4px', textAlign:'center' }}>
                     <div style={{ fontSize:11, color:DIM, textTransform:'uppercase' }}>Метод</div>
@@ -1377,7 +1378,7 @@ export const UnifiedIntelligenceHub: React.FC = () => {
 
           {/* RIR калибрация — только если есть данные, без дубля */}
           {rirCalib && rirCalib.totalSets>0 ? (
-            <ExpandableCard title={`🎯 RIR-калибрация · ${rirCalib.totalSets} подходов`} short={`bias ${rirCalib.overallAvgBias>0?'+':''}${rirCalib.overallAvgBias.toFixed(2)} · консист. ${Math.round(rirCalib.overallConsistency)}%`} full={
+            <ExpandableCard title={`🎯 RIR-калибрация · ${ruCount(rirCalib.totalSets, RU_APPROACHES)}`} short={`bias ${rirCalib.overallAvgBias>0?'+':''}${rirCalib.overallAvgBias.toFixed(2)} · консист. ${Math.round(rirCalib.overallConsistency)}%`} full={
               <div style={SMALL}>
                 <div>Системное смещение: <b style={{ color: Math.abs(rirCalib.overallAvgBias)>1? '#ef4444' : '#22c55e' }}>{rirCalib.overallAvgBias>0?'+':''}{rirCalib.overallAvgBias.toFixed(2)}</b> {rirCalib.overallAvgBias>0.5? '— тяжелее чем думаете' : rirCalib.overallAvgBias<-0.5? '— легче чем думаете' : '— в цели'}</div>
                 {rirCalib.exercises.slice(0,5).map(ex=> (
@@ -1425,7 +1426,7 @@ export const UnifiedIntelligenceHub: React.FC = () => {
                   const histPts = recs.map((v,i)=> `${px(i)},${py(v)}`).join(' ');
                   const fcPts = forecast.values.map((v,i)=> `${px(recs.length-1+i)},${py(v)}`).join(' ');
                   return (
-                    <svg width="100%" viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`Прогноз готовности: история ${recs.length} точек, прогноз ${forecast.values.length} дней`} style={{ display:'block', maxWidth:380, margin:'0 auto' }}>
+                    <svg width="100%" viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`Прогноз готовности: история ${ruCount(recs.length, RU_POINTS)}, прогноз ${ruCount(forecast.values.length, RU_DAYS)}`} style={{ display:'block', maxWidth:380, margin:'0 auto' }}>
                       <polyline points={histPts} fill="none" stroke="#60a5fa" strokeWidth={1.6} />
                       <polyline points={fcPts} fill="none" stroke={ACCENT} strokeWidth={1.7} strokeDasharray="5 4" />
                       {forecast.values.map((v,i)=> <circle key={i} cx={px(recs.length-1+i)} cy={py(v)} r={2.6} fill={ACCENT} />)}

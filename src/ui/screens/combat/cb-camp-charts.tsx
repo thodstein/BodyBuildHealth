@@ -9,6 +9,7 @@ import React from 'react';
 import { SectionCard, Highlight } from './CombatUI';
 import { buildCampSeries, polylinePoints } from '../../../engines/combat/combat-graphs';
 import type { CombatPlan } from '../../../engines/combat/combat.types';
+import { ruCount, RU_SETS, RU_WEEKS } from '../../../engines/ru-plural';
 
 const W = 320, H = 96, PAD = 6;
 
@@ -31,7 +32,7 @@ const Series: React.FC<{
         <Highlight color={color}>{label}</Highlight>
         <span style={{ fontVariantNumeric: 'tabular-nums' }}>пик {f(max)} {unit}</span>
       </div>
-      <svg viewBox={`0 0 ${W} ${H}`} width="100%" height={H} preserveAspectRatio="none" role="img" aria-label={`${label}: максимум ${f(max)} ${unit}, ${values.length} недель`}>
+      <svg viewBox={`0 0 ${W} ${H}`} width="100%" height={H} preserveAspectRatio="none" role="img" aria-label={`${label}: максимум ${f(max)} ${unit}, ${ruCount(values.length, RU_WEEKS)}`}>
         <defs>
           <linearGradient id={`g-${label.replace(/\W/g, '')}`} x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor={color} stopOpacity="0.35" />
@@ -55,7 +56,7 @@ export const CbCampCharts: React.FC<{ plan: CombatPlan }> = ({ plan }) => {
   const s = buildCampSeries(plan);
   if (!s.points.length) return null;
   return (
-    <SectionCard icon="📈" title="Динамика лагеря" subtitle={`пик нед. ${s.peakWeek} · среднее ${Math.round(s.avgSets)} сетов · деload ${s.deloadWeeks} · тапер ${s.taperWeeks}`} accent>
+    <SectionCard icon="📈" title="Динамика лагеря" subtitle={`пик нед. ${s.peakWeek} · среднее ${ruCount(Math.round(s.avgSets), RU_SETS)} · деload ${s.deloadWeeks} · тапер ${s.taperWeeks}`} accent>
       <div className="cb-camp-charts" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         <Series label="Сеты/нед" values={s.points.map(p => p.sets)} max={s.maxSets} unit="сетов" color="#a855f7" points={s.points} />
         <Series label="Тоннаж/нед" values={s.points.map(p => p.tonnage)} max={s.maxTonnage} unit="кг" color="#34c759" points={s.points} />

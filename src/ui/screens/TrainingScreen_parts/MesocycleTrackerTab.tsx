@@ -7,6 +7,7 @@ import {
   type WeekProgression,
 } from '../../../engines/pro/mesocycle-progression.engine';
 import { applyToPlanner } from './planner-bridge';
+import { ruCount, RU_WEEKS } from '../../../engines/ru-plural';
 
 const ACCENT = '#00e68a';
 const CARD: React.CSSProperties = { background: 'rgba(24,24,27,0.6)', borderRadius: 12, border: '1px solid rgba(255,255,255,0.04)', padding: '12px', margin: '6px 0' };
@@ -308,7 +309,7 @@ export const MesocycleTrackerTab: React.FC = () => {
                       </div>
                     </div>
                     <div style={{ marginTop: 6, fontSize: 10, color: '#fff' }}>
-                      ▮{m.startVolumeSets}с старт · %1RM вверху · ▨разгрузка · {m.weeks} недель
+                      ▮{m.startVolumeSets}с старт · %1RM вверху · ▨разгрузка · {ruCount(m.weeks, RU_WEEKS)}
                     </div>
                   </div>
                 )}
