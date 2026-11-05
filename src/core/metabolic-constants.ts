@@ -694,15 +694,21 @@ export function calcFLI(params: { bmi:number; waistCm:number; tgMgDl?:number; gg
   const fli = (Math.exp(logit) / (1 + Math.exp(logit))) * 100;
   return clamp(Math.round(fli), 0, 100);
 }
-export function checkPSMF(ea?: number | null): { risk:boolean; note:string } {
+export function checkPSMF(ea?: number | null): { risk:boolean; known:boolean; note:string } {
   // Blackburn 1973: EA <15 → обязательная потеря FFM даже с белком 2.8г/кг
-  if (ea == null) return { risk:false, note:'EA неизвестна — введи ккал/EEE' };
-  if (ea < 15) return { risk:true, note:'PSMF риск: EA <15 → FFM loss неизбежен (Blackburn). +300ккал или снизь EEE' };
-  if (ea < 20) return { risk:true, note:'EA 15-20 — граница PSMF, белок 2.8г/кг + силовые обязательны' };
-  return { risk:false, note:'EA ≥20 — PSMF безопасен по FFM' };
+  // known=false: EA не посчитана. Раньше такой случай отдавал risk:false, и UI красил
+  // плашку зелёным — «риска нет» при полном отсутствии данных (аудит 2026-11, §1.60).
+  if (ea == null || !isFinite(ea)) return { risk:false, known:false, note:'PSMF: EA не рассчитана — нет ккал или EEE' };
+  if (ea < 15) return { risk:true, known:true, note:'PSMF риск: EA <15 → FFM loss неизбежен (Blackburn). +300ккал или снизь EEE' };
+  if (ea < 20) return { risk:true, known:true, note:'EA 15-20 — граница PSMF, белок 2.8г/кг + силовые обязательны' };
+  // «Безопасен» — медицинское обещание, которого модель не даёт: только порог FFM-риска.
+  return { risk:false, known:true, note:'EA ≥20 — FFM-риск ниже порога Blackburn' };
 }
-export function menstrualWaterRetention(phase?: string): { kg:number; note:string } {
-  // Benton 2021: лютеин +1-2кг воды, Na-чувствительность ↑, Fe потеря
-  if (phase === 'luteal') return { kg: 1.2, note:'Лютеин: +1-2кг воды, +3.2ккал/кг BMR, Na осторожнее, Fe контроль' };
-  return { kg: 0, note:'Фолликул: без задержки воды' };
+export function menstrualWaterRetention(phase?: string): { kg:number; note:string; known:boolean } {
+  // Benton 2021: лютеин +1-2кг воды, Na-чувствительность ↑, Fe потеря.
+  // unknown: фаза не выбрана (в т.ч. мужчины) — раньше здесь печаталось «Фолликул»,
+  // то есть выдуманная фаза вместо «не указано» (аудит 2026-11, §1.60).
+  if (phase === 'luteal') return { kg: 1.2, note:'Лютеин: +1-2кг воды, +3.2ккал/кг BMR, Na осторожнее, Fe контроль', known:true };
+  if (phase === 'follicular') return { kg: 0, note:'Фолликулярная: задержки воды нет', known:true };
+  return { kg: 0, note:'Фаза цикла не указана — задержку воды не оцениваю', known:false };
 }

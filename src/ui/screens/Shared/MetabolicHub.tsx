@@ -887,7 +887,13 @@ const kbju = useMemo(()=> calcKBJU(input), [input]);
     return calcEnergyAvailability({ weight, bodyFat: bfForCalc, height: height||180, heightCm: height, lean: kbju.nat.lean, intakeKcal: intake, eeeKcal: eeeDaily, trainingDays, sex } as any);
   }, [weight,bfForCalc,height,kbju,trainingDays,weeklyVolumeTons,cardioMin, eaIntakeKcal, sex, weeklyEee]);
   const eeeDailyKcal = useMemo(()=> Math.max(0, Math.round(weeklyEee.kcalPerWeek / 7)), [weeklyEee]);
-  const lbmPres = useMemo(()=> calcLBMPreservation({ proteinGPerKg: kbju.nat.protPerKg, deficitKcal: effectiveDeficit, trainingDays, ea: ea?.ea }), [kbju, trainingDays, ea, effectiveDeficit]);
+  const lbmPres = useMemo(()=> {
+    // Аудит 2026-11 §1.61: пороги Helms (2.6+ г/кг) — на кг СУХОЙ массы, а kbju.nat.protPerKg —
+    // на кг веса тела. На 35–40% жира оценка сохранения LBM завышалась (2.1 г/кг веса читалось
+    // как «высокое сохранение» при 3+ г/кг lean). Считаем честно по lean.
+    const perLeanG = kbju.nat.lean > 0 ? (kbju.nat.p / kbju.nat.lean) : kbju.nat.protPerKg;
+    return calcLBMPreservation({ proteinGPerKg: perLeanG, deficitKcal: effectiveDeficit, trainingDays, ea: ea?.ea });
+  }, [kbju, trainingDays, ea, effectiveDeficit]);
   const psmf = useMemo(()=> checkPSMFWrap(ea.ea), [ea.ea]);
   const menstrual = useMemo(()=> calcMenstrualWater(menstrualPhase), [menstrualPhase]);
   const alcohol = useMemo(()=> calcAlcohol(alcoholG ?? 0, weight), [alcoholG, weight]);
@@ -1313,7 +1319,7 @@ const kbju = useMemo(()=> calcKBJU(input), [input]);
         {sex==='female' && (
           <div style={{ marginTop:8 }}>
             <MhGrid>
-              <PopupSelect label="Фаза цикла" value={menstrualPhase} options={[{id:'none',label:'—'},{id:'follicular',label:'Фолликулярная'},{id:'luteal',label:'Лютеиновая +250ккал +1кг воды'}]} onChange={v=> setMenstrualPhase(v as any)} />
+              <PopupSelect label="Фаза цикла" value={menstrualPhase} options={[{id:'none',label:'—'},{id:'follicular',label:'Фолликулярная'},{id:'luteal',label:'Лютеиновая (+3.2 ккал/кг, +1–2 кг воды)'}]} onChange={v=> setMenstrualPhase(v as any)} />
               <div style={{ display:'flex', alignItems:'center', fontSize:8, color:'rgba(255,255,255,0.5)', background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', borderRadius:10, padding:'8px 10px' }}>{kbju.lutealAdd ? `+${kbju.lutealAdd}ккал и +1.2кг воды (Benton 2021)` : '— фолликулярная фаза'}</div>
             </MhGrid>
           </div>
@@ -2233,7 +2239,7 @@ const kbju = useMemo(()=> calcKBJU(input), [input]);
                 <div style={{ padding:8, borderRadius:8, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', textAlign:'center', fontSize:9, color:'#fff' }}>Train day: {kbju.periodization.trainDay.kcal}ккал Б{kbju.periodization.trainDay.p} Ж{kbju.periodization.trainDay.f} У{kbju.periodization.trainDay.c}</div>
                 <div style={{ padding:8, borderRadius:8, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', textAlign:'center', fontSize:9, color:'#fff' }}>Rest day: {kbju.periodization.restDay.kcal}ккал Б{kbju.periodization.restDay.p} Ж{kbju.periodization.restDay.f} У{kbju.periodization.restDay.c}</div>
               </div>
-              <div style={{ marginTop:6, fontSize:9, color:'rgba(255,255,255,0.55)', background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', borderRadius:8, padding:'7px 10px' }}>💡 {kbju.carbTiming} · Клетчатка {kbju.fiber.nat}г (soluble {fiberSplit.soluble} + insoluble {fiberSplit.insoluble} IoM) · TEF {kbju.tefNat}ккал перс. (P25% C7% F3%) · LBM save {lbmPres.pct}% {lbmPres.note}</div>
+              <div style={{ marginTop:6, fontSize:9, color:'rgba(255,255,255,0.55)', background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', borderRadius:8, padding:'7px 10px' }}>💡 {kbju.carbTiming} · Клетчатка {kbju.fiber.nat}г (soluble {fiberSplit.soluble} + insoluble {fiberSplit.insoluble} IoM) · TEF {kbju.tefNat}ккал перс. (P25% C7% F3%) · LBM save {lbmPres.pct}% (белок {(kbju.nat.lean > 0 ? kbju.nat.p / kbju.nat.lean : kbju.nat.protPerKg).toFixed(1)}г/кг lean) {lbmPres.note}</div>
             </div>
           )}
           {mode==='maintenance' && (
@@ -2353,8 +2359,8 @@ const kbju = useMemo(()=> calcKBJU(input), [input]);
                 </div>
               </div>
               <div style={{ marginTop:8, display:'flex', gap:6, flexWrap:'wrap' }}>
-                <span style={{ fontSize:8, padding:'4px 8px', borderRadius:8, background: psmf.risk?'rgba(239,68,68,0.10)':'rgba(34,197,94,0.08)', border:'1px solid rgba(255,255,255,0.06)', color: psmf.risk?'#ef4444':'#22c55e' }}>{psmf.note}</span>
-                <span style={{ fontSize:8, padding:'4px 8px', borderRadius:8, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', color:'#fff' }}>Menstrual: {menstrual.note} {menstrualPhase==='luteal' && `+${menstrual.kg}кг воды`}</span>
+                <span style={{ fontSize:8, padding:'4px 8px', borderRadius:8, background: psmf.risk?'rgba(239,68,68,0.10)': psmf.known?'rgba(34,197,94,0.08)':'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', color: psmf.risk?'#ef4444': psmf.known?'#22c55e':'rgba(255,255,255,0.6)' }}>{psmf.note}</span>
+                <span style={{ fontSize:8, padding:'4px 8px', borderRadius:8, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', color: menstrual.known ? '#fff' : 'rgba(255,255,255,0.6)' }}>Menstrual: {menstrual.note}</span>
               </div>
               <div style={{ marginTop:8, padding:'8px 10px', borderRadius:8, background:'rgba(139,92,246,0.06)', border:'1px solid rgba(139,92,246,0.12)', fontSize:9, color:'#fff', lineHeight:1.4 }}>
                 Thyroid Kim 1 pmol FT4 ≈ +2.2% BMR. HOMA-IR &lt;1.4 оптимально · Mensink 10г SFA +12 LDL / 10г fiber −5 · FLI Bedogni &lt;30 нет стеатоза &gt;60 стеатоз · PSMF Blackburn EA&lt;15 · Mens+ FLI требуют лабы.

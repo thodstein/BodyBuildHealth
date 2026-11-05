@@ -771,8 +771,17 @@ describe('metabolic-hub PRO v2 — новые Pro-исправления', () =>
     expect(fliLean!).toBeLessThan(30);
     expect(checkPSMF(12).risk).toBe(true);
     expect(checkPSMF(25).risk).toBe(false);
+    // §1.60: без EA — не «риска нет», а «не рассчитана»
+    expect(checkPSMF(null).known).toBe(false);
+    expect(checkPSMF(null).risk).toBe(false);
+    expect(checkPSMF(null).note).toMatch(/не рассчитана/);
+    expect(checkPSMF(25).known).toBe(true);
     expect(menstrualWaterRetention('luteal').kg).toBe(1.2);
     expect(menstrualWaterRetention('follicular').kg).toBe(0);
+    // §1.60: фаза не выбрана — не «фолликул», а «не указана»
+    expect(menstrualWaterRetention(undefined).known).toBe(false);
+    expect(menstrualWaterRetention('none').known).toBe(false);
+    expect(menstrualWaterRetention('none').note).toMatch(/не указана/);
   });
 });
 

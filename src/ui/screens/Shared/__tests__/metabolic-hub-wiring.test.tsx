@@ -403,6 +403,23 @@ describe('MetabolicHub: ввод меняет расчёт (проводка п�
     expect(txt).not.toContain('вес растёт вместе с сухой массой');
   });
 
+  it('белковый режим: сохранение LBM считает белок на кг сухой массы, а не веса', () => {
+    render(<MetabolicHub />);
+    const txt = openMode('Белок');
+    expect(txt).toMatch(/LBM save \d+%/);
+    expect(txt, 'единица подписана явно — иначе порог Helms читается неверно').toMatch(/г\/кг lean/);
+    expect(txt).toMatch(/soluble \d+ \+ insoluble \d+/);
+  });
+
+  it('щитовидка: без фазы цикла и без EA не печатает выдуманных «Фолликул» и «безопасен»', () => {
+    render(<MetabolicHub />);
+    const txt = openMode('Щитовидка');
+    expect(txt).toContain('Фаза цикла не указана');
+    expect(txt).not.toMatch(/Фолликул/);
+    expect(txt).toMatch(/FFM-риск ниже порога|PSMF: EA не рассчитана/);
+    expect(txt).not.toMatch(/PSMF безопасен/);
+  });
+
   it('автосейв переживает перезагрузку экрана: ввод восстанавливается из снапшота', () => {
     render(<MetabolicHub />);
     setNumber('Вес, кг', 95);
