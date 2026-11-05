@@ -329,3 +329,38 @@ describe('чтение и запись базы пространства', () =>
     await expect(writeSpaceStores('home', { diary: [] })).resolves.toBeUndefined();
   });
 });
+
+describe('список баз на диске', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it('отдаёт пространства наших баз и не путает их с домашней или чужой', async () => {
+    const a1 = athleteSpaceId('a1');
+    const a2 = athleteSpaceId('a2');
+    vi.stubGlobal('indexedDB', {
+      ...indexedDB,
+      databases: async () => [
+        { name: 'HealthEngineDB_v3', version: 7 },
+        { name: `HealthEngineDB_v3__${a1}`, version: 7 },
+        { name: weightPhotoDbNameFor(a2), version: 1 },
+        { name: 'SomeOtherAppDB', version: 1 },
+        { name: 'he_weight_photos_db', version: 1 },
+      ],
+    });
+
+    const { listSpaceDatabaseIds } = await import('../db');
+    const ids = await listSpaceDatabaseIds();
+
+    expect(ids).not.toBeNull();
+    expect(ids!.sort()).toEqual([a1, a2].sort());
+  });
+
+  it('если среда не умеет список баз — null, а не пустой список', async () => {
+    vi.stubGlobal('indexedDB', { ...indexedDB, databases: undefined });
+
+    const { listSpaceDatabaseIds } = await import('../db');
+    await expect(listSpaceDatabaseIds()).resolves.toBeNull();
+  });
+});

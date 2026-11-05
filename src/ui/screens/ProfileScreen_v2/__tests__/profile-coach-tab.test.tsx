@@ -16,12 +16,17 @@ import { setSpacePurgeHandler } from '../../../../core/space-purge';
  * атлета, а глобальная заглушка делит хранилища между «базами» и не изолирует
  * тесты друг от друга. Остальные функции `core/db` берём настоящие.
  */
-const dbCounts = vi.hoisted(() => ({ counts: {} as Record<string, number | null> }));
+const dbCounts = vi.hoisted(() => ({
+  counts: {} as Record<string, number | null>,
+  disks: null as string[] | null,
+}));
 vi.mock('../../../../core/db', async importOriginal => {
   const actual = await importOriginal<typeof import('../../../../core/db')>();
   return {
     ...actual,
     spaceDbRecordCount: vi.fn(async (sid: string) => dbCounts.counts[sid] ?? 0),
+    // Список баз «на диске»: null — среда не даёт список (проверить нельзя).
+    listSpaceDatabaseIds: vi.fn(async () => dbCounts.disks),
   };
 });
 
@@ -56,6 +61,8 @@ import {
 
 beforeEach(() => {
   try { localStorage.clear(); } catch { /* ignore */ }
+  dbCounts.counts = {};
+  dbCounts.disks = null;
   _resetDataSpaceCache();
 });
 afterEach(() => {
@@ -656,5 +663,61 @@ describe('данные без карточки', () => {
     fireEvent.click(container.querySelector('[data-coach="orphan-delete-cancel"]') as HTMLElement);
     expect(container.querySelector('[data-coach="orphan-delete-confirm"]')).toBeNull();
     expect(readRegistryFromStorage().spaces.some(s => s.id === sid)).toBe(true);
+  });
+});
+
+describe('базы на диске', () => {
+  it('до нажатия ничего не спрашиваем — проверка только по просьбе', () => {
+    seed(1);
+    const { container } = render(<ProfileCoachTab />);
+    expect(container.querySelector('[data-coach="disk-scan"]')).not.toBeNull();
+    expect(container.querySelector('[data-coach="disk-scan-run"]')).not.toBeNull();
+    // результата нет: список баз не запрашивали
+    expect(container.querySelector('[data-coach="disk-scan-clean"]')).toBeNull();
+    expect(container.querySelector('[data-coach="disk-orphan"]')).toBeNull();
+  });
+
+  it('база без записи в реестре видна и удаляется в два шага', async () => {
+    seed(1);
+    const zombie = athleteSpaceId('zombie');
+    dbCounts.disks = [HOME_SPACE_ID, zombie];
+
+    const { container } = render(<ProfileCoachTab />);
+    fireEvent.click(container.querySelector('[data-coach="disk-scan-run"]') as HTMLElement);
+
+    await waitFor(() => expect(container.querySelector('[data-coach="disk-orphan"]')).not.toBeNull());
+    const row = container.querySelector('[data-coach="disk-orphan"]') as HTMLElement;
+    expect(row.getAttribute('data-space-id')).toBe(zombie);
+
+    fireEvent.click(container.querySelector('[data-coach="disk-orphan-delete"]') as HTMLElement);
+    expect(container.querySelector('[data-coach="disk-orphan-confirm"]')).not.toBeNull();
+
+    fireEvent.click(container.querySelector('[data-coach="disk-orphan-confirm"]') as HTMLElement);
+    expect(container.querySelector('[data-coach="disk-orphan"]')).toBeNull();
+    expect(container.querySelector('[data-coach="disk-scan-clean"]')).not.toBeNull();
+  });
+
+  it('пространства из реестра и домашняя база не считаются лишними', async () => {
+    seed(1);
+    const sid = athleteSpaceId('a1');
+    writeRegistryToStorage(upsertSpace(emptyRegistry(), { id: sid, athleteId: 'a1', label: 'Атлет 1' }).registry);
+    dbCounts.disks = [HOME_SPACE_ID, sid];
+
+    const { container } = render(<ProfileCoachTab />);
+    fireEvent.click(container.querySelector('[data-coach="disk-scan-run"]') as HTMLElement);
+
+    await waitFor(() => expect(container.querySelector('[data-coach="disk-scan-clean"]')).not.toBeNull());
+    expect(container.querySelector('[data-coach="disk-orphan"]')).toBeNull();
+  });
+
+  it('если среда не даёт список баз — это сказано прямо, а не «всё чисто»', async () => {
+    seed(1);
+    dbCounts.disks = null;
+
+    const { container } = render(<ProfileCoachTab />);
+    fireEvent.click(container.querySelector('[data-coach="disk-scan-run"]') as HTMLElement);
+
+    await waitFor(() => expect(container.querySelector('[data-coach="disk-scan-unavailable"]')).not.toBeNull());
+    expect(container.querySelector('[data-coach="disk-scan-clean"]')).toBeNull();
   });
 });

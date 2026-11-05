@@ -564,6 +564,42 @@ export async function spaceDbRecordCount(spaceId: string): Promise<number | null
 }
 
 /**
+ * Пространства, у которых на диске есть база.
+ *
+ * Зачем отдельно от реестра: запись реестра могла пропасть раньше (баг удаления
+ * карточки убирал её, хотя в базе лежали дневники) — и тогда база становилась
+ * невидимой: ни в списке атлетов, ни в «Данных без карточки», которые читают
+ * реестр. Здесь мы смотрим на сам диск, а не на реестр.
+ *
+ * `indexedDB.databases()` есть не во всех средах (старый Safari, приватный
+ * режим). Тогда возвращаем `null` — честное «проверить нельзя», а не пустой
+ * список, который читался бы как «баз нет».
+ */
+export async function listSpaceDatabaseIds(): Promise<string[] | null> {
+  try {
+    const factory =
+      typeof indexedDB !== 'undefined'
+        ? (indexedDB as IDBFactory & { databases?: () => Promise<Array<{ name?: string }>> })
+        : null;
+    if (!factory || typeof factory.databases !== 'function') return null;
+    const list = await factory.databases();
+    if (!Array.isArray(list)) return null;
+    const prefixes = [`${DB_NAME}__`, `${weightPhotoDbNameFor(HOME_SPACE_ID)}__`];
+    const out = new Set<string>();
+    for (const item of list) {
+      const name = item && typeof item.name === 'string' ? item.name : '';
+      if (!name) continue;
+      for (const prefix of prefixes) {
+        if (name.startsWith(prefix) && name.length > prefix.length) out.add(name.slice(prefix.length));
+      }
+    }
+    return [...out];
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Удалить базу фотографий веса пространства (в т.ч. домашнего — при полном
  * сбросе). Отдельная функция: домашнюю ОСНОВНУЮ базу удалять нельзя, а фото
  * при «удалить все данные» должны уйти так же, как дневники.

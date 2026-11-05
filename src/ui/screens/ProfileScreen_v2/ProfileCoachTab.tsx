@@ -291,6 +291,20 @@ export const ProfileCoachTab: React.FC<{
   const [forgetBusy, setForgetBusy] = useState(false);
   const [forgetDone, setForgetDone] = useState(false);
   const [forgetError, setForgetError] = useState<string | null>(null);
+  const [diskScan, setDiskScan] = useState<{ ids: string[]; unavailable: boolean } | null>(null);
+  const [scanBusy, setScanBusy] = useState(false);
+  /**
+   * Базы на диске, у которых нет записи в реестре.
+   *
+   * Список приходит только по явной просьбе («Проверить базы»): на старте это
+   * лишний тяжёлый импорт базы в граф вкладки, а нужен он редко — когда тренер
+   * подозревает, что от старой версии остались чужие данные.
+   */
+  const dbOnlySpaces = useMemo(() => {
+    if (!diskScan) return [];
+    const known = new Set(spaceRegistry.spaces.map(s => s.id));
+    return diskScan.ids.filter(id => id !== HOME_SPACE_ID && !known.has(id));
+  }, [diskScan, spaceRegistry]);
   // Итог «забыли всех» показываем, только пока действительно никого не осталось:
   // как только появился новый атлет, блок снова предлагает действие, а не итог.
   const showForgetDone = forgetDone && state.athletes.length === 0 && athleteSpaces.length === 0;
@@ -494,6 +508,8 @@ export const ProfileCoachTab: React.FC<{
     requestSpacePurge([spaceId]);
     setRegistryRev(v => v + 1);
     setConfirmOrphanId(null);
+    // Найденная база больше не «есть на диске» — из результата проверки её убираем.
+    setDiskScan(prev => (prev ? { ...prev, ids: prev.ids.filter(id => id !== spaceId) } : prev));
     void import('../../../core/db')
       .then(({ deleteSpaceDatabases }) => deleteSpaceDatabases([spaceId]))
       .catch(() => { /* база останется — данные уже недостижимы, удаление не блокируем */ });
@@ -508,6 +524,25 @@ export const ProfileCoachTab: React.FC<{
     const res = activateSpaceById(spaceId);
     if (res.error) return;
     reloadToApplySpace();
+  };
+
+  /**
+   * Посмотреть, какие базы вообще есть на диске.
+   *
+   * Реестр — не единственный источник правды о данных: раньше баг удаления
+   * карточки убирал запись реестра у атлета, у которого записи были только в
+   * базе. Такая база невидима и для списка, и для «Данных без карточки» — но
+   * занимает место и остаётся чужой медицинской информацией на телефоне.
+   * Поэтому спрашиваем сам диск, а не реестр. Модуль базы подгружается лениво:
+   * держать его в графе вкладки незачем.
+   */
+  const scanDisk = () => {
+    setScanBusy(true);
+    import('../../../core/db')
+      .then(({ listSpaceDatabaseIds }) => listSpaceDatabaseIds())
+      .then(ids => setDiskScan(ids ? { ids, unavailable: false } : { ids: [], unavailable: true }))
+      .catch(() => setDiskScan({ ids: [], unavailable: true }))
+      .finally(() => setScanBusy(false));
   };
 
   /**
@@ -1286,6 +1321,104 @@ export const ProfileCoachTab: React.FC<{
                   </div>
                 );
               })}
+            </div>
+          )}
+
+          {/* Проверка диска: база может остаться без записи в реестре */}
+          {state.athletes.length > 0 && (
+            <div style={cardStyle} data-coach="disk-scan">
+              <div style={{ fontSize: 13.5, fontWeight: 800, color: '#fff', display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span aria-hidden="true" style={{ display: 'inline-flex', color: colors.textMuted }}>
+                  <NativeIcon name="search" size={14} />
+                </span>
+                Базы на диске
+              </div>
+              <div
+                data-coach="disk-scan-hint"
+                style={{ fontSize: 11.5, color: colors.textMuted, marginTop: 6, lineHeight: 1.5 }}
+              >
+                Проверка, нет ли на устройстве базы дневников и анализов, которая не привязана ни к одной
+                карточке. Такое могло остаться после старых версий приложения — и тогда чужие данные лежат
+                на телефоне, но нигде не видны.
+              </div>
+              <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
+                <button
+                  type="button"
+                  data-coach="disk-scan-run"
+                  onClick={scanDisk}
+                  disabled={scanBusy}
+                  style={{ ...btn('ghost'), fontSize: 12, opacity: scanBusy ? 0.6 : 1 }}
+                >
+                  {scanBusy ? 'Проверяем…' : diskScan ? 'Проверить снова' : 'Проверить базы'}
+                </button>
+              </div>
+              {diskScan?.unavailable && (
+                <div
+                  data-coach="disk-scan-unavailable"
+                  style={{ fontSize: 11.5, color: colors.textMuted, marginTop: 8, lineHeight: 1.5 }}
+                >
+                  Устройство не даёт список баз — проверить здесь нельзя. Это не значит, что лишних баз нет.
+                </div>
+              )}
+              {diskScan && !diskScan.unavailable && dbOnlySpaces.length === 0 && (
+                <div
+                  data-coach="disk-scan-clean"
+                  style={{ fontSize: 11.5, color: colors.textMuted, marginTop: 8, lineHeight: 1.5 }}
+                >
+                  Баз без карточки нет — всё, что лежит на диске, привязано к людям в списке.
+                </div>
+              )}
+              {dbOnlySpaces.map(id => (
+                <div
+                  key={id}
+                  data-coach="disk-orphan"
+                  data-space-id={id}
+                  style={{
+                    marginTop: 10,
+                    padding: '10px 12px',
+                    borderRadius: 12,
+                    border: '1px solid rgba(239,68,68,0.28)',
+                    background: 'rgba(239,68,68,0.06)',
+                  }}
+                >
+                  <div style={{ fontSize: 12.5, fontWeight: 700, color: '#fff', wordBreak: 'break-all' }}>
+                    {id}
+                  </div>
+                  <div style={{ fontSize: 10.5, color: colors.textMuted, marginTop: 4, lineHeight: 1.45 }}>
+                    база есть, записи в реестре нет
+                  </div>
+                  <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
+                    <button
+                      type="button"
+                      data-coach="disk-orphan-delete"
+                      onClick={() => setConfirmOrphanId(confirmOrphanId === id ? null : id)}
+                      style={{ ...btn('danger'), fontSize: 12 }}
+                    >
+                      Удалить данные
+                    </button>
+                    {confirmOrphanId === id && (
+                      <>
+                        <button
+                          type="button"
+                          data-coach="disk-orphan-confirm"
+                          onClick={() => deleteOrphanData(id)}
+                          style={{ ...btn('danger'), fontSize: 12 }}
+                        >
+                          Удалить навсегда
+                        </button>
+                        <button
+                          type="button"
+                          data-coach="disk-orphan-cancel"
+                          onClick={() => setConfirmOrphanId(null)}
+                          style={{ ...btn('ghost'), fontSize: 12 }}
+                        >
+                          Оставить
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </div>
+              ))}
             </div>
           )}
 
