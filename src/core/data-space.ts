@@ -38,6 +38,8 @@
  * уже работает, а облако для атлетов помечается как частичное.
  */
 
+import { markSpaceReturn } from './space-return';
+
 /** Ключ реестра пространств. Всегда данные устройства (никогда не префиксуется). */
 export const DATA_SPACE_KEY = 'he_data_space_v1';
 export const HOME_SPACE_ID = 'home';
@@ -80,6 +82,12 @@ const DEVICE_LEVEL_KEYS: ReadonlySet<string> = new Set([
   'he_manual_onboarding_done',
   'he_lift_master_onboard_v1',
   'he_sync_tg_token_v1',
+  // Замок по биометрии — свойство ТЕЛЕФОНА. Если оставить эти ключи в
+  // пространстве, при входе в данные атлета проверка блокировки (App.tsx)
+  // находит пустые флаги и тихо открывает приложение без замка — ровно в тот
+  // момент, когда телефон передают другому человеку.
+  'he_biometry_enabled',
+  'he_biometry_lock',
 ]);
 
 export interface DataSpaceRecord {
@@ -948,6 +956,15 @@ export function isAthleteDataActive(): boolean {
   return activeSpaceRecord().id !== HOME_SPACE_ID;
 }
 
+/** Точка возврата — удобство, а не условие смены: сбой записи не блокирует. */
+function markSpaceSwitchReturn(): void {
+  try {
+    markSpaceReturn();
+  } catch {
+    /* ignore */
+  }
+}
+
 /**
  * Включить пространство атлета: создаёт его при первом входе и делает активным.
  * Приложение после этого нужно перезагрузить — иначе в памяти останутся данные
@@ -963,6 +980,7 @@ export function activateAthleteSpace(
   const up = upsertSpace(reg, { id, athleteId, label, seed });
   if (up.error) return { id: null, error: up.error };
   writeRegistryToStorage(setActiveSpace(touchSpaceOpened(up.registry, id), id));
+  markSpaceSwitchReturn();
   return { id, error: null };
 }
 
@@ -996,6 +1014,7 @@ export function activeSpaceSeed(): AthleteProfileSeed | null {
 export function activateHomeSpace(): void {
   const reg = readRegistryFromStorage();
   writeRegistryToStorage(setActiveSpace(reg, HOME_SPACE_ID));
+  markSpaceSwitchReturn();
 }
 
 /**
@@ -1006,11 +1025,13 @@ export function activateSpaceById(spaceId: string): { id: string | null; error: 
   const reg = readRegistryFromStorage();
   if (spaceId === HOME_SPACE_ID) {
     writeRegistryToStorage(setActiveSpace(reg, HOME_SPACE_ID));
+    markSpaceSwitchReturn();
     return { id: HOME_SPACE_ID, error: null };
   }
   const known = reg.spaces.some(s => s.id === spaceId);
   if (!known) return { id: null, error: 'unknown' };
   writeRegistryToStorage(setActiveSpace(touchSpaceOpened(reg, spaceId), spaceId));
+  markSpaceSwitchReturn();
   return { id: spaceId, error: null };
 }
 
@@ -1028,7 +1049,11 @@ export function athleteSpacesByRecent(reg: DataSpaceRegistry): DataSpaceRecord[]
   });
 }
 
-/** Единственное место, где мы перезагружаем приложение после смены пространства. */
+/**
+ * Единственное место, где мы перезагружаем приложение после смены пространства.
+ * Сама точка возврата (тот же экран после перезагрузки) ставится при активации
+ * пространства — см. `activate*Space` и `core/space-return`.
+ */
 export function reloadToApplySpace(): void {
   try {
     if (typeof location !== 'undefined' && typeof location.reload === 'function') location.reload();

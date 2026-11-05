@@ -79,6 +79,9 @@ describe('классификация ключей', () => {
       'he_session_v2',
       'he_crypto_key',
       'he_manual_onboarding_done',
+      // биометрия — замок ТЕЛЕФОНА, а не настройка атлета (см. data-space.ts)
+      'he_biometry_enabled',
+      'he_biometry_lock',
     ]) {
       expect(isDeviceLevelKey(k), k).toBe(true);
     }

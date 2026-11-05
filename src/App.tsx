@@ -15,6 +15,7 @@ import { ArticlesScreen } from './ui/screens/ArticlesScreen';
 import { ToastContainer } from './ui/ToastContainer';
 import { KvUpdateBanner } from './ui/KvUpdateBanner';
 import { DataSpaceBanner } from './ui/DataSpaceBanner';
+import { rememberScreen, restoreScreen } from './core/space-return';
 import { KvSyncButton } from './ui/KvSyncButton';
 import { setLocale, getLocale } from './data/interactions-labels';
 import { isNativeApp } from './core/app-platform';
@@ -66,6 +67,30 @@ function NativeAppLock({ onUnlocked }: { onUnlocked: () => void }) {
 }
 
 type Tab = 'home' | 'pharma' | 'training' | 'labs' | 'risks' | 'support' | 'nutrition' | 'profile' | 'articles' | 'marketplace';
+
+const KNOWN_TABS: readonly Tab[] = [
+  'home',
+  'pharma',
+  'training',
+  'labs',
+  'risks',
+  'support',
+  'nutrition',
+  'profile',
+  'articles',
+  'marketplace',
+];
+
+/** Возврат после смены пространства: только настоящая вкладка, иначе главная. */
+function restoredStart(): { tab: Tab; subTab: string | null } {
+  try {
+    const target = restoreScreen(KNOWN_TABS);
+    if (target) return { tab: target.tab as Tab, subTab: target.subTab };
+  } catch {
+    /* возврат — удобство: любая ошибка = обычный старт */
+  }
+  return { tab: 'home', subTab: null };
+}
 
 // NavTarget — куда переходить внутри блока.
 // subTab — конкретный раздел/дневник внутри блока (например, 'diary' в NutritionScreen).
@@ -154,8 +179,11 @@ export const NAV_TARGETS: Record<string, NavTarget> = {
 };
 
 export default function App() {
-  const [tab, setTab] = useState<Tab>('home');
-  const [subTab, setSubTab] = useState<string | null>(null);
+  // Обычный старт — главная. После смены пространства данных (режим тренера)
+  // возвращаем туда, где тренер был: переключение атлета — это перезагрузка.
+  const [start] = useState(restoredStart);
+  const [tab, setTab] = useState<Tab>(start.tab);
+  const [subTab, setSubTab] = useState<string | null>(start.subTab);
   const [initialized, setInitialized] = useState(false);
   const [screenKey, setScreenKey] = useState(0);
   // Блок входа по биометрии — ТОЛЬКО APK (флаги he_biometry_* из BiometrySetupCard).
@@ -181,6 +209,12 @@ export default function App() {
   }, [tab, screenKey]);
   // touchRef removed
   const mainRef = useRef<HTMLElement>(null);
+
+  // App сообщает модулю возврата, где он: в момент перезагрузки (смена
+  // пространства) этот экран станет точкой возврата.
+  useEffect(() => {
+    rememberScreen(tab, subTab);
+  }, [tab, subTab]);
 
   useEffect(() => { registry.init().then(() => setInitialized(true)); }, []);
 
