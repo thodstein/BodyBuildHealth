@@ -440,15 +440,26 @@ export async function preparePdfjsWorker(
   } else {
     try {
       if (typeof fetch === 'function' && typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function') {
-        const res = await fetch(resolved.workerSrc, { cache: 'no-store' });
-        if (res.ok) {
-          const text = await res.text();
-          // Страховка от SPA-фолбэка: index.html вместо скрипта воркера.
-          if (text.length > 1000 && !/^\s*<!doctype html/i.test(text)) {
-            workerSrc = URL.createObjectURL(new Blob([text], { type: 'text/javascript' }));
-            source = 'blob';
-            pdfjsWorkerBlobCache.set(resolved.workerSrc, workerSrc);
+        // Таймаут обязателен: если WebView застрял на запросе скрипта, импорт
+        // PDF не должен зависать — просто останется прямой URL.
+        const controller = typeof AbortController === 'function' ? new AbortController() : null;
+        const timer = setTimeout(() => controller?.abort(), 15_000);
+        try {
+          const res = await fetch(resolved.workerSrc, {
+            cache: 'no-store',
+            ...(controller ? { signal: controller.signal } : {}),
+          });
+          if (res.ok) {
+            const text = await res.text();
+            // Страховка от SPA-фолбэка: index.html вместо скрипта воркера.
+            if (text.length > 1000 && !/^\s*<!doctype html/i.test(text)) {
+              workerSrc = URL.createObjectURL(new Blob([text], { type: 'text/javascript' }));
+              source = 'blob';
+              pdfjsWorkerBlobCache.set(resolved.workerSrc, workerSrc);
+            }
           }
+        } finally {
+          clearTimeout(timer);
         }
       }
     } catch { /* остаётся прямой URL */ }

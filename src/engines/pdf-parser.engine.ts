@@ -1,3 +1,5 @@
+import { isNativeApp } from '../core/app-platform';
+
 export interface ParsedLabValue {
   code: string;
   name: string;
@@ -574,15 +576,55 @@ function installWebViewPolyfills(): void {
   }
 }
 
+/**
+ * Ограничить ожидание этапа. Без этого любой сбой в WebView (воркер не
+ * поднялся, страница не отрисовалась) превращался в вечный спиннер:
+ * у PDF-пути не было ни одного таймаута.
+ */
+function withStageTimeout<T>(promise: Promise<T>, ms: number, stage: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(
+      () => reject(new Error(`таймаут ${Math.round(ms / 1000)}с на этапе «${stage}»`)),
+      ms,
+    );
+    promise.then(
+      (value) => { clearTimeout(timer); resolve(value); },
+      (error) => { clearTimeout(timer); reject(error); },
+    );
+  });
+}
+
+/**
+ * Подготовить pdfjs к работе.
+ *
+ * В АПК pdfjs работает на главном потоке БЕЗ Worker: `globalThis.pdfjsWorker`
+ * — штатный путь pdfjs без воркера. Это важно, потому что WebView в приложении
+ * нередко не поднимает module-worker из blob/ассета, а тогда pdfjs навсегда
+ * ждёт сообщение «ready» от воркера и импорт PDF зависает (ровно это и
+ * происходило в новом APK). На главном потоке воркер не нужен вообще: ни
+ * workerSrc, ни fetch 1.2 МБ скрипта.
+ */
+async function setupPdfjs(pdfjsLib: any): Promise<void> {
+  if (isNativeApp()) {
+    // @ts-expect-error — pdfjs не публикует типы для модуля воркера.
+    const workerModule = await import('pdfjs-dist/legacy/build/pdf.worker.min.mjs');
+    (globalThis as unknown as { pdfjsWorker?: unknown }).pdfjsWorker = workerModule;
+    return;
+  }
+  const { preparePdfjsWorker } = await import('./ocr-assets');
+  await preparePdfjsWorker(pdfjsLib);
+}
+
 async function openPdfDocument(pdfjsLib: any, data: ArrayBuffer): Promise<any> {
   // Копия обязательна: pdfjs передаёт буфер воркеру (ArrayBuffer становится
   // detached). Без копии следующий шаг — OCR страниц того же PDF — падал с
   // «Cannot perform Construct on a detached ArrayBuffer».
   const pdfData = new Uint8Array(data.slice(0));
-  // pdfjs 6 удалил опцию `disableWorker`: воркер обязателен, иначе движок
-  // падает с «No "GlobalWorkerOptions.workerSrc" specified» ещё до чтения
-  // файла. Воркер настраивается вызывающим кодом: preparePdfjsWorker().
-  return pdfjsLib.getDocument({ data: pdfData }).promise;
+  return withStageTimeout(
+    pdfjsLib.getDocument({ data: pdfData }).promise,
+    45_000,
+    'открытие PDF',
+  );
 }
 
 function enhanceOcrCanvas(source: HTMLCanvasElement): HTMLCanvasElement {
@@ -1109,16 +1151,8 @@ export async function parsePDF(fileOrBuffer: File | ArrayBuffer): Promise<Parsed
     // The legacy bundle keeps the same browser API and is compatible with
     // environments where those DOM globals are not exposed eagerly.
     const pdfjsLib = await import('pdfjs-dist/legacy/build/pdf.mjs');
-    // Воркер нужен ВСЕГДА (pdfjs 6 не умеет без него), в том числе в АПК —
-    // раньше в нативном режиме он намеренно не задавался, и любой PDF падал
-    // с «No "GlobalWorkerOptions.workerSrc" specified».
-    {
-      const { preparePdfjsWorker } = await import('./ocr-assets');
-      await preparePdfjsWorker(pdfjsLib);
-    }
+    await setupPdfjs(pdfjsLib);
     const arrayBuffer = fileOrBuffer instanceof ArrayBuffer ? fileOrBuffer : await fileOrBuffer.arrayBuffer();
-    // Scanned PDFs need page rendering. Telegram WebView often cannot load
-    // the PDF.js worker URL, while the main-thread renderer works reliably.
     const pdf = await openPdfDocument(pdfjsLib, arrayBuffer);
     let fullText = '';
     let allItems: TextItem[] = [];
@@ -1180,12 +1214,7 @@ export async function ocrScannedPdf(fileOrBuffer: File | ArrayBuffer): Promise<s
     throw new Error(`OCR сканированного PDF недоступен: ${initError?.message || String(initError)}`);
   }
   try {
-    {
-      // pdfjs 6: воркер обязателен (disableWorker удалён). В АПК настраиваем
-      // его через Blob, чтобы не зависеть от MIME `.mjs` в ассетах.
-      const { preparePdfjsWorker } = await import('./ocr-assets');
-      await preparePdfjsWorker(pdfjsLib);
-    }
+    await setupPdfjs(pdfjsLib);
     const arrayBuffer = fileOrBuffer instanceof ArrayBuffer ? fileOrBuffer : await fileOrBuffer.arrayBuffer();
     if (arrayBuffer.byteLength > 12 * 1024 * 1024) {
       throw new Error('Сканированный PDF больше 12 МБ. Сожмите файл или загрузите страницы по одной.');
@@ -1202,7 +1231,9 @@ export async function ocrScannedPdf(fileOrBuffer: File | ArrayBuffer): Promise<s
       throw new Error(`В сканированном PDF ${pdf.numPages} страниц. Максимум для Telegram Mini App: ${MAX_SCAN_PAGES}.`);
     }
     const texts: string[] = [];
-    const worker = await createRussianOcrWorker(Tesseract);
+    // Загрузка моделей на телефоне — десятки секунд; без предела это вечный
+    // спиннер, если воркер не поднялся.
+    const worker = await withStageTimeout(createRussianOcrWorker(Tesseract), 60_000, 'запуск OCR');
     try {
       await configureLabOcrWorker(worker, mobile);
       for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber++) {
@@ -1219,18 +1250,32 @@ export async function ocrScannedPdf(fileOrBuffer: File | ArrayBuffer): Promise<s
         // requestAnimationFrame, то есть рендер страницы доходит до конца даже
         // когда приложение свернули (иначе rAF в фоне замирает и промис
         // page.render() не резолвится никогда). Для OCR картинка та же.
-        await page.render({ canvas, canvasContext: context, viewport, intent: 'print' }).promise;
+        await withStageTimeout(
+          page.render({ canvas, canvasContext: context, viewport, intent: 'print' }).promise,
+          60_000,
+          `рендер страницы ${pageNumber}`,
+        );
         const enhanced = enhanceOcrCanvasInPlace(canvas);
         try {
-          const { data } = await worker.recognize(enhanced);
+          const { data } = await withStageTimeout<any>(
+            worker.recognize(enhanced),
+            120_000,
+            `распознавание страницы ${pageNumber}`,
+          );
           let pageText = data.text || '';
-          // A sparse-table pass recovers right-aligned result/unit columns on
-          // Android too. Choose the pass that actually yields more biomarkers
-          // instead of appending both noisy OCR versions to one text blob.
+          // Второй (разреженный) проход восстанавливает правые колонки
+          // (значение/единицы/референс) и возвращает показатели, которые первый
+          // проход теряет — проверено: без него пропадают AST и витамин D.
+          // Поэтому проход выполняется всегда; ограничение по времени — только
+          // через withStageTimeout.
           if (typeof worker.setParameters === 'function') {
             try {
               await worker.setParameters({ tessedit_pageseg_mode: '11' });
-              const second = await worker.recognize(enhanced);
+              const second = await withStageTimeout<any>(
+                worker.recognize(enhanced),
+                120_000,
+                `распознавание страницы ${pageNumber} (разреженный проход)`,
+              );
               const sparseText = second.data.text || '';
               pageText = pickBetterLabOcrPass(pageText, sparseText);
             } catch (sparseOcrError: any) {
