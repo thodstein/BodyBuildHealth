@@ -106,39 +106,54 @@ export function exportToJSON(b: AppBackup): string {
   return JSON.stringify(b, null, 2);
 }
 
+/**
+ * Готовый файл копии: имя и текст. Само сохранение — забота UI: на веб это
+ * скачивание, в APK — Documents + share (`core/apk-share`), и только там
+ * известно, что сработало и что сказать пользователю.
+ */
+export async function backupFile(): Promise<{ name: string; text: string }> {
+  const b = await collectBackup();
+  return {
+    name: `health-engine-backup-${b.createdAt.slice(0, 10)}.json`,
+    text: exportToJSON(b),
+  };
+}
+
+/**
+ * Короткая сводка файла для подтверждения перед заменой: сколько пространств и
+ * сколько записей в базе. Нужна, чтобы «восстановить» не было кнопкой-лотереей:
+ * человек видит, что именно заменит его данные.
+ */
+export function describeBackup(b: AppBackup): {
+  spaces: number;
+  records: number;
+  keys: number;
+  createdAt: string;
+} {
+  const perSpace: Record<string, Record<string, any[]>> =
+    b.spaceStores && Object.keys(b.spaceStores).length
+      ? b.spaceStores
+      : { [HOME_SPACE_ID]: b.stores || {} };
+  let records = 0;
+  for (const stores of Object.values(perSpace)) {
+    for (const arr of Object.values(stores || {})) {
+      if (Array.isArray(arr)) records += arr.length;
+    }
+  }
+  return {
+    spaces: Object.keys(perSpace).length,
+    records,
+    keys: Object.keys(b.localStorage || {}).length,
+    createdAt: typeof b.createdAt === 'string' ? b.createdAt : '',
+  };
+}
+
 export function parseBackup(text: string): AppBackup {
   const b = JSON.parse(text);
   if (b?.app !== 'health-engine') {
     throw new Error('Неизвестный файл бэкапа');
   }
   return b as AppBackup;
-}
-
-// Client-only cascade:
-// 1) navigator.share with File (Android TMA → system sheet; iOS 17+ often works)
-// 2) clipboard copy (reliable in TMA; user pastes to Saved Messages)
-// 3) browser <a download> (only works OUTSIDE TMA WebView — blocked there)
-export async function exportBackup(): Promise<void> {
-  const b = await collectBackup();
-  const name = `health-engine-backup-${b.createdAt.slice(0, 10)}.json`;
-  const text = exportToJSON(b);
-  const file = new File([text], name, { type: 'application/json' });
-  const nav = navigator as any;
-  if (nav.canShare && nav.canShare({ files: [file] })) {
-    await nav.share({ files: [file], title: name });
-    return;
-  }
-  try {
-    await navigator.clipboard.writeText(text);
-    return;
-  } catch {
-    /* fallthrough to browser download */
-  }
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(file);
-  a.download = name;
-  a.click();
-  URL.revokeObjectURL(a.href);
 }
 
 // Full replace (restore). Caller wraps parseBackup in try/catch.

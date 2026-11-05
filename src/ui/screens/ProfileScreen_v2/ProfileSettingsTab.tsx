@@ -117,6 +117,83 @@ export const ProfileSettingsTab: React.FC<{ onNavigate?: (screen: string) => voi
     }
   };
 
+  /**
+   * Полная копия всех данных приложения (профиль, дневники, планы, анализы и
+   * данные всех атлетов) в один файл. Это не «экспорт профиля» выше: тот несёт
+   * только профиль, и после смены телефона дневники и анализы в нём не спасти.
+   *
+   * `core/data-backup` импортируется ЛЕНИВО: он тянет движок IndexedDB, а
+   * статический импорт вернул бы тяжёлый движок в граф экрана профиля (это уже
+   * проходили с `core/db` в карточке тренера — холодный старт страдал).
+   */
+  const [backupBusy, setBackupBusy] = useState(false);
+  const handleFullExport = async () => {
+    if (backupBusy) return;
+    setBackupBusy(true);
+    try {
+      const { backupFile } = await import('../../../core/data-backup');
+      const { name, text } = await backupFile();
+      const outcome = await saveTextFileApk(name, text, 'application/json;charset=utf-8');
+      toast(shareOutcomeLabel(outcome));
+    } catch (e) {
+      toast('Ошибка экспорта: ' + (e as Error).message);
+    } finally {
+      setBackupBusy(false);
+    }
+  };
+
+  /** Файл больше этого не читаем: JSON.parse такого размера подвесит вкладку. */
+  const BACKUP_MAX_BYTES = 60 * 1024 * 1024;
+  const handleFullImport = () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'application/json,.json';
+    input.onchange = (e: Event) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (!file) return;
+      if (file.size > BACKUP_MAX_BYTES) {
+        alert('Файл слишком большой для восстановления на этом устройстве.');
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = ev => {
+        void (async () => {
+          const { describeBackup, importBackup, parseBackup } = await import('../../../core/data-backup');
+          let parsed;
+          try {
+            parsed = parseBackup(String(ev.target?.result || ''));
+          } catch (err) {
+            alert('Это не файл резервной копии Health Engine.\n' + (err as Error).message);
+            return;
+          }
+          const info = describeBackup(parsed);
+          const date = info.createdAt.slice(0, 10) || 'без даты';
+          const spaces = info.spaces === 1 ? '1 пространство данных' : `${info.spaces} пространств(а)`;
+          const ok = confirm(
+            `Копия от ${date}: ${spaces}, ${info.records} записей в базе, ${info.keys} настроек.\n\n` +
+              'Восстановление ЗАМЕНИТ все данные на этом устройстве — профиль, дневники, анализы и ' +
+              'данные всех атлетов. Фотографии веса и черновики в файл не входят и останутся как есть. ' +
+              'Отменить это нельзя.\n\nПродолжить?',
+          );
+          if (!ok) return;
+          try {
+            await importBackup(parsed);
+            alert('✅ Данные восстановлены — приложение перезапустится.');
+            try {
+              window.location.reload();
+            } catch {
+              /* среда без перезагрузки */
+            }
+          } catch (err) {
+            alert('Ошибка восстановления: ' + (err as Error).message);
+          }
+        })();
+      };
+      reader.readAsText(file);
+    };
+    input.click();
+  };
+
   const handleClearDiaries = () => {
     if (!confirm('Удалить все дневниковые записи (сон, АД, инъекции, замеры)?')) return;
     try {
@@ -187,7 +264,7 @@ export const ProfileSettingsTab: React.FC<{ onNavigate?: (screen: string) => voi
 
       <AccordionSection
         title="4.2 Экспорт / Импорт"
-        subtitle="Сохранить профиль в файл или восстановить из бэкапа"
+        subtitle="Профиль или ВСЕ данные приложения — в файл и обратно"
         icon={<NativeIcon name="inbox" size={20} />}
         color={colors.primary}
       >
@@ -201,6 +278,41 @@ export const ProfileSettingsTab: React.FC<{ onNavigate?: (screen: string) => voi
           <button onClick={handleCopy} className="pf-set-btn" style={{
             ...btnStyle, borderColor: 'rgba(139,92,246,0.4)', color: '#fff', background: 'linear-gradient(135deg, rgba(139,92,246,0.22), rgba(139,92,246,0.07))',
           }}><span style={{ display:'inline-flex', width:30, height:30, borderRadius:10, alignItems:'center', justifyContent:'center', background:'rgba(139,92,246,0.18)', border:'1px solid rgba(139,92,246,0.35)', flexShrink:0 }}><NativeIcon name="file" size={14} /></span>Копировать в буфер</button>
+        </div>
+
+        {/* Полная копия — отдельный ряд: профиль без дневников и анализов не
+            спасает после смены телефона, а человек читает «экспорт» как «всё». */}
+        <div style={{ marginTop: 10, fontSize: 11.5, color: colors.textMuted, lineHeight: 1.5 }}>
+          Копия профиля выше несёт только профиль. Ниже — копия <strong>всех</strong> данных:
+          дневники, планы, анализы и пространства атлетов.
+        </div>
+        <div
+          style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 10, marginTop: 8 }}
+          data-backup="row"
+        >
+          <button
+            onClick={() => { void handleFullExport(); }}
+            disabled={backupBusy}
+            data-backup="export"
+            className="pf-set-btn"
+            style={{
+              ...btnStyle,
+              opacity: backupBusy ? 0.6 : 1,
+              borderColor: 'rgba(34,211,238,0.4)', color: '#fff', background: 'linear-gradient(135deg, rgba(34,211,238,0.22), rgba(34,211,238,0.07))',
+            }}
+          ><span style={{ display:'inline-flex', width:30, height:30, borderRadius:10, alignItems:'center', justifyContent:'center', background:'rgba(34,211,238,0.18)', border:'1px solid rgba(34,211,238,0.35)', flexShrink:0 }}><NativeIcon name="share" size={14} /></span>{backupBusy ? 'Собираем копию…' : 'Полная копия данных'}</button>
+          <button
+            onClick={handleFullImport}
+            data-backup="import"
+            className="pf-set-btn"
+            style={{
+              ...btnStyle, borderColor: 'rgba(59,130,246,0.4)', color: '#fff', background: 'linear-gradient(135deg, rgba(59,130,246,0.22), rgba(59,130,246,0.07))',
+            }}
+          ><span style={{ display:'inline-flex', width:30, height:30, borderRadius:10, alignItems:'center', justifyContent:'center', background:'rgba(59,130,246,0.18)', border:'1px solid rgba(59,130,246,0.35)', flexShrink:0 }}><NativeIcon name="inbox" size={14} /></span>Восстановить всё из файла</button>
+        </div>
+        <div style={{ marginTop: 8, fontSize: 11.5, color: colors.textSubtle, lineHeight: 1.5 }} data-backup="note">
+          Чего в файле нет: фотографий веса и недописанных черновиков — они остаются на устройстве.
+          Внутри лежит ключ шифрования базы, поэтому файл стоит хранить как пароль.
         </div>
       </AccordionSection>
 

@@ -173,3 +173,68 @@ describe('бэкап уносит базы всех пространств', () 
     expect(localStorage.getItem(toPhysicalKey(a1, 'he_profile_v2'))).toBeNull();
   });
 });
+
+describe('файл копии для пользователя', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    readSpaceStores.mockClear();
+    writeSpaceStores.mockClear();
+  });
+
+  it('backupFile отдаёт имя с датой и текст, который читается обратно', async () => {
+    const a1 = athleteSpaceId('a1');
+    const reg = setActiveSpace(
+      upsertSpace(emptyRegistry(), { id: a1, athleteId: 'a1', label: 'Иван' }).registry,
+      'home',
+    );
+    localStorage.setItem(DATA_SPACE_KEY, serializeRegistry(reg));
+    localStorage.setItem('he_profile_v2', '{"name":"Тренер"}');
+
+    const { backupFile, parseBackup, BACKUP_VERSION } = await import('../data-backup');
+    const file = await backupFile();
+
+    expect(file.name).toMatch(/^health-engine-backup-\d{4}-\d{2}-\d{2}\.json$/);
+    const parsed = parseBackup(file.text);
+    expect(parsed.version).toBe(BACKUP_VERSION);
+    expect(parsed.localStorage.he_profile_v2).toContain('Тренер');
+    expect(Object.keys(parsed.spaceStores || {})).toContain('home');
+  });
+
+  it('describeBackup считает пространства, записи и ключи — цифры для подтверждения', async () => {
+    const { describeBackup } = await import('../data-backup');
+    const b: AppBackup = {
+      app: 'health-engine',
+      version: '2.0',
+      createdAt: '2026-11-01T10:20:00.000Z',
+      stores: {},
+      spaceStores: {
+        home: { training_log: [{}, {}, {}], labs_log: [] },
+        asp_a1: { labs_log: [{}, {}] },
+      },
+      localStorage: { he_profile_v2: '{}', he_weight_log: '[]' },
+    };
+    expect(describeBackup(b)).toEqual({
+      spaces: 2,
+      records: 5,
+      keys: 2,
+      createdAt: '2026-11-01T10:20:00.000Z',
+    });
+  });
+
+  it('describeBackup понимает файл 1.0 (без spaceStores)', async () => {
+    const { describeBackup } = await import('../data-backup');
+    const b: AppBackup = {
+      app: 'health-engine',
+      version: '1.0',
+      createdAt: '2026-05-01T00:00:00.000Z',
+      stores: { diary: [{}, {}] },
+      localStorage: {},
+    };
+    expect(describeBackup(b)).toMatchObject({ spaces: 1, records: 2, keys: 0 });
+  });
+
+  it('битый файл не считается копией', async () => {
+    const { parseBackup } = await import('../data-backup');
+    expect(() => parseBackup('{"hello":"world"}')).toThrow('Неизвестный файл бэкапа');
+  });
+});

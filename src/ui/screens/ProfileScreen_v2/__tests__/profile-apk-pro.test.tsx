@@ -177,8 +177,10 @@ describe('Profile §91 — раунды 4-5: настройки, слайдер�
     const { container, getByRole } = render(<ProfileSettingsTab />);
     // Аккордеон 4.2 закрыт по умолчанию — открываем.
     fireEvent.click(getByRole('button', { name: /4\.2 Экспорт/ }));
+    // 4.2 = копия профиля (3 кнопки) + полная копия данных (2 кнопки).
+    // Число точное: кнопка, потерявшая хук pf-set-btn, тоже должна ронять тест.
     const btns = container.querySelectorAll('.pf-set-btn');
-    expect(btns.length).toBe(3);
+    expect(btns.length).toBe(5);
     (btns as unknown as HTMLElement[]).forEach(b => {
       expect((b as HTMLElement).style.minHeight).toBe('56px');
     });
