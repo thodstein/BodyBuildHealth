@@ -1623,6 +1623,11 @@ const kbju = useMemo(()=> calcKBJU(input), [input]);
             color: deadline.verdict==='on-track'||deadline.verdict==='met' ? '#22c55e' : deadline.verdict==='too-fast' ? '#f59e0b' : '#f87171',
           }}>
             🗓 {deadline.verdict==='met' ? 'цель достигнута' : deadline.verdict==='on-track' ? 'срок выполним' : deadline.verdict==='too-fast' ? 'план быстрее срока' : deadline.verdict==='too-slow' ? 'в срок не успеть' : 'цель и план в разные стороны'} · {deadline.note}
+            {goalV2 && goalV2.breaks > 0 && (
+              <div style={{ marginTop:4, fontSize:8, opacity:0.8 }}>
+                Проверка выше — без брейков (непрерывный дефицит). Календарь с брейками: {goalV2.deficitWeeks} нед дефицита + {goalV2.breaks}×{goalV2.breakWeeks} нед maintenance = {goalV2.weeks} нед, на неделях брейка дефицита нет.
+              </div>
+            )}
           </div>
         )}
         <div style={{ fontSize:9, color:'rgba(255,255,255,0.5)', marginTop:6, lineHeight:1.4 }}>

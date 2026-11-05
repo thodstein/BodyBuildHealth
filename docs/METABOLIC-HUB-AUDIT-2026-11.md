@@ -480,6 +480,15 @@ deficitKcalDelta })` вставляет 2 нед maintenance после кажд
 `metabolic-hub-wiring.test.tsx` → «K — редактируемое поле и реально влияет на штраф питания»
 (K 2 г → `×1.03`, Na 5 г → `×1.06`).
 
+### 1.43 Срок цели проверялся «в лоб», без учёта брейков из календаря
+**Причина.** `calcDeadlineFeasibility` считает непрерывный дефицит, а календарь диеты (после §1.39)
+включает 2 нед maintenance каждые 6 нед. При заполненном «Целевых недель» человек получал «в срок не
+успеть», хотя срок цели в том же экране уже посчитан **с** брейками — два разных ответа на один вопрос.
+**Исправление.** Под вердиктом появилась строка: «Проверка выше — без брейков (непрерывный дефицит).
+Календарь с брейками: N нед дефицита + M×2 нед maintenance = K нед, на неделях брейка дефицита нет».
+**Регрессия.** `metabolic-hub-wiring.test.tsx` → «срок цели не спорит с брейками: показывает, что
+проверено без них» (раскладка сходится: дефицит + брейки = срок).
+
 ---
 
 ## 2. Чего не хватало (добавлено)
@@ -529,7 +538,7 @@ deficitKcalDelta })` вставляет 2 нед maintenance после кажд
   параллельные `tsc`/`vitest` из других сессий → heap OOM / `Zone Allocation failed`.
   Прогонять на свободной машине.
 - `npx vitest run src/ui/screens/Shared/__tests__ src/engines/__tests__/metabolic-hub.test.ts`
-  — **228 passed** (6 файлов: structure / toggles / honesty / modes / wiring / engine).
+  — **229 passed** (6 файлов: structure / toggles / honesty / modes / wiring / engine).
 - `npx vitest run src/ui/__tests__/rest-hooks-native.test.tsx
   src/engines/__tests__/risk-info-honesty-e07-e08.test.ts` — **89 passed**
   (в stderr шумит jsdom-canvas chart.js — это фон, не падения).

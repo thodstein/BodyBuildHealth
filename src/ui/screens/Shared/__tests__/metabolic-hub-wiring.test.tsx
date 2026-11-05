@@ -155,6 +155,21 @@ describe('MetabolicHub: ввод меняет расчёт (проводка п�
     expect(goalWeeks).toBe(planWeeks);
   });
 
+  it('срок цели не спорит с брейками: показывает, что проверено без них', () => {
+    render(<MetabolicHub />);
+    setNumber('Цель вес, кг', 78);
+    setNumber('Целевых недель', 20);
+    const txt = (document.body.textContent || '').replace(/\s+/g, ' ');
+    expect(txt).toContain('без брейков');
+    expect(txt).toContain('нед дефицита');
+    expect(txt).toContain('нед maintenance');
+    // и раскладка сходится: дефицит + брейки = срок
+    const m = txt.match(/Календарь с брейками: (\d+) нед дефицита \+ (\d+)×(\d+) нед maintenance = (\d+) нед/);
+    expect(m, 'нет раскладки календаря с брейками').toBeTruthy();
+    const [def, br, bw, total] = m!.slice(1).map(Number);
+    expect(def + br * bw).toBe(total);
+  });
+
   it('вес 83 → 110 поднимает TDEE и воду', () => {
     render(<MetabolicHub />);
     const tdee0 = tileValue('TDEE');
