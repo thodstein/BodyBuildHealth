@@ -124,10 +124,31 @@ html.app-telegram .my-block { /* только Mini App */ }
   существующий fallback `auth-module.ts`: локальный профиль в IndexedDB.
 - `getSyncIdentity()` отдаёт `tg_<id>` в Mini App и стабильный `dev_<uuid>`
   (`he_device_id_v1`) в APK.
-- `cloud-kv.initKvSync()` намеренно не менялся: с `tg_*` работает как раньше,
-  с `dev_*` переходит в `off` (локальный режим, без ошибок). Серверная поддержка
-  device-токенов (`user_kv` RLS под device id) — следующий шаг на бэкенде,
-  клиент к нему уже готов.
+- `cloud-kv.initKvSync()` включается **при каждом входе** для любой identity:
+  `tg_*` → токен `tk_<sha256(VITE_CRYPTO_KEY + ':' + tgId)>`, `dev_*` → токен
+  от id устройства (своё облачное пространство). Явный токен привязки
+  (`saveLinkedTgToken`) главнее — устройство становится вторым экраном
+  Telegram-аккаунта. RLS в `user_kv` сверяет `id` с заголовком `x-user-token`,
+  поэтому device-токены работают без серверных изменений.
+- Выгрузка: при сворачивании/закрытии (`appStateChange` Capacitor,
+  `pagehide`/`beforeunload`), при уходе в фон (`visibilitychange`), при
+  возврате/фокусе — сначала pull, потом flush; плюс интервал 30 с.
+- Вручную: «🔄 Синхронизировать сейчас» в Профиль → Настройки → Синхронизация
+  (`SyncLinkSection`) и иконка 🔄 в шапке (`KvSyncButton`) — flush + pull.
+
+### 5.1 Если облако «не настроено» / таблиц нет
+
+1. Секреты репозитория (Settings → Secrets → Actions): `VITE_SUPABASE_URL`,
+   `VITE_SUPABASE_ANON_KEY` (можно publishable `sb_publishable_…`),
+   `VITE_CRYPTO_KEY`. Без них шаг **Guard cloud secrets** роняет сборку —
+   специально, чтобы не выпустить APK без облака.
+2. Схема: выполнить `supabase/bootstrap.sql` в Supabase → SQL Editor
+   (идемпотентно; создаёт `user_kv` + `link_codes` с RLS).
+3. Проверка: `GET /rest/v1/user_kv?select=key&limit=1` с заголовками
+   `apikey` и `x-user-token` должен вернуть `200 []` (а не `PGRST205`).
+4. Пауза бесплатного проекта: Supabase усыпляет проект после простоя —
+   Cloudflare отдаёт `521`, DNS может пропасть (NXDOMAIN). Лечится кнопкой
+   Restore в дашборде; данные и таблицы сохраняются.
 
 ## 6. Push (FCM) — что доделать для рассылок
 

@@ -29,6 +29,14 @@ if (decl !== 2) fails.push(`объявлений секрета в env: ${decl},
   const restores = (text.match(/name:\s*Restore keystore/g) || []).length;
   if (restores !== 2) fails.push(`восстановлений keystore: ${restores}, ждали 2 (build + release)`);
   if (!/Guard signing secrets/.test(text)) fails.push('в build нет проверки наличия секретов подписи');
+  // Облако: без VITE_SUPABASE_* APK выходит с «Облако не настроено» и синк
+  // молча не работает — сборка обязана падать, а не притворяться рабочей.
+  if (!/Guard cloud secrets/.test(text)) fails.push('нет проверки наличия Supabase-секретов (Guard cloud secrets)');
+  for (const s of ['VITE_SUPABASE_URL', 'VITE_SUPABASE_ANON_KEY', 'VITE_CRYPTO_KEY']) {
+    if (!new RegExp(`${s}:\\s*\\$\\{\\{\\s*secrets\\.${s}\\s*\\}\\}`).test(text)) {
+      fails.push(`workflow не прокидывает ${s} из secrets`);
+    }
+  }
 }
 
 // Контракт с android/app/build.gradle: workflow обязан класть keystore

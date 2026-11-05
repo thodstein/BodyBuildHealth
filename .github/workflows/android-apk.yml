@@ -36,6 +36,22 @@ jobs:
       - name: Install deps
         run: npm ci
 
+      - name: Guard cloud secrets
+        # Без этих трёх секретов APK собирается, но внутри «Облако не настроено»
+        # и синхронизация молча не работает (так потеряли синк в 3.0.3).
+        # Лучше упасть с понятным текстом, чем выпустить APK без облака.
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          VITE_CRYPTO_KEY: ${{ secrets.VITE_CRYPTO_KEY }}
+        run: |
+          for v in VITE_SUPABASE_URL VITE_SUPABASE_ANON_KEY VITE_CRYPTO_KEY; do
+            if [ -z "${!v}" ]; then
+              echo "::error::Секрет $v пуст — APK соберётся без облака. Добавьте VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY / VITE_CRYPTO_KEY."
+              exit 1
+            fi
+          done
+
       - name: Web build + Capacitor sync
         # Supabase-ключи запекаются в dist на этапе vite build. Локальный .env
         # в CI недоступен (gitignore), поэтому берём из GitHub Secrets
@@ -136,6 +152,22 @@ jobs:
 
       - name: Install deps
         run: npm ci
+
+      - name: Guard cloud secrets
+        # Без этих трёх секретов APK собирается, но внутри «Облако не настроено»
+        # и синхронизация молча не работает (так потеряли синк в 3.0.3).
+        # Лучше упасть с понятным текстом, чем выпустить APK без облака.
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          VITE_CRYPTO_KEY: ${{ secrets.VITE_CRYPTO_KEY }}
+        run: |
+          for v in VITE_SUPABASE_URL VITE_SUPABASE_ANON_KEY VITE_CRYPTO_KEY; do
+            if [ -z "${!v}" ]; then
+              echo "::error::Секрет $v пуст — APK соберётся без облака. Добавьте VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY / VITE_CRYPTO_KEY."
+              exit 1
+            fi
+          done
 
       - name: Web build + Capacitor sync
         # см. комментарий в build-джобе: ключи только из Secrets.
