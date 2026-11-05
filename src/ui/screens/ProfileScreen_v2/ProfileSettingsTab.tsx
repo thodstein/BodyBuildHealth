@@ -169,10 +169,16 @@ export const ProfileSettingsTab: React.FC<{ onNavigate?: (screen: string) => voi
           const info = describeBackup(parsed);
           const date = info.createdAt.slice(0, 10) || 'без даты';
           const spaces = info.spaces === 1 ? '1 пространство данных' : `${info.spaces} пространств(а)`;
+          const photos = info.photosOmitted
+            ? 'Фотографии веса в файл не вошли (слишком большой объём).'
+            : info.photos > 0
+              ? `Фотографий веса в файле: ${info.photos}.`
+              : 'Фотографий веса в файле нет.';
           const ok = confirm(
             `Копия от ${date}: ${spaces}, ${info.records} записей в базе, ${info.keys} настроек.\n\n` +
               'Восстановление ЗАМЕНИТ все данные на этом устройстве — профиль, дневники, анализы и ' +
-              'данные всех атлетов. Фотографии веса и черновики в файл не входят и останутся как есть. ' +
+              'данные всех атлетов. ' + photos + ' ' +
+              'Черновики в файл не входят и останутся как есть. ' +
               'Отменить это нельзя.\n\nПродолжить?',
           );
           if (!ok) return;
@@ -311,7 +317,8 @@ export const ProfileSettingsTab: React.FC<{ onNavigate?: (screen: string) => voi
           ><span style={{ display:'inline-flex', width:30, height:30, borderRadius:10, alignItems:'center', justifyContent:'center', background:'rgba(59,130,246,0.18)', border:'1px solid rgba(59,130,246,0.35)', flexShrink:0 }}><NativeIcon name="inbox" size={14} /></span>Восстановить всё из файла</button>
         </div>
         <div style={{ marginTop: 8, fontSize: 11.5, color: colors.textSubtle, lineHeight: 1.5 }} data-backup="note">
-          Чего в файле нет: фотографий веса и недописанных черновиков — они остаются на устройстве.
+          В копию входят все пространства: ваши данные и данные всех атлетов, включая фотографии веса.
+          Чего в файле нет: недописанных черновиков — они остаются на устройстве.
           Внутри лежит ключ шифрования базы, поэтому файл стоит хранить как пароль.
         </div>
       </AccordionSection>

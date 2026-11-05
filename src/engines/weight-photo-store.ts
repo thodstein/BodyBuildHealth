@@ -36,8 +36,15 @@ export const memoryStore = new Map<string, { photos: string[]; updatedAt: number
 const dbPromises = new Map<string, Promise<IDBDatabase>>();
 
 function openDB(): Promise<IDBDatabase> {
+  return openDBFor(currentSpaceId());
+}
+
+/**
+ * Открыть базу фото КОНКРЕТНОГО пространства: нужно резервной копии — она
+ * обязана унести фото всех атлетов, а не только открытого.
+ */
+function openDBFor(spaceId: string): Promise<IDBDatabase> {
   if (isTestEnv()) return Promise.resolve({} as IDBDatabase);
-  const spaceId = currentSpaceId();
   const cached = dbPromises.get(spaceId);
   if (cached) return cached;
   const promise = new Promise<IDBDatabase>((resolve, reject) => {
@@ -75,19 +82,65 @@ export async function closeWeightPhotoDb(spaceId: string): Promise<void> {
 
 /** Сохранить фото для даты (перезаписывает). */
 export async function saveWeightPhotos(date: string, photos: string[]): Promise<void> {
+  await saveWeightPhotosFor(currentSpaceId(), date, photos);
+}
+
+/**
+ * Записать фото в пространство явно (восстановление резервной копии: файл
+ * содержит фото всех атлетов, а открыто в этот момент одно пространство).
+ */
+export async function saveWeightPhotosFor(spaceId: string, date: string, photos: string[]): Promise<void> {
   console.log('[weight-photo-store] saveWeightPhotos called, isTestEnv:', isTestEnv());
   if (isTestEnv()) {
     console.log('[weight-photo-store] Using memory store');
     memoryStore.set(date, { photos, updatedAt: Date.now() });
     return Promise.resolve();
   }
-  const db = await openDB();
+  const db = await openDBFor(spaceId);
   return new Promise((resolve, reject) => {
     const tx = db.transaction(STORE_NAME, 'readwrite');
     tx.objectStore(STORE_NAME).put({ date, photos, updatedAt: Date.now() });
     tx.oncomplete = () => resolve();
     tx.onerror = () => reject(tx.error);
   });
+}
+
+export interface WeightPhotoRecord {
+  date: string;
+  photos: string[];
+  updatedAt?: number;
+}
+
+/**
+ * Все фото пространства — для резервной копии. `null`, если база не читается
+ * (тогда бэкап честно скажет, что фото не вошли, а не сделает вид, что их нет).
+ */
+export async function listWeightPhotosFor(spaceId: string): Promise<WeightPhotoRecord[] | null> {
+  try {
+    if (isTestEnv()) {
+      return [...memoryStore.entries()].map(([date, v]) => ({
+        date,
+        photos: v.photos,
+        updatedAt: v.updatedAt,
+      }));
+    }
+    const db = await openDBFor(spaceId);
+    return await new Promise<WeightPhotoRecord[]>((resolve, reject) => {
+      const tx = db.transaction(STORE_NAME, 'readonly');
+      const req = tx.objectStore(STORE_NAME).getAll();
+      req.onsuccess = () => {
+        const rows = Array.isArray(req.result) ? req.result : [];
+        resolve(
+          rows
+            .filter((r: any) => r && typeof r.date === 'string' && Array.isArray(r.photos))
+            .map((r: any) => ({ date: r.date, photos: r.photos, updatedAt: r.updatedAt })),
+        );
+      };
+      req.onerror = () => reject(req.error);
+    });
+  } catch {
+    return null;
+  }
 }
 
 /** Получить фото для даты. */

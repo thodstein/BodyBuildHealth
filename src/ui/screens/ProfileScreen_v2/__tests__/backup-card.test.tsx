@@ -44,6 +44,18 @@ const VALID_BACKUP = JSON.stringify({
   localStorage: { he_profile_v2: '{}' },
 });
 
+const BACKUP_WITH_PHOTOS = JSON.stringify({
+  app: 'health-engine',
+  version: '3.0',
+  createdAt: '2026-11-01T10:20:00.000Z',
+  stores: {},
+  spaceStores: { home: { training_log: [{}] } },
+  photoStores: {
+    home: [{ date: '2026-10-01', photos: ['data:image/jpeg;base64,AAA', 'data:image/jpeg;base64,BBB'] }],
+  },
+  localStorage: { he_profile_v2: '{}' },
+});
+
 describe('настройки: полная резервная копия', () => {
   let createdInputs: HTMLInputElement[] = [];
   let alertSpy: ReturnType<typeof vi.spyOn>;
@@ -98,14 +110,15 @@ describe('настройки: полная резервная копия', () =>
     await waitFor(() => expect(confirmSpy).toHaveBeenCalled());
   };
 
-  it('кнопки полной копии есть, и текст честно говорит, чего в файле нет', async () => {
+  it('кнопки полной копии есть, и текст честно говорит, что входит и чего нет', async () => {
     const { ProfileSettingsTab } = await import('../ProfileSettingsTab');
     const { container } = render(<ProfileSettingsTab />);
     openExportSection(container);
     expect(container.querySelector('[data-backup="export"]')).toBeTruthy();
     expect(container.querySelector('[data-backup="import"]')).toBeTruthy();
     const note = container.querySelector('[data-backup="note"]')?.textContent ?? '';
-    expect(note).toContain('фотографий веса');
+    // фото веса теперь входят в копию — обещание изменилось вместе с форматом 3.0
+    expect(note).toContain('включая фотографии веса');
     expect(note).toContain('черновиков');
     // и прямо сказано, чем это отличается от копии профиля выше
     expect(container.textContent).toContain('Копия профиля выше несёт только профиль');
@@ -148,12 +161,22 @@ describe('настройки: полная резервная копия', () =>
     expect(asked).toContain('4 записей в базе');
     expect(asked).toContain('1 настроек');
     expect(asked).toContain('ЗАМЕНИТ все данные');
-    expect(asked).toContain('Фотографии веса и черновики в файл не входят');
+    expect(asked).toContain('Фотографий веса в файле нет');
     expect(importMock).toHaveBeenCalledTimes(1);
   });
 
-  it('после восстановления перезагружает приложение, чтобы не осталось старых данных в памяти', async () => {
+  it('если в файле есть фотографии веса — подтверждение называет их количество', async () => {
     const { ProfileSettingsTab } = await import('../ProfileSettingsTab');
+    const { container } = render(<ProfileSettingsTab />);
+    openExportSection(container);
+    await pickFile(container, BACKUP_WITH_PHOTOS);
+
+    const asked = String(confirmSpy.mock.calls[0][0]);
+    expect(asked).toContain('Фотографий веса в файле: 2');
+    expect(importMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('после восстановления перезагружает приложение, чтобы не осталось старых данных в памяти', async () => {    const { ProfileSettingsTab } = await import('../ProfileSettingsTab');
     const { container } = render(<ProfileSettingsTab />);
     openExportSection(container);
     await pickFile(container, VALID_BACKUP);

@@ -30,12 +30,31 @@ vi.mock('../db', () => ({
     writeSpaceStores(spaceId, stores),
 }));
 
+/**
+ * Фото веса живут в отдельной базе на каждое пространство — в тесте они тоже
+ * раздельные, иначе «унесли фото всех атлетов» нельзя было бы отличить от
+ * «одно и то же фото записали дважды».
+ */
+const photos = vi.hoisted(() => ({
+  bySpace: {} as Record<string, Array<{ date: string; photos: string[]; updatedAt?: number }>>,
+  written: [] as Array<{ spaceId: string; date: string; photos: string[] }>,
+}));
+
+vi.mock('../../engines/weight-photo-store', () => ({
+  listWeightPhotosFor: async (spaceId: string) => photos.bySpace[spaceId] ?? [],
+  saveWeightPhotosFor: async (spaceId: string, date: string, list: string[]) => {
+    photos.written.push({ spaceId, date, photos: list });
+  },
+}));
+
 import { collectBackup, importBackup, type AppBackup } from '../data-backup';
 import { setSpacePurgeHandler } from '../space-purge';
 import {
   DATA_SPACE_KEY,
+  HOME_SPACE_ID,
   athleteSpaceId,
   emptyRegistry,
+  parseRegistry,
   serializeRegistry,
   toPhysicalKey,
   setActiveSpace,
@@ -67,8 +86,8 @@ describe('бэкап уносит базы всех пространств', () 
     // база атлета попала в файл (дневник и тренировки)
     expect(b.spaceStores?.[a1]?.diary).toEqual([{ id: 'd1' }]);
     expect(b.spaceStores?.[a1]?.training_log).toEqual([{ id: 't1' }]);
-    // формат помечен как новый
-    expect(b.version).toBe('2.0');
+    // формат помечен как новый (3.0 добавил фотографии веса)
+    expect(b.version).toBe('3.0');
   });
 
   it('восстановление пишет каждую базу в её собственное пространство', async () => {
@@ -222,6 +241,9 @@ describe('файл копии для пользователя', () => {
       spaces: 2,
       records: 5,
       keys: 2,
+      photos: 0,
+      photoBytes: 0,
+      photosOmitted: false,
       createdAt: '2026-11-01T10:20:00.000Z',
     });
   });
@@ -304,5 +326,96 @@ describe('забыть всех атлетов', () => {
     expect(res.spaces).toBe(0);
     expect(deleteSpaceDatabases).not.toHaveBeenCalled();
     expect(localStorage.getItem('he_profile_v2')).toBe('тренер');
+  });
+});
+
+describe('копия уносит фотографии веса', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    photos.bySpace = {};
+    photos.written = [];
+  });
+
+  const withAthlete = (athleteId: string) => {
+    const sid = athleteSpaceId(athleteId);
+    // реестр дополняем, а не перезаписываем: в файл должны попасть ВСЕ атлеты
+    const base = parseRegistry(localStorage.getItem(DATA_SPACE_KEY));
+    localStorage.setItem(
+      DATA_SPACE_KEY,
+      serializeRegistry(upsertSpace(base, { id: sid, athleteId, label: 'Атлет' }).registry),
+    );
+    return sid;
+  };
+
+  it('фото всех пространств попадают в файл, и сводка их считает', async () => {
+    const a1 = withAthlete('a1');
+    const a2 = withAthlete('a2');
+    photos.bySpace[HOME_SPACE_ID] = [{ date: '2026-10-01', photos: ['data:1'] }];
+    photos.bySpace[a1] = [{ date: '2026-10-02', photos: ['data:22', 'data:333'] }];
+    photos.bySpace[a2] = [{ date: '2026-10-03', photos: ['data:4444'] }];
+
+    const { collectBackup, describeBackup } = await import('../data-backup');
+    const b = await collectBackup();
+
+    expect(b.version).toBe('3.0');
+    expect(b.photoStores?.[HOME_SPACE_ID]?.[0].photos).toEqual(['data:1']);
+    expect(b.photoStores?.[a1]?.[0].photos).toEqual(['data:22', 'data:333']);
+    expect(b.photoStores?.[a2]?.[0].photos).toEqual(['data:4444']);
+    const info = describeBackup(b);
+    expect(info.photos).toBe(4);
+    expect(info.photoBytes).toBe('data:1'.length + 'data:22'.length + 'data:333'.length + 'data:4444'.length);
+    expect(info.photosOmitted).toBe(false);
+  });
+
+  it('восстановление кладёт фото в базу своего пространства', async () => {
+    const a1 = athleteSpaceId('a1');
+    const { importBackup } = await import('../data-backup');
+    await importBackup({
+      app: 'health-engine',
+      version: '3.0',
+      createdAt: '2026-11-01T00:00:00.000Z',
+      stores: {},
+      spaceStores: { [a1]: { diary: [] } },
+      photoStores: { [a1]: [{ date: '2026-10-02', photos: ['data:a'] }] },
+      localStorage: {},
+    });
+
+    expect(photos.written).toEqual([{ spaceId: a1, date: '2026-10-02', photos: ['data:a'] }]);
+  });
+
+  it('слишком большой объём фото в файл не кладём и говорим об этом прямо', async () => {
+    withAthlete('a1');
+    photos.bySpace[HOME_SPACE_ID] = [{ date: '2026-10-01', photos: ['x'.repeat(50)] }];
+    const { collectBackup, describeBackup } = await import('../data-backup');
+
+    const b = await collectBackup({ maxPhotoBytes: 10 });
+
+    expect(b.photoStores).toBeUndefined();
+    expect(b.photosOmitted).toBe(true);
+    const info = describeBackup(b);
+    expect(info.photos).toBe(0);
+    expect(info.photosOmitted).toBe(true);
+  });
+
+  it('когда фото нет — в файле нет ни фото, ни флага «не влезли»', async () => {
+    const { collectBackup, describeBackup } = await import('../data-backup');
+    const b = await collectBackup();
+    expect(b.photoStores).toBeUndefined();
+    expect(b.photosOmitted).toBeUndefined();
+    expect(describeBackup(b).photos).toBe(0);
+    expect(describeBackup(b).photosOmitted).toBe(false);
+  });
+
+  it('файл формата 2.0 (без фото) восстанавливается и фото не трогает', async () => {
+    const { importBackup } = await import('../data-backup');
+    await importBackup({
+      app: 'health-engine',
+      version: '2.0',
+      createdAt: '2026-11-01T00:00:00.000Z',
+      stores: {},
+      spaceStores: { home: { diary: [] } },
+      localStorage: {},
+    });
+    expect(photos.written).toEqual([]);
   });
 });

@@ -7,6 +7,11 @@ import {
   writeSpaceStores,
 } from './db';
 import {
+  listWeightPhotosFor,
+  saveWeightPhotosFor,
+  type WeightPhotoRecord,
+} from '../engines/weight-photo-store';
+import {
   DATA_SPACE_KEY,
   DEVICE_SALT_KEY,
   HOME_SPACE_ID,
@@ -29,7 +34,15 @@ function rawLs() {
   return deviceRawOrFallback(localStorage as unknown as Parameters<typeof deviceRawOrFallback>[0]);
 }
 
-export const BACKUP_VERSION = '2.0';
+export const BACKUP_VERSION = '3.0';
+
+/**
+ * Потолок на фото в файле. Фото веса — data URL в base64, и в JSON они
+ * раздуваются ещё сильнее; на телефоне `JSON.stringify` такого объёма уже
+ * рискует упасть по памяти. Если фото больше лимита — они не попадут в файл
+ * целиком (не «часть»), и сводка скажет об этом прямо.
+ */
+export const MAX_BACKUP_PHOTO_BYTES = 32 * 1024 * 1024;
 
 export interface AppBackup {
   app: 'health-engine';
@@ -47,6 +60,14 @@ export interface AppBackup {
    * после смены телефона терялись бы.
    */
   spaceStores?: Record<string, Record<string, any[]>>;
+  /**
+   * Фото веса по пространствам (формат 3.0). Они лежат в отдельной базе
+   * IndexedDB, в `spaceStores` не попадают — без этого поля «полная копия»
+   * молча теряла бы фото при смене телефона.
+   */
+  photoStores?: Record<string, WeightPhotoRecord[]>;
+  /** Фото не влезли по объёму: пустой `photoStores` значит «не смогли», а не «фото не было». */
+  photosOmitted?: boolean;
   localStorage: Record<string, string>;
 }
 
@@ -69,11 +90,12 @@ function allSpaceIds(): string[] {
   return Array.from(new Set(ids));
 }
 
-export async function collectBackup(): Promise<AppBackup> {
+export async function collectBackup(opts?: { maxPhotoBytes?: number }): Promise<AppBackup> {
   await db.init();
+  const spaceIds = allSpaceIds();
   // База каждого пространства: атлеты живут в своих базах IndexedDB.
   const spaceStores: Record<string, Record<string, any[]>> = {};
-  for (const spaceId of allSpaceIds()) {
+  for (const spaceId of spaceIds) {
     const data = await readSpaceStores(spaceId);
     const hasRecords = Object.values(data).some(records => records.length > 0);
     if (hasRecords) spaceStores[spaceId] = data;
@@ -98,12 +120,35 @@ export async function collectBackup(): Promise<AppBackup> {
       /* один сбойный ключ не должен срывать весь бэкап */
     }
   }
+
+  // Фото веса — в отдельной базе на каждое пространство, поэтому в `spaceStores`
+  // их нет. Считаем объём ДО того, как класть в файл: base64 в JSON тяжёлый.
+  let photoStores: Record<string, WeightPhotoRecord[]> = {};
+  let photoBytes = 0;
+  let photosOmitted = false;
+  for (const spaceId of spaceIds) {
+    const rows = await listWeightPhotosFor(spaceId);
+    if (!rows || !rows.length) continue;
+    photoBytes += rows.reduce(
+      (sum, r) => sum + r.photos.reduce((s, p) => s + (typeof p === 'string' ? p.length : 0), 0),
+      0,
+    );
+    if (photoBytes > (opts?.maxPhotoBytes ?? MAX_BACKUP_PHOTO_BYTES)) {
+      photosOmitted = true;
+      break;
+    }
+    photoStores[spaceId] = rows;
+  }
+  if (photosOmitted) photoStores = {};
+
   return {
     app: 'health-engine',
     version: BACKUP_VERSION,
     createdAt: new Date().toISOString(),
     stores,
     spaceStores,
+    ...(Object.keys(photoStores).length ? { photoStores } : {}),
+    ...(photosOmitted ? { photosOmitted: true } : {}),
     localStorage: local,
   };
 }
@@ -169,6 +214,11 @@ export function describeBackup(b: AppBackup): {
   spaces: number;
   records: number;
   keys: number;
+  /** Сколько фото веса войдёт (или вошло) в файл. */
+  photos: number;
+  photoBytes: number;
+  /** Фото не влезли по объёму — это не то же самое, что «фото не было». */
+  photosOmitted: boolean;
   createdAt: string;
 } {
   const perSpace: Record<string, Record<string, any[]>> =
@@ -181,10 +231,23 @@ export function describeBackup(b: AppBackup): {
       if (Array.isArray(arr)) records += arr.length;
     }
   }
+  let photos = 0;
+  let photoBytes = 0;
+  for (const rows of Object.values(b.photoStores || {})) {
+    if (!Array.isArray(rows)) continue;
+    for (const r of rows) {
+      if (!r || !Array.isArray(r.photos)) continue;
+      photos += r.photos.length;
+      for (const p of r.photos) if (typeof p === 'string') photoBytes += p.length;
+    }
+  }
   return {
     spaces: Object.keys(perSpace).length,
     records,
     keys: Object.keys(b.localStorage || {}).length,
+    photos,
+    photoBytes,
+    photosOmitted: b.photosOmitted === true,
     createdAt: typeof b.createdAt === 'string' ? b.createdAt : '',
   };
 }
@@ -218,6 +281,18 @@ export async function importBackup(b: AppBackup): Promise<void> {
       : { [HOME_SPACE_ID]: b.stores || {} };
   for (const [spaceId, stores] of Object.entries(perSpace)) {
     await writeSpaceStores(spaceId, stores);
+  }
+  // Фото веса — в свои базы (по пространству). Файлы 3.0 и новее.
+  for (const [spaceId, rows] of Object.entries(b.photoStores || {})) {
+    if (!Array.isArray(rows)) continue;
+    for (const row of rows) {
+      if (!row || typeof row.date !== 'string' || !Array.isArray(row.photos)) continue;
+      try {
+        await saveWeightPhotosFor(spaceId, row.date, row.photos);
+      } catch {
+        /* одно фото/одна дата не должны срывать восстановление */
+      }
+    }
   }
   _resetDataSpaceCache();
   // Черновики в sessionStorage принадлежат тому, кто работал здесь до восстановления.
