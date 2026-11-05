@@ -966,15 +966,21 @@ export function calcGoalTimeline(input: { weight:number; targetWeight:number; td
 }
 
 // ——— Adaptive Thermogenesis + Reverse Diet (Trexler 2014, Byrne MATADOR 2017) ———
-export interface AdaptiveThermogenesisResult { atKcal:number; rmrPred:number; rmrMeasEst:number; tier:'none'|'mild'|'moderate'|'severe'; note:string }
+export interface AdaptiveThermogenesisResult { atKcal:number; rmrPred:number; rmrMeasEst:number; tier:'none'|'mild'|'moderate'|'severe'; tierLabel:string; known:boolean; note:string }
 export function calcAdaptiveThermogenesis(input: { weight:number; height:number; age:number; sex:'male'|'female'; bodyFat?: number; deficitKcal?: number; weeksInDeficit?: number; weightLostKg?: number }): AdaptiveThermogenesisResult {
   const rmrPred = computeBMRBase(input as any).bmr;
   const atKcal = estimateAdaptiveThermogenesis({ deficitKcal: input.deficitKcal, weeksInDeficit: input.weeksInDeficit, weightLostKg: input.weightLostKg });
   const rmrMeasEst = Math.max(800, rmrPred - atKcal);
   const tier = atKcal > 150 ? 'severe' : atKcal > 80 ? 'moderate' : atKcal > 30 ? 'mild' : 'none';
   const tierLabel = { none:'Нет', mild:'Лёгкая', moderate:'Умеренная', severe:'Выраженная' }[tier];
-  const note = atKcal > 30 ? `${tierLabel} адаптация −${atKcal}ккал к RMR (Trexler). Reverse +100/7д (MATADOR).` : 'Адаптации нет — дефицит <2нед или <300ккал';
-  return { atKcal, rmrPred, rmrMeasEst, tier, note };
+  // Аудит 2026-11: без недель дефицита/потерянных кг оценка всегда 0, и «AT none · −0ккал» читалось
+  // как вердикт «адаптации нет», хотя данных для неё просто нет. Теперь это разные состояния.
+  const known = (typeof input.weeksInDeficit === 'number' && input.weeksInDeficit > 0)
+    || (typeof input.weightLostKg === 'number' && input.weightLostKg > 0);
+  const note = !known
+    ? 'Нет данных: укажи недели в дефиците или потерянные кг — без них адаптацию не оценить'
+    : atKcal > 30 ? `${tierLabel} адаптация −${atKcal}ккал к RMR (Trexler). Reverse +100/7д (MATADOR).` : 'Адаптации нет — дефицит <2нед или <300ккал';
+  return { atKcal, rmrPred, rmrMeasEst, tier, tierLabel, known, note };
 }
 export function calcReverseDiet(currentKcal:number, targetKcal:number): Array<{ week:number; kcal:number; note:string }> {
   return reverseDietPlan(currentKcal, targetKcal, 100, 7);

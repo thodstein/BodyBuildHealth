@@ -2141,7 +2141,7 @@ const kbju = useMemo(()=> calcKBJU(input), [input]);
                 </div>
                 <div style={{ padding:10, borderRadius:10, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', fontSize:10, color:'#fff', lineHeight:1.5 }}>
                   <b style={{ color:'#eab308' }}>Цель Hall 2011 density + AT + Helms caps:</b> {goalV2?.note ?? 'Введи цель вес в антропометрии'}<br/>
-                  {goalV2 && <span>Дней ~{goalV2.days} ({goalV2.weeks}нед) при {goalV2.kcalDiff>0?'+':''}{goalV2.kcalDiff}ккал/сут · {goalV2.model} · AT −{maintenance?.atKcal ?? 0}ккал.</span>}<br/>
+                  {goalV2 && <span>Дней ~{goalV2.days} ({goalV2.weeks}нед) при {goalV2.kcalDiff>0?'+':''}{goalV2.kcalDiff}ккал/сут · {goalV2.model} · {maintenance ? `AT −${maintenance.atKcal}ккал` : 'AT — (нужен finder: ≥7 взвешиваний + дневник)'}.</span>}<br/>
                   <span style={{ fontSize:9, color:'rgba(255,255,255,0.55)' }}>История {weightHistory.length} точек · {weightHistory.length>=7? 'достаточно':'нужно ≥7'} · плотность {maintenance?.density ?? '—'}ккал/кг · DLW ±12% {stepsCalc.dlwBand.low}-{stepsCalc.dlwBand.high}</span>
                   <div style={{ marginTop:6, display:'flex', gap:6 }}>
                     <PopupNumber label="Цель вес" value={targetWeight ?? weight} min={35} max={200} onChange={setTargetWeight} />
@@ -2204,9 +2204,9 @@ const kbju = useMemo(()=> calcKBJU(input), [input]);
             <div>
               <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
                 <div style={{ padding:14, borderRadius:12, background: at.tier==='severe'?'rgba(239,68,68,0.08)': at.tier==='moderate'?'rgba(245,158,11,0.08)': at.tier==='mild'?'rgba(234,179,8,0.08)':'rgba(255,255,255,0.03)', border:`1px solid ${at.tier==='severe'?'rgba(239,68,68,0.18)': at.tier==='moderate'?'rgba(245,158,11,0.18)':'rgba(255,255,255,0.06)'}`, textAlign:'center' }}>
-                  <div style={{ fontSize:10, color: at.tier==='none'?'rgba(255,255,255,0.55)': at.tier==='severe'?'#ef4444':'#f59e0b' }}>AT {at.tier} · Trexler 2014</div>
-                  <div style={{ fontSize:22, fontWeight:900, color: at.tier==='severe'?'#ef4444': at.tier==='moderate'?'#f59e0b': at.tier==='mild'?'#eab308':'#fff' }}>−{at.atKcal}<span style={{ fontSize:10 }}>ккал</span></div>
-                  <div style={{ fontSize:9, color:'#fff' }}>RMR pred {at.rmrPred} → meas ~{at.rmrMeasEst} · {at.note}</div>
+                  <div style={{ fontSize:10, color: !at.known || at.tier==='none'?'rgba(255,255,255,0.55)': at.tier==='severe'?'#ef4444':'#f59e0b' }}>AT {at.known ? at.tierLabel : '—'} · Trexler 2014</div>
+                  <div style={{ fontSize:22, fontWeight:900, color: at.tier==='severe'?'#ef4444': at.tier==='moderate'?'#f59e0b': at.tier==='mild'?'#eab308':'#fff' }}>{at.known ? <>−{at.atKcal}<span style={{ fontSize:10 }}>ккал</span></> : '—'}</div>
+                  <div style={{ fontSize:9, color:'#fff' }}>RMR pred {at.rmrPred}{at.known ? ` → meas ~${at.rmrMeasEst}` : ''} · {at.note}</div>
                 </div>
                 <div style={{ padding:10, borderRadius:10, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', fontSize:10, color:'#fff', lineHeight:1.5 }}>
                   <b style={{ color:'#f97316' }}>Reverse-auto — MATADOR Byrne 2017</b><br/>старт {diaryAvgKcal ?? kbju.nat.kcal}ккал ({diaryAvgKcal ? 'дневник' : 'цель плана'}) · шаг по trend ({adaptiveV3 ? `тренд ${adaptiveV3.trend}кг/нед` : 'нет trend'}) до {reverseAuto[reverseAuto.length-1]?.kcal ?? stepsCalc.tdeeNat}ккал<br/>

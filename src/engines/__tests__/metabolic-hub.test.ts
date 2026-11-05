@@ -718,9 +718,18 @@ describe('metabolic-hub PRO v2 — новые Pro-исправления', () =>
     const at = calcAdaptiveThermogenesis({ weight:80, height:180, age:30, sex:'male', bodyFat:12, deficitKcal:500, weeksInDeficit:6, weightLostKg:3 });
     expect(at.atKcal).toBeGreaterThan(30);
     expect(at.rmrPred).toBeGreaterThan(at.rmrMeasEst);
+    expect(at.known).toBe(true);
+    expect(at.tierLabel).not.toMatch(/none|mild|moderate|severe/);
     const rev = calcReverseDiet(2200,2600);
     expect(rev.length).toBeGreaterThan(2);
     expect(rev[0].kcal).toBe(2300);
+  });
+  it('AT без недель/потерянных кг — «нет данных», а не «адаптации нет»', () => {
+    const at = calcAdaptiveThermogenesis({ weight:80, height:180, age:30, sex:'male', bodyFat:12, deficitKcal:500 });
+    expect(at.known).toBe(false);
+    expect(at.atKcal).toBe(0);
+    expect(at.note).toContain('Нет данных');
+    expect(at.note).not.toContain('Адаптации нет');
   });
   it('NEAT Levine 2002', () => {
     const n = calcNEAT({ weight:80, standingHours:6, fidgetLevel:3, steps:10000 });

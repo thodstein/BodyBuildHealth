@@ -267,6 +267,22 @@ describe('MetabolicHub: ввод меняет расчёт (проводка п�
     expect(txt).toContain('вязкость OK');
   });
 
+  it('AT без данных — «нет данных», а не «AT none · −0ккал»', () => {
+    render(<MetabolicHub />);
+    setNumber('Цель вес, кг', 78);
+    const txt = openMode('AT');
+    expect(txt).toContain('AT —');
+    expect(txt).not.toContain('AT none');
+    expect(txt).not.toContain('−0ккал');
+    expect(txt).toContain('Нет данных');
+    // а с введёнными неделями вердикт появляется по-русски
+    setNumber('Недель в дефиците', 8);
+    setNumber('Потеряно, кг', 4);
+    const txt2 = openMode('AT');
+    expect(txt2).not.toContain('AT —');
+    expect(txt2).toMatch(/AT (Нет|Лёгкая|Умеренная|Выраженная)/);
+  });
+
   it('Na-загрузка предупреждает персонально по АД и гематокриту', () => {
     render(<MetabolicHub />);
     let txt = openMode('Diet break');

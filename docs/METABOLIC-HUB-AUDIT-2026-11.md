@@ -528,6 +528,18 @@ deficitKcalDelta })` вставляет 2 нед maintenance после кажд
 **Регрессия.** `metabolic-hub.test.ts` → «carb/sodium load печатают оговорку, а не режут её по «—»»;
 `metabolic-hub-wiring.test.tsx` → «Na-загрузка предупреждает персонально по АД и гематокриту».
 
+### 1.47 AT: английский enum в русском UI и «адаптации нет» из отсутствия данных
+**Причина.** Плитка AT печатала сырой `at.tier` → «AT none · Trexler 2014» (хотя `tierLabel` уже
+считался, но не возвращался из движка). И при пустых «Недель в дефиците»/«Потеряно, кг» оценка
+равна 0 → вердикт «адаптации нет — дефицит <2нед или <300ккал» и число «−0ккал», хотя причина
+другая: данных нет. В режиме «Поиск нормы» та же беда с `maintenance?.atKcal ?? 0` («AT −0ккал»).
+**Исправление.** Движок возвращает `tierLabel` и `known`; без данных — `known: false`, заметка
+«Нет данных: укажи недели в дефиците или потерянные кг». Плитка показывает «AT —» и прочерк вместо
+«−0ккал», вердикт по-русски («AT Лёгкая/Умеренная/Выраженная»). В «Поиске нормы» — «AT — (нужен
+finder: ≥7 взвешиваний + дневник)».
+**Регрессия.** `metabolic-hub.test.ts` → «AT без недель/потерянных кг — „нет данных“, а не „адаптации
+нет“»; `metabolic-hub-wiring.test.tsx` → «AT без данных — „нет данных“, а не „AT none · −0ккал“».
+
 ---
 
 ## 2. Чего не хватало (добавлено)
@@ -577,7 +589,7 @@ deficitKcalDelta })` вставляет 2 нед maintenance после кажд
   параллельные `tsc`/`vitest` из других сессий → heap OOM / `Zone Allocation failed`.
   Прогонять на свободной машине.
 - `npx vitest run src/ui/screens/Shared/__tests__ src/engines/__tests__/metabolic-hub.test.ts`
-  — **234 passed** (6 файлов: structure / toggles / honesty / modes / wiring / engine).
+  — **236 passed** (6 файлов: structure / toggles / honesty / modes / wiring / engine).
 - `npx vitest run src/ui/__tests__/rest-hooks-native.test.tsx
   src/engines/__tests__/risk-info-honesty-e07-e08.test.ts` — **89 passed**
   (в stderr шумит jsdom-canvas chart.js — это фон, не падения).
