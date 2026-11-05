@@ -1198,13 +1198,14 @@ describe('metabolic-hub PRO v4-2 — гарды, CAT2-return, AT-персист,
     expect(calcATRange({ tdee:2800, deficitKcal:500, weeksInDeficit:4 }).persistent).toBe(0);
     expect(calcNEATPro({ weight:80, fidgetLevel:3 }).total).toBeGreaterThan(calcNEATPro({ weight:80, fidgetLevel:1 }).total);
   });
-  it('One-answer с беременностью +340; diff режется до 24', async () => {
+  it('One-answer с беременностью +340; diff отдаёт все изменения (обрезка — в UI)', async () => {
     const { buildOneAnswerPro, diffMetabolicSnapshots } = await import('../metabolic-hub.engine');
     const o = buildOneAnswerPro({ formulaTDEE:2600, adaptiveV3:null, waterMl:3000, ea:null, pregnancyAddKcal:340 });
     expect(o.tdee).toBe(2940); expect(o.targets.mildCut).toBe(2690);
     const big: Record<string, number> = {}; const big2: Record<string, number> = {};
     for (let i = 0; i < 40; i++) { big['k'+i] = i; big2['k'+i] = i + 1; }
-    expect(diffMetabolicSnapshots(big, big2).length).toBeLessThanOrEqual(24);
+    // 40 изменений — все на месте: счётчик в UI не должен врать «24 поля»
+    expect(diffMetabolicSnapshots(big, big2).length).toBe(40);
   });
   it('Парсер PRO: мусор -> null; вело 22км -> 1ч', async () => {
     const { parseWeeklyScheduleTextPro } = await import('../metabolic-hub.engine');

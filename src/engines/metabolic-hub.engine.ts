@@ -1683,5 +1683,8 @@ export function diffMetabolicSnapshots(a: Record<string, any>, b: Record<string,
       out.push({ key: k, a: a[k], b: b[k], delta: null });
     }
   }
-  return out.slice(0, 24);
+  // Аудит 2026-11: раньше здесь стоял `.slice(0, 24)` — при >24 изменениях сравнение молча
+  // обрезалось, а заголовок «Δ (24 полей)» выдавал обрезанное число за полное. Теперь движок
+  // отдаёт ВСЁ, а ограничение рендера (24 строки + «ещё N») живёт в UI и подписано.
+  return out;
 }

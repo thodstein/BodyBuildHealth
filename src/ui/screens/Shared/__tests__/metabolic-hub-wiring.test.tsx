@@ -389,6 +389,21 @@ describe('MetabolicHub: ввод меняет расчёт (проводка п�
     expect(byLabel('Удалить последнюю запись HCT')).toBeNull();
   });
 
+  it('сравнение сценариев не выдаёт обрезанные 24 поля за полный список', () => {
+    const a: Record<string, number> = {}; const b: Record<string, number> = {};
+    for (let i = 0; i < 30; i++) { a['f' + i] = i; b['f' + i] = i + 1; }
+    localStorage.setItem('he_metabolic_scenarios_v1', JSON.stringify([
+      { id: 's1', name: 'A', snapshot: a },
+      { id: 's2', name: 'B', snapshot: b },
+    ]));
+    localStorage.setItem('he_metabolic_snapshot_v6', JSON.stringify({ compareIds: ['s1', 's2'] }));
+    render(<MetabolicHub />);
+    const txt = document.body.textContent || '';
+    // счётчик — полный (30), а не 24 (обрезанный рендер)
+    expect(txt).toContain('Δ между сценариями (30 полей)');
+    expect(txt).toContain('Показаны первые 24 из 30');
+  });
+
   it('свежая донация в журнале блокирует повторную флеботомию', () => {
     const last = seedDonation(10);
     render(<MetabolicHub />);
@@ -661,6 +676,14 @@ describe('MetabolicHub: ввод меняет расчёт (проводка п�
       .find(b => (b.textContent || '').trim().startsWith('warm ')) as HTMLElement);
     expect(fieldValue('Пот, мл/ч')).toBe('1300 мл/ч');
     expect(tileValue('Вода')).toBeGreaterThan(water500);
+    // сохранённый профиль можно удалить — иначе «warm 1.30 л/ч» остаётся навсегда
+    const del = document.querySelector('button[aria-label="Удалить профиль пота warm"]') as HTMLButtonElement | null;
+    expect(del, 'кнопка ✕ у профиля').not.toBeNull();
+    fireEvent.click(del!);
+    const stored = JSON.parse(localStorage.getItem('he_sweat_profiles_v1') || '{}');
+    expect(stored.warm).toBeUndefined();
+    expect(document.querySelector('button[aria-label="Удалить профиль пота warm"]')).toBeNull();
+    expect(document.body.textContent).toMatch(/Профиль warm удалён/);
   });
 
   it('измеренный пот-тест попадает в воду, а не живёт только в карточке', () => {

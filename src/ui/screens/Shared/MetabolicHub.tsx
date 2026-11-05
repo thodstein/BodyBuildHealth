@@ -1456,13 +1456,26 @@ const kbju = useMemo(()=> calcKBJU(input), [input]);
         <div style={{ marginTop:8, display:'flex', gap:4, flexWrap:'wrap', alignItems:'center' }}>
           <span style={{ fontSize:8, color:'rgba(255,255,255,0.55)' }}>Профили (нажми — применить):</span>
           {(['cool','warm','hot'] as const).map(k=>(
-            <button key={k} type="button" disabled={!sweatProfiles[k]} aria-label={`Применить профиль пота ${k}${sweatProfiles[k] ? `: ${sweatProfiles[k].rate.toFixed(2)} л/ч, Na ${Math.round(sweatProfiles[k].sodium)}` : ' — не сохранён'}`} onClick={()=>{
-              const prof = sweatProfiles[k]; if(!prof) return;
-              setSweatRate(Math.round(prof.rate*1000));
-              setSweatSodium(Math.round(prof.sodium));
-              setUseMeasuredSweat(false);
-              showToast(`Профиль ${k} применён: ${prof.rate.toFixed(2)} л/ч, Na ${Math.round(prof.sodium)} → режим «Оценка»`);
-            }} style={{ padding:'6px 10px', minHeight:44, borderRadius:8, border:'1px solid rgba(6,182,214,0.18)', background: sweatProfiles[k] ? 'rgba(6,182,214,0.14)':'rgba(255,255,255,0.03)', color: sweatProfiles[k] ? '#06b6d4':'rgba(255,255,255,0.35)', fontSize:9, cursor: sweatProfiles[k] ? 'pointer':'not-allowed' }}>{k} {sweatProfiles[k] ? `${sweatProfiles[k].rate.toFixed(2)}л/ч` : '—'}</button>
+            <span key={k} style={{ display:'inline-flex', gap:0 }}>
+              <button key={k} type="button" disabled={!sweatProfiles[k]} aria-label={`Применить профиль пота ${k}${sweatProfiles[k] ? `: ${sweatProfiles[k].rate.toFixed(2)} л/ч, Na ${Math.round(sweatProfiles[k].sodium)}` : ' — не сохранён'}`} onClick={()=>{
+                const prof = sweatProfiles[k]; if(!prof) return;
+                setSweatRate(Math.round(prof.rate*1000));
+                setSweatSodium(Math.round(prof.sodium));
+                setUseMeasuredSweat(false);
+                showToast(`Профиль ${k} применён: ${prof.rate.toFixed(2)} л/ч, Na ${Math.round(prof.sodium)} → режим «Оценка»`);
+              }} style={{ padding:'6px 10px', minHeight:44, borderRadius: sweatProfiles[k] ? '8px 0 0 8px' : 8, border:'1px solid rgba(6,182,214,0.18)', borderRight: sweatProfiles[k] ? 'none' : '1px solid rgba(6,182,214,0.18)', background: sweatProfiles[k] ? 'rgba(6,182,214,0.14)':'rgba(255,255,255,0.03)', color: sweatProfiles[k] ? '#06b6d4':'rgba(255,255,255,0.35)', fontSize:9, cursor: sweatProfiles[k] ? 'pointer':'not-allowed' }}>{k} {sweatProfiles[k] ? `${sweatProfiles[k].rate.toFixed(2)}л/ч` : '—'}</button>
+              {/* Аудит 2026-11: сохранённый профиль нельзя было удалить — «cool 1.10 л/ч» остаётся
+                  навсегда и подставляется одним нажатием. ✕ убирает только этот профиль. */}
+              {sweatProfiles[k] && (
+                <button type="button" aria-label={`Удалить профиль пота ${k}`} title={`Удалить профиль ${k}`} onClick={()=>{
+                  const next = {...sweatProfiles};
+                  delete next[k];
+                  setSweatProfiles(next);
+                  try{ localStorage.setItem('he_sweat_profiles_v1', JSON.stringify(next)); }catch{}
+                  showToast(`Профиль ${k} удалён`);
+                }} style={{ padding:'6px 8px', minHeight:44, borderRadius:'0 8px 8px 0', border:'1px solid rgba(239,68,68,0.22)', background:'rgba(239,68,68,0.08)', color:'#f87171', fontSize:10, fontWeight:800, cursor:'pointer' }}>✕</button>
+              )}
+            </span>
           ))}
         </div>
         <div style={{ marginTop:4, display:'flex', gap:4, flexWrap:'wrap', alignItems:'center' }}>
@@ -1783,13 +1796,18 @@ const kbju = useMemo(()=> calcKBJU(input), [input]);
             })}
             {scenarioDiff && scenarioDiff.length > 0 && (
               <div style={{ marginTop:4, padding:'8px 10px', borderRadius:10, background:'rgba(139,92,246,0.06)', border:'1px solid rgba(139,92,246,0.16)' }}>
-                <div style={{ fontSize:9, fontWeight:800, color:'#a78bfa', marginBottom:4 }}>Δ между сценариями ({scenarioDiff.length} полей)</div>
-                {scenarioDiff.map(d=> (
+                <div style={{ fontSize:9, fontWeight:800, color:'#a78bfa', marginBottom:4 }}>Δ между сценариями ({scenarioDiff.length} {scenarioDiff.length === 1 ? 'поле' : 'полей'})</div>
+                {scenarioDiff.slice(0, 24).map(d=> (
                   <div key={d.key} style={{ display:'flex', justifyContent:'space-between', gap:8, fontSize:9, color:'#fff', lineHeight:1.5 }}>
                     <span style={{ color:'rgba(255,255,255,0.62)' }}>{SNAP_LABEL[d.key] ?? d.key}</span>
                     <span>{snapValue(d.key, d.a)} → <b>{snapValue(d.key, d.b)}</b>{d.delta != null ? ` (${d.delta>0?'+':''}${d.delta})` : ''}</span>
                   </div>
                 ))}
+                {scenarioDiff.length > 24 && (
+                  <div style={{ fontSize:8, color:'rgba(255,255,255,0.5)', marginTop:3 }}>
+                    Показаны первые 24 из {scenarioDiff.length} — остальные {scenarioDiff.length - 24} не выведены (счётчик выше полный).
+                  </div>
+                )}
               </div>
             )}
             {compareIds.length === 1 && <div style={{ fontSize:9, color:'rgba(255,255,255,0.5)' }}>Отметь второй сценарий — покажу разницу по полям.</div>}
