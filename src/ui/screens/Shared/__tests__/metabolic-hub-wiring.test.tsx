@@ -206,6 +206,27 @@ describe('MetabolicHub: ввод меняет расчёт (проводка п�
     expect(txt).not.toContain('уже включены');
   });
 
+  it('K — редактируемое поле и реально влияет на штраф питания', () => {
+    render(<MetabolicHub />);
+    setNumber('HCT, %', 46);
+    const fieldText = (label: string) => (Array.from(document.querySelectorAll('button'))
+      .find(b => (b.textContent || '').trim().startsWith(label))?.textContent || '').replace(/\s+/g, ' ');
+    // профиль предзаполняет Na/K (3.5/3.0 г) — но теперь это поля, а не «факт» без возможности правки
+    expect(fieldText('Na, г/сут')).toContain('3');
+    expect(fieldText('K, г/сут')).toContain('3');
+    let txt = openMode('Кровь');
+    expect(txt).toContain('питание × гематология ×1');
+    // низкий K → +0.03 к множителю питания
+    setNumber('K, г/сут', 2);
+    expect(fieldText('K, г/сут')).toContain('2');
+    txt = openMode('Кровь');
+    expect(txt).toContain('×1.03');
+    // Na выше 4 г/сут — второй штраф
+    setNumber('Na, г/сут', 5);
+    txt = openMode('Кровь');
+    expect(txt).toContain('×1.06');
+  });
+
   it('вода «факт» подписана источником, а не выдана за измерение', () => {
     render(<MetabolicHub />);
     setNumber('HCT, %', 52);

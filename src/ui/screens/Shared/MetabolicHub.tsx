@@ -251,8 +251,10 @@ export const MetabolicHub: React.FC = () => {
   const [ironIntakeMg, setIronIntakeMg] = useState<number|undefined>(undefined);
   const [gfr, setGfr] = useState<number|undefined>(undefined);
   const [waterL, setWaterL] = useState<number|undefined>(undefined);
-  const [sodiumG, setSodiumG] = useState(3.5);
-  const [potassiumG, setPotassiumG] = useState(3.0);
+  // Аудит 2026-11: 3.5 г Na и 3.0 г K были выдуманным «фактом» (и K вообще нельзя было изменить,
+  // хотя он влиял на nutritionMult). Теперь пусто = «не задано», движок такие значения пропускает.
+  const [sodiumG, setSodiumG] = useState<number|undefined>(undefined);
+  const [potassiumG, setPotassiumG] = useState<number|undefined>(undefined);
   // P0-2 MET
   const [metHoursPerWeek, setMetHoursPerWeek] = useState<number|undefined>(undefined);
   // P0-3 RED-S
@@ -1000,7 +1002,7 @@ const kbju = useMemo(()=> calcKBJU(input), [input]);
     setSweatRate(600); setSweatSodium(900); setSweatIntensity('moderate'); setSweatEnv('temperate');
     setUseMeasuredSweat(true); setPreKg(weight); setPostKg(weight); setFluidL(0); setSweatHours(1);
     setAlcoholG(0); setAlcoholDays(0); setCaffeineMg(150); setCaffeineHoursSince(2);
-    setWaterL(undefined); waterOriginRef.current = null; setSodiumG(3.5); setPotassiumG(3.0);
+    setWaterL(undefined); waterOriginRef.current = null; setSodiumG(undefined); setPotassiumG(undefined);
     setScheduleText('пн: силовая 1ч, вт: бег 0.5ч, чт: силовая 1ч');
     setCarbLoadDays(2); setCarbGPerKg(10); setSodiumLoadDays(2); setSodiumGPerDay(5);
     setProjectionYears(3); setProjectionMode('hold_bf'); setProteinMeals(4);
@@ -1553,10 +1555,11 @@ const kbju = useMemo(()=> calcKBJU(input), [input]);
             onChange={markManualLab('gfr', setGfr)} />
           <PopupNumber label="Вода факт, л/сут" value={waterL ?? 0} min={1} max={6} step={0.1} onChange={(v)=>{ waterOriginRef.current = 'user'; setWaterL(v); }} />
           <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
-            <PopupNumber label="Na, г/сут" value={sodiumG} min={1} max={8} step={0.1} onChange={setSodiumG} />
+            <PopupNumber label="Na, г/сут" value={sodiumG ?? 0} min={1} max={8} step={0.1} onChange={setSodiumG} />
+            <PopupNumber label="K, г/сут" value={potassiumG ?? 0} min={1} max={7} step={0.1} onChange={setPotassiumG} />
             <div style={{ display:'flex', gap:4 }}>
               <span style={{ flex:1, fontSize:8, color: hematology.viscosityFlag ? '#ef4444' : 'rgba(255,255,255,0.45)', background: hematology.viscosityFlag ? 'rgba(239,68,68,0.10)' : 'rgba(255,255,255,0.03)', border:`1px solid ${hematology.viscosityFlag?'rgba(239,68,68,0.18)':'rgba(255,255,255,0.06)'}`, borderRadius:8, padding:'5px 6px', textAlign:'center' }}>{viscosityShort}</span>
-              <span style={{ flex:1, fontSize:8, color:'rgba(255,255,255,0.55)', background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', borderRadius:8, padding:'5px 6px', textAlign:'center' }}>K {potassiumG}г</span>
+              <span style={{ flex:1, fontSize:8, color:'rgba(255,255,255,0.45)', background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', borderRadius:8, padding:'5px 6px', textAlign:'center' }}>K {potassiumG != null ? `${potassiumG}г` : 'не задано'}</span>
             </div>
           </div>
         </div>

@@ -475,6 +475,16 @@ describe('metabolic-hub — calcHematology (ESC/ASA)', () => {
     expect(noWater.nutritionMult).toBe(calcHematology({ ...common, waterL:2.5 }).nutritionMult);
     expect(calcHematology({ ...common, waterL:1.2 }).nutritionMult).toBeGreaterThan(noWater.nutritionMult);
   });
+  it('Na/K без данных не штрафуют питание, а введённые — да', () => {
+    const common = { weight:80, hct:45, proteinPerKg:2, fiberG:30, omega3G:2 } as const;
+    const base = calcHematology(common);
+    // «не задано» — не повод начислять +0.03 ни за низкий K, ни за высокий Na
+    expect(calcHematology({ ...common, sodiumG: undefined, potassiumG: undefined }).nutritionMult).toBe(base.nutritionMult);
+    expect(calcHematology({ ...common, sodiumG: 5 }).nutritionMult).toBeGreaterThan(base.nutritionMult);
+    expect(calcHematology({ ...common, potassiumG: 2 }).nutritionMult).toBeGreaterThan(base.nutritionMult);
+    // нормальные значения ничего не добавляют
+    expect(calcHematology({ ...common, sodiumG: 3, potassiumG: 4 }).nutritionMult).toBe(base.nutritionMult);
+  });
   it('nutritionMult растёт с дефицитами', () => {
     const good = calcHematology({ weight:80, hct:45, waterL:2.5, sodiumG:3, potassiumG:3, proteinPerKg:1.8, fiberG:30, omega3G:1.5 });
     const bad = calcHematology({ weight:80, hct:45, waterL:1.2, sodiumG:5, potassiumG:2, proteinPerKg:1.0, fiberG:10, omega3G:0.2 });
