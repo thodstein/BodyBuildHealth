@@ -75,7 +75,7 @@ const SNAP_LABEL: Record<string, string> = {
   goal: 'цель', stress: 'стресс 1–10', sleepHours: 'сон, ч', sleepQuality: 'качество сна',
   onAAS: 'ААС', aasDose: 'доза ААС', climate: 'климат', humidity: 'влажность, %',
   standingHours: 'стоя, ч/сут', fidgetLevel: 'непоседливость', sweatRate: 'пот, мл/ч',
-  sweatSodium: 'Na пота, мг/л', alcoholG: 'алкоголь, г/нед', alcoholDays: 'дней с алкоголем',
+  sweatSodium: 'Na пота, мг/л', alcoholG: 'алкоголь, г/сут', alcoholDays: 'дней с алкоголем',
   caffeineMg: 'кофеин, мг', tsh: 'ТТГ', ft4: 'св. Т4', glucoseMgDl: 'глюкоза, мг/дл',
   insulinMuMl: 'инсулин, мкЕд/мл', skinfoldSum3: 'сумма 3 складок', skinfoldSum4: 'сумма 4 складок',
   biaResistance: 'BIA, Ом', deficitKcal: 'дефицит, ккал', weeksInDeficit: 'нед в дефиците',
@@ -221,7 +221,10 @@ export const MetabolicHub: React.FC = () => {
   const [fidgetLevel, setFidgetLevel] = useState<1|2|3>(2);
   const [sweatRate, setSweatRate] = useState(600);
   const [sweatSodium, setSweatSodium] = useState(900);
-  const [alcoholG, setAlcoholG] = useState(0);
+  // Аудит 2026-11: `alcoholG` стартовал с 0 → режим «Алко» печатал «Без алкоголя — окисление
+  // жира в норме» как вердикт, хотя человек ничего не вводил. Теперь пусто = «не задано»
+  // (в формулы идёт 0, числа не меняются).
+  const [alcoholG, setAlcoholG] = useState<number|undefined>(undefined);
   const [caffeineMg, setCaffeineMg] = useState(150);
   const [fiberG, setFiberG] = useState<number|undefined>(undefined);
   const [omega3G, setOmega3G] = useState<number|undefined>(undefined);
@@ -835,7 +838,7 @@ const kbju = useMemo(()=> calcKBJU(input), [input]);
   const lbmPres = useMemo(()=> calcLBMPreservation({ proteinGPerKg: kbju.nat.protPerKg, deficitKcal: effectiveDeficit, trainingDays, ea: ea?.ea }), [kbju, trainingDays, ea, effectiveDeficit]);
   const psmf = useMemo(()=> checkPSMFWrap(ea.ea), [ea.ea]);
   const menstrual = useMemo(()=> calcMenstrualWater(menstrualPhase), [menstrualPhase]);
-  const alcohol = useMemo(()=> calcAlcohol(alcoholG, weight), [alcoholG, weight]);
+  const alcohol = useMemo(()=> calcAlcohol(alcoholG ?? 0, weight), [alcoholG, weight]);
   // белок — единая точка PRO: proteinPro (DIAAS + 60+), v1 calcProteinTiming удалён из UI
   const maintenance = useMemo(()=>{
     // Аудит 2026-11: раньше при пустом дневнике сюда подставлялась цель КБЖУ (`kbju.nat.kcal`)
@@ -883,7 +886,7 @@ const kbju = useMemo(()=> calcKBJU(input), [input]);
   const vaiV = useMemo(()=> calcVAIWrap({ waistCm: waist, bmi: bmiNow, tgMgDl: tgMgDl2, hdlMgDl, sex }), [waist, bmiNow, tgMgDl2, hdlMgDl, sex]);
   const fmiV = useMemo(()=> calcFMIWrap(weight, bodyFat ?? fat.current, height), [weight, bodyFat, fat, height]);
   const boerLBM = useMemo(()=> boerLeanBodyMass(weight, height, sex), [weight, height, sex]);
-  const alcoholChronic = useMemo(()=> calcAlcoholChronic(alcoholG, alcoholDays), [alcoholG, alcoholDays]);
+  const alcoholChronic = useMemo(()=> calcAlcoholChronic(alcoholG ?? 0, alcoholDays), [alcoholG, alcoholDays]);
   const proteinPro = useMemo(()=> calcProteinTimingPro(onAAS ? kbju.aas.p : kbju.nat.p, weight, proteinMeals, proteinSource, age), [kbju, weight, onAAS, proteinMeals, proteinSource, age]);
   const neatPro = useMemo(()=> calcNEATPro({ weight, profession: profession === 'auto' ? undefined : profession, standingHours, fidgetLevel, steps, height }), [weight, profession, standingHours, fidgetLevel, steps, height]);
   const atRange = useMemo(()=> calcATRange({ tdee: stepsCalc.tdeeNat, deficitKcal: effectiveDeficit, weeksInDeficit, weightLostKg }), [stepsCalc, effectiveDeficit, weeksInDeficit, weightLostKg]);
@@ -1010,7 +1013,7 @@ const kbju = useMemo(()=> calcKBJU(input), [input]);
     setClimate('temperate'); setHumidity(55); setStandingHours(2); setFidgetLevel(2);
     setSweatRate(600); setSweatSodium(900); setSweatIntensity('moderate'); setSweatEnv('temperate');
     setUseMeasuredSweat(true); setPreKg(weight); setPostKg(weight); setFluidL(0); setSweatHours(1);
-    setAlcoholG(0); setAlcoholDays(0); setCaffeineMg(150); setCaffeineHoursSince(2);
+    setAlcoholG(undefined); setAlcoholDays(0); setCaffeineMg(150); setCaffeineHoursSince(2);
     setWaterL(undefined); waterOriginRef.current = null; setSodiumG(undefined); setPotassiumG(undefined);
     setScheduleText('пн: силовая 1ч, вт: бег 0.5ч, чт: силовая 1ч');
     setCarbLoadDays(2); setCarbGPerKg(10); setSodiumLoadDays(2); setSodiumGPerDay(5);
@@ -1151,7 +1154,7 @@ const kbju = useMemo(()=> calcKBJU(input), [input]);
           : <div style={{ fontSize:9, color:'rgba(255,255,255,0.55)' }}>TDEE по формуле — adaptive v3 включится после 7 взвешиваний и дневника (сейчас {weightHistory.length}/{diaryDays}).</div>}
         {adaptiveV3?.plateau && <div style={{ fontSize:9, color:'#fbbf24' }}>⏸ Плато: тренд {adaptiveV3.trend}кг/нед · AT {adaptiveV3.atKcal}ккал — проверь дефицит и шаги</div>}
         {cat2.light !== 'green' && <div style={{ fontSize:9, color: cat2.color }}>CAT2 {cat2.light.toUpperCase()}: {cat2.note}</div>}
-        {alcoholG > 0 && <div style={{ fontSize:9, color: alcoholChronic.risk==='high'?'#ef4444': alcoholChronic.risk==='moderate'?'#f59e0b':'#facc15' }}>{alcoholChronic.note}</div>}
+        {alcoholG != null && alcoholG > 0 && <div style={{ fontSize:9, color: alcoholChronic.risk==='high'?'#ef4444': alcoholChronic.risk==='moderate'?'#f59e0b':'#facc15' }}>{alcoholChronic.note}</div>}
         <div style={{ fontSize:8, color:'rgba(255,255,255,0.45)' }}>TG/HDL {tgHdl ?? '—'}{tgHdl && tgHdl>=3.5?' ⚠ IR':''} · LAP {lapV ?? '—'} · VAI {vaiV ?? '—'} · FMI {fmiV ?? '—'} · NEAT {neatPro.total} · AT {atRange.low}–{atRange.high} · DIAAS {proteinPro.diaas}{pregAdd ? ` · 🤰 +${pregAdd}ккал` : ''}</div>
       </div>
 
@@ -1483,7 +1486,7 @@ const kbju = useMemo(()=> calcKBJU(input), [input]);
           <PopupNumber label="Сон, ч" value={sleepHours} min={3} max={11} step={0.5} onChange={setSleepHours} />
           <PopupNumber label="Качество сна 1-5" value={sleepQuality} min={1} max={5} onChange={setSleepQuality} />
           <PopupNumber label="Кофеин, мг/сут" value={caffeineMg} min={0} max={800} onChange={setCaffeineMg} />
-          <PopupNumber label="Алкоголь, г/сут" value={alcoholG} min={0} max={120} onChange={setAlcoholG} />
+          <PopupNumber label="Алкоголь, г/сут" value={alcoholG ?? 0} min={0} max={120} onChange={setAlcoholG} />
           <PopupNumber label="Дней/нед с алко" value={alcoholDays} min={0} max={7} onChange={setAlcoholDays} />
           <PopupNumber label="Ч/после кофе, ч" value={caffeineHoursSince} min={0} max={24} step={0.5} onChange={setCaffeineHoursSince} />
           <div style={{ display:'flex', flexDirection:'column', justifyContent:'center', padding:'8px 10px', borderRadius:10, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)' }}>
@@ -1492,7 +1495,7 @@ const kbju = useMemo(()=> calcKBJU(input), [input]);
             <div style={{ fontSize:9, color:'rgba(255,255,255,0.45)' }}>{acwr != null ? 'из sRPE' : 'нужны ≥2 сессии в журнале sRPE'} · {cortisol.caffeineAdj? `коф +${cortisol.caffeineAdj}`:''} {cortisol.alcoholAdj? `алк +${cortisol.alcoholAdj}`:''}</div>
           </div>
         </MhGrid>
-        <div style={{ fontSize:8, color:'rgba(255,255,255,0.45)', background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', borderRadius:10, padding:'8px 10px', marginTop:6 }}>{alcohol.kcal>0? `${alcohol.kcal}ккал алко · блок жира ${alcohol.fatOxidationBlockedPct}%`:'Без алкоголя'} · хроника: {alcoholChronic.unitsPerWeek} units/нед{alcoholG > 0 ? ` · ${alcoholChronic.note}` : ''} · {caffeineCurve.note} · сон cut-off {caffeineCurve.sleepCutoffH}ч</div>
+        <div style={{ fontSize:8, color:'rgba(255,255,255,0.45)', background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', borderRadius:10, padding:'8px 10px', marginTop:6 }}>{alcoholG == null ? 'алкоголь не задан' : alcohol.kcal>0? `${alcohol.kcal}ккал алко · блок жира ${alcohol.fatOxidationBlockedPct}%`:'Без алкоголя'} · хроника: {alcoholG != null ? `${alcoholChronic.unitsPerWeek} units/нед` : '—'}{alcoholG != null && alcoholG > 0 ? ` · ${alcoholChronic.note}` : ''} · {caffeineCurve.note} · сон cut-off {caffeineCurve.sleepCutoffH}ч</div>
       </MhSection>
       </div>
       <div style={{ ...CARD, border:'1px solid rgba(6,182,214,0.12)', padding:10, background:'rgba(6,182,214,0.04)', display: wizardStep===3 ? 'block' : 'none' }}>
@@ -2085,22 +2088,22 @@ const kbju = useMemo(()=> calcKBJU(input), [input]);
             <div>
               <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
                 <div style={{ padding:14, borderRadius:12, background: alcohol.kcal>0?'rgba(249,115,22,0.08)':'rgba(255,255,255,0.03)', border:`1px solid ${alcohol.kcal>0?'rgba(249,115,22,0.18)':'rgba(255,255,255,0.06)'}`, textAlign:'center' }}>
-                  <div style={{ fontSize:10, color: alcohol.kcal>0?'#f97316':'rgba(255,255,255,0.55)' }}>{alcoholG}г этанола</div>
-                  <div style={{ fontSize:26, fontWeight:900, color: alcohol.kcal>0?'#f97316':'#fff' }}>{alcohol.kcal}<span style={{ fontSize:10 }}> ккал</span></div>
-                  <div style={{ fontSize:9, color:'#fff' }}>7.1ккал/г · TEF {alcohol.tef}ккал · блок жира {alcohol.fatOxidationBlockedPct}%</div>
+                  <div style={{ fontSize:10, color: alcohol.kcal>0?'#f97316':'rgba(255,255,255,0.55)' }}>{alcoholG != null ? `${alcoholG}г этанола` : 'алкоголь не указан'}</div>
+                  <div style={{ fontSize:26, fontWeight:900, color: alcohol.kcal>0?'#f97316':'#fff' }}>{alcoholG != null ? <>{alcohol.kcal}<span style={{ fontSize:10 }}> ккал</span></> : '—'}</div>
+                  <div style={{ fontSize:9, color:'#fff' }}>{alcoholG != null ? `7.1ккал/г · TEF ${alcohol.tef}ккал · блок жира ${alcohol.fatOxidationBlockedPct}%` : 'Г/сут этанола — пусто значит «не задано», а не «не пью»'}</div>
                 </div>
                 <div style={{ padding:10, borderRadius:10, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', fontSize:10, color:'#fff', lineHeight:1.5 }}>
-                  {alcohol.note}<br/>
-                  <span style={{ fontSize:9, color:'rgba(255,255,255,0.55)' }}>~{alcohol.stepsEq} шагов компенсируют. Алкоголь подавляет MPS и сон. Введи дозу в HPA-блоке.</span>
+                  {alcoholG != null ? alcohol.note : 'Введи дозу этанола (г/сут), чтобы увидеть ккал, TEF и блок окисления жира. Пока доза не введена, совет по алкоголю не выдаётся.'}<br/>
+                  <span style={{ fontSize:9, color:'rgba(255,255,255,0.55)' }}>{alcoholG != null ? `~${alcohol.stepsEq} шагов компенсируют. ` : ''}Алкоголь подавляет MPS и сон. Введи дозу здесь или в HPA-блоке.</span>
                   <div style={{ marginTop:8, display:'flex', gap:6 }}>
-                    <PopupNumber label="Алкоголь, г" value={alcoholG} min={0} max={200} onChange={setAlcoholG} />
+                    <PopupNumber label="Алкоголь, г" value={alcoholG ?? 0} min={0} max={200} onChange={setAlcoholG} />
                   </div>
                 </div>
               </div>
               {alcohol.kcal>0 && <div style={{ marginTop:8, padding:'8px 10px', borderRadius:8, background:'rgba(249,115,22,0.08)', border:'1px solid rgba(249,115,22,0.18)', fontSize:10, color:'#fff' }}>🥃 {alcohol.kcal} ккал спирта — это <b>приём сверх плана</b>, а не расход: в КБЖУ дневная цель их не содержит (в TEF учтён только расход на переваривание ~{alcohol.tef} ккал). Пьёшь — добавь {alcohol.kcal} ккал к дню или убери ~{Math.round(alcohol.kcal/4)}г углеводов. Жир блок {alcohol.fatOxidationBlockedPct}% ~3ч — не планируй тренировку сразу после.</div>}
-              {alcoholG > 0 && (
+              {alcoholG != null && alcoholG > 0 && (
                 <div style={{ marginTop:8, padding:'8px 10px', borderRadius:8, fontSize:10, lineHeight:1.45, background: alcoholChronic.risk==='high'?'rgba(239,68,68,0.08)':'rgba(245,158,11,0.06)', border:`1px solid ${alcoholChronic.risk==='high'?'rgba(239,68,68,0.18)':'rgba(245,158,11,0.16)'}`, color: alcoholChronic.risk==='high'?'#f87171':'#fbbf24' }}>
-                  📅 Хроника: {alcoholChronic.unitsPerWeek} units/нед ({alcoholG * alcoholDays}г за неделю) · {alcoholChronic.note}
+                  📅 Хроника: {alcoholChronic.unitsPerWeek} units/нед ({alcoholG * (alcoholDays || 0)}г за неделю) · {alcoholChronic.note}
                   {alcoholDays <= 0 && <div style={{ marginTop:4, color:'#fff' }}>Укажи «Дней/нед с алко» в HPA-блоке — иначе недельная доза и риск не считаются.</div>}
                 </div>
               )}

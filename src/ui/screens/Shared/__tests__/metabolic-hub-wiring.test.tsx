@@ -78,7 +78,7 @@ function fieldValue(label: string): string {
   return (el.getAttribute('aria-label') || '').slice(label.length + 2);
 }
 
-/** Значение `.pl-popupnum` по подписи (у PopupNumber нет aria-label — берём второй div). */
+/** Значение `.pl-popupnum` по подписи (второй div — значение; aria-label тоже есть, но он с подписью). */
 function popupValue(label: string): string {
   const btn = Array.from(document.querySelectorAll('button.pl-popupnum'))
     .find(b => (b.textContent || '').trim().startsWith(label));
@@ -265,6 +265,34 @@ describe('MetabolicHub: ввод меняет расчёт (проводка п�
     setNumber('Вода факт, л/сут', 2.5);
     txt = openMode('Кровь');
     expect(txt).toContain('вязкость OK');
+  });
+
+  it('поля попапов объявляются скринридеру: aria-label с подписью и значением', () => {
+    render(<MetabolicHub />);
+    const btns = Array.from(document.querySelectorAll('button.pl-popupnum')) as HTMLElement[];
+    expect(btns.length).toBeGreaterThan(0);
+    for (const b of btns) {
+      const al = b.getAttribute('aria-label') || '';
+      expect(al.length, `пустой aria-label у «${(b.textContent || '').trim()}»`).toBeGreaterThan(3);
+      expect(b.getAttribute('aria-haspopup')).toBe('dialog');
+    }
+    // подпись и значение читаются вместе: «Вода факт, л/сут: не задано»
+    const water = btns.find(b => (b.getAttribute('aria-label') || '').startsWith('Вода факт'));
+    expect(water?.getAttribute('aria-label')).toMatch(/^Вода факт, л\/сут: (.+)$/);
+  });
+
+  it('алкоголь без ввода — «не указан», а не вердикт «Без алкоголя»', () => {
+    render(<MetabolicHub />);
+    let txt = openMode('Алко');
+    expect(txt).toContain('алкоголь не указан');
+    expect(txt).not.toContain('Без алкоголя');
+    // вводим дозу — появляется расчёт, TEF и хроника
+    setNumber('Алкоголь, г/сут', 40);
+    txt = openMode('Алко');
+    expect(txt).toContain('40г этанола');
+    expect(txt).toContain('284'); // 40 г × 7.1 ккал/г
+    expect(txt).toContain('Хроника');
+    expect(txt).toContain('приём сверх плана');
   });
 
   it('AT без данных — «нет данных», а не «AT none · −0ккал»', () => {

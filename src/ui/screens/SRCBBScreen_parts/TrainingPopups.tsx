@@ -50,7 +50,7 @@ export const PopupNumber: React.FC<{
   const [edit, setEdit] = useState(String(value));
   const display = value ? `${value}${suffix}` : `—${suffix ? ' ' + suffix : ''}`;
   return <>
-      <button className="pl-popupnum" onClick={() => { setEdit(String(value)); setOpen(true); }} style={cardBtnStyle(!!value)}>
+      <button className="pl-popupnum" aria-label={`${label}: ${value ? `${value}${suffix}` : 'не задано'}`} aria-haspopup="dialog" onClick={() => { setEdit(String(value)); setOpen(true); }} style={cardBtnStyle(!!value)}>
       <div style={{ fontSize: 11, color: '#fff', fontWeight: 600, marginBottom: 2, overflowWrap: 'anywhere', wordBreak: 'break-word' }}>{label}</div>
       <div style={{ fontSize: 14, color: value ? ACCENT : '#fff', overflowWrap: 'anywhere', wordBreak: 'break-word' }}>{display}</div>
     </button>

@@ -151,4 +151,11 @@ describe('MetabolicHub: ручной ввод лаб переживает авт
     const applied = new Set(Array.from(src.slice(applyStart, applyEnd).matchAll(/\bs\.([A-Za-z0-9_]+)/g)).map(m => m[1]!));
     expect(snapKeys.filter(k => !applied.has(k))).toEqual([]);
   });
+
+  it('единицы в подписях снапшота не врут (алкоголь — г/сут, не г/нед)', () => {
+    // регрессия: движок и поле ввода живут в «г/сут», а подпись в diff сценариев
+    // говорила «г/нед» — сравнение сценариев показывало дозу в 7 раз меньше реальной.
+    expect(src).toContain("alcoholG: 'алкоголь, г/сут'");
+    expect(src).not.toMatch(/alcoholG: 'алкоголь, г\/нед'/);
+  });
 });
