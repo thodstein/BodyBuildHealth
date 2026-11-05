@@ -555,6 +555,19 @@ finder: ≥7 взвешиваний + дневник)».
 `metabolic-hub-structure.test.tsx` → «единицы в подписях снапшота не врут (алкоголь — г/сут, не
 г/нед)».
 
+### 1.49 Кофеин: выдуманные 150 мг и cut-off как факт
+**Причина.** `caffeineMg` стартовал с `150` (и «2 ч с последнего кофе»), поэтому блок кривой кофеина
+печатал «остаток X мг · TEF +N · cut-off 6ч до сна» как результат, даже если человек кофе не пьёт.
+Хуже: эта же цифра уходила в `input.caffeineMg` и в `calcCortisol` (правда, 150 < 300 → вклад в SLI
+нулевой, но пользователь видел посчитанную кривую и не знал, что доза выдумана).
+**Исправление.** `caffeineMg: number | undefined`; без ввода плитка «Caffeine curve» показывает «— ·
+введи мг/сут», гистограмма серая и не подписана дозой, вместо кривой — «Введи кофеин, мг/сут —
+покажу остаток, TEF и cut-off». В формулы по-прежнему идёт 0 (числа не меняются). HPA-строка
+пишет «кофеин не задан (пусто ≠ „не пью кофе“)» и не печатает `сон cut-off`.
+**Регрессия.** `metabolic-hub-wiring.test.tsx` → «кофеин без ввода — „не задан“, кривая и cut-off не
+выдумываются» (проверяет отсутствие `cut-off Nч` и `осталось (peak` до ввода, появление
+`cut-off 8ч` при 300 мг).
+
 ---
 
 ## 2. Чего не хватало (добавлено)
@@ -604,7 +617,7 @@ finder: ≥7 взвешиваний + дневник)».
   параллельные `tsc`/`vitest` из других сессий → heap OOM / `Zone Allocation failed`.
   Прогонять на свободной машине.
 - `npx vitest run src/ui/screens/Shared/__tests__ src/engines/__tests__/metabolic-hub.test.ts`
-  — **239 passed** (6 файлов: structure / toggles / honesty / modes / wiring / engine).
+  — **240 passed** (6 файлов: structure / toggles / honesty / modes / wiring / engine).
 - `npx vitest run src/ui/__tests__/rest-hooks-native.test.tsx
   src/engines/__tests__/risk-info-honesty-e07-e08.test.ts` — **89 passed**
   (в stderr шумит jsdom-canvas chart.js — это фон, не падения).

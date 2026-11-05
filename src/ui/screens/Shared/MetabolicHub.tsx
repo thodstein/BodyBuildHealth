@@ -225,7 +225,9 @@ export const MetabolicHub: React.FC = () => {
   // жира в норме» как вердикт, хотя человек ничего не вводил. Теперь пусто = «не задано»
   // (в формулы идёт 0, числа не меняются).
   const [alcoholG, setAlcoholG] = useState<number|undefined>(undefined);
-  const [caffeineMg, setCaffeineMg] = useState(150);
+  // Аудит 2026-11: 150 мг и «2 ч назад» были выдуманной дозой — HPA-строка печатала кривую кофеина
+  // и cut-off как факт, хотя человек мог не пить кофе. Пусто = «не задано» (в формулы идёт 0).
+  const [caffeineMg, setCaffeineMg] = useState<number|undefined>(undefined);
   const [fiberG, setFiberG] = useState<number|undefined>(undefined);
   const [omega3G, setOmega3G] = useState<number|undefined>(undefined);
   const [sfaG, setSfaG] = useState<number|undefined>(undefined);
@@ -859,7 +861,8 @@ const kbju = useMemo(()=> calcKBJU(input), [input]);
   const fib4 = useMemo(()=> calcFIB4(age, ast, alt, plt), [age, ast, alt, plt]);
   const apri = useMemo(()=> calcAPRI(ast, plt), [ast, plt]);
   const quicki = useMemo(()=> calcQUICKI(glucoseMgDl, insulinMuMl), [glucoseMgDl, insulinMuMl]);
-  const caffeineCurve = useMemo(()=> calcCaffeineCurve(caffeineMg, caffeineHoursSince, weight), [caffeineMg, caffeineHoursSince, weight]);
+  const caffeineCurve = useMemo(()=> calcCaffeineCurve(caffeineMg ?? 0, caffeineHoursSince, weight), [caffeineMg, caffeineHoursSince, weight]);
+  const caffeineKnown = caffeineMg != null && caffeineMg > 0;
   const refeedNeed = useMemo(()=> calcRefeedNeed(weeksInDeficit, bfForCalc, ea?.ea ?? null, sex), [weeksInDeficit, bfForCalc, ea, sex]);
   const carbLoad = useMemo(()=> calcCarbLoading(weight, carbLoadDays, carbGPerKg), [weight, carbLoadDays, carbGPerKg]);
   const sodiumLoad = useMemo(()=> calcSodiumLoading(weight, sodiumLoadDays, sodiumGPerDay), [weight, sodiumLoadDays, sodiumGPerDay]);
@@ -1013,7 +1016,7 @@ const kbju = useMemo(()=> calcKBJU(input), [input]);
     setClimate('temperate'); setHumidity(55); setStandingHours(2); setFidgetLevel(2);
     setSweatRate(600); setSweatSodium(900); setSweatIntensity('moderate'); setSweatEnv('temperate');
     setUseMeasuredSweat(true); setPreKg(weight); setPostKg(weight); setFluidL(0); setSweatHours(1);
-    setAlcoholG(undefined); setAlcoholDays(0); setCaffeineMg(150); setCaffeineHoursSince(2);
+    setAlcoholG(undefined); setAlcoholDays(0); setCaffeineMg(undefined); setCaffeineHoursSince(2);
     setWaterL(undefined); waterOriginRef.current = null; setSodiumG(undefined); setPotassiumG(undefined);
     setScheduleText('пн: силовая 1ч, вт: бег 0.5ч, чт: силовая 1ч');
     setCarbLoadDays(2); setCarbGPerKg(10); setSodiumLoadDays(2); setSodiumGPerDay(5);
@@ -1485,7 +1488,7 @@ const kbju = useMemo(()=> calcKBJU(input), [input]);
           <PopupNumber label="Стресс 1-10" value={stress} min={1} max={10} onChange={setStress} />
           <PopupNumber label="Сон, ч" value={sleepHours} min={3} max={11} step={0.5} onChange={setSleepHours} />
           <PopupNumber label="Качество сна 1-5" value={sleepQuality} min={1} max={5} onChange={setSleepQuality} />
-          <PopupNumber label="Кофеин, мг/сут" value={caffeineMg} min={0} max={800} onChange={setCaffeineMg} />
+          <PopupNumber label="Кофеин, мг/сут" value={caffeineMg ?? 0} min={0} max={800} onChange={setCaffeineMg} />
           <PopupNumber label="Алкоголь, г/сут" value={alcoholG ?? 0} min={0} max={120} onChange={setAlcoholG} />
           <PopupNumber label="Дней/нед с алко" value={alcoholDays} min={0} max={7} onChange={setAlcoholDays} />
           <PopupNumber label="Ч/после кофе, ч" value={caffeineHoursSince} min={0} max={24} step={0.5} onChange={setCaffeineHoursSince} />
@@ -1495,7 +1498,7 @@ const kbju = useMemo(()=> calcKBJU(input), [input]);
             <div style={{ fontSize:9, color:'rgba(255,255,255,0.45)' }}>{acwr != null ? 'из sRPE' : 'нужны ≥2 сессии в журнале sRPE'} · {cortisol.caffeineAdj? `коф +${cortisol.caffeineAdj}`:''} {cortisol.alcoholAdj? `алк +${cortisol.alcoholAdj}`:''}</div>
           </div>
         </MhGrid>
-        <div style={{ fontSize:8, color:'rgba(255,255,255,0.45)', background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', borderRadius:10, padding:'8px 10px', marginTop:6 }}>{alcoholG == null ? 'алкоголь не задан' : alcohol.kcal>0? `${alcohol.kcal}ккал алко · блок жира ${alcohol.fatOxidationBlockedPct}%`:'Без алкоголя'} · хроника: {alcoholG != null ? `${alcoholChronic.unitsPerWeek} units/нед` : '—'}{alcoholG != null && alcoholG > 0 ? ` · ${alcoholChronic.note}` : ''} · {caffeineCurve.note} · сон cut-off {caffeineCurve.sleepCutoffH}ч</div>
+        <div style={{ fontSize:8, color:'rgba(255,255,255,0.45)', background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', borderRadius:10, padding:'8px 10px', marginTop:6 }}>{alcoholG == null ? 'алкоголь не задан' : alcohol.kcal>0? `${alcohol.kcal}ккал алко · блок жира ${alcohol.fatOxidationBlockedPct}%`:'Без алкоголя'} · хроника: {alcoholG != null ? `${alcoholChronic.unitsPerWeek} units/нед` : '—'}{alcoholG != null && alcoholG > 0 ? ` · ${alcoholChronic.note}` : ''} · {caffeineKnown ? caffeineCurve.note : 'кофеин не задан (пусто ≠ «не пью кофе»)'} · {caffeineKnown ? `сон cut-off ${caffeineCurve.sleepCutoffH}ч` : ''}</div>
       </MhSection>
       </div>
       <div style={{ ...CARD, border:'1px solid rgba(6,182,214,0.12)', padding:10, background:'rgba(6,182,214,0.04)', display: wizardStep===3 ? 'block' : 'none' }}>
@@ -2319,7 +2322,7 @@ const kbju = useMemo(()=> calcKBJU(input), [input]);
               </div>
               <div style={{ marginTop:8, display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
                 <div style={{ padding:8, borderRadius:8, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', textAlign:'center', fontSize:9, color:'#fff' }}>Недель в дефиците<br/><b style={{color:'#8b5cf6'}}>{weeksInDeficit ?? '—'}</b></div>
-                <div style={{ padding:8, borderRadius:8, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', textAlign:'center', fontSize:9, color:'#fff' }}>Caffeine curve<br/><b style={{color:'#8b5cf6'}}>{caffeineCurve.remainingMg}мг</b> · HL 5ч · cut-off {caffeineCurve.sleepCutoffH}ч</div>
+                <div style={{ padding:8, borderRadius:8, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', textAlign:'center', fontSize:9, color:'#fff' }}>Caffeine curve<br/>{caffeineKnown ? <><b style={{color:'#8b5cf6'}}>{caffeineCurve.remainingMg}мг</b> · HL 5ч · cut-off {caffeineCurve.sleepCutoffH}ч</> : <><b style={{color:'#8b5cf6'}}>—</b> · введи мг/сут</>}</div>
               </div>
               <div style={{ marginTop:6, display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
                 <div style={{ padding:8, borderRadius:8, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)' }}>
@@ -2354,13 +2357,14 @@ const kbju = useMemo(()=> calcKBJU(input), [input]);
               </div>
               <div style={{ marginTop:6, display:'flex', gap:4, alignItems:'center', height: 18 }}>
                 {[0,2,4,6,8,10,12,16,20,24].map(h=>{
-                  const c=Math.round(caffeineMg*Math.pow(0.5, h/5));
-                  const hh= Math.max(4, Math.min(24, (c/ Math.max(1,caffeineMg))*24));
-                  return <div key={h} style={{ flex:1, height: hh, borderRadius:3, background: h<=caffeineHoursSince ? '#8b5cf6' : 'rgba(139,92,246,0.25)', border:'1px solid rgba(255,255,255,0.06)' }} title={`${h}ч: ${c}мг`} />;
+                  const mg = caffeineMg ?? 0;
+                  const c=Math.round(mg*Math.pow(0.5, h/5));
+                  const hh= mg>0 ? Math.max(4, Math.min(24, (c/ Math.max(1,mg))*24)) : 4;
+                  return <div key={h} style={{ flex:1, height: hh, borderRadius:3, background: mg>0 ? (h<=caffeineHoursSince ? '#8b5cf6' : 'rgba(139,92,246,0.25)') : 'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.06)' }} title={mg>0 ? `${h}ч: ${c}мг` : `${h}ч: кофеин не задан`} />;
                 })}
               </div>
-              <div style={{ fontSize:7, color:'rgba(255,255,255,0.35)', display:'flex', justifyContent:'space-between' }}><span>0ч</span><span>{caffeineHoursSince}ч сейчас</span><span>24ч</span></div>
-              <div style={{ marginTop:6, fontSize:8, color:'rgba(255,255,255,0.45)', background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', borderRadius:8, padding:'6px 8px' }}>{caffeineCurve.note} · Dulloo +3% TEF. Резкий +500 после дефицита = откат жира — reverse +100/7д.</div>
+              <div style={{ fontSize:7, color:'rgba(255,255,255,0.35)', display:'flex', justifyContent:'space-between' }}><span>0ч</span><span>{caffeineKnown ? `${caffeineHoursSince}ч сейчас` : '—'}</span><span>24ч</span></div>
+              <div style={{ marginTop:6, fontSize:8, color:'rgba(255,255,255,0.45)', background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', borderRadius:8, padding:'6px 8px' }}>{caffeineKnown ? `${caffeineCurve.note} · Dulloo +3% TEF.` : 'Введи кофеин, мг/сут — покажу остаток, TEF и cut-off. Без дозы кривая не строится.'} Резкий +500 после дефицита = откат жира — reverse +100/7д.</div>
             </div>
           )}
         </div>

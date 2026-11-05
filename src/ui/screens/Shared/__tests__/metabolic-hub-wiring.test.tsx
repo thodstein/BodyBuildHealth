@@ -295,6 +295,20 @@ describe('MetabolicHub: ввод меняет расчёт (проводка п�
     expect(txt).toContain('приём сверх плана');
   });
 
+  it('кофеин без ввода — «не задан», кривая и cut-off не выдумываются', () => {
+    render(<MetabolicHub />);
+    let txt = openMode('Diet break');
+    expect(txt).toContain('введи мг/сут');
+    expect(txt).toContain('Введи кофеин');
+    // ни кривой, ни конкретного cut-off без дозы
+    expect(txt).not.toMatch(/cut-off \d+ч/);
+    expect(txt).not.toMatch(/осталось \(peak/);
+    setNumber('Кофеин, мг/сут', 300);
+    txt = openMode('Diet break');
+    expect(txt).toContain('cut-off 8ч');
+    expect(txt).not.toContain('введи мг/сут');
+  });
+
   it('AT без данных — «нет данных», а не «AT none · −0ккал»', () => {
     render(<MetabolicHub />);
     setNumber('Цель вес, кг', 78);
