@@ -12,6 +12,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { CardioSessionTimer } from '../CardioSessionTimer';
 import { buildCardioCycle, type CardioCycle } from '../../../../engines/lms/cardio.engine';
+import { loadCardioLog } from '../../../../engines/lms/cardio-diary.engine';
 
 const KEY = 'he_cardio_timer_active';
 const pad = (n: number) => String(n).padStart(2, '0');
@@ -100,12 +101,35 @@ describe('CardioSessionTimer: сессия переживает перезагр
     expect(screen.queryByText(/восстановлена после перезагрузки/)).toBeNull();
   });
 
-  it('завершённая сессия снимок не оставляет', () => {
+  it('завершённая, но не сохранённая сессия восстанавливается с фактом и вводом', () => {
+    const c = cycleToday();
+    const first = render(<CardioSessionTimer cycle={c} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Старт Zone 2' }));
+    fireEvent.click(screen.getByRole('button', { name: /завершить/i }));
+    // Панель оценки: дисциплина и RPE введены, но в дневник не сохранено.
+    fireEvent.click(screen.getByRole('button', { name: 'Дисциплина: велосипед' }));
+    fireEvent.change(screen.getByLabelText('RPE'), { target: { value: '7' } });
+    expect(localStorage.getItem(KEY)).toBeTruthy();
+    first.unmount();
+
+    vi.setSystemTime(new Date('2026-11-05T10:30:00'));
+    render(<CardioSessionTimer cycle={c} />);
+
+    expect(screen.getByText(/Завершённая сессия восстановлена/)).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Дисциплина: велосипед' }).getAttribute('aria-pressed')).toBe('true');
+    expect((screen.getByLabelText('RPE') as HTMLInputElement).value).toBe('7');
+    // В дневник ничего не ушло само: запись только по кнопке.
+    expect(loadCardioLog().length).toBe(0);
+  });
+
+  it('после «Сохранить в дневник» снимок стирается', () => {
     const c = cycleToday();
     render(<CardioSessionTimer cycle={c} />);
     fireEvent.click(screen.getByRole('button', { name: 'Старт Zone 2' }));
     fireEvent.click(screen.getByRole('button', { name: /завершить/i }));
+    fireEvent.click(screen.getByRole('button', { name: /сохранить в дневник/i }));
     expect(localStorage.getItem(KEY)).toBeNull();
+    expect(loadCardioLog().length).toBe(1);
   });
 
   it('битый снимок не ломает экран', () => {

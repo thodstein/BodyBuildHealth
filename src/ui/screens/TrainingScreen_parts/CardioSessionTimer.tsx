@@ -112,21 +112,32 @@ interface TodaySession {
 
 const elapsedOf = (s: Pick<ActiveSession, 'totalSec' | 'remainingSec'>) => Math.max(0, s.totalSec - s.remainingSec);
 
-// ─── Снимок активной сессии (пережить перезагрузку WebView) ───
+// ─── Снимок сессии (пережить перезагрузку WebView) ───
 //
-// На Android WebView может быть убит в фоне, а `location.reload()` (или
-// pull-to-refresh) уничтожает state. Раньше идущая тренировка исчезала молча:
-// ни таймера, ни записи в дневнике. Снимок хранит план и остаток, поэтому
-// после перезагрузки сессия продолжается с того же места, а не с нуля.
+// На Android WebView может быть убит в фоне, а `location.reload()` (и
+// pull-to-refresh) уничтожает state. Раньше пропадали два разных состояния:
+// идущая сессия (ни таймера, ни записи) и уже завершённая, но ещё не
+// сохранённая — вместе с введёнными RPE/ЧСС/км и выбранной дисциплиной.
+// Снимок хранит оба режима, поэтому после перезагрузки всё продолжается.
 const ACTIVE_TIMER_KEY = 'he_cardio_timer_active';
 const TIMER_SNAPSHOT_MAX_AGE_SEC = 8 * 3600;
 const RESTORED_FLASH = '↻ Тренировка восстановлена после перезагрузки';
+const RESTORED_FINISH_FLASH = '↻ Завершённая сессия восстановлена — сохраните в дневник';
+
+interface TimerInputs {
+  rpe: string;
+  hr: string;
+  km: string;
+  power: string;
+}
 
 interface TimerSnapshot {
-  v: 1;
+  /** v1 — только идущая сессия; v2 — ещё и «завершено, но не сохранено». */
+  v: 1 | 2;
   /** Дата старта: вчерашнюю сессию не воскрешаем. */
   date: string;
   savedAt: number;
+  mode?: 'active' | 'finished';
   type: CardioType;
   durationMin: number;
   totalSec: number;
@@ -134,42 +145,105 @@ interface TimerSnapshot {
   paused: boolean;
   targetHr?: { min?: number; max?: number };
   equipment?: CardioEquipment;
+  /** Дисциплина: без неё факт после перезагрузки ушёл бы как <другое>. */
+  sport?: CardioSport;
   plan: CardioIntervalPlan | null;
+  finished?: FinishedSession;
+  inputs?: TimerInputs;
 }
 
-function readTimerSnapshot(): ActiveSession | null {
+interface RestoredTimer {
+  active: ActiveSession | null;
+  finished: FinishedSession | null;
+  sport?: CardioSport;
+  inputs: TimerInputs;
+}
+
+const CARDIO_SPORTS: readonly CardioSport[] = ['run', 'bike', 'row', 'other'];
+const EMPTY_INPUTS: TimerInputs = { rpe: '', hr: '', km: '', power: '' };
+
+const asStr = (v: unknown): string => (typeof v === 'string' ? v : '');
+const asNum = (v: unknown): number | undefined => (Number.isFinite(Number(v)) ? Number(v) : undefined);
+
+function readRestoredFinished(raw: unknown): FinishedSession | null {
+  const f = raw as Partial<FinishedSession> | null | undefined;
+  if (!f || typeof f !== 'object') return null;
+  const type = f.type;
+  const plannedMin = asNum(f.plannedMin);
+  const actualMin = asNum(f.actualMin);
+  if (!type || plannedMin == null || actualMin == null || plannedMin < 0 || actualMin < 0) return null;
+  return {
+    type, plannedMin, actualMin, partial: !!f.partial,
+    equipment: f.equipment,
+    intervalsPlanned: asNum(f.intervalsPlanned),
+    intervalsDone: asNum(f.intervalsDone),
+    workSec: asNum(f.workSec),
+    restSec: asNum(f.restSec),
+    structureMin: asNum(f.structureMin),
+    sessionMin: asNum(f.sessionMin),
+  };
+}
+
+function readTimerSnapshot(): RestoredTimer | null {
   try {
     const raw = localStorage.getItem(ACTIVE_TIMER_KEY);
     if (!raw) return null;
     const p = JSON.parse(raw) as Partial<TimerSnapshot> | null;
-    if (!p || p.v !== 1 || p.date !== todayIso()) return null;
-    const totalSec = Math.round(Number(p.totalSec));
-    const savedRemaining = Math.round(Number(p.remainingSec));
-    const savedAt = Number(p.savedAt);
-    const durationMin = Math.round(Number(p.durationMin));
-    if (!Number.isFinite(totalSec) || totalSec <= 0) return null;
-    if (!Number.isFinite(savedRemaining) || !Number.isFinite(savedAt) || !Number.isFinite(durationMin)) return null;
+    if (!p || (p.v !== 1 && p.v !== 2) || p.date !== todayIso()) return null;
+    const savedAt = asNum(p.savedAt);
+    if (savedAt == null) return null;
     const ageSec = Math.round((Date.now() - savedAt) / 1000);
     if (ageSec < -60 || ageSec > TIMER_SNAPSHOT_MAX_AGE_SEC) return null;
+    const inputs: TimerInputs = {
+      rpe: asStr(p.inputs?.rpe), hr: asStr(p.inputs?.hr), km: asStr(p.inputs?.km), power: asStr(p.inputs?.power),
+    };
+    const sport = p.sport && CARDIO_SPORTS.includes(p.sport) ? p.sport : undefined;
+    if (p.mode === 'finished') {
+      const finished = readRestoredFinished(p.finished);
+      return finished ? { active: null, finished, sport, inputs } : null;
+    }
+    const totalSec = Math.round(Number(p.totalSec));
+    const savedRemaining = Math.round(Number(p.remainingSec));
+    const durationMin = Math.round(Number(p.durationMin));
+    if (!Number.isFinite(totalSec) || totalSec <= 0) return null;
+    if (!Number.isFinite(savedRemaining) || !Number.isFinite(durationMin)) return null;
     // Пауза не «съедает» время простоя: на паузе остаток не уменьшаем.
     const remainingSec = p.paused ? savedRemaining : Math.max(0, savedRemaining - Math.max(0, ageSec));
     return {
-      type: (p.type ?? 'zone2') as CardioType,
-      durationMin: Math.max(1, durationMin),
-      totalSec,
-      remainingSec: Math.min(totalSec, Math.max(0, remainingSec)),
-      paused: !!p.paused,
-      targetHr: p.targetHr,
-      equipment: p.equipment,
-      plan: (p.plan ?? null) as CardioIntervalPlan | null,
+      sport, inputs, finished: null,
+      active: {
+        type: (p.type ?? 'zone2') as CardioType,
+        durationMin: Math.max(1, durationMin),
+        totalSec,
+        remainingSec: Math.min(totalSec, Math.max(0, remainingSec)),
+        paused: !!p.paused,
+        targetHr: p.targetHr,
+        equipment: p.equipment,
+        plan: (p.plan ?? null) as CardioIntervalPlan | null,
+      },
     };
   } catch { return null; }
 }
 
-function writeTimerSnapshot(a: ActiveSession): void {
+function writeTimerSnapshot(
+  a: ActiveSession | null,
+  opts: { sport?: CardioSport; finished?: FinishedSession | null; inputs?: TimerInputs } = {},
+): void {
   try {
+    const base = { date: todayIso(), savedAt: Date.now(), sport: opts.sport, inputs: opts.inputs };
+    if (!a) {
+      const f = opts.finished;
+      if (!f) return;
+      const snap: TimerSnapshot = {
+        ...base, v: 2, mode: 'finished',
+        type: f.type, durationMin: f.plannedMin, totalSec: 0, remainingSec: 0, paused: false,
+        plan: null, finished: f,
+      };
+      localStorage.setItem(ACTIVE_TIMER_KEY, JSON.stringify(snap));
+      return;
+    }
     const snap: TimerSnapshot = {
-      v: 1, date: todayIso(), savedAt: Date.now(),
+      ...base, v: 2, mode: 'active',
       type: a.type, durationMin: a.durationMin, totalSec: a.totalSec, remainingSec: a.remainingSec,
       paused: a.paused, targetHr: a.targetHr, equipment: a.equipment, plan: a.plan,
     };
@@ -183,14 +257,14 @@ function clearTimerSnapshot(): void {
 
 export const CardioSessionTimer: React.FC<{ cycle: CardioCycle | null; onSaved?: () => void; onReschedule?: (next: CardioCycle) => void }> = ({ cycle, onSaved, onReschedule }) => {
   // Снимок читаем один раз при монтировании — до первого рендера.
-  const [restoredActive] = useState<ActiveSession | null>(() => readTimerSnapshot());
+  const [restored] = useState<RestoredTimer | null>(() => readTimerSnapshot());
   const [todaySessions, setTodaySessions] = useState<TodaySession[]>(() => {
     if (!cycle) return [];
     const t = cardioSessionsForDate(cycle, todayIso(), cycle.startDate);
     return t ? t.sessions.map(s => ({ type: s.type, durationMin: s.durationMin, targetHr: s.targetHr, equipment: s.equipment, structured: s.structured })) : [];
   });
-  const [active, setActive] = useState<ActiveSession | null>(() => restoredActive);
-  const [finished, setFinished] = useState<FinishedSession | null>(null);
+  const [active, setActive] = useState<ActiveSession | null>(() => restored?.active ?? null);
+  const [finished, setFinished] = useState<FinishedSession | null>(() => restored?.finished ?? null);
   // PRO (аудит Oct 2026): мощность имеет смысл только на вело-сессии — поле
   // появляется, когда оборудование сессии/цикла = cycling (не шумим на беге).
   const isPowerRelevant = useMemo(() => {
@@ -198,15 +272,15 @@ export const CardioSessionTimer: React.FC<{ cycle: CardioCycle | null; onSaved?:
     const eq = todaySessions.find(s => s.type === finished.type)?.equipment ?? cycle?.config?.equipment?.[0];
     return eq === 'cycling';
   }, [finished, todaySessions, cycle]);
-const [rpe, setRpe] = useState('');
-const [hr, setHr] = useState('');
-const [km, setKm] = useState('');
-const [power, setPower] = useState('');
+const [rpe, setRpe] = useState(() => restored?.inputs.rpe ?? '');
+const [hr, setHr] = useState(() => restored?.inputs.hr ?? '');
+const [km, setKm] = useState(() => restored?.inputs.km ?? '');
+const [power, setPower] = useState(() => restored?.inputs.power ?? '');
   // Спринт 5.2 (аудит): дисциплина записывается в дневник. Раньше таймер вообще
   // не писал `sport` — ВСЕ сессии пользователя лежали как <other>, и пер-спортная
   // разбивка TID видела только импорт. По умолчанию <другое>: не выдумываем.
-  const [sport, setSport] = useState<CardioSport>('other');
-  const [flash, setFlash] = useState<string | null>(() => (restoredActive ? RESTORED_FLASH : null));
+  const [sport, setSport] = useState<CardioSport>(() => restored?.sport ?? 'other');
+  const [flash, setFlash] = useState<string | null>(() => (restored ? (restored.finished ? RESTORED_FINISH_FLASH : RESTORED_FLASH) : null));
   const [warnings, setWarnings] = useState<CardioLogFieldWarnings | null>(null);
   const timerRef = useRef<number | null>(null);
 
@@ -223,17 +297,36 @@ const [power, setPower] = useState('');
   // приложения в фон (Android может убить WebView, не дав дотикать таймеру).
   const activeRef = useRef<ActiveSession | null>(active);
   activeRef.current = active;
+  const finishedRef = useRef<FinishedSession | null>(finished);
+  finishedRef.current = finished;
+  const sportRef = useRef<CardioSport>(sport);
+  sportRef.current = sport;
+  const inputsRef = useRef<TimerInputs>({ rpe, hr, km, power });
+  inputsRef.current = { rpe, hr, km, power };
   const lastSnapshotRef = useRef(0);
   useEffect(() => {
-    if (!active) { clearTimerSnapshot(); lastSnapshotRef.current = 0; return; }
+    if (!active) { lastSnapshotRef.current = 0; return; }
     const now = Date.now();
     if (active.paused || now - lastSnapshotRef.current > 5000) {
       lastSnapshotRef.current = now;
-      writeTimerSnapshot(active);
+      writeTimerSnapshot(active, { sport, inputs: { rpe, hr, km, power } });
     }
-  }, [active]);
+  }, [active, sport, rpe, hr, km, power]);
+  // «Завершено, но не сохранено»: пишем сразу на ввод (RPE/ЧСС/км/дисциплина),
+  // иначе убийство приложения стирало панель оценки вместе с фактическими минутами.
   useEffect(() => {
-    const flush = () => { if (activeRef.current) writeTimerSnapshot(activeRef.current); };
+    if (active) return;
+    if (finished) writeTimerSnapshot(null, { sport, finished, inputs: { rpe, hr, km, power } });
+    else { clearTimerSnapshot(); lastSnapshotRef.current = 0; }
+  }, [active, finished, sport, rpe, hr, km, power]);
+  useEffect(() => {
+    const flush = () => {
+      if (activeRef.current) {
+        writeTimerSnapshot(activeRef.current, { sport: sportRef.current, inputs: inputsRef.current });
+      } else if (finishedRef.current) {
+        writeTimerSnapshot(null, { sport: sportRef.current, finished: finishedRef.current, inputs: inputsRef.current });
+      }
+    };
     const onVis = () => { if (document.visibilityState === 'hidden') flush(); };
     document.addEventListener('visibilitychange', onVis);
     window.addEventListener('pagehide', flush);
@@ -243,10 +336,10 @@ const [power, setPower] = useState('');
     };
   }, []);
   useEffect(() => {
-    if (!restoredActive) return;
-    const t = window.setTimeout(() => setFlash(f => (f === RESTORED_FLASH ? null : f)), 6000);
+    if (!restored) return;
+    const t = window.setTimeout(() => setFlash(f => (f === RESTORED_FLASH || f === RESTORED_FINISH_FLASH ? null : f)), 6000);
     return () => window.clearTimeout(t);
-  }, [restoredActive]);
+  }, [restored]);
 
   useEffect(() => {
     if (!active) { deadlineRef.current = null; pausedRemainingRef.current = null; return; }
@@ -380,6 +473,8 @@ const [power, setPower] = useState('');
   const start = (s: TodaySession) => {
     deadlineRef.current = null;
     pausedRemainingRef.current = null;
+    // Показатели предыдущей сессии не переносим: RPE/ЧСС/км относятся к ней.
+    setRpe(''); setHr(''); setKm(''); setPower(''); setWarnings(null);
     const plan = buildCardioIntervalPlan({ type: s.type, durationMin: s.durationMin, structured: s.structured });
     const totalSec = plan ? plan.totalSec : s.durationMin * 60;
     setActive({ type: s.type, durationMin: s.durationMin, totalSec, remainingSec: totalSec, paused: false, targetHr: s.targetHr, equipment: s.equipment, plan });
@@ -428,7 +523,7 @@ const [power, setPower] = useState('');
     const nextRemaining = Math.max(0, active.remainingSec - cut);
     // Снимок пишем сразу: троттлинг эффекта (раз в 5 с) иначе откатил бы
     // пропущенный шаг при перезагрузке.
-    writeTimerSnapshot({ ...active, remainingSec: nextRemaining });
+    writeTimerSnapshot({ ...active, remainingSec: nextRemaining }, { sport: sportRef.current, inputs: inputsRef.current });
     setActive(prev => prev ? { ...prev, remainingSec: nextRemaining } : null);
   };
 
