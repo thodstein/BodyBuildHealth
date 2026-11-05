@@ -475,6 +475,20 @@ describe('metabolic-hub — calcHematology (ESC/ASA)', () => {
     expect(noWater.nutritionMult).toBe(calcHematology({ ...common, waterL:2.5 }).nutritionMult);
     expect(calcHematology({ ...common, waterL:1.2 }).nutritionMult).toBeGreaterThan(noWater.nutritionMult);
   });
+  it('carb/sodium load печатают оговорку, а не режут её по «—»', async () => {
+    const { calcCarbLoading, calcSodiumLoading } = await import('../metabolic-hub.engine');
+    const carb = calcCarbLoading(80, 2, 10);
+    const na = calcSodiumLoading(80, 2, 5);
+    // оговорка — отдельное поле, раньше UI делал note.split('—')[1] и терял её целиком
+    expect(carb.caveat).toMatch(/пиковая неделя/i);
+    expect(carb.caveat).toMatch(/жиром/i);
+    expect(na.caveat).toMatch(/АД/);
+    expect(na.caveat).toMatch(/6 г\/сут/);
+    // числа по-прежнему считаются
+    expect(carb.dailyG).toBe(800);
+    expect(na.totalSodiumG).toBe(10);
+  });
+
   it('Na/K без данных не штрафуют питание, а введённые — да', () => {
     const common = { weight:80, hct:45, proteinPerKg:2, fiberG:30, omega3G:2 } as const;
     const base = calcHematology(common);

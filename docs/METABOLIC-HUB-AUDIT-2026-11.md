@@ -515,6 +515,19 @@ deficitKcalDelta })` вставляет 2 нед maintenance после кажд
 „профильным“ после загрузки»; `metabolic-hub-structure.test.tsx` → «каждый ключ снапшота реально
 восстанавливается в applySnapshot».
 
+### 1.46 Оговорка carb/sodium-load вычислялась и выбрасывалась
+**Причина.** В режиме «Diet break» числа пиковой недели печатались как
+`note.split('—')[1]`, но в `note` движка нет «—» — выражение всегда давало `undefined`, поэтому
+пропадали и атрибуция «Breno Melo 10-12 г/кг taper», и **предупреждение «проверь АД, не >6 г/сут
+при гипертонии»**. Человек видел «5 г/сут · всего 10 г — » и пустоту: совет по натриевой загрузке без
+единой оговорки.
+**Исправление.** `calcCarbLoading`/`calcSodiumLoading` возвращают отдельное поле `caveat`
+(пиковая неделя, а не повседневное питание; риск при гипертонии), и UI его печатает. Плюс
+персональные флаги по уже введённым данным: АД ≥140/90 — «Na-загрузка не для тебя»; HCT >51 —
+«при сгущении Na-загрузка добавляет риск тромбоза».
+**Регрессия.** `metabolic-hub.test.ts` → «carb/sodium load печатают оговорку, а не режут её по «—»»;
+`metabolic-hub-wiring.test.tsx` → «Na-загрузка предупреждает персонально по АД и гематокриту».
+
 ---
 
 ## 2. Чего не хватало (добавлено)
@@ -564,7 +577,7 @@ deficitKcalDelta })` вставляет 2 нед maintenance после кажд
   параллельные `tsc`/`vitest` из других сессий → heap OOM / `Zone Allocation failed`.
   Прогонять на свободной машине.
 - `npx vitest run src/ui/screens/Shared/__tests__ src/engines/__tests__/metabolic-hub.test.ts`
-  — **232 passed** (6 файлов: structure / toggles / honesty / modes / wiring / engine).
+  — **234 passed** (6 файлов: structure / toggles / honesty / modes / wiring / engine).
 - `npx vitest run src/ui/__tests__/rest-hooks-native.test.tsx
   src/engines/__tests__/risk-info-honesty-e07-e08.test.ts` — **89 passed**
   (в stderr шумит jsdom-canvas chart.js — это фон, не падения).

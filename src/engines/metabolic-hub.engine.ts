@@ -1230,19 +1230,27 @@ export function calcRefeedNeed(
 }
 
 // ——— Carb / Sodium loading (Breno Melo / peak week) ———
-export function calcCarbLoading(weightKg:number, days:number, gPerKg?:number): { totalCarbG:number; dailyG:number; note:string } {
+// Аудит 2026-11: хаб печатал `note.split('—')[1]`, а в note нет «—» → оговорка молча исчезала.
+// Предупреждение «проверь АД» (и атрибуция Breno Melo) считались и терялись. Теперь это отдельное
+// поле `caveat`, которое UI обязан показать.
+export function calcCarbLoading(weightKg:number, days:number, gPerKg?:number): { totalCarbG:number; dailyG:number; note:string; caveat:string } {
   const d = clamp(days,1,3);
   const gpk = gPerKg ?? (d===3 ? 10 : d===2 ? 8 : 6);
   const dailyG = Math.round(weightKg * clamp(gpk,5,12));
   const totalCarbG = dailyG * d;
   const note = `${d}д × ${gpk}г/кг → ${dailyG}г/сут, всего ${totalCarbG}г (Breno Melo 10-12г/кг 1-3д taper)`;
-  return { totalCarbG, dailyG, note };
+  const caveat = 'Пиковая неделя перед соревнованием, не повседневное питание: избыток углей сверх расхода откладывается жиром, «загрузка» работает только на фоне предшествующего истощения гликогена.';
+  return { totalCarbG, dailyG, note, caveat };
 }
-export function calcSodiumLoading(weightKg:number, days:number, sodiumGPerDay?:number): { totalSodiumG:number; dailyG:number; note:string } {
+export function calcSodiumLoading(weightKg:number, days:number, sodiumGPerDay?:number): { totalSodiumG:number; dailyG:number; note:string; caveat:string } {
   const d = clamp(days,1,3);
   const dailyG = sodiumGPerDay ?? 5;
   const totalSodiumG = Math.round(dailyG * d *10)/10;
-  return { totalSodiumG, dailyG, note: `Na ${dailyG}г/сут ×${d}д = ${totalSodiumG}г (проверь АД, не >6г/сут при гипертонии)` };
+  return {
+    totalSodiumG, dailyG,
+    note: `Na ${dailyG}г/сут ×${d}д = ${totalSodiumG}г`,
+    caveat: 'Проверь АД: при гипертонии не >6 г/сут. Загрузка Na имеет смысл только как часть пиковой недели (с последующим сливом воды), а не как ежедневная норма.',
+  };
 }
 // ——— Body comp projection + sensitivity (theontho) ———
 export function calcBodyCompProjection(input:{ weight:number; height:number; bodyFat:number; years:number; mode:'hold_bf'|'hold_weight'|'hold_ffmi' }): Array<{ year:number; weight:number; bodyFat:number; ffmi:number }> {

@@ -2325,7 +2325,8 @@ const kbju = useMemo(()=> calcKBJU(input), [input]);
                     <PopupNumber label="Дней" value={carbLoadDays} min={1} max={3} onChange={setCarbLoadDays} />
                     <PopupNumber label="г/кг" value={carbGPerKg} min={6} max={12} step={0.5} onChange={setCarbGPerKg} />
                   </div>
-                  <div style={{ fontSize:8, color:'#22c55e', marginTop:4 }}>{carbLoad.dailyG}г/сут · всего {carbLoad.totalCarbG}г — {carbLoad.note.split('—')[1] ?? ''}</div>
+                  <div style={{ fontSize:8, color:'#22c55e', marginTop:4 }}>{carbLoad.dailyG}г/сут · всего {carbLoad.totalCarbG}г</div>
+                  <div style={{ fontSize:8, color:'rgba(255,255,255,0.5)', marginTop:2, lineHeight:1.35 }}>{carbLoad.caveat}</div>
                 </div>
                 <div style={{ padding:8, borderRadius:8, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)' }}>
                   <div style={{ fontSize:8, color:'rgba(255,255,255,0.55)', textTransform:'uppercase', marginBottom:4 }}>Sodium-load</div>
@@ -2333,7 +2334,19 @@ const kbju = useMemo(()=> calcKBJU(input), [input]);
                     <PopupNumber label="Дней" value={sodiumLoadDays} min={1} max={3} onChange={setSodiumLoadDays} />
                     <PopupNumber label="Na г/сут" value={sodiumGPerDay} min={3} max={7} step={0.5} onChange={setSodiumGPerDay} />
                   </div>
-                  <div style={{ fontSize:8, color:'#f59e0b', marginTop:4 }}>{sodiumLoad.dailyG}г/сут · всего {sodiumLoad.totalSodiumG}г — {sodiumLoad.note.split('—')[1] ?? ''}</div>
+                  <div style={{ fontSize:8, color:'#f59e0b', marginTop:4 }}>{sodiumLoad.dailyG}г/сут · всего {sodiumLoad.totalSodiumG}г</div>
+                  <div style={{ fontSize:8, color:'rgba(255,255,255,0.5)', marginTop:2, lineHeight:1.35 }}>{sodiumLoad.caveat}</div>
+                  {/* персональный флаг: общая оговорка + известные АД/HCT этого человека */}
+                  {((systolic != null && systolic >= 140) || (diastolic != null && diastolic >= 90)) && (
+                    <div style={{ fontSize:8, color:'#ef4444', marginTop:3, lineHeight:1.35 }}>
+                      ⚠ Твоё АД {systolic ?? '—'}/{diastolic ?? '—'} — Na-загрузка не для тебя (ESC: ≥140/90), сначала врач.
+                    </div>
+                  )}
+                  {hematology.hct != null && hematology.hct > 51 && (
+                    <div style={{ fontSize:8, color:'#ef4444', marginTop:3, lineHeight:1.35 }}>
+                      ⚠ Твой HCT {hematology.hct}% — при сгущении Na-загрузка добавляет риск тромбоза, не делай.
+                    </div>
+                  )}
                 </div>
               </div>
               <div style={{ marginTop:6, display:'flex', gap:4, alignItems:'center', height: 18 }}>

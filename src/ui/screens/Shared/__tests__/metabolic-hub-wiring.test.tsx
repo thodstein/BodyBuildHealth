@@ -267,6 +267,23 @@ describe('MetabolicHub: ввод меняет расчёт (проводка п�
     expect(txt).toContain('вязкость OK');
   });
 
+  it('Na-загрузка предупреждает персонально по АД и гематокриту', () => {
+    render(<MetabolicHub />);
+    let txt = openMode('Diet break');
+    // оговорки видны, а не съедаются split('—')
+    expect(txt).toContain('Пиковая неделя перед соревнованием');
+    expect(txt).toContain('Проверь АД');
+    expect(txt).not.toContain('всего 10г — ');
+    // HCT >51 → личный красный флаг
+    setNumber('HCT, %', 52);
+    txt = openMode('Diet break');
+    expect(txt).toContain('Na-загрузка добавляет риск тромбоза');
+    // АД ≥140/90 → второй флаг
+    setNumber('Сис. АД', 150);
+    txt = openMode('Diet break');
+    expect(txt).toContain('Na-загрузка не для тебя');
+  });
+
   it('источник воды едет со снапшотом и не остаётся «профильным» после загрузки', () => {
     // снапшот со «своей» водой: подпись не должна врать «(профиль)»
     localStorage.setItem('he_metabolic_snapshot_v6', JSON.stringify({ weight: 83, waterL: 3.2, waterOrigin: 'user', hct: 52 }));
