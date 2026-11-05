@@ -276,6 +276,7 @@ export function parseCardioCsv(text: string, fileName = 'import.csv'): CardioImp
     const rawDiscipline = colDiscipline >= 0 ? String(cols[colDiscipline] ?? '') : rawType;
     const notes = colNotes >= 0 ? String(cols[colNotes] || '').trim().slice(0, 300) : undefined;
 
+    const entrySport = sanitizeCardioSport(rawDiscipline);
     const entry: CardioLogEntry = {
       id: genId(),
       date: isoDate,
@@ -283,12 +284,12 @@ export function parseCardioCsv(text: string, fileName = 'import.csv'): CardioImp
       durationMin: clamp(mins, 1, 600),
       distanceKm: dist,
       avgHr: hr,
-      calories: cal ?? estimateCardioEntryKcal(type, clamp(mins, 1, 600)),
+      calories: cal ?? estimateCardioEntryKcal(type, clamp(mins, 1, 600), undefined, { sport: entrySport }),
       rpe: undefined,
       completed: true,
       notes: notes || undefined,
       // Дисциплина: своя колонка приоритетнее; иначе старое поведение (тип-столбец).
-      sport: sanitizeCardioSport(rawDiscipline),
+      sport: entrySport,
       source: 'import',
     };
     entries.push(entry);
@@ -392,6 +393,7 @@ export function parseCardioTcx(text: string): CardioImportResult {
         return '';
       })();
       const type = mapActivityToCardioType(sport || el.tagName);
+      const tcxSport = sanitizeCardioSport(sport);
       entries.push({
         id: genId(),
         date: isoDate,
@@ -399,11 +401,11 @@ export function parseCardioTcx(text: string): CardioImportResult {
         durationMin: clamp(dur, 1, 600),
         distanceKm: dist,
         avgHr: hr,
-        calories: cal ?? estimateCardioEntryKcal(type, clamp(dur, 1, 600)),
+        calories: cal ?? estimateCardioEntryKcal(type, clamp(dur, 1, 600), undefined, { sport: tcxSport }),
         completed: true,
         // Sprint 5.2/5.3: TCX прямо отдаёт дисциплину (Biking/Other) — сохраняем,
         // иначе бег и вело слились бы в один TID с разной калибровкой пульса.
-        sport: sanitizeCardioSport(sport),
+        sport: tcxSport,
         source: 'import',
       });
     } catch {
@@ -486,6 +488,7 @@ export function parseCardioGpx(text: string): CardioImportResult {
       const hrCandidates = Array.from(trk.getElementsByTagName('hr')).map(e => Number(e.textContent)).filter(n => Number.isFinite(n) && n >= 20 && n <= 260);
       if (hrCandidates.length) hr = Math.round(hrCandidates.reduce((a, b) => a + b, 0) / hrCandidates.length);
       const mapped = mapActivityToCardioType(type || name);
+      const gpxSport = sanitizeCardioSport(type || name);
       entries.push({
         id: genId(),
         date: isoDate,
@@ -493,10 +496,10 @@ export function parseCardioGpx(text: string): CardioImportResult {
         durationMin: dur,
         distanceKm: dist,
         avgHr: hr,
-        calories: estimateCardioEntryKcal(mapped, dur),
+        calories: estimateCardioEntryKcal(mapped, dur, undefined, { sport: gpxSport }),
         completed: true,
         notes: name ? name.slice(0, 300) : undefined,
-        sport: sanitizeCardioSport(type || name),
+        sport: gpxSport,
         source: 'import',
       });
     } catch {
@@ -577,6 +580,7 @@ export function parseAppleHealthXml(text: string): CardioImportResult {
         }
       }
       const mapped = mapActivityToCardioType(typeRaw);
+      const appleSport = sanitizeCardioSport(typeRaw);
       entries.push({
         id: genId(),
         date: isoDate,
@@ -584,12 +588,12 @@ export function parseAppleHealthXml(text: string): CardioImportResult {
         durationMin: clamp(dur, 1, 600),
         distanceKm: dist,
         avgHr: hr,
-        calories: cal ?? estimateCardioEntryKcal(mapped, clamp(dur, 1, 600)),
+        calories: cal ?? estimateCardioEntryKcal(mapped, clamp(dur, 1, 600), undefined, { sport: appleSport }),
         completed: true,
         // Спринт 5: дисциплина и provenance — как у CSV/JSON. Раньше Apple
         // (самый частый формат выгрузки) терял sport, и импорт велосипеда
         // сохранялся как бег, а чип «Импорт» не появлялся.
-        sport: sanitizeCardioSport(typeRaw),
+        sport: appleSport,
         source: 'import',
       });
     } catch {
@@ -628,6 +632,7 @@ export function parseCardioJson(text: string): CardioImportResult {
       }
       const typeRaw = String(raw.type || raw.activity || raw.sport || raw.workout_type || '');
       const type = mapActivityToCardioType(typeRaw);
+      const jsonSport = sanitizeCardioSport(raw.sport ?? typeRaw);
       entries.push({
         id: genId(),
         date: isoDate,
@@ -635,10 +640,10 @@ export function parseCardioJson(text: string): CardioImportResult {
         durationMin: clamp(dur, 1, 600),
         distanceKm: dist,
         avgHr: hr,
-        calories: raw.calories ? Math.round(Number(raw.calories)) : estimateCardioEntryKcal(type, clamp(dur, 1, 600)),
+        calories: raw.calories ? Math.round(Number(raw.calories)) : estimateCardioEntryKcal(type, clamp(dur, 1, 600), undefined, { sport: jsonSport }),
         completed: true,
         notes: String(raw.notes || raw.title || '').slice(0, 300) || undefined,
-        sport: sanitizeCardioSport(raw.sport ?? typeRaw),
+        sport: jsonSport,
         source: 'import',
       });
     } catch {
@@ -804,8 +809,10 @@ export function parseCardioFit(buffer: ArrayBuffer): CardioImportResult {
               durationMin: clamp(dur, 1, 600),
               distanceKm: dist,
               avgHr: hr,
-              calories: cal ?? estimateCardioEntryKcal(type, clamp(dur, 1, 600)),
+              calories: cal ?? estimateCardioEntryKcal(type, clamp(dur, 1, 600), undefined, { sport: sanitizeCardioSport(typeRaw) }),
               completed: true,
+              sport: sanitizeCardioSport(typeRaw),
+              source: 'import',
             });
           } catch {}
         }

@@ -145,7 +145,7 @@ export const CardioImportPanel: React.FC<{ onImported?: () => void; cycle?: Card
       durationMin: src.durationMin,
       completed: true,
       avgHr: src.avgHr ?? undefined,
-      calories: estimateCardioEntryKcal(type, src.durationMin, currentWeightKg()),
+      calories: estimateCardioEntryKcal(type, src.durationMin, currentWeightKg(), { sport: src.sport }),
       distanceKm: src.distanceKm ?? undefined,
       rpe: src.rpe ?? undefined,
       // PRO (аудит Oct 2026): decoupling из FIT-записей пишем в журнал —
@@ -175,7 +175,7 @@ export const CardioImportPanel: React.FC<{ onImported?: () => void; cycle?: Card
         durationMin: src.durationMin,
         completed: src.completed !== false,
         avgHr: src.avgHr ?? undefined,
-        calories: src.calories ?? estimateCardioEntryKcal(src.type, src.durationMin, currentWeightKg()),
+        calories: src.calories ?? estimateCardioEntryKcal(src.type, src.durationMin, currentWeightKg(), { sport: src.sport }),
         distanceKm: src.distanceKm ?? undefined,
         rpe: src.rpe ?? undefined,
         sport: src.sport,               // спринт 5: дисциплина из файла не теряется

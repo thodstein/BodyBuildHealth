@@ -251,7 +251,7 @@ const CardioDiaryInner: React.FC<DiaryWindowProps> = ({ open, onClose, onDataCha
       // значение не пересчитываем, иначе правка текста меняет расход и TSS.
       calories: prev && prev.type === type && prev.durationMin === dur && prev.calories != null
         ? prev.calories
-        : estimateCardioEntryKcal(type, dur, weight ?? undefined),
+        : estimateCardioEntryKcal(type, dur, weight ?? undefined, { sport: sanitizeCardioSport(sport) }),
       distanceKm: Number(String(km).replace(',', '.')) > 0 ? Math.max(0, Math.min(200, Math.round(Number(String(km).replace(',', '.')) * 10) / 10)) : undefined,
       notes: notes.trim() ? notes.trim().slice(0, 300) : undefined,
       // Спринт 5.2/5.3: дисциплина + provenance. Раньше форма профиля не писала

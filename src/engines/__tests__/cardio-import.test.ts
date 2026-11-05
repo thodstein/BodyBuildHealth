@@ -80,6 +80,16 @@ describe('cardio-import — CSV', () => {
     expect(r.entries[0].distanceKm).toBe(5.2);
     expect(r.entries[0].avgHr).toBe(142);
   });
+  it('ккал CSV-импорта учитывают дисциплину: вело дешевле бега', () => {
+    const csv = `Дата,Тип,Дисциплина,Минуты,Км,Ккал
+2024-08-20,Zone 2,бег,60,10,
+2024-08-21,Zone 2,велосипед,60,24,
+`;
+    const r = parseCardioCsv(csv);
+    expect(r.entries).toHaveLength(2);
+    expect(r.entries[1].sport).toBe('bike');
+    expect(r.entries[1].calories!).toBeLessThan(r.entries[0].calories!);
+  });
   it('parses Samsung Health CSV (semicolon)', () => {
     const csv = `Start time;End time;Exercise type;Duration;Distance(km);Avg heart rate;Calories
 2024-08-20 07:00;2024-08-20 07:30;Running;00:30:00;5.0;145;300

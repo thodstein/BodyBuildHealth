@@ -577,7 +577,7 @@ const [power, setPower] = useState(() => restored?.inputs.power ?? '');
       sport,
       rpe: Number(rpe) > 0 ? Number(rpe) : undefined,
       avgHr: Number(hr) > 0 ? Number(hr) : undefined,
-      calories: estimateCardioEntryKcal(finished.type, Math.max(1, finished.actualMin), weight ?? undefined, { equipment: finished.equipment, sex, ffmKg }),
+      calories: estimateCardioEntryKcal(finished.type, Math.max(1, finished.actualMin), weight ?? undefined, { sport, equipment: finished.equipment, sex, ffmKg }),
       distanceKm: Number(km) > 0 ? Math.round(Number(km) * 10) / 10 : undefined,
       notes: [finished.partial ? `досрочно: ${finished.actualMin} из ${finished.plannedMin} мин` : null, intervalNote]
         .filter(Boolean).join(' · ') || undefined,

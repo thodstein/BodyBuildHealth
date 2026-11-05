@@ -174,7 +174,7 @@ export const CardioDiaryPanel: React.FC<{ cycle: CardioCycle | null; acwr?: numb
       id: editingId ?? newId(), date, type, durationMin: dur, completed: true,
       rpe: Number(rpe) > 0 ? Number(rpe) : undefined,
       avgHr: Number(hr) > 0 ? Number(hr) : undefined,
-      calories: Number(kcal) > 0 ? Number(kcal) : estimateCardioEntryKcal(type, dur, lastWeight ?? undefined),
+      calories: Number(kcal) > 0 ? Number(kcal) : estimateCardioEntryKcal(type, dur, lastWeight ?? undefined, { sport: sanitizeCardioSport(sport) }),
       distanceKm: Number(km) > 0 ? Math.round(Number(km) * 10) / 10 : undefined,
       // Sprint 5.2/5.3: дисциплина + provenance — иначе TID смешивает
       // бег и вело (разная калибровка пульса), а правка неотличима от импорта.

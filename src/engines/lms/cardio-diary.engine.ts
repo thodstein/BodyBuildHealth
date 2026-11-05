@@ -324,15 +324,33 @@ export interface CardioAdvice {
 export interface CardioEntryKcalOpts {
   /** Оборудование факта (гребля/вело/бег) — MET различается на 10-25%. */
   equipment?: CardioEquipment;
+  /**
+   * Фактическая дисциплина записи. Приоритетнее `equipment` (который может
+   * прийти из плана): атлет запланировал бег, но поехал на вело — MET должен
+   * считаться по вело. Импорт FIT/TCX/CSV без этого поля оценивал велосипед
+   * как бег (+11% ккал).
+   */
+  sport?: CardioSport;
   sex?: 'male' | 'female';
   /** Тощая масса: точнее веса тела (жир почти не тратит). */
   ffmKg?: number;
+}
+
+/** Дисциплина журнала → оборудование двигателя (для MET). `other` — не знаем. */
+export function cardioSportEquipment(sport?: CardioSport | null): CardioEquipment | undefined {
+  switch (sport) {
+    case 'run': return 'running';
+    case 'bike': return 'cycling';
+    case 'row': return 'rowing';
+    default: return undefined;
+  }
 }
 
 /**
  * Оценка ккал сессии журнала по MET-модели движка (вес по умолчанию 80 кг).
  * Раньше факт считался «по весу и типу», игнорируя оборудование: 45 мин
  * гребли оценивались как 45 мин бега. Теперь — те же поправки, что у плана.
+ * С аудита 2026-11 (девятый проход) поправка берётся и из дисциплины записи.
  */
 export function estimateCardioEntryKcal(
   type: CardioType,
@@ -344,7 +362,7 @@ export function estimateCardioEntryKcal(
     type,
     durationMin,
     weightKg && weightKg > 0 ? weightKg : 80,
-    opts.equipment,
+    cardioSportEquipment(opts.sport) ?? opts.equipment,
     opts.sex,
     opts.ffmKg,
   );

@@ -114,6 +114,27 @@ describe('estimateCardioEntryKcal', () => {
     expect(estimateCardioEntryKcal('zone2', 45, 0)).toBe(315);
     expect(estimateCardioEntryKcal('zone2', 45, -5)).toBe(315);
   });
+
+  it('дисциплина записи задаёт MET: вело и гребля дешевле бега', () => {
+    const run = estimateCardioEntryKcal('zone2', 60, 80, { sport: 'run' });
+    const bike = estimateCardioEntryKcal('zone2', 60, 80, { sport: 'bike' });
+    const row = estimateCardioEntryKcal('zone2', 60, 80, { sport: 'row' });
+    expect(bike).toBeLessThan(run);
+    expect(row).toBeLessThan(bike);
+    // Та же поправка, что у плана с оборудованием cycling/rowing.
+    expect(bike).toBe(estimateCardioEntryKcal('zone2', 60, 80, { equipment: 'cycling' }));
+    expect(row).toBe(estimateCardioEntryKcal('zone2', 60, 80, { equipment: 'rowing' }));
+  });
+
+  it("sport приоритетнее equipment: план на бег, факт на вело → MET вело", () => {
+    const plannedRun = estimateCardioEntryKcal('zone2', 60, 80, { equipment: 'running' });
+    const actualBike = estimateCardioEntryKcal('zone2', 60, 80, { equipment: 'running', sport: 'bike' });
+    expect(actualBike).toBeLessThan(plannedRun);
+  });
+
+  it("sport 'other' не меняет прежнюю оценку (не выдумываем вид)", () => {
+    expect(estimateCardioEntryKcal('zone2', 45, 80, { sport: 'other' })).toBe(315);
+  });
 });
 
 describe('cardioPaceMinPerKm / cardioAvgPaceMinPerKm (темп мин/км)', () => {
