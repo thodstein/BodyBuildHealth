@@ -1460,10 +1460,22 @@ describe('белок завтрака из приёмов с запасом (QG2
     expect(bad.slice(0, 5).join(' | ')).toBe('');
   });
 
-  it('тонкий день без запаса не трогаем: L1/6/тр (177 г белка на 6 приёмов) без переноса', () => {
+  it('тонкий день: перенос белка не создаёт белок из ниоткуда (QG45)', () => {
     const thin = DAYS.find((d) => d.id === 'L1/6/тр');
     expect(!!thin).toBe(true);
-    expect(noted20(thin!).length, 'нота переноса в тонком дне').toBe(0);
+    // QG45 (целостность «граммы ↔ нутриенты») убрал фантомные граммы на экстремальных днях;
+    // на этом дне у pre-sleep проявился законный донор, и перенос сработал. Инвариант стадии —
+    // не «ноты нет», а «белка в дне не прибавилось»: перенос перераспределяет, не добавляет.
+    const t: any = buildDayTargets({
+      weightKg: thin!.w, presetGPerKg: 2.0, fatFloorGPerKg: 0.8, kbjuMode: 'auto',
+      goal: 'maintenance', dietStyle: 'classic',
+    } as any);
+    const totP = Number((thin!.plan.totals || {}).p) || 0;
+    expect(Math.abs(totP - t.protein) / t.protein, `белок дня ${totP.toFixed(1)} vs ${t.protein}`).toBeLessThanOrEqual(0.03);
+    if (noted20(thin!).length > 0) {
+      expect(gpk(thin!), 'завтрак после переноса').toBeGreaterThanOrEqual(0.3 - 1e-6);
+      expect(devOf20(thin!), 'КБЖУ дня после переноса').toBeLessThanOrEqual(0.13);
+    }
   });
 
   it('ручной режим не трогаем: в ручном дне переноса нет', () => {

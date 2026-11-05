@@ -365,7 +365,59 @@ function mealTotalsOf(items: any[]): EngineTotals {
 function recalcMealTotals(meals: any[]): void {
   for (const m of meals) m.totals = mealTotalsOf(m.items || []);
 }
+/**
+ * QG45: целостность позиции — граммы и нутриенты не расходятся.
+ *
+ * Часть стадий меняет `amount`, а макросы позиции остаются от прежнего веса. Замер на
+ * экстремальном дне (110 кг / 8370 ккал / 1500 г углеводов): позиция «овсяные хлопья 30 г»
+ * несла **595.8 г углеводов**, и завтрак показывал 3708 ккал = 47% дня. Фантомные граммы
+ * попадали в totals, в оценку дня и в замеры сходимости — то есть скрывали реальный недобор.
+ *
+ * Правило: FOOD_DB — источник плотности, `amount` — источник количества. Ремонтируем только
+ * физически невозможные позиции: перебор макроса больше чем в 2 раза И больше 15 г абсолютно.
+ * Такой порог ловит «фантомные» граммы (овсянка 30 г / 595 г углеводов) и НЕ трогает мелкие
+ * законные поправки стадий (чиа 5 г с жиром +4 г, крупа с авторской порцией ±20%): день,
+ * собранный по нормальным целям, остаётся бит-в-бит прежним.
+ */
+let _fdDensityById: Map<string, any> | null = null;
+function fdDensityMap(): Map<string, any> {
+  if (!_fdDensityById) {
+    _fdDensityById = new Map();
+    for (const f of FOOD_DB as any[]) _fdDensityById.set(String(f.id), f);
+  }
+  return _fdDensityById;
+}
+function sanitizeItemNutrients(meals: any[]): number {
+  const byId = fdDensityMap();
+  let fixed = 0;
+  for (const m of meals || []) {
+    for (const it of (m?.items || [])) {
+      const fd: any = byId.get(String(it?.id));
+      const amount = Number(it?.amount) || 0;
+      if (!fd || amount <= 0) continue;
+      const k = amount / 100;
+      const expP = (fd.protein || 0) * k;
+      const expF = (fd.fat || 0) * k;
+      const expC = (fd.carbs || 0) * k;
+      const impossible = (v: number, e: number) => Math.abs(v - e) > Math.max(15, e * 2);
+      if (!impossible(Number(it.p) || 0, expP) && !impossible(Number(it.f) || 0, expF) && !impossible(Number(it.c) || 0, expC)) continue;
+      it.p = Math.round(expP * 10) / 10;
+      it.f = Math.round(expF * 10) / 10;
+      it.c = Math.round(expC * 10) / 10;
+      it.kcal = Math.round(4 * it.p + 9 * it.f + 4 * it.c);
+      it.fiber = Math.round(((fd.fiber || 0) * k) * 10) / 10;
+      it.leucine_mg = Math.round((fd.leucine_mg || 0) * k);
+      fixed++;
+    }
+  }
+  return fixed;
+}
 function recalcDayTotals(meals: any[], totals: any): void {
+  // QG45: единая точка целостности. Любая стадия, меняющая граммы, обязана видеть честные
+  // totals — иначе цикл добивки «думает», что цель достигнута, на фантомных граммах
+  // (замер: 3076 г углеводов при цели 1500 и реальных 751). Ремонт — только физически
+  // невозможных позиций (см. sanitizeItemNutrients), обычный день не задевается.
+  if (sanitizeItemNutrients(meals) > 0) recalcMealTotals(meals);
   totals.kcal = meals.reduce((s: number, m: any) => s + m.totals.kcal, 0);
   totals.p = Math.round(meals.reduce((s: number, m: any) => s + m.totals.p, 0) * 10) / 10;
   totals.f = Math.round(meals.reduce((s: number, m: any) => s + m.totals.f, 0) * 10) / 10;
@@ -14494,6 +14546,12 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     );
     const _finalFoodIds = new Set<string>();
     for (const m of meals) for (const it of (m.items || [])) _finalFoodIds.add(it.id);
+    // QG45: финальная страховка целостности перед микро/оценкой/витриной. Основная работа —
+    // в recalcDayTotals (каждая стадия видит честные totals), здесь — гарантия на выходе.
+    if (sanitizeItemNutrients(meals as any[]) > 0) {
+      recalcMealTotals(meals as any[]);
+      recalcDayTotals(meals as any[], totals);
+    }
     const _finalCategories: Record<string, number> = {};
     _finalFoodIds.forEach(id => { const f = FOOD_DB.find(x => x.id === id); const cat = f?.category || 'other'; _finalCategories[cat] = (_finalCategories[cat] || 0) + 1; });
     const _finalMicroTotals = sumMicros(meals.flatMap(m => m.items.map(it => ({ id: it.id, amount: it.amount }))), FOOD_DB as any);
