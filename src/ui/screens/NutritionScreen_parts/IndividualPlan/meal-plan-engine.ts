@@ -3891,7 +3891,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   // День, чья цель вмещает всё, не меняется ни в грамме (бит-в-бит прежнее поведение).
   let _periSuppressed36 = false;
   let _periSuppressNote36 = '';
-  if (trainWindow && !(process.env as any).QG36_OFF) {
+  if (trainWindow) {
     const _m36 = _regular.filter((r) => r === 'breakfast' || r === 'lunch' || r === 'dinner').length;
     const _s36 = _regular.filter((r) => r !== 'breakfast' && r !== 'lunch' && r !== 'dinner' && r !== 'preSleep').length;
     const _floors36 = _m36 * 18 + _s36 * 14;               // те же полы, что в §7.2-3
@@ -3900,7 +3900,12 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     // Снимаем окна только при РЕАЛЬНОМ переборе: если полы + ночь + два окна больше цели
     // более чем на 5%. Иначе (8 приёмов, цель 160 г: полы 124 + 40 = 164, +2.5%) окна
     // остаются — план их переваривает, а структурный инвариант «peri отдельно» цел.
-    if (_dayPT36 > 0 && _floors36 + _sleep36 + 40 > _dayPT36 * 1.05) {
+    // Замер (§8.34): формула — верхняя оценка, и на 4-приёмном дне она срабатывает зря.
+    // S1/4/тр: цель 100 г, полы 68 + ночь + 40 > 105 — но фактический перебор в таком дне
+    // 2.4%, и снятие окон стоило дню одного балла (98 → 97, витамин E 79% → 72%).
+    // Перебор, ради которого стадия сделана, живёт на 5–6 приёмах: 7.0 / 12.9 / 8.1 / 7.2%.
+    // Поэтому стадия работает только там, где приёмов ≥5: день с 4 приёмами не трогаем.
+    if (_regular.length >= 5 && _dayPT36 > 0 && _floors36 + _sleep36 + 40 > _dayPT36 * 1.05) {
       const _i1 = _periBuilt.indexOf('prew');
       if (_i1 >= 0) _periBuilt.splice(_i1, 1);
       const _i2 = _periBuilt.indexOf('postw');
@@ -15091,8 +15096,6 @@ function liftVitaminEByFatAddress(
 const _QG35_PURE_FAT_MIN_PCT = 80;   // «почти чистый жир»: ≥80% ккал-плотности из жира
 const _QG35_OLIVE_KEEP_G = 10;       // MUFA-основа: после правки оливкового ≥10 г
 const _QG35_NUT_SWAP: Array<[string, string]> = [['cashew', 'almonds']];
-/** Резерв квоты орехов/семян под поздние добивки (они добавляют до 5 г). */
-const _QG35_NUT_RESERVE_G = 5;
 /** Зародыши пшеницы: E 18 мг/100 г, семейство null — единственный адрес витамина E,
  *  который не тратит квоту орехов/семян (масла-«мусор» запрещены QG33, chia/flax в БД
  *  без витамина E, а чиа-дни занимают квоту целиком). */
@@ -15234,9 +15237,9 @@ function liftVitaminEFinal(
     const fIt = Number(it.f) || 0;
     if (!(fIt > 0) || !(amt > 0)) continue;
     const roomHard = Math.max(0, Number(seedsCap) - seedsNow());
-    // Резерв: поздние добивки орехов добавляют до 5 г, и если отдать квоту под ноль,
-    // день выходит за потолок (S2/6/тр 60 г > 55). Сначала с резервом, потом — без.
-    const roomSoft = Math.max(0, roomHard - _QG35_NUT_RESERVE_G);
+    // Потолок проверяет отдельный зажим на финальной тарелке (clampNutSeedsQuota), поэтому
+    // здесь берём всё доступное: резерв стоил витамина E дню S1/4/тр (79% → 70%).
+    const roomSoft = roomHard;
     // Берём ровно столько граммов жира, сколько нужно до порога 70% (минимум 5 г — «это еда»):
     // полная замена ради 2% витамина ломает тарелку, а минимальный срез — нет.
     const needE = Math.max(0, want - eOf());
@@ -15451,13 +15454,20 @@ function clampNutSeedsQuota(
   );
   let trimmed = 0;
   let over = Math.round(seedsNow() - Number(seedsCap));
+  // Режем самый БЕДНЫЙ по витамину E пункт (а не самый крупный): иначе зажим может
+  // снять подсолнечное масло — то есть тот самый адрес, ради которого работает QG35.
+  const eDensOf = (id: string) => {
+    const fd: any = (FOOD_DB as any[]).find((f: any) => String(f.id) === id);
+    return Number(fd?.micros?.VitE ?? fd?.vitamins_100g?.vitamin_e_mg ?? 0);
+  };
   for (let guard = 8; over > 0 && guard-- > 0;) {
     const plate = meals.flatMap((m: any) => (m.items || []) as any[])
       .filter((x: any) => {
         const fam = stapleFamilyOf(String(x.id));
         return (fam === 'seeds' || fam === 'nuts') && !x._fixedGrams;
       })
-      .sort((a: any, b: any) => (Number(b.amount) || 0) - (Number(a.amount) || 0));
+      .sort((a: any, b: any) => eDensOf(String(a.id)) - eDensOf(String(b.id))
+        || (Number(b.amount) || 0) - (Number(a.amount) || 0));
     const target = plate.find((x: any) => Math.floor((Number(x.amount) || 0) - 15) >= 1);
     if (!target) break;
     const cut = Math.min(over, Math.floor((Number(target.amount) || 0) - 15));

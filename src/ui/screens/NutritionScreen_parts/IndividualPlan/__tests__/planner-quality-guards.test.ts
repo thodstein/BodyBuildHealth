@@ -1752,6 +1752,90 @@ describe('витамин E: финальный адрес жира по грам
   });
 });
 
+describe('QG36/B′: пери-окна не создаются, если цель белка их не вмещает', () => {
+  // Замер до стадии: 5 дней из 30 перебирали белок на 7–13% (S1/5/тр 7.0%, S1/6/тр 12.9%,
+  // S2/5/тр 8.1%, S2/6/тр 7.2%), и канон КБЖУ держали только 25/30 дней. Причина: полы
+  // приёмов (18 г в основном, 14 г в перекусе) + два окна по 20 г больше цели белка,
+  // и окна добирались «сверху». Стадия не создаёт pre/post, когда полы + ночь + два окна
+  // превышают цель более чем на 5%: 116 г на S2 при полах 114 + 40 = 154 не вмещаются.
+  // Цели дня берём тем же вызовом, что и сборка (плана в Day нет: он не хранит goals).
+  const tgtOf = (d: Day): any => buildDayTargets({
+    weightKg: d.w, presetGPerKg: 2.0, fatFloorGPerKg: 0.8, kbjuMode: 'auto',
+    goal: 'maintenance', dietStyle: 'classic',
+  } as any);
+  const devP = (d: Day) => {
+    const goal = Number(tgtOf(d).protein) || 0;
+    const p = Number(d.plan.totals?.p ?? d.totP) || 0;
+    return goal > 0 ? Math.abs(p - goal) / goal : 0;
+  };
+  const canonOk = (d: Day) => {
+    const t: any = d.plan.totals || {};
+    const g: any = tgtOf(d);
+    const dev = (v: number, tt: number) => (Number(tt) > 0 ? Math.abs(Number(v) - Number(tt)) / Number(tt) : 0);
+    return [dev(t.kcal, g.kcal), dev(t.p, g.protein), dev(t.f, g.fats), dev(t.c, g.carbs)].every((x) => x <= 0.03);
+  };
+
+  it('канон КБЖУ держат ≥29 дней из 30 (было 25)', () => {
+    const bad = DAYS.filter((d) => !canonOk(d)).map((d) => d.id);
+    expect(bad.length, `дней вне канона: ${bad.join(', ')}`).toBeLessThanOrEqual(1);
+  });
+
+  it('перебор белка >3% — не больше одного дня, и не больше 4.5% (было 5 дней, max 12.9%)', () => {
+    const over = DAYS.map((d) => ({ id: d.id, dev: devP(d) })).filter((x) => x.dev > 0.03);
+    const maxDev = Math.max(0, ...DAYS.map((d) => devP(d)));
+    expect(over.length, `перебор >3%: ${over.map((x) => `${x.id} ${(x.dev * 100).toFixed(1)}%`).join(', ')}`).toBeLessThanOrEqual(1);
+    expect(maxDev * 100, 'максимальный перебор белка').toBeLessThanOrEqual(4.5);
+  });
+
+  it('окон pre/post нет там, где цель белка их не вмещает, и нота честная', () => {
+    const bad: string[] = [];
+    let noted = 0;
+    for (const d of DAYS) {
+      // Дни, где окна сняты, стадия помечает нотой «не вмещает полы».
+      const note = ((d.plan.notes || []) as string[])
+        .find((n) => typeof n === 'string' && n.includes('не вмещает полы'));
+      if (!note) continue;
+      noted++;
+      const late = d.meals.filter((m: any) => /preworkout|postworkout/.test(String(m.type)));
+      if (late.length) bad.push(`${d.id}: нота есть, а окон ${late.length}`);
+      if (!/пери-приёмы не созданы/.test(note)) bad.push(`${d.id}: нота без причины`);
+    }
+    expect(bad.slice(0, 4).join(' | ')).toBe('');
+    // Замер: окна снимаются в 5 днях из 30 (S1/4-6/тр, S2/5-6/тр). Если замер изменится
+    // в меньшую сторону, стадия тихо перестанет работать — это должно ловиться.
+    expect(noted, 'дней, где окна сняты стадией').toBeGreaterThanOrEqual(4);
+  });
+
+  it('в приёме нет двух пунктов одного продукта (дубль 7+7 г масла — дефект витрины)', () => {
+    const bad: string[] = [];
+    for (const d of DAYS) {
+      for (const m of d.meals) {
+        const seen = new Set<string>();
+        for (const x of (m.items || []) as any[]) {
+          const id = String(x.id);
+          if (seen.has(id)) bad.push(`${d.id}/${m.type}:${id} ×2`);
+          seen.add(id);
+        }
+      }
+    }
+    expect(bad.slice(0, 4).join(' | ')).toBe('');
+  });
+
+  it('квота «орехи+семена» не превышена ни в одном дне после финального зажима', () => {
+    // Стадия срезает излишек (поздние добивки орехов добавляют до 5 г), но только если
+    // день остаётся в каноне: потолок и сходимость не должны обмениваться друг на друга.
+    const bad: string[] = [];
+    for (const d of DAYS) {
+      const g = items(d)
+        .filter(({ x }) => ['nuts', 'seeds'].includes(stapleFamilyOf(x.id) || ''))
+        .reduce((s, { x }) => s + (Number(x.amount) || 0), 0);
+      const cap = nutCatchupCap(quotaWeightScale(d.w));
+      if (g > cap) bad.push(`${d.id}: ${g} > ${cap}`);
+    }
+    expect(bad.slice(0, 3).join(' | ')).toBe('');
+  });
+});
+
 describe('в дне минимум два овоща (QG28)', () => {  const sexOf28 = (d: Day) => (d.id.startsWith('S') ? 'female' : 'male') as 'male' | 'female';
   const kPct28 = (d: Day) => {
     const cov = analyzeMicroCoverage(
