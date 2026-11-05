@@ -8,7 +8,7 @@ import type { SRCycleTemplate, SRDaySpec, SRExerciseSpec, SRSetSpec, SRDirection
 import type { BBPlan, BBWeek, BBSession, BBExercise, BBSet } from './bb-builder.engine';
 import type { BBPhase } from './bb-types';
 import { femalePosteriorBoost, mastersAdjust } from './bb-demographics';
-import { getBBVolumeLandmarks, isWeak, abDominantPattern, normalizeWeekMrv } from './bb-builder.engine';
+import { getBBVolumeLandmarks, isWeak, abDominantPattern, normalizeWeekMrv, WEAK_TO_MUSCLE } from './bb-builder.engine';
 import { syncBBPlanSetShape } from './bb-validator.engine';
 import { aggregateBBVolume, perExerciseCap, exerciseVolumeContributions, BB_MRV_TOLERANCE } from './bb-volume.engine';
 import { buildBBVolumeTarget, computeMrvMult, regimeMrvMultFor, weeklyCapFor, perSessionMuscleCap, type BBVolumeTarget } from './bb-volume.engine';
@@ -37,6 +37,7 @@ import type { FullProgram, ProgramWeek, ProgramDay } from '../../engines/complet
 import type { BBTrainingFocus } from './bb-goal-types';
 import { FOCUS_RIR_TABLE } from './bb-goal-types';
 import { finalizeBBPlan, reconcileVolumeTargets } from './bb-finalize.engine';
+import { refreshBBPlanSnapshots } from './bb-plan-snapshot.engine';
 import { buildBBPlanReport } from './bb-report.engine';
 import { computeBBRecoveryMultiplier, computeBBNutritionMultiplier } from './bb-volume.engine';
 import { applyFeedbackToBuild, autoReplaceOnPlateau, applyDiaryVolumeCorrection } from './bb-progression-feedback.engine';
@@ -1981,7 +1982,38 @@ export function convertCycleToBBPlan(input: CycleToPlanInput): BBPlan {
     // финализатора не накладывается поверх (taper W2-W4 рабочего мезоцикла).
     if (meta.deloadWeeks?.length) (finalized as any).sourceDeloads = true;
   }
-  finalized.report = buildBBPlanReport(finalized);
+  if (mode === 'adapt') {
+    // Аудит Y: после недельного MRV-трима план меняет состав/сеты уже ПОСЛЕ
+    // finalizeBBPlan, поэтому снимки факта (weeklyVolume/validation/fatigueReport/
+    // expandedSummary/report) описывали до-тримовую версию. Замер: cycle-08 —
+    // 59/175 ячеек объёма, 90 issue в validation против 51 фактических,
+    // 30/72 сессий fatigue; program-путь — 9/42, 25 против 11, 6/12.
+    refreshBBPlanSnapshots(finalized, {
+      validationOptions: {
+        level,
+        trainingYears: input.trainingYears,
+        equipment,
+        excludedExercises,
+        excludedMuscles: [...excludedMuscles],
+        avoidAxialLoad,
+        checkOrder: true,
+        methodology: input.methodology,
+        specializationTargets: (finalized as any).priorityMuscles,
+        onCourse,
+        trainingVolumeMode: (input as any).trainingVolumeMode,
+        maxWorkingSets: (finalized as any).maxWorkingSets,
+        maxExercises: (finalized as any).maxExercises,
+      },
+      specTargets: (finalized as any).priorityMuscles || [],
+      canonicalMuscle: (m: string) => WEAK_TO_MUSCLE[m] || m,
+      refreshFrequency: true,
+      // Паритет с билдером: строки «⚠ Валидация» в rationale тоже к факту —
+      // иначе после среза в тексте остаются предупреждения, которых уже нет.
+      refreshValidationRationale: true,
+    });
+  } else {
+    finalized.report = buildBBPlanReport(finalized);
+  }
   return finalized;
 }
 
@@ -3306,7 +3338,29 @@ export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts)
       );
     }
   }
-  finalized.report = buildBBPlanReport(finalized);
+  // Аудит Y: тот же класс, что и в цикл-пути — MRV-трим/rehab-relief правят
+  // план после finalizeBBPlan, поэтому снимки факта пересобираются последними.
+  refreshBBPlanSnapshots(finalized, {
+    validationOptions: {
+      level,
+      trainingYears: opts.trainingYears,
+      equipment: eqList,
+      excludedExercises: opts.excludedExercises,
+      excludedMuscles: [...excludedMuscles],
+      avoidAxialLoad: avAxial,
+      checkOrder: mode !== 'faithful',
+      methodology: opts.methodology,
+      specializationTargets: (finalized as any).priorityMuscles,
+      onCourse: programOnCourse,
+      trainingVolumeMode: opts.trainingVolumeMode,
+      maxWorkingSets: (finalized as any).maxWorkingSets,
+      maxExercises: (finalized as any).maxExercises,
+    },
+    specTargets: (finalized as any).priorityMuscles || [],
+    canonicalMuscle: (m: string) => WEAK_TO_MUSCLE[m] || m,
+    refreshFrequency: true,
+    refreshValidationRationale: true,
+  });
   return finalized;
 }
 

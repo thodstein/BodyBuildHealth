@@ -165,8 +165,12 @@ describe('BB zero-state snapshots (baseline Этапа 10)', () => {
     // ягодицы убран из quad-бакета; валидатор зелёный).
     // Re-baseline 3 (про-объём циклового пути): предписанные цели по мышцам
     // (частота×per-session-кап) — квадры 13→15.
+    // Re-baseline 4 (итерация Z, «снимки = факт»): weeklyVolume теперь
+    // пересобирается ПОСЛЕ post-finalize `expandPlanToTargets` и MRV-трима.
+    // Прежние 8 по груди были до-расширения (в плане реально 14 сетов;
+    // кап 28, валидатор без ошибок). Остальные мышцы не сдвинулись.
     expect(directVolume(plan)).toEqual({
-      abs: 7, back: 10, biceps: 11, calves: 8, chest: 8, delt_front: 2, delt_mid: 2, delt_rear: 10, forearms: 7, glutes: 8, hamstrings: 11, quads: 15, shoulders: 0, traps: 6, triceps: 9,
+      abs: 7, back: 10, biceps: 11, calves: 8, chest: 14, delt_front: 2, delt_mid: 2, delt_rear: 10, forearms: 7, glutes: 8, hamstrings: 11, quads: 15, shoulders: 0, traps: 6, triceps: 9,
     });
   });
 
@@ -182,8 +186,10 @@ describe('BB zero-state snapshots (baseline Этапа 10)', () => {
     // УПРАЖНЕНИЕМ — перераспределение без переполнений: трицепс 12→8 (на капе,
     // косвенный объём от жимов сохранён), грудь 11→13, квадры 19→20; max сетов
     // на упражнение ≤ кап, сессии ≤ лимитов (валидатор зелёный).
+    // Re-baseline 5 (итерация Z): снимок был снят до post-finalize расширения
+    // целей — хамс в плане 12 сетов (кап 22, валидатор без ошибок), а не 10.
     expect(directVolume(plan)).toEqual({
-      abs: 7, back: 9, biceps: 12, calves: 8, chest: 13, delt_front: 3, delt_mid: 2, delt_rear: 10, forearms: 7, glutes: 8, hamstrings: 10, quads: 20, shoulders: 0, traps: 6, triceps: 8,
+      abs: 7, back: 9, biceps: 12, calves: 8, chest: 13, delt_front: 3, delt_mid: 2, delt_rear: 10, forearms: 7, glutes: 8, hamstrings: 12, quads: 20, shoulders: 0, traps: 6, triceps: 8,
     });
   });
 
