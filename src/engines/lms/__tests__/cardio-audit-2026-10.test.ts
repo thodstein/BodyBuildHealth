@@ -16,12 +16,12 @@ import {
   applyIndividualizedTaperToCycle, autoTuneCardioCycle, improveCardioCycle,
   bumpCardioZone2Volume, bumpCardioZone2VolumeGuarded, applyCardioCompetitionCascade,
   cardioCyclePeriodAware, moveCardioSessionInWeek, rescheduleCardioSession,
-  cardioAcwr, explainCardioChoice, buildCardioIcs, spreadSessionsAcrossDays,
+  cardioAcwr, explainCardioChoice, buildCardioIcs, spreadSessionsAcrossDays, expandWeekSchedule,
   cardioEntryLoad, maxHrByFormula, dailyTrimpMap, cardioHeartZones, cardioFactHrAdjustment, powerTss,
 } from '../cardio.engine';
 import { individualizedTaperPlan } from '../cardio-taper-pro.engine';
 import { validateCardioLogFields } from '../cardio-diary.engine';
-import { todayLocalIso, parseLocalIso, addDaysIso, weekStartIso, dayOfWeekIso } from '../cardio-date-utils.engine';
+import { todayLocalIso, parseLocalIso, addDaysIso, weekStartIso } from '../cardio-date-utils.engine';
 
 const sumWeeksKcal = (c: { weeks: { totalKcal: number }[] }) =>
   c.weeks.reduce((s, w) => s + w.totalKcal, 0);
@@ -162,17 +162,15 @@ describe('P1-4 локальный парс дат: .ics и раскладка п
     // Ожидание — из канона cardio-date-utils: `dayOfWeek` сессии — АБСОЛЮТНЫЙ
     // день недели (Пн=0), окно недели начинается с даты старта. Раньше тест
     // повторял ошибку экспорта (dow трактовался как смещение от startDate).
+    // Раскладка (сколько и в какие дни) — ответственность expandWeekSchedule;
+    // здесь проверяем именно датную арифметику экспорта: каждая дата = локальный
+    // понедельник окна + смещение от дня старта.
     const startDow = (parseLocalIso(start).getDay() + 6) % 7;
     const expected: string[] = [];
     for (const w of c.weeks) {
-      for (const s of w.sessions) {
-        const freq = Math.max(1, Math.round(s.weeklyFrequency));
-        for (let k = 0; k < freq; k++) {
-          const iso = s.dayOfWeek != null
-            ? dayOfWeekIso(w.week, (s.dayOfWeek + k - startDow + 7) % 7, start)
-            : addDaysIso(weekStartIso(w.week, start), k);
-          expected.push(iso.replace(/-/g, ''));
-        }
+      const weekStart = weekStartIso(w.week, start);
+      for (const x of expandWeekSchedule(w, start, { weekNo: w.week })) {
+        expected.push(addDaysIso(weekStart, (x.dayOfWeek - startDow + 7) % 7).replace(/-/g, ''));
       }
     }
     expect(dates.slice().sort()).toEqual(expected.slice().sort());

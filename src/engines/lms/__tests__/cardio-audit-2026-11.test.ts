@@ -96,6 +96,39 @@ describe('раскладка недели: частота → дни', () => {
     expect(spreadSessionsAcrossDays(w, '2026-03-02')).toHaveLength(2);
   });
 
+  it('повторы не отбирают день другой сессии: 4 слота — 4 разных дня', () => {
+    // Реальный дефект генератора: zone2 ×3 занимала Пн/Вт/Ср, а miss со своим
+    // Вт падал на уже занятый Вт — 4 занятия на 3 днях при четырёх свободных.
+    const w: CardioWeek = {
+      ...week([
+        { type: 'zone2', durationMin: 37, weeklyFrequency: 3, intensity: 'low', kcalPerSession: 250, purpose: 'Z2', dayOfWeek: 0 },
+        { type: 'missing', durationMin: 18, weeklyFrequency: 1, intensity: 'high', kcalPerSession: 200, purpose: 'MISS', dayOfWeek: 1 },
+      ]),
+    };
+    const laid = expandWeekSchedule(w, '2026-03-02');
+    expect(laid).toHaveLength(4);
+    expect(new Set(laid.map(x => x.dayOfWeek)).size).toBe(4);
+    // Авторский день miss уважается — сдвигается повтор zone2, а не он сам.
+    expect(laid.find(x => x.session.type === 'missing')!.dayOfWeek).toBe(1);
+  });
+
+  it('генератор: при ≤7 слотах в неделю каждый день занят не больше одного раза', () => {
+    const bad: string[] = [];
+    for (const goal of ['health', 'cut', 'recomp', 'mass', 'bb_prep'] as const) {
+      for (const days of [3, 4, 5, 6, 7]) {
+        const c = buildCardioCycle({ goal, daysAvailable: days, totalWeeks: 8, bodyWeight: 80, startDate: '2026-03-02' });
+        for (const w of c.weeks) {
+          const slots = w.sessions.reduce((s, x) => s + Math.max(1, Math.round(x.weeklyFrequency)), 0);
+          if (slots > 7) continue;
+          const laid = expandWeekSchedule(w, c.startDate, { weekNo: w.week });
+          const uniq = new Set(laid.map(x => x.dayOfWeek)).size;
+          if (uniq !== slots) bad.push(`${goal}/${days}d w${w.week}: ${slots} слотов на ${uniq} днях`);
+        }
+      }
+    }
+    expect(bad).toEqual([]);
+  });
+
   it('buildCardioIcs: одно событие на каждый повтор', () => {
     const c = buildCardioCycle({ goal: 'health', totalWeeks: 3, startDate: '2026-03-02' });
     const expected = c.weeks.reduce((s, w) => s + w.sessions.reduce((a, x) => a + Math.max(1, Math.round(x.weeklyFrequency)), 0), 0);

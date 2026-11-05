@@ -1823,17 +1823,37 @@ export function removeCardioScenario(id: string): void {
 export function assignSessionDays(sessions: CardioSession[], legDays?: number[], referenceIso?: string): CardioSession[] {
   const blocked = new Set((legDays ?? []).filter(d => d >= 0 && d <= 6));
   const out: CardioSession[] = [];
-  const ref = referenceIso ? new Date(referenceIso) : new Date();
-  let day = (ref.getDay() + 6) % 7;
+  // Локальный парс: `new Date('2026-01-05')` — это UTC-полночь, в западных
+  // таймзонах она ещё предыдущий день, и стартовый день недели уезжал на 1.
+  const ref = referenceIso ? parseLocalIso(referenceIso) : new Date();
+  const norm = (d: number): number => ((Math.round(d) % 7) + 7) % 7;
+  let cursor = Number.isFinite(ref.getTime()) ? norm(ref.getDay() + 6) : 0;
   const avoid = (t: CardioType) => t !== 'recovery' && blocked.size > 0 && blocked.size < 7;
+  // Явные дни сессий уже заняты: авто-дни не должны на них наступать, иначе
+  // неделя получала два занятия в один день при свободных соседних.
+  const occupied = new Set<number>(
+    sessions
+      .filter(s => s.dayOfWeek != null && Number.isFinite(Number(s.dayOfWeek)))
+      .map(s => norm(Number(s.dayOfWeek))),
+  );
+  const pick = (type: CardioType): number => {
+    const skip = avoid(type);
+    for (let pass = 0; pass < 2; pass++) {
+      for (let i = 0; i < 7; i++) {
+        const d = (cursor + i) % 7;
+        if (skip && blocked.has(d)) continue;
+        if (pass === 0 && occupied.has(d)) continue;
+        return d;
+      }
+    }
+    return cursor;
+  };
   for (const s of sessions) {
     if (s.dayOfWeek != null) { out.push(s); continue; }
-    if (avoid(s.type)) {
-      let guard = 0;
-      while (blocked.has(day) && guard < 7) { day = (day + 1) % 7; guard++; }
-    }
+    const day = pick(s.type);
+    occupied.add(day);
     out.push({ ...s, dayOfWeek: day });
-    day = (day + 1) % 7;
+    cursor = (day + 1) % 7;
   }
   return out;
 }
@@ -2951,6 +2971,15 @@ export function expandWeekSchedule(
   const occupied = new Set<number>();
   const out: CardioScheduledSession[] = [];
   let cursor = startDow;
+  const norm = (d: number): number => ((Math.round(d) % 7) + 7) % 7;
+  // Явные дни бросаются на глаз, если брать их по очереди: первая сессия с
+  // weeklyFrequency=3 успевала занять 0/1/2, а следующая «своим» днём 1
+  // ставила третью сессию на уже занятый день — 4 занятия на 3 днях при
+  // четырёх свободных. Поэтому авторские дни бронируются заранее: повторы
+  // обходят их, а не отбирают.
+  for (const s of week.sessions) {
+    if (s.dayOfWeek != null && Number.isFinite(Number(s.dayOfWeek))) occupied.add(norm(Number(s.dayOfWeek)));
+  }
   const pick = (start: number, type: CardioType): number => {
     const avoid = blockedActive && type !== 'recovery';
     // Первый проход — только свободные дни, второй — с повторным использованием.
@@ -2967,7 +2996,7 @@ export function expandWeekSchedule(
   for (const s of week.sessions) {
     const freq = Math.max(1, Math.min(7, Math.round(s.weeklyFrequency || 1)));
     for (let occ = 0; occ < freq; occ++) {
-      const explicit = occ === 0 && s.dayOfWeek != null ? ((Math.round(s.dayOfWeek) % 7) + 7) % 7 : null;
+      const explicit = occ === 0 && s.dayOfWeek != null && Number.isFinite(Number(s.dayOfWeek)) ? norm(Number(s.dayOfWeek)) : null;
       const day = explicit != null ? explicit : pick(cursor, s.type);
       occupied.add(day);
       out.push({

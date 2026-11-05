@@ -589,19 +589,31 @@ const CardioConstructorInner: React.FC = () => {
     };
   };
 
-  /** Собрать цикл по параметрам и сохранить (общий хвост build/selectVariant). */
+  /**
+   * Собрать цикл по параметрам и сохранить (общий хвост build/selectVariant).
+   *
+   * Если цикл уже есть — это правка ЕГО ЖЕ плана («⚙️ Изменить параметры» →
+   * «🔄 Пересобрать цикл», смена варианта нагрузки). Раньше в этом случае
+   * генератор создавал НОВЫЙ цикл с новым id и стартом «сегодня»: календарь,
+   * номер недели и adherence молча откатывались на первую неделю, а в
+   * библиотеке оставался дубль старого плана. Теперь id/имя/дата старта
+   * сохраняются. Завершённый цикл честно начинается заново с сегодня — и
+   * сообщение об этом говорит прямо.
+   */
   const commitCycle = (applied: CardioCycleInput, msg: string) => {
-    // Авторский шаблон пересобираем ЧЕРЕЗ шаблон, а не генератором: иначе
-    // «Собрать» после «Изменить параметры» молча уничтожал план источника
-    // (C25K/Хигдон/Concept2 превращались в сгенерированный цикл).
-    const c = cycle?.config?.templateId
-      ? finishCycle(rebuildCardioCycleFromConfig({ ...cycle, config: applied }))
-      : finishCycle(buildCardioCycle({ ...applied, config: applied }));
+    const today = todayIso();
+    const started = !!cycle?.startDate && today >= String(cycle.startDate);
+    const finished = started && !cardioWeekForDate(cycle!, today, cycle!.startDate);
+    const keepIdentity = !!cycle && !finished;
+    const next: CardioCycleInput = keepIdentity ? applied : { ...applied, startDate: today };
+    const c = cycle
+      ? finishCycle(rebuildCardioCycleFromConfig(cycle, { overrides: next, preserveIdentity: keepIdentity }))
+      : finishCycle(buildCardioCycle({ ...next, config: next }));
     saveCardioCycle(c);
     setActiveCardioCycle(c);
     setCycle(c);
     reload();
-    flashMsg(msg);
+    flashMsg(finished ? `${msg} · прошлый цикл завершён — новый стартует с сегодня` : msg);
   };
 
   const build = () => {

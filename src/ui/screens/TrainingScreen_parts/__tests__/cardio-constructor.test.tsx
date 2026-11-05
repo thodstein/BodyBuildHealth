@@ -9,7 +9,8 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { CardioConstructor } from '../CardioConstructor';
 import { getCardioLink, clearCardioLink } from '../../../../engines/lms/cardio-bridge';
 import { buildBbMacrocycle, serializeBbMacro, deserializeBbMacro } from '../../../../engines/lms/macrocycle.engine';
-import { loadCardioCycles, loadActiveCardioCycle } from '../../../../engines/lms/cardio.engine';
+import { loadCardioCycles, loadActiveCardioCycle, buildCardioCycle, cardioWeekForDate } from '../../../../engines/lms/cardio.engine';
+import { addDaysIso, todayLocalIso } from '../../../../engines/lms/cardio-date-utils.engine';
 import { buildBBContestPrepPlan, serializeBBContestPrepPlan, isoAddDays, isoToday } from '../../../../engines/bb/bb-contest-prep.engine';
 import { saveAnnualTrainingPlan } from '../../../../engines/annual-training/annual-training-storage';
 import { annualPlanFromMacro } from '../../../../engines/annual-training/block-builders.engine';
@@ -416,5 +417,47 @@ describe('CardioConstructor — CSR', () => {
     expect(loadCardioCycles().filter(c => c.id.startsWith('annual-cardio-')).length).toBe(0);
     expect(localStorage.getItem(ANNUAL_CARDIO_KEY)).toBeNull();
     expect(screen.getAllByRole('status').some(s => (s.textContent || '').includes('Кардио по блокам года сброшено'))).toBe(true);
+  });
+});
+
+describe('CardioConstructor — пересборка не откатывает начатый цикл', () => {
+  const nextStep = () => fireEvent.click(screen.getByRole('button', { name: /^Далее/ }));
+  const toPreview = () => { nextStep(); nextStep(); nextStep(); nextStep(); };
+
+  it('«🔄 Пересобрать цикл» сохраняет id и дату старта (не плодит дубль и не сбрасывает неделю)', () => {
+    // Цикл, начатый три недели назад: сегодня — 4-я неделя.
+    const startDate = addDaysIso(todayLocalIso(), -21);
+    const built = buildCardioCycle({ goal: 'cut', totalWeeks: 12, daysAvailable: 5, bodyWeight: 80, startDate });
+    localStorage.setItem(CYCLES_KEY, JSON.stringify([built]));
+    localStorage.setItem(ACTIVE_KEY, JSON.stringify(built));
+    render(<CardioConstructor />);
+    toPreview();
+    fireEvent.click(screen.getByRole('button', { name: /Пересобрать цикл/ }));
+    const all = loadCardioCycles();
+    // Тот же цикл, а не второй с тем же именем.
+    expect(all).toHaveLength(1);
+    const after = all.find(c => c.id === built.id);
+    expect(after).toBeTruthy();
+    expect(after!.startDate).toBe(startDate);
+    // Прогресс остался на текущей неделе, а не откатился на первую.
+    expect(cardioWeekForDate(after!, todayLocalIso(), after!.startDate)?.week).toBe(4);
+  });
+
+  it('завершённый цикл честно стартует заново с сегодня (новый id + сообщение)', () => {
+    const startDate = addDaysIso(todayLocalIso(), -200);
+    const old = buildCardioCycle({ goal: 'health', totalWeeks: 8, daysAvailable: 4, bodyWeight: 80, startDate });
+    localStorage.setItem(CYCLES_KEY, JSON.stringify([old]));
+    localStorage.setItem(ACTIVE_KEY, JSON.stringify(old));
+    render(<CardioConstructor />);
+    toPreview();
+    fireEvent.click(screen.getByRole('button', { name: /Пересобрать цикл/ }));
+    const all = loadCardioCycles();
+    const fresh = all.find(c => c.id !== old.id);
+    expect(fresh).toBeTruthy();
+    expect(fresh!.startDate).toBe(todayLocalIso());
+    // Старый цикл остаётся в библиотеке как история.
+    expect(all.some(c => c.id === old.id)).toBe(true);
+    const statuses = screen.getAllByRole('status').map(s => s.textContent || '').join(' ');
+    expect(statuses).toMatch(/прошлый цикл завершён/i);
   });
 });
