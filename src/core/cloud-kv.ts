@@ -33,6 +33,7 @@ import {
   toPhysicalKey,
 } from './data-space';
 import { setSpacePurgeHandler } from './space-purge';
+import { COACH_AUDIT_KEY, mergeCoachAudit, serializeCoachAudit } from '../engines/coach/coach-audit.engine';
 
 export const CHUNK_SIZE = 100_000;
 const PULL_PAGE = 1000;
@@ -56,6 +57,10 @@ export const EXCLUDED_KEYS = new Set([
   'he_session_v2',
   'he_crypto_key',
   'he_last_active',
+  // PIN режима тренера — свойство УСТРОЙСТВА, а не аккаунта. Синкать хэш PIN
+  // значит: включил на телефоне — заблокировал себя на планшете, а слабый
+  // хэш (на старых WebView) уехал бы в облако. Граница защиты — устройство.
+  'he_coach_lock',
   // Реестр пространств — свойство УСТРОЙСТВА. Если его синкать, переключение на
   // атлета уедет в облако и на другом устройстве приложение откроется «в
   // пространстве атлета», которого там нет: пустой профиль вместо своих данных.
@@ -896,9 +901,29 @@ async function pull(opts?: { reload?: boolean }): Promise<number> {
       // локальная правка сделана ПОКА шёл сетевой pull — её нет в снимке облака → локальная
       const winner = dirtyDuringPull.has(k) ? 'local' : pickConflict(localMtime, remoteTs);
       if (winner === 'remote') {
-        localStorage.setItem(k, value);
+        // Журнал тренера — объединяем, а не затираем: два устройства пишут
+        // события независимо, и «последний записавший» не должен съедать чужие.
+        let nextValue = value;
+        let mergedGrew = false;
+        if (toLogicalKey(k) === COACH_AUDIT_KEY) {
+          let localRaw: string | null = null;
+          try { localRaw = localStorage.getItem(k); } catch { localRaw = null; }
+          const mergedText = serializeCoachAudit(mergeCoachAudit(localRaw, value));
+          if (mergedText !== value) {
+            nextValue = mergedText;
+            mergedGrew = true;
+          }
+        }
+        localStorage.setItem(k, nextValue);
         mtimes.set(k, remoteTs);
         dirty.delete(k);
+        if (mergedGrew) {
+          // Слияние — локальная правка: поднимаем объединённое наверх, чтобы
+          // второе устройство получило события, а не только первое.
+          mtimes.set(k, serverNowMs());
+          dirty.add(k);
+          scheduleFlush();
+        }
         applied++;
       } else if (winner === 'local') {
         dirty.add(k);

@@ -31,6 +31,8 @@ interface CoachWeekViewProps {
   tasks: readonly import('../../../engines/coach/coach-planner.engine').CoachTask[];
   /** Переход к карточке атлета (фильтр списка по имени). */
   onSelectAthlete?: (athleteId: string, athleteName: string) => void;
+  /** Журнал действий: напоминания — тоже действие тренера. */
+  onAudit?: (kind: 'reminders-enabled' | 'reminders-disabled') => void;
 }
 
 const cardStyle: React.CSSProperties = {
@@ -78,7 +80,7 @@ function WeekNote(props: { title: string; children: React.ReactNode; tone?: 'war
   );
 }
 
-export function CoachWeekView({ week, tasks, onSelectAthlete }: CoachWeekViewProps) {
+export function CoachWeekView({ week, tasks, onSelectAthlete, onAudit }: CoachWeekViewProps) {
   const [reminders, setReminders] = useState(() => readCoachReminderSettings(ls()));
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<string | null>(null);
@@ -101,6 +103,7 @@ export function CoachWeekView({ week, tasks, onSelectAthlete }: CoachWeekViewPro
     const next = setCoachRemindersEnabled(reminders, !reminders.enabled);
     writeCoachReminderSettings(ls(), next);
     setReminders(next);
+    onAudit?.(next.enabled ? 'reminders-enabled' : 'reminders-disabled');
     try {
       const bridge = await import('../../../core/native-bridge');
       const ids = planned.map((_, i) => REMINDER_ID_BASE + i);

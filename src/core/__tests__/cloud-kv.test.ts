@@ -118,6 +118,10 @@ describe('isKvExcludedKey', () => {
     expect(isKvExcludedKey('he_draft_sleep_inline')).toBe(true);
     expect(isKvExcludedKey('he_nav_to_lab_diary')).toBe(true);
     expect(isKvExcludedKey('he_admin_seeded_v1')).toBe(true);
+    // PIN — настройка устройства: хэш не должен уезжать в облако и блокировать
+    // профиль на другом телефоне. Журнал действий, наоборот, синкается.
+    expect(isKvExcludedKey('he_coach_lock')).toBe(true);
+    expect(isKvExcludedKey('he_coach_audit')).toBe(false);
   });
 
   it('синхронизирует пользовательские ключи', () => {
@@ -219,8 +223,35 @@ describe('синхронизация (движок с фейковым тран�
     expect(localStorage.getItem('he_profile_v2')).toBe('{"v":2}');
   });
 
-  it('локальные данные новее → push, а не потеря', async () => {
+  it('журнал тренера при pull СЛИВАЕТСЯ, а не затирается последним писавшим', async () => {
     const t = new FakeTransport();
+    await init(t);
+    const local = {
+      version: 1,
+      items: [{ id: 'e-local', kind: 'athlete-added', at: '2026-11-05T10:00:00.000Z', athleteId: 'a1' }],
+    };
+    localStorage.setItem('he_coach_audit', JSON.stringify(local));
+    await flushKvNow();
+
+    const remote = {
+      version: 1,
+      items: [{ id: 'e-remote', kind: 'program-issued', at: '2026-11-05T12:00:00.000Z', athleteId: 'a2' }],
+    };
+    t.seed('he_coach_audit', JSON.stringify(remote), Date.now() + 5000);
+    await pullKvNow();
+
+    const stored = JSON.parse(localStorage.getItem('he_coach_audit')!) as { items: { id: string }[] };
+    expect(stored.items.map(e => e.id)).toEqual(['e-local', 'e-remote']);
+
+    // Объединённое уходит наверх: второе устройство тоже увидит оба события.
+    await flushKvNow();
+    const pushed = JSON.parse(t.cloud.get('he_coach_audit')!.map(r => r.value).join('')) as {
+      items: { id: string }[];
+    };
+    expect(pushed.items.map(e => e.id)).toEqual(['e-local', 'e-remote']);
+  });
+
+  it('локальные данные новее → push, а не потеря', async () => {    const t = new FakeTransport();
     t.seed('he_profile_v2', '{"v":1}', 1000);
     await init(t);
     expect(localStorage.getItem('he_profile_v2')).toBe('{"v":1}');

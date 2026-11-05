@@ -14,7 +14,7 @@
  *    Переключение всегда через перезагрузку: половинчатая подмена оставила бы в
  *    памяти чужие данные. Удаление карточки и удаление ЕГО данных — разные кнопки.
  */
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { NativeIcon } from '../../native/NativeIcons';
 import { colors, withAlpha } from './ui';
 import {
@@ -43,6 +43,7 @@ import {
   applyProgramBundle,
   collectProgramBundle,
   describeProgramBundle,
+  normalizeProgramBundle,
   programBundleErrorText,
   type CoachProgramBundle,
 } from '../../../engines/coach/coach-program-bundle.engine';
@@ -70,6 +71,14 @@ import {
   type AdherenceResult,
 } from '../../../engines/coach/coach-adherence.engine';
 import {
+  ATHLETE_COPY_MAX_BYTES,
+  applyAthleteCopyKeys,
+  athleteCopyErrorText,
+  collectAthleteCopy,
+  describeAthleteCopy,
+  normalizeAthleteCopy,
+} from '../../../engines/coach/coach-athlete-copy.engine';
+import {
   buildCoachInbox,
   inboxSummary,
 } from '../../../engines/coach/coach-inbox.engine';
@@ -77,6 +86,24 @@ import {
   buildCoachWeek,
 } from '../../../engines/coach/coach-week.engine';
 import { CoachWeekView } from './CoachWeekView';
+import { CoachReportSheet } from './CoachReportSheet';
+import { CoachLockSettingsCard } from './CoachLockSettingsCard';
+import {
+  addCoachAuditEvent,
+  readCoachAudit,
+  writeCoachAudit,
+  type CoachAuditKind,
+  type CoachAuditStore,
+} from '../../../engines/coach/coach-audit.engine';
+import {
+  isCoachUnlocked,
+  readCoachLock,
+  readUnlockedAt,
+  verifyCoachPin,
+  writeCoachLock,
+  writeUnlockedAt,
+  type CoachLockSettings,
+} from '../../../engines/coach/coach-lock.engine';
 import {
   addCoachNote,
   countNotesForAthlete,
@@ -124,6 +151,15 @@ const ACCENT = '#22d3ee';
 const ls = (): Storage | null => {
   try {
     return typeof localStorage !== 'undefined' ? localStorage : null;
+  } catch {
+    return null;
+  }
+};
+
+/** sessionStorage: «профиль разблокирован в этой сессии», а не навсегда. */
+const ss = (): Storage | null => {
+  try {
+    return typeof sessionStorage !== 'undefined' ? sessionStorage : null;
   } catch {
     return null;
   }
@@ -305,6 +341,83 @@ export const ProfileCoachTab: React.FC<{
   const [issuePick, setIssuePick] = useState<Set<string>>(() => new Set());
   const [issueConfirm, setIssueConfirm] = useState(false);
   const [issueDone, setIssueDone] = useState<string | null>(null);
+  /** Какой атлет открыт в отчёте (по одному за раз — меньше шума на экране). */
+  const [reportFor, setReportFor] = useState<string | null>(null);
+  const [programFileBusy, setProgramFileBusy] = useState(false);
+  /** Копия ОДНОГО атлета — отдельное действие и отдельные сообщения. */
+  const [copyNotice, setCopyNotice] = useState<string | null>(null);
+  const [copyError, setCopyError] = useState<string | null>(null);
+  const [copyBusy, setCopyBusy] = useState(false);
+
+  /**
+   * PIN и журнал действий — устройственные. Состояние держим в памяти, чтобы
+   * карточка настроек и гейт не читали localStorage на каждый рендер.
+   */
+  const [lock, setLock] = useState<CoachLockSettings>(() => readCoachLock(ls()));
+  const [audit, setAudit] = useState<CoachAuditStore>(() => readCoachAudit(ls()));
+  const [unlocked, setUnlocked] = useState(() =>
+    isCoachUnlocked(readCoachLock(ls()), readUnlockedAt(ss()), Date.now()),
+  );
+  const [pinAttempt, setPinAttempt] = useState('');
+  const [pinAttemptError, setPinAttemptError] = useState<string | null>(null);
+  const lastBumpRef = useRef(0);
+
+  const auditEvent = (kind: CoachAuditKind, athleteId?: string | null) => {
+    // Читаем с диска: другой вызов мог уже дописать событие (выдача на пятерых).
+    const next = addCoachAuditEvent(readCoachAudit(ls()), kind, { athleteId: athleteId ?? null });
+    writeCoachAudit(ls(), next);
+    setAudit(next);
+  };
+
+  const applyLock = (next: CoachLockSettings) => {
+    writeCoachLock(ls(), next);
+    setLock(next);
+    if (!next.enabled) {
+      writeUnlockedAt(ss(), null);
+      setUnlocked(true);
+    }
+  };
+
+  const tryUnlock = async () => {
+    const ok = await verifyCoachPin(lock, pinAttempt);
+    if (!ok) {
+      setPinAttemptError('PIN не подошёл.');
+      return;
+    }
+    writeUnlockedAt(ss(), new Date().toISOString());
+    setPinAttempt('');
+    setPinAttemptError(null);
+    setUnlocked(true);
+  };
+
+  /**
+   * Автовыход по бездействию. Активность отмечаем не чаще раза в 20 секунд,
+   * иначе каждое движение пальца пишет в sessionStorage.
+   */
+  useEffect(() => {
+    if (!lock.enabled || !unlocked) return;
+    const bump = () => {
+      const now = Date.now();
+      if (now - lastBumpRef.current < 20_000) return;
+      lastBumpRef.current = now;
+      if (isCoachUnlocked(lock, readUnlockedAt(ss()), now)) writeUnlockedAt(ss(), new Date(now).toISOString());
+    };
+    const timer = setInterval(() => {
+      if (!isCoachUnlocked(lock, readUnlockedAt(ss()), Date.now())) {
+        writeUnlockedAt(ss(), null);
+        setUnlocked(false);
+        auditEvent('locked');
+      }
+    }, 30_000);
+    window.addEventListener('pointerdown', bump);
+    window.addEventListener('keydown', bump);
+    return () => {
+      window.removeEventListener('pointerdown', bump);
+      window.removeEventListener('keydown', bump);
+      clearInterval(timer);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lock, unlocked]);
 
   /**
    * Сводка по атлетам из ИХ данных. Сначала карточки рисуются без цифр — чтение
@@ -536,6 +649,7 @@ export const ProfileCoachTab: React.FC<{
     }
     writeCoachPrograms(storage, res.store);
     setPrograms(res.store);
+    auditEvent('program-saved', athlete.id);
     setProgramNotice(`«${res.template.name}» — в «Моих программах». Теперь её можно выдать другому атлету.`);
   };
 
@@ -604,6 +718,7 @@ export const ProfileCoachTab: React.FC<{
         continue;
       }
       ok++;
+      auditEvent('program-issued', a.id);
       nextReg = upsertSpace(nextReg, { id: sid, athleteId: a.id, label: a.name }).registry;
     }
     if (nextReg !== reg) {
@@ -630,8 +745,202 @@ export const ProfileCoachTab: React.FC<{
     setIssueDone(`Готово: программа выдана — ${names}. Атлет увидит её, когда откроет свои данные.`);
   };
 
-  const saveProgramRename = (id: string) => {
+  /**
+   * Программа — файл. Формат тот же, что у выдачи: `bodybuildhealth` +
+   * `coach-program` v1. Файл можно передать другому тренеру/на другое устройство,
+   * и там он попадёт в библиотеку, а не перезапишет атлета молча.
+   */
+  const exportProgramFile = async (t: CoachProgramTemplate) => {
+    setProgramNotice(null);
+    setProgramError(null);
+    try {
+      const mod = await import('../../../core/apk-share');
+      const fileName = `${t.name.replace(/[^\p{L}\p{N}_-]+/gu, '_')}.coach-program.json`;
+      const res = await mod.saveTextFileApk(
+        fileName,
+        JSON.stringify(t.bundle, null, 2),
+        'application/json;charset=utf-8',
+      );
+      setProgramNotice(`Файл программы: ${mod.shareOutcomeLabel(res)}`);
+      auditEvent('program-exported');
+    } catch {
+      setProgramError('Не удалось сохранить файл программы.');
+    }
+  };
+
+  /** Импорт файла — только в библиотеку: выдача по-прежнему отдельным шагом. */
+  const importProgramFile = async (file: File | null | undefined) => {
+    if (!file) return;
+    setProgramNotice(null);
+    setProgramError(null);
+    setProgramFileBusy(true);
+    try {
+      const text = typeof file.text === 'function'
+        ? await file.text()
+        : await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(String(reader.result ?? ''));
+            reader.onerror = () => reject(reader.error);
+            reader.readAsText(file);
+          });
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(text) as unknown;
+      } catch {
+        setProgramError('Это не файл программы: внутри не JSON.');
+        return;
+      }
+      const norm = normalizeProgramBundle(parsed);
+      if (norm.error || !norm.bundle) {
+        setProgramError(programBundleErrorText(norm.error) || 'Файл не похож на программу из этого приложения.');
+        return;
+      }
+      const fallbackName = file.name.replace(/\.coach-program\.json$/i, '').replace(/\.json$/i, '');
+      const res = addCoachProgram(programs, {
+        name: norm.bundle.name || fallbackName || 'Программа из файла',
+        bundle: norm.bundle,
+        sourceLabel: 'из файла',
+      });
+      if (res.error || !res.template) {
+        setProgramError(coachProgramErrorText(res.error));
+        return;
+      }
+      writeCoachPrograms(ls(), res.store);
+      setPrograms(res.store);
+      auditEvent('program-imported');
+      setProgramNotice(`«${res.template.name}» — в «Моих программах». Проверьте и выдайте, когда будете готовы.`);
+    } catch {
+      setProgramError('Не удалось прочитать файл.');
+    } finally {
+      setProgramFileBusy(false);
+    }
+  };
+
+  /**
+   * Копия одного атлета файлом. Читает его пространство целиком (настройки +
+   * записи базы), но НЕ фото веса и не служебные ключи — об этом сказано в UI.
+   */
+  const exportAthleteCopy = async (athlete: CoachAthlete) => {
     const storage = ls();
+    setCopyNotice(null);
+    setCopyError(null);
+    if (!storage) {
+      setCopyError('Хранилище недоступно — копию не сделать.');
+      return;
+    }
+    setCopyBusy(true);
+    try {
+      const sid = athleteSpaceId(athlete.id);
+      let stores: Record<string, unknown[]> = {};
+      try {
+        const mod = await loadDb();
+        stores = await mod.readSpaceStores(sid);
+      } catch {
+        stores = {};
+      }
+      const { copy, bytes } = collectAthleteCopy({ storage, spaceId: sid, stores, label: athlete.name });
+      if (bytes > ATHLETE_COPY_MAX_BYTES) {
+        setCopyError(athleteCopyErrorText('size'));
+        return;
+      }
+      const d = describeAthleteCopy(copy);
+      if (!d.keys && !d.records) {
+        setCopyError(athleteCopyErrorText('empty'));
+        return;
+      }
+      const share = await import('../../../core/apk-share');
+      const fileName = `${athlete.name.replace(/[^\p{L}\p{N}_-]+/gu, '_')}.coach-athlete.json`;
+      const res = await share.saveTextFileApk(
+        fileName,
+        JSON.stringify(copy, null, 2),
+        'application/json;charset=utf-8',
+      );
+      setCopyNotice(
+        `Копия: ${d.keys} ${plural(d.keys, 'ключ', 'ключа', 'ключей')}, ${d.records} ${plural(d.records, 'запись', 'записи', 'записей')} · ${share.shareOutcomeLabel(res)}. Фото веса в копию не входят.`,
+      );
+      auditEvent('copy-exported', athlete.id);
+    } catch {
+      setCopyError('Не удалось собрать копию атлета.');
+    } finally {
+      setCopyBusy(false);
+    }
+  };
+
+  /**
+   * Восстановление копии — ВСЕГДА в нового атлета. Затирать существующего
+   * копией нельзя: это потеря его данных, а не «обновление».
+   */
+  const importAthleteCopy = async (file: File | null | undefined) => {
+    if (!file) return;
+    const storage = ls();
+    setCopyNotice(null);
+    setCopyError(null);
+    if (!storage) {
+      setCopyError('Хранилище недоступно — копию не восстановить.');
+      return;
+    }
+    setCopyBusy(true);
+    try {
+      const text = typeof file.text === 'function'
+        ? await file.text()
+        : await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(String(reader.result ?? ''));
+            reader.onerror = () => reject(reader.error);
+            reader.readAsText(file);
+          });
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(text) as unknown;
+      } catch {
+        setCopyError(athleteCopyErrorText('not-object'));
+        return;
+      }
+      const norm = normalizeAthleteCopy(parsed);
+      if (norm.error || !norm.copy) {
+        setCopyError(athleteCopyErrorText(norm.error));
+        return;
+      }
+      const copy = norm.copy;
+      const baseName = (copy.label || file.name.replace(/\.coach-athlete\.json$/i, '').replace(/\.json$/i, '')).trim() || 'Атлет из копии';
+      const created = addCoachAthlete(state, {
+        name: `${baseName} (копия)`,
+        direction: '',
+        goal: '',
+        note: 'Восстановлен из файла копии',
+      });
+      if (created.error || !created.athlete) {
+        setCopyError('Не удалось создать карточку для копии.');
+        return;
+      }
+      apply(created.state);
+      const sid = athleteSpaceId(created.athlete.id);
+      const written = applyAthleteCopyKeys(storage, sid, copy);
+      let records = 0;
+      try {
+        const mod = await loadDb();
+        await mod.writeSpaceStores(sid, copy.stores as Record<string, any[]>);
+        records = describeAthleteCopy(copy).records;
+      } catch {
+        /* настройки уже записаны; честно скажем про базу ниже */
+      }
+      writeRegistryToStorage(upsertSpace(readRegistryFromStorage(), { id: sid, athleteId: created.athlete.id, label: created.athlete.name }).registry);
+      setRegistryRev(v => v + 1);
+      setSnapshotsRev(v => v + 1);
+      setCopyNotice(
+        `Восстановлено в нового атлета «${created.athlete.name}»: ${written} ${plural(written, 'ключ', 'ключа', 'ключей')}` +
+          (records ? `, ${records} ${plural(records, 'запись', 'записи', 'записей')} в базе` : ', записей базы нет') +
+          '. Фото веса копия не содержит.',
+      );
+      auditEvent('copy-imported', created.athlete.id);
+    } catch {
+      setCopyError('Не удалось прочитать файл копии.');
+    } finally {
+      setCopyBusy(false);
+    }
+  };
+
+  const saveProgramRename = (id: string) => {    const storage = ls();
     if (!storage) return;
     const res = renameCoachProgram(programs, id, renameValue);
     if (res.error) {
@@ -723,6 +1032,7 @@ export const ProfileCoachTab: React.FC<{
       // тоже: иначе полоса «Данные атлета: <старое имя>» и список «Сменить»
       // показывали бы прежнее имя, пока тренер не войдёт в данные заново.
       syncSpaceLabel(editingId, form.name);
+      auditEvent('athlete-updated', editingId);
       cancelEdit();
       return;
     }
@@ -742,6 +1052,7 @@ export const ProfileCoachTab: React.FC<{
       return;
     }
     apply(res.state);
+    if (res.athlete) auditEvent('athlete-added', res.athlete.id);
     setForm(EMPTY_FORM);
     setFormError(null);
   };
@@ -813,6 +1124,7 @@ export const ProfileCoachTab: React.FC<{
   const confirmCardDelete = async (id: string) => {
     const sid = athleteSpaceId(id);
     apply(removeCoachAthlete(state, id));
+    auditEvent('athlete-removed', id);
     setConfirmDeleteId(null);
     if (editingId === id) cancelEdit();
     if (usageOf(id).keys !== 0) return;
@@ -861,6 +1173,7 @@ export const ProfileCoachTab: React.FC<{
     // нет — просим синхронизацию убрать пространство из облака (если она включена).
     requestSpacePurge([sid]);
     apply(removeCoachAthlete(state, a.id));
+    auditEvent('athlete-data-deleted', a.id);
     setConfirmDeleteId(null);
     if (editingId === a.id) cancelEdit();
     // База грузится лениво: движок нужен только здесь, а статический импорт
@@ -1059,6 +1372,11 @@ export const ProfileCoachTab: React.FC<{
     [planner.items, state.athletes, snapshots, adherence, notes],
   );
 
+  const changeStatus = (athlete: CoachAthlete, status: CoachAthleteStatus) => {
+    apply(setCoachAthleteStatus(state, athlete.id, status));
+    auditEvent('athlete-status', athlete.id);
+  };
+
   const openWeekComment = (a: CoachAthlete) => {
     if (weekCommentFor === a.id) {
       setWeekCommentFor(null);
@@ -1092,6 +1410,58 @@ export const ProfileCoachTab: React.FC<{
 
   const sectionLabel = (id: CoachSectionId): string =>
     COACH_SECTIONS.find(s => s.id === id)?.label ?? id;
+
+  // Замок: если включён PIN и сессия не разблокирована, наружу показываем
+  // ТОЛЬКО экран входа. Никакого «частично видно» — иначе PIN бессмысленен.
+  if (state.enabled && lock.enabled && !unlocked) {
+    return (
+      <div
+        className="pf-coach"
+        data-coach="locked"
+        style={{ ...cardStyle, display: 'flex', flexDirection: 'column', gap: 10 }}
+      >
+        <div style={{ fontSize: 14, fontWeight: 800, color: '#fff', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span aria-hidden="true" style={{ display: 'inline-flex', color: ACCENT }}>
+            <NativeIcon name="sliders" size={15} />
+          </span>
+          Профиль тренера заблокирован
+        </div>
+        <div style={{ fontSize: 11.5, color: colors.textMuted, lineHeight: 1.45 }}>
+          Введите PIN. Данные атлетов не удалены — закрыт только вход на этом устройстве.
+        </div>
+        <input
+          type="password"
+          inputMode="numeric"
+          autoComplete="current-password"
+          maxLength={8}
+          value={pinAttempt}
+          aria-label="PIN"
+          data-coach="lock-unlock-pin"
+          onChange={e => setPinAttempt(e.target.value.replace(/\D/g, ''))}
+          onKeyDown={e => {
+            if (e.key === 'Enter') void tryUnlock();
+          }}
+          style={{ ...inputStyle, letterSpacing: 3, fontSize: 16, textAlign: 'center' }}
+        />
+        {pinAttemptError && (
+          <div data-coach="lock-unlock-error" role="alert" style={{ fontSize: 11.5, color: colors.danger }}>
+            {pinAttemptError}
+          </div>
+        )}
+        <button
+          type="button"
+          data-coach="lock-unlock"
+          onClick={() => void tryUnlock()}
+          style={{ ...btn('primary'), alignSelf: 'flex-start' }}
+        >
+          Открыть
+        </button>
+        <div style={{ fontSize: 10.5, color: colors.textSubtle, lineHeight: 1.45 }}>
+          Забыли PIN? Восстановить его нельзя, но данные остаются на месте.
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="pf-coach" data-coach="root" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -1287,10 +1657,18 @@ export const ProfileCoachTab: React.FC<{
             )}
           </div>
 
+          <CoachLockSettingsCard
+            settings={lock}
+            audit={audit}
+            onChange={applyLock}
+            onEvent={kind => auditEvent(kind)}
+          />
+
           {/* Неделя: задачи по дням и обзор — до списка карточек. */}
           <CoachWeekView
             week={week}
             tasks={planner.items}
+            onAudit={kind => auditEvent(kind)}
             onSelectAthlete={(_id, name) => {
               setQuery(name);
               setStatusFilter('all');
@@ -1318,7 +1696,53 @@ export const ProfileCoachTab: React.FC<{
                 data-coach="search"
                 style={{ ...inputStyle, width: 180, flex: '0 1 180px' }}
               />
+              <label
+                data-coach="athlete-copy-import-label"
+                style={{
+                  ...btn('ghost'),
+                  fontSize: 11.5,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  cursor: copyBusy ? 'default' : 'pointer',
+                  opacity: copyBusy ? 0.6 : 1,
+                }}
+                title="Восстановить атлета из файла копии — всегда в новую карточку"
+              >
+                {copyBusy ? 'Читаем…' : 'Из копии'}
+                <input
+                  type="file"
+                  accept=".json,application/json"
+                  data-coach="athlete-copy-import"
+                  disabled={copyBusy}
+                  onChange={e => {
+                    const file = e.target.files?.[0] ?? null;
+                    e.target.value = '';
+                    void importAthleteCopy(file);
+                  }}
+                  style={{ display: 'none' }}
+                />
+              </label>
             </div>
+
+            {copyNotice && (
+              <div
+                data-coach="copy-notice"
+                role="status"
+                style={{ marginTop: 8, fontSize: 11.5, color: colors.green, lineHeight: 1.45 }}
+              >
+                {copyNotice}
+              </div>
+            )}
+            {copyError && (
+              <div
+                data-coach="copy-error"
+                role="alert"
+                style={{ marginTop: 8, fontSize: 11.5, color: colors.danger, lineHeight: 1.45 }}
+              >
+                {copyError}
+              </div>
+            )}
 
             <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap', alignItems: 'center' }}>
               <button
@@ -1918,6 +2342,24 @@ export const ProfileCoachTab: React.FC<{
                       )}
                       <button
                         type="button"
+                        data-coach="report-open"
+                        onClick={() => setReportFor(prev => (prev === a.id ? null : a.id))}
+                        style={{ ...btn('ghost'), fontSize: 12 }}
+                        title="Отчёт за неделю или 30 дней: объём, вес, выполнение, заметки"
+                      >
+                        {reportFor === a.id ? 'Свернуть отчёт' : 'Отчёт'}
+                      </button>
+                      <button
+                        type="button"
+                        data-coach="athlete-copy-export"
+                        onClick={() => void exportAthleteCopy(a)}
+                        style={{ ...btn('ghost'), fontSize: 12 }}
+                        title="Файл со всеми данными этого атлета (без фото веса)"
+                      >
+                        Копия
+                      </button>
+                      <button
+                        type="button"
                         data-coach="save-program"
                         onClick={() => saveProgramFromAthlete(a)}
                         style={{ ...btn('ghost'), fontSize: 12 }}
@@ -1948,7 +2390,7 @@ export const ProfileCoachTab: React.FC<{
                         <button
                           type="button"
                           data-coach="unarchive"
-                          onClick={() => apply(setCoachAthleteStatus(state, a.id, 'active'))}
+                          onClick={() => changeStatus(a, 'active')}
                           style={{ ...btn('ghost'), fontSize: 12 }}
                         >
                           Вернуть из архива
@@ -1959,7 +2401,7 @@ export const ProfileCoachTab: React.FC<{
                             type="button"
                             data-coach={a.status === 'paused' ? 'resume' : 'pause'}
                             onClick={() =>
-                              apply(setCoachAthleteStatus(state, a.id, a.status === 'paused' ? 'active' : 'paused'))
+                              changeStatus(a, a.status === 'paused' ? 'active' : 'paused')
                             }
                             style={{ ...btn('ghost'), fontSize: 12 }}
                             title={
@@ -1973,7 +2415,7 @@ export const ProfileCoachTab: React.FC<{
                           <button
                             type="button"
                             data-coach="archive"
-                            onClick={() => apply(setCoachAthleteStatus(state, a.id, 'archived'))}
+                            onClick={() => changeStatus(a, 'archived')}
                             style={{ ...btn('ghost'), fontSize: 12 }}
                             title="Скрыть из рабочего списка; данные и программа сохраняются"
                           >
@@ -2071,6 +2513,16 @@ export const ProfileCoachTab: React.FC<{
                         .
                       </div>
                     )}
+                    {reportFor === a.id && (
+                      <CoachReportSheet
+                        athlete={a}
+                        spaceId={athleteSpaceId(a.id)}
+                        notes={notes.items.filter(n => n.athleteId === a.id)}
+                        coachLog={log.items.filter(e => e.athleteId === a.id)}
+                        adherenceLine={adherence[a.id] ? adherenceLine(adherence[a.id]) : null}
+                        onClose={() => setReportFor(null)}
+                      />
+                    )}
                   </div>
                 );
               })}
@@ -2088,6 +2540,34 @@ export const ProfileCoachTab: React.FC<{
                     : 'Снимите программу с атлета и выдайте её другому — без повторной сборки блока.'}
                 </div>
               </div>
+              <label
+                data-coach="program-import-label"
+                style={{
+                  ...btn('ghost'),
+                  fontSize: 11.5,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  cursor: programFileBusy ? 'default' : 'pointer',
+                  opacity: programFileBusy ? 0.6 : 1,
+                }}
+                title="Добавить программу из файла в «Мои программы» (атлета не трогает)"
+              >
+                {programFileBusy ? 'Читаем…' : 'Из файла'}
+                <input
+                  type="file"
+                  accept=".json,application/json"
+                  data-coach="program-import"
+                  disabled={programFileBusy}
+                  onChange={e => {
+                    const file = e.target.files?.[0] ?? null;
+                    // Сбрасываем input: иначе повторный выбор того же файла не сработает.
+                    e.target.value = '';
+                    void importProgramFile(file);
+                  }}
+                  style={{ display: 'none' }}
+                />
+              </label>
             </div>
 
             {programNotice && (
@@ -2186,6 +2666,15 @@ export const ProfileCoachTab: React.FC<{
                               style={{ ...btn('ghost'), fontSize: 12 }}
                             >
                               Переименовать
+                            </button>
+                            <button
+                              type="button"
+                              data-coach="program-export"
+                              onClick={() => void exportProgramFile(t)}
+                              style={{ ...btn('ghost'), fontSize: 12 }}
+                              title="Сохранить программу файлом — для передачи или бэкапа"
+                            >
+                              Файл
                             </button>
                             {confirmProgramDelete === t.id ? (
                               <>
