@@ -389,10 +389,16 @@ describe('CardioConstructor — CSR', () => {
     buildHere();
     next();
     fireEvent.click(screen.getByRole('button', { name: /Собрать кардио по блокам года/ }));
-    expect(screen.getAllByRole('status').some(s => /Кардио по блокам года: собрано \d+ циклов/.test(s.textContent || ''))).toBe(true);
     const cycles = loadCardioCycles();
     const annual = cycles.filter(c => c.id.startsWith('annual-cardio-'));
     expect(annual.length).toBeGreaterThan(0);
+    // Число в статусе сверяем с тем, что реально сохранилось, а не с формой
+    // слова: «собрано 4 цикла» — правильная русская форма, и требовать
+    // строго «циклов» значит ломать тест на каждом другом количестве блоков.
+    const statusText = screen.getAllByRole('status').map(s => s.textContent || '').join(' ');
+    const reported = statusText.match(/Кардио по блокам года: собрано (\d+)/);
+    expect(reported).not.toBeNull();
+    expect(Number(reported![1])).toBe(annual.length);
     const map = JSON.parse(localStorage.getItem(ANNUAL_CARDIO_KEY) || '{}');
     expect(Object.keys(map).length).toBe(annual.length);
     expect(Object.values(map).every((v: string) => annual.some(c => c.id === v))).toBe(true);

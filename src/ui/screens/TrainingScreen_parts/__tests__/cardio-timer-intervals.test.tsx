@@ -173,4 +173,30 @@ describe('CardioDiaryPanel: факт по подходам виден в жур�
     const { container } = render(<CardioDiaryPanel cycle={null} log={log} />);
     expect(container.querySelector('[data-cardio="interval-adherence"]')).toBeNull();
   });
+
+  it('правка записи не стирает подходы, заметку и длительность работы/отдыха', () => {
+    // Дефект: форма собирала запись с нуля, поэтому исправление RPE
+    // превращало интервальную сессию в обычную (чип 🔁 исчезал).
+    const log: CardioLogEntry[] = [{
+      id: 'iv-edit', date: '2026-11-01', type: 'hiit', durationMin: 40, completed: true,
+      intervalsPlanned: 8, intervalsDone: 6, workSec: 60, restSec: 90,
+      notes: 'интервалы: 6 из 8 · работа 1 мин / отдых 1.5 мин',
+    }];
+    render(<CardioDiaryPanel cycle={null} log={log} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Редактировать 2026-11-01' }));
+    expect(screen.getByText(/Подходы 6\/8 и длительность работы\/отдыха сохранятся/)).toBeTruthy();
+
+    fireEvent.change(screen.getByLabelText('RPE'), { target: { value: '7' } });
+    fireEvent.click(screen.getByRole('button', { name: /Обновить/ }));
+
+    const saved = loadCardioLog();
+    expect(saved).toHaveLength(1);
+    expect(saved[0].rpe).toBe(7);
+    expect(saved[0].intervalsPlanned).toBe(8);
+    expect(saved[0].intervalsDone).toBe(6);
+    expect(saved[0].workSec).toBe(60);
+    expect(saved[0].restSec).toBe(90);
+    expect(saved[0].notes).toContain('интервалы: 6 из 8');
+  });
 });

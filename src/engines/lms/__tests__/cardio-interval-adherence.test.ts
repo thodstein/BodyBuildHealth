@@ -116,6 +116,19 @@ describe('computeCardioAdvice: интервалы влияют на объём',
     expect(a.action).toBe('keep');
   });
 
+  it('мало минут из-за недобранных подходов → reduce, а не «добавьте Zone 2»', () => {
+    // Раньше порядок был «процент плана → RPE → интервалы»: недобранные
+    // отрезки сами уменьшают минуты, срабатывал increase, и совет предлагал
+    // добавить объём атлету, который не закрывает уже запланированные подходы.
+    const log = [
+      entry({ date: '2026-01-04', durationMin: 20, rpe: 6, intervalsPlanned: 8, intervalsDone: 4 }),
+      entry({ date: '2026-01-05', durationMin: 20, rpe: 6, intervalsPlanned: 8, intervalsDone: 4 }),
+    ];
+    const a = computeCardioAdvice(cycle, log, { referenceIso: REF });
+    expect(a.action).toBe('reduce');
+    expect(a.reason).toContain('Интервалы');
+  });
+
   it('RPE-перегруз важнее интервалов (сначала восстановление)', () => {
     const log = [
       entry({ date: '2026-01-05', durationMin: 90, rpe: 9, intervalsPlanned: 8, intervalsDone: 2 }),

@@ -422,20 +422,21 @@ export function computeCardioAdvice(
     return { action: 'keep', reason: 'За 7 дней кардио не записано — начните с плана недели.' };
   }
   const ratio = plannedWeekly > 0 ? stats.minutes / plannedWeekly : 1;
-  if (ratio < 0.6) {
-    return { action: 'increase', reason: `Выполнено ${Math.round(ratio * 100)}% плана — добавьте недостающие сессии Zone 2.` };
-  }
   if (stats.avgRpe != null && stats.avgRpe >= 8) {
     return { action: 'reduce', reason: `Средний RPE ${stats.avgRpe} — кардио перегружает: снизить интенсивность/минуты.` };
   }
-  // Интервалы: если атлет систематически не добирает подходы, виноват не он, а
-  // объём в плане. 14 дней — достаточно, чтобы это был паттерн, а не разовый день.
+  // Интервалы проверяем ДО процента плана: недобранные подходы сами уменьшают
+  // минуты, и «добавьте Zone 2» было бы советом добавлять объём атлету, который
+  // не закрывает уже запланированные отрезки. Причина известна — режем объём.
   const intervals = cardioIntervalAdherence(log, 14, opts.referenceIso);
   if (intervals.sessions >= 2 && intervals.pct < 80) {
     return {
       action: 'reduce',
       reason: `Интервалы: ${intervals.done} из ${intervals.planned} подходов (${intervals.pct}%) за 14 дней — сократить число подходов, качество важнее объёма.`,
     };
+  }
+  if (ratio < 0.6) {
+    return { action: 'increase', reason: `Выполнено ${Math.round(ratio * 100)}% плана — добавьте недостающие сессии Zone 2.` };
   }
   return { action: 'keep', reason: 'Нагрузка соответствует плану — продолжайте.' };
 }

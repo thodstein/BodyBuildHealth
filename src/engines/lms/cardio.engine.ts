@@ -2438,29 +2438,21 @@ export function buildCardioTcx(cycle: CardioCycle, referenceIso?: string): strin
       act++;
       lines.push(`  <Activities><Activity Sport="${tcxSportForSession(s, cycle)}" ActivityType="Manual">`);
       lines.push(`    <Id>${start}</Id>`);
-      if (s.structured && s.structured.length > 0) {
+      // Тот же таймлайн, что ведёт таймер: разминка/заминка из остатка бюджета
+      // и ВСЕ повторы (раньше лапы были короче сессии — 75 из 95 мин у вело-темпа).
+      const plan = buildCardioIntervalPlan(s);
+      if (plan) {
         let t = new Date(start).getTime();
-        for (const blk of s.structured) {
-          for (let r = 0; r < blk.reps; r++) {
-            const lapStart = new Date(t).toISOString().replace(/\.\d+Z$/, 'Z');
-            t += blk.workSec * 1000;
-            lines.push(`    <Lap StartTime="${lapStart}">`);
-            lines.push(`      <TotalTimeSeconds>${blk.workSec}</TotalTimeSeconds>`);
-            lines.push(`      <DistanceMeters>0</DistanceMeters>`);
-            lines.push(`      <Calories>${Math.round(s.kcalPerSession * blk.workSec / (s.durationMin * 60))}</Calories>`);
-            lines.push(`      <Intensity>Active</Intensity>`);
-            lines.push('    </Lap>');
-            if (blk.restSec > 0) {
-              const restStart = new Date(t).toISOString().replace(/\.\d+Z$/, 'Z');
-              t += blk.restSec * 1000;
-              lines.push(`    <Lap StartTime="${restStart}">`);
-              lines.push(`      <TotalTimeSeconds>${blk.restSec}</TotalTimeSeconds>`);
-              lines.push(`      <DistanceMeters>0</DistanceMeters>`);
-              lines.push(`      <Calories>0</Calories>`);
-              lines.push(`      <Intensity>Resting</Intensity>`);
-              lines.push('    </Lap>');
-            }
-          }
+        for (const step of plan.steps) {
+          const lapStart = new Date(t).toISOString().replace(/\.\d+Z$/, 'Z');
+          t += step.sec * 1000;
+          const active = step.kind !== 'rest';
+          lines.push(`    <Lap StartTime="${lapStart}">`);
+          lines.push(`      <TotalTimeSeconds>${step.sec}</TotalTimeSeconds>`);
+          lines.push('      <DistanceMeters>0</DistanceMeters>');
+          lines.push(`      <Calories>${active ? Math.round(s.kcalPerSession * step.sec / Math.max(1, plan.totalSec)) : 0}</Calories>`);
+          lines.push(`      <Intensity>${active ? 'Active' : 'Resting'}</Intensity>`);
+          lines.push('    </Lap>');
         }
       } else {
         lines.push(`    <Lap StartTime="${start}">`);
@@ -2470,7 +2462,8 @@ export function buildCardioTcx(cycle: CardioCycle, referenceIso?: string): strin
         lines.push(`      <Intensity>${s.type === 'hiit' ? 'Active' : 'Resting'}</Intensity>`);
         lines.push('    </Lap>');
       }
-      lines.push(`    <Notes>${escXml(`Кардио ${s.type.toUpperCase()} · ${CARDIO_PHASE_LABELS[w.phase]} · нед ${w.week}${s.equipment ? ' · ' + cardioEquipmentLabel(s.equipment) : ''}`)}</Notes>`);
+      const structNote = plan ? ` · ${Math.round(plan.totalSec / 60)} мин по структуре` : '';
+      lines.push(`    <Notes>${escXml(`Кардио ${s.type.toUpperCase()} · ${CARDIO_PHASE_LABELS[w.phase]} · нед ${w.week}${s.equipment ? ' · ' + cardioEquipmentLabel(s.equipment) : ''}${structNote}`)}</Notes>`);
       lines.push('  </Activity></Activities>');
     }
   }
@@ -2499,39 +2492,80 @@ function cycleEquipment(cycle: CardioCycle): CardioEquipment | null {
   return cycle.config?.equipment?.[0] ?? null;
 }
 
-/** Экспорт первой недели цикла в Zwift .zwo (structured workout, bike/run). */
+/**
+ * %FTP из примечания блока («88-94% FTP», «95/105% FTP») → доля FTP для Zwift.
+ *
+ * Раньше код брал `blk.targetHr?.max` (это ПУЛЬС в уд/мин) и делил на 100 —
+ * при данных с ЧСС-полем вело-блок уехал бы в 1.5-1.8 FTP. Темп блока задан
+ * в тексте, который пишут сами шаблоны, поэтому читаем его оттуда; если
+ * процента нет — берём запасное значение по типу сессии.
+ */
+function zwoPowerFromNote(note: string | undefined, fallback: number): number {
+  const m = note?.match(/(\d+(?:\.\d+)?)\s*(?:[/\-–]\s*(\d+(?:\.\d+)?))?\s*%\s*FTP/i);
+  if (!m) return fallback;
+  const lo = Number(m[1]);
+  const hi = m[2] ? Number(m[2]) : lo;
+  const mid = (lo + hi) / 200;
+  return Math.min(1.5, Math.max(0.3, mid));
+}
+
+/**
+ * Экспорт ключевой сессии первой недели в Zwift .zwo.
+ *
+ * ZWO — формат ОДНОЙ тренировки. Раньше в файл склеивались все сессии недели
+ * подряд (до 3-4 часов), а `structured`-блоки теряли `reps`: 8×1 мин выгружались
+ * как один 60-секундный отрезок. Теперь берём ключевую сессию недели (со
+ * структурой → hiit/miss → самая длинная) и разворачиваем её так же, как таймер:
+ * разминка/заминка из плана, отрезки — `IntervalsT` с реальным числом повторов.
+ */
 export function buildCardioZwo(cycle: CardioCycle, referenceIso?: string): string {
   const w = cycle.weeks[0];
-  if (!w) return '<?xml version="1.0" encoding="UTF-8"?><workout_file><workout></workout></workout_file>';
+  if (!w || w.sessions.length === 0) {
+    return '<?xml version="1.0" encoding="UTF-8"?><workout_file><workout></workout></workout_file>';
+  }
   const eq = cycleEquipment(cycle);
   const sport = (eq ? ZWO_SPORT_BY_EQUIPMENT[eq] : undefined) ?? 'other';
+  const key = w.sessions.find(s => (s.structured?.length ?? 0) > 0)
+    ?? w.sessions.find(s => s.type === 'hiit' || s.type === 'miss')
+    ?? w.sessions.reduce((a, b) => (b.durationMin > a.durationMin ? b : a), w.sessions[0]);
+  const plan = buildCardioIntervalPlan(key);
   const lines: string[] = [
     '<?xml version="1.0" encoding="UTF-8"?>',
     '<workout_file>',
     `  <author>BodyBuildHealth</author>`,
-    `  <name>${escXml(cycle.name)}</name>`,
-    `  <description>${escXml(`Кардио ${CARDIO_GOAL_LABELS[cycle.goal]} · ${cycle.totalWeeks} нед · ${cycle.weeks[0].totalMinutes} мин/нед${eq ? ` · ${cardioEquipmentLabel(eq)}` : ''}`)}</description>`,
+    `  <name>${escXml(`${cycle.name} · нед 1 · ${key.type.toUpperCase()}`)}</name>`,
+    `  <description>${escXml(`Кардио ${CARDIO_GOAL_LABELS[cycle.goal]} · нед 1 · ${key.type.toUpperCase()} ${key.durationMin} мин${eq ? ` · ${cardioEquipmentLabel(eq)}` : ''}`)}</description>`,
     `  <sportType>${sport}</sportType>`,
     '  <workout>',
   ];
-  for (const s of w.sessions) {
-    if (s.structured && s.structured.length > 0) {
-      for (const blk of s.structured) {
-        const pwr = blk.target === 'power' ? blk.targetHr?.max ?? 65 : s.type === 'hiit' ? 95 : s.type === 'miss' ? 80 : 65;
-        lines.push(`    <Warmup Duration="${blk.workSec}" PowerLow="${Math.max(0.3, pwr/100-0.1).toFixed(2)}" PowerHigh="${(pwr/100).toFixed(2)}" pace="0"/>`);
-        if (blk.restSec > 0) lines.push(`    <SteadyState Duration="${blk.restSec}" Power="${(0.5).toFixed(2)}" pace="0"/>`);
-      }
-    } else {
-      const pwrMap: Record<string, number> = { zone2: 0.65, miss: 0.8, hiit: 0.95, recovery: 0.5 };
-      const pwr = pwrMap[s.type] ?? 0.65;
-      if (s.type === 'hiit') {
-        // 60/90 ×4 минимум
-        const reps = Math.max(4, Math.round((s.durationMin * 60) / 150));
-        lines.push(`    <IntervalsT Repeat="${reps}" OnDuration="60" OffDuration="90" OnPower="${pwr.toFixed(2)}" OffPower="0.45" pace="0"/>`);
+  if (plan) {
+    const first = plan.steps[0];
+    const last = plan.steps[plan.steps.length - 1];
+    if (first && first.kind === 'warmup' && first.sec > 0) {
+      lines.push(`    <SteadyState Duration="${first.sec}" Power="0.50" pace="0"/>`);
+    }
+    for (const blk of key.structured ?? []) {
+      const on = zwoPowerFromNote(blk.note, key.type === 'hiit' ? 0.95 : key.type === 'miss' ? 0.85 : 0.75);
+      if (blk.restSec > 0) {
+        lines.push(`    <IntervalsT Repeat="${blk.reps}" OnDuration="${blk.workSec}" OffDuration="${blk.restSec}" OnPower="${on.toFixed(2)}" OffPower="0.45" pace="0"/>`);
       } else {
-        lines.push(`    <SteadyState Duration="${s.durationMin * 60}" Power="${pwr.toFixed(2)}" pace="0"/>`);
+        for (let r = 0; r < blk.reps; r++) {
+          lines.push(`    <SteadyState Duration="${blk.workSec}" Power="${on.toFixed(2)}" pace="0"/>`);
+        }
       }
     }
+    if (last && last.kind === 'cooldown' && last.sec > 0) {
+      lines.push(`    <SteadyState Duration="${last.sec}" Power="0.50" pace="0"/>`);
+    }
+  } else if (key.type === 'hiit') {
+    // Без структуры Zwift-файл всё равно должен быть одной тренировкой:
+    // классическая схема 60/90, число повторов — из длительности.
+    const reps = Math.max(4, Math.round((key.durationMin * 60) / 150));
+    lines.push(`    <IntervalsT Repeat="${reps}" OnDuration="60" OffDuration="90" OnPower="0.95" OffPower="0.45" pace="0"/>`);
+  } else {
+    const pwrMap: Record<string, number> = { zone2: 0.65, miss: 0.8, hiit: 0.95, recovery: 0.5 };
+    const pwr = pwrMap[key.type] ?? 0.65;
+    lines.push(`    <SteadyState Duration="${key.durationMin * 60}" Power="${pwr.toFixed(2)}" pace="0"/>`);
   }
   lines.push('  </workout>');
   lines.push('</workout_file>');

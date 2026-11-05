@@ -60,6 +60,7 @@ import { CardioValidationCard, CardioMesoRow } from './CardioPlanExtras';
 import { ConfirmDialogProvider, useConfirmDialog } from './ConfirmDialog';
 import { useAndroidBackHandler } from '../../../core/use-android-back';
 import { CardioHiitSection } from './CardioHiitSection';
+import { ruCount, RU_CYCLES } from '../../../engines/ru-plural';
 
 /**
  * Кардио-конструктор в оболочке ББ-авто (модерн): 7 мелких шагов
@@ -489,7 +490,11 @@ const CardioConstructorInner: React.FC = () => {
     try { saveCardioCycleVersion(cycle, `До HIIT «${preset.title}»`); } catch { /* ignore */ }
     const block = preset.build(opts ?? {});
     const equip = (equipment.find(e => preset.equipment.includes(e)) ?? preset.equipment[0] ?? 'running') as CardioEquipment;
-    const totalMin = Math.max(12, Math.round((block.workSec * block.reps + block.restSec * block.reps) / 60) + 12);
+    // Текст сессии обещает «Разминка 10-12 мин», но бюджет оставлял на
+    // разминку и заминку всего 12 мин (по 6) — таймер давал разминку вдвое
+    // короче обещанной. Считаем честно: работа + 10 мин разминки + 10 заминки.
+    const mainSec = block.workSec * block.reps + block.restSec * block.reps;
+    const totalMin = Math.max(20, Math.round(mainSec / 60) + 20);
     const sessType = preset.sessionType;
     const session: CardioSession = {
       type: sessType,
@@ -794,7 +799,7 @@ const CardioConstructorInner: React.FC = () => {
     const blockCount = Object.keys(outcome.cycles).length;
     const warn = outcome.warnings.length > 0 ? ` · ${outcome.warnings[0]}` : '';
     const medNote = redFlags.length > 0 ? ' · мед-блок: HIIT/MISS вырезаны до врача' : '';
-    flashMsg(blockCount > 0 ? `❤️ Кардио по блокам года: собрано ${blockCount} циклов${medNote}${warn}` : `⚠ ${warn}`);
+    flashMsg(blockCount > 0 ? `❤️ Кардио по блокам года: собрано ${ruCount(blockCount, RU_CYCLES)}${medNote}${warn}` : `⚠ ${warn}`);
   };
 
   /** 🗑 Сбросить кардио-циклы года (маппинг + циклы из библиотеки). */

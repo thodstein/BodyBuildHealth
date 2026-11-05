@@ -92,6 +92,7 @@ export const CardioDiaryPanel: React.FC<{ cycle: CardioCycle | null; acwr?: numb
   const stats7 = useMemo(() => cardioLogStats(log, 7), [log]);
   const stats28 = useMemo(() => cardioLogStats(log, 28), [log]);
   const intervals14 = useMemo(() => cardioIntervalAdherence(log, 14), [log]);
+  const editingEntry = editingId ? log.find(x => x.id === editingId) ?? null : null;
   const advice = useMemo(() => computeCardioAdvice(cycle, log, { acwr, recoveryLow }), [log, cycle, acwr, recoveryLow]);
   // Серия дней подряд. Было три разных расчёта в одном memo (два из них —
   // мёртвые: их результат перезатирался). Один проход: best по всем дням,
@@ -161,7 +162,14 @@ export const CardioDiaryPanel: React.FC<{ cycle: CardioCycle | null; acwr?: numb
     }
     setWarnings(null);
     const dur = clampCardioLogNumber(minutes, 5, 180, 30);
+    // Правка НЕ должна стирать то, чего нет в форме: факт по подходам
+    // (`intervalsPlanned/Done`, workSec/restSec), заметку таймера, decoupling
+    // из FIT и мощность. Раньше запись собиралась с нуля, и исправление RPE
+    // молча превращало интервальную сессию в «обычную» — чип 🔁 исчезал,
+    // а приверженность по подходам теряла данные.
+    const prev = editingId ? log.find(x => x.id === editingId) ?? null : null;
     const entry: CardioLogEntry = {
+      ...(prev ?? {}),
       id: editingId ?? newId(), date, type, durationMin: dur, completed: true,
       rpe: Number(rpe) > 0 ? Number(rpe) : undefined,
       avgHr: Number(hr) > 0 ? Number(hr) : undefined,
@@ -170,7 +178,7 @@ export const CardioDiaryPanel: React.FC<{ cycle: CardioCycle | null; acwr?: numb
       // Sprint 5.2/5.3: дисциплина + provenance — иначе TID смешивает
       // бег и вело (разная калибровка пульса), а правка неотличима от импорта.
       sport: sanitizeCardioSport(sport),
-      source: editingId ? 'manual' : 'manual',
+      source: 'manual',
     };
     const next = saveCardioLogEntry(entry);
     setUndoPrev(log);
@@ -235,7 +243,7 @@ export const CardioDiaryPanel: React.FC<{ cycle: CardioCycle | null; acwr?: numb
           >{CARDIO_SPORT_RU[s]}</button>
         ))}
       </div>
-      {editingId && <div style={{ fontSize: 11, color: '#fbbf24' }}>✏️ Редактирование записи — сохраните или нажмите ✕ на строке, чтобы отменить.</div>}
+      {editingId && <div style={{ fontSize: 11, color: '#fbbf24' }}>✏️ Редактирование записи — сохраните или нажмите ✕ на строке, чтобы отменить.{editingEntry?.intervalsPlanned ? ` Подходы ${editingEntry.intervalsDone ?? 0}/${editingEntry.intervalsPlanned} и длительность работы/отдыха сохранятся.` : ''}</div>}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(96px,1fr))', gap: 6 }}>
         <input value={minutes} onChange={e => setMinutes(e.target.value)} placeholder="Мин" inputMode="numeric" style={{ ...INPUT, width: 'auto' }} aria-label="Минуты" />
         <input value={rpe} onChange={e => setRpe(e.target.value)} placeholder="RPE 1-10" inputMode="numeric" style={{ ...INPUT, width: 'auto' }} aria-label="RPE" />
