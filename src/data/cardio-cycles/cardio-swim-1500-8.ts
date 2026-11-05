@@ -18,7 +18,10 @@ const rec = (min: number, dow: number): CardioTemplateSession => ({
   type: 'recovery', durationMin: min, equipment: 'swimming', dayOfWeek: dow, purpose: 'Спокойное плавание/дриллы без задачи.',
 });
 const test = (min: number, desc: string, dow: number): CardioTemplateSession => ({
-  type: 'hiit', durationMin: min, equipment: 'swimming', dayOfWeek: dow, purpose: desc,
+  // Тест 1500 м — не интервалы (аудит: «гонка не HIIT»), но со структурой:
+  // таймер ведёт разминку → непрерывный тест → заминку.
+  type: 'miss', durationMin: min, equipment: 'swimming', dayOfWeek: dow, purpose: desc,
+  structured: [{ workSec: 1800, restSec: 0, reps: 1, target: 'pace', note: 'Тест 1500 м на результат — непрерывно' }],
 });
 
 const WEEKS: CardioTemplateWeek[] = [

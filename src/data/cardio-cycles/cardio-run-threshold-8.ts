@@ -9,15 +9,17 @@
  *   Сб — длинная в Z2, Вс — восстановительная;
  * малые шаги объёма (+5-8%/нед), делод на 4-й, тест 10К на 8-й.
  */
-import type { CardioCycleTemplate, CardioTemplateSession, CardioTemplateWeek } from './cardio-cycle-types';
+import type { CardioCycleTemplate, CardioStructuredBlock, CardioTemplateSession, CardioTemplateWeek } from './cardio-cycle-types';
 
 const T = 'Темп T: «комфортно тяжело» (разговор короткими фразами), ~88-92% LTHR, 25-30 с/км медленнее 5K-темпа.';
 const RW = 'Разминка 15 мин легко + заминка 10 мин.';
 
-/** Т-сессия: отрезки в пороговом темпе через короткую трусцу. */
-const thr = (min: number, desc: string, dow: number): CardioTemplateSession => ({
+/** Т-сессия: отрезки в пороговом темпе через короткую трусцу.
+ *  `structured` — чтобы таймер вёл по подходам, а не просто считал 60 минут. */
+const thr = (min: number, desc: string, dow: number, block: CardioStructuredBlock): CardioTemplateSession => ({
   type: 'miss', durationMin: min, equipment: 'running', dayOfWeek: dow,
   purpose: `${RW} ${desc} ${T}`,
+  structured: [{ ...block, target: 'pace', note: 'Темп T (88-92% LTHR)' }],
 });
 const easy = (min: number, desc: string, dow: number): CardioTemplateSession => ({
   type: 'zone2', durationMin: min, equipment: 'running', dayOfWeek: dow, purpose: `Лёгкий бег: ${desc} Разговорно, Z2.`,
@@ -29,18 +31,20 @@ const rec = (min: number, dow: number): CardioTemplateSession => ({
   type: 'recovery', durationMin: min, equipment: 'running', dayOfWeek: dow, purpose: 'Восстановительная: трусца/ходьба, ноги «прокрутить».',
 });
 const race = (min: number, desc: string, dow: number): CardioTemplateSession => ({
-  type: 'hiit', durationMin: min, equipment: 'running', dayOfWeek: dow, purpose: `${desc} Сберегите силы на гонку — темп T больше не нужен.`,
+  // Тест/гонка — максимальное усилие, но это НЕ интервалы: тип «miss»
+  // (аудит: «гонка не HIIT»), поэтому таймер ведёт её одним отсчётом.
+  type: 'miss', durationMin: min, equipment: 'running', dayOfWeek: dow, purpose: `${desc} Сберегите силы на гонку — темп T больше не нужен.`,
 });
 
 const WEEKS: CardioTemplateWeek[] = [
-  { sessions: [thr(60, '3×8 мин T / 2 мин трусцой.', 1), easy(40, 'легко, ровно.', 3), long(60, 'первый объёмный.', 5), rec(30, 6)], phase: 'base', note: 'Втягивание в порог: отрезки короче, качество важнее.' },
-  { sessions: [thr(65, '4×8 мин T / 2 мин трусцой.', 1), easy(40, 'легко.', 3), long(70, 'на 10 мин больше прошлой.', 5), rec(30, 6)], phase: 'base' },
-  { sessions: [thr(70, '3×12 мин T / 2.5 мин трусцой.', 1), easy(40, 'легко.', 3), long(80, 'спокойный, ок.', 5), rec(30, 6)], phase: 'build', note: 'Пик объёма первой волны — затем разгрузка.' },
+  { sessions: [thr(60, '3×8 мин T / 2 мин трусцой.', 1, { workSec: 480, restSec: 120, reps: 3 }), easy(40, 'легко, ровно.', 3), long(60, 'первый объёмный.', 5), rec(30, 6)], phase: 'base', note: 'Втягивание в порог: отрезки короче, качество важнее.' },
+  { sessions: [thr(65, '4×8 мин T / 2 мин трусцой.', 1, { workSec: 480, restSec: 120, reps: 4 }), easy(40, 'легко.', 3), long(70, 'на 10 мин больше прошлой.', 5), rec(30, 6)], phase: 'base' },
+  { sessions: [thr(70, '3×12 мин T / 2.5 мин трусцой.', 1, { workSec: 720, restSec: 150, reps: 3 }), easy(40, 'легко.', 3), long(80, 'спокойный, ок.', 5), rec(30, 6)], phase: 'build', note: 'Пик объёма первой волны — затем разгрузка.' },
   { sessions: [rec(25, 6), easy(35, 'только легко.', 1), long(55, 'укороченная.', 5), rec(25, 3)], phase: 'base', deload: true, note: 'Делод −40%: порог не бегается, восстанавливаемся.' },
-  { sessions: [thr(75, '2×20 мин T / 3 мин трусцой — канонический порог.', 1), easy(40, 'легко.', 3), long(85, 'уверенно.', 5), rec(30, 6)], phase: 'build', note: 'Возврат после делода: лучшая Т-сессия блока.' },
-  { sessions: [thr(75, '3×15 мин T / 3 мин трусцой.', 1), easy(40, 'легко.', 3), long(90, 'полтора часа.', 5), rec(30, 6)], phase: 'build' },
-  { sessions: [thr(65, '25 мин нон-стоп T (без разрывов).', 1), easy(40, 'легко.', 3), long(95, 'последняя большая.', 5), rec(30, 6)], phase: 'build', note: 'Специфика: держать порог непрерывно.' },
-  { sessions: [thr(45, 'Подводка: 4×3 мин T / 2 мин.', 1), easy(30, 'коротко и легко.', 3), rec(25, 5), race(55, 'ТЕСТ 10К: гонка на максимум!', 6)], phase: 'peak', taper: true, note: 'Taper + тест 10К: сравните с тестом до блока.' },
+  { sessions: [thr(75, '2×20 мин T / 3 мин трусцой — канонический порог.', 1, { workSec: 1200, restSec: 180, reps: 2 }), easy(40, 'легко.', 3), long(85, 'уверенно.', 5), rec(30, 6)], phase: 'build', note: 'Возврат после делода: лучшая Т-сессия блока.' },
+  { sessions: [thr(75, '3×15 мин T / 3 мин трусцой.', 1, { workSec: 900, restSec: 180, reps: 3 }), easy(40, 'легко.', 3), long(90, 'полтора часа.', 5), rec(30, 6)], phase: 'build' },
+  { sessions: [thr(65, '25 мин нон-стоп T (без разрывов).', 1, { workSec: 1500, restSec: 0, reps: 1 }), easy(40, 'легко.', 3), long(95, 'последняя большая.', 5), rec(30, 6)], phase: 'build', note: 'Специфика: держать порог непрерывно.' },
+  { sessions: [thr(45, 'Подводка: 4×3 мин T / 2 мин.', 1, { workSec: 180, restSec: 120, reps: 4 }), easy(30, 'коротко и легко.', 3), rec(25, 5), race(55, 'ТЕСТ 10К: гонка на максимум!', 6)], phase: 'peak', taper: true, note: 'Taper + тест 10К: сравните с тестом до блока.' },
 ];
 
 export const CARDIO_RUN_THRESHOLD_8: CardioCycleTemplate = {

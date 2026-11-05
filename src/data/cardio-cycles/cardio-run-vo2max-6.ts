@@ -7,17 +7,21 @@
  * «не более 8% недельного объёма в I-темпе» (в минутах — с разминкой);
  * длинная в Z2 держит аэробную базу, делод на 4-й, финал — гонка 5К.
  */
-import type { CardioCycleTemplate, CardioTemplateSession, CardioTemplateWeek } from './cardio-cycle-types';
+import type { CardioCycleTemplate, CardioStructuredBlock, CardioTemplateSession, CardioTemplateWeek } from './cardio-cycle-types';
 
 const I = 'Темп I: 3K-5K-усилие, дыхание тяжёлое, 4-5 мин на повтор — не быстрее, чем удержите все повторы.';
 const R = 'Темп R: коротко и быстро, расслабленно, полное восстановление между отрезками.';
 const RW = 'Разминка 15 мин легко + 4×20 с ускорения. Заминка 10 мин.';
 
-const iv = (min: number, desc: string, dow: number): CardioTemplateSession => ({
+/** Интервалы I-темпа: `structured` ведёт таймер по подходам. */
+const iv = (min: number, desc: string, dow: number, block: CardioStructuredBlock): CardioTemplateSession => ({
   type: 'hiit', durationMin: min, equipment: 'running', dayOfWeek: dow, purpose: `${RW} ${desc} ${I}`,
+  structured: [{ ...block, target: 'pace', note: 'Темп I (vVO2max)' }],
 });
-const speed = (min: number, desc: string, dow: number): CardioTemplateSession => ({
+/** Короткая скорость R: полное восстановление между отрезками. */
+const speed = (min: number, desc: string, dow: number, block: CardioStructuredBlock): CardioTemplateSession => ({
   type: 'hiit', durationMin: min, equipment: 'running', dayOfWeek: dow, purpose: `${RW} ${desc} ${R}`,
+  structured: [{ ...block, target: 'pace', note: 'Темп R (скорость)' }],
 });
 const easy = (min: number, dow: number): CardioTemplateSession => ({
   type: 'zone2', durationMin: min, equipment: 'running', dayOfWeek: dow, purpose: 'Лёгкий бег Z2: разговорно, восстанавливает к интервалам.',
@@ -29,16 +33,17 @@ const rec = (min: number, dow: number): CardioTemplateSession => ({
   type: 'recovery', durationMin: min, equipment: 'running', dayOfWeek: dow, purpose: 'Восстановление: трусца/ходьба.',
 });
 const race = (min: number, desc: string, dow: number): CardioTemplateSession => ({
-  type: 'hiit', durationMin: min, equipment: 'running', dayOfWeek: dow, purpose: desc,
+  // Гонка — не интервалы (аудит: «гонка не HIIT»): один отсчёт, без подходов.
+  type: 'miss', durationMin: min, equipment: 'running', dayOfWeek: dow, purpose: desc,
 });
 
 const WEEKS: CardioTemplateWeek[] = [
-  { sessions: [iv(55, '8×400 м I / 2.5 мин трусцой.', 1), easy(45, 3), long(65, 'ровно.', 5), rec(30, 6)], phase: 'base', note: 'Втягивание: 400-ки, следите за одинаковым временем кругов.' },
-  { sessions: [iv(60, '6×600 м I / 3 мин трусцой.', 1), easy(45, 3), long(75, 'чуть длиннее.', 5), rec(30, 6)], phase: 'base' },
-  { sessions: [iv(65, '5×800 м I / 3 мин трусцой.', 1), easy(45, 3), long(85, 'спокойно.', 5), rec(35, 6)], phase: 'build', note: 'Пик объёма интервалов — затем разгрузка.' },
+  { sessions: [iv(55, '8×400 м I / 2.5 мин трусцой.', 1, { workSec: 90, restSec: 150, reps: 8 }), easy(45, 3), long(65, 'ровно.', 5), rec(30, 6)], phase: 'base', note: 'Втягивание: 400-ки, следите за одинаковым временем кругов.' },
+  { sessions: [iv(60, '6×600 м I / 3 мин трусцой.', 1, { workSec: 135, restSec: 180, reps: 6 }), easy(45, 3), long(75, 'чуть длиннее.', 5), rec(30, 6)], phase: 'base' },
+  { sessions: [iv(65, '5×800 м I / 3 мин трусцой.', 1, { workSec: 185, restSec: 180, reps: 5 }), easy(45, 3), long(85, 'спокойно.', 5), rec(35, 6)], phase: 'build', note: 'Пик объёма интервалов — затем разгрузка.' },
   { sessions: [rec(30, 6), easy(40, 1), long(55, 'укороченная.', 5), rec(25, 3)], phase: 'base', deload: true, note: 'Делод: скорость не трогаем, восстанавливаемся.' },
-  { sessions: [iv(70, '4×1000 м I / 3 мин трусцой — специфика 5К.', 1), easy(45, 3), long(90, 'последняя большая.', 5), rec(35, 6)], phase: 'build', note: 'Ключевая сессия блока: 1000-ки в темпе цели.' },
-  { sessions: [speed(45, 'Подводка: 6×200 м R / полное восстановление.', 1), easy(35, 3), rec(25, 5), race(50, 'ГОНКА 5К: цель — личный рекорд!', 6)], phase: 'peak', taper: true, note: 'Taper + гонка 5К.' },
+  { sessions: [iv(70, '4×1000 м I / 3 мин трусцой — специфика 5К.', 1, { workSec: 230, restSec: 180, reps: 4 }), easy(45, 3), long(90, 'последняя большая.', 5), rec(35, 6)], phase: 'build', note: 'Ключевая сессия блока: 1000-ки в темпе цели.' },
+  { sessions: [speed(45, 'Подводка: 6×200 м R / полное восстановление.', 1, { workSec: 35, restSec: 145, reps: 6 }), easy(35, 3), rec(25, 5), race(50, 'ГОНКА 5К: цель — личный рекорд!', 6)], phase: 'peak', taper: true, note: 'Taper + гонка 5К.' },
 ];
 
 export const CARDIO_RUN_VO2MAX_6: CardioCycleTemplate = {

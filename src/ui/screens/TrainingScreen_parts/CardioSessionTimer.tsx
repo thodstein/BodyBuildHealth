@@ -2,12 +2,19 @@
  * CardioSessionTimer.tsx — «рабочий» режим кардио: быстрый старт сессии
  * с таймером (пауза/завершение), ввод RPE/ЧСС и запись в дневник
  * (he_cardio_sessions) одним действием.
+ *
+ * Аудит 2026-11, ч.2: если у сессии есть машиночитаемая структура
+ * (`structured`: работа/отдых/подходы), таймер ведёт по шагам — «Работа 3/8»,
+ * обратный отсчёт шага, бип на смене, «Дальше» для пропуска шага и факт по
+ * подходам в дневнике. Раньше был один отсчёт на всю сессию: текст обещал
+ * «8×1 мин», а атлет считал подходы в голове. Без структуры — прежнее поведение.
  */
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   cardioSessionsForDate, cardioSessionProtocol, rescheduleCardioSession,
+  buildCardioIntervalPlan, cardioIntervalStepAt, cardioIntervalDoneWork,
   cardioEquipmentLabel,
-  type CardioCycle, type CardioType, type CardioEquipment,
+  type CardioCycle, type CardioType, type CardioEquipment, type CardioIntervalPlan, type CardioStructuredBlock,
 } from '../../../engines/lms/cardio.engine';
 import { saveCardioLogEntry, loadCardioLog, estimateCardioEntryKcal, cardioExpectedDistanceHint, validateCardioLogFields, CARDIO_SPORT_RU, type CardioSport, type CardioLogFieldWarnings } from '../../../engines/lms/cardio-diary.engine';
 import { getWeightLog } from '../../../engines/profile-store';
@@ -21,6 +28,10 @@ const INPUT: React.CSSProperties = {
 };
 
 const TYPE_LABEL: Record<CardioType, string> = { zone2: 'Zone 2', hiit: 'HIIT', miss: 'MISS', recovery: 'Recovery' };
+
+const STEP_COLOR: Record<'warmup' | 'work' | 'rest' | 'cooldown', string> = {
+  warmup: '#60a5fa', work: '#f59e0b', rest: '#22c55e', cooldown: '#60a5fa',
+};
 
 function todayIso(): string {
   const d = new Date();
@@ -53,10 +64,13 @@ function vibrate(pattern: number | number[]) {
 interface ActiveSession {
   type: CardioType;
   durationMin: number;
+  /** Полная длительность сессии в секундах: структура (если есть) или план. */
+  totalSec: number;
   remainingSec: number;
   paused: boolean;
   targetHr?: { min?: number; max?: number };
   equipment?: CardioEquipment;
+  plan: CardioIntervalPlan | null;
 }
 
 interface FinishedSession {
@@ -68,6 +82,13 @@ interface FinishedSession {
   /** true — завершено досрочно (факт < план). */
   partial: boolean;
   equipment?: CardioEquipment;
+  /** Интервалы: план/факт по подходам (только если была структура). */
+  intervalsPlanned?: number;
+  intervalsDone?: number;
+  workSec?: number;
+  restSec?: number;
+  /** Длительность по структуре (может быть меньше durationMin, если структура короче). */
+  structureMin?: number;
 }
 
 interface TodaySession {
@@ -75,13 +96,16 @@ interface TodaySession {
   durationMin: number;
   targetHr?: { min?: number; max?: number };
   equipment?: CardioEquipment;
+  structured?: CardioStructuredBlock[];
 }
+
+const elapsedOf = (s: Pick<ActiveSession, 'totalSec' | 'remainingSec'>) => Math.max(0, s.totalSec - s.remainingSec);
 
 export const CardioSessionTimer: React.FC<{ cycle: CardioCycle | null; onSaved?: () => void; onReschedule?: (next: CardioCycle) => void }> = ({ cycle, onSaved, onReschedule }) => {
   const [todaySessions, setTodaySessions] = useState<TodaySession[]>(() => {
     if (!cycle) return [];
     const t = cardioSessionsForDate(cycle, todayIso(), cycle.startDate);
-    return t ? t.sessions.map(s => ({ type: s.type, durationMin: s.durationMin, targetHr: s.targetHr, equipment: s.equipment })) : [];
+    return t ? t.sessions.map(s => ({ type: s.type, durationMin: s.durationMin, targetHr: s.targetHr, equipment: s.equipment, structured: s.structured })) : [];
   });
   const [active, setActive] = useState<ActiveSession | null>(null);
   const [finished, setFinished] = useState<FinishedSession | null>(null);
@@ -107,7 +131,7 @@ const [power, setPower] = useState('');
   useEffect(() => {
     if (!cycle) { setTodaySessions([]); return; }
     const t = cardioSessionsForDate(cycle, todayIso(), cycle.startDate);
-    setTodaySessions(t ? t.sessions.map(s => ({ type: s.type, durationMin: s.durationMin, targetHr: s.targetHr, equipment: s.equipment })) : []);
+    setTodaySessions(t ? t.sessions.map(s => ({ type: s.type, durationMin: s.durationMin, targetHr: s.targetHr, equipment: s.equipment, structured: s.structured })) : []);
   }, [cycle]);
 
   const deadlineRef = useRef<number | null>(null);
@@ -150,25 +174,58 @@ const [power, setPower] = useState('');
 
   // 3-2-1: один бип на каждое значение (раньше на 00:01 срабатывали и бип
   // завершения, и бип обратного отсчёта, а таймер замирал на 00:01).
+  // Интервальный режим: сигнал на КАЖДОЙ смене шага (работа ↔ отдых) и
+  // обратный отсчёт до конца шага, а не до конца сессии.
   const lastBeepSecRef = useRef<number | null>(null);
+  const lastStepRef = useRef<number | null>(null);
   useEffect(() => {
-    if (!active) { lastBeepSecRef.current = null; return; }
-    if (active.remainingSec <= 0) {
+    if (!active) { lastBeepSecRef.current = null; lastStepRef.current = null; return; }
+    const finish = (intervalsDone?: number) => {
       if (timerRef.current != null) window.clearInterval(timerRef.current);
       deadlineRef.current = null;
       pausedRemainingRef.current = null;
       lastBeepSecRef.current = null;
+      lastStepRef.current = null;
       beep(880, 300);
       vibrate([120, 80, 120]);
-      // Факт = план: таймер дошёл до нуля сам.
+      const total = active.totalSec;
+      const structureMin = Math.round(total / 60);
+      // Факт = план структуры: таймер дошёл до нуля сам.
       setFinished({
-        type: active.type, plannedMin: active.durationMin, actualMin: active.durationMin,
+        type: active.type, plannedMin: structureMin, actualMin: structureMin,
         partial: false, equipment: active.equipment,
+        intervalsPlanned: active.plan?.workSteps,
+        intervalsDone: active.plan ? (intervalsDone ?? active.plan.workSteps) : undefined,
+        workSec: active.plan?.workSec,
+        restSec: active.plan?.restSec,
+        structureMin: active.plan ? structureMin : undefined,
       });
       setActive(null);
+    };
+    if (active.remainingSec <= 0) {
+      finish(active.plan ? active.plan.workSteps : undefined);
       return;
     }
     if (active.paused) return;
+
+    const elapsed = elapsedOf(active);
+    const plan = active.plan;
+    if (plan) {
+      const info = cardioIntervalStepAt(plan, elapsed);
+      if (lastStepRef.current != null && lastStepRef.current !== info.index) {
+        // Смена шага: короткий сигнал (работа — выше, отдых — ниже).
+        beep(info.step.kind === 'work' ? 980 : 620, 200);
+        vibrate(info.step.kind === 'work' ? [90, 60, 90] : 70);
+      }
+      lastStepRef.current = info.index;
+      if (info.stepRemainingSec > 0 && info.stepRemainingSec <= 3 && lastBeepSecRef.current !== info.stepRemainingSec) {
+        lastBeepSecRef.current = info.stepRemainingSec;
+        beep(660, 120);
+        if (info.stepRemainingSec === 1) vibrate(120);
+      }
+      return;
+    }
+
     if (active.remainingSec <= 3 && lastBeepSecRef.current !== active.remainingSec) {
       lastBeepSecRef.current = active.remainingSec;
       beep(660, 120);
@@ -208,10 +265,12 @@ const [power, setPower] = useState('');
 
   const flashMsg = (m: string) => { setFlash(m); window.setTimeout(() => setFlash(null), 3000); };
 
-  const start = (type: CardioType, durationMin: number, targetHr?: { min?: number; max?: number }, equipment?: CardioEquipment) => {
+  const start = (s: TodaySession) => {
     deadlineRef.current = null;
     pausedRemainingRef.current = null;
-    setActive({ type, durationMin, remainingSec: durationMin * 60, paused: false, targetHr, equipment });
+    const plan = buildCardioIntervalPlan({ type: s.type, durationMin: s.durationMin, structured: s.structured });
+    const totalSec = plan ? plan.totalSec : s.durationMin * 60;
+    setActive({ type: s.type, durationMin: s.durationMin, totalSec, remainingSec: totalSec, paused: false, targetHr: s.targetHr, equipment: s.equipment, plan });
     setFinished(null);
   };
 
@@ -224,16 +283,36 @@ const [power, setPower] = useState('');
     vibrate(140);
     // Аудит 2026-11: досрочное завершение записывалось как ПОЛНЫЙ план —
     // журнал «подтверждал» минуты, которых не было. Теперь факт = отработанное.
-    const elapsedSec = Math.max(0, active.durationMin * 60 - active.remainingSec);
+    const elapsedSec = elapsedOf(active);
     const actualMin = Math.max(0, Math.round(elapsedSec / 60));
+    const plannedMin = Math.max(1, Math.round(active.totalSec / 60));
     setFinished({
       type: active.type,
-      plannedMin: active.durationMin,
+      plannedMin,
       actualMin,
-      partial: actualMin < active.durationMin,
+      partial: elapsedSec < active.totalSec,
       equipment: active.equipment,
+      intervalsPlanned: active.plan?.workSteps,
+      intervalsDone: active.plan ? cardioIntervalDoneWork(active.plan, elapsedSec) : undefined,
+      workSec: active.plan?.workSec,
+      restSec: active.plan?.restSec,
+      structureMin: active.plan ? plannedMin : undefined,
     });
     setActive(null);
+  };
+
+  /** Пропустить текущий шаг интервалов (отдых затянулся / отрезок не пошёл). */
+  const skipStep = () => {
+    if (!active?.plan) return;
+    const info = cardioIntervalStepAt(active.plan, elapsedOf(active));
+    const cut = Math.max(1, info.stepRemainingSec);
+    beep(520, 90);
+    if (active.paused) {
+      pausedRemainingRef.current = Math.max(0, active.remainingSec - cut);
+    } else if (deadlineRef.current != null) {
+      deadlineRef.current -= cut * 1000;
+    }
+    setActive(prev => prev ? { ...prev, remainingSec: Math.max(0, prev.remainingSec - cut) } : null);
   };
 
   const save = () => {
@@ -263,6 +342,9 @@ const [power, setPower] = useState('');
         ffmKg = Math.round(weight * (1 - bf / 100) * 10) / 10;
       }
     } catch { /* ignore */ }
+    const intervalNote = finished.intervalsPlanned
+      ? `интервалы: ${finished.intervalsDone ?? 0} из ${finished.intervalsPlanned}`
+      : null;
     saveCardioLogEntry({
       id: 'c-' + Date.now() + '-' + Math.floor(Math.random() * 1e6),
       date: todayIso(),
@@ -274,10 +356,15 @@ const [power, setPower] = useState('');
       avgHr: Number(hr) > 0 ? Number(hr) : undefined,
       calories: estimateCardioEntryKcal(finished.type, Math.max(1, finished.actualMin), weight ?? undefined, { equipment: finished.equipment, sex, ffmKg }),
       distanceKm: Number(km) > 0 ? Math.round(Number(km) * 10) / 10 : undefined,
-      notes: finished.partial ? `досрочно: ${finished.actualMin} из ${finished.plannedMin} мин` : undefined,
+      notes: [finished.partial ? `досрочно: ${finished.actualMin} из ${finished.plannedMin} мин` : null, intervalNote]
+        .filter(Boolean).join(' · ') || undefined,
       // PRO (аудит Oct 2026): средняя мощность вело-сессии — TSS по мощности
       // в PMC (точнее пульсовой оценки на ровной работе).
       avgPowerWatts: isPowerRelevant && Number(power) > 0 ? Math.round(Number(power)) : undefined,
+      intervalsPlanned: finished.intervalsPlanned,
+      intervalsDone: finished.intervalsDone,
+      workSec: finished.workSec,
+      restSec: finished.restSec,
     });
     onSaved?.();
     setFinished(null);
@@ -325,6 +412,10 @@ const [power, setPower] = useState('');
     flashMsg(`↗ Сессия перенесена на ${r.changes[0].to} (нед ${r.changes[0].week})`);
   };
 
+  // Что показывать крупно: в интервальном режиме — остаток ШАГА, иначе — сессии.
+  const activeElapsed = active ? elapsedOf(active) : 0;
+  const activeStep = active?.plan ? cardioIntervalStepAt(active.plan, activeElapsed) : null;
+
   return (
     <div className="train-cardiotimer" style={CARD}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
@@ -338,36 +429,73 @@ const [power, setPower] = useState('');
           <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'center' }}>
             <span style={{ fontSize: 11, color: '#fff', fontWeight: 700 }}>{TYPE_LABEL[active.type]} · {active.durationMin} мин</span>
             {active.targetHr?.max && <span style={{ fontSize: 11, fontWeight: 800, color: '#60a5fa', background: 'rgba(96,165,250,0.14)', border: '1px solid rgba(96,165,250,0.28)', borderRadius: 20, padding: '2px 8px' }}>🎯 ЧСС {active.targetHr.min}-{active.targetHr.max}</span>}
+            {active.plan && (
+              <span data-cardio="intervals" style={{ fontSize: 11, fontWeight: 800, color: '#f59e0b', background: 'rgba(245,158,11,0.14)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: 20, padding: '2px 8px' }}>
+                🔁 {active.plan.workSteps}×{fmt(active.plan.workSec)}{active.plan.restSec > 0 ? `/${fmt(active.plan.restSec)}` : ''}
+              </span>
+            )}
           </div>
-          <div role="timer" aria-live="polite" aria-atomic="true" style={{ fontSize: 54, fontWeight: 900, fontVariantNumeric: 'tabular-nums', color: active.remainingSec < 60 ? '#ef4444' : '#00e68a', lineHeight: 1, letterSpacing: -1.5, textShadow: active.remainingSec < 60 ? '0 0 24px rgba(239,68,68,0.45)' : '0 0 24px rgba(0,230,138,0.40)' }}>{fmt(active.remainingSec)}</div>
-          <div style={{ width: '100%', maxWidth: 340 }} role="progressbar" aria-valuenow={active.durationMin * 60 - active.remainingSec} aria-valuemin={0} aria-valuemax={active.durationMin * 60} aria-label="Прогресс сессии">
-            <ProgressBar value={active.durationMin * 60 - active.remainingSec} max={active.durationMin * 60} color={active.remainingSec < 60 ? '#ef4444' : '#00e68a'} height={8} />
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10.5, color: '#fff', marginTop: 5, fontVariantNumeric: 'tabular-nums' }}>
-              <span>прошло {fmt(active.durationMin * 60 - active.remainingSec)}</span>
-              <span>{active.paused ? '⏸ пауза' : '▶ в процессе'}</span>
-              <span>осталось {fmt(active.remainingSec)}</span>
-            </div>
-          </div>
-          {(() => {
-            const protocol = cardioSessionProtocol({ type: active.type, durationMin: active.durationMin });
-            const elapsed = active.durationMin * 60 - active.remainingSec;
-            let acc = 0;
-            const currentIdx = protocol.findIndex(p => { acc += p.minutes * 60; return elapsed < acc; });
-            const activeIdx = currentIdx >= 0 ? currentIdx : protocol.length - 1;
-            return (
-              <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', justifyContent: 'center' }}>
-                {protocol.map((p, i) => (
-                  <div key={p.name} style={{ fontSize: 10, padding: '4px 8px', borderRadius: 8, border: i === activeIdx ? '1px solid rgba(0,230,138,0.5)' : '1px solid rgba(255,255,255,0.08)', background: i === activeIdx ? 'rgba(0,230,138,0.12)' : 'rgba(255,255,255,0.03)', color: i === activeIdx ? '#4ade80' : '#fff' }}>
-                    {i === activeIdx ? '▶ ' : ''}{p.name} {p.minutes}м
-                  </div>
-                ))}
+
+          {activeStep ? (
+            <>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 2, alignItems: 'center' }} aria-live="polite">
+                <span data-cardio="interval-step" style={{ fontSize: 12.5, fontWeight: 900, letterSpacing: 0.4, textTransform: 'uppercase', color: STEP_COLOR[activeStep.step.kind] }}>
+                  {activeStep.step.label}
+                </span>
+                {activeStep.step.note && (
+                  <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.65)', textAlign: 'center', maxWidth: 320, lineHeight: 1.4 }}>{activeStep.step.note}</span>
+                )}
               </div>
-            );
-          })()}
+              <div role="timer" aria-live="polite" aria-atomic="true" aria-label={`Осталось в шаге: ${activeStep.step.label}`} style={{ fontSize: 54, fontWeight: 900, fontVariantNumeric: 'tabular-nums', color: activeStep.stepRemainingSec <= 10 ? STEP_COLOR[activeStep.step.kind] : '#fff', lineHeight: 1, letterSpacing: -1.5, textShadow: `0 0 24px ${STEP_COLOR[activeStep.step.kind]}55` }}>{fmt(activeStep.stepRemainingSec)}</div>
+              <div style={{ width: '100%', maxWidth: 340 }} role="progressbar" aria-valuenow={activeStep.stepElapsedSec} aria-valuemin={0} aria-valuemax={activeStep.step.sec} aria-label={`Шаг: ${activeStep.step.label}`}>
+                <ProgressBar value={activeStep.stepElapsedSec} max={Math.max(1, activeStep.step.sec)} color={STEP_COLOR[activeStep.step.kind]} height={8} />
+                <div style={{ marginTop: 4 }}>
+                  <ProgressBar value={activeElapsed} max={Math.max(1, active.totalSec)} color="rgba(255,255,255,0.35)" height={3} />
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10.5, color: '#fff', marginTop: 5, fontVariantNumeric: 'tabular-nums' }}>
+                  <span>всего {fmt(activeElapsed)}</span>
+                  <span>{active.paused ? '⏸ пауза' : '▶ в процессе'}</span>
+                  <span>из {fmt(active.totalSec)}</span>
+                </div>
+              </div>
+            </>
+          ) : (
+            <>
+              <div role="timer" aria-live="polite" aria-atomic="true" style={{ fontSize: 54, fontWeight: 900, fontVariantNumeric: 'tabular-nums', color: active.remainingSec < 60 ? '#ef4444' : '#00e68a', lineHeight: 1, letterSpacing: -1.5, textShadow: active.remainingSec < 60 ? '0 0 24px rgba(239,68,68,0.45)' : '0 0 24px rgba(0,230,138,0.40)' }}>{fmt(active.remainingSec)}</div>
+              <div style={{ width: '100%', maxWidth: 340 }} role="progressbar" aria-valuenow={activeElapsed} aria-valuemin={0} aria-valuemax={active.totalSec} aria-label="Прогресс сессии">
+                <ProgressBar value={activeElapsed} max={active.totalSec} color={active.remainingSec < 60 ? '#ef4444' : '#00e68a'} height={8} />
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10.5, color: '#fff', marginTop: 5, fontVariantNumeric: 'tabular-nums' }}>
+                  <span>прошло {fmt(activeElapsed)}</span>
+                  <span>{active.paused ? '⏸ пауза' : '▶ в процессе'}</span>
+                  <span>осталось {fmt(active.remainingSec)}</span>
+                </div>
+              </div>
+              {(() => {
+                const protocol = cardioSessionProtocol({ type: active.type, durationMin: active.durationMin });
+                const elapsed = activeElapsed;
+                let acc = 0;
+                const currentIdx = protocol.findIndex(p => { acc += p.minutes * 60; return elapsed < acc; });
+                const activeIdx = currentIdx >= 0 ? currentIdx : protocol.length - 1;
+                return (
+                  <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', justifyContent: 'center' }}>
+                    {protocol.map((p, i) => (
+                      <div key={p.name} style={{ fontSize: 10, padding: '4px 8px', borderRadius: 8, border: i === activeIdx ? '1px solid rgba(0,230,138,0.5)' : '1px solid rgba(255,255,255,0.08)', background: i === activeIdx ? 'rgba(0,230,138,0.12)' : 'rgba(255,255,255,0.03)', color: i === activeIdx ? '#4ade80' : '#fff' }}>
+                        {i === activeIdx ? '▶ ' : ''}{p.name} {p.minutes}м
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
+            </>
+          )}
+
           <div style={ROW}>
             <button style={BTN} onClick={() => setActive(prev => prev ? { ...prev, paused: !prev.paused } : null)} aria-label="Пауза">
               {active.paused ? '▶️ Продолжить' : '⏸ Пауза'}
             </button>
+            {active.plan && (
+              <button style={BTN} onClick={skipStep} aria-label="Следующий шаг">⏭ Дальше</button>
+            )}
             <button style={BTN_DANGER} onClick={finishNow}>⏹ Завершить</button>
             <button style={BTN} onClick={() => skip(active.type, active.durationMin)} title="Отметить сессию пропущенной">⏭ Пропустить</button>
           </div>
@@ -381,6 +509,12 @@ const [power, setPower] = useState('');
               ? `${finished.actualMin} из ${finished.plannedMin} мин (досрочно)`
               : `${finished.actualMin} мин`} завершена — оцените сессию:
           </div>
+          {!!finished.intervalsPlanned && (
+            <div data-cardio="intervals-result" style={{ fontSize: 10.5, color: finished.intervalsDone === finished.intervalsPlanned ? '#4ade80' : '#fbbf24', lineHeight: 1.45 }}>
+              🔁 Интервалы: {finished.intervalsDone ?? 0} из {finished.intervalsPlanned} подходов
+              {finished.workSec ? ` · ${fmt(finished.workSec)} работа` : ''}{finished.restSec ? ` / ${fmt(finished.restSec)} отдых` : ''}
+            </div>
+          )}
           {/* Дисциплина: без неё запись ляжет в <другое> и не попадёт в разбивку TID. */}
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
             <span style={{ ...LABEL, fontSize: 10 }}>дисциплина:</span>
@@ -429,19 +563,27 @@ const [power, setPower] = useState('');
       {!active && !finished && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           {todaySessions.length === 0 && <div style={{ fontSize: 11, color: '#fff' }}>По плану на сегодня кардио нет.</div>}
-          {todaySessions.map((s, i) => (
-            <div key={i} style={{ ...ROW, flexWrap: 'nowrap', background: 'linear-gradient(180deg, rgba(255,255,255,0.045), rgba(255,255,255,0.015))', border: '1px solid rgba(255,255,255,0.08)', borderLeft: `3px solid ${TYPE_COLOR[s.type] ?? 'rgba(255,255,255,0.16)'}`, borderRadius: 12, padding: '9px 10px', fontVariantNumeric: 'tabular-nums' }}>
-              <span style={{ fontSize: 12.5, flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
-                <span style={{ fontWeight: 800 }}>{TYPE_LABEL[s.type]} · {s.durationMin} мин{s.equipment ? ` · ${cardioEquipmentLabel(s.equipment as CardioEquipment)}` : ''}</span>
-                {s.targetHr?.max && (
-                  <span style={{ fontSize: 10.5, color: 'rgba(96,165,250,0.9)' }}>🎯 ЧСС {s.targetHr.min}-{s.targetHr.max} уд/мин</span>
-                )}
-              </span>
-              <button style={{ ...BTN_CTA, flexShrink: 0 }} onClick={() => start(s.type, s.durationMin, s.targetHr, s.equipment)} aria-label={`Старт ${TYPE_LABEL[s.type]}`}>▶️ Старт</button>
-              <button style={{ ...BTN, flexShrink: 0, minWidth: 44 }} onClick={reschedule} aria-label="Перенести на другой день">↗</button>
-              <button style={{ ...BTN, flexShrink: 0, minWidth: 44 }} onClick={() => skip(s.type, s.durationMin)} aria-label={`Пропустить ${TYPE_LABEL[s.type]}`}>⏭</button>
-            </div>
-          ))}
+          {todaySessions.map((s, i) => {
+            const plan = buildCardioIntervalPlan({ type: s.type, durationMin: s.durationMin, structured: s.structured });
+            return (
+              <div key={i} style={{ ...ROW, flexWrap: 'nowrap', background: 'linear-gradient(180deg, rgba(255,255,255,0.045), rgba(255,255,255,0.015))', border: '1px solid rgba(255,255,255,0.08)', borderLeft: `3px solid ${TYPE_COLOR[s.type] ?? 'rgba(255,255,255,0.16)'}`, borderRadius: 12, padding: '9px 10px', fontVariantNumeric: 'tabular-nums' }}>
+                <span style={{ fontSize: 12.5, flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  <span style={{ fontWeight: 800 }}>{TYPE_LABEL[s.type]} · {s.durationMin} мин{s.equipment ? ` · ${cardioEquipmentLabel(s.equipment as CardioEquipment)}` : ''}</span>
+                  {plan && (
+                    <span data-cardio="interval-hint" style={{ fontSize: 10.5, color: '#fbbf24' }}>
+                      🔁 {plan.workSteps}×{fmt(plan.workSec)}{plan.restSec > 0 ? ` / ${fmt(plan.restSec)}` : ''} — таймер ведёт по подходам
+                    </span>
+                  )}
+                  {s.targetHr?.max && (
+                    <span style={{ fontSize: 10.5, color: 'rgba(96,165,250,0.9)' }}>🎯 ЧСС {s.targetHr.min}-{s.targetHr.max} уд/мин</span>
+                  )}
+                </span>
+                <button style={{ ...BTN_CTA, flexShrink: 0 }} onClick={() => start(s)} aria-label={`Старт ${TYPE_LABEL[s.type]}`}>▶️ Старт</button>
+                <button style={{ ...BTN, flexShrink: 0, minWidth: 44 }} onClick={reschedule} aria-label="Перенести на другой день">↗</button>
+                <button style={{ ...BTN, flexShrink: 0, minWidth: 44 }} onClick={() => skip(s.type, s.durationMin)} aria-label={`Пропустить ${TYPE_LABEL[s.type]}`}>⏭</button>
+              </div>
+            );
+          })}
         </div>
       )}
     </div>

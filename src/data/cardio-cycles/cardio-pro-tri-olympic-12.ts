@@ -7,19 +7,27 @@
  * каждую неделю билда; зоны RPE 1-5, каденс вело 85-95, транзиты).
  *   Вт — плавание, Ср — бег, Чт — вело, Сб — плавание, Вс — кирпич.
  */
-import type { CardioCycleTemplate, CardioTemplateSession, CardioTemplateWeek } from './cardio-cycle-types';
+import type { CardioCycleTemplate, CardioStructuredBlock, CardioTemplateSession, CardioTemplateWeek } from './cardio-cycle-types';
 
 const RPE = 'Зоны RPE: Z1 легко · Z2 разговорно · Z3 быстро-хорошо · Z4 тяжело · Z5 максимум.';
 const swim = (min: number, desc: string, dow: number): CardioTemplateSession => ({
   type: 'zone2', durationMin: min, equipment: 'swimming', dayOfWeek: dow, purpose: `Заплыв: ${desc} ${RPE}`,
 });
-const run = (min: number, desc: string, dow: number, hard = false): CardioTemplateSession => ({
-  type: hard ? 'hiit' : /Z3/.test(desc) ? 'miss' : 'zone2',
+/**
+ * Тип по форме работы (аудит 2026-11, ч.2): повторы → «hiit» (таймер ведёт по
+ * подходам); непрерывная прогрессия зон → «miss» (один отсчёт, как в тексте).
+ */
+const sessionType = (min: number, desc: string, blocks?: CardioStructuredBlock[]): CardioTemplateSession['type'] =>
+  blocks && blocks.length > 0 ? 'hiit' : /Z[345]/.test(desc) || min >= 55 ? 'miss' : 'zone2';
+const run = (min: number, desc: string, dow: number, blocks?: CardioStructuredBlock[]): CardioTemplateSession => ({
+  type: sessionType(min, desc, blocks),
   durationMin: min, equipment: 'running', dayOfWeek: dow, purpose: `Бег: ${desc}`,
+  structured: blocks && blocks.length > 0 ? blocks.map(b => ({ ...b, target: 'rpe' as const })) : undefined,
 });
-const bike = (min: number, desc: string, dow: number, hard = false): CardioTemplateSession => ({
-  type: hard ? 'hiit' : /Z3/.test(desc) ? 'miss' : 'zone2', durationMin: min, equipment: 'cycling', dayOfWeek: dow,
+const bike = (min: number, desc: string, dow: number, blocks?: CardioStructuredBlock[]): CardioTemplateSession => ({
+  type: sessionType(min, desc, blocks), durationMin: min, equipment: 'cycling', dayOfWeek: dow,
   purpose: `Вело ${min} мин: ${desc} Каденс 85-95 RPM.`,
+  structured: blocks && blocks.length > 0 ? blocks.map(b => ({ ...b, target: 'rpe' as const })) : undefined,
 });
 const brick = (bikeMin: number, bikeDesc: string, runMin: number, runDesc: string, dow: number): CardioTemplateSession[] => [
   { ...bike(bikeMin, `${bikeDesc} + переход <3 мин (к 8-й нед <2 мин)`, dow), purpose: `Вело ${bikeMin} мин: ${bikeDesc}. Переход <3 мин!` },
@@ -39,8 +47,8 @@ const WEEKS: CardioTemplateWeek[] = [
   { sessions: [swim(40, '1000 м нон-стоп Z2.', 1), run(45, '15 Z1 + 20 Z2 + 10 Z3.', 2), bike(75, '20 Z1 + 40 Z2 + 15 Z3, 90-95 RPM.', 3), swim(35, '5×200 (30"): №4-5 Z3.', 5), ...brick(65, '20 Z1 + 30 Z3 + 15 Z1', 20, '10 Z3 + 10 Z2', 6)], phase: 'build', note: 'Объёмный пик билда.' },
   { sessions: [rec(30, 1), run(30, 'легко Z1-Z2.', 2), bike(45, 'лёгкое Z1.', 3), swim(30, 'техника 1200 м Z1.', 5), ...brick(35, 'легко Z1', 12, 'Z1', 6)], phase: 'base', deload: true, note: 'Делод: впитываем билд.' },
   { sessions: [swim(40, '1500 м нон-стоп — контроль.', 1), run(45, '15 Z1 + 20 Z2, пересечёнка.', 2), bike(80, '20 Z1 + 45 Z2 + 15 Z3, 90-95 RPM.', 3), swim(40, '4×400 (40") Z2.', 5), ...brick(70, '20 Z1 + 35 Z2 + 15 Z3', 22, '12 Z3 + 10 Z2', 6)], phase: 'build', note: 'Специфика: плавание в темпе цели 1500.' },
-  { sessions: [swim(40, '1000 Z2 + 10×50 (20"): 25 Z4 / 25 Z1.', 1), run(35, '15 Z1 + 10 Z3 + 5 Z4 + 5 Z2.', 2, true), bike(70, '20 Z1 + 2×(5 Z3 / 2.5 Z2 / 5 Z4 / 2.5 Z2) + 10 Z1, 95 RPM.', 3, true), swim(35, '5×200 (30"): №4-5 Z4.', 5), ...brick(50, '15 Z1 + 15 Z3 + 10 Z4', 20, '10 Z4 + 5 Z3 + 5 Z1', 6)], phase: 'peak', taper: true, note: 'Скоростная неделя: коротко и остро, без накопления.' },
-  { sessions: [swim(30, '500 Z1→Z2 + 10×50 (20"): 25 быстро / 25 легко.', 1), run(30, '15 Z1 + 3×3 мин Z3 (пауза 2) + 5 Z1.', 2), bike(50, '15 Z1 + 3×(5 Z3 / 3 Z1) + 10 Z1.', 3), swim(25, 'лёгкое 800 м.', 5), ...brick(30, '15 Z1 + 10 Z3 + 5 Z1', 15, '5 Z3 + 5 Z2 + 5 Z1', 6)], phase: 'taper', taper: true, note: 'Taper: объём −60%, острые касания темпа.' },
+  { sessions: [swim(40, '1000 Z2 + 10×50 (20"): 25 Z4 / 25 Z1.', 1), run(35, '15 Z1 + 10 Z3 + 5 Z4 + 5 Z2.', 2), bike(70, '20 Z1 + 2×(5 Z3 / 2.5 Z2 / 5 Z4 / 2.5 Z2) + 10 Z1, 95 RPM.', 3, [{ workSec: 300, restSec: 150, reps: 2 }, { workSec: 300, restSec: 150, reps: 2 }]), swim(35, '5×200 (30"): №4-5 Z4.', 5), ...brick(50, '15 Z1 + 15 Z3 + 10 Z4', 20, '10 Z4 + 5 Z3 + 5 Z1', 6)], phase: 'peak', taper: true, note: 'Скоростная неделя: коротко и остро, без накопления.' },
+  { sessions: [swim(30, '500 Z1→Z2 + 10×50 (20"): 25 быстро / 25 легко.', 1), run(30, '15 Z1 + 3×3 мин Z3 (пауза 2) + 5 Z1.', 2, [{ workSec: 180, restSec: 120, reps: 3 }]), bike(50, '15 Z1 + 3×(5 Z3 / 3 Z1) + 10 Z1.', 3, [{ workSec: 300, restSec: 180, reps: 3 }]), swim(25, 'лёгкое 800 м.', 5), ...brick(30, '15 Z1 + 10 Z3 + 5 Z1', 15, '5 Z3 + 5 Z2 + 5 Z1', 6)], phase: 'taper', taper: true, note: 'Taper: объём −60%, острые касания темпа.' },
   { sessions: [swim(20, '200 Z1 + 8×50: 25 быстро / 25 легко + 100 Z1.', 1), run(18, '12 Z1 + 3 Z3 + 3 Z1.', 2), bike(25, '15 Z1 + 2×2.5 мин Z3, 95 RPM.', 3), swim(15, 'раскатка 500 м.', 5), { type: 'miss', durationMin: 150, equipment: 'running', dayOfWeek: 6, purpose: 'СТАРТ: олимпийский триатлон — 1500 м / 40 км / 10 км! Раскладка: плывите ровно, вело первые 10 км спокойно, бегите по ощущению.' } ], phase: 'peak', taper: true, note: 'Taper + старт. Разложите экипировку и транзит заранее.' },
 ];
 

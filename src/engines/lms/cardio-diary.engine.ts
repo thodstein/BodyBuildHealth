@@ -63,6 +63,14 @@ export interface CardioLogEntry {
   /** PRO: средняя мощность вело-сессии (Вт) — TSS по мощности (powerTss),
    *  точнее пульсовой оценки. */
   avgPowerWatts?: number;
+  /** Интервальная сессия: план и факт по подходам (аудит 2026-11, ч.2).
+   *  Раньше журнал знал только минуты — «сделал 6 из 8 отрезков» было негде
+   *  записать, и проверка объёма интервалов врала в пользу атлета. */
+  intervalsPlanned?: number;
+  intervalsDone?: number;
+  /** Длительность работы/отдыха в подходе (сек) — по структуре сессии. */
+  workSec?: number;
+  restSec?: number;
 }
 
 export function loadCardioLog(): CardioLogEntry[] {

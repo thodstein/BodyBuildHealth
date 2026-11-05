@@ -7,13 +7,15 @@
  * ровные интервалы; финал — тест на холмистом круге):
  *   Вт — горки, Чт — лёгкий бег, Сб — длинная Z2; делод на 4-й.
  */
-import type { CardioCycleTemplate, CardioTemplateSession, CardioTemplateWeek } from './cardio-cycle-types';
+import type { CardioCycleTemplate, CardioStructuredBlock, CardioTemplateSession, CardioTemplateWeek } from './cardio-cycle-types';
 
 const HILL = 'В горку 4-8%: сильно, но подконтрольно, шаг короткий и частый; вниз — трусцой, восстанавливаясь.';
 const RW = 'Разминка 15 мин с 2-3 короткими ускорениями + заминка 10 мин.';
 
-const hill = (min: number, desc: string, dow: number): CardioTemplateSession => ({
+/** Горки: `structured` (подъём/трусца вниз × повторы) ведёт таймер по подходам. */
+const hill = (min: number, desc: string, dow: number, block: CardioStructuredBlock): CardioTemplateSession => ({
   type: 'miss', durationMin: min, equipment: 'running', dayOfWeek: dow, purpose: `${RW} ${desc} ${HILL}`,
+  structured: [{ ...block, target: 'rpe', note: 'Подъём 4-8% (силовое усилие)' }],
 });
 const easy = (min: number, dow: number): CardioTemplateSession => ({
   type: 'zone2', durationMin: min, equipment: 'running', dayOfWeek: dow, purpose: 'Лёгкий бег Z2: ровно, разговорно.',
@@ -26,12 +28,12 @@ const rec = (min: number, dow: number): CardioTemplateSession => ({
 });
 
 const WEEKS: CardioTemplateWeek[] = [
-  { sessions: [hill(55, '6×45 с в горку / трусца вниз.', 1), easy(40, 3), long(70, 'ровно по плоскому.', 5)], phase: 'base', note: 'Втягивание: короткие горки, следите за техникой.' },
-  { sessions: [hill(60, '8×60 с в горку / трусца вниз.', 1), easy(45, 3), long(75, 'спокойно.', 5)], phase: 'base' },
-  { sessions: [hill(65, '10×60 с в горку / трусца вниз.', 1), easy(45, 3), long(85, 'уверенно.', 5)], phase: 'build', note: 'Пик объёма горок — затем разгрузка.' },
+  { sessions: [hill(55, '6×45 с в горку / трусца вниз.', 1, { workSec: 45, restSec: 120, reps: 6 }), easy(40, 3), long(70, 'ровно по плоскому.', 5)], phase: 'base', note: 'Втягивание: короткие горки, следите за техникой.' },
+  { sessions: [hill(60, '8×60 с в горку / трусца вниз.', 1, { workSec: 60, restSec: 135, reps: 8 }), easy(45, 3), long(75, 'спокойно.', 5)], phase: 'base' },
+  { sessions: [hill(65, '10×60 с в горку / трусца вниз.', 1, { workSec: 60, restSec: 120, reps: 10 }), easy(45, 3), long(85, 'уверенно.', 5)], phase: 'build', note: 'Пик объёма горок — затем разгрузка.' },
   { sessions: [rec(30, 6), easy(40, 1), long(55, 'укороченная.', 5)], phase: 'base', deload: true, note: 'Делод: горки не бегаем, ноги отдыхают.' },
-  { sessions: [hill(70, '6×90 с в горку / трусца вниз — длинные подъёмы.', 1), easy(45, 3), long(90, 'последняя большая.', 5)], phase: 'build', note: 'Ключевая: длинные подъёмы — сила-выносливость.' },
-  { sessions: [hill(50, 'Подводка: 4×60 с в горку / полностью вниз.', 1), easy(35, 3), { type: 'hiit', durationMin: 55, equipment: 'running', dayOfWeek: 5, purpose: 'ТЕСТ: 5 км по холмистому кругу — сравните с ровным тестом.' }], phase: 'peak', taper: true, note: 'Taper + холмистый тест 5К.' },
+  { sessions: [hill(70, '6×90 с в горку / трусца вниз — длинные подъёмы.', 1, { workSec: 90, restSec: 150, reps: 6 }), easy(45, 3), long(90, 'последняя большая.', 5)], phase: 'build', note: 'Ключевая: длинные подъёмы — сила-выносливость.' },
+  { sessions: [hill(50, 'Подводка: 4×60 с в горку / полностью вниз.', 1, { workSec: 60, restSec: 180, reps: 4 }), easy(35, 3), { type: 'miss', durationMin: 55, equipment: 'running', dayOfWeek: 5, purpose: 'ТЕСТ: 5 км по холмистому кругу — сравните с ровным тестом.', structured: [{ workSec: 1500, restSec: 0, reps: 1, target: 'pace', note: 'Тест 5К по холмистому кругу — непрерывно' }] }], phase: 'peak', taper: true, note: 'Taper + холмистый тест 5К.' },
 ];
 
 export const CARDIO_RUN_HILLS_6: CardioCycleTemplate = {

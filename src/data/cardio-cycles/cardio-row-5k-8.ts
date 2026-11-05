@@ -7,12 +7,14 @@
  * тяга без «дёргания») и British Rowing рекомендаций по сплиту
  * (цель 5К ↔ темп на 500 м). Всё в метрах и сплитах, без выдуманных кг.
  */
-import type { CardioCycleTemplate, CardioTemplateSession, CardioTemplateWeek } from './cardio-cycle-types';
+import type { CardioCycleTemplate, CardioStructuredBlock, CardioTemplateSession, CardioTemplateWeek } from './cardio-cycle-types';
 
 const TECH = 'Техника: ровная тяга 1:2 (тяга:возврат), rate 22-26, дыхание по гребкам.';
 const RW = 'Разминка 5-10 мин лёгкой гребли + заминка 5 мин.';
-const iv = (min: number, desc: string, dow: number): CardioTemplateSession => ({
+/** Интервалы в метрах: `structured` (работа/отдых/подходы) ведёт таймер. */
+const iv = (min: number, desc: string, dow: number, block: CardioStructuredBlock): CardioTemplateSession => ({
   type: 'hiit', durationMin: min, equipment: 'rowing', dayOfWeek: dow, purpose: `${RW} ${desc}`,
+  structured: [{ ...block, target: 'pace', note: 'Сплит 500 м по цели 5К' }],
 });
 const tempo = (min: number, desc: string, dow: number): CardioTemplateSession => ({
   type: 'miss', durationMin: min, equipment: 'rowing', dayOfWeek: dow, purpose: `${RW} ${desc} Сплит: цель 5К +2-3 с/500 м. ${TECH}`,
@@ -25,14 +27,14 @@ const rec = (min: number, dow: number): CardioTemplateSession => ({
 });
 
 const WEEKS: CardioTemplateWeek[] = [
-  { sessions: [iv(45, '4×1000 м / 3 мин лёгкой гребли.', 1), steady(30, 'ровно.', 3), tempo(35, '3000 м нон-стоп.', 5), rec(25, 6)], phase: 'base', note: 'Втягивание: запишите сплит 3000 м — это ориентир.' },
-  { sessions: [iv(50, '6×3 мин / 2 мин.', 1), steady(35, 'ровно.', 3), tempo(40, '4000 м.', 5), rec(25, 6)], phase: 'base' },
-  { sessions: [iv(55, '5×1500 м / 3 мин.', 1), steady(35, 'ровно.', 3), tempo(45, '5000 м.', 5), rec(25, 6)], phase: 'build', note: 'Пик первой волны.' },
+  { sessions: [iv(45, '4×1000 м / 3 мин лёгкой гребли.', 1, { workSec: 240, restSec: 180, reps: 4 }), steady(30, 'ровно.', 3), tempo(35, '3000 м нон-стоп.', 5), rec(25, 6)], phase: 'base', note: 'Втягивание: запишите сплит 3000 м — это ориентир.' },
+  { sessions: [iv(50, '6×3 мин / 2 мин.', 1, { workSec: 180, restSec: 120, reps: 6 }), steady(35, 'ровно.', 3), tempo(40, '4000 м.', 5), rec(25, 6)], phase: 'base' },
+  { sessions: [iv(55, '5×1500 м / 3 мин.', 1, { workSec: 360, restSec: 180, reps: 5 }), steady(35, 'ровно.', 3), tempo(45, '5000 м.', 5), rec(25, 6)], phase: 'build', note: 'Пик первой волны.' },
   { sessions: [rec(25, 1), steady(30, 'легко.', 3), steady(30, 'легко.', 5), rec(20, 6)], phase: 'base', deload: true, note: 'Делод: интервалы не гребём.' },
-  { sessions: [iv(45, '8×500 м / 2 мин — быстро.', 1), steady(35, 'ровно.', 3), tempo(45, '5000 м.', 5), rec(25, 6)], phase: 'build', note: 'Скоростная неделя: короткие отрезки.' },
-  { sessions: [iv(55, '3×2000 м / 4 мин — на целевом сплите 5К.', 1), steady(35, 'ровно.', 3), tempo(50, '6000 м.', 5), rec(25, 6)], phase: 'build', note: 'Ключевая: 2000-ки — сплит цели.' },
-  { sessions: [iv(40, 'Подводка: 4×500 м бодро / полное восстановление.', 1), steady(30, 'легко.', 3), rec(20, 5), rec(25, 6)], phase: 'taper', taper: true, note: 'Taper: объём −35%, скорость свежая.' },
-  { sessions: [iv(35, 'Подводка: 3×250 м по сплиту цели / полный отдых.', 1), rec(25, 3), rec(20, 5), { type: 'hiit', durationMin: 45, equipment: 'rowing', dayOfWeek: 6, purpose: 'ТЕСТ 5К: разминка 10 мин + 5000 м на максимум! Сравните сплит с 3000 м недели 1.' }], phase: 'peak', taper: true, note: 'Неделя теста 5К.' },
+  { sessions: [iv(45, '8×500 м / 2 мин — быстро.', 1, { workSec: 120, restSec: 120, reps: 8 }), steady(35, 'ровно.', 3), tempo(45, '5000 м.', 5), rec(25, 6)], phase: 'build', note: 'Скоростная неделя: короткие отрезки.' },
+  { sessions: [iv(55, '3×2000 м / 4 мин — на целевом сплите 5К.', 1, { workSec: 480, restSec: 240, reps: 3 }), steady(35, 'ровно.', 3), tempo(50, '6000 м.', 5), rec(25, 6)], phase: 'build', note: 'Ключевая: 2000-ки — сплит цели.' },
+  { sessions: [iv(40, 'Подводка: 4×500 м бодро / полное восстановление.', 1, { workSec: 115, restSec: 165, reps: 4 }), steady(30, 'легко.', 3), rec(20, 5), rec(25, 6)], phase: 'taper', taper: true, note: 'Taper: объём −35%, скорость свежая.' },
+  { sessions: [iv(35, 'Подводка: 3×250 м по сплиту цели / полный отдых.', 1, { workSec: 60, restSec: 180, reps: 3 }), rec(25, 3), rec(20, 5), { type: 'miss', durationMin: 45, equipment: 'rowing', dayOfWeek: 6, purpose: 'ТЕСТ 5К: разминка 10 мин + 5000 м на максимум! Сравните сплит с 3000 м недели 1.', structured: [{ workSec: 1300, restSec: 0, reps: 1, target: 'pace', note: 'Тест 5К на результат — непрерывно' }] }], phase: 'peak', taper: true, note: 'Неделя теста 5К.' },
 ];
 
 export const CARDIO_ROW_5K_8: CardioCycleTemplate = {

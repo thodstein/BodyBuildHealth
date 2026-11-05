@@ -185,9 +185,9 @@ export const CardioDiaryPanel: React.FC<{ cycle: CardioCycle | null; acwr?: numb
   };
 
   const exportCsv = () => {
-    const head = 'Дата,Тип,Минуты,Км,Темп,Ккал,ЧСС,RPE,Завершено\n';
+    const head = 'Дата,Тип,Минуты,Км,Темп,Ккал,ЧСС,RPE,Интервалы,Завершено\n';
     const body = log.map(e =>
-      [e.date, TYPE_LABEL[e.type], e.durationMin, e.distanceKm ?? '', cardioPaceMinPerKm(e.distanceKm, e.durationMin) ?? '', e.calories ?? '', e.avgHr ?? '', e.rpe ?? '', e.completed ? 'да' : 'нет'].map(csvEscape).join(','),
+      [e.date, TYPE_LABEL[e.type], e.durationMin, e.distanceKm ?? '', cardioPaceMinPerKm(e.distanceKm, e.durationMin) ?? '', e.calories ?? '', e.avgHr ?? '', e.rpe ?? '', e.intervalsPlanned ? `${e.intervalsDone ?? 0}/${e.intervalsPlanned}` : '', e.completed ? 'да' : 'нет'].map(csvEscape).join(','),
     ).join('\n');
     // АПК: <a download> файл не сохраняет — канон saveCsvApk (BOM внутри).
     void saveCsvApk(`cardio-log-${todayIso()}.csv`, head + body)
@@ -348,6 +348,15 @@ export const CardioDiaryPanel: React.FC<{ cycle: CardioCycle | null; acwr?: numb
                 {e.completed !== false && e.rpe != null && <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.72)' }}>RPE {e.rpe}</span>}
                 {e.completed !== false && e.avgHr != null && <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.72)' }}>{e.avgHr} уд</span>}
                 {e.completed !== false && e.calories != null && e.calories > 0 && <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.72)' }}>{e.calories} ккал</span>}
+                {e.completed !== false && !!e.intervalsPlanned && (
+                  <span
+                    data-cardio="diary-intervals"
+                    title={`Работа ${Math.round((e.workSec ?? 0) / 60 * 10) / 10} мин${e.restSec ? ` / отдых ${Math.round((e.restSec ?? 0) / 60 * 10) / 10} мин` : ''}`}
+                    style={{ fontSize: 10.5, fontWeight: 800, color: (e.intervalsDone ?? 0) >= e.intervalsPlanned ? '#4ade80' : '#fbbf24', background: 'rgba(245,158,11,0.10)', border: '1px solid rgba(245,158,11,0.28)', borderRadius: 20, padding: '3px 8px' }}
+                  >
+                    🔁 {e.intervalsDone ?? 0}/{e.intervalsPlanned}
+                  </span>
+                )}
                 {e.completed !== false && e.distanceKm != null && e.distanceKm > 0 && (
                   <>
                     <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.72)' }}>{e.distanceKm} км</span>

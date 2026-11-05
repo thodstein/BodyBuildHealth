@@ -3595,6 +3595,139 @@ export function buildStructuredIntervals(session: CardioSession, zones?: HeartZo
   }
   return [];
 }
+// ─── Интервальный таймер: раскладка структуры в шаги (аудит 2026-11, ч.2) ───
+//
+// Дефект: шаблоны и конструктор писали `structured` (work/rest/reps), но таймер
+// показывал ОДИН обратный отсчёт на всю сессию. Текст обещал «8×1 мин / 1 мин
+// отдыха», а на тренировке атлет видел «40:00» и сам считал подходы в голове.
+//
+// Здесь структура превращается в плоский таймлайн с шагами. Источник данных —
+// только `session.structured`: эвристика (`buildStructuredIntervals`) остаётся
+// для экспорта/текста и НЕ включает интервальный режим. Если структуры нет,
+// таймер работает как раньше (один отсчёт) — никаких выдуманных интервалов.
+//
+// Разминка/заминка не выдумываются из воздуха: они занимают РОВНО остаток
+// бюджета (`durationMin`), которого не хватило основной части, поровну и не
+// больше 20 мин каждая. Так «Σ шагов» никогда не превышает план, а интервалы
+// не «съедаются» разминкой.
+
+export interface CardioIntervalStep {
+  /** Порядковый номер шага в таймлайне (0-индекс). */
+  index: number;
+  kind: 'warmup' | 'work' | 'rest' | 'cooldown';
+  /** Длительность шага, сек. */
+  sec: number;
+  /** Номер подхода (1..N) — только для work/rest. */
+  rep?: number;
+  repsTotal?: number;
+  /** Подпись для таймера: «Работа 3/8», «Разминка». */
+  label: string;
+  note?: string;
+  hrZone?: { min?: number; max?: number };
+}
+
+export interface CardioIntervalPlan {
+  steps: CardioIntervalStep[];
+  /** Сумма всех шагов (что реально ведёт таймер). */
+  totalSec: number;
+  /** Основная часть по данным структуры (без разминки/заминки). */
+  mainSec: number;
+  /** Бюджет сессии по плану. */
+  budgetSec: number;
+  /** Сколько шагов «работа» (подходов) всего. */
+  workSteps: number;
+  /** Сколько секунд работы в одном подходе (для записи в дневник). */
+  workSec: number;
+  restSec: number;
+  warmupSec: number;
+  cooldownSec: number;
+}
+
+/** Максимум на разминку/заминку: остальное — уже не разминка, а тренировка. */
+const MAX_EDGE_SEC = 20 * 60;
+
+/**
+ * Развернуть `structured` в таймлайн шагов. `null` — структуры нет, интервальный
+ * режим неприменим (сессия ведётся обычным отсчётом).
+ */
+export function buildCardioIntervalPlan(
+  session: Pick<CardioSession, 'type' | 'durationMin' | 'structured'>,
+): CardioIntervalPlan | null {
+  const blocks = (session.structured ?? []).filter(b => !!b && b.workSec > 0 && b.reps > 0);
+  if (blocks.length === 0) return null;
+  const mainSec = blocks.reduce((sum, b) => sum + (b.workSec + Math.max(0, b.restSec)) * b.reps, 0);
+  const budgetSec = Math.max(1, Math.round(session.durationMin * 60));
+  const slack = Math.max(0, budgetSec - mainSec);
+  const warmupSec = Math.min(MAX_EDGE_SEC, Math.floor(slack / 2));
+  const cooldownSec = Math.min(MAX_EDGE_SEC, slack - warmupSec);
+
+  const steps: CardioIntervalStep[] = [];
+  const push = (s: Omit<CardioIntervalStep, 'index'>) => { steps.push({ ...s, index: steps.length }); };
+  if (warmupSec > 0) {
+    push({ kind: 'warmup', sec: warmupSec, label: 'Разминка', note: 'Лёгкий темп, плавный подъём пульса' });
+  }
+  for (const b of blocks) {
+    for (let r = 1; r <= b.reps; r++) {
+      push({
+        kind: 'work', sec: b.workSec, rep: r, repsTotal: b.reps,
+        label: b.reps > 1 ? `Работа ${r}/${b.reps}` : 'Работа',
+        note: b.note, hrZone: b.targetHr,
+      });
+      if (b.restSec > 0) {
+        push({
+          kind: 'rest', sec: b.restSec, rep: r, repsTotal: b.reps,
+          label: b.reps > 1 ? `Отдых ${r}/${b.reps}` : 'Отдых',
+          note: 'Восстановление перед следующим отрезком',
+        });
+      }
+    }
+  }
+  if (cooldownSec > 0) {
+    push({ kind: 'cooldown', sec: cooldownSec, label: 'Заминка', note: 'Снижение темпа, дыхание' });
+  }
+  return {
+    steps,
+    totalSec: steps.reduce((sum, s) => sum + s.sec, 0),
+    mainSec,
+    budgetSec,
+    workSteps: steps.filter(s => s.kind === 'work').length,
+    workSec: blocks[0].workSec,
+    restSec: Math.max(0, blocks[0].restSec),
+    warmupSec,
+    cooldownSec,
+  };
+}
+
+/** Где мы сейчас: текущий шаг и сколько в нём осталось (по прошедшим секундам). */
+export function cardioIntervalStepAt(
+  plan: CardioIntervalPlan,
+  elapsedSec: number,
+): { step: CardioIntervalStep; index: number; stepElapsedSec: number; stepRemainingSec: number } {
+  const elapsed = Math.max(0, Math.round(elapsedSec));
+  let acc = 0;
+  for (const step of plan.steps) {
+    const end = acc + step.sec;
+    if (elapsed < end) {
+      return { step, index: step.index, stepElapsedSec: elapsed - acc, stepRemainingSec: Math.max(0, end - elapsed) };
+    }
+    acc = end;
+  }
+  const last = plan.steps[plan.steps.length - 1];
+  return { step: last, index: last.index, stepElapsedSec: last.sec, stepRemainingSec: 0 };
+}
+
+/** Сколько подходов «работа» уже закрыто (для записи факта в дневник). */
+export function cardioIntervalDoneWork(plan: CardioIntervalPlan, elapsedSec: number): number {
+  const elapsed = Math.max(0, Math.round(elapsedSec));
+  let acc = 0;
+  let done = 0;
+  for (const step of plan.steps) {
+    acc += step.sec;
+    if (step.kind === 'work' && elapsed >= acc) done++;
+  }
+  return done;
+}
+
 /** Проверка интерференции (Wilson 2012): HIIT <48ч до тяжёлых ног = penalty, Zone2 после ног = ok. */
 export function interferenceScore(legDays: number[], cardioDay: number): 'ok' | 'caution' | 'avoid' {
   if (!legDays || legDays.length === 0) return 'ok';

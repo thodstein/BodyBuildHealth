@@ -10,7 +10,7 @@
 import { describe, expect, it } from 'vitest';
 import { CARDIO_CYCLES } from '../../../data/cardio-cycles/cardio-cycle-index';
 import { buildCardioCycleFromTemplate } from '../cardio-templates.engine';
-import { buildCardioCycle, expandWeekSchedule } from '../cardio.engine';
+import { buildCardioCycle, expandWeekSchedule, buildCardioIntervalPlan } from '../cardio.engine';
 import { rankCardioCycles, scoreCardioTemplate, cardioTemplateWeeklyMinutes } from '../cardio-cycle-selector.engine';
 import type { CardioCycleTemplate } from '../../../data/cardio-cycles/cardio-cycle-types';
 
@@ -91,10 +91,47 @@ describe('шаблоны: данные сессий', () => {
     for (const t of explicit) {
       t.weeks!.forEach((w, wi) => w.sessions.forEach((s, si) => {
         const text = `${s.purpose ?? ''}`.toLowerCase();
-        const isRace = /старт|забег|гонк|марафон|race|тест 2000|half marathon/.test(text);
-        if (isRace && s.type === 'hiit' && s.durationMin >= 60) {
-          bad.push(`${t.meta.id} w${wi + 1} s${si + 1}: гонка как HIIT ${s.durationMin} мин — «${s.purpose}»`);
+        // «Предстарт» — это подводящая раскатка с отрезками, а не гонка:
+        // её исключаем, иначе настоящая интервальная сессия выглядит гонкой.
+        const isRace = !/предстарт/.test(text) && /старт|забег|гонк|марафон|race|тест \d/.test(text);
+        // Аудит 2026-11, ч.2: раньше условие было `>= 60 мин`, и тесты на 45-55 мин
+        // проходили как HIIT — таймер вёл их интервалами, которых в плане нет.
+        if (isRace && s.type === 'hiit') {
+          bad.push(`${t.meta.id} w${wi + 1} s${si + 1}: гонка/тест как HIIT ${s.durationMin} мин — «${s.purpose}»`);
         }
+      }));
+    }
+    expect(bad).toEqual([]);
+  });
+
+  it('каждая HIIT-сессия несёт машиночитаемые интервалы (structured)', () => {
+    // Иначе текст обещает «8×1 мин», а таймер ведёт один отсчёт на всю сессию:
+    // атлет считает подходы в голове, факт по подходам записать некуда.
+    const bad: string[] = [];
+    for (const t of explicit) {
+      t.weeks!.forEach((w, wi) => w.sessions.forEach((s, si) => {
+        if (s.type !== 'hiit') return;
+        if (!s.structured || s.structured.length === 0) {
+          bad.push(`${t.meta.id} w${wi + 1} s${si + 1}: HIIT без structured — «${s.purpose}»`);
+        }
+      }));
+    }
+    expect(bad).toEqual([]);
+  });
+
+  it('интервальный таймлайн не обещает больше, чем длится сессия', () => {
+    const bad: string[] = [];
+    for (const t of explicit) {
+      t.weeks!.forEach((w, wi) => w.sessions.forEach((s, si) => {
+        if (!s.structured || s.structured.length === 0) return;
+        const plan = buildCardioIntervalPlan(s);
+        if (!plan) { bad.push(`${t.meta.id} w${wi + 1} s${si + 1}: plan=null при structured`); return; }
+        if (plan.totalSec > Math.round(s.durationMin * 60)) {
+          bad.push(`${t.meta.id} w${wi + 1} s${si + 1}: таймлайн ${plan.totalSec}с > план ${s.durationMin} мин`);
+        }
+        if (plan.workSteps < 1) bad.push(`${t.meta.id} w${wi + 1} s${si + 1}: нет ни одного подхода`);
+        const lastWork = plan.steps.filter(x => x.kind === 'work').pop();
+        if (!lastWork) bad.push(`${t.meta.id} w${wi + 1} s${si + 1}: нет шагов «работа»`);
       }));
     }
     expect(bad).toEqual([]);
