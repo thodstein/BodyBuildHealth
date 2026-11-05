@@ -651,3 +651,61 @@ APK запекает `dist/` в момент сборки, поэтому сам
    авто-откат на встроенный dist. Данные (IndexedDB/localStorage) общие,
    бандл меняет только код.
 4. Откат вручную: `resetToBuiltInBundle()` из `src/core/live-update.ts`.
+
+## 12.2. Релиз одной командой (всё делает GitHub)
+
+```bash
+npm run release:apk                 # 3.0.0 -> 3.0.1: версии, коммит, тег v3.0.1, push
+npm run release:apk -- --version 3.1.0   # конкретная версия
+npm run release:apk -- --dry-run    # только показать план
+npm run release:apk -- --no-push    # версии и тег локально, push вручную
+```
+
+Скрипт `scripts/release-apk.mjs` поднимает `versionCode` (+1) и `versionName`
+в `android/app/build.gradle`, версию в `package.json`, коммитит **только эти
+два файла** (посторонний WIP в дереве не попадает), ставит аннотированный тег
+`vX.Y.Z` и пушит ветку с тегом. Дальше CI (`android-apk.yml`, триггер
+`push: tags: v*`) собирает и публикует GitHub Release: `app-release.apk`
+(или `app-debug.apk`) + `web-bundle-<tag>.zip` для OTA. Телефон сам покажет
+баннер обновления.
+
+### Почему keystore не кладём в проект и не «берём из секретов»
+
+Секреты Actions в GitHub **write-only**: их значение нельзя прочитать ни
+через API, ни через `gh`, ни из репозитория — только перезаписать. Поэтому
+«вытащить `ANDROID_KEYSTORE_BASE64` в локальную папку» технически невозможно,
+и это правильно: ключ должен жить в одном месте — в секрете.
+
+Локальная копия нужна ровно в одном случае — если вы собираете APK на своей
+машине и хотите, чтобы он вставал поверх CI-сборок. Тогда положите файл
+самостоятельно (он в `.gitignore`):
+
+```bash
+# android/app/he-release.keystore — тот же файл, что лежит в секрете
+# android/keystore.properties:
+storeFile=he-release.keystore
+storePassword=<пароль>
+keyAlias=<алиас>
+keyPassword=<пароль>
+```
+
+После этого `assembleDebug` локально тоже подписывается release-ключом, и
+локальные сборки взаимозаменяемы с CI.
+
+### Разовая миграция, если APK собран локально без keystore
+
+CI подписывает всё release-ключом, локальная сборка без `keystore.properties`
+— debug-ключом (`CN=Android Debug`). Android не ставит обновление поверх
+другой подписи (`INSTALL_FAILED_UPDATE_INCOMPATIBLE`), при этом старая версия
+остаётся на месте — снаружи это выглядит как «правок нет». Проверить подпись
+установленного APK:
+
+```bash
+# Windows: build-tools из SDK
+apksigner.bat verify --print-certs <путь к apk>
+```
+
+Переезд делается один раз: удалить приложение (или установить APK той же
+подписью — например, собранный локально), дальше все обновления из GitHub
+встают поверх молча, а обычные правки `src/` вообще не требуют переустановки
+(§12.1).
