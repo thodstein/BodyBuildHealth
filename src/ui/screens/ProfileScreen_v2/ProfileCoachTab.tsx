@@ -5,8 +5,8 @@
  *  • выключатель режима — в профиле, как просил пользователь;
  *  • разделы: реальные направления приложения (Тренировки, Питание, Анализы,
  *    Риски, Фарма, БАДы) — их можно выбрать все, по отдельности или снять все;
- *  • атлеты: до 20 карточек; при достижении лимита добавление блокируется и
- *    ПРИЧИНА написана текстом, а не «кнопка молча не работает»;
+ *  • атлеты: без ограничения по количеству; пустое имя — единственный отказ,
+ *    и ПРИЧИНА написана текстом, а не «кнопка молча не работает»;
  *  • активный атлет — тот, с кем тренер работает сейчас; удаление активного
  *    корректно сбрасывает выбор (движок это гарантирует);
  *  • «Войти в его данные» — переключение приложения в пространство данных атлета
@@ -19,18 +19,22 @@ import { NativeIcon } from '../../native/NativeIcons';
 import { colors, withAlpha } from './ui';
 import {
   COACH_SECTIONS,
+  COACH_STATUS_LABELS,
   addCoachAthlete,
   coachActiveAthlete,
+  coachStatusCounts,
   coachToday,
   readCoachState,
   removeCoachAthlete,
   selectAllCoachSections,
   setActiveCoachAthlete,
+  setCoachAthleteStatus,
   setCoachEnabled,
   toggleCoachSection,
   updateCoachAthlete,
   writeCoachState,
   type CoachAthlete,
+  type CoachAthleteStatus,
   type CoachSectionId,
   type CoachSex,
   type CoachState,
@@ -60,9 +64,21 @@ import {
   type AthleteSnapshot,
 } from '../../../engines/coach/coach-athlete-snapshot.engine';
 import {
+  adherenceLine,
+  computeAdherence,
+  weekStartOf,
+  type AdherenceResult,
+} from '../../../engines/coach/coach-adherence.engine';
+import {
+  buildCoachInbox,
+  inboxSummary,
+} from '../../../engines/coach/coach-inbox.engine';
+import {
+  addCoachNote,
   countNotesForAthlete,
   emptyCoachNotes,
   readCoachNotes,
+  weekNoteFor,
   writeCoachNotes,
   type CoachNotesStore,
 } from '../../../engines/coach/coach-notes.engine';
@@ -156,6 +172,12 @@ interface AthleteForm {
   direction: string;
   goal: string;
   note: string;
+  status: CoachAthleteStatus;
+  group: string;
+  /** Метки строкой «сила, спина» — в карточке хранятся массивом. */
+  tags: string;
+  contact: string;
+  startedAt: string;
 }
 
 const EMPTY_FORM: AthleteForm = {
@@ -167,6 +189,11 @@ const EMPTY_FORM: AthleteForm = {
   direction: '',
   goal: '',
   note: '',
+  status: 'active',
+  group: '',
+  tags: '',
+  contact: '',
+  startedAt: '',
 };
 
 const formFromAthlete = (a: CoachAthlete): AthleteForm => ({
@@ -178,6 +205,11 @@ const formFromAthlete = (a: CoachAthlete): AthleteForm => ({
   direction: a.direction,
   goal: a.goal,
   note: a.note,
+  status: a.status,
+  group: a.group,
+  tags: a.tags.join(', '),
+  contact: a.contact,
+  startedAt: a.startedAt,
 });
 
 const cardStyle: React.CSSProperties = {
@@ -275,20 +307,27 @@ export const ProfileCoachTab: React.FC<{
    * баз не должно задерживать первый рендер; сводки подставляются по мере чтения.
    */
   const [snapshots, setSnapshots] = useState<Record<string, AthleteSnapshot>>({});
+  const [adherence, setAdherence] = useState<Record<string, AdherenceResult>>({});
   const [snapshotsBusy, setSnapshotsBusy] = useState(false);
   const [snapshotsDone, setSnapshotsDone] = useState(false);
   const [snapshotsRev, setSnapshotsRev] = useState(0);
   const [attentionOnly, setAttentionOnly] = useState(false);
   const [sortMode, setSortMode] = useState<'default' | 'name' | 'inactive'>('default');
+  const [statusFilter, setStatusFilter] = useState<'live' | 'all' | 'active' | 'paused' | 'archived'>('live');
+  // Комментарий к неделе: одна открытая форма на карточку, без чата и «доставки».
+  const [weekCommentFor, setWeekCommentFor] = useState<string | null>(null);
+  const [weekDraft, setWeekDraft] = useState('');
+  const [weekError, setWeekError] = useState<string | null>(null);
+  const [notesRev, setNotesRev] = useState(0);
 
-  // Заметки/планер/журнал читаем один раз на состояние режима: сам экран их не меняет,
-  // а пересчитывать JSON на каждый символ в форме атлета незачем.
-  const { notes, planner, log } = useMemo<{
-    notes: CoachNotesStore;
+  const notes = useMemo<CoachNotesStore>(() => readCoachNotes(ls()), [state, notesRev]);
+
+  // Планер/журнал экран только читает; их состояние меняют другие вкладки.
+  const { planner, log } = useMemo<{
     planner: CoachPlannerStore;
     log: CoachLogStore;
   }>(
-    () => ({ notes: readCoachNotes(ls()), planner: readCoachPlanner(ls()), log: readCoachLog(ls()) }),
+    () => ({ planner: readCoachPlanner(ls()), log: readCoachLog(ls()) }),
     [state],
   );
 
@@ -394,6 +433,11 @@ export const ProfileCoachTab: React.FC<{
       for (const a of list) if (prev[a.id]) next[a.id] = prev[a.id];
       return next;
     });
+    setAdherence(prev => {
+      const next: Record<string, AdherenceResult> = {};
+      for (const a of list) if (prev[a.id]) next[a.id] = prev[a.id];
+      return next;
+    });
     if (!list.length) {
       setSnapshotsBusy(false);
       setSnapshotsDone(false);
@@ -435,6 +479,15 @@ export const ProfileCoachTab: React.FC<{
         const snap = buildAthleteSnapshot({ spaceId: sid, stores, readKey, today: coachToday() });
         if (cancelled) return;
         setSnapshots(prev => ({ ...prev, [a.id]: snap }));
+        // Выполнение недели считается по тем же датам: отдельного чтения базы не
+        // нужно, а план берём из рантайма тренировок этого пространства.
+        const adh = computeAdherence({
+          runtimeRaw: readKey('he_pl_runtime'),
+          sessionDates: snap.sessionDates,
+          today: coachToday(),
+        });
+        if (cancelled) return;
+        setAdherence(prev => ({ ...prev, [a.id]: adh }));
       }
       if (!cancelled) {
         setSnapshotsBusy(false);
@@ -638,6 +691,16 @@ export const ProfileCoachTab: React.FC<{
       setFormError('Имя обязательно — по нему тренер находит атлета в списке.');
       return;
     }
+    // Статус, группа, метки, контакт и дата старта — часть карточки, а не
+    // отдельная форма: сохраняются тем же «Сохранить», что и имя.
+    const extras = {
+      status: form.status,
+      group: form.group,
+      tags: form.tags,
+      contact: form.contact,
+      // Пустая дата — «не знаю»: при создании движок подставит сегодняшний день.
+      startedAt: form.startedAt.trim() || undefined,
+    };
     if (editingId) {
       apply(
         updateCoachAthlete(state, editingId, {
@@ -649,6 +712,7 @@ export const ProfileCoachTab: React.FC<{
           direction: form.direction,
           goal: form.goal,
           note: form.note,
+          ...extras,
         }),
       );
       // Переименовали атлета — имя в его пространстве данных должно обновиться
@@ -667,6 +731,7 @@ export const ProfileCoachTab: React.FC<{
       direction: form.direction,
       goal: form.goal,
       note: form.note,
+      ...extras,
     });
     if (res.error === 'name') {
       setFormError('Имя обязательно.');
@@ -920,14 +985,25 @@ export const ProfileCoachTab: React.FC<{
     reloadToApplySpace();
   };
 
-  const attentionCount = state.athletes.filter(a => snapshots[a.id]?.needsAttention).length;
+  const attentionCount = state.athletes.filter(
+    a => a.status !== 'archived' && snapshots[a.id]?.needsAttention,
+  ).length;
+
+  /** Фильтр статуса: архив скрыт по умолчанию, но данные с ним не удаляются. */
+  const statusCounts = useMemo(() => coachStatusCounts(state), [state]);
 
   const visibleAthletes = useMemo(() => {
     const q = query.trim().toLowerCase();
     let list = state.athletes;
+    if (statusFilter === 'live') list = list.filter(a => a.status !== 'archived');
+    else if (statusFilter !== 'all') list = list.filter(a => a.status === statusFilter);
     if (attentionOnly) list = list.filter(a => snapshots[a.id]?.needsAttention);
     if (q) {
-      list = list.filter(a => `${a.name} ${a.direction} ${a.goal} ${a.note}`.toLowerCase().includes(q));
+      list = list.filter(a =>
+        `${a.name} ${a.direction} ${a.goal} ${a.note} ${a.group} ${a.tags.join(' ')} ${a.contact}`
+          .toLowerCase()
+          .includes(q),
+      );
     }
     if (sortMode === 'name') {
       list = [...list].sort((a, b) => a.name.localeCompare(b.name, 'ru'));
@@ -944,7 +1020,54 @@ export const ProfileCoachTab: React.FC<{
       });
     }
     return list;
-  }, [state.athletes, query, attentionOnly, sortMode, snapshots]);
+  }, [state, query, attentionOnly, sortMode, snapshots, statusFilter]);
+
+  /**
+   * Инбокс — те же факты, что на карточках, но одной строкой «к кому идти».
+   * Строится из уже загруженных сводок: ни одного лишнего чтения базы.
+   */
+  const inbox = useMemo(
+    () =>
+      buildCoachInbox(
+        state.athletes.map(a => ({
+          athlete: a,
+          snapshot: snapshots[a.id],
+          adherence: adherence[a.id],
+        })),
+      ),
+    [state.athletes, snapshots, adherence],
+  );
+
+  const openWeekComment = (a: CoachAthlete) => {
+    if (weekCommentFor === a.id) {
+      setWeekCommentFor(null);
+      return;
+    }
+    const week = weekStartOf(coachToday());
+    const existing = weekNoteFor(notes, a.id, week);
+    setWeekDraft(existing?.body ?? '');
+    setWeekError(null);
+    setWeekCommentFor(a.id);
+  };
+
+  const saveWeekComment = (a: CoachAthlete) => {
+    const week = weekStartOf(coachToday());
+    const body = weekDraft.trim();
+    if (!body) {
+      setWeekError('Пустой комментарий не сохраняем.');
+      return;
+    }
+    const res = addCoachNote(notes, { athleteId: a.id, week, body });
+    if (res.error) {
+      setWeekError(res.error === 'limit' ? 'Лимит заметок — удалите старые в разделе «Заметки».' : 'Не удалось сохранить.');
+      return;
+    }
+    writeCoachNotes(ls(), res.store);
+    setNotesRev(v => v + 1);
+    setWeekCommentFor(null);
+    setWeekDraft('');
+    setWeekError(null);
+  };
 
   const sectionLabel = (id: CoachSectionId): string =>
     COACH_SECTIONS.find(s => s.id === id)?.label ?? id;
@@ -1149,7 +1272,9 @@ export const ProfileCoachTab: React.FC<{
               <div style={{ flex: 1, minWidth: 120 }}>
                 <div style={{ fontSize: 13.5, fontWeight: 800, color: '#fff' }}>Атлеты</div>
                 <div style={{ fontSize: 11.5, color: colors.textSubtle, fontVariantNumeric: 'tabular-nums' }}>
-                  {state.athletes.length} в списке · {state.sections.length} разделов
+                  {statusCounts.active + statusCounts.paused} в работе
+                  {statusCounts.archived > 0 ? ` · ${statusCounts.archived} в архиве` : ''}
+                  {` · ${state.sections.length} разделов`}
                 </div>
               </div>
               <input
@@ -1202,6 +1327,96 @@ export const ProfileCoachTab: React.FC<{
                 </span>
               )}
             </div>
+
+            {/*
+              Статус — не украшение: «архив» скрыт по умолчанию, чтобы список
+              оставался рабочим, но переключатель рядом, и данные архивных
+              атлетов никуда не деваются (удаление — отдельное действие).
+            */}
+            <div
+              data-coach="status-filter"
+              style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}
+            >
+              {(
+                [
+                  ['live', `В работе (${statusCounts.active + statusCounts.paused})`],
+                  ['active', `Активные (${statusCounts.active})`],
+                  ['paused', `Пауза (${statusCounts.paused})`],
+                  ['archived', `Архив (${statusCounts.archived})`],
+                  ['all', `Все (${state.athletes.length})`],
+                ] as const
+              ).map(([key, label]) => (
+                <button
+                  key={key}
+                  type="button"
+                  data-coach={`status-${key}`}
+                  aria-pressed={statusFilter === key}
+                  onClick={() => setStatusFilter(key)}
+                  style={{ ...btn(statusFilter === key ? 'primary' : 'ghost'), fontSize: 11.5, padding: '6px 10px' }}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            {/*
+              Инбокс: «к кому идти сейчас». Показываем только когда есть поводы и
+              сводки уже загружены — иначе строка была бы пустым обещанием.
+            */}
+            {snapshotsDone && inbox.length > 0 && (
+              <div
+                data-coach="inbox"
+                style={{
+                  marginTop: 10,
+                  borderRadius: 12,
+                  border: `1px solid ${withAlpha(colors.warning, '33')}`,
+                  background: withAlpha(colors.warning, '0c'),
+                  padding: 10,
+                }}
+              >
+                <div style={{ fontSize: 11.5, fontWeight: 800, color: colors.warning, marginBottom: 6 }}>
+                  Требуют внимания · {inboxSummary(inbox)}
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  {inbox.slice(0, 8).map(item => (
+                    <button
+                      key={item.key}
+                      type="button"
+                      data-coach="inbox-item"
+                      onClick={() => {
+                        // Переход в нужное место без «магии»: фильтруем список по
+                        // имени и показываем все статусы, чтобы карточка точно
+                        // нашлась, даже если она в архиве.
+                        setQuery(item.athleteName);
+                        setStatusFilter('all');
+                        setAttentionOnly(false);
+                      }}
+                      style={{
+                        display: 'flex',
+                        gap: 8,
+                        alignItems: 'baseline',
+                        textAlign: 'left',
+                        background: 'transparent',
+                        border: 'none',
+                        padding: '2px 0',
+                        cursor: 'pointer',
+                        color: 'rgba(255,255,255,0.86)',
+                        fontSize: 11.5,
+                        lineHeight: 1.4,
+                      }}
+                    >
+                      <span style={{ fontWeight: 800, color: '#fff', flexShrink: 0 }}>{item.athleteName}</span>
+                      <span style={{ color: colors.textMuted }}>{item.text}</span>
+                    </button>
+                  ))}
+                </div>
+                {inbox.length > 8 && (
+                  <div style={{ fontSize: 10.5, color: colors.textSubtle, marginTop: 4 }}>
+                    и ещё {inbox.length - 8} — сузьте фильтр по статусу
+                  </div>
+                )}
+              </div>
+            )}
 
             <div
               style={{
@@ -1300,6 +1515,64 @@ export const ProfileCoachTab: React.FC<{
                       data-coach="goal"
                     />
                   </div>
+                  <div>
+                    <label style={labelStyle} htmlFor="coach-group">Группа</label>
+                    <input
+                      id="coach-group"
+                      value={form.group}
+                      onChange={e => setForm(f => ({ ...f, group: e.target.value }))}
+                      placeholder="Вечерняя, сборная…"
+                      style={inputStyle}
+                      data-coach="group"
+                    />
+                  </div>
+                  <div>
+                    <label style={labelStyle} htmlFor="coach-started">Веду с</label>
+                    <input
+                      id="coach-started"
+                      type="date"
+                      value={form.startedAt}
+                      onChange={e => setForm(f => ({ ...f, startedAt: e.target.value }))}
+                      style={inputStyle}
+                      data-coach="started-at"
+                    />
+                  </div>
+                  <div>
+                    <label style={labelStyle} htmlFor="coach-status">Статус</label>
+                    <select
+                      id="coach-status"
+                      value={form.status}
+                      onChange={e => setForm(f => ({ ...f, status: e.target.value as CoachAthleteStatus }))}
+                      style={{ ...inputStyle, appearance: 'none' }}
+                      data-coach="status"
+                    >
+                      <option value="active">Активен</option>
+                      <option value="paused">Пауза</option>
+                      <option value="archived">Архив</option>
+                    </select>
+                  </div>
+                  <div style={{ gridColumn: '1 / -1' }}>
+                    <label style={labelStyle} htmlFor="coach-contact">Контакт</label>
+                    <input
+                      id="coach-contact"
+                      value={form.contact}
+                      onChange={e => setForm(f => ({ ...f, contact: e.target.value }))}
+                      placeholder="Телефон или ник в мессенджере — приложение ему не пишет"
+                      style={inputStyle}
+                      data-coach="contact"
+                    />
+                  </div>
+                  <div style={{ gridColumn: '1 / -1' }}>
+                    <label style={labelStyle} htmlFor="coach-tags">Метки</label>
+                    <input
+                      id="coach-tags"
+                      value={form.tags}
+                      onChange={e => setForm(f => ({ ...f, tags: e.target.value }))}
+                      placeholder="сила, спина, новичок — через запятую"
+                      style={inputStyle}
+                      data-coach="tags"
+                    />
+                  </div>
                   <div style={{ gridColumn: '1 / -1' }}>
                     <label style={labelStyle} htmlFor="coach-note">Пометка тренера</label>
                     <textarea
@@ -1332,8 +1605,12 @@ export const ProfileCoachTab: React.FC<{
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 12 }}>
               {visibleAthletes.length === 0 && (
-                <div style={{ fontSize: 12, color: colors.textMuted }}>
-                  {state.athletes.length === 0 ? 'Пока ни одного атлета — добавьте первого.' : 'По запросу никого не найдено.'}
+                <div data-coach="athletes-empty" style={{ fontSize: 12, color: colors.textMuted }}>
+                  {state.athletes.length === 0
+                    ? 'Пока ни одного атлета — добавьте первого.'
+                    : statusFilter === 'live' && statusCounts.archived > 0
+                      ? `В работе никого нет — ${statusCounts.archived} в архиве. Откройте «Архив»: данные и программы на месте.`
+                      : 'По фильтру никого не найдено.'}
                 </div>
               )}
               {visibleAthletes.map(a => {
@@ -1376,6 +1653,25 @@ export const ProfileCoachTab: React.FC<{
                           активный
                         </span>
                       )}
+                      {a.status !== 'active' && (
+                        <span
+                          data-coach="athlete-status"
+                          style={{
+                            fontSize: 10.5,
+                            fontWeight: 800,
+                            padding: '3px 8px',
+                            borderRadius: 999,
+                            color: a.status === 'archived' ? 'rgba(255,255,255,0.62)' : '#fde68a',
+                            background: a.status === 'archived' ? 'rgba(255,255,255,0.06)' : 'rgba(253,230,138,0.12)',
+                            border: '1px solid rgba(255,255,255,0.08)',
+                          }}
+                        >
+                          {COACH_STATUS_LABELS[a.status]}
+                        </span>
+                      )}
+                      {a.group && (
+                        <span style={{ fontSize: 10.5, color: colors.textMuted }}>группа: {a.group}</span>
+                      )}
                     </div>
                     <div style={{ fontSize: 11.5, color: colors.textMuted, marginTop: 3 }}>{meta.join(' · ')}</div>
                     {(a.direction || a.goal) && (
@@ -1388,6 +1684,16 @@ export const ProfileCoachTab: React.FC<{
                     {a.note && (
                       <div style={{ fontSize: 11.5, color: colors.textMuted, marginTop: 5, lineHeight: 1.45 }}>
                         {a.note}
+                      </div>
+                    )}
+                    {(a.contact || a.startedAt) && (
+                      <div
+                        data-coach="athlete-contacts"
+                        style={{ fontSize: 10.5, color: colors.textMuted, marginTop: 5, lineHeight: 1.45 }}
+                      >
+                        {a.contact ? `контакт: ${a.contact}` : ''}
+                        {a.contact && a.startedAt ? ' · ' : ''}
+                        {a.startedAt ? `веду с ${fmtShort(a.startedAt)}` : ''}
                       </div>
                     )}
                     <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 7 }}>
@@ -1404,6 +1710,22 @@ export const ProfileCoachTab: React.FC<{
                           }}
                         >
                           {sectionLabel(id)}
+                        </span>
+                      ))}
+                      {a.tags.map(tag => (
+                        <span
+                          key={`tag:${tag}`}
+                          data-coach="athlete-tag"
+                          style={{
+                            fontSize: 10.5,
+                            padding: '3px 8px',
+                            borderRadius: 999,
+                            color: '#c7f9ee',
+                            background: 'rgba(34,211,238,0.10)',
+                            border: '1px solid rgba(34,211,238,0.18)',
+                          }}
+                        >
+                          #{tag}
                         </span>
                       ))}
                       {noteCount > 0 && (
@@ -1456,6 +1778,73 @@ export const ProfileCoachTab: React.FC<{
                         style={{ marginTop: 6, fontSize: 10.5, color: colors.textSubtle, lineHeight: 1.45 }}
                       >
                         {snapshotsBusy ? 'смотрим данные…' : 'сводка не загружена'}
+                      </div>
+                    )}
+                    {adherence[a.id] && (
+                      <div
+                        data-coach="adherence"
+                        style={{ marginTop: 4, fontSize: 10.5, color: colors.textMuted, lineHeight: 1.45 }}
+                      >
+                        {adherenceLine(adherence[a.id])}
+                      </div>
+                    )}
+                    {weekCommentFor === a.id ? (
+                      <div data-coach="week-comment-editor" style={{ marginTop: 8 }}>
+                        <label style={{ ...labelStyle, marginBottom: 4 }} htmlFor={`week-comment-${a.id}`}>
+                          Комментарий к неделе
+                        </label>
+                        <textarea
+                          id={`week-comment-${a.id}`}
+                          value={weekDraft}
+                          onChange={e => setWeekDraft(e.target.value)}
+                          rows={2}
+                          placeholder="Что важно помнить по этой неделе: сон, боль, просьбы"
+                          style={{ ...inputStyle, minHeight: 58, resize: 'vertical' }}
+                          data-coach="week-comment-input"
+                        />
+                        {weekError && (
+                          <div role="alert" style={{ fontSize: 11, color: colors.danger, marginTop: 4 }}>
+                            {weekError}
+                          </div>
+                        )}
+                        <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
+                          <button
+                            type="button"
+                            data-coach="week-comment-save"
+                            onClick={() => saveWeekComment(a)}
+                            style={{ ...btn('primary'), fontSize: 11.5 }}
+                          >
+                            Сохранить
+                          </button>
+                          <button
+                            type="button"
+                            data-coach="week-comment-cancel"
+                            onClick={() => {
+                              setWeekCommentFor(null);
+                              setWeekError(null);
+                            }}
+                            style={{ ...btn('ghost'), fontSize: 11.5 }}
+                          >
+                            Отмена
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div style={{ marginTop: 6, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                        <button
+                          type="button"
+                          data-coach="week-comment-open"
+                          onClick={() => openWeekComment(a)}
+                          style={{ ...btn('ghost'), fontSize: 11, padding: '5px 9px' }}
+                          title="Короткая заметка, привязанная к этой неделе (не чат)"
+                        >
+                          Комментарий к неделе
+                        </button>
+                        {weekNoteFor(notes, a.id, weekStartOf(coachToday())) && (
+                          <span data-coach="week-comment-has" style={{ fontSize: 10.5, color: colors.textSubtle }}>
+                            комментарий есть
+                          </span>
+                        )}
                       </div>
                     )}
                     {snapshots[a.id]?.needsAttention && (
@@ -1522,6 +1911,43 @@ export const ProfileCoachTab: React.FC<{
                         >
                           Сделать активным
                         </button>
+                      )}
+                      {a.status === 'archived' ? (
+                        <button
+                          type="button"
+                          data-coach="unarchive"
+                          onClick={() => apply(setCoachAthleteStatus(state, a.id, 'active'))}
+                          style={{ ...btn('ghost'), fontSize: 12 }}
+                        >
+                          Вернуть из архива
+                        </button>
+                      ) : (
+                        <>
+                          <button
+                            type="button"
+                            data-coach={a.status === 'paused' ? 'resume' : 'pause'}
+                            onClick={() =>
+                              apply(setCoachAthleteStatus(state, a.id, a.status === 'paused' ? 'active' : 'paused'))
+                            }
+                            style={{ ...btn('ghost'), fontSize: 12 }}
+                            title={
+                              a.status === 'paused'
+                                ? 'Вернуть в работу: данные и программа остаются на месте'
+                                : 'Перерыв: карточка остаётся в списке, данные не удаляются'
+                            }
+                          >
+                            {a.status === 'paused' ? 'Снять с паузы' : 'В паузу'}
+                          </button>
+                          <button
+                            type="button"
+                            data-coach="archive"
+                            onClick={() => apply(setCoachAthleteStatus(state, a.id, 'archived'))}
+                            style={{ ...btn('ghost'), fontSize: 12 }}
+                            title="Скрыть из рабочего списка; данные и программа сохраняются"
+                          >
+                            В архив
+                          </button>
+                        </>
                       )}
                       {spaceActiveId === athleteSpaceId(a.id) ? (
                         <span

@@ -59,6 +59,20 @@ const SECTION_IDS: CoachSectionId[] = COACH_SECTIONS.map(s => s.id);
 
 export type CoachSex = 'male' | 'female' | 'unspecified';
 
+/**
+ * Состояние работы с атлетом.
+ *  • active — тренируется, виден в ростере;
+ *  • paused — перерыв (болезнь, отпуск, травма): не удаляем и не прячем;
+ *  • archived — работа закончена: скрыт по умолчанию, но данные и история остаются.
+ */
+export type CoachAthleteStatus = 'active' | 'paused' | 'archived';
+
+export const COACH_STATUS_LABELS: Record<CoachAthleteStatus, string> = {
+  active: 'активен',
+  paused: 'пауза',
+  archived: 'архив',
+};
+
 export interface CoachAthlete {
   id: string;
   name: string;
@@ -75,6 +89,16 @@ export interface CoachAthlete {
   sections: CoachSectionId[];
   /** Заметка тренера по атлету (короткая, не дневник). */
   note: string;
+  /** Статус работы (см. `CoachAthleteStatus`). */
+  status: CoachAthleteStatus;
+  /** Группа/поток свободным текстом («вечерняя», «сентябрь», «сборная»). */
+  group: string;
+  /** Метки: до 8 коротких, для фильтров и поиска. */
+  tags: string[];
+  /** Контакт свободным текстом (телефон/мессенджер). Приложение НЕ пишет ему. */
+  contact: string;
+  /** С какого дня тренер ведёт человека (`YYYY-MM-DD`). */
+  startedAt: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -119,6 +143,34 @@ function normalizeSex(v: unknown): CoachSex {
   return v === 'male' || v === 'female' ? v : 'unspecified';
 }
 
+export function normalizeCoachStatus(v: unknown): CoachAthleteStatus {
+  return v === 'paused' || v === 'archived' ? v : 'active';
+}
+
+const isoDayOf = (v: unknown): string | null => {
+  if (typeof v !== 'string') return null;
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(v.trim());
+  return m ? `${m[1]}-${m[2]}-${m[3]}` : null;
+};
+
+/** Группа/метки: строка «a, b» или массив; мусор отбрасывается. */
+export function normalizeCoachTags(raw: unknown): string[] {
+  const list = Array.isArray(raw)
+    ? raw
+    : typeof raw === 'string'
+      ? raw.split(',')
+      : [];
+  const out: string[] = [];
+  for (const item of list) {
+    const t = typeof item === 'string' ? item.replace(/\s+/g, ' ').trim().slice(0, 24) : '';
+    if (!t) continue;
+    if (out.some(x => x.toLowerCase() === t.toLowerCase())) continue;
+    out.push(t);
+    if (out.length >= 8) break;
+  }
+  return out;
+}
+
 function normalizeAthlete(raw: unknown): CoachAthlete | null {
   if (!raw || typeof raw !== 'object') return null;
   const a = raw as Partial<CoachAthlete> & Record<string, unknown>;
@@ -139,6 +191,13 @@ function normalizeAthlete(raw: unknown): CoachAthlete | null {
     goal: clampText(a.goal, MAX_TEXT_CHARS),
     sections: normalizeCoachSections(a.sections),
     note: clampText(a.note, MAX_TEXT_CHARS * 2),
+    // Старые карточки (v1) не имели статуса/группы/контакта: миграция без потерь —
+    // все становятся «активными», дата старта = дата создания карточки.
+    status: normalizeCoachStatus(a.status),
+    group: clampText(a.group, 40),
+    tags: normalizeCoachTags(a.tags),
+    contact: clampText(a.contact, 120),
+    startedAt: isoDayOf(a.startedAt) ?? isoDayOf(createdAt) ?? createdAt.slice(0, 10),
     createdAt,
     updatedAt: clampText(a.updatedAt, 40) || createdAt,
   };
@@ -253,6 +312,12 @@ export interface CoachAthletePatch {
   goal?: string;
   sections?: unknown;
   note?: string;
+  status?: CoachAthleteStatus | string;
+  group?: string;
+  /** Массив меток или строка «a, b». */
+  tags?: unknown;
+  contact?: string;
+  startedAt?: string;
 }
 
 export interface AddCoachAthleteResult {
@@ -292,6 +357,11 @@ export function addCoachAthlete(
     goal: input.goal,
     sections: input.sections ?? state.sections,
     note: input.note,
+    status: input.status,
+    group: input.group,
+    tags: input.tags,
+    contact: input.contact,
+    startedAt: input.startedAt ?? now.slice(0, 10),
     createdAt: now,
     updatedAt: now,
   }) as CoachAthlete;
@@ -323,12 +393,37 @@ export function updateCoachAthlete(
     goal: patch.goal === undefined ? prev.goal : clampText(patch.goal, MAX_TEXT_CHARS),
     sections: patch.sections === undefined ? prev.sections : patch.sections,
     note: patch.note === undefined ? prev.note : clampText(patch.note, MAX_TEXT_CHARS * 2),
+    status: patch.status === undefined ? prev.status : patch.status,
+    group: patch.group === undefined ? prev.group : clampText(patch.group, 40),
+    tags: patch.tags === undefined ? prev.tags : patch.tags,
+    contact: patch.contact === undefined ? prev.contact : clampText(patch.contact, 120),
+    startedAt: patch.startedAt === undefined ? prev.startedAt : patch.startedAt,
     updatedAt: opts.now ?? nowIso(),
   });
   if (!merged) return state; // пустое имя не сохраняем: атлет без имени бесполезен
   const athletes = [...state.athletes];
   athletes[idx] = merged;
   return { ...state, athletes };
+}
+
+/**
+ * Сменить статус работы. Отдельная функция, а не «патч наугад»: статус меняется
+ * одной кнопкой в карточке, и архивирование не должно терять другие поля.
+ */
+export function setCoachAthleteStatus(
+  state: CoachState,
+  id: string,
+  status: CoachAthleteStatus,
+  opts: { now?: string } = {},
+): CoachState {
+  return updateCoachAthlete(state, id, { status }, opts);
+}
+
+/** Сколько атлетов в каждом статусе (для подписи и фильтров). */
+export function coachStatusCounts(state: CoachState): Record<CoachAthleteStatus, number> {
+  const counts: Record<CoachAthleteStatus, number> = { active: 0, paused: 0, archived: 0 };
+  for (const a of state.athletes) counts[a.status] += 1;
+  return counts;
 }
 
 export function removeCoachAthlete(state: CoachState, id: string): CoachState {

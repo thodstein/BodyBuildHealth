@@ -35,6 +35,12 @@ export interface AthleteSnapshot {
   daysSinceTraining: number | null;
   sessions7: number;
   sessions28: number;
+  /**
+   * Уникальные даты тренировок по возрастанию (`YYYY-MM-DD`). Нужны выполнению
+   * недели и отчётам; ограничены последними 400, чтобы карточка не таскала всю
+   * историю за годы.
+   */
+  sessionDates: string[];
   /** Тоннаж за окно, кг (сумма вес × повторы). 0 — записи есть, чисел нет. */
   tonnage7: number;
   tonnage28: number;
@@ -240,6 +246,7 @@ export function buildAthleteSnapshot(input: SnapshotInput): AthleteSnapshot {
     daysSinceTraining,
     sessions7,
     sessions28,
+    sessionDates: days.slice(-400),
     tonnage7: Math.round(tonnage7),
     tonnage28: Math.round(tonnage28),
     lastWeight,

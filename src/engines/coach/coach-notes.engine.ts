@@ -25,6 +25,11 @@ export interface CoachNote {
   body: string;
   /** Атлет, к которому относится заметка (null — общая заметка тренера). */
   athleteId: string | null;
+  /**
+   * Неделя, к которой относится заметка (`YYYY-MM-DD`, понедельник), либо null.
+   * Так «комментарий к неделе» находит своё место, не превращая заметки в чат.
+   */
+  week: string | null;
   pinned: boolean;
   createdAt: string;
   updatedAt: string;
@@ -45,6 +50,13 @@ export function emptyCoachNotes(): CoachNotesStore {
 const nowIso = (): string => new Date().toISOString();
 const text = (v: unknown, max: number): string => String(v ?? '').trim().slice(0, max);
 
+/** Неделя — только календарный день `YYYY-MM-DD`; всё остальное → null. */
+const weekDay = (v: unknown): string | null => {
+  if (typeof v !== 'string') return null;
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(v.trim());
+  return m ? `${m[1]}-${m[2]}-${m[3]}` : null;
+};
+
 function normalizeNote(raw: unknown): CoachNote | null {
   if (!raw || typeof raw !== 'object') return null;
   const n = raw as Partial<CoachNote> & Record<string, unknown>;
@@ -58,6 +70,7 @@ function normalizeNote(raw: unknown): CoachNote | null {
     title,
     body,
     athleteId: text(n.athleteId, 80) || null,
+    week: weekDay(n.week),
     pinned: n.pinned === true,
     createdAt,
     updatedAt: text(n.updatedAt, 40) || createdAt,
@@ -123,7 +136,14 @@ export interface AddCoachNoteResult {
 
 export function addCoachNote(
   store: CoachNotesStore,
-  input: { title?: string; body?: string; athleteId?: string | null; pinned?: boolean },
+  input: {
+    title?: string;
+    body?: string;
+    athleteId?: string | null;
+    pinned?: boolean;
+    /** Неделя `YYYY-MM-DD` (понедельник) — для «комментария к неделе». */
+    week?: string | null;
+  },
   opts: { id?: string; now?: string } = {},
 ): AddCoachNoteResult {
   const title = text(input.title, COACH_NOTE_TITLE_MAX);
@@ -136,6 +156,7 @@ export function addCoachNote(
     title,
     body,
     athleteId: text(input.athleteId, 80) || null,
+    week: weekDay(input.week),
     pinned: input.pinned === true,
     createdAt: now,
     updatedAt: now,
@@ -146,7 +167,13 @@ export function addCoachNote(
 export function updateCoachNote(
   store: CoachNotesStore,
   id: string,
-  patch: { title?: string; body?: string; athleteId?: string | null; pinned?: boolean },
+  patch: {
+    title?: string;
+    body?: string;
+    athleteId?: string | null;
+    pinned?: boolean;
+    week?: string | null;
+  },
   opts: { now?: string } = {},
 ): CoachNotesStore {
   const idx = store.items.findIndex(n => n.id === id);
@@ -161,6 +188,7 @@ export function updateCoachNote(
     title,
     body,
     athleteId: patch.athleteId === undefined ? prev.athleteId : (text(patch.athleteId, 80) || null),
+    week: patch.week === undefined ? prev.week : weekDay(patch.week),
     pinned: patch.pinned === undefined ? prev.pinned : patch.pinned === true,
     updatedAt: opts.now ?? nowIso(),
   };
@@ -170,6 +198,21 @@ export function updateCoachNote(
 export function removeCoachNote(store: CoachNotesStore, id: string): CoachNotesStore {
   const items = store.items.filter(n => n.id !== id);
   return items.length === store.items.length ? store : { version: 1, items };
+}
+
+/** Комментарий тренера к неделе атлета (самый свежий), либо null. */
+export function weekNoteFor(
+  store: CoachNotesStore,
+  athleteId: string,
+  week: string,
+): CoachNote | null {
+  const day = weekDay(week);
+  if (!day) return null;
+  return (
+    store.items.find(
+      n => n.athleteId === athleteId && n.week === day && !n.pinned,
+    ) ?? null
+  );
 }
 
 export function toggleCoachNotePin(store: CoachNotesStore, id: string): CoachNotesStore {

@@ -18,6 +18,7 @@ import {
   sortCoachNotes,
   toggleCoachNotePin,
   updateCoachNote,
+  weekNoteFor,
   writeCoachNotes,
 } from '../coach-notes.engine';
 
@@ -138,5 +139,40 @@ describe('хранение и терпимость', () => {
   it('сериализация не теряет флаг закрепления', () => {
     const s = addCoachNote(emptyCoachNotes(), { title: 'A', pinned: true }, { id: 'n1', now: NOW }).store;
     expect(parseCoachNotes(serializeCoachNotes(s)).items[0].pinned).toBe(true);
+  });
+});
+describe('комментарий к неделе', () => {
+  it('заметка хранит неделю и находится по атлету+неделе', () => {
+    const r = addCoachNote(
+      emptyCoachNotes(),
+      { body: 'Неделя тяжёлая: сон 6 ч', athleteId: 'a1', week: '2026-11-02' },
+      { id: 'n1', now: NOW },
+    );
+    expect(r.note?.week).toBe('2026-11-02');
+    expect(weekNoteFor(r.store, 'a1', '2026-11-02')?.id).toBe('n1');
+    expect(weekNoteFor(r.store, 'a1', '2026-11-09')).toBeNull();
+    expect(weekNoteFor(r.store, 'a2', '2026-11-02')).toBeNull();
+  });
+
+  it('неделя без атлета и мусор в неделе не создают ложную привязку', () => {
+    const r = addCoachNote(emptyCoachNotes(), { body: 'общая', week: 'не дата' }, { id: 'n1', now: NOW });
+    expect(r.note?.week).toBeNull();
+    expect(weekNoteFor(r.store, '', '2026-11-02')).toBeNull();
+  });
+
+  it('старая заметка без поля week читается как «без недели»', () => {
+    const legacy = JSON.stringify({
+      version: 1,
+      items: [{ id: 'n1', title: 'A', body: 'B', athleteId: 'a1', pinned: false, createdAt: NOW, updatedAt: NOW }],
+    });
+    const s = parseCoachNotes(legacy);
+    expect(s.items[0].week).toBeNull();
+    expect(weekNoteFor(s, 'a1', '2026-11-02')).toBeNull();
+  });
+
+  it('неделю можно снять патчем', () => {
+    const s = addCoachNote(emptyCoachNotes(), { body: 'X', athleteId: 'a1', week: '2026-11-02' }, { id: 'n1', now: NOW }).store;
+    const upd = updateCoachNote(s, 'n1', { week: null }, { now: NOW });
+    expect(upd.items[0].week).toBeNull();
   });
 });

@@ -15,6 +15,7 @@ import {
   addCoachAthlete,
   allCoachSections,
   coachActiveAthlete,
+  coachStatusCounts,
   coachSummary,
   emptyCoachState,
   parseCoachState,
@@ -22,6 +23,7 @@ import {
   removeCoachAthlete,
   serializeCoachState,
   setActiveCoachAthlete,
+  setCoachAthleteStatus,
   setCoachEnabled,
   setCoachSections,
   toggleCoachSection,
@@ -219,5 +221,128 @@ describe('подписи', () => {
     s = addCoachAthlete(s, { name: 'Иван' }, { id: 'a1', now: NOW }).state;
     expect(coachSummary(s)).toContain('Атлетов: 1');
     expect(coachSummary(s)).toContain('активный: Иван');
+  });
+});
+
+describe('карточка v2: статус, группа, метки, контакт, дата старта', () => {
+  it('новая карточка: активна, дата старта = день создания, остальное пусто', () => {
+    const a = withAthlete('Иван', 'a1').athletes[0];
+    expect(a.status).toBe('active');
+    expect(a.startedAt).toBe('2026-11-04');
+    expect(a.group).toBe('');
+    expect(a.tags).toEqual([]);
+    expect(a.contact).toBe('');
+  });
+
+  it('старая карточка без полей v2 мигрирует без потери данных', () => {
+    const legacy = JSON.stringify({
+      version: 1,
+      enabled: true,
+      sections: ['training'],
+      activeAthleteId: 'a1',
+      athletes: [
+        {
+          id: 'a1',
+          name: 'Иван',
+          sex: 'male',
+          age: 30,
+          weightKg: 82,
+          heightCm: 180,
+          direction: 'ПЛ',
+          goal: '200',
+          sections: ['training'],
+          note: 'спина',
+          createdAt: '2026-01-15T09:00:00.000Z',
+          updatedAt: '2026-01-15T09:00:00.000Z',
+        },
+      ],
+    });
+    const a = parseCoachState(legacy).athletes[0];
+    expect(a.name).toBe('Иван');
+    expect(a.status).toBe('active');
+    // Дата старта — день создания старой карточки, а не «сегодня».
+    expect(a.startedAt).toBe('2026-01-15');
+    expect(a.group).toBe('');
+    expect(a.tags).toEqual([]);
+  });
+
+  it('патч сохраняет статус, группу, метки, контакт и дату', () => {
+    const s = updateCoachAthlete(
+      withAthlete('Иван', 'a1'),
+      'a1',
+      {
+        status: 'paused',
+        group: 'Вечерняя',
+        tags: 'сила, спина, Сила',
+        contact: '+7 900 000-00-00',
+        startedAt: '2026-09-01',
+      },
+      { now: NOW },
+    );
+    const a = s.athletes[0];
+    expect(a.status).toBe('paused');
+    expect(a.group).toBe('Вечерняя');
+    // Регистр не создаёт дубль: «Сила» и «сила» — одна метка.
+    expect(a.tags).toEqual(['сила', 'спина']);
+    expect(a.contact).toBe('+7 900 000-00-00');
+    expect(a.startedAt).toBe('2026-09-01');
+  });
+
+  it('метки ограничены восемью и не растут от повторов', () => {
+    const s = updateCoachAthlete(
+      withAthlete('Иван', 'a1'),
+      'a1',
+      { tags: ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10'] },
+      { now: NOW },
+    );
+    expect(s.athletes[0].tags).toHaveLength(8);
+  });
+
+  it('неизвестный статус из чужой версии → активен (не ломает список)', () => {
+    const legacy = JSON.stringify({
+      version: 1,
+      enabled: true,
+      sections: [],
+      activeAthleteId: null,
+      athletes: [{ id: 'a1', name: 'Иван', status: 'нечто', createdAt: NOW, updatedAt: NOW }],
+    });
+    expect(parseCoachState(legacy).athletes[0].status).toBe('active');
+  });
+
+  it('архив и возврат не теряют остальные поля карточки', () => {
+    let s = updateCoachAthlete(withAthlete('Иван', 'a1'), 'a1', { group: 'Г1', goal: '200' }, { now: NOW });
+    s = setCoachAthleteStatus(s, 'a1', 'archived', { now: NOW });
+    expect(s.athletes[0].status).toBe('archived');
+    expect(s.athletes[0].group).toBe('Г1');
+    expect(s.athletes[0].goal).toBe('200');
+    s = setCoachAthleteStatus(s, 'a1', 'active', { now: NOW });
+    expect(s.athletes[0].status).toBe('active');
+    expect(s.athletes[0].group).toBe('Г1');
+  });
+
+  it('счётчики статусов считают всех, включая архив', () => {
+    let s = emptyCoachState();
+    s = addCoachAthlete(s, { name: 'A' }, { id: 'a1', now: NOW }).state;
+    s = addCoachAthlete(s, { name: 'B' }, { id: 'a2', now: NOW }).state;
+    s = addCoachAthlete(s, { name: 'C' }, { id: 'a3', now: NOW }).state;
+    s = setCoachAthleteStatus(s, 'a2', 'paused', { now: NOW });
+    s = setCoachAthleteStatus(s, 'a3', 'archived', { now: NOW });
+    expect(coachStatusCounts(s)).toEqual({ active: 1, paused: 1, archived: 1 });
+  });
+
+  it('статус переживает запись/чтение состояния', () => {
+    const storage = new Map<string, string>();
+    const fake = {
+      getItem: (k: string) => storage.get(k) ?? null,
+      setItem: (k: string, v: string) => { storage.set(k, v); },
+    };
+    let s = withAthlete('Иван', 'a1');
+    s = setCoachAthleteStatus(s, 'a1', 'archived', { now: NOW });
+    s = updateCoachAthlete(s, 'a1', { tags: ['сила'], group: 'Г1' }, { now: NOW });
+    writeCoachState(fake, s);
+    const back = readCoachState(fake).athletes[0];
+    expect(back.status).toBe('archived');
+    expect(back.tags).toEqual(['сила']);
+    expect(back.group).toBe('Г1');
   });
 });

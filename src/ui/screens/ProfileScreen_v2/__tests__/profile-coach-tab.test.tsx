@@ -36,6 +36,7 @@ import {
   addCoachAthlete,
   emptyCoachState,
   readCoachState,
+  setCoachAthleteStatus,
   setCoachEnabled,
   writeCoachState,
   type CoachAthlete,
@@ -718,5 +719,73 @@ describe('базы на диске', () => {
 
     await waitFor(() => expect(container.querySelector('[data-coach="disk-scan-unavailable"]')).not.toBeNull());
     expect(container.querySelector('[data-coach="disk-scan-clean"]')).toBeNull();
+  });
+});
+describe('карточка v2: статусы, группа, метки, контакт', () => {
+  it('архив скрыт по умолчанию, но открывается переключателем и возвращается', () => {
+    let s = seed(2);
+    s = setCoachAthleteStatus(s, 'a2', 'archived');
+    writeCoachState(localStorage, s);
+
+    const { container } = render(<ProfileCoachTab />);
+    // По умолчанию в списке только «в работе».
+    expect(athleteCards(container)).toHaveLength(1);
+    expect(container.querySelector('[data-coach="status-live"]')?.textContent).toContain('В работе (1)');
+    expect(container.querySelector('[data-coach="status-archived"]')?.textContent).toContain('Архив (1)');
+
+    fireEvent.click(container.querySelector('[data-coach="status-archived"]') as HTMLElement);
+    expect(athleteCards(container)).toHaveLength(1);
+    expect(container.querySelector('[data-coach="athlete-status"]')?.textContent).toBe('архив');
+
+    // «Вернуть из архива» — данные и программа остаются, меняется только статус.
+    fireEvent.click(container.querySelector('[data-coach="unarchive"]') as HTMLElement);
+    expect(readCoachState(localStorage).athletes.find(a => a.id === 'a2')?.status).toBe('active');
+    expect(container.querySelector('[data-coach="status-archived"]')?.textContent).toContain('Архив (0)');
+  });
+
+  it('«В паузу» сохраняет статус, а «Снять с паузы» возвращает в работу', () => {
+    seed(1);
+    const { container } = render(<ProfileCoachTab />);
+
+    fireEvent.click(container.querySelector('[data-coach="pause"]') as HTMLElement);
+    expect(readCoachState(localStorage).athletes[0].status).toBe('paused');
+    // Пауза не прячет карточку: тренер должен видеть, с кем перерыв.
+    expect(athleteCards(container)).toHaveLength(1);
+
+    fireEvent.click(container.querySelector('[data-coach="resume"]') as HTMLElement);
+    expect(readCoachState(localStorage).athletes[0].status).toBe('active');
+  });
+
+  it('группа, метки, контакт и дата старта вводятся и видны на карточке', () => {
+    seed(0);
+    const { container } = render(<ProfileCoachTab />);
+
+    fireEvent.change(container.querySelector('[data-coach="name"]') as HTMLElement, { target: { value: 'Иван' } });
+    fireEvent.change(container.querySelector('[data-coach="group"]') as HTMLElement, { target: { value: 'Вечерняя' } });
+    fireEvent.change(container.querySelector('[data-coach="tags"]') as HTMLElement, { target: { value: 'сила, спина' } });
+    fireEvent.change(container.querySelector('[data-coach="contact"]') as HTMLElement, { target: { value: '@ivan' } });
+    fireEvent.change(container.querySelector('[data-coach="started-at"]') as HTMLElement, { target: { value: '2026-09-01' } });
+    fireEvent.click(container.querySelector('[data-coach="save"]') as HTMLElement);
+
+    const a = readCoachState(localStorage).athletes[0];
+    expect(a.group).toBe('Вечерняя');
+    expect(a.tags).toEqual(['сила', 'спина']);
+    expect(a.contact).toBe('@ivan');
+    expect(a.startedAt).toBe('2026-09-01');
+
+    const card = container.querySelector('[data-coach="athlete"]') as HTMLElement;
+    expect(card.textContent).toContain('Вечерняя');
+    expect(card.textContent).toContain('#сила');
+    expect(card.textContent).toContain('#спина');
+    expect(card.querySelector('[data-coach="athlete-contacts"]')?.textContent).toContain('@ivan');
+  });
+
+  it('клик по «Архив» при пустом рабочем списке объясняет, где искать людей', () => {
+    let s = seed(1);
+    s = setCoachAthleteStatus(s, 'a1', 'archived');
+    writeCoachState(localStorage, s);
+
+    const { container } = render(<ProfileCoachTab />);
+    expect(container.querySelector('[data-coach="athletes-empty"]')?.textContent).toContain('1 в архиве');
   });
 });
