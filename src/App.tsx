@@ -178,12 +178,17 @@ export const NAV_TARGETS: Record<string, NavTarget> = {
   'profile-diary-measurements': { tab: 'profile', subTab: 'measurements' },
 };
 
+/**
+ * Точка старта читается ОДИН раз при загрузке модуля, а не в инициализаторе
+ * состояния: в dev-StrictMode инициализатор вызывается дважды, а `takeSpaceReturn`
+ * забирает запись одноразово — второй вызов вернул бы главную и возврат
+ * «сломался» бы только в разработке.
+ */
+const BOOT_START = restoredStart();
+
 export default function App() {
-  // Обычный старт — главная. После смены пространства данных (режим тренера)
-  // возвращаем туда, где тренер был: переключение атлета — это перезагрузка.
-  const [start] = useState(restoredStart);
-  const [tab, setTab] = useState<Tab>(start.tab);
-  const [subTab, setSubTab] = useState<string | null>(start.subTab);
+  const [tab, setTab] = useState<Tab>(BOOT_START.tab);
+  const [subTab, setSubTab] = useState<string | null>(BOOT_START.subTab);
   const [initialized, setInitialized] = useState(false);
   const [screenKey, setScreenKey] = useState(0);
   // Блок входа по биометрии — ТОЛЬКО APK (флаги he_biometry_* из BiometrySetupCard).
