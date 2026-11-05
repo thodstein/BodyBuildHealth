@@ -10,8 +10,9 @@
  *  • на старых WebView без WebCrypto используется слабый хэш — это написано;
  *  • забытый PIN нельзя «подобрать обратно»: данные на месте, но вход закрыт.
  */
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { colors, withAlpha } from './ui';
+import { isBiometricAvailable } from '../../../core/native-bridge';
 import {
   COACH_PIN_MAX,
   COACH_PIN_MIN,
@@ -20,6 +21,7 @@ import {
   disableCoachLock,
   pinPolicyError,
   pinPolicyErrorText,
+  setCoachLockBiometry,
   verifyCoachPin,
   type CoachLockSettings,
 } from '../../../engines/coach/coach-lock.engine';
@@ -113,6 +115,18 @@ export function CoachLockSettingsCard({ settings, audit, onChange, onEvent }: Pr
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [auditNotice, setAuditNotice] = useState<string | null>(null);
+  /** Есть ли на телефоне отпечаток/Face — спрашиваем ОС, а не угадываем. */
+  const [bioAvailable, setBioAvailable] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    void isBiometricAvailable().then(ok => {
+      if (alive) setBioAvailable(ok);
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   /** Выгрузка журнала: человек должен мочь показать его, а не только листать. */
   const exportAudit = async () => {
@@ -163,6 +177,7 @@ export function CoachLockSettingsCard({ settings, audit, onChange, onEvent }: Pr
       const res = await createCoachLock(pin, {
         autoLockMin: settings.autoLockMin,
         autoExitSpaceMin: settings.autoExitSpaceMin,
+        biometry: settings.biometry,
       });
       if (res.error || !res.settings) {
         setError(pinPolicyErrorText(res.error));
@@ -263,6 +278,29 @@ export function CoachLockSettingsCard({ settings, audit, onChange, onEvent }: Pr
             ))}
           </select>
         </div>
+      )}
+
+      {settings.enabled && bioAvailable && (
+        <label
+          style={{
+            marginTop: 10,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            fontSize: 12,
+            color: 'rgba(255,255,255,0.82)',
+            cursor: 'pointer',
+          }}
+        >
+          <input
+            type="checkbox"
+            data-coach="lock-biometry"
+            checked={settings.biometry}
+            onChange={e => onChange(setCoachLockBiometry(settings, e.target.checked))}
+            style={{ width: 18, height: 18 }}
+          />
+          Разблокировать отпечатком или Face
+        </label>
       )}
 
       <div style={{ marginTop: 10 }}>

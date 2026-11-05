@@ -19,6 +19,7 @@ import {
   verifyCoachPin,
   type CoachLockSettings,
 } from '../engines/coach/coach-lock.engine';
+import { authenticateWithBiometrics, isBiometricAvailable } from '../core/native-bridge';
 
 const ACCENT = '#22d3ee';
 
@@ -46,12 +47,38 @@ export function CoachPinDialog({ purpose, onConfirm, onCancel, settings }: Props
   const [pin, setPin] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [bioAvailable, setBioAvailable] = useState(false);
+
+  const actual = settings ?? readCoachLock(typeof localStorage !== 'undefined' ? localStorage : null);
+
+  React.useEffect(() => {
+    if (!actual.biometry) return;
+    let alive = true;
+    void isBiometricAvailable().then(ok => {
+      if (alive) setBioAvailable(ok);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [actual.biometry]);
+
+  const unlockWithBiometrics = async () => {
+    setError(null);
+    setBusy(true);
+    try {
+      const ok = await authenticateWithBiometrics('Вход в данные атлета');
+      if (!ok) {
+        setError('Биометрия не подтвердила вход. Введите PIN.');
+        return;
+      }
+      onConfirm();
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const submit = async () => {
     setError(null);
-    const actual =
-      settings ??
-      readCoachLock(typeof localStorage !== 'undefined' ? localStorage : null);
     setBusy(true);
     try {
       const ok = await verifyCoachPin(actual, pin);
@@ -133,6 +160,26 @@ export function CoachPinDialog({ purpose, onConfirm, onCancel, settings }: Props
           <div data-coach="pin-dialog-error" role="alert" style={{ fontSize: 11.5, color: colors.danger }}>
             {error}
           </div>
+        )}
+        {actual.biometry && bioAvailable && (
+          <button
+            type="button"
+            data-coach="pin-dialog-bio"
+            onClick={() => void unlockWithBiometrics()}
+            disabled={busy}
+            style={{
+              minHeight: 44,
+              borderRadius: 12,
+              fontSize: 12.5,
+              fontWeight: 800,
+              cursor: busy ? 'default' : 'pointer',
+              color: ACCENT,
+              background: 'rgba(34,211,238,0.10)',
+              border: '1px solid rgba(34,211,238,0.38)',
+            }}
+          >
+            Отпечаток или Face
+          </button>
         )}
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
           <button

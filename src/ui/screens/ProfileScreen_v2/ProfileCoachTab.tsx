@@ -105,6 +105,7 @@ import {
   writeUnlockedAt,
   type CoachLockSettings,
 } from '../../../engines/coach/coach-lock.engine';
+import { authenticateWithBiometrics, isBiometricAvailable } from '../../../core/native-bridge';
 import {
   addCoachNote,
   countNotesForAthlete,
@@ -361,6 +362,9 @@ export const ProfileCoachTab: React.FC<{
   );
   const [pinAttempt, setPinAttempt] = useState('');
   const [pinAttemptError, setPinAttemptError] = useState<string | null>(null);
+  /** Есть ли на телефоне биометрия и разрешена ли она в настройке PIN. */
+  const [bioAvailable, setBioAvailable] = useState(false);
+  const [bioBusy, setBioBusy] = useState(false);
   /** PIN-подтверждение перед входом в данные атлета (действие, а не экран). */
   const [pinFor, setPinFor] = useState<{ purpose: string; run: () => void } | null>(null);
   const lastBumpRef = useRef(0);
@@ -404,6 +408,37 @@ export const ProfileCoachTab: React.FC<{
     setPinAttempt('');
     setPinAttemptError(null);
     setUnlocked(true);
+  };
+
+  /** Биометрия — только если она включена в настройке PIN и доступна в WebView. */
+  useEffect(() => {
+    if (!lock.enabled || !lock.biometry) {
+      setBioAvailable(false);
+      return;
+    }
+    let alive = true;
+    void isBiometricAvailable().then(ok => {
+      if (alive) setBioAvailable(ok);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [lock.enabled, lock.biometry]);
+
+  const tryUnlockBiometrics = async () => {
+    setPinAttemptError(null);
+    setBioBusy(true);
+    try {
+      const ok = await authenticateWithBiometrics('Вход в профиль тренера');
+      if (!ok) {
+        setPinAttemptError('Биометрия не подтвердила вход. Введите PIN.');
+        return;
+      }
+      writeUnlockedAt(ss(), new Date().toISOString());
+      setUnlocked(true);
+    } finally {
+      setBioBusy(false);
+    }
   };
 
   /**
@@ -1479,6 +1514,23 @@ export const ProfileCoachTab: React.FC<{
         >
           Открыть
         </button>
+        {lock.biometry && bioAvailable && (
+          <button
+            type="button"
+            data-coach="lock-unlock-bio"
+            onClick={() => void tryUnlockBiometrics()}
+            disabled={bioBusy}
+            style={{
+              ...btn('ghost'),
+              alignSelf: 'flex-start',
+              opacity: bioBusy ? 0.6 : 1,
+              color: ACCENT,
+              borderColor: 'rgba(34,211,238,0.38)',
+            }}
+          >
+            {bioBusy ? 'Проверяем…' : 'Отпечаток или Face'}
+          </button>
+        )}
         <div style={{ fontSize: 10.5, color: colors.textSubtle, lineHeight: 1.45 }}>
           Забыли PIN? Восстановить его нельзя, но данные остаются на месте.
         </div>

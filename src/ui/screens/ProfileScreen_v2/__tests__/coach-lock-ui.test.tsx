@@ -20,6 +20,11 @@ vi.mock('../../../../core/db', () => ({
 
 const shareCalls = vi.hoisted(() => ({ saved: [] as { name: string; text: string }[] }));
 
+vi.mock('../../../../core/native-bridge', () => ({
+  isBiometricAvailable: vi.fn(async () => true),
+  authenticateWithBiometrics: vi.fn(async () => true),
+}));
+
 vi.mock('../../../../core/apk-share', () => ({
   saveTextFileApk: vi.fn(async (name: string, text: string) => {
     shareCalls.saved.push({ name, text });
@@ -76,8 +81,7 @@ describe('PIN по желанию', () => {
     expect(container.querySelector('[data-coach="lock-enable-open"]')?.textContent).toContain('Включить PIN');
   });
 
-  it('включение PIN сохраняет настройку и пишет событие в журнал', async () => {
-    seedAthletes(1);
+  it('включение PIN сохраняет настройку и пишет событие в журнал', async () => {    seedAthletes(1);
     const { container } = render(<ProfileCoachTab />);
     fireEvent.click(container.querySelector('[data-coach="lock-enable-open"]') as HTMLElement);
     fireEvent.change(container.querySelector('[data-coach="lock-pin"]') as HTMLElement, { target: { value: '2468' } });
@@ -162,8 +166,7 @@ describe('PIN по желанию', () => {
     expect(readCoachAudit(localStorage).items.map(e => e.kind)).toContain('pin-disabled');
   });
 
-  it('автовыход меняется и сохраняется', async () => {
-    seedAthletes(1);
+  it('автовыход меняется и сохраняется', async () => {    seedAthletes(1);
     const { settings } = await createCoachLock('1357', { salt: 'fixed', autoLockMin: 15 });
     writeCoachLock(localStorage, settings!);
     sessionStorage.setItem(COACH_UNLOCK_KEY, new Date().toISOString());
@@ -189,6 +192,33 @@ describe('PIN по желанию', () => {
     expect(container.querySelector('[data-coach="pin-dialog"]')?.textContent).toContain('чужое пространство');
     fireEvent.click(container.querySelector('[data-coach="pin-dialog-cancel"]') as HTMLElement);
     expect(container.querySelector('[data-coach="pin-dialog"]')).toBeNull();
+  });
+
+  it('биометрия включается только с PIN и открывает профиль', async () => {
+    seedAthletes(1);
+    const { setCoachLockBiometry, readCoachLock: read } = await import(
+      '../../../../engines/coach/coach-lock.engine'
+    );
+    const { settings } = await createCoachLock('1357', { salt: 'fixed' });
+    // Включаем биометрию через движок: настройка «только с PIN».
+    writeCoachLock(localStorage, setCoachLockBiometry(settings!, true));
+    expect(read(localStorage).biometry).toBe(true);
+
+    const { container } = render(<ProfileCoachTab />);
+    expect(container.querySelector('[data-coach="locked"]')).not.toBeNull();
+    const bio = await waitFor(() => {
+      const el = container.querySelector('[data-coach="lock-unlock-bio"]') as HTMLElement | null;
+      expect(el).not.toBeNull();
+      return el as HTMLElement;
+    });
+    fireEvent.click(bio);
+    await waitFor(() => expect(container.querySelector('[data-coach="locked"]')).toBeNull());
+    expect(sessionStorage.getItem(COACH_UNLOCK_KEY)).toBeTruthy();
+  });
+
+  it('без PIN биометрия не включается — она бы ничего не защищала', async () => {
+    const { emptyCoachLock, setCoachLockBiometry } = await import('../../../../engines/coach/coach-lock.engine');
+    expect(setCoachLockBiometry(emptyCoachLock(), true).biometry).toBe(false);
   });
 });
 

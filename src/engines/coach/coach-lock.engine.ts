@@ -41,6 +41,12 @@ export interface CoachLockSettings {
    * (по умолчанию). Это про доверие при передаче телефона, а не про PIN.
    */
   autoExitSpaceMin: number;
+  /**
+   * Разрешить разблокировку биометрией (отпечаток/Face) вместе с PIN.
+   * Биометрия — свойство телефона, поэтому флаг хранится здесь же, в
+   * устройственной настройке, и в облако не уезжает.
+   */
+  biometry: boolean;
   updatedAt: string;
 }
 
@@ -55,6 +61,7 @@ export function emptyCoachLock(): CoachLockSettings {
     hash: '',
     autoLockMin: 15,
     autoExitSpaceMin: COACH_SPACE_EXIT_DEFAULT_MIN,
+    biometry: false,
     updatedAt: '',
   };
 }
@@ -153,7 +160,13 @@ function safeEqual(a: string, b: string): boolean {
 
 export async function createCoachLock(
   pin: string,
-  opts: { autoLockMin?: number; autoExitSpaceMin?: number; now?: string; salt?: string } = {},
+  opts: {
+    autoLockMin?: number;
+    autoExitSpaceMin?: number;
+    biometry?: boolean;
+    now?: string;
+    salt?: string;
+  } = {},
 ): Promise<{ settings: CoachLockSettings | null; error: CoachPinError }> {
   const policy = pinPolicyError(pin);
   if (policy) return { settings: null, error: policy };
@@ -169,6 +182,7 @@ export async function createCoachLock(
       hash,
       autoLockMin: clampAutoLock(opts.autoLockMin ?? 15),
       autoExitSpaceMin: clampAutoLock(opts.autoExitSpaceMin ?? COACH_SPACE_EXIT_DEFAULT_MIN),
+      biometry: opts.biometry === true,
       updatedAt: opts.now ?? new Date().toISOString(),
     },
     error: null,
@@ -194,6 +208,21 @@ export function disableCoachLock(settings: CoachLockSettings, opts: { now?: stri
     enabled: false,
     hash: '',
     salt: '',
+    // Без PIN биометрия не «полузамок»: вход и так открыт.
+    biometry: false,
+    updatedAt: opts.now ?? new Date().toISOString(),
+  };
+}
+
+/** Включить/выключить разблокировку биометрией (имеет смысл только с PIN). */
+export function setCoachLockBiometry(
+  settings: CoachLockSettings,
+  on: boolean,
+  opts: { now?: string } = {},
+): CoachLockSettings {
+  return {
+    ...settings,
+    biometry: settings.enabled && on === true,
     updatedAt: opts.now ?? new Date().toISOString(),
   };
 }
@@ -218,6 +247,7 @@ export function parseCoachLock(raw: string | null | undefined): CoachLockSetting
       autoExitSpaceMin: clampAutoLock(
         typeof parsed.autoExitSpaceMin === 'number' ? parsed.autoExitSpaceMin : COACH_SPACE_EXIT_DEFAULT_MIN,
       ),
+      biometry: enabled && parsed.biometry === true,
       updatedAt: typeof parsed.updatedAt === 'string' ? parsed.updatedAt : '',
     };
   } catch {

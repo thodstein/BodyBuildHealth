@@ -8,6 +8,7 @@ import {
   parseCoachLock,
   pinPolicyError,
   readCoachLock,
+  setCoachLockBiometry,
   spaceIdleExpired,
   verifyCoachPin,
   writeCoachLock,
@@ -139,5 +140,16 @@ describe('возврат из данных атлета', () => {
     expect(spaceIdleExpired(0, start, start + 1000 * 60_000)).toBe(false);
     // Битое время не должно выглядеть как «пора выходить».
     expect(spaceIdleExpired(5, Number.NaN, start)).toBe(false);
+  });
+
+  it('биометрия живёт только вместе с PIN', async () => {
+    const { settings } = await createCoachLock('1234', { salt: 's', biometry: true });
+    expect(settings?.biometry).toBe(true);
+    expect(parseCoachLock(JSON.stringify(settings)).biometry).toBe(true);
+    // Флаг без PIN — не защита: считаем выключенным.
+    expect(parseCoachLock(JSON.stringify({ ...settings, enabled: false })).biometry).toBe(false);
+    expect(setCoachLockBiometry(emptyCoachLock(), true).biometry).toBe(false);
+    // Выключение PIN снимает и биометрию.
+    expect(disableCoachLock(settings!).biometry).toBe(false);
   });
 });
