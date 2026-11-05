@@ -7,7 +7,7 @@
  * требуем, чтобы итог МЕНЯЛСЯ в предсказуемую сторону.
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { render, fireEvent, cleanup } from '@testing-library/react';
+import { render, fireEvent, cleanup, waitFor } from '@testing-library/react';
 import { MetabolicHub } from '../MetabolicHub';
 
 beforeEach(() => {
@@ -401,6 +401,43 @@ describe('MetabolicHub: ввод меняет расчёт (проводка п�
     expect(txt).toContain('жир −0.5 пп/год');
     expect(txt).toContain('не измерение');
     expect(txt).not.toContain('вес растёт вместе с сухой массой');
+  });
+
+  it('сценарий можно переименовать (автоимя больше не приговор)', () => {
+    localStorage.setItem('he_metabolic_scenarios_v1', JSON.stringify([
+      { id: 's1', name: 'Сценарий 1 · 05.11.2026 · 80кг Сушка', snapshot: { weight: 80 } },
+    ]));
+    render(<MetabolicHub />);
+    fireEvent.click(document.querySelector('button[aria-label^="Переименовать сценарий"]') as HTMLElement);
+    const input = document.querySelector('input[aria-label^="Новое имя"]') as HTMLInputElement | null;
+    expect(input, 'поле нового имени').not.toBeNull();
+    fireEvent.change(input!, { target: { value: 'Сушка 78 кг' } });
+    fireEvent.click(Array.from(document.querySelectorAll('button'))
+      .find(b => (b.textContent || '').trim() === 'Сохранить') as HTMLElement);
+    const stored = JSON.parse(localStorage.getItem('he_metabolic_scenarios_v1') || '[]');
+    expect(stored[0].name).toBe('Сушка 78 кг');
+    expect(document.querySelector('input[aria-label^="Новое имя"]')).toBeNull();
+    expect(document.body.textContent || '').toContain('Сушка 78 кг');
+  });
+
+  it('⤓ JSON выгружает сводку и не молчит, если окно не умеет скачивать', async () => {
+    // jsdom не умеет навигацию по blob-ссылке — глушим клик по <a download>, иначе тест
+    // падает на «Not implemented: navigation», хотя код отработал.
+    const origClick = HTMLAnchorElement.prototype.click;
+    HTMLAnchorElement.prototype.click = function () { /* no-op */ };
+    try {
+      render(<MetabolicHub />);
+      const btn = Array.from(document.querySelectorAll('button'))
+        .find(b => (b.textContent || '').includes('JSON')) as HTMLElement | undefined;
+      expect(btn, 'кнопка ⤓ JSON').toBeTruthy();
+      fireEvent.click(btn!);
+      // либо файл отдан, либо честный отказ — молчания быть не должно
+      await waitFor(() => {
+        expect(document.body.textContent || '').toMatch(/JSON сводки экспортирован|Экспорт недоступен в этом окне/);
+      });
+    } finally {
+      HTMLAnchorElement.prototype.click = origClick;
+    }
   });
 
   it('удаление выбранного сценария снимает его из сравнения (не оставляет битую пару)', () => {

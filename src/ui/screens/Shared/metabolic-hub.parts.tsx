@@ -150,8 +150,54 @@ export const MhNum: React.FC<{
   );
 };
 
-/** MhToggle — карточка-переключатель вместо нативного checkbox. */
-export const MhToggle: React.FC<{
+/**
+ * MhRename — модалка переименования (сценарий/что угодно текстовое).
+ *
+ * Зачем отдельный примитив: автоимена сценариев («Сценарий 3 · 05.11.2026 · 80кг Сушка»)
+ * нельзя было изменить, а сравнение двух похожих конфигураций из-за этого путалось.
+ * Текстовый ввод живёт здесь, а не в JSX хаба, чтобы не нарушать guard на нативные
+ * `<select>`/checkbox и держать god-файл без форм.
+ */
+export const MhRename: React.FC<{
+  open: boolean;
+  title: string;
+  value: string;
+  onChange: (v: string) => void;
+  onSubmit: () => void;
+  onCancel: () => void;
+}> = ({ open, title, value, onChange, onSubmit, onCancel }) => {
+  if (!open) return null;
+  return (
+    <MhOverlay onClose={onCancel}>
+      <div onClick={(e) => e.stopPropagation()} role="dialog" aria-label={title} style={{
+        width: '88%', maxWidth: 340, borderRadius: 16, background: '#18181b',
+        border: '1px solid rgba(255,255,255,0.1)', padding: 16,
+      }}>
+        <div style={{ fontSize: 14, fontWeight: 800, color: '#a78bfa', marginBottom: 8 }}>{title}</div>
+        <input type="text" value={value} aria-label={`Новое имя: ${title}`} autoFocus
+          onChange={(e) => onChange(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') onSubmit(); if (e.key === 'Escape') onCancel(); }}
+          style={{
+            width: '100%', padding: 12, borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)',
+            background: 'rgba(0,0,0,0.3)', color: '#fff', fontSize: 16, boxSizing: 'border-box',
+            textAlign: 'center', marginBottom: 12,
+          }} />
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button type="button" onClick={onCancel} style={{
+            flex: 1, minHeight: 44, borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)',
+            background: 'transparent', color: 'rgba(255,255,255,0.7)', fontWeight: 700, fontSize: 11, cursor: 'pointer',
+          }}>Отмена</button>
+          <button type="button" onClick={onSubmit} style={{
+            flex: 1, minHeight: 44, borderRadius: 8, border: 'none', cursor: 'pointer',
+            background: 'linear-gradient(135deg,#a78bfa,#8b5cf6)', color: '#000', fontWeight: 800, fontSize: 12,
+          }}>Сохранить</button>
+        </div>
+      </div>
+    </MhOverlay>
+  );
+};
+
+/** MhToggle — карточка-переключатель вместо нативного checkbox. */export const MhToggle: React.FC<{
   checked: boolean; onChange: (v: boolean) => void; icon?: string; title: string; desc?: string;
   accent?: string; compact?: boolean; span?: boolean;
 }> = ({ checked, onChange, icon, title, desc, accent = '#22c55e', compact, span }) => (

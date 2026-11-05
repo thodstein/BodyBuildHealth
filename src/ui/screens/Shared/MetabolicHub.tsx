@@ -23,7 +23,7 @@ import { toDailyLoads, acuteChronicRatio } from '../../../engines/pro/training-l
 import { PopupSelect, PopupNumber } from '../SRCBBScreen_parts/TrainingPopups';
 import { ModernHero } from '../NutritionScreen_parts/nutrition-modern-kit';
 import { printPlanHtml, shareOrCopyText, downloadCoachFile } from '../NutritionScreen_parts/IndividualPlan/planner-day-print';
-import { MH_CARD, MhSection, MhGrid, MhNum, MhToggle, MhTile, MhBar, MhEmaChart } from './metabolic-hub.parts';
+import { MH_CARD, MhSection, MhGrid, MhNum, MhToggle, MhTile, MhBar, MhEmaChart, MhRename } from './metabolic-hub.parts';
 
 const CARD: React.CSSProperties = MH_CARD;
 
@@ -322,6 +322,10 @@ export const MetabolicHub: React.FC = () => {
   const [sweatEnv, setSweatEnv] = useState<'cool'|'temperate'|'hot'|'hot_humid'>('temperate');
   const [useMeasuredSweat, setUseMeasuredSweat] = useState(true);
   const [compareIds, setCompareIds] = useState<string[]>([]);
+  // Аудит 2026-11: сценарии назывались только автоматически («Сценарий 3 · 05.11 · 80кг Сушка»),
+  // переименовать было нельзя — а две похожие конфигурации иначе не различить при сравнении.
+  const [renameId, setRenameId] = useState<string|null>(null);
+  const [renameDraft, setRenameDraft] = useState('');
   const [toast, setToast] = useState<string|null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const showToast = useCallback((m:string)=>{
@@ -1019,6 +1023,15 @@ const kbju = useMemo(()=> calcKBJU(input), [input]);
     if(!a || !b) return null;
     return diffMetabolicSnapshots(a, b);
   }, [compareIds, scenarios]);
+  const renameScenario = useCallback(()=>{
+    if(!renameId) return;
+    const name = renameDraft.trim();
+    if(!name){ showToast('Имя пустое — не переименовал'); return; }
+    const next = scenarios.map(s => s.id === renameId ? { ...s, name } : s);
+    setScenarios(next); try{ localStorage.setItem(SCENARIOS_KEY, JSON.stringify(next)); }catch{}
+    setRenameId(null);
+    showToast(`Сценарий переименован: ${name}`);
+  }, [renameId, renameDraft, scenarios, showToast]);
   const deleteScenario = useCallback((id:string)=>{
     const next=scenarios.filter(s=>s.id!==id); setScenarios(next); try{ localStorage.setItem(SCENARIOS_KEY, JSON.stringify(next)); }catch{}
     // Аудит 2026-11: удалённый сценарий оставался в compareIds — сравнение молча ломалось
@@ -1804,6 +1817,8 @@ const kbju = useMemo(()=> calcKBJU(input), [input]);
                   </button>
                   <button type="button" className="mh-mini" style={{ flex:1, minHeight:44, textAlign:'left', padding:'8px 10px', borderRadius:10, border:'1px solid rgba(255,255,255,0.08)', background:'rgba(255,255,255,0.03)', color:'#fff', fontSize:9, fontWeight:700, cursor:'pointer', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}
                     onClick={()=> loadScenario(s.id)}>↺ {s.name}</button>
+                  <button type="button" className="mh-mini" style={{ minHeight:44, minWidth:44, padding:'8px 10px', borderRadius:10, border:'1px solid rgba(167,139,250,0.20)', background:'rgba(167,139,250,0.08)', color:'#a78bfa', fontSize:10, fontWeight:700, cursor:'pointer' }}
+                    aria-label={`Переименовать сценарий: ${s.name}`} onClick={()=>{ setRenameId(s.id); setRenameDraft(s.name); }}>✎</button>
                   <button type="button" className="mh-mini" style={{ minHeight:44, minWidth:44, padding:'8px 10px', borderRadius:10, border:'1px solid rgba(239,68,68,0.18)', background:'rgba(239,68,68,0.08)', color:'#f87171', fontSize:10, fontWeight:700, cursor:'pointer' }}
                     aria-label={`Удалить сценарий: ${s.name}`} onClick={()=> deleteScenario(s.id)}>🗑</button>
                 </div>
@@ -1826,6 +1841,9 @@ const kbju = useMemo(()=> calcKBJU(input), [input]);
               </div>
             )}
             {compareIds.length === 1 && <div style={{ fontSize:9, color:'rgba(255,255,255,0.5)' }}>Отметь второй сценарий — покажу разницу по полям.</div>}
+            <MhRename open={renameId != null} title="Переименовать сценарий"
+              value={renameDraft} onChange={setRenameDraft}
+              onSubmit={renameScenario} onCancel={()=> setRenameId(null)} />
           </div>
         )}
       </MhSection>
@@ -2473,6 +2491,43 @@ const kbju = useMemo(()=> calcKBJU(input), [input]);
             void printPlanHtml('Метаболика Pro — сводка', html);
           }catch{ showToast('Печать недоступна в этом окне'); }
         }} style={{ flex:1, minHeight:44, padding:'10px 12px', borderRadius:10, border:'1px solid rgba(96,165,250,0.22)', background:'rgba(96,165,250,0.10)', color:'#60a5fa', fontSize:10, fontWeight:800, cursor:'pointer' }}>🖨 PDF сводки</button>
+        <button type="button" className="mh-act" onClick={()=>{
+          // Аудит 2026-11: выгрузить весь набор одной кнопкой было нельзя — JSON существовал
+          // только в блоке гематокрита. Здесь уходят и входы (снапшот), и результаты, с явной
+          // пометкой, что формулы — оценки. Ошибки печати больше не проглатываются.
+          const payload = {
+            app: 'Метаболика Pro',
+            version: 'v4',
+            date: localISODate(),
+            exportedAt: new Date().toISOString(),
+            disclaimer: 'TDEE/BF по формулам — оценки с разбросом, не измерение. Stress Load — эвристика (не кортизол). AAS-модель экспериментальная. Не назначение.',
+            inputs: snapshot,
+            results: {
+              tdee: {
+                kcal: oneAnswer.tdee, low: oneAnswer.low, high: oneAnswer.high,
+                source: oneAnswer.tdeeFromAdaptive ? 'adaptive-v3' : 'formula',
+                adaptive: adaptiveV3 ? { tdee: adaptiveV3.tdee, r2: adaptiveV3.r2, confidence: adaptiveV3.confidence, trendKgPerWeek: adaptiveV3.trend, logDays: adaptiveV3.adherence.logDays, weighIns: adaptiveV3.adherence.weighIns } : null,
+              },
+              water: {
+                ml: onAAS ? water.aas : water.nat, mlPerKg: water.iomPerKg,
+                sweatMlPerH: effectiveSweatMlPerH,
+                sweatSource: measuredSweatMlPerH != null ? 'пот-тест (измерено)' : 'среднее/поле — не замер',
+              },
+              macros: { kcal: onAAS ? kbju.aas.kcal : kbju.nat.kcal, proteinG: onAAS ? kbju.aas.p : kbju.nat.p, fatG: onAAS ? kbju.aas.f : kbju.nat.f, carbsG: onAAS ? kbju.aas.c : kbju.nat.c },
+              energyAvailability: { kcalPerKgFfm: ea.ea, zone: ea.zoneLabel, eeeKcalPerDay: ea.eee },
+              bodyComposition: { bodyFatPct: fat.current, source: bfSource, ffmiNormalized: onAAS ? fat.ffmiNormAdj : fat.ffmiNorm },
+              hematology: { hctPct: hematology.hct, zone: hematology.zoneLabel, waterTargetMl: hematology.waterTargetMl, iron: hematology.ironRecLabel },
+              stressLoad: { score: onAAS ? cortisol.aas : cortisol.nat, zone: onAAS ? cortisol.zoneLabelAAS : cortisol.zoneLabelNat },
+              metS: { score: mets.score, hasMetS: mets.hasMetS, criteria: mets.criteria },
+              atRangeKcal: { low: atRange.low, high: atRange.high },
+              protein: { perMealG: proteinPro.perMeal, diaas: proteinPro.diaas },
+            },
+            missingInputs: missing.map(m=> m.label),
+          };
+          void downloadCoachFile(JSON.stringify(payload, null, 2), `metabolika-${localISODate()}.json`)
+            .then(ok => showToast(ok ? 'JSON сводки экспортирован' : 'Экспорт недоступен в этом окне'))
+            .catch(() => showToast('Экспорт недоступен в этом окне'));
+        }} style={{ minHeight:44, padding:'10px 12px', borderRadius:10, border:'1px solid rgba(167,139,250,0.22)', background:'rgba(167,139,250,0.10)', color:'#a78bfa', fontSize:10, fontWeight:800, cursor:'pointer' }}>⤓ JSON</button>
         <button type="button" className="mh-act" onClick={resetAll} style={{ minHeight:44, padding:'10px 12px', borderRadius:10, border:'1px solid rgba(239,68,68,0.22)', background:'rgba(239,68,68,0.08)', color:'#f87171', fontSize:10, fontWeight:800, cursor:'pointer' }}>⟲ Сброс</button>
       </div>
 
