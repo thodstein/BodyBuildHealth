@@ -267,6 +267,21 @@ describe('MetabolicHub: ввод меняет расчёт (проводка п�
     expect(txt).toContain('вязкость OK');
   });
 
+  it('источник воды едет со снапшотом и не остаётся «профильным» после загрузки', () => {
+    // снапшот со «своей» водой: подпись не должна врать «(профиль)»
+    localStorage.setItem('he_metabolic_snapshot_v6', JSON.stringify({ weight: 83, waterL: 3.2, waterOrigin: 'user', hct: 52 }));
+    render(<MetabolicHub />);
+    let txt = openMode('Кровь');
+    expect(txt).toContain('факт 3.2л');
+    expect(txt).not.toContain('(профиль)');
+    cleanup();
+    // а вода из профиля в снапшоте остаётся подписанной
+    localStorage.setItem('he_metabolic_snapshot_v6', JSON.stringify({ weight: 83, waterL: 1.6, waterOrigin: 'profile', hct: 52 }));
+    render(<MetabolicHub />);
+    txt = openMode('Кровь');
+    expect(txt).toContain('факт 1.6л (профиль)');
+  });
+
   it('поле «Железо, мг/сут» доходит до совета по крови', () => {
     render(<MetabolicHub />);
     setNumber('HCT, %', 52);

@@ -137,4 +137,18 @@ describe('MetabolicHub: ручной ввод лаб переживает авт
     const labels = new Set(Array.from(labelBlock![1].matchAll(/([A-Za-z0-9_]+)\s*:/g)).map(m => m[1]!));
     expect(snapKeys.filter(k => !labels.has(k))).toEqual([]);
   });
+
+  it('каждый ключ снапшота реально восстанавливается в applySnapshot', () => {
+    // регрессия: поле могло попасть в автосейв/сценарий и не читаться обратно —
+    // diff показывал разницу, а загрузка сценария молча её теряла.
+    const snapBlock = src.match(/const snapshot = useMemo\(\(\)=>\(\{([^}]*)\}/);
+    expect(snapBlock, 'snapshot').toBeTruthy();
+    const snapKeys = snapBlock![1].split(',').map(s => s.trim().split(':')[0]!.trim()).filter(Boolean);
+    const applyStart = src.indexOf('const applySnapshot');
+    const applyEnd = src.indexOf('// init: актуальный снапшот');
+    expect(applyStart).toBeGreaterThan(-1);
+    expect(applyEnd).toBeGreaterThan(applyStart);
+    const applied = new Set(Array.from(src.slice(applyStart, applyEnd).matchAll(/\bs\.([A-Za-z0-9_]+)/g)).map(m => m[1]!));
+    expect(snapKeys.filter(k => !applied.has(k))).toEqual([]);
+  });
 });

@@ -500,6 +500,21 @@ deficitKcalDelta })` вставляет 2 нед maintenance после кажд
 **Регрессия.** `metabolic-hub-wiring.test.tsx` → «ACWR без журнала sRPE — „нет данных“, а не
 1.00 optimal».
 
+### 1.45 Подпись «(профиль)» у воды переживала загрузку сценария
+**Причина.** `waterOriginRef` — не состояние, а ref: в снапшот он не попадал, и `applySnapshot`
+его не восстанавливал. Если профиль успевал подставить 2 л (origin = `profile`), а потом человек
+загружал сценарий со своими 3.2 л, подпись в «Крови» продолжала говорить «факт 3.2л (профиль)» —
+то есть приписывала ручное значение профилю.
+**Исправление.** `waterOrigin` теперь часть снапшота, `applySnapshot` восстанавливает его
+(`profile`/`user`, иначе `null` = источник неизвестен → подпись без «(профиль)»). Старые снапшоты
+без поля читаются как «источник неизвестен», а не как профильные.
+Попутно проверено и зафиксировано тестом: **каждый** ключ снапшота действительно читается обратно
+в `applySnapshot` (раньше это держалось только на внимательности) и у каждого есть подпись в
+`SNAP_LABEL`.
+**Регрессия.** `metabolic-hub-wiring.test.tsx` → «источник воды едет со снапшотом и не остаётся
+„профильным“ после загрузки»; `metabolic-hub-structure.test.tsx` → «каждый ключ снапшота реально
+восстанавливается в applySnapshot».
+
 ---
 
 ## 2. Чего не хватало (добавлено)
@@ -549,7 +564,7 @@ deficitKcalDelta })` вставляет 2 нед maintenance после кажд
   параллельные `tsc`/`vitest` из других сессий → heap OOM / `Zone Allocation failed`.
   Прогонять на свободной машине.
 - `npx vitest run src/ui/screens/Shared/__tests__ src/engines/__tests__/metabolic-hub.test.ts`
-  — **230 passed** (6 файлов: structure / toggles / honesty / modes / wiring / engine).
+  — **232 passed** (6 файлов: structure / toggles / honesty / modes / wiring / engine).
 - `npx vitest run src/ui/__tests__/rest-hooks-native.test.tsx
   src/engines/__tests__/risk-info-honesty-e07-e08.test.ts` — **89 passed**
   (в stderr шумит jsdom-canvas chart.js — это фон, не падения).
