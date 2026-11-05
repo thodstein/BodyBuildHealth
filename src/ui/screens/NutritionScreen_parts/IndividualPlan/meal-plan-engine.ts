@@ -3820,6 +3820,13 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   if (typeof input.carbCapGPerKg === 'number') {
     if (input.carbCapGPerKg === 0) { _capDisabled = true; _capPerKg = 8; }
     else _capPerKg = Math.max(0, input.carbCapGPerKg);
+  } else if (input.manualTargetsLocked === true) {
+    // QG44: ручные цели — явное число пользователя. Потолок 8–10 г/кг — это guard для
+    // РАСЧЁТНЫХ целей (auto/profile). Замер до фикса: 110 кг / 1490 г углеводов (13.5 г/кг)
+    // молча усекались до 880 г (8 г/кг) → день −12.1% углеводов, оценка 59; с потолком,
+    // снятым по факту ручного ввода, — −10.7% и 86 (остальное — вместимость, отдельный долг).
+    // Явный carbCapGPerKg (0 или число) остаётся главнее ручного режима — см. ветку выше.
+    _capDisabled = true;
   } else {
     const _isBulk = !input.isCutting && (input.cyclePhase === 'course' || input.cyclePhase === 'recovery' || !input.cyclePhase || input.cyclePhase === 'maintenance');
     // bulk + max бюджет → 10 г/кг (независимо от объёма — пользователь явно high-carb)
