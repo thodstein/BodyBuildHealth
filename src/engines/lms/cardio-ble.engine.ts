@@ -2,6 +2,10 @@
  * cardio-ble.engine.ts — BLE HR sensor (Web Bluetooth) для live пульса в CardioSessionTimer.
  * PRO: подключается к HR-датчику (Polar H10, Garmin HRM) → live HR в таймере + подсветка зоны.
  * Без датчика — fallback на ручной ввод.
+ *
+ * ВАЖНО про APK: в Capacitor WebView `navigator.bluetooth` нет и плагина BLE в
+ * сборке тоже нет — там этот путь честно упирается в ошибку, а пульс вводится
+ * вручную или импортом .fit/.tcx. Никакого «фейкового» пульса не подставляем.
  */
 export interface BleHrState {
   connected: boolean;
@@ -14,7 +18,7 @@ export interface BleHrState {
 export async function connectBleHr(onHr: (hr: number) => void, onState: (s: BleHrState) => void): Promise<{ disconnect: () => void } | null> {
   const nav = navigator as unknown as { bluetooth?: { requestDevice: (opts: unknown) => Promise<BluetoothDevice> } };
   if (!nav.bluetooth) {
-    onState({ connected: false, error: 'Web Bluetooth не поддерживается в этом браузере' });
+    onState({ connected: false, error: 'Web Bluetooth недоступен (в APK нужен нативный BLE-плагин) — вводите пульс вручную или импортом .fit/.tcx' });
     return null;
   }
   try {
