@@ -1323,10 +1323,10 @@ const kbju = useMemo(()=> calcKBJU(input), [input]);
             hint="Честный PAL по Ainsworth: 3 силовые × 6 MET × 1ч = 18 MET·ч/нед → +0.12 PAL. Пусто = оценка по шагам/тренировкам."
             onChange={setMetHoursPerWeek} />
           <MhNum label="Пот, мл/ч" value={sweatRate} min={200} max={2000} suffix=" мл/ч"
-            hint="Baker 2017: 400–800 мл/ч в среднем, до 2000 в жару. Идёт в воду, когда пот-тест стоит в режиме «Оценка» — измеренный пот подставляется сам."
+            hint="Baker 2017: 400–800 мл/ч в среднем, до 2000 в жару. 600 — среднее по умолчанию, это не замер. Идёт в воду, когда пот-тест стоит в режиме «Оценка» — измеренный пот подставляется сам."
             onChange={v=> setSweatRate(v ?? 600)} />
           <MhNum label="Na пота, мг/л" value={sweatSodium} min={200} max={2000} suffix=" мг/л"
-            hint="Индивидуально 200–1800 мг/л; 900 = среднее. Точное значение — полоской пота."
+            hint="Индивидуально 200–1800 мг/л; 900 — среднее по умолчанию (не замер). Точное значение — полоской пота."
             onChange={v=> setSweatSodium(v ?? 900)} />
           <PopupSelect label="Климат" value={climate} options={[{id:'temperate',label:'Умеренный'},{id:'hot',label:'Жара +0.6л'},{id:'cold',label:'Холод −0.15л'}]} onChange={v=> setClimate(v as any)} />
           <MhNum label="Влажность, %" value={humidity} min={0} max={100} suffix=" %" optional
@@ -1337,7 +1337,7 @@ const kbju = useMemo(()=> calcKBJU(input), [input]);
           💧 В воду идёт {effectiveSweatMlPerH} мл/ч
           {measuredSweatMlPerH != null
             ? ` — измерено пот-тестом (${sweatV2?.rateLPerH.toFixed(2)} л/ч); ручное ${sweatRate} вернётся в режиме «Оценка»`
-            : ' — ручное значение (измеренный пот подставится после взвешивания до/после)'}
+            : ` — среднее по умолчанию, не замер; своё значение — поле «Пот, мл/ч», измеренный пот подставится после взвешивания до/после`}
           {' · '}Na {effectiveSweatNaMgPerL} мг/л{acclimated ? ' (акклиматизация −40%, Periard)' : ''}
         </div>
         <div style={{ marginTop:6 }}>
@@ -1447,7 +1447,7 @@ const kbju = useMemo(()=> calcKBJU(input), [input]);
             <div style={{ marginTop:6, fontSize:8, color:'rgba(255,255,255,0.45)' }}>BHI-рейтинг: {beverageV2.slice(0,3).map(b=>`${b.name} ×${b.score}`).join(' · ')}</div>
             {sweatV2 && <div style={{ marginTop:6, fontSize:8, color:'#06b6d4', background:'rgba(6,182,214,0.06)', border:'1px solid rgba(6,182,214,0.12)', borderRadius:8, padding:'6px 8px' }}>PRO v2 {sweatV2.measured ? 'измеренный' : 'оценка ACSM'}: {sweatV2.rateLPerH.toFixed(2)} л/ч · {sweatV2.rangeNote} · BHI-топ: {beverageV2.slice(0,3).map(b=>`${b.name} BHI${b.bhi}`).join(' · ')}</div>}
           </div>
-        ) : <div style={{ marginTop:8, fontSize:9, color:'rgba(255,255,255,0.45)', background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', borderRadius:8, padding:'7px 10px' }}>Формула: (до − после + выпито)/часы. 1кг =1л пота. Тестируй в условиях гонки. Пока измерения нет, в воду идёт {effectiveSweatMlPerH} мл/ч (ручное значение из шага ②).</div>}
+        ) : <div style={{ marginTop:8, fontSize:9, color:'rgba(255,255,255,0.45)', background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', borderRadius:8, padding:'7px 10px' }}>Формула: (до − после + выпито)/часы. 1кг =1л пота. Тестируй в условиях гонки. Пока измерения нет, в воду идёт {effectiveSweatMlPerH} мл/ч (поле «Пот, мл/ч» из шага ② — по умолчанию среднее, это не замер).</div>}
         {/* Профили пота — вне карточки результата: без замера их тоже надо видеть/применять.
             Аудит 2026-11: профиль только сохранялся и никуда не применялся («cool 1.10 л/ч»
             в списке не влиял ни на воду, ни на электролиты). */}

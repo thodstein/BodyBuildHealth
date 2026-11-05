@@ -665,8 +665,8 @@ describe('MetabolicHub: ввод меняет расчёт (проводка п�
 
   it('измеренный пот-тест попадает в воду, а не живёт только в карточке', () => {
     render(<MetabolicHub />);
-    // без измерений «измеренный» не выдумывается: в воду идёт ручное 600 мл/ч
-    expect(document.body.textContent || '').toMatch(/— ручное значение/);
+    // без измерений «измеренный» не выдумывается: в воду идёт 600 мл/ч — среднее, а не замер
+    expect(document.body.textContent || '').toMatch(/среднее по умолчанию, не замер/);
     const waterManual = tileValue('Вода');
     setNumber('Вес до, кг', 83);
     setNumber('Вес после, кг', 82.2);
@@ -676,7 +676,7 @@ describe('MetabolicHub: ввод меняет расчёт (проводка п�
     expect(waterMeasured).toBeGreaterThan(waterManual);
     fireEvent.click(Array.from(document.querySelectorAll('button'))
       .find(b => (b.textContent || '').includes('Оценка')) as HTMLElement);
-    expect(document.body.textContent || '').toMatch(/— ручное значение/);
+    expect(document.body.textContent || '').toMatch(/среднее по умолчанию, не замер/);
     expect(tileValue('Вода')).toBe(waterManual);
   });
 });
