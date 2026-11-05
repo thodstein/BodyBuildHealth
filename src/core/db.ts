@@ -1,4 +1,5 @@
 import { currentSpaceId, DATA_SPACE_KEY, HOME_SPACE_ID, parseRegistry } from './data-space';
+import { closeWeightPhotoDb, weightPhotoDbNameFor } from '../engines/weight-photo-store';
 
 const DB_NAME = 'HealthEngineDB_v3';
 const DB_VERSION = 7;
@@ -436,40 +437,41 @@ export async function deleteSpaceDatabases(spaceIds: readonly string[]): Promise
   if (!ids.length) return;
   // Закрываем соединение только если удаляем базу ТЕКУЩЕГО пространства:
   // закрывать рабочую базу из-за чужого атлета незачем (и это ломало бы запись).
-  if (ids.includes(currentSpaceId())) {
+  const current = currentSpaceId();
+  if (ids.includes(current)) {
     try {
       db.close();
     } catch {
       /* ignore */
     }
   }
+  // Фото веса живут в отдельной базе (по одной на пространство): без её удаления
+  // «удалил его данные» оставило бы фотографии на диске.
+  await Promise.all(ids.map(id => closeWeightPhotoDb(id).catch(() => undefined)));
   await Promise.all(
-    ids.map(
-      id =>
-        new Promise<void>(resolve => {
-          try {
-            const req = indexedDB.deleteDatabase(dbNameFor(id));
-            req.onsuccess = () => resolve();
-            req.onerror = () => resolve();
-            req.onblocked = () => resolve(); // другое окно держит базу — не подвешиваем UI
-          } catch {
-            resolve();
-          }
-        }),
+    ids.flatMap(id =>
+      [dbNameFor(id), weightPhotoDbNameFor(id)].map(
+        name =>
+          new Promise<void>(resolve => {
+            try {
+              const req = indexedDB.deleteDatabase(name);
+              req.onsuccess = () => resolve();
+              req.onerror = () => resolve();
+              req.onblocked = () => resolve(); // другое окно держит базу — не подвешиваем UI
+            } catch {
+              resolve();
+            }
+          }),
+      ),
     ),
   );
 }
 
 /**
- * Сколько записей лежит в базе пространства (дневники тренировок, анализы,
- * фото). Нужно, чтобы «удалить данные атлета» показывало НАСТОЯЩИЙ объём:
- * `localStorage` этого атлета может быть почти пуст, а база — на тысячи записей.
- *
- * Возвращает `0`, если базы нет (открытие создало бы пустую — прерываем
- * апгрейд, поэтому база не появляется), и `null`, если посчитать не удалось.
- * Никогда не бросает: это вспомогательная цифра, а не рабочий путь записи.
+ * Сколько записей в одной базе IndexedDB. `0` — базы нет (открытие создало бы
+ * пустую, поэтому апгрейд прерывается), `null` — посчитать не удалось.
  */
-export function spaceDbRecordCount(spaceId: string): Promise<number | null> {
+function countDbRecords(dbName: string): Promise<number | null> {
   return new Promise<number | null>(resolve => {
     let settled = false;
     const done = (v: number | null) => {
@@ -478,7 +480,7 @@ export function spaceDbRecordCount(spaceId: string): Promise<number | null> {
       resolve(v);
     };
     try {
-      const req = indexedDB.open(dbNameFor(spaceId));
+      const req = indexedDB.open(dbName);
       req.onupgradeneeded = () => {
         // Базы ещё нет. Открытие без версии создало бы пустую — прерываем.
         try {
@@ -545,6 +547,42 @@ export function spaceDbRecordCount(spaceId: string): Promise<number | null> {
 }
 
 /**
+ * Сколько записей лежит в данных пространства (дневники тренировок, анализы,
+ * фото веса). Нужно, чтобы «удалить данные атлета» показывало НАСТОЯЩИЙ объём:
+ * `localStorage` этого атлета может быть почти пуст, а базы — на тысячи записей.
+ *
+ * Считаем ОБЕ базы: основную и отдельную базу фотографий веса. Иначе цифра
+ * снова занижала бы то, что удаляется.
+ */
+export async function spaceDbRecordCount(spaceId: string): Promise<number | null> {
+  const [main, photos] = await Promise.all([
+    countDbRecords(dbNameFor(spaceId)),
+    countDbRecords(weightPhotoDbNameFor(spaceId)),
+  ]);
+  if (main == null || photos == null) return null;
+  return main + photos;
+}
+
+/**
+ * Удалить базу фотографий веса пространства (в т.ч. домашнего — при полном
+ * сбросе). Отдельная функция: домашнюю ОСНОВНУЮ базу удалять нельзя, а фото
+ * при «удалить все данные» должны уйти так же, как дневники.
+ */
+export async function deleteWeightPhotoDatabase(spaceId: string): Promise<void> {
+  await closeWeightPhotoDb(spaceId).catch(() => undefined);
+  await new Promise<void>(resolve => {
+    try {
+      const req = indexedDB.deleteDatabase(weightPhotoDbNameFor(spaceId));
+      req.onsuccess = () => resolve();
+      req.onerror = () => resolve();
+      req.onblocked = () => resolve();
+    } catch {
+      resolve();
+    }
+  });
+}
+
+/**
  * Удалить базы ВСЕХ пространств (аварийный сброс). Синхронная: вызывается из
  * обработчиков кнопок, где ждать нечего.
  */export function deleteAllDatabasesSync(): void {
@@ -558,6 +596,11 @@ export function spaceDbRecordCount(spaceId: string): Promise<number | null> {
   for (const id of targets) {
     try {
       indexedDB.deleteDatabase(dbNameFor(id));
+    } catch {
+      /* ignore */
+    }
+    try {
+      indexedDB.deleteDatabase(weightPhotoDbNameFor(id));
     } catch {
       /* ignore */
     }

@@ -24,6 +24,7 @@ vi.mock('../db', () => ({
   STORES: ['diary', 'training_log', 'labs_log'],
   db: { init: vi.fn(async () => {}), clear: vi.fn(async () => {}), put: vi.fn(async () => {}) },
   deleteSpaceDatabases: vi.fn(async () => {}),
+  deleteWeightPhotoDatabase: vi.fn(async () => {}),
   readSpaceStores: (spaceId: string) => readSpaceStores(spaceId),
   writeSpaceStores: (spaceId: string, stores: Record<string, any[]>) =>
     writeSpaceStores(spaceId, stores),
@@ -143,7 +144,7 @@ describe('бэкап уносит базы всех пространств', () 
 
   it('«удалить все данные» из пространства атлета чистит и домашнюю базу', async () => {
     const { softClear } = await import('../data-backup');
-    const { deleteSpaceDatabases } = await import('../db');
+    const { deleteSpaceDatabases, deleteWeightPhotoDatabase } = await import('../db');
     const a1 = athleteSpaceId('a1');
     const reg = setActiveSpace(
       upsertSpace(emptyRegistry(), { id: a1, athleteId: 'a1', label: 'Иван' }).registry,
@@ -164,6 +165,8 @@ describe('бэкап уносит базы всех пространств', () 
     // база атлета удаляется целиком
     // аргумент — массив пространств, поэтому разворачиваем на два уровня
     expect(vi.mocked(deleteSpaceDatabases).mock.calls.flat(2)).toContain(a1);
+    // фотографии веса живут в отдельной базе — «всё» значит и её
+    expect(vi.mocked(deleteWeightPhotoDatabase).mock.calls.flat()).toContain('home');
     // профиль устройства и сессия остаются, данные атлета уходят
     expect(localStorage.getItem('he_profile_v2')).toBe('тренер');
     expect(localStorage.getItem('he_session_v2')).toBe('сессия');

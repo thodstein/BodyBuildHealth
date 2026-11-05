@@ -12,6 +12,7 @@
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { db, deleteSpaceDatabases, dbNameFor, readSpaceStores, spaceDbRecordCount, writeSpaceStores } from '../db';
+import { weightPhotoDbNameFor } from '../../engines/weight-photo-store';
 import {
   _resetDataSpaceCache,
   athleteSpaceId,
@@ -43,15 +44,18 @@ describe('удаление баз пространств', () => {
   it('домашнюю базу не удаляет никогда, даже по прямому запросу', async () => {
     await deleteSpaceDatabases([HOME_SPACE_ID]);
     await deleteSpaceDatabases(['home', '', HOME_SPACE_ID]);
+    // и базу фотографий домашнего пространства — тоже
     expect(deletedNames()).toEqual([]);
   });
 
   it('база атлета удаляется по своему имени, а домашняя не трогается', async () => {
     const sid = athleteSpaceId('a1');
     await deleteSpaceDatabases(['home', sid]);
-    expect(deletedNames()).toEqual([dbNameFor(sid)]);
-    // удостоверимся, что имя действительно отличается от домашней базы
+    // основная база + отдельная база фотографий веса: обе — его данные
+    expect(deletedNames()).toEqual([dbNameFor(sid), weightPhotoDbNameFor(sid)]);
+    // удостоверимся, что имена действительно отличаются от домашних
     expect(dbNameFor(sid)).not.toBe(dbNameFor(HOME_SPACE_ID));
+    expect(weightPhotoDbNameFor(sid)).not.toBe(weightPhotoDbNameFor(HOME_SPACE_ID));
   });
 
   it('чужой атлет не закрывает соединение открытого пространства', async () => {
@@ -71,7 +75,7 @@ describe('удаление баз пространств', () => {
     await deleteSpaceDatabases([sid]);
 
     expect(close).toHaveBeenCalled();
-    expect(deletedNames()).toEqual([dbNameFor(sid)]);
+    expect(deletedNames()).toEqual([dbNameFor(sid), weightPhotoDbNameFor(sid)]);
   });
 
   it('ошибка удаления базы не превращается в отказ интерфейса', async () => {
@@ -92,7 +96,7 @@ describe('подсчёт записей в базе пространства', (
   type FakeCounts = Record<string, number>;
 
   /** Поддельный IndexedDB: `exists=false` ведёт себя как отсутствующая база. */
-  const stubIdb = (opts: { exists: boolean; counts?: FakeCounts }) => {
+  const stubIdb = (opts: { exists: boolean; counts?: FakeCounts; photoCount?: number }) => {
     const log: string[] = [];
     const fake = {
       open(name: string) {
@@ -110,7 +114,11 @@ describe('подсчёт записей в базе пространства', (
             req.onupgradeneeded?.();
             return;
           }
-          const counts = opts.counts ?? {};
+          // У фотографий веса своя база и свой стор — подделка их различает.
+          const isPhotos = name.startsWith('he_weight_photos_db');
+          const counts: FakeCounts = isPhotos
+            ? { photos: opts.photoCount ?? 0 }
+            : (opts.counts ?? {});
           const tx: any = { oncomplete: null, onerror: null, onabort: null };
           tx.objectStore = (store: string) => ({
             count: () => {
@@ -145,6 +153,13 @@ describe('подсчёт записей в базе пространства', (
   it('складывает записи всех сторов', async () => {
     stubIdb({ exists: true, counts: { training_log: 300, workout_log: 12, labs_log: 4 } });
     await expect(spaceDbRecordCount('home')).resolves.toBe(316);
+  });
+
+  it('считает и отдельную базу фотографий веса', async () => {
+    // Фото — тоже данные атлета, и они в другой базе: без них цифра удаления
+    // занижала бы объём (фото весят больше всего).
+    stubIdb({ exists: true, counts: { training_log: 300 }, photoCount: 7 });
+    await expect(spaceDbRecordCount(athleteSpaceId('a1'))).resolves.toBe(307);
   });
 
   it('если базы нет — 0, и пустая база не создаётся', async () => {

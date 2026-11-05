@@ -1,4 +1,11 @@
-import { db, STORES, deleteSpaceDatabases, readSpaceStores, writeSpaceStores } from './db';
+import {
+  db,
+  STORES,
+  deleteSpaceDatabases,
+  deleteWeightPhotoDatabase,
+  readSpaceStores,
+  writeSpaceStores,
+} from './db';
 import {
   DATA_SPACE_KEY,
   DEVICE_SALT_KEY,
@@ -194,6 +201,9 @@ export async function softClear(): Promise<void> {
   // только открытое пространство нельзя: если сброс нажали, находясь в данных
   // атлета, домашняя база осталась бы с дневниками и анализами.
   await writeSpaceStores(HOME_SPACE_ID, {});
+  // Фотографии веса лежат в отдельной базе и в сторы основной не попадают —
+  // без этого «удалил все данные» оставило бы их на диске.
+  await deleteWeightPhotoDatabase(HOME_SPACE_ID);
   _resetDataSpaceCache();
   // Черновики атлетов в sessionStorage относятся к «всем данным» так же, как
   // их ключи в localStorage: после сброса они не должны всплыть заново.
