@@ -47,11 +47,13 @@ const die = (msg) => {
 };
 
 function git(args, opts = {}) {
-  return execFileSync('git', args, {
+  const out = execFileSync('git', args, {
     cwd: root,
     encoding: 'utf8',
     stdio: opts.stdio ?? ['ignore', 'pipe', 'pipe'],
-  }).trim();
+  });
+  // stdio: 'inherit' не отдаёт stdout — возвращаем пустую строку, а не падаем.
+  return typeof out === 'string' ? out.trim() : '';
 }
 
 function nextVersion(current) {
