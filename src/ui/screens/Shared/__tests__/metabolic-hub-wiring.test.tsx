@@ -389,6 +389,20 @@ describe('MetabolicHub: ввод меняет расчёт (проводка п�
     expect(byLabel('Удалить последнюю запись HCT')).toBeNull();
   });
 
+  it('проекция тела подписывает модель выбранного режима, а не одну на всех', () => {
+    render(<MetabolicHub />);
+    // hold BF: рост FFMI до cap, жир держим
+    expect(document.body.textContent || '').toContain('FFMI +0.4/г 2 года');
+    fireEvent.click(Array.from(document.querySelectorAll('button'))
+      .find(b => (b.textContent || '').includes('BF const')) as HTMLElement);
+    fireEvent.click(Array.from(document.querySelectorAll('button'))
+      .find(b => (b.textContent || '').trim() === 'FFMI const') as HTMLElement);
+    const txt = document.body.textContent || '';
+    expect(txt).toContain('жир −0.5 пп/год');
+    expect(txt).toContain('не измерение');
+    expect(txt).not.toContain('вес растёт вместе с сухой массой');
+  });
+
   it('сравнение сценариев не выдаёт обрезанные 24 поля за полный список', () => {
     const a: Record<string, number> = {}; const b: Record<string, number> = {};
     for (let i = 0; i < 30; i++) { a['f' + i] = i; b['f' + i] = i + 1; }

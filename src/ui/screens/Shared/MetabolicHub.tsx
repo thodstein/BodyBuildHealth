@@ -1415,7 +1415,14 @@ const kbju = useMemo(()=> calcKBJU(input), [input]);
             ))}
           </div>
           <div style={{ display:'flex', justifyContent:'space-between', fontSize:7, color:'rgba(255,255,255,0.35)', marginTop:4 }}><span>{bodyCompProj[0]?.weight}кг → {bodyCompProj[bodyCompProj.length-1]?.weight}кг</span><span>FFMI {bodyCompProj[0]?.ffmi} → {bodyCompProj[bodyCompProj.length-1]?.ffmi}</span></div>
-          <div style={{ fontSize:7, color:'rgba(255,255,255,0.45)', marginTop:4 }}>Модель: +0.4 FFMI/г 2 года, затем +0.15 (Morton) до 26.2 cap · sensitivity ±3% BF → ±0.6 FFMI · ±10% TEE envelope.</div>
+          <div style={{ fontSize:7, color:'rgba(255,255,255,0.45)', marginTop:4 }}>
+            {projectionMode === 'hold_bf'
+              ? 'Модель: FFMI +0.4/г 2 года, затем +0.15 (Morton) до 26.2 cap; % жира держим — вес растёт вместе с LBM, а жир пропорционально (это не рекомпозиция).'
+              : projectionMode === 'hold_weight'
+                ? 'Модель: вес держим; FFMI +0.4/г 2 года, затем +0.15 (Morton) до 26.2 cap — значит % жира падает за счёт роста LBM.'
+                : 'Сценарий: FFMI держим, жир −0.5 пп/год до 5 % — это гипотетическая скорость, не измерение; модель не обещает, что так и будет.'}
+            {' '}sensitivity ±3% BF → ±0.6 FFMI · ±10% TEE envelope.
+          </div>
         </div>
       </MhSection>
       </div>
