@@ -216,7 +216,9 @@ export const MetabolicHub: React.FC = () => {
   const [sleepHours, setSleepHours] = useState(7);
   const [sleepQuality, setSleepQuality] = useState(3);
   const [climate, setClimate] = useState<'temperate'|'hot'|'cold'>('temperate');
-  const [humidity, setHumidity] = useState<number|undefined>(55);
+  // Аудит 2026-11: влажность 55% была «введённым» значением по умолчанию. Сама по себе она ни на
+  // что не влияет (движок добавляет мл только >60%), но поле выглядело заполненным. Пусто = «не задано».
+  const [humidity, setHumidity] = useState<number|undefined>(undefined);
   const [standingHours, setStandingHours] = useState(2);
   const [fidgetLevel, setFidgetLevel] = useState<1|2|3>(2);
   const [sweatRate, setSweatRate] = useState(600);
@@ -1057,7 +1059,7 @@ const kbju = useMemo(()=> calcKBJU(input), [input]);
     // тест пота, расписание, загрузки, горизонт прогноза, профессию и ААС — значения
     // продолжали влиять на расчёт после сброса.
     setStress(5); setSleepHours(7); setSleepQuality(3);
-    setClimate('temperate'); setHumidity(55); setStandingHours(2); setFidgetLevel(2);
+    setClimate('temperate'); setHumidity(undefined); setStandingHours(2); setFidgetLevel(2);
     setSweatRate(600); setSweatSodium(900); setSweatIntensity('moderate'); setSweatEnv('temperate');
     setUseMeasuredSweat(true); setPreKg(weight); setPostKg(weight); setFluidL(0); setSweatHours(1);
     setAlcoholG(undefined); setAlcoholDays(0); setCaffeineMg(undefined); setCaffeineHoursSince(2);

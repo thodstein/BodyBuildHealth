@@ -159,6 +159,11 @@ describe('MetabolicHub: ручной ввод лаб переживает авт
     expect(src).not.toMatch(/alcoholG: 'алкоголь, г\/нед'/);
   });
 
+  it('влажность по умолчанию — «не задано», а не 55 % как введённое значение', () => {
+    expect(src).toContain('const [humidity, setHumidity] = useState<number|undefined>(undefined)');
+    expect(src).not.toMatch(/setHumidity\(55\)/);
+  });
+
   it('пот по умолчанию (600 мл/ч, Na 900) не выдаётся за ручной ввод и замер', () => {
     // регрессия: шаг «Активность» писал «ручное значение», хотя 600 мл/ч — среднее
     // из Baker 2017, которое никто не вводил.
