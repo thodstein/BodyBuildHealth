@@ -459,6 +459,50 @@ export const MetabolicHub: React.FC = () => {
       showToast(`Донация ${today} записана · HCT ${hct}% → прогноз ~${est.hct}% через 7д`);
     }catch{ showToast('Донация записана'); }
   }, [hct, showToast, pushHct]);
+  /**
+   * Аудит 2026-11: журнал HCT и донаций только дописывался — опечатку (HCT 5.6 вместо 56, донацию
+   * не в тот день) нельзя было убрать вообще, а она продолжала двигать прогноз HCT и запрет
+   * флеботомии. Даём явную отмену последней записи (не «сброс всего»: остальные точки остаются).
+   */
+  const removeLastHct = useCallback(()=>{
+    try{
+      const raw = localStorage.getItem(HCT_HIST_KEY);
+      const arr: HctPoint[] = raw ? JSON.parse(raw) : [];
+      if(!arr.length){ showToast('История HCT пуста — удалять нечего'); return; }
+      const removed = arr[arr.length-1]!;
+      const next = arr.slice(0, -1);
+      localStorage.setItem(HCT_HIST_KEY, JSON.stringify(next));
+      setHctHistory(next);
+      showToast(`Удалена ${removed.est ? 'прогнозная точка' : 'точка'} HCT ${removed.date} (${removed.hct}%)`);
+    }catch{ showToast('Не удалось удалить точку HCT'); }
+  }, [showToast]);
+  const removeLastDonation = useCallback(()=>{
+    try{
+      const raw = localStorage.getItem(DONATION_LOG_KEY);
+      const arr: HctPoint[] = raw ? JSON.parse(raw) : [];
+      if(!arr.length){ showToast('Журнал донаций пуст — удалять нечего'); return; }
+      const last = arr[arr.length-1]!;
+      const next = arr.slice(0, -1);
+      localStorage.setItem(DONATION_LOG_KEY, JSON.stringify(next));
+      setDonationLog(next);
+      // Прогнозная точка (донация +7 д, est:true) принадлежит этой донации — убираем её вместе с ней,
+      // иначе на графике остаётся «будущее», которого уже не будет.
+      try{
+        const rawH = localStorage.getItem(HCT_HIST_KEY);
+        if(rawH){
+          const h: HctPoint[] = JSON.parse(rawH);
+          const d = new Date(); d.setDate(d.getDate() + 7);
+          const estDate = localISODate(d);
+          const idx = h.findIndex(p => p.est && p.date === estDate);
+          const nextH = idx >= 0 ? [...h.slice(0, idx), ...h.slice(idx + 1)] : h;
+          localStorage.setItem(HCT_HIST_KEY, JSON.stringify(nextH));
+          setHctHistory(nextH);
+        }
+      }catch{}
+      showToast(`Донация ${last.date} удалена · осталось ${next.length}`);
+    }catch{ showToast('Не удалось удалить донацию'); }
+  }, [showToast]);
+
   useEffect(()=>{ try{ const raw=localStorage.getItem('he_sweat_profiles_v1'); if(raw){ const p=JSON.parse(raw); if(p && typeof p==='object') setSweatProfiles(p); } }catch{} },[]);
 
   // labs live refresh — только те поля, которые пользователь не правил руками.
@@ -1026,7 +1070,7 @@ const kbju = useMemo(()=> calcKBJU(input), [input]);
     setGoal('maintain'); setActivityLevel('medium'); setOnAAS(false); setAasDose(500);
     setCompareIds([]);
     setWizardStep(1);
-    showToast('Ввод сброшен: лабы, замеры, пот, климат, сон, цель — пусто. Вес/рост/активность из профиля не тронуты');
+    showToast('Ввод сброшен: лабы, замеры, пот, климат, сон, цель — пусто. Вес/рост/активность из профиля не тронуты; журнал HCT/донаций и профили пота сохранены (убрать — кнопками ↺)');
   }, [showToast, weight]);
 
   /**
@@ -1582,7 +1626,9 @@ const kbju = useMemo(()=> calcKBJU(input), [input]);
           <button onClick={resetLabs} className="mh-act" style={{ padding:'10px 12px', minHeight:44, borderRadius:10, border:'1px solid rgba(255,255,255,0.08)', background:'rgba(255,255,255,0.03)', color:'rgba(255,255,255,0.65)', fontSize:10, fontWeight:600, cursor:'pointer' }}>⟲ Сброс лаб</button>
           <button onClick={recordHct} className="mh-act" style={{ padding:'10px 12px', minHeight:44, borderRadius:10, border:'1px solid rgba(56,165,250,0.18)', background:'rgba(56,165,250,0.10)', color:'#38bdf8', fontSize:10, fontWeight:700, cursor:'pointer' }}>📌 Записать HCT</button>
           <button onClick={recordDonation} className="mh-act" style={{ padding:'10px 12px', minHeight:44, borderRadius:10, border:'1px solid rgba(239,68,68,0.18)', background:'rgba(239,68,68,0.10)', color:'#ef4444', fontSize:10, fontWeight:700, cursor:'pointer' }}>🩸 Донация сегодня</button>
-          <span style={{ fontSize:8, color:'rgba(255,255,255,0.45)', alignSelf:'center' }}>ESC &gt;52% (м)/48% (ж), флеботомия &gt;54%.</span>
+          {hctHistory.length>0 && <button onClick={removeLastHct} className="mh-act" aria-label="Удалить последнюю запись HCT" style={{ padding:'10px 12px', minHeight:44, borderRadius:10, border:'1px solid rgba(255,255,255,0.08)', background:'rgba(255,255,255,0.03)', color:'rgba(255,255,255,0.6)', fontSize:10, fontWeight:600, cursor:'pointer' }}>↺ HCT</button>}
+          {donationLog.length>0 && <button onClick={removeLastDonation} className="mh-act" aria-label="Удалить последнюю донацию" style={{ padding:'10px 12px', minHeight:44, borderRadius:10, border:'1px solid rgba(255,255,255,0.08)', background:'rgba(255,255,255,0.03)', color:'rgba(255,255,255,0.6)', fontSize:10, fontWeight:600, cursor:'pointer' }}>↺ Донация</button>}
+          <span style={{ fontSize:8, color:'rgba(255,255,255,0.45)', alignSelf:'center' }}>ESC &gt;52% (м)/48% (ж), флеботомия &gt;54%. ↺ убирает последнюю запись журнала.</span>
         </div>
         {hctHistory.length>0 && (
           <div style={{ marginTop:6, display:'flex', gap:4, alignItems:'end', flexWrap:'wrap' }}>

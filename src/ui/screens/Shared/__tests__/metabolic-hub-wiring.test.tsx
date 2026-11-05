@@ -367,6 +367,28 @@ describe('MetabolicHub: ввод меняет расчёт (проводка п�
     expect(txt).toContain('добавка поддерживает эритроцитоз');
   });
 
+  it('запись в журнал HCT/донаций можно отменить (опечатку не заклинивает)', () => {
+    const byLabel = (l: string) => document.querySelector(`button[aria-label="${l}"]`) as HTMLButtonElement | null;
+    const last = seedDonation(10);
+    render(<MetabolicHub />);
+    // донация видна в журнале и удаляется кнопкой ↺
+    const undoDonation = byLabel('Удалить последнюю донацию');
+    expect(undoDonation, 'кнопка ↺ Донация').not.toBeNull();
+    fireEvent.click(undoDonation!);
+    expect(JSON.parse(localStorage.getItem('he_donation_log_v1') || '[]')).toEqual([]);
+    expect(byLabel('Удалить последнюю донацию')).toBeNull();
+    expect(document.body.textContent).not.toContain(`посл. ${last}`);
+    // то же для точек HCT: пишем HCT 52 → появляется «↺ HCT», жмём — история пуста
+    setNumber('HCT, %', 52);
+    fireEvent.click(Array.from(document.querySelectorAll('button')).find(b => /Записать HCT/.test(b.textContent || '')) as HTMLElement);
+    expect(JSON.parse(localStorage.getItem('he_hct_history_v1') || '[]').length).toBe(1);
+    const undoHct = byLabel('Удалить последнюю запись HCT');
+    expect(undoHct, 'кнопка ↺ HCT').not.toBeNull();
+    fireEvent.click(undoHct!);
+    expect(JSON.parse(localStorage.getItem('he_hct_history_v1') || '[]')).toEqual([]);
+    expect(byLabel('Удалить последнюю запись HCT')).toBeNull();
+  });
+
   it('свежая донация в журнале блокирует повторную флеботомию', () => {
     const last = seedDonation(10);
     render(<MetabolicHub />);
