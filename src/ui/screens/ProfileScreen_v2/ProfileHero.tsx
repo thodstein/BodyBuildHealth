@@ -21,7 +21,7 @@ const coachDescForHero = (): string => {
   try {
     return coachSummary(readCoachState(typeof localStorage !== 'undefined' ? localStorage : null));
   } catch {
-    return 'До 20 атлетов, разделы, активный атлет';
+    return 'Атлеты, разделы, активный атлет';
   }
 };
 
@@ -37,7 +37,7 @@ const TABS: TabDef[] = [
   { id: 'user', icon: 'user', label: 'Пользователь', desc: 'Имя, параметры, образ жизни, курс, цели', color: colors.primary },
   { id: 'diaries', icon: 'notebook', label: 'Дневники', desc: 'Сон, давление, вес, замеры', color: colors.orange },
   { id: 'reports', icon: 'chart', label: 'Отчёты', desc: 'Комплексный отчёт для врача/тренера', color: colors.blue },
-  { id: 'coach', icon: 'award', label: 'Тренер', desc: 'До 20 атлетов, разделы, активный атлет', color: COACH_COLOR },
+  { id: 'coach', icon: 'award', label: 'Тренер', desc: 'Атлеты, разделы, активный атлет', color: COACH_COLOR },
   { id: 'log', icon: 'activity', label: 'Журнал', desc: 'Подходы и вес тела по атлетам', color: LOG_COLOR },
   { id: 'notes', icon: 'file', label: 'Заметки', desc: 'Контекст, ограничения, договорённости', color: NOTES_COLOR },
   { id: 'planner', icon: 'clock', label: 'Планер', desc: 'Календарь задач по дням', color: PLANNER_COLOR },

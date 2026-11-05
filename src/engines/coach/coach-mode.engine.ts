@@ -10,8 +10,8 @@
  *    устройства — этот движок НЕ делает изоляцию данных по атлетам. Он ведёт
  *    карточки атлетов, выбор разделов и активного атлета. Изоляция — следующий шаг,
  *    и UI обязан говорить это прямо, а не делать вид, что у каждого атлета свой план;
- *  • лимит 20 атлетов — требование продукта, а не техники: движок не даёт его
- *    превысить и возвращает причину, а не молча обрезает;
+ *  • количество атлетов не ограничено продуктом; единственный порог в парсере —
+ *    защита от испорченного файла, а не «лимит» (обрезать данные молча нельзя);
  *  • числовые поля (возраст/вес/рост) проверяются только на здравый смысл
  *    (опечатка/минус/мусор), это НЕ медицинские нормативы и не «норма»;
  *  • парсер терпимый: битый JSON, чужая версия и мусорные записи не роняют
@@ -20,8 +20,11 @@
 import { localIsoDate } from '../../core/local-date';
 
 export const COACH_STORE_KEY = 'he_coach_mode';
-/** Требование продукта: тренер вносит до 20 атлетов. */
-export const COACH_MAX_ATHLETES = 20;
+/**
+ * Защита парсера от испорченного файла (не продуктовый лимит): список атлетов
+ * не ограничен, но миллион записей из поддельного JSON разбирать незачем.
+ */
+export const MAX_STORED_ATHLETES = 1000;
 const MAX_NAME_CHARS = 60;
 const MAX_TEXT_CHARS = 240;
 /** Здравый смысл полей, не нормативы. */
@@ -156,7 +159,7 @@ export function parseCoachState(raw: string | null | undefined): CoachState {
       if (!a || seen.has(a.id)) continue;
       seen.add(a.id);
       athletes.push(a);
-      if (athletes.length >= COACH_MAX_ATHLETES) break;
+      if (athletes.length >= MAX_STORED_ATHLETES) break;
     }
     const active = clampText(obj.activeAthleteId, 80);
     return {
@@ -238,7 +241,7 @@ export function selectAllCoachSections(state: CoachState): CoachState {
 /* Атлеты                                                              */
 /* ------------------------------------------------------------------ */
 
-export type CoachAthleteError = 'limit' | 'name' | null;
+export type CoachAthleteError = 'name' | null;
 
 export interface CoachAthletePatch {
   name?: string;
@@ -267,8 +270,8 @@ function nextAthleteId(existing: CoachAthlete[], now: string): string {
 }
 
 /**
- * Добавить атлета. Лимит 20 — жёсткий: при переполнении возвращаем `limit`
- * и НЕ трогаем состояние (никакого «вытесним самого старого» — это чужие данные).
+ * Добавить атлета. Количество не ограничено; пустое имя — единственная причина
+ * отказа (атлет без имени бесполезен в списке).
  */
 export function addCoachAthlete(
   state: CoachState,
@@ -277,7 +280,6 @@ export function addCoachAthlete(
 ): AddCoachAthleteResult {
   const name = clampText(input.name, MAX_NAME_CHARS);
   if (!name) return { state, athlete: null, error: 'name' };
-  if (state.athletes.length >= COACH_MAX_ATHLETES) return { state, athlete: null, error: 'limit' };
   const now = opts.now ?? nowIso();
   const athlete: CoachAthlete = normalizeAthlete({
     id: opts.id ?? nextAthleteId(state.athletes, now),
@@ -350,23 +352,10 @@ export function coachActiveAthlete(state: CoachState): CoachAthlete | null {
   return state.athletes.find(a => a.id === state.activeAthleteId) ?? null;
 }
 
-export interface CoachLimits {
-  count: number;
-  max: number;
-  canAdd: boolean;
-  remaining: number;
-}
-
-export function coachLimits(state: CoachState): CoachLimits {
-  const max = COACH_MAX_ATHLETES;
-  const count = state.athletes.length;
-  return { count, max, canAdd: count < max, remaining: Math.max(0, max - count) };
-}
-
 /** Короткая подпись для карточки профиля. */
 export function coachSummary(state: CoachState): string {
   if (!state.enabled) return 'Выключен · карточки атлетов, разделы и активный атлет';
-  const parts = [`${state.athletes.length}/${COACH_MAX_ATHLETES} атлетов`, `${state.sections.length} разделов`];
+  const parts = [`Атлетов: ${state.athletes.length}`, `${state.sections.length} разделов`];
   const active = coachActiveAthlete(state);
   if (active) parts.push(`активный: ${active.name}`);
   return parts.join(' · ');

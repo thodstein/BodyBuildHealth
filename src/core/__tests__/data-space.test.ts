@@ -7,7 +7,7 @@
  *  • ключ, пришедший из бэкапа/облака (`he_ath_…__…`), не префиксуется второй раз;
  *  • данные устройства (режим тренера, синк, тема) видны везде и не теряются;
  *  • перечисление показывает только активное пространство;
- *  • реестр терпим к мусору, лимит 20 соблюдается, удаление активного → home;
+ *  • реестр терпим к мусору, количество пространств не ограничено, удаление активного → home;
  *  • удаление данных атлета не трогает ни home, ни других атлетов.
  */
 import { describe, expect, it, beforeEach } from 'vitest';
@@ -15,7 +15,7 @@ import {
   ATHLETE_SPACE_PREFIX,
   DATA_SPACE_KEY,
   HOME_SPACE_ID,
-  MAX_DATA_SPACES,
+  MAX_REGISTRY_SPACES,
   _resetDataSpaceCache,
   athleteSpaceId,
   athleteSpacesByRecent,
@@ -192,17 +192,28 @@ describe('реестр пространств', () => {
     expect(spaceForAthlete(back, 'a1')?.label).toBe('Иван');
   });
 
-  it('лимит 20 пространств атлетов: 21-е отклоняется, реестр не меняется', () => {
+  it('количество пространств не ограничено: 25-е создаётся', () => {
     let reg = emptyRegistry();
-    for (let i = 0; i < MAX_DATA_SPACES; i++) {
+    for (let i = 0; i < 25; i++) {
       const r = upsertSpace(reg, { id: athleteSpaceId(`a${i}`), athleteId: `a${i}`, label: `A${i}` });
       expect(r.error).toBeNull();
       reg = r.registry;
     }
-    const before = reg.spaces.length;
-    const over = upsertSpace(reg, { id: athleteSpaceId('overflow'), athleteId: 'overflow' });
-    expect(over.error).toBe('limit');
-    expect(over.registry.spaces).toHaveLength(before);
+    expect(reg.spaces).toHaveLength(26); // home + 25
+    const extra = upsertSpace(reg, { id: athleteSpaceId('overflow'), athleteId: 'overflow' });
+    expect(extra.error).toBeNull();
+    expect(extra.registry.spaces).toHaveLength(27);
+  });
+
+  it('испорченный реестр с тысячами записей не роняет парсер (защита, не лимит)', () => {
+    const spaces = [
+      { id: HOME_SPACE_ID, athleteId: null, label: 'Мои данные', createdAt: '2026-01-01' },
+      ...Array.from({ length: MAX_REGISTRY_SPACES + 20 }, (_, i) => ({
+        id: `asp_a${i}`, athleteId: `a${i}`, label: `A${i}`, createdAt: '2026-01-01',
+      })),
+    ];
+    const back = parseRegistry(JSON.stringify({ version: 1, active: HOME_SPACE_ID, spaces }));
+    expect(back.spaces).toHaveLength(MAX_REGISTRY_SPACES + 1);
   });
 
   it('upsert обновляет существующее пространство (переименование атлета)', () => {

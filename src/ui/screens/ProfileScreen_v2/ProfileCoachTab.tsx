@@ -18,11 +18,10 @@ import React, { useMemo, useState } from 'react';
 import { NativeIcon } from '../../native/NativeIcons';
 import { colors, withAlpha } from './ui';
 import {
-  COACH_MAX_ATHLETES,
   COACH_SECTIONS,
   addCoachAthlete,
   coachActiveAthlete,
-  coachLimits,
+  coachToday,
   readCoachState,
   removeCoachAthlete,
   selectAllCoachSections,
@@ -36,6 +35,25 @@ import {
   type CoachSex,
   type CoachState,
 } from '../../../engines/coach/coach-mode.engine';
+import {
+  applyProgramBundle,
+  collectProgramBundle,
+  describeProgramBundle,
+  programBundleErrorText,
+  type CoachProgramBundle,
+} from '../../../engines/coach/coach-program-bundle.engine';
+import {
+  COACH_PROGRAMS_MAX,
+  addCoachProgram,
+  coachProgramErrorText,
+  markCoachProgramIssued,
+  readCoachPrograms,
+  removeCoachProgram,
+  renameCoachProgram,
+  writeCoachPrograms,
+  type CoachProgramsStore,
+  type CoachProgramTemplate,
+} from '../../../engines/coach/coach-program-library.engine';
 import {
   countNotesForAthlete,
   emptyCoachNotes,
@@ -57,7 +75,6 @@ import {
 } from '../../../engines/coach/coach-athlete-log.engine';
 import {
   HOME_SPACE_ID,
-  MAX_DATA_SPACES,
   activateAthleteSpace,
   activateHomeSpace,
   activateSpaceById,
@@ -100,6 +117,17 @@ const fmtBytes = (bytes: number): string => {
   const kb = bytes / 1024;
   if (kb < 1024) return `${kb.toFixed(1).replace('.', ',')} КБ`;
   return `${(kb / 1024).toFixed(1).replace('.', ',')} МБ`;
+};
+
+/** Свободное имя в библиотеке: «Иван · 05.11.26», при совпадении «(2)». */
+const uniqueProgramName = (base: string, existing: CoachProgramTemplate[]): string => {
+  const taken = new Set(existing.map(t => t.name.toLowerCase()));
+  if (!taken.has(base.toLowerCase())) return base;
+  for (let i = 2; i < 100; i++) {
+    const next = `${base} (${i})`;
+    if (!taken.has(next.toLowerCase())) return next;
+  }
+  return `${base} (${Date.now() % 1000})`;
 };
 
 /** 1 запись / 2 записи / 5 записей — иначе «2 записей» выглядит небрежно. */
@@ -212,6 +240,29 @@ export const ProfileCoachTab: React.FC<{
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [query, setQuery] = useState('');
 
+  /**
+   * Библиотека программ тренера. Ключ `he_coach_programs` — устройственный,
+   * поэтому переключается не с атлетом, а синхронизируется между устройствами тренера.
+   */
+  const [programs, setPrograms] = useState<CoachProgramsStore>(() => readCoachPrograms(ls()));
+  const [programNotice, setProgramNotice] = useState<string | null>(null);
+  const [programError, setProgramError] = useState<string | null>(null);
+  const [renameProgramId, setRenameProgramId] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState('');
+  const [confirmProgramDelete, setConfirmProgramDelete] = useState<string | null>(null);
+  /**
+   * Черновик выдачи: шаблон (или снимок с атлета) + выбранные получатели.
+   * confirm — второй шаг, потому что выдача ЗАМЕНЯЕТ программу, а не дополняет.
+   */
+  const [issue, setIssue] = useState<{
+    templateId: string | null;
+    title: string;
+    bundle: CoachProgramBundle;
+  } | null>(null);
+  const [issuePick, setIssuePick] = useState<Set<string>>(() => new Set());
+  const [issueConfirm, setIssueConfirm] = useState(false);
+  const [issueDone, setIssueDone] = useState<string | null>(null);
+
   // Заметки/планер/журнал читаем один раз на состояние режима: сам экран их не меняет,
   // а пересчитывать JSON на каждый символ в форме атлета незачем.
   const { notes, planner, log } = useMemo<{
@@ -258,12 +309,11 @@ export const ProfileCoachTab: React.FC<{
     const storage = ls();
     if (!storage) return new Map<string, { keys: number; bytes: number }>();
     return spaceUsageMap(deviceRawOrFallback(storage));
-  }, [state, spaceActiveId]);
+  }, [state, spaceActiveId, registryRev]);
   const usageOf = (athleteId: string) => usage.get(athleteSpaceId(athleteId)) ?? { keys: 0, bytes: 0 };
   const lastOpenedOf = (athleteId: string) =>
     spaceRegistry.spaces.find(s => s.id === athleteSpaceId(athleteId))?.lastOpenedAt ?? null;
 
-  const limits = coachLimits(state);
   const active = coachActiveAthlete(state);
 
   /**
@@ -308,6 +358,161 @@ export const ProfileCoachTab: React.FC<{
   // Итог «забыли всех» показываем, только пока действительно никого не осталось:
   // как только появился новый атлет, блок снова предлагает действие, а не итог.
   const showForgetDone = forgetDone && state.athletes.length === 0 && athleteSpaces.length === 0;
+
+  /**
+   * «Снять программу» с атлета: сырые программные ключи его пространства →
+   * шаблон в устройственной библиотеке. Дневники и анализы не попадают.
+   */
+  const saveProgramFromAthlete = (athlete: CoachAthlete) => {
+    const storage = ls();
+    setProgramNotice(null);
+    setProgramError(null);
+    if (!storage) {
+      setProgramError('Хранилище недоступно — сохранить программу нельзя.');
+      return;
+    }
+    const bundle = collectProgramBundle(storage, athleteSpaceId(athlete.id), {
+      createdAt: new Date().toISOString(),
+      name: athlete.name,
+    });
+    if (describeProgramBundle(bundle).keys === 0) {
+      setProgramError(`У атлета «${athlete.name}» пока нет сохранённой программы — снимать нечего.`);
+      return;
+    }
+    const base = `${athlete.name} · ${fmtShort(coachToday())}`;
+    const res = addCoachProgram(programs, {
+      name: uniqueProgramName(base, programs.items),
+      bundle,
+      sourceLabel: athlete.name,
+    });
+    if (res.error || !res.template) {
+      setProgramError(coachProgramErrorText(res.error));
+      return;
+    }
+    writeCoachPrograms(storage, res.store);
+    setPrograms(res.store);
+    setProgramNotice(`«${res.template.name}» — в «Моих программах». Теперь её можно выдать другому атлету.`);
+  };
+
+  /** Начать выдачу из библиотеки (шаблон) или прямо с карточки атлета (снимок). */
+  const startIssueTemplate = (t: CoachProgramTemplate) => {
+    setIssue({ templateId: t.id, title: t.name, bundle: t.bundle });
+    setIssuePick(new Set());
+    setIssueConfirm(false);
+    setIssueDone(null);
+    setProgramNotice(null);
+    setProgramError(null);
+  };
+
+  const startIssueFromAthlete = (athlete: CoachAthlete) => {
+    const storage = ls();
+    if (!storage) {
+      setProgramError('Хранилище недоступно — скопировать программу нельзя.');
+      return;
+    }
+    const bundle = collectProgramBundle(storage, athleteSpaceId(athlete.id), {
+      createdAt: new Date().toISOString(),
+      name: athlete.name,
+    });
+    if (describeProgramBundle(bundle).keys === 0) {
+      setProgramError(`У «${athlete.name}» нет программы для копирования.`);
+      return;
+    }
+    setIssue({ templateId: null, title: `Программа «${athlete.name}»`, bundle });
+    setIssuePick(new Set());
+    setIssueConfirm(false);
+    setIssueDone(null);
+    setProgramNotice(null);
+    setProgramError(null);
+  };
+
+  const toggleIssuePick = (id: string) => {
+    setIssuePick(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+    setIssueConfirm(false);
+    setIssueDone(null);
+  };
+
+  /**
+   * Выдать программу выбранным. Пишем через шов с физическими ключами, поэтому
+   * синхронизация видит правку (и надгробия на снятые ключи), а регистрируем
+   * пространство — иначе копия не попадёт в бэкап и список переключения.
+   */
+  const doIssue = () => {
+    const storage = ls();
+    if (!storage || !issue) return;
+    const chosen = state.athletes.filter(a => issuePick.has(a.id));
+    if (!chosen.length) return;
+    let ok = 0;
+    let failed = 0;
+    const reg = readRegistryFromStorage();
+    let nextReg = reg;
+    for (const a of chosen) {
+      const sid = athleteSpaceId(a.id);
+      const r = applyProgramBundle(storage, sid, issue.bundle, { mode: 'replace' });
+      if (r.error) {
+        failed++;
+        continue;
+      }
+      ok++;
+      nextReg = upsertSpace(nextReg, { id: sid, athleteId: a.id, label: a.name }).registry;
+    }
+    if (nextReg !== reg) {
+      writeRegistryToStorage(nextReg);
+      setRegistryRev(v => v + 1);
+    }
+    if (issue.templateId && ok > 0) {
+      const next = markCoachProgramIssued(programs, issue.templateId);
+      writeCoachPrograms(storage, next);
+      setPrograms(next);
+    }
+    setIssueConfirm(false);
+    const names =
+      chosen.slice(0, 3).map(a => a.name).join(', ') +
+      (chosen.length > 3 ? ` и ещё ${chosen.length - 3}` : '');
+    if (failed) {
+      setIssueDone(
+        `Выдано: ${ok ? names : 'никому'} · не удалось: ${failed}. Повторите для неудавшихся — данные не тронуты.`,
+      );
+      return;
+    }
+    setIssue(null);
+    setIssuePick(new Set());
+    setIssueDone(`Готово: программа выдана — ${names}. Атлет увидит её, когда откроет свои данные.`);
+  };
+
+  const saveProgramRename = (id: string) => {
+    const storage = ls();
+    if (!storage) return;
+    const res = renameCoachProgram(programs, id, renameValue);
+    if (res.error) {
+      setProgramError(coachProgramErrorText(res.error));
+      return;
+    }
+    writeCoachPrograms(storage, res.store);
+    setPrograms(res.store);
+    setRenameProgramId(null);
+    setRenameValue('');
+    setProgramError(null);
+  };
+
+  const deleteProgram = (id: string) => {
+    const storage = ls();
+    if (!storage) return;
+    const next = removeCoachProgram(programs, id);
+    writeCoachPrograms(storage, next);
+    setPrograms(next);
+    setConfirmProgramDelete(null);
+    if (issue?.templateId === id) {
+      setIssue(null);
+      setIssuePick(new Set());
+    }
+    setProgramNotice('Программа удалена из библиотеки. У атлетов, кому её уже выдали, она осталась.');
+  };
 
   const toggleEnabled = () => {
     const next = setCoachEnabled(state, !state.enabled);
@@ -375,10 +580,6 @@ export const ProfileCoachTab: React.FC<{
       goal: form.goal,
       note: form.note,
     });
-    if (res.error === 'limit') {
-      setFormError(`Лимит ${COACH_MAX_ATHLETES} атлетов достигнут. Удалите карточку, чтобы добавить нового.`);
-      return;
-    }
     if (res.error === 'name') {
       setFormError('Имя обязательно.');
       return;
@@ -604,10 +805,6 @@ export const ProfileCoachTab: React.FC<{
       ...(a.weightKg != null ? { weight: a.weightKg } : {}),
     };
     const res = activateAthleteSpace(a.id, a.name, seed);
-    if (res.error === 'limit') {
-      setFormError(`Лимит ${MAX_DATA_SPACES} пространств данных. Удалите данные неактуального атлета.`);
-      return;
-    }
     if (res.error) {
       setFormError('Не удалось открыть данные атлета.');
       return;
@@ -639,7 +836,7 @@ export const ProfileCoachTab: React.FC<{
               Режим тренера
             </div>
             <div style={{ fontSize: 12, color: colors.textMuted, marginTop: 4, lineHeight: 1.45 }}>
-              До {COACH_MAX_ATHLETES} атлетов, выбор нужных разделов, заметки и планер.
+              Атлеты без ограничения по количеству, выбор нужных разделов, заметки и планер.
             </div>
           </div>
           <button
@@ -826,7 +1023,7 @@ export const ProfileCoachTab: React.FC<{
               <div style={{ flex: 1, minWidth: 120 }}>
                 <div style={{ fontSize: 13.5, fontWeight: 800, color: '#fff' }}>Атлеты</div>
                 <div style={{ fontSize: 11.5, color: colors.textSubtle, fontVariantNumeric: 'tabular-nums' }}>
-                  {limits.count} / {limits.max}
+                  {state.athletes.length} в списке · {state.sections.length} разделов
                 </div>
               </div>
               <input
@@ -840,17 +1037,16 @@ export const ProfileCoachTab: React.FC<{
               />
             </div>
 
-            {limits.canAdd ? (
-              <div
-                style={{
-                  marginTop: 12,
-                  padding: 12,
-                  borderRadius: 14,
-                  background: 'rgba(255,255,255,0.03)',
-                  border: '1px dashed rgba(255,255,255,0.14)',
-                }}
-                data-coach="form"
-              >
+            <div
+              style={{
+                marginTop: 12,
+                padding: 12,
+                borderRadius: 14,
+                background: 'rgba(255,255,255,0.03)',
+                border: '1px dashed rgba(255,255,255,0.14)',
+              }}
+              data-coach="form"
+            >
                 <div style={{ fontSize: 12, fontWeight: 800, color: colors.textMuted, marginBottom: 10 }}>
                   {editingId ? 'Правка карточки' : 'Новый атлет'}
                 </div>
@@ -967,23 +1163,6 @@ export const ProfileCoachTab: React.FC<{
                   )}
                 </div>
               </div>
-            ) : (
-              <div
-                data-coach="limit"
-                style={{
-                  marginTop: 12,
-                  padding: '10px 12px',
-                  borderRadius: 12,
-                  fontSize: 12,
-                  color: colors.warning,
-                  background: colors.warningDim,
-                  border: '1px solid rgba(245,158,11,0.35)',
-                }}
-              >
-                Достигнут лимит — {COACH_MAX_ATHLETES} атлетов. Чтобы добавить нового, удалите карточку
-                атлета, который больше не тренируется.
-              </div>
-            )}
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 12 }}>
               {visibleAthletes.length === 0 && (
@@ -1127,6 +1306,24 @@ export const ProfileCoachTab: React.FC<{
                           </button>
                         </>
                       )}
+                      <button
+                        type="button"
+                        data-coach="save-program"
+                        onClick={() => saveProgramFromAthlete(a)}
+                        style={{ ...btn('ghost'), fontSize: 12 }}
+                        title="Сохранить программу этого атлета в библиотеку"
+                      >
+                        Снять программу
+                      </button>
+                      <button
+                        type="button"
+                        data-coach="copy-program"
+                        onClick={() => startIssueFromAthlete(a)}
+                        style={{ ...btn('ghost'), fontSize: 12 }}
+                        title="Выдать программу этого атлета другому"
+                      >
+                        Выдать другому
+                      </button>
                       {!isActive && (
                         <button
                           type="button"
@@ -1231,6 +1428,270 @@ export const ProfileCoachTab: React.FC<{
                 );
               })}
             </div>
+          </div>
+
+          {/* Мои программы: снял с одного — выдал пятерым, без повторной сборки */}
+          <div style={cardStyle} data-coach="programs">
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+              <div style={{ flex: 1, minWidth: 140 }}>
+                <div style={{ fontSize: 13.5, fontWeight: 800, color: '#fff' }}>Мои программы</div>
+                <div style={{ fontSize: 11.5, color: colors.textSubtle, lineHeight: 1.45 }}>
+                  {programs.items.length
+                    ? `${programs.items.length} из ${COACH_PROGRAMS_MAX} · выдача заменяет программу атлета`
+                    : 'Снимите программу с атлета и выдайте её другому — без повторной сборки блока.'}
+                </div>
+              </div>
+            </div>
+
+            {programNotice && (
+              <div
+                data-coach="program-notice"
+                role="status"
+                style={{ marginTop: 10, fontSize: 12, color: colors.green, lineHeight: 1.45 }}
+              >
+                {programNotice}
+              </div>
+            )}
+            {programError && (
+              <div
+                data-coach="program-error"
+                role="alert"
+                style={{ marginTop: 10, fontSize: 12, color: colors.danger, lineHeight: 1.45 }}
+              >
+                {programError}
+              </div>
+            )}
+
+            {programs.items.length > 0 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 10 }}>
+                {programs.items.map(t => {
+                  const d = describeProgramBundle(t.bundle);
+                  return (
+                    <div
+                      key={t.id}
+                      data-coach="program"
+                      style={{
+                        padding: '10px 12px',
+                        borderRadius: 12,
+                        background: 'rgba(255,255,255,0.03)',
+                        border: '1px solid rgba(255,255,255,0.08)',
+                      }}
+                    >
+                      {renameProgramId === t.id ? (
+                        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                          <input
+                            autoFocus
+                            value={renameValue}
+                            onChange={e => setRenameValue(e.target.value)}
+                            aria-label="Новое название программы"
+                            data-coach="program-rename-input"
+                            style={{ ...inputStyle, flex: '1 1 160px' }}
+                          />
+                          <button
+                            type="button"
+                            data-coach="program-rename-save"
+                            onClick={() => saveProgramRename(t.id)}
+                            style={{ ...btn('primary'), fontSize: 12 }}
+                          >
+                            Сохранить
+                          </button>
+                          <button
+                            type="button"
+                            data-coach="program-rename-cancel"
+                            onClick={() => {
+                              setRenameProgramId(null);
+                              setRenameValue('');
+                            }}
+                            style={{ ...btn('ghost'), fontSize: 12 }}
+                          >
+                            Отмена
+                          </button>
+                        </div>
+                      ) : (
+                        <>
+                          <div style={{ fontSize: 12.5, fontWeight: 800, color: '#fff' }}>{t.name}</div>
+                          <div style={{ fontSize: 11, color: colors.textMuted, marginTop: 3, lineHeight: 1.45 }}>
+                            {d.keys} {plural(d.keys, 'план', 'плана', 'планов')} ·{' '}
+                            {d.parts.slice(0, 3).join(', ')}
+                            {d.parts.length > 3 ? ` +${d.parts.length - 3}` : ''}
+                            {t.issuedCount > 0
+                              ? ` · выдана ${t.issuedCount} ${plural(t.issuedCount, 'раз', 'раза', 'раз')}`
+                              : ' · ещё не выдавалась'}
+                            {t.sourceLabel ? ` · снята с «${t.sourceLabel}»` : ''}
+                          </div>
+                          <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
+                            <button
+                              type="button"
+                              data-coach="program-issue"
+                              onClick={() => startIssueTemplate(t)}
+                              style={{ ...btn('primary'), fontSize: 12 }}
+                            >
+                              Выдать
+                            </button>
+                            <button
+                              type="button"
+                              data-coach="program-rename"
+                              onClick={() => {
+                                setRenameProgramId(t.id);
+                                setRenameValue(t.name);
+                                setProgramError(null);
+                              }}
+                              style={{ ...btn('ghost'), fontSize: 12 }}
+                            >
+                              Переименовать
+                            </button>
+                            {confirmProgramDelete === t.id ? (
+                              <>
+                                <button
+                                  type="button"
+                                  data-coach="program-delete-confirm"
+                                  onClick={() => deleteProgram(t.id)}
+                                  style={{ ...btn('danger'), fontSize: 12 }}
+                                >
+                                  Точно удалить
+                                </button>
+                                <button
+                                  type="button"
+                                  data-coach="program-delete-cancel"
+                                  onClick={() => setConfirmProgramDelete(null)}
+                                  style={{ ...btn('ghost'), fontSize: 12 }}
+                                >
+                                  Оставить
+                                </button>
+                              </>
+                            ) : (
+                              <button
+                                type="button"
+                                data-coach="program-delete"
+                                onClick={() => setConfirmProgramDelete(t.id)}
+                                style={{ ...btn('ghost'), fontSize: 12 }}
+                              >
+                                Удалить
+                              </button>
+                            )}
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {issue && (
+              <div
+                data-coach="issue"
+                style={{
+                  marginTop: 12,
+                  padding: 12,
+                  borderRadius: 14,
+                  background: 'rgba(34,211,238,0.06)',
+                  border: '1px solid rgba(34,211,238,0.25)',
+                }}
+              >
+                <div style={{ fontSize: 12.5, fontWeight: 800, color: '#fff' }}>Выдать: {issue.title}</div>
+                <div style={{ fontSize: 11.5, color: colors.textMuted, marginTop: 4, lineHeight: 1.45 }}>
+                  Отметьте, кому. Программа заменит текущую; дневники, вес, анализы и фото не тронем.
+                </div>
+                {state.athletes.length === 0 ? (
+                  <div data-coach="issue-empty" style={{ fontSize: 12, color: colors.textMuted, marginTop: 8 }}>
+                    Сначала добавьте атлета выше.
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 8 }}>
+                    {state.athletes.map(a => (
+                      <label
+                        key={a.id}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 9,
+                          minHeight: 44,
+                          fontSize: 12.5,
+                          color: 'rgba(255,255,255,0.85)',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={issuePick.has(a.id)}
+                          onChange={() => toggleIssuePick(a.id)}
+                          data-coach="issue-athlete"
+                          style={{ width: 18, height: 18, accentColor: ACCENT }}
+                        />
+                        <span>{a.name}</span>
+                        {issuePick.has(a.id) && (
+                          <span style={{ fontSize: 10.5, color: colors.textMuted }}>заменит текущую</span>
+                        )}
+                      </label>
+                    ))}
+                  </div>
+                )}
+                {!issueConfirm ? (
+                  <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
+                    <button
+                      type="button"
+                      data-coach="issue-ask"
+                      disabled={issuePick.size === 0}
+                      onClick={() => setIssueConfirm(true)}
+                      style={{ ...btn('primary'), fontSize: 12, opacity: issuePick.size ? 1 : 0.5 }}
+                    >
+                      Выдать выбранным ({issuePick.size})
+                    </button>
+                    <button
+                      type="button"
+                      data-coach="issue-close"
+                      onClick={() => {
+                        setIssue(null);
+                        setIssuePick(new Set());
+                      }}
+                      style={{ ...btn('ghost'), fontSize: 12 }}
+                    >
+                      Закрыть
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    <div
+                      data-coach="issue-warning"
+                      role="alert"
+                      style={{ marginTop: 10, fontSize: 11.5, color: colors.warning, lineHeight: 1.45 }}
+                    >
+                      Точно заменить программу у выбранных ({issuePick.size})? Отменить это будет нельзя —
+                      старую программу придётся собирать заново.
+                    </div>
+                    <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
+                      <button
+                        type="button"
+                        data-coach="issue-confirm"
+                        onClick={doIssue}
+                        style={{ ...btn('danger'), fontSize: 12 }}
+                      >
+                        Заменить и выдать
+                      </button>
+                      <button
+                        type="button"
+                        data-coach="issue-cancel"
+                        onClick={() => setIssueConfirm(false)}
+                        style={{ ...btn('ghost'), fontSize: 12 }}
+                      >
+                        Отмена
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+
+            {issueDone && (
+              <div
+                data-coach="issue-done"
+                role="status"
+                style={{ marginTop: 10, fontSize: 12, color: colors.green, lineHeight: 1.45 }}
+              >
+                {issueDone}
+              </div>
+            )}
           </div>
 
           {/* Данные, у которых больше нет карточки: не даём им потеряться */}

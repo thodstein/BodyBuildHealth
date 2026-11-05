@@ -1,7 +1,7 @@
 /**
  * data-space.ts — пространства данных («кто сейчас тренируется»).
  *
- * ЗАЧЕМ. Режим тренера ведёт до 20 атлетов, но планы, дневники, анализы и профиль
+ * ЗАЧЕМ. Режим тренера ведёт список атлетов, а планы, дневники, анализы и профиль
  * исторически лежат в одном устройстве. Нужно, чтобы данные атлета не смешивались
  * с данными тренера и с данными другого атлета.
  *
@@ -47,8 +47,12 @@ export const HOME_SPACE_ID = 'home';
 export const ATHLETE_SPACE_PREFIX = 'he_ath_';
 /** Разделитель между префиксом пространства и логическим ключом. */
 export const SPACE_INFIX = '__';
-/** Больше 20 пространств не бывает: столько же атлетов разрешено в режиме тренера. */
-export const MAX_DATA_SPACES = 20;
+/**
+ * Защита от испорченного реестра, а НЕ продуктовый лимит: количество атлетов
+ * не ограничено. Порог нужен, чтобы битый/поддельный файл не заставил парсер
+ * перебирать миллионы записей.
+ */
+export const MAX_REGISTRY_SPACES = 1000;
 
 /** Соль ключа шифрования IndexedDB (`core/db-encryption.ts`) — свойство устройства. */
 export const DEVICE_SALT_KEY = 'health-engine-v2-salt';
@@ -286,7 +290,7 @@ export function parseRegistry(raw: string | null | undefined): DataSpaceRegistry
     if (!rec || seen.has(rec.id)) continue;
     seen.add(rec.id);
     spaces.push(rec);
-    if (spaces.length > MAX_DATA_SPACES + 1) break;
+    if (spaces.length > MAX_REGISTRY_SPACES) break;
   }
   const activeWanted = clean(obj.active, 80) || HOME_SPACE_ID;
   const active = spaces.some(s => s.id === activeWanted) ? activeWanted : HOME_SPACE_ID;
@@ -297,7 +301,7 @@ export function serializeRegistry(reg: DataSpaceRegistry): string {
   return JSON.stringify({ version: 1, active: reg.active, spaces: reg.spaces });
 }
 
-/** Добавить/обновить пространство (лимит — на атлетов, `home` не считается). */
+/** Добавить/обновить пространство. Количество атлетов не ограничено. */
 export function upsertSpace(
   reg: DataSpaceRegistry,
   rec: {
@@ -307,7 +311,7 @@ export function upsertSpace(
     createdAt?: string;
     seed?: AthleteProfileSeed;
   },
-): { registry: DataSpaceRegistry; error: 'limit' | 'invalid' | null } {
+): { registry: DataSpaceRegistry; error: 'invalid' | null } {
   const id = clean(rec.id, 80);
   if (!id || id === HOME_SPACE_ID || id.includes(SPACE_INFIX)) {
     return { registry: reg, error: 'invalid' };
@@ -330,8 +334,7 @@ export function upsertSpace(
         : s,
     );
     return { registry: { ...reg, spaces }, error: null };
-  }  const athleteSpaces = reg.spaces.filter(s => s.id !== HOME_SPACE_ID).length;
-  if (athleteSpaces >= MAX_DATA_SPACES) return { registry: reg, error: 'limit' };
+  }
   const space: DataSpaceRecord = {
     id,
     athleteId: rec.athleteId ?? null,
@@ -1004,7 +1007,7 @@ export function activateAthleteSpace(
   athleteId: string,
   label: string,
   seed?: AthleteProfileSeed,
-): { id: string | null; error: 'limit' | 'invalid' | null } {
+): { id: string | null; error: 'invalid' | null } {
   const reg = readRegistryFromStorage();
   const id = athleteSpaceId(athleteId);
   const up = upsertSpace(reg, { id, athleteId, label, seed });

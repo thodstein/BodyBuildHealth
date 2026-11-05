@@ -2,7 +2,7 @@
  * coach-mode.test.ts — режим тренера: карточки атлетов и разделы.
  *
  * Проверяем продуктовые обещания, а не «геттеры»:
- *  • лимит 20 атлетов — жёсткий: 21-й не добавляется, чужие данные не вытесняются;
+ *  • количество атлетов не ограничено (парсер защищён от испорченного файла);
  *  • включение режима с пустым выбором разделов не оставляет тренера с пустым экраном;
  *  • активный атлет не может «повиснуть» после удаления;
  *  • битый/чужой JSON не роняет профиль, мусорные атлеты не загружаются;
@@ -10,12 +10,11 @@
  */
 import { describe, expect, it } from 'vitest';
 import {
-  COACH_MAX_ATHLETES,
+  MAX_STORED_ATHLETES,
   COACH_SECTIONS,
   addCoachAthlete,
   allCoachSections,
   coachActiveAthlete,
-  coachLimits,
   coachSummary,
   emptyCoachState,
   parseCoachState,
@@ -88,17 +87,16 @@ describe('атлеты: добавление', () => {
     expect(r.athlete?.sections).toEqual(allCoachSections());
   });
 
-  it('лимит 20 атлетов жёсткий: 21-й отклоняется, состояние не меняется', () => {
+  it('количество атлетов не ограничено: 40-й добавляется', () => {
     let s = emptyCoachState();
-    for (let i = 1; i <= COACH_MAX_ATHLETES; i++) {
+    for (let i = 1; i <= 40; i++) {
       s = addCoachAthlete(s, { name: `Атлет ${i}` }, { id: `a${i}`, now: NOW }).state;
     }
-    expect(s.athletes).toHaveLength(COACH_MAX_ATHLETES);
-    const r = addCoachAthlete(s, { name: 'Двадцать первый' }, { id: 'a21', now: NOW });
-    expect(r.error).toBe('limit');
-    expect(r.athlete).toBeNull();
-    expect(r.state).toBe(s); // именно то же состояние, без «тихого» вытеснения
-    expect(coachLimits(r.state)).toMatchObject({ count: 20, max: 20, canAdd: false, remaining: 0 });
+    expect(s.athletes).toHaveLength(40);
+    const r = addCoachAthlete(s, { name: 'Сорок первый' }, { id: 'a41', now: NOW });
+    expect(r.error).toBeNull();
+    expect(r.athlete?.name).toBe('Сорок первый');
+    expect(r.state.athletes).toHaveLength(41);
   });
 
   it('мусор в числах не превращается в «норму»: null вместо выдумки', () => {
@@ -191,10 +189,11 @@ describe('хранение и терпимость', () => {
     expect(s.sections).toEqual(['training']);
   });
 
-  it('больше 20 атлетов в файле — грузим только 20', () => {
-    const athletes = Array.from({ length: 30 }, (_, i) => ({ id: `a${i}`, name: `А${i}` }));
+  it('испорченный файл с тысячами атлетов не роняет парсер и не теряет всех', () => {
+    const athletes = Array.from({ length: MAX_STORED_ATHLETES + 50 }, (_, i) => ({ id: `a${i}`, name: `А${i}` }));
     const s = parseCoachState(JSON.stringify({ version: 1, enabled: true, athletes }));
-    expect(s.athletes).toHaveLength(COACH_MAX_ATHLETES);
+    expect(s.athletes).toHaveLength(MAX_STORED_ATHLETES);
+    expect(s.athletes[0].name).toBe('А0');
   });
 
   it('read/write через хранилище; недоступное хранилище не роняет', () => {
@@ -218,7 +217,7 @@ describe('подписи', () => {
     expect(coachSummary(emptyCoachState())).toMatch(/Выключен/);
     let s = setCoachEnabled(emptyCoachState(), true);
     s = addCoachAthlete(s, { name: 'Иван' }, { id: 'a1', now: NOW }).state;
-    expect(coachSummary(s)).toContain('1/20');
+    expect(coachSummary(s)).toContain('Атлетов: 1');
     expect(coachSummary(s)).toContain('активный: Иван');
   });
 });

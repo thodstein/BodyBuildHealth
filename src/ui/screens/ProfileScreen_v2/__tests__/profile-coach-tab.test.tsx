@@ -3,7 +3,7 @@
  *
  * Проверяем продуктовые обещания, которые видит человек:
  *  • выключатель в профиле, включение не оставляет пустой экран;
- *  • до 20 атлетов, на 21-м — честное сообщение, форма добавления закрыта;
+ *  • количество атлетов не ограничено — форма добавления всегда доступна;
  *  • разделы можно снять/выбрать все, быстрый переход ведёт в раздел приложения;
  *  • удаление — через подтверждение, а не «одним тапом навсегда».
  */
@@ -32,7 +32,6 @@ vi.mock('../../../../core/db', async importOriginal => {
 
 import { ProfileCoachTab } from '../ProfileCoachTab';
 import {
-  COACH_MAX_ATHLETES,
   COACH_SECTIONS,
   addCoachAthlete,
   emptyCoachState,
@@ -167,13 +166,13 @@ describe('атлеты', () => {
     expect(athleteCards(container)).toHaveLength(0);
   });
 
-  it(`лимит ${COACH_MAX_ATHLETES}: форма закрыта, причина написана`, () => {
-    seed(COACH_MAX_ATHLETES);
+  it('количество атлетов не ограничено: 21-я карточка и форма на месте', () => {
+    seed(21);
     const { container } = render(<ProfileCoachTab />);
-    expect(athleteCards(container)).toHaveLength(COACH_MAX_ATHLETES);
-    expect(container.querySelector('[data-coach="form"]')).toBeNull();
-    expect(container.querySelector('[data-coach="limit"]')?.textContent).toContain(String(COACH_MAX_ATHLETES));
-    expect(container.querySelector('[data-coach="save"]')).toBeNull();
+    expect(athleteCards(container)).toHaveLength(21);
+    expect(container.querySelector('[data-coach="limit"]')).toBeNull();
+    expect(container.querySelector('[data-coach="form"]')).not.toBeNull();
+    expect(container.querySelector('[data-coach="save"]')).not.toBeNull();
   });
 
   it('поиск фильтрует список по имени', () => {
