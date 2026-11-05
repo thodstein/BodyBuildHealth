@@ -89,4 +89,13 @@ describe('SyncLinkSection — видимость ввода кода', () => {
     await renderSection();
     expect(screen.getByLabelText('Код привязки из Telegram')).toBeTruthy();
   });
+
+  it('кнопка «Синхронизировать сейчас» есть при настроенном облаке', async () => {
+    setCapacitorNative(true);
+    await renderSection();
+    const btn = screen.getByRole('button', { name: /Синхронизировать с облаком сейчас/ });
+    expect(btn).toBeTruthy();
+    // синк ещё не инициализирован → кнопка выключена, а не «молча ничего не делает»
+    expect((btn as HTMLButtonElement).disabled).toBe(true);
+  });
 });

@@ -197,6 +197,11 @@ export function isKvSyncEnabled(): boolean {
   return state.status !== 'off';
 }
 
+/** Настроено ли облако в этой сборке (есть URL и anon-ключ Supabase). */
+export function isKvCloudConfigured(): boolean {
+  return !!(SUPABASE_URL && SUPABASE_ANON);
+}
+
 /** Прочитать сохранённый tg-токен привязки АПК (null — не привязано). */
 export function getLinkedTgToken(): string | null {
   try {
@@ -246,9 +251,11 @@ export async function initKvSync(
     return state;
   }
   const tgId = userId.startsWith('tg_') ? userId.slice(3) : '';
-  // dev_* (АПК) без явного токена — локальный режим. С явным tg-токеном
-  // (привязка кодом) — работает как второе устройство того же аккаунта.
-  if (!tgId && !opts?.token && !opts?.transport) {
+  // Один аккаунт = один токен: `tg_<id>` у Telegram, `dev_<uuid>` у АПК/веба.
+  // Явный токен (привязка кодом) главнее — устройство становится вторым экраном
+  // того же Telegram-аккаунта.
+  const identity = tgId || userId.trim();
+  if (!identity && !opts?.token && !opts?.transport) {
     setState({ status: 'off', error: undefined });
     return state;
   }
@@ -258,7 +265,7 @@ export async function initKvSync(
   // тянул supabase-js.
   setSpacePurgeHandler(async ids => { await purgeSpacesFromCloud(ids); });
   try {
-    token = opts?.token || (tgId ? await deriveSyncToken(tgId) : '');
+    token = opts?.token || (identity ? await deriveSyncToken(identity) : '');
     if (!token) {
       setState({ status: 'off', error: undefined });
       return state;
@@ -1018,6 +1025,28 @@ function attachLifecycle(pullIntervalMs: number): void {
     void pull({ reload: true });
     void flush();
   });
+  // APK: WebView не всегда шлёт pagehide при сворачивании, а Capacitor знает
+  // точно. Свернули/закрыли приложение — выгружаем накопленное; вернулись —
+  // подтягиваем изменения с другого устройства.
+  void (async () => {
+    try {
+      const { isCapacitorNative } = await import('./app-platform');
+      if (!isCapacitorNative()) return;
+      const { App } = await import('@capacitor/app');
+      await App.addListener('appStateChange', ({ isActive }) => {
+        if (isActive) {
+          void pull({ reload: true });
+          void flush();
+          return;
+        }
+        writeMetaNow();
+        keepAliveFlush();
+        void flush();
+      });
+    } catch {
+      /* веб или плагин недоступен — хватает pagehide/visibilitychange */
+    }
+  })();
   window.addEventListener('pagehide', () => {
     writeMetaNow();
     keepAliveFlush();

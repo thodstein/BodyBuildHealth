@@ -87,8 +87,10 @@ describe('привязка АПК кодом', () => {
     expect(getKvSyncState().status).not.toBe('off');
   });
 
-  it('dev_* без токена и без транспорта — off', async () => {
-    const s = await initKvSync('dev_xxx', { token: '' } as any);
-    expect(s.status).toBe('off');
+  it('dev_* без токена — своё облачное пространство устройства (не off)', async () => {
+    const t = new FakeTransport();
+    const s = await initKvSync('dev_xxx', { transport: t, token: '' } as any);
+    expect(s.status).not.toBe('off');
+    expect(getKvSyncState().status).not.toBe('off');
   });
 });

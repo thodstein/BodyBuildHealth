@@ -20,6 +20,8 @@ import {
   saveLinkedTgToken,
   clearLinkedTgToken,
   deriveSyncToken,
+  syncKvNow,
+  isKvCloudConfigured,
 } from '../../../core/cloud-kv';
 import { getSyncIdentity } from '../../../core/app-platform';
 import {
@@ -70,6 +72,7 @@ export const SyncLinkSection: React.FC = () => {
   const [expiresAt, setExpiresAt] = useState<number>(0);
   const [now, setNow] = useState(Date.now());
   const [busy, setBusy] = useState(false);
+  const [busySync, setBusySync] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [input, setInput] = useState('');
   const [syncStatus, setSyncStatus] = useState(() => getKvSyncState().status);
@@ -179,6 +182,21 @@ export const SyncLinkSection: React.FC = () => {
     setMsg('Отвязано — дальше АПК работает локально.');
   };
 
+  /** Ручная синхронизация: выгрузка локального + загрузка с другого устройства. */
+  const syncNow = async () => {
+    if (busySync || syncStatus === 'off') return;
+    setBusySync(true);
+    setMsg(null);
+    try {
+      const applied = await syncKvNow();
+      setMsg(applied > 0 ? '🔄 Новые данные с другого устройства получены' : '✅ Данные синхронизированы с облаком');
+    } catch (e) {
+      setMsg('Не удалось синхронизировать: ' + (e as Error).message);
+    } finally {
+      setBusySync(false);
+    }
+  };
+
   const remainSec = expiresAt ? Math.max(0, Math.round((expiresAt - now) / 1000)) : 0;
 
   return (
@@ -234,6 +252,17 @@ export const SyncLinkSection: React.FC = () => {
           <div style={hint}>✅ Привязано к ТГ-аккаунту · облако: {syncStatus}</div>
           <button onClick={unlink} style={btnGhost}>✕ Отвязать</button>
         </div>
+      )}
+
+      {isKvCloudConfigured() && (
+        <button
+          onClick={syncNow}
+          disabled={busySync || syncStatus === 'off'}
+          style={{ ...btnGhost, opacity: busySync || syncStatus === 'off' ? 0.6 : 1 }}
+          aria-label="Синхронизировать с облаком сейчас"
+        >
+          {busySync ? '⟳ Синхронизирую…' : '🔄 Синхронизировать сейчас'}
+        </button>
       )}
 
       {msg && (

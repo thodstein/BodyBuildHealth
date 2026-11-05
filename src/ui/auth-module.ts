@@ -3,6 +3,7 @@ import type { LocalUserProfile } from '../core/auth-manager';
 import { ensureAdmin } from '../core/auth-manager';
 import type { UserProfile, UserRole } from '../core/types';
 import { initKvSync, getLinkedTgToken } from '../core/cloud-kv';
+import { getSyncIdentity } from '../core/app-platform';
 
 function toAppProfile(p: LocalUserProfile): UserProfile {
   return {
@@ -146,10 +147,13 @@ export async function renderAuthModule(container: HTMLElement, onLogin: (profile
   user.lastLogin = new Date().toISOString();
   await saveUserSafe(user);
   writeSessionSafe(user);
-  // АПК после привязки кодом: привязанный tg-токен даёт pull облака (переустановка — тоже).
+  // Облако при входе работает всегда: привязанный tg-токен (кодом) делает АПК
+  // вторым экраном Telegram-аккаунта, без привязки — своё пространство устройства
+  // (`dev_*`), чтобы данные не оставались только в этом телефоне.
   try {
     const linked = getLinkedTgToken();
-    if (linked) await initKvSync(user.id, { token: linked });
-  } catch (e) { console.warn('KvSync linked init failed:', e); }
+    const ident = getSyncIdentity();
+    await initKvSync(ident.id, linked ? { token: linked } : undefined);
+  } catch (e) { console.warn('KvSync init failed:', e); }
   onLogin(toAppProfile(user));
 }
