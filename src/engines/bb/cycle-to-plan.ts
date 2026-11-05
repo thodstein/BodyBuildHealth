@@ -1983,6 +1983,25 @@ export function convertCycleToBBPlan(input: CycleToPlanInput): BBPlan {
     if (meta.deloadWeeks?.length) (finalized as any).sourceDeloads = true;
   }
   if (mode === 'adapt') {
+    // J: тот же класс, что и у программа-пути — `expandPlanToTargets` и MRV-трим
+    // меняют сеты уже после назначения схемы объёма, а комментарий продолжал
+    // обещать протокол. Замер: до 56 упражнений на цикл с «GVT 10×10» при
+    // 4 сетах в плане (gironda — до 52, fst7 — до 8); generic/программа-путь
+    // после своих сверок дают 0.
+    {
+      const schemeFix = reconcileSchemeComments(finalized as any, {
+        reason: (a, m) => `после сборки цикла: ${a} из ${m} сетов`,
+      });
+      if (schemeFix.fixed > 0) {
+        const parts: string[] = [];
+        if (schemeFix.aspects.sets) parts.push(`${schemeFix.aspects.sets} — сеты`);
+        if (schemeFix.aspects.reps) parts.push(`${schemeFix.aspects.reps} — повторы`);
+        if (schemeFix.aspects.rest) parts.push(`${schemeFix.aspects.rest} — отдых`);
+        finalized.rationale.push(
+          `🎛 Схема объёма: у ${schemeFix.fixed} упр. комментарий приведён к факту после сборки цикла (${parts.join(', ')}).`,
+        );
+      }
+    }
     // Аудит Y: после недельного MRV-трима план меняет состав/сеты уже ПОСЛЕ
     // finalizeBBPlan, поэтому снимки факта (weeklyVolume/validation/fatigueReport/
     // expandedSummary/report) описывали до-тримовую версию. Замер: cycle-08 —

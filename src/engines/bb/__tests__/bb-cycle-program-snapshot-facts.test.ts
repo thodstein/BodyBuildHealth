@@ -7,6 +7,7 @@ import { validateBBPlan } from '../bb-validator.engine';
 import { estimateBBSessionCost } from '../bb-fatigue.engine';
 import { buildBBExpandedSummary } from '../bb-summary.engine';
 import { analyzeBBRotation } from '../bb-rotation.engine';
+import { reconcileSchemeComments } from '../bb-scheme-comment-reconcile';
 
 /**
  * Аудит Y: цикл- и программа-пути меняют план ПОСЛЕ `finalizeBBPlan`
@@ -132,4 +133,29 @@ describe('цикл/программа: снимки факта после пос
     expect(plan.weeks.length).toBeGreaterThan(0);
     expectSnapshotsMatchFacts(plan, 'program');
   });
+});
+
+describe('цикл: обещание схемы объёма = фактическим сетам', () => {
+  // Замер до правки: цикл-путь не сверял комментарий после expandPlanToTargets
+  // и MRV-трима — до 56 упражнений обещали «GVT 10×10» при 4 сетах в плане
+  // (gironda до 52, fst7 до 8); generic и программа-путь давали 0.
+  for (const scheme of ['gvt', 'gironda'] as const) {
+    it(`${scheme}: комментарий схемы приведён к факту`, () => {
+      let marked = 0;
+      for (const cycle of bbCycles.slice(0, 3)) {
+        const plan: any = convertCycleToBBPlan({
+          cycle, workMax, level: 'intermediate', trainingYears: 3,
+          mode: 'adapt', sex: 'male', goal: 'mass', volumeScheme: scheme,
+        } as any);
+        const marker = scheme === 'gvt' ? /GVT/ : /Gironda/;
+        marked += plan.weeks
+          .flatMap((w: any) => w.sessions)
+          .flatMap((s: any) => s.exercises)
+          .filter((e: any) => marker.test(String(e.comment || ''))).length;
+        // Сверка идемпотентна: 0 правок = обещание уже равно факту.
+        expect(reconcileSchemeComments(structuredClone(plan)).fixed, `${cycle.meta.id}/${scheme}`).toBe(0);
+      }
+      expect(marked, `${scheme}: схема должна назначаться`).toBeGreaterThan(0);
+    });
+  }
 });
