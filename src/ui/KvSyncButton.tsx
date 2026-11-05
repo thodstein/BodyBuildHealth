@@ -5,18 +5,25 @@ import { toastStore } from '../core/toast';
 /**
  * Кнопка «🔄» в шапке: принудительная синхронизация с облаком (выгрузка локальных
  * изменений + загрузка с другого устройства) без перезагрузки экрана. Показывается
- * только когда синк включён (Telegram-путь).
+ * только когда синк включён (Telegram-путь или своё пространство устройства).
+ *
+ * Состояние видно по иконке: 🔄 — всё синхронизировано, ⟳ — идёт обмен,
+ * ⚠️ — облако не отвечает (данные копятся локально, нажатие повторяет попытку).
  */
 export const KvSyncButton: React.FC = () => {
-  const [status, setStatus] = useState(getKvSyncState().status);
+  const [state, setState] = useState(() => getKvSyncState());
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    const unsub = onKvSyncStatus(s => setStatus(s.status));
+    const unsub = onKvSyncStatus(s => setState(s));
     return unsub;
   }, []);
 
-  if (status === 'off') return null;
+  if (state.status === 'off') return null;
+
+  const failed = state.status === 'error';
+  const working = busy || state.status === 'syncing';
+  const accent = failed ? 'rgba(251,191,36,' : 'rgba(0,230,138,';
 
   return (
     <button
@@ -36,7 +43,11 @@ export const KvSyncButton: React.FC = () => {
           setBusy(false);
         }
       }}
-      title="Синхронизировать с облаком"
+      title={
+        failed
+          ? `Облако недоступно: ${state.error || 'нет связи'}. Данные сохранены локально — нажмите, чтобы повторить`
+          : 'Синхронизировать с облаком'
+      }
       aria-label="Синхронизировать с облаком"
       disabled={busy}
       style={{
@@ -44,18 +55,18 @@ export const KvSyncButton: React.FC = () => {
         borderRadius: 20,
         fontSize: 11,
         fontWeight: 600,
-        background: busy ? 'rgba(255,255,255,0.08)' : 'rgba(0,230,138,0.12)',
-        border: busy ? '1px solid rgba(255,255,255,0.15)' : '1px solid rgba(0,230,138,0.35)',
-        color: busy ? 'rgba(255,255,255,0.6)' : '#00e68a',
+        background: working ? 'rgba(255,255,255,0.08)' : `${accent}0.12)`,
+        border: working ? '1px solid rgba(255,255,255,0.15)' : `1px solid ${accent}0.35)`,
+        color: working ? 'rgba(255,255,255,0.6)' : failed ? '#fbbf24' : '#00e68a',
         cursor: 'pointer',
         backdropFilter: 'blur(8px)',
         WebkitBackdropFilter: 'blur(8px)',
         whiteSpace: 'nowrap',
         minHeight: 30,
-        opacity: busy ? 0.7 : 1,
+        opacity: working ? 0.7 : 1,
       }}
     >
-      {busy ? '⟳' : '🔄'}
+      {working ? '⟳' : failed ? '⚠️' : '🔄'}
     </button>
   );
 };

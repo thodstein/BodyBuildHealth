@@ -7,7 +7,7 @@
  * Стили инлайн: styles-native.css — зона блочного агента, не трогаем.
  */
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { getAppPlatform } from '../../core/app-platform';
 import {
   fetchLatestRelease,
@@ -15,8 +15,10 @@ import {
   readUpdateState,
   shouldCheckNow,
   writeUpdateState,
+  UPDATE_CHECK_EVENT,
   type UpdateRelease,
 } from '../../core/app-updater';
+import { toastStore } from '../../core/toast';
 import {
   getDeviceInfo,
   installDownloadedApk,
@@ -121,49 +123,64 @@ export const AppUpdateBanner: React.FC = () => {
   const en =
     typeof navigator !== 'undefined' && (navigator.language || '').startsWith('en');
 
+  /** Явная проверка (в т.ч. из настроек): показывает результат даже без обновления. */
+  const runCheck = useCallback(async (manual: boolean) => {
+    try {
+      if (!manual && !shouldCheckNow()) return;
+      const info = await getDeviceInfo();
+      const installed = (info.appVersion || '').trim();
+      // Без версии сборки сравнивать не с чем — тихо выходим.
+      if (!installed) {
+        writeUpdateState({ lastCheck: Date.now() });
+        if (manual) toastStore.error('Не удалось узнать версию приложения');
+        return;
+      }
+      const latest = await fetchLatestRelease();
+      writeUpdateState({ lastCheck: Date.now() });
+      if (!latest) {
+        if (manual) toastStore.error('Не удалось проверить обновления — нет связи');
+        return;
+      }
+      if (!isNewerVersion(latest.version, installed)) {
+        if (manual) toastStore.success(`✅ У вас последняя версия ${installed}`);
+        return;
+      }
+      // Пропущенную версию не навязываем при фоновой проверке, но ручная
+      // проверка — это явная просьба показать, что есть.
+      if (!manual && readUpdateState().skippedVersion === latest.version) return;
+      // Быстрый путь — только при совместимом мажоре и не установленном бандле.
+      try {
+        const liveId = await getLiveBundleId();
+        if (
+          latest.bundleUrl &&
+          isBundleCompatible(latest.version, installed) &&
+          liveId !== latest.version
+        ) {
+          setOta(true);
+        }
+      } catch {
+        /* без OTA — остаётся полный APK */
+      }
+      setRelease(latest);
+      setPhase('available');
+      if (manual) toastStore.success(`⬆️ Доступна версия ${latest.version}`);
+    } catch {
+      if (manual) toastStore.error('Не удалось проверить обновления');
+    }
+  }, []);
+
   useEffect(() => {
     if (getAppPlatform() !== 'native') return;
-    let cancelled = false;
-    (async () => {
-      try {
-        if (!shouldCheckNow()) return;
-        const info = await getDeviceInfo();
-        const installed = (info.appVersion || '').trim();
-        // Без версии сборки сравнивать не с чем — тихо выходим.
-        if (!installed) {
-          writeUpdateState({ lastCheck: Date.now() });
-          return;
-        }
-        const latest = await fetchLatestRelease();
-        writeUpdateState({ lastCheck: Date.now() });
-        if (cancelled || !latest) return;
-        if (!isNewerVersion(latest.version, installed)) return;
-        if (readUpdateState().skippedVersion === latest.version) return;
-        // Быстрый путь — только при совместимом мажоре и не установленном бандле.
-        try {
-          const liveId = await getLiveBundleId();
-          if (cancelled) return;
-          if (
-            latest.bundleUrl &&
-            isBundleCompatible(latest.version, installed) &&
-            liveId !== latest.version
-          ) {
-            setOta(true);
-          }
-        } catch {
-          /* без OTA — остаётся полный APK */
-        }
-        setRelease(latest);
-        setPhase('available');
-      } catch {
-        /* тишина: обновление — не повод шуметь */
-      }
-    })();
+    void runCheck(false);
+    const onManual = () => {
+      void runCheck(true);
+    };
+    window.addEventListener(UPDATE_CHECK_EVENT, onManual);
     return () => {
-      cancelled = true;
+      window.removeEventListener(UPDATE_CHECK_EVENT, onManual);
       if (pollRef.current) clearInterval(pollRef.current);
     };
-  }, []);
+  }, [runCheck]);
 
   if (getAppPlatform() !== 'native') return null;
   if (phase === 'idle' || !release) return null;

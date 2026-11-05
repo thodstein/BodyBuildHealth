@@ -201,3 +201,20 @@ export function shouldCheckNow(now = Date.now()): boolean {
   if (!lastCheck) return true;
   return now - lastCheck >= UPDATE_CHECK_INTERVAL_MS;
 }
+
+/**
+ * Ручная проверка обновлений из настроек.
+ *
+ * Проверка живёт в баннере (`AppUpdateBanner`) — там же скачивание и установка.
+ * Дублировать этот поток в настройках нельзя: два места = две разные ошибки.
+ * Поэтому кнопка в настройках лишь просит баннер проверить прямо сейчас.
+ */
+export const UPDATE_CHECK_EVENT = 'he:check-updates';
+
+export function requestUpdateCheck(): void {
+  try {
+    window.dispatchEvent(new Event(UPDATE_CHECK_EVENT));
+  } catch {
+    /* SSR/без window — нечего проверять */
+  }
+}

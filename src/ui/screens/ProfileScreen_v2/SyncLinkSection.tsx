@@ -21,6 +21,7 @@ import {
   clearLinkedTgToken,
   deriveSyncToken,
   syncKvNow,
+  forcePushAllKv,
   isKvCloudConfigured,
 } from '../../../core/cloud-kv';
 import { getSyncIdentity } from '../../../core/app-platform';
@@ -66,6 +67,18 @@ export function resolveLinkMode(): 'telegram' | 'native' | 'web' {
   return 'web';
 }
 
+/** Человеческий текст состояния облака вместо сырого 'idle'/'error'. */
+function syncStatusText(s: ReturnType<typeof getKvSyncState>): string {
+  if (s.status === 'off') return 'облако выключено';
+  if (s.status === 'syncing') return 'синхронизирую…';
+  if (s.status === 'error') return 'нет связи — изменения копятся в телефоне';
+  if (s.lastSyncAt) {
+    const d = new Date(s.lastSyncAt);
+    return 'синхронизировано в ' + d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+  }
+  return 'ждёт первой синхронизации';
+}
+
 export const SyncLinkSection: React.FC = () => {
   const [mode, setMode] = useState<'telegram' | 'native' | 'web'>(() => resolveLinkMode());
   const [code, setCode] = useState('');
@@ -73,13 +86,16 @@ export const SyncLinkSection: React.FC = () => {
   const [now, setNow] = useState(Date.now());
   const [busy, setBusy] = useState(false);
   const [busySync, setBusySync] = useState(false);
+  const [pushing, setPushing] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [input, setInput] = useState('');
-  const [syncStatus, setSyncStatus] = useState(() => getKvSyncState().status);
+  const [syncState, setSyncState] = useState(() => getKvSyncState());
   const [linked, setLinked] = useState(() => !!getLinkedTgToken());
 
+  const syncStatus = syncState.status;
+
   useEffect(() => {
-    const off = onKvSyncStatus(s => setSyncStatus(s.status));
+    const off = onKvSyncStatus(s => setSyncState(s));
     return off;
   }, []);
 
@@ -197,6 +213,27 @@ export const SyncLinkSection: React.FC = () => {
     }
   };
 
+  /**
+   * Полная перевыгрузка: локальная версия перезаписывает облако. Нужна, когда
+   * облако «уверено», что его данные новее, и обычная синхронизация молчит —
+   * на телефоне видны одни данные, на втором устройстве другие.
+   */
+  const forcePush = async () => {
+    if (pushing || syncStatus === 'off') return;
+    setPushing(true);
+    setMsg(null);
+    try {
+      const n = await forcePushAllKv();
+      setMsg(n > 0
+        ? `⬆️ Выгружено ключей: ${n}. Облако перезаписано данными этого телефона.`
+        : 'Выгружать нечего — локальных данных нет.');
+    } catch (e) {
+      setMsg('Не получилось выгрузить: ' + (e as Error).message);
+    } finally {
+      setPushing(false);
+    }
+  };
+
   const remainSec = expiresAt ? Math.max(0, Math.round((expiresAt - now) / 1000)) : 0;
 
   return (
@@ -231,6 +268,10 @@ export const SyncLinkSection: React.FC = () => {
 
       {mode !== 'telegram' && !linked && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <div style={warnBox}>
+            ⚠️ Пока не привязано, данные живут только в этом телефоне. Удаление приложения или
+            сброс хранилища сотрёт их без возможности восстановить.
+          </div>
           <input
             value={input}
             onChange={e => setInput(normalizeLinkCode(e.target.value))}
@@ -255,14 +296,34 @@ export const SyncLinkSection: React.FC = () => {
       )}
 
       {isKvCloudConfigured() && (
-        <button
-          onClick={syncNow}
-          disabled={busySync || syncStatus === 'off'}
-          style={{ ...btnGhost, opacity: busySync || syncStatus === 'off' ? 0.6 : 1 }}
-          aria-label="Синхронизировать с облаком сейчас"
-        >
-          {busySync ? '⟳ Синхронизирую…' : '🔄 Синхронизировать сейчас'}
-        </button>
+        <div style={statusRow} role="status" aria-live="polite" aria-label="Состояние облака">
+          <span aria-hidden="true">
+            {syncStatus === 'error' ? '⚠️' : syncStatus === 'syncing' ? '⟳' : '☁️'}
+          </span>
+          <span>{syncStatusText(syncState)}</span>
+        </div>
+      )}
+
+      {isKvCloudConfigured() && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <button
+            onClick={syncNow}
+            disabled={busySync || syncStatus === 'off'}
+            style={{ ...btnGhost, opacity: busySync || syncStatus === 'off' ? 0.6 : 1 }}
+            aria-label="Синхронизировать с облаком сейчас"
+          >
+            {busySync ? '⟳ Синхронизирую…' : '🔄 Синхронизировать сейчас'}
+          </button>
+          <button
+            onClick={forcePush}
+            disabled={pushing || syncStatus === 'off'}
+            style={{ ...btnGhost, opacity: pushing || syncStatus === 'off' ? 0.6 : 1 }}
+            aria-label="Выгрузить все данные в облако заново"
+            title="Перезаписать облако данными этого телефона (лечит рассинхрон между устройствами)"
+          >
+            {pushing ? '⬆️ Выгружаю…' : '⬆️ Выгрузить всё заново'}
+          </button>
+        </div>
       )}
 
       {msg && (
@@ -345,4 +406,27 @@ const msgBox: React.CSSProperties = {
   borderRadius: 12,
   padding: '8px 10px',
   lineHeight: 1.5,
+};
+
+const statusRow: React.CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 8,
+  fontSize: 12,
+  color: '#fff',
+  opacity: 0.9,
+  padding: '6px 10px',
+  borderRadius: 12,
+  background: 'rgba(0,0,0,0.25)',
+  border: '1px solid rgba(255,255,255,0.10)',
+};
+
+const warnBox: React.CSSProperties = {
+  fontSize: 11.5,
+  lineHeight: 1.5,
+  color: '#fbbf24',
+  background: 'rgba(251,191,36,0.10)',
+  border: '1px solid rgba(251,191,36,0.35)',
+  borderRadius: 12,
+  padding: '8px 10px',
 };

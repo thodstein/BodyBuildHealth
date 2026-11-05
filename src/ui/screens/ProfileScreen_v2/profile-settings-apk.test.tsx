@@ -16,6 +16,10 @@ vi.mock('../../../core/native-bridge', () => ({
   notifyLocal: vi.fn(async () => true),
   pickPhoto: vi.fn(async () => null),
   shareText: vi.fn(async () => true),
+  getDeviceInfo: vi.fn(async () => ({ appVersion: '3.0.4' })),
+  scheduleDailyReminders: vi.fn(async () => 0),
+  scheduleWeeklyReminders: vi.fn(async () => 0),
+  cancelScheduledReminders: vi.fn(async () => {}),
 }));
 
 import { resetAppPlatformCache } from '../../../core/app-platform';

@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { FOOD_DB } from '../../../../../core/nutrition-database';
 import { fillMissingMicros, quantityToGrams } from '../../../../../engines/nutrition-ocr-parser';
+import { mergeMealsFromPrevious, previousDateKey } from '../diary-quick-repeat';
 
 export function useDiaryDayOps({ diaryData, selectedDate, saveDiary, showToast, safeSet }: {
   diaryData: Record<string, any>;
@@ -113,8 +114,31 @@ export function useDiaryDayOps({ diaryData, selectedDate, saveDiary, showToast, 
     showToast(`✅ День ${copiedDay} → ${targetDate}`);
   }, [copiedDay, diaryData, saveDiary, showToast]);
 
-  const saveMealMood = useCallback((date: string, mood: { satiety: number; enjoyment: number; note: string }) => {
-    const upd = { ...mealMood, [date]: mood };
+  /**
+   * «Как вчера»: переносит приёмы предыдущего дня в выбранный.
+   * Только добавление, дубликаты (то же имя и количество) пропускаются —
+   * повторное нажатие не удваивает калории.
+   */
+  const repeatPreviousDay = useCallback(() => {
+    const sourceDate = previousDateKey(selectedDate);
+    const source = diaryData[sourceDate]?.meals as Record<string, any[]> | undefined;
+    if (!source || Object.keys(source).length === 0) {
+      showToast(`❌ За ${sourceDate} записей нет`);
+      return;
+    }
+    const target = diaryData[selectedDate]?.meals as Record<string, any[]> | undefined;
+    const { meals, added, skipped } = mergeMealsFromPrevious(target, source);
+    if (added === 0) {
+      showToast('ℹ️ Всё уже перенесено — дубликатов нет');
+      return;
+    }
+    const data = { ...diaryData };
+    data[selectedDate] = { ...(data[selectedDate] || {}), meals };
+    saveDiary(data);
+    showToast(`↩ Из ${sourceDate}: +${added} поз.${skipped > 0 ? ` (${skipped} уже были)` : ''}`);
+  }, [diaryData, selectedDate, saveDiary, showToast]);
+
+  const saveMealMood = useCallback((date: string, mood: { satiety: number; enjoyment: number; note: string }) => {    const upd = { ...mealMood, [date]: mood };
     setMealMood(upd);
     safeSet('he_meal_mood', upd);
   }, [mealMood, safeSet]);
@@ -170,7 +194,7 @@ export function useDiaryDayOps({ diaryData, selectedDate, saveDiary, showToast, 
     clearDayConfirmOpen, setClearDayConfirmOpen,
     foodPatterns, foodTriggers, mealMood,
     deleteItem, clearDay, confirmClearDay, openEdit, saveEdit,
-    copyMeal, pasteMeal, copyDay, pasteDay,
+    copyMeal, pasteMeal, copyDay, pasteDay, repeatPreviousDay,
     saveMealMood, savePatterns, saveTriggers,
     importFromPlan, fillDayMicros,
   };

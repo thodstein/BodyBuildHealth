@@ -14,6 +14,7 @@ import { ArticlesScreen } from './ui/screens/ArticlesScreen';
 
 import { ToastContainer } from './ui/ToastContainer';
 import { KvUpdateBanner } from './ui/KvUpdateBanner';
+import { KvErrorBanner } from './ui/KvErrorBanner';
 import { DataSpaceBanner } from './ui/DataSpaceBanner';
 import { rememberScreen, restoreScreen } from './core/space-return';
 import { KvSyncButton } from './ui/KvSyncButton';
@@ -492,6 +493,7 @@ export default function App() {
           </div>
           {/* Пока открыто пространство атлета — полоса предупреждения сверху. */}
           <DataSpaceBanner />
+          <KvErrorBanner />
           {renderContent()}
         </div>
       </main>

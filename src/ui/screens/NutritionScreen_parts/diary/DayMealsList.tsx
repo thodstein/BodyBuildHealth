@@ -16,11 +16,14 @@ interface DayMealsListProps {
   copySource: string | null;
   onPasteMeal: (date: string) => void;
   onCancelCopy: () => void;
+  /** Быстрый ввод: перенести приёмы предыдущего дня в выбранный. */
+  onRepeatYesterday?: () => void;
 }
 
 export const DayMealsList: React.FC<DayMealsListProps> = ({
   dayMeals, onEditItem, onDeleteItem, onCopyMeal, onSavePreset,
   onImportFromPlan, onClearDay, onFillMicros, selectedDate, copySource, onPasteMeal, onCancelCopy,
+  onRepeatYesterday,
 }) => {
   const mealNames = Object.keys(dayMeals);
   const hasData = mealNames.length > 0;
@@ -35,6 +38,28 @@ export const DayMealsList: React.FC<DayMealsListProps> = ({
         )}
         <div style={{ fontSize: 13, color: '#fff', marginBottom: 6, fontWeight: 700 }}>Пока пусто — начните день</div>
         <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)', marginBottom:14, lineHeight:1.5 }}>Добавьте завтрак, обед или перекус — поиск, штрихкод, фото чека или план</div>
+        {onRepeatYesterday && (
+          <button
+            className="day-empty-cta nd-repeat-yesterday"
+            onClick={onRepeatYesterday}
+            aria-label="Повторить вчерашний день"
+            style={{
+              background: 'rgba(139,92,246,0.14)',
+              color: '#c4b5fd',
+              border: '1px solid rgba(139,92,246,0.35)',
+              boxShadow: 'none',
+              padding: '12px 22px',
+              borderRadius: 15,
+              fontSize: 13,
+              fontWeight: 800,
+              cursor: 'pointer',
+              minHeight: 48,
+              marginBottom: 8,
+            }}
+          >
+            ↩ Как вчера
+          </button>
+        )}
         {isNativeApp() && (
           <button className="day-empty-cta" onClick={onImportFromPlan} aria-label="Импорт из плана">
             📥 Импорт из плана
@@ -75,6 +100,30 @@ export const DayMealsList: React.FC<DayMealsListProps> = ({
           {mealNames.length} приёмов
         </span>
       </div>
+
+      {/* Быстрый ввод: день обычно повторяется — одна кнопка вместо ручного ввода */}
+      {onRepeatYesterday && (
+        <button
+          onClick={onRepeatYesterday}
+          aria-label="Повторить вчерашний день"
+          className="nd-repeat-yesterday"
+          style={{
+            width: '100%',
+            padding: '9px 12px',
+            marginBottom: 10,
+            borderRadius: 12,
+            border: '1px solid rgba(139,92,246,0.25)',
+            background: 'rgba(139,92,246,0.08)',
+            color: '#c4b5fd',
+            fontSize: 12,
+            fontWeight: 700,
+            cursor: 'pointer',
+            minHeight: 44,
+          }}
+        >
+          ↩ Повторить вчерашний день
+        </button>
+      )}
 
       {/* Copy paste banner */}
       {copySource && (

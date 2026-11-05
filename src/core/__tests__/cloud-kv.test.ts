@@ -16,6 +16,7 @@ import {
   clearKvPendingUpdate,
   reloadKvView,
   touchKvKeys,
+  forcePushAllKv,
   _resetKvForTests,
   type KvRow,
   type KvTransport,
@@ -712,5 +713,49 @@ describe('удаление данных атлета убирает и обла�
     const purged = await purgeSpacesFromCloud([athleteSpaceId('a1')]);
     expect(purged).toBe(0);
     expect(t.cloud.size).toBe(1);
+  });
+});
+
+describe('forcePushAllKv — полная перевыгрузка', () => {
+  afterEach(() => {
+    _resetKvForTests();
+  });
+
+  it('отправляет ключи, которые обычный flush уже не считает изменёнными', async () => {
+    const t = new FakeTransport();
+    await init(t);
+    localStorage.setItem('he_profile_v2', '{"name":"A"}');
+    await flushKvNow();
+    expect(t.replaceCalls).toContain('he_profile_v2');
+
+    // без новых правок обычный flush молчит
+    t.replaceCalls.length = 0;
+    await flushKvNow();
+    expect(t.replaceCalls).toEqual([]);
+
+    const n = await forcePushAllKv();
+
+    expect(n).toBeGreaterThan(0);
+    expect(t.replaceCalls).toContain('he_profile_v2');
+    expect(JSON.parse(t.cloud.get('he_profile_v2')![0].value)).toEqual({ name: 'A' });
+  });
+
+  it('не выгружает исключённые ключи (сессия, токен привязки)', async () => {
+    const t = new FakeTransport();
+    await init(t);
+    localStorage.setItem('he_session_v2', 'secret');
+    localStorage.setItem('he_sync_tg_token_v1', 'tk_x');
+    localStorage.setItem('he_profile_v2', '{}');
+
+    await forcePushAllKv();
+
+    expect(t.replaceCalls).not.toContain('he_session_v2');
+    expect(t.replaceCalls).not.toContain('he_sync_tg_token_v1');
+    expect(t.replaceCalls).toContain('he_profile_v2');
+  });
+
+  it('без запущенной синхронизации возвращает 0 и не бросает', async () => {
+    localStorage.setItem('he_profile_v2', '{}');
+    await expect(forcePushAllKv()).resolves.toBe(0);
   });
 });

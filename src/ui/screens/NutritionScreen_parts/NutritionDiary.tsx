@@ -60,7 +60,7 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
     clearDayConfirmOpen, setClearDayConfirmOpen,
     foodPatterns, foodTriggers, mealMood,
     deleteItem, clearDay, confirmClearDay, openEdit, saveEdit,
-    copyMeal, pasteMeal, copyDay, pasteDay,
+    copyMeal, pasteMeal, copyDay, pasteDay, repeatPreviousDay,
     saveMealMood, savePatterns, saveTriggers,
     importFromPlan, fillDayMicros,
   } = useDiaryDayOps({ diaryData, selectedDate, saveDiary, showToast, safeSet });
@@ -311,6 +311,7 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
             onFillMicros={fillDayMicros}
             selectedDate={selectedDate} copySource={copySource}
             onPasteMeal={pasteMeal} onCancelCopy={() => setCopySource(null)}
+            onRepeatYesterday={repeatPreviousDay}
           />
           </DiarySection>
           <DiarySection id="quality" icon="⭐" title="Качество дня" sub="полезность · настроение · паттерны" color="#a78bfa">

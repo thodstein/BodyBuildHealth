@@ -333,6 +333,51 @@ export async function syncKvNow(): Promise<number> {
   return pullKvNow();
 }
 
+/** Локальные ключи текущего пространства, которые имеют право уехать в облако. */
+function collectPushableKeys(): string[] {
+  const out: string[] = [];
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (!k || !k.startsWith('he_')) continue;
+      if (isKvExcludedKey(toLogicalKey(k))) continue;
+      // Чужие пространства не трогаем: их ключи уедут, когда в них зайдут.
+      if (!_ownsKvKey(k)) continue;
+      out.push(k);
+    }
+  } catch { /* нет localStorage — нечего выгружать */ }
+  return out;
+}
+
+/** Сколько локальных ключей готовы к выгрузке (для подписи кнопки в UI). */
+export function countPushableKvKeys(): number {
+  return collectPushableKeys().length;
+}
+
+/**
+ * Полная повторная выгрузка текущего пространства.
+ *
+ * Зачем отдельно от `syncKvNow`: обычный flush отправляет только «грязные»
+ * ключи, а их правка отслеживается по значению. Если облако получило версию,
+ * которую локально уже не считают изменённой (ручные правки через экспорт,
+ * сбой ровно между записью и выгрузкой), синхронизация навсегда расходится —
+ * обе стороны молчат. Здесь мы честно помечаем ВСЁ изменённым и перезаписываем
+ * облако локальной версией (локальные данные — источник правды по кнопке).
+ */
+export async function forcePushAllKv(): Promise<number> {
+  if (!started || !token) return 0;
+  const keys = collectPushableKeys();
+  if (!keys.length) return 0;
+  const now = serverNowMs();
+  for (const k of keys) {
+    dirty.add(k);
+    mtimes.set(k, now);
+  }
+  persistMeta();
+  await flush();
+  return keys.length;
+}
+
 /** Best-effort выгрузка маленьких изменений (pagehide/beforeunload). */
 export function flushKvKeepAlive(): void {
   keepAliveFlush();

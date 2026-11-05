@@ -153,6 +153,42 @@ export async function cancelScheduledReminders(ids: number[]): Promise<void> {
   }
 }
 
+export interface DailyReminder {
+  id: number;
+  hour: number;
+  minute: number;
+  title: string;
+  body: string;
+}
+
+/**
+ * Ежедневные повторы («каждый день в HH:MM»): взвешивание, приёмы пищи.
+ * Возвращает число поставленных. Вне native — 0, ошибки плагина — тихий 0.
+ */
+export async function scheduleDailyReminders(items: DailyReminder[]): Promise<number> {
+  if (!isCapacitorNative() || items.length === 0) return 0;
+  try {
+    const { LocalNotifications } = await import('@capacitor/local-notifications');
+    try {
+      await LocalNotifications.requestPermissions();
+    } catch {
+      /* ignore */
+    }
+    await LocalNotifications.schedule({
+      notifications: items.map((r) => ({
+        id: r.id,
+        title: r.title,
+        body: r.body,
+        // `on` с часом/минутой без даты = ежедневный повтор.
+        schedule: { on: { hour: r.hour, minute: r.minute } },
+      })),
+    });
+    return items.length;
+  } catch {
+    return 0;
+  }
+}
+
 /**
  * Инициализация нативных push (APK). В Telegram/web — no-op (там свои механики).
  * onToken — сохранить токен на бэкенде для адресных рассылок (FCM).

@@ -3,7 +3,7 @@
  * Кнопки без эмодзи-хрома, градиент за акцентом темы, вне native — null.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { render, screen, cleanup } from '@testing-library/react';
+import { render, screen, cleanup, act } from '@testing-library/react';
 
 vi.mock('../../core/app-platform', () => ({
   getAppPlatform: vi.fn(() => 'native'),
@@ -14,6 +14,7 @@ vi.mock('../../core/app-updater', () => ({
   readUpdateState: vi.fn(() => ({})),
   shouldCheckNow: vi.fn(() => true),
   writeUpdateState: vi.fn(),
+  UPDATE_CHECK_EVENT: 'he:check-updates',
 }));
 vi.mock('../../core/native-bridge', () => ({
   getDeviceInfo: vi.fn(async () => ({ appVersion: '1.0.0' })),
@@ -74,6 +75,21 @@ describe('AppUpdateBanner (волна 20)', () => {
     (getAppPlatform as unknown as { mockReturnValue: (v: string) => void }).mockReturnValue('web');
     const { container } = render(<AppUpdateBanner />);
     expect(container.querySelector('[aria-label="app-update"]')).toBeNull();
+  });
+
+  it('5. ручная проверка из настроек не ждёт суточного окна', async () => {
+    (getAppPlatform as unknown as { mockReturnValue: (v: string) => void }).mockReturnValue('native');
+    const upd = await import('../../core/app-updater');
+    // фоновая проверка при монтировании — «рано», ручная обязана пройти
+    (upd.shouldCheckNow as unknown as { mockReturnValueOnce: (v: boolean) => void }).mockReturnValueOnce(false);
+    render(<AppUpdateBanner />);
+    expect(screen.queryByText(/9\.9\.9/)).toBeNull();
+
+    act(() => {
+      window.dispatchEvent(new Event('he:check-updates'));
+    });
+
+    expect(await screen.findByText(/9\.9\.9/)).not.toBeNull();
   });
 });
 

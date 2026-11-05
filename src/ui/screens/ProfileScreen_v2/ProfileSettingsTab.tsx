@@ -12,6 +12,8 @@ import { WidgetsSetupCard } from '../../../ui/native/WidgetsSetupCard';
 import { AppearanceSetupCard } from '../../../ui/native/AppearanceSetupCard';
 import { BiometrySetupCard } from '../../../ui/native/BiometrySetupCard';
 import { NativeFeaturesCard } from '../../../ui/native/NativeFeaturesCard';
+import { UpdateCheckCard } from '../../../ui/native/UpdateCheckCard';
+import { RemindersCard } from '../../../ui/native/RemindersCard';
 import { SyncLinkSection } from './SyncLinkSection';
 import { copyOrShareText, saveTextFileApk, shareOutcomeLabel } from '../../../core/apk-share';
 
@@ -370,7 +372,9 @@ export const ProfileSettingsTab: React.FC<{ onNavigate?: (screen: string) => voi
             <AppearanceSetupCard />
             <WidgetsSetupCard />
             <BiometrySetupCard />
+            <RemindersCard />
             <NativeFeaturesCard />
+            <UpdateCheckCard />
           </div>
         </AccordionSection>
       )}
