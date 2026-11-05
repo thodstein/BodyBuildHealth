@@ -624,10 +624,12 @@ finder: ≥7 взвешиваний + дневник)».
 
 - **Type-check затронутого графа** — чисто: `tsc -p` по временному конфигу с `include`
   = `src/vite-env.d.ts`, `MetabolicHub.tsx`, `metabolic-hub.parts.tsx`,
-  `metabolic-hub.engine.ts` (TS тянет все импорты, так что проверяются и зависимости).
-  Полный `npm run type-check` в этом окружении не укладывается в память: 7.9 ГБ RAM и
-  параллельные `tsc`/`vitest` из других сессий → heap OOM / `Zone Allocation failed`.
-  Прогонять на свободной машине.
+  `TrainingPopups.tsx`, `metabolic-hub.engine.ts` (TS тянет все импорты, так что
+  проверяются и зависимости).
+- **Полный `npm run type-check`** — чисто, `EXIT=0`:
+  `node --max-old-space-size=6144 ./node_modules/typescript/bin/tsc --noEmit`.
+  Раньше в этом окружении падал по памяти (7.9 ГБ RAM + параллельные `tsc`/`vitest`
+  из других сессий → heap OOM); на 6 ГБ heap проходит, если рядом никто не собирает.
 - `npx vitest run src/ui/screens/Shared/__tests__ src/engines/__tests__/metabolic-hub.test.ts`
   — **241 passed** (6 файлов: structure / toggles / honesty / modes / wiring / engine).
 - `npx vitest run src/ui/__tests__/rest-hooks-native.test.tsx
