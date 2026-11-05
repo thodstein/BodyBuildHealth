@@ -1581,8 +1581,8 @@ const kbju = useMemo(()=> calcKBJU(input), [input]);
           <PopupNumber label="Стресс 1-10" value={stress} min={1} max={10} onChange={setStress} />
           <PopupNumber label="Сон, ч" value={sleepHours} min={3} max={11} step={0.5} onChange={setSleepHours} />
           <PopupNumber label="Качество сна 1-5" value={sleepQuality} min={1} max={5} onChange={setSleepQuality} />
-          <PopupNumber label="Кофеин, мг/сут" value={caffeineMg ?? 0} min={0} max={800} onChange={setCaffeineMg} />
-          <PopupNumber label="Алкоголь, г/сут" value={alcoholG ?? 0} min={0} max={120} onChange={setAlcoholG} />
+          <PopupNumber label="Кофеин, мг/сут" value={caffeineMg} min={0} max={800} onChange={setCaffeineMg} zeroIsValue />
+          <PopupNumber label="Алкоголь, г/сут" value={alcoholG} min={0} max={120} onChange={setAlcoholG} zeroIsValue />
           <PopupNumber label="Дней/нед с алко" value={alcoholDays} min={0} max={7} onChange={setAlcoholDays} />
           <PopupNumber label="Ч/после кофе, ч" value={caffeineHoursSince} min={0} max={24} step={0.5} onChange={setCaffeineHoursSince} />
           <div style={{ display:'flex', flexDirection:'column', justifyContent:'center', padding:'8px 10px', borderRadius:10, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)' }}>
@@ -2204,7 +2204,7 @@ const kbju = useMemo(()=> calcKBJU(input), [input]);
                   {alcoholG != null ? alcohol.note : 'Введи дозу этанола (г/сут), чтобы увидеть ккал, TEF и блок окисления жира. Пока доза не введена, совет по алкоголю не выдаётся.'}<br/>
                   <span style={{ fontSize:9, color:'rgba(255,255,255,0.55)' }}>{alcoholG != null ? `~${alcohol.stepsEq} шагов компенсируют. ` : ''}Алкоголь подавляет MPS и сон. Введи дозу здесь или в HPA-блоке.</span>
                   <div style={{ marginTop:8, display:'flex', gap:6 }}>
-                    <PopupNumber label="Алкоголь, г" value={alcoholG ?? 0} min={0} max={200} onChange={setAlcoholG} />
+                    <PopupNumber label="Алкоголь, г" value={alcoholG} min={0} max={200} onChange={setAlcoholG} zeroIsValue />
                   </div>
                 </div>
               </div>

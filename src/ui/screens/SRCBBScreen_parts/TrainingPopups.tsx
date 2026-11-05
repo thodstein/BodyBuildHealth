@@ -43,16 +43,28 @@ export const cardBtnStyle = (active: boolean): React.CSSProperties => ({
 });
 
 export const PopupNumber: React.FC<{
-  label: string; value: number; min?: number; max?: number; step?: number; suffix?: string;
+  /** `undefined` — «не задано» (в отличие от осознанного 0). */
+  label: string; value?: number; min?: number; max?: number; step?: number; suffix?: string;
   hint?: string; onChange: (v: number) => void;
-}> = ({ label, value, min, max, step = 1, suffix = '', hint, onChange }) => {
+  /**
+   * 0 — это ответ, а не «пусто» (нет алкоголя/кофеина, 0 минут кардио).
+   * По умолчанию 0 = «не задано»: в большинстве полей 0 — это стартовое значение
+   * состояния, а не ввод пользователя, и печатать «0 кг» вместо «—» было бы враньём.
+   * Чтобы 0 считался ответом, поле должно получать `undefined` для незаполненного.
+   */
+  zeroIsValue?: boolean;
+}> = ({ label, value, min, max, step = 1, suffix = '', hint, onChange, zeroIsValue = false }) => {
   const [open, setOpen] = useState(false);
-  const [edit, setEdit] = useState(String(value));
-  const display = value ? `${value}${suffix}` : `—${suffix ? ' ' + suffix : ''}`;
+  const [edit, setEdit] = useState(value == null ? '' : String(value));
+  // Аудит 2026-11: раньше любой 0 показывался как «—» и озвучивался как «не задано»,
+  // даже когда пользователь осознанно ввёл «0 г алкоголя». Теперь это решает поле.
+  const hasValue = value != null && Number.isFinite(value);
+  const filled = hasValue && (zeroIsValue || value !== 0);
+  const display = filled ? `${value}${suffix}` : `—${suffix ? ' ' + suffix : ''}`;
   return <>
-      <button className="pl-popupnum" aria-label={`${label}: ${value ? `${value}${suffix}` : 'не задано'}`} aria-haspopup="dialog" onClick={() => { setEdit(String(value)); setOpen(true); }} style={cardBtnStyle(!!value)}>
+      <button className="pl-popupnum" aria-label={`${label}: ${filled ? `${value}${suffix}` : 'не задано'}`} aria-haspopup="dialog" onClick={() => { setEdit(value == null ? '' : String(value)); setOpen(true); }} style={cardBtnStyle(filled)}>
       <div style={{ fontSize: 11, color: '#fff', fontWeight: 600, marginBottom: 2, overflowWrap: 'anywhere', wordBreak: 'break-word' }}>{label}</div>
-      <div style={{ fontSize: 14, color: value ? ACCENT : '#fff', overflowWrap: 'anywhere', wordBreak: 'break-word' }}>{display}</div>
+      <div style={{ fontSize: 14, color: filled ? ACCENT : '#fff', overflowWrap: 'anywhere', wordBreak: 'break-word' }}>{display}</div>
     </button>
     {open && <PortalOverlay onClose={() => setOpen(false)}>
       <div onClick={e => e.stopPropagation()} style={sheet()}>

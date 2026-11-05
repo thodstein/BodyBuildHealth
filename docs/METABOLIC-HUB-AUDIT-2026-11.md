@@ -708,6 +708,35 @@ soluble/insoluble, которое раньше выводилось без ис�
 **Регрессия.** `metabolic-hub-wiring.test.tsx` → «белковый режим: сохранение LBM считает белок на
 кг сухой массы, а не веса».
 
+### 1.62 Осознанный 0 в поле выглядел как «не задано»
+**Причина.** Общий `PopupNumber` (`SRCBBScreen_parts/TrainingPopups.tsx`, ~180 полей на
+SRCBScreen/TrainingScreen/хабе) считал значение по `!!value` — то есть любой 0 печатался как «—»,
+озвучивался скринридером как «не задано» и терял зелёный акцент. В хабе это билось с §1.48/1.49:
+`alcoholG`/`caffeineMg` — `number|undefined`, движок различает 0 и «не указано», а поле показывало
+«—» и после ввода 0 («не пью» / «без кофеина» — реальные ответы, а не пустота).
+**Исправление.** `value` стал опциональным (`undefined` = «не задано»), добавлен флаг
+`zeroIsValue`: с ним 0 — значение (зелёный акцент, «0г/сут», в `aria-label` тоже «0»). Без флага
+поведение прежнее, поэтому остальные ~180 полей не изменились. В хабе флаг включён у
+«Алкоголь, г/сут», «Алкоголь, г» и «Кофеин, мг/сут»; «Дней/нед с алко» намеренно осталось
+«не задано» (0 там значит «не указано», см. подсказку в alcohol-режиме).
+**Регрессия.** Новый `SRCBBScreen_parts/__tests__/popup-number-honesty.test.tsx` (8 тестов):
+0 без флага / 0 с флагом / `undefined` с флагом / подстановка текущего значения + кламп сверху и
+снизу, пустой ввод без `NaN`, «Отмена» без `onChange`. `metabolic-hub-wiring.test.tsx` →
+«осознанный 0 в поле не превращается в «не задано» (алкоголь/кофеин)».
+
+### 1.63 Проверка затронутых экранов общего PopupNumber
+`PopupNumber` из `TrainingPopups` — единственный компонент, который я менял на SRCBBScreen и
+TrainingScreen (harness: кламп min/max + `aria-label`/`aria-haspopup`, §1.62). Прогон:
+SRCBScreen (33 файла, 334 теста), TrainingScreen (196 файлов, 1937 тестов), hub (260 тестов) —
+все зелёные, кроме двух вещей, к правке не относящихся:
+- `src/ui/__tests__/rest-hooks-native.test.tsx` — 68/68 passed, но процесс завершается с кодом 1
+  из-за `HTMLCanvasElement.getContext` в `ProMetricsPanel.FFChart` под jsdom. Воспроизводится и
+  на HEAD этого файла (`git checkout -- TrainingPopups.tsx` → тот же шум), значит не наша регрессия.
+- `session-widgets-pack.test.tsx` падает только в общем прогоне папки (unhandled error из
+  соседнего файла), в изоляции — 16/16 passed.
+- `src/ui/components/PopupXxx.tsx` (своя копия: LabsScreen, NutritionScreen, SupportScreen,
+  PharmaScreen) и `CombatUI` (`CombatPopupNumber`) я **не** менял.
+
 ---
 
 ## 2. Чего не хватало (добавлено)
@@ -763,7 +792,7 @@ soluble/insoluble, которое раньше выводилось без ис�
   это параллельная сессия, файл хаба к нему не относится; scoped-прогон по графу хаба
   по-прежнему `EXIT=0`.
 - `npx vitest run src/ui/screens/Shared/__tests__ src/engines/__tests__/metabolic-hub.test.ts`
-  — **251 passed** (6 файлов: structure / toggles / honesty / modes / wiring / engine).
+  — **260 passed** (6 файлов: structure / toggles / honesty / modes / wiring / engine).
 - `npx vitest run src/ui/__tests__/rest-hooks-native.test.tsx
   src/engines/__tests__/risk-info-honesty-e07-e08.test.ts` — **89 passed**
   (в stderr шумит jsdom-canvas chart.js — это фон, не падения).

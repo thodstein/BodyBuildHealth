@@ -403,6 +403,20 @@ describe('MetabolicHub: ввод меняет расчёт (проводка п�
     expect(txt).not.toContain('вес растёт вместе с сухой массой');
   });
 
+  it('осознанный 0 в поле не превращается в «не задано» (алкоголь/кофеин)', () => {
+    render(<MetabolicHub />);
+    expect(fieldValue('Алкоголь, г/сут')).toBe('не задано');
+    setNumber('Алкоголь, г/сут', 0);
+    expect(fieldValue('Алкоголь, г/сут')).toBe('0');
+    setNumber('Кофеин, мг/сут', 0);
+    expect(fieldValue('Кофеин, мг/сут')).toBe('0');
+    // поле без zeroIsValue по-прежнему честно говорит «не задано» при стартовом 0
+    expect(fieldValue('Дней/нед с алко')).toBe('не задано');
+    const snap = JSON.parse(localStorage.getItem('he_metabolic_snapshot_v6') || '{}');
+    expect(snap.alcoholG).toBe(0);
+    expect(snap.caffeineMg).toBe(0);
+  });
+
   it('белковый режим: сохранение LBM считает белок на кг сухой массы, а не веса', () => {
     render(<MetabolicHub />);
     const txt = openMode('Белок');
