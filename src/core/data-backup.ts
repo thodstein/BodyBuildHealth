@@ -19,8 +19,10 @@ import {
   parseRegistry,
   rawKeys,
   readRegistryFromStorage,
+  removePhysicalKey,
   writeRegistryToStorage,
 } from './data-space';
+import { requestSpacePurge } from './space-purge';
 
 /** Сырое хранилище: бэкап и полная очистка обязаны видеть все пространства. */
 function rawLs() {
@@ -135,6 +137,9 @@ export async function forgetAllAthletes(): Promise<{ spaces: number }> {
     active: HOME_SPACE_ID,
     spaces: reg.spaces.filter(s => s.id === HOME_SPACE_ID),
   });
+  // В облаке остались бы копии их дневников — «забыли» было бы правдой только
+  // на этом телефоне.
+  requestSpacePurge(ids);
   return { spaces: ids.length };
 }
 
@@ -243,7 +248,9 @@ export async function softClear(): Promise<void> {
   }
   for (const k of toRemove) {
     try {
-      raw.removeItem(k);
+      // Через живой метод: синхронизация ставит поверх свой removeItem и только
+      // так узнаёт об удалении. Иначе в облаке остались бы копии удалённого.
+      removePhysicalKey(raw, k);
     } catch {
       /* ignore */
     }
@@ -264,4 +271,7 @@ export async function softClear(): Promise<void> {
     /* среда без sessionStorage */
   }
   await deleteSpaceDatabases(athleteSpaces);
+  // Базы атлетов удалены целиком — у этих записей в облаке нет надгробий,
+  // поэтому просим убрать их префиксы из облака отдельно.
+  requestSpacePurge(athleteSpaces);
 }

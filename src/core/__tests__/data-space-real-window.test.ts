@@ -15,6 +15,7 @@ import {
   _resetDataSpaceCache,
   athleteSpaceId,
   DATA_SPACE_KEY,
+  clearSpaceData,
   deviceSessionRaw,
   emptyRegistry,
   HOME_SPACE_ID,
@@ -101,5 +102,40 @@ describe('шов на настоящем window', () => {
     for (const junk of ['getItem', 'setItem', 'removeItem', 'key', 'clear']) {
       expect(keys).not.toContain(junk);
     }
+  });
+
+  /**
+   * Синхронизация ставит свой `removeItem` поверх хранилища и только так узнаёт
+   * об удалении ключа (отправляет в облако надгробие). Если удалять через снимок
+   * методов, она об этом не узнает, и данные «удалённого» атлета останутся на
+   * сервере. Поэтому очистка обязана идти через живой метод хранилища.
+   */
+  it('очистка данных пространства идёт через живой метод хранилища, а не через снимок', () => {
+    _resetDataSpaceCache();
+    const sid = athleteSpaceId('a1');
+    api!.writeRegistry(
+      setActiveSpace(upsertSpace(emptyRegistry(), { id: sid, athleteId: 'a1', label: 'Иван' }).registry, sid),
+    );
+    localStorage.setItem('he_profile_v2', 'иван');
+    const physical = toPhysicalKey(sid, 'he_profile_v2');
+    api!.writeRegistry(setActiveSpace(api!.readRegistry(), HOME_SPACE_ID));
+
+    // «Синхронизация»: обёртка над живым методом
+    const storage = api!.storage;
+    const original = storage.removeItem.bind(storage);
+    const seen: string[] = [];
+    storage.removeItem = (k: string) => {
+      seen.push(k);
+      original(k);
+    };
+    try {
+      const removed = clearSpaceData(api!.raw, sid);
+      expect(removed).toBeGreaterThan(0);
+      expect(seen).toContain(physical);
+    } finally {
+      storage.removeItem = original;
+    }
+    // и ключ действительно удалён, а не только «замечен»
+    expect(api!.raw.getItem(physical)).toBeNull();
   });
 });

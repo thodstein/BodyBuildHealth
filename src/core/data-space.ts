@@ -458,7 +458,8 @@ export function createSpaceStorage(raw: RawStorageLike, getActiveSpaceId: () => 
         const mine = parsed ? parsed.spaceId === active : active === HOME_SPACE_ID;
         if (!mine) continue;
         try {
-          raw.removeItem(k);
+          // через живой метод: иначе синхронизация не узнает об удалении
+          removePhysicalKey(raw, k);
         } catch {
           /* один сбойный ключ не должен блокировать очистку */
         }
@@ -496,6 +497,31 @@ let installedRaw: RawStorageLike | null = null;
 
 export function deviceRaw(): RawStorageLike | null {
   return installedRaw;
+}
+
+/**
+ * Живой объект хранилища для каждого снимка методов: `raw` — это снимок
+ * (методы сняты ДО подмены), а «живой» объект смотрит в текущую подмену.
+ *
+ * Зачем: синхронизация (`cloud-kv`) ставит свой `removeItem` поверх хранилища,
+ * чтобы отправить в облако надгробие ключа. Если удалять через снимок, она об
+ * этом не узнает — и данные «удалённого» атлета остаются на сервере, а на новом
+ * устройстве возвращаются. Поэтому удаление обязано идти через живой метод.
+ */
+const liveOf = new WeakMap<object, RawStorageLike>();
+
+/** Удалить физический ключ, если можно — через живой (обёрнутый) метод хранилища. */
+export function removePhysicalKey(raw: RawStorageLike, key: string): void {
+  const live = liveOf.get(raw as unknown as object) ?? null;
+  if (live && live !== raw) {
+    try {
+      live.removeItem(key);
+      return;
+    } catch {
+      /* живой метод не сработал — падаем на снимок */
+    }
+  }
+  raw.removeItem(key);
 }
 
 /**
@@ -645,7 +671,7 @@ export function clearSpaceData(raw: RawStorageLike, spaceId: string): number {
   for (const k of rawKeys(raw)) {
     if (!k.startsWith(prefix)) continue;
     try {
-      raw.removeItem(k);
+      removePhysicalKey(raw, k);
       removed++;
     } catch {
       /* ignore */
@@ -860,6 +886,9 @@ export function installDataSpaceStorage(win: Window | null | undefined): Install
   };
 
   const storage = createSpaceStorage(raw, activeSpaceId);
+  // Живой объект: если позже синхронизация обернёт методы, удаление пойдёт через
+  // неё и попадёт в облако как надгробие (см. `removePhysical`).
+  liveOf.set(raw as unknown as object, storage);
 
   const writeRegistry = (reg: DataSpaceRegistry): void => {
     cachedActive = reg.active;
@@ -899,6 +928,7 @@ export function installDataSpaceStorage(win: Window | null | undefined): Install
       const ssRaw = snapshotStorage(ss);
       if (ssRaw) {
         const ssStorage = createSpaceStorage(ssRaw, activeSpaceId);
+        liveOf.set(ssRaw as unknown as object, ssStorage);
         if (installOnWindow(w, 'sessionStorage', ssStorage, ssRaw)) installedSessionRaw = ssRaw;
       }
     }

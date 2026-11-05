@@ -28,9 +28,11 @@ import {
   HOME_SPACE_ID,
   currentSpaceId,
   spaceIdOfKey,
+  spaceKeyPrefix,
   toLogicalKey,
   toPhysicalKey,
 } from './data-space';
+import { setSpacePurgeHandler } from './space-purge';
 
 export const CHUNK_SIZE = 100_000;
 const PULL_PAGE = 1000;
@@ -89,6 +91,8 @@ export interface KvTransport {
   pull(token: string, onRows: (rows: KvRow[]) => void, onServerNow?: (ms: number) => void): Promise<void>;
   replaceKey(rows: KvRow[]): Promise<void>;
   removeKey(token: string, key: string): Promise<void>;
+  /** Пачкой: все ключи с префиксом (нужно для «удалил данные атлета»). */
+  removePrefix?(token: string, prefix: string): Promise<void>;
   keepAlivePush(rows: KvRow[]): void;
 }
 
@@ -249,6 +253,10 @@ export async function initKvSync(
     return state;
   }
   installHook();
+  // «Удалил данные атлета» должно унести и облачную копию: локальная очистка
+  // просит об этом через крошечный канал (space-purge), чтобы экран профиля не
+  // тянул supabase-js.
+  setSpacePurgeHandler(async ids => { await purgeSpacesFromCloud(ids); });
   try {
     token = opts?.token || (tgId ? await deriveSyncToken(tgId) : '');
     if (!token) {
@@ -348,6 +356,7 @@ export function _resetKvForTests(): void {
   idbEnabled = false;
   idbMeta = new Map();
   state = { status: 'off' };
+  setSpacePurgeHandler(null);
   applyingRemote = false;
   pulling = false;
   dirtyDuringPull.clear();
@@ -861,9 +870,76 @@ async function pull(opts?: { reload?: boolean }): Promise<number> {
   return applied;
 }
 
+/** Префиксы, под которыми в облаке лежат данные пространства (LS-ключи и записи IndexedDB). */
+function spacePrefixes(spaceId: string): string[] {
+  return [spaceKeyPrefix(spaceId), IDB_KV_PREFIX + spaceId + ':'];
+}
+
+/** Резервный путь, если транспорт не умеет удалять по префиксу: тянем строки и удаляем по одной. */
+async function removeByPrefixFallback(prefix: string): Promise<void> {
+  if (!transport || !token) return;
+  const keys = new Set<string>();
+  await transport.pull(token, rows => {
+    for (const r of rows) if (r.key.startsWith(prefix)) keys.add(r.key);
+  });
+  let n = 0;
+  for (const k of keys) {
+    // Ограничение: удаление не должно превращаться в тысячи запросов на телефоне.
+    if (n++ >= 500) break;
+    await transport.removeKey(token, k);
+  }
+}
+
+/**
+ * Убрать из облака всё, что принадлежит пространству атлета.
+ *
+ * Нужно после локального «удалил данные атлета»: без этого удаление было бы
+ * правдой только на этом телефоне, а копия осталась бы на сервере (и вернулась
+ * бы на новом устройстве). Домашнее пространство не трогаем — это данные
+ * тренера.
+ */
+export async function purgeSpacesFromCloud(spaceIds: readonly string[]): Promise<number> {
+  if (!started || !transport || !token) return 0;
+  const ids = (spaceIds || []).filter(id => !!id && id !== HOME_SPACE_ID);
+  if (!ids.length) return 0;
+  let purged = 0;
+  for (const spaceId of ids) {
+    const prefixes = spacePrefixes(spaceId);
+    for (const prefix of prefixes) {
+      try {
+        if (transport.removePrefix) await transport.removePrefix(token, prefix);
+        else await removeByPrefixFallback(prefix);
+      } catch {
+        // Транспорт не справился — пробуем по одной строке (и молчим: локальные
+        // данные уже удалены, это «догоняющая» уборка).
+        try { await removeByPrefixFallback(prefix); } catch { /* сеть недоступна */ }
+      }
+    }
+    // Метаданные (mtime/dirty/сигнатуры IndexedDB) этого пространства больше не нужны:
+    // иначе при следующем pull мы считали бы удалённые ключи «локально изменёнными».
+    const hit = (k: string) => prefixes.some(p => k.startsWith(p));
+    let metaChanged = false;
+    for (const k of Array.from(mtimes.keys())) {
+      if (!hit(k)) continue;
+      mtimes.delete(k);
+      dirty.delete(k);
+      metaChanged = true;
+    }
+    let idbChanged = false;
+    for (const k of Array.from(idbMeta.keys())) {
+      if (!hit(k)) continue;
+      idbMeta.delete(k);
+      idbChanged = true;
+    }
+    if (metaChanged) persistMeta();
+    if (idbChanged) persistIdbMeta();
+    purged++;
+  }
+  return purged;
+}
+
 /** Локальные ключи, которых нет ни в облаке, ни в mtimes (никогда не синкались) → выгрузить. */
-function reconcileLocalKeys(remoteByKey: Map<string, KvRow[]>): void {
-  if (typeof localStorage === 'undefined') return;
+function reconcileLocalKeys(remoteByKey: Map<string, KvRow[]>): void {  if (typeof localStorage === 'undefined') return;
   const remoteKeys = new Set(remoteByKey.keys());
   for (let i = 0; i < localStorage.length; i++) {
     const logical = localStorage.key(i);
@@ -1015,6 +1091,17 @@ class SupabaseKvTransport implements KvTransport {
 
   async removeKey(token: string, key: string): Promise<void> {
     const { error } = await this.client.from('user_kv').delete().eq('id', token).eq('key', key);
+    if (error) throw new Error(error.message);
+  }
+
+  /**
+   * Удаление всех ключей пространства одной операцией.
+   * `_` и `%` в LIKE — шаблоны, а в ключах приложения их полно (`he_ath_...`):
+   * без экранирования префикс мог бы зацепить соседние ключи.
+   */
+  async removePrefix(token: string, prefix: string): Promise<void> {
+    const pattern = prefix.replace(/[\\%_]/g, m => '\\' + m) + '%';
+    const { error } = await this.client.from('user_kv').delete().eq('id', token).like('key', pattern);
     if (error) throw new Error(error.message);
   }
 

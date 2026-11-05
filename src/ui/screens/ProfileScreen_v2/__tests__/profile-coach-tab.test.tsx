@@ -9,6 +9,7 @@
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, fireEvent, cleanup, waitFor } from '@testing-library/react';
+import { setSpacePurgeHandler } from '../../../../core/space-purge';
 
 /**
  * База IndexedDB подменена: тесту нужно управлять числом записей в пространстве
@@ -59,6 +60,7 @@ beforeEach(() => {
 });
 afterEach(() => {
   cleanup();
+  setSpacePurgeHandler(null);
   try { localStorage.clear(); } catch { /* ignore */ }
   _resetDataSpaceCache();
 });
@@ -303,6 +305,9 @@ describe('атлеты', () => {
     localStorage.setItem('he_profile_v2', '{"name":"Тренер"}');
     const sid = athleteSpaceId('a1');
     localStorage.setItem(`${ATHLETE_SPACE_PREFIX}${sid}__he_profile_v2`, '{"name":"Иван"}');
+    // синхронизация зарегистрирована — удаление должно унести и облачную копию
+    const purged: string[][] = [];
+    setSpacePurgeHandler(ids => { purged.push([...ids]); });
 
     const { container } = render(<ProfileCoachTab />);
     fireEvent.click(container.querySelector('[data-coach="delete"]') as HTMLElement);
@@ -311,6 +316,7 @@ describe('атлеты', () => {
     expect(readCoachState(localStorage).athletes).toHaveLength(0);
     expect(localStorage.getItem(`${ATHLETE_SPACE_PREFIX}${sid}__he_profile_v2`)).toBeNull();
     expect(localStorage.getItem('he_profile_v2')).toBe('{"name":"Тренер"}');
+    expect(purged.flat()).toContain(sid);
   });
 
   it('обычное удаление убирает из реестра ПУСТОЕ пространство атлета', async () => {
@@ -530,6 +536,10 @@ describe('забыть всех атлетов', () => {
     );
     expect(readCoachNotes(localStorage).items).toHaveLength(1);
 
+    // синхронизация: облачные копии всех атлетов тоже должны уйти
+    const purged: string[][] = [];
+    setSpacePurgeHandler(ids => { purged.push([...ids]); });
+
     const { container } = render(<ProfileCoachTab />);
     fireEvent.click(container.querySelector('[data-coach="forget-all"]') as HTMLElement);
     fireEvent.click(container.querySelector('[data-coach="forget-all"]') as HTMLElement);
@@ -538,6 +548,7 @@ describe('забыть всех атлетов', () => {
     // данные атлета и запись его пространства ушли
     expect(localStorage.getItem(toPhysicalKey(sid, 'he_profile_v2'))).toBeNull();
     expect(readRegistryFromStorage().spaces.filter(s => s.id !== HOME_SPACE_ID)).toHaveLength(0);
+    expect(purged.flat()).toContain(sid);
     // заметки и журнал относились к людям, которых больше нет
     expect(readCoachNotes(localStorage).items).toHaveLength(0);
     // собственные данные тренера остались: это не полный сброс приложения

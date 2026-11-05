@@ -73,6 +73,7 @@ import {
   upsertSpace,
   writeRegistryToStorage,
 } from '../../../core/data-space';
+import { requestSpacePurge } from '../../../core/space-purge';
 
 const ACCENT = '#22d3ee';
 
@@ -463,6 +464,9 @@ export const ProfileCoachTab: React.FC<{
     // иначе в следующем входе всплыл бы старый недописанный черновик.
     clearSessionSpaceData(sid);
     writeRegistryToStorage(removeSpace(readRegistryFromStorage(), sid));
+    // Облачная копия: базы IndexedDB удаляются целиком, и надгробий у их записей
+    // нет — просим синхронизацию убрать пространство из облака (если она включена).
+    requestSpacePurge([sid]);
     // База IndexedDB грузится лениво: движок нужен только здесь, а статический
     // импорт тянул его в граф экрана профиля и замедлял холодный старт.
     void import('../../../core/db')
@@ -487,6 +491,7 @@ export const ProfileCoachTab: React.FC<{
     if (storage) clearSpaceData(deviceRawOrFallback(storage), spaceId);
     clearSessionSpaceData(spaceId);
     writeRegistryToStorage(removeSpace(readRegistryFromStorage(), spaceId));
+    requestSpacePurge([spaceId]);
     setRegistryRev(v => v + 1);
     setConfirmOrphanId(null);
     void import('../../../core/db')

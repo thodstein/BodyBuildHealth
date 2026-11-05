@@ -9,7 +9,7 @@
  * Здесь база подменена: проверяем именно разводку — какие пространства
  * спрашиваются при экспорте и в какие базы пишется восстановление.
  */
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 
 const { readSpaceStores, writeSpaceStores } = vi.hoisted(() => {
   const read = vi.fn(async (spaceId: string): Promise<Record<string, any[]>> => {
@@ -31,6 +31,7 @@ vi.mock('../db', () => ({
 }));
 
 import { collectBackup, importBackup, type AppBackup } from '../data-backup';
+import { setSpacePurgeHandler } from '../space-purge';
 import {
   DATA_SPACE_KEY,
   athleteSpaceId,
@@ -155,6 +156,8 @@ describe('бэкап уносит базы всех пространств', () 
     localStorage.setItem('he_session_v2', 'сессия');
     localStorage.setItem(toPhysicalKey(a1, 'he_profile_v2'), 'иван');
     writeSpaceStores.mockClear();
+    const purged: string[][] = [];
+    setSpacePurgeHandler(ids => { purged.push([...ids]); });
 
     await softClear();
 
@@ -171,6 +174,8 @@ describe('бэкап уносит базы всех пространств', () 
     expect(localStorage.getItem('he_profile_v2')).toBe('тренер');
     expect(localStorage.getItem('he_session_v2')).toBe('сессия');
     expect(localStorage.getItem(toPhysicalKey(a1, 'he_profile_v2'))).toBeNull();
+    // и облачная копия данных атлета тоже убирается
+    expect(purged.flat()).toContain(a1);
   });
 });
 
@@ -248,6 +253,10 @@ describe('забыть всех атлетов', () => {
     vi.clearAllMocks();
   });
 
+  afterEach(() => {
+    setSpacePurgeHandler(null);
+  });
+
   it('убирает данные и записи всех атлетов, но не трогает домашнее пространство', async () => {
     const a1 = athleteSpaceId('a1');
     const a2 = athleteSpaceId('a2');
@@ -266,6 +275,8 @@ describe('забыть всех атлетов', () => {
     // Черновики чистятся через шов над sessionStorage — он ставится при старте
     // приложения; в тесте ставим явно (окно настоящее, jsdom).
     expect(installDataSpaceStorage(window)).not.toBeNull();
+    const purged: string[][] = [];
+    setSpacePurgeHandler(ids => { purged.push([...ids]); });
     const res = await forgetAllAthletes();
 
     expect(res.spaces).toBe(2);
@@ -281,6 +292,8 @@ describe('забыть всех атлетов', () => {
     expect(after.active).toBe('home');
     // базы атлетов удалены (обе — основная и фото, это делает deleteSpaceDatabases)
     expect(vi.mocked(deleteSpaceDatabases).mock.calls.flat(2)).toEqual(expect.arrayContaining([a1, a2]));
+    // и облачные копии тоже: без этого «забыли» было бы правдой только на телефоне
+    expect(purged.flat()).toEqual(expect.arrayContaining([a1, a2]));
   });
 
   it('когда атлетов нет — ничего не удаляет и возвращает 0', async () => {

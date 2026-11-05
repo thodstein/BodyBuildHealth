@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { DATA_SPACE_KEY } from '../data-space';
+import { DATA_SPACE_KEY, HOME_SPACE_ID, athleteSpaceId, spaceKeyPrefix } from '../data-space';
 import {
   CHUNK_SIZE,
   META_KEY,
@@ -11,6 +11,7 @@ import {
   flushKvNow,
   flushKvKeepAlive,
   pullKvNow,
+  purgeSpacesFromCloud,
   getKvSyncState,
   clearKvPendingUpdate,
   reloadKvView,
@@ -636,5 +637,80 @@ describe('защита от «отскока» данных назад', () => {
     const applied = await pullKvNow();
     expect(applied).toBe(1);
     expect(localStorage.getItem('he_weight_log')).toBe('[{"w":82}]');
+  });
+});
+
+describe('удаление данных атлета убирает и облачную копию', () => {
+  afterEach(() => {
+    _resetKvForTests();
+  });
+
+  /** Всё, что «принадлежит» пространству: ключи настроек/планов и записи дневников. */
+  const seedSpace = (t: FakeTransport, sid: string, label: string) => {
+    t.seed(`${spaceKeyPrefix(sid)}he_profile_v2`, label, Date.now() - 60_000);
+    t.seed(`${spaceKeyPrefix(sid)}he_plans_v2`, '[]', Date.now() - 60_000);
+    t.seed(`idb:${sid}:training_log:1`, '{"id":1}', Date.now() - 60_000);
+    t.seed(`idb:${sid}:training_log:2`, '{"id":2}', Date.now() - 60_000);
+  };
+
+  it('убирает ключи и записи базы своего пространства, чужие и домашние не трогает', async () => {
+    const t = new FakeTransport();
+    await init(t);
+    const a1 = athleteSpaceId('a1');
+    const a2 = athleteSpaceId('a2');
+    t.seed('he_profile_v2', 'тренер', Date.now() - 60_000);
+    t.seed('he_ath_asp_a2__he_profile_v2', 'пётр', Date.now() - 60_000);
+    seedSpace(t, a1, 'иван');
+    seedSpace(t, a2, 'пётр');
+
+    const purged = await purgeSpacesFromCloud([a1]);
+
+    expect(purged).toBe(1);
+    expect(t.cloud.has(`${spaceKeyPrefix(a1)}he_profile_v2`)).toBe(false);
+    expect(t.cloud.has(`${spaceKeyPrefix(a1)}he_plans_v2`)).toBe(false);
+    expect(t.cloud.has(`idb:${a1}:training_log:1`)).toBe(false);
+    expect(t.cloud.has(`idb:${a1}:training_log:2`)).toBe(false);
+    // чужие данные и домашние остаются
+    expect(t.cloud.has('he_profile_v2')).toBe(true);
+    expect(t.cloud.has(`${spaceKeyPrefix(a2)}he_profile_v2`)).toBe(true);
+    expect(t.cloud.has(`idb:${a2}:training_log:1`)).toBe(true);
+  });
+
+  it('если транспорт умеет пачку — удаляет префиксом, а не по одной строке', async () => {
+    const t = new FakeTransport();
+    const prefixes: string[] = [];
+    t.removePrefix = async (_token: string, prefix: string) => {
+      prefixes.push(prefix);
+      for (const k of [...t.cloud.keys()]) if (k.startsWith(prefix)) t.cloud.delete(k);
+    };
+    await init(t);
+    const a1 = athleteSpaceId('a1');
+    seedSpace(t, a1, 'иван');
+
+    await purgeSpacesFromCloud([a1]);
+
+    expect(prefixes).toContain(spaceKeyPrefix(a1));
+    expect(prefixes).toContain(`idb:${a1}:`);
+    expect(t.removeCalls).toHaveLength(0);
+    expect(t.cloud.size).toBe(0);
+  });
+
+  it('домашнее пространство не удаляется, даже если его попросили', async () => {
+    const t = new FakeTransport();
+    await init(t);
+    t.seed('he_profile_v2', 'тренер', Date.now() - 60_000);
+
+    const purged = await purgeSpacesFromCloud([HOME_SPACE_ID, '']);
+
+    expect(purged).toBe(0);
+    expect(t.cloud.has('he_profile_v2')).toBe(true);
+  });
+
+  it('без запущенной синхронизации — ничего не делает и не бросает', async () => {
+    const t = new FakeTransport();
+    t.seed('he_ath_asp_a1__he_profile_v2', 'иван', Date.now());
+    const purged = await purgeSpacesFromCloud([athleteSpaceId('a1')]);
+    expect(purged).toBe(0);
+    expect(t.cloud.size).toBe(1);
   });
 });
