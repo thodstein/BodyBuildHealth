@@ -8,7 +8,7 @@
  *  3) «К своим данным» возвращает домашнее пространство и перезагружает приложение.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { render, fireEvent, cleanup } from '@testing-library/react';
+import { render, fireEvent, cleanup, waitFor } from '@testing-library/react';
 import { DataSpaceBanner } from '../DataSpaceBanner';
 import {
   DATA_SPACE_KEY,
@@ -177,5 +177,118 @@ describe('полоса пространства данных', () => {
     // пилюля — не меньше 32 px по высоте: иначе по ней тяжело попасть пальцем
     const pill = container.querySelector('[data-space="switch-to"]') as HTMLElement;
     expect(Number.parseInt(pill.style.minHeight || '0', 10)).toBeGreaterThanOrEqual(32);
+  });
+});
+
+describe('PIN и автовозврат в полосе пространства', () => {
+  it('с включённым PIN переключение к другому атлету сначала спрашивает код', async () => {
+    const { createCoachLock, writeCoachLock } = await import('../../engines/coach/coach-lock.engine');
+    const { settings } = await createCoachLock('2468', { salt: 'fixed' });
+    writeCoachLock(localStorage, settings!);
+    activateAthleteSpace('a1', 'Иван');
+    activateAthleteSpace('a2', 'Пётр');
+    _resetDataSpaceCache();
+
+    const { reload, restore } = stubReload();
+    try {
+      const { container } = render(<DataSpaceBanner />);
+      fireEvent.click(container.querySelector('[data-space="switch"]') as HTMLElement);
+      fireEvent.click(
+        container.querySelector(
+          `[data-space="switch-to"][data-space-id="${athleteSpaceId('a1')}"]`,
+        ) as HTMLElement,
+      );
+      // Без PIN данные не открываются — даже на мгновение.
+      expect(container.querySelector('[data-coach="pin-dialog"]')).not.toBeNull();
+      expect(container.querySelector('[data-coach="pin-dialog"]')?.textContent).toContain('Иван');
+      expect(reload).not.toHaveBeenCalled();
+      expect(readRegistryFromStorage().active).toBe(athleteSpaceId('a2'));
+
+      fireEvent.change(container.querySelector('[data-coach="pin-dialog-input"]') as HTMLElement, {
+        target: { value: '1111' },
+      });
+      fireEvent.click(container.querySelector('[data-coach="pin-dialog-ok"]') as HTMLElement);
+      await waitFor(() =>
+        expect(container.querySelector('[data-coach="pin-dialog-error"]')?.textContent).toContain('не подошёл'),
+      );
+      expect(reload).not.toHaveBeenCalled();
+
+      fireEvent.change(container.querySelector('[data-coach="pin-dialog-input"]') as HTMLElement, {
+        target: { value: '2468' },
+      });
+      fireEvent.click(container.querySelector('[data-coach="pin-dialog-ok"]') as HTMLElement);
+      await waitFor(() => expect(reload).toHaveBeenCalledTimes(1));
+      expect(readRegistryFromStorage().active).toBe(athleteSpaceId('a1'));
+    } finally {
+      restore();
+    }
+  });
+
+  it('отмена PIN оставляет всё как было', async () => {
+    const { createCoachLock, writeCoachLock } = await import('../../engines/coach/coach-lock.engine');
+    const { settings } = await createCoachLock('2468', { salt: 'fixed' });
+    writeCoachLock(localStorage, settings!);
+    activateAthleteSpace('a1', 'Иван');
+    activateAthleteSpace('a2', 'Пётр');
+    _resetDataSpaceCache();
+
+    const { reload, restore } = stubReload();
+    try {
+      const { container } = render(<DataSpaceBanner />);
+      fireEvent.click(container.querySelector('[data-space="switch"]') as HTMLElement);
+      fireEvent.click(
+        container.querySelector(
+          `[data-space="switch-to"][data-space-id="${athleteSpaceId('a1')}"]`,
+        ) as HTMLElement,
+      );
+      fireEvent.click(container.querySelector('[data-coach="pin-dialog-cancel"]') as HTMLElement);
+      expect(container.querySelector('[data-coach="pin-dialog"]')).toBeNull();
+      expect(reload).not.toHaveBeenCalled();
+      expect(readRegistryFromStorage().active).toBe(athleteSpaceId('a2'));
+    } finally {
+      restore();
+    }
+  });
+
+  it('«К своим данным» PIN не требует: это не чужие данные', async () => {
+    const { createCoachLock, writeCoachLock } = await import('../../engines/coach/coach-lock.engine');
+    const { settings } = await createCoachLock('2468', { salt: 'fixed' });
+    writeCoachLock(localStorage, settings!);
+    activateAthleteSpace('a1', 'Иван');
+    _resetDataSpaceCache();
+
+    const { reload, restore } = stubReload();
+    try {
+      const { container } = render(<DataSpaceBanner />);
+      fireEvent.click(container.querySelector('[data-space="return"]') as HTMLElement);
+      expect(reload).toHaveBeenCalledTimes(1);
+      expect(readRegistryFromStorage().active).toBe('home');
+    } finally {
+      restore();
+    }
+  });
+
+  it('автовозврат: после бездействия приложение уходит к своим данным', async () => {
+    const { emptyCoachLock, writeCoachLock } = await import('../../engines/coach/coach-lock.engine');
+    writeCoachLock(localStorage, { ...emptyCoachLock(), autoExitSpaceMin: 5 });
+    activateAthleteSpace('a1', 'Иван');
+    _resetDataSpaceCache();
+
+    const { reload, restore } = stubReload();
+    vi.useFakeTimers();
+    try {
+      const { container } = render(<DataSpaceBanner />);
+      expect(container.querySelector('[data-space="auto-exit"]')?.textContent).toContain('5');
+      expect(reload).not.toHaveBeenCalled();
+      // Проверка раз в 15 секунд: до истечения 5 минут ничего не происходит.
+      vi.advanceTimersByTime(4 * 60_000);
+      expect(reload).not.toHaveBeenCalled();
+      vi.advanceTimersByTime(2 * 60_000);
+      expect(reload).toHaveBeenCalledTimes(1);
+      expect(readRegistryFromStorage().active).toBe('home');
+    } finally {
+      vi.useRealTimers();
+      restore();
+    }
   });
 });

@@ -24,6 +24,8 @@ export type CoachAuditKind =
   | 'athlete-status'
   | 'athlete-removed'
   | 'athlete-data-deleted'
+  | 'athletes-forgotten'
+  | 'space-entered'
   | 'program-saved'
   | 'program-issued'
   | 'program-imported'
@@ -55,6 +57,8 @@ const KINDS: readonly CoachAuditKind[] = [
   'athlete-status',
   'athlete-removed',
   'athlete-data-deleted',
+  'athletes-forgotten',
+  'space-entered',
   'program-saved',
   'program-issued',
   'program-imported',
@@ -190,6 +194,10 @@ export function auditLabel(kind: CoachAuditKind): string {
       return 'удалена карточка';
     case 'athlete-data-deleted':
       return 'удалены данные атлета';
+    case 'athletes-forgotten':
+      return 'забыты все атлеты';
+    case 'space-entered':
+      return 'открыты данные атлета';
     case 'program-saved':
       return 'программа снята в библиотеку';
     case 'program-issued':

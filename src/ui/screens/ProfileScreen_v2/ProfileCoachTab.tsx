@@ -88,6 +88,7 @@ import {
 import { CoachWeekView } from './CoachWeekView';
 import { CoachReportSheet } from './CoachReportSheet';
 import { CoachLockSettingsCard } from './CoachLockSettingsCard';
+import { CoachPinDialog } from '../../CoachPinDialog';
 import {
   addCoachAuditEvent,
   readCoachAudit,
@@ -360,7 +361,22 @@ export const ProfileCoachTab: React.FC<{
   );
   const [pinAttempt, setPinAttempt] = useState('');
   const [pinAttemptError, setPinAttemptError] = useState<string | null>(null);
+  /** PIN-подтверждение перед входом в данные атлета (действие, а не экран). */
+  const [pinFor, setPinFor] = useState<{ purpose: string; run: () => void } | null>(null);
   const lastBumpRef = useRef(0);
+
+  /**
+   * Если PIN включён — спрашиваем его ПЕРЕД переключением в пространство
+   * атлета. Проверка на самой вкладке этого не заменяет: после переключения
+   * приложение открывается уже в дневниках и анализах атлета.
+   */
+  const guardPin = (purpose: string, run: () => void) => {
+    if (!readCoachLock(ls()).enabled) {
+      run();
+      return;
+    }
+    setPinFor({ purpose, run });
+  };
 
   const auditEvent = (kind: CoachAuditKind, athleteId?: string | null) => {
     // Читаем с диска: другой вызов мог уже дописать событие (выдача на пятерых).
@@ -1209,9 +1225,12 @@ export const ProfileCoachTab: React.FC<{
 
   /** Войти в данные без карточки — тем же путём, что и обычное переключение. */
   const openOrphanSpace = (spaceId: string) => {
-    const res = activateSpaceById(spaceId);
-    if (res.error) return;
-    reloadToApplySpace();
+    guardPin('Открыть данные без карточки. Это чужое пространство.', () => {
+      const res = activateSpaceById(spaceId);
+      if (res.error) return;
+      auditEvent('space-entered');
+      reloadToApplySpace();
+    });
   };
 
   /**
@@ -1270,6 +1289,7 @@ export const ProfileCoachTab: React.FC<{
       // Блок остаётся на экране с итогом: иначе он просто исчезает вместе с
       // последней карточкой, и человек не видит, что операция состоялась.
       setForgetDone(true);
+      auditEvent('athletes-forgotten');
       setRegistryRev(v => v + 1);
       // Если открыты данные атлета — в памяти остались его дневники:
       // возвращаемся домой, как при любом переключении.
@@ -1285,21 +1305,24 @@ export const ProfileCoachTab: React.FC<{
 
   /** Войти в данные атлета: своё пространство профиля/дневников/планов. */
   const enterAthleteData = (a: CoachAthlete) => {
-    // Переносим введённое в карточку в пустой профиль атлета: имя, пол, возраст,
-    // рост и вес тренер уже заполнял здесь — второй раз спрашивать незачем.
-    const seed = {
-      name: a.name,
-      ...(a.sex === 'male' || a.sex === 'female' ? { sex: a.sex } : {}),
-      ...(a.age != null ? { age: a.age } : {}),
-      ...(a.heightCm != null ? { height: a.heightCm } : {}),
-      ...(a.weightKg != null ? { weight: a.weightKg } : {}),
-    };
-    const res = activateAthleteSpace(a.id, a.name, seed);
-    if (res.error) {
-      setFormError('Не удалось открыть данные атлета.');
-      return;
-    }
-    reloadToApplySpace();
+    guardPin(`Войти в данные атлета «${a.name}». Это чужое пространство.`, () => {
+      // Переносим введённое в карточку в пустой профиль атлета: имя, пол, возраст,
+      // рост и вес тренер уже заполнял здесь — второй раз спрашивать незачем.
+      const seed = {
+        name: a.name,
+        ...(a.sex === 'male' || a.sex === 'female' ? { sex: a.sex } : {}),
+        ...(a.age != null ? { age: a.age } : {}),
+        ...(a.heightCm != null ? { height: a.heightCm } : {}),
+        ...(a.weightKg != null ? { weight: a.weightKg } : {}),
+      };
+      const res = activateAthleteSpace(a.id, a.name, seed);
+      if (res.error) {
+        setFormError('Не удалось открыть данные атлета.');
+        return;
+      }
+      auditEvent('space-entered', a.id);
+      reloadToApplySpace();
+    });
   };
 
   const attentionCount = state.athletes.filter(
@@ -1663,6 +1686,19 @@ export const ProfileCoachTab: React.FC<{
             onChange={applyLock}
             onEvent={kind => auditEvent(kind)}
           />
+
+          {pinFor && (
+            <CoachPinDialog
+              purpose={pinFor.purpose}
+              settings={lock}
+              onCancel={() => setPinFor(null)}
+              onConfirm={() => {
+                const action = pinFor;
+                setPinFor(null);
+                action?.run();
+              }}
+            />
+          )}
 
           {/* Неделя: задачи по дням и обзор — до списка карточек. */}
           <CoachWeekView

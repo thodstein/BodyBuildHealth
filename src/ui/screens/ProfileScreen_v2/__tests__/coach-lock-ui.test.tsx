@@ -18,6 +18,18 @@ vi.mock('../../../../core/db', () => ({
   listSpaceDatabaseIds: vi.fn(async () => null),
 }));
 
+const shareCalls = vi.hoisted(() => ({ saved: [] as { name: string; text: string }[] }));
+
+vi.mock('../../../../core/apk-share', () => ({
+  saveTextFileApk: vi.fn(async (name: string, text: string) => {
+    shareCalls.saved.push({ name, text });
+    return 'shared';
+  }),
+  shareOutcomeLabel: vi.fn(() => 'файл сохранён'),
+  printHtmlApk: vi.fn(async () => 'shared'),
+  copyOrShareText: vi.fn(async () => 'shared'),
+}));
+
 import { ProfileCoachTab } from '../ProfileCoachTab';
 import {
   addCoachAthlete,
@@ -45,6 +57,7 @@ const seedAthletes = (n = 1) => {
 beforeEach(() => {
   try { localStorage.clear(); } catch { /* ignore */ }
   try { sessionStorage.clear(); } catch { /* ignore */ }
+  shareCalls.saved = [];
   _resetDataSpaceCache();
 });
 afterEach(() => {
@@ -159,6 +172,24 @@ describe('PIN по желанию', () => {
     fireEvent.change(container.querySelector('[data-coach="lock-auto"]') as HTMLElement, { target: { value: '5' } });
     expect(readCoachLock(localStorage).autoLockMin).toBe(5);
   });
+
+  it('вход в чужие данные просит PIN до переключения, а не после', async () => {
+    seedAthletes(1);
+    const { settings } = await createCoachLock('1357', { salt: 'fixed' });
+    writeCoachLock(localStorage, settings!);
+    sessionStorage.setItem(COACH_UNLOCK_KEY, new Date().toISOString());
+
+    const { container } = render(<ProfileCoachTab />);
+    const enter = container.querySelector('[data-coach="enter-space"]') as HTMLElement;
+    expect(enter).not.toBeNull();
+    fireEvent.click(enter);
+
+    // Пространство ещё не переключено: диалог, а не перезагрузка в чужой профиль.
+    expect(container.querySelector('[data-coach="pin-dialog"]')).not.toBeNull();
+    expect(container.querySelector('[data-coach="pin-dialog"]')?.textContent).toContain('чужое пространство');
+    fireEvent.click(container.querySelector('[data-coach="pin-dialog-cancel"]') as HTMLElement);
+    expect(container.querySelector('[data-coach="pin-dialog"]')).toBeNull();
+  });
 });
 
 describe('журнал действий', () => {
@@ -186,5 +217,24 @@ describe('журнал действий', () => {
     fireEvent.click(container.querySelector('[data-coach="delete"]') as HTMLElement);
     fireEvent.click(container.querySelector('[data-coach="delete"]') as HTMLElement);
     expect(readCoachAudit(localStorage).items.map(e => e.kind)).toContain('athlete-removed');
+  });
+
+  it('журнал выгружается файлом без имён и содержимого', async () => {
+    seedAthletes(0);
+    const { container } = render(<ProfileCoachTab />);
+    fireEvent.change(container.querySelector('[data-coach="name"]') as HTMLElement, {
+      target: { value: 'Секретное Имя' },
+    });
+    fireEvent.click(container.querySelector('[data-coach="save"]') as HTMLElement);
+
+    fireEvent.click(container.querySelector('[data-coach="audit-export"]') as HTMLElement);
+    await waitFor(() => expect(shareCalls.saved.length).toBe(1));
+    const saved = shareCalls.saved[0];
+    expect(saved.name).toContain('coach-audit-');
+    expect(saved.text).toContain('добавлен атлет');
+    expect(saved.text).not.toContain('Секретное Имя');
+    await waitFor(() =>
+      expect(container.querySelector('[data-coach="audit-notice"]')?.textContent).toContain('файл сохранён'),
+    );
   });
 });

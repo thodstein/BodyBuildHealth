@@ -14,7 +14,7 @@
  * В домашнем пространстве баннер не рисуется вообще (обычный пользователь его
  * никогда не увидит).
  */
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { NativeIcon } from './native/NativeIcons';
 import {
   HOME_SPACE_ID,
@@ -25,8 +25,18 @@ import {
   readRegistryFromStorage,
   reloadToApplySpace,
 } from '../core/data-space';
+import { readCoachLock, spaceIdleExpired } from '../engines/coach/coach-lock.engine';
+import { CoachPinDialog, coachPinRequiredForSpace } from './CoachPinDialog';
 
 const VIOLET = '#a78bfa';
+
+const ls = (): Storage | null => {
+  try {
+    return typeof localStorage !== 'undefined' ? localStorage : null;
+  } catch {
+    return null;
+  }
+};
 
 export const DataSpaceBanner: React.FC = () => {
   const active = useMemo(() => activeSpaceRecord(), []);
@@ -34,12 +44,57 @@ export const DataSpaceBanner: React.FC = () => {
   // а переключение всегда перезагружает приложение.
   const spaces = useMemo(() => readRegistryFromStorage(), []);
   const [open, setOpen] = useState(false);
+  /** Куда хотим перейти: PIN спрашиваем до переключения, а не после. */
+  const [pending, setPending] = useState<{ id: string; label: string } | null>(null);
+  /** Автовозврат к своим данным (0 — выключен) — устройственная настройка. */
+  const exitMinutes = useMemo(() => readCoachLock(ls()).autoExitSpaceMin, []);
+
+  useEffect(() => {
+    if (!exitMinutes || !isAthleteDataActive()) return;
+    let last = Date.now();
+    const bump = () => {
+      last = Date.now();
+    };
+    window.addEventListener('pointerdown', bump);
+    window.addEventListener('keydown', bump);
+    // Проверяем раз в 15 секунд: точность до минуты не нужна, а будить таймер
+    // чаще на телефоне дороже, чем польза.
+    let fired = false;
+    const timer = setInterval(() => {
+      if (fired) return;
+      if (!isAthleteDataActive()) return;
+      if (!spaceIdleExpired(exitMinutes, last, Date.now())) return;
+      // Перезагрузка асинхронна: без флага таймер успел бы «вернуть» ещё
+      // несколько раз, пока экран не сменился.
+      fired = true;
+      const res = activateSpaceById(HOME_SPACE_ID);
+      if (res.error) {
+        fired = false;
+        return;
+      }
+      reloadToApplySpace();
+    }, 15_000);
+    return () => {
+      window.removeEventListener('pointerdown', bump);
+      window.removeEventListener('keydown', bump);
+      clearInterval(timer);
+    };
+  }, [exitMinutes]);
+
   if (!isAthleteDataActive()) return null;
 
-  const go = (id: string) => {
+  const activate = (id: string) => {
     const res = activateSpaceById(id);
     if (res.error) return;
     reloadToApplySpace();
+  };
+
+  const go = (id: string, label: string) => {
+    if (coachPinRequiredForSpace(id)) {
+      setPending({ id, label });
+      return;
+    }
+    activate(id);
   };
 
   // В списке «Сменить» — только атлеты, последние открытые первыми: рабочий день
@@ -48,6 +103,7 @@ export const DataSpaceBanner: React.FC = () => {
   const others = athleteSpacesByRecent(spaces).filter(s => s.id !== active.id);
 
   return (
+    <>
     <div
       data-space="banner"
       role="status"
@@ -81,6 +137,12 @@ export const DataSpaceBanner: React.FC = () => {
           <div style={{ opacity: 0.72, fontSize: 11 }}>
             Профиль, дневники и планы сейчас — этого атлета. Заметки и планер тренера общие.
           </div>
+          {exitMinutes > 0 && (
+            <div data-space="auto-exit" style={{ opacity: 0.62, fontSize: 10.5, marginTop: 2 }}>
+              Без действий {exitMinutes} {exitMinutes === 1 ? 'минуту' : exitMinutes < 5 ? 'минуты' : 'минут'} —
+              вернёмся к вашим данным.
+            </div>
+          )}
         </div>
       </div>
 
@@ -110,7 +172,7 @@ export const DataSpaceBanner: React.FC = () => {
         <button
           type="button"
           data-space="return"
-          onClick={() => go(HOME_SPACE_ID)}
+          onClick={() => activate(HOME_SPACE_ID)}
           style={{
             minHeight: 32,
             padding: '5px 12px',
@@ -150,7 +212,7 @@ export const DataSpaceBanner: React.FC = () => {
               type="button"
               data-space="switch-to"
               data-space-id={s.id}
-              onClick={() => go(s.id)}
+              onClick={() => go(s.id, s.label)}
               aria-label={`Открыть данные атлета: ${s.label}`}
               style={{
                 padding: '6px 10px',
@@ -174,5 +236,17 @@ export const DataSpaceBanner: React.FC = () => {
         </div>
       )}
     </div>
+    {pending && (
+      <CoachPinDialog
+        purpose={`Открыть данные: ${pending.label}. PIN нужен, потому что это чужое пространство.`}
+        onCancel={() => setPending(null)}
+        onConfirm={() => {
+          const target = pending;
+          setPending(null);
+          if (target) activate(target.id);
+        }}
+      />
+    )}
+    </>
   );
 };

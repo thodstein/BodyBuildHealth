@@ -8,6 +8,7 @@ import {
   parseCoachLock,
   pinPolicyError,
   readCoachLock,
+  spaceIdleExpired,
   verifyCoachPin,
   writeCoachLock,
   writeUnlockedAt,
@@ -113,5 +114,30 @@ describe('сессия: автовыход', () => {
     expect(storage.dump().size).toBe(1);
     writeUnlockedAt(storage, null);
     expect(storage.dump().size).toBe(0);
+  });
+});
+
+describe('возврат из данных атлета', () => {
+  it('по умолчанию выключен: настройка не появляется «сама»', () => {
+    expect(emptyCoachLock().autoExitSpaceMin).toBe(0);
+    expect(parseCoachLock(JSON.stringify({ version: 1 })).autoExitSpaceMin).toBe(0);
+  });
+
+  it('включённый возврат сохраняется и переживает смену PIN', async () => {
+    const { settings } = await createCoachLock('1234', { salt: 's', autoExitSpaceMin: 15 });
+    expect(settings?.autoExitSpaceMin).toBe(15);
+    const parsed = parseCoachLock(JSON.stringify(settings));
+    expect(parsed.autoExitSpaceMin).toBe(15);
+    const replaced = await createCoachLock('5678', { autoExitSpaceMin: parsed.autoExitSpaceMin });
+    expect(replaced.settings?.autoExitSpaceMin).toBe(15);
+  });
+
+  it('бездействие считается только после заданного времени; 0 — никогда', () => {
+    const start = Date.parse('2026-11-05T10:00:00.000Z');
+    expect(spaceIdleExpired(5, start, start + 4 * 60_000)).toBe(false);
+    expect(spaceIdleExpired(5, start, start + 5 * 60_000)).toBe(true);
+    expect(spaceIdleExpired(0, start, start + 1000 * 60_000)).toBe(false);
+    // Битое время не должно выглядеть как «пора выходить».
+    expect(spaceIdleExpired(5, Number.NaN, start)).toBe(false);
   });
 });

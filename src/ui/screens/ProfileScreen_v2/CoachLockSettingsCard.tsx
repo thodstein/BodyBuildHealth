@@ -23,7 +23,12 @@ import {
   verifyCoachPin,
   type CoachLockSettings,
 } from '../../../engines/coach/coach-lock.engine';
-import { auditLabel, recentAudit, type CoachAuditStore } from '../../../engines/coach/coach-audit.engine';
+import {
+  COACH_AUDIT_MAX,
+  auditLabel,
+  recentAudit,
+  type CoachAuditStore,
+} from '../../../engines/coach/coach-audit.engine';
 
 const ACCENT = '#22d3ee';
 
@@ -92,12 +97,48 @@ const AUTO_OPTIONS: { value: number; label: string }[] = [
   { value: 0, label: 'не выходить автоматически' },
 ];
 
+/** Возврат из данных атлета — отдельная настройка, работает и без PIN. */
+const SPACE_EXIT_OPTIONS: { value: number; label: string }[] = [
+  { value: 0, label: 'не возвращать' },
+  { value: 5, label: 'через 5 минут без действий' },
+  { value: 15, label: 'через 15 минут без действий' },
+  { value: 30, label: 'через 30 минут без действий' },
+  { value: 60, label: 'через час без действий' },
+];
+
 export function CoachLockSettingsCard({ settings, audit, onChange, onEvent }: Props) {
   const [mode, setMode] = useState<'idle' | 'enable' | 'disable'>('idle');
   const [pin, setPin] = useState('');
   const [confirmPin, setConfirmPin] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [auditNotice, setAuditNotice] = useState<string | null>(null);
+
+  /** Выгрузка журнала: человек должен мочь показать его, а не только листать. */
+  const exportAudit = async () => {
+    setAuditNotice(null);
+    try {
+      const mod = await import('../../../core/apk-share');
+      const lines = recentAudit(audit, COACH_AUDIT_MAX).map(e => {
+        const at = e.at ? e.at.replace('T', ' ').slice(0, 19) : '—';
+        return `${at}\t${auditLabel(e.kind)}${e.athleteId ? `\t${e.athleteId}` : ''}`;
+      });
+      const text = [
+        'Журнал действий тренера',
+        'Только вид события, время и id атлета. Без имён, программ и текстов заметок.',
+        '',
+        ...lines,
+      ].join('\n');
+      const res = await mod.saveTextFileApk(
+        `coach-audit-${new Date().toISOString().slice(0, 10)}.txt`,
+        text,
+        'text/plain;charset=utf-8',
+      );
+      setAuditNotice(mod.shareOutcomeLabel(res));
+    } catch {
+      setAuditNotice('Не удалось сохранить журнал.');
+    }
+  };
 
   const reset = () => {
     setPin('');
@@ -119,7 +160,10 @@ export function CoachLockSettingsCard({ settings, audit, onChange, onEvent }: Pr
     }
     setBusy(true);
     try {
-      const res = await createCoachLock(pin, { autoLockMin: settings.autoLockMin });
+      const res = await createCoachLock(pin, {
+        autoLockMin: settings.autoLockMin,
+        autoExitSpaceMin: settings.autoExitSpaceMin,
+      });
       if (res.error || !res.settings) {
         setError(pinPolicyErrorText(res.error));
         return;
@@ -151,6 +195,11 @@ export function CoachLockSettingsCard({ settings, audit, onChange, onEvent }: Pr
 
   const changeAutoLock = (value: number) => {
     const next = { ...settings, autoLockMin: clampAutoLock(value), updatedAt: new Date().toISOString() };
+    onChange(next);
+  };
+
+  const changeSpaceExit = (value: number) => {
+    const next = { ...settings, autoExitSpaceMin: clampAutoLock(value), updatedAt: new Date().toISOString() };
     onChange(next);
   };
 
@@ -215,6 +264,28 @@ export function CoachLockSettingsCard({ settings, audit, onChange, onEvent }: Pr
           </select>
         </div>
       )}
+
+      <div style={{ marginTop: 10 }}>
+        <label style={labelStyle} htmlFor="coach-space-exit">
+          Возвращать к своим данным из данных атлета
+        </label>
+        <select
+          id="coach-space-exit"
+          data-coach="space-exit"
+          value={settings.autoExitSpaceMin}
+          onChange={e => changeSpaceExit(Number(e.target.value))}
+          style={{ ...inputStyle, letterSpacing: 0, fontSize: 12.5, appearance: 'none' }}
+        >
+          {SPACE_EXIT_OPTIONS.map(o => (
+            <option key={o.value} value={o.value}>
+              {o.label}
+            </option>
+          ))}
+        </select>
+        <div style={{ marginTop: 4, fontSize: 10.5, color: colors.textSubtle, lineHeight: 1.45 }}>
+          Работает и без PIN: телефон вернули владельцу — чужие дневники не остаются на экране.
+        </div>
+      </div>
 
       {mode === 'enable' && (
         <div data-coach="lock-enable" style={{ marginTop: 10, display: 'grid', gap: 8 }}>
@@ -337,6 +408,21 @@ export function CoachLockSettingsCard({ settings, audit, onChange, onEvent }: Pr
         )}
         <div style={{ marginTop: 4, fontSize: 10, color: colors.textSubtle }}>
           Без имён и содержимого: только вид события, время и id.
+        </div>
+        <div style={{ marginTop: 6, display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            data-coach="audit-export"
+            onClick={() => void exportAudit()}
+            style={{ ...btn('ghost'), minHeight: 34, fontSize: 11 }}
+          >
+            Выгрузить журнал
+          </button>
+          {auditNotice && (
+            <span data-coach="audit-notice" style={{ fontSize: 10.5, color: colors.textMuted }}>
+              {auditNotice}
+            </span>
+          )}
         </div>
       </details>
 

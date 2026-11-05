@@ -23,6 +23,8 @@ export const COACH_UNLOCK_KEY = 'he_coach_unlocked_at';
 export const COACH_PIN_MIN = 4;
 export const COACH_PIN_MAX = 8;
 export const COACH_LOCK_MAX_MIN = 240;
+/** Автовыход из данных атлета по умолчанию выключен. */
+export const COACH_SPACE_EXIT_DEFAULT_MIN = 0;
 
 export type CoachPinAlgo = 'pbkdf2-sha256' | 'sha256' | 'fnv1a';
 
@@ -34,13 +36,27 @@ export interface CoachLockSettings {
   hash: string;
   /** 0 — без автовыхода. */
   autoLockMin: number;
+  /**
+   * Возврат из данных атлета к своим по бездействию, минуты. 0 — выключено
+   * (по умолчанию). Это про доверие при передаче телефона, а не про PIN.
+   */
+  autoExitSpaceMin: number;
   updatedAt: string;
 }
 
 export type CoachPinError = 'short' | 'long' | 'nondigit' | 'weak-storage' | null;
 
 export function emptyCoachLock(): CoachLockSettings {
-  return { version: 1, enabled: false, algo: pinAlgoAvailable(), salt: '', hash: '', autoLockMin: 15, updatedAt: '' };
+  return {
+    version: 1,
+    enabled: false,
+    algo: pinAlgoAvailable(),
+    salt: '',
+    hash: '',
+    autoLockMin: 15,
+    autoExitSpaceMin: COACH_SPACE_EXIT_DEFAULT_MIN,
+    updatedAt: '',
+  };
 }
 
 /** Какой алгоритм реально доступен на этом движке. */
@@ -137,7 +153,7 @@ function safeEqual(a: string, b: string): boolean {
 
 export async function createCoachLock(
   pin: string,
-  opts: { autoLockMin?: number; now?: string; salt?: string } = {},
+  opts: { autoLockMin?: number; autoExitSpaceMin?: number; now?: string; salt?: string } = {},
 ): Promise<{ settings: CoachLockSettings | null; error: CoachPinError }> {
   const policy = pinPolicyError(pin);
   if (policy) return { settings: null, error: policy };
@@ -152,6 +168,7 @@ export async function createCoachLock(
       salt,
       hash,
       autoLockMin: clampAutoLock(opts.autoLockMin ?? 15),
+      autoExitSpaceMin: clampAutoLock(opts.autoExitSpaceMin ?? COACH_SPACE_EXIT_DEFAULT_MIN),
       updatedAt: opts.now ?? new Date().toISOString(),
     },
     error: null,
@@ -198,6 +215,9 @@ export function parseCoachLock(raw: string | null | undefined): CoachLockSetting
       salt: typeof parsed.salt === 'string' ? parsed.salt : '',
       hash: enabled ? String(parsed.hash) : '',
       autoLockMin: clampAutoLock(typeof parsed.autoLockMin === 'number' ? parsed.autoLockMin : 15),
+      autoExitSpaceMin: clampAutoLock(
+        typeof parsed.autoExitSpaceMin === 'number' ? parsed.autoExitSpaceMin : COACH_SPACE_EXIT_DEFAULT_MIN,
+      ),
       updatedAt: typeof parsed.updatedAt === 'string' ? parsed.updatedAt : '',
     };
   } catch {
@@ -270,4 +290,14 @@ export function isCoachUnlocked(
   if (!Number.isFinite(at)) return false;
   if (settings.autoLockMin <= 0) return true;
   return nowMs - at <= settings.autoLockMin * 60_000;
+}
+
+/**
+ * Пора ли вернуть телефон владельцу: с момента последнего действия прошло
+ * больше заданного времени. 0 минут — «никогда», а не «сразу».
+ */
+export function spaceIdleExpired(minutes: number, lastActivityMs: number, nowMs: number): boolean {
+  if (!Number.isFinite(minutes) || minutes <= 0) return false;
+  if (!Number.isFinite(lastActivityMs) || !Number.isFinite(nowMs)) return false;
+  return nowMs - lastActivityMs >= minutes * 60_000;
 }
