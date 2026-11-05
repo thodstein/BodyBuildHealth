@@ -14,7 +14,7 @@
  *    Переключение всегда через перезагрузку: половинчатая подмена оставила бы в
  *    памяти чужие данные. Удаление карточки и удаление ЕГО данных — разные кнопки.
  */
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { NativeIcon } from '../../native/NativeIcons';
 import { colors, withAlpha } from './ui';
 import {
@@ -55,6 +55,11 @@ import {
   type CoachProgramTemplate,
 } from '../../../engines/coach/coach-program-library.engine';
 import {
+  buildAthleteSnapshot,
+  snapshotLine,
+  type AthleteSnapshot,
+} from '../../../engines/coach/coach-athlete-snapshot.engine';
+import {
   countNotesForAthlete,
   emptyCoachNotes,
   readCoachNotes,
@@ -87,10 +92,12 @@ import {
   reloadToApplySpace,
   removeSpace,
   spaceUsageMap,
+  toPhysicalKey,
   upsertSpace,
   writeRegistryToStorage,
 } from '../../../core/data-space';
 import { requestSpacePurge } from '../../../core/space-purge';
+import { loadDb } from '../../../core/lazy-db';
 
 const ACCENT = '#22d3ee';
 
@@ -263,6 +270,17 @@ export const ProfileCoachTab: React.FC<{
   const [issueConfirm, setIssueConfirm] = useState(false);
   const [issueDone, setIssueDone] = useState<string | null>(null);
 
+  /**
+   * Сводка по атлетам из ИХ данных. Сначала карточки рисуются без цифр — чтение
+   * баз не должно задерживать первый рендер; сводки подставляются по мере чтения.
+   */
+  const [snapshots, setSnapshots] = useState<Record<string, AthleteSnapshot>>({});
+  const [snapshotsBusy, setSnapshotsBusy] = useState(false);
+  const [snapshotsDone, setSnapshotsDone] = useState(false);
+  const [snapshotsRev, setSnapshotsRev] = useState(0);
+  const [attentionOnly, setAttentionOnly] = useState(false);
+  const [sortMode, setSortMode] = useState<'default' | 'name' | 'inactive'>('default');
+
   // Заметки/планер/журнал читаем один раз на состояние режима: сам экран их не меняет,
   // а пересчитывать JSON на каждый символ в форме атлета незачем.
   const { notes, planner, log } = useMemo<{
@@ -358,6 +376,76 @@ export const ProfileCoachTab: React.FC<{
   // Итог «забыли всех» показываем, только пока действительно никого не осталось:
   // как только появился новый атлет, блок снова предлагает действие, а не итог.
   const showForgetDone = forgetDone && state.athletes.length === 0 && athleteSpaces.length === 0;
+
+  /**
+   * Сводки читаются из ДРУГИХ пространств (readSpaceStores) — это тяжёлый шаг,
+   * поэтому: по одному атлету, с отменой при размонтировании, без блокировки
+   * первого рендера. Ошибка чтения одного атлета не рушит остальные.
+   */
+  const athletesFingerprint = useMemo(
+    () => state.athletes.map(a => `${a.id}:${a.name}`).join('|'),
+    [state.athletes],
+  );
+
+  useEffect(() => {
+    const list = state.athletes;
+    setSnapshots(prev => {
+      const next: Record<string, AthleteSnapshot> = {};
+      for (const a of list) if (prev[a.id]) next[a.id] = prev[a.id];
+      return next;
+    });
+    if (!list.length) {
+      setSnapshotsBusy(false);
+      setSnapshotsDone(false);
+      return;
+    }
+    const storage = ls();
+    if (!storage) return;
+    let cancelled = false;
+    setSnapshotsBusy(true);
+    setSnapshotsDone(false);
+    void (async () => {
+      let readStores: ((id: string) => Promise<Record<string, unknown[]>>) | null = null;
+      try {
+        const mod = await loadDb();
+        if (typeof mod.readSpaceStores === 'function') {
+          readStores = mod.readSpaceStores as (id: string) => Promise<Record<string, unknown[]>>;
+        }
+      } catch {
+        readStores = null;
+      }
+      for (const a of list) {
+        if (cancelled) return;
+        const sid = athleteSpaceId(a.id);
+        let stores: Record<string, unknown[]> = {};
+        if (readStores) {
+          try {
+            stores = await readStores(sid);
+          } catch {
+            stores = {};
+          }
+        }
+        const readKey = (k: string) => {
+          try {
+            return storage.getItem(toPhysicalKey(sid, k));
+          } catch {
+            return null;
+          }
+        };
+        const snap = buildAthleteSnapshot({ spaceId: sid, stores, readKey, today: coachToday() });
+        if (cancelled) return;
+        setSnapshots(prev => ({ ...prev, [a.id]: snap }));
+      }
+      if (!cancelled) {
+        setSnapshotsBusy(false);
+        setSnapshotsDone(true);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [athletesFingerprint, snapshotsRev]);
 
   /**
    * «Снять программу» с атлета: сырые программные ключи его пространства →
@@ -612,18 +700,22 @@ export const ProfileCoachTab: React.FC<{
   /**
    * Ленивый подсчёт записей в базе пространства. Возвращает то же значение,
    * которое кладёт в состояние: `null` — посчитать не удалось.
+   *
+   * Импорт именно `await import(...)`, а не `import(...).then(...)`: так модуль
+   * базы подменяется в тестах (Vitest перехватывает await-импорт) и не уезжает
+   * в основной граф вкладки.
    */
-  const loadSpaceDbCount = (id: string): Promise<number | null> =>
-    import('../../../core/db')
-      .then(({ spaceDbRecordCount }) => spaceDbRecordCount(athleteSpaceId(id)))
-      .then(records => {
-        setSpaceDbRecords(prev => ({ ...prev, [id]: records }));
-        return records;
-      })
-      .catch(() => {
-        setSpaceDbRecords(prev => ({ ...prev, [id]: null }));
-        return null;
-      });
+  const loadSpaceDbCount = async (id: string): Promise<number | null> => {
+    try {
+      const { spaceDbRecordCount } = await loadDb();
+      const records = await spaceDbRecordCount(athleteSpaceId(id));
+      setSpaceDbRecords(prev => ({ ...prev, [id]: records }));
+      return records;
+    } catch {
+      setSpaceDbRecords(prev => ({ ...prev, [id]: null }));
+      return null;
+    }
+  };
 
   const askDelete = (id: string) => {
     if (confirmDeleteId === id) {
@@ -668,6 +760,23 @@ export const ProfileCoachTab: React.FC<{
     }
   };
 
+  /**
+   * Удалить базу IndexedDB пространства — в фоне, ПОСЛЕ того как ключи, запись
+   * реестра и карточка уже убраны. Так «Удалено» не ждёт открытия базы: если
+   * удаление базы не удалось, данные всё равно недостижимы, а осиротевшая база
+   * видна в «Базах на диске».
+   */
+  const dropSpaceDatabase = (spaceId: string) => {
+    void (async () => {
+      try {
+        const { deleteSpaceDatabases } = await loadDb();
+        await deleteSpaceDatabases([spaceId]);
+      } catch {
+        /* база останется — данные уже недостижимы, это не блокирует удаление */
+      }
+    })();
+  };
+
   /** Удаление карточки вместе с данными атлета (профиль/дневники/анализы). */
   const deleteWithData = (a: CoachAthlete) => {
     const sid = athleteSpaceId(a.id);
@@ -682,14 +791,12 @@ export const ProfileCoachTab: React.FC<{
     // Облачная копия: базы IndexedDB удаляются целиком, и надгробий у их записей
     // нет — просим синхронизацию убрать пространство из облака (если она включена).
     requestSpacePurge([sid]);
-    // База IndexedDB грузится лениво: движок нужен только здесь, а статический
-    // импорт тянул его в граф экрана профиля и замедлял холодный старт.
-    void import('../../../core/db')
-      .then(({ deleteSpaceDatabases }) => deleteSpaceDatabases([sid]))
-      .catch(() => { /* база останется — данные уже недостижимы, это не блокирует удаление */ });
     apply(removeCoachAthlete(state, a.id));
     setConfirmDeleteId(null);
     if (editingId === a.id) cancelEdit();
+    // База грузится лениво: движок нужен только здесь, а статический импорт
+    // тянул его в граф экрана профиля и замедлял холодный старт.
+    dropSpaceDatabase(sid);
     if (spaceActiveId === sid) {
       activateHomeSpace();
       reloadToApplySpace();
@@ -711,9 +818,7 @@ export const ProfileCoachTab: React.FC<{
     setConfirmOrphanId(null);
     // Найденная база больше не «есть на диске» — из результата проверки её убираем.
     setDiskScan(prev => (prev ? { ...prev, ids: prev.ids.filter(id => id !== spaceId) } : prev));
-    void import('../../../core/db')
-      .then(({ deleteSpaceDatabases }) => deleteSpaceDatabases([spaceId]))
-      .catch(() => { /* база останется — данные уже недостижимы, удаление не блокируем */ });
+    dropSpaceDatabase(spaceId);
     if (spaceActiveId === spaceId) {
       activateHomeSpace();
       reloadToApplySpace();
@@ -737,13 +842,17 @@ export const ProfileCoachTab: React.FC<{
    * Поэтому спрашиваем сам диск, а не реестр. Модуль базы подгружается лениво:
    * держать его в графе вкладки незачем.
    */
-  const scanDisk = () => {
+  const scanDisk = async () => {
     setScanBusy(true);
-    import('../../../core/db')
-      .then(({ listSpaceDatabaseIds }) => listSpaceDatabaseIds())
-      .then(ids => setDiskScan(ids ? { ids, unavailable: false } : { ids: [], unavailable: true }))
-      .catch(() => setDiskScan({ ids: [], unavailable: true }))
-      .finally(() => setScanBusy(false));
+    try {
+      const { listSpaceDatabaseIds } = await loadDb();
+      const ids = await listSpaceDatabaseIds();
+      setDiskScan(ids ? { ids, unavailable: false } : { ids: [], unavailable: true });
+    } catch {
+      setDiskScan({ ids: [], unavailable: true });
+    } finally {
+      setScanBusy(false);
+    }
   };
 
   /**
@@ -755,7 +864,7 @@ export const ProfileCoachTab: React.FC<{
    * относятся к атлетам (включая карточки, заметки, задачи и журнал — иначе
    * после «забыли людей» остались бы записи о людях, которых больше нет).
    */
-  const forgetAll = () => {
+  const forgetAll = async () => {
     if (!confirmForgetAll) {
       setForgetError(null);
       setForgetDone(false);
@@ -764,33 +873,32 @@ export const ProfileCoachTab: React.FC<{
     }
     setForgetBusy(true);
     const wasInAthleteSpace = spaceActiveId !== HOME_SPACE_ID;
-    void import('../../../core/data-backup')
-      .then(({ forgetAllAthletes }) => forgetAllAthletes())
-      .then(() => {
-        const storage = ls();
-        writeCoachNotes(storage, emptyCoachNotes());
-        writeCoachPlanner(storage, emptyCoachPlanner());
-        writeCoachLog(storage, emptyCoachLog());
-        apply({ ...state, athletes: [], activeAthleteId: null });
-        setSpaceDbRecords({});
-        setConfirmOrphanId(null);
-        setConfirmForgetAll(false);
-        setForgetBusy(false);
-        // Блок остаётся на экране с итогом: иначе он просто исчезает вместе с
-        // последней карточкой, и человек не видит, что операция состоялась.
-        setForgetDone(true);
-        setRegistryRev(v => v + 1);
-        // Если открыты данные атлета — в памяти остались его дневники:
-        // возвращаемся домой, как при любом переключении.
-        if (wasInAthleteSpace) {
-          activateHomeSpace();
-          reloadToApplySpace();
-        }
-      })
-      .catch(() => {
-        setForgetBusy(false);
-        setForgetError('Не удалось удалить данные атлетов — попробуйте ещё раз.');
-      });
+    try {
+      const { forgetAllAthletes } = await import('../../../core/data-backup');
+      await forgetAllAthletes();
+      const storage = ls();
+      writeCoachNotes(storage, emptyCoachNotes());
+      writeCoachPlanner(storage, emptyCoachPlanner());
+      writeCoachLog(storage, emptyCoachLog());
+      apply({ ...state, athletes: [], activeAthleteId: null });
+      setSpaceDbRecords({});
+      setConfirmOrphanId(null);
+      setConfirmForgetAll(false);
+      setForgetBusy(false);
+      // Блок остаётся на экране с итогом: иначе он просто исчезает вместе с
+      // последней карточкой, и человек не видит, что операция состоялась.
+      setForgetDone(true);
+      setRegistryRev(v => v + 1);
+      // Если открыты данные атлета — в памяти остались его дневники:
+      // возвращаемся домой, как при любом переключении.
+      if (wasInAthleteSpace) {
+        activateHomeSpace();
+        reloadToApplySpace();
+      }
+    } catch {
+      setForgetBusy(false);
+      setForgetError('Не удалось удалить данные атлетов — попробуйте ещё раз.');
+    }
   };
 
   /** Войти в данные атлета: своё пространство профиля/дневников/планов. */
@@ -812,13 +920,31 @@ export const ProfileCoachTab: React.FC<{
     reloadToApplySpace();
   };
 
+  const attentionCount = state.athletes.filter(a => snapshots[a.id]?.needsAttention).length;
+
   const visibleAthletes = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return state.athletes;
-    return state.athletes.filter(a =>
-      `${a.name} ${a.direction} ${a.goal} ${a.note}`.toLowerCase().includes(q),
-    );
-  }, [state.athletes, query]);
+    let list = state.athletes;
+    if (attentionOnly) list = list.filter(a => snapshots[a.id]?.needsAttention);
+    if (q) {
+      list = list.filter(a => `${a.name} ${a.direction} ${a.goal} ${a.note}`.toLowerCase().includes(q));
+    }
+    if (sortMode === 'name') {
+      list = [...list].sort((a, b) => a.name.localeCompare(b.name, 'ru'));
+    } else if (sortMode === 'inactive') {
+      // Без порогов: кто дольше без тренировки — выше. «Нет данных» — наверх,
+      // потому что тренеру как раз нечего смотреть.
+      list = [...list].sort((a, b) => {
+        const x = snapshots[a.id]?.daysSinceTraining;
+        const y = snapshots[b.id]?.daysSinceTraining;
+        if (x == null && y == null) return a.name.localeCompare(b.name, 'ru');
+        if (x == null) return -1;
+        if (y == null) return 1;
+        return y - x;
+      });
+    }
+    return list;
+  }, [state.athletes, query, attentionOnly, sortMode, snapshots]);
 
   const sectionLabel = (id: CoachSectionId): string =>
     COACH_SECTIONS.find(s => s.id === id)?.label ?? id;
@@ -1035,6 +1161,46 @@ export const ProfileCoachTab: React.FC<{
                 data-coach="search"
                 style={{ ...inputStyle, width: 180, flex: '0 1 180px' }}
               />
+            </div>
+
+            <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+              <button
+                type="button"
+                data-coach="attention-filter"
+                aria-pressed={attentionOnly}
+                onClick={() => setAttentionOnly(v => !v)}
+                style={{ ...btn(attentionOnly ? 'primary' : 'ghost'), fontSize: 12 }}
+              >
+                Требуют внимания ({attentionCount})
+              </button>
+              <select
+                aria-label="Сортировка атлетов"
+                data-coach="athlete-sort"
+                value={sortMode}
+                onChange={e => setSortMode(e.target.value as 'default' | 'name' | 'inactive')}
+                style={{ ...inputStyle, width: 'auto', flex: '0 1 auto' }}
+              >
+                <option value="default">Как добавлены</option>
+                <option value="inactive">Давно не тренировался</option>
+                <option value="name">По имени</option>
+              </select>
+              <button
+                type="button"
+                data-coach="snapshots-refresh"
+                onClick={() => setSnapshotsRev(v => v + 1)}
+                disabled={snapshotsBusy}
+                style={{ ...btn('ghost'), fontSize: 12, opacity: snapshotsBusy ? 0.6 : 1 }}
+              >
+                {snapshotsBusy ? 'Проверяю…' : 'Обновить сводки'}
+              </button>
+              {snapshotsDone && (
+                <span
+                  data-coach="snapshots-status"
+                  style={{ fontSize: 11, color: colors.textMuted, fontVariantNumeric: 'tabular-nums' }}
+                >
+                  сводки: {Object.keys(snapshots).length} из {state.athletes.length}
+                </span>
+              )}
             </div>
 
             <div
@@ -1277,6 +1443,29 @@ export const ProfileCoachTab: React.FC<{
                         </div>
                       );
                     })()}
+                    {snapshots[a.id] ? (
+                      <div
+                        data-coach="snapshot"
+                        style={{ marginTop: 6, fontSize: 10.5, color: colors.textMuted, lineHeight: 1.45 }}
+                      >
+                        {snapshotLine(snapshots[a.id])}
+                      </div>
+                    ) : (
+                      <div
+                        data-coach="snapshot-pending"
+                        style={{ marginTop: 6, fontSize: 10.5, color: colors.textSubtle, lineHeight: 1.45 }}
+                      >
+                        {snapshotsBusy ? 'смотрим данные…' : 'сводка не загружена'}
+                      </div>
+                    )}
+                    {snapshots[a.id]?.needsAttention && (
+                      <div
+                        data-coach="attention"
+                        style={{ marginTop: 5, fontSize: 10.5, color: colors.warning, lineHeight: 1.45 }}
+                      >
+                        внимание: {snapshots[a.id].attention.join(' · ')}
+                      </div>
+                    )}
                     <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
                       {onOpenAthlete && (
                         <>
