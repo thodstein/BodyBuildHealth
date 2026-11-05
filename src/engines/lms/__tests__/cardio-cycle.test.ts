@@ -9,7 +9,7 @@ import {
   cardioWeekForDate, cardioSessionsForDate, cardioHeartZones,
   spreadSessionsAcrossDays, cardioVolumeSeries, autoTuneCardioCycle,
   cardioQualityReport,
-  saveCardioCycleVersion, loadCardioCycleVersions, latestCardioCycleVersion,
+  saveCardioCycleVersion, loadCardioCycleVersions, latestCardioCycleVersion, CARDIO_VERSIONS_PER_CYCLE,
   restoreCardioCycleVersion, clearCardioCycleHistory,
   buildCardioSummaryText,
   cardioPlanVariants, explainCardioChoice, improveCardioCycle, cardioSessionProtocol,
@@ -668,11 +668,13 @@ describe('история версий цикла', () => {
     expect(loadCardioCycleVersions()).toHaveLength(0);
   });
 
-  it('cap 5 версий на цикл', () => {
+  it('cap версий на цикл = CARDIO_VERSIONS_PER_CYCLE', () => {
     const c = buildCardioCycle({ goal: 'health', totalWeeks: 4, id: 'h-2' });
-    for (let i = 0; i < 7; i++) saveCardioCycleVersion({ ...c, name: `v${i}` }, `правка ${i}`);
+    for (let i = 0; i < CARDIO_VERSIONS_PER_CYCLE + 3; i++) saveCardioCycleVersion({ ...c, name: `v${i}` }, `правка ${i}`);
     const versions = loadCardioCycleVersions().filter(v => v.cycleId === 'h-2');
-    expect(versions.length).toBeLessThanOrEqual(5);
+    expect(versions.length).toBeLessThanOrEqual(CARDIO_VERSIONS_PER_CYCLE);
+    // Свежие версии остаются, старые вытесняются с конца (undo работает).
+    expect(versions[0].cycle.name).toBe(`v${CARDIO_VERSIONS_PER_CYCLE + 2}`);
   });
 
   it('clear удаляет историю конкретного цикла', () => {

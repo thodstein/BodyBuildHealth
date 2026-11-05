@@ -771,7 +771,10 @@ export function buildCardioCycle(input: CardioCycleInput): CardioCycle {
   const now = new Date();
   const todayLocal = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
   const cycle: CardioCycle = {
-    id: input.id ?? `cardio-${Date.now()}`,
+    // Аудит 2026-11 (P1): id из Date.now() склеивался при двух сборках в одну
+    // миллисекунду (например, пакет циклов по блокам года) — второй цикл
+    // перезаписывал первый в библиотеке. newId гарантирует уникальность.
+    id: input.id ?? newId('cardio'),
     name: input.name ?? `Кардио ${CARDIO_GOAL_LABELS[input.goal].toLowerCase()} ${totalWeeks} нед`,
     goal: input.goal,
     totalWeeks,
@@ -1755,6 +1758,15 @@ export function cardioPrepCheckIn(
 
 export const CARDIO_CYCLES_KEY = 'he_cardio_cycles';
 export const ACTIVE_CARDIO_CYCLE_KEY = 'he_active_cardio_cycle';
+/** Сколько циклов держит библиотека. Раньше было 20 и старые вытеснялись молча. */
+export const CARDIO_CYCLES_CAP = 60;
+/** Сколько снапшотов (undo) хранится на один цикл. */
+export const CARDIO_VERSIONS_PER_CYCLE = 10;
+
+export interface CardioSaveResult {
+  /** Названия вытесненных циклов (старше лимита). Пусто — ничего не потеряно. */
+  evicted: string[];
+}
 
 export function loadCardioCycles(): CardioCycle[] {
   try {
@@ -1763,10 +1775,35 @@ export function loadCardioCycles(): CardioCycle[] {
   } catch { return []; }
 }
 
-export function saveCardioCycle(cycle: CardioCycle): void {
+/**
+ * Сохранить цикл в библиотеку.
+ *
+ * Лимит — `CARDIO_CYCLES_CAP`, но **активный цикл не вытесняется никогда**:
+ * иначе библиотека теряла план, который сейчас ведёт календарь, а активный
+ * указатель оставался «призраком». Вытеснение теперь не молчит — список
+ * названий возвращается вызывающему коду для честного сообщения.
+ */
+export function saveCardioCycle(cycle: CardioCycle): CardioSaveResult {
   const all = loadCardioCycles().filter(c => c.id !== cycle.id);
   all.unshift(cycle);
-  try { localStorage.setItem(CARDIO_CYCLES_KEY, JSON.stringify(all.slice(0, 20))); } catch { /* ignore */ }
+  let activeId = '';
+  try {
+    const v = JSON.parse(localStorage.getItem(ACTIVE_CARDIO_CYCLE_KEY) ?? 'null') as CardioCycle | null;
+    activeId = v?.id ?? '';
+  } catch { /* ignore */ }
+  const evicted: string[] = [];
+  while (all.length > CARDIO_CYCLES_CAP) {
+    let idx = -1;
+    for (let i = all.length - 1; i >= 0; i--) {
+      if (all[i].id !== activeId && all[i].id !== cycle.id) { idx = i; break; }
+    }
+    // Остались только активный и сохраняемый — вытеснять некого.
+    if (idx < 0) break;
+    evicted.push(all[idx].name || all[idx].id);
+    all.splice(idx, 1);
+  }
+  try { localStorage.setItem(CARDIO_CYCLES_KEY, JSON.stringify(all)); } catch { /* ignore */ }
+  return { evicted };
 }
 
 export function removeCardioCycle(id: string): void {
@@ -1968,7 +2005,7 @@ export function bumpCardioZone2VolumeGuarded(cycle: CardioCycle, addMin = 10, da
 // ─── История версий цикла (undo авто-подстройки/правок) ───
 
 export const CARDIO_HISTORY_KEY = 'he_cardio_cycle_history';
-const CARDIO_HISTORY_CAP = 20;
+const CARDIO_HISTORY_CAP = 40;
 export const CARDIO_UI_PREFS_KEY = 'he_cardio_ui_prefs';
 export interface CardioUiPrefs { filters?: Record<string, string>; lastTab?: string }
 export function loadCardioUiPrefs(): CardioUiPrefs {
@@ -1991,18 +2028,19 @@ export function loadCardioCycleVersions(): CardioCycleVersion[] {
   } catch { return []; }
 }
 
-/** Снапшот текущей версии цикла перед изменением (для undo). Хранит до 5 версий на цикл, 20 глобально. */
+/** Снапшот текущей версии цикла перед изменением (для undo). Хранит до
+ * `CARDIO_VERSIONS_PER_CYCLE` версий на цикл и CARDIO_HISTORY_CAP глобально. */
 export function saveCardioCycleVersion(cycle: CardioCycle, reason: string): void {
   if (!cycle) return;
   const all = loadCardioCycleVersions();
   const snapshot: CardioCycle = JSON.parse(JSON.stringify(cycle));
   all.unshift({ id: `v-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`, cycleId: cycle.id, savedAt: new Date().toISOString(), reason, cycle: snapshot });
-  // cap per cycle: 5 на цикл
+  // cap per cycle: undo-снапшоты; лимит — CARDIO_VERSIONS_PER_CYCLE
   const perCycle = new Map<string, number>();
   const filtered: typeof all = [];
   for (const v of all) {
     const cnt = perCycle.get(v.cycleId) ?? 0;
-    if (cnt < 5) { filtered.push(v); perCycle.set(v.cycleId, cnt + 1); }
+    if (cnt < CARDIO_VERSIONS_PER_CYCLE) { filtered.push(v); perCycle.set(v.cycleId, cnt + 1); }
   }
   try { localStorage.setItem(CARDIO_HISTORY_KEY, JSON.stringify(filtered.slice(0, CARDIO_HISTORY_CAP))); } catch { /* ignore */ }
 }
@@ -3814,6 +3852,38 @@ export function buildCardioIntervalPlan(
     warmupSec,
     cooldownSec,
   };
+}
+
+/** Человеческая длительность отрезка: 90 → «90 с», 120 → «2 мин», 150 → «2:30». */
+export function formatCardioSec(sec: number): string {
+  const s = Math.max(0, Math.round(sec));
+  if (s === 0) return '0 с';
+  if (s % 60 === 0) return `${s / 60} мин`;
+  if (s > 60) return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+  return `${s} с`;
+}
+
+/**
+ * Компактная подпись структуры для списков и редактора: «8×20 с/40 с».
+ * `null` — структуры нет (сессия ведётся ровным темпом).
+ */
+export function cardioStructuredLabel(structured?: CardioStructuredBlock[]): string | null {
+  const blocks = (structured ?? []).filter(b => !!b && b.workSec > 0 && b.reps > 0);
+  if (blocks.length === 0) return null;
+  return blocks
+    .map(b => `${b.reps}×${formatCardioSec(b.workSec)}${b.restSec > 0 ? `/${formatCardioSec(b.restSec)}` : ''}`)
+    .join(' + ');
+}
+
+/**
+ * Основная часть структуры (все подходы вместе с отдыхом) в секундах — без
+ * разминки/заминки. По этой цифре редактор проверяет, влезает ли структура
+ * в длительность сессии.
+ */
+export function cardioStructuredMainSec(structured?: CardioStructuredBlock[]): number {
+  return (structured ?? [])
+    .filter(b => !!b && b.workSec > 0 && b.reps > 0)
+    .reduce((sum, b) => sum + (b.workSec + Math.max(0, b.restSec)) * b.reps, 0);
 }
 
 /** Где мы сейчас: текущий шаг и сколько в нём осталось (по прошедшим секундам). */

@@ -293,7 +293,10 @@ export function rebuildCardioCycleFromConfig(
         id: cycle.id,
         name: cycle.name ?? rebuilt.name,
         createdAt: cycle.createdAt ?? rebuilt.createdAt,
-        startDate: cycle.startDate ?? rebuilt.startDate,
+        // Явная дата в overrides (правка формы «Дата старта») важнее старой:
+        // иначе смена даты молча откатывалась к прежней. Без override —
+        // сохраняем дату цикла, как и раньше.
+        startDate: cfg.startDate ?? cycle.startDate ?? rebuilt.startDate,
         linkedMacrocycleId: cycle.linkedMacrocycleId ?? rebuilt.linkedMacrocycleId,
         linkedCompetitionIds: cycle.linkedCompetitionIds ?? rebuilt.linkedCompetitionIds,
         version: 1 as CardioCycle['version'],

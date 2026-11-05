@@ -18,6 +18,7 @@ import { CardioProgressCard } from './CardioProgressCard';
 import { CARD, ROW, LABEL, BTN, BTN_PRIMARY, BTN_CTA, BTN_DANGER, PHASE_COLOR, TYPE_COLOR, Badge, ProgressBar, Stepper, Tabs, CARD_HERO, HINT_SM, EmptyState } from './CardioUI';
 import { CardioCalendar } from './CardioCalendar';
 import { copyOrShareText } from '../../../core/apk-share';
+import { parseLocalIso } from '../../../engines/lms/cardio-date-utils.engine';
 import { useAndroidBackHandler } from '../../../core/use-android-back';
 
 const VARIANT_CARD: React.CSSProperties = {
@@ -42,6 +43,10 @@ export const CardioPreviewStep: React.FC<{
   onBuild: () => void;
   onRename: (name: string) => void;
   onEditConfig: () => void;
+  /** 🆕 Новый блок: тот же план с новой даты (старый — в библиотеку). */
+  onNewBlock?: () => void;
+  /** Выбранная дата старта (YYYY-MM-DD) — показывается в шапке. */
+  startDate?: string;
   daysAvailable: number;
   recoveryLow: boolean;
   variant: CardioVariant;
@@ -52,7 +57,7 @@ export const CardioPreviewStep: React.FC<{
   onImproved: (cycle: CardioCycle) => void;
   factorsSummary: string[];
   nutritionNotes: string[];
-}> = ({ cycle, onBuild, onRename, onEditConfig, daysAvailable, recoveryLow, variant, onVariant, variants, explanation, paramsDirty, onImproved, factorsSummary, nutritionNotes }) => {
+}> = ({ cycle, onBuild, onRename, onEditConfig, onNewBlock, startDate, daysAvailable, recoveryLow, variant, onVariant, variants, explanation, paramsDirty, onImproved, factorsSummary, nutritionNotes }) => {
   const [subTab, setSubTab] = useState<'overview' | 'variants' | 'plan' | 'chart' | 'details'>('overview');
   const [showAllWeeks, setShowAllWeeks] = useState(false);
   const [nameDraft, setNameDraft] = useState('');
@@ -221,6 +226,9 @@ export const CardioPreviewStep: React.FC<{
         <div style={ROW}>
           <span style={{ fontSize: 16, fontWeight: 900, color: '#fff', letterSpacing: -0.2 }}>{cycle.name}</span>
           <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)', fontVariantNumeric: 'tabular-nums' }}>создан {new Date(cycle.createdAt).toLocaleDateString('ru-RU')}</span>
+          <span style={{ fontSize: 11, fontWeight: 750, color: '#7dd3fc', background: 'rgba(14,165,233,0.12)', border: '1px solid rgba(14,165,233,0.28)', borderRadius: 20, padding: '3px 10px', fontVariantNumeric: 'tabular-nums' }} title="Дата начала недели 1">
+            📅 старт {parseLocalIso(String(startDate ?? cycle.startDate ?? cycle.createdAt).slice(0, 10)).toLocaleDateString('ru-RU')}
+          </span>
           <span style={{ flex: 1 }} />
           <span style={{ fontSize: 11.5, fontWeight: 800, color: '#4ade80', background: 'rgba(0,230,138,0.12)', border: '1px solid rgba(0,230,138,0.30)', borderRadius: 20, padding: '4px 12px', fontVariantNumeric: 'tabular-nums', boxShadow: '0 0 10px rgba(0,230,138,0.14)' }}>{cycle.totalWeeks} нед · {summary.avgMinutesPerWeek} мин/нед</span>
         </div>
@@ -238,6 +246,11 @@ export const CardioPreviewStep: React.FC<{
           <button style={{ ...BTN, flex: '1 1 130px' }} onClick={copyKcal} aria-label="Скопировать ккал">
             {kcalFlash ? '✅ Ккал в буфере' : '🔥 Ккал в буфер'}
           </button>
+          {onNewBlock && (
+            <button style={{ ...BTN, flex: '1 1 150px' }} onClick={onNewBlock} title="Тот же план, но с выбранной даты — прошлый блок останется в библиотеке">
+              🆕 Новый блок
+            </button>
+          )}
         </div>
         {paramsDirty && (
           <div style={{ fontSize: 11, color: '#fbbf24', background: 'rgba(245,158,11,0.10)', border: '1px solid rgba(245,158,11,0.32)', borderRadius: 10, padding: '8px 10px' }} role="status">

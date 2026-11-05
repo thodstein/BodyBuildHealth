@@ -15,6 +15,7 @@ import {
 import { finishCardioCycle } from '../../../engines/lms/cardio-templates.engine';
 import { CARDIO_SPORTS, CARDIO_SPORT_RU } from '../../../engines/lms/cardio-diary.engine';
 import { parsePaceText } from '../../../engines/lms/cardio-personal-zones.engine';
+import { todayLocalIso, addDaysIso, weekdayMon0Iso } from '../../../engines/lms/cardio-date-utils.engine';
 import type { CardioCompetitionRef, CardioPhase } from '../../../engines/lms/cardio.engine';
 import {
   ROW, LABEL, HINT_SM, BTN_SMALL, CHIP, CHIP_ACTIVE, PHASE_COLOR, TYPE_COLOR,
@@ -47,6 +48,12 @@ const GOAL_DESC: Record<CardioGoal, string> = {
   bb_prep: 'Прогрессия Zone 2 + MISS/HIIT на дефиците — подготовка ББ к шоу',
   pl_prep: 'Умеренный Zone 2 + MISS, без HIIT — не утомлять ЦНС к старту',
   bb_taper: '4 нед плавного снижения объёма (0.85→0.4) — тапер ББ к шоу',
+};
+
+const DATE_INPUT: React.CSSProperties = {
+  minHeight: 44, padding: '9px 12px', borderRadius: 11, border: '1px solid rgba(255,255,255,0.16)',
+  background: 'rgba(255,255,255,0.06)', color: '#fff', fontSize: 13, fontWeight: 750,
+  colorScheme: 'dark', fontVariantNumeric: 'tabular-nums',
 };
 
 export interface PhaseSplitState { auto: boolean; base: number; build: number; maintenance: number }
@@ -247,7 +254,9 @@ export const CardioGoalHorizonSection: React.FC<{
   taperModel?: CardioTaperModel; setTaperModel?: (m: CardioTaperModel) => void;
   maxHrFormula?: 'classic' | 'tanaka' | 'gulati'; setMaxHrFormula?: (f: 'classic' | 'tanaka' | 'gulati') => void;
   wizardMode?: 'simple' | 'pro';
-}> = ({ goal, setGoal, totalWeeks, setTotalWeeks, daysAvailable, setDaysAvailable, recoveryLow, setRecoveryLow, phaseSplit, setPhaseSplit, comps, taperWeeks, setTaperWeeks, taperEnabled, setTaperEnabled, peakWeek, setPeakWeek, previewFactors, periodizationModel, setPeriodizationModel, taperModel, setTaperModel, maxHrFormula, setMaxHrFormula, wizardMode = 'pro' }) => {
+  /** Дата старта цикла (YYYY-MM-DD): неделя 1 начинается с неё. */
+  startDate?: string; setStartDate?: (v: string) => void;
+}> = ({ goal, setGoal, totalWeeks, setTotalWeeks, daysAvailable, setDaysAvailable, recoveryLow, setRecoveryLow, phaseSplit, setPhaseSplit, comps, taperWeeks, setTaperWeeks, taperEnabled, setTaperEnabled, peakWeek, setPeakWeek, previewFactors, periodizationModel, setPeriodizationModel, taperModel, setTaperModel, maxHrFormula, setMaxHrFormula, wizardMode = 'pro', startDate, setStartDate }) => {
   const applyPreset = (id: string) => {
     const p = CARDIO_PRESETS.find(x => x.id === id);
     if (!p) return;
@@ -286,6 +295,29 @@ export const CardioGoalHorizonSection: React.FC<{
           <Stepper label="Дней/нед" value={daysAvailable} min={0} max={7} step={1} onChange={setDaysAvailable} ariaPrefix="Дней" suffix="дн" width={50} />
         </div>
         <div style={HINT_SM}>Дней в неделю ограничивает частоту — приоритет zone2 → recovery → miss → hiit.</div>
+        {setStartDate && (() => {
+          const iso = startDate && /^\d{4}-\d{2}-\d{2}$/.test(startDate) ? startDate : todayLocalIso();
+          const today = todayLocalIso();
+          const dowMon0 = weekdayMon0Iso(today);
+          const monday = addDaysIso(today, (7 - dowMon0) % 7);
+          return (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center' }}>
+              <span style={LABEL}>📅 Старт цикла</span>
+              <input
+                type="date"
+                value={iso}
+                onChange={e => setStartDate(e.target.value || today)}
+                aria-label="Дата старта цикла"
+                style={DATE_INPUT}
+              />
+              <button style={iso === today ? CHIP_ACTIVE : CHIP} onClick={() => setStartDate(today)}>Сегодня</button>
+              <button style={iso === monday ? CHIP_ACTIVE : CHIP} onClick={() => setStartDate(monday)}>С понедельника</button>
+              <span style={{ flexBasis: '100%', fontSize: 11, color: 'rgba(255,255,255,0.55)', lineHeight: 1.45 }}>
+                Неделя 1 начинается с этой даты. Прошлую дату можно ставить задним числом — недели и дневник посчитаются от неё.
+              </span>
+            </div>
+          );
+        })()}
         <div style={ROW}>
           <button style={phaseSplit.auto ? CHIP_ACTIVE : CHIP} onClick={() => setPhaseSplit({ ...phaseSplit, auto: true })}>Авто (по долям)</button>
           <button style={!phaseSplit.auto ? CHIP_ACTIVE : CHIP} onClick={() => setPhaseSplit({ ...phaseSplit, auto: false })}>Вручную</button>
@@ -670,6 +702,9 @@ export const CardioParamsStep: React.FC<{
   onFromLog?: () => void;
   onReset: () => void;
   wizardMode?: 'simple' | 'pro';
+  /** Дата старта цикла (YYYY-MM-DD) — та же опция, что в секциях мастера. */
+  startDate?: string;
+  setStartDate?: (v: string) => void;
   periodizationModel?: CardioPeriodizationModel;
   setPeriodizationModel?: (m: CardioPeriodizationModel) => void;
   taperModel?: CardioTaperModel;
@@ -688,7 +723,7 @@ export const CardioParamsStep: React.FC<{
   humidityPct?: string;
   altitudeM?: string;
   setAltitudeM?: (v: string) => void;
-}> = ({ goal, setGoal, totalWeeks, setTotalWeeks, daysAvailable, setDaysAvailable, recoveryLow, setRecoveryLow, phaseSplit, setPhaseSplit, comps, bodyWeight, setBodyWeight, bodyFatPct, taperWeeks, setTaperWeeks, taperEnabled, setTaperEnabled, peakWeek, setPeakWeek, previewFactors, level, setLevel, equipment, setEquipment, lowImpact, setLowImpact, age, setAge, sex, setSex, restingHr, setRestingHr, legDays, setLegDays, factorsOn, onToggleFactor, factorsSummary, onFromProfile, onSaveProfile, onFromDiaryHr, onFromLog, onReset, wizardMode = 'pro', periodizationModel = 'linear', setPeriodizationModel, taperModel = 'step', setTaperModel, maxHrFormula = 'classic', setMaxHrFormula, lthr = '', setLthr, ftpWatts = '', setFtpWatts, talkHr = '', setTalkHr, tempC = '', setTempC, humidityPct = '', altitudeM = '', setAltitudeM }) => {
+}> = ({ goal, setGoal, totalWeeks, setTotalWeeks, daysAvailable, setDaysAvailable, recoveryLow, setRecoveryLow, phaseSplit, setPhaseSplit, comps, bodyWeight, setBodyWeight, bodyFatPct, taperWeeks, setTaperWeeks, taperEnabled, setTaperEnabled, peakWeek, setPeakWeek, previewFactors, level, setLevel, equipment, setEquipment, lowImpact, setLowImpact, age, setAge, sex, setSex, restingHr, setRestingHr, legDays, setLegDays, factorsOn, onToggleFactor, factorsSummary, onFromProfile, onSaveProfile, onFromDiaryHr, onFromLog, onReset, wizardMode = 'pro', periodizationModel = 'linear', setPeriodizationModel, taperModel = 'step', setTaperModel, maxHrFormula = 'classic', setMaxHrFormula, lthr = '', setLthr, ftpWatts = '', setFtpWatts, talkHr = '', setTalkHr, tempC = '', setTempC, humidityPct = '', altitudeM = '', setAltitudeM, startDate, setStartDate }) => {
   const preview: { cycle: CardioCycle | null; warnings: string[] } = useMemo(() => {
     const warnings: string[] = [];
     if (totalWeeks < 4) warnings.push('Цикл короче 4 недель — базовая фаза почти отсутствует.');
@@ -883,6 +918,29 @@ export const CardioParamsStep: React.FC<{
           <Stepper label="Дней/нед" value={daysAvailable} min={0} max={7} step={1} onChange={setDaysAvailable} ariaPrefix="Дней" suffix="дн" width={50} />
         </div>
         <div style={HINT_SM}>Дней в неделю ограничивает частоту — приоритет zone2 → recovery → miss → hiit.</div>
+        {setStartDate && (() => {
+          const iso = startDate && /^\d{4}-\d{2}-\d{2}$/.test(startDate) ? startDate : todayLocalIso();
+          const today = todayLocalIso();
+          const dowMon0 = weekdayMon0Iso(today);
+          const monday = addDaysIso(today, (7 - dowMon0) % 7);
+          return (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center' }}>
+              <span style={LABEL}>📅 Старт цикла</span>
+              <input
+                type="date"
+                value={iso}
+                onChange={e => setStartDate(e.target.value || today)}
+                aria-label="Дата старта цикла"
+                style={DATE_INPUT}
+              />
+              <button style={iso === today ? CHIP_ACTIVE : CHIP} onClick={() => setStartDate(today)}>Сегодня</button>
+              <button style={iso === monday ? CHIP_ACTIVE : CHIP} onClick={() => setStartDate(monday)}>С понедельника</button>
+              <span style={{ flexBasis: '100%', fontSize: 11, color: 'rgba(255,255,255,0.55)', lineHeight: 1.45 }}>
+                Неделя 1 начинается с этой даты. Прошлую дату можно ставить задним числом — недели и дневник посчитаются от неё.
+              </span>
+            </div>
+          );
+        })()}
         <div style={ROW}>
           <button style={phaseSplit.auto ? CHIP_ACTIVE : CHIP} onClick={() => setPhaseSplit({ ...phaseSplit, auto: true })}>Авто (по долям)</button>
           <button style={!phaseSplit.auto ? CHIP_ACTIVE : CHIP} onClick={() => setPhaseSplit({ ...phaseSplit, auto: false })}>Вручную</button>

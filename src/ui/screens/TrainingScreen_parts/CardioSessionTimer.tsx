@@ -647,6 +647,12 @@ const [power, setPower] = useState(() => restored?.inputs.power ?? '');
         <span style={LABEL}>⚡ Быстрый старт сессии</span>
         <span style={HINT_SM}>таймер · фазы · ЧСС-зона · аудио</span>
       </div>
+      {active && (
+        <div data-cardio="apk-audio-note" style={{ fontSize: 10, color: 'rgba(251,191,36,0.85)', lineHeight: 1.45 }}>
+          🔔 Бип на смене шага звучит, пока приложение открыто: экран держится включённым (wake-lock), но при блокировке телефона или уходе в фон
+          Android без нативной службы может остановить звук — отсчёт тогда досчитается по времени при возврате.
+        </div>
+      )}
       {flash && <div style={{ fontSize: 11.5, fontWeight: 750, color: '#4ade80', background: 'rgba(0,230,138,0.08)', border: '1px solid rgba(0,230,138,0.28)', borderLeft: '3px solid #00e68a', borderRadius: 10, padding: '8px 11px', lineHeight: 1.5 }} role="status">{flash}</div>}
 
       {active && (

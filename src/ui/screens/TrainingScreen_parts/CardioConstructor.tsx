@@ -16,11 +16,12 @@ import {
   cardioPlanVariants, explainCardioChoice, saveCardioCycleVersion, restoreCardioCycleVersion, clearCardioCycleHistory,
   loadCardioScenarios, saveCardioScenario, removeCardioScenario,
   bumpCardioZone2VolumeGuarded, dailyTrimpMap, maxHrByFormula,
-  cardioProfileFactors, cardioNutritionNotes, CARDIO_VARIANT_LABELS,
+  cardioProfileFactors, cardioNutritionNotes, CARDIO_VARIANT_LABELS, CARDIO_CYCLES_CAP,
   latestFieldTestMetrics, kcalForCardio, cardioHiitInjectGate, lthrBySportFromInput,
   type CardioCycle, type CardioCycleInput, type CardioGoal, type CardioCompetitionRef, type CardioLevel, type CardioEquipment, type CardioVariant, type CardioScenario, type CardioSession,
 } from '../../../engines/lms/cardio.engine';
 import { getCardioCycleTemplateById } from '../../../data/cardio-cycles/cardio-cycle-index';
+import { newId } from '../../../engines/user-program/user-program.types';
 import { saveTextFileApk, printHtmlApk } from '../../../core/apk-share';
 import { buildCardioCycleFromTemplate, finishCardioCycle, rebuildCardioCycleFromConfig } from '../../../engines/lms/cardio-templates.engine';
 import { consumeCardioTemplatePending, subscribeCardioTemplatePending } from '../../../engines/lms/cardio-cycle-bridge';
@@ -125,6 +126,8 @@ interface WizardState {
   comps: CardioCompetitionRef[];
   wizardMode?: 'simple' | 'pro';
   bodyFatPct?: number;
+  /** Дата старта цикла (YYYY-MM-DD) — «с сегодня» или с выбранного дня. */
+  startDate?: string;
   /** Влажность % (влияет на зоны при жаре и коррекцию TSS). */
   humidityPct?: number;
   periodizationModel?: 'linear' | 'polarized' | 'pyramidal' | 'pyramidal_polarized';
@@ -287,6 +290,9 @@ const CardioConstructorInner: React.FC = () => {
   // P6 PRO-2: durability-сессия 1×/нед (длинная Z2, только недели ≥150 мин).
   const [durabilityOn, setDurabilityOn] = useState((wizard as WizardState).durabilityOn === true);
   const [variant, setVariant] = useState<CardioVariant>(wizard.variant ?? 'base');
+  // Дата старта: по умолчанию сегодня; для открытого цикла засевается его
+  // стартом (см. эффект ниже), поэтому правка не сбрасывает дату молча.
+  const [startDate, setStartDate] = useState<string>(wizard.startDate ?? todayIso());
   const [wizardMode, setWizardMode] = useState<'simple' | 'pro'>((wizard as WizardState).wizardMode ?? 'pro');
   const [legDays, setLegDays] = useState<number[]>(wizard.legDays ?? []);
   const [comps, setComps] = useState<CardioCompetitionRef[]>(wizard.comps ?? []);
@@ -380,7 +386,17 @@ const CardioConstructorInner: React.FC = () => {
   const reload = useCallback(() => { setLibrary(loadCardioCycles()); }, []);
   useEffect(() => { reload(); }, [reload]);
   useEffect(() => {
-    setCycle(loadActiveCardioCycle());
+    const active = loadActiveCardioCycle();
+    setCycle(active);
+    // Дата старта — из активного цикла, ИНАЧЕ «Пересобрать цикл» молча
+    // переносил старт на сегодня (номер недели/adherence откатывались).
+    // Завершённый цикл — наоборот: новая сборка стартует с сегодня.
+    if (active) {
+      const today = todayIso();
+      const started = !!active.startDate && today >= String(active.startDate);
+      const finished = started && !cardioWeekForDate(active, today, active.startDate);
+      setStartDate(finished ? today : (active.startDate ?? today));
+    }
     const un = subscribeCardioLink(l => setLink(l));
     return un;
   }, []);
@@ -456,14 +472,16 @@ const CardioConstructorInner: React.FC = () => {
       redFlags: redFlags.length > 0 ? [...redFlags] : undefined,
       ...previewFactors,
     }));
-    saveCardioCycle(c);
+    const savedTpl = saveCardioCycle(c);
     setActiveCardioCycle(c);
     setCycle(c);
+    setStartDate(/^\d{4}-\d{2}-\d{2}$/.test(String(c.startDate ?? '')) ? String(c.startDate) : todayIso());
     reload();
+    const evictedNote = savedTpl.evicted.length > 0 ? ` · библиотека переполнена — вытеснен «${savedTpl.evicted[0]}»` : '';
     if (redFlags.length > 0 && c.weeks.some(w => w.sessions.some(s => s.type === 'hiit' || s.type === 'miss'))) {
-      flashMsg(`📚 «${tpl.meta.title}» — собрано, но в плане есть HIIT/MISS: при ваших флагах запрещены до врача`);
+      flashMsg(`📚 «${tpl.meta.title}» — собрано, но в плане есть HIIT/MISS: при ваших флагах запрещены до врача${evictedNote}`);
     } else {
-      flashMsg(`📚 «${tpl.meta.title}» — собрано и активировано`);
+      flashMsg(`📚 «${tpl.meta.title}» — собрано и активировано${evictedNote}`);
     }
   };
   const applyTemplateRef = React.useRef(applyTemplate);
@@ -558,6 +576,7 @@ const CardioConstructorInner: React.FC = () => {
       totalWeeks,
       daysAvailable,
       bodyWeight,
+      startDate: /^\d{4}-\d{2}-\d{2}$/.test(startDate) ? startDate : undefined,
       bodyFatPct: bf,
       competitions: comps,
       taperWeeks,
@@ -593,31 +612,61 @@ const CardioConstructorInner: React.FC = () => {
    * Собрать цикл по параметрам и сохранить (общий хвост build/selectVariant).
    *
    * Если цикл уже есть — это правка ЕГО ЖЕ плана («⚙️ Изменить параметры» →
-   * «🔄 Пересобрать цикл», смена варианта нагрузки). Раньше в этом случае
-   * генератор создавал НОВЫЙ цикл с новым id и стартом «сегодня»: календарь,
-   * номер недели и adherence молча откатывались на первую неделю, а в
-   * библиотеке оставался дубль старого плана. Теперь id/имя/дата старта
-   * сохраняются. Завершённый цикл честно начинается заново с сегодня — и
-   * сообщение об этом говорит прямо.
+   * «🔄 Пересобрать цикл», смена варианта нагрузки): id/имя сохраняются, дата
+   * старта берётся из формы (форма засеяна стартом блока, поэтому «молчаливого
+   * сброса» нет, а осознанная смена даты применяется). Новый блок — только по
+   * явной кнопке «🆕 Новый блок» или когда прошлый цикл уже завершён.
    */
-  const commitCycle = (applied: CardioCycleInput, msg: string) => {
+  const commitCycle = (applied: CardioCycleInput, msg: string, opts: { restart?: boolean } = {}) => {
     const today = todayIso();
     const started = !!cycle?.startDate && today >= String(cycle.startDate);
-    const finished = started && !cardioWeekForDate(cycle!, today, cycle!.startDate);
-    const keepIdentity = !!cycle && !finished;
-    const next: CardioCycleInput = keepIdentity ? applied : { ...applied, startDate: today };
-    const c = cycle
-      ? finishCycle(rebuildCardioCycleFromConfig(cycle, { overrides: next, preserveIdentity: keepIdentity }))
-      : finishCycle(buildCardioCycle({ ...next, config: next }));
-    saveCardioCycle(c);
+    const finished = !!cycle && started && !cardioWeekForDate(cycle, today, cycle.startDate!);
+    const formStart = /^\d{4}-\d{2}-\d{2}$/.test(String(applied.startDate ?? '')) ? String(applied.startDate) : today;
+    const fresh = !cycle || opts.restart === true || finished;
+    const next: CardioCycleInput = { ...applied, startDate: formStart };
+    const c = cycle && !fresh
+      ? finishCycle(rebuildCardioCycleFromConfig(cycle, { overrides: next, preserveIdentity: true }))
+      : cycle
+        ? finishCycle(rebuildCardioCycleFromConfig(cycle, { overrides: next, preserveIdentity: false }))
+        : finishCycle(buildCardioCycle({ ...next, config: next }));
+    const saved = saveCardioCycle(c);
     setActiveCardioCycle(c);
     setCycle(c);
+    setStartDate(formStart);
     reload();
-    flashMsg(finished ? `${msg} · прошлый цикл завершён — новый стартует с сегодня` : msg);
+    const notes: string[] = [msg];
+    if (finished) notes.push(`прошлый цикл завершён — новый стартует с ${formStart}`);
+    else if (opts.restart) notes.push(`новый блок с ${formStart}, прошлый остался в библиотеке`);
+    if (saved.evicted.length > 0) notes.push(`библиотека переполнена (${CARDIO_CYCLES_CAP}) — вытеснен «${saved.evicted[0]}»`);
+    flashMsg(notes.join(' · '));
   };
 
   const build = () => {
     commitCycle(assembleInput(variant), '✅ Кардио-цикл собран и сохранён в библиотеку');
+  };
+
+  /** 🆕 Новый блок: тот же план, но с выбранной даты; прошлый — в историю. */
+  const startNewBlock = async () => {
+    if (cycle) {
+      const today = todayIso();
+      const started = !!cycle.startDate && today >= String(cycle.startDate);
+      const finished = started && !cardioWeekForDate(cycle, today, cycle.startDate!);
+      if (!finished) {
+        const ok = await confirm({
+          title: 'Начать новый блок?',
+          message: `«${cycle.name}» останется в библиотеке как история. Новый блок начнётся ${startDate} с теми же параметрами.`,
+          confirmLabel: 'Начать новый',
+        });
+        if (!ok) return;
+      }
+    }
+    // Основа — параметры действующего плана (а не форма, которую пользователь
+    // мог открыть на чужом цикле); вес атлета — свежий. Имя сохраняем: это тот
+    // же блок, просто с новой даты (в библиотеке различаются датами старта).
+    const base: CardioCycleInput = cycle?.config
+      ? { ...(cycle.config as CardioCycleInput), bodyWeight, name: cycle.name }
+      : assembleInput(variant);
+    commitCycle({ ...base, startDate }, '🆕 Новый блок', { restart: true });
   };
 
   /** Живой пересчёт при выборе варианта нагрузки: вариант применяется сразу. */
@@ -639,6 +688,14 @@ const CardioConstructorInner: React.FC = () => {
     if (typeof (cfg as { bodyFatPct?: number }).bodyFatPct === 'number') setBodyFatPct(String((cfg as { bodyFatPct?: number }).bodyFatPct));
     setComps(cfg.competitions ? cfg.competitions.map(c => ({ ...c })) : []);
     setTaperWeeks(cfg.taperWeeks ?? taperWeeks);
+    // Дата старта: у завершённого цикла форма показывает сегодня (новая
+    // сборка = новый блок), у живого — его собственный старт.
+    {
+      const today = todayIso();
+      const started = !!cycle?.startDate && today >= String(cycle.startDate);
+      const finished = !!cycle && started && !cardioWeekForDate(cycle, today, cycle.startDate!);
+      setStartDate(finished ? today : (cfg.startDate ?? cycle?.startDate ?? today));
+    }
     if ((cfg as unknown as { taperModel?: 'step' | 'exponential' }).taperModel) setTaperModel((cfg as unknown as { taperModel?: 'step' | 'exponential' }).taperModel!);
     if ((cfg as unknown as { periodizationModel?: 'linear' | 'polarized' | 'pyramidal' | 'pyramidal_polarized' }).periodizationModel) setPeriodizationModel((cfg as unknown as { periodizationModel?: 'linear' | 'polarized' | 'pyramidal' | 'pyramidal_polarized' }).periodizationModel!);
     if ((cfg as unknown as { maxHrFormula?: 'classic' | 'tanaka' | 'gulati' }).maxHrFormula) setMaxHrFormula((cfg as unknown as { maxHrFormula?: 'classic' | 'tanaka' | 'gulati' }).maxHrFormula!);
@@ -708,7 +765,7 @@ const CardioConstructorInner: React.FC = () => {
   };
 
   const duplicate = (c: CardioCycle) => {
-    const copy: CardioCycle = { ...c, id: `cardio-${Date.now()}`, name: c.name + ' (копия)', createdAt: new Date().toISOString() };
+    const copy: CardioCycle = { ...c, id: newId('cardio'), name: c.name + ' (копия)', createdAt: new Date().toISOString() };
     saveCardioCycle(copy);
     setActiveCardioCycle(copy);
     setCycle(copy);
@@ -924,6 +981,7 @@ const CardioConstructorInner: React.FC = () => {
     try {
       const s: WizardState = {
         goal, totalWeeks, daysAvailable, recoveryLow, bodyWeight, taperWeeks, taperModel, periodizationModel, maxHrFormula, taperEnabled, peakWeek,
+        startDate,
         phaseAuto: phaseSplit.auto, phaseBase: phaseSplit.base, phaseBuild: phaseSplit.build, phaseMaint: phaseSplit.maintenance,
         level, equipment, lowImpact, age: Math.max(12, Math.min(90, Number(age) || 30)), sex, restingHr: Number(restingHr) > 0 ? Number(restingHr) : 0, legDays,
         factorSleep: factorsOn.sleep, factorStress: factorsOn.stress, factorHrv: factorsOn.hrv, factorPed: factorsOn.ped, factorJoints: factorsOn.joints,
@@ -938,7 +996,7 @@ const CardioConstructorInner: React.FC = () => {
       };
       localStorage.setItem(WIZARD_KEY, JSON.stringify({ ...s, version: 2 }));
     } catch { /* ignore */ }
-  }, [goal, totalWeeks, daysAvailable, recoveryLow, bodyWeight, taperWeeks, taperModel, periodizationModel, maxHrFormula, taperEnabled, peakWeek, phaseSplit, level, equipment, lowImpact, age, sex, restingHr, legDays, factorsOn, variant, comps, wizardMode, lthr, lthrBySport, ftpWatts, talkHr, tempC, altitudeM, bodyFatPct, humidityPct, easyPace, tempoPace, intervalPace, mesoOn, strictValidate, redFlags, tidSwitch, durabilityOn]);
+  }, [goal, totalWeeks, daysAvailable, recoveryLow, bodyWeight, taperWeeks, taperModel, periodizationModel, maxHrFormula, taperEnabled, peakWeek, startDate, phaseSplit, level, equipment, lowImpact, age, sex, restingHr, legDays, factorsOn, variant, comps, wizardMode, lthr, lthrBySport, ftpWatts, talkHr, tempC, altitudeM, bodyFatPct, humidityPct, easyPace, tempoPace, intervalPace, mesoOn, strictValidate, redFlags, tidSwitch, durabilityOn]);
 
   const renameCycle = (name: string) => {
     if (!cycle) return;
@@ -1415,6 +1473,7 @@ const CardioConstructorInner: React.FC = () => {
             taperModel={taperModel} setTaperModel={setTaperModel}
             maxHrFormula={maxHrFormula} setMaxHrFormula={setMaxHrFormula}
             wizardMode={wizardMode}
+            startDate={startDate} setStartDate={setStartDate}
           />
           <CardioParamsPreviewHero
             preview={paramsPreview.preview} s={paramsPreview.s} tidPreview={paramsPreview.tidPreview}
@@ -1560,7 +1619,7 @@ const CardioConstructorInner: React.FC = () => {
       {step === 'preview' && (
         <>
           <CardioPreviewStep
-            cycle={cycle} onBuild={build} onRename={renameCycle} onEditConfig={editConfig}
+            cycle={cycle} onBuild={build} onRename={renameCycle} onEditConfig={editConfig} onNewBlock={startNewBlock} startDate={startDate}
             daysAvailable={daysAvailable} recoveryLow={recoveryLow}
             variant={variant} onVariant={selectVariant}
             variants={planVariants} explanation={planExplanation}

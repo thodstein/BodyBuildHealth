@@ -8,7 +8,7 @@
  *  - каскад старта A сохраняет структуру пик-недели;
  *  - wellness-шкала однозначна, ккал учитывают оборудование.
  */
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, beforeEach } from 'vitest';
 import {
   buildCardioCycle,
   cardioSessionsForDate,
@@ -17,6 +17,13 @@ import {
   spreadSessionsAcrossDays,
   applyCardioCompetitionCascade,
   buildCardioIcs,
+  saveCardioCycle,
+  loadCardioCycles,
+  setActiveCardioCycle,
+  CARDIO_CYCLES_CAP,
+  cardioStructuredLabel,
+  cardioStructuredMainSec,
+  buildCardioIntervalPlan,
   type CardioCycle,
   type CardioWeek,
 } from '../cardio.engine';
@@ -246,5 +253,89 @@ describe('кардио-цикл: инвариант «плановые мину�
       const laid = expandWeekSchedule(w, c.startDate);
       expect(laid.reduce((s, x) => s + x.session.durationMin, 0)).toBe(w.totalMinutes);
     }
+  });
+});
+
+describe('старт цикла: дата — часть плана, а не подпись', () => {
+  it('цикл с датой в прошлом: неделя 1 начинается с неё, дальше — по календарю', () => {
+    const c = buildCardioCycle({ goal: 'cut', totalWeeks: 4, startDate: '2026-01-05' });
+    expect(c.startDate).toBe('2026-01-05');
+    expect(cardioWeekForDate(c, '2026-01-05', c.startDate)?.week).toBe(1);
+    expect(cardioWeekForDate(c, '2026-01-12', c.startDate)?.week).toBe(2);
+  });
+
+  it('пересборка: overrides.startDate применяется, id/имя сохраняются', () => {
+    const c = buildCardioCycle({ goal: 'cut', totalWeeks: 6, startDate: '2026-03-02' });
+    const moved = rebuildCardioCycleFromConfig(c, { overrides: { startDate: '2026-04-06' } });
+    expect(moved.id).toBe(c.id);
+    expect(moved.name).toBe(c.name);
+    expect(moved.startDate).toBe('2026-04-06');
+    // Без override дата не меняется — правка плана не сбрасывает старт.
+    expect(rebuildCardioCycleFromConfig(c, { overrides: {} }).startDate).toBe('2026-03-02');
+  });
+
+  it('новый блок (preserveIdentity:false): новый id и выбранная дата', () => {
+    const c = buildCardioCycle({ goal: 'cut', totalWeeks: 6, startDate: '2026-03-02' });
+    const fresh = rebuildCardioCycleFromConfig(c, { overrides: { ...(c.config ?? {}), startDate: '2026-04-06' }, preserveIdentity: false });
+    expect(fresh.id).not.toBe(c.id);
+    expect(fresh.startDate).toBe('2026-04-06');
+    expect(cardioWeekForDate(fresh, '2026-04-06', fresh.startDate)?.week).toBe(1);
+  });
+});
+
+describe('библиотека циклов: лимит не молчит и не вытесняет активный цикл', () => {
+  beforeEach(() => {
+    try {
+      localStorage.removeItem('he_cardio_cycles');
+      localStorage.removeItem('he_active_cardio_cycle');
+    } catch { /* ignore */ }
+  });
+
+  it('на лимите вытесняется самый старый, и об этом сообщается', () => {
+    const base = buildCardioCycle({ goal: 'health', totalWeeks: 1 });
+    for (let i = 0; i < CARDIO_CYCLES_CAP; i++) {
+      saveCardioCycle({ ...base, id: `cap-${i}`, name: `Цикл ${i}`, createdAt: new Date(2026, 0, 1 + i).toISOString() });
+    }
+    expect(loadCardioCycles()).toHaveLength(CARDIO_CYCLES_CAP);
+    const res = saveCardioCycle({ ...base, id: 'cap-new', name: 'Новый', createdAt: '2026-03-01T00:00:00.000Z' });
+    expect(loadCardioCycles()).toHaveLength(CARDIO_CYCLES_CAP);
+    expect(res.evicted).toEqual(['Цикл 0']);
+    expect(loadCardioCycles().some(c => c.id === 'cap-0')).toBe(false);
+    expect(loadCardioCycles().some(c => c.id === 'cap-new')).toBe(true);
+  });
+
+  it('активный цикл остаётся в библиотеке, даже если он самый старый', () => {
+    const base = buildCardioCycle({ goal: 'health', totalWeeks: 1 });
+    const active = { ...base, id: 'active-old', name: 'Активный', createdAt: '2020-01-01T00:00:00.000Z' };
+    setActiveCardioCycle(active);
+    saveCardioCycle(active);
+    for (let i = 0; i < CARDIO_CYCLES_CAP + 3; i++) {
+      saveCardioCycle({ ...base, id: `n-${i}`, name: `Н${i}`, createdAt: new Date(2026, 0, 1 + i).toISOString() });
+    }
+    const all = loadCardioCycles();
+    expect(all).toHaveLength(CARDIO_CYCLES_CAP);
+    expect(all.some(c => c.id === 'active-old')).toBe(true);
+  });
+});
+
+describe('структура интервалов: подпись и бюджет сессии', () => {
+  it('подпись перечисляет все отрезки, основная часть считается с отдыхом', () => {
+    const blocks = [
+      { workSec: 20, restSec: 40, reps: 8 },
+      { workSec: 180, restSec: 120, reps: 3 },
+    ];
+    expect(cardioStructuredLabel(blocks)).toBe('8×20 с/40 с + 3×3 мин/2 мин');
+    expect(cardioStructuredMainSec(blocks)).toBe((20 + 40) * 8 + (180 + 120) * 3);
+    expect(cardioStructuredLabel([])).toBeNull();
+    expect(cardioStructuredLabel(undefined)).toBeNull();
+  });
+
+  it('длительность = ceil(основная часть) → таймер не режет отрезки', () => {
+    const blocks = [{ workSec: 60, restSec: 60, reps: 10 }];
+    const durationMin = Math.ceil(cardioStructuredMainSec(blocks) / 60);
+    const plan = buildCardioIntervalPlan({ type: 'hiit', durationMin, structured: blocks })!;
+    expect(plan.workSteps).toBe(10);
+    expect(plan.totalSec).toBeLessThanOrEqual(durationMin * 60);
+    expect(plan.totalSec).toBeGreaterThanOrEqual(cardioStructuredMainSec(blocks));
   });
 });

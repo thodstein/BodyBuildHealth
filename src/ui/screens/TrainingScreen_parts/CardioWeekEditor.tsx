@@ -3,14 +3,15 @@
  * раскладка по дням (Пн-Вс), масштабирование минут ±10%, переключатель HIIT
  * и полноценный редактор сессий (тип, минуты, частота, удалить, добавить).
  */
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   spreadSessionsAcrossDays, DAY_LABELS_RU, CARDIO_PHASE_LABELS,
   loadCardioCycles, saveCardioCycle, setActiveCardioCycle, kcalForCardio,
   saveCardioCycleVersion, latestCardioCycleVersion, restoreCardioCycleVersion,
   cardioWeekForDate, cardioSafetyReport, cycleBodyWeight, cycleFfmKg, rebuildCycle, cardioWeekLegConflicts, cardioHiitInjectGate,
   moveCardioSessionInWeek,
-  type CardioCycle, type CardioType, type CardioSession, type CardioWeek,
+  CARDIO_EQUIPMENT_OPTIONS, cardioStructuredLabel, cardioStructuredMainSec,
+  type CardioCycle, type CardioType, type CardioSession, type CardioWeek, type CardioEquipment, type CardioStructuredBlock,
 } from '../../../engines/lms/cardio.engine';
 import { CARD, ROW, LABEL, HINT_SM, BTN, BTN_PRIMARY, BTN_DANGER, BTN_SMALL, SelectInput } from './CardioUI';
 
@@ -36,13 +37,31 @@ function rebuildTotals(week: CardioWeek): CardioWeek {
   return { ...week, totalMinutes, totalKcal };
 }
 
+/** Дописать/обновить в тексте сессии пометку о структуре (без дублей). */
+function withStructNote(purpose: string | undefined, label: string | null): string | undefined {
+  const base = (purpose ?? '').split('⚡ Структура:')[0].trim().replace(/[\s·]+$/, '');
+  if (!label) return base || undefined;
+  return `${base ? `${base} · ` : ''}⚡ Структура: ${label}`;
+}
+
+const clampInt = (v: number, min: number, max: number): number => Math.max(min, Math.min(max, Math.round(Number.isFinite(v) ? v : min)));
+
 export const CardioWeekEditor: React.FC<{ cycle: CardioCycle | null; onChanged?: () => void }> = ({ cycle, onChanged }) => {
   const [weekNo, setWeekNo] = useState(1);
   const [flash, setFlash] = useState<string | null>(null);
   const [editSessions, setEditSessions] = useState(false);
   const [newType, setNewType] = useState<CardioType>('zone2');
+  const [newEquip, setNewEquip] = useState<CardioEquipment | ''>('');
+  // Открытая панель структуры интервалов + черновик (сохраняется кнопкой,
+  // чтобы каждое нажатие стрелки не плодило версии и записи в localStorage).
+  const [structIdx, setStructIdx] = useState<number | null>(null);
+  const [structDraft, setStructDraft] = useState<CardioStructuredBlock[]>([]);
   const [dragIdx, setDragIdx] = useState<number | null>(null);
   const [dragOverDay, setDragOverDay] = useState<number | null>(null);
+
+  // Смена недели закрывает панель структуры: иначе черновик одной недели
+  // сохранялся бы в сессию с тем же индексом на другой неделе.
+  useEffect(() => { setStructIdx(null); setStructDraft([]); }, [weekNo]);
 
   const week: CardioWeek | null = useMemo(() => {
     if (!cycle) return null;
@@ -120,7 +139,9 @@ export const CardioWeekEditor: React.FC<{ cycle: CardioCycle | null; onChanged?:
   const scaleMinutes = (mult: number) => saveWeek(w => ({
     ...w,
     sessions: w.sessions.map(s => {
-      const dur = Math.max(10, Math.round(s.durationMin * mult));
+      // Структура не режется: ниже её основной части минуты не опускаем.
+      const need = Math.ceil(cardioStructuredMainSec(s.structured) / 60);
+      const dur = Math.max(10, need, Math.round(s.durationMin * mult));
       return { ...s, durationMin: dur, kcalPerSession: kcalForCardio(s.type, dur, bw, s.equipment, csex, ffm) };
     }),
   }));
@@ -133,11 +154,19 @@ export const CardioWeekEditor: React.FC<{ cycle: CardioCycle | null; onChanged?:
       gateFlash(nextType);
       return;
     }
+    let safe = patch;
+    if (cur && patch.durationMin != null) {
+      const need = Math.ceil(cardioStructuredMainSec(cur.structured) / 60);
+      if (need > 0 && patch.durationMin < need) {
+        safe = { ...patch, durationMin: need };
+        flashMsg(`⚠ Структура занимает ${need} мин — сессия не может быть короче`);
+      }
+    }
     saveWeek(w => ({
       ...w,
       sessions: w.sessions.map((s, i) => {
         if (i !== idx) return s;
-        const next = { ...s, ...patch };
+        const next = { ...s, ...safe };
         next.kcalPerSession = kcalForCardio(next.type, next.durationMin, bw, next.equipment, csex, ffm);
         return next;
       }),
@@ -150,11 +179,60 @@ export const CardioWeekEditor: React.FC<{ cycle: CardioCycle | null; onChanged?:
     if (!hiitGate.allowed && (newType === 'hiit' || newType === 'miss')) { gateFlash(newType); return; }
     saveWeek(w => ({
       ...w,
-      sessions: [...w.sessions, { type: newType, durationMin: 30, weeklyFrequency: 1, intensity: newType === 'hiit' ? 'high' : newType === 'recovery' ? 'low' : 'moderate', kcalPerSession: kcalForCardio(newType, 30, bw, undefined, csex, ffm), purpose: 'Ручная сессия' }],
+      sessions: [...w.sessions, {
+        type: newType,
+        durationMin: 30,
+        weeklyFrequency: 1,
+        intensity: newType === 'hiit' ? 'high' : newType === 'recovery' ? 'low' : 'moderate',
+        kcalPerSession: kcalForCardio(newType, 30, bw, newEquip || undefined, csex, ffm),
+        purpose: 'Ручная сессия',
+        equipment: newEquip || undefined,
+      }],
     }));
   };
 
+  // ─── Структура интервалов (⚡): черновик → 💾 сохранить ───
+  const openStructure = (idx: number) => {
+    if (structIdx === idx) { setStructIdx(null); setStructDraft([]); return; }
+    const src = week?.sessions[idx]?.structured;
+    setStructIdx(idx);
+    setStructDraft(Array.isArray(src) ? src.map(b => ({ ...b })) : []);
+  };
+  const patchBlock = (bi: number, patch: Partial<CardioStructuredBlock>) => {
+    setStructDraft(prev => prev.map((b, i) => (i === bi ? { ...b, ...patch } : b)));
+  };
+  const addBlock = () => setStructDraft(prev => [...prev, { workSec: 60, restSec: 60, reps: 8 }]);
+  const removeBlock = (bi: number) => setStructDraft(prev => prev.filter((_, i) => i !== bi));
+
+  const saveStructure = (idx: number) => {
+    const s = week?.sessions[idx];
+    if (!s) return;
+    const blocks = structDraft.filter(b => b.workSec > 0 && b.reps > 0);
+    const label = cardioStructuredLabel(blocks);
+    const mainSec = cardioStructuredMainSec(blocks);
+    // Структура не обрезается никогда: длительность сессии поднимаем до неё
+    // (разминка/заминка тогда — только остаток бюджета).
+    const needMin = Math.max(5, Math.ceil(mainSec / 60));
+    const dur = Math.max(s.durationMin, needMin);
+    updateSession(idx, {
+      structured: blocks.length > 0 ? blocks : undefined,
+      durationMin: dur,
+      purpose: withStructNote(s.purpose, label),
+    });
+    setStructIdx(null);
+    setStructDraft([]);
+    if (needMin > s.durationMin) {
+      flashMsg(`⚡ Структура сохранена · сессия увеличена до ${dur} мин, чтобы все отрезки влезли`);
+    } else {
+      flashMsg(label ? `⚡ Структура сохранена: ${label}` : '⚡ Интервалы убраны — ровный темп');
+    }
+  };
+
   if (!cycle || !week) return null;
+
+  const draftLabel = cardioStructuredLabel(structDraft);
+  const draftMainSec = cardioStructuredMainSec(structDraft);
+  const draftNeedMin = Math.max(5, Math.ceil(draftMainSec / 60));
 
   const onDragStart = (idx: number) => setDragIdx(idx);
   const onDragOverDay = (day: number, e: React.DragEvent) => { e.preventDefault(); setDragOverDay(day); };
@@ -224,7 +302,7 @@ export const CardioWeekEditor: React.FC<{ cycle: CardioCycle | null; onChanged?:
             >
               <div style={{ color: isLeg ? '#fbbf24' : '#fff', fontWeight: 800, fontSize: 11 }}>{d}{isLeg ? ' 🦵' : ''}</div>
               {sess.length === 0 ? <div style={{ color: 'rgba(255,255,255,0.22)', fontSize: 11, marginTop: 4 }}>—</div> : sess.map((s, j) => (
-                <div key={j} style={{ color: isLeg && s.type !== 'recovery' ? '#f87171' : '#4ade80', fontWeight: 700, fontSize: 10, whiteSpace: 'nowrap', background: `${isLeg && s.type !== 'recovery' ? 'rgba(239,68,68,0.12)' : 'rgba(0,230,138,0.08)'}`, border: `1px solid ${isLeg && s.type !== 'recovery' ? 'rgba(239,68,68,0.24)' : 'rgba(0,230,138,0.18)'}`, borderRadius: 6, padding: '1px 4px' }}>{TYPE_SHORT[s.type]} {s.durationMin}м</div>
+                <div key={j} style={{ color: isLeg && s.type !== 'recovery' ? '#f87171' : '#4ade80', fontWeight: 700, fontSize: 10, whiteSpace: 'nowrap', background: `${isLeg && s.type !== 'recovery' ? 'rgba(239,68,68,0.12)' : 'rgba(0,230,138,0.08)'}`, border: `1px solid ${isLeg && s.type !== 'recovery' ? 'rgba(239,68,68,0.24)' : 'rgba(0,230,138,0.18)'}`, borderRadius: 6, padding: '1px 4px' }}>{TYPE_SHORT[s.type]} {s.durationMin}м{s.structured && s.structured.length > 0 ? ' ⚡' : ''}</div>
               ))}
               {isOver && <div style={{ fontSize: 8, color: '#00e68a', fontWeight: 700 }}>⇣ сюда</div>}
             </div>
@@ -249,28 +327,95 @@ export const CardioWeekEditor: React.FC<{ cycle: CardioCycle | null; onChanged?:
               ⛔ {hiitGate.reason} — HIIT/MISS недоступны (только Zone 2 / recovery).
             </div>
           )}
-          {week.sessions.map((s, idx) => (
-            <div key={idx} role="listitem" aria-grabbed={dragIdx === idx} tabIndex={0} onKeyDown={e => { if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { e.preventDefault(); const cur = s.dayOfWeek ?? 0; const next = (cur + (e.key === 'ArrowLeft' ? -1 : 1) + 7) % 7; updateSession(idx, { dayOfWeek: next }); } }} style={{ ...ROW, opacity: dragIdx === idx ? 0.6 : 1, border: dragIdx === idx ? '1px dashed rgba(0,230,138,0.35)' : '1px solid transparent', borderRadius: 8, padding: '4px 0' }} draggable onTouchStart={() => setDragIdx(idx)} onTouchEnd={() => setDragIdx(null)} onDragStart={() => onDragStart(idx)} onDragEnd={() => setDragIdx(null)} title="Перетащите на день недели (мышь/touch) или используйте ←/→ для перемещения">
-              <span style={{ cursor: 'grab', fontSize: 12, color: '#fff', padding: '0 4px', userSelect: 'none' }} aria-hidden>⋮⋮</span>
-                <SelectInput value={s.type} onChange={v => updateSession(idx, { type: v as CardioType })} ariaLabel={`Тип сессии ${idx + 1}`} width={110}
-                  options={TYPES.filter(t => hiitGate.allowed || s.type === t || (t !== 'hiit' && t !== 'miss')).map(t => ({ value: t, label: TYPE_LABEL[t] }))} />
-                <SelectInput value={s.dayOfWeek != null ? String(s.dayOfWeek) : ''} onChange={v => updateSession(idx, { dayOfWeek: v === '' ? undefined : Number(v) })} ariaLabel={`День недели сессии ${idx + 1}`} width={110}
-                  options={[{ value: '', label: 'Авто' }, ...DAY_LABELS_RU.map((d, di) => ({ value: String(di), label: `${d}${legDays.has(di) ? ' (ноги)' : ''}` }))]} />
-              {s.dayOfWeek != null && legDays.has(s.dayOfWeek) && s.type !== 'recovery' && (
-                <span style={{ fontSize: 10, color: '#f87171', fontWeight: 700 }} title="День тяжёлых ног — интенсивное кардио лучше перенести">⚠ ноги</span>
-              )}
-              <input type="number" value={s.durationMin} onChange={e => updateSession(idx, { durationMin: Math.max(5, Math.min(180, Number(e.target.value) || 30)) })} inputMode="numeric" style={NUM} aria-label={`Минуты сессии ${idx + 1}`} />
-              <span style={{ fontSize: 10, color: '#fff' }}>мин ×</span>
-              <button style={{ ...BTN, minHeight: 44, minWidth: 44, padding: '4px 8px' }} onClick={() => updateSession(idx, { weeklyFrequency: Math.max(1, s.weeklyFrequency - 1) })} aria-label="Меньше частоты">−</button>
-              <span style={{ fontSize: 12, fontWeight: 800, minWidth: 16, textAlign: 'center' }}>{s.weeklyFrequency}</span>
-              <button style={{ ...BTN, minHeight: 44, minWidth: 44, padding: '4px 8px' }} onClick={() => updateSession(idx, { weeklyFrequency: Math.min(7, s.weeklyFrequency + 1) })} aria-label="Больше частоты">+</button>
-              <span style={{ fontSize: 10, color: '#fff' }}>в нед</span>
-              <button style={BTN_DANGER} onClick={() => removeSession(idx)} aria-label={`Удалить сессию ${idx + 1}`}>✕</button>
-            </div>
-          ))}
+          {week.sessions.map((s, idx) => {
+            const structLabel = cardioStructuredLabel(s.structured);
+            const isOpen = structIdx === idx;
+            const draftTooLong = draftMainSec > s.durationMin * 60;
+            return (
+              <div key={idx} role="listitem" style={{ border: '1px solid rgba(255,255,255,0.07)', borderRadius: 10, padding: '5px 6px', background: 'rgba(255,255,255,0.02)' }}>
+                <div aria-grabbed={dragIdx === idx} tabIndex={0} onKeyDown={e => { if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { e.preventDefault(); const cur = s.dayOfWeek ?? 0; const next = (cur + (e.key === 'ArrowLeft' ? -1 : 1) + 7) % 7; updateSession(idx, { dayOfWeek: next }); } }} style={{ ...ROW, opacity: dragIdx === idx ? 0.6 : 1, border: dragIdx === idx ? '1px dashed rgba(0,230,138,0.35)' : '1px solid transparent', borderRadius: 8, padding: '4px 0' }} draggable onTouchStart={() => setDragIdx(idx)} onTouchEnd={() => setDragIdx(null)} onDragStart={() => onDragStart(idx)} onDragEnd={() => setDragIdx(null)} title="Перетащите на день недели (мышь/touch) или используйте ←/→ для перемещения">
+                  <span style={{ cursor: 'grab', fontSize: 12, color: '#fff', padding: '0 4px', userSelect: 'none' }} aria-hidden>⋮⋮</span>
+                  <SelectInput value={s.type} onChange={v => updateSession(idx, { type: v as CardioType })} ariaLabel={`Тип сессии ${idx + 1}`} width={110}
+                    options={TYPES.filter(t => hiitGate.allowed || s.type === t || (t !== 'hiit' && t !== 'miss')).map(t => ({ value: t, label: TYPE_LABEL[t] }))} />
+                  <SelectInput value={s.dayOfWeek != null ? String(s.dayOfWeek) : ''} onChange={v => updateSession(idx, { dayOfWeek: v === '' ? undefined : Number(v) })} ariaLabel={`День недели сессии ${idx + 1}`} width={110}
+                    options={[{ value: '', label: 'Авто' }, ...DAY_LABELS_RU.map((d, di) => ({ value: String(di), label: `${d}${legDays.has(di) ? ' (ноги)' : ''}` }))]} />
+                  {s.dayOfWeek != null && legDays.has(s.dayOfWeek) && s.type !== 'recovery' && (
+                    <span style={{ fontSize: 10, color: '#f87171', fontWeight: 700 }} title="День тяжёлых ног — интенсивное кардио лучше перенести">⚠ ноги</span>
+                  )}
+                  <input type="number" value={s.durationMin} onChange={e => updateSession(idx, { durationMin: Math.max(5, Math.min(180, Number(e.target.value) || 30)) })} inputMode="numeric" style={NUM} aria-label={`Минуты сессии ${idx + 1}`} />
+                  <span style={{ fontSize: 10, color: '#fff' }}>мин ×</span>
+                  <button style={{ ...BTN, minHeight: 44, minWidth: 44, padding: '4px 8px' }} onClick={() => updateSession(idx, { weeklyFrequency: Math.max(1, s.weeklyFrequency - 1) })} aria-label="Меньше частоты">−</button>
+                  <span style={{ fontSize: 12, fontWeight: 800, minWidth: 16, textAlign: 'center' }}>{s.weeklyFrequency}</span>
+                  <button style={{ ...BTN, minHeight: 44, minWidth: 44, padding: '4px 8px' }} onClick={() => updateSession(idx, { weeklyFrequency: Math.min(7, s.weeklyFrequency + 1) })} aria-label="Больше частоты">+</button>
+                  <span style={{ fontSize: 10, color: '#fff' }}>в нед</span>
+                  <button style={BTN_DANGER} onClick={() => removeSession(idx)} aria-label={`Удалить сессию ${idx + 1}`}>✕</button>
+                </div>
+                <div style={{ ...ROW, marginTop: 2 }}>
+                  <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.6)' }}>⚙ Оборудование</span>
+                  <SelectInput
+                    value={s.equipment ?? ''}
+                    onChange={v => updateSession(idx, { equipment: (v || undefined) as CardioEquipment | undefined })}
+                    ariaLabel={`Оборудование сессии ${idx + 1}`}
+                    width={140}
+                    options={[{ value: '', label: 'Авто' }, ...CARDIO_EQUIPMENT_OPTIONS.map(e => ({ value: e.id, label: `${e.icon} ${e.label}` }))]}
+                  />
+                  <button
+                    style={{ ...BTN_SMALL, flex: '1 1 150px', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', ...(structLabel ? { border: '1px solid rgba(0,230,138,0.42)' } : {}) }}
+                    onClick={() => openStructure(idx)}
+                    aria-expanded={isOpen}
+                    aria-label={`Интервалы сессии ${idx + 1}`}
+                    title="Структура интервалов: работа / отдых / повторы. Таймер пойдёт по отрезкам."
+                  >
+                    {structLabel ? `⚡ ${structLabel}` : '⚡ Интервалы (ровный темп)'}
+                  </button>
+                </div>
+                {isOpen && (
+                  <div data-cardio="week-structured" style={{ marginTop: 6, padding: '9px 10px', borderRadius: 10, background: 'rgba(0,230,138,0.05)', border: '1px solid rgba(0,230,138,0.24)', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    <div style={{ fontSize: 11, fontWeight: 850, color: '#fff' }}>⚡ Структура: работа / отдых / повторы</div>
+                    <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.62)', lineHeight: 1.45 }}>
+                      Таймер ведёт по этим отрезкам. Разминка и заминка — из остатка длительности (до 20 мин каждая); сама структура не обрезается.
+                    </div>
+                    {structDraft.length === 0 && (
+                      <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)' }}>Отрезков нет — сессия идёт ровным темпом.</div>
+                    )}
+                    {structDraft.map((b, bi) => (
+                      <div key={bi} style={ROW}>
+                        <input type="number" inputMode="numeric" value={b.workSec}
+                          onChange={e => patchBlock(bi, { workSec: clampInt(Number(e.target.value), 5, 1800) })}
+                          style={NUM} aria-label={`Работа отрезка ${bi + 1}, секунд`} />
+                        <span style={{ fontSize: 10, color: '#fff' }}>с работа /</span>
+                        <input type="number" inputMode="numeric" value={b.restSec}
+                          onChange={e => patchBlock(bi, { restSec: clampInt(Number(e.target.value), 0, 1800) })}
+                          style={NUM} aria-label={`Отдых отрезка ${bi + 1}, секунд`} />
+                        <span style={{ fontSize: 10, color: '#fff' }}>с отдых ×</span>
+                        <input type="number" inputMode="numeric" value={b.reps}
+                          onChange={e => patchBlock(bi, { reps: clampInt(Number(e.target.value), 1, 30) })}
+                          style={{ ...NUM, width: 54 }} aria-label={`Повторов отрезка ${bi + 1}`} />
+                        <button style={BTN_DANGER} onClick={() => removeBlock(bi)} aria-label={`Удалить отрезок ${bi + 1}`}>✕</button>
+                      </div>
+                    ))}
+                    <div style={ROW}>
+                      <button style={BTN_SMALL} onClick={addBlock}>+ Отрезок</button>
+                      <button style={BTN_SMALL} onClick={() => setStructDraft([])} disabled={structDraft.length === 0}>Очистить</button>
+                      <span style={{ flex: 1 }} />
+                      <button style={BTN_PRIMARY} onClick={() => saveStructure(idx)}>💾 Сохранить</button>
+                    </div>
+                    <div style={{ fontSize: 11, fontWeight: 750, color: draftTooLong ? '#fbbf24' : 'rgba(255,255,255,0.68)', lineHeight: 1.45 }} role="status">
+                      {draftLabel ? `${draftLabel} · основная часть ${Math.round(draftMainSec / 60)} мин` : 'Ровный темп'}
+                      {draftTooLong
+                        ? ` — в ${s.durationMin} мин не влезает: сессия станет ${draftNeedMin} мин (структура не режется)`
+                        : ` · в сессии ${s.durationMin} мин остаётся ${Math.max(0, s.durationMin - Math.round(draftMainSec / 60))} мин на разминку/заминку`}
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
           <div style={ROW}>
             <SelectInput value={newType} onChange={v => setNewType(v as CardioType)} ariaLabel="Тип новой сессии" width={130}
               options={TYPES.filter(t => hiitGate.allowed || (t !== 'hiit' && t !== 'miss')).map(t => ({ value: t, label: TYPE_LABEL[t] }))} />
+            <SelectInput value={newEquip} onChange={v => setNewEquip(v as CardioEquipment | '')} ariaLabel="Оборудование новой сессии" width={140}
+              options={[{ value: '', label: '⚙ Авто' }, ...CARDIO_EQUIPMENT_OPTIONS.map(e => ({ value: e.id, label: `${e.icon} ${e.label}` }))]} />
             <button style={BTN_PRIMARY} onClick={addSession}>+ Добавить сессию</button>
           </div>
         </div>

@@ -5,7 +5,7 @@
 import React from 'react';
 import { describe, expect, it, beforeEach } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { CardioConstructor } from '../CardioConstructor';
 import { getCardioLink, clearCardioLink } from '../../../../engines/lms/cardio-bridge';
 import { buildBbMacrocycle, serializeBbMacro, deserializeBbMacro } from '../../../../engines/lms/macrocycle.engine';
@@ -461,5 +461,43 @@ describe('CardioConstructor — пересборка не откатывает �
     expect(all.some(c => c.id === old.id)).toBe(true);
     const statuses = screen.getAllByRole('status').map(s => s.textContent || '').join(' ');
     expect(statuses).toMatch(/прошлый цикл завершён/i);
+  });
+
+  it('«📅 Дата старта» в мастере реально задаёт старт собранного цикла', () => {
+    render(<CardioConstructor />);
+    const dateInput = screen.getByLabelText('Дата старта цикла') as HTMLInputElement;
+    fireEvent.change(dateInput, { target: { value: '2026-05-04' } });
+    toPreview();
+    fireEvent.click(screen.getByRole('button', { name: /Собрать и сохранить цикл/ }));
+    const active = loadActiveCardioCycle();
+    expect(active?.startDate).toBe('2026-05-04');
+    // Неделя 1 начинается именно с этой даты (и это понедельник).
+    expect(cardioWeekForDate(active!, '2026-05-04', active!.startDate)?.week).toBe(1);
+  });
+
+  it('«🆕 Новый блок»: новый id, старт с выбранной даты, прошлый остаётся в библиотеке', async () => {
+    const startDate = addDaysIso(todayLocalIso(), -21);
+    const built = buildCardioCycle({ goal: 'cut', totalWeeks: 12, daysAvailable: 5, bodyWeight: 80, startDate });
+    localStorage.setItem(CYCLES_KEY, JSON.stringify([built]));
+    localStorage.setItem(ACTIVE_KEY, JSON.stringify(built));
+    render(<CardioConstructor />);
+    toPreview();
+    // Дата в мастере засеяна стартом текущего блока, а не «сегодня».
+    fireEvent.click(screen.getByRole('button', { name: /Изменить параметры/ }));
+    const dateInput = screen.getByLabelText('Дата старта цикла') as HTMLInputElement;
+    expect(dateInput.value).toBe(startDate);
+    fireEvent.change(dateInput, { target: { value: '2026-06-01' } });
+    toPreview();
+    fireEvent.click(screen.getByRole('button', { name: /Новый блок/ }));
+    fireEvent.click(await screen.findByRole('button', { name: /^Начать новый$/ }));
+    await waitFor(() => {
+      const all = loadCardioCycles();
+      expect(all.length).toBe(2);
+      expect(all.some(c => c.id === built.id)).toBe(true);
+    });
+    const all = loadCardioCycles();
+    const fresh = all.find(c => c.id !== built.id)!;
+    expect(fresh.startDate).toBe('2026-06-01');
+    expect(loadActiveCardioCycle()?.id).toBe(fresh.id);
   });
 });
