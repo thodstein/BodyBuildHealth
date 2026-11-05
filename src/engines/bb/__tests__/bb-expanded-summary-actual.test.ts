@@ -48,7 +48,7 @@ describe('bb-expanded-summary = факт плана', () => {
     for (const v of [{}, { weakPoints: ['chest_upper'] }]) {
       const plan: any = buildBBPlan({ patternId: 'fullbody_3', level: 'beginner', goal: 'mass', weeks: 1, workMax: WM, ...v });
       const text = buildBBPlanReportText(plan);
-      const m = text.match(/Итого:\s*(\d+)\s*рабочих сетов\/нед/);
+      const m = text.match(/Итого:\s*(\d+)\s*рабочих\s+(?:сет|сета|сетов)\/нед/);
       expect(m, 'в отчёте нет строки итога').toBeTruthy();
       // Рабочие сеты: активаторы/разминочные в сводке учитываются отдельно
       // (warmupSets), поэтому из суммы факта их исключаем.

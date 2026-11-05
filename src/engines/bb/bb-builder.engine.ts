@@ -24,6 +24,7 @@ import { mergeWearableIntoRecovery, wearableRecoveryFactor, type WearableDaily }
 import { bodyCompVolumeFactor } from './bb-bodycomp.engine';
 import { tempoFor } from './bb-tempo-rest';
 import { aggregateBBVolume, computeMuscleBalance } from './bb-volume.engine';
+import { ruCount, RU_SETS } from '../ru-plural';
 import { EXERCISE_CATALOG } from '../../core/exercise-catalog';
 import { selectExercisesSmart, isAxialLoadExercise } from '../exercise-selector.engine';
 import { trueMuscleOf, musclesForRole, derivePattern } from '../movement-pattern';
@@ -4968,7 +4969,7 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
     );
     for (const report of tradeoffReports) {
       if (report.removedSets > 0 || report.transferredSets > 0) {
-        rationale.push(`🔁 Донорское перераспределение (нед ${report.week}): доноры [${report.donors.join(', ')}] — снято ${report.removedSets} сетов, перенесено ${report.transferredSets}, не использовано ${report.unusedSets}${report.notes.length ? ` (${report.notes.join('; ')})` : ''}.`);
+        rationale.push(`🔁 Донорское перераспределение (нед ${report.week}): доноры [${report.donors.join(', ')}] — снято ${ruCount(report.removedSets, RU_SETS)}, перенесено ${report.transferredSets}, не использовано ${report.unusedSets}${report.notes.length ? ` (${report.notes.join('; ')})` : ''}.`);
       }
     }
   }
@@ -5323,11 +5324,11 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
         withMeth.rationale.push(`⚙️ Схемы применены к загрузке: ${heavyApplied} тяж-primary + ${pumpApplied} памп-accessory (reps/rest/tempo/вес пересчитаны).`);
       }
       // Все сплиты адаптируются: показать адаптированный объём для выбранного сплита
-      const adaptNote = `🔄 Сплит «${pattern.name}» адаптирован: целевые объёмы пересчитаны под фарму (режим ×${regimeMult.toFixed(2)}, оценка бюджета ${weeklyBudgetEstimate} сетов/нед) — все сплиты масштабируются, выбор сохранён`;
+      const adaptNote = `🔄 Сплит «${pattern.name}» адаптирован: целевые объёмы пересчитаны под фарму (режим ×${regimeMult.toFixed(2)}, оценка бюджета ${ruCount(weeklyBudgetEstimate, RU_SETS)}/нед) — все сплиты масштабируются, выбор сохранён`;
       if (!withMeth.rationale.includes(adaptNote)) withMeth.rationale.push(adaptNote);
       finalized = withMeth;
     } else {
-      finalized.rationale.push(`🔄 Сплит «${pattern.name}» адаптирован: оценка бюджета ${weeklyBudgetEstimate} сетов/нед (натурал) — все сплиты масштабируются под режим`);
+      finalized.rationale.push(`🔄 Сплит «${pattern.name}» адаптирован: оценка бюджета ${ruCount(weeklyBudgetEstimate, RU_SETS)}/нед (натурал) — все сплиты масштабируются под режим`);
     }
   } catch (e) { console.warn('[BB] PED overlay (схемы/методики/adapt-note) пропущен:', e); }
 

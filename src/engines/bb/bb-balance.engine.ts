@@ -2,6 +2,7 @@ import type { BBPlan } from './bb-builder.engine';
 import { derivePattern } from '../movement-pattern';
 import { EXERCISE_CATALOG } from '../../core/exercise-catalog';
 import { MUSCLE_LABEL_RU } from '../volume-landmarks.engine';
+import { ruCount, RU_SETS } from '../ru-plural';
 
 const PATTERN_RU: Record<string, string> = {
   horizontal_push: 'горизонтальный жим', vertical_push: 'вертикальный жим',
@@ -89,10 +90,10 @@ export function analyzeBBBalance(plan: BBPlan, opts?: { specTargets?: string[]; 
   report.compoundIsolationRatio = report.isolation > 0 ? Math.round((report.compound / report.isolation) * 100) / 100 : 0;
   report.peakWork = { press: report.upperPress, pull: report.upperPull, pullPressRatio: report.pullPressRatio };
   if (report.upperPress > 0 && report.upperPull < report.upperPress * 0.75) {
-    if (!pressAccent) report.issues.push(`Перекос верхней части: тяги ${report.upperPull} против жимов ${report.upperPress} сетов (ratio ${report.pullPressRatio}).`);
+    if (!pressAccent) report.issues.push(`Перекос верхней части: тяги ${ruCount(report.upperPull, RU_SETS)} против жимов ${ruCount(report.upperPress, RU_SETS)} (ratio ${report.pullPressRatio}).`);
   }
   if (report.upperPull > 0 && report.upperPress < report.upperPull * 0.4) {
-    if (!pullAccent) report.issues.push(`Перекос верхней части: жимы ${report.upperPress} против тяг ${report.upperPull} сетов.`);
+    if (!pullAccent) report.issues.push(`Перекос верхней части: жимы ${ruCount(report.upperPress, RU_SETS)} против тяг ${ruCount(report.upperPull, RU_SETS)}.`);
   }
   if (report.press > 0 && report.pull === 0) report.issues.push('Нет тягового объёма при наличии жимов.');
   if (report.pull > 0 && report.press === 0) report.issues.push('Нет жимового объёма при наличии тяг.');
@@ -104,12 +105,12 @@ export function analyzeBBBalance(plan: BBPlan, opts?: { specTargets?: string[]; 
     if (coverage.shortened === 0 && coverage.midRange > 0) report.issues.push(`${ru}: нет сокращённой позиции — добавьте пиковое сокращение (кроссовер, концентрированный подъём, сведение).`);
     if (Object.keys(coverage.patterns).length === 1 && Object.values(coverage.patterns)[0] >= 4) {
       const pat = Object.keys(coverage.patterns)[0];
-      report.issues.push(`${ru}: доминирует один паттерн «${PATTERN_RU[pat] || pat}» (${Object.values(coverage.patterns)[0]} сетов) — добавьте второй угол/хват для разнообразия стимула.`);
+      report.issues.push(`${ru}: доминирует один паттерн «${PATTERN_RU[pat] || pat}» (${ruCount(Object.values(coverage.patterns)[0] as number, RU_SETS)}) — добавьте второй угол/хват для разнообразия стимула.`);
     }
     const totalMuscleSets = coverage.compound + coverage.isolation;
     const isolationDominantByDesign = new Set(['biceps', 'triceps', 'forearms', 'calves', 'abs', 'shoulders', 'delt_front', 'delt_mid', 'delt_rear', 'traps', 'glutes']).has(muscle);
     if (!isolationDominantByDesign && totalMuscleSets >= 6 && coverage.compound < totalMuscleSets * 0.4) {
-      report.issues.push(`${ru}: только ${coverage.compound}/${totalMuscleSets} сетов базовых (менее 40%) — слишком много изоляции («мусорный объём»). Добавьте базу: жим/тяга/присед.`);
+      report.issues.push(`${ru}: только ${coverage.compound} из ${totalMuscleSets} базовых (менее 40%) — слишком много изоляции («мусорный объём»). Добавьте базу: жим/тяга/присед.`);
     }
   }
   return report;

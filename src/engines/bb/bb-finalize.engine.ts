@@ -30,6 +30,8 @@ import { bbExerciseTier } from './bb-exercise-tier.engine';
 import { isHardAdvanced, isPoolAllowed, swapExerciseForLevel } from './bb-exercise-levels.engine';
 import { isAxialLoadExercise } from '../exercise-selector.engine';
 import { computeVolumeLandmarks, getVolumeLandmarks } from '../volume-landmarks.engine';
+import { MUSCLE_LABEL_RU } from '../volume-landmarks.engine';
+import { ruCount, RU_SETS } from '../ru-plural';
 import { calibratedLandmarksFor, type MEVCalibration } from './bb-mev-calibration.engine';
 import { refreshBBPlanSnapshots } from './bb-plan-snapshot.engine';
 import { buildExerciseInstructions } from './bb-exercise-instructions.engine';
@@ -3852,7 +3854,7 @@ export function reconcileVolumeTargets(plan: BBPlan, opts: { maxWorkingSets?: nu
       let next = Math.round(got);
       if (next > got) next = Math.floor(got);
       target.targetSets = next;
-      plan.rationale.push(`📉 Цель «${m}» переопределена до достижимой: ${prev} → ${target.targetSets} сетов/нед (сессионный бюджет ${opts.maxWorkingSets ?? '—'}, число движений источника, perExerciseCap/кап).`);
+      plan.rationale.push(`📉 Цель «${MUSCLE_LABEL_RU[m] || m}» переопределена до достижимой: ${prev} → ${ruCount(target.targetSets, RU_SETS)}/нед (сессионный бюджет ${opts.maxWorkingSets ?? '—'}, число движений источника, perExerciseCap/кап).`);
     }
   }
 }

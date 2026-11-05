@@ -2,6 +2,7 @@ import type { BBPlan } from './bb-builder.engine';
 import type { BBBalanceReport } from './bb-balance.engine';
 import { trueMuscleOf } from '../movement-pattern';
 import { EXERCISE_CATALOG } from '../../core/exercise-catalog';
+import { ruCount, ruForm, RU_EXERCISES, RU_SETS, RU_TRAININGS, RU_WEEKS } from '../ru-plural';
 
 export interface BBPlanReport {
   pattern: string;
@@ -167,7 +168,7 @@ function progressionSummary(plan: BBPlan): string {  const byName = new Map<stri
   const peakWeek = plan.report?.peakWeek || plan.weeks.length;
   if (Math.abs(avg) < 0.5) return `Прогрессия: веса стабильны (нед 1 → пик нед ${peakWeek}, Δ ~0%)`;
   const dir = avg > 0 ? '↑' : '↓';
-  return `Прогрессия: рабочие веса ${dir} ~${Math.abs(Math.round(avg))}% к пику (нед 1 → нед ${peakWeek}, ${rows.length} первичных упражнений)`;
+  return `Прогрессия: рабочие веса ${dir} ~${Math.abs(Math.round(avg))}% к пику (нед 1 → нед ${peakWeek}, первичных упражнений: ${rows.length})`;
 }
 
 /** Сводка применённых методик (памп/дропы/суперсеты/схемы объёма/DUP/порядок) —
@@ -193,8 +194,8 @@ export function buildBBMethodologySummary(plan: BBPlan): string[] {
     if ((ex.comment || '').includes('одна группа')) samePairs++;
     else antaPairs++;
   }
-  if (antaPairs > 0) out.push(`Суперсеты (антагонисты): ${antaPairs} упражнений в парах`);
-  if (samePairs > 0) out.push(`Суперсеты (одна группа — «пробить»): ${samePairs} упражнений в парах`);
+  if (antaPairs > 0) out.push(`Суперсеты (антагонисты): ${ruCount(antaPairs, RU_EXERCISES)} в парах`);
+  if (samePairs > 0) out.push(`Суперсеты (одна группа — «пробить»): ${ruCount(samePairs, RU_EXERCISES)} в парах`);
   // Pre-exhaust-пары и гигант-сеты.
   let preCount = 0, giantCount = 0;
   for (const w of plan.weeks) for (const s of w.sessions || []) for (const ex of s.exercises || []) {
@@ -202,8 +203,8 @@ export function buildBBMethodologySummary(plan: BBPlan): string[] {
     if (c.includes('⚡ Пред-истощение')) preCount++;
     if (c.includes('🔄 Гигант-сет')) giantCount++;
   }
-  if (preCount > 0) out.push(`Pre-exhaust (изоляция → база без отдыха): ${preCount} упражнений в паре`);
-  if (giantCount > 0) out.push(`Гигант-сет (3 упражнения одной группы): ${giantCount} упражнений`);
+  if (preCount > 0) out.push(`Pre-exhaust (изоляция → база без отдыха): ${ruCount(preCount, RU_EXERCISES)} в паре`);
+  if (giantCount > 0) out.push(`Гигант-сет (3 упражнения одной группы): ${ruCount(giantCount, RU_EXERCISES)}`);
   // Интенсивные техники (дропы/rest-pause/myo-reps/21s) на последнем подходе.
   let techCount = 0;
   const techNames = new Set<string>();
@@ -213,7 +214,7 @@ export function buildBBMethodologySummary(plan: BBPlan): string[] {
     const wsTech = (ex.workSets || []).some((ws: any) => ws.technique);
     if (wsTech || m) { techCount++; if (m) techNames.add(m[1].trim()); }
   }
-  if (techCount > 0) out.push(`Интенсивные техники (${[...techNames].join(', ') || 'дропы/rest-pause'}): ${techCount} упражнений, на последнем подходе`);
+  if (techCount > 0) out.push(`Интенсивные техники (${[...techNames].join(', ') || 'дропы/rest-pause'}): ${ruCount(techCount, RU_EXERCISES)}, на последнем подходе`);
   // Схемы объёма памп-дней.
   const schemeMap: Record<string, string> = { gvt: 'GVT 10×10', fst7: 'FST-7', gironda: '8×8 Gironda' };
   let schemeCount = 0; let schemeLabel = '';
@@ -231,7 +232,7 @@ export function buildBBMethodologySummary(plan: BBPlan): string[] {
 /** Полный текстовый отчёт ББ-плана (сводка/баланс/фазы/нагрузка) — полностью на русском, код остаётся EN. */
 export function buildBBPlanReportText(plan: BBPlan): string {
   const lines: string[] = [];
-  lines.push(`План: ${plan.pattern.name} · ${plan.weeks.length} недель · ${plan.pattern.sessionsPerRotation} тренировок в неделю`);
+  lines.push(`План: ${plan.pattern.name} · ${plan.weeks.length} ${ruForm(plan.weeks.length, RU_WEEKS)} · ${plan.pattern.sessionsPerRotation} ${ruForm(plan.pattern.sessionsPerRotation, RU_TRAININGS)} в неделю`);
   // Маппинги кодов EN → RU для отображения
   const LEVEL_RU: Record<string,string> = { beginner:'Новичок', intermediate:'Средний', advanced:'Опытный', enhanced:'Enhanced (фарма)' };
   const GOAL_RU: Record<string,string> = { mass:'Масса', cut:'Сушка', recomp:'Рекомпозиция', maintenance:'Поддержание', strength_mass:'Сила+Масса' };
@@ -270,7 +271,7 @@ export function buildBBPlanReportText(plan: BBPlan): string {
   // Курс/ПЕД — одна запись (PED + множитель, не дублировать courseIntensity/MRV×)
   const peds = p.pedAdaptation?.activePEDs?.length ? `${p.pedAdaptation.activePEDs.join(', ')} ×${p.pedAdaptation.combinedMrvMultiplier?.toFixed(2)}` : (p.courseIntensity ? p.courseIntensity : null);
   if (peds) settings.push(`Курс: ${peds}`);
-  if (p.maxWorkingSets) settings.push(`Капы: ${p.maxWorkingSets} сетов / ${p.maxExercises} упр.`);
+  if (p.maxWorkingSets) settings.push(`Капы: ${ruCount(p.maxWorkingSets, RU_SETS)} / ${p.maxExercises} упр.`);
   const snap = p.inputSnapshot || {};
   if (snap.rotationMode) settings.push(`Ротация упражнений: ${ROT_RU[snap.rotationMode] || snap.rotationMode}`);
   if (snap.intensityLevel) settings.push(`Интенсивность: ${INT_RU[snap.intensityLevel] || snap.intensityLevel}`);
@@ -343,14 +344,14 @@ export function buildBBPlanReportText(plan: BBPlan): string {
           const expl = (sub as any).explanation as { labelRu?: string; patternRu?: string } | undefined;
           const label = expl?.labelRu || subId;
           const subEx = Object.entries(sub.byExercise || {}).map(([e, v]) => `${e} ${v}`).join(', ');
-          lines.push(`    └ ${label}: ${sub.workingSets} сетов${subEx ? ` — ${subEx}` : ''}`);
+          lines.push(`    └ ${label}: ${ruCount(sub.workingSets, RU_SETS)}${subEx ? ` — ${subEx}` : ''}`);
         }
       } else {
         const byEx = Object.entries((m as any).byExercise || {}).map(([e, v]) => `${e} ${v}`).join(', ');
         if (byEx) lines.push(`    ${byEx}`);
       }
     }
-    lines.push(`  Итого: ${plan.expandedSummary.totalWorkingSets} рабочих сетов/нед`);
+    lines.push(`  Итого: ${plan.expandedSummary.totalWorkingSets} рабочих ${ruForm(plan.expandedSummary.totalWorkingSets, RU_SETS)}/нед`);
   }
   lines.push('');
   const wps = plan.priorityMuscles?.filter(m => !['delt_front', 'delt_mid', 'delt_rear'].includes(m)) || [];
