@@ -1,4 +1,4 @@
-﻿/**
+/**
  * meal-plan-engine.ts — профессиональный движок генерации рациона бодибилдера.
  *
  * Принципы (на основе клинической спортивной диетологии):
@@ -14788,97 +14788,76 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
       recalcMealTotals(meals as any[]);
       recalcDayTotals(meals as any[], totals);
     }
-    // ─── §8.57: авто-перекус, когда тарелка не влезает ───────────────────────────
+    // ─── §8.57: выравнивание тарелок без добавления приёмов ───────────────────────
     // Ведро — арифметика «N приёмов × кап массы»: 2065 г еды на 3000 ккал (1.45 ккал/г)
-    // при 4 приёмах = 500–880 г на тарелку. Ни раскладка (QG53), ни плотные носители
-    // (§8.56: GL и Ca уходят из канона) вёдра не чинят. Единственный рычаг, не трогающий
-    // оси, — добавить приём и перенести в него половину крупнейшего гарнира.
-    // Включается флагом `autoExtraMeal` (решение владельца), по умолчанию выключено.
-    if ((input as any).autoExtraMeal) {
+    // при 4 приёмах = 500–880 г на тарелку. Добавление приёма вёдра чинит, но платит
+    // осью «белок ядра»: новый перекус дробит белок, и приём-донор падает ниже 0.30 г/кг
+    // (замер: avg 88.18 против 91.25). Правильный рычаг — перенести половину крупнейшего
+    // гарнира в самый лёгкий существующий приём того же дня: число приёмов, белок и
+    // микро дня не меняются. Флаг `autoMealRebalance` (по умолчанию ВЫКЛ: перенос гарнира
+    // в чужой приём в конце конвейера ломает 31 замок каплей углеводов — долг §8.57).
+    if ((input as any).autoMealRebalance) {
       const _skip57 = new Set(['liquid', 'supplement']);
       const _mass57 = (m: any) => (m.items || [])
         .filter((i: any) => !_skip57.has(String(i.role || '')))
         .reduce((s: number, i: any) => s + (Number(i.amount) || 0), 0);
-      const _heavy57 = [...meals].filter((m: any) => _mass57(m) > 500).sort((a: any, b: any) => _mass57(b) - _mass57(a));
-      let _added57 = 0;
-      for (const hm of _heavy57) {
-        const _snackN = meals.filter((m: any) => /^snack/.test(String(m.type))).length;
-        if (_snackN >= 8) break;
-        const _carb57: any = (hm.items || [])
-          .filter((i: any) => (i.role === 'carb_slow' || i.role === 'carb_fast') && (Number(i.amount) || 0) >= 120)
-          .sort((a: any, b: any) => (Number(b.amount) || 0) - (Number(a.amount) || 0))[0];
-        if (!_carb57) continue;
-        const _move = Math.round((Number(_carb57.amount) || 0) * 0.5);
-        const _r = _move / Math.max(1, Number(_carb57.amount) || 1);
-        const _loser: any = { ..._carb57, amount: _move };
+      // Донор — основной приём (завтрак/обед/ужин/перекус), но не окна (peri-капы и
+      // инсулиновые окна неприкосновенны) и не предсон (там белково-жировой состав).
+      const _eligible57 = (m: any) => !['preworkout', 'postworkout', 'intra', 'presleep'].includes(String(m.type || ''));
+      // Получатель — перекус: завтрак не принимает рис/картофель/макароны, окна держат
+      // peri-капы, а обед/ужин не должны получать второй полноценный гарнир (P1/P1a-fix2).
+      const _receiver57 = (m: any) => /^snack/.test(String(m.type || ''));
+      let _moves57 = 0;
+      for (let _it57 = 0; _it57 < 8; _it57++) {
+        const _heavy57 = [...meals]
+          .filter((m: any) => _eligible57(m) && _mass57(m) > 500)
+          .sort((a: any, b: any) => _mass57(b) - _mass57(a))[0];
+        if (!_heavy57) break;
+        const _carbs57 = (_heavy57.items || [])
+          .filter((i: any) => (i.role === 'carb_slow' || i.role === 'carb_fast') && (Number(i.amount) || 0) >= 60)
+          .sort((a: any, b: any) => (Number(b.amount) || 0) - (Number(a.amount) || 0));
+        const _cand57 = [...meals]
+          .filter((m: any) => m !== _heavy57 && _receiver57(m) && (m.items || []).length > 0 && 500 - _mass57(m) >= 30)
+          .sort((a: any, b: any) => _mass57(a) - _mass57(b))[0];
+        const _pick57: any = _cand57 && _carbs57.length > 0 ? _carbs57[0] : null;
+        const _light57: any = _cand57 && _carbs57.length > 0 ? _cand57 : null;
+        if (!_pick57) break;
+        const _room57 = 500 - _mass57(_light57);
+        const _min57 = _pick57.role === 'carb_fast' ? 20 : 30;
+        // Половина пункта, но не больше свободного места на тарелке получателя и так,
+        // чтобы у донора осталась осмысленная порция (≥ _min57).
+        const _mv57 = Math.min(
+          Math.round((Number(_pick57.amount) || 0) / 2),
+          Math.round(Number(_pick57.amount) || 0) - _min57,
+          Math.max(_min57, Math.round(_room57)),
+        );
+        if (_mv57 < _min57) break;
+        const _r57 = _mv57 / Math.max(1, Number(_pick57.amount) || 1);
+        const _moved57: any = { ..._pick57, amount: _mv57 };
         for (const k of ['p', 'f', 'c', 'kcal', 'fiber', 'leucine_mg']) {
-          if (_loser[k]) _loser[k] = Math.round(Number(_loser[k]) * _r * 10) / 10;
+          if (_moved57[k]) _moved57[k] = Math.round(Number(_moved57[k]) * _r57 * 10) / 10;
         }
-        _carb57.amount = Math.round((Number(_carb57.amount) || 0) - _move);
+        _pick57.amount = Math.round((Number(_pick57.amount) || 0) - _mv57);
         for (const k of ['p', 'f', 'c', 'kcal', 'fiber', 'leucine_mg']) {
-          if (_carb57[k]) _carb57[k] = Math.round(Number(_carb57[k]) * (1 - _r) * 10) / 10;
+          if (_pick57[k]) _pick57[k] = Math.round(Number(_pick57[k]) * (1 - _r57) * 10) / 10;
         }
-        const _type57 = `snack${_snackN + 1}`;
-        // Вместе с гарниром переносим половину белкового пункта: перекус только из углеводов
-        // роняет ось «белок ядра» (замер: avg 91.25 → 82.88 без этого).
-        const _prot57: any = (hm.items || [])
-          .filter((i: any) => (i.role === 'protein' || i.role === 'fast_protein' || i.role === 'slow_protein') && (Number(i.amount) || 0) >= 80)
-          .sort((a: any, b: any) => (Number(b.amount) || 0) - (Number(a.amount) || 0))[0];
-        const _extra57: any[] = [];
-        if (_prot57) {
-          // Белок в новый перекус — не больше, чем позволяет донор: он обязан остаться
-          // ≥0.30 г/кг (порог MPS), иначе ось «белок основного приёма» падает.
-          const _w57 = Math.max(1, Number(input.weightKg) || 0);
-          const _perGp = (Number(_prot57.p) || 0) / Math.max(1, Number(_prot57.amount) || 1);
-          let _mv = Math.max(40, Math.round((Number(_prot57.amount) || 0) * 0.5));
-          if (((Number(_prot57.p) || 0) - _mv * _perGp) / _w57 < 0.3) {
-            _mv = Math.max(0, Math.round(((Number(_prot57.p) || 0) - 0.3 * _w57) / Math.max(0.02, _perGp)));
-          }
-          const _rp = _mv / Math.max(1, Number(_prot57.amount) || 1);
-          const _lp: any = { ..._prot57, amount: _mv };
+        // Один продукт в двух приёмах — это одна порция, поделённая на две тарелки:
+        // объединяем пункт, чтобы «разнообразие» не считало его дважды.
+        const _same57 = (_light57.items || []).find((i: any) => i.id === _moved57.id);
+        if (_same57) {
+          _same57.amount = Math.round((Number(_same57.amount) || 0) + _mv57);
           for (const k of ['p', 'f', 'c', 'kcal', 'fiber', 'leucine_mg']) {
-            if (_lp[k]) _lp[k] = Math.round(Number(_lp[k]) * _rp * 10) / 10;
+            if (_moved57[k]) _same57[k] = Math.round(((Number(_same57[k]) || 0) + Number(_moved57[k])) * 10) / 10;
           }
-          _prot57.amount = Math.round((Number(_prot57.amount) || 0) - _mv);
-          for (const k of ['p', 'f', 'c', 'kcal', 'fiber', 'leucine_mg']) {
-            if (_prot57[k]) _prot57[k] = Math.round(Number(_prot57[k]) * (1 - _rp) * 10) / 10;
-          }
-          _extra57.push(_lp);
+        } else {
+          (_light57.items as any[]).push(_moved57);
         }
-        // Жир тоже переносим половиной: иначе весь жир дня остаётся в основных приёмах,
-        // maxFatShare растёт и ось «распределение жира» проседает (§8.57).
-        const _fat57: any = (hm.items || [])
-          .filter((i: any) => i.role === 'fat' && (Number(i.amount) || 0) >= 10)
-          .sort((a: any, b: any) => (Number(b.amount) || 0) - (Number(a.amount) || 0))[0];
-        if (_fat57) {
-          const _mvf = Math.round((Number(_fat57.amount) || 0) * 0.5);
-          const _rf = _mvf / Math.max(1, Number(_fat57.amount) || 1);
-          const _lf: any = { ..._fat57, amount: _mvf };
-          for (const k of ['p', 'f', 'c', 'kcal', 'fiber', 'leucine_mg']) {
-            if (_lf[k]) _lf[k] = Math.round(Number(_lf[k]) * _rf * 10) / 10;
-          }
-          _fat57.amount = Math.round((Number(_fat57.amount) || 0) - _mvf);
-          for (const k of ['p', 'f', 'c', 'kcal', 'fiber', 'leucine_mg']) {
-            if (_fat57[k]) _fat57[k] = Math.round(Number(_fat57[k]) * (1 - _rf) * 10) / 10;
-          }
-          _extra57.push(_lf);
-        }
-        meals.push({
-          label: `Перекус ${_snackN + 1}`,
-          time: '',
-          items: [_loser, ..._extra57],
-          totals: { kcal: 0, p: 0, f: 0, c: 0, fiber: 0 },
-          type: _type57,
-          rationale: ['Перекус добавлен, потому что тарелка не влезала в один приём (§8.57).'],
-          mpsCheck: true,
-          target: { p: Math.round(_loser.c ? 0 : 0), c: Math.round(_loser.c || 0), f: 0 },
-        } as any);
+        _moves57++;
         recalcMealTotals(meals as any[]);
         recalcDayTotals(meals as any[], totals);
-        _added57++;
       }
-      if (_added57 > 0) {
-        notes.push(`➕ Добавлен${_added57 === 1 ? '' : 'о'} ${_added57} перекус(а/ов): тарелка не влезала в один приём — углеводы перенесены, КБЖУ дня те же.`);
+      if (_moves57 > 0) {
+        notes.push('➕ Гарнир переложен в более лёгкие приёмы: тарелки остаются в пределах 500 г, КБЖУ дня те же (§8.57).');
       }
     }
     const _finalCategories: Record<string, number> = {};
