@@ -309,8 +309,18 @@ describe('атлеты', () => {
     expect(hint).toContain('Удалить и его данные');
   });
 
-  it('подтверждение показывает измеренный объём, а не выдуманный', () => {
+  it('в подтверждении сказано, что данные уйдут и из облака, а телефон атлета потеряет доступ', () => {
     seed(1);
+    const { container } = render(<ProfileCoachTab />);
+    fireEvent.click(container.querySelector('[data-coach="delete"]') as HTMLElement);
+    const hint = container.querySelector('[data-coach="delete-cloud-hint"]')?.textContent ?? '';
+    // Без этого тренер не знает, что удаление дойдёт и до телефона атлета.
+    expect(hint).toContain('из облака');
+    expect(hint).toContain('потеряет');
+    expect(hint).toContain('следующей синхронизации');
+  });
+
+  it('подтверждение показывает измеренный объём, а не выдуманный', () => {    seed(1);
     const sid = athleteSpaceId('a1');
     localStorage.setItem(`${ATHLETE_SPACE_PREFIX}${sid}__he_profile_v2`, 'x'.repeat(2048));
     const { container } = render(<ProfileCoachTab />);

@@ -2670,6 +2670,16 @@ export const ProfileCoachTab: React.FC<{
                         .
                       </div>
                     )}
+                    {confirmDeleteId === a.id && (
+                      <div
+                        data-coach="delete-cloud-hint"
+                        style={{ marginTop: 4, fontSize: 11.5, color: colors.textMuted, lineHeight: 1.45 }}
+                      >
+                        «Удалить и его данные» уносит их и из облака: телефон атлета, подключённый по
+                        коду, потеряет к ним доступ. Если связи нет прямо сейчас, уборка произойдёт при
+                        следующей синхронизации.
+                      </div>
+                    )}
                     {reportFor === a.id && (
                       <CoachReportSheet
                         athlete={a}
