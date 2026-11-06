@@ -440,6 +440,11 @@ export function CoachDeviceInviteCard({ spaces, onAudit, onChanged }: Props) {
         <div style={{ ...hint, marginTop: 2 }}>
           Для атлета: вставьте код, который прислал тренер. Этот телефон получит только своё пространство.
         </div>
+        <div data-coach="device-join-home-hint" style={{ ...hint, marginTop: 4, color: colors.textSubtle }}>
+          Записи, сделанные на этом телефоне раньше, никуда не денутся и в пространство тренера не
+          переедут: они остаются в домашнем профиле, и вернуться к ним можно в любой момент — кнопкой
+          возврата к своим данным.
+        </div>
 
         {joined.length > 0 && (
           <div data-coach="device-joined" style={{ marginTop: 8, display: 'grid', gap: 6 }}>

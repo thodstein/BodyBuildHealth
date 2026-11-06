@@ -239,6 +239,20 @@ describe('атлет: подключение по коду', () => {
     expect(readRegistryFromStorage().active).toBe('home');
   });
 
+  it('атлету сразу сказано, что его прошлые записи не переезжают к тренеру', () => {
+    const { container } = render(
+      <CoachDeviceInviteCard
+        spaces={[{ id: 'home', athleteId: null, label: 'Мои данные', createdAt: '' }]}
+        onAudit={() => {}}
+      />,
+    );
+    // Атлет ждёт «подключусь — и мои дневники поедут к тренеру». Это не так:
+    // пространства раздельные, и молчать об этом нельзя.
+    const hint = container.querySelector('[data-coach="device-join-home-hint"]')?.textContent ?? '';
+    expect(hint).toContain('домашнем профиле');
+    expect(hint).toContain('не переедут');
+  });
+
   it('на телефоне атлета не предлагает выдать или сменить код чужого пространства', async () => {
     const token = 'tk_' + '6'.repeat(48);
     const code = encodeSpaceInvite({
