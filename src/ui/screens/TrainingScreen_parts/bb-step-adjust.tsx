@@ -83,7 +83,7 @@ export interface BbAdjustStepProps {
   handleSendToExecution: () => void;
   handlePrintPlan: () => void;
   handleExportIcs: () => void;
-  handlePrintMesocycleTable: () => void;
+  handlePrintMesocycleTable: (weekNo?: number) => void;
   handleExportQualityReport: () => void;
   handleExportCSV: () => void;
   handleLoadVariant: (v: SavedBBPlan) => void;
@@ -254,7 +254,8 @@ export const BbAdjustStep: React.FC<BbAdjustStepProps> = ({
             <button style={{ ...BTN_GHOST, borderColor:'#38bdf8', color:'#38bdf8' }} aria-label="Открыть ББ-диагностику" onClick={() => { try { window.dispatchEvent(new CustomEvent('training-open-tab', { detail: 'bb_diagnostics_hub' })); } catch {} }}>🎯 ББ-диагностика</button>
            <button style={BTN_GHOST} onClick={handlePrintPlan}>🖨 PDF</button>
             <button style={BTN_GHOST} onClick={handleExportIcs}>📅 .ics</button>
-            <button style={BTN_GHOST} onClick={handlePrintMesocycleTable}>📋 Вся таблица</button>
+            <button style={BTN_GHOST} onClick={() => handlePrintMesocycleTable()}>📋 Вся таблица</button>
+            <button style={BTN_GHOST} onClick={() => handlePrintMesocycleTable(bbWeekSel)} title="Печать только текущей недели — лист на страницу для зала">🖨 Неделя</button>
            <button style={BTN_GHOST} onClick={handleExportQualityReport}>📄 Отчёт (txt)</button>
            <button style={BTN_GHOST} onClick={handleExportCSV}>📥 CSV</button>
           </div>

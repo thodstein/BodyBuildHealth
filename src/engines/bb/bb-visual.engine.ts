@@ -237,24 +237,41 @@ function esc(s: unknown): string {
   return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
-/** Фаза 4.24: стилизованный print HTML (цвета фаз, таблица мезоцикла, heatmap) вместо <pre>. */
-export function buildBBPlanPrintHtml(plan: BBPlan, opts?: { heatmap?: boolean }): string {
+/**
+ * Фаза 4.24: стилизованный print HTML (цвета фаз, таблица мезоцикла, heatmap).
+ *
+ * §6.4 (практический бодибилдинг): нужны ОБА формата — «весь мезоцикл» для
+ * тренера и «неделя на страницу» для зала. Раньше был только первый, и
+ * распечатка недели занимала одну страницу из шести. Теперь:
+ *   `scope: 'week'` — только выбранная неделя;
+ *   `pageBreakPerWeek` — каждая неделя начинается с новой страницы.
+ */
+export function buildBBPlanPrintHtml(plan: BBPlan, opts?: { heatmap?: boolean; scope?: 'mesocycle' | 'week'; week?: number; pageBreakPerWeek?: boolean }): string {
   const title = esc(plan.pattern?.name || 'BB-план');
-  const rows = buildBBMesocycleTable(plan);
-  const heatmap = opts?.heatmap !== false ? buildBBMuscleHeatmap(plan) : [];
+  const isWeekScope = opts?.scope === 'week';
+  const allRows = buildBBMesocycleTable(plan);
+  const rows = isWeekScope && opts?.week != null ? allRows.filter(r => r.week === opts.week) : allRows;
+  const heatmapAll = opts?.heatmap !== false ? buildBBMuscleHeatmap(plan) : [];
+  const heatmap = isWeekScope && opts?.week != null ? heatmapAll.filter(h => h.week === opts.week) : heatmapAll;
   // Печать — для человека и тренера: сырые ключи (`delt_mid`, `back`) и
   // английский уровень в ней недопустимы. Замер до правки: 2507 из 2946 ячеек
   // мышц печатались ключами, 16/16 планов печатали `Level: advanced`.
   const LEVEL_RU: Record<string, string> = { beginner: 'Новичок', intermediate: 'Средний', advanced: 'Опытный', enhanced: 'Enhanced (фарма)' };
   const phases = new Set(rows.map(r => r.phase));
   const phaseLegend = [...phases].map(p => `<span style="margin-right:10px"><i style="display:inline-block;width:10px;height:10px;background:${BB_PHASE_COLOR[p] || '#888'};border-radius:2px"></i> ${esc(BB_PHASE_LABEL_RU[p] || p)}</span>`).join('');
-  const weeksHtml = rows.map(r => {
+  const rowHtml = (r: MesocycleRow): string => {
     const pc = BB_PHASE_COLOR[r.phase] || '#888';
     const exercises = r.exercises.map(ex => `<tr><td>${esc(ex.name)}${ex.superset ? ` <b style="color:#a855f7">🔗${esc(ex.superset)}</b>` : ''}</td><td>${esc(ruMuscle(ex.muscle))}</td><td>${ex.sets}</td><td>${ex.reps}</td><td>${ex.weight}</td><td>${ex.rir}</td><td>${ex.rest}</td><td style="font-size:9px">${esc(ex.technique || '')}</td><td style="font-size:9px">${esc(ex.progression || '')}</td><td style="border-left:1px solid #999;min-width:70px">&nbsp;</td></tr>`).join('');
     return `<h3 style="margin:14px 0 4px;color:${pc}">Неделя ${r.week} · ${esc(r.phase)} · День ${r.day} (${esc(r.character)})</h3>
       <table border="1" cellspacing="0" cellpadding="4" style="border-collapse:collapse;width:100%;font-size:11px">
         <thead><tr style="background:#f4f4f5"><th>Упражнение</th><th>Мышца</th><th>Сеты</th><th>Повт</th><th>Вес</th><th>RIR</th><th>Отдых</th><th>Техника</th><th>Прогрессия</th><th>Факт (вес×повт)</th></tr></thead>
         <tbody>${exercises}</tbody></table>`;
+  };
+  const weekNos = [...new Set(rows.map(r => r.week))];
+  const weeksHtml = weekNos.map((wn, gi) => {
+    const inner = rows.filter(r => r.week === wn).map(rowHtml).join('');
+    const brk = opts?.pageBreakPerWeek && gi > 0 ? ' style="page-break-before:always"' : '';
+    return `<section${brk}>${inner}</section>`;
   }).join('');
   const heatmapHtml = heatmap.length ? (() => {
     const weeks = [...new Set(heatmap.map(h => h.week))].sort((a, b) => a - b);
@@ -272,13 +289,17 @@ export function buildBBPlanPrintHtml(plan: BBPlan, opts?: { heatmap?: boolean })
     return `<h3 style="margin:16px 0 4px">🧬 Heatmap «мышца × неделя»</h3><table border="1" cellspacing="0" cellpadding="4" style="border-collapse:collapse;font-size:11px"><thead><tr>${header}</tr></thead><tbody>${body}</tbody></table>`;
   })() : '';
   const levelLine = plan.level ? (LEVEL_RU[String(plan.level)] || String(plan.level)) : '';
+  const scopeTitle = isWeekScope && opts?.week != null
+    ? `${title} — неделя ${esc(opts.week)} из ${plan.weeks.length}`
+    : `${title} — ${plan.weeks.length} нед`;
+  const tableHeading = isWeekScope && opts?.week != null ? `📋 Неделя ${esc(opts.week)} на страницу` : '📋 Таблица мезоцикла';
   return `<!DOCTYPE html><html lang="ru"><head><meta charset="utf-8"><title>${title}</title>
 <style>body{font-family:system-ui,Arial,sans-serif;max-width:900px;margin:0 auto;padding:20px;color:#111;font-size:12px}
 h1{font-size:18px}h2{font-size:14px;border-bottom:1px solid #ddd;padding-bottom:4px}@media print{body{font-size:10px}}</style>
-</head><body><h1>${title} — ${plan.weeks.length} нед</h1>
+</head><body><h1>${scopeTitle}</h1>
 <div style="margin:8px 0">${phaseLegend}</div>
 <div style="margin:4px 0 0;color:#666;font-size:11px">Уровень: ${esc(levelLine)} · MRV×${esc((plan as any).mrvMultiplier ?? 1)}</div>
-<h2>📋 Таблица мезоцикла</h2>${weeksHtml}${heatmapHtml}</body></html>`;
+<h2>${tableHeading}</h2>${weeksHtml}${heatmapHtml}</body></html>`;
 }
 
 /** Сдвиг ISO-даты (`YYYY-MM-DD`) на N дней. Один календарный канон на модуль. */

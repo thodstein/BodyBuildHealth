@@ -35,8 +35,14 @@ const allowedFor = (level: string): Set<string> => new Set(
 );
 
 describe('M-3: уровень техник берётся из данных, а не из догадки', () => {
-  it('новичок: техник нет вообще', () => {
-    expect(techniquesOf(planFor('beginner'))).toEqual([]);
+  it('новичок: только дроп-сет, без отказных техник', () => {
+    // §6.5 (практический бодибилдинг): новичку допустим один дроп-сет в конце
+    // изоляции — он не требует отказа и не ломает технику. Rest-pause/myo-rep/21s
+    // остаются закрытыми: это отказные протоколы.
+    const used = techniquesOf(planFor('beginner'));
+    for (const t of used) expect(['dropset'], `новичок получил ${t}`).toContain(t);
+    expect(used).not.toContain('rest_pause');
+    expect(used).not.toContain('myo_rep');
   });
 
   it('intermediate: только техники, разрешённые данными (без rest-pause/myo-rep)', () => {

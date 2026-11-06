@@ -23,6 +23,8 @@ export interface MethodologyFinisher {
   reps: number;
   rir: number;
   restSec: number;
+  /** Темп последнего подхода — протокол, а не только «7 сетов». */
+  tempo?: string;
   /** Тег техники для плана/печати (совпадает с `REP_SCHEMES.fst7.techniques`). */
   technique: string;
 }
@@ -33,6 +35,12 @@ export interface MethodologySpec {
   labelRu: string;
   /** Что методика делает с порядком — одна строка для карточки сессии. */
   orderNote: string;
+  /**
+   * Полный практический протокол (сеты × повторы × RIR, пауза, темп) — то, что
+   * тренер реально диктует по ходу дня. Появился после разбора §6.1: название
+   * методики обещало протокол, а в плане был только порядок.
+   */
+  protocolLine?: string;
   /** Модификатор отдыха в секундах (применяется только к аксессуарам). */
   restDeltaSec: number;
   /** Нижний предел отдыха после модификатора (не режем паузу «в пол»). */
@@ -55,6 +63,7 @@ export const METHODOLOGY_SPECS: Record<SessionMethodology, MethodologySpec> = {
     id: 'compound_first',
     labelRu: 'Базовые → изоляция',
     orderNote: 'сначала тяжёлые многосуставные на свежие мышцы, затем изоляция и финишёры.',
+    protocolLine: 'база 3-5×6-10 RIR1-2, отдых 120-180 с · изоляция 2-4×10-15 RIR0-1, отдых 45-90 с.',
     restDeltaSec: 0,
     restFloorSec: 45,
     honestNote: 'Порядок почти не влияет на гипертрофию (мета-анализ Nunes 2020, umbrella 2022/2023), но первое упражнение растёт в силе быстрее — поэтому тяжёлая база идёт первой.',
@@ -64,6 +73,7 @@ export const METHODOLOGY_SPECS: Record<SessionMethodology, MethodologySpec> = {
     id: 'pre_exhaust',
     labelRu: 'Pre-exhaust: изоляция первой',
     orderNote: 'изоляция целевой мышцы идёт ПЕРЕД базой, вес базы автоматически −10 %.',
+    protocolLine: 'изоляция 2×12-15 RIR2-3 (не в отказ) → база 3-4×6-9 RIR1-2, вес базы −10 %, отдых 60-90 с после изоляции.',
     restDeltaSec: 0,
     restFloorSec: 45,
     honestNote: 'Предутомление не усиливает стимул: 12-недельное сравнение не дало преимуществ (Gentil 2014), ЭМГ показывает перераспределение работы на синергист. Это инструмент ощущения мышцы и техники, а не «больше роста».',
@@ -73,6 +83,7 @@ export const METHODOLOGY_SPECS: Record<SessionMethodology, MethodologySpec> = {
     id: 'post_exhaust',
     labelRu: 'Post-exhaust: база → изоляция',
     orderNote: 'изоляция той же мышцы ставится сразу после базы (добивка при том же бюджете времени).',
+    protocolLine: 'база 3-4×6-9 RIR1-2 → изоляция 2-3×12-15 в отказ (RIR0), отдых 30-45 с внутри пары.',
     restDeltaSec: 0,
     restFloorSec: 45,
     honestNote: 'Добивка после базы — способ добрать объём за то же время; при равном числе сетов стимул сопоставим с обычным порядком (обзор стратегий 2025).',
@@ -82,6 +93,7 @@ export const METHODOLOGY_SPECS: Record<SessionMethodology, MethodologySpec> = {
     id: 'mountain_dog',
     labelRu: 'Mountain Dog: активация → база → памп → стретч',
     orderNote: 'лёгкая активация (RIR ≥ 3, не в отказ) → тяжёлая база → памп → loaded stretch последним.',
+    protocolLine: 'активация 2×12-15 RIR3, отдых 60 с · база 3-4×6-9 RIR1-2, отдых 120-180 с · памп 3×12-15 RIR0-1, отдых 45-60 с · loaded stretch 1×30-45 с.',
     restDeltaSec: 0,
     restFloorSec: 45,
     honestNote: 'Фазовая структура дня (Meadows) — про качество стимула и суставы; отдельного преимущества в гипертрофии при равном объёме не показано.',
@@ -91,12 +103,13 @@ export const METHODOLOGY_SPECS: Record<SessionMethodology, MethodologySpec> = {
     id: 'fst7',
     labelRu: 'FST-7: праймер → 7-сетовый финишер',
     orderNote: 'памп-праймер (RIR ≥ 3) первым, тяжёлая работа в середине, 7-сетовый финишер и стретч в конце.',
+    protocolLine: 'праймер 2×10-12 RIR3 → рабочие 3-4×8-12 RIR1-2 → финишер 7×8-12 RIR1-2, отдых 30-45 с, постоянное напряжение без замка.',
     restDeltaSec: 0,
     restFloorSec: 45,
     // Методика включает FST-7 как СХЕМУ объёма, а не только порядок:
     // без этого 7-сетовый финишер требовал отдельного выбора схемы (M-1).
     impliedVolumeScheme: 'fst7',
-    finisher: { sets: 7, reps: 12, rir: 2, restSec: 40, technique: 'fst7' },
+    finisher: { sets: 7, reps: 12, rir: 2, restSec: 40, tempo: '2-1-1-0', technique: 'fst7' },
     honestNote: 'FST-7 — способ добрать объём одной мышцей за короткое время и получить памп; при равном объёме не превосходит обычный тренинг (Sødal 2023, обзор 2025). Гейт: только enhanced без joint-guard. 7 сетов ставятся, только если влезают в MRV недели — иначе финишер укорачивается, и это прямо написано в плане.',
     evidence: 'Hany Rambod (FST-7); Sødal 2023; advanced strategies 2025.',
   },
@@ -104,6 +117,7 @@ export const METHODOLOGY_SPECS: Record<SessionMethodology, MethodologySpec> = {
     id: 'hyperemia',
     labelRu: 'Hyperemia: памп раньше тяжестей',
     orderNote: 'у аксессуаров памп-изоляция идёт раньше тяжёлой, паузы короче на 15 с (не ниже 45 с).',
+    protocolLine: 'памп-изоляции 12-20 повт перед тяжёлой, отдых −15 с (пол 45 с), темп 2-0-1-0 — плотность, не «больше роста».',
     restDeltaSec: -15,
     restFloorSec: 45,
     honestNote: 'Кровенаполнение (Sarcev) — про ощущение и плотность тренировки. Это осознанный компромисс: паузы >60 с в мета-анализе 2024 дают чуть больше гипертрофии, поэтому ниже 45 с не опускаем и не обещаем «больше роста» от плотности. Гормональный отклик не является медиатором роста (обзор 2025).',
@@ -146,6 +160,6 @@ export function applyMethodologyRest(
 export function methodologyOptions(): Array<{ id: SessionMethodology; label: string; desc: string }> {
   return (Object.keys(METHODOLOGY_SPECS) as SessionMethodology[]).map(id => {
     const spec = METHODOLOGY_SPECS[id];
-    return { id, label: spec.labelRu, desc: `${spec.orderNote} ${spec.honestNote}` };
+    return { id, label: spec.labelRu, desc: [spec.orderNote, spec.protocolLine, spec.honestNote].filter(Boolean).join(' ') };
   });
 }

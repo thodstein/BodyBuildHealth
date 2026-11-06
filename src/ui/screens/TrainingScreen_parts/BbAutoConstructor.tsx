@@ -3385,12 +3385,18 @@ const [bbVolumeRamp, setBbVolumeRamp] = useState<'standard' | 'preloaded' | 'fla
     } catch { flash('⚠ Не удалось сформировать .ics'); }
   };
 
-  /** 4.7: печать «таблицы мезоцикла» — единый движковый buildBBPlanPrintHtml (фазы/таблица/heatmap). */
-  const handlePrintMesocycleTable = () => {
+  /** 4.7: печать «таблицы мезоцикла» — единый движковый buildBBPlanPrintHtml (фазы/таблица/heatmap).
+   *  §6.4: без аргумента — весь мезоцикл с новой страницы на каждую неделю (для тренера),
+   *  с номером недели — только эта неделя (лист для зала). */
+  const handlePrintMesocycleTable = (weekNo?: number) => {
     if (!builtPlan) return;
     const plan = applyEditsToPlan(builtPlan);
     try {
-      const html = buildBBPlanPrintHtml(plan, { heatmap: true });
+      const html = buildBBPlanPrintHtml(plan, {
+        heatmap: true,
+        pageBreakPerWeek: true,
+        ...(weekNo ? { scope: 'week' as const, week: weekNo } : {}),
+      });
       const w = window.open('', '_blank');
       if (!w) { flash('Разрешите всплывающие окна для печати'); return; }
       w.document.write(html.replace('</body>', '<script>window.print()</script></body>'));

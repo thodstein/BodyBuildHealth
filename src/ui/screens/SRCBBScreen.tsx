@@ -15,6 +15,7 @@ import { acuteChronicRatio, toDailyLoads } from '../../engines/pro/training-load
 import { loadSRPESessions } from '../../engines/pro/srpe-store';
 import { rankBBSplits } from '../../engines/bb/bb-selector.engine';
 import { buildBBPlan, applyMacrocycleToBBPlan, type BBPlan } from '../../engines/bb/bb-builder.engine';
+import { arrangeSupersetBlocks } from '../../engines/bb/bb-session-order.engine';
 import { applyTrainingTaperToBBPlan, deserializeBBPrepConfig, legacyConfigFromProfile, isoAddDays, isoToday, type BBContestPrepConfig } from '../../engines/bb/bb-contest-prep.engine';
 import { adaptForPEDs, type PED } from '../../engines/bb/bb-ped-adaptation.engine';
 import { getAllVolumeLandmarks } from '../../engines/volume-landmarks.engine';
@@ -1304,7 +1305,7 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
      const wk = builtBb.weeks[Math.min(Math.max(bbWeekSel - 1, 0), builtBb.weeks.length - 1)];
     return wk.sessions.map((sess, i) => ({
       label: `Д${i + 1} ${sess.character}${(sess as any).peakWeekTraining ? ' 🎭' : ''}${sess.exercises.length === 0 ? ' 😴 отдых' : ''}`,
-      exercises: sess.exercises.map(e => {
+      exercises: arrangeSupersetBlocks(sess.exercises.map(e => {
         const sourceSets = e.workSets.length > 0
           ? e.workSets
           : [{ weight: 0, reps: 0, rir: e.rir }];
@@ -1337,8 +1338,15 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
         return {
           name: exName, muscleGroup: e.muscle,
           targetSets,
+          // §8: суперсет — это блок A1→B1, а не бейдж на разнесённых упражнениях.
+          // Раньше поля терялись при выдаче в плеер; теперь доезжают (и порядок
+          // собирается arrangeSupersetBlocks, чтобы пара была рядом).
+          ...(e.supersetGroup != null ? {
+            supersetGroup: Number(e.supersetGroup),
+            supersetSlot: (Number(e.supersetSlot) === 1 ? 1 : 0) as 0 | 1,
+          } : {}),
         };
-      }),
+      })),
     }));
   }, [builtBb, bbWeekSel, autoRegOn, autoRegMode, autoRegResult, diaryAutoreg, priAdjust, tempoAdjust, rirShiftAdjust, deloadAdjust, peakAdjust]);
 

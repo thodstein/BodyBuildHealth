@@ -428,7 +428,8 @@ export function tidySessionExercises(
 
 /* ─────────────── O-5: объяснение порядка (карточка сессии в плане) ─────────────── */
 
-const MUSCLE_RU_SHORT: Record<string, string> = {
+/** Русские короткие имена мышц — общий словарь для текстов плана/печати. */
+export const MUSCLE_RU_SHORT: Record<string, string> = {
   chest: 'грудь', back: 'спина', shoulders: 'плечи', quads: 'квадрицепс',
   hamstrings: 'бицепс бедра', glutes: 'ягодицы', legs: 'ноги', calves: 'икры',
   biceps: 'бицепс', triceps: 'трицепс', forearms: 'предплечья', traps: 'трапеция',
@@ -447,6 +448,7 @@ export function explainSessionOrder(exercises: BBExercise[], opts: OrderOpts = {
   if (warm) notes.push(`🔥 Разминочный активатор первым (${warm}) — вне зачётного объёма.`);
   const spec = methodologySpecFor(opts.methodology);
   notes.push(`📐 ${spec.labelRu}: ${spec.orderNote}`);
+  if (spec.protocolLine) notes.push(`📋 Протокол: ${spec.protocolLine}`);
   const lead = [...new Set((opts.leadMuscles || []).map(collapseMuscle))];
   const leadWithCompound = lead.filter(m => exercises.some(e => collapseMuscle(e.muscle || '') === m && isCompoundEx(e)));
   if (leadWithCompound.length) {
@@ -464,4 +466,105 @@ export function explainSessionOrder(exercises: BBExercise[], opts: OrderOpts = {
     notes.push('🧘 Loaded stretch — последним: растяжение под нагрузкой после объёма, а не вместо него.');
   }
   return notes;
+}
+
+/* ─────────── «Практический бодибилдинг»: слот-объяснение и блоки суперсетов ─────────── */
+
+/**
+ * §6.3: «круги» (interleave) имеют смысл только там, где есть что чередовать —
+ * в full-body дне, где хотя бы одна мышца стоит 2+ раза. Если каждая мышца в дне
+ * одна, «круг» вырождается в обычную группировку, и перестановка только ломает
+ * сравнение с прошлыми неделями.
+ */
+export function shouldInterleave(sessionTag: string | undefined, exercises: Array<{ muscle?: string }>): boolean {
+  if ((sessionTag || '') !== 'FullBody') return false;
+  const counts: Record<string, number> = {};
+  for (const e of exercises || []) {
+    const m = collapseMuscle(e?.muscle || '');
+    if (m) counts[m] = (counts[m] || 0) + 1;
+  }
+  return Object.values(counts).some(c => c >= 2);
+}
+
+/**
+ * §8 (практический бодибилдинг): суперсет — это ОДИН блок, а не «бейдж рядом с
+ * разнесёнными упражнениями». Финализатор помечает пары `supersetGroup/slot`, но
+ * финальный порядок по мышцам может развести антагонистов (грудь ↔ спина).
+ * Плеер обязан выполнять A1 → B1 подряд, поэтому перед выдачей в плеер список
+ * собирается по группам: группа встаёт на месте своего первого участника,
+ * порядок остальных упражнений сохраняется.
+ */
+export function arrangeSupersetBlocks<T extends { supersetGroup?: number | null; supersetSlot?: number | null }>(list: T[]): T[] {
+  if (!Array.isArray(list) || list.length < 2) return list;
+  if (!list.some(x => x && x.supersetGroup != null)) return list;
+  const out: T[] = [];
+  const emitted = new Set<number>();
+  for (const item of list) {
+    const g = item && item.supersetGroup != null ? Number(item.supersetGroup) : null;
+    if (g == null) { out.push(item); continue; }
+    if (emitted.has(g)) continue;
+    emitted.add(g);
+    const group = list
+      .filter(x => x && Number(x.supersetGroup) === g)
+      .sort((a, b) => Number(a?.supersetSlot ?? 0) - Number(b?.supersetSlot ?? 0));
+    out.push(...group);
+  }
+  return out;
+}
+
+export interface OrderSlotExplanation {
+  /** 0-based позиция в уже отсортированном списке. */
+  index: number;
+  name: string;
+  muscle: string;
+  /** Почему упражнение стоит ИМЕННО здесь (не общее правило дня). */
+  reason: string;
+}
+
+/**
+ * §8: объяснение «почему это упражнение на этом месте», а не списка правил.
+ * Чистая функция: принимает уже отсортированный массив и его опции порядка.
+ */
+export function explainSessionOrderPerExercise(exercises: BBExercise[], opts: OrderOpts = {}): OrderSlotExplanation[] {
+  if (!exercises?.length) return [];
+  const methodology = opts.methodology || 'compound_first';
+  const primary = collapseMuscle(opts.primaryMuscle || '');
+  const lead = new Set((opts.leadMuscles || []).map(collapseMuscle));
+  const out: OrderSlotExplanation[] = [];
+  exercises.forEach((ex, index) => {
+    const rawName = String(ex.exerciseName || ex.name || '');
+    const muscle = collapseMuscle(ex.muscle || '');
+    const ru = MUSCLE_RU_SHORT[muscle] || ex.muscle || 'мышца';
+    const compound = isCompoundEx(ex);
+    const isPrimary = !!primary && muscle === primary;
+    const isHeavy = ex.role === 'primary' && (ex as any).character === 'тяж' && compound;
+    const isSuperset = (ex as any).supersetGroup != null;
+    let reason: string;
+    if ((ex as any).warmupActivator) {
+      reason = 'разминочный активатор — первым, вне зачётного объёма';
+    } else if (methodology === 'pre_exhaust' && isPrimary && !compound) {
+      reason = 'предутомление: изоляция до базы — ощущение мышцы и техника, а не «больше роста» (Gentil 2014)';
+    } else if (methodology === 'post_exhaust' && isPrimary && !compound) {
+      reason = 'добивка сразу после базы: тот же бюджет времени, больше работы в целевой мышце';
+    } else if (isStretchHolder(rawName)) {
+      reason = 'loaded stretch — последним: растяжение под нагрузкой после объёма';
+    } else if (methodology === 'fst7' && ex.role === 'accessory' && !compound) {
+      reason = 'FST-7-финишер: серия коротких подходов в конце — памп и объём одной мышцей, без осевой усталости';
+    } else if (isHeavy) {
+      reason = isPrimary
+        ? `тяжёлая база дня (${ru}) — силовое движение на свежих мышцах: первое упражнение растёт в силе быстрее (Nunes 2020)`
+        : lead.has(muscle)
+          ? `база приоритетной мышцы (${ru}) — слабую мышцу ставим туда, где ещё есть сила`
+          : `тяжёлая база (${ru}) — после мышцы дня, но до изоляций`;
+    } else if (compound) {
+      reason = lead.has(muscle)
+        ? `базовое приоритетной мышцы (${ru}) — раньше изоляций остальных мышц`
+        : `базовое (${ru}) — раньше изоляций: больше мышц в работе, меньше локальной усталости`;
+    } else {
+      reason = `изоляция (${ru}) — после базовых: добирает объём без осевой усталости`;
+    }
+    if (isSuperset) reason += ' · в суперсете A1→B1, без отдыха между подходами';
+    out.push({ index, name: rawName, muscle, reason });
+  });
+  return out;
 }

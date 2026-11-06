@@ -64,7 +64,7 @@ function mastersMrvMult(age?: number): number {
 // Импорт distributePhases/getPhaseVolumeMult из UI-модуля намеренный: это каноническая
 // реализация, которую использует и ручной конструктор (phase-periodization).
 import { distributePhases, PHASE_CONFIGS, PHASE_LABELS, getPhaseConfig, getPhaseVolumeMult, getVolumeWaveFactor, type BBPhase } from '../periodization';
-import { orderSessionExercises, type SessionMethodology } from './bb-session-order.engine';
+import { orderSessionExercises, shouldInterleave, type SessionMethodology } from './bb-session-order.engine';
 import { methodologySpecFor, applyMethodologyRest } from './bb-methodology-spec';
 import { type BBTrainingFocus, FOCUS_RIR_TABLE } from './bb-goal-types';
 import { clampRir } from './bb-utils';
@@ -3084,7 +3084,8 @@ function buildSession(
     // других мышц, но после мышцы дня.
     leadMuscles: [...weakPoints, ...(focusGroup ? [focusGroup] : [])],
     // O-2 (итерация D): FullBody — «круги» по мышцам вместо группировки.
-    interleave: sched.sessionTag === 'FullBody',
+    // §6.3: круги только там, где есть что чередовать (2+ упражнения одной мышцы).
+    interleave: shouldInterleave(sched.sessionTag, exercises),
     // O-4: аксиальная стоимость как тай-брейк — только в дни с осевыми движениями.
     axialAware: isLowerAxialDay,
   });
@@ -4101,7 +4102,7 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
         methodology: input.methodology as any,
         priorityMuscles: [...weakPoints, ...(focusGroup ? [focusGroup] : [])],
         leadMuscles: [...weakPoints, ...(focusGroup ? [focusGroup] : [])],
-        interleave: (s.sessionTag || '') === 'FullBody',
+        interleave: shouldInterleave(s.sessionTag, sess.exercises),
         axialAware: /Legs|Lower|Glute|FullBody/i.test(s.sessionTag || ''),
       });
       sess.exercises.length = 0; sess.exercises.push(...reordered);
@@ -4535,7 +4536,7 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
         methodology: input.methodology,
         priorityMuscles: [...weakPoints, ...(focusGroup ? [focusGroup] : [])],
         leadMuscles: [...weakPoints, ...(focusGroup ? [focusGroup] : [])],
-        interleave: (s.sessionTag || '') === 'FullBody',
+        interleave: shouldInterleave(s.sessionTag, s.exercises),
         axialAware: /Legs|Lower|Glute|FullBody/i.test(s.sessionTag || ''),
       });
       s.exercises.length = 0; s.exercises.push(...reordered);
@@ -5443,7 +5444,7 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
         methodology: input.methodology,
         priorityMuscles: [...weakPoints, ...(focusGroup ? [focusGroup] : [])],
         leadMuscles: [...weakPoints, ...(focusGroup ? [focusGroup] : [])],
-        interleave: (sess.sessionTag || '') === 'FullBody',
+        interleave: shouldInterleave(sess.sessionTag, sess.exercises),
         axialAware: /Legs|Lower|Glute|FullBody/i.test(sess.sessionTag || ''),
       });
       sess.exercises.length = 0;

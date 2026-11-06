@@ -1,6 +1,6 @@
 import type { BBPlan } from './bb-builder.engine';
 import { syncBBPlanSetShape, validateBBPlan, resolveExerciseCatalogEntry, BB_MRV_TOLERANCE } from './bb-validator.engine';
-import { tidySessionExercises, orderSessionExercises, isCompoundEx, type SessionMethodology } from './bb-session-order.engine';
+import { tidySessionExercises, orderSessionExercises, isCompoundEx, MUSCLE_RU_SHORT, type SessionMethodology } from './bb-session-order.engine';
 import { aggregateBBVolume, buildBBVolumeTarget, exerciseVolumeContributions, indirectMuscleContributions, normalizeBBMuscle, sessionLimitsFor as centralizedSessionLimits, perExerciseCap, sessionMuscleRealismCap, sessionMuscleClass, prescribedSessionCap, weeklyCapFor, perSessionMuscleCap, sessionMuscleExerciseCap, distributeSetsByRole } from './bb-volume.engine';
 
 /**
@@ -3203,13 +3203,21 @@ export function markGiantSets(plan: BBPlan): void {
  *  памп-изоляциям сессии (cap 5 сетов/упражнение сохраняется).
  *  Волна-3.4: единый источник — REP_SCHEMES (repRange/rest/имя): GVT = ровно
  *  10×10 (ранее reps[1]=12 → фактически 12 повторов), Gironda = 8×8 (было 10). */
-const VOLUME_SCHEMES: Record<string, { target: number; reps: [number, number]; rest: number; label: string }> = {
-  gvt: { target: 10, reps: REP_SCHEMES.gvt.repRange, rest: REP_SCHEMES.gvt.restSec, label: REP_SCHEMES.gvt.nameRu },
-  fst7: { target: 7, reps: REP_SCHEMES.fst7.repRange, rest: REP_SCHEMES.fst7.restSec, label: REP_SCHEMES.fst7.nameRu },
-  gironda: { target: 8, reps: REP_SCHEMES.gironda_8x8.repRange, rest: REP_SCHEMES.gironda_8x8.restSec, label: REP_SCHEMES.gironda_8x8.nameRu },
+const VOLUME_SCHEMES: Record<string, { target: number; reps: [number, number]; rest: number; label: string; tempo: string }> = {
+  gvt: { target: 10, reps: REP_SCHEMES.gvt.repRange, rest: REP_SCHEMES.gvt.restSec, label: REP_SCHEMES.gvt.nameRu, tempo: REP_SCHEMES.gvt.tempo },
+  fst7: { target: 7, reps: REP_SCHEMES.fst7.repRange, rest: REP_SCHEMES.fst7.restSec, label: REP_SCHEMES.fst7.nameRu, tempo: REP_SCHEMES.fst7.tempo },
+  gironda: { target: 8, reps: REP_SCHEMES.gironda_8x8.repRange, rest: REP_SCHEMES.gironda_8x8.restSec, label: REP_SCHEMES.gironda_8x8.nameRu, tempo: REP_SCHEMES.gironda_8x8.tempo },
 };
-/** Применить схему объёма к одному упражнению (сеты/reps/отдых/workSets/коммент). */
-function assignSchemeSets(ex: any, sets: number, cfg: { reps: [number, number]; rest: number; label: string }): void {
+/** Применить схему объёма к одному упражнению (сеты/reps/отдых/темп/workSets/коммент). */
+function assignSchemeSets(ex: any, sets: number, cfg: { reps: [number, number]; rest: number; label: string; tempo?: string }): void {
+  // §6.1: методика — это ПРОТОКОЛ, а не только количество сетов. Раньше схема
+  // ставила сеты/повторы/отдых, но не темп: в плане оставался темп фазы, и
+  // FST-7 выглядел «7 подходами без техники». Темп берём из REP_SCHEMES —
+  // единого источника, чтобы карточка и печать не расходились.
+  if (cfg.tempo) {
+    (ex as any).tempoSpec = cfg.tempo;
+    if (Array.isArray(ex.workSets)) ex.workSets = ex.workSets.map((ws: any) => ({ ...ws, tempo: cfg.tempo }));
+  }
   if (sets !== ex.sets || (ex.repsRange && ex.repsRange[0] !== cfg.reps[0])) {
     ex.sets = sets;
     ex.repsRange = cfg.reps;
@@ -3223,7 +3231,7 @@ function assignSchemeSets(ex: any, sets: number, cfg: { reps: [number, number]; 
     (ex as any).schemeLabel = cfg.label;
     if (Array.isArray(ex.workSets) && ex.workSets.length > 0) {
       const sample = ex.workSets[ex.workSets.length - 1];
-      ex.workSets = Array.from({ length: sets }, () => ({ ...sample, reps: cfg.reps[1], restSeconds: cfg.rest }));
+      ex.workSets = Array.from({ length: sets }, () => ({ ...sample, reps: cfg.reps[1], restSeconds: cfg.rest, ...(cfg.tempo ? { tempo: cfg.tempo } : {}) }));
     }
     ex.comment = (ex.comment || '') + (ex.comment ? ' · ' : '') + `${cfg.label} (${sets}×${cfg.reps[0]}-${cfg.reps[1]}, отдых ${cfg.rest}с)`;
     // H: база для идемпотентного reconcile — комментарий без нашей причины.
@@ -3244,6 +3252,10 @@ export function applyVolumeScheme(plan: BBPlan, scheme: string, opts?: { fst7Sev
   const cfg = VOLUME_SCHEMES[scheme];
   if (!cfg) return;
   const caps = (plan as any).mrvByMuscle || {};
+  // §8.3 (практический бодибилдинг): если FST-7 не влезает в MRV — это не поломка,
+  // а сигнал «объём мышцы уже на потолке». Вместо молчаливого пропуска даём
+  // тренеру действие: сделать мышцу приоритетной или поднять MRV.
+  const fst7MrvSkips: string[] = [];
   for (const week of plan.weeks) {
     if (week.phase === 'deload' || isTaperPrepOrPeakWeek(week)) continue;
     // Недельный прямой объём по мышцам (до схемы) — схема не должна
@@ -3275,7 +3287,10 @@ export function applyVolumeScheme(plan: BBPlan, scheme: string, opts?: { fst7Sev
         if (cap) {
           const oldIsolation = exs.reduce((a: number, e: any) => a + (e.sets || 0), 0);
           const newTotal = (weekDirect[muscle] || 0) - oldIsolation + cfg.target;
-          if (newTotal > cap) continue; // не влезает в MRV — схему не применяем
+          if (newTotal > cap) { // не влезает в MRV — схему не применяем
+            if (scheme === 'fst7') fst7MrvSkips.push(muscle);
+            continue;
+          }
           // Учитываем indirect (жимы/тяги): схема не должна выталкивать
           // EFFECTIVE за кап — иначе cap-adjust всё равно срежет, а инвариант
           // ovf упадёт (delt_rear/GVT-кейс). Пропуск терпим тестами.
@@ -3284,7 +3299,10 @@ export function applyVolumeScheme(plan: BBPlan, scheme: string, opts?: { fst7Sev
             if ((e as any).warmupActivator) continue;
             weekIndirect += indirectToMuscle(e, muscle);
           }
-          if (newTotal + weekIndirect > cap * BB_MRV_TOLERANCE) continue;
+          if (newTotal + weekIndirect > cap * BB_MRV_TOLERANCE) {
+            if (scheme === 'fst7') fst7MrvSkips.push(muscle);
+            continue;
+          }
         }
         schemeApplied.add(muscle);
         // FST-7 (Rambod): 7 сетов ОДНИМ финишером — только с явного разрешения
@@ -3334,6 +3352,12 @@ export function applyVolumeScheme(plan: BBPlan, scheme: string, opts?: { fst7Sev
         }
       }
     }
+  }
+  if (scheme === 'fst7' && fst7MrvSkips.length) {
+    const uniq = [...new Set(fst7MrvSkips)].map(m => MUSCLE_RU_SHORT[m] || m).join(', ');
+    const line = `📐 FST-7 не применён на ${uniq}: мышца уже на MRV недели. Чтобы получить 7-сетовый финишер — сделайте её приоритетной (специализация) или поднимите MRV.`;
+    const rat = ((plan as any).rationale ||= []);
+    if (!rat.includes(line)) rat.push(line);
   }
 }
 
@@ -5999,11 +6023,17 @@ for (const week of next.weeks) {
  * Не более 1 техники на упражнение, не более 2-3 на сессию.
  */
 export function autoAssignIntensityTechniques(plan: BBPlan, level: string, priorityMuscles?: string[], schedule?: SpecializationSchedule, allowFailureTechniques = true): void {
-  if (level === 'beginner') return; // новички не используют intensity techniques
+  // §6.5 (практический бодибилдинг): новичку допустим РОВНО один дроп-сет в конце
+  // изоляции — он не требует отказа и не ломает технику. Rest-pause/myo-rep/21s
+  // остаются закрытыми: это отказные протоколы, их ставят после 6-12 месяцев
+  // стабильной техники. Раньше новичок не получал вообще ничего — это тоже
+  // перекос: метаболический финишер безопасен и мотивирует.
+  const beginner = level === 'beginner';
   // M-3: уровень решают ДАННЫЕ (`INTENSITY_TECHNIQUES[].level`), а не эта функция.
   // Раньше здесь была одна проверка `beginner → return`, и intermediate мог получить
   // rest-pause/myo-rep, которые в данных помечены как advanced+ — две правды в репо.
   const allowedTechs = new Set<string>(techniquesFor('памп', level).map(t => t.technique));
+  if (beginner) allowedTechs.add('dropset');
   /** Честная замена, если уровень не разрешает выбранную по имени технику. */
   const levelFallback: Record<string, string[]> = {
     rest_pause: ['dropset', 'mechanical_drop', 'slow_eccentric'],
@@ -6030,7 +6060,7 @@ export function autoAssignIntensityTechniques(plan: BBPlan, level: string, prior
     const bicepsPriority = weekPriority.some(m => (WEAK_TO_MUSCLE[m] || m) === 'biceps');
     for (const session of week.sessions) {
       let techniquesInSession = 0;
-      const maxPerSession = level === 'enhanced' ? 3 : level === 'advanced' ? 3 : 2;
+      const maxPerSession = beginner ? 1 : level === 'enhanced' ? 3 : level === 'advanced' ? 3 : 2;
       for (const ex of session.exercises) {
         if (techniquesInSession >= maxPerSession) break;
         // Только accessory/памп упражнения получают intensity technique
@@ -6040,8 +6070,15 @@ export function autoAssignIntensityTechniques(plan: BBPlan, level: string, prior
         if (ex.workSets?.some(ws => ws.technique)) continue;
         const name = (ex.exerciseName || ex.name || '').toLowerCase();
         let technique: string | undefined;
+        // §6.5: новичок — только дроп-сет и только на «безопасной» изоляции
+        // (тренажёры, блоки, сведения), где не нужна страховка. Один на сессию.
+        if (beginner) {
+          if (/кроссовер|crossover|сведение|fly|пек.?дек|бабоч|разгибан.*ног|leg.?extension|сгибан.*ног|leg.?curl|разгибан.*рук|pushdown|махи|lateral.?raise/i.test(name)) {
+            technique = 'dropset';
+          }
+        }
         // Cable fly / сведение → dropset
-        if (/кроссовер|crossover|сведение|fly|пек.?дек|бабоч/i.test(name)) {
+        else if (/кроссовер|crossover|сведение|fly|пек.?дек|бабоч/i.test(name)) {
           technique = 'dropset';
         }
         // Leg extension → myo_rep (соло-инсулин: пропуск — rest-pause протокол)

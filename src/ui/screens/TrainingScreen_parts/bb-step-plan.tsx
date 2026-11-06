@@ -10,7 +10,7 @@ import { EXERCISE_CATALOG } from '../../../core/exercise-catalog';
 import type { BBPlan } from '../../../engines/bb/bb-builder.engine';
 import { buildWarmup } from '../../../engines/bb/bb-builder.engine';
 import type { BBPlanMetrics } from '../../../engines/bb/bb-metrics.engine';
-import { isCompoundEx, explainSessionOrder } from '../../../engines/bb/bb-session-order.engine';
+import { isCompoundEx, explainSessionOrder, explainSessionOrderPerExercise, shouldInterleave } from '../../../engines/bb/bb-session-order.engine';
 import { methodologySpecFor } from '../../../engines/bb/bb-methodology-spec';
 import type { DUPMode } from '../../../engines/bb/bb-dup.engine';
 import { loadSRPESessions } from '../../../engines/pro/srpe-store';
@@ -552,7 +552,15 @@ export const BbPlanStep: React.FC<BbPlanStepProps> = ({
                   sessionTag: tag,
                   methodology: builtPlan.methodology as any,
                   leadMuscles: weakPoints,
-                  interleave: tag === 'FullBody',
+                  interleave: shouldInterleave(tag, s.exercises),
+                  axialAware: /Legs|Lower|Glute|FullBody/i.test(tag),
+                });
+                // §8: по-слотовое «почему это упражнение здесь», а не только правила дня.
+                const slots = explainSessionOrderPerExercise(s.exercises, {
+                  sessionTag: tag,
+                  methodology: builtPlan.methodology as any,
+                  leadMuscles: weakPoints,
+                  interleave: shouldInterleave(tag, s.exercises),
                   axialAware: /Legs|Lower|Glute|FullBody/i.test(tag),
                 });
                 if (!notes.length) return null;
@@ -563,6 +571,13 @@ export const BbPlanStep: React.FC<BbPlanStepProps> = ({
                     </summary>
                     <div style={{ marginTop: 4, display: 'flex', flexDirection: 'column', gap: 3, fontSize: 10, color: '#fff', lineHeight: 1.5 }}>
                       {notes.map((n, ni) => <div key={ni}>{n}</div>)}
+                      {slots.length > 0 && (
+                        <div style={{ marginTop: 4, paddingTop: 4, borderTop: '1px solid rgba(255,255,255,0.08)', display: 'flex', flexDirection: 'column', gap: 2, color: 'rgba(255,255,255,0.82)' }}>
+                          {slots.map(sl => (
+                            <div key={sl.index}><b>{sl.index + 1}. {sl.name}</b> — {sl.reason}</div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </details>
                 );
