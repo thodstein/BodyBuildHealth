@@ -456,7 +456,7 @@ export function explainSessionOrder(exercises: BBExercise[], opts: OrderOpts = {
     notes.push(`🎯 Приоритет: ${names} — база этой мышцы идёт раньше изоляций других мышц (упражнение, выполненное первым, растёт в силе быстрее: Nunes 2020).`);
   }
   if (opts.interleave) {
-    notes.push('🔁 Full-body: упражнения чередуются по мышцам (круги) — локальная усталость не копится, каждая мышца получает свежий подход.');
+    notes.push('🔁 Круги (full-body / верх тела): упражнения чередуются по мышцам — локальная усталость не копится, каждая мышца получает свежий подход.');
   }
   const heavyAxial = exercises.filter(e => axialCostOf(e.name || '') >= 2).length;
   if (heavyAxial >= 2) {
@@ -471,19 +471,24 @@ export function explainSessionOrder(exercises: BBExercise[], opts: OrderOpts = {
 /* ─────────── «Практический бодибилдинг»: слот-объяснение и блоки суперсетов ─────────── */
 
 /**
- * §6.3: «круги» (interleave) имеют смысл только там, где есть что чередовать —
- * в full-body дне, где хотя бы одна мышца стоит 2+ раза. Если каждая мышца в дне
- * одна, «круг» вырождается в обычную группировку, и перестановка только ломает
- * сравнение с прошлыми неделями.
+ * §6.3 (решение практики): «круги» (interleave) нужны в многомышечных днях —
+ * full-body и верх тела (`Torso`: грудь/спина/дельты/руки). В сплит-днях
+ * (Push/Pull/Legs) мышцы уже сгруппированы, и перестановка только мешает
+ * прогресс-контролю.
+ *
+ * Условие включения: в дне ≥3 разных мышц и хотя бы одна мышца стоит 2+ раза.
+ * Если каждая мышца в дне одна, «круг» вырождается в обычную группировку.
  */
 export function shouldInterleave(sessionTag: string | undefined, exercises: Array<{ muscle?: string }>): boolean {
-  if ((sessionTag || '') !== 'FullBody') return false;
+  const tag = String(sessionTag || '');
+  if (tag !== 'FullBody' && tag !== 'Torso') return false;
   const counts: Record<string, number> = {};
   for (const e of exercises || []) {
     const m = collapseMuscle(e?.muscle || '');
     if (m) counts[m] = (counts[m] || 0) + 1;
   }
-  return Object.values(counts).some(c => c >= 2);
+  const values = Object.values(counts);
+  return Object.keys(counts).length >= 3 && values.some(c => c >= 2);
 }
 
 /**

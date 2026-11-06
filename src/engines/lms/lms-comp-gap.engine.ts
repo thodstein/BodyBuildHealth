@@ -19,6 +19,7 @@ import { candidateCyclesForSlot, fitCycleToWeeks, applyFitConsent, PL_MIN_CYCLE_
 import type { LMSRankedCycle, LMSSelectorInput } from './lms-selector.engine';
 import type { SRCycleTemplate } from '../../data/lms-cycles/lms-types';
 import type { PED } from '../bb/bb-ped-adaptation.engine';
+import { ruCount, RU_GAPS } from '../ru-plural';
 
 export interface GapSegment {
   meetId: string;          // старт, К КОТОРОМУ ведёт сегмент
@@ -332,7 +333,7 @@ export function planBetweenCompetitions(
   // Итоговое предупреждение о требующих согласия сегментах
   const blocked = segments.filter(s => s.fitMode === 'strict_skip' && s.needsConsent);
   if (blocked.length > 0) {
-    notes.push(`⛔ ${blocked.length} пролёт(ов) требуют согласия на изменение раскладки — сборка заблокирована до решения`);
+    notes.push(`⛔ ${ruCount(blocked.length, RU_GAPS)} требуют согласия на изменение раскладки — сборка заблокирована до решения`);
   }
 
   // P2-6: честный учёт недель без тренировочного блока (иначе «итого N нед» врёт).

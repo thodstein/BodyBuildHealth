@@ -7,6 +7,7 @@
  * Чистые функции, без мутаций. ESM-safe (статические импорты).
  */
 import { EXERCISE_CATALOG } from '../../core/exercise-catalog';
+import { ruCount, RU_DEVIATIONS } from '../ru-plural';
 
 export type StimulusFlag =
   | 'wrongHead'
@@ -1000,7 +1001,7 @@ export function diagnoseStimulusTarget(
     }
     if (matched > 0) {
       flags.push('setupRisk');
-      issues.push(`Сетап: ${matched} отклонение(я) — проверь: ${rec.setup.slice(0, 2).join('; ')}`);
+      issues.push(`Сетап: ${ruCount(matched, RU_DEVIATIONS)} — проверь: ${rec.setup.slice(0, 2).join('; ')}`);
       bd.setup = Math.max(30, 100 - matched * 25);
       bd.line = Math.max(40, bd.line - matched * 15);
     } else {

@@ -94,15 +94,27 @@ describe('§8.2 объяснение порядка по слоту', () => {
 
 describe('§6.3 круги только там, где есть что чередовать', () => {
   it('FullBody с двумя упражнениями одной мышцы — круги', () => {
-    expect(shouldInterleave('FullBody', [{ muscle: 'chest' }, { muscle: 'chest' }, { muscle: 'quads' }])).toBe(true);
+    expect(shouldInterleave('FullBody', [
+      { muscle: 'chest' }, { muscle: 'chest' }, { muscle: 'quads' }, { muscle: 'back' },
+    ])).toBe(true);
   });
 
   it('FullBody, где каждая мышца один раз, — без кругов (чередовать нечего)', () => {
     expect(shouldInterleave('FullBody', [{ muscle: 'chest' }, { muscle: 'quads' }, { muscle: 'back' }])).toBe(false);
   });
 
-  it('не FullBody — круги не включаются', () => {
-    expect(shouldInterleave('Torso', [{ muscle: 'chest' }, { muscle: 'chest' }])).toBe(false);
+  it('Torso (верх тела) — тоже круги, если есть 3+ мышцы и 2+ упражнения одной', () => {
+    expect(shouldInterleave('Torso', [
+      { muscle: 'chest' }, { muscle: 'chest' }, { muscle: 'back' }, { muscle: 'shoulders' },
+    ])).toBe(true);
+  });
+
+  it('Torso из 1-2 мышц — без кругов (чередовать нечего)', () => {
+    expect(shouldInterleave('Torso', [{ muscle: 'chest' }, { muscle: 'chest' }, { muscle: 'back' }])).toBe(false);
+  });
+
+  it('сплит-день (Push) — круги не включаются', () => {
+    expect(shouldInterleave('Push', [{ muscle: 'chest' }, { muscle: 'chest' }, { muscle: 'triceps' }])).toBe(false);
   });
 });
 
@@ -118,6 +130,18 @@ describe('§6.1 FST-7 — протокол с темпом, а не только
     expect(f.workSets.length).toBeGreaterThan(0);
     for (const ws of f.workSets) expect(ws.tempo).toBe(REP_SCHEMES.fst7.tempo);
     expect(f.tempoSpec).toBe(REP_SCHEMES.fst7.tempo);
+  });
+
+  it('«7 в одном» не режется MRV-гейтом: это перераспределение сетов мышцы', () => {
+    const p: any = plan('enhanced', {
+      peds: ['AAS', 'GH'], pedDoses: { AAS: 500, GH: 2 }, courseIntensity: 'moderate',
+      methodology: 'fst7',
+    });
+    const finishers = exercisesOf(p).filter(ex => /FST-7/.test(String(ex.comment || '')));
+    expect(finishers.length, 'FST-7-финишер не назначен').toBeGreaterThan(0);
+    for (const f of finishers) {
+      expect(f.workSets.length, `${f.name}: финишер не 7 сетов`).toBe(7);
+    }
   });
 });
 

@@ -250,6 +250,10 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
    const [supersetMode, setSupersetMode] = useState<boolean>(false);
    const [circuitMode, setCircuitMode] = useState<boolean>(false);
     const [supersetExercises, setSupersetExercises] = useState<number[]>([]);
+    // §8.1 (полностью): какие группы суперсетов уже применены к текущему дню.
+    // План размечает пары (`supersetGroup/supersetSlot`), плеер должен их
+    // исполнять сам, а не ждать ручного выбора упражнений.
+    const autoSupersetKeyRef = useRef<string>('');
     // Подкладка «Калькулятор блинов»: доступный вес применяется к упражнению текущей сессии
     const [plateOpen, setPlateOpen] = useState<boolean>(false);
     // Разворачиваемая техника упражнения (по имени упражнения)
@@ -480,7 +484,9 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
 
     const getSupersetRestTime = useCallback((): number => {
       if (circuitMode) return 0; // no rest between exercises in circuit
-      return 30; // short rest for supersets
+      // Практика: внутри пары A1→B1 отдыха нет — только переход к снаряду.
+      // 30 с «мини-отдыха» делали суперсет обычным упражнением.
+      return 15;
     }, [circuitMode]);
  
     const startRestTimer = useCallback((ei: number) => {
@@ -549,12 +555,41 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
      });
     }, []);
 
+  /**
+   * §8.1: план уже знает пары суперсетов. На старте дня включаем режим и
+   * отмечаем ВСЕ размеченные упражнения — иначе A1→B1 выполняются как два
+   * отдельных упражнения с полным отдыхом, и суперсет остаётся картинкой.
+   * Ручной выбор пользователя не перетираем: применяем только при смене дня
+   * или явном старте сессии.
+   */
+  const applyPlanSupersets = useCallback(() => {
+    const exs = day?.exercises || [];
+    const idx = exs.map((e, i) => (e.supersetGroup != null ? i : -1)).filter(i => i >= 0);
+    if (idx.length >= 2) {
+      setSupersetExercises(idx);
+      setSupersetMode(true);
+      setCircuitMode(false);
+    }
+  }, [day]);
+
+  useEffect(() => {
+    if (!day?.exercises?.length) return;
+    const key = `plan-superset:${String((day as any).label || '')}:${day.exercises.length}`;
+    if (autoSupersetKeyRef.current === key) return;
+    autoSupersetKeyRef.current = key;
+    applyPlanSupersets();
+  }, [day, applyPlanSupersets]);
+
    const timerPct = timerRunning && timerSec > 0 && currentRestSec > 0
     ? ((currentRestSec - timerSec) / currentRestSec) * 100
     : 0;
 
   const begin = () => {
     if (!day || !Array.isArray(day.exercises)) return;
+    // Новый старт сессии — заново применяем разметку суперсетов из плана
+    // (пользователь мог выключить режим в прошлый раз).
+    autoSupersetKeyRef.current = '';
+    applyPlanSupersets();
     
     const riskFlags: Record<string, string> = {};
     if (profile.injuries?.length) {

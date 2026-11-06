@@ -23,6 +23,7 @@ import { buildPLSeasonPeaks, type MacroTaperOpts, type PLSeasonMeet } from './lm
 import { speedOrientationOf } from '../../data/lms-cycles/lms-speed-index';
 import { adaptForPEDs, type PED } from '../bb/bb-ped-adaptation.engine';
 import { getAllVolumeLandmarks } from '../volume-landmarks.engine';
+import { ruCount, RU_SLOTS } from '../ru-plural';
 
 // ─── Периоды-слоты ───────────────────────────────────────────────────────────────
 
@@ -368,7 +369,7 @@ export function planSeason(input: PLSeasonInput): PLSeasonPlan {
   // Если есть strict_skip сегменты — добавляем итоговое предупреждение
   const blocked = segments.filter(s => s.fit.mode === 'strict_skip');
   if (blocked.length > 0) {
-    seasonNotes.push(`⛔ ${blocked.length} слот(ов) требуют согласия на изменение раскладки — сборка заблокирована до решения`);
+    seasonNotes.push(`⛔ ${ruCount(blocked.length, RU_SLOTS)} требуют согласия на изменение раскладки — сборка заблокирована до решения`);
   }
   return { segments, totalWeeks, notes: seasonNotes, cycleIds };
 }

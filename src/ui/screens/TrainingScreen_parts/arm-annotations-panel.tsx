@@ -14,6 +14,7 @@ import {
   saveArmAnnotations,
   type ArmAnnotation,
 } from '../../../engines/arm/arm-annotations.engine';
+import { ruCount, RU_ROWS } from '../../../engines/ru-plural';
 
 interface ExerciseRef { week: number; sessionIndex: number; exerciseName: string }
 
@@ -105,7 +106,7 @@ export const ArmAnnotationsPanel: React.FC<{ plan: any; lines: string[]; onChang
               ))
             )}
           </div>
-          <AdBanner>В печать и сводку идут {armAnnotationLines(list).length} строк(и) из этого списка.</AdBanner>
+          <AdBanner>В печать и сводку идут {ruCount(armAnnotationLines(list).length, RU_ROWS)} из этого списка.</AdBanner>
           {lines.length > 0 && (
             <pre data-arm="annotations-print" style={{ display: 'none' }}>{lines.join('\n')}</pre>
           )}

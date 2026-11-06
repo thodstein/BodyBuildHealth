@@ -1,7 +1,7 @@
 ﻿import React, { useMemo, useState, useCallback, useEffect } from 'react';
 import ReactDOM from 'react-dom';
 import { buildTzInput } from '../../../engines/support-plan/engine-helpers';
-import { ruCount, RU_ELEMENTS, RU_SUPPLEMENTS } from '../../../engines/ru-plural';
+import { ruCount, RU_ELEMENTS, RU_STACKS, RU_SUPPLEMENTS } from '../../../engines/ru-plural';
 import { calculateTzSpecRisk, type TzSpecResult } from '../../../engines/risk-engine-tz-spec';
 import { getAdministrationRules } from '../../../data/administration-rules-db';
 import { PREANALYTIC_EFFECTS_DB, ASSAY_INTERFERENCE_DB } from '../../../data/assay-interference-db';
@@ -2740,7 +2740,7 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
       {level === 'manual' && manualResultSubs.length > 0 && (
         <div style={{ marginBottom:10, padding:'10px 12px', borderRadius:12, background:'rgba(168,85,247,0.08)', border:'1px solid rgba(168,85,247,0.22)' }}>
           <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:6 }}>
-            <span style={{ fontSize:12, fontWeight:800, color:'#c084fc' }}>📦 Ручной план: {manualResultSubs.length} препарат(ов) из {selectedStacks.length} стеков</span>
+            <span style={{ fontSize:12, fontWeight:800, color:'#c084fc' }}>📦 Ручной план: {ruCount(manualResultSubs.length, RU_SUPPLEMENTS)} из {ruCount(selectedStacks.length, RU_STACKS)}</span>
             <button onClick={() => setShowManualPopup(true)} style={{ fontSize:11, fontWeight:700, cursor:'pointer', padding:'4px 9px', borderRadius:6, background:'rgba(168,85,247,0.14)', border:'1px solid rgba(168,85,247,0.3)', color:'#c084fc' }}>⚙️ Изменить</button>
           </div>
           <div style={{ display:'flex', flexDirection:'column', gap:2 }}>

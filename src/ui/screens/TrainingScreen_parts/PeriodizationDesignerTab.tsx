@@ -533,7 +533,7 @@ export const PeriodizationDesignerTab: React.FC<{ initialUnifiedMode?: 'micro' |
             </div>
             {incompatibleBlocks.length > 0 && (
               <div role="alert" style={{ marginBottom: 10, padding: 10, borderRadius: 10, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.22)', fontSize: 11, lineHeight: 1.45 }}>
-                <div style={{ fontWeight: 800, color: '#ef4444', marginBottom: 4 }}>⚠ {incompatibleBlocks.length} блок(ов) не из набора {disciplineLabel}</div>
+                <div style={{ fontWeight: 800, color: '#ef4444', marginBottom: 4 }}>⚠ {ruCount(incompatibleBlocks.length, RU_BLOCKS)} не из набора {disciplineLabel}</div>
                 <div style={{ color: '#fff', marginBottom: 6 }}>
                   {incompatibleBlocks.map(b => `${PHASE_ICONS[b.phaseKey]} ${PHASE_LABELS_RU[b.phaseKey]} (${b.startWeek}–${b.endWeek})`).join(' · ')}
                 </div>

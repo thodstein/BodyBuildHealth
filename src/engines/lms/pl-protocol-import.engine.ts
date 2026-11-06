@@ -121,7 +121,7 @@ export function parseMeetProtocol(text: string): ProtocolParseResult {
 
   if (rows.length === 0) warnings.push('Не распознано ни одной попытки. Формат: «Присед 2 192.5 ✅» (движение, номер, вес, зачёт).');
   const noMark = rows.filter(r => r.made === null).length;
-  if (noMark > 0) warnings.push(`${noMark} строк(и) без маркера зачёта — результат не проставлен (решите сами).`);
+  if (noMark > 0) warnings.push(`Строк без маркера зачёта: ${noMark} — результат не проставлен (решите сами).`);
 
   rows.sort((a, b) => (a.lift === b.lift ? a.attempt - b.attempt : a.lift.localeCompare(b.lift)));
   return { rows, warnings };

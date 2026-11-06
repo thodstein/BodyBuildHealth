@@ -57,7 +57,7 @@ import { PLToolsCard } from './SRCBBScreen_parts/PLToolsCard';
 import { buildPLPrintHtml, printPLHtml, buildPLExcelWorkbook, downloadPLExcel, plExportRows } from './SRCBBScreen_parts/pl-export';
 import { periodLabelRu, directionLabelRu } from '../../data/lms-cycles/period-labels';
 import { loadSessions } from '../../engines/workout-logger.engine';
-import { ruCount, RU_EXERCISES, RU_SETS, RU_WEEKS } from '../../engines/ru-plural';
+import { ruCount, RU_BLOCKS, RU_EXERCISES, RU_SETS, RU_WEEKS } from '../../engines/ru-plural';
 
 const getTempo = (exerciseName: string, goal: string, isMainLift: boolean): RepTempoOutput => {
   return generateRepTempo({
@@ -715,7 +715,7 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
       template: first.template,
       weeks: finalWeeks,
       cycleMetrics: calcCycleMetrics(sessions),
-      progressionRationale: `Макроцикл: ${outputs.length} СРЦ-блок(ов), ${ruCount(weeks.length, RU_WEEKS)}. ` + outputs.map(({ block, output }) => `${block.phase} ${block.weekOffset}-${block.weekOffset + block.weeks - 1}: ${output.template.meta.title}`).join('; ') + (reusedWeeks > 0 ? ` ⚠ ${reusedWeeks} нед без собственного цикла (соревновательные блоки) — использована ближайшая тренировочная раскладка.` : '') + (taperRes.notes.length > 0 ? ' 🏁 ' + taperRes.notes.join(' ') : ''),
+      progressionRationale: `Макроцикл: ${ruCount(outputs.length, RU_BLOCKS)} СРЦ, ${ruCount(weeks.length, RU_WEEKS)}. ` + outputs.map(({ block, output }) => `${block.phase} ${block.weekOffset}-${block.weekOffset + block.weeks - 1}: ${output.template.meta.title}`).join('; ') + (reusedWeeks > 0 ? ` ⚠ ${reusedWeeks} нед без собственного цикла (соревновательные блоки) — использована ближайшая тренировочная раскладка.` : '') + (taperRes.notes.length > 0 ? ' 🏁 ' + taperRes.notes.join(' ') : ''),
     };
     // 🔋 Делод по кнопке — и на макроцикловом пути (недели могут не совпасть:
     // pickDeloadWeeks сам честно пропустит отсутствующие/защищённые).

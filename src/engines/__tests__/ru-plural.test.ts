@@ -11,6 +11,8 @@
  * Родительный после предлогов («до 2 сетов», «из 4 сетов») в проверку не входит.
  */
 import { describe, it, expect } from 'vitest';
+import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { join } from 'node:path';
 import { ruForm, ruCount, ruAdjCount, ruFracCount, RU_ADJ_BUILT, RU_ADJ_CRITICAL_F, RU_ADJ_CRITICAL_M, RU_BLOCKS, RU_CONFLICTS, RU_CONFLICTS_DRUG, RU_EXERCISES, RU_PAIRS, RU_SESSIONS, RU_SETS, RU_TRAININGS, RU_WEEKS } from '../ru-plural';
 import { buildBBPlan } from '../bb/bb-builder.engine';
 import { buildBBPlanReportText } from '../bb/bb-report.engine';
@@ -101,4 +103,52 @@ describe('тексты плана: числительные согласован
       }
     }
   }, 600000);
+});
+
+describe('хеджи «слово(ов)» не возвращаются в тексты BB/PL/ARM', () => {
+  // Итерация AO: 19 мест писали «N приём(ов)», «N строк(и)», «N блок(а)» —
+  // это не согласование, а его отсутствие. Ратчет по зонам, за текст которых
+  // отвечаем мы; Nutrition и Profile — зона параллельной работы.
+  const ROOTS = [
+    'src/engines/bb',
+    'src/engines/lms',
+    'src/engines/arm',
+    'src/ui/screens/SRCBBScreen.tsx',
+    'src/ui/screens/SRCBBScreen_parts',
+    'src/ui/screens/TrainingScreen_parts',
+  ];
+  // «Выполнил(а)» — настоящий род (м/ж), а не числительное. Не хедж счёта.
+  const ALLOWED = new Set(['Выполнил(а)']);
+  const HEDGE = /([а-яА-ЯёЁ]{3,})\((ов|ей|а|я|и|ы)\)/g;
+
+  const files: string[] = [];
+  const walk = (p: string) => {
+    const st = statSync(p);
+    if (st.isDirectory()) {
+      for (const name of readdirSync(p)) {
+        if (name === '__tests__' || name === 'node_modules') continue;
+        walk(join(p, name));
+      }
+      return;
+    }
+    if (!/\.tsx?$/.test(p) || /\.test\.tsx?$/.test(p)) return;
+    files.push(p);
+  };
+  for (const root of ROOTS) walk(root);
+
+  it('ни одного «(ов)/(а)/(и)» в строках кода', () => {
+    const bad: string[] = [];
+    for (const file of files) {
+      const lines = readFileSync(file, 'utf8').split(/\r?\n/);
+      lines.forEach((line, i) => {
+        const trimmed = line.trim();
+        if (/^(\/\/|\*|\/\*)/.test(trimmed)) return; // комментарии — не текст пользователю
+        for (const m of line.matchAll(HEDGE)) {
+          if (ALLOWED.has(m[0])) continue;
+          bad.push(`${file}:${i + 1}: ${m[0]}`);
+        }
+      });
+    }
+    expect(bad, bad.join('\n')).toEqual([]);
+  });
 });

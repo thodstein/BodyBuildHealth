@@ -30,6 +30,7 @@ import { cloneCycleTemplate } from '../../data/lms-cycles/lms-cycle-clone';
 import { meetAttemptsFor, MEET_STRATEGY_PCT_LABEL, MEET_WARMUP_STEPS, warmupToOpener, resolveCompetitionLifts, type MeetAttemptsInfo, type MeetStrategy } from './competition-attempts';
 import { buildPLTaperCurve, summarizeTaperCurve, type PeakWeekLayout, type TaperCurvePoint, type TaperMode, type TaperWeightGoal } from './lms-taper.engine';
 import { buildPLPeakBlockLayout, dateWeeksBackward, type PLPeakBlockLayout } from './lms-peak-block.engine';
+import { ruCount, RU_WEEKS } from '../ru-plural';
 
 export interface LMSBuildInput {
   template: SRCycleTemplate;
@@ -2458,7 +2459,7 @@ export function appendPLTaperWeeks(
     cycleMetrics,
     plVolumeLandmarks,
     progressionRationale: plan.progressionRationale +
-      ` 📉 Тапер к действующему циклу: +${blockTotal} нед(и) — ${taperCurveSummary} (${taperMode === 'pl' ? 'ПЛ-пик-протокол' : taperMode === 'pro' ? 'про-тапер по усталости' : 'Bosquet 2005'}).` +
+      ` 📉 Тапер к действующему циклу: +${ruCount(blockTotal, RU_WEEKS)} — ${taperCurveSummary} (${taperMode === 'pl' ? 'ПЛ-пик-протокол' : taperMode === 'pro' ? 'про-тапер по усталости' : 'Bosquet 2005'}).` +
       windowNote +
       (blockWarnings.length > 0 ? ' ⚠ ' + blockWarnings.join(' ⚠ ') : '') +
       replacedTailNote +

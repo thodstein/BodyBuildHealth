@@ -53,7 +53,7 @@ export function checkAntagonistMinimum(w: AntagonistWeek, weekNo: number): Antag
   const note =
     warnings.length === 0
       ? `${tag}: антагонисты закрыты (ext/sup/fingers).`
-      : `${tag}: добрать ${warnings.length} антагонист-блок(а) лёгко 12–20, RIR≥2.`;
+      : `${tag}: добрать антагонист-блоки лёгко 12–20, RIR≥2 (пробелов: ${warnings.length}).`;
   return { warnings, note };
 }
 

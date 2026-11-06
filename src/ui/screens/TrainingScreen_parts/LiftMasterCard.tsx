@@ -38,7 +38,7 @@ import { estimate1RMConsensus } from '../../../engines/pro/estimate1rm.engine';
 import { epley1RM } from '../../../engines/e1rm';
 import { meetAttemptsFor, warmupToOpener, MEET_STRATEGY_PCT_LABEL, type MeetStrategy } from '../../../engines/lms/competition-attempts';
 import { daysBetweenIso } from '../../../engines/lms/pl-meet-registry.engine';
-import { ruAdjCount, RU_ADJ_PAUSED, RU_SETS } from '../../../engines/ru-plural';
+import { ruAdjCount, ruCount, RU_ADJ_PAUSED, RU_SETS, RU_SLICES } from '../../../engines/ru-plural';
 import { relativeStrengthFullReport, type Sex } from '../../../engines/pro/relative-strength.engine';
 import { getISOWeekNumber } from '../../../engines/workout-logger.engine';
 import { getPLWeakGroupExerciseCandidates, diagnosticProtocolFromCycle } from '../../../engines/lms/lms-builder.engine';
@@ -2472,7 +2472,7 @@ export const LiftMasterCard: React.FC<{
           const tone = verdict ? (verdict.deltaSlowPct <= -3 ? '#4ade80' : verdict.deltaSlowPct >= 3 ? '#f87171' : DIM) : DIM;
           return (
             <div data-lift="heat-trend" style={{ marginTop:6, padding:7, borderRadius:8, background:'rgba(251,191,36,0.05)', border:'1px solid rgba(251,191,36,0.2)' }}>
-              <div style={{ fontSize:10, fontWeight:800, color:'#fbbf24' }}>📈 Динамика heat по неделям · {rows.length} срез(ов)</div>
+              <div style={{ fontSize:10, fontWeight:800, color:'#fbbf24' }}>📈 Динамика heat по неделям · {ruCount(rows.length, RU_SLICES)}</div>
               <svg viewBox={`0 0 ${W} ${H}`} width="100%" height={40} preserveAspectRatio="none" role="img" aria-label="Доля медленных отрезков траектории по неделям">
                 <polyline points={pts.map(p => p.join(',')).join(' ')} fill="none" stroke="#fbbf24" strokeWidth={2} strokeLinejoin="round" />
                 {pts.map((p, i) => <circle key={i} cx={p[0]} cy={p[1]} r={2.5} fill="#fbbf24" />)}

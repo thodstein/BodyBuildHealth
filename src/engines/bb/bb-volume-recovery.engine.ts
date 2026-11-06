@@ -31,6 +31,7 @@ import {
 } from '../volume-landmarks.engine';
 import { canonicalOfZone, isGranularZone } from './bb-granular-zone.engine';
 import { canonicalMuscle } from './bb-specialization.engine';
+import { ruCount, RU_FAILURES } from '../ru-plural';
 
 export type VrZone = 'green' | 'yellow' | 'red' | 'nodata';
 
@@ -325,7 +326,7 @@ export function buildVolumeRecoveryPanel(input: VolumeRecoveryInput): VolumeReco
     advice.push(`Сон ${sleep} ч — объём приоритетов ×0.8, пока не будет 7+ ч три ночи подряд`);
   }
   if (mobilityChecked && mobilityFails > 0 && advice.length < 3) {
-    advice.push(`${mobilityFails} провал(а) мобилити — дрилл перед сессией на проблемную зону (🦴 Ортопедия)`);
+    advice.push(`${ruCount(mobilityFails, RU_FAILURES)} мобилити — дрилл перед сессией на проблемную зону (🦴 Ортопедия)`);
   }
 
   // ── Чипы ──────────────────────────────────────────────────────────────────
@@ -374,7 +375,7 @@ export function buildVolumeRecoveryPanel(input: VolumeRecoveryInput): VolumeReco
     {
       id: 'mobility',
       label: 'Мобилити',
-      value: mobilityChecked ? `${mobilityFails} провал(а)` : 'не проверено',
+      value: mobilityChecked ? ruCount(mobilityFails, RU_FAILURES) : 'не проверено',
       zone: !mobilityChecked ? 'nodata' : mobilityFails >= 2 ? 'red' : mobilityFails === 1 ? 'yellow' : 'green',
       detail: mobilityChecked
         ? (mobilityFails > 0 ? 'Провалы закрывают часть упражнений зоны — см. скрининг' : 'Скрининг пройден без провалов')

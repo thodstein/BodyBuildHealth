@@ -5,7 +5,7 @@ import { acuteChronicRatio, toDailyLoads, weeklyMonotony } from '../../../engine
 import { useDataLink } from '../../../core/data-link';
 import { DeloadProtocolCard } from './DeloadProtocolCard';
 import { applyToPlanner } from './planner-bridge';
-import { ruCount, RU_WEEKS } from '../../../engines/ru-plural';
+import { ruCount, RU_DELOADS, RU_WEEKS } from '../../../engines/ru-plural';
 
 const CARD: React.CSSProperties = { background: 'rgba(24,24,27,0.6)', borderRadius: 12, border: '1px solid rgba(255,255,255,0.04)', padding: '12px', margin: '6px 0' };
 const ACCENT = '#00e68a';
@@ -296,7 +296,7 @@ export const DeloadSchedulerTab: React.FC = () => {
       <div style={CARD}>
         <div style={{ fontSize: 12, fontWeight: 700, color: '#fff', marginBottom: 8 }}>
           📅 Расписание {ruCount(schedule.weeks.length, RU_WEEKS)}
-          {schedule.deloadWeeks.length > 0 && <span style={{ marginLeft: 8, fontSize: 10, color: '#60a5fa' }}>{schedule.deloadWeeks.length} делод(ов)</span>}
+          {schedule.deloadWeeks.length > 0 && <span style={{ marginLeft: 8, fontSize: 10, color: '#60a5fa' }}>{ruCount(schedule.deloadWeeks.length, RU_DELOADS)}</span>}
           {schedule.peakWeek && <span style={{ marginLeft: 8, fontSize: 10, color: '#ef4444' }}>Пик: нед {schedule.peakWeek}</span>}
         </div>
         {schedule.warnings.length > 0 && (

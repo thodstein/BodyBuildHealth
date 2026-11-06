@@ -3252,10 +3252,18 @@ export function applyVolumeScheme(plan: BBPlan, scheme: string, opts?: { fst7Sev
   const cfg = VOLUME_SCHEMES[scheme];
   if (!cfg) return;
   const caps = (plan as any).mrvByMuscle || {};
-  // §8.3 (практический бодибилдинг): если FST-7 не влезает в MRV — это не поломка,
-  // а сигнал «объём мышцы уже на потолке». Вместо молчаливого пропуска даём
-  // тренеру действие: сделать мышцу приоритетной или поднять MRV.
+  // §8.3 (практический бодибилдинг): FST-7 «7 в одном» — это ПЕРЕРАСПРЕДЕЛЕНИЕ
+  // сетов мышцы на одно упражнение: финишер получает 7, дельта снимается с других
+  // упражнений той же мышцы (см. блок fst7Seven ниже), недельный объём не растёт.
+  // Поэтому MRV-гейт к нему не применяется — иначе обещанные 7 сетов не доезжают
+  // до плана, и методика остаётся словом (это и было ограничение §8.3).
+  // Гейт сохраняется для legacy 5+2, где схема ДОБАВЛЯЕТ объём.
+  const redistributes = scheme === 'fst7' && !!opts?.fst7Seven;
+  // Если legacy-схема не влезает в MRV — это не поломка, а сигнал «объём мышцы
+  // уже на потолке»: вместо молчаливого пропуска даём действие.
   const fst7MrvSkips: string[] = [];
+  // Случаи, когда доноров не хватило и FST-7 всё-таки добавил объём.
+  const fst7Overflow: Array<{ muscle: string; extra: number }> = [];
   for (const week of plan.weeks) {
     if (week.phase === 'deload' || isTaperPrepOrPeakWeek(week)) continue;
     // Недельный прямой объём по мышцам (до схемы) — схема не должна
@@ -3284,7 +3292,7 @@ export function applyVolumeScheme(plan: BBPlan, scheme: string, opts?: { fst7Sev
         const muscle = exs[0].muscle;
         if (schemeApplied.has(muscle)) continue;
         const cap = caps[muscle];
-        if (cap) {
+        if (cap && !redistributes) {
           const oldIsolation = exs.reduce((a: number, e: any) => a + (e.sets || 0), 0);
           const newTotal = (weekDirect[muscle] || 0) - oldIsolation + cfg.target;
           if (newTotal > cap) { // не влезает в MRV — схему не применяем
@@ -3338,6 +3346,9 @@ export function applyVolumeScheme(plan: BBPlan, scheme: string, opts?: { fst7Sev
               }
             }
           }
+          // Доноров не хватило — объём вырос. Не прячем это: оверрич допустим,
+          // но должен быть виден тренеру и в rationale плана.
+          if (need > 0) fst7Overflow.push({ muscle, extra: need });
           continue;
         }
         let remaining = cfg.target;
@@ -3355,7 +3366,14 @@ export function applyVolumeScheme(plan: BBPlan, scheme: string, opts?: { fst7Sev
   }
   if (scheme === 'fst7' && fst7MrvSkips.length) {
     const uniq = [...new Set(fst7MrvSkips)].map(m => MUSCLE_RU_SHORT[m] || m).join(', ');
-    const line = `📐 FST-7 не применён на ${uniq}: мышца уже на MRV недели. Чтобы получить 7-сетовый финишер — сделайте её приоритетной (специализация) или поднимите MRV.`;
+    const line = `📐 FST-7 (5+2) не применён на ${uniq}: мышца уже на MRV недели. Режим «7 в одном» объём не добавляет и применяется всегда; если нужен именно он — включите 7-сетовый финишер (enhanced, без joint-guard).`;
+    const rat = ((plan as any).rationale ||= []);
+    if (!rat.includes(line)) rat.push(line);
+  }
+  if (scheme === 'fst7' && fst7Overflow.length) {
+    const uniq = [...new Set(fst7Overflow.map(o => MUSCLE_RU_SHORT[o.muscle] || o.muscle))].join(', ');
+    const total = fst7Overflow.reduce((a, b) => a + b.extra, 0);
+    const line = `📐 FST-7 (${uniq}): финишер получил 7 подходов, доноров не хватило — недельный объём вырос на ${ruCount(total, RU_SETS)}. Это осознанный оверрич на блок: следите за восстановлением и силовыми.`;
     const rat = ((plan as any).rationale ||= []);
     if (!rat.includes(line)) rat.push(line);
   }

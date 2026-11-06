@@ -129,6 +129,17 @@ export const RU_DEPLETIONS: RuPluralForms = ['истощение', 'истоще
 export const RU_PROGRAMS: RuPluralForms = ['программа', 'программы', 'программ'];
 export const RU_PL_CYCLES: RuPluralForms = ['ПЛ-цикл', 'ПЛ-цикла', 'ПЛ-циклов'];
 export const RU_HALL_SETS: RuPluralForms = ['зал-сет', 'зал-сета', 'зал-сетов'];
+// Итерация AO: словари, которые раньше писались хеджем «N строк(и)/(ов)».
+export const RU_DEVIATIONS: RuPluralForms = ['отклонение', 'отклонения', 'отклонений'];
+export const RU_FAILURES: RuPluralForms = ['провал', 'провала', 'провалов'];
+export const RU_GAPS: RuPluralForms = ['пролёт', 'пролёта', 'пролётов'];
+export const RU_SLOTS: RuPluralForms = ['слот', 'слота', 'слотов'];
+export const RU_SEGMENTS: RuPluralForms = ['сегмент', 'сегмента', 'сегментов'];
+export const RU_ROWS: RuPluralForms = ['строка', 'строки', 'строк'];
+export const RU_SLICES: RuPluralForms = ['срез', 'среза', 'срезов'];
+export const RU_DELOADS: RuPluralForms = ['делод', 'делода', 'делодов'];
+export const RU_ANTAGONIST_BLOCKS: RuPluralForms = ['антагонист-блок', 'антагонист-блока', 'антагонист-блоков'];
+export const RU_STACKS: RuPluralForms = ['стек', 'стека', 'стеков'];
 export const RU_ADJ_CRITICAL_F: RuPluralForms = ['критическая', 'критические', 'критических'];
 export const RU_ADJ_CRITICAL_M: RuPluralForms = ['критический', 'критических', 'критических'];
 export const RU_ADJ_BUILT: RuPluralForms = ['собранный', 'собранных', 'собранных'];

@@ -1931,7 +1931,7 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
                 return (
                   <div style={{ marginTop: 8, padding: 8, borderRadius: 10, background: 'rgba(139,92,246,0.05)', border: '1px solid rgba(139,92,246,0.2)' }} className="macrocycle-phase-cycles">
                     <div style={{ fontSize: 10, fontWeight: 800, color: '#a78bfa', marginBottom: 4 }}>
-                      🔄 Циклы фазы «{PHASE_LABEL_RU[activeBlock.phase as MacroPhase] ?? activeBlock.phase}» · {phaseBlocks.length} блок(а) · всего {phaseTotal} нед
+                      🔄 Циклы фазы «{PHASE_LABEL_RU[activeBlock.phase as MacroPhase] ?? activeBlock.phase}» · {ruCount(phaseBlocks.length, RU_BLOCKS)} · всего {phaseTotal} нед
                     </div>
                     {phaseBlocks.map(({ block, index }) => (
                       <div key={index} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4, marginBottom: 4, padding: 6, borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>

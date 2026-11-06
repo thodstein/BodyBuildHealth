@@ -39,6 +39,7 @@ import { LMS_CYCLES, normalizeCycleDirection } from '../../../data/lms-cycles/lm
 import type { SRCycleTemplate } from '../../../data/lms-cycles/lms-types';
 import { calcCycleMetrics, type SRExercise } from '../../../engines/lms/lms-metrics.engine';
 import { BbCard, BbFoldCard } from '../TrainingScreen_parts/training-ui';
+import { ruCount, RU_GAPS, RU_SEGMENTS, RU_SLOTS } from '../../../engines/ru-plural';
 
 const ALL_PL_CYCLES = LMS_CYCLES.filter(c => normalizeCycleDirection(c.meta.direction) !== 'bodybuilding');
 
@@ -339,7 +340,7 @@ export const PLSeasonBuilder: React.FC<PLSeasonBuilderProps> = ({ selector, meet
         // Если есть заблокированные пролёты — блокируем сборку
         const blockedGaps = compGap!.segments.filter(s => s.fitMode === 'strict_skip' && s.needsConsent);
         if (blockedGaps.length > 0) {
-          onBuilt(null, [`⛔ Сборка заблокирована: ${blockedGaps.length} пролёт(ов) требуют согласия на изменение раскладки — подтвердите или выберите другой цикл.`], []);
+          onBuilt(null, [`⛔ Сборка заблокирована: ${ruCount(blockedGaps.length, RU_GAPS)} требуют согласия на изменение раскладки — подтвердите или выберите другой цикл.`], []);
           return;
         }
         // P2-6: план с «дырами» не собираем — иначе пустые недели выглядят как тренировки.
@@ -361,7 +362,7 @@ export const PLSeasonBuilder: React.FC<PLSeasonBuilderProps> = ({ selector, meet
         // Проверяем также сезонные слоты на блокировку
         const blockedSeason = seasonPlan.segments.filter(s => s.fit.mode === 'strict_skip');
         if (blockedSeason.length > 0) {
-          onBuilt(null, [`⛔ Сборка заблокирована: ${blockedSeason.length} слот(ов) требуют согласия.`], []);
+          onBuilt(null, [`⛔ Сборка заблокирована: ${ruCount(blockedSeason.length, RU_SLOTS)} требуют согласия.`], []);
           return;
         }
         out = {
@@ -383,7 +384,7 @@ export const PLSeasonBuilder: React.FC<PLSeasonBuilderProps> = ({ selector, meet
       } else if (seasonPlan.segments.length > 0) {
         const blocked = seasonPlan.segments.filter(s => s.fit.mode === 'strict_skip');
         if (blocked.length > 0) {
-          onBuilt(null, [`⛔ Сборка заблокирована: ${blocked.length} слот(ов) требуют согласия на изменение раскладки — подтвердите или выберите другой цикл.`], []);
+          onBuilt(null, [`⛔ Сборка заблокирована: ${ruCount(blocked.length, RU_SLOTS)} требуют согласия на изменение раскладки — подтвердите или выберите другой цикл.`], []);
           return;
         }
         out = assembleSeasonPlan(seasonPlan, {
@@ -715,7 +716,7 @@ export const PLSeasonBuilder: React.FC<PLSeasonBuilderProps> = ({ selector, meet
           {slotSummary && <div style={{ fontSize: 10, color: '#fff', marginBottom: 8 }}>📅 Сезон: {slotSummary}</div>}
           {hasBlockedSegments && (
             <div style={{ fontSize: 10, color: '#ef4444', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 8, padding: 8, marginBottom: 8 }}>
-              ⛔ Сборка заблокирована: {seasonPlan.segments.filter(s => s.fit.mode === 'strict_skip').length + (compGap?.segments.filter(s => s.fitMode === 'strict_skip' && s.needsConsent).length ?? 0)} сегмент(ов) требуют согласия. Подтвердите изменения или выберите другой цикл.
+              ⛔ Сборка заблокирована: {ruCount(seasonPlan.segments.filter(s => s.fit.mode === 'strict_skip').length + (compGap?.segments.filter(s => s.fitMode === 'strict_skip' && s.needsConsent).length ?? 0), RU_SEGMENTS)} требуют согласия. Подтвердите изменения или выберите другой цикл.
             </div>
           )}
           {renderCompGap()}
