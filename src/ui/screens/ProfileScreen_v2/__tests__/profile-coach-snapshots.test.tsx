@@ -225,6 +225,33 @@ describe('фильтр и сортировка', () => {
       );
     });
   });
+
+  it('возвращение из фона пересобирает сводки: привезённые тренировки видны без кнопки', async () => {
+    seed(['Иван']);
+    const sid1 = athleteSpaceId('a1');
+    spaceStores.bySpace[sid1] = {};
+    const { container } = render(<ProfileCoachTab />);
+    await waitFor(() => {
+      expect(cardByName(container, 'Иван')?.querySelector('[data-coach="snapshot"]')?.textContent).toBe(
+        'нет данных в приложении',
+      );
+    });
+
+    // Пока вкладка была в фоне, синхронизация привезла тренировку.
+    spaceStores.bySpace[sid1] = { training_log: [{ date: coachToday(), sets: [{ weight: 60, reps: 5 }] }] };
+    const setVisibility = (state: 'hidden' | 'visible') =>
+      Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => state });
+    setVisibility('hidden');
+    document.dispatchEvent(new Event('visibilitychange'));
+    setVisibility('visible');
+    document.dispatchEvent(new Event('visibilitychange'));
+
+    await waitFor(() => {
+      expect(cardByName(container, 'Иван')?.querySelector('[data-coach="snapshot"]')?.textContent).toContain(
+        'тренировка сегодня',
+      );
+    });
+  });
 });
 describe('выполнение недели, инбокс и комментарий к неделе', () => {
   it('план из рантайма + тренировка → «1 из 2 за неделю», без выдуманных процентов сверх факта', async () => {

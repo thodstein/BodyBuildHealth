@@ -15,6 +15,7 @@
  *    памяти чужие данные. Удаление карточки и удаление ЕГО данных — разные кнопки.
  */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { ruCount, RU_SECTIONS } from '../../../engines/ru-plural';
 import { NativeIcon } from '../../native/NativeIcons';
 import { colors, withAlpha } from './ui';
 import {
@@ -668,6 +669,27 @@ export const ProfileCoachTab: React.FC<{
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [athletesFingerprint, snapshotsRev]);
+
+  /**
+   * Сводки читаются из баз ДРУГИХ пространств, а синхронизация дома привозит новые
+   * тренировки, пока вкладка в фоне. Вернувшись в приложение, пересобираем сводки:
+   * иначе тренер видел бы цифры на момент открытия вкладки. Только переход
+   * фон→передний план: «focus» в браузере срабатывает часто и без повода.
+   */
+  useEffect(() => {
+    let wasHidden = false;
+    const onVis = () => {
+      if (document.visibilityState === 'hidden') {
+        wasHidden = true;
+        return;
+      }
+      if (!wasHidden) return;
+      wasHidden = false;
+      setSnapshotsRev(v => v + 1);
+    };
+    document.addEventListener('visibilitychange', onVis);
+    return () => document.removeEventListener('visibilitychange', onVis);
+  }, []);
 
   /**
    * «Снять программу» с атлета: сырые программные ключи его пространства →
@@ -1780,7 +1802,7 @@ export const ProfileCoachTab: React.FC<{
                 <div style={{ fontSize: 11.5, color: colors.textSubtle, fontVariantNumeric: 'tabular-nums' }}>
                   {statusCounts.active + statusCounts.paused} в работе
                   {statusCounts.archived > 0 ? ` · ${statusCounts.archived} в архиве` : ''}
-                  {` · ${state.sections.length} разделов`}
+                  {` · ${ruCount(state.sections.length, RU_SECTIONS)}`}
                 </div>
               </div>
               <input
