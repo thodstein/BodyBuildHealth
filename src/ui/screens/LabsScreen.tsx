@@ -4,6 +4,7 @@ import { HeroImg } from '../HeroImg';
 import { RISK_SYSTEMS, ALL_RISK_SYSTEMS, REQUIRED_LABS_PER_PHASE, UCUM_MAP } from '../../core/constants';
 import type { RiskResult, LabPoint } from '../../core/types';
 import { calculateRiskFromAnalyses } from '../../engines/risk-calculator-v2.engine';
+import { ruCount, RU_MARKERS } from '../../engines/ru-plural';
 import { calculatePenaltyCoefficients } from '../../engines/labs-penalty.engine';
 import { LabDiaryTab } from './LabsScreen_parts/LabDiaryTab';
 import { computeLabIndexDetails, type LabIndexDetail } from '../../engines/labs-indices.engine';
@@ -817,7 +818,7 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
               {mainTab === 'risks' ? 'Риски и индексы' : (LAB_SUB_TABS.find(t => t.id === subTab)?.label || 'Анализы')}
             </div>
             <div style={{ fontSize:12, color:'#fff', marginTop:2, lineHeight:1.3, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>
-              {mainTab === 'risks' ? 'ASI · HMI · CR · механизм-модель ТЗ' : `${currentLabs.length} маркеров · ${PHASE_LABELS[selectedPhase] || selectedPhase}`}
+              {mainTab === 'risks' ? 'ASI · HMI · CR · механизм-модель ТЗ' : `${ruCount(currentLabs.length, RU_MARKERS)} · ${PHASE_LABELS[selectedPhase] || selectedPhase}`}
             </div>
           </div>
           <div style={{ width:38, height:38, borderRadius:13, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(var(--labs-accent-rgb, 0,230,138),0.14)', border:'1px solid rgba(var(--labs-accent-rgb, 0,230,138),0.22)', color:LABS_ACCENT, flexShrink:0 }}>
@@ -1393,7 +1394,7 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                   <div style={{ fontSize:11, color:'#fff', textAlign:'center', marginTop:8 }}>Сохранено в архив. Доступно в Профиле → Отчёты.</div>
                   <div style={{ display:'flex', gap:8, marginTop:10, flexWrap:'wrap' }}>
                     <button onClick={() => {
-                      const txt = `Анализы ${localIsoDate()} · ${labs.length} маркеров (${deviationCount} с откл.)\n` + labs.map((l: any) => `${l.name || l.code}: ${l.value} ${l.unit || ''} (${l.date || ''})`).join('\n');
+                      const txt = `Анализы ${localIsoDate()} · ${ruCount(labs.length, RU_MARKERS)} (${deviationCount} с откл.)\n` + labs.map((l: any) => `${l.name || l.code}: ${l.value} ${l.unit || ''} (${l.date || ''})`).join('\n');
                       void copyOrShareText(txt, 'Анализы').then(o => flashShare(shareOutcomeLabel(o)));
                     }} style={{ flex:1, minHeight:44, padding:'10px 14px', borderRadius:12, cursor:'pointer', fontWeight:800, fontSize:12, background:'rgba(59,130,246,0.12)', border:'1px solid rgba(59,130,246,0.30)', color:'#fff' }}>📋 Копия / Share</button>
                     <button onClick={() => {
@@ -1787,8 +1788,8 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                 <div style={{ fontSize:12, color:'#fff', marginBottom:10, lineHeight:1.6 }}>
                   {(() => {
                     const phases: Record<string,string> = {
-                       baseline:`Перед началом курса — полный базовый скрининг (${requiredLabs.length} маркеров, включая ОАМ)`,
-                       on_cycle:`Каждые 4 недели на курсе — контроль печени, липидов, гормонов и ОАМ (${requiredLabs.length} маркеров)`,
+                       baseline:`Перед началом курса — полный базовый скрининг (${ruCount(requiredLabs.length, RU_MARKERS)}, включая ОАМ)`,
+                       on_cycle:`Каждые 4 недели на курсе — контроль печени, липидов, гормонов и ОАМ (${ruCount(requiredLabs.length, RU_MARKERS)})`,
                       bridge:'Между курсами — восстановительный мониторинг (30 маркеров)',
                       pct:'Послекурсовая терапия — контроль восстановления оси HPG (29 маркеров)',
                       post_pct:'Через 4-6 недель после ПКТ — финальная проверка (32 маркера)',

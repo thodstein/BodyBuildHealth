@@ -8,6 +8,7 @@ import type { UnifiedSettings } from '../../../core/types';
 import { AccordionSection, FieldRow, PopupValueEditor, BoolChip, colors } from './ui';
 import { NativeIcon } from '../../native/NativeIcons';
 import { isNativeApp } from '../../../core/app-platform';
+import { ruCount, RU_ENTRIES, RU_SETTINGS } from '../../../engines/ru-plural';
 import { WidgetsSetupCard } from '../../../ui/native/WidgetsSetupCard';
 import { AppearanceSetupCard } from '../../../ui/native/AppearanceSetupCard';
 import { BiometrySetupCard } from '../../../ui/native/BiometrySetupCard';
@@ -177,7 +178,7 @@ export const ProfileSettingsTab: React.FC<{ onNavigate?: (screen: string) => voi
               ? `Фотографий веса в файле: ${info.photos}.`
               : 'Фотографий веса в файле нет.';
           const ok = confirm(
-            `Копия от ${date}: ${spaces}, ${info.records} записей в базе, ${info.keys} настроек.\n\n` +
+            `Копия от ${date}: ${spaces}, ${ruCount(info.records, RU_ENTRIES)} в базе, ${ruCount(info.keys, RU_SETTINGS)}.\n\n` +
               'Восстановление ЗАМЕНИТ все данные на этом устройстве — профиль, дневники, анализы и ' +
               'данные всех атлетов. ' + photos + ' ' +
               'Черновики в файл не входят и останутся как есть. ' +

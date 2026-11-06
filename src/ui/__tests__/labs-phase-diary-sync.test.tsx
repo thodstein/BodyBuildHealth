@@ -63,7 +63,7 @@ describe('LabDiaryTab auto-import on labs change', () => {
     await waitFor(() => {
       // after fix, diary should have 1 day and show abnormal
       const text = document.body.textContent || '';
-      expect(text).toContain('1 дней');
+      expect(text).toContain('1 день');
     });
     cleanup();
     try { localStorage.clear(); } catch {}

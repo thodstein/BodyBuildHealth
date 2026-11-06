@@ -4,6 +4,7 @@ import type { LabPoint } from '../../../core/types';
 import { db } from '../../../core/db';
 import { notifyDataChange } from '../../../core/data-link';
 import { getLabNorm, FEMALE_LABS_NOTE } from '../../../engines/lab-norms.engine';
+import { ruCount, RU_MARKERS } from '../../../engines/ru-plural';
 import { LABS_ACCENT, LABS_CARD, LABS_CARD_FLAT, LABS_SYS_COLOR, LABS_SYS_LABEL, LABS_SYS_ICON, LabsBadge, labsWithAlpha } from './LabsUI';
 import { NativeIcon } from '../../native/NativeIcons';
 
@@ -336,7 +337,7 @@ export default function LabsCatalogTab({
         <div style={{ width:40, height:40, borderRadius:13, display:'flex', alignItems:'center', justifyContent:'center', background: catalogMode==='markers'? 'rgba(var(--labs-accent-rgb, 0,230,138),0.14)' : 'rgba(168,85,247,0.14)', border:`1px solid ${catalogMode==='markers'?'rgba(var(--labs-accent-rgb, 0,230,138),0.22)':'rgba(168,85,247,0.22)'}`, color: catalogMode === 'markers' ? LABS_ACCENT : '#a855f7', flexShrink:0 }}><NativeIcon name={catalogMode === 'markers' ? 'bookOpen' : 'cross'} size={18} /></div>
         <div style={{ flex:1, minWidth:0 }}>
           <div style={{ fontSize:15, fontWeight:800, color:'#fff', letterSpacing:-0.2 }}>{catalogMode === 'markers' ? 'Каталог маркеров' : 'Обследования'}</div>
-          <div style={{ fontSize:12, color:'#fff', marginTop:2, lineHeight:1.4 }}>{catalogMode === 'markers' ? `${catalogEntries.length} маркеров • ${filledCount} заполнено для «${PHASE_LABELS[selectedPhase]}»` : `${INVESTIGATIONS.length} панелей • группировка по типу исследования`}</div>
+          <div style={{ fontSize:12, color:'#fff', marginTop:2, lineHeight:1.4 }}>{catalogMode === 'markers' ? `${ruCount(catalogEntries.length, RU_MARKERS)} • ${filledCount} заполнено для «${PHASE_LABELS[selectedPhase]}»` : `${INVESTIGATIONS.length} панелей • группировка по типу исследования`}</div>
         </div>
         <LabsBadge color={catalogMode==='markers'? LABS_ACCENT : '#a855f7'}>{catalogMode === 'markers' ? `${catalogEntries.length}` : `${INVESTIGATIONS.length}`}</LabsBadge>
       </div>

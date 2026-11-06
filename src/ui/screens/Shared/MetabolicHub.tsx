@@ -19,6 +19,7 @@ import { getProfile, updateProfile } from '../../../core/profile-manager';
 import { getNutritionV2Data } from '../../../core/nutrition-v2-data';
 import { readDiaryV2, onDiaryChangeV2 } from '../NutritionScreen_parts/diary-storage-v2';
 import { loadSRPESessions } from '../../../engines/pro/srpe-store';
+import { ruCount, RU_OBSERVATIONS, RU_FORECASTS } from '../../../engines/ru-plural';
 import { toDailyLoads, acuteChronicRatio } from '../../../engines/pro/training-load.engine';
 import { PopupSelect, PopupNumber } from '../SRCBBScreen_parts/TrainingPopups';
 import { ModernHero } from '../NutritionScreen_parts/nutrition-modern-kit';
@@ -1688,7 +1689,7 @@ const kbju = useMemo(()=> calcKBJU(input), [input]);
               </div>
             ))}
             <span style={{ fontSize:8, color:'rgba(255,255,255,0.45)', marginLeft:4 }}>
-              {hctStats.measured} измерений{hctStats.forecast>0 ? ` + ${hctStats.forecast} прогноз` : ''}
+              {ruCount(hctStats.measured, RU_OBSERVATIONS)}{hctStats.forecast>0 ? ` + ${ruCount(hctStats.forecast, RU_FORECASTS)}` : ''}
               {hctStats.delta!=null ? ` · Δ ${hctStats.delta>0?'+':''}${hctStats.delta}%` : ''}
             </span>
             {donationLog.length>0 && <span style={{ fontSize:8, color:'#ef4444', background:'rgba(239,68,68,0.08)', border:'1px solid rgba(239,68,68,0.12)', borderRadius:6, padding:'2px 6px' }}>🩸 донаций {donationLog.length} · посл. {donationLog[donationLog.length-1].date}</span>}
@@ -2107,7 +2108,7 @@ const kbju = useMemo(()=> calcKBJU(input), [input]);
               {hctHistory.length>=2 && (
                 <div style={{ marginTop:8, padding:'8px 10px', borderRadius:8, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)' }}>
                   <div style={{ fontSize:9, fontWeight:700, color:'rgba(255,255,255,0.55)', textTransform:'uppercase', letterSpacing:0.3, marginBottom:6 }}>
-                    История HCT · {hctStats.measured} измерений{hctStats.forecast>0 ? ` + ${hctStats.forecast} прогноз` : ''}
+                    История HCT · {ruCount(hctStats.measured, RU_OBSERVATIONS)}{hctStats.forecast>0 ? ` + ${ruCount(hctStats.forecast, RU_FORECASTS)}` : ''}
                     {hctStats.delta!=null ? ` · Δ ${hctStats.delta>0?'+':''}${hctStats.delta}%` : ''}
                     {hctStats.lastStep!=null ? ` · посл. шаг ${hctStats.lastStep>0?'+':''}${hctStats.lastStep}%` : ''}
                   </div>

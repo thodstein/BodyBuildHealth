@@ -3,6 +3,8 @@
  * Без React, без UI, без localStorage. Импортируются тестами и компонентом.
  */
 
+import { ruCount, RU_ENTRIES } from '../../../engines/ru-plural';
+
 export type DiaryEntryLike = { id?: string; date: string; fields: { label: string; value: string; unit: string }[] };
 
 export type DiaryKey =
@@ -1317,7 +1319,7 @@ const entryToHtmlTable = (entries: DiaryEntryLike[], title: string): string => {
     )
     .join('');
   return `
-    <h3>${escHtml(title)} (${entries.length} записей)</h3>
+    <h3>${escHtml(title)} (${ruCount(entries.length, RU_ENTRIES)})</h3>
     <table style="border-collapse:collapse;width:100%;margin-bottom:24px;font-size:11px">
       <thead><tr style="background:#f3f4f6"><th style="border:1px solid #ddd;padding:6px">Дата</th>${fields
         .map((f) => `<th style="border:1px solid #ddd;padding:6px">${escHtml(f)}</th>`)

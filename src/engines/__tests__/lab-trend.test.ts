@@ -65,7 +65,7 @@ describe('lab-trend.engine', () => {
       lab('AST', 28, '2024-02-01'),
     ];
     const result = computeLabTrends(labs);
-    expect(result.summary).toContain('2 маркеров');
+    expect(result.summary).toContain('2 маркера');
   });
 
   it('getTrendColor returns correct colors', () => {

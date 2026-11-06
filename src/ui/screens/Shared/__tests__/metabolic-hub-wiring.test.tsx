@@ -571,7 +571,7 @@ describe('MetabolicHub: ввод меняет расчёт (проводка п�
     ]));
     render(<MetabolicHub />);
     const txt = openMode('Кровь');
-    expect(txt).toContain('2 измерений');
+    expect(txt).toContain('2 измерения');
     expect(txt).toContain('+ 1 прогноз');
     // Δ считается по лабораторным точкам (50 → 54), а не по прогнозной 50%
     expect(txt).toContain('Δ +4%');

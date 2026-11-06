@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import type { WeightEntry } from '../../../../../engines/profile-store';
+import { ruCount, RU_ENTRIES } from '../../../../../engines/ru-plural';
 import { c, glassCard, glassTile, metricLabel, metricValue, flexBetween, glowRing, FONT } from './design';
 
 interface PhotoTimelineProps {
@@ -42,7 +43,7 @@ export const PhotoTimeline: React.FC<PhotoTimelineProps> = ({ rows }) => {
   return (
     <section style={glassCard}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-        <div style={{ ...metricLabel, fontSize: 13 }}>📸 Лента прогресса <span style={{ color: c.text3, fontWeight: 400 }}>({photoEntries.length} записей с фото)</span></div>
+        <div style={{ ...metricLabel, fontSize: 13 }}>📸 Лента прогресса <span style={{ color: c.text3, fontWeight: 400 }}>({ruCount(photoEntries.length, RU_ENTRIES)} с фото)</span></div>
         <small style={{ color: c.text3, fontSize: 11 }}>Клик на фото — увеличить</small>
       </div>
       

@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import { colors } from '../../ui';
+import { ruCount, RU_ENTRIES } from '../../../../../engines/ru-plural';
 
 interface PhaseInsightsProps {
   rows: { date: string; weight: number; bodyFat?: number; muscleMass?: number }[];
@@ -262,7 +263,7 @@ export const PhaseInsights: React.FC<PhaseInsightsProps> = ({ rows }) => {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6, gap: 8 }}>
                 <b style={{ color: '#fff', fontSize: 13.5 }}>{label}</b>
                 <small style={{ color: 'rgba(255,255,255,0.55)', fontSize: 11, fontVariantNumeric: 'tabular-nums' }}>
-                  {p.start} → {p.end} ({days}д, {p.entries.length} записей)
+                  {p.start} → {p.end} ({days}д, {ruCount(p.entries.length, RU_ENTRIES)})
                 </small>
               </div>
               <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', fontSize: 12.5, fontVariantNumeric: 'tabular-nums' }}>

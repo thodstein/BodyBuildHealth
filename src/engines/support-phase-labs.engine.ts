@@ -17,6 +17,7 @@
 // ════════════════════════════════════════════════════════════════════════════
 
 import type { PhaseKey } from './tz-bridge-phase';
+import { ruCount, RU_CARDS, RU_MARKERS } from './ru-plural';
 
 /** Минимальные PED-флаги, нужные карточкам (структурный подтип PEDFlags). */
 export interface PhaseLabFlags {
@@ -715,7 +716,7 @@ export function phaseLabTeaser(
   markerCount: number,
 ): string {
   const n = phaseCardsFor(flags, phase).length;
-  return `K0–K10 · ${n} карт · 🎯 ${markerCount} маркеров`;
+  return `K0–K10 · ${ruCount(n, RU_CARDS)} · 🎯 ${ruCount(markerCount, RU_MARKERS)}`;
 }
 
 // ════════════════════════════════════════════════════════════════════

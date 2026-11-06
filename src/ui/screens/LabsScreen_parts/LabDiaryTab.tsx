@@ -10,6 +10,7 @@ import {
 import { LABS_ACCENT, LABS_CARD, LABS_CARD_FLAT } from './LabsUI';
 import { NativeIcon } from '../../native/NativeIcons';
 import { getLabNorm, FEMALE_LABS_TAB_NOTE } from '../../../engines/lab-norms.engine';
+import { ruCount, RU_DAYS, RU_MARKERS, RU_ENTRIES, RU_ANOMALIES } from '../../../engines/ru-plural';
 import { db } from '../../../core/db';
 import { notifyDataChange } from '../../../core/data-link';
 
@@ -135,7 +136,7 @@ export const LabDiaryTab: React.FC<{ labs: LabPoint[]; sex?: 'male' | 'female' }
           <div style={{ width:36, height:36, borderRadius:11, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(var(--labs-accent-rgb, 0,230,138),0.14)', border:'1px solid rgba(var(--labs-accent-rgb, 0,230,138),0.18)', color: LABS_ACCENT }}><NativeIcon name="notebook" size={17} /></div>
           <div style={{ flex:1 }}>
             <div style={{ fontSize:14, fontWeight:800, color:'#fff' }}>Дневник анализов</div>
-            <div style={{ fontSize:11, color:'#fff', marginTop:2, lineHeight:1.4 }}>{stats.totalDays} дней • {stats.totalMarkers} маркеров • {abnormalMarkers.length} аномалий</div>
+            <div style={{ fontSize:11, color:'#fff', marginTop:2, lineHeight:1.4 }}>{ruCount(stats.totalDays, RU_DAYS)} • {ruCount(stats.totalMarkers, RU_MARKERS)} • {ruCount(abnormalMarkers.length, RU_ANOMALIES)}</div>
           </div>
           {stats.firstDate && <span style={{ fontSize:11, padding:'6px 10px', borderRadius:999, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.08)', color:'#fff', fontWeight:700, flexShrink:0 }}>📅 {stats.firstDate} → {stats.lastDate}</span>}
         </div>
@@ -236,7 +237,7 @@ export const LabDiaryTab: React.FC<{ labs: LabPoint[]; sex?: 'male' | 'female' }
               border:'1px solid rgba(var(--labs-accent-rgb, 0,230,138),0.30)', borderLeft:`3px solid ${LABS_ACCENT}`, background:'linear-gradient(180deg, rgba(21,38,66,0.72), rgba(12,23,40,0.72))', color:'#fff',
               fontWeight:800, fontSize:13, boxShadow:'0 8px 22px rgba(0,0,0,0.35)',
             }}>
-              🔄 Импортировать результаты из лаборатории ({labs.length} записей)
+              🔄 Импортировать результаты из лаборатории ({ruCount(labs.length, RU_ENTRIES)})
             </button>
           )}
         </div>
@@ -423,7 +424,7 @@ export const LabDiaryTab: React.FC<{ labs: LabPoint[]; sex?: 'male' | 'female' }
                   </div>
                   <div style={{ display:'flex', gap:6, alignItems:'center', flexShrink:0 }}>
                     <span style={{ fontSize:11, color:'#fff', fontWeight:700 }}>
-                      {day.totalMarkers} маркеров
+                      {ruCount(day.totalMarkers, RU_MARKERS)}
                     </span>
                     {day.abnormalCount > 0 && (
                       <span style={{ fontSize:11, color:'#ef4444', fontWeight:800 }}>

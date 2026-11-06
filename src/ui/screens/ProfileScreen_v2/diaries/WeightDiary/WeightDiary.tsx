@@ -9,6 +9,7 @@ import { migrateWeightPhotosFromLocalStorage } from '../../../../../engines/weig
 import { updateSection } from '../../../../../core/profile-manager';
 import { strengthDiary } from '../../../../../engines/strength-diary.engine';
 import { generateInsights, type DiarySession, type DiarySet } from '../../../../../engines/diary-insights.engine';
+import { ruCount, RU_ENTRIES } from '../../../../../engines/ru-plural';
 import { projectWeight, calcFFMI } from '../../../../../engines/body-composition.engine';
 import {
   buildWeeklyHistogram,
@@ -824,7 +825,7 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
       }
       const merged = [...rows, ...imported];
       await commit(merged);
-      (window as any).showToast?.(`📥 Импортировано ${imported.length} записей`);
+      (window as any).showToast?.(`📥 Импортировано: ${ruCount(imported.length, RU_ENTRIES)}`);
     } catch {
       (window as any).showToast?.('⚠️ Ошибка чтения CSV');
     } finally {
@@ -1033,7 +1034,7 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
         {showArchive && archiveRows.length > 0 && (
           <details style={card} open>
             <summary style={sum}>
-              <span>🗄</span> Архив — {archiveRows.length} записей старше 365 дней
+              <span>🗄</span> Архив — {ruCount(archiveRows.length, RU_ENTRIES)} старше 365 дней
               <span style={{ marginLeft: 'auto', color: c.text3, fontSize: 11, transition: 'transform 0.2s' }}>▾</span>
             </summary>
             <div style={{ display: 'flex', gap: 8, margin: '10px 0' }}>
@@ -1436,7 +1437,7 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
         {heatmap && (
           <details style={card}>
             <summary style={sum}>
-              <span>🗓</span> Календарь веса ({heatmap.cells.flat().filter(Boolean).length} записей)
+              <span>🗓</span> Календарь веса ({ruCount(heatmap.cells.flat().filter(Boolean).length, RU_ENTRIES)})
               <span style={{ marginLeft: 'auto', color: c.text3, fontSize: 11 }}>▾</span>
             </summary>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 4, marginTop: 10 }}>

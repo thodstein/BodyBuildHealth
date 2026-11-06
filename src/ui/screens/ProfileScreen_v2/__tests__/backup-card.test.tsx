@@ -158,8 +158,8 @@ describe('настройки: полная резервная копия', () =>
     const asked = String(confirmSpy.mock.calls[0][0]);
     expect(asked).toContain('2026-11-01');
     expect(asked).toContain('2 пространств');
-    expect(asked).toContain('4 записей в базе');
-    expect(asked).toContain('1 настроек');
+    expect(asked).toContain('4 записи в базе');
+    expect(asked).toContain('1 настройка');
     expect(asked).toContain('ЗАМЕНИТ все данные');
     expect(asked).toContain('Фотографий веса в файле нет');
     expect(importMock).toHaveBeenCalledTimes(1);

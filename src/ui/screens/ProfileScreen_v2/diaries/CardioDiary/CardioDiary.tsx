@@ -11,6 +11,7 @@ import { NativeIcon } from '../../../../native/NativeIcons';
 import { btnBase, btnPrimary, chip, chipActive, diaryShell, header as diaryHeaderStyle, glassSection, heroCard, main as pageMain, sectionTitle, statCard, tableTh, tableTd } from '../diary-page-styles';
 import { DiaryHeader } from '../DiaryHeader';
 import { saveCsvApk, printHtmlApk, shareOutcomeLabel } from '../../../../../core/apk-share';
+import { ruCount, RU_TRAININGS } from '../../../../../engines/ru-plural';
 import { ConfirmDialogProvider, useConfirmDialog } from '../../../TrainingScreen_parts/ConfirmDialog';
 import { useAndroidBackHandler } from '../../../../../core/use-android-back';
 import {
@@ -99,7 +100,7 @@ const CardioDiaryInner: React.FC<DiaryWindowProps> = ({ open, onClose, onDataCha
         setImportPreview({ entries: [], warnings: parsed.warnings, format: parsed.format, fileName: file.name });
       } else {
         setImportPreview({ entries: parsed.entries, warnings: parsed.warnings, format: parsed.format, fileName: file.name });
-        flashMsg(`📥 Распознано ${parsed.entries.length} тренировок (${parsed.format}) — проверьте превью`);
+        flashMsg(`📥 Распознано: ${ruCount(parsed.entries.length, RU_TRAININGS)} (${parsed.format}) — проверьте превью`);
       }
     } catch (e) {
       flashMsg(`⚠️ Ошибка чтения файла: ${(e as Error).message}`);
@@ -119,7 +120,7 @@ const CardioDiaryInner: React.FC<DiaryWindowProps> = ({ open, onClose, onDataCha
     const added = merged.length - prev.length;
     reload();
     flashMsg(added > 0
-      ? `✅ Импортировано ${added} тренировок`
+      ? `✅ Импортировано: ${ruCount(added, RU_TRAININGS)}`
       : `ℹ️ Новых записей нет — дубликаты пропущены (${incoming.length})`);
     setImportPreview(null);
   };
@@ -576,7 +577,7 @@ const CardioDiaryInner: React.FC<DiaryWindowProps> = ({ open, onClose, onDataCha
           <button style={btnBase(ACCENT)} onClick={() => setShowImportHelp(v => !v)}>{showImportHelp ? 'Скрыть справку' : 'ℹ️ Как экспортировать'}</button>
           {importPreview && importPreview.entries.length > 0 && (
             <button style={{ ...btnBase(ACCENT), background: ACCENT, color: '#07130e', fontWeight: 800 }} onClick={confirmImport}>
-              ✅ Импортировать {importPreview.entries.length} тренировок
+              ✅ Импортировать: {ruCount(importPreview.entries.length, RU_TRAININGS)}
             </button>
           )}
           {importPreview && (
@@ -586,7 +587,7 @@ const CardioDiaryInner: React.FC<DiaryWindowProps> = ({ open, onClose, onDataCha
         {importPreview && (
           <div style={{ marginTop: 12, padding: 13, borderRadius: 14, background: importPreview.entries.length ? 'rgba(74,222,128,0.09)' : 'rgba(239,68,68,0.09)', border: `1px solid ${importPreview.entries.length ? 'rgba(74,222,128,0.28)' : 'rgba(239,68,68,0.28)'}` }}>
             <div style={{ fontSize: 12.5, fontWeight: 800, color: importPreview.entries.length ? '#4ade80' : '#f87171', marginBottom: 7, fontVariantNumeric: 'tabular-nums' }}>
-              {importPreview.fileName} → {importPreview.format} · найдено {importPreview.entries.length} тренировок
+              {importPreview.fileName} → {importPreview.format} · найдено {ruCount(importPreview.entries.length, RU_TRAININGS)}
             </div>
             {importPreview.warnings.length > 0 && (
               <div style={{ fontSize: 11.5, color: '#fbbf24', marginBottom: 7, lineHeight: 1.5 }}>
@@ -607,7 +608,7 @@ const CardioDiaryInner: React.FC<DiaryWindowProps> = ({ open, onClose, onDataCha
                     {e.notes && <span style={{ color: 'rgba(255,255,255,0.55)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 120 }}>{e.notes}</span>}
                   </div>
                 ))}
-                {importPreview.entries.length > 5 && <div style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.6)' }}>… и ещё {importPreview.entries.length - 5} тренировок</div>}
+                {importPreview.entries.length > 5 && <div style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.6)' }}>… и ещё {ruCount(importPreview.entries.length - 5, RU_TRAININGS)}</div>}
               </div>
             )}
           </div>

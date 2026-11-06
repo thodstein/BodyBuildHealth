@@ -1,5 +1,6 @@
 import type { LabPoint } from '../core/types';
 import { UCUM_MAP } from '../core/constants';
+import { ruCount, ruAdjCount, RU_MARKERS } from './ru-plural';
 
 export interface LabTrendPoint {
   date: string;
@@ -158,11 +159,11 @@ export function computeLabTrends(labs: LabPoint[]): LabTrendReport {
 
 function buildSummary(total: number, significant: number, improved: number, worsened: number, newMarkers: number): string {
   const parts: string[] = [];
-  parts.push(`${total} маркеров`);
+  parts.push(ruCount(total, RU_MARKERS));
   if (significant > 0) parts.push(`${significant} с изменением`);
   if (worsened > 0) parts.push(`↓ ${worsened}`);
   if (improved > 0) parts.push(`↑ ${improved}`);
-  if (newMarkers > 0) parts.push(`+${newMarkers} новых`);
+  if (newMarkers > 0) parts.push(`+${ruAdjCount(newMarkers, ['новый', 'новых', 'новых'], RU_MARKERS)}`);
   return parts.join(' · ');
 }
 

@@ -3,6 +3,7 @@ import { colors, glassCard, inputStyle, labelStyle, selectStyle, withAlpha } fro
 import { NativeIcon } from '../../../../native/NativeIcons';
 import { btnBase, btnPrimary, chip, chipActive, main as pageMain } from '../diary-page-styles';
 import { DiaryHeader } from '../DiaryHeader';
+import { ruCount, RU_DAYS, RU_ENTRIES, RU_INJECTIONS } from '../../../../../engines/ru-plural';
 import {
   INJECTION_ZONES,
   NEEDLE_GAUGES,
@@ -1089,7 +1090,7 @@ export const InjectionDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDa
                 ←
               </button>
               <span style={{ color: colors.textMuted, fontSize: 12 }}>
-                Страница {page} из {pages} · {visible.length} записей
+                Страница {page} из {pages} · {ruCount(visible.length, RU_ENTRIES)}
               </span>
               <button style={button} disabled={page >= pages} onClick={() => setPage((value) => value + 1)}>
                 →
@@ -1158,7 +1159,7 @@ export const InjectionDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDa
               <div style={{ ...card, marginTop: 12, background: 'rgba(59,130,246,.07)' }}>
                 <b style={{ color: colors.blue }}>📊 Последние 7 дней</b>
                 <div style={{ marginTop: 5, color: colors.textMuted }}>
-                  {stats.last7.count} инъекций · средняя боль {stats.last7.avgPain} · средний PIP {stats.last7.avgPip}
+                  {ruCount(stats.last7.count, RU_INJECTIONS)} · средняя боль {stats.last7.avgPain} · средний PIP {stats.last7.avgPip}
                 </div>
               </div>
             )}
@@ -1307,7 +1308,7 @@ export const InjectionDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDa
                       margin: '6px 0',
                     }}
                   >
-                    ⚠ {zoneLabel(item.zone)} · {item.daysSince} дней · последняя {item.lastDate}
+                    ⚠ {zoneLabel(item.zone)} · {ruCount(item.daysSince, RU_DAYS)} · последняя {item.lastDate}
                   </div>
                 ))
               ) : (
@@ -1774,7 +1775,7 @@ export const InjectionDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDa
               <line x1="12" y1="146" x2="705" y2="146" stroke="#555" />
             </svg>
             <div style={{ color: colors.textMuted, fontSize: 11 }}>
-              30 дней: {summary.recentInjections.length} записей · Pharma: {pharma.totalEntries} за 30 дней
+              30 дней: {ruCount(summary.recentInjections.length, RU_ENTRIES)} · Pharma: {pharma.totalEntries} за 30 дней
             </div>
           </div>
           <div style={card}>

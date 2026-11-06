@@ -236,7 +236,7 @@ describe('withLabTiming — добивка пустых when', () => {
 describe('phaseLabTeaser — тизер свернутого мониторинга', () => {
   it('course: 6 карт; pct без флагов: 4 карты', () => {
     expect(phaseLabTeaser({ hasAAS: true }, 'course', 5)).toBe('K0–K10 · 6 карт · 🎯 5 маркеров');
-    expect(phaseLabTeaser(null, 'pct', 0)).toBe('K0–K10 · 4 карт · 🎯 0 маркеров');
+    expect(phaseLabTeaser(null, 'pct', 0)).toBe('K0–K10 · 4 карты · 🎯 0 маркеров');
   });
 });
 

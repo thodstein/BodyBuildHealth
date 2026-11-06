@@ -7,6 +7,7 @@ import React from 'react';
 import { useSectionState } from '../hooks/useSectionState';
 import { AccordionSection, FieldRow, PopupValueEditor, BoolChip, SliderInput, GroupHeader, colors } from '../ui';
 import { NativeIcon } from '../../../native/NativeIcons';
+import { ruCount, RU_ENTRIES } from '../../../../engines/ru-plural';
 import {
   CHRONIC_CONDITIONS_LIST, ALLERGEN_LIST, ORGAN_WEAKNESSES, GENETIC_POLYMORPHISMS,
 } from '../../../../core/contraindications';
@@ -66,7 +67,7 @@ export const UserHealthSection: React.FC = React.memo(function UserHealthSection
       subtitle="Хроника, аллергии, генетика, риски, системные показатели"
       icon={<NativeIcon name="heart" size={20} />}
       color={colors.danger}
-      badge={`${(health.chronicConditions?.length || 0) + (health.injuries?.length || 0)} записей`}
+      badge={ruCount((health.chronicConditions?.length || 0) + (health.injuries?.length || 0), RU_ENTRIES)}
     >
       {/* Хронические заболевания */}
       <div style={{ marginBottom: 16 }}>

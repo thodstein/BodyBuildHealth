@@ -3,6 +3,7 @@ import { BoolChip, SliderInput, colors, glassCard, inputStyle } from '../../ui';
 import { NativeIcon, type NativeIconName } from '../../../../native/NativeIcons';
 import { useDiaryDraft } from '../../diary-modals';
 import { saveCsvApk, printHtmlApk } from '../../../../../core/apk-share';
+import { ruCount, RU_ENTRIES } from '../../../../../engines/ru-plural';
 import {
   analyzeAllSleepCorrelations,
   generateCorrelationRecommendations,
@@ -1558,7 +1559,7 @@ export const SleepDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals: p
             ← Назад
           </button>
           <span style={{ fontSize: 13, color: colors.textMuted }}>
-            Страница {page}/{pageData.totalPages} · {pageData.total} записей
+            Страница {page}/{pageData.totalPages} · {ruCount(pageData.total, RU_ENTRIES)}
           </span>
           <button style={chip} disabled={page >= pageData.totalPages} onClick={() => setPage(page + 1)}>
             Далее →
