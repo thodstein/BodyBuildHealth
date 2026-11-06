@@ -128,6 +128,7 @@ export const NAV_TARGETS: Record<string, NavTarget> = {
   'labs': { tab: 'labs' },
   'risks': { tab: 'risks' },
   'nutrition': { tab: 'nutrition' },
+  'calendar': { tab: 'profile', subTab: 'planner' },
   'profile': { tab: 'profile' },
   'course': { tab: 'training' },
   'plan': { tab: 'training' },

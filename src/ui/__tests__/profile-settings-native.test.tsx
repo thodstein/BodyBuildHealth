@@ -54,7 +54,7 @@ describe('ProfileSettingsTab phone section', () => {
     await resetPlatform();
     render(<ProfileSettingsTab />);
     fireEvent.click(screen.getByText('4.4 Телефон · APK'));
-    expect(screen.getAllByText('📌 На стол').length).toBe(4);
+    expect(screen.getAllByText('📌 На стол').length).toBe(7);
     expect(screen.getByText('Как добавить вручную')).not.toBeNull();
   });
 
@@ -117,7 +117,7 @@ describe('ProfileSettingsTab phone section', () => {
     const card = document.querySelector('[aria-label="Виджеты рабочего стола"]');
     expect(card).not.toBeNull();
     const rows = card!.querySelectorAll('.native-feature-row-icon');
-    expect(rows.length).toBe(4);
+    expect(rows.length).toBe(7);
     for (const el of Array.from(rows)) {
       expect(el.querySelector('svg'), el.textContent).not.toBeNull();
       expect(el.querySelector('svg')?.getAttribute('viewBox')).toBe('0 0 24 24');

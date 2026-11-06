@@ -18,6 +18,14 @@ export const COACH_NOTES_KEY = 'he_coach_notes';
 export const COACH_NOTES_MAX = 500;
 export const COACH_NOTE_TITLE_MAX = 120;
 export const COACH_NOTE_BODY_MAX = 8000;
+export const COACH_NOTE_CHECKLIST_MAX = 100;
+export const COACH_NOTE_CHECKLIST_TEXT_MAX = 300;
+
+export interface CoachNoteChecklistItem {
+  id: string;
+  text: string;
+  done: boolean;
+}
 
 export interface CoachNote {
   id: string;
@@ -33,6 +41,8 @@ export interface CoachNote {
   pinned: boolean;
   createdAt: string;
   updatedAt: string;
+  /** Чек-лист (TickTick-подобный): пункты с отметками. Опционален для старых заметок. */
+  checklist?: CoachNoteChecklistItem[];
 }
 
 export interface CoachNotesStore {
@@ -57,13 +67,34 @@ const weekDay = (v: unknown): string | null => {
   return m ? `${m[1]}-${m[2]}-${m[3]}` : null;
 };
 
+/** Терпимый парсер чек-листа: битые/пустые пункты пропускаются, лимит сохраняется. */
+export function normalizeChecklist(raw: unknown): CoachNoteChecklistItem[] {
+  if (!Array.isArray(raw)) return [];
+  const seen = new Set<string>();
+  const out: CoachNoteChecklistItem[] = [];
+  for (let i = 0; i < raw.length; i++) {
+    const row = raw[i];
+    if (!row || typeof row !== 'object') continue;
+    const item = row as Partial<CoachNoteChecklistItem> & Record<string, unknown>;
+    const textValue = text(item.text, COACH_NOTE_CHECKLIST_TEXT_MAX);
+    if (!textValue) continue;
+    let id = text(item.id, 80) || `c_${i + 1}`;
+    if (seen.has(id)) id = `c_${i + 1}_${out.length + 1}`;
+    seen.add(id);
+    out.push({ id, text: textValue, done: item.done === true });
+    if (out.length >= COACH_NOTE_CHECKLIST_MAX) break;
+  }
+  return out;
+}
+
 function normalizeNote(raw: unknown): CoachNote | null {
   if (!raw || typeof raw !== 'object') return null;
   const n = raw as Partial<CoachNote> & Record<string, unknown>;
   const id = text(n.id, 80);
   const title = text(n.title, COACH_NOTE_TITLE_MAX);
   const body = text(n.body, COACH_NOTE_BODY_MAX);
-  if (!id || (!title && !body)) return null;
+  const checklist = normalizeChecklist(n.checklist);
+  if (!id || (!title && !body && checklist.length === 0)) return null;
   const createdAt = text(n.createdAt, 40) || nowIso();
   return {
     id,
@@ -74,6 +105,7 @@ function normalizeNote(raw: unknown): CoachNote | null {
     pinned: n.pinned === true,
     createdAt,
     updatedAt: text(n.updatedAt, 40) || createdAt,
+    checklist,
   };
 }
 
@@ -143,12 +175,14 @@ export function addCoachNote(
     pinned?: boolean;
     /** Неделя `YYYY-MM-DD` (понедельник) — для «комментария к неделе». */
     week?: string | null;
+    checklist?: CoachNoteChecklistItem[];
   },
   opts: { id?: string; now?: string } = {},
 ): AddCoachNoteResult {
   const title = text(input.title, COACH_NOTE_TITLE_MAX);
   const body = text(input.body, COACH_NOTE_BODY_MAX);
-  if (!title && !body) return { store, note: null, error: 'empty' };
+  const checklist = normalizeChecklist(input.checklist);
+  if (!title && !body && checklist.length === 0) return { store, note: null, error: 'empty' };
   if (store.items.length >= COACH_NOTES_MAX) return { store, note: null, error: 'limit' };
   const now = opts.now ?? nowIso();
   const note: CoachNote = {
@@ -160,6 +194,7 @@ export function addCoachNote(
     pinned: input.pinned === true,
     createdAt: now,
     updatedAt: now,
+    checklist,
   };
   return { store: { version: 1, items: [note, ...store.items] }, note, error: null };
 }
@@ -173,6 +208,7 @@ export function updateCoachNote(
     athleteId?: string | null;
     pinned?: boolean;
     week?: string | null;
+    checklist?: CoachNoteChecklistItem[];
   },
   opts: { now?: string } = {},
 ): CoachNotesStore {
@@ -181,7 +217,8 @@ export function updateCoachNote(
   const prev = store.items[idx];
   const title = patch.title === undefined ? prev.title : text(patch.title, COACH_NOTE_TITLE_MAX);
   const body = patch.body === undefined ? prev.body : text(patch.body, COACH_NOTE_BODY_MAX);
-  if (!title && !body) return store; // пустая заметка — мусор, не сохраняем
+  const checklist = patch.checklist === undefined ? normalizeChecklist(prev.checklist) : normalizeChecklist(patch.checklist);
+  if (!title && !body && checklist.length === 0) return store; // пустая заметка — мусор, не сохраняем
   const items = [...store.items];
   items[idx] = {
     ...prev,
@@ -190,9 +227,35 @@ export function updateCoachNote(
     athleteId: patch.athleteId === undefined ? prev.athleteId : (text(patch.athleteId, 80) || null),
     week: patch.week === undefined ? prev.week : weekDay(patch.week),
     pinned: patch.pinned === undefined ? prev.pinned : patch.pinned === true,
+    checklist,
     updatedAt: opts.now ?? nowIso(),
   };
   return { version: 1, items };
+}
+
+/** Отметить пункт чек-листа. Прогресс считает UI/виджет. */
+export function toggleNoteChecklistItem(
+  store: CoachNotesStore,
+  noteId: string,
+  itemId: string,
+  opts: { now?: string } = {},
+): CoachNotesStore {
+  const idx = store.items.findIndex(n => n.id === noteId);
+  if (idx < 0) return store;
+  const note = store.items[idx];
+  const checklist = normalizeChecklist(note.checklist);
+  const itemIdx = checklist.findIndex(c => c.id === itemId);
+  if (itemIdx < 0) return store;
+  checklist[itemIdx] = { ...checklist[itemIdx], done: !checklist[itemIdx].done };
+  const items = [...store.items];
+  items[idx] = { ...note, checklist, updatedAt: opts.now ?? nowIso() };
+  return { version: 1, items };
+}
+
+/** Сколько пунктов чек-листа выполнено: { done, total }. */
+export function noteChecklistProgress(note: CoachNote): { done: number; total: number } {
+  const checklist = normalizeChecklist(note.checklist);
+  return { done: checklist.filter(c => c.done).length, total: checklist.length };
 }
 
 export function removeCoachNote(store: CoachNotesStore, id: string): CoachNotesStore {
@@ -244,7 +307,11 @@ export function filterCoachNotes(
   if (opts.athleteId === 'none') items = items.filter(n => !n.athleteId);
   else if (opts.athleteId) items = items.filter(n => n.athleteId === opts.athleteId);
   if (q) {
-    items = items.filter(n => `${n.title} ${n.body}`.toLowerCase().includes(q));
+    const hay = (n: CoachNote): string => {
+      const checkText = normalizeChecklist(n.checklist).map(c => c.text).join(' ');
+      return `${n.title} ${n.body} ${checkText}`.toLowerCase();
+    };
+    items = items.filter(n => hay(n).includes(q));
   }
   return sortCoachNotes(items);
 }

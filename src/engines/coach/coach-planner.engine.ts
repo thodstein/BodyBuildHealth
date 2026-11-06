@@ -19,6 +19,36 @@ export const COACH_PLANNER_MAX = 2000;
 export const COACH_TASK_TITLE_MAX = 140;
 export const COACH_TASK_NOTE_MAX = 2000;
 
+export type CoachTaskPriority = 'none' | 'low' | 'medium' | 'high';
+export type CoachRepeat = 'none' | 'daily' | 'weekly' | 'monthly';
+export type CoachTaskList = 'inbox' | 'training' | 'health' | 'work' | 'personal';
+
+export const COACH_PRIORITY_LABELS: Record<CoachTaskPriority, string> = {
+  none: 'Обычная',
+  low: 'Низкий',
+  medium: 'Средний',
+  high: 'Высокий',
+};
+
+export const COACH_REPEAT_LABELS: Record<CoachRepeat, string> = {
+  none: 'Один раз',
+  daily: 'Каждый день',
+  weekly: 'Каждую неделю',
+  monthly: 'Каждый месяц',
+};
+
+export const COACH_TASK_LIST_LABELS: Record<CoachTaskList, string> = {
+  inbox: 'Входящие',
+  training: 'Тренировки',
+  health: 'Здоровье',
+  work: 'Работа',
+  personal: 'Личное',
+};
+
+export const COACH_TASK_LISTS: readonly CoachTaskList[] = ['inbox', 'training', 'health', 'work', 'personal'];
+export const COACH_PRIORITIES: readonly CoachTaskPriority[] = ['none', 'low', 'medium', 'high'];
+export const COACH_REPEATS: readonly CoachRepeat[] = ['none', 'daily', 'weekly', 'monthly'];
+
 export interface CoachTask {
   id: string;
   title: string;
@@ -31,7 +61,17 @@ export interface CoachTask {
   note: string;
   createdAt: string;
   updatedAt: string;
+  /** Приоритет (TickTick-подобный). Опционален для задач из старых версий. */
+  priority?: CoachTaskPriority;
+  /** Повтор: при закрытии задачи создаётся следующее вхождение. */
+  repeat?: CoachRepeat;
+  /** Список/папка задачи. */
+  list?: CoachTaskList;
 }
+
+export const coachTaskPriority = (t: CoachTask): CoachTaskPriority => t.priority ?? 'none';
+export const coachTaskRepeat = (t: CoachTask): CoachRepeat => t.repeat ?? 'none';
+export const coachTaskList = (t: CoachTask): CoachTaskList => t.list ?? 'inbox';
 
 export interface CoachPlannerStore {
   version: 1;
@@ -63,6 +103,18 @@ export function normalizeCoachTime(v: unknown): string | null {
   return TIME_RE.test(s) ? s : null;
 }
 
+export function normalizePriority(v: unknown): CoachTaskPriority {
+  return COACH_PRIORITIES.includes(v as CoachTaskPriority) ? (v as CoachTaskPriority) : 'none';
+}
+
+export function normalizeRepeat(v: unknown): CoachRepeat {
+  return COACH_REPEATS.includes(v as CoachRepeat) ? (v as CoachRepeat) : 'none';
+}
+
+export function normalizeList(v: unknown): CoachTaskList {
+  return COACH_TASK_LISTS.includes(v as CoachTaskList) ? (v as CoachTaskList) : 'inbox';
+}
+
 function normalizeTask(raw: unknown): CoachTask | null {
   if (!raw || typeof raw !== 'object') return null;
   const t = raw as Partial<CoachTask> & Record<string, unknown>;
@@ -81,6 +133,9 @@ function normalizeTask(raw: unknown): CoachTask | null {
     note: text(t.note, COACH_TASK_NOTE_MAX),
     createdAt,
     updatedAt: text(t.updatedAt, 40) || createdAt,
+    priority: normalizePriority(t.priority),
+    repeat: normalizeRepeat(t.repeat),
+    list: normalizeList(t.list),
   };
 }
 
@@ -143,7 +198,16 @@ export interface AddCoachTaskResult {
 
 export function addCoachTask(
   store: CoachPlannerStore,
-  input: { title?: string; date?: string; time?: string | null; athleteId?: string | null; note?: string },
+  input: {
+    title?: string;
+    date?: string;
+    time?: string | null;
+    athleteId?: string | null;
+    note?: string;
+    priority?: CoachTaskPriority;
+    repeat?: CoachRepeat;
+    list?: CoachTaskList;
+  },
   opts: { id?: string; now?: string } = {},
 ): AddCoachTaskResult {
   const title = text(input.title, COACH_TASK_TITLE_MAX);
@@ -162,6 +226,9 @@ export function addCoachTask(
     note: text(input.note, COACH_TASK_NOTE_MAX),
     createdAt: now,
     updatedAt: now,
+    priority: normalizePriority(input.priority),
+    repeat: normalizeRepeat(input.repeat),
+    list: normalizeList(input.list),
   };
   return { store: { version: 1, items: [...store.items, task] }, task, error: null };
 }
@@ -169,7 +236,17 @@ export function addCoachTask(
 export function updateCoachTask(
   store: CoachPlannerStore,
   id: string,
-  patch: { title?: string; date?: string; time?: string | null; athleteId?: string | null; done?: boolean; note?: string },
+  patch: {
+    title?: string;
+    date?: string;
+    time?: string | null;
+    athleteId?: string | null;
+    done?: boolean;
+    note?: string;
+    priority?: CoachTaskPriority;
+    repeat?: CoachRepeat;
+    list?: CoachTaskList;
+  },
   opts: { now?: string } = {},
 ): CoachPlannerStore {
   const idx = store.items.findIndex(t => t.id === id);
@@ -188,9 +265,69 @@ export function updateCoachTask(
     athleteId: patch.athleteId === undefined ? prev.athleteId : (text(patch.athleteId, 80) || null),
     done: patch.done === undefined ? prev.done : patch.done === true,
     note: patch.note === undefined ? prev.note : text(patch.note, COACH_TASK_NOTE_MAX),
+    priority: patch.priority === undefined ? coachTaskPriority(prev) : normalizePriority(patch.priority),
+    repeat: patch.repeat === undefined ? coachTaskRepeat(prev) : normalizeRepeat(patch.repeat),
+    list: patch.list === undefined ? coachTaskList(prev) : normalizeList(patch.list),
     updatedAt: opts.now ?? nowIso(),
   };
   return { version: 1, items };
+}
+
+/** Следующее вхождение повтора (локальная дата), либо null. */
+export function nextRepeatDate(iso: string, repeat: CoachRepeat): string | null {
+  if (!isValidCoachDate(iso) || repeat === 'none') return null;
+  const d = parseLocalIsoDate(iso);
+  if (!d) return null;
+  if (repeat === 'daily') return localIsoDate(new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1));
+  if (repeat === 'weekly') return localIsoDate(new Date(d.getFullYear(), d.getMonth(), d.getDate() + 7));
+  return localIsoDate(new Date(d.getFullYear(), d.getMonth() + 1, d.getDate()));
+}
+
+/**
+ * Закрыть/открыть задачу. Повторяющаяся задача при закрытии создаёт
+ * следующее вхождение (без дублей: одно и то же название + дата не плодим).
+ */
+export function completeCoachTask(
+  store: CoachPlannerStore,
+  id: string,
+  opts: { now?: string } = {},
+): CoachPlannerStore {
+  const idx = store.items.findIndex(t => t.id === id);
+  if (idx < 0) return store;
+  const prev = store.items[idx];
+  const nextDone = !prev.done;
+  const now = opts.now ?? nowIso();
+  const items = [...store.items];
+  items[idx] = { ...prev, done: nextDone, updatedAt: now };
+  const repeat = coachTaskRepeat(prev);
+  if (nextDone && repeat !== 'none') {
+    const nextDate = nextRepeatDate(prev.date, repeat);
+    const exists = nextDate
+      ? items.some(t => t.date === nextDate && t.title === prev.title && coachTaskList(t) === coachTaskList(prev))
+      : false;
+    if (nextDate && !exists && items.length < COACH_PLANNER_MAX) {
+      items.push({
+        ...prev,
+        id: `t_${now.replace(/[^0-9]/g, '').slice(0, 14)}_${items.length + 1}_r`,
+        date: nextDate,
+        done: false,
+        createdAt: now,
+        updatedAt: now,
+      });
+    }
+  }
+  return { version: 1, items };
+}
+
+/** Перенос задачи на другой день (без изменения остальных полей). */
+export function moveCoachTask(
+  store: CoachPlannerStore,
+  id: string,
+  date: string,
+  opts: { now?: string } = {},
+): CoachPlannerStore {
+  if (!isValidCoachDate(date)) return store;
+  return updateCoachTask(store, id, { date }, opts);
 }
 
 export function toggleCoachTaskDone(store: CoachPlannerStore, id: string): CoachPlannerStore {
@@ -207,14 +344,53 @@ export function removeCoachTask(store: CoachPlannerStore, id: string): CoachPlan
 }
 
 const timeRank = (t: CoachTask): string => t.time ?? '99:99';
+const priorityRank = (t: CoachTask): number => {
+  switch (coachTaskPriority(t)) {
+    case 'high': return 0;
+    case 'medium': return 1;
+    case 'low': return 2;
+    default: return 3;
+  }
+};
 
 /** Сортировка: по дате, внутри дня — по времени, «на весь день» после задач со временем. */
 export function sortCoachTasks(items: CoachTask[]): CoachTask[] {
   return [...items].sort((a, b) =>
     a.date.localeCompare(b.date) ||
     timeRank(a).localeCompare(timeRank(b)) ||
+    priorityRank(a) - priorityRank(b) ||
     a.title.localeCompare(b.title),
   );
+}
+
+/** Фильтр по списку/приоритету/поиску — для вкладок «Входящие», «Тренировки» и т.п. */
+export function filterCoachTasks(
+  store: CoachPlannerStore,
+  opts: {
+    query?: string;
+    list?: CoachTaskList | 'all';
+    priority?: CoachTaskPriority | 'all';
+    from?: string;
+    to?: string;
+    includeDone?: boolean;
+  } = {},
+): CoachTask[] {
+  const q = text(opts.query, 200).toLowerCase();
+  let items = store.items;
+  if (opts.list && opts.list !== 'all') items = items.filter(t => coachTaskList(t) === opts.list);
+  if (opts.priority && opts.priority !== 'all') items = items.filter(t => coachTaskPriority(t) === opts.priority);
+  if (opts.from && isValidCoachDate(opts.from)) items = items.filter(t => t.date >= opts.from!);
+  if (opts.to && isValidCoachDate(opts.to)) items = items.filter(t => t.date <= opts.to!);
+  if (opts.includeDone === false) items = items.filter(t => !t.done);
+  if (q) items = items.filter(t => `${t.title} ${t.note}`.toLowerCase().includes(q));
+  return sortCoachTasks(items);
+}
+
+/** Сколько задач в каждом списке — для чипов-фильтров. */
+export function countTasksByList(store: CoachPlannerStore): Record<CoachTaskList, number> {
+  const out = { inbox: 0, training: 0, health: 0, work: 0, personal: 0 } as Record<CoachTaskList, number>;
+  for (const t of store.items) out[coachTaskList(t)] += 1;
+  return out;
 }
 
 export function tasksForDate(store: CoachPlannerStore, date: string): CoachTask[] {

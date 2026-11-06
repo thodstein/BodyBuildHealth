@@ -134,6 +134,29 @@
                 android:resource="@xml/widget_waterquick_info" />
         </receiver>
         <receiver
+            android:name=".widgets.CalendarWidgetProvider"
+            android:exported="false"
+            android:label="@string/widget_calendar_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.healthengine.app.action.WIDGET_TASK" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_calendar_info" />
+        </receiver>
+        <receiver
+            android:name=".widgets.NotesWidgetProvider"
+            android:exported="false"
+            android:label="@string/widget_notes_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_notes_info" />
+        </receiver>
+        <receiver
             android:name=".widgets.TodayWidgetProvider"
             android:exported="false"
             android:label="@string/widget_today_label">

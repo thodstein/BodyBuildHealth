@@ -54,6 +54,9 @@ public class NutritionWidgetProvider extends AppWidgetProvider {
                 WidgetStore.enqueue(context, item);
                 optimisticWater(context, ml);
                 updateAll(context);
+                try {
+                    WaterQuickWidgetProvider.updateAll(context);
+                } catch (Exception ignored) {}
                 return;
             }
         } catch (Exception ignored) {}
@@ -130,8 +133,9 @@ public class NutritionWidgetProvider extends AppWidgetProvider {
         } else {
             int left = target > 0 ? target - kcal : 0;
             boolean over = target > 0 && left < 0;
-            v.setTextViewText(R.id.w_nut_left_label, over ? "ПЕРЕБОР" : "ОСТАЛОСЬ");
-            v.setTextColor(R.id.w_nut_left_label, over ? C_DANGER : C_MUTED);
+            boolean reached = target > 0 && left == 0;
+            v.setTextViewText(R.id.w_nut_left_label, over ? "ПЕРЕБОР" : (reached ? "ЦЕЛЬ" : "ОСТАЛОСЬ"));
+            v.setTextColor(R.id.w_nut_left_label, over ? C_DANGER : (reached ? C_ACCENT : C_MUTED));
             v.setTextViewText(R.id.w_nut_left_value, formatNum(Math.abs(left)));
             v.setTextColor(R.id.w_nut_left_value, over ? C_DANGER : C_TEXT);
             v.setTextViewText(
@@ -147,11 +151,13 @@ public class NutritionWidgetProvider extends AppWidgetProvider {
         setMacro(v, R.id.w_nut_c_value, R.id.w_nut_c_bar, carbs, tCarbs);
 
         int waterPct = tWater > 0 ? Math.min(100, Math.round(water * 100f / tWater)) : 0;
+        boolean waterDone = tWater > 0 && water >= tWater;
         String waterLine = tWater > 0
-                ? ("Вода " + formatNum(water) + " / " + formatNum(tWater) + " мл")
+                ? ((waterDone ? "✓ " : "") + "Вода " + formatNum(water) + " / " + formatNum(tWater) + " мл")
                 : (water > 0 ? ("Вода " + formatNum(water) + " мл") : "Вода не записана");
         v.setTextViewText(R.id.w_nut_water_label, waterLine);
-        v.setTextViewText(R.id.w_nut_water_pct, tWater > 0 ? (waterPct + "%") : " ");
+        v.setTextViewText(R.id.w_nut_water_pct, tWater > 0 ? (waterDone ? "цель" : (waterPct + "%")) : " ");
+        v.setTextColor(R.id.w_nut_water_pct, waterDone ? C_ACCENT : C_MUTED);
         v.setProgressBar(R.id.w_nut_water_bar, 100, waterPct, false);
 
         v.setOnClickPendingIntent(R.id.w_nut_water,

@@ -17,6 +17,9 @@ const WIDGETS_RU: { kind: WidgetKind; icon: NativeIconName; name: string; desc: 
   { kind: 'timer', icon: 'clock', name: 'Таймер отдыха', desc: 'Пресеты 0:30–3:00, старт/пауза без открытия приложения' },
   { kind: 'compliance', icon: 'chart', name: 'Комплаенс', desc: 'Процент выполнения плана за неделю' },
   { kind: 'nutrition', icon: 'bowl', name: 'Питание', desc: 'Остаток ккал, БЖУ, вода +250/+500 в один тап' },
+  { kind: 'water', icon: 'droplet', name: 'Вода', desc: 'Прогресс воды дня и +250 мл в один тап' },
+  { kind: 'calendar', icon: 'clock', name: 'Календарь', desc: 'Задачи на сегодня и отметка «сделано» с рабочего стола' },
+  { kind: 'notes', icon: 'notebook', name: 'Заметки', desc: 'Закреплённые и свежие заметки, прогресс чек-листов' },
 ];
 
 const WIDGETS_EN: { kind: WidgetKind; icon: NativeIconName; name: string; desc: string }[] = [
@@ -24,6 +27,9 @@ const WIDGETS_EN: { kind: WidgetKind; icon: NativeIconName; name: string; desc: 
   { kind: 'timer', icon: 'clock', name: 'Rest timer', desc: 'Presets 0:30–3:00, start/pause without opening the app' },
   { kind: 'compliance', icon: 'chart', name: 'Compliance', desc: 'Weekly plan completion percent' },
   { kind: 'nutrition', icon: 'bowl', name: 'Nutrition', desc: 'Kcal left, macros, water +250/+500 in one tap' },
+  { kind: 'water', icon: 'droplet', name: 'Water', desc: 'Daily water progress and +250 ml in one tap' },
+  { kind: 'calendar', icon: 'clock', name: 'Calendar', desc: "Today's tasks and one-tap done from the home screen" },
+  { kind: 'notes', icon: 'notebook', name: 'Notes', desc: 'Pinned and recent notes with checklist progress' },
 ];
 
 const PIN_REASON_RU: Record<string, string> = {
@@ -49,7 +55,7 @@ function strings() {
       reasons: PIN_REASON_EN,
       cardLabel: 'Home screen widgets',
       title: 'Home screen widgets',
-      sub: 'APK only · 4 widgets · work without opening the app',
+      sub: 'APK only · 7 widgets · work without opening the app',
       pin: (name: string) => `Pin the ${name} widget`,
       pinCta: '📌 To home',
       refreshBusy: 'Updating…',
@@ -57,6 +63,7 @@ function strings() {
       refreshed: '✅ Data sent to widgets',
       refreshWater: (ml: number) => `widget water: +${ml} ml`,
       refreshFoods: (n: number) => `widget dishes: ${n}`,
+      refreshTasks: (n: number) => `widget tasks: ${n}`,
       refreshFail: 'Could not refresh widgets',
       manualTitle: 'How to add manually',
       manual: (
@@ -65,7 +72,7 @@ function strings() {
           <br />
           2. Choose “Widgets”
           <br />
-          3. Find “Health Engine” (HE · Workout / Timer / Compliance / Nutrition)
+          3. Find “Health Engine” (HE · Workout / Timer / Compliance / Nutrition / Water / Calendar / Notes)
           <br />
           4. Drag the widget onto the screen
           <br />
@@ -80,7 +87,7 @@ function strings() {
     reasons: PIN_REASON_RU,
     cardLabel: 'Виджеты рабочего стола',
     title: 'Виджеты на рабочий стол',
-    sub: 'Только APK · 4 виджета · работают без открытия приложения',
+    sub: 'Только APK · 7 виджетов · работают без открытия приложения',
     pin: (name: string) => `Закрепить виджет ${name}`,
     pinCta: '📌 На стол',
     refreshBusy: 'Обновление…',
@@ -88,6 +95,7 @@ function strings() {
     refreshed: '✅ Данные отправлены на виджеты',
     refreshWater: (ml: number) => `вода из виджета: +${ml} мл`,
     refreshFoods: (n: number) => `блюд из виджета: ${n}`,
+    refreshTasks: (n: number) => `задач с виджета: ${n}`,
     refreshFail: 'Не удалось обновить виджеты',
     manualTitle: 'Как добавить вручную',
     manual: (
@@ -96,7 +104,7 @@ function strings() {
         <br />
         2. Выберите «Виджеты»
         <br />
-        3. Найдите «Health Engine» (HE · Тренировка / Таймер / Комплаенс / Питание)
+        3. Найдите «Health Engine» (HE · Тренировка / Таймер / Комплаенс / Питание / Вода / Календарь / Заметки)
         <br />
         4. Перетащите виджет на стол
         <br />
@@ -136,6 +144,7 @@ export const WidgetsSetupCard: React.FC = () => {
       const parts: string[] = [T.refreshed];
       if (r.drainedWaterMl > 0) parts.push(T.refreshWater(r.drainedWaterMl));
       if (r.drainedFoods > 0) parts.push(T.refreshFoods(r.drainedFoods));
+      if (r.tasksToggled > 0) parts.push(T.refreshTasks(r.tasksToggled));
       setMsg(parts.join(' · '));
     } catch {
       setMsg(T.refreshFail);

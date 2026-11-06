@@ -216,7 +216,7 @@ PRO-палитра натива: `android/.../res/values/colors.xml` 1-в-1 с �
 ## 10. Виджеты рабочего стола (только APK)
 
 В Telegram Mini App виджетов нет и быть не может (ограничение Telegram).
-В APK — 4 нативных виджета (`android/app/src/main/java/com/healthengine/app/widgets/`):
+В APK — 7 нативных виджетов (`android/app/src/main/java/com/healthengine/app/widgets/`):
 
 | Виджет | Что показывает | Работает без открытия приложения |
 |---|---|---|
@@ -224,6 +224,9 @@ PRO-палитра натива: `android/.../res/values/colors.xml` 1-в-1 с �
 | HE · Таймер | таймер отдыха, пресеты 0:30/1:00/1:30/3:00 | **да** (старт/пауза/сброс, тики через AlarmManager) |
 | HE · Комплаенс | % выполнения (БАДы 7д или тренировки недели) | нет (тап открывает раздел) |
 | HE · Питание | остаток калорий, съедено/цель, Б/Ж/У, вода дня | **частично** (вода +250/+500 пишет в очередь, еда — через дневник) |
+| HE · Вода | прогресс воды дня (мл/цель, полоса) | **да** (+250 мл пишет в очередь и сразу обновляет снапшот) |
+| HE · Календарь | задачи на сегодня, отметка «сделано», просрочено | **да** (отметка уходит в очередь `type=task`) |
+| HE · Заметки | закреплённые/свежие заметки, прогресс чек-листов | нет (тап открывает «Заметки») |
 
 Как это устроено:
 
@@ -231,13 +234,16 @@ PRO-палитра натива: `android/.../res/values/colors.xml` 1-в-1 с �
   SharedPreferences `he_widgets` (`WidgetStore.java`).
 - JS-мост `src/core/widget-bridge.ts` (безопасен везде, вне native —
   localStorage-фолбэк): `syncTrainingWidget` / `syncComplianceWidget` /
-  `syncNutritionWidget` / `queueWaterMl` / `drainWidgetQueue` /
+  `syncNutritionWidget` / `syncCalendarWidget` / `syncNotesWidget` /
+  `queueWaterMl` / `queueTaskToggle` / `drainWidgetQueue` /
   `widgetTimerCommand` / `consumeWidgetLaunchTarget` / `requestPinWidget`.
 - Сборка снапшотов и разбор очереди — `src/ui/native/widget-sync.ts`:
   тренировка из `workout-logger`, комплаенс из приверженности/недели,
   питание из `diary-storage-v2` + `he_water_log` (снапшот: ккал и Б/Ж/У
-  факт/цель + вода); очередь применяется
-  (`applyWidgetQueue`) при каждом входе на Главную.
+  факт/цель + вода), календарь из `he_coach_planner` (задачи дня +
+  просрочено), заметки из `he_coach_notes` (закреплённые сверху, прогресс
+  чек-листа); очередь применяется (`applyWidgetQueue`) при каждом входе
+  на Главную — вода, еда и отметки задач.
 - Тап по виджету открывает `MainActivity` с `WIDGET_OPEN`-intent →
   one-shot target в `WidgetStore` → JS забирает через `getLaunchTarget()`
   и ведёт в раздел (`DashboardScreen.native`).

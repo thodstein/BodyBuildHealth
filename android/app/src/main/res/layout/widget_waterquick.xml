@@ -1,42 +1,80 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+    Виджет «Вода»: прогресс дня (мл / цель) и кнопка +250 мл.
+    Значения читаются из снапшота питания (WidgetStore.KEY_NUTRITION).
+-->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/w_waterquick_root"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:background="@drawable/widget_bg"
-    android:orientation="vertical"
-    android:padding="12dp"
     android:gravity="center"
-    android:contentDescription="Вода">
+    android:orientation="vertical"
+    android:paddingLeft="12dp"
+    android:paddingRight="12dp"
+    android:paddingTop="10dp"
+    android:paddingBottom="10dp">
 
     <TextView
         android:id="@+id/w_waterquick_title"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Вода"
+        android:includeFontPadding="false"
+        android:text="HE · ВОДА"
         android:textColor="#C9F73A"
-        android:textSize="12sp"
+        android:textSize="10sp"
+        android:textStyle="bold" />
+
+    <TextView
+        android:id="@+id/w_waterquick_value"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="2dp"
+        android:includeFontPadding="false"
+        android:text="0"
+        android:textColor="#FFFFFF"
+        android:textSize="22sp"
         android:textStyle="bold" />
 
     <TextView
         android:id="@+id/w_waterquick_sub"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginTop="4dp"
-        android:text="+250 мл"
-        android:textColor="#E2ECFF"
-        android:textSize="10sp" />
+        android:includeFontPadding="false"
+        android:text="мл"
+        android:textColor="#8FA3C4"
+        android:textSize="9sp" />
+
+    <ProgressBar
+        android:id="@+id/w_waterquick_bar"
+        style="@android:style/Widget.ProgressBar.Horizontal"
+        android:layout_width="match_parent"
+        android:layout_height="4dp"
+        android:layout_marginTop="5dp"
+        android:max="100"
+        android:progress="0"
+        android:progressDrawable="@drawable/widget_bar_water" />
+
+    <TextView
+        android:id="@+id/w_waterquick_pct"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="2dp"
+        android:includeFontPadding="false"
+        android:text=" "
+        android:textColor="#8FA3C4"
+        android:textSize="9sp" />
 
     <TextView
         android:id="@+id/w_waterquick_act"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
+        android:layout_height="30dp"
+        android:layout_marginTop="5dp"
         android:background="@drawable/widget_action"
         android:gravity="center"
-        android:padding="10dp"
-        android:text="+250"
+        android:includeFontPadding="false"
+        android:text="+250 мл"
         android:textColor="#C9F73A"
-        android:textSize="14sp"
+        android:textSize="12sp"
         android:textStyle="bold" />
 </LinearLayout>

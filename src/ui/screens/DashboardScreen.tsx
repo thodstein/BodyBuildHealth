@@ -6,7 +6,7 @@ import { HeroImg } from '../HeroImg';
 import { getSymptomDiaryStats } from '../../engines/symptom-diary.engine';
 import { getAdherenceStats } from '../../engines/symptom-adherence.engine';
 
-type ScreenId = 'dashboard'|'pharma'|'course'|'peptides'|'nutrition'|'plan'|'substances'|'labs'|'risks'|'profile'|'predictive'|'marketplace'|'articles'|'assistant'|'gamification'|'fertility-pct'|'reports'|'integrations'|'role-management'|'support'|'training';
+type ScreenId = 'dashboard'|'pharma'|'course'|'peptides'|'nutrition'|'plan'|'substances'|'labs'|'risks'|'profile'|'predictive'|'marketplace'|'articles'|'assistant'|'gamification'|'fertility-pct'|'reports'|'integrations'|'role-management'|'support'|'training'|'calendar'|'notes';
 
 interface Props { onNavigate?: (screen: ScreenId) => void; }
 

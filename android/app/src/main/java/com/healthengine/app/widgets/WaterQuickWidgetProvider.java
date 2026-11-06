@@ -6,7 +6,7 @@ import android.appwidget.AppWidgetProvider;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
-import android.os.SystemClock;
+import android.view.View;
 import android.widget.RemoteViews;
 
 import com.healthengine.app.MainActivity;
@@ -15,11 +15,19 @@ import com.healthengine.app.R;
 import org.json.JSONObject;
 
 /**
- * Виджет «Вода»: кнопка +250 мл → очередь виджета.
+ * Виджет «Вода»: прогресс дня (мл / цель) и кнопка +250 мл.
+ *
+ * Вода живёт в снапшоте питания (WidgetStore.KEY_NUTRITION): виджет читает
+ * waterMl/waterTargetMl, поэтому не требует отдельного синка. Кнопка пишет
+ * в общую очередь и оптимистично пополняет снапшот — значение видно сразу.
  */
 public class WaterQuickWidgetProvider extends AppWidgetProvider {
 
     public static final String ACTION_WATER = "com.healthengine.app.action.WIDGET_WATER_QUICK";
+
+    private static final int C_MUTED = 0xFF8FA3C4;
+    private static final int C_TEXT = 0xFFFFFFFF;
+    private static final int C_WATER = 0xFF38BDF8;
 
     @Override
     public void onUpdate(Context context, AppWidgetManager mgr, int[] ids) {
@@ -37,7 +45,9 @@ public class WaterQuickWidgetProvider extends AppWidgetProvider {
                 item.put("ml", ml);
                 item.put("ts", System.currentTimeMillis());
                 WidgetStore.enqueue(context, item);
+                NutritionWidgetProvider.optimisticWater(context, ml);
                 updateAll(context);
+                NutritionWidgetProvider.updateAll(context);
                 return;
             }
         } catch (Exception ignored) {}
@@ -56,12 +66,34 @@ public class WaterQuickWidgetProvider extends AppWidgetProvider {
 
     static RemoteViews build(Context context) {
         RemoteViews v = new RemoteViews(context.getPackageName(), R.layout.widget_waterquick);
+        JSONObject d = WidgetStore.getJson(context, WidgetStore.KEY_NUTRITION);
+        int water = Math.max(0, d.optInt("waterMl", 0));
+        int target = Math.max(0, d.optInt("waterTargetMl", 0));
+        int pct = target > 0 ? Math.min(100, Math.round(water * 100f / target)) : 0;
+        boolean done = target > 0 && water >= target;
+
+        v.setTextViewText(R.id.w_waterquick_value, NutritionWidgetProvider.formatNum(water));
+        v.setTextColor(R.id.w_waterquick_value, done ? C_WATER : C_TEXT);
+        v.setTextViewText(
+                R.id.w_waterquick_sub,
+                target > 0 ? ("из " + NutritionWidgetProvider.formatNum(target) + " мл") : "мл");
+        v.setTextViewText(R.id.w_waterquick_pct, target > 0 ? (done ? "✓ цель" : (pct + "%")) : " ");
+        v.setTextColor(R.id.w_waterquick_pct, done ? C_WATER : C_MUTED);
+        v.setProgressBar(R.id.w_waterquick_bar, 100, pct, false);
+        v.setViewVisibility(R.id.w_waterquick_bar, View.VISIBLE);
+
         Intent waterIntent = new Intent(context, WaterQuickWidgetProvider.class);
         waterIntent.setAction(ACTION_WATER);
         PendingIntent waterPi = PendingIntent.getBroadcast(context, 31, waterIntent,
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
-        v.setOnClickPendingIntent(R.id.w_waterquick_root, openApp(context, WidgetStore.TARGET_TRAINING, 32));
+        v.setOnClickPendingIntent(R.id.w_waterquick_root, openApp(context, WidgetStore.TARGET_NUTRITION, 32));
         v.setOnClickPendingIntent(R.id.w_waterquick_act, waterPi);
+
+        v.setContentDescription(
+                R.id.w_waterquick_root,
+                target > 0
+                        ? ("Вода: " + water + " из " + target + " мл")
+                        : ("Вода: " + water + " мл"));
         return v;
     }
 

@@ -20,6 +20,8 @@ public final class WidgetStore {
     public static final String KEY_TRAINING = "training_json";
     public static final String KEY_COMPLIANCE = "compliance_json";
     public static final String KEY_NUTRITION = "nutrition_json";
+    public static final String KEY_CALENDAR = "calendar_json";
+    public static final String KEY_NOTES = "notes_json";
     public static final String KEY_QUEUE = "nutrition_queue";
     public static final String KEY_TIMER = "timer_json";
     public static final String KEY_LAUNCH_TARGET = "launch_target";
@@ -36,6 +38,8 @@ public final class WidgetStore {
     public static final String TARGET_TRAINING_QUICK = "training_quick";
     public static final String TARGET_NUTRITION = "nutrition";
     public static final String TARGET_SUPPORT = "support";
+    public static final String TARGET_CALENDAR = "calendar";
+    public static final String TARGET_NOTES = "notes";
     public static final String TARGET_HOME = "home";
 
     private WidgetStore() {}

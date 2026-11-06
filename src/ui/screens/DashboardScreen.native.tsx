@@ -21,6 +21,7 @@ import { loadFoodLog } from '../../engines/nutrition-tracker.engine';
 
 export type DashboardNativeNavId =
   | 'training' | 'nutrition' | 'labs' | 'risks' | 'pharma' | 'support'
+  | 'calendar' | 'notes'
   | 'profile' | 'articles' | 'marketplace';
 
 interface Props {
@@ -37,6 +38,8 @@ const TRIO: { id: DashboardNativeNavId; icon: React.ReactNode; labelRu: string; 
 const RAIL: { id: DashboardNativeNavId; icon: React.ReactNode; labelRu: string; labelEn: string }[] = [
   { id: 'training', icon: <NativeIcon name="dumbbell" size={17} />, labelRu: 'Тренинг', labelEn: 'Training' },
   { id: 'nutrition', icon: <NativeIcon name="bowl" size={17} />, labelRu: 'Питание', labelEn: 'Food' },
+  { id: 'calendar', icon: <NativeIcon name="clock" size={17} />, labelRu: 'Календарь', labelEn: 'Calendar' },
+  { id: 'notes', icon: <NativeIcon name="notebook" size={17} />, labelRu: 'Заметки', labelEn: 'Notes' },
   { id: 'labs', icon: <NativeIcon name="flask" size={17} />, labelRu: 'Анализы', labelEn: 'Labs' },
   { id: 'risks', icon: <NativeIcon name="alertTriangle" size={17} />, labelRu: 'Риски', labelEn: 'Risks' },
   { id: 'pharma', icon: <NativeIcon name="pill" size={17} />, labelRu: 'Фарма', labelEn: 'Gear' },
@@ -192,7 +195,7 @@ export const DashboardNative: React.FC<Props> = ({ onNavigate }) => {
           }, 700);
           return;
         }
-        if (target === 'training' || target === 'nutrition' || target === 'support') {
+        if (target === 'training' || target === 'nutrition' || target === 'support' || target === 'calendar' || target === 'notes') {
           onNavigate?.(target);
         }
       } catch {

@@ -50,8 +50,8 @@ describe('DashboardNative landing', () => {
     expect(screen.getByText('Магазин')).not.toBeNull();
     expect(screen.getByText('Статьи')).not.toBeNull();
     expect(screen.queryByText(/Доброе утро|Добрый день|Добрый вечер|Доброй ночи/)).toBeNull();
-    // Карусель разделов (волна A): 6 рабочих табов с SVG.
-    expect(container.querySelectorAll('.native-home-rail-item').length).toBe(6);
+    // Карусель разделов (волна A): 8 рабочих разделов с SVG.
+    expect(container.querySelectorAll('.native-home-rail-item').length).toBe(8);
     expect(container.querySelectorAll('.native-home-today .native-home-stat').length).toBe(3);
     expect(container.querySelector('.native-home-cta')).not.toBeNull();
     expect(screen.queryByText('Разделы')).toBeNull();

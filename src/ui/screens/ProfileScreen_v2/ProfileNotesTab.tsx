@@ -15,16 +15,20 @@ import { colors, withAlpha } from './ui';
 import { readCoachState } from '../../../engines/coach/coach-mode.engine';
 import {
   COACH_NOTE_BODY_MAX,
+  COACH_NOTE_CHECKLIST_TEXT_MAX,
   COACH_NOTE_TITLE_MAX,
   COACH_NOTES_MAX,
   addCoachNote,
   filterCoachNotes,
+  noteChecklistProgress,
   readCoachNotes,
   removeCoachNote,
   toggleCoachNotePin,
+  toggleNoteChecklistItem,
   updateCoachNote,
   writeCoachNotes,
   type CoachNote,
+  type CoachNoteChecklistItem,
   type CoachNotesStore,
 } from '../../../engines/coach/coach-notes.engine';
 
@@ -44,9 +48,10 @@ interface EditorState {
   body: string;
   athleteId: string;
   pinned: boolean;
+  checklist: CoachNoteChecklistItem[];
 }
 
-const EMPTY_EDITOR: EditorState = { id: null, title: '', body: '', athleteId: '', pinned: false };
+const EMPTY_EDITOR: EditorState = { id: null, title: '', body: '', athleteId: '', pinned: false, checklist: [] };
 
 const inputStyle: React.CSSProperties = {
   width: '100%',
@@ -128,18 +133,29 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
   };
 
   const openEdit = (n: CoachNote) => {
-    setEditor({ id: n.id, title: n.title, body: n.body, athleteId: n.athleteId ?? '', pinned: n.pinned });
+    setEditor({
+      id: n.id,
+      title: n.title,
+      body: n.body,
+      athleteId: n.athleteId ?? '',
+      pinned: n.pinned,
+      checklist: (n.checklist ?? []).map(c => ({ ...c })),
+    });
     setError(null);
     setConfirmDeleteId(null);
   };
 
   const save = () => {
     if (!editor) return;
+    const checklist = editor.checklist
+      .map(c => ({ ...c, text: c.text.trim() }))
+      .filter(c => c.text.length > 0);
     const payload = {
       title: editor.title,
       body: editor.body,
       athleteId: editor.athleteId || null,
       pinned: editor.pinned,
+      checklist,
     };
     if (editor.id) {
       const next = updateCoachNote(store, editor.id, payload);
@@ -254,6 +270,61 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
             style={{ ...inputStyle, minHeight: 120, resize: 'vertical' }}
             data-notes="body"
           />
+          <label style={{ display: 'block', fontSize: 11.5, fontWeight: 700, color: colors.textMuted, margin: '10px 0 5px' }}>
+            Чек-лист
+          </label>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }} data-notes="checklist-edit">
+            {editor.checklist.map((c, i) => (
+              <div key={c.id} style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                <input
+                  value={c.text}
+                  maxLength={COACH_NOTE_CHECKLIST_TEXT_MAX}
+                  onChange={e =>
+                    setEditor(s =>
+                      s
+                        ? { ...s, checklist: s.checklist.map((x, xi) => (xi === i ? { ...x, text: e.target.value } : x)) }
+                        : s,
+                    )
+                  }
+                  placeholder={`Пункт ${i + 1}`}
+                  aria-label={`Пункт чек-листа ${i + 1}`}
+                  data-notes="checklist-input"
+                  style={{ ...inputStyle, flex: 1, minHeight: 38, padding: '7px 10px', fontSize: 12.5 }}
+                />
+                <button
+                  type="button"
+                  aria-label="Удалить пункт"
+                  data-notes="checklist-remove"
+                  onClick={() =>
+                    setEditor(s => (s ? { ...s, checklist: s.checklist.filter((_, xi) => xi !== i) } : s))
+                  }
+                  style={{ ...btn('ghost'), minHeight: 38, padding: '4px 10px', fontSize: 12 }}
+                >
+                  ✕
+                </button>
+              </div>
+            ))}
+            <button
+              type="button"
+              data-notes="checklist-add"
+              onClick={() =>
+                setEditor(s =>
+                  s
+                    ? {
+                        ...s,
+                        checklist: [
+                          ...s.checklist,
+                          { id: `c_${Date.now().toString(36)}_${s.checklist.length + 1}`, text: '', done: false },
+                        ],
+                      }
+                    : s,
+                )
+              }
+              style={{ ...btn('ghost'), alignSelf: 'flex-start', fontSize: 12 }}
+            >
+              + Пункт чек-листа
+            </button>
+          </div>
           <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap', alignItems: 'center' }}>
             {athletes.length > 0 && (
               <select
@@ -346,6 +417,48 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
                       {n.body}
                     </div>
                   )}
+                  {(n.checklist?.length ?? 0) > 0 && (() => {
+                    const prog = noteChecklistProgress(n);
+                    return (
+                      <div data-notes="checklist" style={{ marginTop: 8 }}>
+                        <div style={{ fontSize: 10.5, color: colors.textSubtle, marginBottom: 5, fontVariantNumeric: 'tabular-nums' }}>
+                          Чек-лист · {prog.done}/{prog.total}
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                          {(n.checklist ?? []).map(c => (
+                            <button
+                              key={c.id}
+                              type="button"
+                              data-notes="checklist-toggle"
+                              data-checked={c.done}
+                              onClick={() => apply(toggleNoteChecklistItem(store, n.id, c.id))}
+                              aria-pressed={c.done}
+                              style={{
+                                display: 'flex', alignItems: 'flex-start', gap: 8, textAlign: 'left',
+                                minHeight: 32, padding: '4px 6px', borderRadius: 8, cursor: 'pointer',
+                                border: '1px solid rgba(255,255,255,0.08)', background: 'transparent',
+                                color: c.done ? colors.textSubtle : '#fff', fontSize: 12,
+                                textDecoration: c.done ? 'line-through' : undefined,
+                              }}
+                            >
+                              <span
+                                aria-hidden="true"
+                                style={{
+                                  flexShrink: 0, width: 16, height: 16, marginTop: 1, borderRadius: 5,
+                                  border: `1px solid ${c.done ? withAlpha(AMBER, '99') : 'rgba(255,255,255,0.25)'}`,
+                                  background: c.done ? withAlpha(AMBER, '33') : 'transparent',
+                                  color: AMBER, fontSize: 11, lineHeight: '14px', textAlign: 'center',
+                                }}
+                              >
+                                {c.done ? '✓' : ''}
+                              </span>
+                              <span style={{ wordBreak: 'break-word' }}>{c.text}</span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })()}
                   <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8, alignItems: 'center' }}>
                     {athleteName && (
                       <span

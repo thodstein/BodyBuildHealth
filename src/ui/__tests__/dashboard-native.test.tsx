@@ -59,8 +59,8 @@ describe('DashboardScreen platform branching', () => {
     expect(document.querySelectorAll('.native-home-stat').length).toBe(3);
     // Умная CTA ведёт первым незакрытым (пусто → тренировка)
     expect(document.querySelector('.native-home-cta')).not.toBeNull();
-    // Карусель разделов: 6 рабочих табов
-    expect(document.querySelectorAll('.native-home-rail-item').length).toBe(6);
+    // Карусель разделов: 8 рабочих разделов (включая Календарь и Заметки)
+    expect(document.querySelectorAll('.native-home-rail-item').length).toBe(8);
     // Герой чистый: настроек телефона тут нет — они в Профиле → Настройки
     expect(document.querySelector('.native-feature-card')).toBeNull();
     expect(screen.queryByText('Виджеты на рабочий стол')).toBeNull();

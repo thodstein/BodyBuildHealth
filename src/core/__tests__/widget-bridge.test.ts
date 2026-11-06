@@ -162,7 +162,7 @@ describe('очередь -> дневники', () => {
     await queueWaterMl(250);
     await queueWaterMl(500);
     const applied = applyWidgetQueue(await drainWidgetQueue());
-    expect(applied).toEqual({ waterMl: 750, foods: 0 });
+    expect(applied).toEqual({ waterMl: 750, foods: 0, tasks: 0 });
     const log = JSON.parse(localStorage.getItem('he_water_log') || '[]');
     // Канон даты — локальный календарь (`local-date`), а не UTC: `toISOString()`
     // в UTC+10 до 10:00 утра отдаёт «вчера», и тест падал только по утрам.
@@ -174,7 +174,7 @@ describe('очередь -> дневники', () => {
   it('10. еда из виджета падает в nutrition_diary_v2', async () => {
     await queueFood({ name: 'Овсянка', kcal: 300, p: 10, f: 6, c: 55, meal: 'breakfast' });
     const applied = applyWidgetQueue(await drainWidgetQueue());
-    expect(applied).toEqual({ waterMl: 0, foods: 1 });
+    expect(applied).toEqual({ waterMl: 0, foods: 1, tasks: 0 });
     const diary = JSON.parse(localStorage.getItem('nutrition_diary_v2') || '{}');
     const dates = Object.keys(diary).filter((k) => k !== '__version');
     expect(dates.length).toBe(1);
@@ -191,5 +191,19 @@ describe('очередь -> дневники', () => {
     ]);
     expect(applied.waterMl).toBe(100);
     expect(applied.foods).toBe(0);
+  });
+
+  it('12. задача из виджета отмечается в планшете', async () => {
+    const { addCoachTask, readCoachPlanner, writeCoachPlanner, emptyCoachPlanner } = await import(
+      '../../engines/coach/coach-planner.engine'
+    );
+    const added = addCoachTask(emptyCoachPlanner(), { title: 'Сдать ферритин', date: localIsoDate() });
+    writeCoachPlanner(localStorage, added.store);
+    const applied = applyWidgetQueue([
+      { type: 'task', id: added.task!.id, done: true, ts: Date.now() },
+    ]);
+    expect(applied.tasks).toBe(1);
+    const stored = readCoachPlanner(localStorage);
+    expect(stored.items.find(t => t.id === added.task!.id)?.done).toBe(true);
   });
 });

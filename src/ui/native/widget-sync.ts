@@ -26,12 +26,27 @@ import {
   syncTrainingWidget,
   syncComplianceWidget,
   syncNutritionWidget,
+  syncCalendarWidget,
+  syncNotesWidget,
   drainWidgetQueue,
   type QueuedItem,
 } from '../../core/widget-bridge';
 import { ruCount, RU_APPROACHES } from '../../engines/ru-plural';
+import {
+  readCoachPlanner,
+  writeCoachPlanner,
+  tasksForDate,
+  overdueCoachTasks,
+  updateCoachTask,
+  coachTaskPriority,
+} from '../../engines/coach/coach-planner.engine';
+import {
+  readCoachNotes,
+  sortCoachNotes,
+  noteChecklistProgress,
+} from '../../engines/coach/coach-notes.engine';
 
-export type WidgetNavTarget = 'training' | 'nutrition' | 'support' | 'home';
+export type WidgetNavTarget = 'training' | 'nutrition' | 'support' | 'calendar' | 'notes' | 'home';
 
 function safe<T>(fn: () => T, fallback: T): T {
   try {
@@ -61,9 +76,12 @@ function isoFromTs(ts: number): string {
 export interface WidgetSyncResult {
   drainedWaterMl: number;
   drainedFoods: number;
+  tasksToggled: number;
   trainingOk: boolean;
   complianceOk: boolean;
   nutritionOk: boolean;
+  calendarOk: boolean;
+  notesOk: boolean;
 }
 
 function collectTraining(): {
@@ -232,12 +250,88 @@ function collectNutrition(): {
 }
 
 /**
- * Применить очередь виджета к журналам: вода -> he_water_log,
- * еда -> nutrition_diary_v2 в день из метки времени.
+ * Календарь для виджета: задачи «сегодня» + просрочено. Как агенда TickTick:
+ * чужие дневники не трогает, задачи берёт из того же хранилища, что и вкладка
+ * «Планер» (he_coach_planner).
  */
-export function applyWidgetQueue(items: QueuedItem[]): { waterMl: number; foods: number } {
+function collectCalendar(): {
+  date: string;
+  dateLabel: string;
+  tasks: { id: string; title: string; time: string; done: boolean; priority: string }[];
+  total: number;
+  done: number;
+  overdue: number;
+} {
+  const today = todayLocalISO();
+  let dateLabel = today;
+  try {
+    dateLabel = new Date(`${today}T00:00:00`).toLocaleDateString('ru-RU', {
+      weekday: 'short',
+      day: 'numeric',
+      month: 'short',
+    });
+  } catch {
+    /* подпись — удобство, дата остаётся */
+  }
+  const store = safe(() => readCoachPlanner(localStorageRef()), { version: 1 as const, items: [] });
+  const dayTasks = safe(() => tasksForDate(store, today), []);
+  const overdue = safe(() => overdueCoachTasks(store, today).length, 0);
+  return {
+    date: today,
+    dateLabel,
+    tasks: dayTasks.slice(0, 5).map(t => ({
+      id: t.id,
+      title: String(t.title).slice(0, 120),
+      time: t.time ?? '',
+      done: !!t.done,
+      priority: coachTaskPriority(t),
+    })),
+    total: dayTasks.length,
+    done: dayTasks.filter(t => t.done).length,
+    overdue,
+  };
+}
+
+/** Заметки для виджета: закреплённые сверху, затем свежие. */
+function collectNotes(): {
+  notes: { id: string; title: string; done: number; total: number }[];
+  total: number;
+  pinned: number;
+} {
+  const store = safe(() => readCoachNotes(localStorageRef()), { version: 1 as const, items: [] });
+  const sorted = safe(() => sortCoachNotes(store.items), []);
+  return {
+    notes: sorted.slice(0, 5).map(n => {
+      const p = noteChecklistProgress(n);
+      return {
+        id: n.id,
+        title: String(n.title || n.body.split('\n')[0] || 'Без названия').slice(0, 90),
+        done: p.done,
+        total: p.total,
+      };
+    }),
+    total: store.items.length,
+    pinned: store.items.filter(n => n.pinned).length,
+  };
+}
+
+function localStorageRef(): Storage | null {
+  try {
+    return typeof localStorage !== 'undefined' ? localStorage : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Применить очередь виджета к журналам: вода -> he_water_log,
+ * еда -> nutrition_diary_v2 в день из метки времени,
+ * задача -> статус «сделано» в планшете (he_coach_planner).
+ */
+export function applyWidgetQueue(items: QueuedItem[]): { waterMl: number; foods: number; tasks: number } {
   let waterMl = 0;
   let foods = 0;
+  let tasks = 0;
   for (const it of items) {
     try {
       if (it.type === 'water') {
@@ -262,12 +356,20 @@ export function applyWidgetQueue(items: QueuedItem[]): { waterMl: number; foods:
         });
         writeDiaryV2({ ...diary, [date]: { meals: { ...day.meals, [meal]: list } } });
         foods += 1;
+      } else if (it.type === 'task' && it.id) {
+        const storage = localStorageRef();
+        const store = readCoachPlanner(storage);
+        const next = updateCoachTask(store, String(it.id), { done: it.done === true });
+        if (next !== store) {
+          writeCoachPlanner(storage, next);
+          tasks += 1;
+        }
       }
     } catch {
       /* один битый элемент не роняет остальные */
     }
   }
-  return { waterMl, foods };
+  return { waterMl, foods, tasks };
 }
 
 /** Только виджет тренировки — живой прогресс во время проведения (APK). */
@@ -286,12 +388,14 @@ export async function pushTrainingWidget(): Promise<boolean> {
 export async function syncAllWidgets(): Promise<WidgetSyncResult> {
   let drainedWaterMl = 0;
   let drainedFoods = 0;
+  let tasksToggled = 0;
   try {
     const items = await drainWidgetQueue();
     if (items.length > 0) {
       const applied = applyWidgetQueue(items);
       drainedWaterMl = applied.waterMl;
       drainedFoods = applied.foods;
+      tasksToggled = applied.tasks;
     }
   } catch {
     /* очередь недоступна */
@@ -299,7 +403,9 @@ export async function syncAllWidgets(): Promise<WidgetSyncResult> {
   const t = collectTraining();
   const c = collectCompliance();
   const n = collectNutrition();
-  const [trainingOk, complianceOk, nutritionOk] = await Promise.all([
+  const cal = collectCalendar();
+  const nt = collectNotes();
+  const [trainingOk, complianceOk, nutritionOk, calendarOk, notesOk] = await Promise.all([
     syncTrainingWidget(t).catch(() => false),
     syncComplianceWidget(c).catch(() => false),
     syncNutritionWidget({
@@ -314,6 +420,17 @@ export async function syncAllWidgets(): Promise<WidgetSyncResult> {
       waterMl: n.waterMl,
       waterTargetMl: n.waterTargetMl,
     }).catch(() => false),
+    syncCalendarWidget(cal).catch(() => false),
+    syncNotesWidget(nt).catch(() => false),
   ]);
-  return { drainedWaterMl, drainedFoods, trainingOk, complianceOk, nutritionOk };
+  return {
+    drainedWaterMl,
+    drainedFoods,
+    tasksToggled,
+    trainingOk,
+    complianceOk,
+    nutritionOk,
+    calendarOk,
+    notesOk,
+  };
 }

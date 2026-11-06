@@ -22,21 +22,43 @@ import { readCoachState } from '../../../engines/coach/coach-mode.engine';
 import {
   COACH_MONTH_LABELS,
   COACH_PLANNER_MAX,
+  COACH_PRIORITY_LABELS,
+  COACH_PRIORITIES,
+  COACH_REPEAT_LABELS,
+  COACH_REPEATS,
+  COACH_TASK_LIST_LABELS,
+  COACH_TASK_LISTS,
   COACH_WEEKDAY_LABELS,
   addCoachTask,
   buildCoachMonthGrid,
+  coachTaskList,
+  coachTaskPriority,
+  coachTaskRepeat,
+  completeCoachTask,
+  countTasksByList,
   countTasksByDate,
+  filterCoachTasks,
+  moveCoachTask,
   overdueCoachTasks,
   readCoachPlanner,
   removeCoachTask,
   shiftCoachMonth,
-  tasksForDate,
-  toggleCoachTaskDone,
   writeCoachPlanner,
   type CoachPlannerStore,
+  type CoachRepeat,
+  type CoachTask,
+  type CoachTaskList,
+  type CoachTaskPriority,
 } from '../../../engines/coach/coach-planner.engine';
 
 const BLUE = '#60a5fa';
+
+const PRIORITY_COLOR: Record<CoachTaskPriority, string> = {
+  none: '#64748b',
+  low: '#38bdf8',
+  medium: '#f59e0b',
+  high: '#ef4444',
+};
 
 const ls = (): Storage | null => {
   try {
@@ -105,6 +127,11 @@ export const ProfilePlannerTab: React.FC<{ initialAthleteId?: string }> = ({ ini
   const [selected, setSelected] = useState<string>(today);
   const [title, setTitle] = useState('');
   const [time, setTime] = useState('');
+  const [priority, setPriority] = useState<CoachTaskPriority>('none');
+  const [repeat, setRepeat] = useState<CoachRepeat>('none');
+  const [list, setList] = useState<CoachTaskList>('inbox');
+  const [filterList, setFilterList] = useState<CoachTaskList | 'all'>('all');
+  const [query, setQuery] = useState('');
   // Атлет, к которому пришли из карточки тренера; удалённая карточка — не подставляем.
   const [athleteId, setAthleteId] = useState<string>(() => {
     if (!initialAthleteId) return '';
@@ -129,12 +156,24 @@ export const ProfilePlannerTab: React.FC<{ initialAthleteId?: string }> = ({ ini
     return countTasksByDate(store, from, to);
   }, [grid, store]);
 
-  const dayTasks = useMemo(() => tasksForDate(store, selected), [store, selected]);
+  const dayTasks = useMemo(
+    () => filterCoachTasks(store, { from: selected, to: selected, list: filterList, query }),
+    [store, selected, filterList, query],
+  );
+  const listCounts = useMemo(() => countTasksByList(store), [store]);
   const overdue = useMemo(() => overdueCoachTasks(store, today), [store, today]);
   const doneCount = dayTasks.filter(t => t.done).length;
 
   const add = () => {
-    const res = addCoachTask(store, { title, date: selected, time: time || null, athleteId: athleteId || null });
+    const res = addCoachTask(store, {
+      title,
+      date: selected,
+      time: time || null,
+      athleteId: athleteId || null,
+      priority,
+      repeat,
+      list,
+    });
     if (res.error === 'title') {
       setError('Название задачи пустое — напишите, что нужно сделать.');
       return;
@@ -174,6 +213,10 @@ export const ProfilePlannerTab: React.FC<{ initialAthleteId?: string }> = ({ ini
     setSelected(iso);
     const d = new Date(`${iso}T00:00:00`);
     if (!Number.isNaN(d.getTime())) setCursor({ year: d.getFullYear(), month: d.getMonth() });
+  };
+
+  const moveTomorrow = (t: CoachTask) => {
+    apply(moveCoachTask(store, t.id, shiftIsoDate(t.date, 1)));
   };
 
   return (
@@ -303,6 +346,48 @@ export const ProfilePlannerTab: React.FC<{ initialAthleteId?: string }> = ({ ini
         </div>
       </div>
 
+      {/* Фильтры списков + поиск (TickTick: списки и быстрый поиск) */}
+      <div style={cardStyle} data-planner="filters">
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          {([{ id: 'all' as const, label: 'Все', count: store.items.length }, ...COACH_TASK_LISTS.map(id => ({ id, label: COACH_TASK_LIST_LABELS[id], count: listCounts[id] }))]).map(chip => {
+            const active = filterList === chip.id;
+            return (
+              <button
+                key={chip.id}
+                type="button"
+                onClick={() => setFilterList(chip.id)}
+                aria-pressed={active}
+                data-planner="list-chip"
+                data-list={chip.id}
+                style={{
+                  minHeight: 36,
+                  padding: '6px 11px',
+                  borderRadius: 999,
+                  cursor: 'pointer',
+                  fontSize: 11.5,
+                  fontWeight: 800,
+                  border: `1px solid ${active ? withAlpha(BLUE, '99') : 'rgba(255,255,255,0.12)'}`,
+                  background: active ? withAlpha(BLUE, '26') : 'rgba(255,255,255,0.03)',
+                  color: active ? '#fff' : colors.textMuted,
+                }}
+              >
+                {chip.label}
+                <span style={{ opacity: 0.6, marginLeft: 5, fontVariantNumeric: 'tabular-nums' }}>{chip.count}</span>
+              </button>
+            );
+          })}
+        </div>
+        <input
+          type="search"
+          value={query}
+          onChange={e => setQuery(e.target.value)}
+          placeholder="Поиск по задачам"
+          aria-label="Поиск по задачам"
+          data-planner="search"
+          style={{ ...inputStyle, width: '100%', marginTop: 8 }}
+        />
+      </div>
+
       {/* Задачи дня + добавление */}
       <div style={cardStyle} data-planner="day">
         <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8 }}>
@@ -328,14 +413,15 @@ export const ProfilePlannerTab: React.FC<{ initialAthleteId?: string }> = ({ ini
                 gap: 10,
                 padding: '10px 12px',
                 borderRadius: 12,
-                border: '1px solid rgba(255,255,255,0.09)',
+                border: `1px solid ${t.done ? 'rgba(255,255,255,0.09)' : withAlpha(PRIORITY_COLOR[coachTaskPriority(t)], '3d')}`,
+                boxShadow: `inset 3px 0 0 ${PRIORITY_COLOR[coachTaskPriority(t)]}`,
                 background: t.done ? 'rgba(255,255,255,0.025)' : 'rgba(255,255,255,0.045)',
                 opacity: t.done ? 0.62 : 1,
               }}
             >
               <button
                 type="button"
-                onClick={() => apply(toggleCoachTaskDone(store, t.id))}
+                onClick={() => apply(completeCoachTask(store, t.id))}
                 aria-label={t.done ? 'Отметить невыполненной' : 'Отметить выполненной'}
                 aria-pressed={t.done}
                 data-planner="toggle"
@@ -370,13 +456,69 @@ export const ProfilePlannerTab: React.FC<{ initialAthleteId?: string }> = ({ ini
                   }}
                 >
                   {t.time && <span style={{ color: BLUE, fontVariantNumeric: 'tabular-nums', marginRight: 7 }}>{t.time}</span>}
+                  {coachTaskPriority(t) !== 'none' && (
+                    <span
+                      aria-label={`Приоритет: ${COACH_PRIORITY_LABELS[coachTaskPriority(t)]}`}
+                      style={{
+                        display: 'inline-block', width: 7, height: 7, borderRadius: '50%',
+                        background: PRIORITY_COLOR[coachTaskPriority(t)], marginRight: 6, verticalAlign: 'middle',
+                      }}
+                    />
+                  )}
                   {t.title}
                 </div>
+                {(coachTaskList(t) !== 'inbox' || coachTaskRepeat(t) !== 'none') && (
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 5 }}>
+                    {coachTaskList(t) !== 'inbox' && (
+                      <span
+                        data-planner="task-list"
+                        style={{
+                          fontSize: 10, padding: '2px 7px', borderRadius: 999,
+                          color: '#c7d2fe', background: 'rgba(99,102,241,0.16)', border: '1px solid rgba(99,102,241,0.35)',
+                        }}
+                      >
+                        {COACH_TASK_LIST_LABELS[coachTaskList(t)]}
+                      </span>
+                    )}
+                    {coachTaskRepeat(t) !== 'none' && (
+                      <span
+                        data-planner="task-repeat"
+                        style={{
+                          fontSize: 10, padding: '2px 7px', borderRadius: 999,
+                          color: '#a7f3d0', background: 'rgba(16,185,129,0.14)', border: '1px solid rgba(16,185,129,0.32)',
+                        }}
+                      >
+                        ↻ {COACH_REPEAT_LABELS[coachTaskRepeat(t)]}
+                      </span>
+                    )}
+                  </div>
+                )}
                 {nameOf(t.athleteId) && (
                   <div style={{ fontSize: 11, color: colors.textMuted, marginTop: 3 }}>{nameOf(t.athleteId)}</div>
                 )}
                 {t.note && <div style={{ fontSize: 11.5, color: colors.textMuted, marginTop: 3 }}>{t.note}</div>}
               </div>
+              <button
+                type="button"
+                onClick={() => moveTomorrow(t)}
+                aria-label="Перенести на завтра"
+                title="Перенести на завтра"
+                data-planner="move"
+                style={{
+                  flexShrink: 0,
+                  minHeight: 32,
+                  padding: '4px 8px',
+                  borderRadius: 9,
+                  cursor: 'pointer',
+                  fontSize: 11,
+                  fontWeight: 800,
+                  border: '1px solid rgba(255,255,255,0.12)',
+                  background: 'transparent',
+                  color: colors.textMuted,
+                }}
+              >
+                →1д
+              </button>
               <button
                 type="button"
                 onClick={() => askDelete(t.id)}
@@ -431,6 +573,39 @@ export const ProfilePlannerTab: React.FC<{ initialAthleteId?: string }> = ({ ini
               data-planner="time"
               style={{ ...inputStyle, flex: '0 0 auto', minWidth: 110 }}
             />
+            <select
+              value={priority}
+              onChange={e => setPriority(e.target.value as CoachTaskPriority)}
+              aria-label="Приоритет задачи"
+              data-planner="priority"
+              style={{ ...inputStyle, flex: '0 0 auto' }}
+            >
+              {COACH_PRIORITIES.map(p => (
+                <option key={p} value={p}>{COACH_PRIORITY_LABELS[p]}</option>
+              ))}
+            </select>
+            <select
+              value={list}
+              onChange={e => setList(e.target.value as CoachTaskList)}
+              aria-label="Список задачи"
+              data-planner="list"
+              style={{ ...inputStyle, flex: '0 0 auto' }}
+            >
+              {COACH_TASK_LISTS.map(l => (
+                <option key={l} value={l}>{COACH_TASK_LIST_LABELS[l]}</option>
+              ))}
+            </select>
+            <select
+              value={repeat}
+              onChange={e => setRepeat(e.target.value as CoachRepeat)}
+              aria-label="Повтор задачи"
+              data-planner="repeat"
+              style={{ ...inputStyle, flex: '0 0 auto' }}
+            >
+              {COACH_REPEATS.map(r => (
+                <option key={r} value={r}>{COACH_REPEAT_LABELS[r]}</option>
+              ))}
+            </select>
             {athletes.length > 0 && (
               <select
                 value={athleteId}

@@ -9,6 +9,7 @@ import android.content.Intent;
 import android.os.Build;
 import android.os.SystemClock;
 
+import com.getcapacitor.JSArray;
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
@@ -42,6 +43,15 @@ public class WidgetBridgePlugin extends Plugin {
         } catch (Exception ignored) {}
         try {
             TimerWidgetProvider.updateAll(ctx);
+        } catch (Exception ignored) {}
+        try {
+            CalendarWidgetProvider.updateAll(ctx);
+        } catch (Exception ignored) {}
+        try {
+            NotesWidgetProvider.updateAll(ctx);
+        } catch (Exception ignored) {}
+        try {
+            WaterQuickWidgetProvider.updateAll(ctx);
         } catch (Exception ignored) {}
     }
 
@@ -132,12 +142,59 @@ public class WidgetBridgePlugin extends Plugin {
             int size = WidgetStore.enqueue(ctx, item);
             NutritionWidgetProvider.optimisticWater(ctx, ml);
             NutritionWidgetProvider.updateAll(ctx);
+            try {
+                WaterQuickWidgetProvider.updateAll(ctx);
+            } catch (Exception ignored) {}
             JSObject ret = new JSObject();
             ret.put("ok", true);
             ret.put("queue", size);
             call.resolve(ret);
         } catch (Exception e) {
             call.reject("queueWater failed");
+        }
+    }
+
+    @PluginMethod
+    public void syncCalendar(PluginCall call) {
+        try {
+            Context ctx = getContext();
+            JSONObject obj = new JSONObject();
+            obj.put("date", call.getString("date", ""));
+            obj.put("dateLabel", call.getString("dateLabel", ""));
+            JSArray tasks = call.getArray("tasks");
+            obj.put("tasks", tasks == null ? new JSONArray() : tasks);
+            obj.put("total", Math.max(0, call.getInt("total", 0)));
+            obj.put("done", Math.max(0, call.getInt("done", 0)));
+            obj.put("overdue", Math.max(0, call.getInt("overdue", 0)));
+            obj.put("queue", WidgetStore.queueSize(ctx));
+            obj.put("updatedAt", System.currentTimeMillis());
+            WidgetStore.putJson(ctx, WidgetStore.KEY_CALENDAR, obj);
+            CalendarWidgetProvider.updateAll(ctx);
+            JSObject ret = new JSObject();
+            ret.put("ok", true);
+            call.resolve(ret);
+        } catch (Exception e) {
+            call.reject("syncCalendar failed");
+        }
+    }
+
+    @PluginMethod
+    public void syncNotes(PluginCall call) {
+        try {
+            Context ctx = getContext();
+            JSONObject obj = new JSONObject();
+            JSArray notes = call.getArray("notes");
+            obj.put("notes", notes == null ? new JSONArray() : notes);
+            obj.put("total", Math.max(0, call.getInt("total", 0)));
+            obj.put("pinned", Math.max(0, call.getInt("pinned", 0)));
+            obj.put("updatedAt", System.currentTimeMillis());
+            WidgetStore.putJson(ctx, WidgetStore.KEY_NOTES, obj);
+            NotesWidgetProvider.updateAll(ctx);
+            JSObject ret = new JSObject();
+            ret.put("ok", true);
+            call.resolve(ret);
+        } catch (Exception e) {
+            call.reject("syncNotes failed");
         }
     }
 
@@ -162,6 +219,36 @@ public class WidgetBridgePlugin extends Plugin {
             call.resolve(ret);
         } catch (Exception e) {
             call.reject("queueNutrition failed");
+        }
+    }
+
+    @PluginMethod
+    public void queueTaskToggle(PluginCall call) {
+        try {
+            Context ctx = getContext();
+            String id = call.getString("id", "");
+            if (id == null || id.isEmpty()) {
+                JSObject ret = new JSObject();
+                ret.put("ok", false);
+                ret.put("queue", WidgetStore.queueSize(ctx));
+                call.resolve(ret);
+                return;
+            }
+            boolean done = call.getBoolean("done", true);
+            JSONObject item = new JSONObject();
+            item.put("type", "task");
+            item.put("id", id);
+            item.put("done", done);
+            item.put("ts", System.currentTimeMillis());
+            int size = WidgetStore.enqueue(ctx, item);
+            CalendarWidgetProvider.optimisticTaskDone(ctx, id, done);
+            CalendarWidgetProvider.updateAll(ctx);
+            JSObject ret = new JSObject();
+            ret.put("ok", true);
+            ret.put("queue", size);
+            call.resolve(ret);
+        } catch (Exception e) {
+            call.reject("queueTaskToggle failed");
         }
     }
 
@@ -363,13 +450,19 @@ public class WidgetBridgePlugin extends Plugin {
         if ("timer".equals(kind)) return TimerWidgetProvider.class;
         if ("compliance".equals(kind)) return ComplianceWidgetProvider.class;
         if ("nutrition".equals(kind)) return NutritionWidgetProvider.class;
+        if ("water".equals(kind)) return WaterQuickWidgetProvider.class;
+        if ("calendar".equals(kind)) return CalendarWidgetProvider.class;
+        if ("notes".equals(kind)) return NotesWidgetProvider.class;
         return null;
     }
 
     private String kindToTarget(String kind) {
         if ("training".equals(kind) || "timer".equals(kind)) return WidgetStore.TARGET_TRAINING;
         if ("nutrition".equals(kind)) return WidgetStore.TARGET_NUTRITION;
+        if ("water".equals(kind)) return WidgetStore.TARGET_NUTRITION;
         if ("compliance".equals(kind)) return WidgetStore.TARGET_SUPPORT;
+        if ("calendar".equals(kind)) return WidgetStore.TARGET_CALENDAR;
+        if ("notes".equals(kind)) return WidgetStore.TARGET_NOTES;
         return WidgetStore.TARGET_HOME;
     }
 

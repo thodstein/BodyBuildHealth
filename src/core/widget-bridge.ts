@@ -11,12 +11,20 @@
 
 import { Capacitor, registerPlugin } from '@capacitor/core';
 
-export type WidgetKind = 'training' | 'timer' | 'compliance' | 'nutrition';
-export type WidgetTarget = 'training' | 'training_run' | 'training_quick' | 'nutrition' | 'support' | 'home';
+export type WidgetKind = 'training' | 'timer' | 'compliance' | 'nutrition' | 'water' | 'calendar' | 'notes';
+export type WidgetTarget =
+  | 'training'
+  | 'training_run'
+  | 'training_quick'
+  | 'nutrition'
+  | 'support'
+  | 'calendar'
+  | 'notes'
+  | 'home';
 export type TimerAction = 'preset' | 'start' | 'pause' | 'toggle' | 'reset';
 
 export interface QueuedItem {
-  type: 'water' | 'food';
+  type: 'water' | 'food' | 'task';
   ml?: number;
   name?: string;
   kcal?: number;
@@ -24,6 +32,9 @@ export interface QueuedItem {
   f?: number;
   c?: number;
   meal?: string;
+  /** Для type='task': id задачи и её новое состояние «сделано». */
+  id?: string;
+  done?: boolean;
   ts: number;
 }
 
@@ -50,6 +61,45 @@ export interface NutritionWidgetSnapshot {
   waterTargetMl: number;
 }
 
+/** Задача для виджета «Календарь» (агенда дня, как в TickTick). */
+export interface CalendarWidgetTask {
+  id: string;
+  title: string;
+  /** HH:MM или пусто. */
+  time: string;
+  done: boolean;
+  /** none|low|medium|high — для точки приоритета. */
+  priority: string;
+}
+
+export interface CalendarWidgetSnapshot {
+  /** YYYY-MM-DD локальная дата дня. */
+  date: string;
+  /** Человеческая подпись: «сб, 7 нояб.». */
+  dateLabel: string;
+  tasks: CalendarWidgetTask[];
+  /** Всего задач на день (может быть больше, чем поместилось в tasks). */
+  total: number;
+  done: number;
+  /** Просроченных задач (до сегодня, не закрыты). */
+  overdue: number;
+}
+
+/** Заметка для виджета «Заметки». */
+export interface NotesWidgetNote {
+  id: string;
+  title: string;
+  /** Прогресс чек-листа: сколько пунктов выполнено. */
+  done: number;
+  total: number;
+}
+
+export interface NotesWidgetSnapshot {
+  notes: NotesWidgetNote[];
+  total: number;
+  pinned: number;
+}
+
 interface WidgetBridgeNative {
   syncTraining(o: {
     title: string; subtitle: string; meta: string;
@@ -57,8 +107,11 @@ interface WidgetBridgeNative {
   }): Promise<{ ok: boolean }>;
   syncCompliance(o: { pct: number; label: string; detail: string }): Promise<{ ok: boolean }>;
   syncNutrition(o: NutritionWidgetSnapshot): Promise<{ ok: boolean }>;
+  syncCalendar(o: CalendarWidgetSnapshot): Promise<{ ok: boolean }>;
+  syncNotes(o: NotesWidgetSnapshot): Promise<{ ok: boolean }>;
   queueWater(o: { ml: number }): Promise<{ ok: boolean; queue: number }>;
   queueNutrition(o: { name: string; kcal: number; p: number; f: number; c: number; meal: string }): Promise<{ ok: boolean; queue: number }>;
+  queueTaskToggle(o: { id: string; done: boolean }): Promise<{ ok: boolean; queue: number }>;
   drainQueue(): Promise<{ items: string; count: number }>;
   queueSize(): Promise<{ queue: number }>;
   timerCommand(o: { action: string; seconds: number }): Promise<TimerState>;
@@ -149,7 +202,9 @@ export function parseQueueItems(raw: string): QueuedItem[] {
     if (!Array.isArray(arr)) return [];
     return arr.filter(
       (it): it is QueuedItem =>
-        !!it && typeof it === 'object' && (it.type === 'water' || it.type === 'food'),
+        !!it &&
+        typeof it === 'object' &&
+        (it.type === 'water' || it.type === 'food' || it.type === 'task'),
     );
   } catch {
     return [];
@@ -269,6 +324,34 @@ export async function syncNutritionWidget(input: NutritionWidgetSnapshot): Promi
   return false;
 }
 
+export async function syncCalendarWidget(input: CalendarWidgetSnapshot): Promise<boolean> {
+  const p = plugin();
+  if (p) {
+    try {
+      await p.syncCalendar(input);
+      return true;
+    } catch {
+      /* fallback ниже */
+    }
+  }
+  fbSnapshot('calendar', { ...input, updatedAt: Date.now() });
+  return false;
+}
+
+export async function syncNotesWidget(input: NotesWidgetSnapshot): Promise<boolean> {
+  const p = plugin();
+  if (p) {
+    try {
+      await p.syncNotes(input);
+      return true;
+    } catch {
+      /* fallback ниже */
+    }
+  }
+  fbSnapshot('notes', { ...input, updatedAt: Date.now() });
+  return false;
+}
+
 /* ---------------- queue ---------------- */
 
 export async function queueWaterMl(ml: number): Promise<number> {
@@ -324,6 +407,24 @@ export async function queueFood(input: {
   }
   const q = fbReadQueue();
   q.push(item);
+  fbWriteQueue(q);
+  return Math.min(50, q.length);
+}
+
+export async function queueTaskToggle(id: string, done: boolean): Promise<number> {
+  const taskId = String(id || '').slice(0, 80);
+  if (!taskId) return 0;
+  const p = plugin();
+  if (p) {
+    try {
+      const r = await p.queueTaskToggle({ id: taskId, done: !!done });
+      return typeof r.queue === 'number' ? r.queue : 0;
+    } catch {
+      /* fallback ниже */
+    }
+  }
+  const q = fbReadQueue();
+  q.push({ type: 'task', id: taskId, done: !!done, ts: Date.now() });
   fbWriteQueue(q);
   return Math.min(50, q.length);
 }
@@ -413,7 +514,18 @@ export async function consumeWidgetLaunchTarget(): Promise<WidgetTarget | null> 
     try {
       const r = await p.getLaunchTarget();
       const t = r.target;
-      if (t === 'training' || t === 'nutrition' || t === 'support' || t === 'home') return t;
+      if (
+        t === 'training' ||
+        t === 'training_run' ||
+        t === 'training_quick' ||
+        t === 'nutrition' ||
+        t === 'support' ||
+        t === 'calendar' ||
+        t === 'notes' ||
+        t === 'home'
+      ) {
+        return t;
+      }
       return null;
     } catch {
       return null;
