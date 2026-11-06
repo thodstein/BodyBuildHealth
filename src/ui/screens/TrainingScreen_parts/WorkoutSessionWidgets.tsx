@@ -4,6 +4,7 @@
  * Без чужих правок: самодостаточные карточки, монтируются 1 строкой где угодно.
  */
 import React, { useEffect, useMemo, useState } from 'react';
+import { ruCount, RU_PERCENTS } from '../../../engines/ru-plural';
 import {
   loadActiveSession, loadSessions, summarizeActiveSession,
   type ActiveSessionSummary,
@@ -110,7 +111,7 @@ export const WorkoutMiniPult: React.FC<{ state?: WorkoutWidgetState | null; onOp
   const total = live ? Math.max(live.setsDone, live.setsPlanned) : (s?.exercises ?? []).reduce((a, e) => a + e.total, 0);
   const pct = total > 0 ? Math.round((done / total) * 100) : 0;
   return (
-    <div data-widget="workout-pult" role="status" aria-label={`Пульт тренировки, выполнено ${pct} процентов`}
+    <div data-widget="workout-pult" role="status" aria-label={`Пульт тренировки, выполнено ${ruCount(pct, RU_PERCENTS)}`}
       style={{ ...CARD, position: 'static', top: 0, zIndex: 20, display: 'flex', gap: 10, alignItems: 'center', borderColor: live ? 'rgba(0,230,138,0.28)' : undefined }}>
       <div style={{ width: 44, height: 44, borderRadius: 12, background: 'rgba(0,230,138,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22 }} aria-hidden>🏋️</div>
       <div style={{ flex: 1, minWidth: 0 }}>

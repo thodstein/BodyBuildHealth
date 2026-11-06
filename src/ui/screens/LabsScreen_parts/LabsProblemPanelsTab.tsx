@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
+import { ruCount, RU_SYMPTOMS } from '../../../engines/ru-plural';
 import { PROBLEM_PANELS, formatPanelAsReferral, type ProblemPanel } from '../../../data/labs-problem-panels';
 import { getProblemPanelsForSymptoms } from '../../../engines/symptom-lab-link';
 import { SYMPTOM_DB, findSymptomById, type SymptomEntry } from '../../../engines/symptom-solver.engine';
@@ -327,7 +328,7 @@ const LabsProblemPanelsTab: React.FC = () => {
             border: selectedSymptomIds.length > 0 ? 'none' : '1px solid var(--border)',
             color: selectedSymptomIds.length > 0 ? '#000' : '#fff',
           }}>
-            🔍 Найти анализы для {selectedSymptomIds.length > 0 ? `${selectedSymptomIds.length} симптомов` : 'симптомов'}
+            🔍 Найти анализы для {selectedSymptomIds.length > 0 ? ruCount(selectedSymptomIds.length, RU_SYMPTOMS) : 'симптомов'}
           </button>
 
           {symptomLinkedPanels.length > 0 && (

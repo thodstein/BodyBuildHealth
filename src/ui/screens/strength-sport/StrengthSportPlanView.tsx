@@ -18,7 +18,7 @@ import { activeSeasonBlockForDate } from '../../../engines/strength-sport/streng
 import { CARD, BTN, BTN_PRIMARY, BTN_SMALL, INPUT, TEXT_2, TEXT_3, ACCENT, ACCENT_STRONG, ACCENT_SOFT, STRONG_SOFT, ACCENT_BORDER, STRONG_BORDER, ACCENT_GRAD, SectionCard, StatTile, Badge, InfoBanner, GroupHeading, CardHeader, Highlight, HighlightStrong, ChipToggle, Divider } from './StrengthUI';
 import { StrengthGantt, StrengthHeatmap, EventCard } from './StrengthUI';
 import { MODE_RU, LEVEL_RU, PHASE_RU, ruLabel } from './StrengthUI';
-import { ruCount, RU_SESSIONS, RU_SETS } from '../../../engines/ru-plural';
+import { ruCount, RU_SESSIONS, RU_SETS, RU_BLOCKS, RU_EVENTS, RU_EVENT_DAYS } from '../../../engines/ru-plural';
 
 type Props = {
   plan: StrengthSportPlan;
@@ -113,7 +113,7 @@ export const StrengthSportPlanView: React.FC<Props> = ({
         {plan.rationale?.length ? <div style={{ fontSize:13, color:'#fff', background:'rgba(0,0,0,0.16)', padding:'12px 14px', borderRadius:14, border:'0.5px solid rgba(255,255,255,0.07)', lineHeight:1.55 }}>{plan.rationale.slice(0,3).map((r,i)=> <div key={i} style={{ display:'flex', gap:8 }}><span style={{ color:modeColor }}>•</span><span>{r}</span></div>)}</div> : null}
       </SectionCard>
 
-      <SectionCard icon="🗓️" title="Gantt фаз" subtitle="Накопление · интенсификация · пик · taper 1-2нед перед стартом" collapsible defaultOpen={false} summary={`${plan.weeks} нед · ${plan.weeksData.length} блоков`}>
+      <SectionCard icon="🗓️" title="Gantt фаз" subtitle="Накопление · интенсификация · пик · taper 1-2нед перед стартом" collapsible defaultOpen={false} summary={`${plan.weeks} нед · ${ruCount(plan.weeksData.length, RU_BLOCKS)}`}>
         <StrengthGantt weeks={plan.weeksData} totalWeeks={plan.weeks} />
         <div style={{ fontSize:12, color: TEXT_3, background:'rgba(255,255,255,0.035)', padding:'10px 12px', borderRadius:12, border:'0.5px solid rgba(255,255,255,0.05)', lineHeight:1.5 }}>
           Тапер <span style={{ color:'#30D158', fontWeight:700 }}>зелёный</span> 1-2 нед выносится отдельной фазой в Gantt. С датой старта работает <b>дат-тейпер</b>: per-event cessation (йок/камень/тяга 7-8 д, лог/фермер 5-6 д) + Winwood W-1 <b>×0.45 int ×0.50</b>, W-2 <b>×0.55 int ×0.75</b>; модель toro4 — мягче (<b>×0.65</b>). Без даты — внешний тапер <b>×0.55 → ×0.45</b>.</div>
@@ -146,7 +146,7 @@ export const StrengthSportPlanView: React.FC<Props> = ({
         ) : null;
       })()}
       {(plan.inputSnapshot as any)?.contest?.events?.length ? (
-        <SectionCard icon="🏆" title="Контест-пакет" subtitle={`${(plan.inputSnapshot as any).contest.events.length} ивентов · ${(plan.inputSnapshot as any).contestStrategy||'balanced'} · тапер ≈${taperLengthDaysFor(plan.mode, sex)}д`} strong collapsible defaultOpen={false} summary={`${(plan.inputSnapshot as any).contest.events.length} ивентов · ${(plan.inputSnapshot as any).contestStrategy||'balanced'}`}>
+        <SectionCard icon="🏆" title="Контест-пакет" subtitle={`${ruCount((plan.inputSnapshot as any).contest.events.length, RU_EVENTS)} · ${(plan.inputSnapshot as any).contestStrategy||'balanced'} · тапер ≈${taperLengthDaysFor(plan.mode, sex)}д`} strong collapsible defaultOpen={false} summary={`${ruCount((plan.inputSnapshot as any).contest.events.length, RU_EVENTS)} · ${(plan.inputSnapshot as any).contestStrategy||'balanced'}`}>
           <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
             {(plan.inputSnapshot as any).contest.events.map((e:any, i:number)=> (
               <span key={i} style={{ padding:'7px 12px', borderRadius:12, background:'rgba(245,158,11,0.10)', border:'0.5px solid rgba(245,158,11,0.20)', fontSize:12, fontWeight:600, color:'#fff' }}><HighlightStrong>{(EVENT_META as any)[e.id]?.label || e.id}</HighlightStrong> {e.format} {e.weight?`${e.weight}кг`:''} {e.distanceM?`${e.distanceM}м`:''} {e.timeCapS?`cap${e.timeCapS}с`:''} {e.heightCm?`${e.heightCm}см`:''} {e.turn?'разв.':''} {TAPER_CESSATION_DAYS[e.id] ? `· cess ${cessationDaysFor(e.id, sex)}д` : ''}</span>
@@ -206,7 +206,7 @@ export const StrengthSportPlanView: React.FC<Props> = ({
       {plan.mode==='strongman' && plan.weeksData.some(w=> w.sessions.some(s=> s.sessionTag==='event_day')) && (
         <EventCard
           title="⛓️ Medley — цепь 2+1 в плане"
-          subtitle={`${plan.weeksData.filter(w=> w.sessions.some(s=> s.sessionTag==='event_day')).length} ивент-дней · distance 10-50м / cap 30-180с · суммарный cap < 360с`}
+          subtitle={`${ruCount(plan.weeksData.filter(w=> w.sessions.some(s=> s.sessionTag==='event_day')).length, RU_EVENT_DAYS)} · distance 10-50м / cap 30-180с · суммарный cap < 360с`}
           events={(() => {
             const ev = plan.weeksData[0].sessions.find(s=> s.sessionTag==='event_day');
             if (!ev) return [];
@@ -297,8 +297,8 @@ export const StrengthSportPlanView: React.FC<Props> = ({
 
       {annual && (
         <>
-        <SectionCard icon="🗓️" title="Годовой план" subtitle={`${annual.totalWeeks} нед · ${annual.blocks.length} блоков · синхронизация с дневником`} collapsible defaultOpen={false} summary={`${annual.totalWeeks} нед · ${annual.blocks.length} блоков`}>
-          <CardHeader icon="🗓️" title={`Годовой · ${annual.totalWeeks} нед`} subtitle={`${annual.blocks.length} блоков · ${plan.weeks} нед текущий`} />
+        <SectionCard icon="🗓️" title="Годовой план" subtitle={`${annual.totalWeeks} нед · ${ruCount(annual.blocks.length, RU_BLOCKS)} · синхронизация с дневником`} collapsible defaultOpen={false} summary={`${annual.totalWeeks} нед · ${ruCount(annual.blocks.length, RU_BLOCKS)}`}>
+          <CardHeader icon="🗓️" title={`Годовой · ${annual.totalWeeks} нед`} subtitle={`${ruCount(annual.blocks.length, RU_BLOCKS)} · ${plan.weeks} нед текущий`} />
           <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
             {annual.blocks.map((b:any) => {
               const col = b.mode==='weightlifting'?'#30d158': b.mode==='strongman'?'#ff9f0a':'#0a84ff';

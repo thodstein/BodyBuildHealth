@@ -9,6 +9,7 @@
  * Использует все 9 ортопедических калькуляторов проекта + быструю оценку техники. Без вкладок, один скролл.
  */
 import React, { useMemo, useState, useRef, useEffect } from 'react';
+import { ruCount, RU_PATTERNS, RU_TESTS, RU_BLOCKS } from '../../../engines/ru-plural';
 import { JOINTS, JOINT_OPTIONS, jointLoadDiagnosis, JOINT_MAP, type JointId } from '../../../engines/pro/joint-load-master.engine';
 import { EXERCISE_CATALOG } from '../../../core/exercise-catalog';
 import type { Lift } from '../../../engines/lms/weakpoint-pl';
@@ -213,7 +214,7 @@ export const JointMasterCard: React.FC = () => {
           if (diag.blockedPatterns.length) {
             const map: Record<string,string[]> = {};
             diag.blockedPatterns.forEach(p => { map[diag.joint.id+'|blocked|'+p] = [PATTERN_RU[p]||p]; });
-            applyToPlanner({ kind:'limiter', label:`Разгрузка ${diag.joint.label}: ${diag.blockedPatterns.length} паттернов`, data:{ limiterExerciseMap: map, limiterProtocolMap:{}, limiterDayMap:{} } as any });
+            applyToPlanner({ kind:'limiter', label:`Разгрузка ${diag.joint.label}: ${ruCount(diag.blockedPatterns.length, RU_PATTERNS)}`, data:{ limiterExerciseMap: map, limiterProtocolMap:{}, limiterDayMap:{} } as any });
           } else {
             applyToPlanner({ kind:'pri', label:`Статус ${diag.joint.label}: норма`, data:{ volumeMult: 1, rirShift: 0 } as any });
           }
@@ -291,7 +292,7 @@ export const JointMasterCard: React.FC = () => {
             <button onClick={() => {
               const map: Record<string,string[]> = {};
               diag.weakest.forEach(w => { map[diag.joint.id+'|weak|'+w.test.id] = [w.test.title]; });
-              applyToPlanner({ kind:'limiter', label:`Прехаб слабых ${diag.joint.label}: ${diag.weakest.length} тестов`, data:{ limiterExerciseMap: map, limiterProtocolMap:{}, limiterDayMap:{} } as any });
+              applyToPlanner({ kind:'limiter', label:`Прехаб слабых ${diag.joint.label}: ${ruCount(diag.weakest.length, RU_TESTS)}`, data:{ limiterExerciseMap: map, limiterProtocolMap:{}, limiterDayMap:{} } as any });
             }} style={{ marginTop:6, width:'100%', minHeight:28, border:'none', borderRadius:6, cursor:'pointer', background:'#f43f5e', color:'#fff', fontWeight:700, fontSize:10 }}>🛠 Добавить прехаб для слабых</button>
           </div>
         )}
@@ -308,7 +309,7 @@ export const JointMasterCard: React.FC = () => {
           const map: Record<string,string[]> = {};
           diag.mobilityTests.forEach(t => { map[diag.joint.id+'|mobility|'+t.id] = [t.title]; });
           diag.flows.forEach(f => { map[diag.joint.id+'|flow|'+f.id] = (f.exercises || []).map((e:any)=> e.name || e) as any || [f.name]; });
-          applyToPlanner({ kind:'limiter', label:`Весь прехаб ${diag.joint.label}: ${diag.mobilityTests.length + diag.flows.length} блоков`, data:{ limiterExerciseMap: map, limiterProtocolMap:{}, limiterDayMap:{} } as any });
+          applyToPlanner({ kind:'limiter', label:`Весь прехаб ${diag.joint.label}: ${ruCount(diag.mobilityTests.length + diag.flows.length, RU_BLOCKS)}`, data:{ limiterExerciseMap: map, limiterProtocolMap:{}, limiterDayMap:{} } as any });
         }} style={{ marginTop:8, width:'100%', minHeight:32, border:'none', borderRadius:8, cursor:'pointer', background:'#a78bfa', color:'#fff', fontWeight:800, fontSize:10 }}>🛠 Добавить весь прехаб для {diag.joint.label}</button>
         <div style={{ marginTop:6, padding:'6px', borderRadius:6, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', fontSize:9, color:'#fff', lineHeight:1.3 }}>
           📍 Куда: <b>ПЛ-авто → Лимитеры → {diag.joint.label} → прехаб/мобильность</b> · Карточки цветные (#a78bfa / #38bdf8), не белые.

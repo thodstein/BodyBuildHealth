@@ -12,7 +12,7 @@ import { ACCENT, CARD, DIM, BTN_GHOST } from './training-ui';
 import { bulkProgressWeeks } from '../../../engines/manual-constructor/manual-progression.engine';
 import type { LoadStrategy } from '../../../engines/bb/bb-autocoach.engine';
 import { applyDUPToProgram, type DupPreset, DUP_PRESETS, applySpecializationToProgram, applyTaperToProgram, inheritWeekBlocks } from '../../../engines/manual-constructor/manual-periodization-pro.engine';
-import { ruAdjCount, RU_ADJ_EMPTY_F, RU_WEEKS } from '../../../engines/ru-plural';
+import { ruAdjCount, ruCount, RU_ADJ_EMPTY_F, RU_BLOCKS, RU_WEEKS } from '../../../engines/ru-plural';
 
 interface Props {
   program: UserProgram;
@@ -99,7 +99,7 @@ export const BulkApplyCard: React.FC<Props> = ({ program, onChange, showToast })
     const to = weekRange === 'all' ? totalWeeks : rangeEnd;
     const res = bulkProgressWeeks(program, from, to, { strategy: progStrategy, totalWeeks, skipDeload: true });
     onChange(res.program);
-    showToast(`📈 Прогрессия ${progStrategy}: ${res.changedBlocks} блоков, делод пропущено ${res.deloadSkipped} (нед ${from}-${to})`);
+    showToast(`📈 Прогрессия ${progStrategy}: ${ruCount(res.changedBlocks, RU_BLOCKS)}, делод пропущено ${res.deloadSkipped} (нед ${from}-${to})`);
   };
 
   const applyDup = () => {

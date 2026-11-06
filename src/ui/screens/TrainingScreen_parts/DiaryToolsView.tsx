@@ -16,7 +16,7 @@ import { exportWarmupCheckinsCSV, loadWarmupLog, warmupAdherence, warmupQualityT
 import { exportCooldownCheckinsCSV, loadCooldownLog, cooldownAdherence, cooldownQualityTrend } from '../../../engines/cooldown.engine';
 import { loadStretchLog, stretchStats } from '../../../engines/stretch-session.engine';
 import { restoreDiaryExtras } from '../../../engines/diary-backup.engine';
-import { ruCount, RU_ENTRIES, RU_MEASUREMENTS, RU_SESSIONS, RU_SETS, RU_TRAININGS } from '../../../engines/ru-plural';
+import { ruCount, RU_DUPLICATES, RU_ENTRIES, RU_MEASUREMENTS, RU_SESSIONS, RU_SETS, RU_TRAININGS } from '../../../engines/ru-plural';
 
 export const DiaryToolsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
   const {
@@ -306,7 +306,7 @@ export const DiaryToolsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                   onRefresh();
                 }} disabled={dupesBusy}
                   style={{ flex: 1, minWidth: 120, padding: '8px 10px', borderRadius: 8, fontSize: 11, fontWeight: 700, background: 'rgba(239,68,68,0.15)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.35)', cursor: 'pointer' }}>
-                  {dupesBusy ? 'Удаляю...' : `🗑 Удалить ${dupes.reduce((s, d) => s + d.dupes.length, 0)} дублей`}
+                  {dupesBusy ? 'Удаляю...' : `🗑 Удалить ${ruCount(dupes.reduce((s, d) => s + d.dupes.length, 0), RU_DUPLICATES)}`}
                 </button>
               )}
             </div>

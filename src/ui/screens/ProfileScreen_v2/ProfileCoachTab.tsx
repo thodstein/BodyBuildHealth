@@ -15,6 +15,7 @@
  *    памяти чужие данные. Удаление карточки и удаление ЕГО данных — разные кнопки.
  */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { ruCount, RU_SECTIONS } from '../../../engines/ru-plural';
 import { NativeIcon } from '../../native/NativeIcons';
 import { colors, withAlpha } from './ui';
 import {
@@ -1801,7 +1802,7 @@ export const ProfileCoachTab: React.FC<{
                 <div style={{ fontSize: 11.5, color: colors.textSubtle, fontVariantNumeric: 'tabular-nums' }}>
                   {statusCounts.active + statusCounts.paused} в работе
                   {statusCounts.archived > 0 ? ` · ${statusCounts.archived} в архиве` : ''}
-                  {` · ${state.sections.length} разделов`}
+                  {` · ${ruCount(state.sections.length, RU_SECTIONS)}`}
                 </div>
               </div>
               <input

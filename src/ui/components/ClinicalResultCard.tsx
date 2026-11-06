@@ -1,5 +1,6 @@
 // ClinicalResultCard.tsx — клинический вердикт selectStack: карточка врачебного уровня
 import React, { useMemo } from 'react';
+import { ruCount, RU_NOTES, RU_DUPLICATES } from '../../engines/ru-plural';
 import type { SelectStackResult } from '../../engines/biostack-clinical-v2.engine';
 import { findMeaningfulReplacement, type MeaningfulReplacement } from '../../engines/biostack-clinical-v2.engine';
 import type { BioStackProfile } from '../../engines/biostack-ai.engine';
@@ -176,7 +177,7 @@ export const ClinicalResultCard: React.FC<{
           <div style={{ fontSize:11,color:'rgba(255,255,255,0.45)',marginTop:2 }}>
             {totalIssues === 0
               ? 'Клинических замечаний нет — стек допустим к приёму'
-              : `${totalIssues} замечаний: ${hardCount} крит., ${exclCount} лекарств., ${ulCount} доз., ${labCount} лаб., ${titCount} титрац., ${redCount} дублей`}
+              : `${ruCount(totalIssues, RU_NOTES)}: ${hardCount} крит., ${exclCount} лекарств., ${ulCount} доз., ${labCount} лаб., ${titCount} титрац., ${ruCount(redCount, RU_DUPLICATES)}`}
           </div>
         </div>
       </div>

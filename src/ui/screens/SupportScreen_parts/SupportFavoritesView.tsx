@@ -1,5 +1,6 @@
 // @ts-nocheck
 import React from 'react';
+import { ruCount, RU_SUPPLEMENTS } from '../../../engines/ru-plural';
 import { readSupportStacks } from '../../../engines/stack-storage';
 import { ALL_INTERACTIONS, SUPPORT_CATALOG_DATA } from '../../../data/support-database';
 import { CATEGORY_LABELS } from './SupportScreenData';
@@ -224,7 +225,7 @@ export const SupportFavoritesView: React.FC<{ s: Record<string, any> }> = ({ s }
                     const fresh = (st.subs || []).filter((id: string) => !livePlanSubs.includes(id));
                     if (fresh.length === 0) { showToast('Все препараты стека уже в плане'); return; }
                     setEnhancedSubs([...(enhancedSubs || []), ...fresh]);
-                    showToast(`✅ ${fresh.length} препаратов добавлено в план`);
+                    showToast(`✅ ${ruCount(fresh.length, RU_SUPPLEMENTS)} добавлено в план`);
                   }} style={{ marginTop:4, padding:'10px 12px', borderRadius:12, fontSize:12, minHeight:44, cursor:'pointer', background:'rgba(0,230,138,0.1)', border:'1px solid rgba(0,230,138,0.3)', color:'#00e68a', fontWeight:700 }}>📋 В план</button>
                 </div>
               ))}

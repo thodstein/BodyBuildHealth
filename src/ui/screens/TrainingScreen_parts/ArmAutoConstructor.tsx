@@ -76,7 +76,7 @@ import { buzzPlanner } from './planner-ui';
 import { AdSwitch, AdSheetSelect } from './arm-design-system';
 import { isNativeApp } from '../../../core/app-platform';
 import { ensureArmApkStyles } from './arm-apk-loader';
-import { ruCount, RU_SETS } from '../../../engines/ru-plural';
+import { ruCount, RU_SETS, RU_BLOCKS } from '../../../engines/ru-plural';
 
 /* ── Единый плотный каркас: Ad* — тонкие обёртки над китом training-ui
   * (BB-авто — эталон). DOM-контракты 1-в-1: классы .ad-* + data-arm хуки +
@@ -3225,13 +3225,13 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
                    annualNote = `в общий годовой план: собрано ${outcome.built}, пропущено ${outcome.skipped}, ошибок ${outcome.failed}`;
                    if (outcome.errors.length) annualNote += ` · первая: ${outcome.errors[0].blockKey} — ${outcome.errors[0].message}`;
                  } catch (ae: any) { annualNote = `в общий годовой план не записан: ${ae?.message || ae}`; }
-                 flash(`🗓 Год собран: ${res.length} блоков · тейпер ${res.filter((r: any)=>r.taperApplied).length} · предупр. ${warns} · ${annualNote}`);
+                 flash(`🗓 Год собран: ${ruCount(res.length, RU_BLOCKS)} · тейпер ${res.filter((r: any)=>r.taperApplied).length} · предупр. ${warns} · ${annualNote}`);
               } catch (e: any) { flash(`❌ Год: ${e?.message || e}`); } finally { setYearBusy(false); }
             }}>{yearBusy ? '⏳ Собираем год…' : '🗓 Собрать год'}</AdBtn>
             <AdBtn variant="ghost" block onClick={()=>setStep('export')}>← Назад</AdBtn>
           </AdCta>
           {yearBuilt && (
-            <AdSec title="📊 Итог года" collapsible defaultOpen={true} summary={`${yearBuilt.length} блоков`}>
+            <AdSec title="📊 Итог года" collapsible defaultOpen={true} summary={`${ruCount(yearBuilt.length, RU_BLOCKS)}`}>
               <div className="ad-list" data-arm="year-result">
                 {yearBuilt.map((r: any)=>(
                   <div key={r.blockKey} className="ad-sec ad-bio" data-valid={r.warnings.length ? 'warn' : 'ok'}>

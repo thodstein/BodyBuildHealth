@@ -112,7 +112,7 @@ import { BbPlanStep } from './bb-step-plan';
 import { BbQualityUnifiedCard, BbQualityPlanLogicCard, BbQualitySafetySection } from './bb-quality-sections';
 import { BbQualityLoadOverview, BbQualityLoadVolume, BbQualityLoadChecks, type BbQualityLoadCtx } from './bb-quality-load-sections';
 import { BbContestPrepParams, BbContestPrepPreview, BbContestPrepTrialSafety, BbContestPrepPost, type BbContestPrepCtx } from './bb-contest-prep-sections';
-import { ruCount, RU_CYCLES, RU_ERRORS, RU_OCCURRENCES, RU_SETS, RU_WARNINGS } from '../../../engines/ru-plural';
+import { ruCount, RU_CYCLES, RU_ERRORS, RU_OCCURRENCES, RU_REVEALS, RU_SETS, RU_WARNINGS } from '../../../engines/ru-plural';
 export {
   PHASE_TECHNIQUES, backSubgroupLabel, armHeadLabel, isAbRotationActive,
   annualBlockCtxToPrepPatch, annualActiveBlockLine,
@@ -1517,7 +1517,7 @@ const [bbVolumeRamp, setBbVolumeRamp] = useState<'standard' | 'preloaded' | 'fla
                 setBbExclEx((prev) => Array.from(new Set([...prev, ...risky])));
                 try { localStorage.setItem('he_bb_ortho_excluded', JSON.stringify(risky)); } catch {}
               }
-              pro2parts.push(`🦴 Beighton+: light + без отказных + повторы + ${risky.length} раскрытий исключено`);
+              pro2parts.push(`🦴 Beighton+: light + без отказных + повторы + ${ruCount(risky.length, RU_REVEALS)} исключено`);
             }
           }
         if (Array.isArray(bbDiag.orthoFlags) && bbDiag.orthoFlags.length) {

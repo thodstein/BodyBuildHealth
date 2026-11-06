@@ -71,7 +71,7 @@ import { ManualLibraryDrawer } from './ManualLibraryDrawer';
 import { MANUAL_STORAGE_KEYS } from '../../../engines/manual-constructor/manual-storage';
 
 import { GOAL_OPTS_BB as CENTRAL_GOAL_BB2, GOAL_OPTS_PL as CENTRAL_GOAL_PL2, GOAL_OPTS_HYBRID as CENTRAL_GOAL_HYBRID2, goalLabelOf as centralGoalLabelOf2 } from '../../../engines/goals';
-import { ruAdjCount, ruCount, RU_ADJ_TRAINING, RU_DAYS, RU_ENTRIES, RU_WEEKS } from '../../../engines/ru-plural';
+import { ruAdjCount, ruCount, RU_ADJ_TRAINING, RU_BLOCKS, RU_DAYS, RU_ENTRIES, RU_WEEKS } from '../../../engines/ru-plural';
 export const GOAL_OPTS_BB = CENTRAL_GOAL_BB2;
 export const GOAL_OPTS_PL = CENTRAL_GOAL_PL2;
 export const GOAL_OPTS_HYBRID = CENTRAL_GOAL_HYBRID2;
@@ -1016,7 +1016,7 @@ return (
               <span style={{ fontSize: 11, color: DIM_STRONG }}>🎨 Привязать дизайн периодизации:</span>
               <EditorPopupSelect
                 value={designLinkId}
-                options={[{ id: '', label: '— выберите дизайн —' }, ...savedDesigns.map(d => ({ id: d.id, label: `${d.name} (${d.blocks.length} блоков)` }))]}
+                options={[{ id: '', label: '— выберите дизайн —' }, ...savedDesigns.map(d => ({ id: d.id, label: `${d.name} (${ruCount(d.blocks.length, RU_BLOCKS)})` }))]}
                 onChange={setDesignLinkId}
                 ariaLabel="Дизайн периодизации"
                 title="Дизайн периодизации"

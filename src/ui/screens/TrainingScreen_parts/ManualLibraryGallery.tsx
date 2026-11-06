@@ -10,6 +10,7 @@
  * Кардио-циклы — через свой мост cardio-cycle-bridge (трек cardio).
  */
 import React, { useMemo, useState } from 'react';
+import { ruCount, RU_PROGRAMS, RU_PL_CYCLES } from '../../../engines/ru-plural';
 import type { FullProgram } from '../../../engines/complete-program-library.engine';
 import type { SRCycleTemplate } from '../../../data/lms-cycles/lms-types';
 import { ARM_CYCLE_LIBRARY, type ArmCycleTemplate } from '../../../engines/arm/arm-cycle-library.engine';
@@ -295,7 +296,7 @@ export const ManualLibraryGallery: React.FC<Props> = ({ bbPrograms, plCycles, ar
     <div className="train-manlib lib-manlib" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
       <ManualHeader
         title="📚 Библиотека шаблонов"
-        subtitle={`${bbPrograms.length} программ · ${plCycles.length} ПЛ-циклов · ${armCycles.length} арм · ${ssCycles.length} ТА/стронг · ${cardioCycles.length} кардио · ${combatCycles.length} единоборства · фильтры + превью + мост в конструкторы`}
+        subtitle={`${ruCount(bbPrograms.length, RU_PROGRAMS)} · ${ruCount(plCycles.length, RU_PL_CYCLES)} · ${armCycles.length} арм · ${ssCycles.length} ТА/стронг · ${cardioCycles.length} кардио · ${combatCycles.length} единоборства · фильтры + превью + мост в конструкторы`}
         chips={[{ label: `${filteredBB.length + filteredPL.length + filteredArm.length + filteredSS.length + filteredCardio.length + filteredCombat.length} показано`, color: ACCENT }]}
       />
       {bridgeMsg && <div role="status" className="lib-bridge-msg" style={{ fontSize: 12, color: '#fff', background: 'rgba(0,230,138,0.10)', border: '1px solid rgba(0,230,138,0.30)', borderRadius: 10, padding: '8px 10px' }}>{bridgeMsg}</div>}

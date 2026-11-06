@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { ruCount, RU_FLAGS } from '../../../engines/ru-plural';
 import {
   screenOrtho, orthoGuardsForPlan, saveOrthoFlags, loadOrthoFlags,
   applyOrthoToProfile, rankJointSupport, buildOrthoCsv, buildOrthoHtml,
@@ -63,7 +64,7 @@ export const OrthoScreenCard: React.FC<{ compact?: boolean }> = ({ compact = fal
     const r = applyOrthoToProfile(result.flags);
     set('msg', `✅ Сохранено: флагов ${result.flags.length} · в профиль: ${r.mobilityAdd.join(', ') || '—'}`);
     try {
-      (window as unknown as { showToast?: (m: string) => void }).showToast?.(`🦴 Орто-скрининг: ${result.flags.length} флагов`);
+      (window as unknown as { showToast?: (m: string) => void }).showToast?.(`🦴 Орто-скрининг: ${ruCount(result.flags.length, RU_FLAGS)}`);
     } catch { /* noop */ }
   };
 
@@ -237,7 +238,7 @@ export const OrthoScreenCard: React.FC<{ compact?: boolean }> = ({ compact = fal
         <button onClick={sendToPlan} style={{ padding: '10px 14px', borderRadius: 8, fontSize: 12, fontWeight: 700, border: '1px solid rgba(34,197,94,0.4)', background: 'rgba(34,197,94,0.12)', color: '#fff' }}>📦 В конструктор</button>
       </div>
       {s.msg && <div role="status" style={{ fontSize: 10, color: '#fff' }}>{s.msg}</div>}
-      <div style={{ fontSize: 9, color: '#fff', opacity: 0.8 }}>История: {loadOrthoFlags().length > 0 ? `${loadOrthoFlags().length} флагов сохранено` : 'пусто'}. Прошлый скрининг подгружается из `he_ortho_screen_v1`.</div>
+      <div style={{ fontSize: 9, color: '#fff', opacity: 0.8 }}>История: {loadOrthoFlags().length > 0 ? `${ruCount(loadOrthoFlags().length, RU_FLAGS)} сохранено` : 'пусто'}. Прошлый скрининг подгружается из `he_ortho_screen_v1`.</div>
     </div>
   );
 };

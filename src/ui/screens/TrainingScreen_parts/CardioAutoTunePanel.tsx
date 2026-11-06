@@ -13,7 +13,7 @@ import {
   type CardioCycle, type CardioTuneChange,
 } from '../../../engines/lms/cardio.engine';
 import { loadCardioLog, cardioHrCompliance, loadCardioWellness, wellnessReadiness } from '../../../engines/lms/cardio-diary.engine';
-import { ruCount, RU_CHANGES } from '../../../engines/ru-plural';
+import { ruCount, RU_CHANGES, RU_CORRECTIONS } from '../../../engines/ru-plural';
 import { CARD, ROW, LABEL, HINT_SM, BTN, BTN_SMALL, BTN_PRIMARY, BTN_DANGER, NumberInput, Badge, Accordion } from './CardioUI';
 import { getProfile, updateSection } from '../../../core/profile-manager';
 import { connectBleHr, type BleHrState } from '../../../engines/lms/cardio-ble.engine';
@@ -99,7 +99,7 @@ export const CardioAutoTunePanel: React.FC<{
     saveCardioCycle(r.cycle);
     setActiveCardioCycle(r.cycle);
     onChanged?.();
-    flashMsg(`🌸 Применено ${r.changes.length} коррекций: ${r.changes.map(c => `нед ${c.week} ${c.label}`).join(', ')}`);
+    flashMsg(`🌸 Применено ${ruCount(r.changes.length, RU_CORRECTIONS)}: ${r.changes.map(c => `нед ${c.week} ${c.label}`).join(', ')}`);
   };
 
   const handleBleConnect = async () => {

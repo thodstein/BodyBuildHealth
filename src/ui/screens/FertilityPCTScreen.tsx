@@ -9,7 +9,7 @@ import { STRUCTURED_PCT_PROTOCOLS } from '../../engines/pct-timing.engine';
 import { AAS_MEDICAL_DISCLAIMER, matchProtocolsForStack } from '../../data/aas-support-protocols';
 import { PHARMA_DB } from '../../core/pharma-database';
 import { UnifiedLabPanel } from '../components/UnifiedLabPanel';
-import { ruCount, RU_WEEKS } from '../../engines/ru-plural';
+import { ruCount, RU_SUPPLEMENTS, RU_TESTS, RU_WEEKS } from '../../engines/ru-plural';
 
 type FertTab = 'overview' | 'pct-plan' | 'hrt';
 const addToPlan = async (substanceId: string, doseValue: number, doseUnit: string, freq: string, startWeek: number, endWeek: number) => {
@@ -409,7 +409,7 @@ export const FertilityPCTScreen: React.FC<{ initialTab?: FertTab; restrictToMode
                 <div style={{ fontSize: 13, fontWeight: 700, color: '#f59e0b' }}>Заказать анализы</div>
                 <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>
                   {Object.values(labChecklist).filter(Boolean).length > 0
-                    ? `Выбрано: ${Object.values(labChecklist).filter(Boolean).length} тестов`
+                    ? `Выбрано: ${ruCount(Object.values(labChecklist).filter(Boolean).length, RU_TESTS)}`
                     : 'Список рекомендуемых анализов'}
                 </div>
               </div>
@@ -601,7 +601,7 @@ export const FertilityPCTScreen: React.FC<{ initialTab?: FertTab; restrictToMode
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                   {[
                     { icon: '📅', label: 'Длительность', desc: `${ruCount(pctPlan.pctProtocol.reduce((max: number, p: any) => Math.max(max, p.endWeek || 0), 0) - pctPlan.pctStartWeek + 1, RU_WEEKS)}` },
-                    { icon: '💊', label: 'Препараты', desc: `${pctPlan.pctProtocol.length} препаратов в протоколе` },
+                    { icon: '💊', label: 'Препараты', desc: `${ruCount(pctPlan.pctProtocol.length, RU_SUPPLEMENTS)} в протоколе` },
                     { icon: '📊', label: 'Мониторинг', desc: 'Контроль гормонов каждые 2-4 нед' },
                     { icon: '🧬', label: 'Цель', desc: 'LH/ФСГ > 5, тестостерон > 15 нмоль/л' },
                   ].map((item, i) => (

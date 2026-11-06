@@ -9,6 +9,7 @@
  * → ряд табов с «Применить» → контент таба → «Итог и применение» → нижняя панель действий.
  */
 import { localIsoDate } from '../../../core/local-date';
+import { ruCount, RU_CORRECTIONS } from '../../../engines/ru-plural';
 import React, { useMemo, useState, useEffect } from 'react';
 import { diagnoseArmWeakDetailed, expandLegacyWeakPoints, LEGACY_TO_DETAILED } from '../../../engines/arm/arm-weakpoint.engine';
 import { getArmLandmarks, tendonWeeklyLimit } from '../../../engines/arm/arm-volume-landmarks.engine';
@@ -1362,7 +1363,7 @@ export const ArmDiagnosticsHub: React.FC = () => {
       source: 'intellectual',
     });
     const label = hasPoints ? weakPoints!.join(', ') : toApply.map((g:any)=> ARM_MUSCLE_RU[g as any]||g).join(', ');
-    setToast(`✓ Применено в Арм-конструктор: ${label} ${hasPoints? `(${(diag as any).biomechCards?.length||0} коррекций)` : ''}`);
+    setToast(`✓ Применено в Арм-конструктор: ${label} ${hasPoints? `(${ruCount((diag as any).biomechCards?.length||0, RU_CORRECTIONS)})` : ''}`);
     setTimeout(() => setToast(''), 3000);
     try {
       window.dispatchEvent(new CustomEvent('planning-track-open', { detail: 'arm' } as any));

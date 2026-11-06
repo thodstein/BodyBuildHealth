@@ -6,6 +6,7 @@
  * Движок: gym-competition.engine (calculatePlates / getPlateLoadingOrder / warmupPlateSequence).
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { ruCount, RU_PLATES } from '../../../engines/ru-plural';
 import { calculatePlates, getPlateLoadingOrder, warmupPlateSequence, reversePlateWeight, nearestLoadable, percentTargets, loadPlateHistory, pushPlateHistory, loadPlateLocations, savePlateLocation, removePlateLocation, getActivePlateLocationId, setActivePlateLocationId, type WeightUnit, type PlateInventory, type PlateLocation } from '../../../engines/gym-competition.engine';
 import { PopupNumber, PopupSelect, ExpandableCard, MetricCard } from '../SRCBBScreen_parts/TrainingPopups';
 
@@ -517,7 +518,7 @@ export const PlateCalcTab: React.FC<PlateCalcTabProps> = ({ initialWeight, onApp
             if (plates.platesPerSide.length > 0) {
               lines.push('Блины на сторону:');
               plates.platesPerSide.forEach(p => lines.push(`  ${p.plate} ${unitLabel} × ${p.count}`));
-              lines.push(`Всего: ${plates.totalPlates} × 2 = ${plates.totalPlates * 2} блинов`);
+              lines.push(`Всего: ${plates.totalPlates} × 2 = ${ruCount(plates.totalPlates * 2, RU_PLATES)}`);
             }
             lines.push('');
             lines.push('Разминка:');

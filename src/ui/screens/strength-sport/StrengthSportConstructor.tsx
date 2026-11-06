@@ -3,6 +3,7 @@
  * Стекло + градиенты, современный мобильный стиль. Полностью изолирован.
  */
 import React from 'react';
+import { ruCount, RU_BLOCKS, RU_EVENTS } from '../../../engines/ru-plural';
 import { useStrengthSportWizard, type StrengthSportStep } from './useStrengthSportWizard';
 import { StrengthSportPlanView } from './StrengthSportPlanView';
 import { buildStrengthSportPlan } from '../../../engines/strength-sport/strength-sport-builder.engine';
@@ -752,7 +753,7 @@ export const StrengthSportConstructor: React.FC = () => {
       const season = recommendSeasonPlan(seasonInputNow);
       setSeasonPlan(season);
       try { saveSeasonPlan(season); } catch { /* квота/ssr — тихо */ }
-      setMsg(`🧭 Сезон рассчитан: ${season.blocks.length} блоков · ${season.totalWeeks} нед`);
+      setMsg(`🧭 Сезон рассчитан: ${ruCount(season.blocks.length, RU_BLOCKS)} · ${season.totalWeeks} нед`);
       setTimeout(()=>setMsg(''),2400);
     } catch (e) {
       const m = e instanceof Error ? e.message : String(e);
@@ -772,7 +773,7 @@ export const StrengthSportConstructor: React.FC = () => {
       const sync = syncStrengthAnnualToGeneral(ann);
       setSeasonPlan(season);
       try { saveSeasonPlan(season); } catch { /* квота/ssr — тихо */ }
-      setMsg(`✦ Сезон собран: ${ann.blocks.length} блоков · ${ann.totalWeeks} нед${v.warnings.length ? ` · ⚠ ${v.warnings.length}` : ''}${sync.ok ? (sync.note ? ` · ${sync.note}` : '') : ` · ⚠ ${sync.note || 'не синхронизирован с общим планом'}`}`);
+      setMsg(`✦ Сезон собран: ${ruCount(ann.blocks.length, RU_BLOCKS)} · ${ann.totalWeeks} нед${v.warnings.length ? ` · ⚠ ${v.warnings.length}` : ''}${sync.ok ? (sync.note ? ` · ${sync.note}` : '') : ` · ⚠ ${sync.note || 'не синхронизирован с общим планом'}`}`);
       setTimeout(() => setMsg(''), (!sync.ok || v.warnings.length) ? 4200 : 3200);
     } catch (e) {
       const m = e instanceof Error ? e.message : String(e);
@@ -1179,7 +1180,7 @@ export const StrengthSportConstructor: React.FC = () => {
             })()}
           </SectionCard>
           {mode==='strongman' && (
-            <SectionCard icon="🏆" title="Контест — пакет ивентов" subtitle="Йок/лог/камни → план строит под них" collapsible defaultOpen={false} summary={contest ? `${contest.name || 'Кастом'} · ${contest.events.length} ивентов` : 'без пакета — generic 5-фаз'} status={contest ? 'ok' : undefined}>
+            <SectionCard icon="🏆" title="Контест — пакет ивентов" subtitle="Йок/лог/камни → план строит под них" collapsible defaultOpen={false} summary={contest ? `${contest.name || 'Кастом'} · ${ruCount(contest.events.length, RU_EVENTS)}` : 'без пакета — generic 5-фаз'} status={contest ? 'ok' : undefined}>
               <Field label="Пресет контеста">
               <div data-ss="presets" style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
                 {Object.entries(CONTEST_PRESETS).map(([pid, pc])=> (
@@ -1364,7 +1365,7 @@ export const StrengthSportConstructor: React.FC = () => {
               </div>
               {annual && <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}><span style={{ fontSize:12, fontWeight:700, color:'#fff' }}>Год: {annual.totalWeeks}нед · {annual.blocks.length} блоков</span></div>}
               {renderNavRow('quality', 'plan', 'К плану →')}
-              <SectionCard id="ss-season-pro" icon="🧭" title="Профессиональный сезон ТА/стронг" subtitle="Фазы → циклы: GPP → база → наращивание → пик → тейпер → переход" accent={!!seasonPlan} collapsible defaultOpen={false} status={seasonPlan ? (validateSeasonPeriodization(seasonPlan).warnings.length ? 'warn' : 'ok') : undefined} summary={seasonPlan ? `${seasonPlan.blocks.length} блоков · ${seasonPlan.totalWeeks} нед · ${seasonPlan.presetLabel}` : 'подбор блоков под цель, уровень и дату старта'}>
+              <SectionCard id="ss-season-pro" icon="🧭" title="Профессиональный сезон ТА/стронг" subtitle="Фазы → циклы: GPP → база → наращивание → пик → тейпер → переход" accent={!!seasonPlan} collapsible defaultOpen={false} status={seasonPlan ? (validateSeasonPeriodization(seasonPlan).warnings.length ? 'warn' : 'ok') : undefined} summary={seasonPlan ? `${ruCount(seasonPlan.blocks.length, RU_BLOCKS)} · ${seasonPlan.totalWeeks} нед · ${seasonPlan.presetLabel}` : 'подбор блоков под цель, уровень и дату старта'}>
                 <div data-ss="season-pro">
                   <StrengthPopupSelect label="Пресет сезона" value={seasonPresetId} onChange={v => { setSeasonPresetId(v); setSeasonPlan(null); try { clearSeasonPlan(); } catch { /* noop */ } }} strong={mode==='strongman'} options={[
                     { id: '', label: 'Авто (по цели и старту)', desc: 'планировщик выберет сам' },

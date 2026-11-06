@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { SUPPORT_CATALOG_DATA, ALL_INTERACTIONS } from '../../../data/support-database';
-import { ruCount, RU_MARKERS } from '../../../engines/ru-plural';
+import { ruAdjCount, ruCount, RU_ADJ_CRITICAL_M, RU_CONFLICTS, RU_DEPLETIONS, RU_MARKERS } from '../../../engines/ru-plural';
 import { buildConflicts, buildCautions, buildSpecialInstructions } from '../../../engines/support-plan/display';
 import { calcStackSynergyScore, suggestSynergyAdditions } from '../../../engines/support-plan/display';
 import { SynergyEngine } from '../../../engines/synergy-score.engine';
@@ -1130,8 +1130,8 @@ export const UnifiedSynergyCalculator: React.FC<{ s?: Record<string,any> }> = ({
             const criticalCount = enrichedMatrix.filter((m:any)=>m.type==='conflict'&&m.severity==='HIGH').length;
             const isScore = enrichedScore.score>=60;
             const lines: string[] = [enrichedScore.score>=80?'Совместимость высокая':enrichedScore.score>=60?'Совместимость умеренная':enrichedScore.score>=45?'Совместимость низкая — пересмотр':'Рискованная комбинация — замена компонентов'];
-            if (criticalCount>0) lines.push(`⛔ ${criticalCount} критических конфликтов — разделить приём ≥4 ч или заменить`);
-            if (depletionData.length>0) lines.push(`${depletionData.length} истощений — см. карточку выше`);
+            if (criticalCount>0) lines.push(`⛔ ${ruAdjCount(criticalCount, RU_ADJ_CRITICAL_M, RU_CONFLICTS)} — разделить приём ≥4 ч или заменить`);
+            if (depletionData.length>0) lines.push(`${ruCount(depletionData.length, RU_DEPLETIONS)} — см. карточку выше`);
             if (cypMap.length>0) lines.push(`${cypMap.length} веществ влияют на CYP450 — см. карточку выше`);
             if (labMonitor.length>0) lines.push(`${ruCount(labMonitor.length, RU_MARKERS)} к мониторингу — см. карточку ниже`);
             if (lines.length<2) lines.push('Дополнительных мер не требуется');

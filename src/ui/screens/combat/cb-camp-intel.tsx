@@ -9,6 +9,7 @@
  * посчитает иначе, поменяется и карточка.
  */
 import React, { useMemo } from 'react';
+import { ruCount, RU_HALL_SETS } from '../../../engines/ru-plural';
 import { SectionCard, InfoBanner, Highlight, Badge } from './CombatUI';
 import type { CombatPlan } from '../../../engines/combat/combat.types';
 import { weightCutSafetyBanner } from '../../../engines/combat/combat-weight-cut.engine';
@@ -93,7 +94,7 @@ export const CbCampIntelCard: React.FC<{
         // была недостижима: максимум = 2 модальности × 36 мин = 6 сетов. Теперь
         // единицы честные, warn — от 5 сетов (≈10% недельного бюджета зала).
         tone: worst >= 5 ? 'warn' : 'ok',
-        body: `съедает ${worst} зал-сетов бюджета (худшая неделя${worst >= 5 ? ' — много' : ''}) · сессий ${cond.sessions.length}/нед${needsAerobic ? ' · нужна аэробная поддержка (≥5 внешних сессий)' : ''}`,
+        body: `съедает ${ruCount(worst, RU_HALL_SETS)} бюджета (худшая неделя${worst >= 5 ? ' — много' : ''}) · сессий ${cond.sessions.length}/нед${needsAerobic ? ' · нужна аэробная поддержка (≥5 внешних сессий)' : ''}`,
         badge: needsAerobic ? 'аэроба' : undefined,
       });
     }

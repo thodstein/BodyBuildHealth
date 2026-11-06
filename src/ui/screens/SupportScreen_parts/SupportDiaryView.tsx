@@ -1459,7 +1459,7 @@ export const SupportDiaryView: React.FC<{ s: Record<string, any>; onOpenSolver?:
                         const result = Array.from(merged.values()).sort((a, b) => a.date.localeCompare(b.date));
                         saveDiary(result);
                         setEntries(result);
-                        setImportMsg({ text: `Импорт завершён: +${added} новых, ${updated} обновлено`, ok: true });
+                        setImportMsg({ text: `Импорт завершён: добавлено ${added}, обновлено ${updated}`, ok: true });
                       } catch { setImportMsg({ text: 'Ошибка чтения файла. Убедитесь, что это валидный JSON-экспорт дневника.', ok: false }); }
                     };
                     reader.readAsText(file);

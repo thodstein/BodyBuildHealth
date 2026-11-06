@@ -1,5 +1,6 @@
 // @ts-nocheck
 import React, { useState, useMemo } from 'react';
+import { ruAdjCount, ruCount, RU_ADJ_CRITICAL_F, RU_PAIRS, RU_SUPPLEMENTS } from '../../../engines/ru-plural';
 import { PHARMA_DB } from '../../../core/pharma-database';
 import { SUPPORT_CATALOG_DATA } from '../../../data/support-database';
 import { INTERACTION_ENRICHMENT } from '../../../data/support-interaction-enrichment';
@@ -47,9 +48,9 @@ function buildTimingTips(ids: string[]): string[] {
 }
 
 function buildConclusion(ids: string[], score: number, organLoad: Record<string,{score:number;items:string[]}>, criticalCount: number): string[] {
-  const lines: string[] = [`Комбинация: ${ids.length} препаратов`];
+  const lines: string[] = [`Комбинация: ${ruCount(ids.length, RU_SUPPLEMENTS)}`];
   lines.push(score >= 80 ? '✅ Совместимость высокая' : score >= 60 ? '🟡 Совместимость умеренная — контроль' : '🔴 Совместимость низкая — пересмотр');
-  if (criticalCount > 0) lines.push(`🔴 ${criticalCount} критических пар — разделить приём ≥4 ч или заменить`);
+  if (criticalCount > 0) lines.push(`🔴 ${ruAdjCount(criticalCount, RU_ADJ_CRITICAL_F, RU_PAIRS)} — разделить приём ≥4 ч или заменить`);
   if (organLoad.hepatic?.score >= 3) lines.push('🫁 Нагрузка на печень — добавьте гепатопротектор (NAC/TUDCA)');
   if (organLoad.renal?.score >= 3) lines.push('🫘 Нагрузка на почки — контроль креатинина каждые 4 нед');
   if (organLoad.cardio?.score >= 3) lines.push('❤️ Нагрузка на ССС — контроль давления и ЧСС');

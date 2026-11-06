@@ -12,6 +12,7 @@ import { finalizeCombatPlan } from '../combat-finalize.engine';
 import { CUT_WARN_PCT, CUT_BLOCK_PCT } from '../combat-science';
 import { NECK_FLEX_EXT_CUTOFF, concussionProtocol } from '../combat-safety.engine';
 import { sparringToOutsideLoad, sparringWeeklyLoad } from '../combat-sparring.engine';
+import { RU_HALL_SETS } from '../../ru-plural';
 import { weekGroupSets } from '../combat-groups';
 import { travelPoolFilter } from '../combat-female-travel.engine';
 import { buildWeightCutProtocol, weightCutNutritionForWeek } from '../combat-weight-cut.engine';
@@ -115,7 +116,8 @@ describe('P2-5: юниты бюджета кондиции больше не п�
   it('conditioningBudgetCost — сетs; label UI их так и называет', () => {
     const fs = require('fs'), path = require('path');
     const src = fs.readFileSync(path.join(process.cwd(), 'src/ui/screens/combat/cb-camp-intel.tsx'), 'utf8');
-    expect(src).toContain('зал-сетов');
+    expect(src).toContain('ruCount(worst, RU_HALL_SETS)');
+    expect(RU_HALL_SETS).toEqual(['зал-сет', 'зал-сета', 'зал-сетов']);
     expect(src).not.toContain('% бюджета');    // warn-порог достижим: максимум реальной стоимости ~6 сетов
     expect(src).toContain('worst >= 5');
   });

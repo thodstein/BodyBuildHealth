@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
+import { ruCount, RU_MECHANISMS, RU_ORGANS } from '../../engines/ru-plural';
 import { SYNERGY_PAIRS, ORGAN_SYNERGIES, SUPPLEMENT_DESCRIPTIONS, SUPPLEMENT_TARGETS, SUPPORT_RESEARCH, calculateSupport, checkSupportInteractions, findSupportForGoal, findSupportByGoal, getSupportDatabaseStats, type SupportInput, type SupplementTarget } from '../../engines/support.engine';
 import type { SupportRecommendation } from '../../engines/tz-mapper-engine';
 import { decodeGarbled, cleanDesc } from '../../utils/text-sanitizer';
@@ -1844,7 +1845,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab; initialSubTab?: 
         const score = Math.min(100, 60 + Math.round(Math.random() * 30));
         const pros: string[] = [];
         const cons: string[] = [];
-        if (sub.mechanisms && sub.mechanisms.length > 0) pros.push(`${sub.mechanisms.length} механизмов`);
+        if (sub.mechanisms && sub.mechanisms.length > 0) pros.push(`${ruCount(sub.mechanisms.length, RU_MECHANISMS)}`);
         if (!sub.mechanisms || sub.mechanisms.length === 0) cons.push('нет механизмов');
         results.push({ id: sub.id, score, reason: `действует на ${target}`, pros, cons, organs: sub.organs || [] });
       }
@@ -1861,7 +1862,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab; initialSubTab?: 
         const score = Math.min(100, 60 + Math.round(Math.random() * 30));
         const pros: string[] = [];
         const cons: string[] = [];
-        if (sub.organs && sub.organs.length > 0) pros.push(`действует на ${sub.organs.length} органов`);
+        if (sub.organs && sub.organs.length > 0) pros.push(`действует на ${ruCount(sub.organs.length, RU_ORGANS)}`);
         if (!sub.organs || sub.organs.length === 0) cons.push('нет данных по органам');
         results.push({ id: sub.id, score, reason: `механизм: ${target}`, pros, cons, organs: sub.organs || [] });
       }
@@ -1945,8 +1946,8 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab; initialSubTab?: 
       if (score > 0 || (!organ && !mech && !eq && category)) {
         const pros: string[] = [];
         const cons: string[] = [];
-        if (sub.mechanisms && sub.mechanisms.length > 0) pros.push(`${sub.mechanisms.length} механизмов`);
-        if (sub.organs && sub.organs.length > 0) pros.push(`действует на ${sub.organs.length} органов`);
+        if (sub.mechanisms && sub.mechanisms.length > 0) pros.push(`${ruCount(sub.mechanisms.length, RU_MECHANISMS)}`);
+        if (sub.organs && sub.organs.length > 0) pros.push(`действует на ${ruCount(sub.organs.length, RU_ORGANS)}`);
         if (!sub.organs || sub.organs.length === 0) cons.push('нет данных по органам');
         if (!score) score = 50;
         results.push({ id: sub.id, name: sub.name || sub.id, type: 'substance', score: Math.min(100, score), reason: reasons.join('; ') || 'соответствует критериям', pros, cons, description: sub.description, mechanisms: sub.mechanisms, organs: sub.organs });

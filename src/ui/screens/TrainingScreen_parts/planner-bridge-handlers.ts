@@ -32,7 +32,7 @@ import {
 import { loadCardioLog } from '../../../engines/lms/cardio-diary.engine';
 import { publishCardioKcalContract } from '../../../engines/lms/cardio-nutrition-contract.engine';
 import { parseTempoCanon } from '../../../engines/tempo-canon.engine';
-import { ruAdjCount, RU_ADJ_WORKING, RU_SETS } from '../../../engines/ru-plural';
+import { ruAdjCount, ruCount, RU_ADJ_WORKING, RU_BLOCKS, RU_SETS } from '../../../engines/ru-plural';
 
 export interface BridgeCtx {
   program: UserProgram;
@@ -717,7 +717,7 @@ const designHandler: Handler = (payload, { program: p, dir, update, onChange, sh
       // MC-10 FIX: detailed toast with stats
       const phaseCounts = design.blocks.reduce((acc, b) => { acc[b.phaseKey] = (acc[b.phaseKey] || 0) + 1; return acc; }, {} as Record<string, number>);
       const phaseSummary = Object.entries(phaseCounts).map(([phase, count]) => `${DESIGNER_PHASE_VISUAL[phase as keyof typeof DESIGNER_PHASE_VISUAL]?.label || phase}: ${count}`).join(', ');
-      showToast(`🔗 Фазы дизайнера применены: ${design.totalWeeks} нед, ${design.blocks.length} блоков (${phaseSummary}) · 🎨 привязан`);
+      showToast(`🔗 Фазы дизайнера применены: ${design.totalWeeks} нед, ${ruCount(design.blocks.length, RU_BLOCKS)} (${phaseSummary}) · 🎨 привязан`);
     } else {
       const weeks = designerToUserWeeks(design, {
         fillExercises,
@@ -742,7 +742,7 @@ const designHandler: Handler = (payload, { program: p, dir, update, onChange, sh
       // MC-10 FIX: detailed toast with stats
       const phaseCounts = design.blocks.reduce((acc, b) => { acc[b.phaseKey] = (acc[b.phaseKey] || 0) + 1; return acc; }, {} as Record<string, number>);
       const phaseSummary = Object.entries(phaseCounts).map(([phase, count]) => `${DESIGNER_PHASE_VISUAL[phase as keyof typeof DESIGNER_PHASE_VISUAL]?.label || phase}: ${count}`).join(', ');
-      showToast(`🔗 Дизайн применён как новая программа: ${design.totalWeeks} нед, ${design.blocks.length} блоков (${phaseSummary})${fillExercises ? ' + упражнения' : ''}`);
+      showToast(`🔗 Дизайн применён как новая программа: ${design.totalWeeks} нед, ${ruCount(design.blocks.length, RU_BLOCKS)} (${phaseSummary})${fillExercises ? ' + упражнения' : ''}`);
     }
   } catch (e) { showToast('⚠ Не удалось применить дизайн: ' + (e as Error)?.message); }
 };

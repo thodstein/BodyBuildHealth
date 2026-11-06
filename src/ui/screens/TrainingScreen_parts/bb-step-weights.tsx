@@ -72,7 +72,7 @@ export const BbWeightsStep: React.FC<BbWeightsStepProps> = ({
       </div>
       <div style={{ display: 'flex', gap: 8, marginBottom: 10, flexWrap: 'wrap', alignItems: 'center' }}>
         <button style={{ ...BTN, flex: 1 }} onClick={apply} disabled={filled === 0}>
-          {weightsApplied > 0 ? `✓ Применено к ${weightsApplied} вхождений` : '⚖️ Применить реальные веса'}
+          {weightsApplied > 0 ? `✓ Применено к ${ruCount(weightsApplied, RU_OCCURRENCES)}` : '⚖️ Применить реальные веса'}
         </button>
         <button style={BTN_GHOST} onClick={() => { setWeightEntries(collectPlanExercises(builtPlan)); setWeightsApplied(0); }}>⟲ Сбросить</button>
         <button style={BTN_GHOST} onClick={() => { const allOpen = Object.values(weightsCollapsed).every(Boolean); const next: Record<string, boolean> = {}; for (const g of groups) next[g.muscle] = !allOpen; setWeightsCollapsed(next); }}>{(Object.values(weightsCollapsed).filter(Boolean).length === 0 ? 'Свернуть все' : 'Развернуть все')}</button>

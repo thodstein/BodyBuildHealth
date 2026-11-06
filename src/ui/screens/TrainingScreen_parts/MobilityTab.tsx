@@ -10,6 +10,7 @@
  * Отображение-онли: вкладка НЕ влияет на планирование/авторегуляцию.
  */
 import React, { useCallback, useMemo, useState } from 'react';
+import { ruCount, RU_BLOCKS } from '../../../engines/ru-plural';
 import type { DiaryHubCtx } from './diary-hub-context';
 import { ACCENT, DIM, diaryCard, diaryInput } from './diary-tokens';
 import { localIsoDate } from './diary-shared';
@@ -292,7 +293,7 @@ export const MobilityTab: React.FC<{ hub: DiaryHubCtx }> = () => {
       th,td{border:1px solid #ddd;padding:4px 6px;text-align:left}th{background:#f5f5f5}h1{font-size:18px}h2{font-size:14px;margin-top:20px}
       .stats{display:flex;gap:20px;font-size:13px;margin:8px 0;flex-wrap:wrap}</style></head><body>
       <h1>🧘 Мобильность и гибкость — отчёт</h1>
-      <div style="color:#555;font-size:12px">Сформировано: ${new Date().toLocaleString('ru-RU')}${active ? ` · протокол: ${esc(active.name)} (${active.items.length} блоков)` : ' · протокол не собран'}</div>
+      <div style="color:#555;font-size:12px">Сформировано: ${new Date().toLocaleString('ru-RU')}${active ? ` · протокол: ${esc(active.name)} (${ruCount(active.items.length, RU_BLOCKS)})` : ' · протокол не собран'}</div>
       <div class="stats">
         <span>Чек-инов всего: <b>${checks.length}</b></span>
         <span>За 30 дней: <b>${tr.count}</b></span>

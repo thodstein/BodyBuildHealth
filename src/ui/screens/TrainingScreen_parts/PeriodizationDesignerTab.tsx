@@ -51,7 +51,7 @@ import { loadSRPESessions } from '../../../engines/pro/srpe-store';
 import { acuteChronicRatio, toDailyLoads, weeklyMonotony } from '../../../engines/pro/training-load.engine';
 import { generateMesocycleProgression, generateInterMesocycleProgression, phaseDistribution } from '../../../engines/pro/mesocycle-progression.engine';
 import { useDataLink } from '../../../core/data-link';
-import { ruCount, RU_WEEKS } from '../../../engines/ru-plural';
+import { ruCount, RU_BLOCKS, RU_WEEKS } from '../../../engines/ru-plural';
 
 const ACCENT = '#00e68a';
 const ACCENT_PL = '#3b82f6';
@@ -1424,7 +1424,7 @@ export const PeriodizationDesignerTab: React.FC<{ initialUnifiedMode?: 'micro' |
               onClick={async () => {
                 const ok = await confirm({
                   title: 'Применить весь дизайн?',
-                  message: `Будет создана новая программа (${current.totalWeeks} нед, ${current.blocks.length} блоков) — ${disciplineLabel}. Текущая программа будет заменена.`,
+                  message: `Будет создана новая программа (${current.totalWeeks} нед, ${ruCount(current.blocks.length, RU_BLOCKS)}) — ${disciplineLabel}. Текущая программа будет заменена.`,
                   confirmLabel: 'Применить',
                   cancelLabel: 'Отмена',
                   danger: false,
@@ -1442,7 +1442,7 @@ export const PeriodizationDesignerTab: React.FC<{ initialUnifiedMode?: 'micro' |
               onClick={async () => {
                 const ok = await confirm({
                   title: 'Применить дизайн с упражнениями?',
-                  message: `Будет создана новая программа с упражнениями (${current.totalWeeks} нед, ${current.blocks.length} блоков) — ${disciplineLabel}. Это может занять несколько секунд.`,
+                  message: `Будет создана новая программа с упражнениями (${current.totalWeeks} нед, ${ruCount(current.blocks.length, RU_BLOCKS)}) — ${disciplineLabel}. Это может занять несколько секунд.`,
                   confirmLabel: 'Применить',
                   cancelLabel: 'Отмена',
                   danger: false,

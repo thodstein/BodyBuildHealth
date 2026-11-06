@@ -69,7 +69,7 @@ import { CARD, DIM, ACCENT } from './training-ui';
 import { loadSRPESessions } from '../../../engines/pro/srpe-store';
 import { toDailyLoads, acuteChronicRatio } from '../../../engines/pro/training-load.engine';
 import { printHtmlApk, shareOutcomeLabel, saveTextFileApk, saveCsvApk } from '../../../core/apk-share';
-import { ruCount, RU_SETS } from '../../../engines/ru-plural';
+import { ruCount, RU_KEYS, RU_SETS } from '../../../engines/ru-plural';
 
 const STORAGE_KEY = 'he_strongman_diagnostics_hub_v1';
 
@@ -1328,7 +1328,7 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
         } catch { /* состояние не трогаем — восстановленные ключи истории уже подхвачены */ }
         setSmDataNonce((n) => n + 1);
         setPlanNonce((n) => n + 1);
-        done(`✓ Восстановлено ${res.restored.length} ключей${res.failed.length ? ` · не записано ${res.failed.length} (квота)` : ''} — данные хаба обновлены`);
+        done(`✓ Восстановлено ${ruCount(res.restored.length, RU_KEYS)}${res.failed.length ? ` · не записано ${res.failed.length} (квота)` : ''} — данные хаба обновлены`);
       } catch {
         done('⚠ Файл повреждён — не JSON');
       }

@@ -51,7 +51,7 @@ import type { AnnualTrainingPlan, AnnualBlockConfig, AnnualBlockKind } from '../
 import { loadAnnualTrainingPlan, saveAnnualTrainingPlan } from '../../../engines/annual-training/annual-training-storage';
 import { ARM_CYCLE_LIBRARY } from '../../../engines/arm/arm-cycle-library.engine';
 import { annualBlockCycleSuggestion } from '../../../engines/arm/arm-annual';
-import { ruCount, RU_CYCLES, RU_SESSIONS, RU_WEEKS } from '../../../engines/ru-plural';
+import { ruAdjCount, ruCount, RU_ADJ_BUILT, RU_BLOCKS, RU_CYCLES, RU_SESSIONS, RU_WEEKS } from '../../../engines/ru-plural';
 
 /** Единый канон недели для даты (P2-1): движок block-builders.engine, не дублируем. */
 export const macroWeekForDate = weekForDate;
@@ -1060,7 +1060,7 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
     const plan = annualPlan;
     if (!plan) { setAnnualStatusNote('⚠ Сначала постройте макроцикл'); return; }
     setScenarioList(saveAnnualScenario(plan, `Снапшот ${plan.status} · ${plan.totalWeeks} нед`));
-    setScenarioNote(`📸 Снапшот сохранён (${plan.blocks.filter(b => b.status === 'built').length} блоков собрано)`);
+    setScenarioNote(`📸 Снапшот сохранён (${ruCount(plan.blocks.filter(b => b.status === 'built').length, RU_BLOCKS)} собрано)`);
   };
   const compareScenario = (id: string) => {
     const current = annualPlan;
@@ -1079,7 +1079,7 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
     const plan = src ? syncAnnualPlan(restored, src) : restored;
     saveAnnualTrainingPlan(plan);
     setAnnualPlan(plan);
-    setScenarioNote(`📥 Снапшот восстановлен — ${plan.blocks.filter(b => b.status === 'built').length} собранных блоков, статус ${plan.status}`);
+    setScenarioNote(`📥 Снапшот восстановлен — ${ruAdjCount(plan.blocks.filter(b => b.status === 'built').length, RU_ADJ_BUILT, RU_BLOCKS)}, статус ${plan.status}`);
   };
   const dropScenario = (id: string) => setScenarioList(removeAnnualScenario(id));
 

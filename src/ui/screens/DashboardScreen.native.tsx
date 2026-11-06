@@ -256,7 +256,7 @@ export const DashboardNative: React.FC<Props> = ({ onNavigate }) => {
             type="button"
             className="native-home-alert native-home-alert--danger native-fade-up"
             onClick={() => onNavigate?.('risks')}
-            aria-label={en ? `Drug interactions: ${alerts.drugHigh} critical` : `Взаимодействия: ${alerts.drugHigh} критических`}
+            aria-label={en ? `Drug interactions: ${alerts.drugHigh} critical` : `Критических взаимодействий: ${alerts.drugHigh}`}
           >
             <NativeIcon name="alertTriangle" size={18} />
             <span>
@@ -271,7 +271,7 @@ export const DashboardNative: React.FC<Props> = ({ onNavigate }) => {
             type="button"
             className="native-home-alert native-fade-up"
             onClick={() => onNavigate?.('profile')}
-            aria-label={en ? `Symptoms: ${alerts.symptoms} active` : `Симптомы: ${alerts.symptoms} активных`}
+            aria-label={en ? `Symptoms: ${alerts.symptoms} active` : `Активных симптомов: ${alerts.symptoms}`}
           >
             <NativeIcon name="activity" size={18} />
             <span>

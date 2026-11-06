@@ -139,7 +139,7 @@ export const InjurySelectCard: React.FC<Props> = ({ injuries, onChange }) => {
           {activeCount > 0
             ? `${activeCount} активн. · всего ${totalCount}`
             : totalCount > 0
-              ? `${totalCount} неактивных`
+              ? `${totalCount} неактивн.`
               : 'Нет травм'}
         </div>
       </button>

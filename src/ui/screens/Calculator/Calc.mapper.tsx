@@ -1,6 +1,7 @@
 ﻿import React, { useMemo, useState, useCallback, useEffect } from 'react';
 import ReactDOM from 'react-dom';
 import { buildTzInput } from '../../../engines/support-plan/engine-helpers';
+import { ruCount, RU_ELEMENTS, RU_SUPPLEMENTS } from '../../../engines/ru-plural';
 import { calculateTzSpecRisk, type TzSpecResult } from '../../../engines/risk-engine-tz-spec';
 import { getAdministrationRules } from '../../../data/administration-rules-db';
 import { PREANALYTIC_EFFECTS_DB, ASSAY_INTERFERENCE_DB } from '../../../data/assay-interference-db';
@@ -821,7 +822,7 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
         a: i.a, b: i.b, reason: `${i.reason} — ${i.action}`, level: i.severity === 'block' ? 'block' as const : 'warn' as const,
       })),
       contraindications: checkContraindications(interactionIds, mappedConditions),
-      summary: `${rec0.summary} После ручной корректировки: ${rec0.subs.length} элементов.`,
+      summary: `${rec0.summary} После ручной корректировки: ${ruCount(rec0.subs.length, RU_ELEMENTS)}.`,
       protocolWarnings: optNotes.length > 0 ? [...(rec0.protocolWarnings || []), ...optNotes] : rec0.protocolWarnings,
     };
   }, [rec, removedSubs, addedSubs, state]);
@@ -3914,7 +3915,7 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
           display:'flex', alignItems:'center', justifyContent:'center', gap:6,
         }}>
           <span style={{fontSize:14}}>{applyFlash ? '✓' : '✅'}</span>
-          <span>{applyFlash ? 'Готово' : `Применить план поддержки (${finalRec.subs.length} препаратов)`}</span>
+          <span>{applyFlash ? 'Готово' : `Применить план поддержки (${ruCount(finalRec.subs.length, RU_SUPPLEMENTS)})`}</span>
         </button>
       )}
 
