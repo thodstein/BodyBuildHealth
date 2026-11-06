@@ -411,8 +411,10 @@ const [power, setPower] = useState(() => restored?.inputs.power ?? '');
         partial: false, equipment: active.equipment,
         intervalsPlanned: active.plan?.workSteps,
         intervalsDone: active.plan ? (intervalsDone ?? active.plan.workSteps) : undefined,
-        workSec: active.plan?.workSec,
-        restSec: active.plan?.restSec,
+        // Мульти-блочная структура имеет разные работа/отдых — одно число
+        // соврало бы, поэтому в дневник оно не пишется.
+        workSec: active.plan && active.plan.blockCount === 1 ? active.plan.workSec : undefined,
+        restSec: active.plan && active.plan.blockCount === 1 ? active.plan.restSec : undefined,
         structureMin: active.plan ? structureMin : undefined,
         sessionMin: active.plan ? active.durationMin : undefined,
       });
@@ -512,8 +514,8 @@ const [power, setPower] = useState(() => restored?.inputs.power ?? '');
       equipment: active.equipment,
       intervalsPlanned: active.plan?.workSteps,
       intervalsDone: active.plan ? cardioIntervalDoneWork(active.plan, elapsedSec) : undefined,
-      workSec: active.plan?.workSec,
-      restSec: active.plan?.restSec,
+      workSec: active.plan && active.plan.blockCount === 1 ? active.plan.workSec : undefined,
+      restSec: active.plan && active.plan.blockCount === 1 ? active.plan.restSec : undefined,
       structureMin: active.plan ? plannedMin : undefined,
       sessionMin: active.plan ? active.durationMin : undefined,
     });
@@ -662,7 +664,7 @@ const [power, setPower] = useState(() => restored?.inputs.power ?? '');
             {active.targetHr?.max && <span style={{ fontSize: 11, fontWeight: 800, color: '#60a5fa', background: 'rgba(96,165,250,0.14)', border: '1px solid rgba(96,165,250,0.28)', borderRadius: 20, padding: '2px 8px' }}>🎯 ЧСС {active.targetHr.min}-{active.targetHr.max}</span>}
             {active.plan && (
               <span data-cardio="intervals" style={{ fontSize: 11, fontWeight: 800, color: '#f59e0b', background: 'rgba(245,158,11,0.14)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: 20, padding: '2px 8px' }}>
-                🔁 {active.plan.workSteps}×{fmt(active.plan.workSec)}{active.plan.restSec > 0 ? `/${fmt(active.plan.restSec)}` : ''}
+                🔁 {active.plan.structureLabel || `${active.plan.workSteps}×${fmt(active.plan.workSec)}${active.plan.restSec > 0 ? `/${fmt(active.plan.restSec)}` : ''}`}
               </span>
             )}
           </div>
@@ -852,7 +854,7 @@ const [power, setPower] = useState(() => restored?.inputs.power ?? '');
                   )}
                   {plan && (
                     <span data-cardio="interval-hint" style={{ fontSize: 10.5, color: '#fbbf24' }}>
-                      🔁 {plan.workSteps}×{fmt(plan.workSec)}{plan.restSec > 0 ? ` / ${fmt(plan.restSec)}` : ''} — таймер ведёт по подходам
+                      🔁 {plan.structureLabel || `${plan.workSteps}×${fmt(plan.workSec)}${plan.restSec > 0 ? ` / ${fmt(plan.restSec)}` : ''}`} — таймер ведёт по подходам
                     </span>
                   )}
                   {s.targetHr?.max && (

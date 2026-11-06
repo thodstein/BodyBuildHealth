@@ -222,6 +222,15 @@ export const CardioWeekEditor: React.FC<{ cycle: CardioCycle | null; onChanged?:
         flashMsg(`⚠ Структура занимает ${need} мин — сессия не может быть короче`);
       }
     }
+    // Смена типа на «ровный» (zone2/recovery) снимает интервалы — то же
+    // правило, что в движке: текст «Zone 2», а таймер вёл бы спринты.
+    if (cur && patch.type && patch.type !== cur.type
+      && (patch.type === 'zone2' || patch.type === 'recovery')
+      && (cur.structured?.length ?? 0) > 0) {
+      safe = { ...safe, structured: undefined, purpose: withStructNote(cur.purpose, null) };
+      if (structIdx === idx) { setStructIdx(null); setStructDraft([]); setStructTypeDraft(null); }
+      flashMsg(`⚡ Структура снята: ${TYPE_LABEL[patch.type]} — ровный темп`);
+    }
     saveWeek(w => ({
       ...w,
       sessions: w.sessions.map((s, i) => {
@@ -292,6 +301,13 @@ export const CardioWeekEditor: React.FC<{ cycle: CardioCycle | null; onChanged?:
   const saveStructure = (idx: number) => {
     const s = week?.sessions[idx];
     if (!s) return;
+    // Протокол мог остаться в черновике с прошлого открытия панели: не
+    // записываем смену типа на интенсив в обход мед-гейта.
+    const nextType = structTypeDraft ?? s.type;
+    if (!hiitGate.allowed && (nextType === 'hiit' || nextType === 'miss') && s.type !== nextType) {
+      gateFlash(nextType);
+      return;
+    }
     const blocks = normalizeStructureBlocks(structDraft);
     const label = cardioStructuredLabel(blocks);
     const mainSec = cardioStructuredMainSec(blocks);

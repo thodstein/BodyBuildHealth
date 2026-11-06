@@ -373,7 +373,7 @@ export const CardioDiaryPanel: React.FC<{ cycle: CardioCycle | null; acwr?: numb
                 {e.completed !== false && !!e.intervalsPlanned && (
                   <span
                     data-cardio="diary-intervals"
-                    title={`Работа ${Math.round((e.workSec ?? 0) / 60 * 10) / 10} мин${e.restSec ? ` / отдых ${Math.round((e.restSec ?? 0) / 60 * 10) / 10} мин` : ''}`}
+                    title={e.workSec ? `Работа ${Math.round((e.workSec ?? 0) / 60 * 10) / 10} мин${e.restSec ? ` / отдых ${Math.round((e.restSec ?? 0) / 60 * 10) / 10} мин` : ''}` : `Подходов: ${e.intervalsDone ?? 0} из ${e.intervalsPlanned}`}
                     style={{ fontSize: 10.5, fontWeight: 800, color: (e.intervalsDone ?? 0) >= e.intervalsPlanned ? '#4ade80' : '#fbbf24', background: 'rgba(245,158,11,0.10)', border: '1px solid rgba(245,158,11,0.28)', borderRadius: 20, padding: '3px 8px' }}
                   >
                     🔁 {e.intervalsDone ?? 0}/{e.intervalsPlanned}

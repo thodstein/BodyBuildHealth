@@ -363,6 +363,29 @@ describe('конструктор недели: структура не пише�
   });
 });
 
+describe('конструктор недели: смена типа на Zone 2 снимает интервалы', () => {
+  it('HIIT со структурой → Zone 2: структура и ⚡-пометка уходят', () => {
+    const c = seed();
+    const withStruct: CardioCycle = {
+      ...c,
+      weeks: c.weeks.map(w => (w.week === 1
+        ? { ...w, sessions: [{ ...w.sessions[0], structured: [{ workSec: 30, restSec: 30, reps: 8 }], purpose: 'Спринты · ⚡ Структура: 8×30 с/30 с' }] }
+        : w)),
+    };
+    localStorage.setItem(CYCLES_KEY, JSON.stringify([withStruct]));
+    setActiveCardioCycle(withStruct);
+    render(<CardioWeekEditor cycle={withStruct} />);
+    fireEvent.click(screen.getByRole('button', { name: /Редактировать сессии/ }));
+    fireEvent.click(screen.getByLabelText('Тип сессии 1'));
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: /Zone 2/ }));
+
+    const s = savedSession();
+    expect(s.type).toBe('zone2');
+    expect(s.structured).toBeUndefined();
+    expect(s.purpose).toBe('Спринты');
+  });
+});
+
 describe('конструктор недели: пульсовой диапазон отрезка', () => {
   it('перепутанные границы нормализуются при сохранении', () => {
     const c = seed();

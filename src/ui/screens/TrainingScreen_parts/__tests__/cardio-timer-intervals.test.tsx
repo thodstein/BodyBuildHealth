@@ -38,12 +38,28 @@ function cycleWithIntervals(durationMin = 20): CardioCycle {
   };
 }
 
+/** Цикл с ДВУМЯ разными блоками: подпись и дневник обязаны видеть всю структуру. */
+function cycleWithMultiIntervals(): CardioCycle {
+  const c = cycleWithIntervals(60);
+  const s = c.weeks[0].sessions[0];
+  return {
+    ...c,
+    weeks: c.weeks.map((w, i) => i === 0 ? {
+      ...w,
+      sessions: [{ ...s, structured: [
+        { workSec: 60, restSec: 30, reps: 2 },
+        { workSec: 20, restSec: 10, reps: 4 },
+      ] }],
+    } : w),
+  };
+}
+
 describe('CardioSessionTimer: интервальный режим', () => {
   beforeEach(() => localStorage.clear());
 
   it('список «сегодня» предупреждает, что таймер поведёт по подходам', () => {
     render(<CardioSessionTimer cycle={cycleWithIntervals()} />);
-    expect(screen.getByText(/2×01:00 \/ 00:30 — таймер ведёт по подходам/)).toBeTruthy();
+    expect(screen.getByText(/2×1 мин\/30 с — таймер ведёт по подходам/)).toBeTruthy();
   });
 
   it('ведёт по шагам: разминка → работа → отдых → работа', () => {
@@ -83,6 +99,21 @@ describe('CardioSessionTimer: интервальный режим', () => {
     expect(log[0].workSec).toBe(60);
     expect(log[0].restSec).toBe(30);
     expect(log[0].notes).toContain('интервалы: 1 из 2');
+  });
+
+  it('мульти-блочная структура: чип показывает все блоки, дневник не выдумывает один work/rest', () => {
+    render(<CardioSessionTimer cycle={cycleWithMultiIntervals()} />);
+    expect(screen.getByText(/2×1 мин\/30 с \+ 4×20 с\/10 с — таймер ведёт по подходам/)).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Старт HIIT' }));
+    fireEvent.click(screen.getByRole('button', { name: /завершить/i }));
+    fireEvent.click(screen.getByRole('button', { name: /сохранить в дневник/i }));
+
+    const log = loadCardioLog();
+    expect(log).toHaveLength(1);
+    expect(log[0].intervalsPlanned).toBe(6);
+    expect(log[0].workSec).toBeUndefined();
+    expect(log[0].restSec).toBeUndefined();
   });
 
   it('структура короче сессии — честно пишет «по структуре 43 из 60 мин»', () => {

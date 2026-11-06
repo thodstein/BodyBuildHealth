@@ -2452,7 +2452,11 @@ export function buildCardioIcs(cycle: CardioCycle, referenceIso?: string): strin
         const summary = `Кардио ${s.type.toUpperCase()} ${s.durationMin} мин · нед ${w.week}`;
         // P6 PRO-2: гоночный чек-лист — в описания taper-сессий.
         const checklist = w.taper ? ' · Чек-лист гоночной недели: сон 8ч, без нового 48–72ч, привычное питание/гидратация, shakeout 15–20 мин.' : '';
-        const desc = `Фаза: ${CARDIO_PHASE_LABELS[w.phase]} · ${s.purpose}${s.equipment ? ' · ' + cardioEquipmentLabel(s.equipment) : ''}${w.deload ? ' · делод' : ''}${w.taper ? ' · taper' : ''}${checklist}`;
+        // Структура — в описание события: атлет на площадке должен видеть
+        // работу/отдых/повторы, а не только тип и минуты.
+        const structLabel = cardioStructuredLabel(s.structured);
+        const structPart = structLabel && !String(s.purpose ?? '').includes(structLabel) ? ` · ⚡ ${structLabel}` : '';
+        const desc = `Фаза: ${CARDIO_PHASE_LABELS[w.phase]} · ${s.purpose}${structPart}${s.equipment ? ' · ' + cardioEquipmentLabel(s.equipment) : ''}${w.deload ? ' · делод' : ''}${w.taper ? ' · taper' : ''}${checklist}`;
         lines.push('BEGIN:VEVENT');
         lines.push(`UID:${cycle.id}-w${w.week}-${s.type}-${si}-${occurrence}@bbh`);
         lines.push(`DTSTART:${dtStart}`);
@@ -2840,7 +2844,10 @@ export function buildCardioSummaryText(cycle: CardioCycle): string {
   lines.push('── Недели ──');
   for (const w of cycle.weeks) {
     const sessions = w.sessions
-      .map(x => `${x.type.toUpperCase()} ${x.durationMin}×${x.weeklyFrequency}${x.equipment ? ' (' + cardioEquipmentLabel(x.equipment) + ')' : ''}${x.targetHr?.max ? ' ЧСС ' + x.targetHr.min + '-' + x.targetHr.max : ''}`)
+      .map(x => {
+        const label = cardioStructuredLabel(x.structured);
+        return `${x.type.toUpperCase()} ${x.durationMin}×${x.weeklyFrequency}${label ? ' ⚡ ' + label : ''}${x.equipment ? ' (' + cardioEquipmentLabel(x.equipment) + ')' : ''}${x.targetHr?.max ? ' ЧСС ' + x.targetHr.min + '-' + x.targetHr.max : ''}`;
+      })
       .join(', ');
     const marks = [w.deload ? 'делод' : null, w.taper ? 'taper' : null].filter(Boolean).join('+');
     lines.push(`Нед ${w.week} · ${CARDIO_PHASE_LABELS[w.phase]}${marks ? ' · ' + marks : ''}: ${sessions} — ${w.totalMinutes} мин, ${w.totalKcal} ккал`);
@@ -2906,7 +2913,10 @@ export function buildCardioPrintHtml(cycle: CardioCycle): string {
     .join('');
   const weekRows = cycle.weeks.map(w => {
     const sessions = w.sessions
-      .map(s => `${s.type.toUpperCase()} ${s.durationMin} мин ×${s.weeklyFrequency}`)
+      .map(s => {
+        const label = cardioStructuredLabel(s.structured);
+        return `${s.type.toUpperCase()} ${s.durationMin} мин ×${s.weeklyFrequency}${label ? ` · ⚡ ${label}` : ''}`;
+      })
       .join(' · ');
     const marks = [w.deload ? 'делод' : null, w.taper ? 'taper' : null].filter(Boolean).join(' + ');
     return `<tr><td>${w.week}</td><td>${escHtml(CARDIO_PHASE_LABELS[w.phase])}</td><td>${escHtml(sessions)}</td><td>${w.totalMinutes}</td><td>${w.totalKcal}</td><td>${escHtml(marks)}</td></tr>`;
@@ -2917,7 +2927,10 @@ export function buildCardioPrintHtml(cycle: CardioCycle): string {
       const isLeg = legDays.includes(di);
       const content = sess.length === 0
         ? '—'
-        : sess.map(s => `${s.type.toUpperCase()} ${s.durationMin}м${s.equipment ? ' · ' + cardioEquipmentLabel(s.equipment) : ''}${s.targetHr?.max ? '<br>ЧСС ' + s.targetHr.min + '-' + s.targetHr.max : ''}`).join('<br>');
+        : sess.map(s => {
+            const label = cardioStructuredLabel(s.structured);
+            return `${s.type.toUpperCase()} ${s.durationMin}м${label ? ' · ⚡ ' + label : ''}${s.equipment ? ' · ' + cardioEquipmentLabel(s.equipment) : ''}${s.targetHr?.max ? '<br>ЧСС ' + s.targetHr.min + '-' + s.targetHr.max : ''}`;
+          }).join('<br>');
       return `<td style="vertical-align:top;font-size:11px${isLeg ? ';background:#fff7e0' : ''}">${isLeg ? '🦵 ' : ''}${escHtml(content)}</td>`;
     }).join('');
     return `<tr><td style="font-weight:700;font-size:11px">Нед ${w.week}<br>${escHtml(CARDIO_PHASE_LABELS[w.phase])}</td>${cells}</tr>`;
@@ -3700,15 +3713,24 @@ export function cardioSessionProtocol(session: Pick<CardioSession, 'type' | 'dur
   const blocks = session.structured && session.structured.length > 0
     ? session.structured
     : buildStructuredIntervals(session as CardioSession, zones);
-  const intervalNote = (fallbackIdx: number): { note: string; zone?: { min?: number; max?: number } } => {
+  const intervalNote = (fallbackIdx: number, hasStructure: boolean): { note: string; zone?: { min?: number; max?: number } } => {
     const b = blocks[0];
+    // Эвристика (`buildStructuredIntervals`) осталась для текста, но если
+    // `session.structured` нет, таймер ведёт один отсчёт — нельзя выдавать
+    // ориентир за реальные отрезки.
+    const caveat = hasStructure ? '' : ' — структура не задана, таймер ведёт ровным темпом';
     if (b) {
+      // Мульти-блочная структура: первый блок не описывает сессию целиком —
+      // показываем все блоки той же подписью, что и редактор/таймер.
+      const note = blocks.length > 1
+        ? `${cardioStructuredLabel(blocks) ?? 'интервалы'} (${b.note || 'интервалы'})`
+        : `${b.reps}×${fmtSec(b.workSec)} работа / ${fmtSec(b.restSec)} отдых (${b.note || 'интервалы'})`;
       return {
-        note: `${b.reps}×${fmtSec(b.workSec)} работа / ${fmtSec(b.restSec)} отдых (${b.note || 'интервалы'})`,
+        note: note + caveat,
         zone: b.targetHr ?? (z(fallbackIdx) ? { min: z(fallbackIdx)!.bpmMin, max: z(fallbackIdx)!.bpmMax } : undefined),
       };
     }
-    return { note: 'Интервалы в целевом диапазоне', zone: z(fallbackIdx) ? { min: z(fallbackIdx)!.bpmMin, max: z(fallbackIdx)!.bpmMax } : undefined };
+    return { note: `Интервалы в целевом диапазоне${caveat}`, zone: z(fallbackIdx) ? { min: z(fallbackIdx)!.bpmMin, max: z(fallbackIdx)!.bpmMax } : undefined };
   };
   // Структурированная сессия: протокол = таймлайн таймера. Раньше превью
   // обещало «Разминка 5 мин» на любой сессии, а таймер вёл 10-20 мин из остатка
@@ -3719,7 +3741,7 @@ export function cardioSessionProtocol(session: Pick<CardioSession, 'type' | 'dur
     const warm = steps[0]?.kind === 'warmup' ? steps[0].sec : 0;
     const cool = steps[steps.length - 1]?.kind === 'cooldown' ? steps[steps.length - 1].sec : 0;
     const mainSec = Math.max(0, plan.totalSec - warm - cool);
-    const iv = intervalNote(session.type === 'hiit' ? 3 : 2);
+    const iv = intervalNote(session.type === 'hiit' ? 3 : 2, true);
     const structMin = Math.round(plan.totalSec / 60);
     const planMin = Math.round(session.durationMin);
     const shortNote = structMin < planMin ? ` · по структуре ${structMin} из ${planMin} мин, остаток — лёгкий темп` : '';
@@ -3750,7 +3772,7 @@ export function cardioSessionProtocol(session: Pick<CardioSession, 'type' | 'dur
   switch (session.type) {
     case 'hiit': {
       const work = Math.max(5, dur - 10);
-      const iv = intervalNote(3);
+      const iv = intervalNote(3, false);
       return [
         { name: 'Разминка', minutes: 5, note: 'Лёгкий темп, плавное повышение пульса', hrZone: z(0) ? { min: z(0)!.bpmMin, max: z(0)!.bpmMax } : undefined },
         { name: 'Интервалы', minutes: work, note: iv.note, hrZone: iv.zone },
@@ -3759,7 +3781,7 @@ export function cardioSessionProtocol(session: Pick<CardioSession, 'type' | 'dur
     }
     case 'miss': {
       const work = Math.max(5, dur - 10);
-      const iv = intervalNote(2);
+      const iv = intervalNote(2, false);
       return [
         { name: 'Разминка', minutes: 5, note: 'Лёгкий темп, плавное повышение пульса', hrZone: z(0) ? { min: z(0)!.bpmMin, max: z(0)!.bpmMax } : undefined },
         { name: 'Темповые отрезки', minutes: work, note: iv.note, hrZone: iv.zone },
@@ -3844,9 +3866,17 @@ export interface CardioIntervalPlan {
   budgetSec: number;
   /** Сколько шагов «работа» (подходов) всего. */
   workSteps: number;
+  /** Сколько блоков в структуре (2+ — у блоков разные работа/отдых). */
+  blockCount: number;
   /** Сколько секунд работы в одном подходе (для записи в дневник). */
   workSec: number;
   restSec: number;
+  /**
+   * Подпись ВСЕЙ структуры (все блоки): «4×4 мин/3 мин + 8×30 с/30 с».
+   * `workSec`/`restSec` берут только первый блок — для мульти-блочной
+   * структуры они не описывают сессию, поэтому в UI показываем это поле.
+   */
+  structureLabel: string;
   warmupSec: number;
   cooldownSec: number;
 }
@@ -3899,8 +3929,10 @@ export function buildCardioIntervalPlan(
     mainSec,
     budgetSec,
     workSteps: steps.filter(s => s.kind === 'work').length,
+    blockCount: blocks.length,
     workSec: blocks[0].workSec,
     restSec: Math.max(0, blocks[0].restSec),
+    structureLabel: cardioStructuredLabel(blocks) ?? '',
     warmupSec,
     cooldownSec,
   };

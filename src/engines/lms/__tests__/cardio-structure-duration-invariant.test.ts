@@ -15,6 +15,11 @@ import {
   applyIndividualizedTaperToCycle,
   buildCardioCycle,
   buildCardioCycleFromPrep,
+  buildCardioIcs,
+  buildCardioIntervalPlan,
+  buildCardioPrintHtml,
+  buildCardioSummaryText,
+  cardioSessionProtocol,
   cardioStructuredMainSec,
   scaleCardioDurationMin,
   type CardioCycle,
@@ -189,5 +194,51 @@ describe('генератор: структура и текст согласов�
   it('cut: budget таймера не превышает длительность ни в одной сессии', () => {
     const c = buildCardioCycle({ goal: 'cut', totalWeeks: 12, daysAvailable: 7, bodyWeight: 80, level: 'advanced' });
     expect(brokenStructure(c)).toEqual([]);
+  });
+});
+
+describe('экспорт: структура не теряется в печати и тексте', () => {
+  it('⚡-подпись есть в печатном плане, копируемой сводке и календаре', () => {
+    const c = withWeekSession(baseCycle(2), 1, structuredSession('hiit', 30, { workSec: 30, restSec: 30, reps: 8 }));
+    const html = buildCardioPrintHtml(c);
+    const text = buildCardioSummaryText(c);
+    const ics = buildCardioIcs(c, '2026-11-02');
+    expect(html).toContain('⚡ 8×30 с/30 с');
+    expect(text).toContain('⚡ 8×30 с/30 с');
+    expect(ics).toContain('⚡ 8×30 с/30 с');
+  });
+
+  it('structureLabel описывает все блоки, а не только первый', () => {
+    const plan = buildCardioIntervalPlan({
+      type: 'hiit',
+      durationMin: 60,
+      structured: [
+        { workSec: 240, restSec: 180, reps: 4 },
+        { workSec: 30, restSec: 30, reps: 8 },
+      ],
+    })!;
+    expect(plan.structureLabel).toBe('4×4 мин/3 мин + 8×30 с/30 с');
+    expect(plan.blockCount).toBe(2);
+    expect(plan.workSteps).toBe(12);
+  });
+});
+
+describe('превью-протокол не выдаёт эвристику за структуру', () => {
+  it('HIIT/MISS без structured: отрезки помечены как ориентир, таймер ведёт ровно', () => {
+    for (const type of ['hiit', 'miss'] as const) {
+      const phases = cardioSessionProtocol({ type, durationMin: 30 });
+      const main = phases.find(p => p.name === 'Интервалы' || p.name === 'Темповые отрезки')!;
+      expect(main.note).toContain('структура не задана');
+      expect(main.note).toContain('ровным темпом');
+    }
+  });
+
+  it('со structured такой пометки нет — это реальные отрезки', () => {
+    const phases = cardioSessionProtocol({
+      type: 'hiit', durationMin: 30, structured: [{ workSec: 30, restSec: 30, reps: 8 }],
+    });
+    const main = phases.find(p => p.name === 'Интервалы')!;
+    expect(main.note).not.toContain('не задана');
+    expect(main.note).toContain('8×30 с');
   });
 });
