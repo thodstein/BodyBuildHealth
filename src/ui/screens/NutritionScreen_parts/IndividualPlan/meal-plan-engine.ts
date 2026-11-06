@@ -14822,7 +14822,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
         // Вместе с гарниром переносим половину белкового пункта: перекус только из углеводов
         // роняет ось «белок ядра» (замер: avg 91.25 → 82.88 без этого).
         const _prot57: any = (hm.items || [])
-          .filter((i: any) => (i.role === 'protein' || i.role === 'fast_protein' || i.role === 'slow_protein') && (Number(i.amount) || 0) >= 60)
+          .filter((i: any) => (i.role === 'protein' || i.role === 'fast_protein' || i.role === 'slow_protein') && (Number(i.amount) || 0) >= 80)
           .sort((a: any, b: any) => (Number(b.amount) || 0) - (Number(a.amount) || 0))[0];
         const _extra57: any[] = [];
         if (_prot57) {
@@ -14830,7 +14830,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
           // ≥0.30 г/кг (порог MPS), иначе ось «белок основного приёма» падает.
           const _w57 = Math.max(1, Number(input.weightKg) || 0);
           const _perGp = (Number(_prot57.p) || 0) / Math.max(1, Number(_prot57.amount) || 1);
-          let _mv = Math.round((Number(_prot57.amount) || 0) * 0.5);
+          let _mv = Math.max(40, Math.round((Number(_prot57.amount) || 0) * 0.5));
           if (((Number(_prot57.p) || 0) - _mv * _perGp) / _w57 < 0.3) {
             _mv = Math.max(0, Math.round(((Number(_prot57.p) || 0) - 0.3 * _w57) / Math.max(0.02, _perGp)));
           }
