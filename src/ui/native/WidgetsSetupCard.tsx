@@ -16,14 +16,14 @@ const WIDGETS_RU: { kind: WidgetKind; icon: NativeIconName; name: string; desc: 
   { kind: 'training', icon: 'dumbbell', name: 'Тренировка', desc: 'Последняя сессия и переход в план в один тап' },
   { kind: 'timer', icon: 'clock', name: 'Таймер отдыха', desc: 'Пресеты 0:30–3:00, старт/пауза без открытия приложения' },
   { kind: 'compliance', icon: 'chart', name: 'Комплаенс', desc: 'Процент выполнения плана за неделю' },
-  { kind: 'nutrition', icon: 'bowl', name: 'Питание', desc: 'Ккал дня, вода +250/+500 в один тап, переход в дневник' },
+  { kind: 'nutrition', icon: 'bowl', name: 'Питание', desc: 'Остаток ккал, БЖУ, вода +250/+500 в один тап' },
 ];
 
 const WIDGETS_EN: { kind: WidgetKind; icon: NativeIconName; name: string; desc: string }[] = [
   { kind: 'training', icon: 'dumbbell', name: 'Workout', desc: 'Last session and one-tap jump to the plan' },
   { kind: 'timer', icon: 'clock', name: 'Rest timer', desc: 'Presets 0:30–3:00, start/pause without opening the app' },
   { kind: 'compliance', icon: 'chart', name: 'Compliance', desc: 'Weekly plan completion percent' },
-  { kind: 'nutrition', icon: 'bowl', name: 'Nutrition', desc: 'Day kcal, water +250/+500 in one tap, jump to diary' },
+  { kind: 'nutrition', icon: 'bowl', name: 'Nutrition', desc: 'Kcal left, macros, water +250/+500 in one tap' },
 ];
 
 const PIN_REASON_RU: Record<string, string> = {

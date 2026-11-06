@@ -117,7 +117,21 @@ describe('фолбэк вне native', () => {
   it('6. снапшоты пишутся в фолбэк и читаются', async () => {
     expect(await syncTrainingWidget({ title: 'A', subtitle: 'B', meta: 'C' })).toBe(false);
     expect(await syncComplianceWidget({ pct: 142, label: 'L', detail: 'D' })).toBe(false);
-    expect(await syncNutritionWidget({ kcal: 1, targetKcal: 2, protein: 3, waterMl: 4 })).toBe(false);
+    expect(await syncNutritionWidget({
+      kcal: 1, targetKcal: 2, protein: 3, fat: 4, carbs: 5,
+      targetProtein: 6, targetFat: 7, targetCarbs: 8,
+      waterMl: 9, waterTargetMl: 10,
+    })).toBe(false);
+    const n = readFallbackSnapshot('nutrition') as {
+      kcal: number; protein: number; fat: number; carbs: number; waterMl: number;
+      targetProtein: number; targetFat: number; targetCarbs: number; waterTargetMl: number;
+    };
+    expect(n.kcal).toBe(1);
+    expect(n.fat).toBe(4);
+    expect(n.carbs).toBe(5);
+    expect(n.targetProtein).toBe(6);
+    expect(n.targetCarbs).toBe(8);
+    expect(n.waterTargetMl).toBe(10);
     const t = readFallbackSnapshot('training') as { title: string };
     expect(t.title).toBe('A');
     const c = readFallbackSnapshot('compliance') as { pct: number };

@@ -33,13 +33,30 @@ export interface TimerState {
   durationSec: number;
 }
 
+/**
+ * Снапшот дня для homescreen-виджета «Питание» (как сводка FatSecret):
+ * остаток калорий, Б/Ж/У и вода — факт и цель.
+ */
+export interface NutritionWidgetSnapshot {
+  kcal: number;
+  targetKcal: number;
+  protein: number;
+  fat: number;
+  carbs: number;
+  targetProtein: number;
+  targetFat: number;
+  targetCarbs: number;
+  waterMl: number;
+  waterTargetMl: number;
+}
+
 interface WidgetBridgeNative {
   syncTraining(o: {
     title: string; subtitle: string; meta: string;
     progress?: number; live?: boolean; actionLabel?: string; actionTarget?: string;
   }): Promise<{ ok: boolean }>;
   syncCompliance(o: { pct: number; label: string; detail: string }): Promise<{ ok: boolean }>;
-  syncNutrition(o: { kcal: number; targetKcal: number; protein: number; waterMl: number }): Promise<{ ok: boolean }>;
+  syncNutrition(o: NutritionWidgetSnapshot): Promise<{ ok: boolean }>;
   queueWater(o: { ml: number }): Promise<{ ok: boolean; queue: number }>;
   queueNutrition(o: { name: string; kcal: number; p: number; f: number; c: number; meal: string }): Promise<{ ok: boolean; queue: number }>;
   drainQueue(): Promise<{ items: string; count: number }>;
@@ -238,12 +255,7 @@ export async function syncComplianceWidget(input: {
   return false;
 }
 
-export async function syncNutritionWidget(input: {
-  kcal: number;
-  targetKcal: number;
-  protein: number;
-  waterMl: number;
-}): Promise<boolean> {
+export async function syncNutritionWidget(input: NutritionWidgetSnapshot): Promise<boolean> {
   const p = plugin();
   if (p) {
     try {

@@ -99,7 +99,13 @@ public class WidgetBridgePlugin extends Plugin {
             obj.put("kcal", call.getInt("kcal", 0));
             obj.put("targetKcal", call.getInt("targetKcal", 0));
             obj.put("protein", call.getInt("protein", 0));
+            obj.put("fat", call.getInt("fat", 0));
+            obj.put("carbs", call.getInt("carbs", 0));
+            obj.put("targetProtein", call.getInt("targetProtein", 0));
+            obj.put("targetFat", call.getInt("targetFat", 0));
+            obj.put("targetCarbs", call.getInt("targetCarbs", 0));
             obj.put("waterMl", call.getInt("waterMl", 0));
+            obj.put("waterTargetMl", call.getInt("waterTargetMl", 0));
             obj.put("queue", WidgetStore.queueSize(ctx));
             obj.put("updatedAt", System.currentTimeMillis());
             WidgetStore.putJson(ctx, WidgetStore.KEY_NUTRITION, obj);
@@ -124,6 +130,7 @@ public class WidgetBridgePlugin extends Plugin {
             item.put("ml", ml);
             item.put("ts", System.currentTimeMillis());
             int size = WidgetStore.enqueue(ctx, item);
+            NutritionWidgetProvider.optimisticWater(ctx, ml);
             NutritionWidgetProvider.updateAll(ctx);
             JSObject ret = new JSObject();
             ret.put("ok", true);

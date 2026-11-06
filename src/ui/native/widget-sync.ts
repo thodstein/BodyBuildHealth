@@ -152,8 +152,8 @@ function collectCompliance(): { pct: number; label: string; detail: string } {
   };
 }
 
-function collectTargets(): { kcal: number; protein: number } {
-  const fallback = { kcal: 2500, protein: 160 };
+function collectTargets(): { kcal: number; protein: number; fats: number; carbs: number; waterMl: number } {
+  const fallback = { kcal: 2500, protein: 160, fats: 70, carbs: 300, waterMl: 2500 };
   try {
     const s = (safe(() => getProfile(), null as never) as unknown as {
       settings?: Record<string, Record<string, number & string>>;
@@ -173,17 +173,28 @@ function collectTargets(): { kcal: number; protein: number } {
       pal,
       goal: (tr?.primaryGoal as string) || 'maintenance',
     });
-    return { kcal: t.kcal || fallback.kcal, protein: t.protein || fallback.protein };
+    return {
+      kcal: t.kcal || fallback.kcal,
+      protein: t.protein || fallback.protein,
+      fats: t.fats || fallback.fats,
+      carbs: t.carbs || fallback.carbs,
+      waterMl: Math.round((t.water || 2.5) * 1000),
+    };
   } catch {
     return fallback;
   }
 }
 
-function collectNutrition(): { kcal: number; protein: number; waterMl: number; targetKcal: number; targetProtein: number } {
+function collectNutrition(): {
+  kcal: number; protein: number; fat: number; carbs: number; waterMl: number;
+  targetKcal: number; targetProtein: number; targetFat: number; targetCarbs: number; waterTargetMl: number;
+} {
   const targets = collectTargets();
   const today = todayLocalISO();
   let kcal = 0;
   let protein = 0;
+  let fat = 0;
+  let carbs = 0;
   try {
     const diary = readDiaryV2();
     const day = diary[today];
@@ -192,6 +203,8 @@ function collectNutrition(): { kcal: number; protein: number; waterMl: number; t
         for (const it of items || []) {
           kcal += it.kcal || 0;
           protein += it.p || 0;
+          fat += it.f || 0;
+          carbs += it.c || 0;
         }
       }
     }
@@ -204,7 +217,18 @@ function collectNutrition(): { kcal: number; protein: number; waterMl: number; t
   } catch {
     /* ignore */
   }
-  return { kcal: Math.round(kcal), protein: Math.round(protein), waterMl, targetKcal: targets.kcal, targetProtein: targets.protein };
+  return {
+    kcal: Math.round(kcal),
+    protein: Math.round(protein),
+    fat: Math.round(fat),
+    carbs: Math.round(carbs),
+    waterMl,
+    targetKcal: targets.kcal,
+    targetProtein: targets.protein,
+    targetFat: targets.fats,
+    targetCarbs: targets.carbs,
+    waterTargetMl: targets.waterMl,
+  };
 }
 
 /**
@@ -282,7 +306,13 @@ export async function syncAllWidgets(): Promise<WidgetSyncResult> {
       kcal: n.kcal,
       targetKcal: n.targetKcal,
       protein: n.protein,
+      fat: n.fat,
+      carbs: n.carbs,
+      targetProtein: n.targetProtein,
+      targetFat: n.targetFat,
+      targetCarbs: n.targetCarbs,
       waterMl: n.waterMl,
+      waterTargetMl: n.waterTargetMl,
     }).catch(() => false),
   ]);
   return { drainedWaterMl, drainedFoods, trainingOk, complianceOk, nutritionOk };
