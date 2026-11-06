@@ -190,6 +190,8 @@ export const ProfilePlannerTab: React.FC<{ initialAthleteId?: string }> = ({ ini
     setTitle('');
     setTime('');
     setError(null);
+    // Задача не должна «пропадать» из-за активного фильтра другого списка.
+    if (filterList !== 'all' && filterList !== list) setFilterList('all');
   };
 
   const askDelete = (id: string) => {
