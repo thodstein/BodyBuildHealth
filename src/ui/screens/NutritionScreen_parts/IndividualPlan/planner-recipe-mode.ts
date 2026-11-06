@@ -2463,6 +2463,65 @@ export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDa
     }
   }
 
+  // ── §8.50 (QG51): последняя миля рецептурного пути — честными граммами ───────
+  // QG45 убрал фантомные макросы (позиция 8 г с макросами 160 г), и рецептурный день
+  // 95 кг / 3600 ккал / 10 приёмов стал честно короче: жир −7.8 % (87.6 из 95), У −5.8 %.
+  // §4.4-лок «сходимость kcal ≤4 %» покраснел (4.3 %) — не потому, что сборка испортилась,
+  // а потому, что раньше канон держался фантомом (тот же класс, что §8.44/§8.45).
+  // Добираем РЕАЛЬНОЙ едой, не распуханием авторских порций рецептов: остаток жира
+  // 5–14 г — порцией масла 5–10 г (контракт QG46), остаток углеводов 12–40 г — гарниром
+  // 30–200 г в приём с наибольшей комнатой. Авторские ядра (±3 %) не двигаются.
+  // Каждая добавка принимается только если максимальная девиация дня падает.
+  {
+    const _mlSnapOf = (m: any) => ({
+      items: (m.items || []).map((x: any) => ({ ...x })),
+      totals: { ...(m.totals || {}) },
+    });
+    const _mlMains = (outMeals as any[]).filter((m: any) => ['breakfast', 'lunch', 'dinner'].includes(String(m.type)));
+    const _mlTargets = { kcal: targets.kcal, p: targets.p, f: targets.f, c: targets.c } as any;
+    const _mlDev = (): number => maxDeviationPct(sumDayTotals(outMeals as any) as any, _mlTargets);
+    const _mlTryAdd = (host: any, fd: any, grams: number, role: string, why: string): boolean => {
+      if (!host || !fd || grams < 5) return false;
+      const snap = _mlSnapOf(host);
+      const d0 = _mlDev();
+      const item = scaleItem({
+        name: fd.name, id: fd.id, amount: 100, kcal: Math.round(fd.kcal || 0),
+        p: fd.protein || 0, f: fd.fat || 0, c: fd.carbs || 0, fiber: fd.fiber || 0,
+        role,
+      } as any, grams);
+      host.items = [...(host.items || []), item];
+      host.totals = sumMealTotals(host.items as any);
+      if (_mlDev() > d0 + 0.0005) {
+        host.items = snap.items;
+        host.totals = snap.totals;
+        return false;
+      }
+      notes.push(`➕ ${why}: ${fd.name} ${grams} г → «${String(host.label || host.type)}» (последняя миля рецептурного дня)`);
+      return true;
+    };
+    if (_mlMains.length > 0) {
+      const _t = sumDayTotals(outMeals as any);
+      const _fatGap = (targets.f || 0) - (_t.f || 0);
+      if (_fatGap >= 5 && _fatGap <= 14) {
+        const _oil = FOOD_DB.find((f: any) => (f.id === 'oil_olive' || f.id === 'oil_sunflower_unrefined')
+          && !(excludedIds && excludedIds.has(f.id)));
+        const _hostF = [..._mlMains].sort((a: any, b: any) => (a.totals?.f || 0) - (b.totals?.f || 0))[0];
+        if (_oil) _mlTryAdd(_hostF, _oil, Math.max(5, Math.min(10, Math.round(_fatGap))), 'fat', 'Остаток жира дня');
+      }
+      const _t2 = sumDayTotals(outMeals as any);
+      const _carbGap = (targets.c || 0) - (_t2.c || 0);
+      if (_carbGap >= 12 && _carbGap <= 40) {
+        const _side = FOOD_DB.find((f: any) => f.id === 'bulgur' && !(excludedIds && excludedIds.has(f.id)))
+          || FOOD_DB.find((f: any) => f.id === 'rice_white' && !(excludedIds && excludedIds.has(f.id)));
+        const _hostC = [..._mlMains].sort((a: any, b: any) => ((b.target?.c ?? 0) - (b.totals?.c || 0)) - ((a.target?.c ?? 0) - (a.totals?.c || 0)))[0];
+        if (_side) {
+          const _g = Math.round((_carbGap / Math.max(1, _side.carbs || 1)) * 100 / 10) * 10;
+          if (_g >= 30 && _g <= 200) _mlTryAdd(_hostC, _side, _g, 'carb_slow', 'Остаток углеводов дня');
+        }
+      }
+    }
+  }
+
   // Тримы/доборы меняют тоталы — пересчитываем честную девиацию (иначе врём на ~1 п.п.).
   const _finTot = sumDayTotals(outMeals);
   const _finDev = maxDeviationPct(_finTot as any, { kcal: targets.kcal, p: targets.p, f: targets.f, c: targets.c } as any);
