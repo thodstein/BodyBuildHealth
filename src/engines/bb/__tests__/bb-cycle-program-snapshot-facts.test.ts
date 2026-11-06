@@ -9,6 +9,7 @@ import { buildBBExpandedSummary } from '../bb-summary.engine';
 import { analyzeBBRotation } from '../bb-rotation.engine';
 import { reconcileSchemeComments } from '../bb-scheme-comment-reconcile';
 import { backQualityIssues, armQualityIssues } from '../bb-back-quality.engine';
+import { analyzePlanStress } from '../bb-injury-prevention.engine';
 
 /**
  * Аудит Y: цикл- и программа-пути меняют план ПОСЛЕ `finalizeBBPlan`
@@ -104,6 +105,22 @@ function expectSnapshotsMatchFacts(plan: any, label: string) {
     rationale.filter(line => line.startsWith('⚠ Качество рук:')),
     `${label}: качество рук`,
   ).toEqual(armQualityIssues(plan.weeks).map((i: string) => `⚠ Качество рук: ${i}`));
+
+  // Суставной стресс и «🚫 Валидация» — обещания, которые цикл-путь врал
+  // после трима (3 фантомные ошибки на 3 циклах; суставы — во всех 23 планах).
+  const jointIssues = analyzePlanStress(plan).issues;
+  expect(
+    rationale.filter(line => line.startsWith('🦿 Суставы:')),
+    `${label}: строка суставов`,
+  ).toEqual(jointIssues.length ? [`🦿 Суставы: ${jointIssues.join(' ')}`] : []);
+  const freshErrors = ((plan.validation?.issues || []) as any[])
+    .filter((issue: any) => issue.level === 'error')
+    .slice(0, 20)
+    .map((issue: any) => `🚫 Валидация: ${issue.message}`);
+  expect(
+    rationale.filter(line => line.startsWith('🚫 Валидация:')),
+    `${label}: строки ошибок валидации`,
+  ).toEqual(freshErrors);
 
   const warningSet = new Set(
     ((plan.validation?.issues || []) as any[])

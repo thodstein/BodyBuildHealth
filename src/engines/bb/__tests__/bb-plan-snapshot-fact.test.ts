@@ -25,6 +25,7 @@ import { buildBBPlanReport } from '../bb-report.engine';
 import { buildBBExpandedSummary } from '../bb-summary.engine';
 import { analyzeBBRotation } from '../bb-rotation.engine';
 import { backQualityIssues, armQualityIssues } from '../bb-back-quality.engine';
+import { analyzePlanStress } from '../bb-injury-prevention.engine';
 
 const WM = { chest: 100, back: 120, shoulders: 60, biceps: 50, triceps: 60, quads: 140, hamstrings: 100, glutes: 140, calves: 80, abs: 60, traps: 80, forearms: 40 };
 
@@ -214,6 +215,23 @@ describe('bb: снимки после правок (revalidate-путь)', () =>
         rationale.filter((line: string) => line.startsWith('⚠ Качество рук:')),
         `${where}: качество рук`,
       ).toEqual(armQualityIssues(plan.weeks).map((i: string) => `⚠ Качество рук: ${i}`));
+
+      // Суставной стресс и строки «🚫 Валидация» — тоже обещания пользователю
+      // (замер до правки: суставы расходились в 23/23 планов, а цикл-путь
+      // держал 3 фантомные ошибки, которых в плане уже нет).
+      const jointIssues = analyzePlanStress(plan).issues;
+      expect(
+        rationale.filter((line: string) => line.startsWith('🦿 Суставы:')),
+        `${where}: строка суставов`,
+      ).toEqual(jointIssues.length ? [`🦿 Суставы: ${jointIssues.join(' ')}`] : []);
+      const freshErrors = ((plan.validation?.issues || []) as any[])
+        .filter((issue: any) => issue.level === 'error')
+        .slice(0, 20)
+        .map((issue: any) => `🚫 Валидация: ${issue.message}`);
+      expect(
+        rationale.filter((line: string) => line.startsWith('🚫 Валидация:')),
+        `${where}: строки ошибок валидации`,
+      ).toEqual(freshErrors);
       const freshValidation = validateBBPlan(plan, uiValidationOptions(plan) as any);
       const countErrors = (issues: any[]) => issues.filter((i: any) => i.level === 'error').length;
       expect(

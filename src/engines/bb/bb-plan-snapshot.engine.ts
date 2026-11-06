@@ -35,6 +35,7 @@ import { buildBBPlanReport } from './bb-report.engine';
 import { buildBBExpandedSummary } from './bb-summary.engine';
 import { analyzeBBRotation } from './bb-rotation.engine';
 import { backQualityIssues, armQualityIssues } from './bb-back-quality.engine';
+import { analyzePlanStress } from './bb-injury-prevention.engine';
 import {
   applyFrequencyDriftNote,
   frequencyDriftNote,
@@ -62,6 +63,8 @@ const BACK_SUMMARY_PREFIX = '🧩 Спина по паттернам:';
 const ARM_SUMMARY_PREFIX = '💪 Руки по паттернам:';
 const BACK_ISSUE_PREFIX = '⚠ Качество спины:';
 const ARM_ISSUE_PREFIX = '⚠ Качество рук:';
+const JOINT_LINE_PREFIX = '🦿 Суставы:';
+const ERROR_LINE_PREFIX = '🚫 Валидация:';
 
 /** Сумма сетов по movement-паттернам для выбранных мышц (как в финализаторе). */
 function patternSummary(weeks: any[], muscles: string[]): string {
@@ -148,20 +151,40 @@ export function refreshBBPlanSnapshots(plan: any, opts: BBPlanSnapshotOptions = 
     plan.rationale = rationale;
   }
 
+  // Суставной стресс (объём × вес × RIR-проксимити + PED): в финализаторе он
+  // считался до гарантии головок рук, гейта уровней, реализма сессии и
+  // пост-финального трима — строка расходилась во всех 23 собранных планах.
+  {
+    const rationale = (Array.isArray(plan.rationale) ? plan.rationale : [])
+      .filter((line: string) => !String(line).startsWith(JOINT_LINE_PREFIX));
+    const jointIssues = analyzePlanStress(plan).issues;
+    if (jointIssues.length) rationale.push(`${JOINT_LINE_PREFIX} ${jointIssues.join(' ')}`);
+    plan.rationale = rationale;
+  }
+
   if (opts.refreshFrequency && opts.canonicalMuscle) {
     const freq = reconcileFrequencyClaim(plan, { canonical: opts.canonicalMuscle });
     applyFrequencyDriftNote(plan, frequencyDriftNote(freq));
   }
 
   if (opts.refreshValidationRationale && plan.validation) {
-    const fresh = ((plan.validation.issues || []) as any[])
+    const issues = ((plan.validation.issues || []) as any[]);
+    const fresh = issues
       .filter((issue) => issue.level === 'warning')
       .filter((issue) => !TRANSIENT_VALIDATION_CODES.has(String(issue.code)))
       .slice(0, 20)
       .map((issue) => `${VALIDATION_LINE_PREFIX} ${issue.message}`);
+    // Ошибки — то же обещание: цикл-путь после трима гасил их в плане, а строки
+    // «🚫 Валидация» оставались (замер: 3 фантомные ошибки на 3 циклах).
+    const freshErrors = issues
+      .filter((issue) => issue.level === 'error')
+      .slice(0, 20)
+      .map((issue) => `${ERROR_LINE_PREFIX} ${issue.message}`);
     const rationale: string[] = (Array.isArray(plan.rationale) ? plan.rationale : [])
-      .filter((line: string) => !String(line).startsWith(VALIDATION_LINE_PREFIX));
+      .filter((line: string) => !String(line).startsWith(VALIDATION_LINE_PREFIX)
+        && !String(line).startsWith(ERROR_LINE_PREFIX));
     for (const line of fresh) if (!rationale.includes(line)) rationale.push(line);
+    for (const line of freshErrors) if (!rationale.includes(line)) rationale.push(line);
     plan.rationale = rationale;
   }
 

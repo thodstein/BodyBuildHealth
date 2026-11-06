@@ -36,7 +36,6 @@ import { calibratedLandmarksFor, type MEVCalibration } from './bb-mev-calibratio
 import { refreshBBPlanSnapshots } from './bb-plan-snapshot.engine';
 import { buildExerciseInstructions } from './bb-exercise-instructions.engine';
 import { applyTaperToFinalWeeks, isDeloadLikeWeek } from './bb-autocoach.engine';
-import { analyzePlanStress } from './bb-injury-prevention.engine';
 import { annotateBackExercise, verticalPullProfile, classifyLegExercise, annotateArmExercise, classifyArmExercise, classifyBackExercise } from './bb-back-quality.engine';
 import { WEAK_TO_MUSCLE, isBBJunk } from './bb-builder.engine';
 // G1-рампа: кап недельного потолка «Вход в мезоцикл» переустанавливается на
@@ -5743,10 +5742,9 @@ for (const week of next.weeks) {
   // Паттерны/качество спины и рук считаются в ЕДИНОЙ точке снимков
   // (`refreshBBPlanSnapshots`) — здесь они были бы до поздних замен/удалений
   // (гарантия головок, гейт уровней, реализм сессии) и врали бы в rationale.
-  // Суставной стресс (объём × вес × RIR-проксимити + PED-интенсификация):
-  // предупреждения по суставам попадают в rationale плана.
-  const jointIssues = analyzePlanStress(next).issues;
-  if (jointIssues.length) next.rationale.push(`🦿 Суставы: ${jointIssues.join(' ')}`);
+  // Суставной стресс пишется в ЕДИНОЙ точке снимков: здесь он был бы до
+  // гарантии головок, гейта уровней и реализма сессии (замер: строка
+  // расходилась во всех 23 планах).
   const errors = validation.issues
     .filter(issue => issue.level === 'error')
     .slice(0, 20)
