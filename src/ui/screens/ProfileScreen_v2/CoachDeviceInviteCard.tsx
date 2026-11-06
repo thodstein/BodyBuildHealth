@@ -109,7 +109,6 @@ const sectionTitle: React.CSSProperties = { fontSize: 13.5, fontWeight: 800, col
 const hint: React.CSSProperties = { fontSize: 11, color: colors.textSubtle, lineHeight: 1.5 };
 
 export function CoachDeviceInviteCard({ spaces, onAudit, onChanged }: Props) {
-  const athleteSpaces = useMemo(() => spaces.filter(s => s.id !== HOME_SPACE_ID), [spaces]);
   const [selected, setSelected] = useState<string>('');
   const [rev, setRev] = useState(0);
   const [busy, setBusy] = useState(false);
@@ -120,6 +119,18 @@ export function CoachDeviceInviteCard({ spaces, onAudit, onChanged }: Props) {
   const [joinCode, setJoinCode] = useState('');
   const [joinError, setJoinError] = useState<string | null>(null);
   const [joinBusy, setJoinBusy] = useState(false);
+
+  const athleteSpaces = useMemo(() => {
+    void rev;
+    return spaces.filter(s => {
+      if (s.id === HOME_SPACE_ID) return false;
+      const rec = spaceTokenRecord(s.id);
+      // Пространство, к которому ЭТОТ телефон подключился по чужому коду, — не
+      // «наш атлет»: выдавать на него код (и тем более менять его) нельзя, это
+      // доступ к данным тренера, а не к своим. Такие пространства — в блоке ниже.
+      return !rec || rec.role === 'coach';
+    });
+  }, [spaces, rev]);
 
   const spaceId = selected || athleteSpaces[0]?.id || '';
   const space = athleteSpaces.find(s => s.id === spaceId) ?? null;
@@ -164,6 +175,10 @@ export function CoachDeviceInviteCard({ spaces, onAudit, onChanged }: Props) {
   const createCode = async () => {
     if (!space || busy) return;
     clearMessages();
+    if (spaceTokenRecord(space.id)?.role === 'athlete') {
+      setError('Это пространство принадлежит тренеру: код на него выдаёт он, а не вы.');
+      return;
+    }
     if (!CLOUD_CONFIGURED) {
       setError('Облако не настроено — телефон атлета не получит данные. Код имеет смысл только с синхронизацией.');
       return;
@@ -201,6 +216,10 @@ export function CoachDeviceInviteCard({ spaces, onAudit, onChanged }: Props) {
 
   const rotate = async () => {
     if (!space || busy) return;
+    if (spaceTokenRecord(space.id)?.role === 'athlete') {
+      setError('Сменить код может только тренер: это его пространство.');
+      return;
+    }
     if (!confirmRotate) {
       setConfirmRotate(true);
       setConfirmRevoke(false);
@@ -229,6 +248,10 @@ export function CoachDeviceInviteCard({ spaces, onAudit, onChanged }: Props) {
    */
   const revokePhone = async () => {
     if (!space || busy) return;
+    if (spaceTokenRecord(space.id)?.role === 'athlete') {
+      setError('Отключить доступ может только тренер. Чтобы уйти от него — «Отключиться» ниже.');
+      return;
+    }
     if (!confirmRevoke) {
       setConfirmRevoke(true);
       setConfirmRotate(false);
@@ -310,7 +333,9 @@ export function CoachDeviceInviteCard({ spaces, onAudit, onChanged }: Props) {
 
       {athleteSpaces.length === 0 ? (
         <div data-coach="device-invite-empty" style={{ ...hint, marginTop: 10 }}>
-          Пока нет ни одного пространства атлета. Добавьте атлета и откройте его данные — после этого можно выдать код.
+          {joined.length > 0
+            ? 'Этот телефон подключён к данным тренера — кодов вы не выдаёте. Управление доступом у тренера.'
+            : 'Пока нет ни одного пространства атлета. Добавьте атлета и откройте его данные — после этого можно выдать код.'}
         </div>
       ) : (
         <>

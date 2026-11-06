@@ -240,6 +240,65 @@ export async function writeSpaceStores(
   }
 }
 
+/**
+ * Дописать записи в базу ДРУГОГО пространства (кэш для сводок тренера).
+ *
+ * `create=false`: базу не открывали — не создаём. Иначе на телефоне тренера
+ * появлялись бы пустые базы всех атлетов, а «сводка» опиралась бы на базу,
+ * которой раньше не было. Существующие записи не заменяются целиком: пишем
+ * только то, что пришло (аддитивно), удаление — отдельная операция.
+ *
+ * @returns число записанных записей; `null` — базы пространства на устройстве
+ * нет (значит, локальное состояние трогать нельзя: вызывающий не должен
+ * запоминать, что эта запись «уже синхронизирована», иначе при первом входе в
+ * пространство её сочтут удалённой локально и удалят в облаке).
+ */
+export async function putSpaceRecords(
+  spaceId: string,
+  records: Record<string, any[]>,
+): Promise<number | null> {
+  const database = await openSpaceDb(spaceId, false);
+  if (!database) return null;
+  let written = 0;
+  try {
+    const names = STORES.filter(
+      s => (records[s]?.length ?? 0) > 0 && database.objectStoreNames.contains(s),
+    );
+    if (!names.length) return 0;
+    const tx = database.transaction(names, 'readwrite');
+    for (const s of names) {
+      try {
+        const os = tx.objectStore(s);
+        for (const rec of records[s]) {
+          if (!rec || (rec as any).id == null) continue;
+          try {
+            os.put(rec);
+            written++;
+          } catch {
+            /* одна битая запись не должна срывать остальные */
+          }
+        }
+      } catch {
+        /* ignore */
+      }
+    }
+    await new Promise<void>(res => {
+      tx.oncomplete = () => res();
+      tx.onerror = () => res();
+      tx.onabort = () => res();
+    });
+    return written;
+  } catch {
+    return written;
+  } finally {
+    try {
+      database.close();
+    } catch {
+      /* ignore */
+    }
+  }
+}
+
 class HealthDB {
   private db: IDBDatabase | null = null;
 

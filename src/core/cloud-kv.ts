@@ -21,7 +21,7 @@
  * edge function, верифицирующая Telegram initData серверным TELEGRAM_BOT_TOKEN.
  */
 
-import { db } from './db';
+import { db, putSpaceRecords } from './db';
 import {
   DATA_SPACE_KEY,
   HOME_SPACE_ID,
@@ -63,7 +63,7 @@ const CONFLICT_WINDOW_MS = 500;
 
 /** IndexedDB-хранилища с реальными пользовательскими данными (анализы, курс, дневник силы). */
 export const IDB_STORES = ['labs_log', 'course_log', 'workout_log', 'training_log', 'cardio_sessions'] as const;
-const IDB_META_KEY = 'he_sync_meta_idb_v1';
+export const IDB_META_KEY = 'he_sync_meta_idb_v1';
 const IDB_KV_PREFIX = 'idb:';
 
 /** Ключ локально хранимого tg-токена после привязки АПК кодом (не синкается). */
@@ -802,24 +802,52 @@ async function pullIdb(byKey: Map<string, KvRow[]>): Promise<number> {
   let applied = 0;
   let metaChanged = false;
   const remoteKeys = new Set<string>();
+  const activeSpace = currentSpaceId();
+  // Записи ЧУЖИХ пространств (дома): кладём в базу именно того пространства, но
+  // только если она уже есть — пустые базы атлетов на телефоне тренера не нужны.
+  const knownSpaces = new Set(readRegistryFromStorage().spaces.map(s => s.id));
+  const foreign = new Map<
+    string,
+    { records: Record<string, any[]>; meta: { key: string; sig: string; ts: number }[] }
+  >();
   for (const [k, keyRows] of byKey) {
     if (!k.startsWith(IDB_KV_PREFIX)) continue;
     const parsed0 = parseIdbKvKey(k);
-    // Записи других пространств не применяем в текущую базу: они приедут, когда
-    // тренер откроет этого атлета. Иначе анализы атлета легли бы в чужие данные.
-    if (!parsed0 || parsed0.space !== currentSpaceId()) continue;
-    remoteKeys.add(k);
+    if (!parsed0) continue;
     const parsed = parsed0;
-    if (!parsed || !IDB_STORES.includes(parsed.store as any)) continue;
+    if (!IDB_STORES.includes(parsed.store as any)) continue;
     const count = keyRows.find(r => r.chunk_index === 0)?.chunk_count;
     if (!count || keyRows.filter(r => r.chunk_index < count).length !== count) continue;
     let rec: any;
     try { rec = JSON.parse(joinChunks(keyRows.filter(r => r.chunk_index < count))); } catch { continue; }
     if (!rec?.id) continue;
     const remoteTs = Math.max(...keyRows.map(r => Date.parse(r.updated_at) || 0));
-    const localRec = await idbAdapter.get(parsed.store, String(rec.id));
     const remoteSig = stableStringify(rec);
     const prev = idbMeta.get(k);
+    if (parsed.space !== activeSpace) {
+      // Сводки в списке атлетов должны обновляться, не заходя в пространство:
+      // тренировки атлета с его телефона лежат в облаке как `idb:<space>:...`.
+      if (!knownSpaces.has(parsed.space)) continue;
+      if (prev?.deleted) continue; // локально удалено — не воскрешаем
+      if (prev && prev.sig === remoteSig) {
+        if (prev.ts < remoteTs) {
+          idbMeta.set(k, { sig: prev.sig, ts: remoteTs });
+          metaChanged = true;
+        }
+        continue;
+      }
+      if (prev && prev.ts > remoteTs) continue; // локальная копия новее
+      // Отметку «синхронизировано» ставим ТОЛЬКО после успешной записи: если базы
+      // пространства на устройстве нет, локального состояния не меняем, иначе при
+      // первом входе запись сочли бы удалённой локально и удалили в облаке.
+      const bucket = foreign.get(parsed.space) ?? { records: {}, meta: [] };
+      (bucket.records[parsed.store] ||= []).push(rec);
+      bucket.meta.push({ key: k, sig: remoteSig, ts: remoteTs });
+      foreign.set(parsed.space, bucket);
+      continue;
+    }
+    remoteKeys.add(k);
+    const localRec = await idbAdapter.get(parsed.store, String(rec.id));
     if (!localRec) {
       if (prev && prev.deleted) continue; // локально удалена — не воскрешаем
       if (prev) {
@@ -849,12 +877,26 @@ async function pullIdb(byKey: Map<string, KvRow[]>): Promise<number> {
       // prev отсутствует или localSig !== prev.sig → локальная версия побеждает (pushIdb)
     }
   }
+  // Дозапись в базы других пространств — одним заходом на пространство.
+  for (const [spaceId, bucket] of foreign) {
+    try {
+      const written = await putSpaceRecords(spaceId, bucket.records);
+      if (written == null) continue; // базы нет — локальное состояние не трогаем
+      for (const m of bucket.meta) idbMeta.set(m.key, { sig: m.sig, ts: m.ts });
+      applied += written;
+      metaChanged = true;
+    } catch {
+      /* кэш для сводок — не критично: данные придут при открытии пространства */
+    }
+  }
   // удаления в облаке: локально не менялось → применяем
   for (const [kvKey, meta] of idbMeta) {
     if (remoteKeys.has(kvKey)) continue;
     const parsed = parseIdbKvKey(kvKey);
     if (!parsed) continue;
-    // Удаления чужого пространства к нашей базе не применяем.
+    // Удаления чужого пространства к нашей базе не применяем: полный снимок
+    // токена приходит не каждый цикл (ротация по кругу), и «нет строки» там
+    // означало бы «удалено» только для активного пространства.
     if (parsed.space !== currentSpaceId()) continue;
     const localRec = await idbAdapter.get(parsed.store, parsed.id);
     if (!localRec) {
@@ -1321,6 +1363,9 @@ export async function migrateSpaceToToken(spaceId: string): Promise<boolean> {
   if (!started || !transport || !token) return false;
   const rec = spaceTokenRecord(spaceId);
   if (!rec || rec.revokedAt) return false;
+  // Перенос делает только владелец-тренер: на телефоне атлета данные уже лежат
+  // под его токеном, а «перенос» чужого пространства — не его действие.
+  if (rec.role !== 'coach') return false;
   if (rec.migratedAt) return true;
   try {
     await flush();
@@ -1406,6 +1451,10 @@ export async function rotateSpaceToken(spaceId: string): Promise<string | null> 
   if (!started || !transport || !token) return null;
   const old = spaceTokenRecord(spaceId);
   if (!old || old.revokedAt) return null;
+  // Менять ключ доступа может только тренер. Телефон атлета, подключённый по
+  // коду, не должен «ротировать» чужой токен: данные разъехались бы между
+  // старым и новым токенами, а тренер потерял бы доступ к своей же копии.
+  if (old.role !== 'coach') return null;
   const source = old.migratedAt ? old.token : token;
   try {
     const rows = await pullSpaceRows(spaceId, [source]);

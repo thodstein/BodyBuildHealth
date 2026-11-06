@@ -11,7 +11,7 @@
  *    (закрыть рабочую базу из-за чужого атлета — значит сломать запись).
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { db, deleteSpaceDatabases, dbNameFor, readSpaceStores, spaceDbRecordCount, writeSpaceStores } from '../db';
+import { db, deleteSpaceDatabases, dbNameFor, putSpaceRecords, readSpaceStores, spaceDbRecordCount, writeSpaceStores } from '../db';
 import { weightPhotoDbNameFor } from '../../engines/weight-photo-store';
 import {
   _resetDataSpaceCache,
@@ -317,6 +317,43 @@ describe('чтение и запись базы пространства', () =>
     const { dbs } = stubDb({});
     await writeSpaceStores(sid, { diary: [{ id: 'x' }] });
     expect(dbs.get(dbNameFor(sid))!.diary).toEqual([{ id: 'x' }]);
+  });
+
+  it('дозапись в существующую базу пространства не стирает остальное', async () => {
+    const sid = athleteSpaceId('a1');
+    const { dbs } = stubDb({
+      [dbNameFor(sid)]: { training_log: [{ id: 'old' }], profile: [{ id: 'p1' }] },
+    });
+    const written = await putSpaceRecords(sid, {
+      training_log: [{ id: 'new' }, { id: 'new2' }],
+    });
+    expect(written).toBe(2);
+    // дописываем, а не заменяем: у тренера в кэше уже лежит прошлая история
+    expect(dbs.get(dbNameFor(sid))!.training_log).toEqual([
+      { id: 'old' },
+      { id: 'new' },
+      { id: 'new2' },
+    ]);
+    expect(dbs.get(dbNameFor(sid))!.profile).toEqual([{ id: 'p1' }]);
+  });
+
+  it('не создаёт базу пространства, которое на этом телефоне не открывали', async () => {
+    const { created, dbs } = stubDb({ [dbNameFor('home')]: {} });
+    const written = await putSpaceRecords(athleteSpaceId('nobody'), {
+      training_log: [{ id: 'x' }],
+    });
+    // null — это «базы нет»: вызывающий не должен считать запись синхронизированной
+    expect(written).toBeNull();
+    expect(created).toEqual([]);
+    expect(dbs.has(dbNameFor(athleteSpaceId('nobody')))).toBe(false);
+  });
+
+  it('запись без id пропускается (битая строка не срывает остальные)', async () => {
+    const sid = athleteSpaceId('a1');
+    const { dbs } = stubDb({ [dbNameFor(sid)]: { training_log: [] } });
+    const written = await putSpaceRecords(sid, { training_log: [{ nope: 1 }, { id: 'ok' }] });
+    expect(written).toBe(1);
+    expect(dbs.get(dbNameFor(sid))!.training_log).toEqual([{ id: 'ok' }]);
   });
 
   it('сбой хранилища не роняет бэкап', async () => {

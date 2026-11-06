@@ -226,6 +226,35 @@ describe('атлет: подключение по коду', () => {
     expect(readRegistryFromStorage().active).toBe('home');
   });
 
+  it('на телефоне атлета не предлагает выдать или сменить код чужого пространства', async () => {
+    const token = 'tk_' + '6'.repeat(48);
+    const code = encodeSpaceInvite({
+      spaceId: SID,
+      token,
+      role: 'athlete',
+      label: 'Тренер',
+      createdAt: '2026-11-06T10:00:00.000Z',
+    });
+    const { joinSpaceByInvite } = await import('../../../../core/space-invite');
+    joinSpaceByInvite(code);
+    _resetDataSpaceCache();
+    const spaces = readRegistryFromStorage().spaces;
+
+    const { container } = render(<CoachDeviceInviteCard spaces={spaces} onAudit={() => {}} />);
+    // Выдавать и менять код вправе только тренер: на телефоне атлета этих
+    // действий нет вовсе — иначе атлет «ротировал» бы чужой ключ доступа.
+    expect(container.querySelector('[data-coach="device-invite-create"]')).toBeNull();
+    expect(container.querySelector('[data-coach="device-invite-rotate"]')).toBeNull();
+    expect(container.querySelector('[data-coach="device-invite-revoke"]')).toBeNull();
+    expect(container.querySelector('[data-coach="device-invite-code"]')).toBeNull();
+    expect(container.querySelector('[data-coach="device-invite-group"]')).toBeNull();
+    // Пустое состояние объясняет, а не зовёт «добавить атлета».
+    expect(container.querySelector('[data-coach="device-invite-empty"]')?.textContent).toContain(
+      'подключён к данным тренера',
+    );
+    expect(container.querySelector('[data-coach="device-joined"]')?.textContent).toContain('Тренер');
+  });
+
   it('подключённое пространство можно отключить', async () => {
     const token = 'tk_' + '5'.repeat(48);
     const code = encodeSpaceInvite({
