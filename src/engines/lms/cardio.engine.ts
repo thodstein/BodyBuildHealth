@@ -68,6 +68,7 @@ import { screenCardioRedFlags as screenRedFlagsLocal } from './cardio-red-flags.
 // Локальные алиасы для использования внутри движка (реэкспорты выше — только наружу).
 import { zonesFromTalkTest as talkZonesFromTest } from './cardio-field-tests.engine';
 import { timeInZones as calcTimeInZones, classifyTid as classifyTidLocal } from './cardio-tid.engine';
+import { buildGeneratedHiitStructure } from './cardio-interval-presets.engine';
 // P1 PRO-2: доменные типы живут в cardio-cycle-types.engine.ts (zero-runtime).
 // Реэкспорт — импорты потребителей (`from '../cardio.engine'`) не меняются.
 import type {
@@ -742,13 +743,24 @@ export function buildCardioCycle(input: CardioCycleInput): CardioCycle {
         const mid = Math.round(zone!.bpmMin + (zone!.bpmMax - zone!.bpmMin) * prog);
         targetHr = { min: mid, max: zone!.bpmMax };
       }
+      // Генератор сам назначает HIIT-протокол (SIT 8×20/10 с прогрессией по
+      // неделям) и пишет ту же цифру в текст — иначе план обещал «EPOC», а
+      // таймер шёл одним отсчётом и интервалы спортсмен придумывал сам.
+      const hiit = s.type === 'hiit' && !s.structured
+        ? buildGeneratedHiitStructure({
+            durationMin: dur, equipment: equip, level: input.level ?? 'intermediate',
+            week: w, phase,
+          })
+        : null;
+      const purposeBase = hiit ? `${s.purpose} · ${hiit.text}` : s.purpose;
       return {
         ...s,
         durationMin: dur,
         kcalPerSession: kcalForCardio(s.type, dur, bw, equip, input.sex, ffmKg),
         equipment: equip,
+        structured: s.structured ?? (hiit ? [hiit.block] : undefined),
         // P7 PRO-2: фьюлинг длинных — дозой в purpose (печать/ICS подхватывают).
-        purpose: dur >= 60 ? `${s.purpose} · Фьюлинг: ${fuelForSessionLocal(dur, input.tempC).note}` : s.purpose,
+        purpose: dur >= 60 ? `${purposeBase} · Фьюлинг: ${fuelForSessionLocal(dur, input.tempC).note}` : purposeBase,
         targetHr,
       };
     });
@@ -2056,6 +2068,20 @@ export function latestCardioCycleVersion(cycleId: string): CardioCycleVersion | 
 export function restoreCardioCycleVersion(cycleId: string): CardioCycle | null {
   const v = latestCardioCycleVersion(cycleId);
   return v ? v.cycle : null;
+}
+
+/** Все снапшоты цикла, новые сверху — для списка истории версий в редакторе. */
+export function cardioCycleVersions(cycleId: string): CardioCycleVersion[] {
+  return loadCardioCycleVersions().filter(v => v.cycleId === cycleId);
+}
+
+/**
+ * Восстановить конкретный снапшот по id (не обязательно последний).
+ * Снапшоты не удаляются — история остаётся, пока её не почистят вручную
+ * `clearCardioCycleHistory` или пока не сработает лимит версий.
+ */
+export function restoreCardioCycleVersionById(versionId: string): CardioCycle | null {
+  return loadCardioCycleVersions().find(v => v.id === versionId)?.cycle ?? null;
 }
 
 /** Очистить историю версий цикла (при полном удалении цикла). */
@@ -3557,7 +3583,20 @@ export function improveCardioCycle(cycle: CardioCycle, opts: { daysAvailable?: n
     // 1. HIIT для cut/recomp/подготовки ББ (скип при мед-блоке).
     if ((cycle.goal === 'cut' || cycle.goal === 'recomp' || cycle.goal === 'bb_prep') && s.hiitWeeks === 0 && !recoveryLow && !improveMedicalBlock && daysAvailable >= 3) {
       if ((w.phase === 'build' || w.phase === 'maintenance') && !w.deload && !w.taper && !w.sessions.some(x => x.type === 'hiit')) {
-        sessions = [...sessions, mkSession('hiit', 15, 1, 'HIIT добавлен авто-улучшением (EPOC, ЖСС)', bw, undefined, sex, ffm)];
+        // Оборудование и структура — как у генератора: строкой ниже текст и
+        // таймер должны говорить одно и то же (SIT 8×20/10), а не «EPOC».
+        const equip = w.sessions.find(x => x.equipment)?.equipment ?? cycle.config?.equipment?.[0] ?? 'running';
+        const hiit = buildGeneratedHiitStructure({
+          durationMin: 15, equipment: equip, level: cycle.config?.level ?? 'intermediate',
+          week: w.week, phase: w.phase,
+        });
+        const base = mkSession('hiit', 15, 1, 'HIIT добавлен авто-улучшением (EPOC, ЖСС)', bw, undefined, sex, ffm);
+        sessions = [...sessions, {
+          ...base,
+          equipment: equip,
+          structured: hiit ? [hiit.block] : undefined,
+          purpose: hiit ? `${base.purpose} · ${hiit.text}` : base.purpose,
+        }];
         changes.push({ week: w.week, label: 'HIIT 15×1 добавлен', from: 'нет', to: 'HIIT 15×1' });
       }
     }

@@ -13,6 +13,7 @@ import { CardioWeekEditor } from '../CardioWeekEditor';
 import {
   buildCardioCycle, loadCardioCycles, setActiveCardioCycle,
   buildCardioIntervalPlan, cardioStructuredMainSec, kcalForCardio, cycleBodyWeight, cycleFfmKg,
+  saveCardioCycleVersion,
   type CardioCycle,
 } from '../../../../engines/lms/cardio.engine';
 
@@ -128,5 +129,150 @@ describe('конструктор недели: структура интерва
     const s = savedSession();
     expect(s.structured).toBeUndefined();
     expect(s.purpose).not.toContain('⚡ Структура');
+  });
+});
+
+/** Три недели с одной HIIT-сессией в каждой — для прогрессии и истории. */
+function threeWeekHiitCycle(): CardioCycle {
+  const base = buildCardioCycle({ goal: 'cut', totalWeeks: 3, daysAvailable: 3, bodyWeight: 80 });
+  const session = { type: 'hiit' as const, durationMin: 20, weeklyFrequency: 1, intensity: 'high' as const, kcalPerSession: 250, purpose: 'Ручная сессия' };
+  const cycle: CardioCycle = {
+    ...base,
+    weeks: base.weeks.map(w => (w.week <= 3 ? { ...w, sessions: [{ ...session }], totalMinutes: 20, totalKcal: 250 } : w)),
+  };
+  localStorage.setItem(CYCLES_KEY, JSON.stringify([cycle]));
+  setActiveCardioCycle(cycle);
+  return cycle;
+}
+
+const savedWeek = (no: number) => loadCardioCycles()[0].weeks.find(w => w.week === no)!;
+
+describe('конструктор недели: пресеты, цель и примечание отрезка', () => {
+  it('пресет заполняет работу/отдых/повторы, сохраняется в сессию и текст', () => {
+    const c = seed();
+    render(<CardioWeekEditor cycle={c} />);
+    fireEvent.click(screen.getByRole('button', { name: /Редактировать сессии/ }));
+    fireEvent.click(screen.getByLabelText('Интервалы сессии 1'));
+
+    fireEvent.click(screen.getByLabelText('Пресет интервалов 1'));
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: /Billat/ }));
+
+    expect((screen.getByLabelText('Работа отрезка 1, секунд') as HTMLInputElement).value).toBe('30');
+    expect((screen.getByLabelText('Отдых отрезка 1, секунд') as HTMLInputElement).value).toBe('30');
+    expect((screen.getByLabelText('Повторов отрезка 1') as HTMLInputElement).value).toBe('20');
+
+    fireEvent.click(screen.getByRole('button', { name: /Сохранить/ }));
+    const s = savedSession();
+    expect(s.structured).toHaveLength(1);
+    expect(s.structured![0]).toMatchObject({ workSec: 30, restSec: 30, reps: 20, target: 'pace' });
+    expect(s.purpose).toContain('⚡ Структура: 20×30 с/30 с');
+    // Структура 20×60 с = 20 мин; сессия поднята минимум до неё.
+    expect(s.durationMin).toBeGreaterThanOrEqual(20);
+  });
+
+  it('пресет другого типа меняет тип сессии при сохранении (Sweet Spot → MISS)', () => {
+    const c = seed();
+    render(<CardioWeekEditor cycle={c} />);
+    fireEvent.click(screen.getByRole('button', { name: /Редактировать сессии/ }));
+    fireEvent.click(screen.getByLabelText('Интервалы сессии 1'));
+    fireEvent.click(screen.getByLabelText('Пресет интервалов 1'));
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: /Sweet Spot/ }));
+    expect(screen.getByText(/тип сессии станет «MISS»/)).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: /Сохранить/ }));
+    const s = savedSession();
+    expect(s.type).toBe('miss');
+    expect(s.structured![0]).toMatchObject({ workSec: 720, restSec: 240, reps: 3, target: 'power' });
+  });
+
+  it('цель «пульс», диапазон и примечание уходят в таймер', () => {
+    const c = seed();
+    render(<CardioWeekEditor cycle={c} />);
+    fireEvent.click(screen.getByRole('button', { name: /Редактировать сессии/ }));
+    fireEvent.click(screen.getByLabelText('Интервалы сессии 1'));
+    fireEvent.click(screen.getByRole('button', { name: '+ Отрезок' }));
+
+    fireEvent.click(screen.getByLabelText('Цель отрезка 1'));
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: /^пульс$/ }));
+    fireEvent.change(screen.getByLabelText('Пульс от отрезка 1'), { target: { value: '150' } });
+    fireEvent.change(screen.getByLabelText('Пульс до отрезка 1'), { target: { value: '170' } });
+    fireEvent.change(screen.getByLabelText('Примечание отрезка 1'), { target: { value: 'держать ровно' } });
+    fireEvent.click(screen.getByRole('button', { name: /Сохранить/ }));
+
+    const block = savedSession().structured![0];
+    expect(block.target).toBe('hr');
+    expect(block.targetHr).toEqual({ min: 150, max: 170 });
+    expect(block.note).toBe('держать ровно');
+    // Таймер получает тот же пульс-диапазон на рабочих отрезках.
+    const plan = buildCardioIntervalPlan(savedSession())!;
+    expect(plan.steps.find(st => st.kind === 'work')!.hrZone).toEqual({ min: 150, max: 170 });
+  });
+});
+
+describe('конструктор недели: цель сессии и день новой сессии', () => {
+  it('цель сессии сохраняется по blur (не на каждый символ)', () => {
+    const c = seed();
+    render(<CardioWeekEditor cycle={c} />);
+    fireEvent.click(screen.getByRole('button', { name: /Редактировать сессии/ }));
+    const input = screen.getByLabelText('Цель сессии 1');
+    fireEvent.change(input, { target: { value: 'Темповая база' } });
+    // До blur в хранилище ещё старое значение.
+    expect(savedSession().purpose).toBe('Ручная сессия');
+    fireEvent.blur(input);
+    expect(savedSession().purpose).toBe('Темповая база');
+  });
+
+  it('новую сессию можно добавить сразу на выбранный день', () => {
+    const c = seed();
+    render(<CardioWeekEditor cycle={c} />);
+    fireEvent.click(screen.getByRole('button', { name: /Редактировать сессии/ }));
+    fireEvent.click(screen.getByLabelText('День новой сессии'));
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: /^Пт$/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Добавить сессию/ }));
+
+    const sessions = savedWeek(1).sessions;
+    expect(sessions).toHaveLength(2);
+    expect(sessions[1].dayOfWeek).toBe(4);
+  });
+});
+
+describe('конструктор недели: прогрессия по неделям и история версий', () => {
+  it('📈 раскладывает структуру на все недели с +1 повтором каждые 2 недели', () => {
+    const c = threeWeekHiitCycle();
+    render(<CardioWeekEditor cycle={c} />);
+    fireEvent.click(screen.getByRole('button', { name: /Редактировать сессии/ }));
+    fireEvent.click(screen.getByLabelText('Интервалы сессии 1'));
+    fireEvent.click(screen.getByRole('button', { name: '+ Отрезок' }));
+    fireEvent.change(screen.getByLabelText('Повторов отрезка 1'), { target: { value: '4' } });
+    fireEvent.click(screen.getByRole('button', { name: /На все недели/ }));
+
+    const w1 = savedWeek(1).sessions[0];
+    const w2 = savedWeek(2).sessions[0];
+    const w3 = savedWeek(3).sessions[0];
+    expect(w1.structured![0].reps).toBe(4);
+    expect(w2.structured![0].reps).toBe(4);
+    expect(w3.structured![0].reps).toBe(5);   // +1 за 2 недели
+    expect(w1.purpose).toContain('⚡ Структура');
+    expect(w2.purpose).toContain('⚡ Структура');
+    expect(w3.purpose).toContain('⚡ Структура');
+    // Прогрессия тоже не ломает бюджет таймера.
+    for (const s of [w1, w2, w3]) {
+      expect(cardioStructuredMainSec(s.structured)).toBeLessThanOrEqual(s.durationMin * 60);
+    }
+  });
+
+  it('🕘 история показывает версии и возвращает выбранную в два тапа', () => {
+    const c = seed();
+    saveCardioCycleVersion(c, 'до правки');
+    render(<CardioWeekEditor cycle={c} />);
+    fireEvent.click(screen.getByRole('button', { name: /Редактировать сессии/ }));
+    fireEvent.click(screen.getByRole('button', { name: /История/ }));
+    expect(screen.getByText('до правки')).toBeTruthy();
+
+    const first = screen.getByRole('button', { name: 'Восстановить версию' });
+    fireEvent.click(first);
+    const confirm = screen.getByRole('button', { name: 'Подтвердить восстановление версии' });
+    fireEvent.click(confirm);
+    expect(screen.getByRole('status').textContent).toContain('Версия восстановлена');
   });
 });

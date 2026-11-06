@@ -8,11 +8,13 @@ import {
   spreadSessionsAcrossDays, DAY_LABELS_RU, CARDIO_PHASE_LABELS,
   loadCardioCycles, saveCardioCycle, setActiveCardioCycle, kcalForCardio,
   saveCardioCycleVersion, latestCardioCycleVersion, restoreCardioCycleVersion,
+  cardioCycleVersions, restoreCardioCycleVersionById,
   cardioWeekForDate, cardioSafetyReport, cycleBodyWeight, cycleFfmKg, rebuildCycle, cardioWeekLegConflicts, cardioHiitInjectGate,
-  moveCardioSessionInWeek,
+  moveCardioSessionInWeek, maxHrClassic,
   CARDIO_EQUIPMENT_OPTIONS, cardioStructuredLabel, cardioStructuredMainSec,
   type CardioCycle, type CardioType, type CardioSession, type CardioWeek, type CardioEquipment, type CardioStructuredBlock,
 } from '../../../engines/lms/cardio.engine';
+import { CARDIO_INTERVAL_PRESETS, getCardioIntervalPreset } from '../../../engines/lms/cardio-interval-presets.engine';
 import { CARD, ROW, LABEL, HINT_SM, BTN, BTN_PRIMARY, BTN_DANGER, BTN_SMALL, SelectInput } from './CardioUI';
 
 const DAY_CELL: React.CSSProperties = {
@@ -46,22 +48,62 @@ function withStructNote(purpose: string | undefined, label: string | null): stri
 
 const clampInt = (v: number, min: number, max: number): number => Math.max(min, Math.min(max, Math.round(Number.isFinite(v) ? v : min)));
 
+const TARGET_OPTIONS: { value: string; label: string }[] = [
+  { value: '', label: 'без метки' },
+  { value: 'hr', label: 'пульс' },
+  { value: 'pace', label: 'темп' },
+  { value: 'power', label: 'мощность' },
+  { value: 'rpe', label: 'RPE' },
+];
+
+const fmtVersionAt = (iso: string): string => {
+  const d = new Date(iso);
+  if (!Number.isFinite(d.getTime())) return iso;
+  const p2 = (n: number) => String(n).padStart(2, '0');
+  return `${p2(d.getDate())}.${p2(d.getMonth() + 1)} ${p2(d.getHours())}:${p2(d.getMinutes())}`;
+};
+
+/** Цель сессии: черновик до blur/Enter, чтобы каждый символ не создавал
+ *  снапшот версии и не писал в localStorage. */
+const PurposeField: React.FC<{ purpose?: string; index: number; onCommit: (v: string) => void }> = ({ purpose, index, onCommit }) => {
+  const [v, setV] = useState(purpose ?? '');
+  useEffect(() => { setV(purpose ?? ''); }, [purpose]);
+  const commit = () => { if ((purpose ?? '') !== v) onCommit(v); };
+  return (
+    <input
+      value={v}
+      onChange={e => setV(e.target.value)}
+      onBlur={commit}
+      onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); }}
+      aria-label={`Цель сессии ${index + 1}`}
+      placeholder="цель сессии"
+      style={{ ...SEL, flex: '1 1 150px', minWidth: 0 }}
+    />
+  );
+};
+
 export const CardioWeekEditor: React.FC<{ cycle: CardioCycle | null; onChanged?: () => void }> = ({ cycle, onChanged }) => {
   const [weekNo, setWeekNo] = useState(1);
   const [flash, setFlash] = useState<string | null>(null);
   const [editSessions, setEditSessions] = useState(false);
   const [newType, setNewType] = useState<CardioType>('zone2');
   const [newEquip, setNewEquip] = useState<CardioEquipment | ''>('');
+  const [newDay, setNewDay] = useState('');
   // Открытая панель структуры интервалов + черновик (сохраняется кнопкой,
   // чтобы каждое нажатие стрелки не плодило версии и записи в localStorage).
   const [structIdx, setStructIdx] = useState<number | null>(null);
   const [structDraft, setStructDraft] = useState<CardioStructuredBlock[]>([]);
+  // Тип сессии, который диктует выбранный протокол (Sweet Spot — MISS,
+  // Tabata — HIIT): применяется вместе с 💾, а не в момент выбора пресета.
+  const [structTypeDraft, setStructTypeDraft] = useState<CardioType | null>(null);
+  const [histOpen, setHistOpen] = useState(false);
+  const [confirmVerId, setConfirmVerId] = useState<string | null>(null);
   const [dragIdx, setDragIdx] = useState<number | null>(null);
   const [dragOverDay, setDragOverDay] = useState<number | null>(null);
 
   // Смена недели закрывает панель структуры: иначе черновик одной недели
   // сохранялся бы в сессию с тем же индексом на другой неделе.
-  useEffect(() => { setStructIdx(null); setStructDraft([]); }, [weekNo]);
+  useEffect(() => { setStructIdx(null); setStructDraft([]); setStructTypeDraft(null); }, [weekNo]);
 
   const week: CardioWeek | null = useMemo(() => {
     if (!cycle) return null;
@@ -187,22 +229,35 @@ export const CardioWeekEditor: React.FC<{ cycle: CardioCycle | null; onChanged?:
         kcalPerSession: kcalForCardio(newType, 30, bw, newEquip || undefined, csex, ffm),
         purpose: 'Ручная сессия',
         equipment: newEquip || undefined,
+        dayOfWeek: newDay === '' ? undefined : Number(newDay),
       }],
     }));
   };
 
   // ─── Структура интервалов (⚡): черновик → 💾 сохранить ───
   const openStructure = (idx: number) => {
-    if (structIdx === idx) { setStructIdx(null); setStructDraft([]); return; }
+    if (structIdx === idx) { setStructIdx(null); setStructDraft([]); setStructTypeDraft(null); return; }
     const src = week?.sessions[idx]?.structured;
     setStructIdx(idx);
     setStructDraft(Array.isArray(src) ? src.map(b => ({ ...b })) : []);
+    setStructTypeDraft(null);
   };
   const patchBlock = (bi: number, patch: Partial<CardioStructuredBlock>) => {
     setStructDraft(prev => prev.map((b, i) => (i === bi ? { ...b, ...patch } : b)));
   };
   const addBlock = () => setStructDraft(prev => [...prev, { workSec: 60, restSec: 60, reps: 8 }]);
   const removeBlock = (bi: number) => setStructDraft(prev => prev.filter((_, i) => i !== bi));
+
+  /** Пресет → черновик структуры. HRmax берём из возраста в конфиге (220-age),
+   *  без него пресет строит блок без targetHr — никаких выдуманных пульсов. */
+  const applyPreset = (presetId: string) => {
+    const p = getCardioIntervalPreset(presetId);
+    if (!p) return;
+    const age = cycle?.config?.age;
+    const hrMax = typeof age === 'number' && age > 0 ? maxHrClassic(age, cycle?.config?.sex) : undefined;
+    setStructDraft([p.build(hrMax ? { hrMax } : {})]);
+    setStructTypeDraft(p.sessionType);
+  };
 
   const saveStructure = (idx: number) => {
     const s = week?.sessions[idx];
@@ -218,9 +273,11 @@ export const CardioWeekEditor: React.FC<{ cycle: CardioCycle | null; onChanged?:
       structured: blocks.length > 0 ? blocks : undefined,
       durationMin: dur,
       purpose: withStructNote(s.purpose, label),
+      ...(structTypeDraft && structTypeDraft !== s.type ? { type: structTypeDraft } : {}),
     });
     setStructIdx(null);
     setStructDraft([]);
+    setStructTypeDraft(null);
     if (needMin > s.durationMin) {
       flashMsg(`⚡ Структура сохранена · сессия увеличена до ${dur} мин, чтобы все отрезки влезли`);
     } else {
@@ -228,8 +285,75 @@ export const CardioWeekEditor: React.FC<{ cycle: CardioCycle | null; onChanged?:
     }
   };
 
+  /**
+   * Прогрессия структуры по остальным неделям: та же работа/отдых, но +1
+   * повтор за каждые 2 недели после текущей (не больше +50% и 30 повторов).
+   * Длительность сессии поднимается, если основная часть не влезает.
+   * Одно явное действие с версией для отмены — никакой «магии» в фоне.
+   */
+  const progressAcrossWeeks = (idx: number) => {
+    const src = week?.sessions[idx];
+    const blocks = structDraft.filter(b => b.workSec > 0 && b.reps > 0);
+    if (!cycle || !week || !src || blocks.length === 0) return;
+    const nextType = structTypeDraft ?? src.type;
+    // Не затираем чужой протокол: раскладываем только на сессии того же типа,
+    // у которых структуры нет или она ровно такая же, как у исходной.
+    const srcSig = JSON.stringify(src.structured ?? []);
+    const sameStruct = (s: CardioSession) => !s.structured || JSON.stringify(s.structured) === srcSig;
+    saveCardioCycleVersion(cycle, `прогрессия структуры с недели ${week.week}`);
+    let touched = 0;
+    const weeks = cycle.weeks.map(w => {
+      if (w.week < week.week) return w;
+      const elapsed = w.week - week.week;
+      const sessions = w.sessions.map((s, si) => {
+        const isSource = w.week === week.week && si === idx;
+        if (!isSource && (s.type !== nextType || !sameStruct(s))) return s;
+        const scaled = blocks.map(b => ({
+          ...b,
+          reps: Math.max(1, Math.min(30, b.reps + Math.min(Math.floor(elapsed / 2), Math.ceil(b.reps * 0.5)))),
+        }));
+        const mainSec = cardioStructuredMainSec(scaled);
+        const dur = Math.max(s.durationMin, Math.ceil(mainSec / 60));
+        touched++;
+        return {
+          ...s,
+          type: nextType,
+          structured: scaled,
+          durationMin: dur,
+          kcalPerSession: kcalForCardio(nextType, dur, bw, s.equipment, csex, ffm),
+          purpose: withStructNote(s.purpose, cardioStructuredLabel(scaled)) ?? s.purpose,
+        };
+      });
+      return rebuildTotals({ ...w, sessions });
+    });
+    const next = rebuildCycle({ ...cycle, weeks });
+    saveCardioCycle(next);
+    setActiveCardioCycle(next);
+    setStructIdx(null);
+    setStructDraft([]);
+    setStructTypeDraft(null);
+    onChanged?.();
+    flashMsg(`📈 Структура разложена на ${touched} сессий: +1 повтор каждые 2 недели (отмена — «↩ Вернуть»)`);
+  };
+
+  /** Восстановление конкретной версии: первый тап — подтверждение, второй — вернуть. */
+  const restoreVersionRow = (vid: string) => {
+    if (!cycle) return;
+    if (confirmVerId !== vid) { setConfirmVerId(vid); return; }
+    const restored = restoreCardioCycleVersionById(vid);
+    if (!restored) { flashMsg('⚠ Версия не найдена'); setConfirmVerId(null); return; }
+    // Текущее состояние тоже сохраняем, чтобы восстановление было обратимым.
+    saveCardioCycleVersion(cycle, 'перед восстановлением версии');
+    saveCardioCycle(restored);
+    setActiveCardioCycle(restored);
+    setConfirmVerId(null);
+    onChanged?.();
+    flashMsg('↩ Версия восстановлена');
+  };
+
   if (!cycle || !week) return null;
 
+  const versions = histOpen ? cardioCycleVersions(cycle.id) : [];
   const draftLabel = cardioStructuredLabel(structDraft);
   const draftMainSec = cardioStructuredMainSec(structDraft);
   const draftNeedMin = Math.max(5, Math.ceil(draftMainSec / 60));
@@ -316,7 +440,31 @@ export const CardioWeekEditor: React.FC<{ cycle: CardioCycle | null; onChanged?:
         <button style={BTN_SMALL} onClick={() => setEditSessions(v => !v)}>{editSessions ? '▾ Скрыть сессии' : '✏️ Редактировать сессии'}</button>
         {week.week < cycle.totalWeeks && <button style={BTN_SMALL} onClick={copyToNext} title="Скопировать сессии недели в следующую">⧉ В след. неделю</button>}
         {hasVersion && <button style={BTN_SMALL} onClick={undoVersion} title="Отменить последнюю правку">↩ Вернуть</button>}
+        <button style={BTN_SMALL} onClick={() => { setHistOpen(v => !v); setConfirmVerId(null); }} aria-expanded={histOpen} title="Все сохранённые версии этого цикла">
+          🕘 История{hasVersion ? ` (${cardioCycleVersions(cycle.id).length})` : ''}
+        </button>
       </div>
+
+      {histOpen && (
+        <div data-cardio="week-history" style={{ display: 'flex', flexDirection: 'column', gap: 5, padding: '8px 10px', borderRadius: 10, background: 'rgba(59,130,246,0.06)', border: '1px solid rgba(59,130,246,0.24)' }}>
+          <div style={{ fontSize: 11, fontWeight: 800, color: '#93c5fd' }}>🕘 Версии цикла — новые сверху</div>
+          {versions.length === 0 && <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)' }}>Пока нет версий: они создаются перед каждой правкой недели/подстройкой.</div>}
+          {versions.map(v => (
+            <div key={v.id} style={{ ...ROW, gap: 6 }}>
+              <span style={{ fontSize: 10.5, color: '#fff', fontVariantNumeric: 'tabular-nums' }}>{fmtVersionAt(v.savedAt)}</span>
+              <span style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.72)', flex: '1 1 90px', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={v.reason}>{v.reason}</span>
+              <button
+                style={{ ...BTN_SMALL, ...(confirmVerId === v.id ? { border: '1px solid rgba(239,68,68,0.5)', color: '#fca5a5' } : {}) }}
+                onClick={() => restoreVersionRow(v.id)}
+                aria-label={confirmVerId === v.id ? 'Подтвердить восстановление версии' : 'Восстановить версию'}
+              >
+                {confirmVerId === v.id ? 'Точно вернуть?' : '↩ Вернуть'}
+              </button>
+            </div>
+          ))}
+          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', lineHeight: 1.45 }}>Хранится до 10 версий на цикл; при восстановлении текущее состояние тоже сохраняется в историю.</div>
+        </div>
+      )}
 
       {editSessions && (
         <div role="list" style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -369,29 +517,64 @@ export const CardioWeekEditor: React.FC<{ cycle: CardioCycle | null; onChanged?:
                     {structLabel ? `⚡ ${structLabel}` : '⚡ Интервалы (ровный темп)'}
                   </button>
                 </div>
+                <div style={{ ...ROW, marginTop: 2 }}>
+                  <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.6)' }}>📝 Цель</span>
+                  <PurposeField purpose={s.purpose} index={idx} onCommit={v => updateSession(idx, { purpose: v })} />
+                </div>
                 {isOpen && (
                   <div data-cardio="week-structured" style={{ marginTop: 6, padding: '9px 10px', borderRadius: 10, background: 'rgba(0,230,138,0.05)', border: '1px solid rgba(0,230,138,0.24)', display: 'flex', flexDirection: 'column', gap: 8 }}>
                     <div style={{ fontSize: 11, fontWeight: 850, color: '#fff' }}>⚡ Структура: работа / отдых / повторы</div>
                     <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.62)', lineHeight: 1.45 }}>
                       Таймер ведёт по этим отрезкам. Разминка и заминка — из остатка длительности (до 20 мин каждая); сама структура не обрезается.
                     </div>
+                    <div style={ROW}>
+                      <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.6)' }}>Протокол</span>
+                      <SelectInput value="" onChange={applyPreset} ariaLabel={`Пресет интервалов ${idx + 1}`} width={190}
+                        options={[{ value: '', label: '— выбрать протокол —' }, ...CARDIO_INTERVAL_PRESETS.map(p => ({ value: p.id, label: p.title }))]} />
+                    </div>
+                    {structTypeDraft && structTypeDraft !== s.type && (
+                      <div style={{ fontSize: 10.5, color: '#fbbf24', fontWeight: 700 }}>При сохранении тип сессии станет «{TYPE_LABEL[structTypeDraft]}» — так требует протокол.</div>
+                    )}
                     {structDraft.length === 0 && (
                       <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)' }}>Отрезков нет — сессия идёт ровным темпом.</div>
                     )}
                     {structDraft.map((b, bi) => (
-                      <div key={bi} style={ROW}>
-                        <input type="number" inputMode="numeric" value={b.workSec}
-                          onChange={e => patchBlock(bi, { workSec: clampInt(Number(e.target.value), 5, 1800) })}
-                          style={NUM} aria-label={`Работа отрезка ${bi + 1}, секунд`} />
-                        <span style={{ fontSize: 10, color: '#fff' }}>с работа /</span>
-                        <input type="number" inputMode="numeric" value={b.restSec}
-                          onChange={e => patchBlock(bi, { restSec: clampInt(Number(e.target.value), 0, 1800) })}
-                          style={NUM} aria-label={`Отдых отрезка ${bi + 1}, секунд`} />
-                        <span style={{ fontSize: 10, color: '#fff' }}>с отдых ×</span>
-                        <input type="number" inputMode="numeric" value={b.reps}
-                          onChange={e => patchBlock(bi, { reps: clampInt(Number(e.target.value), 1, 30) })}
-                          style={{ ...NUM, width: 54 }} aria-label={`Повторов отрезка ${bi + 1}`} />
-                        <button style={BTN_DANGER} onClick={() => removeBlock(bi)} aria-label={`Удалить отрезок ${bi + 1}`}>✕</button>
+                      <div key={bi} style={{ display: 'flex', flexDirection: 'column', gap: 4, padding: '6px 0', borderTop: bi > 0 ? '1px solid rgba(255,255,255,0.06)' : 'none' }}>
+                        <div style={ROW}>
+                          <input type="number" inputMode="numeric" value={b.workSec}
+                            onChange={e => patchBlock(bi, { workSec: clampInt(Number(e.target.value), 5, 1800) })}
+                            style={NUM} aria-label={`Работа отрезка ${bi + 1}, секунд`} />
+                          <span style={{ fontSize: 10, color: '#fff' }}>с работа /</span>
+                          <input type="number" inputMode="numeric" value={b.restSec}
+                            onChange={e => patchBlock(bi, { restSec: clampInt(Number(e.target.value), 0, 1800) })}
+                            style={NUM} aria-label={`Отдых отрезка ${bi + 1}, секунд`} />
+                          <span style={{ fontSize: 10, color: '#fff' }}>с отдых ×</span>
+                          <input type="number" inputMode="numeric" value={b.reps}
+                            onChange={e => patchBlock(bi, { reps: clampInt(Number(e.target.value), 1, 30) })}
+                            style={{ ...NUM, width: 54 }} aria-label={`Повторов отрезка ${bi + 1}`} />
+                          <button style={BTN_DANGER} onClick={() => removeBlock(bi)} aria-label={`Удалить отрезок ${bi + 1}`}>✕</button>
+                        </div>
+                        <div style={ROW}>
+                          <SelectInput value={b.target ?? ''} onChange={v => patchBlock(bi, v
+                            ? { target: v as NonNullable<CardioStructuredBlock['target']>, ...(v !== 'hr' ? { targetHr: undefined } : {}) }
+                            : { target: undefined, targetHr: undefined })}
+                            ariaLabel={`Цель отрезка ${bi + 1}`} width={115} options={TARGET_OPTIONS} />
+                          {b.target === 'hr' && (
+                            <>
+                              <input type="number" inputMode="numeric" value={b.targetHr?.min ?? ''} placeholder="от"
+                                onChange={e => { const n = Number(e.target.value); patchBlock(bi, { targetHr: { ...b.targetHr, min: e.target.value === '' ? undefined : clampInt(n, 80, 220) } }); }}
+                                style={{ ...NUM, width: 62 }} aria-label={`Пульс от отрезка ${bi + 1}`} />
+                              <span style={{ fontSize: 10, color: '#fff' }}>–</span>
+                              <input type="number" inputMode="numeric" value={b.targetHr?.max ?? ''} placeholder="до"
+                                onChange={e => { const n = Number(e.target.value); patchBlock(bi, { targetHr: { ...b.targetHr, max: e.target.value === '' ? undefined : clampInt(n, 80, 220) } }); }}
+                                style={{ ...NUM, width: 62 }} aria-label={`Пульс до отрезка ${bi + 1}`} />
+                              <span style={{ fontSize: 10, color: '#fff' }}>уд/мин</span>
+                            </>
+                          )}
+                          <input value={b.note ?? ''} onChange={e => patchBlock(bi, { note: e.target.value })}
+                            placeholder="примечание (таймер покажет)" aria-label={`Примечание отрезка ${bi + 1}`}
+                            style={{ ...SEL, flex: '1 1 110px', minWidth: 0 }} />
+                        </div>
                       </div>
                     ))}
                     <div style={ROW}>
@@ -399,6 +582,11 @@ export const CardioWeekEditor: React.FC<{ cycle: CardioCycle | null; onChanged?:
                       <button style={BTN_SMALL} onClick={() => setStructDraft([])} disabled={structDraft.length === 0}>Очистить</button>
                       <span style={{ flex: 1 }} />
                       <button style={BTN_PRIMARY} onClick={() => saveStructure(idx)}>💾 Сохранить</button>
+                    </div>
+                    <div style={ROW}>
+                      <button style={BTN_SMALL} onClick={() => progressAcrossWeeks(idx)} disabled={structDraft.length === 0} title="Разложить структуру на эту и последующие недели с прогрессией повторов">
+                        📈 На все недели (+1 повтор / 2 нед)
+                      </button>
                     </div>
                     <div style={{ fontSize: 11, fontWeight: 750, color: draftTooLong ? '#fbbf24' : 'rgba(255,255,255,0.68)', lineHeight: 1.45 }} role="status">
                       {draftLabel ? `${draftLabel} · основная часть ${Math.round(draftMainSec / 60)} мин` : 'Ровный темп'}
@@ -416,6 +604,8 @@ export const CardioWeekEditor: React.FC<{ cycle: CardioCycle | null; onChanged?:
               options={TYPES.filter(t => hiitGate.allowed || (t !== 'hiit' && t !== 'miss')).map(t => ({ value: t, label: TYPE_LABEL[t] }))} />
             <SelectInput value={newEquip} onChange={v => setNewEquip(v as CardioEquipment | '')} ariaLabel="Оборудование новой сессии" width={140}
               options={[{ value: '', label: '⚙ Авто' }, ...CARDIO_EQUIPMENT_OPTIONS.map(e => ({ value: e.id, label: `${e.icon} ${e.label}` }))]} />
+            <SelectInput value={newDay} onChange={setNewDay} ariaLabel="День новой сессии" width={120}
+              options={[{ value: '', label: '📅 Авто' }, ...DAY_LABELS_RU.map((d, di) => ({ value: String(di), label: `${d}${legDays.has(di) ? ' (ноги)' : ''}` }))]} />
             <button style={BTN_PRIMARY} onClick={addSession}>+ Добавить сессию</button>
           </div>
         </div>

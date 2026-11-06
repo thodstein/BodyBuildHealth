@@ -14,7 +14,7 @@
  * Калибровка — через параметры, без выдуманных темпов: если HRmax
  * неизвестен — зоны не ставятся, интенсивность задаётся текстом/RPE.
  */
-import type { CardioEquipment, CardioStructuredBlock, CardioType } from './cardio.engine';
+import type { CardioEquipment, CardioLevel, CardioPhase, CardioStructuredBlock, CardioType } from './cardio.engine';
 
 export interface CardioIntervalPreset {
   id: 'norwegian-4x4' | 'billat-30-30' | 'tabata' | 'rst-10x10' | 'sit-8x20' | 'hiit-opt-140'
@@ -173,4 +173,110 @@ export const CARDIO_INTERVAL_PRESETS: CardioIntervalPreset[] = [
 
 export function getCardioIntervalPreset(id: string): CardioIntervalPreset | undefined {
   return CARDIO_INTERVAL_PRESETS.find(p => p.id === id);
+}
+
+// ─── Вписывание/прогрессия структуры (аудит 2026-11, 12-й проход) ───
+
+/** Сколько минут длительности оставляем на разминку+заминку при вписывании
+ *  структуры в сессию. Меньше — нечестно: таймер режет края до нуля. */
+export const STRUCTURED_EDGE_MIN = 10;
+
+/**
+ * Вписать протокол в длительность сессии: работа/отдых не меняются,
+ * подрезаются только ПОВТОРЫ (`reps`), чтобы основная часть + разминка и
+ * заминка влезли в бюджет. `null` — даже минимум повторов не влезает,
+ * структуру ставить нельзя (иначе `buildCardioIntervalPlan` переполнит сессию).
+ */
+export function fitStructuredToDuration(
+  block: CardioStructuredBlock,
+  durationMin: number,
+  opts: { minReps?: number; edgeMin?: number } = {},
+): CardioStructuredBlock | null {
+  const perRep = block.workSec + Math.max(0, block.restSec);
+  if (!(perRep > 0) || !(durationMin > 0)) return null;
+  const edgeMin = Math.max(0, Math.round(opts.edgeMin ?? STRUCTURED_EDGE_MIN));
+  const budgetSec = Math.max(0, Math.round(durationMin * 60) - edgeMin * 60);
+  const fits = Math.floor(budgetSec / perRep);
+  const minReps = Math.max(1, Math.round(opts.minReps ?? 1));
+  if (fits < minReps) return null;
+  return { ...block, reps: Math.max(minReps, Math.min(block.reps, fits)) };
+}
+
+/**
+ * Прогрессия повторов по неделям цикла: +1 повтор за каждые `perWeeks`
+ * недель, но не больше `maxExtraPct` от базы. В базовой фазе/на 1-й неделе
+ * прирост нулевой — никакого «плана, который сразу тяжелее заявленного».
+ */
+export function progressStructuredReps(
+  baseReps: number,
+  week: number,
+  opts: { perWeeks?: number; maxExtraPct?: number; maxReps?: number } = {},
+): number {
+  const base = Math.max(1, Math.round(baseReps));
+  const perWeeks = Math.max(1, Math.round(opts.perWeeks ?? 2));
+  const capPct = Math.max(0, opts.maxExtraPct ?? 0.5);
+  const extra = Math.min(
+    Math.ceil(base * capPct),
+    Math.floor(Math.max(0, Math.round(week) - 1) / perWeeks),
+  );
+  return Math.max(1, Math.min(Math.round(opts.maxReps ?? 30), base + extra));
+}
+
+/** Фазы, в которых цикл прогрессирует (база/taper/peak — без прироста повторов). */
+const PROGRESSING_PHASES: ReadonlySet<CardioPhase> = new Set(['build', 'contest_prep', 'maintenance']);
+
+/** Применить недельную прогрессию к блоку (с учётом фазы). */
+export function progressStructuredBlock(
+  block: CardioStructuredBlock,
+  opts: { week: number; phase?: CardioPhase; perWeeks?: number; maxExtraPct?: number },
+): CardioStructuredBlock {
+  if (opts.phase && !PROGRESSING_PHASES.has(opts.phase)) return block;
+  const reps = progressStructuredReps(block.reps, opts.week, {
+    perWeeks: opts.perWeeks,
+    maxExtraPct: opts.maxExtraPct,
+  });
+  return reps === block.reps ? block : { ...block, reps };
+}
+
+export interface GeneratedHiitStructure {
+  block: CardioStructuredBlock;
+  /** Короткая машинная подпись для purpose: «SIT 8×20 с / 10 с». */
+  text: string;
+}
+
+/** Оборудование, на котором SIT 8×20 выполним (ходьба/плавание — нет). */
+const SIT_EQUIPMENT: ReadonlySet<CardioEquipment> = new Set(['running', 'cycling', 'rowing', 'elliptical']);
+
+/**
+ * Канонический протокол для HIIT-сессии, которую СГЕНЕРИРОВАЛ конструктор.
+ * Генератор раньше писал «Метаболический стимул, EPOC» без единой цифры:
+ * таймер шёл одним отсчётом, и спортсмен сам придумывал интервалы. Теперь
+ * генератор сам назначает SIT 8×20/10 (Hov: +3.3% VO2max, время-эффективно),
+ * пишет ту же цифру в текст сессии и отдаёт машинную структуру.
+ * `null` — оборудование не позволяет спринт или протокол не влезает в минуты.
+ */
+export function buildGeneratedHiitStructure(opts: {
+  durationMin: number;
+  equipment?: CardioEquipment;
+  level?: CardioLevel;
+  week?: number;
+  phase?: CardioPhase;
+}): GeneratedHiitStructure | null {
+  const equip = opts.equipment ?? 'running';
+  if (!SIT_EQUIPMENT.has(equip)) return null;
+  const level: CardioLevel = opts.level ?? 'intermediate';
+  const baseReps = level === 'beginner' ? 6 : level === 'advanced' ? 10 : 8;
+  const progressed = progressStructuredBlock(
+    { workSec: 20, restSec: 10, reps: baseReps, target: 'rpe' },
+    { week: opts.week ?? 1, phase: opts.phase },
+  );
+  const fitted = fitStructuredToDuration(progressed, opts.durationMin, { minReps: 4 });
+  if (!fitted) return null;
+  return {
+    block: {
+      ...fitted,
+      note: `SIT: 20 с спринт / 10 с пауза ×${fitted.reps} (RPE 9-10)`,
+    },
+    text: `SIT ${fitted.reps}×20 с / 10 с (RPE 9-10)`,
+  };
 }
