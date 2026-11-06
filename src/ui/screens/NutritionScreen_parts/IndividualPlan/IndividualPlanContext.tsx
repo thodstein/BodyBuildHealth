@@ -3843,6 +3843,9 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
           goalFatG: _applyPrepTargets ? _peakTargets.fatG : Math.round(Math.max(30, baseGoalF * (isRefeedDay ? 0.5 : 1)) + (_diaryActive ? diaryComp.delta.f : 0)),
            goalCarbsG: _applyPrepTargets ? _peakTargets.carbsG : Math.round(_waveC.carbsG + (_diaryActive ? diaryComp.delta.c * _dampC : 0)),
            manualTargetsLocked: kbjuMode === 'manual',
+          // QG52: справедливость приёмов в рецептурном контуре применяется ПОСЛЕ посадки
+          // блюд (§8.51) — движку сообщаем, что день дальше пересоберётся из рецептов.
+          recipeAssembly: generationModeRef.current === 'recipes',
            // P0-фикс: привязка к тренировке больше НЕ гейтится по plannerMode —
            // тумблер «Привязать к тренировкам» включён → пред-/пост-трен и тайминг
            // работают во ВСЕХ режимах (раньше в simple/minimal peri-окна молча

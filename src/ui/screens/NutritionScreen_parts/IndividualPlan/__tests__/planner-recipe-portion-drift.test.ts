@@ -21,6 +21,10 @@ const base = (over: any = {}): MealPlanInput => ({
   mealsCount: 10, isTrainingDay: false, budget: 'max' as const, dayOffset: 0,
   cyclePhase: 'course' as const, variety: 'max' as const, eveningLowCarb: false,
   quality: 'full' as const, randomSalt: 3, carbCapGPerKg: 0,
+  // QG52: этот файл моделирует РЕЦЕПТУРНЫЙ контур (движок → assembleRecipeDay) —
+  // как в продакшене (`generationMode === 'recipes'`): справедливость приёмов идёт
+  // после посадки блюд, а не в движке (§8.51).
+  recipeAssembly: true,
   wakeTime: '07:00', bedTime: '23:00', dinnerTime: '19:00',
   ...over,
 } as any);

@@ -21,7 +21,7 @@ import { decomposeRecipe, pickRecipesForMeal, scaleComponentAmount, recipeViolat
 import { optimizeRecipePortionScales, maxRelativeDeviation } from './planner-recipe-optimizer';
 import { isHighCarbDay, extremeCapacityProfile } from './planner-carb-density';
 import { createDailyQuota, registerMealInQuota, blockedIdsForNextMeal, foodAvailableWithQuota, isProteinPowderId, stapleFamilyOf, isPortableFood, isWorkWindowMeal, isBreakfastBannedCarb, isBreakfastBannedProtein, hvStyleWidensTopups, HV_PRACTICAL_CARB_IDS, scaleQuotasForExtreme } from './food-availability';
-import { applyRealisticFloors, closeExtremeMicroGaps } from './meal-plan-engine';
+import { applyRealisticFloors, closeExtremeMicroGaps, applyMealFairness } from './meal-plan-engine';
 import { correctDayToTargets } from './day-target-corrector';
 import { toRawPurchaseAmount } from './planner-weight-mode';
 import type { RecipeMatchOptions, CookProfile } from './recipe-engine';
@@ -2520,6 +2520,16 @@ export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDa
         }
       }
     }
+  }
+
+  // QG52: справедливость приёмов — ПОСЛЕ посадки блюд (§8.51). В продуктовом контуре её
+  // зовёт сам движок; здесь она нужна, потому что до посадки выравнивание меняет выбор
+  // рецептов и сходимость дня уезжает (замер: plain 2600 2.6 % → 4.4 %). Перенос идёт
+  // тем же продуктом с той же плотностью, поэтому калории/Б/Ж/У дня не меняются —
+  // девиация, посчитанная ниже, остаётся той же; меняется только раскладка по приёмам.
+  if (!args.portableMode && outMeals.some((m: any) => !!m?.target)) {
+    const _ffTot = sumDayTotals(outMeals as any);
+    applyMealFairness(outMeals as any[], _ffTot as any, Number(args.athleteWeightKg) || 0, notes);
   }
 
   // Тримы/доборы меняют тоталы — пересчитываем честную девиацию (иначе врём на ~1 п.п.).

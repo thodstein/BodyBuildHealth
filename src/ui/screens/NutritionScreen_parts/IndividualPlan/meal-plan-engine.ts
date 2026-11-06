@@ -120,6 +120,11 @@ export interface MealPlanInput {
   goalFatG: number;
   goalCarbsG: number;
   manualTargetsLocked?: boolean;
+  /** QG52: день будет пересобран из готовых рецептов (`assembleRecipeDay`). В этом
+   *  контуре справедливость приёмов применяется ПОСЛЕ посадки блюд, а не в движке —
+   *  иначе меняется выбор рецептов (§8.51). Ставит `IndividualPlanContext` при
+   *  `generationMode === 'recipes'`. */
+  recipeAssembly?: boolean;
   mealsCount: number;
   isTrainingDay: boolean;
   trainStartMin?: number;
@@ -501,6 +506,131 @@ function applyLastMilePortions(
   // (−4.9 %) вызван не «последней милей», а приёмом без белка: обед = картофель 199 г +
   // спаржа 200 г. Пост-обработка тут дала бы крошку (35 г курицы) или изолят вместо еды —
   // лечится в сборке приёма (каждый основной приём несёт белок), отдельная стадия QG47.
+  return changed;
+}
+
+/**
+ * QG52: «голодный приём — это не еда» (перенос еды внутри дня тем же продуктом).
+ *
+ * Замер (§8.51): на 60 днях (10 профилей × 4/5/6 приёмов × трен/отдых) **12 приёмов
+ * в 8 днях** заканчивались «не едой» — меньше половины СВОЕЙ цели по ккал либо
+ * <150 ккал при недоборе: `c1500/4 тр` — «Перекус 3» 108 ккал при цели 453,
+ * `small60/4 тр` — перекус 48 из 169, `cutF50/6 тр` — завтрак 104 из 260.
+ * Источник — корректор дня: чтобы свести суммы, он стягивает калории в 1–2 мейна.
+ *
+ * Стадия снимает часть гибкого углеводного носителя с приёма, перекормленного
+ * относительно СВОЕЙ цели, и отдаёт голодному. Перенос **пропорциональный** (плотность
+ * позиции сохраняется бит-в-бит): калории/Б/Ж/У дня не меняются, канон 3 % не может
+ * пострадать по построению (§8.51: пересчёт из FOOD_DB давал +12 % — позиция несёт
+ * плотность отваренного/рецептурного варианта, а запись в БД — сухого).
+ *
+ * Гарды: «голодный» = <50 % своей цели ЛИБО <150 ккал при недоборе заметнее 10 %
+ * (абсолютный пол не применяется к тонким дням, где цель приёма сама <150 ккал);
+ * донор обязан остаться едой (≥150 ккал); приёмник не выходит за свою цель (+25 ккал);
+ * перенос ≥20 г; оценка дня не падает — иначе откат.
+ *
+ * Контур: продуктовый путь зовёт стадию из `buildDayPlan`; рецептурный — ПОСЛЕ посадки
+ * рецептов (`assembleRecipeDay`), иначе выравнивание меняет выбор блюд и сходимость
+ * рецептурного дня уезжает (замер: plain 2600 2.6 % → 4.4 %, лок ≤4 %).
+ */
+export function applyMealFairness(
+  meals: any[],
+  totals: any,
+  weightKg: number,
+  notes: string[],
+): boolean {
+  const MAIN = new Set(['breakfast', 'lunch', 'dinner', 'snack', 'snack2', 'snack3', 'snack4', 'snack5', 'snack6']);
+  const kcalOf = (m: any) => Number(m?.totals?.kcal) || 0;
+  const tgtKcal = (m: any) => (m?.target
+    ? 4 * (Number(m.target.p) || 0) + 9 * (Number(m.target.f) || 0) + 4 * (Number(m.target.c) || 0)
+    : 0);
+  const isFlexCarb = (x: any) => (x?.role === 'carb_slow' || x?.role === 'carb_fast') && !x?._fixedGrams;
+  /** Копия позиции с другой граммовкой: плотность сохраняется, пересчёта из БД нет. */
+  const scaledCopy = (src: any, grams: number) => {
+    const r = grams / Math.max(1e-6, Number(src?.amount) || 0);
+    const out: any = { ...src, amount: Math.round(grams) };
+    for (const k of ['p', 'f', 'c', 'kcal', 'fiber']) {
+      if (typeof src?.[k] === 'number') out[k] = Math.round(src[k] * r * 10) / 10;
+    }
+    if (typeof src?.leucine_mg === 'number') out.leucine_mg = Math.round(src.leucine_mg * r);
+    delete out._fixedGrams;
+    return out;
+  };
+  const scoreOf = () => scoreDayQuality(meals as any[], {
+    weightKg: Number(weightKg) || 0,
+    microCoverage: { lowCount: 0, total: 16 },
+  });
+  let changed = false;
+  for (let pass = 0; pass < 3; pass++) {
+    const hungry = (meals || [])
+      .filter((m: any) => MAIN.has(String(m.type)) && tgtKcal(m) > 0)
+      .filter((m: any) => {
+        const k = kcalOf(m);
+        if (!(k > 0)) return false;
+        const t = tgtKcal(m);
+        return k < t * 0.5 || (k < 150 && k < t * 0.9);
+      })
+      .sort((a: any, b: any) => kcalOf(a) / Math.max(1, tgtKcal(a)) - kcalOf(b) / Math.max(1, tgtKcal(b)))[0];
+    if (!hungry) break;
+    const needKcal = tgtKcal(hungry) - kcalOf(hungry);
+    if (needKcal < 60) break;
+    const donors = (meals || [])
+      .filter((m: any) => m !== hungry && MAIN.has(String(m.type)))
+      .map((m: any) => ({ m, over: kcalOf(m) - tgtKcal(m) }))
+      .filter((x: any) => x.over > 30)
+      .sort((a: any, b: any) => b.over - a.over);
+    let applied = false;
+    for (const d of donors) {
+      const dIt: any = (d.m.items || [])
+        .filter(isFlexCarb)
+        .sort((a: any, b: any) => (Number(b.c) || 0) - (Number(a.c) || 0))[0];
+      if (!dIt) continue;
+      const dAmt = Number(dIt.amount) || 0;
+      const dDensity = (Number(dIt.kcal) || 0) / Math.max(1e-6, dAmt);
+      if (!(dDensity > 0)) continue;
+      const dKeep = Math.max(30, dAmt * 0.45);
+      const giveKcal = Math.min(needKcal, d.over, kcalOf(d.m) - 150, (dAmt - dKeep) * dDensity);
+      const addG = Math.floor(giveKcal / dDensity);
+      if (addG < 20) continue;
+      const host: any = (hungry.items || []).find((x: any) => isFlexCarb(x) && String(x.id) === String(dIt.id));
+      const hostCap = Math.min(Number(edibilityCapFor(String(dIt.id), 600)) || 600, 600);
+      const hostAmt = host ? Number(host.amount) || 0 : 0;
+      const g = Math.min(addG, hostCap - hostAmt);
+      if (g < 20) continue;
+      const snapH = host ? { ...host } : null;
+      const snapD = { ...dIt };
+      const q0 = scoreOf();
+      const moved = scaledCopy(dIt, g);
+      Object.assign(dIt, scaledCopy(dIt, dAmt - g));
+      if (host) {
+        Object.assign(host, scaledCopy(host, hostAmt + g));
+      } else {
+        hungry.items = [...(hungry.items || []), moved];
+      }
+      recalcMealTotals(meals as any[]);
+      recalcDayTotals(meals as any[], totals);
+      const q1 = scoreOf();
+      const donorOk = kcalOf(d.m) >= 150;
+      const hostOk = tgtKcal(hungry) <= 0 || kcalOf(hungry) <= tgtKcal(hungry) + 25;
+      if (!donorOk || !hostOk || q1.total < q0.total) {
+        Object.assign(dIt, snapD);
+        if (snapH) Object.assign(host, snapH);
+        else hungry.items = (hungry.items || []).filter((x: any) => x !== moved);
+        recalcMealTotals(meals as any[]);
+        recalcDayTotals(meals as any[], totals);
+        continue;
+      }
+      notes.push(
+        `🍽 «${String(hungry.label || hungry.type)}» добрана до еды: ${dIt.name} `
+        + `${host ? Math.round(hostAmt) : 0}→${Math.round(hostAmt + g)} г (перенос из «${String(d.m.label || d.m.type)}»: `
+        + `${Math.round(dAmt)}→${Math.round(dAmt - g)} г) — калории дня те же, приём ${Math.round(kcalOf(hungry))} из ${Math.round(tgtKcal(hungry))} ккал`,
+      );
+      applied = true;
+      changed = true;
+      break;
+    }
+    if (!applied) break;
+  }
   return changed;
 }
 
@@ -14639,6 +14769,17 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
         (id: string) => !combinedExcluded.has(id),
         notes as string[],
       );
+      // QG52: после всех доборов ни один приём не остаётся «не едой» (§8.51).
+      // В рецептурном контуре стадия зовётся ПОСЛЕ посадки блюд (`assembleRecipeDay`):
+      // выравнивание до посадки меняет выбор рецептов и ломает сходимость (замер §8.51).
+      if (!(input as any).recipeAssembly) {
+        applyMealFairness(
+          meals as any[],
+          totals,
+          Number(input.weightKg) || 0,
+          notes as string[],
+        );
+      }
     }
     const _finalFoodIds = new Set<string>();
     for (const m of meals) for (const it of (m.items || [])) _finalFoodIds.add(it.id);    // QG45: финальная страховка целостности перед микро/оценкой/витриной. Основная работа —
