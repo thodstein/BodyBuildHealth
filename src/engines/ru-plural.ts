@@ -42,6 +42,19 @@ export function ruAdjCount(n: number, adj: RuPluralForms, noun: RuPluralForms): 
   return `${n} ${ruForm(n, adj)} ${ruForm(n, noun)}`;
 }
 
+/**
+ * Дробное число: после дроби в русском всегда родительный единственного
+ * («4.7 сессии/нед», «14.5 сета/группа»), а `ruForm` по `trunc` дал бы
+ * форму «5+» («4.7 сессий»). Значение приходит уже отформатированным
+ * (`x.toFixed(1)`), чтобы не терять знаки после запятой; если после
+ * форматирования число целое («18.0»), работает обычное правило (сетов).
+ */
+export function ruFracCount(shown: number | string, forms: RuPluralForms): string {
+  const raw = typeof shown === 'number' ? shown : Number(String(shown).replace(',', '.'));
+  if (Number.isFinite(raw) && Number.isInteger(raw)) return `${shown} ${ruForm(raw, forms)}`;
+  return `${shown} ${forms[1]}`;
+}
+
 /** Прилагательные, которые встречаются в счёте (формы подобраны под род). */
 export const RU_ADJ_WORKING: RuPluralForms = ['рабочий', 'рабочих', 'рабочих'];
 export const RU_ADJ_TRAINING: RuPluralForms = ['тренировочный', 'тренировочных', 'тренировочных'];

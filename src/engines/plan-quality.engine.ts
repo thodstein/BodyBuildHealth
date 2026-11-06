@@ -14,7 +14,7 @@
  * Источники: Israetel M. (RP Strength 2021), Schoenfeld B. (2016), Helms E. (2019).
  */
 
-import { ruCount, ruAdjCount, RU_ADJ_CRITICAL_F, RU_ADJ_UNIQUE, RU_EXERCISES, RU_PROBLEMS, RU_SETS } from './ru-plural';
+import { ruCount, ruAdjCount, ruFracCount, RU_ADJ_CRITICAL_F, RU_ADJ_UNIQUE, RU_EXERCISES, RU_PROBLEMS, RU_SETS } from './ru-plural';
 import {
   checkSessionCap,
   deloadQualityCheck,
@@ -386,8 +386,8 @@ export function validatePlanQuality(input: PlanQualityInput): PlanQualityResult 
     if (goal === 'cut' && avgSets > 18) {
       issues.push({
         id: 'goal_cut_volume_high', severity: 'warning', category: 'volume',
-        message: `Цель «сушка» выбрана, но средний объём ${avgSets.toFixed(1)} сетов/группа > MAV — на дефиците риск перетрена`,
-        detail: `Выбрано: цель cut · План: ${avgSets.toFixed(1)} сетов/группа (MAV≈18)`,
+        message: `Цель «сушка» выбрана, но средний объём ${ruFracCount(avgSets.toFixed(1), RU_SETS)}/группа > MAV — на дефиците риск перетрена`,
+        detail: `Выбрано: цель cut · План: ${ruFracCount(avgSets.toFixed(1), RU_SETS)}/группа (MAV≈18)`,
         fix: `Снизить объём до MAV или сменить цель на mass/recomp`,
       });
     }
@@ -408,7 +408,7 @@ export function validatePlanQuality(input: PlanQualityInput): PlanQualityResult 
       issues.push({
         id: 'vol_goal_mrv_not_reached', severity: 'info', category: 'volume',
         message: `Цель объёма «максимальный (MRV)» выбрана, но ни одна группа не на MRV — план ниже выбранного уровня`,
-        detail: `Выбрано: ${vg} · План: макс ${Math.max(...Object.values(weeklySets as Record<string, number>)).toFixed(1)} сетов`,
+        detail: `Выбрано: ${vg} · План: макс ${ruFracCount(Math.max(...Object.values(weeklySets as Record<string, number>)).toFixed(1), RU_SETS)}`,
         fix: `Увеличить объём или сменить цель на MAV`,
       });
     }

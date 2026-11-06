@@ -11,7 +11,7 @@
  * Родительный после предлогов («до 2 сетов», «из 4 сетов») в проверку не входит.
  */
 import { describe, it, expect } from 'vitest';
-import { ruForm, ruCount, ruAdjCount, RU_ADJ_BUILT, RU_ADJ_CRITICAL_F, RU_ADJ_CRITICAL_M, RU_BLOCKS, RU_CONFLICTS, RU_CONFLICTS_DRUG, RU_EXERCISES, RU_PAIRS, RU_SETS, RU_TRAININGS, RU_WEEKS } from '../ru-plural';
+import { ruForm, ruCount, ruAdjCount, ruFracCount, RU_ADJ_BUILT, RU_ADJ_CRITICAL_F, RU_ADJ_CRITICAL_M, RU_BLOCKS, RU_CONFLICTS, RU_CONFLICTS_DRUG, RU_EXERCISES, RU_PAIRS, RU_SESSIONS, RU_SETS, RU_TRAININGS, RU_WEEKS } from '../ru-plural';
 import { buildBBPlan } from '../bb/bb-builder.engine';
 import { buildBBPlanReportText } from '../bb/bb-report.engine';
 import { buildBBPlanPrintHtml } from '../bb/bb-visual.engine';
@@ -50,6 +50,14 @@ describe('словари: род прилагательного и фразов�
   it('«собранный блок» — мужской род (было «1 собранная блок»)', () => {
     expect(ruAdjCount(1, RU_ADJ_BUILT, RU_BLOCKS)).toBe('1 собранный блок');
     expect(ruAdjCount(3, RU_ADJ_BUILT, RU_BLOCKS)).toBe('3 собранных блока');
+  });
+
+  it('дробное число — родительный единственного, целое в «.0» — обычное правило', () => {
+    expect(ruFracCount(4.7.toFixed(1), RU_SESSIONS)).toBe('4.7 сессии');
+    expect(ruFracCount(14.5.toFixed(1), RU_SETS)).toBe('14.5 сета');
+    expect(ruFracCount(18.0.toFixed(1), RU_SETS)).toBe('18.0 сетов');
+    expect(ruCount(5.7, RU_SETS)).toBe('5.7 сетов'); // ловушка: trunc(5.7) = 5 → форма «5+»
+    expect(ruFracCount(5.7.toFixed(1), RU_SETS)).toBe('5.7 сета');
   });
 });
 

@@ -3,7 +3,7 @@
  * Scoring + rationale по аналогии с lms-selector / split-selector.
  */
 import { SPLIT_PATTERNS, type SplitPattern } from './bb-split-patterns';
-import { ruAdjCount, RU_ADJ_LEG, RU_SESSIONS } from '../ru-plural';
+import { ruAdjCount, ruFracCount, RU_ADJ_LEG, RU_SESSIONS } from '../ru-plural';
 import { normLevel } from '../volume-landmarks.engine';
 import { TAG_MUSCLES } from './bb-day-types';
 import { WEAK_TO_MUSCLE } from './bb-builder.engine';
@@ -94,28 +94,28 @@ export function rankBBSplits(input: BBSelectorInput): BBRankedPattern[] {
       //  • перебор 1 день → +8, 2 → −5, ≥3 → −15.
       if (Math.abs(diff) <= 0.5) {
         score += 60;
-        rationale.push(`~${eff.toFixed(1)} сессий/нед — точно под ${input.daysPerWeek} дн.`);
+        rationale.push(`~${ruFracCount(eff.toFixed(1), RU_SESSIONS)}/нед — точно под ${input.daysPerWeek} дн.`);
       } else if (diff < 0) {
         const under = -diff;
         if (under <= 1.5) {
           score += 30;
-          rationale.push(`~${eff.toFixed(1)} сессий/нед — на ${under.toFixed(1)} меньше ${input.daysPerWeek} (допустимо)`);
+          rationale.push(`~${ruFracCount(eff.toFixed(1), RU_SESSIONS)}/нед — на ${under.toFixed(1)} меньше ${input.daysPerWeek} (допустимо)`);
         } else if (under <= 2.5) {
           score += 12;
-          rationale.push(`~${eff.toFixed(1)} сессий/нед — на ${under.toFixed(1)} меньше ${input.daysPerWeek}`);
+          rationale.push(`~${ruFracCount(eff.toFixed(1), RU_SESSIONS)}/нед — на ${under.toFixed(1)} меньше ${input.daysPerWeek}`);
         } else {
           score -= 12;
-          warnings.push(`~${eff.toFixed(1)} сессий/нед сильно меньше ${input.daysPerWeek} (−${under.toFixed(1)})`);
+          warnings.push(`~${ruFracCount(eff.toFixed(1), RU_SESSIONS)}/нед сильно меньше ${input.daysPerWeek} (−${under.toFixed(1)})`);
         }
       } else if (diff <= 1.5) {
         score += 12;
-        rationale.push(`~${eff.toFixed(1)} сессий/нед — чуть больше ${input.daysPerWeek}`);
+        rationale.push(`~${ruFracCount(eff.toFixed(1), RU_SESSIONS)}/нед — чуть больше ${input.daysPerWeek}`);
       } else if (diff <= 2.5) {
         score -= 10;
-        warnings.push(`~${eff.toFixed(1)} сессий/нед > ${input.daysPerWeek} (превышение +${diff.toFixed(1)})`);
+        warnings.push(`~${ruFracCount(eff.toFixed(1), RU_SESSIONS)}/нед > ${input.daysPerWeek} (превышение +${diff.toFixed(1)})`);
       } else {
         score -= 25;
-        warnings.push(`~${eff.toFixed(1)} сессий/нед > ${input.daysPerWeek} (превышение +${diff.toFixed(1)})`);
+        warnings.push(`~${ruFracCount(eff.toFixed(1), RU_SESSIONS)}/нед > ${input.daysPerWeek} (превышение +${diff.toFixed(1)})`);
       }
     }
 
@@ -350,8 +350,8 @@ export function splitFitWarnings(input: BBSelectorInput, patternId: string): str
   if (input.daysPerWeek != null) {
     const eff = p.sessionsPerRotation * 7 / p.rotationDays;
     const diff = eff - input.daysPerWeek;
-    if (diff > 1.5) out.push(`${eff.toFixed(1)} сессий/нед при ${input.daysPerWeek} доступных днях — план нереализуем`);
-    else if (diff < -2.5) out.push(`только ${eff.toFixed(1)} сессий/нед при ${input.daysPerWeek} днях — недоиспользуете неделю`);
+    if (diff > 1.5) out.push(`${ruFracCount(eff.toFixed(1), RU_SESSIONS)}/нед при ${input.daysPerWeek} доступных днях — план нереализуем`);
+    else if (diff < -2.5) out.push(`только ${ruFracCount(eff.toFixed(1), RU_SESSIONS)}/нед при ${input.daysPerWeek} днях — недоиспользуете неделю`);
   }
   if (input.sex === 'male' && patternId.startsWith('female_')) out.push('сплит для женского профиля');
   const highVolumeDemand = lvl === 'enhanced' || (input.peds || []).length > 0;
