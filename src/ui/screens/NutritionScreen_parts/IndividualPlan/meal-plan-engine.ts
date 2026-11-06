@@ -14788,6 +14788,74 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
       recalcMealTotals(meals as any[]);
       recalcDayTotals(meals as any[], totals);
     }
+    // ─── §8.57: авто-перекус, когда тарелка не влезает ───────────────────────────
+    // Ведро — арифметика «N приёмов × кап массы»: 2065 г еды на 3000 ккал (1.45 ккал/г)
+    // при 4 приёмах = 500–880 г на тарелку. Ни раскладка (QG53), ни плотные носители
+    // (§8.56: GL и Ca уходят из канона) вёдра не чинят. Единственный рычаг, не трогающий
+    // оси, — добавить приём и перенести в него половину крупнейшего гарнира.
+    // Включается флагом `autoExtraMeal` (решение владельца), по умолчанию выключено.
+    if ((input as any).autoExtraMeal) {
+      const _skip57 = new Set(['liquid', 'supplement']);
+      const _mass57 = (m: any) => (m.items || [])
+        .filter((i: any) => !_skip57.has(String(i.role || '')))
+        .reduce((s: number, i: any) => s + (Number(i.amount) || 0), 0);
+      const _heavy57 = [...meals].filter((m: any) => _mass57(m) > 500).sort((a: any, b: any) => _mass57(b) - _mass57(a));
+      let _added57 = 0;
+      for (const hm of _heavy57) {
+        const _snackN = meals.filter((m: any) => /^snack/.test(String(m.type))).length;
+        if (_snackN >= 8) break;
+        const _carb57: any = (hm.items || [])
+          .filter((i: any) => (i.role === 'carb_slow' || i.role === 'carb_fast') && (Number(i.amount) || 0) >= 120)
+          .sort((a: any, b: any) => (Number(b.amount) || 0) - (Number(a.amount) || 0))[0];
+        if (!_carb57) continue;
+        const _move = Math.round((Number(_carb57.amount) || 0) * 0.5);
+        const _r = _move / Math.max(1, Number(_carb57.amount) || 1);
+        const _loser: any = { ..._carb57, amount: _move };
+        for (const k of ['p', 'f', 'c', 'kcal', 'fiber', 'leucine_mg']) {
+          if (_loser[k]) _loser[k] = Math.round(Number(_loser[k]) * _r * 10) / 10;
+        }
+        _carb57.amount = Math.round((Number(_carb57.amount) || 0) - _move);
+        for (const k of ['p', 'f', 'c', 'kcal', 'fiber', 'leucine_mg']) {
+          if (_carb57[k]) _carb57[k] = Math.round(Number(_carb57[k]) * (1 - _r) * 10) / 10;
+        }
+        const _type57 = `snack${_snackN + 1}`;
+        // Вместе с гарниром переносим половину белкового пункта: перекус только из углеводов
+        // роняет ось «белок ядра» (замер: avg 91.25 → 82.88 без этого).
+        const _prot57: any = (hm.items || [])
+          .filter((i: any) => (i.role === 'protein' || i.role === 'fast_protein' || i.role === 'slow_protein') && (Number(i.amount) || 0) >= 60)
+          .sort((a: any, b: any) => (Number(b.amount) || 0) - (Number(a.amount) || 0))[0];
+        const _extra57: any[] = [];
+        if (_prot57) {
+          const _mv = Math.round((Number(_prot57.amount) || 0) * 0.5);
+          const _rp = _mv / Math.max(1, Number(_prot57.amount) || 1);
+          const _lp: any = { ..._prot57, amount: _mv };
+          for (const k of ['p', 'f', 'c', 'kcal', 'fiber', 'leucine_mg']) {
+            if (_lp[k]) _lp[k] = Math.round(Number(_lp[k]) * _rp * 10) / 10;
+          }
+          _prot57.amount = Math.round((Number(_prot57.amount) || 0) - _mv);
+          for (const k of ['p', 'f', 'c', 'kcal', 'fiber', 'leucine_mg']) {
+            if (_prot57[k]) _prot57[k] = Math.round(Number(_prot57[k]) * (1 - _rp) * 10) / 10;
+          }
+          _extra57.push(_lp);
+        }
+        meals.push({
+          label: `Перекус ${_snackN + 1}`,
+          time: '',
+          items: [_loser, ..._extra57],
+          totals: { kcal: 0, p: 0, f: 0, c: 0, fiber: 0 },
+          type: _type57,
+          rationale: ['Перекус добавлен, потому что тарелка не влезала в один приём (§8.57).'],
+          mpsCheck: true,
+          target: { p: Math.round(_loser.c ? 0 : 0), c: Math.round(_loser.c || 0), f: 0 },
+        } as any);
+        recalcMealTotals(meals as any[]);
+        recalcDayTotals(meals as any[], totals);
+        _added57++;
+      }
+      if (_added57 > 0) {
+        notes.push(`➕ Добавлен${_added57 === 1 ? '' : 'о'} ${_added57} перекус(а/ов): тарелка не влезала в один приём — углеводы перенесены, КБЖУ дня те же.`);
+      }
+    }
     const _finalCategories: Record<string, number> = {};
     _finalFoodIds.forEach(id => { const f = FOOD_DB.find(x => x.id === id); const cat = f?.category || 'other'; _finalCategories[cat] = (_finalCategories[cat] || 0) + 1; });
     const _finalMicroTotals = sumMicros(meals.flatMap(m => m.items.map(it => ({ id: it.id, amount: it.amount }))), FOOD_DB as any);
