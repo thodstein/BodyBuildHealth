@@ -9679,8 +9679,16 @@ html.app-native .nd-root {
 }
 html.app-native .nd-tabs {
   position: sticky !important;
-  top: calc(max(env(safe-area-inset-top, 0px), 24px) + 56px) !important;
+  /* Скролл-контейнер дневника — .nutrition-tabs-body (шапка экрана вне его),
+   * поэтому закрепляем ровно по верхней кромке: раньше top был +56px от
+   * safe-area и лента табов «висела» посреди экрана поверх контента. */
+  top: 0 !important;
   z-index: 19 !important;
+  /* Лента табов едет поверх контента — фон должен быть плотным, иначе
+   * сквозь неё просвечивают карточки («наложение экранов»). */
+  background: rgba(9, 18, 34, 0.94) !important;
+  backdrop-filter: blur(14px) !important;
+  -webkit-backdrop-filter: blur(14px) !important;
   overflow-x: auto !important;
   scroll-snap-type: x proximity !important;
   scrollbar-width: none !important;
@@ -9848,7 +9856,8 @@ html.app-native .nd-mealbtn:active {
 }
 html.app-native .nd-dayactions {
   position: sticky !important;
-  bottom: calc(var(--nav-height) + max(env(safe-area-inset-bottom, 0px), 28px) + 8px) !important;
+  /* Над плавающей пилюлей (--nav-height+8 = 112px заезжал под неё: пилюля 38..114px). */
+  bottom: calc(var(--tabbar-lift) + 4px) !important;
   z-index: 18 !important;
   padding: 8px !important;
   border-radius: 16px !important;
@@ -9883,7 +9892,7 @@ html.app-native .nd-dayempty {
 }
 @media (max-width: 380px) {
   html.app-native .nd-tabs {
-    top: calc(max(env(safe-area-inset-top, 0px), 24px) + 52px) !important;
+    top: 0 !important;
   }
 }
 @media (max-width: 380px) {
@@ -9909,6 +9918,41 @@ html.app-native .nd-dayempty {
 @media (prefers-reduced-motion: reduce) {
   html.app-native .nd-dayrow {
     transform: none !important;
+  }
+}
+/* --- 89.1 DIARY PHONE FIT: на телефоне шапка дневника съедала первый экран —
+ * до строки поиска и до распознанных продуктов приходилось скроллить.
+ * Только компактность (размеры/паддинги), логика не тронута. --- */
+@media (max-width: 430px) {
+  html.app-native .food-diary .modern-hero {
+    padding: 12px !important;
+    border-radius: 16px !important;
+  }
+  html.app-native .food-diary .nd-tabs {
+    padding: 6px !important;
+    gap: 6px !important;
+  }
+  html.app-native .food-diary .nd-tab {
+    min-height: 48px !important;
+    padding: 8px 6px !important;
+  }
+  /* Третья строка таба (поиск/приёмы/итоги) на телефоне лишняя. */
+  html.app-native .food-diary .nd-tab > span:nth-of-type(3) {
+    display: none !important;
+  }
+  html.app-native .food-diary .nd-week {
+    padding: 10px !important;
+    border-radius: 16px !important;
+  }
+  html.app-native .food-diary .nd-weekday {
+    min-height: 62px !important;
+    padding: 6px 2px !important;
+  }
+  html.app-native .food-diary .nd-weeklegend {
+    display: none !important;
+  }
+  html.app-native .food-diary .nd-macros-card {
+    padding: 10px !important;
   }
 }
 /* --- 90. NUTRITION DIARY PRO-2: quality/mood/freq/sheets --- */
@@ -13829,7 +13873,7 @@ html.app-native .train-bbdiag [data-bb="export-row"] {
  * Только APK (html.app-native). TG/web — инлайны из TSX едины.
  * 1) hero на весь экран (бьёт §73 top:24px — позже и точнее);
  * 2) тело вкладок до низа без чёрной ямы (12px над пилюлей вместо 140px);
- * 3) плавающая строка добавления еды + шапка рациона sticky;
+ * 3) строка добавления еды sticky НАД пилюлей (не под ней) + шапка рациона sticky;
  * 4) FAB генерации fixed над пилюлей;
  * 5) весь серый текст блока → белый (только color-свойство, рамки/фоны целы);
  * 6) тапер: APK-press/focus/tabular/тач-норма. */
@@ -13844,15 +13888,23 @@ html.app-native .nutrition-hero {
   overflow: hidden !important;
 }
 html.app-native .nutrition-tabs-body {
-  padding: 0 12px calc(var(--nav-height) + max(env(safe-area-inset-bottom, 0px), 28px) + 12px) !important;
+  /* +8px под закреплённую строку добавления: последняя позиция не прячется. */
+  padding: 0 12px calc(var(--tabbar-lift) + 8px) !important;
 }
-html.app-native .nd-add-sticky {
-  position: sticky !important;
-  top: 0 !important;
-  z-index: 18 !important;
-  background: rgba(9, 18, 34, 0.92) !important;
-  backdrop-filter: blur(14px) !important;
-  -webkit-backdrop-filter: blur(14px) !important;
+/* Строка добавления: закреплена над пилюлей навигации, а не под ней.
+ * Раньше bottom считался от --nav-height (84px) при пилюле 38..114px —
+ * кнопка физически лежала ПОД навигацией, тап уходил в неё. */
+html.app-native .nd-ocr-actions {
+  bottom: calc(var(--tabbar-lift) + 4px) !important;
+  z-index: 22 !important;
+  border-radius: 16px !important;
+}
+/* Глобальный FAB быстрой записи (z-index 1200) висит ровно над пилюлей —
+ * в дневнике он накрывал правую часть закреплённой строки «Добавить»,
+ * и тап уходил в FAB вместо кнопки. В дневнике FAB не нужен: у него своя
+ * строка добавления. Старые WebView без :has просто покажут FAB как раньше. */
+html.app-native:has(.food-diary) .native-fab-wrap {
+  display: none !important;
 }
 html.app-native .plan-tabbar-sticky {
   position: sticky !important;

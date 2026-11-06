@@ -128,6 +128,28 @@ describe('Дневник: сохранение распознанных скри
     expect(screen.getByLabelText('Разобрать заново')).toBeTruthy();
   });
 
+  it('поиск не sticky, а строка добавления закреплена над пилюлей навигации', async () => {
+    const { container } = render(<NutritionDiary foodEntries={[]} />);
+
+    // Карточка поиска — в потоке: иначе она накрывала распознанные продукты.
+    expect(container.querySelector('.nd-add-sticky')).toBeNull();
+
+    fireEvent.click(screen.getByLabelText('Текст'));
+    fireEvent.change(screen.getByLabelText('Текст для распознавания'), {
+      target: { value: 'Курица 200 г 330 ккал Б:35 Ж:7 У:0' },
+    });
+    fireEvent.click(screen.getByLabelText('Распознать'));
+    await waitFor(() => expect(screen.getByText(/На очереди \(1\)/)).toBeTruthy());
+
+    const actions = container.querySelector('.nd-ocr-actions') as HTMLElement;
+    expect(actions).toBeTruthy();
+    expect(actions.style.position).toBe('sticky');
+    // bottom от --nav-height уводил кнопку ПОД пилюлю навигации — тап не работал.
+    expect(actions.style.bottom).toContain('--tabbar-lift');
+    // Дублирующая кнопка прямо в карточке очереди — видна без прокрутки.
+    expect(screen.getByLabelText('Добавить позиции в дневник')).toBeTruthy();
+  });
+
   it('после добавления уводит на «День», чтобы результат было видно', async () => {
     const { container } = render(<NutritionDiary foodEntries={[]} />);
     const fileInput = container.querySelector('input[type="file"][accept="image/*"]') as HTMLInputElement;

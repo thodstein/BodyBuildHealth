@@ -222,6 +222,32 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
     return () => { cancelled = true; };
   }, [debouncedSearch]);
 
+  // После распознавания очередь продуктов должна быть видна сразу: раньше она
+  // оставалась ниже высокой карточки поиска, и экран «распознано» не находился.
+  const queueRef = useRef<HTMLDivElement>(null);
+  const ocrPanelRef = useRef<HTMLDivElement>(null);
+  const prevParsedCount = useRef(parsedItems.length);
+  useEffect(() => {
+    const prev = prevParsedCount.current;
+    prevParsedCount.current = parsedItems.length;
+    if (prev === 0 && parsedItems.length > 0) {
+      const el = queueRef.current;
+      if (el && typeof el.scrollIntoView === 'function') {
+        try { el.scrollIntoView({ block: 'start', behavior: 'smooth' }); } catch { /* WebView без options */ }
+      }
+    }
+  }, [parsedItems.length]);
+
+  // Открыли «Текст» — сразу показываем панель вставки, а не оставляем её
+  // где-то ниже быстрых действий вне экрана.
+  useEffect(() => {
+    if (!showOCR) return;
+    const el = ocrPanelRef.current;
+    if (el && typeof el.scrollIntoView === 'function') {
+      try { el.scrollIntoView({ block: 'start', behavior: 'smooth' }); } catch { /* WebView без options */ }
+    }
+  }, [showOCR]);
+
   const [editingIdx, setEditingIdx] = useState<number>(-1);
   const [editName, setEditName] = useState('');
   const [editQty, setEditQty] = useState(100);
@@ -255,11 +281,14 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
 
   return (
     <div className="nd-add" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-      {/* Search — плавающая закреплённая строка (sticky): поиск + приёмы всегда под рукой */}
-      <div className="nd-search nd-add-sticky" style={{ padding: 14, borderRadius: 18, background: '#18181b', border: '1px solid rgba(255,255,255,0.08)', boxShadow: '0 2px 12px rgba(0,0,0,0.15)', position: 'static', top:0, zIndex:18 }}>
+      {/* Поиск + приёмы — обычная карточка в потоке.
+          Раньше вся эта карточка была sticky сверху: когда в неё открывались
+          результаты поиска / быстрые действия / OCR, она становилась выше
+          экрана и накрывала распознанные продукты вместе с кнопкой «Добавить». */}
+      <div className="nd-search" style={{ padding: 14, borderRadius: 18, background: '#18181b', border: '1px solid rgba(255,255,255,0.08)', boxShadow: '0 2px 12px rgba(0,0,0,0.15)' }}>
         <div style={{ display:'flex', gap:6, alignItems:'center' }}>
           <input type="text" value={foodSearch} onChange={e => onFoodSearchChange(e.target.value)}
-            aria-label="Поиск продуктов" placeholder="🔍 Поиск продуктов... (начните вводить 2 буквы)" autoFocus
+            aria-label="Поиск продуктов" placeholder="🔍 Поиск продуктов... (начните вводить 2 буквы)"
             className="nd-search-input"
             style={{ flex:1, padding: '12px 14px', borderRadius: 12, background: '#202023',
               border: '1px solid rgba(255,255,255,0.06)', color: '#fff', fontSize: 16, boxSizing: 'border-box',
@@ -606,7 +635,7 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
       {(showOCR || parsedItems.length > 0) && (
       <div className="nd-ocr-wrap" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
       {showOCR && (
-        <div className="nd-ocr" style={{ padding: 14, borderRadius: 16, background: '#18181b', border: '1px solid rgba(255,255,255,0.06)' }}>
+        <div ref={ocrPanelRef} className="nd-ocr" style={{ padding: 14, borderRadius: 16, background: '#18181b', border: '1px solid rgba(255,255,255,0.06)', scrollMarginTop: 96 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
             <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.85)', fontWeight: 600 }}>Скриншот из приложения калорий</span>
             <button onClick={onOcrClose} aria-label="Закрыть OCR"
@@ -659,7 +688,7 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
 
       {/* Parsed items queue */}
       {parsedItems.length > 0 && (
-        <div className="nd-queue" style={{ padding: 14, borderRadius: 16, background: 'rgba(0,230,138,0.04)', border: '1px solid rgba(0,230,138,0.15)' }}>
+        <div ref={queueRef} className="nd-queue" style={{ padding: 14, borderRadius: 16, background: 'rgba(0,230,138,0.04)', border: '1px solid rgba(0,230,138,0.15)', scrollMarginTop: 96 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
             <span style={{ fontSize: 12, color: '#00e68a', fontWeight: 700 }}>📋 На очереди ({parsedItems.length})</span>
             <span style={{ fontSize: 9, fontWeight: 700, padding: '3px 8px', borderRadius: 999, background: 'rgba(0,230,138,0.10)', color: '#00e68a', border: '1px solid rgba(0,230,138,0.15)' }}>{mealType || 'Приём пищи'}</span>
@@ -780,6 +809,14 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
               ✨ Микронутриенты
             </button>
           </div>
+          {/* Кнопка добавления прямо в карточке очереди: видна без прокрутки,
+              даже если закреплённая строка ниже ушла под навигацию. */}
+          <button onClick={onSaveItems} aria-label="Добавить позиции в дневник" className="nd-ocr-add-inline"
+            style={{ width: '100%', marginTop: 8, padding: '12px', borderRadius: 10, border: 'none', cursor: 'pointer',
+              background: 'linear-gradient(135deg,#00e68a,#00c8a0)', color: '#000', fontWeight: 800, fontSize: 12,
+              minHeight: 48, boxShadow: '0 4px 16px rgba(0,230,138,0.22)' }}>
+            💾 Добавить {parsedItems.length} поз. в дневник
+          </button>
         </div>
       )}
 
@@ -813,16 +850,21 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
         </details>
       )}
 
-      {/* Закреплённая строка добавления: всегда на одном месте, не «бегает» */}
-      <div className="nd-ocr-actions" style={{ position: 'sticky', bottom: 'calc(var(--nav-height, 0px) + 8px)', zIndex: 3, display: 'flex', gap: 8, padding: 8, borderRadius: 14, background: 'linear-gradient(180deg, rgba(24,24,27,0.88), #18181b)', border: '1px solid rgba(0,230,138,0.18)', backdropFilter: 'blur(12px)', boxShadow: '0 -6px 20px rgba(0,0,0,0.35)' }}>
-        <button onClick={onSaveItems} aria-label="Сохранить" disabled={parsedItems.length === 0} className="nd-ocr-add"
-          style={{ width: '100%', padding: '12px', borderRadius: 10, border: 'none', cursor: parsedItems.length ? 'pointer' : 'not-allowed',
-            background: parsedItems.length ? 'linear-gradient(135deg,#00e68a,#00c8a0)' : 'rgba(255,255,255,0.07)',
-            color: parsedItems.length ? '#000' : 'rgba(255,255,255,0.4)', fontWeight: 800, fontSize: 12, minHeight: 48,
-            boxShadow: parsedItems.length ? '0 4px 16px rgba(0,230,138,0.22)' : 'none' }}>
+      {/* Закреплённая строка добавления: стоит над плавающей пилюлей навигации
+          (раньше bottom считался от --nav-height и кнопка уходила ПОД пилюлю —
+          тап попадал в навигацию, поэтому «добавление не работало»).
+          Показываем только когда есть что добавлять. */}
+      {parsedItems.length > 0 && (
+      <div className="nd-ocr-actions" style={{ position: 'sticky', bottom: 'var(--tabbar-lift, calc(var(--nav-height, 76px) + max(env(safe-area-inset-bottom, 0px), 28px) + 18px))', zIndex: 22, display: 'flex', gap: 8, padding: 8, borderRadius: 14, background: 'linear-gradient(180deg, rgba(24,24,27,0.94), #18181b)', border: '1px solid rgba(0,230,138,0.18)', backdropFilter: 'blur(12px)', boxShadow: '0 -6px 20px rgba(0,0,0,0.35)' }}>
+        <button onClick={onSaveItems} aria-label="Сохранить" className="nd-ocr-add"
+          style={{ width: '100%', padding: '12px', borderRadius: 10, border: 'none', cursor: 'pointer',
+            background: 'linear-gradient(135deg,#00e68a,#00c8a0)',
+            color: '#000', fontWeight: 800, fontSize: 12, minHeight: 48,
+            boxShadow: '0 4px 16px rgba(0,230,138,0.22)' }}>
           💾 Добавить {parsedItems.length} поз. в дневник
         </button>
       </div>
+      )}
       </div>
       )}
 
