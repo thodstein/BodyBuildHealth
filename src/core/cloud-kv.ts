@@ -803,8 +803,8 @@ async function pullIdb(byKey: Map<string, KvRow[]>): Promise<number> {
   let metaChanged = false;
   const remoteKeys = new Set<string>();
   const activeSpace = currentSpaceId();
-  // Записи ЧУЖИХ пространств (дома): кладём в базу именно того пространства, но
-  // только если она уже есть — пустые базы атлетов на телефоне тренера не нужны.
+  // Записи ЧУЖИХ пространств (дома): кладём в базу именно того пространства, чтобы
+  // сводки в списке атлетов обновлялись без перехода в его данные.
   const knownSpaces = new Set(readRegistryFromStorage().spaces.map(s => s.id));
   const foreign = new Map<
     string,
@@ -837,9 +837,9 @@ async function pullIdb(byKey: Map<string, KvRow[]>): Promise<number> {
         continue;
       }
       if (prev && prev.ts > remoteTs) continue; // локальная копия новее
-      // Отметку «синхронизировано» ставим ТОЛЬКО после успешной записи: если базы
-      // пространства на устройстве нет, локального состояния не меняем, иначе при
-      // первом входе запись сочли бы удалённой локально и удалили в облаке.
+      // Отметку «синхронизировано» ставим ТОЛЬКО после успешной записи: если базу
+      // не удалось открыть, локального состояния не меняем, иначе при первом входе
+      // запись сочли бы удалённой локально и удалили в облаке.
       const bucket = foreign.get(parsed.space) ?? { records: {}, meta: [] };
       (bucket.records[parsed.store] ||= []).push(rec);
       bucket.meta.push({ key: k, sig: remoteSig, ts: remoteTs });
@@ -881,7 +881,7 @@ async function pullIdb(byKey: Map<string, KvRow[]>): Promise<number> {
   for (const [spaceId, bucket] of foreign) {
     try {
       const written = await putSpaceRecords(spaceId, bucket.records);
-      if (written == null) continue; // базы нет — локальное состояние не трогаем
+      if (written == null) continue; // базу не открыли — локальное состояние не трогаем
       for (const m of bucket.meta) idbMeta.set(m.key, { sig: m.sig, ts: m.ts });
       applied += written;
       metaChanged = true;

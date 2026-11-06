@@ -1,6 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
-const dbm = vi.hoisted(() => ({ stores: {} as Record<string, Record<string, unknown[]>> }));
+const dbm = vi.hoisted(() => ({
+  stores: {} as Record<string, Record<string, unknown[]>>,
+  fail: new Set<string>(),
+}));
 
 /**
  * База пространства: в тестах достаточно «какие записи есть в базе SID».
@@ -15,9 +18,9 @@ vi.mock('../db', () => ({
   },
   readSpaceStores: async (spaceId: string) => dbm.stores[spaceId] ?? {},
   putSpaceRecords: async (spaceId: string, records: Record<string, unknown[]>) => {
-    const target = dbm.stores[spaceId];
-    // Как у настоящей функции: базы нет — не создаём и возвращаем null.
-    if (!target) return null;
+    // Как у настоящей функции: базу не открыли — null, иначе пишем (создавая её).
+    if (dbm.fail.has(spaceId)) return null;
+    const target = (dbm.stores[spaceId] ||= {});
     let n = 0;
     for (const [store, recs] of Object.entries(records)) {
       const list = (target[store] ||= []);
@@ -165,6 +168,7 @@ beforeEach(() => {
   _resetDataSpaceCache();
   localStorage.clear();
   for (const k of Object.keys(dbm.stores)) delete dbm.stores[k];
+  dbm.fail.clear();
   vi.useRealTimers();
 });
 
@@ -219,8 +223,8 @@ describe('токен пространства в облаке', () => {
   it('дома записи дневника атлета доезжают в его базу — сводки свежие без перехода', async () => {
     setRegistry(HOME_SPACE_ID);
     seedToken(SID, SPACE_TOKEN);
-    // База атлета на устройстве уже есть (её открывали раньше). Пустую не создаём.
-    dbm.stores[SID] = {};
+    // База атлета на устройстве уже есть (её открывали раньше).
+    dbm.stores[SID] = { training_log: [{ id: 'old' }] };
     const transport = new TokenTransport();
     const kvKey = `idb:${SID}:training_log:w1`;
     transport.seed(
@@ -231,21 +235,36 @@ describe('токен пространства в облаке', () => {
     );
     await init(transport);
     const rows = (dbm.stores[SID] as { training_log?: { id: string }[] }).training_log ?? [];
-    expect(rows.map(r => r.id)).toContain('w1');
+    // дописываем, а не заменяем: прошлая история остаётся
+    expect(rows.map(r => r.id)).toEqual(['old', 'w1']);
+    // и запись считается синхронизированной — второй раз её не переписываем
+    expect(localStorage.getItem(IDB_META_KEY) ?? '').toContain(kvKey);
   });
 
-  it('дома не создаёт базу атлета, которую ни разу не открывали', async () => {
+  it('дома создаёт базу атлета, если записи пришли, а базы ещё не было', async () => {
     setRegistry(HOME_SPACE_ID);
     seedToken(SID, SPACE_TOKEN);
     const transport = new TokenTransport();
     const kvKey = `idb:${SID}:training_log:w2`;
     transport.seed(SPACE_TOKEN, kvKey, JSON.stringify({ id: 'w2' }), Date.now() - 5_000);
     await init(transport);
-    expect(dbm.stores[SID]).toBeUndefined();
-    // Базы нет — значит запись НЕ считается синхронизированной. Иначе при первом
-    // входе в пространство её сочли бы удалённой локально и удалили из облака.
+    // Иначе «сводка» по новому атлету врала бы: данные есть, а тренер их не видит.
+    expect(dbm.stores[SID]).toBeDefined();
+    const rows = (dbm.stores[SID] as { training_log?: { id: string }[] }).training_log ?? [];
+    expect(rows.map(r => r.id)).toEqual(['w2']);
+  });
+
+  it('если базу не удалось открыть, запись не считается синхронизированной', async () => {
+    setRegistry(HOME_SPACE_ID);
+    seedToken(SID, SPACE_TOKEN);
+    dbm.fail.add(SID);
+    const transport = new TokenTransport();
+    const kvKey = `idb:${SID}:training_log:w3`;
+    transport.seed(SPACE_TOKEN, kvKey, JSON.stringify({ id: 'w3' }), Date.now() - 5_000);
+    await init(transport);
+    // Иначе при первом входе в пространство запись сочли бы удалённой локально
+    // и удалили бы её из облака.
     expect(localStorage.getItem(IDB_META_KEY) ?? '').not.toContain(kvKey);
-    // и сама строка в облаке цела
     expect(transport.keys(SPACE_TOKEN)).toContain(kvKey);
   });
 

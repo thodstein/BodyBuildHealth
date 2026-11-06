@@ -337,15 +337,32 @@ describe('чтение и запись базы пространства', () =>
     expect(dbs.get(dbNameFor(sid))!.profile).toEqual([{ id: 'p1' }]);
   });
 
-  it('не создаёт базу пространства, которое на этом телефоне не открывали', async () => {
+  it('создаёт базу пространства, если записи пришли (сводки без перехода)', async () => {
+    const sid = athleteSpaceId('fresh');
     const { created, dbs } = stubDb({ [dbNameFor('home')]: {} });
-    const written = await putSpaceRecords(athleteSpaceId('nobody'), {
-      training_log: [{ id: 'x' }],
-    });
-    // null — это «базы нет»: вызывающий не должен считать запись синхронизированной
-    expect(written).toBeNull();
+    const written = await putSpaceRecords(sid, { training_log: [{ id: 'x' }] });
+    expect(written).toBe(1);
+    expect(created).toEqual([dbNameFor(sid)]);
+    expect(dbs.get(dbNameFor(sid))!.training_log).toEqual([{ id: 'x' }]);
+  });
+
+  it('пустая пачка не создаёт базу', async () => {
+    const { created, dbs } = stubDb({ [dbNameFor('home')]: {} });
+    await expect(putSpaceRecords(athleteSpaceId('nobody'), { training_log: [] })).resolves.toBe(0);
     expect(created).toEqual([]);
     expect(dbs.has(dbNameFor(athleteSpaceId('nobody')))).toBe(false);
+  });
+
+  it('если базу не удалось открыть — null, а не «записали 0»', async () => {
+    vi.stubGlobal('indexedDB', {
+      open() {
+        throw new Error('нет доступа');
+      },
+    });
+    // null важен: вызывающий не должен решить, что запись синхронизирована.
+    await expect(
+      putSpaceRecords(athleteSpaceId('a1'), { training_log: [{ id: 'x' }] }),
+    ).resolves.toBeNull();
   });
 
   it('запись без id пропускается (битая строка не срывает остальные)', async () => {
