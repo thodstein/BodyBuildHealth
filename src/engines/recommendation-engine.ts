@@ -1,4 +1,4 @@
-import { ruAdjCount, ruCount, RU_ADJ_CRITICAL_M, RU_ADJ_HIGH, RU_RECOMMENDATIONS, RU_RISKS } from './ru-plural';
+import { ruAdjCount, ruCount, ruFracCount, RU_ADJ_CRITICAL_M, RU_ADJ_ELITE, RU_ADJ_HIGH, RU_RECOMMENDATIONS, RU_RISKS, RU_SUPPLEMENTS, RU_SYNERGY_POINTS } from './ru-plural';
 import type { CalculatorState, CalculatorResult, LabSlice } from './support-plan/types';
 import { TZ_AUTO_BLACKLIST, sameClassIds } from './support-plan/shared-constants';
 import { PHARMA_DB } from '../core/pharma-database';
@@ -917,8 +917,8 @@ export function applyBoost(recs: Recommendation[], level: string): { recs: Recom
   for (const a of allIds) for (const b of boostIds) totalSyn += getSynergyScore(a, b);
 
   const message = [
-    `⚡ Усиление: +${boostIds.length} элитных препаратов`,
-    `+${totalSyn.toFixed(1)} очков синергии`,
+    `⚡ Усиление: +${ruAdjCount(boostIds.length, RU_ADJ_ELITE, RU_SUPPLEMENTS)}`,
+    `+${ruFracCount(totalSyn.toFixed(1), RU_SYNERGY_POINTS)} синергии`,
     `Доп. снижение риска ≈ ${riskReduction}%`,
   ].join(' · ');
 
