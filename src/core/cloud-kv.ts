@@ -21,18 +21,35 @@
  * edge function, верифицирующая Telegram initData серверным TELEGRAM_BOT_TOKEN.
  */
 
-import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { db } from './db';
 import {
   DATA_SPACE_KEY,
   HOME_SPACE_ID,
+  clearSessionSpaceData,
+  clearSpaceData,
   currentSpaceId,
+  deviceRawOrFallback,
+  isDeviceLevelKey,
+  readRegistryFromStorage,
+  removeSpace,
   spaceIdOfKey,
   spaceKeyPrefix,
   toLogicalKey,
   toPhysicalKey,
+  writeRegistryToStorage,
 } from './data-space';
 import { setSpacePurgeHandler } from './space-purge';
+import {
+  SPACE_TOKENS_KEY,
+  listLiveSpaceTokens,
+  markSpaceTokenMigrated,
+  mergeSpaceTokens,
+  randomSyncToken,
+  removeSpaceToken,
+  spaceTokenFor,
+  spaceTokenRecord,
+  writeSpaceTokenRecord,
+} from './space-tokens';
 import { COACH_AUDIT_KEY, mergeCoachAudit, serializeCoachAudit } from '../engines/coach/coach-audit.engine';
 
 export const CHUNK_SIZE = 100_000;
@@ -70,6 +87,22 @@ export const EXCLUDED_KEYS = new Set([
   LINKED_TG_TOKEN_KEY,
 ]);
 export const EXCLUDED_PREFIXES = ['he_sync_ts_', 'he_draft_', 'he_nav_', 'he_admin_', 'he_data_space_'];
+
+/**
+ * Служебная строка «доступ отозван» — лежит в облаке под токеном ПРОСТРАНСТВА.
+ *
+ * Зачем: тренер удалил атлета (или сменил код), а на телефоне атлета осталась
+ * локальная копия. Просто удалить строки из облака нельзя — телефон этого не
+ * увидит и продолжит показывать данные. Маркер переживает очистку (его ключ не
+ * попадает под префиксы пространства) и говорит телефону: сотри это пространство
+ * и вернись к своим данным.
+ */
+export const REVOKED_KEY_PREFIX = 'he_sys_revoked__';
+
+export function spaceRevokedKey(spaceId: string): string {
+  return REVOKED_KEY_PREFIX + spaceId;
+}
+
 
 export interface KvRow {
   id: string;
@@ -278,10 +311,7 @@ export async function initKvSync(
     if (opts?.transport) {
       transport = opts.transport;
     } else {
-      const client = createClient(SUPABASE_URL, SUPABASE_ANON, {
-        global: { headers: { 'x-user-token': token } },
-      });
-      transport = new SupabaseKvTransport(client);
+      transport = new SupabaseKvTransport();
     }
   } catch (e) {
     setState({ status: 'error', error: (e as Error)?.message || 'kv init failed' });
@@ -416,6 +446,7 @@ export function _resetKvForTests(): void {
   setSpacePurgeHandler(null);
   applyingRemote = false;
   pulling = false;
+  spacePullCursor = 0;
   dirtyDuringPull.clear();
   reloadFn = () => { try { if (typeof location !== 'undefined') location.reload(); } catch { /* no-op */ } };
   if (flushTimer != null) { clearTimeout(flushTimer); flushTimer = null; }
@@ -532,6 +563,33 @@ export function _ownsKvKey(k: string): boolean {
   if (physical) return physical.spaceId === space;
   return space === HOME_SPACE_ID;
 }
+
+/**
+ * Пространство, которому принадлежит физический ключ синхронизации (null — home
+ * или ключ устройства).
+ */
+function spaceOfSyncKey(k: string): string | null {
+  if (k.startsWith(IDB_KV_PREFIX)) {
+    const parsed = parseIdbKvKey(k);
+    return parsed && parsed.space !== HOME_SPACE_ID ? parsed.space : null;
+  }
+  return spaceIdOfKey(k)?.spaceId ?? null;
+}
+
+/**
+ * Под каким токеном ключ живёт в облаке.
+ *
+ * По умолчанию — токен владельца устройства. Пространство, у которого есть
+ * ПЕРЕНОС под собственный токен (`migratedAt`), уезжает под него: так телефон
+ * атлета получает только свои строки. Ключи устройства (тема, журнал, реестр
+ * токенов) всегда остаются под токеном владельца.
+ */
+function tokenOfSyncKey(k: string): string {
+  const space = spaceOfSyncKey(k);
+  if (!space) return token;
+  return spaceTokenFor(space) || token;
+}
+
 
 function markDirty(k: string): void {
   const sk = syncKey(k);
@@ -702,8 +760,9 @@ async function pushIdb(): Promise<void> {
         if (prev && prev.sig === sig) continue;
         const ts = new Date(serverNowMs()).toISOString();
         const chunks = chunkValue(JSON.stringify(rec));
+        const t = tokenOfSyncKey(kvKey);
         const rows: KvRow[] = chunks.map((c, i) => ({
-          id: token,
+          id: t,
           key: kvKey,
           chunk_index: i,
           chunk_count: i === 0 ? chunks.length : 0,
@@ -725,7 +784,7 @@ async function pushIdb(): Promise<void> {
       let localRec: any;
       try { localRec = await idbAdapter.get(parsed.store, parsed.id); } catch { localRec = undefined; }
       if (localRec) continue; // запись есть, просто цикл начался до неё — не трогаем
-      await transport.removeKey(token, kvKey);
+      await transport.removeKey(tokenOfSyncKey(kvKey), kvKey);
       idbMeta.delete(kvKey);
       changed = true;
     }
@@ -823,15 +882,16 @@ async function flush(): Promise<void> {
   setState({ status: 'syncing' });
   try {
     for (const k of keys) {
+      const t = tokenOfSyncKey(k);
       const v = localStorage.getItem(k);
       if (v === null) {
-        await transport.removeKey(token, k);
+        await transport.removeKey(t, k);
         mtimes.delete(k);
       } else {
         const ts = new Date(mtimes.get(k) || serverNowMs()).toISOString();
         const chunks = chunkValue(v);
         const rows: KvRow[] = chunks.map((c, i) => ({
-          id: token,
+          id: t,
           key: k,
           chunk_index: i,
           chunk_count: i === 0 ? chunks.length : 0,
@@ -852,17 +912,52 @@ async function flush(): Promise<void> {
   }
 }
 
+/** Сколько токенов пространств обновлять за один цикл дома (курсор по кругу). */
+const SPACE_PULL_BATCH = 8;
+let spacePullCursor = 0;
+
+/**
+ * Под какими токенами тянуть облако в этом цикле.
+ *
+ * Дома тянем свой токен и несколько токенов пространств по кругу: иначе первая
+ * же сводка по атлетам показывала бы данные, которых нет на устройстве (тренер
+ * видит «последнюю тренировку» из кэша), а 1000 атлетов дали бы 1000 запросов
+ * за цикл. В пространстве атлета тянуть чужие незачем — он смотрит не ростер.
+ */
+function tokensToPull(): string[] {
+  const out = new Set<string>([token]);
+  const active = currentSpaceId();
+  const activeRec = active !== HOME_SPACE_ID ? spaceTokenRecord(active) : null;
+  if (activeRec?.migratedAt && !activeRec.revokedAt) {
+    out.add(activeRec.token);
+    return [...out];
+  }
+  // Тянем только те пространства, которые реально есть на этом устройстве:
+  // запись токена могла приехать из объединённого реестра, а карточку атлета
+  // удалили — качать его данные в никуда не нужно.
+  const here = new Set(readRegistryFromStorage().spaces.map(s => s.id));
+  const migrated = listLiveSpaceTokens().filter(
+    r => r.migratedAt && r.token !== token && here.has(r.spaceId),
+  );
+  const n = Math.min(SPACE_PULL_BATCH, migrated.length);
+  for (let i = 0; i < n; i++) out.add(migrated[(spacePullCursor + i) % migrated.length].token);
+  if (migrated.length) spacePullCursor = (spacePullCursor + n) % migrated.length;
+  return [...out];
+}
+
 async function pull(opts?: { reload?: boolean }): Promise<number> {
   if (!transport || !token) return 0;
   const rows: KvRow[] = [];
   pulling = true;
   try {
-    // onServerNow калибрует skewMs ДО обработки строк (часы сервера — источник правды)
-    await transport.pull(
-      token,
-      r => rows.push(...r),
-      serverNow => { skewMs = serverNow - Date.now(); },
-    );
+    for (const t of tokensToPull()) {
+      // onServerNow калибрует skewMs ДО обработки строк (часы сервера — источник правды)
+      await transport.pull(
+        t,
+        r => rows.push(...r),
+        serverNow => { skewMs = serverNow - Date.now(); },
+      );
+    }
   } catch (e) {
     pulling = false;
     dirtyDuringPull.clear();
@@ -871,17 +966,42 @@ async function pull(opts?: { reload?: boolean }): Promise<number> {
   } finally {
     pulling = false;
   }
+
+  const reloadNeeded = handleRevokedSpaces(rows);
+
+  // Строку принимаем, только если она лежит под ОЖИДАЕМЫМ токеном этого ключа.
+  // Иначе старые копии пространства (под токеном тренера) затирали бы данные,
+  // которые уже живут под токеном пространства.
+  const expectedToken = (r: KvRow): string => {
+    const space = spaceOfSyncKey(r.key);
+    if (!space) return token;
+    return spaceTokenFor(space) || token;
+  };
+  const usable = rows.filter(r => !r.key.startsWith(REVOKED_KEY_PREFIX) && r.id === expectedToken(r));
+
   const byKey = new Map<string, KvRow[]>();
-  for (const r of rows) {
+  for (const r of usable) {
     const list = byKey.get(r.key) || [];
     list.push(r);
     byKey.set(r.key, list);
   }
+  // Реестр токенов применяем ПЕРВЫМ: от него зависит, какие ключи этого же
+  // снимка считать «своими» при первом запуске на новом устройстве.
+  const ordered = [...byKey.entries()].sort(([a], [b]) => {
+    if (a === SPACE_TOKENS_KEY) return -1;
+    if (b === SPACE_TOKENS_KEY) return 1;
+    return 0;
+  });
+  const activeSpaceId = currentSpaceId();
   let applied = 0;
   applyingRemote = true;
   try {
-    for (const [k, keyRows] of byKey) {
+    for (const [k, keyRows] of ordered) {
       if (k.startsWith(IDB_KV_PREFIX)) continue; // IndexedDB-записи обрабатывает pullIdb
+      // Домашние ключи (без префикса пространства) нельзя писать, находясь в
+      // пространстве атлета: шов превратил бы `he_profile_v2` тренера в профиль
+      // атлета. Ключи устройства (тема/журнал/реестр) применяем всегда.
+      if (!isDeviceLevelKey(k) && !spaceIdOfKey(k) && activeSpaceId !== HOME_SPACE_ID) continue;
       const count = keyRows.find(r => r.chunk_index === 0)?.chunk_count;
       if (!count || keyRows.filter(r => r.chunk_index < count).length !== count) {
         // неполная/битая запись в облаке: если локально данные есть — локальные новее,
@@ -898,9 +1018,30 @@ async function pull(opts?: { reload?: boolean }): Promise<number> {
       const value = joinChunks(chunks);
       const remoteTs = Math.max(...keyRows.map(r => Date.parse(r.updated_at) || 0));
       const localMtime = mtimes.get(k) || 0;
-      // локальная правка сделана ПОКА шёл сетевой pull — её нет в снимке облака → локальная
-      const winner = dirtyDuringPull.has(k) ? 'local' : pickConflict(localMtime, remoteTs);
-      if (winner === 'remote') {
+      const isRegistry = toLogicalKey(k) === SPACE_TOKENS_KEY;
+      // Реестр токенов объединяем ВСЕГДА, а не только когда «победило» облако:
+      // токен мог быть создан на другом устройстве в ту же секунду, и LWW
+      // потерял бы его целиком (в реестре лежат токены всех пространств).
+      const winner = isRegistry
+        ? 'merge'
+        : dirtyDuringPull.has(k)
+          ? 'local'
+          : pickConflict(localMtime, remoteTs);
+      if (winner === 'merge') {
+        let localRaw: string | null = null;
+        try { localRaw = localStorage.getItem(k); } catch { localRaw = null; }
+        const merged = mergeSpaceTokens(localRaw, value);
+        if (merged.text !== localRaw) localStorage.setItem(k, merged.text);
+        mtimes.set(k, remoteTs);
+        dirty.delete(k);
+        if (merged.changed) {
+          // Объединённое отличается от облачного — поднимаем наверх.
+          mtimes.set(k, serverNowMs());
+          dirty.add(k);
+          scheduleFlush();
+        }
+        applied++;
+      } else if (winner === 'remote') {
         // Журнал тренера — объединяем, а не затираем: два устройства пишут
         // события независимо, и «последний записавший» не должен съедать чужие.
         let nextValue = value;
@@ -939,6 +1080,13 @@ async function pull(opts?: { reload?: boolean }): Promise<number> {
   setState({ status: 'idle', lastPullAt: Date.now(), error: undefined });
   // выгрузка локальных правок IndexedDB (изменения анализов/курса/дневника без LS-триггера)
   await pushIdb();
+  if (reloadNeeded) {
+    // Данные, которые были открыты на экране, только что удалены (доступ отозван):
+    // ждать пользователя нельзя — в памяти остались бы чужие дневники.
+    setTimeout(() => {
+      try { reloadFn(); } catch { /* среда без location */ }
+    }, 0);
+  }
   if (opts?.reload && applied > 0) {
     console.debug('[kv] background pull applied', applied, 'keys — show update hint');
     // без авто-перезагрузки: данные уже записаны локально, ждём пользователя
@@ -947,23 +1095,80 @@ async function pull(opts?: { reload?: boolean }): Promise<number> {
   return applied;
 }
 
+/**
+ * Обработать маркеры «доступ отозван».
+ *
+ * Маркер приходит только под токеном самого пространства — значит, увидеть его
+ * может лишь телефон, которому этот токен выдавали. Чужой маркер (другого
+ * пространства или под нашим токеном) игнорируется.
+ */
+function handleRevokedSpaces(rows: KvRow[]): boolean {
+  let activeRevoked = false;
+  for (const r of rows) {
+    if (!r.key.startsWith(REVOKED_KEY_PREFIX)) continue;
+    const spaceId = r.key.slice(REVOKED_KEY_PREFIX.length);
+    const rec = spaceTokenRecord(spaceId);
+    // Могила — уже отозвано на этом устройстве: маркер больше ничего не меняет.
+    if (!rec || rec.revokedAt || r.id !== rec.token) continue;
+    const wasActive = currentSpaceId() === spaceId;
+    wipeRevokedSpace(spaceId);
+    if (wasActive) activeRevoked = true;
+  }
+  return activeRevoked;
+}
+
+/**
+ * Стереть пространство на этом устройстве после отзыва доступа.
+ *
+ * Это не «удалить данные атлета у тренера»: облако тренер уже почистил, здесь —
+ * локальная копия, которая иначе осталась бы читаемой на телефоне атлета.
+ */
+function wipeRevokedSpace(spaceId: string): void {
+  try {
+    if (typeof localStorage !== 'undefined') {
+      clearSpaceData(deviceRawOrFallback(localStorage), spaceId);
+    }
+    clearSessionSpaceData(spaceId);
+    writeRegistryToStorage(removeSpace(readRegistryFromStorage(), spaceId));
+  } catch {
+    /* реестр недоступен — хотя бы ключи и токен убираем */
+  }
+  removeSpaceToken(spaceId);
+  const prefixes = spacePrefixes(spaceId);
+  for (const k of Array.from(mtimes.keys())) {
+    if (prefixes.some(p => k.startsWith(p))) {
+      mtimes.delete(k);
+      dirty.delete(k);
+    }
+  }
+  for (const k of Array.from(idbMeta.keys())) {
+    if (prefixes.some(p => k.startsWith(p))) idbMeta.delete(k);
+  }
+  writeMetaNow();
+  persistIdbMeta();
+  // База грузится лениво: удаление чужих дневников не должно тянуть её в граф.
+  void import('./db')
+    .then(m => m.deleteSpaceDatabases([spaceId]))
+    .catch(() => undefined);
+}
+
 /** Префиксы, под которыми в облаке лежат данные пространства (LS-ключи и записи IndexedDB). */
 function spacePrefixes(spaceId: string): string[] {
   return [spaceKeyPrefix(spaceId), IDB_KV_PREFIX + spaceId + ':'];
 }
 
 /** Резервный путь, если транспорт не умеет удалять по префиксу: тянем строки и удаляем по одной. */
-async function removeByPrefixFallback(prefix: string): Promise<void> {
+async function removeByPrefixFallback(targetToken: string, prefix: string): Promise<void> {
   if (!transport || !token) return;
   const keys = new Set<string>();
-  await transport.pull(token, rows => {
+  await transport.pull(targetToken, rows => {
     for (const r of rows) if (r.key.startsWith(prefix)) keys.add(r.key);
   });
   let n = 0;
   for (const k of keys) {
     // Ограничение: удаление не должно превращаться в тысячи запросов на телефоне.
     if (n++ >= 500) break;
-    await transport.removeKey(token, k);
+    await transport.removeKey(targetToken, k);
   }
 }
 
@@ -974,6 +1179,10 @@ async function removeByPrefixFallback(prefix: string): Promise<void> {
  * правдой только на этом телефоне, а копия осталась бы на сервере (и вернулась
  * бы на новом устройстве). Домашнее пространство не трогаем — это данные
  * тренера.
+ *
+ * Если у пространства был свой токен (телефон атлета), убираем и его строки, и
+ * оставляем маркер отзыва: иначе на телефоне атлета осталась бы локальная копия,
+ * которую он продолжал бы видеть.
  */
 export async function purgeSpacesFromCloud(spaceIds: readonly string[]): Promise<number> {
   if (!started || !transport || !token) return 0;
@@ -981,16 +1190,28 @@ export async function purgeSpacesFromCloud(spaceIds: readonly string[]): Promise
   if (!ids.length) return 0;
   let purged = 0;
   for (const spaceId of ids) {
+    const rec = spaceTokenRecord(spaceId);
     const prefixes = spacePrefixes(spaceId);
-    for (const prefix of prefixes) {
-      try {
-        if (transport.removePrefix) await transport.removePrefix(token, prefix);
-        else await removeByPrefixFallback(prefix);
-      } catch {
-        // Транспорт не справился — пробуем по одной строке (и молчим: локальные
-        // данные уже удалены, это «догоняющая» уборка).
-        try { await removeByPrefixFallback(prefix); } catch { /* сеть недоступна */ }
+    // Свой токен — всегда, токен пространства — если он есть. Старые копии под
+    // токеном тренера тоже уходят: иначе они вернулись бы на другом устройстве.
+    const tokens = new Set<string>([token]);
+    if (rec) tokens.add(rec.token);
+    for (const t of tokens) {
+      for (const prefix of prefixes) {
+        try {
+          if (transport.removePrefix) await transport.removePrefix(t, prefix);
+          else await removeByPrefixFallback(t, prefix);
+        } catch {
+          // Транспорт не справился — пробуем по одной строке (и молчим: локальные
+          // данные уже удалены, это «догоняющая» уборка).
+          try { await removeByPrefixFallback(t, prefix); } catch { /* сеть недоступна */ }
+        }
       }
+    }
+    if (rec) {
+      // Маркер пишем ПОСЛЕ очистки: он не попадает под префиксы пространства,
+      // поэтому переживает её и доходит до телефона атлета.
+      await writeRevokedMarker(rec.token, spaceId);
     }
     // Метаданные (mtime/dirty/сигнатуры IndexedDB) этого пространства больше не нужны:
     // иначе при следующем pull мы считали бы удалённые ключи «локально изменёнными».
@@ -1010,9 +1231,213 @@ export async function purgeSpacesFromCloud(spaceIds: readonly string[]): Promise
     }
     if (metaChanged) persistMeta();
     if (idbChanged) persistIdbMeta();
+    // Токен пространства больше не обслуживаем: новый код создаст новый.
+    if (rec) removeSpaceToken(spaceId);
     purged++;
   }
   return purged;
+}
+
+/** Служебная строка под токеном пространства: «этот доступ больше не действует». */
+async function writeRevokedMarker(targetToken: string, spaceId: string): Promise<void> {
+  if (!transport) return;
+  try {
+    await transport.replaceKey([
+      {
+        id: targetToken,
+        key: spaceRevokedKey(spaceId),
+        chunk_index: 0,
+        chunk_count: 1,
+        value: '1',
+        updated_at: new Date(serverNowMs()).toISOString(),
+      },
+    ]);
+  } catch {
+    /* маркер best-effort: удаление данных уже состоялось */
+  }
+}
+
+/** Строки одного пространства из облака под указанным токеном. */
+async function pullSpaceRows(spaceId: string, fromTokens: readonly string[]): Promise<Map<string, KvRow[]>> {
+  const out = new Map<string, KvRow[]>();
+  if (!transport) return out;
+  const prefixes = spacePrefixes(spaceId);
+  for (const t of fromTokens) {
+    await transport.pull(t, rows => {
+      for (const r of rows) {
+        if (!prefixes.some(p => r.key.startsWith(p))) continue;
+        const list = out.get(r.key) || [];
+        list.push(r);
+        out.set(r.key, list);
+      }
+    });
+  }
+  return out;
+}
+
+/** Записать группы строк под другой токен (чанки проверяем: битую запись не копируем). */
+async function writeRowsAs(rows: Map<string, KvRow[]>, targetToken: string): Promise<number> {
+  if (!transport) return 0;
+  let written = 0;
+  for (const [key, keyRows] of rows) {
+    const count = keyRows.find(r => r.chunk_index === 0)?.chunk_count;
+    if (!count || keyRows.filter(r => r.chunk_index < count).length !== count) continue;
+    const chunks = keyRows
+      .filter(r => r.chunk_index < count)
+      .sort((a, b) => a.chunk_index - b.chunk_index);
+    const tsMs = Math.max(0, ...keyRows.map(r => Date.parse(r.updated_at) || 0)) || serverNowMs();
+    await transport.replaceKey(
+      chunks.map((r, i) => ({
+        id: targetToken,
+        key,
+        chunk_index: i,
+        chunk_count: i === 0 ? chunks.length : 0,
+        value: r.value,
+        updated_at: new Date(tsMs).toISOString(),
+      })),
+    );
+    written++;
+  }
+  return written;
+}
+
+/**
+ * Перенести данные пространства под его собственный токен.
+ *
+ * Вызывается один раз — когда тренер создаёт код для телефона атлета. Что делает:
+ *  1) выгружает накопленные локальные правки;
+ *  2) читает из облака строки ЭТОГО пространства (под токеном тренера);
+ *  3) дополняет их локальными ключами пространства, которых в облаке ещё нет
+ *     (данные, созданные до включения синхронизации);
+ *  4) пишет всё под токен пространства и ставит `migratedAt`.
+ *
+ * Старые строки под токеном тренера НЕ удаляем: они страховка на случай, если
+ * телефон тренера в этот момент ещё писал под старым токеном. После `migratedAt`
+ * они игнорируются при pull (см. `expectedToken`), а «удалить атлета» убирает и их.
+ *
+ * @returns true, если перенос завершён (в т.ч. если уже был выполнен).
+ */
+export async function migrateSpaceToToken(spaceId: string): Promise<boolean> {
+  if (!started || !transport || !token) return false;
+  const rec = spaceTokenRecord(spaceId);
+  if (!rec || rec.revokedAt) return false;
+  if (rec.migratedAt) return true;
+  try {
+    await flush();
+    const rows = await pullSpaceRows(spaceId, [token]);
+    // Локальные ключи пространства, которых нет в облаке (или они новее).
+    const local = new Map<string, { value: string; ts: number }>();
+    try {
+      if (typeof localStorage !== 'undefined') {
+        const raw = deviceRawOrFallback(localStorage);
+        const prefix = spaceKeyPrefix(spaceId);
+        for (let i = 0; i < raw.length; i++) {
+          const k = raw.key(i);
+          if (!k || !k.startsWith(prefix)) continue;
+          const v = raw.getItem(k);
+          if (v == null) continue;
+          local.set(k, { value: v, ts: mtimes.get(k) || serverNowMs() });
+        }
+      }
+    } catch {
+      /* хранилище недоступно — переносим то, что есть в облаке */
+    }
+    for (const [k, v] of local) {
+      const remoteTs = (rows.get(k) ?? []).reduce((max, r) => Math.max(max, Date.parse(r.updated_at) || 0), 0);
+      if (remoteTs > v.ts) continue;
+      const chunks = chunkValue(v.value);
+      rows.set(
+        k,
+        chunks.map((c, i) => ({
+          id: token,
+          key: k,
+          chunk_index: i,
+          chunk_count: i === 0 ? chunks.length : 0,
+          value: c,
+          updated_at: new Date(v.ts).toISOString(),
+        })),
+      );
+    }
+    // Записи IndexedDB пространства, которых в облаке ещё нет. Обычно их туда
+    // уже выгрузил pushIdb, но тренер мог выйти из пространства раньше, чем
+    // сработал цикл. Дописываем ТОЛЬКО отсутствующие: перезаписывать облачные
+    // записи локальными нельзя — телефон атлета мог быть новее.
+    try {
+      const { readSpaceStores } = await import('./db');
+      const stores = await readSpaceStores(spaceId);
+      for (const [store, recs] of Object.entries(stores)) {
+        for (const rec of recs as any[]) {
+          const id = rec?.id;
+          if (id == null) continue;
+          const kvKey = `${IDB_KV_PREFIX}${spaceId}:${store}:${String(id)}`;
+          if (rows.has(kvKey)) continue;
+          const chunks = chunkValue(JSON.stringify(rec));
+          rows.set(
+            kvKey,
+            chunks.map((c, i) => ({
+              id: token,
+              key: kvKey,
+              chunk_index: i,
+              chunk_count: i === 0 ? chunks.length : 0,
+              value: c,
+              updated_at: new Date(serverNowMs()).toISOString(),
+            })),
+          );
+        }
+      }
+    } catch {
+      /* база недоступна/пуста — переносим LS-часть и облачные записи */
+    }
+    await writeRowsAs(rows, rec.token);
+    markSpaceTokenMigrated(spaceId, new Date().toISOString());
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Сменить код доступа: данные переезжают на новый токен, старый отзывается.
+ *
+ * Зачем: старый телефон (потерян/передан другому) не должен продолжать получать
+ * данные. Он увидит маркер отзыва и сотрёт у себя это пространство.
+ */
+export async function rotateSpaceToken(spaceId: string): Promise<string | null> {
+  if (!started || !transport || !token) return null;
+  const old = spaceTokenRecord(spaceId);
+  if (!old || old.revokedAt) return null;
+  const source = old.migratedAt ? old.token : token;
+  try {
+    const rows = await pullSpaceRows(spaceId, [source]);
+    const nextToken = randomSyncToken();
+    await writeRowsAs(rows, nextToken);
+    // Сначала отзываем старый доступ, потом публикуем новый: если запись нового
+    // рекорда не удастся, старый код уже недействителен — это безопаснее.
+    // Маркер имеет смысл только для токена пространства (не для токена тренера).
+    if (old.migratedAt) await writeRevokedMarker(old.token, spaceId);
+    const saved = writeSpaceTokenRecord({
+      ...old,
+      token: nextToken,
+      createdAt: new Date().toISOString(),
+      migratedAt: new Date().toISOString(),
+      revokedAt: undefined,
+    });
+    if (!saved) return null;
+    // Строки старого токена (если это был токен пространства) убираем.
+    if (old.migratedAt) {
+      for (const prefix of spacePrefixes(spaceId)) {
+        try {
+          if (transport.removePrefix) await transport.removePrefix(old.token, prefix);
+          else await removeByPrefixFallback(old.token, prefix);
+        } catch {
+          /* данные уже под новым токеном — уборка догоняющая */
+        }
+      }
+    }
+    return nextToken;
+  } catch {
+    return null;
+  }
 }
 
 /** Локальные ключи, которых нет ни в облаке, ни в mtimes (никогда не синкались) → выгрузить. */
@@ -1056,9 +1481,10 @@ function keepAliveFlush(): void {
     // keepalive-запрос лимитирован браузером (~64КБ)
     if (bytes + total > KEEPALIVE_MAX_BYTES) continue;
     const chunks = chunkValue(v);
+    const t = tokenOfSyncKey(k);
     for (let i = 0; i < chunks.length; i++) {
       rows.push({
-        id: token,
+        id: t,
         key: k,
         chunk_index: i,
         chunk_count: i === 0 ? chunks.length : 0,
@@ -1137,8 +1563,22 @@ function attachLifecycle(pullIntervalMs: number): void {
 /* Транспорт на Supabase REST                                          */
 /* ------------------------------------------------------------------ */
 
+/**
+ * REST-запросы с явным `x-user-token` на каждый вызов.
+ *
+ * Раньше здесь был supabase-js с токеном в заголовках клиента. Для пространств
+ * атлетов это не годится: у каждой строки может быть СВОЙ токен, а клиент один.
+ * Заодно из графа ушёл supabase-js (меньше вес APK), запросы не изменились.
+ */
 class SupabaseKvTransport implements KvTransport {
-  constructor(private client: SupabaseClient) {}
+  private headers(targetToken: string, extra: Record<string, string> = {}): Record<string, string> {
+    return {
+      apikey: SUPABASE_ANON,
+      Authorization: `Bearer ${SUPABASE_ANON}`,
+      'x-user-token': targetToken,
+      ...extra,
+    };
+  }
 
   async pull(token: string, onRows: (rows: KvRow[]) => void, onServerNow?: (ms: number) => void): Promise<void> {
     if (!SUPABASE_URL || !SUPABASE_ANON) throw new Error('Supabase not configured');
@@ -1152,12 +1592,7 @@ class SupabaseKvTransport implements KvTransport {
         offset: String(offset),
       });
       const resp = await fetch(`${SUPABASE_URL}/rest/v1/user_kv?${qs.toString()}`, {
-        headers: {
-          apikey: SUPABASE_ANON,
-          Authorization: `Bearer ${SUPABASE_ANON}`,
-          'x-user-token': token,
-          Accept: 'application/json',
-        },
+        headers: this.headers(token, { Accept: 'application/json' }),
       });
       if (!resp.ok) throw new Error(`pull failed: HTTP ${resp.status}`);
       // серверные часы из Date-заголовка — единый источник правды для LWW
@@ -1175,22 +1610,34 @@ class SupabaseKvTransport implements KvTransport {
 
   async replaceKey(rows: KvRow[]): Promise<void> {
     const key = rows[0]?.key;
-    if (!key) return;
-    const { error: delErr } = await this.client
-      .from('user_kv')
-      .delete()
-      .eq('id', rows[0].id)
-      .eq('key', key);
-    if (delErr) throw new Error(delErr.message);
-    const { error } = await this.client
-      .from('user_kv')
-      .upsert(rows, { onConflict: 'id,key,chunk_index' });
-    if (error) throw new Error(error.message);
+    const rowToken = rows[0]?.id;
+    if (!key || !rowToken) return;
+    // Сначала удаляем прежние чанки ключа: иначе длинная старая запись оставила
+    // бы «хвост», и pull счёл бы ключ неполным.
+    const delQs = new URLSearchParams({ id: `eq.${rowToken}`, key: `eq.${key}` });
+    const del = await fetch(`${SUPABASE_URL}/rest/v1/user_kv?${delQs.toString()}`, {
+      method: 'DELETE',
+      headers: this.headers(rowToken),
+    });
+    if (!del.ok) throw new Error(`delete failed: HTTP ${del.status}`);
+    const resp = await fetch(`${SUPABASE_URL}/rest/v1/user_kv?on_conflict=id,key,chunk_index`, {
+      method: 'POST',
+      headers: this.headers(rowToken, {
+        'Content-Type': 'application/json',
+        Prefer: 'resolution=merge-duplicates,return=minimal',
+      }),
+      body: JSON.stringify(rows),
+    });
+    if (!resp.ok) throw new Error(`push failed: HTTP ${resp.status}`);
   }
 
   async removeKey(token: string, key: string): Promise<void> {
-    const { error } = await this.client.from('user_kv').delete().eq('id', token).eq('key', key);
-    if (error) throw new Error(error.message);
+    const qs = new URLSearchParams({ id: `eq.${token}`, key: `eq.${key}` });
+    const resp = await fetch(`${SUPABASE_URL}/rest/v1/user_kv?${qs.toString()}`, {
+      method: 'DELETE',
+      headers: this.headers(token),
+    });
+    if (!resp.ok) throw new Error(`delete failed: HTTP ${resp.status}`);
   }
 
   /**
@@ -1200,8 +1647,12 @@ class SupabaseKvTransport implements KvTransport {
    */
   async removePrefix(token: string, prefix: string): Promise<void> {
     const pattern = prefix.replace(/[\\%_]/g, m => '\\' + m) + '%';
-    const { error } = await this.client.from('user_kv').delete().eq('id', token).like('key', pattern);
-    if (error) throw new Error(error.message);
+    const qs = new URLSearchParams({ id: `eq.${token}`, key: `like.${pattern}` });
+    const resp = await fetch(`${SUPABASE_URL}/rest/v1/user_kv?${qs.toString()}`, {
+      method: 'DELETE',
+      headers: this.headers(token),
+    });
+    if (!resp.ok) throw new Error(`delete failed: HTTP ${resp.status}`);
   }
 
   keepAlivePush(rows: KvRow[]): void {
@@ -1209,13 +1660,10 @@ class SupabaseKvTransport implements KvTransport {
     void fetch(`${SUPABASE_URL}/rest/v1/user_kv?on_conflict=id,key,chunk_index`, {
       method: 'POST',
       keepalive: true,
-      headers: {
-        apikey: SUPABASE_ANON,
-        Authorization: `Bearer ${SUPABASE_ANON}`,
+      headers: this.headers(rows[0].id, {
         'Content-Type': 'application/json',
         Prefer: 'resolution=merge-duplicates',
-        'x-user-token': rows[0].id,
-      },
+      }),
       body: JSON.stringify(rows),
     }).catch(() => { /* best-effort */ });
   }

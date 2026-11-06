@@ -88,6 +88,7 @@ import {
 import { CoachWeekView } from './CoachWeekView';
 import { CoachReportSheet } from './CoachReportSheet';
 import { CoachLockSettingsCard } from './CoachLockSettingsCard';
+import { CoachDeviceInviteCard } from './CoachDeviceInviteCard';
 import { CoachPinDialog } from '../../CoachPinDialog';
 import {
   addCoachAuditEvent,
@@ -1737,6 +1738,13 @@ export const ProfileCoachTab: React.FC<{
             audit={audit}
             onChange={applyLock}
             onEvent={kind => auditEvent(kind)}
+          />
+
+          {/* Телефон атлета: отдельный код на пространство и подключение по коду. */}
+          <CoachDeviceInviteCard
+            spaces={spaceRegistry.spaces}
+            onAudit={(kind, athleteId) => auditEvent(kind, athleteId)}
+            onChanged={() => setRegistryRev(v => v + 1)}
           />
 
           {pinFor && (
