@@ -163,7 +163,7 @@ export const CARDIO_INTERVAL_PRESETS: CardioIntervalPreset[] = [
     calibration: 'Сплит: цель 5К +2-3 с на 500 м; rate 24-26, техника ровная',
     sessionType: 'hiit',
     build: () => ({
-      workSec: 360, restSec: 180, reps: 4, target: 'pace',
+      workSec: 360, restSec: 180, reps: 4, target: 'pace', distanceM: 1500,
       note: 'Гребля: 1500 м на сплите цели / 3 мин легко ×4',
     }),
     warmup: 'Разминка 8-10 мин лёгкой гребли + 2×20 мощных гребков.',

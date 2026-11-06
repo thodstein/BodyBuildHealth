@@ -19,6 +19,7 @@ import {
   buildCardioIntervalPlan,
   buildCardioPrintHtml,
   buildCardioSummaryText,
+  buildCardioTcx,
   cardioSessionProtocol,
   cardioStructuredMainSec,
   loadActiveCardioCycle,
@@ -32,6 +33,7 @@ import {
   type CardioSession,
 } from '../cardio.engine';
 import { buildCardioCycleFromTemplateId } from '../cardio-templates.engine';
+import { getCardioIntervalPreset } from '../cardio-interval-presets.engine';
 
 const LONG_BLOCK = { workSec: 600, restSec: 120, reps: 3 };   // 36 мин основной части
 const SHORT_BLOCK = { workSec: 60, restSec: 60, reps: 5 };    // 10 мин
@@ -303,5 +305,50 @@ describe('числовая цель отрезка не теряется', () =>
     const work = plan.steps.find(s => s.kind === 'work')!;
     expect(work.note ?? '').not.toContain('RPE');
     expect(work.hrZone).toEqual({ min: 150, max: 170 });
+  });
+});
+
+describe('дистанционные интервалы: метры и темп', () => {
+  const DIST_BLOCK = { workSec: 90, restSec: 90, reps: 8, target: 'pace' as const, targetValue: 240, distanceM: 400 };
+
+  it('время работы считается из дистанции и темпа, подпись показывает метры', () => {
+    const plan = buildCardioIntervalPlan({ type: 'hiit', durationMin: 40, structured: [DIST_BLOCK] })!;
+    const work = plan.steps.filter(s => s.kind === 'work');
+    expect(work).toHaveLength(8);
+    // 400 м × 4:00/км = 96 с, а не оставшиеся в данных 90 с.
+    expect(work[0].sec).toBe(96);
+    expect(work[0].label).toContain('400 м');
+    expect(work[0].note).toContain('4:00/км');
+    expect(work[0].distanceM).toBe(400);
+    expect(plan.workSec).toBe(96);
+    expect(plan.structureLabel).toBe('8×400 м/1:30');
+    expect(cardioStructuredMainSec([DIST_BLOCK])).toBe((96 + 90) * 8);
+  });
+
+  it('дистанция без темпа не выдумывает время — остаётся заданный workSec', () => {
+    const row = { workSec: 360, restSec: 180, reps: 4, target: 'pace' as const, distanceM: 1500 };
+    const plan = buildCardioIntervalPlan({ type: 'hiit', durationMin: 40, structured: [row] })!;
+    expect(plan.steps.find(s => s.kind === 'work')!.sec).toBe(360);
+    expect(plan.structureLabel).toBe('4×1500 м/3 мин');
+  });
+
+  it('метры и темп попадают в печать, сводку, календарь, TCX и протокол', () => {
+    const c = withWeekSession(baseCycle(2), 1, structuredSession('hiit', 40, DIST_BLOCK));
+    expect(buildCardioPrintHtml(c)).toContain('8×400 м/1:30');
+    expect(buildCardioSummaryText(c)).toContain('8×400 м/1:30');
+    expect(buildCardioIcs(c, '2026-11-02')).toContain('8×400 м/1:30');
+    expect(buildCardioTcx(c, '2026-11-02')).toContain('<DistanceMeters>400</DistanceMeters>');
+
+    const proto = cardioSessionProtocol({ type: 'hiit', durationMin: 40, structured: [DIST_BLOCK] });
+    const main = proto.find(p => p.name === 'Интервалы')!;
+    expect(main.note).toContain('400 м');
+    expect(main.note).toContain('4:00/км');
+  });
+
+  it('пресет гребли несёт дистанцию 1500 м и не выдумывает темп', () => {
+    const preset = getCardioIntervalPreset('row-4x1500')!;
+    const block = preset.build({});
+    expect(block.distanceM).toBe(1500);
+    expect(block.targetValue).toBeUndefined();
   });
 });

@@ -3,7 +3,7 @@
  * раскладка по дням (Пн-Вс), масштабирование минут ±10%, переключатель HIIT
  * и полноценный редактор сессий (тип, минуты, частота, удалить, добавить).
  */
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   spreadSessionsAcrossDays, DAY_LABELS_RU, CARDIO_PHASE_LABELS,
   loadCardioCycles, saveCardioCycle, setActiveCardioCycle, kcalForCardio,
@@ -11,10 +11,11 @@ import {
   cardioCycleVersions, restoreCardioCycleVersionById,
   cardioWeekForDate, cardioSafetyReport, cycleBodyWeight, cycleFfmKg, rebuildCycle, cardioWeekLegConflicts, cardioHiitInjectGate,
   moveCardioSessionInWeek, maxHrClassic,
-  CARDIO_EQUIPMENT_OPTIONS, cardioStructuredLabel, cardioStructuredMainSec,
+  CARDIO_EQUIPMENT_OPTIONS, cardioStructuredLabel, cardioStructuredMainSec, cardioBlockWorkSec, formatCardioSec,
   type CardioCycle, type CardioType, type CardioSession, type CardioWeek, type CardioEquipment, type CardioStructuredBlock,
 } from '../../../engines/lms/cardio.engine';
 import { CARDIO_INTERVAL_PRESETS, getCardioIntervalPreset } from '../../../engines/lms/cardio-interval-presets.engine';
+import { parsePaceText } from '../../../engines/lms/cardio-personal-zones.engine';
 import { CARD, ROW, LABEL, HINT_SM, BTN, BTN_PRIMARY, BTN_DANGER, BTN_SMALL, SelectInput, DraftNumberInput } from './CardioUI';
 
 const DAY_CELL: React.CSSProperties = {
@@ -53,7 +54,7 @@ function withStructNote(purpose: string | undefined, label: string | null): stri
  */
 function normalizeStructureBlocks(draft: CardioStructuredBlock[]): CardioStructuredBlock[] {
   return draft
-    .filter(b => b.workSec > 0 && b.reps > 0)
+    .filter(b => cardioBlockWorkSec(b) > 0 && b.reps > 0)
     .map(b => {
       let out: CardioStructuredBlock = b;
       // Пульсовой диапазон живёт только у цели «пульс».
@@ -65,13 +66,24 @@ function normalizeStructureBlocks(draft: CardioStructuredBlock[]): CardioStructu
         if (min == null && max == null) out = { ...out, targetHr: undefined };
         else if (min != null && max != null && min > max) out = { ...out, targetHr: { min: max, max: min } };
       }
-      // Числовая цель — только RPE/мощность: иначе цифра ни к чему не относится.
-      if (b.target !== 'rpe' && b.target !== 'power') {
+      // Дистанция имеет смысл только у цели «темп» (иначе её нечем перевести в время).
+      if (b.target !== 'pace') {
+        if (b.distanceM != null) out = { ...out, distanceM: undefined };
+      } else if (b.distanceM != null) {
+        const d = Math.round(b.distanceM);
+        out = d >= 50 && d <= 10000 ? { ...out, distanceM: d } : { ...out, distanceM: undefined };
+      }
+      // Числовая цель: RPE 1-10, мощность 30-1500 Вт, темп 120-900 с/км.
+      if (b.target !== 'rpe' && b.target !== 'power' && b.target !== 'pace') {
         if (b.targetValue != null) out = { ...out, targetValue: undefined };
       } else if (out.targetValue != null) {
-        const lo = b.target === 'rpe' ? 1 : 30;
-        const hi = b.target === 'rpe' ? 10 : 1500;
+        const lo = b.target === 'rpe' ? 1 : b.target === 'power' ? 30 : 120;
+        const hi = b.target === 'rpe' ? 10 : b.target === 'power' ? 1500 : 900;
         out = { ...out, targetValue: Math.max(lo, Math.min(hi, Math.round(out.targetValue))) };
+      }
+      // Дистанция + темп задают время работы — синхронизируем workSec при записи.
+      if (out.distanceM != null && out.target === 'pace' && out.targetValue != null) {
+        out = { ...out, workSec: cardioBlockWorkSec(out) };
       }
       return out;
     });
@@ -84,6 +96,34 @@ const TARGET_OPTIONS: { value: string; label: string }[] = [
   { value: 'power', label: 'мощность' },
   { value: 'rpe', label: 'RPE' },
 ];
+
+const paceToText = (v?: number): string =>
+  v == null ? '' : `${Math.floor(v / 60)}:${String(Math.round(v % 60)).padStart(2, '0')}`;
+
+/** Темп отрезка: «4:30» или «4.5» → сек/км; blur без значения снимает темп. */
+const PaceField: React.FC<{ value?: number; onCommit: (v: number) => void; onClear: () => void; ariaLabel: string }> = ({ value, onCommit, onClear, ariaLabel }) => {
+  const [draft, setDraft] = useState(paceToText(value));
+  const focused = useRef(false);
+  useEffect(() => { if (!focused.current) setDraft(paceToText(value)); }, [value]);
+  const commit = () => {
+    focused.current = false;
+    const raw = draft.trim();
+    if (!raw) { setDraft(''); onClear(); return; }
+    const sec = parsePaceText(raw);
+    if (sec == null) { setDraft(paceToText(value)); return; }
+    setDraft(paceToText(sec));
+    if (sec !== value) onCommit(sec);
+  };
+  return (
+    <input type="text" inputMode="decimal" value={draft}
+      onChange={e => setDraft(e.target.value)}
+      onFocus={() => { focused.current = true; }}
+      onBlur={commit}
+      onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); }}
+      placeholder="мм:сс/км" aria-label={ariaLabel}
+      style={{ ...SEL, width: 96 }} />
+  );
+};
 
 const fmtVersionAt = (iso: string): string => {
   const d = new Date(iso);
@@ -287,7 +327,16 @@ export const CardioWeekEditor: React.FC<{ cycle: CardioCycle | null; onChanged?:
     setStructTypeDraft(null);
   };
   const patchBlock = (bi: number, patch: Partial<CardioStructuredBlock>) => {
-    setStructDraft(prev => prev.map((b, i) => (i === bi ? { ...b, ...patch } : b)));
+    setStructDraft(prev => prev.map((b, i) => {
+      if (i !== bi) return b;
+      const next = { ...b, ...patch };
+      // Дистанция + темп = время работы; держим workSec производным, иначе
+      // таймер пошёл бы по старым секундам при подписи «400 м».
+      if (next.target === 'pace' && next.distanceM != null && next.targetValue != null) {
+        return { ...next, workSec: cardioBlockWorkSec(next) };
+      }
+      return next;
+    }));
   };
   const addBlock = () => setStructDraft(prev => [...prev, { workSec: 60, restSec: 60, reps: 8 }]);
   const removeBlock = (bi: number) => setStructDraft(prev => prev.filter((_, i) => i !== bi));
@@ -602,9 +651,16 @@ export const CardioWeekEditor: React.FC<{ cycle: CardioCycle | null; onChanged?:
                     {structDraft.map((b, bi) => (
                       <div key={bi} style={{ display: 'flex', flexDirection: 'column', gap: 4, padding: '6px 0', borderTop: bi > 0 ? '1px solid rgba(255,255,255,0.06)' : 'none' }}>
                         <div style={ROW}>
-                          <DraftNumberInput value={b.workSec} min={5} max={1800}
-                            onCommit={v => patchBlock(bi, { workSec: v })}
-                            style={NUM} ariaLabel={`Работа отрезка ${bi + 1}, секунд`} />
+                          {b.target === 'pace' && b.distanceM != null && b.targetValue != null ? (
+                            <span
+                              title="Время работы выводится из дистанции и темпа"
+                              style={{ minHeight: 44, minWidth: 72, padding: '0 10px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', borderRadius: 10, background: 'rgba(96,165,250,0.10)', border: '1px solid rgba(96,165,250,0.30)', fontSize: 12, fontWeight: 800, color: '#93c5fd', fontVariantNumeric: 'tabular-nums' }}
+                            >{formatCardioSec(b.workSec)}</span>
+                          ) : (
+                            <DraftNumberInput value={b.workSec} min={5} max={1800}
+                              onCommit={v => patchBlock(bi, { workSec: v })}
+                              style={NUM} ariaLabel={`Работа отрезка ${bi + 1}, секунд`} />
+                          )}
                           <span style={{ fontSize: 10, color: '#fff' }}>с работа /</span>
                           <DraftNumberInput value={b.restSec} min={0} max={1800}
                             onCommit={v => patchBlock(bi, { restSec: v })}
@@ -620,9 +676,12 @@ export const CardioWeekEditor: React.FC<{ cycle: CardioCycle | null; onChanged?:
                             ? {
                                 target: v as NonNullable<CardioStructuredBlock['target']>,
                                 ...(v !== 'hr' ? { targetHr: undefined } : {}),
-                                ...(v !== 'rpe' && v !== 'power' ? { targetValue: undefined } : {}),
+                                // RPE/Вт/темп — разные единицы: число между ними не переносим
+                                // (иначе 240 с/км при смене на RPE станет «RPE 10»).
+                                ...(v !== b.target ? { targetValue: undefined } : {}),
+                                ...(v !== 'pace' ? { distanceM: undefined } : {}),
                               }
-                            : { target: undefined, targetHr: undefined, targetValue: undefined })}
+                            : { target: undefined, targetHr: undefined, targetValue: undefined, distanceM: undefined })}
                             ariaLabel={`Цель отрезка ${bi + 1}`} width={115} options={TARGET_OPTIONS} />
                           {b.target === 'hr' && (
                             <>
@@ -647,10 +706,30 @@ export const CardioWeekEditor: React.FC<{ cycle: CardioCycle | null; onChanged?:
                               style={{ ...NUM, width: 84 }}
                               ariaLabel={b.target === 'rpe' ? `RPE отрезка ${bi + 1}` : `Мощность отрезка ${bi + 1}, Вт`} />
                           )}
+                          {b.target === 'pace' && (
+                            <>
+                              <DraftNumberInput value={b.distanceM ?? ''} min={50} max={10000} allowEmpty
+                                onCommit={v => patchBlock(bi, { distanceM: v })}
+                                onCommitEmpty={() => patchBlock(bi, { distanceM: undefined })}
+                                placeholder="м" style={{ ...NUM, width: 78 }}
+                                ariaLabel={`Дистанция отрезка ${bi + 1}, м`} />
+                              <PaceField value={b.targetValue}
+                                onCommit={v => patchBlock(bi, { targetValue: v })}
+                                onClear={() => patchBlock(bi, { targetValue: undefined })}
+                                ariaLabel={`Темп отрезка ${bi + 1}`} />
+                            </>
+                          )}
                           <input value={b.note ?? ''} onChange={e => patchBlock(bi, { note: e.target.value })}
                             placeholder="примечание (таймер покажет)" aria-label={`Примечание отрезка ${bi + 1}`}
                             style={{ ...SEL, flex: '1 1 110px', minWidth: 0 }} />
                         </div>
+                        {b.target === 'pace' && (
+                          <div style={{ ...HINT_SM, fontSize: 10 }} role="status">
+                            {b.distanceM != null && b.targetValue != null
+                              ? `Работа ${formatCardioSec(b.workSec)} — из ${Math.round(b.distanceM)} м и темпа ${paceToText(b.targetValue)}/км.`
+                              : 'Дистанция + темп задают время работы; без темпа таймер идёт по заданным секундам.'}
+                          </div>
+                        )}
                       </div>
                     ))}
                     <div style={ROW}>

@@ -455,6 +455,82 @@ describe('конструктор недели: числовые поля наб�
   });
 });
 
+describe('конструктор недели: дистанционные интервалы', () => {
+  it('400 м с темпом 4:00 дают 96 с работы и сохраняются в сессию', () => {
+    const c = seed();
+    render(<CardioWeekEditor cycle={c} />);
+    fireEvent.click(screen.getByRole('button', { name: /Редактировать сессии/ }));
+    fireEvent.click(screen.getByLabelText('Интервалы сессии 1'));
+    fireEvent.click(screen.getByRole('button', { name: '+ Отрезок' }));
+    fireEvent.click(screen.getByLabelText('Цель отрезка 1'));
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: /^темп$/ }));
+
+    const dist = screen.getByLabelText('Дистанция отрезка 1, м') as HTMLInputElement;
+    fireEvent.change(dist, { target: { value: '400' } });
+    fireEvent.blur(dist);
+    const pace = screen.getByLabelText('Темп отрезка 1') as HTMLInputElement;
+    fireEvent.change(pace, { target: { value: '4:00' } });
+    fireEvent.blur(pace);
+    // Работа — производная от дистанции и темпа, а не ручные 60 с.
+    expect(screen.queryByLabelText('Работа отрезка 1, секунд')).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: /Сохранить/ }));
+    const b = savedSession().structured?.[0];
+    expect(b).toMatchObject({ target: 'pace', distanceM: 400, targetValue: 240, workSec: 96 });
+  });
+
+  it('смена цели с «темп» на «пульс» убирает дистанцию, а не оставляет её без темпа', () => {
+    const c = seed();
+    const first = render(<CardioWeekEditor cycle={c} />);
+    fireEvent.click(screen.getByRole('button', { name: /Редактировать сессии/ }));
+    fireEvent.click(screen.getByLabelText('Интервалы сессии 1'));
+    fireEvent.click(screen.getByRole('button', { name: '+ Отрезок' }));
+    fireEvent.click(screen.getByLabelText('Цель отрезка 1'));
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: /^темп$/ }));
+    const dist = screen.getByLabelText('Дистанция отрезка 1, м') as HTMLInputElement;
+    fireEvent.change(dist, { target: { value: '400' } });
+    fireEvent.click(screen.getByRole('button', { name: /Сохранить/ }));
+    expect(savedSession().structured?.[0].distanceM).toBe(400);
+    first.unmount();
+
+    render(<CardioWeekEditor cycle={loadCardioCycles()[0]} />);
+    fireEvent.click(screen.getByRole('button', { name: /Редактировать сессии/ }));
+    fireEvent.click(screen.getByLabelText('Интервалы сессии 1'));
+    fireEvent.click(screen.getByLabelText('Цель отрезка 1'));
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: /^пульс$/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Сохранить/ }));
+    expect(savedSession().structured?.[0].target).toBe('hr');
+    expect(savedSession().structured?.[0].distanceM).toBeUndefined();
+  });
+
+  it('переключение «темп» → «RPE» не превращает 240 с/км в «RPE 10»', () => {
+    const c = seed();
+    const first = render(<CardioWeekEditor cycle={c} />);
+    fireEvent.click(screen.getByRole('button', { name: /Редактировать сессии/ }));
+    fireEvent.click(screen.getByLabelText('Интервалы сессии 1'));
+    fireEvent.click(screen.getByRole('button', { name: '+ Отрезок' }));
+    fireEvent.click(screen.getByLabelText('Цель отрезка 1'));
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: /^темп$/ }));
+    const dist = screen.getByLabelText('Дистанция отрезка 1, м') as HTMLInputElement;
+    fireEvent.change(dist, { target: { value: '400' } });
+    const pace = screen.getByLabelText('Темп отрезка 1') as HTMLInputElement;
+    fireEvent.change(pace, { target: { value: '4:00' } });
+    fireEvent.blur(pace);
+    fireEvent.click(screen.getByRole('button', { name: /Сохранить/ }));
+    expect(savedSession().structured?.[0].targetValue).toBe(240);
+    first.unmount();
+
+    render(<CardioWeekEditor cycle={loadCardioCycles()[0]} />);
+    fireEvent.click(screen.getByRole('button', { name: /Редактировать сессии/ }));
+    fireEvent.click(screen.getByLabelText('Интервалы сессии 1'));
+    fireEvent.click(screen.getByLabelText('Цель отрезка 1'));
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: /^RPE$/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Сохранить/ }));
+    expect(savedSession().structured?.[0].target).toBe('rpe');
+    expect(savedSession().structured?.[0].targetValue).toBeUndefined();
+  });
+});
+
 describe('конструктор недели: пульсовой диапазон отрезка', () => {
   it('перепутанные границы нормализуются при сохранении', () => {
     const c = seed();

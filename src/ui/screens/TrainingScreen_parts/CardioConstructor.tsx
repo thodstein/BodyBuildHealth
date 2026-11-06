@@ -17,7 +17,7 @@ import {
   loadCardioScenarios, saveCardioScenario, removeCardioScenario,
   bumpCardioZone2VolumeGuarded, dailyTrimpMap, maxHrByFormula,
   cardioProfileFactors, cardioNutritionNotes, CARDIO_VARIANT_LABELS, CARDIO_CYCLES_CAP,
-  latestFieldTestMetrics, kcalForCardio, cardioHiitInjectGate, lthrBySportFromInput,
+  latestFieldTestMetrics, kcalForCardio, cardioHiitInjectGate, lthrBySportFromInput, cardioBlockWorkSec,
   type CardioCycle, type CardioCycleInput, type CardioGoal, type CardioCompetitionRef, type CardioLevel, type CardioEquipment, type CardioVariant, type CardioScenario, type CardioSession,
 } from '../../../engines/lms/cardio.engine';
 import { getCardioCycleTemplateById } from '../../../data/cardio-cycles/cardio-cycle-index';
@@ -511,7 +511,7 @@ const CardioConstructorInner: React.FC = () => {
     // Текст сессии обещает «Разминка 10-12 мин», но бюджет оставлял на
     // разминку и заминку всего 12 мин (по 6) — таймер давал разминку вдвое
     // короче обещанной. Считаем честно: работа + 10 мин разминки + 10 заминки.
-    const mainSec = block.workSec * block.reps + block.restSec * block.reps;
+    const mainSec = cardioBlockWorkSec(block) * block.reps + block.restSec * block.reps;
     const totalMin = Math.max(20, Math.round(mainSec / 60) + 20);
     const sessType = preset.sessionType;
     const session: CardioSession = {

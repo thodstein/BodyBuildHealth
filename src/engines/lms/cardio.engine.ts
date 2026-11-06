@@ -2606,7 +2606,7 @@ export function buildCardioTcx(cycle: CardioCycle, referenceIso?: string): strin
           const active = step.kind !== 'rest';
           lines.push(`    <Lap StartTime="${lapStart}">`);
           lines.push(`      <TotalTimeSeconds>${step.sec}</TotalTimeSeconds>`);
-          lines.push('      <DistanceMeters>0</DistanceMeters>');
+          lines.push(`      <DistanceMeters>${step.kind === 'work' && step.distanceM ? step.distanceM : 0}</DistanceMeters>`);
           lines.push(`      <Calories>${active ? Math.round(s.kcalPerSession * step.sec / Math.max(1, plan.totalSec)) : 0}</Calories>`);
           lines.push(`      <Intensity>${active ? 'Active' : 'Resting'}</Intensity>`);
           lines.push('    </Lap>');
@@ -2704,10 +2704,10 @@ export function buildCardioZwo(cycle: CardioCycle, referenceIso?: string): strin
     for (const blk of key.structured ?? []) {
       const on = zwoPowerFromNote(blk.note, key.type === 'hiit' ? 0.95 : key.type === 'miss' ? 0.85 : 0.75);
       if (blk.restSec > 0) {
-        lines.push(`    <IntervalsT Repeat="${blk.reps}" OnDuration="${blk.workSec}" OffDuration="${blk.restSec}" OnPower="${on.toFixed(2)}" OffPower="0.45" pace="0"/>`);
+        lines.push(`    <IntervalsT Repeat="${blk.reps}" OnDuration="${cardioBlockWorkSec(blk)}" OffDuration="${blk.restSec}" OnPower="${on.toFixed(2)}" OffPower="0.45" pace="0"/>`);
       } else {
         for (let r = 0; r < blk.reps; r++) {
-          lines.push(`    <SteadyState Duration="${blk.workSec}" Power="${on.toFixed(2)}" pace="0"/>`);
+          lines.push(`    <SteadyState Duration="${cardioBlockWorkSec(blk)}" Power="${on.toFixed(2)}" pace="0"/>`);
         }
       }
     }
@@ -3780,7 +3780,12 @@ export function cardioSessionProtocol(session: Pick<CardioSession, 'type' | 'dur
       // показываем все блоки той же подписью, что и редактор/таймер.
       const note = blocks.length > 1
         ? `${cardioStructuredLabel(blocks) ?? 'интервалы'} (${b.note || 'интервалы'})`
-        : `${b.reps}×${fmtSec(b.workSec)} работа / ${fmtSec(b.restSec)} отдых (${b.note || 'интервалы'})`;
+        : (() => {
+            const workText = b.distanceM != null && b.distanceM > 0
+              ? `${Math.round(b.distanceM)} м`
+              : fmtSec(cardioBlockWorkSec(b));
+            return `${b.reps}×${workText} работа / ${fmtSec(b.restSec)} отдых (${b.note || 'интервалы'})`;
+          })();
       const tgt = cardioBlockTargetText(b);
       return {
         note: (tgt ? `${note} · ${tgt}` : note) + caveat,
@@ -3911,6 +3916,8 @@ export interface CardioIntervalStep {
   label: string;
   note?: string;
   hrZone?: { min?: number; max?: number };
+  /** Дистанция отрезка, м (для TCX и подписи; время уже посчитано в `sec`). */
+  distanceM?: number;
 }
 
 export interface CardioIntervalPlan {
@@ -3948,9 +3955,9 @@ const MAX_EDGE_SEC = 20 * 60;
 export function buildCardioIntervalPlan(
   session: Pick<CardioSession, 'type' | 'durationMin' | 'structured'>,
 ): CardioIntervalPlan | null {
-  const blocks = (session.structured ?? []).filter(b => !!b && b.workSec > 0 && b.reps > 0);
+  const blocks = (session.structured ?? []).filter(b => !!b && cardioBlockWorkSec(b) > 0 && b.reps > 0);
   if (blocks.length === 0) return null;
-  const mainSec = blocks.reduce((sum, b) => sum + (b.workSec + Math.max(0, b.restSec)) * b.reps, 0);
+  const mainSec = blocks.reduce((sum, b) => sum + (cardioBlockWorkSec(b) + Math.max(0, b.restSec)) * b.reps, 0);
   const budgetSec = Math.max(1, Math.round(session.durationMin * 60));
   const slack = Math.max(0, budgetSec - mainSec);
   const warmupSec = Math.min(MAX_EDGE_SEC, Math.floor(slack / 2));
@@ -3964,9 +3971,12 @@ export function buildCardioIntervalPlan(
   for (const b of blocks) {
     for (let r = 1; r <= b.reps; r++) {
       push({
-        kind: 'work', sec: b.workSec, rep: r, repsTotal: b.reps,
-        label: b.reps > 1 ? `Работа ${r}/${b.reps}` : 'Работа',
+        kind: 'work', sec: cardioBlockWorkSec(b),
+        rep: r, repsTotal: b.reps,
+        label: (b.reps > 1 ? `Работа ${r}/${b.reps}` : 'Работа')
+          + (b.distanceM != null && b.distanceM > 0 ? ` · ${Math.round(b.distanceM)} м` : ''),
         note: [b.note, cardioBlockTargetText(b)].filter(Boolean).join(' · ') || undefined, hrZone: b.targetHr,
+        distanceM: b.distanceM != null && b.distanceM > 0 ? Math.round(b.distanceM) : undefined,
       });
       if (b.restSec > 0) {
         push({
@@ -3987,7 +3997,7 @@ export function buildCardioIntervalPlan(
     budgetSec,
     workSteps: steps.filter(s => s.kind === 'work').length,
     blockCount: blocks.length,
-    workSec: blocks[0].workSec,
+    workSec: cardioBlockWorkSec(blocks[0]),
     restSec: Math.max(0, blocks[0].restSec),
     structureLabel: cardioStructuredLabel(blocks) ?? '',
     warmupSec,
@@ -4009,21 +4019,47 @@ export function formatCardioSec(sec: number): string {
  * `null` — структуры нет (сессия ведётся ровным темпом).
  */
 export function cardioStructuredLabel(structured?: CardioStructuredBlock[]): string | null {
-  const blocks = (structured ?? []).filter(b => !!b && b.workSec > 0 && b.reps > 0);
+  const blocks = (structured ?? []).filter(b => !!b && cardioBlockWorkSec(b) > 0 && b.reps > 0);
   if (blocks.length === 0) return null;
   return blocks
-    .map(b => `${b.reps}×${formatCardioSec(b.workSec)}${b.restSec > 0 ? `/${formatCardioSec(b.restSec)}` : ''}`)
+    .map(b => {
+      const work = b.distanceM != null && b.distanceM > 0
+        ? `${Math.round(b.distanceM)} м`
+        : formatCardioSec(cardioBlockWorkSec(b));
+      return `${b.reps}×${work}${b.restSec > 0 ? `/${formatCardioSec(b.restSec)}` : ''}`;
+    })
     .join(' + ');
 }
 
 /**
- * Числовая цель отрезка: «RPE 8», «250 Вт». Для пульса и темпа — `null`
- * (диапазон живёт в `targetHr`/заметке), чтобы таймер не выдумывал цифру.
+ * Время рабочего отрезка. Для дистанции с темпом (`distanceM` + `targetValue`
+ * сек/км) считается из них — иначе таймер и подпись разошлись бы с
+ * «8×400 м». Без темпа работает заданное `workSec` (дистанция остаётся
+ * ориентиром в подписи).
+ */
+export function cardioBlockWorkSec(b: CardioStructuredBlock): number {
+  const pace = b.target === 'pace' ? b.targetValue : undefined;
+  if (b.distanceM != null && b.distanceM > 0 && pace != null && pace >= 120 && pace <= 900) {
+    return Math.max(5, Math.min(7200, Math.round(b.distanceM * pace / 1000)));
+  }
+  return Math.max(0, b.workSec);
+}
+
+/** «4:00/км» из секунд на километр (округление до целой секунды). */
+function fmtPacePerKm(secPerKm: number): string {
+  const total = Math.max(0, Math.round(secPerKm));
+  return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, '0')}/км`;
+}
+
+/**
+ * Числовая цель отрезка: «RPE 8», «250 Вт», «4:00/км». Для пульса — `null`
+ * (диапазон живёт в `targetHr`), чтобы таймер не выдумывал цифру.
  */
 export function cardioBlockTargetText(b?: CardioStructuredBlock | null): string | null {
   if (!b || b.targetValue == null || !Number.isFinite(b.targetValue)) return null;
   if (b.target === 'rpe') return `RPE ${Math.round(b.targetValue)}`;
   if (b.target === 'power') return `${Math.round(b.targetValue)} Вт`;
+  if (b.target === 'pace') return fmtPacePerKm(b.targetValue);
   return null;
 }
 
@@ -4034,8 +4070,8 @@ export function cardioBlockTargetText(b?: CardioStructuredBlock | null): string 
  */
 export function cardioStructuredMainSec(structured?: CardioStructuredBlock[]): number {
   return (structured ?? [])
-    .filter(b => !!b && b.workSec > 0 && b.reps > 0)
-    .reduce((sum, b) => sum + (b.workSec + Math.max(0, b.restSec)) * b.reps, 0);
+    .filter(b => !!b && cardioBlockWorkSec(b) > 0 && b.reps > 0)
+    .reduce((sum, b) => sum + (cardioBlockWorkSec(b) + Math.max(0, b.restSec)) * b.reps, 0);
 }
 
 /**
