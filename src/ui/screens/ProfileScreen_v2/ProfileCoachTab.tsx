@@ -90,6 +90,7 @@ import { CoachWeekView } from './CoachWeekView';
 import { CoachReportSheet } from './CoachReportSheet';
 import { CoachLockSettingsCard } from './CoachLockSettingsCard';
 import { CoachDeviceInviteCard } from './CoachDeviceInviteCard';
+import { isJoinedSpace } from '../../../core/space-invite';
 import { CoachPinDialog } from '../../CoachPinDialog';
 import {
   addCoachAuditEvent,
@@ -552,16 +553,25 @@ export const ProfileCoachTab: React.FC<{
    * заново добавит атлета с тем же именем — создастся НОВОЕ пространство, и
    * старые дневники останутся сиротами навсегда, занимая лимит и место.
    * Поэтому сироты видны явно: открыть или удалить, но не «потерять».
+   *
+   * Пространство, к которому телефон ПОДКЛЮЧИЛСЯ по коду тренера (роль
+   * `athlete`), сиротой не считается: карточки у него и не было, а «Удалить
+   * данные» здесь стёрло бы чужую облачную копию. Для него есть «Отключиться» в
+   * карточке «Телефон атлета».
    */
   const orphanSpaces = useMemo(() => {
     const known = new Set(state.athletes.map(a => a.id));
     return spaceRegistry.spaces.filter(
-      s => s.id !== HOME_SPACE_ID && !(s.athleteId && known.has(s.athleteId)),
+      s =>
+        s.id !== HOME_SPACE_ID &&
+        !(s.athleteId && known.has(s.athleteId)) &&
+        !isJoinedSpace(s.id),
     );
-  }, [spaceRegistry, state.athletes]);
+  }, [spaceRegistry, state.athletes, registryRev]);
+  /** Пространства атлетов ЭТОГО тренера (подключённые к чужому — не считаем). */
   const athleteSpaces = useMemo(
-    () => spaceRegistry.spaces.filter(s => s.id !== HOME_SPACE_ID),
-    [spaceRegistry],
+    () => spaceRegistry.spaces.filter(s => s.id !== HOME_SPACE_ID && !isJoinedSpace(s.id)),
+    [spaceRegistry, registryRev],
   );
   const [confirmOrphanId, setConfirmOrphanId] = useState<string | null>(null);
   const [confirmForgetAll, setConfirmForgetAll] = useState(false);
@@ -1265,6 +1275,12 @@ export const ProfileCoachTab: React.FC<{
    * запись реестра, база IndexedDB — иначе «удалено» значило бы «спрятано».
    */
   const deleteOrphanData = (spaceId: string) => {
+    // Защита на случай, если блок как-то показал подключённое пространство:
+    // «удалить» здесь означает стереть облачную копию, а она не наша.
+    if (isJoinedSpace(spaceId)) {
+      setConfirmOrphanId(null);
+      return;
+    }
     const storage = ls();
     if (storage) clearSpaceData(deviceRawOrFallback(storage), spaceId);
     clearSessionSpaceData(spaceId);

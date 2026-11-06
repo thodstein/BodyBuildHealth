@@ -51,6 +51,18 @@ vi.mock('../../../../core/apk-share', () => ({
   copyOrShareText: vi.fn(async () => 'copied'),
 }));
 
+/** Удаление базы пространства: «отключиться» обязано унести и её, а не только ключи. */
+const dbCalls = vi.hoisted(() => ({ deleted: [] as string[][] }));
+vi.mock('../../../../core/db', async importOriginal => {
+  const actual = await importOriginal<typeof import('../../../../core/db')>();
+  return {
+    ...actual,
+    deleteSpaceDatabases: vi.fn(async (ids: readonly string[]) => {
+      dbCalls.deleted.push([...ids]);
+    }),
+  };
+});
+
 import { CoachDeviceInviteCard } from '../CoachDeviceInviteCard';
 import {
   DATA_SPACE_KEY,
@@ -97,6 +109,7 @@ beforeEach(() => {
   sessionStorage.clear();
   _resetDataSpaceCache();
   _resetSpaceTokensCache();
+  dbCalls.deleted = [];
   kv.migrate.mockClear();
   kv.rotate.mockClear();
   kv.purge.mockClear();
@@ -278,6 +291,8 @@ describe('атлет: подключение по коду', () => {
     await waitFor(() => expect(spaceTokenRecord(SID)?.revokedAt).toBeTruthy());
     expect(spaceTokenFor(SID)).toBeNull();
     expect(localStorage.getItem(`he_ath_${SID}__he_note`)).toBeNull();
+    // База пространства — тоже копия данных тренера: уходит вместе с ключами.
+    await waitFor(() => expect(dbCalls.deleted.flat()).toContain(SID));
     restore();
   });
 });

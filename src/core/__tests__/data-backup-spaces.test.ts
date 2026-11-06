@@ -49,6 +49,7 @@ vi.mock('../../engines/weight-photo-store', () => ({
 
 import { collectBackup, importBackup, type AppBackup } from '../data-backup';
 import { setSpacePurgeHandler } from '../space-purge';
+import { _resetSpaceTokensCache, ensureSpaceToken, spaceTokenRecord } from '../space-tokens';
 import {
   DATA_SPACE_KEY,
   HOME_SPACE_ID,
@@ -272,11 +273,13 @@ describe('забыть всех атлетов', () => {
     try { sessionStorage.clear(); } catch { /* ignore */ }
     readSpaceStores.mockClear();
     writeSpaceStores.mockClear();
+    _resetSpaceTokensCache();
     vi.clearAllMocks();
   });
 
   afterEach(() => {
     setSpacePurgeHandler(null);
+    _resetSpaceTokensCache();
   });
 
   it('убирает данные и записи всех атлетов, но не трогает домашнее пространство', async () => {
@@ -316,6 +319,42 @@ describe('забыть всех атлетов', () => {
     expect(vi.mocked(deleteSpaceDatabases).mock.calls.flat(2)).toEqual(expect.arrayContaining([a1, a2]));
     // и облачные копии тоже: без этого «забыли» было бы правдой только на телефоне
     expect(purged.flat()).toEqual(expect.arrayContaining([a1, a2]));
+  });
+
+  it('подключённое к чужому тренеру пространство «забыть» не даёт: это не его атлет', async () => {
+    const a1 = athleteSpaceId('a1');
+    const joined = athleteSpaceId('a2');
+    let reg = upsertSpace(emptyRegistry(), { id: a1, athleteId: 'a1', label: 'Иван' }).registry;
+    reg = upsertSpace(reg, { id: joined, athleteId: null, label: 'Данные тренера' }).registry;
+    localStorage.setItem(DATA_SPACE_KEY, serializeRegistry(setActiveSpace(reg, HOME_SPACE_ID)));
+    localStorage.setItem(toPhysicalKey(a1, 'he_profile_v2'), 'иван');
+    localStorage.setItem(toPhysicalKey(joined, 'he_profile_v2'), 'атлет у тренера');
+    // Роль athlete — так выглядит запись после подключения по коду.
+    ensureSpaceToken(joined, {
+      token: 'tk_' + '7'.repeat(48),
+      role: 'athlete',
+      migratedAt: '2026-11-06T10:00:00.000Z',
+    });
+
+    const { forgetAllAthletes } = await import('../data-backup');
+    const { installDataSpaceStorage } = await import('../data-space');
+    expect(installDataSpaceStorage(window)).not.toBeNull();
+    const purged: string[][] = [];
+    setSpacePurgeHandler(ids => { purged.push([...ids]); });
+
+    const res = await forgetAllAthletes();
+
+    // Удалили только СВОЕГО атлета.
+    expect(res.spaces).toBe(1);
+    expect(localStorage.getItem(toPhysicalKey(a1, 'he_profile_v2'))).toBeNull();
+    // Подключённое пространство осталось и локально, и в реестре, и в облаке.
+    expect(localStorage.getItem(toPhysicalKey(joined, 'he_profile_v2'))).toBe('атлет у тренера');
+    expect(JSON.parse(localStorage.getItem(DATA_SPACE_KEY) as string).spaces.map((s: any) => s.id)).toEqual([
+      'home',
+      joined,
+    ]);
+    expect(spaceTokenRecord(joined)?.role).toBe('athlete');
+    expect(purged.flat()).toEqual([a1]);
   });
 
   it('когда атлетов нет — ничего не удаляет и возвращает 0', async () => {

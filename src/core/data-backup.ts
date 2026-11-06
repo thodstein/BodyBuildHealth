@@ -28,6 +28,7 @@ import {
   writeRegistryToStorage,
 } from './data-space';
 import { requestSpacePurge } from './space-purge';
+import { listLiveSpaceTokens } from './space-tokens';
 
 /** Сырое хранилище: бэкап и полная очистка обязаны видеть все пространства. */
 function rawLs() {
@@ -159,12 +160,24 @@ export async function collectBackup(opts?: { maxPhotoBytes?: number }): Promise<
  * здесь человек закончил работу с людьми или отдаёт телефон, но свои данные
  * сохраняет.
  *
+ * Пространства, к которым ЭТОТ телефон подключился по чужому коду (роль
+ * `athlete`), остаются: это не «его атлеты». Стереть чужую облачную копию
+ * кнопкой «забыть своих» нельзя — отключиться можно только осознанно, в карточке
+ * «Телефон атлета».
+ *
  * Возвращает число удалённых пространств — его показывают в подтверждении, а не
  * пишут «все данные удалены» без цифры.
  */
 export async function forgetAllAthletes(): Promise<{ spaces: number }> {
   const reg = readRegistryFromStorage();
-  const ids = reg.spaces.filter(s => s.id !== HOME_SPACE_ID).map(s => s.id);
+  const joined = new Set(
+    listLiveSpaceTokens()
+      .filter(r => r.role === 'athlete')
+      .map(r => r.spaceId),
+  );
+  const ids = reg.spaces
+    .filter(s => s.id !== HOME_SPACE_ID && !joined.has(s.id))
+    .map(s => s.id);
   const raw = rawLs();
   for (const id of ids) {
     // Ключи чистим по префиксу, а не по наличию записи в реестре: осиротевшие
@@ -179,8 +192,10 @@ export async function forgetAllAthletes(): Promise<{ spaces: number }> {
   if (ids.length) await deleteSpaceDatabases(ids);
   writeRegistryToStorage({
     ...reg,
-    active: HOME_SPACE_ID,
-    spaces: reg.spaces.filter(s => s.id === HOME_SPACE_ID),
+    // Открытое подключённое пространство нельзя «выкинуть» молча: активность
+    // остаётся на нём, иначе телефон прыгнет домой без объяснения.
+    active: joined.has(reg.active) ? reg.active : HOME_SPACE_ID,
+    spaces: reg.spaces.filter(s => s.id === HOME_SPACE_ID || joined.has(s.id)),
   });
   // В облаке остались бы копии их дневников — «забыли» было бы правдой только
   // на этом телефоне.

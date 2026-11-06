@@ -58,18 +58,21 @@ import {
   upsertSpace,
   writeRegistryToStorage,
 } from '../../../../core/data-space';
+import { _resetSpaceTokensCache, ensureSpaceToken } from '../../../../core/space-tokens';
 
 beforeEach(() => {
   try { localStorage.clear(); } catch { /* ignore */ }
   dbCounts.counts = {};
   dbCounts.disks = null;
   _resetDataSpaceCache();
+  _resetSpaceTokensCache();
 });
 afterEach(() => {
   cleanup();
   setSpacePurgeHandler(null);
   try { localStorage.clear(); } catch { /* ignore */ }
   _resetDataSpaceCache();
+  _resetSpaceTokensCache();
 });
 
 const seed = (athletes: number) => {
@@ -603,6 +606,29 @@ describe('данные без карточки', () => {
     expect(rows[0].querySelector('[data-coach="orphan-facts"]')?.textContent).toContain('свои данные: есть');
     // и прямо сказано, почему это важно: новая карточка = новое пространство
     expect(container.querySelector('[data-coach="orphans-hint"]')?.textContent).toContain('новое');
+  });
+
+  it('подключённое к тренеру пространство — не «данные без карточки» и не в «забыть всех»', () => {
+    seed(1);
+    // Своё пространство с карточкой + чужое, к которому телефон подключился по коду:
+    // у подключённого карточки нет никогда, но стирать его «забыть всех» нельзя.
+    const own = athleteSpaceId('a1');
+    const joined = athleteSpaceId('a2');
+    let reg = upsertSpace(emptyRegistry(), { id: own, athleteId: 'a1', label: 'Атлет 1' }).registry;
+    reg = upsertSpace(reg, { id: joined, athleteId: null, label: 'Данные тренера' }).registry;
+    writeRegistryToStorage({ ...reg, active: HOME_SPACE_ID });
+    _resetDataSpaceCache();
+    ensureSpaceToken(joined, {
+      token: 'tk_' + '5'.repeat(48),
+      role: 'athlete',
+      migratedAt: '2026-11-06T10:00:00.000Z',
+    });
+
+    const { container } = render(<ProfileCoachTab />);
+    // Не сирота: «Удалить данные» здесь стёрло бы чужую облачную копию.
+    expect(container.querySelector('[data-coach="orphans"]')).toBeNull();
+    // И в счётчике «забыть всех» только своё пространство.
+    expect(container.querySelector('[data-coach="forget-all-hint"]')?.textContent).toContain('(1');
   });
 
   it('пространство с живой карточкой в этот блок не попадает', () => {

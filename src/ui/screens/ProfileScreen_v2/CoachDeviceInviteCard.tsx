@@ -298,11 +298,20 @@ export function CoachDeviceInviteCard({ spaces, onAudit, onChanged }: Props) {
     }
   };
 
-  const leave = (id: string) => {
+  const leave = async (id: string) => {
     const wasActive = leaveJoinedSpace(id);
     onAudit('space-left');
     bump();
     onChanged?.();
+    // Ключи уже стёрты, но база IndexedDB — тоже копия данных тренера (дневник,
+    // анализы, тренировки). Без этого «удалено с этого телефона» было бы
+    // неправдой, а база висела бы на диске невидимой.
+    try {
+      const mod = await import('../../../core/db');
+      await mod.deleteSpaceDatabases([id]);
+    } catch {
+      /* базу удалить не вышло: настройки уже чисты, повторная попытка — при следующем «отключиться» */
+    }
     if (wasActive) reloadToApplySpace();
     else setNotice('Отключено. Данные тренера удалены с этого телефона.');
   };
