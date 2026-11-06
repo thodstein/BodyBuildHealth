@@ -12,6 +12,7 @@
  *  - direction-фильтр (powerlifting/bench/...) при подборе циклов
  */
 import type { SRCycleTemplate } from '../../data/lms-cycles/lms-types';
+import { ruCount, RU_CYCLES } from '../ru-plural';
 import { LMS_CYCLES, normalizeCycleDirection, getCycleById } from '../../data/lms-cycles/lms-cycle-index';
 import type { BBTrainingFocus } from '../bb/bb-goal-types';
 
@@ -366,7 +367,7 @@ export function buildMacrocycleMulti(events: CompetitionEvent[], input: Omit<Mac
       ? comp.cycleIds.filter((cid): cid is string => Boolean(cid))
       : null;
     if (compCycles && compCycles.length > effPeakWeeks) {
-      throw new Error(`Для соревнования «${comp.name}» выбрано ${compCycles.length} циклов, но пик длится только ${effPeakWeeks} нед.`);
+      throw new Error(`Для соревнования «${comp.name}» выбрано ${ruCount(compCycles.length, RU_CYCLES)}, но пик длится только ${effPeakWeeks} нед.`);
     }
     if (compCycles && compCycles.length > 0 && effPeakWeeks >= compCycles.length) {
       const base = Math.floor(effPeakWeeks / compCycles.length);
@@ -381,7 +382,7 @@ export function buildMacrocycleMulti(events: CompetitionEvent[], input: Omit<Mac
     }
     // Competition блок (1 неделя) - ровно на comp.week. Competition phase gets no cycleId.
     pushPhaseBlock('competition', compWeeks, comp.id);
-    rationale.push(`🏁 «${comp.name}» (${comp.priority}, нед ${comp.week}): peak ${effPeakWeeks} нед${compCycles && compCycles.length > 1 ? ` (${compCycles.length} циклов)` : ''} + competition ${compWeeks} нед.`);
+    rationale.push(`🏁 «${comp.name}» (${comp.priority}, нед ${comp.week}): peak ${effPeakWeeks} нед${compCycles && compCycles.length > 1 ? ` (${ruCount(compCycles.length, RU_CYCLES)})` : ''} + competition ${compWeeks} нед.`);
 
     if (isMain && !isLast) {
       const next = sorted[i + 1];

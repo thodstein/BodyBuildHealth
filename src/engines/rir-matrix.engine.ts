@@ -1,4 +1,5 @@
 import type { Exercise, TrainingInput, TrainingOutput } from '../core/types';
+import { ruCount, RU_SETS } from './ru-plural';
 import { TRAINING_LEVEL_CONFIGS, TRAINING_GOAL_CONFIGS, TRAINING_SPLITS } from './training.engine';
 import { PROGRESSION_RULES, selectProgressionRule } from './progression.engine';
 
@@ -334,7 +335,7 @@ export function getProgressionRationale(
   } else if (isPeak) {
     rationale += ` → Пик: минимум объёма, максимум интенсивности. Готовимся к тесту.`;
   } else {
-    rationale += ` → Прогрессия: +${rule.weeklyWeightIncrement} кг/нед (compound) или +${rule.weeklyVolumeIncrement} сет/нед.`;
+    rationale += ` → Прогрессия: +${rule.weeklyWeightIncrement} кг/нед (compound) или +${ruCount(rule.weeklyVolumeIncrement, RU_SETS)}/нед.`;
   }
   
   return rationale;

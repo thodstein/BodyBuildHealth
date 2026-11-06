@@ -4,6 +4,7 @@
  * Полноценный движок: CRUD, статистика, аномалии, ротация зон, рекомендации.
  * Хранилище: localStorage key `he_injection_diary`.
  */
+import { ruCount, RU_DAYS, RU_INJECTIONS } from './ru-plural';
 
 const STORAGE_KEY = 'he_injection_diary';
 
@@ -413,7 +414,7 @@ export function detectInjectionAnomalies(entries: InjectionEntry[]): InjectionAn
         date: warning.lastDate,
         zone: warning.zone,
         severity: 'danger',
-        message: `Зона ${zoneLabel(warning.zone)} не использовалась ${warning.daysSince} дней — риск фиброза/липома`,
+        message: `Зона ${zoneLabel(warning.zone)} не использовалась ${ruCount(warning.daysSince, RU_DAYS)} — риск фиброза/липома`,
         category: 'rotation',
       });
     }
@@ -430,7 +431,7 @@ export function detectInjectionAnomalies(entries: InjectionEntry[]): InjectionAn
         date: today,
         zone,
         severity: 'warn',
-        message: `Зона ${zoneLabel(zone)}: ${count} инъекций за 7 дней — рекомендуется ротация`,
+        message: `Зона ${zoneLabel(zone)}: ${ruCount(count, RU_INJECTIONS)} за 7 дней — рекомендуется ротация`,
         category: 'frequency',
       });
     }
@@ -645,7 +646,7 @@ export function getRotationRecommendations(entries: InjectionEntry[], restDays: 
       recommendations.push({
         zone: zone.id,
         reason: 'rest',
-        message: `Зона ${zoneLabel(zone.id)} отдыхала ${daysSince} дней — риск фиброза/липома`,
+        message: `Зона ${zoneLabel(zone.id)} отдыхала ${ruCount(daysSince, RU_DAYS)} — риск фиброза/липома`,
         suggestedZones: available.slice(0, 3).map(z => z.id),
       });
     } else if (daysSince < restDays) {
@@ -684,7 +685,7 @@ export function getRotationRecommendations(entries: InjectionEntry[], restDays: 
       recommendations.push({
         zone,
         reason: 'overuse',
-        message: `${count} инъекций в ${zoneLabel(zone)} за 7 дней — требуется ротация`,
+        message: `${ruCount(count, RU_INJECTIONS)} в ${zoneLabel(zone)} за 7 дней — требуется ротация`,
         suggestedZones: available.slice(0, 3).map(z => z.id),
       });
     }
@@ -787,7 +788,7 @@ export function getInjectionRecommendations(entries: InjectionEntry[]): Injectio
 
   const todayEntries = entries.filter(e => e.date === today);
   if (todayEntries.length >= 3) {
-    recs.push({ priority: 'medium', category: 'schedule', message: `${todayEntries.length} инъекций сегодня — высокая нагрузка`, action: 'Рассмотрите распределение по нескольким дням' });
+    recs.push({ priority: 'medium', category: 'schedule', message: `${ruCount(todayEntries.length, RU_INJECTIONS)} сегодня — высокая нагрузка`, action: 'Рассмотрите распределение по нескольким дням' });
   }
 
   if (entries.length >= 30) {

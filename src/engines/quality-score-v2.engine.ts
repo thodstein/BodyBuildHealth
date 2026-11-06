@@ -16,6 +16,7 @@
  * (делод 6.4±1.7 дня каждые 5.6±2.3 нед, объём −30…−50%); Maeo 2021–2023 / Kassiano 2023 /
  * Wolf 2023 / Strey 2026 (длина > короткой, ES 0.283); Gabbett ACWR 0.8–1.3; Foster монотония.
  */
+import { ruCount, RU_SETS } from './ru-plural';
 
 export const QUALITY_WEIGHTS = {
   volume: 40,
@@ -507,22 +508,22 @@ export function composeQualityScoreV2(input: V2ComposerInput): QualityScoreV2 {
       status = 'maintenance';
       issues.push({
         id: `vol_maint_${muscle}`, severity: 'info', category: 'volume', muscle,
-        message: `${muscle}: ${sets} сетов — поддержание (MV-режим спец-блока), не штрафуется`,
+        message: `${muscle}: ${ruCount(sets, RU_SETS)} — поддержание (MV-режим спец-блока), не штрафуется`,
       });
     } else if (mvStatus(sets, mev) === 'maintenance' && !input.specTargets?.length && !input.maintenanceMuscles?.length) {
       status = 'maintenance';
       issues.push({
         id: `vol_maint_${muscle}`, severity: 'info', category: 'volume', muscle,
-        message: `${muscle}: ${sets} сетов — поддержание (между MV и MEV), для роста добавьте до ${mev}`,
-        fix: `Добавить ${mev - sets} сетов/нед (до MEV)`,
+        message: `${muscle}: ${ruCount(sets, RU_SETS)} — поддержание (между MV и MEV), для роста добавьте до ${mev}`,
+        fix: `Добавить ${ruCount(mev - sets, RU_SETS)}/нед (до MEV)`,
       });
     } else {
       status = 'below_mev';
       b.volume = Math.max(0, b.volume - 6);
       issues.push({
         id: `vol_low_${muscle}`, severity: 'warning', category: 'volume', muscle,
-        message: `${muscle}: ${sets} сетов/нед < MEV (${mev})`,
-        fix: `Добавить ${mev - sets} сетов/нед (до MEV)`,
+        message: `${muscle}: ${ruCount(sets, RU_SETS)}/нед < MEV (${mev})`,
+        fix: `Добавить ${ruCount(mev - sets, RU_SETS)}/нед (до MEV)`,
       });
     }
 

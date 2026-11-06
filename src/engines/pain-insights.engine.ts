@@ -16,6 +16,7 @@ export interface PainEntry {
 }
 
 import { PAIN_ZONE_LIST, computeZoneBreakdown, getMostPainfulZone, computePainImprovementStreak, computeTimeOfDayBreakdown, computeTriggerFrequency, computePainTypeDistribution, computeReliefEffectiveness } from '../ui/screens/ProfileScreen_v2/diary-helpers';
+import { ruCount, RU_ENTRIES } from './ru-plural';
 
 export interface PainInsight {
   id: string;
@@ -151,7 +152,7 @@ function generateInsights(ctx: InsightContext): PainInsight[] {
     result.push({
       id: 'worsening-streak',
       severity: 'warning',
-      title: `Ухудшение ${ctx.streak.streak} записей подряд`,
+      title: `Ухудшение ${ruCount(ctx.streak.streak, RU_ENTRIES)} подряд`,
       description: 'Боль неуклонно растёт. Требуется коррекция протокола.',
       action: 'Обсудить с тренером/врачом изменение программы',
     });
@@ -161,7 +162,7 @@ function generateInsights(ctx: InsightContext): PainInsight[] {
     result.push({
       id: 'improving-streak',
       severity: 'info',
-      title: `Улучшение ${ctx.streak.streak} записей подряд`,
+      title: `Улучшение ${ruCount(ctx.streak.streak, RU_ENTRIES)} подряд`,
       description: 'Боль снижается. Продолжать текущий протокол.',
       action: 'Продолжать текущую поддержку',
     });
@@ -193,7 +194,7 @@ function generateInsights(ctx: InsightContext): PainInsight[] {
       id: 'pain-type-dominant',
       severity: 'info',
       title: `Доминирующий тип: ${ctx.topTypes[0].type}`,
-      description: `${ctx.topTypes[0].type} боль преобладает (${ctx.topTypes[0].count} записей, ср. ${ctx.topTypes[0].avgScore.toFixed(1)}/10).`,
+      description: `${ctx.topTypes[0].type} боль преобладает (${ruCount(ctx.topTypes[0].count, RU_ENTRIES)}, ср. ${ctx.topTypes[0].avgScore.toFixed(1)}/10).`,
       action: 'Выбрать протокол, соответствующий типу боли',
     });
   }

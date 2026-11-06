@@ -9,6 +9,7 @@
  *
  * @module split-engines
  */
+import { ruCount, RU_TRAININGS } from './ru-plural';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Types
@@ -221,7 +222,7 @@ export function generatePPLSplit(input: SplitInput): SplitOutput {
 
   return {
     name: 'Push/Pull/Legs (PPL)',
-    description: `${sessions.length} тренировок/нед. Первый цикл — сила, остальные — гипертрофия.`,
+    description: `${ruCount(sessions.length, RU_TRAININGS)}/нед. Первый цикл — сила, остальные — гипертрофия.`,
     sessions,
     recommendations: ['6 дней/нед: PPL ×2 для максимальной гипертрофии.', '3 дня/нед: PPL ×1 для базовой силы.'],
   };

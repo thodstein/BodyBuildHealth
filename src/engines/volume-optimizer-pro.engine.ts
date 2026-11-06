@@ -14,6 +14,7 @@
  */
 
 import { EXERCISE_CATALOG, getExerciseById } from '../core/exercise-catalog';
+import { ruCount, RU_APPROACHES } from './ru-plural';
 import type { Exercise } from '../core/types';
 import { getVolumeLandmarks, getAllVolumeLandmarks, normLevel, normMuscle, checkVolumeStatus } from './volume-landmarks.engine';
 import type { MuscleVolumeLandmarks, TrainingLevel } from './volume-landmarks.engine';
@@ -462,7 +463,7 @@ export function analyzeMuscleVolumePro(
   // Actionable tips
   const tips: string[] = [];
   if (status === 'below_mev') {
-    tips.push(`Добавьте ${lm.mev - currentSets} подходов для выхода на MEV`);
+    tips.push(`Добавьте ${ruCount(lm.mev - currentSets, RU_APPROACHES)} для выхода на MEV`);
   } else if (status === 'exceeding_mrv') {
     tips.push(`Сократите на ${currentSets - lm.mrv} подходов — превышен MRV`);
   } else if (status === 'approaching_mrv') {
@@ -737,7 +738,7 @@ export function scoreSplitQuality(
     if (sets === 0) { volDistScore -= 25; issues.push(`${muscleRu(m)}: нет подходов — добавьте упражнения`); }
     else if (sets < lm.mev) { volDistScore -= 12; issues.push(`${muscleRu(m)}: ${sets}/${lm.mev} подходов — ниже MEV`); }
     else if (sets > lm.mrv) { volDistScore -= 18; issues.push(`${muscleRu(m)}: ${sets}/${lm.mrv} подходов — превышен MRV`); }
-    else { strengths.push(`${muscleRu(m)}: объём в норме (${sets} подходов)`); }
+    else { strengths.push(`${muscleRu(m)}: объём в норме (${ruCount(sets, RU_APPROACHES)})`); }
 
     // Weak points get bonus if they have extra volume
     if (weakPoints.includes(m) && sets >= (lm.mav || 10)) {
@@ -929,7 +930,7 @@ export function findCoverageGaps(entries: ProExerciseRow[], level: TrainingLevel
         missing, sets, mev: lm.mev,
         suggestion: missing
           ? `Добавьте 1-2 упражнения на ${muscleRu(muscle)} (минимум ${lm.mev} подх/нед)`
-          : `Добавьте ${lm.mev - sets} подходов до MEV`,
+          : `Добавьте ${ruCount(lm.mev - sets, RU_APPROACHES)} до MEV`,
       });
     }
   }

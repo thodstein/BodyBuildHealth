@@ -17,6 +17,7 @@
  *
  * @module recommendation-engine-v2
  */
+import { ruCount, RU_WEEKS } from './ru-plural';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Types
@@ -123,7 +124,7 @@ const RECOMMENDATION_RULES: RecRule[] = [
     category: 'load',
     condition: (i) => i.performance.plateauWeeks >= 4 && i.performance.strengthTrend <= 0,
     generate: (i) => ({
-      id: 'rec_plateau', category: 'load', severity: 'medium', title: `Плато ${i.performance.plateauWeeks} недель`,
+      id: 'rec_plateau', category: 'load', severity: 'medium', title: `Плато ${ruCount(i.performance.plateauWeeks, RU_WEEKS)}`,
       message: 'Прогресс остановился. Текущий стимул недостаточен.',
       details: 'Тело адаптировалось к нагрузке. Нужен новый стимул.',
       actionItems: ['Сменить прогрессию (linear → double → RPE)', 'Увеличить или уменьшить объём на 20%', 'Сменить вариацию упражнения', 'Deload 1 неделя → новый цикл'],

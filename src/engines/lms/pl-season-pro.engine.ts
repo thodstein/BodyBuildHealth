@@ -23,6 +23,7 @@
  * Все функции чистые (без UI/storage), вход не мутируется.
  */
 import type { LMSBuildOutput, LMSPlanWeek } from './lms-builder.engine';
+import { ruCount, RU_SESSIONS } from '../ru-plural';
 import { dateFromWeeksToStart } from './pl-meet-registry.engine';
 import type { WorkoutLog } from '../../core/types';
 import { localIsoDate } from '../../core/local-date';
@@ -516,9 +517,9 @@ export function plIntensityAdvisory(plan: LMSBuildOutput, opts?: { sessions?: Wo
   if (fact.avgLossPct != null && fact.sessions > 0) {
     // Фактический VL: порог силы 20% (Zhang/Jukic), выше 30% — стоп-зона.
     const advisory = fact.avgLossPct > 30
-      ? `Потеря скорости по факту дневника: ${fact.avgLossPct}% в среднем (${fact.sessions} сессий) — стоп-зона: штанга замедляется сильнее 30%, оставьте 1–2 повтора в запасе (velocity loss ≤20%).`
+      ? `Потеря скорости по факту дневника: ${fact.avgLossPct}% в среднем (${ruCount(fact.sessions, RU_SESSIONS)}) — стоп-зона: штанга замедляется сильнее 30%, оставьте 1–2 повтора в запасе (velocity loss ≤20%).`
       : fact.avgLossPct > 20
-        ? `Потеря скорости по факту дневника: ${fact.avgLossPct}% в среднем (${fact.sessions} сессий) — выше коридора 10–20% для силы (Zhang 2023), снижайте вес или срезайте повторы.`
+        ? `Потеря скорости по факту дневника: ${fact.avgLossPct}% в среднем (${ruCount(fact.sessions, RU_SESSIONS)}) — выше коридора 10–20% для силы (Zhang 2023), снижайте вес или срезайте повторы.`
         : '';
     return {
       nearFailureShare: 0, mainSets: 0, nearFailureSets: 0,

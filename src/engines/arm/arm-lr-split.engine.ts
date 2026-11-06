@@ -8,6 +8,7 @@
  * ≥12% — слабая +25% (приоритет 2×/нед), сильная maintenance;
  * всегда в пределах MRV (cap). Чистый модуль.
  */
+import { ruCount, RU_SETS } from '../ru-plural';
 
 export interface LrSplitInput {
   leftKg?: number;
@@ -61,7 +62,7 @@ export function planLrSplit(input: LrSplitInput = {}): LrSplit {
     weakFreq: pct >= 12 ? 2 : 1,
     withinMrv: total <= mrv,
     note: pct >= 12
-      ? `Асимметрия ${pct}% ≥12% CRITICAL: слабая (${weakArm}) +25% ${weakSets} сетов 2×/нед, сильная maintenance ${strongSets} (сумма ${total}${total <= mrv ? ' ≤' : ' ПРЕВЫШАЕТ'} MRV ${mrv}${total <= mrv ? '' : ' — снижьте базу'}).`
-      : `Асимметрия ${pct}% ≥7%: слабая (${weakArm}) +15% ${weakSets} сетов 1×/нед добивка.`,
+      ? `Асимметрия ${pct}% ≥12% CRITICAL: слабая (${weakArm}) +25% ${ruCount(weakSets, RU_SETS)} 2×/нед, сильная maintenance ${strongSets} (сумма ${total}${total <= mrv ? ' ≤' : ' ПРЕВЫШАЕТ'} MRV ${mrv}${total <= mrv ? '' : ' — снижьте базу'}).`
+      : `Асимметрия ${pct}% ≥7%: слабая (${weakArm}) +15% ${ruCount(weakSets, RU_SETS)} 1×/нед добивка.`,
   };
 }

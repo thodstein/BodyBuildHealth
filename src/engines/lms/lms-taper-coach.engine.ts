@@ -11,6 +11,7 @@
  * Все функции чистые и покрыты тестами (lms-taper-coach.test.ts).
  */
 import type { LMSBuildOutput, LMSPlanWeek } from './lms-builder.engine';
+import { ruAdjCount, RU_ADJ_WORKING, RU_SETS } from '../ru-plural';
 import { buildPLTaperCurve, taperWeeksByFatigue, type TaperCurvePoint, type TaperMode, type TaperWeightGoal } from './lms-taper.engine';
 import { LAST_HEAVY_DAYS, type Lift } from '../pro/taper.engine';
 import { norm } from '../norm';
@@ -274,7 +275,7 @@ export function coachPLPeakPlan(plan: LMSBuildOutput, ctx?: TaperCoachCtx): Tape
       .filter(ws => (ws.pct ?? 0) > 1.0 && (ws.reps ?? 1) > 1 && (ws.sets ?? 0) >= 1);
     if (overPm.length > 0) {
       score -= 20;
-      notes.push({ severity: 'danger', icon: '⚖️', text: `В финальной неделе ${overPm.length} рабочих сетов выше 100% ПМ (${overPm.map(ws => Math.round((ws.pct ?? 0) * 100)).join('/')}%) — выше ПМ допустимы только прикиды-синглы дня соревнований.` });
+      notes.push({ severity: 'danger', icon: '⚖️', text: `В финальной неделе ${ruAdjCount(overPm.length, RU_ADJ_WORKING, RU_SETS)} выше 100% ПМ (${overPm.map(ws => Math.round((ws.pct ?? 0) * 100)).join('/')}%) — выше ПМ допустимы только прикиды-синглы дня соревнований.` });
     }
   }
 

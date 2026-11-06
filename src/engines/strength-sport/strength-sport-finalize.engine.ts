@@ -3,6 +3,7 @@
  * Аналог bb-finalize: капы, баланс, недели делода, outside-конфликты.
  */
 import type { StrengthSportPlan } from './strength-sport.types';
+import { ruCount, RU_SESSIONS, RU_SETS } from '../ru-plural';
 import { getWL, getStrong } from './strength-sport-volume';
 import { sessionLimitsFor, validateSync } from './strength-sport-limits';
 import { calcDOTS, calcWilks, calcIPFGL } from '../pl-points.engine';
@@ -599,7 +600,7 @@ export function buildStrengthSportReport(plan: StrengthSportPlan): string {
   for (const wk of plan.weeksData) {
     const sn = wk.sessions.flatMap(s=> s.exercises.filter(e=> ['snatch','hang_snatch','power_snatch','muscle_snatch'].includes(e.id))).reduce((a,e)=> a + e.workSets.reduce((x,s)=> x+s.reps,0),0);
     const sq = wk.sessions.flatMap(s=> s.exercises.filter(e=> ['back_squat','front_squat','squat','hack_squat'].includes(e.id))).reduce((a,e)=> a+e.sets,0);
-    lines.push(`Нед ${wk.week} ${wk.phase}: рывок ${sn} подъёмов, присед ${sq} сетов, ${wk.sessions.length} сессий`);
+    lines.push(`Нед ${wk.week} ${wk.phase}: рывок ${sn} подъёмов, присед ${ruCount(sq, RU_SETS)}, ${ruCount(wk.sessions.length, RU_SESSIONS)}`);
   }
   if (plan.outsideMetrics) lines.push(`Вне зала: ${plan.outsideMetrics.weeklyLoad} load → ×${plan.outsideMetrics.volumeMultiplier} (${plan.outsideMetrics.interference}) ${plan.outsideMetrics.rationale.join(' | ')}`);
   lines.push(`Rationale: ${plan.rationale.slice(0,5).join(' | ')}`);

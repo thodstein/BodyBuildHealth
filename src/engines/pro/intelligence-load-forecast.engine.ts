@@ -15,6 +15,7 @@
  *    факта с планом делается понедельно (E5, «средняя неделя плана»).
  */
 import { ewma, type DayLoad } from './training-load.engine';
+import { ruCount, RU_DAYS } from '../ru-plural';
 import { localIsoDate } from '../../core/local-date';
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -82,7 +83,7 @@ export function loadForecast(dailyLoads: DayLoad[], referenceDate?: string, days
   }
   const suggestedCap = consecutiveDays >= 3 ? Math.round(level * 0.85) : null;
   const guidance = consecutiveDays >= 3
-    ? `${consecutiveDays} дней подряд с нагрузкой. Ориентир: следующий день — около ${suggestedCap} AU (≈ −15%) либо отдых. Решение за вами.`
+    ? `${ruCount(consecutiveDays, RU_DAYS)} подряд с нагрузкой. Ориентир: следующий день — около ${suggestedCap} AU (≈ −15%) либо отдых. Решение за вами.`
     : hasData
       ? `Нагрузка идёт ${consecutiveDays} дн. подряд — порог на ${consecutiveDays + 1}-й день не применяется.`
       : 'Нет данных о нагрузке — прогноз не строится.';

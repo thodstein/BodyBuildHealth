@@ -6,6 +6,7 @@
  * then applies the shared drug-interaction gate.
  */
 import { SUPPORT_CATALOG_DATA } from '../data/support-database';
+import { ruAdjCount, RU_ADJ_DOSE, RU_WARNINGS } from './ru-plural';
 import { findSupplements } from './supplement-finder.engine';
 import { getEvidenceGrade } from './biostack-clinical-v2.engine';
 import { getSafeStackRecommendations, optimizeTiming, checkStackToxicity } from './biostack-safety.engine';
@@ -165,7 +166,7 @@ export function optimizeStack(input: StackInput): StackOutput {
   const essential = selected.filter(item => item.priority === 'essential');
   const recommended = selected.filter(item => item.priority === 'recommended');
   const optional = selected.filter(item => item.priority === 'optional');
-  const warningSuffix = toxicity.length ? ` Есть ${toxicity.length} дозовых предупреждений.` : '';
+  const warningSuffix = toxicity.length ? ` Есть ${ruAdjCount(toxicity.length, RU_ADJ_DOSE, RU_WARNINGS)}.` : '';
 
   return {
     essential, recommended, optional,

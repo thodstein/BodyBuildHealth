@@ -4,6 +4,7 @@
  * Чистая функция: волна объёма коррекций + dayMap по ARM_CORRECTIONS.dayTags.
  */
 import type { ArmWeakPoint } from './arm-biomechanics.engine';
+import { ruCount, RU_SETS } from '../ru-plural';
 import { ARM_CORRECTIONS } from './arm-weakpoint-corrections';
 import { tableWeekKind } from './arm-table.engine';
 
@@ -57,9 +58,9 @@ export function buildArmSpecBlock(input: {
     const firstBase = points.length ? (ARM_CORRECTIONS[points[0]]?.sets ?? 3) : 3;
     const delta = (targetSets[points[0]] ?? firstBase) - firstBase;
     const note = delta > 0
-      ? `Объём +${delta} сет @65-70%`
+      ? `Объём +${ruCount(delta, RU_SETS)} @65-70%`
       : delta < 0
-        ? `Стресс-контроль: ${delta} сет, изометрия`
+        ? `Стресс-контроль: ${ruCount(delta, RU_SETS)}, изометрия`
         : 'Техника 8-12 @60-65%';
     weeks.push({ week: w, kind, targetSets, note });
   }

@@ -11,6 +11,7 @@
  */
 
 import type { StrengthSportPlan } from './strength-sport.types';
+import { ruCount, RU_SETS } from '../ru-plural';
 import { auditSMPlan } from './strength-sport-sm-plan-audit.engine';
 import { SM_BIOMECH, type SMWeakPoint } from './strength-sport-sm-biomechanics.engine';
 import { basePmForSM } from './strength-sport-sm-injection.engine';
@@ -76,7 +77,7 @@ export function simulateSMCorrection(plan: StrengthSportPlan | null | undefined,
   const coverageBefore = before.coveredCount;
   const coverageAfter = beforeSets > 0 ? coverageBefore : coverageBefore + 1;
   const loadStr = isCarry ? `~${distanceEstM}м carries` : `~${(tonnageEst / 1000).toFixed(1)}т`;
-  const summary = `+${setsTotal} сетов (${loadStr}) · покрытие ${coverageBefore}/16 → ${coverageAfter}/16`;
+  const summary = `+${ruCount(setsTotal, RU_SETS)} (${loadStr}) · покрытие ${coverageBefore}/16 → ${coverageAfter}/16`;
   return {
     weakPoint: action.weakPoint,
     corrId: action.corrId,

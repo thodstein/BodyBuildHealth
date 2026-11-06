@@ -9,6 +9,7 @@
  */
 
 import { epley1RM } from './e1rm';
+import { ruCount, RU_APPROACHES, RU_ERRORS, RU_TRAININGS } from './ru-plural';
 import { localIsoDate } from '../core/local-date';
 import { formatDate } from '../core/utils/date-utils';
 import { EXERCISE_CATALOG } from '../core/exercise-catalog';
@@ -275,7 +276,7 @@ export function generateInsights(
     insights.push({
       type: 'warning',
       category: 'technique',
-      message: `⚠️ ${totalErrors} ошибок техники за период`,
+      message: `⚠️ ${ruCount(totalErrors, RU_ERRORS)} техники за период`,
       detail: `Самая частая: ${topError[0]} (${topError[1]} раз). Приоритет — исправление техники.`,
       timestamp: new Date().toISOString(),
     });
@@ -289,7 +290,7 @@ export function generateInsights(
       insights.push({
         type: 'warning',
         category: 'technique',
-        message: `⚠️ Средняя техника ${avgTech.toFixed(1)}/5 (${scored.length} подходов)`,
+        message: `⚠️ Средняя техника ${avgTech.toFixed(1)}/5 (${ruCount(scored.length, RU_APPROACHES)})`,
         detail: 'Более половины подходов с оценкой ниже 4. Снизьте вес или повторы, сфокусируйтесь на форме.',
         timestamp: new Date().toISOString(),
       });
@@ -297,7 +298,7 @@ export function generateInsights(
       insights.push({
         type: 'positive',
         category: 'technique',
-        message: `✅ Техника: ${avgTech.toFixed(1)}/5 (${scored.length} подходов)`,
+        message: `✅ Техника: ${avgTech.toFixed(1)}/5 (${ruCount(scored.length, RU_APPROACHES)})`,
         detail: 'Стабильное качество выполнения. Можно повышать нагрузку.',
         timestamp: new Date().toISOString(),
       });
@@ -309,7 +310,7 @@ export function generateInsights(
     insights.push({
       type: 'positive',
       category: 'consistency',
-      message: `🔥 Серия: ${history.currentStreak} тренировок подряд!`,
+      message: `🔥 Серия: ${ruCount(history.currentStreak, RU_TRAININGS)} подряд!`,
       detail: `Лучшая серия: ${history.bestStreak}. Отличная дисциплина.`,
       timestamp: new Date().toISOString(),
     });
@@ -320,7 +321,7 @@ export function generateInsights(
       type: 'positive',
       category: 'consistency',
       message: `🏆 100+ тренировок в дневнике!`,
-      detail: `Всего ${history.totalSessions} тренировок с ${history.firstSessionDate}`,
+      detail: `Всего ${ruCount(history.totalSessions, RU_TRAININGS)} с ${history.firstSessionDate}`,
       timestamp: new Date().toISOString(),
     });
   }

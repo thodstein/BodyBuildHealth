@@ -3,6 +3,7 @@
  * Зеркало bb-finalize.engine.ts.
  */
 import type { ArmPlan } from './arm-types';
+import { ruCount, RU_EXERCISES } from '../ru-plural';
 import { getArmLandmarks } from './arm-volume-landmarks.engine';
 import { perExerciseCap, aggregateArmVolume, sessionLimitsForArm } from './arm-volume.engine';
 import { getArmCycle } from './arm-cycle-library.engine';
@@ -370,7 +371,7 @@ function enforceInputSafety(plan: ArmPlan): void {
         if (repsCap != null) ex.repsRange = [Math.min(ex.repsRange[0], repsCap), Math.min(ex.repsRange[1], repsCap)];
       }
       if (sess.exercises.length !== before) {
-        plan.rationale.push(`Н${wk.week} ${sess.sessionTag}: safety-фильтр снял ${before - sess.exercises.length} упражнений по травме/мобильности.`);
+        plan.rationale.push(`Н${wk.week} ${sess.sessionTag}: safety-фильтр снял ${ruCount(before - sess.exercises.length, RU_EXERCISES)} по травме/мобильности.`);
       }
     }
   }

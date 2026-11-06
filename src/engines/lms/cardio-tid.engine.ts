@@ -11,6 +11,7 @@
  * - Frontiers 2025: фазовый сдвиг general PYR/POL → specific PYR → pre-comp POL.
  */
 import type { CardioCycle, CardioType } from './cardio.engine';
+import { ruCount, RU_SESSIONS } from '../ru-plural';
 import { maxHrClassic } from './cardio-physiology.engine';
 
 export type TidModel = 'polarized' | 'pyramidal' | 'threshold' | 'other';
@@ -220,7 +221,7 @@ export function factTimeInZones(
       ? 'Нет ни одной сессии со средним HR — фактический TID не считаем (план ≠ факт).'
       : skipped > 0
         ? `${byHr} по среднему HR; ${skipped} без HR — вне расчёта.`
-        : `${byHr} сессий по среднему HR${basis === 'lthr' ? ' (пороги по LTHR)' : ' (пороги по % ЧССмакс)'}.`,
+        : `${ruCount(byHr, RU_SESSIONS)} по среднему HR${basis === 'lthr' ? ' (пороги по LTHR)' : ' (пороги по % ЧССмакс)'}.`,
   };
 }
 

@@ -6,6 +6,7 @@
  * Хранит историю в localStorage('he_rir_calibration').
  */
 import type { WorkoutSession } from './workout-logger.engine';
+import { ruCount, RU_APPROACHES } from './ru-plural';
 
 const KEY = 'he_rir_calibration';
 
@@ -128,7 +129,7 @@ export function getAdjustedRIR(exerciseKey: string, plannedRIR: number): { adjus
   return {
     adjustedRIR: adjusted,
     bias: cal.avgBias,
-    rationale: `По данным ${cal.totalPoints} подходов: bias ${cal.avgBias > 0 ? '+' : ''}${cal.avgBias} RIR (${direction}). Рекомендуемый RIR: ${adjusted} вместо ${plannedRIR}`,
+    rationale: `По данным ${ruCount(cal.totalPoints, RU_APPROACHES)}: bias ${cal.avgBias > 0 ? '+' : ''}${cal.avgBias} RIR (${direction}). Рекомендуемый RIR: ${adjusted} вместо ${plannedRIR}`,
   };
 }
 

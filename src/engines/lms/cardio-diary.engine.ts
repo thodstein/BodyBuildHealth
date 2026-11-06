@@ -12,6 +12,7 @@
  */
 import type { CardioCycle, CardioEquipment, CardioSession, CardioType } from './cardio.engine';
 import { cardioSessionsForDate, cardioWeekForDate, kcalForCardio } from './cardio.engine';
+import { ruCount, RU_SESSIONS } from '../ru-plural';
 import { todayLocalIso, addDaysIso, toLocalIso } from './cardio-date-utils.engine';
 import { cardioEntryLoad } from './cardio-physiology.engine';
 
@@ -492,7 +493,7 @@ export function computeCardioAdvice(
     const from = dateDaysAgo(7, opts.referenceIso);
     const skipped = log.filter(e => !e.completed && e.date >= from).length;
     if (skipped > 0) {
-      return { action: 'keep', reason: `За 7 дней пропущено ${skipped} сессий — начните со следующей по плану.` };
+      return { action: 'keep', reason: `За 7 дней пропущено ${ruCount(skipped, RU_SESSIONS)} — начните со следующей по плану.` };
     }
     return { action: 'keep', reason: 'За 7 дней кардио не записано — начните с плана недели.' };
   }
@@ -687,7 +688,7 @@ export function cardioHrCompliance(
   const avgDelta = Math.round(checks.reduce((s, c) => s + (c.avgHr - ((c.targetMin ?? 0) + (c.targetMax ?? 0)) / 2), 0) / checks.length);
   let advice: string;
   if (inZonePct >= 70) {
-    advice = `Попадание в пульс-зону ${inZonePct}% (${checks.length} сессий) — точность хорошая, среднее отклонение ${avgDelta > 0 ? '+' : ''}${avgDelta} уд.`;
+    advice = `Попадание в пульс-зону ${inZonePct}% (${ruCount(checks.length, RU_SESSIONS)}) — точность хорошая, среднее отклонение ${avgDelta > 0 ? '+' : ''}${avgDelta} уд.`;
   } else if (avgDelta > 5) {
     advice = `ЧСС выше целевой зоны в среднем на ${avgDelta} уд — снизьте темп, держитесь в зоне сессии (Z2/Z3).`;
   } else if (avgDelta < -5) {

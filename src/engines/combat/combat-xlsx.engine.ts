@@ -4,6 +4,7 @@
  * Изолировано. Бинарный XLSX через `xlsx` (как у BB bb-xlsx), HTML остаётся для тестов/фолбэка.
  */
 import type { CombatPlan } from './combat.types';
+import { ruCount, RU_SETS } from '../ru-plural';
 import { getCombat } from './combat-volume';
 import { weekGroupSets } from './combat-groups';
 import { cbSessionTagName, cbDisciplineName, cbAnnualPhaseName } from './combat-builder.engine';
@@ -47,7 +48,7 @@ export function buildCombatXlsxHtml(plan: CombatPlan): string {
       const exRows = s.exercises.map(e=> `<tr><td>${escCell(e.name)}</td><td>${e.sets}×${escCell(e.reps)}</td><td>${e.weight}кг</td><td>RIR${e.rir}</td><td>${escCell(e.tempo||'')}</td><td>${e.restSeconds||''}с</td><td style="font-size:9px;">${escCell(e.comment||'')}</td></tr>`).join('');
       return `<h4 style="margin:8px 0 4px;color:${col};">День ${s.day} · ${escCell(cbSessionTagName(s.sessionTag))} · ${escCell(s.character)} · ${s.durationMin||''}′</h4><table border="1" cellpadding="4" cellspacing="0" style="border-collapse:collapse;width:100%;font-size:11px;"><tr style="background:#f3f4f6;"><th>Упражнение</th><th>Сеты×Повт</th><th>Вес</th><th>RIR</th><th>Темп</th><th>Отдых</th><th>Коммент</th></tr>${exRows}</table>`;
     }).join('');
-    return `<div style="border-left:4px solid ${col};background:${col}0a;padding:8px;margin:8px 0;"><h3 style="margin:0 0 6px;color:${col};">Неделя ${w.week} · ${escCell(cbAnnualPhaseName(w.phase))}${w.deload?' · делод':(w as any).taper?' · тапер':''} · ${w.totalSets||0} сетов ${(w as any).totalTonnage? `· ${(((w as any).totalTonnage)/1000).toFixed(1)}т`:''}</h3>${sessHtml}</div>`;
+    return `<div style="border-left:4px solid ${col};background:${col}0a;padding:8px;margin:8px 0;"><h3 style="margin:0 0 6px;color:${col};">Неделя ${w.week} · ${escCell(cbAnnualPhaseName(w.phase))}${w.deload?' · делод':(w as any).taper?' · тапер':''} · ${ruCount(w.totalSets||0, RU_SETS)} ${(w as any).totalTonnage? `· ${(((w as any).totalTonnage)/1000).toFixed(1)}т`:''}</h3>${sessHtml}</div>`;
   }).join('<hr/>');
   // sparring / weightcut / style
   const snap: any = plan.inputSnapshot || {};

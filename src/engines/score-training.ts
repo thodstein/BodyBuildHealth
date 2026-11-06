@@ -2,6 +2,7 @@
 // Risk_total = Σ(Factor_i * Weight_i)
 
 import type { ModuleSystemScore, ModuleResult } from './score-engine';
+import { ruCount, RU_TRAININGS } from './ru-plural';
 
 // ─── Types ───
 
@@ -162,7 +163,7 @@ export function generateTrainingReport(result: ModuleResult): string {
 
   const d = result.details as any;
   text += `📊 ПАРАМЕТРЫ\n`;
-  text += `  📅 ${d.workoutsPerWeek} тренировок/нед · ${d.avgMinutes} мин\n`;
+  text += `  📅 ${ruCount(d.workoutsPerWeek, RU_TRAININGS)}/нед · ${d.avgMinutes} мин\n`;
   text += `  📦 Объём: ${d.weeklyVolume} мин/нед\n`;
   text += `  😴 Сон: ${d.sleepHours} ч · Стресс: ${d.stressLevel}/10\n`;
   text += `  🔄 Делауд: ${d.deloadWeeksAgo} нед назад\n`;

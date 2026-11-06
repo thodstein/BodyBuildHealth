@@ -64,6 +64,7 @@ const MICRO_LABELS: Record<string, string> = {
 };
 
 import { FOOD_DB } from '../core/nutrition-database';
+import { ruCount, RU_MEALS } from './ru-plural';
 import { getMicro } from '../core/nutrition-micros';
 
 // Sodium estimation by food category (mg per 100g typical)
@@ -487,7 +488,7 @@ export function generateNutritionReport(input: NutritionReportInput): NutritionR
     proteinSpreadOk,
     gaps: timingGaps,
     recommendation: [
-      meals.length < 4 ? `Всего ${meals.length} приёмов — рекомендуется 4-6.` : `Приёмов пищи: ${meals.length} — оптимально.`,
+      meals.length < 4 ? `Всего ${ruCount(meals.length, RU_MEALS)} — рекомендуется 4-6.` : `Приёмов пищи: ${meals.length} — оптимально.`,
       longestGap > 5 ? `Самый длинный перерыв ${Math.round(longestGap * 10) / 10}ч — добавьте перекус.` : 'Перерывы между приёмами в норме.',
       hasPreWorkout ? '' : workoutTime ? 'Нет приёма за 1-2ч до тренировки — добавьте белок + углеводы.' : '',
       hasPostWorkout ? '' : workoutTime ? 'Нет приёма после тренировки — пост-трен питание критически важно.' : '',

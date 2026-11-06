@@ -3,6 +3,7 @@
  * Зеркало bb-selector.engine.ts / lms-selector.
  */
 import { ARM_SPLIT_PATTERNS, type SplitPattern } from './arm-split-patterns';
+import { ruCount, RU_MUSCLES } from '../ru-plural';
 import { TAG_MUSCLES_ARM } from './arm-day-types';
 import { normLevel } from '../volume-landmarks.engine';
 
@@ -65,8 +66,8 @@ export function armSplitReport(r: ArmRankedPattern, level: string): ArmSplitRepo
   if (parts.length > 0) lines.push(`Частота: ${parts.join(' · ')}`);
   lines.push(
     over
-      ? `Ёмкость дня: ${cap} мышц > вашей ${lvlCap} (уровень ${level}) — сессия может выйти давной, стимул размоется`
-      : `Ёмкость дня: ${cap} мышц ≤ вашей ${lvlCap} (уровень ${level}) — нагрузка распределится`
+      ? `Ёмкость дня: ${ruCount(cap, RU_MUSCLES)} > вашей ${lvlCap} (уровень ${level}) — сессия может выйти давной, стимул размоется`
+      : `Ёмкость дня: ${ruCount(cap, RU_MUSCLES)} ≤ вашей ${lvlCap} (уровень ${level}) — нагрузка распределится`
   );
   return { splitName: r.pattern?.name ?? '', capacity: { maxSessionMuscles: cap, levelCapacity: lvlCap, over }, freq, lines };
 }
@@ -149,13 +150,13 @@ export function rankArmSplits(input: ArmSelectorInput): ArmRankedPattern[] {
     const capacity = levelSessionCapacity(lvl);
     const maxMuscles = splitMaxSessionMuscles(p);
     if (maxMuscles > capacity + 2) {
-      score -= 18; warnings.push(`день несёт ${maxMuscles} мышц — при уровне ${lvl} ёмкость ~${capacity}: сессия слишком плотная (расплывчатый стимул)`);
+      score -= 18; warnings.push(`день несёт ${ruCount(maxMuscles, RU_MUSCLES)} — при уровне ${lvl} ёмкость ~${capacity}: сессия слишком плотная (расплывчатый стимул)`);
     } else if (maxMuscles > capacity) {
-      score -= 8; warnings.push(`день несёт ${maxMuscles} мышц при ёмкости ~${capacity} — плотновато для ${lvl}`);
+      score -= 8; warnings.push(`день несёт ${ruCount(maxMuscles, RU_MUSCLES)} при ёмкости ~${capacity} — плотновато для ${lvl}`);
     } else if (maxMuscles <= capacity - 2) {
-      score += 8; rationale.push(`день ${maxMuscles} мышц — с запасом для доборов`);
+      score += 8; rationale.push(`день ${ruCount(maxMuscles, RU_MUSCLES)} — с запасом для доборов`);
     } else {
-      score += 4; rationale.push(`день ${maxMuscles} мышц ~ ёмкость ${capacity} (${lvl})`);
+      score += 4; rationale.push(`день ${ruCount(maxMuscles, RU_MUSCLES)} ~ ёмкость ${capacity} (${lvl})`);
     }
 
     // goal bias

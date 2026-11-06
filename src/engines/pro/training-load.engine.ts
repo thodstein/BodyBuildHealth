@@ -4,6 +4,7 @@
  * Заполняет пробел: sRPE и fitness-fatigue отсутствовали; ACWR был разбросан по 13 файлам →
  * здесь канонический модуль для проф-фич (P4 авторегуляция, P12 UI).
  */
+import { ruCount, RU_WEEKS } from '../ru-plural';
 
 export interface TrainingSession { date: string; sRPE: number; durationMin: number; }
 export interface DayLoad { date: string; load: number; }        // нагрузка на день (AU)
@@ -301,7 +302,7 @@ export function trainingLoadReport(sessions: TrainingSession[], referenceDate?: 
   if (acwr.lowBase) recommendations.push(`База нагрузки тонкая (хроника ${acwr.chronic} AU/день) — высокий ratio может отражать недотренированность, а не перегрузку; ориентируйтесь на абсолютные цифры и тренд.`);
   if (streak.uniform) {
     recommendations.push(streak.uniformWeeks >= 2
-      ? `Нагрузка ${streak.uniformWeeks} недель подряд абсолютно ровная (SD=0) — это максимальное однообразие по Фостеру: добавьте вариативность/восстановление.`
+      ? `Нагрузка ${ruCount(streak.uniformWeeks, RU_WEEKS)} подряд абсолютно ровная (SD=0) — это максимальное однообразие по Фостеру: добавьте вариативность/восстановление.`
       : 'Нагрузка недели абсолютно ровная (SD=0) — максимальное однообразие (самый высокий monotony): добавьте вариативность.');
   } else if (monotony.monotony > 2) {
     recommendations.push(`Monotony ${monotony.monotony} > 2 — однообразная нагрузка, добавьте вариативность/восстановление.`);

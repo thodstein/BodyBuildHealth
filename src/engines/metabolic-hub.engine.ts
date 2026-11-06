@@ -5,6 +5,7 @@
  * Gabbett ACWR, Hall 2011 (density p*9400), IOC RED-S Mountjoy 2018, Westerterp TEF, Baker 2017 sweat, Levine NEAT 2002, Trexler AT 2014, MATADOR Byrne 2017.
  * ВАЖНО: все AAS-мультипликаторы помечены experimental — не peer-reviewed, вывод через FFM предпочтителен.
  */
+import { ruCount, RU_MEALS, RU_POINTS, RU_TRAININGS } from './ru-plural';
 import {
   computeBMR as computeBMRBase,
   computePalSimple,
@@ -842,7 +843,7 @@ export function weeklyExerciseEnergy(input: { weeklyVolumeTons?: number; trainin
   return {
     kcalPerWeek,
     source: days || cardio ? 'sessions' : 'none',
-    note: days || cardio ? `${days} тренировок × 380 ккал + ${cardio} мин кардио × 7 ккал/мин` : 'EEE не задан',
+    note: days || cardio ? `${ruCount(days, RU_TRAININGS)} × 380 ккал + ${cardio} мин кардио × 7 ккал/мин` : 'EEE не задан',
   };
 }
 export function calcEnergyAvailability(input: { weight:number; bodyFat?:number; height:number; lean?:number; intakeKcal?:number; eeeKcal?: number; trainingDays?:number; heightCm?:number; sex?: 'male'|'female' }): EAResult {
@@ -917,7 +918,7 @@ export function calcProteinTiming(totalProteinG:number, weightKg:number, mealsPe
   // Вердикт и расчёт используют ОДИН порог (LEUCINE_MPS_G) — рассинхрон 2.2/2.5 устранён.
   if (leucinePerMeal>=leucineThreshold && !overCeiling) note = `MPS ок (${leucinePerMeal}г leuc ≥${leucineThreshold}г, ${perMealGPerKg}г/кг <0.55) — ${mealsPerDay} приема ок. Pre-sleep ${preSleepG}г казеин (Res 2012)`;
   else if (overCeiling) note = `Перебор ${perMealGPerKg}г/кг >0.55 waste — увеличь приемы до ${optimalMeals} по ~${Math.round(totalProteinG/optimalMeals)}г. ${plantNote}`;
-  else note = `Мало leuc ${leucinePerMeal}г <${leucineThreshold}г (нужный порог MPS; в литературе 2.2–2.5 г) — нужно ${optimalMeals} приемов по ~${Math.round(totalProteinG/optimalMeals)}г. ${plantNote}`;
+  else note = `Мало leuc ${leucinePerMeal}г <${leucineThreshold}г (нужный порог MPS; в литературе 2.2–2.5 г) — нужно ${ruCount(optimalMeals, RU_MEALS)} по ~${Math.round(totalProteinG/optimalMeals)}г. ${plantNote}`;
   return { perMeal: protPerMeal, meals: mealsPerDay, leucinePerMeal, perMealGPerKg, ceiling, preSleepG, note, plantNote };
 }
 
@@ -1395,8 +1396,8 @@ export function calcAdaptiveTDEEv3(params: {
     note: sufficient ? `Логов достаточно (${logDays}д питания, ${weighIns} взвешиваний)` : `Нужно ≥10 логов питания + ≥10 взвешиваний за 28д (сейчас ${logDays}/${weighIns}) — иначе формула, не адаптив`,
   };
   const note = plateau
-    ? `Плато сушки v3: тренд ${best.trend}кг/нед (EMA ${pts.length} точек, R²${best.r2}) — AT ${atKcal}ккал · ${adherence.note}`
-    : `Adaptive v3: TDEE ~${tdee} [${low}–${high} DLW] тренд ${best.trend} R²${best.r2} EMA ${pts.length} точек · cut ${targets.cut}/ bulk ${targets.bulk} · ${adherence.note}`;
+    ? `Плато сушки v3: тренд ${best.trend}кг/нед (EMA ${ruCount(pts.length, RU_POINTS)}, R²${best.r2}) — AT ${atKcal}ккал · ${adherence.note}`
+    : `Adaptive v3: TDEE ~${tdee} [${low}–${high} DLW] тренд ${best.trend} R²${best.r2} EMA ${ruCount(pts.length, RU_POINTS)} · cut ${targets.cut}/ bulk ${targets.bulk} · ${adherence.note}`;
   return { tdee, tdeeNoAT, low, high, trend: best.trend, r2: best.r2, days: best.days, n: best.n, density, atKcal, confidence, plateau, adherence, targets, emaSeries, note };
 }
 

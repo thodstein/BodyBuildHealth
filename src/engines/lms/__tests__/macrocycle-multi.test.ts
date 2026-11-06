@@ -180,7 +180,7 @@ describe('buildMacrocycleMulti — несколько соревнований',
     expect(() => buildMacrocycleMulti([{
       id: 'c1', name: 'Early', week: 3, priority: 'A',
       cycleIds: ['a', 'b', 'c', 'd'],
-    }], { level: 'intermediate', goal: 'powerlifting', totalWeeks: 20 })).toThrow(/циклов/);
+    }], { level: 'intermediate', goal: 'powerlifting', totalWeeks: 20 })).toThrow(/цикл/);
   });
 
   it('допускает соревнование на первой неделе без фиктивного peak-блока', () => {

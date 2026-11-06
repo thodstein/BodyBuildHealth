@@ -86,3 +86,7 @@ export const RU_ADJ_PAUSED: RuPluralForms = ['паузный', 'паузных',
 export const RU_ADJ_RECORDED: RuPluralForms = ['записанный', 'записанных', 'записанных'];
 export const RU_ADJ_SAME: RuPluralForms = ['одинаковый', 'одинаковых', 'одинаковых'];
 export const RU_SESSIONS_IN: RuPluralForms = ['сессии', 'сессиях', 'сессиях'];
+export const RU_MEALS: RuPluralForms = ['приём', 'приёма', 'приёмов'];
+export const RU_ADJ_UNIQUE: RuPluralForms = ['уникальный', 'уникальных', 'уникальных'];
+export const RU_ADJ_DOSE: RuPluralForms = ['дозовое', 'дозовых', 'дозовых'];
+export const RU_ADJ_UNILATERAL: RuPluralForms = ['унилатеральный', 'унилатеральных', 'унилатеральных'];

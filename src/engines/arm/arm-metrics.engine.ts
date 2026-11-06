@@ -2,6 +2,7 @@
  * arm-metrics.engine.ts — метрики арм-плана (как bb-metrics).
  */
 import type { ArmPlan, ArmMetrics } from './arm-types';
+import { ruCount, RU_SETS } from '../ru-plural';
 import { tableTimeSummary } from './arm-table.engine';
 import { isArmTendonMuscle } from './arm-tendon-sets.engine';
 
@@ -45,7 +46,7 @@ export function armMetricsSummary(m: ArmMetrics): string[] {
     `Table sessions: ${(m.tableSessionShare*100).toFixed(0)}%`,
     `Table minutes: ${m.tableMinutesShare == null ? 'нет данных' : `${(m.tableMinutesShare*100).toFixed(0)}%`}`,
     `Table volume: ${(m.tableVolumeShare*100).toFixed(0)}%`,
-    `Tendon load: ${m.tendonLoad} сетов`,
-    `Side pressure: ${m.sidePressureLoad} сетов`,
+    `Tendon load: ${ruCount(m.tendonLoad, RU_SETS)}`,
+    `Side pressure: ${ruCount(m.sidePressureLoad, RU_SETS)}`,
   ];
 }

@@ -14,6 +14,7 @@
  * Источники: Israetel M. (RP Strength 2021), Schoenfeld B. (2016), Helms E. (2019).
  */
 
+import { ruCount, ruAdjCount, RU_ADJ_UNIQUE, RU_EXERCISES, RU_SETS } from './ru-plural';
 import {
   checkSessionCap,
   deloadQualityCheck,
@@ -255,9 +256,9 @@ export function validatePlanQuality(input: PlanQualityInput): PlanQualityResult 
     } else if (sets < t.mev) {
       issues.push({
         id: `vol_low_${g}`, severity: isWeak ? 'critical' : 'warning', category: 'volume', muscle: g,
-        message: `${g}: ${sets} сетов/нед < MEV (${t.mev})${isWeak ? ' — слабая группа недогружена' : ''}`,
+        message: `${g}: ${ruCount(sets, RU_SETS)}/нед < MEV (${t.mev})${isWeak ? ' — слабая группа недогружена' : ''}`,
         detail: `${contextNote}`,
-        fix: `Добавить ${t.mev - sets} сетов/нед (до MEV)`,
+        fix: `Добавить ${ruCount(t.mev - sets, RU_SETS)}/нед (до MEV)`,
       });
     }
 
@@ -372,7 +373,7 @@ export function validatePlanQuality(input: PlanQualityInput): PlanQualityResult 
       issues.push({
         id: `injury_active_${inj.muscle}`, severity: 'critical', category: 'injury', muscle: inj.muscle,
         message: `Травмированная группа «${inj.muscle}» включена в план (должна быть исключена) — выбрано исключение, план нарушает`,
-        detail: `Выбрано: исключить ${inj.muscle} · План: содержит ${weeklySets[inj.muscle]||0} сетов`,
+        detail: `Выбрано: исключить ${inj.muscle} · План: содержит ${ruCount(weeklySets[inj.muscle]||0, RU_SETS)}`,
         fix: `Исключить ${inj.muscle} из плана или сменить травму на щадящую`,
       });
     }
@@ -429,7 +430,7 @@ export function validatePlanQuality(input: PlanQualityInput): PlanQualityResult 
       issues.push({
         id: `focus_low_${fg}`, severity: 'warning', category: 'weak_point', muscle: fg,
         message: `Фокус-группа «${fg}» выбрана, но объём ${fgSets} < MAV ${fgThresh.mav} — фокус не реализован`,
-        detail: `Выбрано: фокус ${fg} · План: ${fgSets} сетов (MAV ${fgThresh.mav})`,
+        detail: `Выбрано: фокус ${fg} · План: ${ruCount(fgSets, RU_SETS)} (MAV ${fgThresh.mav})`,
         fix: `Увеличить объём фокуса до MAV или убрать фокус`,
       });
     }
@@ -450,7 +451,7 @@ export function validatePlanQuality(input: PlanQualityInput): PlanQualityResult 
       issues.push({
         id: 'methodology_low_diversity', severity: 'info', category: 'exercise',
         message: `Методика «${methodology}» выбрана, но разнообразие низкое (${uniq} упр.) — эффект методики снижен`,
-        detail: `Выбрано: методика ${methodology} · План: ${uniq} уникальных упражнений`,
+        detail: `Выбрано: методика ${methodology} · План: ${ruAdjCount(uniq, RU_ADJ_UNIQUE, RU_EXERCISES)}`,
         fix: `Добавить вариаций для методики`,
       });
     }

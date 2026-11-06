@@ -10,6 +10,7 @@
  * @module log-analytics-progression-engine
  */
 import { localIsoDate, localIsoDateOffset } from '../core/local-date';
+import { ruCount, RU_TRAININGS } from './ru-plural';
 import { saveWeightLogSync } from './profile-store';
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -447,7 +448,7 @@ export function generateWeeklyReport(logs: WorkoutSetLog[], sessionData: { date:
     insights.push('Нет тренировок на этой неделе.');
     recommendations.push('Не пропускайте тренировки. Даже 1 лучше чем 0.');
   } else {
-    insights.push(`${weekSessions.length} тренировок, ${Math.round(volume).toLocaleString()} кг тоннажа.`);
+    insights.push(`${ruCount(weekSessions.length, RU_TRAININGS)}, ${Math.round(volume).toLocaleString()} кг тоннажа.`);
     if (prs > 0) insights.push(`🎯 ${prs} персональных рекордов!`);
     if (avgIntensity > 8) { insights.push(`Высокая средняя интенсивность (RPE ${avgIntensity}).`); recommendations.push('Следите за восстановлением. Рассмотрите deload если 2+ недели RPE>8.'); }
   }

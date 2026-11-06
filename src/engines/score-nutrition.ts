@@ -4,6 +4,7 @@
 // Risk_total = Σ(Factor_i * Weight_i)
 
 import type { ModuleSystemScore, ModuleResult } from './score-engine';
+import { ruCount, RU_MEALS } from './ru-plural';
 
 // ─── Types ───
 
@@ -113,7 +114,7 @@ export function analyzeNutrition(input: NutritionInput): ModuleResult {
     id: 'hydration', label: 'Режим питания', icon: '💧',
     score: Math.round(hydScore * 100) / 100,
     maxScore: 100,
-    details: [`${mealCount} приёмов пищи/день`],
+    details: [`${ruCount(mealCount, RU_MEALS)} пищи/день`],
   });
 
   // Processing score (estimated from protein sources diversity)

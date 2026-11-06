@@ -5,6 +5,7 @@
  * sRPE + боль (0-10) + VBT-потеря → множитель объёма, сдвиг RIR, замены.
  * Боль ≥4 в локте/запястье: side → изометрия, pron heavy → pulses.
  */
+import { ruCount, RU_DAYS } from '../ru-plural';
 
 export interface ArmDiaryDay {
   dateIso: string;
@@ -74,7 +75,7 @@ export function autoregArmFromDiary(days: ArmDiaryDay[]): ArmAutoregResult {
   if (rirShift > 0) notes.push(`RIR+${rirShift}`);
   if (replaceSideWithIso) notes.push('Side → изометрия');
   if (replaceHeavyPronWithPulses) notes.push('Pron heavy → pulses');
-  if (extraRestDays > 0) notes.push(`+${extraRestDays} день отдыха`);
+  if (extraRestDays > 0) notes.push(`+${ruCount(extraRestDays, RU_DAYS)} отдыха`);
   return {
     volumeMult: Math.round(volumeMult * 100) / 100,
     rirShift,

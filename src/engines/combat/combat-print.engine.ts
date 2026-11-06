@@ -3,6 +3,7 @@
  * HTML с XSS-экранированием, CSV-строки, ICS для плана.
  */
 import type { CombatPlan } from './combat.types';
+import { ruCount, RU_SETS } from '../ru-plural';
 import { cbSessionTagName, cbDisciplineName, cbAnnualPhaseName } from './combat-builder.engine';
 
 const CB_RU_GOAL: Record<string, string> = { power: 'Взрывная сила', endurance: 'Выносливость', maintenance: 'Поддержание', camp: 'Кэмп к бою', weight_cut: 'Весогонка' };
@@ -36,7 +37,7 @@ export function buildCombatPrintHtml(plan: CombatPlan): string {
       return `<h4>День ${s.day} · ${escHtml(cbSessionTagName(s.sessionTag))} · ${escHtml(s.character)} · ${s.durationMin||''} мин</h4><table border="1" cellpadding="4" cellspacing="0" style="border-collapse:collapse;width:100%;font-size:11px"><tr><th>Упражнение</th><th>Сеты×Повт</th><th>Вес</th><th>RIR</th><th>Темп</th><th>Отдых</th><th>Коммент</th></tr>${exRows}</table>`;
     }).join('');
     const bg = col + '14';
-    return `<div style="background:${bg};border-left:4px solid ${col};padding:8px;margin:8px 0;border-radius:6px"><h3 style="margin:0 0 6px;color:${col}">Неделя ${w.week} · ${escHtml(cbAnnualPhaseName(w.phase))}${w.deload?' · делод':''}${(w as any).taper?' · тапер':''} · ${w.totalSets||0} сетов${(w as any).totalTonnage?` · ${((w as any).totalTonnage/1000).toFixed(1)}т`:''}</h3>${sessRows}</div>`;
+    return `<div style="background:${bg};border-left:4px solid ${col};padding:8px;margin:8px 0;border-radius:6px"><h3 style="margin:0 0 6px;color:${col}">Неделя ${w.week} · ${escHtml(cbAnnualPhaseName(w.phase))}${w.deload?' · делод':''}${(w as any).taper?' · тапер':''} · ${ruCount(w.totalSets||0, RU_SETS)}${(w as any).totalTonnage?` · ${((w as any).totalTonnage/1000).toFixed(1)}т`:''}</h3>${sessRows}</div>`;
   }).join('<hr/>');
   const cond = (plan as any).conditioning ? (()=>{ const c=(plan as any).conditioning as {weeks:number; sessions:any[][]}; const rows=c.sessions.map((week:any[],wi:number)=> `<tr><td>Нед ${wi+1}</td><td>${week.length? week.map((s:any)=> `${escHtml(s.modality)} ${s.durationMin}′ ${escHtml(s.intervals||'')}${s.hrZone?` · ${escHtml(s.hrZone)}`:''}`).join('<br/>') : '— внезал покрывает'}</td></tr>`).join(''); return `<h3>Кондиция (3 системы)</h3><table border="1" cellpadding="4" cellspacing="0" style="border-collapse:collapse;width:100%;font-size:11px"><tr><th>Неделя</th><th>Сессии</th></tr>${rows}</table>`; })() : '';
   const sparr = (plan.inputSnapshot as any)?.sparringLoad ? `<p><b>Спарринг:</b> жёсткий ${(plan.inputSnapshot as any).sparringLoad.hardSparSessions}× RPE 8.5 / технический ${(plan.inputSnapshot as any).sparringLoad.techSparSessions}× RPE 5.5 / борьба ${(plan.inputSnapshot as any).sparringLoad.wrestlingSessions}× RPE 7.5 — Collins шея +0.45кг=−5% сотряс</p>` : '';
@@ -51,7 +52,7 @@ export function buildCombatPrintHtml(plan: CombatPlan): string {
   // Gantt + heatmap по неделям
   const ganttSegs = plan.weeksData.map(w=>{
     const col = phaseColor[w.phase] || '#a855f7';
-    const tip = `Нед ${w.week} ${escHtml(cbAnnualPhaseName(w.phase))} ${w.deload?'делод': (w as any).taper?'тапер':''} ${w.totalSets||0} сетов`;
+    const tip = `Нед ${w.week} ${escHtml(cbAnnualPhaseName(w.phase))} ${w.deload?'делод': (w as any).taper?'тапер':''} ${ruCount(w.totalSets||0, RU_SETS)}`;
     return `<div title="${tip}" style="flex:1;background:${col};display:flex;align-items:center;justify-content:center;color:#fff;font-size:7px;font-weight:700;border-right:0.5px solid #fff;min-width:8px">${w.week}</div>`;
   }).join('');
   const gantt = `<div style="display:flex;height:14px;border-radius:6px;overflow:hidden;border:0.5px solid #e5e7eb;margin:8px 0 4px">${ganttSegs}</div><div style="display:flex;justify-content:space-between;font-size:8px;color:#6b7280"><span>Нед 1</span><span>Нед ${plan.weeks}</span></div>`;

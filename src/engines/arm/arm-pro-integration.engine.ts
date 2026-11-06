@@ -7,6 +7,7 @@
  * Билдер вызывает ОДНУ функцию и применяет результат — инварианты ядра целы.
  */
 import { buildWafStartCard } from './arm-waf.engine';
+import { ruCount, RU_POINTS } from '../ru-plural';
 import { planBilateralVolume } from './arm-bilateral.engine';
 import { buildSupermatchPlan } from './arm-supermatch.engine';
 import { buildStrapSession } from './arm-start-strap.engine';
@@ -230,7 +231,7 @@ export function applyArmPro(input: ArmBuilderInput): ArmProResult {
       const m = armPathMetrics(pts);
       const traj = classifyArmTrajectory(pts);
       if (m && traj) {
-        videoLine = `Видео: ${m.points} точек, xLoop ${m.xLoop}, тип ${traj === 'inside_hook' ? 'хук (внутрь)' : traj === 'outside_toproll' ? 'топролл (наружу)' : 'пресс (прямо)'}`;
+        videoLine = `Видео: ${ruCount(m.points, RU_POINTS)}, xLoop ${m.xLoop}, тип ${traj === 'inside_hook' ? 'хук (внутрь)' : traj === 'outside_toproll' ? 'топролл (наружу)' : 'пресс (прямо)'}`;
         rationale.push(videoLine);
       }
     }

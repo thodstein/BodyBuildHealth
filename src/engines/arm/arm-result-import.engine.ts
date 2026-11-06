@@ -10,6 +10,7 @@
  * помоста (he_arm_platform_log) через savePlatformLogEntry.
  */
 import { localIsoDate } from '../../core/local-date';
+import { ruCount, RU_ENTRIES } from '../ru-plural';
 import { loadPlatformLog, platformWrFor, savePlatformLogEntry, type PlatformLogEntry } from './arm-platform.engine';
 
 export interface ArmResultImportAttempt {
@@ -104,7 +105,7 @@ export function parseArmResultJson(raw: string, sex = 'male'): ArmResultImportRe
   }
   const records = Array.isArray(parsed) ? parsed : [parsed];
   if (records.length === 0) errors.push('В файле нет записей.');
-  if (records.length > 1) warnings.push(`В файле ${records.length} записей — импортируется первая (журнал поместа — по одному соревнованию).`);
+  if (records.length > 1) warnings.push(`В файле ${ruCount(records.length, RU_ENTRIES)} — импортируется первая (журнал поместа — по одному соревнованию).`);
   const record = (records[0] ?? {}) as Record<string, unknown>;
   const implementRaw = String(record.implement ?? record.sport ?? '');
   const implement = normalizeArmImplement(implementRaw);

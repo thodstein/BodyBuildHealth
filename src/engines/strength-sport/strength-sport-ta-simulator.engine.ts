@@ -9,6 +9,7 @@
  */
 
 import type { StrengthSportPlan } from './strength-sport.types';
+import { ruCount, RU_SETS } from '../ru-plural';
 import { auditTAPlan } from './strength-sport-ta-plan-audit.engine';
 import { TA_BIOMECH } from './strength-sport-biomechanics.engine';
 import type { WLWeakPoint } from './strength-sport-weakpoint';
@@ -60,7 +61,7 @@ export function simulateTACorrection(plan: StrengthSportPlan | null | undefined,
   const afterSets = beforeSets + setsTotal;
   const coverageBefore = before.coveredCount;
   const coverageAfter = beforeSets > 0 ? coverageBefore : coverageBefore + 1;
-  const summary = `+${setsTotal} сетов (~${(tonnageEst / 1000).toFixed(1)}т) · покрытие ${coverageBefore}/11 → ${coverageAfter}/11`;
+  const summary = `+${ruCount(setsTotal, RU_SETS)} (~${(tonnageEst / 1000).toFixed(1)}т) · покрытие ${coverageBefore}/11 → ${coverageAfter}/11`;
   return {
     weakPoint: action.weakPoint, corrId: action.corrId,
     setsPerWeek, weeks, setsTotal, tonnageEst, weightEst,

@@ -2,6 +2,7 @@
 // Risk_total = Σ(Deviation_i * Weight_i)
 
 import { LAB_PANELS, type LabPanelMarker } from '../data/labs-phase-panels';
+import { ruCount, RU_MARKERS } from './ru-plural';
 import type { ModuleSystemScore, ModuleResult } from './score-engine';
 
 // ─── Types ───
@@ -148,7 +149,7 @@ export function analyzeLabs(input: LabInput): ModuleResult {
   if (overallRaw < 30) {
     recommendations.push('✅ Все маркеры в пределах нормы. Регулярный мониторинг — 1 раз в 3 мес.');
   } else {
-    recommendations.push(`📅 Следующий контроль — через 4 нед. Всего ${results.length} маркеров проанализировано.`);
+    recommendations.push(`📅 Следующий контроль — через 4 нед. Всего ${ruCount(results.length, RU_MARKERS)} проанализировано.`);
   }
 
   return {

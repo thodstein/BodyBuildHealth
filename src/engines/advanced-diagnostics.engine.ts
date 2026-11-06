@@ -13,6 +13,7 @@
  *
  * @module advanced-diagnostics.engine
  */
+import { ruCount, RU_WARNINGS } from './ru-plural';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // CONSTANTS
@@ -442,7 +443,7 @@ export function runAdvancedDiagnostics(
   }
 
   if (vitalsResult.alerts.length > 0) {
-    parts.push(`🟡 ${vitalsResult.alerts.length} предупреждений по витальным показателям.`);
+    parts.push(`🟡 ${ruCount(vitalsResult.alerts.length, RU_WARNINGS)} по витальным показателям.`);
   }
 
   if (bioage.ageAcceleration > 2) {

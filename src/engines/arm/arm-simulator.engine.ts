@@ -3,6 +3,7 @@
  * Parity: bb `simulateCorrection` — сеты/покрытие точек до/после, без мутаций плана.
  */
 import type { ArmPlan } from './arm-types';
+import { ruCount, RU_SETS } from '../ru-plural';
 import type { ArmWeakPoint } from './arm-biomechanics.engine';
 import { ARM_BIOMECH } from './arm-biomechanics.engine';
 import { auditArmPlan } from './arm-plan-audit.engine';
@@ -124,6 +125,6 @@ export function simulateArmInjection(
   const doseTag = dose.adjusted ? ` · ${dose.note}` : '';
   const summary = blocked
     ? `⊘ ${ex}: ${blocked} · покрытие ${before}/12 → ${after}/12`
-    : `+${wantSets} сетов (${ex}${estWeight != null ? ` ≈${estWeight}кг` : ''})${doseTag} · покрытие ${before}/12 → ${after}/12`;
+    : `+${ruCount(wantSets, RU_SETS)} (${ex}${estWeight != null ? ` ≈${estWeight}кг` : ''})${doseTag} · покрытие ${before}/12 → ${after}/12`;
   return { addSets: wantSets, coverageBefore: before, coverageAfter: after, summary, blocked, estWeight };
 }

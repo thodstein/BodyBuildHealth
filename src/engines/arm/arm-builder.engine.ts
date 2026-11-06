@@ -3,6 +3,7 @@
  * Зеркало bb-builder.engine.ts, упрощённая версия для арм-мышц.
  */
 import type { ArmBuilderInput, ArmPlan, ArmWeek, ArmSession, ArmExercise, ArmSet, ArmWorkingAngle } from './arm-types';
+import { ruCount, ruAdjCount, RU_ADJ_UNILATERAL, RU_SETS } from '../ru-plural';
 import { ARM_MUSCLES } from './arm-types';
 import { TAG_MUSCLES_ARM } from './arm-day-types';
 import { ARM_SPLIT_PATTERNS, getArmPattern } from './arm-split-patterns';
@@ -596,7 +597,7 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
     const vt = volumeTargets['shoulder_stab'];
     const bumped = Math.min(vt.mrv, Math.round(vt.targetSets * 1.15));
     if (bumped > vt.targetSets) {
-      selectionWarnings.push(`🩺 Баланс ротаторов плеча (ER:IR risk — диагностика): shoulder_stab ${vt.targetSets}→${bumped} сетов/нед (кап MRV ${vt.mrv}).`);
+      selectionWarnings.push(`🩺 Баланс ротаторов плеча (ER:IR risk — диагностика): shoulder_stab ${vt.targetSets}→${ruCount(bumped, RU_SETS)}/нед (кап MRV ${vt.mrv}).`);
       vt.targetSets = bumped;
     }
   }
@@ -1201,7 +1202,7 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
           ex.sets += want;
           totals[ex.muscle] += want;
           uniBonusSets += want;
-          ex.comment = `${ex.comment || ''} + унилатерально слабой (${lrWeak}): +${want} сета сверху`.trim();
+          ex.comment = `${ex.comment || ''} + унилатерально слабой (${lrWeak}): +${ruCount(want, RU_SETS)} сверху`.trim();
         }
       }
     } catch { markDegraded('L/R добивка недоступна — унилатеральные сеты не добавлены'); }
@@ -1264,7 +1265,7 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
   const tableSummary = tableTimeSummary(planWeeks, tableRatio);
   rationale.push(`Table sessions: target ${(tableRatio * 100).toFixed(0)}%, fact ${(tableSummary.tableSessionShare * 100).toFixed(0)}%; minutes ${tableSummary.tableMinutesShare == null ? 'нет данных' : `${(tableSummary.tableMinutesShare * 100).toFixed(0)}%`}; target applies to session share.`);
   rationale.push(`Бюджет: recovery×${recoveryMult.toFixed(2)} lab×${labMult.toFixed(2)} nutrition×${nutritionMult.toFixed(2)} ped×${pedMult.toFixed(2)} tendon×${tendonMultGlobal.toFixed(2)} (tendonCap 1.2×)`);
-  if (isTendonMuscle('wrist_flexors')) rationale.push(`Tendon лимит ${tendonWeeklyLimit(level)} сетов/нед для wrist/pron/sup`);
+  if (isTendonMuscle('wrist_flexors')) rationale.push(`Tendon лимит ${ruCount(tendonWeeklyLimit(level), RU_SETS)}/нед для wrist/pron/sup`);
   if (crossMesoWorkMax) rationale.push(`Cross-meso: веса +2.5% от предыдущего мезоцикла (${Object.keys(crossMesoWorkMax).length} групп)`);
   // TOP wave-6: кросс-мезо лестницы — прогресс имплемента между мезоциклами
   try {
@@ -1288,7 +1289,7 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
   if (lrNote) rationale.push(lrNote);
   for (const line of simRationale) rationale.push(line);
   for (const line of tableInjectNotes) rationale.push(line);
-  if (uniBonusSets > 0) rationale.push(`L/R добивка: +${uniBonusSets} унилатеральных сетов слабой (${lrWeak}) в клампе MRV.`);
+  if (uniBonusSets > 0) rationale.push(`L/R добивка: +${ruAdjCount(uniBonusSets, RU_ADJ_UNILATERAL, RU_SETS)} слабой (${lrWeak}) в клампе MRV.`);
   // PRO-5: честные строки (деградация/PED/ACWR/safety/синглы/RPE/сплит-подсказка).
   if (pedNote) rationale.push(pedNote);
   if (acwrNote) rationale.push(`PRO-5: ${acwrNote}`);

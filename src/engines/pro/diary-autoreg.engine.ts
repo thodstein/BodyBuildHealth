@@ -19,6 +19,7 @@
 import type { WorkoutLog, StrengthLogEntry } from '../../core/types';
 import { rpeFromLoad, loadForRPE } from './autoregulation-pro.engine';
 import { norm } from '../norm';
+import { ruCount, RU_EXERCISES } from '../ru-plural';
 import { epley1RM } from '../e1rm';
 import { exerciseMatchScore } from '../exercise-aliases';
 import { toLocalIso } from '../lms/cardio-date-utils.engine';
@@ -286,7 +287,7 @@ export function buildDiaryAutoreg(input: DiaryAutoregInput): DiaryAutoregResult 
     });
   }
 
-  if (noData > 0) decisions.push(`${noData} упражнений без данных дневника — плановые веса`);
+  if (noData > 0) decisions.push(`${ruCount(noData, RU_EXERCISES)} без данных дневника — плановые веса`);
   if (plateauWarnings.length > 0) decisions.push(`${plateauWarnings.length} плато-предупреждений`);
 
   return {

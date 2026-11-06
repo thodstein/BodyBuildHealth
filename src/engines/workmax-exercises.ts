@@ -11,6 +11,7 @@
  */
 
 import { EXERCISE_CATALOG } from '../core/exercise-catalog';
+import { ruCount, RU_EXERCISES } from './ru-plural';
 
 export interface WorkMaxExerciseOption {
   id: string;
@@ -221,7 +222,7 @@ export const validateWorkMaxCategories = (): { ok: boolean; issues: string[] } =
   const seenIds = new Set<string>();
   for (const cat of WORKMAX_CATEGORIES) {
     if (cat.exercises.length < 5 || cat.exercises.length > 7) {
-      issues.push(`${cat.label}: ${cat.exercises.length} упражнений (нужно 5-7)`);
+      issues.push(`${cat.label}: ${ruCount(cat.exercises.length, RU_EXERCISES)} (нужно 5-7)`);
     }
     for (const ex of cat.exercises) {
       if (!ex.name || !ex.name.trim()) issues.push(`${cat.label}: «${ex.id}» без имени`);

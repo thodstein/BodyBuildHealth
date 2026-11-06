@@ -6,6 +6,7 @@
  * Floors: asym≥12, humerus, tendon>22 — cap 49.
  * Используется только для gauge оверлея, основной отчёт остаётся механизм-ориентированным (без score).
  */
+import { ruCount, ruAdjCount, RU_POINTS, RU_ADJ_DEAD } from '../ru-plural';
 
 export type ScoreLevel = 'ok' | 'warn' | 'critical';
 export interface ArmScoringInput {
@@ -48,7 +49,7 @@ export function scoreArm(input: ArmScoringInput): ArmScoringResult {
   const floors: string[] = [];
 
   for (let i = 0; i < input.weakCount; i++) penalties.push(PENALTY.weak);
-  if (input.weakCount > 0) findings.push({ level: input.weakCount >= 3 ? 'critical' : 'warn', text: `${input.weakCount} мёртвые точки` });
+  if (input.weakCount > 0) findings.push({ level: input.weakCount >= 3 ? 'critical' : 'warn', text: ruAdjCount(input.weakCount, RU_ADJ_DEAD, RU_POINTS) });
   else findings.push({ level: 'ok', text: 'Мёртвые точки — баланс' });
 
   if (input.asymmetryPct != null) {
@@ -105,7 +106,7 @@ export function scoreArm(input: ArmScoringInput): ArmScoringResult {
   if (input.gripLevel) {
     if (['beginner','intermediate'].includes(input.gripLevel) && input.weakCount >= 2) {
       penalties.push(PENALTY.gripWarn);
-      findings.push({ level: 'warn', text: `Bench ${input.gripLevel} + ${input.weakCount} точки` });
+      findings.push({ level: 'warn', text: `Bench ${input.gripLevel} + ${ruCount(input.weakCount, RU_POINTS)}` });
     }
   }
 

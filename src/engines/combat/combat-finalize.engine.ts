@@ -3,6 +3,7 @@
  * Отдельно от ББ/ПЛ, не трогает их логику.
  */
 import type { CombatPlan, CombatSession } from './combat.types';
+import { ruCount, RU_SESSIONS, RU_SETS } from '../ru-plural';
 import { isDayConflictWithOutside } from '../outside-load.engine';
 import { getCombat } from './combat-volume';
 import { inCombatGroup, weekGroupSets } from './combat-groups';
@@ -336,7 +337,7 @@ export function buildCombatReport(plan: CombatPlan): string {
     // P1-5: единый канон групп (в отчёте видел farmer_carry, не двоил шею)
     const neck = weekGroupSets(wk.sessions, 'neck');
     const grip = weekGroupSets(wk.sessions, 'grip');
-    lines.push(`Нед ${wk.week} ${wk.phase}: шея ${neck} сетов, хват ${grip}, ${wk.sessions.length} сессий`);
+    lines.push(`Нед ${wk.week} ${wk.phase}: шея ${ruCount(neck, RU_SETS)}, хват ${grip}, ${ruCount(wk.sessions.length, RU_SESSIONS)}`);
   }
   if (plan.outsideMetrics) lines.push(`Вне зала: ${plan.outsideMetrics.weeklyLoad} load → ×${plan.outsideMetrics.volumeMultiplier} (${cbRuInterference(plan.outsideMetrics.interference)}) ${plan.outsideMetrics.rationale.join(' | ')}`);
   lines.push(`Rationale: ${plan.rationale.slice(0,5).join(' | ')}`);

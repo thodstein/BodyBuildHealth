@@ -13,6 +13,7 @@
  *  - createBlank(direction)         → пустой стартер
  */
 import type { FullProgram, ProgramWeek, ProgramDay } from '../complete-program-library.engine';
+import { ruCount, RU_SESSIONS, RU_WEEKS } from '../ru-plural';
 import { getCycleById } from '../../data/lms-cycles/lms-cycle-index';
 import type { SRCycleTemplate } from '../../data/lms-cycles/lms-types';
 import type { BBPlan, BBWeek, BBSession, BBExercise, BBSet } from '../bb/bb-builder.engine';
@@ -284,7 +285,7 @@ export function validateProgram(program: UserProgram): ValidationIssue[] {
       issues.push({ level: 'info', code: 'NO_DELOAD', message: 'Длинный цикл без явной делод-недели' });
     }
     if (bb.weeks.length > 0 && bb.weeks[0].sessions.length !== meta.daysPerWeek) {
-      issues.push({ level: 'info', code: 'DAYS_MISMATCH', message: `meta.daysPerWeek=${meta.daysPerWeek}, но в неделе ${bb.weeks[0].sessions.length} сессий. Нажмите «Дней/нед» чтобы синхронизировать.` });
+      issues.push({ level: 'info', code: 'DAYS_MISMATCH', message: `meta.daysPerWeek=${meta.daysPerWeek}, но в неделе ${ruCount(bb.weeks[0].sessions.length, RU_SESSIONS)}. Нажмите «Дней/нед» чтобы синхронизировать.` });
     }
     // cycleLength 5-9
     if ((meta as any).cycleLength && ![5,6,7,8,9].includes((meta as any).cycleLength)) {
@@ -299,7 +300,7 @@ export function validateProgram(program: UserProgram): ValidationIssue[] {
       issues.push({ level: 'warning', code: 'NO_WEEKS', message: 'Программа единоборств без недель — добавьте хотя бы одну' });
     } else {
       if (body.weeks.length !== meta.weeks) {
-        issues.push({ level: 'warning', code: 'COMBAT_META_MISMATCH', message: `meta.weeks=${meta.weeks}, в теле ${body.weeks.length} недель — расхождение` });
+        issues.push({ level: 'warning', code: 'COMBAT_META_MISMATCH', message: `meta.weeks=${meta.weeks}, в теле ${ruCount(body.weeks.length, RU_WEEKS)} — расхождение` });
       }
       for (const w of body.weeks) {
         for (const s of (w.sessions || [])) {

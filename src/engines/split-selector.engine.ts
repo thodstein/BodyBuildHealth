@@ -1,4 +1,5 @@
 import type { TrainingInput } from '../core/types';
+import { ruCount, RU_DAYS } from './ru-plural';
 
 export interface SplitCandidate {
   id: string;
@@ -170,7 +171,7 @@ export function selectSplit(input: TrainingInput): SplitCandidate[] {
     // Days match (×3 — mandatory)
     if (split.minDays <= daysPerWeek && split.maxDays >= daysPerWeek) {
       score += 30;
-      rationale.push(`${daysPerWeek} дней/нед — подходит для ${split.name}`);
+      rationale.push(`${ruCount(daysPerWeek, RU_DAYS)}/нед — подходит для ${split.name}`);
     } else {
       continue;
     }

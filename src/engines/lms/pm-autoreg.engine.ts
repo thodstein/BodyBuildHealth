@@ -9,6 +9,7 @@
  *               сравнивается с плановым ПМ → множитель кривой ПМ (обгон → ×1.05, отставание → ×0.95).
  */
 import type { WorkoutLog } from '../../core/types';
+import { ruCount, RU_EXERCISES } from '../ru-plural';
 import { findLastFact } from '../pro/diary-autoreg.engine';
 import {
   courseDefaultPercent,
@@ -83,6 +84,6 @@ export function pmDiaryMultiplier(input: PMDiaryInput): PMDiaryResult {
     }
   }
 
-  if (noData > 0) decisions.push(`${noData} упражнений без данных дневника — ПМ без коррекции`);
+  if (noData > 0) decisions.push(`${ruCount(noData, RU_EXERCISES)} без данных дневника — ПМ без коррекции`);
   return { multiplier, decisions, adjusted, noData };
 }

@@ -13,6 +13,7 @@
 // сегодня, ключи ячеек календаря, окна недели/месяца). UTC-версия в вечернее
 // время UTC+3…+12 сдвигала всё на «вчера».
 import { localIsoDate, localIsoDateOffset } from '../core/local-date';
+import { ruCount, RU_DAYS } from './ru-plural';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Types
@@ -857,7 +858,7 @@ export function generateHealthReport(
 
   sections.push({
     heading: 'Тренировочная статистика',
-    content: `Всего тренировок: ${stats.totalSessions}\nСерия: ${stats.streak} дней\n` +
+    content: `Всего тренировок: ${stats.totalSessions}\nСерия: ${ruCount(stats.streak, RU_DAYS)}\n` +
       Object.entries(stats.bestLifts || {}).map(([k, v]: [string, any]) => `${k}: ${v.weight}кг ×${v.reps}`).join('\n'),
     type: 'summary',
   });
