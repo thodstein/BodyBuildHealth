@@ -69,6 +69,16 @@ const IDB_KV_PREFIX = 'idb:';
 /** Ключ локально хранимого tg-токена после привязки АПК кодом (не синкается). */
 export const LINKED_TG_TOKEN_KEY = 'he_sync_tg_token_v1';
 
+/**
+ * Отложенная уборка облака: «удалил данные атлета» без сети в этот момент.
+ *
+ * Молча «не смогли — пропустили» здесь нельзя: тренер уверен, что удалил, а
+ * телефон атлета продолжает жить своей копией (и доступ у него остаётся). Поэтому
+ * просьба пишется сюда вместе с токеном пространства — после удаления записи
+ * токена взять его будет негде — и повторяется, пока не выйдет.
+ */
+export const PURGE_PENDING_KEY = 'he_sync_purge_pending_v1';
+
 /** Ключи, которые НЕ синхронизируются (сессия/ключи шифрования/синк-внутренности). */
 export const EXCLUDED_KEYS = new Set([
   'he_session_v2',
@@ -85,6 +95,7 @@ export const EXCLUDED_KEYS = new Set([
   META_KEY,
   IDB_META_KEY,
   LINKED_TG_TOKEN_KEY,
+  PURGE_PENDING_KEY,
 ]);
 export const EXCLUDED_PREFIXES = ['he_sync_ts_', 'he_draft_', 'he_nav_', 'he_admin_', 'he_data_space_'];
 
@@ -320,6 +331,9 @@ export async function initKvSync(
   loadMeta();
   loadIdbMeta();
   started = true;
+  // Отложенные удаления из облака (сеть была недоступна в момент удаления) —
+  // доводим до конца до pull, чтобы уборка не «воскресла» обратно.
+  await flushPendingPurges();
   const flushDelay = opts?.flushDelayMs ?? FLUSH_DELAY_MS;
   setFlushDelay(flushDelay);
   if (opts?.reloadFn) reloadFn = opts.reloadFn;
@@ -1227,62 +1241,140 @@ async function removeByPrefixFallback(targetToken: string, prefix: string): Prom
  * которую он продолжал бы видеть.
  */
 export async function purgeSpacesFromCloud(spaceIds: readonly string[]): Promise<number> {
-  if (!started || !transport || !token) return 0;
   const ids = (spaceIds || []).filter(id => !!id && id !== HOME_SPACE_ID);
   if (!ids.length) return 0;
+  // Просьба записывается ДО попытки: без сети она не потеряется и повторится при
+  // следующем старте синхронизации, а не исчезнет молча.
+  rememberPendingPurges(ids);
+  return flushPendingPurges();
+}
+
+/**
+ * Довести до конца отложенные удаления из облака.
+ *
+ * Зовётся при старте синхронизации (и из `purgeSpacesFromCloud`): «удалил данные
+ * атлета» должно означать удаление и в тот раз, когда сети не было. Без этого
+ * телефон атлета продолжал бы читать облачную копию и заливать её обратно.
+ */
+export async function flushPendingPurges(): Promise<number> {
+  if (!started || !transport || !token) return 0;
+  const pending = readPendingPurges();
+  if (!pending.length) return 0;
+  const left: PendingPurge[] = [];
   let purged = 0;
-  for (const spaceId of ids) {
-    const rec = spaceTokenRecord(spaceId);
-    const prefixes = spacePrefixes(spaceId);
-    // Свой токен — всегда, токен пространства — если он есть. Старые копии под
-    // токеном тренера тоже уходят: иначе они вернулись бы на другом устройстве.
-    const tokens = new Set<string>([token]);
-    if (rec) tokens.add(rec.token);
-    for (const t of tokens) {
-      for (const prefix of prefixes) {
-        try {
-          if (transport.removePrefix) await transport.removePrefix(t, prefix);
-          else await removeByPrefixFallback(t, prefix);
-        } catch {
-          // Транспорт не справился — пробуем по одной строке (и молчим: локальные
-          // данные уже удалены, это «догоняющая» уборка).
-          try { await removeByPrefixFallback(t, prefix); } catch { /* сеть недоступна */ }
-        }
-      }
-    }
-    if (rec) {
-      // Маркер пишем ПОСЛЕ очистки: он не попадает под префиксы пространства,
-      // поэтому переживает её и доходит до телефона атлета.
-      await writeRevokedMarker(rec.token, spaceId);
-    }
-    // Метаданные (mtime/dirty/сигнатуры IndexedDB) этого пространства больше не нужны:
-    // иначе при следующем pull мы считали бы удалённые ключи «локально изменёнными».
-    const hit = (k: string) => prefixes.some(p => k.startsWith(p));
-    let metaChanged = false;
-    for (const k of Array.from(mtimes.keys())) {
-      if (!hit(k)) continue;
-      mtimes.delete(k);
-      dirty.delete(k);
-      metaChanged = true;
-    }
-    let idbChanged = false;
-    for (const k of Array.from(idbMeta.keys())) {
-      if (!hit(k)) continue;
-      idbMeta.delete(k);
-      idbChanged = true;
-    }
-    if (metaChanged) persistMeta();
-    if (idbChanged) persistIdbMeta();
-    // Токен пространства больше не обслуживаем: новый код создаст новый.
-    if (rec) removeSpaceToken(spaceId);
-    purged++;
+  for (const item of pending) {
+    if (await purgeOneSpace(item.spaceId, item.token)) purged++;
+    else left.push(item);
   }
+  writePendingPurges(left);
   return purged;
 }
 
+/** Убрать одно пространство из облака. `false` — получилось не всё, повторим. */
+async function purgeOneSpace(spaceId: string, knownToken?: string): Promise<boolean> {
+  if (!transport || !token) return false;
+  const rec = spaceTokenRecord(spaceId);
+  const prefixes = spacePrefixes(spaceId);
+  // Свой токен — всегда, токен пространства — если он есть. Старые копии под
+  // токеном тренера тоже уходят: иначе они вернулись бы на другом устройстве.
+  const tokens = new Set<string>([token]);
+  // Токен пространства берём из реестра, а если запись уже убрана — из отложенной
+  // просьбы: без него не поставить маркер «доступ отозван».
+  const spaceToken = rec?.token ?? knownToken;
+  if (spaceToken) tokens.add(spaceToken);
+  let ok = true;
+  for (const t of tokens) {
+    for (const prefix of prefixes) {
+      try {
+        if (transport.removePrefix) await transport.removePrefix(t, prefix);
+        else await removeByPrefixFallback(t, prefix);
+      } catch {
+        // Транспорт не справился — пробуем по одной строке (и молчим: локальные
+        // данные уже удалены, это «догоняющая» уборка).
+        try { await removeByPrefixFallback(t, prefix); } catch { ok = false; }
+      }
+    }
+  }
+  if (spaceToken) {
+    // Маркер пишем ПОСЛЕ очистки: он не попадает под префиксы пространства,
+    // поэтому переживает её и доходит до телефона атлета.
+    if (!(await writeRevokedMarker(spaceToken, spaceId))) ok = false;
+  }
+  // Метаданные (mtime/dirty/сигнатуры IndexedDB) этого пространства больше не нужны:
+  // иначе при следующем pull мы считали бы удалённые ключи «локально изменёнными».
+  const hit = (k: string) => prefixes.some(p => k.startsWith(p));
+  let metaChanged = false;
+  for (const k of Array.from(mtimes.keys())) {
+    if (!hit(k)) continue;
+    mtimes.delete(k);
+    dirty.delete(k);
+    metaChanged = true;
+  }
+  let idbChanged = false;
+  for (const k of Array.from(idbMeta.keys())) {
+    if (!hit(k)) continue;
+    idbMeta.delete(k);
+    idbChanged = true;
+  }
+  if (metaChanged) persistMeta();
+  if (idbChanged) persistIdbMeta();
+  // Токен пространства больше не обслуживаем — но только когда уборка прошла:
+  // иначе повторять маркер было бы нечем. Новый код создаст новый токен.
+  if (ok && rec) removeSpaceToken(spaceId);
+  return ok;
+}
+
+interface PendingPurge {
+  spaceId: string;
+  /** Токен пространства на момент просьбы: после удаления записи взять его негде. */
+  token?: string;
+}
+
+function readPendingPurges(): PendingPurge[] {
+  try {
+    const raw = origGetItem ? origGetItem(PURGE_PENDING_KEY) : localStorage.getItem(PURGE_PENDING_KEY);
+    if (!raw) return [];
+    const arr = JSON.parse(raw) as unknown;
+    if (!Array.isArray(arr)) return [];
+    return arr
+      .filter((x): x is Record<string, unknown> => !!x && typeof x === 'object')
+      .map(x => ({
+        spaceId: typeof x.spaceId === 'string' ? x.spaceId : '',
+        ...(typeof x.token === 'string' && x.token ? { token: x.token } : {}),
+      }))
+      .filter(x => !!x.spaceId && x.spaceId !== HOME_SPACE_ID);
+  } catch {
+    return [];
+  }
+}
+
+function writePendingPurges(items: readonly PendingPurge[]): void {
+  try {
+    const raw = JSON.stringify(items);
+    if (origSetItem) origSetItem(PURGE_PENDING_KEY, raw);
+    else localStorage.setItem(PURGE_PENDING_KEY, raw);
+  } catch {
+    /* quota — уборка повторится при следующем удалении */
+  }
+}
+
+function rememberPendingPurges(ids: readonly string[]): void {
+  const items = readPendingPurges();
+  const known = new Set(items.map(i => i.spaceId));
+  let changed = false;
+  for (const spaceId of ids) {
+    if (!spaceId || spaceId === HOME_SPACE_ID || known.has(spaceId)) continue;
+    const token = spaceTokenRecord(spaceId)?.token;
+    items.push({ spaceId, ...(token ? { token } : {}) });
+    known.add(spaceId);
+    changed = true;
+  }
+  if (changed) writePendingPurges(items);
+}
+
 /** Служебная строка под токеном пространства: «этот доступ больше не действует». */
-async function writeRevokedMarker(targetToken: string, spaceId: string): Promise<void> {
-  if (!transport) return;
+async function writeRevokedMarker(targetToken: string, spaceId: string): Promise<boolean> {
+  if (!transport) return false;
   try {
     await transport.replaceKey([
       {
@@ -1294,8 +1386,11 @@ async function writeRevokedMarker(targetToken: string, spaceId: string): Promise
         updated_at: new Date(serverNowMs()).toISOString(),
       },
     ]);
+    return true;
   } catch {
-    /* маркер best-effort: удаление данных уже состоялось */
+    // Маркер best-effort, но не «навсегда забытый»: просьба останется в очереди и
+    // повторится при следующем старте синхронизации.
+    return false;
   }
 }
 

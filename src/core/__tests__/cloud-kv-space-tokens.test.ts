@@ -51,6 +51,7 @@ import {
 import {
   FLUSH_DELAY_MS,
   IDB_META_KEY,
+  PURGE_PENDING_KEY,
   _resetKvForTests,
   chunkValue,
   flushKvNow,
@@ -474,6 +475,65 @@ describe('служебные строки не считаются данными
     await flushKvNow();
     expect(transport.value(TRAINER, 'he_theme')).toBe('dark');
     expect(transport.value(SPACE_TOKEN, 'he_theme')).toBeNull();
+  });
+});
+
+describe('удаление из облака не теряется без сети', () => {
+  it('просьба без синхронизации доводится при следующем старте', async () => {
+    setRegistry(SID);
+    seedToken(SID, SPACE_TOKEN);
+    const transport = new TokenTransport();
+    await init(transport);
+    const key = spaceKeyPrefix(SID) + 'he_note';
+    localStorage.setItem(key, 'заметка');
+    await flushKvNow();
+    expect(transport.value(SPACE_TOKEN, key)).toBe('заметка');
+
+    // Синхронизация выключена (нет входа/сети), а тренер уже нажал «удалить».
+    _resetKvForTests();
+    _resetSpaceTokensCache();
+    localStorage.removeItem(key);
+    expect(await purgeSpacesFromCloud([SID])).toBe(0);
+    // Просьба сохранена вместе с токеном: после удаления записи его негде взять.
+    expect(localStorage.getItem(PURGE_PENDING_KEY) || '').toContain(SPACE_TOKEN);
+    expect(transport.value(SPACE_TOKEN, spaceRevokedKey(SID))).toBeNull();
+
+    // Следующий запуск — уборка догоняет, телефон атлета получит маркер.
+    await init(transport);
+    await new Promise(r => setTimeout(r, 10));
+    expect(transport.value(SPACE_TOKEN, key)).toBeNull();
+    expect(transport.value(SPACE_TOKEN, spaceRevokedKey(SID))).toBe('1');
+    expect(JSON.parse(localStorage.getItem(PURGE_PENDING_KEY) || '[]')).toEqual([]);
+  });
+
+  it('если маркер отзыва не записался, просьба остаётся и повторяется', async () => {
+    setRegistry(SID);
+    seedToken(SID, SPACE_TOKEN);
+    const transport = new TokenTransport();
+    await init(transport);
+    const key = spaceKeyPrefix(SID) + 'he_note';
+    localStorage.setItem(key, 'заметка');
+    await flushKvNow();
+
+    // Сервер принимает всё, кроме маркера: «отозвано» ещё не знает ни один телефон.
+    const realReplace = transport.replaceKey.bind(transport);
+    let failMarkers = true;
+    transport.replaceKey = async (rows: KvRow[]) => {
+      if (failMarkers && rows[0]?.key?.startsWith('he_sys_revoked__')) throw new Error('offline');
+      return realReplace(rows);
+    };
+
+    localStorage.removeItem(key);
+    expect(await purgeSpacesFromCloud([SID])).toBe(0);
+    expect(JSON.parse(localStorage.getItem(PURGE_PENDING_KEY) || '[]').map((x: any) => x.spaceId)).toEqual([SID]);
+    // Запись токена ещё жива — иначе повторять маркер было бы нечем.
+    expect(spaceTokenRecord(SID)?.revokedAt).toBeFalsy();
+
+    failMarkers = false;
+    await init(transport);
+    await new Promise(r => setTimeout(r, 10));
+    expect(transport.value(SPACE_TOKEN, spaceRevokedKey(SID))).toBe('1');
+    expect(JSON.parse(localStorage.getItem(PURGE_PENDING_KEY) || '[]')).toEqual([]);
   });
 });
 
