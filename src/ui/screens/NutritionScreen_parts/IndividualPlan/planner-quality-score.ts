@@ -77,8 +77,14 @@ export function scoreDayQuality(meals: any[], input: QualityScoringInput): Quali
     const mf = Number(m?.totals?.f) || 0;
     if (fatTotal > 0 && isMainMeal(m)) maxFatShare = Math.max(maxFatShare, mf / fatTotal);
     if (isMainMeal(m)) {
-      const ppk = (Number(m?.totals?.p) || 0) / w;
-      minMainProteinPerKg = Math.min(minMainProteinPerKg, ppk);
+      // §8.57: приём, добавленный авто-перекусом, не имеет белковой цели (target.p = 0),
+      // поэтому он не вправе задавать минимум оси «белок основного приёма»: иначе
+      // перенос гарнира в перекус роняет ось на 3 балла при неизменном белке дня.
+      const _noProteinTarget = /^snack/.test(String(m.type || '')) && Number(m?.target?.p) === 0;
+      if (!_noProteinTarget) {
+        const ppk = (Number(m?.totals?.p) || 0) / w;
+        minMainProteinPerKg = Math.min(minMainProteinPerKg, ppk);
+      }
     }
     for (const it of m?.items || []) {
       ids.add(String(it.id));
