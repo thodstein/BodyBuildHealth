@@ -18,6 +18,8 @@ export interface CardioStructuredBlock {
   reps: number;
   target?: 'hr' | 'pace' | 'power' | 'rpe';
   targetHr?: { min?: number; max?: number };
+  /** Числовая цель для RPE (1-10) и мощности (Вт). Для hr — targetHr, для темпа — заметка. */
+  targetValue?: number;
   note?: string;
 }
 

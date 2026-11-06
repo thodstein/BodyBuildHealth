@@ -52,6 +52,11 @@ export const CardioDiaryPanel: React.FC<{ cycle: CardioCycle | null; acwr?: numb
   const [hr, setHr] = useState('');
   const [kcal, setKcal] = useState('');
   const [km, setKm] = useState('');
+  // Ручная запись интервалов: без таймера атлет всё равно должен отметить
+  // «сделал 6 из 8» — раньше это можно было только в заметке, а чип 🔁 и
+  // приверженность по подходам видели только записи из таймера.
+  const [intPlanned, setIntPlanned] = useState('');
+  const [intDone, setIntDone] = useState('');
   const [showAll, setShowAll] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [flash, setFlash] = useState<string | null>(null);
@@ -78,6 +83,8 @@ export const CardioDiaryPanel: React.FC<{ cycle: CardioCycle | null; acwr?: numb
     setHr(e.avgHr != null ? String(e.avgHr) : '');
     setKcal(e.calories != null ? String(e.calories) : '');
     setKm(e.distanceKm != null ? String(e.distanceKm) : '');
+    setIntPlanned(e.intervalsPlanned != null ? String(e.intervalsPlanned) : '');
+    setIntDone(e.intervalsDone != null ? String(e.intervalsDone) : '');
     setSport(sanitizeCardioSport(e.sport));
   };
 
@@ -169,6 +176,12 @@ export const CardioDiaryPanel: React.FC<{ cycle: CardioCycle | null; acwr?: numb
     // молча превращало интервальную сессию в «обычную» — чип 🔁 исчезал,
     // а приверженность по подходам теряла данные.
     const prev = editingId ? log.find(x => x.id === editingId) ?? null : null;
+    // Подходы: план обязателен, «сделано» пустое = все по плану (так и написано
+    // в placeholder). Больше плана записать нельзя — иначе чип «6 из 8» врал бы.
+    const plannedN = Number(intPlanned) > 0 ? Math.min(30, Math.max(1, Math.round(Number(intPlanned)))) : undefined;
+    const doneN = plannedN != null
+      ? (intDone.trim() === '' ? plannedN : Math.max(0, Math.min(plannedN, Math.round(Number(intDone) || 0))))
+      : undefined;
     const entry: CardioLogEntry = {
       ...(prev ?? {}),
       id: editingId ?? newId(), date, type, durationMin: dur, completed: true,
@@ -176,6 +189,8 @@ export const CardioDiaryPanel: React.FC<{ cycle: CardioCycle | null; acwr?: numb
       avgHr: Number(hr) > 0 ? Number(hr) : undefined,
       calories: Number(kcal) > 0 ? Number(kcal) : estimateCardioEntryKcal(type, dur, lastWeight ?? undefined, { sport: sanitizeCardioSport(sport) }),
       distanceKm: Number(km) > 0 ? Math.round(Number(km) * 10) / 10 : undefined,
+      intervalsPlanned: plannedN,
+      intervalsDone: doneN,
       // Sprint 5.2/5.3: дисциплина + provenance — иначе TID смешивает
       // бег и вело (разная калибровка пульса), а правка неотличима от импорта.
       sport: sanitizeCardioSport(sport),
@@ -186,6 +201,8 @@ export const CardioDiaryPanel: React.FC<{ cycle: CardioCycle | null; acwr?: numb
     commitLog(next);
     setKcal('');
     setKm('');
+    setIntPlanned('');
+    setIntDone('');
     setEditingId(null);
     flashMsg(editingId ? '✏️ Сессия обновлена' : '💾 Сессия записана');
   };
@@ -251,8 +268,10 @@ export const CardioDiaryPanel: React.FC<{ cycle: CardioCycle | null; acwr?: numb
         <input value={hr} onChange={e => setHr(e.target.value)} placeholder="ЧСС" inputMode="numeric" style={{ ...INPUT, width: 'auto' }} aria-label="ЧСС" />
         <input value={kcal} onChange={e => setKcal(e.target.value)} placeholder="ккал (авто)" inputMode="numeric" style={{ ...INPUT, width: 'auto' }} aria-label="Ккал" title="Оставьте пустым — ккал рассчитаются по весу и типу сессии" />
         <input value={km} onChange={e => setKm(e.target.value)} placeholder="км" inputMode="decimal" style={{ ...INPUT, width: 'auto' }} aria-label="Км" title="Дистанция (для бега/езды)" />
+        <input value={intPlanned} onChange={e => setIntPlanned(e.target.value)} placeholder="Подходов" inputMode="numeric" style={{ ...INPUT, width: 'auto' }} aria-label="Подходов план" title="Сколько отрезков было в плане (без таймера)" />
+        <input value={intDone} onChange={e => setIntDone(e.target.value)} placeholder="Сделано (пусто = все)" inputMode="numeric" style={{ ...INPUT, width: 'auto' }} aria-label="Подходов сделано" title="Сколько отрезков выполнено; пусто = все по плану" />
         <button style={{ ...BTN_CTA, minHeight: 48 }} onClick={add}>{editingId ? '💾 Обновить' : '+ Записать'}</button>
-        <button style={{ ...BTN, minHeight: 48 }} onClick={() => { setMinutes('30'); setRpe(''); setHr(''); setKcal(''); setKm(''); setEditingId(null); setWarnings(null); }} aria-label="Сбросить форму">✕ Сбросить</button>
+        <button style={{ ...BTN, minHeight: 48 }} onClick={() => { setMinutes('30'); setRpe(''); setHr(''); setKcal(''); setKm(''); setIntPlanned(''); setIntDone(''); setEditingId(null); setWarnings(null); }} aria-label="Сбросить форму">✕ Сбросить</button>
       </div>
       {warnings && (
         <div style={{ fontSize: 11, color: '#f87171', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 8, padding: '6px 8px' }} role="alert">

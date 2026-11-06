@@ -20,7 +20,7 @@ import type { CardioCompetitionRef, CardioPhase } from '../../../engines/lms/car
 import {
   ROW, LABEL, HINT_SM, BTN_SMALL, CHIP, CHIP_ACTIVE, PHASE_COLOR, TYPE_COLOR,
   SectionCard, StatTile, SectionNav, InfoBanner, Accordion, Badge,
-  NumberInput, Stepper, CARD_HERO,
+  NumberInput, Stepper, CARD_HERO, DraftNumberInput,
 } from './CardioUI';
 
 const GOAL_CARD: React.CSSProperties = {
@@ -410,6 +410,17 @@ export const CardioGoalHorizonSection: React.FC<{
   );
 };
 
+/** Вес: черновик до blur — иначе набор «75» клэмпился в 300 на первой цифре. */
+const WeightInput: React.FC<{ value: number; onChange: (n: number) => void }> = ({ value, onChange }) => (
+  <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
+    <span style={LABEL}>Вес (кг)</span>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+      <DraftNumberInput value={value} min={30} max={300} step={0.5} onCommit={onChange} ariaLabel="Вес" width={100} placeholder="80" />
+      <span style={{ fontSize: 11, color: '#fff' }}>кг</span>
+    </div>
+  </div>
+);
+
 /** Шаг 2 ББ-оболочки: атлет — пользователь + PRO полевые тесты (бывшие sec-user/sec-field). */
 export const CardioAthleteSection: React.FC<{
   age: string; setAge: (v: string) => void;
@@ -451,7 +462,7 @@ export const CardioAthleteSection: React.FC<{
       </div>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
         <NumberInput label="Возраст" value={age} onChange={setAge} min={12} max={90} step={1} placeholder="30" ariaLabel="Возраст" width={90} suffix="лет" />
-        <NumberInput label="Вес (кг)" value={String(bodyWeight)} onChange={v => setBodyWeight(Math.max(30, Math.min(300, Number(v) || 80)))} min={30} max={300} step={0.5} placeholder="80" ariaLabel="Вес" width={100} suffix="кг" />
+        <WeightInput value={bodyWeight} onChange={setBodyWeight} />
         {setBodyFatPct && <NumberInput label="Жир (%)" value={bodyFatPct ?? ''} onChange={v => setBodyFatPct(v)} min={3} max={70} step={0.5} placeholder="15" ariaLabel="Процент жира" width={100} suffix="%" />}
         <NumberInput label="ЧСС покоя" value={restingHr} onChange={setRestingHr} min={30} max={120} step={1} placeholder="60" ariaLabel="ЧСС покоя" width={100} suffix="уд/мин" />
       </div>
@@ -848,7 +859,7 @@ export const CardioParamsStep: React.FC<{
         </div>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
           <NumberInput label="Возраст" value={age} onChange={setAge} min={12} max={90} step={1} placeholder="30" ariaLabel="Возраст" width={90} suffix="лет" />
-          <NumberInput label="Вес (кг)" value={String(bodyWeight)} onChange={v => setBodyWeight(Math.max(30, Math.min(300, Number(v) || 80)))} min={30} max={300} step={0.5} placeholder="80" ariaLabel="Вес" width={100} suffix="кг" />
+          <WeightInput value={bodyWeight} onChange={setBodyWeight} />
           <NumberInput label="ЧСС покоя" value={restingHr} onChange={setRestingHr} min={30} max={120} step={1} placeholder="60" ariaLabel="ЧСС покоя" width={100} suffix="уд/мин" />
         </div>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>

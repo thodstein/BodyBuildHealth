@@ -120,6 +120,19 @@ describe('CardioConstructor — сценарий пользователя', () =
     expect(saved.settings.lifestyle.restingHR).toBe(55);
   });
 
+  it('вес набирается по цифрам: «7»→«75» не превращается в 300', () => {
+    seedProfile({});
+    render(<CardioConstructor />);
+    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
+    const weight = screen.getByLabelText('Вес') as HTMLInputElement;
+    fireEvent.change(weight, { target: { value: '7' } });
+    fireEvent.change(weight, { target: { value: '75' } });
+    expect(weight.value).toBe('75');
+    fireEvent.click(screen.getByRole('button', { name: /В профиль/ }));
+    const saved = JSON.parse(localStorage.getItem(PROFILE_KEY) ?? '{}');
+    expect(saved.settings.personal.weight).toBe(75);
+  });
+
   it('предпросмотр: «План по фазам» и «Taper-план» видны после сборки со стартом', () => {
     seedProfile({});
     render(<CardioConstructor />);

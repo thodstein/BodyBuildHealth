@@ -205,6 +205,34 @@ describe('CardioDiaryPanel: факт по подходам виден в жур�
     expect(container.querySelector('[data-cardio="interval-adherence"]')).toBeNull();
   });
 
+  it('ручная запись фиксирует подходы без таймера: план 8, сделано 6', () => {
+    render(<CardioDiaryPanel cycle={null} />);
+    fireEvent.change(screen.getByLabelText('Минуты'), { target: { value: '40' } });
+    fireEvent.change(screen.getByLabelText('Подходов план'), { target: { value: '8' } });
+    fireEvent.change(screen.getByLabelText('Подходов сделано'), { target: { value: '6' } });
+    fireEvent.click(screen.getByRole('button', { name: /Записать/ }));
+
+    const saved = loadCardioLog();
+    expect(saved[0].intervalsPlanned).toBe(8);
+    expect(saved[0].intervalsDone).toBe(6);
+    expect(screen.getByText(/6\/8/)).toBeTruthy();
+  });
+
+  it('пустое «сделано» = все подходы по плану, больше плана записать нельзя', () => {
+    render(<CardioDiaryPanel cycle={null} />);
+    fireEvent.change(screen.getByLabelText('Минуты'), { target: { value: '40' } });
+    fireEvent.change(screen.getByLabelText('Подходов план'), { target: { value: '8' } });
+    fireEvent.click(screen.getByRole('button', { name: /Записать/ }));
+    expect(loadCardioLog()[0]).toMatchObject({ intervalsPlanned: 8, intervalsDone: 8 });
+
+    render(<CardioDiaryPanel cycle={null} />);
+    fireEvent.change(screen.getAllByLabelText('Минуты')[1], { target: { value: '40' } });
+    fireEvent.change(screen.getAllByLabelText('Подходов план')[1], { target: { value: '8' } });
+    fireEvent.change(screen.getAllByLabelText('Подходов сделано')[1], { target: { value: '12' } });
+    fireEvent.click(screen.getAllByRole('button', { name: /Записать/ })[1]);
+    expect(loadCardioLog()[0].intervalsDone).toBe(8);
+  });
+
   it('правка записи не стирает подходы, заметку и длительность работы/отдыха', () => {
     // Дефект: форма собирала запись с нуля, поэтому исправление RPE
     // превращало интервальную сессию в обычную (чип 🔁 исчезал).

@@ -58,6 +58,10 @@ const CardioDiaryInner: React.FC<DiaryWindowProps> = ({ open, onClose, onDataCha
   const [hr, setHr] = useState('');
   const [km, setKm] = useState('');
   const [notes, setNotes] = useState('');
+  // Ручная запись интервалов без таймера: «сделал 6 из 8» должно попадать
+  // в журнал, а не только в текст заметки.
+  const [intPlanned, setIntPlanned] = useState('');
+  const [intDone, setIntDone] = useState('');
   // Спринт 5.2: дисциплина записи. Форма профиля — второй вход в дневник, и
   // без этого поля ручные сессии навсегда оставались <другое> (мимо разбивки TID).
   // По умолчанию <другое>: не выдумываем — чип в один тап.
@@ -134,6 +138,8 @@ const CardioDiaryInner: React.FC<DiaryWindowProps> = ({ open, onClose, onDataCha
     setRpe(e.rpe != null ? String(e.rpe) : '');
     setHr(e.avgHr != null ? String(e.avgHr) : '');
     setKm(e.distanceKm != null ? String(e.distanceKm) : '');
+    setIntPlanned(e.intervalsPlanned != null ? String(e.intervalsPlanned) : '');
+    setIntDone(e.intervalsDone != null ? String(e.intervalsDone) : '');
     setNotes(e.notes ?? '');
     // Спринт 5.2: правка не должна терять дисциплину записи.
     setSport(sanitizeCardioSport(e.sport));
@@ -242,6 +248,11 @@ const CardioDiaryInner: React.FC<DiaryWindowProps> = ({ open, onClose, onDataCha
     // (мощность, decoupling из FIT, source/updatedAt). Раньше редактирование
     // пересоздавало запись с нуля и теряло импортированные метрики.
     const prev = editingId ? log.find(e => e.id === editingId) : undefined;
+    // Подходы: план обязателен, пустое «сделано» = все по плану (так в placeholder).
+    const plannedN = Number(intPlanned) > 0 ? Math.min(30, Math.max(1, Math.round(Number(intPlanned)))) : undefined;
+    const doneN = plannedN != null
+      ? (intDone.trim() === '' ? plannedN : Math.max(0, Math.min(plannedN, Math.round(Number(intDone) || 0))))
+      : undefined;
     const entry: CardioLogEntry = {
       ...(prev ?? {}),
       id: editingId ?? newId(), date, type, durationMin: dur,
@@ -254,6 +265,8 @@ const CardioDiaryInner: React.FC<DiaryWindowProps> = ({ open, onClose, onDataCha
         ? prev.calories
         : estimateCardioEntryKcal(type, dur, weight ?? undefined, { sport: sanitizeCardioSport(sport) }),
       distanceKm: Number(String(km).replace(',', '.')) > 0 ? Math.max(0, Math.min(200, Math.round(Number(String(km).replace(',', '.')) * 10) / 10)) : undefined,
+      intervalsPlanned: plannedN,
+      intervalsDone: doneN,
       notes: notes.trim() ? notes.trim().slice(0, 300) : undefined,
       // Спринт 5.2/5.3: дисциплина + provenance. Раньше форма профиля не писала
       // ни то, ни другое — запись была анонимной для разбивки TID.
@@ -264,6 +277,8 @@ const CardioDiaryInner: React.FC<DiaryWindowProps> = ({ open, onClose, onDataCha
     saveCardioLogEntry(entry);
     setEditingId(null);
     setNotes('');
+    setIntPlanned('');
+    setIntDone('');
     reload();
     flashMsg(editingId ? '✏️ Сессия обновлена' : '💾 Сессия записана');
   };
@@ -539,13 +554,21 @@ const CardioDiaryInner: React.FC<DiaryWindowProps> = ({ open, onClose, onDataCha
             <span style={labelStyle}>км</span>
             <input value={km} onChange={e => setKm(e.target.value)} inputMode="decimal" style={{ ...inputStyle, width: 70, borderColor: warnings.km ? '#f87171' : undefined }} aria-label="Км сессии" title="Дистанция (для бега/езды)" />
           </label>
+          <label style={{ display: 'block' }}>
+            <span style={labelStyle}>Подходов</span>
+            <input value={intPlanned} onChange={e => setIntPlanned(e.target.value)} inputMode="numeric" style={{ ...inputStyle, width: 70 }} aria-label="Подходов план" title="Сколько отрезков было в плане (если записываете без таймера)" />
+          </label>
+          <label style={{ display: 'block' }}>
+            <span style={labelStyle}>Сделано</span>
+            <input value={intDone} onChange={e => setIntDone(e.target.value)} inputMode="numeric" style={{ ...inputStyle, width: 70 }} aria-label="Подходов сделано" title="Сколько отрезков выполнено; пусто = все по плану" />
+          </label>
           <label style={{ display: 'block', flex: '1 1 180px', minWidth: 160 }}>
             <span style={labelStyle}>Заметка</span>
             <input value={notes} onChange={e => setNotes(e.target.value)} placeholder="Самочувствие, погода, интервалы…" style={{ ...inputStyle, width: '100%' }} aria-label="Заметка сессии" maxLength={300} />
           </label>
           <button style={{ ...btnPrimary(ACCENT), display:'inline-flex', alignItems:'center', gap:6 }} onClick={add}><NativeIcon name="check" size={13} />{editingId ? 'Обновить' : 'Записать'}</button>
           {editingId && (
-            <button style={{ ...btnBase(ACCENT), background: 'rgba(255,255,255,0.06)' }} onClick={() => { setEditingId(null); setNotes(''); }}>
+            <button style={{ ...btnBase(ACCENT), background: 'rgba(255,255,255,0.06)' }} onClick={() => { setEditingId(null); setNotes(''); setIntPlanned(''); setIntDone(''); }}>
               ✕ Отмена
             </button>
           )}

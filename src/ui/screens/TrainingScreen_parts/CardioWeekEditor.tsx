@@ -15,7 +15,7 @@ import {
   type CardioCycle, type CardioType, type CardioSession, type CardioWeek, type CardioEquipment, type CardioStructuredBlock,
 } from '../../../engines/lms/cardio.engine';
 import { CARDIO_INTERVAL_PRESETS, getCardioIntervalPreset } from '../../../engines/lms/cardio-interval-presets.engine';
-import { CARD, ROW, LABEL, HINT_SM, BTN, BTN_PRIMARY, BTN_DANGER, BTN_SMALL, SelectInput } from './CardioUI';
+import { CARD, ROW, LABEL, HINT_SM, BTN, BTN_PRIMARY, BTN_DANGER, BTN_SMALL, SelectInput, DraftNumberInput } from './CardioUI';
 
 const DAY_CELL: React.CSSProperties = {
   flex: '1 1 48px', minWidth: 48, borderRadius: 11, padding: '8px 4px', textAlign: 'center',
@@ -46,8 +46,6 @@ function withStructNote(purpose: string | undefined, label: string | null): stri
   return `${base ? `${base} · ` : ''}⚡ Структура: ${label}`;
 }
 
-const clampInt = (v: number, min: number, max: number): number => Math.max(min, Math.min(max, Math.round(Number.isFinite(v) ? v : min)));
-
 /**
  * Нормализация черновика структуры перед записью: пульсовой диапазон с
  * перепутанными границами не должен попадать в план (таймер показывал бы
@@ -57,12 +55,25 @@ function normalizeStructureBlocks(draft: CardioStructuredBlock[]): CardioStructu
   return draft
     .filter(b => b.workSec > 0 && b.reps > 0)
     .map(b => {
-      if (b.target !== 'hr') return b.targetHr ? { ...b, targetHr: undefined } : b;
-      const min = b.targetHr?.min;
-      const max = b.targetHr?.max;
-      if (min == null && max == null) return { ...b, targetHr: undefined };
-      if (min != null && max != null && min > max) return { ...b, targetHr: { min: max, max: min } };
-      return b;
+      let out: CardioStructuredBlock = b;
+      // Пульсовой диапазон живёт только у цели «пульс».
+      if (b.target !== 'hr') {
+        if (b.targetHr) out = { ...out, targetHr: undefined };
+      } else {
+        const min = b.targetHr?.min;
+        const max = b.targetHr?.max;
+        if (min == null && max == null) out = { ...out, targetHr: undefined };
+        else if (min != null && max != null && min > max) out = { ...out, targetHr: { min: max, max: min } };
+      }
+      // Числовая цель — только RPE/мощность: иначе цифра ни к чему не относится.
+      if (b.target !== 'rpe' && b.target !== 'power') {
+        if (b.targetValue != null) out = { ...out, targetValue: undefined };
+      } else if (out.targetValue != null) {
+        const lo = b.target === 'rpe' ? 1 : 30;
+        const hi = b.target === 'rpe' ? 10 : 1500;
+        out = { ...out, targetValue: Math.max(lo, Math.min(hi, Math.round(out.targetValue))) };
+      }
+      return out;
     });
 }
 
@@ -540,7 +551,7 @@ export const CardioWeekEditor: React.FC<{ cycle: CardioCycle | null; onChanged?:
                   {s.dayOfWeek != null && legDays.has(s.dayOfWeek) && s.type !== 'recovery' && (
                     <span style={{ fontSize: 10, color: '#f87171', fontWeight: 700 }} title="День тяжёлых ног — интенсивное кардио лучше перенести">⚠ ноги</span>
                   )}
-                  <input type="number" value={s.durationMin} onChange={e => updateSession(idx, { durationMin: Math.max(5, Math.min(180, Number(e.target.value) || 30)) })} inputMode="numeric" style={NUM} aria-label={`Минуты сессии ${idx + 1}`} />
+                  <DraftNumberInput value={s.durationMin} min={5} max={180} onCommit={v => updateSession(idx, { durationMin: v })} width={72} style={NUM} ariaLabel={`Минуты сессии ${idx + 1}`} />
                   <span style={{ fontSize: 10, color: '#fff' }}>мин ×</span>
                   <button style={{ ...BTN, minHeight: 44, minWidth: 44, padding: '4px 8px' }} onClick={() => updateSession(idx, { weeklyFrequency: Math.max(1, s.weeklyFrequency - 1) })} aria-label="Меньше частоты">−</button>
                   <span style={{ fontSize: 12, fontWeight: 800, minWidth: 16, textAlign: 'center' }}>{s.weeklyFrequency}</span>
@@ -591,35 +602,50 @@ export const CardioWeekEditor: React.FC<{ cycle: CardioCycle | null; onChanged?:
                     {structDraft.map((b, bi) => (
                       <div key={bi} style={{ display: 'flex', flexDirection: 'column', gap: 4, padding: '6px 0', borderTop: bi > 0 ? '1px solid rgba(255,255,255,0.06)' : 'none' }}>
                         <div style={ROW}>
-                          <input type="number" inputMode="numeric" value={b.workSec}
-                            onChange={e => patchBlock(bi, { workSec: clampInt(Number(e.target.value), 5, 1800) })}
-                            style={NUM} aria-label={`Работа отрезка ${bi + 1}, секунд`} />
+                          <DraftNumberInput value={b.workSec} min={5} max={1800}
+                            onCommit={v => patchBlock(bi, { workSec: v })}
+                            style={NUM} ariaLabel={`Работа отрезка ${bi + 1}, секунд`} />
                           <span style={{ fontSize: 10, color: '#fff' }}>с работа /</span>
-                          <input type="number" inputMode="numeric" value={b.restSec}
-                            onChange={e => patchBlock(bi, { restSec: clampInt(Number(e.target.value), 0, 1800) })}
-                            style={NUM} aria-label={`Отдых отрезка ${bi + 1}, секунд`} />
+                          <DraftNumberInput value={b.restSec} min={0} max={1800}
+                            onCommit={v => patchBlock(bi, { restSec: v })}
+                            style={NUM} ariaLabel={`Отдых отрезка ${bi + 1}, секунд`} />
                           <span style={{ fontSize: 10, color: '#fff' }}>с отдых ×</span>
-                          <input type="number" inputMode="numeric" value={b.reps}
-                            onChange={e => patchBlock(bi, { reps: clampInt(Number(e.target.value), 1, 30) })}
-                            style={{ ...NUM, width: 54 }} aria-label={`Повторов отрезка ${bi + 1}`} />
+                          <DraftNumberInput value={b.reps} min={1} max={30}
+                            onCommit={v => patchBlock(bi, { reps: v })}
+                            style={{ ...NUM, width: 54 }} ariaLabel={`Повторов отрезка ${bi + 1}`} />
                           <button style={BTN_DANGER} onClick={() => removeBlock(bi)} aria-label={`Удалить отрезок ${bi + 1}`}>✕</button>
                         </div>
                         <div style={ROW}>
                           <SelectInput value={b.target ?? ''} onChange={v => patchBlock(bi, v
-                            ? { target: v as NonNullable<CardioStructuredBlock['target']>, ...(v !== 'hr' ? { targetHr: undefined } : {}) }
-                            : { target: undefined, targetHr: undefined })}
+                            ? {
+                                target: v as NonNullable<CardioStructuredBlock['target']>,
+                                ...(v !== 'hr' ? { targetHr: undefined } : {}),
+                                ...(v !== 'rpe' && v !== 'power' ? { targetValue: undefined } : {}),
+                              }
+                            : { target: undefined, targetHr: undefined, targetValue: undefined })}
                             ariaLabel={`Цель отрезка ${bi + 1}`} width={115} options={TARGET_OPTIONS} />
                           {b.target === 'hr' && (
                             <>
-                              <input type="number" inputMode="numeric" value={b.targetHr?.min ?? ''} placeholder="от"
-                                onChange={e => { const n = Number(e.target.value); patchBlock(bi, { targetHr: { ...b.targetHr, min: e.target.value === '' ? undefined : clampInt(n, 80, 220) } }); }}
-                                style={{ ...NUM, width: 62 }} aria-label={`Пульс от отрезка ${bi + 1}`} />
+                              <DraftNumberInput value={b.targetHr?.min ?? ''} min={80} max={220} allowEmpty
+                                onCommit={v => patchBlock(bi, { targetHr: { ...b.targetHr, min: v } })}
+                                onCommitEmpty={() => patchBlock(bi, { targetHr: { ...b.targetHr, min: undefined } })}
+                                placeholder="от" style={{ ...NUM, width: 62 }} ariaLabel={`Пульс от отрезка ${bi + 1}`} />
                               <span style={{ fontSize: 10, color: '#fff' }}>–</span>
-                              <input type="number" inputMode="numeric" value={b.targetHr?.max ?? ''} placeholder="до"
-                                onChange={e => { const n = Number(e.target.value); patchBlock(bi, { targetHr: { ...b.targetHr, max: e.target.value === '' ? undefined : clampInt(n, 80, 220) } }); }}
-                                style={{ ...NUM, width: 62 }} aria-label={`Пульс до отрезка ${bi + 1}`} />
+                              <DraftNumberInput value={b.targetHr?.max ?? ''} min={80} max={220} allowEmpty
+                                onCommit={v => patchBlock(bi, { targetHr: { ...b.targetHr, max: v } })}
+                                onCommitEmpty={() => patchBlock(bi, { targetHr: { ...b.targetHr, max: undefined } })}
+                                placeholder="до" style={{ ...NUM, width: 62 }} ariaLabel={`Пульс до отрезка ${bi + 1}`} />
                               <span style={{ fontSize: 10, color: '#fff' }}>уд/мин</span>
                             </>
+                          )}
+                          {(b.target === 'rpe' || b.target === 'power') && (
+                            <DraftNumberInput value={b.targetValue ?? ''}
+                              min={b.target === 'rpe' ? 1 : 30} max={b.target === 'rpe' ? 10 : 1500} allowEmpty
+                              onCommit={v => patchBlock(bi, { targetValue: v })}
+                              onCommitEmpty={() => patchBlock(bi, { targetValue: undefined })}
+                              placeholder={b.target === 'rpe' ? 'RPE 1-10' : 'Вт'}
+                              style={{ ...NUM, width: 84 }}
+                              ariaLabel={b.target === 'rpe' ? `RPE отрезка ${bi + 1}` : `Мощность отрезка ${bi + 1}, Вт`} />
                           )}
                           <input value={b.note ?? ''} onChange={e => patchBlock(bi, { note: e.target.value })}
                             placeholder="примечание (таймер покажет)" aria-label={`Примечание отрезка ${bi + 1}`}

@@ -21,7 +21,12 @@ import {
   buildCardioSummaryText,
   cardioSessionProtocol,
   cardioStructuredMainSec,
+  loadActiveCardioCycle,
+  loadCardioCycles,
+  normalizeCardioCycle,
   scaleCardioDurationMin,
+  setActiveCardioCycle,
+  CARDIO_CYCLES_KEY,
   type CardioCycle,
   type CardioPrepPlanLike,
   type CardioSession,
@@ -240,5 +245,63 @@ describe('превью-протокол не выдаёт эвристику з�
     const main = phases.find(p => p.name === 'Интервалы')!;
     expect(main.note).not.toContain('не задана');
     expect(main.note).toContain('8×30 с');
+  });
+});
+
+describe('старые циклы и напоминания календаря', () => {
+  it('legacy: durationMin короче структуры — при чтении поднимается, ккал и итоги пересчитаны', () => {
+    const legacy = withWeekSession(baseCycle(2), 1, structuredSession('hiit', 24, LONG_BLOCK)); // структура 36 мин
+    localStorage.setItem(CARDIO_CYCLES_KEY, JSON.stringify([legacy]));
+
+    const loaded = loadCardioCycles()[0];
+    const s = loaded.weeks[0].sessions[0];
+    expect(s.durationMin).toBe(36);
+    expect(loaded.weeks[0].totalMinutes).toBe(36);
+    expect(loaded.weeks[0].totalKcal).toBe(s.kcalPerSession);
+    expect(brokenStructure(loaded)).toEqual([]);
+
+    setActiveCardioCycle(legacy);
+    expect(loadActiveCardioCycle()!.weeks[0].sessions[0].durationMin).toBe(36);
+  });
+
+  it('валидный цикл нормализация не трогает', () => {
+    const ok = withWeekSession(baseCycle(2), 1, structuredSession('hiit', 36, LONG_BLOCK));
+    expect(normalizeCardioCycle(ok)).toBe(ok);
+    localStorage.setItem(CARDIO_CYCLES_KEY, JSON.stringify([ok]));
+    expect(loadCardioCycles()[0].weeks[0].totalMinutes).toBe(ok.weeks[0].totalMinutes);
+  });
+
+  it('.ics несёт напоминание за час до сессии', () => {
+    const c = withWeekSession(baseCycle(2), 1, structuredSession('hiit', 36, LONG_BLOCK));
+    const ics = buildCardioIcs(c, '2026-11-02');
+    expect(ics).toContain('BEGIN:VALARM');
+    expect(ics).toContain('TRIGGER:-PT60M');
+    expect(ics).toContain('ACTION:DISPLAY');
+  });
+});
+
+describe('числовая цель отрезка не теряется', () => {
+  it('RPE и мощность попадают в таймер и превью', () => {
+    const rpe = [{ workSec: 30, restSec: 30, reps: 4, target: 'rpe' as const, targetValue: 8 }];
+    const plan = buildCardioIntervalPlan({ type: 'hiit', durationMin: 30, structured: rpe })!;
+    expect(plan.steps.find(s => s.kind === 'work')!.note).toContain('RPE 8');
+    const proto = cardioSessionProtocol({ type: 'hiit', durationMin: 30, structured: rpe });
+    expect(proto.find(p => p.name === 'Интервалы')!.note).toContain('RPE 8');
+
+    const powerPlan = buildCardioIntervalPlan({
+      type: 'miss', durationMin: 30,
+      structured: [{ workSec: 120, restSec: 60, reps: 4, target: 'power', targetValue: 250 }],
+    })!;
+    expect(powerPlan.steps.find(s => s.kind === 'work')!.note).toContain('250 Вт');
+  });
+
+  it('у цели «пульс» числовая метка не выдумывается', () => {
+    const plan = buildCardioIntervalPlan({
+      type: 'hiit', durationMin: 30,
+      structured: [{ workSec: 30, restSec: 30, reps: 4, target: 'hr', targetHr: { min: 150, max: 170 }, targetValue: 8 }],
+    })!;
+    const work = plan.steps.find(s => s.kind === 'work')!;
+    expect(work.note ?? '').not.toContain('RPE');
+    expect(work.hrZone).toEqual({ min: 150, max: 170 });
   });
 });

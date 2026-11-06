@@ -4,7 +4,7 @@
  * Stepper, ChipToggle, SectionNav). Все вкладки используют эти примитивы,
  * чтобы структура и оформление были едиными.
  */
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useAndroidBackHandler } from '../../../core/use-android-back';
 
@@ -296,6 +296,99 @@ export const NumberInput: React.FC<NumberInputProps> = ({
       </div>
       {error && <span style={{ fontSize: 10, color: '#f87171' }}>⚠ {error}</span>}
     </div>
+  );
+};
+
+export interface DraftNumberInputProps {
+  /** Текущее сохранённое значение; '' — поле пустое (для необязательных границ). */
+  value: number | '';
+  min: number;
+  max: number;
+  onCommit: (value: number) => void;
+  ariaLabel: string;
+  /** Округление при коммите: 1 — целые, 0.5 — вес, 0 — как есть. */
+  step?: number;
+  width?: number;
+  placeholder?: string;
+  style?: React.CSSProperties;
+  disabled?: boolean;
+  /** Разрешить пустое значение: blur в пустом поле вызовет onCommitEmpty. */
+  allowEmpty?: boolean;
+  onCommitEmpty?: () => void;
+}
+
+/**
+ * Числовое поле с черновиком: набор цифр не клэмпится на каждый символ.
+ *
+ * Дефект, который это лечит: `Math.max(5, ...)` в `onChange` превращал набор
+ * «30» в 50 (первая «3» → 5, вторая цифра дописывалась к 5), «145» уд/мин — в
+ * 220, а вес «75» — в 300. Здесь в state живёт ровно то, что набрал атлет;
+ * валидное число коммитится сразу (превью живое), а границы применяются на
+ * blur/Enter. Заодно один коммит = один снапшот версии, а не один на символ.
+ */
+export const DraftNumberInput: React.FC<DraftNumberInputProps> = ({
+  value, min, max, onCommit, ariaLabel, step = 1, width = 100,
+  placeholder, style, disabled, allowEmpty, onCommitEmpty,
+}) => {
+  const [draft, setDraft] = useState(value === '' ? '' : String(value));
+  const focused = useRef(false);
+  useEffect(() => {
+    if (!focused.current) setDraft(value === '' ? '' : String(value));
+  }, [value]);
+
+  const round = (n: number): number => {
+    if (!step || step <= 0) return n;
+    return Math.round(n / step) * step;
+  };
+  const parse = (raw: string): number | null => {
+    const t = raw.trim().replace(',', '.');
+    if (t === '' || t === '-' || t === '.' || t === '-.') return null;
+    const n = Number(t);
+    return Number.isFinite(n) ? n : null;
+  };
+
+  const handleChange = (raw: string) => {
+    setDraft(raw);
+    const n = parse(raw);
+    if (n == null) return;
+    // Валидное число коммитим сразу — подписи структуры/превью не отстают.
+    if (n >= min && n <= max) {
+      const next = round(n);
+      if (next !== value) onCommit(next);
+    }
+  };
+
+  const commit = () => {
+    focused.current = false;
+    const n = parse(draft);
+    if (n == null) {
+      if (allowEmpty) {
+        setDraft('');
+        onCommitEmpty?.();
+        return;
+      }
+      setDraft(String(value === '' ? min : value));
+      return;
+    }
+    const next = Math.max(min, Math.min(max, round(n)));
+    setDraft(String(next));
+    if (next !== value) onCommit(next);
+  };
+
+  return (
+    <input
+      type="text"
+      inputMode={step > 0 && step % 1 !== 0 ? 'decimal' : 'numeric'}
+      value={draft}
+      onChange={e => handleChange(e.target.value)}
+      onFocus={() => { focused.current = true; }}
+      onBlur={commit}
+      onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); }}
+      placeholder={placeholder}
+      aria-label={ariaLabel}
+      disabled={disabled}
+      style={{ ...INPUT, width, ...style }}
+    />
   );
 };
 

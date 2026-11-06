@@ -386,6 +386,75 @@ describe('конструктор недели: смена типа на Zone 2 �
   });
 });
 
+describe('конструктор недели: числовые поля набираются по цифрам', () => {
+  it('работа «3»→«30» остаётся 30 секунд, а не 50', () => {
+    const c = seed();
+    render(<CardioWeekEditor cycle={c} />);
+    fireEvent.click(screen.getByRole('button', { name: /Редактировать сессии/ }));
+    fireEvent.click(screen.getByLabelText('Интервалы сессии 1'));
+    fireEvent.click(screen.getByRole('button', { name: '+ Отрезок' }));
+    const work = screen.getByLabelText('Работа отрезка 1, секунд') as HTMLInputElement;
+    fireEvent.change(work, { target: { value: '3' } });
+    fireEvent.change(work, { target: { value: '30' } });
+    expect(work.value).toBe('30');
+    fireEvent.click(screen.getByRole('button', { name: /Сохранить/ }));
+    expect(savedSession().structured?.[0]?.workSec).toBe(30);
+  });
+
+  it('пульс «1»→«145» сохраняется как 145, а не 220', () => {
+    const c = seed();
+    render(<CardioWeekEditor cycle={c} />);
+    fireEvent.click(screen.getByRole('button', { name: /Редактировать сессии/ }));
+    fireEvent.click(screen.getByLabelText('Интервалы сессии 1'));
+    fireEvent.click(screen.getByRole('button', { name: '+ Отрезок' }));
+    fireEvent.click(screen.getByLabelText('Цель отрезка 1'));
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: /^пульс$/ }));
+    const min = screen.getByLabelText('Пульс от отрезка 1') as HTMLInputElement;
+    fireEvent.change(min, { target: { value: '1' } });
+    fireEvent.change(min, { target: { value: '145' } });
+    expect(min.value).toBe('145');
+    fireEvent.click(screen.getByRole('button', { name: /Сохранить/ }));
+    expect(savedSession().structured?.[0]?.targetHr).toEqual({ min: 145, max: undefined });
+  });
+
+  it('минуты сессии «3»→«30» — 30, а не 55', () => {
+    const c = seed();
+    render(<CardioWeekEditor cycle={c} />);
+    fireEvent.click(screen.getByRole('button', { name: /Редактировать сессии/ }));
+    const inp = screen.getByLabelText('Минуты сессии 1') as HTMLInputElement;
+    fireEvent.change(inp, { target: { value: '3' } });
+    fireEvent.change(inp, { target: { value: '30' } });
+    expect(inp.value).toBe('30');
+    fireEvent.blur(inp);
+    expect(savedWeek(1).sessions[0].durationMin).toBe(30);
+  });
+
+  it('цель RPE сохраняется числом и чистится при смене на пульс', () => {
+    const c = seed();
+    const first = render(<CardioWeekEditor cycle={c} />);
+    fireEvent.click(screen.getByRole('button', { name: /Редактировать сессии/ }));
+    fireEvent.click(screen.getByLabelText('Интервалы сессии 1'));
+    fireEvent.click(screen.getByRole('button', { name: '+ Отрезок' }));
+    fireEvent.click(screen.getByLabelText('Цель отрезка 1'));
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: /^RPE$/ }));
+    fireEvent.change(screen.getByLabelText('RPE отрезка 1'), { target: { value: '8' } });
+    fireEvent.click(screen.getByRole('button', { name: /Сохранить/ }));
+    expect(savedSession().structured?.[0]).toMatchObject({ target: 'rpe', targetValue: 8 });
+    first.unmount();
+
+    // Смена цели на пульс должна снять числовую метку, иначе в таймере
+    // осталась бы «RPE 8» на отрезке с пульсовым диапазоном.
+    render(<CardioWeekEditor cycle={loadCardioCycles()[0]} />);
+    fireEvent.click(screen.getByRole('button', { name: /Редактировать сессии/ }));
+    fireEvent.click(screen.getByLabelText('Интервалы сессии 1'));
+    fireEvent.click(screen.getByLabelText('Цель отрезка 1'));
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: /^пульс$/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Сохранить/ }));
+    expect(savedSession().structured?.[0].target).toBe('hr');
+    expect(savedSession().structured?.[0].targetValue).toBeUndefined();
+  });
+});
+
 describe('конструктор недели: пульсовой диапазон отрезка', () => {
   it('перепутанные границы нормализуются при сохранении', () => {
     const c = seed();

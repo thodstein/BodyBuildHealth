@@ -180,7 +180,7 @@ describe('CardioWeekEditor', () => {
     const c = buildCardioCycle({ goal: 'health', totalWeeks: 4, id: 'we-4' });
     render(<CardioWeekEditor cycle={c} />);
     fireEvent.click(screen.getByRole('button', { name: /Редактировать сессии/ }));
-    const input = screen.getAllByRole('spinbutton')[0];
+    const input = screen.getByLabelText('Минуты сессии 1');
     fireEvent.change(input, { target: { value: '50' } });
     const saved = loadCardioCycles().find(x => x.id === 'we-4');
     const week = saved!.weeks[0];

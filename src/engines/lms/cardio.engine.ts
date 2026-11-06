@@ -1793,10 +1793,56 @@ export interface CardioSaveResult {
   evicted: string[];
 }
 
+/**
+ * Нормализация цикла при чтении из localStorage.
+ *
+ * До 13-го прохода урезка объёма (taper, ACWR, уровень) уменьшала `durationMin`
+ * арифметикой и могла оставить `structured` длиннее сессии: в плане «24 мин»,
+ * а таймер вёл 36. Новые записи защищены `scaleCardioDurationMin`, но уже
+ * сохранённые циклы надо починить на чтении: поднимаем длительность до
+ * основной части структуры и пересчитываем ккал/итоги недели. Валидный цикл
+ * возвращается тем же объектом — функция идемпотентна.
+ */
+export function normalizeCardioCycle(cycle: CardioCycle): CardioCycle {
+  try {
+    if (!cycle || !Array.isArray(cycle.weeks)) return cycle;
+    const bw = cycleBodyWeight(cycle);
+    const ffm = cycleFfmKg(cycle);
+    const sex = cycle.config?.sex;
+    let changed = false;
+    const weeks = cycle.weeks.map(w => {
+      let weekChanged = false;
+      const sessions = (w.sessions ?? []).map(s => {
+        const needMin = Math.ceil(cardioStructuredMainSec(s.structured) / 60);
+        if (!needMin || (Number(s.durationMin) || 0) >= needMin) return s;
+        weekChanged = true;
+        return {
+          ...s,
+          durationMin: needMin,
+          kcalPerSession: kcalForCardio(s.type, needMin, bw, s.equipment, sex, ffm),
+        };
+      });
+      if (!weekChanged) return w;
+      changed = true;
+      return {
+        ...w,
+        sessions,
+        totalMinutes: sessions.reduce((sum, x) => sum + x.durationMin * x.weeklyFrequency, 0),
+        totalKcal: sessions.reduce((sum, x) => sum + x.kcalPerSession * x.weeklyFrequency, 0),
+      };
+    });
+    return changed ? { ...cycle, weeks } : cycle;
+  } catch {
+    return cycle;
+  }
+}
+
 export function loadCardioCycles(): CardioCycle[] {
   try {
     const v = JSON.parse(localStorage.getItem(CARDIO_CYCLES_KEY) ?? '[]');
-    return Array.isArray(v) ? v.filter((c): c is CardioCycle => !!c && typeof c === 'object' && Array.isArray(c.weeks)) : [];
+    return Array.isArray(v)
+      ? v.filter((c): c is CardioCycle => !!c && typeof c === 'object' && Array.isArray(c.weeks)).map(normalizeCardioCycle)
+      : [];
   } catch { return []; }
 }
 
@@ -1838,7 +1884,7 @@ export function removeCardioCycle(id: string): void {
 export function loadActiveCardioCycle(): CardioCycle | null {
   try {
     const v = JSON.parse(localStorage.getItem(ACTIVE_CARDIO_CYCLE_KEY) ?? 'null');
-    return v && typeof v === 'object' && Array.isArray(v.weeks) ? v as CardioCycle : null;
+    return v && typeof v === 'object' && Array.isArray(v.weeks) ? normalizeCardioCycle(v as CardioCycle) : null;
   } catch { return null; }
 }
 
@@ -2080,7 +2126,7 @@ export function latestCardioCycleVersion(cycleId: string): CardioCycleVersion | 
  * перезапишет её (LIFO). Для полной очистки истории — clearCardioCycleHistory. */
 export function restoreCardioCycleVersion(cycleId: string): CardioCycle | null {
   const v = latestCardioCycleVersion(cycleId);
-  return v ? v.cycle : null;
+  return v ? normalizeCardioCycle(v.cycle) : null;
 }
 
 /** Все снапшоты цикла, новые сверху — для списка истории версий в редакторе. */
@@ -2094,7 +2140,9 @@ export function cardioCycleVersions(cycleId: string): CardioCycleVersion[] {
  * `clearCardioCycleHistory` или пока не сработает лимит версий.
  */
 export function restoreCardioCycleVersionById(versionId: string): CardioCycle | null {
-  return loadCardioCycleVersions().find(v => v.id === versionId)?.cycle ?? null;
+  const found = loadCardioCycleVersions().find(v => v.id === versionId)?.cycle ?? null;
+  // Снапшот мог быть снят до инварианта «структура не режется»: чиним на входе.
+  return found ? normalizeCardioCycle(found) : null;
 }
 
 /** Очистить историю версий цикла (при полном удалении цикла). */
@@ -2463,6 +2511,14 @@ export function buildCardioIcs(cycle: CardioCycle, referenceIso?: string): strin
         lines.push(`DTEND:${dtEnd}`);
         lines.push(`SUMMARY:${escIcs(summary)}`);
         lines.push(`DESCRIPTION:${escIcs(desc)}`);
+        // Напоминание: без нативного плагина уведомлений единственный честный
+        // канал — календарь. VALARM сработает за час до сессии в любом
+        // календаре, куда импортирован .ics.
+        lines.push('BEGIN:VALARM');
+        lines.push('TRIGGER:-PT60M');
+        lines.push('ACTION:DISPLAY');
+        lines.push(`DESCRIPTION:${escIcs(summary)}`);
+        lines.push('END:VALARM');
         lines.push('END:VEVENT');
       }
     }
@@ -3725,8 +3781,9 @@ export function cardioSessionProtocol(session: Pick<CardioSession, 'type' | 'dur
       const note = blocks.length > 1
         ? `${cardioStructuredLabel(blocks) ?? 'интервалы'} (${b.note || 'интервалы'})`
         : `${b.reps}×${fmtSec(b.workSec)} работа / ${fmtSec(b.restSec)} отдых (${b.note || 'интервалы'})`;
+      const tgt = cardioBlockTargetText(b);
       return {
-        note: note + caveat,
+        note: (tgt ? `${note} · ${tgt}` : note) + caveat,
         zone: b.targetHr ?? (z(fallbackIdx) ? { min: z(fallbackIdx)!.bpmMin, max: z(fallbackIdx)!.bpmMax } : undefined),
       };
     }
@@ -3909,7 +3966,7 @@ export function buildCardioIntervalPlan(
       push({
         kind: 'work', sec: b.workSec, rep: r, repsTotal: b.reps,
         label: b.reps > 1 ? `Работа ${r}/${b.reps}` : 'Работа',
-        note: b.note, hrZone: b.targetHr,
+        note: [b.note, cardioBlockTargetText(b)].filter(Boolean).join(' · ') || undefined, hrZone: b.targetHr,
       });
       if (b.restSec > 0) {
         push({
@@ -3957,6 +4014,17 @@ export function cardioStructuredLabel(structured?: CardioStructuredBlock[]): str
   return blocks
     .map(b => `${b.reps}×${formatCardioSec(b.workSec)}${b.restSec > 0 ? `/${formatCardioSec(b.restSec)}` : ''}`)
     .join(' + ');
+}
+
+/**
+ * Числовая цель отрезка: «RPE 8», «250 Вт». Для пульса и темпа — `null`
+ * (диапазон живёт в `targetHr`/заметке), чтобы таймер не выдумывал цифру.
+ */
+export function cardioBlockTargetText(b?: CardioStructuredBlock | null): string | null {
+  if (!b || b.targetValue == null || !Number.isFinite(b.targetValue)) return null;
+  if (b.target === 'rpe') return `RPE ${Math.round(b.targetValue)}`;
+  if (b.target === 'power') return `${Math.round(b.targetValue)} Вт`;
+  return null;
 }
 
 /**
