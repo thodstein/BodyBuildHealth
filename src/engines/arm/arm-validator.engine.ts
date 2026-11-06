@@ -143,7 +143,7 @@ export function validateArmPlan(plan: ArmPlan, level?: string): ArmValidationRes
   } catch { /* опционально */ }
   try {
     const ax = (plan.inputSnapshot as any)?.axisCheck;
-    if (ax && axisScoreOf(ax) >= 3) blocked.push(`Ось high (${axisScoreOf(ax)} флага): side_pressure только техника, макс запрещён.`);
+    if (ax && axisScoreOf(ax) >= 3) blocked.push(`Ось high (флагов: ${axisScoreOf(ax)}): side_pressure только техника, макс запрещён.`);
   } catch { /* опционально */ }
   try {
     for (const wk of plan.weeks) {

@@ -17,7 +17,7 @@ export interface BbTendonJoint {
 }
 
 import { EXERCISE_CATALOG } from '../../core/exercise-catalog';
-import { ruAdjCount, RU_ADJ_PRESS, RU_SETS } from '../ru-plural';
+import { ruAdjCount, ruForm, RU_ADJ_PRESS, RU_SETS } from '../ru-plural';
 
 export interface BbTendonGuard {
   elbow: BbTendonJoint;
@@ -127,17 +127,17 @@ export function assessBbTendonGuard(
   const elbowText = elbowForced
     ? `Локоть: стоп — боль-мониторинг красный (PMM: разгрузка до боли ≤3), ${elbowSets} тяж. сетов/нед`
     : elbowLevel === 'stop'
-      ? `Локоть: стоп — ${elbowSets} тяж. сетов/нед${opts.elbowPain ? ' + боль' : ''}, только изометрия/ремень-техника`
+      ? `Локоть: стоп — ${elbowSets} тяж. ${ruForm(elbowSets, RU_SETS)}/нед${opts.elbowPain ? ' + боль' : ''}, только изометрия/ремень-техника`
       : elbowLevel === 'warn'
-        ? `Локоть: осторожно — ${elbowSets} тяж. сетов/нед (>${caps.warn}), без разнохвата и читинга`
-        : `Локоть: порядок — ${elbowSets} тяж. сетов/нед`;
+        ? `Локоть: осторожно — ${elbowSets} тяж. ${ruForm(elbowSets, RU_SETS)}/нед (>${caps.warn}), без разнохвата и читинга`
+        : `Локоть: порядок — ${elbowSets} тяж. ${ruForm(elbowSets, RU_SETS)}/нед`;
   const shoulderText = shoulderForced
     ? `Плечо: стоп — боль-мониторинг красный (PMM: разгрузка до боли ≤3), ${ruAdjCount(shoulderSets, RU_ADJ_PRESS, RU_SETS)}/нед`
     : shoulderLevel === 'stop'
-      ? `Плечо: стоп — ${shoulderSets} жимовых сетов/нед${opts.shoulderOhsFail ? ' + провал плеча в присед-тесте' : ''}, жимы над головой убрать`
+      ? `Плечо: стоп — ${ruAdjCount(shoulderSets, RU_ADJ_PRESS, RU_SETS)}/нед${opts.shoulderOhsFail ? ' + провал плеча в присед-тесте' : ''}, жимы над головой убрать`
       : shoulderLevel === 'warn'
-        ? `Плечо: осторожно — ${shoulderSets} жимовых сетов/нед (>${caps.warn}), контроль лопатки, без отказа`
-        : `Плечо: порядок — ${shoulderSets} жимовых сетов/нед`;
+        ? `Плечо: осторожно — ${ruAdjCount(shoulderSets, RU_ADJ_PRESS, RU_SETS)}/нед (>${caps.warn}), контроль лопатки, без отказа`
+        : `Плечо: порядок — ${ruAdjCount(shoulderSets, RU_ADJ_PRESS, RU_SETS)}/нед`;
   return {
     elbow: { joint: 'elbow', heavySets: elbowSets, level: elbowLevel, text: elbowText },
     shoulder: { joint: 'shoulder', heavySets: shoulderSets, level: shoulderLevel, text: shoulderText },

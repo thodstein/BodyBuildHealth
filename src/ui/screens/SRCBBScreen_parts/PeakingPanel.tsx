@@ -23,12 +23,13 @@ import { meetAttemptsFor, MEET_STRATEGY_LABEL, type MeetStrategy } from '../../.
 import { getPeakCycles } from '../../../engines/lms/pl-peak-cycle-taper.engine';
 import { scoreBBShowPrep } from '../../../engines/bb/bb-show-coach.engine';
 import { buildBBContestPrepPlan } from '../../../engines/bb/bb-contest-prep.engine';
+import { ruForm, RU_WEEKS } from '../../../engines/ru-plural';
 import { saveContestPrepEverywhere } from '../../../engines/bb/bb-contest-prep-sync';
 
 const ACCENT = '#00e68a';
 const H: React.CSSProperties = { fontSize: 14, fontWeight: 800, color: ACCENT, margin: '4px 0 10px' };
 
-const WEEK_OPTS = [1,2,3,4].map(w => ({ id: String(w), label: `${w} неделя${w > 1 ? 'и' : ''}` }));
+const WEEK_OPTS = [1,2,3,4].map(w => ({ id: String(w), label: `${w} ${ruForm(w, RU_WEEKS)}` }));
 const FED_OPTS = [
   { id: 'ipf', label: 'IPF', desc: 'Международная федерация пауэрлифтинга' },
   { id: 'fpr', label: 'FPR', desc: 'Федерация пауэрлифтинга России' },

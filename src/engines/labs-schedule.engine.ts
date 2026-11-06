@@ -245,7 +245,7 @@ export function generateLabSchedule(input: PhaseLabScheduleInput): LabScheduleIt
 
     schedule.push({
       week: 4,
-      label: 'Контроль 4 неделя',
+      label: 'Контроль 4 нед',
       labs: week4Labs,
       diagnostics: week4Diags.length > 0 ? week4Diags : ['echocg', 'bp_monitor'],
       urgency: 'important',
@@ -260,7 +260,7 @@ export function generateLabSchedule(input: PhaseLabScheduleInput): LabScheduleIt
 
     schedule.push({
       week: 8,
-      label: 'Контроль 8 неделя (конец курса)',
+      label: 'Контроль 8 нед (конец курса)',
       labs: week8Labs,
       diagnostics: week8Diags,
       urgency: 'critical',

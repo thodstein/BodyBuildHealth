@@ -13,7 +13,7 @@
  *
  * @module advanced-diagnostics.engine
  */
-import { ruCount, RU_WARNINGS } from './ru-plural';
+import { ruCount, RU_CONFLICTS_DRUG, RU_SUPPLEMENTS, RU_WARNINGS } from './ru-plural';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // CONSTANTS
@@ -431,14 +431,14 @@ export function runAdvancedDiagnostics(
   const swingFlags = pkpd.filter(r => r.hormonalSwingFlag);
   if (swingFlags.length > 0) {
     parts.push(
-      `⚠ Гормональные качели: ${swingFlags.length} препарат(ов) с дельтой >40% — ${swingFlags.map(r => r.drugName).join(', ')}.`
+      `⚠ Гормональные качели: ${ruCount(swingFlags.length, RU_SUPPLEMENTS)} с дельтой >40% — ${swingFlags.map(r => r.drugName).join(', ')}.`
     );
   }
 
   const crit = interactions.filter(i => i.severity === 'critical');
   if (crit.length > 0) {
     parts.push(
-      `🔴 ${crit.length} критических межлекарственных конфликта: ${crit.map(i => i.drugsInvolved.join('+')).join(', ')}.`
+      `🔴 ${ruCount(crit.length, RU_CONFLICTS_DRUG)}: ${crit.map(i => i.drugsInvolved.join('+')).join(', ')}.`
     );
   }
 

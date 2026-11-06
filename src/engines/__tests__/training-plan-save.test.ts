@@ -132,7 +132,20 @@ describe('analyzeMixUsage', () => {
       ...jointInput(),
       course: [{ id: 'zzz_unknown_drug', name: 'Тест' }],
     });
-    expect(rec.general.some(g => g.includes('Учтена фарма курса (1 препарат.) — конфликтов с миксам не выявлено'))).toBe(true);
+    expect(rec.general.some(g => g.includes('Учтена фарма курса (1 препарат) — конфликтов с миксам не выявлено'))).toBe(true);
+  });
+
+  it('счёт препаратов курса согласован числительным', () => {
+    const rec3 = analyzeMixUsage({
+      ...jointInput(),
+      course: [
+        { id: 'zzz_unknown_drug', name: 'Тест' },
+        { id: 'zzz_unknown_drug_2', name: 'Тест 2' },
+        { id: 'zzz_unknown_drug_3', name: 'Тест 3' },
+      ],
+    });
+    expect(rec3.general.some(g => g.includes('(3 препарата)'))).toBe(true);
+    expect(rec3.general.some(g => g.includes('(3 препарат.)'))).toBe(false);
   });
 
   it('не добавляет блок про курс, если курс не передан', () => {

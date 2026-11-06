@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { ruCount, RU_MEASUREMENTS } from '../../../../../engines/ru-plural';
 import { colors } from '../../ui';
 import { NativeIcon } from '../../../../native/NativeIcons';
 import {
@@ -174,7 +175,7 @@ export const BPDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, onDa
         sRaw = Math.round(readings.reduce((a, r) => a + r.s, 0) / readings.length);
         dRaw = Math.round(readings.reduce((a, r) => a + r.d, 0) / readings.length);
         pRaw = Math.round(readings.reduce((a, r) => a + r.p, 0) / readings.length);
-        sessionNote = `Сессия ${readings.length} замера: ${readings.map(r => `${r.s}/${r.d} ${r.p}уд`).join(' · ')}`;
+        sessionNote = `Сессия ${ruCount(readings.length, RU_MEASUREMENTS)}: ${readings.map(r => `${r.s}/${r.d} ${r.p}уд`).join(' · ')}`;
       } else if (readings.length === 1 && (s2.trim() || d2.trim() || p2.trim())) {
         setValidationErrors([{ field: 'systolic', message: 'Заполните 2-й замер полностью (систола/диастола/пульс) или выключите сессию' }]);
         return;

@@ -71,7 +71,7 @@ export function summarizeLrDirection(history: BbLrSnapshot[] | null | undefined,
     persistent,
     flipped,
     text: persistent
-      ? `Перекос ${group}: слабее ${ru[last]} ${run} замера подряд — добивка оправдана${flipped ? ' (сторона плавала ранее — наблюдаем)' : ''}`
+      ? `Перекос ${group}: слабее ${ru[last]} ${run} подряд — добивка оправдана${flipped ? ' (сторона плавала ранее — наблюдаем)' : ''}`
       : flipped
         ? `Перекос ${group}: сторона плавает — наблюдаем, добивку не фиксируем`
         : `Перекос ${group}: данных мало (${seq.length}) — следим дальше`,

@@ -63,10 +63,10 @@ export function applyPro5Safety(input: Pro5SafetyInput = {}): Pro5SafetyResult {
   // S1: axis-gate — high-риск режет боковое в процедуру.
   if (score >= 3) {
     res.forceSideTechnique = true;
-    res.blocked.push(`Ось high (${score} флага): side_pressure только техника/изометрия, макс запрещён.`);
+    res.blocked.push(`Ось high (флагов: ${score}): side_pressure только техника/изометрия, макс запрещён.`);
     res.notes.push('PRO-5 safety: ось high — боковое переведено в технику (процедура без лифта).');
   } else if (score >= 1) {
-    res.warnings.push(`Ось guarded (${score} флага): держать локоть-якорь, side без максимума.`);
+    res.warnings.push(`Ось guarded (флагов: ${score}): держать локоть-якорь, side без максимума.`);
   }
   // S3: warmup-gate — холод без разминки.
   if (input.axisCheck?.coldNoWarmup && input.warmupDone !== true) {

@@ -16,7 +16,7 @@
  * (делод 6.4±1.7 дня каждые 5.6±2.3 нед, объём −30…−50%); Maeo 2021–2023 / Kassiano 2023 /
  * Wolf 2023 / Strey 2026 (длина > короткой, ES 0.283); Gabbett ACWR 0.8–1.3; Foster монотония.
  */
-import { ruCount, RU_SETS } from './ru-plural';
+import { ruAdjCount, ruCount, RU_ADJ_CRITICAL_F, RU_PROBLEMS, RU_SETS } from './ru-plural';
 
 export const QUALITY_WEIGHTS = {
   volume: 40,
@@ -606,7 +606,7 @@ export function composeQualityScoreV2(input: V2ComposerInput): QualityScoreV2 {
   )));
   const criticals = issues.filter(i => i.severity === 'critical');
   if (criticals.length > 0) {
-    recommendations.unshift(`⚠ ${criticals.length} критических проблем — исправить до начала`);
+    recommendations.unshift(`⚠ ${ruAdjCount(criticals.length, RU_ADJ_CRITICAL_F, RU_PROBLEMS)} — исправить до начала`);
   }
   const totalSets = Object.values(input.weeklySets).reduce((a, c) => a + c, 0);
   return {

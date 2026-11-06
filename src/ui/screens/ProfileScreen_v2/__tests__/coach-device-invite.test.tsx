@@ -239,8 +239,25 @@ describe('атлет: подключение по коду', () => {
     expect(readRegistryFromStorage().active).toBe('home');
   });
 
-  it('атлету сразу сказано, что его прошлые записи не переезжают к тренеру', () => {
+  it('при выключенном режиме тренера карточка только про подключение и отключение', () => {
     const { container } = render(
+      <CoachDeviceInviteCard
+        coachEnabled={false}
+        spaces={[{ id: 'home', athleteId: null, label: 'Мои данные', createdAt: '' }]}
+        onAudit={() => {}}
+      />,
+    );
+    expect(container.textContent).toContain('Данные тренера');
+    // Выдавать коды на этом телефоне нечего: их выдаёт тренер.
+    expect(container.querySelector('[data-coach="device-invite-create"]')).toBeNull();
+    expect(container.querySelector('[data-coach="device-invite-space"]')).toBeNull();
+    expect(container.querySelector('[data-coach="device-invite-empty"]')).toBeNull();
+    // Подключиться и отключиться — можно, это и есть весь смысл карточки здесь.
+    expect(container.querySelector('[data-coach="device-join"]')).not.toBeNull();
+    expect(container.textContent).toContain('Отключиться');
+  });
+
+  it('атлету сразу сказано, что его прошлые записи не переезжают к тренеру', () => {    const { container } = render(
       <CoachDeviceInviteCard
         spaces={[{ id: 'home', athleteId: null, label: 'Мои данные', createdAt: '' }]}
         onAudit={() => {}}

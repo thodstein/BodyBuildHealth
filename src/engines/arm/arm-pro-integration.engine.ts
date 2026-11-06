@@ -7,7 +7,7 @@
  * Билдер вызывает ОДНУ функцию и применяет результат — инварианты ядра целы.
  */
 import { buildWafStartCard } from './arm-waf.engine';
-import { ruCount, RU_POINTS } from '../ru-plural';
+import { ruCount, RU_FLAGS, RU_POINTS } from '../ru-plural';
 import { planBilateralVolume } from './arm-bilateral.engine';
 import { buildSupermatchPlan } from './arm-supermatch.engine';
 import { buildStrapSession } from './arm-start-strap.engine';
@@ -430,7 +430,7 @@ export function applyArmPro(input: ArmBuilderInput): ArmProResult {
     const ex = input as unknown as Record<string, unknown>;
     if (ex['axisCheck'] != null && typeof ex['axisCheck'] === 'object') {
       const a = checkHumerusAxis(ex['axisCheck'] as never);
-      axisLine = `Ось: риск ${a.risk} (${a.score} флага). ${a.cues[0] || ''}`;
+      axisLine = `Ось: риск ${a.risk} (${ruCount(a.score, RU_FLAGS)}). ${a.cues[0] || ''}`;
       rationale.push(axisLine);
       for (const wmsg of a.warnings) warnings.push(`Ось: ${wmsg}`);
     }

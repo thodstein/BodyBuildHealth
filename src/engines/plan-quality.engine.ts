@@ -14,7 +14,7 @@
  * Источники: Israetel M. (RP Strength 2021), Schoenfeld B. (2016), Helms E. (2019).
  */
 
-import { ruCount, ruAdjCount, RU_ADJ_UNIQUE, RU_EXERCISES, RU_SETS } from './ru-plural';
+import { ruCount, ruAdjCount, RU_ADJ_CRITICAL_F, RU_ADJ_UNIQUE, RU_EXERCISES, RU_PROBLEMS, RU_SETS } from './ru-plural';
 import {
   checkSessionCap,
   deloadQualityCheck,
@@ -569,7 +569,7 @@ export function validatePlanQuality(input: PlanQualityInput): PlanQualityResult 
   // ─── Итоговые рекомендации ───
   const criticals = issues.filter(i => i.severity === 'critical');
   if (criticals.length > 0) {
-    recommendations.unshift(`⚠ ${criticals.length} критических проблем — исправить до начала`);
+    recommendations.unshift(`⚠ ${ruAdjCount(criticals.length, RU_ADJ_CRITICAL_F, RU_PROBLEMS)} — исправить до начала`);
   }
 
   const summary: string[] = [

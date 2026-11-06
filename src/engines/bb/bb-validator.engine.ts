@@ -1,6 +1,6 @@
 import type { BBPlan, BBSession } from './bb-builder.engine';
 import { trueMuscleOf } from '../movement-pattern';
-import { ruCount, RU_APPROACHES } from '../ru-plural';
+import { ruAdjCount, ruCount, RU_ADJ_WORKING, RU_APPROACHES, RU_EXERCISES, RU_SETS } from '../ru-plural';
 import { estimateBBSessionCost } from './bb-fatigue.engine';
 import { aggregateBBVolume, aggregateFractionalVolume, PUOS_SESSION_FRACTIONAL, BB_MRV_TOLERANCE, sessionLimitsFor as centralizedSessionLimits } from './bb-volume.engine';
 import { getVolumeLandmarks } from '../volume-landmarks.engine';
@@ -176,7 +176,7 @@ function validateSession(session: BBSession, week: number, sessionIndex: number,
   const workingCount = session.exercises.filter(exercise => !(exercise as any).warmupActivator && !(exercise as any).optional).length;
   const { maxExercises } = sessionLimitsFor(options);
   if (workingCount > maxExercises) {
-    issues.push({ level: 'error', code: 'session_exercise_cap', message: `Сессия содержит ${workingCount} рабочих упражнений (максимум ${maxExercises}).`, week, session: sessionIndex });
+    issues.push({ level: 'error', code: 'session_exercise_cap', message: `Сессия содержит ${ruAdjCount(workingCount, RU_ADJ_WORKING, RU_EXERCISES)} (максимум ${maxExercises}).`, week, session: sessionIndex });
   }
   const cost = estimateBBSessionCost(session);
   if (options.checkOrder) {
@@ -276,7 +276,7 @@ export function validateBBPlan(plan: BBPlan, options: BBPlanValidationOptions = 
       issues.push({
         level: severe ? 'error' : 'warning',
         code: 'session_working_set_cap',
-        message: `Сессия содержит ${sessionSets} рабочих сетов; target/session cap равен ${maxWorkingSets}.`,
+        message: `Сессия содержит ${ruAdjCount(sessionSets, RU_ADJ_WORKING, RU_SETS)}; target/session cap равен ${maxWorkingSets}.`,
         week: week.week || wi + 1, session: si + 1,
       });
     }

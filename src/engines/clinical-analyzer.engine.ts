@@ -13,6 +13,7 @@ import {
   CLINICAL_PATHOLOGIES, CLINICAL_MARKERS, COMPOUND_RISK_MAP, SYSTEM_GROUPS,
   type ClinicalPathology, type CompoundRiskMapping,
 } from '../data/clinical-pathology-db';
+import { ruAdjCount, RU_ADJ_CRITICAL_M, RU_ADJ_HIGH, RU_RISKS } from './ru-plural';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Types
@@ -339,9 +340,9 @@ export function analyzeClinicalRisks(input: ClinicalAnalysisInput): ClinicalAnal
   const highCount = results.filter(r => r.alertLevel === 2).length;
   const drugOnlyCount = results.filter(r => r.markersUsed.length === 0).length;
   const summary = criticalCount > 0
-    ? `🔴 ${criticalCount} критических рисков, ${highCount} повышенных. ${drugOnlyCount > 0 ? `${drugOnlyCount} — оценка по препаратам (без анализов).` : ''} Требуется внимание.`
+    ? `🔴 ${ruAdjCount(criticalCount, RU_ADJ_CRITICAL_M, RU_RISKS)}, ${highCount} повышенных. ${drugOnlyCount > 0 ? `${drugOnlyCount} — оценка по препаратам (без анализов).` : ''} Требуется внимание.`
     : highCount > 0
-      ? `🟡 ${highCount} повышенных рисков. ${drugOnlyCount > 0 ? `${drugOnlyCount} — по препаратам.` : ''} Рекомендуется коррекция.`
+      ? `🟡 ${ruAdjCount(highCount, RU_ADJ_HIGH, RU_RISKS)}. ${drugOnlyCount > 0 ? `${drugOnlyCount} — по препаратам.` : ''} Рекомендуется коррекция.`
       : drugOnlyCount > 0
         ? `📋 ${drugOnlyCount} патологий оценено по препаратам. Сдайте анализы для точного прогноза.`
         : `✅ Все показатели в норме.`;

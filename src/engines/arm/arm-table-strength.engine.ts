@@ -61,7 +61,7 @@ export function assessTableStrength(input: TableStrengthInput = {}): TableStreng
     const weakRu = weak === 'wristFlex' ? 'сгибание кисти' : weak === 'pron' ? 'пронация' : 'райзинг';
     note = `Заполнено ${filled}/4. Слабое звено стола: ${weakRu}.` +
       (fatigueIndex != null ? ` Усталость к 3-му раунду: ${fatigueIndex}%.` : '') +
-      (gaps.length ? ` Добрать: ${gaps.length} замер(а).` : '');
+      (gaps.length ? ` Добрать замеров: ${gaps.length}.` : '');
   } else {
     note = `Заполнено ${filled}/4 (только pinHold ${hold}с). Добавь кг-замеры трёх векторов.`;
   }

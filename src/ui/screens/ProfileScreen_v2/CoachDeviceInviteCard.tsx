@@ -52,6 +52,15 @@ interface Props {
   onAudit: (kind: CoachAuditKind, athleteId?: string | null) => void;
   /** Перечитать реестр после подключения/отключения. */
   onChanged?: () => void;
+  /**
+   * Включён ли режим тренера на этом телефоне.
+   *
+   * `false` — режим выключен, но телефон всё ещё подключён к данным тренера.
+   * Тогда карточка не предлагает выдавать коды (их выдаёт тренер), а показывает
+   * только подключение/отключение: иначе у атлета, выключившего режим, не
+   * осталось бы способа выйти из чужих данных, кроме сброса приложения.
+   */
+  coachEnabled?: boolean;
 }
 
 const inputStyle: React.CSSProperties = {
@@ -108,7 +117,7 @@ const codeStyle: React.CSSProperties = {
 const sectionTitle: React.CSSProperties = { fontSize: 13.5, fontWeight: 800, color: '#fff' };
 const hint: React.CSSProperties = { fontSize: 11, color: colors.textSubtle, lineHeight: 1.5 };
 
-export function CoachDeviceInviteCard({ spaces, onAudit, onChanged }: Props) {
+export function CoachDeviceInviteCard({ spaces, onAudit, onChanged, coachEnabled = true }: Props) {
   const [selected, setSelected] = useState<string>('');
   const [rev, setRev] = useState(0);
   const [busy, setBusy] = useState(false);
@@ -320,9 +329,11 @@ export function CoachDeviceInviteCard({ spaces, onAudit, onChanged }: Props) {
     <div data-coach="device-invite" style={cardStyle}>
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
         <div style={{ flex: 1, minWidth: 150 }}>
-          <div style={sectionTitle}>Телефон атлета</div>
+          <div style={sectionTitle}>{coachEnabled ? 'Телефон атлета' : 'Данные тренера'}</div>
           <div style={{ ...hint, marginTop: 2 }}>
-            Отдельный код на одно пространство. Атлет видит только свои данные, вы — все.
+            {coachEnabled
+              ? 'Отдельный код на одно пространство. Атлет видит только свои данные, вы — все.'
+              : 'Режим тренера выключен, но телефон подключён к данным тренера: отсюда можно отключиться.'}
           </div>
         </div>
         <span
@@ -340,7 +351,7 @@ export function CoachDeviceInviteCard({ spaces, onAudit, onChanged }: Props) {
         </span>
       </div>
 
-      {athleteSpaces.length === 0 ? (
+      {coachEnabled && (athleteSpaces.length === 0 ? (
         <div data-coach="device-invite-empty" style={{ ...hint, marginTop: 10 }}>
           {joined.length > 0
             ? 'Этот телефон подключён к данным тренера — кодов вы не выдаёте. Управление доступом у тренера.'
@@ -433,7 +444,7 @@ export function CoachDeviceInviteCard({ spaces, onAudit, onChanged }: Props) {
             </div>
           )}
         </>
-      )}
+      ))}
 
       <div style={{ marginTop: 12, paddingTop: 10, borderTop: '1px solid rgba(255,255,255,0.08)' }}>
         <div style={sectionTitle}>Подключиться к тренеру</div>
@@ -519,10 +530,20 @@ export function CoachDeviceInviteCard({ spaces, onAudit, onChanged }: Props) {
       )}
 
       <div style={{ marginTop: 10, ...hint, fontSize: 10.5 }}>
-        Код — это ключ доступа к данным выбранного пространства: кто его знает, тот их видит. Новый код
-        отключает старый телефон. Фото веса в облако не уходят. Телефон получает изменения, когда приложение
-        открыто или снова на экране.
-        {hasTokenCount === 0 ? ' Пока ни одному устройству доступ не выдан.' : ''}
+        {coachEnabled ? (
+          <>
+            Код — это ключ доступа к данным выбранного пространства: кто его знает, тот их видит. Новый код
+            отключает старый телефон. Фото веса в облако не уходят. Телефон получает изменения, когда приложение
+            открыто или снова на экране.
+            {hasTokenCount === 0 ? ' Пока ни одному устройству доступ не выдан.' : ''}
+          </>
+        ) : (
+          <>
+            Телефон получает изменения от тренера, когда приложение открыто или снова на экране. Фото
+            веса в облако не уходят. «Отключиться» убирает данные тренера с этого телефона — у самого
+            тренера они остаются.
+          </>
+        )}
       </div>
     </div>
   );

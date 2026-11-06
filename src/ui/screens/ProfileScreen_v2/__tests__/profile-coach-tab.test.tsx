@@ -111,6 +111,41 @@ describe('переключатель', () => {
   });
 });
 
+describe('телефон, подключённый к тренеру, при выключенном режиме', () => {
+  const joinAsAthlete = () => {
+    const joined = athleteSpaceId('coach-a');
+    const reg = upsertSpace(emptyRegistry(), { id: joined, athleteId: null, label: 'Тренер' }).registry;
+    writeRegistryToStorage({ ...reg, active: HOME_SPACE_ID });
+    _resetDataSpaceCache();
+    ensureSpaceToken(joined, {
+      token: 'tk_' + '4'.repeat(48),
+      role: 'athlete',
+      migratedAt: '2026-11-06T10:00:00.000Z',
+    });
+    return joined;
+  };
+
+  it('из чужих данных есть выход даже без режима тренера', () => {
+    joinAsAthlete();
+    // Режим тренера НЕ включаем: атлет выключил его после подключения.
+    const { container } = render(<ProfileCoachTab />);
+    const card = container.querySelector('[data-coach="device-invite"]');
+    expect(card).not.toBeNull();
+    expect(card?.textContent).toContain('Данные тренера');
+    // Кодов атлет не выдаёт — их выдаёт тренер.
+    expect(container.querySelector('[data-coach="device-invite-create"]')).toBeNull();
+    expect(container.querySelector('[data-coach="device-invite-rotate"]')).toBeNull();
+    // А подключиться к другому и отключиться — может.
+    expect(container.querySelector('[data-coach="device-join"]')).not.toBeNull();
+    expect(container.querySelector('[data-coach="device-leave"]')).not.toBeNull();
+  });
+
+  it('без подключения карточки нет: чужой доступ не навязывается', () => {
+    const { container } = render(<ProfileCoachTab />);
+    expect(container.querySelector('[data-coach="device-invite"]')).toBeNull();
+  });
+});
+
 describe('разделы', () => {
   it('чип снимается и возвращается, счётчик честный', () => {
     seed(0);

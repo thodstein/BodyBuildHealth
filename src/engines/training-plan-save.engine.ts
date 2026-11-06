@@ -4,6 +4,7 @@
  *  (he_training_mix_plan_queue). Анализ препаратов микса → структурированные рекомендации. */
 
 import { SUPPORT_CATALOG_DATA, type SupportCatalogEntry } from '../data/support-catalog-data';
+import { ruCount, RU_SUPPLEMENTS } from './ru-plural';
 
 export const MIX_DIARY_KEY = 'he_training_mixes';
 export const FAVORITES_KEY = 'he_support_favorites';
@@ -268,9 +269,9 @@ export function analyzeMixUsage(input: SaveMixInput): TrainingPlanRecommendation
       }
     }
     if (courseConflicts.length > 0) {
-      general.push(`⚠️ Учтена фарма курса (${courseList.length} препарат.): обнаружены взаимодействия — ${courseConflicts.slice(0, 3).join('; ')}.`);
+      general.push(`⚠️ Учтена фарма курса (${ruCount(courseList.length, RU_SUPPLEMENTS)}): обнаружены взаимодействия — ${courseConflicts.slice(0, 3).join('; ')}.`);
     } else {
-      general.push(`ℹ️ Учтена фарма курса (${courseList.length} препарат.) — конфликтов с миксам не выявлено.`);
+      general.push(`ℹ️ Учтена фарма курса (${ruCount(courseList.length, RU_SUPPLEMENTS)}) — конфликтов с миксам не выявлено.`);
     }
   }
 

@@ -17,7 +17,7 @@
  *
  * @module recommendation-engine-v2
  */
-import { ruCount, RU_WEEKS } from './ru-plural';
+import { ruAdjCount, ruCount, RU_ADJ_CRITICAL_F, RU_RECOMMENDATIONS, RU_WEEKS } from './ru-plural';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Types
@@ -277,9 +277,9 @@ export function generateRecommendations(input: RecInput): RecOutput {
   else if (totalCount >= 5) complianceRate = 80;
 
   const summary = criticalCount > 0
-    ? `🔴 ${criticalCount} критических рекомендаций требуют немедленного внимания. ${totalCount} всего.`
+    ? `🔴 ${ruAdjCount(criticalCount, RU_ADJ_CRITICAL_F, RU_RECOMMENDATIONS)} требуют немедленного внимания. Всего ${totalCount}.`
     : totalCount > 0
-      ? `🟡 ${totalCount} рекомендаций для оптимизации тренировок.`
+      ? `🟡 ${ruCount(totalCount, RU_RECOMMENDATIONS)} для оптимизации тренировок.`
       : '✅ Все показатели в норме. Продолжайте программу.';
 
   return { recommendations: allRecs, criticalActions, suggestions, summary, complianceRate };

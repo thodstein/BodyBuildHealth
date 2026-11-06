@@ -451,7 +451,7 @@ export function scoreVolumeWeek(plan: PlanLike, weekNo: number): BBVolumeWeekSco
       row.note = `цель плана ${targetSets}`;
       penalize('warning', 2, {
         muscle: m, code: 'off_target',
-        message: `${muscleRu(m)}: ${factDirect} прямых vs цель плана ${targetSets}`,
+        message: `${muscleRu(m)}: ${ruAdjCount(factDirect, RU_ADJ_DIRECT, RU_SETS)} vs цель плана ${targetSets}`,
         source: `цель плана ${targetSets}`, fact: factDirect, expected: targetSets,
       });
     } else {

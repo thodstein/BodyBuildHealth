@@ -91,7 +91,7 @@ export function applyMesoMult(cycle: CardioCycle, mult: number): CardioCycle {
     totalKcal: weeks.reduce((sum, w) => sum + w.totalKcal, 0),
     rationale: [
       ...cycle.rationale,
-      `🔗 Cross-meso: стартовый объём ×${mult} от прошлого цикла (${scaled} рабочих нед.; делод/тапер/гонки не тронуты).`,
+      `🔗 Cross-meso: стартовый объём ×${mult} от прошлого цикла (${scaled} раб. нед.; делод/тапер/гонки не тронуты).`,
     ],
   };
 }

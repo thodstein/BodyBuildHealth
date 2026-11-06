@@ -743,7 +743,7 @@ function generateRecommendations(sections: ReportSection[], pedRisk: RiskBridgeD
 
   const symptoms = findMetric('Ухудшившиеся');
   if (symptoms && typeof symptoms.current === 'number' && symptoms.current > 0) {
-    recs.push({ section: 'Симптомы', priority: 'warning', text: `${symptoms.current} симптом(ов) ухудшились за период. Обсудить с врачом на следующем приёме.` });
+    recs.push({ section: 'Симптомы', priority: 'warning', text: `Ухудшившихся симптомов: ${symptoms.current}. Обсудить с врачом на следующем приёме.` });
   }
 
   const bpMaxSys = findMetric('Макс. систолическое');

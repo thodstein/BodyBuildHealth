@@ -720,7 +720,7 @@ export const StrengthSportConstructor: React.FC = () => {
       saveAnnualSS(ann3); setAnnual(ann3);
       const sync = syncStrengthAnnualToGeneral(ann3);
       setMsg(sync.ok
-        ? `✦ Год из циклов: ${picked.length} блока (${ann3.totalWeeks}нед)${sync.note ? ` · ${sync.note}` : ''}`
+        ? `✦ Год из циклов: ${ruCount(picked.length, RU_BLOCKS)} (${ann3.totalWeeks}нед)${sync.note ? ` · ${sync.note}` : ''}`
         : `⚠ Год собран, но не синхронизирован с общим планом: ${sync.note || 'неизвестно'}`);
       setTimeout(() => setMsg(''), sync.ok ? 2200 : 3800);
     }catch(e){ const m = e instanceof Error ? e.message : String(e); try { console.warn('[SS annual-from-cycles]', m); } catch {} setMsg(`⛔ ${m}`); setTimeout(()=>setMsg(''),4600); }

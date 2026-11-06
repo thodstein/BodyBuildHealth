@@ -54,7 +54,7 @@ export function nheDose(reps?: number | null, sessions = 2): { sets: number; rep
     sets,
     reps: r,
     total,
-    text: `NHE: ${s}×/нед, ${sets} подхода × ${r} повторов (${total} повторов/нед) — ${build}; делод −30%`,
+    text: `NHE: ${s}×/нед, ${sets}×${r} (${total} повторов/нед) — ${build}; делод −30%`,
   };
 }
 

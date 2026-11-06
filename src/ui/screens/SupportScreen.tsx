@@ -1901,7 +1901,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab; initialSubTab?: 
         const pros: string[] = [];
         const cons: string[] = [];
         const mechComparison: string[] = [];
-        if (mechOverlap > 0) { reasonParts.push(`совпадает ${mechOverlap} механизм(ов)`); }
+        if (mechOverlap > 0) { reasonParts.push(`совпадает механизмов: ${mechOverlap}`); }
         if (orgOverlap > 0) reasonParts.push(`действует на те же органы (${orgOverlap})`);
         if (catOverlap > 0) pros.push(`из категории ${sub.categories?.[0] || '—'}`);
         if ((sub.mechanisms||[]).length > (source.mechanisms||[]).length) pros.push('больше механизмов');

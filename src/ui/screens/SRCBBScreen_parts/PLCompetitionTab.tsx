@@ -7,6 +7,7 @@
  * State остаётся в SRCBBScreen (сериализация he_pl_session) и передаётся через api.
  */
 import React from 'react';
+import { ruCount, RU_KEYS, RU_STARTS } from '../../../engines/ru-plural';
 import { recommendWeightCut } from '../../../engines/gym-competition.engine';
 import { appendPLTaperWeeks, refreshMeetAttempts, computeMeetAttemptsFromPmRow, type LMSBuildOutput } from '../../../engines/lms/lms-builder.engine';
 import { buildPLPeakBlockLayout } from '../../../engines/lms/lms-peak-block.engine';
@@ -269,7 +270,7 @@ export const PLCompetitionTab: React.FC<{ api: PLCompetitionTabApi }> = ({ api }
         progressionRationale: builtSrc.progressionRationale + ' 🏁 ' + res.notes.join(' '),
       };
       setBuiltSrc(season);
-      setTaperNote(`📅 Сезон: ${meets.length} старт(ов) → ${season.weeks.length} нед`);
+      setTaperNote(`📅 Сезон: ${ruCount(meets.length, RU_STARTS)} → ${season.weeks.length} нед`);
       onNote('📅 Тапер по всему сезону построен: ' + res.notes.join(' '));
     } catch (e) { onNote('⚠ Ошибка построения сезона: ' + (e as Error).message); }
   };
@@ -1358,7 +1359,7 @@ export const PLCompetitionTab: React.FC<{ api: PLCompetitionTabApi }> = ({ api }
                 void saveTextFileApk(`pl-backup-${localIsoDateOffset(0)}.json`, JSON.stringify(backup, null, 2), 'application/json;charset=utf-8')
                   .then(out => setBackupLog(out === 'failed'
                     ? ['⚠ Не удалось сохранить файл бэкапа.']
-                    : [`✔ Бэкап: ${keysCount} ключ(ей) — ${Object.keys(backup.keys).map(k => PL_BACKUP_KEY_LABEL[k as keyof typeof PL_BACKUP_KEY_LABEL] ?? k).join(', ')}`]))
+                    : [`✔ Бэкап: ${ruCount(keysCount, RU_KEYS)} — ${Object.keys(backup.keys).map(k => PL_BACKUP_KEY_LABEL[k as keyof typeof PL_BACKUP_KEY_LABEL] ?? k).join(', ')}`]))
                   .catch(e => setBackupLog([`⚠ Ошибка бэкапа: ${(e as Error).message}`]));
               }}
               style={{ ...BTN_GHOST, minHeight: 34, fontSize: 10, padding: '5px 10px', background: 'rgba(0,230,138,0.1)', color: '#00e68a', border: '1px solid rgba(0,230,138,0.35)' }}

@@ -26,6 +26,7 @@ import {
 } from './volume-landmarks.engine';
 import type { MuscleVolumeLandmarks, VolumeStatus } from './volume-landmarks.engine';
 import { indirectMuscleContributions } from './bb/bb-volume.engine';
+import { ruAdjCount, RU_ADJ_DIRECT, RU_SETS } from './ru-plural';
 import { getExerciseById } from '../core/exercise-catalog';
 // Ж3: только ТИП композитора (рантайм-связи нет — чужой движок не трогаем и не падаем вместе с ним)
 import type { V2ComposerInput } from './quality-score-v2.engine';
@@ -126,7 +127,7 @@ export function sessionMavViolations(rows: CanonicalRow[]): SessionMavViolation[
         const day = Number(dayStr);
         out.push({
           muscle, day, directSets: sets, cap: SESSION_MAV_CAP,
-          message: `${muscle}: ${sets} прямых сетов в день ${day} > session-MAV ${SESSION_MAV_CAP} — разбейте на 2 сессии`,
+          message: `${muscle}: ${ruAdjCount(sets, RU_ADJ_DIRECT, RU_SETS)} в день ${day} > session-MAV ${SESSION_MAV_CAP} — разбейте на 2 сессии`,
         });
       }
     }

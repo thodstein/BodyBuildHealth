@@ -1,3 +1,4 @@
+import { ruAdjCount, ruCount, RU_ADJ_CRITICAL_M, RU_ADJ_HIGH, RU_RECOMMENDATIONS, RU_RISKS } from './ru-plural';
 import type { CalculatorState, CalculatorResult, LabSlice } from './support-plan/types';
 import { TZ_AUTO_BLACKLIST, sameClassIds } from './support-plan/shared-constants';
 import { PHARMA_DB } from '../core/pharma-database';
@@ -997,7 +998,7 @@ export function buildPreApplyCard(recs: Recommendation[], state?: CalculatorStat
 
   const criticalCount = lines.filter(l => l.severity === 'critical').length;
   const highCount = lines.filter(l => l.severity === 'high').length;
-  const summary = `Обнаружено ${criticalCount} критических и ${highCount} высоких рисков. Всего ${lines.length} рекомендаций.`;
+  const summary = `Обнаружено ${ruAdjCount(criticalCount, RU_ADJ_CRITICAL_M, RU_RISKS)} и ${ruAdjCount(highCount, RU_ADJ_HIGH, RU_RISKS)}. Всего ${ruCount(lines.length, RU_RECOMMENDATIONS)}.`;
 
   return { lines, summary };
 }

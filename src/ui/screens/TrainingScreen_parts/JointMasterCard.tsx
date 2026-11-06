@@ -219,7 +219,7 @@ export const JointMasterCard: React.FC = () => {
             applyToPlanner({ kind:'pri', label:`Статус ${diag.joint.label}: норма`, data:{ volumeMult: 1, rirShift: 0 } as any });
           }
         }} style={{ marginTop:8, width:'100%', minHeight:32, border:'none', borderRadius:8, cursor:'pointer', background:ACCENT, color:'#000', fontWeight:800, fontSize:10 }}>
-          {diag.blockedPatterns.length ? `🛠 Разгрузить ${diag.joint.label} — исключить ${diag.blockedPatterns.length} паттерна` : `✓ ${diag.joint.label}: ограничений нет — применить норму`}
+          {diag.blockedPatterns.length ? `🛠 Разгрузить ${diag.joint.label} — исключить ${ruCount(diag.blockedPatterns.length, RU_PATTERNS)}` : `✓ ${diag.joint.label}: ограничений нет — применить норму`}
         </button>
       </div>
       </section>

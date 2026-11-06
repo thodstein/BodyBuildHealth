@@ -119,3 +119,13 @@ export const RU_HALL_SETS: RuPluralForms = ['зал-сет', 'зал-сета', 
 export const RU_ADJ_CRITICAL_F: RuPluralForms = ['критическая', 'критические', 'критических'];
 export const RU_ADJ_CRITICAL_M: RuPluralForms = ['критический', 'критических', 'критических'];
 export const RU_ADJ_BUILT: RuPluralForms = ['собранный', 'собранных', 'собранных'];
+export const RU_ADJ_HIGH: RuPluralForms = ['высокий', 'высоких', 'высоких'];
+export const RU_PROBLEMS: RuPluralForms = ['проблема', 'проблемы', 'проблем'];
+export const RU_RECOMMENDATIONS: RuPluralForms = ['рекомендация', 'рекомендации', 'рекомендаций'];
+export const RU_RISKS: RuPluralForms = ['риск', 'риска', 'рисков'];
+/** Фраза целиком: прилагательных два, `ruCount` согласует всю цепочку. */
+export const RU_CONFLICTS_DRUG: RuPluralForms = [
+  'критический межлекарственный конфликт',
+  'критических межлекарственных конфликта',
+  'критических межлекарственных конфликтов',
+];

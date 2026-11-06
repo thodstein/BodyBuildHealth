@@ -573,6 +573,15 @@ export const ProfileCoachTab: React.FC<{
     () => spaceRegistry.spaces.filter(s => s.id !== HOME_SPACE_ID && !isJoinedSpace(s.id)),
     [spaceRegistry, registryRev],
   );
+  /**
+   * Пространства, к которым подключён ЭТОТ телефон. Их видно и при выключенном
+   * режиме тренера: иначе атлет, выключивший режим, остался бы в чужих данных без
+   * единого способа отключиться.
+   */
+  const joinedSpaces = useMemo(
+    () => spaceRegistry.spaces.filter(s => s.id !== HOME_SPACE_ID && isJoinedSpace(s.id)),
+    [spaceRegistry, registryRev],
+  );
   const [confirmOrphanId, setConfirmOrphanId] = useState<string | null>(null);
   const [confirmForgetAll, setConfirmForgetAll] = useState(false);
   const [forgetBusy, setForgetBusy] = useState(false);
@@ -1673,11 +1682,25 @@ export const ProfileCoachTab: React.FC<{
       </div>
 
       {!state.enabled ? (
-        <div style={{ ...cardStyle, fontSize: 12.5, color: colors.textMuted, lineHeight: 1.55 }}>
-          Включите режим, чтобы вести карточки атлетов и выбрать разделы, которые вы у них
-          контролируете. Заметки и календарь-планер доступны отдельными вкладками профиля
-          и работают независимо от режима.
-        </div>
+        <>
+          <div style={{ ...cardStyle, fontSize: 12.5, color: colors.textMuted, lineHeight: 1.55 }}>
+            Включите режим, чтобы вести карточки атлетов и выбрать разделы, которые вы у них
+            контролируете. Заметки и календарь-планер доступны отдельными вкладками профиля
+            и работают независимо от режима.
+          </div>
+          {/* Режим выключен, но телефон подключён к тренеру: без этой карточки
+              отключиться было бы негде — режим тренера выключен, а данные чужие. */}
+          {joinedSpaces.length > 0 && (
+            <div style={{ marginTop: 10 }}>
+              <CoachDeviceInviteCard
+                coachEnabled={false}
+                spaces={spaceRegistry.spaces}
+                onAudit={() => {}}
+                onChanged={() => setRegistryRev(v => v + 1)}
+              />
+            </div>
+          )}
+        </>
       ) : (
         <>
           {/* Разделы */}

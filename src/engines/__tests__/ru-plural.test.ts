@@ -11,7 +11,7 @@
  * Родительный после предлогов («до 2 сетов», «из 4 сетов») в проверку не входит.
  */
 import { describe, it, expect } from 'vitest';
-import { ruForm, ruCount, RU_EXERCISES, RU_SETS, RU_TRAININGS, RU_WEEKS } from '../ru-plural';
+import { ruForm, ruCount, ruAdjCount, RU_ADJ_BUILT, RU_ADJ_CRITICAL_F, RU_ADJ_CRITICAL_M, RU_BLOCKS, RU_CONFLICTS, RU_CONFLICTS_DRUG, RU_EXERCISES, RU_PAIRS, RU_SETS, RU_TRAININGS, RU_WEEKS } from '../ru-plural';
 import { buildBBPlan } from '../bb/bb-builder.engine';
 import { buildBBPlanReportText } from '../bb/bb-report.engine';
 import { buildBBPlanPrintHtml } from '../bb/bb-visual.engine';
@@ -30,6 +30,26 @@ describe('ru-plural: согласование', () => {
     expect(ruCount(3, RU_EXERCISES)).toBe('3 упражнения');
     expect(ruCount(1, RU_WEEKS)).toBe('1 неделя');
     expect(ruCount(4, RU_TRAININGS)).toBe('4 тренировки');
+  });
+});
+
+describe('словари: род прилагательного и фразовые формы', () => {
+  it('пары (ж.) и конфликты (м.) — разные формы прилагательного', () => {
+    expect(ruAdjCount(1, RU_ADJ_CRITICAL_F, RU_PAIRS)).toBe('1 критическая пара');
+    expect(ruAdjCount(3, RU_ADJ_CRITICAL_F, RU_PAIRS)).toBe('3 критические пары');
+    expect(ruAdjCount(1, RU_ADJ_CRITICAL_M, RU_CONFLICTS)).toBe('1 критический конфликт');
+    expect(ruAdjCount(3, RU_ADJ_CRITICAL_M, RU_CONFLICTS)).toBe('3 критических конфликта');
+  });
+
+  it('фразовый словарь согласует всю цепочку «прил. + прил. + сущ.»', () => {
+    expect(ruCount(1, RU_CONFLICTS_DRUG)).toBe('1 критический межлекарственный конфликт');
+    expect(ruCount(2, RU_CONFLICTS_DRUG)).toBe('2 критических межлекарственных конфликта');
+    expect(ruCount(5, RU_CONFLICTS_DRUG)).toBe('5 критических межлекарственных конфликтов');
+  });
+
+  it('«собранный блок» — мужской род (было «1 собранная блок»)', () => {
+    expect(ruAdjCount(1, RU_ADJ_BUILT, RU_BLOCKS)).toBe('1 собранный блок');
+    expect(ruAdjCount(3, RU_ADJ_BUILT, RU_BLOCKS)).toBe('3 собранных блока');
   });
 });
 
