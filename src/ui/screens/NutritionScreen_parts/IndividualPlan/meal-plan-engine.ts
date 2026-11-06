@@ -14826,7 +14826,14 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
           .sort((a: any, b: any) => (Number(b.amount) || 0) - (Number(a.amount) || 0))[0];
         const _extra57: any[] = [];
         if (_prot57) {
-          const _mv = Math.round((Number(_prot57.amount) || 0) * 0.5);
+          // Белок в новый перекус — не больше, чем позволяет донор: он обязан остаться
+          // ≥0.30 г/кг (порог MPS), иначе ось «белок основного приёма» падает.
+          const _w57 = Math.max(1, Number(input.weightKg) || 0);
+          const _perGp = (Number(_prot57.p) || 0) / Math.max(1, Number(_prot57.amount) || 1);
+          let _mv = Math.round((Number(_prot57.amount) || 0) * 0.5);
+          if (((Number(_prot57.p) || 0) - _mv * _perGp) / _w57 < 0.3) {
+            _mv = Math.max(0, Math.round(((Number(_prot57.p) || 0) - 0.3 * _w57) / Math.max(0.02, _perGp)));
+          }
           const _rp = _mv / Math.max(1, Number(_prot57.amount) || 1);
           const _lp: any = { ..._prot57, amount: _mv };
           for (const k of ['p', 'f', 'c', 'kcal', 'fiber', 'leucine_mg']) {
