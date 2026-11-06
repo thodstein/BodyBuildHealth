@@ -14838,6 +14838,24 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
           }
           _extra57.push(_lp);
         }
+        // Жир тоже переносим половиной: иначе весь жир дня остаётся в основных приёмах,
+        // maxFatShare растёт и ось «распределение жира» проседает (§8.57).
+        const _fat57: any = (hm.items || [])
+          .filter((i: any) => i.role === 'fat' && (Number(i.amount) || 0) >= 10)
+          .sort((a: any, b: any) => (Number(b.amount) || 0) - (Number(a.amount) || 0))[0];
+        if (_fat57) {
+          const _mvf = Math.round((Number(_fat57.amount) || 0) * 0.5);
+          const _rf = _mvf / Math.max(1, Number(_fat57.amount) || 1);
+          const _lf: any = { ..._fat57, amount: _mvf };
+          for (const k of ['p', 'f', 'c', 'kcal', 'fiber', 'leucine_mg']) {
+            if (_lf[k]) _lf[k] = Math.round(Number(_lf[k]) * _rf * 10) / 10;
+          }
+          _fat57.amount = Math.round((Number(_fat57.amount) || 0) - _mvf);
+          for (const k of ['p', 'f', 'c', 'kcal', 'fiber', 'leucine_mg']) {
+            if (_fat57[k]) _fat57[k] = Math.round(Number(_fat57[k]) * (1 - _rf) * 10) / 10;
+          }
+          _extra57.push(_lf);
+        }
         meals.push({
           label: `Перекус ${_snackN + 1}`,
           time: '',
