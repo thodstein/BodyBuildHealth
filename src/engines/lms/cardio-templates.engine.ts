@@ -18,6 +18,7 @@ import {
   zonesFromTalkTest,
   CARDIO_LEVEL_MULT,
   kcalForCardio,
+  scaleCardioDurationMin,
   CARDIO_GOAL_LABELS,
   type CardioCycle,
   type CardioCycleInput,
@@ -138,7 +139,7 @@ function buildExplicitWeeks(
     let sessions: CardioSession[] = tw.sessions.map((s, si) => {
       const declared = s.equipment ?? o.equipment?.[0] ?? tpl.preset.equipment?.[0] ?? tpl.meta.equipment[0] ?? 'running';
       const equip: CardioEquipment = lowImpact && IMPACTFUL_EQUIPMENT.has(declared) ? lowImpactFallback : declared;
-      const durationMin = Math.max(10, Math.round(s.durationMin * levelMult));
+      const durationMin = scaleCardioDurationMin(s, levelMult);
       const zone = zones?.[ZONE_OF[s.type]];
       const targetHr = zone ? { min: zone.bpmMin, max: zone.bpmMax } : undefined;
       const structured = s.structured?.map(blk => (

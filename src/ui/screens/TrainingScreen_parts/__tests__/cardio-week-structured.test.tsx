@@ -15,6 +15,7 @@ import {
   buildCardioIntervalPlan, cardioStructuredMainSec, kcalForCardio, cycleBodyWeight, cycleFfmKg,
   saveCardioCycleVersion,
   type CardioCycle,
+  type CardioSession,
 } from '../../../../engines/lms/cardio.engine';
 
 const CYCLES_KEY = 'he_cardio_cycles';
@@ -274,5 +275,107 @@ describe('конструктор недели: прогрессия по нед�
     const confirm = screen.getByRole('button', { name: 'Подтвердить восстановление версии' });
     fireEvent.click(confirm);
     expect(screen.getByRole('status').textContent).toContain('Версия восстановлена');
+  });
+});
+
+/** Цикл с мед-блоком: HIIT/MISS запрещены скринингом. */
+function gatedCycle(session?: Partial<CardioSession>): CardioCycle {
+  const c = seed();
+  const gated: CardioCycle = {
+    ...c,
+    config: { ...c.config, redFlags: ['syncope'] },
+    weeks: c.weeks.map(w => (w.week === 1 && session
+      ? { ...w, sessions: [{ ...w.sessions[0], ...session }] }
+      : w)),
+  };
+  localStorage.setItem(CYCLES_KEY, JSON.stringify([gated]));
+  setActiveCardioCycle(gated);
+  return gated;
+}
+
+describe('конструктор недели: мед-гейт нельзя обойти протоколом/прогрессией', () => {
+  it('пресет HIIT при красном флаге не применяется в черновик', () => {
+    const c = gatedCycle();
+    render(<CardioWeekEditor cycle={c} />);
+    fireEvent.click(screen.getByRole('button', { name: /Редактировать сессии/ }));
+    fireEvent.click(screen.getByLabelText('Интервалы сессии 1'));
+    fireEvent.click(screen.getByLabelText('Пресет интервалов 1'));
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: /Tabata/ }));
+
+    expect(screen.getByText(/не применён/)).toBeTruthy();
+    // Черновик остался пустым: отрезков нет.
+    expect(screen.queryByLabelText('Повторов отрезка 1')).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: /Сохранить/ }));
+    const s = savedSession();
+    expect(s.structured).toBeUndefined();
+    expect(s.type).toBe('hiit');  // тип сессии не менялся задним числом
+  });
+
+  it('📈 не раскладывает HIIT-структуру на недели при красном флаге', () => {
+    // HIIT-сессия осталась с прошлой версии плана (скрининг добавлен позже).
+    const c = gatedCycle({ type: 'hiit' });
+    render(<CardioWeekEditor cycle={c} />);
+    fireEvent.click(screen.getByRole('button', { name: /Редактировать сессии/ }));
+    fireEvent.click(screen.getByLabelText('Интервалы сессии 1'));
+    fireEvent.click(screen.getByRole('button', { name: '+ Отрезок' }));
+    fireEvent.click(screen.getByRole('button', { name: /На все недели/ }));
+
+    expect(screen.getByText(/не добавлен/)).toBeTruthy();
+    expect(savedSession().structured).toBeUndefined();
+  });
+});
+
+describe('конструктор недели: структура не пишется чужой сессии', () => {
+  it('удаление сессии выше открытой панели сдвигает индекс, а не теряет правку', () => {
+    const c = seed();
+    const two: CardioCycle = {
+      ...c,
+      weeks: c.weeks.map(w => (w.week === 1
+        ? { ...w, sessions: [w.sessions[0], { ...w.sessions[0], purpose: 'Вторая сессия' }] }
+        : w)),
+    };
+    localStorage.setItem(CYCLES_KEY, JSON.stringify([two]));
+    setActiveCardioCycle(two);
+    // Харнесс с обновлением cycle после каждой правки: в APK это делает
+    // родительский экран по onChanged, и две правки подряд не должны
+    // откатывать друг друга.
+    const Harness: React.FC = () => {
+      const [cur, setCur] = React.useState<CardioCycle>(two);
+      return <CardioWeekEditor cycle={cur} onChanged={() => setCur(loadCardioCycles()[0])} />;
+    };
+    render(<Harness />);
+    fireEvent.click(screen.getByRole('button', { name: /Редактировать сессии/ }));
+
+    // Открываем структуру ВТОРОЙ сессии и вводим отрезки.
+    fireEvent.click(screen.getByLabelText('Интервалы сессии 2'));
+    fireEvent.click(screen.getByRole('button', { name: '+ Отрезок' }));
+    fireEvent.change(screen.getByLabelText('Повторов отрезка 1'), { target: { value: '5' } });
+
+    // Удаляем первую: панель должна остаться на той же (теперь первой) сессии.
+    fireEvent.click(screen.getByLabelText('Удалить сессию 1'));
+    fireEvent.click(screen.getByRole('button', { name: /Сохранить/ }));
+
+    const sessions = savedWeek(1).sessions;
+    expect(sessions).toHaveLength(1);
+    expect(sessions[0].purpose).toContain('Вторая сессия');
+    expect(sessions[0].structured?.[0]?.reps).toBe(5);
+  });
+});
+
+describe('конструктор недели: пульсовой диапазон отрезка', () => {
+  it('перепутанные границы нормализуются при сохранении', () => {
+    const c = seed();
+    render(<CardioWeekEditor cycle={c} />);
+    fireEvent.click(screen.getByRole('button', { name: /Редактировать сессии/ }));
+    fireEvent.click(screen.getByLabelText('Интервалы сессии 1'));
+    fireEvent.click(screen.getByRole('button', { name: '+ Отрезок' }));
+    fireEvent.click(screen.getByLabelText('Цель отрезка 1'));
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: /^пульс$/ }));
+    fireEvent.change(screen.getByLabelText('Пульс от отрезка 1'), { target: { value: '170' } });
+    fireEvent.change(screen.getByLabelText('Пульс до отрезка 1'), { target: { value: '150' } });
+    fireEvent.click(screen.getByRole('button', { name: /Сохранить/ }));
+
+    expect(savedSession().structured![0].targetHr).toEqual({ min: 150, max: 170 });
   });
 });

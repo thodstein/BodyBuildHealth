@@ -48,6 +48,24 @@ function withStructNote(purpose: string | undefined, label: string | null): stri
 
 const clampInt = (v: number, min: number, max: number): number => Math.max(min, Math.min(max, Math.round(Number.isFinite(v) ? v : min)));
 
+/**
+ * Нормализация черновика структуры перед записью: пульсовой диапазон с
+ * перепутанными границами не должен попадать в план (таймер показывал бы
+ * «170–150»), а `targetHr` без единой границы — мусор.
+ */
+function normalizeStructureBlocks(draft: CardioStructuredBlock[]): CardioStructuredBlock[] {
+  return draft
+    .filter(b => b.workSec > 0 && b.reps > 0)
+    .map(b => {
+      if (b.target !== 'hr') return b.targetHr ? { ...b, targetHr: undefined } : b;
+      const min = b.targetHr?.min;
+      const max = b.targetHr?.max;
+      if (min == null && max == null) return { ...b, targetHr: undefined };
+      if (min != null && max != null && min > max) return { ...b, targetHr: { min: max, max: min } };
+      return b;
+    });
+}
+
 const TARGET_OPTIONS: { value: string; label: string }[] = [
   { value: '', label: 'без метки' },
   { value: 'hr', label: 'пульс' },
@@ -215,7 +233,13 @@ export const CardioWeekEditor: React.FC<{ cycle: CardioCycle | null; onChanged?:
     }));
   };
 
-  const removeSession = (idx: number) => saveWeek(w => ({ ...w, sessions: w.sessions.filter((_, i) => i !== idx) }));
+  const removeSession = (idx: number) => {
+    // Панель структуры держит индекс: после удаления он должен указывать на
+    // ту же сессию, иначе «Сохранить» записало бы структуру чужой сессии.
+    if (structIdx === idx) { setStructIdx(null); setStructDraft([]); setStructTypeDraft(null); }
+    else if (structIdx != null && structIdx > idx) setStructIdx(structIdx - 1);
+    saveWeek(w => ({ ...w, sessions: w.sessions.filter((_, i) => i !== idx) }));
+  };
 
   const addSession = () => {
     if (!hiitGate.allowed && (newType === 'hiit' || newType === 'miss')) { gateFlash(newType); return; }
@@ -253,6 +277,12 @@ export const CardioWeekEditor: React.FC<{ cycle: CardioCycle | null; onChanged?:
   const applyPreset = (presetId: string) => {
     const p = getCardioIntervalPreset(presetId);
     if (!p) return;
+    // Мед-гейт действует и на пресеты: иначе можно было бы обойти запрет
+    // HIIT/MISS, применив протокол в обход селекта типа.
+    if (!hiitGate.allowed && (p.sessionType === 'hiit' || p.sessionType === 'miss')) {
+      flashMsg(`⛔ ${hiitGate.reason ?? 'HIIT/MISS запрещены мед-скринингом'} — протокол «${p.title}» не применён`);
+      return;
+    }
     const age = cycle?.config?.age;
     const hrMax = typeof age === 'number' && age > 0 ? maxHrClassic(age, cycle?.config?.sex) : undefined;
     setStructDraft([p.build(hrMax ? { hrMax } : {})]);
@@ -262,7 +292,7 @@ export const CardioWeekEditor: React.FC<{ cycle: CardioCycle | null; onChanged?:
   const saveStructure = (idx: number) => {
     const s = week?.sessions[idx];
     if (!s) return;
-    const blocks = structDraft.filter(b => b.workSec > 0 && b.reps > 0);
+    const blocks = normalizeStructureBlocks(structDraft);
     const label = cardioStructuredLabel(blocks);
     const mainSec = cardioStructuredMainSec(blocks);
     // Структура не обрезается никогда: длительность сессии поднимаем до неё
@@ -293,9 +323,13 @@ export const CardioWeekEditor: React.FC<{ cycle: CardioCycle | null; onChanged?:
    */
   const progressAcrossWeeks = (idx: number) => {
     const src = week?.sessions[idx];
-    const blocks = structDraft.filter(b => b.workSec > 0 && b.reps > 0);
+    const blocks = normalizeStructureBlocks(structDraft);
     if (!cycle || !week || !src || blocks.length === 0) return;
     const nextType = structTypeDraft ?? src.type;
+    // Прогрессия пишет цикл напрямую, минуя updateSession: мед-гейт нужно
+    // проверить здесь же, иначе протокол HIIT/MISS раскладывался бы на все
+    // недели в обход запрета по скринингу.
+    if (!hiitGate.allowed && (nextType === 'hiit' || nextType === 'miss')) { gateFlash(nextType); return; }
     // Не затираем чужой протокол: раскладываем только на сессии того же типа,
     // у которых структуры нет или она ровно такая же, как у исходной.
     const srcSig = JSON.stringify(src.structured ?? []);

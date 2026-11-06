@@ -721,7 +721,7 @@ export function buildCardioCycle(input: CardioCycleInput): CardioCycle {
     if (deload) {
       sessions = sessions
         .filter(s => s.type !== 'hiit' && s.type !== 'miss')
-        .map(s => ({ ...s, durationMin: Math.max(10, Math.round(s.durationMin * profile.deloadMult)), weeklyFrequency: Math.max(1, Math.round(s.weeklyFrequency * profile.deloadMult)) }));
+        .map(s => ({ ...s, durationMin: scaleCardioDurationMin(s, profile.deloadMult), weeklyFrequency: Math.max(1, Math.round(s.weeklyFrequency * profile.deloadMult)) }));
       rationale.push('Делод: объём кардио снижен, HIIT/MISS убраны.');
     }
     // Персонализация: уровень (объём), оборудование, целевые пульс-зоны.
@@ -729,7 +729,7 @@ export function buildCardioCycle(input: CardioCycleInput): CardioCycle {
     // цикла (нижняя часть в базе → верхняя в пике объёма, ниже в taper),
     // HIIT/MISS — фиксированные зоны 3/4.
     sessions = sessions.map(s => {
-      const dur = Math.max(10, Math.round(s.durationMin * factorMult));
+      const dur = scaleCardioDurationMin(s, factorMult);
       const equip = (s.type === 'hiit' || s.type === 'miss') ? (equipmentPool[1] ?? fallbackEquipment) : (equipmentPool[0] ?? fallbackEquipment);
       const zone = s.type === 'hiit' ? zonesAdj?.[3] : s.type === 'miss' ? zonesAdj?.[2] : zonesAdj?.[1];
       let targetHr = zone ? { min: zone.bpmMin, max: zone.bpmMax } : s.targetHr;
@@ -1141,14 +1141,25 @@ export function buildCardioCycleFromPrep(
     }
     // Персонализация: уровень (объём), оборудование, целевые пульс-зоны, ккал.
     sessions = sessions.map(s => {
-      const dur = Math.max(10, Math.round(s.durationMin * levelMult));
+      const dur = scaleCardioDurationMin(s, levelMult);
       const equip = (s.type === 'hiit' || s.type === 'miss') ? (equipmentPool[1] ?? fallbackEquipment) : (equipmentPool[0] ?? fallbackEquipment);
       const zone = s.type === 'hiit' ? zonesPrep?.[3] : s.type === 'miss' ? zonesPrep?.[2] : zonesPrep?.[1];
+      // Prep-путь генерировал HIIT без структуры: текст «метаболический стимул»,
+      // а таймер — один отсчёт. Протокол назначаем тем же генератором, что и в
+      // основном пути, чтобы текст и машинная структура совпадали.
+      const hiit = s.type === 'hiit' && !s.structured
+        ? buildGeneratedHiitStructure({
+            durationMin: dur, equipment: equip, level: opts.level ?? 'intermediate',
+            week: w, phase,
+          })
+        : null;
       return {
         ...s,
         durationMin: dur,
         kcalPerSession: kcalForCardio(s.type, dur, bw, equip, sex, ffmPrep),
         equipment: equip,
+        structured: s.structured ?? (hiit ? [hiit.block] : undefined),
+        purpose: hiit ? `${s.purpose} · ${hiit.text}` : s.purpose,
         targetHr: zone ? { min: zone.bpmMin, max: zone.bpmMax } : s.targetHr,
       };
     });
@@ -1330,10 +1341,12 @@ export function cardioCyclePeriodAware(
     const from = intense.map(s => `${s.type.toUpperCase()} ×${s.weeklyFrequency}`).join(', ');
     const sessions = w.sessions.map(s => {
       if (s.type === 'hiit') {
-        return recalcSessionKcal({ ...s, type: 'zone2' as CardioType, intensity: 'moderate' as const, durationMin: Math.max(10, Math.round(s.durationMin * 1.5)), purpose: 'Лютеиновая фаза: HIIT → zone2 (RPE воспринимается выше)' }, bw, sex, ffm);
+        // Тип меняется на zone2 — интервальная структура больше не применима:
+        // иначе таймер вёл бы «зону 2» спринтами, которых в тексте нет.
+        return recalcSessionKcal({ ...s, type: 'zone2' as CardioType, intensity: 'moderate' as const, structured: undefined, durationMin: scaleCardioDurationMin(s, 1.5), purpose: 'Лютеиновая фаза: HIIT → zone2 (RPE воспринимается выше)' }, bw, sex, ffm);
       }
       if (s.type === 'miss') {
-        return recalcSessionKcal({ ...s, type: 'zone2' as CardioType, intensity: 'moderate' as const, purpose: 'Лютеиновая фаза: MISS → zone2 (щадяще)' }, bw, sex, ffm);
+        return recalcSessionKcal({ ...s, type: 'zone2' as CardioType, intensity: 'moderate' as const, structured: undefined, purpose: 'Лютеиновая фаза: MISS → zone2 (щадяще)' }, bw, sex, ffm);
       }
       return s;
     });
@@ -1436,7 +1449,7 @@ export function applyCardioCompetitionCascade(
           const dropMiss = priority === 'A' && delta === 1;
           const sessions = w.sessions
             .filter(s => s.type !== 'hiit' && (!dropMiss || s.type !== 'miss'))
-            .map(s => recalcSessionKcal({ ...s, durationMin: Math.max(10, Math.round(s.durationMin * main)), weeklyFrequency: Math.max(1, Math.round(s.weeklyFrequency * (priority === 'A' && delta === 1 ? 1 : 0.8))) }, bw, sex));
+            .map(s => recalcSessionKcal({ ...s, durationMin: scaleCardioDurationMin(s, main), weeklyFrequency: Math.max(1, Math.round(s.weeklyFrequency * (priority === 'A' && delta === 1 ? 1 : 0.8))) }, bw, sex));
           return rebuildWeek({ ...w, phase: 'taper', taper: true }, sessions, [`ПЛ taper (${priority}) N-${delta}: объём снижен, HIIT${dropMiss ? '/MISS' : ''} убраны.`]);
         }
         return w;
@@ -1998,7 +2011,7 @@ export function bumpCardioZone2VolumeGuarded(cycle: CardioCycle, addMin = 10, da
     let newTotal = sessions.reduce((s, x) => s + x.durationMin * x.weeklyFrequency, 0);
     if (newTotal > capTotal) {
       const scale = capTotal / newTotal;
-      sessions = sessions.map(s => s.type === 'zone2' ? recalcSessionKcal({ ...s, durationMin: Math.max(10, Math.round(s.durationMin * scale)) }, bw, sex, ffm) : s);
+      sessions = sessions.map(s => s.type === 'zone2' ? recalcSessionKcal({ ...s, durationMin: scaleCardioDurationMin(s, scale) }, bw, sex, ffm) : s);
       newTotal = sessions.reduce((s, x) => s + x.durationMin * x.weeklyFrequency, 0);
       anyCapped = true;
     }
@@ -2237,10 +2250,10 @@ export function adaptCardioToStrength(cycle: CardioCycle, ctx: StrengthContext):
     if (zone === 'dangerous') {
       sessions = sessions
         .filter(s => s.type === 'recovery' || s.type === 'zone2')
-        .map(s => recalcSessionKcal({ ...s, durationMin: Math.max(10, Math.round(s.durationMin * 0.6)), weeklyFrequency: Math.max(1, Math.round(s.weeklyFrequency * 0.6)) }, bw, sex, ffm));
+        .map(s => recalcSessionKcal({ ...s, durationMin: scaleCardioDurationMin(s, 0.6), weeklyFrequency: Math.max(1, Math.round(s.weeklyFrequency * 0.6)) }, bw, sex, ffm));
       extra.push('ACWR опасный: только лёгкое кардио, объём −30-50%.');
     } else if (zone === 'caution') {
-      sessions = sessions.filter(s => s.type !== 'hiit').map(s => recalcSessionKcal({ ...s, durationMin: Math.max(10, Math.round(s.durationMin * 0.85)) }, bw, sex, ffm));
+      sessions = sessions.filter(s => s.type !== 'hiit').map(s => recalcSessionKcal({ ...s, durationMin: scaleCardioDurationMin(s, 0.85) }, bw, sex, ffm));
       extra.push('ACWR осторожный: HIIT убран, минуты −15%.');
     }
     if (recoveryLow) {
@@ -2254,7 +2267,7 @@ export function adaptCardioToStrength(cycle: CardioCycle, ctx: StrengthContext):
       // обязаны пересчитать, как это делают ACWR-ветки выше. Раньше здесь
       // менялся только тип, и план держал калории MISS на «zone2».
       sessions = sessions.map(s => s.type === 'miss'
-        ? recalcSessionKcal({ ...s, type: 'zone2' as CardioType, intensity: 'moderate' as const, purpose: s.purpose }, bw, sex, ffm)
+        ? recalcSessionKcal({ ...s, type: 'zone2' as CardioType, intensity: 'moderate' as const, structured: undefined, purpose: s.purpose }, bw, sex, ffm)
         : s);
       if (sessions.some(s => s.type === 'hiit')) {
         sessions = sessions.filter(s => s.type !== 'hiit');
@@ -2294,7 +2307,7 @@ export function applyPLCardioTaper(cycle: CardioCycle, opts: { competitionWeek: 
       const mult = delta === 1 ? 0.5 : 0.7;
       sessions = sessions
         .filter(s => s.type === 'recovery' || s.type === 'zone2')
-        .map(s => recalcSessionKcal({ ...s, durationMin: Math.max(10, Math.round(s.durationMin * mult)), weeklyFrequency: Math.max(1, Math.round(s.weeklyFrequency * (delta === 1 ? 1 : 0.8))) }, bw, sex, ffm));
+        .map(s => recalcSessionKcal({ ...s, durationMin: scaleCardioDurationMin(s, mult), weeklyFrequency: Math.max(1, Math.round(s.weeklyFrequency * (delta === 1 ? 1 : 0.8))) }, bw, sex, ffm));
       const note = delta === 1 ? 'PL taper N-1: только лёгкое кардио.' : `PL taper N-${delta}: объём −30%, HIIT убран.`;
       return rebuildWeek({ ...w, phase: 'taper', taper: true }, sessions, [note]);
     }
@@ -2327,7 +2340,7 @@ export function applyBBCardioTaper(cycle: CardioCycle, opts: { showWeek: number;
       // перед шоу никакой утомляющей аэробной работы); дальше — без HIIT.
       let sessions = w.sessions.filter(s => s.type !== 'hiit' && (delta === 1 ? s.type !== 'miss' : true));
       const mult = bbCardioTaperMult(delta); // 1→0.6, 2→0.7, 3→0.85, 4→0.9
-      sessions = sessions.map(s => recalcSessionKcal({ ...s, durationMin: Math.max(10, Math.round(s.durationMin * mult)) }, bw, sex, ffm));
+      sessions = sessions.map(s => recalcSessionKcal({ ...s, durationMin: scaleCardioDurationMin(s, mult) }, bw, sex, ffm));
       const note = delta === 1 ? 'BB taper N-1: объём снижен, только лёгкое кардио.' : `BB taper N-${delta}: объём −${Math.round((1 - mult) * 100)}%, HIIT убран.`;
       return rebuildWeek({ ...w, phase: 'taper', taper: true }, sessions, [note]);
     }
@@ -2374,7 +2387,7 @@ export function applyIndividualizedTaperToCycle(
     const mult = Math.round((1 - r * (full > 0 ? prog / full : 1)) * 1000) / 1000;
     const before = w.totalMinutes;
     let sessions = w.sessions.filter(s => s.type !== 'hiit' && (delta === 1 ? s.type !== 'miss' : true));
-    sessions = sessions.map(s => recalcSessionKcal({ ...s, durationMin: Math.max(10, Math.round(s.durationMin * mult)) }, bw, sex, ffm));
+    sessions = sessions.map(s => recalcSessionKcal({ ...s, durationMin: scaleCardioDurationMin(s, mult) }, bw, sex, ffm));
     const after = sessions.reduce((s, x) => s + x.durationMin * x.weeklyFrequency, 0);
     changes.push({
       week: w.week,
@@ -3206,7 +3219,7 @@ export function autoTuneCardioCycle(
       cw('ACWR опасный → HIIT убран', `HIIT ×${w.sessions.filter(s => s.type === 'hiit').reduce((s, x) => s + x.weeklyFrequency, 0)}`, '0');
     } else if (acwr != null && acwr.ratio >= 1.3) {
       const before = sessions.reduce((s, x) => s + x.durationMin * x.weeklyFrequency, 0);
-      sessions = sessions.map(s => recalcSessionKcal({ ...s, durationMin: Math.max(10, Math.round(s.durationMin * 0.85)) }, bw, sex, ffm));
+      sessions = sessions.map(s => recalcSessionKcal({ ...s, durationMin: scaleCardioDurationMin(s, 0.85) }, bw, sex, ffm));
       const after = sessions.reduce((s, x) => s + x.durationMin * x.weeklyFrequency, 0);
       cw('ACWR осторожный → минуты −15%', `${before} мин`, `${after} мин`);
     } else if (opts.wellnessReadiness != null && opts.wellnessReadiness < 4) {
@@ -3218,12 +3231,12 @@ export function autoTuneCardioCycle(
       const hadHiit = sessions.some(s => s.type === 'hiit');
       sessions = sessions
         .filter(s => s.type !== 'hiit')
-        .map(s => recalcSessionKcal({ ...s, durationMin: Math.max(10, Math.round(s.durationMin * 0.9)) }, bw, sex, ffm));
+        .map(s => recalcSessionKcal({ ...s, durationMin: scaleCardioDurationMin(s, 0.9) }, bw, sex, ffm));
       const after = sessions.reduce((s, x) => s + x.durationMin * x.weeklyFrequency, 0);
       cw(`Готовность ${opts.wellnessReadiness}/10 → минуты −10%${hadHiit ? ', HIIT убран' : ''}`, `${before} мин`, `${after} мин`);
     } else if (done.length > 0 && avgRpe >= 8) {
       const before = sessions.reduce((s, x) => s + x.durationMin * x.weeklyFrequency, 0);
-      sessions = sessions.map(s => recalcSessionKcal({ ...s, durationMin: Math.max(10, Math.round(s.durationMin * 0.9)) }, bw, sex, ffm));
+      sessions = sessions.map(s => recalcSessionKcal({ ...s, durationMin: scaleCardioDurationMin(s, 0.9) }, bw, sex, ffm));
       const after = sessions.reduce((s, x) => s + x.durationMin * x.weeklyFrequency, 0);
       cw(`RPE ${avgRpe.toFixed(1)} → минуты −10%`, `${before} мин`, `${after} мин`);
     } else if (pct > 0 && pct < 0.6) {
@@ -3236,7 +3249,7 @@ export function autoTuneCardioCycle(
       }
     } else if (pct >= 1.1 && avgRpe > 0 && avgRpe < 6 && (cycle.goal === 'cut' || cycle.goal === 'recomp' || cycle.goal === 'bb_prep')) {
       const before = sessions.reduce((s, x) => s + x.durationMin * x.weeklyFrequency, 0);
-      sessions = sessions.map(s => recalcSessionKcal({ ...s, durationMin: Math.max(10, Math.round(s.durationMin * 1.1)) }, bw, sex, ffm));
+      sessions = sessions.map(s => recalcSessionKcal({ ...s, durationMin: scaleCardioDurationMin(s, 1.1) }, bw, sex, ffm));
       const after = sessions.reduce((s, x) => s + x.durationMin * x.weeklyFrequency, 0);
       cw('Выполнено >110%, RPE низкий → минуты +10%', `${before} мин`, `${after} мин`);
     }
@@ -3262,7 +3275,7 @@ export function autoTuneCardioCycle(
       for (const w of weeks) {
         if (w.week <= currentWeek || w.deload || w.taper || w.phase === 'peak' || w.phase === 'transition') continue;
         const before = w.totalMinutes;
-        const sessions = w.sessions.map(s => recalcSessionKcal({ ...s, durationMin: Math.max(10, Math.round(s.durationMin * weeklyAdjust!.mult)) }, bw, sex, ffm));
+        const sessions = w.sessions.map(s => recalcSessionKcal({ ...s, durationMin: scaleCardioDurationMin(s, weeklyAdjust!.mult) }, bw, sex, ffm));
         const after = sessions.reduce((s, x) => s + x.durationMin * x.weeklyFrequency, 0);
         if (after !== before) {
           const idx = weeks.indexOf(w);
@@ -3284,7 +3297,7 @@ export function autoTuneCardioCycle(
         const bw2 = cycleBodyWeight(cycle);
         const ffm2 = cycleFfmKg(cycle);
         const sex2 = cycle.config?.sex;
-        const sessions = w.sessions.map(s => recalcSessionKcal({ ...s, durationMin: Math.max(10, Math.round(s.durationMin * scale)) }, bw2, sex2, ffm2));
+        const sessions = w.sessions.map(s => recalcSessionKcal({ ...s, durationMin: scaleCardioDurationMin(s, scale) }, bw2, sex2, ffm2));
         weeks[i] = rebuildWeek(w, sessions, [`Guard: capped to ${maxPerWeek} мин (дней ${daysAvail} ×90).`]);
         changes.push({ week: w.week, label: 'Guard: перегруз дня → scaled', from: `${w.totalMinutes} мин`, to: `${weeks[i].totalMinutes} мин` });
       }
@@ -3614,7 +3627,7 @@ export function improveCardioCycle(cycle: CardioCycle, opts: { daysAvailable?: n
       const idx = sessions.findIndex(x => x.type === 'miss');
       if (idx >= 0) {
         const m = sessions[idx];
-        const conv = recalcSessionKcal({ ...m, type: 'zone2' as CardioType, intensity: 'moderate' as const, purpose: 'MISS → Zone 2 авто-улучшением (TID threshold → pyramidal, Seiler)' }, bw, sex, ffm);
+        const conv = recalcSessionKcal({ ...m, type: 'zone2' as CardioType, intensity: 'moderate' as const, structured: undefined, purpose: 'MISS → Zone 2 авто-улучшением (TID threshold → pyramidal, Seiler)' }, bw, sex, ffm);
         sessions = [...sessions.slice(0, idx), conv, ...sessions.slice(idx + 1)];
         changes.push({ week: w.week, label: 'MISS → Zone 2 (TID)', from: `MISS ${m.durationMin}×${m.weeklyFrequency}`, to: `ZONE2 ${conv.durationMin}×${conv.weeklyFrequency}` });
       }
@@ -3923,6 +3936,23 @@ export function cardioStructuredMainSec(structured?: CardioStructuredBlock[]): n
   return (structured ?? [])
     .filter(b => !!b && b.workSec > 0 && b.reps > 0)
     .reduce((sum, b) => sum + (b.workSec + Math.max(0, b.restSec)) * b.reps, 0);
+}
+
+/**
+ * Минуты сессии при масштабировании объёма (taper, deload, адаптации, уровень).
+ * Структура интервалов не режется никогда: если работа+отдых×повторы не влезает
+ * в урезанную длительность, сессия остаётся минимум на `ceil(main/60)` мин.
+ * Без этого taper ×0.5 превращал Sweet Spot 3×12 в «24 мин» по плану, а таймер
+ * вёл 48 — ровно тот разрыв текста и реальности, который запрещён инвариантом.
+ */
+export function scaleCardioDurationMin(
+  session: Pick<CardioSession, 'durationMin' | 'structured'>,
+  mult: number,
+  floorMin = 10,
+): number {
+  const structureMin = Math.ceil(cardioStructuredMainSec(session.structured) / 60);
+  const m = Number.isFinite(mult) && mult > 0 ? mult : 1;
+  return Math.max(floorMin, structureMin, Math.round(session.durationMin * m));
 }
 
 /** Где мы сейчас: текущий шаг и сколько в нём осталось (по прошедшим секундам). */
