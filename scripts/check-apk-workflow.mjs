@@ -135,6 +135,34 @@ if (!text.includes('timeout-minutes:')) fails.push('нет timeout-minutes у jo
   }
 }
 
+// Публикация обязана работать и для ручной сборки (workflow_dispatch):
+// раньше publish был привязан к refs/tags/v*, а у ручного запуска ref =
+// refs/heads/main → job молча пропускался и релиз не появлялся.
+{
+  if (!/needs:\s*\[prepare,\s*build,\s*release\]/.test(text)) {
+    fails.push('publish не зависит от prepare (нет единой версии для ручной сборки)');
+  }
+  if (!/needs\.prepare\.outputs\.publish\s*==\s*'true'/.test(text)) {
+    fails.push('publish не учитывает workflow_dispatch (ручная сборка снова не публикуется)');
+  }
+  if (/if:.*startsWith\(github\.ref,\s*'refs\/tags\/v'\)/.test(text)) {
+    fails.push('publish снова привязан только к тегам — ручная сборка пропустит публикацию');
+  }
+  if (!text.includes('TAG: ${{ needs.prepare.outputs.tag }}')) {
+    fails.push('publish берёт TAG не из prepare (на ручном запуске github.ref_name = main)');
+  }
+  if (!/--target\s+"?\$GITHUB_SHA"?/.test(text)) {
+    fails.push('gh release create без --target: ручной релиз создаст тег не на собранном коммите');
+  }
+  if (!/scripts\/apk-version\.mjs resolve/.test(text)) {
+    fails.push('prepare не считает версию через scripts/apk-version.mjs');
+  }
+  const applies = (text.match(/scripts\/apk-version\.mjs apply/g) || []).length;
+  if (applies !== 2) {
+    fails.push(`apk-version.mjs apply: ${applies}, ждали 2 (build + release) — versionName должен совпасть с тегом`);
+  }
+}
+
 if (fails.length > 0) {
   console.error('[check-apk-workflow] FAIL:');
   for (const f of fails) console.error(`  - ${f}`);

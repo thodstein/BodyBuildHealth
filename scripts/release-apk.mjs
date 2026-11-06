@@ -62,6 +62,41 @@ function nextVersion(current) {
   return `${m[1]}.${m[2]}.${Number(m[3]) + 1}`;
 }
 
+/** Числовое сравнение версий (3.0.10 > 3.0.9). */
+function compareVersions(a, b) {
+  const pa = a.split('.');
+  const pb = b.split('.');
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    const x = Number(pa[i]) || 0;
+    const y = Number(pb[i]) || 0;
+    if (x !== y) return x > y ? 1 : -1;
+  }
+  return 0;
+}
+
+/**
+ * Теги релизов на origin. Нужны, потому что ручная сборка в CI публикует
+ * тег vX.Y.Z, не меняя package.json в репозитории. Без этого следующий
+ * release:apk посчитал бы уже занятую версию и упал на существующем теге.
+ */
+function remoteReleaseTags() {
+  try {
+    const out = execFileSync('git', ['ls-remote', '--tags', 'origin', 'refs/tags/v*'], {
+      cwd: root,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    return out
+      .split('\n')
+      .map((line) => line.split('refs/tags/')[1] || '')
+      .map((t) => t.replace(/\^\{\}$/, ''))
+      .filter((t) => /^v\d+\.\d+\.\d+$/.test(t))
+      .map((t) => t.slice(1));
+  } catch {
+    return [];
+  }
+}
+
 // ── 0. Проверки окружения ────────────────────────────────────────────────────
 const branch = git(['rev-parse', '--abbrev-ref', 'HEAD']);
 if (branch !== 'main') die(`релиз только с main (сейчас "${branch}")`);
@@ -84,10 +119,20 @@ const codeMatch = /^([ \t]*)versionCode[ \t]+(\d+)[ \t]*$/m.exec(gradleRaw);
 const nameMatch = /^([ \t]*)versionName[ \t]+"([^"]+)"[ \t]*$/m.exec(gradleRaw);
 if (!codeMatch || !nameMatch) die('в android/app/build.gradle нет versionCode/versionName');
 
-const version = versionArg || nextVersion(pkgVersion);
+const remoteTags = remoteReleaseTags();
+const latestRemote = remoteTags.slice().sort(compareVersions).pop() || '';
+const baseVersion =
+  latestRemote && compareVersions(latestRemote, pkgVersion) > 0 ? latestRemote : pkgVersion;
+if (baseVersion !== pkgVersion) {
+  log(`последний релиз на origin: v${latestRemote} (в package.json ${pkgVersion}) — считаю от него`);
+}
+
+const version = versionArg || nextVersion(baseVersion);
 if (!/^\d+\.\d+\.\d+$/.test(version)) die(`--version должен быть x.y.z, получено "${version}"`);
-if (version === pkgVersion && !versionArg) die('версия не изменилась');
-if (git(['tag', '-l', `v${version}`])) die(`тег v${version} уже существует`);
+if (version === baseVersion && !versionArg) die('версия не изменилась');
+if (remoteTags.includes(version) || git(['tag', '-l', `v${version}`])) {
+  die(`тег v${version} уже существует`);
+}
 
 const nextCode = Number(codeMatch[2]) + 1;
 const tag = `v${version}`;

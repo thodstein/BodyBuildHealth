@@ -7,12 +7,54 @@ name: android-apk
 
 on:
   workflow_dispatch:
+    inputs:
+      version:
+        description: 'Версия x.y.z (пусто = патч +1 от последнего релиза: 3.0.5 → 3.0.6)'
+        required: false
+        default: ''
+      publish:
+        description: 'Опубликовать GitHub Release (APK + OTA), чтобы приложение подтянуло сборку'
+        type: boolean
+        default: true
   push:
     tags:
       - 'v*'
 
+# Ручные запуски на одной ветке сериализуем: prepare считает «+1 патч» от
+# последнего релиза, два параллельных запуска иначе возьмут один номер.
+concurrency:
+  group: android-apk-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
+  # Единая версия для всех job'ов. Ручная сборка раньше не публиковалась вообще:
+  # publish был привязан к refs/tags/v*, а у workflow_dispatch ref = refs/heads/main.
+  # Здесь же ручной запуск получает следующую версию (+1 патч от последнего
+  # релиза) — без этого APK собрался бы со старой versionName и телефон
+  # не увидел бы обновление, даже если релиз появился.
+  prepare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.version.outputs.tag }}
+      code: ${{ steps.version.outputs.code }}
+      publish: ${{ steps.version.outputs.publish }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Resolve APK version
+        id: version
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          INPUT_VERSION: ${{ inputs.version }}
+          INPUT_PUBLISH: ${{ inputs.publish }}
+        run: node scripts/apk-version.mjs resolve --event "$GITHUB_EVENT_NAME" --ref "$GITHUB_REF" >> "$GITHUB_OUTPUT"
+
   build:
+    needs: prepare
     runs-on: ubuntu-latest
     timeout-minutes: 30
     # Тот же стабильный ключ, что и в release-джобе: иначе assembleDebug
@@ -51,6 +93,11 @@ jobs:
               exit 1
             fi
           done
+
+      - name: Set APK version
+        # versionName внутри APK должен совпадать с тегом релиза, иначе
+        # App.getInfo() не увидит обновление (см. scripts/apk-version.mjs).
+        run: node scripts/apk-version.mjs apply --version "${{ needs.prepare.outputs.version }}" --code "${{ needs.prepare.outputs.code }}"
 
       - name: Web build + Capacitor sync
         # Supabase-ключи запекаются в dist на этапе vite build. Локальный .env
@@ -130,6 +177,7 @@ jobs:
   # ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS, ANDROID_KEY_PASSWORD.
   # Без секретов job корректно пропускается (debug-артефакт выше не страдает).
   release:
+    needs: prepare
     runs-on: ubuntu-latest
     timeout-minutes: 45
     # secrets нельзя использовать прямо в `if` (Invalid workflow file) —
@@ -168,6 +216,10 @@ jobs:
               exit 1
             fi
           done
+
+      - name: Set APK version
+        # Та же версия, что в build-джобе — AAB/APK и тег не расходятся.
+        run: node scripts/apk-version.mjs apply --version "${{ needs.prepare.outputs.version }}" --code "${{ needs.prepare.outputs.code }}"
 
       - name: Web build + Capacitor sync
         # см. комментарий в build-джобе: ключи только из Secrets.
@@ -222,13 +274,17 @@ jobs:
           path: android/app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
 
-  # Лента обновлений без сторов: по тегу v* публикует GitHub Release с APK.
+  # Лента обновлений без сторов: тег v* ИЛИ ручной запуск публикуют GitHub Release.
   # Приложение проверяет его через api.github.com (движок src/core/app-updater.ts,
   # оверрайд — VITE_APP_UPDATE_URL). Подписанный APK — приоритетом (единая подпись
   # всех CI-сборок — см. signingConfig debug в build.gradle).
   publish:
-    needs: [build, release]
-    if: ${{ always() && startsWith(github.ref, 'refs/tags/v') }}
+    needs: [prepare, build, release]
+    # Ручная сборка обязана публиковаться: раньше здесь стоял только
+    # startsWith(github.ref, 'refs/tags/v'), а workflow_dispatch идёт с
+    # refs/heads/main → job молча пропускался. Теперь публикуем, если prepare
+    # посчитал publish=true (для тега — всегда, для ручного запуска — input).
+    if: ${{ always() && needs.prepare.outputs.publish == 'true' && needs.build.result == 'success' }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -258,7 +314,8 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_REPO: ${{ github.repository }}
-          TAG: ${{ github.ref_name }}
+          TAG: ${{ needs.prepare.outputs.tag }}
+          VERSION: ${{ needs.prepare.outputs.version }}
         run: |
           FILES=""
           if [ -f ./artifacts/app-debug.apk ]; then
@@ -279,9 +336,12 @@ jobs:
             # shellcheck disable=SC2086
             gh release upload "$TAG" $FILES --clobber --repo "$GH_REPO"
           else
+            # --target: при ручном запуске тега ещё нет — создаём его на коммите,
+            # который реально собран в этом запуске (а не на «default branch»).
             # shellcheck disable=SC2086
             gh release create "$TAG" $FILES \
               --repo "$GH_REPO" \
+              --target "$GITHUB_SHA" \
               --title "Health Engine $TAG" \
-              --notes "APK + web-bundle для самообновления без сторов. Приложение само предложит: быстрое обновление (файлы внутрь, без переустановки) или полный APK поверх (данные сохраняются). Требуется та же подпись сборки — все CI-сборки подписываются единым ключом."
+              --notes "APK $VERSION + web-bundle для самообновления без сторов. Приложение само предложит: быстрое обновление (файлы внутрь, без переустановки) или полный APK поверх (данные сохраняются). Требуется та же подпись сборки — все CI-сборки подписываются единым ключом."
           fi
