@@ -3842,8 +3842,14 @@ export function reconcileVolumeTargets(plan: BBPlan, opts: { maxWorkingSets?: nu
     const v = aggregateBBVolume(week.sessions) as any;
     for (const [m, x] of Object.entries(v)) achieved[m] = Math.max(achieved[m] || 0, (x as any).effectiveSets || 0);
   }
+  if (!Array.isArray(plan.rationale)) (plan as any).rationale = [];
   for (const [m, target] of Object.entries(vt as Record<string, any>)) {
     const t = Number(target?.targetSets) || 0;
+    // Снимаем прошлую строку этого же счётчика: пассажи реконсиляции могут
+    // вызываться повторно, и оставленная старая строка врала бы о текущей цели.
+    const label = MUSCLE_LABEL_RU[m] || m;
+    const prefix = `📉 Цель «${label}» переопределена`;
+    plan.rationale = plan.rationale.filter(l => !String(l).startsWith(prefix));
     if (t <= 0) continue;
     const got = achieved[m] || 0;
     if (got < t * 0.9) {
@@ -3853,7 +3859,7 @@ export function reconcileVolumeTargets(plan: BBPlan, opts: { maxWorkingSets?: nu
       let next = Math.round(got);
       if (next > got) next = Math.floor(got);
       target.targetSets = next;
-      plan.rationale.push(`📉 Цель «${MUSCLE_LABEL_RU[m] || m}» переопределена до достижимой: ${prev} → ${ruCount(target.targetSets, RU_SETS)}/нед (сессионный бюджет ${opts.maxWorkingSets ?? '—'}, число движений источника, perExerciseCap/кап).`);
+      plan.rationale.push(`📉 Цель «${label}» переопределена до достижимой: ${prev} → ${ruCount(target.targetSets, RU_SETS)}/нед (сессионный бюджет ${opts.maxWorkingSets ?? '—'}, число движений источника, perExerciseCap/кап).`);
     }
   }
 }

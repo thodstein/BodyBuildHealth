@@ -10,6 +10,7 @@ import { analyzeBBRotation } from '../bb-rotation.engine';
 import { reconcileSchemeComments } from '../bb-scheme-comment-reconcile';
 import { backQualityIssues, armQualityIssues } from '../bb-back-quality.engine';
 import { analyzePlanStress } from '../bb-injury-prevention.engine';
+import { MUSCLE_LABEL_RU } from '../../volume-landmarks.engine';
 
 /**
  * Аудит Y: цикл- и программа-пути меняют план ПОСЛЕ `finalizeBBPlan`
@@ -130,6 +131,23 @@ function expectSnapshotsMatchFacts(plan: any, label: string) {
   const stale = ((plan.rationale || []) as string[])
     .filter(line => String(line).startsWith('⚠ Валидация:') && !warningSet.has(line));
   expect(stale, `${label}: rationale описывает снятые предупреждения`).toEqual([]);
+
+  // «📉 Цель … переопределена» — обещание о текущей цели: число обязано
+  // совпадать с volumeTargets, на мышцу — одна строка.
+  const vt = (plan as any).volumeTargets || {};
+  const seenTargets = new Map<string, number>();
+  for (const line of rationale.filter(l => l.includes('переопределена до достижимой'))) {
+    const m = line.match(/«(.+?)» переопределена до достижимой: \d+ → (\d+)/);
+    expect(m, `${label}: разбор строки цели — ${line}`).toBeTruthy();
+    const targetLabel = m![1];
+    const key = Object.keys(vt).find(k => (MUSCLE_LABEL_RU as any)[k] === targetLabel || k === targetLabel);
+    expect(key, `${label}: мышца «${targetLabel}» есть в volumeTargets`).toBeTruthy();
+    expect(Number(m![2]), `${label}: цель «${targetLabel}» по volumeTargets`).toBe(Number(vt[key!]?.targetSets) || 0);
+    seenTargets.set(targetLabel, (seenTargets.get(targetLabel) || 0) + 1);
+  }
+  for (const [targetLabel, n] of seenTargets) {
+    expect(n, `${label}: дубль строки цели «${targetLabel}»`).toBe(1);
+  }
 }
 
 const program = (): FullProgram => {

@@ -26,6 +26,7 @@ import { buildBBExpandedSummary } from '../bb-summary.engine';
 import { analyzeBBRotation } from '../bb-rotation.engine';
 import { backQualityIssues, armQualityIssues } from '../bb-back-quality.engine';
 import { analyzePlanStress } from '../bb-injury-prevention.engine';
+import { MUSCLE_LABEL_RU } from '../../volume-landmarks.engine';
 
 const WM = { chest: 100, back: 120, shoulders: 60, biceps: 50, triceps: 60, quads: 140, hamstrings: 100, glutes: 140, calves: 80, abs: 60, traps: 80, forearms: 40 };
 
@@ -238,6 +239,25 @@ describe('bb: снимки после правок (revalidate-путь)', () =>
         countErrors(plan.validation?.issues || []),
         `${where}: ошибки валидации`,
       ).toBe(countErrors(freshValidation.issues));
+
+      // «📉 Цель … переопределена» — обещание о ТЕКУЩЕЙ цели: число в строке
+      // обязано совпадать с volumeTargets, и на мышцу должна быть одна строка
+      // (замер до правки: в 9 из 10 generic-планов 36 висячих/дублирующих строк,
+      // например «→ 17 сетов» при фактических 15).
+      const vt = (plan as any).volumeTargets || {};
+      const seenTargets = new Map<string, number>();
+      for (const line of rationale.filter((l: string) => l.includes('переопределена до достижимой'))) {
+        const m = line.match(/«(.+?)» переопределена до достижимой: \d+ → (\d+)/);
+        expect(m, `${where}: разбор строки цели — ${line}`).toBeTruthy();
+        const label = m![1];
+        const key = Object.keys(vt).find((k) => (MUSCLE_LABEL_RU as any)[k] === label || k === label);
+        expect(key, `${where}: мышца «${label}» есть в volumeTargets`).toBeTruthy();
+        expect(Number(m![2]), `${where}: цель «${label}» по volumeTargets`).toBe(Number(vt[key!]?.targetSets) || 0);
+        seenTargets.set(label, (seenTargets.get(label) || 0) + 1);
+      }
+      for (const [label, n] of seenTargets) {
+        expect(n, `${where}: дубль строки цели «${label}»`).toBe(1);
+      }
     }
   }, 900000);
 
