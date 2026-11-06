@@ -5,6 +5,7 @@
  * готовые ПРОФ-циклы с конкретными упражнениями вместо generic-генерации.
  */
 import type { SRCycleTemplate, SRDaySpec, SRExerciseSpec, SRSetSpec, SRDirection, SRLevel, SRPeriod } from '../../data/lms-cycles/lms-types';
+import { ruCount, RU_SETS } from '../ru-plural';
 import type { BBPlan, BBWeek, BBSession, BBExercise, BBSet } from './bb-builder.engine';
 import type { BBPhase } from './bb-types';
 import { femalePosteriorBoost, mastersAdjust } from './bb-demographics';
@@ -1718,7 +1719,7 @@ export function convertCycleToBBPlan(input: CycleToPlanInput): BBPlan {
     );
     for (const report of tradeoffReports) {
       if (report.removedSets > 0 || report.transferredSets > 0) {
-        rationale.push(`🔁 Донорское перераспределение (нед ${report.week}): доноры [${report.donors.join(', ')}] — снято ${report.removedSets} сетов, перенесено ${report.transferredSets}, не использовано ${report.unusedSets}${report.notes.length ? ` (${report.notes.join('; ')})` : ''}.`);
+        rationale.push(`🔁 Донорское перераспределение (нед ${report.week}): доноры [${report.donors.join(', ')}] — снято ${ruCount(report.removedSets, RU_SETS)}, перенесено ${report.transferredSets}, не использовано ${report.unusedSets}${report.notes.length ? ` (${report.notes.join('; ')})` : ''}.`);
       }
     }
   }
@@ -2976,7 +2977,7 @@ export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts)
     );
     for (const report of tradeoffReports) {
       if (report.removedSets > 0 || report.transferredSets > 0) {
-        rationale.push(`🔁 Донорское перераспределение (нед ${report.week}): доноры [${report.donors.join(', ')}] — снято ${report.removedSets} сетов, перенесено ${report.transferredSets}, не использовано ${report.unusedSets}${report.notes.length ? ` (${report.notes.join('; ')})` : ''}.`);
+        rationale.push(`🔁 Донорское перераспределение (нед ${report.week}): доноры [${report.donors.join(', ')}] — снято ${ruCount(report.removedSets, RU_SETS)}, перенесено ${report.transferredSets}, не использовано ${report.unusedSets}${report.notes.length ? ` (${report.notes.join('; ')})` : ''}.`);
       }
     }
   }

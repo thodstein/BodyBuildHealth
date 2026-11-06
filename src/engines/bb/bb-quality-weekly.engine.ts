@@ -19,6 +19,7 @@
  * Чистый движок: без UI и storage.
  */
 import type { BBPlan } from './bb-builder.engine';
+import { ruAdjCount, RU_ADJ_DIRECT, RU_SETS } from '../ru-plural';
 import { BB_MRV_TOLERANCE } from './bb-validator.engine';
 import { QUALITY_GRADE_THRESHOLDS } from '../quality-score-v2.engine';
 import { getVolumeLandmarks, MUSCLE_LABEL_RU } from '../volume-landmarks.engine';
@@ -349,7 +350,7 @@ export function scoreVolumeWeek(plan: PlanLike, weekNo: number): BBVolumeWeekSco
         row.note = 'исключение нарушено';
         penalize('error', 12, {
           muscle: m, code: 'excluded_muscle_trained',
-          message: `${muscleRu(m)}: исключена травмой (параметр), но в неделе ${factDirect} прямых сетов`,
+          message: `${muscleRu(m)}: исключена травмой (параметр), но в неделе ${ruAdjCount(factDirect, RU_ADJ_DIRECT, RU_SETS)}`,
           source: 'параметр: исключение травмы', fact: factDirect, expected: 0,
         });
       } else {

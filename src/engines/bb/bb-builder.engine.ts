@@ -24,7 +24,7 @@ import { mergeWearableIntoRecovery, wearableRecoveryFactor, type WearableDaily }
 import { bodyCompVolumeFactor } from './bb-bodycomp.engine';
 import { tempoFor } from './bb-tempo-rest';
 import { aggregateBBVolume, computeMuscleBalance } from './bb-volume.engine';
-import { ruCount, RU_SETS } from '../ru-plural';
+import { ruCount, RU_SETS, RU_SESSIONS, RU_MUSCLES, RU_APPROACHES } from '../ru-plural';
 import { EXERCISE_CATALOG } from '../../core/exercise-catalog';
 import { selectExercisesSmart, isAxialLoadExercise } from '../exercise-selector.engine';
 import { trueMuscleOf, musclesForRole, derivePattern } from '../movement-pattern';
@@ -4266,7 +4266,7 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
   }
 
   const rationale: string[] = [
-    `Сплит «${pattern.name}» (${pattern.rotationDays}дн ротация, ${pattern.sessionsPerRotation} сессий)`,
+    `Сплит «${pattern.name}» (${pattern.rotationDays}дн ротация, ${ruCount(pattern.sessionsPerRotation, RU_SESSIONS)})`,
     `Уровень ${level}, цель ${input.goal}, ${input.weeks} нед`,
     `Объём ${input.volumeGoal || 'MAV'}: ` + Object.entries(muscleVolumeRotation).map(([m, v]) => `${m}=${v}`).join(', '),
     ...(specSchedule.active ? [`Специализация (блоки): ${specializationScheduleText(specSchedule)}`] : [`Специализация: нет`]),
@@ -4437,7 +4437,7 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
     const avgDelta = musclesProgressed > 0
       ? Math.round(Object.values(mesoProgression.weightProgression).reduce((s, v) => s + v, 0) / musclesProgressed * 10) / 10
       : 0;
-    rationale.push(`🔗 Cross-mesocycle: веса +${avgDelta} кг (${musclesProgressed} мышц), объём +${Object.values(mesoProgression.volumeDelta).filter(v => v > 0).length} групп, ротация ${mesoProgression.previousExercises.length} упр.`);
+    rationale.push(`🔗 Cross-mesocycle: веса +${avgDelta} кг (${ruCount(musclesProgressed, RU_MUSCLES)}), объём +${Object.values(mesoProgression.volumeDelta).filter(v => v > 0).length} групп, ротация ${mesoProgression.previousExercises.length} упр.`);
     if (mesoProgression.needsDeload) {
       rationale.push(`⚠ Cross-mesocycle: предыдущий мезо был длинным/объёмным — рекомендуется deload-неделя в начале нового плана.`);
     }
@@ -4978,7 +4978,7 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
   // P1: гимназическая микрозагрузка — округлить веса к достижимым на наборе пластин.
   if (Array.isArray(input.availablePlates) && input.availablePlates.length > 0) {
     const pl = applyPlateRoundingToPlan(finalPlan, input.availablePlates, 20);
-    if (pl.changed > 0) rationale.push(`🎯 Реалистичные веса: округлены к набору пластин зала (изменено ${pl.changed} подходов).`);
+    if (pl.changed > 0) rationale.push(`🎯 Реалистичные веса: округлены к набору пластин зала (изменено ${ruCount(pl.changed, RU_APPROACHES)}).`);
   }
   const volumeLandmarks = getBBVolumeLandmarks(finalPlan, level, effectiveMrvMult);
   // muscleFrequency: muscleSessionCount содержит число сессий на мышцу за ротацию (= неделя для 7-дн паттернов)

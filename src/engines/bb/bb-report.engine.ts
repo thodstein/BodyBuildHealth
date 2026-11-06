@@ -2,7 +2,7 @@ import type { BBPlan } from './bb-builder.engine';
 import type { BBBalanceReport } from './bb-balance.engine';
 import { trueMuscleOf } from '../movement-pattern';
 import { EXERCISE_CATALOG } from '../../core/exercise-catalog';
-import { ruCount, ruForm, RU_EXERCISES, RU_SETS, RU_TRAININGS, RU_WEEKS } from '../ru-plural';
+import { ruCount, ruForm, RU_EXERCISES, RU_SETS, RU_TRAININGS, RU_WEEKS, RU_ERRORS, RU_WARNINGS } from '../ru-plural';
 import { MUSCLE_LABEL_RU } from '../volume-landmarks.engine';
 
 export interface BBPlanReport {
@@ -324,7 +324,7 @@ export function buildBBPlanReportText(plan: BBPlan): string {
   if (plan.validation) {
     const v = plan.validation;
     if (v.valid) lines.push('✅ Валидация: план валиден (0 ошибок).');
-    else lines.push(`❌ Валидация: ${(v.issues || []).filter(i => i.level === 'error').length} ошибок, ${(v.issues || []).filter(i => i.level === 'warning').length} предупреждений.`);
+    else lines.push(`❌ Валидация: ${ruCount((v.issues || []).filter(i => i.level === 'error').length, RU_ERRORS)}, ${ruCount((v.issues || []).filter(i => i.level === 'warning').length, RU_WARNINGS)}.`);
   }
   // Покрытие функций сложных мышц — что не закрыто по паттернам (практическая ценность).
   const coverage = checkBBFunctionCoverage(plan);

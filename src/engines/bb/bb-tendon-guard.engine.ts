@@ -17,6 +17,7 @@ export interface BbTendonJoint {
 }
 
 import { EXERCISE_CATALOG } from '../../core/exercise-catalog';
+import { ruAdjCount, RU_ADJ_PRESS, RU_SETS } from '../ru-plural';
 
 export interface BbTendonGuard {
   elbow: BbTendonJoint;
@@ -131,7 +132,7 @@ export function assessBbTendonGuard(
         ? `Локоть: осторожно — ${elbowSets} тяж. сетов/нед (>${caps.warn}), без разнохвата и читинга`
         : `Локоть: порядок — ${elbowSets} тяж. сетов/нед`;
   const shoulderText = shoulderForced
-    ? `Плечо: стоп — боль-мониторинг красный (PMM: разгрузка до боли ≤3), ${shoulderSets} жимовых сетов/нед`
+    ? `Плечо: стоп — боль-мониторинг красный (PMM: разгрузка до боли ≤3), ${ruAdjCount(shoulderSets, RU_ADJ_PRESS, RU_SETS)}/нед`
     : shoulderLevel === 'stop'
       ? `Плечо: стоп — ${shoulderSets} жимовых сетов/нед${opts.shoulderOhsFail ? ' + провал плеча в присед-тесте' : ''}, жимы над головой убрать`
       : shoulderLevel === 'warn'

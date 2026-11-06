@@ -1,5 +1,6 @@
 import type { BBPlan, BBSession } from './bb-builder.engine';
 import { trueMuscleOf } from '../movement-pattern';
+import { ruCount, RU_APPROACHES } from '../ru-plural';
 import { estimateBBSessionCost } from './bb-fatigue.engine';
 import { aggregateBBVolume, aggregateFractionalVolume, PUOS_SESSION_FRACTIONAL, BB_MRV_TOLERANCE, sessionLimitsFor as centralizedSessionLimits } from './bb-volume.engine';
 import { getVolumeLandmarks } from '../volume-landmarks.engine';
@@ -493,7 +494,7 @@ export function generateActionableRecommendations(
         const deficit = Math.max(1, Math.ceil((mev > 0 ? mev : current + 1) - current));
         recs.push({
           priority: 'high',
-          action: `Добавьте ${deficit} подход(ов) на «${ru}»: текущие эффективные ${current} < минимума MEV ${mev}. Включите фидер-сет (2-3 сета изоляции) или добавьте упражнение в ближайшую тренировку этой мышцы.`,
+          action: `Добавьте ${ruCount(deficit, RU_APPROACHES)} на «${ru}»: текущие эффективные ${current} < минимума MEV ${mev}. Включите фидер-сет (2-3 сета изоляции) или добавьте упражнение в ближайшую тренировку этой мышцы.`,
           code: issue.code,
         });
         break;

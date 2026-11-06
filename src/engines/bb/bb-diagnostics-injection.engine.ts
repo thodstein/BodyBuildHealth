@@ -4,6 +4,7 @@
  * Parity: per-day dedup, weekly Budget cap (sessionLimitsFor), протокол по каталогу.
  */
 import type { BBPlan, BBSession, BBExercise } from './bb-builder.engine';
+import { ruCount, RU_SETS } from '../ru-plural';
 import { EXERCISE_CATALOG } from '../../core/exercise-catalog';
 import { canonicalMuscle } from './bb-specialization.engine';
 import { sessionLimitsFor, computeBBWeeklyBudget, computeBBRecoveryScore } from './bb-volume.engine';
@@ -352,7 +353,7 @@ export function injectBBWeakPoints(plan: BBPlan, weakZones: string[], opts: BBIn
       doseLines.push(`${wp}: ${catName} ${addSets}×${reps}${repsMax > reps ? `–${repsMax}` : ''} ${loadText} RIR${rir} · отдых ${rest}с`);
       if (!opts.allWeeks) notes.push(`✓ ${wp} → ${catName} в день ${targetSession.day} ${addSets}×${reps} ${loadText} RIR${rir} · отдых ${rest}с`);
     }
-    if (opts.allWeeks) notes.push(`✓ ${wp} → ${catName} в ${weekIdxs.length} нед по ${wantSets} сетов (${tempo})`);
+    if (opts.allWeeks) notes.push(`✓ ${wp} → ${catName} в ${weekIdxs.length} нед по ${ruCount(wantSets, RU_SETS)} (${tempo})`);
   }
 
   if (injected > 0) {

@@ -10,6 +10,7 @@
  *  - 27: compareBBVariants — по-недельный дифф двух вариантов плана
  */
 import type { BBPlan, BBExercise } from './bb-builder.engine';
+import { ruCount, RU_SETS } from '../ru-plural';
 import { MUSCLE_LABEL_RU } from '../volume-landmarks.engine';
 import { bbSessionTagLabel } from './bb-session-tags';
 import { icsProperty } from '../ics-format';
@@ -367,7 +368,7 @@ export function compareBBVariants(a: BBPlan, b: BBPlan): BBVariantDiff[] {
     else {
       const sa = (wa.sessions || []).reduce((s, x) => s + x.exercises.reduce((a2, e) => a2 + (e.sets || 0), 0), 0);
       const sb = (wb.sessions || []).reduce((s, x) => s + x.exercises.reduce((a2, e) => a2 + (e.sets || 0), 0), 0);
-      if (sa !== sb) detail.push(`Объём: ${sa} → ${sb} сетов (${sb > sa ? '+' : ''}${sb - sa})`);
+      if (sa !== sb) detail.push(`Объём: ${sa} → ${ruCount(sb, RU_SETS)} (${sb > sa ? '+' : ''}${sb - sa})`);
       const phaseA = String((wa as any).phase || '');
       const phaseB = String((wb as any).phase || '');
       if (phaseA !== phaseB) detail.push(`Фаза: ${esc(phaseA || '—')} → ${esc(phaseB || '—')}`);

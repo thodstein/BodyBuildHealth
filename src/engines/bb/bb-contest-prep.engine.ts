@@ -19,6 +19,7 @@
  */
 
 import { getPeakingProtocol, type PeakingProtocol } from '../peaking-protocols.engine';
+import { ruCount, ruAdjCount, RU_DAYS, RU_WEEKS, RU_ADJ_COMPLETED } from '../ru-plural';
 import type { BBPlan } from './bb-builder.engine';
 import { reconcileSchemeCommentsIn } from './bb-scheme-comment-reconcile';
 import {
@@ -2785,7 +2786,7 @@ export function shiftBBContestPrepShowDate(plan: BBContestPrepPlan, newShowDate:
     }
   }
   const warnings: string[] = [];
-  if (changedFrozen) warnings.push(`⚠ Перенос шоу меняет фазы внутри первых ${frozen} завершённых недель — пересчёт требует подтверждения.`);
+  if (changedFrozen) warnings.push(`⚠ Перенос шоу меняет фазы внутри первых ${ruAdjCount(frozen, RU_ADJ_COMPLETED, RU_WEEKS)} — пересчёт требует подтверждения.`);
   return { plan: next, changedFrozen, warnings };
 }
 
@@ -3815,7 +3816,7 @@ ${peakWeek.map(d => `<tr><td>${d.day === 7 ? '🎬 Show' : `Д${d.day}`}</td><td
 ${timeline.map(t => `<tr><td>${t.time}</td><td><b>${escHtml(t.action)}</b></td><td>${escHtml(t.detail)}</td></tr>`).join('')}
 </table>
 
-<h2>🔄 Post-show (${post.durationDays} дней)</h2>
+<h2>🔄 Post-show (${ruCount(post.durationDays, RU_DAYS)})</h2>
 <ul>${rows(post.notes)}</ul>
 <div class="muted">🏋️ ${escHtml(post.training.join(' '))}</div>
 <div class="muted">⚖️ ${escHtml(post.weightCheck)}</div>

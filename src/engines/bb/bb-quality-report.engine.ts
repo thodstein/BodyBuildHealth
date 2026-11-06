@@ -13,6 +13,7 @@
  */
 
 import { calculatePlanSafetyScore } from './bb-safety-score.engine';
+import { ruCount, RU_ERRORS, RU_WARNINGS } from '../ru-plural';
 import { gradeQualityScore, type QualityV2Grade } from '../quality-score-v2.engine';
 import { canonicalBBIssueText } from './bb-validation-format';
 
@@ -234,7 +235,7 @@ export function buildBBQualityReport(plan: QualityPlanLike, opts: {
 export function bbQualityReportSummary(r: BBQualityReport): string {
   const err = r.issues.filter(i => i.level === 'error').length;
   const warn = r.issues.filter(i => i.level === 'warning').length;
-  return `Качество ${r.score}/100 (${r.riskLevel === 'ok' ? 'хорошо' : r.riskLevel === 'caution' ? 'осторожно' : 'риск'}) · ${err} ошибок, ${warn} предупреждений · рабочих сетов ${r.totalWorkingSets}`;
+  return `Качество ${r.score}/100 (${r.riskLevel === 'ok' ? 'хорошо' : r.riskLevel === 'caution' ? 'осторожно' : 'риск'}) · ${ruCount(err, RU_ERRORS)}, ${ruCount(warn, RU_WARNINGS)} · рабочих сетов ${r.totalWorkingSets}`;
 }
 
 /** Бейдж риска для UI. */

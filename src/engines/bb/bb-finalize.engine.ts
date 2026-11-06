@@ -31,7 +31,7 @@ import { isHardAdvanced, isPoolAllowed, swapExerciseForLevel } from './bb-exerci
 import { isAxialLoadExercise } from '../exercise-selector.engine';
 import { computeVolumeLandmarks, getVolumeLandmarks } from '../volume-landmarks.engine';
 import { MUSCLE_LABEL_RU } from '../volume-landmarks.engine';
-import { ruCount, RU_SETS } from '../ru-plural';
+import { ruCount, ruAdjCount, RU_SETS, RU_EXERCISES, RU_ADJ_SECONDARY } from '../ru-plural';
 import { calibratedLandmarksFor, type MEVCalibration } from './bb-mev-calibration.engine';
 import { refreshBBPlanSnapshots } from './bb-plan-snapshot.engine';
 import { buildExerciseInstructions } from './bb-exercise-instructions.engine';
@@ -3433,7 +3433,7 @@ function addAdaptiveMEVFeeders(plan: BBPlan, options: BBFinalizeOptions): void {
         session.exercises.push({
           muscle, name: candidate.name, exerciseName: candidate.name, role: 'accessory', character: 'памп', sets,
           repsRange: [12, 20], rir: 3, workSets, tempoSpec: '3-0-1-0', restSeconds: 45,
-          comment: `Добивка до минимума MEV: ${sets}×12-20 (RIR 3, темп 3-0-1-0, отдых 45с) для покрытия минимума MEV ${landmarks.mev} сетов @${weight} кг; лимит сессии ${maxSetsPerSession}. Дефицит до цели: ${target ? target.targetSets - effectiveSets : 0} сетов — добивка даёт базовый стимул, не перегружая.`,
+          comment: `Добивка до минимума MEV: ${sets}×12-20 (RIR 3, темп 3-0-1-0, отдых 45с) для покрытия минимума MEV ${ruCount(landmarks.mev, RU_SETS)} @${weight} кг; лимит сессии ${maxSetsPerSession}. Дефицит до цели: ${ruCount(target ? target.targetSets - effectiveSets : 0, RU_SETS)} — добивка даёт базовый стимул, не перегружая.`,
           rationale: `Авто-добивка до MEV для «${muscle}»: добавлен ${candidate.name} ${sets}×12-20 — минимум для роста, без перегрузки`,
           warmupSets: [],
         });
@@ -3751,7 +3751,7 @@ function ensureMuscleSessionCapacity(week: any, plan: BBPlan, options: BBFinaliz
           muscle: m, name: cand.name, exerciseName: cand.name, role: 'accessory', character: 'памп',
           sets, repsRange: [10, 15], rir: 3, restSeconds: 90, warmupSets: [],
           workSets: Array.from({ length: sets }, () => ({ reps: 12, rir: 3, weight: w, restSeconds: 90 })),
-          comment: `➕ Ёмкость сессии: ${cand.name} (${m}) — упражнения мышцы на капе ${exCap}, цель сессии ${perSessionGoal} сетов.`,
+          comment: `➕ Ёмкость сессии: ${cand.name} (${m}) — упражнения мышцы на капе ${exCap}, цель сессии ${ruCount(perSessionGoal, RU_SETS)}.`,
           rationale: 'Cycle capacity: движение вместо раздувания одного упражнения',
         } as any);
       }
@@ -4159,7 +4159,7 @@ for (const week of next.weeks) {
           : options.onCourse ? 120 * 60 : undefined,
       });
       if (fitted.removed.length > 0) {
-        next.rationale.push(`Fatigue budget: ${session.sessionTag || `день ${session.day}`} — удалено ${fitted.removed.length} вторичных упражнений, расчётная длительность ${Math.round(fitted.cost.timeSeconds / 60)} мин.`);
+        next.rationale.push(`Fatigue budget: ${session.sessionTag || `день ${session.day}`} — удалено ${ruAdjCount(fitted.removed.length, RU_ADJ_SECONDARY, RU_EXERCISES)}, расчётная длительность ${Math.round(fitted.cost.timeSeconds / 60)} мин.`);
       }
     }
   }

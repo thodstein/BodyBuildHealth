@@ -11,6 +11,7 @@
  * Отдельно от ПЛ-рекомендаций: только бодибилдинг.
  */
 import type { WorkoutLog } from '../../core/types';
+import { ruCount, ruAdjCount, RU_TRAININGS, RU_SETS, RU_ADJ_WORKING } from '../ru-plural';
 import { getExerciseById } from '../../core/exercise-catalog';
 import { getPedCap } from './bb-ped-adaptation.engine';
 
@@ -144,7 +145,7 @@ export function generateBBRecommendations(ctx: BBRecContext): BBRecSection[] {
     const totalSets = planWeeklySets(plan);
     progItems.push({
       id: 'prog-summary', severity: 'info',
-      text: `Текущая программа: «${name}», ${sessions} тренировок/нед, ${totalSets} рабочих сетов на неделю. Держите объём и RIR по плану — не импровизируйте сеты/веса без причины.`,
+      text: `Текущая программа: «${name}», ${ruCount(sessions, RU_TRAININGS)}/нед, ${ruAdjCount(totalSets, RU_ADJ_WORKING, RU_SETS)} на неделю. Держите объём и RIR по плану — не импровизируйте сеты/веса без причины.`,
     });
     if (params?.focusGroup && params.focusGroup !== '') {
       progItems.push({ id: 'prog-focus', severity: 'info', text: `Акцент на «${GRP_RU[params.focusGroup] || params.focusGroup}» — этот объём неприкосновенен, при нехватке времени срезайте второстепенные изоляции, не специализацию.` });

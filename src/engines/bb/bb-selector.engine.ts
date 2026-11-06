@@ -3,6 +3,7 @@
  * Scoring + rationale по аналогии с lms-selector / split-selector.
  */
 import { SPLIT_PATTERNS, type SplitPattern } from './bb-split-patterns';
+import { ruAdjCount, RU_ADJ_LEG, RU_SESSIONS } from '../ru-plural';
 import { normLevel } from '../volume-landmarks.engine';
 import { TAG_MUSCLES } from './bb-day-types';
 import { WEAK_TO_MUSCLE } from './bb-builder.engine';
@@ -175,7 +176,7 @@ export function rankBBSplits(input: BBSelectorInput): BBRankedPattern[] {
     const armSessions = p.schedule.filter(d => d.kind === 'тренировка' && /Arms/i.test(d.sessionTag || '')).length;
     if (legDonor && legSessions > 0) {
       score -= legSessions * 8;
-      rationale.push(`доноры ног: снижена рекомендация leg-heavy (${legSessions} ножных сессий)`);
+      rationale.push(`доноры ног: снижена рекомендация leg-heavy (${ruAdjCount(legSessions, RU_ADJ_LEG, RU_SESSIONS)})`);
     }
     if (armDonor && armSessions > 0) {
       score -= armSessions * 5;

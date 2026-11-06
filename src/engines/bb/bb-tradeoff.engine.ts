@@ -12,6 +12,7 @@
  */
 
 import type { BBPlan, BBWeek, BBExercise } from './bb-builder.engine';
+import { ruCount, RU_SETS } from '../ru-plural';
 import { isBBJunk } from './bb-builder.engine';
 import { aggregateBBVolume } from './bb-volume.engine';
 import { canonicalMuscle, expandDonorMuscles, type VolumeTradeoffPolicy } from './bb-specialization.engine';
@@ -211,7 +212,7 @@ function addToRecipient(
     }
   }
   if (transferred < budget) {
-    notes.push(`Не перенесено ${budget - transferred} сетов: нет room (MRV/session cap) в целевой зоне`);
+    notes.push(`Не перенесено ${ruCount(budget - transferred, RU_SETS)}: нет room (MRV/session cap) в целевой зоне`);
   }
   return { transferred, notes };
 }

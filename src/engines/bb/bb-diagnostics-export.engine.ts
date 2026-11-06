@@ -3,6 +3,7 @@
  * Расширен таблицей «Упражнение → эффект (SFR/lengthened/паттерн/темп/техника)» для единого инструмента.
  */
 import type { BBDiagnosticsReport } from './bb-diagnostics-hub.engine';
+import { ruCount, RU_SETS } from '../ru-plural';
 import { auditPlanExercises } from './bb-plan-exercise-audit.engine';
 import { exerciseEffectScore } from './bb-exercise-effect.engine';
 import { auditHeadCoverage } from './bb-stimulus-target.engine';
@@ -157,7 +158,7 @@ export function buildBBDiagnosticsHtml(report: BBDiagnosticsReport, meta?: { dat
           })
         ).join('');
         const flagsEx = audit.flags.length ? `<div style="font-size:11px;color:#f59e0b">Флаги портфеля: ${esc(audit.flags.join(' · '))}</div>` : '';
-        exerciseSection = `<h2>Упражнения → эффект (максимально)</h2><div style="font-size:11px;color:#666">SFR средний ${audit.avgSfr ?? '—'}/5 · lengthened ${(audit.lengthenedRatio * 100).toFixed(0)}% · unilateral ${(audit.unilateralRatio * 100).toFixed(0)}% · усталость ${audit.fatigueDensity.toFixed(2)} · ${audit.totalExercises} упр · ${audit.totalSets} сетов</div>${flagsEx}<table><tr><th>Мышца</th><th>Упражнение</th><th>SFR</th><th>Профиль</th><th>Угол</th><th>Строгая</th><th>Сустав</th><th>Uni</th><th>Сеты</th><th>Score</th><th>Прим.</th></tr>${rowsEx || '<tr><td colspan="11">— нет упражнений</td></tr>'}</table>`;
+        exerciseSection = `<h2>Упражнения → эффект (максимально)</h2><div style="font-size:11px;color:#666">SFR средний ${audit.avgSfr ?? '—'}/5 · lengthened ${(audit.lengthenedRatio * 100).toFixed(0)}% · unilateral ${(audit.unilateralRatio * 100).toFixed(0)}% · усталость ${audit.fatigueDensity.toFixed(2)} · ${audit.totalExercises} упр · ${ruCount(audit.totalSets, RU_SETS)}</div>${flagsEx}<table><tr><th>Мышца</th><th>Упражнение</th><th>SFR</th><th>Профиль</th><th>Угол</th><th>Строгая</th><th>Сустав</th><th>Uni</th><th>Сеты</th><th>Score</th><th>Прим.</th></tr>${rowsEx || '<tr><td colspan="11">— нет упражнений</td></tr>'}</table>`;
       }
     }
   } catch {}
