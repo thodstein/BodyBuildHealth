@@ -535,6 +535,39 @@ describe('удаление из облака не теряется без сет
     expect(transport.value(SPACE_TOKEN, spaceRevokedKey(SID))).toBe('1');
     expect(JSON.parse(localStorage.getItem(PURGE_PENDING_KEY) || '[]')).toEqual([]);
   });
+
+  it('смена кода с несостоявшимся маркером не отзывает новый код', async () => {
+    setRegistry(SID);
+    seedToken(SID, SPACE_TOKEN);
+    const transport = new TokenTransport();
+    await init(transport);
+    const key = spaceKeyPrefix(SID) + 'he_note';
+    transport.seed(SPACE_TOKEN, key, 'данные', Date.now() - 10_000);
+
+    const realReplace = transport.replaceKey.bind(transport);
+    let failMarkers = true;
+    transport.replaceKey = async (rows: KvRow[]) => {
+      if (failMarkers && rows[0]?.key?.startsWith('he_sys_revoked__')) throw new Error('offline');
+      return realReplace(rows);
+    };
+
+    const next = await rotateSpaceToken(SID);
+    expect(next).toBeTruthy();
+    // Маркер не дошёл — просьба ждёт повтора и помнит СТАРЫЙ токен.
+    const queued = JSON.parse(localStorage.getItem(PURGE_PENDING_KEY) || '[]');
+    expect(queued).toEqual([{ spaceId: SID, token: SPACE_TOKEN }]);
+
+    failMarkers = false;
+    await init(transport);
+    await new Promise(r => setTimeout(r, 10));
+    // Старый телефон получает маркер, новый код остаётся живым.
+    expect(transport.value(SPACE_TOKEN, spaceRevokedKey(SID))).toBe('1');
+    expect(transport.value(next as string, spaceRevokedKey(SID))).toBeNull();
+    expect(spaceTokenRecord(SID)?.token).toBe(next);
+    expect(spaceTokenRecord(SID)?.revokedAt).toBeFalsy();
+    expect(transport.value(next as string, key)).toBe('данные');
+    expect(JSON.parse(localStorage.getItem(PURGE_PENDING_KEY) || '[]')).toEqual([]);
+  });
 });
 
 // FLUSH_DELAY_MS импортирован, чтобы тест явно говорил: задержка не влияет на flushKvNow.

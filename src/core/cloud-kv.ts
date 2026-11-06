@@ -1280,7 +1280,7 @@ async function purgeOneSpace(spaceId: string, knownToken?: string): Promise<bool
   const tokens = new Set<string>([token]);
   // Токен пространства берём из реестра, а если запись уже убрана — из отложенной
   // просьбы: без него не поставить маркер «доступ отозван».
-  const spaceToken = rec?.token ?? knownToken;
+  const spaceToken = knownToken ?? rec?.token;
   if (spaceToken) tokens.add(spaceToken);
   let ok = true;
   for (const t of tokens) {
@@ -1318,9 +1318,10 @@ async function purgeOneSpace(spaceId: string, knownToken?: string): Promise<bool
   }
   if (metaChanged) persistMeta();
   if (idbChanged) persistIdbMeta();
-  // Токен пространства больше не обслуживаем — но только когда уборка прошла:
-  // иначе повторять маркер было бы нечем. Новый код создаст новый токен.
-  if (ok && rec) removeSpaceToken(spaceId);
+  // Токен пространства больше не обслуживаем — но только когда уборка прошла и
+  // запись всё ещё про этот токен: если тренер успел создать новый код, отзывать
+  // (и убирать) его нельзя. Новый код создаст новый токен.
+  if (ok && rec && rec.token === spaceToken) removeSpaceToken(spaceId);
   return ok;
 }
 
@@ -1360,16 +1361,29 @@ function writePendingPurges(items: readonly PendingPurge[]): void {
 
 function rememberPendingPurges(ids: readonly string[]): void {
   const items = readPendingPurges();
-  const known = new Set(items.map(i => i.spaceId));
   let changed = false;
   for (const spaceId of ids) {
-    if (!spaceId || spaceId === HOME_SPACE_ID || known.has(spaceId)) continue;
-    const token = spaceTokenRecord(spaceId)?.token;
-    items.push({ spaceId, ...(token ? { token } : {}) });
-    known.add(spaceId);
-    changed = true;
+    if (pushPendingPurge(items, spaceId, spaceTokenRecord(spaceId)?.token)) changed = true;
   }
   if (changed) writePendingPurges(items);
+}
+
+/**
+ * Запомнить просьбу об одном пространстве. `token` — какой именно доступ надо
+ * отозвать: после смены кода в реестре уже НОВЫЙ токен, а маркер старого нужно
+ * доставить именно на старый телефон.
+ */
+function pushPendingPurge(items: PendingPurge[], spaceId: string, token?: string): boolean {
+  if (!spaceId || spaceId === HOME_SPACE_ID) return false;
+  if (items.some(i => i.spaceId === spaceId)) return false;
+  items.push({ spaceId, ...(token ? { token } : {}) });
+  return true;
+}
+
+/** Очередь на повтор: маркер отзыва не записался, но доступ уже сменили. */
+function rememberPendingMarker(spaceId: string, token: string): void {
+  const items = readPendingPurges();
+  if (pushPendingPurge(items, spaceId, token)) writePendingPurges(items);
 }
 
 /** Служебная строка под токеном пространства: «этот доступ больше не действует». */
@@ -1558,7 +1572,11 @@ export async function rotateSpaceToken(spaceId: string): Promise<string | null> 
     // Сначала отзываем старый доступ, потом публикуем новый: если запись нового
     // рекорда не удастся, старый код уже недействителен — это безопаснее.
     // Маркер имеет смысл только для токена пространства (не для токена тренера).
-    if (old.migratedAt) await writeRevokedMarker(old.token, spaceId);
+    // Если маркер не записался, старый телефон его всё равно получит: просьба
+    // уходит в очередь повтора с ТЕМ токеном, который надо отозвать (`old.token`),
+    // а не с новым — иначе телефон с новым кодом стёр бы себя.
+    const marked = old.migratedAt ? await writeRevokedMarker(old.token, spaceId) : true;
+    if (!marked) rememberPendingMarker(spaceId, old.token);
     const saved = writeSpaceTokenRecord({
       ...old,
       token: nextToken,
