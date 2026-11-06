@@ -112,7 +112,7 @@ import { BbPlanStep } from './bb-step-plan';
 import { BbQualityUnifiedCard, BbQualityPlanLogicCard, BbQualitySafetySection } from './bb-quality-sections';
 import { BbQualityLoadOverview, BbQualityLoadVolume, BbQualityLoadChecks, type BbQualityLoadCtx } from './bb-quality-load-sections';
 import { BbContestPrepParams, BbContestPrepPreview, BbContestPrepTrialSafety, BbContestPrepPost, type BbContestPrepCtx } from './bb-contest-prep-sections';
-import { ruCount, RU_SETS } from '../../../engines/ru-plural';
+import { ruCount, RU_CYCLES, RU_ERRORS, RU_OCCURRENCES, RU_SETS, RU_WARNINGS } from '../../../engines/ru-plural';
 export {
   PHASE_TECHNIQUES, backSubgroupLabel, armHeadLabel, isAbRotationActive,
   annualBlockCtxToPrepPatch, annualActiveBlockLine,
@@ -2755,7 +2755,7 @@ const [bbVolumeRamp, setBbVolumeRamp] = useState<'standard' | 'preloaded' | 'fla
       const stored = getProfile().settings?.training?.workMaxByExercise;
       const calib = autoCalibrateFromStored(plan, stored, (n) => /подтягив|отжимани|скручив|планка|пловец|альпинист|tgu|мостик|отведение.*стоя|икры.*одной|выпад.*назад|болгарск/i.test(n));
       if (calib.applied > 0) {
-        plan = { ...calib.plan, rationale: [...calib.plan.rationale, `⚖️ Применены сохранённые реальные веса (${calib.applied} вхождений упражнений).`] };
+        plan = { ...calib.plan, rationale: [...calib.plan.rationale, `⚖️ Применены сохранённые реальные веса (${ruCount(calib.applied, RU_OCCURRENCES)} упражнений).`] };
       }
     } catch { /* ignore */ }
 
@@ -3417,7 +3417,7 @@ const [bbVolumeRamp, setBbVolumeRamp] = useState<'standard' | 'preloaded' | 'fla
       for (const r of (safety.recommendations || []).slice(0, 5)) lines.push(`  • ${r}`);
       const errs = issues.filter(i => i.level === 'error');
       const warns = issues.filter(i => i.level === 'warning');
-      lines.push('', `ВАЛИДАТОР: ${errs.length} ошибок, ${warns.length} предупреждений`);
+      lines.push('', `ВАЛИДАТОР: ${ruCount(errs.length, RU_ERRORS)}, ${ruCount(warns.length, RU_WARNINGS)}`);
       for (const i of issues.slice(0, 20)) lines.push(`  [${i.level}] ${i.message}`);
       if (recs.length) {
         lines.push('', 'РЕКОМЕНДАЦИИ:');
@@ -4385,7 +4385,7 @@ const [bbVolumeRamp, setBbVolumeRamp] = useState<'standard' | 'preloaded' | 'fla
           savePrepToProfile(main.prepPlan, cfg);
         } catch { /* silent */ }
       }
-      flash(`🏁 Сезон: собрано ${res.cycles.length} цикла (по одному на старт)`);
+      flash(`🏁 Сезон: собрано ${ruCount(res.cycles.length, RU_CYCLES)} (по одному на старт)`);
     } catch (e) {
       flash(`⚠ ${(e as Error)?.message ?? 'Не удалось собрать сезон'}`);
     }

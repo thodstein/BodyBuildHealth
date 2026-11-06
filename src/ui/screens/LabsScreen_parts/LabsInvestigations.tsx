@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { UCUM_MAP } from '../../../core/constants';
+import { ruCount, RU_MARKERS } from '../../../engines/ru-plural';
 import { getLabNorm } from '../../../engines/lab-norms.engine';
 
 interface InvestigationItem {
@@ -210,7 +211,7 @@ export const LabsInvestigations: React.FC<{ sex?: 'male' | 'female' }> = ({ sex 
                           <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                             <span style={{ fontSize:11, color:'var(--accent)', fontWeight:700, background:'rgba(0,230,138,0.10)', padding:'4px 8px', borderRadius:999, whiteSpace:'nowrap' }}>⏱ {inv.frequency}</span>
                             <span style={{ fontSize:11, color:'#fff', fontWeight:600 }}>
-                              {inv.markers.length > 0 ? `${inv.markers.length} маркеров` : `${inv.isInstrumental ? 'Инструментальное исследование' : 'Описательная оценка'}`}
+                              {inv.markers.length > 0 ? ruCount(inv.markers.length, RU_MARKERS) : `${inv.isInstrumental ? 'Инструментальное исследование' : 'Описательная оценка'}`}
                             </span>
                           </div>
                         </div>

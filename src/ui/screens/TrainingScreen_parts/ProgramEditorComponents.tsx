@@ -43,7 +43,7 @@ import { suggestWeightFromVelocity } from '../../../engines/manual-constructor/m
 import { getVolumeLandmarks } from '../../../engines/volume-landmarks.engine';
 import { MesoHeatmap } from './MesoHeatmap';
 import { MANUAL_STORAGE_KEYS } from '../../../engines/manual-constructor/manual-storage';
-import { ruCount, RU_DAYS, RU_EXERCISES, RU_SESSIONS, RU_SETS, RU_WEEKS } from '../../../engines/ru-plural';
+import { ruCount, RU_APPROACHES, RU_DAYS, RU_EXERCISES, RU_SESSIONS, RU_SETS, RU_WEEKS } from '../../../engines/ru-plural';
 
 export const TRAINING_DAY_NAMES = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'] as const;
 const DAY_COLORS = ['#f59e0b', '#3b82f6', '#22c55e', '#a78bfa', '#ef4444', '#06b6d4', '#ec4899'];
@@ -1365,7 +1365,7 @@ const BlockList: React.FC<{ blocks: UserBlock[]; phase?: UserWeek['phase']; sess
               <div className="editor-exercise-title">{b.exerciseName || 'Упражнение не выбрано'}</div>
             </div>
             <div className={`editor-exercise-status${b.exerciseName && b.sets.length > 0 ? ' is-ready' : ''}`}>
-              {b.exerciseName && b.sets.length > 0 ? `${b.sets.length} подход${b.sets.length === 1 ? '' : 'а'}` : 'Нужно заполнить'}
+              {b.exerciseName && b.sets.length > 0 ? ruCount(b.sets.length, RU_APPROACHES) : 'Нужно заполнить'}
             </div>
           </div>
           {b.supersetWith && (

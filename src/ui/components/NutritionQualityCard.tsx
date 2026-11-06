@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { analyzeNutrition } from '../../engines/score-nutrition';
+import { ruCount, RU_OBSERVATIONS } from '../../engines/ru-plural';
 import type { ModuleResult } from '../../engines/score-engine';
 
 interface NutritionQualityCardProps {
@@ -57,7 +58,7 @@ export const NutritionQualityCard: React.FC<NutritionQualityCardProps> = ({ meal
       </div>
       {result.systems.length > 4 && (
         <button onClick={() => setExpanded(!expanded)} style={{ background: 'none', border: 'none', color: '#818cf8', fontSize: 8, cursor: 'pointer', padding: '4px 0', fontWeight: 600 }}>
-          {expanded ? '▲ Свернуть' : `▼ Ещё ${result.systems.length - 4} измерений`}
+          {expanded ? '▲ Свернуть' : `▼ Ещё ${ruCount(result.systems.length - 4, RU_OBSERVATIONS)}`}
         </button>
       )}
       {details && (

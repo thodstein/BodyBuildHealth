@@ -5,6 +5,7 @@
  */
 import React from 'react';
 import { collectPlanExercises, recalibratePlanWeights, groupWeightEntries, type PlanWeightEntry } from '../../../engines/bb/bb-weight-calibration.engine';
+import { ruCount, RU_OCCURRENCES } from '../../../engines/ru-plural';
 import type { BBPlan } from '../../../engines/bb/bb-builder.engine';
 import { getProfile, updateProfile } from '../../../core/profile-manager';
 import { BTN, BTN_GHOST } from './training-ui';
@@ -46,7 +47,7 @@ export const BbWeightsStep: React.FC<BbWeightsStepProps> = ({
   const apply = () => {
     if (!builtPlan) return;
     const res = recalibratePlanWeights(builtPlan, entries);
-    setBuiltPlan({ ...res.plan, rationale: [...res.plan.rationale, `⚖️ Реальные веса: применено к ${res.applied} вхождений упражнений (${filled} заполнено).`] });
+    setBuiltPlan({ ...res.plan, rationale: [...res.plan.rationale, `⚖️ Реальные веса: применено к упражнениям — ${ruCount(res.applied, RU_OCCURRENCES)} (${filled} заполнено).`] });
     setWeightsApplied(res.applied);
     // Персистентность в training.workMaxByExercise (ключ = id упражнения)
     try {

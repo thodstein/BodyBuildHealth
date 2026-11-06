@@ -45,7 +45,7 @@ import { applyToPlanner } from './planner-bridge';
 import { generateBBRecommendations, bbRecSummary } from '../../../engines/bb/bb-training-recommendations.engine';
 import { weeklySetsByGroup } from '../../../engines/training-recommendations.engine';
 import { MetricCard, ExpandableCard, PopupNumber, PopupSelect } from '../SRCBBScreen_parts/TrainingPopups';
-import { ruCount, RU_APPROACHES, RU_DAYS, RU_ENTRIES, RU_MEASUREMENTS, RU_POINTS } from '../../../engines/ru-plural';
+import { ruCount, RU_APPROACHES, RU_DAYS, RU_ENTRIES, RU_MEASUREMENTS, RU_POINTS, RU_WEEKS } from '../../../engines/ru-plural';
 
 const ACCENT = '#00e68a';
 const DIM = '#fff';
@@ -917,7 +917,7 @@ export const UnifiedIntelligenceHub: React.FC = () => {
               </div>
               {monotony.uniform && (
                 <div style={{ marginTop:6, padding:'7px 10px', borderRadius:9, background:'rgba(245,158,11,0.08)', border:'1px solid rgba(245,158,11,0.20)', fontSize:11, color:'#f59e0b', lineHeight:1.4 }}>
-                  ⚠ Неделя без единого дня отдыха: SD=0, monotony математически 2 и «выглядит нормой», но это самое рискованное однообразие. {uniformStreak>=2 ? `Так уже ${uniformStreak} недели подряд.` : ''} Нужна вариация нагрузки/дни отдыха.
+                  ⚠ Неделя без единого дня отдыха: SD=0, monotony математически 2 и «выглядит нормой», но это самое рискованное однообразие. {uniformStreak>=2 ? `Так уже ${ruCount(uniformStreak, RU_WEEKS)} подряд.` : ''} Нужна вариация нагрузки/дни отдыха.
                 </div>
               )}
 
@@ -1197,7 +1197,7 @@ export const UnifiedIntelligenceHub: React.FC = () => {
                 <div style={{ marginTop:6, padding:'7px 10px', borderRadius:9, background:'rgba(245,158,11,0.06)', border:'1px solid rgba(245,158,11,0.16)', fontSize:11, color:'#f59e0b', lineHeight:1.4 }}>
                   🟡 Ранний сигнал: {recoveryOut.overtrainingRisk >= 60 ? `риск перетрена ${recoveryOut.overtrainingRisk}≥60` : ''}
                   {(recoveryOut.overtrainingRisk >= 60) && (monoStreak.sustainedHigh || uniformStreak >= 2) ? ' + ' : ''}
-                  {uniformStreak >= 2 ? `${uniformStreak} недели подряд ровная нагрузка (SD=0) — монотонность при этом не растёт, а риск накопления есть` : ''}
+                  {uniformStreak >= 2 ? `${ruCount(uniformStreak, RU_WEEKS)} подряд ровная нагрузка (SD=0) — монотонность при этом не растёт, а риск накопления есть` : ''}
                   {uniformStreak >= 2 && monoStreak.sustainedHigh && !monoStreak.uniform ? ' + ' : ''}
                   {monoStreak.sustainedHigh && !uniformStreak ? `монотонность >2 две недели подряд (${monoStreak.current}, ${monoStreak.prev.join('/')})` : ''}
                   {' '}— запланируйте deload на следующую неделю, не дожидаясь провала восстановления.

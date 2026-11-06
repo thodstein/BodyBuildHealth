@@ -51,7 +51,7 @@ import type { AnnualTrainingPlan, AnnualBlockConfig, AnnualBlockKind } from '../
 import { loadAnnualTrainingPlan, saveAnnualTrainingPlan } from '../../../engines/annual-training/annual-training-storage';
 import { ARM_CYCLE_LIBRARY } from '../../../engines/arm/arm-cycle-library.engine';
 import { annualBlockCycleSuggestion } from '../../../engines/arm/arm-annual';
-import { ruCount, RU_SESSIONS, RU_WEEKS } from '../../../engines/ru-plural';
+import { ruCount, RU_CYCLES, RU_SESSIONS, RU_WEEKS } from '../../../engines/ru-plural';
 
 /** Единый канон недели для даты (P2-1): движок block-builders.engine, не дублируем. */
 export const macroWeekForDate = weekForDate;
@@ -3043,8 +3043,8 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
             <div data-pl="macro-fit-consent" role="alert" style={{ marginTop: 6, padding: 10, borderRadius: 10, background: macroFitConsent ? 'rgba(34,197,94,0.08)' : 'rgba(245,158,11,0.08)', border: `1px solid ${macroFitConsent ? 'rgba(34,197,94,0.3)' : 'rgba(245,158,11,0.35)'}` }}>
               <div style={{ fontSize: 11, fontWeight: 800, color: macroFitConsent ? '#22c55e' : '#f59e0b', marginBottom: 4 }}>
                 {macroFitConsent
-                  ? `✓ Согласие дано: ${macroFitChanges.length} цикл(ов) будут адаптированы под длину блоков`
-                  : `⚠️ Требуется согласие: ${macroFitChanges.length} цикл(ов) будут растянуты/сжаты/повторены под блоки`}
+                  ? `✓ Согласие дано: ${ruCount(macroFitChanges.length, RU_CYCLES)} будут адаптированы под длину блоков`
+                  : `⚠️ Требуется согласие: ${ruCount(macroFitChanges.length, RU_CYCLES)} будут растянуты/сжаты/повторены под блоки`}
               </div>
               <div style={{ fontSize: 10, color: '#fff', lineHeight: 1.5, marginBottom: 4 }}>
                 {macroFitChanges.map(ch => (

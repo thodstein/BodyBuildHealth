@@ -25,7 +25,7 @@ import { VolumeByWeekChart, RirDriftChart, type WeekVolume, type RirRecord } fro
 import { MesocycleProgressionCard } from './MesocycleProgressionCard';
 import type { InjurySelectEntry } from './InjurySelectCard';
 import type { calcBBPlanMetrics } from '../../../engines/bb/bb-metrics.engine';
-import { ruCount, RU_SETS } from '../../../engines/ru-plural';
+import { ruCount, RU_MUSCLES, RU_SETS } from '../../../engines/ru-plural';
 
 /** Структурный срез quality-объекта конструктора (поля — как их читает train-load блок;
  *  «any» намеренно: форма внутри god-object, контекстная типизация картбека рекомендаций сохранена). */
@@ -364,7 +364,7 @@ export const BbQualityLoadVolume: React.FC<BbQualityLoadVolumeProps> = ({ ctx, q
                   // сортировка внутри группы
                   const sorted = [...rows].sort((a,b)=> (order[a.status]??9)-(order[b.status]??9) || b.effectiveSets - a.effectiveSets);
                   return (
-                     <CollapsibleCard key={g.id} title={`${g.icon} ${g.label}`} defaultOpen={true} badge={`${sorted.length} мышц`} headerStyle={{ background:'linear-gradient(135deg, rgba(0,230,138,0.09), rgba(0,230,138,0.03))', color:'#00e68a' }}>
+                     <CollapsibleCard key={g.id} title={`${g.icon} ${g.label}`} defaultOpen={true} badge={`${ruCount(sorted.length, RU_MUSCLES)}`} headerStyle={{ background:'linear-gradient(135deg, rgba(0,230,138,0.09), rgba(0,230,138,0.03))', color:'#00e68a' }}>
                        <div style={{ display:'grid', gap:8 }}>
                         {sorted.map((m:any)=>{
                           const st = statusMeta[m.status] || statusMeta.optimal;

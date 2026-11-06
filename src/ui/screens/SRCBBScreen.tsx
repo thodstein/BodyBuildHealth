@@ -1178,7 +1178,7 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
         if (tabForApply === 'bb') { setMrvOverride(Math.round(targetSets)); pendingApplyRef.current = p; }
         else {
           // Честность (аудит P1-1): в ПЛ объём задаёт раскладка цикла — «применить» тут нечего, не молчим.
-          setMethodNote(`🛠 Цель ${Math.round(targetSets)} сет/мышца/нед — ориентир ББ-авто. В ПЛ объём задаёт цикл: смените цикл/ассистентов, а для разгрузки используйте «Применить делод».`);
+          setMethodNote(`🛠 Цель ${ruCount(Math.round(targetSets), RU_SETS)}/мышца/нед — ориентир ББ-авто. В ПЛ объём задаёт цикл: смените цикл/ассистентов, а для разгрузки используйте «Применить делод».`);
         }
       }
     } else if (p.kind === 'split') {

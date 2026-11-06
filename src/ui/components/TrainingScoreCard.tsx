@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { analyzeTraining } from '../../engines/score-training';
+import { ruCount, RU_OBSERVATIONS } from '../../engines/ru-plural';
 import type { ModuleResult } from '../../engines/score-engine';
 
 interface TrainingScoreCardProps {
@@ -68,7 +69,7 @@ export const TrainingScoreCard: React.FC<TrainingScoreCardProps> = ({
       </div>
       {result.systems.filter(s => s.weightedScore > 5).length > 4 && (
         <button onClick={() => setExpanded(!expanded)} style={{ background: 'none', border: 'none', color: '#818cf8', fontSize: 8, cursor: 'pointer', padding: '4px 0', fontWeight: 600 }}>
-          {expanded ? '▲ Свернуть' : `▼ Ещё ${result.systems.filter(s => s.weightedScore > 5).length - 4} измерений`}
+          {expanded ? '▲ Свернуть' : `▼ Ещё ${ruCount(result.systems.filter(s => s.weightedScore > 5).length - 4, RU_OBSERVATIONS)}`}
         </button>
       )}
       {result.recommendations.length > 0 && (

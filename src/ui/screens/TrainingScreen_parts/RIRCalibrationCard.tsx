@@ -5,6 +5,7 @@ import { getCalibrationStats, clearCalibrationData, type RIRCalibrationStats } f
 import { loadSessions } from '../../../engines/workout-logger.engine';
 import { recordSessionRIR } from '../../../engines/rir-calibration.engine';
 import { applyToPlanner } from './planner-bridge';
+import { ruAdjCount, RU_ADJ_RECORDED, RU_APPROACHES } from '../../../engines/ru-plural';
 import { CalcSection, PopupToggle, ExpandableCard, MetricCard } from '../SRCBBScreen_parts/TrainingPopups';
 
 const ACCENT = '#00e68a';
@@ -102,7 +103,7 @@ export const RIRCalibrationCard: React.FC = () => {
 
   return (
     <div className="train-rir">
-    <CalcSection icon="🎯" title="RIR-калибровка" accent={ACCENT} desc={`${stats.totalSets} записанных подходов`}>
+    <CalcSection icon="🎯" title="RIR-калибровка" accent={ACCENT} desc={`${ruAdjCount(stats.totalSets, RU_ADJ_RECORDED, RU_APPROACHES)}`}>
       <div style={{ display:'flex', gap:6, marginBottom:8 }}>
         <button onClick={()=>setMode('manual')} style={{ flex:1, padding:'6px', borderRadius:6, border: mode==='manual'?'1px solid var(--accent)':'1px solid rgba(255,255,255,0.1)', background: mode==='manual'?'rgba(0,230,138,0.12)':'rgba(255,255,255,0.05)', color: mode==='manual'?'var(--accent)':'#fff', fontSize:10, fontWeight:700, cursor:'pointer' }}>✍️ Вручную</button>
         <button onClick={()=>setMode('diary')} style={{ flex:1, padding:'6px', borderRadius:6, border: mode==='diary'?'1px solid var(--accent)':'1px solid rgba(255,255,255,0.1)', background: mode==='diary'?'rgba(0,230,138,0.12)':'rgba(255,255,255,0.05)', color: mode==='diary'?'var(--accent)':'#fff', fontSize:10, fontWeight:700, cursor:'pointer' }}>📓 Из дневника</button>

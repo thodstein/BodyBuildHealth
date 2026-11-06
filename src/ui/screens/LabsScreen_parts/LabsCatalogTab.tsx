@@ -404,7 +404,7 @@ export default function LabsCatalogTab({
                               <div style={{ display:'flex', gap:8, alignItems:'center', flexWrap:'wrap' }}>
                                 <span style={{ fontSize:11, color:'var(--accent)', fontWeight:800, background:'rgba(var(--labs-accent-rgb, 0,230,138),0.10)', padding:'4px 8px', borderRadius:999, display:'inline-flex', alignItems:'center', gap:4 }}><NativeIcon name="clock" size={10} /> {inv.frequency}</span>
                                 <span style={{ fontSize:11, color:'#fff', fontWeight:700 }}>
-                                  {inv.markers.length > 0 ? `${inv.markers.length} маркеров` : `${inv.isInstrumental ? 'Инструментальное' : 'Описательная оценка'}`}
+                                  {inv.markers.length > 0 ? ruCount(inv.markers.length, RU_MARKERS) : `${inv.isInstrumental ? 'Инструментальное' : 'Описательная оценка'}`}
                                 </span>
                               </div>
                             </div>

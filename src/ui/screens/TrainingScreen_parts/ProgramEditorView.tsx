@@ -71,7 +71,7 @@ import { ManualLibraryDrawer } from './ManualLibraryDrawer';
 import { MANUAL_STORAGE_KEYS } from '../../../engines/manual-constructor/manual-storage';
 
 import { GOAL_OPTS_BB as CENTRAL_GOAL_BB2, GOAL_OPTS_PL as CENTRAL_GOAL_PL2, GOAL_OPTS_HYBRID as CENTRAL_GOAL_HYBRID2, goalLabelOf as centralGoalLabelOf2 } from '../../../engines/goals';
-import { ruAdjCount, ruCount, RU_ADJ_TRAINING, RU_DAYS, RU_ENTRIES } from '../../../engines/ru-plural';
+import { ruAdjCount, ruCount, RU_ADJ_TRAINING, RU_DAYS, RU_ENTRIES, RU_WEEKS } from '../../../engines/ru-plural';
 export const GOAL_OPTS_BB = CENTRAL_GOAL_BB2;
 export const GOAL_OPTS_PL = CENTRAL_GOAL_PL2;
 export const GOAL_OPTS_HYBRID = CENTRAL_GOAL_HYBRID2;
@@ -1686,7 +1686,7 @@ return (
                   if (v < program.meta.weeks && program.bb) {
                     const willDeleteContent = program.bb.weeks.slice(v).some(w => w.sessions.some(s => s.blocks.some(b => b.exerciseName && b.exerciseName.trim())));
                     if (willDeleteContent) {
-                      const ok = await confirm({ title: `Сократить до ${v} нед?`, message: `Последние ${program.meta.weeks - v} недели с упражнениями будут удалены. Продолжить?`, confirmLabel: 'Удалить', danger: true });
+                      const ok = await confirm({ title: `Сократить до ${ruCount(v, RU_WEEKS)}?`, message: `Последние ${ruCount(program.meta.weeks - v, RU_WEEKS)} с упражнениями будут удалены. Продолжить?`, confirmLabel: 'Удалить', danger: true });
                       if (!ok) { e.target.value = String(program.meta.weeks); return; }
                     }
                   }

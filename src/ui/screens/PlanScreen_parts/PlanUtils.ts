@@ -1,5 +1,6 @@
 import { RIR_TABLE, SPLIT_LABELS, GROUP_LABELS } from './PlanConstants';
 import { EXERCISE_CATALOG, getExercisesByGroup, getExerciseById } from '../../../core/exercise-catalog';
+import { ruCount, RU_DAYS } from '../../../engines/ru-plural';
 import { calcExercisePrescription } from '../../../engines/training.engine';
 import type { TrainingOutput, Exercise } from '../../../core/types';
 
@@ -12,10 +13,10 @@ export function getRIR(goal: string, level: string, isDeload: boolean): string {
 
 export function getSplitRationale(goal: string, level: string, daysPerWeek: number, recovery: number, weakPoints: string[]): string[] {
   const reasons: string[] = [];
-  if (daysPerWeek <= 3) reasons.push(`${daysPerWeek} дня/дня для полноценного восстановления/или по 1 упражнению на мышечную группу`);
-  else if (daysPerWeek === 4) reasons.push(`${daysPerWeek} дня для полной тренировки сплит/или 2 упражнения на мышечную группу (оптимальный баланс)`);
-  else if (daysPerWeek === 5) reasons.push(`${daysPerWeek} дня для PPL + добавленный день для слабых мест/или 3 упражнения на мышечную группу`);
-  else reasons.push(`${daysPerWeek} дня для PPL с дублированием или 4 упражнения на мышечную группу`);
+  if (daysPerWeek <= 3) reasons.push(`${ruCount(daysPerWeek, RU_DAYS)}/дня для полноценного восстановления/или по 1 упражнению на мышечную группу`);
+  else if (daysPerWeek === 4) reasons.push(`${ruCount(daysPerWeek, RU_DAYS)} для полной тренировки сплит/или 2 упражнения на мышечную группу (оптимальный баланс)`);
+  else if (daysPerWeek === 5) reasons.push(`${ruCount(daysPerWeek, RU_DAYS)} для PPL + добавленный день для слабых мест/или 3 упражнения на мышечную группу`);
+  else reasons.push(`${ruCount(daysPerWeek, RU_DAYS)} для PPL с дублированием или 4 упражнения на мышечную группу`);
 
   if (weakPoints.length > 0) reasons.push(`С акцентом на слабые места (${weakPoints.map(g => GROUP_LABELS[g] || g).join(', ')}): +20% объема, больше подходов для развития`);
   if (recovery < 55) reasons.push(`Восстановление ${recovery}% < 55 требуется снижение объема тренировок и увеличение отдыха 30-50%`);

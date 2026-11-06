@@ -38,6 +38,7 @@ import { estimate1RMConsensus } from '../../../engines/pro/estimate1rm.engine';
 import { epley1RM } from '../../../engines/e1rm';
 import { meetAttemptsFor, warmupToOpener, MEET_STRATEGY_PCT_LABEL, type MeetStrategy } from '../../../engines/lms/competition-attempts';
 import { daysBetweenIso } from '../../../engines/lms/pl-meet-registry.engine';
+import { ruAdjCount, RU_ADJ_PAUSED, RU_SETS } from '../../../engines/ru-plural';
 import { relativeStrengthFullReport, type Sex } from '../../../engines/pro/relative-strength.engine';
 import { getISOWeekNumber } from '../../../engines/workout-logger.engine';
 import { getPLWeakGroupExerciseCandidates, diagnosticProtocolFromCycle } from '../../../engines/lms/lms-builder.engine';
@@ -2281,7 +2282,7 @@ export const LiftMasterCard: React.FC<{
         {(lift==='bench'||lift==='squat'||lift==='deadlift'||lift==='sumo') && (
           <div style={{ marginTop:6, padding:7, borderRadius:8, background:'rgba(0,230,138,0.05)', border:'1px solid rgba(0,230,138,0.18)', fontSize:10, lineHeight:1.5, color: pauseSets>0?'#00e68a':'#fbbf24' }}>
             {pauseSets>0
-              ? `⏸ Паузная работа: ${pauseSets} паузных сетов за 28 дней${lift==='bench'?' — старт «на паузе» без отбива отрабатывается.':' — пауза в слабой фазе отрабатывается.'}`
+              ? `⏸ Паузная работа: ${ruAdjCount(pauseSets, RU_ADJ_PAUSED, RU_SETS)} за 28 дней${lift==='bench'?' — старт «на паузе» без отбива отрабатывается.':' — пауза в слабой фазе отрабатывается.'}`
               : lift==='bench'
                 ? '⏸ Паузных сетов нет за 28 дней — IPF-отбив под запретом: добавьте 1-2 жима с паузой в неделю (⏸ в дневнике или «Жим с паузой»).'
                 : '⏸ Паузных сетов нет за 28 дней — паузные варианты (⏸ в дневнике) точечно грузят слабую фазу.'}

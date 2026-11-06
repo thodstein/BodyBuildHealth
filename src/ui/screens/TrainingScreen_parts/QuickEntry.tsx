@@ -53,7 +53,7 @@ interface ExerciseRecord {
  * единый источник для QuickEntry и DiaryRecordingForm.
  */
 import { getPreviousWorkoutData, getPersonalRecord, searchExerciseCatalog, seedForNewExercise } from './diary-shared';
-import { ruCount, RU_APPROACHES, RU_SETS } from '../../../engines/ru-plural';
+import { ruCount, ruAdjCount, RU_APPROACHES, RU_ADJ_SAME, RU_SETS } from '../../../engines/ru-plural';
 
 export const QuickEntry: React.FC<QuickEntryProps> = ({
   diary, historyWorkouts, selectedWeek, onSave,
@@ -552,7 +552,7 @@ export const QuickEntry: React.FC<QuickEntryProps> = ({
                     <button
                       key={n}
                       onClick={() => addSets(n)}
-                      title={`Добавить ${n} одинаковых подхода`}
+                      title={`Добавить ${ruAdjCount(n, RU_ADJ_SAME, RU_APPROACHES)}`}
                       style={{
                         padding: '8px 10px', borderRadius: 8,
                         border: '1px dashed rgba(0,230,138,0.2)', background: 'transparent',

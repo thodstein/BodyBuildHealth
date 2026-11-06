@@ -24,7 +24,7 @@ import { PeakWeekMonitorCard, ShowDayEmergencyCard, PrepLabsCard, ShowSeriesCard
 import { buildTaperModifiers, taperCurveSVG, compareTaperStrategies } from '../../../engines/bb/bb-taper-adaptive.engine';
 import { postShowRecoveryProgress } from '../../../engines/bb/bb-peak-pro.engine';
 import { getWeightLog } from '../../../engines/profile-store';
-import { ruCount, RU_DAYS, RU_WEEKS } from '../../../engines/ru-plural';
+import { ruCount, RU_DAYS, RU_SESSIONS_IN, RU_WEEKS } from '../../../engines/ru-plural';
 
 export interface BbContestPrepCtx { [key: string]: any }
 
@@ -1066,7 +1066,7 @@ export const BbContestPrepTrialSafety: React.FC<{ ctx: BbContestPrepCtx }> = ({ 
                       const already = weeks.some((w: any) => w.peakWeek && (w.sessions || []).some((s: any) => (s.exercises || []).some((e: any) => e.priming)));
                       if (already) { flash('🧠 Прайминг уже добавлен в пик-неделю'); return; }
                       const { plan: primed, added } = addPeakPriming(builtPlan as any, bbWorkMax || {});
-                      if (added > 0) { setBuiltPlan(primed as any); flash(`🧠 Прайминг 3×3-5 @50-70% добавлен в ${added} сессии D-2/D-1`); }
+                      if (added > 0) { setBuiltPlan(primed as any); flash(`🧠 Прайминг 3×3-5 @50-70% добавлен в ${ruCount(added, RU_SESSIONS_IN)} D-2/D-1`); }
                       else flash('Пик-неделя не найдена — сначала соберите/примените prep');
                     } catch { flash('Не удалось добавить прайминг'); }
                   }}

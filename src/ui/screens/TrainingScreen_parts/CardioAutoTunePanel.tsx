@@ -13,6 +13,7 @@ import {
   type CardioCycle, type CardioTuneChange,
 } from '../../../engines/lms/cardio.engine';
 import { loadCardioLog, cardioHrCompliance, loadCardioWellness, wellnessReadiness } from '../../../engines/lms/cardio-diary.engine';
+import { ruCount, RU_CHANGES } from '../../../engines/ru-plural';
 import { CARD, ROW, LABEL, HINT_SM, BTN, BTN_SMALL, BTN_PRIMARY, BTN_DANGER, NumberInput, Badge, Accordion } from './CardioUI';
 import { getProfile, updateSection } from '../../../core/profile-manager';
 import { connectBleHr, type BleHrState } from '../../../engines/lms/cardio-ble.engine';
@@ -168,7 +169,7 @@ export const CardioAutoTunePanel: React.FC<{
     setActiveCardioCycle(r.cycle);
     setPending(null);
     onChanged?.();
-    flashMsg(`✅ Подстройка применена: ${r.changes.length} изменений (${r.advice.action})`);
+    flashMsg(`✅ Подстройка применена: ${ruCount(r.changes.length, RU_CHANGES)} (${r.advice.action})`);
   };
 
   const previewTune = () => {

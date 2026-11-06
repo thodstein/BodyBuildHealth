@@ -54,7 +54,7 @@ import { appendTAPullPower, taPullPowerTrend, loadTAPullPower, saveTAPullPower }
 import { ymaxNormForBodyweight } from '../../../engines/strength-sport/strength-sport-ta-norms.engine';
 import { printHtmlApk, shareOutcomeLabel, saveTextFileApk, saveCsvApk } from '../../../core/apk-share';
 import { localIsoDate } from '../../../core/local-date';
-import { ruCount, RU_SETS } from '../../../engines/ru-plural';
+import { ruCount, RU_POINTS, RU_SETS } from '../../../engines/ru-plural';
 
 const STORAGE_KEY = 'he_wl_diagnostics_hub_v1';
 
@@ -1900,7 +1900,7 @@ export const WLDiagnosticsHub: React.FC = () => {
               {velFlag && <div data-wl="vel-metric-flag" style={{ fontSize: 10, color: '#f59e0b', marginTop: 4 }}>⚠️ {velFlag}</div>}
               {ballisticNote && <div data-wl="lvp-ballistic" style={{ fontSize: 10, color: '#f59e0b', marginTop: 4 }}>🏀 {ballisticNote}</div>}
               <div style={{ fontSize:9, color:'#fff', marginTop:4 }}>Population → individual приоритет: `velocityForSS` сначала ищет `he_lv_profile_ss_v1` (Wood 2026 individual). {velocityTypeForLift(state.lvpLift)==='peak'?'peak':'mpv'} badge.</div>
-              {lvpSpark && <div style={{ marginTop: 6 }}><svg width="120" height="36" role="img" aria-label={`LVP ${lvpSpark.n} точки`}><polyline points={lvpSpark.pts} fill="none" stroke="#a78bfa" strokeWidth="2" /></svg></div>}
+              {lvpSpark && <div style={{ marginTop: 6 }}><svg width="120" height="36" role="img" aria-label={`LVP ${ruCount(lvpSpark.n, RU_POINTS)}`}><polyline points={lvpSpark.pts} fill="none" stroke="#a78bfa" strokeWidth="2" /></svg></div>}
             </div>
            </div>
          )}

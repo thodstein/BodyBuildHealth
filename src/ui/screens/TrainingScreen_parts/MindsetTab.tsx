@@ -27,7 +27,7 @@ import {
   type MindsetProtocol, type ProtocolItem, type ProtocolItemKind, type MindsetDayType, type MindsetDirection,
   type MoodTag,
 } from '../../../engines/mindset-protocol.engine';
-import { ruCount, RU_SESSIONS } from '../../../engines/ru-plural';
+import { ruCount, RU_SESSIONS, RU_STEPS } from '../../../engines/ru-plural';
 
 const CARD = diaryCard;
 const IN = diaryInput;
@@ -301,7 +301,7 @@ export const MindsetTab: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
       th,td{border:1px solid #ddd;padding:4px 6px;text-align:left}th{background:#f5f5f5}h1{font-size:18px}h2{font-size:14px;margin-top:20px}
       .stats{display:flex;gap:20px;font-size:13px;margin:8px 0;flex-wrap:wrap}</style></head><body>
       <h1>🧠 Психология тренировок — отчёт</h1>
-      <div style="color:#555;font-size:12px">Сформировано: ${new Date().toLocaleString('ru-RU')}${active ? ` · протокол: ${esc(active.name)} (${active.items.length} шагов)` : ' · протокол не собран'}</div>
+      <div style="color:#555;font-size:12px">Сформировано: ${new Date().toLocaleString('ru-RU')}${active ? ` · протокол: ${esc(active.name)} (${ruCount(active.items.length, RU_STEPS)})` : ' · протокол не собран'}</div>
       <div class="stats">
         <span>Чек-инов всего: <b>${checks.length}</b></span>
         <span>За 14 дней: <b>${tr.count}</b></span>

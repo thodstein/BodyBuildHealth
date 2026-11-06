@@ -30,7 +30,7 @@ const HUB_HERO: React.CSSProperties = {
 };
 const HUB_SECTION_GAP: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: 6, marginTop: 6 };
 import { LEVEL_OPTS, TAB_DEFS, WP_LABEL_SHORT } from './arm-hub-shared';
-import { ruCount, RU_MUSCLES, RU_POINTS, RU_SETS } from '../../../engines/ru-plural';
+import { ruCount, ruAdjCount, RU_ADJ_DEAD, RU_FACTS, RU_MUSCLES, RU_POINTS, RU_SETS } from '../../../engines/ru-plural';
 
 const TECHNIQUE_OPTS = [
   { id: 'balanced', label: 'Сбалансировано' },
@@ -55,7 +55,7 @@ export function HubHead({ H }: { H: any }) {
         </div>
         <div className="ad-head-side">
           <div>{hasWeak ? ((state.weakPoints.length? state.weakPoints.join(', ') : report.weakMuscles.join(', '))) : 'баланс'}</div>
-          <div className="ad-muted">{hasWeak ? `${(report as any).weakPoints?.length||0} мёртвых точек · ${report.findings.length} факта` : 'слабые зоны не выявлены'}</div>
+          <div className="ad-muted">{hasWeak ? `${ruAdjCount((report as any).weakPoints?.length||0, RU_ADJ_DEAD, RU_POINTS)} · ${ruCount(report.findings.length, RU_FACTS)}` : 'слабые зоны не выявлены'}</div>
         </div>
         {showScoring && scoring && (()=>{
           const pct = Math.max(0, Math.min(100, Number(scoring.score) || 0));

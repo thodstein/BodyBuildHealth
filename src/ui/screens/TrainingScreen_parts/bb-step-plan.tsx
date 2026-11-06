@@ -29,7 +29,7 @@ import { PHASE_COLORS, PHASE_LABELS } from './PlanOutput';
 import { Chip, BTN, BTN_GHOST, H, SMALL, IN } from './training-ui';
 import { sessionTagLabel, muscleLabel, exerciseTargetNote } from './bb-labels';
 import { ExpandableCard } from '../SRCBBScreen_parts/TrainingPopups';
-import { ruCount, RU_SETS } from '../../../engines/ru-plural';
+import { ruCount, RU_MUSCLES, RU_SETS } from '../../../engines/ru-plural';
 
 export interface BbPlanStepProps {
   builtPlan: BBPlan | null;
@@ -188,7 +188,7 @@ export const BbPlanStep: React.FC<BbPlanStepProps> = ({
         };
         const findLandmark = (m: string) => lm.find((l: any) => l.group === m || l.label === m);
         return (
-          <CollapsibleCard title="🔥 Тепловая карта объёма" defaultOpen={true} headerStyle={{ background: 'linear-gradient(135deg, rgba(96,165,250,0.12), rgba(96,165,250,0.04))', color: '#60a5fa' }} badge={`${muscles.length} мышц · прям/косв`}>
+          <CollapsibleCard title="🔥 Тепловая карта объёма" defaultOpen={true} headerStyle={{ background: 'linear-gradient(135deg, rgba(96,165,250,0.12), rgba(96,165,250,0.04))', color: '#60a5fa' }} badge={`${ruCount(muscles.length, RU_MUSCLES)} · прям/косв`}>
             <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(118px, 1fr))', gap:6 }}>
               {muscles.sort((a,b) => (vol[b]||0) - (vol[a]||0)).map(m => {
                 const mm = metrics.perMuscle.find((x:any)=> x.muscle===m);

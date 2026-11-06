@@ -1,5 +1,6 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { computePlanQualityFor } from '../../../engines/manual-constructor';
+import { ruCount, RU_SETS } from '../../../engines/ru-plural';
 import type { UserProgram } from '../../../engines/user-program/user-program.types';
 import { GROUP_RU } from './program-types';
 import { loadTrainingProfile } from './training-profile';
@@ -633,7 +634,7 @@ export const CalcQualityTab: React.FC<{ program?: UserProgram | null; level?: st
               `Уровень: ${effectiveLevel} · ${pedOn ? `ПЕД ×${pedAdapt?.combinedMrvMultiplier.toFixed(2)}` : 'Натурал'} · Лаб ×${labMult.toFixed(2)}`,
               `Оценка: ${analysis.score}/100 ${analysis.grade} · PRO: ${pro ? Math.max(0, Math.min(100, analysis.score + pro.scoreDelta)) : analysis.score}/100`,
               `--- Объём ---`,
-              ...analysis.perMuscle.map(p => `${ru(p.muscle)}: ${p.peakSets} сет (MEV${p.mev}/MAV${p.mav}/MRV${p.mrv}) ${p.status}`),
+              ...analysis.perMuscle.map(p => `${ru(p.muscle)}: ${ruCount(p.peakSets, RU_SETS)} (MEV${p.mev}/MAV${p.mav}/MRV${p.mrv}) ${p.status}`),
               `--- PRO ---`,
               ...(pro ? [`Паттерны: ${pro.patterns.map(p => `${ru(p.muscle)}:${p.distinct}/${p.expected.length}${p.ok ? '✓' : '✕'}`).join(' · ')}`, `Углы: ${pro.angles.map(a => `${ru(a.muscle)}:${Math.round(a.coverage * 100)}%`).join(' · ')}`, `Техника: ${pro.technique.pct}%`, `Цель: ${pro.goalAlignment.goal} ${pro.goalAlignment.ok ? '✓' : '✕'}`] : []),
               ...(lmsChart ? [`--- Тоннаж/КПШ (ПЛ) ---`, ...lmsChart.map(m => `Нед ${m.week}: тоннаж ${m.tonnage} кг · КПШ ${m.kpsh} · Инт ${m.relInt} · УОИ ${m.uoi}`)] : []),

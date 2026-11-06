@@ -1,5 +1,6 @@
 ﻿import React, { useMemo, useState, useCallback } from 'react';
 import type { CalculatorState, CalculatorResult, LabSlice } from '../../../engines/support-plan';
+import { ruCount, RU_MARKERS } from '../../../engines/ru-plural';
 import { calculateSupportTZ, hydrateState } from '../../../engines/support-plan';
 import { PHARMA_DB, PHARMA_CLASSES } from '../../../core/pharma-database';
 import { getProfile } from '../../../core/profile-manager';
@@ -243,7 +244,7 @@ export const AutoCalculator: React.FC<AutoCalculatorProps> = ({ onApply, embedde
         return;
       }
       update('labs', { ...state.labs, fullPanel: slice });
-      setFillStatus(`✅ Анализы загружены (${src.length} маркеров из Лабскрин)`);
+      setFillStatus(`✅ Анализы загружены (${ruCount(src.length, RU_MARKERS)} из Лабскрин)`);
       setTimeout(() => setFillStatus(''), 2000);
     } catch {
       setFillStatus('❌ Ошибка загрузки анализов');

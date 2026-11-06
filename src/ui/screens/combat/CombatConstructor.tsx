@@ -7,6 +7,7 @@
  */
 import React from 'react';
 import { buildCombatPlan, cbExerciseName, resolveCombatSwapMeta } from '../../../engines/combat/combat-builder.engine';
+import { ruCount, RU_CYCLES } from '../../../engines/ru-plural';
 import { finalizeCombatPlan, buildCombatReport, isCombatPlanBlocked } from '../../../engines/combat/combat-finalize.engine';
 import { COMBAT_PATTERNS, recommendCombatPattern } from '../../../engines/combat/combat-split-patterns';
 import { COMBAT_CYCLE_LIBRARY, getCombatCycle } from '../../../engines/combat/combat-cycle-library';
@@ -614,7 +615,7 @@ export const CombatConstructor: React.FC = () => {
     const effCycles = Math.max(1, Math.min(4, Math.floor(annualWeeks / 8)));
     const ann = buildAnnualATR(discipline as any, annualWeeks, startDate || null, { cycles: annualCycles } as any);
     saveAnnualCB(ann); setAnnual(ann);
-    setMsg(`✦ Годовой ATR ${annualWeeks} нед ×${Math.min(annualCycles, effCycles)} цикла построен${annualCycles > effCycles ? ` (лимит ${effCycles}: цикл ≥8 нед)` : ''}`);
+    setMsg(`✦ Годовой ATR ${annualWeeks} нед ×${ruCount(Math.min(annualCycles, effCycles), RU_CYCLES)} построен${annualCycles > effCycles ? ` (лимит ${effCycles}: цикл ≥8 нед)` : ''}`);
     setTimeout(() => setMsg(''), 2600);
   };
   const handleAddCompetition = () => {

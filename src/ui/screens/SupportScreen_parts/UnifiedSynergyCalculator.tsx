@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { SUPPORT_CATALOG_DATA, ALL_INTERACTIONS } from '../../../data/support-database';
+import { ruCount, RU_MARKERS } from '../../../engines/ru-plural';
 import { buildConflicts, buildCautions, buildSpecialInstructions } from '../../../engines/support-plan/display';
 import { calcStackSynergyScore, suggestSynergyAdditions } from '../../../engines/support-plan/display';
 import { SynergyEngine } from '../../../engines/synergy-score.engine';
@@ -1132,7 +1133,7 @@ export const UnifiedSynergyCalculator: React.FC<{ s?: Record<string,any> }> = ({
             if (criticalCount>0) lines.push(`⛔ ${criticalCount} критических конфликтов — разделить приём ≥4 ч или заменить`);
             if (depletionData.length>0) lines.push(`${depletionData.length} истощений — см. карточку выше`);
             if (cypMap.length>0) lines.push(`${cypMap.length} веществ влияют на CYP450 — см. карточку выше`);
-            if (labMonitor.length>0) lines.push(`${labMonitor.length} маркеров к мониторингу — см. карточку ниже`);
+            if (labMonitor.length>0) lines.push(`${ruCount(labMonitor.length, RU_MARKERS)} к мониторингу — см. карточку ниже`);
             if (lines.length<2) lines.push('Дополнительных мер не требуется');
             return (
               <div style={{ padding:'8px 12px', borderRadius:8, background:isScore?'rgba(34,197,94,0.03)':'rgba(239,68,68,0.03)', border:`1px solid ${isScore?'rgba(34,197,94,0.1)':'rgba(239,68,68,0.1)'}`, marginBottom:8 }}>
