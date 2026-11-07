@@ -16,7 +16,7 @@ import {
 } from '../../engines/workout-logger.engine';
 import { getAdherenceStats } from '../../engines/symptom-adherence.engine';
 import { calcNutrition } from '../../engines/nutrition.engine';
-import { derivePAL } from '../../core/data-link';
+import { derivePAL } from '../../core/energy-pal';
 import { loadWaterLog, addWater } from '../../engines/nutrition-tracker.engine';
 import {
   readDiaryV2,

@@ -95,17 +95,15 @@ export default defineConfig(({ command }) => ({
           if (id.includes('Risk3DModel')) return 'risk-3d';
           if (id.includes('usda-foods')) return 'usda-foods';
           if (id.includes('pharma-database')) return 'pharma-db';
-          if (id.includes('nutrition-database') || id.includes('nutrition-v2-data')) return 'nutrition-db';
-          if (id.includes('support-database') ||
-              id.includes('support-catalog-data') ||
-              id.includes('support-catalog-supplement') ||
-              id.includes('support-stacks') ||
-              id.includes('support-enrichment') ||
-              id.includes('support-meta') ||
-              id.includes('support-synergy-network') ||
-              id.includes('support-interactions-db') ||
-              id.includes('support-category-data') ||
-              id.includes('risk-engine-tz-db')) return 'support-db';
+          // FOOD_DB (383 кБ) — отдельный чанк: его читают десятки модулей питания,
+          // и без группы он уезжал целиком в recipe-db. nutrition-v2-data сюда
+          // НЕ входит — его импортирует nutrition-v2.engine на старте.
+          if (id.includes('nutrition-database')) return 'nutrition-db';
+          // Данные БАДов НЕ группируем вручную: при ручной группе rollup
+          // добавлял статический import этого чанка в entry, и старт тянул
+          // весь каталог (2.5 МБ) в preload. Без группы rollup кладёт данные
+          // в общий on-demand чанк (data-link/SupportScreen), а не в старт.
+          // См. docs/UI-PERF-PASS-2026-11.md.
           // recipe-decompose — чистый слой (только core/nutrition-database): держим в
           // recipe-db чанке, а не в nutrition-plan, иначе цикл чанков
           // nutrition-plan → recipe-db → nutrition-plan даёт TDZ на старте APK.

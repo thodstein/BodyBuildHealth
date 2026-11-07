@@ -1,13 +1,18 @@
-import { EFFECTS_DB } from '../data/support-database';
-import { MECHANISMS_DB } from '../data/support-database';
-import { RECOMMENDATIONS_DB } from '../data/support-database';
-import { RISKS_DB } from '../data/support-database';
+// ВАЖНО (perf): НЕ импортируем из барреля ../data/support-database — он тянет
+// весь каталог БАДов (~2.4 МБ). master-db нужны только базовые таблицы рисков,
+// а они лежат в двух листовых файлах без боковых эффектов.
+import {
+  EFFECTS_DB,
+  MECHANISMS_DB,
+  RECOMMENDATIONS_DB,
+  RISKS_DB,
+} from '../data/support-category-data';
 import { AXES_DB } from './data/axes';
 import { BANDS_DB } from './data/bands';
 import { CATEGORIES_DB } from './data/categories';
 import { HORMONAL_AXES_DB } from './data/hormonal-axes';
 import { INTERACTION_LINKS_DB } from './data/interaction-links';
-import { INTERACTIONS_DB } from '../data/support-database';
+import { INTERACTIONS_DB } from '../data/support-interactions-db';
 import substancesJson from '../substances.json';
 import interactionsJson from '../interactions.json';
 import type { 

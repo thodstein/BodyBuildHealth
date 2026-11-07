@@ -13,6 +13,10 @@ import { readRiskBridge } from '../engines/risk-bridge';
 import type { ReadinessScores, RiskCalculationResult } from './types';
 import { mapCourseToSubstances, hasCourseDiff, derivePedFlagsFromCourse } from './course-sync';
 import { injectionsPerWeek, weeklyDose } from '../engines/pharma-frequency';
+// Чистые расчёты активности живут в листовом модуле: их импортирует
+// widget-sync на старте APK, и он не должен тянуть движки рисков/БАДов.
+import { derivePAL, deriveTrainingLoad } from './energy-pal';
+export { derivePAL, deriveTrainingLoad };
 
 let globalTick = 0;
 const listeners = new Set<() => void>();
@@ -38,24 +42,6 @@ export interface LinkedData {
   pal: number;
   trainingLoadRatio: number;
   refetch: () => void;
-}
-
-export function derivePAL(workoutsPerWeek?: number, avgWorkoutMinutes?: number): number {
-  const wpw = workoutsPerWeek ?? 3;
-  const awm = avgWorkoutMinutes ?? 60;
-  let p = 1.2 + wpw * 0.075;
-  if (awm > 60) p += 0.05;
-  if (awm > 90) p += 0.075;
-  if (wpw >= 6) p += 0.05;
-  return Math.max(1.2, Math.min(1.9, Math.round(p * 100) / 100));
-}
-
-export function deriveTrainingLoad(workoutsPerWeek?: number, avgWorkoutMinutes?: number): number {
-  const wpw = workoutsPerWeek ?? 3;
-  const awm = avgWorkoutMinutes ?? 60;
-  const weeklyMinutes = wpw * awm;
-  const ratio = weeklyMinutes / 420;
-  return Math.max(0.2, Math.min(1.5, Math.round(ratio * 100) / 100));
 }
 
 function getLatestLabValue(labs: LabPoint[], code: string): number | undefined {
