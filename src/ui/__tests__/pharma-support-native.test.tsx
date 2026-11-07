@@ -131,4 +131,25 @@ describe('волна 12: pharma-subtabs', () => {
     fireEvent.click(info);
     expect(second.container.querySelector('.pharma-subtabs')).not.toBeNull();
   });
+
+  it('8. каталог знаний скроллится целиком: скролл на корне, body не обрезает контент', async () => {
+    await resetPlatform();
+    const { container } = render(<PharmaScreen />);
+    const info = container.querySelector(
+      '.pharma-hero-card[data-key="info"]',
+    ) as HTMLElement;
+    fireEvent.click(info);
+    const root = container.querySelector('.pharma-inner') as HTMLElement;
+    const body = container.querySelector('.pharma-body') as HTMLElement;
+    expect(root).not.toBeNull();
+    expect(body).not.toBeNull();
+    expect(root.style.overflowY).toBe('auto');
+    expect(root.style.height).toBe('');
+    // Тело каталога не должно само резать контент: весь скролл — на корне экрана.
+    expect(body.style.overflowY).toBe('');
+    expect(body.style.flex).toBe('0 0 auto');
+    // Сводка и каталог лежат внутри одного скролл-контейнера (высота не съедается).
+    expect(root.contains(container.querySelector('.pharma-info-summary'))).toBe(true);
+    expect(root.contains(container.querySelector('.pharma-catalog'))).toBe(true);
+  });
 });

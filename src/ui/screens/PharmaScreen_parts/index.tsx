@@ -153,7 +153,7 @@ export const PharmaScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubT
   const pageIcon: Record<PharmaPage, NativeIconName> = { main:'pill', course:'syringe', calculators:'cpu', info:'bookOpen', reports:'chart' };
 
   return (
-    <div className="screen pharma pharma-inner" style={{ padding:'0 12px 0', display:'flex', flexDirection:'column', height:'100%', minHeight:0, overflow:'hidden' }}>
+    <div className="screen pharma pharma-inner" style={{ padding:'0 12px 0', display:'flex', flexDirection:'column', flex:1, minHeight:0, overflowY:'auto', overflowX:'hidden', WebkitOverflowScrolling:'touch' as any }}>
       {/* topbar — 56px, sticky, safe-area, стекло */}
       <div className="pharma-head" style={{ display:'flex', alignItems:'center', gap:10, flexShrink:0, minHeight:56, padding:'10px 12px', margin:'0 -12px 0', background:'linear-gradient(180deg, rgba(9,18,34,0.92), rgba(9,18,34,0.78))', backdropFilter:'blur(20px)', WebkitBackdropFilter:'blur(20px)', borderBottom:'1px solid rgba(140,190,255,0.12)', position: 'static', top:0, zIndex:20 }}>
         <button onClick={() => setPage('main')} aria-label="Назад" style={{
@@ -251,7 +251,7 @@ export const PharmaScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubT
       ))}
       </div>
 
-      <div className="pharma-body" style={{ flex:1, overflowY:'auto', overflowX:'hidden', WebkitOverflowScrolling:'touch' as any, paddingBottom:'calc(var(--nav-height,68px) + 28px + env(safe-area-inset-bottom))', minHeight:0, display:'flex', flexDirection:'column', gap:10 }}>
+      <div className="pharma-body" style={{ flex:'0 0 auto', display:'flex', flexDirection:'column', gap:10, paddingBottom:'calc(var(--nav-height,68px) + 28px + env(safe-area-inset-bottom))' }}>
       {page === 'course' && <PharmaCourseScreen />}
       {page === 'reports' && <PharmaReportsTab />}
       {page === 'calculators' && subTab === 'pkpd' && <PKPDSimulationTab />}
