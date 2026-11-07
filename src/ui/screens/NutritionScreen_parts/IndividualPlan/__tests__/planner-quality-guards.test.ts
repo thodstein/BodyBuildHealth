@@ -424,9 +424,9 @@ describe('порции: фрукт и орехи — еда, а не украш�
   const nuts = (d: Day) => items(d).filter(({ x }) => x.role === 'fat' && !x._fixedGrams
     && /^(cashew|almonds?|walnuts?|hazelnuts?|peanuts?|pistachios?|pecan|macadamia|brazil_nut|seed_|sunflower_seeds|pumpkin_seeds|sesame_seeds)/i.test(String(x.id)));
 
-  it('фрукт меньше порции (80 г): пунктов ≤ 26 на 30 дней (было 53)', () => {
+  it('фрукт меньше порции (80 г): пунктов ≤ 12 на 30 дней (было 53, затем 26)', () => {
     const bad = DAYS.flatMap((d) => fruits(d).filter(({ x }) => (x.amount || 0) < 80).map(({ x }) => `${d.id}:${x.id} ${x.amount}г`));
-    expect(bad.length, `фрукт мельче 80 г: ${bad.slice(0, 5).join(', ')}`).toBeLessThanOrEqual(26);
+    expect(bad.length, `фрукт мельче 80 г: ${bad.slice(0, 5).join(', ')}`).toBeLessThanOrEqual(12);
   });
 
   it('орехи/семена меньше 15 г: пунктов ≤ 18 на 30 дней (было 19)', () => {
@@ -434,10 +434,10 @@ describe('порции: фрукт и орехи — еда, а не украш�
     expect(bad.length, `орехов мельче 15 г: ${bad.slice(0, 5).join(', ')}`).toBeLessThanOrEqual(18);
   });
 
-  it('ось «порции» в оценке качества: среднее ≥ 89 (было 85.7)', () => {
+  it('ось «порции» в оценке качества: среднее ≥ 94 (было 85.7, затем 89)', () => {
     const vals = DAYS.map((d) => scoreDayQuality(d.meals as any, { weightKg: d.w, microCoverage: { lowCount: 0, total: 16 } }).portions);
     const avg = vals.reduce((s, v) => s + v, 0) / vals.length;
-    expect(avg, `средняя ось «порции»: ${avg.toFixed(1)}`).toBeGreaterThanOrEqual(89);
+    expect(avg, `средняя ось «порции»: ${avg.toFixed(1)}`).toBeGreaterThanOrEqual(94);
   });
 
   it('QG11 не выводит день из канона: дней вне 3% ≤ 8 из 30 (было 5)', () => {

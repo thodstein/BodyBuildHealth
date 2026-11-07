@@ -49,7 +49,7 @@ const carbsFor = (p: { k: number; p: number; f: number; c?: number }) => (
   p.c && p.c > 0 ? p.c : Math.max(0, Math.round((p.k - 4 * p.p - 9 * p.f) / 4))
 );
 
-const build = (p: typeof PROFILES[number], mc: number, tr: boolean, rebalance: boolean): any => buildDayPlan({
+const build = (p: typeof PROFILES[number], mc: number, tr: boolean, rebalance: boolean, fruitFloor = true): any => buildDayPlan({
   weightKg: p.w, lbmKg: p.lbm, bodyFatPct: p.bf, sex: p.sex,
   goalKcal: p.k, goalProteinG: p.p, goalFatG: p.f, goalCarbsG: carbsFor(p),
   mealsCount: mc, isTrainingDay: tr, trainStartMin: tr ? 18 * 60 : undefined, trainDurationMin: 75,
@@ -57,6 +57,7 @@ const build = (p: typeof PROFILES[number], mc: number, tr: boolean, rebalance: b
   variety: 'medium', goal: 'maintenance', quality: 'full',
   excludedIds: new Set<string>(), allergenTags: new Set<string>(), randomSalt: 0,
   autoMealRebalance: rebalance,
+  fruitPortionFloor: fruitFloor,
 } as unknown as MealPlanInput);
 
 const SOLID_SKIP = new Set(['liquid', 'supplement']);
@@ -64,10 +65,10 @@ const solidG = (m: any): number => (m.items || [])
   .filter((i: any) => !SOLID_SKIP.has(String(i.role || '')))
   .reduce((s: number, i: any) => s + (Number(i.amount) || 0), 0);
 
-const cells = (extreme: boolean, rebalance: boolean) => PROFILES.filter((p) => p.extreme === extreme)
+const cells = (extreme: boolean, rebalance: boolean, fruitFloor = true) => PROFILES.filter((p) => p.extreme === extreme)
   .flatMap((p) => [4, 5, 6].flatMap((mc) => [true, false].map((tr) => ({
     key: `${p.id}/${mc}/${tr ? 'тр' : 'отд'}`,
-    plan: build(p, mc, tr, rebalance),
+    plan: build(p, mc, tr, rebalance, fruitFloor),
   }))));
 
 describe('§8.57 выравнивание тарелок (`autoMealRebalance`)', () => {
@@ -128,8 +129,8 @@ describe('§8.57 выравнивание тарелок (`autoMealRebalance`)',
 
   it('цель приёма переезжает вместе с гарниром: сумма целей дня не меняется', () => {
     const sumT = (pl: any, k: string) => (pl.meals || []).reduce((s: number, m: any) => s + (Number(m.target?.[k]) || 0), 0);
-    const off = cells(false, false);
-    const on = cells(false, true);
+    const off = cells(false, false, false);
+    const on = cells(false, true, false);
     const bad: string[] = [];
     for (const row of on) {
       const before = off.find((r) => r.key === row.key)!.plan;
@@ -147,8 +148,8 @@ describe('§8.57 выравнивание тарелок (`autoMealRebalance`)',
     // Замер: 15 дней / 31 приём, где перенос сдвинул углеводы тарелки больше 5 г.
     // Цель обязана сдвинуться РОВНО на столько же: иначе UI показывал «60,7 / 10 г»
     // красным перебором, хотя план сам положил еду в этот приём.
-    const off = cells(false, false);
-    const on = cells(false, true);
+    const off = cells(false, false, false);
+    const on = cells(false, true, false);
     const bad: string[] = [];
     let checked = 0;
     for (const row of on) {

@@ -14661,6 +14661,106 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
         }
       }
     }
+
+    // ─── §8.59: фрукт — порция, а не украшение ───────────────────────────────────
+    // Замер 60 дней (10 профилей × 4/5/6 приёмов × трен/отдых): 87 пунктов фрукта
+    // меньше 80 г, из них 49 — меньше 40 г («яблоко 20 г», «малина 38 г»). Правило
+    // владельца «порции не ниже это еда» нарушено, а ось «порции» (вес 0.18 в оценке)
+    // считает такой пункт не-едой.
+    // Фикс — обмен ВНУТРИ приёма: фрукт растёт до 80 г, а гарнир того же приёма
+    // ужимается ровно на столько же УГЛЕВОДОВ. Новый пункт не появляется (лимиты
+    // гарниров/семейств/anti-repeat не затрагиваются), день теряет/получает ~0 ккал,
+    // канон 3 % проверяется после каждого обмена и откатывается, если нарушен.
+    if ((input as any).fruitPortionFloor !== false
+      && !(input as any).recipeAssembly
+      && !_pickCtx.highVolumeDay
+      && !((input as any).injections && (input as any).injections.length)) {
+      const FRUIT_MIN59 = 80;
+      // Роль `fruit` в плане иногда несёт не фрукт (замер: `bulgur 120 г` в ужине,
+      // `peas_green 19 г`): «порцию фрукта» растить по роли нельзя — только по БД.
+      const _isFruit59 = (id: string): boolean => {
+        const fd: any = FOOD_DB.find((f: any) => String(f.id) === id);
+        if (!fd || String(fd.category) !== 'veg_fruit') return false;
+        return !/pea|lentil|bean|chickpea|corn|maize|soy|edamame/i.test(id);
+      };
+      const _mass59 = (m: any) => (m.items || [])
+        .filter((i: any) => !['liquid', 'supplement'].includes(String(i.role || '')))
+        .reduce((s: number, i: any) => s + (Number(i.amount) || 0), 0);
+      const _scale59 = (it: any, na: number) => {
+        const a0 = Number(it.amount) || 0;
+        if (!(a0 > 0) || na === a0) return;
+        const r = na / a0;
+        for (const k of ['p', 'f', 'c', 'kcal', 'fiber', 'leucine_mg']) {
+          if (it[k]) it[k] = Math.round(Number(it[k]) * r * 10) / 10;
+        }
+        it.amount = na;
+      };
+      const _dev59 = () => {
+        const d = (v: number, t: number) => (t > 0 ? Math.abs(v - t) / t : 0);
+        return Math.max(
+          d(Number(totals?.kcal) || 0, Number(input.goalKcal) || 0),
+          d(Number(totals?.p) || 0, Number(input.goalProteinG) || 0),
+          d(Number(totals?.f) || 0, Number(input.goalFatG) || 0),
+          d(Number(totals?.c) || 0, Number(input.goalCarbsG) || 0),
+        );
+      };
+      let _fixed59 = 0;
+      for (const m of meals as any[]) {
+        // Предсон — не тарелка, а фикс-протокол (казеин + мелатонин-фрукт 50 г по дизайну).
+        if (String(m.type) === 'presleep' || (m as any).recipeApplied) continue;
+        for (const fr of (m.items || []) as any[]) {
+          const a = Number(fr.amount) || 0;
+          if (String(fr.role) !== 'fruit' || !_isFruit59(String(fr.id)) || (fr as any)._fixedGrams || !(a > 0 && a < FRUIT_MIN59)) continue;
+          const donor = ((m.items || []) as any[])
+            .filter((i: any) => (i.role === 'carb_slow' || i.role === 'carb_fast') && !i._fixedGrams && (Number(i.amount) || 0) >= 60)
+            .sort((x: any, y: any) => (Number(y.amount) || 0) - (Number(x.amount) || 0))[0];
+          if (_mass59(m) + (FRUIT_MIN59 - a) > 500) continue;
+          // Гарнира в приёме нет (сыворотка + 38 г малины): растим фрукт «чисто», а
+          // канон решает, вправе ли день это принять — короткий день от этого только
+          // ближе к цели, а день «в нуле» правка откатит сама.
+          const snap = { fr: { ...fr }, donor: donor ? { ...donor } : null, dev: _dev59() };
+          if (donor) {
+            const cPerG = (Number(fr.c) || 0) / a;
+            const dC = (Number(donor.c) || 0) / Math.max(1, Number(donor.amount) || 0);
+            if (!(cPerG > 0) || !(dC > 0)) continue;
+            const cutG = Math.round((cPerG * (FRUIT_MIN59 - a)) / dC);
+            const donorAfter = (Number(donor.amount) || 0) - cutG;
+            // Порог среза 2 г — «крошки» 69–76 г иначе не проходят: там до 80 г не
+            // хватает 4–11 г, а это 1–4 г углеводов гарнира. 30 г — пол «это еда».
+            if (cutG < 2 || donorAfter < 30) continue;
+            _scale59(fr, FRUIT_MIN59);
+            _scale59(donor, donorAfter);
+          } else {
+            _scale59(fr, FRUIT_MIN59);
+          }
+          recalcMealTotals(meals as any[]);
+          recalcDayTotals(meals as any[], totals);
+          // Канон 3 % — единственное, что не имеет права пострадать: внутри канона
+          // допускаем +0.2 п.п. на округление, вне канона — не хуже исходного.
+          if (_dev59() > Math.max(0.03, snap.dev + 0.002)) {
+            Object.assign(fr, snap.fr);
+            if (snap.donor) Object.assign(donor!, snap.donor);
+            recalcMealTotals(meals as any[]);
+            recalcDayTotals(meals as any[], totals);
+            continue;
+          }
+          _fixed59++;
+        }
+      }
+      if (_fixed59 > 0) {
+        notes.push(`🍎 Фрукт — порцией: ${_fixed59} пункт(ов) поднято до 80 г за счёт гарнира того же приёма — углеводы и калории дня те же (§8.59).`);
+        // Обмен двигает граммы гарнира, а значит и белок приёма: нота QG14 о минимуме
+        // обязана говорить по ФИНАЛЬНЫМ тарелкам (замер: «нота 39, факт 40»).
+        const _idxQ59 = notes.findIndex((n) => typeof n === 'string' && n.startsWith('🥩 Белок по приёмам:'));
+        if (_idxQ59 >= 0) {
+          const _mains59 = (meals as any[]).filter((m) => !['preworkout', 'postworkout', 'intra', 'presleep'].includes(String(m.type)));
+          if (_mains59.length) {
+            const _min59 = Math.min(..._mains59.map((m) => Number(m.totals?.p) || 0));
+            notes[_idxQ59] = String(notes[_idxQ59]).replace(/минимум по основным приёмам \d+ г/, `минимум по основным приёмам ${Math.round(_min59)} г`);
+          }
+        }
+      }
+    }
     // Витрина MPS должна совпадать с ФИНАЛЬНЫМ планом (санитайзеры E17/E18 меняют items).
     if (typeof _refreshMpsFromMeals === 'function') _refreshMpsFromMeals();
     // Честная строка «белок по приёмам». Раньше она печаталась ДО сборки тарелок, по
