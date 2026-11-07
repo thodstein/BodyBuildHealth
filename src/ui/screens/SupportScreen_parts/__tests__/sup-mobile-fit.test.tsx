@@ -11,7 +11,7 @@
  * табличные правила — строковыми ассертами по CSS-файлам.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, fireEvent, cleanup } from '@testing-library/react';
+import { render, fireEvent, cleanup, waitFor } from '@testing-library/react';
 import * as fs from 'fs';
 import * as path from 'path';
 import React from 'react';
@@ -479,26 +479,35 @@ describe('SUP mobile fit (360px)', () => {
     expect(heroHtml).toContain('84px');
   });
 
-  it('топбары не перекрывают контент: отступ ≥ высоты шапки, горизонталь зажата', () => {
+  it('топбары не перекрывают контент: отступ ≥ высоты шапки, горизонталь зажата', async () => {
     // персист навигации (he_sup_nav_v1) сбрасываем — каждый кейс стартует с hero
     localStorage.removeItem('he_sup_nav_v1');
     const { container } = render(<SupportScreen />);
+    const openSection = async (key: string) => {
+      const card = container.querySelector(`.support-hero-card[data-key="${key}"]`) as HTMLElement;
+      expect(card, `${key} card`).not.toBeNull();
+      fireEvent.click(card);
+      // раздел грузится ленивым чанком — ждём шапку раздела
+      await waitFor(() => {
+        expect(container.querySelector("[data-sup='topbar']"), `${key} topbar`).not.toBeNull();
+      }, { timeout: 15000 });
+      return container.querySelector('.support-screen') as HTMLElement;
+    };
     const root = container.querySelector('.support-screen') as HTMLElement;
     expect(root.style.overflowX, 'no page h-scroll').toBe('clip');
     // Генератор: шапка BackNav+пилюли ≈120px → отступ 124px
-    const calc = container.querySelector('.support-hero-card[data-key="calc"]') as HTMLElement;
-    expect(calc, 'calc card').not.toBeNull();
-    fireEvent.click(calc as HTMLElement);
-    expect(container.querySelector("[data-sup='topbar']"), 'gen topbar').not.toBeNull();
-    expect(root.style.paddingTop, 'gen offset').toBe('108px');
+    const rootGen = await openSection('calc');
+    expect(rootGen.style.paddingTop, 'gen offset').toBe('108px');
     cleanup();
     // Протоколы: шапка BackNav ≈57px → отступ 60px
     localStorage.removeItem('he_sup_nav_v1');
     const second = render(<SupportScreen />);
     const proto = second.container.querySelector('.support-hero-card[data-key="protocols"]') as HTMLElement;
     fireEvent.click(proto);
-    const root2 = second.container.querySelector('.support-screen') as HTMLElement;
-    expect(root2.style.paddingTop, 'protocols offset').toBe('60px');
+    await waitFor(() => {
+      const r = second.container.querySelector('.support-screen') as HTMLElement | null;
+      expect(r?.style.paddingTop, 'protocols offset').toBe('60px');
+    }, { timeout: 15000 });
     second.unmount();
     // Инфо: шапка BackNav+пилюли ≈123px на 360px → отступ 132px
     localStorage.removeItem('he_sup_nav_v1');
@@ -506,7 +515,9 @@ describe('SUP mobile fit (360px)', () => {
     const info = third.container.querySelector('.support-hero-card[data-key="info"]') as HTMLElement;
     expect(info, 'info card').not.toBeNull();
     fireEvent.click(info);
-    expect(third.container.querySelector("[data-sup='topbar']"), 'info topbar').not.toBeNull();
+    await waitFor(() => {
+      expect(third.container.querySelector("[data-sup='topbar']"), 'info topbar').not.toBeNull();
+    }, { timeout: 15000 });
     const root3 = third.container.querySelector('.support-screen') as HTMLElement;
     expect(root3.style.paddingTop, 'info offset').toBe('112px');
     third.unmount();

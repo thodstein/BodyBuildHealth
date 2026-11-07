@@ -5,7 +5,7 @@
  * удаления дёргали location.reload, валидации орали через alert().
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, fireEvent, cleanup } from '@testing-library/react';
+import { render, fireEvent, cleanup, waitFor } from '@testing-library/react';
 import React from 'react';
 import { SupportFavoritesView } from '../SupportFavoritesView';
 import { SupportStacksView } from '../SupportStacksView';
@@ -268,24 +268,27 @@ describe('saved plan load merges subs', () => {
     } catch {}
   });
 
-  it('загрузка сохранённого плана доводит вещества до действующего плана', () => {
+  it('загрузка сохранённого плана доводит вещества до действующего плана', async () => {
     localStorage.setItem(
       'he_saved_support_plans',
       JSON.stringify([
         { id: 11, date: new Date().toISOString(), plan: { level: 'mid', subs: ['plan_sub_x'] } },
       ]),
     );
-    const { container, getByText } = render(<SupportScreen />);
+    const { container, getByText, findByText } = render(<SupportScreen />);
     // hero → инфо → избранное → план (действующий, со списком «Мои планы»)
     fireEvent.click(getByText('Общая информация'));
-    fireEvent.click(getByText(/Избранное · Дневник/));
-    fireEvent.click(getByText('📋 План'));
+    // Разделы грузятся ленивыми чанками — ждём появления следующего шага.
+    fireEvent.click(await findByText(/Избранное · Дневник/));
+    fireEvent.click(await findByText('📋 План'));
     // загрузка сохранённого плана
-    fireEvent.click(getByText('📂'));
+    fireEvent.click(await findByText('📂'));
     // вещество из загруженного плана видно в действующем плане (даже без
     // записи в каталоге — таблица показывает фолбэк, а не дропает строку)
-    expect(container.textContent).toContain('plan sub x');
-    expect(container.textContent).toContain('✅ План сохранён');
+    await waitFor(() => {
+      expect(container.textContent).toContain('plan sub x');
+      expect(container.textContent).toContain('✅ План сохранён');
+    }, { timeout: 15000 });
   });
 });
 
@@ -319,12 +322,12 @@ describe('level and modes modal entry', () => {
     expect(getByText('🔥 Усиление')).not.toBeNull();
   });
 
-  it('сквозной флоу: уровень + суставы применяются и модалка закрывается', () => {
-    const { container, getByText, queryByText } = render(<SupportScreen />);
+  it('сквозной флоу: уровень + суставы применяются и модалка закрывается', async () => {
+    const { container, getByText, queryByText, findByText } = render(<SupportScreen />);
     fireEvent.click(getByText('Общая информация'));
-    fireEvent.click(getByText(/Избранное · Дневник/));
-    fireEvent.click(getByText('📋 План'));
-    fireEvent.click(getByText('⚙️ Уровень и режимы'));
+    fireEvent.click(await findByText(/Избранное · Дневник/));
+    fireEvent.click(await findByText('📋 План'));
+    fireEvent.click(await findByText('⚙️ Уровень и режимы'));
     // модалка открылась
     expect(getByText('Выберите уровень поддержки')).not.toBeNull();
     fireEvent.click(getByText('🟡 Средний'));
@@ -338,11 +341,11 @@ describe('level and modes modal entry', () => {
     expect(container.querySelector('.sup-modals')).toBeNull();
   });
 
-  it('сквозной флоу: выбор недели курса из плана', () => {
-    const { getByText, queryByText } = render(<SupportScreen />);
+  it('сквозной флоу: выбор недели курса из плана', async () => {
+    const { getByText, queryByText, findByText } = render(<SupportScreen />);
     fireEvent.click(getByText('Общая информация'));
-    fireEvent.click(getByText(/Избранное · Дневник/));
-    fireEvent.click(getByText('📋 План'));
+    fireEvent.click(await findByText(/Избранное · Дневник/));
+    fireEvent.click(await findByText('📋 План'));
     // стартовая неделя видна на кнопке
     expect(getByText('📅 Неделя 6')).not.toBeNull();
     fireEvent.click(getByText('📅 Неделя 6'));

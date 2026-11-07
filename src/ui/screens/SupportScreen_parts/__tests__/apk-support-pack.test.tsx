@@ -10,7 +10,7 @@
  *    в native — класс sup-apk + загрузка стилей.
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { render, fireEvent, cleanup } from '@testing-library/react';
+import { render, fireEvent, cleanup, waitFor } from '@testing-library/react';
 import * as fs from 'fs';
 import * as path from 'path';
 import React from 'react';
@@ -158,7 +158,7 @@ describe('APK support pack', () => {
     }
   });
 
-  it('TG/web 1-в-1: загрузчик — no-op, корень без sup-apk, хуки по навигации', () => {
+  it('TG/web 1-в-1: загрузчик — no-op, корень без sup-apk, хуки по навигации', async () => {
     expect(ensureSupportApkStyles()).toBe(false);
     const { container } = render(<SupportScreen />);
     const root = container.querySelector('.support-screen');
@@ -172,8 +172,11 @@ describe('APK support pack', () => {
     const proto = container.querySelector('.support-hero-card[data-key="protocols"]') as HTMLElement;
     expect(proto, 'protocols hero card').not.toBeNull();
     fireEvent.click(proto);
-    expect(container.querySelector("[data-sup='protocols']"), 'protocols hook').not.toBeNull();
-    expect(container.querySelector("[data-sup='topbar']"), 'topbar hook').not.toBeNull();
+    // Разделы грузятся отдельными чанками (React.lazy) — ждём отрисовки.
+    await waitFor(() => {
+      expect(container.querySelector("[data-sup='protocols']"), 'protocols hook').not.toBeNull();
+      expect(container.querySelector("[data-sup='topbar']"), 'topbar hook').not.toBeNull();
+    }, { timeout: 15000 });
   });
 
   it('native: корень sup-apk, загрузчик запускает импорт', () => {
@@ -198,7 +201,7 @@ describe('APK support pack', () => {
     expect(container.querySelector("[data-sup='nav']"), 'nav removed').toBeNull();
   });
 
-  it('Навигация без таббара: hero-карточки открывают разделы изолированно', () => {
+  it('Навигация без таббара: hero-карточки открывают разделы изолированно', async () => {
     const { container } = render(<SupportScreen />);
     expect(
       container.querySelector("[data-sup='nav']"),
@@ -209,11 +212,13 @@ describe('APK support pack', () => {
     ) as HTMLElement;
     expect(infoCard, 'info hero card').not.toBeNull();
     fireEvent.click(infoCard);
-    // каталог реально виден, а не пустая шапка
-    expect(
-      container.querySelector("[data-sup='catalog']"),
-      'catalog content',
-    ).not.toBeNull();
+    // каталог реально виден, а не пустая шапка (чанк раздела грузится лениво)
+    await waitFor(() => {
+      expect(
+        container.querySelector("[data-sup='catalog']"),
+        'catalog content',
+      ).not.toBeNull();
+    }, { timeout: 15000 });
     expect(
       (container.textContent || '').length,
       'non-empty content',
@@ -230,28 +235,34 @@ describe('APK support pack', () => {
     expect(protoCard, 'protocols hero card').not.toBeNull();
     fireEvent.click(protoCard);
     // только протоколы: ни каталога, ни чужого долгоживущего tab-контента
-    expect(container.querySelector("[data-sup='protocols']")).not.toBeNull();
+    await waitFor(() => {
+      expect(container.querySelector("[data-sup='protocols']")).not.toBeNull();
+    }, { timeout: 15000 });
     expect(container.querySelector("[data-sup='catalog']")).toBeNull();
   });
 
-  it('Навигация запоминается: уход и возврат открывают тот же раздел', () => {
+  it('Навигация запоминается: уход и возврат открывают тот же раздел', async () => {
     const first = render(<SupportScreen />);
     const proto = first.container.querySelector(
       '.support-hero-card[data-key="protocols"]',
     ) as HTMLElement;
     fireEvent.click(proto);
-    expect(first.container.querySelector("[data-sup='protocols']")).not.toBeNull();
+    await waitFor(() => {
+      expect(first.container.querySelector("[data-sup='protocols']")).not.toBeNull();
+    }, { timeout: 15000 });
     const stored = JSON.parse(localStorage.getItem('he_sup_nav_v1') || '{}');
     expect(stored.section, 'persisted section').toBe('protocols');
     first.unmount();
     // новый монт (возврат во вкладку) — сразу протоколы, без кликов
     const second = render(<SupportScreen />);
-    expect(second.container.querySelector("[data-sup='protocols']"), 'restored').not.toBeNull();
+    await waitFor(() => {
+      expect(second.container.querySelector("[data-sup='protocols']"), 'restored').not.toBeNull();
+    }, { timeout: 15000 });
     expect(second.container.querySelector('.support-hero'), 'no hero').toBeNull();
     second.unmount();
   });
 
-  it('Смена раздела сбрасывает скролл наверх', () => {
+  it('Смена раздела сбрасывает скролл наверх', async () => {
     const { container } = render(<SupportScreen />);
     // нижней панели нет — навигация через hero-карточки
     expect(container.querySelectorAll("[data-sup='nav']").length, 'no nav').toBe(0);
@@ -262,7 +273,9 @@ describe('APK support pack', () => {
     ) as HTMLElement;
     expect(protoCard, 'protocols hero card').not.toBeNull();
     fireEvent.click(protoCard);
-    expect(container.querySelector("[data-sup='protocols']")).not.toBeNull();
+    await waitFor(() => {
+      expect(container.querySelector("[data-sup='protocols']")).not.toBeNull();
+    }, { timeout: 15000 });
     expect(root.scrollTop, 'scroll reset').toBe(0);
     // и после перехода нижней панели по-прежнему нет
     expect(container.querySelectorAll("[data-sup='nav']").length, 'still none').toBe(0);
@@ -280,14 +293,18 @@ describe('APK support pack', () => {
     expect(root?.getAttribute('data-theme'), 'theme hook').toBe('dark');
   });
 
-  it('Диплинк reports открывает реальные отчёты, а не пустой экран', () => {
+  it('Диплинк reports открывает реальные отчёты, а не пустой экран', async () => {
     const { container, getByText } = render(<SupportScreen initialSubTab="reports" />);
-    expect(getByText('📊 Отчёты поддержки'), 'reports header').not.toBeNull();
+    await waitFor(() => {
+      expect(getByText('📊 Отчёты поддержки'), 'reports header').not.toBeNull();
+    }, { timeout: 15000 });
     expect(container.querySelector('.support-hero'), 'no hero').toBeNull();
   });
 
-  it('Диплинк diary открывает дневник приёма', () => {
+  it('Диплинк diary открывает дневник приёма', async () => {
     const { container } = render(<SupportScreen initialSubTab="diary" />);
-    expect(container.querySelector('.sup-diary'), 'diary root').not.toBeNull();
+    await waitFor(() => {
+      expect(container.querySelector('.sup-diary'), 'diary root').not.toBeNull();
+    }, { timeout: 15000 });
   });
 });

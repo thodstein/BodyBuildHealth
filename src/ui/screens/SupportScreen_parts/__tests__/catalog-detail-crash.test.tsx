@@ -11,7 +11,7 @@
  * без фикса fireEvent.click бросает, с фиксом корень жив.
  */
 import { describe, it, expect, afterEach, vi } from 'vitest';
-import { render, fireEvent, cleanup } from '@testing-library/react';
+import { render, fireEvent, cleanup, waitFor } from '@testing-library/react';
 import React from 'react';
 
 vi.mock('../../../../data/support-database', async (importOriginal) => {
@@ -51,12 +51,15 @@ describe('catalog detail crash guard', () => {
     ['строка вместо массива', 'Строка'],
     // mechanisms строкой: падает строка списка (ловит InfoErrorBoundary ветки)
     ['механизмы строкой', 'Мех'],
-  ])('тап по битой записи (%s) не роняет экран', (_label, needle) => {
+  ])('тап по битой записи (%s) не роняет экран', async (_label, needle) => {
     try { localStorage.removeItem('he_sup_nav_v1'); } catch {}
     const { container } = render(<SupportScreen />);
     fireEvent.click(container.querySelector('.support-hero-card[data-key="info"]') as HTMLElement);
+    // Каталог — ленивый раздел: ждём его чанк.
+    await waitFor(() => {
+      expect(container.querySelector('.sup-catalogview input[placeholder*="Поиск"]'), 'search box').not.toBeNull();
+    }, { timeout: 15000 });
     const search = container.querySelector('.sup-catalogview input[placeholder*="Поиск"]') as HTMLInputElement;
-    expect(search, 'search box').not.toBeNull();
     fireEvent.change(search, { target: { value: 'яд тестовый' } });
     const rows = Array.from(
       container.querySelectorAll('.sup-catalogview [style*="cursor: pointer"]'),

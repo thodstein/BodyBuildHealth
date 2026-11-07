@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useMemo, useEffect, useCallback, useRef, Suspense } from 'react';
 import { ruCount, RU_MECHANISMS, RU_ORGANS } from '../../engines/ru-plural';
 import { SYNERGY_PAIRS, ORGAN_SYNERGIES, SUPPLEMENT_DESCRIPTIONS, SUPPLEMENT_TARGETS, SUPPORT_RESEARCH, calculateSupport, checkSupportInteractions, findSupportForGoal, findSupportByGoal, getSupportDatabaseStats, type SupportInput, type SupplementTarget } from '../../engines/support.engine';
 import type { SupportRecommendation } from '../../engines/tz-mapper-engine';
@@ -69,28 +69,31 @@ type InfoView = 'main' | 'catalog' | 'interactions' | 'stacks' | 'calc_tools' | 
 
 import { INTERACTION_TYPE_LABELS, EFFECT_LABELS, INTERACTION_SEVERITY_LABELS, CATEGORY_LABELS, MECH_TRANSLATIONS_RU, getCategoryInfo, TYPE_LABELS_RU, CLASS_BASE_NAMES, SYNERGY_COLORS, SUPPORT_CLASS_LABELS, MECH_LABELS, SUPPORT_MED_DETAIL, InfoErrorBoundary } from './SupportScreen_parts/SupportScreenData';
 import { PopupBool, PopupNumber, PopupSelect } from '../components/PopupXxx';
-import { SupportPeptideCalc } from './SupportScreen_parts/SupportPeptideCalc';
-import { SupportResearch } from './SupportScreen_parts/SupportResearch';
-import { SupportGeneratorInfo } from './SupportScreen_parts/SupportGeneratorInfo';
+/* lazy */ const SupportPeptideCalc = React.lazy(() => import('./SupportScreen_parts/SupportPeptideCalc').then(m => ({ default: m.SupportPeptideCalc })));
+/* lazy */ const SupportResearch = React.lazy(() => import('./SupportScreen_parts/SupportResearch').then(m => ({ default: m.SupportResearch })));
+/* lazy */ const SupportGeneratorInfo = React.lazy(() => import('./SupportScreen_parts/SupportGeneratorInfo').then(m => ({ default: m.SupportGeneratorInfo })));
 import { SupportHomeView } from './SupportScreen_parts/SupportHomeView';
-import { SupportCatalogView } from './SupportScreen_parts/SupportCatalogView';
+/* lazy */ const SupportCatalogView = React.lazy(() => import('./SupportScreen_parts/SupportCatalogView').then(m => ({ default: m.SupportCatalogView })));
 import { SupportInteractionsView } from './SupportScreen_parts/SupportInteractionsView';
-import { SupportFavoritesView } from './SupportScreen_parts/SupportFavoritesView';
-import { SupportDiaryView } from './SupportScreen_parts/SupportDiaryView';
-import { SupportStacksView } from './SupportScreen_parts/SupportStacksView';
+/* lazy */ const SupportFavoritesView = React.lazy(() => import('./SupportScreen_parts/SupportFavoritesView').then(m => ({ default: m.SupportFavoritesView })));
+/* lazy */ const SupportDiaryView = React.lazy(() => import('./SupportScreen_parts/SupportDiaryView').then(m => ({ default: m.SupportDiaryView })));
+/* lazy */ const SupportStacksView = React.lazy(() => import('./SupportScreen_parts/SupportStacksView').then(m => ({ default: m.SupportStacksView })));
 import { readSupportStacks, writeSupportStacks } from '../../engines/stack-storage';
-import { SupportManualPicker } from './SupportScreen_parts/SupportManualPicker';
-
-
-import { SupportProtocols } from './SupportScreen_parts/SupportProtocols';
-import { SupportBioavailability } from './SupportScreen_parts/SupportBioavailability';
-import { SupportEffectiveDose } from './SupportScreen_parts/SupportEffectiveDose';
-import { UnifiedSynergyCalculator } from './SupportScreen_parts/UnifiedSynergyCalculator';
-import { SupportTimingPlanner } from './SupportScreen_parts/SupportTimingPlanner';
+/* lazy */ const SupportManualPicker = React.lazy(() => import('./SupportScreen_parts/SupportManualPicker').then(m => ({ default: m.SupportManualPicker })));
+/* lazy */ const SupportProtocols = React.lazy(() => import('./SupportScreen_parts/SupportProtocols').then(m => ({ default: m.SupportProtocols })));
+/* lazy */ const SupportBioavailability = React.lazy(() => import('./SupportScreen_parts/SupportBioavailability').then(m => ({ default: m.SupportBioavailability })));
+/* lazy */ const SupportEffectiveDose = React.lazy(() => import('./SupportScreen_parts/SupportEffectiveDose').then(m => ({ default: m.SupportEffectiveDose })));
+/* lazy */ const UnifiedSynergyCalculator = React.lazy(() => import('./SupportScreen_parts/UnifiedSynergyCalculator').then(m => ({ default: m.UnifiedSynergyCalculator })));
+/* lazy */ const SupportTimingPlanner = React.lazy(() => import('./SupportScreen_parts/SupportTimingPlanner').then(m => ({ default: m.SupportTimingPlanner })));
 import { SupportAnalogCalculator } from './SupportScreen_parts/SupportAnalogCalculator';
-import { SupportCalcToolsHub } from './SupportScreen_parts/SupportCalcToolsHub';
-import { AutoCalculator } from './Calculator';
+/* lazy */ const SupportCalcToolsHub = React.lazy(() => import('./SupportScreen_parts/SupportCalcToolsHub').then(m => ({ default: m.SupportCalcToolsHub })));
+/* lazy */ const AutoCalculator = React.lazy(() => import('./Calculator/AutoCalculator').then(m => ({ default: m.AutoCalculator })));
 import { normalizeCalculatorState } from './Calculator/Calc.types';
+/** Пока грузится раздел (React.lazy-чанк) — без «прыжка» всего экрана. */
+const SupportLazyFallback = () => (
+  <div style={{ padding: '24px 16px', color: 'var(--text-dim)', fontSize: 12, textAlign: 'center' }}>Загрузка…</div>
+);
+
 export const SupportScreen: React.FC<{ initialTab?: SupportTab; initialSubTab?: string; onNavigate?: (screen: string) => void }> = ({ initialTab, initialSubTab, onNavigate }) => {
   const linked = useDataLink();
   // initialSubTab маппится в initialTab для обратной совместимости
@@ -3163,6 +3166,7 @@ ${planResult.monitoring?.length ? 'МОНИТОРИНГ:\n' + planResult.monitor
   React.useEffect(() => { ensureSupportApkStyles(); }, []);
   const supApk = isNativeApp() ? ' train-sup sup-apk' : ' train-sup';
   return (
+    <Suspense fallback={<SupportLazyFallback />}>
     <div ref={rootRef} className={`screen support-screen support-root${supApk}`} data-sup="root" style={{ paddingTop: section === 'protocols' ? '60px' : section === 'generator' ? '108px' : (section === 'info' || calcView === 'info' || calcView === 'peptides') ? '112px' : section !== 'home' ? '56px' : '12px', paddingBottom: `calc(16px + var(--nav-height, 68px) + env(safe-area-inset-bottom, 0px))`, overflowY: 'auto', overflowX: 'clip', minHeight: '100%', boxSizing: 'border-box' }}>
 
       {/* ===== GENERATOR SUB-TAB PILLS (glass) ===== */}
@@ -3601,5 +3605,6 @@ ${planResult.monitoring?.length ? 'МОНИТОРИНГ:\n' + planResult.monitor
         </div>
       )}
     </div>
+    </Suspense>
   );
 };
