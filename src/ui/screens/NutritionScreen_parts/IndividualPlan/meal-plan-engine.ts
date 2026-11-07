@@ -9203,7 +9203,12 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
         return _vals.length > 0 ? Math.min(..._vals) : 600;
       };
       let _g8 = 10;
-      while (totals.c < _goalC8 * 0.96 && totals.kcal < _goalK8 * 1.05 && _g8-- > 0) {
+      // Замер §8.69 (60 дней): порог 98.5% вместо 96% даёт −5 вёдер, но канон НЕ
+      // улучшает (`hugeCarb/6/тр` 6.5 → 8.3%: перезалив мейна съедается финальным
+      // срезом) и 2 дня теряют балл; +10 итераций не меняют ни грамма (стадия упирается
+      // в `!_added8`). Оставлено 96% — долг зафиксирован в аудите.
+      const _cFloor8 = _goalC8 * 0.96;
+      while (totals.c < _cFloor8 && totals.kcal < _goalK8 * 1.05 && _g8-- > 0) {
         const _cands8: Array<{ m: any; it: any; fd: any; solid: number }> = [];
         for (const m of meals) {
           const _t8 = String((m as any).type || '');
@@ -15788,6 +15793,102 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
         _resyncMps();
         _refreshProteinNote();
         notes.push(`🥩 Перекусы не голодают: ${_done72.join('; ')} — перенос «белок за белок»: белок дня сохранён (±1.5 г), основные приёмы-якоря не опускаются ниже 0.30 г/кг (§8.72).`);
+      }
+    }
+    // ─── §8.73: порошок не мельче полупорции ─────────────────────────────────────
+    // Замер 60 дней: перекус `recomp80/6/тр` — «whey_isolate 11 г» (8 г белка) при
+    // цели 19 г и пороге `pd` 23; день недобирает белок 193.5/200 = −3.25% и попадает
+    // «вне канона». Пустая ложка — не еда: порошок в тарелке полагается от полупорции
+    // 20 г. Рост гейтится каноном дня (белок/ккал/жир/угли ≤3% и не хуже, чем было),
+    // качеством и вёдрами; иначе шаг откатывается.
+    if ((input as any).powderMinPortion73 !== false
+      && _pickCtx.qualityMode === 'full'
+      && !(input as any).manualTargetsLocked
+      && (input as any).kbjuMode !== 'manual'
+      && !(input as any).recipeAssembly
+      && !(input as any).portableMode) {
+      const _MIN73 = 20;
+      const _goal73 = {
+        k: Number(input.goalKcal) || 0,
+        p: Number(adjustedProteinG || input.goalProteinG) || 0,
+        f: Number(input.goalFatG) || 0,
+        c: Number(adjustedCarbsG || input.goalCarbsG) || 0,
+      };
+      const _raw73 = {
+        k: Number(input.goalKcal) || 0,
+        p: Number(input.goalProteinG) || 0,
+        f: Number(input.goalFatG) || 0,
+        c: Number(input.goalCarbsG) || 0,
+      };
+      const _devOf73 = (g: typeof _goal73) => Math.max(
+        g.k > 0 ? Math.abs(Number(totals.kcal) - g.k) / g.k : 0,
+        g.p > 0 ? Math.abs(Number(totals.p) - g.p) / g.p : 0,
+        g.f > 0 ? Math.abs(Number(totals.f) - g.f) / g.f : 0,
+        g.c > 0 ? Math.abs(Number(totals.c) - g.c) / g.c : 0,
+      );
+      const _dev73 = () => Math.max(_devOf73(_goal73), _devOf73(_raw73));
+      const _solid73 = (m: any) => ((m.items || []) as any[])
+        .filter((x: any) => !['liquid', 'supplement'].includes(String(x.role || '')))
+        .reduce((s: number, x: any) => s + (Number(x.amount) || 0), 0);
+      const _buckets73 = () => (meals as any[]).filter((m: any) => (m.items || []).length > 0 && _solid73(m) > 500).length;
+      const _scale73 = (x: any, grams: number) => {
+        const amt = Number(x.amount) || 0;
+        if (!(amt > 0) || grams <= 0) return;
+        const k = grams / amt;
+        x.amount = Math.round(grams);
+        for (const key of ['p', 'f', 'c', 'kcal', 'fiber', 'leucine_mg']) {
+          if (x[key]) x[key] = Math.round(Number(x[key]) * k * 10) / 10;
+        }
+      };
+      let _d73 = _dev73();
+      const _pDay73 = Number(totals.p) || 0;
+      let _b73 = _buckets73();
+      let _q73 = _qNow(_finalMicro);
+      const _done73: string[] = [];
+      for (const m of meals as any[]) {
+        for (const it of (m.items || []) as any[]) {
+          if (!isProteinPowderId(it.id) || it._fixedGrams) continue;
+          if (!['protein', 'fast_protein', 'slow_protein'].includes(String(it.role))) continue;
+          const amt = Number(it.amount) || 0;
+          if (!(amt > 0) || amt >= _MIN73) continue;
+          const snap73 = ((m.items || []) as any[]).map((x: any) => ({ ...x }));
+          _scale73(it, _MIN73);
+          m.totals = mealTotalsOf(m.items);
+          recalcDayTotals(meals as any[], totals);
+          const dev = _dev73();
+          const buck = _buckets73();
+          const q = _qNow(_microNow());
+          const pDrift = Math.abs((Number(totals.p) || 0) - _pDay73);
+          const restore = () => {
+            m.items = snap73.map((x: any) => ({ ...x }));
+            m.totals = mealTotalsOf(m.items);
+            recalcDayTotals(meals as any[], totals);
+          };
+          // Канон: если день был в зоне 3% — он в ней и остаётся; белок не улетает
+          // больше 3%, качество не ниже, вёдер не больше. Плюс шаг не должен ухудшать
+          // отклонение белка от цели (иначе день с −1.3% перелетал в +2.8%: замер
+          // `c1500/4/отд`, две ложки разом).
+          const pBefore = Math.abs(_pDay73 - _goal73.p);
+          const pAfter = Math.abs((Number(totals.p) || 0) - _goal73.p);
+          if (dev > Math.max(_d73, 0.029) + 1e-9 || (dev > 0.029 && _d73 <= 0.029)
+            || pAfter > pBefore + 0.5
+            || Math.abs((Number(totals.p) || 0) - _goal73.p) / Math.max(1, _goal73.p) > 0.03
+            || buck > _b73 || q.total < _q73.total) {
+            restore();
+            continue;
+          }
+          _d73 = dev;
+          _b73 = buck;
+          _q73 = q;
+          _done73.push(`${String(m.type)}: ${String(it.id)} ${Math.round(amt)}→${_MIN73} г, белок дня ${_pDay73.toFixed(1)}→${(Number(totals.p) || 0).toFixed(1)} г`);
+          if (pDrift > 0) break;
+        }
+      }
+      if (_done73.length > 0) {
+        _finalMicro = _microNow() ?? _finalMicro;
+        _resyncMps();
+        _refreshProteinNote();
+        notes.push(`🥄 Порошок не мельче полупорции: ${_done73.join('; ')} — день сходится к цели без новой еды (§8.73).`);
       }
     }
     _jMark('final', 'Финал (микро/гигиена/витрина)');
