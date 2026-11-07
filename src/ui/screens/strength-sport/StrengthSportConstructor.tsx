@@ -38,7 +38,7 @@ import { getWL, getStrong } from '../../../engines/strength-sport/strength-sport
 import { isNativeApp } from '../../../core/app-platform';
 import { weightClassFor, weightClassLine, weightClassForInput, smWeightClassesFor, RPE_CAP_OPTIONS, SS_BLOCK_MODELS, DELOAD_VS_TAPER_NOTE, scoreCheckin, pushCheckin, loadCheckins, saveCheckins, progHashOf, autoDeloadEffective, type SsCheckin } from '../../../engines/strength-sport/strength-sport-planner-pro.engine';
 import { ROW, BTN, BTN_PRIMARY, BTN_SMALL, BTN_STRONG, INPUT, TEXT_2, ACCENT, ACCENT_STRONG, ACCENT_GRAD, STRONG_GRAD, SectionCard, Badge, InfoBanner, GroupHeading, ChipToggle, Field, Divider, Highlight, StrengthPopupSelect, StrengthPopupNumber, EventCard, LEVEL_RU, ZONE_RU, EQUIP_RU, MOBILITY_RU, MODE_RU, GOAL_RU, ruLabel } from './StrengthUI';
-import { BTN as T_BTN, BTN_GHOST as T_BTN_GHOST, PlannerStepNav, usePlannerStepScroll, PLANNER_HEAD_BAR, PLANNER_HEAD_TITLE, PLANNER_STEP_NAV_WRAP, PLANNER_FLASH } from '../TrainingScreen_parts/training-ui';
+import { BTN as T_BTN, BTN_GHOST as T_BTN_GHOST, BbRowSwitch, BbToggleChip, PlannerStepNav, usePlannerStepScroll, PLANNER_HEAD_BAR, PLANNER_HEAD_TITLE, PLANNER_STEP_NAV_WRAP, PLANNER_FLASH } from '../TrainingScreen_parts/training-ui';
 
 type Step = StrengthSportStep;
 /** Подписи шагов — в формате ББ-авто: номер + текст, эмодзи у шага выдачи. */
@@ -969,7 +969,7 @@ export const StrengthSportConstructor: React.FC = () => {
           </SectionCard>
 
           <SectionCard icon="🧠" title="Методика и волны" subtitle="Подсветка зон RIR/веса" collapsible defaultOpen={false} summary={methodologySummary} status={(dupMode !== 'off' || intensityTech !== 'none') ? 'ok' : undefined}>
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:10 }}>
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(130px,1fr))', gap:10 }}>
               <StrengthPopupSelect label="Порядок" value={methodology} onChange={v=> setMethodology(v as any)} options={[{id:'compound_first',label:'База первой',desc:'классика'},{id:'pre_exhaust',label:'Предутомление',desc:'изоляция → база'},{id:'post_exhaust',label:'Постутомление',desc:'база → изоляция'}]} />
               <StrengthPopupSelect label="DUP" value={dupMode} onChange={v=> setDupMode(v as any)} options={[{id:'off',label:'Выкл',desc:'одна зона'},{id:'heavy_light',label:'Тяж/лёг',desc:'волна'},{id:'wave',label:'Волна',desc:'3-волны'}]} />
               <StrengthPopupSelect label="Техника" value={intensityTech} onChange={v=> setIntensityTech(v as any)} options={[{id:'none',label:'Нет',desc:'чистые сеты'},{id:'cluster',label:'Кластер 3×1',desc:'база'}]} />
@@ -1014,12 +1014,10 @@ export const StrengthSportConstructor: React.FC = () => {
             </div>
             <div style={{ fontSize:11, color:'#fff', background:'rgba(255,255,255,0.04)', padding:'7px 10px', borderRadius:9 }}>{mode === 'strongman' ? weightClassLine(bodyweight, weightClass || weightClassFor(bodyweight, sex as any), sex as any) : 'Весовая категория — только для стронга (у ТА — IWF-категории)'}</div>
             {deadliftGrip==='mixed' && <InfoBanner tone="warn">Разнохват: на ≥85% — 100% разрывов бицепса на супинированной руке (PMC8237209) → hook/лямки. Камень: руки-канаты, локти прямые.</InfoBanner>}
-            <label style={{ display:'flex', gap:8, alignItems:'center', fontSize:12, color:'#fff', fontWeight:700, cursor:'pointer', minHeight:44 }}>
-              <input type="checkbox" checked={autoDeload} onChange={e=> setAutoDeload(e.target.checked)} style={{ width:20, height:20, accentColor:'#30d158' }} /> Делоды 4/7/11 (≥8 нед)
-            </label>
-            <label style={{ display:'flex', gap:8, alignItems:'center', fontSize:12, color:'#fff', fontWeight:700, cursor:'pointer', minHeight:44 }}>
-              <input type="checkbox" checked={conditioningDay} onChange={e=> setConditioningDay(e.target.checked)} style={{ width:20, height:20, accentColor:'#30d158' }} /> Отдельный cond_day (стронг GPP)
-            </label>
+            <BbRowSwitch checked={autoDeload} onChange={setAutoDeload} icon="🔄" accent="#30d158" ariaLabel="Делоды 4/7/11 (≥8 нед)"
+              title="Делоды 4/7/11 (≥8 нед)" />
+            <BbRowSwitch checked={conditioningDay} onChange={setConditioningDay} icon="🏃" accent="#30d158" ariaLabel="Отдельный cond_day (стронг GPP)"
+              title="Отдельный cond_day" desc="стронг GPP" />
             <div style={{ fontSize:10, color:'#fff', opacity:0.85 }}>{DELOAD_VS_TAPER_NOTE}</div>
           </SectionCard>
 
@@ -1074,12 +1072,11 @@ export const StrengthSportConstructor: React.FC = () => {
         <div style={{ display:'flex', flexDirection:'column', gap: 8 }}>
           <SectionCard icon="🏃" title="Вне зала — поле / кроссфит" subtitle="ACWR и объём зала ×" accent={outsideEnabled}>
             <GroupHeading icon="📊" text="Нагрузка вне зала" desc="Поле, кроссфит, GPP — декремент объёма зала" />
-            <label style={{ display:'flex', gap:8, alignItems:'center', fontSize:13, color:'#fff', fontWeight:700, background: outsideEnabled ? 'rgba(48,209,88,0.12)' : 'rgba(255,255,255,0.03)', padding:'11px 12px', borderRadius:12, border:`1px solid ${outsideEnabled?'rgba(48,209,88,0.22)':'rgba(255,255,255,0.06)'}`, cursor:'pointer', fontFamily: '-apple-system, system-ui, sans-serif' }}>
-              <input type="checkbox" checked={outsideEnabled} onChange={e => setOutsideEnabled(e.target.checked)} style={{ width:18, height:18, accentColor:'#30d158' }} /> Учитывать внезальную нагрузку — <Highlight>{outsideEnabled?'включено':'выкл'}</Highlight>
-            </label>
+            <BbRowSwitch checked={outsideEnabled} onChange={setOutsideEnabled} icon="🏃" accent="#30d158" ariaLabel="Учитывать внезальную нагрузку"
+              title="Учитывать внезальную нагрузку" desc={outsideEnabled ? 'включено — объём зала корректируется' : 'выкл — только зал'} />
             {outsideEnabled && outside && (
               <>
-                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:10 }}>
+                <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(150px,1fr))', gap:10 }}>
                   <Field label="Сессий / нед" hint={`${outside.sessionsPerWeek}×`}><div style={{ display:'flex', alignItems:'center', gap:8 }}><input type="range" min={0} max={6} value={outside.sessionsPerWeek} onChange={e => setOutside(o => o ? { ...o, sessionsPerWeek: Number(e.target.value) } : o)} style={{ flex:1 }} /><Highlight>{outside.sessionsPerWeek}×</Highlight></div></Field>
                   <Field label="Длительность" hint={`${outside.avgDurationMin} мин`}><div style={{ display:'flex', alignItems:'center', gap:8 }}><input type="range" min={30} max={180} step={10} value={outside.avgDurationMin} onChange={e => setOutside(o => o ? { ...o, avgDurationMin: Number(e.target.value) } : o)} style={{ flex:1 }} /><Highlight>{outside.avgDurationMin}′</Highlight></div></Field>
                   <Field label="RPE" hint={`RPE ${outside.avgSRPE}`}><div style={{ display:'flex', alignItems:'center', gap:8 }}><input type="range" min={1} max={10} value={outside.avgSRPE} onChange={e => setOutside(o => o ? { ...o, avgSRPE: Number(e.target.value) } : o)} style={{ flex:1 }} /><Highlight color={outside.avgSRPE>=8?'#ff3b30': outside.avgSRPE>=6?'#ff9f0a':'#30d158'}>RPE {outside.avgSRPE}</Highlight></div></Field>
@@ -1171,10 +1168,8 @@ export const StrengthSportConstructor: React.FC = () => {
               const bg = rankedCycles.find(r=> r.cycle.meta.bulgarian);
               if (!bg || !bg.blocked || !/согласие/.test(bg.blocked)) return null;
               return (
-                <label style={{ display:'flex', gap:8, alignItems:'flex-start', fontSize:11.5, color:'#fff', background:'rgba(239,68,68,0.08)', padding:'10px 12px', borderRadius:12, border:'1px solid rgba(239,68,68,0.20)', cursor:'pointer', lineHeight:1.4 }}>
-                  <input type="checkbox" checked={cycleConsent} onChange={e=> setCycleConsent(e.target.checked)} style={{ width:18, height:18, marginTop:1, accentColor:'#ef4444' }} />
-                  <span>Понимаю риск daily-max (максимумы каждый день, только advanced+, сон 8ч). Разблокировать болгарский цикл.</span>
-                </label>
+                <BbRowSwitch checked={cycleConsent} onChange={setCycleConsent} icon="⚠️" accent="#ef4444" ariaLabel="Разблокировать болгарский цикл — понимаю риск daily-max"
+                  title="Понимаю риск daily-max (максимумы каждый день, только advanced+, сон 8ч). Разблокировать болгарский цикл." />
               );
             })()}
           </SectionCard>
@@ -1201,7 +1196,7 @@ export const StrengthSportConstructor: React.FC = () => {
                       <input type="number" value={ev.weight||''} placeholder="кг" onChange={e=> setContest(c=> c ? { ...c, events: c.events.map((x,i)=> i===idx ? { ...x, weight: Number(e.target.value)||0 } : x)} : c)} style={{ width:72, minHeight:44, padding:'8px 6px', fontSize:14, fontWeight:700, background:'rgba(255,255,255,0.06)', border:'0.5px solid rgba(255,255,255,0.12)', borderRadius:10, color:'#fff', textAlign:'center', fontVariantNumeric:'tabular-nums' }} />
                       {(ev.id.includes('yoke')||ev.id.includes('farmers')||ev.id.includes('conan')||ev.id.includes('truck')||ev.id.includes('carry')||ev.id.includes('shield')||ev.id.includes('duck')) && <input type="number" value={ev.distanceM||''} placeholder="м" onChange={e=> setContest(c=> c ? { ...c, events: c.events.map((x,i)=> i===idx ? { ...x, distanceM: Number(e.target.value)||0 } : x)} : c)} style={{ width:60, minHeight:44, padding:'8px 6px', fontSize:14, fontWeight:700, background:'rgba(255,159,10,0.08)', border:'0.5px solid rgba(255,159,10,0.20)', borderRadius:10, color:'#fff', textAlign:'center', fontVariantNumeric:'tabular-nums' }} />}
                       <input type="number" value={ev.timeCapS||''} placeholder="capс" onChange={e=> setContest(c=> c ? { ...c, events: c.events.map((x,i)=> i===idx ? { ...x, timeCapS: Number(e.target.value)||0 } : x)} : c)} style={{ width:64, minHeight:44, padding:'8px 6px', fontSize:14, fontWeight:700, background:'rgba(59,130,246,0.08)', border:'0.5px solid rgba(59,130,246,0.20)', borderRadius:10, color:'#fff', textAlign:'center', fontVariantNumeric:'tabular-nums' }} />
-                      <label style={{ display:'flex', gap:6, alignItems:'center', fontSize:12, fontWeight:600, color:'#fff', minHeight:44, cursor:'pointer' }}><input type="checkbox" checked={!!ev.turn} onChange={e=> setContest(c=> c ? { ...c, events: c.events.map((x,i)=> i===idx ? { ...x, turn: e.target.checked } : x)} : c)} style={{ width:20, height:20, accentColor:'#f59e0b' }} /> разв.</label>
+                      <BbToggleChip checked={!!ev.turn} accent="#f59e0b" label="разв." ariaLabel="Разворот" onChange={v=> setContest(c=> c ? { ...c, events: c.events.map((x,i)=> i===idx ? { ...x, turn: v } : x)} : c)} />
                       <input type="number" value={ev.heightCm||''} placeholder="высота" onChange={e=> setContest(c=> c ? { ...c, events: c.events.map((x,i)=> i===idx ? { ...x, heightCm: Number(e.target.value)||0 } : x)} : c)} style={{ width:76, minHeight:44, padding:'8px 6px', fontSize:12, background:'rgba(255,255,255,0.06)', border:'0.5px solid rgba(255,255,255,0.12)', borderRadius:10, color:'#fff' }} />
                       {(ev.format==='ladder' || ev.id.includes('stone') || ev.id.includes('sandbag')) && <input type="text" value={(ev.ladderWeights||[]).join(',')} placeholder="100,110,120" onChange={e=> setContest(c=> c ? { ...c, events: c.events.map((x,i)=> i===idx ? { ...x, ladderWeights: e.target.value.split(',').map(v=> Number(v.trim())).filter(v=> v>0) } : x)} : c)} style={{ flex:1, minWidth:120, minHeight:44, padding:'8px', fontSize:12, background:'rgba(255,255,255,0.06)', border:'0.5px solid rgba(255,255,255,0.12)', borderRadius:10, color:'#fff' }} />}
                       <button onClick={()=> setContest(c=> c ? { ...c, events: c.events.filter((_,i)=> i!==idx)} : c)} style={{ width:44, height:44, borderRadius:12, background:'rgba(239,68,68,0.14)', border:'0.5px solid rgba(239,68,68,0.24)', color:'#fecaca', cursor:'pointer', fontSize:15, fontWeight:700 }}>✕</button>

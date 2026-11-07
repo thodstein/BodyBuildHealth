@@ -6,7 +6,7 @@ import React from 'react';
 import type { CombatPlan } from '../../../engines/combat/combat.types';
 import { getCombat } from '../../../engines/combat/combat-volume';
 import { buildCombatReport, isCombatPlanBlocked } from '../../../engines/combat/combat-finalize.engine';
-import { ruLabel, PHASE_RU, SESSION_TAG_RU, Badge, InfoBanner, BTN, BTN_PRIMARY, BTN_SMALL, INPUT, TEXT_3, Highlight, SectionCard, CardHeader, StatTile, GroupHeading, Divider, CombatPopupSelect } from './CombatUI';
+import { ruLabel, PHASE_RU, SESSION_TAG_RU, Badge, InfoBanner, BTN, BTN_PRIMARY, BTN_SMALL, INPUT, TEXT_3, Highlight, SectionCard, StatTile, GroupHeading, Divider, CombatPopupSelect } from './CombatUI';
 import { AnnualCard } from './combat-annual-card';
 import { CampStrip } from './cb-camp-strip';
 import { CbCampCharts } from './cb-camp-charts';
@@ -69,7 +69,6 @@ type Props = {
 /* Карта качества шея/хват/core по неделям — переиспользуется в шаге «Качество» */
 export const CbQualityMap: React.FC<{ plan: CombatPlan }> = ({ plan }) => (
   <SectionCard icon="✦" title="Карта качества" subtitle="Сеты/нед vs MEV/MRV — шея/хват/core" accent>
-    <CardHeader icon="✦" title="Карта качества — сеты/нед" subtitle="vs MEV/MRV · подсветка зон" accent />
     <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
       {(['neck', 'grip', 'core'] as const).map(kind => (
         <div key={kind} style={{ display: 'flex', gap: 8, alignItems:'center', background:'rgba(255,255,255,0.02)', padding:'8px 10px', borderRadius:12, border:'0.5px solid rgba(255,255,255,0.04)' }}>
@@ -244,10 +243,10 @@ export const CombatPlanView: React.FC<Props> = ({
       </div>
 
       {shown.validation?.errors?.length ? (
-        <div className="cb-plan-errors" style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.24)', borderRadius: 12, padding: 10, display: 'flex', flexDirection: 'column', gap: 6 }}>
-          <div style={{ fontSize: 12, fontWeight: 800, color: '#fff' }}>⛔ Сборка заблокирована ({shown.validation.errors.length}) — до врача/исправления</div>
+        <div className="cb-plan-errors" style={{ background: 'rgba(239,68,68,0.08)', border: '0.5px solid rgba(239,68,68,0.24)', borderRadius: 14, padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div style={{ fontSize: 13, fontWeight: 800, color: '#fff' }}>⛔ Сборка заблокирована ({shown.validation.errors.length}) — до врача/исправления</div>
           {shown.validation.errors.map((e, i) => (
-            <div key={i} style={{ fontSize: 11, color: '#fff' }}>• {e}</div>
+            <div key={i} style={{ fontSize: 12, color: '#fff', lineHeight: 1.45 }}>• {e}</div>
           ))}
         </div>
       ) : null}

@@ -850,8 +850,8 @@ export const CombatConstructor: React.FC = () => {
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: '#fff', marginTop: 2, fontVariantNumeric: 'tabular-nums' }}><span>2</span><span>4</span></div>
                   </Field>
                 </div>
-                <div style={{ height:0.5, background:'rgba(84,84,88,0.36)', margin:'4px 0' }} />
-                <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}><span style={{ fontSize:11, color:'#fff' }}>Акценты: <Highlight>шея</Highlight> · <Highlight>хват</Highlight> · <Highlight>ротация</Highlight> · <Highlight>кор</Highlight></span></div>
+                <div style={{ gridColumn: '1 / -1', height:0.5, background:'rgba(84,84,88,0.36)', margin:'4px 0' }} />
+                <div style={{ gridColumn: '1 / -1', display:'flex', gap:6, flexWrap:'wrap' }}><span style={{ fontSize:11, color:'#fff' }}>Акценты: <Highlight>шея</Highlight> · <Highlight>хват</Highlight> · <Highlight>ротация</Highlight> · <Highlight>кор</Highlight></span></div>
               </div>
             </SectionCard>
           </CbSec>
@@ -911,7 +911,7 @@ export const CombatConstructor: React.FC = () => {
           <CbSec title="👤 Антропометрия" defaultOpen summary={athleteSummary}>
             <SectionCard icon="👤" title="Антропометрия" subtitle="Вес и возраст — % от ПМ и тонус">
               <div style={{ display: 'flex', gap:6, flexWrap:'wrap', background:'rgba(255,255,255,0.03)', padding:'8px 10px', borderRadius:10, border:'0.5px solid rgba(255,255,255,0.06)', fontSize:11, color:'#fff' }}>Профиль: <Highlight color="#a855f7">{sex==='male'?'Мужской':'Женский'}</Highlight> · <Highlight>{bodyweight}кг</Highlight> · <Highlight>{age} лет</Highlight></div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px,1fr))', gap: 10 }}>
                 <CombatPopupSelect label="Пол" value={sex} onChange={v=> setSex(v as any)} options={[
                   { id:'male', label:'Мужской' },
                   { id:'female', label:'Женский' },
@@ -1073,7 +1073,7 @@ export const CombatConstructor: React.FC = () => {
         <div className="cb-pane" data-pane="outside" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           <CbSec title="🏁 Дата боя и тапер" defaultOpen summary={fightDate || 'без даты'}>
             <SectionCard icon="🏁" title="Дата боя и тапер" subtitle="Дата боя включает авто-тапер + сауну">
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px,1fr))', gap: 10 }}>
                 <Field label="Дата боя">
                   <input type="date" value={fightDate} onChange={e => setFightDate(e.target.value)} style={INPUT} />
                 </Field>
@@ -1296,23 +1296,23 @@ export const CombatConstructor: React.FC = () => {
                   key={c.id}
                   className="cb-cycle-card"
                   style={{
-                    textAlign: 'left', padding: 10, borderRadius: 14,
+                    textAlign: 'left', padding: '12px 14px', borderRadius: 14, fontSize: 12,
                     background: 'linear-gradient(180deg, rgba(255,255,255,0.035), rgba(20,22,28,0.55))',
                     border: '1px solid rgba(255,255,255,0.08)',
                     borderLeft: `4px solid ${edge}`,
                   }}
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-                    <span style={{ fontSize: 13, fontWeight: 800, color: '#fff' }}>{c.name}</span>
-                    <span className="cb-cycle-meta" style={{ fontSize: 11, fontWeight: 800, color: '#d8b4fe', background: 'rgba(168,85,247,0.18)', padding: '3px 8px', borderRadius: 20, border: '1px solid rgba(168,85,247,0.22)', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{c.weeks}нед · {c.daysPerWeek}×</span>
+                    <span style={{ fontSize: 15, fontWeight: 800, color: '#fff' }}>{c.name}</span>
+                    <span className="cb-cycle-meta" style={{ fontSize: 12, fontWeight: 800, color: '#d8b4fe', background: 'rgba(168,85,247,0.18)', padding: '5px 12px', borderRadius: 22, border: '1px solid rgba(168,85,247,0.33)', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{c.weeks}нед · {c.daysPerWeek}×</span>
                   </div>
-                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 4 }}>
-                    <span className="cb-cycle-author" style={{ fontSize: 10, fontWeight: 800, color: edge, background: `${edge}1f`, padding: '3px 8px', borderRadius: 20, border: `1px solid ${edge}55` }}>✒ {c.author}</span>
-                    <span style={{ fontSize: 10, fontWeight: 700, color: '#fff', background: 'rgba(255,255,255,0.06)', padding: '3px 8px', borderRadius: 20, border: '1px solid rgba(255,255,255,0.08)' }}>{ruLabel(LEVEL_RU, c.level)}</span>
-                    <span style={{ fontSize: 10, fontWeight: 700, color: '#fff', background: 'rgba(255,255,255,0.06)', padding: '3px 8px', borderRadius: 20, border: '1px solid rgba(255,255,255,0.08)' }}>{GOAL_RU[c.goal] || c.goal}</span>
-                    <span style={{ fontSize: 10, fontWeight: 700, color: '#fff', background: 'rgba(255,255,255,0.06)', padding: '3px 8px', borderRadius: 20, border: '1px solid rgba(255,255,255,0.08)', fontVariantNumeric: 'tabular-nums' }}>{ruLabel(PERIODIZATION_RU, c.periodizationModel ?? 'atr_10')}</span>
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 6 }}>
+                    <span className="cb-cycle-author" style={{ fontSize: 11, fontWeight: 700, color: edge, background: `${edge}1f`, padding: '4px 10px', borderRadius: 22, border: `1px solid ${edge}55` }}>✒ {c.author}</span>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: '#fff', background: 'rgba(255,255,255,0.06)', padding: '4px 10px', borderRadius: 22, border: '1px solid rgba(255,255,255,0.08)' }}>{ruLabel(LEVEL_RU, c.level)}</span>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: '#fff', background: 'rgba(255,255,255,0.06)', padding: '4px 10px', borderRadius: 22, border: '1px solid rgba(255,255,255,0.08)' }}>{GOAL_RU[c.goal] || c.goal}</span>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: '#fff', background: 'rgba(255,255,255,0.06)', padding: '4px 10px', borderRadius: 22, border: '1px solid rgba(255,255,255,0.08)', fontVariantNumeric: 'tabular-nums' }}>{ruLabel(PERIODIZATION_RU, c.periodizationModel ?? 'atr_10')}</span>
                   </div>
-                  <div style={{ fontSize: 11.5, color: '#fff', marginTop: 4, lineHeight: 1.4 }}>{c.blurb}</div>
+                  <div style={{ fontSize: 12, color: '#fff', marginTop: 6, lineHeight: 1.45 }}>{c.blurb}</div>
                   <button
                     onClick={() => {
                       setDiscipline(c.discipline); setGoal(c.goal); setLevel(c.level); setWeeks(c.weeks); setDays(c.daysPerWeek);
@@ -1320,7 +1320,7 @@ export const CombatConstructor: React.FC = () => {
                       buzzStep(); setMsg(`✦ Цикл «${c.name}» применён — жмите «Собрать PRO-план»`); setTimeout(() => setMsg(''), 2600);
                     }}
                     className="cb-cycle-apply"
-                    style={{ ...BTN_PRIMARY, width: '100%', marginTop: 6, padding: '10px 14px', fontSize: 12, borderRadius: 12 }}
+                    style={{ ...BTN_PRIMARY, width: '100%', marginTop: 8, padding: '12px 14px', fontSize: 13, borderRadius: 14 }}
                   >
                     ✦ Применить «{c.name}»
                   </button>
@@ -1341,19 +1341,19 @@ export const CombatConstructor: React.FC = () => {
                   className="cb-split-card"
                   data-active={active ? 'true' : 'false'}
                   style={{
-                    textAlign: 'left', padding: '12px 14px', borderRadius: 14, cursor: 'pointer', transition: 'all 0.18s ease',
+                    textAlign: 'left', padding: '12px 14px', borderRadius: 14, fontSize: 12, cursor: 'pointer', transition: 'all 0.18s ease', minHeight: 72,
                     background: active ? 'linear-gradient(180deg, rgba(168,85,247,0.14), rgba(20,22,28,0.55))' : 'rgba(20,22,28,0.55)',
-                    border: active ? '1px solid rgba(168,85,247,0.36)' : '1px solid rgba(255,255,255,0.08)',
+                    border: active ? '1px solid rgba(168,85,247,0.55)' : '1px solid rgba(255,255,255,0.08)',
                     borderLeft: `4px solid ${active ? '#a855f7' : 'rgba(255,255,255,0.14)'}`,
                   }}
                 >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontSize: 13, fontWeight: 800, color: active ? '#fff' : '#fff' }}>{p.name}</span>
-                    <span className="cb-split-freq" style={{ fontSize: 11, fontWeight: 800, color: active ? '#d8b4fe' : '#fff', background: active ? 'rgba(168,85,247,0.18)' : 'rgba(255,255,255,0.06)', padding: '3px 8px', borderRadius: 20, border: `1px solid ${active ? 'rgba(168,85,247,0.22)' : 'rgba(255,255,255,0.06)'}` }}>{p.sessionsPerRotation}×/нед</span>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+                    <span style={{ fontSize: 15, fontWeight: 800, color: '#fff', minWidth: 0 }}>{p.name}</span>
+                    <span className="cb-split-freq" style={{ fontSize: 12, fontWeight: 800, color: active ? '#d8b4fe' : '#fff', background: active ? 'rgba(168,85,247,0.18)' : 'rgba(255,255,255,0.06)', padding: '5px 12px', borderRadius: 22, border: `1px solid ${active ? 'rgba(168,85,247,0.33)' : 'rgba(255,255,255,0.07)'}`, whiteSpace: 'nowrap' }}>{p.sessionsPerRotation}×/нед</span>
                   </div>
-                  <div style={{ fontSize: 11.5, color: '#fff', marginTop: 4, lineHeight: 1.4 }}>{p.description}</div>
-                  <div className="cb-split-preview" style={{ fontSize: 11, color: '#fff', marginTop: 6, fontFamily: 'ui-monospace, monospace', background: 'rgba(0,0,0,0.18)', padding: '6px 10px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.04)' }}>{preview}</div>
-                  {active && <div className="cb-split-active" style={{ fontSize: 11, color: '#d8b4fe', fontWeight: 800, marginTop: 8, display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ width: 6, height: 6, borderRadius: '50%', background: '#a855f7', boxShadow: '0 0 8px #a855f7' }} /> Выбран — предпросмотр: {p.schedule.filter(s => s.kind === 'тренировка').map(s => SESSION_TAG_RU[s.sessionTag || ''] || s.sessionTag).join(', ')}</div>}
+                  <div style={{ fontSize: 12, color: '#fff', marginTop: 6, lineHeight: 1.45 }}>{p.description}</div>
+                  <div className="cb-split-preview" style={{ fontSize: 12, color: '#fff', marginTop: 6, fontFamily: 'ui-monospace, monospace', background: 'rgba(0,0,0,0.18)', padding: '6px 8px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.05)' }}>{preview}</div>
+                  {active && <div className="cb-split-active" style={{ fontSize: 12, color: '#d8b4fe', fontWeight: 800, marginTop: 6, display: 'flex', alignItems: 'center', gap: 8 }}><span style={{ width: 8, height: 8, borderRadius: '50%', background: '#a855f7', boxShadow: '0 0 10px #a855f7', flexShrink: 0 }} /> Выбран — предпросмотр: {p.schedule.filter(s => s.kind === 'тренировка').map(s => SESSION_TAG_RU[s.sessionTag || ''] || s.sessionTag).join(', ')}</div>}
                 </button>
               );
             })}
@@ -1448,10 +1448,10 @@ export const CombatConstructor: React.FC = () => {
             )}
           </SectionCard>
           {plan.validation?.errors?.length ? (
-            <div className="cb-errors" style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.24)', borderRadius: 12, padding: 10, display: 'flex', flexDirection: 'column', gap: 6 }}>
-              <div style={{ fontSize: 12, fontWeight: 800, color: '#fff' }}>⛔ Сборка заблокирована ({plan.validation.errors.length}) — до врача/исправления</div>
+            <div className="cb-errors" style={{ background: 'rgba(239,68,68,0.08)', border: '0.5px solid rgba(239,68,68,0.24)', borderRadius: 14, padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <div style={{ fontSize: 13, fontWeight: 800, color: '#fff' }}>⛔ Сборка заблокирована ({plan.validation.errors.length}) — до врача/исправления</div>
               {plan.validation.errors.map((e, i) => (
-                <div key={i} style={{ fontSize: 11, color: '#fff' }}>• {e}</div>
+                <div key={i} style={{ fontSize: 12, color: '#fff', lineHeight: 1.45 }}>• {e}</div>
               ))}
             </div>
           ) : null}

@@ -15,7 +15,7 @@ import { TAPER_CESSATION_DAYS, cessationDaysFor, taperLengthDaysFor } from '../.
 import { buildConditioningRationale } from '../../../engines/strength-sport/strength-sport-conditioning';
 import { moveAnnualBlock } from '../../../engines/strength-sport/strength-sport-annual';
 import { activeSeasonBlockForDate } from '../../../engines/strength-sport/strength-sport-season-planner.engine';
-import { BTN, BTN_PRIMARY, BTN_SMALL, INPUT, TEXT_2, TEXT_3, ACCENT, ACCENT_STRONG, ACCENT_SOFT, STRONG_SOFT, ACCENT_BORDER, STRONG_BORDER, SectionCard, StatTile, Badge, InfoBanner, GroupHeading, CardHeader, Highlight, HighlightStrong, ChipToggle, Divider } from './StrengthUI';
+import { BTN, BTN_PRIMARY, BTN_SMALL, INPUT, TEXT_2, TEXT_3, ACCENT, ACCENT_STRONG, ACCENT_SOFT, STRONG_SOFT, ACCENT_BORDER, STRONG_BORDER, SectionCard, StatTile, Badge, InfoBanner, GroupHeading, Highlight, HighlightStrong, ChipToggle, Divider } from './StrengthUI';
 import { StrengthGantt, StrengthHeatmap, EventCard } from './StrengthUI';
 import { MODE_RU, LEVEL_RU, PHASE_RU, ruLabel } from './StrengthUI';
 import { ruCount, RU_SESSIONS, RU_SETS, RU_BLOCKS, RU_EVENTS, RU_EVENT_DAYS } from '../../../engines/ru-plural';
@@ -353,8 +353,7 @@ export const StrengthSportPlanView: React.FC<Props> = ({
 
       {annual && (
         <>
-        <SectionCard icon="🗓️" title="Годовой план" subtitle={`${annual.totalWeeks} нед · ${ruCount(annual.blocks.length, RU_BLOCKS)} · синхронизация с дневником`} collapsible defaultOpen={false} summary={`${annual.totalWeeks} нед · ${ruCount(annual.blocks.length, RU_BLOCKS)}`}>
-          <CardHeader icon="🗓️" title={`Годовой · ${annual.totalWeeks} нед`} subtitle={`${ruCount(annual.blocks.length, RU_BLOCKS)} · ${plan.weeks} нед текущий`} />
+        <SectionCard icon="🗓️" title="Годовой план" subtitle={`${annual.totalWeeks} нед · ${ruCount(annual.blocks.length, RU_BLOCKS)} · текущий ${plan.weeks} нед`} collapsible defaultOpen={false} summary={`${annual.totalWeeks} нед · ${ruCount(annual.blocks.length, RU_BLOCKS)}`}>
           <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
             {annual.blocks.map((b:any) => {
               const col = b.mode==='weightlifting'?'#30d158': b.mode==='strongman'?'#ff9f0a':'#0a84ff';

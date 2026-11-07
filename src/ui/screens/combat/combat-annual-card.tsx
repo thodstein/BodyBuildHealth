@@ -6,7 +6,7 @@
  * чего второй (secondary) бой оттуда добавить было нельзя. Теперь копия одна.
  */
 import React from 'react';
-import { SectionCard, CardHeader, Badge, BTN_SMALL, INPUT, CombatPopupSelect, Highlight, PHASE_RU, ruLabel, TEXT_3 } from './CombatUI';
+import { SectionCard, Badge, BTN_SMALL, INPUT, CombatPopupSelect, Highlight, PHASE_RU, ruLabel, TEXT_3 } from './CombatUI';
 import { annualCBPhaseForWeek, annualResidualNote } from '../../../engines/combat/combat-annual';
 import { localIsoDate } from '../../../core/local-date';
 import { ruCount, RU_SETS, RU_BLOCKS } from '../../../engines/ru-plural';
@@ -74,13 +74,7 @@ export const AnnualCard: React.FC<AnnualCardProps> = (p) => {
 
   return (
     <div className="cb-plan-annual">
-      <SectionCard icon="🗓️" title={`Годовой ATR · ${annual.totalWeeks} нед`} subtitle={`${ruCount(blocks.length, RU_BLOCKS)} · синхронизация`} accent>
-        <CardHeader
-          icon="🗓️"
-          title={`Годовой · ${annual.totalWeeks} нед · ${ruCount(blocks.length, RU_BLOCKS)}`}
-          subtitle={`${annual.discipline ? `${annual.discipline} · ` : ''}тапер строится автоматически`}
-          accent
-        />
+      <SectionCard icon="🗓️" title={`Годовой ATR · ${annual.totalWeeks} нед`} subtitle={`${ruCount(blocks.length, RU_BLOCKS)} · ${annual.discipline ? `${annual.discipline} · ` : ''}тапер строится автоматически`} accent>
         {dday !== null && (
           <InfoDays dday={dday} firstFight={comps[0]?.name || comps[0]?.date} />
         )}

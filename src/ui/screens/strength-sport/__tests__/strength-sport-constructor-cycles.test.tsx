@@ -42,7 +42,7 @@ describe('StrengthSportConstructor: интернет-циклы', () => {
     // Чекбокс согласия виден (блокировка именно по согласию)
     const consent = await screen.findByText(/Понимаю риск daily-max/);
     expect(consent).toBeTruthy();
-    fireEvent.click(screen.getByRole('checkbox'));
+    fireEvent.click(screen.getByRole('switch', { name: /Разблокировать болгарский цикл/ }));
     fireEvent.click(screen.getByLabelText('Цикл'));
     fireEvent.click(await screen.findByText(/болгарский максимум/));
     await waitFor(() => expect(container.textContent).toContain('Дословно'));

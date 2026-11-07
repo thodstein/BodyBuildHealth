@@ -3185,6 +3185,21 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
               ))}
             </div>
           </AdSec>
+          {yearBuilt && (
+            <AdSec title="📊 Итог года" collapsible defaultOpen={true} summary={`${ruCount(yearBuilt.length, RU_BLOCKS)}`}>
+              <div className="ad-list" data-arm="year-result">
+                {yearBuilt.map((r: any)=>(
+                  <div key={r.blockKey} className="ad-sec ad-bio" data-valid={r.warnings.length ? 'warn' : 'ok'}>
+                    <div className="ad-row" style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                      <span><b>{r.blockKey}</b> <span className="ad-muted">· {r.weeks.length} нед{r.taperApplied ? ' · тейпер' : ''}{r.peakApplied ? ' · пик' : ''}</span></span>
+                      {r.warnings.length > 0 && <span className="ad-tag">⚠ {r.warnings.length}</span>}
+                    </div>
+                    {r.warnings.slice(0, 3).map((w: string, i: number)=><div key={i} className="ad-finding" data-level="warn">{w}</div>)}
+                  </div>
+                ))}
+              </div>
+            </AdSec>
+          )}
           <AdCta>
             <AdBtn variant="primary" block hero disabled={yearBusy} onClick={async ()=>{
               if (yearBusy) return;
@@ -3242,21 +3257,6 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
             }}>{yearBusy ? '⏳ Собираем год…' : '🗓 Собрать год'}</AdBtn>
             <AdBtn variant="ghost" block onClick={()=>setStep('export')}>← Назад</AdBtn>
           </AdCta>
-          {yearBuilt && (
-            <AdSec title="📊 Итог года" collapsible defaultOpen={true} summary={`${ruCount(yearBuilt.length, RU_BLOCKS)}`}>
-              <div className="ad-list" data-arm="year-result">
-                {yearBuilt.map((r: any)=>(
-                  <div key={r.blockKey} className="ad-sec ad-bio" data-valid={r.warnings.length ? 'warn' : 'ok'}>
-                    <div className="ad-row" style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                      <span><b>{r.blockKey}</b> <span className="ad-muted">· {r.weeks.length} нед{r.taperApplied ? ' · тейпер' : ''}{r.peakApplied ? ' · пик' : ''}</span></span>
-                      {r.warnings.length > 0 && <span className="ad-tag">⚠ {r.warnings.length}</span>}
-                    </div>
-                    {r.warnings.slice(0, 3).map((w: string, i: number)=><div key={i} className="ad-finding" data-level="warn">{w}</div>)}
-                  </div>
-                ))}
-              </div>
-            </AdSec>
-          )}
         </AdCard>
       )}
     </AdRoot>
