@@ -81,7 +81,7 @@ export interface Meal {
   type: 'breakfast' | 'lunch' | 'snack' | 'snack2' | 'snack3' | 'snack4' | 'snack5' | 'snack6' | 'preworkout' | 'intra' | 'postworkout' | 'dinner' | 'presleep';
   rationale: string[];
   mpsCheck?: { proteinG: number; leucineG: number; triggers_mTOR: boolean };
-  target?: { p: number; c: number; f: number; /** §8.60: цели для показа (план приёма, см. §8.60) */ fd?: number; cd?: number };
+  target?: { p: number; c: number; f: number; /** §8.60: цели для показа (план приёма, см. §8.60) */ fd?: number; cd?: number; /** §8.60: MPS-порог приёма по белку для показа */ pd?: number };
 }
 
 export interface DayPlanV2 {
@@ -15347,6 +15347,18 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
         for (const m of _regs60) {
           m.target.cd = Math.max(0, Math.round((Number(m.totals?.c) || 0) * _kC60));
         }
+      }
+      // Белок: у цели приёма другой смысл — это MPS-порог («не меньше»), а не «ровно
+      // столько». Замер: завтрак 49 раз из 60 «не добирал» до цели 46 г, имея 35 г =
+      // 0.39 г/кг — порог 0.30 г/кг закрыт с запасом, тревога ложная. Перекус наоборот:
+      // цель 22 г (0.24 г/кг) ниже порога, а тарелка 29 г — «перебор», которого нет.
+      // Поэтому для показа кладём порог `pd` = 0.30 г/кг, и UI говорит только про НЕДОБОР
+      // до него. Рабочий `target.p` (доля дня) не трогаем — его читают корректор и
+      // стадии перекладки белка.
+      const _w60 = Number(input.weightKg) || 0;
+      if (_w60 > 0) {
+        const _mpsP60 = Math.round(0.3 * _w60);
+        for (const m of _regs60) m.target.pd = _mpsP60;
       }
     }
     return {

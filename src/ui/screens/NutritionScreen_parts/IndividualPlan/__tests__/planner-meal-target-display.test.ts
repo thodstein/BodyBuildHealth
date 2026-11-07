@@ -111,7 +111,50 @@ describe('§8.60 цель приёма = план приёма (`target.fd` / `t
       for (const m of plan.meals || []) {
         const t = String(m.type);
         const fixed = ['preworkout', 'postworkout', 'intra', 'presleep'].includes(t) || (m as any)._insulinWindow;
-        if (fixed && (Number.isFinite(Number(m.target?.fd)) || Number.isFinite(Number(m.target?.cd)))) bad.push(`${key}:${t}`);
+        if (fixed && (Number.isFinite(Number(m.target?.fd)) || Number.isFinite(Number(m.target?.cd)) || Number.isFinite(Number(m.target?.pd)))) bad.push(`${key}:${t}`);
+      }
+    }
+    expect(bad.slice(0, 5).join(', ')).toBe('');
+  });
+
+  /**
+   * Белок: цель приёма — MPS-порог («не меньше»), а не «ровно столько».
+   * Замер до: 227 из 322 приёмов «вне цели» >3 г, причём завтрак 49 раз из 60
+   * «не добирал» до цели 46 г, имея 35 г = 0.39 г/кг (порог 0.30 закрыт с запасом),
+   * а перекус показывал «перебор» при тарелке 0.32 г/кг. То есть тревога была ложной
+   * в обе стороны.
+   */
+  it('белок: бейдж только при недоборе до порога 0.30 г/кг (227 → ≤84 на 60 дней)', () => {
+    let below = 0;
+    let meals = 0;
+    const bad: string[] = [];
+    for (const { key, profile, plan } of cells(true)) {
+      const want = Math.round(0.3 * profile.w);
+      for (const m of plan.meals || []) {
+        const pd = Number(m.target?.pd);
+        if (!Number.isFinite(pd)) continue;
+        meals++;
+        if (pd !== want) bad.push(`${key}:${m.type} pd ${pd} ≠ ${want}`);
+        if ((Number(m.totals?.p) || 0) < pd - 3) below++;
+      }
+    }
+    expect(bad.slice(0, 5).join(', ')).toBe('');
+    expect(meals).toBeGreaterThan(250);
+    expect(below, 'приёмов ниже MPS-порога').toBeLessThanOrEqual(84);
+  });
+
+  it('цели приёмов по белку: числовые и не раздуты выше дневной цели', () => {
+    // ДОЛГ: сумма рабочих целей по белку НЕ равна дневной цели — на p500/4/отд
+    // 368 г при цели 500 (доли роль-весов + капсы окон). Это проект «цели приёмов от
+    // структурных минимумов», записан в §8.60 аудита; здесь он не продавливается.
+    // Попытка §8.61 (двигать цель вместе с переносом белка в QG14) отклонена: ломает
+    // QG52 «не-еда» (4 → 5) и видимого выигрыша не даёт — UI по белку уже берёт порог `pd`.
+    const bad: string[] = [];
+    for (const { key, profile, plan } of cells(true)) {
+      for (const m of plan.meals || []) {
+        const p = Number(m.target?.p);
+        if (!Number.isFinite(p) || p < 0) bad.push(`${key}:${m.type} p=${p}`);
+        else if (p > profile.p * 1.2) bad.push(`${key}:${m.type} p=${p} > ${profile.p}`);
       }
     }
     expect(bad.slice(0, 5).join(', ')).toBe('');
