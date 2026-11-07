@@ -38,6 +38,26 @@ import {
   AB_SLOTS, type AbSlot, type AbPlanSnapshot, type AbDiffResult,
 } from "./planner-ab-compare";
 
+/* ── Индекс продуктов для рендера ─────────────────────────────────────────
+ * В рендере не разу не вызывался FOOD_DB.find(...) на каждый приём/пункт:
+ * это линейный скан ~1000 позиций на каждый вызов (десятки вызовов за
+ * перерисовку). Индексы «первое вхождение» дают ровно тот же результат, что
+ * и `find(f => f.id === id || f.name === name)`: берём минимальный из двух
+ * первых индексов. */
+const FOOD_FIRST_BY_ID = new Map<string, number>();
+const FOOD_FIRST_BY_NAME = new Map<string, number>();
+FOOD_DB.forEach((f, i) => {
+  if (typeof f.id === 'string' && f.id && !FOOD_FIRST_BY_ID.has(f.id)) FOOD_FIRST_BY_ID.set(f.id, i);
+  const nm = (f as { name?: string }).name;
+  if (typeof nm === 'string' && nm && !FOOD_FIRST_BY_NAME.has(nm)) FOOD_FIRST_BY_NAME.set(nm, i);
+});
+const findFoodBy = (id?: string | null, name?: string | null) => {
+  const a = id ? FOOD_FIRST_BY_ID.get(id) : undefined;
+  const b = name ? FOOD_FIRST_BY_NAME.get(name) : undefined;
+  const idx = a === undefined ? b : b === undefined ? a : Math.min(a, b);
+  return idx === undefined ? undefined : FOOD_DB[idx];
+};
+
 const getDiaryEntriesForDate = (date: string): any[] => {
   try {
     const diary = readDiaryV2();
@@ -330,7 +350,7 @@ export const IndividualPlanResults: React.FC = () => {
       const currentFoodIds = new Set((m.items || []).map((it: any) => it.id).filter(Boolean));
       const issues: { type: string; text: string; severity: 'low' | 'medium' | 'high'; suggestion?: { foodId: string; name: string; reason: string }[] }[] = [];
       const products = (m.items || []).map((it: any) => {
-        const food = FOOD_DB.find(f => f.id === it.id || f.name === it.name);
+        const food = findFoodBy(it.id, it.name);
         return { ...it, food };
       });
       const totalKcal = m.totals?.kcal || 0;
@@ -393,7 +413,7 @@ export const IndividualPlanResults: React.FC = () => {
   };
 
   const itemToProduct = (it: any) => {
-    const food = FOOD_DB.find(f => f.id === it.id || f.name === it.name);
+    const food = findFoodBy(it.id, it.name);
     return { foodId: food?.id || it.name || 'unknown', weightGrams: Number.isFinite(it.amount) ? it.amount : 100 };
   };
 
@@ -2148,18 +2168,18 @@ const doImportPlan = (raw: string): boolean => {
                 // P1-fix: null guard на dayPlan.meals — был crash при meals=null
                 const items = (Array.isArray(dayPlan.meals) ? dayPlan.meals : []).flatMap((m: any) => m.items || []);
                 const gl = Math.round(items.reduce((sum: number, it: any) => {
-                  const food = FOOD_DB.find(f => f.id === it.id || f.name === it.name);
+                  const food = findFoodBy(it.id, it.name);
                   if (!food?.gi) return sum;
                   const amountRatio = (it.amount || 100) / 100;
                   const availableCarbs = Math.max(0, (food.carbs || 0) - (food.fiber || 0)) * amountRatio;
                   return sum + availableCarbs * food.gi / 100;
                 }, 0));
                 const carbItems = items.filter((it: any) => {
-                  const food = FOOD_DB.find(f => f.id === it.id || f.name === it.name);
+                  const food = findFoodBy(it.id, it.name);
                   return food?.gi && (food.carbs || 0) > 0;
                 });
                 const avgGI = carbItems.length > 0 ? Math.round(carbItems.reduce((sum: number, it: any) => {
-                  const food = FOOD_DB.find(f => f.id === it.id || f.name === it.name);
+                  const food = findFoodBy(it.id, it.name);
                   return sum + (food?.gi || 0);
                 }, 0) / carbItems.length) : 0;
                 const totalCarbs = dayPlan.totals?.c || 0;
@@ -2413,7 +2433,7 @@ const doImportPlan = (raw: string): boolean => {
           if (specialMealGoal === 'before_bed') picks.push({ id: 'cottage_cheese', g: Math.round(p / 18 * 100) });
           if (specialMealGoal === 'keto' && f > 20) picks.push({ id: 'avocado', g: Math.round(f / 15 * 100) });
           return picks.map(pk => {
-            const food = FOOD_DB.find(x => x.id === pk.id);
+            const food = findFoodBy(pk.id);
             return { id: pk.id, name: food?.name || pk.id, amount: pk.g + 'г' };
           });
         };
@@ -3243,7 +3263,7 @@ const doImportPlan = (raw: string): boolean => {
                                     // была мёртвой. Теперь ищем «жертву» — позицию в приёме, из-за
                                     // которой возникла проблема (см. pickReplaceIdxForIssue), и
                                     // меняем ИМЕННО её на предложенный продукт.
-                                    const target = FOOD_DB.find(f => f.id === s.foodId);
+                                    const target = findFoodBy(s.foodId);
                                     const items = activeMeal?.items || [];
                                     const victimIdx = pickReplaceIdxForIssue(items, issue.type);
                                     if (target && victimIdx >= 0 && items[victimIdx]) {

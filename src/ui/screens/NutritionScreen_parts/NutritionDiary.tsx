@@ -168,13 +168,18 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
       </div>
 
       {/* Переход к добавлению — обычная кнопка в потоке, на одном и том же месте.
-          Плавающих/FAB-кнопок в дневнике нет: только закреплённые в раскладке. */}
+          Плавающих/FAB-кнопок в дневнике нет: только закреплённые в раскладке.
+          Классы `nut-diary-fabbar` / `nut-diary-fab` — якоря APK-слоя
+          (styles-native.css §75): там они работают как обёртка и кнопка в потоке,
+          но с гарантированным safe-area отступом. */}
       {tab !== 'add' && (
-        <button onClick={() => setTab('add')} aria-label="Быстро добавить" className="nd-addfood-pin"
-          style={{ width: '100%', minHeight: 52, borderRadius: 14, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-            border: '1px solid rgba(0,230,138,0.25)', background: 'rgba(0,230,138,0.08)', color: '#00e68a', fontSize: 13, fontWeight: 800 }}>
-          <span style={{ fontSize: 16, lineHeight: 1 }}>＋</span> Добавить еду
-        </button>
+        <div className="nut-diary-fabbar" style={{ display: 'flex' }}>
+          <button onClick={() => setTab('add')} aria-label="Быстро добавить" className="nd-addfood-pin nut-diary-fab"
+            style={{ flex: 1, width: '100%', minHeight: 52, borderRadius: 14, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+              border: '1px solid rgba(0,230,138,0.25)', background: 'rgba(0,230,138,0.08)', color: '#00e68a', fontSize: 13, fontWeight: 800 }}>
+            <span style={{ fontSize: 16, lineHeight: 1 }}>＋</span> Добавить еду
+          </button>
+        </div>
       )}
 
       {/* Tab content */}

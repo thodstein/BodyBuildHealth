@@ -78,11 +78,12 @@ interface TooltipState {
   values: { field: string; color: string; value: number; label: string }[];
 }
 
-const Tooltip: React.FC<TooltipState> = ({ x, y, date, values }) => {
+const Tooltip = React.forwardRef<HTMLDivElement, TooltipState>(function Tooltip({ x, y, date, values }, ref) {
   if (!values.length) return null;
   const top = Math.max(0, y - 80);
   return (
     <div
+      ref={ref}
       style={{
         position: 'fixed',
         left: x + 12,
@@ -108,7 +109,7 @@ const Tooltip: React.FC<TooltipState> = ({ x, y, date, values }) => {
       ))}
     </div>
   );
-};
+});
 
 /* ── Legend ────────────────────────────────────────────────── */
 
@@ -143,6 +144,12 @@ export const OverlayChart: React.FC<OverlayChartProps> = ({
   const [hoverIdx, setHoverIdx] = useState<number | null>(null);
   const touchStartX = useRef<number>(0);
   const [swipeIndex, setSwipeIndex] = useState(0);
+  // Подсказка следует за курсором: двигаем её напрямую через DOM, а не
+  // перерисовкой всего SVG на каждый mousemove (десятки точек × серии =
+  // дёрганый hover на телефоне).
+  const tooltipRef = useRef<HTMLDivElement>(null);
+  const rafRef = useRef<number>(0);
+  const pendingPos = useRef<{ x: number; y: number } | null>(null);
 
   const activeSeries = useMemo(
     () =>
@@ -200,7 +207,24 @@ export const OverlayChart: React.FC<OverlayChartProps> = ({
     const relX = clientX - rect.left;
     const relY = clientY - rect.top;
     const idx = Math.round(((relX - 42) / 540) * (dates.length - 1));
-    if (idx < 0 || idx >= dates.length) { setTooltip(null); setHoverIdx(null); return; }
+    if (idx < 0 || idx >= dates.length) { onLeave(); return; }
+    // День не сменился — двигаем только подсказку (через DOM, с коалесценцией
+    // в один кадр). Полная перерисовка SVG нужна лишь при смене точки.
+    if (idx === hoverIdx) {
+      pendingPos.current = { x: relX, y: relY };
+      if (!rafRef.current && typeof requestAnimationFrame === 'function') {
+        rafRef.current = requestAnimationFrame(() => {
+          rafRef.current = 0;
+          const pos = pendingPos.current;
+          const el = tooltipRef.current;
+          if (pos && el) {
+            el.style.left = `${pos.x + 12}px`;
+            el.style.top = `${Math.max(0, pos.y - 80)}px`;
+          }
+        });
+      }
+      return;
+    }
     const date = dates[idx];
     const vals = activeSeries
       .map(s => {
@@ -213,7 +237,15 @@ export const OverlayChart: React.FC<OverlayChartProps> = ({
     setTooltip({ x: relX, y: relY, date, values: vals });
   };
 
-  const onLeave = () => { setTooltip(null); setHoverIdx(null); };
+  const onLeave = () => {
+    if (rafRef.current) {
+      try { cancelAnimationFrame(rafRef.current); } catch { /* ignore */ }
+      rafRef.current = 0;
+    }
+    pendingPos.current = null;
+    setTooltip(null);
+    setHoverIdx(null);
+  };
 
   const handleSwipe = (dir: 1 | -1) => {
     if (!onSwipeField || activeSeries.length <= 1) return;
@@ -405,7 +437,7 @@ export const OverlayChart: React.FC<OverlayChartProps> = ({
 
       <ChartLegend series={activeSeries} />
 
-      {tooltip && <Tooltip {...tooltip} />}
+      {tooltip && <Tooltip ref={tooltipRef} {...tooltip} />}
     </div>
   );
 };

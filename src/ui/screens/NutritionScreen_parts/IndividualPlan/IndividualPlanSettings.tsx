@@ -16,6 +16,28 @@ import { plannerWeightAdjustAdvice } from './planner-targets';
 import { recommendMealCount, planMealStructure } from './planner-meal-count';
 
 /**
+ * Поиск по FOOD_DB без повторных toLowerCase на каждый рендер.
+ * Индекс строится один раз при загрузке модуля («имя\0id» в нижнем регистре),
+ * поэтому фильтрация по вводу — один `includes` на продукт. Семантика та же:
+ * совпадение по имени ИЛИ по id.
+ */
+const FOOD_SEARCH_INDEX: { food: (typeof FOOD_DB)[number]; hay: string }[] = FOOD_DB.map(f => ({
+  food: f,
+  hay: `${f.name || ''}\u0000${f.id || ''}`.toLowerCase(),
+}));
+
+function searchFoods(query: string, limit = 60) {
+  const q = (query || '').toLowerCase();
+  const out: (typeof FOOD_DB)[number][] = [];
+  for (const row of FOOD_SEARCH_INDEX) {
+    if (q && !row.hay.includes(q)) continue;
+    out.push(row.food);
+    if (out.length >= limit) break;
+  }
+  return out;
+}
+
+/**
  * FIX audit (C1): «Заполнить анализы» дублировалась в двух карточках (~30 строк копии).
  * Единая чистая функция: v2Labs-мапа кодов → поля (POTASSIUM/SODIUM/MAGNESIUM
  * НЕ импортируются — это дневные цели электролитов, не сыворотка).
@@ -2083,7 +2105,7 @@ export const IndividualPlanSettings: React.FC = () => {
       {(() => {
         const allRecipes = [...getRecipes(), ...(userRecipes||[])] as Recipe[];
         const prefRecipeRows = (setFn: (v: string[]) => void, current: string[], lsKey: string, search: string) =>
-          allRecipes.filter(r => !search || r.name.toLowerCase().includes(search.toLowerCase())).map(r => {
+          allRecipes.filter(r => !search || r.name.toLowerCase().includes(search.trim().toLowerCase())).map(r => {
             const rid = '__recipe__' + r.name;
             const urid = '__user_recipe__' + r.name;
             const sel = current.includes(rid) || current.includes(urid);
@@ -2114,7 +2136,7 @@ export const IndividualPlanSettings: React.FC = () => {
             <div style={{ fontSize:14, fontWeight:700, color:'#00e68a', marginBottom:8, textAlign:'center' }}>🌟 Любимые продукты и рецепты</div>
             <input value={prefSearch} onChange={e => setPrefSearch(e.target.value)} placeholder="Поиск продуктов и рецептов..." style={{ ...inputStyle, marginBottom:8, fontSize:11, padding:'8px 10px', boxSizing:'border-box', width:'100%' }} />
             <div style={{ display:'flex', flexDirection:'column', gap:3, maxHeight:'50vh', overflowY:'auto' }}>
-              {FOOD_DB.filter(f => !prefSearch || (f.name||'').toLowerCase().includes(prefSearch.toLowerCase()) || (f.id||'').toLowerCase().includes(prefSearch.toLowerCase())).slice(0,60).map(f => {
+              {searchFoods(prefSearch).map(f => {
                 const sel = preferredFoods.includes(f.id);
                 const mealBound = (['Завтрак','Обед','Ужин','Полдник']).find(m => (preferredByMeal[m]||[]).includes(f.id));
                 return (
@@ -2141,7 +2163,7 @@ export const IndividualPlanSettings: React.FC = () => {
             <div style={{ fontSize:14, fontWeight:700, color:'#ef4444', marginBottom:8, textAlign:'center' }}>🚫 Исключённые продукты и рецепты</div>
             <input value={exclSearch} onChange={e => setExclSearch(e.target.value)} placeholder="Поиск продуктов и рецептов..." style={{ ...inputStyle, marginBottom:8, fontSize:11, padding:'8px 10px', boxSizing:'border-box', width:'100%' }} />
             <div style={{ display:'flex', flexDirection:'column', gap:3, maxHeight:'50vh', overflowY:'auto' }}>
-              {FOOD_DB.filter(f => !exclSearch || (f.name||'').toLowerCase().includes(exclSearch.toLowerCase()) || (f.id||'').toLowerCase().includes(exclSearch.toLowerCase())).slice(0,60).map(f => {
+              {searchFoods(exclSearch).map(f => {
                 const sel = excludedFoods.includes(f.id);
                 return (
                   <div key={f.id} onClick={() => {

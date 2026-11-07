@@ -1767,6 +1767,10 @@ const exportAllDiariesPdf = () => {
           </AccordionSection>
 
           {/* ── Модальные окна для быстрого добавления из карточек дневников ── */}
+          {/* Закрытые модалки не монтируются вовсе: раньше все семь всегда
+              рендерились (даже скрытые) и пересобирали разметку на каждый рендер
+              вкладки. Открывается — монтируется, закрылась — снимается. */}
+          {addSleepOpen && (
           <AddSleepModal
             open={addSleepOpen}
             onClose={() => setAddSleepOpen(false)}
@@ -1784,7 +1788,8 @@ const exportAllDiariesPdf = () => {
               });
               if (routine?.step === 'sleep') advanceRoutine();
             }}
-          />
+          />)}
+          {addBPOpen && (
           <AddBPModal
             open={addBPOpen}
             presetTimeOfDay={routine?.step === 'bp' ? (routine.kind === 'evening' ? 'evening' : 'morning') : undefined}
@@ -1814,7 +1819,8 @@ const exportAllDiariesPdf = () => {
               });
               if (routine?.step === 'bp') advanceRoutine();
             }}
-          />
+          />)}
+          {addBodyMeasurementsOpen && (
           <AddBodyMeasurementsModal
             open={addBodyMeasurementsOpen}
             onClose={() => setAddBodyMeasurementsOpen(false)}
@@ -1839,7 +1845,8 @@ const exportAllDiariesPdf = () => {
               );
               if (routine?.step === 'weight') advanceRoutine();
             }}
-          />
+          />)}
+          {addWeightOpen && (
           <AddWeightModal
             open={addWeightOpen}
             onClose={() => setAddWeightOpen(false)}
@@ -1864,7 +1871,8 @@ const exportAllDiariesPdf = () => {
               );
               if (routine?.step === 'weight') advanceRoutine();
             }}
-          />
+          />)}
+          {addInjectionOpen && (
           <AddInjectionModal
             open={addInjectionOpen}
             onClose={() => setAddInjectionOpen(false)}
@@ -1882,7 +1890,8 @@ const exportAllDiariesPdf = () => {
                 setInjectionEntries(prev);
               });
             }}
-          />
+          />)}
+          {addHealthOpen && (
           <AddHealthModal
             open={addHealthOpen}
             onClose={() => setAddHealthOpen(false)}
@@ -1950,7 +1959,8 @@ const exportAllDiariesPdf = () => {
               });
               if (routine?.step === 'health') advanceRoutine();
             }}
-          />
+          />)}
+          {addCardioOpen && (
           <AddCardioModal
             open={addCardioOpen}
             onClose={() => setAddCardioOpen(false)}
@@ -1969,7 +1979,7 @@ const exportAllDiariesPdf = () => {
                 },
               );
             }}
-          />
+          />)}
         </>
       )}
 
