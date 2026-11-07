@@ -2901,8 +2901,8 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
             <>
                <AdSec title={`📤 Экспорт — ${builtPlan.pattern.name}`} hint="Печать · .ics · CSV · копировать сводку">
                {exportBlocked && <AdBanner tone="bad" hook="export-blocked">⛔ Экспорт заблокирован: план содержит safety-блокеры. Сначала исправьте их в разделе «Качество».</AdBanner>}
-               <div className="ad-row" data-arm="export-actions" style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8 }}>
-                 <AdBtn variant="ghost" disabled={exportBlocked} onClick={() => {
+               <div className="ad-row" data-arm="export-actions" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px,1fr))', gap: 8, marginTop: 8 }}>
+                 <AdBtn variant="primary" disabled={exportBlocked} onClick={() => {
 
                   let diag: any = null;
                   try { const raw = localStorage.getItem('he_arm_last_diagnostics'); if (raw) diag = JSON.parse(raw); } catch {}
@@ -2921,8 +2921,8 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
                   const html = buildArmPrintHtml(viewPlan, { findings: diag?.findings, humerusWarnings: diag?.humerusWarnings, balanceWarnings: diag?.balanceWarnings, asymmetryPct: diag?.asymmetryPct, benchLevel: diag?.benchLevel, fatigue: diag?.fatigue, trend: diag?.trend, info: [...(diag?.info ?? []), ...annotationLines.map(l => `🎥 ${l}`)], movement: diag?.movement, armliftMovement }, proSummary);
                   const w = window.open('', '_blank');
                   if (w) { w.document.write(html); w.document.close(); } else flash('⚠ Всплывающие окна заблокированы');
-                 }} block style={{ minHeight: 48 }}>🖨 Печать</AdBtn>
-                 <AdBtn variant="ghost" disabled={exportBlocked} block style={{ minHeight: 48 }} onClick={() => {
+                 }} style={{ minHeight: 48 }}>🖨 Печать</AdBtn>
+                 <AdBtn variant="ghost" disabled={exportBlocked} style={{ minHeight: 48 }} onClick={() => {
                    const ics = buildArmIcs(viewPlan);
 
                   const blob = new Blob([ics], { type: 'text/calendar' });
@@ -2988,7 +2988,7 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
                     if (nav?.clipboard?.writeText) nav.clipboard.writeText(txt).then(done, fallback);
                     else fallback();
                   } catch { fallback(); }
-                }} block style={{ minHeight: 48 }}>📋 Копировать сводку</AdBtn>
+                }} style={{ minHeight: 48 }}>📋 Копировать сводку</AdBtn>
               </div>
               </AdSec>
               <AdSec title="💾 Варианты плана" hint="Сохранить текущий (с правками), загрузить, удалить. Кап 10." collapsible defaultOpen={false} summary={`${armVariants.length}/10`}>

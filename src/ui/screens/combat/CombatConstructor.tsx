@@ -42,7 +42,7 @@ import { useCombatWizard, type WizardStep } from './useCombatWizard';
 import {
   CARD_ACCENT, ROW, COL, LABEL, HINT, HINT_SM, BTN, BTN_PRIMARY, BTN_SMALL, BTN_GHOST,
   INPUT, SELECT, CHIP, CHIP_ACTIVE, PHASE_COLOR, DISCIPLINE_COLOR, ACCENT, ACCENT_GRAD, TEXT_3,
-  SectionCard, StatTile, Badge, InfoBanner, GroupHeading, SectionNav, Stepper, ChipToggle, Field, Divider, Highlight, AccentText, CombatPopupSelect, CombatPopupNumber,
+  SectionCard, StatTile, Badge, InfoBanner, GroupHeading, ChipToggle, Field, Divider, Highlight, AccentText, CombatPopupSelect, CombatPopupNumber,
   EQUIP_RU, MOBILITY_RU, LEVEL_RU, PHASE_RU, ZONE_RU, PERIODIZATION_RU, SESSION_TAG_RU, ruLabel, CbSwitch,
 } from './CombatUI';
 import { BTN as T_BTN, BTN_GHOST as T_BTN_GHOST, H as T_H, IN as T_IN, PlannerStepNav, usePlannerStepScroll, PLANNER_HEAD_BAR, PLANNER_HEAD_TITLE, PLANNER_STEP_NAV_WRAP, PLANNER_FLASH, bbCardChrome, bbIconTile, bbCardTitle, bbCardBadge, PlannerNestedCardContext, plannerTitleText } from '../TrainingScreen_parts/training-ui';

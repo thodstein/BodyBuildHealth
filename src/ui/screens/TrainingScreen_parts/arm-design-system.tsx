@@ -295,13 +295,14 @@ export function AdSheetSelect({
         // влияния backdrop-filter/transform предков), а классы .ad-* цепляются.
         // В native — тот же arm-apk скоуп, чтобы работали APK-правила шита.
         <div className={isNativeApp() ? 'train-arm arm-apk' : 'train-arm'} data-arm="sheet-portal">
-        <div className="ad-sheet-backdrop" style={{ alignItems: 'center', background: 'rgba(0,0,0,0.85)' }} onClick={() => setOpen(false)}>
+        <style>{'@keyframes adPopFade{from{opacity:0}to{opacity:1}}@keyframes adPopSheetUp{from{opacity:0;transform:translateY(8px) scale(0.98)}to{opacity:1;transform:none}}'}</style>
+        <div className="ad-sheet-backdrop" style={{ alignItems: 'center', background: 'rgba(0,0,0,0.85)', animation: 'adPopFade 0.20s ease' }} onClick={() => setOpen(false)}>
           <div
             className="ad-sheet-card"
             role="dialog"
             aria-label={label}
             onClick={(e) => e.stopPropagation()}
-            style={{ width: '88%', maxWidth: 420, maxHeight: '78vh', borderRadius: 16, background: '#18181b', border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 20px 60px rgba(0,0,0,0.6)', padding: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}
+            style={{ width: '88%', maxWidth: 420, maxHeight: '78vh', borderRadius: 16, background: '#18181b', border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 20px 60px rgba(0,0,0,0.6)', padding: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column', animation: 'adPopSheetUp 0.22s ease' }}
           >
             <div style={{ height: 3, flexShrink: 0, background: 'linear-gradient(90deg, var(--ad-acc, #00e68a), var(--ad-acc, #00e68a))' }} />
             <div style={{ padding: '14px 16px', overflowY: 'auto', maxHeight: 'calc(78vh - 3px)' }}>
@@ -331,7 +332,7 @@ export function AdSheetSelect({
                 type="button"
                 className="ad-sheet-done"
                 onClick={() => setOpen(false)}
-                style={{ width: '100%', marginTop: 6, padding: '10px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'transparent', color: '#fff', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}
+                style={{ width: '100%', marginTop: 12, padding: '10px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'transparent', color: '#fff', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}
               >
                 Готово
               </button>
