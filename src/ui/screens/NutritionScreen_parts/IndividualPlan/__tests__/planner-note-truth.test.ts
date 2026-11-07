@@ -49,9 +49,9 @@ const timelineOf = (plan: any): Timeline => (plan.meals as any[])
   .map((m) => ({ t: toMin(m.time), label: String(m.label || m.type || ''), p: Number(m.totals?.p) || 0 }))
   .sort((a, b) => a.t - b.t);
 
-const DAYS: Array<{ key: string; weightKg: number; plan: any }> = [];
+const DAYS: Array<{ key: string; weightKg: number; goalP: number; plan: any }> = [];
 for (const p of PROFILES) for (const mc of [4, 5, 6]) for (const tr of [true, false]) {
-  DAYS.push({ key: `${p[0]}/${mc}/${tr ? 'тр' : 'отд'}`, weightKg: p[1], plan: build(p, mc, tr) });
+  DAYS.push({ key: `${p[0]}/${mc}/${tr ? 'тр' : 'отд'}`, weightKg: p[1], goalP: p[5], plan: build(p, mc, tr) });
 }
 
 describe('§8.64 ноты не спорят с финальным планом', () => {
@@ -162,5 +162,33 @@ describe('§8.64 ноты не спорят с финальным планом',
       }
     }
     expect(withPresleep).toBeGreaterThan(30);
+  });
+
+  it('§8.66 «порог приёма снижен» — только когда день не оплачивает 0.30 г/кг', () => {
+    const FIXED = new Set(['preworkout', 'postworkout', 'intra', 'presleep']);
+    let capped = 0;
+    for (const d of DAYS) {
+      const meals = (d.plan.meals as any[]).filter((m) => (m.items || []).length > 0);
+      const reg = meals.filter((m) => Number.isFinite(Number(m.target?.pd)));
+      const fixedP = meals.filter((m) => FIXED.has(String(m.type)))
+        .reduce((s, m) => s + (Number(m.target?.p) || 0), 0);
+      const floor = Math.round(0.3 * d.weightKg);
+      const budget = Math.max(0, d.goalP - fixedP);
+      const fair = reg.length > 0 ? budget / reg.length : floor;
+      const note = (d.plan.notes as string[]).find((x) => typeof x === 'string' && x.startsWith('⚖️ Белка дня '));
+      if (note) {
+        capped++;
+        // Нота — только когда округлённый бюджет на приём ниже порога.
+        expect(Math.round(fair)).toBeLessThan(floor);
+        const want = Math.min(floor, Math.max(Math.min(15, floor), Math.round(fair)));
+        expect(note).toContain(`порог приёма снижен до ${want} г`);
+      } else {
+        // И наоборот: день, который явно не оплачивает порог, обязан объяснить это.
+        expect(Math.round(fair)).toBeGreaterThanOrEqual(floor - 1);
+      }
+      // Порог-для-показа никогда не выше 0.30 г/кг.
+      for (const m of reg) expect(Number(m.target.pd)).toBeLessThanOrEqual(floor);
+    }
+    expect(capped).toBeGreaterThan(0);
   });
 });

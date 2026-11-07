@@ -15541,7 +15541,22 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
       const _w60 = Number(input.weightKg) || 0;
       if (_w60 > 0) {
         const _mpsP60 = Math.round(0.3 * _w60);
-        for (const m of _regs60) m.target.pd = _mpsP60;
+        // §8.66: пол приёма не может быть выше бюджета дня. HV/болюс-день (13 кормлений
+        // при 300 г белка) физически даёт ~21 г на приём — показывать «цель 33 г» значит
+        // обещать то, что план не исполнит ни при какой сборке: бейдж горит на 78 приёмах
+        // из 322, 57 из них — ровно на таких днях. Пол = min(0.30 г/кг, бюджет/приём),
+        // причина печатается ОДНОЙ дневной нотой, а бейдж ловит реальный недобор тарелки.
+        const _fixedP60 = (meals as any[])
+          .filter((m) => m?.target && _isFixed60(m))
+          .reduce((s, m) => s + (Number(m.target.p) || 0), 0);
+        const _goalP60 = Number(adjustedProteinG || input.goalProteinG) || 0;
+        const _budgetReg60 = Math.max(0, _goalP60 - _fixedP60);
+        const _fairP60 = _regs60.length > 0 ? _budgetReg60 / _regs60.length : _mpsP60;
+        const _pd60 = Math.min(_mpsP60, Math.max(Math.min(15, _mpsP60), Math.round(_fairP60)));
+        for (const m of _regs60) m.target.pd = _pd60;
+        if (_pd60 < _mpsP60) {
+          notes.push(`⚖️ Белка дня ${Math.round(_goalP60)} г не хватает на ${_regs60.length} приёмов по ${_mpsP60} г (0.30 г/кг): порог приёма снижен до ${_pd60} г — это бюджет дня, а не недобор тарелки. Объедините приёмы, чтобы вернуть 0.30 г/кг.`);
+        }
       }
     }
     // ─── §8.64: тайминговые ноты — по ФИНАЛУ, а не по промежуточному плану ──────────

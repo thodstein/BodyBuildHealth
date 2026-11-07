@@ -124,23 +124,31 @@ describe('§8.60 цель приёма = план приёма (`target.fd` / `t
    * а перекус показывал «перебор» при тарелке 0.32 г/кг. То есть тревога была ложной
    * в обе стороны.
    */
-  it('белок: бейдж только при недоборе до порога 0.30 г/кг (227 → ≤84 на 60 дней)', () => {
+  it('белок: бейдж только при недоборе до порога 0.30 г/кг (227 → ≤70 на 60 дней)', () => {
     let below = 0;
     let meals = 0;
     const bad: string[] = [];
+    const FIXED = new Set(['preworkout', 'postworkout', 'intra', 'presleep']);
     for (const { key, profile, plan } of cells(true)) {
       const want = Math.round(0.3 * profile.w);
-      for (const m of plan.meals || []) {
+      const all = (plan.meals || []).filter((m: any) => Number.isFinite(Number(m.target?.pd)));
+      const fixedP = (plan.meals || [])
+        .filter((m: any) => FIXED.has(String(m.type)))
+        .reduce((s: number, m: any) => s + (Number(m.target?.p) || 0), 0);
+      const budget = Math.max(0, profile.p - fixedP);
+      const fundable = all.length > 0 && budget >= all.length * want;
+      for (const m of all) {
         const pd = Number(m.target?.pd);
-        if (!Number.isFinite(pd)) continue;
         meals++;
-        if (pd !== want) bad.push(`${key}:${m.type} pd ${pd} ≠ ${want}`);
+        // §8.67: порог-для-показа не выше бюджета дня, но и не выше 0.30 г/кг.
+        if (pd > want) bad.push(`${key}:${m.type} pd ${pd} > ${want}`);
+        if (fundable && pd !== want) bad.push(`${key}:${m.type} pd ${pd} ≠ ${want} (день оплачивает)`);
         if ((Number(m.totals?.p) || 0) < pd - 3) below++;
       }
     }
     expect(bad.slice(0, 5).join(', ')).toBe('');
     expect(meals).toBeGreaterThan(250);
-    expect(below, 'приёмов ниже MPS-порога').toBeLessThanOrEqual(84);
+    expect(below, 'приёмов ниже порога').toBeLessThanOrEqual(70);
   });
 
   it('цели приёмов по белку: числовые и не раздуты выше дневной цели', () => {
