@@ -81,7 +81,7 @@ export interface Meal {
   type: 'breakfast' | 'lunch' | 'snack' | 'snack2' | 'snack3' | 'snack4' | 'snack5' | 'snack6' | 'preworkout' | 'intra' | 'postworkout' | 'dinner' | 'presleep';
   rationale: string[];
   mpsCheck?: { proteinG: number; leucineG: number; triggers_mTOR: boolean };
-  target?: { p: number; c: number; f: number };
+  target?: { p: number; c: number; f: number; /** §8.60: цели для показа (план приёма, см. §8.60) */ fd?: number; cd?: number };
 }
 
 export interface DayPlanV2 {
@@ -15294,6 +15294,59 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
           t = t.replace(/омега-3 [\d.,]+ мг/, `омега-3 ${Math.round(_o337)} мг`);
         }
         if (t !== s) notes[i] = t;
+      }
+    }
+
+    // ─── §8.60: цель приёма по жиру — план приёма, а не «доля дня» ───────────────
+    // Замер 60 дней: Σ целевого жира = 80.5% дневного (доли 0.20/0.15/0.22 + 0.10 на
+    // перекус в сумме далеко не 1), поэтому бейдж «Ж 24 / 16 (+8)» горел на 276 из 456
+    // приёмов — при том, что собственная ось «жир в одном приёме» зелёная (максимум
+    // доли 30% при норме ≤35%). То есть раскладка жира здоровая, а обещание цели —
+    // нет: доли не описывают тарелку, остаток дня добирает корректор в те же приёмы.
+    // Нормировка долей (попытка «Σ=1») уже была отклонена замерами — сходимость падает.
+    // Поэтому цель НЕ МЕНЯЕМ (её читают корректор и гейты), а кладём отдельное поле
+    // `target.fd` — «цель-для-показа»: неизбежный жир тарелки (белок/гарнир/овощи) плюс
+    // её доля остатка жирового бюджета дня. Σ fd = дневной бюджет, а бейдж в UI честно
+    // говорит «тарелка разошлась со своим планом» (например, после ручной правки).
+    if ((input as any).mealTargetFatShare !== false) {
+      const _fatGoal60 = Number(adjustedFatG || input.goalFatG) || 0;
+      const _FIXED60 = new Set(['preworkout', 'postworkout', 'intra', 'presleep']);
+      const _isFixed60 = (m: any) => _FIXED60.has(String(m?.type)) || !!(m as any)?._insulinWindow;
+      const _regs60 = (meals as any[]).filter((m) => m?.target && !_isFixed60(m));
+      const _structF60 = (m: any) => (m.items || []).reduce((s: number, i: any) => (
+        String(i.role) === 'fat' ? s : s + (Number(i.f) || 0)
+      ), 0);
+      const _fatItemF60 = (m: any) => (m.items || []).reduce((s: number, i: any) => (
+        String(i.role) === 'fat' ? s + (Number(i.f) || 0) : s
+      ), 0);
+      const _S60 = _regs60.reduce((s, m) => s + _structF60(m), 0);
+      const _W60 = _regs60.reduce((s, m) => s + _fatItemF60(m), 0);
+      // Остаток бюджета сверх неизбежного жира раздаём тем приёмам, где жир вообще
+      // стоит (масло/орехи/сыр) — пропорционально тому, сколько его там.
+      const _R60 = Math.max(0, _fatGoal60 - _S60);
+      // День, который сам не дотягивает до бюджета, не должен «обещать» приёму жир,
+      // которого в дне нет: растягиваем жир тарелки максимум до её же уровня (k≤1).
+      // Цель сжимается только когда день ПЕРЕБИРАЕТ — тогда бейдж честно называет приём.
+      if (_fatGoal60 > 0 && _regs60.length > 0) {
+        const _kF60 = _W60 > 0 ? Math.min(1, _R60 / _W60) : 0;
+        for (const m of _regs60) {
+          m.target.fd = Math.max(0, Math.round(_structF60(m) + _fatItemF60(m) * _kF60));
+        }
+      }
+      // Углеводы — та же болезнь: Σ целевых углеводов = 79% дневного, бейдж «У 69 / 25»
+      // горит на 288 из 456 приёмов. План по углеводам движок распределяет сам (окна,
+      // приёмы вокруг тренировки, остатки дня), поэтому цель-для-показа = фактическая
+      // доля приёма, сжатая до бюджета ровно так же (k≤1).
+      const _carbGoal60 = Number(adjustedCarbsG || input.goalCarbsG) || 0;
+      const _plateC60 = _regs60.reduce((s, m) => s + (Number(m.totals?.c) || 0), 0);
+      const _fixedC60 = (meals as any[]).filter((m) => m?.target && _isFixed60(m))
+        .reduce((s, m) => s + (Number(m.target.c) || 0), 0);
+      const _wantC60 = _carbGoal60 - _fixedC60;
+      if (_carbGoal60 > 0 && _plateC60 > 0) {
+        const _kC60 = Math.min(1, _wantC60 / _plateC60);
+        for (const m of _regs60) {
+          m.target.cd = Math.max(0, Math.round((Number(m.totals?.c) || 0) * _kC60));
+        }
       }
     }
     return {
