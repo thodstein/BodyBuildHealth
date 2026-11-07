@@ -2,25 +2,27 @@
  * Только инструменты, релевантные планированию — каждый подключён к planner-bridge.
  * Состав подобран под режим (ПЛ-авто / ББ-авто / Ручной сбор).
  * ПЛ-авто: все инструменты из «⚡ Интеллект тренировки» как отдельные красивые раскрывающиеся карточки. */
-import React, { useState } from 'react';
+import React, { useState, lazy, Suspense } from 'react';
 
-// Интеллект — все хабы
-import { UnifiedIntelligenceHub } from './UnifiedIntelligenceHub';
-import { StrengthAnalysisHub } from './StrengthAnalysisHub';
-import { QualityHub } from './QualityHub';
-import { DiagnosticsHub } from './DiagnosticsHub';
-import { JointMasterCard } from './JointMasterCard';
-import { PeriodizationHub } from './PeriodizationHub';
-import ExerciseLabMerged from './ExerciseLabMerged';
-import { VolumeHub } from './VolumeHub';
-import { MixHub } from './MixHub';
-import { MetabolicHub } from '../Shared/MetabolicHub';
-import { ToolsHub } from './ToolsHub';
-import { RirForecastHub } from './RirForecastHub';
-import { TrainingSafetyHub } from './TrainingSafetyHub';
+// Инструменты грузятся по требованию: в панели одновременно раскрыт максимум
+// один, а все хабы вместе — сотни килобайт, которые раньше приезжали вместе с
+// ББ-авто (≈85 запросов и второй длинный таск). См. docs/UI-PERF-PASS-2026-11.md.
+const UnifiedIntelligenceHub = lazy(() => import('./UnifiedIntelligenceHub').then(m => ({ default: m.UnifiedIntelligenceHub })));
+const StrengthAnalysisHub = lazy(() => import('./StrengthAnalysisHub').then(m => ({ default: m.StrengthAnalysisHub })));
+const QualityHub = lazy(() => import('./QualityHub').then(m => ({ default: m.QualityHub })));
+const DiagnosticsHub = lazy(() => import('./DiagnosticsHub').then(m => ({ default: m.DiagnosticsHub })));
+const JointMasterCard = lazy(() => import('./JointMasterCard').then(m => ({ default: m.JointMasterCard })));
+const PeriodizationHub = lazy(() => import('./PeriodizationHub').then(m => ({ default: m.PeriodizationHub })));
+const ExerciseLabMerged = lazy(() => import('./ExerciseLabMerged'));
+const VolumeHub = lazy(() => import('./VolumeHub').then(m => ({ default: m.VolumeHub })));
+const MixHub = lazy(() => import('./MixHub').then(m => ({ default: m.MixHub })));
+const MetabolicHub = lazy(() => import('../Shared/MetabolicHub').then(m => ({ default: m.MetabolicHub })));
+const ToolsHub = lazy(() => import('./ToolsHub').then(m => ({ default: m.ToolsHub })));
+const RirForecastHub = lazy(() => import('./RirForecastHub').then(m => ({ default: m.RirForecastHub })));
+const TrainingSafetyHub = lazy(() => import('./TrainingSafetyHub').then(m => ({ default: m.TrainingSafetyHub })));
 
 // ББ-специфичные (SplitGen/VolumeOptimizer удалены — без дублей)
-import { TempoTab } from './TempoTab';
+const TempoTab = lazy(() => import('./TempoTab').then(m => ({ default: m.TempoTab })));
 
 interface ToolDef { id: string; title: string; icon: string; short: string; accent: string; desc: string; render: () => React.ReactNode; }
 
@@ -147,7 +149,13 @@ export const PlannerToolsPanel: React.FC<{ mode: 'pl' | 'bb' }> = ({ mode }) => 
               }}>{open ? '▼' : '▶'}</span>
             </button>
             {!open && null}
-            {open && <div style={{ padding: 6, minWidth: 0, maxWidth: '100%', overflowX: 'hidden', background: 'rgba(0,0,0,0.10)' }}>{t.render()}</div>}
+            {open && (
+              <div style={{ padding: 6, minWidth: 0, maxWidth: '100%', overflowX: 'hidden', background: 'rgba(0,0,0,0.10)' }}>
+                <Suspense fallback={<div style={{ padding: '18px 12px', textAlign: 'center', fontSize: 12, color: 'var(--text-dim)' }}>Загрузка…</div>}>
+                  {t.render()}
+                </Suspense>
+              </div>
+            )}
           </div>
         );
       })}

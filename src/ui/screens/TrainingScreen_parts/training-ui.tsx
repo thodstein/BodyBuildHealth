@@ -362,15 +362,29 @@ export const PlannerStepNav: React.FC<{
 
 /** Смена шага — скролл экрана наверх + активная пилюля в видимую зону. */
 export function usePlannerStepScroll(navKey: string, deps: React.DependencyList): void {
+  // При открытии конструктора экран и так наверху, а активная пилюля уже видна:
+  // плавный скролл в первые ~0.8 с — это только кадры на пустом месте
+  // (≈650 мс на 4× CPU, выглядит как «ББ-авто тормозит»). Анимируем лишь
+  // настоящие переключения шагов пользователем.
+  const mountedAt = React.useRef(Date.now());
   // eslint-disable-next-line react-hooks/exhaustive-deps
   React.useEffect(() => {
     try {
+      const animate = Date.now() - mountedAt.current > 800;
+      const behavior: ScrollBehavior = animate ? 'smooth' : 'auto';
       const scroller = document.querySelector('.screen.training-screen') as HTMLElement | null;
-      if (scroller && typeof scroller.scrollTo === 'function') scroller.scrollTo({ top: 0, behavior: 'smooth' });
+      // Скролл «наверх» вызываем только если реально прокручено: пустой
+      // scrollTo всё равно заставляет браузер пересчитать раскладку (~780 мс
+      // на 4× CPU на тяжёлом конструкторе).
+      if (scroller && typeof scroller.scrollTo === 'function' && scroller.scrollTop > 0) scroller.scrollTo({ top: 0, behavior });
       const nav = document.querySelector(`[data-planner-step-nav="${navKey}"]`) as HTMLElement | null;
       const activeBtn = nav?.querySelector('button[aria-current="step"]') as HTMLElement | null;
-      if (activeBtn && typeof activeBtn.scrollIntoView === 'function') {
-        activeBtn.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' });
+      if (activeBtn && nav && typeof activeBtn.scrollIntoView === 'function') {
+        // Пилюля уже в видимой зоне навигации — центрировать нечего.
+        const b = activeBtn.getBoundingClientRect();
+        const n = nav.getBoundingClientRect();
+        const visible = b.left >= n.left - 1 && b.right <= n.right + 1;
+        if (!visible) activeBtn.scrollIntoView({ inline: 'center', block: 'nearest', behavior });
       }
     } catch { /* нет DOM (SSR/jsdom) — не критично */ }
   }, deps);

@@ -21,6 +21,17 @@ export { derivePAL, deriveTrainingLoad };
 let globalTick = 0;
 const listeners = new Set<() => void>();
 
+/**
+ * Кэш дорогой производной `risk` (покрытие БАДов по каталогу + риск).
+ * `useDataLink` держат одновременно несколько экранов (TrainingScreen,
+ * BbAutoConstructor, дашборд), поэтому расчёт общий: одинаковый снимок данных
+ * считается один раз. Ключ перечисляет ровно входы расчёта.
+ */
+let riskCache: { key: string; value: RiskCalculationResult } | null = null;
+/** Последний загруженный снимок анализов и курса — общий для всех экранов. */
+let sharedLabs: { pid: string; items: LabPoint[] } | null = null;
+let sharedCourse: { pid: string; items: CourseEntry[] } | null = null;
+
 export function notifyDataChange() {
   globalTick++;
   listeners.forEach(fn => fn());
@@ -121,8 +132,17 @@ export { mapCourseToSubstances, hasCourseDiff, derivePedFlagsFromCourse } from '
 
 export function useDataLink(): LinkedData {
   const [profile, setProfile] = useState<UserProfile>(getProfile());
-  const [labs, setLabs] = useState<LabPoint[]>([]);
-  const [course, setCourse] = useState<CourseEntry[]>([]);
+  // Стартуем с последнего общего снимка, а не с пустых массивов: иначе каждый
+  // новый экран делает свой первый расчёт риска по пустым анализам/курсу, а
+  // сразу за ним — второй по загруженным (≈1.3 с на 4× CPU в ББ-авто).
+  const [labs, setLabs] = useState<LabPoint[]>(() => {
+    const pid = getProfile().id || 'current-user';
+    return sharedLabs && sharedLabs.pid === pid ? sharedLabs.items : [];
+  });
+  const [course, setCourse] = useState<CourseEntry[]>(() => {
+    const pid = getProfile().id || 'current-user';
+    return sharedCourse && sharedCourse.pid === pid ? sharedCourse.items : [];
+  });
   const [tick, setTick] = useState(0);
 
   const refetch = useCallback(() => setTick(t => t + 1), []);
@@ -143,6 +163,7 @@ export function useDataLink(): LinkedData {
         const allLabs = await db.getAll<LabPoint>('labs_log');
         const pid = profile.id || 'current-user';
          const userLabs = (Array.isArray(allLabs) ? allLabs : []).filter(l => l && typeof l.code === 'string' && l.patientId === pid || l && typeof l.code === 'string' && !l.patientId);
+         sharedLabs = { pid, items: userLabs };
          setLabs(userLabs);
 
          const allCourse = await db.getAll<CourseEntry>('course_log');
@@ -163,6 +184,7 @@ export function useDataLink(): LinkedData {
             };
           });
          setCourse(validCourse);
+         sharedCourse = { pid, items: validCourse };
          // Автосинхронизация course_log → profile.currentSubstances + PED-флаги/дозы
          syncCourseToProfile(validCourse);
       } catch {}
@@ -250,12 +272,29 @@ export function useDataLink(): LinkedData {
   }, [labs, profile, sRpeFatigueAdj, sRpeLoadAdj, trainingLoad]);
 
   const risk = useMemo(() => {
+    // Тяжёлая производная (раскатка каталога БАДов + риск ≈1.3 с на 4× CPU).
+    // `useDataLink` держат сразу несколько экранов (TrainingScreen + ББ-авто),
+    // и без общего кэша каждый новый экран платил за полный пересчёт с теми же
+    // данными. Ключ — ровно входы расчёта: изменились данные → пересчёт.
+    const bridge = readRiskBridge();
+    const cacheKey = JSON.stringify([
+      _h.genetics ?? {},
+      (_n.currentSupplements ?? []).map((sup: any) => sup.id),
+      _p.age, _p.weight, _p.sex,
+      _sys.nutritionFactor, _sys.trainingFactor,
+      labs.slice(-10).map(l => [l.code, l.value]),
+      Object.entries(activeDrugs).map(([k, v]) => [k, v.dosePerWeek]),
+      bridge ? [bridge.riskBefore, bridge.riskAfter, bridge.systemBreakdown] : null,
+    ]);
+    if (riskCache && riskCache.key === cacheKey) return riskCache.value;
+
     // Default risk result for error fallback
     const defaultRisk = {
       overallRaw: 5, overallNet: 5,
       coverageMap: {} as Record<string, number>,
       systemBreakdown: {} as Record<string, { raw: number; net: number }>,
     };
+    let result: RiskCalculationResult;
     try {
       const genetics = _h.genetics ?? {};
       // Compute support coverage first, then pass to risk calculation
@@ -286,7 +325,6 @@ export function useDataLink(): LinkedData {
         supportCoverage: coverage,
       });
       // C18: Merge bridge data from SupportScreen for consistent cross-screen risk
-      const bridge = readRiskBridge();
       let finalRisk = { ...riskResult, coverageMap: coverage } as RiskCalculationResult;
       if (bridge && bridge.systemBreakdown) {
         const bd: Record<string, { raw: number; net: number }> = {};
@@ -300,7 +338,7 @@ export function useDataLink(): LinkedData {
           systemBreakdown: { ...(finalRisk.systemBreakdown || {}), ...bd },
         } as RiskCalculationResult;
       }
-      return finalRisk;
+      result = finalRisk;
     } catch (e) {
       console.warn('Risk calculation failed:', e);
       const fallbackCoverage: Record<string, number> = {};
@@ -308,8 +346,10 @@ export function useDataLink(): LinkedData {
         fallbackCoverage[sys] = 0.5;
         for (let m = 1; m <= 9; m++) fallbackCoverage[`${sys}_${m}`] = 0.5;
       }
-      return { ...defaultRisk, coverageMap: fallbackCoverage } as RiskCalculationResult;
+      result = { ...defaultRisk, coverageMap: fallbackCoverage } as RiskCalculationResult;
     }
+    riskCache = { key: cacheKey, value: result };
+    return result;
   }, [profile, activeDrugs, labs]);
 
   const avg = useMemo(() => computeWeeklyAverages(), []);
