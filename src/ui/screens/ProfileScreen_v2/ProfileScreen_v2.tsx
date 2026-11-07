@@ -3,16 +3,19 @@
  * Hero (4 карточки) + 4 вкладки (Пользователь / Тренировки / Дневники / Настройки / Отчёты).
  * Auto-save внутри вкладок через debounce 500мс.
  */
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { ProfileHero } from './ProfileHero';
-import { ProfileUserTab } from './ProfileUserTab';
-import { ProfileDiariesTab } from './ProfileDiariesTab';
-import { ProfileReportsTab } from './ProfileReportsTab';
-import { ProfileSettingsTab } from './ProfileSettingsTab';
-import { ProfileCoachTab } from './ProfileCoachTab';
-import { ProfileNotesTab } from './ProfileNotesTab';
-import { ProfilePlannerTab } from './ProfilePlannerTab';
-import { ProfileAthleteLogTab } from './ProfileAthleteLogTab';
+// Вкладки грузятся по требованию: на первом входе профиль показывает только
+// hero-плитки, а вкладки весят больше мегабайта (дневники, тренер, отчёты).
+// См. docs/UI-PERF-PASS-2026-11.md.
+const ProfileUserTab = lazy(() => import('./ProfileUserTab').then(m => ({ default: m.ProfileUserTab })));
+const ProfileDiariesTab = lazy(() => import('./ProfileDiariesTab').then(m => ({ default: m.ProfileDiariesTab })));
+const ProfileReportsTab = lazy(() => import('./ProfileReportsTab').then(m => ({ default: m.ProfileReportsTab })));
+const ProfileSettingsTab = lazy(() => import('./ProfileSettingsTab').then(m => ({ default: m.ProfileSettingsTab })));
+const ProfileCoachTab = lazy(() => import('./ProfileCoachTab').then(m => ({ default: m.ProfileCoachTab })));
+const ProfileNotesTab = lazy(() => import('./ProfileNotesTab').then(m => ({ default: m.ProfileNotesTab })));
+const ProfilePlannerTab = lazy(() => import('./ProfilePlannerTab').then(m => ({ default: m.ProfilePlannerTab })));
+const ProfileAthleteLogTab = lazy(() => import('./ProfileAthleteLogTab').then(m => ({ default: m.ProfileAthleteLogTab })));
 import { useProfileRefresh, getSnapshotsCount, undoLastSnapshot } from '../../../core/profile-manager';
 import { onAnyProfileChange } from '../../../core/profile-events';
 import { colors } from './ui';
@@ -203,6 +206,7 @@ export const ProfileScreen_v2: React.FC<{ onNavigate?: (screen: string) => void;
         WebkitOverflowScrolling: 'touch',
         background: 'radial-gradient(120% 40% at 50% 0%, rgba(52,211,153,0.06), transparent 70%)',
       }}>
+         <Suspense fallback={<div style={{ padding: '24px 16px', color: 'var(--text-dim)', fontSize: 12, textAlign: 'center' }}>Загрузка…</div>}>
          {tab === 'user' && <ProfileErrorBoundary tabName="Пользователь"><ProfileUserTab /></ProfileErrorBoundary>}
           {tab === 'coach' && <ProfileErrorBoundary tabName="Тренер"><ProfileCoachTab onNavigate={onNavigate} onOpenAthlete={openAthleteSection} /></ProfileErrorBoundary>}
           {tab === 'log' && <ProfileErrorBoundary tabName="Журнал"><ProfileAthleteLogTab initialAthleteId={athleteFocus?.target === 'log' ? athleteFocus.id : undefined} /></ProfileErrorBoundary>}
@@ -217,6 +221,7 @@ export const ProfileScreen_v2: React.FC<{ onNavigate?: (screen: string) => void;
             onNavigate={onNavigate}
             initialView={initialSubTab === 'archive' ? 'archive' : initialSubTab === 'custom-report' ? 'comprehensive' : initialSubTab === 'reports' ? 'blocks' : undefined}
           /></ProfileErrorBoundary>}
+         </Suspense>
       </div>
     </div>
   );
