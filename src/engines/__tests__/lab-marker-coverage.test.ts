@@ -283,8 +283,10 @@ P1NP 45 нг/мл 20-80`;
       const codes = result.extractedMarkers.map(m => m.code);
       expect(codes).toContain('T4');
       expect(codes).toContain('T3');
-      // T4 should NOT be mapped to T4_Free
-      expect(result.extractedMarkers.find(m => m.code === 'T4')?.unit).toBe('nmol/L');
+      // T4 should NOT be mapped to T4_Free. Единица — та, что напечатана в
+      // бланке: пересчёт к канону (nmol/L) выполняет normalizeLabMeasurement
+      // при сохранении, а парсер не должен подменять реальную единицу.
+      expect(result.extractedMarkers.find(m => m.code === 'T4')?.unit).toBe('нмоль/л');
     });
   });
 

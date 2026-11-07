@@ -334,7 +334,7 @@ const MARKER_SYSTEM: Record<string, string> = {
   CREATININE:'renal',UREA:'renal',URIC_ACID:'renal',
   GLUCOSE:'metabolic',INSULIN:'metabolic',HOMOCYSTEINE:'metabolic',HBA1C:'metabolic',
   LDL:'cardio',HDL:'cardio',TRIGLYCERIDES:'cardio',CHOLESTEROL_TOTAL:'cardio',
-  BP_SYSTOLIC:'cardio',BP_DIASTOLIC:'cardio',HR:'cardio',CRP:'cardio',APOB:'cardio',
+  BP_SYSTOLIC:'cardio',BP_DIASTOLIC:'cardio',HR:'cardio',CRP:'cardio',APOB:'cardio',APO_B:'cardio',
   HEMATOCRIT:'hematologic',HEMOGLOBIN:'hematologic',FERRITIN:'hematologic',
   ERYTHROCYTES:'hematologic',THROMBOCYTES:'hematologic',LEUKOCYTES:'hematologic',
   INR:'coagulation',FIBRINOGEN:'coagulation',D_DIMER:'coagulation',

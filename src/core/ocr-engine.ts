@@ -1130,14 +1130,19 @@ export async function saveParsedLabs(
     const validFormDate = typeof opts?.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(opts.date) ? opts.date : undefined;
     const saveDate = validFormDate || formatDate(new Date());
     for (const lab of labs) {
-      // Гендерные нормы там, где их знает проект (HCT/Hb/RBC/ферритин/АЛТ/АСТ…).
-      // Приоритет у нормы профиля: пол в коде UCUM_MAP — мужской дефолт.
+      // Явный референс из бланка — авторитетнее половых норм приложения:
+      // лаборатория указывает диапазон для своей методики и единиц. Гендерные
+      // нормы подставляем только когда бланк диапазона не дал, и проверяем
+      // ОБЕ границы — раньше при наличии uln нижняя граница игнорировалась
+      // (женский гемоглобин 110 при норме 120–160 считался нормальным).
       let isAbnormal = lab.isAbnormal;
-      if (opts?.sex) {
+      const hasReportReference = lab.refLow !== undefined || lab.refHigh !== undefined;
+      if (!hasReportReference && opts?.sex) {
         try {
           const norm = getLabNorm(lab.code, opts.sex as 'male' | 'female');
           if (norm && (norm.uln != null || norm.lln != null)) {
-            isAbnormal = norm.uln != null ? lab.value > norm.uln : lab.value < norm.lln;
+            isAbnormal = (norm.uln != null && lab.value > norm.uln)
+              || (norm.lln != null && lab.value < norm.lln);
           }
         } catch { /* нет нормы для кода — оставляем как распознали */ }
       }

@@ -107,6 +107,30 @@ function findUnitToken(line: string): string | undefined {
 }
 
 /**
+ * Название показателя не может быть единицей измерения.
+ *
+ * Общие regex-паттерны без якорей принимали «mg/dL» из строки
+ * «Apolipoprotein B 95 60-120 mg/dL» за имя маркера и выдавали ложный
+ * магний (MG) со значением 95. Сравниваем позиции: если вхождение «имени»
+ * пересекается с токеном единицы, это единица, а не показатель. Позиционное
+ * сравнение (а не просто совпадение строк) важно для «Mg 1.8 mg/dL»:
+ * здесь «Mg» стоит отдельно от единицы и должно распознаваться как магний.
+ */
+function isUnitLikeMarkerName(raw: string, line: string): boolean {
+  const name = raw.replace(/\s+/g, ' ').trim().toLowerCase();
+  if (!name) return true;
+  const unit = findUnitToken(line)?.toLowerCase();
+  if (!unit) return false;
+  if (name.replace(/\s+/g, '') === unit) return true;
+  const lower = line.toLowerCase();
+  const unitAt = lower.indexOf(unit);
+  if (unitAt < 0) return false;
+  const nameAt = lower.indexOf(name);
+  if (nameAt < 0) return false;
+  return nameAt < unitAt + unit.length && unitAt < nameAt + name.length;
+}
+
+/**
  * resolveLabMarker возвращает сырое имя в верхнем регистре, если синоним не
  * найден. Для лабораторного парсера это недопустимо: «TR» (OCR «ТТГ») и
  * «КРЕАТИНИН 88 62 -» попадали в результат отдельными показателями.
@@ -136,7 +160,7 @@ function parseTabLine(line: string, provider: ParsedLabResult['provider']): Pars
   let marker = '';
   for (let ci = 0; ci < Math.min(cols.length - 1, 3); ci++) {
     const resolved = resolveLabMarker(cols[ci]);
-    if (resolved && isResolvedMarker(resolved, cols[ci])) {
+    if (resolved && !isUnitLikeMarkerName(cols[ci], line) && isResolvedMarker(resolved, cols[ci])) {
       nameIdx = ci;
       marker = resolved;
       break;
@@ -174,7 +198,7 @@ function parseStructuredLine(line: string, provider: ParsedLabResult['provider']
   if (!match) return null;
   if (!isPlausibleUnit(match[3])) return null;
   const marker = resolveLabMarker(match[1].replace(/[|¦]/g, ' '));
-  if (!marker || !isResolvedMarker(marker, match[1])) return null;
+  if (!marker || isUnitLikeMarkerName(match[1], line) || !isResolvedMarker(marker, match[1])) return null;
   const value = parseLabNumber(match[2]);
   if (!Number.isFinite(value) || value <= 0) return null;
   const ref = parseLabReference(match[4]);
@@ -267,7 +291,7 @@ export function parseLabText(text: string): ParsedLabResult[] {
 
        const value = parseLabNumber(valStr);
         const marker = resolveLabMarker(markerRaw.replace(/[|¦]/g, ' '));
-        if (!marker || !isResolvedMarker(marker, markerRaw) || Number.isNaN(value) || value <= 0) continue;
+        if (!marker || isUnitLikeMarkerName(markerRaw, line) || !isResolvedMarker(marker, markerRaw) || Number.isNaN(value) || value <= 0) continue;
         // «Единица» из общего regex часто оказывается референсом («7-40»).
         // Не выбрасываем строку — ищем настоящую единицу во всей строке.
         // Дата «12.08.2026» по-прежнему отсекается: токена единицы в ней нет.
@@ -338,7 +362,7 @@ export function parseLabText(text: string): ParsedLabResult[] {
         } else { continue; }
          const value = parseLabNumber(valStr);
          const marker = resolveLabMarker(markerRaw.replace(/[|¦]/g, ' '));
-        if (!marker || !isResolvedMarker(marker, markerRaw) || Number.isNaN(value) || value <= 0) continue;
+        if (!marker || isUnitLikeMarkerName(markerRaw, combined) || !isResolvedMarker(marker, markerRaw) || Number.isNaN(value) || value <= 0) continue;
         if (!isPlausibleUnit(u)) {
           const realUnit = findUnitToken(combined);
           if (!realUnit) continue;

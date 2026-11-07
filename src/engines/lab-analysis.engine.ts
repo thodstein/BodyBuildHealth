@@ -128,6 +128,10 @@ const LAB_CODE_ALIASES: Record<string, string[]> = {
   INHB: ['INHIBIN_B'],
   K: ['POTASSIUM'],
   NA: ['SODIUM'],
+  // Канонические коды UCUM_MAP, под которыми теперь сохраняются анализы;
+  // старые записи с APOB/APOA1 должны находиться через этот алиас.
+  APO_B: ['APOB'],
+  APO_A1: ['APOA1'],
 };
 
 function findLab(labs: LabPoint[], code: string): number | null {

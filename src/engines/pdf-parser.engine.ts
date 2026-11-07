@@ -58,8 +58,8 @@ const LAB_PATTERNS: { code: string; names: string[]; unitPatterns: string[]; ref
   { code: 'TSH', names: ['ТТГ', 'TSH', 'тиреотропный', 'тиротропин'], unitPatterns: ['мЕд/л', 'mIU/L', 'мМЕ/л', 'мЕд/мл'] },
   { code: 'FT4', names: ['Т4 свободный', 'Т4 св', 'T4 свободный', 'T4 св', 'FT4', 'Free T4', 'тироксин свободный'], unitPatterns: ['пмоль/л', 'pmol/L'] },
   { code: 'FT3', names: ['Т3 свободный', 'Т3 св', 'T3 свободный', 'T3 св', 'FT3', 'Free T3', 'трийодтиронин свободный'], unitPatterns: ['пмоль/л', 'pmol/L'] },
-  { code: 'T4', names: ['Т4 общий', 'тироксин общий', 'Total T4'], unitPatterns: ['нмоль/л', 'nmol/L'] },
-  { code: 'T3', names: ['Т3 общий', 'трийодтиронин общий', 'Total T3'], unitPatterns: ['нмоль/л', 'nmol/L'] },
+  { code: 'T4', names: ['Т4 общий', 'тироксин общий', 'Total T4', 'T4 Total', 'T4 total'], unitPatterns: ['нмоль/л', 'nmol/L', 'мкг/дл', 'ug/dL'] },
+  { code: 'T3', names: ['Т3 общий', 'трийодтиронин общий', 'Total T3', 'T3 Total', 'T3 total'], unitPatterns: ['нмоль/л', 'nmol/L', 'нг/дл', 'ng/dL'] },
   { code: 'TESTO', names: ['тестостерон', 'Testosterone', 'тестостерон общий', 'общий тестостерон'], unitPatterns: ['нмоль/л', 'nmol/L', 'нг/мл', 'ng/mL', 'нг/дл', 'ng/dL'] },
   { code: 'FTESTO', names: ['тестостерон свободный', 'свободный тестостерон', 'Free Testosterone', 'Free T'], unitPatterns: ['пмоль/л', 'pmol/L', 'пг/мл', 'pg/mL'] },
   { code: 'SHBG', names: ['SHBG', 'ГСПГ', 'глобулин связывающий половые'], unitPatterns: ['нмоль/л', 'nmol/L'] },
@@ -89,7 +89,7 @@ const LAB_PATTERNS: { code: string; names: string[]; unitPatterns: string[]; ref
   { code: 'VITAMIN_A', names: ['витамин A', 'Vitamin A', 'ретинол'], unitPatterns: ['мкмоль/л', 'mcmol/L'] },
   { code: 'FOLATE', names: ['фолиевая кислота', 'фолат', 'Folate', 'витамин B9', 'B9'], unitPatterns: ['нг/мл', 'ng/mL', 'нмоль/л'] },
   { code: 'IRON', names: ['железо', 'Iron', 'Fe', 'сывороточное железо'], unitPatterns: ['мкмоль/л', 'umol/L', 'мкг/дл', 'ug/dL'] },
-  { code: 'TRANSF', names: ['трансферрин', 'Transferrin', 'TRF'], unitPatterns: ['г/л', 'g/L'] },
+  { code: 'TRANSF', names: ['трансферрин', 'Transferrin', 'TRF'], unitPatterns: ['г/л', 'g/L', 'мг/дл', 'mg/dL'] },
   { code: 'TIBC', names: ['ОЖСС', 'TIBC', 'железосвязывающая способность'], unitPatterns: ['мкмоль/л', 'umol/L'] },
   { code: 'K', names: ['калий', 'Potassium', 'K\\+', 'K', 'Kalium'], unitPatterns: ['ммоль/л', 'mmol/L', 'mM'] },
   { code: 'NA', names: ['натрий', 'Sodium', 'Na\\+', 'Na', 'Natrium'], unitPatterns: ['ммоль/л', 'mmol/L', 'mM'] },
@@ -99,7 +99,7 @@ const LAB_PATTERNS: { code: string; names: string[]; unitPatterns: string[]; ref
   { code: 'PHOS', names: ['фосфор', 'Phosphorus', 'P', 'фосфат'], unitPatterns: ['ммоль/л', 'mmol/L', 'mM'] },
   { code: 'LDH', names: ['ЛДГ', 'LDH', 'лактатдегидрогеназа'], unitPatterns: ['Е/л', 'U/L'] },
   { code: 'CK', names: ['КФК', 'CK', 'креатинкиназа', 'CPK'], unitPatterns: ['Е/л', 'U/L'] },
-  { code: 'CKMB', names: ['КФК-МВ', 'CK-MB', 'креатинкиназа MB'], unitPatterns: ['Е/л', 'U/L', 'нг/мл'] },
+  { code: 'CKMB', names: ['КФК-МВ', 'CK-MB', 'креатинкиназа MB', 'КФК-МБ', 'КФК МБ'], unitPatterns: ['Е/л', 'U/L', 'нг/мл'] },
   { code: 'TROP', names: ['тропонин', 'Troponin', 'TnI', 'TnT'], unitPatterns: ['нг/мл', 'ng/mL', 'пг/мл'] },
   { code: 'MYOG', names: ['миоглобин', 'Myoglobin', 'MYO'], unitPatterns: ['нг/мл', 'ng/mL'] },
   { code: 'FIB', names: ['фибриноген', 'Fibrinogen', 'FIB'], unitPatterns: ['г/л', 'g/L', 'мг/дл'] },
@@ -133,7 +133,7 @@ const LAB_PATTERNS: { code: string; names: string[]; unitPatterns: string[]; ref
   { code: 'TPO_AB', names: ['АТ к ТПО', 'anti-TPO', 'антитела к тиреопероксидазе'], unitPatterns: ['МЕ/мл', 'IU/mL'] },
   { code: 'TG_AB', names: ['АТ к ТГ', 'АТ к тиреоглобулину', 'anti-TG', 'антитела к тиреоглобулину'], unitPatterns: ['МЕ/мл', 'IU/mL'] },
   { code: 'MPV', names: ['МПВ', 'MPV', 'средний объем тромбоцита'], unitPatterns: ['фл', 'fL'] },
-  { code: 'UIBC', names: ['лат. жсс', 'uibc', 'unsaturated iron', 'unsat iron binding', 'лат жсс'], unitPatterns: ['мкмоль/л', 'umol/L'] },
+  { code: 'UIBC', names: ['лат. жсс', 'uibc', 'unsaturated iron', 'unsat iron binding', 'лат жсс', 'ЛЖСС', 'НЖСС', 'латентная железосвязывающая способность', 'латентная жсс'], unitPatterns: ['мкмоль/л', 'umol/L', 'мкг/дл', 'ug/dL'] },
   { code: 'GLOB', names: ['глобулины', 'globulin', 'глобулин общий'], unitPatterns: ['г/л', 'g/L'] },
   { code: 'C_PEPTIDE', names: ['с-пептид', 'c-peptide', 'c peptide', 'с пептид'], unitPatterns: ['пмоль/л', 'pmol/L', 'нг/мл'] },
   { code: 'AG_RATIO', names: ['а/г', 'a/g', 'альбумин/глобулин', 'альбумино-глобулиновый'], unitPatterns: ['', ''] },
@@ -288,7 +288,11 @@ const LAB_PATTERNS: { code: string; names: string[]; unitPatterns: string[]; ref
 function containsLabName(text: string, name: string): boolean {
   const needle = name.toLowerCase();
   if (needle.length > 3) return text.toLowerCase().includes(needle);
-  return new RegExp(`(^|[^a-zа-яё0-9])${needle.replace(/[+]/g, '\\$&')}(?=$|[^a-zа-яё0-9])`, 'i').test(text);
+  // Короткие аббревиатуры НЕ должны совпадать с единицей измерения:
+  // «Apolipoprotein B 95 ... mg/dL» раньше давал маркер Mg (магний) со
+  // значением 95, потому что «mg» в «mg/dL» считалось названием показателя.
+  // Аналогично Cl, P, K, Na перед косой чертой — это единицы, а не анализы.
+  return new RegExp(`(^|[^a-zа-яё0-9])${needle.replace(/[+]/g, '\\$&')}(?!\\s*\\/)(?=$|[^a-zа-яё0-9])`, 'i').test(text);
 }
 
 function normalizeOcrText(text: string): string {
@@ -490,7 +494,7 @@ function extractUnit(text: string): string {
   // Раньше «нмоль/л» матчилось как «моль/л», префикс терялся, и
   // normalizeLabMeasurement не мог применить коэффициент (тестостерон
   // 18.4 нмоль/л сохранялся как 18.4 ng/dL вместо 530.7).
-  const match = text.match(/(?:мк\s*моль|ммоль|н\s*моль|п\s*моль|моль|мг|нг|пг|мкг|мк\s*МЕ|м\s*[ЕEеe]д|мМЕ|МЕ|ЕД|Е|ед|г|мл|л)\s*\/\s*(?:дл|мл|л)|(?:umol|mmol|nmol|pmol|mg|ng|pg|ug|mIU|MIU|IU|U|g)\s*\/\s*(?:dL|mL|L)|%|сек|s\b|\/сут|\/24\s*ч|meq\/l|ммоль\/моль|(?:кл|тыс|млн)\s*\/\s*(?:мкл|мл|л)|фл|fl\b/i);
+  const match = text.match(/(?:мк\s*моль|ммоль|н\s*моль|п\s*моль|моль|мг|нг|пг|мкг|мк\s*МЕ|м\s*[ЕEеe]д|мМЕ|МЕ|ЕД|Е|ед|г|мл|л)\s*\/\s*(?:дл|мл|л)|(?:umol|mmol|nmol|pmol|mg|ng|pg|ug|mIU|MIU|IU|U|g)\s*\/\s*(?:dL|mL|L)|%|сек|(?<![a-zа-яё0-9-])s\b|\/сут|\/24\s*ч|meq\/l|ммоль\/моль|(?:кл|тыс|млн)\s*\/\s*(?:мкл|мл|л)|фл|fl\b/i);
   return match?.[0].replace(/\s+/g, '') || '';
 }
 
@@ -793,7 +797,7 @@ function tryParseTableRows(lines: string[], provider: string | null): ParsedLabV
 
     if (cols.length < 2) continue;
 
-    const combined = cols.join(' | ').toLowerCase();
+    const combined = cols.join(' ').toLowerCase();
 
     // Longest-name match: выбираем наиболее специфичный паттерн (длиннейший
     // matching name), чтобы "креатинин мочи" попадал в CREATININE_URINE, а не CREAT.
@@ -849,9 +853,26 @@ function tryParseTableRows(lines: string[], provider: string | null): ParsedLabV
       // после вырезания названия — иначе «25-ОН витамин D 75 75 - 250»
       // отдаёт 25 из названия.
       const columnar = hasTab || hasTripleSpace;
+      // Для строк из одного пробела название может занимать несколько
+      // ячеек, а перед ним стоять его же цифровая часть («25-ОН витамин D»:
+      // bestNameText = «витамин D»). Берём только ячейки ПОСЛЕ конца
+      // найденного названия, иначе «25-ОН» снова становится результатом.
+      let nameEndCell = -1;
+      if (bestNameText) {
+        const nameStart = combined.indexOf(bestNameText.toLowerCase());
+        if (nameStart >= 0) {
+          const nameEnd = nameStart + bestNameText.length;
+          let cursor = 0;
+          for (let i = 0; i < cols.length; i++) {
+            cursor += cols[i].length;
+            if (cursor >= nameEnd) { nameEndCell = i; break; }
+            cursor += 1; // разделитель между ячейками
+          }
+        }
+      }
       const cellsForValue = columnar
         ? cols.filter(cell => !labDef.names.some(n => containsLabName(cell, n)))
-        : valueLine.split(colDelim).map(c => c.trim()).filter(Boolean);
+        : (nameEndCell >= 0 ? cols.slice(nameEndCell + 1) : valueLine.split(colDelim).map(c => c.trim()).filter(Boolean));
 
       for (const cell of cellsForValue) {
         // Gemotest rows carry service codes (A09.05.023 / 01-01.001) before

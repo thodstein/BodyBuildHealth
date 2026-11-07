@@ -277,7 +277,7 @@ describe('processUploadedFile: text input pipeline', () => {
     expect(result.labs.find(l => l.code === 'HbA1c')?.value).toBe(4.6);
     expect(result.labs.find(l => l.code === 'GLU')?.value).toBe(5);
     expect(result.labs.find(l => l.code === 'TSH')?.value).toBe(0);
-    expect(result.labs.find(l => l.code === 'FT4')?.value).toBe(3.28);
+    expect(result.labs.find(l => l.code === 'FT4')?.value).toBe(42.221);
     expect(result.labs.every(l => /^[A-Z][A-Z0-9_]*$/i.test(l.code))).toBe(true);
   });
 });

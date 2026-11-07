@@ -287,7 +287,7 @@ function getMiFromLab(mechId:string,labValues:Record<string,number>,doseFactor?:
   const urea=labValues['UREA'];const uric=labValues['URIC'];const wbc=labValues['WBC'];const rbcVal=labValues['RBC'];
   const ft=labValues['FT'];const dht=labValues['DHT'];const prog=labValues['PROG'];
   const t3=labValues['T3'];const t4=labValues['T4'];const antiTpo=labValues['ANTI_TPO'];
-  const psaFree=labValues['PSA_FREE'];const aldo=labValues['ALDO'];const pth=labValues['PTH'];
+  const psaFree=labValues['PSA_FREE'];const aldo=labValues['ALDO']??labValues['ALDOSTERONE'];const pth=labValues['PTH']??labValues['PARATHYROID'];
 
   // Хелпер: лабораторный m_i → max(default, labValue)
   const labMi = (val:number|undefined, thresholds:[number,number,number]):number|undefined => {

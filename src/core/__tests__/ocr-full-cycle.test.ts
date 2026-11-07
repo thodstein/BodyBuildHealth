@@ -847,7 +847,8 @@ describe('Критический аудит — регрессионные те�
   it('P1-4: ApoB распознаётся табличным парсером', async () => {
     const text = 'Аполипопротеин B\t1.2\t0.6-1.3\tг/л';
     const result = await processUploadedFile(textFile(text));
-    expect(result.labs.some(l => l.code === 'APOB')).toBe(true);
+    // Канонический код UCUM_MAP — APO_B (APOB из бланка алиасится к нему).
+    expect(result.labs.some(l => l.code === 'APO_B' || l.code === 'APOB')).toBe(true);
   });
 
   it('P1-4: Цистатин C распознаётся', async () => {

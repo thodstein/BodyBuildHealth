@@ -81,7 +81,7 @@ const CODE_ALIAS: Record<string, string> = {
   // T3/T4 (общие) — отдельные от FT3/FT4 (свободных). Было WRONG: T3→FT3, T4→FT4.
   'IGF-1': 'IGF1',
   'IGF1': 'IGF1',
-  'PSA_FREE': 'PSA',
+  'PSA_FREE': 'PSA_FREE',
   'PHOSPHORUS': 'P',
   'FIBRINOGEN': 'FIBRINOGEN',
   'D_DIMER': 'D_DIMER',
@@ -101,7 +101,6 @@ const CODE_ALIAS: Record<string, string> = {
   'TROPONIN_I': 'TROPONIN_I',
   'TROPONIN_T': 'TROPONIN_I',
   'CK_MB': 'CK_MB',
-  'PTH': 'PTH',
   'MPV': 'MPV',
   'C-PEPTIDE': 'C_PEPTIDE',
   'ACTH': 'ACTH',
@@ -187,8 +186,25 @@ const CODE_ALIAS: Record<string, string> = {
   'TESTOSTERONE_TOTAL': 'TT',
   'TESTOSTERONE_FREE': 'FT',
   'NT-PROBNP': 'NT_PROBNP',
-  // APOB/APOA1/EPO/PTH остаются собственными кодами: их ждут риск-движок,
-  // каталог и кардио-панели (см. risk-calculator-v2, LabsCatalogTab).
+  // ── Канонизация кодов парсеров ──
+  // Один и тот же показатель приходил под двумя кодами: табличный парсер
+  // писал PARATHYROID/ERYTHROPOIETIN/APO_B, а regex-движок и синонимы —
+  // PTH/EPO/APOB. В импорте это давало ДВЕ строки на один анализ, у второй
+  // не было норм и пересчёта единиц. Все алиасы ведут в ключи UCUM_MAP.
+  'APOB': 'APO_B',
+  'APOA1': 'APO_A1',
+  'PTH': 'PARATHYROID',
+  'EPO': 'ERYTHROPOIETIN',
+  'ALD': 'ALDOSTERONE',
+  'ANDRO': 'ANDROSTENEDIONE',
+  'CL': 'CHLORIDE',
+  'TRANSF': 'TRANSFERRIN',
+  'CKMB': 'CK_MB',
+  'AMY': 'AMYLASE',
+  'CT': 'CALCITONIN',
+  'PSAF': 'PSA_FREE',
+  // Свободный ПСА — отдельный показатель: слияние с общим ПСА затирало
+  // результат, если в бланке были обе строки.
 };
 
 /**
@@ -201,11 +217,35 @@ const CODE_ALIAS: Record<string, string> = {
  * вместо 11.3 ng/mL.
  */
 function unitKey(unit: string): string {
-  let key = unit.toLowerCase()
+  // Регистр «МЕ» важен: заглавные «МЕ/л», «МЕ/мл» — это IU (международные
+  // единицы), а «мЕд», «мМЕ», «мкМЕ» — тысячные доли mIU/µIU. После
+  // toLowerCase() различить их нельзя, и новый пересчёт активности уменьшал
+  // анти-ТГ 1.8 МЕ/мл в 1000 раз (0.002 IU/мл).
+  const cased = unit
+    .replace(/мк\s*ме/gi, 'uIU')
+    .replace(/мк\s*ед/gi, 'uIU')
+    .replace(/м\s*мед/gi, 'mIU')
+    .replace(/м\s*ме/gi, 'mIU')
+    .replace(/м\s*ед/gi, 'mIU')
+    .replace(/МЕ/g, 'IU')
+    .replace(/Ед/g, 'IU');
+  let key = cased.toLowerCase()
     .replace(/ё/g, 'е')
     .replace(/[µμ]/g, 'u')
     .replace(/\?/g, 'u')
+    .replace(/mcmol/g, 'umol')
+    .replace(/mcg/g, 'ug')
     .replace(/[\s.]/g, '');
+
+  // Каталитическая активность (МЕ/кат): в международных бланках ферменты
+  // печатают в мккат/л. Без этой замены единица не распознавалась и число
+  // подписывалось каноническим U/L без пересчёта (0.58 мккат/л → 0.58 U/L).
+  key = key
+    .replace(/мккат\/л/g, 'ukat/l')
+    .replace(/мккат\/мл/g, 'ukat/ml')
+    .replace(/мкат\/л/g, 'mkat/l')
+    .replace(/нкат\/л/g, 'nkat/l')
+    .replace(/кат\/л/g, 'kat/l');
 
   // Активность: мкМЕ < мМЕ < МЕ/Ед. Более длинные префиксы — первыми.
   key = key
@@ -251,6 +291,57 @@ function unitKey(unit: string): string {
   return key;
 }
 
+/** Массовые единицы в граммах (база — g/L концентрации). */
+const MASS_TO_GRAM: Record<string, number> = { g: 1, mg: 1e-3, ug: 1e-6, ng: 1e-9, pg: 1e-12 };
+/** Объёмные единицы в литрах. */
+const VOLUME_TO_LITRE: Record<string, number> = { l: 1, dl: 0.1, ml: 1e-3, ul: 1e-6 };
+/** Молярные единицы в молях. */
+const MOLE_TO_MOL: Record<string, number> = { mol: 1, mmol: 1e-3, umol: 1e-6, nmol: 1e-9, pmol: 1e-12 };
+/** Активность в МЕ (IU); численно U = IU для ферментов. */
+const ACTIVITY_TO_IU: Record<string, number> = { u: 1, iu: 1, mu: 1e-3, miu: 1e-3, uiu: 1e-6 };
+
+/**
+ * Молярные массы (г/моль) для пересчёта массовая ↔ молярная концентрация.
+ * Нужны, когда бланк даёт результат в mg/dL, а канон приложения — µmol/L
+ * (кортизол, гормоны, железо, ТИБЦ…). Источник — PubChem/стандартные
+ * коэффициенты клинических лабораторий.
+ */
+const MOLAR_MASS: Record<string, number> = {
+  GLU: 180.156, CREATININE: 113.12, UREA: 60.06, UA: 168.11, URIC_ACID: 168.11,
+  BIL: 584.66, DBIL: 584.66, DIRECT_BIL: 584.66,
+  CHOL: 386.65, HDL: 386.65, LDL: 386.65, VLDL: 386.65, TG: 885.4,
+  CA: 40.078, CALCIUM: 40.078, MG: 24.305, MAGNESIUM: 24.305,
+  P: 30.974, PHOSPHORUS: 30.974, IRON: 55.845, TIBC: 55.845, UIBC: 55.845,
+  TT: 288.42, FT: 288.42, E2: 272.38, PROG: 314.46, PROGESTERONE: 314.46,
+  DHEA_S: 368.49, CORTISOL: 362.46, CORTISOL_NIGHT: 362.46,
+  FT4: 776.87, T4: 776.87, FT3: 650.97, T3: 650.97,
+  ALDOSTERONE: 360.44, ACTH: 4541.1, PARATHYROID: 9424.8,
+  C_PEPTIDE: 3020.3, HOMOCYSTEINE: 135.19, B12: 1355.37,
+  FOL: 441.4, FOLATE: 441.4, VITD: 400.64,
+  VITAMIN_A: 286.45, VITAMIN_E: 430.71, INS: 5808,
+  SELENIUM: 78.96, COPPER: 63.546, ZINC: 65.38, MANGANESE: 54.94,
+  CHROMIUM: 52.0, IODINE: 126.904, LACTATE: 90.08, AMMONIA: 17.031,
+};
+
+type ConcentrationUnit = { kind: 'mass' | 'mole' | 'activity'; perBase: number };
+
+/** Разбор единицы-концентрации вида «мг/дл» / «nmol/L» / «mIU/mL». */
+function parseConcentrationUnit(key: string): ConcentrationUnit | null {
+  if (!key) return null;
+  const mass = key.match(/^(g|mg|ug|ng|pg)\/(l|dl|ml|ul)$/);
+  if (mass) return { kind: 'mass', perBase: MASS_TO_GRAM[mass[1]] / VOLUME_TO_LITRE[mass[2]] };
+  const mole = key.match(/^(mol|mmol|umol|nmol|pmol)\/(l|dl|ml|ul)$/);
+  if (mole) return { kind: 'mole', perBase: MOLE_TO_MOL[mole[1]] / VOLUME_TO_LITRE[mole[2]] };
+  const activity = key.match(/^(u|iu|mu|miu|uiu)\/(l|dl|ml|ul)$/);
+  if (activity) return { kind: 'activity', perBase: ACTIVITY_TO_IU[activity[1]] / VOLUME_TO_LITRE[activity[2]] };
+  return null;
+}
+
+/** Ферменты, которые в бланках печатают в мккат/л (SI). 1 U = 1 мкмоль/мин. */
+const ENZYME_CODES = new Set([
+  'ALT', 'AST', 'GGT', 'ALP', 'LDH', 'CK', 'AMYLASE', 'LIPASE', 'CHOLINESTERASE', 'CK_18', 'GLDH',
+]);
+
 /** Convert common Russian/foreign lab units to the canonical UCUM_MAP unit. */
 export function normalizeLabMeasurement(code: string, value: number, unit: string): { value: number; unit: string } {
   const canonicalCode = mapToUcumCode(code);
@@ -262,6 +353,7 @@ export function normalizeLabMeasurement(code: string, value: number, unit: strin
   const from = unitKey(unit);
   const target = unitKey(info.prefUnit);
   let factor = 1;
+  let converted = false;
 
   // IFCC HbA1c mmol/mol → NGSP % is affine, not a simple ratio. Handle it
   // before the equal-unit fast path (which otherwise treats mmol/mol as %).
@@ -278,52 +370,82 @@ export function normalizeLabMeasurement(code: string, value: number, unit: strin
 
   if (from && from === target) return { value: round(value), unit: info.prefUnit };
   switch (canonical) {
-    case 'CREATININE': if (from.includes('mg/dl')) factor = 88.42; break;
-    case 'GLU': if (from.includes('mg/dl')) factor = 1 / 18.018; break;
-    case 'UREA': if (from.includes('mg/dl')) factor = 1 / 2.801; break;
-    case 'UA': if (from.includes('mg/dl')) factor = 59.48; break;
-    case 'BIL': case 'DBIL': if (from.includes('mg/dl')) factor = 17.104; break;
-    case 'E2': if (from.includes('pmol') || /пмоль|pmol/i.test(unit)) factor = 1 / 3.671; break;
-    case 'PRL': if (from.includes('miu') || from.includes('uiu')) factor = 1 / 21.2; break;
+    case 'CREATININE': if (from.includes('mg/dl')) { factor = 88.42; converted = true; } break;
+    // BUN (азот мочевины) в США: mg/dL × 0.357 = ммоль/л мочевины.
+    case 'UREA': if (from.includes('mg/dl')) { factor = 1 / 2.801; converted = true; } break;
+    case 'UA': if (from.includes('mg/dl')) { factor = 59.48; converted = true; } break;
+    case 'BIL': case 'DBIL': if (from.includes('mg/dl')) { factor = 17.104; converted = true; } break;
+    // Глюкоза: клинический коэффициент 18.018 (100 mg/dL = 5.55 ммоль/л).
+    case 'GLU': if (from.includes('mg/dl')) { factor = 1 / 18.018; converted = true; } break;
+    case 'E2': if (from.includes('pmol') || /пмоль|pmol/i.test(unit)) { factor = 1 / 3.671; converted = true; } break;
+    // Пролактин: 1 ng/mL = 21.2 mIU/L. mIU/mL — это 1000 mIU/L, раньше
+    // делитель применялся так же, как к mIU/L, и результат был занижен в 1000 раз.
+    case 'PRL':
+      if (from === 'miu/ml') { factor = 1000 / 21.2; converted = true; }
+      else if (from.includes('miu') || from.includes('uiu')) { factor = 1 / 21.2; converted = true; }
+      break;
     case 'TT':
-      if (from.includes('nmol')) factor = 28.84;
-      else if (from.includes('ng/ml')) factor = 100;
+      if (from.includes('nmol')) { factor = 28.84; converted = true; }
+      else if (from.includes('ng/ml')) { factor = 100; converted = true; }
       break;
     case 'FT':
       // Canonical free-testosterone unit is pg/mL. 1 pg/mL = 3.467 pmol/L.
-      if (from.includes('pmol')) factor = 1 / 3.467;
-      else if (from.includes('nmol')) factor = 288.4;
+      if (from.includes('pmol')) { factor = 1 / 3.467; converted = true; }
+      else if (from.includes('nmol')) { factor = 288.4; converted = true; }
       break;
-    case 'VITD': if (from.includes('nmol')) factor = 1 / 2.496; break;
-    case 'HbA1c': break;
-    case 'HGB': if (from.includes('g/dl')) factor = 10; break;
-    case 'CHOL': case 'HDL': case 'LDL': if (from.includes('mg/dl')) factor = 1 / 38.67; break;
-    case 'TG': if (from.includes('mg/dl')) factor = 1 / 88.57; break;
-    case 'CRP': if (from.includes('mg/dl')) factor = 10; break;
-    case 'CA': if (from.includes('mg/dl')) factor = 1 / 4.008; break;
-    case 'MG': if (from.includes('mg/dl')) factor = 1 / 2.429; break;
-    case 'P': if (from.includes('mg/dl')) factor = 1 / 3.097; break;
-    case 'B12': if (from.includes('pmol')) factor = 1 / 0.738; break;
-    case 'FOL': if (from.includes('nmol')) factor = 1 / 2.266; break;
-    case 'INS': if (from.includes('pmol')) factor = 1 / 6.0; break;
-    case 'PROG': if (from.includes('nmol')) factor = 1 / 3.18; break;
-    case 'DHEA_S': if (from.includes('umol')) factor = 36.84; break;
-    case 'IRON': if (from.includes('ug/dl')) factor = 0.1791; break;
-    case 'TP': case 'ALB': case 'TRANSFERRIN': case 'FIBRINOGEN':
-      if (from.includes('g/dl')) factor = 10;
-      else if (from.includes('mg/dl')) factor = 0.01;
-      break;
-    case 'D_DIMER': if (from.includes('ng/ml')) factor = 0.001; break;
+    case 'VITD': if (from.includes('nmol')) { factor = 1 / 2.496; converted = true; } break;
+    case 'HGB': if (from.includes('g/dl') && !from.includes('mg/dl')) { factor = 10; converted = true; } break;
+    case 'CHOL': case 'HDL': case 'LDL': if (from.includes('mg/dl')) { factor = 1 / 38.67; converted = true; } break;
+    case 'TG': if (from.includes('mg/dl')) { factor = 1 / 88.57; converted = true; } break;
+    case 'CRP': if (from.includes('mg/dl')) { factor = 10; converted = true; } break;
+    case 'CA': if (from.includes('mg/dl')) { factor = 1 / 4.008; converted = true; } break;
+    case 'MG': if (from.includes('mg/dl')) { factor = 1 / 2.429; converted = true; } break;
+    case 'P': if (from.includes('mg/dl')) { factor = 1 / 3.097; converted = true; } break;
+    case 'B12': if (from.includes('pmol')) { factor = 1 / 0.738; converted = true; } break;
+    case 'FOL': if (from.includes('nmol')) { factor = 1 / 2.266; converted = true; } break;
+    case 'INS': if (from.includes('pmol')) { factor = 1 / 6.0; converted = true; } break;
+    case 'PROG': if (from.includes('nmol')) { factor = 1 / 3.18; converted = true; } break;
+    case 'DHEA_S': if (from.includes('umol')) { factor = 36.84; converted = true; } break;
+    case 'IRON': if (from.includes('ug/dl')) { factor = 0.1791; converted = true; } break;
     default: break;
   }
+
+  // Ферменты в кат/л: 1 мккат/л = 60 U/L, 1 нкат/л = 0.06 U/L.
+  if (!converted && ENZYME_CODES.has(canonical) && factor === 1) {
+    if (from === 'ukat/l' || from === 'ukat/ml') { factor = 60; converted = true; }
+    else if (from === 'nkat/l') { factor = 0.06; converted = true; }
+    else if (from === 'mkat/l') { factor = 60000; converted = true; }
+    else if (from === 'kat/l') { factor = 6e7; converted = true; }
+  }
+
+  // Универсальный пересчёт концентраций: масса↔масса и моль↔моль считаются
+  // через базовые единицы (g/L, mol/L), а масса↔моль — через молярную массу
+  // показателя. Так fibrinogen 300 mg/dL → 3 g/L, трансферрин 250 mg/dL →
+  // 2.5 g/L, кортизол 15 µg/dL → 414 nmol/L, ТТГ 5 mIU/mL остаётся mIU/L и т.д.
+  const sourceDim = parseConcentrationUnit(from);
+  const targetDim = parseConcentrationUnit(target);
+  if (!converted && factor === 1 && from && from !== target && sourceDim && targetDim) {
+    if (sourceDim.kind === targetDim.kind) {
+      factor = sourceDim.perBase / targetDim.perBase;
+      converted = true;
+    } else if (sourceDim.kind !== 'activity' && targetDim.kind !== 'activity') {
+      const molarMass = MOLAR_MASS[canonical];
+      if (molarMass) {
+        factor = sourceDim.kind === 'mass'
+          ? sourceDim.perBase / (molarMass * targetDim.perBase)
+          : (sourceDim.perBase * molarMass) / targetDim.perBase;
+        converted = true;
+      }
+    }
+  }
+
   // Концентрацию нельзя «переименовать» без коэффициента: раньше неизвестная
   // или обрезанная единица (например, «моль/л» вместо «нмоль/л») отдавала
   // исходное число с каноническим ярлыком — 18.4 нмоль/л тестостерона
-  // превращалось в «18.4 ng/dL» (реально 530). Если обе единицы — массовые
-  // концентрации, а правило пересчёта не найдено, честно оставляем исходную
-  // единицу, чтобы UI не показывал ложную норму.
-  const massUnit = /(?:mol|g|mg|ug|ng|pg)\//;
-  if (factor === 1 && from && from !== target && massUnit.test(from) && massUnit.test(target)) {
+  // превращалось в «18.4 ng/dL» (реально 530). Если обе единицы разобраны как
+  // концентрации, но пересчёт невозможен (например, Лп(а) mg/dL → nmol/L или
+  // КФК-МВ U/L → ng/mL), честно оставляем исходную единицу.
+  if (!converted && from && from !== target && sourceDim && targetDim) {
     return { value: round(value), unit: unit.trim() };
   }
   return { value: round(value * factor), unit: info.prefUnit };

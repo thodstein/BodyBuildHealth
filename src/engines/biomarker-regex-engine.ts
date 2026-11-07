@@ -51,7 +51,7 @@ export const BIOMARKER_DICTIONARY: Record<string, string[]> = {
   'Troponin_I': ['тропонин i', 'troponin i', 'тропонин-i', 'тропонин', 'troponin'],
   'Troponin_T': ['тропонин t', 'troponin t', 'тропонин-t'],
   'ADMA': ['adma', 'асимметричный диметиларгинин', 'адима', 'asymmetric dimethylarginine'],
-  'CK_MB': ['кфк-мв', 'ck-mb', 'креатинкиназа-мв', 'кфк мв', 'ck mb'],
+  'CK_MB': ['кфк-мв', 'ck-mb', 'креатинкиназа-мв', 'кфк мв', 'ck mb', 'кфк-мб', 'кфк мб', 'ck-mb mass'],
 
   // ── Lipids / Atherosclerosis ──
   'Cholesterol_Total': ['холестерин общий', 'total cholesterol', 'общий холестерин', 'холестерин', 'хс общ', 'chol total'],
@@ -118,6 +118,7 @@ export const BIOMARKER_DICTIONARY: Record<string, string[]> = {
   'Folate': ['фолиевая кислота', 'folate', 'фолат', 'витамин b9', 'фолиев. к-та'],
   'Iron': ['железо', 'iron', 'fe', 'сывороточное железо', 'железо сыворотки'],
   'TIBC': ['ожсс', 'tibc', 'общая железосвязывающая способность', 'железосвяз. спос.'],
+  'UIBC': ['лжсс', 'нжсс', 'латентная железосвязывающая способность', 'лат. жсс', 'лат жсс', 'uibc', 'unsaturated iron binding capacity'],
   'Transferrin': ['трансферрин', 'transferrin', 'трансф.'],
   'PSA': ['пса', 'psa', 'простат-специфический антиген', 'простатический специфический антиген', 'пса общий'],
   'PSA_Free': ['пса свободный', 'free psa', 'свободный пса'],
@@ -190,8 +191,8 @@ export const BIOMARKER_DICTIONARY: Record<string, string[]> = {
   'MONO': ['моноциты', 'mono', 'monocytes', 'моноцит'],
   'EO': ['эозинофилы', 'eo', 'eosinophils', 'эозинофил'],
   'BASO': ['базофилы', 'baso', 'basophils', 'базофил'],
-  'T4': ['т4 общий', 'тироксин общий', 'total t4', 'т4 общ'],
-  'T3': ['т3 общий', 'трийодтиронин общий', 'total t3', 'т3 общ'],
+  'T4': ['т4 общий', 'тироксин общий', 'total t4', 'т4 общ', 't4 total'],
+  'T3': ['т3 общий', 'трийодтиронин общий', 'total t3', 'т3 общ', 't3 total'],
   'CA125': ['ca-125', 'са-125', 'ca125', 'cancer antigen 125'],
   'AFP': ['афп', 'альфа-фетопротеин', 'afp', 'alpha-fetoprotein'],
   'CEA': ['рэа', 'раково-эмбриональный антиген', 'cea', 'carcinoembryonic antigen'],
@@ -205,6 +206,12 @@ export const BIOMARKER_DICTIONARY: Record<string, string[]> = {
   'GPX': ['глутатионпероксидаза', 'gpx', 'glutathione peroxidase'],
   'METAN': ['метанефрин', 'metanephrine', 'mn'],
   'NMETAN': ['норметанефрин', 'normetanephrine', 'nmn'],
+  // ── Ранее не покрытые словарём маркёры (распознавались только табличным
+  //    парсером, а без alias-кода оставались без норм и пересчёта) ──
+  'Androstenedione': ['андростендион', 'androstenedione'],
+  'Chloride': ['хлор', 'хлориды', 'chloride'],
+  'Calcitonin': ['кальцитонин', 'calcitonin'],
+  'Amylase': ['амилаза', 'альфа-амилаза', 'альфа амилаза', 'alpha-amylase', 'amylase'],
 
   // ═══════════════════════════════════════════════════════════════════════
   // ОБЩИЙ АНАЛИЗ МОЧИ (ОАМ) — количественные маркёры
@@ -260,7 +267,8 @@ export const UNIT_MAP: Record<string, string> = {
   'Hematocrit': '%', 'Hemoglobin': 'g/L', 'Ferritin': 'ng/mL',
   'WBC': '10^9/L', 'RBC': '10^12/L', 'Platelets': '10^9/L',
   'Vitamin_D': 'ng/mL', 'Vitamin_B12': 'pg/mL', 'Folate': 'ng/mL',
-  'Iron': 'mcmol/L', 'TIBC': 'mcmol/L', 'Transferrin': 'g/L',
+  'Iron': 'mcmol/L', 'TIBC': 'mcmol/L', 'UIBC': 'mcmol/L', 'Transferrin': 'g/L',
+  'Androstenedione': 'nmol/L', 'Chloride': 'mmol/L', 'Calcitonin': 'pg/mL',
   'hs-CRP': 'mg/L', 'CRP': 'mg/L', 'Homocysteine': 'mcmol/L',
   'Cystatin_C': 'mg/L', 'UACR': 'mg/g', 'eGFR': 'mL/min/1.73m2',
   'Magnesium': 'mmol/L', 'Calcium': 'mmol/L', 'Potassium': 'mmol/L',
@@ -391,10 +399,30 @@ function extractNumbers(text: string): number[] {
   return matches.map(Number).filter(n => !isNaN(n));
 }
 
+// Unit expression used both for "value right before the unit" and for pulling
+// the unit written in the report. Keep the two in sync.
+const LAB_UNIT_EXPR = '(?:мк\\s*моль|н\\s*моль|п\\s*моль|ммоль|моль|мг|нг|пг|мкг|мкМЕ|м\\s*[ЕEеe]д|мМЕ|МЕ|ЕД|Е|ед|г|мл|л)\\s*\\/\\s*(?:дл|мл|л)|(?:umol|mmol|nmol|pmol|mg|ng|pg|ug|mIU|MIU|IU|U|g)\\s*\\/\\s*(?:dL|mL|L)|%|сек|(?<![a-zа-яё0-9-])s\\b|meq\\/l';
+
+/**
+ * Единица, реально напечатанная в строке бланка.
+ *
+ * Раньше `parseLabResults` подписывал результат канонической единицей
+ * (UNIT_MAP) независимо от бланка: «Гомоцистеин 1.1 mg/L» превращался в
+ * «1.1 µmol/L», «Кортизол 15 µg/dL» — в «15 nmol/L». Пересчёт в
+ * normalizeLabMeasurement видел «совпадающие» единицы и не применял
+ * коэффициент — результат был занижен в десятки раз. Берём последнее
+ * совпадение: единица в табличных строках стоит после референса.
+ */
+export function extractUnitFromLine(text: string): string {
+  const matches = [...text.matchAll(new RegExp(LAB_UNIT_EXPR, 'gi'))];
+  if (matches.length === 0) return '';
+  return matches[matches.length - 1][0].replace(/\s+/g, '');
+}
+
 // Real Gemotest rows include service codes before the result. Prefer the
 // numeric token immediately before a laboratory unit, including zero.
 function extractResultBeforeUnit(text: string): number | null {
-  const unit = '(?:мк\s*моль|ммоль|моль|мг|нг|пг|мкг|мкМЕ|м\s*[ЕEеe]д|мМЕ|МЕ|ЕД|Е|ед|г|мл|л)\\s*\\/\\s*(?:дл|мл|л)|(?:umol|mmol|nmol|pmol|mg|ng|pg|ug|mIU|MIU|IU|U|g)\\s*\\/\\s*(?:dL|mL|L)|%|сек|s\\b|meq\\/l';
+  const unit = LAB_UNIT_EXPR;
   const matches = [...text.matchAll(new RegExp(`(\\d+[.,]?\\d*)\\s*[+*]*\\s*(?=${unit})`, 'gi'))];
   if (matches.length === 0) return null;
   const selected = matches[matches.length - 1];
@@ -600,7 +628,10 @@ export function parseLabResults(
       || match.code === 'PROTEIN_24H' || match.code === 'CREATININE_URINE';
     if (value < 0 || (value === 0 && !isUrineMarker)) continue;
 
-    const unit = UNIT_MAP[match.code] || '';
+    // Берём единицу, напечатанную в бланке (UNIT_MAP — запасной вариант,
+    // если OCR её потерял). Иначе значение в mg/dL подписывалось канонической
+    // µmol/L, пересчёт не срабатывал и результат был занижен в разы.
+    const unit = extractUnitFromLine(rawLine) || UNIT_MAP[match.code] || '';
 
     // Confidence: higher for multi-number lines with ref ranges
     let confidence = 0.6;

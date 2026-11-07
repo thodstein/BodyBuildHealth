@@ -54,7 +54,7 @@ function importLabsToV2(labs: any[], v2Labs: Record<string, string>): Record<str
     LH: 'lh', FSH: 'fsh', BILIRUBIN_TOTAL: 'bilirubin', BILIRUBIN: 'bilirubin',
     CHOLESTEROL: 'cholesterol', UREA: 'urea', URIC_ACID: 'uric_acid',
     INSULIN: 'insulin', FERRITIN: 'ferritin', IRON: 'iron',
-    VITAMIN_D: 'vitamin_d', HOMOCYSTEINE: 'homocysteine', APOB: 'apob',
+    VITAMIN_D: 'vitamin_d', HOMOCYSTEINE: 'homocysteine', APOB: 'apob', APO_B: 'apob',
   };
   (labs || []).forEach((lp: any) => {
     const field = codeMap[String(lp?.code || '').toUpperCase()];

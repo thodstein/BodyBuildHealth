@@ -46,6 +46,7 @@ export function calculateRiskFromAnalyses(arg1: RiskResult | LabPoint[], labs?: 
     'HDL': { 'cardio': 1.0, inverse: true }, // low HDL = bad
     'TG': { 'cardio': 1.0 },
     'APOB': { 'cardio': 1.0 },
+    'APO_B': { 'cardio': 1.0 },
     'LP(a)': { 'cardio': 1.0 },
     'hsCRP': { 'cardio': 1.0, 'hematologic': 1.0 },
 
@@ -134,6 +135,7 @@ export function calculateRiskFromAnalyses(arg1: RiskResult | LabPoint[], labs?: 
 
     // Lipid / cardiac extended
     'APOA1': { 'cardio': 1.0, inverse: true },
+    'APO_A1': { 'cardio': 1.0, inverse: true },
     'NON_HDL': { 'cardio': 1.0 },
 
     // Thyroid extended
