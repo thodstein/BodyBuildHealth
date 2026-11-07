@@ -15335,9 +15335,288 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     const _finalCategories: Record<string, number> = {};
     _finalFoodIds.forEach(id => { const f = FOOD_DB.find(x => x.id === id); const cat = f?.category || 'other'; _finalCategories[cat] = (_finalCategories[cat] || 0) + 1; });
     const _finalMicroTotals = sumMicros(meals.flatMap(m => m.items.map(it => ({ id: it.id, amount: it.amount }))), FOOD_DB as any);
-    const _finalMicro = _pickCtx.qualityMode === 'full'
+    let _finalMicro = _pickCtx.qualityMode === 'full'
       ? analyzeMicroCoverage(_finalMicroTotals, input.sex || 'male', input.weightKg, input.cyclePhase as any, !!input.isTrainingDay, input.calciumTargetOverride, input.sodiumTargetOverride)
       : { coverage: [], topDeficitNutrient: null as string | null };
+    // Общие помощники финала (используются §8.68-срезкой и §8.71-обменом): микро и
+    // оценка по ТЕКУЩИМ тарелкам + честность витрины mpsSummary (C5-fix).
+    const _microNow = () => _pickCtx.qualityMode === 'full'
+      ? analyzeMicroCoverage(
+        sumMicros(meals.flatMap((m: any) => (m.items || []).map((it: any) => ({ id: it.id, amount: it.amount }))), FOOD_DB as any),
+        input.sex || 'male', input.weightKg, input.cyclePhase as any, !!input.isTrainingDay,
+        input.calciumTargetOverride, input.sodiumTargetOverride,
+      )
+      : null;
+    const _qNow = (cov: any) => {
+      const total = Array.isArray(cov?.coverage) ? cov.coverage.length : 0;
+      const low = total > 0 ? lowCountForScore(cov.coverage as any) : 0;
+      return scoreDayQuality(meals as any[], {
+        weightKg: Number(input.weightKg) || 0,
+        microCoverage: total > 0 ? { lowCount: low, total } : undefined,
+      });
+    };
+    const _resyncMps = () => {
+      const mb = (meals as any[]).map((m: any) => {
+        const pm = (m.items || []).reduce((s: number, i: any) => s + (i.p || 0), 0);
+        const leu = ((m.items || []).reduce((s: number, i: any) => s + (i.leucine_mg || 0), 0)) / 1000;
+        return {
+          label: m.label || m.type, proteinG: Math.round(pm), leucineG: Math.round(leu * 10) / 10,
+          triggersMps: m.mpsCheck?.triggers_mTOR || (pm >= 25 && leu >= 2.5),
+        };
+      });
+      (mpsSummary as any).meals = mb;
+      (mpsSummary as any).avg_protein_per_meal_g = Math.round(totals.p / Math.max(1, (meals as any[]).length));
+      const feed = mb.filter((x: any) => (x.proteinG || 0) >= 25).length;
+      (mpsSummary as any).avg_leucine_g = Math.round((totals.leucine_mg || 0) / Math.max(1, feed)) / 1000;
+      (mpsSummary as any).fiberG = Math.round(totals.fiber);
+      const iMps = notes.findIndex((n) => typeof n === 'string' && String(n).startsWith('Сводка MPS:'));
+      if (iMps >= 0) {
+        notes[iMps] = `Сводка MPS: ${feed} feedings × ${(mpsSummary as any).avg_protein_per_meal_g} г/meal, ${(mpsSummary as any).avg_leucine_g} г лейцина (порог ${LEU_THRESHOLD_MG / 1000} г)`;
+      }
+    };
+    // Честная строка «белок по приёмам» — пересобирается ПОСЛЕ любой финальной стадии,
+    // меняющей граммы белка в приёме (§8.68-срезка, §8.71-обмен). Раньше строка печаталась
+    // до сборки тарелок и врала на 1 г (замок planner-protein-note).
+    const _refreshProteinNote = () => {
+      const idx = notes.findIndex((n) => typeof n === 'string'
+        && (String(n).startsWith('Белок равномерно:') || String(n).startsWith('Белок по приёмам:')));
+      const mains = (meals as any[]).filter((m) => !['preworkout', 'postworkout', 'intra'].includes(String(m.type)) && (m.totals?.p || 0) > 0);
+      if (idx < 0 || mains.length === 0) return;
+      const vals = mains.map((m) => m.totals.p || 0);
+      const pMin = Math.min(...vals);
+      const pMax = Math.max(...vals);
+      const wKg = input.weightKg || 0;
+      const gpk = (v: number) => (wKg > 0 ? Math.round((v / wKg) * 100) / 100 : 0);
+      const even = Math.round(totals.p / mains.length);
+      const list = vals.map((v) => Math.round(v)).join('/');
+      const weak = mains
+        .filter((m) => wKg > 0 && (m.totals.p || 0) / wKg < 0.3 && (m.totals.p || 0) < even * 0.85)
+        .sort((a, b) => (a.totals.p || 0) - (b.totals.p || 0))[0];
+      const gpkDown = (v: number) => (wKg > 0 ? Math.floor((v / wKg) * 100) / 100 : 0);
+      notes[idx] = weak
+        ? `Белок по приёмам: ${list} г (${gpk(pMin)}–${gpk(pMax)} г/кг) — «${weak.label}» недобирает (${Math.round((weak.totals.p || 0) * 10) / 10} г = ${gpkDown(weak.totals.p || 0)} г/кг), цель ≥${Math.round(0.3 * wKg)} г: добавьте 20–25 г белка или объедините приём`
+        : `Белок равномерно: ${list} г (${gpk(pMin)}–${gpk(pMax)} г/кг, ${mains.length} основных) — всего ${Math.round(totals.p)} г`;
+    };
+    // ─── §8.68: канон 3% по жиру — финальная срезка граммами (2026-11) ───────────
+    // Замер 60 дней: два ОБЫЧНЫХ дня стояли вне канона из-за жира — `small60/4/тр`
+    // (Ж 46.6/45 = +3.6%) и `recomp80/6/тр` (Ж 62.4/60 = +4.0%), при том что остальные
+    // оси в норме. Причина конструктивная: жир добавляют стадии (E, QG9/24, добор)
+    // уже ПОСЛЕ последней сходимости, и вернуть его в канон нечем — все резалки выше
+    // по конвейеру. Здесь последний проход: снимаем жир с самого крупного жирового
+    // пункта, который стоит выше своего пола (масла 5 г, орехи/семена 15 г), шагом
+    // ≤5 г жира, и принимаем шаг только если канон СТРОГО улучшился, а оценка дня и
+    // микро — по срезанной тарелке — не упали.
+    if ((input as any).fatCanonTrim !== false
+      && _pickCtx.qualityMode === 'full'
+      && !(input as any).manualTargetsLocked
+      && (input as any).kbjuMode !== 'manual'
+      && !(input as any).recipeAssembly
+      && !(input as any).portableMode) {
+      const _goal68 = {
+        k: Number(input.goalKcal) || 0,
+        p: Number(adjustedProteinG || input.goalProteinG) || 0,
+        f: Number(input.goalFatG) || 0,
+        c: Number(adjustedCarbsG || input.goalCarbsG) || 0,
+      };
+      const _dev68 = () => Math.max(
+        _goal68.k > 0 ? Math.abs(Number(totals.kcal) - _goal68.k) / _goal68.k : 0,
+        _goal68.p > 0 ? Math.abs(Number(totals.p) - _goal68.p) / _goal68.p : 0,
+        _goal68.f > 0 ? Math.abs(Number(totals.f) - _goal68.f) / _goal68.f : 0,
+        _goal68.c > 0 ? Math.abs(Number(totals.c) - _goal68.c) / _goal68.c : 0,
+      );
+      const _isOil68 = (id: string) => /oil|ghee|lard|butter/i.test(id);
+      // Регекс «орех/семя» ловит `oil_sunflower_unrefined` — масла исключаем явно.
+      const _isNut68 = (id: string) => !_isOil68(id) && /almond|pecan|walnut|cashew|seed|chia|hazelnut|pistach|sunflower|pumpkin|flax|sesame|peanut/i.test(id);
+      let _cur68 = _dev68();
+      if (_cur68 > 0.03 && Number(totals.f) > _goal68.f + 0.5) {
+        const _q0 = _qNow(_finalMicro);
+        const _applied: Array<{ it: any; snap: any }> = [];
+        for (let _step = 0; _step < 3; _step++) {
+          const _excess68 = Number(totals.f) - _goal68.f;
+          if (_excess68 <= 0.5) break;
+          let _best: any = null, _bestCut = 0;
+          for (const m of meals as any[]) for (const it of (m.items || [])) {
+            if (String(it?.role) !== 'fat' || it._fixedGrams) continue;
+            const id = String(it.id);
+            const floorG = _isOil68(id) ? 5 : _isNut68(id) ? 15 : 0;
+            if (!floorG) continue;
+            const amt = Number(it.amount) || 0, f = Number(it.f) || 0;
+            if (amt <= floorG + 0.5 || f <= 0.1) continue;
+            const fPerG = f / amt;
+            const room = (amt - floorG) * fPerG;
+            const cut = Math.min(5, room);
+            if (cut > 0.2 && cut > _bestCut) { _best = { it, amt, fPerG, floorG }; _bestCut = cut; }
+          }
+          if (!_best) break;
+          const _dcut = Math.min(_bestCut, _excess68);
+          const _newAmt = Math.max(_best.floorG, Math.round(_best.amt - _dcut / _best.fPerG));
+          if (_newAmt >= _best.amt) break;
+          const _snap = { amount: _best.it.amount, p: _best.it.p, f: _best.it.f, c: _best.it.c, kcal: _best.it.kcal, fiber: _best.it.fiber, leucine_mg: _best.it.leucine_mg };
+          const _k68 = _newAmt / _best.amt;
+          _best.it.amount = _newAmt;
+          for (const key of ['p', 'f', 'c', 'kcal', 'fiber', 'leucine_mg']) {
+            if (_best.it[key]) _best.it[key] = Math.round(Number(_best.it[key]) * _k68 * 10) / 10;
+          }
+          recalcMealTotals(meals as any[]);
+          recalcDayTotals(meals as any[], totals);
+          const _nd68 = _dev68();
+          if (_nd68 < _cur68 - 1e-9) {
+            _cur68 = _nd68;
+            _applied.push({ it: _best.it, snap: _snap });
+          } else {
+            Object.assign(_best.it, _snap);
+            recalcMealTotals(meals as any[]);
+            recalcDayTotals(meals as any[], totals);
+            break;
+          }
+        }
+        if (_applied.length > 0) {
+          const _covAfter = _microNow();
+          const _q1 = _qNow(_covAfter);
+          if (_q1.total < _q0.total) {
+            // День не имеет права потерять балл — откат всего пакета срезки.
+            for (const a of _applied) Object.assign(a.it, a.snap);
+            recalcMealTotals(meals as any[]);
+            recalcDayTotals(meals as any[], totals);
+          } else {
+            if (_covAfter) _finalMicro = _covAfter as any;
+            _resyncMps();
+            _refreshProteinNote();
+            const _names68 = Array.from(new Set(_applied.map((a) => String(a.it.id))));
+            notes.push(`⚖️ Канон по жиру: ${_names68.join(', ')} ужаты на ${_applied.length} шаг(а) — день сведён к канону ${(_cur68 * 100).toFixed(1)}% по жиру (масла ≥5 г, орехи/семена ≥15 г сохранены; оценка дня и микро не хуже).`);
+          }
+        }
+      }
+    }
+    // ─── §8.71: яичный белок не уносит тарелку (2026-11) ────────────────────────
+    // Замер 60 дней: в 10 днях завтрак — 300–408 г яичного белка (13 белков = упаковка),
+    // и именно они держали «вёдра >500 г» на обычных профилях (`recomp80/4/отд` 541 г,
+    // `keto85/4/отд` 519 г). Прямой кап в EDIBILITY_CAPS ломает 2–3 дня (белок дня уезжает
+    // на −11 г, `planner-meal-protein-floor`), поэтому здесь хирургия: излишек белка сверх
+    // 250 г переводится в творог С СОХРАНЕНИЕМ белка дня, добавленный жир снимается с
+    // масла того же приёма (пол 5 г), а обмен принимается только если канон, качество и
+    // число «вёдер» не стали хуже.
+    if ((input as any).eggSwap71 !== false
+      && _pickCtx.qualityMode === 'full'
+      && !(input as any).manualTargetsLocked
+      && (input as any).kbjuMode !== 'manual'
+      && !(input as any).recipeAssembly
+      && !(input as any).portableMode) {
+      const _EGG71 = 250;
+      const _goal71 = {
+        k: Number(input.goalKcal) || 0,
+        p: Number(adjustedProteinG || input.goalProteinG) || 0,
+        f: Number(input.goalFatG) || 0,
+        c: Number(adjustedCarbsG || input.goalCarbsG) || 0,
+      };
+      const _dev71 = () => Math.max(
+        _goal71.k > 0 ? Math.abs(Number(totals.kcal) - _goal71.k) / _goal71.k : 0,
+        _goal71.p > 0 ? Math.abs(Number(totals.p) - _goal71.p) / _goal71.p : 0,
+        _goal71.f > 0 ? Math.abs(Number(totals.f) - _goal71.f) / _goal71.f : 0,
+        _goal71.c > 0 ? Math.abs(Number(totals.c) - _goal71.c) / _goal71.c : 0,
+      );
+      const _solid71 = (m: any) => ((m.items || []) as any[])
+        .filter((x: any) => !['liquid', 'supplement'].includes(String(x.role || '')))
+        .reduce((s: number, x: any) => s + (Number(x.amount) || 0), 0);
+      const _buckets71 = () => (meals as any[]).filter((m: any) => (m.items || []).length > 0 && _solid71(m) > 500).length;
+      const _scale71 = (x: any, grams: number) => {
+        const amt = Number(x.amount) || 0;
+        if (!(amt > 0) || grams <= 0) return;
+        const k = grams / amt;
+        x.amount = Math.round(grams);
+        for (const key of ['p', 'f', 'c', 'kcal', 'fiber', 'leucine_mg']) {
+          if (x[key]) x[key] = Math.round(Number(x[key]) * k * 10) / 10;
+        }
+      };
+      const _mk71 = (fd: any, grams: number, role: string) => {
+        const g = Math.max(5, Math.round(grams / 5) * 5);
+        const r = g / 100;
+        const p = Math.round((fd.protein || 0) * r * 10) / 10;
+        const f = Math.round((fd.fat || 0) * r * 10) / 10;
+        const c = Math.round((fd.carbs || 0) * r * 10) / 10;
+        return {
+          id: fd.id, name: fd.name, amount: g, role, kcal: Math.round(4 * p + 9 * f + 4 * c),
+          p, f, c, fiber: Math.round((fd.fiber || 0) * r * 10) / 10, leucine_mg: Math.round(getLeucine(fd) * r),
+        };
+      };
+      const _targets71: Array<{ m: any; it: any }> = [];
+      for (const m of meals as any[]) for (const it of (m.items || [])) {
+        if (String(it?.id) !== 'egg_white' || it._fixedGrams) continue;
+        if ((Number(it.amount) || 0) > _EGG71 + 10) _targets71.push({ m, it });
+      }
+      if (_targets71.length > 0) {
+        let _b71 = _buckets71();
+        let _q71 = _qNow(_finalMicro);
+        let _d71 = _dev71();
+        const _done71: string[] = [];
+        for (const t of _targets71) {
+          const g = Number(t.it.amount) || 0;
+          const pEx = (Number(t.it.p) || 0) * (1 - _EGG71 / g);
+          if (pEx < 3) continue;
+          const snap = { m: t.m, items: ((t.m.items || []) as any[]).map((x: any) => ({ ...x })) };
+          const restored = () => {
+            snap.m.items = snap.items.map((x: any) => ({ ...x }));
+            recalcMealTotals(meals as any[]);
+            recalcDayTotals(meals as any[], totals);
+          };
+          // Доноры перебираются: творог/йогурт отдают не те же микро (рибофлавин/Se яичного
+          // белка), поэтому берём первый, который не роняет день по микро и качеству.
+          const donors = ['cottage_cheese_0', 'cottage_cheese_5', 'yogurt_greek', 'milk', 'kefir', 'whey_isolate']
+            .map((id) => FOOD_DB.find((f: any) => f.id === id))
+            .filter((f: any) => f && !combinedExcluded.has(String(f.id)) && foodPassesCtxAllergens(f) && (Number(f.protein) || 0) > 5);
+          let accepted = false;
+          for (const donor of donors) {
+            if (!donor) continue;
+            const needG = Math.ceil(pEx / ((Number(donor.protein) || 0) / 100) / 5) * 5;
+            if (!(needG > 0 && needG <= 250)) continue;
+            const fBefore = Number(t.m.totals?.f) || 0;
+            _scale71(t.it, _EGG71);
+            const exist = ((t.m.items || []) as any[]).find((x: any) => x !== t.it && String(x.id) === String(donor.id) && !x._fixedGrams);
+            if (exist) _scale71(exist, (Number(exist.amount) || 0) + needG);
+            else (t.m.items as any[]).push(_mk71(donor, needG, 'protein'));
+            recalcMealTotals(meals as any[]);
+            recalcDayTotals(meals as any[], totals);
+            // Добавленный жир — с масла этого же приёма (пол 5 г), чтобы канон по жиру не поехал.
+            const dF = (Number(t.m.totals?.f) || 0) - fBefore;
+            if (dF > 0.3) {
+              const oil = ((t.m.items || []) as any[])
+                .filter((x: any) => String(x.role) === 'fat' && /oil|ghee/i.test(String(x.id)) && !x._fixedGrams)
+                .sort((a: any, b: any) => (Number(b.amount) || 0) - (Number(a.amount) || 0))[0];
+              const oa = Number(oil?.amount) || 0;
+              const oF = Number(oil?.f) || 0;
+              if (oil && oa > 5 && oF > 0.1) {
+                const cut = Math.min(oa - 5, dF / (oF / oa));
+                if (cut > 0.3) _scale71(oil, oa - cut);
+              }
+              recalcMealTotals(meals as any[]);
+              recalcDayTotals(meals as any[], totals);
+            }
+            const dev = _dev71();
+            const buck = _buckets71();
+            const q = _qNow(_microNow());
+            // Канон — зона ≤3%: сдвиг ВНУТРИ зоны (1.0% → 1.3%) допустим, выход из неё — нет;
+            // день, уже стоявший вне канона, не имеет права стать хуже.
+            if (dev > Math.max(_d71, 0.03) + 1e-9 || buck > _b71 || q.total < _q71.total) {
+              restored();
+              continue;
+            }
+            _d71 = dev;
+            _b71 = buck;
+            _q71 = q;
+            _done71.push(`${String(t.m.label || t.m.type)}: белок яйца ${Math.round(g)}→${_EGG71} г, ${String(donor.name || donor.id)} ${exist ? 'добран' : 'добавлен'} на ${needG} г`);
+            accepted = true;
+            break;
+          }
+          if (!accepted) continue;
+        }
+        if (_done71.length > 0) {
+          _finalMicro = _microNow() ?? _finalMicro;
+          _resyncMps();
+          _refreshProteinNote();
+          notes.push(`🥚 Белок яйца не уносит тарелку: ${_done71.join('; ')} — белок дня сохранён, жир снят с масла того же приёма (масло ≥5 г).`);
+        }
+      }
+    }
     _jMark('final', 'Финал (микро/гигиена/витрина)');
     // ─── Качество рациона одним числом (0–100) ───────────────────────────────
     // Сходимость ≤3% говорит, что граммы совпали; она молчит о том, съедобен ли план.
