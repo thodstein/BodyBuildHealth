@@ -125,4 +125,56 @@ describe('§8.57 выравнивание тарелок (`autoMealRebalance`)',
     expect(lost.join(', ')).toBe('');
     expect(countChanged.join(', ')).toBe('');
   });
+
+  it('цель приёма переезжает вместе с гарниром: сумма целей дня не меняется', () => {
+    const sumT = (pl: any, k: string) => (pl.meals || []).reduce((s: number, m: any) => s + (Number(m.target?.[k]) || 0), 0);
+    const off = cells(false, false);
+    const on = cells(false, true);
+    const bad: string[] = [];
+    for (const row of on) {
+      const before = off.find((r) => r.key === row.key)!.plan;
+      for (const k of ['p', 'c', 'f']) {
+        if (Math.abs(sumT(row.plan, k) - sumT(before, k)) > 0.5) bad.push(`${row.key}:${k}`);
+      }
+      for (const m of row.plan.meals || []) {
+        for (const k of ['p', 'c', 'f']) if ((Number(m.target?.[k]) || 0) < 0) bad.push(`${row.key}:${m.type}:${k}<0`);
+      }
+    }
+    expect(bad.join(', ')).toBe('');
+  });
+
+  it('перенос не оставляет в получателе красный перебор углеводов', () => {
+    // Замер: 15 дней / 31 приём, где перенос сдвинул углеводы тарелки больше 5 г.
+    // Цель обязана сдвинуться РОВНО на столько же: иначе UI показывал «60,7 / 10 г»
+    // красным перебором, хотя план сам положил еду в этот приём.
+    const off = cells(false, false);
+    const on = cells(false, true);
+    const bad: string[] = [];
+    let checked = 0;
+    for (const row of on) {
+      const before = off.find((r) => r.key === row.key)!.plan;
+      const offByType = new Map<string, any[]>();
+      for (const m of before.meals || []) {
+        const list = offByType.get(String(m.type)) || [];
+        list.push(m);
+        offByType.set(String(m.type), list);
+      }
+      const seen = new Map<string, number>();
+      for (const m of row.plan.meals || []) {
+        const idx = seen.get(String(m.type)) || 0;
+        seen.set(String(m.type), idx + 1);
+        const o = (offByType.get(String(m.type)) || [])[idx];
+        if (!o) continue;
+        const dFood = (Number(m.totals?.c) || 0) - (Number(o.totals?.c) || 0);
+        if (Math.abs(dFood) <= 5) continue;
+        checked++;
+        const dTarget = (Number(m.target?.c) || 0) - (Number(o.target?.c) || 0);
+        if (Math.abs(dFood - dTarget) > 2) {
+          bad.push(`${row.key} ${m.type}: еда ${dFood.toFixed(1)} г, цель ${dTarget.toFixed(1)} г`);
+        }
+      }
+    }
+    expect(checked).toBeGreaterThanOrEqual(15);
+    expect(bad.join('; ')).toBe('');
+  });
 });

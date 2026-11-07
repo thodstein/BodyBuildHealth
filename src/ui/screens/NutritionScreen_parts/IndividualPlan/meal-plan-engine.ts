@@ -14443,6 +14443,17 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
       // ниже порога — не опускаем текущий минимум.
       const _donorFloor57 = _curMin57 >= 0.3 ? 0.3 : _curMin57;
       let _moves57 = 0;
+      // §8.58: цель приёма переезжает ВМЕСТЕ с едой. Раньше перенос менял только
+      // тарелку: перекус с 69 г углеводов показывал «69 / 25 г» красным перебором,
+      // а обед — «50 / 86 г» недобором. Сумма целей дня при точном переносе не
+      // меняется (переносим ту же долю p/f/c, что и массу), поэтому канон 3% цел.
+      const _bump57 = (m: any, d: any, sign: number) => {
+        const t = m?.target; if (!t) return;
+        t.p = Math.max(0, Math.round(((Number(t.p) || 0) + sign * (Number(d.p) || 0)) * 10) / 10);
+        t.c = Math.max(0, Math.round(((Number(t.c) || 0) + sign * (Number(d.c) || 0)) * 10) / 10);
+        t.f = Math.max(0, Math.round(((Number(t.f) || 0) + sign * (Number(d.f) || 0)) * 10) / 10);
+        t.kcal = Math.round(4 * t.p + 9 * t.f + 4 * t.c);
+      };
       // Если у самого тяжёлого приёма гарнир не проходит капы (обед — главный приём,
       // семейный кап, поздний перекус), пробуем следующий по массе, а не сдаёмся.
       const _skipHeavy57 = new Set<any>();
@@ -14548,6 +14559,8 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
         } else {
           (_light57.items as any[]).push(_moved57);
         }
+        _bump57(_heavy57, _moved57, -1);
+        _bump57(_light57, _moved57, +1);
         _moves57++;
         recalcMealTotals(meals as any[]);
         recalcDayTotals(meals as any[], totals);
@@ -14621,6 +14634,8 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
           for (const k of ['p', 'f', 'c', 'kcal', 'fiber', 'leucine_mg']) {
             if (_moved2[k]) (_same2 as any)[k] = Math.round(((Number((_same2 as any)[k]) || 0) + Number(_moved2[k])) * 10) / 10;
           }
+          _bump57(_heavy2, _moved2, -1);
+          _bump57(_r2, _moved2, +1);
           _moves57++;
           recalcMealTotals(meals as any[]);
           recalcDayTotals(meals as any[], totals);
