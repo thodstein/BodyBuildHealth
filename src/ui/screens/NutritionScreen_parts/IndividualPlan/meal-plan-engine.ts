@@ -3878,7 +3878,8 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   // dinner already covers the night MPS window and a second protein meal is redundant.
   // P2-fix: комментарий исправлен с "150 min" на "60 min" — соответствует фактическому порогу в коде.
   const _dinnerToBedGap = (() => { try { const [dh, dm] = tDinner.split(':').map(Number); const [bh, bm] = tBed.split(':').map(Number); if (isNaN(dh) || isNaN(dm) || isNaN(bh) || isNaN(bm)) return 240; return ((bh * 60 + bm) - (dh * 60 + dm) + 1440) % 1440; } catch { return 240; } })();
-  const wantPreSleep = input.mealsCount >= 3 && _dinnerToBedGap >= 60;
+  const wantPreSleep0 = input.mealsCount >= 3 && _dinnerToBedGap >= 60;
+  let wantPreSleep = wantPreSleep0;
   // Snack time: midpoint between lunch and dinner
   // P2-fix: try/catch на time parsing
   let tSnack = (() => {
@@ -4048,6 +4049,25 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     // B15: pre-sleep привязан к отбою (за 30 мин до сна) и НЕ сдвигается тренировкой —
     // иначе «за 30 мин до сна» переставало быть правдой.
     tSnack = adjustStr(tSnack);
+  }
+  // ─── §8.65: ужин не «прилипает» к предсну ────────────────────────────────────
+  // Трен-день 18:00+75: пост-окно сдвигало ужин на конец+90 = 20:45, а предсон
+  // привязан к отбою (bed−30 = 21:30) — два приёма за 45 минут, и план сам печатал
+  // «Приёмы слишком близко» (24 дня из 60). Держим между ужином и предсном ≥75 мин:
+  // ужин подтягивается к концу тренировки (+30 от пост-окна), но не позже отбой−105.
+  // Если сессия всё равно упирается (ужин ближе 60 мин к отбою) — предсон не создаём:
+  // его белок уходит в регулярные приёмы (mealBudget), а не в «два приёма подряд».
+  {
+    const _dMin65 = timeStrToMinutes(tDinner);
+    const _bMin65 = timeStrToMinutes(tBed);
+    if (_dMin65 !== null && _bMin65 !== null && _bMin65 >= 300) {
+      const _cap65 = _bMin65 - 105;
+      const _earliest65 = Number.isFinite(postwMin) ? postwMin + 20 : 0;
+      const _target65 = Math.max(_earliest65, Math.min(_dMin65, _cap65));
+      if (_target65 < _dMin65 && _target65 <= _cap65) tDinner = fmtMin(_target65);
+      const _gap65 = ((_bMin65 - timeStrToMinutes(tDinner)! + 1440) % 1440);
+      if (wantPreSleep && _gap65 < 60) wantPreSleep = false;
+    }
   }
   // Carb periodization: тренировка → 25% pre+30% post+15% lunch; отдых → 30/30/20
   // planType теперь только фильтр пулов (не множитель КБЖУ) — карточка = план; labAdj остаётся
@@ -14936,9 +14956,15 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
         const _gpk = (v: number) => (_wKg > 0 ? Math.round((v / _wKg) * 100) / 100 : 0);
         const _even = Math.round(totals.p / _pMains.length);
         const _list = _pVals.map((v) => Math.round(v)).join('/');
-        const _weak = _pMains.find((m) => _wKg > 0 && (m.totals.p || 0) / _wKg < 0.3 && (m.totals.p || 0) < _even * 0.85);
+        // §8.64: называем САМЫЙ слабый приём (был «первый по порядку» — «"Завтрак"
+        // недобирает (27 г)» при пороге 27 г и перекусе 13 г, то есть совет противоречил
+        // сам себе и тыкал не туда). Граммы — с десятыми, доля — вниз (0.29, не 0.3).
+        const _weak = _pMains
+          .filter((m) => _wKg > 0 && (m.totals.p || 0) / _wKg < 0.3 && (m.totals.p || 0) < _even * 0.85)
+          .sort((a, b) => (a.totals.p || 0) - (b.totals.p || 0))[0];
+        const _gpkDown = (v: number) => (_wKg > 0 ? Math.floor((v / _wKg) * 100) / 100 : 0);
         notes[_idxPNote] = _weak
-          ? `Белок по приёмам: ${_list} г (${_gpk(_pMin)}–${_gpk(_pMax)} г/кг) — «${_weak.label}» недобирает (${Math.round(_weak.totals.p)} г), цель ≥0.30 г/кг: добавьте 20–25 г белка или объедините приём`
+          ? `Белок по приёмам: ${_list} г (${_gpk(_pMin)}–${_gpk(_pMax)} г/кг) — «${_weak.label}» недобирает (${Math.round((_weak.totals.p || 0) * 10) / 10} г = ${_gpkDown(_weak.totals.p || 0)} г/кг), цель ≥${Math.round(0.3 * _wKg)} г: добавьте 20–25 г белка или объедините приём`
           : `Белок равномерно: ${_list} г (${_gpk(_pMin)}–${_gpk(_pMax)} г/кг, ${_pMains.length} основных) — всего ${Math.round(totals.p)} г`;
       }
     }
@@ -15516,6 +15542,81 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
       if (_w60 > 0) {
         const _mpsP60 = Math.round(0.3 * _w60);
         for (const m of _regs60) m.target.pd = _mpsP60;
+      }
+    }
+    // ─── §8.64: тайминговые ноты — по ФИНАЛУ, а не по промежуточному плану ──────────
+    // Замер 60 дней: 24 дня печатали «Приёмы слишком близко» и «MPS gap 8.3ч … добавьте
+    // белковый перекус» — а он УЖЕ стоял (cutF50/5/тр: перекус 40 г в 15:30). Причина:
+    // ноты считаются на промежуточных тарелках (≈строка 6000), а §8.57/§8.59/§8.63
+    // позже перекладывают белок. Совет противоречил собственному плану.
+    // Пересобираем по финальным приёмам: разрыв по фактическим кормлениям (≥25 г),
+    // и если в промежутке есть слабый приём — просим УСИЛИТЬ его, а не добавлять новый.
+    {
+      const _toMin64 = (s: any): number => {
+        const m = typeof s === 'string' ? s.match(/^(\d{1,2}):(\d{2})/) : null;
+        if (!m) return -1;
+        const h = Number(m[1]), mm = Number(m[2]);
+        return h >= 0 && h < 24 && mm >= 0 && mm < 60 ? h * 60 + mm : -1;
+      };
+      const _STALE64 = [/^⏰ MPS gap /, /^⏱ Приёмы слишком близко/, /^⏱ Большой интервал /];
+      let _firstIdx64 = -1;
+      for (let i = notes.length - 1; i >= 0; i--) {
+        const s = notes[i];
+        if (typeof s === 'string' && _STALE64.some((re) => re.test(s))) {
+          if (_firstIdx64 < 0 || i < _firstIdx64) _firstIdx64 = i;
+          notes.splice(i, 1);
+        }
+      }
+      const _timed64 = (meals as any[])
+        .filter((m) => (m.items || []).length > 0 && _toMin64(m.time) >= 0)
+        .map((m) => ({ t: _toMin64(m.time), label: String(m.label || m.type || ''), p: Number(m.totals?.p) || 0, w: ['preworkout', 'postworkout', 'intra'].includes(String(m.type)) }))
+        .sort((a, b) => a.t - b.t);
+      const _fresh64: string[] = [];
+      if (_timed64.length >= 2) {
+        let _minGap64 = Infinity, _maxGap64 = 0, _gFrom64 = '', _gTo64 = '';
+        let _closeA64 = '', _closeB64 = '';
+        for (let i = 1; i < _timed64.length; i++) {
+          const g = _timed64[i].t - _timed64[i - 1].t;
+          if (g <= 0) continue;
+          if (g > _maxGap64) { _maxGap64 = g; _gFrom64 = _timed64[i - 1].label; _gTo64 = _timed64[i].label; }
+          // Пери-приёмы (pre/intra/post) — окна, а не «приёмы пищи»: пост-шейк за
+          // 30 минут до ужина — норма, нота «слишком близко» про них вводит в заблуждение.
+          if (!_timed64[i].w && !_timed64[i - 1].w && g < _minGap64) { _minGap64 = g; _closeA64 = _timed64[i - 1].label; _closeB64 = _timed64[i].label; }
+        }
+        if (_maxGap64 > 300) {
+          _fresh64.push(`⏱ Большой интервал ${Math.round(_maxGap64 / 60)} ч между «${_gFrom64}» и «${_gTo64}» — белок распределён неравномерно. Увеличьте число приёмов (сейчас ${input.mealsCount}) или сдвиньте время обеда/ужина, чтобы интервалы были 3–5 ч.`);
+        }
+        if (_minGap64 < 60 && _minGap64 !== Infinity) {
+          _fresh64.push(`⏱ Приёмы слишком близко («${_closeA64}» → «${_closeB64}», ${_minGap64} мин) — разнесите их минимум на 2.5 ч, чтобы поддержать MPS-окно.`);
+        }
+        const _feed64 = _timed64.filter((f) => f.p >= 25);
+        if (_feed64.length >= 2) {
+          let _gap64 = 0, _from64: { t: number; label: string; p: number } | null = null, _to64: { t: number; label: string; p: number } | null = null;
+          for (let i = 1; i < _feed64.length; i++) {
+            const g = _feed64[i].t - _feed64[i - 1].t;
+            if (g > _gap64) { _gap64 = g; _from64 = _feed64[i - 1]; _to64 = _feed64[i]; }
+          }
+          if (_gap64 > 240 && _from64 && _to64) {
+            const _between64 = _timed64
+              .filter((f) => f.t > (_from64 as any).t && f.t < (_to64 as any).t)
+              .sort((a, b) => a.p - b.p)[0];
+            // Если в промежутке есть слабый приём — строку «Белок по приёмам: … недобирает»
+            // уже напечатала переделка QG14/§8.63, и совет «доведите его» её дублирует
+            // (замер: +36 повторов на 60 дней). Держим только «добавьте перекус» — там,
+            // где в промежутке действительно пусто.
+            const _hasWeakNote64 = notes.some((x) => typeof x === 'string'
+              && x.startsWith('Белок по приёмам:') && x.includes('недобирает'));
+            if (!(_between64 && _hasWeakNote64)) {
+              _fresh64.push(_between64
+                ? `⏰ MPS gap ${(_gap64 / 60).toFixed(1)}ч между «${_from64.label}» и «${_to64.label}» — в промежутке «${_between64.label}» даёт ${Math.round(_between64.p)} г белка: доведите его до ≥25 г (лейцин ≥2.5 г), новый приём не нужен.`
+                : `⏰ MPS gap ${(_gap64 / 60).toFixed(1)}ч между «${_from64.label}» и «${_to64.label}» — окно 3–4ч (Areta 20г/3ч) превышено: добавьте белковый перекус ≥25 г в промежуток.`);
+            }
+          }
+        }
+      }
+      if (_fresh64.length > 0) {
+        if (_firstIdx64 >= 0) notes.splice(Math.min(_firstIdx64, notes.length), 0, ..._fresh64);
+        else notes.push(..._fresh64);
       }
     }
     return {
