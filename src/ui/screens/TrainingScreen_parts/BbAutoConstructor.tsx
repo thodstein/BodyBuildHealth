@@ -19,7 +19,8 @@ import { EXERCISE_CATALOG, getExerciseById } from '../../../core/exercise-catalo
 import { SubstitutionPopup } from './SubstitutionPopup';
 import { SPLIT_PATTERNS } from '../../../engines/bb/bb-split-patterns';
 import { rankBBSplits, splitFitWarnings } from '../../../engines/bb/bb-selector.engine';
-import { buildBBPlan, applyMacrocycleToBBPlan, type BBPlan } from '../../../engines/bb/bb-builder.engine';
+import { applyMacrocycleToBBPlan, type BBPlan } from '../../../engines/bb/bb-builder.engine';
+import { buildBBPlanAsync, prewarmBBWorker } from '../../../engines/bb/bb-build-async';
 import { autoCalibrateFromStored, type PlanWeightEntry } from '../../../engines/bb/bb-weight-calibration.engine';
 import type { DUPMode } from '../../../engines/bb/bb-dup.engine';
 import { applyDUPOverlay, recommendDUPMode } from '../../../engines/bb/bb-dup.engine';
@@ -60,7 +61,8 @@ import { DELOAD_PROTOCOLS, type LoadStrategy, type DeloadType, type IntensityTec
 import type { SessionMethodology } from '../../../engines/bb/bb-session-order.engine';
 import { labTrainingAdjust } from './lab-training-adjust';
 import { getCycleById, normalizeCycleDirection, getCyclesByDirection } from '../../../data/lms-cycles/lms-cycle-index';
-import { programToBBPlan, cycleTemplateToFullProgram } from '../../../engines/bb/cycle-to-plan';
+import { cycleTemplateToFullProgram } from '../../../engines/bb/cycle-to-plan';
+import { programToBBPlanAsync } from '../../../engines/bb/bb-build-async';
 import { resolveEffectiveVolumeScheme, resolveEffectiveMethodology, namedSystemNote } from './bb-scheme-resolve';
 import type { SRCycleTemplate } from '../../../data/lms-cycles/lms-types';
 import { FULL_PROGRAM_LIBRARY } from '../../../engines/complete-program-library.engine';
@@ -2035,6 +2037,10 @@ const [bbVolumeRamp, setBbVolumeRamp] = useState<'standard' | 'preloaded' | 'fla
   const builtPlanRef = useRef<BBPlan | null>(builtPlan);
   useEffect(() => { builtPlanRef.current = builtPlan; }, [builtPlan]);
 
+  // Сборка плана считается в воркере (see engines/bb/bb-build-async.ts) — греем
+  // его при открытии конструктора, чтобы первое «Собрать» не платило за загрузку.
+  useEffect(() => { prewarmBBWorker(); }, []);
+
   useEffect(() => {
     const onExternalPlan = (e: Event) => {
       try {
@@ -2326,7 +2332,7 @@ const [bbVolumeRamp, setBbVolumeRamp] = useState<'standard' | 'preloaded' | 'fla
     if (planMode === 'programs') {
       // Единственный путь: FullProgram → programToBBPlan (faithful / adapt)
       if (effectiveProgram) {
-        plan = programToBBPlan(effectiveProgram, {
+        plan = await programToBBPlanAsync(effectiveProgram, {
           workMax: bbWorkMax,
           weakPoints,
           focusGroup: '',
@@ -2412,7 +2418,7 @@ const [bbVolumeRamp, setBbVolumeRamp] = useState<'standard' | 'preloaded' | 'fla
     } else {
       const pattern = SPLIT_PATTERNS.find(p => p.id === selectedSplitId);
       if (!pattern) return;
-        plan = buildBBPlan({
+        plan = await buildBBPlanAsync({
           patternId: selectedSplitId, level: bbLevel, trainingYears: bbTrainingYears, goal: bbGoal as any, weeks: bbWeeks,
           bodyweightCapability: prof.bodyweightCapability,
           workMax: bbWorkMax, weakPoints, focusGroup: '', volumeGoal: effectiveVolGoal,

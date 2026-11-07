@@ -14,7 +14,8 @@ import { autoRegulate, type AutoRegOutput } from '../../engines/pro/autoregulati
 import { acuteChronicRatio, toDailyLoads } from '../../engines/pro/training-load.engine';
 import { loadSRPESessions } from '../../engines/pro/srpe-store';
 import { rankBBSplits } from '../../engines/bb/bb-selector.engine';
-import { buildBBPlan, applyMacrocycleToBBPlan, type BBPlan } from '../../engines/bb/bb-builder.engine';
+import { applyMacrocycleToBBPlan, type BBPlan } from '../../engines/bb/bb-builder.engine';
+import { buildBBPlanAsync } from '../../engines/bb/bb-build-async';
 import { arrangeSupersetBlocks } from '../../engines/bb/bb-session-order.engine';
 import { applyTrainingTaperToBBPlan, deserializeBBPrepConfig, legacyConfigFromProfile, isoAddDays, isoToday, type BBContestPrepConfig } from '../../engines/bb/bb-contest-prep.engine';
 import { adaptForPEDs, type PED } from '../../engines/bb/bb-ped-adaptation.engine';
@@ -1002,15 +1003,16 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
   const bbRanked = useMemo(() => rankBBSplits({ level: bbLevel, goal: bbGoal as any, daysPerWeek: bbDays }), [bbLevel, bbGoal, bbDays]);
   const bbBest = bbRanked[0];
 
-  const buildBb = () => {
+  const buildBb = async () => {
     if (!bbBest) return;
     const profData = linked.profile?.settings?.personal;
     const lifeData = linked.profile?.settings?.lifestyle;
     const nutrData = linked.profile?.settings?.nutrition as (Record<string, any> | undefined);
     const bodyFat = profData?.bodyFat;
     const leanMass = (profData?.weight && bodyFat != null) ? Math.round(profData.weight * (1 - bodyFat / 100)) : undefined;
-    // BB-2+BB-5 FIX: pass all available parameters to buildBBPlan
-    let plan: BBPlan = buildBBPlan({
+    // BB-2+BB-5 FIX: pass all available parameters to buildBBPlan.
+    // Сборка идёт в воркере (bb-build-async), чтобы не морозить UI на ~0.2–1 с.
+    let plan: BBPlan = await buildBBPlanAsync({
       patternId: bbBest.pattern.id, level: bbLevel, goal: bbGoal as any, weeks: bbWeeks,
       workMax: bbWorkMax, weakPoints, focusGroup: bbFocus, volumeGoal: bbVolGoal as any,
       trainingFocus: bbTrainingFocus,
@@ -1034,7 +1036,7 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
     setBuiltBb(plan); setBbWeekSel(1);
   };
 
-  const applyBBMacrocycle = (macro: Macrocycle | BBMacrocycle) => {
+  const applyBBMacrocycle = async (macro: Macrocycle | BBMacrocycle) => {
     if (!bbBest) throw new Error('Не найден подходящий ББ-сплит');
     const profData = linked.profile?.settings?.personal;
     const lifeData = linked.profile?.settings?.lifestyle;
@@ -1043,8 +1045,9 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
     const leanMass = (profData?.weight && bodyFat != null)
       ? Math.round(profData.weight * (1 - bodyFat / 100))
       : undefined;
-    // BB-2+BB-5 FIX: pass all available parameters to buildBBPlan
-    const plan = buildBBPlan({
+    // BB-2+BB-5 FIX: pass all available parameters to buildBBPlan.
+    // Сборка — в воркере (bb-build-async): кнопка «применить макроцикл» не морозится.
+    const plan = await buildBBPlanAsync({
       patternId: bbBest.pattern.id,
       level: bbLevel,
       goal: bbGoal as any,
@@ -1102,6 +1105,18 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
     setBuiltBb(finalPlan);
     setBbWeekSel(1);
     setSubView('plan');
+  };
+  /**
+   * Обёртка для кнопок: сборка макроцикла-плана теперь асинхронная (воркер),
+   * ошибки ловим явно — иначе они станут unhandled rejection и пользователь
+   * останется без объяснения, почему план не применился.
+   */
+  const applyBBMacrocycleSafe = (macro: Macrocycle | BBMacrocycle) => {
+    void applyBBMacrocycle(macro).catch((error: unknown) => {
+      const msg = (error as Error)?.message ?? String(error);
+      setMethodNote(`⚠ Макроцикл не применён: ${msg}`);
+      setSubView('plan');
+    });
   };
   // 🔗 применение корректировок из калькуляторов к активному плану (ПЛ/ББ) — с маршрутизацией по источнику
   const applyExternal = (explicit?: PlannerApply | null) => {
@@ -2027,7 +2042,7 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
       {subView === 'macro' && <MacrocyclePanel taperMode={macroTaperMode} level={macroLevel} goal={macroGoal} onLevelChange={setMacroLevel} onGoalChange={setMacroGoal} onApplyMacrocycle={(macro, sourceChangeConsent = false) => {
         try {
           if (mainTab === 'pl') buildSrcMacrocycle(macro as Macrocycle, sourceChangeConsent);
-          else applyBBMacrocycle(macro as Macrocycle | BBMacrocycle);
+          else applyBBMacrocycleSafe(macro as Macrocycle | BBMacrocycle);
         } catch (error) {
           setMethodNote(`⚠ Макроцикл не применён: ${(error as Error).message}`);
           setSubView('plan');
@@ -2039,14 +2054,14 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
             const raw = localStorage.getItem('he_bb_macro');
             if (raw) {
               const bbMacro = deserializeBbMacro(raw);
-              if (bbMacro) { applyBBMacrocycle(bbMacro); return; }
+              if (bbMacro) { applyBBMacrocycleSafe(bbMacro); return; }
             }
             // Fallback на PL-макроцикл
             const rawPl = localStorage.getItem('he_pl_macro');
             if (!rawPl) { setSubView('plan'); return; }
             const macro = deserializeMacro(rawPl);
             if (!macro) { setSubView('plan'); return; }
-            applyBBMacrocycle(macro);
+            applyBBMacrocycleSafe(macro);
            } catch (error) {
               setMethodNote(`⚠ Макроцикл ББ не применён: ${(error as Error).message}`);
               setSubView('plan');

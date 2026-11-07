@@ -1,0 +1,99 @@
+/**
+ * bb-build-worker-handler.ts — чистая обработка задачи сборки плана.
+ *
+ * Вынесено из `bb-build.worker.ts`, чтобы логику можно было:
+ *  • тестировать в jsdom без настоящего Worker;
+ *  • переиспользовать в синхронном fallback.
+ *
+ * ЗАЧЕМ ВОРКЕР. Сборка BB-плана — сотни миллисекунд синхронной работы
+ * (после итерации AP: ~200 мс generic 8 нед, ~420 мс enhanced 12 нед на
+ * десктопе; на телефоне в 2–3 раза дольше). На главном потоке это
+ * «замороженный» UI. Профиль показал, что вынос безопасен:
+ *  • вход и выход — простые данные (проверено обходом плана: ни функций,
+ *    ни классов, ни Date);
+ *  • из хранилища движок читает ровно 4 ключа (замер):
+ *    `he_bb_mev_calibration`, `he_hrv_log`, `he_srpe_sessions`,
+ *    `he_workout_log_v2` — их снимок приходит с главного потока.
+ * В воркере `localStorage` нет, поэтому на время сборки подставляется шим
+ * со снимком (иначе личные ориентиры объёма / HRV / sRPE / журнал молча
+ * выпали бы и план отличался от собранного в основном потоке).
+ */
+import { buildBBPlan } from './bb-builder.engine';
+import { programToBBPlan } from './cycle-to-plan';
+
+export type BBTaskRequest =
+  | { kind: 'build'; input: any; pedAdapt?: any }
+  | { kind: 'program'; program: any; opts: any }
+  /** Прогрев: заставляет воркер загрузить модуль и каталог заранее. */
+  | { kind: 'warmup' };
+
+export interface BBTaskPayload {
+  /** Снимок localStorage: ключ → значение (null = ключа нет). */
+  storage?: Record<string, string | null>;
+}
+
+export type BBTaskResult =
+  | { ok: true; plan: any }
+  | { ok: false; error: string };
+
+function makeStorageShim(snapshot: Record<string, string | null>) {
+  const map = new Map<string, string>();
+  for (const [k, v] of Object.entries(snapshot || {})) if (v != null) map.set(k, String(v));
+  return {
+    getItem: (k: string) => (map.has(k) ? map.get(k)! : null),
+    setItem: (k: string, v: string) => { map.set(k, String(v)); },
+    removeItem: (k: string) => { map.delete(k); },
+    clear: () => map.clear(),
+    key: (i: number) => Array.from(map.keys())[i] ?? null,
+    get length() { return map.size; },
+  };
+}
+
+/**
+ * Выполнить задачу со «снимком» localStorage вместо настоящего.
+ * В воркере localStorage нет — шим просто появляется; в браузере/тестах
+ * исходный объект восстанавливается в finally.
+ */
+export function withStorageSnapshot<T>(snapshot: Record<string, string | null>, fn: () => T): T {
+  const g: any = globalThis;
+  let previous: PropertyDescriptor | undefined;
+  try {
+    previous = Object.getOwnPropertyDescriptor(g, 'localStorage');
+  } catch { previous = undefined; }
+  let installed = false;
+  try {
+    Object.defineProperty(g, 'localStorage', {
+      value: makeStorageShim(snapshot),
+      configurable: true,
+      writable: true,
+      enumerable: false,
+    });
+    installed = true;
+  } catch {
+    installed = false; // не смогли подменить — движок сработает на своём хранилище
+  }
+  try {
+    return fn();
+  } finally {
+    if (installed) {
+      try {
+        if (previous) Object.defineProperty(g, 'localStorage', previous);
+        else delete g.localStorage;
+      } catch { /* ignore */ }
+    }
+  }
+}
+
+/** Собрать план по задаче (чистая функция, без postMessage). */
+export function runBBTask(req: BBTaskRequest, payload: BBTaskPayload = {}): BBTaskResult {
+  if (!req || req.kind === 'warmup') return { ok: true, plan: null };
+  try {
+    const plan = withStorageSnapshot(payload.storage || {}, () => {
+      if ('program' in req) return programToBBPlan(req.program, req.opts);
+      return buildBBPlan(req.input, req.pedAdapt);
+    });
+    return { ok: true, plan };
+  } catch (e: any) {
+    return { ok: false, error: String(e?.message || e) };
+  }
+}

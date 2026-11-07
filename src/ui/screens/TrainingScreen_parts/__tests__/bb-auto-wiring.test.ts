@@ -80,8 +80,10 @@ describe('BB-03/BB-14: вес считается, а не копируется',
 describe('BB-08/BB-09: контекст доезжает до обоих путей сборки', () => {
   it('age и боль передаются в оба пути сборки', () => {
     // Программы/циклы идут через programToBBPlan, сплиты — через buildBBPlan.
-    expect(count('programToBBPlan(')).toBeGreaterThanOrEqual(1);
-    expect(count('buildBBPlan({')).toBeGreaterThanOrEqual(1);
+    // Оба вызова обёрнуты в *Async: сборка считается в Worker
+    // (engines/bb/bb-build-async.ts), иначе кнопка «Собрать» морозит UI.
+    expect(count('programToBBPlanAsync(')).toBeGreaterThanOrEqual(1);
+    expect(count('buildBBPlanAsync({')).toBeGreaterThanOrEqual(1);
     // ... и в каждом payload есть возраст и вердикт по боли.
     expect(countRe(/\bage:\s*Number\(/)).toBeGreaterThanOrEqual(2);
     expect(countRe(/\bpainLevel:/)).toBeGreaterThanOrEqual(2);
