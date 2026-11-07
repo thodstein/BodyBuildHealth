@@ -706,14 +706,14 @@
   align-items: center;
   gap: 10px;
   width: 100%;
-  min-height: 60px;
-  padding: 12px 14px;
-  margin-bottom: 8px;
-  border-radius: 16px;
+  min-height: 44px;
+  padding: 10px 12px;
+  margin-bottom: 6px;
+  border-radius: 10px;
   background: var(--ad-bg2);
   border: 1px solid var(--ad-edge);
   color: var(--ad-text);
-  font-size: 13px;
+  font-size: 11px;
   font-weight: 600;
   cursor: pointer;
   text-align: left;
@@ -1055,57 +1055,115 @@
   box-shadow: 0 6px 18px rgba(245, 158, 11, 0.3);
 }
 
-/* ─── Сессии и упражнения плана ──────────────────────────────────── */
+/* ─── Сессии и упражнения плана — как день/упражнение в ББ-плане ─── */
 :is(.train-arm) .ad-sess {
-  border: 1px solid var(--ad-edge);
-  border-left: 3px solid var(--ad-acc);
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 16px;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.015)), var(--ad-bg2);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 8px 22px rgba(0, 0, 0, 0.25);
-  padding: 13px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-left: 4px solid var(--ad-acc);
+  border-radius: 14px;
+  background: rgba(20, 22, 28, 0.55);
+  box-shadow: none;
+  -webkit-backdrop-filter: blur(18px) saturate(160%);
+  backdrop-filter: blur(18px) saturate(160%);
+  padding: 0;
   margin-bottom: 10px;
+  overflow: hidden;
 }
 
 :is(.train-arm) .ad-sess-h {
   display: flex;
   align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-  font-size: 13.5px;
+  gap: 10px;
+  flex-wrap: nowrap;
+  padding: 14px 16px;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.02));
+  font-size: 15px;
   font-weight: 800;
   letter-spacing: -0.1px;
   color: var(--ad-text);
-  margin-bottom: 10px;
+  margin-bottom: 0;
 }
 
 :is(.train-arm) .ad-sess-h::before {
-  content: '';
-  width: 8px;
-  height: 8px;
-  border-radius: 99px;
-  background: linear-gradient(135deg, var(--ad-acc), #00c8a0);
-  box-shadow: 0 0 10px rgba(0, 230, 138, 0.7);
+  content: none;
+}
+
+:is(.train-arm) .ad-sess-num {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--ad-acc);
+  color: #000;
+  font-weight: 900;
+  font-size: 14px;
   flex-shrink: 0;
 }
 
+:is(.train-arm) .ad-sess-tt {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+:is(.train-arm) .ad-sess-name {
+  font-size: 15px;
+  font-weight: 800;
+  line-height: 1.2;
+  color: var(--ad-text);
+}
+
+:is(.train-arm) .ad-sess-sub {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  align-items: center;
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--ad-dim);
+  opacity: 0.9;
+}
+
 :is(.train-arm) .ad-tag {
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
-  padding: 2px 8px;
-  border-radius: 999px;
+  padding: 2px 7px;
+  border-radius: 6px;
   background: var(--ad-bg3);
   border: 1px solid var(--ad-edge);
   color: var(--ad-dim);
 }
 
+:is(.train-arm) .ad-sess > .ad-muted {
+  padding: 8px 16px 0;
+}
+
+:is(.train-arm) .ad-sess .ad-ex {
+  margin: 8px 10px;
+}
+
+:is(.train-arm) .ad-sess .ad-ex:last-child {
+  margin-bottom: 10px;
+}
+
+:is(.train-arm) .ad-sess .ad-tag,
+:is(.train-arm) .ad-ex .ad-tag {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 5px;
+}
+
 :is(.train-arm) .ad-ex {
-  padding: 10px 11px;
+  padding: 10px 12px;
   margin: 0 0 8px;
-  border: 1px solid rgba(255, 255, 255, 0.07);
-  border-radius: 13px;
-  background: rgba(255, 255, 255, 0.03);
-  font-size: 12.5px;
+  border: 0.5px solid rgba(255, 255, 255, 0.04);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.025);
+  font-size: 12px;
 }
 
 :is(.train-arm) .ad-ex:last-child {
@@ -1116,15 +1174,17 @@
   display: flex;
   justify-content: space-between;
   gap: 6px 10px;
-  align-items: baseline;
+  align-items: flex-start;
   flex-wrap: wrap;
   min-width: 0;
 }
 
 :is(.train-arm) .ad-ex-nm {
   color: var(--ad-text);
-  font-weight: 600;
-  line-height: 1.45;
+  font-size: 14px;
+  font-weight: 800;
+  line-height: 1.25;
+  letter-spacing: -0.2px;
   min-width: 0;
   flex: 1 1 180px;
   overflow-wrap: break-word;
@@ -1132,14 +1192,19 @@
 
 :is(.train-arm) .ad-ex-nm > span {
   color: var(--ad-dim);
-  font-weight: 400;
+  font-size: 11px;
+  font-weight: 600;
 }
 
 :is(.train-arm) .ad-ex-vl {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  align-items: center;
   flex-shrink: 0;
   color: var(--ad-dim);
+  font-size: 11px;
   font-variant-numeric: tabular-nums;
-  white-space: nowrap;
 }
 
 :is(.train-arm, .train-armdiag) .ad-tip {
@@ -2199,12 +2264,30 @@
   gap: 8px;
 }
 :is(.train-arm) .ad-card {
-  padding: 10px 12px;
-  margin: 0 0 8px;
+  /* Шаг — плоская обёртка (как корень ББ-авто): рамку и фон рисуют карточки
+     AdSec, а не AdCard, иначе на каждом шаге была «карточка в карточке». */
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  animation: none;
+  padding: 0;
+  margin: 0;
 }
 :is(.train-arm) .ad-sec {
   padding: 10px 12px;
   margin-top: 0;
+  box-shadow: none;
+}
+:is(.train-arm) .ad-sec .ad-sec {
+  /* Вложенная секция — плоский под-блок кита, без второго слоя тени. */
+  background: rgba(0, 0, 0, 0.18);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  padding: 8px 10px;
+  margin: 8px 0 0;
 }
 :is(.train-arm) .ad-sec-t {
   margin: 0 0 6px;

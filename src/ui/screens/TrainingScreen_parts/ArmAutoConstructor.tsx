@@ -70,6 +70,7 @@ import './arm-design.css';
 import {
   CARD, SMALL, BTN, BTN_GHOST, H, IN,
   bbCardChrome, bbIconTile, bbCardTitle, bbCardBadge,
+  PlannerNestedCardContext, PLANNER_SUBCARD, plannerTitleText,
   PlannerStepNav, usePlannerStepScroll, PLANNER_HEAD_BAR, PLANNER_HEAD_TITLE, PLANNER_FLASH, PLANNER_STEP_NAV_WRAP,
 } from './training-ui';
 import { buzzPlanner } from './planner-ui';
@@ -110,36 +111,43 @@ function AdRoot({ rootClass, children }: { rootClass: string; children: React.Re
   // Отступы и ширину даёт хост окна конструктора (.tp-cbody) — как в ББ-авто.
   return <div className={isNativeApp() ? `${rootClass} arm-apk ad-wrap planner-root` : `${rootClass} ad-wrap planner-root`} style={{ display: 'flex', flexDirection: 'column', gap: 8, width: '100%', minWidth: 0, maxWidth: '100%' }}>{children}</div>;
 }
-/** Контейнер шага — рамка карточки кита, БЕЗ gap: расстояние задаёт
- *  marginBottom 10 самой карточки (как в ББ-авто), иначе 8+10 = «дырки». */
-function AdCard({ className, children, ...rest }: React.HTMLAttributes<HTMLDivElement>) {
-  return <div className={className ? `ad-card ${className}` : 'ad-card'} style={{ ...bbCardChrome(AD_ACCENT.params), display: 'flex', flexDirection: 'column' }} {...rest}>{children}</div>;
+/** Обёртка шага — без собственной рамки: шаг состоит из карточек кита (AdSec),
+ *  ровно как в ББ-авто (раньше AdCard + AdSec давали «двойные» карточки). */
+function AdCard({ className, children, style, ...rest }: React.HTMLAttributes<HTMLDivElement>) {
+  return <div className={className ? `ad-card ${className}` : 'ad-card'} style={{ display: 'flex', flexDirection: 'column', gap: 8, ...style }} {...rest}>{children}</div>;
 }
 function AdSec({ title, hint, children, hook, collapsible, defaultOpen, summary, status, accent = AD_ACCENT.params }: { title: React.ReactNode; hint?: React.ReactNode; children: React.ReactNode; hook?: string; collapsible?: boolean; defaultOpen?: boolean; summary?: React.ReactNode; status?: 'ok' | 'warn'; accent?: string }) {
   // Вторичное по умолчанию закрыто (BB-эталон PlannerFold); первичное — открыто.
   const [open, setOpen] = React.useState(defaultOpen ?? !collapsible);
   const { icon, text } = splitIconTitle(title);
+  /* Кит ББ-авто: верхнеуровневая секция — карточка, вложенная — плоский
+     под-блок (без второго стеклянного слоя). Заголовок родителя не дублируем. */
+  const parentTitle = React.useContext(PlannerNestedCardContext);
+  const nested = parentTitle !== null;
+  const ownTitle = plannerTitleText(text);
+  const hideDupTitle = nested && ownTitle !== '' && ownTitle === parentTitle;
+  const chrome: React.CSSProperties = nested ? PLANNER_SUBCARD : { ...bbCardChrome(accent), marginBottom: 0 };
   const dot = status ? <span className="ad-dot" data-s={status} aria-hidden style={{ width: 8, height: 8, borderRadius: 99, background: status === 'ok' ? '#00e68a' : '#f59e0b', display: 'inline-block', marginRight: 6 }} /> : null;
   const head = (
     <>
-      {icon ? <span className="ad-sec-ic" aria-hidden style={bbIconTile(accent)}>{icon}</span> : null}
+      {icon && !hideDupTitle ? <span className="ad-sec-ic" aria-hidden style={bbIconTile(accent)}>{icon}</span> : null}
       {dot}
-      <span className="ad-sec-t" style={{ ...bbCardTitle, flex: 1, margin: 0 }}>{text}</span>
+      {!hideDupTitle ? <span className="ad-sec-t" style={{ ...bbCardTitle, flex: 1, margin: 0 }}>{text}</span> : null}
       {!open && summary ? <span className="ad-sec-sum" style={bbCardBadge(accent)}>{summary}</span> : null}
     </>
   );
   const bodyStyle: React.CSSProperties = { marginTop: open ? 8 : 0, ...(open ? {} : { display: 'grid', gridTemplateRows: '0fr', opacity: 0, pointerEvents: 'none' as const }) };
   if (!collapsible) {
     return (
-      <div className="ad-sec" {...(hook ? { 'data-arm': hook } : {})} style={bbCardChrome(accent)}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>{head}</div>
+      <div className="ad-sec" {...(hook ? { 'data-arm': hook } : {})} style={{ ...chrome, display: 'flex', flexDirection: 'column' }}>
+        {(icon || dot || !hideDupTitle) ? <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>{head}</div> : null}
         {hint ? <div className="ad-sec-hint" style={{ fontSize: 10.5, color: '#fff', lineHeight: 1.45, marginBottom: 8 }}>{hint}</div> : null}
-        {children}
+        <PlannerNestedCardContext.Provider value={ownTitle || parentTitle || ''}>{children}</PlannerNestedCardContext.Provider>
       </div>
     );
   }
   return (
-    <div className="ad-sec" {...(hook ? { 'data-arm': hook } : {})} style={bbCardChrome(accent)}>
+    <div className="ad-sec" {...(hook ? { 'data-arm': hook } : {})} style={{ ...chrome, display: 'flex', flexDirection: 'column' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
         <button type="button" className="ad-sec-head" aria-expanded={open} onClick={() => { buzzPlanner(); setOpen((o) => !o); }} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', padding: 0, cursor: 'pointer', background: 'transparent', border: 'none', color: '#fff', textAlign: 'left', fontFamily: 'inherit', minHeight: 28 }}>
           {head}
@@ -148,7 +156,9 @@ function AdSec({ title, hint, children, hook, collapsible, defaultOpen, summary,
       </div>
       {hint && open ? <div className="ad-sec-hint" style={{ fontSize: 10.5, color: '#fff', lineHeight: 1.45, marginTop: 6 }}>{hint}</div> : null}
       <div className="ad-sec-body" data-collapsed={!open} style={bodyStyle}>
-        <div style={open ? undefined : { minHeight: 0, overflow: 'hidden' }}>{children}</div>
+        <div style={open ? undefined : { minHeight: 0, overflow: 'hidden' }}>
+          <PlannerNestedCardContext.Provider value={ownTitle || parentTitle || ''}>{children}</PlannerNestedCardContext.Provider>
+        </div>
       </div>
     </div>
   );
@@ -244,13 +254,6 @@ function shortSplitTag(tag?: string): string {
   return SPLIT_TAG_RU[tag] || tag;
 }
 
-/* Светофор фаз и RIR — та же палитра, что в печати (arm-export engine) */
-const PHASE_DOT: Record<string, string> = {
-  accumulation: '#22c55e',
-  intensification: '#f59e0b',
-  deload: '#60a5fa',
-  peaking: '#ef4444',
-};
 /* Кромка сессий по характеру дня */
 const CHAR_EDGE: Record<string, string> = {
   'тяж': '#ef4444',
@@ -2251,11 +2254,6 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
               </div>
             )}
           </AdSec>
-          <AdCta>
-            <AdBtn variant="primary" block hero onClick={handleBuild}>⚡ Собрать план</AdBtn>
-            {builtPlan && <AdBtn variant="ghost" block onClick={() => setStep('plan')}>Далее: План →</AdBtn>}
-            <div className="ad-muted">Лучший сплит: <b>{best?.name || '—'}</b> ({ranked[0]?.score ?? 0} баллов) · {ranked[0]?.rationale.slice(0,2).join(' · ')}</div>
-          </AdCta>
           <AdSec title="📚 Именной цикл" hint="Выбор цикла ставит его недели (exact-fit, согласие не нужно). Пусто = обычный план." collapsible defaultOpen={false} summary={summCyc} status={cycId ? 'ok' : undefined}>
             {rankedCycles.length > 0 && (
               <CyclePickerList items={rankedCycles} cycId={cycId} onPick={pickCycleId} levelRu={CYC_LEVEL_RU} phaseRu={CYC_PHASE_RU} />
@@ -2450,7 +2448,10 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
             {peaksPreview?.notes.map((n, i) => <div key={i} className="ad-tip" data-arm="peak-note">{n}</div>)}
           </AdSec>
           <AdCta>
+            <AdBtn variant="primary" block hero onClick={handleBuild}>⚡ Собрать план</AdBtn>
+            {builtPlan && <AdBtn variant="ghost" block onClick={() => setStep('plan')}>Далее: План →</AdBtn>}
             <AdBtn variant="ghost" block onClick={()=>setStep('grip')}>← Назад</AdBtn>
+            <div className="ad-muted">Лучший сплит: <b>{best?.name || '—'}</b> ({ranked[0]?.score ?? 0} баллов) · {ranked[0]?.rationale.slice(0,2).join(' · ')}</div>
           </AdCta>
         </AdCard>
       )}
@@ -2459,7 +2460,7 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
         <AdCard className="ad-stepview">
           {!builtPlan ? <AdEmpty icon="📋" title="План не собран — вернись в «Параметры»." sub="Выбери дисциплину, уровень и цель — соберём периодизацию 3/2/1 с tendon-cap и humerus-guard."><AdBtn variant="primary" block onClick={()=>setStep('params')}>🎛 К параметрам</AdBtn></AdEmpty> : (
             <>
-              <div className="ad-sec-t">📋 План — {builtPlan.pattern.name}</div>
+              <AdSec title={`📋 План — ${builtPlan.pattern.name}`} hint="Недели — сетка сверху; ниже выбранная неделя с сессиями и упражнениями.">
               <div className="ad-row" style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 6 }}>
                 <span className="ad-tag">{DISCIPLINES.find(d => d.id === discipline)?.label || discipline}</span>
                 <span className="ad-tag">{TECHNIQUES.find(t => t.id === technique)?.label || technique}</span>
@@ -2488,17 +2489,27 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
                   );
                 })}
               </div>
+              </AdSec>
               {curWeek && (
-                <div>
-                  <h4 className="ad-sec-t"><span aria-hidden style={{ display: 'inline-block', width: 9, height: 9, borderRadius: 99, background: PHASE_DOT[curWeek.phase] || '#94a3b8', marginRight: 6, verticalAlign: '1px' }} />Неделя {curWeek.week} — {curWeek.phase} {curWeek.deload ? '(deload)' : ''}</h4>
+                <AdSec title={`🗓 Неделя ${curWeek.week} — ${curWeek.phase}${curWeek.deload ? ' (deload)' : ''}`} status={curWeek.deload ? 'warn' : undefined}>
                   {curWeek.block && <div className="ad-tip" data-arm="week-block">🧱 Блок: {curWeek.block}</div>}
                   {curWeek.peak && <div className="ad-tip" data-arm="week-peak">🏁 Старт ({curWeek.peak.priority}): {curWeek.peak.name} — тейпер-окно, объём срезан, RIR поднят.</div>}
                   {editsCount > 0 && <div className="ad-row" style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 6 }}><span className="ad-tag">✏️ Правки: {editsCount} упр.</span><AdBtn variant="ghost" data-arm="edits-reset" onClick={()=>{ setArmEdits({}); setEditOpen(null); }}>Сбросить правки</AdBtn></div>}
                   {curWeek.note && <div className="ad-tip">📝 {curWeek.note}</div>}
                   <div className="ad-sess-list">
                   {curWeek.sessions.map((sess:any, si:number)=> (
-                    <div key={si} className="ad-sess" style={CHAR_EDGE[sess.character] ? { borderLeft: `3px solid ${CHAR_EDGE[sess.character]}` } : undefined}>
-                      <div className="ad-sess-h">{sess.sessionTag} <span className="ad-tag" data-ch={sess.character}>{sess.character}</span> {sess.tableTime ? <span className="ad-tag" data-ch="table">🖐️ стол</span> : ''}</div>
+                    <div key={si} className="ad-sess" style={CHAR_EDGE[sess.character] ? { borderLeft: `4px solid ${CHAR_EDGE[sess.character]}` } : undefined}>
+                      <div className="ad-sess-h">
+                        <span className="ad-sess-num" aria-hidden>{si + 1}</span>
+                        <span className="ad-sess-tt">
+                          <span className="ad-sess-name">День {si + 1} · {sess.sessionTag}</span>
+                          <span className="ad-sess-sub">
+                            <span className="ad-tag" data-ch={sess.character}>{sess.character}</span>
+                            {sess.tableTime ? <span className="ad-tag" data-ch="table">🖐️ стол</span> : ''}
+                            <span className="ad-muted" style={{ display: 'inline' }}>{sess.exercises.length} упр.</span>
+                          </span>
+                        </span>
+                      </div>
                       {sess.note && <div className="ad-muted">📝 {sess.note}</div>}
                       {sess.exercises.map((ex:any, ei:number)=> (
                         <div key={ei} className="ad-ex">
@@ -2548,7 +2559,7 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
                     </div>
                   ))}
                   </div>
-                </div>
+                </AdSec>
               )}
               <AdCta>
                 <AdBtn variant="primary" block hero onClick={() => setStep('quality')}>Далее: Проверка →</AdBtn>
@@ -2888,7 +2899,7 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
         <AdCard className="ad-stepview">
           {!builtPlan ? <AdEmpty icon="📤" title="План не собран — вернись в «Параметры»." sub="Собери план на шаге «Сплит и цикл» — здесь появятся печать, календарь и обоснование."><AdBtn variant="primary" block onClick={() => setStep('params')}>🎛 К параметрам</AdBtn></AdEmpty> : (
             <>
-               <div className="ad-sec-t">📤 Экспорт — {builtPlan.pattern.name}</div>
+               <AdSec title={`📤 Экспорт — ${builtPlan.pattern.name}`} hint="Печать · .ics · CSV · копировать сводку">
                {exportBlocked && <AdBanner tone="bad" hook="export-blocked">⛔ Экспорт заблокирован: план содержит safety-блокеры. Сначала исправьте их в разделе «Качество».</AdBanner>}
                <div className="ad-row" data-arm="export-actions" style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8 }}>
                  <AdBtn variant="ghost" disabled={exportBlocked} onClick={() => {
@@ -2979,6 +2990,7 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
                   } catch { fallback(); }
                 }} block style={{ minHeight: 48 }}>📋 Копировать сводку</AdBtn>
               </div>
+              </AdSec>
               <AdSec title="💾 Варианты плана" hint="Сохранить текущий (с правками), загрузить, удалить. Кап 10." collapsible defaultOpen={false} summary={`${armVariants.length}/10`}>
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'flex-end' }}>
                   <AdField label="Название варианта">

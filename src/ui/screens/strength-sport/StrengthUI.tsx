@@ -5,6 +5,10 @@
  */
 import React from 'react';
 import * as SharedAppleUI from '../../shared/apple-ui'; void SharedAppleUI.CARD;
+import {
+  bbCardChrome, bbIconTile, bbCardTitle,
+  PlannerNestedCardContext, PLANNER_SUBCARD, plannerTitleText,
+} from '../TrainingScreen_parts/training-ui';
 
 export const ACCENT = '#00e68a';
 export const ACCENT_STRONG = '#f59e0b';
@@ -172,51 +176,61 @@ export const SectionCard: React.FC<{
   status?: 'ok' | 'warn';
 }> = ({ id, title, subtitle, icon, right, accent, strong, hint, children, collapsible, defaultOpen, summary, status }) => {
   const [open, setOpen] = React.useState(defaultOpen ?? true);
+  const parentTitle = React.useContext(PlannerNestedCardContext);
+  const nested = parentTitle !== null;
+  const ownTitle = plannerTitleText(title);
+  // Вложенная карточка с тем же заголовком, что у родителя, не дублирует его.
+  const hideDupTitle = nested && ownTitle !== '' && ownTitle === parentTitle;
+  const color = strong ? ACCENT_STRONG : accent ? ACCENT : '#a855f7';
   const dot = status ? (
     <span className="ss-sec-dot" data-s={status} aria-hidden style={{
       width: 8, height: 8, borderRadius: 99, flexShrink: 0,
-      background: status === 'ok' ? 'linear-gradient(135deg, #00e68a, #10b981)' : 'linear-gradient(135deg, #f59e0b, #f97316)',
-      boxShadow: status === 'ok' ? '0 0 10px rgba(0,230,138,0.7)' : '0 0 10px rgba(245,158,11,0.7)',
+      background: status === 'ok' ? '#00e68a' : '#f59e0b',
+      boxShadow: status === 'ok' ? '0 0 10px rgba(0,230,138,0.6)' : '0 0 10px rgba(245,158,11,0.6)',
     }} />
   ) : null;
-  const head = title != null ? (
-    <div style={{ ...ROW, marginBottom: collapsible ? 0 : 4 }}>
-      {icon && (
-        <span style={{
-          width: 30, height: 30, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center',
-          background: strong ? ACCENT_GRAD_STRONG : accent ? ACCENT_GRAD : 'rgba(58,58,60,0.72)', border: `0.5px solid ${strong ? STRONG_BORDER : accent ? ACCENT_BORDER : SEPARATOR}`,
-          fontSize: 15, flexShrink: 0, fontFamily: SF, color: strong || accent ? '#fff' : TEXT_1,
-          boxShadow: strong ? '0 4px 14px rgba(245,158,11,0.30)' : accent ? '0 4px 14px rgba(0,230,138,0.28)' : 'none',
-        }}>{icon}</span>
-      )}
+  const showTitle = title != null && !hideDupTitle;
+  const head = showTitle ? (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', width: '100%' }}>
+      {icon && <span aria-hidden style={bbIconTile(color)}>{icon}</span>}
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 14, fontWeight: 700, color: TEXT_1, letterSpacing: -0.02 * 14, fontFamily: SF, lineHeight: 1.2, display: 'flex', alignItems: 'center', gap: 8 }}>{dot}{title}</div>
-        {(!collapsible || open) && subtitle && <div style={{ fontSize: 12, color: TEXT_2, fontFamily: SF, marginTop: 2, lineHeight: 1.4 }}>{subtitle}</div>}
-        {collapsible && !open && summary != null && <div className="ss-sec-sum" style={{ fontSize: 12, color: TEXT_2, fontFamily: SF, marginTop: 2, lineHeight: 1.4, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontVariantNumeric: 'tabular-nums' }}>{summary}</div>}
+        <div style={{ ...bbCardTitle, display: 'flex', alignItems: 'center', gap: 6 }}>{dot}{title}</div>
+        {(!collapsible || open) && subtitle && <div style={{ fontSize: 10.5, color: '#fff', lineHeight: 1.45, marginTop: 2 }}>{subtitle}</div>}
+        {collapsible && !open && summary != null && <div className="ss-sec-sum" style={{ fontSize: 10.5, color: '#fff', marginTop: 2, lineHeight: 1.45, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontVariantNumeric: 'tabular-nums' }}>{summary}</div>}
       </div>
-      {collapsible && (
-        <span className="ss-sec-chev" data-open={open} aria-hidden style={{
-          width: 28, height: 28, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center',
-          background: 'rgba(255,255,255,0.06)', border: `0.5px solid ${SEPARATOR}`, color: TEXT_2, fontSize: 13,
-          flexShrink: 0, transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s ease',
-        }}>▾</span>
-      )}
       {!collapsible && right}
     </div>
   ) : null;
+  const chevron = collapsible ? (
+    <span className="ss-sec-chev" data-open={open} aria-hidden style={{
+      marginLeft: 'auto', fontSize: 11, color: '#fff', flexShrink: 0,
+      display: 'inline-block', transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s ease',
+    }}>▾</span>
+  ) : null;
+  const hasHead = showTitle;
+  const containerStyle: React.CSSProperties = nested
+    ? { ...PLANNER_SUBCARD, display: 'flex', flexDirection: 'column' }
+    : { ...bbCardChrome(color), marginBottom: 0, display: 'flex', flexDirection: 'column' };
   return (
-    <div className="kit-section" data-ss={strong ? 'section-strong' : 'section'} style={strong ? CARD_STRONG : accent ? CARD_ACCENT : CARD} id={id}>
+    <section id={id} className={nested ? 'kit-section kit-section--nested' : 'kit-section'} data-ss={strong ? 'section-strong' : 'section'} style={containerStyle}>
       {collapsible ? (
-        <button type="button" className="ss-sec-head" aria-expanded={open} onClick={() => setOpen((o) => !o)} style={{ width: '100%', background: 'none', border: 'none', padding: 0, margin: 0, cursor: 'pointer', textAlign: 'left', minHeight: 44, display: 'block', fontFamily: SF, WebkitTapHighlightColor: 'transparent' }}>{head}</button>
+        <button type="button" className="ss-sec-head" aria-expanded={open} onClick={() => setOpen((o) => !o)} style={{ width: '100%', background: 'none', border: 'none', padding: 0, margin: 0, cursor: 'pointer', textAlign: 'left', minHeight: 28, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', fontFamily: SF, WebkitTapHighlightColor: 'transparent' }}>
+          {head}
+          {chevron}
+        </button>
       ) : head}
-      <div className="ss-sec-body" data-open={open} style={collapsible ? { display: 'grid', gridTemplateRows: open ? '1fr' : '0fr', opacity: open ? 1 : 0, transition: 'grid-template-rows 0.28s ease, opacity 0.2s ease' } : undefined}>
+      {hideDupTitle && subtitle ? (
+        <div style={{ fontSize: 10.5, color: '#fff', lineHeight: 1.45, marginTop: hasHead ? 6 : 0, marginBottom: 8 }}>{subtitle}</div>
+      ) : null}
+      <div className="ss-sec-body" data-open={open} style={collapsible ? { display: 'grid', gridTemplateRows: open ? '1fr' : '0fr', opacity: open ? 1 : 0, transition: 'grid-template-rows 0.28s ease, opacity 0.2s ease', marginTop: open && hasHead ? 8 : 0 } : { marginTop: hasHead ? 8 : 0 }}>
         <div style={collapsible ? { minHeight: 0, overflow: 'hidden' } : undefined}>
-          {children}
-          {hint && <div style={{ ...HINT, background: 'rgba(58,58,60,0.36)', border: `0.5px solid ${SEPARATOR}`, borderRadius: 8, padding: '8px 10px', fontSize: 12, lineHeight: 1.4 }}>{hint}</div>}
+          <PlannerNestedCardContext.Provider value={ownTitle || parentTitle || ''}>
+            {children}
+          </PlannerNestedCardContext.Provider>
+          {hint && <div style={{ ...HINT, background: 'rgba(0,0,0,0.18)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, padding: '8px 10px', fontSize: 10.5, lineHeight: 1.45, marginTop: 8 }}>{hint}</div>}
         </div>
       </div>
-      {!collapsible && hint && <div style={{ ...HINT, background: 'rgba(58,58,60,0.36)', border: `0.5px solid ${SEPARATOR}`, borderRadius: 8, padding: '8px 10px', fontSize: 12, lineHeight: 1.4 }}>{hint}</div>}
-    </div>
+    </section>
   );
 };
 export const StatTile: React.FC<{ label: string; value: string; color?: string; sub?: string; icon?: string }> = ({ label, value, color = ACCENT, sub, icon }) => (
@@ -361,16 +375,21 @@ export const HighlightStrong: React.FC<{ children: React.ReactNode }> = ({ child
   <span style={{ background: `${ACCENT_STRONG}14`, color: ACCENT_STRONG, padding: '2px 6px', borderRadius: 6, fontWeight: 590, fontFamily: SF, border: `0.5px solid ${ACCENT_STRONG}18` }}>{children}</span>
 );
 
-// ─── Apple sheets ───
-const SS_POP_ANIM = `@keyframes ssPopFade{from{opacity:0}to{opacity:1}}@keyframes ssPopSheetUp{from{opacity:0;transform:translateY(56px) scale(0.98)}to{opacity:1;transform:translateY(0) scale(1)}}`;
-const POP_OVERLAY: React.CSSProperties = { position: 'fixed', inset: 0, zIndex: 500, display: 'flex', alignItems: 'flex-end', justifyContent: 'center', background: 'rgba(2,6,14,0.60)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', padding: 0, animation: 'ssPopFade 0.22s ease' };
-const POP_SHEET: React.CSSProperties = { width: '100%', maxWidth: 440, maxHeight: '82vh', overflowY: 'auto', scrollbarWidth: 'none', borderRadius: '24px 24px 0 0', background: 'linear-gradient(180deg, #232a3d 0%, #1a1e2e 100%)', border: `0.5px solid ${SEPARATOR}`, borderBottom: 'none', boxShadow: '0 -16px 48px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.07)', paddingBottom: 'max(16px, env(safe-area-inset-bottom))', animation: 'ssPopSheetUp 0.32s cubic-bezier(0.22,0.9,0.28,1)' };
-const POP_HANDLE: React.CSSProperties = { width: 40, height: 5, borderRadius: 3, background: 'rgba(140,190,255,0.30)', margin: '10px auto 0' };
-const popCardBtn: React.CSSProperties = {
-  width: '100%', padding: '12px 14px', borderRadius: 16, cursor: 'pointer', fontSize: 11, fontWeight: 700, textAlign: 'center', minHeight: 60, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 3, fontFamily: SF,
-  background: 'rgba(58,58,60,0.72)', border: `0.5px solid ${SEPARATOR}`, color: TEXT_2, transition: 'all 0.18s',
-  boxShadow: '0 2px 8px rgba(0,0,0,0.18)',
-};
+// ─── Попапы в стиле ББ-авто: центральный диалог, тёмная карточка, акцент ───
+const SS_POP_ANIM = `@keyframes ssPopFade{from{opacity:0}to{opacity:1}}@keyframes ssPopSheetUp{from{opacity:0;transform:translateY(8px) scale(0.98)}to{opacity:1;transform:none}}`;
+const POP_OVERLAY: React.CSSProperties = { position: 'fixed', inset: 0, zIndex: 500, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.85)', padding: 0, animation: 'ssPopFade 0.20s ease' };
+const POP_SHEET: React.CSSProperties = { width: '88%', maxWidth: 420, maxHeight: '78vh', borderRadius: 16, background: '#18181b', border: '1px solid rgba(255,255,255,0.1)', overflow: 'hidden', display: 'flex', flexDirection: 'column', animation: 'ssPopSheetUp 0.22s ease' };
+const POP_BAR = (accent: string): React.CSSProperties => ({ height: 3, flexShrink: 0, background: `linear-gradient(90deg, ${accent}, ${accent}cc)` });
+const POP_BODY: React.CSSProperties = { padding: '14px 16px', overflowY: 'auto', maxHeight: 'calc(78vh - 3px)' };
+const POP_TITLE = (accent: string): React.CSSProperties => ({ fontSize: 14, fontWeight: 700, color: accent, marginBottom: 10 });
+const popLabelStyle: React.CSSProperties = { fontSize: 11, color: '#fff', fontWeight: 600, marginBottom: 2, overflowWrap: 'anywhere', wordBreak: 'break-word' };
+const popCardBtn = (active: boolean, accent: string): React.CSSProperties => ({
+  width: '100%', padding: '10px 12px', borderRadius: 10, cursor: 'pointer', fontSize: 11, fontWeight: 700,
+  textAlign: 'left' as const, boxSizing: 'border-box' as const, minWidth: 0, maxWidth: '100%', overflow: 'hidden',
+  background: active ? `${accent}1a` : 'rgba(255,255,255,0.03)',
+  border: active ? `1px solid ${accent}59` : '1px solid rgba(255,255,255,0.06)',
+  color: active ? accent : '#fff',
+});
 
 export const StrengthPopupSelect: React.FC<{ label: string; value: string | undefined; options: { id: string; label: string; desc?: string }[]; onChange: (v: string) => void; strong?: boolean }> = ({ label, value, options, onChange, strong }) => {
   const [open, setOpen] = React.useState(false);
@@ -378,38 +397,38 @@ export const StrengthPopupSelect: React.FC<{ label: string; value: string | unde
   const accent = strong ? ACCENT_STRONG : ACCENT;
   return (
     <>
-      <button onClick={() => setOpen(true)} style={popCardBtn} aria-haspopup="dialog" aria-label={label}>
-        <span style={{ fontSize: 11, color: TEXT_2, textTransform: 'uppercase', letterSpacing: 0.06 * 11, fontWeight: 700, fontFamily: SF }}>{label}</span>
-        <span style={{ fontSize: 17, color: strong ? '#f59e0b' : '#00e68a', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontFamily: SF, display: 'flex', alignItems: 'center', gap: 6, justifyContent: 'center' }}>{sel ? sel.label : 'Выбрать…'}<span style={{ fontSize: 11, color: TEXT_3 }}>▾</span></span>
+      <button onClick={() => setOpen(true)} style={popCardBtn(!!value, accent)} aria-haspopup="dialog" aria-label={label}>
+        <div style={popLabelStyle}>{label}</div>
+        <div style={{ fontSize: 12, color: value ? accent : '#fff', overflowWrap: 'anywhere', wordBreak: 'break-word' }}>{sel ? sel.label : 'Выбрать…'}</div>
       </button>
       {open && (
         <div className="ss-apk-backdrop" style={POP_OVERLAY} onClick={() => setOpen(false)} role="presentation">
           <style>{SS_POP_ANIM}</style>
-          <div className="ss-apk-sheet" onClick={e => e.stopPropagation()} style={{ ...POP_SHEET, borderTop: `2px solid ${strong ? ACCENT_STRONG : ACCENT}` }} role="dialog" aria-modal="true" aria-label={label}>
-            <div className="ss-apk-handle" style={POP_HANDLE} />
-            <div style={{ padding: '16px 16px 10px', borderBottom: `0.5px solid ${SEPARATOR}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-              <div style={{ fontSize: 15, fontWeight: 700, color: TEXT_1, textAlign: 'center', fontFamily: SF, flex: 1 }}>{label}</div>
-              {sel?.desc && <span style={{ fontSize: 12, color: accent, background: strong ? 'rgba(245,158,11,0.12)' : 'rgba(0,230,138,0.12)', padding: '4px 10px', borderRadius: 22, border: strong ? '0.5px solid rgba(245,158,11,0.24)' : '0.5px solid rgba(0,230,138,0.24)', fontFamily: SF, fontWeight: 600 }}>{sel.desc}</span>}
-            </div>
-            <div style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 6 }}>
-              {options.map(o => {
-                const active = value === o.id;
-                return (
-                  <button key={o.id} className="ss-apk-option" onClick={() => { onChange(o.id); setOpen(false); }} style={{
-                    display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', padding: '14px 16px', borderRadius: 14, cursor: 'pointer', textAlign: 'left' as const, minHeight: 60,
-                    fontFamily: SF, background: active ? (strong ? 'rgba(245,158,11,0.16)' : 'rgba(0,230,138,0.16)') : 'rgba(255,255,255,0.02)',
-                    border: active ? (strong ? '0.5px solid rgba(245,158,11,0.30)' : '0.5px solid rgba(0,230,138,0.30)') : '0.5px solid transparent', transition: 'background 0.18s',
-                  }}>
-                    <span style={{ flex: 1, minWidth: 0 }}>
-                      <span style={{ fontSize: 18, fontWeight: active ? 700 : 500, color: active ? accent : TEXT_1, fontFamily: SF, display: 'flex', alignItems: 'center', gap: 8 }}>{o.label}{active && <span style={{ fontSize: 15, color: accent }}>✓</span>}</span>
-                      {o.desc && <span style={{ fontSize: 13, color: active ? accent : TEXT_2, fontFamily: SF, marginTop: 3, display: 'block', lineHeight: 1.4, opacity: active ? 0.95 : 0.8 }}>{o.desc}</span>}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-            <div style={{ padding: '4px 16px 12px' }}>
-              <button className="ss-apk-done" onClick={() => setOpen(false)} style={{ width: '100%', padding: '14px', borderRadius: 14, background: strong ? ACCENT_GRAD_STRONG : ACCENT_GRAD, border: 'none', color: strong ? '#fff' : '#06281c', fontSize: 17, fontWeight: 800, fontFamily: SF, cursor: 'pointer', minHeight: 52, boxShadow: strong ? '0 6px 20px rgba(245,158,11,0.30)' : '0 6px 20px rgba(0,230,138,0.28)' }}>Готово</button>
+          <div className="ss-apk-sheet" onClick={e => e.stopPropagation()} style={POP_SHEET} role="dialog" aria-modal="true" aria-label={label}>
+            <div style={POP_BAR(accent)} />
+            <div style={POP_BODY}>
+              <div style={POP_TITLE(accent)}>{label}</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {options.map(o => {
+                  const active = value === o.id;
+                  return (
+                    <button key={o.id} className="ss-apk-option" onClick={() => { onChange(o.id); setOpen(false); }} style={{
+                      display: 'block', width: '100%', padding: '10px 12px', borderRadius: 10, cursor: 'pointer', textAlign: 'left' as const,
+                      fontSize: 11, fontWeight: active ? 700 : 400,
+                      background: active ? `${accent}1f` : 'rgba(255,255,255,0.03)',
+                      border: active ? `1px solid ${accent}4d` : '1px solid rgba(255,255,255,0.06)',
+                      color: active ? accent : '#fff',
+                    }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span>{o.label}</span>
+                        {active && <span style={{ fontSize: 10 }}>✓</span>}
+                      </div>
+                      {o.desc && <div style={{ fontSize: 9, color: '#fff', marginTop: 2, lineHeight: 1.4 }}>{o.desc}</div>}
+                    </button>
+                  );
+                })}
+              </div>
+              <button className="ss-apk-done" data-kind="close" onClick={() => setOpen(false)} style={{ width: '100%', marginTop: 12, padding: '10px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'transparent', color: '#fff', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>Закрыть</button>
             </div>
           </div>
         </div>
@@ -425,23 +444,29 @@ export const StrengthPopupNumber: React.FC<{ label: string; value: number; min?:
   React.useEffect(() => { if (!open) setEdit(String(value)); }, [value, open]);
   return (
     <>
-      <button onClick={() => { setEdit(String(value)); setOpen(true); }} style={popCardBtn} aria-haspopup="dialog">
-        <span style={{ fontSize: 11, color: TEXT_2, textTransform: 'uppercase', letterSpacing: 0.06 * 11, fontWeight: 600, fontFamily: SF }}>{label}</span>
-        <span style={{ fontSize: 17, color: accent, fontWeight: 600, fontFamily: SF, fontVariantNumeric: 'tabular-nums' }}>{value}{suffix ? ` ${suffix}` : ''}</span>
+      <button onClick={() => { setEdit(String(value)); setOpen(true); }} style={popCardBtn(true, accent)} aria-haspopup="dialog" aria-label={`${label}: ${value}${suffix ? ' ' + suffix : ''}`}>
+        <div style={popLabelStyle}>{label}</div>
+        <div style={{ fontSize: 14, color: accent, overflowWrap: 'anywhere', wordBreak: 'break-word', fontVariantNumeric: 'tabular-nums' }}>{value}{suffix ? ` ${suffix}` : ''}</div>
       </button>
       {open && (
         <div className="ss-apk-backdrop" style={POP_OVERLAY} onClick={() => setOpen(false)} role="presentation">
           <style>{SS_POP_ANIM}</style>
-          <div className="ss-apk-sheet" onClick={e => e.stopPropagation()} style={{ ...POP_SHEET, maxWidth: 360, borderTop: `2px solid ${strong ? ACCENT_STRONG : ACCENT}` }} role="dialog" aria-modal="true" aria-label={label}>
-            <div className="ss-apk-handle" style={POP_HANDLE} />
-            <div style={{ padding: 18, display: 'flex', flexDirection: 'column', gap: 16 }}>
-              <div style={{ fontSize: 19, fontWeight: 700, color: TEXT_1, textAlign: 'center', fontFamily: SF }}>{label}</div>
-              <input type="range" min={min ?? 0} max={max ?? 300} step={step} value={parseFloat(edit) || 0} onChange={e => setEdit(e.target.value)} style={{ width: '100%', accentColor: accent, height: 8, borderRadius: 999 }} />
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: TEXT_3, fontFamily: SF, fontVariantNumeric: 'tabular-nums' }}><span>{min ?? 0}</span><span>{max ?? 300}</span></div>
-              <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-                <input type="number" value={edit} onChange={e => setEdit(e.target.value)} style={{ flex: 1, padding: '13px 14px', borderRadius: 14, border: `0.5px solid ${SEPARATOR}`, background: 'rgba(58,58,60,0.72)', color: TEXT_1, fontSize: 19, fontWeight: 600, textAlign: 'center', outline: 'none', fontFamily: SF, fontVariantNumeric: 'tabular-nums', minHeight: 52 }} />
-                {suffix && <span style={{ fontSize: 14, color: TEXT_2, fontFamily: SF, fontWeight: 600 }}>{suffix}</span>}
-                <button className="ss-apk-done" onClick={() => { let v = parseFloat(edit); if (isNaN(v)) v = min ?? 0; if (min !== undefined) v = Math.max(min, v); if (max !== undefined) v = Math.min(max, v); onChange(v); setOpen(false); }} style={{ padding: '13px 24px', borderRadius: 14, border: 'none', background: accent, color: strong ? '#fff' : '#06281c', fontWeight: 800, fontSize: 16, fontFamily: SF, cursor: 'pointer', minHeight: 52, boxShadow: '0 6px 20px rgba(0,0,0,0.30)' }}>Готово</button>
+          <div className="ss-apk-sheet" onClick={e => e.stopPropagation()} style={{ ...POP_SHEET, maxWidth: 360 }} role="dialog" aria-modal="true" aria-label={label}>
+            <div style={POP_BAR(accent)} />
+            <div style={POP_BODY}>
+              <div style={POP_TITLE(accent)}>{label}</div>
+              <input type="number" value={edit} min={min} max={max} step={step}
+                onChange={e => setEdit(e.target.value)} autoFocus
+                style={{ width: '100%', padding: '12px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.3)', color: '#fff', fontSize: 16, boxSizing: 'border-box', textAlign: 'center', marginBottom: 12 }} />
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button onClick={() => setOpen(false)} style={{ flex: 1, padding: '10px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'transparent', color: '#fff', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>Отмена</button>
+                <button className="ss-apk-done" data-kind="ok" onClick={() => {
+                  let v = parseFloat(edit);
+                  if (isNaN(v)) { setOpen(false); return; }
+                  if (min !== undefined) v = Math.max(min, v);
+                  if (max !== undefined) v = Math.min(max, v);
+                  onChange(v); setOpen(false);
+                }} style={{ flex: 1, padding: '10px', borderRadius: 8, border: 'none', cursor: 'pointer', background: `linear-gradient(135deg, ${accent}, ${accent}cc)`, color: '#000', fontWeight: 700, fontSize: 12 }}>OK</button>
               </div>
             </div>
           </div>

@@ -6,7 +6,7 @@ import React from 'react';
 import type { CombatPlan } from '../../../engines/combat/combat.types';
 import { getCombat } from '../../../engines/combat/combat-volume';
 import { buildCombatReport, isCombatPlanBlocked } from '../../../engines/combat/combat-finalize.engine';
-import { ruLabel, PHASE_RU, SESSION_TAG_RU, Badge, InfoBanner, CARD, CARD_ACCENT, BTN, BTN_PRIMARY, BTN_SMALL, INPUT, ACCENT_GRAD, TEXT_3, Highlight, SectionCard, CardHeader, StatTile, GroupHeading, Divider, CombatPopupSelect } from './CombatUI';
+import { ruLabel, PHASE_RU, SESSION_TAG_RU, Badge, InfoBanner, BTN, BTN_PRIMARY, BTN_SMALL, INPUT, TEXT_3, Highlight, SectionCard, CardHeader, StatTile, GroupHeading, Divider, CombatPopupSelect } from './CombatUI';
 import { AnnualCard } from './combat-annual-card';
 import { CampStrip } from './cb-camp-strip';
 import { CbCampCharts } from './cb-camp-charts';
@@ -177,9 +177,9 @@ export const CombatPlanView: React.FC<Props> = ({
     [personal?.weight, personal?.bodyFat]);
 
   return (
-    <div className="combat-planview" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+    <div className="combat-planview" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
       {/* Верхняя панель действий */}
-      <div className="cb-plan-actions" style={{ ...CARD, padding: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+      <div className="cb-plan-actions" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
           <button className="cb-plan-undo" onClick={onUndo} disabled={historyLen === 0} style={{
             padding: '8px 12px', minHeight: 44, borderRadius: 10, fontSize: 11, fontWeight: 800, cursor: historyLen ? 'pointer' : 'default',
@@ -299,37 +299,35 @@ export const CombatPlanView: React.FC<Props> = ({
       {/* Недели */}
       {shown.weeksData.map(wk => {
         const isOpen = expandedWeek === wk.week - 1;
-        const phaseColor = (PHASE_RU as any)[wk.phase] ? (wk.deload ? '#f59e0b' : (wk as any).taper ? '#60a5fa' : '#a855f7') : '#a855f7';
-        const border = wk.deload ? 'rgba(245,158,11,0.28)' : (wk as any).taper ? 'rgba(59,130,246,0.22)' : 'rgba(168,85,247,0.16)';
+        const tone = (PHASE_RU as any)[wk.phase] ? (wk.deload ? '#f59e0b' : (wk as any).taper ? '#60a5fa' : '#a855f7') : '#a855f7';
         return (
-          <div key={wk.week} className="cb-plan-week" data-open={isOpen ? 'true' : 'false'} style={{ ...CARD, padding: 0, overflow: 'hidden', borderColor: border, background: isOpen ? 'linear-gradient(180deg, rgba(26,24,38,0.82), rgba(18,16,28,0.66))' : CARD.background }}>
+          <div key={wk.week} className="cb-plan-week" data-open={isOpen ? 'true' : 'false'} style={{ background: isOpen ? `linear-gradient(180deg, ${tone}10, rgba(20,22,28,0.55))` : 'rgba(20,22,28,0.55)', backdropFilter:'blur(18px) saturate(160%)', WebkitBackdropFilter:'blur(18px) saturate(160%)', borderRadius:14, border:`1px solid ${tone}30`, borderLeft:`4px solid ${tone}`, overflow:'hidden' }}>
             <button
               onClick={() => setExpandedWeek(isOpen ? null : wk.week - 1)}
               className="cb-plan-weekhead"
               aria-expanded={isOpen}
               aria-controls={`cb-wk-${wk.week}`}
               aria-label={`Неделя ${wk.week}${wk.deload ? ' · разгрузка' : (wk as any).taper ? ' · тапер' : ''}`}
-              style={{
-                width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '14px 14px', minHeight: 64, background: 'transparent', border: 'none',
-                cursor: 'pointer', textAlign: 'left',
-              }}
+              style={{ width:'100%', display:'flex', justifyContent:'space-between', alignItems:'center', gap:12, padding:'14px 16px', background:`linear-gradient(135deg, ${tone}18, rgba(255,255,255,0.02))`, border:'none', cursor:'pointer', textAlign:'left' as const, minHeight:64 }}
             >
-              <span className="cb-plan-weeknum" style={{
-                width: 36, height: 36, borderRadius: 11, background: wk.deload ? 'linear-gradient(135deg,#f59e0b,#f97316)' : (wk as any).taper ? 'linear-gradient(135deg,#3b82f6,#06b6d4)' : ACCENT_GRAD,
-                display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 900, fontSize: 13, flexShrink: 0,
-                boxShadow: '0 4px 14px rgba(0,0,0,0.18)',
-              }}>{wk.week}</span>
-              <div className="cb-plan-weektitle" style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 13, fontWeight: 700, color: '#fff', lineHeight: 1.1, display:'flex', gap:6, flexWrap:'wrap', alignItems:'center' }}><Highlight color={wk.deload?'#f59e0b': (wk as any).taper?'#60a5fa':'#a855f7'}>{ruLabel(PHASE_RU, wk.phase)}</Highlight>{wk.deload ? <Highlight color="#f59e0b">разгрузка</Highlight> : (wk as any).taper ? <Highlight color="#60a5fa">тапер</Highlight> : null}<span style={{ fontWeight:400, color:TEXT_3 }}>· <Highlight>{wk.totalSets}</Highlight> сетов{(wk as any).totalTonnage ? <> · <Highlight>{((wk as any).totalTonnage / 1000).toFixed(1)}т</Highlight></> : ''}</span></div>
-                <div style={{ fontSize: 11, color: TEXT_3, marginTop: 1, fontVariantNumeric:'tabular-nums' }}>Неделя {wk.week} · {ruCount(wk.sessions.length, RU_SESSIONS)} · {wk.sessions.reduce((a, s) => a + s.exercises.length, 0)} упр.</div>
+              <div style={{ display:'flex', alignItems:'center', gap:10, flex:1, minWidth:0 }}>
+                <span className="cb-plan-weeknum" style={{ width:36, height:36, borderRadius:10, background:tone, display:'flex', alignItems:'center', justifyContent:'center', color:'#000', fontWeight:900, fontSize:14, flexShrink:0 }}>{wk.week}</span>
+                <div className="cb-plan-weektitle" style={{ flex:1, minWidth:0 }}>
+                  <div style={{ fontSize:15, fontWeight:800, color:'#fff', lineHeight:1.2 }}>Неделя {wk.week} · {ruLabel(PHASE_RU, wk.phase)}</div>
+                  <div style={{ fontSize:11, color:'#fff', opacity:0.85, marginTop:2, display:'flex', gap:6, flexWrap:'wrap', alignItems:'center' }}>
+                    <span style={{ padding:'2px 7px', borderRadius:6, background:`${tone}22`, color:tone, border:`1px solid ${tone}35`, fontWeight:700 }}>{ruLabel(PHASE_RU, wk.phase)}</span>
+                    {wk.deload ? <span style={{ padding:'2px 7px', borderRadius:6, background:'rgba(245,158,11,0.15)', color:'#f59e0b', border:'1px solid rgba(245,158,11,0.3)', fontWeight:700 }}>разгрузка</span> : (wk as any).taper ? <span style={{ padding:'2px 7px', borderRadius:6, background:'rgba(96,165,250,0.15)', color:'#60a5fa', border:'1px solid rgba(96,165,250,0.3)', fontWeight:700 }}>тапер</span> : null}
+                    <span style={{ fontVariantNumeric:'tabular-nums' }}>{wk.totalSets} сетов{(wk as any).totalTonnage ? ` · ${((wk as any).totalTonnage / 1000).toFixed(1)}т` : ''} · {ruCount(wk.sessions.length, RU_SESSIONS)}</span>
+                  </div>
+                </div>
               </div>
-              <span className="cb-plan-weekchev" style={{ width: 36, height: 36, borderRadius: 12, background: isOpen ? 'rgba(168,85,247,0.14)' : 'rgba(255,255,255,0.06)', border: `1px solid ${isOpen ? 'rgba(168,85,247,0.22)' : 'rgba(255,255,255,0.08)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 13, transition: 'transform 0.18s', transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>▾</span>
+              <span className="cb-plan-weekchev" style={{ width:32, height:32, borderRadius:8, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.1)', display:'flex', alignItems:'center', justifyContent:'center', color:'#fff', fontSize:14, flexShrink:0, transition:'transform 0.2s', transform: isOpen ? 'rotate(0deg)' : 'rotate(-90deg)' }}>▼</span>
             </button>
 
             {!isOpen && (
-              <div className="cb-plan-weekchips" style={{ padding: '0 14px 12px', display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              <div className="cb-plan-weekchips" style={{ padding: '0 12px 12px', display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                 {wk.sessions.map(s => (
-                  <span key={s.day} style={{ fontSize: 11, padding: '4px 8px', borderRadius: 10, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', color: '#fff' }}>
+                  <span key={s.day} style={{ fontSize: 11, fontWeight:700, padding: '3px 8px', borderRadius: 6, background: 'rgba(255,255,255,0.05)', border: '0.5px solid rgba(255,255,255,0.07)', color: '#fff' }}>
                     {SESSION_TAG_RU[s.sessionTag] || s.sessionTag} · {s.exercises.length}упр
                   </span>
                 ))}
@@ -337,71 +335,87 @@ export const CombatPlanView: React.FC<Props> = ({
             )}
 
             {isOpen && (
-              <div id={`cb-wk-${wk.week}`} className="cb-plan-weekbody" style={{ padding: '0 12px 12px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <div id={`cb-wk-${wk.week}`} className="cb-plan-weekbody" style={{ padding: '8px 10px', borderTop:`1px solid ${tone}15`, display: 'flex', flexDirection: 'column', gap: 10 }}>
                 <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
                   <button className="cb-plan-copyweek" onClick={() => {
                     const txt = wk.sessions.map(s => `${s.sessionTag} (${s.character}) д${s.day}:\n` + s.exercises.map(e => `  ${e.name} ${e.sets}x${e.reps} ${e.weight ? e.weight + 'кг' : ''} RIR${e.rir} ${e.tempo} отдых${e.restSeconds}с${e.comment ? ' // ' + e.comment : ''}`).join('\n')).join('\n\n');
                     navigator.clipboard?.writeText(`Неделя ${wk.week} ${wk.phase}\n` + txt); doMsg(`Неделя ${wk.week} скопирована`);
-                  }} style={{ ...BTN_SMALL, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)', color: '#fff' }}>⎙ Копировать неделю</button>
+                  }} style={{ ...BTN_SMALL, padding:'6px 10px', fontSize:11, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)', color: '#fff' }}>⎙ Копировать неделю</button>
                 </div>
 
                 {wk.sessions.map((sess, si) => {
                   const sOpen = sessOpen(wk.week, sess.day, si);
                   return (
                   <div key={sess.day} className="cb-plan-sess" data-open={sOpen ? 'true' : 'false'} style={{
-                    background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 14, padding: sOpen ? 10 : '0 10px',
-                    backdropFilter: 'blur(8px)',
+                    background:'rgba(20,22,28,0.55)', border:`1px solid ${tone}30`, borderLeft:`4px solid ${tone}`, borderRadius:14, overflow:'hidden',
                   }}>
                     <button
                       onClick={() => setOpenSess(s => ({ ...s, [`${wk.week}-${sess.day}`]: !sOpen }))}
                       aria-expanded={sOpen}
                       className="cb-plan-sesshead-btn"
-                      style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', minHeight: 48, background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left' as const, flexWrap: 'wrap', gap: 6 }}
+                      style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 16px', background:`linear-gradient(135deg, ${tone}18, rgba(255,255,255,0.02))`, border: 'none', cursor: 'pointer', textAlign: 'left' as const, gap: 12 }}
                     >
-                      <span style={{ fontSize: 12, fontWeight: 700, color: '#fff', fontFamily:'-apple-system, system-ui, sans-serif', flex: 1, minWidth: 0 }}>{SESSION_TAG_RU[sess.sessionTag] || sess.sessionTag} <span style={{ fontWeight:500, color:TEXT_3 }}>· <Highlight color={sess.character==='тяж'?'#ff9f0a': sess.character==='памп'?'#a855f7':'#60a5fa'}>{sess.character}</Highlight> · день {sess.day} · {sess.durationMin}′ · {sess.exercises.length} упр.</span></span>
-                      <span style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                        <span style={{ fontSize: 11, color: TEXT_3, background:'rgba(0,0,0,0.16)', padding:'4px 8px', borderRadius:20, border:'0.5px solid rgba(255,255,255,0.06)', fontVariantNumeric:'tabular-nums' }}>
-                          ⏱ {Math.round(sess.exercises.reduce((a, e) => a + e.workSets.length * (e.restSeconds || 75), 0) / 60)}′ отдыха
-                        </span>
-                        <span aria-hidden style={{ width: 32, height: 32, borderRadius: 10, background: sOpen ? 'rgba(168,85,247,0.14)' : 'rgba(255,255,255,0.06)', border: `1px solid ${sOpen ? 'rgba(168,85,247,0.22)' : 'rgba(255,255,255,0.08)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 12, transition: 'transform 0.18s', transform: sOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>▾</span>
-                      </span>
+                      <div style={{ display:'flex', alignItems:'center', gap:10, flex:1, minWidth:0 }}>
+                        <span style={{ width:36, height:36, borderRadius:10, background:tone, display:'inline-flex', alignItems:'center', justifyContent:'center', color:'#000', fontWeight:900, fontSize:14, flexShrink:0 }}>{sess.day}</span>
+                        <div style={{ flex:1, minWidth:0 }}>
+                          <div style={{ fontSize:15, fontWeight:800, color:'#fff', lineHeight:1.2 }}>День {sess.day} · {SESSION_TAG_RU[sess.sessionTag] || sess.sessionTag}</div>
+                          <div style={{ fontSize:11, color:'#fff', opacity:0.85, marginTop:2, display:'flex', gap:6, flexWrap:'wrap', alignItems:'center' }}>
+                            <span style={{ padding:'2px 7px', borderRadius:6, background:`${tone}22`, color:tone, border:`1px solid ${tone}35`, fontWeight:700 }}>{sess.character}</span>
+                            <span>{sess.durationMin}′ · {sess.exercises.length} упр</span>
+                            <span>⏱ {Math.round(sess.exercises.reduce((a, e) => a + e.workSets.length * (e.restSeconds || 75), 0) / 60)}′ отдыха</span>
+                          </div>
+                        </div>
+                      </div>
+                      <span aria-hidden style={{ width: 32, height: 32, borderRadius: 8, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 14, flexShrink:0, transition: 'transform 0.2s', transform: sOpen ? 'rotate(0deg)' : 'rotate(-90deg)' }}>▼</span>
                     </button>
 
                     {sOpen && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, paddingBottom: 2 }}>
-                      {sess.exercises.map(ex => (
+                    <div style={{ padding:'8px 10px', borderTop:`1px solid ${tone}15`, display: 'flex', flexDirection: 'column' }}>
+                      {sess.exercises.map((ex, exIdx) => (
                         <div key={ex.id} className="cb-plan-ex" style={{
-                          background: 'linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.01))',
-                          border: '1px solid rgba(255,255,255,0.06)', borderRadius: 12, padding: 10, display: 'flex', flexDirection: 'column', gap: 7,
+                          padding: '10px 12px', marginBottom: 8, background: 'rgba(255,255,255,0.025)', borderRadius: 10, border: '0.5px solid rgba(255,255,255,0.04)',
                         }}>
-                          <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                            <span style={{ fontSize: 12.5, fontWeight: 700, color: '#fff', flex: '1 1 160px', fontFamily:'-apple-system, system-ui, sans-serif' }}>
-                               {ex.name} <span style={{ fontWeight: 500, color: '#fff' }}>— <Highlight color="#a855f7">{ex.sets}×{ex.reps}</Highlight>{ex.holdSeconds != null ? <> · <Highlight color="#22c55e">холд {ex.holdSeconds}с</Highlight></> : ''}{ex.weight ? <> · <Highlight>{ex.weight}кг</Highlight></> : ''} · <Highlight>RIR{ex.rir}</Highlight></span>
-                              <span style={{ fontSize: 11, color: TEXT_3, marginLeft: 6, fontVariantNumeric:'tabular-nums' }}>· {ex.tempo} · {ex.restSeconds}с</span>
-                              {ex.comment?.includes('Тапер') && <Highlight color="#60a5fa">тапер</Highlight>}
-                              {ex.comment?.includes('Весогонка') && <Highlight color="#ff9f0a">весогонка</Highlight>}
-                            </span>
+                          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                            <span style={{ minWidth:22, height:22, borderRadius:'50%', background:'rgba(168,85,247,0.16)', color:'#c084fc', fontSize:12, fontWeight:800, display:'inline-flex', alignItems:'center', justifyContent:'center', flexShrink:0, marginTop:1 }}>{exIdx + 1}</span>
+                            <div style={{ flex:1, minWidth:0 }}>
+                              <div style={{ fontSize:14, fontWeight:800, color:'#fff', lineHeight:1.25, letterSpacing:'-0.2px' }}>{ex.name}</div>
+                              <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginTop:4 }}>
+                                <span style={{ fontSize:11, fontWeight:700, padding:'2px 7px', borderRadius:5, background:'rgba(168,85,247,0.12)', color:'#e9d5ff', border:'0.5px solid rgba(168,85,247,0.25)' }}>{ex.sets}×{ex.reps}</span>
+                                {ex.holdSeconds != null ? <span style={{ fontSize:11, fontWeight:700, padding:'2px 7px', borderRadius:5, background:'rgba(34,197,94,0.10)', color:'#86efac', border:'0.5px solid rgba(34,197,94,0.22)' }}>холд {ex.holdSeconds}с</span> : null}
+                                {ex.weight ? <span style={{ fontSize:11, fontWeight:700, padding:'2px 7px', borderRadius:5, background:'rgba(255,255,255,0.05)', color:'#fff', border:'0.5px solid rgba(255,255,255,0.08)' }}>{ex.weight} кг</span> : null}
+                                <span style={{ fontSize:11, fontWeight:700, padding:'2px 7px', borderRadius:5, background:'rgba(255,255,255,0.04)', color:'#fff', opacity:0.85, border:'0.5px solid rgba(255,255,255,0.06)' }}>RIR {ex.rir}</span>
+                                <span style={{ fontSize:11, fontWeight:600, padding:'2px 7px', borderRadius:5, background:'rgba(255,255,255,0.04)', color:'#fff', opacity:0.7, border:'0.5px solid rgba(255,255,255,0.06)' }}>{ex.tempo} · {ex.restSeconds}с</span>
+                                {ex.comment?.includes('Тапер') ? <span style={{ fontSize:11, fontWeight:700, padding:'2px 7px', borderRadius:5, background:'rgba(96,165,250,0.10)', color:'#60a5fa', border:'0.5px solid rgba(96,165,250,0.22)' }}>тапер</span> : null}
+                                {ex.comment?.includes('Весогонка') ? <span style={{ fontSize:11, fontWeight:700, padding:'2px 7px', borderRadius:5, background:'rgba(245,158,11,0.10)', color:'#f59e0b', border:'0.5px solid rgba(245,158,11,0.22)' }}>весогонка</span> : null}
+                              </div>
+                            </div>
                           </div>
 
-                          <div className="cb-plan-exgrid" style={{ display: 'grid', gridTemplateColumns: '64px 64px 64px 1fr auto', gap: 6, alignItems: 'center' }}>
-                            <input aria-label="вес" type="number" value={ex.weight} onChange={e => updEx(wk.week - 1, sess.day, ex.id, { weight: Number(e.target.value) || 0 })} placeholder="вес" style={{ ...INPUT, padding: '10px 8px', fontSize: 13, textAlign: 'center' }} />
-                            <input aria-label="повторы" type="text" value={ex.reps} onChange={e => updEx(wk.week - 1, sess.day, ex.id, { reps: e.target.value })} placeholder="повт" style={{ ...INPUT, padding: '10px 8px', fontSize: 13, textAlign: 'center' }} />
-                            <input aria-label="RIR" type="number" min={0} max={5} value={ex.rir} onChange={e => updEx(wk.week - 1, sess.day, ex.id, { rir: Number(e.target.value) || 0 })} style={{ ...INPUT, padding: '10px 8px', fontSize: 13, textAlign: 'center' }} />
-                            <div style={{ flex: '1 1 120px', minWidth: 0 }}>
-                              <CombatPopupSelect label="Замена" value={ex.id} onChange={v => { if (v !== ex.id) swpEx(wk.week - 1, sess.day, ex.id, v); }} options={[
-                                { id: ex.id, label: `${cbExerciseName(ex.id)} · текущий` },
-                                ...(cbStrictGroupFor(ex.id) ? CB_STRICT_GROUPS[cbStrictGroupFor(ex.id)!] : []).filter(id => id !== ex.id).map(id => ({ id, label: cbExerciseName(id) })),
-                              ]} />
-                            </div>
+                          <div className="cb-plan-exgrid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr auto', gap: 6, alignItems: 'center', marginTop: 8 }}>
+                            <input aria-label="вес" type="number" value={ex.weight} onChange={e => updEx(wk.week - 1, sess.day, ex.id, { weight: Number(e.target.value) || 0 })} placeholder="вес" style={{ ...INPUT, padding: '8px 6px', fontSize: 12, textAlign: 'center', minHeight: 44, borderRadius: 8 }} />
+                            <input aria-label="повторы" type="text" value={ex.reps} onChange={e => updEx(wk.week - 1, sess.day, ex.id, { reps: e.target.value })} placeholder="повт" style={{ ...INPUT, padding: '8px 6px', fontSize: 12, textAlign: 'center', minHeight: 44, borderRadius: 8 }} />
+                            <input aria-label="RIR" type="number" min={0} max={5} value={ex.rir} onChange={e => updEx(wk.week - 1, sess.day, ex.id, { rir: Number(e.target.value) || 0 })} style={{ ...INPUT, padding: '8px 6px', fontSize: 12, textAlign: 'center', minHeight: 44, borderRadius: 8 }} />
                             <div style={{ display: 'flex', gap: 4 }}>
-                              <button aria-label="вверх" onClick={() => movEx(wk.week - 1, sess.day, ex.id, -1)} className="cb-plan-move" style={{ width: 44, height: 44, borderRadius: 12, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', cursor: 'pointer', fontSize: 14 }}>↑</button>
-                              <button aria-label="вниз" onClick={() => movEx(wk.week - 1, sess.day, ex.id, 1)} className="cb-plan-move" style={{ width: 44, height: 44, borderRadius: 12, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', cursor: 'pointer', fontSize: 14 }}>↓</button>
+                              <button aria-label="вверх" onClick={() => movEx(wk.week - 1, sess.day, ex.id, -1)} className="cb-plan-move" style={{ width: 44, height: 44, borderRadius: 8, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', cursor: 'pointer', fontSize: 14 }}>↑</button>
+                              <button aria-label="вниз" onClick={() => movEx(wk.week - 1, sess.day, ex.id, 1)} className="cb-plan-move" style={{ width: 44, height: 44, borderRadius: 8, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', cursor: 'pointer', fontSize: 14 }}>↓</button>
                             </div>
                           </div>
+                          <div style={{ marginTop: 6 }}>
+                            <CombatPopupSelect label="Замена" value={ex.id} onChange={v => { if (v !== ex.id) swpEx(wk.week - 1, sess.day, ex.id, v); }} options={[
+                              { id: ex.id, label: `${cbExerciseName(ex.id)} · текущий` },
+                              ...(cbStrictGroupFor(ex.id) ? CB_STRICT_GROUPS[cbStrictGroupFor(ex.id)!] : []).filter(id => id !== ex.id).map(id => ({ id, label: cbExerciseName(id) })),
+                            ]} />
+                          </div>
 
-                          {ex.comment && <div style={{ fontSize: 11, color: '#fff', background: 'rgba(168,85,247,0.06)', borderLeft: '2px solid rgba(168,85,247,0.28)', padding: '6px 8px', borderRadius: 8 }}>{ex.comment}</div>}
-                          {ex.warmupSets && ex.warmupSets.length > 0 && <div style={{ fontSize: 11, color: TEXT_3 }}>Разминка: {ex.warmupSets.map(s => `${s.reps}×${s.weight}кг`).join(' → ')} → рабочие</div>}
-                          <div style={{ fontSize: 11, color: '#fff', fontFamily: 'ui-monospace, monospace' }}>Сеты: {ex.workSets.map(s => `${s.reps}×${s.weight ? s.weight + 'кг' : '—'} RIR${s.rir}${s.holdSeconds != null ? ` холд ${s.holdSeconds}с` : ''}`).join(' · ')}</div>
+                          {ex.comment && <div style={{ fontSize: 11, color: '#fff', background: 'rgba(168,85,247,0.06)', borderLeft: '2px solid rgba(168,85,247,0.28)', padding: '6px 8px', borderRadius: 6, marginTop: 6 }}>{ex.comment}</div>}
+                          {ex.warmupSets && ex.warmupSets.length > 0 && <div style={{ fontSize: 10.5, color: '#fff', opacity: 0.7, marginTop: 6 }}>Разминка: {ex.warmupSets.map(s => `${s.reps}×${s.weight}кг`).join(' → ')} → рабочие</div>}
+                          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 6 }}>
+                            {ex.workSets.map((s, setIdx) => (
+                              <span key={setIdx} data-ss="set-row" style={{ fontSize: 11, fontFamily: 'ui-monospace, monospace', padding: '3px 8px', borderRadius: 5, background: 'rgba(168,85,247,0.10)', color: '#e9d5ff', border: '0.5px solid rgba(168,85,247,0.25)' }}>
+                                {setIdx + 1}. {s.reps}×{s.weight ? `${s.weight}кг` : '—'} RIR{s.rir}{s.holdSeconds != null ? ` холд ${s.holdSeconds}с` : ''}
+                              </span>
+                            ))}
+                          </div>
                         </div>
                       ))}
                     </div>

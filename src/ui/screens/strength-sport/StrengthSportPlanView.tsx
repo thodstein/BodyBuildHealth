@@ -15,7 +15,7 @@ import { TAPER_CESSATION_DAYS, cessationDaysFor, taperLengthDaysFor } from '../.
 import { buildConditioningRationale } from '../../../engines/strength-sport/strength-sport-conditioning';
 import { moveAnnualBlock } from '../../../engines/strength-sport/strength-sport-annual';
 import { activeSeasonBlockForDate } from '../../../engines/strength-sport/strength-sport-season-planner.engine';
-import { CARD, BTN, BTN_PRIMARY, BTN_SMALL, INPUT, TEXT_2, TEXT_3, ACCENT, ACCENT_STRONG, ACCENT_SOFT, STRONG_SOFT, ACCENT_BORDER, STRONG_BORDER, ACCENT_GRAD, SectionCard, StatTile, Badge, InfoBanner, GroupHeading, CardHeader, Highlight, HighlightStrong, ChipToggle, Divider } from './StrengthUI';
+import { BTN, BTN_PRIMARY, BTN_SMALL, INPUT, TEXT_2, TEXT_3, ACCENT, ACCENT_STRONG, ACCENT_SOFT, STRONG_SOFT, ACCENT_BORDER, STRONG_BORDER, SectionCard, StatTile, Badge, InfoBanner, GroupHeading, CardHeader, Highlight, HighlightStrong, ChipToggle, Divider } from './StrengthUI';
 import { StrengthGantt, StrengthHeatmap, EventCard } from './StrengthUI';
 import { MODE_RU, LEVEL_RU, PHASE_RU, ruLabel } from './StrengthUI';
 import { ruCount, RU_SESSIONS, RU_SETS, RU_BLOCKS, RU_EVENTS, RU_EVENT_DAYS } from '../../../engines/ru-plural';
@@ -62,6 +62,15 @@ export const StrengthSportPlanView: React.FC<Props> = ({
   onExportProgram, onBuildSeason, onBuildAnnualFromCycles,
 }) => {
   const doMsg = (m: string, ms = 1800) => { setMsg?.(m); setTimeout(() => setMsg?.(''), ms); };
+  /** Раскрытие дней/упражнений — как в ББ-плане: по умолчанию всё открыто. */
+  const [collapsedDays, setCollapsedDays] = React.useState<Set<string>>(new Set());
+  const [collapsedEx, setCollapsedEx] = React.useState<Set<string>>(new Set());
+  const toggleDay = (key: string) => setCollapsedDays(prev => {
+    const n = new Set(prev); if (n.has(key)) n.delete(key); else n.add(key); return n;
+  });
+  const toggleEx = (key: string) => setCollapsedEx(prev => {
+    const n = new Set(prev); if (n.has(key)) n.delete(key); else n.add(key); return n;
+  });
   /** «Где я в сезоне»: активный блок по дате старта годового плана. */
   const seasonNow = React.useMemo(() => { try { return activeSeasonBlockForDate(annual); } catch { return null; } }, [annual]);
   return (
@@ -227,68 +236,115 @@ export const StrengthSportPlanView: React.FC<Props> = ({
       {plan.weeksData.map(wk => {
         const isOpen = expandedWeek === wk.week - 1;
         const tone = wk.deload ? '#f59e0b' : (wk as any).taper ? '#60a5fa' : '#30d158';
-        const border = wk.deload ? 'rgba(245,158,11,0.22)' : (wk as any).taper ? 'rgba(59,130,246,0.22)' : 'rgba(48,209,88,0.16)';
         const tonnage = Math.round(wk.sessions.reduce((a,s)=>a+s.exercises.reduce((x,e)=>x+e.workSets.reduce((q,w)=>q+w.weight*w.reps,0),0),0)/1000);
         return (
-        <div key={wk.week} data-ss="week" style={{ ...CARD, padding:0, overflow:'hidden', borderColor: border, background: isOpen ? 'linear-gradient(180deg, rgba(26,24,38,0.82), rgba(18,16,28,0.66))' : CARD.background }}>
-          <button onClick={()=> onToggleWeek(isOpen? null : wk.week-1)} style={{ width:'100%', display:'flex', alignItems:'center', gap:12, padding:'16px 18px', background: wk.deload? 'rgba(245,158,11,0.07)' : (wk as any).taper? 'rgba(59,130,246,0.07)':'transparent', border:'none', cursor:'pointer', textAlign:'left', minHeight:72 }}>
-            <span style={{ width:46, height:46, borderRadius:14, background: wk.deload? 'linear-gradient(135deg,#f59e0b,#f97316)' : (wk as any).taper? 'linear-gradient(135deg,#3b82f6,#06b6d4)' : ACCENT_GRAD, display:'flex', alignItems:'center', justifyContent:'center', color:'#fff', fontWeight:800, fontSize:16, flexShrink:0, boxShadow:'0 6px 18px rgba(0,0,0,0.22), inset 0 1px 0 rgba(255,255,255,0.22)', fontFamily:'-apple-system, system-ui, sans-serif' }}>{wk.week}</span>
-            <div style={{ flex:1, minWidth:0 }}>
-              <div style={{ fontSize:15, fontWeight:700, color:'#fff', lineHeight:1.2, display:'flex', gap:8, flexWrap:'wrap', alignItems:'center' }}><Highlight color={tone}>{ruLabel(PHASE_RU, wk.phase)}</Highlight>{wk.deload? <Highlight color="#f59e0b">разгрузка</Highlight> : (wk as any).taper? <Highlight color="#60a5fa">тапер</Highlight> : null}<span style={{ fontWeight:400, color:TEXT_3 }}>· {ruCount(wk.totalSets ?? 0, RU_SETS)} · <Highlight color={tone}>{tonnage}т</Highlight></span></div>
-              <div style={{ fontSize:11, color:TEXT_3, marginTop:1, fontFamily:'-apple-system, system-ui, sans-serif' }}>Неделя {wk.week} · {ruCount(wk.sessions.length, RU_SESSIONS)} · {wk.sessions.reduce((a,s)=>a+s.exercises.length,0)} упр.</div>
+        <div key={wk.week} data-ss="week" style={{ background: isOpen ? `linear-gradient(180deg, ${tone}10, rgba(20,22,28,0.55))` : 'rgba(20,22,28,0.55)', backdropFilter:'blur(18px) saturate(160%)', WebkitBackdropFilter:'blur(18px) saturate(160%)', borderRadius:14, border:`1px solid ${tone}30`, borderLeft:`4px solid ${tone}`, overflow:'hidden' }}>
+          <button onClick={()=> onToggleWeek(isOpen? null : wk.week-1)} aria-expanded={isOpen} style={{ width:'100%', display:'flex', justifyContent:'space-between', alignItems:'center', gap:12, padding:'14px 16px', background:`linear-gradient(135deg, ${tone}18, rgba(255,255,255,0.02))`, border:'none', cursor:'pointer', textAlign:'left', minHeight:64 }}>
+            <div style={{ display:'flex', alignItems:'center', gap:10, flex:1, minWidth:0 }}>
+              <span style={{ width:36, height:36, borderRadius:10, display:'inline-flex', alignItems:'center', justifyContent:'center', background:tone, color:'#000', fontWeight:900, fontSize:14, flexShrink:0 }}>{wk.week}</span>
+              <div style={{ flex:1, minWidth:0 }}>
+                <div style={{ fontSize:15, fontWeight:800, color:'#fff', lineHeight:1.2 }}>Неделя {wk.week} · {ruLabel(PHASE_RU, wk.phase)}</div>
+                <div style={{ fontSize:11, color:'#fff', opacity:0.85, marginTop:2, display:'flex', gap:6, flexWrap:'wrap', alignItems:'center' }}>
+                  <span style={{ padding:'2px 7px', borderRadius:6, background:`${tone}22`, color:tone, border:`1px solid ${tone}35`, fontWeight:700 }}>{ruLabel(PHASE_RU, wk.phase)}</span>
+                  {wk.deload && <span style={{ padding:'2px 7px', borderRadius:6, background:'rgba(245,158,11,0.15)', color:'#f59e0b', border:'1px solid rgba(245,158,11,0.3)', fontWeight:700 }}>разгрузка</span>}
+                  {(wk as any).taper && <span style={{ padding:'2px 7px', borderRadius:6, background:'rgba(96,165,250,0.15)', color:'#60a5fa', border:'1px solid rgba(96,165,250,0.3)', fontWeight:700 }}>тапер</span>}
+                  <span>{ruCount(wk.sessions.length, RU_SESSIONS)} · {wk.sessions.reduce((a,s)=>a+s.exercises.length,0)} упр · {ruCount(wk.totalSets ?? 0, RU_SETS)} · {tonnage}т</span>
+                </div>
+              </div>
             </div>
-            <span style={{ width:38, height:38, borderRadius:12, background: isOpen? `${tone}14`:'rgba(255,255,255,0.06)', border:`0.5px solid ${isOpen? tone+'22':'rgba(255,255,255,0.08)'}`, display:'flex', alignItems:'center', justifyContent:'center', color: isOpen? tone:'#fff', fontSize:13, transition:'transform 0.18s', transform: isOpen? 'rotate(180deg)':'rotate(0deg)', flexShrink:0 }}>▾</span>
+            <span style={{ width:32, height:32, borderRadius:8, display:'inline-flex', alignItems:'center', justifyContent:'center', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.1)', color:'#fff', fontSize:14, flexShrink:0, transform: isOpen ? 'rotate(0deg)' : 'rotate(-90deg)', transition:'transform 0.2s' }}>▼</span>
           </button>
           {!isOpen && (
-            <div style={{ padding:'0 14px 12px', display:'flex', gap:6, flexWrap:'wrap' }}>
-              {wk.sessions.map(s=> <span key={s.day} style={{ fontSize:12, fontWeight:600, padding:'7px 12px', borderRadius:12, background:'rgba(255,255,255,0.045)', border:'0.5px solid rgba(255,255,255,0.07)', color:'rgba(255,255,255,0.78)', fontFamily:'-apple-system, system-ui, sans-serif' }}>{s.sessionTag} · {s.exercises.length}упр · {s.character}</span>)}
+            <div style={{ padding:'0 12px 12px', display:'flex', gap:6, flexWrap:'wrap' }}>
+              {wk.sessions.map(s=> <span key={s.day} style={{ fontSize:11, fontWeight:700, padding:'3px 8px', borderRadius:6, background:'rgba(255,255,255,0.05)', border:'0.5px solid rgba(255,255,255,0.07)', color:'#fff' }}>{s.sessionTag} · {s.exercises.length}упр</span>)}
             </div>
           )}
           {isOpen && (
-          <div style={{ padding:'0 12px 12px', display:'flex', flexDirection:'column', gap:10 }}>
+          <div style={{ padding:'8px 10px', borderTop:`1px solid ${tone}15`, display:'flex', flexDirection:'column', gap:10 }}>
             <div style={{ display:'flex', justifyContent:'flex-end' }}><button onClick={()=>{
               const txt = wk.sessions.map(s=> `${s.sessionTag} (${s.character}) д${s.day}:\n` + s.exercises.map(e=> `  ${e.name} ${e.sets}x${e.reps} ${e.weight}кг RIR${e.rir}`).join('\n')).join('\n\n');
               navigator.clipboard?.writeText(`Неделя ${wk.week} ${wk.phase}\n`+txt); doMsg(`Неделя ${wk.week} скопирована`);
-            }} style={{ ...BTN_SMALL, background:'rgba(255,255,255,0.06)', color:'#fff', border:'0.5px solid rgba(255,255,255,0.08)' }}>⎙ Копировать неделю</button></div>
-            {wk.sessions.map(sess => (
-              <div key={sess.day} style={{ background:'rgba(255,255,255,0.032)', border:'0.5px solid rgba(255,255,255,0.07)', borderRadius:18, padding:14, backdropFilter:'blur(8px)' }}>
-                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:10, flexWrap:'wrap', gap:8 }}>
-                  <span style={{ fontSize:14, fontWeight:700, color:'#fff', fontFamily:'-apple-system, system-ui, sans-serif' }}>{sess.sessionTag} <span style={{ fontWeight:500, color:TEXT_3 }}>· <Highlight color={sess.character==='тяж'?'#f59e0b': sess.character==='памп'?'#30d158':'#64d2ff'}>{sess.character}</Highlight> · день {sess.day} · {sess.durationMin}′</span></span>
-                  <span style={{ fontSize:10, color:TEXT_3, background:'rgba(0,0,0,0.16)', padding:'3px 7px', borderRadius:20, border:'0.5px solid rgba(255,255,255,0.06)', fontVariantNumeric:'tabular-nums' }}>⏱ {Math.round(sess.exercises.reduce((a,e)=>a+ e.workSets.length* (e.restSeconds||90),0)/60)}′ отдыха</span>
-                </div>
-                <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-                  {sess.exercises.map(ex => (
-                    <div key={ex.id} data-ss="exercise" style={{ background:'linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02))', border:'0.5px solid rgba(255,255,255,0.08)', borderLeft:'3px solid rgba(0,230,138,0.35)', borderRadius:16, padding:14, display:'flex', flexDirection:'column', gap:10 }}>
-                      <div style={{ display:'flex', gap:8, alignItems:'center', flexWrap:'wrap' }}>
-                        <span style={{ fontSize:15, fontWeight:700, color:'#fff', flex:'1 1 160px', fontFamily:'-apple-system, system-ui, sans-serif', lineHeight:1.35 }}>{ex.name} <span style={{ fontWeight:500, color:'#fff' }}>— <Highlight color={mode==='strongman'?ACCENT_STRONG:ACCENT}>{ex.sets}×{ex.reps}</Highlight>{(ex.workSets[0] as any)?.distanceM ? <> · <Highlight color={ACCENT_STRONG}>{(ex.workSets[0] as any).distanceM}м</Highlight></> : null}{(ex.workSets[0] as any)?.timeCapS ? <> · <Highlight>{(ex.workSets[0] as any).timeCapS}с cap</Highlight></> : null} · <Highlight>{ex.weight}кг</Highlight> · <Highlight color={ex.rir<=1?'#ff3b30': ex.rir<=2?'#ff9f0a':'#30d158'}>RIR{ex.rir}</Highlight></span><span style={{ fontSize:11.5, color:TEXT_3, marginLeft:6, fontVariantNumeric:'tabular-nums' }}>· {ex.tempo} · {ex.restSeconds}с{ex.isCompetitionLift?' ★':''}</span></span>
-                      </div>
-                      <div style={{ display:'grid', gridTemplateColumns:'76px 76px 76px auto', gap:8, alignItems:'center' }}>
-                        <input type="number" value={ex.weight} onChange={e=> onUpdateEx(wk.week-1, sess.day, ex.id, { weight: Number(e.target.value)||0 })} style={{ ...INPUT, padding:'12px 8px', fontSize:15, fontWeight:700, textAlign:'center', fontVariantNumeric:'tabular-nums', minHeight:52 }} placeholder="кг" />
-                        <input type="text" value={ex.reps} onChange={e=> onUpdateEx(wk.week-1, sess.day, ex.id, { reps: e.target.value })} style={{ ...INPUT, padding:'12px 8px', fontSize:15, fontWeight:700, textAlign:'center', minHeight:52 }} placeholder="повт" />
-                        <input type="number" value={ex.rir} onChange={e=> onUpdateEx(wk.week-1, sess.day, ex.id, { rir: Number(e.target.value)||0 })} style={{ ...INPUT, padding:'12px 8px', fontSize:15, fontWeight:700, textAlign:'center', fontVariantNumeric:'tabular-nums', minHeight:52 }} placeholder="RIR" />
-                        <div style={{ display:'flex', gap:6 }}><button onClick={()=> onMoveEx(wk.week-1, sess.day, ex.id, -1)} style={{ width:46, height:52, borderRadius:12, background:'rgba(255,255,255,0.06)', border:'0.5px solid rgba(255,255,255,0.09)', color:'#fff', cursor:'pointer', fontSize:15 }}>↑</button><button onClick={()=> onMoveEx(wk.week-1, sess.day, ex.id, 1)} style={{ width:46, height:52, borderRadius:12, background:'rgba(255,255,255,0.06)', border:'0.5px solid rgba(255,255,255,0.09)', color:'#fff', cursor:'pointer', fontSize:15 }}>↓</button></div>
-                      </div>
-                      {ex.comment && <div style={{ fontSize:11, color:'#fff', background: mode==='strongman'?'rgba(245,158,11,0.08)':'rgba(48,209,88,0.08)', borderLeft:`2px solid ${mode==='strongman'?'rgba(245,158,11,0.28)':'rgba(48,209,88,0.28)'}`, padding:'6px 8px', borderRadius:8, lineHeight:1.4 }}>{ex.comment}</div>}
-                      {ex.warmupSets && ex.warmupSets.length>0 && <div style={{ fontSize:10.5, color:TEXT_3, fontFamily:'-apple-system, system-ui, sans-serif' }}>Разминка: {ex.warmupSets.map(s=> `${s.reps}×${s.weight}кг`).join(' → ')} → рабочие</div>}
-                        <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
-                          {ex.workSets.map((s,si)=> (
-                          <span key={si} data-ss="set-row" style={{ display:'flex', gap:6, alignItems:'center', background:'rgba(255,255,255,0.045)', padding:'8px 10px', borderRadius:12, fontSize:12, fontWeight:600, color:'#fff', border:'0.5px solid rgba(255,255,255,0.07)', fontVariantNumeric:'tabular-nums', minHeight:52 }}>
-                            <span style={{ color:'#fff', fontWeight:700 }}>#{si+1}</span>
-                            <input type="number" value={s.weight} onChange={e=> onUpdateSet(wk.week-1,sess.day,ex.id,si,{weight:Number(e.target.value)||0})} style={{ width:62, minHeight:44, padding:'8px 6px', fontSize:14, fontWeight:700, background:'rgba(255,255,255,0.07)', color:'#fff', border:'0.5px solid rgba(255,255,255,0.12)', borderRadius:10, textAlign:'center', fontVariantNumeric:'tabular-nums' }} />кг
-                            <input type="number" value={s.reps} onChange={e=> onUpdateSet(wk.week-1,sess.day,ex.id,si,{reps:Number(e.target.value)||0})} style={{ width:48, minHeight:44, padding:'8px 6px', fontSize:14, fontWeight:700, background:'rgba(255,255,255,0.07)', color:'#fff', border:'0.5px solid rgba(255,255,255,0.12)', borderRadius:10, textAlign:'center', fontVariantNumeric:'tabular-nums' }} />×
-                            <input type="number" value={s.rir} onChange={e=> onUpdateSet(wk.week-1,sess.day,ex.id,si,{rir:Number(e.target.value)||0})} style={{ width:46, minHeight:44, padding:'8px 6px', fontSize:14, fontWeight:700, background:'rgba(255,255,255,0.07)', color:'#fff', border:'0.5px solid rgba(255,255,255,0.12)', borderRadius:10, textAlign:'center', fontVariantNumeric:'tabular-nums' }} />RIR
-                            {(ex.id.includes('yoke')||ex.id.includes('farmers')||ex.id.includes('carry')||ex.id.includes('husafell')||ex.id.includes('frame')||ex.id.includes('sled')||ex.id.includes('tire')||ex.id.includes('stone')||ex.id.includes('sandbag')) && <>
-                              <input type="number" placeholder="м" title="дистанция м" value={(s as any).distanceM ?? ''} onChange={e=> onUpdateSet(wk.week-1,sess.day,ex.id,si,{distanceM: Number(e.target.value)||0} as any)} style={{ width:54, minHeight:44, padding:'8px 6px', fontSize:13, fontWeight:700, background:'rgba(255,159,10,0.10)', color:'#fff', border:'0.5px solid rgba(255,159,10,0.20)', borderRadius:10, textAlign:'center' }} />
-                              <input type="number" placeholder="с" title="cap с" value={(s as any).timeCapS ?? ''} onChange={e=> onUpdateSet(wk.week-1,sess.day,ex.id,si,{timeCapS: Number(e.target.value)||0} as any)} style={{ width:54, minHeight:44, padding:'8px 6px', fontSize:13, fontWeight:700, background:'rgba(59,130,246,0.10)', color:'#fff', border:'0.5px solid rgba(59,130,246,0.20)', borderRadius:10, textAlign:'center' }} />
-                            </>}
-                          </span>
-                        ))}
+            }} style={{ ...BTN_SMALL, padding:'6px 10px', fontSize:11, background:'rgba(255,255,255,0.06)', color:'#fff', border:'0.5px solid rgba(255,255,255,0.08)' }}>⎙ Копировать неделю</button></div>
+            {wk.sessions.map(sess => {
+              const dayKey = `${wk.week}-${sess.day}`;
+              const dayOpen = !collapsedDays.has(dayKey);
+              return (
+              <div key={sess.day} style={{ background:'rgba(20,22,28,0.55)', backdropFilter:'blur(18px) saturate(160%)', WebkitBackdropFilter:'blur(18px) saturate(160%)', borderRadius:14, border:`1px solid ${tone}30`, borderLeft:`4px solid ${tone}`, overflow:'hidden' }}>
+                <button onClick={()=>toggleDay(dayKey)} aria-expanded={dayOpen} style={{ width:'100%', display:'flex', justifyContent:'space-between', alignItems:'center', padding:'14px 16px', cursor:'pointer', background:`linear-gradient(135deg, ${tone}18, rgba(255,255,255,0.02))`, border:'none', textAlign:'left', gap:12 }}>
+                  <div style={{ display:'flex', alignItems:'center', gap:10, flex:1, minWidth:0 }}>
+                    <span style={{ width:36, height:36, borderRadius:10, display:'inline-flex', alignItems:'center', justifyContent:'center', background:tone, color:'#000', fontWeight:900, fontSize:14, flexShrink:0 }}>{sess.day}</span>
+                    <div style={{ flex:1, minWidth:0 }}>
+                      <div style={{ fontSize:15, fontWeight:800, color:'#fff', lineHeight:1.2 }}>День {sess.day} · {sess.sessionTag}</div>
+                      <div style={{ fontSize:11, color:'#fff', opacity:0.85, marginTop:2, display:'flex', gap:6, flexWrap:'wrap', alignItems:'center' }}>
+                        <span style={{ padding:'2px 7px', borderRadius:6, background:`${tone}22`, color:tone, border:`1px solid ${tone}35`, fontWeight:700 }}>{sess.character}</span>
+                        <span>{sess.durationMin}′ · {sess.exercises.length} упр</span>
+                        <span>⏱ {Math.round(sess.exercises.reduce((a,e)=>a+ e.workSets.length* (e.restSeconds||90),0)/60)}′ отдыха</span>
                       </div>
                     </div>
-                  ))}
+                  </div>
+                  <span style={{ width:32, height:32, borderRadius:8, display:'inline-flex', alignItems:'center', justifyContent:'center', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.1)', color:'#fff', fontSize:14, flexShrink:0, transform: dayOpen ? 'rotate(0deg)' : 'rotate(-90deg)', transition:'transform 0.2s' }}>▼</span>
+                </button>
+                {dayOpen && (
+                <div style={{ padding:'8px 10px', borderTop:`1px solid ${tone}15`, display:'flex', flexDirection:'column' }}>
+                  {sess.exercises.map((ex, exIdx) => {
+                    const exKey = `${dayKey}-${exIdx}`;
+                    const exOpen = !collapsedEx.has(exKey);
+                    const dist = (ex.workSets[0] as any)?.distanceM;
+                    const cap = (ex.workSets[0] as any)?.timeCapS;
+                    return (
+                    <div key={ex.id} data-ss="exercise" style={{ padding:'10px 12px', marginBottom:8, background:'rgba(255,255,255,0.025)', borderRadius:10, border:'0.5px solid rgba(255,255,255,0.04)' }}>
+                      <button onClick={()=>toggleEx(exKey)} aria-expanded={exOpen} style={{ width:'100%', display:'flex', alignItems:'flex-start', gap:8, background:'transparent', border:'none', padding:0, cursor:'pointer', textAlign:'left' }}>
+                        <span style={{ minWidth:22, height:22, borderRadius:'50%', background:'rgba(0,230,138,0.15)', color:'#00e68a', fontSize:12, fontWeight:800, display:'inline-flex', alignItems:'center', justifyContent:'center', flexShrink:0, marginTop:1 }}>{exIdx+1}</span>
+                        <div style={{ flex:1, minWidth:0 }}>
+                          <div style={{ fontSize:14, fontWeight:800, color:'#fff', lineHeight:1.25, letterSpacing:'-0.2px' }}>{ex.name}{ex.isCompetitionLift ? ' ★' : ''}</div>
+                          <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginTop:4 }}>
+                            <span style={{ fontSize:11, fontWeight:700, padding:'2px 7px', borderRadius:5, background:'rgba(0,230,138,0.10)', color:'#86efac', border:'0.5px solid rgba(0,230,138,0.22)' }}>{ex.sets}×{ex.reps}</span>
+                            <span style={{ fontSize:11, fontWeight:700, padding:'2px 7px', borderRadius:5, background:'rgba(255,255,255,0.05)', color:'#fff', border:'0.5px solid rgba(255,255,255,0.08)' }}>{ex.weight} кг</span>
+                            <span style={{ fontSize:11, fontWeight:700, padding:'2px 7px', borderRadius:5, background: ex.rir<=1?'rgba(255,59,48,0.12)':ex.rir<=2?'rgba(255,159,10,0.12)':'rgba(48,209,88,0.12)', color: ex.rir<=1?'#ff453a':ex.rir<=2?'#ff9f0a':'#30d158', border:'0.5px solid rgba(255,255,255,0.08)' }}>RIR {ex.rir}</span>
+                            <span style={{ fontSize:11, fontWeight:600, padding:'2px 7px', borderRadius:5, background:'rgba(255,255,255,0.04)', color:'#fff', opacity:0.8, border:'0.5px solid rgba(255,255,255,0.06)' }}>{ex.tempo} · {ex.restSeconds}с</span>
+                            {dist ? <span style={{ fontSize:11, fontWeight:700, padding:'2px 7px', borderRadius:5, background:'rgba(245,158,11,0.10)', color:'#f59e0b', border:'0.5px solid rgba(245,158,11,0.22)' }}>{dist} м</span> : null}
+                            {cap ? <span style={{ fontSize:11, fontWeight:700, padding:'2px 7px', borderRadius:5, background:'rgba(96,165,250,0.10)', color:'#60a5fa', border:'0.5px solid rgba(96,165,250,0.22)' }}>{cap} с</span> : null}
+                          </div>
+                        </div>
+                        <span style={{ width:24, height:24, borderRadius:6, display:'inline-flex', alignItems:'center', justifyContent:'center', background:'rgba(255,255,255,0.06)', border:'0.5px solid rgba(255,255,255,0.08)', color:'#fff', fontSize:11, flexShrink:0, transform: exOpen ? 'rotate(0deg)' : 'rotate(-90deg)', transition:'transform 0.2s' }}>▼</span>
+                      </button>
+                      {exOpen && (
+                      <>
+                      <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(80px, 1fr))', gap:6, marginTop:8 }}>
+                        <input type="number" value={ex.weight} onChange={e=> onUpdateEx(wk.week-1, sess.day, ex.id, { weight: Number(e.target.value)||0 })} style={{ ...INPUT, padding:'8px 6px', fontSize:12, fontWeight:700, textAlign:'center', fontVariantNumeric:'tabular-nums', minHeight:44, borderRadius:8 }} placeholder="кг" aria-label={`Вес: ${ex.name}`} />
+                        <input type="text" value={ex.reps} onChange={e=> onUpdateEx(wk.week-1, sess.day, ex.id, { reps: e.target.value })} style={{ ...INPUT, padding:'8px 6px', fontSize:12, fontWeight:700, textAlign:'center', minHeight:44, borderRadius:8 }} placeholder="повт" aria-label={`Повторы: ${ex.name}`} />
+                        <input type="number" value={ex.rir} onChange={e=> onUpdateEx(wk.week-1, sess.day, ex.id, { rir: Number(e.target.value)||0 })} style={{ ...INPUT, padding:'8px 6px', fontSize:12, fontWeight:700, textAlign:'center', fontVariantNumeric:'tabular-nums', minHeight:44, borderRadius:8 }} placeholder="RIR" aria-label={`RIR: ${ex.name}`} />
+                        <div style={{ display:'flex', gap:6 }}>
+                          <button onClick={()=> onMoveEx(wk.week-1, sess.day, ex.id, -1)} aria-label={`Выше: ${ex.name}`} style={{ width:44, height:44, borderRadius:8, background:'rgba(255,255,255,0.06)', border:'0.5px solid rgba(255,255,255,0.09)', color:'#fff', cursor:'pointer', fontSize:14 }}>↑</button>
+                          <button onClick={()=> onMoveEx(wk.week-1, sess.day, ex.id, 1)} aria-label={`Ниже: ${ex.name}`} style={{ width:44, height:44, borderRadius:8, background:'rgba(255,255,255,0.06)', border:'0.5px solid rgba(255,255,255,0.09)', color:'#fff', cursor:'pointer', fontSize:14 }}>↓</button>
+                        </div>
+                      </div>
+                      {ex.comment && <div style={{ fontSize:11, color:'#fff', background: mode==='strongman'?'rgba(245,158,11,0.08)':'rgba(48,209,88,0.08)', borderLeft:`2px solid ${mode==='strongman'?'rgba(245,158,11,0.28)':'rgba(48,209,88,0.28)'}`, padding:'6px 8px', borderRadius:6, lineHeight:1.4, marginTop:8 }}>{ex.comment}</div>}
+                      {ex.warmupSets && ex.warmupSets.length>0 && <div style={{ fontSize:10.5, color:'#fff', opacity:0.7, marginTop:6 }}>Разминка: {ex.warmupSets.map(s=> `${s.reps}×${s.weight}кг`).join(' → ')} → рабочие</div>}
+                      <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginTop:8 }}>
+                        {ex.workSets.map((s,si)=> (
+                        <span key={si} data-ss="set-row" style={{ display:'flex', gap:6, alignItems:'center', background:'rgba(255,255,255,0.04)', padding:'6px 8px', borderRadius:8, fontSize:11, fontWeight:600, color:'#fff', border:'0.5px solid rgba(255,255,255,0.07)', fontVariantNumeric:'tabular-nums', minHeight:44 }}>
+                          <span style={{ color:'#86efac', fontWeight:800 }}>#{si+1}</span>
+                          <input type="number" value={s.weight} onChange={e=> onUpdateSet(wk.week-1,sess.day,ex.id,si,{weight:Number(e.target.value)||0})} style={{ width:62, minHeight:36, padding:'6px 4px', fontSize:12, fontWeight:700, background:'rgba(255,255,255,0.07)', color:'#fff', border:'0.5px solid rgba(255,255,255,0.12)', borderRadius:6, textAlign:'center', fontVariantNumeric:'tabular-nums' }} aria-label={`Подход ${si+1} вес`} />кг
+                          <input type="number" value={s.reps} onChange={e=> onUpdateSet(wk.week-1,sess.day,ex.id,si,{reps:Number(e.target.value)||0})} style={{ width:48, minHeight:36, padding:'6px 4px', fontSize:12, fontWeight:700, background:'rgba(255,255,255,0.07)', color:'#fff', border:'0.5px solid rgba(255,255,255,0.12)', borderRadius:6, textAlign:'center', fontVariantNumeric:'tabular-nums' }} aria-label={`Подход ${si+1} повторы`} />×
+                          <input type="number" value={s.rir} onChange={e=> onUpdateSet(wk.week-1,sess.day,ex.id,si,{rir:Number(e.target.value)||0})} style={{ width:46, minHeight:36, padding:'6px 4px', fontSize:12, fontWeight:700, background:'rgba(255,255,255,0.07)', color:'#fff', border:'0.5px solid rgba(255,255,255,0.12)', borderRadius:6, textAlign:'center', fontVariantNumeric:'tabular-nums' }} aria-label={`Подход ${si+1} RIR`} />RIR
+                          {(ex.id.includes('yoke')||ex.id.includes('farmers')||ex.id.includes('carry')||ex.id.includes('husafell')||ex.id.includes('frame')||ex.id.includes('sled')||ex.id.includes('tire')||ex.id.includes('stone')||ex.id.includes('sandbag')) && <>
+                            <input type="number" placeholder="м" title="дистанция м" value={(s as any).distanceM ?? ''} onChange={e=> onUpdateSet(wk.week-1,sess.day,ex.id,si,{distanceM: Number(e.target.value)||0} as any)} style={{ width:54, minHeight:36, padding:'6px 4px', fontSize:11, fontWeight:700, background:'rgba(255,159,10,0.10)', color:'#fff', border:'0.5px solid rgba(255,159,10,0.20)', borderRadius:6, textAlign:'center' }} />
+                            <input type="number" placeholder="с" title="cap с" value={(s as any).timeCapS ?? ''} onChange={e=> onUpdateSet(wk.week-1,sess.day,ex.id,si,{timeCapS: Number(e.target.value)||0} as any)} style={{ width:54, minHeight:36, padding:'6px 4px', fontSize:11, fontWeight:700, background:'rgba(59,130,246,0.10)', color:'#fff', border:'0.5px solid rgba(59,130,246,0.20)', borderRadius:6, textAlign:'center' }} />
+                          </>}
+                        </span>
+                        ))}
+                      </div>
+                      </>
+                      )}
+                    </div>
+                    );
+                  })}
                 </div>
+                )}
               </div>
-            ))}
+              );
+            })}
           </div>
           )}
         </div>

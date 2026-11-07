@@ -40,12 +40,12 @@ import { loadRtp, rtpIncomplete, loadSparring, sparringJournalToLoad } from '../
 import { localIsoDate } from '../../../core/local-date';
 import { useCombatWizard, type WizardStep } from './useCombatWizard';
 import {
-  CARD, CARD_ACCENT, CARD_HERO, ROW, COL, LABEL, HINT, HINT_SM, BTN, BTN_PRIMARY, BTN_SMALL, BTN_GHOST,
-  INPUT, SELECT, CHIP, CHIP_ACTIVE, PHASE_COLOR, DISCIPLINE_COLOR, ACCENT, ACCENT_GRAD, GLASS_BORDER, TEXT_3,
-  SectionCard, StatTile, Badge, InfoBanner, GroupHeading, SectionNav, ProgressBar, Stepper, ChipToggle, Field, Divider, CardHeader, Highlight, AccentText, CombatPopupSelect, CombatPopupNumber,
+  CARD_ACCENT, ROW, COL, LABEL, HINT, HINT_SM, BTN, BTN_PRIMARY, BTN_SMALL, BTN_GHOST,
+  INPUT, SELECT, CHIP, CHIP_ACTIVE, PHASE_COLOR, DISCIPLINE_COLOR, ACCENT, ACCENT_GRAD, TEXT_3,
+  SectionCard, StatTile, Badge, InfoBanner, GroupHeading, SectionNav, Stepper, ChipToggle, Field, Divider, Highlight, AccentText, CombatPopupSelect, CombatPopupNumber,
   EQUIP_RU, MOBILITY_RU, LEVEL_RU, PHASE_RU, ZONE_RU, PERIODIZATION_RU, SESSION_TAG_RU, ruLabel, CbSwitch,
 } from './CombatUI';
-import { CARD as T_CARD, BTN as T_BTN, BTN_GHOST as T_BTN_GHOST, H as T_H, SMALL as T_SMALL, IN as T_IN, PlannerStepNav, usePlannerStepScroll, PLANNER_HEAD_BAR, PLANNER_HEAD_TITLE, PLANNER_STEP_NAV_WRAP } from '../TrainingScreen_parts/training-ui';
+import { BTN as T_BTN, BTN_GHOST as T_BTN_GHOST, H as T_H, IN as T_IN, PlannerStepNav, usePlannerStepScroll, PLANNER_HEAD_BAR, PLANNER_HEAD_TITLE, PLANNER_STEP_NAV_WRAP, PLANNER_FLASH, bbCardChrome, bbIconTile, bbCardTitle, bbCardBadge, PlannerNestedCardContext, plannerTitleText } from '../TrainingScreen_parts/training-ui';
 import { CombatPlanView, CbQualityMap, CbMesoCard, CbDiaryCard } from './CombatPlanView';
 
 type Step = WizardStep;
@@ -86,38 +86,49 @@ function buzzStep(): void {
 /* №1: заблокированный план (errors) нельзя выгружать ни в каком виде — канон isCombatPlanBlocked из finalize */
 
 /* ── BB-аккордеон: шапка-кнопка + саммари, контент — те же SectionCard 1-в-1 ── */
+/** «🎯 Дисциплина» → эмодзи в тайл кита, текст — в заголовок. */
+const splitLeadEmoji = (title: string): { icon: string; text: string } => {
+  const m = /^([\u{1F000}-\u{1FAFF}\u{2190}-\u{2BFF}\u{FE0F}\u{20E3}\u{200D}]{1,6})\s+(.*)$/u.exec(title);
+  return m ? { icon: m[1]!, text: m[2]! } : { icon: '', text: title };
+};
 const CbSec: React.FC<{
   title: string;
   defaultOpen?: boolean;
   summary?: string;
+  subtitle?: string;
   children: React.ReactNode;
-}> = ({ title, defaultOpen = false, summary, children }) => {
+}> = ({ title, defaultOpen = false, summary, subtitle, children }) => {
   const [open, setOpen] = React.useState(defaultOpen);
+  const { icon, text } = splitLeadEmoji(title);
+  const ownTitle = plannerTitleText(title);
   return (
-    <div style={{ ...T_CARD, padding: 0, overflow: 'hidden' }}>
+    <section className="kit-section" style={{ ...bbCardChrome(ACCENT), marginBottom: 0, display: 'flex', flexDirection: 'column' }}>
       <button
         type="button"
         onClick={() => { setOpen(v => !v); buzzStep(); }}
         aria-expanded={open}
         className="cb-sec-head"
         style={{
-          width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-          padding: '10px 12px', minHeight: 44, cursor: 'pointer', background: 'linear-gradient(135deg, rgba(168,85,247,0.10), rgba(236,72,153,0.03))',
-          border: 'none', borderBottom: open ? '1px solid rgba(255,255,255,0.06)' : 'none', textAlign: 'left',
+          width: '100%', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap',
+          padding: 0, margin: 0, minHeight: 28, cursor: 'pointer',
+          background: 'none', border: 'none', textAlign: 'left', fontFamily: 'inherit',
+          WebkitTapHighlightColor: 'transparent',
         }}
       >
-        <span style={{ fontSize: 12, fontWeight: 800, color: '#fff' }}>{title}</span>
-        <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          {!open && summary && <span style={{ ...T_SMALL, color: '#fff' }}>{summary}</span>}
-          <span style={{ fontSize: 11, color: '#fff', transform: open ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s', display: 'inline-block' }}>▼</span>
-        </span>
+        {icon && <span aria-hidden style={bbIconTile(ACCENT)}>{icon}</span>}
+        <span style={{ ...bbCardTitle, flex: '1 1 auto', minWidth: 0 }}>{text}</span>
+        {!open && summary && <span className="cb-sec-sum" style={bbCardBadge(ACCENT)}>{summary}</span>}
+        <span aria-hidden style={{ marginLeft: (!open && summary) ? 0 : 'auto', fontSize: 11, color: '#fff', transform: open ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s', display: 'inline-block' }}>▾</span>
       </button>
+      {open && subtitle ? <div style={{ fontSize: 10.5, color: '#fff', lineHeight: 1.45, marginTop: 6 }}>{subtitle}</div> : null}
       <div data-collapsed={!open} style={open
-        ? { display: 'flex', flexDirection: 'column', gap: 8 }
-        : { display: 'grid', gridTemplateRows: '0fr', opacity: 0, transition: 'grid-template-rows 0.28s ease, opacity 0.2s ease', pointerEvents: 'none' }}>
-        <div style={open ? undefined : { minHeight: 0, overflow: 'hidden' }}>{children}</div>
+        ? { marginTop: 8 }
+        : { display: 'grid', gridTemplateRows: '0fr', opacity: 0, transition: 'grid-template-rows 0.28s ease, opacity 0.2s ease', pointerEvents: 'none', marginTop: 8 }}>
+        <div style={open ? undefined : { minHeight: 0, overflow: 'hidden' }}>
+          <PlannerNestedCardContext.Provider value={ownTitle}>{children}</PlannerNestedCardContext.Provider>
+        </div>
       </div>
-    </div>
+    </section>
   );
 };
 
@@ -777,12 +788,9 @@ export const CombatConstructor: React.FC = () => {
       </div>
       {renderStepNav()}
 
-      {/* HERO — статусная строка (прогресс + бейджи), карточка кита. */}
-      <div className="cb-hero" style={CARD_HERO}>
-        <div className="cb-hero-sub" style={{ fontSize: 11, color: '#fff', lineHeight: 1.35 }}>ATR 5/3/2 · кондиция 3 системы · тапер к дате · весогонка ISSN · спарринг · годовой</div>
-
-        <div className="cb-progress"><ProgressBar value={stepIndex} max={7} color={ACCENT} height={8} /></div>
-
+      {/* Статусная строка режима — без отдельной карточки: карточки начинаются
+          с шагов, как в ББ-авто (единый плотный каркас планировщиков). */}
+      <div className="cb-hero" style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
         <div className="cb-status" style={{ ...ROW, justifyContent: 'space-between', gap: 8 }}>
           <div style={ROW}>
             {plan && <Badge color="#fff" bg="rgba(168,85,247,0.16)" border="rgba(168,85,247,0.30)" icon="📋">План {plan.weeks}нед · {plan.patternId}</Badge>}
@@ -799,9 +807,7 @@ export const CombatConstructor: React.FC = () => {
           </div>
           {msg && (
             <span className="cb-msg" role="status" aria-live="polite" style={{
-              fontSize: 11.5, fontWeight: 750, color: '#fff', background: 'linear-gradient(135deg, rgba(168,85,247,0.18), rgba(236,72,153,0.14))',
-              border: '1px solid rgba(255,255,255,0.10)', padding: '6px 12px', borderRadius: 20, backdropFilter: 'blur(8px)',
-              boxShadow: '0 4px 16px rgba(0,0,0,0.18)', animation: 'fadeInUp 0.22s ease',
+              ...PLANNER_FLASH, marginBottom: 0, color: ACCENT, background: 'rgba(168,85,247,0.10)', border: '1px solid rgba(168,85,247,0.24)',
             }}>{msg}</span>
           )}
         </div>
@@ -1093,8 +1099,7 @@ export const CombatConstructor: React.FC = () => {
           </CbSec>
 
           <CbSec title="⚖️ Весогонка ISSN 2025" summary={weightCut > 0 ? `${weightCut} кг` : 'выкл'}>
-            <div style={{ ...CARD, background: weightCut > 0 ? 'linear-gradient(180deg, rgba(239,68,68,0.08), rgba(18,16,28,0.62))' : CARD.background, borderColor: weightCut > 0 ? 'rgba(239,68,68,0.22)' : GLASS_BORDER }}>
-              <CardHeader icon="⚖️" title="Весогонка ISSN 2025" subtitle={weightCut > 0 ? `Сгонка ${weightCut} кг — плавная, без экстремальных протоколов` : 'Выключена — стабильный режим'} />
+            <SectionCard icon="⚖️" title="Весогонка ISSN 2025" subtitle={weightCut > 0 ? `Сгонка ${weightCut} кг — плавная, без экстремальных протоколов` : 'Выключена — стабильный режим'}>
               <Field label={`Сгонка · ${weightCut} кг`}>
                 <input type="range" min={0} max={8} step={0.5} value={weightCut} onChange={e => { const v = Number(e.target.value); setWeightCut(v); if (v === 0) { setWaterMode('stable'); setSodiumMode('stable'); setCarbMode('stable'); setHeatSessions(false); return; } if (v >= 3) setHeatSessions(true); if (v >= 4) setWaterMode('load_cut'); if (v >= 3) setSodiumMode('moderate_cut'); if (v >= 5) setCarbMode('deplete_reload'); }} />
               </Field>
@@ -1166,11 +1171,11 @@ export const CombatConstructor: React.FC = () => {
                   {sex==='female' && weightCut > 2 && <InfoBanner tone="info">Женщины: консервативно ≤5% BM, учёт цикла — лютеиновая задержка +0.5-1кг. RED-S floor 1400ккал.</InfoBanner>}
                 </>
               )}
-            </div>
+            </SectionCard>
           </CbSec>
 
           <CbSec title="🥋 Вне зала — спарринг" summary={outsideSummary}>
-            <SectionCard icon="🥋" title="Вне зала — спарринг декомпозиция" subtitle="Hard RPE 8.5 · tech 5.5 · борьба 7.5. При ≥5× зал сохраняет 1× Zone2 30′ (77% aerobic — Boxing Science)" accent>
+            <SectionCard icon="🥋" title="Вне зала — спарринг" subtitle="Декомпозиция: Hard RPE 8.5 · tech 5.5 · борьба 7.5. При ≥5× зал сохраняет 1× Zone2 30′ (77% aerobic — Boxing Science)" accent>
               <CbSwitch checked={outsideEnabled} onChange={setOutsideEnabled} label="Учитывать нагрузку вне зала (ринг / татами)" />
 
               {outsideEnabled && (
@@ -1268,24 +1273,16 @@ export const CombatConstructor: React.FC = () => {
 
       {step === 'split' && (
         <div className="cb-pane" data-pane="split" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <div style={{ ...CARD, padding: 12, gap: 8 }}>
+          <SectionCard icon="✨" title="Рекомендация" subtitle="Подбор сплита по дням, вне зала и уровню" accent>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-              <span style={{ width: 32, height: 32, borderRadius: 10, background: ACCENT_GRAD, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14 }}>✨</span>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 12, fontWeight: 900, color: '#fff' }}>Рекомендуем: <span style={{ color: '#d8b4fe' }}>{recommendCombatPattern(days, outside?.sessionsPerWeek || 0, level).name}</span></div>
-                <div style={{ fontSize: 11, color: TEXT_3 }}>{patternId ? `Выбран: ${COMBAT_PATTERNS.find(p => p.id === patternId)?.name}` : 'Авто-подбор по дням и нагрузке'} · модель <b style={{ color: '#fff' }}>{ruLabel(PERIODIZATION_RU, periodizationModel ?? 'atr_10')}</b></div>
-              </div>
+              <span style={{ fontSize: 12, color: '#fff' }}>Рекомендуем:</span>
+              <Highlight color="#a855f7">{recommendCombatPattern(days, outside?.sessionsPerWeek || 0, level).name}</Highlight>
+              <Badge color="#c4b5fd" bg="rgba(168,85,247,0.12)" border="rgba(168,85,247,0.22)">{recommendCombatPattern(days, outside?.sessionsPerWeek || 0, level).sessionsPerRotation}×/нед</Badge>
             </div>
-          </div>
+            <div style={{ fontSize: 11, color: '#fff' }}>{patternId ? `Выбран: ${COMBAT_PATTERNS.find(p => p.id === patternId)?.name}` : 'Авто-подбор по дням и нагрузке'} · модель <b style={{ color: '#fff' }}>{ruLabel(PERIODIZATION_RU, periodizationModel ?? 'atr_10')}</b></div>
+          </SectionCard>
 
-          <div style={{ ...CARD, padding: 12, gap: 10 }}>
-            <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-              <span style={{ width: 32, height: 32, borderRadius: 10, background: ACCENT_GRAD, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14 }}>📚</span>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 12, fontWeight: 900, color: '#fff' }}>Готовые циклы · {COMBAT_CYCLE_LIBRARY.length}</div>
-                <div style={{ fontSize: 11, color: '#fff' }}>Одна кнопка — дисциплина, цель, недели, дни, модель и сплит</div>
-              </div>
-            </div>
+          <SectionCard icon="📚" title="Готовые циклы" subtitle={`${COMBAT_CYCLE_LIBRARY.length} программ · одна кнопка — дисциплина, цель, недели, дни, модель и сплит`}>
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }} role="group" aria-label="Фильтр циклов по виду спорта">
               {([['all', 'Все'], ['boxing', '🥊 Бокс'], ['wrestling', '🤼 Борьба'], ['mma', '🥋 ММА'], ['kickboxing', '🦵 Кик'], ['general', '🏋️ Общая']] as const).map(([id, label]) => (
                 <ChipToggle key={id} active={cycFilter === id} onClick={() => { setCycFilter(id); buzzStep(); }}>{label}</ChipToggle>
@@ -1300,14 +1297,13 @@ export const CombatConstructor: React.FC = () => {
                   className="cb-cycle-card"
                   style={{
                     textAlign: 'left', padding: 10, borderRadius: 14,
-                    background: 'linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.015))',
-                    border: '1px solid rgba(255,255,255,0.06)',
-                    borderLeft: `3px solid ${edge}`,
-                    boxShadow: '0 4px 12px rgba(0,0,0,0.14)',
+                    background: 'linear-gradient(180deg, rgba(255,255,255,0.035), rgba(20,22,28,0.55))',
+                    border: '1px solid rgba(255,255,255,0.08)',
+                    borderLeft: `4px solid ${edge}`,
                   }}
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-                    <span style={{ fontSize: 13, fontWeight: 900, color: '#fff' }}>{c.name}</span>
+                    <span style={{ fontSize: 13, fontWeight: 800, color: '#fff' }}>{c.name}</span>
                     <span className="cb-cycle-meta" style={{ fontSize: 11, fontWeight: 800, color: '#d8b4fe', background: 'rgba(168,85,247,0.18)', padding: '3px 8px', borderRadius: 20, border: '1px solid rgba(168,85,247,0.22)', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{c.weeks}нед · {c.daysPerWeek}×</span>
                   </div>
                   <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 4 }}>
@@ -1332,7 +1328,7 @@ export const CombatConstructor: React.FC = () => {
                 );
               })}
             </div>
-          </div>
+          </SectionCard>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {COMBAT_PATTERNS.map(p => {
@@ -1345,15 +1341,14 @@ export const CombatConstructor: React.FC = () => {
                   className="cb-split-card"
                   data-active={active ? 'true' : 'false'}
                   style={{
-                    textAlign: 'left', padding: 12, borderRadius: 14, cursor: 'pointer', transition: 'all 0.18s ease',
-                    background: active ? 'linear-gradient(135deg, rgba(168,85,247,0.16), rgba(236,72,153,0.10))' : 'linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.015))',
-                    border: active ? '1px solid rgba(168,85,247,0.36)' : '1px solid rgba(255,255,255,0.06)',
-                    boxShadow: active ? '0 6px 20px rgba(168,85,247,0.16), inset 0 1px 0 rgba(255,255,255,0.08)' : '0 4px 12px rgba(0,0,0,0.14)',
-                    backdropFilter: 'blur(12px)',
+                    textAlign: 'left', padding: '12px 14px', borderRadius: 14, cursor: 'pointer', transition: 'all 0.18s ease',
+                    background: active ? 'linear-gradient(180deg, rgba(168,85,247,0.14), rgba(20,22,28,0.55))' : 'rgba(20,22,28,0.55)',
+                    border: active ? '1px solid rgba(168,85,247,0.36)' : '1px solid rgba(255,255,255,0.08)',
+                    borderLeft: `4px solid ${active ? '#a855f7' : 'rgba(255,255,255,0.14)'}`,
                   }}
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontSize: 13, fontWeight: 900, color: active ? '#fff' : '#fff' }}>{p.name}</span>
+                    <span style={{ fontSize: 13, fontWeight: 800, color: active ? '#fff' : '#fff' }}>{p.name}</span>
                     <span className="cb-split-freq" style={{ fontSize: 11, fontWeight: 800, color: active ? '#d8b4fe' : '#fff', background: active ? 'rgba(168,85,247,0.18)' : 'rgba(255,255,255,0.06)', padding: '3px 8px', borderRadius: 20, border: `1px solid ${active ? 'rgba(168,85,247,0.22)' : 'rgba(255,255,255,0.06)'}` }}>{p.sessionsPerRotation}×/нед</span>
                   </div>
                   <div style={{ fontSize: 11.5, color: '#fff', marginTop: 4, lineHeight: 1.4 }}>{p.description}</div>
@@ -1415,12 +1410,13 @@ export const CombatConstructor: React.FC = () => {
         />
       )}
       {step === 'plan' && !plan && (
-        <div className="cb-empty" style={{ ...CARD, alignItems: 'center', padding: 28, textAlign: 'center' }}>
-          <span style={{ width: 56, height: 56, borderRadius: 16, background: 'rgba(168,85,247,0.12)', border: '1px solid rgba(168,85,247,0.18)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24 }}>📋</span>
-          <div style={{ fontSize: 14, fontWeight: 900, color: '#fff' }}>План ещё не собран</div>
-          <div style={{ fontSize: 12, color: TEXT_3, maxWidth: 320 }}>Вернитесь к параметрам, выберите сплит и нажмите «Собрать PRO-план». Годовой ATR можно построить и без плана.</div>
-          <button onClick={() => go('split')} style={BTN_GHOST}>← К сплиту</button>
-        </div>
+        <SectionCard icon="📋" title="План ещё не собран" subtitle="Вернитесь к параметрам, выберите сплит и нажмите «Собрать PRO-план»">
+          <div className="cb-empty" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, padding: '8px 0 4px', textAlign: 'center' }}>
+            <span aria-hidden style={{ fontSize: 40, lineHeight: 1 }}>📋</span>
+            <div style={{ fontSize: 12, color: TEXT_3, maxWidth: 320 }}>Годовой ATR можно построить и без плана — шаг «Экспорт».</div>
+            <button onClick={() => go('split')} style={{ ...BTN_GHOST, width: '100%' }}>← К сплиту</button>
+          </div>
+        </SectionCard>
       )}
       {step === 'plan' && plan && renderNavRow('split', 'quality')}
 
@@ -1484,12 +1480,12 @@ export const CombatConstructor: React.FC = () => {
         </div>
       )}
       {step === 'quality' && !plan && (
-        <div className="cb-empty" style={{ ...CARD, alignItems: 'center', padding: 28, textAlign: 'center' }}>
-          <span style={{ width: 56, height: 56, borderRadius: 16, background: 'rgba(168,85,247,0.12)', border: '1px solid rgba(168,85,247,0.18)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24 }}>✦</span>
-          <div style={{ fontSize: 14, fontWeight: 900, color: '#fff' }}>Сначала соберите план</div>
-          <div style={{ fontSize: 12, color: TEXT_3, maxWidth: 320 }}>Качество считается по собранному плану: сеты/нед, MEV/MRV, ACWR, дневник.</div>
-          <button onClick={() => go('split')} style={BTN_GHOST}>← К сплиту</button>
-        </div>
+        <SectionCard icon="✦" title="Сначала соберите план" subtitle="Качество считается по собранному плану: сеты/нед, MEV/MRV, ACWR, дневник">
+          <div className="cb-empty" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, padding: '8px 0 4px', textAlign: 'center' }}>
+            <span aria-hidden style={{ fontSize: 40, lineHeight: 1 }}>✦</span>
+            <button onClick={() => go('split')} style={{ ...BTN_GHOST, width: '100%' }}>← К сплиту</button>
+          </div>
+        </SectionCard>
       )}
 
       {step === 'export' && (
@@ -1541,12 +1537,12 @@ export const CombatConstructor: React.FC = () => {
               onLoadBlock={handleLoadAnnualBlock}
             />
           ) : (
-            <div className="cb-empty" style={{ ...CARD, alignItems: 'center', padding: 28, textAlign: 'center' }}>
-              <span style={{ width: 56, height: 56, borderRadius: 16, background: 'rgba(168,85,247,0.12)', border: '1px solid rgba(168,85,247,0.18)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24 }}>🗓️</span>
-              <div style={{ fontSize: 14, fontWeight: 900, color: '#fff' }}>Годовой ATR ещё не построен</div>
-              <div style={{ fontSize: 12, color: TEXT_3, maxWidth: 320 }}>Соберите план — годовой ATR построится автоматически. Годовой ATR можно построить и без плана.</div>
-              <button onClick={handleBuildATR} style={BTN_GHOST}>↻ Построить {annualWeeks} нед ×{annualCycles ?? 1} ц</button>
-            </div>
+            <SectionCard icon="🗓️" title="Годовой ATR ещё не построен" subtitle="Соберите план — годовой ATR построится автоматически; можно построить и без плана">
+              <div className="cb-empty" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, padding: '8px 0 4px', textAlign: 'center' }}>
+                <span aria-hidden style={{ fontSize: 40, lineHeight: 1 }}>🗓️</span>
+                <button onClick={handleBuildATR} style={{ ...BTN_GHOST, width: '100%' }}>↻ Построить {annualWeeks} нед ×{annualCycles ?? 1} ц</button>
+              </div>
+            </SectionCard>
           )}
           {plan && (
             <SectionCard icon="📤" title="Экспорт и шаринг" subtitle="Печать · CSV · ICS · в программу">

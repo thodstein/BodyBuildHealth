@@ -10659,26 +10659,21 @@ html.app-native .combat-constructor {
   padding-bottom: calc(var(--nav-height) + max(env(safe-area-inset-bottom, 0px), 28px) + 4px) !important;
 }
 html.app-native .combat-constructor .cb-hero {
-  border-radius: 20px !important;
-  padding: 16px 16px 14px !important;
-  background: linear-gradient(180deg, rgba(46, 32, 72, 0.78), rgba(16, 14, 28, 0.78)) !important;
-  border: 1px solid rgba(196, 181, 253, 0.14) !important;
-  border-top: 2px solid rgba(168, 85, 247, 0.5) !important;
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5) !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
 }
 /* .cb-hero-icon / .cb-hero-title удалены 2026-09-27: иконка и заголовок
    единоборств переехали в компактную шапку ББ-стиля (PLANNER_HEAD_BAR),
-   где отдельного тайла 48px нет — правила стали бы мёртвыми. */
-html.app-native .combat-constructor .cb-hero-sub {
-  font-size: 12px !important;
-  line-height: 1.5 !important;
-}
+   где отдельного тайла 48px нет — правила стали бы мёртвыми.
+   .cb-hero-sub / .cb-progress удалены 2026-11-07: hero сведён к статусной
+   строке, как в ББ-авто (без стеклянной карточки и прогресс-бара). */
 html.app-native .combat-constructor .cb-hero-step {
   font-variant-numeric: tabular-nums !important;
   white-space: nowrap !important;
-}
-html.app-native .combat-constructor .cb-progress {
-  filter: drop-shadow(0 0 6px rgba(168, 85, 247, 0.4)) !important;
 }
 html.app-native .combat-constructor .cb-steps .kit-sectionnav {
   flex-wrap: nowrap !important;
@@ -10716,22 +10711,33 @@ html.app-native .combat-constructor .cb-msg {
   align-items: center !important;
 }
 html.app-native .combat-constructor .cb-pane {
-  gap: 12px !important;
+  gap: 8px !important;
 }
 html.app-native .combat-constructor .kit-section {
-  border-radius: 18px !important;
-  border-top: 2px solid rgba(168, 85, 247, 0.3) !important;
-  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.42) !important;
+  border-radius: 14px !important;
+  padding: 10px 12px !important;
+  background: rgba(255, 255, 255, 0.025) !important;
+  border: 1px solid rgba(196, 181, 253, 0.18) !important;
+  border-top: 2px solid rgba(168, 85, 247, 0.33) !important;
+  box-shadow: none !important;
+}
+/* Вложенная секция (CbSec → SectionCard) — плоский под-блок кита. */
+html.app-native .combat-constructor .kit-section--nested {
+  border-radius: 10px !important;
+  padding: 8px 10px !important;
+  background: rgba(0, 0, 0, 0.18) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  border-top: 1px solid rgba(255, 255, 255, 0.08) !important;
 }
 html.app-native .combat-constructor .cb-split-card {
-  border-radius: 18px !important;
-  padding: 14px !important;
+  border-radius: 14px !important;
+  padding: 12px 14px !important;
 }
 html.app-native .combat-constructor .cb-split-card:active {
   transform: scale(0.98) !important;
 }
 html.app-native .combat-constructor .cb-split-card[data-active='true'] {
-  box-shadow: 0 8px 26px rgba(168, 85, 247, 0.28) !important;
+  box-shadow: 0 6px 18px rgba(168, 85, 247, 0.18) !important;
 }
 html.app-native .combat-constructor .cb-split-freq {
   min-height: 32px !important;
@@ -10778,7 +10784,7 @@ html.app-native .combat-constructor .cb-profile:active {
   transform: scale(0.98) !important;
 }
 html.app-native .combat-constructor .cb-empty {
-  border-radius: 20px !important;
+  border-radius: 14px !important;
   gap: 10px !important;
 }
 html.app-native .combat-constructor input:not([type='range']):not([type='checkbox']) {
@@ -10833,11 +10839,6 @@ html.app-native .combat-constructor .cb-steps .kit-sectionnav-opt[data-active]:f
 @media (max-width: 380px) {
   html.app-native .combat-constructor div[style*='grid-template-columns: 1fr 1fr'] {
     grid-template-columns: 1fr !important;
-  }
-}
-@media (max-width: 380px) {
-  html.app-native .combat-constructor .cb-hero-sub {
-    display: none !important;
   }
 }
 /* .cb-hero-icon удалён 2026-09-27: иконка ушла в компактную шапку ББ-стиля. */
@@ -11481,47 +11482,44 @@ html.app-native .tp-fallback-open:focus-visible {
  * Done 52px градиент, чипы 40px с актив-градиентом, цифры tabular,
  * press 0.97-0.98, focus-visible, 380px, reduced-motion. Только APK. */
 html.app-native .combat-constructor .cb-pop-trig {
-  min-height: 56px !important;
-  border-radius: 14px !important;
+  min-height: 44px !important;
+  border-radius: 10px !important;
   font-variant-numeric: tabular-nums !important;
 }
 html.app-native .combat-constructor .cb-pop-trig:active {
   transform: scale(0.98) !important;
 }
 html.app-native .combat-constructor .cb-pop-backdrop {
-  background: rgba(0, 0, 0, 0.55) !important;
-  -webkit-backdrop-filter: blur(20px) !important;
-  backdrop-filter: blur(20px) !important;
+  background: rgba(0, 0, 0, 0.85) !important;
 }
 html.app-native .combat-constructor .cb-pop-sheet {
-  border-radius: 20px 20px 0 0 !important;
-  background: rgba(28, 28, 32, 0.96) !important;
-  border-top: 2px solid rgba(168, 85, 247, 0.4) !important;
-  box-shadow: 0 -12px 40px rgba(0, 0, 0, 0.55) !important;
-  padding-bottom: max(20px, env(safe-area-inset-bottom, 0px)) !important;
-  animation: cbPopSheetUp 0.25s ease !important;
+  border-radius: 16px !important;
+  background: rgb(24, 24, 27) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6) !important;
+  padding-bottom: 0 !important;
+  animation: cbPopSheetUp 0.2s ease !important;
 }
 @keyframes cbPopSheetUp {
   from {
-    transform: translateY(24px);
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
   }
   to {
-    transform: translateY(0);
+    opacity: 1;
+    transform: none;
   }
-}
-html.app-native .combat-constructor .cb-pop-handle {
-  width: 44px !important;
 }
 html.app-native .combat-constructor .cb-pop-title {
   font-size: 14px !important;
   font-variant-numeric: tabular-nums !important;
 }
 html.app-native .combat-constructor .cb-pop-list {
-  gap: 4px !important;
+  gap: 6px !important;
 }
 html.app-native .combat-constructor .cb-pop-opt {
-  min-height: 52px !important;
-  border-radius: 12px !important;
+  min-height: 44px !important;
+  border-radius: 10px !important;
 }
 html.app-native .combat-constructor .cb-pop-opt:active {
   transform: scale(0.98) !important;
@@ -11534,12 +11532,10 @@ html.app-native .combat-constructor .cb-pop-optlabel {
   font-variant-numeric: tabular-nums !important;
 }
 html.app-native .combat-constructor .cb-pop-done {
-  min-height: 52px !important;
-  border-radius: 14px !important;
-  font-size: 15px !important;
-  font-weight: 800 !important;
-  background: linear-gradient(135deg, rgba(168, 85, 247, 1), rgba(236, 72, 153, 1)) !important;
-  box-shadow: 0 6px 22px rgba(168, 85, 247, 0.4) !important;
+  min-height: 44px !important;
+  border-radius: 8px !important;
+  font-size: 12px !important;
+  font-weight: 700 !important;
 }
 html.app-native .combat-constructor .cb-pop-done:active {
   transform: scale(0.98) !important;
@@ -11547,21 +11543,15 @@ html.app-native .combat-constructor .cb-pop-done:active {
 html.app-native .combat-constructor .cb-pop-numtitle {
   font-variant-numeric: tabular-nums !important;
 }
-html.app-native .combat-constructor .cb-pop-range {
-  min-height: 28px !important;
-}
-html.app-native .combat-constructor .cb-pop-scale {
-  font-variant-numeric: tabular-nums !important;
-}
 html.app-native .combat-constructor .cb-pop-input {
-  min-height: 48px !important;
+  min-height: 44px !important;
   font-size: 16px !important;
   font-variant-numeric: tabular-nums !important;
 }
 html.app-native .combat-constructor .cb-pop-ok {
-  min-height: 48px !important;
-  border-radius: 12px !important;
-  box-shadow: 0 4px 16px rgba(168, 85, 247, 0.4) !important;
+  min-height: 44px !important;
+  border-radius: 8px !important;
+  box-shadow: none !important;
 }
 html.app-native .combat-constructor .cb-pop-ok:active {
   transform: scale(0.96) !important;
@@ -13444,9 +13434,9 @@ html.app-native .combat-constructor [data-cb='annual-dday'] {
  * 44px + press 0.97 + focus-visible + tabular, 380px, reduced-motion.
  * Только APK, без hex. */
 html.app-native .combat-constructor .cb-cycle-card {
-  border-radius: 18px !important;
-  border-top: 2px solid rgba(168, 85, 247, 0.3) !important;
-  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.42) !important;
+  border-radius: 14px !important;
+  border-top: 1px solid rgba(255, 255, 255, 0.08) !important;
+  box-shadow: none !important;
 }
 html.app-native .combat-constructor .cb-cycle-meta {
   font-variant-numeric: tabular-nums !important;

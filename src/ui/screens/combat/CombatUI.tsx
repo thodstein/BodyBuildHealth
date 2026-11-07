@@ -5,6 +5,10 @@
  */
 import React from 'react';
 import * as SharedAppleUI from '../../shared/apple-ui'; void SharedAppleUI.CARD; // shared HIG tokens единый источник
+import {
+  bbCardChrome, bbIconTile, bbCardTitle,
+  PlannerNestedCardContext, PLANNER_SUBCARD, plannerTitleText,
+} from '../TrainingScreen_parts/training-ui';
 
 // ─── Apple палитра (системные) ───
 export const ACCENT = '#a855f7';
@@ -195,28 +199,48 @@ export const SectionCard: React.FC<{
   accent?: boolean;
   hint?: string;
   children: React.ReactNode;
-}> = ({ id, title, subtitle, icon, right, accent, hint, children }) => (
-  <div className="kit-section" style={accent ? CARD_ACCENT : CARD} id={id}>
-    {title != null && (
-      <div style={{ ...ROW, marginBottom: 2 }}>
-        {icon && (
-          <span style={{
-            width: 28, height: 28, borderRadius: 7, display: 'flex', alignItems: 'center', justifyContent: 'center',
-            background: accent ? ACCENT : 'rgba(58,58,60,0.72)', border: `0.5px solid ${accent ? ACCENT_BORDER : SEPARATOR}`,
-            fontSize: 14, flexShrink: 0, fontFamily: SF,
-          }}>{icon}</span>
-        )}
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 14, fontWeight: 600, color: TEXT_1, letterSpacing: -0.02 * 14, fontFamily: SF }}>{title}</div>
-          {subtitle && <div style={{ fontSize: 12, color: TEXT_2, fontFamily: SF, marginTop: 1, lineHeight: 1.35 }}>{subtitle}</div>}
-        </div>
-        {right}
+}> = ({ id, title, subtitle, icon, right, accent, hint, children }) => {
+  /* Тот же кит, что в ББ-авто и ТА/стронг: иконка-тайл, заголовок 12.5/800,
+     верхняя кромка акцента. Вложенная карточка (внутри CbSec) не рисует
+     второй слой — становится плоским под-блоком, как внутри BB-карточек. */
+  const parentTitle = React.useContext(PlannerNestedCardContext);
+  const nested = parentTitle !== null;
+  const ownTitle = plannerTitleText(title);
+  const hideDupTitle = nested && ownTitle !== '' && ownTitle === parentTitle;
+  const color = accent ? ACCENT : '#c4b5fd';
+  const showTitle = title != null && !hideDupTitle;
+  // Вложенная карточка с тем же заголовком, что у родителя (CbSec), — не второй
+  // стеклянный слой, а плоский контент: шапку даёт CbSec, здесь только subtitle.
+  const containerStyle: React.CSSProperties = nested
+    ? (hideDupTitle ? { display: 'flex', flexDirection: 'column' } : { ...PLANNER_SUBCARD, display: 'flex', flexDirection: 'column' })
+    : { ...bbCardChrome(color), marginBottom: 0, display: 'flex', flexDirection: 'column' };
+  const head = showTitle ? (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', width: '100%' }}>
+      {icon && <span aria-hidden style={bbIconTile(color)}>{icon}</span>}
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ ...bbCardTitle, display: 'flex', alignItems: 'center', gap: 6 }}>{title}</div>
+        {subtitle && <div style={{ fontSize: 10.5, color: '#fff', lineHeight: 1.45, marginTop: 2 }}>{subtitle}</div>}
       </div>
-    )}
-    {children}
-    {hint && <div style={{ ...HINT, background: 'rgba(58,58,60,0.36)', border: `0.5px solid ${SEPARATOR}`, borderRadius: 8, padding: '8px 10px', fontSize: 12, lineHeight: 1.4 }}>{hint}</div>}
-  </div>
-);
+      {right}
+    </div>
+  ) : null;
+  return (
+    <section id={id} className={nested ? 'kit-section kit-section--nested' : 'kit-section'} style={containerStyle}>
+      {head}
+      {hideDupTitle && subtitle ? (
+        <div style={{ fontSize: 10.5, color: '#fff', lineHeight: 1.45, marginBottom: 8 }}>{subtitle}</div>
+      ) : null}
+      <div style={{ marginTop: head || (hideDupTitle && subtitle) ? 8 : 0 }}>
+        <PlannerNestedCardContext.Provider value={ownTitle || parentTitle || ''}>
+          {children}
+        </PlannerNestedCardContext.Provider>
+        {hint && (
+          <div style={{ ...HINT, background: 'rgba(0,0,0,0.18)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, padding: '8px 10px', fontSize: 10.5, lineHeight: 1.45, marginTop: 8 }}>{hint}</div>
+        )}
+      </div>
+    </section>
+  );
+};
 
 export const StatTile: React.FC<{ label: string; value: string; color?: string; sub?: string; icon?: string }> = ({ label, value, color = ACCENT, sub, icon }) => (
   <div className="kit-stat" style={{
@@ -434,60 +458,63 @@ export const CbSwitch: React.FC<{ checked: boolean; onChange: (v: boolean) => vo
   );
 };
 
-// ─── Apple sheets (попапы) ───
+// ─── Попапы в стиле ББ-авто: центральный диалог, тёмная карточка ───
 const POP_OVERLAY: React.CSSProperties = {
-  position: 'fixed', inset: 0, zIndex: 500, display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
-  background: 'rgba(0,0,0,0.38)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', padding: 0,
+  position: 'fixed', inset: 0, zIndex: 500, display: 'flex', alignItems: 'center', justifyContent: 'center',
+  background: 'rgba(0,0,0,0.85)', padding: 0,
 };
 const POP_SHEET: React.CSSProperties = {
-  width: '100%', maxWidth: 420, maxHeight: '78vh', overflowY: 'auto', borderRadius: '16px 16px 0 0',
-  background: '#1C1C1E', borderTop: `0.5px solid ${SEPARATOR}`,
-  boxShadow: '0 -8px 32px rgba(0,0,0,0.32)', paddingBottom: 'max(16px, env(safe-area-inset-bottom))',
+  width: '88%', maxWidth: 420, maxHeight: '78vh', borderRadius: 16,
+  background: '#18181b', border: '1px solid rgba(255,255,255,0.1)', overflow: 'hidden',
+  display: 'flex', flexDirection: 'column',
 };
-const POP_HANDLE: React.CSSProperties = { width: 36, height: 5, borderRadius: 3, background: 'rgba(120,120,128,0.36)', margin: '8px auto 0' };
-const popCardBtn: React.CSSProperties = {
-  width: '100%', padding: '10px 12px', borderRadius: 10, cursor: 'pointer', fontSize: 11, fontWeight: 600, textAlign: 'center', minHeight: 52,
-  display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 2, fontFamily: SF,
-  background: 'rgba(58,58,60,0.72)', border: `0.5px solid ${SEPARATOR}`, color: TEXT_2, transition: 'all 0.18s',
-};
+const POP_BODY: React.CSSProperties = { padding: '14px 16px', overflowY: 'auto', maxHeight: 'calc(78vh - 3px)' };
+const popLabelStyle: React.CSSProperties = { fontSize: 11, color: '#fff', fontWeight: 600, marginBottom: 2, overflowWrap: 'anywhere', wordBreak: 'break-word' };
+const popCardBtn = (active: boolean, accent: string): React.CSSProperties => ({
+  width: '100%', padding: '10px 12px', borderRadius: 10, cursor: 'pointer', fontSize: 11, fontWeight: 700,
+  textAlign: 'left' as const, boxSizing: 'border-box' as const, minWidth: 0, maxWidth: '100%', overflow: 'hidden',
+  background: active ? `${accent}1a` : 'rgba(255,255,255,0.03)',
+  border: active ? `1px solid ${accent}59` : '1px solid rgba(255,255,255,0.06)',
+  color: active ? accent : '#fff',
+});
 
 export const CombatPopupSelect: React.FC<{ label: string; value: string | undefined; options: { id: string; label: string; desc?: string }[]; onChange: (v: string) => void }> = ({ label, value, options, onChange }) => {
   const [open, setOpen] = React.useState(false);
   const sel = options.find(o => o.id === (value ?? ''));
+  const accent = ACCENT;
   return (
     <>
-      <button onClick={() => setOpen(true)} className="cb-pop-trig" style={popCardBtn} aria-haspopup="dialog" aria-label={label}>
-        <span style={{ fontSize: 11, color: TEXT_2, textTransform: 'uppercase', letterSpacing: 0.06 * 11, fontWeight: 600, fontFamily: SF }}>{label}</span>
-        <span style={{ fontSize: 15, color: '#BF5AF2', fontWeight: 590, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontFamily: SF, display: 'flex', alignItems: 'center', gap: 6, justifyContent: 'center' }}>{sel ? sel.label : 'Выбрать…'}<span style={{ fontSize: 10, color: TEXT_3 }}>▾</span></span>
+      <button onClick={() => setOpen(true)} className="cb-pop-trig" style={popCardBtn(!!value, accent)} aria-haspopup="dialog" aria-label={label}>
+        <div style={popLabelStyle}>{label}</div>
+        <div style={{ fontSize: 12, color: value ? accent : '#fff', overflowWrap: 'anywhere', wordBreak: 'break-word' }}>{sel ? sel.label : 'Выбрать…'}</div>
       </button>
       {open && (
         <div className="cb-pop-backdrop" style={POP_OVERLAY} onClick={() => setOpen(false)} role="presentation">
           <div onClick={e => e.stopPropagation()} className="cb-pop-sheet" style={POP_SHEET} role="dialog" aria-modal="true" aria-label={label}>
-            <div className="cb-pop-handle" style={POP_HANDLE} />
-            <div style={{ padding: '12px 16px 8px', borderBottom: `0.5px solid ${SEPARATOR}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <div className="cb-pop-title" style={{ fontSize: 13, fontWeight: 600, color: TEXT_2, textAlign: 'center', fontFamily: SF, flex: 1 }}>{label}</div>
-              {sel?.desc && <span className="cb-pop-desc" style={{ fontSize: 11, color: TEXT_3, background: 'rgba(255,255,255,0.06)', padding: '3px 8px', borderRadius: 20, border: '0.5px solid rgba(255,255,255,0.08)', fontFamily: SF }}>{sel.desc}</span>}
-            </div>
-            <div className="cb-pop-list" style={{ padding: 8, display: 'flex', flexDirection: 'column', gap: 2 }}>
-              {options.map(o => {
-                const active = value === o.id;
-                return (
-                  <button key={o.id} onClick={() => { onChange(o.id); setOpen(false); }} className="cb-pop-opt" data-active={active ? 'true' : 'false'} style={{
-                    display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', padding: '12px 14px', borderRadius: 10, cursor: 'pointer', textAlign: 'left' as const,
-                    fontFamily: SF, background: active ? 'rgba(175,82,222,0.12)' : 'transparent',
-                    border: 'none', borderBottom: `0.5px solid ${SEPARATOR}`,
-                  }}>
-                    <span style={{ flex: 1, minWidth: 0 }}>
-                      <span className="cb-pop-optlabel" style={{ fontSize: 17, fontWeight: active ? 600 : 400, color: active ? '#BF5AF2' : TEXT_1, display: 'flex', alignItems: 'center', gap: 8 }}><span className="cb-pop-radio" aria-hidden style={{ width: 18, height: 18, borderRadius: '50%', flexShrink: 0, background: active ? '#BF5AF2' : 'transparent', border: `2px solid ${active ? '#BF5AF2' : 'rgba(255,255,255,0.25)'}`, boxShadow: active ? '0 0 8px rgba(191,90,242,0.6)' : 'none' }} />{o.label}</span>
-                      {o.desc && <span className="cb-pop-optdesc" style={{ fontSize: 12, color: active ? '#BF5AF2' : TEXT_2, display: 'block', marginTop: 2, lineHeight: 1.35, opacity: active ? 0.92 : 0.78 }}>{o.desc}</span>}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-            {sel?.desc && <div className="cb-pop-foot" style={{ margin: '0 8px', padding: '8px 12px', fontSize: 12, color: TEXT_2, background: 'rgba(175,82,222,0.08)', border: '0.5px solid rgba(175,82,222,0.12)', borderRadius: 8, fontFamily: SF, lineHeight: 1.4 }}>{sel.desc}</div>}
-            <div style={{ padding: '8px 16px' }}>
-              <button onClick={() => setOpen(false)} className="cb-pop-done" style={{ width: '100%', padding: '12px', minHeight: 48, borderRadius: 12, background: 'rgba(58,58,60,0.72)', border: `0.5px solid ${SEPARATOR}`, color: TEXT_1, fontSize: 17, fontWeight: 590, fontFamily: SF, cursor: 'pointer' }}>Готово</button>
+            <div style={{ height: 3, flexShrink: 0, background: `linear-gradient(90deg, ${accent}, ${accent}cc)` }} />
+            <div style={POP_BODY}>
+              <div className="cb-pop-title" style={{ fontSize: 14, fontWeight: 700, color: accent, marginBottom: 10 }}>{label}</div>
+              <div className="cb-pop-list" style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {options.map(o => {
+                  const active = value === o.id;
+                  return (
+                    <button key={o.id} onClick={() => { onChange(o.id); setOpen(false); }} className="cb-pop-opt" data-active={active ? 'true' : 'false'} style={{
+                      display: 'block', width: '100%', padding: '10px 12px', borderRadius: 10, cursor: 'pointer', textAlign: 'left' as const,
+                      fontSize: 11, fontWeight: active ? 700 : 400,
+                      background: active ? `${accent}1f` : 'rgba(255,255,255,0.03)',
+                      border: active ? `1px solid ${accent}4d` : '1px solid rgba(255,255,255,0.06)',
+                      color: active ? accent : '#fff',
+                    }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span className="cb-pop-optlabel">{o.label}</span>
+                        {active && <span style={{ fontSize: 10 }}>✓</span>}
+                      </div>
+                      {o.desc && <div className="cb-pop-optdesc" style={{ fontSize: 9, color: '#fff', marginTop: 2, lineHeight: 1.4 }}>{o.desc}</div>}
+                    </button>
+                  );
+                })}
+              </div>
+              <button onClick={() => setOpen(false)} className="cb-pop-done" style={{ width: '100%', marginTop: 12, padding: '10px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'transparent', color: '#fff', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>Готово</button>
             </div>
           </div>
         </div>
@@ -499,25 +526,26 @@ export const CombatPopupSelect: React.FC<{ label: string; value: string | undefi
 export const CombatPopupNumber: React.FC<{ label: string; value: number; min?: number; max?: number; step?: number; suffix?: string; onChange: (v: number) => void }> = ({ label, value, min, max, step = 1, suffix = '', onChange }) => {
   const [open, setOpen] = React.useState(false);
   const [edit, setEdit] = React.useState(String(value));
+  const accent = ACCENT;
   React.useEffect(() => { if (!open) setEdit(String(value)); }, [value, open]);
   return (
     <>
-      <button onClick={() => { setEdit(String(value)); setOpen(true); }} className="cb-pop-trig" style={popCardBtn} aria-haspopup="dialog">
-        <span style={{ fontSize: 11, color: TEXT_2, textTransform: 'uppercase', letterSpacing: 0.06 * 11, fontWeight: 600, fontFamily: SF }}>{label}</span>
-        <span style={{ fontSize: 17, color: '#BF5AF2', fontWeight: 600, fontFamily: SF, fontVariantNumeric: 'tabular-nums' }}>{value}{suffix ? ` ${suffix}` : ''}</span>
+      <button onClick={() => { setEdit(String(value)); setOpen(true); }} className="cb-pop-trig" style={popCardBtn(true, accent)} aria-haspopup="dialog" aria-label={`${label}: ${value}${suffix ? ' ' + suffix : ''}`}>
+        <div style={popLabelStyle}>{label}</div>
+        <div style={{ fontSize: 14, color: accent, overflowWrap: 'anywhere', wordBreak: 'break-word', fontVariantNumeric: 'tabular-nums' }}>{value}{suffix ? ` ${suffix}` : ''}</div>
       </button>
       {open && (
         <div className="cb-pop-backdrop" style={POP_OVERLAY} onClick={() => setOpen(false)} role="presentation">
           <div onClick={e => e.stopPropagation()} className="cb-pop-sheet" style={{ ...POP_SHEET, maxWidth: 360 }} role="dialog" aria-modal="true" aria-label={label}>
-            <div className="cb-pop-handle" style={POP_HANDLE} />
-            <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 14 }}>
-              <div className="cb-pop-numtitle" style={{ fontSize: 17, fontWeight: 600, color: TEXT_1, textAlign: 'center', fontFamily: SF }}>{label}</div>
-              <input className="cb-pop-range" type="range" min={min ?? 0} max={max ?? 300} step={step} value={parseFloat(edit) || 0} onChange={e => setEdit(e.target.value)} style={{ width: '100%', accentColor: ACCENT, height: 6, borderRadius: 999 }} />
-              <div className="cb-pop-scale" style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: TEXT_3, fontFamily: SF, fontVariantNumeric: 'tabular-nums' }}><span>{min ?? 0}</span><span>{max ?? 300}</span></div>
-              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                <input className="cb-pop-input" type="number" value={edit} onChange={e => setEdit(e.target.value)} style={{ flex: 1, padding: '11px 12px', borderRadius: 10, border: `0.5px solid ${SEPARATOR}`, background: 'rgba(58,58,60,0.72)', color: TEXT_1, fontSize: 17, fontWeight: 400, textAlign: 'center', outline: 'none', fontFamily: SF, fontVariantNumeric: 'tabular-nums' }} />
-                {suffix && <span style={{ fontSize: 13, color: TEXT_2, fontFamily: SF }}>{suffix}</span>}
-                <button onClick={() => { let v = parseFloat(edit); if (isNaN(v)) v = min ?? 0; if (min !== undefined) v = Math.max(min, v); if (max !== undefined) v = Math.min(max, v); onChange(v); setOpen(false); }} className="cb-pop-ok" style={{ padding: '11px 22px', borderRadius: 10, border: 'none', background: ACCENT, color: '#fff', fontWeight: 600, fontFamily: SF, cursor: 'pointer', minHeight: 44 }}>{'Готово'}</button>
+            <div style={{ height: 3, flexShrink: 0, background: `linear-gradient(90deg, ${accent}, ${accent}cc)` }} />
+            <div style={POP_BODY}>
+              <div className="cb-pop-numtitle" style={{ fontSize: 14, fontWeight: 700, color: accent, marginBottom: 10 }}>{label}</div>
+              <input className="cb-pop-input" type="number" value={edit} min={min} max={max} step={step}
+                onChange={e => setEdit(e.target.value)} autoFocus
+                style={{ width: '100%', padding: '12px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.3)', color: '#fff', fontSize: 16, boxSizing: 'border-box', textAlign: 'center', marginBottom: 12 }} />
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button onClick={() => setOpen(false)} style={{ flex: 1, padding: '10px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'transparent', color: '#fff', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>Отмена</button>
+                <button onClick={() => { let v = parseFloat(edit); if (isNaN(v)) { setOpen(false); return; } if (min !== undefined) v = Math.max(min, v); if (max !== undefined) v = Math.min(max, v); onChange(v); setOpen(false); }} className="cb-pop-ok" style={{ flex: 1, padding: '10px', borderRadius: 8, border: 'none', cursor: 'pointer', background: `linear-gradient(135deg, ${accent}, ${accent}cc)`, color: '#000', fontWeight: 700, fontSize: 12 }}>OK</button>
               </div>
             </div>
           </div>

@@ -37,8 +37,8 @@ import type { StrengthSportInput, StrengthSportPlan } from '../../../engines/str
 import { getWL, getStrong } from '../../../engines/strength-sport/strength-sport-volume';
 import { isNativeApp } from '../../../core/app-platform';
 import { weightClassFor, weightClassLine, weightClassForInput, smWeightClassesFor, RPE_CAP_OPTIONS, SS_BLOCK_MODELS, DELOAD_VS_TAPER_NOTE, scoreCheckin, pushCheckin, loadCheckins, saveCheckins, progHashOf, autoDeloadEffective, type SsCheckin } from '../../../engines/strength-sport/strength-sport-planner-pro.engine';
-import { CARD_STRONG, CARD_HERO, ROW, BTN, BTN_PRIMARY, BTN_SMALL, BTN_STRONG, INPUT, SELECT, TEXT_2, ACCENT, ACCENT_STRONG, ACCENT_GRAD, STRONG_GRAD, SectionCard, Badge, InfoBanner, GroupHeading, ProgressBar, ChipToggle, Field, Divider, Highlight, StrengthPopupSelect, StrengthPopupNumber, EventCard, LEVEL_RU, ZONE_RU, EQUIP_RU, MOBILITY_RU, MODE_RU, GOAL_RU, ruLabel } from './StrengthUI';
-import { BTN as T_BTN, BTN_GHOST as T_BTN_GHOST, PlannerStepNav, usePlannerStepScroll, PLANNER_HEAD_BAR, PLANNER_HEAD_TITLE, PLANNER_STEP_NAV_WRAP } from '../TrainingScreen_parts/training-ui';
+import { ROW, BTN, BTN_PRIMARY, BTN_SMALL, BTN_STRONG, INPUT, TEXT_2, ACCENT, ACCENT_STRONG, ACCENT_GRAD, STRONG_GRAD, SectionCard, Badge, InfoBanner, GroupHeading, ChipToggle, Field, Divider, Highlight, StrengthPopupSelect, StrengthPopupNumber, EventCard, LEVEL_RU, ZONE_RU, EQUIP_RU, MOBILITY_RU, MODE_RU, GOAL_RU, ruLabel } from './StrengthUI';
+import { BTN as T_BTN, BTN_GHOST as T_BTN_GHOST, PlannerStepNav, usePlannerStepScroll, PLANNER_HEAD_BAR, PLANNER_HEAD_TITLE, PLANNER_STEP_NAV_WRAP, PLANNER_FLASH } from '../TrainingScreen_parts/training-ui';
 
 type Step = StrengthSportStep;
 /** Подписи шагов — в формате ББ-авто: номер + текст, эмодзи у шага выдачи. */
@@ -905,10 +905,9 @@ export const StrengthSportConstructor: React.FC = () => {
       </div>
       <div data-ss="steps">{renderStepNav()}</div>
 
-      {/* HERO — статусная строка режима (прогресс + бейджи), карточка кита. */}
-      <div data-ss="hero" style={mode === 'strongman' ? CARD_STRONG : CARD_HERO}>
-        <div style={{ fontSize: 11, color: '#fff', lineHeight: 1.35 }}>Torokhtiy 3/3/3/1 · Prilepin · SINCLAIR 2025 · 92/97/102%</div>
-        <ProgressBar value={stepIndex} max={7} color={modeColor} height={8} />
+      {/* Статусная строка режима — без отдельной карточки: карточки начинаются
+          с шагов, как в ББ-авто (единый плотный каркас планировщиков). */}
+      <div data-ss="hero" style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
         <div style={{ ...ROW, justifyContent:'space-between', gap: 8 }}>
           <div style={{ ...ROW, gap: 6 }}>
             {plan && <Badge color={modeColor} bg={`${modeColor}12`} border={`${modeColor}22`} icon="📋">План {plan.weeks}нед · {plan.patternId}</Badge>}
@@ -922,7 +921,7 @@ export const StrengthSportConstructor: React.FC = () => {
             {acwr && <Badge color={acwr.zone==='dangerous'?'#fecaca': acwr.zone==='caution'?'#fde68a': acwr.zone==='caution'?'#fde68a':'#86efac'} bg={acwr.zone==='dangerous'?'rgba(239,68,68,0.12)': acwr.zone==='caution'?'rgba(245,158,11,0.12)':'rgba(0,230,138,0.08)'} border={acwr.zone==='dangerous'?'rgba(239,68,68,0.22)': acwr.zone==='caution'?'rgba(245,158,11,0.22)':'rgba(0,230,138,0.16)'}>ACWR {acwr.ratio} · {ruLabel(ZONE_RU, acwr.zone)}</Badge>}
             {hrv && <Badge color={hrv.zone==='dangerous'?'#fecaca': hrv.zone==='caution'?'#fde68a':'#86efac'} bg={hrv.zone==='dangerous'?'rgba(239,68,68,0.12)': hrv.zone==='caution'?'rgba(245,158,11,0.12)':'rgba(0,230,138,0.08)'} border={hrv.zone==='dangerous'?'rgba(239,68,68,0.22)': hrv.zone==='caution'?'rgba(245,158,11,0.22)':'rgba(0,230,138,0.16)'}>HRV {hrv.ewma ?? hrv.last} мс · {hrv.zone}</Badge>}
           </div>
-          {msg && <span data-ss="msg" style={{ fontSize:11.5, fontWeight:700, color:'#fff', background: mode==='strongman'?'linear-gradient(135deg, rgba(245,158,11,0.18), rgba(239,68,68,0.12))':'linear-gradient(135deg, rgba(48,209,88,0.18), rgba(14,165,233,0.12))', border:'1px solid rgba(255,255,255,0.10)', padding:'6px 12px', borderRadius:20, backdropFilter:'blur(8px)', boxShadow:'0 4px 16px rgba(0,0,0,0.18)' }}>{msg}</span>}
+          {msg && <span data-ss="msg" role="status" aria-live="polite" style={{ ...PLANNER_FLASH, marginBottom: 0, fontSize: 11, color: modeColor, background: `${modeColor}14`, border: `1px solid ${modeColor}3a` }}>{msg}</span>}
         </div>
       </div>
 
@@ -1089,10 +1088,10 @@ export const StrengthSportConstructor: React.FC = () => {
               </>
             )}
           </SectionCard>
-          {renderNavRow('athlete', 'split')}
           {diaryLoad != null && (
             <InfoBanner tone={diaryLoad>30?'warn':'info'}>Дневник: нагрузка 7д ≈ <Highlight color={diaryLoad>30?'#ff9f0a':'#30d158'}>{diaryLoad}</Highlight> {diaryLoad>30?'— высоко, лёгкую неделю?':'— норма'} {acwr && <span>· ACWR <Highlight>{acwr.ratio}</Highlight> · {ruLabel(ZONE_RU, acwr.zone)}</span>}</InfoBanner>
           )}
+          {renderNavRow('athlete', 'split')}
         </div>
       )}
 
@@ -1209,10 +1208,13 @@ export const StrengthSportConstructor: React.FC = () => {
                     </div>
                   ))}
                   <div style={{ display:'flex', gap:6, alignItems:'center', flexWrap:'wrap' }}>
-                    <select onChange={e=> { const id=e.target.value; if(!id) return; setContest(c=> c ? { ...c, events: [...c.events, { id, format: (EVENT_META as any)[id]?.class === 'loading_race' ? 'loading_race' : (EVENT_META as any)[id]?.class === 'reps_60s' ? 'reps_60s' : 'max', weight: 100 } as any] } : { name:'Кастом', events:[{ id, format:'max', weight:100 } as any] }); e.target.value=''; }} style={{ ...SELECT, flex:1, minWidth:160 }}>
-                      <option value="">＋ Добавить ивент…</option>
-                      {Object.keys(EVENT_META).map(id=> <option key={id} value={id}>{(EVENT_META as any)[id]?.label || id}</option>)}
-                    </select>
+                    <StrengthPopupSelect label="Добавить ивент" value="" strong onChange={id => {
+                      if (!id) return;
+                      setContest(c => c ? { ...c, events: [...c.events, { id, format: (EVENT_META as any)[id]?.class === 'loading_race' ? 'loading_race' : (EVENT_META as any)[id]?.class === 'reps_60s' ? 'reps_60s' : 'max', weight: 100 } as any] } : { name:'Кастом', events:[{ id, format:'max', weight:100 } as any] });
+                    }} options={[
+                      { id: '', label: '— выбрать ивент —', desc: 'добавит в пакет с весом 100 кг' },
+                      ...Object.keys(EVENT_META).map(id => ({ id, label: (EVENT_META as any)[id]?.label || id, desc: (EVENT_META as any)[id]?.class })),
+                    ]} />
                   </div>
                   {contestSim && (
                     <div style={{ background:'rgba(245,158,11,0.10)', border:'1px solid rgba(245,158,11,0.22)', borderRadius:10, padding:'8px 10px', display:'flex', flexDirection:'column', gap:4 }}>
@@ -1237,10 +1239,10 @@ export const StrengthSportConstructor: React.FC = () => {
               const preview = p.schedule.map(s=> s.kind==='тренировка' ? (s.sessionTag||'тренировка').slice(0,4) : 'отд').join(' · ');
               return (
                 <button key={p.id} onClick={()=> setPatternId(p.id)} style={{
-                  textAlign:'left', padding:12, borderRadius:16, cursor:'pointer', transition:'all 0.18s ease', minHeight:72,
-                  background: active ? (mode==='strongman' ? 'linear-gradient(135deg, rgba(245,158,11,0.16), rgba(239,68,68,0.10))' : 'linear-gradient(135deg, rgba(0,230,138,0.16), rgba(14,165,233,0.10))') : 'linear-gradient(180deg, rgba(255,255,255,0.045), rgba(255,255,255,0.02))',
-                  border: active ? `1.5px solid ${modeColor}55` : '1px solid rgba(255,255,255,0.07)', color:'#fff', fontSize:12,
-                  boxShadow: active ? `0 8px 24px ${modeColor}1F, inset 0 1px 0 rgba(255,255,255,0.09)` : '0 4px 12px rgba(0,0,0,0.14)', backdropFilter:'blur(12px)'
+                  textAlign:'left', padding:'12px 14px', borderRadius:14, cursor:'pointer', transition:'all 0.18s ease', minHeight:72,
+                  background: active ? `linear-gradient(180deg, ${modeColor}18, rgba(20,22,28,0.55))` : 'rgba(20,22,28,0.55)',
+                  border: `1px solid ${active ? `${modeColor}55` : 'rgba(255,255,255,0.08)'}`,
+                  borderLeft: `4px solid ${active ? modeColor : 'rgba(255,255,255,0.14)'}`, color:'#fff', fontSize:12,
                 }}>
                   <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:8 }}><b style={{ fontSize:15, color:'#fff' }}>{p.name}</b><span style={{ fontSize:12, fontWeight:800, color: active? modeColor : '#fff', background: active?`${modeColor}1F`:'rgba(255,255,255,0.06)', padding:'5px 12px', borderRadius:22, border:`1px solid ${active?`${modeColor}33`:'rgba(255,255,255,0.07)'}`}}>{p.sessionsPerRotation}×/нед</span></div>
                   {active && (<>
@@ -1335,12 +1337,15 @@ export const StrengthSportConstructor: React.FC = () => {
       {step === 'export' && (
         <div className="ss-pane" data-pane="export" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {!plan && !annual && (
+            <>
             <SectionCard icon="📤" title="Пока пусто" subtitle="Соберите план — откроются файлы, печать и год">
               <div style={{ fontSize:14, color:'#fff', textAlign:'center', lineHeight:1.55 }}>Выдача строится после сборки плана на шаге «5 План».</div>
-              {renderNavRow('quality', null)}
             </SectionCard>
+            {renderNavRow('quality', null)}
+            </>
           )}
           {(plan || annual) && (
+            <>
             <SectionCard icon="📤" title="Экспорт и шаринг" subtitle={plan ? `${plan.weeks}нед · ${plan.patternId}` : `${(annual as any)?.totalWeeks ?? 0}нед год`} summary={qualitySummary}>
               {plan && (
                 <>
@@ -1364,7 +1369,6 @@ export const StrengthSportConstructor: React.FC = () => {
                 <button onClick={handleBuildSeason} style={{ ...BTN_SMALL, background:'linear-gradient(135deg, #f59e0b, #ef4444)', color:'#fff', border:'none' }}>✦ Сезон 2 пика</button>
               </div>
               {annual && <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}><span style={{ fontSize:12, fontWeight:700, color:'#fff' }}>Год: {annual.totalWeeks}нед · {annual.blocks.length} блоков</span></div>}
-              {renderNavRow('quality', 'plan', 'К плану →')}
               <SectionCard id="ss-season-pro" icon="🧭" title="Профессиональный сезон ТА/стронг" subtitle="Фазы → циклы: GPP → база → наращивание → пик → тейпер → переход" accent={!!seasonPlan} collapsible defaultOpen={false} status={seasonPlan ? (validateSeasonPeriodization(seasonPlan).warnings.length ? 'warn' : 'ok') : undefined} summary={seasonPlan ? `${ruCount(seasonPlan.blocks.length, RU_BLOCKS)} · ${seasonPlan.totalWeeks} нед · ${seasonPlan.presetLabel}` : 'подбор блоков под цель, уровень и дату старта'}>
                 <div data-ss="season-pro">
                   <StrengthPopupSelect label="Пресет сезона" value={seasonPresetId} onChange={v => { setSeasonPresetId(v); setSeasonPlan(null); try { clearSeasonPlan(); } catch { /* noop */ } }} strong={mode==='strongman'} options={[
@@ -1437,6 +1441,8 @@ export const StrengthSportConstructor: React.FC = () => {
                 </div>
               </SectionCard>
             </SectionCard>
+            {renderNavRow('quality', 'plan', 'К плану →')}
+            </>
           )}
         </div>
       )}

@@ -140,13 +140,17 @@ html.app-native .train-armdiag.arm-apk .ad-step {
   scroll-snap-align: start !important;
 }
 
-/* ─── 5. КАРТОЧКИ — глубина + акцентная кромка сверху ─────────────── */
+/* ─── 5. КАРТОЧКИ — кит ББ-авто: карточку рисует AdSec, AdCard — плоский шаг ── */
 html.app-native .train-arm.arm-apk .ad-card {
-  border-radius: 20px !important;
-  border-top: 2px solid rgba(var(--accent-rgb), 0.45) !important;
-  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.07) !important;
-  -webkit-backdrop-filter: blur(20px) !important;
-  backdrop-filter: blur(20px) !important;
+  border-radius: 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+  animation: none !important;
 }
 
 html.app-native .train-armdiag.arm-apk .ad-card {
@@ -158,8 +162,13 @@ html.app-native .train-armdiag.arm-apk .ad-card {
 }
 
 html.app-native .train-arm.arm-apk .ad-sec {
-  border-radius: 15px !important;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06) !important;
+  border-radius: 14px !important;
+  box-shadow: none !important;
+}
+
+html.app-native .train-arm.arm-apk .ad-sec .ad-sec {
+  border-radius: 10px !important;
+  box-shadow: none !important;
 }
 
 html.app-native .train-armdiag.arm-apk .ad-sec {
@@ -356,16 +365,16 @@ html.app-native .train-arm.arm-apk .ad-sec-sum {
 
 /* ─── 12. СЕССИИ — левая кромка + карточки упражнений ─────────────── */
 html.app-native .train-arm.arm-apk .ad-sess {
-  border-radius: 16px !important;
-  border-left: 3px solid rgba(var(--accent-rgb), 0.8) !important;
-  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.06) !important;
-  -webkit-backdrop-filter: blur(16px) !important;
-  backdrop-filter: blur(16px) !important;
+  border-radius: 14px !important;
+  border-left: 4px solid rgba(var(--accent-rgb), 0.8) !important;
+  box-shadow: none !important;
+  -webkit-backdrop-filter: blur(18px) !important;
+  backdrop-filter: blur(18px) !important;
 }
 
 html.app-native .train-arm.arm-apk .ad-ex {
-  border-radius: 13px !important;
-  background: rgba(255, 255, 255, 0.035) !important;
+  border-radius: 10px !important;
+  background: rgba(255, 255, 255, 0.025) !important;
 }
 
 html.app-native .train-arm.arm-apk .ad-ex-vl {
@@ -538,7 +547,7 @@ html.app-native .train-armdiag.arm-apk .ad-btn:focus-visible {
     padding: 12px !important;
   }
   html.app-native .train-arm.arm-apk .ad-card {
-    padding: 12px !important;
+    padding: 0 !important;
   }
   html.app-native .train-arm.arm-apk .ad-head-title {
     font-size: 19px !important;
@@ -822,7 +831,7 @@ html.app-native .train-arm.arm-apk .ad-switch-label {
 
 /* Шиты — триггер 52px, опции 60px, press + focus */
 html.app-native .train-arm.arm-apk .ad-sheet-trigger {
-  min-height: 52px !important;
+  min-height: 44px !important;
 }
 
 html.app-native .train-arm.arm-apk .ad-sheet-trigger:active {
@@ -835,7 +844,7 @@ html.app-native .train-arm.arm-apk .ad-sheet-trigger:focus-visible {
 }
 
 html.app-native .train-arm.arm-apk .ad-sheet-opt {
-  min-height: 60px !important;
+  min-height: 44px !important;
 }
 
 html.app-native .train-arm.arm-apk .ad-sheet-opt:active {
@@ -916,7 +925,6 @@ html.app-native .train-arm.arm-apk [data-arm='sheet-portal'] .ad-sheet-backdrop 
 /* Полноэкранный blur 14-20px на слабых GPU даёт лаги скролла — в native
  * достаточно 8px (TG/web без изменений). content-visibility пропускает
  * рендер закадровых карточек циклов/сессий (Chromium WebView умеет). */
-html.app-native .train-arm.arm-apk .ad-card,
 html.app-native .train-arm.arm-apk .ad-steps,
 html.app-native .train-arm.arm-apk .ad-cta,
 html.app-native .train-arm.arm-apk .ad-banner,

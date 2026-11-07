@@ -295,38 +295,47 @@ export function AdSheetSelect({
         // влияния backdrop-filter/transform предков), а классы .ad-* цепляются.
         // В native — тот же arm-apk скоуп, чтобы работали APK-правила шита.
         <div className={isNativeApp() ? 'train-arm arm-apk' : 'train-arm'} data-arm="sheet-portal">
-        <div className="ad-sheet-backdrop" onClick={() => setOpen(false)}>
+        <div className="ad-sheet-backdrop" style={{ alignItems: 'center', background: 'rgba(0,0,0,0.85)' }} onClick={() => setOpen(false)}>
           <div
             className="ad-sheet-card"
             role="dialog"
             aria-label={label}
             onClick={(e) => e.stopPropagation()}
+            style={{ width: '88%', maxWidth: 420, maxHeight: '78vh', borderRadius: 16, background: '#18181b', border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 20px 60px rgba(0,0,0,0.6)', padding: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}
           >
-            <div className="ad-sheet-handle" aria-hidden />
-            <div className="ad-sheet-title">{label}</div>
-            {options.map((o) => (
-              <button
-                key={o.id}
-                type="button"
-                className="ad-sheet-opt"
-                data-active={o.id === value}
-                aria-pressed={o.id === value}
-                onClick={() => { buzz(); onChange(o.id); setOpen(false); }}
-              >
-                <span className="ad-sheet-opt-tx">
-                  <span>{o.label}</span>
-                  {o.desc ? <span className="ad-sheet-desc">{o.desc}</span> : null}
-                </span>
-                {o.id === value ? (
-                  <span aria-hidden>
-                    ✓
+            <div style={{ height: 3, flexShrink: 0, background: 'linear-gradient(90deg, var(--ad-acc, #00e68a), var(--ad-acc, #00e68a))' }} />
+            <div style={{ padding: '14px 16px', overflowY: 'auto', maxHeight: 'calc(78vh - 3px)' }}>
+              <div className="ad-sheet-title" style={{ margin: '0 0 10px', fontSize: 14, fontWeight: 700, color: 'var(--ad-acc, #00e68a)', letterSpacing: 0 }}>{label}</div>
+              {options.map((o) => (
+                <button
+                  key={o.id}
+                  type="button"
+                  className="ad-sheet-opt"
+                  data-active={o.id === value}
+                  aria-pressed={o.id === value}
+                  onClick={() => { buzz(); onChange(o.id); setOpen(false); }}
+                  style={{ display: 'block', width: '100%', marginBottom: 6, padding: '10px 12px', minHeight: 44, borderRadius: 10, textAlign: 'left', fontSize: 11, fontWeight: o.id === value ? 700 : 400, background: o.id === value ? 'rgba(0,230,138,0.12)' : 'rgba(255,255,255,0.03)', border: o.id === value ? '1px solid rgba(0,230,138,0.3)' : '1px solid rgba(255,255,255,0.06)', color: o.id === value ? 'var(--ad-acc, #00e68a)' : '#fff' }}
+                >
+                  <span className="ad-sheet-opt-tx" style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                    <span>{o.label}</span>
+                    {o.id === value ? (
+                      <span aria-hidden>
+                        ✓
+                      </span>
+                    ) : null}
                   </span>
-                ) : null}
+                  {o.desc ? <span className="ad-sheet-desc" style={{ display: 'block', fontSize: 9, fontWeight: 400, color: '#fff', marginTop: 2, lineHeight: 1.4 }}>{o.desc}</span> : null}
+                </button>
+              ))}
+              <button
+                type="button"
+                className="ad-sheet-done"
+                onClick={() => setOpen(false)}
+                style={{ width: '100%', marginTop: 6, padding: '10px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'transparent', color: '#fff', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}
+              >
+                Готово
               </button>
-            ))}
-            <AdBtn variant="ghost" block onClick={() => setOpen(false)}>
-              Готово
-            </AdBtn>
+            </div>
           </div>
         </div>
         </div>,

@@ -197,6 +197,25 @@ export const BbCard: React.FC<{
   </section>
 );
 
+/** Контекст вложенности карточек: карточка внутри карточки не должна рисовать
+ *  второй стеклянный слой (это давало «двойные рамки» в арм/ТА/единоборствах).
+ *  Значение — чистый текст заголовка родителя, чтобы не дублировать его. */
+export const PlannerNestedCardContext = React.createContext<string | null>(null);
+
+/** Чистый текст заголовка без ведущего эмодзи — для сравнения дублей. */
+export function plannerTitleText(title: React.ReactNode): string {
+  if (typeof title !== 'string' && typeof title !== 'number') return '';
+  return String(title)
+    .replace(/^([\u{1F000}-\u{1FAFF}\u{2190}-\u{2BFF}\u{FE0F}\u{20E3}\u{200D}]{1,6})\s*/u, '')
+    .trim();
+}
+
+/** Плоский под-блок вложенной карточки — как внутренние блоки BB-авто. */
+export const PLANNER_SUBCARD: React.CSSProperties = {
+  marginBottom: 8, padding: '8px 10px', borderRadius: 10, boxSizing: 'border-box',
+  background: 'rgba(0,0,0,0.18)', border: '1px solid rgba(255,255,255,0.08)',
+};
+
 /** Карточка-аккордеон (необязательные/второстепенные секции): тот же стиль, шапка-кнопка. */
 export const BbFoldCard: React.FC<{
   icon?: string;
