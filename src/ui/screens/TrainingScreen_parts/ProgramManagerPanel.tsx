@@ -89,7 +89,7 @@ import { EXERCISE_CATALOG } from '../../../core/exercise-catalog';
 import type { Exercise } from '../../../core/types';
 import { detectLift } from '../../../engines/lms/lms-to-pl';
 import { ManualProgramWizard, type WizardStep, type WizardDirection } from './ManualProgramWizard';
-import { buildBBUserProgramFromProfile } from './auto-fill-draft';
+import { buildBBUserProgramFromProfileAsync } from './auto-fill-draft';
 import { sessionDayOfWeek } from './program-editor-logic';
 import { periodLabelRu } from '../../../data/lms-cycles/period-labels';
 import { MANUAL_STORAGE_KEYS } from '../../../engines/manual-constructor/manual-storage';
@@ -866,11 +866,12 @@ export const ProgramManagerPanel: React.FC = () => {
   // Для ББ — autodraftBBPlan генерирует недели/сессии/блоки/упражнения с весами.
   // Для ПЛ — подбирается LMS-цикл под уровень/дни, заполняется customWeeks.
   // Для Powerbuilder — и то и другое.
-  const applyQuickTemplate = (tpl: typeof QUICK_TEMPLATES[0]) => {
+  const applyQuickTemplate = async (tpl: typeof QUICK_TEMPLATES[0]) => {
     const prof = loadTrainingProfile();
     try {
       if (tpl.dir === 'bb') {
-        const userProg = buildBBUserProgramFromProfile({ title: tpl.title, goal: tpl.goal, level: tpl.level, days: tpl.days, weeks: tpl.weeks, prof });
+        // Сборка плана (~240 мс) — в воркере, чтобы тап по шаблону не морозил экран.
+        const userProg = await buildBBUserProgramFromProfileAsync({ title: tpl.title, goal: tpl.goal, level: tpl.level, days: tpl.days, weeks: tpl.weeks, prof });
         setEditing(userProg);
         const totalEx = userProg.bb?.weeks?.reduce((s, w) => s + w.sessions.reduce((ss, sess) => ss + sess.blocks.length, 0), 0) ?? 0;
         flash('🚀 ' + tpl.title + ' — готово: ' + userProg.bb?.weeks.length + ' нед, ' + totalEx + ' упр');
@@ -908,7 +909,7 @@ export const ProgramManagerPanel: React.FC = () => {
         const foundCycle = LMS_CYCLES.find(c => c.meta.level === tpl.level && Math.abs(c.meta.sessionsPerWeek - sessCount) <= 1)
           ?? LMS_CYCLES.find(c => Math.abs(c.meta.sessionsPerWeek - sessCount) <= 1);
         try {
-          const bbUserProg = buildBBUserProgramFromProfile({ title: 'hybrid-bb', goal: 'hypertrophy', level: tpl.level, days: bbDays, weeks: tpl.weeks, prof });
+          const bbUserProg = await buildBBUserProgramFromProfileAsync({ title: 'hybrid-bb', goal: 'hypertrophy', level: tpl.level, days: bbDays, weeks: tpl.weeks, prof });
           if (p.hybrid) {
             p.hybrid.plRef = { sourceCycleId: foundCycle?.meta.id ?? '', sessionIndices: foundCycle ? Array.from({ length: foundCycle.meta.sessionsPerWeek }, (_, i) => i) : [] };
             p.hybrid.bbWeeks = bbUserProg.bb?.weeks ?? [];

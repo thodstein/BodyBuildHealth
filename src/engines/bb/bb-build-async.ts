@@ -12,7 +12,14 @@
  *    классов, ни Date);
  *  • из хранилища движок читает ровно 4 ключа — их снимок уходит в воркер,
  *    поэтому план в воркере получается байт-в-байт таким же, как в основном
- *    потоке (это закреплено тестом).
+ *    потоке (это закреплено тестом). Если задача запросит ключ вне снимка,
+ *    воркер сообщает его в `missingKeys`, а клиент пересчитывает всё в
+ *    основном потоке — корректность не зависит от полноты списка.
+ *
+ * ЧЕРЕЗ ВОРКЕР ИДУТ ВСЕ «ДОЛГИЕ» СБОРКИ (замер AR): план из сплита и из
+ * ПРО-программы/цикла, авто-черновик, пересборка остатка мезоцикла, prep-цикл
+ * и сезон подготовки. Дешёвые обёртки (макроцикл поверх готового плана,
+ * разворот шаблона цикла, contest-prep план) остаются синхронными: 0.1–3 мс.
  *
  * FALLBACK (обязателен): нет `Worker` (старый WebView, jsdom), ошибка
  * создания, DataCloneError, падение воркера или таймаут — считаем
@@ -20,6 +27,11 @@
  */
 import { buildBBPlan, type BBPlan } from './bb-builder.engine';
 import { programToBBPlan } from './cycle-to-plan';
+import { replanBBMesoFromFact, type ReplanBBResult } from './bb-replan.engine';
+import { autodraftBBPlan } from '../manual-constructor/manual-draft.engine';
+import { buildPrepCycle, buildPrepSeason } from './bb-prep-cycle.engine';
+import type { PrepCycleResult, PrepSeasonResult } from './bb-prep-cycle.engine';
+import { buildBBContestPrepPlan } from './bb-contest-prep.engine';
 import type { BBTaskRequest } from './bb-build-worker-handler';
 
 /**
@@ -67,10 +79,40 @@ function readStorageSnapshot(): Record<string, string | null> {
   return snapshot;
 }
 
-/** Синхронная сборка — общий путь для fallback. */
-function runSync(req: BBTaskRequest): BBPlan {
-  if (req.kind === 'warmup') return null as unknown as BBPlan;
-  return req.kind === 'program' ? programToBBPlan(req.program, req.opts) : buildBBPlan(req.input);
+/** Синхронная сборка — общий путь для fallback (всё в одном месте с воркером). */
+function runSync(req: BBTaskRequest): any {
+  switch (req.kind) {
+    case 'warmup':
+      return null;
+    case 'program':
+      return programToBBPlan(req.program, req.opts);
+    case 'replan':
+      return replanBBMesoFromFact(req.plan, req.sessions, req.opts);
+    case 'autodraft':
+      return autodraftBBPlan(req.opts);
+    case 'prep-cycle':
+      return buildPrepCycle(req.cfg, req.opts);
+    case 'prep-season':
+      return buildPrepSeason(req.cfg, req.opts);
+    case 'prep-plan':
+      return buildBBContestPrepPlan(req.cfg, req.opts);
+    case 'build':
+    default:
+      return buildBBPlan(req.input, req.pedAdapt);
+  }
+}
+
+let missingWarned = false;
+/** Один раз в консоль: задача запросила хранилище, которого нет в снимке воркера. */
+function warnMissingStorage(keys: string[]): void {
+  if (missingWarned) return;
+  missingWarned = true;
+  try {
+    console.warn(
+      '[bb-build-async] сборка запросила ключи хранилища вне снимка воркера, '
+      + 'считаем в основном потоке: ' + keys.join(', '),
+    );
+  } catch { /* ignore */ }
 }
 
 function failAll(reason: string): void {
@@ -102,16 +144,28 @@ function getWorker(): Worker | null {
       if (!entry) return;
       pending.delete(data.id);
       if (entry.timer) clearTimeout(entry.timer);
-      if (data.ok) {
-        entry.resolve(data.plan);
-      } else {
-        // Воркер не смог собрать (или не смог склонировать) — честный fallback.
+      const settleFromMainThread = () => {
         try {
           entry.resolve(runSync(entry.req));
         } catch (e: any) {
           entry.reject(e instanceof Error ? e : new Error(String(e?.message || e)));
         }
+      };
+      if (data.ok) {
+        // Воркер запросил ключ хранилища, которого нет в снимке. Молча принять
+        // такой план нельзя: он посчитан по другим данным, чем на главном
+        // потоке. Считаем заново здесь — там хранилище полное.
+        const missing: string[] = Array.isArray(data.missingKeys) ? data.missingKeys : [];
+        if (missing.length === 0) {
+          entry.resolve(data.plan);
+          return;
+        }
+        warnMissingStorage(missing);
+        settleFromMainThread();
+        return;
       }
+      // Воркер не смог собрать (или не смог склонировать) — честный fallback.
+      settleFromMainThread();
     };
     created.onerror = () => {
       workerUnavailable = true;
@@ -157,21 +211,21 @@ export function prewarmBBWorker(): void {
 }
 
 /** Общая отправка задачи в воркер с fallback на синхронную сборку. */
-function submit(req: BBTaskRequest, timeoutMs: number): Promise<BBPlan> {
+function submit<T = BBPlan>(req: BBTaskRequest, timeoutMs: number): Promise<T> {
   const w = getWorker();
   if (!w) {
     try {
-      return Promise.resolve(runSync(req));
+      return Promise.resolve(runSync(req) as T);
     } catch (e: any) {
       return Promise.reject(e instanceof Error ? e : new Error(String(e?.message || e)));
     }
   }
 
   const id = ++seq;
-  return new Promise<BBPlan>((resolve, reject) => {
+  return new Promise<T>((resolve, reject) => {
     const fallback = () => {
       try {
-        resolve(runSync(req));
+        resolve(runSync(req) as T);
       } catch (e: any) {
         reject(e instanceof Error ? e : new Error(String(e?.message || e)));
       }
@@ -181,7 +235,7 @@ function submit(req: BBTaskRequest, timeoutMs: number): Promise<BBPlan> {
       // Воркер молчит дольше таймаута — не держим пользователя в вечном спиннере.
       fallback();
     }, timeoutMs);
-    pending.set(id, { req, resolve, reject, timer });
+    pending.set(id, { req, resolve: resolve as (p: any) => void, reject, timer });
     try {
       w.postMessage({ ...req, id, storage: readStorageSnapshot() });
     } catch {
@@ -209,6 +263,52 @@ export async function programToBBPlanAsync(
   options: { timeoutMs?: number } = {},
 ): Promise<BBPlan> {
   return submit({ kind: 'program', program, opts }, options.timeoutMs ?? DEFAULT_TIMEOUT_MS);
+}
+
+/** Пересобрать остаток мезоцикла по факту («Пересобрать остаток», ~190 мс). */
+/** Пересобрать остаток мезоцикла по факту («Пересобрать остаток», ~190 мс). */
+export async function replanBBMesoAsync(
+  plan: any,
+  sessions: any,
+  opts: any,
+  options: { timeoutMs?: number } = {},
+): Promise<ReplanBBResult | null> {
+  return submit<ReplanBBResult | null>({ kind: 'replan', plan, sessions, opts }, options.timeoutMs ?? DEFAULT_TIMEOUT_MS);
+}
+
+/** Авто-черновик плана (ручной конструктор, годовой план, сборка блока, ~240 мс). */
+export async function autodraftBBPlanAsync(
+  opts: any,
+  options: { timeoutMs?: number } = {},
+): Promise<BBPlan> {
+  return submit({ kind: 'autodraft', opts }, options.timeoutMs ?? DEFAULT_TIMEOUT_MS);
+}
+
+/** Prep-цикл подготовки к соревнованиям (~350 мс). */
+export async function buildPrepCycleAsync(
+  cfg: any,
+  opts: any = {},
+  options: { timeoutMs?: number } = {},
+): Promise<PrepCycleResult> {
+  return submit<PrepCycleResult>({ kind: 'prep-cycle', cfg, opts }, options.timeoutMs ?? DEFAULT_TIMEOUT_MS);
+}
+
+/** Сезон подготовки (N стартов × prep-цикл — самый дорогой экран препа). */
+export async function buildPrepSeasonAsync(
+  cfg: any,
+  opts: any = {},
+  options: { timeoutMs?: number } = {},
+): Promise<PrepSeasonResult> {
+  return submit<PrepSeasonResult>({ kind: 'prep-season', cfg, opts }, options.timeoutMs ?? DEFAULT_TIMEOUT_MS);
+}
+
+/** Contest-prep план (дёшево — ~0.1 мс; вынесен для единообразия вызовов). */
+export async function buildContestPrepPlanAsync(
+  cfg: any,
+  opts: any = {},
+  options: { timeoutMs?: number } = {},
+): Promise<any> {
+  return submit({ kind: 'prep-plan', cfg, opts }, options.timeoutMs ?? DEFAULT_TIMEOUT_MS);
 }
 
 /** Только для тестов: сбросить состояние клиента (воркер, очередь). */

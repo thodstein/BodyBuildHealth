@@ -20,7 +20,7 @@ import { SubstitutionPopup } from './SubstitutionPopup';
 import { SPLIT_PATTERNS } from '../../../engines/bb/bb-split-patterns';
 import { rankBBSplits, splitFitWarnings } from '../../../engines/bb/bb-selector.engine';
 import { applyMacrocycleToBBPlan, type BBPlan } from '../../../engines/bb/bb-builder.engine';
-import { buildBBPlanAsync, prewarmBBWorker } from '../../../engines/bb/bb-build-async';
+import { buildBBPlanAsync, prewarmBBWorker, replanBBMesoAsync, buildPrepCycleAsync, buildPrepSeasonAsync } from '../../../engines/bb/bb-build-async';
 import { autoCalibrateFromStored, type PlanWeightEntry } from '../../../engines/bb/bb-weight-calibration.engine';
 import type { DUPMode } from '../../../engines/bb/bb-dup.engine';
 import { applyDUPOverlay, recommendDUPMode } from '../../../engines/bb/bb-dup.engine';
@@ -49,7 +49,7 @@ import { autoRegulate } from '../../../engines/pro/autoregulation-pro.engine';
 import { riskyOpenChainIds, decideBbOrthoIntake, subtractTracked } from '../../../engines/pro/ortho-screen.engine';
 import { resolveBbDiagIntakeExtras } from '../../../engines/bb/bb-diag-intake.engine';
 import { buildBbMovementPrintBlock } from '../../../engines/bb/bb-diagnostics-export.engine';
-import { replanBBMesoFromFact, replanSummary } from '../../../engines/bb/bb-replan.engine';
+import { replanSummary } from '../../../engines/bb/bb-replan.engine';
 import { loadTrainingProfile, saveTrainingProfile, type TrainingProfile } from './training-profile';
 import { canonicalMuscleOf, exerciseKeyOf, makeWorkSets, estimatedWeightFor, loadRatioBetween, findCatalogExercise } from './bb-auto-injections';
 import { subscribePlannerApply, applyToPlanner, getPlannerApply, clearPlannerApply, type PlannerApply, type WeakpointsPayload } from './planner-bridge';
@@ -77,7 +77,7 @@ import { deserializeBBPrepConfig, isoAddDays, isoToday, CATEGORY_PROFILES, build
 import { CONTEST_PREP_UPDATED_EVENT, migrateLegacyContestPrepIfNeeded, storeContestPrepPlan } from '../../../engines/bb/bb-contest-prep-sync';
 import { loadPeakWeekLog, peakWeekAdherence, peakWeekTrendAdvice, emergencyLines } from '../../../engines/bb/bb-peak-pro.engine';
 import type { PeakingProtocol } from '../../../engines/peaking-protocols.engine';
-import { buildPrepCycle, buildPrepSeason, recommendMinimalMode, getPosingCheckins, type PrepCycleConfig, type PrepCycleResult, type PrepSeasonConfig } from '../../../engines/bb/bb-prep-cycle.engine';
+import { recommendMinimalMode, getPosingCheckins, type PrepCycleConfig, type PrepCycleResult, type PrepSeasonConfig, type PrepSeasonResult } from '../../../engines/bb/bb-prep-cycle.engine';
 import { PREP_SPLIT_PROFILES, type PrepMinimalMode } from '../../../engines/bb/bb-prep-splits';
 import { optimizeMuscleFrequency, type FrequencyOptimizationResult } from '../../../engines/bb/bb-frequency-optimizer.engine';
 import { calculatePlanSafetyScore, type PlanSafetyScore } from '../../../engines/bb/bb-safety-score.engine';
@@ -157,7 +157,7 @@ export const BbAutoConstructor: React.FC = () => {
   const [prepSplit, setPrepSplit] = useState<string>('');
   const [prepBodyFat, setPrepBodyFat] = useState<number | undefined>(undefined);
   const [prepResult, setPrepResult] = useState<PrepCycleResult | null>(null);
-  const [prepSeason, setPrepSeason] = useState<ReturnType<typeof buildPrepSeason> | null>(null);
+  const [prepSeason, setPrepSeason] = useState<PrepSeasonResult | null>(null);
   const [posingMin, setPosingMin] = useState<number>(0);
   const [posingList, setPosingList] = useState<ReturnType<typeof getPosingCheckins>>(() => getPosingCheckins());
   const [pcBusy, setPcBusy] = useState<boolean>(false);
@@ -3471,7 +3471,7 @@ const [bbVolumeRamp, setBbVolumeRamp] = useState<'standard' | 'preloaded' | 'fla
    * тестами, но не имел точки входа в UI — пересборка остатка мезоцикла по факту
    * была мёртвой функцией. Кнопка доступна в плане, начиная со 2-й недели.
    */
-  const handleReplanRemainder = () => {
+  const handleReplanRemainder = async () => {
     if (!builtPlan) { flash('Сначала соберите план'); return; }
     const plan = applyEditsToPlan(builtPlan);
     // Пересборка остатка работает только для плана, собранного из сплита:
@@ -3485,7 +3485,8 @@ const [bbVolumeRamp, setBbVolumeRamp] = useState<'standard' | 'preloaded' | 'fla
     if (wk < 2) { flash('Пересборка остатка доступна со 2-й недели мезоцикла (сейчас неделя 1)'); return; }
     let sessions: any[] = [];
     try { sessions = loadSessions() as any[]; } catch { sessions = []; }
-    const result = replanBBMesoFromFact(plan as any, sessions as any, {
+    // Пересборка = полная сборка плана (~190 мс) — считаем в воркере.
+    const result = await replanBBMesoAsync(plan as any, sessions as any, {
       currentWeek: wk,
       planStartWeek: startDateInput || (plan as any).planStartWeek,
     });
@@ -4320,14 +4321,15 @@ const [bbVolumeRamp, setBbVolumeRamp] = useState<'standard' | 'preloaded' | 'fla
     glycogenLevel: prepGlycogenLevel,
   });
 
-  const handleBuildPrep = () => {
+  const handleBuildPrep = async () => {
     setPcBusy(true);
     try {
       const pcCfg = buildPrepCycleCfg();
       // PRO-3 Э4: trial едет в Prep-цикл (доза загрузки + ссылка на испытанный протокол),
       // иначе сохранение из Prep-цикла теряло trial-данные (питание шло по среднему коридору).
       const pcTrialDose = lastTest ? trialCarbDoseGPerKg(lastTest, pcCfg.category, pcCfg.sex) : undefined;
-      const res = buildPrepCycle(pcCfg, { carbDoseGPerKg: pcTrialDose, testPeakWeekId: lastTest?.id });
+      // Prep-цикл строит полный BB-план (~350 мс) — считаем в воркере.
+      const res = await buildPrepCycleAsync(pcCfg, { carbDoseGPerKg: pcTrialDose, testPeakWeekId: lastTest?.id });
       setPrepResult(res);
       // Синхронизируем общий prep-контекст (печать/.ics/JSON/адаптация по весу работают на prepPlan).
       setPrepPlan(res.prepPlan);
@@ -4389,13 +4391,14 @@ const [bbVolumeRamp, setBbVolumeRamp] = useState<'standard' | 'preloaded' | 'fla
     };
   };
 
-  const handleBuildSeason = () => {
+  const handleBuildSeason = async () => {
     if (prepComps.length < 2) { flash('Добавьте минимум 2 старта в параметрах, чтобы собрать сезон'); return; }
     setPcBusy(true);
     try {
       const seasonCfg = buildPrepSeasonCfg();
       const seasonDose = lastTest ? trialCarbDoseGPerKg(lastTest, seasonCfg.category, seasonCfg.sex) : undefined;
-      const res = buildPrepSeason(seasonCfg, { carbDoseGPerKg: seasonDose, testPeakWeekId: lastTest?.id });
+      // Сезон = N prep-циклов (N × ~350 мс) — в воркере, иначе экран замирает на секунды.
+      const res = await buildPrepSeasonAsync(seasonCfg, { carbDoseGPerKg: seasonDose, testPeakWeekId: lastTest?.id });
       setPrepSeason(res);
       setPrepResult(res.cycles[res.cycles.length - 1] ?? null);
       setPrepStep('result');

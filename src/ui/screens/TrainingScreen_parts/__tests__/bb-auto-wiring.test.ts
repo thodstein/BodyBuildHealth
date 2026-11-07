@@ -97,12 +97,13 @@ describe('BB-08/BB-09: контекст доезжает до обоих пут�
 
 describe('BB-11: пересборка остатка не подменяет чужой сплит', () => {
   it('обработчик отказывает вне канона сплита и до 2-й недели', () => {
-    const i = SRC.indexOf('const handleReplanRemainder = () => {');
+    const i = SRC.indexOf('const handleReplanRemainder = async () => {');
     expect(i).toBeGreaterThan(-1);
     const fn = SRC.slice(i, i + 2000);
     expect(fn).toContain('SPLIT_PATTERNS.some(p => p.id === pid)');
     expect(fn).toContain('wk < 2');
-    expect(fn).toContain('replanBBMesoFromFact(');
+    // Пересборка = полная сборка плана (~190 мс) → считается в воркере.
+    expect(fn).toContain('replanBBMesoAsync(');
     // Результат пересборки тоже проходит пере-финализацию (иначе объём/капы
     // проверялись бы по состоянию до правки).
     expect(fn).toContain('revalidateEditedPlan(');

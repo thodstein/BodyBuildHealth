@@ -1,8 +1,8 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { BTN, BTN_GHOST, CARD, DIM, IN, SMALL } from './training-ui';
 import { TrainingModal } from './TrainingModal';
 import { EditorPopupSelect } from './EditorPopup';
-import { buildBBUserProgramFromProfile } from './auto-fill-draft';
+import { buildBBUserProgramFromProfileAsync } from './auto-fill-draft';
 import { loadTrainingProfile } from './training-profile';
 import { computePlanQualityFor } from '../../../engines/manual-constructor';
 import { ProgressBar, InfoBanner } from './ManualUI';
@@ -55,34 +55,54 @@ export const ManualProgramWizard: React.FC<Props> = ({
   const effStep: WizardStep = (step >= 3 ? 3 : step) as WizardStep;
   const STEP_TITLES = ['Тип', 'Параметры', 'Превью'] as const;
 
-  const preview = useMemo(() => {
+  // ARM/ПЛ — превью без сборки плана (миллисекунды): считаем синхронно.
+  const cheapPreview = useMemo(() => {
     if (effStep !== 3) return null;
-    try {
-      const prof = loadTrainingProfile();
-      if (direction === 'bb') {
-        const prog = buildBBUserProgramFromProfile({ title: 'Превью', goal, level, days, weeks, prof });
-        let quality: ReturnType<typeof computePlanQualityFor> | null = null;
-        try { quality = computePlanQualityFor(prog, level); } catch {}
-        const w1 = prog.bb?.weeks[0];
-        const totalEx = prog.bb?.weeks.reduce((s, w) => s + w.sessions.reduce((ss, se) => ss + se.blocks.length, 0), 0) ?? 0;
-        const perMuscle = quality?.perMuscle.slice(0, 6) ?? [];
-        return { kind: 'bb' as const, prog, quality, w1, totalEx, perMuscle };
-      }
-      if (direction === 'arm') {
-        return { kind: 'arm' as const, info: `${days} дн/нед × ${weeks} нед · уровень ${level}` };
-      }
-      if (direction === 'pl') {
-        // PL preview: show selected cycle info would be here; simplified
-        return { kind: 'pl' as const, info: `${days} дн/нед × ${weeks} нед · уровень ${level}` };
-      }
-      // hybrid
-      const prof2 = loadTrainingProfile();
-      const bbProg = buildBBUserProgramFromProfile({ title: 'Превью hybrid', goal: 'hypertrophy', level, days: Math.max(1, days - 2), weeks, prof: prof2 });
-      return { kind: 'hybrid' as const, bbProg, info: `ПЛ ${Math.max(2, Math.min(4, days))}д + ББ ${Math.max(1, days - 2)}д` };
-    } catch {
-      return { kind: 'error' as const };
+    if (direction === 'arm') {
+      return { kind: 'arm' as const, info: `${days} дн/нед × ${weeks} нед · уровень ${level}` };
     }
-  }, [step, direction, goal, level, days, weeks]);
+    if (direction === 'pl') {
+      // PL preview: show selected cycle info would be here; simplified
+      return { kind: 'pl' as const, info: `${days} дн/нед × ${weeks} нед · уровень ${level}` };
+    }
+    return undefined; // ББ/Powerbuilder — ниже, асинхронно
+  }, [effStep, direction, days, weeks, level]);
+
+  // ББ/Powerbuilder: превью = полная сборка плана (~240 мс). Считаем в воркере,
+  // иначе переход на шаг «Превью» замирал на четверть секунды (на телефоне —
+  // заметно больше). `null` = превью не нужно, `loading` = считаем.
+  const [asyncPreview, setAsyncPreview] = useState<any>(() => (cheapPreview === undefined ? { kind: 'loading' } : null));
+
+  useEffect(() => {
+    if (cheapPreview !== undefined) { setAsyncPreview(null); return; }
+    let cancelled = false;
+    setAsyncPreview({ kind: 'loading' });
+    void (async () => {
+      try {
+        const prof = loadTrainingProfile();
+        if (direction === 'bb') {
+          const prog = await buildBBUserProgramFromProfileAsync({ title: 'Превью', goal, level, days, weeks, prof });
+          let quality: ReturnType<typeof computePlanQualityFor> | null = null;
+          try { quality = computePlanQualityFor(prog, level); } catch {}
+          if (cancelled) return;
+          const w1 = prog.bb?.weeks[0];
+          const totalEx = prog.bb?.weeks.reduce((s, w) => s + w.sessions.reduce((ss, se) => ss + se.blocks.length, 0), 0) ?? 0;
+          const perMuscle = quality?.perMuscle.slice(0, 6) ?? [];
+          setAsyncPreview({ kind: 'bb', prog, quality, w1, totalEx, perMuscle });
+          return;
+        }
+        // hybrid
+        const bbProg = await buildBBUserProgramFromProfileAsync({ title: 'Превью hybrid', goal: 'hypertrophy', level, days: Math.max(1, days - 2), weeks, prof });
+        if (cancelled) return;
+        setAsyncPreview({ kind: 'hybrid', bbProg, info: `ПЛ ${Math.max(2, Math.min(4, days))}д + ББ ${Math.max(1, days - 2)}д` });
+      } catch {
+        if (!cancelled) setAsyncPreview({ kind: 'error' });
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [cheapPreview, direction, goal, level, days, weeks]);
+
+  const preview = cheapPreview === undefined ? asyncPreview : cheapPreview;
 
   const content = (
     <div className="manual-wizard" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -141,7 +161,9 @@ export const ManualProgramWizard: React.FC<Props> = ({
       {effStep === 3 && (
         <div className="manual-wiz-preview" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           <div style={{ fontSize: 12, color: '#fff', fontWeight: 800 }}>Шаг 3 из 3: превью — как будет выглядеть программа</div>
-          {!preview || (preview as any).kind === 'error' ? (
+          {!preview ? null : (preview as any).kind === 'loading' ? (
+            <InfoBanner tone="info">⏳ Собираем превью — план считается в фоне, интерфейс не замирает.</InfoBanner>
+          ) : (preview as any).kind === 'error' ? (
             <InfoBanner tone="warn">⚠ Не удалось собрать превью — проверьте профиль (оборудование/уровень) и попробуйте снова. Можно создать пустой каркас.</InfoBanner>
           ) : (preview as any).kind === 'bb' ? (
             <>

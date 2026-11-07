@@ -30,7 +30,7 @@ import { loadTrainingProfile, useTrainingProfile, type TrainingProfile } from '.
 import { TrainingProfileCard } from './TrainingProfileCard';
 import { subscribePlannerApply, clearPlannerApply, type PlannerApply } from './planner-bridge';
 import { applyBridgePayloadDispatch, type BridgeCtx } from './planner-bridge-handlers';
-import { autoFillDraftDispatch, type AutoFillCtx } from './auto-fill-draft';
+import { autoFillDraftDispatchAsync, type AutoFillCtx } from './auto-fill-draft';
 import { calcBBPlanMetrics } from '../../../engines/bb/bb-metrics.engine';
 import { designerToUserWeeks, applyDesignPhasesToWeeks, linkDesignToProgram, isProgramDesignStale, reapplyDesignToProgram, unlinkDesignFromProgram } from '../../../engines/periodization/designer-to-program';
 import { macrocycleToBBProgram } from '../../../engines/lms/macrocycle-to-bb';
@@ -496,10 +496,10 @@ export const ProgramEditor: React.FC<ProgramEditorProps> = ({ program, onChange,
         update, showToast,
       };
       setIsAutoFilling(true);
-      window.setTimeout(() => {
-        try { autoFillDraftDispatch(ctx); }
-        finally { setIsAutoFilling(false); }
-      }, 0);
+      try {
+        // Сборка BB-плана (~240 мс) идёт в воркере — спиннер продолжает крутиться.
+        await autoFillDraftDispatchAsync(ctx);
+      } finally { setIsAutoFilling(false); }
     }, [program, tprofile, linked.profile, labAdjust.mrvMultiplier, update, showToast, hasProgramContent, confirm]);
 
 

@@ -26,7 +26,7 @@ import { SPLIT_PATTERNS } from '../../../engines/bb/bb-split-patterns';
 import { rankBBSplits } from '../../../engines/bb/bb-selector.engine';
 import { applyMacrocycleToBBPlan, type BBPlan } from '../../../engines/bb/bb-builder.engine';
 import { applyPeakWeekOverlayToBBPlan, buildBBContestPrep, normalizeContestCategory, isoToday, isoAddDays, PHASE_LABELS_RU, PEAK_PHASE_COLORS, CONTEST_SPECIALIZATION_LABELS, deserializeBBPrepConfig, type BBContestPrepConfig, type BBContestPrepResult } from '../../../engines/bb/bb-contest-prep.engine';
-import { autodraftBBPlan } from '../../../engines/manual-constructor/manual-draft.engine';
+import { autodraftBBPlanAsync } from '../../../engines/bb/bb-build-async';
 import { createFromBuild } from '../../../engines/user-program/program-store';
 import { applyToPlanner } from '../TrainingScreen_parts/planner-bridge';
 import { getProfile } from '../../../core/profile-manager';
@@ -813,7 +813,7 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
     setBuilderMsg(null);
     setBuilderPeakWeek(block.phase === 'contest_prep');
   };
-  const buildCycleFromBuilder = () => {
+  const buildCycleFromBuilder = async () => {
     if (!bbMacro || builderForBlock < 0) return;
     const block = bbMacro.blocks[builderForBlock];
     if (!block) return;
@@ -821,7 +821,8 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
     const total = BB_PHASES.reduce((s, phase) => s + (builderWeeks[phase] || 0), 0);
     if (total < 4) { setBuilderMsg('Суммарно нужно минимум 4 недели — добавьте недели фазам.'); return; }
     try {
-      const draft = autodraftBBPlan({
+      // Черновик = полная сборка BB-плана (~240 мс) — считаем в воркере.
+      const draft = await autodraftBBPlanAsync({
         level: effLevel,
         goal: 'hypertrophy',
         daysPerWeek: pattern.sessionsPerRotation,
@@ -1253,11 +1254,11 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
 
   // 📦 «Весь год в программу»: autodraftBBPlan (≤16 нед) → цикл недель до totalWeeks
   // → applyMacrocycleToBBPlan (объём/RIR по фазам макроцикла).
-  const buildWholeYearPlan = (): { plan: BBPlan; total: number; label: string } | null => {
+  const buildWholeYearPlan = async (): Promise<{ plan: BBPlan; total: number; label: string } | null> => {
     if (!bbMacro) return null;
     const total = bbMacro.totalWeeks;
     const pattern = SPLIT_PATTERNS.find(p => p.id === builderSplit) ?? SPLIT_PATTERNS[0];
-    const draft = autodraftBBPlan({
+    const draft = await autodraftBBPlanAsync({
       level: effLevel,
       goal: 'hypertrophy',
       daysPerWeek: pattern.sessionsPerRotation,
@@ -1271,9 +1272,9 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
     const plan = applyMacrocycleToBBPlan({ ...draft, weeks }, bbMacro);
     return { plan, total, label: `Весь год: ${pattern.name} · ${total} нед` };
   };
-  const sendWholeYearToManual = () => {
+  const sendWholeYearToManual = async () => {
     try {
-      const built = buildWholeYearPlan();
+      const built = await buildWholeYearPlan();
       if (!built) return;
       const prog = createFromBuild(built.plan, { goal: 'hypertrophy', level: effLevel, title: 'Годовой план ББ: ' + built.label });
       applyToPlanner({ kind: 'program', label: built.label, data: { program: prog } });
@@ -1282,9 +1283,9 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
       setYearNote(`Ошибка сборки года: ${(error as Error).message}`);
     }
   };
-  const sendWholeYearToBbAuto = () => {
+  const sendWholeYearToBbAuto = async () => {
     try {
-      const built = buildWholeYearPlan();
+      const built = await buildWholeYearPlan();
       if (!built) return;
       localStorage.setItem('he_bb_plan_saved', JSON.stringify({ plan: built.plan, date: new Date().toISOString() }));
       window.dispatchEvent(new CustomEvent('he-bb-plan-saved'));
@@ -3223,7 +3224,7 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
                     </label>
                   </>
                 )}
-                <button type="button" onClick={buildCycleFromBuilder} style={{ ...BTN, width: '100%', minHeight: 44, fontSize: 13 }}>
+                <button type="button" onClick={() => { void buildCycleFromBuilder(); }} style={{ ...BTN, width: '100%', minHeight: 44, fontSize: 13 }}>
                   ⚙️ Собрать и расписать ({total} нед)
                 </button>
                 {builderMsg && (

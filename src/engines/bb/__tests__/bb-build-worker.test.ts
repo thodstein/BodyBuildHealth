@@ -93,13 +93,53 @@ describe('BB build worker — контракт', () => {
   });
 
   it('прогрев и пустая задача не роняют обработчик', () => {
-    expect(runBBTask({ kind: 'warmup' })).toEqual({ ok: true, plan: null });
-    expect(runBBTask(null as any)).toEqual({ ok: true, plan: null });
+    expect(runBBTask({ kind: 'warmup' })).toEqual({ ok: true, plan: null, missingKeys: [] });
+    expect(runBBTask(null as any)).toEqual({ ok: true, plan: null, missingKeys: [] });
   });
 
   it('ошибка внутри сборки не бросается наружу, а возвращается как результат', () => {
     const result = runBBTask({ kind: 'build', input: null });
     expect(result.ok).toBe(false);
+  });
+
+  /**
+   * Все «долгие» пути UI идут через тот же воркер (каждый строит полный план:
+   * пересборка остатка ~190 мс, авто-черновик ~240 мс, prep-цикл ~350 мс).
+   * Держим под замком две вещи: результат — простые данные (клонируются
+   * postMessage) и задача не запрашивает хранилище вне снимка.
+   */
+  const SNAPSHOT: Record<string, string | null> = Object.fromEntries(BB_WORKER_STORAGE_KEYS.map((k) => [k, null]));
+  const LONG_INPUT: any = { patternId: 'upper_lower_4', level: 'intermediate', goal: 'mass', weeks: 12 };
+  const PREP_CFG: any = {
+    category: 'mens_physique', sex: 'male', accentMuscles: ['shoulders', 'back'],
+    minimalMuscles: ['quads', 'arms'], weeks: 12, taperWeeks: 3, showDate: '2027-03-01',
+    level: 'intermediate', trainingYears: 4, enhanced: false, weightKg: 82, experienceLevel: 'intermediate',
+  };
+
+  const TASKS: Array<[string, () => any]> = [
+    ['replan', () => ({ plan: buildBBPlan(LONG_INPUT), sessions: [], opts: { currentWeek: 4 } })],
+    ['autodraft', () => ({ opts: { level: 'intermediate', goal: 'hypertrophy', daysPerWeek: 4, weeks: 12, splitPattern: 'upper_lower_4', equipment: [], weakPoints: [], trainingFocus: 'hypertrophy' } })],
+    ['prep-cycle', () => ({ cfg: PREP_CFG, opts: {} })],
+  ];
+
+  for (const [kind, make] of TASKS) {
+    it(`задача «${kind}» считается в воркере и возвращает клонируемые данные`, () => {
+      const result = runBBTask({ kind, ...make() } as any, { storage: SNAPSHOT });
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(result.plan).toBeTruthy();
+      expect(result.missingKeys).toEqual([]);
+      // postMessage требует клонируемых данных — иначе воркер молча уйдёт в fallback.
+      expect(() => structuredClone(result.plan)).not.toThrow();
+    });
+  }
+
+  it('задача, запросившая ключ вне снимка, сообщает его (клиент пересчитает в основном потоке)', () => {
+    const result = runBBTask({ kind: 'build', input: INPUT }, { storage: {} });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    // Пустой снимок = «ничего не объявлено»: движку нечего отдать, это видно клиенту.
+    expect(result.missingKeys?.length).toBeGreaterThan(0);
   });
 });
 
