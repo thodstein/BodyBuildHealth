@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useMemo, useEffect, useCallback, useRef, Suspense } from 'react';
 import { HeroImg } from '../HeroImg';
 import { EXERCISE_CATALOG, getExercisesByGroup, getSubstitutes, canReplace, getExerciseById } from '../../core/exercise-catalog';
 import { calcTraining, calcExercisePrescription, EXERCISE_DB, TRAINING_SPLITS, TRAINING_LEVEL_CONFIGS, LEVEL_VOLUMES } from '../../engines/training.engine';
@@ -25,35 +25,35 @@ import { generateWeeklyReport, analyzeMeasurements, loadMeasurements, saveMeasur
 import { getExerciseBio } from '../../data/exercise-biomechanics-db';
 import { getStrengthLevel, getNextLevelTarget } from '../../engines/performance-analytics.engine';
 import { computeStructuredAnalytics } from '../../engines/structured-analytics.engine';
-import { PlannerPlAuto } from './TrainingScreen_parts/PlannerPlAuto';
-import { PlannerBbAuto } from './TrainingScreen_parts/PlannerBbAuto';
-import { CardioConstructor } from './TrainingScreen_parts/CardioConstructor';
-import { StrengthSportConstructor } from './strength-sport/StrengthSportConstructor';
-import { CombatConstructor } from './combat/CombatConstructor';
-import { ArmAutoConstructor } from './TrainingScreen_parts/ArmAutoConstructor';
-import { ProgramManagerPanelWithProvider as ProgramManagerPanel } from './TrainingScreen_parts/ProgramManagerPanel';
-import { DiaryAnalyticsZone } from './TrainingScreen_parts/DiaryAnalyticsZone';
-import { LibraryZone } from './TrainingScreen_parts/LibraryZone';
-import { QualityHub } from './TrainingScreen_parts/QualityHub';
-import { VolumeHub } from './TrainingScreen_parts/VolumeHub';
-import { JointMasterCard } from './TrainingScreen_parts/JointMasterCard';
-
+/* lazy */ const loadPlannerPl = () => import('./TrainingScreen_parts/PlannerPlAuto');
+/* lazy */ const loadPlannerBb = () => import('./TrainingScreen_parts/PlannerBbAuto');
+/* lazy */ const PlannerPlAuto = React.lazy(() => loadPlannerPl().then(m => ({ default: m.PlannerPlAuto })));
+/* lazy */ const PlannerBbAuto = React.lazy(() => loadPlannerBb().then(m => ({ default: m.PlannerBbAuto })));
+/* lazy */ const CardioConstructor = React.lazy(() => import('./TrainingScreen_parts/CardioConstructor').then(m => ({ default: m.CardioConstructor })));
+/* lazy */ const StrengthSportConstructor = React.lazy(() => import('./strength-sport/StrengthSportConstructor').then(m => ({ default: m.StrengthSportConstructor })));
+/* lazy */ const CombatConstructor = React.lazy(() => import('./combat/CombatConstructor').then(m => ({ default: m.CombatConstructor })));
+/* lazy */ const ArmAutoConstructor = React.lazy(() => import('./TrainingScreen_parts/ArmAutoConstructor').then(m => ({ default: m.ArmAutoConstructor })));
+/* lazy */ const ProgramManagerPanel = React.lazy(() => import('./TrainingScreen_parts/ProgramManagerPanel').then(m => ({ default: m.ProgramManagerPanelWithProvider })));
+/* lazy */ const DiaryAnalyticsZone = React.lazy(() => import('./TrainingScreen_parts/DiaryAnalyticsZone').then(m => ({ default: m.DiaryAnalyticsZone })));
+/* lazy */ const LibraryZone = React.lazy(() => import('./TrainingScreen_parts/LibraryZone').then(m => ({ default: m.LibraryZone })));
+/* lazy */ const QualityHub = React.lazy(() => import('./TrainingScreen_parts/QualityHub').then(m => ({ default: m.QualityHub })));
+/* lazy */ const VolumeHub = React.lazy(() => import('./TrainingScreen_parts/VolumeHub').then(m => ({ default: m.VolumeHub })));
+/* lazy */ const JointMasterCard = React.lazy(() => import('./TrainingScreen_parts/JointMasterCard').then(m => ({ default: m.JointMasterCard })));
 import { PlannerToolsPanel } from './TrainingScreen_parts/PlannerToolsPanel';
-import { StrengthAnalysisHub } from './TrainingScreen_parts/StrengthAnalysisHub';
+/* lazy */ const StrengthAnalysisHub = React.lazy(() => import('./TrainingScreen_parts/StrengthAnalysisHub').then(m => ({ default: m.StrengthAnalysisHub })));
 import TrainingIntelligenceDashboard from './TrainingScreen_parts/TrainingIntelligenceDashboard';
-import { DiagnosticsHub } from './TrainingScreen_parts/DiagnosticsHub';
-import { ArmDiagnosticsHub } from './TrainingScreen_parts/ArmDiagnosticsHub';
-import { ArmliftingDiagnosticsHub } from './TrainingScreen_parts/ArmliftingDiagnosticsHub';
-import { WLDiagnosticsHub } from './TrainingScreen_parts/WLDiagnosticsHub';
-import { StrongmanDiagnosticsHub } from './TrainingScreen_parts/StrongmanDiagnosticsHub';
-import { BBDiagnosticsHub } from './TrainingScreen_parts/BBDiagnosticsHub';
-import { PeriodizationHub } from './TrainingScreen_parts/PeriodizationHub';
+/* lazy */ const DiagnosticsHub = React.lazy(() => import('./TrainingScreen_parts/DiagnosticsHub').then(m => ({ default: m.DiagnosticsHub })));
+/* lazy */ const ArmDiagnosticsHub = React.lazy(() => import('./TrainingScreen_parts/ArmDiagnosticsHub').then(m => ({ default: m.ArmDiagnosticsHub })));
+/* lazy */ const ArmliftingDiagnosticsHub = React.lazy(() => import('./TrainingScreen_parts/ArmliftingDiagnosticsHub').then(m => ({ default: m.ArmliftingDiagnosticsHub })));
+/* lazy */ const WLDiagnosticsHub = React.lazy(() => import('./TrainingScreen_parts/WLDiagnosticsHub').then(m => ({ default: m.WLDiagnosticsHub })));
+/* lazy */ const StrongmanDiagnosticsHub = React.lazy(() => import('./TrainingScreen_parts/StrongmanDiagnosticsHub').then(m => ({ default: m.StrongmanDiagnosticsHub })));
+/* lazy */ const BBDiagnosticsHub = React.lazy(() => import('./TrainingScreen_parts/BBDiagnosticsHub').then(m => ({ default: m.BBDiagnosticsHub })));
+/* lazy */ const PeriodizationHub = React.lazy(() => import('./TrainingScreen_parts/PeriodizationHub').then(m => ({ default: m.PeriodizationHub })));
 import { TaperPlannerTab } from './TrainingScreen_parts/TaperPlannerTab';
-import { ExecutionZone } from './TrainingScreen_parts/ExecutionZone';
+/* lazy */ const ExecutionZone = React.lazy(() => import('./TrainingScreen_parts/ExecutionZone').then(m => ({ default: m.ExecutionZone })));
 import { TrainingDiaryHub } from './TrainingScreen_parts/TrainingDiaryHub';
-import { UnifiedIntelligenceHub } from './TrainingScreen_parts/UnifiedIntelligenceHub';
-import { MetabolicHub } from './Shared/MetabolicHub';
-
+/* lazy */ const UnifiedIntelligenceHub = React.lazy(() => import('./TrainingScreen_parts/UnifiedIntelligenceHub').then(m => ({ default: m.UnifiedIntelligenceHub })));
+/* lazy */ const MetabolicHub = React.lazy(() => import('./Shared/MetabolicHub').then(m => ({ default: m.MetabolicHub })));
 import {
   GOALS, LEVELS, MUSCLE_GROUPS, GROUP_LABELS, EQUIP_LABELS, JOINT_LABELS,
   PHASE_LABELS, PHASE_HINTS, TAB_LABELS,
@@ -70,7 +70,7 @@ import {
   getSessionsByWeek,
   getISOWeekNumber,
 } from '../../engines/workout-logger.engine';
-import { InfoErrorBoundary } from './SupportScreen_parts/SupportScreenData';
+import { InfoErrorBoundary } from '../components/InfoErrorBoundary';
 import { subscribePlannerApply, setPlannerSource } from './TrainingScreen_parts/planner-bridge';
 import { getCycleById, normalizeCycleDirection } from '../../data/lms-cycles/lms-cycle-index';
 import { saveTrainingProfile, loadTrainingProfile } from './TrainingScreen_parts/training-profile';
@@ -128,6 +128,12 @@ const TrainingHeroStats: React.FC = () => {
  * списка разъехались бы при первой же правке). Здесь — только импорт.
  */
 
+/**
+ * Экран «Тренинг». Внутри — единая Suspense-граница (см. return): тяжёлые
+ * разделы (ББ-авто, ПЛ, кардио, арм, бой, стронг, диагностики и редакторы
+ * программ) грузятся отдельными чанками по требованию, а не все сразу при
+ * первом открытии вкладки.
+ */
 export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab }) => {
   const linked = useDataLink();
   const readiness = linked.readiness;
@@ -148,6 +154,16 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSu
   // 3-уровневая иерархия: hero → planning → constructor (каждый в новом окне)
   const openPlanning = useCallback(() => { setZone('planner'); setPage('planning'); }, []);
   const openConstructor = useCallback((t: PlanningTrack | PlannerMode) => { setPlanningTrack(t as PlanningTrack); setPlanningTrackState(t as PlanningTrack); setZone('planner'); setPage('constructor'); }, []);
+  // Пока пользователь выбирает трек (ПЛ/ББ/…), прогреваем чанки авто-конструкторов:
+  // они по 0.6 МБ и раньше грузились уже по нажатию «ББ-авто» (≈0.9 с на 4× CPU).
+  useEffect(() => {
+    if (page !== 'planning') return;
+    const t = setTimeout(() => {
+      void loadPlannerPl();
+      void loadPlannerBb();
+    }, 120);
+    return () => clearTimeout(t);
+  }, [page]);
   // Переход в зону «Планировщик» → режим «Ручной сбор» (внешние ссылки setTab('constructor'))
   const goPlannerManual = useCallback(() => { openConstructor('manual'); }, [openConstructor]);
   // Внешнее переключение режима планировщика (напр., из CardioLinkCard «Открыть кардио-конструктор»)
@@ -688,6 +704,10 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSu
 
 
   return (
+    // Граница Suspense — ВНУТРИ экрана, чтобы при подгрузке чанка раздела
+    // (React.lazy) не терялось состояние экрана: страница/зона/вкладка живут
+    // в самом TrainingScreen, а подменяется только отрисованное дерево.
+    <Suspense fallback={<TrainingLazyFallback />}>
     <div className="screen training-screen" style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'auto', padding: '0 0 calc(var(--nav-height) + env(safe-area-inset-bottom) + 16px) 0', WebkitOverflowScrolling: 'touch' }}>
 
       {/* ─── HERO PAGE ─── */}
@@ -1048,6 +1068,7 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSu
      </div>
       )}
     </div>
+    </Suspense>
   );
 };
 
@@ -1069,7 +1090,7 @@ import { CsvImportTab } from './TrainingScreen_parts/CsvImportTab';
 import { MethodsTab } from './TrainingScreen_parts/MethodsTab';
 import { ProgramsTab } from './TrainingScreen_parts/ProgramsTab';
 import { VolumeOptimizerTab } from './TrainingScreen_parts/VolumeOptimizerTab';
-import ExerciseLabMerged from './TrainingScreen_parts/ExerciseLabMerged';
+/* lazy */ const ExerciseLabMerged = React.lazy(() => import('./TrainingScreen_parts/ExerciseLabMerged'));
 import { appendReadinessToday } from './TrainingScreen_parts/readiness-history';
 import { useTrainingProfile } from './TrainingScreen_parts/training-profile';
 import { SessionPlayer, type PlayerDay } from './SRCBBScreen_parts/SessionPlayer';
@@ -1080,7 +1101,18 @@ import { StructuredAnalyticsCard } from './TrainingScreen_parts/StructuredAnalyt
 import { TrainingCalendarTab } from './TrainingScreen_parts/TrainingCalendarTab';
 import { PlateCalcTab } from './TrainingScreen_parts/PlateCalcTab';
 import { TonnageCalcTab } from './TrainingScreen_parts/TonnageCalcTab';
-import { TempoTab } from './TrainingScreen_parts/TempoTab';
-import { MixHub } from './TrainingScreen_parts/MixHub';
+/* lazy */ const TempoTab = React.lazy(() => import('./TrainingScreen_parts/TempoTab').then(m => ({ default: m.TempoTab })));
+/* lazy */ const MixHub = React.lazy(() => import('./TrainingScreen_parts/MixHub').then(m => ({ default: m.MixHub })));
 import MesoCorrectionCard from './TrainingScreen_parts/MesoCorrectionCard';
 import MMCTrackingCard from './TrainingScreen_parts/MMCTrackingCard';
+
+
+/** Скелет на время подгрузки чанка раздела: виден только при первом открытии вкладки. */
+const TrainingLazyFallback = () => (
+  <div
+    className="screen training-screen"
+    style={{ flex: 1, minHeight: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#9aa4b2', fontSize: 12 }}
+  >
+    Загрузка…
+  </div>
+);

@@ -91,16 +91,23 @@ describe('profile deep links — целевые экраны открывают 
 
   it('TrainingScreen diary → «Дневник тренировок», hero закрыт', async () => {
     const { container } = render(<TrainingScreen initialSubTab="diary" />);
-    await waitFor(() => {
-      expect(screen.getByText('Дневник тренировок')).toBeTruthy();
-    });
+    // Зона дневника подгружается отдельным чанком — в jsdom это дольше секунды.
+    await waitFor(
+      () => {
+        expect(screen.getByText('Дневник тренировок')).toBeTruthy();
+      },
+      { timeout: 15000 },
+    );
     expect(container.querySelector('.training-hero-title')).toBeNull();
   });
 
   it('TrainingScreen analytics → hero закрыт', async () => {
     const { container } = render(<TrainingScreen initialSubTab="analytics" />);
-    await waitFor(() => {
-      expect(container.querySelector('.training-hero-title')).toBeNull();
-    });
+    await waitFor(
+      () => {
+        expect(container.querySelector('.training-hero-title')).toBeNull();
+      },
+      { timeout: 15000 },
+    );
   });
 });

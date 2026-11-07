@@ -40,7 +40,7 @@ import { getNutritionV2Data } from '../../core/nutrition-v2-data';
 import { getQualityLabel } from '../../engines/nutrition-quality.engine';
 import { getMicroTargets } from './NutritionScreen_parts/IndividualPlan/planner-micro-coverage';
 import { matchesSelectedAllergen } from './NutritionScreen_parts/IndividualPlan/planner-restrictions';
-import { InfoErrorBoundary } from './SupportScreen_parts/SupportScreenData';
+import { InfoErrorBoundary } from '../components/InfoErrorBoundary';
 
 interface DiaryEntry { name: string; kcal: number; p: number; f: number; c: number; date?: string; }
 type NutritionPage = 'hero' | 'tabs';

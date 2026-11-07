@@ -1,16 +1,7 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback, Suspense } from 'react';
 import { registry } from './core/data/registry';
 import { DashboardScreen } from './ui/screens/DashboardScreen';
-import { MarketplaceScreen } from './ui/screens/MarketplaceScreen';
-import { PharmaScreen } from './ui/screens/PharmaScreen';
-import { SupportScreen } from './ui/screens/SupportScreen';
-import { TrainingScreen } from './ui/screens/TrainingScreen';
-import { LabsScreen } from './ui/screens/LabsScreen';
-import { InfoErrorBoundary } from './ui/screens/SupportScreen_parts/SupportScreenData';
-import { RiskScreen } from './ui/screens/RiskScreen';
-import { NutritionScreen } from './ui/screens/NutritionScreen';
-import { ProfileScreen_v2 } from './ui/screens/ProfileScreen_v2/ProfileScreen_v2';
-import { ArticlesScreen } from './ui/screens/ArticlesScreen';
+import { InfoErrorBoundary } from './ui/components/InfoErrorBoundary';
 
 import { ToastContainer } from './ui/ToastContainer';
 import { KvUpdateBanner } from './ui/KvUpdateBanner';
@@ -26,6 +17,65 @@ import { NativeFab } from './ui/native/NativeFab';
 import { NativeOfflinePill } from './ui/native/NativeOfflinePill';
 import { getNavBadges } from './ui/native/nav-badges';
 import { HeroImg } from './ui/HeroImg';
+
+/* ── Экраны — по требованию ───────────────────────────────────────────────
+ * Раньше все экраны и их движки лежали в главном бандле и разбирались при
+ * старте: пользователь видел один экран, а грузился весь апп. Теперь каждый
+ * экран — отдельный чанк. «Домашний» остаётся в главном бандле (он первым
+ * показывается), остальные подтягиваются при первом открытии.
+ * В АПК ассеты локальные — после старта чанки прогреваются в простое, чтобы
+ * переключение вкладок было мгновенным. В веб/TG прогреваем только при
+ * наведении/тапе на вкладку (не тянем мегабайты на мобильном трафике). */
+function lazyScreen(loader: () => Promise<any>, name: string) {
+  return React.lazy(() => loader().then(m => ({ default: (m as Record<string, React.ComponentType<any>>)[name] })));
+}
+
+const SCREEN_LOADERS = {
+  pharma: () => import('./ui/screens/PharmaScreen'),
+  support: () => import('./ui/screens/SupportScreen'),
+  training: () => import('./ui/screens/TrainingScreen'),
+  labs: () => import('./ui/screens/LabsScreen'),
+  risks: () => import('./ui/screens/RiskScreen'),
+  nutrition: () => import('./ui/screens/NutritionScreen'),
+  marketplace: () => import('./ui/screens/MarketplaceScreen'),
+  profile: () => import('./ui/screens/ProfileScreen_v2/ProfileScreen_v2'),
+  articles: () => import('./ui/screens/ArticlesScreen'),
+} as const;
+
+type LazyTab = keyof typeof SCREEN_LOADERS;
+
+const PharmaScreen = lazyScreen(SCREEN_LOADERS.pharma, 'PharmaScreen');
+const SupportScreen = lazyScreen(SCREEN_LOADERS.support, 'SupportScreen');
+const TrainingScreen = lazyScreen(SCREEN_LOADERS.training, 'TrainingScreen');
+const LabsScreen = lazyScreen(SCREEN_LOADERS.labs, 'LabsScreen');
+const RiskScreen = lazyScreen(SCREEN_LOADERS.risks, 'RiskScreen');
+const NutritionScreen = lazyScreen(SCREEN_LOADERS.nutrition, 'NutritionScreen');
+const MarketplaceScreen = lazyScreen(SCREEN_LOADERS.marketplace, 'MarketplaceScreen');
+const ProfileScreen_v2 = lazyScreen(SCREEN_LOADERS.profile, 'ProfileScreen_v2');
+const ArticlesScreen = lazyScreen(SCREEN_LOADERS.articles, 'ArticlesScreen');
+
+const prefetchScreen = (tab: string) => {
+  const loader = (SCREEN_LOADERS as Record<string, (() => Promise<any>) | undefined>)[tab];
+  if (!loader) return;
+  try {
+    void loader();
+  } catch {
+    /* предзагрузка — необязательная оптимизация */
+  }
+};
+
+/** Заглушка на время загрузки чанка экрана — тот же скелет, что на старте. */
+const ScreenLoading = () => (
+  <div className="screen-loading native-boot">
+    <div className="loading-spinner" />
+    <span>Загрузка...</span>
+    <div className="native-boot-skeleton" aria-hidden="true">
+      <div className="native-skeleton" />
+      <div className="native-skeleton" />
+      <div className="native-skeleton" />
+    </div>
+  </div>
+);
 
 /** Экран блокировки входа. Рендерится ТОЛЬКО в APK при включённом блоке. */
 function NativeAppLock({ onUnlocked }: { onUnlocked: () => void }) {
@@ -225,6 +275,30 @@ export default function App() {
 
   useEffect(() => { registry.init().then(() => setInitialized(true)); }, []);
 
+  // АПК: ассеты локальные — в простое прогреваем чанки экранов, чтобы
+  // переключение вкладок не показывало «Загрузка...». В веб/TG не греем
+  // (не тянем мегабайты на мобильном трафике) — там предзагрузка по
+  // наведению/тапу на вкладку.
+  useEffect(() => {
+    if (!initialized || !isNativeApp()) return;
+    // Самое тяжёлое (каталог БАДов 2.7 МБ, питание 2.5 МБ) в простое не
+    // разбираем: исполнение такого чанка на слабом телефоне — это рывок на
+    // секунды посреди чужой вкладки. Они грузятся по тапу (там ожидание
+    // пользователь ждёт осознанно). «Тренинг» после сплита — 106 КБ, его греем.
+    const skip: LazyTab[] = ['support', 'nutrition'];
+    const order = (Object.keys(SCREEN_LOADERS) as LazyTab[]).filter(t => t !== tab && skip.indexOf(t) < 0);
+    let i = 0;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const tick = () => {
+      const next = order[i++];
+      if (!next) return;
+      prefetchScreen(next);
+      timer = setTimeout(tick, 500);
+    };
+    timer = setTimeout(tick, 1200);
+    return () => { if (timer) clearTimeout(timer); };
+  }, [initialized, tab]);
+
   useEffect(() => {
     if (!isNativeApp()) return;
     let alive = true;
@@ -320,6 +394,8 @@ export default function App() {
   }, [initialized]);
 
   const go = useCallback((t: Tab, st: string | null = null) => {
+    // Чанк экрана тянем заранее: к моменту рендера он уже в памяти.
+    prefetchScreen(t);
     // Нижний дашборд: тап по разделу без subTab — всегда возврат на главную
     // раздела. SupportScreen персистит позицию в he_sup_nav_v1 и при ремаунте
     // восстанавливает глубокий каталог — чистим ключ, иначе кнопка «БАДы»
@@ -436,32 +512,27 @@ export default function App() {
   // Свайпы между вкладками — хук useSwipeTabs выше (только APK).
 
   const renderContent = () => {
-    if (!initialized) return (
-      <div className="screen-loading native-boot">
-        <div className="loading-spinner"/>
-        <span>Загрузка...</span>
-        <div className="native-boot-skeleton" aria-hidden="true">
-          <div className="native-skeleton" />
-          <div className="native-skeleton" />
-          <div className="native-skeleton" />
-        </div>
-      </div>
-    );
+    if (!initialized) return <ScreenLoading />;
 
     const key = `screen-${tab}-${subTab || 'main'}-${screenKey}`;
-    switch (tab) {
-      case 'home': return <DashboardScreen key={key} onNavigate={handleNavigate} />;
-      case 'pharma': return <PharmaScreen key={key} initialSubTab={subTab || undefined} />;
-      case 'support': return <SupportScreen key={key} onNavigate={handleNavigate} initialSubTab={subTab || undefined} />;
-      case 'training': return <TrainingScreen key={key} initialSubTab={subTab || undefined} />;
-      case 'labs': return <InfoErrorBoundary label="Лаборатория"><LabsScreen key={key} initialSubTab={subTab || undefined} /></InfoErrorBoundary>;
-      case 'risks': return <RiskScreen key={key} onNavigate={handleNavigate} initialSubTab={subTab || undefined} />;
-      case 'nutrition': return <NutritionScreen key={key} initialSubTab={subTab || undefined} />;
-      case 'marketplace': return <MarketplaceScreen key={key} />;
-      case 'profile': return <ProfileScreen_v2 key={key} onNavigate={handleNavigate} initialSubTab={subTab || undefined} />;
-      case 'articles': return <ArticlesScreen key={key} />;
-      default: return <DashboardScreen key={key} onNavigate={handleNavigate} />;
-    }
+    const content = (() => {
+      switch (tab) {
+        case 'home': return <DashboardScreen key={key} onNavigate={handleNavigate} />;
+        case 'pharma': return <PharmaScreen key={key} initialSubTab={subTab || undefined} />;
+        case 'support': return <SupportScreen key={key} onNavigate={handleNavigate} initialSubTab={subTab || undefined} />;
+        case 'training': return <TrainingScreen key={key} initialSubTab={subTab || undefined} />;
+        case 'labs': return <InfoErrorBoundary label="Лаборатория"><LabsScreen key={key} initialSubTab={subTab || undefined} /></InfoErrorBoundary>;
+        case 'risks': return <RiskScreen key={key} onNavigate={handleNavigate} initialSubTab={subTab || undefined} />;
+        case 'nutrition': return <NutritionScreen key={key} initialSubTab={subTab || undefined} />;
+        case 'marketplace': return <MarketplaceScreen key={key} />;
+        case 'profile': return <ProfileScreen_v2 key={key} onNavigate={handleNavigate} initialSubTab={subTab || undefined} />;
+        case 'articles': return <ArticlesScreen key={key} />;
+        default: return <DashboardScreen key={key} onNavigate={handleNavigate} />;
+      }
+    })();
+    // Ленивый экран может отдать чанк не сразу — показываем тот же скелет,
+    // что и на старте, а не пустоту.
+    return <Suspense fallback={<ScreenLoading />}>{content}</Suspense>;
   };
 
   return (
@@ -517,6 +588,9 @@ export default function App() {
             aria-current={tab === item.id ? 'page' : undefined}
             className={'nav-btn' + (tab === item.id ? ' active' : '')}
             onClick={() => go(item.id)}
+            onMouseEnter={() => prefetchScreen(item.id)}
+            onTouchStart={() => prefetchScreen(item.id)}
+            onFocus={() => prefetchScreen(item.id)}
           >
             {item.icon}
             <span>{item.label}</span>

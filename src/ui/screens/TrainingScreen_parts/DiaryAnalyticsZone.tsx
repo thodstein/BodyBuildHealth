@@ -7,7 +7,7 @@ import React from 'react';
 import { StrengthDiary, type StrengthStats, type WeeklyProgress } from '../../../engines/strength-diary.engine';
 import type { WorkoutLog, TrainingOutput } from '../../../core/types';
 import type { MacrocyclePlan } from '../../../engines/training-periodization.engine';
-import { InfoErrorBoundary } from '../SupportScreen_parts/SupportScreenData';
+import { InfoErrorBoundary } from '../../components/InfoErrorBoundary';
 import { TrainingDiaryHub } from './TrainingDiaryHub';
 import type { TrainingTab } from './shared';
 

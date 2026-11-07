@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { FOOD_DB } from '../../../core/nutrition-database';
+import { FOOD_DB, findFoodById, filterFoodsByNameOrId } from '../../../core/nutrition-database';
 import { useDataLink } from '../../../core/data-link';
 import { scoreAllProducts, compareProducts, calcMealScore, CATEGORY_LABELS, GOAL_MAP_RU } from '../../../engines/product-usefulness.engine';
 import type { MealProduct, SavedMeal, MealScore } from '../../../engines/product-usefulness.engine';
@@ -40,7 +40,7 @@ const normalizeAmount = (item: any): number => {
 const findFoodByDiaryItem = (item: any) => {
   const directId = item?.id || item?.foodId;
   if (directId) {
-    const byId = FOOD_DB.find(f => f.id === directId);
+    const byId = findFoodById(directId);
     if (byId) return byId;
   }
   const q = (item?.name || '').toLowerCase().trim();
@@ -879,7 +879,7 @@ const avgScore = scoredItems.length > 0 ? Math.round(scoredItems.reduce((s, x) =
               <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
                 <span style={{ fontSize: 10, fontWeight: 700, color: '#8b5cf6' }}>⚖️ Сравнение:</span>
                 {compareIds.map(id => {
-                  const f = FOOD_DB.find(x => x.id === id);
+                  const f = findFoodById(id);
                   return (
                     <span key={id} style={{ padding: '3px 8px', borderRadius: 6, fontSize: 8, background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.15)', color: '#a78bfa', display: 'flex', alignItems: 'center', gap: 4 }}>
                       {f?.name || id}
@@ -938,7 +938,7 @@ const avgScore = scoredItems.length > 0 ? Math.round(scoredItems.reduce((s, x) =
                       </div>
                     )}
                     {(() => {
-                      const found = FOOD_DB.find(f => f.id === food.id);
+                      const found = findFoodById(food.id);
                       if (!found) return null;
                       const f = found as any;
                       const diaas = calcDIAAS(food);
@@ -999,7 +999,7 @@ const avgScore = scoredItems.length > 0 ? Math.round(scoredItems.reduce((s, x) =
                   return null;
                 };
                 const rows = catKeys.map(key => {
-                  const vals = compareData.map((c:any) => { const ff = FOOD_DB.find((x:any) => x.id === c.food.id); return { id: c.food.id, v: getVal(ff, key) }; });
+                  const vals = compareData.map((c:any) => { const ff = findFoodById(c.food.id); return { id: c.food.id, v: getVal(ff, key) }; });
                   const numeric = vals.filter(v => v.v !== null && typeof v.v === 'number');
                   if (numeric.length < 2) return null;
                   const best = key === 'kcal' ? Math.min(...numeric.map(v=>v.v as number)) : Math.max(...numeric.map(v=>v.v as number));
@@ -1102,7 +1102,7 @@ const avgScore = scoredItems.length > 0 ? Math.round(scoredItems.reduce((s, x) =
               </div>
               {mealSearch && (
                 <div style={{ maxHeight: 150, overflowY: 'auto', marginBottom: 8, borderRadius: 8, border: '1px solid rgba(255,255,255,0.04)' }}>
-                  {FOOD_DB.filter(f => (f.name || '').toLowerCase().includes(mealSearch.toLowerCase()) || f.id.includes(mealSearch)).slice(0, 8).map(food => (
+                  {filterFoodsByNameOrId(mealSearch).slice(0, 8).map(food => (
                     <div key={food.id} onClick={() => {
                       const existing = mealProducts.find(p => p.foodId === food.id);
                       if (existing) {
@@ -1125,7 +1125,7 @@ const avgScore = scoredItems.length > 0 ? Math.round(scoredItems.reduce((s, x) =
                 <div style={{ marginBottom: 8 }}>
                   <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.75)', marginBottom: 4 }}>Продукты в приёме:</div>
                   {mealProducts.map((mp, idx) => {
-                    const food = FOOD_DB.find(f => f.id === mp.foodId);
+                    const food = findFoodById(mp.foodId);
                     return (
                       <div key={mp.foodId} style={{
                         display: 'flex', alignItems: 'center', gap: 6, padding: '5px 8px', borderRadius: 8,
@@ -1156,19 +1156,19 @@ const avgScore = scoredItems.length > 0 ? Math.round(scoredItems.reduce((s, x) =
                     marginTop: 4, borderRadius: 8, background: 'rgba(255,255,255,0.03)', fontSize: 8, color: 'rgba(255,255,255,0.8)',
                   }}>
                     <span>∑ {mealProducts.reduce((s, mp) => {
-                      const f = FOOD_DB.find(x => x.id === mp.foodId);
+                      const f = findFoodById(mp.foodId);
                       return s + ((f?.kcal || 0) * mp.weightGrams / 100);
                     }, 0).toFixed(0)} ккал</span>
                     <span>🥩 {mealProducts.reduce((s, mp) => {
-                      const f = FOOD_DB.find(x => x.id === mp.foodId);
+                      const f = findFoodById(mp.foodId);
                       return s + ((f?.protein || 0) * mp.weightGrams / 100);
                     }, 0).toFixed(1)}г</span>
                     <span>🧈 {mealProducts.reduce((s, mp) => {
-                      const f = FOOD_DB.find(x => x.id === mp.foodId);
+                      const f = findFoodById(mp.foodId);
                       return s + ((f?.fat || 0) * mp.weightGrams / 100);
                     }, 0).toFixed(1)}г</span>
                     <span>🍚 {mealProducts.reduce((s, mp) => {
-                      const f = FOOD_DB.find(x => x.id === mp.foodId);
+                      const f = findFoodById(mp.foodId);
                       return s + ((f?.carbs || 0) * mp.weightGrams / 100);
                     }, 0).toFixed(1)}г</span>
                     <span>⚖️ {mealProducts.reduce((s, mp) => s + mp.weightGrams, 0).toFixed(0)}г</span>
@@ -1289,7 +1289,7 @@ const avgScore = scoredItems.length > 0 ? Math.round(scoredItems.reduce((s, x) =
                     <div style={{ marginTop:8, padding:'8px 10px', borderRadius:8, background:'rgba(0,230,138,0.04)', border:'1px solid rgba(0,230,138,0.1)' }}>
                       <div style={{ fontSize:9, fontWeight:700, color:'#00e68a', marginBottom:6 }}>🔄 Точечные замены (улучшение скора)</div>
                        {mealResult.productScores.filter(ps => ps.score < (mealResult.maxPossible <= 10 ? 5 : 50)).slice(0,3).map(ps=>{
-                         const food = FOOD_DB.find(f=>f.id===ps.foodId);
+                         const food = findFoodById(ps.foodId);
                          if(!food) return null;
                          const sameCat = scored.filter((p:any)=>p.food.category===food.category&&p.food.id!==food.id);
                          const best = sameCat.sort((a,b)=>b.score.total-a.score.total)[0];
@@ -1336,7 +1336,7 @@ const avgScore = scoredItems.length > 0 ? Math.round(scoredItems.reduce((s, x) =
                       try {
                         const plan = JSON.parse(localStorage.getItem('he_daily_plan') || '[]');
                         mealProducts.forEach(mp => {
-                          const food = FOOD_DB.find(f => f.id === mp.foodId);
+                          const food = findFoodById(mp.foodId);
                           if (food) plan.push({ id: food.id, name: food.name, amount: mp.weightGrams, kcal: (food.kcal || 0) * mp.weightGrams / 100, protein: (food.protein || 0) * mp.weightGrams / 100, fat: (food.fat || 0) * mp.weightGrams / 100, carbs: (food.carbs || 0) * mp.weightGrams / 100 });
                         });
                         localStorage.setItem('he_daily_plan', JSON.stringify(plan));
@@ -1410,7 +1410,7 @@ const avgScore = scoredItems.length > 0 ? Math.round(scoredItems.reduce((s, x) =
                       </div>
                       <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.75)', marginBottom: 4 }}>
                         {meal.products.map(p => {
-                          const f = FOOD_DB.find(x => x.id === p.foodId);
+                          const f = findFoodById(p.foodId);
                           return `${f?.name || p.foodId} (${p.weightGrams}г)`;
                         }).join(', ')}
                       </div>

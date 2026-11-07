@@ -2,7 +2,7 @@
  * Единый каталог тренировочных процессов: циклы (LMS), программы, методики, упражнения, «мои тренировки».
  * Содержимое зоны — ровно эти 5 вкладок; нигде больше они не рендерятся. */
 import React from 'react';
-import { InfoErrorBoundary } from '../SupportScreen_parts/SupportScreenData';
+import { InfoErrorBoundary } from '../../components/InfoErrorBoundary';
 import { useDataLink } from '../../../core/data-link';
 import { CycleCatalog } from './CycleCatalog';
 import type { TrainingOutput, WorkoutLog } from '../../../core/types';

@@ -125,10 +125,11 @@ describe('TrainingScreen native hero', () => {
     expect(container.querySelectorAll('.training-subnav-card').length).toBeGreaterThanOrEqual(5);
     expect(screen.getAllByText('Показатели').length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText('Качество и диагностика').length).toBeGreaterThanOrEqual(1);
-    // Уход в инструмент и возврат назад.
+    // Уход в инструмент и возврат назад. Инструменты грузятся отдельным чанком
+    // (React.lazy) — поэтому ждём появления кнопки возврата.
     const strengthBtn = screen.getAllByText(/Анализ силы/)[0] as HTMLElement;
     fireEvent.click(strengthBtn);
-    const back = screen.getAllByText(/К дашборду/)[0] as HTMLElement;
+    const back = (await screen.findAllByText(/К дашборду/))[0] as HTMLElement;
     expect(back).not.toBeNull();
     fireEvent.click(back);
     expect(container.querySelector('.train-inteldash')).not.toBeNull();

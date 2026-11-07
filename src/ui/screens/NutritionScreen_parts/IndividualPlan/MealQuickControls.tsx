@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { usePlanCtx } from "./IndividualPlanContext";
-import { FOOD_DB } from "../../../../core/nutrition-database";
+import { FOOD_DB, findFoodById, findFoodByName, filterFoodsByName } from "../../../../core/nutrition-database";
 import {
   scoreFoodsForKBJU, getMealKBJUTarget, getMealCurrentKBJU, parseServingSizeGrams,
   buildSupplementPortions, getSupplementDose,
@@ -186,7 +186,7 @@ export const MealQuickControls: React.FC<Props> = ({ mode = 'basic', advancedFil
       const mealTarget = getMealKBJUTarget(dayPlan, mealIdx);
       const mealCur = getMealCurrentKBJU(dayPlan, mealIdx);
       const defaultTarget = mealTarget || { kcal: 600, protein: 40, fat: 20, carbs: 60 };
-      const itemFood = FOOD_DB.find((f: any) => f.id === item.id) || FOOD_DB.find((f: any) => f.name === item.name);
+      const itemFood = findFoodById(item.id) || findFoodByName(item.name);
       const itemCategory = itemFood?.category || '';
       const CATEGORY_CLUSTERS: Record<string, string[]> = {
         protein: ['protein', 'dairy'],
@@ -231,7 +231,7 @@ export const MealQuickControls: React.FC<Props> = ({ mode = 'basic', advancedFil
     saveUndo();
     const mealIdx = popup.selectedMealIdx;
     const itemIdx = popup.selectedItemIdx;
-    const _suppFood = FOOD_DB.find((f: any) => f.id === supp.id);
+    const _suppFood = findFoodById(supp.id);
     const _suppG = Math.round(supp.doseG || 30);
     const mkRepl = (it: any) => ({
       ...it, name: '💊 ' + supp.name, id: supp.id,
@@ -267,7 +267,7 @@ export const MealQuickControls: React.FC<Props> = ({ mode = 'basic', advancedFil
     if (!oldItem) { closePopup(); return; }
     // per100 invariant: сохраняем граммы старого приёма, пересчитываем КБЖУ честно per100; spice ≤10г
     let grams = oldItem.amount || 100;
-    const newFood = FOOD_DB.find((x: any) => x.id === (food.id || food.foodId)) || food;
+    const newFood = findFoodById(food.id || food.foodId) || food;
     if ((newFood as any).category === 'other' && grams > 10) grams = 10;
     if (newFood.id && String(newFood.id).startsWith('spice_') && grams > 10) grams = 10;
     const ratio = grams / 100;
@@ -346,7 +346,7 @@ export const MealQuickControls: React.FC<Props> = ({ mode = 'basic', advancedFil
     // dedup: две каши в один приём — запрет
     if (dayPlan?.meals?.[mealIdx]?.items?.some((it: any) => it.id === result.foodId)) return;
     saveUndo();
-    const food = FOOD_DB.find(f => f.id === result.foodId);
+    const food = findFoodById(result.foodId);
     let amount = parseServingSizeGrams(food?.servingSize) || 100;
     if ((food as any)?.category === 'other' && amount > 10) amount = 10;
     if (food?.id && String(food.id).startsWith('spice_') && amount > 10) amount = 10;
@@ -374,7 +374,7 @@ export const MealQuickControls: React.FC<Props> = ({ mode = 'basic', advancedFil
     if (!popup || popup.selectedMealIdx === undefined) return;
     setPopup({ ...popup, searchQuery: q, scoredResults: [] });
     if (q.trim().length > 0) {
-      const raw = FOOD_DB.filter((f: any) => (f.name || '').toLowerCase().includes(q.toLowerCase()));
+      const raw = filterFoodsByName(q);
       const mealTarget = getMealKBJUTarget(dayPlan, popup.selectedMealIdx);
       const mealCur = getMealCurrentKBJU(dayPlan, popup.selectedMealIdx);
       const defaultTarget = mealTarget || { kcal: 600, protein: 40, fat: 20, carbs: 60 };
@@ -529,7 +529,7 @@ export const MealQuickControls: React.FC<Props> = ({ mode = 'basic', advancedFil
               )}
               {(popup.scoredResults || []).length > 0 ? (
                 (popup.scoredResults || []).map((r: any, ri: number) => (
-                  <button key={r.foodId || ri} onClick={() => doReplaceProduct(FOOD_DB.find((f: any) => f.id === r.foodId) || r)}
+                  <button key={r.foodId || ri} onClick={() => doReplaceProduct(findFoodById(r.foodId) || r)}
                     style={{ ...productBtn, padding: (mode === 'advanced' || mode === 'targeting') ? '8px 10px' : '10px 12px' }}
                     onMouseEnter={e => (e.target as HTMLElement).style.borderColor = 'rgba(0,230,138,0.3)'}
                     onMouseLeave={e => (e.target as HTMLElement).style.borderColor = 'rgba(255,255,255,0.06)'}>

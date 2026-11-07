@@ -1,7 +1,7 @@
 ﻿import React, { useState, useMemo, useEffect, useRef, createContext, useContext, useCallback } from "react";
 import { applyBBNutritionToTargets } from "./planner-bb-nutrition";
 import { addToCart } from "../../../../core/nutrition-utils";
-import { FOOD_DB, FOOD_ALLERGEN_DIET, compositeQualityScore } from "../../../../core/nutrition-database";
+import { FOOD_DB, FOOD_ALLERGEN_DIET, compositeQualityScore, findFoodById, findFoodByName } from "../../../../core/nutrition-database";
 import { PHARMA_DB } from "../../../../core/pharma-database";
 import { updateProfile, getProfile } from "../../../../core/profile-manager";
 import { getRecipes, getRecipesByMeal, type Recipe } from "../../../../engines/nutrition-periodization.engine";
@@ -1918,8 +1918,8 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
 
   const findSimilarFoods = (item: any, count = 5) => {
     const nameMatch = (name: string, query: string) => name?.toLowerCase().includes(query?.toLowerCase()) || query?.toLowerCase().includes(name?.toLowerCase());
-    let food: any = FOOD_DB.find(f => f.id === item.id);
-    if (!food) food = FOOD_DB.find(f => f.name === item.name);
+    let food: any = findFoodById(item.id);
+    if (!food) food = findFoodByName(item.name);
     if (!food) food = FOOD_DB.find(f => f.name && item.name && nameMatch(f.name, item.name));
     if (!food) food = FOOD_DB.find(f => item.name && f.name && nameMatch(item.name, f.name));
     if (!food) {
@@ -2051,7 +2051,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     try {
       if ((excludedFoods || []).includes(foodId)) return 'продукт в списке исключённых';
       if (resolveAllExcludedFoodIds(FOOD_DB, allergens || [], dietPrefs || []).has(foodId)) return 'продукт не проходит аллергены/рацион';
-      const food = FOOD_DB.find(f => f.id === foodId);
+      const food = findFoodById(foodId);
       if (food && !matchesCategoryPref(food, { preferred: [], excluded: excludedCategories || [] })) return 'категория продукта исключена';
       if ((dietPrefs || []).includes('vegetarian') && FOOD_ALLERGEN_DIET[foodId]?.isVegetarian === false) return 'продукт не подходит для вегетарианского рациона';
       return null;
@@ -2106,11 +2106,11 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     const dayData = resolved.plan === 'day' ? dayPlan : resolved.plan === 'three' ? threeDayPlan?.days?.[resolved.day] : weekPlan?.days?.[resolved.day];
     if (!dayData?.meals?.[mealIdx]) return;
     const mk = (f: any, grams: number) => { const p = Math.round((f.protein || 0) * grams / 100), f2 = Math.round((f.fat || 0) * grams / 100), c = Math.round((f.carbs || 0) * grams / 100); return { name: f.name, id: f.id, amount: grams, kcal: Math.round(4 * p + 9 * f2 + 4 * c), p, f: f2, c, fiber: Math.round((f.fiber || 0) * grams / 100) }; };
-    const whey = FOOD_DB.find(f => f.id === 'whey_isolate') || FOOD_DB.find(f => f.id === 'whey_protein');
+    const whey = findFoodById('whey_isolate') || findFoodById('whey_protein');
     // E3b: единый учёт графика (в т.ч. смены) вместо локальной копии без shift_*.
     const isWorkDayForAdd = isWorkDayForIndex(dayIdx, { enabled: workScheduleEnabled, scheduleType: workScheduleType, workDays, dowBase: 0 });
     const usePortable = workFood === 'portable' && isWorkDayForAdd;
-    const oats = FOOD_DB.find(f => f.id === (usePortable ? 'oats_dry' : 'oats')) || FOOD_DB.find(f => f.id === 'oats_dry') || FOOD_DB.find(f => f.id === 'oats');
+    const oats = findFoodById(usePortable ? 'oats_dry' : 'oats') || findFoodById('oats_dry') || findFoodById('oats');
     const additions = [] as any[];
     if (whey) {
       const _r = _manualFoodBlockReason(whey.id);
@@ -2122,7 +2122,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     }
     // полноценная еда на работе — добавляем орехи/фрукт для баланса
     if (usePortable) {
-      const alm = FOOD_DB.find(f => f.id === 'almonds');
+      const alm = findFoodById('almonds');
       if (alm && !_manualFoodBlockReason(alm.id)) additions.push(mk(alm, 15));
     }
     if (additions.length === 0) return;
@@ -2655,7 +2655,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
       const _tags = selectedAllergenTags(allergens || [], dietPrefs || []);
       const _isVeg = (dietPrefs || []).includes('vegetarian');
       const _hits = _decomp.filter(it => {
-        const food = FOOD_DB.find(f => f.id === it.id);
+        const food = findFoodById(it.id);
         return _blocked.has(it.id)
           || getFoodAllergenTags(it.id, FOOD_DB).some(t => _tags.has(t))
           || (!!food && !matchesCategoryPref(food, { preferred: [], excluded: excludedCategories || [] }))
@@ -4104,7 +4104,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
         const _allergenWarnings: { food: string; allergens: string[] }[] = [];
         if ((allergens || []).length > 0) {
           meals.forEach((m: any) => (Array.isArray(m.items) ? m.items : []).forEach((it: any) => {
-            const food = FOOD_DB.find(f => f.id === it.id);
+            const food = findFoodById(it.id);
             if (!food || excludedIds.has(food.id)) return;
             const matched = allergens.filter(a => matchesSelectedAllergen(food, a, FOOD_DB));
             if (matched.length > 0) _allergenWarnings.push({ food: it.name, allergens: matched.map(a => ALLERGEN_LIST.find(al => al.id === a)?.label || a) });

@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from 'vitest';
-import { render, screen, fireEvent, cleanup, within } from '@testing-library/react';
+import { render, screen, fireEvent, cleanup, within, waitFor } from '@testing-library/react';
 import { TrainingScreen } from '../../TrainingScreen';
 import { ZONES, zoneForTab } from '../nav';
 import { TAB_LABELS } from '../shared';
@@ -16,7 +16,7 @@ describe('arm-lifting nav: второй хаб виден в навигации'
     expect(zoneForTab('arm_lifting_diagnostics')).toBe('calculators');
     expect(TAB_LABELS['arm_lifting_diagnostics']).toContain('Армлифтинг');
   });
-  it('оба хаба рядом в «Качество и диагностика», клик открывает армлифтинг', () => {
+  it('оба хаба рядом в «Качество и диагностика», клик открывает армлифтинг', async () => {
     try {
       localStorage.clear();
     } catch {
@@ -51,6 +51,12 @@ describe('arm-lifting nav: второй хаб виден в навигации'
       .find(Boolean);
     expect(pill).toBeTruthy();
     fireEvent.click(pill!);
-    expect(document.body.textContent).toContain('замеры снарядов');
+    // Хаб армлифтинга грузится отдельным чанком (React.lazy) — ждём отрисовки.
+    await waitFor(
+      () => {
+        expect(document.body.textContent).toContain('замеры снарядов');
+      },
+      { timeout: 15000 },
+    );
   });
 });

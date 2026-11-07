@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { FOOD_DB } from "../../../../core/nutrition-database";
+import { FOOD_DB, findFoodById } from "../../../../core/nutrition-database";
 import { PHARMA_DB } from "../../../../core/pharma-database";
 import { ALL_SUBSTANCES } from "../../../../data/support-substances";
 import { SUPPORT_CATALOG_DATA } from "../../../../data/support-catalog-data";
@@ -1777,7 +1777,7 @@ export const IndividualPlanSettings: React.FC = () => {
             {(() => {
               const allRecipes = [...getRecipes(), ...(userRecipes||[])] as Recipe[];
               const findName = (id: string): string | null => {
-                const food = FOOD_DB.find(f => f.id === id);
+                const food = findFoodById(id);
                 if (food) return food.name;
                 if (id.startsWith('__recipe__')) { const r = allRecipes.find(r => '__recipe__' + r.name === id); if (r) return '🍳 ' + r.name; }
                 if (id.startsWith('__user_recipe__')) { const r = allRecipes.find(r => '__user_recipe__' + r.name === id); if (r) return '👨‍🍳 ' + r.name; }
@@ -2045,7 +2045,7 @@ export const IndividualPlanSettings: React.FC = () => {
             {(() => {
               const allRecipes = [...getRecipes(), ...(userRecipes||[])] as Recipe[];
               const findName = (id: string): string | null => {
-                const food = FOOD_DB.find(f => f.id === id);
+                const food = findFoodById(id);
                 if (food) return food.name;
                 if (id.startsWith('__recipe__')) { const r = allRecipes.find(r => '__recipe__' + r.name === id); if (r) return '🍳 ' + r.name; }
                 if (id.startsWith('__user_recipe__')) { const r = allRecipes.find(r => '__user_recipe__' + r.name === id); if (r) return '👨‍🍳 ' + r.name; }

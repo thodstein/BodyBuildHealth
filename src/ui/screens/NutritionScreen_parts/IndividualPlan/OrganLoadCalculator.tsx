@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useCallback, useEffect } from "react";
 import { usePlanCtx } from "./IndividualPlanContext";
-import { FOOD_DB } from "../../../../core/nutrition-database";
+import { FOOD_DB, findFoodById } from "../../../../core/nutrition-database";
 import {
   calcOrganLoad, compareScenarios, ORGAN_LABELS, ORGAN_KEYS,
   saveOrganLoadHistory, loadOrganLoadHistory, clearOrganLoadHistory,
@@ -183,7 +183,7 @@ export const OrganLoadCalculator: React.FC = () => {
     if (!p?.meals) return null;
     let mg = 0;
     (p.meals as any[]).forEach(m => (m.items || []).forEach((it: any) => {
-      const fd = FOOD_DB.find(f => f.id === it.id);
+      const fd = findFoodById(it.id);
       if (!fd) return;
       const o3 = (fd.micros as any)?.Omega3;
       if (typeof o3 === 'number' && o3 > 0) {

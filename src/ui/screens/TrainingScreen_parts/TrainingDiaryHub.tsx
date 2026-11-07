@@ -68,7 +68,7 @@ import { loadActiveProtocol, itemsForDay, loadDayProgress, loadCheckins, detectD
 import { loadActiveMobility, itemsForSlot, loadMobilityDayProgress, hasDailyRoutine } from '../../../engines/mobility-protocol.engine';
 import { loadWarmupLog, upsertWarmupLog, warmupLogForDate } from '../../../engines/warmup.engine';
 import { loadCooldownLog, upsertCooldownLog, cooldownLogForDate } from '../../../engines/cooldown.engine';
-import { InfoErrorBoundary } from '../SupportScreen_parts/SupportScreenData';
+import { InfoErrorBoundary } from '../../components/InfoErrorBoundary';
 
 /* ─── RecordModeSelector — sub-mode toggle for record (quick vs full) ─── */
 const RecordModeSelector: React.FC<{

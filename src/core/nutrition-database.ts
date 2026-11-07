@@ -1974,8 +1974,59 @@ export function searchFood(query: string, filter?: FoodFilter): FoodItem[] {
   )).slice(0, 12);
 }
 
+/* ── Быстрые индексы FOOD_DB ───────────────────────────────────────────────
+ * `FOOD_DB.find(f => f.id === id)` — линейный скан ~1000 продуктов, и он
+ * стоял в рендере построчно (план дня, попапы замены, анализ дня). Индексы
+ * хранят ПЕРВОЕ вхождение, поэтому результат ровно тот же, что у find. */
+const FOOD_IDX_BY_ID = new Map<string, number>();
+const FOOD_IDX_BY_NAME = new Map<string, number>();
+FOOD_DB.forEach((f, i) => {
+  if (f.id && !FOOD_IDX_BY_ID.has(f.id)) FOOD_IDX_BY_ID.set(f.id, i);
+  if (f.name && !FOOD_IDX_BY_NAME.has(f.name)) FOOD_IDX_BY_NAME.set(f.name, i);
+});
+
+/** Быстрый аналог `FOOD_DB.find(f => f.id === id)` — без скана по массиву. */
+export function findFoodById(id?: string | null): FoodItem | undefined {
+  if (!id) return undefined;
+  const i = FOOD_IDX_BY_ID.get(id);
+  return i === undefined ? undefined : FOOD_DB[i];
+}
+
+/** Быстрый аналог `FOOD_DB.find(f => f.name === name)`. */
+export function findFoodByName(name?: string | null): FoodItem | undefined {
+  if (!name) return undefined;
+  const i = FOOD_IDX_BY_NAME.get(name);
+  return i === undefined ? undefined : FOOD_DB[i];
+}
+
+/** Ровно то же, что `FOOD_DB.find(f => f.id === id || f.name === name)`. */
+export function findFoodByIdOrName(id?: string | null, name?: string | null): FoodItem | undefined {
+  const a = id ? FOOD_IDX_BY_ID.get(id) : undefined;
+  const b = name ? FOOD_IDX_BY_NAME.get(name) : undefined;
+  const i = a === undefined ? b : b === undefined ? a : Math.min(a, b);
+  return i === undefined ? undefined : FOOD_DB[i];
+}
+
+/* Низкорегистровый индекс для поиска по вводу: без toLowerCase на каждый
+ * продукт при каждом нажатии клавиши. */
+const FOOD_HAY = FOOD_DB.map(f => ({ food: f, name: (f.name || '').toLowerCase(), id: (f.id || '').toLowerCase() }));
+
+/** Аналог `FOOD_DB.filter(f => (f.name||'').toLowerCase().includes(q))`. */
+export function filterFoodsByName(query: string): FoodItem[] {
+  const q = (query || '').toLowerCase();
+  if (!q) return FOOD_DB.slice();
+  return FOOD_HAY.filter(r => r.name.includes(q)).map(r => r.food);
+}
+
+/** Аналог `FOOD_DB.filter(f => name.includes(q) || id.includes(q))`. */
+export function filterFoodsByNameOrId(query: string): FoodItem[] {
+  const q = (query || '').toLowerCase();
+  if (!q) return FOOD_DB.slice();
+  return FOOD_HAY.filter(r => r.name.includes(q) || r.id.includes(q)).map(r => r.food);
+}
+
 export function getFoodById(id: string): FoodItem | undefined {
-  const f = FOOD_DB.find(f => f.id === id);
+  const f = findFoodById(id);
   if (!f) return undefined;
   const tags = FOOD_ALLERGEN_DIET[id];
   if (tags) return { ...f, allergens: tags.allergens, isVegetarian: tags.isVegetarian, isVegan: tags.isVegan, isGlutenFree: tags.isGlutenFree, isDairyFree: tags.isDairyFree, dietTags: tags.dietTags };

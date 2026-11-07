@@ -1,5 +1,5 @@
 import React from 'react';
-import { FOOD_DB, calcBBQualityScore } from '../../../core/nutrition-database';
+import { FOOD_DB, calcBBQualityScore, findFoodById } from '../../../core/nutrition-database';
 import { ModernHero, modernCardBg } from './nutrition-modern-kit';
 
 interface VisualizerProps {
@@ -26,7 +26,7 @@ export const MealVisualizer: React.FC<VisualizerProps> = ({ items, maxItems = 6 
       <div style={{ display: 'flex', height: 12, borderRadius: 6, overflow: 'hidden', background: 'rgba(255,255,255,0.03)' }}>
         {display.map((item, i) => {
           const pct = item.weightG / totalW * 100;
-          const food = FOOD_DB.find(f => f.id === item.id);
+          const food = findFoodById(item.id);
           const color = FOOD_COLORS[item.id] || `hsl(${i * 60}, 60%, 50%)`;
           const bb = food?.bb_quality_score;
           const opacity = bb && bb >= 6 ? 1 : bb && bb >= 4 ? 0.6 : 0.35;
@@ -35,7 +35,7 @@ export const MealVisualizer: React.FC<VisualizerProps> = ({ items, maxItems = 6 
       </div>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 2, marginTop: 4, justifyContent: 'center' }}>
         {display.map((item, i) => {
-          const food = FOOD_DB.find(f => f.id === item.id);
+          const food = findFoodById(item.id);
           const bb = food?.bb_quality_score;
           const color = FOOD_COLORS[item.id] || `hsl(${i * 60}, 60%, 50%)`;
           return (

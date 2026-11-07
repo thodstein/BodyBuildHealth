@@ -113,11 +113,16 @@ export default defineConfig(({ command }) => ({
           if (id.includes('recipe-db')) return 'recipe-db';
           if (id.includes('symptom-solver.data')) return 'symptom-solver';
           if (id.includes('programs-data') || id.includes('training-methodology') || id.includes('lms-cycles')) return 'training-data';
-          if (id.includes('IndividualPlan')) return 'nutrition-plan';
-          if (id.includes('FertilityPCTScreen')) return 'fertility';
-          if (id.includes('SupportScreen')) return 'support-ui';
-          if (id.includes('NutritionScreen')) return 'nutrition-ui';
-          if (id.includes('LabsScreen')) return 'labs-ui';
+          // Хранилище дневника питания — лист без зависимостей, его читает
+          // widget-sync на старте. Без отдельного чанка старт приложения тянул
+          // через него весь nutrition-ui (1.3 МБ) и nutrition-plan (3.5 МБ).
+          if (/NutritionScreen_parts[\\/]diary-storage/.test(id)) return 'diary-storage';
+          // Экраны больше НЕ группируем по папкам вручную: они и так грузятся
+          // динамическим import() и получают собственный чанк. Ручные группы
+          // (nutrition-plan/support-ui/...) заставляли rollup складывать туда
+          // ещё и общие модули (React, core/*, engines/*), и старт приложения
+          // тянул весь каталог БАДов и весь планировщик питания. См.
+          // docs/UI-PERF-PASS-2026-11.md.
         },
       },
     },

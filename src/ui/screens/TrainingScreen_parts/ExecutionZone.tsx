@@ -1,7 +1,7 @@
 /** ExecutionZone.tsx — зона «Тренировка» (выполнение): live-сессия, таймеры, миксы.
  * Содержимое зоны — ровно эти 3 вкладки; нигде больше они не рендерятся. */
 import React from 'react';
-import { InfoErrorBoundary } from '../SupportScreen_parts/SupportScreenData';
+import { InfoErrorBoundary } from '../../components/InfoErrorBoundary';
 import { EXERCISE_CATALOG } from '../../../core/exercise-catalog';
 import { StrengthDiary } from '../../../engines/strength-diary.engine';
 import type { TrainingOutput, MovementPattern } from '../../../core/types';
