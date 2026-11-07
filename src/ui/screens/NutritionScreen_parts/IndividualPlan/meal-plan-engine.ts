@@ -14761,6 +14761,163 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
         }
       }
     }
+    // ─── §8.63: основной приём не голодает по белку ──────────────────────────────
+    // Замер 60 дней: cutF50/5/тр — завтрак 6 г белка (0.12 г/кг при пороге 0.30),
+    // ужин 18 г, а перекус в тот же день — 40 г; recomp80/6/тр — завтрак 19 г (0.24).
+    // QG14 добивает слабейший основной приём раньше по конвейеру (и это правильно —
+    // «питание», а не «рюмки»), но её работу съедают поздние стадии (фрукт, ребаланс),
+    // и пользователь видит красный бейдж «Б 6 / 15» на первом приёме дня.
+    // Здесь последний, честный проход: основной приём ниже MPS-порога 0.30 г/кг берёт
+    // белок у самого богатого регулярного приёма (обмен strого по белку), а выросшие
+    // калории гасим гарниром донора — день не разъезжается. Нет донора — растим свой
+    // белковый пункт за счёт углеводов/жира ТОЙ ЖЕ тарелки. Канон 3% — гейт: шаг,
+    // который его ухудшает, откатывается целиком.
+    if ((input as any).breakfastProteinFloor !== false
+      && !(input as any).recipeAssembly
+      && !_pickCtx.highVolumeDay
+      && !((input as any).injections && (input as any).injections.length)) {
+      const _w63 = Math.max(1, Number(input.weightKg) || 0);
+      const _floor63 = 0.30 * _w63;
+      const _skip63 = new Set(['liquid', 'supplement']);
+      const _PROT63 = new Set(['protein', 'fast_protein', 'slow_protein']);
+      const _mass63 = (m: any) => (m.items || [])
+        .filter((i: any) => !_skip63.has(String(i.role || '')))
+        .reduce((s: number, i: any) => s + (Number(i.amount) || 0), 0);
+      const _perG63 = (it: any, k: string) => (Number(it[k]) || 0) / Math.max(1, Number(it.amount) || 1);
+      const _setG63 = (it: any, g: number) => {
+        const a0 = Number(it.amount) || 0;
+        // Белковые порции — шагом 5 г и в «порционных» границах 40–200 г (QG19):
+        // «107 г рыбы» и «84 г яйца» читаются как ошибка, а не как еда.
+        const _isProt = _PROT63.has(String(it.role));
+        let na = Math.round(g);
+        if (_isProt) na = Math.min(200, Math.max(40, Math.round(na / 5) * 5));
+        if (!(a0 > 0) || na < 1 || na === Math.round(a0)) return;
+        const r = na / a0;
+        for (const k of ['p', 'f', 'c', 'kcal', 'fiber', 'leucine_mg']) {
+          if (it[k]) it[k] = Math.round(Number(it[k]) * r * 10) / 10;
+        }
+        it.amount = na;
+      };
+      const _dev63 = () => {
+        const d = (v: number, t: number) => (t > 0 ? Math.abs(v - t) / t : 0);
+        return Math.max(
+          d(Number(totals?.kcal) || 0, Number(input.goalKcal) || 0),
+          d(Number(totals?.p) || 0, Number(input.goalProteinG) || 0),
+          d(Number(totals?.f) || 0, Number(input.goalFatG) || 0),
+          d(Number(totals?.c) || 0, Number(input.goalCarbsG) || 0),
+        );
+      };
+      const _isReg63 = (m: any) => !['preworkout', 'postworkout', 'intra', 'presleep'].includes(String(m.type || ''));
+      const _reg63 = (meals as any[]).filter((m) => _isReg63(m) && (m.items || []).length);
+      // Порядок важен: сначала основные приёмы (это «питание», а не «рюмки»), и только
+      // потом перекусы — иначе голодный перекус вычерпает донора раньше завтрака.
+      const _isMain63 = (m: any) => ['breakfast', 'lunch', 'dinner'].includes(String(m.type || ''));
+      const _mains63 = _reg63
+        .filter((m) => !(m as any).recipeApplied)
+        .sort((a, b) => (Number(_isMain63(b)) - Number(_isMain63(a)))
+          || (Number(a.totals?.p) || 0) - (Number(b.totals?.p) || 0));
+      let _fixed63 = 0;
+      for (const main of _mains63) {
+        const _need0 = _floor63 - (Number(main.totals?.p) || 0);
+        if (!(_need0 > 1)) continue;
+        // Растим самый «дешёвый» по калориям белок тарелки: яичный белок выгоднее
+        // целого яйца, творог — сыра. Новых пунктов не появляется.
+        const grow = ((main.items || []) as any[])
+          .filter((i: any) => _PROT63.has(String(i.role)) && !(i as any)._fixedGrams && (Number(i.p) || 0) > 0 && (Number(i.amount) || 0) > 0)
+          .sort((a: any, b: any) => _perG63(a, 'kcal') / Math.max(0.01, _perG63(a, 'p')) - _perG63(b, 'kcal') / Math.max(0.01, _perG63(b, 'p')))[0];
+        if (!grow) continue;
+        const _pGrow63 = _perG63(grow, 'p');
+        const _kcalGrow63 = _perG63(grow, 'kcal');
+        if (!(_pGrow63 > 0)) continue;
+        // Донор — регулярный приём с наибольшим белком, но богаче «порога + запас»:
+        // отдавать может только тот, кто сам не на полу MPS.
+        const donor = _reg63
+          .filter((m) => m !== main && (Number(m.totals?.p) || 0) / _w63 >= Math.max(0.45, 1.35 * _floor63 / _w63)
+            && _mass63(m) > 120)
+          .sort((a, b) => (Number(b.totals?.p) || 0) - (Number(a.totals?.p) || 0))[0];
+        const donorItem = donor ? ((donor.items || []) as any[])
+          .filter((i: any) => _PROT63.has(String(i.role)) && !(i as any)._fixedGrams && (Number(i.p) || 0) > 0 && (Number(i.amount) || 0) >= 40)
+          .sort((a: any, b: any) => (Number(b.p) || 0) - (Number(a.p) || 0))[0] : null;
+        // Сколько отдать донор может, не провалившись сам ниже порога и «крошки» 30 г.
+        const _need63 = _need0;
+        let _dG63 = 0;
+        if (donorItem) {
+          const _pD63 = _perG63(donorItem, 'p');
+          const _maxD63 = Math.min(
+            Math.round(_need63 / Math.max(0.001, _pD63)),
+            Math.round(Number(donorItem.amount) - 30),
+            Math.floor(Math.max(0, ((Number((donor as any).totals?.p) || 0) - _floor63) / Math.max(0.001, _pD63))),
+          );
+          if (_maxD63 >= 1) _dG63 = _maxD63;
+        }
+        // Сколько белка реально даст замена; если донор не дотягивает — остальное
+        // добираем ростом своего пункта (тарелка та же), но канон это проверит.
+        const _gGrowTot63 = Math.round(_need0 / Math.max(0.001, _pGrow63));
+        if (!(_gGrowTot63 > 0)) continue;
+        if (_mass63(main) + _gGrowTot63 > 500) continue;
+        const _deltaKcal63 = _gGrowTot63 * _kcalGrow63 - (_dG63 > 0 && donorItem ? _dG63 * _perG63(donorItem, 'kcal') : 0);
+        const _touched: Array<{ it: any; v: any }> = [];
+        const _snap63 = (it: any) => {
+          if (!it || _touched.some((t) => t.it === it)) return;
+          _touched.push({ it, v: { ...it } });
+        };
+        const _restore63 = () => {
+          for (const t of _touched) Object.assign(t.it, t.v);
+          recalcMealTotals(meals as any[]);
+          recalcDayTotals(meals as any[], totals);
+        };
+        _snap63(grow);
+        if (donorItem) _snap63(donorItem);
+        // Разницу калорий гасим гарниром донора (пол 30 г), затем — гарниром/жиром
+        // самой тарелки. Обмен держит день на цели, а не «перекачивает» его в белок.
+        const _carbCuts: any[] = donor
+          ? ((donor.items || []) as any[]).filter((i: any) => (i.role === 'carb_slow' || i.role === 'carb_fast') && !(i as any)._fixedGrams && (Number(i.amount) || 0) >= 60)
+          : [];
+        const _ownCuts: any[] = ((main.items || []) as any[]).filter((i: any) =>
+          ((i.role === 'carb_slow' || i.role === 'carb_fast') && !(i as any)._fixedGrams && (Number(i.amount) || 0) >= 60)
+          || (String(i.role) === 'fat' && !(i as any)._fixedGrams && (Number(i.amount) || 0) >= 5));
+        let _left63 = _deltaKcal63;
+        for (const d of [..._carbCuts.sort((a: any, b: any) => _perG63(b, 'kcal') - _perG63(a, 'kcal')),
+          ..._ownCuts.sort((a: any, b: any) => _perG63(b, 'kcal') - _perG63(a, 'kcal'))]) {
+          if (_left63 <= 1) break;
+          const _kpg = _perG63(d, 'kcal');
+          if (!(_kpg > 0)) continue;
+          const _isCarb = d.role === 'carb_slow' || d.role === 'carb_fast';
+          const _floorG = _isCarb ? 30 : 5;
+          const _cutMax = Math.max(0, (Number(d.amount) || 0) - _floorG);
+          if (_cutMax < 1) continue;
+          const _cut = Math.min(_cutMax, Math.round(_left63 / _kpg));
+          if (_cut < 1) continue;
+          _snap63(d);
+          _setG63(d, (Number(d.amount) || 0) - _cut);
+          _left63 -= _cut * _kpg;
+        }
+        _snap63(grow);
+        if (donorItem) _snap63(donorItem);
+        const _baseDev63 = _dev63();
+        _setG63(grow, (Number(grow.amount) || 0) + _gGrowTot63);
+        if (donorItem && _dG63 > 0) _setG63(donorItem, (Number(donorItem.amount) || 0) - _dG63);
+        recalcMealTotals(meals as any[]);
+        recalcDayTotals(meals as any[], totals);
+        const _devAfter63 = _dev63();
+        if (_devAfter63 > Math.max(0.03, _baseDev63 + 0.002)) {
+          _restore63();
+          continue;
+        }
+        _fixed63++;
+      }
+      if (_fixed63 > 0) {
+        notes.push(`🥩 Белок приёма: ${_fixed63} приём(ов) доведено до MPS-порога 0.30 г/кг переносом из самого богатого приёма дня — КБЖУ дня и канон 3% сохранены (§8.63).`);
+        const _idxQ63 = notes.findIndex((n) => typeof n === 'string' && n.startsWith('🥩 Белок по приёмам:'));
+        if (_idxQ63 >= 0) {
+          const _mains63 = (meals as any[]).filter((m) => !['preworkout', 'postworkout', 'intra', 'presleep'].includes(String(m.type)));
+          if (_mains63.length) {
+            const _min63 = Math.min(..._mains63.map((m) => Number(m.totals?.p) || 0));
+            notes[_idxQ63] = String(notes[_idxQ63]).replace(/минимум по основным приёмам \d+ г/, `минимум по основным приёмам ${Math.round(_min63)} г`);
+          }
+        }
+      }
+    }
     // Витрина MPS должна совпадать с ФИНАЛЬНЫМ планом (санитайзеры E17/E18 меняют items).
     if (typeof _refreshMpsFromMeals === 'function') _refreshMpsFromMeals();
     // Честная строка «белок по приёмам». Раньше она печаталась ДО сборки тарелок, по
