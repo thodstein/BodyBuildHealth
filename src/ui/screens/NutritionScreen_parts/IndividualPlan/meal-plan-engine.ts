@@ -15617,6 +15617,179 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
         }
       }
     }
+    // ─── §8.72: перекус не голодает по белку (HV-дни) ────────────────────────────
+    // Замер 60 дней: 59 бейджей «Б факт / порог», и 53 из них — ПЕРЕКУСЫ на
+    // high-volume днях (`c1500` 3.2/день, `hugeCarb` 4.0/день): день несёт 9 регулярных
+    // приёмов, белок при этом 8–18 г в перекусе при пороге `pd` 21–28 г. Причина: §8.63
+    // (перенос белка в слабый приём) на HV-днях ОТКЛЮЧЁН (`!_pickCtx.highVolumeDay`).
+    // Здесь — чистый обмен: перекус растит СВОЙ белковый пункт, ровно столько же белка
+    // снимается с донора (свой класс → пери-окно сверх контракта → основной приём сверх
+    // MPS-пола), поэтому белок дня не меняется by design. Замер: 59 → 50 бейджей,
+    // оценка 91.75 → 91.93 (0 дней хуже), канон 4 → 4, вёдра 88 → 88.
+    if ((input as any).hvSnackProtein72 !== false
+      && _pickCtx.highVolumeDay
+      && _pickCtx.qualityMode === 'full'
+      && !(input as any).manualTargetsLocked
+      && (input as any).kbjuMode !== 'manual'
+      && !(input as any).recipeAssembly
+      && !(input as any).portableMode) {
+      const _w72 = Math.max(1, Number(input.weightKg) || 0);
+      const _floor72 = 0.30 * _w72;
+      const _goal72 = {
+        k: Number(input.goalKcal) || 0,
+        p: Number(adjustedProteinG || input.goalProteinG) || 0,
+        f: Number(input.goalFatG) || 0,
+        c: Number(adjustedCarbsG || input.goalCarbsG) || 0,
+      };
+      // Канон дня меряем по СЫРЫМ целям профиля (так же, как его видит пользователь) —
+      // гейт берёт худшее из двух мер (сырая и скорректированная бюджетом дня).
+      const _rawGoal72 = {
+        k: Number(input.goalKcal) || 0,
+        p: Number(input.goalProteinG) || 0,
+        f: Number(input.goalFatG) || 0,
+        c: Number(input.goalCarbsG) || 0,
+      };
+      const _devOf72 = (g: typeof _goal72) => Math.max(
+        g.k > 0 ? Math.abs(Number(totals.kcal) - g.k) / g.k : 0,
+        g.p > 0 ? Math.abs(Number(totals.p) - g.p) / g.p : 0,
+        g.f > 0 ? Math.abs(Number(totals.f) - g.f) / g.f : 0,
+        g.c > 0 ? Math.abs(Number(totals.c) - g.c) / g.c : 0,
+      );
+      const _dev72 = () => Math.max(_devOf72(_goal72), _devOf72(_rawGoal72));
+      const _solid72 = (m: any) => ((m.items || []) as any[])
+        .filter((x: any) => !['liquid', 'supplement'].includes(String(x.role || '')))
+        .reduce((s: number, x: any) => s + (Number(x.amount) || 0), 0);
+      const _buckets72 = () => (meals as any[]).filter((m: any) => (m.items || []).length > 0 && _solid72(m) > 500).length;
+      const _PROT72 = new Set(['protein', 'fast_protein', 'slow_protein']);
+      const _scale72 = (x: any, grams: number) => {
+        const amt = Number(x.amount) || 0;
+        if (!(amt > 0) || grams <= 0) return;
+        const k = grams / amt;
+        x.amount = Math.round(grams);
+        for (const key of ['p', 'f', 'c', 'kcal', 'fiber', 'leucine_mg']) {
+          if (x[key]) x[key] = Math.round(Number(x[key]) * k * 10) / 10;
+        }
+      };
+      const _protItem72 = (m: any) => ((m.items || []) as any[])
+        .filter((x: any) => _PROT72.has(String(x.role)) && !x._fixedGrams)
+        .sort((a: any, b: any) => (Number(b.p) || 0) - (Number(a.p) || 0))[0];
+      const _reg72 = (meals as any[]).filter((m: any) => !['preworkout', 'postworkout', 'intra', 'presleep'].includes(String(m.type || ''))
+        && (m.items || []).length > 0);
+      // Донором может быть и пери-окно (только сверх своего `target.p`), поэтому снимок
+      // для откатов берём по всем приёмам с тарелкой.
+      const _pool72 = (meals as any[]).filter((m: any) => (m.items || []).length > 0);
+      let _b72 = _buckets72();
+      let _q72 = _qNow(_finalMicro);
+      let _d72 = _dev72();
+      // `target.pd` присваивается ниже по конвейеру (витрина §8.60-б) — считаем тот же
+      // порог здесь по той же формуле: пол = min(0.30 г/кг, бюджет дня / число приёмов).
+      const _FIXED72 = new Set(['preworkout', 'postworkout', 'intra', 'presleep']);
+      const _isFixed72 = (m: any) => _FIXED72.has(String(m?.type)) || !!(m as any)?._insulinWindow;
+      const _regsPd72 = (meals as any[]).filter((m: any) => m?.target && !_isFixed72(m));
+      const _mpsPd72 = Math.round(0.3 * _w72);
+      const _fixedPd72 = (meals as any[])
+        .filter((m: any) => m?.target && _isFixed72(m))
+        .reduce((s: number, m: any) => s + (Number(m.target.p) || 0), 0);
+      const _goalPd72 = Number(adjustedProteinG || input.goalProteinG) || 0;
+      const _fairPd72 = _regsPd72.length > 0 ? Math.max(0, _goalPd72 - _fixedPd72) / _regsPd72.length : _mpsPd72;
+      const _pd72 = Math.min(_mpsPd72, Math.max(Math.min(15, _mpsPd72), Math.round(_fairPd72)));
+      const _done72: string[] = [];
+      const _targets72 = _reg72.filter((m: any) => /^snack/.test(String(m.type || ''))
+        && _pd72 > 0 && (Number(m.totals?.p) || 0) < _pd72 - 3);
+      for (const recv of _targets72) {
+        const pd = _pd72;
+        const pNow = Number(recv.totals?.p) || 0;
+        // Целимся чуть выше порога, но не тащим в перекус больше 8 г белка за раз.
+        const dP = Math.min(8, pd - pNow + 0.5);
+        if (!(dP > 1.5)) continue;
+        const rIt = _protItem72(recv);
+        if (!rIt) continue;
+        const rPerG = (Number(rIt.p) || 0) / Math.max(1, Number(rIt.amount) || 1);
+        if (!(rPerG > 0.05)) continue;
+        // Донор: сначала СВОЙ класс (перекус → перекус), затем пери-окно сверх своего
+        // контракта, затем основной приём.
+        // Основной приём на HV-дне стоит ровно на MPS-полу 0.30 г/кг (110 кг → 33 г:
+        // завтрак 44, обед 33, ужин 35), и снимать с него белок — значит гасить якорь
+        // MPS ради красного бейджа на гликогеновом перекусе. Поэтому основной приём
+        // донор только с запасом над полом, а перекус — с запасом над `pd`.
+        // Пери-окно (пост-тренировочный whey) отдаёт только то, что выше своего
+        // `target.p` — контракт окна не нарушается.
+        // Порция: порошок (whey/изолят/казеин) — от 10 г; еда — от 40 г в перекусе и от
+        // 75 г в основном приёме у атлетов ≥80 кг (`planner-realism-guarantees` F1.8).
+        const _minPortion72 = (x: any, meal: any) => {
+          if (isProteinPowderId(x?.id)) return 10;
+          const isMainMeal = ['breakfast', 'lunch', 'dinner'].includes(String(meal?.type || ''));
+          return isMainMeal && _w72 >= 80 ? 75 : 40;
+        };
+        const donors = _pool72
+          .filter((m: any) => m !== recv)
+          .map((m: any) => {
+            const it = _protItem72(m);
+            if (!it) return null;
+            const perG = (Number(it.p) || 0) / Math.max(1, Number(it.amount) || 1);
+            if (!(perG > 0.05)) return null;
+            const isSnack = /^snack/.test(String(m.type || ''));
+            const isPeri = _isFixed72(m);
+            // Пол, ниже которого донор не опускается: перекус — pd (его собственный
+            // класс), пери-окно — свой `target.p`, основной приём — MPS-пол дня.
+            const keep = isPeri
+              ? (Number(m?.target?.p) || 0)
+              : (isSnack ? Math.max(pd, 0) : Math.max(_floor72, pd));
+            const roomP = (Number(m.totals?.p) || 0) - keep - 0.5;
+            const roomG = (Number(it.amount) - _minPortion72(it, m)) * perG;
+            const room = Math.min(roomP, roomG);
+            return { m, it, p: Number(m.totals?.p) || 0, perG, room, same: isSnack ? 2 : (isPeri ? 1 : 0) };
+          })
+          .filter((d: any) => d && d.room > 1)
+          .sort((a: any, b: any) => (b.same - a.same) || (b.room - a.room) || (b.p - a.p));
+        const d0 = donors[0];
+        if (!d0) continue;
+        // Не тащим в перекус больше, чем донор может отдать без обвала своей порции.
+        const dPuse = Math.min(dP, d0.room);
+        if (!(dPuse > 1.5)) continue;
+        const snap = _pool72.map((m: any) => ({ m, items: ((m.items || []) as any[]).map((x: any) => ({ ...x })) }));
+        const restore = () => {
+          for (const s of snap) s.m.items = s.items.map((x: any) => ({ ...x }));
+          recalcMealTotals(meals as any[]);
+          recalcDayTotals(meals as any[], totals);
+        };
+        const rAmt0 = Number(rIt.amount) || 0;
+        const dPerG = (Number(d0.it.p) || 0) / Math.max(1, Number(d0.it.amount) || 1);
+        const pDay0 = Number(totals.p) || 0;
+        // Шаг порции 5 г; еда не мельче 40 г, порошок — не мельче 10 г, потолок 200 г.
+        const rNew = Math.min(200, Math.max(_minPortion72(rIt, recv), Math.round((rAmt0 + dPuse / rPerG) / 5) * 5));
+        const dNew = Math.min(200, Math.max(_minPortion72(d0.it, d0.m), Math.round((Number(d0.it.amount) - dPuse / dPerG) / 5) * 5));
+        if (rNew <= Math.round(rAmt0) || dNew >= Math.round(Number(d0.it.amount))) continue;
+        _scale72(rIt, rNew);
+        _scale72(d0.it, dNew);
+        recalcMealTotals(meals as any[]);
+        recalcDayTotals(meals as any[], totals);
+        const dev = _dev72();
+        const buck = _buckets72();
+        const q = _qNow(_microNow());
+        // Белок дня — инвариант переноса. Порции белка идут шагом 5 г, поэтому перенос
+        // «грамм-в-грамм» сходится с точностью до шага (≤1.5 г на день).
+        const pDayDrift = Math.abs((Number(totals.p) || 0) - pDay0);
+        if (pDayDrift > 1.5) { restore(); continue; }
+        // Канон — жёсткий инвариант: день, который был в зоне 3%, в неё не выходит (запас
+        // 0.1 п.п., потому что «белок за белок» из разных продуктов тащит жир: замер
+        // c1500/4/отд — F 130.7 → 133.9 г, ровно на кромке 3%).
+        if (dev > Math.max(_d72, 0.029) + 1e-9 || (dev > 0.029 && _d72 <= 0.029) || buck > _b72 || q.total < _q72.total) {
+          restore();
+          continue;
+        }
+        _d72 = dev;
+        _b72 = buck;
+        _q72 = q;
+        _done72.push(`${String(recv.type)} ${Math.round(pNow)}→${Math.round(Number(recv.totals?.p) || 0)} г (${String(rIt.id)} ${Math.round(rAmt0)}→${Math.round(Number(rIt.amount))} г; взято у «${String(d0.m.label || d0.m.type)}»)`);
+      }
+      if (_done72.length > 0) {
+        _finalMicro = _microNow() ?? _finalMicro;
+        _resyncMps();
+        _refreshProteinNote();
+        notes.push(`🥩 Перекусы не голодают: ${_done72.join('; ')} — перенос «белок за белок»: белок дня сохранён (±1.5 г), основные приёмы-якоря не опускаются ниже 0.30 г/кг (§8.72).`);
+      }
+    }
     _jMark('final', 'Финал (микро/гигиена/витрина)');
     // ─── Качество рациона одним числом (0–100) ───────────────────────────────
     // Сходимость ≤3% говорит, что граммы совпали; она молчит о том, съедобен ли план.
