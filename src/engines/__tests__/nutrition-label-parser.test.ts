@@ -97,4 +97,70 @@ describe('nutrition-label-parser (фото упаковки)', () => {
     expect(entry).toMatchObject({ name: 'Йогурт', kcal: 60, protein: 3, fat: 2, carbs: 5, servingSize: '100 г', source: 'label_photo', barcode: '4600000000000' });
     expect(entry.id).toMatch(/^custom_label_/);
   });
+
+  it('понимает кДж, записанные с пробелом между разрядами', () => {
+    const parsed = parseNutritionLabel([
+      'Овсяные хлопья',
+      'Энергетическая ценность 1 500 кДж',
+      'Белки 12 г Жиры 6 г Углеводы 60 г',
+    ].join('\n'));
+    // Раньше regex видел «500 кДж» → 120 ккал.
+    expect(parsed!.kcal).toBe(359);
+  });
+
+  it('берёт ккал из пары «кДж/ккал», а не первое число', () => {
+    const parsed = parseNutritionLabel([
+      'Печенье',
+      'Пищевая ценность на 100 г',
+      'Энергетическая ценность, кДж/ккал',
+      '1256/300',
+      'Белки 5 г',
+      'Жиры 12 г',
+      'Углеводы 60 г',
+    ].join('\n'));
+    // Раньше 1256 уезжало в дневник как килокалории.
+    expect(parsed!.kcal).toBe(300);
+  });
+
+  it('чинит буквы-двойники OCR в значениях макросов', () => {
+    const parsed = parseNutritionLabel([
+      'Йогурт',
+      'Пищевая ценность на 100 г',
+      'Белки 1O г',
+      'Жиры З г',
+      'Углеводы 4,7 г',
+      'Энергетическая ценность 100 ккал',
+    ].join('\n'));
+    // Раньше «1O» → 1, а «З» (кириллическая) → 0.
+    expect(parsed).toMatchObject({ protein: 10, fat: 3, carbs: 4.7, kcal: 100 });
+  });
+
+  it('не считает массой порции значение из соседней строки', () => {
+    const parsed = parseNutritionLabel([
+      'Протеин',
+      'Пищевая ценность в порции',
+      'Белки 24 г',
+      'Жиры 2 г',
+      'Углеводы 3 г',
+      'Энергетическая ценность 125 ккал',
+    ].join('\n'))!;
+    // Раньше 24 г из строки «Белки 24 г» становились массой порции,
+    // и все значения умножались на 100/24 без предупреждения.
+    expect(parsed).toMatchObject({ kcal: 125, protein: 24, fat: 2, carbs: 3, basis: 'unknown' });
+    expect(parsed.warnings.join(' ')).toMatch(/масса не распознана/i);
+  });
+
+  it('не находит натрий в слове «banana» и не путает мг с магнием', () => {
+    const label = parseNutritionLabel([
+      'Banana chips',
+      'Nutrition Facts',
+      'Per 100 g',
+      'Protein 2 g',
+      'Fat 10 g',
+      'Carbohydrates 60 g',
+      'Energy 350 kcal',
+    ].join('\n'))!;
+    expect(label.micros.sodium_mg).toBeUndefined();
+    expect(label.micros.magnesium_mg).toBeUndefined();
+  });
 });

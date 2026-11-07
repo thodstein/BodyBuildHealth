@@ -10,7 +10,7 @@
  * указана только порция, пересчитываем по её массе; без массы — не выдумываем
  * множитель, а честно помечаем basis='unknown'.
  */
-import { parseMicroLine, type NutritionMicros } from './nutrition-ocr-parser';
+import { parseMicroLine, repairOcrNumericToken, type NutritionMicros } from './nutrition-ocr-parser';
 import type { CustomFoodEntry } from './meal-custom-food';
 
 export type NutritionLabelBasis = '100g' | 'serving' | 'unknown';
@@ -32,12 +32,27 @@ export interface ParsedNutritionLabel {
 }
 
 const ZERO_CONFUSION = /[ОоOo]/g;
-const NUMERIC = /(\d+(?:[.,]\d+)?)/;
+/** Буквы, которыми OCR заменяет цифры в числах этикетки. */
+const OCR_DIGITS = '0-9OoОоЗзSsLlIбБ';
+/**
+ * Число на этикетке: обычная запись, буквы-двойники OCR («1O» → 10,
+ * «Жиры З г» → 3 г) и разряды через пробел («1 500 кДж»). Первая ветка
+ * жадная, поэтому «1500» не распадается на «1» + «500».
+ */
+const LABEL_NUMBER = `([${OCR_DIGITS}]+(?:[.,][${OCR_DIGITS}]+)?|[${OCR_DIGITS}]{1,3}(?:[ ][${OCR_DIGITS}]{3})+(?:[.,][${OCR_DIGITS}]+)?)`;
+const SINGLE_OCR_DIGIT: Record<string, number> = {
+  'З': 3, 'з': 3, 'О': 0, 'о': 0, O: 0, o: 0, l: 1, I: 1, S: 5, s: 5,
+};
 
 function numeric(raw: string | undefined): number {
   if (!raw) return 0;
-  const value = Number.parseFloat(raw.replace(/\s+/g, '').replace(ZERO_CONFUSION, '0').replace(',', '.'));
-  return Number.isFinite(value) ? value : 0;
+  const compact = raw.replace(/\s+/g, '');
+  const repaired = repairOcrNumericToken(compact);
+  const value = Number.parseFloat(repaired.replace(ZERO_CONFUSION, '0').replace(',', '.'));
+  if (Number.isFinite(value)) return value;
+  // Отдельная буква-двойник: «Жиры З г» → 3 г, «Белки O г» → 0 г.
+  if (compact.length === 1 && SINGLE_OCR_DIGIT[compact] !== undefined) return SINGLE_OCR_DIGIT[compact];
+  return 0;
 }
 
 function round1(value: number): number {
@@ -115,14 +130,19 @@ function isPer100(text: string): boolean {
 
 function servingGrams(text: string): number {
   const sources = [
-    /(?:на|в)\s*(?:1\s*)?порци[а-яё]*[^\d]{0,28}(\d+(?:[.,]\d+)?)\s*(?:г|g|мл|ml)/i,
-    /(?:1\s*)?порци[а-яё]*\s*[()\-–—:]?\s*(\d+(?:[.,]\d+)?)\s*(?:г|g|мл|ml)/i,
-    /(?:serving\s*(?:size)?|per\s*serving)[^\d]{0,20}(\d+(?:[.,]\d+)?)\s*(?:g|ml)/i,
+    /(?:на|в)\s*(?:1\s*)?порци[а-яё]*([^\d\n]{0,28})(\d+(?:[.,]\d+)?)\s*(?:г|g|мл|ml)/i,
+    /(?:1\s*)?порци[а-яё]*([^\d\n]{0,16})(\d+(?:[.,]\d+)?)\s*(?:г|g|мл|ml)/i,
+    /(?:serving\s*(?:size)?|per\s*serving)([^\d\n]{0,20})(\d+(?:[.,]\d+)?)\s*(?:g|ml)/i,
   ];
   for (const pattern of sources) {
     const match = text.match(pattern);
-    const grams = numeric(match?.[1]);
-    if (grams > 0) return grams;
+    if (!match) continue;
+    // «Пищевая ценность в порции» и «Белки 24 г» на соседних строках — это не
+    // масса порции. Иначе 24 г становились «порцией», и все значения этикетки
+    // умножались на 100/24 ≈ 4,2 без единого предупреждения.
+    if (/(?:белк|жир|углевод|ккал|калор|энерг|protein|fat|carb|kcal|energy)/i.test(match[1] || '')) continue;
+    const grams = numeric(match[2]);
+    if (grams > 0 && grams <= 5000) return grams;
   }
   return 0;
 }
@@ -133,8 +153,21 @@ function isServingBasis(text: string): boolean {
 
 /** Ккал из текста; если только кДж — переводим (1 ккал = 4,184 кДж). */
 function findCalories(text: string, basis: NutritionLabelBasis): { kcal: number; fromKj: boolean } {
+  // Подпись «Энергетическая ценность, кДж/ккал» и пара значений «1256/300»:
+  // числа идут в том же порядке, что единицы в подписи. Раньше первое число
+  // (килоджоули) уезжало в дневник как килокалории.
+  const combined = text.match(new RegExp(
+    `(кдж|kcal|ккал|kj)\\s*[/\\\\]\\s*(кдж|kcal|ккал|kj)[^\\d]{0,12}${LABEL_NUMBER}\\s*[/\\\\]\\s*${LABEL_NUMBER}`,
+    'i',
+  ));
+  if (combined) {
+    const firstIsKcal = /ккал|kcal/i.test(combined[1]);
+    const value = numeric(firstIsKcal ? combined[3] : combined[4]);
+    if (value > 0) return { kcal: value, fromKj: !firstIsKcal };
+  }
+
   const matches: Array<{ value: number; index: number; serving: boolean }> = [];
-  const kcalPattern = /(\d+(?:[.,]\d+)?)\s*(?:ккал|kcal|cal\b|calories?)/gi;
+  const kcalPattern = new RegExp(`${LABEL_NUMBER}\\s*(?:ккал|kcal|cal\\b|calories?)`, 'gi');
   let match: RegExpExecArray | null;
   while ((match = kcalPattern.exec(text)) !== null) {
     const value = numeric(match[1]);
@@ -152,14 +185,14 @@ function findCalories(text: string, basis: NutritionLabelBasis): { kcal: number;
   // Таблица, где число стоит на следующей строке под «Энергетическая
   // ценность, ккал». Отдельный проход нужен, потому что прямой regex ищет
   // число ПЕРЕД «ккал» и такую раскладку пропускает.
-  const verticalKcal = text.match(/(?:энергетическая\s+ценность|калорийность)[^\d]{0,16}(?:ккал|kcal)(?:\s*[/на]*\s*100\s*(?:г|g))?[^\d]{0,12}(\d+(?:[.,]\d+)?)/i);
+  const verticalKcal = text.match(new RegExp(`(?:энергетическая\\s+ценность|калорийность)[^\\d]{0,16}(?:ккал|kcal)(?:\\s*[/на]*\\s*100\\s*(?:г|g))?[^\\d]{0,12}${LABEL_NUMBER}`, 'i'));
   if (verticalKcal) {
     const value = numeric(verticalKcal[1]);
     if (value > 0) return { kcal: value, fromKj: false };
   }
 
   const kjMatches: Array<{ value: number; index: number; serving: boolean }> = [];
-  const kjPattern = /(\d+(?:[.,]\d+)?)\s*(?:кдж|kj)/gi;
+  const kjPattern = new RegExp(`${LABEL_NUMBER}\\s*(?:кдж|kj)`, 'gi');
   while ((match = kjPattern.exec(text)) !== null) {
     const value = numeric(match[1]);
     if (value <= 0) continue;
@@ -176,9 +209,9 @@ function findCalories(text: string, basis: NutritionLabelBasis): { kcal: number;
 type MacroKey = 'p' | 'f' | 'c';
 
 const MACRO_PATTERNS: Record<MacroKey, RegExp[]> = {
-  p: [/(?:белк[а-яё]*|протеин[а-яё]*|proteins?)\s*(?:,?\s*(?:г|g))?\s*[:\-–—]?\s*(\d+(?:[.,]\d+)?)/i, /(?:^|\s)б\s*[:\-–—]\s*(\d+(?:[.,]\d+)?)/i],
-  f: [/(?:жир[а-яё]*|fats?)\s*(?:,?\s*(?:г|g))?\s*[:\-–—]?\s*(\d+(?:[.,]\d+)?)/i, /(?:^|\s)ж\s*[:\-–—]\s*(\d+(?:[.,]\d+)?)/i],
-  c: [/(?:углевод[а-яё]*|carbohydrates?|carbs?)\s*(?:,?\s*(?:г|g))?\s*[:\-–—]?\s*(\d+(?:[.,]\d+)?)/i, /(?:^|\s)у\s*[:\-–—]\s*(\d+(?:[.,]\d+)?)/i],
+  p: [new RegExp(`(?:белк[а-яё]*|протеин[а-яё]*|proteins?)\\s*(?:,?\\s*(?:г|g))?\\s*[:\\-–—]?\\s*${LABEL_NUMBER}`, 'i'), new RegExp(`(?:^|\\s)б\\s*[:\\-–—]\\s*${LABEL_NUMBER}`, 'i')],
+  f: [new RegExp(`(?:жир[а-яё]*|fats?)\\s*(?:,?\\s*(?:г|g))?\\s*[:\\-–—]?\\s*${LABEL_NUMBER}`, 'i'), new RegExp(`(?:^|\\s)ж\\s*[:\\-–—]\\s*${LABEL_NUMBER}`, 'i')],
+  c: [new RegExp(`(?:углевод[а-яё]*|carbohydrates?|carbs?)\\s*(?:,?\\s*(?:г|g))?\\s*[:\\-–—]?\\s*${LABEL_NUMBER}`, 'i'), new RegExp(`(?:^|\\s)у\\s*[:\\-–—]\\s*${LABEL_NUMBER}`, 'i')],
 };
 
 // Подпись без значения («Белки, г»), за которой число стоит на следующей
@@ -189,7 +222,7 @@ const BARE_MACRO_LINE: Record<MacroKey, RegExp> = {
   f: /^(?:жир[а-яё]*|fats?)(?:\s*,?\s*(?:г|g))?\s*$/i,
   c: /^(?:углевод[а-яё]*|carbohydrates?|carbs?)(?:\s*,?\s*(?:г|g))?\s*$/i,
 };
-const BARE_NUMBER_LINE = /^(\d+(?:[.,]\d+)?)\s*(?:г|g)?$/i;
+const BARE_NUMBER_LINE = new RegExp(`^${LABEL_NUMBER}\\s*(?:г|g)?$`, 'i');
 
 function macroFromLine(line: string, key: MacroKey): number {
   for (const pattern of MACRO_PATTERNS[key]) {
@@ -223,7 +256,7 @@ function parseMacros(lines: string[]): Record<MacroKey, number> {
   // подписи). Используем только когда ни один макрос не распознан.
   if (result.p === 0 && result.f === 0 && result.c === 0) {
     for (const line of lines) {
-      const compact = line.trim().match(/^(\d+(?:[.,]\d+)?)\s+(\d+(?:[.,]\d+)?)\s+(\d+(?:[.,]\d+)?)(?:\s*(?:г|g))?$/);
+      const compact = line.trim().match(new RegExp(`^${LABEL_NUMBER}\\s+${LABEL_NUMBER}\\s+${LABEL_NUMBER}(?:\\s*(?:г|g))?$`));
       if (compact) {
         result.p = numeric(compact[1]);
         result.f = numeric(compact[2]);
@@ -236,7 +269,7 @@ function parseMacros(lines: string[]): Record<MacroKey, number> {
 }
 
 function findFiber(text: string): number {
-  const match = text.match(/(?:пищевые\s+волокна|клетчатк[а-яё]*|fiber)\s*(?:,?\s*(?:г|g))?\s*[:\-–—]?\s*(\d+(?:[.,]\d+)?)/i);
+  const match = text.match(new RegExp(`(?:пищевые\\s+волокна|клетчатк[а-яё]*|fiber)\\s*(?:,?\\s*(?:г|g))?\\s*[:\\-–—]?\\s*${LABEL_NUMBER}`, 'i'));
   return match ? numeric(match[1]) : 0;
 }
 

@@ -95,6 +95,9 @@ function normalizeName(raw: string): string {
   return String(raw ?? '').toLowerCase().replace(/ё/g, 'е').replace(/[^a-zа-я0-9]+/gi, ' ').trim();
 }
 
+/** Имена-заглушки: по ним нельзя решать, что это тот же самый продукт. */
+const GENERIC_FOOD_NAMES = new Set(['продукт с упаковки', 'продукт', 'блюдо', 'неизвестно', 'unknown', 'food']);
+
 export function saveCustomFood(entry: CustomFoodEntry): void {
   const foods = loadCustomFoods();
   const idx = foods.findIndex(f => f.id === entry.id);
@@ -116,11 +119,20 @@ export function saveOrUpdateCustomFood(entry: CustomFoodEntry): CustomFoodEntry 
   if (barcode) {
     idx = foods.findIndex(f => barcodeVariants(f.barcode).includes(barcode));
   }
-  if (idx < 0 && name) {
-    idx = foods.findIndex(f => normalizeName(f.name) === name);
+  // Совпадение по названию — только если штрихкоды не конфликтуют: второй
+  // товар той же марки/вкуса с другим штрихкодом раньше затирал первый, и
+  // сканер начинал отдавать чужое КБЖУ. Безымянный «Продукт с упаковки» по
+  // названию не ищем вовсе — иначе все фото без названия сливались в одну запись.
+  if (idx < 0 && name && !GENERIC_FOOD_NAMES.has(name)) {
+    idx = foods.findIndex(f => normalizeName(f.name) === name && (!barcode || !normalizeBarcode(f.barcode)));
   }
   if (idx >= 0) {
-    const merged: CustomFoodEntry = { ...foods[idx], ...entry, id: foods[idx].id };
+    const existing = foods[idx];
+    const merged: CustomFoodEntry = { ...existing, ...entry, id: existing.id };
+    // Новый снимок без штрихкода не должен стирать уже известный штрихкод,
+    // а «Продукт с упаковки» — нормальное имя, которое уже есть у записи.
+    if (!barcode && existing.barcode) merged.barcode = existing.barcode;
+    if (GENERIC_FOOD_NAMES.has(name) && existing.name) merged.name = existing.name;
     foods[idx] = merged;
     try { localStorage.setItem(CUSTOM_FOODS_KEY, JSON.stringify(foods)); } catch { /* quota */ }
     notifyChanged();

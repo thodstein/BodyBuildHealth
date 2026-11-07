@@ -66,6 +66,33 @@ function pushRecent(barcode: string, name: string, kcal: number): RecentScan[] {
   }
 }
 
+function parseNumberField(value: string, fallback: number): number {
+  const parsed = Number.parseFloat(String(value ?? '').replace(',', '.'));
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback;
+}
+
+/**
+ * Своя еда из формы сканера. Без настоящего штрихкода `barcode` остаётся
+ * пустым, а id локальный: раньше вместо него подставлялся Date.now() —
+ * 13-значный «штрихкод», который уходил в общую базу сканирований и мог
+ * совпасть с настоящим GTIN другого товара.
+ */
+export function buildCustomBarcodeProduct(input: { barcode: string; name: string; kcal: string; p: string; f: string; c: string }): OFFProduct {
+  const digits = String(input.barcode || '').replace(/\D/g, '');
+  return {
+    id: digits || `custom_${Date.now()}`,
+    barcode: digits,
+    name: input.name.trim(),
+    kcal: Math.round(parseNumberField(input.kcal, 100)),
+    protein: parseNumberField(input.p, 0),
+    fat: parseNumberField(input.f, 0),
+    carbs: parseNumberField(input.c, 0),
+    fiber: 0,
+    servingSize: '100 г',
+    cachedAt: Date.now(),
+  } as OFFProduct;
+}
+
 const ModernCreateFood: React.FC<{ error: string; barcode: string; onProductFound: (p: OFFProduct)=>void; btnStyle: React.CSSProperties; onLabelScan?: () => void }> = ({ error, barcode, onProductFound, onLabelScan }) => {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState('');
@@ -78,11 +105,12 @@ const ModernCreateFood: React.FC<{ error: string; barcode: string; onProductFoun
   const handleSave = async () => {
     if (!canSave) return;
     setSaving(true);
-    const kc = Number(kcal) || 100, pp = Number(p)||0, ff=Number(f)||0, cc=Number(c)||0;
-    const bc = (barcode || 'custom_' + Date.now()).replace(/\D/g,'') || 'custom_' + Date.now();
-    const prod: OFFProduct = { id: bc, barcode: bc, name: name.trim(), kcal: isNaN(kc)?100:kc, protein: isNaN(pp)?0:pp, fat: isNaN(ff)?0:ff, carbs: isNaN(cc)?0:cc, fiber:0, servingSize:'100 г', cachedAt: Date.now() } as any;
-    try { await saveToCache(prod); } catch {}
-    try { await saveSharedBarcode(prod); } catch {}
+    const prod = buildCustomBarcodeProduct({ barcode, name, kcal, p, f, c });
+    // Кэшировать по штрихкоду можно только реальный код.
+    if (prod.barcode) {
+      try { await saveToCache(prod); } catch {}
+      try { await saveSharedBarcode(prod); } catch {}
+    }
     onProductFound(prod);
   };
   if (!open) {
@@ -165,13 +193,26 @@ export const BarcodeScanner: React.FC<Props> = ({ onProductFound, onClose, onLab
   const handleBarcodeLookup = useCallback(async (code?: string) => {
     const raw = code || barcodeRef.current.trim();
     const bc = raw.replace(/\D/g, '');
-    if (!bc) return;
+    // Раньше пустой/буквенный код молча игнорировался — нажатие «Найти» ничего
+    // не делало и выглядело как зависший сканер.
+    if (!bc) { setError('В штрихкоде нет цифр. Введите 8–13 цифр EAN/UPC или отсканируйте код камерой.'); return; }
     if (bc.length < 8) { setError('Штрихкод слишком короткий. EAN-13 — 13 цифр.'); return; }
     barcodeRef.current = bc;
     setBarcode(bc);
     setLoading(true);
     setError('');
     setShowSettings(false);
+    // Продукт без КБЖУ (частая дыра в Open Food Facts) не отдаём молча:
+    // в дневник уезжала позиция с 0 ккал / 0 БЖУ. Предлагаем снять этикетку.
+    const rejectIncomplete = (product: OFFProduct): boolean => {
+      const hasValues = (Number(product.kcal) || 0) > 0
+        || (Number(product.protein) || 0) > 0
+        || (Number(product.fat) || 0) > 0
+        || (Number(product.carbs) || 0) > 0;
+      if (hasValues) return false;
+      setError(`«${product.name}» найден, но в базе нет КБЖУ — в дневник попали бы нули. Снимите этикетку (кнопка ниже) или введите значения вручную: штрихкод ${bc} сохранится.`);
+      return true;
+    };
     try {
       // Свои продукты (в т.ч. распознанные с упаковки) — до сети: одинаковый
       // штрихкод должен находить ровно ту запись, которую сохранил пользователь.
@@ -187,12 +228,14 @@ export const BarcodeScanner: React.FC<Props> = ({ onProductFound, onClose, onLab
       setLookupStep('Проверяем локальный кэш и Open Food Facts…');
       const product = await searchByBarcode(bc);
       if (product) {
+        if (rejectIncomplete(product)) return;
         deliverProduct(product, bc);
         return;
       }
       setLookupStep('Ищем в общей базе сканирований…');
       const shared = await searchSharedBarcode(bc);
       if (shared) {
+        if (rejectIncomplete(shared)) return;
         try { await saveToCache(shared); } catch {}
         deliverProduct(shared, bc);
         return;
@@ -214,6 +257,7 @@ export const BarcodeScanner: React.FC<Props> = ({ onProductFound, onClose, onLab
           servingSize: '100 г',
           cachedAt: Date.now(),
         } as OFFProduct;
+        if (rejectIncomplete(mapped)) return;
         deliverProduct(mapped, bc);
         return;
       }

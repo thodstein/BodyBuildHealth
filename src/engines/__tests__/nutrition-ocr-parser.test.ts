@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { fillMissingMicros, parseFatSecretText, parseMicroLine, parseMyFitnessPalText, parseNutritionScreenshot, parseNutritionText, quantityToGrams, parseVerticalNutritionTable } from '../nutrition-ocr-parser';
+import { fillMissingMicros, normalizeOcrArtifacts, parseFatSecretText, parseMicroLine, parseMyFitnessPalText, parseNutritionScreenshot, parseNutritionText, quantityToGrams, parseVerticalNutritionTable } from '../nutrition-ocr-parser';
 
 describe('nutrition-ocr-parser', () => {
   describe('MyFitnessPal APK screenshots', () => {
@@ -75,7 +75,7 @@ describe('nutrition-ocr-parser', () => {
       expect(meals).toHaveLength(1);
       expect(meals[0]).toMatchObject({ date: '2026-09-24', mealType: 'Завтрак' });
       expect(meals[0].items).toHaveLength(1);
-      expect(meals[0].items[0]).toMatchObject({ name: 'Oatmeal', qtyGrams: 240, kcal: 63, c: 12, f: 1.4, p: 2.5 });
+      expect(meals[0].items[0]).toMatchObject({ name: 'Oatmeal', qtyGrams: 240, kcal: 63, c: 11.3, f: 1.3, p: 2.1 });
     });
 
     it('ignores calorie totals as food rows and rejects impossible calendar dates', () => {
@@ -129,7 +129,9 @@ describe('nutrition-ocr-parser', () => {
 Яйца 100 г 150 ккал`;
       const meals = parseFatSecretText(text);
       expect(meals.length).toBeGreaterThanOrEqual(1);
-      expect(meals[0].date).toBe('01.02.2026');
+      // Дата дневника — всегда ISO-ключ: раньше сюда сохранялась сырая строка
+      // «01.02.2026», и запись не попадала в день 2026-02-01.
+      expect(meals[0].date).toBe('2026-02-01');
     });
 
     it('handles empty input', () => {
@@ -390,6 +392,33 @@ describe('nutrition-ocr-parser', () => {
       expect(parseMicroLine('Vit A 120 mcg Vit C 15 mg B12 0,5 mcg')).toMatchObject({ vitamin_a_mcg: 120, vitamin_c_mg: 15, vitamin_b12_mcg: 0.5 });
     });
 
+    it('не находит микроэлементы внутри слов и не считает «mg» магнием', () => {
+      // Раньше `na` без границ слова матчил «baNAna 120 ккал» → 120 мг натрия.
+      expect(parseMicroLine('Банан 120 ккал').sodium_mg).toBeUndefined();
+      const micros = parseMicroLine('Sodium 130 mg Potassium 300 mg');
+      expect(micros).toMatchObject({ sodium_mg: 130, potassium_mg: 300 });
+      expect(micros.magnesium_mg).toBeUndefined();
+      // Символ Mg по-прежнему читается как магний.
+      expect(parseMicroLine('Mg 20')).toMatchObject({ magnesium_mg: 20 });
+    });
+
+    it('не принимает произвольную строку за заголовок таблицы микроэлементов', () => {
+      // Раньше любой текст без цифр («Завтрак») объявлялся заголовком из всех
+      // 13 колонок, и следующая строка чисел уходила в натрий/калий/магний.
+      const item = parseFatSecretText('Завтрак\nКурица 200 г 330 ккал\n2,8 3,2 4,7').flatMap(meal => meal.items)[0];
+      expect(item.micros?.sodium_mg).toBeUndefined();
+      expect(item.micros?.potassium_mg).toBeUndefined();
+    });
+
+    it('приводит макросы из БД к калорийности строки, где есть только ккал', () => {
+      // «Овсянка 100 г 350 ккал» — калории из дневника, а белки/жиры/углеводы
+      // подставлялись из FOOD_DB без пересчёта (варёная овсянка 71 ккал).
+      const item = parseNutritionText('Овсянка 100 г 350 ккал').flatMap(meal => meal.items)[0];
+      const macroKcal = item.p * 4 + item.f * 9 + item.c * 4;
+      expect(item.kcal).toBe(350);
+      expect(Math.abs(macroKcal - item.kcal)).toBeLessThan(40);
+    });
+
     it('assigns confidence scores to parsed items', () => {
       const withMacros = parseFatSecretText('Завтрак\nКурица 200 г 330 ккал Б:40 Ж:10 У:0');
       const foodOnly = parseFatSecretText('Завтрак\nКурица 200 г');
@@ -444,6 +473,14 @@ describe('nutrition-ocr-parser', () => {
       expect(item.f).toBe(5);
     });
 
+    it('склеивает разбитое OCR число только перед единицей, а не колонки макросов', () => {
+      // «3 3 0 ккал» — одно число, его надо склеить.
+      expect(normalizeOcrArtifacts('Курица 3 3 0 ккал')).toBe('Курица 330 ккал');
+      // «150 ккал 27 3 5» — калории и три колонки БЖУ; раньше получалось
+      // «153 2735», и макросы подменялись значениями из БД.
+      expect(normalizeOcrArtifacts('Oatmeal 1 cup 150 kcal 27 3 5')).toBe('Oatmeal 1 cup 150 ккал 27 3 5');
+    });
+
     it('collapses comma-separated OCR digits with 3 groups', () => {
       const meals = parseFatSecretText('Завтрак\nКурица 200 г 3,3,0 ккал Б:40 Ж:10 У:0');
       const item = meals[0].items[0];
@@ -462,6 +499,22 @@ describe('nutrition-ocr-parser', () => {
       expect(meals.length).toBeGreaterThanOrEqual(1);
       const items = meals.flatMap(m => m.items);
       expect(items.length).toBeGreaterThanOrEqual(2);
+    });
+
+    it('нормализует дату скриншота в ISO-ключ дневника', () => {
+      const meals = parseNutritionScreenshot([
+        '14.03.2026',
+        'Обед',
+        'Куриная грудка 200 г · 330 ккал · Б 40 Ж 10 У 0',
+      ].join('\n'));
+      // Раньше в date сохранялась сырая строка «14.03.2026», и запись не
+      // попадала ни в один день дневника.
+      expect(meals[0].date).toBe('2026-03-14');
+    });
+
+    it('считает ккал для вертикальной таблицы без энергетической ценности', () => {
+      const meals = parseNutritionScreenshot(['Белки 12', 'Жиры 6', 'Углеводы 60'].join('\n'));
+      expect(meals[0].items[0]).toMatchObject({ p: 12, f: 6, c: 60, kcal: 342 });
     });
 
     it('creates currentMeal for unrecognized lines', () => {

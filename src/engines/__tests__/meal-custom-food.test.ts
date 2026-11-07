@@ -58,6 +58,28 @@ describe('meal-custom-food: своя база продуктов', () => {
     expect(loadCustomFoods()[0].kcal).toBe(65);
   });
 
+  it('не сливает два товара с одинаковым названием, но разными штрихкодами', () => {
+    saveOrUpdateCustomFood(entry({ barcode: '4600000000000' }));
+    saveOrUpdateCustomFood(entry({ id: 'other', kcal: 99, barcode: '4600000000001' }));
+    // Раньше второй товар затирал первый, и сканер отдавал чужое КБЖУ.
+    expect(loadCustomFoods()).toHaveLength(2);
+    expect(findCustomFoodByBarcode('4600000000000')?.kcal).toBe(60);
+    expect(findCustomFoodByBarcode('4600000000001')?.kcal).toBe(99);
+  });
+
+  it('снимок без штрихкода не стирает уже известный штрихкод', () => {
+    saveOrUpdateCustomFood(entry({ barcode: '4600000000000' }));
+    const merged = saveOrUpdateCustomFood(entry({ id: 'photo', kcal: 65 }));
+    expect(merged.barcode).toBe('4600000000000');
+    expect(findCustomFoodByBarcode('4600000000000')?.kcal).toBe(65);
+  });
+
+  it('не сливает безымянные «Продукт с упаковки» в одну запись', () => {
+    saveOrUpdateCustomFood(entry({ name: 'Продукт с упаковки', barcode: '4600000000000' }));
+    saveOrUpdateCustomFood(entry({ id: 'second', name: 'Продукт с упаковки', barcode: '4600000000001' }));
+    expect(loadCustomFoods()).toHaveLength(2);
+  });
+
   it('отдаёт FoodItem для поиска в дневнике', () => {
     const food = customFoodToFoodItem(entry({ sodium_mg: 40, barcode: '460' }));
     expect(food).toMatchObject({ id: 'custom_label_1', name: 'Йогурт 2%', kcal: 60, protein: 3, fat: 2, carbs: 5, category: 'dairy', servingSize: '100 г' });

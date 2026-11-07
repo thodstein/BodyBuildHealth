@@ -79,6 +79,34 @@ async function recognizePass(buffer: Buffer, language: keyof typeof TESSERACT_LA
   }
 }
 
+/**
+ * Слияние двух языковых проходов OCR.
+ *
+ * Английский проход нужен, чтобы дочитать латинские метки (HbA1c, TSH, ALT,
+ * HDL…), которые русская модель превращает в кириллический мусор. Но если
+ * русский проход уже прочитал таблицу КБЖУ, английский добавлял второй набор
+ * строк-двойников (латиница вместо кириллицы), и парсер видел позицию дважды.
+ */
+const CYRILLIC_NUTRITION_MARKER = /ккал|калори|белк|жир|углев|порци|завтрак|обед|ужин|перекус/gi;
+const LATIN_OCR_MARKER = /\b(?:hba1c|tsh|alt|ast|hdl|ldl|vldl|crp|psa|gfr|esr|mcv|mch|mchc|rdw|wbc|rbc|plt|hgb|ggt|t3|t4|ft3|ft4|igf|apob|homocysteine|vitamin\s*[a-k]|protein|fat|carbs?|carbohydrates?|kcal|kj|energy|fiber|sodium|potassium|magnesium|calcium|iron|zinc)\b/gi;
+
+function countMatches(text: string, pattern: RegExp): number {
+  return (text.match(pattern) || []).length;
+}
+
+export function mergeOcrPasses(rusText: string, engText: string): string {
+  const rus = (rusText || '').trim();
+  const eng = (engText || '').trim();
+  if (!rus) return eng;
+  if (!eng) return rus;
+  // Русская этикетка/дневник уже прочитаны — латинский проход только продублирует строки.
+  if (countMatches(rus, CYRILLIC_NUTRITION_MARKER) >= 1) return rus;
+  const rusLatin = countMatches(rus, LATIN_OCR_MARKER);
+  const engLatin = countMatches(eng, LATIN_OCR_MARKER);
+  if (engLatin > rusLatin) return `${rus}\n${eng}`;
+  return rus;
+}
+
 async function recognizeImage(buffer: Buffer): Promise<string> {
   const rus = (await recognizePass(buffer, 'rus')).trim();
   // Вторая модель — латинские аббревиатуры. На русском бланке анализов метки
@@ -88,28 +116,9 @@ async function recognizeImage(buffer: Buffer): Promise<string> {
   // текст уже получен.
   let eng = '';
   try { eng = (await recognizePass(buffer, 'eng')).trim(); } catch { /* опциональный проход */ }
-  // Бланки анализов (Инвитро/Хеликс/Гемотест/КДЛ) и скриншоты питания
-  // содержат латинские аббревиатуры (HbA1c, TSH, ALT, HDL, LDL, GFR,
-  // CRP и т.д.), которые русская модель читает как мусор. Поэтому
-  // английский проход добавляем ВСЕГДА, когда он вернул непустой текст —
-  // даже если nutritionOcrScore = 0 (чистый бланк без макро-этикеток).
-  // Парсеры ниже дедуплицируют маркеры по коду, дублей строк не будет.
-  if (eng.trim()) {
-    if (!rus) return eng;
-    return `${rus}\n${eng}`;
-  }
-  if (rus) return rus;
+  const merged = mergeOcrPasses(rus, eng);
+  if (merged) return merged;
   throw new Error('OCR returned empty text');
-}
-
-function nutritionOcrScore(text: string, language: keyof typeof TESSERACT_LANG_PATHS): number {
-  const labels = text.match(/жир|углев|белк|ккал|калори|fat|carb|protein|calor|завтрак|обед|ужин|breakfast|lunch|dinner/gi)?.length || 0;
-  const foodWords = text.match(/куриц|рис|манк|протеин|масло|chicken|rice|protein|oil|oat|beef|salmon/gi)?.length || 0;
-  const numericRows = text.split(/\r?\n/).filter(line => (line.match(/\d+(?:[.,]\d+)?/g)?.length || 0) >= 3).length;
-  const scriptWords = language === 'rus'
-    ? (text.match(/[А-Яа-яЁё]{3,}/g)?.length || 0)
-    : (text.match(/[A-Za-z]{3,}/g)?.length || 0);
-  return labels * 10 + foodWords * 8 + numericRows * 3 + scriptWords;
 }
 
 function decodeBase64(value: string): Buffer {

@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, expect, it, vi } from 'vitest';
-import handler from '../../../api/ocr-image';
+import handler, { mergeOcrPasses } from '../../../api/ocr-image';
 
 function invoke(req: any) {
   const state: { status: number; body: unknown } = { status: 200, body: undefined };
@@ -31,5 +31,27 @@ describe('api/ocr-image', () => {
       expect(result.status).toBe(422);
       expect(result.body).toMatchObject({ ok: false, error: 'Image data must be valid base64' });
     } finally { errorSpy.mockRestore(); }
+  });
+});
+
+describe('api/ocr-image: слияние языковых проходов', () => {
+  it('не добавляет английский дубль к уже прочитанной русской этикетке', () => {
+    const rus = 'Завтрак\nОвсянка 100 г 350 ккал\nБелки 12 г';
+    const eng = 'Breakfast\nOatmeal 100 g 350 kcal\nProtein 12 g';
+    expect(mergeOcrPasses(rus, eng)).toBe(rus);
+  });
+
+  it('добавляет латинские метки бланка анализов, которые русский проход не прочитал', () => {
+    const rus = 'Глюкоза 5,4 ммоль/л\nХолестерин общий 4,8';
+    const eng = 'HbA1c 5.4\nHDL 1.2\nLDL 2.8';
+    const merged = mergeOcrPasses(rus, eng);
+    expect(merged).toContain('Глюкоза');
+    expect(merged).toContain('HbA1c');
+  });
+
+  it('возвращает единственный непустой проход как есть', () => {
+    expect(mergeOcrPasses('', 'Protein 10 g')).toBe('Protein 10 g');
+    expect(mergeOcrPasses('Белки 10 г', '')).toBe('Белки 10 г');
+    expect(mergeOcrPasses('', '')).toBe('');
   });
 });

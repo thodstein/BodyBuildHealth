@@ -137,7 +137,10 @@ export function useLabelScan({ showToast, onAddToQueue }: Options) {
       setHint('Распознаём этикетку…');
       const file = await dataUrlToFile(photo.uri, photo.format);
       const native = isCapacitorNative();
-      const timeoutMs = native ? 140_000 : 55_000;
+      // Веб: серверный OCR (2 эндпоинта × 35 с) + офлайн-фолбэк (90 с) = до
+      // ~160 с. Прежние 55 с обрывали распознавание на живом сервере, и
+      // пользователь видел «таймаут» вместо готового результата.
+      const timeoutMs = native ? 140_000 : 170_000;
       const result = await Promise.race([
         processUploadedFile(file, {
           purpose: 'nutrition',
@@ -150,7 +153,7 @@ export function useLabelScan({ showToast, onAddToQueue }: Options) {
         }),
         new Promise<never>((_, reject) => setTimeout(() => reject(new Error(native
           ? 'Распознавание не ответило за 140 секунд. Сфотографируйте только блок «Пищевая ценность» при хорошем свете.'
-          : 'Распознавание не ответило за 55 секунд. Попробуйте фото меньшего размера.')), timeoutMs)),
+          : 'Распознавание не ответило за 170 секунд. Сфотографируйте только блок «Пищевая ценность» при хорошем свете или сделайте снимок меньшего размера.')), timeoutMs)),
       ]);
       if (requestId !== requestRef.current) return;
       setRawText(result.text || '');

@@ -49,7 +49,11 @@ export function repairOcrNumericToken(token: string): string {
 
 export function normalizeOcrArtifacts(text: string): string {
   return text
-    .replace(/(\d)\s+(\d)\s+(\d)/g, '$1$2$3')
+    // OCR иногда разбивает одно число пробелами («3 3 0 ккал»). Склеиваем
+    // такое число только перед единицей измерения/энергией: иначе строка
+    // макросов «150 ккал 27 3 5» превращалась в «153 2735», и колонки
+    // калорий оставались без БЖУ.
+    .replace(/(\d)\s+(\d)\s+(\d)(?=\s*(?:ккал|kcal|кДж|kj|г|g|мл|ml)(?![0-9A-Za-zА-Яа-яЁё]))/gi, '$1$2$3')
     .replace(/(\d)[,.](\d)[,.](\d)/g, '$1$2$3')
     .replace(/[\u2010\u2011\u2012\u2013\u2014\u2015]/g, '-')
     .replace(/[“”„‟«»]/g, '"')
@@ -322,8 +326,11 @@ const MICRO_LABELS: Array<[RegExp, string, string]> = [
 
 export function parseMicroLine(line: string): NutritionMicros {
   const result: NutritionMicros = {};
-  const keys: Record<string, string> = { натрий: 'sodium_mg', sodium: 'sodium_mg', na: 'sodium_mg', калий: 'potassium_mg', potassium: 'potassium_mg', k: 'potassium_mg', магний: 'magnesium_mg', magnesium: 'magnesium_mg', mg: 'magnesium_mg', кальций: 'calcium_mg', calcium: 'calcium_mg', ca: 'calcium_mg', железо: 'iron_mg', iron: 'iron_mg', fe: 'iron_mg', цинк: 'zinc_mg', zinc: 'zinc_mg', zn: 'zinc_mg', фосфор: 'phosphorus_mg', phosphorus: 'phosphorus_mg', p: 'phosphorus_mg' };
-  for (const match of line.matchAll(/(натрий|sodium|na|калий|potassium|k|магний|magnesium|mg|кальций|calcium|ca|железо|iron|fe|цинк|zinc|zn|фосфор|phosphorus|p)\s*[:\-]?\s*(\d+(?:[.,]\d+)?)\s*(мг|mg|мкг|mcg|г|g)?/gi)) {
+  const keys: Record<string, string> = { натрий: 'sodium_mg', sodium: 'sodium_mg', na: 'sodium_mg', калий: 'potassium_mg', potassium: 'potassium_mg', k: 'potassium_mg', магний: 'magnesium_mg', magnesium: 'magnesium_mg', кальций: 'calcium_mg', calcium: 'calcium_mg', ca: 'calcium_mg', железо: 'iron_mg', iron: 'iron_mg', fe: 'iron_mg', цинк: 'zinc_mg', zinc: 'zinc_mg', zn: 'zinc_mg', фосфор: 'phosphorus_mg', phosphorus: 'phosphorus_mg', p: 'phosphorus_mg' };
+  // Границы слова обязательны: без них `na` матчил «baNAna 120 ккал» и
+  // записывал 120 мг натрия в продукт, где натрий не указан. `mg` как ярлык
+  // магния убран — в таблицах это единица измерения («Sodium 130 mg»).
+  for (const match of line.matchAll(/(?:^|[^А-Яа-яЁёA-Za-z])(натрий|sodium|na|калий|potassium|k|магний|magnesium|кальций|calcium|ca|железо|iron|fe|цинк|zinc|zn|фосфор|phosphorus|p)(?![А-Яа-яЁёA-Za-z])\s*[:\-]?\s*(\d+(?:[.,]\d+)?)\s*(мг|mg|мкг|mcg|г|g)?/gi)) {
     const value = numberFrom(match[2], 0);
     const unit = (match[3] || 'mg').toLowerCase();
     result[keys[match[1].toLowerCase()]] = Math.round((unit === 'г' || unit === 'g' ? value * 1000 : value) * 100) / 100;
@@ -642,6 +649,12 @@ function normalizeItem(name: string, qty: string, kcal: number, p: number, f: nu
     ocrSuspicious = true;
     rejectOcrMacros = true;
   }
+  // Строка дневника часто содержит только ккал («Овсянка 100 г 350 ккал»).
+  // Макросы из БД раньше подставлялись без пересчёта: 350 ккал и 2,5 г белка,
+  // как у варёной овсянки на воде (71 ккал). Приводим их к калорийности строки.
+  const dbScale = providedKcal > 0 && !hasAnyMacros && (food?.kcal || 0) > 0
+    ? Math.min(6, Math.max(0.2, providedKcal / ((food as FoodItem).kcal * multiplier)))
+    : 1;
   const confidenceBase = food
     ? (directId ? (hasMacros ? 0.95 : 0.85) : hasAnyMacros ? 0.6 : 0.4)
     : (hasAnyMacros ? 0.5 : 0.3);
@@ -663,9 +676,9 @@ function normalizeItem(name: string, qty: string, kcal: number, p: number, f: nu
     qty,
     qtyGrams: Math.round(weight),
     kcal: (providedKcal > 0 || hasAnyMacros) ? Math.round(portionKcal / multiplier) : food?.kcal || 0,
-    p: hasMacros && macrosPlausible && !rejectOcrMacros ? Math.round((safeP || (food?.protein || 0) * multiplier) / multiplier * 10) / 10 : (rejectOcrMacros ? 0 : (food?.protein || 0)),
-    f: hasMacros && macrosPlausible && !rejectOcrMacros ? Math.round((safeF || (food?.fat || 0) * multiplier) / multiplier * 10) / 10 : (rejectOcrMacros ? 0 : (food?.fat || 0)),
-    c: hasMacros && macrosPlausible && !rejectOcrMacros ? Math.round((safeC || (food?.carbs || 0) * multiplier) / multiplier * 10) / 10 : (rejectOcrMacros ? 0 : (food?.carbs || 0)),
+    p: hasMacros && macrosPlausible && !rejectOcrMacros ? Math.round((safeP || (food?.protein || 0) * multiplier * dbScale) / multiplier * 10) / 10 : (rejectOcrMacros ? 0 : Math.round((food?.protein || 0) * dbScale * 10) / 10),
+    f: hasMacros && macrosPlausible && !rejectOcrMacros ? Math.round((safeF || (food?.fat || 0) * multiplier * dbScale) / multiplier * 10) / 10 : (rejectOcrMacros ? 0 : Math.round((food?.fat || 0) * dbScale * 10) / 10),
+    c: hasMacros && macrosPlausible && !rejectOcrMacros ? Math.round((safeC || (food?.carbs || 0) * multiplier * dbScale) / multiplier * 10) / 10 : (rejectOcrMacros ? 0 : Math.round((food?.carbs || 0) * dbScale * 10) / 10),
     micros,
     foodId: food?.id,
     category: food?.category,
@@ -686,23 +699,48 @@ function attachMicros(meal: ParsedMeal | null, line: string): boolean {
   return false;
 }
 
+/**
+ * Заголовок таблицы микроэлементов → список ключей в порядке колонок.
+ *
+ * Раньше функция возвращала ВСЕ 13 ключей для любой строки без цифр — даже
+ * для «Завтрак». Следующая строка вида «2,8 3,2 4,7» превращалась в
+ * натрий/калий/магний вместо макросов. Теперь в список попадают только
+ * реально упомянутые в заголовке элементы. Латинские символы (Na, K, Mg)
+ * ищем с учётом регистра: «Mg» — магний, а «mg» — миллиграммы.
+ */
 function parseMicroTableHeader(line: string): string[] {
   if (/\d/.test(line)) return [];
-  const defaults: Array<[RegExp, string, string]> = [
-    [/sodium|натри|\bna\b/i, 'sodium', 'mg'], [/potassium|кали|\bk\b/i, 'potassium', 'mg'],
-    [/magnesium|магни|\bmg\b/i, 'magnesium', 'mg'], [/calcium|кальци|\bca\b/i, 'calcium', 'mg'],
-    [/iron|желез|\bfe\b/i, 'iron', 'mg'], [/zinc|цинк|\bzn\b/i, 'zinc', 'mg'],
-    [/phosphorus|фосфор|\bp\b/i, 'phosphorus', 'mg'], [/vit(?:amin)?\s*a|витамин\s*a/i, 'vitamin_a', 'mcg'],
-    [/vit(?:amin)?\s*c|витамин\s*c/i, 'vitamin_c', 'mg'], [/vit(?:amin)?\s*d|витамин\s*d/i, 'vitamin_d', 'mcg'],
-    [/vit(?:amin)?\s*e|витамин\s*e/i, 'vitamin_e', 'mg'], [/vit(?:amin)?\s*k|витамин\s*k/i, 'vitamin_k', 'mcg'],
-    [/vit(?:amin)?\s*b12|витамин\s*b12|\bb12\b/i, 'vitamin_b12', 'mcg'],
+  type Spec = { words: RegExp; symbol?: string; base: string; defaultUnit: string };
+  const specs: Spec[] = [
+    { words: /sodium|натри/i, symbol: 'Na', base: 'sodium', defaultUnit: 'mg' },
+    { words: /potassium|кали/i, symbol: 'K', base: 'potassium', defaultUnit: 'mg' },
+    { words: /magnesium|магни/i, symbol: 'Mg', base: 'magnesium', defaultUnit: 'mg' },
+    { words: /calcium|кальци/i, symbol: 'Ca', base: 'calcium', defaultUnit: 'mg' },
+    { words: /iron|желез/i, symbol: 'Fe', base: 'iron', defaultUnit: 'mg' },
+    { words: /zinc|цинк/i, symbol: 'Zn', base: 'zinc', defaultUnit: 'mg' },
+    { words: /phosphorus|фосфор/i, symbol: 'P', base: 'phosphorus', defaultUnit: 'mg' },
+    { words: /vit(?:amin)?\s*a|витамин\s*a/i, base: 'vitamin_a', defaultUnit: 'mcg' },
+    { words: /vit(?:amin)?\s*c|витамин\s*c/i, base: 'vitamin_c', defaultUnit: 'mg' },
+    { words: /vit(?:amin)?\s*d|витамин\s*d/i, base: 'vitamin_d', defaultUnit: 'mcg' },
+    { words: /vit(?:amin)?\s*e|витамин\s*e/i, base: 'vitamin_e', defaultUnit: 'mg' },
+    { words: /vit(?:amin)?\s*k|витамин\s*k/i, base: 'vitamin_k', defaultUnit: 'mcg' },
+    { words: /vit(?:amin)?\s*b12|витамин\s*b12|\bb12\b/i, base: 'vitamin_b12', defaultUnit: 'mcg' },
   ];
-  return defaults.map(([pattern, base, defaultUnit]) => {
-    const match = line.match(new RegExp(`(${pattern.source})\\s*\\(\\s*(мг|mg|мкг|mcg|г|g)\\s*\\)`, 'i'));
-    const unit = match ? match[2].toLowerCase() : defaultUnit;
+  const unitPattern = '(мг|mg|мкг|mcg|г|g)';
+  const keys: string[] = [];
+  for (const spec of specs) {
+    if (!spec.words.test(line) && !(spec.symbol && new RegExp(`(?:^|[^A-Za-z])${spec.symbol}(?![a-z])`).test(line))) continue;
+    let unit = spec.defaultUnit;
+    const wordUnit = line.match(new RegExp(`(?:${spec.words.source})[^()]{0,16}\\(\\s*${unitPattern}\\s*\\)`, 'i'));
+    const symbolUnit = spec.symbol
+      ? line.match(new RegExp(`(?:^|[^A-Za-z])${spec.symbol}\\s*\\(\\s*${unitPattern}\\s*\\)`))
+      : null;
+    if (wordUnit) unit = wordUnit[1].toLowerCase();
+    else if (symbolUnit) unit = symbolUnit[1].toLowerCase();
     const suffix = unit === 'г' || unit === 'g' ? '_g' : unit === 'мкг' || unit === 'mcg' ? '_mcg' : '_mg';
-    return `${base}${suffix}`;
-  });
+    keys.push(`${spec.base}${suffix}`);
+  }
+  return keys;
 }
 
 function parseMicroTableValues(line: string, keys: string[]): NutritionMicros {
@@ -793,6 +831,7 @@ function parseMacroValue(text: string, patterns: RegExp[]): { kcal: number; p: n
 
 export function parseNutritionScreenshot(text: string): ParsedMeal[] {
   if (typeof text !== 'string' || !text.trim()) return [];
+  const today = localTodayDate();
   const sourceLines = text.split(/\r?\n/).map(l => normalizeOcrArtifacts(l)).filter(l => l.trim().length > 2);
   const lines = reconstructFoodRows(reconstructFatSecretDiaryRows(sourceLines));
   const meals: ParsedMeal[] = [];
@@ -809,18 +848,18 @@ export function parseNutritionScreenshot(text: string): ParsedMeal[] {
 
     const dateMatch = line.match(dateRegex);
     if (dateMatch && !currentMeal) {
-      currentMeal = { date: dateMatch[0], mealType: 'Общее', items: [] };
+      currentMeal = { date: normalizeScreenshotDate(dateMatch[0], today), mealType: 'Общее', items: [] };
       meals.push(currentMeal);
     }
 
     const mealMatch = line.match(mealRegex);
     if (mealMatch) {
-      currentMeal = { date: currentMeal?.date || new Date().toISOString().slice(0, 10), mealType: mealMatch[0], items: [] };
+      currentMeal = { date: currentMeal?.date || today, mealType: mealMatch[0], items: [] };
       meals.push(currentMeal);
     }
 
     if (!currentMeal) {
-      currentMeal = { date: new Date().toISOString().slice(0, 10), mealType: 'Общее', items: [] };
+      currentMeal = { date: today, mealType: 'Общее', items: [] };
       meals.push(currentMeal);
     }
 
@@ -998,6 +1037,15 @@ function parseCompactDiaryRow(line: string): ParsedMeal['items'][number] | null 
   return normalizeItem(name, `${numeric(qty)} ${unit}`, numeric(kcalRaw), p, f, c);
 }
 
+/** Локальная дата YYYY-MM-DD. У `toISOString()` это UTC: в Москве после
+ * полуночи он отдаёт вчерашний день и скриншот «за сегодня» уезжал во вчера. */
+export function localTodayDate(now = new Date()): string {
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 function normalizeScreenshotDate(raw: string | undefined, fallback: string, usDateOrder = false): string {
   if (!raw) return fallback;
   const ymd = raw.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})$/);
@@ -1110,7 +1158,7 @@ export function parseMyFitnessPalText(text: string): ParsedMeal[] {
   if (typeof text !== 'string' || !text.trim()) return [];
   if (!/(?:my\s*fitness\s*pal|myfitnesspal|mfp|food\s+diary|calories\s+(?:goal|remaining)|калорий?\s+осталось|осталось\s+калорий?|калории\s+осталось|цель\s+калорий)/i.test(text)) return [];
   const now = new Date();
-  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  const today = localTodayDate(now);
   const lines = text.split(/\r?\n/).map(normalizeOcrArtifacts).filter(Boolean);
   const result: ParsedMeal[] = [];
   let date = today;
@@ -1242,14 +1290,14 @@ export function parseFatSecretText(text: string): ParsedMeal[] {
   const meals: ParsedMeal[] = [];
   let currentMeal: ParsedMeal | null = null;
   let microTableKeys: string[] = [];
-  let currentDate = new Date().toISOString().slice(0, 10);
+  let currentDate = localTodayDate();
 
   for (const line of lines) {
     const totalCheck = /итого|всего|total|дневн(?:ой|ая)|сумма|итог|daily\s*total/i.test(line);
     if (totalCheck) continue;
 
     const dateMatch = line.match(/(\d{1,2})[./-](\d{1,2})[./-](\d{2,4})/);
-    if (dateMatch) currentDate = dateMatch[0];
+    if (dateMatch) currentDate = normalizeScreenshotDate(dateMatch[0], localTodayDate());
 
     const mealMatch = line.match(/(завтрак|обед|ужин|перекус|бранч|полдник|snack|breakfast|lunch|dinner)/i);
     if (mealMatch) {
@@ -1366,7 +1414,7 @@ function attachVerticalTableIfEmpty(meals: ParsedMeal[], text: string): ParsedMe
   const keys = Object.keys(vertical);
   if (keys.length === 0) return meals;
 
-  const date = meals[0]?.date || new Date().toISOString().slice(0, 10);
+  const date = meals[0]?.date || localTodayDate();
   const mealType = meals[0]?.mealType || 'Общее';
   const item: any = { name: 'Блюдо', qty: '100 г', kcal: 0, p: 0, f: 0, c: 0, micros: {} };
 
@@ -1375,6 +1423,11 @@ function attachVerticalTableIfEmpty(meals: ParsedMeal[], text: string): ParsedMe
     else if (key === 'f') item.f = value;
     else if (key === 'c') item.c = value;
     else item.micros[key] = value;
+  }
+  // Таблица только с БЖУ: ккал считаем по 4/9/4, иначе в дневник уезжала
+  // позиция с нулевой калорийностью и ненулевыми макросами.
+  if (item.kcal <= 0 && (item.p > 0 || item.f > 0 || item.c > 0)) {
+    item.kcal = Math.round(item.p * 4 + item.f * 9 + item.c * 4);
   }
 
   return [{ date, mealType, items: [item] }];

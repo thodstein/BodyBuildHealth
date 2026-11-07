@@ -65,15 +65,40 @@ function detectCategory(categories?: string, name?: string): string {
   return 'other';
 }
 
-function round1(v: number | undefined): number | undefined {
-  return v !== undefined && v !== null ? Math.round(v * 10) / 10 : undefined;
+function round1(v: number | undefined, digits = 1): number | undefined {
+  if (v === undefined || v === null) return undefined;
+  const factor = 10 ** digits;
+  return Math.round(v * factor) / factor;
 }
 
-function normalizeProduct(p: any): OFFProduct | null {
+/** Пересчёт единиц OFF → приложение. Отсутствующее значение остаётся undefined. */
+function convertUnit(value: unknown, factor: number): number | undefined {
+  if (value === undefined || value === null) return undefined;
+  const num = Number(value);
+  return Number.isFinite(num) ? round1(num * factor, 2) : undefined;
+}
+
+export function normalizeProduct(p: any): OFFProduct | null {
   const nutriments = p.nutriments || {};
   const name = p.product_name_ru || p.product_name || '';
   if (!name) return null;
   const n = (field: string) => nutriments[field + '_100g'] ?? nutriments[field];
+  // OFF отдаёт микроэлементы в граммах на 100 г (sodium 0.5 = 500 мг), а
+  // остальное приложение хранит натрий/кальций/железо в мг, витамины D/B12 —
+  // в мкг. Без пересчёта дневник получал 0,5 мг натрия вместо 500.
+  const grams = (field: string) => convertUnit(n(field), 1000);
+  const micrograms = (field: string) => convertUnit(n(field), 1_000_000);
+  // Энергетическая ценность: в OFF часто есть только energy-kj (или общий
+  // energy) в кДж, а energy-kcal отсутствует — раньше такой продукт приходил
+  // с 0 ккал. 1 ккал = 4,184 кДж.
+  const kcalValue = convertUnit(n('energy-kcal'), 1);
+  const kjValue = convertUnit(n('energy-kj'), 1);
+  const energyValue = convertUnit(n('energy'), 1);
+  let kcal = kcalValue && kcalValue > 0 ? kcalValue : 0;
+  if (kcal <= 0) {
+    if (kjValue && kjValue > 0) kcal = kjValue / 4.184;
+    else if (energyValue && energyValue > 0) kcal = energyValue / 4.184;
+  }
   return {
     id: p.code || p._id || '',
     barcode: p.code || '',
@@ -82,7 +107,7 @@ function normalizeProduct(p: any): OFFProduct | null {
     brand: p.brands || undefined,
     categories: p.categories || undefined,
     category: detectCategory(p.categories, name),
-    kcal: Math.round(n('energy-kcal') || 0),
+    kcal: Math.round(kcal || 0),
     protein: round1(n('proteins')) || 0,
     fat: round1(n('fat')) || 0,
     carbs: round1(n('carbohydrates')) || 0,
@@ -93,14 +118,14 @@ function normalizeProduct(p: any): OFFProduct | null {
     micros: {
       saturatedFat: round1(n('saturated-fat')),
       sugars: round1(n('sugars')),
-      sodium: round1(n('sodium')),
-      calcium: round1(n('calcium')),
-      iron: round1(n('iron')),
-      magnesium: round1(n('magnesium')),
-      potassium: round1(n('potassium')),
-      vitaminC: round1(n('vitamin-c')),
-      vitaminD: n('vitamin-d'),
-      vitaminB12: n('vitamin-b12'),
+      sodium: grams('sodium'),
+      calcium: grams('calcium'),
+      iron: grams('iron'),
+      magnesium: grams('magnesium'),
+      potassium: grams('potassium'),
+      vitaminC: grams('vitamin-c'),
+      vitaminD: micrograms('vitamin-d'),
+      vitaminB12: micrograms('vitamin-b12'),
     },
   };
 }

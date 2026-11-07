@@ -43,8 +43,8 @@ vi.mock('../../../engines/retail-search.engine', async (importOriginal) => {
 });
 
 import { scanNativeBarcode, scanNativeBarcodeImage } from '../../../core/native-bridge';
-import { saveSharedBarcode } from '../../../engines/food-barcode-catalog.engine';
-import { BarcodeScanner } from '../BarcodeScanner';
+import { saveSharedBarcode, searchSharedBarcode } from '../../../engines/food-barcode-catalog.engine';
+import { BarcodeScanner, buildCustomBarcodeProduct } from '../BarcodeScanner';
 
 beforeEach(() => {
   try { localStorage.clear(); } catch {}
@@ -122,5 +122,45 @@ describe('Сканер АПК: нативный путь', () => {
     fireEvent.click(button);
     await waitFor(() => expect(container.querySelector('.nd-scannotice')).toBeNull());
     expect(scanNativeBarcode).toHaveBeenCalledTimes(2);
+  });
+
+  it('продукт без КБЖУ не отдаётся в дневник молча — предлагает снять этикетку', async () => {
+    vi.mocked(scanNativeBarcode).mockResolvedValueOnce({ status: 'scanned', code: '4600000000001' });
+    vi.mocked(searchSharedBarcode).mockResolvedValueOnce({
+      id: '4600000000001', barcode: '4600000000001', name: 'Вода питьевая',
+      kcal: 0, protein: 0, fat: 0, carbs: 0, fiber: 0, servingSize: '100 г', cachedAt: Date.now(),
+    } as any);
+    const found: unknown[] = [];
+    const { container } = render(<BarcodeScanner onProductFound={(p) => found.push(p)} onClose={() => {}} />);
+    fireEvent.click(container.querySelector('.nd-scannative') as HTMLElement);
+    await waitFor(() => expect(container.querySelector('.nd-scancreate')).not.toBeNull(), { timeout: 8000 });
+    expect(found).toHaveLength(0);
+    expect(container.textContent).toMatch(/нет КБЖУ/i);
+    expect(vi.mocked(saveSharedBarcode)).not.toHaveBeenCalled();
+  });
+
+  it('код без цифр даёт понятную ошибку, а не тишину', async () => {
+    vi.mocked(scanNativeBarcode).mockResolvedValueOnce({ status: 'scanned', code: 'PROMO-QR' });
+    const { container } = render(<BarcodeScanner onProductFound={() => {}} onClose={() => {}} />);
+    fireEvent.click(container.querySelector('.nd-scannative') as HTMLElement);
+    await waitFor(() => expect(container.textContent).toMatch(/нет цифр/i), { timeout: 8000 });
+  });
+});
+
+describe('своя еда из формы сканера', () => {
+  it('без штрихкода не выдумывает 13-значный GTIN', () => {
+    const product = buildCustomBarcodeProduct({ barcode: '', name: 'Хлеб', kcal: '0', p: '0', f: '3', c: '45' });
+    expect(product.barcode).toBe('');
+    expect(product.id).toMatch(/^custom_/);
+    // Ноль калорий — валидное значение, а не повод подставить 100.
+    expect(product.kcal).toBe(0);
+    expect(product.fat).toBe(3);
+  });
+
+  it('сохраняет настоящий штрихкод и числа из формы', () => {
+    const product = buildCustomBarcodeProduct({ barcode: '460 0494 400795', name: 'Творог', kcal: '121', p: '16', f: '5', c: '3' });
+    expect(product.barcode).toBe('4600494400795');
+    expect(product.id).toBe('4600494400795');
+    expect(product).toMatchObject({ kcal: 121, protein: 16, fat: 5, carbs: 3 });
   });
 });
