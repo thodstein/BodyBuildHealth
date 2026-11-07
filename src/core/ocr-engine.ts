@@ -761,7 +761,7 @@ export async function recognizeImageTextOffline(
     throw new Error(`движок OCR не запустился (worker/core/lang): ${lastOcrBootError}`);
   }
   try {
-    const { scoreOcrText, isGoodOcrText, isCompleteOcrText, isNutritionDiaryOcrText, pickBestOcrText, hasMacroLabels } = await import('../engines/ocr-preprocess');
+    const { scoreOcrText, isGoodOcrText, isCompleteOcrText, isNutritionDiaryOcrText, pickBestOcrText, hasMacroLabels, mergeNutritionOcrPasses } = await import('../engines/ocr-preprocess');
     const setPsm = async (mode: '6' | '11') => {
       if (typeof worker.setParameters === 'function') {
         await worker.setParameters({
@@ -859,11 +859,9 @@ export async function recognizeImageTextOffline(
         if (labOcrCandidateQuality(sparseText).score > labOcrCandidateQuality(best).score) return sparseText;
         return best;
       }
-      const lines = [...best.split(/\r?\n/), ...sparseText.split(/\r?\n/)]
-        .map((line) => line.trim())
-        .filter(Boolean);
-      const merged = [...new Set(lines)].join('\n');
-      return scoreOcrText(merged) >= scoreOcrText(best) ? merged : best;
+      // Слияние без дублей: та же строка дня из двух проходов давала в
+      // дневнике две позиции с разными ккал (см. mergeNutritionOcrPasses).
+      return mergeNutritionOcrPasses(best, sparseText);
     })();
     return await Promise.race([
       run,

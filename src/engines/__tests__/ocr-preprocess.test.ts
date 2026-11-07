@@ -13,6 +13,8 @@ import {
   hasMacroLabels,
   isCompleteOcrText,
   isNutritionDiaryOcrText,
+  countNutritionRows,
+  mergeNutritionOcrPasses,
 } from '../ocr-preprocess';
 
 vi.mock('tesseract.js', () => {
@@ -35,6 +37,28 @@ vi.mock('tesseract.js', () => {
 import { recognizeImageTextOffline } from '../../core/ocr-engine';
 
 describe('ocr-preprocess: чистые функции', () => {
+  it('mergeNutritionOcrPasses: не дублирует строку дневника с другими ккал', () => {
+    const block = 'Завтрак\nРисовая манка 130 г 455 ккал\nКурица 200 г 330 ккал';
+    const sparse = 'Завтрак\nРисовая манка 130 г 525 ккал\nКурица 200 г 330 ккал';
+    expect(countNutritionRows(block)).toBe(2);
+    const merged = mergeNutritionOcrPasses(block, sparse);
+    // Строка манки остаётся только одна — из блочного прохода.
+    expect(merged.match(/Рисовая манка/g)).toHaveLength(1);
+    expect(merged).toContain('455 ккал');
+    expect(merged).not.toContain('525 ккал');
+  });
+
+  it('mergeNutritionOcrPasses: макросы и потерянные строки из PSM-11 добавляются', () => {
+    const block = 'Завтрак\nКуриная грудка\n200 г\n330 ккал';
+    const sparse = 'Белки 40 г\nЖиры 10 г\nУглеводы 0 г\nРис 150 г 195 ккал';
+    const merged = mergeNutritionOcrPasses(block, sparse);
+    expect(merged).toContain('Белки 40 г');
+    expect(merged).toContain('Рис 150 г 195 ккал');
+    expect(merged.split('\n')[0]).toBe('Завтрак');
+    expect(mergeNutritionOcrPasses(block, '')).toBe(block);
+    expect(mergeNutritionOcrPasses('', sparse)).toBe(sparse);
+  });
+
   it('dataUrlToBlob: base64 → Blob с типом, мусор → null', () => {
     const blob = dataUrlToBlob('data:image/png;base64,iVBORw0KGgo=');
     expect(blob).not.toBeNull();

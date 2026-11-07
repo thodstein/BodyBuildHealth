@@ -583,4 +583,55 @@ describe('nutrition-ocr-parser', () => {
       expect(items[0].kcal).toBe(121);
     });
   });
+
+  // Репорт из АПК: «вместо 130 г рисовой манки вбивает 1 или 130 и 1 калория».
+  // Причина — tesseract отдаёт цифры буквами-двойниками («1З0», «13O», «45S»),
+  // а parseFloat на таком токене останавливается на первой цифре.
+  describe('буквы-двойники цифр в OCR (АПК: 1З0 г → 1 г / 44500 ккал)', () => {
+    const confusionCases: Array<[string, string]> = [
+      ['1З0', '455'],
+      ['13О', '4S5'],
+      ['13O', '4S5'],
+      ['l30', '455'],
+      ['I30', '455'],
+      ['1ЗО', '455'],
+    ];
+
+    it.each(confusionCases)('порция %s и ккал %s дают 130 г и 350 ккал/100 г', (qty, kcal) => {
+      const items = parseNutritionText(`Завтрак\nРисовая манка ${qty} г ${kcal} ккал Б:9 Ж:0,6 У:101`)
+        .flatMap(meal => meal.items);
+      expect(items).toHaveLength(1);
+      expect(items[0]).toMatchObject({ name: 'Рисовая манка', qtyGrams: 130, kcal: 350 });
+      expect(items[0].foodId).toBe('cereal_semolina');
+    });
+
+    it('вертикальная карточка с «1З0 г» тоже читается как 130 г', () => {
+      const items = parseNutritionText([
+        'Завтрак',
+        'Рисовая манка',
+        '1З0 г',
+        '45S ккал',
+        'Белки 9 г',
+        'Жиры 0,6 г',
+        'Углеводы 101 г',
+      ].join('\n')).flatMap(meal => meal.items);
+      expect(items).toHaveLength(1);
+      expect(items[0]).toMatchObject({ qtyGrams: 130, kcal: 350, p: 6.9, c: 77.7 });
+    });
+
+    it('символ «|» в разделителях не считается единицей', () => {
+      const items = parseFatSecretText('Курица|200 г|330|40|10|0').flatMap(meal => meal.items);
+      expect(items).toHaveLength(1);
+      expect(items[0]).toMatchObject({ qtyGrams: 200, kcal: 165 });
+    });
+
+    it('не выдаёт физически невозможные «44500 ккал / 100 г»', () => {
+      // Порция съехала в 1 г, ккал остались 455 — прежний код делил на 0.01.
+      const items = parseNutritionText('Завтрак\nРисовая манка 1 г 455 ккал').flatMap(meal => meal.items);
+      expect(items).toHaveLength(1);
+      expect(items[0].kcal).toBeLessThanOrEqual(950);
+      expect(items[0].p).toBeLessThanOrEqual(100);
+      expect(items[0].confidence).toBeLessThanOrEqual(0.35);
+    });
+  });
 });

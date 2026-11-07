@@ -112,12 +112,73 @@ export function isNutritionDiaryOcrText(text: string): boolean {
   return foodRows >= 2 || compactDiaryRows >= 2 || (appMarker && mealHeaders >= 1 && /(?:ккал|kcal|calories?)/i.test(text)) || separateMealRows >= 2;
 }
 
+/**
+ * Сколько строк с калориями нашлось в тексте — метрика полноты для питания.
+ * «330 ккал», «330 kcal», «330 cal» считаются одинаково.
+ */
+export function countNutritionRows(text: string): number {
+  if (!text) return 0;
+  // Без `\b` после кириллицы: в JS \w = [A-Za-z0-9_], поэтому «ккал\b» не срабатывает.
+  return (text.match(/\d+(?:[.,]\d+)?\s*(?:ккал|kcal|cal)(?![А-Яа-яЁёA-Za-z])/gi) || []).length;
+}
+
+const isCalorieRow = (line: string) => /\d\s*(?:ккал|kcal|cal)(?![А-Яа-яЁёA-Za-z])/i.test(line);
+
+/** Ключ строки дневника: первые три слова без цифр («рисовая манка»). */
+function rowNameKey(line: string): string {
+  const words = line
+    .toLowerCase()
+    .replace(/[^\p{L}]+/gu, ' ')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 3);
+  return words.join(' ');
+}
+
+/** Ключ сравнения «это ровно та же строка OCR». */
+function exactLineKey(line: string): string {
+  return line.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+}
+
+/**
+ * Слияние блочного (PSM-6) и разреженного (PSM-11) проходов по одному кадру.
+ *
+ * Раньше строки просто конкатенировались — и каждая строка дневника попадала
+ * в текст ДВАЖДЫ. Когда цифры двух проходов расходились («манка 455» и
+ * «манка 525»), в очередь уходили две позиции с разными ккал.
+ * Теперь:
+ *  - строка-дубль (та же строка с теми же цифрами) отбрасывается;
+ *  - строка с ккал, чьё название уже есть в блочном проходе, отбрасывается:
+ *    блочный проход читает выровненные цифры лучше;
+ *  - строки макросов/микроэлементов без ккал добавляются — именно из-за них
+ *    PSM-11 и нужен (PSM-6 часто теряет колонки Б/Ж/У).
+ */
+export function mergeNutritionOcrPasses(blockText: string, sparseText: string): string {
+  if (!sparseText.trim()) return blockText;
+  if (!blockText.trim()) return sparseText;
+  const blockLines = blockText.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
+  const seenExact = new Set(blockLines.map(exactLineKey));
+  const rowNames = new Set(blockLines.filter(isCalorieRow).map(rowNameKey).filter(Boolean));
+  const out = [...blockLines];
+  for (const line of sparseText.split(/\r?\n/).map(l => l.trim()).filter(Boolean)) {
+    const exact = exactLineKey(line);
+    if (seenExact.has(exact)) continue;
+    if (isCalorieRow(line)) {
+      const key = rowNameKey(line);
+      if (key && rowNames.has(key)) continue;
+      if (key) rowNames.add(key);
+    }
+    seenExact.add(exact);
+    out.push(line);
+  }
+  return out.join('\n');
+}
+
 export interface OcrVariant {
   kind: 'gray' | 'inverted' | 'contrast';
   blob: Blob;
-}
-
-function canvasToBlob(canvas: HTMLCanvasElement): Promise<Blob | null> {
+}function canvasToBlob(canvas: HTMLCanvasElement): Promise<Blob | null> {
   return new Promise((resolve) => {
     try {
       canvas.toBlob((b) => resolve(b), 'image/png');

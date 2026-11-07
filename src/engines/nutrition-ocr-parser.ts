@@ -8,7 +8,46 @@ export interface ParsedMeal {
 
 export type NutritionMicros = Record<string, number>;
 
-function normalizeOcrArtifacts(text: string): string {
+/**
+ * Буквы, которыми tesseract чаще всего заменяет цифры в числе.
+ * Внутри числового токена они читаются однозначно: «1З0» — это всегда 130,
+ * а не слово. Метка «Б»/«б» в начале токена остаётся меткой («Б40», «б:9»).
+ */
+const OCR_DIGIT_LIKE: Record<string, string> = {
+  O: '0', o: '0', 'О': '0', 'о': '0',
+  'З': '3', 'з': '3',
+  l: '1', I: '1',
+  S: '5', s: '5',
+};
+/** Б/б чиним только внутри числа (45Б → 458): в начале токена это макрос. */
+const OCR_DIGIT_LIKE_INNER: Record<string, string> = { ...OCR_DIGIT_LIKE, 'б': '6', 'Б': '8' };
+
+/**
+ * Чинит буквы-двойники в одном числовом токене OCR.
+ *
+ * Реальный кейс из АПК: «Рисовая манка 1З0 г 455 ккал» — «1З0» не число для
+ * `Number.parseFloat`, порция падала в 1 г, а ккал пересчитывались «на 100 г»
+ * делением на 0.01 — в дневник уезжали 44500 ккал и 900 г белка.
+ * Трогаем токен только если в нём уже есть настоящая цифра, поэтому слова
+ * («Обед», «Молоко», «Белки») остаются словами.
+ */
+export function repairOcrNumericToken(token: string): string {
+  if (!token || !/[0-9OoОоЗзSsLlI]/.test(token)) return token;
+  const match = token.match(/^([^0-9OoОоЗзSsLlIбБ]*)((?:[0-9OoОоЗзSsLlIбБ]+[.,]?)+)(.*)$/);
+  if (!match) return token;
+  const [, lead, rawCore, trail] = match;
+  const core = rawCore.replace(/[.,]+$/, '');
+  const suffix = rawCore.slice(core.length) + trail;
+  if (!/[0-9]/.test(core)) return token;
+  // «Б40» / «б40» — подпись макроса, а не число.
+  if (!/^[0-9OoОоЗзSsLlI]/.test(core)) return token;
+  const fixed = core.replace(/[OoОоЗзSsLlIбБ]/g, ch => OCR_DIGIT_LIKE_INNER[ch] || ch);
+  // Только настоящая десятичная запись («130», «1,5») — иначе не наш случай.
+  if (!/^\d+(?:[.,]\d+)*$/.test(fixed)) return token;
+  return `${lead}${fixed}${suffix}`;
+}
+
+export function normalizeOcrArtifacts(text: string): string {
   return text
     .replace(/(\d)\s+(\d)\s+(\d)/g, '$1$2$3')
     .replace(/(\d)[,.](\d)[,.](\d)/g, '$1$2$3')
@@ -17,6 +56,7 @@ function normalizeOcrArtifacts(text: string): string {
     .replace(/[‘’‚‹›]/g, "'")
     .replace(/(\d)\s*[rг]/gi, '$1 г')
     .replace(/ккал|kcal/gi, ' ккал')
+    .replace(/\S+/g, token => repairOcrNumericToken(token))
     .replace(/\s+/g, ' ')
     .trim();
 }
@@ -85,11 +125,15 @@ function reconstructFoodRows(lines: string[]): string[] {
 }
 
 function normalizeFatSecretNumber(value: string): string {
-  return value.replace(/[Оо]/g, '0').replace(/[Зз]/g, '3').replace(/[Бб]/g, '8');
+  // Один и тот же ремонт, что и в normalizeOcrArtifacts: О/o/O → 0, З/з → 3,
+  // l/I → 1, S → 5, Б → 8 (внутри числа).
+  return repairOcrNumericToken(value)
+    .replace(/[OoОоЗзSsLlI|]/g, ch => OCR_DIGIT_LIKE[ch] || ch)
+    .replace(/[^0-9.,]/g, '');
 }
 
 function fatSecretQuantityLine(line: string): string | null {
-  const match = line.trim().match(/^([0-9ОоЗз]+(?:[.,][0-9ОоЗз]+)?)\s*(г|g|r|мл|ml|шт|pcs?)$/i);
+  const match = line.trim().match(/^([0-9OoОоЗзSsLlIбБ]+(?:[.,][0-9OoОоЗзSsLlIбБ]+)?)\s*(г|g|r|мл|ml|шт|pcs?)$/i);
   if (!match) return null;
   const value = normalizeFatSecretNumber(match[1]).replace(',', '.');
   const unit = /мл|ml/i.test(match[2]) ? 'мл' : /шт|pcs?/i.test(match[2]) ? 'шт' : 'г';
@@ -98,7 +142,7 @@ function fatSecretQuantityLine(line: string): string | null {
 
 function fatSecretMacroColumns(line: string): { f: number; c: number; p: number } | null {
   const match = line.trim().replace(/[|;]/g, ' ').match(
-    /^([0-9ОоЗз]+(?:[.,][0-9ОоЗз]+)?)\s+([0-9ОоЗз]+(?:[.,][0-9ОоЗз]+)?)\s+([0-9ОоЗз]+(?:[.,][0-9ОоЗз]+)?)\s+\d{1,3}\s*%/i,
+    /^([0-9OoОоЗзSsLlIбБ]+(?:[.,][0-9OoОоЗзSsLlIбБ]+)?)\s+([0-9OoОоЗзSsLlIбБ]+(?:[.,][0-9OoОоЗзSsLlIбБ]+)?)\s+([0-9OoОоЗзSsLlIбБ]+(?:[.,][0-9OoОоЗзSsLlIбБ]+)?)\s+[0-9OoОоЗзSsLlI]{1,3}\s*%/i,
   );
   if (!match) return null;
   const values = match.slice(1, 4).map(value => numberFrom(normalizeFatSecretNumber(value), NaN));
@@ -108,7 +152,7 @@ function fatSecretMacroColumns(line: string): { f: number; c: number; p: number 
 }
 
 function fatSecretCaloriesFromLine(line: string): number | null {
-  const match = line.trim().match(/([0-9ОоЗз]+(?:[.,][0-9ОоЗз]+)?)\s*(?:ккал|kcal|cal)?\s*[›>‹<'"]?$/i);
+  const match = line.trim().match(/([0-9OoОоЗзSsLlIбБ]+(?:[.,][0-9OoОоЗзSsLlIбБ]+)?)\s*(?:ккал|kcal|cal)?\s*[›>‹<'"’“”]?\s*$/i);
   if (!match) return null;
   const value = numberFrom(normalizeFatSecretNumber(match[1]), NaN);
   return Number.isFinite(value) ? value : null;
@@ -552,8 +596,7 @@ export function quantityToGrams(qty: string, food?: FoodItem): number {
 function normalizeItem(name: string, qty: string, kcal: number, p: number, f: number, c: number, micros: NutritionMicros = {}) {
   const directId = matchRussianFood(name);
   const food = findFood(name);
-  const weight = Math.max(1, quantityToGrams(qty, food));
-  const multiplier = weight / 100;
+  let weight = Math.max(1, quantityToGrams(qty, food));
   const providedKcal = Number.isFinite(kcal) ? Math.max(0, kcal) : 0;
   const safeP = Number.isFinite(p) ? Math.max(0, p) : 0;
   const safeF = Number.isFinite(f) ? Math.max(0, f) : 0;
@@ -569,10 +612,40 @@ function normalizeItem(name: string, qty: string, kcal: number, p: number, f: nu
   // нельзя — это значения, которых на снимке НЕ БЫЛО (дневник — факт, а не
   // додумывание). В этом случае макросы обнуляются, ккал сохраняются.
   // Если колонок не было вовсе — подстановка из БД остаётся прежней.
-  const rejectOcrMacros = !macrosPlausible && hasAnyMacros;
-  const confidence = food
+  let rejectOcrMacros = !macrosPlausible && hasAnyMacros;
+
+  // ── Физические предохранители ──────────────────────────────────────────
+  // Ни один продукт не даёт больше ~9 ккал/г (чистый жир). Если порция это
+  // превышает, OCR перепутал цифру в граммах («1З0» → 1) или в ккал, и без
+  // проверки в дневник уезжали «44500 ккал / 100 г» и 900 г белка.
+  // Тогда верим ккал (крупное число читается устойчивее) и восстанавливаем
+  // порцию по калорийности каталога: 455 ккал манки → 130 г, а не 1 г.
+  let ocrSuspicious = false;
+  if (providedKcal > 0 && weight > 0 && providedKcal / weight > 9.5) {
+    ocrSuspicious = true;
+    if (food && food.kcal > 0) {
+      const inferred = Math.round((providedKcal / food.kcal) * 100);
+      if (inferred >= 5 && inferred <= 3000) weight = inferred;
+    }
+  }
+  let portionKcal = safeKcal;
+  let multiplier = weight / 100;
+  // На 100 г не бывает больше ~900 ккал — остальное арифметический мусор
+  // после съехавшей порции.
+  if (portionKcal > 0 && portionKcal / multiplier > 950) {
+    ocrSuspicious = true;
+    if (food && food.kcal > 0) portionKcal = Math.round(food.kcal * multiplier);
+    else portionKcal = Math.round(900 * multiplier);
+  }
+  // Больше 100 г макроса на 100 г продукта не бывает (даже чистый сахар/жир).
+  if (hasAnyMacros && Math.max(safeP, safeF, safeC) / multiplier > 100.5) {
+    ocrSuspicious = true;
+    rejectOcrMacros = true;
+  }
+  const confidenceBase = food
     ? (directId ? (hasMacros ? 0.95 : 0.85) : hasAnyMacros ? 0.6 : 0.4)
     : (hasAnyMacros ? 0.5 : 0.3);
+  const confidence = ocrSuspicious ? Math.min(confidenceBase, 0.35) : confidenceBase;
   const displayName = name
     .replace(/^(?:завтрак|обед|ужин|перекус|бранч|полдник|breakfast|lunch|dinner|snack)\s*[:\-–—|,]?\s*/i, '')
     .replace(/^\d{1,2}[./-]\d{1,2}[./-]\d{2,4}\s*/, '')
@@ -589,10 +662,10 @@ function normalizeItem(name: string, qty: string, kcal: number, p: number, f: nu
     name: normalizedDisplayName || food?.name || 'Блюдо',
     qty,
     qtyGrams: Math.round(weight),
-    kcal: (providedKcal > 0 || hasAnyMacros) ? Math.round(safeKcal / multiplier) : food?.kcal || 0,
-    p: hasMacros && macrosPlausible ? Math.round((safeP || (food?.protein || 0) * multiplier) / multiplier * 10) / 10 : (rejectOcrMacros ? 0 : (food?.protein || 0)),
-    f: hasMacros && macrosPlausible ? Math.round((safeF || (food?.fat || 0) * multiplier) / multiplier * 10) / 10 : (rejectOcrMacros ? 0 : (food?.fat || 0)),
-    c: hasMacros && macrosPlausible ? Math.round((safeC || (food?.carbs || 0) * multiplier) / multiplier * 10) / 10 : (rejectOcrMacros ? 0 : (food?.carbs || 0)),
+    kcal: (providedKcal > 0 || hasAnyMacros) ? Math.round(portionKcal / multiplier) : food?.kcal || 0,
+    p: hasMacros && macrosPlausible && !rejectOcrMacros ? Math.round((safeP || (food?.protein || 0) * multiplier) / multiplier * 10) / 10 : (rejectOcrMacros ? 0 : (food?.protein || 0)),
+    f: hasMacros && macrosPlausible && !rejectOcrMacros ? Math.round((safeF || (food?.fat || 0) * multiplier) / multiplier * 10) / 10 : (rejectOcrMacros ? 0 : (food?.fat || 0)),
+    c: hasMacros && macrosPlausible && !rejectOcrMacros ? Math.round((safeC || (food?.carbs || 0) * multiplier) / multiplier * 10) / 10 : (rejectOcrMacros ? 0 : (food?.carbs || 0)),
     micros,
     foodId: food?.id,
     category: food?.category,
@@ -906,7 +979,8 @@ function parseCompactDiaryRow(line: string): ParsedMeal['items'][number] | null 
   const tail = repairOcrZero(rawTail);
   const numeric = (raw?: string) => {
     if (!raw) return 0;
-    const value = Number.parseFloat(raw.replace(/\s+/g, '').replace(/[ОоOo]/g, '0').replace(',', '.'));
+    const cleaned = normalizeFatSecretNumber(raw).replace(/\s+/g, '').replace(/,/g, '.');
+    const value = Number.parseFloat(cleaned);
     return Number.isFinite(value) ? value : 0;
   };
   const labeled = (pattern: RegExp) => numeric(tail.match(pattern)?.[1]);
