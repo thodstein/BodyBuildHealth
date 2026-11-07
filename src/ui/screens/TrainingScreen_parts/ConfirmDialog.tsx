@@ -6,7 +6,7 @@
  *   const ok = await confirm({ title: 'Удалить?', message: 'Будет потеряно N элементов', confirmLabel: 'Удалить', danger: true });
  *   if (ok) doDelete();
  */
-import React, { useState, useCallback, useRef, createContext, useContext, type ReactNode } from 'react';
+import React, { useState, useCallback, useMemo, useRef, createContext, useContext, type ReactNode } from 'react';
 import { ACCENT, BTN, BTN_GHOST } from './training-ui';
 import { useAndroidBackHandler } from '../../../core/use-android-back';
 
@@ -36,6 +36,10 @@ export const ConfirmDialogProvider: React.FC<{ children: ReactNode }> = ({ child
     });
   }, []);
 
+  // Раньше value создавался инлайн: каждый показ/скрытие диалога
+  // перерисовывал всех потребителей `confirm()` (12 мест).
+  const contextValue = useMemo(() => ({ confirm }), [confirm]);
+
   const handleClose = (ok: boolean) => {
     state.resolve?.(ok);
     setState({ open: false, options: { message: '' }, resolve: null });
@@ -51,7 +55,7 @@ export const ConfirmDialogProvider: React.FC<{ children: ReactNode }> = ({ child
     : 'linear-gradient(135deg,#00e68a,#00c8a0)';
 
   return (
-    <ConfirmDialogContext.Provider value={{ confirm }}>
+    <ConfirmDialogContext.Provider value={contextValue}>
       {children}
       {state.open && (
         <div

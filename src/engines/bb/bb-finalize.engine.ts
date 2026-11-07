@@ -25,6 +25,7 @@ import { INTENSITY_TECHNIQUES, techniquesFor } from './bb-intensity-techniques';
 import { buildProgressionRule } from './bb-progression-rule';
 import { analyzeBBRotation } from './bb-rotation.engine';
 import { EXERCISE_CATALOG } from '../../core/exercise-catalog';
+import { catalogByMuscle, findCatalogExercise } from './bb-catalog-index';
 import { trueMuscleOf, derivePattern } from '../movement-pattern';
 import { bbExerciseTier } from './bb-exercise-tier.engine';
 import { isHardAdvanced, isPoolAllowed, swapExerciseForLevel } from './bb-exercise-levels.engine';
@@ -3487,6 +3488,25 @@ function addAdaptiveMEVFeeders(plan: BBPlan, options: BBFinalizeOptions): void {
   }
 }
 
+/**
+ * Один проход вместо `filter(...).sort(...)[0]`.
+ *
+ * Прежний код вызывал `replacementScore` внутри компаратора — O(n log n)
+ * вызовов классификаторов на каждую замену упражнения. Здесь score считается
+ * ровно один раз на кандидата, победитель — первый с максимальным счётом
+ * (как у стабильной сортировки).
+ */
+function bestReplacementFor<T>(candidates: readonly T[], score: (c: T) => number, ok: (c: T) => boolean): T | undefined {
+  let best: T | undefined;
+  let bestScore = -Infinity;
+  for (const candidate of candidates) {
+    if (!ok(candidate)) continue;
+    const value = score(candidate);
+    if (value > bestScore) { bestScore = value; best = candidate; }
+  }
+  return best;
+}
+
 function applyControlledAccessoryRotation(plan: BBPlan, options: Pick<BBFinalizeOptions, 'equipment' | 'excludedExercises' | 'avoidAxialLoad' | 'excludedMuscles' | 'mobilityRestrictions'> = {}): void {
   const optionsEquipment = options.equipment || [];
   const excluded = new Set(options.excludedExercises || []);
@@ -3522,8 +3542,7 @@ function applyControlledAccessoryRotation(plan: BBPlan, options: Pick<BBFinalize
             const phaseBonus = phaseIndex < 0 ? 0 : (phaseEquipment.length - phaseIndex) * 3;
             return phaseBonus + sameEquipment + canonical;
           };
-          const replacement = EXERCISE_CATALOG
-            .filter(candidate => {
+          const replacement = bestReplacementFor(catalogByMuscle(exercise.muscle), replacementScore, (candidate) => {
             if (excluded.has(candidate.id) || excluded.has(candidate.name)) return false;
             if (excludedMuscles.has(candidate.group) || excludedMuscles.has(trueMuscleOf(candidate) || '')) return false;
             if (options.avoidAxialLoad && isAxialLoadExercise(candidate as any)) return false;
@@ -3536,8 +3555,7 @@ function applyControlledAccessoryRotation(plan: BBPlan, options: Pick<BBFinalize
             }
             if (derivePattern(candidate) === pattern && equipmentOf(candidate.name) === equipmentOf(exercise.name)) return false;
             return candidate.type === 'isolation' || (exercise as any).type === 'compound' || (exercise as any).exerciseType === 'compound';
-            })
-            .sort((a: any, b: any) => replacementScore(b) - replacementScore(a))[0];
+          });
           if (replacement) {
             const oldName = exercise.name;
             const oldEquipment = equipmentOf(oldName);
@@ -3584,14 +3602,16 @@ function repairAdaptiveSafety(plan: BBPlan, options: BBFinalizeOptions): void {
       const raw = Array.isArray(candidate.equipment) ? candidate.equipment : [String(candidate.equipment || '')];
       return !equipment.length || raw.length === 0 || raw.some(item => equipment.includes(item));
     };
-    const catalogExercise = EXERCISE_CATALOG.find(item => item.name === exercise.name || item.id === exercise.exerciseName);
+    const catalogExercise = findCatalogExercise(exercise.name) || findCatalogExercise(exercise.exerciseName);
     const unknownWithEquipmentRestriction = equipment.length > 0 && !catalogExercise;
     const unsafe = excludedExercises.has(exercise.name) || excludedExercises.has(exercise.exerciseName || '') || excludedMuscles.has(exercise.muscle) || (options.avoidAxialLoad && isAxialLoadExercise({ name: exercise.name, id: exercise.exerciseName } as any)) || isMobilityRestricted(exercise, options.mobilityRestrictions) || unknownWithEquipmentRestriction || !equipmentAllowed(catalogExercise as any);
     if (excludedMuscles.has(exercise.muscle)) continue;
     if (!unsafe) continue;
-    const replacement = EXERCISE_CATALOG
-      .filter(candidate => bbExerciseTier(candidate) <= 2 && trueMuscleOf(candidate) === exercise.muscle && !excludedExercises.has(candidate.id) && !excludedExercises.has(candidate.name) && !excludedMuscles.has(candidate.group) && !isAxialLoadExercise(candidate as any) && !isMobilityRestricted(candidate, options.mobilityRestrictions) && equipmentAllowed(candidate))
-      .sort((a: any, b: any) => (exercise.role === 'primary' ? (bbExerciseTier(a) - bbExerciseTier(b)) : ((a.type === 'isolation' ? 0 : 1) - (b.type === 'isolation' ? 0 : 1))))[0];
+    const replacement = bestReplacementFor(
+      catalogByMuscle(exercise.muscle),
+      (candidate: any) => -(exercise.role === 'primary' ? bbExerciseTier(candidate) : (candidate.type === 'isolation' ? 0 : 1)),
+      (candidate) => bbExerciseTier(candidate) <= 2 && trueMuscleOf(candidate) === exercise.muscle && !excludedExercises.has(candidate.id) && !excludedExercises.has(candidate.name) && !excludedMuscles.has(candidate.group) && !isAxialLoadExercise(candidate as any) && !isMobilityRestricted(candidate, options.mobilityRestrictions) && equipmentAllowed(candidate),
+    );
     if (!replacement) continue;
     const oldName = exercise.name;
     exercise.name = replacement.name;
@@ -3607,7 +3627,7 @@ function repairAdaptiveSafety(plan: BBPlan, options: BBFinalizeOptions): void {
       return 'other';
     };
     const replacementEquipment = Array.isArray(replacement.equipment)
-      ? replacement.equipment.find(item => loadRatio[String(item)] != null)
+      ? replacement.equipment.find((item: any) => loadRatio[String(item)] != null)
       : replacement.equipment;
     const ratio = (loadRatio[String(replacementEquipment)] || 1) / (loadRatio[equipmentOfName(oldName)] || 1);
     exercise.workSets = exercise.workSets.map(set => ({ ...set, weight: Math.round(set.weight * ratio * 10) / 10 }));

@@ -1,5 +1,6 @@
 /** Builds coach-facing execution notes from the Exercise Lab databases. */
 import { EXERCISE_CATALOG } from '../../core/exercise-catalog';
+import { bbCatalogIndex, findCatalogExercise } from './bb-catalog-index';
 import { getExerciseBio, hasExerciseBioEntry, type ExerciseBio } from '../../data/exercise-biomechanics-db';
 import { getMappedBioId } from '../../data/exercise-id-mapping';
 import { getTargetMuscleForExercise, TARGET_MUSCLE_DB, type TargetMuscleEntry } from '../../data/target-muscle-db';
@@ -57,9 +58,9 @@ const PATTERN_RU: Record<string, string> = {
 };
 
 function findBio(input: ExerciseInstructionInput): { bio?: ExerciseBio; target?: TargetMuscleEntry; id?: string; hasLabBio: boolean } {
-  const catalog = input.exerciseId
-    ? EXERCISE_CATALOG.find(e => e.id === input.exerciseId)
-    : EXERCISE_CATALOG.find(e => e.name.toLowerCase() === input.exerciseName.toLowerCase());
+  // Замер (2026-11-07): два полных скана каталога на каждое упражнение плана
+  // (`find` + `toLowerCase` по всем 500+ записям). Теперь O(1) по индексу.
+  const catalog = findCatalogExercise(input.exerciseId) || findCatalogExercise(input.exerciseName);
   const id = input.exerciseId || catalog?.id;
   const resolvedId = id ? (EXERCISE_ID_ALIASES[id] || id) : undefined;
   const mapped = resolvedId ? getMappedBioId(resolvedId) : undefined;
@@ -76,7 +77,7 @@ function findBio(input: ExerciseInstructionInput): { bio?: ExerciseBio; target?:
 }
 
 function catalogInstruction(input: ExerciseInstructionInput, id?: string) {
-  const entry = EXERCISE_CATALOG.find(e => e.id === id || e.name.toLowerCase() === input.exerciseName.toLowerCase());
+  const entry = findCatalogExercise(id) || findCatalogExercise(input.exerciseName);
   if (!entry) return undefined;
   return {
     pattern: PATTERN_RU[entry.movementPattern || ''] || entry.movementPattern || entry.group,
@@ -101,8 +102,30 @@ function orderLabel(input: ExerciseInstructionInput): string {
   return 'добивочное упражнение в конце блока мышцы';
 }
 
-/** Returns detailed instructions suitable for BBPlan.comment and exports. */
+/**
+ * Замер (2026-11-07): `buildExerciseInstructions` — 1.5 с из 11 с профиля
+ * (≈68 мс на сборку плана): на каждое упражнение каждой недели пересчитывались
+ * одинаковые подсказки + два скана каталога. Функция детерминирована от входа —
+ * кэшируем и отдаём копию, чтобы вызывающий код не портил кэш.
+ */
+const INSTRUCTION_CACHE = new Map<string, ExerciseInstructionProfile>();
+const INSTRUCTION_CACHE_MAX = 4000;
+
 export function buildExerciseInstructions(input: ExerciseInstructionInput): ExerciseInstructionProfile {
+  const key = [
+    input.exerciseId, input.exerciseName, input.muscle, input.role, input.phase,
+    input.trainingFocus, input.level, input.tempo, input.restSeconds,
+    input.orderIndex, input.totalExercises, input.intensityTechnique,
+  ].join('\u0001');
+  const hit = INSTRUCTION_CACHE.get(key);
+  if (hit) return { ...hit, cues: [...hit.cues], mistakes: [...hit.mistakes] };
+  const value = buildExerciseInstructionsUncached(input);
+  if (INSTRUCTION_CACHE.size >= INSTRUCTION_CACHE_MAX) INSTRUCTION_CACHE.clear();
+  INSTRUCTION_CACHE.set(key, value);
+  return { ...value, cues: [...value.cues], mistakes: [...value.mistakes] };
+}
+
+function buildExerciseInstructionsUncached(input: ExerciseInstructionInput): ExerciseInstructionProfile {
   const { bio, target, id, hasLabBio } = findBio(input);
   const catalog = catalogInstruction(input, id);
   const derived = derivePattern({ name: input.exerciseName, group: input.muscle, type: 'compound', targetMuscle: input.muscle } as any);
@@ -218,7 +241,7 @@ export function buildExerciseInstructions(input: ExerciseInstructionInput): Exer
   // Честный источник: exercise-lab ТОЛЬКО при реальной записи (bio БЕЗ generic-fallback)
   // или target-muscle покрытии. Иначе — каталог (есть техника) или generic.
   const source = hasLabBio || target ? 'exercise-lab'
-    : id || EXERCISE_CATALOG.some(e => e.name === input.exerciseName) ? 'catalog' : 'generic';
+    : id || bbCatalogIndex().byName.has(String(input.exerciseName || '').toLowerCase()) ? 'catalog' : 'generic';
   const finalMistakes = [...(target?.commonMistakes || []), ...(catalog?.mistakes || [])];
   while (finalMistakes.length < 3) {
     const fb = fallbackMistakes[finalMistakes.length % fallbackMistakes.length];

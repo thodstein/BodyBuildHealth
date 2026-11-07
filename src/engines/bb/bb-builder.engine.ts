@@ -1687,8 +1687,59 @@ export interface BuildExercisePoolOpts {
 
 /** 3.1 — вынесенный слой selection: построение скорированного пула упражнений.
  *  Включает: истинно-мышечный фильтр + контекст сессии + fallback-пул +
- *  BB-фильтр + _score (BB-приоритет) + generic-блэклист. */
+ *  BB-фильтр + _score (BB-приоритет) + generic-блэклист.
+ *
+ *  ЗАМЕР (2026-11-07): `buildExercisePool` — 1.0 с из 3.0 с профиля сборки
+ *  (60+ вызовов за мезоцикл × 500+ упражнений каталога × 8 классификаторов и
+ *  ~20 регулярок на упражнение). Результат зависит ТОЛЬКО от аргументов, а
+ *  каталог статичен — поэтому пул кэшируется по подписи опций. Наружу отдаётся
+ *  копия массива: вызывающий код сортирует/фильтрует пул на месте.
+ */
 export function buildExercisePool(muscle: string, role: string, opts: BuildExercisePoolOpts): any[] {
+  const key = exercisePoolKey(muscle, role, opts);
+  const hit = EXERCISE_POOL_CACHE.get(key);
+  // Копируем и массив, И элементы: сборщик сессии проставляет выбранным
+  // упражнениям подходы/RIR/роль — на общих объектах это протекало в
+  // следующий прогон и ломало детерминизм плана.
+  if (hit && hit.catalogSize === EXERCISE_CATALOG.length) return hit.pool.map((ex: any) => ({ ...ex }));
+  const pool = buildExercisePoolUncached(muscle, role, opts);
+  if (EXERCISE_POOL_CACHE.size >= EXERCISE_POOL_CACHE_MAX) EXERCISE_POOL_CACHE.clear();
+  EXERCISE_POOL_CACHE.set(key, { pool, catalogSize: EXERCISE_CATALOG.length });
+  return pool.map((ex: any) => ({ ...ex }));
+}
+
+const EXERCISE_POOL_CACHE_MAX = 600;
+const EXERCISE_POOL_CACHE = new Map<string, { pool: any[]; catalogSize: number }>();
+
+/** Только для тестов: сброс кэша пулов. */
+export function clearExercisePoolCache(): void {
+  EXERCISE_POOL_CACHE.clear();
+}
+
+function exercisePoolKey(muscle: string, role: string, opts: BuildExercisePoolOpts): string {
+  return muscle + '|' + role + '|' + JSON.stringify({
+    level: opts.level,
+    roleMuscles: opts.roleMuscles,
+    sessionTag: opts.sessionTag || '',
+    allowExotic: !!opts.allowExotic,
+    allowStrengthLifts: !!opts.allowStrengthLifts,
+    isPurePull: !!opts.isPurePull,
+    equipmentList: opts.equipmentList,
+    excludeIds: opts.excludeIds,
+    avoidAxialLoad: !!opts.avoidAxialLoad,
+    mobilityRestrictions: opts.mobilityRestrictions || null,
+    bodyweightCapability: opts.bodyweightCapability || null,
+    favoriteIds: opts.favoriteIds,
+    focusGroup: opts.focusGroup || '',
+    weakPoints: opts.weakPoints,
+    fewerCompound: !!opts.fewerCompound,
+    pedDoses: opts.pedDoses || null,
+    labMrvMultiplier: opts.labMrvMultiplier ?? null,
+    phase: opts.phase || '',
+  });
+}
+
+function buildExercisePoolUncached(muscle: string, role: string, opts: BuildExercisePoolOpts): any[] {
   const tag = (opts.sessionTag || '').toLowerCase();
   // Гейт уровней — в swap-backstop финализатора (пул НЕ трогаем: удаление
   // из пула сдвигало offsets/ротацию и рвало настроенные объёмы).

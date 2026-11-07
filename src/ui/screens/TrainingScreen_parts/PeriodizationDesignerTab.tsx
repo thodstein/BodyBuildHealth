@@ -101,14 +101,25 @@ export const PeriodizationDesignerTab: React.FC<{ initialUnifiedMode?: 'micro' |
   const linked = useDataLink();
 
   useEffect(() => {
-    const check = () => {
+    // Ресайз: обработчик вызывался на каждый кадр перетаскивания окна, а
+    // `setViewMode(prev => prev)` был пустым сеттером — React всё равно
+    // планировал перерисовку всего конструктора. Считаем один раз за кадр.
+    let raf = 0;
+    const apply = () => {
+      raf = 0;
       const m = typeof window !== 'undefined' ? window.innerWidth < 560 : false;
       setIsMobile(m);
-      if (m) setViewMode(prev => prev); // keep user choice
+    };
+    const check = () => {
+      if (raf) return;
+      raf = typeof requestAnimationFrame === 'function' ? requestAnimationFrame(apply) : (setTimeout(apply, 16) as any);
     };
     check();
     window.addEventListener('resize', check);
-    return () => window.removeEventListener('resize', check);
+    return () => {
+      window.removeEventListener('resize', check);
+      if (raf) { if (typeof cancelAnimationFrame === 'function') cancelAnimationFrame(raf); else clearTimeout(raf as any); }
+    };
   }, []);
 
   useEffect(() => {
@@ -353,6 +364,13 @@ export const PeriodizationDesignerTab: React.FC<{ initialUnifiedMode?: 'micro' |
   // пресеты под дисциплину
   const plPresets = useMemo(() => getPLPresetDesigns(), []);
   const bbPresets = useMemo(() => getBBPresetDesigns(), []);
+  // Топ-3 сплита: rankBBSplits перебирает все паттерны и считает скор —
+  // раньше вызывался прямо в JSX на каждый рендер (каждый символ в полях
+  // уровня/цели/дней). Теперь только при смене этих трёх значений.
+  const bbTopSplits = useMemo(
+    () => rankBBSplits({ level: bbLevel, goal: bbGoal as any, daysPerWeek: bbDays } as any).slice(0, 3),
+    [bbLevel, bbGoal, bbDays],
+  );
   const currentPresets = effectiveDiscipline === 'pl' ? plPresets : bbPresets;
 
   // несовместимые фазы в текущем дизайне
@@ -806,7 +824,7 @@ export const PeriodizationDesignerTab: React.FC<{ initialUnifiedMode?: 'micro' |
                     </div>
                     <div style={{ fontSize: 10, color: accent, fontWeight: 700, marginBottom: 4 }}>⭐ Топ-3 сплита для ББ (rankBBSplits)</div>
                     <div style={{ display: 'grid', gap: 6, marginBottom: 10 }}>
-                      {rankBBSplits({ level: bbLevel, goal: bbGoal as any, daysPerWeek: bbDays } as any).slice(0,3).map((r, idx) => (
+                      {bbTopSplits.map((r, idx) => (
                         <div key={r.pattern.id} style={{ padding: 8, borderRadius: 8, background: idx===0 ? accent+'14' : 'rgba(255,255,255,0.03)', border: `1px solid ${idx===0 ? accent+'33' : 'rgba(255,255,255,0.06)'}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
                           <div style={{ minWidth: 0 }}>
                             <div style={{ fontSize: 11, fontWeight: 800, color: idx===0 ? accent : '#fff' }}>{idx===0 ? '★ ' : ''}{r.pattern.name}</div>

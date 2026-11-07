@@ -343,6 +343,12 @@ export function selectExercisesSmart(input: SelectorInput): SelectedExercise[] {
   if (pool.length === 0) pool = candidates.filter(ex => ex && ex.id && !_selIds.includes(ex.id) && !_selNames.includes(ex.name));
 
   // Скоринг
+  // Замер (2026-11-07): `alreadySelected` считался ВНУТРИ map по каждому
+  // кандидату (O(n·m) с `candidates.find`), хотя зависит только от `_selIds`.
+  // Выносим за цикл — тот же результат, но одна сборка вместо n.
+  const _byId = new Map<string, Exercise>();
+  for (const c of candidates) if (c && c.id && !_byId.has(c.id)) _byId.set(c.id, c);
+  const alreadySelected = _selIds.map(id => _byId.get(id)).filter(Boolean) as Exercise[];
   const scored = pool.map(ex => {
     const rationales: string[] = [];
     let score = 50; // базовый
@@ -353,7 +359,6 @@ export function selectExercisesSmart(input: SelectorInput): SelectedExercise[] {
     if (wz > 0) rationales.push(`Закрывает слабую зону: ${muscleGroup}`);
 
     // 2. Разнообразие углов — программа-специфично
-    const alreadySelected = _selIds.map(id => candidates.find(c => c.id === id)).filter(Boolean) as Exercise[];
     const ad = angleDiversityScore(ex, alreadySelected, muscleGroup);
     score += ad;
     if (ad > 0) rationales.push(`Новый угол для ${muscleGroup} — разнообразие паттерна`);
@@ -410,7 +415,7 @@ export function selectExercisesSmart(input: SelectorInput): SelectedExercise[] {
     if (_tier === 1) { score += 8; rationales.push('Каноническое упражнение — базовый паттерн для гипертрофии'); }
     else if (_tier === 3) { score -= 15; rationales.push('Экзотика — только для опытных, не в базе этой программы'); }
     else if (_tier === 4) { score -= 40; rationales.push('Не подходит для гипертрофии в этой программе — исключено'); }
-    if (isInappropriateBB(ex) && level && (level === 'beginner' || level === 'intermediate')) { score -= 30; rationales.push('Недоступно на данном уровне — требует техники'); }
+    if (_tier === 4 && level && (level === 'beginner' || level === 'intermediate')) { score -= 30; rationales.push('Недоступно на данном уровне — требует техники'); }
 
     // 5b. Контекст бодибилдинга — программа-специфично
     if (preferBB && isCompetitionLift(ex)) {

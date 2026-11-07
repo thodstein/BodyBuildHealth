@@ -486,6 +486,7 @@ const [bbVolumeRamp, setBbVolumeRamp] = useState<'standard' | 'preloaded' | 'fla
   const [qualityWeek, setQualityWeek] = useState<number | 'avg'>('avg');
   const [autoRegOn, setAutoRegOn] = useState(false);
   const [isBuilding, setIsBuilding] = useState(false);
+  const buildingRef = useRef(false);
   const [collapsedDays, setCollapsedDays] = useState<Set<number>>(new Set());
   const [collapsedExercises, setCollapsedExercises] = useState<Set<string>>(new Set());
   const [safetyOpen, setSafetyOpen] = useState(true);
@@ -2277,9 +2278,18 @@ const [bbVolumeRamp, setBbVolumeRamp] = useState<'standard' | 'preloaded' | 'fla
     setSubTarget(null);
   }, [subTarget, builtPlan, bbWeekSel, bbWorkMax]);
 
-  const buildBb = () => {
-    if (isBuilding) return;
+  // Сборка плана синхронная (200–1500 мс на слабых устройствах). Раньше
+  // `setIsBuilding(true)` и сама сборка шли в одном тике — браузер не успевал
+  // отрисовать индикатор, и кнопка выглядела «зависшей». Теперь сначала кадр
+  // с индикатором, потом сборка. Двойной клик режется ref-гардом.
+  const buildBb = async () => {
+    if (buildingRef.current) return;
+    buildingRef.current = true;
     setIsBuilding(true);
+    await new Promise<void>((resolve) => {
+      if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => setTimeout(resolve, 0));
+      else setTimeout(resolve, 0);
+    });
     let plan: BBPlan;
 
     // AutoReg-пейлоад (для buildBBPlan → applyPostPhaseProcessing)
@@ -2862,6 +2872,7 @@ const [bbVolumeRamp, setBbVolumeRamp] = useState<'standard' | 'preloaded' | 'fla
       flash('Ошибка при генерации плана: ' + (e?.message || String(e)) + '. Проверьте параметры и попробуйте снова.');
       return;
     } finally {
+      buildingRef.current = false;
       setIsBuilding(false);
     }
   };

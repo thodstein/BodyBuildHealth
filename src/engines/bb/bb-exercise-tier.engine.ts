@@ -15,6 +15,7 @@
  *      прогулка фермера, плиометрика, одной рукой) — исключать из пула по умолчанию.
  */
 import type { Exercise } from '../../core/types';
+import { cachedClassification } from '../ex-classify-cache';
 
 export type BBExerciseTier = 1 | 2 | 3 | 4;
 
@@ -37,6 +38,10 @@ const INAPPROPRIATE_PATTERNS: RegExp = /донышк|bottom.?up|гильотин
 const EXOTIC_SUBGROUPS = new Set(['oly', 'strongman', 'mobility', 'core_stab']);
 
 export function bbExerciseTier(ex: Exercise | any): BBExerciseTier {
+  return cachedClassification('tier', ex, bbExerciseTierUncached);
+}
+
+function bbExerciseTierUncached(ex: Exercise | any): BBExerciseTier {
   const n = (ex?.name || '').toLowerCase();
   const id = (ex?.id || '').toLowerCase();
   const equip = String(ex?.equipment || '').toLowerCase();

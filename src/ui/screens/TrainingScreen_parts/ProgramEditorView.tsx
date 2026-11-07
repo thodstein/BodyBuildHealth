@@ -340,6 +340,9 @@ export const ProgramEditor: React.FC<ProgramEditorProps> = ({ program, onChange,
   const originalPrograms = useOriginalPrograms();
   const libraryPrograms = useMemo(() => [...getAllPrograms(), ...WOMENS_PROGRAMS, ...CUSTOM_PROGRAMS, ...originalPrograms], [originalPrograms]);
   const plCycleList = useMemo(() => LMS_CYCLES, []);
+  // Валидация программы: раньше вызывалась прямо в JSX и пересчитывалась на
+  // каждый символ в полях заметок. Зависимость — только сама программа.
+  const programIssues = useMemo(() => validateProgram(program), [program]);
   const loadIntoEditor = (p: UserProgram) => {
     onChange(p);
     setEditorLibOpen(null);
@@ -1944,7 +1947,7 @@ return (
 
       {/* P2.8: Валидация программы */}
       {(() => {
-        const issues = validateProgram(program);
+        const issues = programIssues;
         if (issues.length === 0) return null;
         const errCount = issues.filter(i => i.level === 'error').length;
         const warnCount = issues.filter(i => i.level === 'warning').length;

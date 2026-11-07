@@ -36,6 +36,26 @@ import { CalcSubstanceManager } from './CalcSubstanceManager';
 import { hctGradationLabel } from './Calc.labs-derived';
 import { checkStackToxicity, type ToxWarning } from '../../../engines/biostack-safety.engine';
 import { calculateReboundTrajectory, getReboundSummary, type ReboundInput } from '../../../engines/rebound-modeling.engine';
+
+/**
+ * Кэш прогноза ребаунда (24-недельная ПК-симуляция).
+ *
+ * Аудит производительности 2026-11-07: `calculateReboundTrajectory` вызывалась
+ * прямо в JSX на каждый рендер «Калькулятора» (в т.ч. свёрнутой карточки).
+ * Входные данные — маленький плоский объект, поэтому ключ по JSON дешёвый,
+ * а сама симуляция переиспользуется, пока курс/профиль не изменились.
+ */
+const reboundCache = new Map<string, any>();
+function reboundMemo(input: ReboundInput): any {
+  let key = '';
+  try { key = JSON.stringify(input); } catch { return calculateReboundTrajectory(input); }
+  const hit = reboundCache.get(key);
+  if (hit) return hit;
+  const value = calculateReboundTrajectory(input);
+  if (reboundCache.size > 40) reboundCache.clear();
+  reboundCache.set(key, value);
+  return value;
+}
 import { printProtocol, buildExportDataFromRec } from '../../../ui/components/ProtocolExport';
 import { checkNotifications } from '../../../engines/notification-engine';
 import { computeOverdueSystems, type SystemOverdue } from '../../../engines/labs-overdue';
@@ -3818,8 +3838,24 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
         };
         
         try {
-          const rebound = calculateReboundTrajectory(reboundInput) as any;
-          const summary = getReboundSummary(rebound) as any;
+          // Прогноз ребаунда = 24-недельная ПК-симуляция. Раньше он считался на
+          // КАЖДЫЙ рендер экрана «Калькулятор» — даже когда блок свёрнут.
+          // Теперь: только когда блок раскрыт, и с кэшем по входным данным.
+          const rebound = showRebound ? reboundMemo(reboundInput) as any : null;
+          const summary = rebound ? getReboundSummary(rebound) as any : null;
+          if (!rebound) {
+            return (
+              <div style={{ marginTop:6 }}>
+                <div onClick={() => setShowRebound(true)} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', cursor:'pointer', padding:'7px 9px', borderRadius: 8, background:'rgba(245,158,11,0.07)', border:'1px solid rgba(245,158,11,0.18)' }}>
+                  <span style={{ fontSize:10, fontWeight:700, color:'#f59e0b', display:'flex', alignItems:'center', gap:5 }}>
+                    📉 Прогноз ребаунда после отмены
+                    <span style={{ fontSize:7, fontWeight:600, color:'rgba(245,158,11,0.5)', padding:'1px 5px', borderRadius:4, background:'rgba(245,158,11,0.1)' }}>по вашему курсу</span>
+                  </span>
+                  <span style={{ fontSize:8, color:'rgba(255,255,255,0.55)' }}>▼ показать</span>
+                </div>
+              </div>
+            );
+          }
           
           return (
             <div style={{ marginTop:6 }}>

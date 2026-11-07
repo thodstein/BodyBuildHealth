@@ -6,32 +6,42 @@
  * Обе стороны импортируют derivePattern / isCarryExercise отсюда.
  */
 
+import { cachedClassification } from './ex-classify-cache';
+
 const BODYWEIGHT_TERMS = ['подтяг', 'отжим', 'скручиван', 'планк', 'турник', 'подъём ног', 'уголок', 'кошка'];
 
 /** Упражнение с собственным весом (без внешнего отягощения). */
 export function isBodyweightExercise(ex: any): boolean {
-  if (ex.type === 'bodyweight') return true;
-  const eq = ex.equipment;
-  const eqArr = Array.isArray(eq) ? eq : (eq ? [String(eq)] : []);
-  if (eqArr.includes('bodyweight')) return true;
-  const nm = (ex.name || '').toLowerCase();
-  return BODYWEIGHT_TERMS.some(t => nm.includes(t)) && !/(гантел|блином|весом|блок|тренаж|штанг|кросс)/.test(nm);
+  return cachedClassification('bodyweight', ex, (x) => {
+    if (x.type === 'bodyweight') return true;
+    const eq = x.equipment;
+    const eqArr = Array.isArray(eq) ? eq : (eq ? [String(eq)] : []);
+    if (eqArr.includes('bodyweight')) return true;
+    const nm = (x.name || '').toLowerCase();
+    return BODYWEIGHT_TERMS.some(t => nm.includes(t)) && !/(гантел|блином|весом|блок|тренаж|штанг|кросс)/.test(nm);
+  });
 }
 
 const CARRY_TERMS = ['прогулк', 'carry', 'walk', 'носил'];
 
 /** Упражнение-переноска (фермерская прогулка и т.п.). */
 export function isCarryExercise(ex: any): boolean {
-  const nm = (ex.name || '').toLowerCase();
-  // Аудит 5.1 (BB-AUTO-EXHAUSTIVE-PRO): «Ходьба с резиной (monster walks)» — активация
-  // ягодиц, НЕ переноска; слово walk в имени не делает упражнение carry.
-  if (/резин|band|monster/.test(nm)) return false;
-  return CARRY_TERMS.some(t => nm.includes(t));
+  return cachedClassification('carry', ex, (x) => {
+    const nm = (x.name || '').toLowerCase();
+    // Аудит 5.1 (BB-AUTO-EXHAUSTIVE-PRO): «Ходьба с резиной (monster walks)» — активация
+    // ягодиц, НЕ переноска; слово walk в имени не делает упражнение carry.
+    if (/резин|band|monster/.test(nm)) return false;
+    return CARRY_TERMS.some(t => nm.includes(t));
+  });
 }
 
 /** Эвристический вывод movementPattern для записей каталога без тега
  *  (275/529 упражнений лишены movementPattern — иначе patternBalance сыплет «unknown»). */
 export function derivePattern(ex: any): string {
+  return cachedClassification('pattern', ex, derivePatternUncached);
+}
+
+function derivePatternUncached(ex: any): string {
   const g: string = ex.group || '';
   const nm: string = (ex.name || '').toLowerCase();
   const tgt: string = (ex.targetMuscle || '').toLowerCase();
@@ -145,6 +155,10 @@ const MP_TO_MUSCLE: Record<string, string | null> = {
 };
 
 export function trueMuscleOf(ex: any): string | null {
+  return cachedClassification('trueMuscle', ex, trueMuscleOfUncached);
+}
+
+function trueMuscleOfUncached(ex: any): string | null {
   const mp = ex?.movementPattern || derivePattern(ex);
   const tgt: string = (ex?.targetMuscle || '').toLowerCase();
   const nm: string = (ex?.name || '').toLowerCase();

@@ -2387,13 +2387,22 @@ export const LiftMasterCard: React.FC<{
                   })()}
                 </g>
               ) : (
-                <polyline points={kinoveaResult.points.map((p, idx) => {
-                  const xs = kinoveaResult.points.map(q=>q.x); const ys = kinoveaResult.points.map(q=>q.y);
-                  const minX = Math.min(...xs), maxX = Math.max(...xs); const minY = Math.min(...ys), maxY = Math.max(...ys);
-                  const x = 30 + ((p.x - minX) / Math.max(0.001, maxX - minX)) * 160;
-                  const y = 80 - ((p.y - minY) / Math.max(0.001, maxY - minY)) * 60;
-                  return x + "," + y;
-                }).join(" ")} fill="none" stroke="#38bdf8" strokeWidth="1.5" />
+                <polyline points={(() => {
+                  // Было O(n²): границы min/max пересчитывались заново внутри
+                  // .map для КАЖДОЙ точки (n массивов + spread). Считаем один раз.
+                  const pts = kinoveaResult.points;
+                  const xs = pts.map(q => q.x);
+                  const ys = pts.map(q => q.y);
+                  const minX = Math.min(...xs), maxX = Math.max(...xs);
+                  const minY = Math.min(...ys), maxY = Math.max(...ys);
+                  const dx = Math.max(0.001, maxX - minX);
+                  const dy = Math.max(0.001, maxY - minY);
+                  return pts.map(p => {
+                    const x = 30 + ((p.x - minX) / dx) * 160;
+                    const y = 80 - ((p.y - minY) / dy) * 60;
+                    return x + ',' + y;
+                  }).join(' ');
+                })()} fill="none" stroke="#38bdf8" strokeWidth="1.5" />
               )
             ) : null}
             {kinoveaResult ? (

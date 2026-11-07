@@ -172,8 +172,8 @@ describe('Ручной конструктор — последовательны
     expect(screen.getByText('🎨 Привязать дизайн периодизации:')).toBeTruthy();
     // выбираем дизайн через попап-карточку и привязываем
     fireEvent.click(screen.getByLabelText('Дизайн периодизации'));
-    await waitFor(() => expect(screen.getByText('Мой макроцикл (2 блоков)')).toBeTruthy(), { timeout: 5000 });
-    fireEvent.click(screen.getByText('Мой макроцикл (2 блоков)'));
+    await waitFor(() => expect(screen.getByText('Мой макроцикл (2 блока)')).toBeTruthy(), { timeout: 5000 });
+    fireEvent.click(screen.getByText('Мой макроцикл (2 блока)'));
     fireEvent.click(screen.getByText('🔗 Привязать'));
     // связанный дизайн показан, без бейджа stale
     expect(screen.getByText(/Дизайн периодизации:/)).toBeTruthy();

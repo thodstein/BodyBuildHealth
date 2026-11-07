@@ -16,6 +16,8 @@
  * Капы не меняются.
  */
 
+import { cachedClassification } from '../ex-classify-cache';
+
 export type ResistanceProfile = 'lengthened' | 'mid' | 'short';
 
 export interface SFRRecord {
@@ -141,6 +143,10 @@ function findByName(n: string): string | null {
 
 /** SFR записи для упражнения (по id, fallback по имени). */
 export function sfrOf(ex: { id?: string; name?: string }): number | null {
+  return cachedClassification('sfr', ex, sfrOfUncached);
+}
+
+function sfrOfUncached(ex: { id?: string; name?: string }): number | null {
   if (ex?.id && SFR_EXERCISE_DB[ex.id]) return SFR_EXERCISE_DB[ex.id].sfr;
   const n = String(ex?.name || '').toLowerCase();
   const idByName = findByName(n);
