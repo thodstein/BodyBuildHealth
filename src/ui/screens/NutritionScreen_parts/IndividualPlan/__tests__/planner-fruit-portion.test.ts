@@ -50,6 +50,10 @@ const build = (p: typeof PROFILES[number], mc: number, tr: boolean, on: boolean)
   variety: 'medium', goal: 'maintenance', quality: 'full',
   excludedIds: new Set<string>(), allergenTags: new Set<string>(), randomSalt: 0,
   fruitPortionFloor: on,
+  // §8.74 (огрызок — не порция) включается отдельно и имеет свой замок
+  // (`planner-fruit-crumb.test.ts`): в «без стадии» варианте §8.59 крошка остаётся —
+  // иначе §8.74 её уберёт, и A/B перестанет быть сравнением одной стадии.
+  fruitCrumb74: false,
 } as unknown as MealPlanInput);
 
 const crumbs = (pl: any) => (pl.meals || []).flatMap((m: any) => ((m.items || []) as any[])

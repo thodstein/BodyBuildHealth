@@ -40,6 +40,9 @@ const build = (p: P, mc: number, tr: boolean, on: boolean) => buildDayPlan({
   variety: 'medium', goal: 'maintenance', quality: 'full',
   excludedIds: new Set<string>(), allergenTags: new Set<string>(), randomSalt: 0,
   powderMinPortion73: on,
+  // §8.74 (огрызок — не порция) выключается в обоих вариантах: она меняет состав блюд
+  // и мешала бы проверять «состав тот же». Её собственный замок — planner-fruit-crumb.test.ts.
+  fruitCrumb74: false,
 } as any) as any;
 
 const solidG = (m: any) => ((m.items || []) as any[])

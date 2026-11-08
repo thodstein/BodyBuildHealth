@@ -15339,7 +15339,10 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     }
     const _finalCategories: Record<string, number> = {};
     _finalFoodIds.forEach(id => { const f = FOOD_DB.find(x => x.id === id); const cat = f?.category || 'other'; _finalCategories[cat] = (_finalCategories[cat] || 0) + 1; });
-    const _finalMicroTotals = sumMicros(meals.flatMap(m => m.items.map(it => ({ id: it.id, amount: it.amount }))), FOOD_DB as any);
+    // §8.74: факт микро для нот (QG21) обязан идти за тарелкой — поздние стадии
+    // (§8.70–§8.74) меняют её после этого снимка, и нота «⚠ Дефицит VitB9: 226» врала
+    // при факте 223.3 г. `let` + пересчёт в каждой поздней стадии.
+    let _finalMicroTotals = sumMicros(meals.flatMap(m => m.items.map(it => ({ id: it.id, amount: it.amount }))), FOOD_DB as any);
     let _finalMicro = _pickCtx.qualityMode === 'full'
       ? analyzeMicroCoverage(_finalMicroTotals, input.sex || 'male', input.weightKg, input.cyclePhase as any, !!input.isTrainingDay, input.calciumTargetOverride, input.sodiumTargetOverride)
       : { coverage: [], topDeficitNutrient: null as string | null };
@@ -15616,6 +15619,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
         }
         if (_done71.length > 0) {
           _finalMicro = _microNow() ?? _finalMicro;
+          _finalMicroTotals = sumMicros(meals.flatMap(m => m.items.map(it => ({ id: it.id, amount: it.amount }))), FOOD_DB as any);
           _resyncMps();
           _refreshProteinNote();
           notes.push(`🥚 Белок яйца не уносит тарелку: ${_done71.join('; ')} — белок дня сохранён, жир снят с масла того же приёма (масло ≥5 г).`);
@@ -15790,6 +15794,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
       }
       if (_done72.length > 0) {
         _finalMicro = _microNow() ?? _finalMicro;
+        _finalMicroTotals = sumMicros(meals.flatMap(m => m.items.map(it => ({ id: it.id, amount: it.amount }))), FOOD_DB as any);
         _resyncMps();
         _refreshProteinNote();
         notes.push(`🥩 Перекусы не голодают: ${_done72.join('; ')} — перенос «белок за белок»: белок дня сохранён (±1.5 г), основные приёмы-якоря не опускаются ниже 0.30 г/кг (§8.72).`);
@@ -15886,9 +15891,94 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
       }
       if (_done73.length > 0) {
         _finalMicro = _microNow() ?? _finalMicro;
+        _finalMicroTotals = sumMicros(meals.flatMap(m => m.items.map(it => ({ id: it.id, amount: it.amount }))), FOOD_DB as any);
         _resyncMps();
         _refreshProteinNote();
         notes.push(`🥄 Порошок не мельче полупорции: ${_done73.join('; ')} — день сходится к цели без новой еды (§8.73).`);
+      }
+    }
+    // ─── §8.74: огрызок — не порция ──────────────────────────────────────────────
+    // Замер 60 дней: 34 приёма с «фруктом» меньше 40 г — «яблоко 20 г», «хурма 19 г»,
+    // «малина 19 г». Это остаток добивки, а не еда: в тарелке висит огрызок, который
+    // пользователь либо выбрасывает, либо не замечает. Крошка удаляется, а её углеводы
+    // возвращаются гарниру того же приёма (если у гарнира есть комната и тарелка не
+    // перерастёт 500 г). Гейт на приём: канон не хуже и не выходит из 3%, качество не
+    // ниже, вёдер не больше; иначе откат.
+    if ((input as any).fruitCrumb74 !== false
+      && _pickCtx.qualityMode === 'full'
+      && !(input as any).manualTargetsLocked
+      && (input as any).kbjuMode !== 'manual'
+      && !(input as any).recipeAssembly
+      && !(input as any).portableMode) {
+      const _MIN_FRUIT74 = 40;
+      const _goal74 = {
+        k: Number(input.goalKcal) || 0,
+        p: Number(adjustedProteinG || input.goalProteinG) || 0,
+        f: Number(input.goalFatG) || 0,
+        c: Number(adjustedCarbsG || input.goalCarbsG) || 0,
+      };
+      const _raw74 = {
+        k: Number(input.goalKcal) || 0,
+        p: Number(input.goalProteinG) || 0,
+        f: Number(input.goalFatG) || 0,
+        c: Number(input.goalCarbsG) || 0,
+      };
+      const _devOf74 = (g: typeof _goal74) => Math.max(
+        g.k > 0 ? Math.abs(Number(totals.kcal) - g.k) / g.k : 0,
+        g.p > 0 ? Math.abs(Number(totals.p) - g.p) / g.p : 0,
+        g.f > 0 ? Math.abs(Number(totals.f) - g.f) / g.f : 0,
+        g.c > 0 ? Math.abs(Number(totals.c) - g.c) / g.c : 0,
+      );
+      const _dev74 = () => Math.max(_devOf74(_goal74), _devOf74(_raw74));
+      const _solid74 = (m: any) => ((m.items || []) as any[])
+        .filter((x: any) => !['liquid', 'supplement'].includes(String(x.role || '')))
+        .reduce((s: number, x: any) => s + (Number(x.amount) || 0), 0);
+      const _buckets74 = () => (meals as any[]).filter((m: any) => (m.items || []).length > 0 && _solid74(m) > 500).length;
+      // Роль `fruit` несёт не только фрукт (`peas_green`, `bulgur`) — определяем по БД,
+      // как §8.59: категория `veg_fruit` минус бобовые/кукуруза/соя.
+      const _isFruit74 = (x: any) => {
+        if (String(x?.role) !== 'fruit') return false;
+        const fd: any = FOOD_DB.find((f: any) => String(f.id) === String(x.id));
+        if (!fd || String(fd.category) !== 'veg_fruit') return false;
+        return !/pea|lentil|bean|chickpea|corn|maize|soy|edamame/i.test(String(x.id));
+      };
+      let _d74 = _dev74();
+      let _b74 = _buckets74();
+      let _q74 = _qNow(_finalMicro);
+      const _done74: string[] = [];
+      for (const m of meals as any[]) {
+        const _crumbs = ((m.items || []) as any[]).filter((x: any) => _isFruit74(x)
+          && (Number(x.amount) || 0) > 0 && (Number(x.amount) || 0) < _MIN_FRUIT74);
+        if (_crumbs.length === 0) continue;
+        const snap74 = ((m.items || []) as any[]).map((x: any) => ({ ...x }));
+        const restore74 = () => { m.items = snap74.map((x: any) => ({ ...x })); m.totals = mealTotalsOf(m.items); recalcDayTotals(meals as any[], totals); };
+        const names = _crumbs.map((x: any) => `${String(x.id)} ${Math.round(Number(x.amount))} г`).join(', ');
+        // Компенсировать крошку плотным гарниром нельзя: фрукт несёт воду и клетчатку,
+        // а рис на те же углеводы даёт втрое больше ккал — замер `mid75/6/тр`: 2433 →
+        // 2451 ккал, канон 1.9 → 2.8%. Огрызок просто убирается (−10…20 ккал дня).
+        m.items = ((m.items || []) as any[]).filter((x: any) => !_crumbs.includes(x));
+        m.totals = mealTotalsOf(m.items);
+        recalcDayTotals(meals as any[], totals);
+        const dev = _dev74();
+        const buck = _buckets74();
+        const q = _qNow(_microNow());
+        if (dev > Math.max(_d74, 0.029) + 1e-9 || (dev > 0.029 && _d74 <= 0.029)
+          || Math.abs(Number(totals.p) - _goal74.p) / Math.max(1, _goal74.p) > 0.03
+          || buck > _b74 || q.total < _q74.total) {
+          restore74();
+          continue;
+        }
+        _d74 = dev;
+        _b74 = buck;
+        _q74 = q;
+        _done74.push(`${String(m.type)}: ${names}`);
+      }
+      if (_done74.length > 0) {
+        _finalMicro = _microNow() ?? _finalMicro;
+        _finalMicroTotals = sumMicros(meals.flatMap(m => m.items.map(it => ({ id: it.id, amount: it.amount }))), FOOD_DB as any);
+        _resyncMps();
+        _refreshProteinNote();
+        notes.push(`🍓 Огрызок — не порция: ${_done74.join('; ')} — крошка фрукта меньше ${_MIN_FRUIT74} г убрана (§8.74).`);
       }
     }
     _jMark('final', 'Финал (микро/гигиена/витрина)');
