@@ -1650,7 +1650,7 @@ export const NutritionScreen: React.FC<{ initialSubTab?: string }> = ({ initialS
           }}>☰</button>
           <div style={{ flex:1, minWidth:0 }}>
             <div style={{ fontSize:15, fontWeight:800, color:'#fff', letterSpacing:-0.3, lineHeight:1.15 }}>Питание</div>
-            <div style={{ fontSize:11, fontWeight:600, color:'#fff', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', lineHeight:1.3 }}>
+            <div style={{ fontSize:11, fontWeight:600, color:'#fff', whiteSpace:'normal', overflowWrap:'anywhere', lineHeight:1.3 }}>
               {TAB_LABELS[tab] || tab}
               <span style={{ color:'rgba(255,255,255,0.55)', fontWeight:400 }}> · {nutritionSection === 'diary' ? 'Дневник' : nutritionSection === 'ration' ? 'Рацион' : nutritionSection === 'kitchen' ? 'Кухня' : nutritionSection === 'analysis' ? 'Анализ' : nutritionSection === 'overview' ? 'Обзор' : 'Всё'}</span>
             </div>
