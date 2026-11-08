@@ -9,6 +9,7 @@ import { NutritionDiary } from './NutritionScreen_parts/NutritionDiary';
 import { searchByName as searchOFF, productToFoodItem } from '../../engines/openfoodfacts.engine';
 import { localIsoDate } from '../../core/local-date';
 import { readProgramRestrictions, summarizeImportChecks } from './NutritionScreen_parts/diary/diary-import-guards';
+import { addFavorite, removeFavorite, resolveFavorites, type FavFood } from './NutritionScreen_parts/diary/food-favorites';
 import { RETAIL_CHAINS, RETAIL_RESULT_LIMIT, retailToFoodItem, searchRetailProducts, type RetailProduct } from '../../engines/retail-search.engine';
 import { IndividualPlan, NutritionPlanScope, PlanReportTab, NutritionPeriodizationTab } from './NutritionScreen_parts/IndividualPlan';
 import { OrganLoadCalculator } from './NutritionScreen_parts/IndividualPlan/OrganLoadCalculator';
@@ -314,8 +315,16 @@ const CatalogTab: React.FC = () => {
   const allFoods = React.useMemo(() => [...FOOD_DB as any[], ...usdaFoods.map(f => ({...f, category: f.category || 'other', tier: f.tier || 'standard', fiber: f.fiber || 0, gi: 0, servingSize: '100g', allergens: [], isVegetarian: false, isVegan: false, isGlutenFree: false, isDairyFree: false, dietTags: [] as string[], description: f.description || '', micros: {} }))], [usdaFoods]);
 
   const categories = React.useMemo(() => [...new Set(allFoods.map(f => f.category).filter(Boolean) as string[])], [allFoods]);
-  const addFav = (food: { id: string; name: string; kcal: number; protein: number; fat: number; carbs: number }) => {
-    try { const ids: string[] = JSON.parse(localStorage.getItem('he_food_favs') || '[]'); const updated = [food.id, ...ids.filter(f => f !== food.id)].slice(0, 100); localStorage.setItem('he_food_favs', JSON.stringify(updated)); } catch {}
+  const addFav = (food: { id: string; name: string; kcal: number; protein: number; fat: number; carbs: number; category?: string }) => {
+    addFavorite({
+      id: String(food.id || food.name),
+      name: food.name,
+      kcal: food.kcal,
+      protein: food.protein,
+      fat: food.fat,
+      carbs: food.carbs,
+      category: food.category,
+    });
   };
   const filtered = React.useMemo(() => {
     const q = (catSearch || '').toLowerCase().replace(/ё/g,'е').trim();
@@ -1192,14 +1201,14 @@ const InfoTab: React.FC = () => {
 
 const FavoritesTab: React.FC = () => {
   const [favTab, setFavTab] = useState<'products'|'recipes'|'plans'|'stacks'>('products');
-  const [favs, setFavs] = useState<typeof FOOD_DB>(() => { try { const ids: string[] = JSON.parse(localStorage.getItem('he_food_favs') || '[]'); return ids.map(id => FOOD_DB.find(f => f.id === id)).filter(Boolean) as typeof FOOD_DB; } catch { return []; } });
-  const removeFav = (id: string) => { try { const ids: string[] = JSON.parse(localStorage.getItem('he_food_favs') || '[]'); localStorage.setItem('he_food_favs', JSON.stringify(ids.filter(f => f !== id))); setFavs(prev => prev.filter(f => f.id !== id)); } catch {} };
+  const [favs, setFavs] = useState<FavFood[]>(() => resolveFavorites());
+  const removeFav = (id: string) => { removeFavorite(id); setFavs(prev => prev.filter(f => f.id !== id)); };
   const [myRecipes] = useState<any[]>(() => { try { return JSON.parse(localStorage.getItem('he_recipes') || '[]'); } catch { return []; } });
   const [savedPlans] = useState<any[]>(() => { try { return JSON.parse(localStorage.getItem('he_my_plans') || '[]'); } catch { return []; } });
   const [savedStacks] = useState<any[]>(() => { try { return JSON.parse(localStorage.getItem('he_finder_saved_stacks') || '[]'); } catch { return []; } });
   const catLabels: Record<string, string> = { protein:'🥩 Мясо', dairy:'🥛 Молочка', carb:'🍚 Крупы', grain:'🌾 Зерно', fat:'🧈 Жиры', veg_fruit:'🥦 Овощи', fast_food:'🍔 Фастфуд', supplement:'💊 Добавки', other:'📦 Прочее' };
-  const groups: Record<string, typeof FOOD_DB> = {};
-  favs.forEach(f => { const g = catLabels[f.category] || '📦 Прочее'; if (!groups[g]) groups[g] = []; groups[g].push(f); });
+  const groups: Record<string, FavFood[]> = {};
+  favs.forEach(f => { const g = (f.category && catLabels[f.category]) || '📦 Прочее'; if (!groups[g]) groups[g] = []; groups[g].push(f); });
   const pill = (t: string, icon: string, label: string) => (
     <button onClick={() => setFavTab(t as any)} aria-pressed={favTab === t} style={{ padding:'10px 14px', borderRadius:999, fontSize:12, fontWeight: favTab === t ? 700 : 500, cursor:'pointer', minHeight:44, border: favTab === t ? '1px solid #00e68a' : '1px solid rgba(255,255,255,0.07)', background: favTab === t ? 'linear-gradient(135deg,rgba(0,230,138,0.18),rgba(0,200,160,0.12))' : '#202023', color: favTab === t ? '#00e68a' : 'rgba(255,255,255,0.7)', boxShadow: favTab === t ? '0 2px 8px rgba(0,230,138,0.2)' : 'none' }}>{icon} {label}</button>
   );

@@ -281,6 +281,7 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
           foodSearch={foodSearch} onFoodSearchChange={setFoodSearch} debouncedSearch={debouncedSearch}
           usdaFoods={usdaFoods} mealType={mealType} onMealTypeChange={setMealType}
           allMealTypes={allMealTypes} onAddFoodFromDB={addFoodFromDB} onDirectAdd={handleDirectAdd}
+          onFavoritesChanged={bumpRefresh}
           customMealInput={customMealInput} onCustomMealInputChange={setCustomMealInput} onAddCustomMeal={addCustomMeal}
            onShowBarcode={() => setShowBarcode(true)} onCloseBarcode={() => setShowBarcode(false)} showBarcode={showBarcode} onBarcodeProduct={handleBarcodeProduct}
           labelOpen={labelOpen} labelLoading={labelLoading} labelProgress={labelProgress}

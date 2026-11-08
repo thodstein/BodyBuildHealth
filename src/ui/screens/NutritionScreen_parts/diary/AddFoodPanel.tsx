@@ -11,6 +11,7 @@ import { readDiaryV2 } from '../diary-storage-v2';
 import { LabelNutritionPanel, type LabelDraftView } from './LabelNutritionPanel';
 import { customFoodToFoodItem } from '../../../../engines/meal-custom-food';
 import { useCustomFoods } from './hooks/useCustomFoods';
+import { readFavIds, toggleFavorite } from './food-favorites';
 
 interface AddFoodPanelProps {
   foodSearch: string;
@@ -83,6 +84,8 @@ interface AddFoodPanelProps {
   onClearQueue?: () => void;
   /** Дополнительные блоки под поиском (частые продукты, недавние). */
   below?: React.ReactNode;
+  /** Избранное изменилось — попросить дневник перечитать список. */
+  onFavoritesChanged?: () => void;
 }
 
 const fmt = (v: number) => Math.round((v || 0) * 10) / 10;
@@ -104,7 +107,7 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
   onFixAllLowConfidence,
   favoriteFoods, mealPresets, onAddPreset, showCustomFood, onToggleCustomFood,
   customFoodName, onCustomFoodNameChange, customFoodKcal, customFoodP, customFoodF, customFoodC,
-  onCustomFoodFieldChange, onAddCustomFood, ocrFileRef, ocrCameraRef, onClearQueue, below,
+  onCustomFoodFieldChange, onAddCustomFood, ocrFileRef, ocrCameraRef, onClearQueue, below, onFavoritesChanged,
 }) => {
   // АПК: системная камера/галерея вместо сырого file-input (в WebView он
   // открывается через раз). Перехват клика по плитке «Фото».
@@ -145,6 +148,45 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
     setLastQueued(String(food?.name || ''));
     if (lastQueuedTimer.current) clearTimeout(lastQueuedTimer.current);
     lastQueuedTimer.current = setTimeout(() => setLastQueued(''), 2600);
+  };
+
+  // ── ⭐ в результатах поиска ──────────────────────────────────────────────
+  // Подсказка «добавляйте ⭐ из поиска» раньше была неправдой: звезды в этом
+  // листе не было. Теперь любимый продукт (в т.ч. из сети) попадает в
+  // «Избранное» и «Частое» одним тапом.
+  const [favIds, setFavIds] = useState<string[]>(() => readFavIds());
+  const toggleFav = (food: any) => {
+    const id = String(food?.id || food?.name || '');
+    if (!id) return;
+    toggleFavorite({
+      id,
+      name: String(food.name || 'Продукт'),
+      kcal: food.kcal, protein: food.protein, fat: food.fat, carbs: food.carbs,
+      category: food.category,
+    });
+    setFavIds(readFavIds());
+    try { onFavoritesChanged?.(); } catch { /* ignore */ }
+  };
+  const favButton = (food: any) => {
+    const on = favIds.includes(String(food?.id || food?.name || ''));
+    return (
+      <button
+        onClick={(e) => { e.stopPropagation(); toggleFav(food); }}
+        aria-label={on ? 'Убрать из избранного' : 'В избранное'}
+        aria-pressed={on}
+        title={on ? 'Убрать из избранного' : 'В избранное'}
+        className="nd-fav-toggle"
+        data-fav={on ? 'true' : undefined}
+        style={{
+          width: 36, height: 44, flexShrink: 0,
+          border: 'none', background: 'transparent', cursor: 'pointer',
+          fontSize: 15, lineHeight: 1, padding: 0,
+          color: on ? '#fbbf24' : 'rgba(255,255,255,0.32)',
+        }}
+      >
+        {on ? '★' : '☆'}
+      </button>
+    );
   };
   const queueKcal = parsedItems.reduce(
     (sum, it) => sum + Math.round(((it.kcal || 0) * (it.qty || 100)) / 100), 0,
@@ -755,6 +797,7 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
                       </button>
                       <button onClick={() => queueFood(f)} title="В очередь (потом Сохранить)" aria-label="В очередь" className="nd-addq" style={addBtnStyle}>＋</button>
                       {onDirectAdd && <button onClick={() => onDirectAdd(f)} title={`Сразу в ${mealType || 'дневник'} 100г`} aria-label="Сразу в дневник" className="nd-addnow" style={nowBtnStyle}>⚡ 100г</button>}
+                      {favButton(f)}
                     </div>
                   ))}
                 </div>
@@ -802,6 +845,7 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
                           </button>
                           <button onClick={() => queueFood(retailToFoodItem(p) as any)} title="В очередь (потом Сохранить)" aria-label="В очередь" className="nd-addq" style={{ ...addBtnStyle, border: '1px solid rgba(0,230,138,0.2)', background: 'rgba(0,230,138,0.08)', color: '#00e68a' }}>＋</button>
                           {onDirectAdd && <button onClick={() => onDirectAdd(retailToFoodItem(p) as any)} title={`Сразу в ${mealType || 'дневник'} 100г`} aria-label="Сразу в дневник" className="nd-addnow" style={nowBtnStyle}>⚡ 100г</button>}
+                          {favButton(retailToFoodItem(p) as any)}
                         </div>
                       );
                     })}
@@ -845,6 +889,7 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
                         </button>
                         <button onClick={() => queueFood(f)} aria-label="В очередь" className="nd-addq" style={{ ...addBtnStyle, border: '1px solid rgba(59,130,246,0.18)', background: 'rgba(59,130,246,0.08)', color: '#60a5fa' }}>＋</button>
                         {onDirectAdd && <button onClick={() => onDirectAdd(f)} aria-label="Сразу в дневник" className="nd-addnow" style={{ ...nowBtnStyle, background: 'linear-gradient(135deg,#60a5fa,#3b82f6)', color: '#fff' }}>⚡ 100г</button>}
+                        {favButton(f)}
                       </div>
                     ))}
                   </div>

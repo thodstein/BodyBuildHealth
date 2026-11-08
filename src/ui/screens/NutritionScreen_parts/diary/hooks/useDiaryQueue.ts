@@ -5,8 +5,8 @@ import { processUploadedFile } from '../../../../../core/ocr-engine';
 import { isCapacitorNative } from '../../../../../core/app-platform';
 import { FOOD_DB } from '../../../../../core/nutrition-database';
 import { type DiaryItem, type FoodItemLike } from '../../types';
-import { readJSONArr } from '../../diary-storage-v2';
 import { readProgramRestrictions, summarizeImportChecks } from '../diary-import-guards';
+import { touchFavorite } from '../food-favorites';
 import { useLabelScan } from './useLabelScan';
 import type { CustomFoodEntry } from '../../../../../engines/meal-custom-food';
 
@@ -40,9 +40,17 @@ export function useDiaryQueue({ diaryData, selectedDate, mealType, usdaFoods, sa
     // схлопывается и приходится искать заново — добавить несколько
     // продуктов подряд становится невозможно.
     try {
-      const favs = readJSONArr<string>('he_food_favs');
-      const updated = [food.id, ...favs.filter((f: string) => f !== food.id)].slice(0, 12);
-      localStorage.setItem('he_food_favs', JSON.stringify(updated));
+      // Снимок продукта кладём рядом с id: продукты сетей есть только в
+      // выдаче, и без снимка они пропадали из «Избранного»/«Частого».
+      touchFavorite({
+        id: String(food.id || food.name),
+        name: food.name,
+        kcal: food.kcal,
+        protein: food.protein,
+        fat: food.fat,
+        carbs: food.carbs,
+        category: food.category,
+      }, 12);
       bumpRefresh();
     } catch {}
   }, [bumpRefresh]);

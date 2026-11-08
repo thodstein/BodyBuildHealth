@@ -132,6 +132,24 @@ describe('Дневник: полноэкранный лист добавлени
     await waitFor(() => expect(screen.getByText(/Каталоги сетей сейчас недоступны/)).toBeTruthy());
   });
 
+  it('звезда в результатах поиска кладёт продукт в избранное', async () => {
+    render(<NutritionDiary foodEntries={[]} />);
+    fireEvent.change(screen.getByLabelText('Поиск продуктов'), { target: { value: 'творог' } });
+
+    await waitFor(() => expect(screen.getAllByLabelText('В избранное').length).toBeGreaterThan(0));
+    fireEvent.click(screen.getAllByLabelText('В избранное')[0]);
+
+    await waitFor(() => expect(screen.getAllByLabelText('Убрать из избранного').length).toBe(1));
+    const ids = JSON.parse(localStorage.getItem('he_food_favs') || '[]');
+    expect(ids.length).toBeGreaterThan(0);
+    expect(String(localStorage.getItem('he_food_favs_meta') || '').toLowerCase()).toContain('творог');
+
+    // Повторный тап снимает звезду — и продукт уходит из избранного.
+    fireEvent.click(screen.getAllByLabelText('Убрать из избранного')[0]);
+    await waitFor(() => expect(screen.queryAllByLabelText('Убрать из избранного')).toHaveLength(0));
+    expect(JSON.parse(localStorage.getItem('he_food_favs') || '[]')).toEqual([]);
+  });
+
   it('после сохранения показывает сами приёмы пищи, а не только КБЖУ', async () => {
     const spy = vi.fn();
     const orig = (Element.prototype as any).scrollIntoView;

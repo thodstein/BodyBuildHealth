@@ -4,7 +4,7 @@ import { aggregateDiaryMicros } from '../../diary-storage';
 import { calcMealQuality, getQualityLabel } from '../../../../../engines/nutrition-quality.engine';
 import { useRecentFoods } from '../../useNutritionDiary';
 import { formatDate, parseDateOnly } from '../../../../../core/utils/date-utils';
-import { readJSONArr } from '../../diary-storage-v2';
+import { resolveFavorites } from '../food-favorites';
 
 export function useDiaryDay({ diaryData, refreshKey }: {
   diaryData: Record<string, any>;
@@ -69,10 +69,7 @@ export function useDiaryDay({ diaryData, refreshKey }: {
     } catch { return null; }
   }, [dayMeals, refreshKey]);
 
-  const favoriteFoods = useMemo(() => {
-    const favs = readJSONArr<string>('he_food_favs');
-    return favs.map(id => FOOD_DB.find(f => f.id === id)).filter(Boolean) as typeof FOOD_DB;
-  }, [refreshKey]);
+  const favoriteFoods = useMemo(() => resolveFavorites(), [refreshKey]);
 
   const recentFoods = useRecentFoods(diaryData as any, 10);
 
