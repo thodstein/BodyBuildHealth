@@ -800,6 +800,7 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
                       style={{ ...addBtnStyle, border: '1px solid rgba(59,130,246,0.18)', background: 'rgba(59,130,246,0.08)', color: '#60a5fa' }}>＋</button>
                     {onDirectAdd && <button onClick={() => onDirectAdd(barcodeFood)} aria-label="Сразу в дневник" className="nd-addnow"
                       style={{ ...nowBtnStyle, background: 'linear-gradient(135deg,#60a5fa,#3b82f6)', color: '#fff' }}>⚡ 100г</button>}
+                    {favButton(barcodeFood)}
                   </>
                 ) : (
                   <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)' }}>
