@@ -129,6 +129,21 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
     return () => { document.body.style.overflow = prev; };
   }, [tab]);
 
+  // После сохранения очереди уводим на «День» и показываем сами приёмы пищи,
+  // а не только карточку КБЖУ: иначе кажется, что еда «где-то там».
+  const scrollToMealsAfterSave = React.useRef(false);
+  React.useEffect(() => {
+    if (tab !== 'day' || !scrollToMealsAfterSave.current) return;
+    scrollToMealsAfterSave.current = false;
+    const timer = window.setTimeout(() => {
+      const el = document.querySelector('.nd-sec-meals');
+      if (el && typeof el.scrollIntoView === 'function') {
+        try { el.scrollIntoView({ block: 'start', behavior: 'smooth' }); } catch { /* noop */ }
+      }
+    }, 120);
+    return () => window.clearTimeout(timer);
+  }, [tab]);
+
   // Фокус в лист: скринридер объявляет диалог, клавиатура не выскакивает.
   React.useEffect(() => {
     if (tab !== 'add') return;
@@ -287,6 +302,7 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
             // Распознанное должно быть ВИДНО: уводим на «День», иначе кажется,
             // что кнопка ничего не добавила (очередь просто исчезла).
             setShowOCR(false);
+            scrollToMealsAfterSave.current = true;
             closeAddSheet();
           }}
           onEditParsedItem={(idx, updated) => setParsedItems(prev => prev.map((item, i) => i === idx ? { ...item, ...updated } : item))}
@@ -396,6 +412,7 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
             selectedDate={selectedDate} copySource={copySource}
             onPasteMeal={pasteMeal} onCancelCopy={() => setCopySource(null)}
             onRepeatYesterday={repeatPreviousDay}
+            onAddFood={() => setTab('add')}
           />
           </DiarySection>
           <DiarySection id="quality" icon="⭐" title="Качество дня" sub="полезность · настроение · паттерны" color="#a78bfa">

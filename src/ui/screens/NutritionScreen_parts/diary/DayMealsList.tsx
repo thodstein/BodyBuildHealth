@@ -18,12 +18,14 @@ interface DayMealsListProps {
   onCancelCopy: () => void;
   /** Быстрый ввод: перенести приёмы предыдущего дня в выбранный. */
   onRepeatYesterday?: () => void;
+  /** Открыть полноэкранное добавление еды прямо из пустого дня. */
+  onAddFood?: () => void;
 }
 
 export const DayMealsList: React.FC<DayMealsListProps> = ({
   dayMeals, onEditItem, onDeleteItem, onCopyMeal, onSavePreset,
   onImportFromPlan, onClearDay, onFillMicros, selectedDate, copySource, onPasteMeal, onCancelCopy,
-  onRepeatYesterday,
+  onRepeatYesterday, onAddFood,
 }) => {
   const mealNames = Object.keys(dayMeals);
   const hasData = mealNames.length > 0;
@@ -38,6 +40,28 @@ export const DayMealsList: React.FC<DayMealsListProps> = ({
         )}
         <div style={{ fontSize: 13, color: '#fff', marginBottom: 6, fontWeight: 700 }}>Пока пусто — начните день</div>
         <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)', marginBottom:14, lineHeight:1.5 }}>Добавьте завтрак, обед или перекус — поиск, штрихкод, фото чека или план</div>
+        {onAddFood && (
+          <button
+            className="day-empty-cta nd-empty-addfood"
+            onClick={onAddFood}
+            aria-label="Добавить еду"
+            style={{
+              background: 'linear-gradient(135deg,#00e68a,#00c8a0)',
+              color: '#000',
+              border: 'none',
+              boxShadow: '0 6px 18px rgba(0,230,138,0.25)',
+              padding: '12px 22px',
+              borderRadius: 15,
+              fontSize: 13,
+              fontWeight: 800,
+              cursor: 'pointer',
+              minHeight: 48,
+              marginBottom: 8,
+            }}
+          >
+            ＋ Добавить еду
+          </button>
+        )}
         {onRepeatYesterday && (
           <button
             className="day-empty-cta nd-repeat-yesterday"

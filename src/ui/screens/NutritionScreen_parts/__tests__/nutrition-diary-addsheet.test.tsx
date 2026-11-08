@@ -132,6 +132,26 @@ describe('Дневник: полноэкранный лист добавлени
     await waitFor(() => expect(screen.getByText(/Каталоги сетей сейчас недоступны/)).toBeTruthy());
   });
 
+  it('после сохранения показывает сами приёмы пищи, а не только КБЖУ', async () => {
+    const spy = vi.fn();
+    const orig = (Element.prototype as any).scrollIntoView;
+    (Element.prototype as any).scrollIntoView = spy;
+    try {
+      render(<NutritionDiary foodEntries={[]} />);
+      fireEvent.change(screen.getByLabelText('Поиск продуктов'), { target: { value: 'творог' } });
+      await waitFor(() => expect(screen.getAllByLabelText('В очередь').length).toBeGreaterThan(0));
+      fireEvent.click(screen.getAllByLabelText('В очередь')[0]);
+      await waitFor(() => expect(screen.getByText(/На очереди \(1\)/)).toBeTruthy());
+
+      fireEvent.click(screen.getByLabelText('Сохранить'));
+      await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+      expect(document.querySelector('.nd-sec-meals')).toBeTruthy();
+      await waitFor(() => expect(spy.mock.calls.length).toBeGreaterThan(0));
+    } finally {
+      (Element.prototype as any).scrollIntoView = orig;
+    }
+  });
+
   it('приём по умолчанию — по часам, и выбранный чип можно сбросить', async () => {
     const at = (h: number) => new Date(2026, 10, 8, h, 0, 0);
     expect(mealForNow(at(8))).toBe('Завтрак');
