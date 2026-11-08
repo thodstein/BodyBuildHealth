@@ -126,6 +126,12 @@ describe('Дневник: полноэкранный лист добавлени
     await waitFor(() => expect(screen.getByText(/На очереди \(1\)/)).toBeTruthy());
   });
 
+  it('честно сообщает, когда каталоги сетей недоступны', async () => {
+    render(<NutritionDiary foodEntries={[]} />);
+    fireEvent.change(screen.getByLabelText('Поиск продуктов'), { target: { value: 'творог' } });
+    await waitFor(() => expect(screen.getByText(/Каталоги сетей сейчас недоступны/)).toBeTruthy());
+  });
+
   it('приём по умолчанию — по часам, и выбранный чип можно сбросить', async () => {
     const at = (h: number) => new Date(2026, 10, 8, h, 0, 0);
     expect(mealForNow(at(8))).toBe('Завтрак');

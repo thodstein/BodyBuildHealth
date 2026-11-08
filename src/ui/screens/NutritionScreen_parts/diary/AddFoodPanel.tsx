@@ -223,6 +223,8 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
   const [isSearchingNet, setIsSearchingNet] = useState(false);
   const [retailResults, setRetailResults] = useState<RetailProduct[]>([]);
   const [isSearchingRetail, setIsSearchingRetail] = useState(false);
+  /** null — ещё не спрашивали; false — бэкенд/сети не отвечают. */
+  const [retailAvailable, setRetailAvailable] = useState<boolean | null>(null);
 
   useEffect(() => {
     if (query && !isBarcodeQuery(query) && foodSearchResults.length > 0) {
@@ -289,8 +291,10 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
     // 24 = 3 сети × 8 позиций: раньше забирали 9 суммарно, поэтому
     // «супермаркеты» выглядели почти пустыми.
     searchRetailProducts(q, RETAIL_RESULT_LIMIT).then(res => {
-      if (!cancelled) setRetailResults(res.available ? res.items.slice(0, RETAIL_RESULT_LIMIT) : []);
-    }).catch(() => { if (!cancelled) setRetailResults([]); }).finally(() => { if (!cancelled) setIsSearchingRetail(false); });
+      if (cancelled) return;
+      setRetailAvailable(res.available);
+      setRetailResults(res.available ? res.items.slice(0, RETAIL_RESULT_LIMIT) : []);
+    }).catch(() => { if (!cancelled) { setRetailAvailable(false); setRetailResults([]); } }).finally(() => { if (!cancelled) setIsSearchingRetail(false); });
     return () => { cancelled = true; };
   }, [query]);
 
@@ -803,6 +807,14 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
                     })}
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* Сети реально недоступны (бэкенд/403) — говорим об этом прямо,
+                иначе пустой раздел «супермаркеты» выглядит как баг. */}
+            {hasQuery && !isSearchingRetail && retailAvailable === false && (
+              <div className="nd-retail-off" style={{ fontSize: 10, lineHeight: 1.35, color: 'rgba(255,255,255,0.5)', padding: '8px 10px', borderRadius: 10, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)' }}>
+                🏪 Каталоги сетей сейчас недоступны — показаны база продуктов и бренды РФ.
               </div>
             )}
 
