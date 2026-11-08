@@ -4009,6 +4009,12 @@ html:not([data-theme="light"]):not([data-apk-theme="light"]) textarea::placehold
 }
 .nd-queued-toast { animation: nd-queued-in 0.18s ease-out both; }
 
+/* Быстрое добавление: 4 таба в одну строку на узком телефоне не влезают —
+ * переносим по два, чтобы подписи не обрезались. */
+@media (max-width: 400px) {
+  .nd-qtabs .nd-qtab { flex: 1 1 calc(50% - 3px) !important; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .nd-addsheet,
   .nd-queued-toast { animation: none; }

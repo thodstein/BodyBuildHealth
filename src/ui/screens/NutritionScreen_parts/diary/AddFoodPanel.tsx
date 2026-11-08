@@ -1011,14 +1011,14 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
             </button>
             {showQuickAdd && (
               <div style={{ padding: 10, borderRadius: 14, background: 'rgba(18,18,20,0.9)', border: '1px solid rgba(255,255,255,0.06)' }}>
-                <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
+                <div className="nd-qtabs" style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
                   {[
                     { id: 'fav', label: '⭐ Избранное', count: favoriteFoods.length },
-                    { id: 'recent', label: '🕒 Часто', count: history.length },
+                    { id: 'recent', label: '🔍 Запросы', count: history.length },
                     { id: 'last', label: '🆕 Последние', count: lastAdded.length },
                     { id: 'presets', label: '📦 Наборы', count: mealPresets.length },
                   ].map(tab => (
-                    <button key={tab.id} onClick={() => setQuickTab(tab.id as any)} aria-pressed={quickTab === tab.id} data-active={quickTab === tab.id} className="nd-qtab" style={{ flex: 1, padding: '9px 6px', borderRadius: 10, fontSize: 10, fontWeight: quickTab === tab.id ? 700 : 500, cursor: 'pointer', minHeight: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 3, background: quickTab === tab.id ? 'rgba(0,230,138,0.14)' : 'rgba(255,255,255,0.03)', border: `1px solid ${quickTab === tab.id ? 'rgba(0,230,138,0.3)' : 'rgba(255,255,255,0.06)'}`, color: quickTab === tab.id ? '#00e68a' : 'rgba(255,255,255,0.65)' }}>
+                    <button key={tab.id} onClick={() => setQuickTab(tab.id as any)} aria-pressed={quickTab === tab.id} data-active={quickTab === tab.id} className="nd-qtab" style={{ flex: '1 1 auto', padding: '9px 6px', borderRadius: 10, fontSize: 10, fontWeight: quickTab === tab.id ? 700 : 500, cursor: 'pointer', minHeight: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 3, background: quickTab === tab.id ? 'rgba(0,230,138,0.14)' : 'rgba(255,255,255,0.03)', border: `1px solid ${quickTab === tab.id ? 'rgba(0,230,138,0.3)' : 'rgba(255,255,255,0.06)'}`, color: quickTab === tab.id ? '#00e68a' : 'rgba(255,255,255,0.65)' }}>
                       {tab.label}
                       {tab.count > 0 && <span style={{ background: quickTab === tab.id ? '#00e68a' : 'rgba(255,255,255,0.08)', color: quickTab === tab.id ? '#000' : 'rgba(255,255,255,0.65)', padding: '1px 5px', borderRadius: 999, fontSize: 9, fontWeight: 700 }}>{tab.count}</span>}
                     </button>
@@ -1076,7 +1076,7 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
                       </div>
                     </div>
                   ) : (
-                    <div style={{ textAlign: 'center', padding: '14px', color: 'rgba(255,255,255,0.45)', fontSize: 11 }}>История пуста — начни поиск продуктов</div>
+                    <div style={{ textAlign: 'center', padding: '14px', color: 'rgba(255,255,255,0.45)', fontSize: 11 }}>История пуста — ваши поисковые запросы появятся здесь</div>
                   )
                 )}
                 {quickTab === 'last' && (
