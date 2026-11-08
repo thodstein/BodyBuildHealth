@@ -504,7 +504,7 @@ const avgScore = scoredItems.length > 0 ? Math.round(scoredItems.reduce((s, x) =
               <div key={food.id} style={{ display:'flex',alignItems:'center',gap:6,padding:'6px 8px',borderRadius:8,marginBottom:3,background:'rgba(34,197,94,0.04)',border:'1px solid rgba(34,197,94,0.08)' }}>
                 <div style={{ width:28,height:28,borderRadius:8,display:'flex',alignItems:'center',justifyContent:'center',background:'#22c55e20',fontSize:13,fontWeight:800,color:'#22c55e',flexShrink:0 }}>{score.total}</div>
                 <div style={{ flex:1,minWidth:0 }}>
-                  <div style={{ fontSize:9,fontWeight:600,color:'#fff',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap' }}>{food.name}</div>
+                  <div style={{ fontSize:9,fontWeight:600,color:'#fff',whiteSpace:'normal',overflowWrap:'anywhere',lineHeight:1.25 }}>{food.name}</div>
                   <div style={{ fontSize:7,color:'rgba(255,255,255,0.9)' }}>{food.kcal}ккал · Б{food.protein} Ж{food.fat} У{food.carbs}</div>
                 </div>
                 <span style={{ fontSize:7,color:'#22c55e',fontWeight:700 }}>{score.label}</span>
@@ -518,7 +518,7 @@ const avgScore = scoredItems.length > 0 ? Math.round(scoredItems.reduce((s, x) =
               <div key={food.id} style={{ display:'flex',alignItems:'center',gap:6,padding:'6px 8px',borderRadius:8,marginBottom:3,background:'rgba(239,68,68,0.04)',border:'1px solid rgba(239,68,68,0.08)' }}>
                 <div style={{ width:28,height:28,borderRadius:8,display:'flex',alignItems:'center',justifyContent:'center',background:'#ef444420',fontSize:13,fontWeight:800,color:'#ef4444',flexShrink:0 }}>{score.total}</div>
                 <div style={{ flex:1,minWidth:0 }}>
-                  <div style={{ fontSize:9,fontWeight:600,color:'#fff',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap' }}>{food.name}</div>
+                  <div style={{ fontSize:9,fontWeight:600,color:'#fff',whiteSpace:'normal',overflowWrap:'anywhere',lineHeight:1.25 }}>{food.name}</div>
                   <div style={{ fontSize:7,color:'rgba(255,255,255,0.9)' }}>{food.kcal}ккал · Б{food.protein} Ж{food.fat} У{food.carbs}</div>
                 </div>
                 <span style={{ fontSize:7,color:'#ef4444',fontWeight:700 }}>{score.label}</span>
@@ -739,7 +739,7 @@ const avgScore = scoredItems.length > 0 ? Math.round(scoredItems.reduce((s, x) =
                         <ScoreBadge score={score.total} max={score.maxPossible} color={score.color} label={score.label} />
                       )}
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: 11, fontWeight: 600, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{food.name}</div>
+                        <div style={{ fontSize: 11, fontWeight: 600, color: '#fff', whiteSpace: 'normal', overflowWrap: 'anywhere', lineHeight: 1.25 }}>{food.name}</div>
                         <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.9)', marginTop: 1 }}>
                           {CATEGORY_LABELS[food.category] || food.category}
                           {food.tier && <span style={{ marginLeft: 4 }}>· {food.tier === 'max' ? '🔸' : food.tier === 'mid' ? '🔹' : '⚪'} {food.tier}</span>}
@@ -1010,7 +1010,7 @@ const avgScore = scoredItems.length > 0 ? Math.round(scoredItems.reduce((s, x) =
                     <div style={{ fontSize:9, fontWeight:700, color:'#8b5cf6', marginBottom:6 }}>🏆 Сравнение метрик (победитель)</div>
                     <div style={{ display:'grid', gridTemplateColumns:`60px repeat(${compareData.length}, 1fr)`, gap:2, fontSize:7 }}>
                       <div style={{ fontWeight:600, color:'rgba(255,255,255,0.5)', padding:'2px 4px' }}>Метрика</div>
-                      {compareData.map((c:any) => <div key={c.food.id} style={{ fontWeight:600, color:'#fff', textAlign:'center', padding:'2px 4px', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', fontSize:6 }}>{c.food.name}</div>)}
+                      {compareData.map((c:any) => <div key={c.food.id} style={{ fontWeight:600, color:'#fff', textAlign:'center', padding:'2px 4px', overflowWrap:'anywhere', whiteSpace:'normal', lineHeight:1.15, fontSize:6 }}>{c.food.name}</div>)}
                       {(rows as any[]).map((row:any, ri:number) => (
                         <React.Fragment key={ri}>
                           <div style={{ padding:'2px 4px', color:'rgba(255,255,255,0.6)' }}>{row.label}</div>
@@ -1710,7 +1710,7 @@ const avgScore = scoredItems.length > 0 ? Math.round(scoredItems.reduce((s, x) =
                                     color: idx < 2 ? '#06b6d4' : 'rgba(255,255,255,0.6)',
                                   }}>{idx + 1}</span>
                                   <div style={{ flex: 1, minWidth: 0 }}>
-                                    <div style={{ color: '#fff', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                    <div style={{ color: '#fff', fontWeight: 600, whiteSpace: 'normal', overflowWrap: 'anywhere', lineHeight: 1.25 }}>
                                       {f.name}
                                     </div>
                                     <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.6)', marginTop: 1, display: 'flex', gap: 6 }}>

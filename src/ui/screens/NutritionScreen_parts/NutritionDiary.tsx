@@ -265,7 +265,7 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
                 border: '1px solid rgba(255,255,255,0.10)', background: '#202023', color: '#fff' }}>✕</button>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div id="nd-addsheet-title" style={{ fontSize: 14, fontWeight: 800, color: '#fff', letterSpacing: -0.2 }}>Добавление еды</div>
-              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)', whiteSpace: 'normal', overflowWrap: 'anywhere', lineHeight: 1.25 }}>
                 {mealType || 'приём не выбран'} · {shortRuDate(selectedDate)}
               </div>
             </div>

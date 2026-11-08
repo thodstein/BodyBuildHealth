@@ -299,7 +299,7 @@ export function useRenderMealList(ctx: Omit<PlanCtx, 'renderMealList'>) {
                 border: d.isTrainingDay ? '1px solid rgba(0,230,138,0.22)' : '1px solid rgba(255,255,255,0.08)',
                 boxShadow: d.isTrainingDay ? '0 2px 12px rgba(0,230,138,0.18)' : 'none',
               }}>{d.isTrainingDay?'🏋️':'😴'}</span>
-              <div style={{flex:1, minWidth:0}}><div style={{fontSize:12.5,fontWeight:900,letterSpacing:'-0.3px', color: d.isTrainingDay ? '#00e68a' : '#fff', lineHeight:1.1, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis'}}>{d.isTrainingDay?'ТРЕНИРОВОЧНЫЙ ДЕНЬ':'ДЕНЬ ОТДЫХА'}</div>
+              <div style={{flex:1, minWidth:0}}><div style={{fontSize:12.5,fontWeight:900,letterSpacing:'-0.3px', color: d.isTrainingDay ? '#00e68a' : '#fff', lineHeight:1.15, whiteSpace:'normal', overflowWrap:'anywhere'}}>{d.isTrainingDay?'ТРЕНИРОВОЧНЫЙ ДЕНЬ':'ДЕНЬ ОТДЫХА'}</div>
                 <div style={{display:'flex', alignItems:'center', gap:6, marginTop:2}}>
                   {plannerMode === 'pro' && <span style={{fontSize:9,fontWeight:800,color:'#c4b5fd',background:'rgba(139,92,246,0.14)',padding:'2px 7px',borderRadius:999,border:'1px solid rgba(139,92,246,0.22)', letterSpacing:'0.2px'}}>◆ Pro</span>}
                   {weightLogEntries.length >= 3 && (() => { const vals = weightLogEntries.map((e: any) => e.weight); const min = Math.min(...vals); const max = Math.max(...vals); const range = max - min || 1; const h = 20; const w = 68; const pts = vals.map((v: number,i: number) => `${Math.round(i/(vals.length-1)*w)},${Math.round(h-(v-min)/range*h)}`).join(' '); const trend = vals.length >= 2 && vals[vals.length-1] < vals[0]; return (<span style={{display:'inline-flex',alignItems:'center',gap:4, padding:'1px 6px', borderRadius:999, background: trend ? 'rgba(34,197,94,0.10)' : 'rgba(239,68,68,0.10)', border: `1px solid ${trend ? 'rgba(34,197,94,0.18)' : 'rgba(239,68,68,0.18)'}`}}><svg width={w} height={h} style={{verticalAlign:'middle'}}><polyline points={pts} fill="none" stroke={trend?'#22c55e':'#ef4444'} strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round"/></svg><span style={{fontSize:9,color:trend?'#22c55e':'#ef4444',fontWeight:700}}>{trend?'↓':'↑'} {Math.abs(vals[vals.length-1]-vals[0]).toFixed(1)} кг</span></span>); })()}
@@ -692,7 +692,7 @@ export function useRenderMealList(ctx: Omit<PlanCtx, 'renderMealList'>) {
                       <div key={i} style={{ display:'flex', alignItems:'center', gap:6, padding:'5px 8px', borderRadius:8, background:bg, border:`1px solid ${col}30`, minWidth:110, flex:'1 0 120px' }} title={m.time + ' — ' + m.label + ' · ' + Math.round(m.totals?.kcal || 0) + ' ккал'}>
                         <span style={{fontSize:10, fontWeight:800, color:col}}>{m.time}</span>
                         <span style={{width:6,height:6,borderRadius:'50%', background:col, flexShrink:0}}/>
-                        <span style={{fontSize:8, fontWeight:700, color:'#fff', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis'}}>{m.label}</span>
+                        <span style={{fontSize:8, fontWeight:700, color:'#fff', whiteSpace:'normal', overflowWrap:'anywhere', lineHeight:1.2}}>{m.label}</span>
                         <span style={{marginLeft:'auto', fontSize:7, color:'rgba(255,255,255,0.6)'}}>{Math.round(m.totals?.kcal||0)}ккал</span>
                       </div>
                     );
