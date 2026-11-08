@@ -707,10 +707,12 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
                 ✨ Микронутриенты
               </button>
             </div>
+            {/* Второй «зелёный» CTA под очередью спорил с нижней строкой
+                листа: оставляем спокойную вторичную кнопку. */}
             <button onClick={onSaveItems} aria-label="Добавить позиции в дневник" className="nd-ocr-add-inline"
-              style={{ width: '100%', marginTop: 8, padding: '12px', borderRadius: 10, border: 'none', cursor: 'pointer',
-                background: 'linear-gradient(135deg,#00e68a,#00c8a0)', color: '#000', fontWeight: 800, fontSize: 12,
-                minHeight: 48, boxShadow: '0 4px 16px rgba(0,230,138,0.22)' }}>
+              style={{ width: '100%', marginTop: 8, padding: '10px', borderRadius: 10, cursor: 'pointer',
+                background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.25)', color: '#00e68a',
+                fontWeight: 700, fontSize: 11, minHeight: 44 }}>
               💾 Добавить {parsedItems.length} поз. в дневник
             </button>
           </div>
