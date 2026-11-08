@@ -4029,6 +4029,8 @@ html:not([data-theme="light"]):not([data-apk-theme="light"]) textarea::placehold
     font-size: 16px;
     font-weight: 700;
   }
+  /* Иконка категории — приятно, но название важнее: на узком экране прячем. */
+  .nd-addsheet .nd-result-emoji { display: none !important; }
 }
 
 @media (prefers-reduced-motion: reduce) {

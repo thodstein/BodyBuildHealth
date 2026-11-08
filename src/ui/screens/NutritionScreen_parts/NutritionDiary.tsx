@@ -371,8 +371,8 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
                   data[selectedDate].meals[mt].push({ ...f });
                   saveDiary(data);
                   showToast(`🕒 ${f.name} → ${mt}`);
-                }} className="nd-recent-chip" style={{ padding: '10px 14px', borderRadius: 999, fontSize: 12, cursor: 'pointer', minHeight: 44, background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.14)', color: '#60a5fa', whiteSpace: 'nowrap', fontWeight: 600, transition: 'all 0.15s', backdropFilter: 'blur(8px)' }} onMouseEnter={e => e.currentTarget.style.background = 'rgba(59,130,246,0.14)'} onMouseLeave={e => e.currentTarget.style.background = 'rgba(59,130,246,0.08)'}>
-                  {f.name.length>14 ? f.name.slice(0,13)+'…' : f.name} <span style={{ opacity: 0.7, fontWeight: 400 }}>· {Math.round(f.kcal)}ккал</span>
+                }} className="nd-recent-chip" style={{ padding: '10px 14px', borderRadius: 999, fontSize: 12, cursor: 'pointer', minHeight: 44, background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.14)', color: '#60a5fa', maxWidth: '100%', whiteSpace: 'normal', overflowWrap: 'anywhere', textAlign: 'left', fontWeight: 600, transition: 'all 0.15s', backdropFilter: 'blur(8px)' }} onMouseEnter={e => e.currentTarget.style.background = 'rgba(59,130,246,0.14)'} onMouseLeave={e => e.currentTarget.style.background = 'rgba(59,130,246,0.08)'}>
+                  {f.name} <span style={{ opacity: 0.7, fontWeight: 400 }}>· {Math.round(f.kcal)}ккал</span>
                 </button>
               ))}
             </div>
@@ -428,10 +428,10 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
                 {dayQuality.perProduct.slice(0, 12).map((p, i) => (
                   <span key={i} title={`${p.name}: ${p.score}/10`} style={{
-                    padding: '4px 8px', borderRadius: 6, fontSize: 11, fontWeight: 600,
+                    padding: '4px 8px', borderRadius: 6, fontSize: 11, fontWeight: 600, maxWidth: '100%',
                     background: `${p.color}18`, border: `1px solid ${p.color}30`,
-                    color: p.color, whiteSpace: 'nowrap',
-                  }}>{p.name.length > 16 ? p.name.slice(0, 15) + '…' : p.name} {p.score}</span>
+                    color: p.color, whiteSpace: 'normal', overflowWrap: 'anywhere', lineHeight: 1.25,
+                  }}>{p.name} {p.score}</span>
                 ))}
                 {dayQuality.perProduct.length > 12 && (
                   <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)', padding: '3px 6px' }}>
@@ -466,6 +466,7 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
           <NutritionDiaryCharts
             dayMeals={dayMeals} dayTotals={dayTotals} targets={targets}
             diaryData={diaryData} selectedDate={selectedDate} refreshKey={refreshKey}
+            onPickFood={(name) => { setFoodSearch(name); setTab('add'); }}
           />
           </DiarySection>
           )}

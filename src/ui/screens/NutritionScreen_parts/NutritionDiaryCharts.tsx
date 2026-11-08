@@ -9,6 +9,8 @@ interface Props {
   diaryData: Record<string, any>;
   selectedDate: string;
   refreshKey: number;
+  /** Тап по «Топ продуктов» — открыть добавление с этим названием в поиске. */
+  onPickFood?: (name: string) => void;
 }
 
 const cardStyle: React.CSSProperties = { padding: 14, borderRadius: 16, background: 'linear-gradient(135deg, #18181b 0%, #1e1e22 100%)', border: '1px solid rgba(255,255,255,0.06)', marginBottom: 8, boxShadow:'0 4px 20px rgba(0,0,0,0.18)', backdropFilter:'blur(8px)' };
@@ -126,7 +128,7 @@ const Sparkline: React.FC<{ data: number[]; color: string; height?: number; labe
   );
 };
 
-const FoodFrequencyChart: React.FC<{ diaryData: Record<string, any>; selectedDate: string }> = ({ diaryData, selectedDate }) => {
+const FoodFrequencyChart: React.FC<{ diaryData: Record<string, any>; selectedDate: string; onPickFood?: (name: string) => void }> = ({ diaryData, selectedDate, onPickFood }) => {
   const freq = useMemo(() => {
     const map = new Map<string, { count: number; totalKcal: number }>();
     const cutOff = parseDateOnly(selectedDate);
@@ -176,20 +178,31 @@ const FoodFrequencyChart: React.FC<{ diaryData: Record<string, any>; selectedDat
         <span style={{ marginLeft:'auto', fontSize:9, padding:'3px 8px', borderRadius:999, background:'rgba(139,92,246,0.12)', color:'#a78bfa', border:'1px solid rgba(139,92,246,0.18)', fontWeight:700 }}>{freq.length} поз.</span>
       </div>
       {freq.map((f, i) => (
-        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-          <span className="nd-topname" style={{ fontSize: 11, color: 'rgba(255,255,255,0.75)', width: 88, textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', textAlign: 'right', fontWeight:500 }}
-            title={`${f.name} • ${f.count} раз • ${Math.round(f.totalKcal)} ккал`}>
-            {f.name.length > 16 ? f.name.slice(0, 15) + '…' : f.name}
+        <button
+          key={i}
+          type="button"
+          onClick={onPickFood ? () => onPickFood(f.name) : undefined}
+          aria-label={onPickFood ? `Найти ${f.name} и добавить` : undefined}
+          title={`${f.name} • ${f.count} раз • ${Math.round(f.totalKcal)} ккал`}
+          className="nd-toprow"
+          style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, width: '100%', minHeight: 44,
+            background: 'none', border: 'none', padding: 0, textAlign: 'left',
+            cursor: onPickFood ? 'pointer' : 'default', color: 'inherit' }}
+        >
+          {/* Полное название: длинные продукты из сетей переносятся, а не режутся */}
+          <span className="nd-topname" style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.75)', flex: '0 0 96px', minWidth: 0,
+            whiteSpace: 'normal', overflowWrap: 'anywhere', lineHeight: 1.25, textAlign: 'right', fontWeight: 500 }}>
+            {f.name}
           </span>
           <div style={{ flex: 1, height: 14, borderRadius: 8, background: 'rgba(255,255,255,0.06)', overflow: 'hidden', padding:1, boxShadow:'inset 0 1px 2px rgba(0,0,0,0.2)' }}>
             <div style={{ height: '100%', width: `${Math.round(f.count / maxCount * 100)}%`, borderRadius: 7, background: barGradients[i % barGradients.length], transition: 'width 0.6s cubic-bezier(0.22,1,0.36,1)', minWidth: 6, boxShadow:'0 1px 4px rgba(0,0,0,0.2)' }} />
           </div>
           <span style={{ fontSize: 10, fontWeight: 800, color: '#fff', minWidth: 22, textAlign: 'right', background:'rgba(255,255,255,0.06)', padding:'2px 6px', borderRadius:6 }}>{f.count}</span>
           <span style={{ fontSize:10, color:'rgba(255,255,255,0.35)', minWidth:42 }}>{Math.round(f.totalKcal)} ккал</span>
-        </div>
+        </button>
       ))}
       <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', marginTop: 6, textAlign:'center', padding:'6px 8px', background:'rgba(255,255,255,0.02)', borderRadius:8, border:'1px solid rgba(255,255,255,0.03)' }}>
-        Частота за последние 30 дней • тап — быстро добавить (в вкладке ➕)
+        {onPickFood ? 'Частота за 30 дней • тап — найти продукт и добавить' : 'Частота за последние 30 дней'}
       </div>
     </div>
   );
@@ -244,7 +257,7 @@ const MacroMiniGauge: React.FC<{ actual: number; target: number; label: string; 
   );
 };
 
-export const NutritionDiaryCharts: React.FC<Props> = ({ dayMeals, dayTotals, targets, diaryData, selectedDate, refreshKey }) => {
+export const NutritionDiaryCharts: React.FC<Props> = ({ dayMeals, dayTotals, targets, diaryData, selectedDate, refreshKey, onPickFood }) => {
   const hasData = Object.keys(dayMeals).length > 0;
 
   function computeWeekly(diaryData: Record<string, any>, field: string): number[] {
@@ -316,7 +329,7 @@ export const NutritionDiaryCharts: React.FC<Props> = ({ dayMeals, dayTotals, tar
       </div>
 
       {/* Food frequency */}
-      <FoodFrequencyChart diaryData={diaryData} selectedDate={selectedDate} />
+      <FoodFrequencyChart diaryData={diaryData} selectedDate={selectedDate} onPickFood={onPickFood} />
     </div>
   );
 };

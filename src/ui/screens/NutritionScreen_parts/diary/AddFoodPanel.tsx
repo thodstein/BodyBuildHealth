@@ -819,7 +819,7 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                   {foodSearchResults.map(f => (
                     <div key={f.id} className="nd-result" style={rowStyle}>
-                      <span style={{ fontSize: 18, width: 24, textAlign: 'center', flexShrink: 0 }}>{CAT_MAP_EMOJI[f.category || 'other'] || '📦'}</span>
+                      <span className="nd-result-emoji" style={{ fontSize: 18, width: 24, textAlign: 'center', flexShrink: 0 }}>{CAT_MAP_EMOJI[f.category || 'other'] || '📦'}</span>
                       <button onClick={() => queueFood(f)} role="button" aria-label={`Добавить ${f.name}`}
                         style={{ flex: 1, minWidth: 0, background: 'none', border: 'none', padding: 0, textAlign: 'left', cursor: 'pointer', color: '#fff' }}>
                         <div style={nameStyle}>{f.name}</div>
@@ -911,7 +911,7 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                     {internetUnique.map(f => (
                       <div key={f.id} className="nd-netrow" style={{ ...rowStyle, background: 'rgba(59,130,246,0.03)', border: '1px solid rgba(59,130,246,0.10)' }}>
-                        <span style={{ fontSize: 18, width: 24, textAlign: 'center', flexShrink: 0 }}>🌐</span>
+                        <span className="nd-result-emoji" style={{ fontSize: 18, width: 24, textAlign: 'center', flexShrink: 0 }}>🌐</span>
                         <button onClick={() => queueFood(f)} role="button" aria-label={`Добавить ${f.name}`}
                           style={{ flex: 1, minWidth: 0, background: 'none', border: 'none', padding: 0, textAlign: 'left', cursor: 'pointer', color: '#fff' }}>
                           <div style={nameStyle}>{f.name}</div>
