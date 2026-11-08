@@ -150,6 +150,19 @@ describe('Дневник: полноэкранный лист добавлени
     expect(JSON.parse(localStorage.getItem('he_food_favs') || '[]')).toEqual([]);
   });
 
+  it('«Отменить» в тосте убирает случайно добавленную позицию', async () => {
+    render(<NutritionDiary foodEntries={[]} />);
+    fireEvent.change(screen.getByLabelText('Поиск продуктов'), { target: { value: 'творог' } });
+
+    await waitFor(() => expect(screen.getAllByLabelText('В очередь').length).toBeGreaterThan(0));
+    fireEvent.click(screen.getAllByLabelText('В очередь')[0]);
+    await waitFor(() => expect(screen.getByText(/На очереди \(1\)/)).toBeTruthy());
+
+    fireEvent.click(screen.getByLabelText('Отменить добавление'));
+    await waitFor(() => expect(screen.queryByText(/На очереди \(1\)/)).toBeNull());
+    expect(document.querySelector('.nd-queued-toast')).toBeNull();
+  });
+
   it('после сохранения показывает сами приёмы пищи, а не только КБЖУ', async () => {
     const spy = vi.fn();
     const orig = (Element.prototype as any).scrollIntoView;

@@ -10241,6 +10241,21 @@ html.app-native .nd-addq:active {
 html.app-native .nd-addnow:active {
   transform: scale(0.96) !important;
 }
+/* Звезда «в избранное» и «Отменить» в тосте — палец, а не мышь. */
+html.app-native .nd-fav-toggle {
+  min-width: 44px !important;
+  min-height: 44px !important;
+}
+html.app-native .nd-fav-toggle:active {
+  transform: scale(0.88) !important;
+}
+html.app-native .nd-queued-undo {
+  min-width: 40px !important;
+  min-height: 40px !important;
+}
+html.app-native .nd-queued-undo:active {
+  transform: scale(0.92) !important;
+}
 html.app-native .nd-qpreset {
   min-height: 44px !important;
   font-variant-numeric: tabular-nums !important;

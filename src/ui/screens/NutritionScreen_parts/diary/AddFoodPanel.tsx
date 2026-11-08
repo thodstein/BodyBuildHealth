@@ -143,11 +143,33 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
   const [lastQueued, setLastQueued] = useState('');
   const lastQueuedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => () => { if (lastQueuedTimer.current) clearTimeout(lastQueuedTimer.current); }, []);
+  /** Что именно добавили — чтобы «Отменить» снимало нужную позицию. */
+  const lastQueuedRef = useRef<{ name: string; idx: number } | null>(null);
   const queueFood = (food: any) => {
+    lastQueuedRef.current = { name: String(food?.name || ''), idx: parsedItems.length };
     onAddFoodFromDB(food);
     setLastQueued(String(food?.name || ''));
     if (lastQueuedTimer.current) clearTimeout(lastQueuedTimer.current);
-    lastQueuedTimer.current = setTimeout(() => setLastQueued(''), 2600);
+    lastQueuedTimer.current = setTimeout(() => setLastQueued(''), 3500);
+  };
+  /** «＋» нажали случайно — один тап возвращает как было. */
+  const undoLastQueued = () => {
+    const rec = lastQueuedRef.current;
+    if (rec) {
+      let idx = rec.idx;
+      const at = parsedItems[idx];
+      if (!at || String(at.name) !== rec.name) {
+        const same = parsedItems
+          .map((it, i) => ({ name: String(it?.name || ''), i }))
+          .filter(x => x.name === rec.name)
+          .map(x => x.i);
+        idx = same.length ? same[same.length - 1] : -1;
+      }
+      if (idx >= 0) onRemoveParsedItem(idx);
+    }
+    lastQueuedRef.current = null;
+    setLastQueued('');
+    if (lastQueuedTimer.current) clearTimeout(lastQueuedTimer.current);
   };
 
   // ── ⭐ в результатах поиска ──────────────────────────────────────────────
@@ -531,6 +553,12 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
               background: 'rgba(0,230,138,0.10)', border: '1px solid rgba(0,230,138,0.25)', color: '#86efac', fontSize: 11, fontWeight: 700 }}>
             <span aria-hidden>✓</span>
             <span style={{ flex: 1, minWidth: 0, overflowWrap: 'anywhere' }}>В очереди: {lastQueued}</span>
+            <button type="button" onClick={undoLastQueued} aria-label="Отменить добавление" title="Убрать из очереди"
+              className="nd-queued-undo"
+              style={{ flexShrink: 0, width: 32, height: 32, borderRadius: 8, border: '1px solid rgba(255,255,255,0.14)',
+                background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.8)', fontSize: 12, fontWeight: 800, cursor: 'pointer' }}>
+              ↩
+            </button>
             <button type="button" onClick={() => {
               const el = queueRef.current;
               if (el && typeof el.scrollIntoView === 'function') {
