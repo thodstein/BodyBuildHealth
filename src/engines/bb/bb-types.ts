@@ -124,6 +124,9 @@ export interface BBPlan {
     mrvMultiplier?: number;
     gradedMuscles?: string[];
     mobilityRestrictions?: string[];
+    /** Авто-taper финальных недель: false — гипертрофийные цели (см.
+     *  BBFinalizeOptions.autoTaper). Повторная финализация наследует флаг. */
+    autoTaper?: boolean;
   };
   safetyConstraints?: {
     equipment?: string[];

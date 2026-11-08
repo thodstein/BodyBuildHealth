@@ -423,10 +423,10 @@ export const BbParamsStep: React.FC<BbParamsStepProps> = ({
                 value={bbVolumeRamp}
                 onChange={v => setBbVolumeRamp(v as any)}
                 options={[
-                  ['standard', 'Разгон — начать легко'],
-                  ['preloaded', 'Сразу разогнанный'],
-                  ['flat', 'Без разгона (ровно)'],
-                ] as any}
+                  { id: 'standard', label: 'Разгон — начать легко' },
+                  { id: 'preloaded', label: 'Сразу разогнанный' },
+                  { id: 'flat', label: 'Без разгона (ровно)' },
+                ]}
               />
             : <div style={{ ...NOTE, color: '#f59e0b' }}>
                 🚀 Вход в мезоцикл: в режиме источника разгон задаёт сама программа — её понедельная

@@ -368,8 +368,15 @@ export const PeriodizationDesignerTab: React.FC<{ initialUnifiedMode?: 'micro' |
   // раньше вызывался прямо в JSX на каждый рендер (каждый символ в полях
   // уровня/цели/дней). Теперь только при смене этих трёх значений.
   const bbTopSplits = useMemo(
-    () => rankBBSplits({ level: bbLevel, goal: bbGoal as any, daysPerWeek: bbDays } as any).slice(0, 3),
-    [bbLevel, bbGoal, bbDays],
+    () => rankBBSplits({
+      level: bbLevel,
+      goal: bbGoal as any,
+      daysPerWeek: bbDays,
+      // M2: пол профиля — иначе женские glute-сплиты не предлагались/предлагались
+      // мужчинам (селектор без sex ведёт себя как «пол неизвестен»).
+      sex: linked.profile?.settings?.personal?.sex,
+    } as any).slice(0, 3),
+    [bbLevel, bbGoal, bbDays, linked.profile?.settings?.personal?.sex],
   );
   const currentPresets = effectiveDiscipline === 'pl' ? plPresets : bbPresets;
 

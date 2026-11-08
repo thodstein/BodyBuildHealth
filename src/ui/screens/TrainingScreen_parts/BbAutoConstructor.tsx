@@ -1804,13 +1804,25 @@ const [bbVolumeRamp, setBbVolumeRamp] = useState<'standard' | 'preloaded' | 'fla
   // после ручного выбора автоматически переключаем ТОЛЬКО при жёстком
   // несоответствии (дни/уровень/пол), иначе оставляем (осознанный выбор).
   const splitFitKeyRef = useRef<string>('');
+  const splitSexRef = useRef<string | undefined>(undefined);
   useEffect(() => {
     if (!bestSplit) return;
-    const key = `${bbDays}|${bbLevel}|${bbGoal}|${peds.join(',')}`;
+    // M2 (аудит женского слоя): пол входит в ключ — смена male→female должна
+    // пересобрать рекомендацию (раньше ключ без sex, и женский glute-сплит
+    // не предлагался, если пол поставили уже в конструкторе).
+    const sex = linked.profile?.settings?.personal?.sex;
+    const key = `${bbDays}|${bbLevel}|${bbGoal}|${peds.join(',')}|${sex ?? 'unknown'}`;
+    // Смена пола — смена целевой эстетики: сплит, выбранный вручную под прежний
+    // пол, больше не «осознанный выбор» (male→female: PPL не даёт glute-фокуса).
+    // Сбрасываем ручной выбор один раз — рекомендация применяется заново.
+    if (splitSexRef.current !== undefined && splitSexRef.current !== sex) {
+      splitTouched.current = false;
+    }
+    splitSexRef.current = sex;
     const keyChanged = splitFitKeyRef.current !== '' && splitFitKeyRef.current !== key;
     splitFitKeyRef.current = key;
     const hard = selectedSplitId
-      ? splitFitWarnings({ level: bbLevel, goal: bbGoal as any, daysPerWeek: bbDays, peds, sex: linked.profile?.settings?.personal?.sex }, selectedSplitId)
+      ? splitFitWarnings({ level: bbLevel, goal: bbGoal as any, daysPerWeek: bbDays, peds, sex }, selectedSplitId)
       : [];
     const shouldSync = !selectedSplitId || (!splitTouched.current ? keyChanged : hard.length > 0);
     if (shouldSync && selectedSplitId !== bestSplit.pattern.id) {
@@ -2125,6 +2137,9 @@ const [bbVolumeRamp, setBbVolumeRamp] = useState<'standard' | 'preloaded' | 'fla
       mrvMultiplier: edited.mrvMultiplier,
       ensureMinimumVolume: true,
       controlledRotation: false,
+      // Та же цель taper, что при сборке: гипертрофийные цели не режут финал.
+      // План несёт goal на top-level (см. setBuiltPlan), иначе — состояние UI.
+      autoTaper: (String((edited as any).goal || bbGoal) === 'strength_mass'),
       maxWorkingSets: edited.maxWorkingSets,
       maxExercises: edited.maxExercises,
       gradedMuscles: edited.gradedMuscles,
@@ -3889,6 +3904,7 @@ const [bbVolumeRamp, setBbVolumeRamp] = useState<'standard' | 'preloaded' | 'fla
       level={bbLevel}
       weeks={bbWeeks}
       daysPerWeek={bbDays}
+      sex={linked.profile?.settings?.personal?.sex}
       isBuilding={isBuilding}
       onBuild={buildBb}
       onBack={() => setStep('ped')}

@@ -5,6 +5,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { buildBBPlan } from '../bb-builder.engine';
+import { applyTaperToFinalWeeks } from '../bb-autocoach.engine';
 import {
   scoreVolumeWeek,
   scoreProWeek,
@@ -154,7 +155,10 @@ describe('bb-quality-weekly: свойства', () => {
   });
 
   it('taper после делода: нет taper_volume_increased (возврат к работе — по дизайну)', () => {
-    const plan = buildBBPlan({ patternId: 'ppl_6', level: 'intermediate', goal: 'mass', weeks: 8, workMax: baseWM } as any);
+    // Масс-мезоцикл больше не получает авто-taper; сценарий «taper после
+    // делода» создаём прямым вызовом — валидатор должен вести себя как раньше.
+    const built = buildBBPlan({ patternId: 'ppl_6', level: 'intermediate', goal: 'mass', weeks: 8, workMax: baseWM } as any);
+    const plan = applyTaperToFinalWeeks(built, built.weeks.length);
     const taperAfterDeload = plan.weeks.filter((w: any, idx: number) => {
       const prev = plan.weeks[idx - 1] as any;
       return (w as any).taper && prev && (prev.deload || String(prev.phase || '').toLowerCase() === 'deload');

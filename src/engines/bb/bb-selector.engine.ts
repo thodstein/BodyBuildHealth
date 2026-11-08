@@ -12,6 +12,23 @@ import { sessionLimitsFor } from './bb-volume.engine';
 export type BBGoal = 'mass' | 'cut' | 'recomp' | 'maintenance' | 'strength_mass';
 export type BBLevel = 'beginner' | 'intermediate' | 'advanced' | 'enhanced';
 
+/**
+ * M2/D1 (аудит женского слоя): женские сплиты с glute-приоритетом.
+ * Женский профиль получает glute-приоритет ПО УМОЛЧАНИЮ (без явной
+ * специализации): ягодицы — главная эстетическая цель, 2–3×/нед оптимальны
+ * (Schoenfeld 2016). Бонус даётся только сплиту, который совпадает по дням
+ * с доступными (иначе на 5 днях выигрывал бы 4-дневный сплит и наоборот).
+ */
+export const FEMALE_GLUTE_SPLITS = new Set([
+  'female_glute_3',
+  'female_glute_5',
+  'female_glute_6',
+  'female_lower_upper_4',
+  'female_bikini_5',
+  'female_wellness_5',
+  'female_upper_glute_4',
+]);
+
 export interface BBSelectorInput {
   level: string;
   goal: BBGoal;
@@ -132,6 +149,7 @@ export function rankBBSplits(input: BBSelectorInput): BBRankedPattern[] {
     if (input.goal === 'mass' || input.goal === 'strength_mass') {
       if (avgFreq >= 2) score += 12;
       if (p.id === 'ppl_6') score += 12;                    // канонический PPL — главная рекомендация
+      else if (input.sex === 'female' && FEMALE_GLUTE_SPLITS.has(p.id)) score += 12; // ♀ канон: glute-сплит
       else if (p.id === 'arnold_6') score += 8;             // Арнольд — альтернатива (акцент на плечи/руки)
       else if (['fullbody_4', 'tpt_o_ttp', 'rolling_3_1_3_1'].includes(p.id)) score += 4;
     }
@@ -198,9 +216,11 @@ export function rankBBSplits(input: BBSelectorInput): BBRankedPattern[] {
       else if (gf > 3) { score += 8; rationale.push(`высокая частота цели ${gf}×/нед`); }
       else if (gf < 2) { warnings.push(`частота цели (glutes) ${gf}×/нед ниже 2×`); }
       if (gf >= 2 && (input.goal === 'mass' || input.goal === 'strength_mass')) score += 12;
-      if (p.id === 'female_glute_5') {
+      // Явная специализация «ягодицы»: любой женский glute-сплит, подходящий
+      // по дням, получает сильный бонус (3, 4, 5 или 6 дней — свой шаблон).
+      if (FEMALE_GLUTE_SPLITS.has(p.id)) {
         score += 30;
-        rationale.push('♀ Женский glute-фокус: 3 glute-сессии/нед (Schoenfeld 2016)');
+        rationale.push(`♀ Женский glute-фокус: ${p.sessionsPerRotation} сессий/нед, ягодицы 2–3×/нед (Schoenfeld 2016)`);
       }
       if (p.id === 'glute_focus_4') {
         score += 15;
@@ -208,11 +228,38 @@ export function rankBBSplits(input: BBSelectorInput): BBRankedPattern[] {
       }
     }
 
-    // M2: женские сплиты — мягкий бонус для female, штраф для male (не навязываем).
+    // M2: женские сплиты — бонус для female; штраф для male И для профиля без
+    // указанного пола (раньше unknown-sex на 5 днях получал «Женский Glute
+    // Focus» как топ-1 — рекомендация женского сплита мужчине/старому профилю).
     if (input.sex === 'female') {
       if (p.id.startsWith('female_')) { score += 8; rationale.push('♀ женский сплит профиля'); }
-    } else if (input.sex === 'male') {
-      if (p.id.startsWith('female_')) { score -= 12; warnings.push('♀-специфичный сплит — для женского профиля'); }
+      // Женский glute-приоритет по умолчанию (D1): если пользователь не выбрал
+      // другую специализацию, ягодичный сплит — основная рекомендация профиля
+      // (ягодицы 2–3×/нед, Schoenfeld 2016). Допуск ±1 день: на 5 днях у
+      // новичка 5-дневного женского сплита нет по политике уровней → рекомендуем
+      // женский 4-дневный (4 из 5 — допустимо), а не upper_lower_4.
+      // При явной специализации на другую группу приоритет не навязывается.
+      const gluteDefault = !input.focusGroup || input.focusGroup === 'glutes';
+      if (gluteDefault && FEMALE_GLUTE_SPLITS.has(p.id)) {
+        const effDays = p.sessionsPerRotation * 7 / p.rotationDays;
+        const dayFit = input.daysPerWeek == null || Math.abs(effDays - input.daysPerWeek) <= 1.5;
+        if (dayFit) {
+          score += 22;
+          // На курсе (enhanced) высокий объём: glute-сплит с короткими днями
+          // реализуем, поэтому PPL6 не должен перебивать женский шаблон.
+          if (lvl === 'enhanced') score += 14;
+          rationale.push(`♀ glute-приоритет профиля: ягодичные 2–3×/нед, ${ruFracCount(effDays.toFixed(1), RU_SESSIONS)}/нед под ${input.daysPerWeek ?? '—'} дн.`);
+        }
+      }
+    } else if (p.id.startsWith('female_')) {
+      // Женский сплит — не рекомендация для мужчины/профиля без пола.
+      // −50 (а не мягкие −12): после добавления 3/4/6-дневных женских шаблонов
+      // с уровнем enhanced мягкого штрафа не хватало — на enhanced/3 дня
+      // female_glute_3 выходил топ-1 у мужчины. Ручной выбор в UI не ограничен.
+      score -= 50;
+      warnings.push(input.sex === 'male'
+        ? '♀-специфичный сплит — для женского профиля'
+        : '♀-специфичный сплит — укажите пол в профиле, чтобы получить корректную рекомендацию');
     }
 
     if (lvl === 'enhanced') {

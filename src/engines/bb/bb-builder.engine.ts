@@ -5176,6 +5176,11 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
     workMax,
     mrvMultiplier: effectiveMrvMult,
     checkOrder: true,
+    // Авто-taper — пиковый протокол. Гипертрофийные цели (масса/сушка/рекомп/
+    // поддержание) не должны терять последние рабочие недели мезоцикла:
+    // владелец: «нет прогрессии нагрузок и объёма» (12-нед PPL резался W9–W11).
+    // Strength+mass сохраняет taper как выход на пик.
+    autoTaper: input.goal === 'strength_mass',
     // Высокообъёмный предел применяется только при явно переданном стаже
     // enhanced-атлета; натуральные и legacy-вызовы сохраняют 24/10.
     maxWorkingSets: sessLimits.maxWorkingSets,

@@ -104,6 +104,15 @@ export function profilePeakDefaults(): { weight: number; category: string; sex: 
   } catch { return { weight: 80, category: 'mens_physique', sex: 'male' }; }
 }
 
+/** Доступные дни тренировок из профиля (BB: 3–6, дефолт 4). */
+export function profileTrainingDays(): number {
+  try {
+    const settings = getProfile()?.settings as (Record<string, any> | undefined);
+    const raw = Number(settings?.training?.daysPerWeek);
+    return Number.isFinite(raw) && raw > 0 ? Math.min(6, Math.max(3, Math.round(raw))) : 4;
+  } catch { return 4; }
+}
+
 export interface MacroScenario {  id: string;
   label: string;
   ts: number;
@@ -805,7 +814,10 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
     if (!src) return;
     const block = src.blocks[blockIdx];
     if (!block) return;
-    const ranked = rankBBSplits({ level: effLevel, goal: 'hypertrophy' as any, daysPerWeek: Math.min(6, Math.max(3, block.weeks)) });
+    // M2 (аудит женского слоя): пол профиля — иначе селектор считает пол
+    // неизвестным и не предлагает женские glute-сплиты (а на 5 днях раньше
+    // отдавал «Женский Glute Focus» даже без пола).
+    const ranked = rankBBSplits({ level: effLevel, goal: 'hypertrophy' as any, daysPerWeek: profileTrainingDays(), sex: profilePeakDefaults().sex });
     setBuilderForBlock(blockIdx);
     setBuilderSplit(ranked[0]?.pattern.id ?? SPLIT_PATTERNS[0].id);
     setBuilderWeeks({ hypertrophy: 0, strength: 0, contest_prep: 0, transition: 0, [block.phase]: block.weeks });
@@ -830,6 +842,7 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
         splitPattern: pattern.id,
         equipment: [],
         weakPoints: [],
+        sex: profilePeakDefaults().sex,
         trainingFocus: block.trainingFocus ?? 'hypertrophy',
       });
       // Синтезируем ББ-макроцикл из настроенных фаз → объём/RIR по фазам (Helms 2022).
@@ -1266,6 +1279,7 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
       splitPattern: pattern.id,
       equipment: [],
       weakPoints: [],
+      sex: profilePeakDefaults().sex,
       trainingFocus: bbMacro.trainingFocus ?? 'hypertrophy',
     });
     const weeks = Array.from({ length: total }, (_, i) => ({ ...draft.weeks[i % draft.weeks.length], week: i + 1 }));

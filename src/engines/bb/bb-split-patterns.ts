@@ -451,6 +451,27 @@ export const SPLIT_PATTERNS: SplitPattern[] = [
   // Glutes hit 3×/нед (evidence: Schoenfeld 2016 — 2-3×/нед optimal).
   // ════════════════════════════════════════════════════════════
   {
+    // Аудит женского слоя (2026-11): женских сплитов на 3 дня не было —
+    // женскому профилю рекомендовался fullbody_3. Тот же glute-приоритет:
+    // 2 glute-сессии/нед (Glutes тяж + Lower со glute-приоритетом) —
+    // 2×/нед достаточно для роста (Schoenfeld 2016: доза-ответ по частоте).
+    id: 'female_glute_3',
+    name: 'Женский Glute Focus 3×/нед',
+    rotationDays: 7, sessionsPerRotation: 3,
+    schedule: [
+      { kind: 'тренировка', character: 'тяж', sessionTag: 'Glutes' },
+      { kind: 'отдых', character: null },
+      { kind: 'тренировка', character: 'тяж', sessionTag: 'Upper' },
+      { kind: 'отдых', character: null },
+      { kind: 'тренировка', character: 'тяж', sessionTag: 'Lower' },
+      { kind: 'отдых', character: null },
+      { kind: 'отдых', character: null },
+    ],
+    level: ['beginner', 'intermediate', 'advanced', 'enhanced'],
+    description: 'Женский сплит 3×/нед: Glutes (тяж) + Upper + Lower (ягодицы в двух сессиях, 2×/нед). Компактный вариант для 3 доступных дней — задняя цепь (glutes/hams) получает +20% объёма, кондиционирование — через Lower (quads/calves). Для новичка — рабочая частота без перегрузки (Helms 2022, Schoenfeld 2016).',
+    direction: 'bodybuilding',
+  },
+  {
     id: 'female_glute_5',
     name: 'Женский Glute Focus 5×/нед',
     rotationDays: 7, sessionsPerRotation: 5,
@@ -468,6 +489,28 @@ export const SPLIT_PATTERNS: SplitPattern[] = [
     direction: 'bodybuilding',
   },
   {
+    // Аудит женского слоя (2026-11): 6-дневный женский glute-сплит —
+    // female_glute_5 + третья верхняя сессия (Push памп): ягодицы 3×/нед,
+    // верх 2×/нед на группу (Upper тяж + Pull/Push памп), дни ≤4 групп —
+    // при высоком объёме сессия остаётся реалистичной. quads добираются
+    // quads-гарантией финализатора (как в female_glute_5).
+    id: 'female_glute_6',
+    name: 'Женский Glute Focus 6×/нед',
+    rotationDays: 7, sessionsPerRotation: 6,
+    schedule: [
+      { kind: 'тренировка', character: 'тяж', sessionTag: 'Glutes' },
+      { kind: 'тренировка', character: 'тяж', sessionTag: 'Upper' },
+      { kind: 'тренировка', character: 'тяж', sessionTag: 'GlutesHams' },
+      { kind: 'отдых', character: null },
+      { kind: 'тренировка', character: 'памп', sessionTag: 'Glutes' },
+      { kind: 'тренировка', character: 'памп', sessionTag: 'Pull' },
+      { kind: 'тренировка', character: 'памп', sessionTag: 'Push' },
+    ],
+    level: ['intermediate', 'advanced', 'enhanced'],
+    description: 'Женский сплит 6×/нед: 3 glute-сессии (2 тяж + 1 памп) + Upper/Pull/Push. Ягодичные 3×/нед (Schoenfeld 2016), верх 2×/нед на группу, свип-силуэт (дельты+спина ширина) — для продвинутого женского профиля с 6 доступными днями.',
+    direction: 'bodybuilding',
+  },
+  {
     id: 'female_lower_upper_4',
     name: 'Женский Низ+Верх 4×/нед',
     rotationDays: 7, sessionsPerRotation: 4,
@@ -480,7 +523,7 @@ export const SPLIT_PATTERNS: SplitPattern[] = [
       { kind: 'отдых', character: null },
       { kind: 'отдых', character: null },
     ],
-    level: ['beginner', 'intermediate', 'advanced'],
+    level: ['beginner', 'intermediate', 'advanced', 'enhanced'],
     description: 'Женский низ-доминантный сплит 4×/нед: 2 glute-сессии (Glutes + GlutesHams) + Lower (памп ягодицы/квадры) + Upper для баланса. Ягодичные 3×/нед, база и акцент на нижнюю часть (Schoenfeld 2016, Kassiano 2024).',
     direction: 'bodybuilding',
   },
@@ -531,7 +574,7 @@ export const SPLIT_PATTERNS: SplitPattern[] = [
       { kind: 'отдых', character: null },
       { kind: 'отдых', character: null },
     ],
-    level: ['beginner', 'intermediate', 'advanced'],
+    level: ['beginner', 'intermediate', 'advanced', 'enhanced'],
     description: 'Компактный женский сплит 4×/нед: верх + ягодицы 2×/нед (Glutes + GlutesHams памп) + Pull. Для занятых — мало дней, но акцент на ягодицы и плечи-ширину (Schoenfeld 2016).',
     direction: 'bodybuilding',
   },

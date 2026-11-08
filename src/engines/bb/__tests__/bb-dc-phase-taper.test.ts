@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { buildBBPlan } from '../bb-builder.engine';
+import { applyTaperToFinalWeeks } from '../bb-autocoach.engine';
 
 /**
  * Аудит 2026-10 — ББ-авто: фаз-гейт DC и taper коротких планов.
@@ -144,11 +145,14 @@ describe('BB-auto: DC Rest-Pause — фаз-гейт (аудит 2026-10)', () =
 });
 
 describe('BB-auto: taper коротких планов (аудит 2026-10)', () => {
+  // Taper — пиковый протокол (сила+масса). Гипертрофийные цели (mass) его
+  // больше не получают: иначе последние рабочие недели мезоцикла режутся.
   it('fullbody_3 / 4 нед: taper НЕ покрывает весь план (≥1 рабочая неделя)', () => {
-    const plan: any = buildBBPlan({
+    const built: any = buildBBPlan({
       patternId: 'fullbody_3', weeks: 4, level: 'intermediate', trainingYears: 3, goal: 'mass',
       workMax: WM, sex: 'male',
     } as never);
+    const plan: any = applyTaperToFinalWeeks(built, built.weeks.length);
     const work = plan.weeks.filter(working);
     expect(work.length).toBeGreaterThanOrEqual(2);
     const tapered = work.filter((w: any) => w.taperApplied === true);
@@ -158,10 +162,11 @@ describe('BB-auto: taper коротких планов (аудит 2026-10)', ()
   });
 
   it('8-нед план: taper-окно прежнее (профиль с конца, последняя неделя ×0.50)', () => {
-    const plan: any = buildBBPlan({
+    const built: any = buildBBPlan({
       patternId: 'fullbody_3', weeks: 8, level: 'intermediate', trainingYears: 3, goal: 'mass',
       workMax: WM, sex: 'male',
     } as never);
+    const plan: any = applyTaperToFinalWeeks(built, built.weeks.length);
     const tapered = plan.weeks.filter((w: any) => w.taperApplied === true);
     // 8-нед с финальным делодом → 3 taper-недели (W5–W7) — как было.
     expect(tapered.length).toBe(3);

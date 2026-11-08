@@ -73,7 +73,10 @@ describe('P0-1: taper-недели защищены от объем-добавл
   });
 
   it('неделя с фактической редукцией — реальный taper; неделя входа (×1.0) — рабочая', () => {
-    const plan = buildBBPlan(base({ patternId: 'fullbody_3', weeks: 8 }));
+    // Механику taper проверяем прямым вызовом: у mass/cut/... авто-taper
+    // выключен (гипертрофийный мезоцикл не должен резать финальный блок).
+    const built = buildBBPlan(base({ patternId: 'fullbody_3', weeks: 8 }));
+    const plan = applyTaperToFinalWeeks(built, built.weeks.length);
     const tapered = plan.weeks.filter((w: any) => w.taperApplied === true);
     // Окно из 3 недель сохранено: [вход ×1.0, ×0.75, ×0.50].
     expect(tapered.length).toBe(3);

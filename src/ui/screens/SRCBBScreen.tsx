@@ -1000,7 +1000,14 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
     return pmDiaryMultiplier({ historyWorkouts, pm0Map });
   }, [pmAutoRegMode, exercisePMs, pmSquat, pmBench, pmDead, historyWorkouts]);
 
-  const bbRanked = useMemo(() => rankBBSplits({ level: bbLevel, goal: bbGoal as any, daysPerWeek: bbDays }), [bbLevel, bbGoal, bbDays]);
+  const bbRanked = useMemo(() => rankBBSplits({
+    level: bbLevel,
+    goal: bbGoal as any,
+    daysPerWeek: bbDays,
+    // M2 (аудит женского слоя): без пола экран рекомендовал «Женский Glute
+    // Focus» всем подряд — теперь пол профиля доезжает до селектора.
+    sex: linked.profile?.settings?.personal?.sex,
+  }), [bbLevel, bbGoal, bbDays, linked.profile?.settings?.personal?.sex]);
   const bbBest = bbRanked[0];
 
   const buildBb = async () => {

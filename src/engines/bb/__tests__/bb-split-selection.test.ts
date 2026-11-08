@@ -9,9 +9,14 @@ describe('выбор сплита: day-fit (было: fullbody_3 выигрыв�
     const top = rankBBSplits({ level: 'intermediate', goal: 'mass', daysPerWeek: 6 })[0];
     expect(top.pattern.sessionsPerRotation).toBeGreaterThanOrEqual(5);
   });
-  it('5 дней → ≥5 сессий', () => {
+  it('5 дней → не 3-дневка (4–5 сессий; 5-дневные — bro_5/female_*)', () => {
+    // Аудит женского слоя: раньше на 5 днях топ-1 был female_glute_5 даже при
+    // неизвестном поле. Теперь unknown-sex получает штраф на женские сплиты,
+    // поэтому для intermediate/mass реально доступен 4-дневный upper/lower
+    // (5-дневная плотность — только bro_5 с мета-штрафом или женский glute).
     const top = rankBBSplits({ level: 'intermediate', goal: 'mass', daysPerWeek: 5 })[0];
-    expect(top.pattern.sessionsPerRotation).toBeGreaterThanOrEqual(5);
+    expect(top.pattern.sessionsPerRotation).toBeGreaterThanOrEqual(4);
+    expect(top.pattern.id.startsWith('female_')).toBe(false);
   });
   it('3 дня → ≤4 сессий', () => {
     const top = rankBBSplits({ level: 'intermediate', goal: 'mass', daysPerWeek: 3 })[0];

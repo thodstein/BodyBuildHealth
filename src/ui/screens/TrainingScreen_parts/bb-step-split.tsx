@@ -5,7 +5,7 @@
  */
 import React from 'react';
 import { SPLIT_PATTERNS } from '../../../engines/bb/bb-split-patterns';
-import { getMuscleFrequencies, splitFitWarnings, type BBRankedPattern } from '../../../engines/bb/bb-selector.engine';
+import { FEMALE_GLUTE_SPLITS, getMuscleFrequencies, splitFitWarnings, type BBRankedPattern } from '../../../engines/bb/bb-selector.engine';
 import { PHASE_COLORS, PHASE_LABELS } from './PlanOutput';
 import { ACCENT, BTN, BTN_GHOST, H, SMALL } from './training-ui';
 import { TAG_LABELS_RU, type BBPhase } from './bb-auto-constructor-shared';
@@ -23,6 +23,8 @@ export interface BbSplitStepProps {
   weeks: number;
   /** Число доступных дней/нед — для честной диагностики соответствия сплита. */
   daysPerWeek?: number;
+  /** Пол профиля — диагностика «женский сплит мужчине/без пола» (M2, аудит). */
+  sex?: 'male' | 'female';
   isBuilding: boolean;
   onBuild: () => void;
   onBack: () => void;
@@ -30,12 +32,17 @@ export interface BbSplitStepProps {
 
 export const BbSplitStep: React.FC<BbSplitStepProps> = ({
   selectedSplitId, onSelectSplit, bestSplit, phases, ranked, suggestSplitIds,
-  goal, level, weeks, daysPerWeek, isBuilding, onBuild, onBack,
+  goal, level, weeks, daysPerWeek, sex, isBuilding, onBuild, onBack,
 }) => {
   const selected = SPLIT_PATTERNS.find(p => p.id === selectedSplitId);
   const selectedRank = ranked.find(r => r.pattern.id === selectedSplitId);
-  const fitWarnings = selected && daysPerWeek != null ? splitFitWarnings({ level, goal: goal as any, daysPerWeek }, selected.id) : [];
+  const fitWarnings = selected && daysPerWeek != null ? splitFitWarnings({ level, goal: goal as any, daysPerWeek, sex }, selected.id) : [];
   const isRecommended = bestSplit?.pattern.id === selectedSplitId;
+  // ♀-строки рекомендации показываем первыми: в карточке лимит 4 строки,
+  // и «♀ glute-приоритет профиля» иначе обрезался (аудит женского слоя).
+  const recLines = bestSplit
+    ? [...bestSplit.rationale.filter(x => x.includes('♀')), ...bestSplit.rationale.filter(x => !x.includes('♀'))].slice(0, 4)
+    : [];
   return (
   <div>
     <div style={H}>🏆 Шаг 3: Выбор сплита</div>
@@ -50,6 +57,15 @@ export const BbSplitStep: React.FC<BbSplitStepProps> = ({
         ⚠ Выбранный сплит не подходит под текущие параметры ({daysPerWeek} дн/нед · уровень «{level}»):
         {fitWarnings.map((w, i) => <div key={i}>· {w}</div>)}
         <div style={{ marginTop:4, color:'#fff' }}>Рекомендуем «{bestSplit?.pattern.name}» — нажмите «Применить» ниже или соберите как есть (тогда это осознанный выбор).</div>
+      </div>
+    )}
+    {/* ♀ Мягкая подсказка профиля: ягодичный сплит — основная рекомендация для
+        женщин, но это не запрет. Показываем, если выбран другой сплит и по
+        дням/уровню он валиден (иначе выше уже есть жёсткое предупреждение). */}
+    {selected && !isRecommended && fitWarnings.length === 0 && sex === 'female' && bestSplit && FEMALE_GLUTE_SPLITS.has(bestSplit.pattern.id) && (
+      <div role="status" style={{ marginBottom:8, padding:'6px 10px', borderRadius:10, background:'rgba(236,72,153,0.08)', border:'1px solid rgba(236,72,153,0.25)', fontSize:11, color:'#f9a8d4', lineHeight:1.45 }}>
+        ♀ Профиль женский: glute-приоритет — основная рекомендация, «{bestSplit.pattern.name}» (ягодичные 2–3×/нед, Schoenfeld 2016).
+        Можно нажать «Применить» выше или оставить выбранный сплит — это осознанный выбор.
       </div>
     )}
     <div style={{ marginBottom:8, padding:'6px 10px', borderRadius:10, background:'rgba(168,85,247,0.06)', border:'1px solid rgba(168,85,247,0.12)', fontSize:11, color:'#fff' }}>
@@ -72,7 +88,7 @@ export const BbSplitStep: React.FC<BbSplitStepProps> = ({
             📐 Самый плотный день: <b>{bestSplit.sessionBudget.maxGroups} групп</b> · ориентир <b>≈{bestSplit.sessionBudget.maxExercises} упражнений</b> / <b>≤{bestSplit.sessionBudget.maxWorkingSets} рабочих сетов</b>
           </div>
         )}
-        {bestSplit.rationale.slice(0, 4).map((x,i) => <div key={i} style={{ fontSize:11, color:'#fff' }}>✓ {x}</div>)}
+        {recLines.map((x,i) => <div key={i} style={{ fontSize:11, color:'#fff' }}>✓ {x}</div>)}
         {bestSplit.warnings.slice(0, 2).map((x,i) => <div key={i} style={{ fontSize:11, color:'#f59e0b' }}>⚠ {x}</div>)}
         <div style={{ display:'flex', gap:8, marginTop:8 }}>
           <button onClick={() => onSelectSplit(bestSplit.pattern.id)} style={{ padding:'6px 16px', borderRadius:10, fontSize:11, fontWeight:700, cursor:'pointer', background:'rgba(250,204,21,0.15)', border:'1px solid rgba(250,204,21,0.3)', color:'#facc15' }}>✅ Применить</button>
@@ -85,7 +101,7 @@ export const BbSplitStep: React.FC<BbSplitStepProps> = ({
         const sel = selectedSplitId === r.pattern.id;
         const mf = getMuscleFrequencies(r.pattern);
         const isSugSplit = suggestSplitIds.has(r.pattern.id);
-        const fits = daysPerWeek != null ? splitFitWarnings({ level, goal: goal as any, daysPerWeek }, r.pattern.id) : [];
+        const fits = daysPerWeek != null ? splitFitWarnings({ level, goal: goal as any, daysPerWeek, sex }, r.pattern.id) : [];
         return <div key={r.pattern.id}
           style={{ padding:'10px 12px', borderRadius:10, border:sel?'1px solid #00e68a':isSugSplit?'1px solid rgba(245,158,11,0.25)':'1px solid rgba(255,255,255,0.06)', background:sel?'rgba(0,230,138,0.08)':isSugSplit?'rgba(245,158,11,0.04)':'rgba(255,255,255,0.02)' }}>
           <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>

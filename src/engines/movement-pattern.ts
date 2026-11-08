@@ -220,6 +220,21 @@ function trueMuscleOfUncached(ex: any): string | null {
   // 26.09.2026 (аудит): жимовые compound рук (JM-жим и т.п.) — группа 'arms', но
   // derivePattern по «жим» давал horizontal_push → chest. Это трицепс-движение.
   if (_g === 'arms' && /жим|press|bench/i.test(nm)) return 'triceps';
+  // Аудит 2026-11 (качество упражнений): plan-объекты не хранят group/targetMuscle,
+  // поэтому «жим/сведен/разведен» в имени уводило движения в ЧУЖУЮ группу:
+  // Французский жим и JM-жим считались грудью, обратные сведения и face pull —
+  // грудью/спиной, Арнольд-жим — грудью, шраги — спиной, жим носками — квадрицепсом.
+  // Это давало ложные session_muscle_leak и путало атрибуцию дня.
+  // Гейт `!g`: у каталожных записей есть group/targetMuscle и их штатная
+  // классификация точнее (delt_rear/delt_mid, traps и т.п.) — не переопределяем.
+  if (!ex?.group) {
+    if (/французск|skull.?crush|jm.?жим|трицепс|разгибан[а-яё]*\s*(рук|триц)/i.test(nm)) return 'triceps';
+    if (/обратн[а-яё]*\s*(сведен|разведен)|reverse.?(fly|pec)|задн[а-яё]*\s*дельт|rear.?delt|face.?pull|к лицу/i.test(nm)) return 'shoulders';
+    if (/арнольд/i.test(nm)) return 'shoulders';
+    if (/шраг|shrug|келсо|kelso/i.test(nm)) return 'traps';
+    if (/к подбородку|upright.?row/i.test(nm)) return 'traps';
+    if (/жим.*носками|носками.*жим|calf.?press/i.test(nm)) return 'calves';
+  }
   const base = MP_TO_MUSCLE[mp];
   if (base) return base;
   // isolation_back: шраги → traps, остальное → back

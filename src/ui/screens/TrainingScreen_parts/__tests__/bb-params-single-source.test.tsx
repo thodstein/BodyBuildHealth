@@ -48,6 +48,7 @@ const baseParams = (over: Partial<BbParamsStepProps>): BbParamsStepProps => ({
   rotationMode: 'variety', setRotationMode: noop as any,
   intensityLevel: 'moderate', setIntensityLevel: noop as any,
   bbVolGoal: 'mav', setBbVolGoal: noop as any, onUserVolGoal: setStub,
+  bbVolumeRamp: 'standard', setBbVolumeRamp: noop as any,
   trainingVolumeMode: 'standard', setTrainingVolumeMode: noop as any,
   avoidAxialLoadUi: false, setAvoidAxialLoadUi: noop as any,
   fewerCompound: false, setFewerCompound: noop as any,
@@ -103,6 +104,9 @@ describe('Шаг 1: один контрол на настройку (нет ду
     // «Цель объёма» — ровно 2 контроля быть НЕ должно (был дубль в атлете и объёме):
     // после дедупа в секции «Атлет» и в секции «Объём» — по одному, тег отличает.
     expect(count(generic, '🎯 Цель объёма')).toBe(1);
+    // Регресс: «Вход в мезоцикл» передавал tuple-массив вместо {id,label} —
+    // карточка не находила выбранный вариант и попап был пустым.
+    expect(generic).toContain('Разгон — начать легко');
   });
 
   it('programs+adapt: раньше было по 2 контрола на настройку — теперь по одному', () => {

@@ -847,6 +847,9 @@ function ensureQuadsCoverageForGluteTags(plan: any, options: BBFinalizeOptions):
       heavySess.exercises.push({
         muscle: 'quads', name: heavyCand.name, exerciseName: heavyCand.name, role: 'accessory', character: 'памп',
         sets, repsRange: [12, 15], rir: 2, warmupSets: [],
+        // coverageFill: намеренная добивка ног в глут-сплите — валидатор не
+        // должен считать это «утечкой мышцы» (session_muscle_leak).
+        coverageFill: true,
         workSets: Array.from({ length: sets }, () => ({ reps: 12, rir: 2, weight: Math.round(wm * 0.5 * 10) / 10, restSeconds: 90 })),
         comment: `🦵 Quads-гарантия: ${heavyCand.name} ${sets}×12 RIR 2 — глут-сплит не имеет quads-слота (TAG_MUSCLES.Glutes), недельный прямой объём < 0.7×MEV (${quadsSets}/${floor}). ${heavyScience}.`,
         rationale: 'Quads coverage для glute-сплитов: поддерживающий объём ≥ 0.7×MEV',
@@ -860,6 +863,7 @@ function ensureQuadsCoverageForGluteTags(plan: any, options: BBFinalizeOptions):
       pumpSess.exercises.push({
         muscle: 'quads', name: pumpCand.name, exerciseName: pumpCand.name, role: 'accessory', character: 'памп',
         sets, repsRange: [15, 20], rir: 3, warmupSets: [],
+        coverageFill: true,
         workSets: Array.from({ length: sets }, () => ({ reps: 18, rir: 3, weight: Math.round(wm * 0.3 * 10) / 10, restSeconds: 60 })),
         comment: `🦵 Quads-памп: ${pumpCand.name} ${sets}×18 RIR 3 — вторая quads-сессия недели (частота 2×, Schoenfeld 2016).`,
         rationale: 'Quads frequency 2×/нед для glute-сплитов',
@@ -923,6 +927,8 @@ function ensureLegsCoverageForUpperOnlySplits(plan: any, options: BBFinalizeOpti
   const mk = (c: any, muscle: string, sets: number, reps: [number, number], wm: number, note: string) => ({
     muscle, name: c.name, exerciseName: c.name, role: 'primary', character: 'тяж',
     sets, repsRange: reps, rir: 2, restSeconds: 120, warmupSets: [],
+    // coverageFill: ноги добавлены намеренно в сплит без дня ног — не «утечка».
+    coverageFill: true,
     workSets: Array.from({ length: sets }, () => ({ reps: reps[1], rir: 2, weight: Math.round(wm * 0.5 * 10) / 10, restSeconds: 120 })),
     comment: `🦵 Ноги-покрытие: ${note} (сплит без дня ног — низ не может быть нулевым).`,
     rationale: 'Legs coverage для сплитов без ног: поддерживающий объём нижней части тела',
@@ -997,6 +1003,243 @@ function ensureLegsCoverageForUpperOnlySplits(plan: any, options: BBFinalizeOpti
       // сообщаем в rationale (пустой низ остаётся осознанным исключением).
       plan.rationale.push('⚠ Ноги-покрытие: сплит без дня ног и без доступного ножного упражнения (оборудование/травмы) — низ остался вне недели.');
       continue;
+    }
+  }
+}
+
+/** Аудит 2026-11 (качество сплитов): в днях с двумя «ведущими» мышцами
+ * (Upper/Torso/ChestBack/FullBody) грудь систематически занимала слоты спины.
+ * Замер по 8-недельному блоку (пиковая неделя, прямые сеты): upper_lower_4 —
+ * грудь 23 / спина 14, phul_4 — 25/13, glute_focus_4 — 16/4, female_glute_3 —
+ * 9/2, female_glute_6 — 16/9. Спина — самая крупная мышца верха, перекос 2-4×
+ * означает недобор тяг относительно жимов.
+ *
+ * Проход ОБЪЁМ-НЕЙТРАЛЕН и точечен: изолирующее chest-упражнение (разводка/
+ * сведение/пек-дек/кроссовер) заменяется тягой с тем же числом сетов, затем
+ * (если сессия не на капе) добираются сеты в существующую тягу. База (жимы)
+ * не трогается, число упражнений и общий бюджет сессии не растут.
+ * Идемпотентен: после прохода спина ≥ 0.7×груди, повторный прогон пропускает.
+ */
+function ensureChestBackBalance(plan: any, options: BBFinalizeOptions): void {
+  if (options.preserveSource) return;
+  const upperDualTag = (tag: string) => /Upper|Torso|ChestBack|FullBody/i.test(tag) && !/Glutes/i.test(tag);
+  const chestIso = /разводк|сведен|fly|пек.?дек|пекдек|кроссовер|crossover|бабочк/i;
+  const excludedMuscles = new Set(options.excludedMuscles || []);
+  const gradedMuscles = new Set(options.gradedMuscles || []);
+  if (excludedMuscles.has('back') || gradedMuscles.has('back')) return;
+  const excludedExercises = new Set(options.excludedExercises || []);
+  const equipmentOk = (c: any) => {
+    if (!options.equipment?.length) return true;
+    const eq = Array.isArray(c.equipment) ? c.equipment : [String(c.equipment || '')];
+    if (!eq.length || eq.includes('bodyweight')) return true;
+    return eq.some((x: string) => (options.equipment || []).includes(x));
+  };
+  let maxSets = 24;
+  try {
+    const lim = centralizedSessionLimits(
+      { level: options.level, trainingYears: options.trainingYears, patternId: (plan as any)?.pattern?.id } as any,
+      { id: (plan as any)?.pattern?.id } as any,
+    );
+    maxSets = lim.maxWorkingSets;
+  } catch { /* фолбэк-лимит */ }
+  const backExCap = perExerciseCap(options.level, 'back', options.trainingYears, options.onCourse);
+  const patternOf = (name: string) => annotateBackExercise({ name, muscle: 'back' } as any).movementPattern || 'other';
+  const mkReplacement = (catalogEntry: any, source: any, sets: number, note: string) => {
+    const wm = options.workMax?.back || 80;
+    const character = String(source?.character || 'памп');
+    return {
+      muscle: 'back', name: catalogEntry.name, exerciseName: catalogEntry.name,
+      role: 'accessory', character,
+      sets, repsRange: [8, 12], rir: 2, restSeconds: 90, warmupSets: [],
+      workSets: Array.from({ length: sets }, () => ({
+        reps: 10, rir: 2, weight: Math.round(wm * 0.55 * 10) / 10, restSeconds: 90,
+      })),
+      movementPattern: patternOf(catalogEntry.name),
+      comment: `↔ Баланс спина/грудь: ${catalogEntry.name} ${sets}×8-12 — ${note}. Спина не должна отставать от груди в Upper-дне.`,
+      rationale: 'Баланс жимы/тяги: прямая работа спины вместо изолирующей груди (объём-нейтрально)',
+    };
+  };
+  for (const week of plan.weeks) {
+    const w: any = week;
+    if (w.phase === 'deload' || w.deload) continue;
+    if (w.taperApplied === true || w.taper === true) continue;
+    if (w.contestPhase === 'taper' || w.contestPhase === 'peak_week' || w.peakWeek === true) continue;
+    if (typeof w.prepProtocol === 'string' && !String(w.prepProtocol).startsWith('Пропущена')) continue;
+    if (tradeoffDonorsForWeek(options, w.week ?? 0).has('back')) continue;
+    for (const session of w.sessions || []) {
+      const tag = String((session as any).sessionTag || '');
+      if (!upperDualTag(tag)) continue;
+      const working = () => (session.exercises as any[]).filter((e: any) => !e.warmupActivator && !e.optional);
+      const chest = working().filter((e: any) => e.muscle === 'chest');
+      const back = working().filter((e: any) => e.muscle === 'back');
+      // Спины нет вовсе — это не наш проход (чистый Push/Chest день или
+      // fullbody без тяг: туда добавлять движения решает билдер).
+      if (!chest.length || !back.length) continue;
+      let chestSets = chest.reduce((a: number, e: any) => a + (e.sets || 0), 0);
+      let backSets = back.reduce((a: number, e: any) => a + (e.sets || 0), 0);
+      let need = Math.ceil(chestSets * 0.7) - backSets;
+      if (need < 2) continue;
+      // (1) Обмен: изолирующая грудь → тяга с тем же числом сетов. Если
+      // изоляции нет (FullBody из жимов), отдаём младший по сетам пуш-слот —
+      // но только когда грудь всё же остаётся представленной (≥3 сетов).
+      const isos = chest.filter((e: any) => chestIso.test(String(e.name || '')) && (e.sets || 0) >= 2);
+      const swappable = isos.length ? isos
+        : chest.filter((e: any) => chestSets - (e.sets || 0) >= 3).sort((a: any, b: any) => (a.sets || 0) - (b.sets || 0)).slice(0, 1);
+      let swapped = 0;
+      for (const victim of swappable) {
+        if (need < 2 || swapped >= 2) break;
+        if (chestSets - (victim.sets || 0) < 3) break;
+        const usedNames = new Set(working().map((e: any) => e.name));
+        const usedPatterns = new Set(back.map((e: any) => patternOf(e.name)));
+        const wantWidth = !usedPatterns.has('vertical_pull') && !usedPatterns.has('lat_isolation');
+        const wanted = wantWidth ? ['vertical_pull', 'lat_isolation'] : ['heavy_row', 'supported_row', 'unilateral_row'];
+        const cand = (EXERCISE_CATALOG as any[]).find((c: any) => trueMuscleOf(c) === 'back'
+          && wanted.includes(patternOf(c.name)) && !usedNames.has(c.name) && !excludedExercises.has(c.id) && !excludedExercises.has(c.name)
+          && equipmentOk(c) && !isMobilityRestricted(c, options.mobilityRestrictions)
+          && !(options.avoidAxialLoad && isAxialLoadExercise(c)));
+        if (!cand) break;
+        const sets = Math.min(4, Math.max(2, victim.sets || 3));
+        const idx = (session.exercises as any[]).indexOf(victim);
+        if (idx < 0) break;
+        (session.exercises as any)[idx] = mkReplacement(cand, victim, sets,
+          `${victim.name} заменено на тягу (${sets} сетов, обмен без роста сессии)`);
+        need -= sets; chestSets -= victim.sets || sets; backSets += sets; swapped += 1;
+      }
+      // (2) Добор в существующую тягу, если бюджет сессии позволяет.
+      if (need >= 2) {
+        const totalSets = () => (session.exercises as any[]).reduce((a: number, e: any) => a + (e.warmupActivator ? 0 : (e.sets || 0)), 0);
+        const room = Math.max(0, maxSets - totalSets());
+        const backTarget = (session.exercises as any[])
+          .filter((e: any) => e.muscle === 'back' && !e.warmupActivator && (e.sets || 0) < backExCap)
+          .sort((a: any, b: any) => (a.sets || 0) - (b.sets || 0))[0];
+        // Сессия на кэпе: переносим сеты с груди на спину (объём-нейтрально),
+        // чтобы баланс не упирался в бюджет сессии.
+        let donor: any = null;
+        if (room <= 0) {
+          donor = (session.exercises as any[])
+            .filter((e: any) => e.muscle === 'chest' && !e.warmupActivator && (e.sets || 0) > 2 && chestSets - (e.sets || 0) >= 3)
+            .sort((a: any, b: any) => (b.sets || 0) - (a.sets || 0))[0];
+        }
+        if (backTarget) {
+          const movable = donor ? Math.min(need, (donor.sets || 0) - 2, backExCap - (backTarget.sets || 0)) : 0;
+          const add = room > 0 ? Math.min(need, room, backExCap - (backTarget.sets || 0)) : Math.max(0, movable);
+          if (add > 0) {
+            const sample = backTarget.workSets?.[backTarget.workSets.length - 1] || { reps: 10, rir: 2, weight: 0 };
+            for (let i = 0; i < add; i += 1) backTarget.workSets.push({ ...sample });
+            backTarget.sets = (backTarget.sets || 0) + add;
+            backSets += add;
+            if (donor) {
+              donor.sets = (donor.sets || 0) - add;
+              if (Array.isArray(donor.workSets) && donor.workSets.length > donor.sets) donor.workSets = donor.workSets.slice(0, donor.sets);
+              chestSets -= add;
+            }
+            backTarget.comment = `${String(backTarget.comment || '').trim()} ↔ Баланс спина/грудь: +${add} ${add === 1 ? 'сет' : 'сетов'} (спина ${backSets} vs грудь ${chestSets} в сессии)${donor ? `, перенос с груди` : ''}.`.trim();
+          }
+        }
+      }
+    }
+  }
+}
+
+/** Аудит 2026-11 (качество сплитов): в женских сплитах (female_glute_3/5,
+ * female_lower_upper_4, female_wellness_5, female_upper_glute_4) на intermediate
+ * уровне неделя оставалась с НУЛЁМ прямых сетов на дельты: верхняя сессия
+ * упиралась в кап 10 упр/24 сета, а fill-проход искал только traps/abs и
+ * `trueMuscleOf(x) === 'shoulders'` (каталог отдаёт delt_mid/delt_rear, поэтому
+ * дельты не добирались никогда). Косвенный объём от жимов маскировал это в
+ * валидаторе, но боковые/задние дельты — ключевая эстетическая группа, особенно
+ * в бикини/велнес-программах.
+ *
+ * Проход точечный: только когда за неделю НОЛЬ сетов на delt_*, только в
+ * верхней сессии, и место берётся из «опциональных» abs/forearms (движок сам
+ * помечает их как «при наличии сил и времени»), чтобы не ломать обязательный
+ * объём. Идемпотентен.
+ */
+function ensureDeltCoverageForUpperWeeks(plan: any, options: BBFinalizeOptions): void {
+  if (options.preserveSource) return;
+  const excluded = new Set([...(options.excludedMuscles || []), ...(options.gradedMuscles || [])]);
+  if (excluded.has('shoulders') || excluded.has('delt_mid') || excluded.has('delt_rear')) return;
+  const upperTag = /Upper|Torso|Push|Pull|FullBody/i;
+  const deltRe = /^(shoulders|delt_(front|mid|mid_side|rear|side))$/;
+  let maxEx = 10;
+  let maxSets = 24;
+  try {
+    const lim = centralizedSessionLimits(
+      { level: options.level, trainingYears: options.trainingYears, patternId: (plan as any)?.pattern?.id } as any,
+      { id: (plan as any)?.pattern?.id } as any,
+    );
+    maxEx = lim.maxExercises; maxSets = lim.maxWorkingSets;
+  } catch { /* фолбэк-лимиты */ }
+  const equipmentOk = (c: any) => {
+    if (!options.equipment?.length) return true;
+    const eq = Array.isArray(c.equipment) ? c.equipment : [String(c.equipment || '')];
+    return !eq.length || eq.includes('bodyweight') || eq.some((x: string) => options.equipment!.includes(x));
+  };
+  const pickDelt = (kind: 'side' | 'rear'): any => {
+    return (EXERCISE_CATALOG as any[]).find((c: any) => {
+      if (trueMuscleOf(c) !== 'shoulders') return false;
+      const nm = String(c.name || '').toLowerCase();
+      const isSide = /мах[а-яё]*\s*(гантел|рук)?[а-яё]*\s*в\s*сторон|в\s*сторон[а-яё]*\s*мах|боков|side.?raise|латеральн|разведен[а-яё]*\s*в\s*сторон/.test(nm);
+      const isRear = /обратн[а-яё]*\s*(сведен|разведен)|rear.?delt|задн[а-яё]*\s*дельт|face.?pull|к\s*лицу/.test(nm);
+      if (kind === 'side' ? !isSide : !isRear) return false;
+      return equipmentOk(c) && !isMobilityRestricted(c, options.mobilityRestrictions)
+        && !(options.avoidAxialLoad && isAxialLoadExercise(c));
+    });
+  };
+  const sideCand = pickDelt('side');
+  if (!sideCand) return;
+  const rearCand = pickDelt('rear');
+  const mkDelt = (c: any, sets: number, rear: boolean) => ({
+    muscle: rear ? 'delt_rear' : 'delt_mid', name: c.name, exerciseName: c.name,
+    role: 'accessory', character: 'памп', sets,
+    repsRange: rear ? [15, 20] : [12, 20], rir: 2, restSeconds: 60, warmupSets: [],
+    workSets: Array.from({ length: sets }, () => ({
+      reps: rear ? 18 : 15, rir: 2,
+      weight: Math.round((options.workMax?.[rear ? 'delt_rear' : 'delt_mid'] || 12) * 0.35 * 10) / 10,
+      restSeconds: 60,
+    })),
+    comment: `🎯 Дельты-покрытие: ${c.name} ${sets}×${rear ? '18' : '15'} — неделя без прямых сетов на дельты (жимы дают только косвенный объём).`,
+    rationale: 'Дельты: боковая/задняя головка не получают прямого объёма от жимов',
+  } as any);
+  for (const week of plan.weeks) {
+    const w: any = week;
+    if (w.phase === 'deload' || w.deload) continue;
+    if (w.taperApplied === true || w.taper === true) continue;
+    if (w.contestPhase === 'taper' || w.contestPhase === 'peak_week' || w.peakWeek === true) continue;
+    if (typeof w.prepProtocol === 'string' && !String(w.prepProtocol).startsWith('Пропущена')) continue;
+    const allEx = (w.sessions || []).flatMap((s: any) => (s.exercises || []).filter((e: any) => !e.warmupActivator));
+    if (allEx.some((e: any) => deltRe.test(String(e.muscle || '')))) continue;
+    const sessions = (w.sessions || []).filter((s: any) => upperTag.test(String(s.sessionTag || '')));
+    if (!sessions.length) continue;
+    // Дельты уходят в день с наименьшим объёмом (обычно памп/верх).
+    const totalSets = (s: any) => (s.exercises || []).reduce((a: number, e: any) => a + (e.warmupActivator ? 0 : (e.sets || 0)), 0);
+    const candidates = [...sessions].sort((a: any, b: any) => totalSets(a) - totalSets(b));
+    for (const session of candidates) {
+      let roomEx = maxEx - (session.exercises || []).filter((e: any) => !e.warmupActivator).length;
+      let roomSets = maxSets - totalSets(session);
+      // Место берём только у «опциональных» abs/forearms (сам движок называет их
+      // «при наличии сил и времени»), сохраняя недельный объём пресса ≥ 4.
+      if (roomEx < 1 || roomSets < 2) {
+        const optIdx = (session.exercises as any[]).findIndex((e: any) => e.optional && /abs|forearms/.test(String(e.muscle || '')));
+        if (optIdx < 0) continue;
+        const absWeek = allEx.filter((e: any) => e.muscle === 'abs').reduce((a: number, e: any) => a + (e.sets || 0), 0);
+        const dropped = (session.exercises as any[])[optIdx];
+        if (dropped.muscle === 'abs' && absWeek - (dropped.sets || 0) < 4) continue;
+        (session.exercises as any[]).splice(optIdx, 1);
+        roomEx = maxEx - (session.exercises as any[]).filter((e: any) => !e.warmupActivator).length;
+        roomSets = maxSets - totalSets(session);
+      }
+      if (roomEx < 1 || roomSets < 2) continue;
+      const usedNames = new Set((session.exercises as any[]).map((e: any) => e.name));
+      const useSide = usedNames.has(sideCand.name) ? rearCand : sideCand;
+      if (!useSide) continue;
+      const sideSets = rearCand ? Math.min(2, roomSets) : Math.min(3, roomSets);
+      (session.exercises as any[]).push(mkDelt(useSide, sideSets, useSide === rearCand));
+      roomSets -= sideSets;
+      if (rearCand && useSide !== rearCand && roomSets >= 2 && !usedNames.has(rearCand.name)) {
+        (session.exercises as any[]).push(mkDelt(rearCand, 2, true));
+      }
+      break;
     }
   }
 }
@@ -2566,6 +2809,14 @@ export interface BBFinalizeOptions {
   mrvMultiplier?: number;
   checkOrder?: boolean;
   preserveSource?: boolean;
+  /** Авто-taper финальных недель (applyTaperToFinalWeeks, Bosquet 2005).
+   *  Taper — пиковый протокол: постепенно режет объём последних 2–3 рабочих
+   *  недель. Для гипертрофийных целей (масса/сушка/рекомп/поддержание) он
+   *  обнулял прогрессию мезоцикла: в 12-нед PPL W9–W11 уходили ×1.0/×0.75/×0.5
+   *  сразу после делода, хотя план должен выходить на пик объёма.
+   *  Билдер передаёт false для этих целей и true для strength_mass;
+   *  без флага — true (backward-compat: циклы/программы/прямые вызовы). */
+  autoTaper?: boolean;
   /** Высокообъёмный профиль: лимит всей сессии, а не одной мышцы. */
   maxWorkingSets?: number;
   maxExercises?: number;
@@ -3825,14 +4076,20 @@ function ensureMuscleSessionCapacity(week: any, plan: BBPlan, options: BBFinaliz
  * PRO+ФАРМА: тяговая сессия добивает СПИНУ до per-session канона (60/нед ÷
  * 2 стимула = 30) — паритет generic↔cycle. Бюджет сессии НЕ поднимаем: если
  * свободного бюджета нет, сеты переносятся 1:1 от не-спинных доноров дня
- * (сеты > 2), суммарный объём сессии неизменен. Гейт: enhanced на курсе.
+ * (сеты > 2), суммарный объём сессии неизменен. Гейт: enhanced на курсе, а
+ * также natural advanced (про-уровень): цель спины 28/нед при двух Pull =
+ * 14/сессию, иначе generic PPL стабильно недобирал 20–26/нед.
  * Раньше это жило только в цикловом `expandPlanToTargets` — generic PPL давал
  * спину 22/сессию при капе 30 (владелец: «30/сессию, 60/нед»).
  */
 export function prioritizeBackSessions(plan: BBPlan, opts: {
   level?: string; trainingYears?: number; onCourse?: boolean; maxWorkingSets?: number;
 }): void {
-  if (!opts.onCourse || String(opts.level || '') !== 'enhanced') return;
+  const level = String(opts.level || '');
+  // Enhanced без курса намеренно НЕ включаем: контракт
+  // bb-back-volume-priority — ≤25 сетов/сессию (прежнее поведение).
+  const enhancedOnCourse = !!opts.onCourse && level === 'enhanced';
+  if (!enhancedOnCourse && level !== 'advanced') return;
   const yrs = Number.isFinite(opts.trainingYears) ? (opts.trainingYears as number) : 0;
   const backWeekly = Number((plan as any).volumeTargets?.back?.targetSets) || Number((plan as any).mrvByMuscle?.back) || 0;
   if (backWeekly <= 0) return;
@@ -3970,6 +4227,7 @@ export function finalizeBBPlan(plan: BBPlan, options: BBFinalizeOptions = {}): B
       mrvMultiplier: options.mrvMultiplier ?? priorCtx.mrvMultiplier,
       gradedMuscles: options.gradedMuscles ?? priorCtx.gradedMuscles,
       mobilityRestrictions: options.mobilityRestrictions ?? priorCtx.mobilityRestrictions,
+      autoTaper: options.autoTaper ?? priorCtx.autoTaper,
     };
   }
   const next: BBPlan = {
@@ -4001,6 +4259,7 @@ export function finalizeBBPlan(plan: BBPlan, options: BBFinalizeOptions = {}): B
     mrvMultiplier: options.mrvMultiplier,
     gradedMuscles: options.gradedMuscles,
     mobilityRestrictions: options.mobilityRestrictions,
+    autoTaper: options.autoTaper,
   };
   for (const week of next.weeks) for (const session of week.sessions) {
     session.exercises = session.exercises.map(ex => ex.muscle === 'back' ? annotateBackExercise(ex) : ex);
@@ -4571,7 +4830,7 @@ for (const week of next.weeks) {
   }
   // Taper is a source-independent final phase pass. It is deliberately here
   // rather than in the generic builder so cycle/program outputs get it too.
-  if (!options.preserveSource) {
+  if (!options.preserveSource && options.autoTaper !== false) {
     const tapered = applyTaperToFinalWeeks(next, next.weeks.length);
     next.weeks = tapered.weeks;
     syncBBPlanSetShape(next);
@@ -4665,6 +4924,9 @@ for (const week of next.weeks) {
         session.exercises.push({
           muscle, name: candidate.name, exerciseName: candidate.name,
           role: 'accessory', character: 'памп',
+          // Покрытие «выпавшей» мышцы намеренное (MEV-гарантия), а не утечка
+          // чужой мышцы в день — иначе валидатор сыпал session_muscle_leak.
+          coverageFill: true,
           sets: addSets, repsRange: isCompoundCand ? [8, 12] : [12, 20],
           rir: 3, restSeconds: 60, warmupSets: [],
           workSets: Array.from({ length: addSets }, () => ({ reps: addReps, rir: 3, weight: addWeight, restSeconds: 60 })),
@@ -5908,7 +6170,15 @@ for (const week of next.weeks) {
   // (гарантии головок рук/частоты, фидеры) приводим сессии к практическим
   // лимитам — упражнения и прямые сеты мышц. Только уменьшение объёма.
   if (!options.preserveSource && (next as any).pattern?.id) {
+    // Аудит 2026-11: баланс жимы/тяги в днях с двумя ведущими мышцами верха —
+    // ДО реализм-прохода (он режет лишнее, а не добавляет), чтобы обмен
+    // «изоляция груди → тяга» не выбивал сессию за бюджет.
+    // Аудит 2026-11: сначала реализм (режет перегруз по капам), затем добивка
+    // дельт в освободившееся место, затем объём-нейтральный баланс спина/грудь.
+    // Так добивка не упирается в бюджет, который реализм всё равно освободит.
     enforceSessionRealism(next, options);
+    ensureDeltCoverageForUpperWeeks(next, options);
+    ensureChestBackBalance(next, options);
     // Чистим dangling supersetWith после удалений реализм-прохода (партнёр
     // мог быть удалён как дубль/лишний объём).
     for (const w of next.weeks) for (const s of w.sessions) {

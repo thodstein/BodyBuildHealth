@@ -262,7 +262,10 @@ export function validateBBPlan(plan: BBPlan, options: BBPlanValidationOptions = 
         // Композитные ключи: arms (biceps+triceps), legs (все мышцы ног).
         || (['biceps', 'triceps'].includes(canonical) && allowedMuscles.includes('arms'))
         || (['quads', 'hamstrings', 'glutes', 'calves'].includes(canonical) && allowedMuscles.includes('legs'));
-      if (!allowed) issues.push({ level: 'warning', code: 'session_muscle_leak', message: `${exercise.name}: мышца ${canonical} не соответствует тегу дня ${session.sessionTag}.`, week: week.week || wi + 1, session: si + 1, exercise: exercise.name });
+      // coverageFill: ноги/quads, добавленные гарантией покрытия в сплит без
+      // соответствующего дня (glute-сплиты, push/pull без ног), — намеренная
+      // добивка, а не случайная «утечка мышцы» (аудит 2026-11).
+      if (!allowed && !(exercise as any).coverageFill) issues.push({ level: 'warning', code: 'session_muscle_leak', message: `${exercise.name}: мышца ${canonical} не соответствует тегу дня ${session.sessionTag}.`, week: week.week || wi + 1, session: si + 1, exercise: exercise.name });
     }
     const sessionSets = session.exercises
       .filter(exercise => !(exercise as any).warmupActivator && !(exercise as any).optional)
