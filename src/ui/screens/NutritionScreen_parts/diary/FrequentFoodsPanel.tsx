@@ -95,7 +95,7 @@ export const FrequentFoodsPanel: React.FC<FrequentFoodsPanelProps> = ({
           const c = Math.round(((Number(food.c) || 0) * qty / 100) * 10) / 10;
           return (
             <button key={`${food.name}-${idx}`} onClick={() => handleAdd(food)} className="nd-freqitem" style={{ textAlign: 'left', padding: '10px 12px', borderRadius: 12, background: 'linear-gradient(135deg, rgba(0,230,138,0.06), rgba(0,200,160,0.03))', border: '1px solid rgba(0,230,138,0.12)', backdropFilter: 'blur(8px)', cursor: 'pointer', transition: 'all 0.15s', display: 'flex', flexDirection: 'column', gap: 4, minHeight: 56 }} onMouseEnter={e => (e.currentTarget.style.background = 'linear-gradient(135deg, rgba(0,230,138,0.10), rgba(0,200,160,0.06))')} onMouseLeave={e => (e.currentTarget.style.background = 'linear-gradient(135deg, rgba(0,230,138,0.06), rgba(0,200,160,0.03))')} title={`${food.name}\n${kcal} ккал | Б: ${p} Ж: ${f} У: ${c}`}>
-              <div style={{ fontSize: 12, fontWeight: 700, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{food.name}</div>
+              <div style={{ fontSize: 12, fontWeight: 700, color: '#fff', whiteSpace: 'normal', overflowWrap: 'anywhere', lineHeight: 1.3 }}>{food.name}</div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10 }}>
                 <span style={{ background: 'rgba(0,230,138,0.12)', color: '#00e68a', padding: '2px 6px', borderRadius: 6, fontWeight: 700 }}>{qty}г</span>
                 <span style={{ color: 'rgba(255,255,255,0.6)' }}>→</span>

@@ -62,8 +62,9 @@ export const MealCard: React.FC<MealCardProps> = ({ mealName, items, onEditItem,
             borderBottom: '1px solid rgba(255,255,255,0.03)', minHeight: 52,
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: 0 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                <span style={{ fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.name}</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4, minWidth: 0 }}>
+                {/* Названия из сетей длинные — переносим целиком, а не режем «…» */}
+                <span style={{ fontWeight: 500, whiteSpace: 'normal', overflowWrap: 'anywhere', lineHeight: 1.3 }}>{item.name}</span>
                 {typeof item.confidence === 'number' && item.confidence < 0.5 && (
                   <span style={{ fontSize: 8, color: '#f59e0b', fontWeight: 700, background: 'rgba(245,158,11,0.12)', padding: '1px 5px', borderRadius: 4 }}>⚠</span>
                 )}
