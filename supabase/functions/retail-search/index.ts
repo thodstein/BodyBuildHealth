@@ -350,7 +350,7 @@ async function pyaterochkaSearch(query: string, limit: number, diag?: string[]):
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126 Safari/537.36',
           Referer: 'https://5ka.ru/',
         },
-      }, 8000);
+      }, 3500);
       if (!res.ok) {
         diag?.push(`pyaterochka HTTP ${res.status}`);
         continue;
@@ -400,7 +400,7 @@ async function magnitSearch(query: string, limit: number, diag?: string[]): Prom
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126 Safari/537.36',
           Referer: 'https://magnit.ru/',
         },
-      }, 8000);
+      }, 3500);
       if (!res.ok) {
         diag?.push(`magnit HTTP ${res.status}`);
         continue;
@@ -450,7 +450,7 @@ Deno.serve(async (req: Request) => {
   } catch {}
   const query = String(body?.query ?? '').trim();
   const barcode = String(body?.barcode ?? '').replace(/\D/g, '');
-  const limit = Math.min(Math.max(Number(body?.limit) || 8, 1), 20);
+  const limit = Math.min(Math.max(Number(body?.limit) || 8, 1), 30);
 
   if (barcode.length >= 8) {
     const bcDiag: string[] = [];

@@ -26,9 +26,14 @@ export const RETAIL_CHAINS: Record<RetailChainId, { label: string; emoji: string
 const SUPABASE_URL = (import.meta.env.VITE_SUPABASE_URL || '').replace(/\/+$/, '');
 const SUPABASE_ANON = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 const CACHE_KEY = 'he_retail_search_cache_v2';
+/** Версия формата/полноты выдачи: старые кэши (9 позиций) не должны
+ *  показывать «мало товаров» после расширения лимита до 24. */
+const CACHE_VERSION = 3;
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 const CACHE_MAX_QUERIES = 40;
 const FETCH_TIMEOUT_MS = 12000;
+/** Сколько позиций просим у edge-функции: 3 сети × 8 = до 24 карточек. */
+export const RETAIL_RESULT_LIMIT = 24;
 
 /**
  * Таймаут fetch, совместимый со старыми WebView.
@@ -44,6 +49,7 @@ function fetchTimeoutSignal(): { signal: AbortSignal; done: () => void } {
 
 interface CacheEntry {
   ts: number;
+  v?: number;
   items: RetailProduct[];
 }
 
@@ -119,14 +125,14 @@ export function sanitizeRetailItems(raw: any): RetailProduct[] {
   return out;
 }
 
-export async function searchRetailProducts(query: string, limit = 9): Promise<RetailSearchOutcome> {
+export async function searchRetailProducts(query: string, limit = RETAIL_RESULT_LIMIT): Promise<RetailSearchOutcome> {
   const q = normalizeRetailQuery(query);
   if (q.length < 2) return { items: [], available: true };
   if (!enabled()) return { items: [], available: false };
 
   const cache = readCache();
   const hit = cache[q];
-  if (hit && Date.now() - hit.ts < CACHE_TTL_MS) {
+  if (hit && hit.v === CACHE_VERSION && Date.now() - hit.ts < CACHE_TTL_MS) {
     return { items: hit.items.slice(0, limit), available: true };
   }
 
@@ -145,7 +151,7 @@ export async function searchRetailProducts(query: string, limit = 9): Promise<Re
     if (!res.ok) return { items: [], available: false };
     const data = await res.json();
     const items = sanitizeRetailItems(data?.items);
-    cache[q] = { ts: Date.now(), items };
+    cache[q] = { ts: Date.now(), v: CACHE_VERSION, items };
     writeCache(cache);
     return { items: items.slice(0, limit), available: true };
   } catch {
@@ -162,7 +168,7 @@ export async function searchRetailProductByBarcode(barcode: string): Promise<Ret
   const cache = readCache();
   const cacheKey = `bc:${bc}`;
   const hit = cache[cacheKey];
-  if (hit && Date.now() - hit.ts < CACHE_TTL_MS) return hit.items[0] || null;
+  if (hit && hit.v === CACHE_VERSION && Date.now() - hit.ts < CACHE_TTL_MS) return hit.items[0] || null;
 
   const timeout = fetchTimeoutSignal();
   try {
@@ -179,7 +185,7 @@ export async function searchRetailProductByBarcode(barcode: string): Promise<Ret
     if (!res.ok) return null;
     const data = await res.json();
     const items = sanitizeRetailItems(data?.items);
-    cache[cacheKey] = { ts: Date.now(), items };
+    cache[cacheKey] = { ts: Date.now(), v: CACHE_VERSION, items };
     writeCache(cache);
     return items[0] || null;
   } catch {

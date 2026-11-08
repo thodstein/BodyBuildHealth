@@ -234,9 +234,76 @@ export async function searchByBarcodeBatch(barcodes: string[]): Promise<(OFFProd
   return Promise.all(barcodes.map(b => searchByBarcode(b)));
 }
 
+function offProductFromHit(p: any): OFFProduct | null {
+  if (!p) return null;
+  const src = p.product || p;
+  return normalizeProduct(src.code ? src : {
+    ...src,
+    code: src.code || src._id,
+    product_name: src.product_name || src.product_name_ru,
+    nutriments: src.nutriments,
+  });
+}
+
+async function fetchSearchALicious(query: string, pageSize: number, russiaOnly: boolean): Promise<OFFProduct[]> {
+  const term = russiaOnly ? `${query} AND countries_tags:"en:russia"` : query;
+  try {
+    const encoded = encodeURIComponent(term);
+    const res = await fetch(`https://search.openfoodfacts.org/search?q=${encoded}&page_size=${pageSize}`, { signal: AbortSignal.timeout(7000), headers: { 'Accept': 'application/json' } as any });
+    if (!res.ok) return [];
+    const data = await res.json();
+    const hits = (data.hits || data.products || []) as any[];
+    const products: OFFProduct[] = [];
+    for (const p of hits) {
+      const norm = offProductFromHit(p);
+      if (norm) products.push(norm);
+    }
+    return products;
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Старый API ru.openfoodfacts.org с фильтром страны. Именно он отдаёт
+ * российские бренды (Простоквашино, Домик в деревне, Савушкин) — новый
+ * Search-a-licious без фильтра ставит первыми иностранные позиции.
+ */
+async function fetchRussiaLegacy(query: string, pageSize: number): Promise<OFFProduct[]> {
+  try {
+    const encoded = encodeURIComponent(query);
+    const url = `${OFF_API_RU}/cgi/search.pl?search_terms=${encoded}&page_size=${pageSize}&json=1`
+      + '&tagtype_0=countries&tag_contains_0=contains&tag_0=russia'
+      + '&fields=code,product_name,product_name_ru,brands,categories,nutriments,image_small_url,serving_quantity';
+    const res = await fetch(url, { signal: AbortSignal.timeout(7000), headers: { 'Accept': 'application/json' } as any });
+    if (!res.ok) return [];
+    const data = await res.json();
+    const products: OFFProduct[] = [];
+    for (const p of (data.products || [])) {
+      const norm = normalizeProduct(p);
+      if (norm) products.push(norm);
+    }
+    return products;
+  } catch {
+    return [];
+  }
+}
+
+function dedupeOff(products: OFFProduct[], seen: Set<string>): OFFProduct[] {
+  const out: OFFProduct[] = [];
+  for (const p of products) {
+    const key = p.barcode || p.id || p.name.toLowerCase();
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    out.push(p);
+  }
+  return out;
+}
+
 export async function searchByName(query: string, pageSize = 20): Promise<OFFProduct[]> {
   const q = (query || '').trim();
   if (!q) return [];
+
   const cached = await searchCacheByName(q);
   if (cached.length > 0) return cached;
 
@@ -249,50 +316,52 @@ export async function searchByName(query: string, pageSize = 20): Promise<OFFPro
     if (withoutBrand) tryQueries.push(withoutBrand);
   }
 
+  // RF-first: бренды РФ должны быть в начале выдачи, а не после иностранных
+  // товаров. Оба российских источника спрашиваем параллельно (последовательно
+  // это 2×7 с ожидания при медленной сети), добираем остаток и следим за
+  // общим дедлайном — строка «ищем ещё…» не должна крутиться бесконечно.
+  const startedAt = Date.now();
+  const deadline = 12_000;
+  const expired = () => Date.now() - startedAt > deadline;
+
+  const seen = new Set<string>();
+  const collected: OFFProduct[] = [];
   for (const qq of tryQueries) {
-    // 1. Новый Search-a-licious (лучше для РФ)
-    try {
-      const encoded = encodeURIComponent(qq);
-      const res = await fetch(`https://search.openfoodfacts.org/search?q=${encoded}&page_size=${pageSize}`, { signal: AbortSignal.timeout(7000), headers: { 'Accept': 'application/json' } as any });
-      if (res.ok) {
-        const data = await res.json();
-        const hits = (data.hits || data.products || []) as any[];
-        if (hits.length > 0) {
-          const products: OFFProduct[] = [];
-          for (const p of hits) {
-            const src = p.product || p;
-            const norm = normalizeProduct(src.code ? src : { ...src, code: src.code || src._id, product_name: src.product_name || src.product_name_ru, nutriments: src.nutriments });
-            if (norm) {
-              await saveToCache(norm);
-              products.push(norm);
-            }
-          }
-          if (products.length > 0) return products;
-        }
-      }
-    } catch {}
-    // 2. Fallback старый API
-    const apis = [OFF_API_RU, OFF_API_WORLD];
-    for (const api of apis) {
+    if (expired()) break;
+    const [legacy, salic] = await Promise.all([
+      fetchRussiaLegacy(qq, pageSize),
+      fetchSearchALicious(qq, pageSize, true),
+    ]);
+    collected.push(...dedupeOff(legacy, seen), ...dedupeOff(salic, seen));
+    if (collected.length >= pageSize) break;
+  }
+  // Если по стране данных мало — добираем общий индекс, но только в конец.
+  if (collected.length < pageSize && !expired()) {
+    for (const qq of tryQueries) {
+      if (expired()) break;
+      collected.push(...dedupeOff(await fetchSearchALicious(qq, pageSize, false), seen));
+      if (collected.length >= pageSize) break;
+    }
+  }
+
+  if (collected.length === 0 && !expired()) {
+    // Последний шанс — старый API без фильтра.
+    for (const api of [OFF_API_RU, OFF_API_WORLD]) {
       try {
-        const encoded = encodeURIComponent(qq);
+        const encoded = encodeURIComponent(q);
         const res = await fetch(`${api}/cgi/search.pl?search_terms=${encoded}&page_size=${pageSize}&json=1&fields=code,product_name,product_name_ru,brands,categories,nutriments,image_small_url`, { signal: AbortSignal.timeout(7000), headers: { 'Accept': 'application/json' } as any });
         if (!res.ok) continue;
         const data = await res.json();
-        if (!data.products) continue;
-        const products: OFFProduct[] = [];
-        for (const p of data.products) {
-          const norm = normalizeProduct(p);
-          if (norm) {
-            await saveToCache(norm);
-            products.push(norm);
-          }
-        }
-        if (products.length > 0) return products;
+        collected.push(...dedupeOff((data.products || []).map(normalizeProduct).filter(Boolean) as OFFProduct[], seen));
+        if (collected.length > 0) break;
       } catch {}
     }
   }
-  return [];
+
+  for (const p of collected.slice(0, pageSize)) {
+    try { await saveToCache(p); } catch {}
+  }
+  return collected.slice(0, pageSize);
 }
 
 async function searchCacheByName(query: string): Promise<OFFProduct[]> {

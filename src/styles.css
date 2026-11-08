@@ -3902,3 +3902,114 @@ html:not([data-theme="light"]):not([data-apk-theme="light"]) textarea::placehold
 }
 
 @media (max-width: 380px) { .hub-diary { padding: 6px !important; } .td-subnav-btn { min-width: 72px !important; font-size: 10px !important; } }
+
+/* --- Полноэкранный лист добавления еды (Питание → Дневник → Добавить) ---
+ * Раньше панель жила внутри прокручиваемого таба: поиск, результаты и строка
+ * «＋» уезжали друг относительно друга, а половина карточек не влезала в экран.
+ * Теперь это отдельный fixed-лист на весь экран: шапка и поиск закреплены,
+ * скроллится только тело, строка добавления всегда стоит внизу листа. */
+.nd-addsheet {
+  height: 100dvh;
+  max-height: 100dvh;
+  width: 100%;
+  overflow: hidden;
+  overscroll-behavior: contain;
+}
+.nd-addsheet-head {
+  padding-top: calc(8px + env(safe-area-inset-top, 0px)) !important;
+}
+/* Секция внутри листа — просто контейнер: без карточки и лишнего заголовка
+ * (он уже есть в шапке листа), на всю оставшуюся высоту. */
+.nd-addsheet .nd-sec-add {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  padding: 0 !important;
+  border: none !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+}
+.nd-addsheet .nd-sec-add > .nd-sec-head { display: none !important; }
+.nd-addsheet .nd-sec-add > .nd-sec-body {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  gap: 0 !important;
+  padding: 0 !important;
+}
+.nd-addsheet .nd-add {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+/* Строка добавления — обычный низ листа: никакого «плавания» над навигацией,
+ * лист и так перекрывает таб-бар. */
+.nd-addsheet .nd-ocr-actions {
+  position: static !important;
+  bottom: auto !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  padding-bottom: calc(12px + max(env(safe-area-inset-bottom, 0px), 8px)) !important;
+}
+/* Чипы приёмов пищи листаются горизонтально, а не переносятся на 3 строки. */
+.nd-addsheet .nd-mealchips {
+  scrollbar-width: none;
+}
+.nd-addsheet .nd-mealchips::-webkit-scrollbar { display: none; }
+
+/* Порядок блоков при активном поиске: сначала выдача, очередь — ниже.
+ * Иначе после каждого «＋» результаты «прыгали» вниз вместе с новой карточкой. */
+.nd-add-body--search .nd-results { order: 1; }
+.nd-add-body--search .nd-queue { order: 2; }
+.nd-add-body--search .nd-ocr { order: 3; }
+.nd-add-body--search .nd-ocr-raw { order: 4; }
+.nd-add-body--search .nd-cfood-toggle { order: 5; }
+.nd-add-body--search .nd-cfood-panel { order: 6; }
+
+/* Появление листа: лёгкий подъём снизу, как у нативных шитов. */
+@keyframes nd-addsheet-in {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: none; }
+}
+.nd-addsheet { animation: nd-addsheet-in 0.22s cubic-bezier(0.22, 1, 0.36, 1) both; }
+
+/* Планшет/десктоп: лист по центру, а не растянут на всю ширину монитора. */
+@media (min-width: 760px) {
+  .nd-addsheet {
+    max-width: 600px;
+    margin-left: auto;
+    margin-right: auto;
+    border-left: 1px solid rgba(255, 255, 255, 0.08);
+    border-right: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 0 0 90px rgba(0, 0, 0, 0.6);
+  }
+}
+
+/* Поиск: заметный фокус (в APK поле не подсвечивалось вовсе). */
+.nd-addsheet .nd-search-input {
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.nd-addsheet .nd-search-input:focus,
+.nd-addsheet .nd-search-input:focus-visible {
+  border-color: rgba(0, 230, 138, 0.5) !important;
+  box-shadow: 0 0 0 3px rgba(0, 230, 138, 0.12);
+}
+
+/* Отклик на нажатие у кнопок «＋» и «⚡». */
+.nd-addsheet .nd-addq:active,
+.nd-addsheet .nd-addnow:active {
+  filter: brightness(1.25);
+}
+
+/* Подтверждение «добавлено в очередь». */
+@keyframes nd-queued-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: none; }
+}
+.nd-queued-toast { animation: nd-queued-in 0.18s ease-out both; }
+
+@media (prefers-reduced-motion: reduce) {
+  .nd-addsheet,
+  .nd-queued-toast { animation: none; }
+}

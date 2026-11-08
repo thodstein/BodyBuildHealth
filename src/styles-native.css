@@ -14285,3 +14285,62 @@ html.app-native .hub-intel [data-intel-grid] {
     transition: none !important;
   }
 }
+
+/* --- 115. APK: полноэкранный лист добавления еды ---
+ * Лист перекрывает таб-бар навигации (z-index 200 против 100), поэтому
+ * строка добавления больше не «плавает» над пилюлей: она стоит внизу листа.
+ * Селекторы сильнее §114 (html.app-native .nd-ocr-actions), иначе sticky+bottom
+ * от --tabbar-lift поднимал кнопку вверх и оставлял пустую полосу. */
+html.app-native .nd-addsheet {
+  height: 100dvh !important;
+  max-height: 100dvh !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+  overscroll-behavior: contain !important;
+}
+html.app-native .nd-addsheet .nd-sec-add {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  padding: 0 !important;
+  border: none !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+}
+html.app-native .nd-addsheet .nd-sec-add > .nd-sec-head { display: none !important; }
+html.app-native .nd-addsheet .nd-sec-add > .nd-sec-body {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  gap: 0 !important;
+  padding: 0 !important;
+}
+html.app-native .nd-addsheet .nd-add-body {
+  padding-bottom: 16px !important;
+  -webkit-overflow-scrolling: touch !important;
+}
+html.app-native .nd-addsheet .nd-ocr-actions {
+  position: static !important;
+  bottom: auto !important;
+  z-index: 1 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  padding-bottom: calc(12px + max(env(safe-area-inset-bottom, 0px), 12px)) !important;
+}
+@media (max-width: 380px) {
+  html.app-native .nd-addsheet .nd-tools > button,
+  html.app-native .nd-addsheet .nd-tools > label {
+    font-size: 9px !important;
+  }
+}
+@media (min-width: 760px) {
+  html.app-native .nd-addsheet {
+    max-width: 600px !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
+    border-left: 1px solid rgba(255, 255, 255, 0.08) !important;
+    border-right: 1px solid rgba(255, 255, 255, 0.08) !important;
+  }
+}

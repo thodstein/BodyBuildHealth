@@ -14,11 +14,13 @@ interface DiarySectionProps {
   color?: string;
   /** суффикс хука: секция получает классы `nd-section nd-sec-<id>` */
   id: string;
+  /** Растянуть секцию на всю высоту родителя (полноэкранный лист добавления). */
+  fill?: boolean;
   children: React.ReactNode;
 }
 
 export const DiarySection: React.FC<DiarySectionProps> = ({
-  icon, title, sub, count, color = '#00e68a', id, children,
+  icon, title, sub, count, color = '#00e68a', id, fill = false, children,
 }) => (
   <section
     className={`nd-section nd-sec-${id}`}
@@ -30,6 +32,7 @@ export const DiarySection: React.FC<DiarySectionProps> = ({
       boxShadow: '0 4px 20px rgba(0,0,0,0.18)',
       backdropFilter: 'blur(8px)',
       display: 'flex', flexDirection: 'column', gap: 10,
+      ...(fill ? { flex: 1, minHeight: 0 } : null),
     }}
   >
     <header
@@ -72,7 +75,7 @@ export const DiarySection: React.FC<DiarySectionProps> = ({
         </span>
       ) : null}
     </header>
-    <div className="nd-sec-body" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+    <div className="nd-sec-body" style={{ display: 'flex', flexDirection: 'column', gap: 8, ...(fill ? { flex: 1, minHeight: 0 } : null) }}>
       {children}
     </div>
   </section>

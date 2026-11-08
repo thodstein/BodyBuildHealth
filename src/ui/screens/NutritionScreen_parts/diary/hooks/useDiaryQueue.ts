@@ -10,7 +10,7 @@ import { readProgramRestrictions, summarizeImportChecks } from '../diary-import-
 import { useLabelScan } from './useLabelScan';
 import type { CustomFoodEntry } from '../../../../../engines/meal-custom-food';
 
-export function useDiaryQueue({ diaryData, selectedDate, mealType, usdaFoods, saveDiary, showToast, bumpRefresh, setShowBarcode, setFoodSearch }: {
+export function useDiaryQueue({ diaryData, selectedDate, mealType, usdaFoods, saveDiary, showToast, bumpRefresh, setShowBarcode }: {
   diaryData: Record<string, any>;
   selectedDate: string;
   mealType: string;
@@ -19,7 +19,6 @@ export function useDiaryQueue({ diaryData, selectedDate, mealType, usdaFoods, sa
   showToast: (msg: string) => void;
   bumpRefresh: () => void;
   setShowBarcode: (v: boolean) => void;
-  setFoodSearch: (v: string) => void;
 }) {
   const [ocrText, setOcrText] = useState('');
   const [parsedItems, setParsedItems] = useState<DiaryItem[]>([]);
@@ -37,14 +36,16 @@ export function useDiaryQueue({ diaryData, selectedDate, mealType, usdaFoods, sa
 
   const addFoodFromDB = useCallback((food: FoodItemLike) => {
     setParsedItems(prev => [...prev, { name: food.name, kcal: food.kcal, p: food.protein, f: food.fat, c: food.carbs, qty: 100, category: food.category || 'other' }]);
-    setFoodSearch('');
+    // Поиск НЕ сбрасываем: иначе после каждого «＋» список результатов
+    // схлопывается и приходится искать заново — добавить несколько
+    // продуктов подряд становится невозможно.
     try {
       const favs = readJSONArr<string>('he_food_favs');
       const updated = [food.id, ...favs.filter((f: string) => f !== food.id)].slice(0, 12);
       localStorage.setItem('he_food_favs', JSON.stringify(updated));
       bumpRefresh();
     } catch {}
-  }, [setFoodSearch, bumpRefresh]);
+  }, [bumpRefresh]);
 
   /** Продукт, распознанный с упаковки, — в очередь дневника (100 г). */
   const addCustomEntryToQueue = useCallback((entry: CustomFoodEntry) => {

@@ -1,5 +1,6 @@
 import React, { useState, useRef, useCallback } from 'react';
 import { findFood, quantityToGrams } from '../../../engines/nutrition-ocr-parser';
+import { useAndroidBackHandler } from '../../../core/use-android-back';
 import { readDiaryV2, writeDiaryV2, exportDiaryJSON, exportDiaryCSV, importDiaryJSON, getStorageInfo } from './diary-storage-v2';
 import { NutritionDiaryCharts } from './NutritionDiaryCharts';
 import { NutritionQualityCard } from '../../components/NutritionQualityCard';
@@ -29,6 +30,15 @@ export type { FoodItemLike } from './types';
 
 interface NutritionTargets { kcal: number; protein: number; fats: number; carbs: number; }
 
+const MONTHS_RU = ['янв', 'фев', 'мар', 'апр', 'мая', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'];
+/** `2026-11-08` → `8 ноя` (без Date: ISO-строка парсится как UTC и может съехать на день). */
+function shortRuDate(iso: string): string {
+  const [, m, d] = String(iso || '').split('-');
+  const day = Number(d);
+  const month = MONTHS_RU[Number(m) - 1];
+  return day && month ? `${day} ${month}` : iso;
+}
+
 export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: number; p: number; f: number; c: number }[]; targets?: NutritionTargets; weight?: number; age?: number; sex?: 'male' | 'female'; onDiaryChange?: () => void }> = ({ foodEntries, targets, weight: w, age: a, sex: s, onDiaryChange }) => {
   const weight = w || 80;
   const age = a || 30;
@@ -54,7 +64,7 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
     labelOpen, labelLoading, labelProgress, labelHint, labelError, labelDraft, labelRawText, labelBarcodeLoading,
     openLabelScan, closeLabelScan, handleLabelCamera, handleLabelGallery,
     handleLabelFieldChange, handleLabelSaveToBase, handleLabelAddToDiary, handleLabelBarcodeScan,
-  } = useDiaryQueue({ diaryData, selectedDate, mealType, usdaFoods, saveDiary, showToast, bumpRefresh, setShowBarcode, setFoodSearch });
+  } = useDiaryQueue({ diaryData, selectedDate, mealType, usdaFoods, saveDiary, showToast, bumpRefresh, setShowBarcode });
   const {
     editItem, setEditItem, editQty, setEditQty, copySource, setCopySource, copiedDay,
     clearDayConfirmOpen, setClearDayConfirmOpen,
@@ -79,6 +89,49 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
 
   const ocrFileRef = useRef<HTMLInputElement>(null);
   const ocrCameraRef = useRef<HTMLInputElement>(null);
+  const addSheetRef = useRef<HTMLDivElement>(null);
+
+  const closeAddSheet = useCallback(() => setTab('day'), []);
+
+  // Системная «назад» на Android: сначала закрываем вложенные слои листа
+  // (штрихкод → упаковка → текст), и только потом сам лист. Без этого
+  // «назад» из добавления еды выбрасывала на главную вкладку.
+  useAndroidBackHandler(tab === 'add', () => {
+    if (showBarcode) { setShowBarcode(false); return; }
+    if (labelOpen) { closeLabelScan(); return; }
+    if (showOCR) { setShowOCR(false); return; }
+    closeAddSheet();
+  });
+
+  // Web/десктоп: Esc закрывает лист так же, как ✕.
+  React.useEffect(() => {
+    if (tab !== 'add') return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      if (showBarcode) { setShowBarcode(false); return; }
+      if (labelOpen) { closeLabelScan(); return; }
+      if (showOCR) { setShowOCR(false); return; }
+      closeAddSheet();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [tab, showBarcode, labelOpen, showOCR, closeLabelScan, closeAddSheet]);
+
+  // Пока лист открыт, фоновая страница не должна «резиниться» под ним.
+  React.useEffect(() => {
+    if (tab !== 'add') return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = prev; };
+  }, [tab]);
+
+  // Фокус в лист: скринридер объявляет диалог, клавиатура не выскакивает.
+  React.useEffect(() => {
+    if (tab !== 'add') return;
+    const el = addSheetRef.current;
+    if (!el) return;
+    try { el.focus({ preventScroll: true }); } catch { try { el.focus(); } catch { /* ignore */ } }
+  }, [tab]);
 
   // (хуки данных/поиска/типов приёмов/недели — см. выше)
 
@@ -184,8 +237,27 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
 
       {/* Tab content */}
       {tab === 'add' && (
-        <>
-        <DiarySection id="add" icon="🔍" title="Добавление" sub="поиск · штрихкод · фото · очередь" color="#00e68a" count={parsedItems.length > 0 ? `${parsedItems.length} в очереди` : null}>
+        <div className="nd-addsheet" role="dialog" aria-modal="true" aria-label="Добавление еды" aria-labelledby="nd-addsheet-title"
+          ref={addSheetRef} tabIndex={-1}
+          style={{ position: 'fixed', inset: 0, zIndex: 200, display: 'flex', flexDirection: 'column', outline: 'none', background: 'linear-gradient(180deg,#0b0b0d 0%, #141417 100%)' }}>
+          <div className="nd-addsheet-head" style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', background: '#141417', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+            <button onClick={closeAddSheet} aria-label="Закрыть добавление"
+              style={{ width: 44, height: 44, borderRadius: 12, cursor: 'pointer', flexShrink: 0, fontSize: 18,
+                border: '1px solid rgba(255,255,255,0.10)', background: '#202023', color: '#fff' }}>✕</button>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div id="nd-addsheet-title" style={{ fontSize: 14, fontWeight: 800, color: '#fff', letterSpacing: -0.2 }}>Добавление еды</div>
+              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                {mealType || 'приём не выбран'} · {shortRuDate(selectedDate)}
+              </div>
+            </div>
+            <span style={{ fontSize: 9, fontWeight: 700, padding: '4px 9px', borderRadius: 999, flexShrink: 0,
+              background: parsedItems.length > 0 ? 'rgba(0,230,138,0.14)' : 'rgba(255,255,255,0.05)',
+              color: parsedItems.length > 0 ? '#00e68a' : 'rgba(255,255,255,0.6)',
+              border: `1px solid ${parsedItems.length > 0 ? 'rgba(0,230,138,0.25)' : 'rgba(255,255,255,0.08)'}` }}>
+              {parsedItems.length > 0 ? `${parsedItems.length} в очереди` : 'поиск'}
+            </span>
+          </div>
+        <DiarySection id="add" icon="🔍" title="Добавление" sub="поиск · штрихкод · фото · очередь" color="#00e68a" count={parsedItems.length > 0 ? `${parsedItems.length} в очереди` : null} fill>
         <AddFoodPanel
           foodSearch={foodSearch} onFoodSearchChange={setFoodSearch} debouncedSearch={debouncedSearch}
           usdaFoods={usdaFoods} mealType={mealType} onMealTypeChange={setMealType}
@@ -249,8 +321,8 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
           }}
           onAddCustomFood={addCustomFood}
           ocrFileRef={ocrFileRef} ocrCameraRef={ocrCameraRef}
-        />
-        </DiarySection>
+          onClearQueue={() => setParsedItems([])}
+          below={<>
         {/* FatSecret-уровень: частые продукты 1-клик */}
         <FrequentFoodsPanel diary={diaryData} onAddFood={(food, mealType) => {
           const data = { ...diaryData };
@@ -285,7 +357,10 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
             </div>
           </div>
         )}
-        </>
+          </>}
+        />
+        </DiarySection>
+        </div>
        )}
 
       {tab === 'day' && (

@@ -9,7 +9,7 @@ import { NutritionDiary } from './NutritionScreen_parts/NutritionDiary';
 import { searchByName as searchOFF, productToFoodItem } from '../../engines/openfoodfacts.engine';
 import { localIsoDate } from '../../core/local-date';
 import { readProgramRestrictions, summarizeImportChecks } from './NutritionScreen_parts/diary/diary-import-guards';
-import { RETAIL_CHAINS, retailToFoodItem, searchRetailProducts, type RetailProduct } from '../../engines/retail-search.engine';
+import { RETAIL_CHAINS, RETAIL_RESULT_LIMIT, retailToFoodItem, searchRetailProducts, type RetailProduct } from '../../engines/retail-search.engine';
 import { IndividualPlan, NutritionPlanScope, PlanReportTab, NutritionPeriodizationTab } from './NutritionScreen_parts/IndividualPlan';
 import { OrganLoadCalculator } from './NutritionScreen_parts/IndividualPlan/OrganLoadCalculator';
 import { PeakWeekTab } from './NutritionScreen_parts/IndividualPlan/PeakWeekTab';
@@ -350,8 +350,8 @@ const CatalogTab: React.FC = () => {
     if (!q || q.length < 3 || filtered.length >= 6) { setCatRetail([]); return; }
     let cancelled = false;
     setCatSearchingRetail(true);
-    searchRetailProducts(q, 9).then(res => {
-      if (!cancelled) setCatRetail(res.available ? res.items.slice(0, 9) : []);
+    searchRetailProducts(q, RETAIL_RESULT_LIMIT).then(res => {
+      if (!cancelled) setCatRetail(res.available ? res.items.slice(0, RETAIL_RESULT_LIMIT) : []);
     }).catch(() => { if (!cancelled) setCatRetail([]); }).finally(() => { if (!cancelled) setCatSearchingRetail(false); });
     return () => { cancelled = true; };
   }, [catSearch]);
