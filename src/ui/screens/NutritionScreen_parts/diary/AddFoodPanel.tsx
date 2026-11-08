@@ -3,7 +3,7 @@ import { FOOD_DB } from '../../../../core/nutrition-database';
 import { CAT_MAP_EMOJI } from '../../../../core/nutrition-utils';
 import { type FoodItemLike } from '../types';
 import { BarcodeScanner } from '../../../components/BarcodeScanner';
-import { type OFFProduct, productToFoodItem, searchByName as searchOFF } from '../../../../engines/openfoodfacts.engine';
+import { type OFFProduct, productToFoodItem, searchByBarcode, searchByName as searchOFF } from '../../../../engines/openfoodfacts.engine';
 import { RETAIL_CHAINS, RETAIL_RESULT_LIMIT, retailToFoodItem, searchRetailProducts, type RetailProduct } from '../../../../engines/retail-search.engine';
 import { isCapacitorNative } from '../../../../core/app-platform';
 import { parseNutritionText, findFood } from '../../../../engines/nutrition-ocr-parser';
@@ -89,6 +89,9 @@ const fmt = (v: number) => Math.round((v || 0) * 10) / 10;
 
 /** Быстрые запросы для пустого поиска: то, что ищут чаще всего. */
 const POPULAR_QUERIES = ['творог', 'куриная грудка', 'гречка', 'кефир', 'яйца', 'овсянка', 'банан', 'рис'];
+
+/** 8–14 цифр — это штрихкод (EAN-8/13, UPC, ITF-14), а не название продукта. */
+const isBarcodeQuery = (q: string) => /^\d{8,14}$/.test((q || '').trim());
 
 export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
   foodSearch, onFoodSearchChange, debouncedSearch, usdaFoods, mealType, onMealTypeChange,
@@ -222,7 +225,7 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
   const [isSearchingRetail, setIsSearchingRetail] = useState(false);
 
   useEffect(() => {
-    if (query && foodSearchResults.length > 0) {
+    if (query && !isBarcodeQuery(query) && foodSearchResults.length > 0) {
       setHistory(prev => {
         if (prev[0] === query) return prev;
         const next = [query, ...prev.filter(x => x !== query)].slice(0, 5);
@@ -252,7 +255,7 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
 
   useEffect(() => {
     const q = query;
-    if (!q || q.length < 3) { setInternetResults([]); return; }
+    if (!q || q.length < 3 || isBarcodeQuery(q)) { setInternetResults([]); return; }
     let cancelled = false;
     setIsSearchingNet(true);
     searchOFF(q, 16).then(res => {
@@ -263,9 +266,24 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
     return () => { cancelled = true; };
   }, [query]);
 
+  // ── Штрихкод, вставленный в поиск («4600…») — ищем сразу по нему ─────────
+  const barcodeQuery = isBarcodeQuery(query) ? query : '';
+  const [barcodeFood, setBarcodeFood] = useState<any>(null);
+  const [barcodeLoading, setBarcodeLoading] = useState(false);
+  useEffect(() => {
+    if (!barcodeQuery) { setBarcodeFood(null); setBarcodeLoading(false); return; }
+    let cancelled = false;
+    setBarcodeLoading(true);
+    searchByBarcode(barcodeQuery)
+      .then(p => { if (!cancelled) setBarcodeFood(p ? productToFoodItem(p) : null); })
+      .catch(() => { if (!cancelled) setBarcodeFood(null); })
+      .finally(() => { if (!cancelled) setBarcodeLoading(false); });
+    return () => { cancelled = true; };
+  }, [barcodeQuery]);
+
   useEffect(() => {
     const q = query;
-    if (!q || q.length < 2) { setRetailResults([]); return; }
+    if (!q || q.length < 2 || isBarcodeQuery(q)) { setRetailResults([]); return; }
     let cancelled = false;
     setIsSearchingRetail(true);
     // 24 = 3 сети × 8 позиций: раньше забирали 9 суммарно, поэтому
@@ -345,7 +363,7 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
   }, [foodSearchResults, retailResults, internetResults]);
 
   const totalFound = foodSearchResults.length + retailResults.length + internetUnique.length;
-  const showEmpty = hasQuery && query.length >= 2 && totalFound === 0 && !isSearchingNet && !isSearchingRetail;
+  const showEmpty = hasQuery && query.length >= 2 && !barcodeQuery && totalFound === 0 && !isSearchingNet && !isSearchingRetail;
 
   // ── Общие стили строк результата ─────────────────────────────────────────
   const rowStyle: React.CSSProperties = {
@@ -467,7 +485,16 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
               background: 'rgba(0,230,138,0.10)', border: '1px solid rgba(0,230,138,0.25)', color: '#86efac', fontSize: 11, fontWeight: 700 }}>
             <span aria-hidden>✓</span>
             <span style={{ flex: 1, minWidth: 0, overflowWrap: 'anywhere' }}>В очереди: {lastQueued}</span>
-            <span style={{ flexShrink: 0, color: 'rgba(255,255,255,0.55)', fontWeight: 600 }}>{parsedItems.length} поз.</span>
+            <button type="button" onClick={() => {
+              const el = queueRef.current;
+              if (el && typeof el.scrollIntoView === 'function') {
+                try { el.scrollIntoView({ block: 'start', behavior: 'smooth' }); } catch { /* noop */ }
+              }
+            }} aria-label="Показать очередь" className="nd-queued-open"
+              style={{ flexShrink: 0, padding: '6px 10px', borderRadius: 8, border: '1px solid rgba(0,230,138,0.25)',
+                background: 'rgba(0,230,138,0.12)', color: '#00e68a', fontSize: 10, fontWeight: 800, cursor: 'pointer', minHeight: 32 }}>
+              {parsedItems.length} поз. ↓
+            </button>
           </div>
         )}
 
@@ -680,6 +707,31 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
                 </span>
               )}
             </div>
+
+            {barcodeQuery && (
+              <div className="nd-barcode-result" style={{ padding: '10px 12px', borderRadius: 12, background: 'rgba(59,130,246,0.06)', border: '1px solid rgba(59,130,246,0.16)', display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 16, width: 24, textAlign: 'center', flexShrink: 0 }}>🔢</span>
+                {barcodeLoading ? (
+                  <span role="status" aria-live="polite" style={{ fontSize: 11, color: '#60a5fa' }}>Ищем штрихкод {barcodeQuery}…</span>
+                ) : barcodeFood ? (
+                  <>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={nameStyle}>{barcodeFood.name}</div>
+                      <div style={{ ...metaStyle, color: 'rgba(96,165,250,0.85)' }}>штрихкод {barcodeQuery}</div>
+                      {macros(barcodeFood.kcal, barcodeFood.protein, barcodeFood.fat, barcodeFood.carbs)}
+                    </div>
+                    <button onClick={() => queueFood(barcodeFood)} aria-label="В очередь" className="nd-addq"
+                      style={{ ...addBtnStyle, border: '1px solid rgba(59,130,246,0.18)', background: 'rgba(59,130,246,0.08)', color: '#60a5fa' }}>＋</button>
+                    {onDirectAdd && <button onClick={() => onDirectAdd(barcodeFood)} aria-label="Сразу в дневник" className="nd-addnow"
+                      style={{ ...nowBtnStyle, background: 'linear-gradient(135deg,#60a5fa,#3b82f6)', color: '#fff' }}>⚡ 100г</button>}
+                  </>
+                ) : (
+                  <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)' }}>
+                    Штрихкод {barcodeQuery} не найден в базе — попробуйте отсканировать камерой (кнопка «Штрих-код»).
+                  </span>
+                )}
+              </div>
+            )}
 
             {foodSearchResults.length > 0 && (
               <div>

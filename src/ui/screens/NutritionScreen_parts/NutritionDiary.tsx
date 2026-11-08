@@ -91,7 +91,11 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
   const ocrCameraRef = useRef<HTMLInputElement>(null);
   const addSheetRef = useRef<HTMLDivElement>(null);
 
-  const closeAddSheet = useCallback(() => setTab('day'), []);
+  const closeAddSheet = useCallback(() => {
+    setTab('day');
+    // Новый заход в лист — с чистым поиском; набранная очередь (черновик) остаётся.
+    setFoodSearch('');
+  }, [setFoodSearch]);
 
   // Системная «назад» на Android: сначала закрываем вложенные слои листа
   // (штрихкод → упаковка → текст), и только потом сам лист. Без этого
@@ -283,7 +287,7 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
             // Распознанное должно быть ВИДНО: уводим на «День», иначе кажется,
             // что кнопка ничего не добавила (очередь просто исчезла).
             setShowOCR(false);
-            setTab('day');
+            closeAddSheet();
           }}
           onEditParsedItem={(idx, updated) => setParsedItems(prev => prev.map((item, i) => i === idx ? { ...item, ...updated } : item))}
           onFixAllLowConfidence={() => setParsedItems(prev => prev.map(item => {

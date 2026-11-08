@@ -25,6 +25,7 @@ vi.mock('../diary/hooks/useDiaryToast', () => ({
 // Сеть в тестах не нужна: поиск по брендам/сетям отключён, работаем по FOOD_DB.
 vi.mock('../../../../engines/openfoodfacts.engine', () => ({
   searchByName: vi.fn(async () => []),
+  searchByBarcode: vi.fn(async () => ({ name: 'Творог «Простоквашино» 5%', kcal: 121, protein: 16, fat: 5, carbs: 3 })),
   productToFoodItem: (p: any) => p,
 }));
 vi.mock('../../../../engines/retail-search.engine', () => ({
@@ -115,6 +116,14 @@ describe('Дневник: полноэкранный лист добавлени
     expect(firstName).toContain('творог');
     // Именно «Творог …», а не «Сырники творожные» / «Запеканка творожная».
     expect(/^[^a-zа-яё]*творог/.test(firstName.trim())).toBe(true);
+  });
+
+  it('штрихкод, вставленный в поиск, ищется сразу — без «Сканировать»', async () => {
+    render(<NutritionDiary foodEntries={[]} />);
+    fireEvent.change(screen.getByLabelText('Поиск продуктов'), { target: { value: '4600000000001' } });
+    await waitFor(() => expect(document.querySelector('.nd-barcode-result')?.textContent).toContain('Простоквашино'));
+    fireEvent.click(screen.getAllByLabelText('В очередь')[0]);
+    await waitFor(() => expect(screen.getByText(/На очереди \(1\)/)).toBeTruthy());
   });
 
   it('приём по умолчанию — по часам, и выбранный чип можно сбросить', async () => {
