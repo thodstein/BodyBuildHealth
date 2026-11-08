@@ -41,6 +41,9 @@ const build = (p: P, mc: number, tr: boolean, on: boolean) => buildDayPlan({
   variety: 'medium', goal: 'maintenance', quality: 'full',
   excludedIds: new Set<string>(), allergenTags: new Set<string>(), randomSalt: 0,
   fruitCrumb74: on,
+  // §8.75 (семя вместо масла) выключается в обоих вариантах: она ужимает масло в приёме,
+  // а этот замок проверяет «прочие граммы не тронуты».
+  seedSwap75: false,
 } as any) as any;
 
 const solidG = (m: any) => ((m.items || []) as any[])

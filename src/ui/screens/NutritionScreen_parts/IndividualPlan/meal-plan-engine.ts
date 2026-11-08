@@ -15981,6 +15981,134 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
         notes.push(`🍓 Огрызок — не порция: ${_done74.join('; ')} — крошка фрукта меньше ${_MIN_FRUIT74} г убрана (§8.74).`);
       }
     }
+    // ─── §8.75: семя/орех — еда, а не украшение ──────────────────────────────────
+    // Замер 60 дней: 130 пунктов `role: fat` меньше 15 г. §8.57/§8.61 растит орехи до
+    // 15 г, но её список (`cashew|almonds|walnuts|…`) не знает `chia_seeds`/`flax`/
+    // `hemp` — 26 крошек чиа так и остаются «5 г семян» (30 ккал, ни Ca, ни омега-3).
+    // Фикс без роста калорий: семя растёт до 15 г, масло того же приёма ужимается ровно
+    // на его жир (орех/семя платят за себя маслом, а не сверху). Предсон не трогаем —
+    // там орех дизайнерский (мелатонин-порция), ги/пасты/масло крошкой не считаются.
+    // Гейт: канон не хуже и не выходит из 3%, качество не ниже, вёдер не больше.
+    if ((input as any).seedSwap75 !== false
+      && _pickCtx.qualityMode === 'full'
+      && !(input as any).manualTargetsLocked
+      && (input as any).kbjuMode !== 'manual'
+      && !(input as any).recipeAssembly
+      && !(input as any).portableMode) {
+      const _MIN_NUT75 = 15;
+      const _MAX_NUT75 = 40;
+      const _OIL_FLOOR75 = 5;
+      const _goal75 = {
+        k: Number(input.goalKcal) || 0,
+        p: Number(adjustedProteinG || input.goalProteinG) || 0,
+        f: Number(input.goalFatG) || 0,
+        c: Number(adjustedCarbsG || input.goalCarbsG) || 0,
+      };
+      const _raw75 = {
+        k: Number(input.goalKcal) || 0,
+        p: Number(input.goalProteinG) || 0,
+        f: Number(input.goalFatG) || 0,
+        c: Number(input.goalCarbsG) || 0,
+      };
+      const _devOf75 = (g: typeof _goal75) => Math.max(
+        g.k > 0 ? Math.abs(Number(totals.kcal) - g.k) / g.k : 0,
+        g.p > 0 ? Math.abs(Number(totals.p) - g.p) / g.p : 0,
+        g.f > 0 ? Math.abs(Number(totals.f) - g.f) / g.f : 0,
+        g.c > 0 ? Math.abs(Number(totals.c) - g.c) / g.c : 0,
+      );
+      const _dev75 = () => Math.max(_devOf75(_goal75), _devOf75(_raw75));
+      const _solid75 = (m: any) => ((m.items || []) as any[])
+        .filter((x: any) => !['liquid', 'supplement'].includes(String(x.role || '')))
+        .reduce((s: number, x: any) => s + (Number(x.amount) || 0), 0);
+      const _buckets75 = () => (meals as any[]).filter((m: any) => (m.items || []).length > 0 && _solid75(m) > 500).length;
+      const _isNut75 = (x: any) => String(x?.role) === 'fat'
+        && /(nut|almond|cashew|walnut|hazel|pistach|pecan|macadamia|brazil|seed|chia|flax|hemp|sesame|poppy)/i.test(String(x.id))
+        && !/(paste|butter|oil)/i.test(String(x.id));
+      const _isTrim75 = (x: any) => String(x?.role) === 'fat'
+        && !_isNut75(x) && !x._fixedGrams
+        && !/(paste|butter_p|cheese)/i.test(String(x.id));
+      const _scale75 = (x: any, grams: number) => {
+        const amt = Number(x.amount) || 0;
+        if (!(amt > 0) || grams <= 0) return;
+        const k = grams / amt;
+        x.amount = Math.round(grams);
+        for (const key of ['p', 'f', 'c', 'kcal', 'fiber', 'leucine_mg']) {
+          if (x[key]) x[key] = Math.round(Number(x[key]) * k * 10) / 10;
+        }
+      };
+      let _d75 = _dev75();
+      let _b75 = _buckets75();
+      let _q75 = _qNow(_finalMicro);
+      const _done75: string[] = [];
+      for (const m of meals as any[]) {
+        if (String(m.type) === 'presleep') continue;
+        const _nuts = ((m.items || []) as any[])
+          .filter((x: any) => _isNut75(x) && (Number(x.amount) || 0) > 0 && (Number(x.amount) || 0) < _MIN_NUT75);
+        if (_nuts.length === 0) continue;
+        const _fats = ((m.items || []) as any[])
+          .filter((x: any) => _isTrim75(x) && (Number(x.amount) || 0) > _OIL_FLOOR75)
+          .sort((a: any, b: any) => (Number(b.f) || 0) - (Number(a.f) || 0));
+        const snap75 = ((m.items || []) as any[]).map((x: any) => ({ ...x }));
+        const restore75 = () => { m.items = snap75.map((x: any) => ({ ...x })); m.totals = mealTotalsOf(m.items); recalcDayTotals(meals as any[], totals); };
+        for (const nut of _nuts) {
+          const amt = Number(nut.amount) || 0;
+          const perF = (Number(nut.f) || 0) / Math.max(1, amt);
+          if (!(perF > 0)) continue;
+          const target = Math.min(_MAX_NUT75, Math.max(_MIN_NUT75, Math.round(amt) + 5));
+          const growG = Math.round(target - amt);
+          if (growG < 5) continue;
+          const needF = growG * perF;
+          let left = needF;
+          const trimmed: any[] = [];
+          for (const fat of _fats) {
+            if (left <= 0.3) break;
+            const famt = Number(fat.amount) || 0;
+            const perGF = (Number(fat.f) || 0) / Math.max(1, famt);
+            if (!(perGF > 0)) continue;
+            const canG = Math.min(Math.floor((left / perGF) * 10) / 10, famt - _OIL_FLOOR75);
+            if (canG < 0.5) continue;
+            trimmed.push([fat, famt - canG]);
+            left -= canG * perGF;
+          }
+          // Масло приёма не покрывает жир семени — это уже «добавка сверху», не обмен.
+          if (left > needF * 0.25) continue;
+          _scale75(nut, amt + growG);
+          for (const [fat, grams] of trimmed) _scale75(fat, grams);
+          m.totals = mealTotalsOf(m.items);
+          recalcDayTotals(meals as any[], totals);
+          const dev = _dev75();
+          const buck = _buckets75();
+          const q = _qNow(_microNow());
+          if (dev > Math.max(_d75, 0.029) + 1e-9 || (dev > 0.029 && _d75 <= 0.029)
+            || buck > _b75 || q.total < _q75.total) {
+            restore75();
+            continue;
+          }
+          _d75 = dev;
+          _b75 = buck;
+          _q75 = q;
+          _done75.push(`${String(m.type)}: ${String(nut.id)} ${Math.round(amt)}→${Math.round(amt + growG)} г`);
+          break;
+        }
+      }
+      if (_done75.length > 0) {
+        _finalMicro = _microNow() ?? _finalMicro;
+        _finalMicroTotals = sumMicros(meals.flatMap(mm => mm.items.map(it => ({ id: it.id, amount: it.amount }))), FOOD_DB as any);
+        _resyncMps();
+        _refreshProteinNote();
+        notes.push(`🥜 Семя/орех — еда, а не украшение: ${_done75.join('; ')} — семя доведено до ${_MIN_NUT75} г за счёт масла того же приёма (§8.75).`);
+        // Семя несёт белок (чиа 16 г/100 г): нота «минимум по основным приёмам» обязана
+        // идти за фактом, иначе QG14 ловит «нота 24, факт 25».
+        const _idxQ75 = notes.findIndex((n) => typeof n === 'string' && n.startsWith('🥩 Белок по приёмам:'));
+        if (_idxQ75 >= 0) {
+          const _mains75 = (meals as any[]).filter((m) => !['preworkout', 'postworkout', 'intra', 'presleep'].includes(String(m.type)));
+          if (_mains75.length) {
+            const _min75 = Math.min(..._mains75.map((m) => Number(m.totals?.p) || 0));
+            notes[_idxQ75] = String(notes[_idxQ75]).replace(/минимум по основным приёмам \d+ г/, `минимум по основным приёмам ${Math.round(_min75)} г`);
+          }
+        }
+      }
+    }
     _jMark('final', 'Финал (микро/гигиена/витрина)');
     // ─── Качество рациона одним числом (0–100) ───────────────────────────────
     // Сходимость ≤3% говорит, что граммы совпали; она молчит о том, съедобен ли план.

@@ -50,6 +50,9 @@ const build = (p: typeof PROFILES[number], mc: number, tr: boolean, on: boolean)
   variety: 'medium', goal: 'maintenance', quality: 'full',
   excludedIds: new Set<string>(), allergenTags: new Set<string>(), randomSalt: 0,
   breakfastProteinFloor: on,
+  // §8.75 (семя вместо масла) включается отдельно и имеет свой замок: её обмен меняет
+  // белок приёма и портил бы «без стадии» вариант этого A/B.
+  seedSwap75: false,
 } as unknown as MealPlanInput);
 
 const cells = (on: boolean) => PROFILES.flatMap((p) => [4, 5, 6].flatMap((mc) => [true, false].map((tr) => ({
