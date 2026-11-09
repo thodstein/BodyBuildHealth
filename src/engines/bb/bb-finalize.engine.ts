@@ -1348,10 +1348,11 @@ function bbMinimumProfile(patternId: string, level: string, sex?: 'male' | 'fema
     if (/^female_(glute_|lower_upper|upper_glute)/.test(patternId)) {
       targets.glutes = beginner ? 14 : enhanced ? 20 : advanced ? 18 : 16;
     }
-    // 3-дневный шаблон: одна тяж-ягодичная + одна нижняя сессия — не растим
-    // недельный объём выше 16–18, иначе день упирается в кап сессии.
+    // 3-дневный шаблон: одна тяж-ягодичная + одна нижняя сессия — цель
+    // 18 прямых на пике (нижняя граница решения владельца 18–20).
     if (patternId === 'female_glute_3') {
-      targets.glutes = beginner ? 12 : enhanced ? 18 : 16;
+      // 20 прямых в 3 дня не влезают без ущерба низу/верху — держим 18.
+      targets.glutes = beginner ? 12 : advanced ? 18 : 16;
       // 3-дневный glute-фокус: один Upper-день не вмещает 8 дельт И руки.
       // Intermediate держим 6 дельт, чтобы бицепс не оставался нулевым;
       // advanced/enhanced сохраняют общий профиль (9/10).
@@ -1371,10 +1372,10 @@ function bbMinimumProfile(patternId: string, level: string, sex?: 'male' | 'fema
       targets.shoulders = beginner ? 5 : enhanced ? 8 : 7;
       targets.quads = 10;
       targets.hamstrings = 8;
-      targets.glutes = enhanced ? 18 : 16;
+      targets.glutes = enhanced ? 20 : advanced ? 18 : 16;
     }
     if (patternId === 'female_upper_glute_4') {
-      targets.glutes = advanced ? 18 : 16;
+      targets.glutes = enhanced ? 20 : advanced ? 18 : 16;
     }
     max.traps = patternId === 'female_bikini_5' ? 4 : 10;
   } else {

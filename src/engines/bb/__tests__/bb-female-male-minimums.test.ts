@@ -55,12 +55,18 @@ describe('BB: минимумы на рабочем пике (женщины)', (
     ['female_glute_3', 'beginner', 9, 5],
     ['female_glute_3', 'intermediate', 16, 5],
     ['female_glute_3', 'advanced', 16, 9],
+    ['female_glute_3', 'enhanced', 18, 10],
     ['female_lower_upper_4', 'intermediate', 16, 6],
+    ['female_lower_upper_4', 'enhanced', 18, 10],
     ['female_upper_glute_4', 'intermediate', 16, 6],
+    ['female_upper_glute_4', 'enhanced', 18, 10],
     ['female_glute_5', 'intermediate', 16, 6],
+    ['female_glute_5', 'enhanced', 18, 10],
     ['female_glute_6', 'intermediate', 16, 6],
+    ['female_glute_6', 'enhanced', 18, 10],
     ['female_wellness_5', 'intermediate', 16, 7],
-    ['female_bikini_5', 'enhanced', 12, 10],
+    ['female_wellness_5', 'enhanced', 18, 8],
+    ['female_bikini_5', 'enhanced', 18, 12],
   ];
   for (const [pattern, level, gluteMin, deltMin] of cases) {
     it(`${pattern}/${level}: ягодицы/дельты/бицепс на пике, без дублей и одиночных сетов`, () => {
@@ -77,6 +83,22 @@ describe('BB: минимумы на рабочем пике (женщины)', (
       // DC-1-сет — легитимное исключение; обычных одиночных сетов быть не должно.
       const singles = workingExercises(w).filter((e: any) => (e.sets || 0) < 2 && !/DC Rest-Pause/i.test(String(e.comment || '')));
       expect(singles.map((e: any) => `${e.name}:${e.sets}`), `нед ${w.week}: одиночные сеты`).toEqual([]);
+    });
+  }
+});
+
+describe('BB: женская glute-специализация — ровно 18–20 прямых', () => {
+  const patterns = ['female_glute_3', 'female_glute_5', 'female_glute_6', 'female_lower_upper_4', 'female_upper_glute_4', 'female_bikini_5', 'female_wellness_5'];
+  for (const pattern of patterns) {
+    it(`${pattern}/enhanced: цель 18–20, MRV поднят, факт 18–20`, () => {
+      const plan = build(pattern, 'enhanced', 'female');
+      expect(plan.volumeTargets?.glutes?.targetSets, 'targetSets').toBeGreaterThanOrEqual(18);
+      expect(plan.volumeTargets?.glutes?.targetSets, 'targetSets').toBeLessThanOrEqual(20);
+      expect(plan.mrvByMuscle?.glutes, 'MRV-кап').toBeGreaterThanOrEqual(20);
+      const w = bestWorkingWeek(plan);
+      const glutes = directSets(w, 'glutes');
+      expect(glutes, `нед ${w.week}: 18–20 прямых ягодичных`).toBeGreaterThanOrEqual(18);
+      expect(glutes, `нед ${w.week}: не выше 20 прямых`).toBeLessThanOrEqual(20);
     });
   }
 });

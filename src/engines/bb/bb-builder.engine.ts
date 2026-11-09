@@ -78,7 +78,7 @@ import { syncBBPlanSetShape, validateBBPlan } from './bb-validator.engine';
 import { finalizeBBPlan, prioritizeBackSessions, reconcileVolumeTargets, pplWeeklyFloorFor, reconcileSchemeComments, normalizePlanMuscleTags, ensureFemaleHamstringFloor, ensureBodybuildingMinimums, assignProgressionRules } from './bb-finalize.engine';
 import { normalizeEquipmentIds, equipmentAllows } from './bb-equipment';
 import { refreshBBPlanSnapshots } from './bb-plan-snapshot.engine';
-import { buildBBVolumeTarget, type BBVolumeTarget, computeMrvMult, regimeMrvMultFor, computeBBRecoveryScore, computeBBWeeklyBudget, sessionLimitsFor, computeBBRecoveryMultiplier, computeBBNutritionMultiplier, perExerciseCap, perSessionMuscleCap, sessionMrvRotCap, sessionMuscleRealismCap, sessionMuscleExerciseCap, sessionDensityExerciseCap, resolveMrvCap, weeklyCapFor, distributeSetsByRole, BB_MRV_TOLERANCE } from './bb-volume.engine';
+import { buildBBVolumeTarget, type BBVolumeTarget, computeMrvMult, regimeMrvMultFor, computeBBRecoveryScore, computeBBWeeklyBudget, sessionLimitsFor, computeBBRecoveryMultiplier, computeBBNutritionMultiplier, perExerciseCap, perSessionMuscleCap, sessionMrvRotCap, sessionMuscleRealismCap, sessionMuscleExerciseCap, sessionDensityExerciseCap, resolveMrvCap, weeklyCapFor, distributeSetsByRole, BB_MRV_TOLERANCE, FEMALE_GLUTE_HIGH_CAP, FEMALE_GLUTE_TARGET_CAP } from './bb-volume.engine';
 import { buildBBExpandedSummary } from './bb-summary.engine';
 import { jointGuardScorePenalty, jointGuardActive } from './bb-joint-guard.engine';
 import { insulinWindowActive, applyInsulinWindowToPlan } from './bb-insulin-window.engine';
@@ -3442,6 +3442,12 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
       const v = typeof d === 'string' ? parseFloat(String(d).replace(',', '.').replace(/[^0-9.\-eE]/g, '')) : Number(d);
       return Number.isFinite(v) && v > 0;
     });
+  // Решение владельца 2026-11: ЖЕНСКАЯ glute-специализация (18–20 ПРЯМЫХ на
+  // пике) получает scoped-кап 24 вместо глобального якоря 18. Только advanced/
+  // enhanced и только glute-шаблоны — мужские планы и обычные сплиты не растут.
+  const femaleGluteHigh = input.sex === 'female'
+    && (level === 'advanced' || level === 'enhanced')
+    && /glute|bikini|wellness|lower_upper|upper_glute/i.test(String(pattern.id || ''));
   // Фаза 2.11: единый MRV-конвейер — PED-кривые (doseAwareMrv) как вход, вместо
   // плоского ×2.0. Согласует per-muscle caps с landmarks/валидацией (убирает
   // риск двойного масштабирования: лёгкий курс больше не получает caps ×2.0 при
@@ -3626,10 +3632,21 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
         muscle: m, level, trainingYears: input.trainingYears, onCourse,
         courseIntensity: input.courseIntensity, doseAwareMrv: pedAdapt?.combinedMrvMultiplier,
       });
+      // Женская glute-цель — ровно 18–20: anchor не даёт targetSets уехать к 24.
+      const anchorTarget = femaleGluteHigh && m === 'glutes' ? FEMALE_GLUTE_TARGET_CAP : anchor;
       const t = volumeTargets[m];
-      if (anchor > 0 && t && (t.targetSets || 0) < anchor) {
-        t.targetSets = anchor;
-        t.rationale = [...(t.rationale || []), `Якорь владельца: цель ≥ ${anchor} сетов/нед`];
+      if (anchorTarget > 0 && t && (t.targetSets || 0) < anchorTarget) {
+        t.targetSets = anchorTarget;
+        t.rationale = [...(t.rationale || []), `Якорь владельца: цель ≥ ${anchorTarget} сетов/нед`];
+      }
+    }
+    // Женская glute-специализация: цель ровно 18–20 прямых, даже если
+    // MRV-кап поднят до 24 (запас на indirect).
+    if (femaleGluteHigh && m === 'glutes') {
+      const t = volumeTargets[m];
+      if (t && (t.targetSets || 0) > FEMALE_GLUTE_TARGET_CAP) {
+        t.targetSets = FEMALE_GLUTE_TARGET_CAP;
+        t.rationale = [...(t.rationale || []), `Цель женской glute-специализации: ${FEMALE_GLUTE_TARGET_CAP} прямых сетов/нед`];
       }
     }
     // fix D: истинный MRV — потолок для капа.
@@ -3670,7 +3687,10 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
           courseIntensity: input.courseIntensity, doseAwareMrv: pedAdapt?.combinedMrvMultiplier,
         })
       : 0;
-    mrvByMuscle[m] = userCeiling > 0 ? Math.min(capMrv, userCeiling) : capMrv;
+    // Женская glute-специализация: scoped-кап 24 (18–20 прямых + indirect).
+    const gluteScopedCeiling = femaleGluteHigh && m === 'glutes' ? FEMALE_GLUTE_HIGH_CAP : 0;
+    const ceiling = Math.max(userCeiling, gluteScopedCeiling);
+    mrvByMuscle[m] = ceiling > 0 ? Math.min(capMrv, ceiling) : capMrv;
   }
   }
   // B6: расширяем mrvByMuscle для PRO-ключей (delt_front/mid/rear, forearms, traps,
