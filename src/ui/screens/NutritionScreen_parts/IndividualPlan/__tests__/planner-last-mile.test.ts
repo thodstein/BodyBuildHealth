@@ -28,6 +28,10 @@ const mk = (o: {
   budget: 'medium', dayOffset: 0, cyclePhase: 'none', variety: 'medium',
   quality: 'full', randomSalt: 0, kbjuMode: o.manual ? 'manual' : 'auto',
   manualTargetsLocked: !!o.manual,
+  // §8.79 (кап приёмов на HV-дне) выключен: тест держит форму ноты «Последняя миля»
+  // на заведомо тяжёлом дне. После §8.79 этот день сходится к 0.2% и корректировщик
+  // честно молчит — проверять ноту становится не на чем. Счёт приёмов — чужая ось.
+  hvMealCap79: false,
 } as any);
 
 const pct = (got: number, want: number) => ((got - want) / want) * 100;

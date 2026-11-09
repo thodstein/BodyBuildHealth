@@ -184,7 +184,9 @@ describe('§8.78 плотный овощ вместо объёма', () => {
       const dK = Math.abs(Number(d.on.totals?.kcal) - Number(d.off.totals?.kcal));
       const dP = Math.abs(Number(d.on.totals?.p) - Number(d.off.totals?.p));
       const dF = Math.abs(Number(d.on.totals?.f) - Number(d.off.totals?.f));
-      if (dK > 30) bad.push(`${d.key}: Δккал ${dK.toFixed(0)}`);
+      // Ккал: обмен «тот же вес» меняет их на разницу плотности (до +7 ккал/100 г).
+      // После §8.79 тарелки HV-дней крупнее, поэтому допуск честнее мерить в % дня.
+      if (dK > Math.max(30, Number(d.off.totals?.kcal || 0) * 0.01)) bad.push(`${d.key}: Δккал ${dK.toFixed(0)}`);
       // Плотный овощ сам несёт белок (шпинат 2.9 г/100 г против сельдерея 0.7 г) —
       // на большой порции это до 5 г дня (≤3% от цели), дальше день пересобирается.
       if (dP > 5) bad.push(`${d.key}: Δбелка ${dP.toFixed(1)} г`);

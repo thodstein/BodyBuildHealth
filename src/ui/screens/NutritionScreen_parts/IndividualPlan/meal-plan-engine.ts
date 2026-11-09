@@ -3723,6 +3723,21 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     }
     if (_carb >= 1300 && _need < 9) _need = 9;
     else if (_carb >= 1100 && _need < 8) _need = 8;
+    // §8.79 (замер): контракт белка на HV/болюс-дне упирается в число приёмов.
+    // У 110 кг полы уже съедают 3×0.30 г/кг (99) + предсон (44) + два окна (~59) = 202 г,
+    // остаётся ~100 г на перекусы. При 10+ регулярных приёмах перекус получает 12–17 г,
+    // а порог бейджа `pd` — 21 г: «Б 15/21» горит на каждом втором перекусе, хотя день
+    // собран верно. Девять регулярных приёмов (3 основных + 5 перекусов + предсон) — это
+    // физический максимум: 202 + 5×20 ≈ 300 г. Замер 60 дней: бейджи 49 → 31,
+    // оценка 92.617 → 93.150 (0 дней хуже, 8 лучше), вёдра 88 → 90 (макс. тарелка 887 → 887),
+    // канон >3% 3 → 3 (hugeCarb/4|5/тр попутно 5.2% → 3.6%). Отклонено замером:
+    // кап 6 на отдыхе — оценка 93.6 и бейджи 17, но канон c1500/отд 1.2% → 17.3%
+    // (1500 г углеводов в 5 приёмов физически не влезают).
+    const _hvDay79 = (input.goalKcal || 0) >= 4200 || _carb >= 1100;
+    const _hvCapCfg79 = (input as any).hvMealCap79;
+    const _hvCap79 = _hvCapCfg79 === false ? 0 : (Number(_hvCapCfg79) || 9);
+    const _needBefore79 = _need;
+    if (_hvDay79 && _hvCap79 > 0 && _need > _hvCap79) _need = _hvCap79;
     _need = Math.max(3, Math.min(10, _need));
     if (_need > input.mealsCount) {
       const _isHv = (input.goalCarbsG || 0) >= 1200 || (input.goalProteinG || 0) >= 400;
@@ -3730,6 +3745,9 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
         ? hvProteinCapPerMeal(input.goalProteinG || 0, _need, input.weightKg)
         : perMealProteinCapG(input.weightKg);
       _autoMealsNote = `🍽 День требует ${_need} приёмов (было ${input.mealsCount}): нормальная тарелка — ≤${_pCap} г белка / ≤120 г углей / ≤900 ккал на приём.`;
+      if (_need < _needBefore79) {
+        _autoMealsNote += ` Больше ${_need} основные приёмы не открываем: перекусы получили бы меньше 20 г белка (§8.79).`;
+      }
       input = { ...input, mealsCount: _need };
     }
   }

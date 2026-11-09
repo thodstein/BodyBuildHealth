@@ -116,7 +116,9 @@ describe('§8.75 семя/орех вместо масла', () => {
       const dF = Math.abs(Number(d.on.totals?.f) - Number(d.off.totals?.f));
       const dK = Math.abs(Number(d.on.totals?.kcal) - Number(d.off.totals?.kcal));
       if (dF > 0.6) bad.push(`${d.key}: Δжир ${dF.toFixed(2)} г`);
-      if (dK > 20) bad.push(`${d.key}: Δккал ${dK.toFixed(0)}`);
+      // §8.79 пересобрал HV-дни в 9 приёмов — на крупных тарелках шаг порции 5 г
+      // стоит дороже; допуск мерим в процентах дня, а не в абсолютных ккал.
+      if (dK > Math.max(20, Number(d.off.totals?.kcal || 0) * 0.01)) bad.push(`${d.key}: Δккал ${dK.toFixed(0)}`);
     }
     expect(bad.join(', ')).toBe('');
   });
