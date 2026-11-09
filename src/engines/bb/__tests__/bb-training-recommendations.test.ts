@@ -118,7 +118,11 @@ describe('BB training recommendations', () => {
   });
 
   it('weeklySetsByMuscle агрегирует по группам из каталога', () => {
-    const workouts = [{ date: new Date().toISOString().slice(0, 10), exercises: [{ exerciseId: 'bench_bar', sets: [{}, {}, {}] }] }] as any;
+    // Дата дневника — локальная (как в приложении). UTC-ISO после полуночи
+    // по Владивостоку даёт вчерашнюю дату и выпадает из текущей недели.
+    const d = new Date();
+    const localDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    const workouts = [{ date: localDate, exercises: [{ exerciseId: 'bench_bar', sets: [{}, {}, {}] }] }] as any;
     const wsg = weeklySetsByMuscle(workouts, 1);
     const last = Object.values(wsg).map(arr => arr[0] || 0).reduce((a, b) => a + b, 0);
     expect(last).toBeGreaterThan(0);

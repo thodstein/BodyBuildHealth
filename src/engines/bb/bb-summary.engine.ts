@@ -179,6 +179,9 @@ export const PATTERN_RU: Record<string, string> = {
   lat_isolation: 'изоляция широчайших',
   upper_back: 'верх спины',
   rear_delts: 'задняя дельта',
+  // derivePattern для части rear-delt-имён возвращает единственное число;
+  // без алиаса в сводке протекал сырой id `rear_delt`.
+  rear_delt: 'задняя дельта',
   traps: 'шраги',
   erectors: 'разгибатели',
   biceps_lengthened: 'бицепс растянутый',

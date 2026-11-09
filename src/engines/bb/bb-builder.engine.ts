@@ -75,7 +75,7 @@ import { loadSRPESessions } from '../../engines/pro/srpe-store';
 import { acuteChronicRatio, toDailyLoads } from '../../engines/pro/training-load.engine';
 import type { Macrocycle, MacroPhase, BBMacrocycle } from '../lms/macrocycle.engine';
 import { syncBBPlanSetShape, validateBBPlan } from './bb-validator.engine';
-import { finalizeBBPlan, prioritizeBackSessions, reconcileVolumeTargets, pplWeeklyFloorFor, reconcileSchemeComments } from './bb-finalize.engine';
+import { finalizeBBPlan, prioritizeBackSessions, reconcileVolumeTargets, pplWeeklyFloorFor, reconcileSchemeComments, normalizePlanMuscleTags, ensureFemaleHamstringFloor, ensureBodybuildingMinimums, assignProgressionRules } from './bb-finalize.engine';
 import { normalizeEquipmentIds, equipmentAllows } from './bb-equipment';
 import { refreshBBPlanSnapshots } from './bb-plan-snapshot.engine';
 import { buildBBVolumeTarget, type BBVolumeTarget, computeMrvMult, regimeMrvMultFor, computeBBRecoveryScore, computeBBWeeklyBudget, sessionLimitsFor, computeBBRecoveryMultiplier, computeBBNutritionMultiplier, perExerciseCap, perSessionMuscleCap, sessionMrvRotCap, sessionMuscleRealismCap, sessionMuscleExerciseCap, sessionDensityExerciseCap, resolveMrvCap, weeklyCapFor, distributeSetsByRole, BB_MRV_TOLERANCE } from './bb-volume.engine';
@@ -5164,6 +5164,10 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
     level,
     volumeGoal: input.volumeGoal,
     phaseSafety: true,
+    // Пол нужен финализатору для женского профиля минимумов (ягодицы/дельты/
+    // bikini traps+chest); patternId — источник структуры даже при revalidate.
+    sex: input.sex,
+    patternId: pattern.id,
     controlledRotation: true,
     equipment: eqList,
     excludedExercises: exclIds,
@@ -5598,6 +5602,40 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
     }
   }
   syncBBPlanSetShape(finalized);
+  // Поздняя нормализация задних дельт: метки/сводка финального плана должны
+  // видеть rear-delt как плечо, но объёмные проходы выше — нет (иначе
+  // реалоукейт резал бицепс Pull 8→7 после смены back→delt_rear).
+  normalizePlanMuscleTags(finalized);
+  // ПОЗДНИЕ МИНИМУМЫ: ранний проход финализатора стоит ДО ramp-капа, и кап
+  // срезал женские дельты/икры/бицепс до нуля (аудит 2026-11: female_glute_3
+  // advanced peak W3 shoulders 0). Повторяем минимумы после всех режущих
+  // проходов — цели топ-апа совпадают с volumeTargets, поэтому кап не нарушен.
+  const lateMinOptions = {
+    level,
+    patternId: pattern.id,
+    sex: input.sex,
+    trainingYears: input.trainingYears,
+    onCourse,
+    equipment: eqList,
+    excludedMuscles: [...excludedMuscles],
+    gradedMuscles: [...new Set(gradedInjuries.map(inj => inj.muscle))],
+  } as any;
+  (lateMinOptions as any).late = true;
+  ensureBodybuildingMinimums(finalized, lateMinOptions);
+  // Женские lower/glute-сплиты: после ramp-капа и реалоукейта добиваем
+  // хамстринги до 90% цели, иначе glute-специализация уводит их ниже цели.
+  ensureFemaleHamstringFloor(finalized, lateMinOptions);
+  // Поздние добивки могли добавить упражнение уже ПОСЛЕ финализатора.
+  // Правило прогрессии обязано быть у каждого — иначе bb-visual/прогрессия
+  // падают на новом движении без правила.
+  assignProgressionRules(finalized, lateMinOptions);
+  syncBBPlanSetShape(finalized);
+  // Добивки могли затронуть упражнения со схемами — комментарий снова к факту.
+  reconcileSchemeComments(finalized);
+  // Финальная честная реконсиляция: после ВСЕХ режущих проходов (рампа,
+  // синхронизация схем, женские добивки) цель не должна оставаться выше
+  // достижимого пика — иначе path-adequacy видит 26.25 < 90% цели 30.
+  reconcileVolumeTargets(finalized, { maxWorkingSets: sessLimits.maxWorkingSets });
   // M/L/K: финальный снимок ФАКТА — одной точкой (bb-plan-snapshot.engine).
   // `finalizeBBPlan` снимает weeklyVolume/validation/balanceReport/report в конце
   // СВОЕГО прохода, но билдер после финализатора ещё меняет план: rehab-возврат,

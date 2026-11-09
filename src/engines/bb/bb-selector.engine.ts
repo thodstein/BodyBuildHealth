@@ -200,6 +200,18 @@ export function rankBBSplits(input: BBSelectorInput): BBRankedPattern[] {
       score -= armSessions * 5;
       rationale.push(`доноры рук: снижена рекомендация отдельного Arms-дня`);
     }
+    // Аудит 2026-11 (качество сплитов): Push/Pull без дня ног выигрывал
+    // рекомендацию на 3–4 днях (enhanced 3д — push_pull_2 с нулём ног в
+    // шаблоне; финализатор добивал только поддерживающие 6 сетов). Сплит без
+    // ног не может быть главной рекомендацией для массы: штраф сильнее on-paper
+    // бонуса коротких дней. FullBody/Glutes/Torso/Limbs считаются покрытием.
+    const legCoverageSessions = p.schedule.filter(d => d.kind === 'тренировка'
+      && /Legs|Lower|FullBody|Glutes|Torso|Limbs/i.test(d.sessionTag || '')).length;
+    if (legCoverageSessions === 0 && !legDonor) {
+      const penalty = (input.goal === 'mass' || input.goal === 'strength_mass') ? 18 : 8;
+      score -= penalty;
+      warnings.push(`шаблон без дня ног — низ только поддерживающим добором (штраф −${penalty}); для массы выгоднее сплит с ногами`);
+    }
     if (input.specialization && /^fullbody_/i.test(p.id)) {
       score -= 10;
       rationale.push('специализация: FullBody не выбран автоматически, приоритет специализированным сессиям');
@@ -251,6 +263,43 @@ export function rankBBSplits(input: BBSelectorInput): BBRankedPattern[] {
           rationale.push(`♀ glute-приоритет профиля: ягодичные 2–3×/нед, ${ruFracCount(effDays.toFixed(1), RU_SESSIONS)}/нед под ${input.daysPerWeek ?? '—'} дн.`);
         }
       }
+      // Аудит 2026-11: три 5-дневных женских шаблона (glute/bikini/wellness)
+      // имели ОДИН скор 135 — пользователь не понимал, чем они отличаются.
+      // Дифференцируем по явной цели: bikini = плечи/спина/верх, wellness =
+      // квадры/ягодицы, общий glute — дефолт. Без явной цели glute_5 чуть
+      // выше (универсальный), bikini/wellness остаются альтернативами.
+      if (p.id === 'female_glute_5') {
+        score += 6;
+        rationale.push('♀ универсальный glute-сплит: 3 ягодичные сессии + верх 2×');
+      } else if (p.id === 'female_bikini_5') {
+        const bikiniFocus = ['shoulders', 'back', 'chest', 'delt_mid', 'back_width', 'chest_upper'].includes(String(input.focusGroup || ''));
+        if (bikiniFocus) {
+          score += 10;
+          rationale.push('♀ Bikini: акцент на дельты/спину/верх — совпадает с фокусом');
+        } else {
+          score -= 4;
+          warnings.push('Bikini-шаблон: верх-акцент (плечи/спина), меньше объёма на ноги — выберите при подготовке к бикини');
+        }
+      } else if (p.id === 'female_wellness_5') {
+        const wellnessFocus = ['quads', 'hamstrings', 'glutes', 'legs'].includes(String(input.focusGroup || ''));
+        if (wellnessFocus) {
+          score += 10;
+          rationale.push('♀ Wellness: акцент на квадры/ягодицы/хамсы — совпадает с фокусом');
+        } else {
+          score -= 4;
+          warnings.push('Wellness-шаблон: 4 нижних сессии (квадры/ягодицы) — выберите при подготовке к велнес');
+        }
+      } else if (p.id === 'female_lower_upper_4') {
+        score += 4;
+        rationale.push('♀ низ-доминантный 4-дневный шаблон: ноги 3×, верх 1×');
+      }
+      // Гейт уровня: 6-дневный женский glute-сплит — intermediate+.
+      // Новичку 6 тренировок/нед не рекомендуем даже при 6 доступных днях:
+      // это даёт 5-дневный glute-сплит (на 1 день меньше) или общий 4-дневный.
+      if (p.id === 'female_glute_6' && lvl === 'beginner') {
+        score -= 45;
+        warnings.push('6-дневный glute-сплит — для intermediate+: новичку 6 тренировок/нед избыточны, выберите 4–5 дней');
+      }
     } else if (p.id.startsWith('female_')) {
       // Женский сплит — не рекомендация для мужчины/профиля без пола.
       // −50 (а не мягкие −12): после добавления 3/4/6-дневных женских шаблонов
@@ -300,6 +349,13 @@ export function rankBBSplits(input: BBSelectorInput): BBRankedPattern[] {
       } else if (maxTagSize >= 6) {
         score -= 4;
         warnings.push('дни на 6+ групп: при высоком объёме сессия длиннее 100 мин — рассмотрите Push/Pull');
+      }
+      // Аудит 2026-11: на курсе 4 дня — PPL 4 (Push/Pull/Legs) даёт и короткие
+      // дни, и день ног; FullBody 4 проигрывает по реалистичности сессии.
+      const eff4 = p.sessionsPerRotation * 7 / p.rotationDays;
+      if (p.id === 'push_pull_legs_4' && Math.abs(eff4 - 4) <= 0.5) {
+        score += 12;
+        rationale.push('high-объём 4 дн.: PPL 4 — короткие дни + полноценный день ног');
       }
     }
 

@@ -41,8 +41,12 @@ export const SPLIT_PATTERNS: SplitPattern[] = [
       { kind: 'отдых', character: null },
       { kind: 'отдых', character: null },
     ],
-    level: ['novice', 'intermediate'],
-    description: 'Все группы 3×/нед. Максимальная частота стимуляции белка, лучший синтез для натуралов.',
+    // Аудит 2026-11: 3-дневный FullBody — единственный полноценный 3-дневный
+    // шаблон с ногами; на advanced/enhanced он лучше, чем 2-дневный FullBody
+    // или Push/Pull без ног (селектор отдавал их из-за уровня). Объём сессии
+    // у advanced/enhanced выше за счёт per-session капов, частота 3×/нед.
+    level: ['novice', 'intermediate', 'advanced', 'enhanced'],
+    description: 'Все группы 3×/нед. Максимальная частота стимуляции белка, лучший синтез для натуралов. Для advanced/enhanced — компромисс при 3 доступных днях: полное покрытие тела важнее специализации.',
     direction: 'both',
   },
   {
@@ -440,7 +444,7 @@ export const SPLIT_PATTERNS: SplitPattern[] = [
       { kind: 'отдых', character: null },
       { kind: 'отдых', character: null },
     ],
-    level: ['intermediate', 'advanced'],
+    level: ['intermediate', 'advanced', 'enhanced'],
     description: 'PPL 4×/нед: Push 2×, Pull 1×, Legs 1×. Акцент на жимовые мышцы.',
     direction: 'bodybuilding',
   },

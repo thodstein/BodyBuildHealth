@@ -1048,6 +1048,23 @@ export function applyPrepDeloads(
       prepProtocol: `Prep-делод (нед ${wk1}): объём ×70%, RIR +2 — сброс усталости, мышцы сохраняются.`,
     };
   });
+  // Деload обязан быть НИЖЕ обычной prep-недели по объёму. Если база дала
+  // деload-неделе больше (например, поздняя добивка объёма до prep-разметки),
+  // подрезаем её до первой обычной недели подготовки — иначе «разгрузка»
+  // оказывается объёмнее рабочей недели.
+  {
+    const firstPrep = weeks.find((w: any) =>
+      (w.contestPhase === 'preparation' || w.contestPhase === 'final_preparation')
+      && w.deload !== true);
+    const cap = firstPrep ? totalSetsOfWeek(firstPrep) - 1 : 0;
+    if (cap > 0) {
+      for (let i = 0; i < weeks.length; i += 1) {
+        const w: any = weeks[i];
+        if (w.deload !== true) continue;
+        if (totalSetsOfWeek(w) > cap) weeks[i] = scaleWeekToTarget(w, cap);
+      }
+    }
+  }
   // H: разгрузка подготовки урезает объём — цифра в комментарии схемы = факт.
   reconcileSchemeCommentsIn(weeks, { reason: (a, m) => `prep-делод: ${a} из ${m} сетов` });
   return { ...plan, weeks } as BBPlanWithPrep;

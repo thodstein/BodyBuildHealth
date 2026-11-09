@@ -1047,12 +1047,15 @@ describe('Частотная семантика якорей (подтвержд
   it('source-guard: гард идемппентности — целевой, а не «существования»', () => {
     const src = readFileSync(join(__dirname, '..', 'bb-finalize.engine.ts'), 'utf8');
     expect(src).toContain('const LEGS_COVERAGE_TARGET = 6;');
-    expect(src).toContain('if (legsSets >= LEGS_COVERAGE_TARGET) continue;');
+    expect(src).toContain('const GLUTE_COVERAGE_TARGET = 4;');
+    // Гард идемпотентности с 2026-11 — по всем трём группам (квадры/хамсы,
+    // ягодицы, икры): иначе нулевые glutes/calves считались покрытыми.
+    expect(src).toContain('if (legsSets >= LEGS_COVERAGE_TARGET && glutesSets >= GLUTE_COVERAGE_TARGET && calvesSets >= CALF_COVERAGE_TARGET) continue;');
     // Старый гард существования не должен вернуться в КОД (в комментарии он
     // остаётся как объяснение — поэтому ищем только исполняемую строку).
     const codeLines = src.split(/\r?\n/).filter((l: string) => !l.trim().startsWith('//') && !l.trim().startsWith('*'));
     expect(codeLines.some((l: string) => l.includes('if (legsSets > 0) continue;')), 'вернулся старый гард').toBe(false);
-    expect(codeLines.some((l: string) => l.includes('if (legsSets >= LEGS_COVERAGE_TARGET) continue;'))).toBe(true);
+    expect(codeLines.some((l: string) => l.includes('if (legsSets >= LEGS_COVERAGE_TARGET && glutesSets >= GLUTE_COVERAGE_TARGET && calvesSets >= CALF_COVERAGE_TARGET) continue;'))).toBe(true);
   });
 });
 
