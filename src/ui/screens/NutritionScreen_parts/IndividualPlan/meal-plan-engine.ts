@@ -16183,6 +16183,100 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
       let _d78 = _dev78();
       let _b78 = _buckets78();
       const _done78: string[] = [];
+      // §8.83 (замер): малый день (≤1700 ккал) строит тарелку плотным овощем, а не пустым
+      // гарниром. Замер 60 дней: 9 дней с микро <70, и 8 из них — cutF50/small60
+      // (1240–1600 ккал), где овощей в дне почти нет, micro 30–48%: RDA не масштабируется
+      // по калориям, а крупа нутриентов не несёт. Берём основной приём без овоща, ставим
+      // 150 г плотного (брокколи/шпинат/кейл), его белок вычитаем из якоря того же приёма,
+      // остаток калорий — из гарнира: сходимость и масса тарелки не разъезжаются.
+      const _done83: string[] = [];
+      // Запускается ПОСЛЕ §8.78: сначала апгрейд существующего «пустого» овоща, потом
+      // добавление овоща в приём, где его нет (замер: обратный порядок на `small60/5/тр`
+      // давал два хода в один день и 96 → 95 при том же микро).
+      const _run83 = (): void => {
+      if ((input as any).vegDenseDiet83 !== false && (Number(input.goalKcal) || 0) > 0 && (Number(input.goalKcal) || 0) <= 1700) {
+        // База сравнения — свежая (микро по текущим тарелкам), а не `_finalMicro`:
+        // замер поймал `small60/5/тр` 96 → 95, где микро не изменилось, а гейт по
+        // устаревшей базе пропустил обмен. §8.83 обязан приносить именно МИКРО.
+        const _q83Base = _qNow(_microNow());
+        const _MAINS83 = new Set(['breakfast', 'lunch', 'dinner']);
+        const _minAnchor83 = reconMainProteinFloorG(input.weightKg);
+        const _scale83 = (it: any, newA: number): void => {
+          const r = newA / Math.max(1e-6, Number(it.amount) || 1);
+          it.p = +((Number(it.p) || 0) * r).toFixed(1);
+          it.f = +((Number(it.f) || 0) * r).toFixed(1);
+          it.c = +((Number(it.c) || 0) * r).toFixed(1);
+          it.kcal = Math.round(4 * it.p + 9 * it.f + 4 * it.c);
+          if (typeof it.fiber === 'number') it.fiber = +((Number(it.fiber) || 0) * r).toFixed(1);
+          if (typeof it.leucine_mg === 'number') it.leucine_mg = Math.round((Number(it.leucine_mg) || 0) * r);
+          it.amount = Math.round(newA);
+        };
+        for (const m of meals as any[]) {
+          if (_done83.length > 0) break;
+          if (!_MAINS83.has(String(m.type || ''))) continue;
+          const items83 = ((m.items || []) as any[]);
+          if (items83.some((x: any) => String(x.role) === 'veg')) continue;
+          const prot83 = items83
+            .filter((x: any) => ['protein', 'fast_protein', 'slow_protein'].includes(String(x.role)))
+            .sort((a: any, b: any) => (Number(b.amount) || 0) - (Number(a.amount) || 0))[0];
+          const carb83 = items83
+            .filter((x: any) => ['carb_slow', 'carb_fast'].includes(String(x.role)))
+            .sort((a: any, b: any) => (Number(b.kcal) || 0) - (Number(a.kcal) || 0))[0];
+          if (!carb83) continue;
+          for (const denseId of _DENSE78) {
+            if (_dayIds.has(denseId)) continue;
+            const f: any = FOOD_DB.find((x: any) => String(x.id) === denseId);
+            if (!_allowed78(f)) continue;
+            const vegItem: any = makeItem(f, 150, 'veg') as any;
+            const gV = Number(vegItem.amount) || 0;
+            if (gV < 100) continue;
+            const vegP = Number(vegItem.p) || 0;
+            const vegK = Number(vegItem.kcal) || 0;
+            // 1) белок овоща — из якоря того же приёма, не ниже пола MPS
+            let cutP = 0;
+            let removedK = 0;
+            if (prot83 && vegP > 0) {
+              const perP = (Number(prot83.p) || 0) / Math.max(1, Number(prot83.amount) || 1);
+              const perK = (Number(prot83.kcal) || 0) / Math.max(1, Number(prot83.amount) || 1);
+              if (perP > 0) {
+                const roomP = Math.max(0, (Number(prot83.amount) || 0) - Math.max(_minAnchor83, 20));
+                cutP = Math.min(vegP / perP, roomP);
+                removedK = cutP * perK;
+              }
+            }
+            // 2) остаток калорий овоща — из гарнира (не в ноль: пол 20 г)
+            const perKC = (Number(carb83.kcal) || 0) / Math.max(1, Number(carb83.amount) || 1);
+            const cutCg = perKC > 0
+              ? Math.min(Math.max(0, (Number(carb83.amount) || 0) - 20), Math.round((Math.max(0, vegK - removedK) / perKC) / 5) * 5)
+              : 0;
+            const prevP83 = prot83 ? { ...prot83 } : null;
+            const prevC83 = { ...carb83 };
+            if (prot83 && cutP >= 5) _scale83(prot83, (Number(prot83.amount) || 0) - cutP);
+            if (cutCg >= 5) _scale83(carb83, (Number(carb83.amount) || 0) - cutCg);
+            items83.push(vegItem);
+            m.totals = mealTotalsOf(items83);
+            recalcDayTotals(meals as any[], totals);
+            const dev = _dev78();
+            const buck = _buckets78();
+            const q = _qNow(_microNow());
+            const _crossesFive83 = dev > 0.05 && _d78 <= 0.05;
+            if (dev > Math.max(_d78, 0.029) + 1e-9 || (dev > 0.029 && _d78 <= 0.029) || _crossesFive83
+              || buck > _b78 || q.total <= _q83Base.total || q.micro <= _q83Base.micro) {
+              items83.pop();
+              if (prot83 && prevP83) Object.assign(prot83, prevP83);
+              Object.assign(carb83, prevC83);
+              m.totals = mealTotalsOf(items83);
+              recalcDayTotals(meals as any[], totals);
+              continue;
+            }
+            _q78 = q; _d78 = dev; _b78 = buck;
+            _dayIds.add(denseId);
+            _done83.push(`${String(m.type)}: +${denseId} ${Math.round(gV)} г вместо ${Math.round(cutCg)} г гарнира${cutP >= 5 ? ` и ${Math.round(cutP)} г белка` : ''}`);
+            break;
+          }
+        }
+      }
+      };
       for (const m of meals as any[]) {
         if (_done78.length > 0) break;
         const items = ((m.items || []) as any[]);
@@ -16233,7 +16327,8 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
           if (_done78.length > 0) break;
         }
       }
-      if (_done78.length > 0) {
+      _run83();
+      if (_done78.length > 0 || _done83.length > 0) {
         _finalMicro = _microNow() ?? _finalMicro;
         _finalMicroTotals = sumMicros(meals.flatMap(mm => mm.items.map(it => ({ id: it.id, amount: it.amount }))), FOOD_DB as any);
         _resyncMps();
@@ -16255,7 +16350,12 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
               ? `✓ Точность рациона: отклонение ≤5% (Б ${Math.round(_dP78 * 100)}%, Ж ${Math.round(_dF78 * 100)}%, У ${Math.round(_dC78 * 100)}%)`
               : `⚠ Точность рациона: отклонение >5% (Б ${Math.round(_dP78 * 100)}%, Ж ${Math.round(_dF78 * 100)}%, У ${Math.round(_dC78 * 100)}%) — проверьте пулы продуктов`;
         }
-        notes.push(`🥬 Овощ должен кормить: ${_done78.join('; ')} — плотный овощ того же веса вместо объёма без нутриентов (§8.78).`);
+        if (_done78.length > 0) {
+          notes.push(`🥬 Овощ должен кормить: ${_done78.join('; ')} — плотный овощ того же веса вместо объёма без нутриентов (§8.78).`);
+        }
+      }
+      if (_done83.length > 0) {
+        notes.push(`🥬 Малый день: ${_done83.join('; ')} — плотный овощ вместо пустого гарнира, микро важнее объёма (§8.83).`);
       }
     }
     // §8.81: ночной казеин, урезанный молча.
@@ -16277,6 +16377,130 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
           const _psGap81 = Math.round(_psBudget81 - _psFact81);
           notes.push(`🌙 Ночной приём ${Math.round(_psFact81)} г белка вместо ${Math.round(_psBudget81)}: бюджет дня раньше выбрали перекусы и гарниры (углеводные носители несут белок). Полный казеин вернётся, если освободить ${_psGap81} г белка — убрать перекус или снизить цель дня.`);
         }
+      }
+    }
+    // §8.84: белок должен стоять РОВНО по приёмам, а не копиться в одном.
+    // Замер осей за 60 дней: ось «белок основного приёма» — самая слабая (16 дней <70,
+    // худшие 42–53 при пороге 100). Дефект не в цели дня, а в раскладке: на
+    // `hugeCarb/4/тр` при цели 250 г тарелки стоят 28/33/47 + перекус 15 г, и минимумом
+    // дня становится перекус (0.15 г/кг при пороге оси 0.30). Это не дефицит: 47 г в
+    // ужине — больше, чем нужно для MPS-стимула. Значит белок надо ПЕРЕЛОЖИТЬ, а не
+    // добавить: срезаем богатый приём до порога и поднимаем бедный до него же.
+    // Гейт: качество дня строго выше, канон не хуже, вёдер не больше; до 2 переносов
+    // на день, только по белковым пунктам (белок ходит между приёмами, не внутри дня).
+    if ((input as any).proteinSmooth84 !== false
+      && _pickCtx.qualityMode === 'full'
+      && !(input as any).manualTargetsLocked
+      && (input as any).kbjuMode !== 'manual'
+      && !(input as any).recipeAssembly
+      && !(input as any).portableMode) {
+      const _w84 = Math.max(1, Number(input.weightKg) || 0);
+      const _thr84 = 0.30 * _w84;
+      const _isWin84 = (m: any) => ['preworkout', 'postworkout', 'intra'].includes(String(m.type));
+      const _pOf84 = (m: any) => (m.items || []).reduce((s: number, i: any) => s + (Number(i.p) || 0), 0);
+      const _mains84 = () => (meals as any[]).filter((m: any) => (m.items || []).length > 0
+        && !_isWin84(m) && String(m.type) !== 'presleep'
+        && !(/^snack/.test(String(m.type || '')) && Number(m?.target?.p) === 0));
+      const _solid84 = (m: any) => (m.items || [])
+        .filter((i: any) => !['liquid', 'supplement'].includes(String(i.role || '')))
+        .reduce((s: number, i: any) => s + (Number(i.amount) || 0), 0);
+      const _buckets84 = () => (meals as any[]).filter((m: any) => (m.items || []).length > 0 && _solid84(m) > 500).length;
+      const _dev84 = () => {
+        const one = (x: any) => Math.max(
+          x.k > 0 ? Math.abs(Number(totals.kcal) - x.k) / x.k : 0,
+          x.p > 0 ? Math.abs(Number(totals.p) - x.p) / x.p : 0,
+          x.f > 0 ? Math.abs(Number(totals.f) - x.f) / x.f : 0,
+          x.c > 0 ? Math.abs(Number(totals.c) - x.c) / x.c : 0,
+        );
+        return Math.max(one({ k: Number(input.goalKcal) || 0, p: Number(adjustedProteinG || input.goalProteinG) || 0, f: Number(input.goalFatG) || 0, c: Number(adjustedCarbsG || input.goalCarbsG) || 0 }), one({ k: Number(input.goalKcal) || 0, p: Number(input.goalProteinG) || 0, f: Number(input.goalFatG) || 0, c: Number(input.goalCarbsG) || 0 }));
+      };
+      const _sc84 = (it: any, newA: number): void => {
+        const r = newA / Math.max(1e-6, Number(it.amount) || 1);
+        it.p = +((Number(it.p) || 0) * r).toFixed(1);
+        it.f = +((Number(it.f) || 0) * r).toFixed(1);
+        it.c = +((Number(it.c) || 0) * r).toFixed(1);
+        it.kcal = Math.round(4 * it.p + 9 * it.f + 4 * it.c);
+        if (typeof it.fiber === 'number') it.fiber = +((Number(it.fiber) || 0) * r).toFixed(1);
+        if (typeof it.leucine_mg === 'number') it.leucine_mg = Math.round((Number(it.leucine_mg) || 0) * r);
+        it.amount = Math.round(newA);
+      };
+      const _moves84: string[] = [];
+      let _q84 = _qNow(_microNow());
+      let _sp84 = Number(_q84.proteinSpread) || 0;
+      let _d84 = _dev84();
+      let _b84 = _buckets84();
+      for (let pass = 0; pass < 3; pass++) {
+        const list = _mains84();
+        if (list.length < 2) break;
+        const pickItem = (m: any) => ((m.items || []) as any[])
+          .filter((i: any) => ['protein', 'fast_protein', 'slow_protein'].includes(String(i.role)))
+          .sort((a: any, b: any) => ((Number(b.amount) || 0) * (Number(b.p) || 0)) - ((Number(a.amount) || 0) * (Number(a.p) || 0)))[0];
+        // Бедные — по возрастанию; приём без белкового якоря (белок пришёл с гарниром)
+        // пропускаем: его бедность лечится не переносом, а пересборкой приёма.
+        const poors = [...list].sort((a: any, b: any) => _pOf84(a) - _pOf84(b))
+          .filter((m: any) => _pOf84(m) < _thr84 - 1 && pickItem(m));
+        const poor = poors[0];
+        if (!poor) break;
+        const pPoor = _pOf84(poor);
+        const rich = [...list].sort((a: any, b: any) => _pOf84(b) - _pOf84(a))
+          .find((m: any) => m !== poor && _pOf84(m) > _thr84 + 5 && pickItem(m));
+        if (!rich) break;
+        const pRich = _pOf84(rich);
+        const need = Math.min(_thr84 - pPoor + 0.5, pRich - _thr84);
+        const recv = pickItem(poor);
+        const give = pickItem(rich);
+        if (!recv || !give) break;
+        const dR = (Number(recv.p) || 0) / Math.max(1, Number(recv.amount) || 1);
+        const dG = (Number(give.p) || 0) / Math.max(1, Number(give.amount) || 1);
+        if (!(dR > 0) || !(dG > 0)) break;
+        // Потолок роста — 200 г на пункт (реалистичность тарелки: «рыба 40–200 г»
+        // из QG19), плюс кап съедобности. Без этого перенос мог выдать 300 г грудки
+        // в перекусе и сломать гарантии реалистичности.
+        const capR = Math.min(Number(edibilityCapFor(String(recv.id), 600)) || 600, 200);
+        const roomR = Math.max(0, capR - (Number(recv.amount) || 0));
+        let upG = Math.min(Math.round((need / dR) / 5) * 5, Math.floor(roomR / 5) * 5);
+        // Пол донора — реалистичный минимум порции 75 г (гарантия «мясо/яйцо ≥75 г»),
+        // а не MIN_MEANINGFUL_G: на 40 г грудки гарантия реалистичности тарелки падала.
+        const floorG = Math.max(75, Number(MIN_MEANINGFUL_G[String(give.role)] || 20));
+        let downG = Math.round(((upG * dR) / dG) / 5) * 5;
+        if ((Number(give.amount) || 0) - downG < floorG) {
+          downG = Math.floor(((Number(give.amount) || 0) - floorG) / 5) * 5;
+          upG = Math.round(((downG * dG) / dR) / 5) * 5;
+        }
+        if (upG < 5 || downG < 5) break;
+        const snapR = { ...recv };
+        const snapG = { ...give };
+        _sc84(recv, (Number(recv.amount) || 0) + upG);
+        _sc84(give, (Number(give.amount) || 0) - downG);
+        poor.totals = mealTotalsOf(poor.items);
+        rich.totals = mealTotalsOf(rich.items);
+        recalcDayTotals(meals as any[], totals);
+        const q = _qNow(_microNow());
+        const dv = _dev84();
+        const bk = _buckets84();
+        // Гейт: день не хуже, ось «белок по приёмам» строго выше (это и есть предмет хода),
+        // канон не хуже, вёдер не больше. Требовать строго выше ОБЩЕГО балла нельзя: балл
+        // целый, и второй-третий перенос в тот же день уже не двигает сумму осей.
+        if (q.total < _q84.total || (Number(q.proteinSpread) || 0) <= _sp84 || dv > Math.max(_d84, 0.029) + 1e-9 || bk > _b84) {
+          Object.assign(recv, snapR);
+          Object.assign(give, snapG);
+          poor.totals = mealTotalsOf(poor.items);
+          rich.totals = mealTotalsOf(rich.items);
+          recalcDayTotals(meals as any[], totals);
+          break;
+        }
+        _q84 = q;
+        _sp84 = Number(q.proteinSpread) || 0;
+        _d84 = dv;
+        _b84 = bk;
+        _moves84.push(`${String(poor.type)} ${Math.round(pPoor)}→${Math.round(_pOf84(poor))} г за счёт ${String(rich.type)} ${Math.round(pRich)}→${Math.round(_pOf84(rich))} г`);
+      }
+      if (_moves84.length > 0) {
+        _finalMicro = _microNow() ?? _finalMicro;
+        _finalMicroTotals = sumMicros(meals.flatMap(mm => mm.items.map(it => ({ id: it.id, amount: it.amount }))), FOOD_DB as any);
+        _resyncMps();
+        _refreshProteinNote();
+        notes.push(`⚖️ Белок по приёмам выровнен: ${_moves84.join('; ')} — переложили из богатого приёма, а не добавили еду (§8.84).`);
       }
     }
     _jMark('final', 'Финал (микро/гигиена/витрина)');

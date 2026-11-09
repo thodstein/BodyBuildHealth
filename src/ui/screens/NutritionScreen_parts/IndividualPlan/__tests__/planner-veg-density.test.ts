@@ -45,7 +45,10 @@ const build = (p: P, mc: number, tr: boolean, on: boolean) => buildDayPlan({
   allowIntraWorkout: true, budget: 'medium', dayOffset: 0, cyclePhase: 'none',
   variety: 'medium', goal: 'maintenance', quality: 'full',
   excludedIds: new Set<string>(), allergenTags: new Set<string>(), randomSalt: 0,
+  // §8.83 (плотный овощ в тарелку малого дня) изолирован: замок §8.78 мерит ТОЛЬКО
+  // свою стадию, иначе чужой ход уезжает в его off-базу.
   vegDensity78: on,
+  vegDenseDiet83: false,
 } as any) as any;
 
 const DENSE = new Set(['spinach', 'kale', 'veg_kale', 'broccoli']);

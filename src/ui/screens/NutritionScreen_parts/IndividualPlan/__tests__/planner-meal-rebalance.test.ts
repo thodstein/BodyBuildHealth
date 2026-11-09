@@ -59,6 +59,8 @@ const build = (p: typeof PROFILES[number], mc: number, tr: boolean, rebalance: b
   // §8.78 (плотный овощ вместо объёма) выключается в обоих вариантах: иначе A/B
   // перестаёт быть сравнением одной стадии (микро меняются до её гейтов).
   vegDensity78: false,
+  // §8.84 (перенос белка между приёмами) изолирован: замок мерит только свою стадию.
+  proteinSmooth84: false,
   autoMealRebalance: rebalance,
   fruitPortionFloor: fruitFloor,
 } as unknown as MealPlanInput);
