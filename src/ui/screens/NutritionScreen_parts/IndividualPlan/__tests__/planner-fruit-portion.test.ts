@@ -49,6 +49,9 @@ const build = (p: typeof PROFILES[number], mc: number, tr: boolean, on: boolean)
   allowIntraWorkout: true, budget: 'medium', dayOffset: 0, cyclePhase: 'none',
   variety: 'medium', goal: 'maintenance', quality: 'full',
   excludedIds: new Set<string>(), allergenTags: new Set<string>(), randomSalt: 0,
+  // §8.78 (плотный овощ вместо объёма) выключается в обоих вариантах: иначе A/B
+  // перестаёт быть сравнением одной стадии (микро меняются до её гейтов).
+  vegDensity78: false,
   fruitPortionFloor: on,
   // §8.74 (огрызок — не порция) включается отдельно и имеет свой замок
   // (`planner-fruit-crumb.test.ts`): в «без стадии» варианте §8.59 крошка остаётся —

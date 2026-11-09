@@ -56,6 +56,9 @@ const build = (p: typeof PROFILES[number], mc: number, tr: boolean, rebalance: b
   allowIntraWorkout: true, budget: 'medium', dayOffset: 0, cyclePhase: 'none',
   variety: 'medium', goal: 'maintenance', quality: 'full',
   excludedIds: new Set<string>(), allergenTags: new Set<string>(), randomSalt: 0,
+  // §8.78 (плотный овощ вместо объёма) выключается в обоих вариантах: иначе A/B
+  // перестаёт быть сравнением одной стадии (микро меняются до её гейтов).
+  vegDensity78: false,
   autoMealRebalance: rebalance,
   fruitPortionFloor: fruitFloor,
 } as unknown as MealPlanInput);

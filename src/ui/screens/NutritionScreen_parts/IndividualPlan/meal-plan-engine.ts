@@ -16109,6 +16109,137 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
         }
       }
     }
+    // ─── §8.78: овощ должен кормить, а не занимать объём ─────────────────────────
+    // Замер осей (60 дней): 9 дней с микро <70; дефициты — VitB9 (9 дней), VitK (8),
+    // Fe (7), K (7), VitD (7), VitE (7). При этом овощная ось 96.4 — овощи в дне ЕСТЬ,
+    // но «пустые»: сельдерей 100 г = 29 мкг VitK и 0 B9, пименто = 0 B9, напа = 32 мкг.
+    // Плотный овощ того же веса (шпинат 100 г = 483 мкг VitK, 194 мкг B9, 3 мг Fe)
+    // закрывает 3–5 дефицитов, почти не двигая калории (+7 ккал/100 г), и не меняет
+    // массу тарелки. Гейт: качество дня строго выше (микро реально прибавилось),
+    // канон не хуже, вёдер не больше; один обмен на день, продукта в дне не дублируем.
+    if ((input as any).vegDensity78 !== false
+      && _pickCtx.qualityMode === 'full'
+      // HV-дни не трогаем: там составом владеют инсулиновые окна и рецептурная сборка
+      // (замер `R-1500`: обмен овоща сдвигал день на 20 ккал и сборщик рецептов выбирал
+      // другой перекус — «Перекус 3» оставался без белка).
+      && !_pickCtx.highVolumeDay
+      && !(input as any).manualTargetsLocked
+      && (input as any).kbjuMode !== 'manual'
+      && !(input as any).recipeAssembly
+      && !(input as any).portableMode) {
+      const _WEAK78 = /^(celery|veg_celerysticks|veg_celery_root|pepper_pimento|veg_cabbage_napa|cucumber|tomato|zucchini|pumpkin|veg_cauliflower|veg_asparagus_green|asparagus)$/i;
+      const _DENSE78 = ['spinach', 'kale', 'veg_kale', 'broccoli'];
+      const _goal78 = {
+        k: Number(input.goalKcal) || 0,
+        p: Number(adjustedProteinG || input.goalProteinG) || 0,
+        f: Number(input.goalFatG) || 0,
+        c: Number(adjustedCarbsG || input.goalCarbsG) || 0,
+      };
+      const _raw78 = {
+        k: Number(input.goalKcal) || 0,
+        p: Number(input.goalProteinG) || 0,
+        f: Number(input.goalFatG) || 0,
+        c: Number(input.goalCarbsG) || 0,
+      };
+      const _devOf78 = (g: typeof _goal78) => Math.max(
+        g.k > 0 ? Math.abs(Number(totals.kcal) - g.k) / g.k : 0,
+        g.p > 0 ? Math.abs(Number(totals.p) - g.p) / g.p : 0,
+        g.f > 0 ? Math.abs(Number(totals.f) - g.f) / g.f : 0,
+        g.c > 0 ? Math.abs(Number(totals.c) - g.c) / g.c : 0,
+      );
+      const _dev78 = () => Math.max(_devOf78(_goal78), _devOf78(_raw78));
+      const _solid78 = (m: any) => ((m.items || []) as any[])
+        .filter((x: any) => !['liquid', 'supplement'].includes(String(x.role || '')))
+        .reduce((s: number, x: any) => s + (Number(x.amount) || 0), 0);
+      const _buckets78 = () => (meals as any[]).filter((m: any) => (m.items || []).length > 0 && _solid78(m) > 500).length;
+      const _allowed78 = (f: any): boolean => {
+        if (!f) return false;
+        if (input.excludedIds && input.excludedIds.has(f.id)) return false;
+        const diet = (FOOD_ALLERGEN_DIET as any)?.[f.id];
+        const tags = (diet && Array.isArray(diet.allergens)) ? diet.allergens : (f.allergens || []);
+        if (input.allergenTags && input.allergenTags.size > 0 && [...input.allergenTags].some((t: string) => tags.includes(t))) return false;
+        return true;
+      };
+      const _dayIds = new Set((meals as any[]).flatMap((m: any) => (m.items || []).map((x: any) => String(x.id))));
+      let _q78 = _qNow(_finalMicro);
+      let _d78 = _dev78();
+      let _b78 = _buckets78();
+      const _done78: string[] = [];
+      for (const m of meals as any[]) {
+        if (_done78.length > 0) break;
+        const items = ((m.items || []) as any[]);
+        const weak = items.filter((x: any) => String(x.role) === 'veg' && _WEAK78.test(String(x.id)) && (Number(x.amount) || 0) >= 20);
+        if (weak.length === 0) continue;
+        for (const w of weak) {
+          for (const denseId of _DENSE78) {
+            if (_dayIds.has(denseId)) continue;
+            const f: any = FOOD_DB.find((x: any) => String(x.id) === denseId);
+            if (!_allowed78(f)) continue;
+            const idx = items.indexOf(w);
+            if (idx < 0) continue;
+            const prev = { ...w };
+            const _repl: any = makeItem(f, Number(w.amount) || 0, 'veg') as any;
+            // Вес овоща не меняем (обмен «тот же объём»): если `snapPortionG` подтянул
+            // граммы, возвращаем исходные и пересчитываем поля пропорционально.
+            const _snapped = Number(_repl.amount) || 0;
+            if (_snapped > 0 && Math.round(_snapped) !== Math.round(Number(w.amount) || 0)) {
+              const k2 = (Number(w.amount) || 0) / _snapped;
+              _repl.amount = Math.round(Number(w.amount) || 0);
+              for (const key of ['p', 'f', 'c', 'kcal', 'fiber', 'leucine_mg']) {
+                if (_repl[key]) _repl[key] = Math.round(Number(_repl[key]) * k2);
+              }
+            }
+            items[idx] = _repl;
+            m.totals = mealTotalsOf(items);
+            recalcDayTotals(meals as any[], totals);
+            const dev = _dev78();
+            const buck = _buckets78();
+            const q = _qNow(_microNow());
+            // Не выталкиваем день за 5%: «Точность рациона» пишет предупреждение при >5%
+            // (B38), и порча сходимости не имеет права добавить такое предупреждение.
+            const _crossesFive = dev > 0.05 && _d78 <= 0.05;
+            if (dev > Math.max(_d78, 0.029) + 1e-9 || (dev > 0.029 && _d78 <= 0.029) || _crossesFive
+              || buck > _b78 || q.total <= _q78.total) {
+              items[idx] = prev;
+              m.totals = mealTotalsOf(items);
+              recalcDayTotals(meals as any[], totals);
+              continue;
+            }
+            _q78 = q;
+            _d78 = dev;
+            _b78 = buck;
+            _dayIds.add(denseId);
+            _done78.push(`${String(m.type)}: ${String(prev.id)} ${Math.round(Number(prev.amount))} г → ${denseId} ${Math.round(Number(w.amount))} г`);
+            break;
+          }
+          if (_done78.length > 0) break;
+        }
+      }
+      if (_done78.length > 0) {
+        _finalMicro = _microNow() ?? _finalMicro;
+        _finalMicroTotals = sumMicros(meals.flatMap(mm => mm.items.map(it => ({ id: it.id, amount: it.amount }))), FOOD_DB as any);
+        _resyncMps();
+        _refreshProteinNote();
+        // Обмен меняет Б/У дня на граммы — «Точность рациона» обязана идти за фактом
+        // (B38: нота «Б 6%» против факта 8% ловится замком notes-honest-goals).
+        const _iT78 = notes.findIndex((n) => typeof n === 'string' && /Точность рациона:/.test(String(n)));
+        if (_iT78 >= 0) {
+          const _gP78 = Number(input.goalProteinG) || Number(adjustedProteinG) || 0;
+          const _gF78 = Number(input.goalFatG) || 0;
+          const _gC78 = Number(input.goalCarbsG) || 0;
+          const _dP78 = Math.abs(Number(totals.p) - _gP78) / Math.max(1, _gP78);
+          const _dF78 = Math.abs(Number(totals.f) - _gF78) / Math.max(1, _gF78);
+          const _dC78 = Math.abs(Number(totals.c) - _gC78) / Math.max(1, _gC78);
+          const _mx78t = Math.max(_dP78, _dF78, _dC78);
+          notes[_iT78] = _mx78t <= 0.02
+            ? `🎯 Точность рациона: Б ${totals.p}/${_gP78}г, Ж ${totals.f}/${_gF78}г, У ${totals.c}/${_gC78}г (отклонение ≤2%)`
+            : _mx78t <= 0.05
+              ? `✓ Точность рациона: отклонение ≤5% (Б ${Math.round(_dP78 * 100)}%, Ж ${Math.round(_dF78 * 100)}%, У ${Math.round(_dC78 * 100)}%)`
+              : `⚠ Точность рациона: отклонение >5% (Б ${Math.round(_dP78 * 100)}%, Ж ${Math.round(_dF78 * 100)}%, У ${Math.round(_dC78 * 100)}%) — проверьте пулы продуктов`;
+        }
+        notes.push(`🥬 Овощ должен кормить: ${_done78.join('; ')} — плотный овощ того же веса вместо объёма без нутриентов (§8.78).`);
+      }
+    }
     _jMark('final', 'Финал (микро/гигиена/витрина)');
     // ─── Качество рациона одним числом (0–100) ───────────────────────────────
     // Сходимость ≤3% говорит, что граммы совпали; она молчит о том, съедобен ли план.

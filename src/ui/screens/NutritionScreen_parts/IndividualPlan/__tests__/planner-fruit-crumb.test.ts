@@ -40,6 +40,9 @@ const build = (p: P, mc: number, tr: boolean, on: boolean) => buildDayPlan({
   allowIntraWorkout: true, budget: 'medium', dayOffset: 0, cyclePhase: 'none',
   variety: 'medium', goal: 'maintenance', quality: 'full',
   excludedIds: new Set<string>(), allergenTags: new Set<string>(), randomSalt: 0,
+  // §8.78 (плотный овощ вместо объёма) выключается в обоих вариантах: иначе A/B
+  // перестаёт быть сравнением одной стадии (микро меняются до её гейтов).
+  vegDensity78: false,
   fruitCrumb74: on,
   // §8.75 (семя вместо масла) выключается в обоих вариантах: она ужимает масло в приёме,
   // а этот замок проверяет «прочие граммы не тронуты».
