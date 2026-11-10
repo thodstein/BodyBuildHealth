@@ -218,6 +218,8 @@ export const BbAutoConstructor: React.FC = () => {
 // G1: сценарий входа в мезоцикл (где стартует объём относительно цели).
 // 'standard' = прежнее поведение (0.85→1.10, прогрессивная перегрузка).
 const [bbVolumeRamp, setBbVolumeRamp] = useState<'standard' | 'preloaded' | 'flat'>('standard');
+// G1: волновой вход (накопление→интенсификация) — движок поддерживал, UI не передавал.
+const [bbVolumeWave, setBbVolumeWave] = useState(false);
   const [trainingVolumeMode, setTrainingVolumeMode] = useState<'standard' | 'high'>('standard');
   // Фаза 4.28: ручные оверрайды восстановления/лаб-множителя в визарде (null = авто).
   const [labMultOverride, setLabMultOverride] = useState<number | null>(null);
@@ -2318,6 +2320,7 @@ const [bbVolumeRamp, setBbVolumeRamp] = useState<'standard' | 'preloaded' | 'fla
       volumeMultiplier: autoRegResult.volumeMultiplier,
       topSetPctMultiplier: autoRegResult.topSetPctMultiplier,
       rirShift: autoRegResult.rirShift,
+      deload: autoRegResult.deload,
     } : undefined;
     // Объёмный режим: high → цель MRV, капы те же от уровня (дефолт 24 с фармой — норма)
     const effectiveVolGoal = (trainingVolumeMode === 'high' ? 'mrv' : bbVolGoal) as any;
@@ -2438,6 +2441,7 @@ const [bbVolumeRamp, setBbVolumeRamp] = useState<'standard' | 'preloaded' | 'fla
           bodyweightCapability: prof.bodyweightCapability,
           workMax: bbWorkMax, weakPoints, focusGroup: '', volumeGoal: effectiveVolGoal,
           volumeRamp: bbVolumeRamp,
+          volumeWave: bbVolumeWave,
           specialization: specializationMode,
           specializationSchedule: buildSpecBlocks,
          injuries,
@@ -2487,6 +2491,18 @@ const [bbVolumeRamp, setBbVolumeRamp] = useState<'standard' | 'preloaded' | 'fla
           mobilityRestrictions,
           // PRO: cross-mesocycle continuity — передаём последний сохранённый план
           previousPlan: usePreviousPlan && savedPlans.length > 0 ? savedPlans[0].plan : undefined,
+          // Tonnage progression (≥2 прошлых мезо) и cooldown-история ротации.
+          previousPlans: usePreviousPlan ? savedPlans.slice(0, 3).map(s => s.plan) : undefined,
+          cooldownHistory: usePreviousPlan && savedPlans[0]?.plan
+            ? (() => {
+                const weeks = (savedPlans[0].plan as any).weeks;
+                if (!Array.isArray(weeks) || weeks.length === 0) return undefined;
+                const last = weeks[weeks.length - 1];
+                return (last.sessions || []).flatMap((sess: any) =>
+                  (sess.exercises || []).map((e: any) => ({ exerciseName: e.name || e.exerciseName, pattern: e.movementPattern })),
+                ).filter((x: any) => !!x.exerciseName);
+              })()
+            : undefined,
           supersetMode,
           volumeScheme: effectiveVolumeScheme,
           trainingVolumeMode,
@@ -2807,7 +2823,7 @@ const [bbVolumeRamp, setBbVolumeRamp] = useState<'standard' | 'preloaded' | 'fla
       volumeGoal: (plan as any).volumeGoal || effectiveVolGoal,
       // G1: воспроизводимость варианта — режим входа из плана, иначе из UI.
       // (top-level, как volumeGoal — читается снапшотом варианта.)
-      ...({ volumeRamp: (plan as any).volumeRamp || bbVolumeRamp } as any),
+      ...({ volumeRamp: (plan as any).volumeRamp || bbVolumeRamp, volumeWave: (plan as any).inputSnapshot?.volumeWave ?? bbVolumeWave } as any),
       goal: bbGoal,
       trainingFocus: bbTrainingFocus,
       methodology: bbMethodology,
@@ -3187,6 +3203,7 @@ const [bbVolumeRamp, setBbVolumeRamp] = useState<'standard' | 'preloaded' | 'fla
     if (vp.volumeScheme) setVolumeScheme(vp.volumeScheme);
     // G1: сценарий входа в мезоцикл из варианта (legacy = standard).
     if (vp.volumeRamp) setBbVolumeRamp(vp.volumeRamp);
+    if (typeof vp.volumeWave === 'boolean') setBbVolumeWave(vp.volumeWave);
     if (vp.supersetMode) setSupersetMode(vp.supersetMode);
     if (vp.intensityLevel) setIntensityLevel(vp.intensityLevel);
     if (vp.rotationMode) setRotationMode(vp.rotationMode);
@@ -3814,6 +3831,8 @@ const [bbVolumeRamp, setBbVolumeRamp] = useState<'standard' | 'preloaded' | 'fla
       onUserVolGoal={onUserVolGoal}
  bbVolumeRamp={bbVolumeRamp}
  setBbVolumeRamp={setBbVolumeRamp}
+      volumeWave={bbVolumeWave}
+      setVolumeWave={setBbVolumeWave}
       trainingVolumeMode={trainingVolumeMode}
       setTrainingVolumeMode={setTrainingVolumeMode}
       avoidAxialLoadUi={avoidAxialLoadUi}
@@ -4311,7 +4330,12 @@ const [bbVolumeRamp, setBbVolumeRamp] = useState<'standard' | 'preloaded' | 'fla
     autoDeload,
     deloadType,
     loadStrategy,
-    autoRegResult: (autoRegOn && autoRegResult) ? { volumeMultiplier: autoRegResult.volumeMultiplier, topSetPctMultiplier: autoRegResult.topSetPctMultiplier, rirShift: autoRegResult.rirShift } : undefined,
+    autoRegResult: (autoRegOn && autoRegResult) ? {
+      volumeMultiplier: autoRegResult.volumeMultiplier,
+      topSetPctMultiplier: autoRegResult.topSetPctMultiplier,
+      rirShift: autoRegResult.rirShift,
+      deload: autoRegResult.deload,
+    } : undefined,
     methodology: bbMethodology,
     eccentricMult,
     previousPlan: usePreviousPlan && savedPlans.length > 0 ? savedPlans[0].plan : undefined,

@@ -146,9 +146,13 @@ export function sessionLimitsFor(options: BBPlanValidationOptions): { maxExercis
 
 /** Синхронизирует агрегированное число sets с фактическими рабочими сетами. */
 export function syncBBPlanSetShape(plan: BBPlan): BBPlan {
+  if (!plan || !Array.isArray((plan as any).weeks)) return plan;
   for (const week of plan.weeks) {
+    if (!week || !Array.isArray((week as any).sessions)) continue;
     for (const session of week.sessions) {
-    for (const exercise of session.exercises) {
+      if (!session || !Array.isArray((session as any).exercises)) continue;
+      for (const exercise of session.exercises) {
+        if (!exercise) continue;
         // F0 guard: NaN sets → 0 (капы freeze, только защита от NaN)
         const rawSets = Number(exercise.sets);
         const target = Number.isFinite(rawSets) ? Math.max(0, rawSets) : 0;
@@ -171,22 +175,27 @@ export function syncBBPlanSetShape(plan: BBPlan): BBPlan {
 
 function validateSession(session: BBSession, week: number, sessionIndex: number, options: BBPlanValidationOptions = {}): BBPlanValidationIssue[] {
   const issues: BBPlanValidationIssue[] = [];
+  if (!session || !Array.isArray((session as any).exercises)) {
+    issues.push({ level: 'error', code: 'malformed_session', message: 'Сессия без массива упражнений — план повреждён.', week, session: sessionIndex });
+    return issues;
+  }
   // Разминочное упражнение не входит в лимит рабочих упражнений; optional-добивки
   // («при наличии сил») тоже вне капа сессии.
-  const workingCount = session.exercises.filter(exercise => !(exercise as any).warmupActivator && !(exercise as any).optional).length;
+  const exercises = session.exercises.filter(Boolean);
+  const workingCount = exercises.filter(exercise => !(exercise as any).warmupActivator && !(exercise as any).optional).length;
   const { maxExercises } = sessionLimitsFor(options);
   if (workingCount > maxExercises) {
     issues.push({ level: 'error', code: 'session_exercise_cap', message: `Сессия содержит ${ruAdjCount(workingCount, RU_ADJ_WORKING, RU_EXERCISES)} (максимум ${maxExercises}).`, week, session: sessionIndex });
   }
-  const cost = estimateBBSessionCost(session);
+  const cost = estimateBBSessionCost({ ...session, exercises } as BBSession);
   if (options.checkOrder) {
-    const primaryIndex = session.exercises.findIndex(exercise => exercise.role === 'primary');
+    const primaryIndex = exercises.findIndex(exercise => exercise.role === 'primary');
     if (primaryIndex >= 0) {
-      const primary = session.exercises[primaryIndex];
+      const primary = exercises[primaryIndex];
       if (options.methodology !== 'pre_exhaust' && !isCompoundEx(primary)) {
         issues.push({ level: 'warning', code: 'primary_not_compound', message: `${primary.name}: primary упражнение не является compound.`, week, session: sessionIndex, exercise: primary.name });
       }
-      if (options.methodology !== 'pre_exhaust' && session.exercises.slice(0, primaryIndex).some(exercise => exercise.role !== 'primary')) {
+      if (options.methodology !== 'pre_exhaust' && exercises.slice(0, primaryIndex).some(exercise => exercise.role !== 'primary')) {
         issues.push({ level: 'warning', code: 'order_primary_after_accessory', message: `Primary упражнение ${primary.name} стоит после accessory в сессии.`, week, session: sessionIndex, exercise: primary.name });
       }
     }
@@ -197,7 +206,7 @@ function validateSession(session: BBSession, week: number, sessionIndex: number,
   if (cost.axial > 12) {
     issues.push({ level: 'warning', code: 'axial_fatigue', message: `Высокая осевая усталость: ${cost.axial.toFixed(1)} условных единиц.`, week, session: sessionIndex });
   }
-  for (const exercise of session.exercises) {
+  for (const exercise of exercises) {
     const sets = exercise.workSets?.length || 0;
     if (sets !== exercise.sets) {
       issues.push({ level: 'error', code: 'sets_mismatch', message: `${exercise.name}: sets=${exercise.sets}, workSets=${sets}.`, week, session: sessionIndex, exercise: exercise.name });
@@ -222,7 +231,7 @@ function validateSession(session: BBSession, week: number, sessionIndex: number,
     if (canonical && canonical !== exercise.muscle && !(canonical === 'shoulders' && /^delt_/.test(exercise.muscle)) && !isIsolation) {
       issues.push({ level: 'warning', code: 'muscle_attribution', message: `${exercise.name}: muscle=${exercise.muscle}, каталог определяет ${canonical}.`, week, session: sessionIndex, exercise: exercise.name });
     }
-    if (exercise.workSets.some(ws => !Number.isFinite(ws.weight) || !Number.isFinite(ws.reps) || !Number.isFinite(ws.rir) || ws.weight < 0 || ws.reps <= 0 || ws.rir < 0 || ws.rir > 5)) {
+    if (Array.isArray(exercise.workSets) && exercise.workSets.some(ws => !ws || !Number.isFinite(ws.weight) || !Number.isFinite(ws.reps) || !Number.isFinite(ws.rir) || ws.weight < 0 || ws.reps <= 0 || ws.rir < 0 || ws.rir > 5)) {
       issues.push({ level: 'error', code: 'invalid_work_set', message: `${exercise.name}: некорректные weight/reps/RIR.`, week, session: sessionIndex, exercise: exercise.name });
     }
     if (options.excludedExercises?.includes(exercise.name) || options.excludedExercises?.includes(exercise.exerciseName || '')) issues.push({ level: 'error', code: 'excluded_exercise_present', message: `${exercise.name}: упражнение находится в excludedExercises.`, week, session: sessionIndex, exercise: exercise.name });
@@ -245,13 +254,23 @@ function validateSession(session: BBSession, week: number, sessionIndex: number,
 }
 
 export function validateBBPlan(plan: BBPlan, options: BBPlanValidationOptions = {}): BBPlanValidationResult {
+  // Malformed/imported plans must produce an issue, not a TypeError
+  // (`reading 'length' / 'some' of undefined` in UI revalidate).
+  if (!plan || !Array.isArray((plan as any).weeks)) {
+    return { valid: false, issues: [{ level: 'error', code: 'empty_plan', message: 'План не содержит массива недель.' }] };
+  }
   const resolvedOptions = { ...options, patternId: (options as any).patternId || (options as any).splitId || (plan as any).pattern?.id } as BBPlanValidationOptions;
   const issues: BBPlanValidationIssue[] = [];
   if (!plan.weeks.length) issues.push({ level: 'error', code: 'empty_plan', message: 'План не содержит недель.' });
-  plan.weeks.forEach((week, wi) => week.sessions.forEach((session, si) => {
-    issues.push(...validateSession(session, week.week || wi + 1, si + 1, resolvedOptions));
+  plan.weeks.forEach((week, wi) => {
+    if (!week || !Array.isArray((week as any).sessions)) return;
+    week.sessions.forEach((session, si) => {
+    const sessionIssues = validateSession(session, week.week || wi + 1, si + 1, resolvedOptions);
+    issues.push(...sessionIssues);
+    if (sessionIssues.some(i => i.code === 'malformed_session')) return;
+    const exercises = session.exercises.filter(Boolean);
     const allowedMuscles = TAG_MUSCLES[session.sessionTag || ''];
-    if (allowedMuscles?.length) for (const exercise of session.exercises) {
+    if (allowedMuscles?.length) for (const exercise of exercises) {
       const canonical = trueMuscleOf({ name: exercise.name, muscle: exercise.muscle } as any) || exercise.muscle;
       const allowed = allowedMuscles.includes(canonical) || (canonical === 'shoulders' && allowedMuscles.some(muscle => /^delt_/.test(muscle)))
         // Ф1.1 (CYCLE-SYSTEM-FULL-AUDIT): малые мышцы-финишёры (пресс/икры/
@@ -267,7 +286,7 @@ export function validateBBPlan(plan: BBPlan, options: BBPlanValidationOptions = 
       // добивка, а не случайная «утечка мышцы» (аудит 2026-11).
       if (!allowed && !(exercise as any).coverageFill) issues.push({ level: 'warning', code: 'session_muscle_leak', message: `${exercise.name}: мышца ${canonical} не соответствует тегу дня ${session.sessionTag}.`, week: week.week || wi + 1, session: si + 1, exercise: exercise.name });
     }
-    const sessionSets = session.exercises
+    const sessionSets = exercises
       .filter(exercise => !(exercise as any).warmupActivator && !(exercise as any).optional)
       .reduce((sum, exercise) => sum + exercise.sets, 0);
     const { maxWorkingSets } = sessionLimitsFor(resolvedOptions);
@@ -287,7 +306,7 @@ export function validateBBPlan(plan: BBPlan, options: BBPlanValidationOptions = 
     // точка неотличимости по гипертрофии; не error — предупреждение о diminishing
     // returns и рекомендация распределить на 2+ сессии (только при известном уровне).
     if (resolvedOptions.level) {
-      const frac = aggregateFractionalVolume([session]);
+      const frac = aggregateFractionalVolume([{ ...session, exercises } as BBSession]);
       for (const [muscle, fractional] of Object.entries(frac)) {
         if (fractional > PUOS_SESSION_FRACTIONAL + 0.001) {
           const label = MUSCLE_LABEL_RU[muscle] || muscle;
@@ -300,14 +319,20 @@ export function validateBBPlan(plan: BBPlan, options: BBPlanValidationOptions = 
         }
       }
     }
-  }));
+    });
+  });
   for (let index = 1; index < plan.weeks.length; index++) {
     const week = plan.weeks[index] as any;
-    const previous = plan.weeks[index - 1];
+    const previous = plan.weeks[index - 1] as any;
+    if (!week || !previous) continue;
     const phase = String(week.phase || '').toLowerCase();
     if (phase !== 'deload' && phase !== 'transition') continue;
-    const currentSets = week.sessions.reduce((sum: number, session: BBSession) => sum + session.exercises.reduce((s, exercise) => s + exercise.sets, 0), 0);
-    const previousSets = previous.sessions.reduce((sum, session) => sum + session.exercises.reduce((s, exercise) => s + exercise.sets, 0), 0);
+    const setsOf = (sessions: any[]) => (Array.isArray(sessions) ? sessions : []).reduce((sum: number, s: any) =>
+      sum + (Array.isArray(s?.exercises)
+        ? s.exercises.filter(Boolean).reduce((a: number, e: any) => a + (Number(e?.sets) || 0), 0)
+        : 0), 0);
+    const currentSets = setsOf(week.sessions);
+    const previousSets = setsOf(previous.sessions);
     // Ф1.1 (CYCLE-SYSTEM-FULL-AUDIT): pump-семантика делода — сеты сохраняются,
     // но вес ×0.55 и RIR 4 (DELOAD_PROTOCOLS.pump). Делод, снизивший НАГРУЗКУ
     // (средний вес рабочих ≤ 0.8× предыдущей недели при RIR ≥ 3), валиден и

@@ -23,6 +23,12 @@ export interface SpecWeekPlan {
   donorSets: Record<string, number>;
   frequency: Record<string, number>;
   note: string;
+  /**
+   * Явная политика поддержания: целевые зоны ниже MEV в этой неделе.
+   * Это не «забытый объём», а MV-floor (mev × 0.6, минимум 4) до разгона
+   * блока; дефицит до MEV раскрывается в rationale, а не маскируется.
+   */
+  belowMev?: string[];
 }
 
 export interface SpecBlock {
@@ -69,6 +75,7 @@ export function buildSpecBlock(input: SpecBlockInput): SpecBlock {
   const mavTop: Record<string, number> = {};
   const mrvCap: Record<string, number> = {};
   const mvFloor: Record<string, number> = {};
+  const mevByZone: Record<string, number> = {};
   for (const z of zones) {
     const canon = canonicalMuscle(z);
     const lm = getVolumeLandmarks(level, canon) || getVolumeLandmarks(level, z);
@@ -77,8 +84,10 @@ export function buildSpecBlock(input: SpecBlockInput): SpecBlock {
     const mev = lm ? lm.mev : 8;
     mavTop[z] = Math.min(mrv - 2, Math.round(mav * 1.15));
     mrvCap[z] = mrv;
+    mevByZone[z] = mev;
     mvFloor[z] = Math.max(4, Math.round(mev * 0.6));
   }
+  let belowMevPolicyNoted = false;
 
   for (let w = 1; w <= lengthWeeks; w++) {
     const targetSets: Record<string, number> = {};
@@ -96,12 +105,18 @@ export function buildSpecBlock(input: SpecBlockInput): SpecBlock {
         rationale.push(`${MUSCLE_LABEL_RU[z] || z}: факт ${ruCount(factNow, RU_SETS)} уже выше MRV ${mrvCap[z]} — блок начинаем с ${targetSets[z]} (разгрузка), а не с ${factNow + 4}`);
       }
     }
+    const belowMev = zones.filter(z => targetSets[z] < mevByZone[z]);
+    if (belowMev.length && !belowMevPolicyNoted) {
+      belowMevPolicyNoted = true;
+      rationale.push(`Политика ниже MEV: ${belowMev.map(z => `${MUSCLE_LABEL_RU[z] || z} ${targetSets[z]}<${mevByZone[z]}`).join(', ')} — MV-floor поддержания на старте блока (mev × 0.6, минимум 4), а не целевой рост; дефицит закрывается лесенкой +2/нед и не маскируется.`);
+    }
     weeks.push({
       week: w,
       targetSets,
       donorSets: {},
       frequency,
       note: w === 1 ? 'Старт: факт+4, первым в сессии, lengthened первым' : w === lengthWeeks ? 'Пик блока → делоад, замер перепроверки' : `Прогрессия +2 сета (нед ${w}/${lengthWeeks})`,
+      belowMev: belowMev.length ? belowMev : undefined,
     });
   }
 

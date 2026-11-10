@@ -756,6 +756,8 @@ export interface PostPhaseInput {
     volumeMultiplier: number;
     topSetPctMultiplier: number;
     rirShift: number;
+    /** Readiness требует разгрузку, а не только снижение объёма. */
+    deload?: boolean;
   };
   /** FIX-5: если true — НЕ перераспределять фазы повторно (buildBBPlan уже сделал это).
    *  Пост-обработка применяет только фазо-специфичные темп/повторы/отдых/делод/авто-рег,
@@ -975,28 +977,68 @@ export function applyPostPhaseProcessing(input: PostPhaseInput): BBPlan {
   // Авто-регуляция (последний слой — поверх всего)
   if (autoRegResult) {
     const phaseLabels: Record<string, string> = { accumulation: 'Накопление', intensification: 'Интенсификация', deload: 'Разгрузка', peaking: 'Пик' };
+    // Readiness-deload — не просто ×0.6 объёма: помечаем первую рабочую
+    // неделю и накладываем протокол, иначе deload:true не создавал разгрузку.
+    if (autoRegResult.deload && !weeks.some(w => (w as any).autoRegDeload === true)) {
+      const deloadIdx = weeks.findIndex(w =>
+        w.deload !== true && w.phase !== 'deload' && (w as any).taper !== true && (w as any).taperApplied !== true,
+      );
+      if (deloadIdx >= 0) {
+        const protocol = resolveDeloadProtocol(deloadType);
+        const dw = applyDeloadToWeek(weeks[deloadIdx], protocol);
+        (dw as any).deload = true;
+        (dw as any).phase = 'deload';
+        (dw as any).isDeloadLike = true;
+        (dw as any).autoRegDeload = true;
+        weeks[deloadIdx] = dw;
+        phaseMap.set(dw.week, 'deload');
+      }
+    }
     for (const w of weeks) {
       const ph = phaseMap.get(w.week) || 'accumulation';
-        for (const s of w.sessions) {
-          for (const e of s.exercises) {
-            e.sets = Math.max(1, Math.round(e.sets * autoRegResult.volumeMultiplier));
-            // Аудит 2026-11: у упражнений из UI-инъекций (свопы/добивки) мог
-            // отсутствовать workSets — раньше здесь был TypeError при сборке.
-            const prevSets = Array.isArray(e.workSets) ? e.workSets : [];
-            const template = prevSets[prevSets.length - 1] || {
-              reps: e.repsRange[0], rir: e.rir, weight: 0,
-            };
-            e.workSets = prevSets.slice(0, e.sets);
-            while (e.workSets.length < e.sets) e.workSets.push({ ...template });
-            for (const ws of e.workSets) {
-            ws.weight = Math.round(ws.weight * autoRegResult.topSetPctMultiplier * 10) / 10;
-          }
-          e.rir = Math.min(5, e.rir + autoRegResult.rirShift);
-          e.repsRange = [
-            Math.max(1, e.repsRange[0] - autoRegResult.rirShift),
-            Math.max(2, e.repsRange[1] - autoRegResult.rirShift),
-          ];
+      // Deload/taper не режем повторно авторегуляцией: иначе ×0.6 поверх
+      // делода создавал 1-сетовые упражнения.
+      if (ph === 'deload' || (w as any).taper === true || (w as any).taperApplied === true) continue;
+      for (const s of w.sessions) {
+        for (const e of s.exercises) {
+          const originalSets = Math.max(1, Number(e.sets) || 1);
+          const regulatedSets = Math.max(1, Math.round(originalSets * autoRegResult.volumeMultiplier));
+          // Не создавать одиночные сеты из многоподходных упражнений.
+          e.sets = originalSets >= 2 ? Math.max(2, regulatedSets) : regulatedSets;
+          // Аудит 2026-11: у упражнений из UI-инъекций (свопы/добивки) мог
+          // отсутствовать workSets — раньше здесь был TypeError при сборке.
+          const prevSets = Array.isArray(e.workSets) ? e.workSets : [];
+          const template = prevSets[prevSets.length - 1] || {
+            reps: e.repsRange[0], rir: e.rir, weight: 0,
+          };
+          e.workSets = prevSets.slice(0, e.sets);
+          while (e.workSets.length < e.sets) e.workSets.push({ ...template });
+          // topSetPctMultiplier относится только к топ-сету (первый подход),
+          // а не ко всем рабочим подходам.
+          e.workSets.forEach((ws, idx) => {
+            if (idx === 0) ws.weight = Math.round(ws.weight * autoRegResult.topSetPctMultiplier * 10) / 10;
+          });
+          const baseRir = e.rir;
+          e.rir = Math.min(5, baseRir + autoRegResult.rirShift);
+          // RIR живёт и в рабочих подходах, и в комментарии; раньше менялся
+          // только e.rir, а workSets/комментарий продолжали обещать старый RIR.
+          for (const ws of e.workSets) ws.rir = Math.min(5, (ws.rir ?? baseRir) + autoRegResult.rirShift);
+          // RIR-shift — это «оставить больше в запасе», а не «поднять интенсивность».
+          // Раньше диапазон повторений урезался (8-12 → 6-10), что противоречило
+          // и сдвигу RIR, и readiness-логике; объём/вес уже отрегулированы выше.
           rebuildComment(e, phaseLabels[ph] || ph);
+          if (autoRegResult.rirShift !== 0) {
+            // Старый «RIR 2» рядом с новым режимом — ложь. Переписываем точное
+            // значение, а сдвиг фиксируем отдельной пометкой.
+            const synced = String(e.comment || '')
+              .replace(/\bRIR\s*\d+(?:\s*[-–]\s*\d+)?/gi, `RIR ${e.rir}`)
+              .trim();
+            const actualShift = Math.max(0, e.rir - baseRir);
+            const shiftNote = `RIR +${actualShift} по готовности`;
+            e.comment = actualShift <= 0
+              ? synced
+              : (synced.includes(shiftNote) ? synced : `${synced ? `${synced} · ` : ''}${shiftNote}`);
+          }
         }
       }
     }

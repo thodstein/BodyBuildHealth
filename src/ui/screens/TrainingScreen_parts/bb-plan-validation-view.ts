@@ -99,18 +99,31 @@ function invalidInputView(text: string): PlanValidationView {
 
 export function buildPlanValidationView(plan: BBPlan | null): PlanValidationView {
   if (!plan) return invalidInputView('План отсутствует. Соберите план перед применением.');
+  if (!Array.isArray((plan as any).weeks) || (plan as any).weeks.length === 0) {
+    return invalidInputView('План не прошёл проверку структуры: нет недель. Пересоберите его.');
+  }
+  const ctx: any = (plan as any).buildContext || {};
   let validation;
   try {
     validation = validateBBPlan(plan, {
-      level: plan.level,
-      trainingYears: (plan as any).trainingYears,
+      level: plan.level || ctx.level,
+      trainingYears: (plan as any).trainingYears ?? ctx.trainingYears,
       equipment: (plan as any).safetyConstraints?.equipment,
       excludedExercises: (plan as any).safetyConstraints?.excludedExercises,
-      excludedMuscles: (plan as any).safetyConstraints?.excludedMuscles || (plan as any).gradedMuscles,
+      // gradedMuscles — НЕ excluded: щадящий режим оставляет мышцу в плане.
+      excludedMuscles: (plan as any).safetyConstraints?.excludedMuscles,
       avoidAxialLoad: (plan as any).safetyConstraints?.avoidAxialLoad,
       checkOrder: (plan as any).methodologyApplied !== false,
       methodology: (plan as any).methodology,
       specializationTargets: (plan as any).priorityMuscles,
+      // Контекст, который сборщик применил к капам: иначе валидатор мерил
+      // план по дефолтным 24/10 и давал ложные session_*_cap.
+      onCourse: ctx.onCourse ?? (plan as any).onCourse,
+      patternId: ctx.patternId || (plan as any).pattern?.id,
+      maxWorkingSets: ctx.maxWorkingSets,
+      maxExercises: ctx.maxExercises,
+      trainingVolumeMode: ctx.trainingVolumeMode,
+      sessionGroups: ctx.sessionGroups,
     });
   } catch {
     return invalidInputView('План не прошёл проверку структуры. Пересоберите его перед применением.');

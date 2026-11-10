@@ -35,7 +35,9 @@ describe('BB feedback across adaptive sources', () => {
       autoRegResult: { volumeMultiplier: 0.5, topSetPctMultiplier: 0.95, rirShift: 1 },
     });
     const output = result.weeks[0].sessions[0].exercises[0];
-    expect(output.sets).toBe(1);
+    // Аудит 2026-11: из многоподходного упражнения нельзя делать 1 сет —
+    // авторегуляция режет объём, но не ниже рабочего минимума 2.
+    expect(output.sets).toBe(2);
     expect(output.workSets).toHaveLength(output.sets);
   });
 

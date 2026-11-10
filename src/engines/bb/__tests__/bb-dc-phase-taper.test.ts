@@ -24,12 +24,14 @@ const WM = {
   glutes: 141.3, biceps: 51.7, triceps: 61.7, calves: 81.7, traps: 71.7, forearms: 41.7,
 };
 
-/** Проба из задачи: enhanced + AAS500/GH4/insulin10, upper_lower_6. */
+/** Проба из задачи: enhanced + AAS1000/GH4/insulin10 + dcMode, upper_lower_6.
+ *  Аудит 2026-11: DC — не авто-награда за любой AAS, а явный режим
+ *  (dcMode + AAS ≥ 750). Тест проверяет фаз-гейт DC, поэтому режим включён. */
 function dcProbe(): any {
   return buildBBPlan({
     patternId: 'upper_lower_6', weeks: 8, level: 'enhanced', trainingYears: 9, goal: 'mass',
-    workMax: WM, sex: 'male',
-    peds: ['AAS', 'GH', 'insulin'], pedDoses: { AAS: 500, GH: 4, insulin: 10 }, courseIntensity: 'moderate',
+    workMax: WM, sex: 'male', dcMode: true,
+    peds: ['AAS', 'GH', 'insulin'], pedDoses: { AAS: 1000, GH: 4, insulin: 10 }, courseIntensity: 'moderate',
   } as never);
 }
 
@@ -84,8 +86,8 @@ describe('BB-auto: DC Rest-Pause — фаз-гейт (аудит 2026-10)', () =
     for (const patternId of sample) {
       const plan: any = buildBBPlan({
         patternId, weeks: 8, level: 'enhanced', trainingYears: 9, goal: 'mass',
-        workMax: WM, sex: 'male',
-        peds: ['AAS', 'GH', 'insulin'], pedDoses: { AAS: 500, GH: 4, insulin: 10 }, courseIntensity: 'moderate',
+        workMax: WM, sex: 'male', dcMode: true,
+        peds: ['AAS', 'GH', 'insulin'], pedDoses: { AAS: 1000, GH: 4, insulin: 10 }, courseIntensity: 'moderate',
       } as never);
       for (const w of plan.weeks) {
         const hasDc = w.sessions.some((s: any) => s.exercises.some((e: any) => isDc(e)));
@@ -100,8 +102,8 @@ describe('BB-auto: DC Rest-Pause — фаз-гейт (аудит 2026-10)', () =
     for (const goal of ['mass', 'cut', 'recomp', 'maintenance', 'strength_mass']) {
       const plan: any = buildBBPlan({
         patternId: 'upper_lower_6', weeks: 12, level: 'enhanced', trainingYears: 9, goal,
-        workMax: WM, sex: 'male',
-        peds: ['AAS', 'GH', 'insulin'], pedDoses: { AAS: 500, GH: 4, insulin: 10 }, courseIntensity: 'moderate',
+        workMax: WM, sex: 'male', dcMode: true,
+        peds: ['AAS', 'GH', 'insulin'], pedDoses: { AAS: 1000, GH: 4, insulin: 10 }, courseIntensity: 'moderate',
       } as never);
       for (const w of plan.weeks) for (const s of w.sessions) for (const e of s.exercises) {
         if (isDc(e)) expect(w.phase, `${goal}: DC W${w.week} phase=${w.phase}`).toBe('intensification');
@@ -113,8 +115,8 @@ describe('BB-auto: DC Rest-Pause — фаз-гейт (аудит 2026-10)', () =
   it('аудит 2026-10-2: strength_mass 12 нед — intensification DC, peaking cluster, accumulation без DC (per-phase)', () => {
     const plan: any = buildBBPlan({
       patternId: 'upper_lower_6', weeks: 12, level: 'enhanced', trainingYears: 9, goal: 'strength_mass',
-      workMax: WM, sex: 'male',
-      peds: ['AAS', 'GH', 'insulin'], pedDoses: { AAS: 500, GH: 4, insulin: 10 }, courseIntensity: 'moderate',
+      workMax: WM, sex: 'male', dcMode: true,
+      peds: ['AAS', 'GH', 'insulin'], pedDoses: { AAS: 1000, GH: 4, insulin: 10 }, courseIntensity: 'moderate',
     } as never);
     // intensification: КАЖДЫЙ primary получает DC-схему и 1 рабочий слот.
     const int = plan.weeks.filter((w: any) => w.phase === 'intensification');

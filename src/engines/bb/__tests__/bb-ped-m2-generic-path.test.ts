@@ -6,6 +6,8 @@
  * cycle/program-оверлеев):
  *  1) на 12-недельном плане схемы РАЗНЫЕ в accumulation и intensification
  *     (то есть schemeProfile выбирает схему по фазе, а не один раз);
+ *     DC здесь включается явно (dcMode + AAS ≥ 750, аудит 2026-11), иначе
+ *     фаза intensification не имеет права на 1-сетовый rest-pause.
  *  2) инсулиновое памп-окно появляется ТОЛЬКО когда в стеке есть инсулин
  *     вместе с GH (синергия IGF-1), а не «за компанию» с AAS;
  *  3) GH ≥ 4 МЕ → joint guard честно назван в rationale.
@@ -51,7 +53,7 @@ const repSignature = (exs: any[]) => {
 
 describe('M-2: PED-методика на generic-пути (buildBBPlan)', () => {
   it('12 недель + AAS/GH: схема повторов в accumulation и intensification разная', () => {
-    const p = plan({ peds: ['AAS', 'GH'], pedDoses: { AAS: 500, GH: 2 }, courseIntensity: 'moderate' });
+    const p = plan({ dcMode: true, peds: ['AAS', 'GH'], pedDoses: { AAS: 1000, GH: 2 }, courseIntensity: 'moderate' });
     const acc = exercisesInPhase(p, 'accumulation');
     const intens = exercisesInPhase(p, 'intensification');
     expect(acc.length, 'нет тяж-базы в accumulation').toBeGreaterThan(0);

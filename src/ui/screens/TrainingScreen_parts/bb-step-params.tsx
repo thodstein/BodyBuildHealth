@@ -114,6 +114,9 @@ export interface BbParamsStepProps {
   /** G1: сценарий входа в мезоцикл (standard/preloaded/flat). */
   bbVolumeRamp: 'standard' | 'preloaded' | 'flat';
   setBbVolumeRamp: React.Dispatch<React.SetStateAction<'standard' | 'preloaded' | 'flat'>>;
+  /** G1: волновой вход внутри фазы (opt-in). */
+  volumeWave?: boolean;
+  setVolumeWave?: React.Dispatch<React.SetStateAction<boolean>>;
   onUserVolGoal: (v: string) => void;
   trainingVolumeMode: 'standard' | 'high';
   setTrainingVolumeMode: React.Dispatch<React.SetStateAction<'standard' | 'high'>>;
@@ -180,6 +183,7 @@ export const BbParamsStep: React.FC<BbParamsStepProps> = ({
   loadStrategy, setLoadStrategy, onUserLoadStrategy, deloadType, setDeloadType, onUserDeloadType, onUserIntensityTech,
   eccentricMult, setEccentricMult, calorieSurplus, setCalorieSurplus,
   rotationMode, setRotationMode, intensityLevel, setIntensityLevel, bbVolGoal, setBbVolGoal, onUserVolGoal, bbVolumeRamp, setBbVolumeRamp,
+  volumeWave, setVolumeWave,
   trainingVolumeMode, setTrainingVolumeMode,
   avoidAxialLoadUi, setAvoidAxialLoadUi, fewerCompound, setFewerCompound,
   allowStrengthLifts, setAllowStrengthLifts, abRotation, setAbRotation, packingV2, setPackingV2, autoRegOn, setAutoRegOn,
@@ -438,6 +442,14 @@ export const BbParamsStep: React.FC<BbParamsStepProps> = ({
               ? 'Разгон: первые недели легче цели — есть запас под рост веса и повторов. Сразу разогнанный — старт на цели (возврат после перерыва, короткий блок, повторный мезо). Мышцы на минимумах (руки в PPL, мелкие группы) выбор не двигает — они и так держат минимум.'
               : ''}
           </div>
+          {isGeneric && setVolumeWave ? (
+            <button
+              onClick={() => setVolumeWave(v => !v)}
+              style={{ ...NOTE, color: volumeWave ? '#22c55e' : '#fff', border: `1px solid ${volumeWave ? '#22c55e' : 'rgba(255,255,255,0.12)'}`, borderRadius: 10, padding: '8px 10px', background: volumeWave ? 'rgba(34,197,94,0.12)' : 'rgba(255,255,255,0.02)', cursor: 'pointer', textAlign: 'left' }}
+            >
+              {volumeWave ? '✓ ' : ''}🌊 Волна внутри фазы: накопление → интенсификация (недельный объём волной)
+            </button>
+          ) : null}
           <PopupSelect
             label='📦 Схема объёма памп-дней'
             value={volumeScheme}

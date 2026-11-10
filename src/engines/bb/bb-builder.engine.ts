@@ -75,7 +75,7 @@ import { loadSRPESessions } from '../../engines/pro/srpe-store';
 import { acuteChronicRatio, toDailyLoads } from '../../engines/pro/training-load.engine';
 import type { Macrocycle, MacroPhase, BBMacrocycle } from '../lms/macrocycle.engine';
 import { syncBBPlanSetShape, validateBBPlan } from './bb-validator.engine';
-import { finalizeBBPlan, prioritizeBackSessions, reconcileVolumeTargets, pplWeeklyFloorFor, reconcileSchemeComments, normalizePlanMuscleTags, ensureFemaleHamstringFloor, ensureBodybuildingMinimums, assignProgressionRules } from './bb-finalize.engine';
+import { finalizeBBPlan, prioritizeBackSessions, reconcileVolumeTargets, pplWeeklyFloorFor, reconcileSchemeComments, normalizePlanMuscleTags, ensureFemaleHamstringFloor, ensureBodybuildingMinimums, assignProgressionRules, stampBBPlanFinalizeSignature, repairSingleSetExercises } from './bb-finalize.engine';
 import { normalizeEquipmentIds, equipmentAllows } from './bb-equipment';
 import { refreshBBPlanSnapshots } from './bb-plan-snapshot.engine';
 import { buildBBVolumeTarget, type BBVolumeTarget, computeMrvMult, regimeMrvMultFor, computeBBRecoveryScore, computeBBWeeklyBudget, sessionLimitsFor, computeBBRecoveryMultiplier, computeBBNutritionMultiplier, perExerciseCap, perSessionMuscleCap, sessionMrvRotCap, sessionMuscleRealismCap, sessionMuscleExerciseCap, sessionDensityExerciseCap, resolveMrvCap, weeklyCapFor, distributeSetsByRole, BB_MRV_TOLERANCE, FEMALE_GLUTE_HIGH_CAP, FEMALE_GLUTE_TARGET_CAP } from './bb-volume.engine';
@@ -174,9 +174,8 @@ export interface BBBuilderInput {
    * рампа (1.0 → 1.15 → 0.75 → 1.05 + 2.5% за 4 недели). Дефолт выкл —
    * недельные множители остаются прежними.
    *
-   * @unwired (аудит 2026-11, BB-10) — контрола волны в UI нет ни в одном экране
-   * (`volumeWave` не встречается в `TrainingScreen_parts`), поле никем не
-   * передаётся. Мёртвый вход движка.
+   * UI: `BbAutoConstructor` → `bb-step-params` («🌊 Волна внутри фазы»),
+   * передаётся в generic-путь сборки. Аудит 2026-11 закрыт.
    */
   volumeWave?: boolean;
   specialization?: boolean;      // true = слабые на MAV+10%, остальные на MEV
@@ -224,6 +223,8 @@ export interface BBBuilderInput {
     volumeMultiplier: number;
     topSetPctMultiplier: number;
     rirShift: number;
+    /** Readiness-сигнал: нужна разгрузка, а не просто снижение объёма. */
+    deload?: boolean;
   };
   /** Дозы PED (мг/нед или МЕ/день или мкг). Ключи: 'AAS','insulin','MGF','IGF1','GH'.
    *  Dose-aware: 250 мг ААС ≠ 2000 мг ААС по влиянию на MRV. */
@@ -258,7 +259,11 @@ export interface BBBuilderInput {
   hrvMs?: number;
   /** Личная HRV-база (среднее RMSSD, мс). */
   hrvBaseline?: number;
-  /** Отклонение lnRMSSD от базы в единицах SWC — предпочтительный способ. */
+  /**
+   * Отклонение lnRMSSD от базы в единицах SWC — предпочтительный способ.
+   * UI пока не имеет источника SWC: `BbAutoConstructor` передаёт только
+   * `hrvBaseline`; поле остаётся API-входом для дневника/импорта.
+   */
   hrvBaselineZ?: number;
   /** Часы сна за ночь. >7 = high, 6-7 = medium, <6 = low (Watson 2022). */
   sleepHours?: number;
@@ -287,10 +292,8 @@ export interface BBBuilderInput {
    * ротационное «понижение приоритета» (мягкое избегание повторов в течение
    * cooldown-окна), совместимо с cross-meso rotation.
    *
-   * @unwired (аудит 2026-11, BB-10) — контракт есть и покрыт тестами, но НИ ОДИН
-   * экран приложения не передаёт поле: ротация по «cooldown» фактически не
-   * работает в UI. Чтобы включить — собрать историю из дневника и прокинуть сюда;
-   * до этого поле не считается рабочей функцией.
+   * UI: `BbAutoConstructor` собирает историю из последней недели сохранённого
+   * плана (`previousPlan`) и передаёт её в generic-путь. Аудит 2026-11 закрыт.
    */
   cooldownHistory?: Array<{ exerciseName: string; pattern?: string }>;
   /**
@@ -305,8 +308,9 @@ export interface BBBuilderInput {
    * Если overreachingCheck не «очищен» — после первой разгрузки плана ставится
    * вторая микро-разгрузка (−20% объём, RIR+2) с rationale.
    *
-   * @unwired (аудит 2026-11, BB-10) — UI не передаёт поле: в приложении этот проход
-   * не срабатывает. Включать только вместе с источником before/after (дневник).
+   * @unsupported-in-ui (аудит 2026-11, BB-10) — источника before/after в UI нет,
+   * поэтому поле сознательно не передаётся и не имитируется. Включать только
+   * вместе с реальным дневниковым источником замеров до/после разгрузки.
    */
   deloadReadiness?: { before: number; after: number; soreness?: number };
   /** Суперсеты-антагонисты (грудь↔спина, бицепс↔трицепс, квадры↔хамсы). */
@@ -610,6 +614,12 @@ export interface BBPlan {
     mrvMultiplier?: number;
     gradedMuscles?: string[];
     mobilityRestrictions?: string[];
+    sex?: 'male' | 'female';
+    patternId?: string;
+    autoTaper?: boolean;
+    trainingVolumeMode?: 'standard' | 'high';
+    autoIntensityTechniques?: boolean;
+    inputWarnings?: string[];
   };
   /** Расширенная недельная сводка сетов (по мышцам: сессии/рабочие/разминочные/паттерны). */
   expandedSummary?: import('./bb-summary.engine').BBExpandedSummary;
@@ -668,6 +678,25 @@ export interface BBPlan {
     stressLevel?: number;
     weakPoints?: string[];
     focusGroup?: string;
+    /** Полный контракт replan: всё, что влияет на пересборку остатка. */
+    sex?: 'male' | 'female';
+    pedDoses?: Record<string, number>;
+    intensityTechnique?: string;
+    autoIntensityTechniques?: boolean;
+    autoRegResult?: { volumeMultiplier: number; topSetPctMultiplier: number; rirShift: number; deload?: boolean };
+    volumeRamp?: string;
+    volumeWave?: boolean;
+    age?: number;
+    cycleDay?: number;
+    cycleLength?: number;
+    painLevel?: any;
+    painLocation?: string | null;
+    soreness010?: number | null;
+    rehabMuscles?: string[];
+    rehabWeekStart?: number;
+    bodyweightCapability?: BBBuilderInput['bodyweightCapability'];
+    availablePlates?: number[];
+    planStartWeek?: string;
   };
 }
 
@@ -3308,10 +3337,29 @@ function computeAcwr(): number {
 }
 
 export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BBPlan {
-  // F0 guard: weeks clamp 1-52 — капы freeze, только валидация входа (не меняет лимиты)
-  if (!Number.isFinite(input.weeks) || input.weeks < 1 || input.weeks > 52) {
-    console.warn(`[bb-builder] buildBBPlan: weeks=${input.weeks} некорректно — используется ${Math.max(1, Math.min(52, Math.round(Number(input.weeks) || 8)))}`);
+  // F0 guard: weeks clamp 1-52. The warning previously promised a clamp but
+  // never assigned it; 0/NaN produced an empty plan and 53 produced 53 weeks.
+  const requestedWeeks = Number(input.weeks);
+  const safeWeeks = Number.isFinite(requestedWeeks)
+    ? Math.max(1, Math.min(52, Math.round(requestedWeeks)))
+    : 8;
+  const inputWarnings: string[] = [];
+  if (safeWeeks !== requestedWeeks) {
+    const msg = `weeks=${input.weeks} вне [1,52] — применён clamp до ${safeWeeks}.`;
+    console.warn(`[bb-builder] buildBBPlan: ${msg}`);
+    inputWarnings.push(msg);
   }
+  // Never mutate the caller's object: replan/UI reuse the same input
+  // reference, and workMax numeric clamps used to delete caller keys.
+  input = {
+    ...input,
+    weeks: safeWeeks,
+    workMax: input.workMax ? { ...input.workMax } : undefined,
+    equipment: input.equipment ? [...input.equipment] : input.equipment,
+    injuries: input.injuries ? [...input.injuries] : input.injuries,
+    pedDoses: input.pedDoses ? { ...input.pedDoses } : input.pedDoses,
+    autoRegResult: input.autoRegResult ? { ...input.autoRegResult } : input.autoRegResult,
+  };
   // Числовые гарды — защита от NaN/экстремалей без сдвига капов (только clamp + warn)
   const numWarn = (name: string, v: any, min: number, max: number) => {
     if (v == null) return;
@@ -3351,9 +3399,17 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
   }
   const foundPattern = getPattern(input.patternId);
   if (!foundPattern) {
-    console.warn(`[bb-builder] buildBBPlan: patternId="${input.patternId}" не найден — fallback на SPLIT_PATTERNS[0] (${SPLIT_PATTERNS[0].id}). Проверьте, что передаёте patternId (не split).`);
+    const msg = `patternId="${input.patternId}" не найден — fallback на ${SPLIT_PATTERNS[0].id}. Передавайте patternId, а не split.`;
+    console.warn(`[bb-builder] buildBBPlan: ${msg}`);
+    inputWarnings.push(msg);
   }
   const pattern = foundPattern || SPLIT_PATTERNS[0];
+  const knownLevels = ['beginner', 'intermediate', 'advanced', 'enhanced'];
+  if (input.level != null && String(input.level) !== '' && !knownLevels.includes(String(input.level))) {
+    const msg = `level="${input.level}" неизвестен — применён fallback ${normLevel(input.level)}.`;
+    console.warn(`[bb-builder] buildBBPlan: ${msg}`);
+    inputWarnings.push(msg);
+  }
   const level = normLevel(input.level) as TrainingLevel;
   // PED-автоадаптация: если pedAdapt не передан явно (2-й аргумент), но в
   // pedDoses есть положительные дозы — выводим из доз. Без этого половина
@@ -4355,6 +4411,9 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
     // P1-2: bro_5 warning
     ...(pattern.id === 'bro_5' ? [`⚠ Bro Split 5×/нед — низкая частота 1×/нед на группу; ≥2×/нед результативнее для натуралов (Schoenfeld 2018 мета-анализ).`] : []),
   ];
+  if (inputWarnings.length > 0) {
+    rationale.push(`⚠ Вход нормализован: ${inputWarnings.join(' ')}`);
+  }
 
   const basePlan: BBPlan = { pattern, weeks, rotationMuscleVolume: muscleVolumeRotation, rationale, volumeTargets };
   // Баланс мышц — проф-отчёт + автоправка (не только rationale, но и объём)
@@ -4435,9 +4494,11 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
   // DC rest-pause при соло-инсулине: явный выбор техники снимается (нет базы
   // для отказных rest-pause). Авто-назначение rest_pause в финализаторе гасится
   // флагом soloInsulin (см. finalize options).
-  let effIntensityTechnique = (input.intensityTechnique && input.intensityTechnique !== 'none' ? input.intensityTechnique : undefined) as any;
+  // Явный 'none' — это запрет техник, а не «не задано». Раньше он превращался
+  // в undefined, и finalize/applyPostPhase навешивали дефолтные drop-set'ы.
+  let effIntensityTechnique: IntensityTechnique | undefined = input.intensityTechnique;
   if (soloInsulinGate && input.intensityTechnique === 'rest_pause') {
-    effIntensityTechnique = undefined;
+    effIntensityTechnique = 'none';
     schemeDowngradeNotes.push('⛔ Соло-инсулин: rest-pause (DC) отключён — отказные техники без анаболической базы запрещены. Техника: выкл.');
   }
   const fst7Seven = effVolumeScheme === 'fst7' && level === 'enhanced' && !methForGates?.jointGuard && !soloInsulinGate;
@@ -4452,8 +4513,8 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
     else if (vbtRec.lossPct >= 25) vbtReg = { volumeMultiplier: 0.9, topSetPctMultiplier: 1, rirShift: 1 };
   }
   const mergeAutoReg = (
-    base?: { volumeMultiplier: number; topSetPctMultiplier: number; rirShift: number },
-    extra?: { volumeMultiplier: number; topSetPctMultiplier: number; rirShift: number } | null,
+    base?: { volumeMultiplier: number; topSetPctMultiplier: number; rirShift: number; deload?: boolean },
+    extra?: { volumeMultiplier: number; topSetPctMultiplier: number; rirShift: number; deload?: boolean } | null,
   ) => {
     if (!base && !extra) return undefined;
     if (!extra) return base;
@@ -4462,6 +4523,7 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
       volumeMultiplier: Math.min(base.volumeMultiplier, extra.volumeMultiplier),
       topSetPctMultiplier: base.topSetPctMultiplier,
       rirShift: Math.max(base.rirShift, extra.rirShift),
+      deload: !!base.deload || !!extra.deload,
     };
   };
   const effAutoReg = input.autoRegResult ? mergeAutoReg(input.autoRegResult, vbtReg) : input.autoRegResult;
@@ -5073,6 +5135,8 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
   const output = {
     ...finalPlan,
     level,
+    onCourse,
+    sex: input.sex,
     volumeLandmarks,
     muscleFrequency,
     volumeTargets,
@@ -5153,6 +5217,24 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
       blastCruiseEnabled: input.blastCruiseEnabled,
       blastWeeks: input.blastWeeks,
       cruiseWeeks: input.cruiseWeeks,
+      // P0 replan-контракт: без этих полей пересборка остатка теряла пол,
+      // фарм-дозы, техники, авторегуляцию и стартовую неделю.
+      sex: input.sex,
+      pedDoses: input.pedDoses,
+      intensityTechnique: input.intensityTechnique,
+      autoIntensityTechniques: input.intensityTechnique !== 'none',
+      autoRegResult: input.autoRegResult,
+      age: input.age,
+      cycleDay: input.cycleDay,
+      cycleLength: input.cycleLength,
+      painLevel: input.painLevel,
+      painLocation: input.painLocation,
+      soreness010: input.soreness010,
+      rehabMuscles: input.rehabMuscles,
+      rehabWeekStart: input.rehabWeekStart,
+      bodyweightCapability: input.bodyweightCapability,
+      availablePlates: input.availablePlates,
+      planStartWeek: input.planStartWeek,
     },
     // Аудит 2026-10: generic-путь НЕ писал planStartWeek на уровень плана, хотя
     // его читают bb-plan-fact (план vs факт), bb-visual (диапазоны недель) и
@@ -5224,6 +5306,10 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
     soloInsulin: soloInsulinGate,
     dcWidowmaker: dcGatePass,
     rotationMode: input.rotationMode,
+    trainingVolumeMode: input.trainingVolumeMode,
+    // Явный 'none' запрещает авто-техники; без выбора — прежнее авто-назначение.
+    autoIntensityTechniques: input.intensityTechnique !== 'none',
+    inputWarnings,
   });
   // PRO+ФАРМА: тяговая сессия добивает спину до 30/сессию (60/нед) — паритет
   // с цикловым путём (expandPlanToTargets). Бюджет сессии не поднимаем.
@@ -5369,6 +5455,7 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
         intensityMult: 1,
         // Волна-3.3: гейт minLevel схемы (dc_rp/cluster — advanced+).
         level,
+        dcAllowed: dcGatePass,
       };
       const pedProfile = meth.schemeProfile;
       const phasesInPlan = Array.from(new Set(
@@ -5378,7 +5465,7 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
       ));
       let heavyApplied = 0;
       for (const phase of phasesInPlan) {
-        const hid = schemeFor({ goal: input.goal, focus: input.trainingFocus, phase: phase as BBPhase, character: 'тяж', level, pedProfile });
+        const hid = schemeFor({ goal: input.goal, focus: input.trainingFocus, phase: phase as BBPhase, character: 'тяж', level, pedProfile, dcAllowed: dcGatePass });
         const hs = REP_SCHEMES[hid];
         if (!hs) continue;
         // Дефолтную (не фаз-специфичную) схему применяем только к репрезентативной
@@ -5649,6 +5736,40 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
   // Правило прогрессии обязано быть у каждого — иначе bb-visual/прогрессия
   // падают на новом движении без правила.
   assignProgressionRules(finalized, lateMinOptions);
+  // Поздние pass'ы (схемы/методики/финализатор) могли перезаписать веса
+  // одинаковым значением после autoReg. Восстанавливаем контракт «множитель
+  // только для топ-сета»: если топ и второй сет равны — сдвигаем топ.
+  if (effAutoReg && Number.isFinite(effAutoReg.topSetPctMultiplier) && effAutoReg.topSetPctMultiplier !== 1) {
+    for (const w of finalized.weeks as any[]) {
+      if (w.deload === true || w.phase === 'deload' || w.taper === true || w.taperApplied === true) continue;
+      for (const s of w.sessions || []) for (const e of s.exercises || []) {
+        if (e.warmupActivator) continue;
+        const ws = Array.isArray(e.workSets) ? e.workSets : [];
+        if (ws.length >= 2 && ws[0] && ws[1] && ws[0].weight > 0 && ws[0].weight === ws[1].weight) {
+          ws[0].weight = Math.round(ws[0].weight * effAutoReg.topSetPctMultiplier * 10) / 10;
+        }
+      }
+    }
+  }
+  // Финальные проходы могли менять e.rir, не трогая рабочие подходы (или
+  // наоборот). Сводим их только когда ВСЕ сеты упражнения несут один RIR:
+  // техники (BFR/DC/drop-set) законно держат разные RIR по сетам, их не ломаем.
+  for (const w of finalized.weeks as any[]) {
+    for (const s of w.sessions || []) for (const e of s.exercises || []) {
+      const ws = Array.isArray(e.workSets) ? e.workSets : [];
+      if (ws.length === 0) continue;
+      const rirs = ws.map((set: any) => Math.max(0, Math.min(5, Number(set.rir) || 0)));
+      const uniform = rirs.every((r: number) => r === rirs[0]);
+      const hasTechnique = ws.some((set: any) => !!set.technique);
+      if (uniform && !hasTechnique) e.rir = rirs[0];
+    }
+  }
+  syncBBPlanSetShape(finalized);
+  // Аудит 2026-11: после ВСЕХ режущих проходов (рампа, синхронизация схем,
+  // женские добивки) в рабочей неделе не должно оставаться упражнений с 1
+  // сетом. Сет не добавляем — переносим один у той же мышцы (donor ≥ 3).
+  // Только generic-путь: cycle/program имеют собственные baseline-пост-проходы.
+  repairSingleSetExercises(finalized);
   syncBBPlanSetShape(finalized);
   // Добивки могли затронуть упражнения со схемами — комментарий снова к факту.
   reconcileSchemeComments(finalized);
@@ -5689,6 +5810,9 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
     refreshValidationRationale: true,
     refreshRotationRationale: true,
   });
+  // Поздние проходы изменили план после финализатора — подпись должна
+  // соответствовать ИТОГОВОМУ плану, иначе первый UI-revalidate не no-op.
+  stampBBPlanFinalizeSignature(finalized);
   return finalized;
 }
 

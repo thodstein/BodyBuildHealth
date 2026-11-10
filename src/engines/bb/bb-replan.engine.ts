@@ -19,6 +19,8 @@
 
 import type { BBPlan, BBBuilderInput } from './bb-builder.engine';
 import { buildBBPlan } from './bb-builder.engine';
+import { refreshBBPlanSnapshots } from './bb-plan-snapshot.engine';
+import { stampBBPlanFinalizeSignature } from './bb-finalize.engine';
 import { SPLIT_PATTERNS } from './bb-split-patterns';
 import type { WorkoutSession } from '../workout-logger.engine';
 
@@ -79,6 +81,14 @@ export function replanBBMesoFromFact(
 
   const frozen = plan.weeks.slice(0, current - 1);
   const previousPlan: BBPlan = { ...plan, weeks: frozen };
+  // Fallback для планов, собранных до расширения снапшота: buildContext/plan
+  // хранят пол, PED-адаптацию и капы, без которых реплан стартовал «натуралом».
+  const ctx: any = (plan as any).buildContext || {};
+  const pedDoses: Record<string, number> | undefined = (snap.pedDoses && typeof snap.pedDoses === 'object')
+    ? { ...snap.pedDoses }
+    : (plan as any).pedAdaptation?.pedDoses
+      ? { ...(plan as any).pedAdaptation.pedDoses }
+      : undefined;
 
   const input: BBBuilderInput = {
     patternId,
@@ -125,10 +135,29 @@ export function replanBBMesoFromFact(
     blastCruiseEnabled: snap.blastCruiseEnabled,
     blastWeeks: snap.blastWeeks,
     cruiseWeeks: snap.cruiseWeeks,
+    // P0: сквозной контракт входа. Без пола реплан терял женские минимумы,
+    // без PED-доз — onCourse/MRV/DC, без техник/авторегуляции — интенсивность.
+    sex: (snap.sex || (plan as any).sex || ctx.sex
+      || (/^female_/i.test(String(patternId)) ? 'female' : undefined)) as BBBuilderInput['sex'],
+    pedDoses,
+    intensityTechnique: snap.intensityTechnique as BBBuilderInput['intensityTechnique'],
+    autoRegResult: snap.autoRegResult,
+    volumeWave: snap.volumeWave,
+    volumeRamp: snap.volumeRamp as BBBuilderInput['volumeRamp'],
+    age: Number.isFinite(snap.age) ? snap.age : undefined,
+    cycleDay: Number.isFinite(snap.cycleDay) ? snap.cycleDay : undefined,
+    cycleLength: Number.isFinite(snap.cycleLength) ? snap.cycleLength : undefined,
+    painLevel: snap.painLevel,
+    painLocation: snap.painLocation,
+    soreness010: snap.soreness010,
+    rehabMuscles: Array.isArray(snap.rehabMuscles) ? snap.rehabMuscles : undefined,
+    rehabWeekStart: Number.isFinite(snap.rehabWeekStart) ? snap.rehabWeekStart : undefined,
+    bodyweightCapability: snap.bodyweightCapability,
+    availablePlates: Array.isArray(snap.availablePlates) ? snap.availablePlates : undefined,
     // Продолжение от фактического пика прожитых недель.
     previousPlan,
     previousPlans: [plan],
-    planStartWeek: opts.planStartWeek,
+    planStartWeek: opts.planStartWeek || snap.planStartWeek,
   } as BBBuilderInput;
 
   let rebuilt: BBPlan;
@@ -169,6 +198,33 @@ export function replanBBMesoFromFact(
       ...((rebuilt as any).inputSnapshot || {}),
     },
   } as BBPlan;
+
+  // Пересобрать derived-снапшоты на ВСЁМ итоговом плане: раньше weeklyVolume
+  // покрывал только пересобранный остаток (8-нед план → ключи 1–6) и
+  // валидация не видела замороженный префикс.
+  const finalCtx: any = (rebuilt as any).buildContext || ctx;
+  refreshBBPlanSnapshots(out, {
+    validationOptions: {
+      level: finalCtx.level || input.level,
+      trainingYears: finalCtx.trainingYears ?? input.trainingYears,
+      onCourse: finalCtx.onCourse ?? (rebuilt as any).onCourse,
+      trainingVolumeMode: finalCtx.trainingVolumeMode ?? input.trainingVolumeMode,
+      patternId: finalCtx.patternId || patternId,
+      maxWorkingSets: finalCtx.maxWorkingSets,
+      maxExercises: finalCtx.maxExercises,
+      equipment: input.equipment,
+      excludedExercises: input.excludedExercises,
+      excludedMuscles: (plan as any).safetyConstraints?.excludedMuscles,
+      avoidAxialLoad: input.avoidAxialLoad,
+      specializationTargets: finalCtx.priorityMuscles,
+      checkOrder: true,
+    },
+    specTargets: finalCtx.priorityMuscles || [],
+    refreshFrequency: true,
+    refreshValidationRationale: true,
+    refreshRotationRationale: true,
+  });
+  stampBBPlanFinalizeSignature(out);
 
   return {
     plan: out,

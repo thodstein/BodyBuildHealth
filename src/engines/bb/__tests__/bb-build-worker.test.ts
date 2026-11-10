@@ -68,7 +68,10 @@ describe('BB build worker — контракт', () => {
     const actual = [...seen].sort();
     // Если тест упал: движок начал читать новое хранилище. Добавьте ключ в
     // BB_WORKER_STORAGE_KEYS — иначе план в воркере разойдётся с основным потоком.
-    expect(actual).toEqual([...BB_WORKER_STORAGE_KEYS].sort());
+    // Снимок — надмножество: prep/peak-задачи читают свои ключи, и они должны
+    // пересылаться без sync-fallback.
+    expect(actual.every(key => BB_WORKER_STORAGE_KEYS.includes(key as any))).toBe(true);
+    expect(BB_WORKER_STORAGE_KEYS).toEqual(expect.arrayContaining(actual));
   });
 
   it('withStorageSnapshot подставляет снимок и восстанавливает хранилище', () => {

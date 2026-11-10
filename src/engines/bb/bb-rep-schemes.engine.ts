@@ -226,6 +226,12 @@ export interface SchemeForInput {
   pedProfile?: { hasAAS?: boolean; hasGH?: boolean; hasInsulin?: boolean; hasMGF?: boolean; hasIGF1?: boolean; ghPlusInsulin?: boolean; pedPhase?: 'proliferation' | 'differentiation' | 'both' };
   level?: string;
   character?: 'тяж' | 'памп' | 'лёг';
+  /**
+   * Явный DC-гейт вызывающего. `undefined` сохраняет legacy-поведение для
+   * чистых тестов/рекомендаций; builder всегда передаёт boolean, чтобы режим
+   * DC включался только при dcMode + AAS ≥ 750.
+   */
+  dcAllowed?: boolean;
 }
 
 /**
@@ -253,8 +259,10 @@ export function schemeFor(input: SchemeForInput): RepSchemeId {
   if (differentiating && character === 'памп') return 'pump_15_20';
   if (proliferating && phase === 'accumulation') return 'lengthened_partial';
 
-  // AAS heavy — DC / cluster для тяж
-  if (pedProfile?.hasAAS && isAdv && character === 'тяж' && phase === 'intensification') return 'dc_rp';
+  // AAS heavy — DC / cluster для тяж. DC — только при явном разрешении
+  // вызывающего (builder: dcMode + AAS ≥ 750). Иначе любая доза AAS
+  // автоматически превращала intensification в 1-сетовый rest-pause.
+  if (pedProfile?.hasAAS && isAdv && character === 'тяж' && phase === 'intensification' && input.dcAllowed !== false) return 'dc_rp';
   if (pedProfile?.hasAAS && character === 'тяж' && phase === 'peaking') return 'cluster';
 
   // GH solo — BFR / lengthened для суставов
@@ -370,9 +378,12 @@ export function applySchemeToPlan(
      * Не задан (unit-вызовы) — фильтра нет, поведение прежнее.
      */
     phases?: string[];
+    /** Явный запрет DC: dc_rp не применяется, даже если схема передана ошибочно. */
+    dcAllowed?: boolean;
   },
 ): number {
   if (!scheme) return 0;
+  if (scheme.id === 'dc_rp' && opts.dcAllowed === false) return 0;
   // Волна-3.3: minLevel схемы уважается (dc_rp — advanced, cluster — advanced…).
   if (!levelMeetsMin(opts.level, scheme.minLevel)) return 0;
   const { weightForRepMax, workMax, defaultWorkMax, proWorkmaxRatio, intensityMult = 1, phases } = opts;
@@ -438,8 +449,13 @@ export function applySchemeToPlan(
           tempo: loading.tempo,
           restSeconds: loading.restSec,
         }));
+        // Не оставлять старую заявку «3×8-12» рядом с новым числом сетов/повторов.
         if (!ex.comment?.includes(scheme.nameRu)) {
-          ex.comment = `${ex.comment || ''} | 📋 ${scheme.nameRu} (${scheme.evidence})`.trim().replace(/^\|\s*/, '');
+          const cleaned = String(ex.comment || '')
+            .replace(/\b\d+\s*[×x]\s*\d+(?:\s*[-–]\s*\d+)?/gi, '')
+            .replace(/\s*\|\s*$/, '')
+            .trim();
+          ex.comment = `${cleaned ? `${cleaned} | ` : ''}📋 ${scheme.nameRu} (${scheme.evidence})`;
         }
         applied++;
       }

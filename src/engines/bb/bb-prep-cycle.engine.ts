@@ -424,7 +424,9 @@ export function buildPrepCycle(raw: PrepCycleConfig, opts: PrepCycleBuildOpts = 
   // срезать сеты, оставив метки техник на урезанных подходах. Пере-назначаем на
   // ФИНАЛЬНЫЕ сеты. В пик-неделю убираем failure-протоколы (negative/RIR 0), но
   // оставляем dropset/rest-pause/21s (гипертрофия допустима в финальной подготовке).
-  autoAssignIntensityTechniques(bbPlanPrep, cfg.level || 'intermediate', accent);
+  if (cfg.intensityTechnique !== 'none') {
+    autoAssignIntensityTechniques(bbPlanPrep, cfg.level || 'intermediate', accent);
+  }
   for (const week of bbPlanPrep.weeks) {
     if ((week as any).contestPhase !== 'peak_week') continue;
     for (const session of (week.sessions || [])) for (const ex of (session.exercises || [])) {

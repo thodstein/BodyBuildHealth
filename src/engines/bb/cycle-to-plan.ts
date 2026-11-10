@@ -697,8 +697,8 @@ export interface CycleToPlanInput {
   autoDeload?: boolean;
   /** Тип делода (pump/neural/full_rest). */
   deloadType?: DeloadType;
-  /** Результат авторегуляции (объём/вес/RIR shift). */
-  autoRegResult?: { volumeMultiplier: number; topSetPctMultiplier: number; rirShift: number };
+  /** Результат авторегуляции (объём/вес/RIR shift; deload = разгрузка по готовности). */
+  autoRegResult?: { volumeMultiplier: number; topSetPctMultiplier: number; rirShift: number; deload?: boolean };
   /** Любимые упражнения (ID) — приоритет при замене. */
   favoriteExercises?: string[];
   /** Исключённые упражнения (ID) — замена на альтернативу. */
@@ -1665,7 +1665,8 @@ export function convertCycleToBBPlan(input: CycleToPlanInput): BBPlan {
       acwrRatio, // ← теперь единый расчёт ACWR с mode 1
       autoRegResult,
       skipPhaseRedistribution: true,
-      intensityTechnique: intensityTechnique && intensityTechnique !== 'none' ? intensityTechnique : undefined,
+      // 'none' — явный запрет; undefined означал бы «возьми дефолт фазы».
+      intensityTechnique: intensityTechnique === 'none' ? 'none' : intensityTechnique,
       weakPoints: weakPoints.length > 0 ? weakPoints : undefined,
     });
   }
@@ -1823,6 +1824,8 @@ export function convertCycleToBBPlan(input: CycleToPlanInput): BBPlan {
     supersetMode: (input as any).supersetMode,
     volumeScheme: cycleVolumeScheme,
     fst7Seven: cycleFst7Seven,
+    // Явный 'none' в UI — запрет авто-техник, а не «не выбрано».
+    autoIntensityTechniques: intensityTechnique !== 'none',
   });
   // Прямое расширение до предписанных целей (все мышцы) — до MRV-трима ниже.
   if (mode === 'adapt' && cycleVolumeTargets) {
@@ -2054,7 +2057,7 @@ export interface ProgramToBBPlanOpts {
   autoDeload?: boolean;
   deloadType?: DeloadType;
   loadStrategy?: LoadStrategy;
-  autoRegResult?: { volumeMultiplier: number; topSetPctMultiplier: number; rirShift: number };
+  autoRegResult?: { volumeMultiplier: number; topSetPctMultiplier: number; rirShift: number; deload?: boolean };
   favoriteExercises?: string[];
   excludedExercises?: string[];
   avoidAxialLoad?: boolean;
@@ -2925,7 +2928,7 @@ export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts)
       acwrRatio,
       autoRegResult: opts.autoRegResult,
       skipPhaseRedistribution: true,
-      intensityTechnique: opts.intTechnique && opts.intTechnique !== 'none' ? opts.intTechnique : undefined,
+      intensityTechnique: opts.intTechnique === 'none' ? 'none' : opts.intTechnique,
       weakPoints: weakPoints.length > 0 ? weakPoints : undefined,
     });
   }
@@ -3082,6 +3085,7 @@ export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts)
     supersetMode: (opts as any).supersetMode,
     volumeScheme: programVolumeScheme,
     fst7Seven: programFst7Seven,
+    autoIntensityTechniques: opts.intTechnique !== 'none',
     rotationMode: (opts as any).rotationMode,
     onCourse: programOnCourse,
     dcWidowmaker: dcGateProgram,

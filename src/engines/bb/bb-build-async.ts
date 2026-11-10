@@ -45,6 +45,18 @@ export const BB_WORKER_STORAGE_KEYS = [
   'he_hrv_log',
   'he_srpe_sessions',
   'he_workout_log_v2',
+  // Prep/peak-задачи (buildPrepCycle/buildPrepSeason/buildBBContestPrepPlan)
+  // читают эти ключи; без них каждый такой вызов уходил в sync-fallback.
+  'he_bb_test_peak_weeks',
+  'he_prep_posing_v1',
+  'he_prep_show_checklist',
+  'he_prep_peak_days_v1',
+  'he_prep_emergency_v1',
+  'he_prep_labs_v1',
+  'he_prep_week_checkins_v1',
+  'he_prep_postshow_v1',
+  'he_wearable_daily',
+  'he_bb_lvp_profile',
 ] as const;
 
 const DEFAULT_TIMEOUT_MS = 30000;

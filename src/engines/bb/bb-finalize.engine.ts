@@ -23,6 +23,7 @@ import { estimateBBSessionCost, fitBBSessionToBudget } from './bb-fatigue.engine
 import { REP_SCHEMES, isWidowmakerExercise } from './bb-rep-schemes.engine';
 import { INTENSITY_TECHNIQUES, techniquesFor } from './bb-intensity-techniques';
 import { buildProgressionRule } from './bb-progression-rule';
+import { TAG_MUSCLES } from './bb-day-types';
 import { analyzeBBRotation } from './bb-rotation.engine';
 import { EXERCISE_CATALOG } from '../../core/exercise-catalog';
 import { catalogByMuscle, findCatalogExercise } from './bb-catalog-index';
@@ -1438,31 +1439,9 @@ function bbTagAllows(tag: string, muscle: string): boolean {
   return false;
 }
 
-// Локальная копия TAG_MUSCLES (импорт bb-day-types создал бы цикл
-// builder→finalize→day-types→builder; источник тот же по смыслу).
-const TAG_MUSCLES_SAFE: Record<string, string[]> = {
-  Push: ['chest', 'delt_front', 'delt_mid', 'triceps'],
-  Pull: ['back', 'biceps', 'delt_rear', 'traps'],
-  Legs: ['quads', 'hamstrings', 'glutes', 'calves'],
-  Upper: ['chest', 'back', 'shoulders', 'biceps', 'triceps'],
-  Lower: ['quads', 'hamstrings', 'glutes', 'calves', 'abs'],
-  FullBody: ['chest', 'back', 'quads', 'hamstrings', 'glutes', 'shoulders', 'biceps', 'triceps', 'traps', 'calves'],
-  Chest: ['chest', 'delt_front', 'triceps'],
-  Back: ['back', 'biceps', 'delt_rear', 'traps'],
-  Shoulders: ['delt_front', 'delt_mid', 'delt_rear', 'traps'],
-  Arms: ['biceps', 'triceps', 'forearms'],
-  ChestBack: ['chest', 'back', 'delt_front', 'delt_rear', 'traps', 'forearms'],
-  ShouldersArms: ['delt_front', 'delt_mid', 'delt_rear', 'biceps', 'triceps', 'traps', 'forearms'],
-  Torso: ['chest', 'back', 'shoulders', 'traps', 'abs'],
-  Limbs: ['quads', 'hamstrings', 'glutes', 'biceps', 'triceps', 'calves', 'forearms'],
-  UpperPower: ['chest', 'back', 'shoulders', 'biceps', 'triceps', 'traps'],
-  LowerPower: ['quads', 'hamstrings', 'glutes', 'calves', 'abs', 'lower_back'],
-  UpperHyp: ['chest', 'back', 'delt_front', 'delt_mid', 'delt_rear', 'biceps', 'triceps'],
-  LowerHyp: ['quads', 'hamstrings', 'glutes', 'calves', 'abs'],
-  LegsBiceps: ['quads', 'hamstrings', 'calves', 'biceps'],
-  Glutes: ['glutes', 'hamstrings'],
-  GlutesHams: ['glutes', 'hamstrings', 'calves'],
-};
+// Единый источник тегов дня. Раньше здесь лежала «безопасная» копия
+// TAG_MUSCLES, которая дублировала канон и могла разойтись с валидатором.
+const TAG_MUSCLES_SAFE: Record<string, string[]> = TAG_MUSCLES;
 
 /** Дни, в которые логично добавлять мышцу (для выбора сессии). */
 function bbSessionsForMuscle(week: any, muscle: string): any[] {
@@ -3684,6 +3663,12 @@ export interface BBFinalizeOptions {
   mevCalibration?: import('./bb-mev-calibration.engine').MEVCalibration | null;
   /** Режим ротации (forbid = primary frozen между неделями). */
   rotationMode?: 'forbid' | 'strict' | 'variety';
+  /** Высокообъёмный режим — нужен валидатору для тех же капов, что применил сборщик. */
+  trainingVolumeMode?: 'standard' | 'high';
+  /** false = пользователь явно выбрал «без техник»; не навешивать дефолтные. */
+  autoIntensityTechniques?: boolean;
+  /** Нормализация/fallback входа — сохраняется в buildContext для UI. */
+  inputWarnings?: string[];
 }
 /** Специализация (методики Библиотеки): RIR-профиль (изоляции целевой мышцы
  *  добиваются до RIR 0-1), икры-спец (темп 2-2-1-0, сеты ≥4), спец-частота
@@ -5051,6 +5036,155 @@ export function assignProgressionRules(next: BBPlan, options: BBFinalizeOptions 
 }
 
 /**
+ * Поздняя страховка «одиночных» рабочих упражнений.
+ *
+ * Распределение объёма/бюджет сессии может оставить primary/accessory с
+ * `sets = 1` даже в рабочую неделю (аудит 2026-11: upper_lower_6 enhanced,
+ * Гакк-приседания). Один сет — это не рабочий стимул, а регресс: техники
+ * (DC/Rest-Pause/Myo/drop/BFR) и deload/taper/peak сюда не входят, они
+ * законно держат 1 слот. Сет НЕ добавляем (капы/объём не трогаем), а
+ * переносим один сет у той же мышцы из соседнего упражнения с запасом
+ * (donor ≥ 3 → останется ≥ 2). Это сохраняет недельный объём и лимиты сессии.
+ */
+export function repairSingleSetExercises(next: BBPlan): void {
+  if (!next || !Array.isArray(next.weeks)) return;
+  // Каталог/шаблоны могут переиспользовать одни и те же объекты упражнений
+  // между планами и неделями. Мутация `sets/workSets` «на месте» протекала в
+  // чужие планы (zero-state: chest 13→15, hamstrings 12→10). Клонируем перед
+  // ремонтом — правка остаётся локальной для этого плана.
+  for (const week of next.weeks as any[]) {
+    if (!week || !Array.isArray(week.sessions)) continue;
+    for (const session of week.sessions) {
+      if (!session || !Array.isArray(session.exercises)) continue;
+      session.exercises = session.exercises.map((e: any) => e ? {
+        ...e,
+        workSets: Array.isArray(e.workSets) ? e.workSets.map((ws: any) => (ws ? { ...ws } : ws)) : e.workSets,
+      } : e);
+    }
+  }
+  const isTechnique = (e: any): boolean => {
+    if (!e) return true;
+    if (Array.isArray(e.workSets) && e.workSets.some((ws: any) => !!ws?.technique)) return true;
+    return /DC Rest-Pause|Rest-Pause|Myo-reps|Drop-set|дроп|кластер|cluster|21s|негатив|lengthened|FST-7|GVT|Gironda|DoggCrapp|BFR|окклюз|partial/i
+      .test(String(e.comment || ''));
+  };
+  const canDonate = (e: any): boolean => {
+    if (!e || e.optional || e.warmupActivator || isTechnique(e)) return false;
+    if (Array.isArray(e.workSets)) return e.workSets.length >= 3;
+    return Number(e.sets) >= 3;
+  };
+  // Сырой `muscle` может отсутствовать/быть общим (shoulders) — переносить сет
+  // между разными реальными мышцами нельзя. Сверяем и канонический ключ.
+  const sameMuscle = (a: any, b: any): boolean => {
+    const am = String(a?.muscle || '');
+    const bm = String(b?.muscle || '');
+    if (!am || !bm || am !== bm) return false;
+    const at = trueMuscleOf({ name: a.name || a.exerciseName, muscle: am } as any) || am;
+    const bt = trueMuscleOf({ name: b.name || b.exerciseName, muscle: bm } as any) || bm;
+    return at === bt;
+  };
+  const moveOne = (donor: any, target: any): void => {
+    // Переносим РОВНО один рабочий сет: donor −1, target +1. Не подрезаем
+    // workSets до sets (в плане бывают техники/мини-сеты, и slice менял
+    // недельный объём — zero-state snapshot chest 13→15, hamstrings 12→10).
+    const hasDonorSets = Array.isArray(donor.workSets) && donor.workSets.length > 0;
+    const transfer = hasDonorSets
+      ? donor.workSets.pop()
+      : { reps: donor.repsRange?.[0] || 8, rir: donor.rir ?? 2, weight: 0 };
+    if (hasDonorSets) donor.sets = Math.max(2, donor.workSets.length);
+    else donor.sets = Math.max(2, Number(donor.sets) - 1);
+    if (!Array.isArray(target.workSets)) target.workSets = [];
+    target.workSets.push({ ...transfer });
+    const template = target.workSets[0]
+      || donor.workSets?.[donor.workSets.length - 1]
+      || { reps: target.repsRange?.[0] || 8, rir: target.rir ?? 2, weight: 0 };
+    while (target.workSets.length < 2) target.workSets.push({ ...template });
+    target.sets = target.workSets.length;
+  };
+  for (const week of next.weeks as any[]) {
+    if (!week || !Array.isArray(week.sessions)) continue;
+    const phase = String(week.phase || '').toLowerCase();
+    if (week.deload === true || week.taper === true || week.taperApplied === true
+      || week.peakWeek === true || week.contestPhase || phase === 'deload'
+      || (typeof week.prepProtocol === 'string' && week.prepProtocol)) continue;
+    for (const session of week.sessions) {
+      if (!session || !Array.isArray(session.exercises)) continue;
+      for (const target of session.exercises) {
+        if (!target || Number(target.sets) !== 1 || target.optional || target.warmupActivator || isTechnique(target)) continue;
+        // 1) донор в той же сессии — не меняет структуру дня.
+        let donor = session.exercises.find((d: any) => d !== target && sameMuscle(d, target) && canDonate(d));
+        // 2) донор в другой сессии той же недели — недельный объём мышцы сохраняется.
+        if (!donor) {
+          for (const other of week.sessions) {
+            if (!other || other === session || !Array.isArray(other.exercises)) continue;
+            donor = other.exercises.find((d: any) => d !== target && sameMuscle(d, target) && canDonate(d));
+            if (donor) break;
+          }
+        }
+        if (donor) moveOne(donor, target);
+      }
+    }
+  }
+}
+
+/**
+ * Отпечаток структурных правок плана. Нужен, чтобы повторная финализация
+ * неизменённого плана была строго no-op (аудит 2026-11: sets «гуляли» 4↔2
+ * между одинаковыми прогонами), но ручные правки сетов/упражнений/весов
+ * по-прежнему запускали полный пересчёт.
+ */
+function bbFinalizeInputFingerprint(plan: any): string {
+  const weeks = Array.isArray(plan?.weeks) ? plan.weeks.map((w: any) => ({
+    week: w?.week,
+    phase: w?.phase,
+    deload: !!w?.deload,
+    taper: !!(w?.taper || w?.taperApplied),
+    sessions: (w?.sessions || []).map((s: any) => ({
+      tag: s?.sessionTag ?? s?.tag,
+      exercises: (s?.exercises || []).map((e: any) => [
+        e?.name || e?.exerciseName,
+        e?.muscle,
+        e?.sets,
+        e?.role,
+        (Array.isArray(e?.workSets) ? e.workSets : []).map((ws: any) => [
+          ws?.weight, ws?.reps, ws?.rir, ws?.technique || '',
+        ]),
+      ]),
+    })),
+  })) : [];
+  return JSON.stringify({ weeks, vt: plan?.volumeTargets, pm: plan?.priorityMuscles, ss: plan?.specializationSchedule });
+}
+
+/**
+ * Обновить подпись после поздних проходов билдера (assignProgressionRules,
+ * sync, добивки): иначе UI-revalidate не видел совпадения и зря пересобирал
+ * уже финализированный план. Опции берутся из buildContext.
+ */
+export function stampBBPlanFinalizeSignature(plan: BBPlan): void {
+  const ctx = (plan as any)?.buildContext;
+  if (!ctx || typeof ctx !== 'object') return;
+  const optionsFp = typeof ctx.finalizeOptionsFingerprint === 'string'
+    ? ctx.finalizeOptionsFingerprint
+    : bbFinalizeOptionsFingerprint(ctx);
+  ctx.finalizeSignature = `${bbFinalizeInputFingerprint(plan)}|${optionsFp}`;
+}
+
+function bbFinalizeOptionsFingerprint(options: any): string {
+  const pick = [
+    'level', 'trainingYears', 'onCourse', 'doseAwareMrv', 'courseIntensity',
+    'maxWorkingSets', 'maxExercises', 'priorityMuscles', 'specializationSchedule',
+    'mrvMultiplier', 'gradedMuscles', 'mobilityRestrictions', 'autoTaper', 'sex',
+    'patternId', 'trainingVolumeMode', 'autoIntensityTechniques', 'ensureMinimumVolume',
+    'controlledRotation', 'volumeGoal', 'equipment', 'excludedExercises',
+    'excludedMuscles', 'avoidAxialLoad', 'methodology', 'checkOrder', 'reorder',
+    'phaseSafety', 'workMax', 'fst7Seven', 'soloInsulin', 'dcWidowmaker',
+  ];
+  const out: Record<string, unknown> = {};
+  for (const key of pick) out[key] = options?.[key];
+  return JSON.stringify(out);
+}
+
+/**
  * Общий последний проход для generic, проф-циклов и библиотечных программ.
  * Не меняет объём и не добавляет упражнения: только приводит форму результата
  * к единому BBPlan-контракту и восстанавливает тренерский порядок там, где
@@ -5097,8 +5231,19 @@ export function finalizeBBPlan(plan: BBPlan, options: BBFinalizeOptions = {}): B
       autoTaper: options.autoTaper ?? priorCtx.autoTaper,
       sex: options.sex ?? priorCtx.sex,
       patternId: options.patternId ?? priorCtx.patternId,
+      trainingVolumeMode: options.trainingVolumeMode ?? priorCtx.trainingVolumeMode,
+      autoIntensityTechniques: options.autoIntensityTechniques ?? priorCtx.autoIntensityTechniques,
+      inputWarnings: options.inputWarnings ?? priorCtx.inputWarnings,
     };
   }
+  // Строгая идемпотентность: тот же план + те же опции → no-op. Иначе проходы
+  // «добавить/убрать сет у брата-упражнения» могли перекладывать объём 4↔2
+  // между одинаковыми прогонами. Любая структурная правка меняет отпечаток.
+  const priorSignature = (priorCtx as any)?.finalizeSignature;
+  const finalizeOptionsFp = bbFinalizeOptionsFingerprint(options);
+  const currentSignature = `${bbFinalizeInputFingerprint(plan)}|${finalizeOptionsFp}`;
+  if (priorSignature && priorSignature === currentSignature) return plan;
+
   const next: BBPlan = {
     ...plan,
     safetyConstraints: {
@@ -5131,6 +5276,9 @@ export function finalizeBBPlan(plan: BBPlan, options: BBFinalizeOptions = {}): B
     autoTaper: options.autoTaper,
     sex: options.sex,
     patternId: options.patternId,
+    trainingVolumeMode: options.trainingVolumeMode,
+    autoIntensityTechniques: options.autoIntensityTechniques,
+    inputWarnings: options.inputWarnings,
   };
   for (const week of next.weeks) for (const session of week.sessions) {
     session.exercises = session.exercises.map(ex => ex.muscle === 'back' ? annotateBackExercise(ex) : ex);
@@ -5885,7 +6033,7 @@ for (const week of next.weeks) {
   // техник интенсивности (dropset/rest_pause/myo_rep) для ≥intermediate.
   // Проф-тренер назначает: cable fly → dropset, leg extension → myo_rep,
   // curl → rest_pause. Без этого 0% планов имеют intensity techniques.
-  if (!options.preserveSource) {
+  if (!options.preserveSource && options.autoIntensityTechniques !== false) {
     autoAssignIntensityTechniques(next, options.level || 'intermediate', options.priorityMuscles, options.specializationSchedule, !(options as any).soloInsulin);
   }
   const rotation = analyzeBBRotation(next);
@@ -7147,6 +7295,10 @@ for (const week of next.weeks) {
     enforceRampWeeklyCap(week.sessions, caps);
   }
   syncBBPlanSetShape(next);
+  // Аудит 2026-11: одиночные сеты в рабочих неделях чинит билдер
+  // (`repairSingleSetExercises` после всех режущих проходов). В финализаторе
+  // этого не делаем: cycle/program-путь имеет собственные пост-проходы, и
+  // ремонт здесь менял zero-state baseline (chest 13→15, hamstrings 12→10).
   // Аудит 2026-09 (0.4): ФИНАЛЬНЫЙ снимок валидации и weeklyVolume.
   // Раньше они снимались на ~4824, а после них шли ещё шесть мутирующих
   // проходов (arm-heads, enforceExerciseLevels, warmup, dedup,
@@ -7167,6 +7319,11 @@ for (const week of next.weeks) {
     refreshFrequency: true,
     refreshRotationRationale: true,
   });
+  (next as any).buildContext = {
+    ...((next as any).buildContext || {}),
+    finalizeOptionsFingerprint: finalizeOptionsFp,
+    finalizeSignature: `${bbFinalizeInputFingerprint(next)}|${finalizeOptionsFp}`,
+  };
   return next;
 }
 
