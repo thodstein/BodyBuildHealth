@@ -6,6 +6,7 @@
  * then applies the shared drug-interaction gate.
  */
 import { SUPPORT_CATALOG_DATA } from '../data/support-database';
+import { formatDoseFromMg } from '../data/dose-units';
 import { ruAdjCount, RU_ADJ_DOSE, RU_WARNINGS } from './ru-plural';
 import { findSupplements } from './supplement-finder.engine';
 import { getEvidenceGrade } from './biostack-clinical-v2.engine';
@@ -81,7 +82,7 @@ const RISK_ORDER = { high: 3, medium: 2, low: 1 } as const;
 function formatDose(id: string): string {
   const entry = SUPPORT_CATALOG_DATA[id];
   if (!entry?.dosage) return 'Дозировка по инструкции и анализам';
-  return `${entry.dosage.mg} мг/сут`;
+  return `${formatDoseFromMg(id, entry.dosage.mg)}/сут`;
 }
 
 function buildReason(entry: typeof SUPPORT_CATALOG_DATA[string], domain: Domain): string {

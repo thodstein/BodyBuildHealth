@@ -1,8 +1,8 @@
 // ── ПОЛНЫЙ ДВИЖОК РАСЧЁТА РИСКА (ТЗ разделы 5-19) ──
 // R = Σ(w × m × E × U × Π(1−k*))
 import { DRUG_DB, STACK_DB, TZ_MECH_LABELS, TZ_SYSTEM_LABELS, TZ_SYSTEM_ICONS, TzDrugEntry } from '../data/support-db';
-import { SUPPLEMENTS_DB } from '../data/support-db/supplements';
-import { PHARMACY_DB } from '../data/support-db/pharmacy-db';
+import { getSupportMechIndex, getSupportMechs, canonSupportId } from '../data/support-db/mech-map';
+import { resolvePedAlias } from '../data/ped-alias-map';
 
 const Q_MAP: Record<string, number> = { A: 1.0, B: 0.7, C: 0.4 };
 
@@ -86,8 +86,10 @@ const SYSTEMS: SysDef[] = [
 ];
 
 // ── Типы ──
+export type TzDrugClass = 'aas'|'gh'|'insulin'|'thermo'|'thyroid'|'glp1'|'sarm'|'pct';
+
 export interface DrugInput {
-  drugClass: 'aas'|'gh'|'insulin'; drugName: string;
+  drugClass: TzDrugClass; drugName: string;
   dose: number; form: 'inject'|'oral';
   startWeek?: number;  // неделя начала (по умолчанию 1)
   endWeek?: number;    // неделя окончания (по умолчанию = duration)
@@ -95,7 +97,7 @@ export interface DrugInput {
   effDuration?: number; // эффективная длительность для этого препарата (для timeline)
 }
 export interface TzSpecInput {
-  drugClass: 'aas'|'gh'|'insulin'; drugName: string;
+  drugClass: TzDrugClass; drugName: string;
   dose: number; duration: number; form: 'inject'|'oral';
   combinations: number; labCoverage: number;
   labValues: Record<string, number>; supportSubstances: string[];
@@ -131,6 +133,17 @@ export interface TzSpecResult {
   d_cov: number; u_i: number; supportCount: number; explanation: string;
   /** Доля систем, верифицированных анализами (0..1) */
   overallVerification: number;
+  /**
+   * Честность расчёта:
+   *  - 'ok'      — все препараты курса найдены в механизм-БД;
+   *  - 'partial' — часть препаратов не смоделирована (вклад 0!);
+   *  - 'no_data' — ни один препарат не смоделирован → цифры НЕ валидны.
+   */
+  riskStatus: 'ok' | 'partial' | 'no_data';
+  /** Препараты курса без механизм-профиля (их вклад в риск = 0). */
+  unmodeledDrugs: string[];
+  /** Вещества поддержки без механизмов ТЗ (в покрытии не участвуют). */
+  unmappedSupport: string[];
 }
 
 // ── DRUG_CLASSES ──
@@ -138,6 +151,11 @@ export const DRUG_CLASSES: Record<string,{name:string;doseLabel:string;doseMin:n
   aas:{name:'ААС',doseLabel:'мг/нед',doseMin:100,doseMax:3000,defaultDose:500,defaultDuration:12,icon:'💉'},
   gh:{name:'GH',doseLabel:'МЕ/сут',doseMin:1,doseMax:20,defaultDose:4,defaultDuration:16,icon:'📈'},
   insulin:{name:'Инсулин',doseLabel:'Ед/сут',doseMin:1,doseMax:50,defaultDose:10,defaultDuration:8,icon:'🍬'},
+  thermo:{name:'Кленбутерол',doseLabel:'мкг/сут',doseMin:20,doseMax:200,defaultDose:80,defaultDuration:8,icon:'🔥'},
+  thyroid:{name:'Тиреоиды',doseLabel:'мкг/сут',doseMin:12.5,doseMax:200,defaultDose:50,defaultDuration:8,icon:'🦋'},
+  glp1:{name:'GLP-1',doseLabel:'мг/нед',doseMin:0.25,doseMax:15,defaultDose:1,defaultDuration:12,icon:'⚖️'},
+  sarm:{name:'SARMs',doseLabel:'мг/сут',doseMin:5,doseMax:50,defaultDose:10,defaultDuration:8,icon:'🧪'},
+  pct:{name:'ПКТ',doseLabel:'мг/сут',doseMin:10,doseMax:100,defaultDose:20,defaultDuration:4,icon:'♻️'},
 };
 
 export function getCategoryLabel(cat:string):string {
@@ -149,9 +167,14 @@ export function getCategoryLabel(cat:string):string {
 }
 
 // ── Коэффициенты ──
+// Кленбутерол и тиреоиды дозируются в мкг/сут — для них отдельные шкалы,
+// иначе 80 мкг клена читались бы как «80 мг тестостерона» (0 риск).
 function getDoseFactor(dose:number,drugClass:string):number {
-  if(drugClass==='aas'){if(dose<=200)return 1.0;if(dose<=500)return 1.25;if(dose<=1000)return 1.5;return 2.0}
+  if(drugClass==='aas'||drugClass==='sarm'){if(dose<=200)return 1.0;if(dose<=500)return 1.25;if(dose<=1000)return 1.5;return 2.0}
   if(drugClass==='gh'){if(dose<=4)return 1.0;if(dose<=8)return 1.25;if(dose<=12)return 1.5;return 2.0}
+  if(drugClass==='thermo'){if(dose<=40)return 1.0;if(dose<=80)return 1.25;if(dose<=120)return 1.5;return 2.0}
+  if(drugClass==='thyroid'){if(dose<=50)return 1.0;if(dose<=100)return 1.25;if(dose<=150)return 1.5;return 2.0}
+  if(drugClass==='glp1'){if(dose<=0.5)return 1.0;if(dose<=2)return 1.25;if(dose<=7)return 1.5;return 2.0}
   if(dose<=10)return 1.0;if(dose<=20)return 1.25;if(dose<=30)return 1.5;return 2.0;
 }
 function getDurationFactor(weeks:number):number{if(weeks<=4)return 1.0;if(weeks<=8)return 1.2;if(weeks<=16)return 1.4;return 1.6}
@@ -719,12 +742,34 @@ export function calculateTzSpecRisk(input: TzSpecInput): TzSpecResult {
   const drugEntries=input.drugs&&input.drugs.length>0?input.drugs
     :[{drugClass:input.drugClass,drugName:input.drugName,dose:input.dose,form:input.form}];
 
-  // Собираем поддержку
+  // Собираем поддержку через ЕДИНЫЙ резолвер (кураторские k/q → явные доработки →
+  // производная оценка из каталога). Раньше точный ключ не находился для 67 веществ
+  // каталога (NAC/TUDCA/zinc_sup/PHARMA_ANASTROZOLE…) — они молча не покрывали риск.
   const supportLookup=new Map<string,Array<{organId:string;mechId:string;k:number;q:'A'|'B'|'C'}>>();
+  const unmappedSupport:string[]=[];
   for(const subId of supportSubstances){
-    const entries=SUPPLEMENTS_DB[subId]||PHARMACY_DB[subId]||PROCEDURE_DB[subId];
-    if(entries)supportLookup.set(subId,entries);
+    // ВАЖНО: getSupportMechs возвращает [] (пустой массив — ИСТИНА в JS), поэтому
+    // `getSupportMechs(x) || PROCEDURE_DB[x]` никогда не доходил до процедур
+    // (плазмаферез/эритроцитаферез теряли мех-покрытие). Проверяем длину.
+    const mechs=getSupportMechs(subId);
+    const proc=PROCEDURE_DB[canonSupportId(subId)]||PROCEDURE_DB[subId];
+    const entries=mechs.length>0?mechs:(proc||[]);
+    if(entries&&entries.length>0)supportLookup.set(subId,entries);
+    else if(!proc)unmappedSupport.push(subId);
   }
+
+  // Препараты без записи в DRUG_DB дают 0 вклада во ВСЕ механизмы.
+  // Это нельзя показывать как «риск 0 / покрытие 100%» — собираем список
+  // и отдаём наружу для честного статуса («не рассчитано»).
+  const unmodeledDrugs:string[]=[];
+  for(const drug of drugEntries){
+    const key=resolvePedAlias(drug.drugName);
+    const entry=DRUG_DB[key]||DRUG_DB[String(drug.drugName||'').toLowerCase()];
+    if(!entry||!entry.mechanismWeights||Object.keys(entry.mechanismWeights).length===0){
+      unmodeledDrugs.push(drug.drugName);
+    }
+  }
+
 
   const organResults:TzSpecOrganResult[]=[];
 
@@ -738,7 +783,8 @@ export function calculateTzSpecRisk(input: TzSpecInput): TzSpecResult {
 
       // Суммируем вклад КАЖДОГО препарата в этот механизм
       for(const drug of drugEntries){
-        const drugEntry=DRUG_DB[drug.drugName.toLowerCase()]||DRUG_DB[drug.drugName];
+        const drugKey=resolvePedAlias(drug.drugName);
+        const drugEntry=DRUG_DB[drugKey]||DRUG_DB[drug.drugName.toLowerCase()]||DRUG_DB[drug.drugName];
         const mechWeight=drugEntry?.mechanismWeights?.[mech.id]||0;
         if(mechWeight===0) continue; // Drug doesn't target this mechanism — skip
         const D_i=getDoseFactor(drug.dose,drug.drugClass)*(drugEntry?.doseModifier||1.0)*phaseDoseMultiplier;
@@ -859,6 +905,10 @@ export function calculateTzSpecRisk(input: TzSpecInput): TzSpecResult {
   const highOrgans=organResults.filter(o=>o.afterPercent>=50);
   const suppIDs=[...supportLookup.keys()];
   const drugNames=drugEntries.map(d=>`${d.drugName} ${d.dose}${d.drugClass==='aas'?'мг':''}`).join(' + ');
+  const riskStatus: 'ok'|'partial'|'no_data' =
+    unmodeledDrugs.length === 0 ? 'ok'
+      : unmodeledDrugs.length >= drugEntries.length ? 'no_data'
+      : 'partial';
   const explanation=[
     'Модель: механизм-ориентированный интегральный индекс риска (ТЗ).',
     `Курс: ${drugNames}, ${duration} нед.`,
@@ -867,6 +917,8 @@ export function calculateTzSpecRisk(input: TzSpecInput): TzSpecResult {
     suppIDs.length>0?`Поддержка (${suppIDs.length}): ${suppIDs.join(', ')}.`:'Поддержка не выбрана.',
     highOrgans.length>0?`Наибольший риск: ${highOrgans.map(o=>`${o.icon} ${o.name} (${o.afterPercent}%)`).join(', ')}.`:'Все системы в норме.',
     floors.length>0?`Якорные пороги анализов: ${floors.map(f=>f.label).join('; ')}.`:'',
+    riskStatus!=='ok'?`ВНИМАНИЕ: не смоделированы препараты — ${unmodeledDrugs.join(', ')}. Их вклад в риск принят за 0, цифры занижены.`:'',
+    unmappedSupport.length>0?`Поддержка без механизмов ТЗ (в покрытии не учтена): ${unmappedSupport.join(', ')}.`:'',
     // 26 сен 2026 (E0.7): надбавка за неопределённость РАНЬШЕ применялась к числу
     // (U_i = 1 + 0.25·(1−d_cov)) и была видна только в отладке — пользователь получал
     // завышенный процент без единого слова почему. Теперь она названа своим именем.
@@ -885,6 +937,7 @@ export function calculateTzSpecRisk(input: TzSpecInput): TzSpecResult {
     k_protect_overall:overallK,d_cov:labCoverage,u_i:U_i,
     supportCount:suppIDs.length,explanation,
     overallVerification,
+    riskStatus,unmodeledDrugs,unmappedSupport,
   };
 }
 
@@ -905,7 +958,7 @@ export function pickSupport(riskResult: TzSpecResult, drugClass: string, form: s
       if (m.afterSupport >= (level === 'boost' ? 0 : level === 'max' ? 15 : level === 'medium' ? 30 : 50))
         activeMechs.add(m.id);
 
-  const allDb: Record<string, any[]> = { ...SUPPLEMENTS_DB, ...PHARMACY_DB };
+  const allDb: Record<string, any[]> = getSupportMechIndex();
   const scored: [string, number][] = [];
   for (const [id, entries] of Object.entries(allDb)) {
     if (ids.has(id)) continue;

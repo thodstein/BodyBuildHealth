@@ -996,7 +996,7 @@ function calculateSupportCoverage(
   substanceIds: string[],
   supportDoses?: Record<string, number>,
   goals?: string[]
-): { totalSupport: number; systemSupport: Record<string, number>; organSupport: Record<string, number> } {
+): { totalSupport: number; systemSupport: Record<string, number>; organSupport: Record<string, number>; systemWeights: Record<string, number> } {
   const systemSupport: Record<string, number> = {};
   const organSupport: Record<string, number> = {};
   let totalSupport = 0;
@@ -1097,8 +1097,12 @@ function calculateSupportCoverage(
 
   // Apply system weights: convert raw emax sum to weighted % risk reduction
   for (const system of ALL_RISK_SYSTEMS) {
-    const weight = SYSTEM_WEIGHT[system] ?? 10;
-    systemSupport[system] = Math.min(95, (systemSupport[system] || 0) * weight);
+    // ЕДИНИЦА: systemSupport — ПРОЦЕНТ защиты (0..95), как его читают
+    // data-link (`v/100` → доля) и `calculateRisks` (`raw*(1−cov)`).
+    // БЫЛО `* weight` (15): процент занижался в 6.7 раза, и на экранах
+    // поддержка «снижала риск» на ~0.9% вместо ~6%. Веса ниже используются
+    // только для сводной средней, а не для масштаба процента.
+    systemSupport[system] = Math.min(95, (systemSupport[system] || 0) * 100);
   }
   for (const organ of Object.keys(organSupport)) {
     organSupport[organ] = Math.min(95, organSupport[organ]);
@@ -1109,13 +1113,16 @@ function calculateSupportCoverage(
   const weightedTotal = ALL_RISK_SYSTEMS.reduce((sum, s) => sum + (systemSupport[s] || 0) * (SYSTEM_WEIGHT[s] ?? 10), 0);
   totalSupport = totalWeight > 0 ? Math.min(95, weightedTotal / totalWeight) : Math.min(95, totalSupport);
 
-  return { totalSupport, systemSupport, organSupport };
+  // Возвращаем ВЕСА, использованные при расчёте покрытия (с учётом целей).
+  // Раньше потребитель делил на СВОЮ копию весов, и при goal-множителях
+  // (musculoskeletal 20 vs 15) защита считалась по неверному масштабу.
+  return { totalSupport, systemSupport, organSupport, systemWeights: { ...SYSTEM_WEIGHT } };
 }
 function calculateSupportScore(
   input: SupportInput,
   substances: SubstanceEntry[],
   substanceIds: string[]
-): { score: number; systemSupport: Record<string, number>; organSupport: Record<string, number> } {
+): { score: number; systemSupport: Record<string, number>; organSupport: Record<string, number>; systemWeights: Record<string, number> } {
   const coverage = calculateSupportCoverage(substances, substanceIds, input.supportDoses, input.goals);
   // Lifestyle factors (nutrition, training) are already priced into base risk.
   // Only actual supplement coverage reduces risk. lifestyleSupport removed to avoid
@@ -1123,7 +1130,7 @@ function calculateSupportScore(
 
   const totalScore = Math.min(100, Math.max(0, coverage.totalSupport));
 
-  return { score: totalScore, systemSupport: coverage.systemSupport, organSupport: coverage.organSupport };
+  return { score: totalScore, systemSupport: coverage.systemSupport, organSupport: coverage.organSupport, systemWeights: coverage.systemWeights };
 }
 
 function generateRecommendations(riskResult: RiskResult, input: SupportInput): RecommendationEntry[] {
@@ -1186,12 +1193,10 @@ export function calculateSupport(input: SupportInput): SupportOutput {
 
   for (const system of ALL_RISK_SYSTEMS) {
     const raw = systemBreakdownRaw[system];
-    const weightedSupport = systemSupport[system] ?? 0;
-    const sysWeight: Record<string, number> = { hepatic:15, cardio:15, renal:10, neuro:10, endocrine:12, hematologic:8, reproductive:10, musculoskeletal:10 };
-    const weight = sysWeight[system] ?? 10;
+    const weightedSupport = systemSupport[system] ?? 0; // уже ПРОЦЕНТ (0..95)
     // Capped diminishing protection: max 70% even with optimal support
-    const rawCoverage = weight > 0 ? weightedSupport / weight : 0;
-    const protectionFraction = Math.min(0.7, Math.max(0, rawCoverage * 0.65));
+    const rawCoverage = Math.min(1, Math.max(0, weightedSupport / 100));
+    const protectionFraction = Math.min(0.7, rawCoverage * 0.65);
     const netRisk = raw * (1 - protectionFraction);
     systemBreakdownNet[system] = Math.min(100, Math.max(0, netRisk));
   }

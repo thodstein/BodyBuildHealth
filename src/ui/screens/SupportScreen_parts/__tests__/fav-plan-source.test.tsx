@@ -90,7 +90,9 @@ describe('fav plan source', () => {
     const { container, queryByText } = render(<SupportFavoritesView s={planMocks()} />);
     expect(container.textContent).toContain('A-витамин');
     expect(container.textContent).toContain('B-минерал');
-    expect(container.textContent).toContain('100мг');
+    // Единая единица дозы: «100 мг» (пробел и естественная единица вещества),
+    // а не прежнее «100мг» / «мг для всего».
+    expect(container.textContent).toContain('100 мг');
     expect(container.textContent).toContain('вечер');
     expect(queryByText(/Нет препаратов в плане/)).toBeNull();
   });

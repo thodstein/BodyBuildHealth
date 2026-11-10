@@ -54,6 +54,13 @@ const PED_ALIAS_MAP: Record<string, string> = {
   // ── IGF / MGF ──
   igf1lr3: 'igf1_lr3', igf_lr3: 'igf1_lr3', igf1: 'igf1_lr3', igf: 'igf1_lr3',
   igf_des: 'igf1_des', igf1des: 'igf1_des',
+  // ── Тестостероновые смеси / суспензия ──
+  // Смеси эфиров фармакологически = тестостерон; без алиаса они не находились
+  // в DRUG_DB и давали 0 вклада в риск (P0 аудита).
+  sustanon250: 'sustanon', sustanon_250: 'sustanon', omnadren: 'sustanon',
+  test_mix: 'sustanon', test_blend: 'sustanon', testosterone_mix: 'sustanon',
+  test_suspension: 'test_susp', testosterone_suspension: 'test_susp',
+  test_aqua: 'test_susp', test_base: 'test_susp', testosterone_base: 'test_susp',
   // ── Инсулины ──
   insulin: 'ins_short', insulin_rapid: 'ins_short', humalog: 'ins_short', insulina_rapida: 'ins_short',
   novorapid: 'ins_aspart', insulin_aspart: 'ins_aspart',

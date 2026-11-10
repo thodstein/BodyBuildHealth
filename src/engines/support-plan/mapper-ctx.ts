@@ -134,7 +134,16 @@ export function buildMapperCtx(
     hasCabergoline: state.pharma.hasCaber || false,
      aasIds: (Array.isArray(state.pharma?.aas) ? state.pharma.aas : []).map((a: any) => a.id || '').filter(Boolean),
     pedDoses, libidoLow: symptomsList.includes('low_libido'),
-    bpSystolic: state.cardio.bpStage === 'high' ? 150 : state.cardio.bpStage === 'normal' ? 120 : 135,
+    bpSystolic: (() => {
+      // Стейдж хранится как 'normal'|'elevated'|'hypertension1'|'hypertension2'
+      // (см. recommendation-engine). Раньше сравнивалось с несуществующим
+      // 'high' → любая гипертензия давала 135 мм рт.ст. (P2 аудита).
+      const st = String(state.cardio?.bpStage || 'normal');
+      if (st === 'hypertension2') return 160;
+      if (st === 'hypertension1') return 140;
+      if (st === 'elevated') return 130;
+      return 120;
+    })(),
     lipidLdl: labs['LDL'],
     symptoms: symptomsList,
     healthConditions: state.healthConditions || [],

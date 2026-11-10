@@ -8,6 +8,7 @@ import { GLASS, BADGE, DEFAULT_STATE, normalizeCalculatorState } from './Calc.ty
 import type { AutoCalculatorProps } from './Calc.types';
 import { Card, PopupPEDInput, PopupNumber } from './Calc.parts';
 import { TzRiskCard } from './TzRiskCard';
+import { RiskTimelineChart } from '../SupportScreen_parts/RiskTimelineChart';
 import { MechanismView } from './Calc.result';
 import { deriveStateFromLabs, labPointsToSlice } from './Calc.labs-derived';
 import { db } from '../../../core/db';
@@ -15,7 +16,7 @@ import { CalcMapperCard } from './Calc.mapper';
 import { deriveCourseLinkPatch } from './calc-course-link';
 import type { TzSpecResult } from '../../../engines/risk-engine-tz-spec';
 
-export const AutoCalculator: React.FC<AutoCalculatorProps> = ({ onApply, embedded, courseWeek: propWeek, courseLinked, labsLinked, onOpenManualPicker, onOpenLabs, planResult }) => {
+export const AutoCalculator: React.FC<AutoCalculatorProps> = ({ onApply, embedded, courseWeek: propWeek, courseLinked, labsLinked, onOpenManualPicker, onOpenLabs, planResult, onResetEdits }) => {
   const [state, setState] = useState<CalculatorState>(() => {
     const h = hydrateState();
     return normalizeCalculatorState({ ...DEFAULT_STATE, ...h });
@@ -59,7 +60,24 @@ export const AutoCalculator: React.FC<AutoCalculatorProps> = ({ onApply, embedde
   React.useEffect(() => {
     const t = setTimeout(() => {
       try {
-        localStorage.setItem('he_autocalc_state', JSON.stringify(state));
+        // Слияние с уже сохранённым: другие экраны (SupportDiaryView) пишут
+        // `journal.negative` в тот же ключ. Раньше автосейв калькулятора
+        // перетирал их своей копией стейта — записи дневника пропадали.
+        const rawPrev = localStorage.getItem('he_autocalc_state');
+        const prev = rawPrev ? JSON.parse(rawPrev) : null;
+        const journal = prev?.journal && typeof prev.journal === 'object'
+          ? {
+              positive: Array.isArray(prev.journal.positive) ? prev.journal.positive : state.journal.positive,
+              negative: Array.isArray(prev.journal.negative) ? prev.journal.negative : state.journal.negative,
+            }
+          : state.journal;
+        // Анализы: пустой срез в стейте не должен стирать сохранённый.
+        const labs = { ...(state.labs || {}) } as any;
+        const prevLabs = prev?.labs || {};
+        for (const slice of ['preCourse', 'midCourse', 'postPCT', 'fullPanel']) {
+          if ((labs[slice] === null || labs[slice] === undefined) && prevLabs[slice]) labs[slice] = prevLabs[slice];
+        }
+        localStorage.setItem('he_autocalc_state', JSON.stringify({ ...state, journal, labs }));
       } catch {}
     }, 500);
     return () => clearTimeout(t);
@@ -657,7 +675,9 @@ export const AutoCalculator: React.FC<AutoCalculatorProps> = ({ onApply, embedde
           <div style={{ marginTop: 6 }}>
             {mapperRisk && (
               <div data-manual-risk style={{ fontSize: 8, color: '#a5b4fc', padding: '4px 8px', borderRadius: 6, background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.18)', marginBottom: 4, lineHeight: 1.4 }}>
-                📝 Учтены ручные правки состава (попапы калькулятора) — {mapperRisk.overallRaw}% → {mapperRisk.overallAfter}%
+                {mapperRisk.riskStatus === 'no_data'
+                  ? '📝 Учтены ручные правки состава — риск не рассчитан (нет препаратов с известным механизмом)'
+                  : `📝 Учтены ручные правки состава (попапы калькулятора) — ${mapperRisk.overallRaw}% → ${mapperRisk.overallAfter}%`}
               </div>
             )}
             <TzRiskCard
@@ -679,10 +699,19 @@ export const AutoCalculator: React.FC<AutoCalculatorProps> = ({ onApply, embedde
         ) : null;
       })()}
 
-      <CalcMapperCard state={state} onStateChange={(n) => setState(n)} onRiskChange={setMapperRisk} onApply={(rec) => {
+      {/* Пошаговая динамика риска по неделям курса. Движок её считал всегда
+          (calculateTzSpecRiskTimeline → result.timeline), а компонент
+          RiskTimelineChart никем не рендерился — график был мёртвым кодом. */}
+      {result.timeline && result.timeline.length > 1 && (
+        <div data-risk-timeline style={{ marginTop: 6 }}>
+          <RiskTimelineChart timeline={result.timeline} />
+        </div>
+      )}
+
+      <CalcMapperCard state={state} onStateChange={(n) => setState(n)} onRiskChange={setMapperRisk} onApply={(rec, removed) => {
         const subIds = rec.subs.map(s => s.substanceId);
-        onApply({ level: rec.level, subs: subIds, tzRec: rec });
-      }} onOpenManualPicker={onOpenManualPicker} onOpenLabs={onOpenLabs} planResult={planResult} />
+        onApply({ level: rec.level, subs: subIds, removed, tzRec: rec });
+      }} onOpenManualPicker={onOpenManualPicker} onOpenLabs={onOpenLabs} planResult={planResult} onResetEdits={onResetEdits} />
 
       {/* Д11 (P2): источник — ограничения ПО СОСТОЯНИЮ ЗДОРОВЬЯ (движок поддержки);
           противопоказания конкретных веществ — в блоке «Противопоказания» карточки подбора выше (дедуп по источнику). */}

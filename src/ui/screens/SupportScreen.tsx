@@ -48,7 +48,7 @@ import type { CalculatorState, CalculatorResult, PowerLevel } from '../../engine
 import { getDrugTzMechanisms, getSupportTzDisplay, TZ_MECH_LABELS, TZ_SYSTEM_LABELS, TZ_SYSTEM_ICONS } from '../../data/support-db';
 import { getLabEffectsForDrug, getMarkerName } from '../../data/support-lab-effects';
 import { runSupportUnified, runSupportForLevel, canonId } from '../../engines/support-plan';
-import type { PlanResult, PlanSubstance } from '../../engines/support-plan';
+import { defaultDoseUnit, formatDefaultDose, formatDoseFromMg } from '../../data/dose-units';import type { PlanResult, PlanSubstance } from '../../engines/support-plan';
 import { writeRiskBridge } from '../../engines/risk-bridge';
 import { buildPreApplyCard, evaluateRecommendations, computeCoverageRisk } from '../../engines/recommendation-engine';
 import { calculateMixScore, type TrainingMixScore, type MixSubstance, type MixProfile, MIX_MECHANISMS, MIX_SYNERGY, MIX_TEMPLATES, type MixTemplate, buildBestRecipe, type MixRecipe, type MixRecipeItem, groupRecipeItemsByTiming } from '../../engines/training-mix-scoring.engine';
@@ -186,7 +186,18 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab; initialSubTab?: 
     if (!c.length) return 6;
     return Math.max(...c.map(e => (e.endWeek || 12) - (e.startWeek || 0)), 8);
   });
+  // Неделя курса обновляется при изменении курса: раньше инициализатор
+  // срабатывал один раз, и после сокращения/замены курса расчёт шёл на
+  // неделе, которой больше не существует (P2 аудита).
+  useEffect(() => {
+    const c = Array.isArray(linked?.course) ? linked.course : [];
+    if (c.length === 0) return;
+    const maxWeek = Math.max(1, ...c.map((e: any) => (e.endWeek || 12) - (e.startWeek || 0)));
+    setCourseWeekState(prev => (prev > maxWeek ? maxWeek : prev));
+  }, [linked?.course]);
   const [manualLevelSelected, setManualLevelSelected] = useState(false);
+  /** Вещества, удалённые пользователем в менеджере калькулятора (фильтр живого плана). */
+  const [excludedSubs, setExcludedSubs] = useState<string[]>([]);
   const [boostEnabled, setBoostEnabled] = useState(false);
   const [jointMode, setJointMode] = useState(false);
   const [reproMode, setReproMode] = useState(false);
@@ -551,12 +562,28 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab; initialSubTab?: 
     });
     const h = hydrateState();
     const state: CalculatorState = {
-      profile: h.profile || { weight: s?.weight ?? 80, age: s?.age ?? 30, sex: (s?.sex ?? 'male') as 'male' | 'female', workoutsPerWeek: s?.workoutsPerWeek ?? 3, avgWorkoutMinutes: s?.avgWorkoutMinutes ?? 60, sleepHours: 7, stressLevel: 4, smoker: false, alcohol: 'rare', caffeineMg: 100 },
+      // Дефолты профиля — с nested-чтением UnifiedSettings (settings.training.*),
+      // иначе тренировки/минуты всегда падали в 3/60 (flat-ключей нет).
+      profile: h.profile || { weight: s?.weight ?? (s as any)?.personal?.weight ?? 80, age: s?.age ?? (s as any)?.personal?.age ?? 30, sex: (s?.sex ?? (s as any)?.personal?.sex ?? 'male') as 'male' | 'female', workoutsPerWeek: (s as any)?.training?.daysPerWeek ?? s?.workoutsPerWeek ?? 3, avgWorkoutMinutes: (s as any)?.training?.minutesPerSession ?? s?.avgWorkoutMinutes ?? 60, sleepHours: 7, stressLevel: 4, smoker: false, alcohol: 'rare', caffeineMg: 100 },
       neuro: h.neuro || { dopamineScore: 0, serotoninScore: 0, gabaBalance: 'balance', memoryIssues: false, focusIssues: false, slowThinking: false, coordinationIssues: false, aggressionScore: 0, headaches: false, weatherDependent: false, sleepQuality: 'good' },
        pharma: {
+         // ВАЖНО: `...h.pharma` переносит РЕАЛЬНЫЕ дозы PED-попапов (ghIU/insulinIU/
+         // igfMcg/clenMcg/t3Mcg) в живой план. Раньше копировались только булевы
+         // флаги → механизм-модель считала риск по дефолтным дозам (P0 аудита).
+         ...(h.pharma || {}),
          phase: (supportPhase === 'fertility' ? 'pct' : supportPhase) as any,
-         aas: Array.isArray(h.pharma?.aas) ? h.pharma.aas.filter((a: any) => a && typeof a.id === 'string') : aasList,
-         hasGH: !!h.pharma?.hasGH, hasIGF: !!h.pharma?.hasIGF, hasInsulin: !!h.pharma?.hasInsulin,
+         // Курс из DataLink ∪ ручные правки AutoCalculator: раньше проверялось
+         // Array.isArray(h.pharma.aas) (всегда true) и linked.course терялся.
+         aas: (() => {
+           const fromHydrate = (h.pharma?.aas || []).filter((a: any) => a && typeof a.id === 'string');
+           const m = new Map<string, any>();
+           for (const a of aasList) m.set(canonId(a.id), a);
+           for (const a of fromHydrate) m.set(canonId(a.id), a);
+           return Array.from(m.values());
+         })(),
+         hasGH: !!h.pharma?.hasGH || Number(h.pharma?.ghIU) > 0,
+         hasIGF: !!h.pharma?.hasIGF || Number(h.pharma?.igfMcg) > 0,
+         hasInsulin: !!h.pharma?.hasInsulin || Number(h.pharma?.insulinIU) > 0,
          hasHCG: !!h.pharma?.hasHCG, hasAI: !!h.pharma?.hasAI, hasCaber: !!h.pharma?.hasCaber,
          hasSERM: !!h.pharma?.hasSERM, hasSARMs: !!h.pharma?.hasSARMs, hasMGF: !!h.pharma?.hasMGF, hasGLP1: !!h.pharma?.hasGLP1,
        },
@@ -595,7 +622,11 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab; initialSubTab?: 
       planRes = { substances: [], dosages: {}, schedule: [], systems: {}, mechanisms: [], coveragePercent: 0, synergyComment: '', monitoring: [], specialInstructions: [], riskDynamics: [], overallRiskBefore: 50, overallRiskAfter: 50, labFindings: [], uncoveredMechanisms: [], coverageGaps: [], weekScale: 1, stackRecommendations: [], conflicts: [], riskBreakdown: {}, pillBurden: { totalSubstances: 0, estimatedPillsPerDay: 0, morningPills: 0, afternoonPills: 0, eveningPills: 0, feasibility: 'unknown', message: 'Ошибка расчёта' }, error: 'Ошибка расчёта поддержки: ' + ((e as Error)?.message || 'неизвестная') } as PlanResult;
     }
     // subs + dosages из единого результата (с dedup)
-    const subs: string[] = [...new Set(planRes.substances.map(p => p.id))];
+    // Минус вещества, УДАЛЁННЫЕ пользователем в менеджере калькулятора:
+    // без этого базовый план каждый раз возвращал их обратно (P1 аудита).
+    const excludedCanon = new Set(excludedSubs.map(id => canonId(id)));
+    let subs: string[] = [...new Set(planRes.substances.map(p => p.id))]
+      .filter(id => !excludedCanon.has(canonId(id)));
     const dosages: Record<string, { mg: number; timing: string }> = {};
     for (const p of planRes.substances) {
       dosages[p.id] = { mg: p.doseMg, timing: p.timing };
@@ -605,7 +636,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab; initialSubTab?: 
       const idx = subs.indexOf(originalId);
       if (idx >= 0 && analogId !== originalId) {
         subs[idx] = analogId;
-        const analogDosage = DEFAULT_DOSAGES[analogId] || { mg: 500, timing: 'с едой' };
+        const analogDosage = DEFAULT_DOSAGES[analogId] || DEFAULT_DOSAGES[analogId.toLowerCase()] || { mg: 0, timing: '' };
         delete dosages[originalId];
         dosages[analogId] = analogDosage;
       }
@@ -615,12 +646,14 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab; initialSubTab?: 
       const enhCanon = canonId(enhId);
       if (!subs.some(s => canonId(s) === enhCanon)) {
         subs.push(enhId);
-        const d = DEFAULT_DOSAGES[enhId];
-        dosages[enhId] = d ? { mg: d.mg, timing: d.timing } : { mg: 500, timing: 'с едой' };
+        const d = DEFAULT_DOSAGES[enhId] || DEFAULT_DOSAGES[enhId.toLowerCase()];
+        // Без выдуманных «500 мг, с едой»: если дозы нет — 0 и пустой тайминг,
+        // UI честно покажет «—» (раньше это выглядело как назначенная доза).
+        dosages[enhId] = d ? { mg: d.mg, timing: d.timing } : { mg: 0, timing: '' };
       }
     }
     return { subs, dosages, planRes };
-  }, [supportLevel, supportPhase, selectedAnalogs, enhancedSubs, linked.course, linked.profile, courseWeekState, boostEnabled, jointMode, reproMode, neuroMode]);
+  }, [supportLevel, supportPhase, selectedAnalogs, enhancedSubs, excludedSubs, linked.course, linked.profile, courseWeekState, boostEnabled, jointMode, reproMode, neuroMode]);
 
   // Побочные эффекты (setPlanResult, showToast, localStorage) — в useEffect, НЕ в useMemo
   useEffect(() => {
@@ -658,14 +691,21 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab; initialSubTab?: 
     } catch {}
   }, [effectiveLevel, externalSubs, generalPlanTick]);
 
-  const calcSupport = (overrideLevel?: 'basic' | 'mid' | 'max' | 'boost', overrideSubs?: string[]) => {
+  const calcSupport = (overrideLevel?: 'basic' | 'mid' | 'max' | 'boost', overrideSubs?: string[], overrideRemoved?: string[]) => {
     try {
+    // overrideRemoved — вещества, удалённые в менеджере. Список АВТОРИТЕТНЫЙ:
+    // пустой массив тоже валиден (пользователь всё вернул).
+    if (overrideRemoved) setExcludedSubs(Array.from(new Set(overrideRemoved)));
     // overrideSubs — применённый выбор (AutoCalculator / сохранённые планы).
     // Раньше молча отбрасывались: пересчёт шёл без них и план не менялся.
-    // Вливаем в ручные добавления — они входят в живой план (effectiveLevel),
-    // стор, мост и дневник. Дедуп через Set — повторное применение идемпотентно.
+    // ВАЖНО: применённый список — АВТОРИТЕТНЫЙ состав. Если просто до-добавить
+    // его к `enhancedSubs`, то вещества, УДАЛЁННЫЕ в менеджере веществ, тут же
+    // возвращались из базового плана (P1 аудита). Поэтому enhancedSubs = только то,
+    // чего нет в базовом плане, плюс сам список заменяет прошлые ручные правки.
     if (overrideSubs && overrideSubs.length > 0) {
-      setEnhancedSubs((prev: string[]) => [...new Set([...(prev || []), ...overrideSubs])]);
+      const baseCanon = new Set((effectiveLevel?.subs || []).map((id: string) => canonId(id)));
+      const extra = overrideSubs.filter((id: string) => !baseCanon.has(canonId(id)));
+      setEnhancedSubs(Array.from(new Set(extra)));
     }
     const s = linked.profile?.settings;
     const level = (overrideLevel || supportLevel) as PowerLevel;
@@ -679,7 +719,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab; initialSubTab?: 
       return { id: c.substanceId, doseMgWeek: (c.doseValue || 0) * Math.max(1, freq), weeks: (c.endWeek || 12) - (c.startWeek || 0), startWeek: c.startWeek || 1, endWeek: c.endWeek || 12 };
     });
     const defaults: Partial<CalculatorState> = {
-      profile: { weight: s?.weight ?? 80, age: s?.age ?? 30, sex: (s?.sex ?? 'male') as 'male' | 'female', workoutsPerWeek: s?.workoutsPerWeek ?? 3, avgWorkoutMinutes: s?.avgWorkoutMinutes ?? 60, sleepHours: 7, stressLevel: 4, smoker: false, alcohol: 'rare', caffeineMg: 100 },
+      profile: { weight: s?.weight ?? (s as any)?.personal?.weight ?? 80, age: s?.age ?? (s as any)?.personal?.age ?? 30, sex: (s?.sex ?? (s as any)?.personal?.sex ?? 'male') as 'male' | 'female', workoutsPerWeek: (s as any)?.training?.daysPerWeek ?? s?.workoutsPerWeek ?? 3, avgWorkoutMinutes: (s as any)?.training?.minutesPerSession ?? s?.avgWorkoutMinutes ?? 60, sleepHours: 7, stressLevel: 4, smoker: false, alcohol: 'rare', caffeineMg: 100 },
       pharma: { phase: 'course', aas: aasList, hasGH: false, hasIGF: false, hasInsulin: false, hasHCG: !!linked.course?.find((c: any) => c.substanceId === 'hcg'), hasAI: false, hasCaber: false, hasSERM: false, hasSARMs: aasList.some(a => a.id.includes('ostarine') || a.id.includes('lgd')), hasMGF: false, hasGLP1: false },
       oda: { jointPain: (h.oda?.jointPain || 'none') as string, ligamentIssues: h.oda?.ligamentIssues || false, backPain: h.oda?.backPain || false, injuries: h.oda?.injuries || [] },
     };
@@ -788,21 +828,46 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab; initialSubTab?: 
 
     // Save support results back to profile for integration
     try {
-      const supps = (effectiveLevel?.subs || SUPPORT_LEVELS[level]?.subs || []).map(id => {
-        const dos = (effectiveLevel?.dosages || SUPPORT_LEVELS[level]?.dosages || {})[id] || DEFAULT_DOSAGES[id] || { mg: 500, timing: 'с едой' };
+      // Источник = ФАКТИЧЕСКИ рассчитанный состав (tzResult), а не `effectiveLevel`:
+      // effectiveLevel — это useMemo ДО применения правок/overrideSubs, поэтому
+      // в профиль/мост уходил СТАРЫЙ план (P1 аудита).
+      const actualSubs: string[] = (tzResult.selectedSubstances && tzResult.selectedSubstances.length > 0)
+        ? tzResult.selectedSubstances
+        : (effectiveLevel?.subs || SUPPORT_LEVELS[level]?.subs || []);
+      const actualDoses = tzResult.titrationApplied || {};
+      const supps = actualSubs.map(id => {
+        const titrated = actualDoses[id];
+        const dos = titrated !== undefined
+          ? { mg: titrated, timing: (effectiveLevel?.dosages?.[id]?.timing || SUPPORT_LEVELS[level]?.dosages?.[id]?.timing || DEFAULT_DOSAGES[id]?.timing || '') }
+          : (effectiveLevel?.dosages?.[id] || SUPPORT_LEVELS[level]?.dosages?.[id] || DEFAULT_DOSAGES[id] || { mg: 0, timing: '' });
         const subInfo = catalogSubstances.find(s => s.id === id);
-        const doseUnit = dos.mg >= 5000 ? 'g' : 'mg';
-        return { id, name: subInfo?.name || id, doseMg: dos.mg, doseUnit: doseUnit as 'mg' | 'g' | 'mcg' | 'IU', notes: dos.timing };
+        // Единица — из единой таблицы (мкг/МЕ/Ед), а не «mg для всего».
+        // Значение dos.mg уже в этой же единице (200 мкг остаётся 200 при unit='mcg').
+        const unit = defaultDoseUnit(id);
+        const doseUnit: 'mg' | 'g' | 'mcg' | 'IU' =
+          unit === 'мкг' ? 'mcg' : unit === 'МЕ' ? 'IU' : dos.mg >= 5000 ? 'g' : 'mg';
+        const doseMg = unit === 'мкг' ? dos.mg : unit === 'МЕ' ? dos.mg : dos.mg;
+        return { id, name: subInfo?.name || id, doseMg, doseUnit, notes: dos.timing };
       });
-      updateProfile({ settings: { ...(getProfile().settings || {}), currentSupplements: supps } });
+      const prevSettings: any = getProfile().settings || {};
+      updateProfile({
+        settings: {
+          ...prevSettings,
+          // Плоский ключ — исторический формат; вложенный — то, что читают
+          // Nutrition/Profile (FLAT_TO_NESTED: currentSupplements → nutrition.*).
+          currentSupplements: supps,
+          nutrition: { ...(prevSettings.nutrition || {}), currentSupplements: supps },
+        },
+      });
       notifyDataChange();
-      // Sync support risk data for RiskScreen
-      const bridgeSubs = effectiveLevel?.subs || SUPPORT_LEVELS[level]?.subs || [];
+      // Sync support risk data for RiskScreen — ФАКТИЧЕСКИЙ состав + честный статус.
       localStorage.setItem('he_support_risk', JSON.stringify({
         riskBeforeSupport: calcResultData.riskBeforeSupport,
         riskAfterSupport: calcResultData.riskAfterSupport,
         systemSupport: calcResultData.systemSupport,
-        subs: bridgeSubs,
+        subs: actualSubs,
+        riskStatus: tzResult.riskStatus,
+        unmodeledDrugs: tzResult.unmodeledDrugs,
         timestamp: Date.now(),
       }));
       // Write unified risk bridge (C18: RiskScreen ↔ support engine sync)
@@ -812,7 +877,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab; initialSubTab?: 
         supportScore: calcResultData.supportScore,
         systemBreakdown: calcResultData.riskAssessment?.systemBreakdown || {},
         mechanismDetail: calcResultData.riskAssessment?.mechanismDetail || [],
-        subs: bridgeSubs,
+        subs: actualSubs,
       });
     } catch (e2) { /* ignore profile save errors */ }
     } catch (err: any) {
@@ -2070,7 +2135,7 @@ const renderCatalogDetailInner = (subId: string): React.ReactNode => {
       )}
       {entry.dosage && (
         <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.9)', marginBottom: 3 }}>
-          💊 Дозировка: <span style={{ fontWeight: 600 }}>{entry.dosage.mg}{entry.dosage.mg >= 1000 ? ' г' : entry.dosage.mg < 1 ? ' мкг' : ' мг'}</span> · {entry.dosage.timing}{entry.dosage.form ? ' · ' + entry.dosage.form : ''}
+          💊 Дозировка: <span style={{ fontWeight: 600 }}>{formatDoseFromMg(entry.id, entry.dosage.mg)}</span> · {entry.dosage.timing}{entry.dosage.form ? ' · ' + entry.dosage.form : ''}
         </div>
       )}
       {entry.monitoring && entry.monitoring.length > 0 && (
@@ -2587,7 +2652,10 @@ const renderCatalogDetailInner = (subId: string): React.ReactNode => {
       const sub = allSupport.find((x: any) => x.id === id);
       const d = effectiveLevel?.dosages?.[id];
       const pi = planResult.substances?.find((s: any) => s.id === id);
-      return `${sub?.name || id} — ${d ? (d.mg >= 5000 ? `${(d.mg/1000).toFixed(1)} г` : `${d.mg} мг`) : ''} (${d?.timing || ''})${pi ? ' — ' + pi.comment : ''}`;
+      // Уровни/движок хранят дозу в натуральной единице вещества —
+      // подписываем через единый форматтер, а не «мг» для всего.
+      const doseStr = d?.mg ? formatDefaultDose(id, d.mg) : '';
+      return `${sub?.name || id} — ${doseStr} (${d?.timing || ''})${pi ? ' — ' + pi.comment : ''}`;
     });
     return `ПЛАН ПОДДЕРЖКИ (${SUPPORT_LEVELS[supportLevel]?.label || supportLevel})
 Уровень: ${supportLevel} | Неделя: ${courseWeekState}
@@ -3505,14 +3573,19 @@ ${planResult.monitoring?.length ? 'МОНИТОРИНГ:\n' + planResult.monitor
             // Уровень синхронизируем в стейт, иначе живой план (effectiveLevel)
             // останется на старом уровне и разойдётся с применённым.
             const lvl = r.level === 'manual' ? 'max' : (r.level === 'base' ? 'basic' : r.level === 'medium' ? 'mid' : r.level === 'max' ? 'max' : 'boost') as 'basic' | 'mid' | 'max' | 'boost';
-            if (r.subs && r.subs.length > 0) {
+            // Ручной набор не должен перетираться авто-выбором уровня (3550-й
+            // блок `if (!manualLevelSelected) setSupportLevel(level)`).
+            if (r.level === 'manual') setManualLevelSelected(true);
+            // Передаём и удалённые вещества: иначе базовый план возвращал их обратно.
+            if ((r.subs && r.subs.length > 0) || (r.removed && r.removed.length > 0)) {
               setSupportLevel(lvl);
-              calcSupport(lvl, r.subs);
+              calcSupport(lvl, r.subs, r.removed);
             }
           }}
           onOpenManualPicker={() => setShowManualPicker(true)}
           onOpenLabs={() => onNavigate?.('labs')}
           planResult={planResult ?? undefined}
+          onResetEdits={() => { setExcludedSubs([]); setEnhancedSubs([]); }}
         />
         </InfoErrorBoundary>
         </div>

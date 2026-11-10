@@ -7,6 +7,8 @@ import { CATEGORY_LABELS } from './SupportScreenData';
 import { getMergedExternalSubIds } from '../TrainingScreen_parts/support-plan-bridge';
 import { readFavRecommendations, deleteFavRecommendation, queueMixToSupportPlan } from '../../../engines/training-plan-save.engine';
 import { readSupportArr, readSupportStrArr, writeSupportJSON } from './support-storage';
+import { DEFAULT_DOSAGES } from '../../../data/support-database';
+import { formatDefaultDose, formatDoseFromMg } from '../../../data/dose-units';
 
 export const SupportFavoritesView: React.FC<{ s: Record<string, any> }> = ({ s }) => {
   const {
@@ -256,10 +258,16 @@ export const SupportFavoritesView: React.FC<{ s: Record<string, any> }> = ({ s }
               const d = dosages[id];
               // Движок не всегда отдаёт дозу (режим/уровень без расчёта) — честный
               // фолбэк на каталожную дозировку вместо прочерка «—».
+              // ВАЖНО: `d.mg` — натуральная единица вещества (мкг/МЕ), а
+              // `catDose.mg` — миллиграммы каталога. Подписываем разными
+              // форматтерами, иначе селен показывался как «200 мг» (1000×).
               const catDose = (SUPPORT_CATALOG_DATA as any)?.[id]?.dosage;
-              const mg = (d?.mg ?? 0) || catDose?.mg || 0;
+              const amount = d?.mg ?? 0;
+              const doseStr = amount > 0
+                ? formatDefaultDose(id, amount)
+                : catDose?.mg ? formatDoseFromMg(id, catDose.mg) : '—';
               const timing = d?.timing || catDose?.timing || '';
-              return { id, name: sub?.name || id.replace(/_/g, ' '), mg, timing, desc: sub?.description || '' };
+              return { id, name: sub?.name || id.replace(/_/g, ' '), dose: doseStr, timing, desc: sub?.description || '' };
             };
             return (
               <>
@@ -285,7 +293,7 @@ export const SupportFavoritesView: React.FC<{ s: Record<string, any> }> = ({ s }
                 <div style={{ display:'flex', gap:4, marginBottom:10, flexWrap:'wrap' }}>
                    <button data-sup-io="from-stacks" onClick={() => setStackPickerOpen(o => !o)} style={{ flex:'1 1 140px', padding:'10px 12px', borderRadius:12, fontSize:12, minHeight:48, cursor:'pointer', background:'rgba(139,92,246,0.15)', border:'1px solid rgba(139,92,246,0.3)', color:'#8b5cf6', fontWeight:700 }}>📦 Из моих стеков</button>
                   <button onClick={() => {
-                    const items = subs.map((id: string) => { const info = getInfo(id); return { id, name: info.name, dose: info.mg, timing: info.timing }; });
+                    const items = subs.map((id: string) => { const info = getInfo(id); return { id, name: info.name, dose: info.dose, timing: info.timing }; });
                     const existing: any[] = readSupportArr('supportCart');
                     writeSupportJSON('supportCart', [...existing, ...items]);
                     setCartItems([...cartItems, ...items]);
@@ -340,11 +348,11 @@ export const SupportFavoritesView: React.FC<{ s: Record<string, any> }> = ({ s }
                           const sub = catalogSubstances.find((s:any) => s.id === id);
                           const d = dosages[id];
                           const catDose = (SUPPORT_CATALOG_DATA as any)?.[id]?.dosage;
-                          const effMg = d?.mg || catDose?.mg || 0;
                           const effTiming = d?.timing || catDose?.timing || '';
-                          const dispDose = effMg
-                            ? (effMg >= 1000 && id !== 'omega3' ? `${(effMg/1000).toFixed(effMg%1000===0?0:1)}г` : `${effMg}мг`)
-                            : '—';
+                          // `d.mg` — натуральная единица, `catDose.mg` — мг каталога.
+                          const dispDose = d?.mg
+                            ? formatDefaultDose(id, d.mg)
+                            : catDose?.mg ? formatDoseFromMg(id, catDose.mg) : '—';
                           return (
                             <tr key={id} style={{ borderBottom:'1px solid var(--border)' }}>
                               <td style={{ padding:'3px 5px', color:'var(--text-dim)' }}>{effTiming || '—'}</td>
@@ -557,9 +565,19 @@ export const SupportFavoritesView: React.FC<{ s: Record<string, any> }> = ({ s }
                           if (r.boostEnabled !== undefined) setBoostEnabled(r.boostEnabled);
                           if (r.jointMode !== undefined) setJointMode(r.jointMode);
                           if (r.courseWeekState) setCourseWeekState(r.courseWeekState);
-                          if (r.enhancedSubs) setEnhancedSubs(r.enhancedSubs);
-                          setPlanSaved('✅ Расчёт загружен из избранного');
-                          setTimeout(() => setPlanSaved(''), 3000);
+                          // Состав: раньше читался только `enhancedSubs`, которого в
+                          // сохранённых записях не было → загрузка восстанавливала НИЧЕГО.
+                          const restored: string[] = Array.isArray(r.subs)
+                            ? r.subs
+                            : Array.isArray(r.enhancedSubs) ? r.enhancedSubs : [];
+                          if (restored.length > 0) setEnhancedSubs(restored);
+                          // Переводим на калькулятор, чтобы пользователь увидел план
+                          // и нажал «Рассчитать поддержку» (пересчёт по новым данным).
+                          setSection('generator'); setTab('calculator');
+                          if (typeof setGenTab === 'function') setGenTab('calculator');
+                          setSupportView('calc'); setCalcView('calculator');
+                          setPlanSaved(`✅ Загружено ${restored.length} веществ — нажмите «Рассчитать поддержку»`);
+                          setTimeout(() => setPlanSaved(''), 4000);
                         }} style={{ padding:'6px 10px', borderRadius:10, fontSize:12, minHeight:44, minWidth:44, cursor:'pointer', background:'rgba(96,165,250,0.1)', border:'1px solid rgba(96,165,250,0.3)', color:'#60a5fa' }}>📂</button>
                         <button onClick={() => {
                           const arr: any[] = readSupportArr('he_saved_calc_results');
@@ -678,9 +696,11 @@ export const SupportFavoritesView: React.FC<{ s: Record<string, any> }> = ({ s }
             const levelSubIds = [...new Set([...calcSubIds, ...extIds])];
             const planItems = levelSubIds.map((id:string) => {
               const sub = catalogSubstances.find((s:any) => s.id === id);
-              const dos = { mg:500, timing:'с едой' };
+              // Реальная доза из справочника; если её нет — честное «—», а не
+              // выдуманные «500 мг, с едой» у каждого вещества отчёта.
+              const dos = DEFAULT_DOSAGES[id] || DEFAULT_DOSAGES[id.toLowerCase()] || null;
               const plan = calcSubIds.includes(id) ? 'calc' : 'general';
-              return { id, name:sub?.name||id, dose:dos.mg+'мг', timing:dos.timing, categories:sub?.categories||[], mechanisms:sub?.mechanisms||[], plan };
+              return { id, name:sub?.name||id, dose: dos ? formatDefaultDose(id, dos.mg) : '—', timing: dos?.timing || '', categories:sub?.categories||[], mechanisms:sub?.mechanisms||[], plan };
             });
             const report = {
               id: Date.now().toString(),

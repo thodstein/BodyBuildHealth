@@ -1,6 +1,7 @@
 import React from 'react';
 import type { SupportRecommendation } from '../../../engines/tz-mapper-engine';
 import type { PlanResult } from '../../../engines/support-plan';
+import { formatDose } from '../../../data/dose-units';
 
 /** Инъекционные ААС (для справки по ротации мест) */
 const INJECTABLE_AAS: string[] = [
@@ -243,7 +244,7 @@ export const SafetyCumulativeLoad: React.FC<{ planResult?: PlanResult }> = ({ pl
       <div style={{ fontSize: 8, fontWeight: 700, color: '#a78bfa', marginBottom: 3 }}>📊 Суммарная нагрузка / UL</div>
       {items.map((c: any, i: number) => (
         <div key={i} style={{ padding: '5px 7px', borderRadius: 6, marginBottom: 3, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)' }}>
-          <div style={{ fontSize: 7, fontWeight: 700, color: '#f87171', marginBottom: 1 }}>{c.nutrientName} = {c.totalMg} мг/сут <span style={{ opacity: 0.6 }}>(UL: {c.ulMg} мг, {c.percentUL}%)</span></div>
+          <div style={{ fontSize: 7, fontWeight: 700, color: '#f87171', marginBottom: 1 }}>{c.nutrientName} = {formatDose(c.nutrientId || c.substanceId || '', c.totalMg)}/сут <span style={{ opacity: 0.6 }}>(UL: {formatDose(c.nutrientId || c.substanceId || '', c.ulMg)}, {c.percentUL}%)</span></div>
           <div style={{ fontSize: 6, color: 'rgba(255,255,255,0.6)', lineHeight: 1.5 }}>Источники: {c.contributors.join(', ')}</div>
         </div>
       ))}

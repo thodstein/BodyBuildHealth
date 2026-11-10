@@ -5,7 +5,7 @@ import { PHARMACY_DB } from './pharmacy-db';
 // ── Типы ──
 export interface TzDrugEntry {
   name: string;
-  class: 'aas' | 'gh' | 'insulin' | 'glp1' | 'pct' | 'sarm';
+  class: 'aas' | 'gh' | 'insulin' | 'glp1' | 'pct' | 'sarm' | 'thermo' | 'thyroid';
   form: 'inject' | 'oral';
   targetOrgans: string[];
   organMechanisms: Record<string, string[]>;
@@ -65,6 +65,17 @@ export const DRUG_DB: Record<string, TzDrugEntry> = {
     targetOrgans:['cardio','hepatic','cns','reproductive','hematologic','renal'],
     organMechanisms:{ cardio:['cv1','cv2','cv3','cv4','cv5'], hepatic:['liv1','liv2'], cns:['cns1','cns2','cns4'], reproductive:['rep1','rep2','rep3','rep4','rep5'], hematologic:['hem1','hem2'], renal:['ren1','ren2'] },
     mechanismWeights:{cv1:4, cv2:4, cv5:4, rep1:4, rep2:4, liv1:3, hem1:3, cns1:3, cv3:2, cv4:2, liv2:2, cns2:2, cns4:2, rep3:2, rep4:2, rep5:2, hem2:2, ren1:2, ren2:2}, pk:{halfLifeHours:576}, doseModifier:1.0 },
+  // Сустанон — смесь эфиров (проп/фенилпроп/изокапроат/деканоат): быстрый старт,
+  // но профиль механизмов = тестостерон. PK — средневзвешенный по эфирам.
+  sustanon: { name:'Сустанон (смесь эфиров тестостерона)', class:'aas', form:'inject',
+    targetOrgans:['cardio','hepatic','cns','reproductive','hematologic','renal'],
+    organMechanisms:{ cardio:['cv1','cv2','cv3','cv4','cv5'], hepatic:['liv1','liv2'], cns:['cns1','cns2','cns4'], reproductive:['rep1','rep2','rep3','rep4','rep5'], hematologic:['hem1','hem2'], renal:['ren1','ren2'] },
+    mechanismWeights:{cv1:4, cv2:4, cv5:4, rep1:4, rep2:4, liv1:3, hem1:3, cns1:3, cv3:2, cv4:2, liv2:2, cns2:2, cns4:2, rep3:2, rep4:2, rep5:2, hem2:2, ren1:2, ren2:2}, pk:{halfLifeHours:180}, doseModifier:1.0 },
+  // Суспензия тестостерона (без эфира) — пик/спад за сутки, самый короткий PK.
+  test_susp: { name:'Тестостерон суспензия (без эфира)', class:'aas', form:'inject',
+    targetOrgans:['cardio','hepatic','cns','reproductive','hematologic','renal'],
+    organMechanisms:{ cardio:['cv1','cv2','cv3','cv4','cv5'], hepatic:['liv1','liv2'], cns:['cns1','cns2','cns4'], reproductive:['rep1','rep2','rep3','rep4','rep5'], hematologic:['hem1','hem2'], renal:['ren1','ren2'] },
+    mechanismWeights:{cv1:4, cv2:4, cv5:4, rep1:4, rep2:4, liv1:3, hem1:3, cns1:4, cv3:2, cv4:2, liv2:2, cns2:2, cns4:2, rep3:2, rep4:2, rep5:2, hem2:2, ren1:2, ren2:2}, pk:{halfLifeHours:12}, doseModifier:1.0 },
   tren_acet: { name:'Тренболон ацетат', class:'aas', form:'inject',
     targetOrgans:['cardio','hepatic','cns','reproductive','hematologic','renal'],
     organMechanisms:{ cardio:['cv1','cv2','cv3','cv4','cv5'], hepatic:['liv1','liv3'], cns:['cns1','cns2','cns3','cns4'], reproductive:['rep1','rep2','rep3','rep5'], hematologic:['hem1','hem2'], renal:['ren1','ren4'] },
@@ -117,6 +128,12 @@ export const DRUG_DB: Record<string, TzDrugEntry> = {
     targetOrgans:['cardio','reproductive','hematologic'],
     organMechanisms:{ cardio:['cv2'], reproductive:['rep1','rep2','rep5'], hematologic:['hem2'] },
     mechanismWeights:{rep1:3, rep2:3, cv2:2, hem2:2, cv3:1, rep3:1, hem1:1, ren1:1, cns1:1, rep5:1}, pk:{halfLifeHours:240}, doseModifier:0.7 },
+  // Оральный метенолон (ацетат) — 17α-алкила не имеет, но печёночная нагрузка
+  // и низкая биодоступность дают более высокий liv-вклад, чем у энантата.
+  methenolone_acetate: { name:'Метенолон ацетат (Примоболан оральный)', class:'aas', form:'oral',
+    targetOrgans:['cardio','hepatic','reproductive','hematologic'],
+    organMechanisms:{ cardio:['cv2'], hepatic:['liv1','liv2'], reproductive:['rep1','rep2','rep5'], hematologic:['hem2'] },
+    mechanismWeights:{rep1:2, rep2:2, liv1:2, cv2:1, liv2:1, hem2:1, cv3:1, rep3:1, rep5:1, hem1:1}, pk:{halfLifeHours:6}, doseModifier:1.0 },
   drostanolone_prop: { name:'Дростанолон пропионат (Мастерон)', class:'aas', form:'inject',
     targetOrgans:['cardio','reproductive','hematologic'],
     organMechanisms:{ cardio:['cv2'], reproductive:['rep1','rep2','rep4','rep5'], hematologic:['hem1','hem2'] },
@@ -181,6 +198,29 @@ export const DRUG_DB: Record<string, TzDrugEntry> = {
     mechanismWeights:{rep1:3, rep2:3, cv2:3, hem1:2, liv1:2, cv3:1, cv4:1, rep3:1, rep5:1, cns1:1}, doseModifier:1.0 },
 
   // ── GH / Пептиды (25) ──
+  // Соматропин (рекомбинантный GH): задержка Na/H₂O (cv3), инсулинорезистентность
+  // (hem2/hem3), ↑ВЧД-риск (cns6), кардиомиопатия при супрафизиологических дозах (cv1),
+  // подавление собственной оси (rep1/cns4). Дозы — МЕ/сут.
+  hgh: { name:'Соматропин (рекомбинантный GH)', class:'gh', form:'inject',
+    targetOrgans:['cardio','cns','reproductive','hematologic'],
+    organMechanisms:{ cardio:['cv1','cv3'], cns:['cns6','cns4'], reproductive:['rep1'], hematologic:['hem2','hem3','hem1'] },
+    mechanismWeights:{cv3:3, hem2:3, cns6:2, hem3:2, cv1:2, cns4:1, rep1:1, hem1:1}, pk:{halfLifeHours:20}, doseModifier:1.0 },
+  // Кленбутерол — β2-агонист: тахикардия/ремоделирование (cv1/cv5), гипокалиемия
+  // (hem4/hem5), гипергликемия (hem3), тремор/ЦНС-стимуляция (cns1). Дозы — мкг/сут.
+  clenbuterol: { name:'Кленбутерол', class:'thermo', form:'oral',
+    targetOrgans:['cardio','hematologic','cns'],
+    organMechanisms:{ cardio:['cv1','cv5','cv4'], hematologic:['hem4','hem5','hem3'], cns:['cns1'] },
+    mechanismWeights:{cv5:4, cv1:3, hem3:3, hem4:3, hem5:3, cns1:2, cv4:1}, pk:{halfLifeHours:36}, doseModifier:1.0 },
+  // Левотироксин (T4) — пролекарство, мягче по аритмогенности, но подавляет ТТГ.
+  t4: { name:'Левотироксин (T4)', class:'thyroid', form:'oral',
+    targetOrgans:['cns','cardio','hematologic'],
+    organMechanisms:{ cns:['cns4','cns1'], cardio:['cv5','cv1'], hematologic:['hem3','hem5'] },
+    mechanismWeights:{cns4:3, cv5:2, cv1:2, hem3:1, cns1:1, hem5:1}, pk:{halfLifeHours:168}, doseModifier:1.0 },
+  // Лиотиронин (T3) — прямой тиреоидный гормон: аритмия/ФП, тахикардия, тревога.
+  t3: { name:'Лиотиронин (T3)', class:'thyroid', form:'oral',
+    targetOrgans:['cns','cardio','hematologic'],
+    organMechanisms:{ cns:['cns4','cns1','cns2'], cardio:['cv5','cv1'], hematologic:['hem3','hem5'] },
+    mechanismWeights:{cns4:4, cv5:4, cv1:3, cns1:2, hem3:2, hem5:2, cns2:1}, pk:{halfLifeHours:24}, doseModifier:1.0 },
   cjc1295: { name:'CJC-1295', class:'gh', form:'inject',
     targetOrgans:['cardio','renal','cns','hematologic'],
     organMechanisms:{ cardio:['cv3'], renal:['ren1','ren4'], cns:['cns5','cns6'], hematologic:['hem2'] },

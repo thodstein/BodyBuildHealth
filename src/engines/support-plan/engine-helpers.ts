@@ -14,8 +14,9 @@ import {
 } from './shared-constants';
 export { SUB_ALIAS, canonId, TZ_AUTO_BLACKLIST, SAME_CLASS_GROUPS, ID_TO_CLASS, sameClassIds, PHASE_BLOCKLIST };
 import { evaluateRecommendations } from '../recommendation-engine';
-import { calculateTzSpecRisk, calculateTzSpecRiskTimeline, type TzSpecInput, type DrugInput, type TzSpecResult, type TzSpecMechanismResult } from '../risk-engine-tz-spec';
+import { calculateTzSpecRisk, calculateTzSpecRiskTimeline, type TzSpecInput, type DrugInput, type TzSpecResult, type TzSpecMechanismResult, type TzDrugClass } from '../risk-engine-tz-spec';
 import { DRUG_DB } from '../../data/support-db';
+import { formatDose, doseUnitLabel } from '../../data/dose-units';
 import { resolvePedAlias } from '../../data/ped-alias-map';
 import { SUPPLEMENTS_DB } from '../../data/support-db/supplements';
 import { PHARMACY_DB } from '../../data/support-db/pharmacy-db';
@@ -51,7 +52,7 @@ export function checkDepletionCascade(
   const warnings: DepletionWarning[] = [];
   for (const cascade of DEPLETION_CASCADES) {
     const doseMg = doses[cascade.depleter] || 0;
-    if (doseMg >= cascade.thresholdMg && substances.includes(cascade.depleter)) {
+    if (doseMg >= cascade.threshold && substances.includes(cascade.depleter)) {
       const depletedInPlan = substances.includes(cascade.depleted);
       warnings.push({
         depleter: cascade.depleter,
@@ -76,14 +77,18 @@ interface ULWarning {
 export function checkUpperLimits(
   substances: string[],
   doses: Record<string, number>,
+  /** Дозы ДО UL-капа (см. applyTitration) — иначе превышение уже обрезано и не видно. */
+  rawDoses?: Record<string, number>,
 ): ULWarning[] {
   const warnings: ULWarning[] = [];
   for (const subId of substances) {
     const ul = NUTRIENT_UL[subId];
     if (!ul) continue;
-    const doseMg = doses[subId] || 0;
+    const raw = rawDoses?.[subId];
+    const doseMg = raw !== undefined && raw > 0 ? raw : (doses[subId] || 0);
     if (doseMg > ul) {
       const pct = Math.round(doseMg / ul * 100);
+      const unit = doseUnitLabel(subId);
       warnings.push({
         substanceId: subId,
         currentDoseMg: doseMg,
@@ -91,8 +96,8 @@ export function checkUpperLimits(
         percentUL: pct,
         risk: pct > 200 ? 'Высокий риск токсичности' : pct > 150 ? 'Значительное превышение UL' : pct > 100 ? 'Превышение UL' : 'В пределах нормы',
         recommendation: pct > 150
-          ? `Снизить дозу до ≤${ul * 1.5} мг/сут под контролем врача.`
-          : `Рассмотреть снижение дозы до ≤${ul} мг/сут.`,
+          ? `Снизить дозу до ≤${formatDose(subId, Math.round(ul * 1.5))} под контролем врача (сейчас ${formatDose(subId, Math.round(doseMg))}, UL ${formatDose(subId, ul)}).`
+          : `Рассмотреть снижение дозы до ≤${formatDose(subId, ul)} (сейчас ${formatDose(subId, Math.round(doseMg))}).`,
       });
     }
   }
@@ -623,7 +628,12 @@ function getSubstancesFromSynergies(synergies: SynergyId[], powerLevel: PowerLev
   return [...all];
 }
 
-export function applyTitration(substances: string[], state: CalculatorState): Record<string, number> {
+export function applyTitration(
+  substances: string[],
+  state: CalculatorState,
+  /** Сюда вернутся дозы ДО UL-капа — нужны для честных UL-предупреждений. */
+  rawDosesOut?: Record<string, number>,
+): Record<string, number> {
   const d: Record<string, number> = {};
   const c = state.cardio; const p = state.pharma;
   const cw = state.courseWeek ?? 1;
@@ -664,6 +674,11 @@ export function applyTitration(substances: string[], state: CalculatorState): Re
   if (substances.includes('selenium')) d.selenium = normalizeDoseByWeight(50, bw, 70);
   // UL-cap: гарантия, что нормализация по весу не превысит верхний допустимый уровень (NUTRIENT_UL).
   // Единицы доз в `d` совпадают с единицами NUTRIENT_UL (мг для макро, мкг для микродоз).
+  // ВАЖНО: сырые (до капа) значения сохраняем, иначе `checkUpperLimits` их уже
+  // никогда не увидит — превышение обрезано, предупреждений нет (P1 аудита).
+  if (rawDosesOut) {
+    for (const id of Object.keys(d)) rawDosesOut[id] = d[id];
+  }
   for (const id of Object.keys(d)) {
     const ul = NUTRIENT_UL[id];
     if (ul !== undefined && d[id] > ul) d[id] = ul;
@@ -717,22 +732,15 @@ export function generateSchedule(substances: string[], synergyIds: SynergyId[], 
 
   const doseStr = (id: string): string => {
     if (doses[id]) {
-      const val = doses[id];
-      // МКГ-единицы для микродоз
-      if (id === 'selenium' || id === 'folate' || id === 'vitamin_k2' || id === 'boron' || id === 'chromium')
-        return val + ' мкг';
-      // МЕ для витамина D
-      if (id === 'vitamin_d3') {
-        const iu = Math.round(val * 40); // 1 мкг = 40 МЕ
-        return iu >= 1000 ? iu + ' МЕ' : val + ' мкг';
-      }
-      if (id === 'bpc157' || id === 'tb500') return val + ' мкг';
-      return val + ' мг';
+      // Единая таблица единиц: мкг/МЕ/Ед/ФЕ/мг — вместо локальных списков,
+      // из-за которых селен в мкг подписывался как «мг» (1000× ошибка).
+      return formatDose(id, doses[id]);
     }
     const defs: Record<string, string> = {
       nac:'1200 мг', alpha_lipoic:'300 мг', tudca:'500 мг', milk_thistle:'280 мг',
       omega3:'2000 мг', coq10:'100 мг', magnesium:'200 мг', telmisartan:'40 мг',
-      nebivolol:'5 мг', aspirin:'100 мг', nattokinase:'2000 ФЕ', bromelain:'500 мг',
+      // Наттокиназа дозируется в мг (100 мг ≈ 2000 ФЕ) — единица «мг», не «ФЕ».
+      nebivolol:'5 мг', aspirin:'100 мг', nattokinase:'100 мг', bromelain:'500 мг',
       astragalus:'500 мг', celery_extract:'500 мг', potassium:'200 мг',
       tyrosine:'500 мг', l_dopa:'250 мг', vitamin_b6:'25 мг',
       glycine:'2000 мг', theanine:'100 мг', gaba:'500 мг',
@@ -842,7 +850,11 @@ export function getContraindicationAlerts(state: CalculatorState): string[] {
 }
 
 // ── TZ Risk Engine helpers ──
-function extractLabValues(labs: CalculatorState['labs']): Record<string, number> {
+function extractLabValues(
+  labs: CalculatorState['labs'],
+  sex?: 'male' | 'female',
+  age?: number,
+): Record<string, number> {
   const v: Record<string, number> = {};
   const fp = labs?.fullPanel || labs?.midCourse || labs?.preCourse;
   if (!fp) return v;
@@ -978,11 +990,21 @@ function extractLabValues(labs: CalculatorState['labs']): Record<string, number>
   if (num(th['T4 free']) !== undefined) v['T4'] = num(th['T4 free'])!;
   if (num(th['Anti-TPO']) !== undefined) v['ANTI_TPO'] = num(th['Anti-TPO'])!;
 
-  // eGFR calculated from creatinine (MDRD simplified)
+  // eGFR: CKD-EPI 2021 (race-free) — учитывает пол, но не возраст при отсутствии возраста.
+  // Раньше был MDRD без пола/возраста → у женщин СКФ систематически завышалась
+  // (~на 10-15%), и ренальный риск занижался.
   if (v['CREAT'] !== undefined) {
-    const cr = v['CREAT']; // μmol/L
-    const egfr = Math.round(175 * Math.pow(cr / 88.4, -1.154));
-    v['eGFR'] = Math.min(120, Math.max(15, egfr));
+    const scr = v['CREAT'] / 88.4; // μmol/L → mg/dL
+    const female = sex === 'female';
+    const kappa = female ? 0.7 : 0.9;
+    const alpha = female ? -0.241 : -0.302;
+    const ratio = scr / kappa;
+    const e = 142 * Math.pow(Math.min(ratio, 1), alpha) * Math.pow(Math.max(ratio, 1), -1.2);
+    // Возраст: при отсутствии — 40 лет (нейтральная точка CKD-EPI).
+    const ageFactor = Math.pow(0.9938, Number.isFinite(age) && (age as number) > 0 ? (age as number) : 40);
+    const sexFactor = female ? 1.012 : 1;
+    const egfr = Math.round(e * ageFactor * sexFactor);
+    v['eGFR'] = Math.min(150, Math.max(5, egfr));
   }
 
   return v;
@@ -991,35 +1013,72 @@ function extractLabValues(labs: CalculatorState['labs']): Record<string, number>
 export function buildTzInput(state: CalculatorState, supportSubs: string[]): TzSpecInput | null {
   const drugs: DrugInput[] = [];
   const aasList = state.pharma.aas;
+  const pharma: any = state.pharma;
 
-  for (const a of aasList) {
-    const canon = resolvePedAlias(a.id);
-    const dbEntry = DRUG_DB[canon] || DRUG_DB[a.id];
+  const classOf = (dbClass?: string): TzDrugClass => {
+    switch (dbClass) {
+      case 'gh': return 'gh';
+      case 'insulin': return 'insulin';
+      case 'thermo': return 'thermo';
+      case 'thyroid': return 'thyroid';
+      case 'glp1': return 'glp1';
+      case 'sarm': return 'sarm';
+      case 'pct': return 'pct';
+      default: return 'aas';
+    }
+  };
+  const addDrug = (drugName: string, dose: number, fallbackClass: TzDrugClass, startWeek?: number, endWeek?: number) => {
+    if (!Number.isFinite(dose) || dose <= 0) return;
+    const canon = resolvePedAlias(drugName);
+    if (drugs.some((d) => resolvePedAlias(d.drugName) === canon)) return;
+    const dbEntry = DRUG_DB[canon];
     const form = dbEntry?.form === 'oral' ? 'oral' as const : 'inject' as const;
-    const dbClass = dbEntry?.class || 'aas';
-    const drugClass: 'aas' | 'gh' | 'insulin' = dbClass === 'gh' ? 'gh' : dbClass === 'insulin' ? 'insulin' : 'aas';
-    const safeDose = Number.isFinite(a.doseMgWeek) ? a.doseMgWeek : 0;
-    drugs.push({ drugClass, drugName: canon, dose: safeDose, form, startWeek: a.startWeek, endWeek: a.endWeek });
+    drugs.push({ drugClass: classOf(dbEntry?.class) || fallbackClass, drugName: canon, dose, form, startWeek, endWeek });
+  };
+
+  // 1. Всё, что пользователь ввёл в списке препаратов курса (включая GH/клен/T3,
+  //    если они добавлены как отдельные позиции, а не только флажком).
+  for (const a of aasList) {
+    const rawId = String(a.id || '');
+    const canon = resolvePedAlias(rawId);
+    const dbEntry = DRUG_DB[canon];
+    const fallback: TzDrugClass = /clen/i.test(rawId) ? 'thermo'
+      : /(^|_)t[34]($|_)|thyro|liothyro|levothyro/i.test(rawId) ? 'thyroid'
+      : /hgh|somatrop|gh_|growth/i.test(rawId) ? 'gh'
+      : /insulin|ins_/i.test(rawId) ? 'insulin'
+      : 'aas';
+    addDrug(rawId, Number(a.doseMgWeek), fallback, a.startWeek, a.endWeek);
   }
 
-  if (state.pharma.hasGH && !drugs.some(d => d.drugName === 'mk677' || d.drugName === 'cjc1295')) {
-    drugs.push({ drugClass: 'gh', drugName: 'cjc1295', dose: 300, form: 'inject' });
+  // 2. Флаги PED-карточки. Доза — РЕАЛЬНАЯ из попапа (ghIU/insulinIU/igfMcg/
+  //    clenMcg/t3Mcg), а дефолт — только если пользователь её не задал.
+  //    Раньше здесь был хардкод (cjc1295 300, igf1_lr3 100, ins_short 10), и
+  //    препарат попадал в риск как «пептид», а не как GH/IGF/инсулин.
+  if (pharma.hasGH) {
+    addDrug('hgh', Number(pharma.ghIU) > 0 ? Number(pharma.ghIU) : 4, 'gh');
   }
-  if (state.pharma.hasIGF && !drugs.some(d => d.drugName === 'igf1_lr3')) {
-    drugs.push({ drugClass: 'gh', drugName: 'igf1_lr3', dose: 100, form: 'inject' });
+  if (pharma.hasIGF || Number(pharma.igfMcg) > 0) {
+    addDrug('igf1_lr3', Number(pharma.igfMcg) > 0 ? Number(pharma.igfMcg) : 100, 'gh');
   }
-  if (state.pharma.hasInsulin && !drugs.some(d => d.drugClass === 'insulin')) {
-    drugs.push({ drugClass: 'insulin', drugName: 'ins_short', dose: 10, form: 'inject' });
+  if (pharma.hasInsulin) {
+    addDrug('ins_short', Number(pharma.insulinIU) > 0 ? Number(pharma.insulinIU) : 10, 'insulin');
   }
-  if (state.pharma.hasGLP1 && !drugs.some(d => d.drugName === 'semaglutide' || d.drugName === 'tirzepatide')) {
-    drugs.push({ drugClass: 'insulin', drugName: 'semaglutide', dose: 5, form: 'inject' });
+  if (Number(pharma.clenMcg) > 0 || pharma.hasClen) {
+    addDrug('clenbuterol', Number(pharma.clenMcg) > 0 ? Number(pharma.clenMcg) : 80, 'thermo');
+  }
+  if (Number(pharma.t3Mcg) > 0 || pharma.hasT3) {
+    addDrug('t3', Number(pharma.t3Mcg) > 0 ? Number(pharma.t3Mcg) : 50, 'thyroid');
+  }
+  if (pharma.hasGLP1) {
+    addDrug('semaglutide', Number(pharma.semaMg) > 0 ? Number(pharma.semaMg) : 1, 'glp1');
   }
 
   if (drugs.length === 0) return null;
 
-  const allAasWeeks = aasList.map(a => a.weeks || 12);
-  const duration = Math.max(...allAasWeeks, 12);
-  const labValues = extractLabValues(state.labs);
+  // Длительность = самый длинный препарат курса (не искусственные 12 недель).
+  const allWeeks = aasList.map(a => Number(a.weeks) || 0).filter(w => w > 0);
+  const duration = allWeeks.length > 0 ? Math.max(...allWeeks) : 12;
+  const labValues = extractLabValues(state.labs, state.profile?.sex, state.profile?.age);
   const firstDrug = drugs[0];
   // Genetics
   const genetics = state.genetics ? {

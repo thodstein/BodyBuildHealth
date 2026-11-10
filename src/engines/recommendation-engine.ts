@@ -6,6 +6,7 @@ import { MECHANISM_TO_SUPPORT, ORGAN_TO_SUPPORT, SYSTEM_TO_SUPPORT, CATEGORY_TO_
 import { normalizeMechanisms } from './biostack-mechanism-normalizer';
 import { getSupportByMechanism, getSupportBySystem, getFullChainSupport } from '../data/mechanism-support-bridge';
 import { normalizeLabValue } from '../core/constants';
+import { formatDoseFromMg } from '../data/dose-units';
 import { getPrioritySubstances, getBrandName, getSubstancePriority, getPriorityReason, deriveSeverity, type SeverityLevel } from '../data/lab-priority-map';
 
 export type RecSeverity = 'critical' | 'high' | 'medium' | 'low' | 'info';
@@ -69,7 +70,7 @@ function getV(fp: LabSlice | null | undefined, panel: keyof LabSlice, key: strin
 function subInfo(id: string): { name: string; dose: string; tier: 'first' | 'second' | 'third' | 'base' } {
   const entry = getSupportEntry(id);
   if (entry) {
-    const dose = entry.dosage ? `${entry.dosage.mg} мг` : '';
+    const dose = entry.dosage?.mg ? formatDoseFromMg(id, entry.dosage.mg) : '';
     const tierMap: Record<string, 'first' | 'second' | 'third' | 'base'> = { core: 'first', standard: 'second', advanced: 'third', specialty: 'third' };
     return { name: entry.nameRu || entry.name || id, dose, tier: tierMap[entry.tier] || 'base' };
   }

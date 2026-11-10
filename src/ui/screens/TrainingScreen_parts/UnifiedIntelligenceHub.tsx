@@ -18,6 +18,7 @@ import { loadSRPESessions, saveSRPESession, clearSRPESessions, updateSRPESession
 import { buildIntelCsv, buildIntelHtml, buildIntelDeloadIcs } from '../../../engines/pro/intelligence-export.engine';
 import { toDailyLoads, acuteChronicRatio, weeklyMonotony, fitnessFatigue, trainingLoadReport, sessionLoad, banisterForm, monotonyStreak, trafficLight, ACWR_DISCLAIMER, ACWR_ZONE_META, ACWR_WINDOW_NOTE, type DayLoad, type ACWRZone } from '../../../engines/pro/training-load.engine';
 import { localIsoDate } from './diary-shared';
+import { supportNamesRu } from '../../../data/support-names';
 import { analyzeRecovery, shouldTrain } from '../../../engines/recovery-optimization.engine';
 import { calculatePRI, getPRIThreshold } from '../../../engines/autoregulation.engine';
 import { autoRegulate, loadForRPE, rpeFromLoad, shouldTrainToday, AUTOREG_MARKERS_TOTAL, AUTOREG_RELIABILITY_NOTE } from '../../../engines/pro/autoregulation-pro.engine';
@@ -682,10 +683,19 @@ export const UnifiedIntelligenceHub: React.FC = () => {
         if (cnt>0) nutrition = { avgKcal: Math.round(sumK/cnt), avgProtein: Math.round(sumP/cnt), avgCarbs: Math.round(sumC/cnt), days: cnt };
       }
       const supportSubs: string[] = (()=> { try {
-        const r = JSON.parse(localStorage.getItem('he_support_plan_result')||'null');
-        if (r?.substances) return r.substances.map((s:any)=> s.name||s.id).filter(Boolean);
-        const rr = JSON.parse(localStorage.getItem('he_support_risk')||'null');
-        if (rr?.subs) return rr.subs;
+        const raw = JSON.parse(localStorage.getItem('he_support_plan_result')||'null');
+        // Основной формат — МАССИВ id. Объект { substances } поддержан для
+        // старых записей. Имена резолвим через единый каталог.
+        const ids: string[] = Array.isArray(raw)
+          ? raw.map((x:any)=> String(x))
+          : Array.isArray(raw?.substances)
+            ? raw.substances.map((s:any)=> String(s?.id || s?.substanceId || '')).filter(Boolean)
+            : [];
+        if (ids.length === 0) {
+          const rr = JSON.parse(localStorage.getItem('he_support_risk')||'null');
+          if (Array.isArray(rr?.subs)) ids.push(...rr.subs.map((x:any)=> String(x)));
+        }
+        return supportNamesRu(ids);
       } catch {} return [];})();
       const sleepDiary: any[] = (()=> { try { const r = JSON.parse(localStorage.getItem('he_sleep_diary')||'[]'); return Array.isArray(r)?r:[]; } catch { return []; }})();
       const lastSleep = sleepDiary.length? [...sleepDiary].sort((a,b)=> String(b.date).localeCompare(String(a.date)))[0]?.hours ?? null : null;

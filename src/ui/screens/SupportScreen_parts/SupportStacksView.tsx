@@ -3,6 +3,7 @@ import React from 'react';
 import { PHARMA_DB } from '../../../core/pharma-database';
 import { pharmaSummary } from './SupportBioavailabilityData';
 import { writeSupportStacks } from '../../../engines/stack-storage';
+import { formatDoseFromMg } from '../../../data/dose-units';
 
 export const SupportStacksView: React.FC<{ s: Record<string, any> }> = ({ s }) => {
   const {
@@ -69,7 +70,7 @@ export const SupportStacksView: React.FC<{ s: Record<string, any> }> = ({ s }) =
                         <div key={id} style={{ padding:'5px 8px', borderRadius:6, background:'rgba(139,92,246,0.05)', border:'1px solid rgba(139,92,246,0.1)' }}>
                           <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', flexWrap:'wrap', gap:4 }}>
                             <span style={{ fontSize:10, fontWeight:600, color:'var(--text-light)', minWidth:0 }}>{name}</span>
-                            {dosage && <span style={{ fontSize:9, color:'rgba(255,255,255,0.7)', flexShrink:0 }}>{dosage.timing || ''} {dosage.mg ? `${dosage.mg}мг` : ''}</span>}
+                            {dosage && <span style={{ fontSize:9, color:'rgba(255,255,255,0.7)', flexShrink:0 }}>{dosage.timing || ''} {dosage.mg ? formatDoseFromMg(id, dosage.mg) : ''}</span>}
                           </div>
                           {desc && <div style={{ fontSize:8, color:'var(--text-dim)', marginTop:2, lineHeight:1.3 }}>{desc}</div>}
                         </div>

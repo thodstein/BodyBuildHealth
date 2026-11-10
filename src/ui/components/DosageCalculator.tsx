@@ -1,6 +1,7 @@
 import React from 'react';
 import { EVIDENCE_DOSAGES, EvidenceDosage, getEvidenceDosage } from '../../data/evidence-dosage-db';
 import { SUPPORT_CATALOG_DATA } from '../../data/support-database';
+import { formatDoseFromMg } from '../../data/dose-units';
 
 interface DosageCardProps {
   substanceId: string;
@@ -44,7 +45,7 @@ export const DosageCalculator: React.FC<{
             <span>📋</span> Дозировка: {substanceName}
           </div>
           <div style={DOSE_STYLES.noteBox}>
-            Базовая доза из каталога: <b>{catalogEntry.dosage.mg} мг</b> — {catalogEntry.dosage.timing}
+            Базовая доза из каталога: <b>{formatDoseFromMg(catalogEntry.id || substanceId, catalogEntry.dosage.mg)}</b> — {catalogEntry.dosage.timing}
             {catalogEntry.dosage.form && <span> ({catalogEntry.dosage.form})</span>}
           </div>
           <div style={{ fontSize: 7, color: 'var(--text-dim)', textAlign: 'center' }}>

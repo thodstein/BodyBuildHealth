@@ -303,6 +303,17 @@ export interface CalculatorResult {
     category: string;
   }>;
   protocolWarnings?: string[];
+  /**
+   * Честность расчёта риска (аудит 2026-11, P0):
+   *  'ok' | 'partial' | 'no_data'. 'no_data' = препараты курса не смоделированы,
+   *  цифры риска НЕ валидны (раньше в этом случае подставлялся `drugName:'none'`
+   *  и получался риск 0 / «покрытие 100%»).
+   */
+  riskStatus?: 'ok' | 'partial' | 'no_data';
+  /** Препараты курса без механизм-профиля — их вклад в риск = 0. */
+  unmodeledDrugs?: string[];
+  /** Вещества поддержки без механизмов ТЗ — в покрытии не участвуют. */
+  unmappedSupport?: string[];
 }
 
 export interface TimelineWeekData {
@@ -581,21 +592,25 @@ export const NUTRIENT_LIMIT_INFO: Record<string, {
 );
 
 /** Каскады истощения: вещество X в высокой дозе → истощает Y.
- *  Каждая запись: [истощающее, истощаемое, порог мг/сут для истощения, механизм] */
+ *  Каждая запись: [истощающее, истощаемое, порог в ТОЙ ЖЕ единице, что и доза
+ *  в `applyTitration` (мг для макроэлементов, мкг для D3/селена), механизм]
+ *  ⚠️ Единица порога = внутренняя единица вещества, иначе сравнение бессмысленно. */
 export const DEPLETION_CASCADES: Array<{
-  depleter: string; depleted: string; thresholdMg: number;
+  depleter: string; depleted: string; threshold: number;
   mechanism: string; severity: 'HIGH' | 'MEDIUM' | 'LOW';
 }> = [
-  { depleter: 'zinc', depleted: 'copper', thresholdMg: 30, mechanism: 'Индукция металлотионеина в энтероцитах → связывание Cu → ↓ всасывания Cu на 50-70%', severity: 'HIGH' },
-  { depleter: 'zinc', depleted: 'iron', thresholdMg: 50, mechanism: 'Конкуренция за DMT1-транспортёр в дуоденальных энтероцитах', severity: 'MEDIUM' },
-  { depleter: 'calcium', depleted: 'magnesium', thresholdMg: 1000, mechanism: 'Конкуренция за парацеллюлярный транспорт в толстом кишечнике; Ca >1000 мг ↓ Mg на 30%', severity: 'MEDIUM' },
-  { depleter: 'vitamin_d3', depleted: 'magnesium', thresholdMg: 0.1, mechanism: 'D3 активирует кальбиндин → ↑ потребность в Mg как кофакторе CYP2R1/CYP27B1; Mg расходуется на гидроксилирование', severity: 'MEDIUM' },
-  { depleter: 'calcium', depleted: 'iron', thresholdMg: 500, mechanism: 'Ca ингибирует гемовое и негемовое всасывание Fe на 40-60% при совместном приёме', severity: 'HIGH' },
-  { depleter: 'iron', depleted: 'zinc', thresholdMg: 25, mechanism: 'Конкуренция за DMT1; Fe >25 мг ↓ Zn всасывание на 30%', severity: 'MEDIUM' },
-  { depleter: 'vitamin_c', depleted: 'copper', thresholdMg: 1500, mechanism: 'Аскорбат восстанавливает Cu²⁺→Cu⁺, снижая доступность для церулоплазмина', severity: 'LOW' },
-  { depleter: 'omega3', depleted: 'vitamin_e', thresholdMg: 3000, mechanism: 'ПНЖК ↑ перекисное окисление → ↑ расход вит.E как антиоксиданта; соотношение 0.4-0.6 мг вит.E/г ПНЖК', severity: 'MEDIUM' },
-  { depleter: 'selenium', depleted: 'zinc', thresholdMg: 0.4, mechanism: 'Селенометионин конкурирует с метионином → ↓ синтез MT → изменённый Zn-гомеостаз', severity: 'LOW' },
-  { depleter: 'selenium', depleted: 'copper', thresholdMg: 0.8, mechanism: 'Высокие дозы Se ↑ синтез металлотионеина → связывание Cu', severity: 'MEDIUM' },
+  { depleter: 'zinc', depleted: 'copper', threshold: 30, mechanism: 'Индукция металлотионеина в энтероцитах → связывание Cu → ↓ всасывания Cu на 50-70%', severity: 'HIGH' },
+  { depleter: 'zinc', depleted: 'iron', threshold: 50, mechanism: 'Конкуренция за DMT1-транспортёр в дуоденальных энтероцитах', severity: 'MEDIUM' },
+  { depleter: 'calcium', depleted: 'magnesium', threshold: 1000, mechanism: 'Конкуренция за парацеллюлярный транспорт в толстом кишечнике; Ca >1000 мг ↓ Mg на 30%', severity: 'MEDIUM' },
+  // D3: 25 мкг = 1000 МЕ — с этого уровня клинически значимо ↑ потребность в Mg.
+  { depleter: 'vitamin_d3', depleted: 'magnesium', threshold: 25, mechanism: 'D3 активирует кальбиндин → ↑ потребность в Mg как кофакторе CYP2R1/CYP27B1; Mg расходуется на гидроксилирование', severity: 'MEDIUM' },
+  { depleter: 'calcium', depleted: 'iron', threshold: 500, mechanism: 'Ca ингибирует гемовое и негемовое всасывание Fe на 40-60% при совместном приёме', severity: 'HIGH' },
+  { depleter: 'iron', depleted: 'zinc', threshold: 25, mechanism: 'Конкуренция за DMT1; Fe >25 мг ↓ Zn всасывание на 30%', severity: 'MEDIUM' },
+  { depleter: 'vitamin_c', depleted: 'copper', threshold: 1500, mechanism: 'Аскорбат восстанавливает Cu²⁺→Cu⁺, снижая доступность для церулоплазмина', severity: 'LOW' },
+  { depleter: 'omega3', depleted: 'vitamin_e', threshold: 3000, mechanism: 'ПНЖК ↑ перекисное окисление → ↑ расход вит.E как антиоксиданта; соотношение 0.4-0.6 мг вит.E/г ПНЖК', severity: 'MEDIUM' },
+  // Селен: 200/300 мкг (внутренняя единица — мкг, НЕ мг).
+  { depleter: 'selenium', depleted: 'zinc', threshold: 200, mechanism: 'Селенометионин конкурирует с метионином → ↓ синтез MT → изменённый Zn-гомеостаз', severity: 'LOW' },
+  { depleter: 'selenium', depleted: 'copper', threshold: 300, mechanism: 'Высокие дозы Se ↑ синтез металлотионеина → связывание Cu', severity: 'MEDIUM' },
 ];
 
 /** Категории периодов полувыведения для планирования кратности приёма. */

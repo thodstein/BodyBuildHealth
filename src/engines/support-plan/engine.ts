@@ -16,6 +16,7 @@ import { evaluateRecommendations } from '../recommendation-engine';
 import { calculateTzSpecRisk, calculateTzSpecRiskTimeline, type TzSpecInput, type TzSpecResult } from '../risk-engine-tz-spec';
 import { SUPPLEMENTS_DB } from '../../data/support-db/supplements';
 import { PHARMACY_DB } from '../../data/support-db/pharmacy-db';
+import { getSupportMechIndex } from '../../data/support-db/mech-map';
 import { getPrioritySubstances, getSubstancePriority, type SeverityLevel } from '../../data/lab-priority-map';
 import { checkContraindications } from '../../data/substance-contraindications';
 import { checkInteractions } from '../../data/drug-interactions';
@@ -288,13 +289,14 @@ export function calculateSupportTZ(state: CalculatorState): CalculatorResult {
 
     // ── 3. TZ-подбор: breadth + targeted ──
     interface DBEntry { organId: string; mechId: string; k: number; q: string; }
+    // ЕДИНЫЙ индекс: кураторские таблицы + доработки + производные записи каталога.
+    // Раньше брались только SUPPLEMENTS_DB/PHARMACY_DB по точному ключу → 67 веществ
+    // каталога (включая zinc_sup/selenium_sup/curcumin_sup) не участвовали в подборе.
     const allDb: Record<string, DBEntry[]> = {};
-    const _mergedDb: Record<string, DBEntry[]> = {};
-    Object.assign(_mergedDb, SUPPLEMENTS_DB || {}, PHARMACY_DB || {});
-    for (const [id, entries] of Object.entries(_mergedDb)) {
+    for (const [id, entries] of Object.entries(getSupportMechIndex())) {
       if (!entries || entries.length === 0) continue;
       if (TZ_AUTO_BLACKLIST.has(id)) continue;
-      allDb[id] = entries;
+      allDb[id] = entries as DBEntry[];
     }
 
     const sysCoverageCount: Record<string, number> = {};
@@ -583,12 +585,13 @@ export function calculateSupportTZ(state: CalculatorState): CalculatorResult {
     substances.splice(0, substances.length, ...finalAfterSynergy);
 
     // ── 7. Финальный расчёт риска С поддержкой (включая ВСЕ вещества) ──
-    const titration = applyTitration(substances, state);
+    const rawDoses: Record<string, number> = {};
+    const titration = applyTitration(substances, state, rawDoses);
     const labDeltas = calcLabDeltas(state);
     const schedule = generateSchedule(substances, synergyIds, titration, state);
 
     const depletionWarnings = checkDepletionCascade(substances, titration);
-    const ulWarnings = checkUpperLimits(substances, titration);
+    const ulWarnings = checkUpperLimits(substances, titration, rawDoses);
     const dailyLoad = aggregateDailyLoad(substances, titration);
 
     let overallRaw: number;
@@ -596,6 +599,9 @@ export function calculateSupportTZ(state: CalculatorState): CalculatorResult {
     let finalScores: Record<RiskSystemId, number>;
     let tzResultFinal: TzSpecResult | null = null;
     let peakWeek = 0;
+    let riskStatus: 'ok' | 'partial' | 'no_data' = 'no_data';
+    let unmodeledDrugs: string[] = [];
+    let unmappedSupport: string[] = [];
 
     // Процедуры (эритроцитаферез/флеботомия) — реальные вмешательства,
     // снижающие hem1 (прямое удаление RBC-массы); включаются в расчёт
@@ -603,19 +609,25 @@ export function calculateSupportTZ(state: CalculatorState): CalculatorResult {
     const procedureIds = (unifiedRec?.procedures || [])
       .filter(p => p.id === 'erythrocytapheresis' || p.id === 'phlebotomy')
       .map(p => p.id);
-    let tzInputFinal = buildTzInput(state, [...substances, ...procedureIds]);
-    if (!tzInputFinal) {
-      tzInputFinal = {
-        drugClass: 'aas', drugName: 'none', dose: 0, duration: 12,
-        form: 'inject', combinations: 0, labCoverage: 0.3,
-        labValues: {}, supportSubstances: substances, drugs: [],
-        courseWeek: state.courseWeek,
-      };
+    const tzInputFinal = buildTzInput(state, [...substances, ...procedureIds]);
+    if (tzInputFinal) {
+      // Честный расчёт: если ни один препарат не смоделирован — не выдаём
+      // «риск 0% / покрытие 100%». Раньше здесь подставлялся `drugName:'none'`,
+      // который молча проходил по всем 28 механизмам с нулевым вкладом.
+      tzResultFinal = calculateTzSpecRisk(tzInputFinal);
+      riskStatus = tzResultFinal.riskStatus;
+      unmodeledDrugs = tzResultFinal.unmodeledDrugs;
+      unmappedSupport = tzResultFinal.unmappedSupport;
+      finalScores = tzToScores(tzResultFinal, oldScores);
+      overallRaw = tzResultFinal.overallRaw;
+      overallAfterSupport = tzResultFinal.overallAfter;
+    } else {
+      // Нет данных о препаратах: цифры не выдумываем, показываем «не рассчитано».
+      finalScores = { ...oldScores };
+      overallRaw = 0;
+      overallAfterSupport = 0;
+      riskStatus = 'no_data';
     }
-    tzResultFinal = calculateTzSpecRisk(tzInputFinal);
-    finalScores = tzToScores(tzResultFinal, oldScores);
-    overallRaw = tzResultFinal.overallRaw;
-    overallAfterSupport = tzResultFinal.overallAfter;
 
     // ── 8. Понедельная динамика риска (timeline) ──
     let timelineData: TimelineWeekData[] | undefined;
@@ -764,7 +776,8 @@ export function calculateSupportTZ(state: CalculatorState): CalculatorResult {
         before: finalScores[id] || 0,
         after: tzResultFinal
           ? (tzResultFinal.organs.find(o => o.id === (id === 'neuro' ? 'cns' : id))?.afterPercent ?? 0)
-          : Math.max(0, (finalScores[id] || 0) - Math.round((finalScores[id] || 0) * 0.4)),
+          // Без препаратов «снижение на 40%» — выдумка. Показываем отсутствие расчёта.
+          : finalScores[id] || 0,
       })),
       timeline: timelineData,
       peakWeek,
@@ -779,6 +792,9 @@ export function calculateSupportTZ(state: CalculatorState): CalculatorResult {
       phaseAssignedDrugs: phaseAssignedDrugs.length > 0 ? phaseAssignedDrugs : undefined,
       protocolWarnings: protocolWarnings.length > 0 ? protocolWarnings : undefined,
       tzSpecResult: tzResultFinal,
+      riskStatus,
+      unmodeledDrugs: unmodeledDrugs.length > 0 ? unmodeledDrugs : undefined,
+      unmappedSupport: unmappedSupport.length > 0 ? unmappedSupport : undefined,
     };
     result.risk.systems = tzResultFinal
       ? toSystemRisksFromTz(tzResultFinal, finalScores, synergyIds.length)
@@ -836,6 +852,7 @@ export function hydrateState(): Partial<CalculatorState> {
       // Profile: personal + lifestyle
       const personal = s.personal || {};
       const lifestyle = s.lifestyle || {};
+      const training = s.training || {};
       const health = s.health || {};
       const pharma = s.pharma || {};
       result.profile = {
@@ -844,8 +861,10 @@ export function hydrateState(): Partial<CalculatorState> {
         sex: (personal.sex || s.sex || 'male') as 'male' | 'female',
         height: personal.height ?? s.height,
         bodyfat: personal.bodyFat ?? s.bodyFat ?? personal.bodyfat,
-        workoutsPerWeek: personal.workoutsPerWeek || s.workoutsPerWeek || 3,
-        avgWorkoutMinutes: personal.avgWorkoutMinutes || s.avgWorkoutMinutes || 60,
+        // Тренировки живут в settings.training.* (UnifiedSettings), а не в personal.
+        // Раньше читалось personal.workoutsPerWeek — поля нет → всегда 3/60.
+        workoutsPerWeek: training.daysPerWeek ?? s.daysPerWeek ?? personal.workoutsPerWeek ?? s.workoutsPerWeek ?? 3,
+        avgWorkoutMinutes: training.minutesPerSession ?? s.minutesPerSession ?? personal.avgWorkoutMinutes ?? s.avgWorkoutMinutes ?? 60,
         sleepHours: lifestyle.sleepHours ?? s.sleepHours ?? 7,
         stressLevel: lifestyle.stressLevel ?? s.stressLevel ?? 4,
         smoker: lifestyle.smoke ?? s.smoker ?? false,
@@ -947,14 +966,18 @@ export function hydrateState(): Partial<CalculatorState> {
         (result as any).healthConditions = Array.isArray(health.chronicConditions) ? health.chronicConditions : [];
       }
       // ── Genetics ──
-      if (s.genetics && !result.genetics) {
+      // Генетика хранится в settings.health.genetics (FLAT_TO_NESTED: genetics →
+      // health.genetics). Раньше читалось s.genetics — ключа нет, поэтому
+      // механизм-модель ВСЕГДА работала с 'unknown' (P1 аудита).
+      const geneticsSrc = health.genetics || s.genetics;
+      if (geneticsSrc && !result.genetics) {
         result.genetics = {
-          cyp19a1: s.genetics.CYP19A1 || s.genetics.cyp19a1 || 'unknown',
-          srd5a2: s.genetics.SRD5A2 || s.genetics.srd5a2 || 'unknown',
-          arSensitivity: s.genetics.AR || s.genetics.ar || 'unknown',
-          mthfr: s.genetics.MTHFR || s.genetics.mthfr || 'unknown',
+          cyp19a1: geneticsSrc.CYP19A1 || geneticsSrc.cyp19a1 || 'unknown',
+          srd5a2: geneticsSrc.SRD5A2 || geneticsSrc.srd5a2 || 'unknown',
+          arSensitivity: geneticsSrc.AR || geneticsSrc.ar || 'unknown',
+          mthfr: geneticsSrc.MTHFR || geneticsSrc.mthfr || 'unknown',
           // HFE (гемохроматоз) — из профиля health.genetics (свободная карта маркеров)
-          hfe: s.genetics.HFE || s.genetics.hfe || 'unknown',
+          hfe: geneticsSrc.HFE || geneticsSrc.hfe || 'unknown',
         };
       }
       // ── Принятые добавки (опция «учёт рациона») ──

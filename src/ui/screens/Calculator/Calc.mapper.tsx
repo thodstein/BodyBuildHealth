@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom';
 import { buildTzInput } from '../../../engines/support-plan/engine-helpers';
 import { ruCount, RU_ELEMENTS, RU_STACKS, RU_SUPPLEMENTS } from '../../../engines/ru-plural';
 import { calculateTzSpecRisk, type TzSpecResult } from '../../../engines/risk-engine-tz-spec';
+import { courseSignature, writeCalcSnapshot, SUPPORT_RISK_KEY } from '../../../engines/tz-snapshot';
 import { getAdministrationRules } from '../../../data/administration-rules-db';
 import { PREANALYTIC_EFFECTS_DB, ASSAY_INTERFERENCE_DB } from '../../../data/assay-interference-db';
 import { findSeparationRules } from '../../../data/separation-timing-db';
@@ -25,6 +26,9 @@ import '../../../data/support-catalog-init';
 import { SafetyGuardrails, SafetyConflicts, SafetyProcedures, SafetyAssayWarnings, SafetyGaps, SafetyLabFindings, SafetyCumulativeLoad, SafetyPillBurden, SafetyPedEscalation, SafetyInjections } from './CalcSafetyLayer';
 import { CalcSystemPanel, SYSTEM_PANELS, SYSTEM_TO_PANEL } from './CalcSystemPanel';
 import { DEFAULT_DOSAGES } from '../../../data/support-meta';
+import { formatDose, formatDefaultDose } from '../../../data/dose-units';
+import { supportNameRu } from '../../../data/support-names';
+import { NON_PILL_SUPPORT_IDS } from '../../../engines/support-plan/substances';
 import { checkInteractions, type DrugInteraction } from '../../../data/drug-interactions';
 import { SYNERGY_NETWORK } from '../../../data/support-synergy-network';
 import { CONTRAINDICATIONS, getContraindications, checkContraindications } from '../../../data/substance-contraindications';
@@ -60,7 +64,7 @@ import { printProtocol, buildExportDataFromRec } from '../../../ui/components/Pr
 import { checkNotifications } from '../../../engines/notification-engine';
 import { computeOverdueSystems, type SystemOverdue } from '../../../engines/labs-overdue';
 import { LabsDueBanner } from './LabsDueBanner';
-import { getSupportPlanQueueIds, readSupportPlanQueue, removeFromSupportPlanQueue, deleteFavRecommendation } from '../../../engines/training-plan-save.engine';
+import { getSupportPlanQueueIds, readSupportPlanQueue, removeFromSupportPlanQueue, deleteFavRecommendation, subscribePlanQueueChanged } from '../../../engines/training-plan-save.engine';
 import { CalcPhaseLabCards } from './CalcPhaseLabCards';
 import { LAB_MONITOR_DB } from '../SupportScreen_parts/UnifiedSynergyCalculator';
 import { LAB_TOP20, resolveLabMonitor, type HubLabMon } from '../../../engines/support-hub-labs.engine';
@@ -518,7 +522,6 @@ function DomainSymptomMap({ domains, checked, onToggle }: { domains: DomainCfg[]
 }
 
 // ── Утилиты отображения вещества ─────────────────────────────────────────────
-const SUB_NAME_CACHE: Record<string, string> = {};
 const FALLBACK_NAMES: Record<string, string> = {
   hydration: 'Гидратация', cardio_aerobic: 'Кардио (аэробная)', electrolyte_balance: 'Электролиты Na/K/Mg',
   daily_steps: 'Бытовая активность 10 000+', no_smoking: 'Отказ от курения', no_alcohol: 'Отказ от алкоголя',
@@ -564,11 +567,9 @@ function planItemKind(id: string): 'База' | 'Минерал' | 'БАД' | '�
   return 'БАД';
 }
 function subNameRu(id: string): string {
-  if (SUB_NAME_CACHE[id]) return SUB_NAME_CACHE[id];
-  const e = SUPPORT_CATALOG_DATA[id] || SUPPORT_CATALOG_DATA[id.toLowerCase()] || SUPPORT_CATALOG_DATA[id.toUpperCase()];
-  const name = e?.nameRu || e?.name || FALLBACK_NAMES[id] || FALLBACK_NAMES[id?.toLowerCase()] || id;
-  SUB_NAME_CACHE[id] = name;
-  return name;
+  // Единый резолвер (src/data/support-names.ts) + локальная карта имён как
+  // приоритетный fallback. Раньше это была третья копия одной и той же логики.
+  return supportNameRu(id, FALLBACK_NAMES[id] || FALLBACK_NAMES[id?.toLowerCase()]);
 }
 function subDosage(id: string): { mg: number; timing: string } | null {
   const e = SUPPORT_CATALOG_DATA[id] || SUPPORT_CATALOG_DATA[id.toLowerCase()] || SUPPORT_CATALOG_DATA[id.toUpperCase()];
@@ -704,7 +705,7 @@ function analyzeStackModule(
 export interface CalcMapperProps {
   state: CalculatorState;
   onStateChange?: (next: CalculatorState) => void;
-  onApply?: (rec: SupportRecommendation) => void;
+  onApply?: (rec: SupportRecommendation, removed: string[]) => void;
   onOpenManualPicker?: () => void;
   onOpenLabs?: () => void;
   planResult?: import('../../../engines/support-plan').PlanResult;
@@ -713,9 +714,11 @@ export interface CalcMapperProps {
    * null — правок нет, верхняя карточка считает по движку как раньше (мужской путь не меняется).
    */
   onRiskChange?: (risk: TzSpecResult | null) => void;
+  /** Сброс ручных правок (в т.ч. на уровне живого плана поддержки). */
+  onResetEdits?: () => void;
 }
 
-export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange, onApply, onOpenManualPicker, onOpenLabs, planResult, onRiskChange }) => {
+export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange, onApply, onOpenManualPicker, onOpenLabs, planResult, onRiskChange, onResetEdits }) => {
   const [level, setLevel] = useState<SupportLevel>('medium');
   const [manualSubs, setManualSubs] = useState<string[]>([]);
   const [selectedStacks, setSelectedStacks] = useState<string[]>([]);
@@ -784,6 +787,12 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
   const [megaSelected, setMegaSelected] = useState<Set<string>>(new Set());
   // Очередь «тренировочные миксы и пресеты здоровья» → план поддержки
   const [mixQueueRefresh, setMixQueueRefresh] = useState(0);
+  // Живая подписка: очередь меняется с ДРУГОГО экрана («Комплект → калькулятор»),
+  // без неё карточка миксов и состав плана оставались старыми до перемонтирования.
+  useEffect(() => {
+    const unsub = subscribePlanQueueChanged(() => setMixQueueRefresh(v => v + 1));
+    return unsub;
+  }, []);
   const [showMixCard, setShowMixCard] = useState(true);
   const [mixRemoveConfirm, setMixRemoveConfirm] = useState<string | null>(null);
   const mixPlanIds = useMemo(() => new Set(getSupportPlanQueueIds().map(canonIdLocal)), [mixQueueRefresh]);
@@ -929,23 +938,43 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
       const inp = buildTzInput(state, [...finalRec.subs.map(s => s.substanceId), ...procedureIds]);
       if (!inp) return null;
       const result = calculateTzSpecRisk(inp);
-      // Единый вход для вкладки «Риски» (механизм-модель): snapshot полного TzSpecInput,
-      // чтобы цифры калькулятора и вкладки «Риски» были ИДЕНТИЧНЫ до механизма.
-      try {
-        localStorage.setItem('he_calc_tz_input', JSON.stringify({ input: inp, ts: Date.now() }));
-        localStorage.setItem('he_support_risk', JSON.stringify({
-          subs: finalRec.subs.map(s => s.substanceId),
-          procedures: procedureIds,
-          riskBeforeSupport: result.overallRaw,
-          riskAfterSupport: result.overallAfter,
-          timestamp: Date.now(),
-        }));
-      } catch {}
       return result;
     } catch {
       return null;
     }
   }, [finalRec, state]);
+
+  // ── Снапшот для вкладки «Риски»: пишем В ЭФФЕКТЕ, а не в useMemo ──
+  // 1) Побочный эффект в рендере выполнялся дважды в StrictMode и при каждом
+  //    пересчёте, даже если план не применён.
+  // 2) Снапшот теперь несёт подпись состава курса (id+доза+неделя): вкладка
+  //    «Риски» не покажет цифры от старого курса после его изменения.
+  useEffect(() => {
+    if (!finalRec || !tzFinalRisk) return;
+    const sig = courseSignature(
+      state.pharma.aas.map(a => ({ id: a.id, dose: Number(a.doseMgWeek) || 0 })),
+    );
+    const inp = buildTzInput(state, [
+      ...finalRec.subs.map(s => s.substanceId),
+      ...(finalRec.procedures || [])
+        .filter(p => p.id === 'erythrocytapheresis' || p.id === 'phlebotomy')
+        .map(p => p.id),
+    ]);
+    if (!inp) return;
+    writeCalcSnapshot(inp, sig);
+    try {
+      localStorage.setItem(SUPPORT_RISK_KEY, JSON.stringify({
+        subs: finalRec.subs.map(s => s.substanceId),
+        procedures: (finalRec.procedures || [])
+          .filter(p => p.id === 'erythrocytapheresis' || p.id === 'phlebotomy')
+          .map(p => p.id),
+        riskBeforeSupport: tzFinalRisk.overallRaw,
+        riskAfterSupport: tzFinalRisk.overallAfter,
+        riskStatus: tzFinalRisk.riskStatus,
+        timestamp: Date.now(),
+      }));
+    } catch { /* storage недоступен */ }
+  }, [finalRec, tzFinalRisk, state]);
   const systemRiskOf = (sysId: string) => tzFinalRisk?.organs.find(o => o.id === sysId) || null;
 
   // Д10 (остаток): лифт риска с ручными правками наверх (верхняя карточка AutoCalculator).
@@ -1140,6 +1169,31 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
           </div>
         </div>
       </div>
+
+      {/* Сброс ручных правок: раньше «вернуть как было» можно было только
+          вручную удалив каждое вещество по одному. */}
+      {hasManualEdits && (
+        <div data-reset-edits style={{ display:'flex', alignItems:'center', gap:6, marginBottom:8 }}>
+          <div style={{ flex:1, fontSize:8, color:'#a5b4fc', lineHeight:1.4 }}>
+            Внесены ручные правки: −{removedSubs.length} · +{addedSubs.length + manualSubs.length} · стеков {selectedStacks.length}
+          </div>
+          <button
+            onClick={() => {
+              setRemovedSubs([]);
+              setAddedSubs([]);
+              setManualSubs([]);
+              setSelectedStacks([]);
+              setSubstanceManagerKey(prev => prev + 1);
+              // Сообщаем наружу: живой план поддержки тоже должен снять
+              // исключения/добавления, иначе правки останутся «в силе».
+              onResetEdits?.();
+            }}
+            style={{ padding:'7px 10px', borderRadius:10, fontSize:9, fontWeight:700, cursor:'pointer', background:'rgba(239,68,68,0.1)', border:'1px solid rgba(239,68,68,0.25)', color:'#fca5a5', whiteSpace:'nowrap' }}
+          >
+            ↺ Сбросить правки
+          </button>
+        </div>
+      )}
 
       {/* Пикер из внешнего экрана (SupportManualPicker) — раньше был недостижим (onOpenManualPicker не вызывался) */}
       {onOpenManualPicker && (
@@ -2823,7 +2877,7 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
                         border: mixPlanIds.has(canonIdLocal(s.substanceId)) ? '1px solid rgba(139,92,246,0.3)' : (isTitr ? '1px solid rgba(245,158,11,0.2)' : '1px solid rgba(99,102,241,0.12)'),
                         color: mixPlanIds.has(canonIdLocal(s.substanceId)) ? '#c4b5fd' : '#a5b4fc',
                       }}>
-                         {planItemKind(s.substanceId) === 'База' ? '🧭 ' : planItemKind(s.substanceId) === 'Минерал' ? '⚡ ' : ''}{subNameRu(s.substanceId)}{mg ? ` ${mg}мг` : ''}
+                         {planItemKind(s.substanceId) === 'База' ? '🧭 ' : planItemKind(s.substanceId) === 'Минерал' ? '⚡ ' : ''}{subNameRu(s.substanceId)}{mg ? ` ${isTitr ? formatDose(s.substanceId, mg) : formatDefaultDose(s.substanceId, mg)}` : ''}
                         {mixPlanIds.has(canonIdLocal(s.substanceId)) && <span style={{ marginLeft: 3, fontSize: 6, color: '#c4b5fd', fontWeight: 800 }}>🏋️</span>}
                         {isDoctorControlled(s.substanceId) && <span style={{ marginLeft: 3, fontSize: 6, color: '#fca5a5', fontWeight: 800 }}>👨‍⚕️</span>}
                         {isTitr && ` ↑${((titrF! - 1) * 100).toFixed(0)}%`}
@@ -2838,10 +2892,16 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
                 key={substanceManagerKey}
                 finalRec={finalRec}
                 onApplyChanges={(newSubs) => {
-                  // синхронизируем с состоянием добавления/удаления
-                  const current = finalRec.subs.map(s => s.substanceId);
-                  const toRemove = current.filter(id => !newSubs.includes(id));
-                  const toAdd = newSubs.filter(id => !current.includes(id));
+                  // Менеджер показывает только «не-базовые» вещества (BASE_IDS =
+                  // NON_PILL_SUPPORT_IDS: hydration/cardio/electrolytes/steps/no_smoking/
+                  // no_alcohol). Раньше `toRemove` считался по ПОЛНОМУ finalRec.subs,
+                  // поэтому подтверждение стирало базу курса (P1 аудита).
+                  const visible = finalRec.subs
+                    .map(s => s.substanceId)
+                    .filter(id => !NON_PILL_SUPPORT_IDS.has(id) && !NON_DRUG_IDS.has(id));
+                  const newCanon = new Set(newSubs.map(canonIdLocal));
+                  const toRemove = visible.filter(id => !newCanon.has(canonIdLocal(id)));
+                  const toAdd = newSubs.filter(id => !visible.some(v => canonIdLocal(v) === canonIdLocal(id)));
                   setRemovedSubs(toRemove);
                   requestAddSubs(toAdd);
                   setSubstanceManagerKey(prev => prev + 1);
@@ -3942,7 +4002,7 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
 
 {/* ===== КНОПКА «ПРИМЕНИТЬ ПЛАН» ===== */}
       {finalRec && finalRec.subs.length > 0 && onApply && (
-        <button onClick={() => { onApply(finalRec); setApplyFlash(true); setTimeout(() => setApplyFlash(false), 1800); }} style={{
+        <button onClick={() => { onApply(finalRec, removedSubs); setApplyFlash(true); setTimeout(() => setApplyFlash(false), 1800); }} style={{
           width:'100%', marginTop:10, padding:'12px', borderRadius:12, fontSize:11, fontWeight:800, cursor:'pointer',
           background: applyFlash ? 'rgba(0,230,138,0.2)' : 'linear-gradient(135deg,#00e68a,#00c853)',
           border: applyFlash ? '1.5px solid rgba(0,230,138,0.5)' : 'none',
@@ -4015,7 +4075,13 @@ function buildPlanText(rec: SupportRecommendation): string {
     for (const s of items) {
       const name = subNameRu(s.substanceId);
       const dose = subDosage(s.substanceId);
-      const doseStr = dose && dose.mg > 0 ? ` · ${dose.mg} мг (${dose.timing})` : '';
+      // Доза с правильной единицей (мкг/МЕ/Ед/ФЕ) и с учётом титрации:
+      // раньше ВСЁ печаталось как «мг» (селен 200 мкг → «200 мг»).
+      const tF = (rec as any).titrationFactors?.get?.(canonIdLocal(s.substanceId));
+      const scaled = dose && dose.mg > 0 && tF && tF > 1 ? Math.round(dose.mg * tF) : dose?.mg ?? 0;
+      const doseStr = scaled > 0
+        ? ` · ${tF && tF > 1 ? formatDose(s.substanceId, scaled) : formatDefaultDose(s.substanceId, scaled)} (${dose?.timing || ''})`
+        : '';
       lines.push(`• ${name}${doseStr}${isDoctorControlled(s.substanceId) ? ' [под обязательным контролем врача]' : ''} — ${s.reason}`);
       if (s.mechsCovered.length > 0) lines.push(`  покрывает: ${s.mechsCovered.join(', ')}`);
       lines.push(`  k=${s.k.toFixed(2)} · док.уровень: ${s.q}`);
@@ -4121,7 +4187,11 @@ function buildDoctorReport(rec: SupportRecommendation, state: CalculatorState): 
     for (const s of items) {
       const name = subNameRu(s.substanceId);
       const dose = subDosage(s.substanceId);
-      const doseStr = dose && dose.mg > 0 ? `, ${dose.mg} мг (${dose.timing})` : '';
+      const tF = (rec as any).titrationFactors?.get?.(canonIdLocal(s.substanceId));
+      const scaled = dose && dose.mg > 0 && tF && tF > 1 ? Math.round(dose.mg * tF) : dose?.mg ?? 0;
+      const doseStr = scaled > 0
+        ? `, ${tF && tF > 1 ? formatDose(s.substanceId, scaled) : formatDefaultDose(s.substanceId, scaled)} (${dose?.timing || ''})`
+        : '';
       lines.push(`- ${name}${doseStr}`);
       const organGuess = s.mechsCovered[0] ? mechToOrganLabel(s.mechsCovered[0]) : '—';
       lines.push(`  Категория: ${s.category}, система: ${organGuess}`);
@@ -4265,7 +4335,14 @@ const CalcActions: React.FC<CalcActionsProps> = ({ rec, state }) => {
       const key = 'he_saved_calc_results';
       const arr = JSON.parse(localStorage.getItem(key) || '[]');
       const id = `calc_${Date.now()}`;
-      arr.push({ id, type: 'calc', timestamp: Date.now(), supportLevel: rec.level, subs: rec.subs.map(s => s.substanceId), tzRec: rec });
+      // Сохраняем ПОЛНЫЙ состав с дозами и уровнем: без этого «Загрузить из
+      // избранного» восстанавливало пустоту (в записи не было enhancedSubs).
+      arr.push({
+        id, type: 'calc', timestamp: Date.now(), supportLevel: rec.level,
+        subs: rec.subs.map(s => s.substanceId),
+        enhancedSubs: rec.subs.map(s => s.substanceId),
+        tzRec: rec,
+      });
       localStorage.setItem(key, JSON.stringify(arr));
       setSavedFlash(true);
       setTimeout(() => setSavedFlash(false), 1800);

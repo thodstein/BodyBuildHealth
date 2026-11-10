@@ -38,7 +38,8 @@ interface Props {
 
 export const TzRiskCard: React.FC<Props> = ({ tz, before, after, peakWeek }) => {
   const [expandedOrgan, setExpandedOrgan] = useState<string | null>(null);
-  const organs = Array.isArray(tz?.organs) ? tz.organs : [];
+  const noData = tz?.riskStatus === 'no_data';
+  const organs = noData ? [] : (Array.isArray(tz?.organs) ? tz.organs : []);
 
   return (
     <div className="calc-tzrisk" style={{ ...GLASS, padding: '10px 12px', marginTop: 6, marginBottom: 6 }}>
@@ -51,7 +52,41 @@ export const TzRiskCard: React.FC<Props> = ({ tz, before, after, peakWeek }) => 
         </span>
       </div>
 
+      {/* ── Честность расчёта: не смоделированные препараты ── */}
+      {tz.riskStatus && tz.riskStatus !== 'ok' && (
+        <div style={{
+          padding: '7px 9px', borderRadius: 8, marginBottom: 9,
+          background: 'rgba(239,68,68,0.10)', border: '1px solid rgba(239,68,68,0.35)',
+          fontSize: 8, lineHeight: 1.55, color: '#fca5a5',
+        }}>
+          <div style={{ fontWeight: 800, marginBottom: 2 }}>
+            ⚠ {tz.riskStatus === 'no_data' ? 'Риск НЕ рассчитан' : 'Расчёт неполный'}
+          </div>
+          <div>
+            {tz.riskStatus === 'no_data'
+              ? 'Ни один препарат курса не сопоставлен механизм-модели — цифры ниже были бы выдуманными.'
+              : 'Часть препаратов не сопоставлена механизм-модели, их вклад принят за 0 — риск занижен.'}
+          </div>
+          {tz.unmodeledDrugs?.length > 0 && (
+            <div style={{ marginTop: 3, color: 'rgba(255,255,255,0.75)' }}>
+              Не учтено: <b>{tz.unmodeledDrugs.join(', ')}</b>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* ── Hero: before → after ── */}
+      {tz.riskStatus === 'no_data' ? (
+        <div style={{
+          textAlign: 'center', padding: '14px 10px', borderRadius: 10, marginBottom: 8,
+          background: 'rgba(255,255,255,0.03)', border: '1px dashed rgba(255,255,255,0.15)',
+        }}>
+          <div style={{ fontSize: 22, fontWeight: 800, color: 'rgba(255,255,255,0.35)', lineHeight: 1 }}>—</div>
+          <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.45)', marginTop: 4 }}>
+            Добавьте препараты курса, которые модель знает (ААС, GH, инсулин, кленбутерол, T3/T4).
+          </div>
+        </div>
+      ) : (
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 14, marginBottom: 10 }}>
         <div style={{ textAlign: 'center' }}>
           <div style={{ fontSize: 8, color: '#f87171', fontWeight: 600, textTransform: 'uppercase', marginBottom: 2 }}>Без поддержки</div>
@@ -69,6 +104,18 @@ export const TzRiskCard: React.FC<Props> = ({ tz, before, after, peakWeek }) => 
           </div>
         </div>
       </div>
+      )}
+
+      {/* ── Поддержка, не имеющая механизмов ТЗ ── */}
+      {tz.unmappedSupport && tz.unmappedSupport.length > 0 && (
+        <div style={{
+          padding: '5px 8px', borderRadius: 6, marginBottom: 8,
+          background: 'rgba(245,158,11,0.07)', border: '1px solid rgba(245,158,11,0.22)',
+          fontSize: 7.5, lineHeight: 1.5, color: '#fbbf24',
+        }}>
+          Не участвуют в покрытии (нет привязки к 28 механизмам): {tz.unmappedSupport.join(', ')}
+        </div>
+      )}
 
       {/* ── Статус + Kp ── */}
       <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 8 }}>
@@ -78,11 +125,12 @@ export const TzRiskCard: React.FC<Props> = ({ tz, before, after, peakWeek }) => 
           border: `1px solid ${riskColor(after)}33`,
           fontSize: 10, fontWeight: 700, color: riskColor(after),
         }}>
-          {riskLabel(after)} &middot; Kp={tz.k_protect_overall}%{peakWeek ? ` · пик курса — нед ${peakWeek}` : ''}
+          {noData ? 'Не рассчитано' : <>{riskLabel(after)} &middot; Kp={tz.k_protect_overall}%{peakWeek ? ` · пик курса — нед ${peakWeek}` : ''}</>}
         </div>
       </div>
 
       {/* ── Progress bar ── */}
+      {!noData && (
       <div style={{ height: 6, background: 'rgba(255,255,255,0.05)', borderRadius: 3, overflow: 'hidden', marginBottom: 8 }}>
         <div style={{
           height: '100%', borderRadius: 3,
@@ -91,13 +139,16 @@ export const TzRiskCard: React.FC<Props> = ({ tz, before, after, peakWeek }) => 
           transition: 'width 0.6s ease',
         }} />
       </div>
+      )}
 
       {/* ── Stats row ── */}
+      {!noData && (
       <div style={{ display: 'flex', justifyContent: 'center', gap: 14, fontSize: 8, color: 'rgba(255,255,255,0.45)', marginBottom: 10 }}>
         <span>D_cov: {tz.d_cov.toFixed(1)}</span>
         <span>U: &times;{tz.u_i.toFixed(2)}</span>
         <span>Поддержка: {tz.supportCount} веществ</span>
       </div>
+      )}
 
       {/* ── Верификация анализами ── */}
       {tz.overallVerification !== undefined && (

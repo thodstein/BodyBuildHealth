@@ -3,6 +3,7 @@
 
 import { PHARMA_DB } from '../core/pharma-database';
 import { SUPPORT_CATALOG_DATA } from '../data/support-catalog-data';
+import { formatDoseFromMg } from '../data/dose-units';
 import { INTERACTIONS_DB } from '../data/support-interactions-db';
 import { SYNERGY_NETWORK } from '../data/support-synergy-network';
 
@@ -557,7 +558,7 @@ export function getSuggestedPlan(report: ScoreReport): Array<{ id: string; name:
       added.add(subId);
       const catalogEntry = (SUPPORT_CATALOG_DATA as any)?.[subId];
       const name = catalogEntry?.nameRu || PHARMA_DB[subId]?.name || subId;
-      const dose = catalogEntry?.dosage?.mg ? `${catalogEntry.dosage.mg} мг` : '—';
+      const dose = catalogEntry?.dosage?.mg ? formatDoseFromMg(subId, catalogEntry.dosage.mg) : '—';
       const timing = catalogEntry?.dosage?.timing || '—';
       suggested.push({ id: subId, name, dose, timing: getTimingRu(timing) });
     }
@@ -573,7 +574,7 @@ export function getSuggestedPlan(report: ScoreReport): Array<{ id: string; name:
           added.add(subId);
           const catalogEntry = (SUPPORT_CATALOG_DATA as any)?.[subId];
           const name = catalogEntry?.nameRu || PHARMA_DB[subId]?.name || subId;
-          const dose = catalogEntry?.dosage?.mg ? `${catalogEntry.dosage.mg} мг` : '—';
+          const dose = catalogEntry?.dosage?.mg ? formatDoseFromMg(subId, catalogEntry.dosage.mg) : '—';
           const timing = catalogEntry?.dosage?.timing || '—';
           suggested.push({ id: subId, name, dose, timing: getTimingRu(timing) });
           break;

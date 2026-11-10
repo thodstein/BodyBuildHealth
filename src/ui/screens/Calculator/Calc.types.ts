@@ -286,6 +286,8 @@ export interface AutoCalculatorProps {
   onApply: (result: {
     level: string;
     subs: string[];
+    /** Вещества, УДАЛЁННЫЕ пользователем в менеджере (иначе вернутся из базового плана). */
+    removed?: string[];
     result?: import('../../../engines/support-plan').CalculatorResult;
     tzRec?: import('../../../engines/tz-mapper-engine').SupportRecommendation;
   }) => void;
@@ -296,4 +298,6 @@ export interface AutoCalculatorProps {
   onOpenManualPicker?: () => void;
   onOpenLabs?: () => void;
   planResult?: import('../../../engines/support-plan').PlanResult;
+  /** Сброс ручных правок на уровне экрана поддержки (живой план). */
+  onResetEdits?: () => void;
 }

@@ -595,6 +595,9 @@ const RISK_ORDER: Record<PedRisk, number> = {
   none: 0, low: 1, moderate: 2, high: 3, protective: 4,
 };
 
+/** Паттерны правил, которые означают нандролон (дека/NPP/фенилпропионат). */
+const NANDROLONE_MARKERS = ['nandrolone', 'deca', 'npp', 'nandrolone_dec', 'nandrolone_pp', 'phenylpropionate'];
+
 /** max risk (protective считается как moderate для neuro, но для joints — отдельная логика) */
 function maxNeuroRisk(a: PedRisk, b: PedRisk): PedRisk {
   // protective для neuro не имеет смысла, трактуем как none
@@ -728,7 +731,9 @@ export function assessPedRisk(
     aggRepro = maxSystemRisk(aggRepro, reproductive);
 
     // Маркеры для компенсации/эскалации
-    if (rule.patterns.some(p => 'nandrolone'.includes(p) || p === 'deca' || p === 'npp' || p === 'nandrolone')) {
+    // БЫЛО `'nandrolone'.includes(p)` — проверка подстроки в литерале: любой
+    // короткий паттерн ('n', 'o', 'l'…) давал true. Теперь явное сравнение.
+    if (rule.patterns.some(p => NANDROLONE_MARKERS.includes(p))) {
       if (joints === 'protective') hasNandrolone = true;
     }
     if (rule.patterns.some(p => p === 'stan' || p === 'winstrol' || p === 'winny' || p === 'stanozolol')) {

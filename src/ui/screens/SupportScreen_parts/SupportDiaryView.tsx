@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { SUPPORT_CATALOG_DATA } from '../../../data/support-catalog-data';
+import { formatDoseFromMg } from '../../../data/dose-units';
 import '../../../data/support-catalog-init';
 import { getSubstanceName } from '../../../engines/stack-optimizer.engine';
 import { ComplaintsTab } from './ComplaintsTab';
@@ -728,7 +729,7 @@ export const SupportDiaryView: React.FC<{ s: Record<string, any>; onOpenSolver?:
 
   const addSubstance = (id: string, name: string) => {
     const cat = getCat(id);
-    const dose = cat?.dosage?.mg ? `${cat.dosage.mg} мг` : undefined;
+    const dose = cat?.dosage?.mg ? formatDoseFromMg(id, cat.dosage.mg) : undefined;
     setSubState(today, id, { taken: true, dose });
     setAddModal(false);
   };
@@ -965,7 +966,7 @@ export const SupportDiaryView: React.FC<{ s: Record<string, any>; onOpenSolver?:
                {(filterSub ? planSubs.filter(id => getName(id).toLowerCase().includes(filterSub.toLowerCase())) : planSubs).map((subId: string) => {
                 const cat = getCat(subId);
                 const name = getName(subId);
-                const dose = cat?.dosage?.mg ? `${cat.dosage.mg} мг` : '';
+                const dose = cat?.dosage?.mg ? formatDoseFromMg(subId, cat.dosage.mg) : '';
                 const timing = cat?.dosage?.timing || '';
                 const si = todayEntry?.substances[subId] || { taken: false };
                 const taken = si.taken;

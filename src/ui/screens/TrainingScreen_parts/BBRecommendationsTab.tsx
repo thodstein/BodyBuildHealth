@@ -10,6 +10,7 @@
  */
 import React, { useMemo } from 'react';
 import { generateBBRecommendations, bbRecSummary, type BBRecSection } from '../../../engines/bb/bb-training-recommendations.engine';
+import { supportNamesRu } from '../../../data/support-names';
 import { loadSRPESessions } from '../../../engines/pro/srpe-store';
 import { acuteChronicRatio, toDailyLoads } from '../../../engines/pro/training-load.engine';
 import { loadReadinessHistory } from './readiness-history';
@@ -45,20 +46,28 @@ function loadCurrentBBPlan(): { plan: any; params: any } | null {
   return null;
 }
 
-/** Активные добавки плана поддержки (id + имена). */
+/**
+ * Активные добавки плана поддержки (имена).
+ *
+ * Формат хранения — МАССИВ id (`['nac','curcumin_sup',…]`). Раньше читалось
+ * `result.substances` (объект), которого никогда не было → список всегда пуст,
+ * а из `he_support_risk.subs` в имена попадали сырые id.
+ */
 function loadSupportSubs(): string[] {
-  const names: string[] = [];
+  const ids: string[] = [];
   try {
     const result = JSON.parse(localStorage.getItem('he_support_plan_result') || 'null');
-    if (result?.substances && Array.isArray(result.substances)) {
-      for (const s of result.substances) if (s?.name) names.push(String(s.name));
+    if (Array.isArray(result)) ids.push(...result.map((x: any) => String(x)));
+    // Обратная совместимость: старые записи могли быть объектом.
+    else if (result?.substances && Array.isArray(result.substances)) {
+      ids.push(...result.substances.map((s: any) => String(s?.id || s?.substanceId || s?.name || '')).filter(Boolean));
     }
   } catch {}
   try {
     const risk = JSON.parse(localStorage.getItem('he_support_risk') || 'null');
-    if (risk?.subs && Array.isArray(risk.subs)) names.push(...risk.subs.map((x: any) => String(x)));
+    if (risk?.subs && Array.isArray(risk.subs)) ids.push(...risk.subs.map((x: any) => String(x)));
   } catch {}
-  return names;
+  return supportNamesRu(ids);
 }
 
 /** Среднедневное питание за последние 7 дней из nutrition_diary_v2. */

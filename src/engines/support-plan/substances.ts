@@ -3,6 +3,7 @@
  */
 
 import { DEFAULT_DOSAGES } from '../../data/support-database';
+import { formatDefaultDose, formatDoseFromMg } from '../../data/dose-units';
 import type { CalculatorResult, PlanSubstance } from './types';
 import { catalogEntry } from './types';
 import { canonId } from './shared-constants';
@@ -122,16 +123,23 @@ export function buildSubstances(
       doseMg = Math.round(Math.max(wbd.minMg, Math.min(wbd.maxMg, weight * wbd.mgPerKg)));
     }
     const foundation = FOUNDATION_ITEMS[cid];
-    const doseDisplay = foundation?.dose || (doseMg >= 1000
-      ? `${(doseMg / 1000).toFixed(1)} г`
-      : `${doseMg} мг`);
+    // Есть ли РЕАЛЬНАЯ доза в справочнике (не фолбэк 500 мг ниже).
+    const catalogDose = e?.dosage?.mg && e.dosage.mg > 0 ? e.dosage.mg : undefined;
+    // Доза для отображения. Раньше и натуральная единица `DEFAULT_DOSAGES`
+    // (селен 200 мкг, D3 5000 МЕ), и мг-шкала каталога подписывались «мг» —
+    // получалось «200 мг» селена (1000×) и «5000 мг» витамина D.
+    const doseDisplay = foundation?.dose || (def && !wbd
+      ? formatDefaultDose(cid, def.mg)
+      : wbd
+        ? formatDoseFromMg(cid, doseMg)
+        : catalogDose !== undefined
+          ? formatDoseFromMg(cid, catalogDose)
+          : 'по инструкции');
     const entry = {
       id,
       name: foundation?.name || e?.nameRu || e?.name || id,
       doseMg,
-      doseDisplay: foundation?.dose || ((def && !wbd) || !e?.dosage?.mg
-        ? doseDisplay
-        : (e.dosage.mg > 0 ? doseDisplay : 'по инструкции')),
+      doseDisplay,
       timing: foundation?.timing || def?.timing || e?.dosage?.timing || e?.forms?.[0]?.dose || 'с едой',
       category: foundation ? [foundation.kind] : (e?.category || []),
       tier: e?.tier || 'standard',
@@ -203,9 +211,11 @@ export function buildSchedule(
       continue;
     }
     const name = e?.nameRu || e?.name || id;
+    // Та же логика единиц, что в buildSubstances: DEFAULT_DOSAGES — натуральная
+    // единица, dosage.mg каталога — миллиграммы.
     const dose = def
-      ? (def.mg >= 1000 ? `${(def.mg / 1000).toFixed(1)} г` : `${def.mg} мг`)
-      : (e?.dosage?.mg ? `${e.dosage.mg} мг` : 'по инструкции');
+      ? formatDefaultDose(cid, def.mg)
+      : (e?.dosage?.mg ? formatDoseFromMg(cid, e.dosage.mg) : 'по инструкции');
     const block = timeOf(id);
     blocks[block].push({
       id, name, dose,

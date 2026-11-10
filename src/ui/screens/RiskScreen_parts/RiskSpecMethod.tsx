@@ -8,6 +8,7 @@ import { getRiskColor } from '../../../core/utils/risk-colors';
 import { PHARMA_DB } from '../../../core/pharma-database';
 import { DRUG_DB } from '../../../data/support-db';
 import { resolvePedAlias } from '../../../data/ped-alias-map';
+import { courseSignature, readCalcSnapshot as readCalcSnapshotShared } from '../../../engines/tz-snapshot';
 import { RiskVerificationList } from './RiskVerificationList';
 
 const ACCENT = '#00e68a';
@@ -163,13 +164,12 @@ export const RiskSpecMethod: React.FC<{ subTab?: string }> = ({ subTab }) => {
   // нормализация анализов, тот же phase-множитель, те же nutrition/training.
   // Если калькулятор открыт — его snapshot (he_calc_tz_input) даёт полную идентичность.
   const readCalcSnapshot = (): TzSpecInput | null => {
-    try {
-      const raw = localStorage.getItem('he_calc_tz_input');
-      if (!raw) return null;
-      const d = JSON.parse(raw);
-      if (!d?.input || Date.now() - (d.ts || 0) > 24 * 60 * 60 * 1000) return null;
-      return d.input as TzSpecInput;
-    } catch { return null; }
+    // Подпись текущего курса: снапшот от ДРУГОГО состава/недели отвергается,
+    // иначе вкладка «Риски» показывала цифры старого курса до 24 часов.
+    const sig = course.length > 0
+      ? courseSignature(course.map(c => ({ id: c.substanceId || '', dose: c.doseValue || 0 })))
+      : undefined;
+    return readCalcSnapshotShared(sig);
   };
   // NOTE: state + storage/focus, а не useMemo([]): калькулятор может сохранить
   // свежий снапшот ПОСЛЕ монтирования вкладки — иначе «идентичные цифры»
