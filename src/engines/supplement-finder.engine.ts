@@ -3,6 +3,7 @@ import { ALL_SUBSTANCES, ALL_INTERACTIONS } from '../data/support-database';
 import { SUPPORT_SUBSTANCE_MAP } from '../data/support-substances';
 import { getSubstanceTier } from '../data/support-database';
 import { SUBSTANCE_ANALOGS, SUPPLEMENT_COMPOSITION, COMPONENT_TO_COMPLEX } from '../data/support-meta';
+import { formatDoseFromMg, doseUnit } from '../data/dose-units';
 
 export type GoalType =
   | 'sleep' | 'energy' | 'concentration' | 'muscle_gain' | 'fat_loss'
@@ -214,9 +215,14 @@ function estimateDose(id: string, weight: number): string {
   if (!e) return '';
   if (e.bestForm) return `${e.bestForm} (${weight} кг)`;
   if (e.dosage) {
+    // `dosage.mg` каталога — миллиграммы; подпись/пересчёт — единым форматтером
+    // (селен 0.2 мг = 200 мкг), иначе выходило «0.2 мг/день» и бессмысленный
+    // «мг/кг» для витаминов в мкг/МЕ.
     const mg = e.dosage.mg;
     const perKg = weight > 0 ? Math.round(mg / weight * 10) / 10 : mg;
-    return `${mg} мг/день (${perKg} мг/кг) · ${e.dosage.timing || ''}`;
+    const doseText = formatDoseFromMg(id, mg);
+    const perKgText = doseUnit(id) === 'мг' ? ` (${perKg} мг/кг)` : '';
+    return `${doseText}/день${perKgText} · ${e.dosage.timing || ''}`;
   }
   return '';
 }

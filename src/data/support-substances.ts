@@ -2,6 +2,7 @@ import { resolveCanonicalId } from './support-meta';
 import { INTERACTIONS_DB, resolveInteractionId } from './support-interactions-db';
 import { SYNERGY_NETWORK } from './support-synergy-network';
 import { SUPPORT_CATALOG_DATA } from './support-catalog-data';
+import { formatDoseFromMg } from './dose-units';
 // Шарды каталога должны успеть добавиться ДО backfill описаний внизу файла:
 // иначе прямой импорт этого модуля (мимо barrel) видит неполный каталог
 // и часть записей остаётся без описаний. Цикла нет (shard тянет только base).
@@ -620,7 +621,10 @@ for (const _s of ALL_SUBSTANCES) {
     let _d = _cat.description as string;
     const _dose = _cat.dosage as { mg?: number; timing?: string } | undefined;
     if (_dose && Number.isFinite(_dose.mg) && (_dose.mg as number) > 0) {
-      _d += ` Доза: ${_dose.mg} мг${_dose.timing ? ` · ${_dose.timing}` : ''}.`;
+      // Каталожная доза — в миллиграммах (селен 0.2 мг = 200 мкг, D3 0.125 мг
+      // = 5000 МЕ): подписываем через единый форматтер, а не «0.2 мг».
+      const _doseText = formatDoseFromMg(_key, _dose.mg as number);
+      _d += ` Доза: ${_doseText}${_dose.timing ? ` · ${_dose.timing}` : ''}.`;
     } else if (_dose && _dose.timing) {
       _d += ` Приём: ${_dose.timing}.`;
     }

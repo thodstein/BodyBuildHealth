@@ -299,6 +299,7 @@ P2 — вкладка «Анализы»: отображение и индика
 - `src/data/__tests__/support-names.test.ts` (6): резолвер имён.
 - `src/engines/__tests__/comprehensive-report.test.ts` (+3 в третьем проходе): план из id → русское имя + единица по веществу (`vitamin_d3` = МЕ, `selenium` = мкг) без дублей; GH в курсе — «МЕ», а не «мг»; старая запись `doseUnit='g'` не даёт «5000 г».
 - `src/engines/__tests__/bioequivalence-units.test.ts` (3): единица в предупреждении о дозе замены (по умолчанию «мг», переданная `мкг` соблюдается, ±20 % без предупреждения).
+- `src/engines/__tests__/support-genetics-diet.test.ts` +1: пометка «уже принимаете» подписана единицей вещества (селен — мкг), крупные мг — в граммах.
 
 ### Догон: единицы доз в отображении (второй проход)
 Найдено чтением кода (grep `dosage.mg` + `мг`-шаблоны) — все места, где доза подписывалась «мг» независимо от вещества:
@@ -316,6 +317,15 @@ P2 — вкладка «Анализы»: отображение и индика
 - **`bioequivalence-base.validateReplacementDose`** — новый опциональный параметр `unit` (по умолчанию `'мг'`): текст предупреждения больше не приписывает «мг» дозам в мкг/МЕ. Вызывающий `biostack-clinical-v2` передаёт `defaultDoseUnit(cid)`.
 - **`biostack-clinical-recommender`** — fallback-доза из каталога подписывалась «мг» независимо от источника: `DEFAULT_DOSAGES` → `formatDefaultDose`, `catalog.dosage.mg` → `formatDoseFromMg`.
 - **`comprehensive-report-html` / `ReportsScreen`** — доза больше не «200мкг» слипшись: `${doseMg} ${unit}`.
+
+### Догон: остаточные «мг»-подписи (четвёртый проход)
+Сплошной поиск по шаблонам `${…} мг` с переменными доз — остатки того же класса:
+- `support-genetics-diet.engine` — пометки «учёт принимаемых добавок» («уже принимаете 200 мг» для селена, «1000 из 2000 мг» для омеги): `formatDefaultDose` по веществу; крупные мг → г. Тест обновлён (`1 г из 2 г`) + новый гард «селен — мкг, а не мг».
+- `ClinicalResultCard` (карточка клинической замены) — `rep.doseMg`/`recommendedDoseMg` из `SUBSTANCE_ANALOGS` тоже натуральные: через `formatDefaultDose`.
+- `support-plan/engine-helpers.adjustForBioavailability` — «доза скорректирована: 500 мг» для мкг-веществ: `formatDefaultDose`, и в текст попадает УЖЕ клампленная доза (раньше было неклампленное значение, т.е. текст расходился с планом).
+- `data/support-substances` (бэкфилл описаний) — «Доза: 0.2 мг» из мг-шкалы каталога → `formatDoseFromMg` («200 мкг», D3 «5000 МЕ»).
+- `supplement-finder.estimateDose` — «0.2 мг/день (0.003 мг/кг)» для селена: единица через `formatDoseFromMg`, а «мг/кг» показываем только для веществ в мг-шкале (для мкг/МЕ/млрд КОЕ пересчёт на кг бессмыслен).
+- Проверено и оставлено как есть: `training-plan-save` (`mg` — реальные миллиграммы спортивного стека: кофеин, креатин), `hydration`/`bb-*` (натрий/калий — мг), `pct-planner` (кломифен/тамоксифен — мг), `tz-mapper-engine` (телмисартан/TUDCA/NAC — мг).
 
 ### Финал
 `npm run type-check` — 0 ошибок; `npm run verify:apk-design` — OK; широкий прогон (`src/engines` + `src/ui/components` + `src/ui/screens/__tests__` + `src/ui/__tests__`, 975 файлов): **14 253 теста зелёные**, 1 падение — предсуществующее и не связанное с правками: `diary-mmc-checkin-integration.test.tsx` — ожидает «2 сетов» вместо «2 сета» после `8aeb72252` (воспроизводится на HEAD-версиях). Ранее отмеченное `risk-women-deeplink.test.tsx` (`initialSubTab='women'`) в этот круг не входит и тоже воспроизводится на HEAD.

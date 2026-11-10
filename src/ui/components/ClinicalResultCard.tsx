@@ -4,6 +4,7 @@ import { ruCount, RU_NOTES, RU_DUPLICATES } from '../../engines/ru-plural';
 import type { SelectStackResult } from '../../engines/biostack-clinical-v2.engine';
 import { findMeaningfulReplacement, type MeaningfulReplacement } from '../../engines/biostack-clinical-v2.engine';
 import type { BioStackProfile } from '../../engines/biostack-ai.engine';
+import { formatDefaultDose } from '../../data/dose-units';
 
 function GlassCard({ title, color, style, children }: { title: string; icon?: string; color: string; style?: React.CSSProperties; children: React.ReactNode }) {
   return <div style={{ padding: 12, borderRadius: 12, background: 'rgba(24,24,27,0.55)', border: `1px solid ${color}33`, ...style }}><div style={{ fontSize: 13, fontWeight: 700, color, marginBottom: 8 }}>{title}</div>{children}</div>;
@@ -103,7 +104,7 @@ export const ClinicalResultCard: React.FC<{
     // Фармакокинетические данные
     const formInfo: string[] = [];
     if (rep.form) formInfo.push(rep.form);
-    if (rep.doseMg) formInfo.push(`${rep.doseMg} мг`);
+    if (rep.doseMg) formInfo.push(formatDefaultDose(rep.replacementId, rep.doseMg));
     if (rep.timing) formInfo.push(rep.timing);
 
     const equivColor = rep.clinicalEquivalence === 'high' ? '#22c55e'
@@ -141,7 +142,7 @@ export const ClinicalResultCard: React.FC<{
         {rep.doseWarning && (
           <div style={{ fontSize:10,color:'#f87171',marginTop:4,lineHeight:1.3,padding:'4px 6px',background:'rgba(239,68,68,0.08)',borderRadius:4,border:'1px solid rgba(239,68,68,0.2)' }}>
             {rep.doseWarning}
-            {rep.recommendedDoseMg && ` Рекомендуется: ${rep.recommendedDoseMg} мг.`}
+            {rep.recommendedDoseMg && ` Рекомендуется: ${formatDefaultDose(rep.replacementId, rep.recommendedDoseMg)}.`}
           </div>
         )}
 

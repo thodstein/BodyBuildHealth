@@ -16,7 +16,7 @@ export { SUB_ALIAS, canonId, TZ_AUTO_BLACKLIST, SAME_CLASS_GROUPS, ID_TO_CLASS, 
 import { evaluateRecommendations } from '../recommendation-engine';
 import { calculateTzSpecRisk, calculateTzSpecRiskTimeline, type TzSpecInput, type DrugInput, type TzSpecResult, type TzSpecMechanismResult, type TzDrugClass } from '../risk-engine-tz-spec';
 import { DRUG_DB } from '../../data/support-db';
-import { formatDose, doseUnitLabel } from '../../data/dose-units';
+import { formatDose, doseUnitLabel, formatDefaultDose } from '../../data/dose-units';
 import { resolvePedAlias } from '../../data/ped-alias-map';
 import { SUPPLEMENTS_DB } from '../../data/support-db/supplements';
 import { PHARMACY_DB } from '../../data/support-db/pharmacy-db';
@@ -155,9 +155,11 @@ function adjustForBioavailability(subId: string, baseDoseMg: number): { adjusted
   }
   // Нормализуем к стандартной биодоступности 0.40 (reference)
   const adjustedMg = Math.round(baseDoseMg * (0.40 / Math.max(0.02, baCoeff)));
+  const finalMg = Math.max(baseDoseMg * 0.3, adjustedMg); // не меньше 30% от базовой дозы
   return {
-    adjustedMg: Math.max(baseDoseMg * 0.3, adjustedMg), // не меньше 30% от базовой дозы
-    formInfo: `Биодоступность формы "${formName}": ${Math.round(baCoeff * 100)}% → доза скорректирована: ${adjustedMg} мг`,
+    adjustedMg: finalMg,
+    // Доза в НАТУРАЛЬНОЙ единице вещества (селен — мкг, D3 — МЕ), не «мг».
+    formInfo: `Биодоступность формы "${formName}": ${Math.round(baCoeff * 100)}% → доза скорректирована: ${formatDefaultDose(subId, finalMg)}`,
   };
 }
 

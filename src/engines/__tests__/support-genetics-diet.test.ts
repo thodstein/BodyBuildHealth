@@ -74,7 +74,15 @@ describe('🍽 учёт принятых добавок — PlanSubstance', () =
     const { subs: out, notes } = applyDietAwareToPlanSubs([ps('omega3', 'Омега-3', 2000)], [{ id: 'omega3', doseMg: 1000 }]);
     expect(out).toHaveLength(1);
     expect(notes[0]).toContain('частично');
-    expect(notes[0]).toContain('1000 из 2000');
+    // Крупные мг показываются в граммах (1000 мг = 1 г) — число и единица совпадают.
+    expect(notes[0]).toContain('1 г из 2 г');
+  });
+
+  it('единица в пометке — по веществу, а не «мг для всего»', () => {
+    // Селен хранится в мкг: 200 мкг не должно превращаться в «200 мг».
+    const { notes } = applyDietAwareToPlanSubs([ps('selenium', 'Селен', 200)], [{ id: 'selenium', doseMg: 100 }]);
+    expect(notes[0]).toContain('100 мкг из 200 мкг');
+    expect(notes[0]).not.toContain('мг');
   });
 
   it('дубли принятых по канону → берётся максимум', () => {

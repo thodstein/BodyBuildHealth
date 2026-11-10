@@ -21,6 +21,7 @@
 import type { PlanSubstance } from './support-plan/types';
 import type { RecommendedSub } from './tz-mapper-engine';
 import { canonId } from './support-plan/shared-constants';
+import { formatDefaultDose } from '../data/dose-units';
 import { IRON_FAMILY_IDS } from './female-support-layer';
 
 export interface GeneticsInput {
@@ -93,11 +94,11 @@ export function applyDietAwareToPlanSubs(
     const takenDose = takenByCanon.get(canonId(s.id));
     if (takenDose === undefined) { out.push(s); continue; }
     if (takenDose >= s.doseMg && s.doseMg > 0) {
-      notes.push(`🍽 ${s.name}: уже принимаете ${takenDose} мг — исключено из плана (перекрыто приёмом)`);
+      notes.push(`🍽 ${s.name}: уже принимаете ${formatDefaultDose(s.id, takenDose)} — исключено из плана (перекрыто приёмом)`);
       continue;
     }
     if (takenDose > 0 && s.doseMg > 0) {
-      notes.push(`🍽 ${s.name}: частично перекрыто вашим приёмом (${takenDose} из ${s.doseMg} мг) — в плане полная доза`);
+      notes.push(`🍽 ${s.name}: частично перекрыто вашим приёмом (${formatDefaultDose(s.id, takenDose)} из ${formatDefaultDose(s.id, s.doseMg)}) — в плане полная доза`);
     }
     out.push(s);
   }
@@ -155,10 +156,10 @@ export function applyDietAwareToRecSubs(
     const planDose = doseOf(s.substanceId)?.mg || 0;
     if (takenDose !== undefined && planDose > 0) {
       if (takenDose >= planDose) {
-        notes.push(`🍽 Уже принимаете: ${s.substanceId} (${takenDose} мг) — исключено из плана (перекрыто приёмом)`);
+        notes.push(`🍽 Уже принимаете: ${s.substanceId} (${formatDefaultDose(s.substanceId, takenDose)}) — исключено из плана (перекрыто приёмом)`);
         continue;
       }
-      notes.push(`🍽 Частично перекрыто приёмом: ${s.substanceId} (${takenDose} из ${planDose} мг)`);
+      notes.push(`🍽 Частично перекрыто приёмом: ${s.substanceId} (${formatDefaultDose(s.substanceId, takenDose)} из ${formatDefaultDose(s.substanceId, planDose)})`);
     }
     out.push(s);
   }
