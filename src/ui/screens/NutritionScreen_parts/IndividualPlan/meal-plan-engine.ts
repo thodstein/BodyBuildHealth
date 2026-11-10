@@ -5910,7 +5910,10 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     let devP2 = (totals.p - goalP2) / Math.max(1, goalP2);
     let guardVeg = 6;
     while (devP2 > 0.05 && guardVeg-- > 0) {
-      const proteinVeg = meals.flatMap(m => m.items.map((it, i) => ({ m, it, i })).filter(x => x.it.role === 'veg' && (x.it.p || 0) >= 10 && !(x.it as any)._fixedGrams));
+      // §8.88: добавка микро-прохода (рыба на витамин D, печень на омега-3) больше не
+      // живёт в роли `veg`, но раздувать белок над целью ей по-прежнему нельзя — ужимаем
+      // её наравне с «белковым овощем».
+      const proteinVeg = meals.flatMap(m => m.items.map((it, i) => ({ m, it, i })).filter(x => ((x.it.role === 'veg' && (x.it.p || 0) >= 10) || !!(x.it as any)._microClosure) && !(x.it as any)._fixedGrams));
       if (proteinVeg.length === 0) break;
       const excessP = totals.p - goalP2;
       const item = proteinVeg.sort((a, b) => (b.it.p || 0) - (a.it.p || 0))[0];
@@ -15698,7 +15701,11 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
         }
       };
       const _protItem72 = (m: any) => ((m.items || []) as any[])
-        .filter((x: any) => _PROT72.has(String(x.role)) && !x._fixedGrams)
+        // §8.88: добавка микро-прохода (рыба на витамин D) — ТОППИНГ, а не белковый якорь
+        // приёма. Сейчас она приходит в §8.72 ролью `veg`, но страховка нужна на случай,
+        // если роль начнут править раньше: иначе день пересобирается (замер первой попытки:
+        // бейджи 24 → 28, вёдра 91 → 94).
+        .filter((x: any) => _PROT72.has(String(x.role)) && !x._fixedGrams && !(x as any)._microClosure)
         .sort((a: any, b: any) => (Number(b.p) || 0) - (Number(a.p) || 0))[0];
       const _reg72 = (meals as any[]).filter((m: any) => !['preworkout', 'postworkout', 'intra', 'presleep'].includes(String(m.type || ''))
         && (m.items || []).length > 0);
@@ -16504,6 +16511,213 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
       }
     }
     _jMark('final', 'Финал (микро/гигиена/витрина)');
+    // ─── §8.88: честная роль микро-добавки + настоящий овощ в слот ─────────────
+    // Дефект §8.87: `activelyCloseTopDeficiency` и `closeExtremeMicroGaps` ставили ЛЮБОЙ
+    // продукт ролью `veg` — включая лосось (витамин D) и печень (омега-3). Замер 60 дней:
+    // 10 дней из 60, 953 г «овощей» — рыба. Ось «овощ» (22% оценки) и стадии плотности
+    // (§8.78/§8.83) считали её овощем, то есть дефект МАСКИРОВАЛ отсутствие овоща.
+    // Правка сделана здесь, а не в момент добавки (строка ~5900): если менять роль сразу,
+    // день пересобирается целиком — замер дал 14 дней лучше / 12 хуже, бейджи 24→28,
+    // вёдра 91→94, канон 3→4 дня. В финале состав уже зафиксирован, поэтому меняется
+    // только учёт, а овощной слот добирается настоящим овощем с ккал-нейтральным срезом
+    // крахмала того же приёма.
+    if ((input as any).microRoleByNature88 !== false) {
+      const _relab88: string[] = [];
+      // Снимок дня и его балла ДО правки: гарантия «день не хуже» действует и здесь.
+      const _snapAll88 = (meals as any[]).map((mm: any) => ({ mm, items: ((mm.items || []) as any[]).map((x: any) => ({ ...x })) }));
+      const _totSnap88 = { ...totals };
+      const _qB88 = _qNow(_microNow());
+      for (const m of meals as any[]) {
+        for (const it of ((m.items || []) as any[])) {
+          // Правило общее, а не только для микро-прохода: если пункт роли `veg` несёт
+          // ≥12 г белка на 100 г (рыба, печень, творог, тофу), он не овощ — в овощном
+          // слоте его держать нельзя. Маркеры нужны ниже (ужимание белка, витрина).
+          if (String(it.role) !== 'veg') continue;
+          const fd = FOOD_DB.find(f => f.id === it.id);
+          if (!fd) continue;
+          if ((Number(fd.protein) || 0) / 100 < 0.12) continue; // настоящий овощ — не трогаем
+          it.role = roleForMicroFood(fd, true);
+          _relab88.push(`${it.name} ${Math.round(Number(it.amount) || 0)} г`);
+        }
+      }
+      if (_relab88.length > 0) {
+        const _g88 = {
+          k: Number(input.goalKcal) || 0,
+          p: Number(adjustedProteinG || input.goalProteinG) || 0,
+          f: Number(input.goalFatG) || 0,
+          c: Number(adjustedCarbsG || input.goalCarbsG) || 0,
+        };
+        const _dev88 = () => Math.max(
+          _g88.k > 0 ? Math.abs(Number(totals.kcal) - _g88.k) / _g88.k : 0,
+          _g88.p > 0 ? Math.abs(Number(totals.p) - _g88.p) / _g88.p : 0,
+          _g88.f > 0 ? Math.abs(Number(totals.f) - _g88.f) / _g88.f : 0,
+          _g88.c > 0 ? Math.abs(Number(totals.c) - _g88.c) / _g88.c : 0,
+        );
+        const _solid88 = (m: any) => ((m.items || []) as any[])
+          .filter((x: any) => !['liquid', 'supplement'].includes(String(x.role || '')))
+          .reduce((s: number, x: any) => s + (Number(x.amount) || 0), 0);
+        const _veg88 = () => (meals as any[])
+          .flatMap((m: any) => (m.items || []).filter((x: any) => String(x.role) === 'veg' && !(x as any)._microClosure && !(x as any)._microGap))
+          .reduce((s: number, x: any) => s + (Number(x.amount) || 0), 0);
+        let _devB88 = _dev88();
+        let _buckB88 = (meals as any[]).filter((m: any) => (m.items || []).length > 0 && _solid88(m) > 500).length;
+        let _fiberB88 = Number(totals.fiber) || 0;
+        const _excl88 = (input.excludedIds || new Set<string>()) as Set<string>;
+        let _added88 = 0;
+        // Ккал-нейтральный срез крахмала того же приёма под добавленную калорийность.
+        const _trimCarb88 = (m: any, kcal: number) => {
+          if (!(kcal > 0)) return;
+          const _pick = (mm: any) => ((mm.items || []) as any[])
+            .filter((x: any) => (x.role === 'carb_slow' || x.role === 'carb_fast') && !(x as any)._fixedGrams)
+            .sort((a: any, b: any) => (Number(b.kcal) || 0) - (Number(a.kcal) || 0))[0];
+          // Только крахмал ЭТОГО приёма. Кросс-приёмный срез (замер: `keto85/4/тр`)
+          // ломал замки §8.74/§8.75 и уводил белок дня на 2.4 г — правило «меняется
+          // только эта тарелка» важнее: если в приёме нет крахмала, овощ туда не ставим.
+          const carbIt = _pick(m);
+          if (!carbIt) return;
+          const perG = (Number(carbIt.kcal) || 0) / Math.max(1, Number(carbIt.amount) || 1);
+          if (!(perG > 0)) return;
+          const amt0 = Math.round(Number(carbIt.amount) || 0);
+          // Порция уже на полу «это еда» — резать нечего. Раньше `Math.max(40, …)` здесь
+          // РАСТИЛ гарнир (15 → 40 г), овощ превращался в ведро, и правка откатывалась.
+          if (amt0 <= 40) return;
+          const cut = Math.round(kcal / perG / 5) * 5;
+          const newAmt = Math.max(40, amt0 - cut);
+          if (!(cut > 0) || newAmt >= (Number(carbIt.amount) || 0)) return;
+          const k = newAmt / Math.max(1, Number(carbIt.amount) || 1);
+          carbIt.amount = Math.round(newAmt);
+          for (const key of ['p', 'f', 'c', 'kcal', 'fiber', 'leucine_mg']) {
+            if (carbIt[key]) carbIt[key] = Math.round(Number(carbIt[key]) * k * 10) / 10;
+          }
+        };
+        const _buckNow88 = () => (meals as any[]).filter((mm: any) => (mm.items || []).length > 0 && _solid88(mm) > 500).length;
+        const _ok88 = () => _dev88() <= Math.max(_devB88, PLANNER_CONVERGENCE_PCT / 100) + 0.005
+          && _buckNow88() <= _buckB88
+          && (Number(totals.fiber) || 0) <= Math.max(_fiberB88, Number((input as any).fiberCapG) || 0) + 5;
+        const _run88 = (m: any, mutate: () => number): boolean => {
+          // Срез крахмала может уйти в другой приём (канон дня важнее тарелки) — поэтому
+          // снимок берём по всем приёмам, как §8.72.
+          const snap = (meals as any[]).map((mm: any) => ({ mm, items: ((mm.items || []) as any[]).map((x: any) => ({ ...x })) }));
+          const totSnap = { ...totals };
+          const gained = mutate();
+          for (const mm of meals as any[]) mm.totals = mealTotalsOf(mm.items || []);
+          recalcDayTotals(meals as any[], totals);
+          totals.kcal = Math.round(totals.p * 4 + totals.c * 4 + totals.f * 9);
+          if (!(gained > 0) || !_ok88()) {
+            for (const s of snap) { s.mm.items = s.items.map((x: any) => ({ ...x })); s.mm.totals = mealTotalsOf(s.mm.items); }
+            recalcDayTotals(meals as any[], totals);
+            Object.assign(totals, totSnap);
+            return false;
+          }
+          _added88 += gained;
+          _devB88 = Math.max(_devB88, _dev88());
+          _buckB88 = _buckNow88();
+          _fiberB88 = Number(totals.fiber) || 0;
+          return true;
+        };
+        if (((input as any).vegTopUp88 !== false) && _veg88() < 200) {
+          // 1) доращиваем УЖЕ стоящий овощ — до съедобного капа и до 500 г тарелки.
+          // Перекус исключён: его тарелка плотная и часто единственная, а срез его гарнира
+          // ломает замки §8.74/§8.75 («меняется только эта позиция»). Овощ перекуса —
+          // территория §8.83; здесь работаем с основными приёмами.
+          const _main88 = (meals as any[]).filter((mm: any) => ['lunch', 'dinner', 'breakfast'].includes(String(mm.type)));
+          for (const m of _main88) {
+            if (_veg88() >= 200) break;
+            const vIt = ((m.items || []) as any[])
+              .filter((x: any) => String(x.role) === 'veg' && !(x as any)._fixedGrams && !(x as any)._microClosure && !(x as any)._microGap)
+              .sort((a: any, b: any) => (Number(a.amount) || 0) - (Number(b.amount) || 0))[0];
+            if (!vIt) continue;
+            const _amt = Number(vIt.amount) || 0;
+            const _sw = _solid88(m);
+            const _room = _sw <= 500 ? Math.max(0, 500 - _sw) : 999;
+            const want0 = Math.min(edibilityCapFor(vIt.id, 250), _amt + (200 - _veg88()), _amt + _room);
+            // Меньше 40 г — не порция: лучше дотянуть до минимальной порции, чем оставить
+            // слот полупустым (овоща больше 200 г — не дефект).
+            const want = want0 < _amt + 40 ? Math.min(edibilityCapFor(vIt.id, 250), _amt + _room) : want0;
+            if (!(want >= _amt + 40)) continue;
+            _run88(m, () => {
+              const oldKcal = Number(vIt.kcal) || 0;
+              const k = want / Math.max(1, _amt);
+              for (const key of ['p', 'f', 'c', 'kcal', 'fiber', 'leucine_mg']) if (vIt[key]) vIt[key] = Math.round(Number(vIt[key]) * k * 10) / 10;
+              vIt.amount = Math.round(want);
+              _trimCarb88(m, (Number(vIt.kcal) || 0) - oldKcal);
+              return Math.round(want) - _amt;
+            });
+          }
+          // 2) овощ в основной приём, где овоща нет вовсе. Завтрак НЕ трогаем: типология
+          // приёма (planner-meal-typology) держит завтрак без овоща — его гарнир каша.
+          const _pool88 = [...(pool.vegGreen || []), ...(pool.vegColor || [])]
+            .filter((f: any) => f && !_excl88.has(f.id) && (Number(f.protein) || 0) / 100 < 0.12);
+          for (const t of ['lunch', 'dinner']) {
+            if (_veg88() >= 200) break;
+            const m = (meals as any[]).find((mm: any) => String(mm.type) === t && (mm.items || []).length > 0);
+            if (!m || (m.items || []).some((x: any) => String(x.role) === 'veg')) continue;
+            const fd = _pool88.find((f: any) => !(m.items || []).some((x: any) => x.id === f.id)) || _pool88[0];
+            if (!fd) break;
+            const _sw2 = _solid88(m);
+            const _room2 = _sw2 <= 500 ? Math.max(0, 500 - _sw2) : 999;
+            let g = Math.round(Math.min(150, Math.max(40, 200 - _veg88())) / 10) * 10;
+            if (g > _room2) g = Math.floor(_room2 / 10) * 10;
+            if (g < 40) continue;
+            // Порция овоща проходит человеческую сетку (`makeItem` → 100/150/200), поэтому
+            // тарелку проверяем по ФАКТИЧЕСКОЙ порции минус срез крахмала. Иначе «овощ 40 г»
+            // становился 100 г и выбивал тарелку в ведро (замер §8.57: lunch 451 → 506).
+            const probe = makeItem(fd, g, 'veg');
+            const realG = Number(probe.amount) || 0;
+            if (realG < 40) continue;
+            const carbEst = ((m.items || []) as any[])
+              .filter((x: any) => (x.role === 'carb_slow' || x.role === 'carb_fast') && !(x as any)._fixedGrams)
+              .sort((a: any, b: any) => (Number(b.kcal) || 0) - (Number(a.kcal) || 0))[0];
+            const cutEst = carbEst
+              ? Math.min(
+                Math.round((Number(probe.kcal) || 0) / Math.max(0.01, (Number(carbEst.kcal) || 0) / Math.max(1, Number(carbEst.amount) || 1)) / 5) * 5,
+                Math.max(0, Math.round(Number(carbEst.amount) || 0) - 40),
+              )
+              : 0;
+            if (_sw2 <= 500 && _sw2 + realG - cutEst > 500) continue;
+            _run88(m, () => {
+              m.items.push(probe);
+              _trimCarb88(m, Number(probe.kcal) || 0);
+              return realG;
+            });
+          }
+        }
+        if (_added88 > 0) {
+          // Микро-витрина пересчитывается по фактическим тарелкам: добавленный овощ несёт
+          // микро, и план не должен показывать старое покрытие.
+          _finalMicro = _microNow() ?? _finalMicro;
+          _finalMicroTotals = sumMicros(meals.flatMap((mm: any) => (mm.items || []).map((it: any) => ({ id: it.id, amount: it.amount }))), FOOD_DB as any);
+        }
+        // Гарантия «ни один день не хуже»: если честная роль + добор овоща стоят дню балл
+        // (замер: `keto85/4/тр` в §8.59-харнессе — тарелка занята фруктом, овощу некуда
+        // встать без ведра), день остаётся с прежней ролью. Долг фиксируется нотой, а не
+        // «продавливается» через падение оси.
+        const _qA88 = _qNow(_finalMicro);
+        // Ось овоща — часть обязательства: честная роль допускается, только если овощной
+        // слот восстановлен настоящим овощем. Иначе «рыба-овощ» просто исчезает из счёта
+        // и день проседает по оси (замер §8.57: `normal90/4/тр` 99 → 98).
+        if (_qA88.total < _qB88.total || (_qA88.veg || 0) < (_qB88.veg || 0)) {
+          for (const s of _snapAll88) {
+            s.mm.items = s.items.map((x: any) => ({ ...x }));
+            s.mm.totals = mealTotalsOf(s.mm.items);
+          }
+          recalcDayTotals(meals as any[], totals);
+          Object.assign(totals, _totSnap88);
+          _finalMicro = _microNow() ?? _finalMicro;
+          _finalMicroTotals = sumMicros(meals.flatMap((mm: any) => (mm.items || []).map((it: any) => ({ id: it.id, amount: it.amount }))), FOOD_DB as any);
+          const _why88 = _qA88.total < _qB88.total
+            ? `балл ${_qB88.total} → ${_qA88.total}`
+            : `ось овоща ${_qB88.veg} → ${_qA88.veg}`;
+          notes.push(`🐟 Честная роль микро-добавки отложена: на этом дне она стоила бы (${_why88}) — овощу негде встать без ведра. Долг §8.88.`);
+        } else {
+          if (_added88 > 0) {
+            notes.push(`🥦 Овощной слот закрыт настоящим овощем: ${Math.round(_added88)} г — крахмал срезан на ту же калорийность, канон дня не сдвинулся.`);
+          }
+          notes.push(`🐟 Роль по природе: ${_relab88.join('; ')} — микро-добавка больше не считается овощем (§8.88).`);
+        }
+        recalcDayTotals(meals as any[], totals);
+      }
+    }
     // ─── Качество рациона одним числом (0–100) ───────────────────────────────
     // Сходимость ≤3% говорит, что граммы совпали; она молчит о том, съедобен ли план.
     // Здесь собираем «съедобность» из фактических тарелок: овощи, распределение жира,
@@ -17943,7 +18157,26 @@ function rebuildMicroFactNotes(
 // защита _fixedGrams включается только при комнате <90% цели (см. ниже). Payload
 // _microClosure БЕЗ ссылки на item (иначе круг в JSON.stringify) — конец buildDayPlan
 // пересчитывает ноту по ФАКТИЧЕСКИМ граммам, ища пункт по маркеру.
-function activelyCloseTopDeficiency(meals: Meal[], isVegetarian: boolean, sex: 'male'|'female'|'other', excludedIds: Set<string>, opts?: { allergenTags?: Set<string>; intolerances?: Intolerances; categoryPref?: CategoryPref }, kcalGate: { kcalNow: number; kcalTarget: number } = { kcalNow: 0, kcalTarget: 0 }): { note: string | null; micro?: { foodId: string; foodName: string; grams: number; key: string; unit: string; rda: number; before: number } } {
+// §8.88: роль добавки микро-прохода — по ПРИРОДЕ продукта, а не «veg по умолчанию».
+// Проход закрывает дефицит витамина D рыбой и омега-3 печенью/рыбой, и всё это уходило
+// в овощной счётчик. Замер 60 дней: 10 дней из 60, 953 г «овощей» на самом деле рыба
+// (`salmon` 883 г за 9 дней, `sardines` 70 г). Ось «овощ» (22% оценки дня) считает
+// `role === 'veg'`, а стадии плотности (§8.78/§8.83) ищут овощ по роли — то есть рыба
+// в овощном слоте ещё и МАСКИРОВАЛА отсутствие овоща.
+function roleForMicroFood(f: any, byNature: boolean = true): MealItem['role'] {
+  if (!byNature) return 'veg';
+  const p = Number(f?.protein) || 0;
+  const fat = Number(f?.fat) || 0;
+  const c = Number(f?.carbs) || 0;
+  if (fat >= 40) return 'fat'; // масла, семечки, орехи, пасты
+  if (p >= 10) return 'protein'; // рыба, печень, мясо, творог, яйцо
+  if (fat >= 15) return 'fat';
+  if (c >= 15 && p < 5) return 'carb_slow';
+  if (String(f?.category || '') === 'fruit') return 'fruit';
+  return 'veg';
+}
+
+function activelyCloseTopDeficiency(meals: Meal[], isVegetarian: boolean, sex: 'male'|'female'|'other', excludedIds: Set<string>, opts?: { allergenTags?: Set<string>; intolerances?: Intolerances; categoryPref?: CategoryPref }, kcalGate: { kcalNow: number; kcalTarget: number } = { kcalNow: 0, kcalTarget: 0 }, roleByNature: boolean = true): { note: string | null; micro?: { foodId: string; foodName: string; grams: number; key: string; unit: string; rda: number; before: number } } {
   const _foodAllowed = (f: any): boolean => {
     if (excludedIds.has(f.id)) return false;
     if (!opts) return true;
@@ -18036,7 +18269,7 @@ const EXTREME_MICRO_SOURCES: Array<{ nutrient: string; unit: string; rda: (sex: 
 
 export function closeExtremeMicroGaps(
   meals: Meal[],
-  opts: { kcal: number; sex: 'male' | 'female' | 'other'; excludedIds: Set<string>; allergenTags?: Set<string>; intolerances?: Intolerances; categoryPref?: CategoryPref },
+  opts: { kcal: number; sex: 'male' | 'female' | 'other'; excludedIds: Set<string>; allergenTags?: Set<string>; intolerances?: Intolerances; categoryPref?: CategoryPref; roleByNature?: boolean },
 ): { notes: string[]; kcalUsed: number } {
   if ((opts.kcal || 0) < 8000) return { notes: [], kcalUsed: 0 };
   const _foodAllowed = (f: any): boolean => {
@@ -18115,6 +18348,9 @@ export function closeExtremeMicroGaps(
         kcal: _after.kcal, p: _after.p, f: _after.f, c: _after.c,
         fiber: _after.fiber, leucine_mg: _after.leucine_mg,
         _fixedGrams: _gActual, // микро-добавка не масштабируется коррекциями/тарелкой
+        // §8.88: маркер микро-добавки — в финале роль правится по природе продукта
+        // (семечки/масло здесь стояли ролью `veg` и попадали в овощной счёт).
+        _microGap: true,
       } as MealItem;
       _candMeal.m.items.push(item);
       _candMeal.m.totals = _candMeal.m.items.reduce((acc, it) => ({ kcal: acc.kcal + it.kcal, p: acc.p + it.p, f: acc.f + it.f, c: acc.c + it.c, fiber: acc.fiber + (it.fiber || 0), leucine_mg: acc.leucine_mg + (it.leucine_mg || 0) }), { kcal: 0, p: 0, f: 0, c: 0, fiber: 0, leucine_mg: 0 });

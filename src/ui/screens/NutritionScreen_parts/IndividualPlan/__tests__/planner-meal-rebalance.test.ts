@@ -61,6 +61,12 @@ const build = (p: typeof PROFILES[number], mc: number, tr: boolean, rebalance: b
   vegDensity78: false,
   // §8.84 (перенос белка между приёмами) изолирован: замок мерит только свою стадию.
   proteinSmooth84: false,
+  // §8.88 (роль микро-добавки по природе + добор настоящего овоща) изолирован по той же
+  // причине: он добавляет овощ в тарелки, которые §8.57 выравнивает, и в одном варианте
+  // овощ помещается (тарелка уже ведро), а в другом нет — сравнение «с выравниванием /
+  // без» перестаёт быть сравнением одной стадии. Замок §8.88 живёт отдельно.
+  microRoleByNature88: false,
+  vegTopUp88: false,
   autoMealRebalance: rebalance,
   fruitPortionFloor: fruitFloor,
 } as unknown as MealPlanInput);
