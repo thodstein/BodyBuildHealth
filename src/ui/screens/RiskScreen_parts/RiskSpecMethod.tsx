@@ -325,6 +325,20 @@ export const RiskSpecMethod: React.FC<{ subTab?: string }> = ({ subTab }) => {
               ⚠ Поддержка не выбрана — «с поддержкой» = «без поддержки». Откройте калькулятор поддержки, чтобы учесть план.
             </div>
           )}
+          {/* Честность: препараты без записи в DRUG_DB не моделируются, их вклад
+              принят за 0 → цифры занижены. Раньше экран этого не показывал. */}
+          {result && result.riskStatus !== 'ok' && (
+            <div style={{ marginTop: 8, fontSize: 12, color: '#fff', fontWeight: 700, background:'rgba(239,68,68,0.08)', border:'1px solid rgba(239,68,68,0.24)', borderRadius:8, padding:'6px 10px', lineHeight:1.45 }}>
+              {result.riskStatus === 'no_data'
+                ? '⛔ Риск НЕ рассчитан: ни один препарат курса не смоделирован — проценты ниже не значат «всё хорошо».'
+                : '⚠ Расчёт неполный: часть препаратов не смоделирована, их вклад принят за 0 — проценты занижены.'}
+              {result.unmodeledDrugs?.length > 0 && (
+                <div style={{ fontSize: 11, fontWeight: 600, opacity: 0.85, marginTop: 4 }}>
+                  Не учтено: {result.unmodeledDrugs.join(', ')}
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {result && (

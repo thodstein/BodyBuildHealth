@@ -235,6 +235,22 @@ export const RiskScreen: React.FC<{ initialSubTab?: string; onNavigate?: (screen
     return [];
   }, [tick]);
 
+  // Честность расчёта: SupportScreen пишет `riskStatus` (ok/partial/no_data) и
+  // список не смоделированных препаратов, но экран их раньше не читал — показывал
+  // полные проценты, даже если часть курса в модель не попала.
+  const supportCalcHonesty = useMemo<{ riskStatus?: 'ok' | 'partial' | 'no_data'; unmodeledDrugs: string[] } | null>(() => {
+    try {
+      const sr = JSON.parse(localStorage.getItem('he_support_risk') || 'null');
+      if (sr && (sr.riskStatus || (Array.isArray(sr.unmodeledDrugs) && sr.unmodeledDrugs.length > 0))) {
+        return {
+          riskStatus: sr.riskStatus,
+          unmodeledDrugs: Array.isArray(sr.unmodeledDrugs) ? sr.unmodeledDrugs.filter(Boolean) : [],
+        };
+      }
+    } catch {}
+    return null;
+  }, [tick]);
+
   // Compute pharma risk — using TZ engine (single source of truth)
   // WITH support substances applied → overallRaw = raw risk, overallNet = risk after support reduction
   const pharmaRisk = useMemo<RiskResult | null>(() => {
@@ -722,6 +738,21 @@ export const RiskScreen: React.FC<{ initialSubTab?: string; onNavigate?: (screen
 
           {/* Риск по системам и Эффективность поддержки — удалены, относятся к вероятностной модели */}
           {/* Синхронизация с калькулятором — удалена, не относится к методам расчёта риска */}
+
+          {supportCalcHonesty && supportCalcHonesty.riskStatus !== 'ok' && (
+            <div className="card" style={{ marginBottom: 12, padding: '10px 14px', borderRadius: 14, background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.24)', borderLeft: '4px solid #f59e0b' }}>
+              <div style={{ fontSize: 12, color: '#fff', fontWeight: 700, lineHeight: 1.5 }}>
+                {supportCalcHonesty.riskStatus === 'no_data'
+                  ? '⚠ Риск с поддержкой НЕ рассчитан: ни один препарат курса не смоделирован — проценты занижены.'
+                  : '⚠ Расчёт неполный: часть препаратов курса не смоделирована — проценты занижены.'}
+              </div>
+              {supportCalcHonesty.unmodeledDrugs.length > 0 && (
+                <div style={{ fontSize: 11, color: '#fff', opacity: 0.85, marginTop: 4, lineHeight: 1.4 }}>
+                  Не учтено: {supportCalcHonesty.unmodeledDrugs.join(', ')}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* 4 nav cards — APK PRO: 56px+, белый текст */}
           <div className="risk-navcards" style={{ display:'flex', flexDirection:'column', gap:10 }}>
