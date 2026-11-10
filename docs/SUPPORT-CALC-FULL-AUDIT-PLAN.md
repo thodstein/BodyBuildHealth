@@ -282,7 +282,7 @@ P2 — вкладка «Анализы»: отображение и индика
 - **`DRUG_DB`** +7 препаратов (`hgh`, `clenbuterol`, `t3`, `t4`, `sustanon`, `test_susp`, `methenolone_acetate`); `TzDrugClass` += `thermo`/`thyroid`/`glp1`/`sarm`/`pct`; `getDoseFactor` для новых классов.
 - **`risk-engine-tz-spec.ts`** — `riskStatus: 'ok'|'partial'|'no_data'`, `unmodeledDrugs`, `unmappedSupport` (честный отказ от цифр вместо «0 %»); `supportLookup` через `getSupportMechs` (исправлен баг: `[]` truthy ломал fallback на `PROCEDURE_DB`).
 - **`engine-helpers.buildTzInput`** — реальные дозы (`ghIU`/`insulinIU`/`igfMcg`/`clenMcg`/`t3Mcg`), класс из `DRUG_DB`, длительность = max(weeks), дедуп по канону; `extractLabValues` с CKD-EPI 2021; `checkUpperLimits(..., rawDoses)` видит превышение UL до капа; `applyTitration(..., rawDosesOut)` отдаёт сырые дозы наружу.
-- **`src/data/dose-units.ts` (новый)** — одна единица на вещество (`мг`/`мкг`/`МЕ`/`Ед`/`ФЕ`/`капс`); витамин D внутри в мкг, отображение в МЕ при ≥1000.
+- **`src/data/dose-units.ts` (новый)** — одна единица на вещество (`мг`/`мкг`/`МЕ`/`Ед`/`млрд КОЕ`); витамин D внутри в мкг, отображение в МЕ при ≥1000.
 - **`src/engines/tz-snapshot.ts` (новый)** — `courseSignature` (id+доза, без порядка/дублей, с алиасами), запись снапшота в `useEffect`, TTL 24 ч, старый формат без `sig` принимается.
 - **`src/data/support-names.ts` (новый)** — общий резолвер русских имён (`supportNameRu`/`supportNamesRu`) для Тренировок/Хаба/отчётов.
 - **UI**: менеджер веществ (`toRemove` только по видимым id через `NON_PILL_SUPPORT_IDS`, «↺ Сбросить правки», сохранение состава в избранное, автосейв с merge journal/labs), `excludedSubs` (удалённое не возвращается), честный текст при `no_data`, `RiskTimelineChart`, дозы через `formatDose`/`formatDefaultDose`.
@@ -297,6 +297,8 @@ P2 — вкладка «Анализы»: отображение и индика
 - `src/engines/__tests__/build-tz-input.test.ts` (8): реальные дозы попапов, классы/форма из `DRUG_DB`, длительность из курса, дедуп, `null` без препаратов.
 - `src/engines/__tests__/support-dose-display-units.test.ts` (5): дозы плана/расписания в натуральной единице (селен мкг, D3 МЕ), крупные мг → г, «по инструкции» вместо выдуманного «500 мг».
 - `src/data/__tests__/support-names.test.ts` (6): резолвер имён.
+- `src/engines/__tests__/comprehensive-report.test.ts` (+3 в третьем проходе): план из id → русское имя + единица по веществу (`vitamin_d3` = МЕ, `selenium` = мкг) без дублей; GH в курсе — «МЕ», а не «мг»; старая запись `doseUnit='g'` не даёт «5000 г».
+- `src/engines/__tests__/bioequivalence-units.test.ts` (3): единица в предупреждении о дозе замены (по умолчанию «мг», переданная `мкг` соблюдается, ±20 % без предупреждения).
 
 ### Догон: единицы доз в отображении (второй проход)
 Найдено чтением кода (grep `dosage.mg` + `мг`-шаблоны) — все места, где доза подписывалась «мг» независимо от вещества:
@@ -304,6 +306,16 @@ P2 — вкладка «Анализы»: отображение и индика
 - Убран выдуманный «ФЕ»: наттокиназа/серрапептаза дозируются в МГ (100 мг ≈ 2000 ФЕ), поэтому `doseUnit` возвращает «мг», а не «ФЕ»; литерал `nattokinase:'2000 ФЕ'` в `engine-helpers` → `'100 мг'`.
 - Пробиотики: «капс» → «млрд КОЕ» (значение 20 — это 20 млрд КОЕ, а не 20 капсул).
 - Исправлены точечные ошибки: `SupportScreen` карточка каталога (`mg<1 → «мкг»` без ×1000 давало «0.2 мкг» вместо 200 мкг; `≥1000 → «г»` без деления давало «2000 г»), `buildSubstances`/`buildSchedule` (селен «200 мг» → «200 мкг», D3 «5000 мг» → «5000 МЕ», выдуманное «500 мг» при отсутствии данных → «по инструкции»), `SupportFavoritesView` (таблица плана и корзина: доза в корзину писалась ЧИСЛОМ в мг-шкале, хотя все остальные писатели кладут строку), share-текст плана, `SupportDiaryView`, `SupportStacksView`, `DosageCalculator`, `recommendation-engine`, `score-engine`, `supplement-optimizer`.
+
+### Догон: единицы доз в отображении (третий проход — отчёты, аналоги, курс)
+Тот же класс ошибок, но уже на «выходе» данных: доза хранится в натуральной единице, а подпись — «мг».
+- **`comprehensive-report.engine` (раздел «Поддержка»)** — план из `he_support_plan_result` попадал в отчёт СЫРЫМИ id (`selenium`, `zinc_sup`) и с `doseMg: 0` («—» вместо дозы). Теперь: русское имя через `supportNameRu`, типовая доза из `DEFAULT_DOSAGES`, единица — через локальный `unitOf(id, raw)` (приоритет `defaultDoseUnit`, т.к. число в профиле/дефолтах в натуральной единице; сохранённая подпись `mcg`/`IU` берётся только для мкг/МЕ; `'g'` игнорируется — историческая подпись без пересчёта значения давала «5000 г»). План не дублирует уже добавленные из профиля вещества.
+- **Курс в отчёте** — GH подписывался «8 мг» вместо «8 МЕ»: `doseDisplay` теперь `${doseMg} ${unitOf(id)}` (AAS — мг, GH/ХГЧ — МЕ, клен/Т3 — мкг).
+- **`SupportScreen` (запись `nutrition.currentSupplements`)** — убран мусорный тернарник `doseMg` и подстановка `doseUnit='g'` при `dosage.mg >= 5000` БЕЗ деления значения (в отчёте это давало «5000 г»). Пишем ровно натуральную единицу: `мкг → 'mcg'`, `МЕ → 'IU'`, иначе `'mg'`; число не пересчитываем.
+- **`SupportAnalogCalculator`** — `SUBSTANCE_ANALOGS[].mg` хранит натуральную единицу (D3 5000 = МЕ, селен 200 = мкг, пробиотики 20 = млрд КОЕ), а UI писал «200 мг» / «5000 мг». Теперь `formatDefaultDose(id, …)` для замены и рекомендуемой дозы.
+- **`bioequivalence-base.validateReplacementDose`** — новый опциональный параметр `unit` (по умолчанию `'мг'`): текст предупреждения больше не приписывает «мг» дозам в мкг/МЕ. Вызывающий `biostack-clinical-v2` передаёт `defaultDoseUnit(cid)`.
+- **`biostack-clinical-recommender`** — fallback-доза из каталога подписывалась «мг» независимо от источника: `DEFAULT_DOSAGES` → `formatDefaultDose`, `catalog.dosage.mg` → `formatDoseFromMg`.
+- **`comprehensive-report-html` / `ReportsScreen`** — доза больше не «200мкг» слипшись: `${doseMg} ${unit}`.
 
 ### Финал
 `npm run type-check` — 0 ошибок; `npm run verify:apk-design` — OK; широкий прогон (`src/engines` + `src/ui/components` + `src/ui/screens/__tests__` + `src/ui/__tests__`, 975 файлов): **14 253 теста зелёные**, 1 падение — предсуществующее и не связанное с правками: `diary-mmc-checkin-integration.test.tsx` — ожидает «2 сетов» вместо «2 сета» после `8aeb72252` (воспроизводится на HEAD-версиях). Ранее отмеченное `risk-women-deeplink.test.tsx` (`initialSubTab='women'`) в этот круг не входит и тоже воспроизводится на HEAD.

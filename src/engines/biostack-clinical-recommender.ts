@@ -34,6 +34,7 @@ import type { LabCompositeResult } from './lab-analysis.engine';
 import { getDrugTzMechanisms, TZ_MECH_LABELS, TZ_SYSTEM_LABELS } from '../data/support-db';
 import { SUPPORT_CATALOG_DATA } from '../data/support-database';
 import { DEFAULT_DOSAGES } from '../data/support-meta';
+import { formatDefaultDose, formatDoseFromMg } from '../data/dose-units';
 import { getPrioritySubstances, type SeverityLevel } from '../data/lab-priority-map';
 import { SUPPLEMENTS_DB } from '../data/support-db/supplements';
 import { PHARMACY_DB } from '../data/support-db/pharmacy-db';
@@ -740,14 +741,17 @@ export function buildClinicalStack(
       });
     } else if (catalog) {
       // fallback: вещество из каталога (дозы из DEFAULT_DOSAGES, нормализованные по весу)
-      const dosage = (DEFAULT_DOSAGES as any)[id] || (catalog as any).dosage || { mg: 500, timing: 'с едой' };
+      const def = (DEFAULT_DOSAGES as any)[id];
+      const dosage = def || (catalog as any).dosage || { mg: 500, timing: 'с едой' };
       const bw = state.profile?.weight || 80;
       const normalizedMg = normalizeDoseByWeight(dosage.mg || 500, bw);
       substances.push({
         id,
         name: (catalog as any).nameRu || (catalog as any).name || id,
         doseMg: normalizedMg,
-        doseDisplay: `${normalizedMg} мг`,
+        // DEFAULT_DOSAGES хранит НАТУРАЛЬНУЮ единицу (селен — мкг, D3 — МЕ),
+        // а `catalog.dosage.mg` — миллиграммы. Подпись зависит от источника числа.
+        doseDisplay: def ? formatDefaultDose(id, normalizedMg) : formatDoseFromMg(id, normalizedMg),
         timing: dosage.timing || 'с едой',
         tier: (catalog as any).tier || 'standard',
         categories: (catalog as any).category || [],

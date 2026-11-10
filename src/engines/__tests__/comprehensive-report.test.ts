@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { computeDelta, assignStatus, generateComprehensiveReport } from '../comprehensive-report.engine';
 import { getBpEntries } from '../../core/bp-hr-data';
+import { getProfile } from '../../core/profile-manager';
 
 // Мокаем все хранилища
 vi.mock('../../core/profile-manager', () => ({
@@ -173,5 +174,72 @@ describe('generateComprehensiveReport', () => {
     const evening = bp!.metrics.find(m => m.label === 'Вечер: систолическое');
     expect(morning!.current).toBe(120);
     expect(evening!.current).toBe(140);
+  });
+});
+
+// ────────────────────────────────────────────────────────────────
+//  Единицы и имена в отчёте (аудит 2026-11)
+//  Раньше план поддержки попадал в отчёт сырыми id ('selenium') без дозы,
+//  а GH в курсе подписывался как «8 мг» вместо «8 МЕ».
+// ────────────────────────────────────────────────────────────────
+describe('support section: единицы и имена из плана', () => {
+  const baseProfile = () => ({
+    settings: {
+      personal: { age: 30, sex: 'male', weight: 85, height: 180, bodyFat: 15 },
+      pharma: {
+        courseStartDate: '2026-05-15', trainingCycleWeeks: 16, phase: 'course',
+        currentSubstances: [{ id: 'hgh', name: 'ГР', doseMg: 8, route: 'inject' }],
+      },
+      goals: { primaryGoal: 'mass' },
+      nutrition: { proteinPerKg: 2, mealsPerDay: 5, currentSupplements: [{ id: 'selenium', name: 'Селен', doseMg: 200, doseUnit: 'mcg' }] },
+      lifestyle: { sleepHours: 7, stressLevel: 5, morningHRV: 65, restingHR: 60, dailySteps: 8000 },
+    },
+    name: 'Тестовый пользователь',
+  });
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    (getProfile as any).mockReturnValue(baseProfile());
+    localStorage.setItem('he_support_plan_result', JSON.stringify(['selenium', 'vitamin_d3']));
+  });
+
+  it('план из id: имя по-русски, ед. измерителя по веществу, без дублей', async () => {
+    const report = await generateComprehensiveReport({ type: 'weekly' });
+    const supps = report.support.supplements;
+    const se = supps.find(s => s.id === 'selenium');
+    const d3 = supps.find(s => s.id === 'vitamin_d3');
+    expect(se).toBeDefined();
+    expect(d3).toBeDefined();
+    // Селен уже есть в профиле — не дублируется планом.
+    expect(supps.filter(s => s.id === 'selenium')).toHaveLength(1);
+    expect(se!.unit).toBe('мкг');
+    expect(d3!.unit).toBe('МЕ');
+    // Имя человека-читаемое, а не сырой id.
+    expect(d3!.name).not.toBe('vitamin_d3');
+    // Доза из дефолтов каталога, а не 0.
+    expect(d3!.doseMg).toBeGreaterThan(0);
+  });
+
+  it('GH в курсе — «МЕ», а не «мг»', async () => {
+    const report = await generateComprehensiveReport({ type: 'weekly' });
+    const gh = report.support.course.substances.find(s => s.id === 'hgh');
+    expect(gh).toBeDefined();
+    expect(gh!.doseDisplay).toContain('МЕ');
+    expect(gh!.doseDisplay).not.toContain('мг');
+  });
+
+  it('старая запись с doseUnit="g" (значение не пересчитано) не даёт «5000 г»', async () => {
+    const p = baseProfile();
+    (getProfile as any).mockReturnValue({
+      ...p,
+      settings: {
+        ...p.settings,
+        nutrition: { ...p.settings.nutrition, currentSupplements: [{ id: 'nac', name: 'NAC', doseMg: 5000, doseUnit: 'g' }] },
+      },
+    });
+    const report = await generateComprehensiveReport({ type: 'weekly' });
+    const nac = report.support.supplements.find(s => s.id === 'nac');
+    expect(nac).toBeDefined();
+    expect(nac!.unit).toBe('мг');
   });
 });

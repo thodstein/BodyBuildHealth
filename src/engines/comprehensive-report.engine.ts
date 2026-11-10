@@ -13,6 +13,9 @@ import { getScoreHistory } from './score-history';
 import { analyzeMeasurements, loadMeasurements } from './log-analytics-progression.engine';
 import { getExerciseById } from '../core/exercise-catalog';
 import { readRiskBridge } from './risk-bridge';
+import { DEFAULT_DOSAGES } from '../data/support-database';
+import { defaultDoseUnit } from '../data/dose-units';
+import { supportNameRu } from '../data/support-names';
 import type { BodyMeasurement } from './log-analytics-progression.engine';
 import type { BodyCompEntry } from './body-composition.engine';
 import type { UnifiedSettings } from '../core/types';
@@ -564,24 +567,44 @@ function gatherSupportSchedule(): SupportScheduleSection {
   const planResult: string[] = readJsonSafe('he_support_plan_result', []);
   const riskBridge = readRiskBridge();
 
+  // Латиница из профиля → русская подпись (SupportScreen пишет doseUnit 'mcg'/'IU').
+  const UNIT_RU: Record<string, string> = { mg: 'мг', g: 'г', mcg: 'мкг', IU: 'МЕ', 'млрд КОЕ': 'млрд КОЕ' };
+  const unitOf = (id: string, raw?: string): string => {
+    // Откуда берётся число — такая и единица: `DEFAULT_DOSAGES` и профиль
+    // (SupportScreen) хранят НАТУРАЛЬНУЮ единицу: D3 — МЕ, селен — мкг.
+    // Поэтому приоритет у `defaultDoseUnit`, а не у `doseUnitLabel`
+    // (у D3 он «мкг внутренние» = 40× путаница).
+    const natural = defaultDoseUnit(id);
+    if (natural !== 'мг') return natural;
+    // Сохранённую подпись берём только для мкг/МЕ (кастомные вещества без
+    // каталожной единицы). 'g' игнорируем: исторически SupportScreen писал
+    // 'g' при doseMg>=5000, НЕ деля значение → «5000 г» вместо 5 г.
+    if (raw === 'mcg' || raw === 'IU') return UNIT_RU[raw];
+    return natural;
+  };
+
   const course = {
     isActive: !!pharma.courseStartDate,
     startDate: pharma.courseStartDate || '',
     weekCurrent: pharma.courseStartDate ? Math.floor(Math.max(1, daysBetween(pharma.courseStartDate, todayIso())) / 7) + 1 : 0,
     weekTotal: pharma.trainingCycleWeeks || 0,
     phase: pharma.phase || 'course',
-    substances: substances.map((s: any) => ({
-      id: s.id || s.substanceId || '',
-      name: s.name || s.substance || s.id || '',
-      doseDisplay: s.doseMg ? `${s.doseMg} мг` : s.doseMgWeek ? `${s.doseMgWeek} мг/нед` : '—',
-      route: s.route === 'inject' ? 'inject' : 'oral' as const,
-      frequency: s.frequency || '1 р/нед',
-      startWeek: s.startWeek || 1,
-      endWeek: s.endWeek || 16,
-      isAAS: s.isAAS || false,
-      potencyFactor: s.potencyFactor,
-      className: s.className || s.pClass || '',
-    })),
+    substances: substances.map((s: any) => {
+      const sid = s.id || s.substanceId || '';
+      return {
+        id: sid,
+        name: s.name || s.substance || sid,
+        // Единица — по веществу: AAS в мг, GH в МЕ, клен/Т3 в мкг.
+        doseDisplay: s.doseMg ? `${s.doseMg} ${unitOf(sid, s.doseUnit)}` : s.doseMgWeek ? `${s.doseMgWeek} мг/нед` : '—',
+        route: s.route === 'inject' ? 'inject' : 'oral' as const,
+        frequency: s.frequency || '1 р/нед',
+        startWeek: s.startWeek || 1,
+        endWeek: s.endWeek || 16,
+        isAAS: s.isAAS || false,
+        potencyFactor: s.potencyFactor,
+        className: s.className || s.pClass || '',
+      };
+    }),
   };
 
   const schedule = {
@@ -591,9 +614,23 @@ function gatherSupportSchedule(): SupportScheduleSection {
   };
 
   const profileSupps = (nutrition.currentSupplements || []) as any[];
-  const planSupps = planResult.map(id => ({ id, name: id, doseMg: 0, unit: 'мг', source: 'support_plan' as const }));
+  // `he_support_plan_result` хранит только id: имя и типовую дозу берём из
+  // каталога (раньше в отчёт попадали сырые id и «—» вместо дозы).
+  const planSupps = planResult.map(id => {
+    const def = DEFAULT_DOSAGES[id];
+    return {
+      id,
+      name: supportNameRu(id),
+      doseMg: def?.mg || 0,
+      unit: unitOf(id),
+      source: 'support_plan' as const,
+    };
+  });
   const suppMap = new Map<string, SupportScheduleSection['supplements'][0]>();
-  profileSupps.forEach((s: any) => { suppMap.set(s.id, { id: s.id, name: s.name, doseMg: s.doseMg || 0, unit: s.doseUnit || 'мг', notes: s.notes, source: 'profile' }); });
+  profileSupps.forEach((s: any) => {
+    const id = s.id;
+    suppMap.set(id, { id, name: s.name || supportNameRu(id), doseMg: s.doseMg || 0, unit: unitOf(id, s.doseUnit), notes: s.notes, source: 'profile' });
+  });
   planSupps.forEach(s => { if (!suppMap.has(s.id)) suppMap.set(s.id, s); });
   const supplements = Array.from(suppMap.values());
 

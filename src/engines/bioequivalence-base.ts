@@ -599,7 +599,14 @@ export function validateReplacementDose(
   fromId: string,
   toId: string,
   fromMg: number,
-  toMg: number
+  toMg: number,
+  /**
+   * Единица, в которой переданы дозы (для текста предупреждения).
+   * `SUBSTANCE_ANALOGS` хранит НАТУРАЛЬНУЮ единицу: D3 5000 = МЕ,
+   * селен 200 = мкг, пробиотики 20 = млрд КОЕ. Раньше текст жёстко
+   * писал «мг» и для них врал в 1000× и более.
+   */
+  unit: string = 'мг'
 ): DoseValidation {
   const entry = BIOEQUIVALENCE.find(
     e => (e.from === fromId && e.to === toId) || (e.from === toId && e.to === fromId)
@@ -624,9 +631,9 @@ export function validateReplacementDose(
   let warning: string | undefined;
   if (!isCorrect) {
     if (toMg < lowerBound) {
-      warning = `⚠ Доза ${toMg} мг НИЖЕ рекомендуемой ${Math.round(recommendedToMg)} мг.`;
+      warning = `⚠ Доза ${toMg} ${unit} НИЖЕ рекомендуемой ${Math.round(recommendedToMg)} ${unit}.`;
     } else {
-      warning = `⚠ Доза ${toMg} мг ВЫШЕ рекомендуемой ${Math.round(recommendedToMg)} мг.`;
+      warning = `⚠ Доза ${toMg} ${unit} ВЫШЕ рекомендуемой ${Math.round(recommendedToMg)} ${unit}.`;
     }
   }
 

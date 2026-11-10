@@ -1,4 +1,5 @@
 import { SUPPORT_CATALOG_DATA } from '../data/support-database';
+import { defaultDoseUnit } from '../data/dose-units';
 import type { BioStackProfile } from './biostack-ai.engine';
 import {
   optimizeTiming,
@@ -518,7 +519,9 @@ export function findMeaningfulReplacement(
       let doseWarning: string | undefined;
       let recommendedDoseMg: number | undefined;
       if (cand?.mg && cand.mg > 0) {
-        const validation: DoseValidation = validateReplacementDose(originalId, cid, cand.mg, cand.mg);
+        // Дозы аналогов — в натуральной единице вещества, поэтому и текст
+        // предупреждения подписываем ею, а не «мг» для всего.
+        const validation: DoseValidation = validateReplacementDose(originalId, cid, cand.mg, cand.mg, defaultDoseUnit(cid));
         if (!validation.isCorrect && validation.warning) {
           doseWarning = validation.warning;
           recommendedDoseMg = validation.recommendedDoseMg;

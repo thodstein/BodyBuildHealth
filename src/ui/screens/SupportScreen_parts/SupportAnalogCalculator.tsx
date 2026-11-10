@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { findMeaningfulReplacement, type MeaningfulReplacement, getEvidenceGrade } from '../../../engines/biostack-clinical-v2.engine';
 import { SUPPORT_CATALOG_DATA } from '../../../data/support-database';
+import { formatDefaultDose } from '../../../data/dose-units';
 
 const GLASS: React.CSSProperties = {
   background: 'rgba(24,24,27,0.55)',
@@ -356,7 +357,9 @@ export const SupportAnalogCalculator: React.FC = () => {
                   {replacement.doseMg && (
                     <div>
                       <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)' }}>Доза: </span>
-                      <span style={{ fontSize: 10, color: '#fff' }}>{replacement.doseMg} мг</span>
+                      {/* `mg` в SUBSTANCE_ANALOGS — натуральная единица вещества
+                          (D3 5000 = МЕ, селен 200 = мкг), не миллиграммы. */}
+                      <span style={{ fontSize: 10, color: '#fff' }}>{formatDefaultDose(replacement.replacementId, replacement.doseMg)}</span>
                     </div>
                   )}
                   {replacement.timing && (
@@ -384,7 +387,7 @@ export const SupportAnalogCalculator: React.FC = () => {
                   </div>
                   {replacement.recommendedDoseMg && (
                     <div style={{ fontSize: 10, color: '#f59e0b', marginTop: 4 }}>
-                      Рекомендуемая доза: {replacement.recommendedDoseMg} мг
+                      Рекомендуемая доза: {formatDefaultDose(replacement.replacementId, replacement.recommendedDoseMg)}
                     </div>
                   )}
                 </div>

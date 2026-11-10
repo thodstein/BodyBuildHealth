@@ -843,11 +843,12 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab; initialSubTab?: 
         const subInfo = catalogSubstances.find(s => s.id === id);
         // Единица — из единой таблицы (мкг/МЕ/Ед), а не «mg для всего».
         // Значение dos.mg уже в этой же единице (200 мкг остаётся 200 при unit='mcg').
+        // В граммы НЕ пересчитываем: gram-подпись без деления значения давала
+        // «5000 г» в отчётах — число и единица обязаны совпадать.
         const unit = defaultDoseUnit(id);
         const doseUnit: 'mg' | 'g' | 'mcg' | 'IU' =
-          unit === 'мкг' ? 'mcg' : unit === 'МЕ' ? 'IU' : dos.mg >= 5000 ? 'g' : 'mg';
-        const doseMg = unit === 'мкг' ? dos.mg : unit === 'МЕ' ? dos.mg : dos.mg;
-        return { id, name: subInfo?.name || id, doseMg, doseUnit, notes: dos.timing };
+          unit === 'мкг' ? 'mcg' : unit === 'МЕ' ? 'IU' : 'mg';
+        return { id, name: subInfo?.name || id, doseMg: dos.mg, doseUnit, notes: dos.timing };
       });
       const prevSettings: any = getProfile().settings || {};
       updateProfile({

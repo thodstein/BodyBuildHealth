@@ -84,7 +84,7 @@ export function generateComprehensiveReportHTML(report: ComprehensiveReport): st
         <tr>
           <td style="padding:4px 8px;border:1px solid #ddd;font-size:10pt;">${s.id}</td>
           <td style="padding:4px 8px;border:1px solid #ddd;font-size:10pt;">${s.name}</td>
-          <td style="padding:4px 8px;border:1px solid #ddd;font-size:10pt;text-align:center;">${s.doseMg > 0 ? `${s.doseMg}${s.unit}` : '—'}</td>
+          <td style="padding:4px 8px;border:1px solid #ddd;font-size:10pt;text-align:center;">${s.doseMg > 0 ? `${s.doseMg} ${s.unit}` : '—'}</td>
           <td style="padding:4px 8px;border:1px solid #ddd;font-size:10pt;text-align:center;">${s.source}</td>
         </tr>
       `).join('')}</tbody>

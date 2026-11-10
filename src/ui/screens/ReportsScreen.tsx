@@ -218,7 +218,7 @@ export const ReportsScreen: React.FC = () => {
                 {report.support.supplements.slice(0, 10).map((s, i) => (
                   <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, padding: '4px 8px', background: 'rgba(255,255,255,0.02)', borderRadius: 6 }}>
                     <span style={{ color: colors.text }}>{s.name}</span>
-                    <span style={{ color: colors.textMuted }}>{s.doseMg > 0 ? `${s.doseMg}${s.unit}` : '—'}</span>
+                    <span style={{ color: colors.textMuted }}>{s.doseMg > 0 ? `${s.doseMg} ${s.unit}` : '-'}</span>
                   </div>
                 ))}
               </div>
