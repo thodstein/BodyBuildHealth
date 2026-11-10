@@ -45,7 +45,9 @@ export const PedInputPanel: React.FC<{
   onIntensity: (v: CourseIntensity) => void;
   /** Доп. элемент в шапке (например, переключатель АВТО в ПЛ-авто). */
   headerExtra?: React.ReactNode;
-}> = ({ peds, onToggle, pedDoses, onDose, courseIntensity, onIntensity, headerExtra }) => {
+  /** Возрастной гейт: для <18 PED-протоколы не применяются. */
+  disabled?: boolean;
+}> = ({ peds, onToggle, pedDoses, onDose, courseIntensity, onIntensity, headerExtra, disabled = false }) => {
   const active = peds.length > 0;
   return (
     <div className="train-pedinput" style={{ ...CARD, marginBottom: 10, background: 'rgba(0,230,138,0.04)', border: '1px solid rgba(0,230,138,0.14)', padding: 12 }}>
@@ -70,10 +72,13 @@ export const PedInputPanel: React.FC<{
               key={p}
               role="checkbox"
               aria-checked={on}
-              onClick={() => onToggle(p)}
+              onClick={() => { if (!disabled) onToggle(p); }}
+              disabled={disabled}
               style={{
                 display: 'flex', alignItems: 'center', gap: 6,
-                padding: '7px 12px', borderRadius: 12, fontSize: 11, fontWeight: 700, cursor: 'pointer',
+                padding: '7px 12px', borderRadius: 12, fontSize: 11, fontWeight: 700,
+                cursor: disabled ? 'not-allowed' : 'pointer',
+                opacity: disabled ? 0.45 : 1,
                 border: on ? '1.5px solid ' + ACCENT : '1px solid rgba(255,255,255,0.08)',
                 background: on ? 'rgba(0,230,138,0.16)' : 'rgba(255,255,255,0.02)',
                 color: on ? ACCENT : '#fff',
@@ -112,6 +117,7 @@ export const PedInputPanel: React.FC<{
                     min={0}
                     max={meta.max}
                     step={meta.step}
+                    disabled={disabled}
                     onChange={e => {
                       const v = Number(e.target.value);
                       onDose(p, Number.isFinite(v) && v >= 0 ? Math.min(v, meta.max) : 0);
@@ -150,10 +156,13 @@ export const PedInputPanel: React.FC<{
                   key={item.id}
                   role="radio"
                   aria-checked={on}
-                  onClick={() => onIntensity(item.id)}
+                  onClick={() => { if (!disabled) onIntensity(item.id); }}
+                  disabled={disabled}
                   style={{
                     display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2,
-                    padding: '8px 6px', borderRadius: 10, fontSize: 11, fontWeight: 700, cursor: 'pointer',
+                    padding: '8px 6px', borderRadius: 10, fontSize: 11, fontWeight: 700,
+                    cursor: disabled ? 'not-allowed' : 'pointer',
+                    opacity: disabled ? 0.45 : 1,
                     border: on ? '1.5px solid ' + ACCENT : '1px solid rgba(255,255,255,0.08)',
                     background: on ? 'rgba(0,230,138,0.14)' : 'rgba(255,255,255,0.02)',
                     color: on ? ACCENT : '#fff',

@@ -57,6 +57,8 @@ export interface BbPedWorkMaxStepProps {
   workMax: Record<string, number>;
   setWorkMax: React.Dispatch<React.SetStateAction<Record<string, number>>>;
   planMode: PlanMode;
+  /** Возраст из профиля — PED-гейт <18. */
+  age?: number;
   onBuild: () => void;
   onNext: () => void;
   onBackToParams: () => void;
@@ -72,8 +74,9 @@ export const BbPedWorkMaxStep: React.FC<BbPedWorkMaxStepProps> = ({
   proPreset, setProPreset, dupMode, setDupMode, supersetMode, setSupersetMode,
   volumeScheme, setVolumeScheme, methodology, setMethodology,
   bfrMode, setBfrMode, dcMode, setDcMode, blastCruiseEnabled, setBlastCruiseEnabled, blastWeeks, setBlastWeeks,
-  cruiseWeeks, setCruiseWeeks, workMax, setWorkMax, planMode, onBuild, onNext, onBackToParams, flash,
+  cruiseWeeks, setCruiseWeeks, workMax, setWorkMax, planMode, age, onBuild, onNext, onBackToParams, flash,
 }) => {
+  const isMinor = Number(age) > 0 && Number(age) < 18;
   /* Пресет — явная макро-команда над настройками шага 1: применяем и СООБЩАЕМ,
      что изменили (раньше перезапись была тихой, а meadows не делал ничего). */
   const applyProPreset = (v: string) => {
@@ -99,17 +102,27 @@ export const BbPedWorkMaxStep: React.FC<BbPedWorkMaxStepProps> = ({
     <div>
       <div style={H}>💉 Шаг 2: Фармакология и рабочие веса</div>
 
+      {isMinor && (
+        <div style={{ marginBottom: 10, padding: '9px 11px', borderRadius: 10, background: 'rgba(239,68,68,0.10)', border: '1px solid rgba(239,68,68,0.35)', color: '#fecaca', fontSize: 11, lineHeight: 1.5 }}>
+          🛡️ PED-протоколы недоступны для возраста &lt; 18 лет. План будет построен в натуральном режиме; активные вещества сброшены.
+        </div>
+      )}
+
       <PedInputPanel
-        peds={peds}
-        onToggle={p => setPeds(prev => prev.includes(p) ? prev.filter(x => x !== p) : [...prev, p])}
+        peds={isMinor ? [] : peds}
+        disabled={isMinor}
+        onToggle={p => {
+          if (isMinor) { flash('PED-протоколы недоступны до 18 лет'); return; }
+          setPeds(prev => prev.includes(p) ? prev.filter(x => x !== p) : [...prev, p]);
+        }}
         pedDoses={pedDoses}
-        onDose={(p, v) => setPedDoses(d => ({ ...d, [p]: v }))}
+        onDose={(p, v) => { if (!isMinor) setPedDoses(d => ({ ...d, [p]: v })); }}
         courseIntensity={courseIntensity}
-        onIntensity={setCourseIntensity}
+        onIntensity={v => { if (!isMinor) setCourseIntensity(v); }}
       />
       <PedAdaptationCard adaptation={pedAdapt} />
 
-      {peds.length > 0 && (() => {
+      {!isMinor && peds.length > 0 && (() => {
         try {
           const meth = recommendPEDMethodology({ peds: peds as any, pedDoses, level, goal, focus: trainingFocus, totalWeeks: weeks, phaseOverride: pedPhaseOverride });
           return (

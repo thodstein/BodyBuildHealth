@@ -24,7 +24,7 @@ import type { PrepPhaseKey } from '../../../engines/bb/bb-contest-prep.engine';
 import { PREP_PHASE_COLORS } from '../../../engines/bb/bb-contest-prep.engine';
 import type { PlanWeightEntry } from '../../../engines/bb/bb-weight-calibration.engine';
 import { collectPlanExercises } from '../../../engines/bb/bb-weight-calibration.engine';
-import { CollapsibleCard, phaseForWeek, isWeakMuscle, exerciseComment, backSubgroupLabel, armHeadLabel, type Step } from './bb-auto-constructor-shared';
+import { CollapsibleCard, phaseForWeek, isWeakMuscle, exerciseComment, backSubgroupLabel, armHeadLabel, bbExerciseIdentity, type Step, type BBInlineEdit } from './bb-auto-constructor-shared';
 import { PHASE_COLORS, PHASE_LABELS } from './PlanOutput';
 import { Chip, BTN, BTN_GHOST, H, SMALL, IN } from './training-ui';
 import { sessionTagLabel, muscleLabel, exerciseTargetNote } from './bb-labels';
@@ -42,8 +42,10 @@ export interface BbPlanStepProps {
   dupMode: DUPMode;
   autoRegOn: boolean;
   autoRegResult: { topSetPctMultiplier: number; volumeMultiplier: number } | null;
-  exerciseEdits: Record<string, { sets: number; reps: number; weight: number; rir?: number; tempo?: string; technique?: string; supersetWith?: string }>;
-  setExerciseEdits: React.Dispatch<React.SetStateAction<Record<string, { sets: number; reps: number; weight: number; rir?: number; tempo?: string; technique?: string; supersetWith?: string }>>>;
+  exerciseEdits: Record<string, BBInlineEdit>;
+  setExerciseEdits: React.Dispatch<React.SetStateAction<Record<string, BBInlineEdit>>>;
+  /** Единая запись правки с undo/redo (шаг 7); fallback — прямой setter. */
+  commitEdits?: (next: Record<string, BBInlineEdit>) => void;
   editMode: { dayIdx: number; exIdx: number } | null;
   setEditMode: React.Dispatch<React.SetStateAction<{ dayIdx: number; exIdx: number } | null>>;
   collapsedDays: Set<number>;
@@ -71,7 +73,7 @@ export interface BbPlanStepProps {
 
 export const BbPlanStep: React.FC<BbPlanStepProps> = ({
   builtPlan, metrics, bbWeekSel, setBbWeekSel, bbWeeks, autoDeload, weakPoints, dupMode,
-  exerciseEdits, setExerciseEdits, editMode, setEditMode,
+  exerciseEdits, setExerciseEdits, commitEdits, editMode, setEditMode,
   collapsedDays, setCollapsedDays, collapsedExercises, setCollapsedExercises,
   bbTrainingFocus, bbLevel, bbTrainingYears, onCourse, trainingVolumeMode, setSubTarget, handleSendToExecution,
   setWeightEntries, setWeightsApplied, setStep, actionRow, startDateInput, setStartDateInput,
@@ -595,7 +597,12 @@ export const BbPlanStep: React.FC<BbPlanStepProps> = ({
                   // 26.09.2026 (аудит): ключ правки привязан к НЕДЕЛЕ (wk.week) — иначе
                   // правка одной недели применялась ко ВСЕМ неделям (см. applyEditsToPlan).
                   const editKey = `${wk.week}-${si}-${ei}`;
-                  const edit = exerciseEdits[editKey] || { sets: adjSets0, reps: e.workSets[0]?.reps || 10, weight: adjW };
+                  const exerciseKey = bbExerciseIdentity(e);
+                  const storedEdit = exerciseEdits[editKey];
+                  // Правка от другого упражнения (после replace/move) игнорируется.
+                  const edit = storedEdit && (!storedEdit.exerciseKey || storedEdit.exerciseKey === exerciseKey)
+                    ? { ...storedEdit, exerciseKey }
+                    : { sets: adjSets0, reps: e.workSets[0]?.reps || 10, weight: adjW, exerciseKey };
                   const isEditing = editMode?.dayIdx === si && editMode?.exIdx === ei;
                   const comment = e.comment || exerciseComment(e, weakPoints, '', currentPhase);
                   const roleColor = e.role === 'primary' ? '#00e68a' : '#a855f7';
@@ -694,9 +701,9 @@ export const BbPlanStep: React.FC<BbPlanStepProps> = ({
                       {/* Редактирование (inline) */}
                       {isEditing && (
                         <div style={{ display:'flex', gap:8, marginBottom:8, alignItems:'center', padding:'6px 10px', borderRadius:10, background:'rgba(255,255,255,0.04)' }}>
-                          <div><span style={SMALL}>Сеты</span><input type="number" value={edit.sets} min={0} max={20} onChange={e2 => setExerciseEdits(p => ({ ...p, [editKey]: { ...edit, sets: parseInt(e2.target.value) || 0 } }))} style={{ width:48, ...IN }} /></div>
-                          <div><span style={SMALL}>Повт</span><input type="number" value={edit.reps} min={1} max={30} onChange={e2 => setExerciseEdits(p => ({ ...p, [editKey]: { ...edit, reps: parseInt(e2.target.value) || 1 } }))} style={{ width:48, ...IN }} /></div>
-                          <div><span style={SMALL}>Вес</span><input type="number" value={edit.weight} min={0} max={500} onChange={e2 => setExerciseEdits(p => ({ ...p, [editKey]: { ...edit, weight: parseInt(e2.target.value) || 0 } }))} style={{ width:55, ...IN }} /></div>
+                          <div><span style={SMALL}>Сеты</span><input type="number" value={edit.sets} min={0} max={20} onChange={e2 => { const next = { ...exerciseEdits, [editKey]: { ...edit, sets: parseInt(e2.target.value) || 0 } }; commitEdits ? commitEdits(next) : setExerciseEdits(next); }} style={{ width:48, ...IN }} /></div>
+                          <div><span style={SMALL}>Повт</span><input type="number" value={edit.reps} min={1} max={30} onChange={e2 => { const next = { ...exerciseEdits, [editKey]: { ...edit, reps: parseInt(e2.target.value) || 1 } }; commitEdits ? commitEdits(next) : setExerciseEdits(next); }} style={{ width:48, ...IN }} /></div>
+                          <div><span style={SMALL}>Вес</span><input type="number" value={edit.weight} min={0} max={500} onChange={e2 => { const next = { ...exerciseEdits, [editKey]: { ...edit, weight: parseInt(e2.target.value) || 0 } }; commitEdits ? commitEdits(next) : setExerciseEdits(next); }} style={{ width:55, ...IN }} /></div>
                         </div>
                       )}
 
@@ -851,7 +858,20 @@ export const BbPlanStep: React.FC<BbPlanStepProps> = ({
 
       {/* Summary */}
       <div style={{ display:'flex', gap:12, marginTop:10 }}>
-        <button style={{ ...BTN, flex:1 }} onClick={() => { setWeightEntries(collectPlanExercises(builtPlan)); setWeightsApplied(0); setStep('weights'); }}>Далее: реальные веса →</button>
+        <button style={{ ...BTN, flex:1 }} onClick={() => {
+          const fresh = collectPlanExercises(builtPlan);
+          // Не сбрасываем уже введённые пользователем веса при возврате в шаг 5.
+          setWeightEntries(prev => {
+            if (!prev.length) return fresh;
+            const byName = new Map(prev.map(p => [p.name, p]));
+            return fresh.map(f => {
+              const old = byName.get(f.name);
+              return old ? { ...f, actualWeight: old.actualWeight } : f;
+            });
+          });
+          setWeightsApplied(0);
+          setStep('weights');
+        }}>Далее: реальные веса →</button>
         <button style={BTN_GHOST} onClick={() => setBbWeekSel(1)}>На первую нед</button>
       </div>
       {actionRow}

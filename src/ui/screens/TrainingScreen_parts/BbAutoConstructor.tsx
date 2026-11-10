@@ -102,7 +102,7 @@ import { getPostShowLog } from '../../../engines/bb/bb-prep-post-show-log.engine
 
 /* ── Вынесенный служебный слой (этап 1 §4.3): CollapsibleCard, типы шагов/фаз,
    константы групп и чистые хелперы — в `bb-auto-constructor-shared.tsx`. ── */
-import { CollapsibleCard, WEAK_GROUPS, PHASE_TECHNIQUES, backSubgroupLabel, armHeadLabel, isAbRotationActive, annualBlockCtxToPrepPatch, annualActiveBlockLine, DONOR_GROUPS, normalizeDonorTargets, computePhases, useInlineDialogA11y, BbCard, type Step, type PlanMode } from './bb-auto-constructor-shared';
+import { CollapsibleCard, WEAK_GROUPS, PHASE_TECHNIQUES, backSubgroupLabel, armHeadLabel, isAbRotationActive, annualBlockCtxToPrepPatch, annualActiveBlockLine, DONOR_GROUPS, normalizeDonorTargets, computePhases, useInlineDialogA11y, BbCard, bbExerciseIdentity, type Step, type PlanMode, type BBInlineEdit } from './bb-auto-constructor-shared';
 import { BbSplitStep } from './bb-step-split';
 import { BbPedWorkMaxStep } from './bb-step-ped';
 import { BbWeightsStep } from './bb-step-weights';
@@ -126,7 +126,9 @@ export type { AnnualBlockCtxToPrepPatch } from './bb-auto-constructor-shared';
 
 export const BbAutoConstructor: React.FC = () => {
   const linked = useDataLink();
-  const prof = useMemo(() => loadTrainingProfile(), []);
+  // Профиль перечитываем при обновлении linked.profile: иначе травмы/оборудование,
+  // изменённые в другом экране, не доходили до конструктора (мемо было []).
+  const prof = useMemo(() => loadTrainingProfile(), [linked.profile]);
   // P0-5: лабораторная коррекция MRV (ALT/CRP/HCT/гормоны/почки → снижение объёма).
   const labAdjust = useMemo(() => labTrainingAdjust(linked.labAnalysis ?? null), [linked.labAnalysis]);
 
@@ -355,7 +357,17 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
   const [intensityLevel, setIntensityLevel] = useState<'light' | 'moderate' | 'high'>('moderate');
 
   const [peds, setPeds] = useState<PED[]>((prof.bbPeds?.length ? prof.bbPeds : (prof.onCourse ? ['AAS'] : [])) as PED[]);
-  const [pedDoses, setPedDoses] = useState<Record<string, number>>({ AAS: 500, insulin: 10, MGF: 200, IGF1: 50, GH: 4 });
+  // Возрастной PED-гейт: до 18 лет курс не применяется даже если он был в профиле.
+  const profileAge = Number(linked.profile?.settings?.personal?.age) || 0;
+  const isMinorProfile = profileAge > 0 && profileAge < 18;
+  useEffect(() => {
+    if (isMinorProfile && peds.length > 0) setPeds([]);
+  }, [isMinorProfile, peds.length]);
+  const effectivePeds = useMemo<PED[]>(() => (isMinorProfile ? [] : peds), [isMinorProfile, peds]);
+  const [pedDoses, setPedDoses] = useState<Record<string, number>>({
+    AAS: 500, insulin: 10, MGF: 200, IGF1: 50, GH: 4,
+    ...(prof.pedDoses || {}),
+  });
   const [courseIntensity, setCourseIntensity] = useState<'mild' | 'moderate' | 'heavy'>(prof.courseIntensity || 'moderate');
   const [proPreset, setProPreset] = useState<string>('none');
   const [bfrMode, setBfrMode] = useState<boolean>(false);
@@ -506,17 +518,24 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
   // автоматически при выборе 1-2 отстающих мышц (specTargets).
   const specializationMode = specTargets.length > 0;
   const [editMode, setEditMode] = useState<{ dayIdx: number; exIdx: number } | null>(null);
-  const [exerciseEdits, setExerciseEdits] = useState<Record<string, { sets: number; reps: number; weight: number; rir?: number; tempo?: string; technique?: string; supersetWith?: string }>>({});
+  const [exerciseEdits, setExerciseEdits] = useState<Record<string, BBInlineEdit>>({});
   // Фаза 4.26: undo/redo + bulk-редактирование упражнений.
   const editsRef = useRef(exerciseEdits); editsRef.current = exerciseEdits;
   const [editsHistory, setEditsHistory] = useState<Array<Record<string, any>>>([]);
   const [redosHistory, setRedosHistory] = useState<Array<Record<string, any>>>([]);
-  const commitEdits = (next: Record<string, any>) => { setRedosHistory([]); setEditsHistory(h => [...h.slice(-9), editsRef.current]); setExerciseEdits(next as any); };
+  const commitEdits = (next: Record<string, any>) => {
+    const prev = editsRef.current;
+    editsRef.current = next as any;
+    setRedosHistory([]);
+    setEditsHistory(h => [...h.slice(-9), prev]);
+    setExerciseEdits(next as any);
+  };
   const undoEdits = () => {
     if (!editsHistory.length) return;
     const prev = editsHistory[editsHistory.length - 1];
     setRedosHistory(r => [...r.slice(-9), editsRef.current]);
     setEditsHistory(h => h.slice(0, -1));
+    editsRef.current = prev as any;
     setExerciseEdits(prev as any);
   };
   const redoEdits = () => {
@@ -524,6 +543,7 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
     const next = redosHistory[redosHistory.length - 1];
     setEditsHistory(h => [...h.slice(-9), editsRef.current]);
     setRedosHistory(r => r.slice(0, -1));
+    editsRef.current = next as any;
     setExerciseEdits(next as any);
   };
   const [bulkModal, setBulkModal] = useState(false);
@@ -550,13 +570,13 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
   useEffect(() => {
     try {
       if (bbMethodology !== 'compound_first') return;
-      const sug = suggestMethodologyForStack({ peds: peds as any, pedDoses });
+      const sug = suggestMethodologyForStack({ peds: effectivePeds as any, pedDoses });
       if (sug) {
         setBbMethodology(sug);
         flash('Методика порядка обновлена под PED-стек');
       }
     } catch { /* suggest не должен ломать UI */ }
-  }, [peds, pedDoses]);
+  }, [effectivePeds, pedDoses]);
   // Имя для сохранения (модалка вместо prompt — prompt не работает в Telegram Mini App).
   const [namePrompt, setNamePrompt] = useState<{ title: string; value: string; onOk: (name: string) => void } | null>(null);
   const confirmName = () => {
@@ -772,7 +792,7 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
       // карб-нагрузки пик-недели (glycogenAdjustedDose). «Показано = применяется».
       experience: prepExperience != null ? { yearsTraining: prepExperience } : undefined,
       glycogenLevel: prepGlycogenLevel,
-      enhanced: peds.length > 0,
+      enhanced: effectivePeds.length > 0,
       prepCount: 0,
       showDate: prepShowDate,
       weeksOut: Math.min(4, Math.max(1, prepTaperWeeks)),
@@ -788,7 +808,7 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
       competitions: prepCompetitions,
       mainCompetitionId: prepMainCompetitionId,
       schedule: { wake: '07:00', stage: '12:00' },
-      pedContext: peds.length>0 ? { ghIU: (pedDoses.GH ?? pedDoses.gh ?? 0) || undefined, trenMg: (pedDoses.tren ?? pedDoses.trenbolone ?? 0) || undefined, insulinIU: (pedDoses.insulin ?? 0) || undefined, diuretic: false } : undefined,
+      pedContext: effectivePeds.length>0 ? { ghIU: (pedDoses.GH ?? pedDoses.gh ?? 0) || undefined, trenMg: (pedDoses.tren ?? pedDoses.trenbolone ?? 0) || undefined, insulinIU: (pedDoses.insulin ?? 0) || undefined, diuretic: false } : undefined,
     };
     return base;
   };
@@ -826,7 +846,7 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
       if (applyToPlan) {
         // Сохраняем ручные правки пользователя (exerciseEdits) перед пересборкой prep:
         // иначе повторный taper клонирует план БЕЗ правок и они теряются.
-        const baseWithEdits = Object.keys(exerciseEdits).length > 0 ? applyEditsToPlan(builtPlan) : builtPlan;
+        const baseWithEdits = applyEditsToPlan(builtPlan);
         // Snapshot ДО применения — для блока «Сравнение до/после».
         setPrepBasePlan(structuredClone(baseWithEdits) as BBPlan);
         const updated = applyContestPrepToBBPlan(baseWithEdits, cfg, {
@@ -837,6 +857,10 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
           carbDoseGPerKg: trialDose, // PRO-2 P2: доза trial в пик-неделю плана
         });
         setBuiltPlan(updated);
+        // Правки уже вошли в baseWithEdits — оверлей больше не нужен.
+        setExerciseEdits({});
+        setEditsHistory([]);
+        setRedosHistory([]);
         setPrepApplied(true);
         // PRO-3 Э7: diet-break-окна синхронизируются с deload-неделями собранного плана (ICECAP).
         planFinal = syncPrepDietBreaksWithPlan(plan, (updated as any).weeks ?? []);
@@ -875,13 +899,16 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
     const cfgShifted = { ...buildContestPrepConfig(), showDate: d };
     savePrepToProfile(plan, cfgShifted);
     if (builtPlan && prepApplied) {
-      const updated = applyContestPrepToBBPlan(builtPlan, cfgShifted, {
+      const updated = applyContestPrepToBBPlan(applyEditsToPlan(builtPlan), cfgShifted, {
         prepWeeks: plan.preparation.weeks,
         taperWeeks: plan.taper.weeks,
         prepVolumeMult: prepVolumeMode,
         force: true,
       });
       setBuiltPlan(updated);
+      setExerciseEdits({});
+      setEditsHistory([]);
+      setRedosHistory([]);
     }
   };
 
@@ -897,7 +924,7 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
     // PRO-3 Э1/D2: персист расширения (раньше state/план менялись, профиль — нет, флеш врал).
     const cfg = buildContestPrepConfig();
     if (builtPlan && prepApplied) {
-      let base: BBPlanWithPrep = builtPlan as BBPlanWithPrep;
+      let base: BBPlanWithPrep = applyEditsToPlan(builtPlan) as BBPlanWithPrep;
       if (delta > 0) base = extendBBPlanPreparation(base, delta);
       const updated = applyContestPrepToBBPlan(base, cfg, {
         prepWeeks: newWeeks,
@@ -906,6 +933,9 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
         force: true,
       });
       setBuiltPlan(updated);
+      setExerciseEdits({});
+      setEditsHistory([]);
+      setRedosHistory([]);
     }
     savePrepToProfile(replanned, cfg);
     flash(delta > 0 ? `Подготовка расширена до ${newWeeks} нед (пик и тапер не тронуты)` : `Подготовка сокращена до ${newWeeks} нед`);
@@ -918,7 +948,7 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
       const compliance = (prepApplied && builtPlan)
         ? prepTrainingCompliance(
             prepPlan,
-            builtPlan.weeks.map((w: any) => ({
+            applyEditsToPlan(builtPlan).weeks.map((w: any) => ({
               week: (w as any).week,
               contestPhase: (w as any).contestPhase,
               plannedSets: w.sessions.reduce((a: number, s: any) => a + s.exercises.reduce((b: number, e: any) => b + (e.sets || 0), 0), 0),
@@ -1190,6 +1220,16 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
           selectedSplitId, bbDays, bbWeeks, bbLevel, bbGoal, bbTrainingFocus,
           bbMethodology, bbVolGoal, trainingVolumeMode, loadStrategy,
           autoDeload, deloadType, specBlocks, pedPhaseOverride, dcMode, volumeScheme,
+          // Полный снимок настроек шагов 1–2 (раньше терялись после F5).
+          bbEquipment, pedDoses, proPreset, autoRegOn,
+          intensityTech, dupMode, dupMuscles, supersetMode,
+          bbVolumeRamp, bbVolumeWave, bfrMode,
+          blastCruiseEnabled, blastWeeks, cruiseWeeks,
+          calorieSurplus, eccentricMult, rotationMode, intensityLevel,
+          labMultOverride, recoveryOverride, rehabMuscles,
+          avoidAxialLoadUi, fewerCompound, allowStrengthLifts, abRotation, packingV2,
+          usePreviousPlan, platePreset, targetBodyFat,
+          injuries, mobilityRestrictions,
         }));
         // BUG-FIX (выбор сплита): НЕ пишем he_bb_plan_saved отсюда — эффект срабатывает
         // на КАЖДУЮ смену параметров (в т.ч. selectedSplitId) и сохранял СТАРЫЙ builtPlan,
@@ -1206,7 +1246,12 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
       window.removeEventListener('beforeunload', persist);
       document.removeEventListener('visibilitychange', onHidden);
     };
-  }, [selectedSplitId, bbDays, bbWeeks, bbLevel, bbGoal, bbTrainingFocus, bbMethodology, bbVolGoal, trainingVolumeMode, loadStrategy, autoDeload, deloadType, specBlocks, builtPlan, pedPhaseOverride, dcMode, volumeScheme]);
+  }, [selectedSplitId, bbDays, bbWeeks, bbLevel, bbGoal, bbTrainingFocus, bbMethodology, bbVolGoal, trainingVolumeMode, loadStrategy, autoDeload, deloadType, specBlocks, builtPlan, pedPhaseOverride, dcMode, volumeScheme,
+    bbEquipment, pedDoses, proPreset, autoRegOn, intensityTech, dupMode, dupMuscles, supersetMode,
+    bbVolumeRamp, bbVolumeWave, bfrMode, blastCruiseEnabled, blastWeeks, cruiseWeeks,
+    calorieSurplus, eccentricMult, rotationMode, intensityLevel, labMultOverride, recoveryOverride,
+    rehabMuscles, avoidAxialLoadUi, fewerCompound, allowStrengthLifts, abRotation, packingV2,
+    usePreviousPlan, platePreset, targetBodyFat, injuries, mobilityRestrictions]);
   // Кросс-синхронизация: правки из питания (saveContestPrepEverywhere source=planner) → обновить локальные состояния без пересборки плана
   useEffect(() => {
     const handler = () => {
@@ -1791,13 +1836,13 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
     focusGroup: specTargets[0] || undefined,
     donorMuscles: specBlocks.flatMap(b => b.donors),
     specialization: specTargets.length > 0,
-    peds,
+    peds: effectivePeds,
     pedDoses,
     equipment: bbEquipment,
     injuries,
     mobilityRestrictions,
     preset: proPreset,
-  }), [bbLevel, bbGoal, bbDays, weakPoints, specBlocks, specTargets, linked.profile?.settings?.personal?.sex, peds, pedDoses, bbEquipment, injuries, mobilityRestrictions, proPreset]);
+  }), [bbLevel, bbGoal, bbDays, weakPoints, specBlocks, specTargets, linked.profile?.settings?.personal?.sex, effectivePeds, pedDoses, bbEquipment, injuries, mobilityRestrictions, proPreset]);
   const bestSplit = ranked[0];
   // Авто-синхронизация сплита (аудит 2026-09): раньше once-set `selectedSplitId`
   // навсегда «прилипал» — смена числа дней/уровня/фармы оставляла неподходящий
@@ -1813,7 +1858,7 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
     // пересобрать рекомендацию (раньше ключ без sex, и женский glute-сплит
     // не предлагался, если пол поставили уже в конструкторе).
     const sex = linked.profile?.settings?.personal?.sex;
-    const key = `${bbDays}|${bbLevel}|${bbGoal}|${peds.join(',')}|${sex ?? 'unknown'}`;
+    const key = `${bbDays}|${bbLevel}|${bbGoal}|${effectivePeds.join(',')}|${sex ?? 'unknown'}`;
     // Смена пола — смена целевой эстетики: сплит, выбранный вручную под прежний
     // пол, больше не «осознанный выбор» (male→female: PPL не даёт glute-фокуса).
     // Сбрасываем ручной выбор один раз — рекомендация применяется заново.
@@ -1824,14 +1869,14 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
     const keyChanged = splitFitKeyRef.current !== '' && splitFitKeyRef.current !== key;
     splitFitKeyRef.current = key;
     const hard = selectedSplitId
-      ? splitFitWarnings({ level: bbLevel, goal: bbGoal as any, daysPerWeek: bbDays, peds, sex }, selectedSplitId)
+      ? splitFitWarnings({ level: bbLevel, goal: bbGoal as any, daysPerWeek: bbDays, peds: effectivePeds, sex }, selectedSplitId)
       : [];
     const shouldSync = !selectedSplitId || (!splitTouched.current ? keyChanged : hard.length > 0);
     if (shouldSync && selectedSplitId !== bestSplit.pattern.id) {
       setSelectedSplitId(bestSplit.pattern.id);
       if (selectedSplitId) flash(`🔄 Сплит обновлён под параметры: «${bestSplit.pattern.name}»`);
     }
-  }, [bestSplit, selectedSplitId, bbDays, bbLevel, bbGoal, peds, linked.profile?.settings?.personal?.sex]);
+  }, [bestSplit, selectedSplitId, bbDays, bbLevel, bbGoal, effectivePeds, linked.profile?.settings?.personal?.sex]);
 
   const allLandmarks = useMemo(() => getAllVolumeLandmarks(bbLevel), [bbLevel]);
   // Расчётный объём целей специализации для подсказки: цель = MAV × (1.0 + 0.1×зон)
@@ -1863,7 +1908,7 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
   // (shoulders + delt_mid нельзя; delt_mid + delt_rear можно).
   const specChipDisabled = (targets: string[], id: string, on: boolean) =>
     !!on ? false : targets.length >= 2 || targets.some(t => isRegionConflict(t, id));
-  const pedAdapt = useMemo(() => adaptForPEDs(peds, Object.fromEntries(Object.entries(allLandmarks).map(([m, v]) => [m, v.mrv])), pedDoses, courseIntensity), [peds, allLandmarks, pedDoses, courseIntensity]);
+  const pedAdapt = useMemo(() => adaptForPEDs(effectivePeds, Object.fromEntries(Object.entries(allLandmarks).map(([m, v]) => [m, v.mrv])), pedDoses, courseIntensity), [effectivePeds, allLandmarks, pedDoses, courseIntensity]);
   // Аудит 2026-11 (BB-21): здесь считался «режим-множитель» (computeRegimeMrvMult),
   // но ни в карточке, ни в сборке он не использовался — мёртвый расчёт. Единственный
   // источник множителя: сам план (`mrvMultiplier`) либо `pedAdapt.combinedMrvMultiplier`
@@ -1880,131 +1925,28 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
   // шаг «План» показывал натуральные MRV-капы и ложные «перебор MRV», тогда как
   // сохранение варианта и таблица используют pedAdapt.combinedMrvMultiplier.
   // План несёт итоговый множитель (bb-builder:4821) — берём его.
-  const metrics = useMemo(() => builtPlan ? calcBBPlanMetrics(builtPlan, Number((builtPlan as any).mrvMultiplier) || pedAdapt?.combinedMrvMultiplier || 1) : null, [builtPlan, pedAdapt]);
-  // Epic F: единый отчёт качества (агрегирует validation/balance/rotation/safety, дедуп).
-  const qualityReport = useMemo(() => {
-    if (!builtPlan) return null;
-    const personal = linked.profile?.settings?.personal;
-    const lifestyle = linked.profile?.settings?.lifestyle;
-    return buildBBQualityReport(builtPlan as any, {
-      acwrRatio: acwrData ? acwrData.ratio : undefined,
-      bodyFat: personal?.bodyFat,
-      hrvMs: lifestyle?.morningHRV,
-      sleepHours: lifestyle?.sleepHours,
-      stressLevel: lifestyle?.stressLevel,
-      injuries: injuries.map(i => ({ muscle: i.muscle, exclude: i.exclude })),
-      mobilityRestrictions,
-    });
-  }, [builtPlan, linked.profile, acwrData, injuries, mobilityRestrictions]);
-  // Quality Hub PRO: V2-панель (аддитивно к S5 — S5 считается и показывается как раньше).
-  // Монотония Foster из того же дневника sRPE, что и ACWR.
-  const srpeMonotony = useMemo(() => {
-    try {
-      const srpe = allSrpeSessions;
-      if (srpe.length < 3) return null;
-      return sRPEAdjustment(srpe);
-    } catch { return null; }
-  }, [builtPlan, allSrpeSessions]);
-  const bbQualityV2 = useMemo(() => {
-    if (!builtPlan) return null;
-    try {
-      return bbPlanQualityV2(builtPlan as any, {
-        level: bbLevel,
-        // Акцент = цели специализации ИЛИ слабые группы (аудит 2026-09):
-        // не-целевые мышцы на MV-поддержании не штрафуются за «недогруз».
-        specTargets: specTargets.length ? specTargets : (weakPoints.length ? weakPoints : undefined),
-        acwrRatio: acwrData?.ratio ?? null,
-        monotony: srpeMonotony?.monotony ?? null,
-        hasDiary: acwrData != null,
-      });
-    } catch { return null; }
-  }, [builtPlan, bbLevel, specTargets, weakPoints, acwrData, srpeMonotony]);
-  const todayBadge = useMemo(() => {
-    if (acwrData == null) return null;
-    const acwr = acwrData.ratio;
-    if (acwr > 1.5) return '🔴 Сегодня — снизить объём (ACWR выше 1.5)';
-    if (acwr < 0.6) return '🔵 Сегодня — лёгкий день / техника (ACWR ниже 0.6)';
-    if (srpeMonotony != null && srpeMonotony.monotony > 2) return '🟡 Сегодня — варьируйте нагрузку (монотония выше 2)';
-    return '🟢 Сегодня — можно по плану';
-  }, [acwrData, srpeMonotony]);
-  const safetyScore = useMemo<PlanSafetyScore | null>(() => {
-    if (!builtPlan) return null;
-    const personal = linked.profile?.settings?.personal;
-    const lifestyle = linked.profile?.settings?.lifestyle;
-    return calculatePlanSafetyScore(builtPlan, {
-      acwrRatio: acwrData?.ratio,
-      bodyFat: personal?.bodyFat,
-      hrvMs: lifestyle?.morningHRV,
-      sleepHours: lifestyle?.sleepHours,
-      stressLevel: lifestyle?.stressLevel,
-      injuryCount: injuries.length,
-      injuries,
-      mobilityRestrictions,
-      balanceReport: (builtPlan as any).balanceReport || null,
-      weeklySessions: builtPlan.weeks[0]?.sessions.length ?? 4,
-      goal: bbGoal,
-    });
-  }, [builtPlan, linked.profile, injuries, mobilityRestrictions, acwrData, bbGoal]);
-  // Понедельная оценка качества: факт выдачи × параметры плана (две шкалы, не суммируются).
-  // A «Объём и соответствие» — факт недели vs собственные цели/капы/параметры плана.
-  // B «PRO-техника» — факт исполнения недели (паттерны/углы/растяжка/техники).
-  // Вид: конкретная неделя (по правилам её фазы) или 'avg' (среднее понедельных).
-  const quality = useMemo(() => {
-    if (!builtPlan) return null;
-    try {
-      const totalW = builtPlan.weeks.length || 1;
-      const qw: number | 'avg' = qualityWeek === 'avg' ? 'avg' : Math.min(Math.max(1, qualityWeek), totalW);
-      const avg = averageWeeklyScores(builtPlan as any);
-      let selVolume: ReturnType<typeof scoreVolumeWeek>;
-      let selPro: ReturnType<typeof scoreProWeek>;
-      let viewTag: string;
-      if (qw === 'avg') {
-        viewTag = `среднее · ${avg.weeks} нед`;
-        selVolume = {
-          week: 0, phase: 'среднее', isDeload: false, isTaper: false,
-          score: avg.avgVolume, grade: gradeFor(avg.avgVolume),
-          issues: avg.recurringVolumeIssues, muscles: avg.avgMuscles, balance: [],
-          recommendations: avg.recurringVolumeIssues.filter(i => i.severity !== 'info').slice(0, 5).map(i => `→ ${i.message} [${i.source}]`),
-        };
-        const meso = scoreProWeek(builtPlan as any, 'meso');
-        // Число — среднее понедельных PRO; детали — агрегат мезоцикла (факт).
-        selPro = { ...meso, score: avg.avgPro, grade: gradeFor(avg.avgPro) };
-      } else {
-        viewTag = `нед ${qw}/${totalW}`;
-        selVolume = scoreVolumeWeek(builtPlan as any, qw);
-        selPro = scoreProWeek(builtPlan as any, qw);
-      }
-      const recommendations = [
-        ...selVolume.issues.filter(i => i.severity !== 'info').slice(0, 4).map(i => `→ ${i.message} [${i.source}]`),
-        ...selPro.totalRecommendations.slice(0, 2),
-      ];
-      // Фактический делод из плана (не тоггл autoDeload) — читает экспортная карточка.
-      const hasDeloadActual = builtPlan.weeks.some((w: any) => w.deload || String(w.phase || '').toLowerCase() === 'deload');
-      const deloadWeeksActual = builtPlan.weeks.filter((w: any) => w.deload || String(w.phase || '').toLowerCase() === 'deload').map((w: any) => w.week).filter(Boolean);
-      return {
-        mode: qw, viewTag,
-        avgVolume: avg.avgVolume, volumeLabel: gradeFor(avg.avgVolume),
-        avgPro: avg.avgPro, proLabel: gradeFor(avg.avgPro),
-        perWeek: avg.perWeek,
-        viewVolume: selVolume.score, viewPro: selPro.score,
-        selVolume, selPro,
-        recommendations,
-        hasDeloadActual, deloadWeeksActual,
-        // back-compat для мест, читающих старые поля:
-        score: selVolume.score, label: selVolume.grade,
-        details: selVolume.issues.map(i => i.message),
-        perMuscle: selVolume.muscles.map(m => ({
-          muscle: m.muscle, sets: m.directSets, mev: m.mev, mav: m.mav, mrv: m.mrv,
-          pct: m.mav > 0 ? Math.round((m.effectiveSets / m.mav) * 100) : 0, status: m.status, contextNote: m.note,
-        })),
-        proResult: selPro,
-      };
-    } catch { return null; }
-  }, [builtPlan, qualityWeek]);
+
 
   useEffect(() => {
-    try { saveTrainingProfile({ ...loadTrainingProfile(), workMax: bbWorkMax, weakPoints, injuries, mobilityRestrictions, onCourse: peds.length > 0, bbPeds: peds, courseIntensity, loadStrategy, planMode, bbCycleId: selectedCycleId, trainingFocus: bbTrainingFocus }); } catch {}
-  }, [bbWorkMax, weakPoints, peds, courseIntensity, loadStrategy, planMode, selectedCycleId]);
+    try {
+      saveTrainingProfile({
+        ...loadTrainingProfile(),
+        workMax: bbWorkMax,
+        weakPoints,
+        injuries,
+        mobilityRestrictions,
+        equipment: bbEquipment,
+        pedDoses,
+        onCourse: effectivePeds.length > 0,
+        bbPeds: effectivePeds,
+        courseIntensity,
+        loadStrategy,
+        planMode,
+        bbCycleId: selectedCycleId,
+        trainingFocus: bbTrainingFocus,
+      });
+    } catch { /* профиль недоступен — не роняем визард */ }
+  }, [bbWorkMax, weakPoints, effectivePeds, pedDoses, bbEquipment, injuries, mobilityRestrictions, courseIntensity, loadStrategy, planMode, selectedCycleId, bbTrainingFocus]);
 
   // FIX-19: Авто-загрузка сохранённого плана при монтировании
   useEffect(() => {
@@ -2041,6 +1983,47 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
           // 26.09.2026 (аудит): volumeScheme записывался в he_bb_auto_state_v1, но не
           // восстанавливался → GVT/FST-7/Gironda сбрасывался в 'standard' после перезагрузки.
           if (typeof state.volumeScheme === 'string') setVolumeScheme(state.volumeScheme as any);
+          // Полный снимок шагов 1–2: оборудование/PED-дозы и режимы, которые
+          // раньше сбрасывались к дефолтам после F5.
+          if (Array.isArray(state.bbEquipment)) setBbEquipment(state.bbEquipment.map((x: any) => String(x)));
+          if (state.pedDoses && typeof state.pedDoses === 'object') {
+            const doses: Record<string, number> = {};
+            for (const [k, v] of Object.entries(state.pedDoses)) {
+              if (Number.isFinite(Number(v))) doses[String(k)] = Number(v);
+            }
+            if (Object.keys(doses).length) setPedDoses(prev => ({ ...prev, ...doses }));
+          }
+          if (typeof state.proPreset === 'string') setProPreset(state.proPreset);
+          if (typeof state.autoRegOn === 'boolean') setAutoRegOn(state.autoRegOn);
+          if (typeof state.intensityTech === 'string') setIntensityTech(state.intensityTech as any);
+          if (typeof state.dupMode === 'string') setDupMode(state.dupMode as any);
+          if (Array.isArray(state.dupMuscles)) setDupMuscles(state.dupMuscles.map((x: any) => String(x)));
+          if (typeof state.supersetMode === 'string') setSupersetMode(state.supersetMode as any);
+          if (typeof state.bbVolumeRamp === 'string') setBbVolumeRamp(state.bbVolumeRamp as any);
+          if (typeof state.bbVolumeWave === 'boolean') setBbVolumeWave(state.bbVolumeWave);
+          if (typeof state.bfrMode === 'boolean') setBfrMode(state.bfrMode);
+          if (typeof state.blastCruiseEnabled === 'boolean') setBlastCruiseEnabled(state.blastCruiseEnabled);
+          if (Number.isFinite(state.blastWeeks)) setBlastWeeks(Math.max(1, Math.min(52, Math.round(state.blastWeeks))));
+          if (Number.isFinite(state.cruiseWeeks)) setCruiseWeeks(Math.max(1, Math.min(52, Math.round(state.cruiseWeeks))));
+          if (Number.isFinite(state.calorieSurplus)) setCalorieSurplus(Number(state.calorieSurplus));
+          if (Number.isFinite(state.eccentricMult)) setEccentricMult(Number(state.eccentricMult));
+          if (typeof state.rotationMode === 'string') setRotationMode(state.rotationMode as any);
+          if (typeof state.intensityLevel === 'string') setIntensityLevel(state.intensityLevel as any);
+          if (state.labMultOverride === null) setLabMultOverride(null);
+          else if (Number.isFinite(state.labMultOverride)) setLabMultOverride(Number(state.labMultOverride));
+          if (state.recoveryOverride === null) setRecoveryOverride(null);
+          else if (Number.isFinite(state.recoveryOverride)) setRecoveryOverride(Number(state.recoveryOverride));
+          if (Array.isArray(state.rehabMuscles)) setRehabMuscles(state.rehabMuscles.map((x: any) => String(x)));
+          if (typeof state.avoidAxialLoadUi === 'boolean') setAvoidAxialLoadUi(state.avoidAxialLoadUi);
+          if (typeof state.fewerCompound === 'boolean') setFewerCompound(state.fewerCompound);
+          if (typeof state.allowStrengthLifts === 'boolean') setAllowStrengthLifts(state.allowStrengthLifts);
+          if (typeof state.abRotation === 'boolean') setAbRotation(state.abRotation);
+          if (typeof state.packingV2 === 'boolean') setPackingV2(state.packingV2);
+          if (typeof state.usePreviousPlan === 'boolean') setUsePreviousPlan(state.usePreviousPlan);
+          if (typeof state.platePreset === 'string') setPlatePreset(state.platePreset);
+          if (Number.isFinite(state.targetBodyFat)) setTargetBodyFat(Number(state.targetBodyFat));
+          if (Array.isArray(state.injuries)) setInjuries(state.injuries as any);
+          if (Array.isArray(state.mobilityRestrictions)) setMobilityRestrictions(state.mobilityRestrictions.map((x: any) => String(x)));
         }
       }
     } catch {}
@@ -2154,7 +2137,7 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
     prioritizeBackSessions(out, {
       level: bbLevel as any,
       trainingYears: bbTrainingYears,
-      onCourse: peds.length > 0,
+      onCourse: effectivePeds.length > 0,
       maxWorkingSets: edited.maxWorkingSets,
     });
     // Паритет с buildBBPlan (часть 2): после топ-апа спины переустановить
@@ -2186,7 +2169,7 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
         checkOrder: true,
         methodology: bbMethodology,
         specializationTargets: out.priorityMuscles,
-        onCourse: peds.length > 0,
+        onCourse: effectivePeds.length > 0,
         maxWorkingSets: out.maxWorkingSets,
         maxExercises: out.maxExercises,
       },
@@ -2199,34 +2182,54 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
     return out;
   };
 
+  // deload/taper/peak/prep — не трогаем глобальными множителями: иначе
+  // пользователь одним кликом ломает разгрузку или пиковую неделю.
+  const isProtectedBulkWeek = (w: any) => !!(w?.deload || w?.taper || w?.taperApplied || w?.peakWeek || w?.contestPhase || w?.prepProtocol);
+
   const adjustVolume = (mult: number) => {
-    if (!builtPlan) return;
-    const w2 = structuredClone(builtPlan.weeks);
-    for (const w of w2) for (const s of w.sessions) for (const e of s.exercises) {
-      const next = Math.max(1, Math.round(e.sets * mult));
-      // Аудит 2026-11: sets менялся, workSets — нет → sets_mismatch в валидации
-      // и «пропавшие/лишние» подходы в плеере.
-      if (Array.isArray(e.workSets)) {
-        const tpl = e.workSets[e.workSets.length - 1] || { reps: e.repsRange?.[0] || 10, rir: e.rir, weight: 0 };
-        if (next < e.workSets.length) e.workSets = e.workSets.slice(0, next);
-        while (e.workSets.length < next) e.workSets.push({ ...tpl });
+    if (!effectivePlan) return;
+    const w2 = structuredClone(effectivePlan.weeks);
+    let skipped = 0;
+    for (const w of w2) {
+      if (isProtectedBulkWeek(w)) { skipped += 1; continue; }
+      for (const s of w.sessions) for (const e of s.exercises) {
+        const next = Math.max(1, Math.round(e.sets * mult));
+        // Аудит 2026-11: sets менялся, workSets — нет → sets_mismatch в валидации
+        // и «пропавшие/лишние» подходы в плеере.
+        if (Array.isArray(e.workSets)) {
+          const tpl = e.workSets[e.workSets.length - 1] || { reps: e.repsRange?.[0] || 10, rir: e.rir, weight: 0 };
+          if (next < e.workSets.length) e.workSets = e.workSets.slice(0, next);
+          while (e.workSets.length < next) e.workSets.push({ ...tpl });
+        }
+        e.sets = next;
       }
-      e.sets = next;
     }
-    setBuiltPlan(revalidateEditedPlan({ ...builtPlan, weeks: w2 }));
+    setBuiltPlan(revalidateEditedPlan({ ...effectivePlan, weeks: w2 }));
+    setExerciseEdits({});
+    setEditsHistory([]);
+    setRedosHistory([]);
+    if (skipped > 0) flash(`Объём изменён; ${skipped} нед. deload/taper/peak пропущены.`);
   };
   const adjustWeight = (mult: number) => {
-    if (!builtPlan) return;
-    const w2 = structuredClone(builtPlan.weeks);
-    for (const w of w2) for (const s of w.sessions) for (const e of s.exercises) {
-      // Аудит 2026-11: у упражнений, добавленных лабораторией, workSets отсутствовал
-      // → TypeError и падение всей сборки при «вес ×0.9».
-      if (!Array.isArray(e.workSets)) continue;
-      for (const ws of e.workSets) {
-        ws.weight = Math.round((Number(ws.weight) || 0) * mult * 10) / 10;
+    if (!effectivePlan) return;
+    const w2 = structuredClone(effectivePlan.weeks);
+    let skipped = 0;
+    for (const w of w2) {
+      if (isProtectedBulkWeek(w)) { skipped += 1; continue; }
+      for (const s of w.sessions) for (const e of s.exercises) {
+        // Аудит 2026-11: у упражнений, добавленных лабораторией, workSets отсутствовал
+        // → TypeError и падение всей сборки при «вес ×0.9».
+        if (!Array.isArray(e.workSets)) continue;
+        for (const ws of e.workSets) {
+          ws.weight = Math.round((Number(ws.weight) || 0) * mult * 10) / 10;
+        }
       }
     }
-    setBuiltPlan(revalidateEditedPlan({ ...builtPlan, weeks: w2 }));
+    setBuiltPlan(revalidateEditedPlan({ ...effectivePlan, weeks: w2 }));
+    setExerciseEdits({});
+    setEditsHistory([]);
+    setRedosHistory([]);
+    if (skipped > 0) flash(`Вес изменён; ${skipped} нед. deload/taper/peak пропущены.`);
   };
 
   const bbCyclesList = useMemo(
@@ -2267,9 +2270,10 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
 
   const applyBbSubstitution = useCallback((newId: string) => {
     if (!subTarget || !builtPlan) return;
+    const basePlan = applyEditsToPlan(builtPlan);
     const rep = findCatalogExercise(newId) || getExerciseById(newId); if (!rep) { setSubTarget(null); return; }
     const { dayIdx: si, exIdx: ei } = subTarget;
-    const wk = builtPlan.weeks[bbWeekSel - 1];
+    const wk = basePlan.weeks[bbWeekSel - 1];
     if (!wk) { setSubTarget(null); return; }
     const ses = wk.sessions[si];
     if (!ses) { setSubTarget(null); return; }
@@ -2282,7 +2286,7 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
     const rir = Math.max(0, Math.min(5, Number(oldEx.rir ?? 2)));
     const weight = estimatedWeightFor(rep, bbWorkMax, rir) || Math.round(Number(oldEx.workSets?.[0]?.weight) || 0);
     const reps = Number(oldEx.workSets?.[0]?.reps) || Number(oldEx.repsRange?.[0]) || 10;
-    const w2 = structuredClone(builtPlan.weeks);
+    const w2 = structuredClone(basePlan.weeks);
     const targetSession = w2[bbWeekSel - 1].sessions[si];
     // exerciseName — display-name (канон движка, bb-builder:2996); id давал второй
     // ключ для того же движения в весах/калибровке/экспорте.
@@ -2297,9 +2301,16 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
         restSeconds: oldEx.workSets?.[0]?.restSeconds || oldEx.restSeconds,
       }),
     };
-    setBuiltPlan(revalidateEditedPlan({ ...builtPlan, weeks: w2 }));
+    setBuiltPlan(revalidateEditedPlan({ ...basePlan, weeks: w2 }));
+    // Структурная замена: удаляем правку только заменённого упражнения,
+    // правки остальных упражнений сохраняем.
+    setExerciseEdits(prev => {
+      const next = { ...prev };
+      delete next[`${wk.week}-${si}-${ei}`];
+      return next;
+    });
     setSubTarget(null);
-  }, [subTarget, builtPlan, bbWeekSel, bbWorkMax]);
+  }, [subTarget, builtPlan, bbWeekSel, bbWorkMax, exerciseEdits]);
 
   // Сборка плана синхронная (200–1500 мс на слабых устройствах). Раньше
   // `setIsBuilding(true)` и сама сборка шли в одном тике — браузер не успевал
@@ -2309,6 +2320,12 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
     if (buildingRef.current) return;
     buildingRef.current = true;
     setIsBuilding(true);
+    // Новая сборка — новая структура: старые позиционные правки/веса не применяем.
+    setExerciseEdits({});
+    setEditsHistory([]);
+    setRedosHistory([]);
+    setWeightEntries([]);
+    setWeightsApplied(0);
     await new Promise<void>((resolve) => {
       if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => setTimeout(resolve, 0));
       else setTimeout(resolve, 0);
@@ -2370,7 +2387,7 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
           abPatternRotation: abRotation,
           intensityLevel,
           equipment: bbEquipment,
-          peds,
+          peds: effectivePeds,
            pedDoses,
            courseIntensity,
             level: bbLevel,
@@ -2379,6 +2396,7 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
            volumeGoal: effectiveVolGoal,
            // G1: сценарий входа в мезоцикл (standard/preloaded/flat).
            volumeRamp: bbVolumeRamp,
+           volumeWave: bbVolumeWave,
            // M3 (§8.3): цель пользователя доезжает в program-путь (был тихий игнор:
            // сушка/масса не влияли на объём циклового UI-пути — паритет с generic).
            goal: bbGoal,
@@ -2529,13 +2547,13 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
     // bb-builder) — оживляем PED-слой для режима источника (adapt): инсулиновое
     // окно, MGF-акценты, peri-WO. Только пометки/rationale (объём не меняется);
     // joint-guard-строка пропускается — program-путь axial-замены не делает.
-    if (planMode === 'programs' && bbAdaptMode === 'adapt' && peds.length > 0) {
+    if (planMode === 'programs' && bbAdaptMode === 'adapt' && effectivePeds.length > 0) {
       try {
         const wkPhases = (plan.weeks || []).map((w: any) => w?.phase);
         const schemePhase: 'peaking' | 'intensification' | 'accumulation' = wkPhases.includes('peaking')
           ? 'peaking' : wkPhases.includes('intensification') ? 'intensification' : 'accumulation';
         const meth = recommendPEDMethodology({
-          peds: peds as any, pedDoses, level: bbLevel, goal: bbGoal,
+          peds: effectivePeds as any, pedDoses, level: bbLevel, goal: bbGoal,
           focus: bbTrainingFocus, targetMuscles: specTargets,
           totalWeeks: bbWeeks, phaseOverride: pedPhaseOverride, phase: schemePhase,
         });
@@ -2565,7 +2583,7 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
       // (движок даёт 15-20 для advanced/enhanced — добивки больше не глохнут).
       const maxExForInsert = (() => {
         try {
-          return sessionLimitsFor({ level: bbLevel as any, trainingYears: bbTrainingYears, onCourse: peds.length > 0, trainingVolumeMode: trainingVolumeMode as any } as any).maxExercises;
+          return sessionLimitsFor({ level: bbLevel as any, trainingYears: bbTrainingYears, onCourse: effectivePeds.length > 0, trainingVolumeMode: trainingVolumeMode as any } as any).maxExercises;
         } catch { return 10; }
       })();
       // Инвентарь плана: предпочтения/свопы обязаны его уважать, иначе финализация
@@ -2823,7 +2841,7 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
       volumeGoal: (plan as any).volumeGoal || effectiveVolGoal,
       // G1: воспроизводимость варианта — режим входа из плана, иначе из UI.
       // (top-level, как volumeGoal — читается снапшотом варианта.)
-      ...({ volumeRamp: (plan as any).volumeRamp || bbVolumeRamp, volumeWave: (plan as any).inputSnapshot?.volumeWave ?? bbVolumeWave } as any),
+      ...({ volumeRamp: (plan as any).volumeRamp || bbVolumeRamp, volumeWave: (plan as any).volumeWave ?? bbVolumeWave } as any),
       goal: bbGoal,
       trainingFocus: bbTrainingFocus,
       methodology: bbMethodology,
@@ -2838,6 +2856,8 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
         goal: bbGoal,
         trainingVolumeMode,
         volumeGoal: effectiveVolGoal,
+        volumeRamp: (plan as any).volumeRamp || bbVolumeRamp,
+        volumeWave: bbVolumeWave,
         trainingFocus: bbTrainingFocus,
         methodology: bbMethodology,
         supersetMode,
@@ -2890,15 +2910,45 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
     setBbWeekSel(1);
     setStep('plan');
     try {
-      const playerDays = plan.weeks.flatMap(w => w.sessions.map((s, si) => ({
-        label: 'Нед' + w.week + ' Д' + (si+1),
-        exercises: s.exercises.map(e => {
-           const targetSets = (e.workSets || []).map(ws => ({ weight: ws.weight || 0, reps: ws.reps || 0, rir: ws.rir ?? e.rir ?? 2, technique: ws.technique }));
-          return { name: e.name, muscleGroup: muscleLabel(e.muscle), notes: [exerciseTargetNote(e), e.comment || e.rationale || '', e.muscle === 'back' ? backSubgroupLabel((e as any).backSubgroup) : '', ['biceps', 'triceps', 'forearms'].includes(e.muscle) ? armHeadLabel((e as any).movementPattern) : ''].filter(Boolean).join(' · ') || '', targetSets, restSec: e.restSeconds || 90 };
-        }),
-      })));
-      localStorage.setItem('he_pl_runtime', JSON.stringify({ days: playerDays, focus: plan.pattern?.name || 'ББ-сплит', week: 1, track: 'bb' }));
-    } catch {}
+      // Не пишем runtime до валидации: план с error-ами/низким SafetyScore
+      // не должен попадать в плеер (раньше писался сразу после сборки).
+      const runtimeValidation = plan.validation || validateBBPlan(plan, plan.safetyConstraints);
+      const runtimeSafety = calculatePlanSafetyScore(plan, {
+        acwrRatio: calculateACWR(),
+        injuries,
+        mobilityRestrictions,
+      });
+      const runtimeGuardPlan = { ...plan, validation: runtimeValidation };
+      if (!runtimeValidation.valid || bbPlanSaveBlockReason(runtimeGuardPlan, runtimeSafety)) {
+        flash('⚠ План собран, но не отправлен в выполнение: есть ошибки валидации/безопасности.');
+      } else {
+        const playerDays = plan.weeks.flatMap(w => w.sessions.map((s, si) => ({
+          label: 'Нед' + w.week + ' Д' + (si+1),
+          exercises: s.exercises.map(e => {
+            const targetSets = (e.workSets || []).map(ws => ({
+              weight: ws.weight || 0,
+              reps: ws.reps || 0,
+              rir: ws.rir ?? e.rir ?? 2,
+              technique: ws.technique,
+              tempo: ws.tempo || (e as any).tempoSpec,
+              restSeconds: ws.restSeconds ?? e.restSeconds ?? 90,
+            }));
+            return {
+              name: e.name,
+              muscleGroup: muscleLabel(e.muscle),
+              notes: [exerciseTargetNote(e), e.comment || e.rationale || '', e.muscle === 'back' ? backSubgroupLabel((e as any).backSubgroup) : '', ['biceps', 'triceps', 'forearms'].includes(e.muscle) ? armHeadLabel((e as any).movementPattern) : ''].filter(Boolean).join(' · ') || '',
+              targetSets,
+              restSec: e.restSeconds ?? 90,
+              ...((e as any).supersetGroup != null ? {
+                supersetGroup: Number((e as any).supersetGroup),
+                supersetSlot: (Number((e as any).supersetSlot) === 1 ? 1 : 0) as 0 | 1,
+              } : {}),
+            };
+          }),
+        })));
+        localStorage.setItem('he_pl_runtime', JSON.stringify({ days: playerDays, focus: plan.pattern?.name || 'ББ-сплит', week: 1, track: 'bb' }));
+      }
+    } catch { /* runtime — не критично для отображения плана */ }
 
     // План перестроен — применённый ранее contest prep больше не актуален
     // (новый план не содержит taper/пик-неделю). Сброс метки применения.
@@ -2917,61 +2967,310 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
   // P2-9: применить inline-правки к плану перед сохранением/экспортом.
   // Раньше exerciseEdits были display-only — не мутатируют builtPlan/he_pl_runtime.
   // Теперь: если есть edits — мутируем workSets упражнений.
+  /** Ручной суперсет: реальный партнёр в той же сессии + group/slot/rest.
+   *  Раньше в `supersetWith` писался литерал «антагонист»/«та же группа»,
+   *  который финализатор удалял как dangling-ссылку — правка была косметикой. */
+  const applyManualSuperset = (exercises: any[], index: number, mode: string) => {
+    const ex = exercises[index];
+    if (!ex) return;
+    const muscleOf = (x: any) => canonicalMuscle(String(x?.muscle || ''));
+    const antagonists: Record<string, string[]> = {
+      chest: ['back'], back: ['chest'],
+      biceps: ['triceps'], triceps: ['biceps'],
+      quads: ['hamstrings', 'glutes'], hamstrings: ['quads', 'glutes'], glutes: ['quads', 'hamstrings'],
+      shoulders: ['back'], abs: ['back'], calves: [], forearms: [],
+    };
+    const currentMuscle = muscleOf(ex);
+    const isFree = (x: any) => !x?.supersetWith && !x?.supersetGroup;
+    let partnerIdx = -1;
+    const m = String(mode || '').toLowerCase();
+    if (m === 'антагонист' || m === 'antagonist') {
+      const targets = antagonists[currentMuscle] || [];
+      partnerIdx = exercises.findIndex((x, i) => i !== index && isFree(x) && targets.includes(muscleOf(x)));
+    } else if (m === 'та же группа' || m === 'same_muscle' || m === 'same muscle') {
+      partnerIdx = exercises.findIndex((x, i) => i !== index && isFree(x) && muscleOf(x) === currentMuscle);
+    } else {
+      partnerIdx = exercises.findIndex((x, i) => i !== index && (
+        String(x?.name || '') === mode || String(x?.exerciseName || '') === mode
+      ));
+    }
+    if (partnerIdx < 0) {
+      ex.comment = (ex.comment || '') + ' | ⚠ суперсет: подходящий партнёр не найден';
+      return;
+    }
+    const partner = exercises[partnerIdx];
+    const used = new Set<number>();
+    for (const x of exercises) {
+      const g = Number(x?.supersetGroup);
+      if (Number.isFinite(g)) used.add(g);
+    }
+    let groupId = 1000 + index + 1;
+    while (used.has(groupId)) groupId++;
+    ex.supersetWith = String(partner.name || partner.exerciseName || '');
+    partner.supersetWith = String(ex.name || ex.exerciseName || '');
+    ex.supersetGroup = groupId;
+    partner.supersetGroup = groupId;
+    ex.supersetSlot = 0;
+    partner.supersetSlot = 1;
+    ex.restSeconds = 0;
+    partner.restSeconds = 0;
+    if (Array.isArray(ex.workSets)) ex.workSets = ex.workSets.map((ws: any) => ({ ...ws, restSeconds: 0 }));
+    if (Array.isArray(partner.workSets)) partner.workSets = partner.workSets.map((ws: any) => ({ ...ws, restSeconds: 0 }));
+    if (!String(ex.comment || '').includes('🔗 Суперсет с')) {
+      ex.comment = (ex.comment || '') + ` | 🔗 Суперсет с «${partner.name}»`;
+    }
+    if (!String(partner.comment || '').includes('🔗 Суперсет с')) {
+      partner.comment = (partner.comment || '') + ` | 🔗 Суперсет с «${ex.name}»`;
+    }
+  };
+
   const applyEditsToPlan = (plan: BBPlan): BBPlan => {
     if (!plan || Object.keys(exerciseEdits).length === 0) return plan;
+    // Идемпотентность: effectivePlan уже содержит этот набор правок — не
+    // применяем повторно (иначе comments/веса дублируются на каждом рендере).
+    const editSig = JSON.stringify(exerciseEdits);
+    if ((plan as any)._inlineEditSig === editSig) return plan;
     const weeks = plan.weeks.map(w => ({
       ...w,
-      sessions: w.sessions.map((s, si) => ({
-        ...s,
-        exercises: s.exercises.map((e, ei) => {
-          // 26.09.2026 (аудит): ключ включает неделю (w.week) — правка одной недели
-          // применялась ко ВСЕМ неделям (мезоцикл выравнивался по одному вводу).
+      sessions: w.sessions.map((s, si) => {
+        const exercises = s.exercises.map((e, ei) => {
+          // Ключ по-прежнему позиционный (совместимость с историей правок), но
+          // identity упражнения проверяется отдельно: после replace/move старая
+          // правка не применяется к чужому упражнению.
           const editKey = `${w.week}-${si}-${ei}`;
           const edit = exerciseEdits[editKey];
           if (!edit) return e;
-          const edited = {
-            ...e,
-            sets: edit.sets,
-            workSets: (e.workSets || []).map((ws, i) =>
-              i === 0
-                ? { ...ws, weight: edit.weight, reps: edit.reps }
-                : { ...ws, weight: edit.weight }
-            ),
-            repsRange: [edit.reps, edit.reps] as [number, number],
-            comment: (e.comment || '') + ' | ✏️ inline-правка',
-          };
-          if (edit.rir != null && Number.isFinite(edit.rir)) edited.rir = edit.rir;
-          if (edit.tempo) (edited as any).tempoSpec = edit.tempo;
-          // Канон id: UI-легаси (myo_rep/21s) → движковые (myo_reps/twenty_ones).
-          if (edit.technique && edit.technique !== 'none') {
-            const canonTech = canonTechniqueId(edit.technique) || edit.technique;
-            (edited as any).technique = canonTech;
-            // Потребители читают технику последнего рабочего сета (bb-technique-display,
-            // bb-quality-weekly, bb-report, SessionPlayer targetSets) — пишем и туда.
-            if (Array.isArray(edited.workSets) && edited.workSets.length > 0) {
-              (edited.workSets[edited.workSets.length - 1] as any).technique = canonTech;
+          const identity = bbExerciseIdentity(e);
+          if (edit.exerciseKey && edit.exerciseKey !== identity) return e;
+          const first = e.workSets?.[0];
+          const currentWeight = Number(first?.weight);
+          const weightChanged = Number.isFinite(edit.weight) && Number.isFinite(currentWeight)
+            && Math.abs(Number(edit.weight) - currentWeight) > 0.001;
+          const repsChanged = Number.isFinite(edit.reps) && Number(edit.reps) !== Number(first?.reps);
+          const setsChanged = Number.isFinite(edit.sets) && Number(edit.sets) !== Number(e.sets);
+          const rirChanged = edit.rir != null && Number.isFinite(edit.rir) && Number(edit.rir) !== Number(e.rir);
+          const tempoChanged = !!edit.tempo && edit.tempo !== (e as any).tempoSpec;
+          const techChanged = edit.technique != null
+            && edit.technique !== ((e as any).technique || 'none');
+          const workSets = (e.workSets || []).map((ws, i) => {
+            const next: any = { ...ws };
+            // Вес масштабируем от первого сета: дроп-сет/рест-пауза сохраняют
+            // свои относительные веса, а не выравниваются по одному числу.
+            if (weightChanged) {
+              next.weight = currentWeight > 0
+                ? Math.round((Number(ws.weight) || 0) * (Number(edit.weight) / currentWeight) * 10) / 10
+                : Math.max(0, Number(edit.weight) || 0);
             }
-          } else if (edit.technique === 'none') {
-            delete (edited as any).technique;
-            if (Array.isArray(edited.workSets) && edited.workSets.length > 0) {
-              delete (edited.workSets[edited.workSets.length - 1] as any).technique;
+            if (repsChanged && i === 0) next.reps = Math.max(1, Math.round(Number(edit.reps)));
+            if (rirChanged) next.rir = Number(edit.rir);
+            if (tempoChanged) next.tempo = edit.tempo;
+            if (techChanged && i === (e.workSets?.length || 1) - 1) {
+              if (edit.technique === 'none') delete next.technique;
+              else next.technique = canonTechniqueId(edit.technique!) || edit.technique;
             }
+            return next;
+          });
+          const edited: any = { ...e, workSets };
+          if (setsChanged) edited.sets = Math.max(0, Math.round(Number(edit.sets)));
+          if (repsChanged) {
+            const reps = Math.max(1, Math.round(Number(edit.reps)));
+            edited.repsRange = [reps, reps];
           }
-          if (edit.supersetWith && edit.supersetWith !== 'none') {
-            (edited as any).supersetWith = edit.supersetWith;
-            (edited as any).comment = (edited.comment || '') + ` | 🔗 Суперсет с «${edit.supersetWith}»`;
+          if (rirChanged) edited.rir = Number(edit.rir);
+          if (tempoChanged) edited.tempoSpec = edit.tempo;
+          if (techChanged) {
+            if (edit.technique === 'none') delete edited.technique;
+            else edited.technique = canonTechniqueId(edit.technique!) || edit.technique;
+          }
+          if (setsChanged || repsChanged || weightChanged || rirChanged || tempoChanged || techChanged) {
+            if (!String(e.comment || '').includes('✏️ inline-правка')) {
+              edited.comment = (e.comment || '') + ' | ✏️ inline-правка';
+            }
           }
           return edited;
-        }),
-      })),
+        });
+        // Суперсет применяем после маппинга: нужен доступ ко всей сессии.
+        for (let ei = 0; ei < exercises.length; ei++) {
+          const edit = exerciseEdits[`${w.week}-${si}-${ei}`];
+          if (!edit?.supersetWith || edit.supersetWith === 'none') continue;
+          if (edit.exerciseKey && edit.exerciseKey !== bbExerciseIdentity(exercises[ei])) continue;
+          applyManualSuperset(exercises, ei, edit.supersetWith);
+        }
+        return { ...s, exercises };
+      }),
     }));
-    const editedPlan = { ...plan, weeks };
+    const editedPlan: any = { ...plan, weeks, _inlineEditSig: editSig };
     return revalidateEditedPlan(editedPlan);
   };
 
+  // Единый план для шагов 5–7, качества и сохранения: базовый план + ручные правки.
+  // Раньше шаг 5/6 и отчёты читали builtPlan без оверлея, а сохранение применяло
+  // правки последними — отсюда рассинхрон и перезапись калибровки весов.
+  const effectivePlan = useMemo(() => {
+    if (!builtPlan) return null;
+    return applyEditsToPlan(builtPlan);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [builtPlan, exerciseEdits, bbLevel, bbGoal, bbMethodology, bbVolGoal, bbTrainingYears, effectivePeds.length]);
+
+  /** Зафиксировать ручные правки в builtPlan и очистить оверлей. */
+  const commitEffectivePlan = (plan: BBPlan) => {
+    setBuiltPlan(plan);
+    setExerciseEdits({});
+    setEditsHistory([]);
+    setRedosHistory([]);
+  };
+
+  /** Применить план из шага весов: правки уже вошли в effectivePlan, поэтому
+   *  очищаем оверлей — иначе старый edit.weight перезапишет калибровку. */
+  const handleWeightsPlanChange: React.Dispatch<React.SetStateAction<BBPlan | null>> = (action) => {
+    setBuiltPlan(prev => {
+      const next = typeof action === 'function' ? (action as (p: BBPlan | null) => BBPlan | null)(prev) : action;
+      // Калибровка меняет веса — обновляем validation/weeklyVolume/balance snapshots.
+      return next ? revalidateEditedPlan(next) : next;
+    });
+    setExerciseEdits({});
+    setEditsHistory([]);
+    setRedosHistory([]);
+  };
+
+  /** Структурные операции из шага «Коррекция» (например, «Применить факт»):
+   *  прогоняем через revalidate/finalize и фиксируем правки. */
+  const handleAdjustPlanChange: React.Dispatch<React.SetStateAction<BBPlan | null>> = (action) => {
+    setBuiltPlan(prev => {
+      const next = typeof action === 'function' ? (action as (p: BBPlan | null) => BBPlan | null)(prev) : action;
+      return next ? revalidateEditedPlan(next) : next;
+    });
+    setExerciseEdits({});
+    setEditsHistory([]);
+    setRedosHistory([]);
+  };
+
+  const metrics = useMemo(() => effectivePlan ? calcBBPlanMetrics(effectivePlan, Number((effectivePlan as any).mrvMultiplier) || pedAdapt?.combinedMrvMultiplier || 1) : null, [effectivePlan, pedAdapt]);
+  // Epic F: единый отчёт качества (агрегирует validation/balance/rotation/safety, дедуп).
+  const qualityReport = useMemo(() => {
+    if (!effectivePlan) return null;
+    const personal = linked.profile?.settings?.personal;
+    const lifestyle = linked.profile?.settings?.lifestyle;
+    return buildBBQualityReport(effectivePlan as any, {
+      acwrRatio: acwrData ? acwrData.ratio : undefined,
+      bodyFat: personal?.bodyFat,
+      hrvMs: lifestyle?.morningHRV,
+      sleepHours: lifestyle?.sleepHours,
+      stressLevel: lifestyle?.stressLevel,
+      injuries: injuries.map(i => ({ muscle: i.muscle, exclude: i.exclude })),
+      mobilityRestrictions,
+    });
+  }, [effectivePlan, linked.profile, acwrData, injuries, mobilityRestrictions]);
+  // Quality Hub PRO: V2-панель (аддитивно к S5 — S5 считается и показывается как раньше).
+  // Монотония Foster из того же дневника sRPE, что и ACWR.
+  const srpeMonotony = useMemo(() => {
+    try {
+      const srpe = allSrpeSessions;
+      if (srpe.length < 3) return null;
+      return sRPEAdjustment(srpe);
+    } catch { return null; }
+  }, [effectivePlan, allSrpeSessions]);
+  const bbQualityV2 = useMemo(() => {
+    if (!effectivePlan) return null;
+    try {
+      return bbPlanQualityV2(effectivePlan as any, {
+        level: bbLevel,
+        // Акцент = цели специализации ИЛИ слабые группы (аудит 2026-09):
+        // не-целевые мышцы на MV-поддержании не штрафуются за «недогруз».
+        specTargets: specTargets.length ? specTargets : (weakPoints.length ? weakPoints : undefined),
+        acwrRatio: acwrData?.ratio ?? null,
+        monotony: srpeMonotony?.monotony ?? null,
+        hasDiary: acwrData != null,
+      });
+    } catch { return null; }
+  }, [effectivePlan, bbLevel, specTargets, weakPoints, acwrData, srpeMonotony]);
+  const todayBadge = useMemo(() => {
+    if (acwrData == null) return null;
+    const acwr = acwrData.ratio;
+    if (acwr > 1.5) return '🔴 Сегодня — снизить объём (ACWR выше 1.5)';
+    if (acwr < 0.6) return '🔵 Сегодня — лёгкий день / техника (ACWR ниже 0.6)';
+    if (srpeMonotony != null && srpeMonotony.monotony > 2) return '🟡 Сегодня — варьируйте нагрузку (монотония выше 2)';
+    return '🟢 Сегодня — можно по плану';
+  }, [acwrData, srpeMonotony]);
+  const safetyScore = useMemo<PlanSafetyScore | null>(() => {
+    if (!effectivePlan) return null;
+    const personal = linked.profile?.settings?.personal;
+    const lifestyle = linked.profile?.settings?.lifestyle;
+    return calculatePlanSafetyScore(effectivePlan, {
+      acwrRatio: acwrData?.ratio,
+      bodyFat: personal?.bodyFat,
+      hrvMs: lifestyle?.morningHRV,
+      sleepHours: lifestyle?.sleepHours,
+      stressLevel: lifestyle?.stressLevel,
+      injuryCount: injuries.length,
+      injuries,
+      mobilityRestrictions,
+      balanceReport: (effectivePlan as any).balanceReport || null,
+      weeklySessions: effectivePlan.weeks[0]?.sessions.length ?? 4,
+      goal: bbGoal,
+    });
+  }, [effectivePlan, linked.profile, injuries, mobilityRestrictions, acwrData, bbGoal]);
+  // Понедельная оценка качества: факт выдачи × параметры плана (две шкалы, не суммируются).
+  // A «Объём и соответствие» — факт недели vs собственные цели/капы/параметры плана.
+  // B «PRO-техника» — факт исполнения недели (паттерны/углы/растяжка/техники).
+  // Вид: конкретная неделя (по правилам её фазы) или 'avg' (среднее понедельных).
+  const quality = useMemo(() => {
+    if (!effectivePlan) return null;
+    try {
+      const totalW = effectivePlan.weeks.length || 1;
+      const qw: number | 'avg' = qualityWeek === 'avg' ? 'avg' : Math.min(Math.max(1, qualityWeek), totalW);
+      const avg = averageWeeklyScores(effectivePlan as any);
+      let selVolume: ReturnType<typeof scoreVolumeWeek>;
+      let selPro: ReturnType<typeof scoreProWeek>;
+      let viewTag: string;
+      if (qw === 'avg') {
+        viewTag = `среднее · ${avg.weeks} нед`;
+        selVolume = {
+          week: 0, phase: 'среднее', isDeload: false, isTaper: false,
+          score: avg.avgVolume, grade: gradeFor(avg.avgVolume),
+          issues: avg.recurringVolumeIssues, muscles: avg.avgMuscles, balance: [],
+          recommendations: avg.recurringVolumeIssues.filter(i => i.severity !== 'info').slice(0, 5).map(i => `→ ${i.message} [${i.source}]`),
+        };
+        const meso = scoreProWeek(effectivePlan as any, 'meso');
+        // Число — среднее понедельных PRO; детали — агрегат мезоцикла (факт).
+        selPro = { ...meso, score: avg.avgPro, grade: gradeFor(avg.avgPro) };
+      } else {
+        viewTag = `нед ${qw}/${totalW}`;
+        selVolume = scoreVolumeWeek(effectivePlan as any, qw);
+        selPro = scoreProWeek(effectivePlan as any, qw);
+      }
+      const recommendations = [
+        ...selVolume.issues.filter(i => i.severity !== 'info').slice(0, 4).map(i => `→ ${i.message} [${i.source}]`),
+        ...selPro.totalRecommendations.slice(0, 2),
+      ];
+      // Фактический делод из плана (не тоггл autoDeload) — читает экспортная карточка.
+      const hasDeloadActual = effectivePlan.weeks.some((w: any) => w.deload || String(w.phase || '').toLowerCase() === 'deload');
+      const deloadWeeksActual = effectivePlan.weeks.filter((w: any) => w.deload || String(w.phase || '').toLowerCase() === 'deload').map((w: any) => w.week).filter(Boolean);
+      return {
+        mode: qw, viewTag,
+        avgVolume: avg.avgVolume, volumeLabel: gradeFor(avg.avgVolume),
+        avgPro: avg.avgPro, proLabel: gradeFor(avg.avgPro),
+        perWeek: avg.perWeek,
+        viewVolume: selVolume.score, viewPro: selPro.score,
+        selVolume, selPro,
+        recommendations,
+        hasDeloadActual, deloadWeeksActual,
+        // back-compat для мест, читающих старые поля:
+        score: selVolume.score, label: selVolume.grade,
+        details: selVolume.issues.map(i => i.message),
+        perMuscle: selVolume.muscles.map(m => ({
+          muscle: m.muscle, sets: m.directSets, mev: m.mev, mav: m.mav, mrv: m.mrv,
+          pct: m.mav > 0 ? Math.round((m.effectiveSets / m.mav) * 100) : 0, status: m.status, contextNote: m.note,
+        })),
+        proResult: selPro,
+      };
+    } catch { return null; }
+  }, [effectivePlan, qualityWeek]);
+
   const handleSavePlan = () => {
     try {
-      const planToSave = applyEditsToPlan(builtPlan!);
+      if (!effectivePlan) return;
+      const planToSave = effectivePlan;
       const saveSafety = calculatePlanSafetyScore(planToSave, {
         acwrRatio: calculateACWR(),
         injuries,
@@ -2983,15 +3282,15 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
       // быть исполнен). Блокировка честная: причина + что править.
       const blockReason = bbPlanSaveBlockReason(planToSave, saveSafety);
       if (blockReason) { flash(blockReason); return; }
-      setBuiltPlan(planToSave); localStorage.setItem('he_bb_plan_saved', JSON.stringify({ plan: planToSave, date: new Date().toISOString() })); flash('План сохранён');
+      commitEffectivePlan(planToSave); localStorage.setItem('he_bb_plan_saved', JSON.stringify({ plan: planToSave, date: new Date().toISOString() })); flash('План сохранён');
       try { localStorage.removeItem('he_bb_plan_saved_prev'); localStorage.removeItem('he_bb_plan_history'); } catch { /* ignore */ }
     } catch { flash('Ошибка сохранения'); }
   };
 
   /** Сохранить BB-план в "Мои тренировки" (myTrainingPlans) — унификация с ручным конструктором. */
   const handleSaveToMyPlans = () => {
-    if (!builtPlan) return;
-    const exportPlan = applyEditsToPlan(builtPlan);
+    if (!effectivePlan) return;
+    const exportPlan = effectivePlan;
     const saveSafety = calculatePlanSafetyScore(exportPlan, { acwrRatio: calculateACWR(), injuries, mobilityRestrictions });
     // Волна 0, п.0.2: небезопасный план не сохраняется (см. handleSavePlan).
     const blockReason = bbPlanSaveBlockReason(exportPlan, saveSafety);
@@ -3001,35 +3300,55 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
       title: '💾 Название плана (Мои тренировки)',
       value: fallbackName,
       onOk: (name) => {
-        // Конвертация BB-плана в flat-формат Моих тренировок: все упражнения недели 1
-        const week1 = exportPlan.weeks[0];
-        const exs = week1.sessions.flatMap(s => s.exercises.map(e => ({
+        // Многонедельный план: сохраняем ВСЕ недели в weeksPlan (MyTrainingTab
+        // умеет переключать недели и грузить выбранную). Раньше сохранялась
+        // только неделя 1 — прогрессия/делод/пик терялись.
+        const toFlat = (week: any) => (week?.sessions || []).flatMap((s: any) => (s.exercises || []).map((e: any) => ({
           name: e.name,
-          sets: e.sets,
-          reps: e.workSets[0]?.reps ?? 10,
-          rir: e.rir,
+          sets: e.sets ?? (e.workSets?.length || 0),
+          reps: e.workSets?.[0]?.reps ?? 10,
+          rir: e.workSets?.[0]?.rir ?? e.rir ?? 2,
         })));
-        const plan = { id: 'bbplan_' + Date.now(), name, date: new Date().toISOString(), exercises: exs };
+        const weeksPlan = (exportPlan.weeks || []).map((w: any, idx: number) => ({
+          week: Number(w.week) || idx + 1,
+          exercises: toFlat(w),
+        }));
+        const week1 = exportPlan.weeks[0];
+        const exs = weeksPlan[0]?.exercises ?? toFlat(week1);
+        const plan = {
+          id: 'bbplan_' + Date.now(),
+          name,
+          date: new Date().toISOString(),
+          exercises: exs,
+          weekCount: weeksPlan.length,
+          weeksPlan,
+        };
         try {
           const existing = JSON.parse(localStorage.getItem('myTrainingPlans') || '[]');
-          const updated = [...existing, plan].slice(-20);
+          const updated = [...(Array.isArray(existing) ? existing : []), plan].slice(-20);
           localStorage.setItem('myTrainingPlans', JSON.stringify(updated));
-          flash(`План «${name}» сохранён в Мои тренировки (${exs.length} упр.)`);
+          commitEffectivePlan(exportPlan);
+          flash(`План «${name}» сохранён в Мои тренировки (${exs.length} упр., ${weeksPlan.length} нед.)`);
         } catch { flash('Ошибка сохранения'); }
       },
     });
   };
 
   const handleSaveVariant = () => {
-    if (!builtPlan || !metrics) return;
-    const exportPlan = applyEditsToPlan(builtPlan);
-    // Волна 0, п.0.2: вариант с ошибками валидации не сохраняется.
-    const blockReason = bbPlanSaveBlockReason(exportPlan, null);
+    if (!effectivePlan || !metrics) return;
+    const exportPlan = effectivePlan;
+    // Волна 0, п.0.2: вариант с ошибками валидации или низким SafetyScore не сохраняется.
+    const saveSafety = calculatePlanSafetyScore(exportPlan, {
+      acwrRatio: calculateACWR(),
+      injuries,
+      mobilityRestrictions,
+    });
+    const blockReason = bbPlanSaveBlockReason(exportPlan, saveSafety);
     if (blockReason) { flash(blockReason); return; }
     const exportMetrics = calcBBPlanMetrics(exportPlan, pedAdapt.combinedMrvMultiplier);
     // Скор варианта — среднее понедельных «Объём» (факт выдачи × параметры плана).
     const exportQualityScore = (() => { try { return averageWeeklyScores(exportPlan as any).avgVolume; } catch { return 0; } })();
-    const fallbackName = `${exportPlan.pattern.name} ${bbWeeks}нед ${peds.length > 0 ? peds.join('+') : 'натурал'}`;
+    const fallbackName = `${exportPlan.pattern.name} ${bbWeeks}нед ${effectivePeds.length > 0 ? effectivePeds.join('+') : 'натурал'}`;
     setNamePrompt({
       title: '💾 Название варианта',
       value: fallbackName,
@@ -3038,8 +3357,10 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
           patternId: selectedSplitId,
            patternName: exportPlan.pattern.name,
           level: bbLevel, goal: bbGoal, weeks: bbWeeks, volumeGoal: bbVolGoal,
-          peds, pedDoses, courseIntensity: courseIntensity as string,
+          peds: effectivePeds, pedDoses, courseIntensity: courseIntensity as string,
            weakPoints, focusGroup: '', intensityTechnique: intensityTech,
+           volumeRamp: bbVolumeRamp !== 'standard' ? bbVolumeRamp : undefined,
+           volumeWave: bbVolumeWave ? true : undefined,
            loadStrategy, autoDeload, deloadType, planMode,
            trainingFocus: bbTrainingFocus,
            methodology: bbMethodology,
@@ -3095,6 +3416,7 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
         const updated = saveBBPlanVariant(name, exportPlan, params, planMetrics);
         setSavedPlans(updated);
         setShowCompare(true);
+        commitEffectivePlan(exportPlan);
       },
     });
   };
@@ -3106,9 +3428,15 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
 
   /** Сохранить собранный ББ-план в «Мои программы» (UserProgram) — канонический путь редактирования. */
   const handleSaveAsUserProgram = () => {
-    if (!builtPlan) return;
-    const exportPlan = applyEditsToPlan(builtPlan);
-    if (!exportPlan.validation?.valid) { flash('⚠ Есть ошибки валидации — сохраняем программу с предупреждением.'); }
+    if (!effectivePlan) return;
+    const exportPlan = effectivePlan;
+    const saveSafety = calculatePlanSafetyScore(exportPlan, {
+      acwrRatio: calculateACWR(),
+      injuries,
+      mobilityRestrictions,
+    });
+    const blockReason = bbPlanSaveBlockReason(exportPlan, saveSafety);
+    if (blockReason) { flash(blockReason); return; }
     const fallbackName = `${exportPlan.pattern.name} ${bbWeeks}нед`;
     setNamePrompt({
       title: '📂 Название программы (Мои программы)',
@@ -3123,6 +3451,7 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
             equipment: bbEquipment.slice(),
           });
           saveUserProgramStore(userProg, 'Импорт из ББ-виззарда');
+          commitEffectivePlan(exportPlan);
           flash(`✅ Сохранено в «Мои программы»: ${name}`);
         } catch (e: any) {
           console.error('[BB-auto] Ошибка сохранения в Мои программы:', e);
@@ -3134,15 +3463,28 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
 
   const handleLoadVariant = (v: SavedBBPlan) => {
     if (!v.plan) return;
+    // Загрузка другого варианта инвалидирует позиционные правки и введённые веса.
+    setExerciseEdits({});
+    setEditsHistory([]);
+    setRedosHistory([]);
+    setWeightEntries([]);
+    setWeightsApplied(0);
+    // Другой вариант — прежний contest prep к нему не применён.
+    setPrepApplied(false);
+    setPrepBasePlan(null);
     const loaded = structuredClone(v.plan) as BBPlan;
-    setBuiltPlan(revalidateEditedPlan(loaded));
+    // Вариант уже финализирован со СВОИМИ параметрами. Раньше здесь вызывался
+    // revalidateEditedPlan с текущими state (goal/level/methodology) — загрузка
+    // чужого варианта могла пересобрать snapshots/phase-safety не по его паспорту.
+    // Legacy-вариант без validation всё же финализируем, иначе шаг «План» без снимков.
+    setBuiltPlan((loaded as any).validation ? loaded : revalidateEditedPlan(loaded));
     if (v.params.trainingFocus) setBbTrainingFocus(v.params.trainingFocus);
     if (v.params.level) setBbLevel(v.params.level);
     if (v.params.goal) setBbGoal(v.params.goal);
     if (v.params.daysPerWeek) setBbDays(v.params.daysPerWeek);
     if (v.params.weeks) setBbWeeks(v.params.weeks);
     if (v.params.volumeGoal) setBbVolGoal(v.params.volumeGoal);
-    if (Array.isArray(v.params.peds)) setPeds(v.params.peds as PED[]);
+    if (!isMinorProfile && Array.isArray(v.params.peds)) setPeds(v.params.peds as PED[]);
     // Миграция выбора специализации: specBlocks (новый формат) → слабые
     // точки/фокус (старый формат) → первый блок с целями.
     const legacyTargets = normalizeSpecializationTargets([
@@ -3202,8 +3544,8 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
     if (vp.trainingVolumeMode) setTrainingVolumeMode(vp.trainingVolumeMode);
     if (vp.volumeScheme) setVolumeScheme(vp.volumeScheme);
     // G1: сценарий входа в мезоцикл из варианта (legacy = standard).
-    if (vp.volumeRamp) setBbVolumeRamp(vp.volumeRamp);
-    if (typeof vp.volumeWave === 'boolean') setBbVolumeWave(vp.volumeWave);
+    setBbVolumeRamp(vp.volumeRamp === 'preloaded' || vp.volumeRamp === 'flat' ? vp.volumeRamp : 'standard');
+    setBbVolumeWave(vp.volumeWave === true);
     if (vp.supersetMode) setSupersetMode(vp.supersetMode);
     if (vp.intensityLevel) setIntensityLevel(vp.intensityLevel);
     if (vp.rotationMode) setRotationMode(vp.rotationMode);
@@ -3254,9 +3596,10 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
   };
   const handleReplaceExercise = (si: number, ei: number, newName: string) => {
     if (!newName || !builtPlan) return;
+    const basePlan = applyEditsToPlan(builtPlan);
     const found = EXERCISE_CATALOG.find(x => x.name.toLowerCase() === newName.toLowerCase());
     if (!found) return;
-    const w3 = structuredClone(builtPlan.weeks);
+    const w3 = structuredClone(basePlan.weeks);
     const wLen = w3.length;
     const weekIdx = Math.min(bbWeekSel, wLen) - 1;
     const target = w3[weekIdx]?.sessions[si]?.exercises[ei];
@@ -3284,14 +3627,22 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
     });
     target.comment = `${target.comment || ''} | Ручная замена: ${oldEquipment || 'unknown'} → ${newEquipment || 'unknown'}, вес ×${loadRatio.toFixed(2)}`;
     target.rationale = `${target.rationale || ''} | Manual replacement: ${found.name}`;
-    const editedPlan = { ...builtPlan, weeks: w3 };
+    const editedPlan = { ...basePlan, weeks: w3 };
     setBuiltPlan(revalidateEditedPlan(editedPlan));
+    // Удаляем правку только заменённого упражнения (остальные правки валидны).
+    setExerciseEdits(prev => {
+      const next = { ...prev };
+      const weekNo = Number(w3[weekIdx]?.week) || (weekIdx + 1);
+      delete next[`${weekNo}-${si}-${ei}`];
+      return next;
+    });
   };
 
   // Фаза 5: Перестановка упражнений внутри дня (↑↓ — mobile-friendly вместо HTML5 DnD)
   const handleMoveExercise = (si: number, ei: number, dir: -1 | 1) => {
     if (!builtPlan) return;
-    const w3 = structuredClone(builtPlan.weeks);
+    const basePlan = applyEditsToPlan(builtPlan);
+    const w3 = structuredClone(basePlan.weeks);
     const weekIdx = Math.min(bbWeekSel, w3.length) - 1;
     const sess = w3[weekIdx]?.sessions[si];
     if (!sess) return;
@@ -3301,17 +3652,34 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
     const tmp = sess.exercises[ei];
     sess.exercises[ei] = sess.exercises[newIdx];
     sess.exercises[newIdx] = tmp;
-     setBuiltPlan(revalidateEditedPlan({ ...builtPlan, weeks: w3 }));
+    setBuiltPlan(revalidateEditedPlan({ ...basePlan, weeks: w3 }));
+    // Ключи позиционные: удаляем правки только двух перемещённых упражнений,
+    // чтобы не применить их к чужому упражнению; остальные сохраняем.
+    setExerciseEdits(prev => {
+      const next = { ...prev };
+      const weekNo = Number(w3[weekIdx]?.week) || (weekIdx + 1);
+      delete next[`${weekNo}-${si}-${ei}`];
+      delete next[`${weekNo}-${si}-${newIdx}`];
+      return next;
+    });
   };
 
   const handleSendToExecution = () => {
-    if (!builtPlan) return;
-    const executionPlan = applyEditsToPlan(builtPlan);
+    if (!effectivePlan) return;
+    const executionPlan = effectivePlan;
     const validation = executionPlan.validation || validateBBPlan(executionPlan, executionPlan.safetyConstraints);
     if (!validation.valid) {
-      flash('⚠ Отправляем план на выполнение с предупреждениями валидации — проверьте ошибки.');
+      flash('⚠ План не отправлен: есть ошибки валидации. Исправьте их в шаге «План».');
+      return;
     }
-    setBuiltPlan(executionPlan);
+    const executionSafety = calculatePlanSafetyScore(executionPlan, {
+      acwrRatio: calculateACWR(),
+      injuries,
+      mobilityRestrictions,
+    });
+    const blockReason = bbPlanSaveBlockReason({ ...executionPlan, validation }, executionSafety);
+    if (blockReason) { flash(blockReason); return; }
+    commitEffectivePlan(executionPlan);
     try {
       const playerDays = executionPlan.weeks.flatMap(w => w.sessions.map((s, si) => ({
         label: 'Нед' + w.week + ' Д' + (si+1),
@@ -3321,8 +3689,21 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
             reps: ws.reps || 0,
             rir: ws.rir ?? e.rir ?? 2,
             technique: ws.technique,
+            // RIR/темп/отдых — поля подхода; без них плеер показывал дефолты.
+            tempo: ws.tempo || (e as any).tempoSpec,
+            restSeconds: ws.restSeconds ?? e.restSeconds ?? 90,
           }));
-          return { name: e.name, muscleGroup: muscleLabel(e.muscle) || e.muscle, notes: e.comment || e.rationale || '', targetSets, restSec: e.restSeconds || 90 };
+          return {
+            name: e.name,
+            muscleGroup: muscleLabel(e.muscle) || e.muscle,
+            notes: e.comment || e.rationale || '',
+            targetSets,
+            restSec: e.restSeconds ?? 90,
+            ...((e as any).supersetGroup != null ? {
+              supersetGroup: Number((e as any).supersetGroup),
+              supersetSlot: (Number((e as any).supersetSlot) === 1 ? 1 : 0) as 0 | 1,
+            } : {}),
+          };
         }),
       })));
        localStorage.setItem('he_pl_runtime', JSON.stringify({ days: playerDays, focus: executionPlan.pattern?.name || 'ББ-сплит', week: 1, track: 'bb' }));
@@ -3334,8 +3715,8 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
 
   /** PRO: печать плана в PDF через window.print() — HTML-таблица с упражнениями. */
   const handlePrintPlan = () => {
-    if (!builtPlan) return;
-    const plan = applyEditsToPlan(builtPlan);
+    if (!effectivePlan) return;
+    const plan = effectivePlan;
     const w = window.open('', '_blank');
     if (!w) { flash('Разрешите всплывающие окна для печати'); return; }
     // Аудит 2026-10: было только </> — `&` и кавычки не экранировались, из-за
@@ -3383,8 +3764,8 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
 
   /** Фаза 4.25: передать ББ-план в планировщик питания (калораж/белок/трен-дни/объём). */
   const handleSendToNutrition = () => {
-    if (!builtPlan) return;
-    const plan = applyEditsToPlan(builtPlan);
+    if (!effectivePlan) return;
+    const plan = effectivePlan;
     try {
       // «Сетов/нед» — а мезоцикл содержит несколько недель: раньше суммировались
       // ВСЕ недели плана, и 6-недельный план обещал в 6 раз больше (а плашка и
@@ -3418,8 +3799,8 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
 
   /** Фаза 4.24: экспорт обычного ББ-плана в .ics (календарь) по датам недель. */
   const handleExportIcs = () => {
-    if (!builtPlan) return;
-    const plan = applyEditsToPlan(builtPlan);
+    if (!effectivePlan) return;
+    const plan = effectivePlan;
     try {
       const startDate = startDateInput || localIsoDate();
       const ics = buildBBPlanIcs(plan, { startDate });
@@ -3438,8 +3819,8 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
    *  §6.4: без аргумента — весь мезоцикл с новой страницы на каждую неделю (для тренера),
    *  с номером недели — только эта неделя (лист для зала). */
   const handlePrintMesocycleTable = (weekNo?: number) => {
-    if (!builtPlan) return;
-    const plan = applyEditsToPlan(builtPlan);
+    if (!effectivePlan) return;
+    const plan = effectivePlan;
     try {
       const html = buildBBPlanPrintHtml(plan, {
         heatmap: true,
@@ -3455,10 +3836,10 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
 
   /** 4.8: отчёт качество/безопасность/валидатор/рекомендации (txt) — единый движок + issues. */
   const handleExportQualityReport = () => {
-    if (!builtPlan) return;
-    const plan = applyEditsToPlan(builtPlan);
+    if (!effectivePlan) return;
+    const plan = effectivePlan;
     try {
-      const issues = (((builtPlan as any).validation?.issues ?? []) as Array<{ level?: string; code?: string; message: string }>);
+      const issues = (((effectivePlan as any).validation?.issues ?? []) as Array<{ level?: string; code?: string; message: string }>);
       const recs = generateActionableRecommendations(plan, issues as any);
       const lines: string[] = [`ББ-ПЛАН: ${plan.pattern?.name || 'план'} · ${plan.weeks.length} нед`, ''];
       try { lines.push(buildBBPlanReportText(plan)); } catch { /* базовая сводка недоступна */ }
@@ -3492,10 +3873,10 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
 
   /** Фаза 4.23: календарные диапазоны недель от даты старта + «📍 текущая неделя». */
   const weekDateInfo = useMemo(() => {
-    if (!builtPlan || !startDateInput) return null;
-    try { return bbWeekDateRanges(applyEditsToPlan(builtPlan), { startDate: startDateInput }); }
+    if (!effectivePlan || !startDateInput) return null;
+    try { return bbWeekDateRanges(effectivePlan, { startDate: startDateInput }); }
     catch { return null; }
-  }, [builtPlan, startDateInput, exerciseEdits]);
+  }, [effectivePlan, startDateInput]);
   const currentWeek = weekDateInfo?.find(w => w.isCurrent);
 
   /**
@@ -3504,8 +3885,8 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
    * была мёртвой функцией. Кнопка доступна в плане, начиная со 2-й недели.
    */
   const handleReplanRemainder = async () => {
-    if (!builtPlan) { flash('Сначала соберите план'); return; }
-    const plan = applyEditsToPlan(builtPlan);
+    if (!effectivePlan) { flash('Сначала соберите план'); return; }
+    const plan = effectivePlan;
     // Пересборка остатка работает только для плана, собранного из сплита:
     // у программ/циклов pattern.id = id программы, и движок вернёт null (честно).
     const pid = String((plan as any).pattern?.id || '');
@@ -3531,13 +3912,18 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
       ...result.plan,
       rationale: [...((result.plan as any).rationale || []), ...notes],
     } as any));
+    setExerciseEdits({});
+    setEditsHistory([]);
+    setRedosHistory([]);
+    setPrepApplied(false);
+    setPrepBasePlan(null);
     flash(`🔄 ${replanSummary(result)}`);
   };
 
   /** PRO: CSV export — все сеты плана в CSV для Excel/Google Sheets. */
   const handleExportCSV = () => {
-    if (!builtPlan) return;
-    const plan = applyEditsToPlan(builtPlan);
+    if (!effectivePlan) return;
+    const plan = effectivePlan;
     const rows: string[] = [['Неделя', 'День', 'Упражнение', 'Мышца', 'Подмышка', 'Роль', 'Сет', 'Повторы', 'Вес(кг)', 'RIR', 'Темп', 'Отдых(с)', 'Паттерн', 'Ключи техники', 'Растяжение', 'Пиковое сокращение', 'Ошибки', 'Комментарий', 'Техника/Схема', 'Пояснение'].join(',')];    for (const wk of plan.weeks) {
       for (let si = 0; si < wk.sessions.length; si++) {
         const s = wk.sessions[si];
@@ -3624,12 +4010,22 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
   // Переход на «Годовой план»: построенный цикл сохраняется автоматически
   // (возврат — через шаг «Коррекция»/«План»), чтобы не потерять работу.
   const goAnnual = () => {
-    if (builtPlan && step !== 'annual') {
+    if (effectivePlan && step !== 'annual') {
       try {
-        localStorage.setItem('he_bb_plan_saved', JSON.stringify({ plan: applyEditsToPlan(builtPlan), date: new Date().toISOString() }));
-        localStorage.removeItem('he_bb_plan_saved_prev');
-        localStorage.removeItem('he_bb_plan_history');
-        flash('Построенный цикл сохранён — годовой план можно строить и возвращаться');
+        const annualSafety = calculatePlanSafetyScore(effectivePlan, {
+          acwrRatio: calculateACWR(),
+          injuries,
+          mobilityRestrictions,
+        });
+        const blockReason = bbPlanSaveBlockReason(effectivePlan, annualSafety);
+        if (blockReason) {
+          flash(`Цикл не автосохранён: ${blockReason}`);
+        } else {
+          localStorage.setItem('he_bb_plan_saved', JSON.stringify({ plan: effectivePlan, date: new Date().toISOString() }));
+          localStorage.removeItem('he_bb_plan_saved_prev');
+          localStorage.removeItem('he_bb_plan_history');
+          flash('Построенный цикл сохранён — годовой план можно строить и возвращаться');
+        }
       } catch { flash('Не удалось автосохранить цикл'); }
     }
     setStep('annual');
@@ -3643,8 +4039,13 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
     setBuiltPlan(null);
     setPrepApplied(false);
     setPrepPlan(null);
+    setPrepBasePlan(null);
     setBbWeekSel(1);
     setExerciseEdits({});
+    setEditsHistory([]);
+    setRedosHistory([]);
+    setWeightEntries([]);
+    setWeightsApplied(0);
     setEditMode(null);
     setSubTarget(null);
     setExSwapModal(null);
@@ -3810,7 +4211,7 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
       volumeScheme={volumeScheme}
       setVolumeScheme={setVolumeScheme}
       pedDoses={pedDoses}
-      peds={peds}
+      peds={effectivePeds}
       loadStrategy={loadStrategy}
       setLoadStrategy={setLoadStrategy}
       onUserLoadStrategy={onUserLoadStrategy}
@@ -3886,7 +4287,7 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
 
   const renderPedWorkMax = () => (
     <BbPedWorkMaxStep
-      peds={peds} setPeds={setPeds}
+      peds={effectivePeds} setPeds={setPeds}
       pedDoses={pedDoses} setPedDoses={setPedDoses}
       courseIntensity={courseIntensity} setCourseIntensity={setCourseIntensity}
       pedAdapt={pedAdapt}
@@ -3904,6 +4305,7 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
       cruiseWeeks={cruiseWeeks} setCruiseWeeks={setCruiseWeeks}
       workMax={bbWorkMax} setWorkMax={setBbWorkMax}
       planMode={planMode}
+      age={profileAge || undefined}
       onBuild={buildBb}
       onNext={() => setStep('split')}
       onBackToParams={() => setStep('params')}
@@ -3933,7 +4335,7 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
   const renderPlanWithComments = () => (
     <>
     <BbPlanStep
-      builtPlan={builtPlan}
+      builtPlan={effectivePlan}
       metrics={metrics}
       bbWeekSel={bbWeekSel}
       setBbWeekSel={setBbWeekSel}
@@ -3945,6 +4347,7 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
       autoRegResult={autoRegResult}
       exerciseEdits={exerciseEdits}
       setExerciseEdits={setExerciseEdits}
+      commitEdits={commitEdits}
       editMode={editMode}
       setEditMode={setEditMode}
       collapsedDays={collapsedDays}
@@ -3954,7 +4357,7 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
       bbTrainingFocus={bbTrainingFocus}
       bbLevel={bbLevel}
       bbTrainingYears={bbTrainingYears}
-      onCourse={peds.length > 0}
+      onCourse={effectivePeds.length > 0}
       trainingVolumeMode={trainingVolumeMode === 'high' ? 'high' : 'standard'}
       setSubTarget={setSubTarget}
       handleSendToExecution={handleSendToExecution}
@@ -3965,10 +4368,10 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
       setStartDateInput={setStartDateInput}
       actionRow={renderActionRow(false)}
     />
-    {builtPlan && (() => {
+    {effectivePlan && (() => {
       // Кнопка имеет смысл только для плана из сплита (у программ/циклов
       // pattern.id = id программы — движок вернёт null, чтобы не подменить сплит).
-      const splitId = String((builtPlan as any).pattern?.id || '');
+      const splitId = String((effectivePlan as any).pattern?.id || '');
       const isSplitPlan = SPLIT_PATTERNS.some(p => p.id === splitId);
       const wkNow = Number(currentWeek?.week) || 0;
       const disabled = !isSplitPlan || wkNow < 2;
@@ -3976,7 +4379,7 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
         ? 'Доступно для планов из сплита (ПРОФ-программы/циклы пересобираются в своём конструкторе).'
         : wkNow < 2
           ? 'Доступно со 2-й недели мезоцикла.'
-          : `Прожитые недели остаются как есть; оставшиеся пересобираются от фактического объёма/весов. Текущая неделя: ${wkNow} из ${builtPlan.weeks.length}.`;
+          : `Прожитые недели остаются как есть; оставшиеся пересобираются от фактического объёма/весов. Текущая неделя: ${wkNow} из ${effectivePlan.weeks.length}.`;
       return (
         <div data-bb="replan-remainder" style={{ marginTop: 10, padding: '10px 12px', borderRadius: 12, background: 'rgba(16,185,129,0.06)', border: '1px solid rgba(16,185,129,0.2)' }}>
           <div style={{ fontSize: 12, fontWeight: 800, color: '#34d399', marginBottom: 6 }}>🔄 Пересборка остатка мезоцикла по факту</div>
@@ -4016,8 +4419,8 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
   // ── ⚖️ Реальные веса: фактический ввод весов по упражнениям плана ──
   const renderWeights = () => (
     <BbWeightsStep
-      builtPlan={builtPlan}
-      setBuiltPlan={setBuiltPlan}
+      builtPlan={effectivePlan}
+      setBuiltPlan={handleWeightsPlanChange}
       weightEntries={weightEntries}
       setWeightEntries={setWeightEntries}
       weightsApplied={weightsApplied}
@@ -4031,14 +4434,14 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
 
 
   const renderQuality = () => {
-    if (!metrics || !quality || !builtPlan) return null;
-    const W = builtPlan.weeks;
+    if (!metrics || !quality || !effectivePlan) return null;
+    const W = effectivePlan.weeks;
     // Единый ACWR из селектора (а не 5 расчётов)
     const ratio = acwrData;
     // 4.3: общий снимок plan-basis для под-секций train-load блока (вместо 20+ props каждому).
     const qualityLoadCtx: BbQualityLoadCtx = {
-      quality, builtPlan, metrics, ranked, bestSplit, bbLevel, bbGoal, bbTrainingFocus, bbMethodology,
-      bbVolGoal, trainingVolumeMode, loadStrategy, pedAdapt, peds, weakPoints, injuries,
+      quality, builtPlan: effectivePlan, metrics, ranked, bestSplit, bbLevel, bbGoal, bbTrainingFocus, bbMethodology,
+      bbVolGoal, trainingVolumeMode, loadStrategy, pedAdapt, peds: effectivePeds, weakPoints, injuries,
       mobilityRestrictions, bbEquipment, specTargets, bbDays, bbTrainingYears, specializationMode, ratio,
     };
     return (
@@ -4046,18 +4449,18 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
         {/* 🛡 Единое качество — агрегат validation/balance/rotation/safety (Epic F) */}
         <BbQualityUnifiedCard
           qualityReport={qualityReport}
-          builtPlan={builtPlan}
+          builtPlan={effectivePlan}
           vbtInput={vbtInput}
           setVbtInput={setVbtInput}
           readiness={linked?.readiness?.recovery ?? null}
           bbQualityV2={bbQualityV2}
           todayBadge={todayBadge}
-          v2Context={{ level: bbLevel, goal: bbGoal, focus: bbTrainingFocus, accent: specTargets.length ? specTargets : weakPoints, peds }}
+          v2Context={{ level: bbLevel, goal: bbGoal, focus: bbTrainingFocus, accent: specTargets.length ? specTargets : weakPoints, peds: effectivePeds }}
         />
         {/* 🧠 Логика построения плана — вынесена первой в Шаге 5 */}
         <BbQualityPlanLogicCard
           ranked={ranked}
-          builtPlan={builtPlan}
+          builtPlan={effectivePlan}
           bbLevel={bbLevel}
           bbTrainingYears={bbTrainingYears}
           bbGoal={bbGoal}
@@ -4078,7 +4481,7 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
           mobilityRestrictions={mobilityRestrictions}
           bbEquipment={bbEquipment}
           pedAdapt={pedAdapt}
-          peds={peds}
+          peds={effectivePeds}
           bfrMode={bfrMode}
           blastCruiseEnabled={blastCruiseEnabled}
           blastWeeks={blastWeeks}
@@ -4148,7 +4551,7 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
         <CollapsibleCard title="📤 Экспорт плана" defaultOpen={false} headerStyle={{ background: 'linear-gradient(135deg, rgba(96,165,250,0.12), rgba(96,165,250,0.04))', color: '#60a5fa' }} badge="PDF · CSV · тренеру">{quality && (
           <div style={{ marginTop:8 }}>
             <PlanExportCard
-              bbPlan={builtPlan}
+              bbPlan={effectivePlan}
               profile={{
                 level: bbLevel,
                 goal: bbGoal,
@@ -4158,12 +4561,12 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
                 pmBench: prof.pmBench,
                 pmDead: prof.pmDead,
                 weakPoints,
-                onCourse: peds.length > 0,
+                onCourse: effectivePeds.length > 0,
               }}
               level={bbLevel}
               weakPoints={weakPoints}
               hasDeload={(quality as any).hasDeloadActual ?? autoDeload}
-              meta={{ splitName: builtPlan.pattern?.name || 'BB-сплит', weeks: W.length, corrections: builtPlan.rationale }}
+              meta={{ splitName: effectivePlan.pattern?.name || 'BB-сплит', weeks: W.length, corrections: effectivePlan.rationale }}
             />
           </div>
         )}</CollapsibleCard>
@@ -4173,9 +4576,9 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
 
   const renderAdjust = () => (
     <BbAdjustStep
-      builtPlan={builtPlan}
+      builtPlan={effectivePlan}
       metrics={metrics}
-      setBuiltPlan={setBuiltPlan}
+      setBuiltPlan={handleAdjustPlanChange}
       bbWorkMax={bbWorkMax}
       loadStrategy={loadStrategy}
       exerciseEdits={exerciseEdits}
@@ -4241,12 +4644,12 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
     const phaseNow = prepPlan ? prepPhaseForDate(prepPlan, today) : null;
     // 4.3 остаток-2: снимок внешних привязок шага Contest Prep для под-секций (вместо 80+ props).
     const contestCtx: BbContestPrepCtx = {
-      PREP_CHECKIN_ITEMS, adaptiveTaper, assembleContestPrep, buildContestPrepConfig, builtPlan, setBuiltPlan, bbWorkMax,
+      PREP_CHECKIN_ITEMS, adaptiveTaper, assembleContestPrep, buildContestPrepConfig, builtPlan: effectivePlan, setBuiltPlan: handleAdjustPlanChange, bbWorkMax,
       contestWizard, currentPrepWeek, expYearsForPrep,
       flash, handleApplyAdaptiveTaper, handleApplyWeightAdjustment, handleExportCheckinsCsv, handleExportPrepIcs, handleExportPrepJson,
       handleExportWeeklyReport, handleExtendPrep, handlePrintPrepSummary, handleRunTestPeakWeek, handleSaveWeekCheckin, handleShiftPrepShowDate,
       lastTest, liveFull,
-      liveVisual, liveWater, peakSpec, peakWeekCategory, peds,
+      liveVisual, liveWater, peakSpec, peakWeekCategory, peds: effectivePeds,
       phaseNow, postLogCycle, postLogHunger, postLogSleep, postLogStrength, postLogTick,
       postLogWeek, postLogWeight, prepApplied, prepBasePlan, prepBusy, prepCarbMode,
       prepCheckin, prepCheckinDone, prepCompetitions, prepConfirmedManip, prepContra, prepContraExtra,
@@ -4284,8 +4687,8 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
     };
 
   // ── 🏁 Prep-цикл: отдельный режим подготовки к соревнованиям ──
-  const minRec = recommendMinimalMode({ category: prepCat, enhanced: peds.length > 0, trainingYears: bbTrainingYears, level: bbLevel, minimalMuscles: prepMinimal });
-  const prepPedContext = peds.length > 0
+  const minRec = recommendMinimalMode({ category: prepCat, enhanced: effectivePeds.length > 0, trainingYears: bbTrainingYears, level: bbLevel, minimalMuscles: prepMinimal });
+  const prepPedContext = effectivePeds.length > 0
     ? { ghIU: (pedDoses.GH ?? pedDoses.gh ?? 0) || undefined, trenMg: (pedDoses.tren ?? pedDoses.trenbolone ?? 0) || undefined, insulinIU: (pedDoses.insulin ?? 0) || undefined, diuretic: false }
     : undefined;
 
@@ -4317,7 +4720,7 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
     labMrvMultiplier: labAdjust?.mrvMultiplier,
     labWarnings: labAdjust?.warnings,
     labIntensityNote: labAdjust?.intensityNote,
-    enhanced: peds.length > 0,
+    enhanced: effectivePeds.length > 0,
     pedDoses,
     pedContext: prepPedContext,
     courseIntensity,
@@ -4381,6 +4784,12 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
       setPrepSodiumMode(res.prepPlan.peakWeek.sodiumMode === 'stable' ? 'stable' : 'tapered' as SodiumStrategy);
       setPrepCarbMode(res.prepPlan.peakWeek.carbMode === 'conservative' ? 'back' : res.prepPlan.peakWeek.carbMode === 'high' ? 'front' : 'moderate' as CarbLoadStrategy);
       setBuiltPlan(res.bbPlan);
+      setExerciseEdits({});
+      setEditsHistory([]);
+      setRedosHistory([]);
+      setWeightEntries([]);
+      setWeightsApplied(0);
+      setPrepBasePlan(null);
       setPrepApplied(true);
       // 🏁 Авто-подключение к таперу питания: сохраняем prep-план + конфиг и уведомляем
       // планировщик (вкладка «🏁 Тапер ББ» + дневные цели) СРАЗУ при сборке, без доп. клика.
@@ -4470,6 +4879,13 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
   const handleOpenPrepPlan = () => {
     if (!prepResult) return;
     setBuiltPlan(prepResult.bbPlan);
+    // Структурная смена плана: оверлей правок/веса прошлого плана не применяем.
+    setExerciseEdits({});
+    setEditsHistory([]);
+    setRedosHistory([]);
+    setWeightEntries([]);
+    setWeightsApplied(0);
+    setPrepBasePlan(null);
     setPrepMode(false);
     setStep('plan');
     flash('🏁 Prep-цикл загружен в план — можно смотреть/выполнять');
@@ -4537,7 +4953,7 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
   // ── Exercise swap modal ──
   const renderExSwapModal = () => (
     <BbExSwapModal
-      builtPlan={builtPlan}
+      builtPlan={effectivePlan}
       exSwapModal={exSwapModal}
       exSwapSearch={exSwapSearch}
       setExSwapSearch={setExSwapSearch}
@@ -4633,7 +5049,7 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
       )}
       {renderExSwapModal()}
       {subTarget && (() => {
-        const wk = builtPlan?.weeks[bbWeekSel - 1];
+        const wk = effectivePlan?.weeks[bbWeekSel - 1];
         const ses = wk?.sessions[subTarget.sessionIdx];
         const ex = ses?.exercises[subTarget.exIdx];
         return ex ? (

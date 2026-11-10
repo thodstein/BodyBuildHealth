@@ -76,9 +76,10 @@ describe('PRO-3 Э1 — контур записи', () => {
     // D1: пересборка и сохранение с ЯВНОЙ новой датой (state prepShowDate ещё stale)
     expect(src).toMatch(/const cfgShifted = \{ \.\.\.buildContestPrepConfig\(\), showDate: d \}/);
     expect(src).toMatch(/savePrepToProfile\(plan, cfgShifted\)/);
-    // зов drive-степ остался на новой дате
-    expect(src).toMatch(/applyContestPrepToBBPlan\(builtPlan, cfgShifted/);
+    // зов drive-степ остался на новой дате; ручные правки входят в базу (effective plan)
+    expect(src).toMatch(/applyContestPrepToBBPlan\(applyEditsToPlan\(builtPlan\), cfgShifted/);
     // D2: расширение подготовки сохраняется в профиль
     expect(src).toMatch(/savePrepToProfile\(replanned, cfg\)/);
+    expect(src).toMatch(/applyEditsToPlan\(builtPlan\) as BBPlanWithPrep/);
   });
 });

@@ -39,12 +39,14 @@ describe('bb-plan-save-guard — исполнение валидатора (Во
     expect(bbPlanSaveBlockReason(validPlan, { score: 66, riskLevel: 'caution', recommendations: [] })).toBeNull();
   });
 
-  it('source-guard: все три точки сохранения используют единый гейт', () => {
+  it('source-guard: все точки сохранения/отправки используют единый гейт', () => {
     const src = readFileSync('src/ui/screens/TrainingScreen_parts/BbAutoConstructor.tsx', 'utf8');
     const calls = src.match(/bbPlanSaveBlockReason\(/g) || [];
-    // Ровно 3 вызова: handleSavePlan / handleSaveToMyPlans / handleSaveVariant.
-    expect(calls.length).toBe(3);
+    // handleSavePlan / saveToMyPlans / saveVariant / saveAsUserProgram /
+    // sendToExecution / build runtime / goAnnual — все проходят один гейт.
+    expect(calls.length).toBeGreaterThanOrEqual(7);
     expect(src).toMatch(/from '\.\/bb-plan-save-guard'/);
     expect(src).toMatch(/he_bb_plan_saved/);
+    expect(src).toMatch(/he_pl_runtime/);
   });
 });

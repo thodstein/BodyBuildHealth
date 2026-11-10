@@ -88,6 +88,28 @@ export const CollapsibleCard: React.FC<{
 };
 
 export type Step = 'params' | 'ped' | 'split' | 'plan' | 'weights' | 'quality' | 'adjust' | 'contest' | 'annual' | 'tools';
+
+/** Ручная правка упражнения в шаге «План»/«Коррекция».
+ *  `exerciseKey` — identity упражнения на момент правки: защищает от применения
+ *  старой правки к другому упражнению после replace/move/rebuild. */
+export interface BBInlineEdit {
+  sets: number;
+  reps: number;
+  weight: number;
+  rir?: number;
+  tempo?: string;
+  technique?: string;
+  /** Имя упражнения-партнёра для ручного суперсета (или 'none'). */
+  supersetWith?: string;
+  exerciseKey?: string;
+}
+
+/** Стабильная identity упражнения для ключей ручных правок.
+ *  Движок использует display-name (`exerciseName`/`name`), поэтому он же —
+ *  канонический ключ; id — только fallback. */
+export function bbExerciseIdentity(e: any): string {
+  return String(e?.exerciseName || e?.name || e?.id || '');
+}
 export type BBPhase = 'accumulation' | 'intensification' | 'deload' | 'peaking';
 export type PlanMode = 'generic_split' | 'bb_cycle' | 'programs';
 

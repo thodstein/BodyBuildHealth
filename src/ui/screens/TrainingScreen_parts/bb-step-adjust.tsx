@@ -23,7 +23,7 @@ import { FFChart } from '../SRCBBScreen_parts/ProMetricsPanel';
 import { PopupSelect, ExpandableCard } from '../SRCBBScreen_parts/TrainingPopups';
 import { BTN, BTN_GHOST, IN, SMALL, H } from './training-ui';
 import { PHASE_COLORS } from './PlanOutput';
-import { CollapsibleCard, phaseForWeek, exerciseComment, backSubgroupLabel, armHeadLabel, type BBPhase, type Step } from './bb-auto-constructor-shared';
+import { CollapsibleCard, phaseForWeek, exerciseComment, backSubgroupLabel, armHeadLabel, bbExerciseIdentity, type BBPhase, type Step, type BBInlineEdit } from './bb-auto-constructor-shared';
 import { exerciseFeatureBadges, planSetsBreakdown, canonTechniqueId } from './bb-technique-display';
 import { muscleLabel } from './bb-labels';
 import type { SavedBBPlan } from './bb-plans-store';
@@ -36,8 +36,8 @@ export interface BbAdjustStepProps {
   bbWorkMax: Record<string, number>;
   loadStrategy: LoadStrategy;
   /** Инлайн-правки упражнений (ключ `${si}-${ei}`). */
-  exerciseEdits: Record<string, { sets: number; reps: number; weight: number; rir?: number; tempo?: string; technique?: string; supersetWith?: string }>;
-  setExerciseEdits: React.Dispatch<React.SetStateAction<Record<string, { sets: number; reps: number; weight: number; rir?: number; tempo?: string; technique?: string; supersetWith?: string }>>>;
+  exerciseEdits: Record<string, BBInlineEdit>;
+  setExerciseEdits: React.Dispatch<React.SetStateAction<Record<string, BBInlineEdit>>>;
   editsRef: React.MutableRefObject<Record<string, any>>;
   commitEdits: (next: Record<string, any>) => void;
   editsHistory: Array<Record<string, any>>;
@@ -307,7 +307,13 @@ export const BbAdjustStep: React.FC<BbAdjustStepProps> = ({
               </table>
             </div>
             {diffPlan && builtPlan && (() => {
-              const weekDiff = compareBBVariants(applyEditsToPlan(builtPlan), diffPlan);
+              let weekDiff: ReturnType<typeof compareBBVariants> = [];
+              try {
+                weekDiff = compareBBVariants(builtPlan as any, diffPlan);
+              } catch {
+                // Битый/несовместимый вариант не должен ронять весь шаг коррекции.
+                return <div style={{ marginTop:8, fontSize:10, color:'#f59e0b' }}>⚠ Не удалось сравнить варианты (несовместимый формат плана).</div>;
+              }
               const meaningful = weekDiff.filter(d => d.changes > 0);
               if (meaningful.length === 0) return null;
               return (
@@ -377,7 +383,11 @@ export const BbAdjustStep: React.FC<BbAdjustStepProps> = ({
                 // 26.09.2026 (аудит): ключ правки включает неделю (wk.week) — правка
                 // одной недели больше не применяется ко всему мезоциклу.
                 const editKey = `${wk.week}-${si}-${ei}`;
-                const edit = exerciseEdits[editKey] || { sets: e.sets, reps: e.workSets[0]?.reps || 10, weight: e.workSets[0]?.weight || 80 };
+                const exerciseKey = bbExerciseIdentity(e);
+                const storedEdit = exerciseEdits[editKey];
+                const edit = storedEdit && (!storedEdit.exerciseKey || storedEdit.exerciseKey === exerciseKey)
+                  ? { ...storedEdit, exerciseKey }
+                  : { sets: e.sets, reps: e.workSets[0]?.reps || 10, weight: e.workSets[0]?.weight || 80, exerciseKey };
                 const isComp = isCompoundEx(e);
                 const altExercises = getExercisesByGroup(e.muscle).filter(x => x.name !== e.name).slice(0, 5);
                 const editBadges = exerciseFeatureBadges(e, dupMode);
@@ -403,7 +413,7 @@ export const BbAdjustStep: React.FC<BbAdjustStepProps> = ({
                     <PopupSelect
                       label="Интенсив-техника"
                       value={edit.technique ?? (canonTechniqueId(((e as any).workSets || [])[(e as any).workSets?.length - 1]?.technique) || canonTechniqueId((e as any).technique) || 'none')}
-                      onChange={v => setExerciseEdits(p => ({ ...p, [editKey]: { ...edit, technique: v } }))}
+                      onChange={v => commitEdits({ ...editsRef.current, [editKey]: { ...edit, technique: v } })}
                       options={[
                         { id: 'none', label: '— интенсив-техника —' },
                         { id: 'drop_set', label: '💥 Дроп-сет' },
@@ -416,14 +426,14 @@ export const BbAdjustStep: React.FC<BbAdjustStepProps> = ({
                     <PopupSelect
                       label="Суперсет"
                       value={edit.supersetWith ?? ((e as any).supersetWith || 'none')}
-                      onChange={v => setExerciseEdits(p => ({ ...p, [editKey]: { ...edit, supersetWith: v } }))}
+                      onChange={v => commitEdits({ ...editsRef.current, [editKey]: { ...edit, supersetWith: v } })}
                       options={[
                         { id: 'none', label: '— суперсет —' },
                         { id: 'антагонист', label: '🔗 Антагонист' },
                         { id: 'та же группа', label: '🔗 Та же группа' },
                       ]}
                     />
-                    <div style={{ display:'flex', alignItems:'center', gap:4 }}><span style={{ ...SMALL, fontSize:11 }}>Темп</span><input type="text" defaultValue={(e as any).tempoSpec || edit.tempo || ''} onBlur={e2 => { const v=e2.target.value.trim(); setExerciseEdits(p => ({ ...p, [editKey]: { ...edit, tempo: v || undefined } })); }} placeholder="3-1-1-0" style={{ width:62, ...IN }} /></div>
+                    <div style={{ display:'flex', alignItems:'center', gap:4 }}><span style={{ ...SMALL, fontSize:11 }}>Темп</span><input type="text" defaultValue={(e as any).tempoSpec || edit.tempo || ''} onBlur={e2 => { const v=e2.target.value.trim(); commitEdits({ ...editsRef.current, [editKey]: { ...edit, tempo: v || undefined } }); }} placeholder="3-1-1-0" style={{ width:62, ...IN }} /></div>
                     {(edit.technique && edit.technique !== 'none') || (edit.supersetWith && edit.supersetWith !== 'none') ? <span style={{ fontSize:9, color:'#f59e0b' }}>⚠ применяется при «💾 Сохранить план» / экспорте</span> : null}
                   </div>
                   {(editSetLines.length > 0 || editSetChain) && (

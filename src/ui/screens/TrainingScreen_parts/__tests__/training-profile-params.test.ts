@@ -50,4 +50,20 @@ describe('BB-22: параметры плана переживают переза
     expect(back.targetBodyFat).toBeUndefined();
     expect(back.platePreset).toBe('olympic');
   });
+
+  it('оборудование и PED-дозы переживают перезагрузку', async () => {
+    const { updateSection } = await import('../../../../core/profile-manager');
+    updateSection('training', { daysPerWeek: 4 });
+
+    const { loadTrainingProfile, saveTrainingProfile } = await import('../training-profile');
+    saveTrainingProfile({
+      ...loadTrainingProfile(),
+      equipment: ['barbell', 'cable', 'machine'],
+      pedDoses: { AAS: 750, GH: 6 },
+    });
+
+    const back = loadTrainingProfile();
+    expect(back.equipment).toEqual(['barbell', 'cable', 'machine']);
+    expect(back.pedDoses).toEqual({ AAS: 750, GH: 6 });
+  });
 });

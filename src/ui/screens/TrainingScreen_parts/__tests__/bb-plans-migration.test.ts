@@ -94,6 +94,7 @@ describe('Saved BB plan legacy migration', () => {
           intensityLevel: 'high', rotationMode: 'forbid', calorieSurplus: 300, eccentricMult: 1.2,
           bfrMode: true, blastCruiseEnabled: true, blastWeeks: 6, cruiseWeeks: 3,
           platePreset: 'micro', targetBodyFat: 10, cycleDay: 14,
+          volumeRamp: 'preloaded', volumeWave: true,
         },
       },
       {
@@ -101,6 +102,7 @@ describe('Saved BB plan legacy migration', () => {
           proPreset: 'none', trainingVolumeMode: 'standard', volumeScheme: 'standard', supersetMode: 'none',
           intensityLevel: 'moderate', rotationMode: 'variety', calorieSurplus: 0, eccentricMult: 1,
           bfrMode: false, blastCruiseEnabled: false, blastWeeks: 8, cruiseWeeks: 4, platePreset: 'standard',
+          volumeRamp: 'standard', volumeWave: false,
         },
       },
       { id: 'legacy', plan: { weeks: [{ week: 1, sessions: [] }] }, params: {} },
@@ -122,11 +124,17 @@ describe('Saved BB plan legacy migration', () => {
     expect(on.platePreset).toBe('micro');
     expect(on.targetBodyFat).toBe(10);
     expect(on.cycleDay).toBe(14);
+    expect(on.volumeRamp).toBe('preloaded');
+    expect(on.volumeWave).toBe(true);
     const off = plans.find(p => p.id === 'cfg-defaults')!.params as any;
-    for (const k of ['proPreset', 'trainingVolumeMode', 'volumeScheme', 'supersetMode', 'intensityLevel', 'rotationMode', 'calorieSurplus', 'eccentricMult', 'bfrMode', 'blastCruiseEnabled', 'blastWeeks', 'cruiseWeeks', 'platePreset', 'targetBodyFat', 'cycleDay']) {
+    for (const k of ['proPreset', 'trainingVolumeMode', 'volumeScheme', 'supersetMode', 'intensityLevel', 'rotationMode', 'calorieSurplus', 'eccentricMult', 'bfrMode', 'blastCruiseEnabled', 'blastWeeks', 'cruiseWeeks', 'platePreset', 'targetBodyFat', 'cycleDay', 'volumeWave']) {
       expect(off[k], k).toBeUndefined();
     }
+    // standard ramp — дефолт, в params не пишется.
+    expect(off.volumeRamp).toBe('standard');
     const legacy = plans.find(p => p.id === 'legacy')!.params as any;
+    expect(legacy.volumeRamp).toBe('standard');
+    expect(legacy.volumeWave).toBeUndefined();
     expect(legacy.proPreset).toBeUndefined();
     expect(legacy.trainingVolumeMode).toBeUndefined();
     expect(legacy.volumeScheme).toBeUndefined();

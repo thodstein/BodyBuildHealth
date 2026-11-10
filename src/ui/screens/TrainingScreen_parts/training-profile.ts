@@ -35,6 +35,9 @@ export interface TrainingProfile {
   courseIntensity: 'mild' | 'moderate' | 'heavy';
   trainingFocus?: 'strength' | 'hypertrophy' | 'endurance';
   bbPeds: string[];
+  /** Дозы PED из шага «PED + вес». Раньше жили только в состоянии визарда
+   *  и после F5 откатывались к дефолтам (500 мг AAS и т.д.). */
+  pedDoses?: Record<string, number>;
   pharmaCoursesCount: number;
   monthsSinceLastCourse: number;
   totalYearsOnPharma: number;
@@ -147,6 +150,9 @@ export function loadTrainingProfile(): TrainingProfile {
         courseIntensity: (s.training as any).courseIntensity ?? legacy?.courseIntensity ?? DEFAULT_PROFILE.courseIntensity,
         trainingFocus: (s.training as any).trainingFocus ?? legacy?.trainingFocus,
         bbPeds: Array.isArray((s.training as any).bbPeds) ? (s.training as any).bbPeds : (legacy?.bbPeds ?? DEFAULT_PROFILE.bbPeds),
+        pedDoses: (s.training as any).pedDoses && typeof (s.training as any).pedDoses === 'object'
+          ? (s.training as any).pedDoses
+          : (legacy?.pedDoses && typeof legacy.pedDoses === 'object' ? legacy.pedDoses : undefined),
         // Травмы: явные записи BB-Auto (UnifiedSettings + legacy-ключ) приоритетнее
         // выведенных из профиля «Здоровье». Раньше health.injuries игнорировался,
         // и травма из профиля не влияла на план.
@@ -258,6 +264,7 @@ export function saveTrainingProfile(p: TrainingProfile): void {
     if (p.bbCycleId !== undefined) (next.training as any).bbCycleId = p.bbCycleId;
     (next.training as any).onCourse = !!p.onCourse;
     (next.training as any).bbPeds = p.bbPeds ?? [];
+    if (p.pedDoses && typeof p.pedDoses === 'object') (next.training as any).pedDoses = p.pedDoses;
     if (p.courseIntensity) (next.training as any).courseIntensity = p.courseIntensity;
     if (p.injuries) (next.training as any).injuries = p.injuries;
     if (p.loadStrategy) (next.training as any).loadStrategy = p.loadStrategy;
