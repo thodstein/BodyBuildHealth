@@ -106,6 +106,11 @@ describe('Saved BB plan legacy migration', () => {
         },
       },
       { id: 'legacy', plan: { weeks: [{ week: 1, sessions: [] }] }, params: {} },
+      {
+        id: 'legacy-plan-ramp',
+        plan: { weeks: [{ week: 1, sessions: [] }], volumeRamp: 'flat', volumeWave: true },
+        params: {},
+      },
     ]));
     const plans = loadSavedBBPlans();
     const on = plans.find(p => p.id === 'cfg-on')!.params as any;
@@ -138,5 +143,9 @@ describe('Saved BB plan legacy migration', () => {
     expect(legacy.proPreset).toBeUndefined();
     expect(legacy.trainingVolumeMode).toBeUndefined();
     expect(legacy.volumeScheme).toBeUndefined();
+    // params отсутствуют, но план несёт ramp/wave — восстанавливаем из плана.
+    const planRamp = plans.find(p => p.id === 'legacy-plan-ramp')!.params as any;
+    expect(planRamp.volumeRamp).toBe('flat');
+    expect(planRamp.volumeWave).toBe(true);
   });
 });

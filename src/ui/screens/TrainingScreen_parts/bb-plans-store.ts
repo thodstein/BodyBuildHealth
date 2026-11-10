@@ -118,6 +118,9 @@ function isSavedPlanShape(value: any): boolean {
 
 function migrateSavedPlan(value: any): SavedBBPlan {
   const rawParams = value.params && typeof value.params === 'object' ? value.params : {};
+  const planRamp = value.plan?.volumeRamp ?? value.plan?.inputSnapshot?.volumeRamp;
+  const ramp = rawParams.volumeRamp ?? planRamp;
+  const planWave = value.plan?.volumeWave === true || value.plan?.inputSnapshot?.volumeWave === true;
   const validFocus = ['strength', 'hypertrophy', 'endurance'].includes(rawParams.trainingFocus) ? rawParams.trainingFocus : undefined;
   const validMethodology = ['compound_first', 'pre_exhaust', 'post_exhaust', 'mountain_dog', 'fst7', 'hyperemia'].includes(rawParams.methodology) ? rawParams.methodology : undefined;
   const validIntensityTechnique = ['rest_pause', 'drop_set', 'myo_reps', 'pause_rep', 'mechanical_drop', 'negative', 'twenty_ones', 'none'].includes(rawParams.intensityTechnique) ? rawParams.intensityTechnique : 'none';
@@ -133,9 +136,9 @@ function migrateSavedPlan(value: any): SavedBBPlan {
       patternName: rawParams.patternName || value.plan.pattern?.name || '',
       level: rawParams.level || value.plan.level || 'intermediate', goal: rawParams.goal || 'mass',
       weeks, volumeGoal: rawParams.volumeGoal || 'mav',
-      // G1: сценарий входа в мезоцикл (legacy-варианты без поля = standard).
-      volumeRamp: rawParams.volumeRamp === 'preloaded' || rawParams.volumeRamp === 'flat' ? rawParams.volumeRamp : 'standard',
-      volumeWave: rawParams.volumeWave === true ? true : undefined,
+      // G1: сценарий входа в мезоцикл (legacy-варианты: params → план → standard).
+      volumeRamp: ramp === 'preloaded' || ramp === 'flat' ? ramp : 'standard',
+      volumeWave: rawParams.volumeWave === true || planWave ? true : undefined,
       peds: Array.isArray(rawParams.peds) ? rawParams.peds.filter((item: any) => typeof item === 'string') : [],
       pedDoses: rawParams.pedDoses && typeof rawParams.pedDoses === 'object' ? rawParams.pedDoses : undefined,
       courseIntensity: rawParams.courseIntensity,

@@ -3544,8 +3544,9 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
     if (vp.trainingVolumeMode) setTrainingVolumeMode(vp.trainingVolumeMode);
     if (vp.volumeScheme) setVolumeScheme(vp.volumeScheme);
     // G1: сценарий входа в мезоцикл из варианта (legacy = standard).
-    setBbVolumeRamp(vp.volumeRamp === 'preloaded' || vp.volumeRamp === 'flat' ? vp.volumeRamp : 'standard');
-    setBbVolumeWave(vp.volumeWave === true);
+    const ramp = vp.volumeRamp ?? (v.plan as any)?.volumeRamp ?? (v.plan as any)?.inputSnapshot?.volumeRamp;
+    setBbVolumeRamp(ramp === 'preloaded' || ramp === 'flat' ? ramp : 'standard');
+    setBbVolumeWave(vp.volumeWave === true || (v.plan as any)?.volumeWave === true || (v.plan as any)?.inputSnapshot?.volumeWave === true);
     if (vp.supersetMode) setSupersetMode(vp.supersetMode);
     if (vp.intensityLevel) setIntensityLevel(vp.intensityLevel);
     if (vp.rotationMode) setRotationMode(vp.rotationMode);

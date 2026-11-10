@@ -51,7 +51,10 @@ describe('§2.3: редактор техник пишет в последний 
   });
 
   it('applyEditsToPlan пишет технику в последний workSet и не оставляет intensityTechUsed', () => {
-    expect(SRC).toContain('(edited.workSets[edited.workSets.length - 1] as any).technique = canonTech');
+    // Новый контракт: техника применяется к последнему подходу внутри map и на top-level.
+    expect(SRC).toContain('techChanged && i === (e.workSets?.length || 1) - 1');
+    expect(SRC).toContain('next.technique = canonTechniqueId(edit.technique!)');
+    expect(SRC).toContain('edited.technique = canonTechniqueId(edit.technique!)');
     expect(SRC).not.toContain('intensityTechUsed');
   });
 
