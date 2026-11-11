@@ -57,3 +57,33 @@ describe('TzRiskCard: оценочное покрытие', () => {
     expect(container.textContent).not.toContain('Оценочно');
   });
 });
+
+describe('TzRiskCard: непокрытое разделено на «пробел» и «сопутствующий препарат»', () => {
+  it('вещество поддержки без механизмов — «не участвуют в покрытии»', () => {
+    const { container } = render(
+      <TzRiskCard tz={makeTz({ unmappedSupport: ['some_unknown_herb'] })} before={40} after={30} />,
+    );
+    expect(container.textContent).toContain('Не участвуют в покрытии');
+    expect(container.textContent).toContain('some_unknown_herb');
+    expect(container.textContent).not.toContain('Сопутствующие препараты');
+  });
+
+  it('НПВС/ГКС подписаны как сопутствующие, а не как дыра в данных', () => {
+    const { container } = render(
+      <TzRiskCard tz={makeTz({ unmappedSupport: ['ibuprofen', 'prednisone'] })} before={40} after={30} />,
+    );
+    expect(container.textContent).toContain('Сопутствующие препараты');
+    expect(container.textContent).toContain('ibuprofen');
+    expect(container.textContent).toContain('prednisone');
+    // «Не участвуют в покрытии (нет привязки к 28 механизмам)» — не про них.
+    expect(container.textContent).not.toContain('Не участвуют в покрытии');
+  });
+
+  it('смешанный список показывает обе строки', () => {
+    const { container } = render(
+      <TzRiskCard tz={makeTz({ unmappedSupport: ['ibuprofen', 'some_unknown_herb'] })} before={40} after={30} />,
+    );
+    expect(container.textContent).toContain('Не участвуют в покрытии');
+    expect(container.textContent).toContain('Сопутствующие препараты');
+  });
+});

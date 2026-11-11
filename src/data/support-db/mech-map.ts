@@ -23,6 +23,7 @@
 import { SUPPLEMENTS_DB } from './supplements';
 import { PHARMACY_DB } from './pharmacy-db';
 import { SUPPORT_CATALOG_DATA } from '../support-catalog-data';
+import { canonId } from '../../engines/support-plan/shared-constants';
 
 export interface SupportMechEntry {
   organId: string;
@@ -167,7 +168,38 @@ export function canonSupportId(id: string): string {
 /** Есть ли у вещества кураторская (доказательная) запись механизмов. */
 export function isCuratedSupport(id: string): boolean {
   const k = canonSupportId(id);
-  return !!(CURATED[k] && CURATED[k].length > 0) || !!EXTRA_SUPPORT_MECHS[k];
+  if ((CURATED[k] && CURATED[k].length > 0) || !!EXTRA_SUPPORT_MECHS[k]) return true;
+  // Глобальные алиасы (`metformin_dup` → `metformin`): запись живёт под каноном.
+  const canon = canonId(k);
+  return canon !== k && !!(CURATED[canon]?.length || EXTRA_SUPPORT_MECHS[canon]);
+}
+
+/** Служебные записи каталога — не вещества, выбирать их нельзя. */
+const NON_SUBSTANCE_IDS: ReadonlySet<string> = new Set(['pharma']);
+
+/**
+ * Сопутствующие препараты (НЕ поддержка): НПВС, ГКС, антиконвульсанты,
+ * иммунодепрессанты, половые/метаболические гормоны.
+ *
+ * Они есть в каталоге ради взаимодействий и противопоказаний, но покрытие
+ * риска ими НЕ закрывается — это не «снижатели риска». Пустой список
+ * механизмов для них — правильный ответ, а не пробел в данных. Отдельный
+ * список нужен, чтобы отчёт «не учтено» не смешивал их с реальными дырами
+ * покрытия (аудит 2026-11: 16 таких записей молча попадали в «521 вещество
+ * покрыто механизмами», хотя механизмов у них нет).
+ */
+export const CONCOMITANT_ONLY_IDS: ReadonlySet<string> = new Set([
+  'estradiol', 'glucagon', 'cortisol',
+  'ibuprofen', 'naproxen', 'celecoxib',
+  'prednisone', 'dexamethasone', 'hydrocortisone', 'methylprednisolone',
+  'carbamazepine', 'phenytoin',
+  'tacrolimus', 'cyclosporine', 'mycophenolate', 'azathioprine',
+]);
+
+/** Вещество каталога, которое участвует в покрытии риска (а не сопутствующий препарат). */
+export function isSupportSubstanceId(id: string): boolean {
+  const k = String(id || '').toLowerCase();
+  return !!k && !NON_SUBSTANCE_IDS.has(k) && !CONCOMITANT_ONLY_IDS.has(k);
 }
 
 /**
@@ -286,6 +318,28 @@ export function getSupportMechs(id: string): SupportMechEntry[] {
   const curated = CURATED[key];
   const extra = EXTRA_SUPPORT_MECHS[key];
   const result = curated && curated.length > 0 ? curated : extra && extra.length > 0 ? extra : deriveFromCatalog(key);
+  if (result.length > 0) {
+    cache.set(id, result);
+    cache.set(key, result);
+    return result;
+  }
+  // Глобальные алиасы: `metformin_dup`/`levothyroxine_dup`/`liothyronine_dup`
+  // (и прочие исторические дубли) хранят механизмы под каноническим id.
+  const canon = canonId(key);
+  if (canon && canon !== key) {
+    const canonCurated = CURATED[canon];
+    const canonExtra = EXTRA_SUPPORT_MECHS[canon];
+    const aliased = canonCurated && canonCurated.length > 0
+      ? canonCurated
+      : canonExtra && canonExtra.length > 0
+        ? canonExtra
+        : deriveFromCatalog(canon);
+    if (aliased.length > 0) {
+      cache.set(id, aliased);
+      cache.set(key, aliased);
+      return aliased;
+    }
+  }
   cache.set(id, result);
   cache.set(key, result);
   return result;
@@ -317,10 +371,14 @@ export function getSupportMechIndex(): Record<string, SupportMechEntry[]> {
   return index;
 }
 
-/** Вещества каталога без единого механизма ТЗ — для честного отчёта «не учтено». */
+/** Вещества каталога без единого механизма ТЗ — для честного отчёта «не учтено».
+ *  Сопутствующие препараты и служебные записи исключены: у них механизмов
+ *  поддержки нет по определению (см. `CONCOMITANT_ONLY_IDS`), и смешивать их
+ *  с реальными пробелами покрытия нельзя. */
 export function listUnmappedSupportIds(): string[] {
   const out: string[] = [];
   for (const id of Object.keys(SUPPORT_CATALOG_DATA)) {
+    if (!isSupportSubstanceId(id)) continue;
     if (getSupportMechs(id).length === 0) out.push(id);
   }
   return out;

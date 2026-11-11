@@ -1,6 +1,21 @@
 import React from 'react';
+import { SUPPORT_CATALOG_DATA } from '../../../data/support-catalog-data';
+import '../../../data/support-catalog-init';
+import { isCuratedSupport, isSupportSubstanceId, listUnmappedSupportIds } from '../../../data/support-db/mech-map';
 
 export const SupportGeneratorInfo: React.FC<{ s: Record<string, any> }> = ({ s }) => {
+  // Честные цифры покрытия — из данных, а не «Все 435 мех-веществ» из старой
+  // копирайтинговой строки: каталог вырос до 521 вещества, больше половины
+  // записей — ОЦЕНОЧНЫЕ механизмы (mech-map, q='C'), а часть каталога вообще
+  // не поддержка (НПВС/ГКС/иммунодепрессанты — сопутствующие препараты).
+  const catalogIds = Object.keys(SUPPORT_CATALOG_DATA);
+  const catalogTotal = catalogIds.length
+    || (Array.isArray(s.catalogSubstances) ? s.catalogSubstances.length : 0);
+  const supportIds = catalogIds.filter(isSupportSubstanceId);
+  const curatedCount = supportIds.filter(isCuratedSupport).length;
+  const derivedCount = Math.max(0, supportIds.length - curatedCount);
+  const concomitantCount = Math.max(0, catalogTotal - supportIds.length);
+  const unmappedCount = listUnmappedSupportIds().length;
   return (
     <div className="sup-geninfo" style={{ padding:'0 12px 80px', maxWidth:600, margin:'0 auto' }}>
       <h2 style={{ fontSize:16, fontWeight:800, color:'#fff', margin:'0 0 16px' }}>📖 Механизм-ориентированная модель (ТЗ-28)</h2>
@@ -120,7 +135,7 @@ export const SupportGeneratorInfo: React.FC<{ s: Record<string, any> }> = ({ s }
             <li><b>Фарм-матрица 10 классов PED:</b> для каждого активного класса — механизмы, анализы, фаза, поддержка, врач, взаимодействия.</li>
             <li><b>Преаналитика, приём и разнесение:</b> 6 преаналитических факторов, интерференции плана, особые указания по приёму (схема + обоснование), разнесение конфликтующих пар по времени.</li>
             <li><b>Противопоказания и взаимодействия</b> — дедублированы и структурированы; рецептурные помечены «под контролем врача».</li>
-            <li><b>Все 435 мех-веществ</b> имеют каталог-описания (полное покрытие, без коротких записей).</li>
+            <li><b>Покрытие каталога:</b> {supportIds.length} веществ поддержки сопоставлены с 28 механизмами — {curatedCount} кураторских записей и {derivedCount} оценочных по токенам каталога (q=C, k≤0.12, в интерфейсе помечены «оценочно»); без механизмов — {unmappedCount}. Ещё {concomitantCount} записей — сопутствующие препараты (НПВС, ГКС, иммунодепрессанты): они учитываются во взаимодействиях, но не в покрытии риска.</li>
           </ul>
         </div>
 

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import type { TzSpecResult, TzSpecOrganResult, TzSpecMechanismResult } from '../../../engines/risk-engine-tz-spec';
 import { getCategoryLabel } from '../../../engines/risk-engine-tz-spec';
+import { isSupportSubstanceId } from '../../../data/support-db/mech-map';
 import { GLASS } from './Calc.types';
 
 const ACCENT = '#00e68a';
@@ -106,16 +107,25 @@ export const TzRiskCard: React.FC<Props> = ({ tz, before, after, peakWeek }) => 
       </div>
       )}
 
-      {/* ── Поддержка, не имеющая механизмов ТЗ ── */}
-      {tz.unmappedSupport && tz.unmappedSupport.length > 0 && (
-        <div style={{
-          padding: '5px 8px', borderRadius: 6, marginBottom: 8,
-          background: 'rgba(245,158,11,0.07)', border: '1px solid rgba(245,158,11,0.22)',
-          fontSize: 7.5, lineHeight: 1.5, color: '#fbbf24',
-        }}>
-          Не участвуют в покрытии (нет привязки к 28 механизмам): {tz.unmappedSupport.join(', ')}
-        </div>
-      )}
+      {/* ── Поддержка, не имеющая механизмов ТЗ ──
+          Отделяем реальные пробелы от сопутствующих препаратов (НПВС/ГКС/
+          иммунодепрессанты): у последних механизмов поддержки нет по
+          определению — это не «дыра в данных», а другой тип записи. */}
+      {tz.unmappedSupport && tz.unmappedSupport.length > 0 && (() => {
+        const gaps = tz.unmappedSupport.filter(id => isSupportSubstanceId(id));
+        const concomitant = tz.unmappedSupport.filter(id => !isSupportSubstanceId(id));
+        return (
+          <div style={{
+            padding: '5px 8px', borderRadius: 6, marginBottom: 8,
+            background: 'rgba(245,158,11,0.07)', border: '1px solid rgba(245,158,11,0.22)',
+            fontSize: 7.5, lineHeight: 1.5, color: '#fbbf24',
+          }}>
+            {gaps.length > 0 && <>Не участвуют в покрытии (нет привязки к 28 механизмам): {gaps.join(', ')}</>}
+            {gaps.length > 0 && concomitant.length > 0 && <br />}
+            {concomitant.length > 0 && <>Сопутствующие препараты (учитываются во взаимодействиях, не в покрытии): {concomitant.join(', ')}</>}
+          </div>
+        );
+      })()}
 
       {/* ── Поддержка с ОЦЕНОЧНЫМИ механизмами (выведены из каталога, q=C) ──
           Такие k правдоподобны, но не доказаны: без этой строки процент

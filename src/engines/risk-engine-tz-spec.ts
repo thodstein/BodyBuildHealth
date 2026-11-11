@@ -1,7 +1,7 @@
 // ── ПОЛНЫЙ ДВИЖОК РАСЧЁТА РИСКА (ТЗ разделы 5-19) ──
 // R = Σ(w × m × E × U × Π(1−k*))
 import { DRUG_DB, STACK_DB, TZ_MECH_LABELS, TZ_SYSTEM_LABELS, TZ_SYSTEM_ICONS, TzDrugEntry } from '../data/support-db';
-import { getSupportMechIndex, getSupportMechs, canonSupportId, DERIVED_SOURCE } from '../data/support-db/mech-map';
+import { getSupportMechIndex, getSupportMechs, canonSupportId, isSupportSubstanceId, DERIVED_SOURCE } from '../data/support-db/mech-map';
 import { resolvePedAlias } from '../data/ped-alias-map';
 
 const Q_MAP: Record<string, number> = { A: 1.0, B: 0.7, C: 0.4 };
@@ -929,7 +929,14 @@ export function calculateTzSpecRisk(input: TzSpecInput): TzSpecResult {
     highOrgans.length>0?`Наибольший риск: ${highOrgans.map(o=>`${o.icon} ${o.name} (${o.afterPercent}%)`).join(', ')}.`:'Все системы в норме.',
     floors.length>0?`Якорные пороги анализов: ${floors.map(f=>f.label).join('; ')}.`:'',
     riskStatus!=='ok'?`ВНИМАНИЕ: не смоделированы препараты — ${unmodeledDrugs.join(', ')}. Их вклад в риск принят за 0, цифры занижены.`:'',
-    unmappedSupport.length>0?`Поддержка без механизмов ТЗ (в покрытии не учтена): ${unmappedSupport.join(', ')}.`:'',
+    unmappedSupport.length>0
+      ?`Не учтено в покрытии — поддержка без механизмов ТЗ: ${unmappedSupport.filter(id=>isSupportSubstanceId(id)).join(', ')||'—'}.`
+      :'',
+    // Сопутствующие препараты (НПВС/ГКС/иммунодепрессанты) отдельной строкой:
+    // у них механизмов поддержки нет по определению — это не пробел данных.
+    unmappedSupport.some(id=>!isSupportSubstanceId(id))
+      ?`Сопутствующие препараты (не поддержка, в покрытии не участвуют): ${unmappedSupport.filter(id=>!isSupportSubstanceId(id)).join(', ')}.`
+      :'',
     // Оценочные механизмы (выведены из токенов каталога, q='C', k ≤ 0.12) —
     // называем явно, чтобы процент покрытия не читался как доказанный.
     derivedSupport.length>0?`Оценочно (по механизмам каталога, q='C', k≤0.12 — не доказательная база): ${derivedSupport.join(', ')}.`:'',

@@ -18,21 +18,46 @@ import {
   getSupportMechs,
   isCuratedSupport,
   listUnmappedSupportIds,
+  isSupportSubstanceId,
+  CONCOMITANT_ONLY_IDS,
   DERIVED_SOURCE,
 } from '../support-db/mech-map';
 import { SUPPORT_CATALOG_DATA } from '../support-catalog-data';
+// Инициализация каталога — та же, что в приложении (регистрация CATALOG_EXTRAS):
+// без неё тест видел «чистый» каталог без 20 записей и ложно подтверждал
+// полное покрытие (аудит 2026-11).
+import '../support-catalog-init';
 import { DRUG_DB, TZ_MECH_LABELS } from '../support-db';
 import { PHARMA_DB } from '../../core/pharma-database';
 import { resolvePedAlias } from '../ped-alias-map';
 
 describe('покрытие каталога механизмами ТЗ', () => {
-  it('нет веществ каталога без механизмов', () => {
+  it('нет веществ поддержки каталога без механизмов', () => {
     expect(listUnmappedSupportIds()).toEqual([]);
   });
 
-  it('индекс механизмов содержит каждый id каталога', () => {
+  it('без механизмов остаются ТОЛЬКО объявленные сопутствующие препараты', () => {
+    const unmappedAll = Object.keys(SUPPORT_CATALOG_DATA).filter(id => getSupportMechs(id).length === 0);
+    const unexpected = unmappedAll.filter(id => isSupportSubstanceId(id));
+    expect(unexpected, 'вещества поддержки без механизмов').toEqual([]);
+    // Обратная проверка: объявленный список не разрастается молча —
+    // каждая запись действительно без механизмов (= не поддержка).
+    const withMechs = [...CONCOMITANT_ONLY_IDS].filter(id => getSupportMechs(id).length > 0);
+    expect(withMechs, 'сопутствующий препарат вдруг получил покрытие — обновите классификацию').toEqual([]);
+  });
+
+  it('исторические *_dup алиасы резолвятся в канон, а не в пустоту', () => {
+    for (const [dup, canon] of [['metformin_dup', 'metformin'], ['levothyroxine_dup', 'levothyroxine'], ['liothyronine_dup', 'liothyronine']]) {
+      expect(getSupportMechs(dup), dup).toEqual(getSupportMechs(canon));
+      expect(getSupportMechs(dup).length, dup).toBeGreaterThan(0);
+    }
+  });
+
+  it('индекс механизмов содержит каждый id поддержки каталога', () => {
     const index = getSupportMechIndex();
-    const missing = Object.keys(SUPPORT_CATALOG_DATA).filter(id => !index[id] || index[id].length === 0);
+    const missing = Object.keys(SUPPORT_CATALOG_DATA)
+      .filter(isSupportSubstanceId)
+      .filter(id => !index[id] || index[id].length === 0);
     expect(missing).toEqual([]);
   });
 
