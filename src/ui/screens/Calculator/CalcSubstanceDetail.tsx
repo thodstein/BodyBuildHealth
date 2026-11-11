@@ -6,7 +6,7 @@ import type { SupportRecommendation } from '../../../engines/tz-mapper-engine';
 import { SUPPORT_CATALOG_DATA } from '../../../data/support-catalog-data';
 import '../../../data/support-catalog-init';
 import { DEFAULT_DOSAGES } from '../../../data/support-meta';
-import { formatDose } from '../../../data/dose-units';
+import { formatDefaultDose } from '../../../data/dose-units';
 import { getSubstanceForm } from '../../../data/substance-forms';
 import { getTitrationProtocol } from '../../../data/titration-protocols';
 import { isCuratedSupport } from '../../../data/support-db/mech-map';
@@ -64,7 +64,7 @@ export const CalcSubstanceDetail: React.FC<Props> = ({
         <span style={{ fontSize: 11, fontWeight: 800, color: 'var(--text)' }}>{name}</span>
         {doseMg !== null && (
           <span style={{ fontSize: 10, fontWeight: 700, color: isTitrated ? '#f59e0b' : '#00e68a', whiteSpace: 'nowrap' }}>
-            {formatDose(id, doseMg)}
+            {formatDefaultDose(id, doseMg)}
           </span>
         )}
         {dose && (

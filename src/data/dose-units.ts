@@ -107,6 +107,25 @@ export function formatDoseFromMg(id: string, mg: number): string {
 }
 
 /**
+ * Обратное к `toMgEquivalent`: значение из мг-шкалы каталога →
+ * НАТУРАЛЬНАЯ единица вещества (в ней живут `DEFAULT_DOSAGES`,
+ * `PlanSubstance.doseMg` и `PlanResult.dosages[id].mg`).
+ *
+ * Нужно там, где мг-фолбэк каталога попадает в поле, которое читатели
+ * подписывают через `formatDefaultDose` (шеринг плана, «Мои планы»,
+ * сравнение с фактическим приёмом). Иначе биотина «5 мг» из каталога
+ * отображался как «5 мкг» — 1000× ниже реальной дозы.
+ * Для МЕ/Ед/млрд КОЕ каталог уже хранит значение в этой единице — не трогаем.
+ */
+export function naturalFromMg(id: string, mg: number): number {
+  if (!Number.isFinite(mg) || mg <= 0) return mg;
+  const k = String(id || '').toLowerCase();
+  // Витамин D: натуральная единица DEFAULT_DOSAGES — МЕ (1 МЕ = 0.025 мкг).
+  if (k === 'vitamin_d3' || k === 'vitamin_d') return Math.round(mg * 1000 * IU_PER_MCG_VITAMIN_D);
+  return doseUnit(k) === 'мкг' ? round2(mg * 1000) : mg;
+}
+
+/**
  * Приводит дозу к мг-эквиваленту для нутрициологической математики
  * (суммарная нагрузка, UL). Возвращает `undefined`, если вещество
  * не является нутриентом в мг/мкг-шкале (МЕ/Ед/млрд КОЕ не конвертируем).

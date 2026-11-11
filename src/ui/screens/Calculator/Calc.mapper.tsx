@@ -26,7 +26,8 @@ import '../../../data/support-catalog-init';
 import { SafetyGuardrails, SafetyConflicts, SafetyProcedures, SafetyAssayWarnings, SafetyGaps, SafetyLabFindings, SafetyCumulativeLoad, SafetyPillBurden, SafetyPedEscalation, SafetyInjections } from './CalcSafetyLayer';
 import { CalcSystemPanel, SYSTEM_PANELS, SYSTEM_TO_PANEL } from './CalcSystemPanel';
 import { DEFAULT_DOSAGES } from '../../../data/support-meta';
-import { formatDose, formatDefaultDose } from '../../../data/dose-units';
+import { formatDefaultDose, naturalFromMg } from '../../../data/dose-units';
+import { canonId } from '../../../engines/support-plan/shared-constants';
 import { supportNameRu } from '../../../data/support-names';
 import { isCuratedSupport } from '../../../data/support-db/mech-map';
 import { NON_PILL_SUPPORT_IDS } from '../../../engines/support-plan/substances';
@@ -572,10 +573,15 @@ function subNameRu(id: string): string {
   // приоритетный fallback. Раньше это была третья копия одной и той же логики.
   return supportNameRu(id, FALLBACK_NAMES[id] || FALLBACK_NAMES[id?.toLowerCase()]);
 }
-function subDosage(id: string): { mg: number; timing: string } | null {
+export function subDosage(id: string): { mg: number; timing: string } | null {
   const e = SUPPORT_CATALOG_DATA[id] || SUPPORT_CATALOG_DATA[id.toLowerCase()] || SUPPORT_CATALOG_DATA[id.toUpperCase()];
-  if (e?.dosage) return e.dosage;
-  return DEFAULT_DOSAGES[id] || DEFAULT_DOSAGES[id.toLowerCase()] || null;
+  // ВНУТРЕННЯЯ доза — НАТУРАЛЬНАЯ единица вещества (мкг для селена/биотина,
+  // МЕ для D3), как в `DEFAULT_DOSAGES`: её читают `formatDefaultDose`,
+  // сравнение с уже принятым (`applyDietAwareToRecSubs`) и экспорт врачу.
+  // `e.dosage.mg` каталога — МИЛЛИГРАММЫ, поэтому переводим: иначе селен
+  // показывался как «0.2 мкг», а витамин D — как «0.13 МЕ».
+  if (e?.dosage) return { mg: naturalFromMg(id, e.dosage.mg), timing: e.dosage.timing };
+  return DEFAULT_DOSAGES[canonId(id)] || DEFAULT_DOSAGES[id] || DEFAULT_DOSAGES[id.toLowerCase()] || null;
 }
 function subTier(id: string): string {
   const e = SUPPORT_CATALOG_DATA[id] || SUPPORT_CATALOG_DATA[id.toLowerCase()] || SUPPORT_CATALOG_DATA[id.toUpperCase()];
@@ -1283,7 +1289,11 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
                           sub={{ substanceId: id, category: 'other' as const, k: 0, reason: 'Ручной выбор', mechsCovered: entry.mechanisms || [], q: 'B' }}
                           rec={{ subs: [], suppression: [], coverage: [], gaps: [], conflicts: [], guardrails: [], boosters: [], activatedMechs: [], summary: '', rationale: '', level: 'medium', phase: 'on', phaseLabel: 'На курсе' } as any}
                           subNameRu={(id: string) => SUPPORT_CATALOG_DATA[id]?.nameRu || SUPPORT_CATALOG_DATA[id]?.name || id}
-                          subDosage={(id: string) => SUPPORT_CATALOG_DATA[id]?.dosage || { mg: 0, timing: '' }}
+                          subDosage={(id: string) => {
+                            const cat = SUPPORT_CATALOG_DATA[id]?.dosage;
+                            // Каталог — миллиграммы, `subDosage`-контракт — натуральная единица.
+                            return cat ? { mg: naturalFromMg(id, cat.mg), timing: cat.timing } : { mg: 0, timing: '' };
+                          }}
                           subTier={(id: string) => SUPPORT_CATALOG_DATA[id]?.tier || 'standard'}
                           canonIdLocal={(id: string) => id}
                         />
@@ -2883,7 +2893,7 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
                         border: mixPlanIds.has(canonIdLocal(s.substanceId)) ? '1px solid rgba(139,92,246,0.3)' : (isTitr ? '1px solid rgba(245,158,11,0.2)' : '1px solid rgba(99,102,241,0.12)'),
                         color: mixPlanIds.has(canonIdLocal(s.substanceId)) ? '#c4b5fd' : '#a5b4fc',
                       }}>
-                         {planItemKind(s.substanceId) === 'База' ? '🧭 ' : planItemKind(s.substanceId) === 'Минерал' ? '⚡ ' : ''}{subNameRu(s.substanceId)}{mg ? ` ${isTitr ? formatDose(s.substanceId, mg) : formatDefaultDose(s.substanceId, mg)}` : ''}
+                         {planItemKind(s.substanceId) === 'База' ? '🧭 ' : planItemKind(s.substanceId) === 'Минерал' ? '⚡ ' : ''}{subNameRu(s.substanceId)}{mg ? ` ${formatDefaultDose(s.substanceId, mg)}` : ''}
                         {mixPlanIds.has(canonIdLocal(s.substanceId)) && <span style={{ marginLeft: 3, fontSize: 6, color: '#c4b5fd', fontWeight: 800 }}>🏋️</span>}
                         {isDoctorControlled(s.substanceId) && <span style={{ marginLeft: 3, fontSize: 6, color: '#fca5a5', fontWeight: 800 }}>👨‍⚕️</span>}
                         {isTitr && ` ↑${((titrF! - 1) * 100).toFixed(0)}%`}
@@ -4086,7 +4096,7 @@ function buildPlanText(rec: SupportRecommendation): string {
       const tF = (rec as any).titrationFactors?.get?.(canonIdLocal(s.substanceId));
       const scaled = dose && dose.mg > 0 && tF && tF > 1 ? Math.round(dose.mg * tF) : dose?.mg ?? 0;
       const doseStr = scaled > 0
-        ? ` · ${tF && tF > 1 ? formatDose(s.substanceId, scaled) : formatDefaultDose(s.substanceId, scaled)} (${dose?.timing || ''})`
+        ? ` · ${formatDefaultDose(s.substanceId, scaled)} (${dose?.timing || ''})`
         : '';
       lines.push(`• ${name}${doseStr}${isDoctorControlled(s.substanceId) ? ' [под обязательным контролем врача]' : ''} — ${s.reason}`);
       if (s.mechsCovered.length > 0) lines.push(`  покрывает: ${s.mechsCovered.join(', ')}`);
@@ -4196,7 +4206,7 @@ function buildDoctorReport(rec: SupportRecommendation, state: CalculatorState): 
       const tF = (rec as any).titrationFactors?.get?.(canonIdLocal(s.substanceId));
       const scaled = dose && dose.mg > 0 && tF && tF > 1 ? Math.round(dose.mg * tF) : dose?.mg ?? 0;
       const doseStr = scaled > 0
-        ? `, ${tF && tF > 1 ? formatDose(s.substanceId, scaled) : formatDefaultDose(s.substanceId, scaled)} (${dose?.timing || ''})`
+        ? `, ${formatDefaultDose(s.substanceId, scaled)} (${dose?.timing || ''})`
         : '';
       lines.push(`- ${name}${doseStr}`);
       const organGuess = s.mechsCovered[0] ? mechToOrganLabel(s.mechsCovered[0]) : '—';

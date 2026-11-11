@@ -503,7 +503,7 @@ export const SupportFavoritesView: React.FC<{ s: Record<string, any> }> = ({ s }
                         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:4 }}>
                           <div>
                             <div style={{ fontSize:10, fontWeight:600, color:'var(--text-light)' }}>{p.name}</div>
-                            <div style={{ fontSize:8, color:'var(--text-dim)' }}>{new Date(p.date).toLocaleDateString('ru-RU')} · ур. {p.level} · нед. {p.week}</div>
+                            <div style={{ fontSize:8, color:'var(--text-dim)' }}>{new Date(p.date).toLocaleDateString('ru-RU')} · ур. {p.level}{p.week ? ` · нед. ${p.week}` : ''}</div>
                           </div>
                           <div style={{ display:'flex', gap:4 }}>
                             <button onClick={() => {
@@ -523,8 +523,19 @@ export const SupportFavoritesView: React.FC<{ s: Record<string, any> }> = ({ s }
                           </div>
                         </div>
                         <div style={{ fontSize:8, color:'var(--text-dim)' }}>
-                          {p.subs?.length || 0} препаратов · Риск: {Math.round(p.riskBefore)}% → {Math.round(p.riskAfter)}% · Покрытие: {Math.round(p.supportScore)}/100
+                          {p.subs?.length || 0} препаратов · Риск: {Math.round(Number(p.riskBefore) || 0)}% → {Math.round(Number(p.riskAfter) || 0)}% · Покрытие: {Number.isFinite(p.supportScore) ? Math.round(p.supportScore) : Math.round(100 - (Number(p.riskAfter) || 0))}/100
                         </div>
+                        {/* Честность сохранённого расчёта: старые планы поля не имеют — молчим. */}
+                        {p.riskStatus && p.riskStatus !== 'ok' && (
+                          <div style={{ fontSize:8, color:'#f59e0b', marginTop:2 }}>
+                            ⚠ Риск неполный{Array.isArray(p.unmodeledDrugs) && p.unmodeledDrugs.length > 0 ? `: не смоделированы — ${p.unmodeledDrugs.join(', ')}` : ' — часть препаратов не смоделирована'}
+                          </div>
+                        )}
+                        {Array.isArray(p.derivedSupport) && p.derivedSupport.length > 0 && (
+                          <div style={{ fontSize:8, color:'#a78bfa', marginTop:2 }}>
+                            ℹ Оценочное покрытие (q=C): {p.derivedSupport.join(', ')}
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>

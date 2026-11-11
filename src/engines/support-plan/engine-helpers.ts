@@ -16,7 +16,7 @@ export { SUB_ALIAS, canonId, TZ_AUTO_BLACKLIST, SAME_CLASS_GROUPS, ID_TO_CLASS, 
 import { evaluateRecommendations } from '../recommendation-engine';
 import { calculateTzSpecRisk, calculateTzSpecRiskTimeline, type TzSpecInput, type DrugInput, type TzSpecResult, type TzSpecMechanismResult, type TzDrugClass } from '../risk-engine-tz-spec';
 import { DRUG_DB } from '../../data/support-db';
-import { formatDose, doseUnitLabel, formatDefaultDose } from '../../data/dose-units';
+import { formatDose, doseUnitLabel } from '../../data/dose-units';
 import { resolvePedAlias } from '../../data/ped-alias-map';
 import { SUPPLEMENTS_DB } from '../../data/support-db/supplements';
 import { PHARMACY_DB } from '../../data/support-db/pharmacy-db';
@@ -141,6 +141,9 @@ function halfLifeMultiplicity(id: string): number {
 
 /** Корректировка дозы по биодоступности формы (если известна форма из каталога). */
 function adjustForBioavailability(subId: string, baseDoseMg: number): { adjustedMg: number; formInfo: string } {
+  // Вещества без титрованной дозы (doses[id] = 0) — нечего корректировать:
+  // раньше в инструкции появлялось «доза скорректирована: —» (шум, а не факт).
+  if (!(baseDoseMg > 0)) return { adjustedMg: baseDoseMg, formInfo: '' };
   const entry = SUPPORT_CATALOG_DATA[subId] || SUPPORT_CATALOG_DATA[subId.toUpperCase()];
   if (!entry) return { adjustedMg: baseDoseMg, formInfo: '' };
   const forms = entry.forms;
@@ -153,13 +156,18 @@ function adjustForBioavailability(subId: string, baseDoseMg: number): { adjusted
   for (const [key, coeff] of Object.entries(FORM_BIOAVAIL_MULT)) {
     if (formKey.includes(key)) { baCoeff = coeff; break; }
   }
-  // Нормализуем к стандартной биодоступности 0.40 (reference)
-  const adjustedMg = Math.round(baseDoseMg * (0.40 / Math.max(0.02, baCoeff)));
-  const finalMg = Math.max(baseDoseMg * 0.3, adjustedMg); // не меньше 30% от базовой дозы
+  // Нормализуем к стандартной биодоступности 0.40 (reference).
+  // `baseDoseMg` приходит из titration-карты — это НАТУРАЛЬНАЯ единица, причём
+  // для витамина D она в МКГ (как в `NUTRIENT_UL`), а не в МЕ из DEFAULT_DOSAGES.
+  // Поэтому подпись — `formatDose` (он переводит мкг→МЕ), а не
+  // `formatDefaultDose`: иначе «34 мкг» печатались как «34 МЕ» (40× ниже).
+  const adjusted = baseDoseMg * (0.40 / Math.max(0.02, baCoeff));
+  const finalDose = Math.max(baseDoseMg * 0.3, adjusted); // не меньше 30% от базовой дозы
+  // мг округляем до целого (витринная точность), мкг/МЕ — как есть (2 знака в форматере).
+  const shownDose = doseUnitLabel(subId) === 'мг' ? Math.round(finalDose) : finalDose;
   return {
-    adjustedMg: finalMg,
-    // Доза в НАТУРАЛЬНОЙ единице вещества (селен — мкг, D3 — МЕ), не «мг».
-    formInfo: `Биодоступность формы "${formName}": ${Math.round(baCoeff * 100)}% → доза скорректирована: ${formatDefaultDose(subId, finalMg)}`,
+    adjustedMg: finalDose,
+    formInfo: `Биодоступность формы "${formName}": ${Math.round(baCoeff * 100)}% → доза скорректирована: ${formatDose(subId, shownDose)}`,
   };
 }
 

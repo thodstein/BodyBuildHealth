@@ -178,6 +178,10 @@ function runSupportUnifiedInner(state: CalculatorState): PlanResult {
     cumulativeLoad: cumulativeLoad.length > 0 ? cumulativeLoad : undefined,
     pillBurden,
     phaseAssignedDrugs: tzRes.phaseAssignedDrugs,
+    // Честность риска — тем же контрактом, что CalculatorResult/SupportScreen.
+    riskStatus: tzRes.riskStatus,
+    unmodeledDrugs: tzRes.unmodeledDrugs && tzRes.unmodeledDrugs.length > 0 ? tzRes.unmodeledDrugs : undefined,
+    derivedSupport: tzRes.derivedSupport && tzRes.derivedSupport.length > 0 ? tzRes.derivedSupport : undefined,
     protocolWarnings: optionNotes.length > 0
       ? [...(tzRes.protocolWarnings || []), ...optionNotes]
       : tzRes.protocolWarnings,

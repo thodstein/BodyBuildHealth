@@ -413,6 +413,15 @@ export interface PlanResult {
   stackRecommendations: StackRecommendation[];
   conflicts: Array<{ a: string; b: string; aName: string; bName: string; effect: string; severity: string; mechanism: string; separationAdvice: string }>;
   riskBreakdown: Record<string, string[]>;
+  /**
+   * Честность расчёта риска (прокидывается из `CalculatorResult`):
+   * `partial`/`no_data` — часть препаратов курса не смоделирована (вклад 0),
+   * `derivedSupport` — вещества поддержки с ОЦЕНОЧНЫМИ механизмами каталога.
+   * Без этих полей «Риск X% → Y%» в шеринге/отчётах читается как доказанный.
+   */
+  riskStatus?: 'ok' | 'partial' | 'no_data';
+  unmodeledDrugs?: string[];
+  derivedSupport?: string[];
   /** Нутрициологические данные */
   depletionWarnings?: Array<{ depleter: string; depleterName: string; depleted: string; depletedName: string; mechanism: string; severity: string; recommendation: string }>;
   cumulativeLoad?: Array<{ nutrientId: string; nutrientName: string; totalMg: number; ulMg?: number; percentUL?: number; isOverUL: boolean; contributors: string[] }>;

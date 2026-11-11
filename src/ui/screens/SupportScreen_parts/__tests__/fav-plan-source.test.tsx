@@ -135,6 +135,42 @@ describe('fav plan source', () => {
     expect(JSON.parse(localStorage.getItem('he_my_plans') || '[]')).toEqual([]);
     expect(setMyPlansRefresh).toHaveBeenCalled();
   });
+
+  it('сохранённый план с неполным риском подписан, а не «доказанные проценты»', () => {
+    localStorage.setItem(
+      'he_my_plans',
+      JSON.stringify([{
+        id: 'p1', name: 'План Средний', level: 'mid', week: 4,
+        subs: ['sub_a', 'sub_b'], dosages: {}, date: new Date().toISOString(),
+        riskBefore: 420, riskAfter: 300, supportScore: 70,
+        riskStatus: 'partial', unmodeledDrugs: ['unknown_drug_xyz'],
+        derivedSupport: ['ginger'],
+      }]),
+    );
+    const { container } = render(
+      <SupportFavoritesView s={planMocks({ planSubTab: 'myplans' })} />,
+    );
+    expect(container.textContent).toContain('План Средний');
+    expect(container.textContent).toContain('нед. 4');
+    expect(container.textContent).toContain('Риск неполный');
+    expect(container.textContent).toContain('unknown_drug_xyz');
+    expect(container.textContent).toContain('Оценочное покрытие (q=C)');
+    expect(container.textContent).toContain('ginger');
+    expect(container.textContent).toContain('70/100');
+  });
+
+  it('старый план без supportScore/недели — без «NaN» и «undefined»', () => {
+    localStorage.setItem(
+      'he_my_plans',
+      JSON.stringify([{ id: 9, name: 'Старый', level: 'basic', date: new Date().toISOString(), subs: ['sub_a'], riskBefore: 50, riskAfter: 40 }]),
+    );
+    const { container } = render(
+      <SupportFavoritesView s={planMocks({ planSubTab: 'myplans' })} />,
+    );
+    expect(container.textContent).not.toContain('NaN');
+    expect(container.textContent).not.toContain('undefined');
+    expect(container.textContent).toContain('60/100');
+  });
 });
 
 describe('stacks view save source', () => {

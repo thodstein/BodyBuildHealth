@@ -15,7 +15,7 @@
 import { describe, it, expect } from 'vitest';
 import { DEFAULT_DOSAGES } from '../support-meta';
 import { SUPPORT_CATALOG_DATA } from '../support-catalog-data';
-import { defaultDoseUnit } from '../dose-units';
+import { defaultDoseUnit, formatDefaultDose, formatDoseFromMg, naturalFromMg } from '../dose-units';
 
 /** Сколько натуральных единиц в 1 мг для конкретного вещества. */
 function unitsPerMg(id: string): number {
@@ -64,5 +64,23 @@ describe('DEFAULT_DOSAGES ↔ SUPPORT_CATALOG_DATA: шкала единиц', ()
     expect((DEFAULT_DOSAGES as any).selenium.mg).toBe(200);
     expect(defaultDoseUnit('selenium')).toBe('мкг');
     expect(catalogEntry('selenium').dosage.mg).toBeCloseTo(0.2, 3);
+  });
+
+  /**
+   * Регрессия 2026-11: фолбэк плана на дозу каталога клал МГ в поле, которое
+   * читатели подписывают как натуральную единицу (`formatDefaultDose`),
+   * — биотин «5 мг» превращался в «5 мкг» (1000× ниже). `naturalFromMg`
+   * должен давать ту же ФИЗИЧЕСКУЮ дозу, что и мг-форматтер каталога.
+   */
+  it('naturalFromMg ↔ formatDoseFromMg: одна и та же доза на всех позициях каталога', () => {
+    const broken: string[] = [];
+    for (const [id, e] of Object.entries(SUPPORT_CATALOG_DATA as Record<string, any>)) {
+      const catMg = e?.dosage?.mg;
+      if (!(Number.isFinite(catMg) && catMg > 0)) continue;
+      const viaMg = formatDoseFromMg(id, catMg);
+      const viaNatural = formatDefaultDose(id, naturalFromMg(id, catMg));
+      if (viaMg !== viaNatural) broken.push(`${id}: ${catMg} мг → «${viaMg}» vs «${viaNatural}»`);
+    }
+    expect(broken, broken.join('; ')).toEqual([]);
   });
 });

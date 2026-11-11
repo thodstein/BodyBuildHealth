@@ -34,7 +34,7 @@ import type { LabCompositeResult } from './lab-analysis.engine';
 import { getDrugTzMechanisms, TZ_MECH_LABELS, TZ_SYSTEM_LABELS } from '../data/support-db';
 import { SUPPORT_CATALOG_DATA } from '../data/support-database';
 import { DEFAULT_DOSAGES } from '../data/support-meta';
-import { formatDefaultDose, formatDoseFromMg } from '../data/dose-units';
+import { formatDefaultDose, naturalFromMg } from '../data/dose-units';
 import { getPrioritySubstances, type SeverityLevel } from '../data/lab-priority-map';
 import { SUPPLEMENTS_DB } from '../data/support-db/supplements';
 import { PHARMACY_DB } from '../data/support-db/pharmacy-db';
@@ -55,7 +55,7 @@ for (let i = 0; i < SYNERGY_NETWORK.length; i++) {
   }
 }
 const SYN_ENTRIES = SYNERGY_NETWORK; // короткий алиас для доступа по индексу
-import { TZ_AUTO_BLACKLIST, PHASE_BLOCKLIST } from './support-plan/shared-constants';
+import { TZ_AUTO_BLACKLIST, PHASE_BLOCKLIST, canonId } from './support-plan/shared-constants';
 
 /* ------------------------------------------------------------------ *
  *  Дефолтное состояние калькулятора (локальная копия, без импорта из UI).
@@ -741,17 +741,20 @@ export function buildClinicalStack(
       });
     } else if (catalog) {
       // fallback: вещество из каталога (дозы из DEFAULT_DOSAGES, нормализованные по весу)
-      const def = (DEFAULT_DOSAGES as any)[id];
+      // Канонизация id: алиас (udca, telmi…) хранит дозу под каноном.
+      const cid = canonId(id);
+      const def = (DEFAULT_DOSAGES as any)[cid] || (DEFAULT_DOSAGES as any)[id];
       const dosage = def || (catalog as any).dosage || { mg: 500, timing: 'с едой' };
       const bw = state.profile?.weight || 80;
       const normalizedMg = normalizeDoseByWeight(dosage.mg || 500, bw);
+      // `doseMg`/`doseDisplay` живут в НАТУРАЛЬНОЙ единице (мкг/МЕ): мг-значение
+      // каталога переводим, иначе шеринг/карточки читали 5 мг биотина как «5 мкг».
+      const doseNatural = def ? normalizedMg : naturalFromMg(cid, normalizedMg);
       substances.push({
         id,
         name: (catalog as any).nameRu || (catalog as any).name || id,
-        doseMg: normalizedMg,
-        // DEFAULT_DOSAGES хранит НАТУРАЛЬНУЮ единицу (селен — мкг, D3 — МЕ),
-        // а `catalog.dosage.mg` — миллиграммы. Подпись зависит от источника числа.
-        doseDisplay: def ? formatDefaultDose(id, normalizedMg) : formatDoseFromMg(id, normalizedMg),
+        doseMg: doseNatural,
+        doseDisplay: formatDefaultDose(cid, doseNatural),
         timing: dosage.timing || 'с едой',
         tier: (catalog as any).tier || 'standard',
         categories: (catalog as any).category || [],

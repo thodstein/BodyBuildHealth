@@ -2663,11 +2663,22 @@ const renderCatalogDetailInner = (subId: string): React.ReactNode => {
       const doseStr = d?.mg ? formatDefaultDose(id, d.mg) : '';
       return `${sub?.name || id} — ${doseStr} (${d?.timing || ''})${pi ? ' — ' + pi.comment : ''}`;
     });
+    // Честность: «Риск: X% -> Y%» в шеринге не должно выглядеть доказанным,
+    // если часть препаратов не смоделирована или покрытие оценочное.
+    const riskNotes: string[] = [];
+    if (planResult.riskStatus && planResult.riskStatus !== 'ok') {
+      riskNotes.push(planResult.riskStatus === 'no_data'
+        ? '⚠ Риск НЕ рассчитан: ни один препарат курса не сопоставлен механизм-модели — проценты выше недействительны.'
+        : `⚠ Расчёт неполный: не смоделированы — ${(planResult.unmodeledDrugs || []).join(', ') || 'часть препаратов'} (вклад принят за 0, риск занижен).`);
+    }
+    if (planResult.derivedSupport && planResult.derivedSupport.length > 0) {
+      riskNotes.push(`ℹ Оценочное покрытие (q=C, механизмы выведены из каталога): ${planResult.derivedSupport.join(', ')}`);
+    }
     return `ПЛАН ПОДДЕРЖКИ (${SUPPORT_LEVELS[supportLevel]?.label || supportLevel})
 Уровень: ${supportLevel} | Неделя: ${courseWeekState}
 Риск: ${planResult.overallRiskBefore}% -> ${planResult.overallRiskAfter}%
 Покрытие: ${planResult.coveragePercent}%
-
+${riskNotes.length > 0 ? riskNotes.join('\n') + '\n' : ''}
 ПРЕПАРАТЫ (${subs.length}):
 ${subs.join('\n')}
 
@@ -2677,13 +2688,23 @@ ${planResult.monitoring?.length ? 'МОНИТОРИНГ:\n' + planResult.monitor
 
   const savePlan = () => {
     try {
+      // Поля name/week/supportScore/id обязательны: список «Мои планы» их читает
+      // и раньше показывал «undefined · нед. undefined · NaN/100». riskStatus —
+      // чтобы старый план не выглядел доказанным после сохранения неполного расчёта.
       const data = {
+        id: `plan_${Date.now()}`,
+        name: `План ${SUPPORT_LEVELS[supportLevel]?.label || supportLevel}`,
         level: supportLevel,
+        week: courseWeekState,
         subs: effectiveLevel?.subs || [],
         dosages: effectiveLevel?.dosages || {},
         date: new Date().toISOString(),
         riskBefore: planResult?.overallRiskBefore || 0,
         riskAfter: planResult?.overallRiskAfter || 0,
+        supportScore: planResult?.coveragePercent ?? Math.round(100 - (planResult?.overallRiskAfter || 0)),
+        riskStatus: planResult?.riskStatus,
+        unmodeledDrugs: planResult?.unmodeledDrugs,
+        derivedSupport: planResult?.derivedSupport,
       };
       const existing = JSON.parse(localStorage.getItem('he_my_plans') || '[]');
       existing.push(data);

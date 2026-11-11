@@ -101,6 +101,28 @@ describe('support calc E2E — критический сценарий: test 500
   });
 });
 
+describe('PlanResult: честность риска прокинута в план', () => {
+  it('известный курс → riskStatus ok', () => {
+    const plan = runSupportUnified(stateWith(['test_enan']));
+    expect(plan.riskStatus).toBe('ok');
+    expect(plan.unmodeledDrugs).toBeUndefined();
+  });
+
+  it('препарат без записи в DRUG_DB → no_data + список unmodeledDrugs', () => {
+    const plan = runSupportUnified(stateWith(['unknown_drug_xyz']));
+    expect(plan.riskStatus).toBe('no_data');
+    expect(plan.unmodeledDrugs).toContain('unknown_drug_xyz');
+  });
+
+  it('derivedSupport — только массив (или undefined), не случайная строка', () => {
+    const plan = runSupportUnified(stateWith(['test_enan', 'tren_enan']));
+    expect(plan.derivedSupport === undefined || Array.isArray(plan.derivedSupport)).toBe(true);
+    if (Array.isArray(plan.derivedSupport)) {
+      expect(plan.derivedSupport.every(id => typeof id === 'string' && id.length > 0)).toBe(true);
+    }
+  });
+});
+
 describe('detectActivePedClasses — корректная классификация (баг-регрессия)', () => {
   it('sustanon → тестостерон, НЕ орал 17α', () => {
     const cls = detectActivePedClasses({ pharma: { aas: [{ id: 'sustanon' }] } });

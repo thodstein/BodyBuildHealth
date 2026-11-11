@@ -3,7 +3,7 @@
  */
 
 import { DEFAULT_DOSAGES } from '../../data/support-database';
-import { formatDefaultDose, formatDoseFromMg } from '../../data/dose-units';
+import { formatDefaultDose, formatDoseFromMg, naturalFromMg } from '../../data/dose-units';
 import type { CalculatorResult, PlanSubstance } from './types';
 import { catalogEntry } from './types';
 import { canonId } from './shared-constants';
@@ -116,22 +116,33 @@ export function buildSubstances(
     const e = catalogEntry(id);
     // Канонизация: алиасы (udca→tudca, telmi→telmisartan…) хранят дозу под каноническим id.
     const def = DEFAULT_DOSAGES[cid] || DEFAULT_DOSAGES[id];
-    // Weight-based dosing
-    let doseMg = def?.mg ?? e?.dosage?.mg ?? (FOUNDATION_ITEMS[cid] ? 0 : 500);
-    const wbd = WEIGHT_BASED_DOSING[cid];
-    if (wbd && weight && weight > 0) {
-      doseMg = Math.round(Math.max(wbd.minMg, Math.min(wbd.maxMg, weight * wbd.mgPerKg)));
-    }
-    const foundation = FOUNDATION_ITEMS[cid];
     // Есть ли РЕАЛЬНАЯ доза в справочнике (не фолбэк 500 мг ниже).
     const catalogDose = e?.dosage?.mg && e.dosage.mg > 0 ? e.dosage.mg : undefined;
+    // Weight-based dosing — считается в МГ (таблица выше в мг).
+    const wbd = WEIGHT_BASED_DOSING[cid];
+    const wbdMg = wbd && weight && weight > 0
+      ? Math.round(Math.max(wbd.minMg, Math.min(wbd.maxMg, weight * wbd.mgPerKg)))
+      : undefined;
+    // ВНУТРЕННЯЯ доза плана — всегда НАТУРАЛЬНАЯ единица вещества (мкг для
+    // селена/биотина, МЕ для D3), как в `DEFAULT_DOSAGES`: `dosages[id].mg`
+    // и `PlanSubstance.doseMg` читатели подписывают через `formatDefaultDose`.
+    // Раньше мг-фолбэк каталога (biotin 5 мг) попадал сюда без пересчёта и
+    // отображался как «5 мкг» — 1000× ниже реальной дозы.
+    const doseMg = wbdMg !== undefined
+      ? naturalFromMg(cid, wbdMg)
+      : def
+        ? def.mg
+        : catalogDose !== undefined
+          ? naturalFromMg(cid, catalogDose)
+          : (FOUNDATION_ITEMS[cid] ? 0 : 500);
+    const foundation = FOUNDATION_ITEMS[cid];
     // Доза для отображения. Раньше и натуральная единица `DEFAULT_DOSAGES`
     // (селен 200 мкг, D3 5000 МЕ), и мг-шкала каталога подписывались «мг» —
     // получалось «200 мг» селена (1000×) и «5000 мг» витамина D.
-    const doseDisplay = foundation?.dose || (def && !wbd
+    const doseDisplay = foundation?.dose || (def && wbdMg === undefined
       ? formatDefaultDose(cid, def.mg)
-      : wbd
-        ? formatDoseFromMg(cid, doseMg)
+      : wbdMg !== undefined
+        ? formatDoseFromMg(cid, wbdMg)
         : catalogDose !== undefined
           ? formatDoseFromMg(cid, catalogDose)
           : 'по инструкции');
