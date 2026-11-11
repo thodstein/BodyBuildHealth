@@ -1,12 +1,23 @@
 // Вкладка «Риски (ТЗ)» — лабораторные маркеры для механизм-ориентированной модели
 import React, { useState, useMemo, useEffect } from 'react';
-import { calculateTzSpecRisk, type TzSpecResult, type TzSpecOrganResult } from '../../../engines/risk-engine-tz-spec';
+import { calculateTzSpecRisk, DRUG_CLASSES, type TzSpecResult, type TzSpecOrganResult } from '../../../engines/risk-engine-tz-spec';
 import { useDataLink } from '../../../core/data-link';
 import { NativeIcon } from '../../native/NativeIcons';
 
 const ACCENT = 'var(--labs-accent, #00e68a)';
 const ACCENT_RGB = 'var(--labs-accent-rgb, 0,230,138)';
 const CARD: React.CSSProperties = { padding: 14, borderRadius: 16, background: 'rgba(24,24,27,0.15)', border: '1px solid rgba(255,255,255,0.04)', marginBottom: 10 };
+
+/**
+ * Препарат-модель класса. Движку нужен id из `DRUG_DB` (веса 28 механизмов),
+ * абстрактного «класса» он не знает. Раньше сюда отправлялся `drugName:'custom'`:
+ * записи нет → все веса 0 → экран показывал «0% → 0%» как безопасный курс.
+ */
+export const REP_DRUG: Record<'aas' | 'gh' | 'insulin', { id: string; label: string; doseUnit: string }> = {
+  aas: { id: 'test_enan', label: 'Тестостерон энантат', doseUnit: 'мг/нед' },
+  gh: { id: 'hgh', label: 'Соматропин', doseUnit: 'МЕ/сут' },
+  insulin: { id: 'ins_short', label: 'Инсулин короткого действия', doseUnit: 'Ед/сут' },
+};
 
 // ── Лабораторные маркеры из таблицы T4 ──
 const LAB_MARKERS_CONFIG: { code: string; name: string; unit: string; systems: string[]; normalRange: string }[] = [
@@ -89,9 +100,12 @@ export const LabsTzRiskTab: React.FC = () => {
   };
 
   const handleCalc = () => {
+    // id из DRUG_DB по классу, а не 'custom' (см. REP_DRUG): иначе механизм-модель
+    // не находит запись и выдаёт 0% риска без единого предупреждения.
+    const rep = REP_DRUG[drugClass];
     const result = calculateTzSpecRisk({
       drugClass,
-      drugName: 'custom',
+      drugName: rep.id,
       dose,
       duration,
       form: 'inject',
@@ -136,7 +150,7 @@ export const LabsTzRiskTab: React.FC = () => {
             <div style={{ fontSize:11, color:'#fff', marginBottom:4, fontWeight:700 }}>Класс</div>
             <div style={{ display: 'flex', gap: 3 }}>
               {(['aas', 'gh', 'insulin'] as const).map(dc => (
-                <button key={dc} onClick={() => setDrugClass(dc)} style={{
+                <button key={dc} onClick={() => { setDrugClass(dc); setDose(DRUG_CLASSES[dc].defaultDose); }} style={{
                   flex:1, padding:'10px 4px', borderRadius:10, cursor:'pointer', fontSize:12, fontWeight:700, minHeight:44,
                   transition: 'all 0.2s', textAlign: 'center',
                   background: drugClass === dc ? 'var(--accent)' : 'rgba(24,24,27,0.6)',
@@ -149,7 +163,7 @@ export const LabsTzRiskTab: React.FC = () => {
             </div>
           </div>
           <div>
-            <div style={{ fontSize:11, color:'#fff', marginBottom:4, fontWeight:700 }}>Доза</div>
+            <div style={{ fontSize:11, color:'#fff', marginBottom:4, fontWeight:700 }}>Доза, {REP_DRUG[drugClass].doseUnit}</div>
             <input type="number" value={dose} onChange={e => setDose(Number(e.target.value))}
               style={{ width:'100%', padding:'12px 10px', borderRadius:12, background:'rgba(24,24,27,0.6)', border:'1px solid rgba(255,255,255,0.1)', color:'#fff', fontSize:14, fontWeight:700, boxSizing:'border-box', minHeight:44 }} />
           </div>
@@ -158,6 +172,9 @@ export const LabsTzRiskTab: React.FC = () => {
             <input type="number" value={duration} onChange={e => setDuration(Number(e.target.value))}
               style={{ width:'100%', padding:'12px 10px', borderRadius:12, background:'rgba(24,24,27,0.6)', border:'1px solid rgba(255,255,255,0.1)', color:'#fff', fontSize:14, fontWeight:700, boxSizing:'border-box', minHeight:44 }} />
           </div>
+        </div>
+        <div style={{ marginTop:8, fontSize:11, color:'#fff', opacity:0.85 }}>
+          Модель класса: {REP_DRUG[drugClass].label} — механизм-модель считает по его профилю в DRUG_DB.
         </div>
       </div>
 
@@ -241,6 +258,27 @@ export const LabsTzRiskTab: React.FC = () => {
               <div style={{ height: '100%', width: `${Math.min(100, result.overallAfter)}%`, background: catColor(result.overallAfter), borderRadius: 3 }} />
             </div>
           </div>
+
+          {/* Честность: не смоделированные препараты и оценочное покрытие */}
+          {result.riskStatus !== 'ok' && (
+            <div style={{ ...CARD, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.30)' }}>
+              <div style={{ fontSize:11, fontWeight:800, color:'#fca5a5', lineHeight:1.5 }}>
+                {result.riskStatus === 'no_data'
+                  ? '⛔ Риск НЕ рассчитан: препарат не сопоставлен механизм-модели — проценты выше не значат «всё хорошо».'
+                  : '⚠ Расчёт неполный: часть препаратов не смоделирована, их вклад принят за 0 — проценты занижены.'}
+              </div>
+              {result.unmodeledDrugs?.length > 0 && (
+                <div style={{ fontSize:10, color:'#fff', opacity:0.85, marginTop:3 }}>Не учтено: {result.unmodeledDrugs.join(', ')}</div>
+              )}
+            </div>
+          )}
+          {result.derivedSupport?.length > 0 && (
+            <div style={{ ...CARD, background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.28)' }}>
+              <div style={{ fontSize:11, fontWeight:700, color:'#c4b5fd', lineHeight:1.5 }}>
+                ℹ️ Оценочное покрытие (механизмы выведены из каталога, q=C, k≤0.12): {result.derivedSupport.join(', ')}
+              </div>
+            </div>
+          )}
 
           <div style={CARD}>
             <div style={{ fontSize: 12, fontWeight: 700, color: ACCENT, marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}><NativeIcon name="heart" size={13} /> Риск по системам</div>

@@ -526,6 +526,10 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
     const cov = t4.length > 0 ? p / t4.length : 0.1;
     // курс
     const course = linked.course || [];
+    // Механизм-модель описывает риск ПРЕПАРАТОВ. Без курса все веса = 0, и
+    // карточка показывала бы «0% → 0%» как «всё безопасно» (а с прежним
+    // `drugName:'custom'` движок вообще не находил запись в DRUG_DB).
+    if (course.length === 0) return null;
     const fd = course[0];
     let dc: 'aas'|'gh'|'insulin' = 'aas';
     if (fd) {
@@ -538,7 +542,7 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
     const oral = course.some((c:any)=>{const s=(c.substanceId||'').toLowerCase();return s.includes('oral')||s.includes('oxy')||s.includes('dbol')||s.includes('anadrol')||s.includes('winstrol')||s.includes('stanozo')||s.includes('turinabol');});
     let sup: string[] = [];
     try { const sr = JSON.parse(localStorage.getItem('he_support_risk')||'null'); if(sr?.subs) sup = sr.subs.map((id:string)=>id.toLowerCase()); } catch {}
-    return calculateTzSpecRisk({ drugClass:dc, drugName:fd?.substanceId||'custom', dose:Math.max(50,Math.round(totalDose)), duration:dur, form:oral?'oral':'inject', combinations:Math.max(1,course.length), labCoverage:cov, labValues:m, supportSubstances:sup, ...(profileSex === 'female' ? { sex: 'female' as const } : {}) });
+    return calculateTzSpecRisk({ drugClass:dc, drugName:fd.substanceId, dose:Math.max(50,Math.round(totalDose)), duration:dur, form:oral?'oral':'inject', combinations:Math.max(1,course.length), labCoverage:cov, labValues:m, supportSubstances:sup, ...(profileSex === 'female' ? { sex: 'female' as const } : {}) });
   }, [hasLabs, tzLabValues, linked.course, profileSex]);
 
   const toggleGlobalNoLabs = useCallback(() => {
@@ -2148,6 +2152,26 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                           background: tzSpecResult.overallAfter < 25 ? '#22c55e' : tzSpecResult.overallAfter < 50 ? '#eab308' : '#f97316' }} />
                       </div>
                     </div>
+                    {/* Честность: неполный расчёт и оценочное покрытие поддержки */}
+                    {tzSpecResult.riskStatus !== 'ok' && (
+                      <div style={{ padding:'10px 12px', borderRadius:14, marginBottom:8, background:'rgba(239,68,68,0.08)', border:'1px solid rgba(239,68,68,0.30)' }}>
+                        <div style={{ fontSize:12, fontWeight:800, color:'#fca5a5', lineHeight:1.5 }}>
+                          {tzSpecResult.riskStatus === 'no_data'
+                            ? '⛔ Риск НЕ рассчитан: препарат курса не сопоставлен механизм-модели — цифры не значат «всё хорошо».'
+                            : '⚠ Расчёт неполный: часть препаратов не смоделирована, их вклад принят за 0 — проценты занижены.'}
+                        </div>
+                        {tzSpecResult.unmodeledDrugs?.length > 0 && (
+                          <div style={{ fontSize:11, color:'#fff', opacity:0.85, marginTop:3 }}>Не учтено: {tzSpecResult.unmodeledDrugs.join(', ')}</div>
+                        )}
+                      </div>
+                    )}
+                    {tzSpecResult.derivedSupport?.length > 0 && (
+                      <div style={{ padding:'10px 12px', borderRadius:14, marginBottom:8, background:'rgba(139,92,246,0.08)', border:'1px solid rgba(139,92,246,0.28)' }}>
+                        <div style={{ fontSize:11, fontWeight:700, color:'#c4b5fd', lineHeight:1.5 }}>
+                          ℹ️ Оценочное покрытие (механизмы выведены из каталога, q=C, k≤0.12): {tzSpecResult.derivedSupport.join(', ')}
+                        </div>
+                      </div>
+                    )}
                     <div style={{ display:'grid', gap:8 }}>
                       {tzSpecResult.organs.map((organ: TzSpecOrganResult) => {
                         const cc = (v: number) => v < 25 ? '#22c55e' : v < 50 ? '#eab308' : v < 75 ? '#f97316' : '#ef4444';
@@ -2184,7 +2208,13 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                   </>
                 ) : (
                   <div style={{ ...LABS_CARD, textAlign:'center', padding:20 }}>
-                    <div style={{ fontSize:13, fontWeight:800, color:'#fff' }}>{hasLabs ? 'Недостаточно данных' : 'Введите анализы в текущей фазе'}</div>
+                    <div style={{ fontSize:13, fontWeight:800, color:'#fff' }}>
+                      {!hasLabs
+                        ? 'Введите анализы в текущей фазе'
+                        : (linked.course || []).length === 0
+                          ? 'Добавьте препараты в курс — модель считает риск препаратов, а не «риск анализов»'
+                          : 'Недостаточно данных'}
+                    </div>
                   </div>
                 )}
               </div>)}</div>

@@ -972,6 +972,11 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
         riskBeforeSupport: tzFinalRisk.overallRaw,
         riskAfterSupport: tzFinalRisk.overallAfter,
         riskStatus: tzFinalRisk.riskStatus,
+        // Тот же контракт, что пишет SupportScreen: без этих полей «Риски»
+        // показывали статус, но не могли назвать причину/оценочные вещества.
+        unmodeledDrugs: tzFinalRisk.unmodeledDrugs,
+        unmappedSupport: tzFinalRisk.unmappedSupport,
+        derivedSupport: tzFinalRisk.derivedSupport,
         timestamp: Date.now(),
       }));
     } catch { /* storage недоступен */ }
@@ -4265,6 +4270,16 @@ function buildDoctorReport(rec: SupportRecommendation, state: CalculatorState): 
       const tz = calculateTzSpecRisk(inp);
       lines.push('');
       lines.push(`СИСТЕМНЫЕ РИСКИ (механизм-модель, индекс 0-100): общий ${tz.overallRaw}% → ${tz.overallAfter}%`);
+      // Честность для врача: неполный расчёт и оценочные механизмы поддержки
+      // нельзя выдавать за полные проценты — в тексте это видно только здесь.
+      if (tz.riskStatus !== 'ok') {
+        lines.push(tz.riskStatus === 'no_data'
+          ? `⚠ РИСК НЕ РАССЧИТАН: ни один препарат не сопоставлен механизм-модели (${tz.unmodeledDrugs.join(', ') || 'нет данных'}) — проценты выше недействительны.`
+          : `⚠ РАСЧЁТ НЕПОЛНЫЙ: не смоделированы препараты — ${tz.unmodeledDrugs.join(', ')} (их вклад принят за 0, риск занижен).`);
+      }
+      if (tz.derivedSupport?.length > 0) {
+        lines.push(`Оценочное покрытие поддержки (q=C, механизмы выведены из каталога): ${tz.derivedSupport.join(', ')}`);
+      }
       if (tz.overallVerification !== undefined) {
         lines.push(`Верифицировано анализами: ${Math.round(tz.overallVerification * 100)}% систем${tz.overallVerification < 0.5 ? ' — оценка по фармакологии, сдайте анализы' : ''}`);
       }
