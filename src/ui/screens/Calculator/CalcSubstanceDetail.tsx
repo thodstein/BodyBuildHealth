@@ -9,7 +9,7 @@ import { DEFAULT_DOSAGES } from '../../../data/support-meta';
 import { formatDefaultDose } from '../../../data/dose-units';
 import { getSubstanceForm } from '../../../data/substance-forms';
 import { getTitrationProtocol } from '../../../data/titration-protocols';
-import { isCuratedSupport } from '../../../data/support-db/mech-map';
+import { isCuratedSupport, isSupportSubstanceId } from '../../../data/support-db/mech-map';
 import type { RecommendedSub } from '../../../engines/tz-mapper-engine';
 import { GLASS } from './Calc.types';
 
@@ -114,6 +114,14 @@ export const CalcSubstanceDetail: React.FC<Props> = ({
               {mechsCovered.map(m => (
                 <span key={m} style={{ fontSize: 7, padding: '1px 6px', borderRadius: 6, background: 'rgba(168,85,247,0.08)', color: '#c4b5fd', fontWeight: 500 }}>{m}</span>
               ))}
+            </div>
+          )}
+
+          {/* Сопутствующий препарат: пустой список механизмов — это НЕ пробел,
+              а другой тип записи (НПВС/ГКС/иммунодепрессанты не снижают риск). */}
+          {mechsCovered.length === 0 && !isSupportSubstanceId(id) && (
+            <div style={{ marginBottom: 5, padding: '4px 8px', borderRadius: 6, background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.2)', fontSize: 7, lineHeight: 1.5, color: '#fbbf24' }}>
+              Сопутствующий препарат — не участвует в покрытии риска: учитывается во взаимодействиях и противопоказаниях.
             </div>
           )}
 

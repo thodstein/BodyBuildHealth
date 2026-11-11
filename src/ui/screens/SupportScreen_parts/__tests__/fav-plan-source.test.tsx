@@ -171,6 +171,33 @@ describe('fav plan source', () => {
     expect(container.textContent).not.toContain('undefined');
     expect(container.textContent).toContain('60/100');
   });
+
+  it('старый расчёт калькулятора без riskStatus подписан как «старый формат»', () => {
+    localStorage.setItem(
+      'he_saved_calc_results',
+      JSON.stringify([{
+        id: 'c1', supportLevel: 'mid', date: new Date().toISOString(), subs: ['sub_a'],
+        calcResult: { riskBeforeSupport: 42, riskAfterSupport: 30, supportScore: 70 },
+      }]),
+    );
+    const { container } = render(
+      <SupportFavoritesView s={planMocks({ favTab: 'calculator' })} />,
+    );
+    expect(container.textContent).toContain('Риск: 42% → 30%');
+    expect(container.textContent).toContain('расчёт без статуса риска (старый формат)');
+
+    cleanup();
+    localStorage.setItem(
+      'he_saved_calc_results',
+      JSON.stringify([{
+        id: 'c2', supportLevel: 'mid', date: new Date().toISOString(), subs: ['sub_a'],
+        calcResult: { riskBeforeSupport: 42, riskAfterSupport: 30, supportScore: 70, riskStatus: 'partial', unmodeledDrugs: ['unknown_drug_xyz'] },
+      }]),
+    );
+    const second = render(<SupportFavoritesView s={planMocks({ favTab: 'calculator' })} />);
+    expect(second.container.textContent).toContain('риск неполный');
+    expect(second.container.textContent).toContain('unknown_drug_xyz');
+  });
 });
 
 describe('stacks view save source', () => {

@@ -600,6 +600,13 @@ export const SupportFavoritesView: React.FC<{ s: Record<string, any> }> = ({ s }
                     {r.calcResult && (
                       <div style={{ fontSize:8, color:'var(--text-dim)' }}>
                         Риск: {Math.round(r.calcResult.riskBeforeSupport)}% → {Math.round(r.calcResult.riskAfterSupport)}% · Покрытие: {Math.round(r.calcResult.supportScore)}/100
+                        {/* Старые записи (без riskStatus) писались до появления честного
+                            статуса: подписываем, чтобы проценты не читались как полный расчёт. */}
+                        {r.calcResult.riskStatus === 'partial' || r.calcResult.riskStatus === 'no_data'
+                          ? ` · ⚠ риск неполный${Array.isArray(r.calcResult.unmodeledDrugs) && r.calcResult.unmodeledDrugs.length ? `: ${r.calcResult.unmodeledDrugs.join(', ')}` : ''}`
+                          : !r.calcResult.riskStatus
+                            ? ' · ℹ расчёт без статуса риска (старый формат)'
+                            : ''}
                       </div>
                     )}
                   </div>

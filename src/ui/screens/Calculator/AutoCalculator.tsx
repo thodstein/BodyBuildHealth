@@ -689,7 +689,13 @@ export const AutoCalculator: React.FC<AutoCalculatorProps> = ({ onApply, embedde
           </div>
         ) : result.risk.systems.filter(s => s.rawScore > 0).length > 0 ? (
           <div style={{ marginTop: 6 }}>
-            <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text)', marginBottom: 4, paddingLeft: 4 }}>📊 Риск: {result.overallRiskBefore}% → <span style={{ color: '#00e68a' }}>{result.overallRiskAfter}%</span></div>
+            {/* Ветка старой системной модели (V7): механизм-модель ТЗ-28 не дала
+                органов (нет препаратов с известными механизмами). Без подписи
+                такие проценты читались как результат основной модели. */}
+            <div style={{ fontSize: 8, color: '#fbbf24', paddingLeft: 4, marginBottom: 3 }}>
+              ⚠ Механизм-модель недоступна — показана системная модель V7 (не сверена с 28 механизмами)
+            </div>
+            <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text)', marginBottom: 4, paddingLeft: 4 }}>📊 Риск (V7): {result.overallRiskBefore}% → <span style={{ color: '#00e68a' }}>{result.overallRiskAfter}%</span></div>
             {result.risk.systems.filter(s => s.rawScore > 0).map(sys =>
               <div key={sys.id} style={{ ...GLASS, padding: '4px 10px', marginBottom: 3 }}>
                 <MechanismView sys={sys} />
