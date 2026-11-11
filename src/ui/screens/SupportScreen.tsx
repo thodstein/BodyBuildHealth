@@ -869,6 +869,9 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab; initialSubTab?: 
         subs: actualSubs,
         riskStatus: tzResult.riskStatus,
         unmodeledDrugs: tzResult.unmodeledDrugs,
+        // Тот же контракт полей, что пишет Calc.mapper: без unmappedSupport
+        // «Риски»/отчёты не могут назвать поддержку, не участвующую в покрытии.
+        unmappedSupport: tzResult.unmappedSupport,
         derivedSupport: tzResult.derivedSupport,
         timestamp: Date.now(),
       }));
