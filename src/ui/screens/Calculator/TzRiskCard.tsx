@@ -117,6 +117,19 @@ export const TzRiskCard: React.FC<Props> = ({ tz, before, after, peakWeek }) => 
         </div>
       )}
 
+      {/* ── Поддержка с ОЦЕНОЧНЫМИ механизмами (выведены из каталога, q=C) ──
+          Такие k правдоподобны, но не доказаны: без этой строки процент
+          покрытия читался бы как посчитанный по ТЗ-таблице. */}
+      {tz.derivedSupport && tz.derivedSupport.length > 0 && (
+        <div style={{
+          padding: '5px 8px', borderRadius: 6, marginBottom: 8,
+          background: 'rgba(139,92,246,0.07)', border: '1px solid rgba(139,92,246,0.22)',
+          fontSize: 7.5, lineHeight: 1.5, color: '#c4b5fd',
+        }}>
+          Оценочно (механизмы выведены из каталога, q=C, k≤0.12): {tz.derivedSupport.join(', ')}
+        </div>
+      )}
+
       {/* ── Статус + Kp ── */}
       <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 8 }}>
         <div style={{

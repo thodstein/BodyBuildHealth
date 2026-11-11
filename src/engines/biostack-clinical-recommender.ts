@@ -910,7 +910,7 @@ export function buildClinicalStack(
   for (const s of substances) {
     const mechs = (s.tzMechanisms || []).map(t => t.label).join(', ');
     const role = s.mechanismReason || mechs || 'поддержка';
-    parts.push(`• ${s.name} (${s.doseDisplay || s.doseMg + ' мг'}, ${s.timing}) — ${role}`);
+    parts.push(`• ${s.name} (${s.doseDisplay || formatDefaultDose(s.id, s.doseMg)}, ${s.timing}) — ${role}`);
   }
 
   if (systemNames.length > 0) {
@@ -1001,7 +1001,7 @@ export function summarizeClinicalStack(r: ClinicalStackResult): string {
   lines.push(`Риск до/после поддержки: ${r.riskBefore} → ${r.riskAfter}`);
   if (r.excluded.length) lines.push(`Отсеяно шлюзом безопасности: ${r.excluded.length}`);
   r.substances.forEach((s) => {
-    lines.push(`• ${s.name} — ${s.doseDisplay || s.doseMg + ' мг'}, ${s.timing}`);
+    lines.push(`• ${s.name} — ${s.doseDisplay || formatDefaultDose(s.id, s.doseMg)}, ${s.timing}`);
   });
   return lines.join('\n');
 }

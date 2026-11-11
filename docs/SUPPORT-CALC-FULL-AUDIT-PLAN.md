@@ -334,6 +334,16 @@ P2 — вкладка «Анализы»: отображение и индика
 - `RiskScreen` (страница «Общий риск» в «Других методах») — читает `he_support_risk.riskStatus`/`unmodeledDrugs` (SupportScreen их писал, никто не читал) → та же плашка над карточкой общего риска.
 - Новый гард `risk-spec-honesty.test.tsx` (3): неизвестный препарат → «НЕ рассчитан» + id; смешанный курс → «Расчёт неполный»; полностью известный курс → плашек нет.
 
+### Догон: честность производного покрытия (шестой проход)
+Пятый проход закрыл «препараты не смоделированы», но остался второй источник выдуманной уверенности: **поддержка**. У 454 из 521 вещества каталога нет кураторской записи механизмов — k/q выводятся из токенов каталога (`mech-map.deriveFromCatalog`, q='C', k≤0.12). Эти проценты попадали в «Kp», в план и в отчёты без единой пометки.
+- `risk-engine-tz-spec` → `TzSpecResult.derivedSupport: string[]` (вещества, у которых ХОТЯ БЫ один механизм из `DERIVED_SOURCE`) + строка в `explanation`; `support-plan/engine` → `CalculatorResult.derivedSupport` (для UI SupportScreen).
+- `SupportScreen` → `he_support_risk.derivedSupport` и `risk-bridge.supportDerived`.
+- UI: `TzRiskCard` (калькулятор) и `RiskSpecMethod` (вкладка «Механизм-ориентированная») — фиолетовая плашка «Оценочно (механизмы выведены из каталога, q=C, k≤0.12 — не доказательная база)» со списком; `RiskScreen` (Общий риск) — та же плашка из `he_support_risk`.
+- `CalcSubstanceDetail` — у вещества без кураторской записи «док. C» получает «(оценка)», а над чипами механизмов — «оценочно — механизмы выведены из каталога»; `Calc.mapper` (текстовый экспорт для врача) — «уровень доказательности: C (оценка по каталогу)».
+- Отчёт: «Эффективность поддержки» получает `note` «Оценочное покрытие (q=C…): …» из моста.
+- Новый гард `dose-scale-consistency.test.ts` (4): сверка `DEFAULT_DOSAGES` (натуральная единица) с `SUPPORT_CATALOG_DATA[id].dosage.mg` (мг) по всем 61 пересекающимся id — ловит будущую «×1000» при добавлении доз; плюс явные кейсы selenium/D3.
+- Новые гарды: `tz-risk-status.test.ts` +4 (производное вещество попадает в `derivedSupport`, NAC — нет, неизвестное — нет, `explanation` помечает), `tz-risk-card-derived.test.tsx` (3), `comprehensive-report.test.ts` +2 (note есть/нет).
+
 ### Финал
 `npm run type-check` — 0 ошибок; `npm run verify:apk-design` — OK; широкий прогон (`src/engines` + `src/ui/components` + `src/ui/screens/__tests__` + `src/ui/__tests__`, 975 файлов): **14 253 теста зелёные**, 1 падение — предсуществующее и не связанное с правками: `diary-mmc-checkin-integration.test.tsx` — ожидает «2 сетов» вместо «2 сета» после `8aeb72252` (воспроизводится на HEAD-версиях). Ранее отмеченное `risk-women-deeplink.test.tsx` (`initialSubTab='women'`) в этот круг не входит и тоже воспроизводится на HEAD.
 Контрольный прогон `src/engines` + `src/data` + `src/ui` целиком (1556 файлов): **19 901 тест зелёный**, 20 skipped, 1 падение — то же самое предсуществующее (`diary-mmc`).

@@ -238,13 +238,15 @@ export const RiskScreen: React.FC<{ initialSubTab?: string; onNavigate?: (screen
   // Честность расчёта: SupportScreen пишет `riskStatus` (ok/partial/no_data) и
   // список не смоделированных препаратов, но экран их раньше не читал — показывал
   // полные проценты, даже если часть курса в модель не попала.
-  const supportCalcHonesty = useMemo<{ riskStatus?: 'ok' | 'partial' | 'no_data'; unmodeledDrugs: string[] } | null>(() => {
+  const supportCalcHonesty = useMemo<{ riskStatus?: 'ok' | 'partial' | 'no_data'; unmodeledDrugs: string[]; derivedSupport: string[] } | null>(() => {
     try {
       const sr = JSON.parse(localStorage.getItem('he_support_risk') || 'null');
-      if (sr && (sr.riskStatus || (Array.isArray(sr.unmodeledDrugs) && sr.unmodeledDrugs.length > 0))) {
+      const derived = Array.isArray(sr?.derivedSupport) ? sr.derivedSupport.filter(Boolean) : [];
+      if (sr && (sr.riskStatus || (Array.isArray(sr.unmodeledDrugs) && sr.unmodeledDrugs.length > 0) || derived.length > 0)) {
         return {
           riskStatus: sr.riskStatus,
           unmodeledDrugs: Array.isArray(sr.unmodeledDrugs) ? sr.unmodeledDrugs.filter(Boolean) : [],
+          derivedSupport: derived,
         };
       }
     } catch {}
@@ -751,6 +753,20 @@ export const RiskScreen: React.FC<{ initialSubTab?: string; onNavigate?: (screen
                   Не учтено: {supportCalcHonesty.unmodeledDrugs.join(', ')}
                 </div>
               )}
+            </div>
+          )}
+
+          {/* Честность покрытия: часть поддержки учтена по механизмам, выведенным
+              из каталога (q='C', k ≤ 0.12). Проценты валидны, но вклад этих
+              веществ — оценка; без подписи «Kp» читается как доказанный. */}
+          {supportCalcHonesty && supportCalcHonesty.derivedSupport.length > 0 && (
+            <div className="card" style={{ marginBottom: 12, padding: '10px 14px', borderRadius: 14, background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.24)', borderLeft: '4px solid #8b5cf6' }}>
+              <div style={{ fontSize: 12, color: '#fff', fontWeight: 700, lineHeight: 1.5 }}>
+                ℹ️ Оценочное покрытие: часть поддержки учтена по механизмам каталога (q=C, k≤0.12) — вклад правдоподобен, но не доказан.
+              </div>
+              <div style={{ fontSize: 11, color: '#fff', opacity: 0.85, marginTop: 4, lineHeight: 1.4 }}>
+                Оценочно: {supportCalcHonesty.derivedSupport.join(', ')}
+              </div>
             </div>
           )}
 

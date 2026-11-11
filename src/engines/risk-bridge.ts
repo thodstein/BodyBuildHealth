@@ -21,6 +21,19 @@ export interface RiskBridgeData {
   systemBreakdown: Record<string, { raw: number; net: number }>;
   mechanismDetail: Array<{ system: string; mechanism: string; risk: number; net: number }>;
   subs: string[];
+  /**
+   * Честность расчёта (см. `risk-engine-tz-spec.riskStatus`): препарат без
+   * записи в `DRUG_DB` не даёт вклада, поэтому `partial`/`no_data` означает
+   * «проценты занижены». Поле опционально — старые записи моста его не имеют.
+   */
+  riskStatus?: 'ok' | 'partial' | 'no_data';
+  unmodeledDrugs?: string[];
+  /**
+   * Вещества поддержки с ОЦЕНОЧНЫМИ механизмами (выведены из каталога,
+   * q='C', k ≤ 0.12). Их защита правдоподобна, но не доказана — «эффективность
+   * поддержки» в отчёте нельзя читать как посчитанную по ТЗ-таблице.
+   */
+  supportDerived?: string[];
   timestamp: number;
 }
 

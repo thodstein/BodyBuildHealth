@@ -314,6 +314,12 @@ export interface CalculatorResult {
   unmodeledDrugs?: string[];
   /** Вещества поддержки без механизмов ТЗ — в покрытии не участвуют. */
   unmappedSupport?: string[];
+  /**
+   * Вещества поддержки, чьи механизмы выведены из каталога (`mech-map`
+   * deriveFromCatalog, q='C', k ≤ 0.12): покрытие есть, но оно оценочное —
+   * UI обязан подписать это, а не выдавать за доказательную базу.
+   */
+  derivedSupport?: string[];
 }
 
 export interface TimelineWeekData {

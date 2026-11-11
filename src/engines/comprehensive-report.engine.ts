@@ -674,6 +674,16 @@ function gatherPedRisk(): ReportSection | null {
       status: bridge.riskBefore > 0 && bridge.riskAfter < bridge.riskBefore * 0.5 ? 'normal' : 'warning' },
   ];
 
+  // Честность покрытия: часть веществ поддержки учтена по выведенным из
+  // каталога механизмам (q='C', k ≤ 0.12). Подписываем именно «эффективность
+  // поддержки», потому что её величину формирует в т.ч. эта оценочная защита.
+  if (Array.isArray(bridge.supportDerived) && bridge.supportDerived.length > 0) {
+    const eff = metrics.find(m => m.label === 'Эффективность поддержки');
+    if (eff) {
+      eff.note = `Оценочное покрытие (q=C, механизмы выведены из каталога): ${bridge.supportDerived.join(', ')} — вклад правдоподобен, но не доказан.`;
+    }
+  }
+
   if (bridge.systemBreakdown) {
     Object.entries(bridge.systemBreakdown).forEach(([sys, data]) => {
       metrics.push({
@@ -681,6 +691,21 @@ function gatherPedRisk(): ReportSection | null {
         delta: data.raw - data.net, deltaPct: data.raw > 0 ? ((data.raw - data.net) / data.raw) * 100 : undefined,
         note: `Базовый: ${data.raw}, после поддержки: ${data.net}`,
       });
+    });
+  }
+
+  // Честность: «Риски»/калькулятор сообщают, что часть препаратов не
+  // смоделирована (нет записи в DRUG_DB → вклад 0). Без этой строки отчёт
+  // показывал «эффективность поддержки» по заниженному риску.
+  if (bridge.riskStatus && bridge.riskStatus !== 'ok') {
+    metrics.push({
+      label: 'Полнота расчёта риска',
+      unit: '',
+      current: bridge.riskStatus === 'no_data' ? 'не рассчитан' : 'неполный',
+      status: bridge.riskStatus === 'no_data' ? 'critical' : 'warning',
+      note: bridge.unmodeledDrugs?.length
+        ? `Не смоделированы: ${bridge.unmodeledDrugs.join(', ')} — их вклад принят за 0, риск занижен.`
+        : 'Часть препаратов не смоделирована — их вклад принят за 0, риск занижен.',
     });
   }
 

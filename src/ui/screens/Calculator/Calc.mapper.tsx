@@ -28,6 +28,7 @@ import { CalcSystemPanel, SYSTEM_PANELS, SYSTEM_TO_PANEL } from './CalcSystemPan
 import { DEFAULT_DOSAGES } from '../../../data/support-meta';
 import { formatDose, formatDefaultDose } from '../../../data/dose-units';
 import { supportNameRu } from '../../../data/support-names';
+import { isCuratedSupport } from '../../../data/support-db/mech-map';
 import { NON_PILL_SUPPORT_IDS } from '../../../engines/support-plan/substances';
 import { checkInteractions, type DrugInteraction } from '../../../data/drug-interactions';
 import { SYNERGY_NETWORK } from '../../../data/support-synergy-network';
@@ -4196,7 +4197,10 @@ function buildDoctorReport(rec: SupportRecommendation, state: CalculatorState): 
       const organGuess = s.mechsCovered[0] ? mechToOrganLabel(s.mechsCovered[0]) : '—';
       lines.push(`  Категория: ${s.category}, система: ${organGuess}`);
       lines.push(`  Механизмы покрытия: ${s.mechsCovered.join(', ')}`);
-      lines.push(`  Сила (k): ${s.k.toFixed(2)}, уровень доказательности: ${s.q}`);
+      // Оценочные механизмы (выведены из токенов каталога) — прямо в экспорте,
+      // иначе врач читает k/q как взятые из ТЗ-таблицы.
+      const derivedMech = !isCuratedSupport(s.substanceId);
+      lines.push(`  Сила (k): ${s.k.toFixed(2)}, уровень доказательности: ${s.q}${derivedMech ? ' (оценка по каталогу)' : ''}`);
       lines.push(`  Обоснование: ${s.reason}`);
     }
   }

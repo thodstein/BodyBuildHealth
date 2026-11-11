@@ -9,6 +9,7 @@ import { DEFAULT_DOSAGES } from '../../../data/support-meta';
 import { formatDose } from '../../../data/dose-units';
 import { getSubstanceForm } from '../../../data/substance-forms';
 import { getTitrationProtocol } from '../../../data/titration-protocols';
+import { isCuratedSupport } from '../../../data/support-db/mech-map';
 import type { RecommendedSub } from '../../../engines/tz-mapper-engine';
 import { GLASS } from './Calc.types';
 
@@ -45,6 +46,10 @@ export const CalcSubstanceDetail: React.FC<Props> = ({
   const contraindications = Array.isArray(catalogEntry?.contraindications) ? catalogEntry.contraindications : [];
   const sideEffects = Array.isArray(catalogEntry?.sideEffects) ? catalogEntry.sideEffects : [];
   const conflicts = Array.isArray(catalogEntry?.conflicts) ? catalogEntry.conflicts : [];
+  // Оценочные механизмы: у вещества нет кураторской записи, k/q выведены из
+  // токенов каталога (mech-map, q='C', k ≤ 0.12). Подпись «док. C» без этого
+  // маркера читалась как «доказательность C из ТЗ-таблицы».
+  const derivedMech = mechsCovered.length > 0 && !isCuratedSupport(id);
 
   const doseMg = dose ? (titrFactor && titrFactor > 1 ? Math.round(dose.mg * titrFactor) : dose.mg) : null;
 
@@ -73,7 +78,7 @@ export const CalcSubstanceDetail: React.FC<Props> = ({
         <span style={{ fontSize: 7, padding: '1px 6px', borderRadius: 6, fontWeight: 600, background: 'rgba(99,102,241,0.1)', color: '#818cf8' }}>
           {tier === 'core' ? 'CORE' : tier === 'standard' ? 'STD' : tier === 'advanced' ? 'ADV' : 'SPEC'}
         </span>
-        <span style={{ fontSize: 7, color: 'var(--text-dim)' }}>док. {sub.q}</span>
+        <span style={{ fontSize: 7, color: 'var(--text-dim)' }}>док. {sub.q}{derivedMech ? ' (оценка)' : ''}</span>
         <span style={{ marginLeft: 'auto', fontSize: 8, color: 'var(--text-dim)', fontWeight: 600 }}>
           {expanded ? '▲ скрыть' : '▼ детали'}
         </span>
@@ -101,6 +106,11 @@ export const CalcSubstanceDetail: React.FC<Props> = ({
           {mechsCovered.length > 0 && (
             <div style={{ marginBottom: 5, display: 'flex', flexWrap: 'wrap', gap: 3 }}>
               <span style={{ fontSize: 7, fontWeight: 700, color: '#a78bfa', textTransform: 'uppercase', letterSpacing: '0.3px', width: '100%' }}>ТЗ-механизмы:</span>
+              {derivedMech && (
+                <span style={{ fontSize: 7, color: 'var(--text-dim)', width: '100%', marginBottom: 2 }}>
+                  оценочно — механизмы выведены из каталога (q=C, k≤0.12)
+                </span>
+              )}
               {mechsCovered.map(m => (
                 <span key={m} style={{ fontSize: 7, padding: '1px 6px', borderRadius: 6, background: 'rgba(168,85,247,0.08)', color: '#c4b5fd', fontWeight: 500 }}>{m}</span>
               ))}

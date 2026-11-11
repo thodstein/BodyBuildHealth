@@ -339,6 +339,15 @@ export const RiskSpecMethod: React.FC<{ subTab?: string }> = ({ subTab }) => {
               )}
             </div>
           )}
+          {/* Честность покрытия: для веществ без кураторской записи механизмы
+              выведены из токенов каталога (q='C', k ≤ 0.12). Это правдоподобная
+              оценка, а не доказанная — говорим прямо, иначе % покрытия выглядит
+              как посчитанный по ТЗ-таблице. */}
+          {result && result.derivedSupport?.length > 0 && (
+            <div style={{ marginTop: 8, fontSize: 12, color: '#fff', fontWeight: 700, background:'rgba(139,92,246,0.08)', border:'1px solid rgba(139,92,246,0.28)', borderRadius:8, padding:'6px 10px', lineHeight:1.45 }}>
+              ℹ️ Оценочно (механизмы выведены из каталога, q=C, k≤0.12 — не доказательная база): {result.derivedSupport.join(', ')}
+            </div>
+          )}
         </div>
 
         {result && (

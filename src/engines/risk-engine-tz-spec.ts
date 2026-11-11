@@ -1,7 +1,7 @@
 // ── ПОЛНЫЙ ДВИЖОК РАСЧЁТА РИСКА (ТЗ разделы 5-19) ──
 // R = Σ(w × m × E × U × Π(1−k*))
 import { DRUG_DB, STACK_DB, TZ_MECH_LABELS, TZ_SYSTEM_LABELS, TZ_SYSTEM_ICONS, TzDrugEntry } from '../data/support-db';
-import { getSupportMechIndex, getSupportMechs, canonSupportId } from '../data/support-db/mech-map';
+import { getSupportMechIndex, getSupportMechs, canonSupportId, DERIVED_SOURCE } from '../data/support-db/mech-map';
 import { resolvePedAlias } from '../data/ped-alias-map';
 
 const Q_MAP: Record<string, number> = { A: 1.0, B: 0.7, C: 0.4 };
@@ -144,6 +144,13 @@ export interface TzSpecResult {
   unmodeledDrugs: string[];
   /** Вещества поддержки без механизмов ТЗ (в покрытии не участвуют). */
   unmappedSupport: string[];
+  /**
+   * Вещества поддержки, чей вклад посчитан ОЦЕНОЧНО: у них нет кураторской
+   * записи, механизмы выведены из токенов каталога (`mech-map.deriveFromCatalog`,
+   * q='C', k ≤ 0.12). Покрытие по ним правдоподобно, но не доказано —
+   * UI обязан отделить их от кураторских, иначе слабая оценка выглядит как ТЗ.
+   */
+  derivedSupport: string[];
 }
 
 // ── DRUG_CLASSES ──
@@ -747,6 +754,9 @@ export function calculateTzSpecRisk(input: TzSpecInput): TzSpecResult {
   // каталога (NAC/TUDCA/zinc_sup/PHARMA_ANASTROZOLE…) — они молча не покрывали риск.
   const supportLookup=new Map<string,Array<{organId:string;mechId:string;k:number;q:'A'|'B'|'C'}>>();
   const unmappedSupport:string[]=[];
+  // Вещества, покрытие которых выведено из каталога (не кураторская запись):
+  // k/q оттуда правдоподобны, но не доказаны — отдаём наружу для UI.
+  const derivedSupport:string[]=[];
   for(const subId of supportSubstances){
     // ВАЖНО: getSupportMechs возвращает [] (пустой массив — ИСТИНА в JS), поэтому
     // `getSupportMechs(x) || PROCEDURE_DB[x]` никогда не доходил до процедур
@@ -756,6 +766,7 @@ export function calculateTzSpecRisk(input: TzSpecInput): TzSpecResult {
     const entries=mechs.length>0?mechs:(proc||[]);
     if(entries&&entries.length>0)supportLookup.set(subId,entries);
     else if(!proc)unmappedSupport.push(subId);
+    if(mechs.some(e=>e.source===DERIVED_SOURCE))derivedSupport.push(subId);
   }
 
   // Препараты без записи в DRUG_DB дают 0 вклада во ВСЕ механизмы.
@@ -919,6 +930,9 @@ export function calculateTzSpecRisk(input: TzSpecInput): TzSpecResult {
     floors.length>0?`Якорные пороги анализов: ${floors.map(f=>f.label).join('; ')}.`:'',
     riskStatus!=='ok'?`ВНИМАНИЕ: не смоделированы препараты — ${unmodeledDrugs.join(', ')}. Их вклад в риск принят за 0, цифры занижены.`:'',
     unmappedSupport.length>0?`Поддержка без механизмов ТЗ (в покрытии не учтена): ${unmappedSupport.join(', ')}.`:'',
+    // Оценочные механизмы (выведены из токенов каталога, q='C', k ≤ 0.12) —
+    // называем явно, чтобы процент покрытия не читался как доказанный.
+    derivedSupport.length>0?`Оценочно (по механизмам каталога, q='C', k≤0.12 — не доказательная база): ${derivedSupport.join(', ')}.`:'',
     // 26 сен 2026 (E0.7): надбавка за неопределённость РАНЬШЕ применялась к числу
     // (U_i = 1 + 0.25·(1−d_cov)) и была видна только в отладке — пользователь получал
     // завышенный процент без единого слова почему. Теперь она названа своим именем.
@@ -937,7 +951,7 @@ export function calculateTzSpecRisk(input: TzSpecInput): TzSpecResult {
     k_protect_overall:overallK,d_cov:labCoverage,u_i:U_i,
     supportCount:suppIDs.length,explanation,
     overallVerification,
-    riskStatus,unmodeledDrugs,unmappedSupport,
+    riskStatus,unmodeledDrugs,unmappedSupport,derivedSupport,
   };
 }
 

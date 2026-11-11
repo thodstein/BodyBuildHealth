@@ -795,6 +795,7 @@ export function calculateSupportTZ(state: CalculatorState): CalculatorResult {
       riskStatus,
       unmodeledDrugs: unmodeledDrugs.length > 0 ? unmodeledDrugs : undefined,
       unmappedSupport: unmappedSupport.length > 0 ? unmappedSupport : undefined,
+      derivedSupport: tzResultFinal?.derivedSupport?.length ? tzResultFinal.derivedSupport : undefined,
     };
     result.risk.systems = tzResultFinal
       ? toSystemRisksFromTz(tzResultFinal, finalScores, synergyIds.length)

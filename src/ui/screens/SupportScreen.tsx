@@ -869,6 +869,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab; initialSubTab?: 
         subs: actualSubs,
         riskStatus: tzResult.riskStatus,
         unmodeledDrugs: tzResult.unmodeledDrugs,
+        derivedSupport: tzResult.derivedSupport,
         timestamp: Date.now(),
       }));
       // Write unified risk bridge (C18: RiskScreen ↔ support engine sync)
@@ -879,6 +880,10 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab; initialSubTab?: 
         systemBreakdown: calcResultData.riskAssessment?.systemBreakdown || {},
         mechanismDetail: calcResultData.riskAssessment?.mechanismDetail || [],
         subs: actualSubs,
+        // Честность: «Риски» и отчёты должны знать, что цифры занижены.
+        riskStatus: tzResult.riskStatus,
+        unmodeledDrugs: tzResult.unmodeledDrugs,
+        supportDerived: tzResult.derivedSupport,
       });
     } catch (e2) { /* ignore profile save errors */ }
     } catch (err: any) {

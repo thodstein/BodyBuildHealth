@@ -243,3 +243,67 @@ describe('support section: единицы и имена из плана', () => 
     expect(nac!.unit).toBe('мг');
   });
 });
+
+// ────────────────────────────────────────────────────────────────
+//  Раздел «Риски»: отчёт не должен молчать о заниженных цифрах.
+//  Мост риска (`he_risk_bridge`) получает riskStatus от калькулятора.
+// ────────────────────────────────────────────────────────────────
+describe('report: полнота расчёта риска', () => {
+  const bridge = (extra: Record<string, unknown>) => JSON.stringify({
+    riskBefore: 420, riskAfter: 300, supportScore: 40,
+    systemBreakdown: {}, mechanismDetail: [], subs: ['zinc'],
+    timestamp: Date.now(),
+    ...extra,
+  });
+
+  beforeEach(() => {
+    localStorage.removeItem('he_risk_bridge');
+    localStorage.removeItem('he_support_plan_result');
+  });
+
+  it('partial → строка «Полнота расчёта риска» + список не смоделированных', async () => {
+    localStorage.setItem('he_risk_bridge', bridge({ riskStatus: 'partial', unmodeledDrugs: ['unknown_peptide_xyz'] }));
+    const report = await generateComprehensiveReport({ type: 'weekly' });
+    const sec = report.sections.find(s => s.id === 'ped_risk');
+    expect(sec).toBeDefined();
+    const m = sec!.metrics.find(x => x.label === 'Полнота расчёта риска');
+    expect(m).toBeDefined();
+    expect(String(m!.current)).toBe('неполный');
+    expect(m!.status).toBe('warning');
+    expect(m!.note).toContain('unknown_peptide_xyz');
+  });
+
+  it('no_data → «не рассчитан» и critical', async () => {
+    localStorage.setItem('he_risk_bridge', bridge({ riskStatus: 'no_data', unmodeledDrugs: ['unknown_peptide_xyz'] }));
+    const report = await generateComprehensiveReport({ type: 'weekly' });
+    const m = report.sections.find(s => s.id === 'ped_risk')!.metrics.find(x => x.label === 'Полнота расчёта риска');
+    expect(String(m!.current)).toBe('не рассчитан');
+    expect(m!.status).toBe('critical');
+  });
+
+  it('ok или старая запись моста без поля → строки нет', async () => {
+    localStorage.setItem('he_risk_bridge', bridge({ riskStatus: 'ok' }));
+    const r1 = await generateComprehensiveReport({ type: 'weekly' });
+    expect(r1.sections.find(s => s.id === 'ped_risk')!.metrics.some(x => x.label === 'Полнота расчёта риска')).toBe(false);
+
+    localStorage.setItem('he_risk_bridge', bridge({}));
+    const r2 = await generateComprehensiveReport({ type: 'weekly' });
+    expect(r2.sections.find(s => s.id === 'ped_risk')!.metrics.some(x => x.label === 'Полнота расчёта риска')).toBe(false);
+  });
+
+  it('оценочная поддержка → note у «Эффективность поддержки»', async () => {
+    localStorage.setItem('he_risk_bridge', bridge({ riskStatus: 'ok', supportDerived: ['ginger'] }));
+    const report = await generateComprehensiveReport({ type: 'weekly' });
+    const m = report.sections.find(s => s.id === 'ped_risk')!.metrics.find(x => x.label === 'Эффективность поддержки');
+    expect(m).toBeDefined();
+    expect(m!.note).toContain('Оценочное покрытие');
+    expect(m!.note).toContain('ginger');
+  });
+
+  it('без оценочной поддержки note не появляется', async () => {
+    localStorage.setItem('he_risk_bridge', bridge({ riskStatus: 'ok' }));
+    const report = await generateComprehensiveReport({ type: 'weekly' });
+    const m = report.sections.find(s => s.id === 'ped_risk')!.metrics.find(x => x.label === 'Эффективность поддержки');
+    expect(m!.note).toBeUndefined();
+  });
+});
