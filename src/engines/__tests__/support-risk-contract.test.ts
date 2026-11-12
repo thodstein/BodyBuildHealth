@@ -36,3 +36,20 @@ describe('контракт he_support_risk: оба писателя переда
     });
   }
 });
+
+describe('контракт покрытия механизмов: записанное доходит до «Рисков»', () => {
+  it('RiskScreen читает mechanismCoverage и передаёт в каждую ветку RiskOverview', () => {
+    const screen = readFileSync(resolve(process.cwd(), 'src/ui/screens/RiskScreen.tsx'), 'utf8');
+    expect(screen).toContain('sr.mechanismCoverage');
+    const passed = screen.split('mechanismCoverage={supportCalcHonesty?.mechanismCoverage}').length - 1;
+    // Возврат по 'overview' и default — обе ветки показывают карточку.
+    expect(passed).toBeGreaterThanOrEqual(2);
+  });
+
+  it('RiskOverview не рисует «0 из 0» и подписывает покрытие отдельно от снижения риска', () => {
+    const src = readFileSync(resolve(process.cwd(), 'src/ui/screens/RiskScreen_parts/RiskOverview.tsx'), 'utf8');
+    expect(src).toContain('Снижение риска поддержкой');
+    expect(src).toContain('Механизмы риска: закрыто');
+    expect(src).toContain('mechanismCoverage && mechanismCoverage.total > 0');
+  });
+});

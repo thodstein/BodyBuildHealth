@@ -48,7 +48,9 @@ export const RiskOverview: React.FC<{
   femaleDoseIndex?: number;
   /** Ж1: переход на таб «Женщины и ААС» (Поддержка → Протоколы). */
   onOpenWomenTab?: () => void;
-}> = ({ riskResult, globalNoLabs, noLabsSystems, riskHistory, labRiskContributions, aggregatedRisk, weeklyDynamics, hideRecs, sex, femaleThresholds, femaleDoseIndex, onOpenWomenTab }) => {
+  /** Честное покрытие механизмов из `he_support_risk` (пишут SupportScreen/Calc.mapper). */
+  mechanismCoverage?: { covered: number; total: number; percent: number } | null;
+}> = ({ riskResult, globalNoLabs, noLabsSystems, riskHistory, labRiskContributions, aggregatedRisk, weeklyDynamics, hideRecs, sex, femaleThresholds, femaleDoseIndex, onOpenWomenTab, mechanismCoverage }) => {
   const [chartWeek, setChartWeek] = useState<number | null>(null);
   const [chartMode, setChartMode] = useState<'week' | 'average'>('average');
   const [showSections, setShowSections] = useState<Record<string, boolean>>({
@@ -211,7 +213,16 @@ export const RiskOverview: React.FC<{
 
       {/* Support Coverage — How support reduces risk per system */}
       <Section id="support_coverage" icon="shield" title="Снижение риска поддержкой">
-        <div style={{ fontSize:12, color:'#fff', marginBottom:8, lineHeight:1.5 }}>Доля снижённого риска по системам — не доля закрытых механизмов (она в карточке механизм-модели)</div>
+        <div style={{ fontSize:12, color:'#fff', marginBottom:8, lineHeight:1.5 }}>Доля снижённого риска по системам — не доля закрытых механизмов (она ниже)</div>
+        {mechanismCoverage && mechanismCoverage.total > 0 && (
+          <div style={{
+            fontSize:12, fontWeight:700, color:'#60a5fa', marginBottom:8,
+            padding:'6px 10px', borderRadius:10,
+            background:'rgba(96,165,250,0.08)', border:'1px solid rgba(96,165,250,0.2)',
+          }}>
+            🎯 Механизмы риска: закрыто {mechanismCoverage.covered} из {mechanismCoverage.total} ({mechanismCoverage.percent}%)
+          </div>
+        )}
         <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(150px, 1fr))', gap:8 }}>
           {(() => {
             const supportData = riskResult?.coverageMap || {};

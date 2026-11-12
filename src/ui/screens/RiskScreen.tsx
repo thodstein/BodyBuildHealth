@@ -238,15 +238,19 @@ export const RiskScreen: React.FC<{ initialSubTab?: string; onNavigate?: (screen
   // Честность расчёта: SupportScreen пишет `riskStatus` (ok/partial/no_data) и
   // список не смоделированных препаратов, но экран их раньше не читал — показывал
   // полные проценты, даже если часть курса в модель не попала.
-  const supportCalcHonesty = useMemo<{ riskStatus?: 'ok' | 'partial' | 'no_data'; unmodeledDrugs: string[]; derivedSupport: string[] } | null>(() => {
+  const supportCalcHonesty = useMemo<{ riskStatus?: 'ok' | 'partial' | 'no_data'; unmodeledDrugs: string[]; derivedSupport: string[]; mechanismCoverage?: { covered: number; total: number; percent: number } | null } | null>(() => {
     try {
       const sr = JSON.parse(localStorage.getItem('he_support_risk') || 'null');
       const derived = Array.isArray(sr?.derivedSupport) ? sr.derivedSupport.filter(Boolean) : [];
-      if (sr && (sr.riskStatus || (Array.isArray(sr.unmodeledDrugs) && sr.unmodeledDrugs.length > 0) || derived.length > 0)) {
+      const mc = sr?.mechanismCoverage && Number.isFinite(sr.mechanismCoverage.percent) && sr.mechanismCoverage.total > 0
+        ? { covered: Number(sr.mechanismCoverage.covered) || 0, total: Number(sr.mechanismCoverage.total) || 0, percent: Number(sr.mechanismCoverage.percent) || 0 }
+        : null;
+      if (sr && (sr.riskStatus || (Array.isArray(sr.unmodeledDrugs) && sr.unmodeledDrugs.length > 0) || derived.length > 0 || mc)) {
         return {
           riskStatus: sr.riskStatus,
           unmodeledDrugs: Array.isArray(sr.unmodeledDrugs) ? sr.unmodeledDrugs.filter(Boolean) : [],
           derivedSupport: derived,
+          mechanismCoverage: mc,
         };
       }
     } catch {}
@@ -649,7 +653,7 @@ export const RiskScreen: React.FC<{ initialSubTab?: string; onNavigate?: (screen
     const effectiveLabContrib = labRiskContributions || syntheticLabContrib;
     const isSyntheticLab = !hasLabs && shouldApplyPenalty; // lab contrib came from penalty, not real labs
     switch (subTab) {
-      case 'overview': return <RiskOverview riskResult={riskResult} globalNoLabs={globalNoLabs} noLabsSystems={noLabsSystems} labRiskContributions={effectiveLabContrib} riskHistory={riskHistory} aggregatedRisk={aggregatedRisk} weeklyDynamics={weeklyDynamics} sex={profileSex} femaleThresholds={femaleThresholds} femaleDoseIndex={femaleLayer.doseIndex} onOpenWomenTab={onNavigate ? () => onNavigate('support-women') : undefined} />;
+      case 'overview': return <RiskOverview riskResult={riskResult} globalNoLabs={globalNoLabs} noLabsSystems={noLabsSystems} labRiskContributions={effectiveLabContrib} riskHistory={riskHistory} aggregatedRisk={aggregatedRisk} weeklyDynamics={weeklyDynamics} sex={profileSex} femaleThresholds={femaleThresholds} femaleDoseIndex={femaleLayer.doseIndex} onOpenWomenTab={onNavigate ? () => onNavigate('support-women') : undefined} mechanismCoverage={supportCalcHonesty?.mechanismCoverage} />;
       case 'mechanisms': return <RiskDetails riskResult={riskResult} labRiskContributions={effectiveLabContrib} isSyntheticLab={isSyntheticLab} />;
       case 'v7': return v7Result ? <V7RiskDisplay result={v7Result} organWeek={organWeek} onWeekChange={setOrganWeek} mcEnabled={mcEnabled} onToggleMC={toggleMC} /> : <div style={{ textAlign: 'center', padding: 40, color: '#fff' }}>Загрузка V7...</div>;
 
@@ -660,7 +664,7 @@ export const RiskScreen: React.FC<{ initialSubTab?: string; onNavigate?: (screen
       case 'compliance': return <ComplianceDisplay />;
       case 'clinical': return <ClinicalRiskDisplay />;
       case 'labs_risks': return <LabsRisksTab />;
-      default: return <RiskOverview riskResult={riskResult} globalNoLabs={globalNoLabs} noLabsSystems={noLabsSystems} labRiskContributions={effectiveLabContrib} riskHistory={riskHistory} aggregatedRisk={aggregatedRisk} sex={profileSex} femaleThresholds={femaleThresholds} femaleDoseIndex={femaleLayer.doseIndex} onOpenWomenTab={onNavigate ? () => onNavigate('support-women') : undefined} />;
+      default: return <RiskOverview riskResult={riskResult} globalNoLabs={globalNoLabs} noLabsSystems={noLabsSystems} labRiskContributions={effectiveLabContrib} riskHistory={riskHistory} aggregatedRisk={aggregatedRisk} sex={profileSex} femaleThresholds={femaleThresholds} femaleDoseIndex={femaleLayer.doseIndex} onOpenWomenTab={onNavigate ? () => onNavigate('support-women') : undefined} mechanismCoverage={supportCalcHonesty?.mechanismCoverage} />;
     }
   };
 

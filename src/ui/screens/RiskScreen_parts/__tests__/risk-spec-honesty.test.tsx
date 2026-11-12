@@ -51,4 +51,13 @@ describe('RiskSpecMethod: честность расчёта', () => {
     expect(container.textContent).not.toContain('НЕ рассчитан');
     expect(container.textContent).not.toContain('Расчёт неполный');
   });
+
+  it('покрытие механизмов рядом с Kp: «Механизмы: c/t закрыто»', () => {
+    courseBox.current = [KNOWN];
+    const { container } = render(<RiskSpecMethod />);
+    // Механизмы риска у курса есть; без поддержки закрытых 0 — но цифра честная.
+    expect(container.textContent).toMatch(/Механизмы: \d+\/\d+ закрыто/);
+    // Это отдельная метрика, Kp никуда не исчез.
+    expect(container.textContent).toContain('Kp =');
+  });
 });

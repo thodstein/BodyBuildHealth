@@ -63,4 +63,31 @@ describe('RiskOverview support coverage', () => {
     fireEvent.click(getByText('Снижение риска поддержкой'));
     expect(queryByText(/Сердце/)).toBeNull();
   });
+
+  it('4. покрытие механизмов — отдельной строкой, не вместо «снижения риска»', () => {
+    const { container } = render(
+      <RiskOverview
+        riskResult={mockResult({ cardio: 0.8 })}
+        globalNoLabs={false}
+        noLabsSystems={[]}
+        labRiskContributions={null}
+        mechanismCoverage={{ covered: 3, total: 6, percent: 50 }}
+      />,
+    );
+    expect(container.textContent).toContain('Механизмы риска: закрыто 3 из 6 (50%)');
+    expect(container.textContent).toContain('80%'); // снижение риска по cardio не подменяется
+  });
+
+  it('5. без покрытия механизмов строки нет, «0 из 0» не выводится', () => {
+    const { container } = render(
+      <RiskOverview
+        riskResult={mockResult({})}
+        globalNoLabs={false}
+        noLabsSystems={[]}
+        labRiskContributions={null}
+        mechanismCoverage={{ covered: 0, total: 0, percent: 0 }}
+      />,
+    );
+    expect(container.textContent).not.toContain('Механизмы риска');
+  });
 });
