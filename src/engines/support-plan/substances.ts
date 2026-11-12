@@ -16,12 +16,17 @@ const WEIGHT_BASED_DOSING: Record<string, { mgPerKg: number; minMg: number; maxM
   nac:          { mgPerKg: 15,  minMg: 600,  maxMg: 1800 },
   omega3:       { mgPerKg: 50,  minMg: 2000, maxMg: 6000 },
   vitamin_c:    { mgPerKg: 10,  minMg: 500,  maxMg: 1500 },
-  magnesium:    { mgPerKg: 6,   minMg: 300,  maxMg: 800  },
+  // Магний — элементарный: 2.5 мг/кг даёт 200 мг при 80 кг (как DEFAULT_DOSAGES),
+  // а потолок 350 мг = UL реестра. Раньше здесь было 6 мг/кг с max 800 →
+  // план рекомендовал 480 мг при обычной массе (137% UL) и спорил с собственной
+  // базовой дозой; UL-контур честно это показал (проход 13).
+  magnesium:    { mgPerKg: 2.5, minMg: 200, maxMg: 350  },
   taurine:      { mgPerKg: 20,  minMg: 1000, maxMg: 3000 },
   glycine:      { mgPerKg: 40,  minMg: 1000, maxMg: 5000 },
   alpha_lipoic: { mgPerKg: 5,   minMg: 300,  maxMg: 800  },
   coq10:        { mgPerKg: 3,   minMg: 100,  maxMg: 400  },
-  zinc:         { mgPerKg: 0.5, minMg: 15,   maxMg: 50   },
+  // Цинк: IOM UL 40 мг — жёсткий предел (выше → дефицит меди), поэтому max = UL.
+  zinc:         { mgPerKg: 0.5, minMg: 15,   maxMg: 40   },
 };
 
 // ═══════════════════════════════════════════════════════════════
@@ -92,6 +97,54 @@ const FOUNDATION_ITEMS: Record<string, { name: string; dose: string; timing: str
 export const NON_PILL_SUPPORT_IDS = new Set(Object.keys(FOUNDATION_ITEMS));
 
 /**
+ * Части дозы плана — один резолвер для `buildSubstances` и UL-контура движка.
+ *
+ * Раньше дозу плана знал только `buildSubstances`, а `checkUpperLimits` получал
+ * карту титрации `applyTitration`, где половины веществ нет вовсе (B6, витамин A,
+ * K2, фолат, бор, медь, железо). UL считался по одной дозе, а подписывался под
+ * другой — или не считался совсем.
+ */
+function planDoseParts(id: string, weight?: number): {
+  doseMg: number;
+  wbdMg?: number;
+  def?: { mg: number; timing: string };
+  catalogDose?: number;
+} {
+  const cid = canonId(id);
+  const e = catalogEntry(id);
+  // Канонизация: алиасы (udca→tudca, telmi→telmisartan…) хранят дозу под каноническим id.
+  const def = DEFAULT_DOSAGES[cid] || DEFAULT_DOSAGES[id];
+  // Есть ли РЕАЛЬНАЯ доза в справочнике (не фолбэк 500 мг ниже).
+  const catalogDose = e?.dosage?.mg && e.dosage.mg > 0 ? e.dosage.mg : undefined;
+  // Weight-based dosing — считается в МГ (таблица выше в мг).
+  const wbd = WEIGHT_BASED_DOSING[cid];
+  const wbdMg = wbd && weight && weight > 0
+    ? Math.round(Math.max(wbd.minMg, Math.min(wbd.maxMg, weight * wbd.mgPerKg)))
+    : undefined;
+  // ВНУТРЕННЯЯ доза плана — всегда НАТУРАЛЬНАЯ единица вещества (мкг для
+  // селена/биотина, МЕ для D3), как в `DEFAULT_DOSAGES`: `dosages[id].mg`
+  // и `PlanSubstance.doseMg` читатели подписывают через `formatDefaultDose`.
+  // Раньше мг-фолбэк каталога (biotin 5 мг) попадал сюда без пересчёта и
+  // отображался как «5 мкг» — 1000× ниже реальной дозы.
+  const doseMg = wbdMg !== undefined
+    ? naturalFromMg(cid, wbdMg)
+    : def
+      ? def.mg
+      : catalogDose !== undefined
+        ? naturalFromMg(cid, catalogDose)
+        : (FOUNDATION_ITEMS[cid] ? 0 : 500);
+  return { doseMg, wbdMg, def, catalogDose };
+}
+
+/**
+ * Доза, которую план реально рекомендует (натуральная единица вещества).
+ * Экспортируется для UL-контура: проверять нужно ровно то, что видит пользователь.
+ */
+export function resolvePlanDose(id: string, weight?: number): number {
+  return planDoseParts(id, weight).doseMg;
+}
+
+/**
  * Преобразует список id веществ в PlanSubstance[] (с dedup по canonId).
  * Берёт display-инфо из каталога SUPPORT_CATALOG_DATA, дозировки из DEFAULT_DOSAGES.
  * Если передан weight — применяет вес-зависимые дозировки.
@@ -114,27 +167,7 @@ export function buildSubstances(
     seen.add(id);
     seenCanon.add(cid);
     const e = catalogEntry(id);
-    // Канонизация: алиасы (udca→tudca, telmi→telmisartan…) хранят дозу под каноническим id.
-    const def = DEFAULT_DOSAGES[cid] || DEFAULT_DOSAGES[id];
-    // Есть ли РЕАЛЬНАЯ доза в справочнике (не фолбэк 500 мг ниже).
-    const catalogDose = e?.dosage?.mg && e.dosage.mg > 0 ? e.dosage.mg : undefined;
-    // Weight-based dosing — считается в МГ (таблица выше в мг).
-    const wbd = WEIGHT_BASED_DOSING[cid];
-    const wbdMg = wbd && weight && weight > 0
-      ? Math.round(Math.max(wbd.minMg, Math.min(wbd.maxMg, weight * wbd.mgPerKg)))
-      : undefined;
-    // ВНУТРЕННЯЯ доза плана — всегда НАТУРАЛЬНАЯ единица вещества (мкг для
-    // селена/биотина, МЕ для D3), как в `DEFAULT_DOSAGES`: `dosages[id].mg`
-    // и `PlanSubstance.doseMg` читатели подписывают через `formatDefaultDose`.
-    // Раньше мг-фолбэк каталога (biotin 5 мг) попадал сюда без пересчёта и
-    // отображался как «5 мкг» — 1000× ниже реальной дозы.
-    const doseMg = wbdMg !== undefined
-      ? naturalFromMg(cid, wbdMg)
-      : def
-        ? def.mg
-        : catalogDose !== undefined
-          ? naturalFromMg(cid, catalogDose)
-          : (FOUNDATION_ITEMS[cid] ? 0 : 500);
+    const { doseMg, wbdMg, def, catalogDose } = planDoseParts(id, weight);
     const foundation = FOUNDATION_ITEMS[cid];
     // Доза для отображения. Раньше и натуральная единица `DEFAULT_DOSAGES`
     // (селен 200 мкг, D3 5000 МЕ), и мг-шкала каталога подписывались «мг» —

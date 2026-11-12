@@ -1049,8 +1049,8 @@ vitamin_a: {
     tier: 'standard',
     category: ['vitamin', 'antioxidant'],
     forms: [
-      { id: 'vitamin_a', name: 'Vitamin A', nameRu: 'Ретинола пальмитат 10000 МЕ', dose: '1 мг', best: true },
-      { id: 'vitamin_a_2', name: 'Vitamin A', nameRu: 'Бета-каротин 25000 МЕ', dose: '1 мг', best: false }
+      { id: 'vitamin_a', name: 'Vitamin A', nameRu: 'Ретинола пальмитат 3300 МЕ (1 мг ретинола)', dose: '1 мг', best: true },
+      { id: 'vitamin_a_2', name: 'Vitamin A', nameRu: 'Бета-каротин 25 000 МЕ (15 мг)', dose: '15 мг', best: false }
     ],
     organs: ['EYES', 'SKIN', 'IMMUNE_SYSTEM'],
     systems: ['neuro', 'endocrine'],
@@ -1341,7 +1341,7 @@ vitamin_e: {
     tier: 'standard',
     category: ['vitamin', 'antioxidant'],
     forms: [
-      { id: 'vitamin_e', name: 'Vitamin E', nameRu: 'Смешанные токоферолы 400 МЕ', dose: '200 мг 2x/д', best: true },
+      { id: 'vitamin_e', name: 'Vitamin E', nameRu: 'Смешанные токоферолы (200 мг ≈ 300 МЕ)', dose: '200 мг', best: true },
       { id: 'vitamin_e_2', name: 'Vitamin E', nameRu: 'd-Альфа-токоферол 200 МЕ', dose: '134 мг', best: false },
       { id: 'vitamin_e_3', name: 'Vitamin E', nameRu: 'Токотриенолы 100 мг', dose: '100 мг', best: false }
     ],

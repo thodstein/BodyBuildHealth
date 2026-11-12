@@ -547,7 +547,9 @@ export const SupportFavoritesView: React.FC<{ s: Record<string, any> }> = ({ s }
                             если расчёт выходил за предел и дозу срезал кап. */}
                         {Array.isArray(p.ulWarnings) && p.ulWarnings.length > 0 && (
                           <div style={{ fontSize:8, color:'#f59e0b', marginTop:2 }}>
-                            ⚠ UL по фактическим дозам: {p.ulWarnings.length} — {p.ulWarnings
+                            {p.ulWarnings.some((w: any) => w?.limitKind === 'SafeLevel')
+                              ? '⚠ Пределы доз по фактическим дозам'
+                              : '⚠ UL по фактическим дозам'}: {p.ulWarnings.length} — {p.ulWarnings
                               .slice(0, 4)
                               .map((w: any) => SUPPORT_CATALOG_DATA[w?.substanceId]?.nameRu || w?.substanceId)
                               .join(', ')}{p.ulWarnings.length > 4 ? ' …' : ''}

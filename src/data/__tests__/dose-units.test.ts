@@ -12,6 +12,7 @@ import {
   formatDefaultDose,
   formatDose,
   formatDoseFromMg,
+  naturalFromMg,
   toMgEquivalent,
 } from '../dose-units';
 
@@ -23,10 +24,17 @@ describe('doseUnit', () => {
     expect(doseUnit('clenbuterol')).toBe('мкг');
   });
 
-  it('гормоны/витамины — МЕ', () => {
+  it('гормоны — МЕ', () => {
     expect(doseUnit('hcg')).toBe('МЕ');
     expect(doseUnit('hgh')).toBe('МЕ');
-    expect(doseUnit('vitamin_e')).toBe('МЕ');
+  });
+
+  it('витамины A/E — единицы реестра пределов (мкг/мг), не МЕ', () => {
+    // Аудит 2026-11 (проход 13): каталог хранит мг, а подпись была «МЕ» →
+    // витамин A показывался как «1 МЕ» вместо 3300 МЕ (ошибка 3300×).
+    expect(doseUnit('vitamin_a')).toBe('мкг');
+    expect(doseUnit('vitamin_e')).toBe('мг');
+    expect(doseUnit('vitamin_d3')).toBe('мкг');
   });
 
   it('инсулины — Ед, пробиотики — млрд КОЕ, остальное — мг', () => {
@@ -83,6 +91,13 @@ describe('formatDoseFromMg (каталожные dosage.mg)', () => {
     expect(formatDoseFromMg('nattokinase', 100)).toBe('100 мг');
   });
 
+  it('витамин A/E: мг каталога → мкг RAE / мг α-токоферола', () => {
+    // Каталог: vitamin_a dosage.mg = 1 (1 мг ретинола = 1000 мкг RAE ≈ 3300 МЕ).
+    expect(formatDoseFromMg('vitamin_a', 1)).toBe('1000 мкг');
+    // vitamin_e dosage.mg = 200 (200 мг α-токоферола ≈ 300 МЕ).
+    expect(formatDoseFromMg('vitamin_e', 200)).toBe('200 мг');
+  });
+
   it('МЕ / млрд КОЕ — значение уже в натуральной единице', () => {
     expect(formatDoseFromMg('hcg', 500)).toBe('500 МЕ');
     expect(formatDoseFromMg('probiotics', 20)).toBe('20 млрд КОЕ');
@@ -100,8 +115,20 @@ describe('formatDefaultDose / defaultDoseUnit', () => {
     expect(formatDefaultDose('selenium', 200)).toBe('200 мкг');
     expect(formatDefaultDose('nac', 600)).toBe('600 мг');
     expect(formatDefaultDose('probiotics', 20)).toBe('20 млрд КОЕ');
+    // A/E — единицы реестра UL, а не МЕ.
+    expect(defaultDoseUnit('vitamin_a')).toBe('мкг');
+    expect(defaultDoseUnit('vitamin_e')).toBe('мг');
+    expect(formatDefaultDose('vitamin_e', 200)).toBe('200 мг');
     // Крупные миллиграммы — в граммах.
     expect(formatDefaultDose('collagen', 5000)).toBe('5 г');
+  });
+});
+
+describe('naturalFromMg — мг каталога → натуральная единица плана', () => {
+  it('витамин A/E больше не остаются «в мг» под видом МЕ', () => {
+    expect(naturalFromMg('vitamin_a', 1)).toBe(1000);   // мкг RAE
+    expect(naturalFromMg('vitamin_e', 200)).toBe(200);  // мг α-токоферола
+    expect(naturalFromMg('vitamin_d3', 0.05)).toBe(2000); // МЕ
   });
 });
 
@@ -109,6 +136,8 @@ describe('toMgEquivalent', () => {
   it('мкг → мг, мг → мг', () => {
     expect(toMgEquivalent('selenium', 200)).toBeCloseTo(0.2, 10);
     expect(toMgEquivalent('vitamin_d3', 50)).toBeCloseTo(0.05, 10);
+    expect(toMgEquivalent('vitamin_a', 1000)).toBeCloseTo(1, 10);
+    expect(toMgEquivalent('vitamin_e', 200)).toBe(200);
     expect(toMgEquivalent('nac', 600)).toBe(600);
   });
 

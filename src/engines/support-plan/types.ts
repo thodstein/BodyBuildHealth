@@ -262,6 +262,27 @@ export interface SynergyRecommendation {
   severity: string;
 }
 
+/**
+ * Предупреждение о превышении предела по веществу плана.
+ *
+ * Один контракт движок → `PlanResult` → UI/сохранённые планы. `limitKind`
+ * обязателен для честной вёрстки: `SafeLevel` (железо) — это НЕ UL, и
+ * подписывать его «превышение UL» нельзя (см. `support-limits.ts`).
+ */
+export interface UlWarning {
+  substanceId: string;
+  /** Доза, по которой сработало предупреждение (единица реестра: мг/мкг). */
+  currentDoseMg: number;
+  /** Предел реестра в той же единице. */
+  ulMg: number;
+  percentUL: number;
+  risk: string;
+  recommendation: string;
+  /** Доза после UL-капа (единица реестра); нет, если дозу не капали. */
+  appliedDoseMg?: number;
+  limitKind?: 'UL' | 'SafeLevel' | 'ClinicalGuidance' | 'NotEstablished';
+}
+
 export interface CalculatorResult {
   risk: { systems: SystemRisk[]; overallRaw: number; overallAfterSupport: number; timestamp: string };
   schedule: ScheduleItem[];
@@ -287,7 +308,7 @@ export interface CalculatorResult {
   timestamp: string;
   /** Нутрициологические предупреждения */
   depletionWarnings?: Array<{ depleter: string; depleted: string; mechanism: string; severity: string; recommendation: string }>;
-  ulWarnings?: Array<{ substanceId: string; currentDoseMg: number; ulMg: number; percentUL: number; risk: string; recommendation: string; /** доза после UL-капа */ appliedDoseMg?: number }>;
+  ulWarnings?: UlWarning[];
   dailyLoad?: Record<string, { totalMg: number; contributors: string[]; hasUL: boolean; ulMg?: number }>;
   /**
    * Фазовые назначения — вещества, автоматически добавленные движком
@@ -452,7 +473,7 @@ export interface PlanResult {
    * `currentDoseMg` — расчётная доза до капа, `appliedDoseMg` — что попало в план
    * после UL-капа. Раньше движок их считал, но экран плана не показывал.
    */
-  ulWarnings?: Array<{ substanceId: string; currentDoseMg: number; ulMg: number; percentUL: number; risk: string; recommendation: string; appliedDoseMg?: number }>;
+  ulWarnings?: UlWarning[];
   cumulativeLoad?: Array<{ nutrientId: string; nutrientName: string; totalMg: number; ulMg?: number; percentUL?: number; isOverUL: boolean; contributors: string[] }>;
   pillBurden?: { totalSubstances: number; estimatedPillsPerDay: number; morningPills: number; afternoonPills: number; eveningPills: number; feasibility: string; message: string };
   /** Mandatory-назначения (hCG, AI, caber, TUDCA, NAC и т.д.) */
@@ -570,12 +591,24 @@ export function defaultDosage(id: string): { mg: number; timing: string } | unde
  */
 const NUTRIENT_UL_SUBSTANCE_KEYS = [
   'zinc', 'magnesium', 'calcium', 'iron', 'selenium',
-  'vitamin_b6', 'vitamin_c', 'vitamin_d3', 'vitamin_e', 'vitamin_k2',
+  'vitamin_a', 'vitamin_b6', 'vitamin_c', 'vitamin_d3', 'vitamin_e', 'vitamin_k2',
   'vitamin_b12', 'folate', 'boron', 'potassium', 'copper', 'iodine',
   'manganese', 'molybdenum', 'chromium',
   'nac', 'alpha_lipoic', 'coq10', 'betaine', 'glycine', 'taurine',
   'inositol', 'curcumin',
 ] as const;
+
+/**
+ * Активные формы, которые дозируются как другой нутриент.
+ *
+ * `p5p` (пиридоксаль-5-фосфат) — это B6, поэтому UL B6 (EFSA 2023, 12 мг)
+ * относится и к нему. Без этого алиаса план с P5P 25 мг проходил UL-контур
+ * молча, хотя комментарий в `DEFAULT_DOSAGES.p5p` обещал «консервативно — как B6».
+ */
+export const NUTRIENT_UL_ALIAS: Record<string, string> = {
+  p5p: 'vitamin_b6',
+  pyridoxal_5_phosphate: 'vitamin_b6',
+};
 
 /**
  * Верхний допустимый уровень потребления — значение берётся из реестра
@@ -598,7 +631,7 @@ const NUTRIENT_UL_SUBSTANCE_KEYS = [
  */
 const NUTRIENT_UL_MCG_KEYS = new Set<string>([
   'selenium', 'vitamin_d3', 'vitamin_k2', 'vitamin_b12', 'folate',
-  'iodine', 'manganese', 'molybdenum', 'chromium',
+  'vitamin_a', 'iodine', 'manganese', 'molybdenum', 'chromium',
 ]);
 export const NUTRIENT_UL: Record<string, number> = Object.fromEntries(
   NUTRIENT_UL_SUBSTANCE_KEYS

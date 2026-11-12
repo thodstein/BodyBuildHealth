@@ -2,9 +2,10 @@ import {
   type CalculatorState, type CalculatorResult, type RiskSystemId,
   type SystemRisk, type MechanismDetail, type LabDelta,
   type ScheduleItem, type TimeBlock, type SynergyId,
-  type PowerLevel, type LabSlice, type TimelineWeekData,
+  type PowerLevel, type LabSlice, type TimelineWeekData, type UlWarning as UlWarningShape,
   SYNERGY_ID_SUBSTANCES, TITRATION_RULES, SYNERGY_ID_LABELS,
-  NUTRIENT_UL, DEPLETION_CASCADES, SUBSTANCE_HALF_LIFE,
+  NUTRIENT_UL, NUTRIENT_UL_ALIAS, NUTRIENT_LIMIT_INFO,
+  DEPLETION_CASCADES, SUBSTANCE_HALF_LIFE,
   FORM_BIOAVAIL_MULT, MINERAL_SEPARATION_HOURS, MEAL_CONTEXT_RULES,
 } from './types';
 import {
@@ -16,7 +17,8 @@ export { SUB_ALIAS, canonId, TZ_AUTO_BLACKLIST, SAME_CLASS_GROUPS, ID_TO_CLASS, 
 import { evaluateRecommendations } from '../recommendation-engine';
 import { calculateTzSpecRisk, calculateTzSpecRiskTimeline, type TzSpecInput, type DrugInput, type TzSpecResult, type TzSpecMechanismResult, type TzDrugClass } from '../risk-engine-tz-spec';
 import { DRUG_DB } from '../../data/support-db';
-import { formatDose, doseUnitLabel } from '../../data/dose-units';
+import { formatDose, formatDefaultDose, doseUnitLabel, vitaminDMcgFromIu } from '../../data/dose-units';
+import { resolveNutrient, type LimitKind } from '../support-limits';
 import { resolvePedAlias } from '../../data/ped-alias-map';
 import { SUPPLEMENTS_DB } from '../../data/support-db/supplements';
 import { PHARMACY_DB } from '../../data/support-db/pharmacy-db';
@@ -68,55 +70,115 @@ export function checkDepletionCascade(
   return warnings;
 }
 
-/** Проверка превышения верхнего допустимого уровня (UL).
- *  Возвращает массив предупреждений. */
-export interface ULWarning {
-  substanceId: string; currentDoseMg: number; ulMg: number;
-  percentUL: number; risk: string; recommendation: string;
-  /**
-   * Доза, реально попавшая в план ПОСЛЕ UL-капа (`doses[subId]`).
-   *
-   * `currentDoseMg` — расчётная доза ДО капа: именно она показывает, что
-   * нормализация по весу вышла за предел. Без этого поля UI не мог отличить
-   * «плановые 100 мкг при расчёте 110» от «плановые 110» и либо занижал, либо
-   * пугал. Поле необязательное: старые сохранённые расчёты его не имеют.
-   */
-  appliedDoseMg?: number;
+/**
+ * Форма предупреждения живёт в `types.ts` (`UlWarning`), чтобы движок,
+ * `PlanResult` и сохранённые планы не расходились. Псевдоним оставлен для
+ * существующих импортов/тестов.
+ */
+export type ULWarning = UlWarningShape;
+
+/**
+ * Ключ реестра пределов для вещества.
+ *
+ * `NUTRIENT_UL` индексирован id ВЕЩЕСТВ, поэтому алиасы (`selenium_yeast`,
+ * `methylfolate`) нужно канонизировать, иначе проверка молча пропускает дозу.
+ * `p5p` — активная форма B6 (см. `NUTRIENT_UL_ALIAS`).
+ */
+export function ulLimitKeyOf(subId: string): string | undefined {
+  const c = canonId(subId);
+  const key = NUTRIENT_UL_ALIAS[c] || NUTRIENT_UL_ALIAS[subId] || c;
+  return NUTRIENT_UL[key] !== undefined ? key : undefined;
 }
+
+/** Тип предела для ключа реестра (UL / SafeLevel / ClinicalGuidance). */
+function ulLimitKindOf(key: string): LimitKind {
+  const canon = resolveNutrient(key);
+  const info = canon ? NUTRIENT_LIMIT_INFO[canon] : undefined;
+  return info?.kind || 'UL';
+}
+
+/**
+ * Проверка UL по дозам В ЕДИНИЦЕ РЕЕСТРА (мг/мкг).
+ *
+ * ⚠️ Клинические ориентиры (`ClinicalGuidance`: NAC, CoQ10, B12, K2…) сюда
+ * НЕ попадают: это не пределы, и «превышение UL» по ним — ложь. SafeLevel
+ * (железо) попадает, но с честной подписью «НЕ порог токсичности».
+ */
 export function checkUpperLimits(
   substances: string[],
   doses: Record<string, number>,
   /** Дозы ДО UL-капа (см. applyTitration) — иначе превышение уже обрезано и не видно. */
   rawDoses?: Record<string, number>,
+  /** Дозы, реально попавшие в приём после UL-капа (в единице реестра). */
+  opts?: { appliedDoses?: Record<string, number> },
 ): ULWarning[] {
   const warnings: ULWarning[] = [];
   for (const subId of substances) {
-    const ul = NUTRIENT_UL[subId];
+    const key = ulLimitKeyOf(subId);
+    if (!key) continue;
+    const ul = NUTRIENT_UL[key];
     if (!ul) continue;
+    const kind = ulLimitKindOf(key);
+    if (kind === 'ClinicalGuidance' || kind === 'NotEstablished') continue;
     const raw = rawDoses?.[subId];
     const doseMg = raw !== undefined && raw > 0 ? raw : (doses[subId] || 0);
     if (doseMg > ul) {
       const pct = Math.round(doseMg / ul * 100);
-      const applied = doses[subId];
+      const appliedRaw = opts?.appliedDoses?.[subId] ?? opts?.appliedDoses?.[key] ?? doses[subId];
+      const applied = appliedRaw !== undefined && appliedRaw > 0 && appliedRaw < doseMg ? appliedRaw : undefined;
       // До капа и после капа — в одной строке. Раньше при >150 % рекомендовалось
       // «≤1.5×UL», хотя план капал дозу до UL — совет противоречил собственному плану.
-      const appliedTxt = applied !== undefined && applied > 0 && applied < doseMg
+      const appliedTxt = applied !== undefined
         ? ` В плане ограничено до ${formatDose(subId, applied)}.`
         : '';
+      const risk = kind === 'SafeLevel'
+        ? 'Выше safe level — это НЕ порог токсичности'
+        : pct > 200 ? 'Высокий риск токсичности' : pct > 150 ? 'Значительное превышение UL' : 'Превышение UL';
+      const recommendation = kind === 'SafeLevel'
+        ? `Расчётная доза ${formatDose(subId, Math.round(doseMg))} — ${pct}% от safe level (${formatDose(subId, ul)}). `
+          + `Это НЕ порог токсичности: UL для этого нутриента не установлен, оценивайте по лаборатории.${appliedTxt}`
+        : pct > 150
+          ? `Расчётная доза ${formatDose(subId, Math.round(doseMg))} — ${pct}% от UL (${formatDose(subId, ul)}): значительное превышение, снизить до ≤${formatDose(subId, ul)} под контролем врача.${appliedTxt}`
+          : `Расчётная доза ${formatDose(subId, Math.round(doseMg))} — ${pct}% от UL (${formatDose(subId, ul)}): рассмотреть снижение до ≤${formatDose(subId, ul)}.${appliedTxt}`;
       warnings.push({
         substanceId: subId,
         currentDoseMg: doseMg,
         ulMg: ul,
         percentUL: pct,
-        risk: pct > 200 ? 'Высокий риск токсичности' : pct > 150 ? 'Значительное превышение UL' : pct > 100 ? 'Превышение UL' : 'В пределах нормы',
-        recommendation: pct > 150
-          ? `Расчётная доза ${formatDose(subId, Math.round(doseMg))} — ${pct}% от UL (${formatDose(subId, ul)}): значительное превышение, снизить до ≤${formatDose(subId, ul)} под контролем врача.${appliedTxt}`
-          : `Расчётная доза ${formatDose(subId, Math.round(doseMg))} — ${pct}% от UL (${formatDose(subId, ul)}): рассмотреть снижение до ≤${formatDose(subId, ul)}.${appliedTxt}`,
-        ...(applied !== undefined && applied > 0 ? { appliedDoseMg: applied } : {}),
+        risk,
+        recommendation,
+        limitKind: kind,
+        ...(applied !== undefined ? { appliedDoseMg: applied } : {}),
       });
     }
   }
   return warnings;
+}
+
+/**
+ * UL по ФАКТИЧЕСКИМ дозам плана (`PlanSubstance.doseMg`, натуральная единица).
+ *
+ * Проблема, которую закрывает: `checkUpperLimits` вызывался с картой титрации
+ * (`applyTitration`), а в ней есть только Mg/Zn/D3/Se/VitC/NAC/… — B6, витамин A,
+ * K2, фолат, бор, медь и железо туда не попадают, поэтому их дозы (25 мг B6 при
+ * UL 12 мг, P5P 25 мг) не проверялись ВООБЩЕ, хотя UI обещал «проверено по UL».
+ *
+ * @param planDoses — дозы плана в натуральной единице вещества.
+ * @param appliedDoses — дозы-приёма после капа (в единице реестра, из `applyTitration`).
+ */
+export function checkPlanUpperLimits(
+  substances: string[],
+  planDoses: Record<string, number>,
+  appliedDoses?: Record<string, number>,
+): ULWarning[] {
+  const inUlScale: Record<string, number> = {};
+  for (const [id, dose] of Object.entries(planDoses)) {
+    if (!Number.isFinite(dose) || dose <= 0) continue;
+    const c = canonId(id);
+    // Витамин D в плане — МЕ (`DEFAULT_DOSAGES`), реестр UL — мкг.
+    inUlScale[id] = c === 'vitamin_d3' || c === 'vitamin_d' ? vitaminDMcgFromIu(dose) : dose;
+  }
+  return checkUpperLimits(substances, inUlScale, undefined, { appliedDoses });
 }
 
 /** Агрегация суммарной суточной нагрузки минералов/витаминов по всем веществам в плане.
@@ -746,7 +808,14 @@ export const SUB_NAMES: Record<string, string> = {
   serrapeptase:'Серрапептаза', garlic:'Чеснок', metformin:'Метформин', chromium:'Хром',
 };
 
-export function generateSchedule(substances: string[], synergyIds: SynergyId[], doses: Record<string, number>, state: CalculatorState): ScheduleItem[] {
+export function generateSchedule(
+  substances: string[],
+  synergyIds: SynergyId[],
+  doses: Record<string, number>,
+  state: CalculatorState,
+  /** Дозы плана в натуральной единице — приоритетнее локального `defs`. */
+  planDoses?: Record<string, number>,
+): ScheduleItem[] {
   const schedule: ScheduleItem[] = [];
   const used = new Set<string>();
   const morningGroup = ['vitamin_c','vitamin_d3','vitamin_e','coq10','alpha_lipoic','selenium','boron','zinc','telmisartan','nebivolol','ashwagandha','calcium','vitamin_k2','probiotics','anastrozole','cabergoline','hcg','curcumin','dhea','pregnenolone','collagen','l_citrulline','DIM','saw_palmetto','tyrosine','tadalafil','pycnogenol','astaxanthin','agmatine','chromium','serrapeptase','garlic','dandelion'];
@@ -761,6 +830,12 @@ export function generateSchedule(substances: string[], synergyIds: SynergyId[], 
       // из-за которых селен в мкг подписывался как «мг» (1000× ошибка).
       return formatDose(id, doses[id]);
     }
+    const planDose = planDoses?.[id];
+    if (planDose !== undefined && planDose > 0) {
+      // Доза карточки плана (натуральная единица) — расписание не должно
+      // расходиться с ней («100 мг» в списке приёма против «200 мг» в карточке).
+      return formatDefaultDose(id, planDose);
+    }
     const defs: Record<string, string> = {
       nac:'1200 мг', alpha_lipoic:'300 мг', tudca:'500 мг', milk_thistle:'280 мг',
       omega3:'2000 мг', coq10:'100 мг', magnesium:'200 мг', telmisartan:'40 мг',
@@ -770,7 +845,7 @@ export function generateSchedule(substances: string[], synergyIds: SynergyId[], 
       tyrosine:'500 мг', l_dopa:'250 мг', vitamin_b6:'25 мг',
       glycine:'2000 мг', theanine:'100 мг', gaba:'500 мг',
       x5htp:'50 мг', vitamin_c:'500 мг', zinc:'15 мг', vitamin_d3:'2000 МЕ',
-      probiotics:'1 капс', vitamin_e:'100 мг', glutathione:'100 мг',
+      probiotics:'1 капс', vitamin_e:'200 мг', glutathione:'100 мг',
       betaine:'1000 мг', folate:'200 мкг', vitamin_b12:'500 мкг',
       calcium:'250 мг', boron:'2 мг', vitamin_k2:'100 мкг',
       ashwagandha:'300 мг', selenium:'50 мкг', artichoke:'250 мг',

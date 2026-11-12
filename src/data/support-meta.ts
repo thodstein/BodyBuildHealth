@@ -3021,7 +3021,7 @@ export const SUBSTANCE_ANALOGS: Record<string, { id: string; name: string; reaso
 // Substance enhancers: what boosts each substance
 export const SUBSTANCE_ENHANCERS: Record<string, { id: string; name: string; reason: string; form?: string; mg?: number; timing?: string }[]> = {
   nac: [{ id: 'vitamin_c', name: 'Витамин C', reason: 'Регенерация глутатиона', form: 'порошок', mg: 1000, timing: 'натощак' }, { id: 'alpha_lipoic', name: 'АЛЬК', reason: 'Усиление антиоксидантной сети', form: 'R-форма', mg: 300, timing: 'натощак' }, { id: 'selenium', name: 'Селен', reason: 'Глутатионпероксидаза', form: 'метионин', mg: 200, timing: 'с едой (мкг)' }],
-  omega3: [{ id: 'vitamin_e', name: 'Витамин E', reason: 'Защита от окисления EPA/DHA', form: 'd-альфа-токоферол', mg: 400, timing: 'с едой (МЕ)' }],
+  omega3: [{ id: 'vitamin_e', name: 'Витамин E', reason: 'Защита от окисления EPA/DHA', form: 'd-альфа-токоферол', mg: 200, timing: 'с едой (мг α-токоферола)' }],
   tudca: [{ id: 'milk_thistle', name: 'Силимарин', reason: 'Синергия гепатопротекции', form: 'капсулы', mg: 600, timing: 'с едой, 2x/д' }, { id: 'phosphatidylcholine', name: 'Фосфатидилхолин', reason: 'Мембраны гепатоцитов', form: 'капсулы', mg: 1200, timing: 'с едой' }],
   magnesium: [{ id: 'vitamin_b6', name: 'Витамин B6', reason: 'Улучшение усвоения Mg', form: 'пиридоксин', mg: 50, timing: 'с едой' }, { id: 'taurine', name: 'Таурин', reason: 'Синергия расслабления', form: 'порошок', mg: 2000, timing: 'натощак' }],
   coq10: [{ id: 'selenium', name: 'Селен', reason: 'Защита митохондрий', form: 'метионин', mg: 200, timing: 'с едой (мкг)' }, { id: 'alpha_lipoic', name: 'АЛЬК', reason: 'Регенерация CoQ10', form: 'R-форма', mg: 300, timing: 'натощак' }],
@@ -3112,7 +3112,7 @@ export const DEFAULT_DOSAGES: Record<string, SubstanceDosage> = {
   ashwagandha: { mg: 600, timing: 'вечер' }, vitamin_b12: { mg: 1000, timing: 'утро (мкг)' },
   folate: { mg: 800, timing: 'с едой (мкг)' }, taurine: { mg: 2000, timing: 'натощак' },
   hcg: { mg: 500, timing: '2x/нед, схема 3/1 (МЕ)' }, l_carnitine: { mg: 2000, timing: 'натощак' },
-  vitamin_e: { mg: 400, timing: 'с едой (МЕ)' }, selenium: { mg: 200, timing: 'с едой (мкг)' },
+  vitamin_e: { mg: 200, timing: 'с едой (мг α-токоферола)' }, selenium: { mg: 200, timing: 'с едой (мкг)' },
   vitamin_c: { mg: 1000, timing: 'натощак' }, probiotics: { mg: 20, timing: 'натощак (млрд КОЕ)' },
   coq10: { mg: 200, timing: 'с едой' }, prebiotics: { mg: 5000, timing: 'с едой (мг)' },
   alpha_lipoic: { mg: 600, timing: 'натощак (R-форма)' },

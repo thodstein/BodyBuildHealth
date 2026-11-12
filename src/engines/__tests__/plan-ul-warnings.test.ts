@@ -60,7 +60,20 @@ describe('PlanResult.ulWarnings — та же цифра, что в движке
   });
 
   it('при весе 300 кг превышение реально есть (иначе тест ничего не проверяет)', () => {
+    // После прохода 13 дозы Mg/Zn в плане ограничены UL, но B6 25 мг при
+    // EFSA UL 12 мг остаётся реальным превышением — на нём и проверяем контур.
     expect((plan.ulWarnings || []).length).toBeGreaterThan(0);
+    const b6 = (plan.ulWarnings || []).find(w => w.substanceId === 'vitamin_b6');
+    expect(b6).toBeDefined();
+    expect(b6!.ulMg).toBe(12);
+  });
+
+  it('магний/цинк при 300 кг не превышают UL (вес-доза ограничена пределом)', () => {
+    for (const id of ['magnesium', 'zinc']) {
+      expect((plan.ulWarnings || []).find(w => w.substanceId === id), id).toBeUndefined();
+    }
+    const mg = plan.substances.find(s => s.id === 'magnesium');
+    expect(mg?.doseMg).toBeLessThanOrEqual(350);
   });
 
   it('применённая доза не выше UL и ниже расчётной', () => {
@@ -74,11 +87,9 @@ describe('PlanResult.ulWarnings — та же цифра, что в движке
   });
 
   it('предупреждения подписаны единицей вещества, а не «мг» для всех', () => {
-    const d3 = (plan.ulWarnings || []).find(w => w.substanceId === 'vitamin_d3');
-    if (d3) {
-      // UL витамина D — 100 мкг = 4000 МЕ (единая шкала движка).
-      expect(d3.ulMg).toBe(100);
-    }
+    // D3 2000 МЕ (50 мкг) — в пределах UL 4000 МЕ. Если пересчёт МЕ→мкг
+    // сломать, здесь появится ложное «2000% UL» — тест это поймает.
+    expect((plan.ulWarnings || []).find(w => w.substanceId === 'vitamin_d3')).toBeUndefined();
     for (const w of plan.ulWarnings || []) {
       expect(typeof w.risk).toBe('string');
       expect(w.recommendation).toContain('UL');

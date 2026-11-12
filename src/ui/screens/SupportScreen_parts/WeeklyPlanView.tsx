@@ -166,18 +166,23 @@ export const WeeklyPlanView: React.FC<WeeklyPlanViewProps> = ({ planResult, cour
             const name = planResult.substances.find(s => s.id === w.substanceId)?.name
               || SUB_NAMES[w.substanceId] || w.substanceId;
             const applied = w.appliedDoseMg && w.appliedDoseMg > 0 ? w.appliedDoseMg : null;
+            // SafeLevel (железо) — не UL: подписывать его «UL» значит пугать
+            // порогом токсичности, которого регулятор не устанавливал.
+            const limitLabel = w.limitKind === 'SafeLevel' ? 'safe level' : 'UL';
             return (
               <div key={`${w.substanceId}-${i}`} style={{ fontSize: 6.5, color: 'rgba(255,255,255,0.72)', lineHeight: 1.45 }}>
                 <span style={{ color: '#fbbf24', fontWeight: 700 }}>{name}</span>: расчёт {formatDose(w.substanceId, w.currentDoseMg)}
                 {applied !== null && applied < w.currentDoseMg
                   ? <> → ограничено до <span style={{ color: '#fbbf24', fontWeight: 700 }}>{formatDose(w.substanceId, applied)}</span></>
                   : null}
-                {' '}· UL {formatDose(w.substanceId, w.ulMg)} ({w.percentUL}% от UL){w.risk ? ` — ${w.risk}` : ''}
+                {' '}· {limitLabel} {formatDose(w.substanceId, w.ulMg)} ({w.percentUL}% от {limitLabel}){w.risk ? ` — ${w.risk}` : ''}
               </div>
             );
           })}
           <div style={{ fontSize: 6, color: 'rgba(255,255,255,0.38)', marginTop: 2 }}>
-            Дозы нормализованы по весу; после превышения UL доза капается до предела.
+            Проверены дозы, которые план реально назначает. Вещества, которые титруются движком
+            (магний, цинк, D3, селен, витамин C), капаются до предела; для остальных превышение
+            показывается как предупреждение — дозу в плане не меняем.
           </div>
         </div>
       )}

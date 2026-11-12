@@ -6,7 +6,7 @@ import {
 import {
   getBlacklist, canonId, sameClassIds, calcAllRisks, buildTzInput, tzToScores,
   synergyScoreWithPlan, conflictScoreWithPlan, applyTitration, calcLabDeltas,
-  generateSchedule, checkDepletionCascade, checkUpperLimits, aggregateDailyLoad,
+  generateSchedule, checkDepletionCascade, checkPlanUpperLimits, aggregateDailyLoad,
   toSystemRisksFromTz, toSystemRisks, getContraindicationAlerts,
   generateSynergyRecommendations,
   SYS_META, TZ_AUTO_BLACKLIST,
@@ -20,6 +20,7 @@ import { getSupportMechIndex } from '../../data/support-db/mech-map';
 import { getPrioritySubstances, getSubstancePriority, type SeverityLevel } from '../../data/lab-priority-map';
 import { checkContraindications } from '../../data/substance-contraindications';
 import { checkInteractions } from '../../data/drug-interactions';
+import { resolvePlanDose } from './substances';
 import { resolvePlan } from '../tz-mapper-engine';
 import type { SupportLevel } from '../tz-bridge-mechanism';
 import { buildMapperCtx } from './mapper-ctx';
@@ -587,11 +588,27 @@ export function calculateSupportTZ(state: CalculatorState): CalculatorResult {
     // ── 7. Финальный расчёт риска С поддержкой (включая ВСЕ вещества) ──
     const rawDoses: Record<string, number> = {};
     const titration = applyTitration(substances, state, rawDoses);
+    // Дозы плана считаем ДО расписания: все читатели (расписание, UL-контур)
+    // должны видеть одну и ту же дозу, иначе карточка плана говорит «200 мг»,
+    // а строка приёма — «100 мг» (или «по инструкции»).
+    const planDoses: Record<string, number> = {};
+    {
+      const weight = state.profile?.weight || 80;
+      for (const id of substances) {
+        if (planDoses[id] !== undefined) continue;
+        const dose = resolvePlanDose(id, weight);
+        if (dose > 0) planDoses[id] = dose;
+      }
+    }
     const labDeltas = calcLabDeltas(state);
-    const schedule = generateSchedule(substances, synergyIds, titration, state);
+    const schedule = generateSchedule(substances, synergyIds, titration, state, planDoses);
 
     const depletionWarnings = checkDepletionCascade(substances, titration);
-    const ulWarnings = checkUpperLimits(substances, titration, rawDoses);
+    // UL — по ФАКТИЧЕСКИМ дозам плана, а не только по карте титрации.
+    // В титрации есть Mg/Zn/D3/Se/VitC/NAC/…, но нет B6, витамина A, K2,
+    // фолата, бора, меди, железа: их превышения раньше не проверялись вовсе,
+    // хотя блок плана назывался «UL по фактическим дозам».
+    const ulWarnings = checkPlanUpperLimits(substances, planDoses, titration);
     const dailyLoad = aggregateDailyLoad(substances, titration);
 
     let overallRaw: number;

@@ -15,6 +15,10 @@
  *  - `DEFAULT_DOSAGES` (support-meta) хранит значения в НАТУРАЛЬНОЙ единице:
  *    selenium 200 = 200 мкг, vitamin_d3 2000 = 2000 МЕ, probiotics 20 = 20 млрд КОЕ.
  *    Для них — `formatDefaultDose`.
+ *  - Витамины A и E ведутся в единицах РЕЕСТРА пределов (A — мкг RAE, E — мг
+ *    α-токоферола), а не в МЕ. Раньше оба были в `IU_IDS`, поэтому каталог
+ *    (мг) подписывался как «1 МЕ» витамина A (в 3300 раз меньше реального) и
+ *    «200 МЕ» витамина E. МЕ пользователю показываем в тексте формы.
  *  - `SUPPORT_CATALOG_DATA[id].dosage.mg` хранит МИЛЛИГРАММЫ (selenium 0.2 мг,
  *    vitamin_d3 0.05 мг), кроме hcg/пробиотиков, где значение уже в МЕ/млрд КОЕ.
  *    Для них — `formatDoseFromMg`.
@@ -28,6 +32,8 @@ export type DoseUnit = 'мг' | 'мкг' | 'МЕ' | 'Ед' | 'млрд КОЕ';
 const MCG_IDS = new Set<string>([
   'selenium', 'selenium_yeast', 'folate', 'methylfolate', 'vitamin_b12', 'methylcobalamin',
   'vitamin_k2', 'biotin', 'iodine', 'molybdenum', 'chromium', 'vitamin_d3', 'vitamin_d',
+  // Витамин A — преформированный ретинол; единица реестра UL — мкг RAE.
+  'vitamin_a',
   'bpc157', 'tb500', 'ghk_cu', 'melanotan2', 'semax', 'selank',
   // PED в мкг
   'clenbuterol', 't3', 't4', 'igf1_lr3', 'igf1_des', 'mgf', 'peg_mgf',
@@ -35,7 +41,7 @@ const MCG_IDS = new Set<string>([
 
 /** Вещества, чья внутренняя доза хранится в международных единицах (МЕ/IU). */
 const IU_IDS = new Set<string>([
-  'hcg', 'vitamin_a', 'vitamin_e', 'vitamin_d', 'hgh',
+  'hcg', 'vitamin_d', 'hgh',
 ]);
 
 /** Инсулины — в «ед» (units). */
@@ -47,7 +53,17 @@ const UNIT_IDS = new Set<string>([
 const CFU_IDS = new Set<string>(['probiotics']);
 
 /** Сколько мкг в 1 МЕ витамина D (1 мкг = 40 МЕ). */
-const IU_PER_MCG_VITAMIN_D = 40;
+export const IU_PER_MCG_VITAMIN_D = 40;
+
+/**
+ * Плановая доза витамина D хранится в МЕ (`DEFAULT_DOSAGES`), а реестр
+ * пределов (`NUTRIENT_UL`) — в мкг. Один пересчёт, чтобы UL-контур не
+ * сравнивал 2000 МЕ с порогом 100 «мкг».
+ */
+export function vitaminDMcgFromIu(iu: number): number {
+  if (!Number.isFinite(iu) || iu <= 0) return 0;
+  return round2(iu / IU_PER_MCG_VITAMIN_D);
+}
 
 /**
  * Единица отображения для вещества.
@@ -148,8 +164,9 @@ export function toMgEquivalent(id: string, value: number): number | undefined {
 const DEFAULT_UNIT: Record<string, DoseUnit> = {
   vitamin_d3: 'МЕ',
   vitamin_d: 'МЕ',
-  vitamin_e: 'МЕ',
-  vitamin_a: 'МЕ',
+  // A/E — единицы реестра пределов (мкг RAE / мг α-токоферола), см. шапку файла.
+  vitamin_a: 'мкг',
+  vitamin_e: 'мг',
   selenium: 'мкг',
   folate: 'мкг',
   vitamin_b12: 'мкг',

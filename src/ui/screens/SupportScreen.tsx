@@ -2682,11 +2682,14 @@ const renderCatalogDetailInner = (subId: string): React.ReactNode => {
       riskNotes.push(`ℹ Оценочное покрытие (q=C, механизмы выведены из каталога): ${planResult.derivedSupport.join(', ')}`);
     }
     if (planResult.ulWarnings && planResult.ulWarnings.length > 0) {
-      riskNotes.push(`⚠ UL по фактическим дозам плана: ${planResult.ulWarnings.map(w => {
+      // SafeLevel (железо) — не UL: не называем предел тем, чем он не является.
+      const hasSafeLevel = planResult.ulWarnings.some(w => w.limitKind === 'SafeLevel');
+      riskNotes.push(`${hasSafeLevel ? '⚠ Пределы доз' : '⚠ UL'} по фактическим дозам плана: ${planResult.ulWarnings.map(w => {
         const applied = w.appliedDoseMg && w.appliedDoseMg > 0 && w.appliedDoseMg < w.currentDoseMg
           ? ` → ${formatDose(w.substanceId, w.appliedDoseMg)}`
           : '';
-        return `${w.substanceId} ${formatDose(w.substanceId, w.currentDoseMg)}${applied} (UL ${formatDose(w.substanceId, w.ulMg)}, ${w.percentUL}%)`;
+        const label = w.limitKind === 'SafeLevel' ? 'safe level' : 'UL';
+        return `${w.substanceId} ${formatDose(w.substanceId, w.currentDoseMg)}${applied} (${label} ${formatDose(w.substanceId, w.ulMg)}, ${w.percentUL}%)`;
       }).join('; ')}`);
     }
     return `ПЛАН ПОДДЕРЖКИ (${SUPPORT_LEVELS[supportLevel]?.label || supportLevel})
